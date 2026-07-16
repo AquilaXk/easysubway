@@ -67,6 +67,9 @@ if (!Array.isArray(rcEvidenceContract.requiredDatapackGates)) {
 if (!Array.isArray(rcEvidenceContract.requiredGateStatuses)) {
   fail("RC evidence manifest contract with requiredGateStatuses is required");
 }
+if (!rcEvidenceContract.requiredGateChecks || typeof rcEvidenceContract.requiredGateChecks !== "object") {
+  fail("RC evidence manifest contract with requiredGateChecks is required");
+}
 if (!Array.isArray(rcEvidenceContract.consumerIssues)) {
   fail("RC evidence manifest contract with consumerIssues is required");
 }
@@ -106,6 +109,7 @@ const identity = {
 
 const gateEntries = requiredGateEntries(
   rcEvidenceContract.requiredGateStatuses,
+  rcEvidenceContract.requiredGateChecks,
   providedGateStatuses,
   gateEvidencePaths,
   identity,
@@ -390,7 +394,13 @@ function sameRcIdentity(evidenceIdentity, currentIdentity) {
     && expectedKeys.every((key, index) => key === actualKeys[index] && evidenceIdentity[key] === currentIdentity[key]);
 }
 
-function requiredGateEntries(requiredIds, provided, paths, identity, generatedAt, validationContext) {
+function requiredGateEntries(requiredIds, requiredChecksById, provided, paths, identity, generatedAt, validationContext) {
+  if (
+    Object.keys(requiredChecksById).sort().join(",") !== [...requiredIds].sort().join(",")
+    || requiredIds.some((id) => !Array.isArray(requiredChecksById[id]) || requiredChecksById[id].length === 0)
+  ) {
+    fail("requiredGateChecks must exactly cover requiredGateStatuses");
+  }
   const duplicateId = requiredIds.find((id, index) => requiredIds.indexOf(id) !== index);
   if (duplicateId) fail(`Duplicate required gate status in contract: ${duplicateId}`);
   const knownIds = new Set(requiredIds);
@@ -436,6 +446,10 @@ function requiredGateEntries(requiredIds, provided, paths, identity, generatedAt
         generatedAt,
         validationContext,
       );
+    } else {
+      requireResultSchema(evidence.result, id);
+      requirePassingChecks(id, evidence.result.checks, requiredChecksById[id]);
+      normalizeEvidenceReferences(id, evidence.result.evidenceReferences);
     }
     const evaluatedAt = evidence.evidenceValidity?.evaluatedAt ?? evidence.evidenceValidity?.testedAt;
     const expiresAt = evidence.evidenceValidity?.expiresAt ?? evidence.evidenceValidity?.expiresWhen;

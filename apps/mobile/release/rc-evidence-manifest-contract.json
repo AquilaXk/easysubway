@@ -147,6 +147,21 @@
     "stagedRollout",
     "publicClaims"
   ],
+  "requiredGateChecks": {
+    "androidRcEvidence": ["exactRcIdentityVerified", "deviceQaPassed"],
+    "productionDatapack": ["productionArtifactValidated", "scopeValidated"],
+    "playGeneratedApkDeviceMatrix": ["playArtifactVerified", "deviceMatrixPassed"],
+    "backendOperations": ["backendArtifactVerified", "operationsChecksPassed"],
+    "androidReleaseQuality": ["qualitySuitePassed", "recoveryPassed"],
+    "abusePenetrationRehearsal": ["canonicalSummaryValidated"],
+    "postLaunchOperations": ["canonicalSummaryValidated"],
+    "scopeCoverage": ["coverageDenominatorPassed", "unsupportedScopeBlocked"],
+    "strictArtifactValidation": ["hashSignatureSchemaPassed", "sqliteIntegrityPassed"],
+    "routeAccessibilityQuality": ["routeSafetyPassed", "accessibilityCoveragePassed"],
+    "appSchemaCompatibility": ["appCompatibilityPassed", "schemaCompatibilityPassed"],
+    "stagedRollout": ["rolloutGuardConnected", "rollbackReady"],
+    "publicClaims": ["claimsWithinVerifiedScope", "storeCopyValidated"]
+  },
   "readinessPolicy": {
     "openAndroidP0BlocksGo": true,
     "nonSatisfiedGateBlocksGo": true,

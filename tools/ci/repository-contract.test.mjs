@@ -4938,6 +4938,11 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
       reasonCodes: [],
       rcIdentity: evidenceRcIdentity,
       evidenceValidity: { evaluatedAt: now, expiresAt: "2026-07-30T00:00:00.000Z" },
+      result: {
+        schemaVersion: 1,
+        checks: Object.fromEntries(contract.requiredGateChecks[gateId].map((check) => [check, true])),
+        evidenceReferences: [evidenceReference(`${gateId}-report`, "2")],
+      },
     }, null, 2)}\n`);
     args.push("--gate-status", `${gateId}=SATISFIED`, "--gate-evidence", `${gateId}=${evidencePath}`);
   }
@@ -5263,6 +5268,14 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
     reasonCodes: [],
     rcIdentity: blockedManifest.rcIdentity,
     evidenceValidity: { evaluatedAt: now, expiresAt: "2026-07-30T00:00:00.000Z" },
+    result: {
+      schemaVersion: 1,
+      checks: {
+        coverageDenominatorPassed: true,
+        unsupportedScopeBlocked: true,
+      },
+      evidenceReferences: [{ artifactId: "scope-coverage-report", sha256: "2".repeat(64) }],
+    },
   }));
   await execFileAsync(process.execPath, [
     ...baseArgs,
