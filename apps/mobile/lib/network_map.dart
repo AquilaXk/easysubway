@@ -15,6 +15,7 @@ import 'facility_report.dart';
 import 'features/ads/ad_repository.dart';
 import 'features/network_map/domain/map_camera.dart';
 import 'features/network_map/domain/route_map_major_stations.dart';
+import 'features/network_map/domain/route_map_owner_labels.dart';
 import 'features/network_map/domain/structured_route_map.dart';
 import 'features/network_map/presentation/station_fan_menu.dart';
 import 'features/network_map/presentation/station_fan_menu_geometry.dart'
@@ -3655,6 +3656,25 @@ void resetNetworkMapAttributionCacheForTest() {
   _sharedAttributionTextByRegionFuture = null;
 }
 
+// basemap 6차(#2068) 오너 라벨 sidecar — 5권역 결합 단일 JSON이라 attribution과
+// 같은 모듈 캐시 관례로 1회만 로드해 공유한다(region 전환마다 다시 읽지 않음).
+// 로드 실패 시 캐시를 비워 다음 마운트에서 재시도하고, 그때까지 basemap 라벨은
+// 4차 자동 솔버로 전부 폴백한다(fail-safe, 크래시 금지).
+Future<Map<String, Map<String, RouteMapOwnerLabelEntry>>>?
+_sharedOwnerLabelsByRegionFuture;
+
+Future<Map<String, Map<String, RouteMapOwnerLabelEntry>>>
+_loadNetworkMapOwnerLabelsByRegion() {
+  return _sharedOwnerLabelsByRegionFuture ??= rootBundle
+      .loadString(kRouteMapOwnerLabelsAssetPath)
+      .then(routeMapOwnerLabelsByRegionFrom);
+}
+
+@visibleForTesting
+void resetNetworkMapOwnerLabelsCacheForTest() {
+  _sharedOwnerLabelsByRegionFuture = null;
+}
+
 class _NetworkMapCanvas extends StatefulWidget {
   const _NetworkMapCanvas({
     required this.data,
@@ -3771,11 +3791,16 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   StructuredRouteMap? _structuredMap;
   Map<String, Color>? _structuredLineColors;
   Map<String, String>? _structuredLabelTextByStationId;
+  // basemap 6차(#2068): stationId → 축약 전 원본 nameKo(오너 라벨 sidecar 매칭 키).
+  Map<String, String>? _structuredStationNameByStationId;
   Map<String, String>? _structuredLineBadgeLabelByLineId;
   NetworkMapStation? _selectedStation;
   // region → attribution 표시 문자열(#1951). manifest 로드 전에는 null로 두고
   // attribution을 표시하지 않는다(로드 실패 시에도 동일하게 조용히 미표기).
   Map<String, String>? _attributionTextByRegion;
+  // basemap 6차(#2068): asset id(seoul/busan/...) → station명 → 오너 라벨 앵커.
+  // 로드 전·실패 시 null → basemap 라벨은 4차 자동 솔버로 전부 폴백(fail-safe).
+  Map<String, Map<String, RouteMapOwnerLabelEntry>>? _ownerLabelsByRegion;
   // onTapUp 경로에서만 쓰는 stationLinesById를 매 build(팬 프레임)마다 재계산하지 않도록
   // region·stations identity로 캐시한다(#1973). 800역/24노선 재계산이 build 스파이크 원인.
   Map<String, List<NetworkMapLine>>? _stationLinesByIdCache;
@@ -3792,6 +3817,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
       SchedulerBinding.instance.addTimingsCallback(_logRouteMapFrameTimings);
     }
     _loadAttributionText();
+    _loadOwnerLabels();
   }
 
   Future<void> _loadAttributionText() async {
@@ -3811,6 +3837,25 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
         error,
         stackTrace,
         context: '지도 datapack manifest에서 attribution 정보를 불러오는 중 예외가 발생했습니다.',
+      );
+    }
+  }
+
+  Future<void> _loadOwnerLabels() async {
+    try {
+      final byRegion = await _loadNetworkMapOwnerLabelsByRegion();
+      if (!mounted) {
+        return;
+      }
+      setState(() => _ownerLabelsByRegion = byRegion);
+    } catch (error, stackTrace) {
+      // #2068 6차: 로드/파싱 실패는 basemap 라벨의 4차 자동 솔버 폴백으로
+      // 안전 처리한다(크래시 금지). 재시도를 위해 캐시를 비운다.
+      _sharedOwnerLabelsByRegionFuture = null;
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '노선도 오너 라벨 sidecar를 불러오는 중 예외가 발생했습니다.',
       );
     }
   }
@@ -4386,6 +4431,14 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
         sourceOrigin: sourceOrigin,
       );
     }
+    // basemap 6차(#2068): asset id(예: '수도권'→'seoul')로 오너 라벨 sidecar를
+    // 조회한다. 매핑에 없는 region·로드 전이면 빈 맵 → 4차 자동 솔버 폴백.
+    final basemapAssetId =
+        kRouteMapBasemapRegionToId[widget.data.selectedRegion];
+    final ownerLabelsByStationName = basemapAssetId == null
+        ? const <String, RouteMapOwnerLabelEntry>{}
+        : _ownerLabelsByRegion?[basemapAssetId] ??
+              const <String, RouteMapOwnerLabelEntry>{};
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -4404,6 +4457,8 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
           drawLines: false,
           drawStationSymbols: false,
           sourceOrigin: sourceOrigin,
+          ownerLabelsByStationName: ownerLabelsByStationName,
+          stationNameByStationId: _structuredStationNameByStationId!,
         ),
       ],
     );
@@ -4419,6 +4474,11 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
       _structuredLabelTextByStationId = {
         for (final station in widget.data.stations)
           station.id: routeMapStationLabel(station.nameKo),
+      };
+      // basemap 6차(#2068): 오너 라벨 sidecar 매칭은 축약 전 원본 nameKo
+      // 기준이라 위 축약 맵과 별도로 둔다.
+      _structuredStationNameByStationId = {
+        for (final station in widget.data.stations) station.id: station.nameKo,
       };
       _structuredLineBadgeLabelByLineId = {
         for (final line in widget.data.lines)

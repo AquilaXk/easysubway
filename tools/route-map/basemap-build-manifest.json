@@ -8,8 +8,12 @@
   "content": {
     "svgLayer": "route-lines-and-station-symbols",
     "stationSymbols": "owner-svg",
-    "labels": "structured-data",
+    "labels": "owner-svg-anchor-with-solver-fallback",
     "interaction": "route_map_positions"
+  },
+  "ownerLabelsSidecar": {
+    "path": "apps/mobile/assets/datapacks/metro_map_pack/basemap/labels.json",
+    "sha256": "ca4413690e98bb4cbf8294473dc994a1d66914336c7b71c8d88a8bcd87b93b82"
   },
   "maps": [
     {
@@ -24,7 +28,8 @@
         0,
         2400,
         1800
-      ]
+      ],
+      "ownerLabelCount": 655
     },
     {
       "id": "busan",
@@ -38,7 +43,8 @@
         0,
         4000,
         2700
-      ]
+      ],
+      "ownerLabelCount": 146
     },
     {
       "id": "daegu",
@@ -52,7 +58,8 @@
         0,
         2400,
         1800
-      ]
+      ],
+      "ownerLabelCount": 97
     },
     {
       "id": "daejeon",
@@ -66,7 +73,8 @@
         0,
         2400,
         1800
-      ]
+      ],
+      "ownerLabelCount": 25
     },
     {
       "id": "gwangju",
@@ -80,7 +88,8 @@
         0,
         2400,
         1800
-      ]
+      ],
+      "ownerLabelCount": 62
     }
   ]
 }

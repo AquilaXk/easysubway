@@ -2,6 +2,8 @@ import 'dart:math' as math;
 import 'dart:ui' show Color, Offset, Rect, Size;
 
 import '../domain/route_map_design_space.dart';
+import '../domain/route_map_owner_labels.dart';
+import '../domain/route_map_parallel_offsets.dart';
 import '../domain/structured_route_map.dart';
 import 'route_map_label_placement.dart';
 import 'route_map_transfer_marker.dart';
@@ -90,6 +92,141 @@ class _Candidate {
   final String? badgeLineId; // null이면 역 라벨.
 }
 
+/// basemap 캡슐 반폭(design px) — SVG 캡슐 장축이 멤버(배지) 수에 비례해 는다.
+/// route_map_positions의 환승 멤버 좌표 수렴 파이프라인 때문에 member bbox가
+/// 실제 SVG 캡슐 장축을 반영하지 못해(예: 종로3가 3-노선 환승이 스프레드
+/// 14.4로 눌림) 고정 반폭만으로는 과소평가한다 — 멤버 수 기반 하한을 둔다.
+/// 방향 정보가 없어 균등 inflate(과대는 라벨이 조금 더 밀릴 뿐 안전 방향).
+double _basemapCapsuleHalfWidthFor(int memberCount) => math.max(
+  kRouteMapBasemapTransferCapsuleHalfWidthPx,
+  (memberCount - 1) * kRouteMapBasemapTransferSlotHalfWidthPx +
+      kRouteMapBasemapTransferCapsuleBaseHalfWidthPx,
+);
+
+/// 오너 SVG 앵커 [anchorDesign](design px)에 [anchor] 의미(start=좌측·middle=
+/// 수평중앙·end=우측, 전부 baseline)대로 앱 실측 [size] 텍스트를 배치한다
+/// (#2068 6차). baseline 근사: SVG는 y가 baseline이므로
+/// `rect.top = anchorY − 0.8×appFontPx` — 앱 폰트([appFontPx], design px)가
+/// 오너 SVG font-size(design 환산 ≈16.5~17.8px)보다 작아 오너가 비워둔
+/// 영역 안에 들어간다.
+Rect _ownerLabelRect(
+  Offset anchorDesign,
+  Size size,
+  RouteMapOwnerLabelAnchor anchor,
+  double appFontPx,
+) {
+  final top = anchorDesign.dy - 0.8 * appFontPx;
+  switch (anchor) {
+    case RouteMapOwnerLabelAnchor.middle:
+      return Rect.fromLTWH(
+        anchorDesign.dx - size.width / 2,
+        top,
+        size.width,
+        size.height,
+      );
+    case RouteMapOwnerLabelAnchor.end:
+      return Rect.fromLTWH(
+        anchorDesign.dx - size.width,
+        top,
+        size.width,
+        size.height,
+      );
+    case RouteMapOwnerLabelAnchor.start:
+      return Rect.fromLTWH(anchorDesign.dx, top, size.width, size.height);
+  }
+}
+
+/// 오너 라벨 매칭 위치 게이트(design px, #2068 7차) — 동명이역(신촌·양평 등)이
+/// 같은 sidecar 앵커를 두고 경쟁할 때, station.position(또는 환승 centroid)이
+/// 오너 앵커에서 이 거리보다 멀면 애초에 후보에서 제외해 기존 솔버로 폴백시킨다.
+///
+/// 실측 근거(수도권 실데이터, 2026-07-16 — 동명이역 2건을 정상 매치 후보에서
+/// 제외하고 나머지 648개 매치의 station↔오너 앵커 거리):
+/// min=2.3, p50=27.1, p90=52.4, p95=67.9, p99=96.0, **실측 최댓값=122.7**
+/// (정왕 환승 그룹 — 라벨이 station point에서 멀리 떨어진 정당한 배치).
+/// 122.7 × 1.5(여유) ≈ 184.1 → 185.0으로 올림. 이 값은 정상 매치(정왕 등)를
+/// 전부 통과시키면서, 양평의 오배치(경의중앙선 양평역, 거리 1880.9 — 실제로는
+/// 수인분당선 양평역의 라벨을 공유해 발생)는 배제한다. 신촌(거리 107.2 —
+/// 정상 매치 최댓값 122.7보다 작아 이 게이트만으로는 못 거름)은 아래
+/// [_resolveOwnerLabelsByCandidateKey]의 "이름별 최근접 1개만 채택" 규칙이
+/// 별도로 해소한다(거리 게이트와 최근접 우선은 서로 다른 안전장치).
+const double kRouteMapOwnerLabelMaxAnchorDistancePx = 185.0;
+
+/// SVG·DB 표기 차 정규화(#2068 7차 지시 2) — 중점(·)을 마침표(.)로 통일해
+/// "4·19민주묘지"/DB "4.19민주묘지", "전대·에버랜드"/DB "전대.에버랜드" 2건을
+/// 회수한다. **다른 정규화는 과매칭 위험이 있어 추가하지 않는다**(공백·괄호·
+/// "역" 접미 등은 그대로 둔다 — 시청·용인대·총신대입구(이수)·하남검단산 등은
+/// 여전히 미매치로 남아 솔버 폴백).
+String _normalizeOwnerLabelNameKey(String name) => name.replaceAll('·', '.');
+
+/// basemap 모드에서 candidate id(`transfer:<stationId>` 또는
+/// `<stationId>:<lineId>`) → 채택된 오너 라벨을 사전 해소한다(#2068 7차).
+/// 1) 이름 정규화(중점/마침표) 후 station 원본명으로 오너 라벨을 찾는다.
+/// 2) 같은 정규화 이름을 가진 후보(동명이역)가 여럿이면, 오너 앵커에서 가장
+///    가까운 후보 1개만 채택한다 — 나머지는 결과 맵에 없어(null) 기존 솔버로
+///    폴백한다(신촌·양평 케이스 해소).
+/// 3) 채택된 후보도 [kRouteMapOwnerLabelMaxAnchorDistancePx] 위치 게이트를
+///    통과해야 한다(양평의 원거리 오배치 등 병리적 케이스 방어).
+Map<String, RouteMapOwnerLabelEntry> _resolveOwnerLabelsByCandidateKey({
+  required StructuredRouteMap map,
+  required RouteMapDesignSpace design,
+  required Map<String, RouteMapOwnerLabelEntry> ownerLabelsByStationName,
+  required Map<String, String> stationNameByStationId,
+}) {
+  if (ownerLabelsByStationName.isEmpty || stationNameByStationId.isEmpty) {
+    return const {};
+  }
+  final normalizedOwnerLabels = <String, RouteMapOwnerLabelEntry>{};
+  for (final entry in ownerLabelsByStationName.entries) {
+    normalizedOwnerLabels[_normalizeOwnerLabelNameKey(entry.key)] = entry.value;
+  }
+  // 정규화 이름 → 후보(candidateKey, design 좌표) 목록.
+  final candidatesByName = <String, List<(String key, Offset anchor)>>{};
+  for (final group in map.transferGroups) {
+    final rawName = stationNameByStationId[group.stationId];
+    if (rawName == null) continue;
+    candidatesByName
+        .putIfAbsent(_normalizeOwnerLabelNameKey(rawName), () => [])
+        .add(('transfer:${group.stationId}', design.toDesign(group.centroid)));
+  }
+  for (final station in map.stations) {
+    if (station.labelClass == RouteMapLabelClass.transfer) continue;
+    final rawName = stationNameByStationId[station.stationId];
+    if (rawName == null) continue;
+    candidatesByName
+        .putIfAbsent(_normalizeOwnerLabelNameKey(rawName), () => [])
+        .add((
+          '${station.stationId}:${station.lineId}',
+          design.toDesign(station.position),
+        ));
+  }
+
+  final resolved = <String, RouteMapOwnerLabelEntry>{};
+  for (final labelEntry in normalizedOwnerLabels.entries) {
+    final candidates = candidatesByName[labelEntry.key];
+    if (candidates == null || candidates.isEmpty) {
+      continue;
+    }
+    final anchorDesign = design.toDesign(labelEntry.value.position);
+    String? bestKey;
+    var bestDistance = double.infinity;
+    for (final (key, stationAnchor) in candidates) {
+      final distance = (stationAnchor - anchorDesign).distance;
+      if (distance > kRouteMapOwnerLabelMaxAnchorDistancePx) {
+        continue;
+      }
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestKey = key;
+      }
+    }
+    if (bestKey != null) {
+      resolved[bestKey] = labelEntry.value;
+    }
+  }
+  return resolved;
+}
+
 /// 환승 캡슐의 design space 외접 Rect — 라벨 배치의 선점 장애물(#1789).
 /// painter와 같은 [routeMapTransferMarkers] 호출로 기하 정합을 보장한다
 /// (색은 캡슐 기하에 영향이 없어 placeholder를 넘긴다).
@@ -114,14 +251,7 @@ List<Rect> routeMapTransferObstacleRects(
           Rect.fromCenter(center: center, width: 0, height: 0),
         );
       }
-      rects.add(
-        bounds.inflate(
-          math.max(
-            kRouteMapTransferDotRadiusPx + kRouteMapTransferDotPaddingPx,
-            kRouteMapBasemapTransferCapsuleHalfWidthPx,
-          ),
-        ),
-      );
+      rects.add(bounds.inflate(_basemapCapsuleHalfWidthFor(centers.length)));
       continue;
     }
     final markers = routeMapTransferMarkers(
@@ -149,9 +279,29 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
   required Size Function(String text, {required bool bold}) measureLabel,
   required Size Function(String text) measureBadge,
   bool basemap = false,
+  // basemap 6차(#2068): 오너가 SVG에서 손배치한 라벨 앵커. station 원본 이름
+  // (축약 전 nameKo) 기준 정확 일치로 조회한다 — labelTextByStationId는 화면
+  // 표시용 축약(괄호 부역명 제거) 텍스트라 매칭 키로 못 쓴다. 둘 다 기본값이
+  // 빈 맵이라 기존 호출부는 동작 불변(옵트인).
+  Map<String, RouteMapOwnerLabelEntry> ownerLabelsByStationName = const {},
+  Map<String, String> stationNameByStationId = const {},
 }) {
   final terminusIds = routeMapTerminusStationIds(map);
   final candidates = <_Candidate>[];
+  // basemap 모드 오너 라벨 고정 배치(#2068 6~7차) — 검색(gap 사다리)을 거치지
+  // 않고 SVG 실측 앵커에 즉시 확정한다. 미매치(원본명 없음·sidecar 미보유·
+  // 이름 정규화 후에도 미매치·위치 게이트 밖·동명이역 중 비최근접)는
+  // candidates에 담겨 기존 4차 자동 솔버 경로로 폴백한다.
+  final ownerFixedLabels = <RouteMapStaticLabel>[];
+  // candidate id → 채택된 오너 라벨(동명이역 최근접 해소·위치 게이트 적용 후).
+  final resolvedOwnerLabels = basemap
+      ? _resolveOwnerLabelsByCandidateKey(
+          map: map,
+          design: design,
+          ownerLabelsByStationName: ownerLabelsByStationName,
+          stationNameByStationId: stationNameByStationId,
+        )
+      : const <String, RouteMapOwnerLabelEntry>{};
 
   // 1) 노선 뱃지: 끝점 + arc length 반복 (스펙 S4 — 노선 중간 확대에도 식별).
   for (final line in map.lines) {
@@ -218,21 +368,41 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
     if (text == null || text.isEmpty) {
       continue;
     }
+    final size = measureLabel(text, bold: true);
+    if (basemap) {
+      final entry = resolvedOwnerLabels['transfer:${group.stationId}'];
+      if (entry != null) {
+        ownerFixedLabels.add(
+          RouteMapStaticLabel(
+            id: 'transfer:${group.stationId}',
+            text: text,
+            rect: _ownerLabelRect(
+              design.toDesign(entry.position),
+              size,
+              entry.anchor,
+              kRouteMapDesignLabelFontPx,
+            ),
+            bold: true,
+          ),
+        );
+        continue;
+      }
+    }
     candidates.add(
       _Candidate(
         id: 'transfer:${group.stationId}',
         text: text,
         anchor: design.toDesign(group.centroid),
-        size: measureLabel(text, bold: true),
+        size: size,
         priority: _priorityFor(RouteMapLabelClass.transfer),
         // 캡슐이 걸치는 폭까지 띄운다: 캡슐 짧은축 절반 + 멤버 이격 절반.
-        // basemap 모드는 SVG 캡슐 실측 반폭이 더 크므로 그 값으로 상향한다.
+        // basemap 모드는 SVG 캡슐 실측 반폭(멤버 수 기반, 장애물 rect와 동일
+        // 공식)이 더 크므로 그 값으로 상향한다 — routeMapTransferObstacleRects와
+        // 반폭 산정을 일치시켜 라벨이 자기 그룹 캡슐과 최소 gap에서 충돌하지
+        // 않게 한다. (이 경로는 오너 라벨 미매치 폴백 — #2068 6차.)
         anchorPadding:
             (basemap
-                ? math.max(
-                    kRouteMapDesignBadgeRadiusPx,
-                    kRouteMapBasemapTransferCapsuleHalfWidthPx,
-                  )
+                ? _basemapCapsuleHalfWidthFor(group.memberPositions.length)
                 : kRouteMapDesignBadgeRadiusPx) +
             _memberSpread(group.memberPositions) * design.designScale / 2,
         bold: true,
@@ -248,14 +418,44 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
       continue;
     }
     final bold = terminusIds.contains(station.stationId);
+    final size = measureLabel(text, bold: bold);
+    if (basemap) {
+      final entry =
+          resolvedOwnerLabels['${station.stationId}:${station.lineId}'];
+      if (entry != null) {
+        ownerFixedLabels.add(
+          RouteMapStaticLabel(
+            id: '${station.stationId}:${station.lineId}',
+            text: text,
+            rect: _ownerLabelRect(
+              design.toDesign(entry.position),
+              size,
+              entry.anchor,
+              kRouteMapDesignLabelFontPx,
+            ),
+            bold: bold,
+          ),
+        );
+        continue;
+      }
+    }
     candidates.add(
       _Candidate(
         id: '${station.stationId}:${station.lineId}',
         text: text,
         anchor: design.toDesign(station.position),
-        size: measureLabel(text, bold: bold),
+        size: size,
         priority: _priorityFor(station.labelClass),
-        anchorPadding: kRouteMapDesignStationRadiusPx,
+        // basemap 모드는 자기 노드 심벌(장애물로 시드됨)이 실측 반경만큼 크므로
+        // anchorPadding 하한을 그 반경으로 올려 자기 라벨이 자기 노드와 최소
+        // gap에서 충돌하지 않게 한다. 기본 모드는 기존 3.0 유지. (이 경로는
+        // 오너 라벨 미매치 폴백 — #2068 6차.)
+        anchorPadding: basemap
+            ? math.max(
+                kRouteMapDesignStationRadiusPx,
+                kRouteMapBasemapStationNodeRadiusPx,
+              )
+            : kRouteMapDesignStationRadiusPx,
         bold: bold,
       ),
     );
@@ -268,13 +468,48 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
     return byPriority != 0 ? byPriority : a.id.compareTo(b.id);
   });
   final mapCenter = _designBoundsCenter(map, design);
-  final lineGrid = _RouteMapLineGrid.build(map, design);
+  // basemap 모드는 실측 선 반폭으로 선을 마킹해 라벨이 노선 밴드 위에 올라앉지
+  // 않게 한다(#2068 실기기 반려). 기본 모드는 중심선만(halfWidth 0) 유지.
+  // corridor(다중 노선 공유 구간)는 painter와 같은 routeMapParallelLineOffsets로
+  // 정점을 오프셋한 뒤 마킹해, 화면에 나란히 펼쳐 그려지는 실제 폭(중심선 ±
+  // (n-1) 라인폭)이 밴드에 반영되게 한다(basemap 한정 — 기본 모드는 오프셋 없이
+  // 중심선 그대로).
+  final lineGrid = _RouteMapLineGrid.build(
+    map,
+    design,
+    halfWidth: basemap ? kRouteMapBasemapLineHalfWidthPx : 0,
+    lineOffsets: basemap ? routeMapParallelLineOffsets(map.lines) : null,
+  );
   // 환승 캡슐은 라벨보다 먼저 자리를 선점한 장애물이다 — 라벨이 캡슐을 덮지
-  // 않도록 시드한다(출력에는 포함되지 않음).
-  final placedRects = <Rect>[
-    ...routeMapTransferObstacleRects(map, design, basemap: basemap),
+  // 않도록 시드한다(출력에는 포함되지 않음). basemap·기본 모드 공통 — 3~4차
+  // 장애물 모델은 뱃지 배치·폴백 검색 경로에 그대로 유효하다(#2068 6차에서도
+  // 제거하지 않는다).
+  final transferObstacles = routeMapTransferObstacleRects(
+    map,
+    design,
+    basemap: basemap,
+  );
+  // basemap 모드: 일반(비환승) 역 노드 심벌도 장애물로 시드한다 — 이웃 라벨이
+  // 남의 노드 원을 덮던 실기기 반려(#2068)를 막는다. 각 노드 design 좌표 중심에
+  // 실측 노드 반경 정사각 rect를 놓는다(환승 멤버는 캡슐 장애물이 이미 덮는다).
+  final nodeObstacles = <Rect>[
+    if (basemap)
+      for (final station in map.stations)
+        if (station.labelClass != RouteMapLabelClass.transfer)
+          Rect.fromCenter(
+            center: design.toDesign(station.position),
+            width: kRouteMapBasemapStationNodeRadiusPx * 2,
+            height: kRouteMapBasemapStationNodeRadiusPx * 2,
+          ),
   ];
-  final labels = <RouteMapStaticLabel>[];
+  // basemap 모드: 오너 고정 라벨도 뱃지·폴백 검색보다 먼저 자리를 선점한
+  // 장애물이다(#2068 6차 지시 2) — 뱃지가 오너 라벨을 덮지 않게 한다.
+  final placedRects = <Rect>[
+    ...transferObstacles,
+    ...nodeObstacles,
+    for (final label in ownerFixedLabels) label.rect,
+  ];
+  final labels = <RouteMapStaticLabel>[...ownerFixedLabels];
   final badges = <RouteMapStaticBadge>[];
   var unresolved = 0;
   for (final candidate in candidates) {
@@ -286,14 +521,25 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
     var bestClearLine = double.infinity;
     Rect? bestFallback; // 라벨 겹침 최소(전부 충돌 시).
     var bestFallbackLabel = double.infinity;
+    // basemap 모드는 gap 사다리 시작값을 kRouteMapBasemapLabelGapPx(6.0)로
+    // 상향한다 — 기하상 여유가 sliver 수준(예: 종로3가 3.8px)이면 실기기에서
+    // 라벨-캡슐 접촉으로 보이던 문제 대응(2026-07-16). 기본 모드는
+    // kRouteMapDesignLabelGapPx(4.0) 그대로 — 게이트 baseline 불변.
+    final baseGap = basemap
+        ? kRouteMapBasemapLabelGapPx
+        : kRouteMapDesignLabelGapPx;
     for (final gap in [
-      kRouteMapDesignLabelGapPx,
-      kRouteMapDesignLabelGapPx + 6,
-      kRouteMapDesignLabelGapPx + 12,
-      kRouteMapDesignLabelGapPx + 18,
-      kRouteMapDesignLabelGapPx + 24,
-      kRouteMapDesignLabelGapPx + 30,
-      kRouteMapDesignLabelGapPx + 36,
+      baseGap,
+      baseGap + 6,
+      baseGap + 12,
+      baseGap + 18,
+      baseGap + 24,
+      baseGap + 30,
+      baseGap + 36,
+      // basemap 모드는 넓은 라벨이 밀집 교차부에서 선 밴드를 못 피하는 경우가
+      // 있어 더 먼 gap 단을 추가로 시도한다(선에서 더 멀리 밀어낸다). 기본
+      // 모드는 기존 사다리를 유지해 게이트 baseline을 흔들지 않는다(#2068).
+      if (basemap) ...[baseGap + 44, baseGap + 52, baseGap + 60],
     ]) {
       for (final anchor in order) {
         final rect = routeMapLabelRect(
@@ -351,6 +597,29 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
           bold: candidate.bold,
         ),
       );
+    }
+  }
+  // 오너 고정 라벨은 검색으로 회피하지 않으므로(오너 배치를 그대로 신뢰),
+  // 다른 장애물(캡슐·노드) 또는 서로와 겹치면 "검색으로 못 피한 겹침"과
+  // 동치로 unresolved에 더한다 — 실측 감사용(#2068 6차, 게이트가 하드
+  // 실패시키지 않고 실측치로 보고).
+  if (ownerFixedLabels.isNotEmpty) {
+    final staticObstacles = <Rect>[...transferObstacles, ...nodeObstacles];
+    for (var i = 0; i < ownerFixedLabels.length; i += 1) {
+      final rect = ownerFixedLabels[i].rect;
+      var overlapped = staticObstacles.any((o) => rect.overlaps(o));
+      if (!overlapped) {
+        for (var j = 0; j < ownerFixedLabels.length; j += 1) {
+          if (i == j) continue;
+          if (rect.overlaps(ownerFixedLabels[j].rect)) {
+            overlapped = true;
+            break;
+          }
+        }
+      }
+      if (overlapped) {
+        unresolved += 1;
+      }
     }
   }
   return RouteMapStaticLabelLayout(
@@ -472,25 +741,90 @@ class _RouteMapLineGrid {
   final Set<int> _occupied;
   final double _cell;
 
+  /// [halfWidth]>0이면(basemap 모드) 중심선만이 아니라 실측 선 반폭 원판을
+  /// 샘플마다 마킹해 실제 선 폭을 장애물로 덮는다(#2068 — 라벨이 선 밴드 위에
+  /// 올라앉지 않게). 폴리라인 **내부 정점**에는 반폭×2 원판을 추가 마킹해 SVG
+  /// 라운드 코너 벌지를 보수적으로 덮는다. [halfWidth]==0(기본 모드)이면 기존
+  /// 동작(중심선 단일 셀)을 그대로 유지한다 — 게이트 baseline 불변.
+  ///
+  /// [lineOffsets]는 painter가 렌더에 쓰는 것과 같은
+  /// [routeMapParallelLineOffsets] 결과(basemap 한정)다. 다중 노선이 같은
+  /// 좌표를 공유하는 corridor(서해선·경의중앙 일산~능곡 등)는 화면에 나란히
+  /// 펼쳐 그려지므로, 정점을 그 오프셋만큼 이동한 뒤 마킹해야 corridor의 실제
+  /// 폭(중심선 ± (n-1) 라인폭)이 밴드에 반영된다. null이면(기본 모드) 오프셋
+  /// 없이 원좌표를 그대로 마킹한다.
   static _RouteMapLineGrid build(
     StructuredRouteMap map,
     RouteMapDesignSpace design, {
     double cell = kRouteMapDesignLineWidthPx,
+    double halfWidth = 0,
+    Map<String, List<List<Offset>>>? lineOffsets,
   }) {
     final occupied = <int>{};
+    void markCell(Offset p) {
+      occupied.add(_key((p.dx / cell).floor(), (p.dy / cell).floor()));
+    }
+
+    void markDisk(Offset center, double radius) {
+      final x0 = ((center.dx - radius) / cell).floor();
+      final x1 = ((center.dx + radius) / cell).ceil();
+      final y0 = ((center.dy - radius) / cell).floor();
+      final y1 = ((center.dy + radius) / cell).ceil();
+      final r2 = radius * radius;
+      for (var gy = y0; gy <= y1; gy += 1) {
+        for (var gx = x0; gx <= x1; gx += 1) {
+          final cx = (gx + 0.5) * cell;
+          final cy = (gy + 0.5) * cell;
+          final ddx = cx - center.dx;
+          final ddy = cy - center.dy;
+          if (ddx * ddx + ddy * ddy <= r2) {
+            occupied.add(_key(gx, gy));
+          }
+        }
+      }
+    }
+
     void mark(Offset a, Offset b) {
       final steps = ((b - a).distance / (cell / 2)).ceil();
       for (var i = 0; i <= steps; i += 1) {
         final t = steps == 0 ? 0.0 : i / steps;
         final p = Offset.lerp(a, b, t)!;
-        occupied.add(_key((p.dx / cell).floor(), (p.dy / cell).floor()));
+        if (halfWidth > 0) {
+          markDisk(p, halfWidth);
+        } else {
+          markCell(p);
+        }
       }
     }
 
     for (final line in map.lines) {
-      for (final poly in line.polylines) {
+      final offsetsByPolyline = lineOffsets?[line.lineId];
+      for (var p = 0; p < line.polylines.length; p += 1) {
+        final poly = line.polylines[p];
+        final vertexOffsets =
+            offsetsByPolyline != null && p < offsetsByPolyline.length
+            ? offsetsByPolyline[p]
+            : null;
+        // painter(recordRouteMapPicture)와 같은 식: design 좌표 + 단위 법선 ×
+        // rank × kRouteMapDesignLineWidthPx. vertexOffsets가 없으면(기본 모드)
+        // design.toDesign 그대로.
+        Offset vertexAt(int i) {
+          var point = design.toDesign(poly[i]);
+          if (vertexOffsets != null && i < vertexOffsets.length) {
+            point += vertexOffsets[i] * kRouteMapDesignLineWidthPx;
+          }
+          return point;
+        }
+
         for (var i = 1; i < poly.length; i += 1) {
-          mark(design.toDesign(poly[i - 1]), design.toDesign(poly[i]));
+          mark(vertexAt(i - 1), vertexAt(i));
+        }
+        // 내부 정점(코너)에 여유 원판 — SVG 라운드 코너 arc가 직선 폴리라인
+        // 바깥으로 부푸는 벌지를 보수적으로 덮는다(basemap 전용).
+        if (halfWidth > 0) {
+          for (var i = 1; i < poly.length - 1; i += 1) {
+            markDisk(vertexAt(i), halfWidth * 2);
+          }
         }
       }
     }

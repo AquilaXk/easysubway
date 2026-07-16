@@ -313,6 +313,192 @@ function roundCoord(value) {
   return Number(value.toFixed(4));
 }
 
+// 오너 SVG 라벨 실측 좌표 추출(#2068 6차) — 자동 솔버가 밀집부에서 선을
+// 가로지르는 한계를, 오너가 SVG에서 손으로 배치한 역명 라벨 앵커로 대체한다.
+// station-name-labels-layer(및 gwangju의 동등 레이어)는 컴파일 대상(.vec)에서
+// 제외되므로(제목·범례·역명은 구조화 오버레이가 담당) 원본 svgText에서 별도
+// 추출해 sidecar JSON으로 낸다.
+//
+// 5권역 실측(2026-07) 결과 마크업이 서로 다르다:
+//   - seoul/busan/daegu/daejeon: data-label-role이 <text> 태그 자체에 있다.
+//   - gwangju: data-label-role이 감싸는 <g>에 있고 바로 안에 <text>가 온다.
+// 위치도 2형식이 섞여 있다: x/y 속성형(대부분) / transform="translate(a b)"
+// + tspan x="0" y="0" 형(예: 뚝섬). 드물게(인천 다중행 라벨 2건) 양쪽 다 있어
+// "발견한 모든 translate 오프셋의 합 + text(또는 첫 tspan) x/y"라는 단일
+// 공식을 쓴다 — SVG 렌더 의미(자신의 transform이 좌표계를 옮긴 뒤 그 안에서
+// x/y를 해석)와 정확히 일치해 모든 형식을 하나로 포섭한다.
+//
+// 역명 키는 속성명이 권역마다 다르다(seoul/busan="data-station" 직접 한글명,
+// daejeon="data-full-official-name", gwangju="data-station-name" g 래퍼) —
+// 신뢰하지 않는다. 대신 렌더된 텍스트 내용(tspan 연결)을 station 키로 쓴다.
+// 전 권역 실측 결과 텍스트 내용이 해당 속성값과 항상 일치해 더 단순·강건하다.
+//
+// role 필터: ordinary/transfer/terminal만 포함. code(대구 역번호 라벨) 제외.
+// daejeon의 planned·regional 6+2건은 전부 data-status="construction"/"planned"
+// (미개통 연장·충청권 광역철도 공사중 표기)이라 제외 — compile-basemap-vec.mjs의
+// 기존 construction/planned 제외 관례와 일치한다.
+//
+// font-size는 대개 <text> 속성이지만 gwangju는 CSS class(.station-label-<role>)
+// 에서만 온다 — 클래스 규칙을 role별로 미리 읽어 인라인 속성이 없을 때 쓴다.
+const ownerLabelRoles = ["ordinary", "transfer", "terminal"];
+
+function parseTranslate(transformValue) {
+  if (!transformValue) return { dx: 0, dy: 0 };
+  const match = transformValue.match(
+    /translate\(\s*(-?[\d.]+)[,\s]+(-?[\d.]+)\s*\)/,
+  );
+  return match
+    ? { dx: Number(match[1]), dy: Number(match[2]) }
+    : { dx: 0, dy: 0 };
+}
+
+function firstAttr(tag, name) {
+  const match = tag.match(new RegExp(`\\s${name}="([^"]*)"`));
+  return match ? match[1] : null;
+}
+
+// <style> 블록에서 .station-label-<role> { ... font-size:<n>px ... } 규칙을
+// role → local px 맵으로 읽는다(gwangju처럼 인라인 font-size가 없는 경우 폴백).
+function stationLabelFontSizesByRole(svgText) {
+  const css = [...svgText.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)]
+    .map((match) => match[1])
+    .join("\n");
+  const byRole = {};
+  for (const role of ownerLabelRoles) {
+    const rule = css.match(
+      new RegExp(`\\.station-label-${role}\\s*\\{([^}]*)\\}`),
+    );
+    const fontSize = rule?.[1].match(/font-size:\s*([\d.]+)px/)?.[1];
+    if (fontSize) byRole[role] = Number(fontSize);
+  }
+  return byRole;
+}
+
+function ownerLabelTextContent(textBlock) {
+  return textBlock
+    .replace(/^<text\b[^>]*>/, "")
+    .replace(/<\/text>$/, "")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\s+/g, "")
+    .trim();
+}
+
+// [groupOpenTag]는 gwangju처럼 role이 감싸는 <g>에 있을 때만 넘긴다(그 외 null).
+function ownerLabelEntryFrom(
+  groupOpenTag,
+  textBlock,
+  role,
+  mapScale,
+  mapTranslate,
+  cssFontSizeByRole,
+) {
+  const textOpenTagMatch = textBlock.match(/^<text\b[^>]*>/);
+  if (!textOpenTagMatch) return null;
+  const textOpenTag = textOpenTagMatch[0];
+  // 미개통(공사중) 라벨 제외 — role만으로는 못 거른다(daejeon 2호선 트램 39건이
+  // role="ordinary/transfer/terminal"이면서 data-status="construction"). 기존
+  // compile-basemap-vec.mjs의 construction/planned 제외 관례와 일치시킨다.
+  const constructionPattern = /data-(?:status|state)="(?:construction|planned)"/;
+  if (
+    constructionPattern.test(textOpenTag) ||
+    (groupOpenTag && constructionPattern.test(groupOpenTag))
+  ) {
+    return null;
+  }
+  const groupTranslate = groupOpenTag
+    ? parseTranslate(firstAttr(groupOpenTag, "transform"))
+    : { dx: 0, dy: 0 };
+  const textTranslate = parseTranslate(firstAttr(textOpenTag, "transform"));
+  let x = firstAttr(textOpenTag, "x");
+  let y = firstAttr(textOpenTag, "y");
+  if (x == null || y == null) {
+    const firstTspan = textBlock.match(/<tspan\b[^>]*>/);
+    if (firstTspan) {
+      x = x ?? firstAttr(firstTspan[0], "x");
+      y = y ?? firstAttr(firstTspan[0], "y");
+    }
+  }
+  const localX = groupTranslate.dx + textTranslate.dx + Number(x ?? NaN);
+  const localY = groupTranslate.dy + textTranslate.dy + Number(y ?? NaN);
+  const anchorRaw = firstAttr(textOpenTag, "text-anchor") ?? "start";
+  const anchor = ["start", "middle", "end"].includes(anchorRaw)
+    ? anchorRaw
+    : "start";
+  const fontSizeAttr = firstAttr(textOpenTag, "font-size");
+  const fontSizeLocal = fontSizeAttr
+    ? Number(fontSizeAttr.replace(/px$/, ""))
+    : cssFontSizeByRole[role];
+  const station = ownerLabelTextContent(textBlock);
+  if (
+    !station ||
+    !Number.isFinite(localX) ||
+    !Number.isFinite(localY) ||
+    !Number.isFinite(fontSizeLocal)
+  ) {
+    return null;
+  }
+  return {
+    station,
+    role,
+    x: roundCoord(mapTranslate.dx + localX * mapScale),
+    y: roundCoord(mapTranslate.dy + localY * mapScale),
+    anchor,
+    fontSizePx: roundCoord(fontSizeLocal * mapScale),
+  };
+}
+
+// 원본 svgText(정규화·레이어 추출 이전)에서 오너 라벨 앵커 목록을 뽑는다.
+// 반환은 station 오름차순(로케일 정렬) → role 오름차순으로 정렬해 결정적이다.
+export function extractOwnerLabels(svgText) {
+  const mapTransform = svgText.match(
+    /<g\b(?=[^>]*\bid="main-map-scaled-layer")(?=[^>]*\btransform="([^"]+)")[^>]*>/,
+  )?.[1];
+  const mapScale = scaleFromMapTransform(mapTransform);
+  const mapTranslate = parseTranslate(mapTransform);
+  const cssFontSizeByRole = stationLabelFontSizesByRole(svgText);
+  const rolePattern = ownerLabelRoles.join("|");
+
+  const entries = [];
+  const textRe = new RegExp(
+    `<text\\b[^>]*\\bdata-label-role="(${rolePattern})"[^>]*>[\\s\\S]*?<\\/text>`,
+    "g",
+  );
+  for (const match of svgText.matchAll(textRe)) {
+    const entry = ownerLabelEntryFrom(
+      null,
+      match[0],
+      match[1],
+      mapScale,
+      mapTranslate,
+      cssFontSizeByRole,
+    );
+    if (entry) entries.push(entry);
+  }
+  const groupRe = new RegExp(
+    `<g\\b[^>]*\\bdata-label-role="(${rolePattern})"[^>]*>\\s*<text\\b[^>]*>[\\s\\S]*?<\\/text>`,
+    "g",
+  );
+  for (const match of svgText.matchAll(groupRe)) {
+    const groupOpenTag = match[0].match(/^<g\b[^>]*>/)[0];
+    const textBlock = match[0].slice(groupOpenTag.length).trim();
+    const entry = ownerLabelEntryFrom(
+      groupOpenTag,
+      textBlock,
+      match[1],
+      mapScale,
+      mapTranslate,
+      cssFontSizeByRole,
+    );
+    if (entry) entries.push(entry);
+  }
+  entries.sort((a, b) =>
+    a.station === b.station
+      ? a.role.localeCompare(b.role)
+      : a.station.localeCompare(b.station, "ko"),
+  );
+  return entries;
+}
+
 // style="...font-size:<n>px?..." 선언 값을 ×k로 교체한다(px 접미사는 유지).
 // text·tspan 공통 — SVG에서 style 속성은 동명 presentation attribute보다 우선하므로
 // (예: 클래스가 준 font-size 속성 위에 개별 style로 덮어쓴 배지들) 실제 렌더 크기는
@@ -423,6 +609,8 @@ function compile(inputSvg, outputVec, normalizedSvgDir) {
   ], { cwd: mobileDir, stdio: ["ignore", "inherit", "inherit"] });
 }
 
+const labelsSidecarPath = path.join(outDir, "labels.json");
+
 function main() {
   const verify = process.argv.slice(2).includes("--verify");
   mkdirSync(outDir, { recursive: true });
@@ -438,6 +626,7 @@ function main() {
 
   let allMatch = true;
   const buildMaps = [];
+  const labelsByRegion = {};
   try {
     for (const region of regions) {
       const inputSvg = path.join(svgSourceDir, region.svg);
@@ -455,6 +644,8 @@ function main() {
       }
       compile(inputSvg, outputVec, normalizedSvgDir);
       const digest = sha256(outputVec);
+      const ownerLabels = extractOwnerLabels(sourceText);
+      labelsByRegion[region.id] = ownerLabels;
       buildMaps.push({
         id: region.id,
         source: path.relative(root, inputSvg).replaceAll(path.sep, "/"),
@@ -463,8 +654,11 @@ function main() {
         normalizedSvgSha256: sha256Value(normalizedSvg),
         compiledVectorSha256: digest,
         viewBox,
+        ownerLabelCount: ownerLabels.length,
       });
-      process.stdout.write(`${region.id}.vec  sha256=${digest}\n`);
+      process.stdout.write(
+        `${region.id}.vec  sha256=${digest}  ownerLabels=${ownerLabels.length}\n`,
+      );
 
       if (verify) {
         const secondVec = path.join(verifyDir, `${region.id}.vec`);
@@ -492,6 +686,24 @@ function main() {
     process.stdout.write("전 권역 재현검증 통과: 2회 컴파일 sha256 동일.\n");
   }
 
+  // 오너 라벨 sidecar(#2068 6차): basemap 모드가 자동 솔버 대신 참조하는 SVG
+  // 실측 앵커. 5권역 결합 단일 파일 — metro_map_pack/basemap/ 디렉터리는
+  // pubspec.yaml에 통째로 등록돼 있어 추가 자산 등록이 필요 없다.
+  const labelsSidecarJson = `${JSON.stringify(
+    {
+      schemaVersion: 1,
+      artifactKind: "route-map-basemap-owner-labels",
+      regions: labelsByRegion,
+    },
+    null,
+    2,
+  )}\n`;
+  writeFileSync(labelsSidecarPath, labelsSidecarJson);
+  const labelsSidecarSha256 = sha256Value(labelsSidecarJson);
+  process.stdout.write(
+    `labels.json  sha256=${labelsSidecarSha256}  regions=${Object.keys(labelsByRegion).length}\n`,
+  );
+
   writeFileSync(
     buildManifestPath,
     `${JSON.stringify(
@@ -505,8 +717,14 @@ function main() {
         content: {
           svgLayer: "route-lines-and-station-symbols",
           stationSymbols: "owner-svg",
-          labels: "structured-data",
+          labels: "owner-svg-anchor-with-solver-fallback",
           interaction: "route_map_positions",
+        },
+        ownerLabelsSidecar: {
+          path: path
+            .relative(root, labelsSidecarPath)
+            .replaceAll(path.sep, "/"),
+          sha256: labelsSidecarSha256,
         },
         maps: buildMaps,
       },

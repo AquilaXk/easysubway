@@ -18,6 +18,13 @@ const double kRouteMapDesignBadgeFontPx = 11.0;
 const double kRouteMapDesignBadgeRadiusPx = 9.0;
 const double kRouteMapDesignLabelGapPx = 4.0;
 
+/// basemap 모드 라벨 gap 사다리 시작값(design px). 기본 모드는
+/// [kRouteMapDesignLabelGapPx](4.0)를 그대로 쓰지만(게이트 baseline 의존이라
+/// 불변), basemap은 기하상 통과해도 sliver 수준 여유(예: 종로3가 3.8px)가
+/// 실기기에서 라벨-캡슐 접촉으로 보이는 문제를 없애기 위해 6.0으로 상향한다
+/// (2026-07-16 실기기 재확인 대응).
+const double kRouteMapBasemapLabelGapPx = 6.0;
+
 /// SVG 바탕층(#2068) 환승 캡슐의 design px 반폭. basemap 모드에서는 구조화 캡슐
 /// 대신 오너 SVG 캡슐이 화면에 그려지고 실측 반폭이 훨씬 크므로, 라벨 장애물·
 /// 환승 라벨 anchorPadding을 이 값으로 부풀려 라벨이 캡슐을 침범하지 않게 한다.
@@ -28,6 +35,38 @@ const double kRouteMapDesignLabelGapPx = 4.0;
 /// 캡슐 끝에 닿아 보였다(여유 ~1.6px 불충분). (부산·대구는 designScale이 작아
 /// 실측 반폭이 더 작다 — 과대 시 라벨이 조금 더 밀릴 뿐 겹침 방향으로는 안전).
 const double kRouteMapBasemapTransferCapsuleHalfWidthPx = 13.0;
+
+/// basemap 캡슐 장축(멤버 수) 반폭 기여분(design px) — SVG data-slot-size=3u=
+/// 24 local × 0.455(레이어 스케일) × designScale 1.373 ≈ 15 design px 슬롯 간격의
+/// 절반. 멤버(배지)가 하나 늘 때마다 캡슐 장축 반폭이 이만큼 는다. 종로3가(3개
+/// 노선 환승) 실기기 재확인(2026-07-16): member bbox가 route_map_positions
+/// 수렴 파이프라인으로 눌려(스프레드 14.4) 고정 반폭 13 inflate로는 기하상
+/// 3.8px 여유가 있었는데도 화면에서 라벨이 캡슐에 닿아 보였다 — 멤버 수 기반
+/// 하한이 없어 3-슬롯 캡슐의 실제 장축을 과소평가했기 때문이다.
+const double kRouteMapBasemapTransferSlotHalfWidthPx = 7.5;
+
+/// basemap 캡슐 장축 반폭의 멤버 수 무관 기저값(design px) — SVG 배지 반경
+/// r=12 local × 0.455 × designScale 1.373 ≈ 7.5 design px에 캡슐 외곽 스트로크·
+/// 여유를 더한 값. [kRouteMapBasemapTransferSlotHalfWidthPx]와 함께
+/// `(memberCount-1) × slot + base` 로 멤버 수 기반 반폭 하한을 이룬다.
+const double kRouteMapBasemapTransferCapsuleBaseHalfWidthPx = 9.0;
+
+/// SVG 바탕층(#2068) 노선 선의 design px 반폭. basemap 모드에서 선 장애물을
+/// 중심선만이 아니라 실제 선 폭으로 마킹해, 라벨이 선 위에 올라앉지 않게 한다
+/// (실기기 반려: 수도권 '시청'이 2호선 초록 선 위). 수도권 SVG 최대 노선
+/// stroke-width=13 local, 레이어 스케일 0.455, 실측 designScale=1.3729673 →
+/// 반폭 13/2 × 0.455 × 1.373 ≈ 4.06 design px. 라운드 코너·안티에일리어싱 여유를
+/// 더해 4.5로 잡는다. 기본 모드(구조화 노선)는 이 값을 쓰지 않고 중심선만 마킹.
+const double kRouteMapBasemapLineHalfWidthPx = 4.5;
+
+/// SVG 바탕층(#2068) 일반(비환승) 역 심벌의 design px 외곽 반경. basemap 모드에서
+/// 이웃 라벨이 남의 역 노드를 덮지 않도록 장애물로 시드하고, 자기 라벨의
+/// anchorPadding 하한으로도 쓴다(자기 노드와 자기 라벨이 최소 gap에서 충돌 방지).
+/// 수도권 SVG station-symbols-layer 원 실측: 지배 r=5.8 local·stroke-width 1.5
+/// (원 353개), 그 외 r=6/sw2·r=6.5/sw3. 외곽 반경 = (r + stroke/2) × 0.455 ×
+/// 1.373 → r5.8≈4.09·r6≈4.37·r6.5≈5.00 design px. 지배 케이스+여유를 덮는 4.5로
+/// 잡는다(과대 시 라벨이 조금 더 밀릴 뿐 겹침 방향으로는 안전).
+const double kRouteMapBasemapStationNodeRadiusPx = 4.5;
 
 /// 노선 뱃지 반복 간격(design px). 일반 탐색 줌(라벨≈design 크기 그대로 보이는
 /// scale≈k*)에서 짧은 화면축(~360dp)에 최소 1개 걸리도록 잡는다(스펙 S4).

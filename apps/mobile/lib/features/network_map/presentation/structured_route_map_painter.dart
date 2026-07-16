@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import '../../stations/domain/station_line.dart' show stationLineColor;
 import '../domain/map_camera.dart';
 import '../domain/route_map_design_space.dart';
+import '../domain/route_map_owner_labels.dart';
 import '../domain/route_map_parallel_offsets.dart';
 import '../domain/structured_route_map.dart';
 import 'route_map_label_layout.dart';
@@ -385,6 +386,8 @@ class StructuredRouteMapView extends StatefulWidget {
     this.drawStationSymbols = true,
     this.sourceOrigin = Offset.zero,
     this.attributionText,
+    this.ownerLabelsByStationName = const {},
+    this.stationNameByStationId = const {},
     super.key,
   });
 
@@ -402,6 +405,13 @@ class StructuredRouteMapView extends StatefulWidget {
 
   final String? attributionText;
 
+  /// basemap 6차(#2068): 오너 SVG 라벨 sidecar(현재 region분). 빈 맵이면
+  /// 미보유·로드전으로 취급해 4차 자동 솔버로 전부 폴백한다(fail-safe).
+  final Map<String, RouteMapOwnerLabelEntry> ownerLabelsByStationName;
+
+  /// stationId → 원본 nameKo(축약 전). ownerLabelsByStationName 매칭 키.
+  final Map<String, String> stationNameByStationId;
+
   @override
   State<StructuredRouteMapView> createState() => _StructuredRouteMapViewState();
 }
@@ -410,6 +420,7 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
   StructuredRouteMap? _sourceMap;
   bool? _drawLines;
   bool? _drawStationSymbols;
+  Map<String, RouteMapOwnerLabelEntry>? _ownerLabelsByStationName;
   RouteMapDesignSpace? _design;
   ui.Picture? _picture;
   // attribution TextPainter는 region(텍스트) 변경 시에만 재생성한다. 매 pan 프레임의
@@ -421,6 +432,7 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
     if (identical(_sourceMap, widget.map) &&
         _drawLines == widget.drawLines &&
         _drawStationSymbols == widget.drawStationSymbols &&
+        identical(_ownerLabelsByStationName, widget.ownerLabelsByStationName) &&
         _picture != null) {
       return;
     }
@@ -428,6 +440,7 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
     _sourceMap = widget.map;
     _drawLines = widget.drawLines;
     _drawStationSymbols = widget.drawStationSymbols;
+    _ownerLabelsByStationName = widget.ownerLabelsByStationName;
     final design = routeMapDesignSpaceFor(widget.map);
     _design = design;
     Size measureLabel(String text, {required bool bold}) {
@@ -466,6 +479,10 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
       // 바탕층 모드(역 심벌 미렌더)에서는 화면 캡슐이 오너 SVG 것이라 실측
       // 반폭이 크다 — 라벨 장애물·anchorPadding을 그 크기로 부풀린다(#2068).
       basemap: !widget.drawStationSymbols,
+      // basemap 6차: 오너 SVG 라벨 앵커 sidecar(로드 전·express 모드는 빈 맵 →
+      // 4차 자동 솔버로 전부 폴백, fail-safe).
+      ownerLabelsByStationName: widget.ownerLabelsByStationName,
+      stationNameByStationId: widget.stationNameByStationId,
     );
     _picture = recordRouteMapPicture(
       map: widget.map,

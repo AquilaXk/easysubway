@@ -1,3 +1,4 @@
+import 'dart:convert' show jsonDecode;
 import 'dart:io';
 import 'dart:ui' show Offset;
 
@@ -13,12 +14,16 @@ class CapitalRouteMapFixture {
   const CapitalRouteMapFixture({
     required this.map,
     required this.labelTextByStationId,
+    required this.stationNameByStationId,
     required this.badgeLabelByLineId,
     required this.lineColorHexById,
   });
 
   final StructuredRouteMap map;
   final Map<String, String> labelTextByStationId;
+
+  /// stationId → 축약 전 원본 nameKo(#2068 6차 오너 라벨 sidecar 매칭 키).
+  final Map<String, String> stationNameByStationId;
   final Map<String, String> badgeLabelByLineId;
 
   /// line_id → hex 색(`lines.color`). 렌더링(golden) 테스트가 프로덕션과 같은
@@ -42,7 +47,8 @@ CapitalRouteMapFixture loadCapitalRouteMapFixture({
     try {
       final stationRows = db.select(
         '''
-        SELECT p.station_id, p.line_id, p.x, p.y, sl.line_sequence, s.name_ko
+        SELECT p.station_id, p.line_id, p.x, p.y, p.label_polygon,
+               sl.line_sequence, s.name_ko
         FROM route_map_positions p
         JOIN station_lines sl
           ON sl.station_id = p.station_id AND sl.line_id = p.line_id
@@ -60,10 +66,13 @@ CapitalRouteMapFixture loadCapitalRouteMapFixture({
       final lineRows = db.select('SELECT id, name_ko, color FROM lines');
 
       final labelText = <String, String>{};
+      final stationName = <String, String>{};
       final inputs = <StructuredRouteMapStationInput>[];
       for (final row in stationRows) {
         final stationId = row['station_id'] as String;
-        labelText[stationId] = routeMapStationLabel(row['name_ko'] as String);
+        final nameKo = row['name_ko'] as String;
+        labelText[stationId] = routeMapStationLabel(nameKo);
+        stationName[stationId] = nameKo;
         inputs.add(
           StructuredRouteMapStationInput(
             stationId: stationId,
@@ -73,7 +82,9 @@ CapitalRouteMapFixture loadCapitalRouteMapFixture({
               (row['x'] as num).toDouble(),
               (row['y'] as num).toDouble(),
             ),
-            labelPolygon: const [],
+            labelPolygon:
+                _parseLabelPolygon(row['label_polygon'] as String? ?? '') ??
+                const [],
           ),
         );
       }
@@ -107,6 +118,7 @@ CapitalRouteMapFixture loadCapitalRouteMapFixture({
       return CapitalRouteMapFixture(
         map: map,
         labelTextByStationId: labelText,
+        stationNameByStationId: stationName,
         badgeLabelByLineId: badgeLabel,
         lineColorHexById: lineColorHex,
       );
@@ -115,5 +127,40 @@ CapitalRouteMapFixture loadCapitalRouteMapFixture({
     }
   } finally {
     dir.deleteSync(recursive: true);
+  }
+}
+
+/// network_map.dart의 프로덕션 `_parseLabelPolygon`과 동일한 파싱 규칙(#2068
+/// 5차) — 픽스처가 프로덕션과 같은 오너 라벨 폴리곤을 얻도록 미러링한다. 그
+/// 함수는 private이라 여기서 재사용할 수 없어 로직만 복제한다.
+List<Offset>? _parseLabelPolygon(String value) {
+  if (value.trim().isEmpty) {
+    return null;
+  }
+  try {
+    final decoded = jsonDecode(value);
+    if (decoded is! List || decoded.length < 3) {
+      return null;
+    }
+    final points = <Offset>[];
+    for (final rawPoint in decoded) {
+      if (rawPoint is! Map) {
+        return null;
+      }
+      final x = rawPoint['x'];
+      final y = rawPoint['y'];
+      if (x is! num || y is! num) {
+        return null;
+      }
+      final dx = x.toDouble();
+      final dy = y.toDouble();
+      if (!dx.isFinite || !dy.isFinite || dx < 0 || dy < 0) {
+        return null;
+      }
+      points.add(Offset(dx, dy));
+    }
+    return points;
+  } on FormatException {
+    return null;
   }
 }

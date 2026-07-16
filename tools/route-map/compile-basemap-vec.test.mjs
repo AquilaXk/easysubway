@@ -4,7 +4,10 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
-import { normalizeSvgForCompile } from "./compile-basemap-vec.mjs";
+import {
+  extractOwnerLabels,
+  normalizeSvgForCompile,
+} from "./compile-basemap-vec.mjs";
 
 test("컴파일 전에 단순 class 스타일을 SVG 속성으로 인라인한다", () => {
   const normalized = normalizeSvgForCompile(`
@@ -212,6 +215,126 @@ test("style형 font-size(px 없음)도 동일하게 ×k 스케일한다", () => 
   assert.doesNotMatch(text, /font-size:5px/);
 });
 
+test("extractOwnerLabels: x/y 속성형 위치를 main-map-scaled-layer 변환(×scale+translate)해 뽑는다", () => {
+  const entries = extractOwnerLabels(`
+    <svg>
+      <g id="main-map-scaled-layer" transform="translate(70 138) scale(0.455)">
+        <text data-station="시청" data-label-role="transfer"
+              font-size="28.571px" x="2196.2356" y="1493.1528"
+              ><tspan x="2196.2356" y="1493.1528">시청</tspan></text>
+      </g>
+    </svg>
+  `);
+  assert.equal(entries.length, 1);
+  const [entry] = entries;
+  assert.equal(entry.station, "시청");
+  assert.equal(entry.role, "transfer");
+  assert.equal(entry.anchor, "start"); // 미지정 → 기본값.
+  // x = 70 + 2196.2356*0.455, y = 138 + 1493.1528*0.455.
+  assert.equal(entry.x, Number((70 + 2196.2356 * 0.455).toFixed(4)));
+  assert.equal(entry.y, Number((138 + 1493.1528 * 0.455).toFixed(4)));
+  assert.equal(entry.fontSizePx, Number((28.571 * 0.455).toFixed(4)));
+});
+
+test("extractOwnerLabels: transform=translate + tspan x=0/y=0 위치형(뚝섬형)도 뽑는다", () => {
+  const entries = extractOwnerLabels(`
+    <svg>
+      <g id="main-map-scaled-layer" transform="translate(70 138) scale(0.455)">
+        <text data-station="뚝섬" data-label-role="ordinary"
+              transform="translate(3100.2 1650.8)" font-size="26.374"
+              ><tspan x="0" y="0">뚝섬</tspan></text>
+      </g>
+    </svg>
+  `);
+  assert.equal(entries.length, 1);
+  const [entry] = entries;
+  assert.equal(entry.station, "뚝섬");
+  assert.equal(entry.x, Number((70 + 3100.2 * 0.455).toFixed(4)));
+  assert.equal(entry.y, Number((138 + 1650.8 * 0.455).toFixed(4)));
+});
+
+test("extractOwnerLabels: scale 없는 권역(main-map-scaled-layer 부재)은 좌표를 그대로 쓴다", () => {
+  const entries = extractOwnerLabels(`
+    <svg>
+      <text data-station="가야" data-label-role="ordinary" text-anchor="middle"
+            font-size="12.5" x="1958" y="1430"><tspan x="1958" y="1430" dy="0">가야</tspan></text>
+    </svg>
+  `);
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].x, 1958);
+  assert.equal(entries[0].y, 1430);
+  assert.equal(entries[0].anchor, "middle");
+  assert.equal(entries[0].fontSizePx, 12.5);
+});
+
+test("extractOwnerLabels: <g data-label-role>에 감싸인 gwangju형은 g의 transform도 더하고 CSS class font-size로 폴백한다", () => {
+  const entries = extractOwnerLabels(`
+    <svg>
+      <style>
+        .station-label-terminal { fill:#111111; font-size:15px; font-weight:700; }
+      </style>
+      <g id="station-label-group-119" data-station="119" data-station-name="평동"
+         data-label-role="terminal" transform="translate(3.0637434,55.147382)">
+        <text x="110" y="918" class="station-label station-label-terminal"
+              text-anchor="middle">평동</text>
+      </g>
+    </svg>
+  `);
+  assert.equal(entries.length, 1);
+  const [entry] = entries;
+  assert.equal(entry.station, "평동"); // data-station(코드 "119")이 아니라 텍스트 내용.
+  assert.equal(entry.role, "terminal");
+  assert.equal(entry.x, Number((110 + 3.0637434).toFixed(4)));
+  assert.equal(entry.y, Number((918 + 55.147382).toFixed(4)));
+  assert.equal(entry.fontSizePx, 15); // 인라인 font-size 없음 → CSS class 폴백.
+});
+
+test("extractOwnerLabels: code role과 construction/planned 상태는 제외한다", () => {
+  const entries = extractOwnerLabels(`
+    <svg>
+      <text data-label-role="code" font-size="10" x="0" y="0">312</text>
+      <text data-label-role="ordinary" data-status="construction" font-size="13"
+            x="10" y="10">가수원네거리</text>
+      <text data-label-role="planned" font-size="13" x="20" y="20">용두광역철도</text>
+      <text data-label-role="regional" data-status="construction" font-size="13"
+            x="30" y="30">흑석리</text>
+      <g data-label-role="ordinary" data-state="planned">
+        <text x="40" y="40">미개통역</text>
+      </g>
+      <text data-label-role="ordinary" font-size="13" x="50" y="50">정상역</text>
+    </svg>
+  `);
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].station, "정상역");
+});
+
+test("extractOwnerLabels: 5권역 실 SVG에서 ordinary/transfer/terminal 개수가 실측과 일치한다", () => {
+  const sources = path.join(import.meta.dirname, "route-map-defs/svg-sources");
+  const expected = {
+    "easy-subway-sma-v2.svg": { ordinary: 501, transfer: 124, terminal: 30 },
+    "easy-subway-busan-v1.svg": { ordinary: 127, transfer: 12, terminal: 7 },
+    "easy-subway-daegu-v1.svg": { ordinary: 84, transfer: 5, terminal: 8 },
+    // daejeon: SVG상 ordinary/transfer/terminal 64건 중 39건이 미개통(2호선
+    // 트램) data-status="construction"이라 제외 → 25건(15/8/2)만 남는다.
+    "easy-subway-daejeon-v1.svg": { ordinary: 15, transfer: 8, terminal: 2 },
+    "easy-subway-gwangju-v1.svg": { ordinary: 53, transfer: 7, terminal: 2 },
+  };
+  for (const [file, counts] of Object.entries(expected)) {
+    const entries = extractOwnerLabels(
+      readFileSync(path.join(sources, file), "utf8"),
+    );
+    const byRole = { ordinary: 0, transfer: 0, terminal: 0 };
+    for (const entry of entries) byRole[entry.role] += 1;
+    assert.deepEqual(byRole, counts, file);
+    for (const entry of entries) {
+      assert.ok(entry.station.length > 0, `${file}: 빈 station 키`);
+      assert.ok(Number.isFinite(entry.x) && Number.isFinite(entry.y), file);
+      assert.ok(entry.fontSizePx > 0, file);
+      assert.ok(["start", "middle", "end"].includes(entry.anchor), file);
+    }
+  }
+});
+
 test("build manifest가 source·normalized·vec hash와 viewBox를 결합한다", () => {
   const root = path.resolve(import.meta.dirname, "../..");
   const manifest = JSON.parse(
@@ -224,7 +347,7 @@ test("build manifest가 source·normalized·vec hash와 viewBox를 결합한다"
   assert.deepEqual(manifest.content, {
     svgLayer: "route-lines-and-station-symbols",
     stationSymbols: "owner-svg",
-    labels: "structured-data",
+    labels: "owner-svg-anchor-with-solver-fallback",
     interaction: "route_map_positions",
   });
   assert.equal(manifest.maps.length, 5);
@@ -238,5 +361,25 @@ test("build manifest가 source·normalized·vec hash와 viewBox를 결합한다"
     assert.equal(map.normalizedSvgSha256, hash(normalized));
     assert.equal(map.compiledVectorSha256, hash(vec));
     assert.equal(map.viewBox.length, 4);
+    const ownerLabels = extractOwnerLabels(source.toString("utf8"));
+    assert.equal(map.ownerLabelCount, ownerLabels.length);
+  }
+
+  const sidecarPath = path.join(root, manifest.ownerLabelsSidecar.path);
+  const sidecar = readFileSync(sidecarPath, "utf8");
+  const hash = (value) => createHash("sha256").update(value).digest("hex");
+  assert.equal(manifest.ownerLabelsSidecar.sha256, hash(sidecar));
+  const parsedSidecar = JSON.parse(sidecar);
+  assert.equal(parsedSidecar.artifactKind, "route-map-basemap-owner-labels");
+  assert.deepEqual(
+    Object.keys(parsedSidecar.regions).sort(),
+    ["busan", "daegu", "daejeon", "gwangju", "seoul"],
+  );
+  for (const map of manifest.maps) {
+    assert.equal(
+      parsedSidecar.regions[map.id].length,
+      map.ownerLabelCount,
+      map.id,
+    );
   }
 });
