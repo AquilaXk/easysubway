@@ -69,8 +69,10 @@ function required(args, name) {
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     console.error(error.message);
     process.exitCode = 1;
-  });
+  }
 }

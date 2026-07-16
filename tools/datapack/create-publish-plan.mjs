@@ -94,8 +94,10 @@ async function main() {
       ]
     : [];
 
+  let schemaVersion = includeReleaseManifest ? 2 : 1;
+  if (releaseRequestBindingSteps.length > 0) schemaVersion = 3;
   const plan = {
-    schemaVersion: releaseRequestBindingSteps.length > 0 ? 3 : includeReleaseManifest ? 2 : 1,
+    schemaVersion,
     mode: "object-storage-preflight",
     manifestObjectKey: "catalog/current.json",
     steps: [

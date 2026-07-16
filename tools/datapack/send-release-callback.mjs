@@ -116,8 +116,10 @@ function runnerPaths(env) {
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     process.stderr.write(`${error.message}\n`);
     process.exitCode = 1;
-  });
+  }
 }
