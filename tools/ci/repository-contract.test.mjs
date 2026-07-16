@@ -2087,7 +2087,8 @@ test("모바일 production 사용자 문구는 점수와 기본정보 같은 내
   for (const file of mobileFiles) {
     let source = read(file);
     if (
-      file === "apps/mobile/lib/main.dart" ||
+      file ===
+        "apps/mobile/lib/features/support/presentation/support_access_screen.dart" ||
       file ===
         "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart"
     ) {
