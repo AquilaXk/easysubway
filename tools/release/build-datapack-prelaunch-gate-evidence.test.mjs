@@ -77,11 +77,15 @@ function fixture() {
       isolatedTarget: {
         manifestSha256, artifactSha256: packSha256, immutableManifestWritten: true,
         channelManifestWrittenLast: true, readBackVerified: true,
+        idempotentReplayVerified: true, immutableConflictRejected: true,
+        executor: "tools/datapack/publish-object-storage.mjs",
       },
     },
     androidDeviceReport: {
       artifactKind: "android-datapack-monotonic-rescue-evidence", status: "PASS",
-      rcManifestSha256: manifestSha256, rescueReleaseSequence: 3,
+      rcManifestSha256: manifestSha256, rcArtifactSha256: packSha256, rescueReleaseSequence: 3,
+      rcManifestBytesVerified: true, rcArtifactBytesVerified: true,
+      rcSignatureVerified: true, rcSqliteIntegrityVerified: true,
       knownGoodContentRestored: true, idempotentReplayVerified: true,
       corruptSuccessorPreservedKnownGood: true, lowerSequenceRejected: true, recoveryElapsedMs: 125,
     },
@@ -159,9 +163,21 @@ test("Android device rescue report가 RC와 다르면 fail closed한다", () => 
   assert.throws(() => buildGateFragments(input), /Android device rescue evidence/);
 });
 
+test("Android가 실제 RC bytes와 signature를 검증하지 않으면 fail closed한다", () => {
+  const input = fixture();
+  input.androidDeviceReport.rcSignatureVerified = false;
+  assert.throws(() => buildGateFragments(input), /Android device rescue evidence/);
+});
+
 test("conditional publish report가 실제 isolated write와 RC에 결속되지 않으면 fail closed한다", () => {
   const input = fixture();
   input.conditionalPublishReport.productionWriteCount = 1;
+  assert.throws(() => buildGateFragments(input), /conditional publish rehearsal/);
+});
+
+test("실제 executor의 immutable conflict 검증이 없으면 fail closed한다", () => {
+  const input = fixture();
+  input.conditionalPublishReport.isolatedTarget.immutableConflictRejected = false;
   assert.throws(() => buildGateFragments(input), /conditional publish rehearsal/);
 });
 
@@ -175,12 +191,17 @@ test("prelaunch workflow는 네 gate를 같은 RC final readiness에 결속한�
   const workflow = await readFile(new URL(
     "../../.github/workflows/datapack-prelaunch-gates.yml", import.meta.url,
   ), "utf8");
+  const producer = await readFile(new URL(
+    "./build-datapack-prelaunch-gate-evidence.mjs", import.meta.url,
+  ), "utf8");
   assert.match(workflow, /build-datapack-prelaunch-gate-evidence\.mjs --mode prepare/);
   assert.match(workflow, /build-datapack-prelaunch-gate-evidence\.mjs --mode collect/);
   assert.match(workflow, /--callback-execution-report/);
   assert.match(workflow, /integration_test\/datapack_monotonic_rescue_test\.dart/);
+  assert.match(workflow, /android-rc-bundle\.json/);
   assert.match(workflow, /--android-device-report/);
   assert.match(workflow, /--conditional-publish-report/);
+  assert.match(producer, /tools\/datapack\/publish-object-storage\.mjs/);
   for (const gateId of [
     "source_governance", "freshness_conditional_publish", "rollback_rescue", "callback_reconciliation",
   ]) {

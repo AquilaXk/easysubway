@@ -93,7 +93,7 @@
           "refreshOn": "fixed-release-procedure-change",
           "files": [
             {"path": "apps/mobile/release/signed-release-artifact-gate.json", "sha256": "42c9f83dca5a1c2c24d921cf6ab748c9be5a901dd1b62212a81055098349fc67"},
-            {"path": "apps/mobile/pubspec.yaml", "sha256": "f3471939439b53a165c94ade115813fd235a73f16a6bec259a58409800f5109b"},
+            {"path": "apps/mobile/pubspec.yaml", "sha256": "b0ca261e81f1ded21492c7eddd96d99b42765146fe2d93f8ea48d57a253b3713"},
             {"path": ".github/workflows/release-artifacts.yml", "sha256": "958d3df941225ce02ad7c0fec5ad7e468bc5dbbfde016afb7c5be2affdb32d23"},
             {"path": ".github/workflows/datapack-release.yml", "sha256": "1c449f274f0486c7de8dbecf771cc6813045309277a7a8123b56bee7c1567008"},
             {"path": "backend/build.gradle", "sha256": "00106be89d1834db166c0c4cfba04674e2a456e7e57648595b74feb933c31273"},

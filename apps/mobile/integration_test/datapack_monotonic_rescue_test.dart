@@ -11,8 +11,10 @@ import 'package:easysubway_mobile/core/datapack/data_pack_manifest.dart';
 import 'package:easysubway_mobile/core/datapack/data_pack_update_state.dart';
 import 'package:easysubway_mobile/core/datapack/data_pack_updater.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:sqlite3/sqlite3.dart';
 
 const _rcManifestSha256 = String.fromEnvironment(
   'EASYSUBWAY_RC_MANIFEST_SHA256',
@@ -32,6 +34,56 @@ void main() {
       final directory = await Directory.systemTemp.createTemp(
         'easysubway-android-monotonic-rescue-',
       );
+      final rcBundle =
+          jsonDecode(
+                await rootBundle.loadString(
+                  'assets/datapacks/prelaunch/android-rc-bundle.json',
+                ),
+              )
+              as Map<String, Object?>;
+      final rcManifestBytes = base64Decode(
+        rcBundle['manifestBytesBase64']! as String,
+      );
+      final rcArtifactBytes = base64Decode(
+        rcBundle['artifactBytesBase64']! as String,
+      );
+      final computedManifestSha256 = sha256.convert(rcManifestBytes).toString();
+      final computedArtifactSha256 = sha256.convert(rcArtifactBytes).toString();
+      expect(computedManifestSha256, _rcManifestSha256);
+      expect(computedManifestSha256, rcBundle['manifestSha256']);
+      expect(computedArtifactSha256, rcBundle['artifactSha256']);
+      final publicKeyJson = rcBundle['publicKey']! as Map<String, Object?>;
+      final rcManifest = DataPackManifest.fromJson(
+        jsonDecode(utf8.decode(rcManifestBytes)) as Map<String, Object?>,
+        productionSigningPublicKey: DataPackSigningPublicKey(
+          modulusBase64Url: publicKeyJson['modulusBase64Url']! as String,
+          exponentBase64Url: publicKeyJson['exponentBase64Url']! as String,
+          keyId: publicKeyJson['keyId']! as String,
+        ),
+      );
+      expect(rcManifest.releaseSequence, _rcReleaseSequence);
+      final rcPack = rcManifest.packs.singleWhere(
+        (pack) => pack.compressedSha256 == computedArtifactSha256,
+      );
+      final rcSqliteBytes = gzip.decode(rcArtifactBytes);
+      expect(sha256.convert(rcSqliteBytes).toString(), rcPack.sqliteSha256);
+      final rcSqliteFile = File('${directory.path}/actual-rc.sqlite');
+      await rcSqliteFile.writeAsBytes(rcSqliteBytes, flush: true);
+      final rcSqlite = sqlite3.open(rcSqliteFile.path, mode: OpenMode.readOnly);
+      try {
+        expect(rcSqlite.select('PRAGMA quick_check').first.values.first, 'ok');
+        for (final table in rcPack.requiredTables) {
+          expect(
+            rcSqlite.select(
+              "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+              [table],
+            ),
+            isNotEmpty,
+          );
+        }
+      } finally {
+        rcSqlite.close();
+      }
       final userDatabase = user_db.UserDatabase.memory();
       final catalogDirectory = Directory('${directory.path}/catalog');
       final knownGoodSqliteBytes = await _catalogSqliteBytesWithMarker(
@@ -185,8 +237,13 @@ void main() {
           jsonEncode({
             'artifactKind': 'android-datapack-monotonic-rescue-evidence',
             'status': 'PASS',
-            'rcManifestSha256': _rcManifestSha256,
+            'rcManifestSha256': computedManifestSha256,
+            'rcArtifactSha256': computedArtifactSha256,
             'rescueReleaseSequence': _rcReleaseSequence,
+            'rcManifestBytesVerified': true,
+            'rcArtifactBytesVerified': true,
+            'rcSignatureVerified': true,
+            'rcSqliteIntegrityVerified': true,
             'knownGoodContentRestored': true,
             'idempotentReplayVerified': true,
             'corruptSuccessorPreservedKnownGood': true,

@@ -57,6 +57,10 @@ jobs:
             --evaluated-at "${EVALUATED_AT}" \
             --github-output "${GITHUB_OUTPUT}"
 
+      - name: Stage actual RC bytes for Android verification
+        shell: bash
+        run: cp "${EVIDENCE_DIR}/android-rc-bundle.json" apps/mobile/assets/datapacks/prelaunch/android-rc-bundle.json
+
       - name: Rehearse monotonic rescue on Android emulator
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
         with:

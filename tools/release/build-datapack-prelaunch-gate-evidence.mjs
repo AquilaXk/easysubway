@@ -192,7 +192,12 @@ function validateAndroidDeviceReport(report, identity) {
   if (report?.artifactKind !== "android-datapack-monotonic-rescue-evidence"
     || report.status !== "PASS"
     || report.rcManifestSha256 !== identity.dataPackManifestSha256
+    || report.rcArtifactSha256 !== identity.dataPackArtifactSha256
     || report.rescueReleaseSequence !== identity.releaseSequence
+    || report.rcManifestBytesVerified !== true
+    || report.rcArtifactBytesVerified !== true
+    || report.rcSignatureVerified !== true
+    || report.rcSqliteIntegrityVerified !== true
     || report.knownGoodContentRestored !== true
     || report.idempotentReplayVerified !== true
     || report.corruptSuccessorPreservedKnownGood !== true
@@ -218,7 +223,10 @@ function validateConditionalPublishReport(report, identity) {
     || report.isolatedTarget?.artifactSha256 !== identity.dataPackArtifactSha256
     || report.isolatedTarget?.immutableManifestWritten !== true
     || report.isolatedTarget?.channelManifestWrittenLast !== true
-    || report.isolatedTarget?.readBackVerified !== true) {
+    || report.isolatedTarget?.readBackVerified !== true
+    || report.isolatedTarget?.idempotentReplayVerified !== true
+    || report.isolatedTarget?.immutableConflictRejected !== true
+    || report.isolatedTarget?.executor !== "tools/datapack/publish-object-storage.mjs") {
     throw new Error("conditional publish rehearsal does not match the RC identity");
   }
 }
@@ -338,6 +346,7 @@ async function prepare(args) {
   const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
   const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
   const publicKeyPem = publicKey.export({ type: "spki", format: "pem" }).toString();
+  const publicKeyJwk = publicKey.export({ format: "jwk" });
   const buildOutput = path.join(outputDir, "built-datapack");
   await mkdir(outputDir, { recursive: true });
   await execFileAsync(process.execPath, [
@@ -415,13 +424,13 @@ async function prepare(args) {
     selectedArtifactSha256: pack.sha256,
     selectedReleaseSequence: rescue.manifest.releaseSequence,
   };
-  await mkdir(path.join(outputDir, "catalog/releases"), { recursive: true });
   const paths = {
     manifest: path.join(outputDir, "rescue-manifest.json"),
     rollback: path.join(outputDir, "rollback-report.json"),
     callback: path.join(outputDir, "callback-execution-report.json"),
     conditionalPublish: path.join(outputDir, "conditional-publish-report.json"),
     binding: path.join(outputDir, "rehearsal-binding.json"),
+    androidBundle: path.join(outputDir, "android-rc-bundle.json"),
     publicKey: path.join(outputDir, "public-key.pem"),
     candidate: path.join(outputDir, "candidate-context.json"),
   };
@@ -429,14 +438,27 @@ async function prepare(args) {
     writeFile(paths.manifest, rescue.manifestBytes),
     writeFile(paths.rollback, jsonBytes(rollbackReport)),
     writeFile(paths.binding, jsonBytes(rehearsalBinding)),
+    writeFile(paths.androidBundle, jsonBytes({
+      schemaVersion: 1,
+      artifactKind: "android-prelaunch-rc-bundle",
+      manifestSha256: sha256(rescue.manifestBytes),
+      artifactSha256: pack.sha256,
+      manifestBytesBase64: rescue.manifestBytes.toString("base64"),
+      artifactBytesBase64: artifactBytes.toString("base64"),
+      publicKey: {
+        keyId: "production-v1",
+        modulusBase64Url: publicKeyJwk.n,
+        exponentBase64Url: publicKeyJwk.e,
+      },
+    })),
     writeFile(paths.publicKey, publicKeyPem, { mode: 0o600 }),
-    writeFile(path.join(outputDir, `catalog/releases/${rescue.manifest.releaseSequence}.json`), rescue.manifestBytes),
   ]);
-  await writeFile(path.join(outputDir, "catalog/current.json"), rescue.manifestBytes);
+  const isolatedPublish = await runIsolatedPublishExecutor({
+    repoRoot, outputDir, rescue, artifactBytes, publicKeyPem,
+  });
   const conditionalPublishReport = await buildConditionalPublishReport({
     buildSpec, buildSpecBytes, evaluatedAt, rescue, failed, artifactBytes,
-    isolatedManifestPath: path.join(outputDir, "catalog/current.json"),
-    isolatedImmutablePath: path.join(outputDir, `catalog/releases/${rescue.manifest.releaseSequence}.json`),
+    isolatedPublish,
   });
   await writeFile(paths.conditionalPublish, jsonBytes(conditionalPublishReport));
   const gitSha = (await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: repoRoot })).stdout.trim();
@@ -560,7 +582,7 @@ async function runGenerator({
 
 async function buildConditionalPublishReport({
   buildSpec, buildSpecBytes, evaluatedAt, rescue, failed, artifactBytes,
-  isolatedManifestPath, isolatedImmutablePath,
+  isolatedPublish,
 }) {
   const candidateManifest = rescue.manifest;
   const candidateManifestSha256 = sha256(rescue.manifestBytes);
@@ -586,14 +608,18 @@ async function buildConditionalPublishReport({
     candidateManifest, currentManifest: previousManifest,
     candidateManifestSha256, currentManifestSha256: previousManifestSha256,
     buildSpec, buildSpecSha256: sha256(buildSpecBytes), releaseRequest,
-    strictValidationPassed: true, publishAttempted: true, remoteValidationPassed: true,
+    strictValidationPassed: true,
+    publishAttempted: isolatedPublish.executor === "tools/datapack/publish-object-storage.mjs",
+    remoteValidationPassed: isolatedPublish.immutableManifestWritten
+      && isolatedPublish.channelManifestWrittenLast
+      && isolatedPublish.idempotentReplayVerified
+      && isolatedPublish.immutableConflictRejected
+      && isolatedPublish.manifestSha256 === candidateManifestSha256
+      && isolatedPublish.artifactSha256 === candidateManifest.packs[0].sha256,
     evaluationAt: evaluatedAt,
   });
-  const [channelBytes, immutableBytes] = await Promise.all([
-    readFile(isolatedManifestPath), readFile(isolatedImmutablePath),
-  ]);
-  const readBackVerified = sha256(channelBytes) === candidateManifestSha256
-    && sha256(immutableBytes) === candidateManifestSha256
+  const readBackVerified = isolatedPublish.manifestSha256 === candidateManifestSha256
+    && isolatedPublish.artifactSha256 === candidateManifest.packs[0].sha256
     && sha256(artifactBytes) === candidateManifest.packs[0].sha256;
   return {
     schemaVersion: 1, executionEnvironment: "ISOLATED_PRELAUNCH",
@@ -602,9 +628,133 @@ async function buildConditionalPublishReport({
     isolatedTarget: {
       manifestSha256: candidateManifestSha256,
       artifactSha256: candidateManifest.packs[0].sha256,
-      immutableManifestWritten: true, channelManifestWrittenLast: true, readBackVerified,
+      executor: isolatedPublish.executor,
+      immutableManifestWritten: isolatedPublish.immutableManifestWritten,
+      channelManifestWrittenLast: isolatedPublish.channelManifestWrittenLast,
+      idempotentReplayVerified: isolatedPublish.idempotentReplayVerified,
+      immutableConflictRejected: isolatedPublish.immutableConflictRejected,
+      readBackVerified,
     },
   };
+}
+
+async function runIsolatedPublishExecutor({ repoRoot, outputDir, rescue, artifactBytes, publicKeyPem }) {
+  const stageRoot = path.join(outputDir, "isolated-publish-stage");
+  const pack = rescue.manifest.packs[0];
+  const stagedPackPath = path.join(stageRoot, `catalog/${pack.id}-v${pack.version}.sqlite.gz`);
+  const stagedManifestPath = path.join(stageRoot, "catalog/current.json");
+  const planPath = path.join(outputDir, "isolated-publish-plan.json");
+  await mkdir(path.dirname(stagedPackPath), { recursive: true });
+  await Promise.all([
+    writeFile(stagedPackPath, artifactBytes),
+    writeFile(stagedManifestPath, rescue.manifestBytes),
+  ]);
+  await execFileAsync(process.execPath, [
+    path.join(repoRoot, "tools/datapack/create-publish-plan.mjs"),
+    "--manifest", stagedManifestPath,
+    "--root", stageRoot,
+    "--output", planPath,
+  ], {
+    cwd: repoRoot,
+    env: { ...process.env, EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: publicKeyPem },
+  });
+
+  const objects = new Map();
+  const operations = [];
+  const server = createServer(async (request, response) => {
+    const key = decodeURIComponent(new URL(request.url, "http://127.0.0.1").pathname.replace(/^\/+/, ""));
+    if (request.method === "PUT") {
+      if (request.headers["if-none-match"] === "*" && objects.has(key)) {
+        operations.push({ method: "PUT", key, status: 412 });
+        response.writeHead(412).end();
+        return;
+      }
+      const chunks = [];
+      for await (const chunk of request) chunks.push(chunk);
+      const body = Buffer.concat(chunks);
+      objects.set(key, {
+        body,
+        cacheControl: request.headers["cache-control"],
+      });
+      operations.push({ method: "PUT", key, status: 200 });
+      response.writeHead(200).end();
+      return;
+    }
+    const stored = objects.get(key);
+    operations.push({ method: request.method, key, status: stored ? 200 : 404 });
+    if (!stored) {
+      response.writeHead(404).end();
+      return;
+    }
+    response.writeHead(200, {
+      "cache-control": stored.cacheControl,
+      "content-length": stored.body.length,
+    });
+    response.end(request.method === "HEAD" ? undefined : stored.body);
+  });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  try {
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("isolated publish server address is invalid");
+    const runExecutor = () => execFileAsync(process.execPath, [
+      path.join(repoRoot, "tools/datapack/publish-object-storage.mjs"),
+      "--plan", planPath,
+      "--root", stageRoot,
+    ], {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        EASYSUBWAY_OBJECT_STORAGE_PREAUTH_BASE_URL: `http://127.0.0.1:${address.port}`,
+      },
+    });
+    await runExecutor();
+    const firstRunOperations = operations.slice();
+    const immutableKey = `catalog/releases/${rescue.manifest.releaseSequence}.json`;
+    const channelKey = "catalog/current.json";
+    const packKey = `catalog/${pack.id}-v${pack.version}.sqlite.gz`;
+    const immutable = objects.get(immutableKey);
+    const channel = objects.get(channelKey);
+    const storedPack = objects.get(packKey);
+    const immutableManifestWritten = sha256(immutable?.body ?? Buffer.alloc(0)) === sha256(rescue.manifestBytes);
+    const manifestSha256 = sha256(channel?.body ?? Buffer.alloc(0));
+    const artifactSha256 = sha256(storedPack?.body ?? Buffer.alloc(0));
+    const putIndex = (key) => firstRunOperations.findIndex((entry) => entry.method === "PUT" && entry.key === key);
+    const channelManifestWrittenLast = putIndex(packKey) >= 0
+      && putIndex(immutableKey) > putIndex(packKey)
+      && putIndex(channelKey) > putIndex(immutableKey);
+
+    await runExecutor();
+    const idempotentReplayVerified = sha256(objects.get(immutableKey)?.body ?? Buffer.alloc(0))
+      === sha256(rescue.manifestBytes);
+    const originalImmutable = objects.get(immutableKey);
+    objects.set(immutableKey, {
+      body: Buffer.from("conflicting-immutable-manifest"),
+      cacheControl: originalImmutable.cacheControl,
+    });
+    let immutableConflictRejected = false;
+    try {
+      await runExecutor();
+    } catch (error) {
+      if (!String(error.stderr ?? error.message).includes("immutable violation")) throw error;
+      immutableConflictRejected = true;
+    } finally {
+      objects.set(immutableKey, originalImmutable);
+    }
+    return {
+      executor: "tools/datapack/publish-object-storage.mjs",
+      manifestSha256,
+      artifactSha256,
+      immutableManifestWritten,
+      channelManifestWrittenLast,
+      idempotentReplayVerified,
+      immutableConflictRejected,
+    };
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
 }
 
 async function runCallbackRehearsal({ manifestBytes, identity, pack, rollbackReport }) {
