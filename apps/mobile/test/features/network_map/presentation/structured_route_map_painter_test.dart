@@ -155,15 +155,9 @@ void main() {
     // 동일 attribution → repaint 없음(기존 무효화 조건 유지 확인).
     expect(base.shouldRepaint(painterWith()), isFalse);
     // attributionText 값이 다르면 repaint.
-    expect(
-      base.shouldRepaint(painterWith(attributionText: '© 다른 출처')),
-      isTrue,
-    );
+    expect(base.shouldRepaint(painterWith(attributionText: '© 다른 출처')), isTrue);
     // attributionPainter identity만 달라도 repaint.
-    expect(
-      base.shouldRepaint(painterWith(withPainter: otherPainter)),
-      isTrue,
-    );
+    expect(base.shouldRepaint(painterWith(withPainter: otherPainter)), isTrue);
 
     attributionPainter.dispose();
     otherPainter.dispose();

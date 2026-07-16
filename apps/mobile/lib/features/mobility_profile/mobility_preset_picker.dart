@@ -83,8 +83,9 @@ Future<MobilityPreset?> showMobilityPresetSheet(
                             preset: mobilityPresetSheetOrder[i],
                             selected: mobilityPresetSheetOrder[i] == current,
                             showDescription: true,
-                            onTap: () => Navigator.of(sheetContext)
-                                .pop(mobilityPresetSheetOrder[i]),
+                            onTap: () => Navigator.of(
+                              sheetContext,
+                            ).pop(mobilityPresetSheetOrder[i]),
                           ),
                         ),
                       ],

@@ -9,9 +9,11 @@ void main() {
   // 원본이다(node 리포 계약 테스트에서도 검증). 이 테스트는 Dart 상수를 그
   // JSON에 고정해 둘이 서로 어긋나지 않게 한다.
   test('Dart 프리셋 상수는 release policy JSON과 동기화된다', () {
-    final json = jsonDecode(
-      File('release/mobility-profile-policy.json').readAsStringSync(),
-    ) as Map<String, dynamic>;
+    final json =
+        jsonDecode(
+              File('release/mobility-profile-policy.json').readAsStringSync(),
+            )
+            as Map<String, dynamic>;
 
     expect(json['schemaVersion'], 1);
     expect(json['artifactKind'], 'mobility-profile-policy');
@@ -40,7 +42,9 @@ void main() {
 
     // 시설 제약 매핑.
     expect(
-      MobilityProfilePolicy.presets[MobilityPreset.standard]!.facilityConstraint,
+      MobilityProfilePolicy
+          .presets[MobilityPreset.standard]!
+          .facilityConstraint,
       FacilityConstraint.none,
     );
     expect(
@@ -48,11 +52,15 @@ void main() {
       FacilityConstraint.none,
     );
     expect(
-      MobilityProfilePolicy.presets[MobilityPreset.noStairs]!.facilityConstraint,
+      MobilityProfilePolicy
+          .presets[MobilityPreset.noStairs]!
+          .facilityConstraint,
       FacilityConstraint.noStairs,
     );
     expect(
-      MobilityProfilePolicy.presets[MobilityPreset.stepFree]!.facilityConstraint,
+      MobilityProfilePolicy
+          .presets[MobilityPreset.stepFree]!
+          .facilityConstraint,
       FacilityConstraint.elevatorOnly,
     );
 
@@ -63,15 +71,18 @@ void main() {
     );
     expect(
       MobilityProfilePolicy
-          .presets[MobilityPreset.stepFree]!.elevatorWaitSeconds,
+          .presets[MobilityPreset.stepFree]!
+          .elevatorWaitSeconds,
       60,
     );
   });
 
   test('Dart 이동 유형 매핑은 release policy JSON과 동기화된다', () {
-    final json = jsonDecode(
-      File('release/mobility-profile-policy.json').readAsStringSync(),
-    ) as Map<String, dynamic>;
+    final json =
+        jsonDecode(
+              File('release/mobility-profile-policy.json').readAsStringSync(),
+            )
+            as Map<String, dynamic>;
     final mapping = json['mobilityTypeMapping'] as Map<String, dynamic>;
 
     final expectedTypeByKey = <String, MobilityType>{

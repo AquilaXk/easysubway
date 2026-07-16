@@ -144,7 +144,8 @@ class EasySubwaySearchField extends StatelessWidget {
             child: Padding(
               // idle의 콘텐츠 시작 위치와 동일: 테두리(1.5) + 패딩(12).
               padding: const EdgeInsets.symmetric(
-                horizontal: easySubwaySearchFieldBorderWidth +
+                horizontal:
+                    easySubwaySearchFieldBorderWidth +
                     easySubwaySearchFieldHorizontalPadding,
               ),
               child: Row(
@@ -175,55 +176,55 @@ class EasySubwaySearchField extends StatelessWidget {
                     // 타깃/semantics를 유지한다.
                     child: MergeSemantics(
                       child: _maybeWrapSemantics(
-                      // 터치타겟(56·배율확대) 안에서 단일 줄 필드를 세로 중앙에
-                      // 놓는다. TextField는 고유 높이(글자 줄 높이 + isDense 최소
-                      // 여백)로 두고 Center가 그 줄을 46px 시각 박스 중앙(=터치타겟
-                      // 중앙)에 정렬한다. idle 필드가 Container(46) 안 Row로 고유
-                      // 높이 Text를 중앙에 놓는 것과 같은 폰트 메트릭 독립 원리라,
-                      // 실기기 Noto Sans KR에서 hint·캐럿·입력 글자가 시각 박스
-                      // 중앙에 오프셋 0으로 정합함을 픽셀 판독으로 확인했다(정본 —
-                      // docs/2082-qa). 절대값 비대칭 패딩(구 21/9)·고정 높이 박스 +
-                      // textAlignVertical 조합은 실기기에서 입력 줄을 위/아래로
-                      // 편향시켜 버렸다.
-                      //
-                      // 입력 필드 자체(고유 높이)의 semantics 노드는 46 미만이지만,
-                      // 바깥 SizedBox(56)와 함께 MergeSemantics로 병합해 탭 타깃
-                      // semantics 노드가 터치타겟 높이(≥48)를 갖게 한다(접근성 최소
-                      // 탭 타깃). 지우기 버튼은 이 병합 밖 형제라 자체 탭 타깃·
-                      // semantics를 유지한다.
-                      SizedBox(
-                        height: touchTargetHeight,
-                        child: Center(
-                          child: TextField(
-                            key: const Key('stationSearchInput'),
-                            controller: editController,
-                            focusNode: focusNode,
-                            autofocus: autofocus,
-                            maxLines: 1,
-                            textInputAction: TextInputAction.search,
-                            // #2082: 입력 텍스트 style을 hint style과 동일 glyph
-                            // 메트릭(fontSize 17·w600·height 미지정)으로 두고 색만
-                            // 본문색으로 바꾼다. 두 style이 다른 height를 가지면
-                            // hint와 편집 텍스트의 glyph 중심이 어긋난다.
-                            style: easySubwaySearchFieldInputStyle,
-                            // isDense + contentPadding 0 으로 필드 고유 높이를 글자
-                            // 줄 높이로 만들고 Center로 중앙 정렬한다. isCollapsed·
-                            // floatingLabelBehavior는 각각 탭 타깃·부유 라벨 회귀
-                            // (#1933)를 유발해 쓰지 않는다.
-                            decoration: InputDecoration(
-                              hintText: hintText,
-                              hintStyle: easySubwaySearchFieldHintStyle,
-                              isDense: true,
-                              contentPadding: EdgeInsets.zero,
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
+                        // 터치타겟(56·배율확대) 안에서 단일 줄 필드를 세로 중앙에
+                        // 놓는다. TextField는 고유 높이(글자 줄 높이 + isDense 최소
+                        // 여백)로 두고 Center가 그 줄을 46px 시각 박스 중앙(=터치타겟
+                        // 중앙)에 정렬한다. idle 필드가 Container(46) 안 Row로 고유
+                        // 높이 Text를 중앙에 놓는 것과 같은 폰트 메트릭 독립 원리라,
+                        // 실기기 Noto Sans KR에서 hint·캐럿·입력 글자가 시각 박스
+                        // 중앙에 오프셋 0으로 정합함을 픽셀 판독으로 확인했다(정본 —
+                        // docs/2082-qa). 절대값 비대칭 패딩(구 21/9)·고정 높이 박스 +
+                        // textAlignVertical 조합은 실기기에서 입력 줄을 위/아래로
+                        // 편향시켜 버렸다.
+                        //
+                        // 입력 필드 자체(고유 높이)의 semantics 노드는 46 미만이지만,
+                        // 바깥 SizedBox(56)와 함께 MergeSemantics로 병합해 탭 타깃
+                        // semantics 노드가 터치타겟 높이(≥48)를 갖게 한다(접근성 최소
+                        // 탭 타깃). 지우기 버튼은 이 병합 밖 형제라 자체 탭 타깃·
+                        // semantics를 유지한다.
+                        SizedBox(
+                          height: touchTargetHeight,
+                          child: Center(
+                            child: TextField(
+                              key: const Key('stationSearchInput'),
+                              controller: editController,
+                              focusNode: focusNode,
+                              autofocus: autofocus,
+                              maxLines: 1,
+                              textInputAction: TextInputAction.search,
+                              // #2082: 입력 텍스트 style을 hint style과 동일 glyph
+                              // 메트릭(fontSize 17·w600·height 미지정)으로 두고 색만
+                              // 본문색으로 바꾼다. 두 style이 다른 height를 가지면
+                              // hint와 편집 텍스트의 glyph 중심이 어긋난다.
+                              style: easySubwaySearchFieldInputStyle,
+                              // isDense + contentPadding 0 으로 필드 고유 높이를 글자
+                              // 줄 높이로 만들고 Center로 중앙 정렬한다. isCollapsed·
+                              // floatingLabelBehavior는 각각 탭 타깃·부유 라벨 회귀
+                              // (#1933)를 유발해 쓰지 않는다.
+                              decoration: InputDecoration(
+                                hintText: hintText,
+                                hintStyle: easySubwaySearchFieldHintStyle,
+                                isDense: true,
+                                contentPadding: EdgeInsets.zero,
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                              ),
+                              onSubmitted: onSubmitted,
                             ),
-                            onSubmitted: onSubmitted,
                           ),
                         ),
                       ),
-                    ),
                     ),
                   ),
                   // 지우기 버튼은 입력 유무에 따라 나타난다. 컨트롤러를 직접
@@ -280,11 +281,7 @@ class EasySubwaySearchField extends StatelessWidget {
       return child;
     }
     return MergeSemantics(
-      child: Semantics(
-        label: label,
-        textField: true,
-        child: child,
-      ),
+      child: Semantics(label: label, textField: true, child: child),
     );
   }
 }

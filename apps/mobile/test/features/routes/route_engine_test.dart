@@ -377,30 +377,33 @@ void main() {
       expect(result.warningCodes, isEmpty);
     });
 
-    test('보수중(UNDER_MAINTENANCE) edge는 어떤 조건에서도 가용으로 렌더되지 않고 보수중 사유로 차단된다 (#1996)', () {
-      // 실측 보수중 edge는 available로 오인되면 절대 안 된다. 휠체어뿐 아니라
-      // 계단을 쓸 수 있는 일반 조건(SENIOR)에서도 차단되어야 정직 표시다.
-      for (final mobility in [MobilityType.wheelchair, MobilityType.senior]) {
-        final engine = LocalRouteEngine(graph: _underMaintenanceFixtureGraph());
+    test(
+      '보수중(UNDER_MAINTENANCE) edge는 어떤 조건에서도 가용으로 렌더되지 않고 보수중 사유로 차단된다 (#1996)',
+      () {
+        // 실측 보수중 edge는 available로 오인되면 절대 안 된다. 휠체어뿐 아니라
+        // 계단을 쓸 수 있는 일반 조건(SENIOR)에서도 차단되어야 정직 표시다.
+        for (final mobility in [MobilityType.wheelchair, MobilityType.senior]) {
+          final engine = LocalRouteEngine(
+            graph: _underMaintenanceFixtureGraph(),
+          );
 
-        final result = engine.search(
-          RouteRequest(
-            originStationId: 'station-sangnoksu',
-            destinationStationId: 'station-sadang',
-            mobilityType: mobility,
-          ),
-        );
+          final result = engine.search(
+            RouteRequest(
+              originStationId: 'station-sangnoksu',
+              destinationStationId: 'station-sadang',
+              mobilityType: mobility,
+            ),
+          );
 
-        expect(result.status, RouteStatus.blocked, reason: '$mobility');
-        expect(result.edgeIds, isEmpty, reason: '$mobility');
-        expect(
-          result.blockedReasonCodes,
-          ['FACILITY_UNDER_MAINTENANCE'],
-          reason: '$mobility',
-        );
-        expect(result.warningCodes, isEmpty, reason: '$mobility');
-      }
-    });
+          expect(result.status, RouteStatus.blocked, reason: '$mobility');
+          expect(result.edgeIds, isEmpty, reason: '$mobility');
+          expect(result.blockedReasonCodes, [
+            'FACILITY_UNDER_MAINTENANCE',
+          ], reason: '$mobility');
+          expect(result.warningCodes, isEmpty, reason: '$mobility');
+        }
+      },
+    );
 
     test('실측 비가용(보수중 아님) edge는 일반 이용 어려움 사유로 차단된다 (#1996)', () {
       final engine = LocalRouteEngine(graph: _unavailableFixtureGraph());

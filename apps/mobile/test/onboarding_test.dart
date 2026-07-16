@@ -81,10 +81,7 @@ void main() {
     // 가치 타이틀은 header 시맨틱스로 노출된다.
     expect(
       tester.getSemantics(find.text('빠른 길보다\n갈 수 있는 길을\n안내합니다')),
-      matchesSemantics(
-        label: '빠른 길보다\n갈 수 있는 길을\n안내합니다',
-        isHeader: true,
-      ),
+      matchesSemantics(label: '빠른 길보다\n갈 수 있는 길을\n안내합니다', isHeader: true),
     );
 
     semanticsHandle.dispose();
@@ -163,9 +160,7 @@ void main() {
     expect(find.byKey(const Key('startScreenStartButton')), findsOneWidget);
   });
 
-  testWidgets('시작 화면은 소형 화면(320×568)+확대 텍스트에서도 스크롤로 CTA에 닿는다', (
-    tester,
-  ) async {
+  testWidgets('시작 화면은 소형 화면(320×568)+확대 텍스트에서도 스크롤로 CTA에 닿는다', (tester) async {
     // #2081 리뷰 finding: 기본 배율(320×568)에서는 콘텐츠가 화면에 다 들어가
     // maxScrollExtent가 0이라 SingleChildScrollView 구조가 제거돼도 이전
     // 테스트가 green일 수 있었다. textScaler를 키워 실제로 오버플로가
@@ -200,9 +195,7 @@ void main() {
     // ensureVisible로 스크롤해야 CTA를 탭할 수 있고, 탭이 실제로 콜백을
     // 호출한다 — SingleChildScrollView 구조가 제거되면 오버플로 예외로
     // 이 흐름 자체가 실패한다.
-    await tester.ensureVisible(
-      find.byKey(const Key('startScreenStartButton')),
-    );
+    await tester.ensureVisible(find.byKey(const Key('startScreenStartButton')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('startScreenStartButton')));
     await tester.pumpAndSettle();
@@ -257,7 +250,10 @@ void main() {
       expect(find.text('보통 걸음'), findsOneWidget);
       expect(find.text('휠체어 이용'), findsOneWidget);
       // #1703: 온보딩 step0은 표시명과 부가설명을 함께 노출한다.
-      expect(find.text('엘리베이터로만 이동하는 길을 안내해요 · 유아차와 함께일 때도 좋아요'), findsOneWidget);
+      expect(
+        find.text('엘리베이터로만 이동하는 길을 안내해요 · 유아차와 함께일 때도 좋아요'),
+        findsOneWidget,
+      );
 
       // #1703: 기본 선택(보통 걸음)이라 '이대로 시작'으로 바로 통과할 수 있다.
       final doneButton = tester.widget<FilledButton>(
@@ -266,14 +262,10 @@ void main() {
       expect(doneButton.onPressed, isNotNull);
       expect(find.text('이대로 시작'), findsOneWidget);
 
-      await tester.tap(
-        find.byKey(const Key('mobilityPresetRow-stepFree')),
-      );
+      await tester.tap(find.byKey(const Key('mobilityPresetRow-stepFree')));
       await tester.pumpAndSettle();
       expect(
-        find.bySemanticsLabel(
-          '휠체어 이용, 엘리베이터로만 이동하는 길을 안내해요 · 유아차와 함께일 때도 좋아요',
-        ),
+        find.bySemanticsLabel('휠체어 이용, 엘리베이터로만 이동하는 길을 안내해요 · 유아차와 함께일 때도 좋아요'),
         findsOneWidget,
       );
 

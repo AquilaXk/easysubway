@@ -129,15 +129,51 @@ void main() {
         baseCashFare: 1650,
         baseDistanceMeters: 10000,
         additionalSteps: [
-          FareAdditionalStep(distanceMeters: 5000, cardFare: 100, cashFare: 100),
-          FareAdditionalStep(distanceMeters: 5000, cardFare: 100, cashFare: 100),
-          FareAdditionalStep(distanceMeters: 5000, cardFare: 100, cashFare: 100),
-          FareAdditionalStep(distanceMeters: 5000, cardFare: 100, cashFare: 100),
-          FareAdditionalStep(distanceMeters: 5000, cardFare: 100, cashFare: 100),
-          FareAdditionalStep(distanceMeters: 5000, cardFare: 100, cashFare: 100),
-          FareAdditionalStep(distanceMeters: 5000, cardFare: 100, cashFare: 100),
-          FareAdditionalStep(distanceMeters: 5000, cardFare: 100, cashFare: 100),
-          FareAdditionalStep(distanceMeters: 8000, cardFare: 100, cashFare: 100),
+          FareAdditionalStep(
+            distanceMeters: 5000,
+            cardFare: 100,
+            cashFare: 100,
+          ),
+          FareAdditionalStep(
+            distanceMeters: 5000,
+            cardFare: 100,
+            cashFare: 100,
+          ),
+          FareAdditionalStep(
+            distanceMeters: 5000,
+            cardFare: 100,
+            cashFare: 100,
+          ),
+          FareAdditionalStep(
+            distanceMeters: 5000,
+            cardFare: 100,
+            cashFare: 100,
+          ),
+          FareAdditionalStep(
+            distanceMeters: 5000,
+            cardFare: 100,
+            cashFare: 100,
+          ),
+          FareAdditionalStep(
+            distanceMeters: 5000,
+            cardFare: 100,
+            cashFare: 100,
+          ),
+          FareAdditionalStep(
+            distanceMeters: 5000,
+            cardFare: 100,
+            cashFare: 100,
+          ),
+          FareAdditionalStep(
+            distanceMeters: 5000,
+            cardFare: 100,
+            cashFare: 100,
+          ),
+          FareAdditionalStep(
+            distanceMeters: 8000,
+            cardFare: 100,
+            cashFare: 100,
+          ),
         ],
       );
 

@@ -37,41 +37,44 @@ void main() {
     await controller.dispose();
   });
 
-  test('setCamera는 프레임을 요청하고 post-frame에 CameraLatency·FramePresented', () async {
-    final frames = <void Function(Duration)>[];
-    var frameRequests = 0;
-    final controller = StructuredRouteMapRendererController(
-      scheduleFrame: frames.add,
-      requestFrame: () => frameRequests++,
-    );
-    final events = <RouteMapRendererEvent>[];
-    controller.events.listen(events.add);
-    await flush();
-    events.clear();
+  test(
+    'setCamera는 프레임을 요청하고 post-frame에 CameraLatency·FramePresented',
+    () async {
+      final frames = <void Function(Duration)>[];
+      var frameRequests = 0;
+      final controller = StructuredRouteMapRendererController(
+        scheduleFrame: frames.add,
+        requestFrame: () => frameRequests++,
+      );
+      final events = <RouteMapRendererEvent>[];
+      controller.events.listen(events.add);
+      await flush();
+      events.clear();
 
-    await controller.setCamera(cameraAt(7));
-    await flush();
+      await controller.setCamera(cameraAt(7));
+      await flush();
 
-    expect(
-      events.whereType<RouteMapRendererCameraRequested>().single.revision,
-      7,
-    );
-    expect(frameRequests, greaterThanOrEqualTo(1)); // 프레임을 실제로 요청함
-    expect(events.whereType<RouteMapRendererFramePresented>(), isEmpty);
-    expect(frames, hasLength(1));
+      expect(
+        events.whereType<RouteMapRendererCameraRequested>().single.revision,
+        7,
+      );
+      expect(frameRequests, greaterThanOrEqualTo(1)); // 프레임을 실제로 요청함
+      expect(events.whereType<RouteMapRendererFramePresented>(), isEmpty);
+      expect(frames, hasLength(1));
 
-    frames.single(Duration.zero); // 프레임 도착 시뮬레이션
-    await flush();
+      frames.single(Duration.zero); // 프레임 도착 시뮬레이션
+      await flush();
 
-    expect(
-      events.whereType<RouteMapRendererFramePresented>().single.revision,
-      7,
-    );
-    final latency = events.whereType<RouteMapRendererCameraLatency>().single;
-    expect(latency.revision, 7);
-    expect(latency.elapsed, greaterThanOrEqualTo(Duration.zero));
-    await controller.dispose();
-  });
+      expect(
+        events.whereType<RouteMapRendererFramePresented>().single.revision,
+        7,
+      );
+      final latency = events.whereType<RouteMapRendererCameraLatency>().single;
+      expect(latency.revision, 7);
+      expect(latency.elapsed, greaterThanOrEqualTo(Duration.zero));
+      await controller.dispose();
+    },
+  );
 
   test('retry는 마지막 revision의 FramePresented를 다시 통지한다(복구 완료)', () async {
     final frames = <void Function(Duration)>[];

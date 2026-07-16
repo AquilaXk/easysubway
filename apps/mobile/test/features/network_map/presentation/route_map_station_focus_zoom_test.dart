@@ -66,74 +66,64 @@ void main() {
       });
     });
 
-    test(
-      '초소형 지역(초기 scale이 _maxMapScale 근접)은 확대율이 2.38배보다 줄어든다 '
-      '(상한 saturation, pan-only 퇴행은 아님)',
-      () {
-        // 초기 화면 bounds가 매우 작아 초기 scale 자체가 4.8/0.42≈2.02를
-        // 넘는 경우: focus scale은 4.8에서 saturate돼 확대율이 기본
-        // 2.38배보다 작아진다. 이 케이스는 여전히 확대(ratio>1)는 되지만
-        // 그 폭이 줄어드는 정직한 상한 상호작용을 고정한다(성능을 부풀리지
-        // 않음).
-        const initialBounds = Rect.fromLTWH(1500, 1500, 400, 300);
-        final initialCamera = networkMapInitialCameraForRegion(
-          regionBounds: initialBounds,
-          fullBounds: fullBounds,
-          viewport: viewport,
-        );
-        final focusCamera = networkMapStationFocusCameraForRegion(
-          initialBounds: initialBounds,
-          stationCenter: initialBounds.center,
-          fullBounds: fullBounds,
-          viewport: viewport,
-        );
+    test('초소형 지역(초기 scale이 _maxMapScale 근접)은 확대율이 2.38배보다 줄어든다 '
+        '(상한 saturation, pan-only 퇴행은 아님)', () {
+      // 초기 화면 bounds가 매우 작아 초기 scale 자체가 4.8/0.42≈2.02를
+      // 넘는 경우: focus scale은 4.8에서 saturate돼 확대율이 기본
+      // 2.38배보다 작아진다. 이 케이스는 여전히 확대(ratio>1)는 되지만
+      // 그 폭이 줄어드는 정직한 상한 상호작용을 고정한다(성능을 부풀리지
+      // 않음).
+      const initialBounds = Rect.fromLTWH(1500, 1500, 400, 300);
+      final initialCamera = networkMapInitialCameraForRegion(
+        regionBounds: initialBounds,
+        fullBounds: fullBounds,
+        viewport: viewport,
+      );
+      final focusCamera = networkMapStationFocusCameraForRegion(
+        initialBounds: initialBounds,
+        stationCenter: initialBounds.center,
+        fullBounds: fullBounds,
+        viewport: viewport,
+      );
 
-        expect(initialCamera.scale, closeTo(2.7, 1e-9));
-        expect(focusCamera.scale, closeTo(_maxMapScaleForTest, 1e-9));
-        expect(
-          focusCamera.scale / initialCamera.scale,
-          closeTo(1.7777777777777777, 1e-9),
-          reason: '_maxMapScale saturation으로 확대율이 2.38배 미만으로 줄어야 함',
-        );
-      },
-    );
+      expect(initialCamera.scale, closeTo(2.7, 1e-9));
+      expect(focusCamera.scale, closeTo(_maxMapScaleForTest, 1e-9));
+      expect(
+        focusCamera.scale / initialCamera.scale,
+        closeTo(1.7777777777777777, 1e-9),
+        reason: '_maxMapScale saturation으로 확대율이 2.38배 미만으로 줄어야 함',
+      );
+    });
 
-    test(
-      '극소형 지역(초기 화면 자체가 이미 _maxMapScale)은 focus가 순수 pan이 된다 '
-      '(둘 다 같은 상한 공유 — pan-only 이지만 초기보다 축소되지는 않음)',
-      () {
-        // 초기 화면 bounds가 극단적으로 작아 초기 camera 자체가 이미 상한에서
-        // 시작하는 경우: focus bounds를 아무리 좁혀도 같은 상한에 막혀 focus
-        // scale == 초기 scale이 된다(ratio 1.0). 이 상태를 "확대"로 잘못
-        // 주장하지 않고, 실제 동작(순수 pan, 축소로의 퇴행은 아님) 그대로
-        // 고정한다.
-        const initialBounds = Rect.fromLTWH(1500, 1500, 100, 50);
-        final initialCamera = networkMapInitialCameraForRegion(
-          regionBounds: initialBounds,
-          fullBounds: fullBounds,
-          viewport: viewport,
-        );
-        final focusCamera = networkMapStationFocusCameraForRegion(
-          initialBounds: initialBounds,
-          stationCenter: initialBounds.center,
-          fullBounds: fullBounds,
-          viewport: viewport,
-        );
+    test('극소형 지역(초기 화면 자체가 이미 _maxMapScale)은 focus가 순수 pan이 된다 '
+        '(둘 다 같은 상한 공유 — pan-only 이지만 초기보다 축소되지는 않음)', () {
+      // 초기 화면 bounds가 극단적으로 작아 초기 camera 자체가 이미 상한에서
+      // 시작하는 경우: focus bounds를 아무리 좁혀도 같은 상한에 막혀 focus
+      // scale == 초기 scale이 된다(ratio 1.0). 이 상태를 "확대"로 잘못
+      // 주장하지 않고, 실제 동작(순수 pan, 축소로의 퇴행은 아님) 그대로
+      // 고정한다.
+      const initialBounds = Rect.fromLTWH(1500, 1500, 100, 50);
+      final initialCamera = networkMapInitialCameraForRegion(
+        regionBounds: initialBounds,
+        fullBounds: fullBounds,
+        viewport: viewport,
+      );
+      final focusCamera = networkMapStationFocusCameraForRegion(
+        initialBounds: initialBounds,
+        stationCenter: initialBounds.center,
+        fullBounds: fullBounds,
+        viewport: viewport,
+      );
 
-        expect(initialCamera.scale, closeTo(_maxMapScaleForTest, 1e-9));
-        expect(
-          focusCamera.scale,
-          closeTo(initialCamera.scale, 1e-9),
-          reason:
-              '초기 scale이 이미 상한이면 focus도 같은 상한이라 순수 pan(ratio 1.0)',
-        );
-        // 최소한 초기 scale 아래로 축소되지는 않는다.
-        expect(
-          focusCamera.scale,
-          greaterThanOrEqualTo(initialCamera.scale),
-        );
-      },
-    );
+      expect(initialCamera.scale, closeTo(_maxMapScaleForTest, 1e-9));
+      expect(
+        focusCamera.scale,
+        closeTo(initialCamera.scale, 1e-9),
+        reason: '초기 scale이 이미 상한이면 focus도 같은 상한이라 순수 pan(ratio 1.0)',
+      );
+      // 최소한 초기 scale 아래로 축소되지는 않는다.
+      expect(focusCamera.scale, greaterThanOrEqualTo(initialCamera.scale));
+    });
 
     test('LOD baseline(initialScale)은 focus 후에도 초기 화면 값을 유지한다', () {
       const initialBounds = Rect.fromLTWH(600, 500, 777, 568);

@@ -11,19 +11,10 @@
 library;
 
 /// 보행 프리셋 종류.
-enum MobilityPreset {
-  standard,
-  slow,
-  noStairs,
-  stepFree,
-}
+enum MobilityPreset { standard, slow, noStairs, stepFree }
 
 /// 프리셋별 시설 제약.
-enum FacilityConstraint {
-  none,
-  noStairs,
-  elevatorOnly,
-}
+enum FacilityConstraint { none, noStairs, elevatorOnly }
 
 /// 사용자가 선택하는 이동 유형(온보딩·프로필 입력값).
 enum MobilityType {
@@ -66,33 +57,33 @@ class MobilityProfilePolicy {
   /// 프리셋별 파생 상수.
   static const Map<MobilityPreset, MobilityPresetSpec> presets =
       <MobilityPreset, MobilityPresetSpec>{
-    MobilityPreset.standard: MobilityPresetSpec(
-      speedFactor: 1.0,
-      facilityConstraint: FacilityConstraint.none,
-    ),
-    MobilityPreset.slow: MobilityPresetSpec(
-      speedFactor: 1.35,
-      facilityConstraint: FacilityConstraint.none,
-    ),
-    MobilityPreset.noStairs: MobilityPresetSpec(
-      speedFactor: 1.2,
-      facilityConstraint: FacilityConstraint.noStairs,
-    ),
-    MobilityPreset.stepFree: MobilityPresetSpec(
-      speedFactor: 1.0,
-      facilityConstraint: FacilityConstraint.elevatorOnly,
-      elevatorWaitSeconds: stepFreeElevatorWaitSeconds,
-    ),
-  };
+        MobilityPreset.standard: MobilityPresetSpec(
+          speedFactor: 1.0,
+          facilityConstraint: FacilityConstraint.none,
+        ),
+        MobilityPreset.slow: MobilityPresetSpec(
+          speedFactor: 1.35,
+          facilityConstraint: FacilityConstraint.none,
+        ),
+        MobilityPreset.noStairs: MobilityPresetSpec(
+          speedFactor: 1.2,
+          facilityConstraint: FacilityConstraint.noStairs,
+        ),
+        MobilityPreset.stepFree: MobilityPresetSpec(
+          speedFactor: 1.0,
+          facilityConstraint: FacilityConstraint.elevatorOnly,
+          elevatorWaitSeconds: stepFreeElevatorWaitSeconds,
+        ),
+      };
 
   /// 이동 유형 → 기본 프리셋 매핑.
   static const Map<MobilityType, MobilityPreset> mobilityTypeMapping =
       <MobilityType, MobilityPreset>{
-    MobilityType.senior: MobilityPreset.slow,
-    MobilityType.pregnant: MobilityPreset.slow,
-    MobilityType.temporaryInjury: MobilityPreset.slow,
-    MobilityType.luggage: MobilityPreset.noStairs,
-    MobilityType.stroller: MobilityPreset.stepFree,
-    MobilityType.wheelchair: MobilityPreset.stepFree,
-  };
+        MobilityType.senior: MobilityPreset.slow,
+        MobilityType.pregnant: MobilityPreset.slow,
+        MobilityType.temporaryInjury: MobilityPreset.slow,
+        MobilityType.luggage: MobilityPreset.noStairs,
+        MobilityType.stroller: MobilityPreset.stepFree,
+        MobilityType.wheelchair: MobilityPreset.stepFree,
+      };
 }
