@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SHA256 = /^[a-f0-9]{64}$/;
+const CALLBACK_RECONCILIATION_SOURCE_ISSUE = 2057;
 const CANONICAL_CHECKS = [
   "boundedRetryConverged",
   "independentReconciliationConverged",
@@ -144,6 +145,9 @@ export function wrapCallbackReconciliationGateEvidence({ result, rcManifest, eva
     || !Number.isFinite(evaluatedAtMs)) {
     throw new Error("#2056 final RC manifest is invalid");
   }
+  if (gate.sourceIssue !== CALLBACK_RECONCILIATION_SOURCE_ISSUE) {
+    throw new Error("#2056 final callback gate source issue mismatch");
+  }
   if (rcIdentity.dataPackManifestSha256 !== result.deliveryIdentity.manifestSha256
     || String(rcIdentity.releaseSequence) !== String(result.deliveryIdentity.releaseSequence)) {
     throw new Error("#2056 final RC identity mismatch");
@@ -151,6 +155,7 @@ export function wrapCallbackReconciliationGateEvidence({ result, rcManifest, eva
   return {
     schemaVersion: 1,
     gateId: "callback_reconciliation",
+    sourceIssue: CALLBACK_RECONCILIATION_SOURCE_ISSUE,
     status: "SATISFIED",
     reasonCodes: [],
     rcIdentity,
@@ -176,6 +181,9 @@ export function prepareCallbackReconciliationIdentity({
     || rcManifest.gitSha !== expectedGitSha
     || rcIdentity?.gitSha !== rcManifest.gitSha) {
     throw new Error("#2056 final RC manifest does not match the workflow SHA");
+  }
+  if (gate.sourceIssue !== CALLBACK_RECONCILIATION_SOURCE_ISSUE) {
+    throw new Error("#2056 final callback gate source issue mismatch");
   }
   if (!/^[A-Za-z0-9._-]{1,200}$/.test(releaseRequestId ?? "")) {
     throw new Error("release request ID is invalid for rehearsal");

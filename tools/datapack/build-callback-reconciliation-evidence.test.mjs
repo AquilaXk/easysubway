@@ -151,12 +151,13 @@ test("#2056 final manifest의 전체 RC identity로 canonical gate envelope를 �
       schemaVersion: 1,
       phase: "FINAL",
       gitSha: rcIdentity.gitSha,
-      datapackGates: [{ id: "callback_reconciliation", rcIdentity }],
+      datapackGates: [{ id: "callback_reconciliation", sourceIssue: 2057, rcIdentity }],
     },
     evaluatedAt: "2026-07-16T12:00:00.000Z",
   });
 
   assert.equal(envelope.gateId, "callback_reconciliation");
+  assert.equal(envelope.sourceIssue, 2057);
   assert.deepEqual(envelope.rcIdentity, rcIdentity);
   assert.equal(envelope.evidenceValidity.expiresAt, "2026-07-30T12:00:00.000Z");
   assert.deepEqual(envelope.result, evidence);
@@ -173,7 +174,7 @@ test("result identity가 #2056 final RC identity와 다르면 envelope 생성을
       schemaVersion: 1,
       phase: "FINAL",
       gitSha: "b".repeat(40),
-      datapackGates: [{ id: "callback_reconciliation", rcIdentity: {
+      datapackGates: [{ id: "callback_reconciliation", sourceIssue: 2057, rcIdentity: {
         gitSha: "b".repeat(40), dataPackManifestSha256: "d".repeat(64), releaseSequence,
       } }],
     },
@@ -187,7 +188,7 @@ test("#2056 final manifest에서 rehearsal 입력 identity를 안전하게 추�
       schemaVersion: 1,
       phase: "FINAL",
       gitSha: "b".repeat(40),
-      datapackGates: [{ id: "callback_reconciliation", rcIdentity: {
+      datapackGates: [{ id: "callback_reconciliation", sourceIssue: 2057, rcIdentity: {
         gitSha: "b".repeat(40), dataPackManifestSha256: manifestSha256, releaseSequence,
       } }],
     },
@@ -202,7 +203,7 @@ test("unsafe request ID와 다른 workflow SHA의 final manifest를 거부한다
     schemaVersion: 1,
     phase: "FINAL",
     gitSha: "b".repeat(40),
-    datapackGates: [{ id: "callback_reconciliation", rcIdentity: {
+    datapackGates: [{ id: "callback_reconciliation", sourceIssue: 2057, rcIdentity: {
       gitSha: "b".repeat(40), dataPackManifestSha256: manifestSha256, releaseSequence,
     } }],
   };
@@ -212,4 +213,23 @@ test("unsafe request ID와 다른 workflow SHA의 final manifest를 거부한다
   assert.throws(() => prepareCallbackReconciliationIdentity({
     rcManifest, releaseRequestId, expectedGitSha: "c".repeat(40),
   }), /workflow SHA/);
+});
+
+test("#2056 final manifest의 callback gate source issue가 다르면 거부한다", () => {
+  const { evidence } = buildCallbackReconciliationEvidence({
+    raw: raw(), junitXmlByCheck: junitXmlByCheck(), workflow,
+    expectedIdentity: { releaseRequestId, releaseSequence, manifestSha256 },
+  });
+  assert.throws(() => wrapCallbackReconciliationGateEvidence({
+    result: evidence,
+    rcManifest: {
+      schemaVersion: 1,
+      phase: "FINAL",
+      gitSha: "b".repeat(40),
+      datapackGates: [{ id: "callback_reconciliation", sourceIssue: 9999, rcIdentity: {
+        gitSha: "b".repeat(40), dataPackManifestSha256: manifestSha256, releaseSequence,
+      } }],
+    },
+    evaluatedAt: "2026-07-16T12:00:00.000Z",
+  }), /source issue/);
 });
