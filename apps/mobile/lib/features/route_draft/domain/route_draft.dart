@@ -39,8 +39,7 @@ class RouteDraft {
   final DateTime? lastModifiedAt;
   final String? invalidatedReason;
 
-  bool get isEmpty =>
-      origin == null && destination == null && waypoint == null;
+  bool get isEmpty => origin == null && destination == null && waypoint == null;
 
   String get originLabel {
     final station = origin;

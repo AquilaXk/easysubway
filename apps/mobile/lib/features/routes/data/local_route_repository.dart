@@ -220,7 +220,8 @@ class LocalRouteRepository implements RouteSearchRepository {
     // 60초 1회)와 정합시킨다.
     var estimatedDurationSeconds = _estimatedDurationSeconds(steps);
     if (preset == MobilityPreset.stepFree) {
-      estimatedDurationSeconds += MobilityProfilePolicy.stepFreeElevatorWaitSeconds;
+      estimatedDurationSeconds +=
+          MobilityProfilePolicy.stepFreeElevatorWaitSeconds;
     }
 
     return RouteSearchResult(
@@ -779,11 +780,7 @@ local.LocalRouteResult mergeWaypointRouteResults(
     evidenceSources: const [],
   );
 
-  final flat = <route_step.RouteStep>[
-    ...firstSteps,
-    boundary,
-    ...secondSteps,
-  ];
+  final flat = <route_step.RouteStep>[...firstSteps, boundary, ...secondSteps];
   final renumbered = <route_step.RouteStep>[];
   for (var index = 0; index < flat.length; index += 1) {
     final step = flat[index];
@@ -1644,32 +1641,34 @@ class _RouteCatalogSnapshot {
       if (toSeq > fromSeq) {
         inferredDirection =
             convention == _SeqDirectionConvention.ascendingIsDown
-                ? 'DOWN'
-                : 'UP';
+            ? 'DOWN'
+            : 'UP';
       } else if (toSeq < fromSeq) {
         inferredDirection =
             convention == _SeqDirectionConvention.ascendingIsDown
-                ? 'UP'
-                : 'DOWN';
+            ? 'UP'
+            : 'DOWN';
       }
     }
-    final matches = candidates.where((hint) {
-      final direction = hint.direction.toUpperCase();
-      if (direction.isEmpty) {
-        return true;
-      }
-      if (direction == 'UP' || direction == 'DOWN') {
-        return inferredDirection != null && inferredDirection == direction;
-      }
-      return false;
-    }).toList(growable: false);
+    final matches = candidates
+        .where((hint) {
+          final direction = hint.direction.toUpperCase();
+          if (direction.isEmpty) {
+            return true;
+          }
+          if (direction == 'UP' || direction == 'DOWN') {
+            return inferredDirection != null && inferredDirection == direction;
+          }
+          return false;
+        })
+        .toList(growable: false);
     if (matches.isEmpty) {
       return null;
     }
     matches.sort((a, b) {
-      final priority = _carDoorFacilityPriority(a.facilityType).compareTo(
-        _carDoorFacilityPriority(b.facilityType),
-      );
+      final priority = _carDoorFacilityPriority(
+        a.facilityType,
+      ).compareTo(_carDoorFacilityPriority(b.facilityType));
       if (priority != 0) {
         return priority;
       }

@@ -12,10 +12,19 @@ void main() {
     });
 
     test('서버 문자열 → 프리셋 역파싱', () {
-      expect(mobilityPresetFromServerString('STANDARD'), MobilityPreset.standard);
+      expect(
+        mobilityPresetFromServerString('STANDARD'),
+        MobilityPreset.standard,
+      );
       expect(mobilityPresetFromServerString('SLOW'), MobilityPreset.slow);
-      expect(mobilityPresetFromServerString('NO_STAIRS'), MobilityPreset.noStairs);
-      expect(mobilityPresetFromServerString('STEP_FREE'), MobilityPreset.stepFree);
+      expect(
+        mobilityPresetFromServerString('NO_STAIRS'),
+        MobilityPreset.noStairs,
+      );
+      expect(
+        mobilityPresetFromServerString('STEP_FREE'),
+        MobilityPreset.stepFree,
+      );
       expect(mobilityPresetFromServerString('UNKNOWN'), isNull);
     });
 
@@ -73,7 +82,10 @@ void main() {
   group('구 profileId 마이그레이션', () {
     test('6종 구 프로필 id를 데이터 소실 없이 프리셋으로 승계한다', () {
       expect(mobilityPresetFromLegacyProfileId('elderly'), MobilityPreset.slow);
-      expect(mobilityPresetFromLegacyProfileId('pregnant'), MobilityPreset.slow);
+      expect(
+        mobilityPresetFromLegacyProfileId('pregnant'),
+        MobilityPreset.slow,
+      );
       expect(mobilityPresetFromLegacyProfileId('injured'), MobilityPreset.slow);
       expect(
         mobilityPresetFromLegacyProfileId('luggage'),

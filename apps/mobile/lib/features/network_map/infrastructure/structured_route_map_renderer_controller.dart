@@ -20,11 +20,13 @@ class StructuredRouteMapRendererController
     void Function(void Function(Duration timeStamp))? scheduleFrame,
     void Function()? requestFrame,
     Stopwatch Function()? stopwatchFactory,
-  }) : _scheduleFrame = scheduleFrame ??
+  }) : _scheduleFrame =
+           scheduleFrame ??
            ((callback) =>
                SchedulerBinding.instance.addPostFrameCallback(callback)),
        _requestFrame =
-           requestFrame ?? (() => SchedulerBinding.instance.ensureVisualUpdate()),
+           requestFrame ??
+           (() => SchedulerBinding.instance.ensureVisualUpdate()),
        _stopwatchFactory = stopwatchFactory ?? Stopwatch.new {
     // 초기 이벤트는 첫 구독 시점(onListen)에 방출한다. broadcast stream은
     // 버퍼링하지 않으므로 생성 시 방출하면 늦게 구독하는 monitor가 놓친다.

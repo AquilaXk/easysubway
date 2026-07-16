@@ -163,8 +163,7 @@ class OnboardingResult {
   final OnboardingViewPreferences preferences;
 
   /// 프리셋 대표 이동 유형 문자열(요청·설정에 공급).
-  String get mobilityType =>
-      mobilityPresetRepresentativeMobilityType(preset);
+  String get mobilityType => mobilityPresetRepresentativeMobilityType(preset);
 
   Map<String, Object?> toJson() {
     return {
@@ -580,11 +579,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                   ),
                   const SizedBox(height: EasySubwaySpacing.xl),
-                  for (
-                    var i = 0;
-                    i < mobilityPresetSheetOrder.length;
-                    i++
-                  ) ...[
+                  for (var i = 0; i < mobilityPresetSheetOrder.length; i++) ...[
                     if (i != 0)
                       const Divider(
                         height: 1,

@@ -48,8 +48,9 @@ class RouteMapLinearGeometry {
     }
     final segmentStart = _cumulative[lo - 1];
     final segmentLength = _cumulative[lo] - segmentStart;
-    final fraction =
-        segmentLength == 0 ? 0.0 : (target - segmentStart) / segmentLength;
+    final fraction = segmentLength == 0
+        ? 0.0
+        : (target - segmentStart) / segmentLength;
     return Offset.lerp(_polyline[lo - 1], _polyline[lo], fraction)!;
   }
 
@@ -79,7 +80,8 @@ class RouteMapLinearGeometry {
     final cumulative = <double>[0];
     for (var index = 1; index < polyline.length; index += 1) {
       cumulative.add(
-        cumulative[index - 1] + (polyline[index] - polyline[index - 1]).distance,
+        cumulative[index - 1] +
+            (polyline[index] - polyline[index - 1]).distance,
       );
     }
     return cumulative;
