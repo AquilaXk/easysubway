@@ -99,4 +99,8 @@ test("Route V2 gateway runtime integration probe는 privacy·bucket·identifier-
   assert.match(probe, /start_gateway ""/);
   assert.match(probe, /originVerified.*false/);
   assert.match(probe, /\{"requests":13\}/);
+  assert.match(probe, /GATEWAY_READY_ATTEMPTS="\$\{GATEWAY_READY_ATTEMPTS:-100\}"/);
+  assert.match(probe, /gateway readiness timed out/);
+  assert.match(probe, /docker logs "\$GATEWAY" >&2/);
+  assert.match(probe, /docker logs "\$BACKEND" >&2/);
 });
