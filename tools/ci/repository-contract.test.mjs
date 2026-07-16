@@ -1781,6 +1781,9 @@ test("모바일 demo dependency와 접근성 theme는 app canonical 파일이 �
 
 test("모바일 설정 화면은 settings presentation canonical 파일이 소유한다", () => {
   const main = read("apps/mobile/lib/main.dart");
+  const home = read(
+    "apps/mobile/lib/features/home/presentation/home_screen.dart",
+  );
   const settings = read(
     "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
   );
@@ -1792,8 +1795,8 @@ test("모바일 설정 화면은 settings presentation canonical 파일이 소�
   assert.match(settings, /^class _AppSettingsActionTile extends StatelessWidget/m);
   assert.match(settings, /^class _AppSettingsPreferenceTile extends StatelessWidget/m);
   assert.match(
-    main,
-    /^import 'features\/settings\/presentation\/app_settings_screen\.dart';$/m,
+    home,
+    /^import '\.\.\/\.\.\/settings\/presentation\/app_settings_screen\.dart';$/m,
   );
   assert.match(
     main,
@@ -1809,6 +1812,9 @@ test("모바일 설정 화면은 settings presentation canonical 파일이 소�
 
 test("모바일 즐겨찾기 화면은 favorites presentation canonical 파일이 소유한다", () => {
   const main = read("apps/mobile/lib/main.dart");
+  const home = read(
+    "apps/mobile/lib/features/home/presentation/home_screen.dart",
+  );
   const favorites = read(
     "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart",
   );
@@ -1822,8 +1828,8 @@ test("모바일 즐겨찾기 화면은 favorites presentation canonical 파일�
   assert.match(favorites, /^class _FavoriteHomeStationRow extends StatelessWidget/m);
   assert.match(favorites, /^class _FavoriteHomeFacilityRow extends StatelessWidget/m);
   assert.match(
-    main,
-    /^import 'features\/favorites\/presentation\/favorite_home_screen\.dart';$/m,
+    home,
+    /^import '\.\.\/\.\.\/favorites\/presentation\/favorite_home_screen\.dart';$/m,
   );
   assert.match(
     main,
@@ -1892,6 +1898,9 @@ test("모바일 즐겨찾기 화면은 새로고침·삭제·복귀 재조회 �
 
 test("모바일 계정 삭제와 출처 화면은 feature presentation canonical 파일이 소유한다", () => {
   const main = read("apps/mobile/lib/main.dart");
+  const home = read(
+    "apps/mobile/lib/features/home/presentation/home_screen.dart",
+  );
   const widgetTest = read("apps/mobile/test/widget_test.dart");
   const account = read(
     "apps/mobile/lib/features/account/presentation/user_data_deletion_screen.dart",
@@ -1919,8 +1928,8 @@ test("모바일 계정 삭제와 출처 화면은 feature presentation canonical
     /^import 'features\/account\/presentation\/user_data_deletion_screen\.dart';$/m,
   );
   assert.match(
-    main,
-    /^import 'features\/attribution\/presentation\/data_source_attribution_screen\.dart';$/m,
+    home,
+    /^import '\.\.\/\.\.\/attribution\/presentation\/data_source_attribution_screen\.dart';$/m,
   );
   assert.doesNotMatch(
     main,
@@ -2025,6 +2034,38 @@ test("모바일 도움말 화면과 연결 계약은 support presentation canoni
   assert.match(support, /^Uri\? _mailtoUri\(/m);
 });
 
+test("모바일 홈 화면과 shell 상태는 home presentation canonical 파일이 소유한다", () => {
+  const main = read("apps/mobile/lib/main.dart");
+  const home = read(
+    "apps/mobile/lib/features/home/presentation/home_screen.dart",
+  );
+
+  assert.match(home, /^class HomeScreen\b/m);
+  assert.doesNotMatch(main, /^class HomeScreen\b/m);
+  for (const helper of ["_HomeScreenState", "_HomeNotificationButton"]) {
+    assert.match(home, new RegExp(`^class ${helper}\\b`, "m"));
+    assert.doesNotMatch(main, new RegExp(`^class ${helper}\\b`, "m"));
+  }
+  assert.match(
+    main,
+    /^import 'features\/home\/presentation\/home_screen\.dart';$/m,
+  );
+  assert.doesNotMatch(
+    main,
+    /^export 'features\/home\/presentation\/home_screen\.dart'/m,
+  );
+  for (const testPath of [
+    "apps/mobile/test/accessibility_baseline_test.dart",
+    "apps/mobile/test/onboarding_app_flow_test.dart",
+    "apps/mobile/test/widget_test.dart",
+  ]) {
+    assert.match(
+      read(testPath),
+      /^import 'package:easysubway_mobile\/features\/home\/presentation\/home_screen\.dart';$/m,
+    );
+  }
+});
+
 test("프로덕션 모바일 UI 위젯명은 prototype 명칭을 쓰지 않는다", () => {
   const mobileFiles = execFileSync("git", ["ls-files", "apps/mobile/lib/*.dart"], {
     cwd: root,
@@ -2118,12 +2159,14 @@ test("노선도 탭 화면은 자체 하단 NavigationBar를 만들지 않는다
 });
 
 test("모바일 홈 shell과 주요 상태 UI 회귀 테스트는 유지된다", () => {
-  const main = read("apps/mobile/lib/main.dart");
+  const home = read(
+    "apps/mobile/lib/features/home/presentation/home_screen.dart",
+  );
   const widgetTest = read("apps/mobile/test/widget_test.dart");
 
-  assert.match(main, /int _selectedTabIndex = 0/);
-  assert.match(main, /if \(_selectedTabIndex == 0\)[\s\S]*NetworkMapScreen\(/);
-  assert.doesNotMatch(main, /homeBottomNavigationBar/);
+  assert.match(home, /int _selectedTabIndex = 0/);
+  assert.match(home, /if \(_selectedTabIndex == 0\)[\s\S]*NetworkMapScreen\(/);
+  assert.doesNotMatch(home, /homeBottomNavigationBar/);
   assert.match(widgetTest, /기본 앱은 저장소가 없어도 노선도 중심 첫 화면을 보여준다/);
   assert.match(widgetTest, /노선도 첫 화면은 하단 광고 위에 지도 조작을 유지한다/);
   // #1933: 폼 페이지 제거로 대체된 현행 전환 테스트 앵커
@@ -2133,9 +2176,9 @@ test("모바일 홈 shell과 주요 상태 UI 회귀 테스트는 유지된다",
   assert.match(widgetTest, /find\.byKey\(const Key\('bottomNavSaved'\)\), findsNothing/);
   assert.match(widgetTest, /홈은 시설 알림과 최근 경로 로드 실패를 인라인 오류 없이 넘긴다/);
   assert.match(widgetTest, /노선도 로드 실패는 재시도만 보여준다/);
-  assert.doesNotMatch(main, /class _HomeHero/);
-  assert.doesNotMatch(main, /class _HomeAdaptiveContent/);
-  assert.match(main, /return const SizedBox\.shrink\(\);/);
+  assert.doesNotMatch(home, /class _HomeHero/);
+  assert.doesNotMatch(home, /class _HomeAdaptiveContent/);
+  assert.match(home, /return const SizedBox\.shrink\(\);/);
 });
 
 test("모바일 역 검색 결과 시스템 글자 크기 문구 회귀 테스트는 유지된다", () => {
@@ -2229,16 +2272,20 @@ test("모바일 설정 저장 실패와 시설 제보 위치 실패 회귀 테�
 
 test("모바일 오프라인 안내 화면(OfflineDataScreen)은 완전히 제거됐다 (#1570)", () => {
   const main = read("apps/mobile/lib/main.dart");
+  const homeScreen = read(
+    "apps/mobile/lib/features/home/presentation/home_screen.dart",
+  );
+  const appAndHome = `${main}\n${homeScreen}`;
   const widgetTest = read("apps/mobile/test/widget_test.dart");
   const finalQaEvidence = readJson("apps/mobile/release/issue-1075-final-qa-evidence.json");
   // 진입점 없는 dead screen이라 화면·상태 헬퍼·스레딩(offlineDataExpiresAtLoader)까지
   // 완전 삭제했다(#1570 후속). 오프라인 동작은 설명 없이 그냥 되는 것.
-  assert.doesNotMatch(main, /class OfflineDataScreen/);
-  assert.doesNotMatch(main, /title:\s*'인터넷 없이 이용'/);
-  assert.doesNotMatch(main, /저장된 안내 상태/);
-  assert.doesNotMatch(main, /_offlineDataSourceOfTruth/);
-  assert.doesNotMatch(main, /[Oo]fflineDataExpiresAtLoader/);
-  assert.doesNotMatch(main, /offlineDataSettingsButton/);
+  assert.doesNotMatch(appAndHome, /class OfflineDataScreen/);
+  assert.doesNotMatch(appAndHome, /title:\s*'인터넷 없이 이용'/);
+  assert.doesNotMatch(appAndHome, /저장된 안내 상태/);
+  assert.doesNotMatch(appAndHome, /_offlineDataSourceOfTruth/);
+  assert.doesNotMatch(appAndHome, /[Oo]fflineDataExpiresAtLoader/);
+  assert.doesNotMatch(appAndHome, /offlineDataSettingsButton/);
   assert.doesNotMatch(widgetTest, /OfflineDataScreen/);
   assert.match(widgetTest, /testWidgets\('홈 200% 글자 screenshot smoke는 핵심 CTA 렌더 이미지를 만든다'/);
   assert.match(widgetTest, /RepaintBoundary[\s\S]*toImage\(/);
@@ -2820,6 +2867,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
       "apps/mobile/lib/features/account/presentation/user_data_deletion_screen.dart",
       "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart",
       "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart",
+      "apps/mobile/lib/features/home/presentation/home_screen.dart",
       "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
       "apps/mobile/lib/features/support/presentation/support_access_screen.dart",
       "apps/mobile/lib/main.dart",
@@ -13069,6 +13117,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const envExample = read(".env.example");
   const iosInfoPlist = read("apps/mobile/ios/Runner/Info.plist");
   const main = read("apps/mobile/lib/main.dart");
+  const homeScreen = read(
+    "apps/mobile/lib/features/home/presentation/home_screen.dart",
+  );
   const supportAccessScreen = read(
     "apps/mobile/lib/features/support/presentation/support_access_screen.dart",
   );
@@ -13153,8 +13204,11 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(envExample, /^EASYSUBWAY_ANDROID_KEY_PASSWORD=$/m);
   assert.match(iosInfoPlist, /CFBundleDisplayName[\s\S]*?<string>쉬운 지하철<\/string>/);
   assert.match(main, /class EasySubwayApp extends StatelessWidget/);
-  assert.match(`${main}\n${networkMap}\n${stationSearch}`, /역 검색/);
-  assert.match(`${main}\n${networkMap}\n${routeSearch}\n${stationSearch}`, /길찾기/);
+  assert.match(`${main}\n${homeScreen}\n${networkMap}\n${stationSearch}`, /역 검색/);
+  assert.match(
+    `${main}\n${homeScreen}\n${networkMap}\n${routeSearch}\n${stationSearch}`,
+    /길찾기/,
+  );
   assert.match(appSettingsScreen, /이동 조건/);
   assert.match(appSettingsScreen, /알림 설정/);
   assert.match(main, /EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS/);
@@ -13177,7 +13231,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(stationSearch, /역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다\./);
   assert.match(widgetTest, /역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다\./);
   assert.match(main, /initialMobilityType: onboardingResult\?\.mobilityType/);
-  assert.match(main, /initialMobilityType: initialMobilityType/);
+  assert.match(homeScreen, /initialMobilityType: initialMobilityType/);
   assert.match(main, /OnboardingPreferenceScope/);
   assert.doesNotMatch(accessibilityTheme, /mediaQuery\.textScaler\.clamp\(minScaleFactor: 1\.18\)/);
   assert.match(accessibilityTheme, /highContrast:[\s\S]*preferences\.highContrastEnabled \|\| mediaQuery\.highContrast/);
@@ -13186,13 +13240,16 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(accessibilityTheme, /WidgetStateProperty\.resolveWith/);
   assert.match(accessibilityTheme, /_themeForPreferences/);
   assert.match(main, /simpleViewEnabled: preferences\.simpleViewEnabled/);
-  assert.match(main, /RouteSearchScreen\([\s\S]*simpleViewEnabled: simpleViewEnabled/);
+  assert.match(
+    homeScreen,
+    /RouteSearchScreen\([\s\S]*simpleViewEnabled: simpleViewEnabled/,
+  );
   assert.match(favoriteHomeScreen, /AppBar\(title: const Text\('즐겨찾기'\)\)/);
   // 즐겨찾기 홈은 #1569에서 카테고리 카드를 없애고 역/경로/시설 인라인 섹션으로 바꿨다.
   assert.match(favoriteHomeScreen, /AppSectionTitle\(title: '역'\)/);
   assert.match(favoriteHomeScreen, /AppSectionTitle\(title: '시설'\)/);
   assert.match(favoriteHomeScreen, /AppSectionTitle\(title: '경로'\)/);
-  assert.match(main, /FavoriteHomeScreen/);
+  assert.match(homeScreen, /FavoriteHomeScreen/);
   // #1569: 하위 목록 화면 진입 대신 즐겨찾기 항목을 인라인 행으로 바로 나열한다.
   // (하위 목록 위젯 클래스는 각 소스 파일에 유지, main에서 진입만 제거)
   assert.match(favoriteHomeScreen, /class _FavoriteHomeStationRow/);
