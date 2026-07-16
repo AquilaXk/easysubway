@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { generateKeyPairSync } from "node:crypto";
+import { createHash, generateKeyPairSync } from "node:crypto";
 import { execFile } from "node:child_process";
 import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -32,11 +32,15 @@ test("release request binding은 manifest identity를 변경하지 않고 요청
   assert.equal(binding.schemaVersion, 1);
   assert.equal(binding.artifactKind, "datapack-release-request-binding");
   assert.equal(binding.keyId, "production-v1");
+  assert.equal(binding.releaseOutcome, "PUBLISHED_AND_VERIFIED");
   assert.equal(binding.signature.algorithm, "rsa-sha256-release-request-v1");
   assert.equal(binding.releaseRequestId, "request-2057");
   assert.equal(binding.releaseSequence, 42);
   assert.equal(binding.channel, "production");
-  assert.match(binding.manifestSha256, /^[a-f0-9]{64}$/);
+  assert.equal(
+    binding.manifestSha256,
+    createHash("sha256").update(manifestBytes).digest("hex"),
+  );
   assert.equal(
     verifyRsaSha256Signature(
       publicKey.export({ type: "spki", format: "pem" }),
@@ -100,6 +104,28 @@ test("최종 검증 뒤 binding-only plan이 request identity를 immutable 게�
       EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: publicKey.export({ type: "spki", format: "pem" }),
     },
   }), /signature/i);
+
+  const wrongKeyIdBinding = buildReleaseRequestBinding(
+    manifestBytes,
+    "request-2057",
+    privateKey.export({ type: "pkcs8", format: "pem" }),
+    "rotated-v2",
+  );
+  await writeFile(bindingPath, `${JSON.stringify(wrongKeyIdBinding)}\n`);
+  await assert.rejects(execFileAsync(process.execPath, [
+    "tools/datapack/create-publish-plan.mjs",
+    "--manifest", manifestPath,
+    "--root", root,
+    "--output", planPath,
+    "--release-request-binding", bindingPath,
+    "--only", "release-request-binding",
+  ], {
+    env: {
+      ...process.env,
+      EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: publicKey.export({ type: "spki", format: "pem" }),
+      EASYSUBWAY_DATAPACK_SIGNING_KEY_ID: "production-v1",
+    },
+  }), /keyId/i);
 
   await writeFile(bindingPath, `${JSON.stringify(binding)}\n`);
 

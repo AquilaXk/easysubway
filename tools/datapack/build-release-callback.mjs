@@ -51,7 +51,11 @@ export function buildReleaseCallback(e) {
     publishStatus: gate("PUBLISH_STATUS"),
   };
   fields.idempotencyKey = `${fields.releaseRequestId}:${fields.releaseSequence}:${fields.manifestSha256}`;
-  const value = crypto.createHmac("sha256", required("EASYSUBWAY_DATAPACK_CALLBACK_HMAC_KEY"))
+  const hmacKey = Buffer.from(required("EASYSUBWAY_DATAPACK_CALLBACK_HMAC_KEY"), "utf8");
+  if (hmacKey.length < 32) {
+    throw new Error("EASYSUBWAY_DATAPACK_CALLBACK_HMAC_KEY must be at least 32 bytes");
+  }
+  const value = crypto.createHmac("sha256", hmacKey)
     .update(canonicalCallbackMessage(fields), "utf8").digest("hex");
 
   return { ...fields, callbackVerifier: { kind: "payload-signature", value } };

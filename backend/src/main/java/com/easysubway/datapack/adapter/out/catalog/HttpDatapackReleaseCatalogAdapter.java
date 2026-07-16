@@ -79,18 +79,22 @@ public class HttpDatapackReleaseCatalogAdapter implements DatapackReleaseCatalog
 				&& verify(binding, signatureValue);
 			long sequence = binding.path("releaseSequence").asLong(-1);
 			String boundChannel = binding.path("channel").asText("");
-			String boundRequestId = binding.path("releaseRequestId").asText("");
-			String boundManifestSha256 = binding.path("manifestSha256").asText("");
-			if (!signatureValid || sequence < 1 || !channel.equals(boundChannel)
-				|| !releaseRequestId.equals(boundRequestId)
-				|| !boundManifestSha256.matches("[a-f0-9]{64}")) throw new Unavailable();
+				String boundRequestId = binding.path("releaseRequestId").asText("");
+				String boundManifestSha256 = binding.path("manifestSha256").asText("");
+				String releaseOutcome = binding.path("releaseOutcome").asText("");
+				if (!signatureValid || sequence < 1 || !channel.equals(boundChannel)
+					|| !releaseRequestId.equals(boundRequestId)
+					|| !boundManifestSha256.matches("[a-f0-9]{64}")
+					|| !("PUBLISHED_AND_VERIFIED".equals(releaseOutcome)
+						|| "NO_CHANGE_VALID".equals(releaseOutcome))) throw new Unavailable();
 			var manifest = fetch(channel, sequence);
 			if (!manifest.signatureValid() || manifest.releaseSequence() != sequence
 				|| !channel.equals(manifest.channel())
 				|| !boundManifestSha256.equals(manifest.manifestSha256())) throw new Unavailable();
-			return Optional.of(new CatalogIdentity(
-				sequence, boundManifestSha256, channel, releaseRequestId, true,
-				sha256(signatureValue.getBytes(StandardCharsets.UTF_8))));
+				return Optional.of(new CatalogIdentity(
+					sequence, boundManifestSha256, channel, releaseRequestId, true,
+					sha256(signatureValue.getBytes(StandardCharsets.UTF_8)),
+					"NO_CHANGE_VALID".equals(releaseOutcome)));
 		} catch (NotFound missing) {
 			return Optional.empty();
 		} catch (IOException | RuntimeException exception) {

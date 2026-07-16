@@ -27,18 +27,19 @@ async function currentReleaseState(payload, currentManifestUrl, fetchImpl) {
     payload.routeRegressionStatus,
   ].every((status) => status === "PASS");
   if (!allGatesPassed || !currentManifestUrl) return "READY";
+  let current;
   try {
-    const current = await fetchCurrentRelease(currentManifestUrl, fetchImpl);
-    if (current.releaseSequence > payload.releaseSequence) return "STALE_SUPERSEDED";
-    if (current.releaseSequence !== payload.releaseSequence
-      || current.channel !== payload.channel
-      || current.manifestSha256 !== payload.manifestSha256) {
-      throw new Error("current release identity mismatch");
-    }
-    return "READY";
+    current = await fetchCurrentRelease(currentManifestUrl, fetchImpl);
   } catch {
     return "CURRENT_UNAVAILABLE";
   }
+  if (current.releaseSequence > payload.releaseSequence) return "STALE_SUPERSEDED";
+  if (current.releaseSequence !== payload.releaseSequence
+    || current.channel !== payload.channel
+    || current.manifestSha256 !== payload.manifestSha256) {
+    return "IDENTITY_MISMATCH";
+  }
+  return "READY";
 }
 
 async function sendAttempt(endpoint, token, payloadBytes, fetchImpl) {
@@ -87,6 +88,12 @@ export async function sendReleaseCallback({
     if (currentState === "STALE_SUPERSEDED") {
       artifact.state = currentState;
       artifact.terminalReason = "CURRENT_RELEASE_ADVANCED";
+      return artifact;
+    }
+    if (currentState === "IDENTITY_MISMATCH") {
+      artifact.state = "RECONCILIATION_REQUIRED";
+      artifact.terminalReason = "CURRENT_RELEASE_IDENTITY_MISMATCH";
+      artifact.attempts.push({ attempt: index + 1, httpClass: currentState });
       return artifact;
     }
     if (currentState === "CURRENT_UNAVAILABLE") {

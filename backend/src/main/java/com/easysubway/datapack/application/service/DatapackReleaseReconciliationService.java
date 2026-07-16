@@ -92,8 +92,8 @@ public class DatapackReleaseReconciliationService {
 					var identity = catalog.findByRequest(request.targetChannel(), request.approvalId())
 						.orElse(null);
 					if (!matchesRequest(request, identity)
-						|| !channelRepository.candidateHasManifest(
-							request.candidateId(), identity.manifestSha256())) return;
+						|| (!identity.noChange() && !channelRepository.candidateHasManifest(
+							request.candidateId(), identity.manifestSha256()))) return;
 					repository.upsertSameDelivery(DatapackReleaseDelivery.pending(
 						request.approvalId(), identity.releaseSequence(), identity.manifestSha256(),
 						request.targetChannel(), request.candidateId(), null,
@@ -101,7 +101,12 @@ public class DatapackReleaseReconciliationService {
 				} catch (RuntimeException ignored) {
 					// fail closed: 다음 bounded scheduler tick에서 재시도한다.
 				} finally {
-					requestRepository.deferReconciliation(request.approvalId(), now.plusMinutes(10));
+					try {
+						requestRepository.deferReconciliation(
+							request.approvalId(), now.plusMinutes(10));
+					} catch (RuntimeException ignored) {
+						// due 상태를 유지하고 다음 request discovery를 계속한다.
+					}
 				}
 			});
 	}
@@ -122,6 +127,7 @@ public class DatapackReleaseReconciliationService {
 				return;
 			}
 			if (current.releaseSequence() > delivery.releaseSequence()) {
+				terminateSupersededRequest(delivery, now);
 				markClaimed(delivery, State.DEAD_LETTER, delivery.attempts(),
 					null, "STALE", "CURRENT_RELEASE_ADVANCED", now);
 				return;
@@ -153,6 +159,17 @@ public class DatapackReleaseReconciliationService {
 					"CATALOG_UNAVAILABLE", now);
 			}
 		}
+	}
+
+	private void terminateSupersededRequest(DatapackReleaseDelivery delivery, LocalDateTime now) {
+		if (requestRepository == null) return;
+		requestRepository.findByApprovalId(delivery.releaseRequestId()).ifPresent(request -> {
+			try {
+				requestRepository.save(request.markFailed("CURRENT_RELEASE_ADVANCED", now));
+			} catch (IllegalStateException ignored) {
+				// 이미 terminal이면 delivery만 stale로 수렴한다.
+			}
+		});
 	}
 
 	private void markClaimed(DatapackReleaseDelivery delivery, State state, int attempts,

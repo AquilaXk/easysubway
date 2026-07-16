@@ -1000,9 +1000,14 @@ jobs:
           if [[ "${{ steps.release-decision.outputs.outcome }}" == "NO_CHANGE_VALID" ]]; then
             release_manifest="${EASYSUBWAY_DATAPACK_CURRENT_MANIFEST}"
           fi
+          release_outcome="${{ steps.final-release-decision.outputs.outcome }}"
+          if [[ "${{ steps.release-decision.outputs.outcome }}" == "NO_CHANGE_VALID" ]]; then
+            release_outcome="NO_CHANGE_VALID"
+          fi
           node tools/datapack/build-release-request-binding.mjs \
             --manifest "${release_manifest}" \
             --release-request-id "${EASYSUBWAY_DATAPACK_RELEASE_REQUEST_ID}" \
+            --release-outcome "${release_outcome}" \
             --output "${EASYSUBWAY_DATAPACK_RELEASE_REQUEST_BINDING}"
           node tools/datapack/create-publish-plan.mjs \
             --manifest "${release_manifest}" \
@@ -1049,6 +1054,12 @@ jobs:
           path: ${{ env.EASYSUBWAY_DATAPACK_CALLBACK_DELIVERY }}
           if-no-files-found: error
           retention-days: 14
+
+      - name: Data Pack Release / Require successful no-change remote validation
+        if: ${{ !cancelled() && steps.no-change-release.outputs.manifestSha256 != '' && steps.remote-validation.outcome != 'success' }}
+        run: |
+          echo "NO_CHANGE_REMOTE_VALIDATION_FAILED" >&2
+          exit 1
 
       - name: Data Pack Release / Require confirmed callback delivery
         if: ${{ !cancelled() && (steps.production-publish.outputs.manifestSha256 != '' || steps.no-change-release.outputs.manifestSha256 != '') && steps.callback-delivery.outputs.state != 'DELIVERED' }}

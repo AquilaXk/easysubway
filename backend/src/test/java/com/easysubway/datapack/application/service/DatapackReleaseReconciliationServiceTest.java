@@ -69,6 +69,29 @@ class DatapackReleaseReconciliationServiceTest {
 	}
 
 	@Test
+	@DisplayName("superseded delivery는 원본 request도 terminal FAILED로 종결한다")
+	void supersededReleaseTerminatesRequestDiscovery() {
+		var requests = mock(DatapackReleaseRequestRepository.class);
+		var channels = mock(DatapackReleaseChannelCommandPort.class);
+		var dispatched = DatapackReleaseRequest.requested(
+			"request-2057", "candidate-2057", "scope", "production",
+			"b".repeat(64), "c".repeat(64), "d".repeat(64), "requester", T0)
+			.approve("approver", T0)
+			.markDispatched("https://github.com/run/42", "dispatch-42", T0);
+		when(requests.findByApprovalId("request-2057")).thenReturn(java.util.Optional.of(dispatched));
+		when(catalog.fetchCurrent("production")).thenReturn(
+			new CatalogIdentity(43, "e".repeat(64), "production", "", true, "c".repeat(64)));
+		var terminating = new DatapackReleaseReconciliationService(
+			repository, callbackService, catalog, requests, channels);
+
+		terminating.reconcile(delivery(), T0.plusMinutes(10));
+
+		verify(requests).save(org.mockito.ArgumentMatchers.argThat(request ->
+			request.status().name().equals("FAILED")
+				&& request.promoteDetail().contains("CURRENT_RELEASE_ADVANCED")));
+	}
+
+	@Test
 	@DisplayName("binding이 없어도 current가 전진한 delivery는 stale로 종결한다")
 	void supersededReleaseDeadLettersBeforeMissingBindingLookup() {
 		var delivery = delivery();
@@ -169,6 +192,61 @@ class DatapackReleaseReconciliationServiceTest {
 	}
 
 	@Test
+	@DisplayName("NO_CHANGE binding은 candidate raw manifest SHA가 달라도 delivery를 복원한다")
+	void discoversNoChangeBindingWithCurrentManifestIdentity() {
+		var requests = mock(DatapackReleaseRequestRepository.class);
+		var channels = mock(DatapackReleaseChannelCommandPort.class);
+		var dispatched = DatapackReleaseRequest.requested(
+			"request-2057", "candidate-2057", "scope", "production",
+			"b".repeat(64), "c".repeat(64), "d".repeat(64), "requester", T0)
+			.approve("approver", T0)
+			.markDispatched("https://github.com/run/42", "dispatch-42", T0);
+		when(requests.findReconciliationDue(T0, T0.plusMinutes(10), 100))
+			.thenReturn(java.util.List.of(dispatched));
+		when(channels.candidateHasManifest("candidate-2057", SHA)).thenReturn(false);
+		when(catalog.findByRequest("production", "request-2057"))
+			.thenReturn(java.util.Optional.of(
+				new CatalogIdentity(42, SHA, "production", "request-2057", true,
+					"b".repeat(64), true)));
+		var discovery = new DatapackReleaseReconciliationService(
+			repository, callbackService, catalog, requests, channels);
+
+		discovery.discoverMissing(T0.plusMinutes(10));
+
+		verify(repository).upsertSameDelivery(any());
+	}
+
+	@Test
+	@DisplayName("한 request defer 오류가 다음 missing callback discovery를 중단하지 않는다")
+	void isolatesRequestDeferFailure() {
+		var requests = mock(DatapackReleaseRequestRepository.class);
+		var channels = mock(DatapackReleaseChannelCommandPort.class);
+		var first = DatapackReleaseRequest.requested(
+			"request-2057", "candidate-2057", "scope", "production",
+			"b".repeat(64), "c".repeat(64), "d".repeat(64), "requester", T0)
+			.approve("approver", T0);
+		var second = DatapackReleaseRequest.requested(
+			"request-2058", "candidate-2058", "scope", "production",
+			"b".repeat(64), "c".repeat(64), "d".repeat(64), "requester", T0)
+			.approve("approver", T0);
+		when(requests.findReconciliationDue(T0, T0.plusMinutes(10), 100))
+			.thenReturn(java.util.List.of(first, second));
+		when(catalog.findByRequest("production", "request-2057"))
+			.thenReturn(java.util.Optional.empty());
+		when(catalog.findByRequest("production", "request-2058"))
+			.thenReturn(java.util.Optional.empty());
+		doThrow(new IllegalStateException("defer failed"))
+			.when(requests).deferReconciliation("request-2057", T0.plusMinutes(20));
+		var discovery = new DatapackReleaseReconciliationService(
+			repository, callbackService, catalog, requests, channels);
+
+		discovery.discoverMissing(T0.plusMinutes(10));
+
+		verify(catalog).findByRequest("production", "request-2058");
+		verify(requests).deferReconciliation("request-2058", T0.plusMinutes(20));
+	}
+
+	@Test
 	@DisplayName("signed catalog의 release request identity가 다르면 lost callback을 복원하지 않는다")
 	void rejectsLostCallbackForDifferentRequest() {
 		var requests = mock(DatapackReleaseRequestRepository.class);
@@ -188,6 +266,7 @@ class DatapackReleaseReconciliationServiceTest {
 		discovery.discoverMissing(T0.plusMinutes(10));
 
 		verify(repository, never()).upsertSameDelivery(any());
+		verify(requests).deferReconciliation("request-2057", T0.plusMinutes(20));
 	}
 
 	@Test

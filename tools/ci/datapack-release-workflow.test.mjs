@@ -78,7 +78,10 @@ test("production callback은 bounded sender 증적을 항상 보존하고 실패
   assert.match(callbackStep, /continue-on-error:\s*true/);
   assert.match(callbackStep, /send-release-callback\.mjs/);
   assert.doesNotMatch(callbackStep, /--(?:payload|output|github-output)/);
-  assert.doesNotMatch(callbackStep, /curl|Authorization|Bearer|echo .*secret/i);
+  assert.doesNotMatch(
+    callbackStep,
+    /curl|Authorization|Bearer|set\s+-x|(?:echo|printf|printenv)[^\n]*(?:HMAC|TOKEN|PRIVATE_KEY)/i,
+  );
 
   const uploadStep = yml.match(
     /- name: Data Pack Release \/ Upload callback delivery evidence[\s\S]*?\n\s+- name:/,
@@ -145,6 +148,8 @@ test("NO_CHANGE_VALID 재실행은 current manifest binding과 callback을 복�
   assert.ok(binding, "release request binding 스텝을 찾지 못함");
   assert.match(binding, /steps\.release-decision\.outputs\.outcome == 'NO_CHANGE_VALID'/);
   assert.match(binding, /EASYSUBWAY_DATAPACK_CURRENT_MANIFEST/);
+  assert.match(binding, /--release-outcome/);
+  assert.match(binding, /NO_CHANGE_VALID/);
 
   const callback = yml.match(
     /- name: Data Pack Release \/ Send release callback[\s\S]*?\n\s+- name:/,
@@ -152,6 +157,13 @@ test("NO_CHANGE_VALID 재실행은 current manifest binding과 callback을 복�
   assert.ok(callback, "release callback 스텝을 찾지 못함");
   assert.match(callback, /steps\.no-change-release\.outputs\.releaseSequence/);
   assert.match(callback, /steps\.no-change-release\.outputs\.manifestSha256/);
+
+  const noChangeValidationGate = yml.match(
+    /- name: Data Pack Release \/ Require successful no-change remote validation[\s\S]*?\n\s+- name:/,
+  )?.[0];
+  assert.ok(noChangeValidationGate, "no-change remote validation gate를 찾지 못함");
+  assert.match(noChangeValidationGate, /steps\.remote-validation\.outcome != 'success'/);
+  assert.match(noChangeValidationGate, /exit 1/);
 });
 
 test("coverage gap 스텝은 release 모드에서만 production provenance와 release-scope를 배선한다", () => {

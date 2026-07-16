@@ -254,6 +254,7 @@ class HttpDatapackReleaseCatalogAdapterTest {
 		binding.put("channel", "production");
 		binding.put("manifestSha256", manifestSha256);
 		binding.put("keyId", "production-v1");
+		binding.put("releaseOutcome", "PUBLISHED_AND_VERIFIED");
 		var signer = Signature.getInstance("SHA256withRSA");
 		signer.initSign(keyPair.getPrivate());
 		signer.update(HttpDatapackReleaseCatalogAdapter.canonical(binding));

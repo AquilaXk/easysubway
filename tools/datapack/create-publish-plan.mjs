@@ -4,6 +4,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
   canonicalJson,
+  signingKeyId,
   signingPublicKey,
   verifyRsaSha256Signature,
   withoutSignature,
@@ -164,10 +165,12 @@ function validateReleaseRequestBinding(binding, manifest, manifestBytes) {
     || binding.manifestSha256 !== sha256(manifestBytes)
     || typeof binding.keyId !== "string"
     || binding.keyId.length === 0
+    || binding.keyId !== signingKeyId()
+    || !["PUBLISHED_AND_VERIFIED", "NO_CHANGE_VALID"].includes(binding.releaseOutcome)
     || binding.signature?.algorithm !== "rsa-sha256-release-request-v1"
     || typeof binding.signature?.value !== "string"
     || binding.signature.value.length === 0) {
-    throw new Error("release request binding does not match manifest identity");
+    throw new Error("release request binding keyId or manifest identity does not match configured signer");
   }
   if (!verifyRsaSha256Signature(
     signingPublicKey(),

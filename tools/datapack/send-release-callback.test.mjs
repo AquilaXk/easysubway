@@ -9,7 +9,7 @@ import test from "node:test";
 import { sendReleaseCallback } from "./send-release-callback.mjs";
 import { buildReleaseCallback, canonicalCallbackMessage } from "./build-release-callback.mjs";
 
-const secret = "callback-secret-never-log";
+const secret = "callback-secret-never-log-1234567890";
 const token = "bearer-token-never-log";
 const callbackEnv = {
   RELEASE_SEQUENCE: "42",
@@ -95,6 +95,13 @@ test("callback producer는 서명 전 required gate와 hash를 검증한다", ()
   assert.equal(buildReleaseCallback(env).releaseRequestId, "req-2057");
   assert.throws(() => buildReleaseCallback({ ...env, MANIFEST_SHA256: "invalid" }), /SHA-256/);
   assert.throws(() => buildReleaseCallback({ ...env, VALIDATOR_STATUS: "UNKNOWN" }), /is invalid/);
+});
+
+test("callback producer는 32바이트보다 짧은 HMAC key를 거부한다", () => {
+  assert.throws(() => buildReleaseCallback({
+    ...callbackEnv,
+    EASYSUBWAY_DATAPACK_CALLBACK_HMAC_KEY: "short-key",
+  }), /at least 32 bytes/);
 });
 
 test("Node producer와 Java consumer는 공유 canonical payload hash를 사용한다", async () => {
@@ -214,6 +221,62 @@ test("validator FAIL callback은 current manifest가 없어도 backend에 전달
   assert.equal(artifact.state, "DELIVERED");
   assert.equal(currentChecks, 0);
   assert.equal(callbackRequests, 1);
+});
+
+test("route regression FAIL callback은 current manifest가 없어도 backend에 전달한다", async () => {
+  const failedPayload = buildReleaseCallback({
+    ...callbackEnv,
+    PUBLISH_STATUS: "PASS",
+    ROUTE_REGRESSION_STATUS: "FAIL",
+  });
+  let currentChecks = 0;
+  let callbackRequests = 0;
+  const artifact = await sendReleaseCallback({
+    payload: failedPayload,
+    endpoint: "https://api.example.com/callback",
+    token,
+    currentManifestUrl: "https://datapack.example.com/catalog/current.json",
+    retryDelaysSeconds: [],
+    sleep: async () => {},
+    fetchImpl: async (url) => {
+      if (url.includes("current.json")) {
+        currentChecks += 1;
+        return new Response(null, { status: 404 });
+      }
+      callbackRequests += 1;
+      return new Response(null, { status: 200 });
+    },
+  });
+
+  assert.equal(artifact.state, "DELIVERED");
+  assert.equal(currentChecks, 0);
+  assert.equal(callbackRequests, 1);
+});
+
+test("current identity 불일치는 조회 장애로 재시도하지 않고 reconciliation으로 종결한다", async () => {
+  let callbackRequests = 0;
+  const artifact = await sendReleaseCallback({
+    payload,
+    endpoint: "https://api.example.com/callback",
+    token,
+    currentManifestUrl: "https://datapack.example.com/catalog/current.json",
+    retryDelaysSeconds: [60],
+    sleep: async () => assert.fail("identity mismatch must not retry"),
+    fetchImpl: async (url) => {
+      if (url.includes("current.json")) {
+        return new Response(JSON.stringify({
+          channel: payload.channel,
+          releaseSequence: payload.releaseSequence,
+        }), { status: 200 });
+      }
+      callbackRequests += 1;
+      return new Response(null, { status: 200 });
+    },
+  });
+
+  assert.equal(artifact.state, "RECONCILIATION_REQUIRED");
+  assert.equal(artifact.terminalReason, "CURRENT_RELEASE_IDENTITY_MISMATCH");
+  assert.equal(callbackRequests, 0);
 });
 
 test("CLI는 delivery state를 GitHub output에 기록한다", async () => {

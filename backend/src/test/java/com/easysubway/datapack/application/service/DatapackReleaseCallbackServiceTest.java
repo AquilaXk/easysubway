@@ -22,6 +22,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest
@@ -60,6 +61,8 @@ class DatapackReleaseCallbackServiceTest {
             "DELETE FROM datapack_release_request WHERE approval_id = ?", APPROVAL_ID);
 		when(releaseCatalog.fetchCurrent(CHANNEL)).thenReturn(new CatalogIdentity(
 			RELEASE_SEQUENCE, SHA, CHANNEL, APPROVAL_ID, true, "b".repeat(64)));
+		when(releaseCatalog.findByRequest(CHANNEL, APPROVAL_ID)).thenReturn(java.util.Optional.of(
+			new CatalogIdentity(RELEASE_SEQUENCE, SHA, CHANNEL, APPROVAL_ID, true, "b".repeat(64))));
 		when(releaseCatalog.findByRequest(CHANNEL, APPROVAL_ID)).thenReturn(java.util.Optional.of(
 			new CatalogIdentity(RELEASE_SEQUENCE, SHA, CHANNEL, APPROVAL_ID, true, "b".repeat(64))));
     }
@@ -161,6 +164,35 @@ class DatapackReleaseCallbackServiceTest {
 
 		assertThat(service.receive(cmd).status()).isEqualTo("FAILED");
 		assertThat(statusOf()).isEqualTo("FAILED");
+	}
+
+	@Test
+	@DisplayName("route regression FAIL은 publishStatus PASS여도 FAILED다")
+	void failedRouteRegressionCannotPublish() {
+		insertRow("DISPATCHED");
+		var fields = new CanonicalFields(2, "datapack-release-callback", APPROVAL_ID,
+			RELEASE_SEQUENCE, CHANNEL, idempotencyKey(SHA), WORKFLOW_URL, SHA, SHA, SHA, SHA,
+			"PASS", "FAIL", "PASS");
+		var cmd = new CallbackCommand(2, "datapack-release-callback", APPROVAL_ID,
+			RELEASE_SEQUENCE, CHANNEL, idempotencyKey(SHA), WORKFLOW_URL, SHA, SHA, SHA, SHA,
+			"PASS", "FAIL", "PASS", "payload-signature", callbackSignature.sign(fields));
+
+		assertThat(service.receive(cmd).status()).isEqualTo("FAILED");
+		assertThat(statusOf()).isEqualTo("FAILED");
+	}
+
+	@Test
+	@DisplayName("catalog HTTP 조회는 database transaction 밖에서 수행한다")
+	void fetchesCurrentCatalogOutsideDatabaseTransaction() {
+		insertRow("DISPATCHED");
+		when(releaseCatalog.fetchCurrent(CHANNEL)).thenAnswer(invocation -> {
+			assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+			return new CatalogIdentity(RELEASE_SEQUENCE, SHA, CHANNEL, APPROVAL_ID,
+				true, "b".repeat(64));
+		});
+
+		assertThat(service.receive(command("PASS", computeSignature("PASS"))).status())
+			.isEqualTo("PUBLISHED");
 	}
 
     @Test
@@ -372,6 +404,18 @@ class DatapackReleaseCallbackServiceTest {
 	}
 
 	@Test
+	@DisplayName("legacy callback은 current catalog 장애 때 request 상태를 커밋하지 않는다")
+	void legacyCatalogUnavailableLeavesRequestRetryable() {
+		insertRow("DISPATCHED", "production");
+		when(releaseCatalog.fetchCurrent(CHANNEL))
+			.thenThrow(new DatapackReleaseCatalogPort.Unavailable());
+
+		assertThatThrownBy(() -> service.receive(legacyCommand("PASS")))
+			.isInstanceOf(DatapackReleaseCatalogPort.Unavailable.class);
+		assertThat(statusOf()).isEqualTo("DISPATCHED");
+	}
+
+	@Test
 	@DisplayName("(g) PASS + production 채널 없음 → status PUBLISHED 유지 + promote_outcome=REJECTED + promote_detail에 사유")
     void passWithNoProductionChannel_publishesAndRejectsPromote() {
         insertRow("DISPATCHED", "production");
@@ -446,6 +490,38 @@ class DatapackReleaseCallbackServiceTest {
 		assertThat(jdbcTemplate.queryForObject(
 			"SELECT candidate_id FROM datapack_release_channels WHERE channel = 'production'",
 			String.class)).isEqualTo("cand-1");
+	}
+
+	@Test
+	@DisplayName("NO_CHANGE reconciliation은 current identity로 request를 종결하고 promote를 생략한다")
+	void reconciliationCompletesNoChangeWithoutCandidatePromotion() {
+		insertRow("DISPATCHED", "production");
+		jdbcTemplate.update(
+			"UPDATE datapack_release_request SET workflow_run_url=? WHERE approval_id=?",
+			WORKFLOW_URL, APPROVAL_ID);
+		insertCallbackTestCandidate("cand-1", "e".repeat(64));
+		var delivery = DatapackReleaseDelivery.pending(
+			APPROVAL_ID, RELEASE_SEQUENCE, SHA, CHANNEL, "cand-1", null, "b".repeat(64), T0);
+		var catalog = new CatalogIdentity(
+			RELEASE_SEQUENCE, SHA, CHANNEL, APPROVAL_ID, true, "b".repeat(64), true);
+
+		assertThat(service.reconcile(delivery, catalog).status()).isEqualTo("PUBLISHED");
+
+		assertThat(statusOf()).isEqualTo("PUBLISHED");
+		assertThat(promoteOutcomeOf()).isEqualTo("NO_CHANGE");
+	}
+
+	@Test
+	@DisplayName("reconciliation은 delivery와 binding의 전체 identity가 다르면 dead-letter한다")
+	void reconciliationRejectsCatalogIdentityMismatch() {
+		insertRow("DISPATCHED", "production");
+		var delivery = DatapackReleaseDelivery.pending(
+			APPROVAL_ID, RELEASE_SEQUENCE, SHA, CHANNEL, "cand-1", null, "b".repeat(64), T0);
+		var mismatched = new CatalogIdentity(
+			RELEASE_SEQUENCE, SHA, CHANNEL, "another-request", true, "b".repeat(64));
+
+		assertThat(service.reconcile(delivery, mismatched).status()).isEqualTo("DEAD_LETTER");
+		assertThat(statusOf()).isEqualTo("DISPATCHED");
 	}
 
     @TestConfiguration

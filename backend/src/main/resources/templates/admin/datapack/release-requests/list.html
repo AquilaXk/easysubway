@@ -136,7 +136,7 @@
 				<td th:text="${delivery.releaseRequestId + ' / ' + delivery.releaseSequence}">request</td>
 				<td th:text="${delivery.channel + ' / ' + delivery.state}">state</td>
 				<td th:text="${delivery.attempts + ' / ' + (delivery.httpClass ?: '-')}">attempt</td>
-				<td><time th:text="${delivery.reconcileDeadline}">reconcile</time> / <time th:text="${delivery.deadLetterDeadline}">dead letter</time></td>
+				<td><time th:text="${delivery.nextAttemptAt}">next attempt</time> / <time th:text="${delivery.reconcileDeadline}">reconcile</time> / <time th:text="${delivery.deadLetterDeadline}">dead letter</time></td>
 				<td><code th:text="${delivery.payloadSha256}">payload hash</code><br><code th:text="${delivery.signatureSha256}">signature hash</code></td>
 				<td th:text="${delivery.detail ?: '-'}">blocker</td>
 			</tr>

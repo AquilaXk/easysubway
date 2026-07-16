@@ -261,6 +261,7 @@ class DatapackReleaseRequestAdminPageControllerTest {
 			.contains("RECONCILIATION_REQUIRED")
 			.contains("CALLBACK_RECONCILIATION_REQUIRED")
 			.contains("5XX")
+			.contains("2026-07-06T03:08")
 			.contains("2026-07-06T03:10")
 			.contains("2026-07-06T04:10")
 			.contains("b".repeat(64))

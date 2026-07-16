@@ -5992,6 +5992,10 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
     "targetChannel",
   ]);
   assert.equal(releaseCallbackSchema.properties.artifactKind.const, "datapack-release-callback");
+  assert.equal(
+    releaseCallbackSchema.properties.idempotencyKey.pattern,
+    "^[^:]+:[1-9][0-9]*:[a-f0-9]{64}$",
+  );
   assert.deepEqual(releaseCallbackSchema.required, [
     "schemaVersion",
     "artifactKind",

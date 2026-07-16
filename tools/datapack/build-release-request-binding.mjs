@@ -6,7 +6,13 @@ import { fileURLToPath } from "node:url";
 import { canonicalJson, withoutSignature } from "./lib/manifest-validation.mjs";
 import { rsaSha256Signature, signingPrivateKey } from "./lib/manifest-signing.mjs";
 
-export function buildReleaseRequestBinding(manifestBytes, releaseRequestId, privateKey, keyId) {
+export function buildReleaseRequestBinding(
+  manifestBytes,
+  releaseRequestId,
+  privateKey,
+  keyId,
+  releaseOutcome = "PUBLISHED_AND_VERIFIED",
+) {
   if (typeof releaseRequestId !== "string" || releaseRequestId.trim() === "") {
     throw new Error("releaseRequestId is required");
   }
@@ -18,6 +24,9 @@ export function buildReleaseRequestBinding(manifestBytes, releaseRequestId, priv
     throw new Error("manifest.channel is required");
   }
   if (typeof keyId !== "string" || keyId.trim() === "") throw new Error("keyId is required");
+  if (!["PUBLISHED_AND_VERIFIED", "NO_CHANGE_VALID"].includes(releaseOutcome)) {
+    throw new Error("releaseOutcome is invalid");
+  }
   const unsigned = {
     schemaVersion: 1,
     artifactKind: "datapack-release-request-binding",
@@ -26,6 +35,7 @@ export function buildReleaseRequestBinding(manifestBytes, releaseRequestId, priv
     channel: manifest.channel,
     manifestSha256: createHash("sha256").update(manifestBytes).digest("hex"),
     keyId: keyId.trim(),
+    releaseOutcome,
   };
   return {
     ...unsigned,
@@ -44,6 +54,7 @@ async function main() {
     required(args, "release-request-id"),
     signingPrivateKey(),
     process.env.EASYSUBWAY_DATAPACK_SIGNING_KEY_ID?.trim() || "production-v1",
+    args.get("release-outcome") ?? "PUBLISHED_AND_VERIFIED",
   );
   await writeFile(path.resolve(required(args, "output")), `${JSON.stringify(binding, null, 2)}\n`);
 }

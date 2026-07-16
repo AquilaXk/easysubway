@@ -18,7 +18,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 워크플로가 보낸 release callback payload를 수신해 HMAC 검증 → release request 상태 전이 → 멱등 재수신
@@ -37,13 +39,15 @@ public class DatapackReleaseCallbackService {
     private final DatapackReleasePromoteDelegate promoteDelegate;
     private final DatapackReleaseDeliveryRepository deliveryRepository;
     private final DatapackReleaseCatalogPort releaseCatalog;
+    private final TransactionTemplate transactionTemplate;
 
     public DatapackReleaseCallbackService(DatapackReleaseRequestRepository repository,
         CallbackSignature signature, ObjectProvider<Clock> clockProvider,
         DatapackReleaseChannelCommandPort channelCommandPort,
         DatapackReleasePromoteDelegate promoteDelegate,
         DatapackReleaseDeliveryRepository deliveryRepository,
-        DatapackReleaseCatalogPort releaseCatalog) {
+        DatapackReleaseCatalogPort releaseCatalog,
+        PlatformTransactionManager transactionManager) {
         this.repository = repository;
         this.signature = signature;
         this.clock = clockProvider.getIfAvailable(Clock::systemUTC);
@@ -51,9 +55,9 @@ public class DatapackReleaseCallbackService {
         this.promoteDelegate = promoteDelegate;
         this.deliveryRepository = deliveryRepository;
         this.releaseCatalog = releaseCatalog;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
-    @Transactional
     public CallbackResult receive(CallbackCommand cmd) {
 		if (cmd.schemaVersion() == 1) {
 			return receiveLegacy(cmd);
@@ -70,7 +74,14 @@ public class DatapackReleaseCallbackService {
             || !signature.verify(fields, cmd.verifierValue())) {
             throw new IllegalArgumentException("callback verifier mismatch");
         }
+		boolean pass = allGatesPass(cmd);
+		boolean knownRequest = repository.findByApprovalId(cmd.releaseRequestId()).isPresent();
+		var catalogValidation = pass && knownRequest ? validatePublishedCatalog(cmd) : null;
+		return transactionTemplate.execute(status -> receiveVerified(cmd, fields, catalogValidation));
+	}
 
+	private CallbackResult receiveVerified(CallbackCommand cmd, CanonicalFields fields,
+		PublishedCatalogValidation catalogValidation) {
         var now = LocalDateTime.now(clock);
         var existingSequence = deliveryRepository.findByRequestAndSequence(
             cmd.releaseRequestId(), cmd.releaseSequence());
@@ -105,9 +116,7 @@ public class DatapackReleaseCallbackService {
             return new CallbackResult("DEAD_LETTER", true);
         }
 
-        boolean pass = "PASS".equals(cmd.publishStatus())
-            && "PASS".equals(cmd.validatorStatus())
-            && "PASS".equals(cmd.routeRegressionStatus());
+		boolean pass = allGatesPass(cmd);
 		boolean reconciliationRequired = "BLOCKED_EXTERNAL".equals(cmd.publishStatus())
 			&& "PASS".equals(cmd.validatorStatus())
 			&& "PASS".equals(cmd.routeRegressionStatus());
@@ -117,10 +126,10 @@ public class DatapackReleaseCallbackService {
 			return new CallbackResult("RECONCILIATION_REQUIRED", false);
 		}
 		if (pass) {
-			var currentMismatch = currentReleaseMismatch(cmd);
-			if (currentMismatch != null) {
+			if (catalogValidation != null && catalogValidation.mismatch() != null) {
+				var mismatch = catalogValidation.mismatch();
 				deliveryRepository.mark(delivery.idempotencyKey(), State.DEAD_LETTER,
-					delivery.attempts(), null, currentMismatch.httpClass(), currentMismatch.detail(), now);
+					delivery.attempts(), null, mismatch.httpClass(), mismatch.detail(), now);
 				return new CallbackResult("DEAD_LETTER", false);
 			}
 		}
@@ -144,8 +153,12 @@ public class DatapackReleaseCallbackService {
             : request.markFailed("publish " + cmd.publishStatus(), now);
         repository.save(updated);
 
-        if (pass) {
-            tryPromote(updated, cmd);
+		if (pass) {
+			if (catalogValidation != null && catalogValidation.noChange()) {
+				repository.save(updated.withPromoteOutcome("NO_CHANGE", null));
+			} else {
+				tryPromote(updated, cmd);
+			}
         }
 		deliveryRepository.mark(delivery.idempotencyKey(), State.DELIVERED,
 			delivery.attempts() + 1, null, "2XX", null, now);
@@ -163,7 +176,16 @@ public class DatapackReleaseCallbackService {
 			|| !signature.verify(fields, cmd.verifierValue())) {
 			throw new IllegalArgumentException("callback verifier mismatch");
 		}
+		boolean pass = "PASS".equals(cmd.publishStatus());
+		var targetChannel = repository.findByApprovalId(cmd.releaseRequestId())
+			.map(DatapackReleaseRequest::targetChannel)
+			.orElseThrow(() -> new IllegalArgumentException(
+				"release request not found: " + cmd.releaseRequestId()));
+		var current = pass ? releaseCatalog.fetchCurrent(targetChannel) : null;
+		return transactionTemplate.execute(status -> receiveLegacyVerified(cmd, current));
+	}
 
+	private CallbackResult receiveLegacyVerified(CallbackCommand cmd, CatalogIdentity current) {
 		var request = repository.findByApprovalId(cmd.releaseRequestId())
 			.orElseThrow(() -> new IllegalArgumentException(
 				"release request not found: " + cmd.releaseRequestId()));
@@ -183,7 +205,7 @@ public class DatapackReleaseCallbackService {
 			: request.markFailed("publish " + cmd.publishStatus(), now);
 		repository.save(updated);
 		if (pass) {
-			if (legacyCurrentReleaseMatches(updated, cmd)) {
+			if (legacyCurrentReleaseMatches(updated, cmd, current)) {
 				tryPromote(updated, cmd.manifestSha256(), cmd.workflowRunUrl(),
 					cmd.evidenceBundleSha256(), updated.approvalId());
 			} else {
@@ -194,16 +216,33 @@ public class DatapackReleaseCallbackService {
 		return new CallbackResult(terminal.name(), false);
 	}
 
-	private boolean legacyCurrentReleaseMatches(DatapackReleaseRequest request, CallbackCommand cmd) {
-		try {
-			var current = releaseCatalog.fetchCurrent(request.targetChannel());
-			return current.signatureValid()
-				&& request.targetChannel().equals(current.channel())
-				&& cmd.manifestSha256().equals(current.manifestSha256());
-		} catch (RuntimeException e) {
-			log.warn("legacy callback current release unavailable for {}", request.approvalId());
-			return false;
+	private boolean legacyCurrentReleaseMatches(DatapackReleaseRequest request, CallbackCommand cmd,
+		CatalogIdentity current) {
+		return current.signatureValid()
+			&& request.targetChannel().equals(current.channel())
+			&& cmd.manifestSha256().equals(current.manifestSha256());
+	}
+
+	private static boolean allGatesPass(CallbackCommand cmd) {
+		return "PASS".equals(cmd.publishStatus())
+			&& "PASS".equals(cmd.validatorStatus())
+			&& "PASS".equals(cmd.routeRegressionStatus());
+	}
+
+	private PublishedCatalogValidation validatePublishedCatalog(CallbackCommand cmd) {
+		var currentMismatch = currentReleaseMismatch(cmd);
+		if (currentMismatch != null) return new PublishedCatalogValidation(currentMismatch, false);
+		var binding = releaseCatalog.findByRequest(cmd.channel(), cmd.releaseRequestId())
+			.orElseThrow(DatapackReleaseCatalogPort.Unavailable::new);
+		if (!binding.signatureValid()
+			|| binding.releaseSequence() != cmd.releaseSequence()
+			|| !binding.channel().equals(cmd.channel())
+			|| !binding.releaseRequestId().equals(cmd.releaseRequestId())
+			|| !binding.manifestSha256().equals(cmd.manifestSha256())) {
+			return new PublishedCatalogValidation(
+				new CurrentReleaseMismatch("CONFLICT", "RELEASE_REQUEST_BINDING_MISMATCH"), false);
 		}
+		return new PublishedCatalogValidation(null, binding.noChange());
 	}
 
 	private static String expectedIdempotencyKey(CallbackCommand cmd) {
@@ -224,19 +263,11 @@ public class DatapackReleaseCallbackService {
 		if (!current.manifestSha256().equals(cmd.manifestSha256())) {
 			return new CurrentReleaseMismatch("CONFLICT", "CATALOG_CURRENT_MISMATCH");
 		}
-		var binding = releaseCatalog.findByRequest(cmd.channel(), cmd.releaseRequestId())
-			.orElseThrow(DatapackReleaseCatalogPort.Unavailable::new);
-		if (!binding.signatureValid()
-			|| !cmd.releaseRequestId().equals(binding.releaseRequestId())
-			|| !cmd.channel().equals(binding.channel())
-			|| cmd.releaseSequence() != binding.releaseSequence()
-			|| !cmd.manifestSha256().equals(binding.manifestSha256())) {
-			return new CurrentReleaseMismatch("CONFLICT", "RELEASE_REQUEST_BINDING_MISMATCH");
-		}
 		return null;
 	}
 
 	private record CurrentReleaseMismatch(String httpClass, String detail) {}
+	private record PublishedCatalogValidation(CurrentReleaseMismatch mismatch, boolean noChange) {}
 
     private void tryPromote(DatapackReleaseRequest r, CallbackCommand cmd) {
 		tryPromote(r, cmd.manifestSha256(), cmd.workflowRunUrl(), cmd.evidenceBundleSha256(),
@@ -263,11 +294,25 @@ public class DatapackReleaseCallbackService {
 	@Transactional
 	public CallbackResult reconcile(DatapackReleaseDelivery delivery, CatalogIdentity catalog) {
 		var now = LocalDateTime.now(clock);
+		if (!catalog.signatureValid()
+			|| catalog.releaseSequence() != delivery.releaseSequence()
+			|| !delivery.releaseRequestId().equals(catalog.releaseRequestId())
+			|| !delivery.channel().equals(catalog.channel())
+			|| !delivery.manifestSha256().equals(catalog.manifestSha256())) {
+			markClaimed(delivery, State.DEAD_LETTER, delivery.attempts(), null,
+				"CONFLICT", "CATALOG_IDENTITY_MISMATCH", now);
+			return new CallbackResult("DEAD_LETTER", false);
+		}
 		var request = repository.findByApprovalId(delivery.releaseRequestId()).orElse(null);
 		if (request == null
 			|| !request.candidateId().equals(delivery.candidateId())
-			|| !request.targetChannel().equals(delivery.channel())
-			|| !channelCommandPort.candidateHasManifest(request.candidateId(), catalog.manifestSha256())) {
+			|| !request.targetChannel().equals(delivery.channel())) {
+			markClaimed(delivery, State.DEAD_LETTER, delivery.attempts(), null,
+				"CONFLICT", "REQUEST_CATALOG_MISMATCH", now);
+			return new CallbackResult("DEAD_LETTER", false);
+		}
+		if (!channelCommandPort.candidateHasManifest(request.candidateId(), catalog.manifestSha256())) {
+			if (catalog.noChange()) return completeNoChange(delivery, request, now);
 			markClaimed(delivery, State.DEAD_LETTER, delivery.attempts(), null,
 				"CONFLICT", "REQUEST_CATALOG_MISMATCH", now);
 			return new CallbackResult("DEAD_LETTER", false);
@@ -298,6 +343,29 @@ public class DatapackReleaseCallbackService {
 			tryPromote(request, catalog.manifestSha256(), workflowRunUrl,
 				evidence == null ? null : evidence.evidenceBundleSha256(),
 				delivery.idempotencyKey());
+		}
+		markClaimed(delivery, State.DELIVERED, delivery.attempts() + 1, null,
+			"RECONCILED", null, now);
+		return new CallbackResult("PUBLISHED", false);
+	}
+
+	private CallbackResult completeNoChange(DatapackReleaseDelivery delivery,
+		DatapackReleaseRequest request, LocalDateTime now) {
+		if (request.workflowRunUrl() == null || request.workflowRunUrl().isBlank()) {
+			markClaimed(delivery, State.DEAD_LETTER, delivery.attempts(), null,
+				"CONFLICT", "WORKFLOW_RUN_URL_MISSING", now);
+			return new CallbackResult("DEAD_LETTER", false);
+		}
+		if (request.status() != DatapackReleaseRequestStatus.PUBLISHED) {
+			if (request.status() != DatapackReleaseRequestStatus.APPROVED
+				&& request.status() != DatapackReleaseRequestStatus.DISPATCHED) {
+				markClaimed(delivery, State.DEAD_LETTER, delivery.attempts(), null,
+					"CONFLICT", "REQUEST_STATE_MISMATCH", now);
+				return new CallbackResult("DEAD_LETTER", false);
+			}
+			request = request.markPublished(request.workflowRunUrl(), now)
+				.withPromoteOutcome("NO_CHANGE", null);
+			repository.save(request);
 		}
 		markClaimed(delivery, State.DELIVERED, delivery.attempts() + 1, null,
 			"RECONCILED", null, now);

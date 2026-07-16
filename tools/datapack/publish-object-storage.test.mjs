@@ -126,10 +126,13 @@ test("signed 클라이언트는 releases 객체 불변 제약과 멱등 skip을 
   // signed mode에서 objectUrl은 /<bucket>/<key> 경로를 구성하므로
   // mock은 "testbucket/catalog/releases/5.json" 키로 저장한다.
   const BUCKET_KEY = "testbucket/catalog/releases/5.json";
+  const BINDING_KEY = `testbucket/catalog/release-requests/${"a".repeat(64)}.json`;
   try {
     await mkdir(path.join(workspace, "catalog"), { recursive: true });
     const manifestBytes = Buffer.from(JSON.stringify({ signed: true }));
+    const bindingBytes = Buffer.from(JSON.stringify({ request: "request-2057" }));
     await writeFile(path.join(workspace, "catalog", "current.json"), manifestBytes);
+    await writeFile(path.join(workspace, "catalog", "release-request-binding.json"), bindingBytes);
     const plan = {
       schemaVersion: 2,
       mode: "object-storage-preflight",
@@ -140,6 +143,12 @@ test("signed 클라이언트는 releases 객체 불변 제약과 멱등 skip을 
           sizeBytes: manifestBytes.length, packCount: 1, immutable: true },
         { type: "verify-release-manifest-object", objectKey: "catalog/releases/5.json",
           sha256: sha256(manifestBytes), sizeBytes: manifestBytes.length, packCount: 1, immutable: true },
+        { type: "put-release-request-binding-object", sourcePath: "catalog/release-request-binding.json",
+          objectKey: `catalog/release-requests/${"a".repeat(64)}.json`, sha256: sha256(bindingBytes),
+          sizeBytes: bindingBytes.length, immutable: true },
+        { type: "verify-release-request-binding-object",
+          objectKey: `catalog/release-requests/${"a".repeat(64)}.json`, sha256: sha256(bindingBytes),
+          sizeBytes: bindingBytes.length, immutable: true },
         { type: "put-manifest-object", sourcePath: "catalog/current.json",
           objectKey: "catalog/current.json", sha256: sha256(manifestBytes),
           sizeBytes: manifestBytes.length, packCount: 1 },
@@ -153,10 +162,24 @@ test("signed 클라이언트는 releases 객체 불변 제약과 멱등 skip을 
     // 1회차: 정상 게시 — mock에 bucket 포함 경로로 저장.
     await runPublishSigned(planPath, workspace, mock.port);
     assert.ok(mock.objects.has(BUCKET_KEY), `mock에 ${BUCKET_KEY} 저장 확인`);
+    assert.ok(mock.objects.has(BINDING_KEY), `mock에 ${BINDING_KEY} 저장 확인`);
     assert.equal(mock.objects.get(BUCKET_KEY).sha256, sha256(manifestBytes));
 
     // 2회차: 동일 sha → 멱등 skip (에러 없음).
     await runPublishSigned(planPath, workspace, mock.port);
+
+    // metadata가 원래 checksum을 주장해도 실제 immutable binding body가 바뀌면 거부한다.
+    mock.objects.set(BINDING_KEY, {
+      body: Buffer.from(JSON.stringify({ request: "request-9999" })),
+      sha256: sha256(bindingBytes),
+      cacheControl: "public, max-age=31536000, immutable",
+    });
+    await assert.rejects(runPublishSigned(planPath, workspace, mock.port), /immutable violation|checksum mismatch/);
+    mock.objects.set(BINDING_KEY, {
+      body: bindingBytes,
+      sha256: sha256(bindingBytes),
+      cacheControl: "public, max-age=31536000, immutable",
+    });
 
     // 상이 바이트를 같은 seq로 심은 뒤 재실행 → immutable violation 거부.
     const differentBytes = Buffer.from("completely-different-content");
