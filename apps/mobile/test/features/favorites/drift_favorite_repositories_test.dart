@@ -423,6 +423,7 @@ void main() {
       blockedReasons: const [],
       createdAt: '2026-07-01T09:00:00+09:00',
       etaSource: 'STATIC_BACKEND_V1',
+      transportScope: RouteTransportScope.subwayAndItxCheongchun,
     );
 
     final saved = await repository.saveFavoriteRoute(
@@ -450,7 +451,13 @@ void main() {
     expect(favorites.single.routeSearchId, 'route-v2');
     expect(favorites.single.scoreBasisText, contains('시간표 기준'));
     expect(favorites.single.semanticLabel, contains('시간표 기준'));
+    expect(saved.transportScope, RouteTransportScope.subwayAndItxCheongchun);
+    expect(
+      favorites.single.transportScope,
+      RouteTransportScope.subwayAndItxCheongchun,
+    );
     expect(snapshot['etaSource'], 'STATIC_BACKEND_V1');
+    expect(snapshot['transportScope'], 'SUBWAY_AND_ITX_CHEONGCHUN');
     expect(firstStep['timeSource'], 'STATIC_BACKEND_V1');
     expect(firstStep['distanceSource'], 'BACKEND_V2');
     expect(firstStep['confidenceLabel'], 'LOW');
