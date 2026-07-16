@@ -155,7 +155,7 @@ const entry = lines.find((line) => line.startsWith("EASYSUBWAY_ROUTE_V2_ORIGIN_S
 if (!entry) throw new Error("route V2 origin secret is missing");
 process.stdout.write(entry.slice(entry.indexOf("=") + 1));
 ' "${backend_env}")"
-[[ -n "${origin_secret}" && "${origin_secret}" != *$'\r'* && "${origin_secret}" != *$'\n'* ]] \
+[[ "${origin_secret}" =~ ^[A-Za-z0-9_-]{43,128}$ ]] \
 	|| { echo 'route V2 origin secret is invalid' >&2; exit 1; }
 cache_ready=false
 for _ in $(seq 1 90); do
@@ -182,11 +182,16 @@ request_body='{"originStationId":"station-sangnoksu","destinationStationId":"sta
 
 for attempt in 0 1; do
 	response_file="${work_dir}/cache-response-${attempt}.json"
-	status="$(curl -sS --noproxy '*' --connect-timeout 2 --max-time 10 --output "${response_file}" --write-out '%{http_code}' \
+	curl_config="${work_dir}/cache-request-${attempt}.curl-config"
+	{
+		printf 'header = "X-EasySubway-Origin-Verify: %s"\n' "${origin_secret}"
+		printf 'header = "Authorization: Bearer %s"\n' "${session_tokens[${attempt}]}"
+	} > "${curl_config}"
+	chmod 600 "${curl_config}"
+	status="$(curl --config "${curl_config}" -sS --noproxy '*' --connect-timeout 2 --max-time 10 --output "${response_file}" --write-out '%{http_code}' \
 		--request POST --header 'content-type: application/json' \
-		--header "X-EasySubway-Origin-Verify: ${origin_secret}" \
-		--header "Authorization: Bearer ${session_tokens[${attempt}]}" \
 		--data-binary "${request_body}" "${cache_base_url}/api/v2/routes/search")"
+	rm -f "${curl_config}"
 	route_state_id="$(node -e '
 const response = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
 process.stdout.write(response?.data?.itineraries?.[0]?.itineraryId ?? "");

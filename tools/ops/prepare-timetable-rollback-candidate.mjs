@@ -19,6 +19,26 @@ function resolveWithinRoot(root, candidate, label) {
   return resolved;
 }
 
+export function validateRollbackSourceIntegrity(seed, evidenceBytes) {
+  const evidence = JSON.parse(evidenceBytes);
+  if (evidence.artifactKind !== "server-timetable-snapshot-evidence") {
+    throw new Error("unexpected timetable snapshot evidence");
+  }
+
+  const sourceSql = gunzipSync(seed);
+  const { evidenceHash: sourceEvidenceHash, ...sourceEvidence } = evidence;
+  if (
+    evidence.snapshotSha256 !== sha256(sourceSql) ||
+    evidence.snapshotGzipSha256 !== sha256(seed) ||
+    evidence.snapshotSqlByteSize !== sourceSql.length ||
+    evidence.snapshotGzipByteSize !== seed.length ||
+    sourceEvidenceHash !== sha256(Buffer.from(JSON.stringify(sourceEvidence)))
+  ) {
+    throw new Error("seed and evidence integrity check failed");
+  }
+  return { evidence, sourceSql };
+}
+
 export async function prepareRollbackCandidate(seedPath, evidencePath, outputDirectory) {
   const resolvedSeedPath = resolveWithinRoot(repositoryRoot, seedPath, "seed");
   const resolvedEvidencePath = resolveWithinRoot(repositoryRoot, evidencePath, "evidence");
@@ -45,22 +65,7 @@ export async function prepareRollbackCandidate(seedPath, evidencePath, outputDir
     readFile(canonicalSeedPath),
     readFile(canonicalEvidencePath),
   ]);
-  const evidence = JSON.parse(evidenceBytes);
-  if (evidence.artifactKind !== "server-timetable-snapshot-evidence") {
-    throw new Error("unexpected timetable snapshot evidence");
-  }
-
-  const sourceSql = gunzipSync(seed);
-  const { evidenceHash: sourceEvidenceHash, ...sourceEvidence } = evidence;
-  if (
-    evidence.snapshotSha256 !== sha256(sourceSql) ||
-    evidence.snapshotGzipSha256 !== sha256(seed) ||
-    evidence.snapshotSqlByteSize !== sourceSql.length ||
-    evidence.snapshotGzipByteSize !== seed.length ||
-    sourceEvidenceHash !== sha256(Buffer.from(JSON.stringify(sourceEvidence)))
-  ) {
-    throw new Error("seed and evidence integrity check failed");
-  }
+  const { evidence, sourceSql } = validateRollbackSourceIntegrity(seed, evidenceBytes);
 
   const sql = Buffer.concat([sourceSql, Buffer.from("SELECT 1;\n")]);
   const compressed = gzipSync(sql, { level: 9, mtime: 0 });

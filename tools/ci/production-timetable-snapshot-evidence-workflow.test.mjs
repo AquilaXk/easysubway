@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -62,6 +62,10 @@ test("production timetable evidence는 exact deploy에서 cache와 격리 rollba
   assert.match(script, /docker port "\$\{cache_app\}" 8080\/tcp/);
   assert.match(script, /curl[^\n]+"\$\{cache_base_url\}/);
   assert.doesNotMatch(script, /docker exec[^\n]+"\$\{cache_app\}"[^\n]+curl/);
+  assert.match(script, /curl_config="\$\{work_dir\}\/cache-request-\$\{attempt\}\.curl-config"/);
+  assert.match(script, /curl --config "\$\{curl_config\}"/);
+  assert.doesNotMatch(script, /--header "X-EasySubway-Origin-Verify: \$\{origin_secret\}"/);
+  assert.doesNotMatch(script, /--header "Authorization: Bearer \$\{session_tokens/);
   assert.match(application, /@ConditionalOnProperty\([\s\S]*prefix = "easysubway\.scheduling"[\s\S]*matchIfMissing = true[\s\S]*@EnableScheduling/);
   assert.match(script, /pg_database_size\(current_database\(\)\)/);
   assert.match(script, /docker info --format '\{\{\.DockerRootDir\}\}'/);
@@ -118,18 +122,14 @@ test("rollback 후보는 현재 seed를 다른 immutable identity로 만든다",
     assert.equal(candidate.snapshotGzipSha256, createHash("sha256").update(compressed).digest("hex"));
     assert.equal(evidenceHash, createHash("sha256").update(JSON.stringify(withoutHash)).digest("hex"));
 
-    const tamperedEvidence = path.join(output, "tampered-evidence.json");
-    await writeFile(tamperedEvidence, JSON.stringify({ ...original, snapshotSha256: "0".repeat(64) }));
-    assert.throws(() => execFileSync(
-      "node",
-      [
-        candidatePath,
-        "backend/src/main/resources/timetable/line4-timetable-seed.sql.gz",
-        tamperedEvidence,
-        output,
-      ],
-      { stdio: "pipe" },
-    ));
+    const { validateRollbackSourceIntegrity } = await import("../ops/prepare-timetable-rollback-candidate.mjs");
+    assert.throws(
+      () => validateRollbackSourceIntegrity(
+        seed,
+        Buffer.from(JSON.stringify({ ...original, snapshotSha256: "0".repeat(64) })),
+      ),
+      /seed and evidence integrity check failed/,
+    );
   } finally {
     await rm(runnerTemp, { recursive: true, force: true });
   }
