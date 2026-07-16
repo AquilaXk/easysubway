@@ -22,6 +22,7 @@
     "aabPayloadSha256",
     "dataPackManifestSha256",
     "dataPackArtifactSha256",
+    "sourceSnapshotSetHash",
     "supportContactSetSha256",
     "releaseSequence",
     "routeContractVersion",

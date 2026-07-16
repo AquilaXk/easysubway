@@ -43,6 +43,11 @@ const dataPackArtifactBytes = dataPackArtifactPath && existsSync(dataPackArtifac
   ? statSync(dataPackArtifactPath).size
   : null;
 const requireProductionDataPackBinding = booleanArg("requireProductionDataPackBinding", "require-production-data-pack-binding");
+const dataPackReleaseDecisionPath = arg("dataPackReleaseDecision", "data-pack-release-decision");
+const sourceSnapshotSetHash = readFinalDataPackReleaseDecision(
+  dataPackReleaseDecisionPath,
+  requireProductionDataPackBinding,
+);
 if (requireProductionDataPackBinding) {
   validateProductionDataPackBinding(dataPackManifest, dataPackArtifactPath, dataPackArtifactBytes);
 }
@@ -127,6 +132,7 @@ const identity = {
   backendArtifactSha256: backendIdentity.backendArtifactSha256,
   dataPackManifestSha256: sha256FileIfExists(dataPackManifestPath),
   dataPackArtifactSha256: sha256FileIfExists(dataPackArtifactPath),
+  sourceSnapshotSetHash,
   supportContactSetSha256: arg("supportContactSetSha256", "support-contact-set-sha256")
     ?? androidReleaseMetadata.supportContactSetSha256
     ?? null,
@@ -416,6 +422,31 @@ function validateProductionDataPackBinding(manifest, artifactPath, artifactBytes
   if (activePack.sizeBytes !== artifactBytes) {
     fail("production data pack manifest sizeBytes does not match the supplied artifact");
   }
+}
+
+function readFinalDataPackReleaseDecision(filePath, required) {
+  if (!filePath) {
+    if (required) fail("production data pack binding requires a finalized release decision");
+    return null;
+  }
+  const decision = readJsonIfExists(resolvePath(filePath));
+  const published = decision?.outcome === "PUBLISHED_AND_VERIFIED";
+  const noChange = decision?.outcome === "NO_CHANGE_VALID";
+  if (
+    decision?.schemaVersion !== 1
+    || decision.artifactKind !== "datapack-release-decision"
+    || (!published && !noChange)
+    || decision.productionWriteAllowed !== published
+    || decision.strictValidationPassed !== true
+    || decision.publishAttempted !== published
+    || decision.remoteValidationPassed !== true
+    || !Array.isArray(decision.reasonCodes)
+    || decision.reasonCodes.length !== 0
+    || !/^[a-f0-9]{64}$/.test(decision.sourceSnapshotSetHash ?? "")
+  ) {
+    fail("data pack release decision is not finalized or has invalid sourceSnapshotSetHash");
+  }
+  return decision.sourceSnapshotSetHash;
 }
 
 function readKeyValueFileIfExists(filePath) {
@@ -717,6 +748,9 @@ function requiredDatapackGates(
     if (["source_admission", "source_governance", "freshness_conditional_publish"].includes(id)) {
       if (!/^[a-f0-9]{64}$/.test(evidence.snapshotSetIdentity ?? "")) {
         fail(`SATISFIED source datapack gate requires snapshotSetIdentity: ${id}`);
+      }
+      if (evidence.snapshotSetIdentity !== identity.sourceSnapshotSetHash) {
+        fail(`source datapack gate snapshotSetIdentity does not match RC sourceSnapshotSetHash: ${id}`);
       }
       normalized.snapshotSetIdentity = evidence.snapshotSetIdentity;
     }
@@ -1307,6 +1341,7 @@ function identityBlockers(values) {
     "aabPayloadSha256",
     "dataPackManifestSha256",
     "dataPackArtifactSha256",
+    "sourceSnapshotSetHash",
     "supportContactSetSha256",
     "releaseSequence",
     "routeContractVersion",

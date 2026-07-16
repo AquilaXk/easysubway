@@ -728,6 +728,7 @@ jobs:
           mkdir -p release-artifacts/rc
           data_pack_manifest=apps/mobile/assets/datapacks/metro_map_pack/manifest.json
           data_pack_artifact=apps/mobile/assets/datapacks/capital.sqlite.gz
+          data_pack_release_decision=""
           if [[ "${ANDROID_RC_SIGNING_MODE}" == production-upload-key && -z "${DATAPACK_RUN_ID}" ]]; then
             echo "datapack_run_id is required for production RC identity" >&2
             exit 1
@@ -735,6 +736,7 @@ jobs:
           if [[ -n "${DATAPACK_RUN_ID}" ]]; then
             data_pack_manifest=release-artifacts/downloaded/datapack-selected/current.json
             data_pack_artifact=release-artifacts/downloaded/datapack-selected/active.sqlite.gz
+            data_pack_release_decision=release-artifacts/downloaded/datapack-selected/release-decision.json
           fi
           generator_args=(
             --repo-root .
@@ -748,7 +750,10 @@ jobs:
             --android-version android-15-or-16
           )
           if [[ -n "${DATAPACK_RUN_ID}" ]]; then
-            generator_args+=(--require-production-data-pack-binding true)
+            generator_args+=(
+              --data-pack-release-decision "${data_pack_release_decision}"
+              --require-production-data-pack-binding true
+            )
           fi
           blocked_evidence_args=(
             --gate-status androidRcEvidence=BLOCKED_EXTERNAL

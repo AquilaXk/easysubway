@@ -7,7 +7,8 @@ import { fileURLToPath } from "node:url";
 
 export async function selectRcDataPackArtifact(artifactRoot, outputRoot) {
   const root = path.resolve(artifactRoot);
-  const decision = await readJson(path.join(root, "final-release-decision.json"));
+  const decisionSource = path.join(root, "final-release-decision.json");
+  const decision = await readJson(decisionSource);
   validateFinalDecision(decision);
 
   const manifestSource = decision.outcome === "PUBLISHED_AND_VERIFIED"
@@ -32,9 +33,11 @@ export async function selectRcDataPackArtifact(artifactRoot, outputRoot) {
   await mkdir(output, { recursive: true });
   const manifestPath = path.join(output, "current.json");
   const artifactPath = path.join(output, "active.sqlite.gz");
+  const decisionPath = path.join(output, "release-decision.json");
   await copyFile(manifestSource, manifestPath);
   await copyFile(matchingPacks[0].file, artifactPath);
-  return { outcome: decision.outcome, manifestPath, artifactPath };
+  await copyFile(decisionSource, decisionPath);
+  return { outcome: decision.outcome, manifestPath, artifactPath, decisionPath };
 }
 
 function validateFinalDecision(decision) {
@@ -46,6 +49,7 @@ function validateFinalDecision(decision) {
     || (!published && !noChange)
     || decision.strictValidationPassed !== true
     || decision.remoteValidationPassed !== true
+    || !/^[a-f0-9]{64}$/.test(decision.sourceSnapshotSetHash ?? "")
     || !Array.isArray(decision.reasonCodes)
     || decision.reasonCodes.length !== 0
     || decision.publishAttempted !== published

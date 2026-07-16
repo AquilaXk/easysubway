@@ -94,14 +94,14 @@
           "files": [
             {"path": "apps/mobile/release/signed-release-artifact-gate.json", "sha256": "42c9f83dca5a1c2c24d921cf6ab748c9be5a901dd1b62212a81055098349fc67"},
             {"path": "apps/mobile/pubspec.yaml", "sha256": "8b831a4108c1c77f718a4b729e7d24f36dc024b83845a4ecfa7d2b99e5ad1971"},
-            {"path": ".github/workflows/release-artifacts.yml", "sha256": "d65d1766e9162f2e6931de4d5ee6a1f04f668debf5ff7e23b420309878e426d6"},
+            {"path": ".github/workflows/release-artifacts.yml", "sha256": "b376d1f63516b43b58a6b4848b644e7ce50b3619df08b9f0d029cfea4ee7b974"},
             {"path": ".github/workflows/datapack-release.yml", "sha256": "1c449f274f0486c7de8dbecf771cc6813045309277a7a8123b56bee7c1567008"},
             {"path": "backend/build.gradle", "sha256": "00106be89d1834db166c0c4cfba04674e2a456e7e57648595b74feb933c31273"},
             {"path": "backend/Dockerfile", "sha256": "7d9608f490113e655aeaf9544f061896d20f391d5c309b50a42f6303e5eb676b"},
-            {"path": "apps/mobile/release/rc-evidence-manifest-contract.json", "sha256": "87de8efcc8a2c7a42aaad06f8e1410bdddf1653c9d48069968391b5e5c6e086e"},
+            {"path": "apps/mobile/release/rc-evidence-manifest-contract.json", "sha256": "518e3a641eb0a88c97e892679ad53292de09fc3d02e1c9adde901f232ea18739"},
             {"path": "tools/datapack/lib/manifest-validation.mjs", "sha256": "87b978354def740cfd956ba7186e305e8cb6ab613c1ef5e9d4ea6d3419ac904e"},
-            {"path": "tools/release/generate-rc-evidence-manifest.mjs", "sha256": "d8df2daaf21e41ae24f5db9df5049c3f94f304c9a7e03a53e7f1f7347fafad1e"},
-            {"path": "tools/release/select-rc-datapack-artifact.mjs", "sha256": "6dcd4eb574607c5f51273f090130b1a5b3da44d0f813313c113a612bdf66fed0"},
+            {"path": "tools/release/generate-rc-evidence-manifest.mjs", "sha256": "7121ed09ebe75fbabd7aa2a9eaa97b66d34a2280f57b3948d19cb34c5458faa1"},
+            {"path": "tools/release/select-rc-datapack-artifact.mjs", "sha256": "7cba871878dbcbb1aeb885f9a706549aecc054971457e4fb746828089d80f537"},
             {"path": "tools/release/upload-play-internal.mjs", "sha256": "7bc41b1fb3ce86b2e24043a9a43e47e91577ab33c5170535c8e8c85c09b5c5eb"}
           ]
         }

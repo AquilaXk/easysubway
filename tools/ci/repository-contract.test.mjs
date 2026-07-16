@@ -3735,6 +3735,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "aabPayloadSha256",
     "dataPackManifestSha256",
     "dataPackArtifactSha256",
+    "sourceSnapshotSetHash",
     "supportContactSetSha256",
     "releaseSequence",
     "routeContractVersion",
@@ -3866,6 +3867,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.doesNotMatch(generator, /verifySignature:\s*false/);
   assert.match(workflow, /--data-pack-manifest "\$\{data_pack_manifest\}"/);
   assert.match(workflow, /--data-pack-artifact "\$\{data_pack_artifact\}"/);
+  assert.match(workflow, /--data-pack-release-decision "\$\{data_pack_release_decision\}"/);
   assert.match(workflow, /--phase FINAL/);
   assert.match(workflow, /--candidate-context release-artifacts\/rc\/candidate-context\.json/);
   assert.match(workflow, /--output release-artifacts\/rc\/final-readiness\.json/);
@@ -4813,6 +4815,7 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   const aabPayloadPath = path.join(tempDir, "payload.bin"), aabPath = path.join(tempDir, "app-release.aab");
   const backendArtifactPath = path.join(tempDir, "backend.jar"), dataPackManifestPath = path.join(tempDir, "current.json");
   const dataPackArtifactPath = path.join(tempDir, "capital.sqlite.gz");
+  const dataPackReleaseDecisionPath = path.join(tempDir, "final-release-decision.json");
   await writeFile(aabPayloadPath, "datapack-readiness-aab");
   await execFileAsync("zip", ["-q", aabPath, path.basename(aabPayloadPath)], { cwd: tempDir });
   await writeFile(backendArtifactPath, "datapack-readiness-backend");
@@ -4857,11 +4860,17 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
     }],
   });
   await writeFile(dataPackManifestPath, JSON.stringify(productionManifest));
+  await writeFile(dataPackReleaseDecisionPath, JSON.stringify({
+    schemaVersion: 1, artifactKind: "datapack-release-decision", outcome: "PUBLISHED_AND_VERIFIED",
+    productionWriteAllowed: true, strictValidationPassed: true, publishAttempted: true,
+    remoteValidationPassed: true, sourceSnapshotSetHash: snapshotSetIdentity, reasonCodes: [],
+  }));
   const args = [
     "tools/release/generate-rc-evidence-manifest.mjs",
     "--repo-root", validationRepo, "--app-root", "apps/mobile", "--git-sha", gitSha, "--now", now,
     "--aab", aabPath, "--backend-artifact", backendArtifactPath,
     "--data-pack-manifest", dataPackManifestPath, "--data-pack-artifact", dataPackArtifactPath,
+    "--data-pack-release-decision", dataPackReleaseDecisionPath,
     "--require-production-data-pack-binding", "true",
     "--support-contact-set-sha256", "d".repeat(64),
     "--device", "qa-device-a", "--android-version", "Android 16 API 36",
@@ -4884,6 +4893,14 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   await rejectProductionManifest({ sha256: "f".repeat(64) }, /production data pack manifest sha256 does not match the supplied artifact/);
   await rejectProductionManifest({ sizeBytes: dataPackArtifactBytes + 1 }, /production data pack manifest sizeBytes does not match the supplied artifact/);
   await writeFile(dataPackManifestPath, JSON.stringify(productionManifest));
+  const releaseDecisionArgIndex = args.indexOf("--data-pack-release-decision");
+  const argsWithoutReleaseDecision = args.filter((_, index) => (
+    index !== releaseDecisionArgIndex && index !== releaseDecisionArgIndex + 1
+  ));
+  await assert.rejects(
+    execFileAsync(process.execPath, [...argsWithoutReleaseDecision, "--phase", "CANDIDATE", "--output", baselineOutput], generatorOptions),
+    /production data pack binding requires a finalized release decision/,
+  );
   await execFileAsync(process.execPath, [...args, "--phase", "CANDIDATE", "--output", baselineOutput], generatorOptions);
   const candidateManifest = JSON.parse(readFileSync(baselineOutput, "utf8"));
   assert.equal(candidateManifest.phase, "CANDIDATE");
@@ -4893,6 +4910,7 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   assert.equal(Object.hasOwn(candidateManifest, "summaryArtifactDigest"), false);
   assert.doesNotMatch(JSON.stringify(candidateManifest), /\b(?:GO|NO_GO)\b/);
   assert.equal(candidateManifest.releaseCandidateIdentity.releaseSequence, 102);
+  assert.equal(candidateManifest.releaseCandidateIdentity.sourceSnapshotSetHash, snapshotSetIdentity);
   await assert.rejects(execFileAsync(process.execPath, [...args, "--release-sequence", "2026.07.12",
     "--phase", "CANDIDATE", "--output", path.join(tempDir, "invalid-release-sequence.json")], generatorOptions),
   /--release-sequence must be a positive safe integer/);
@@ -5116,6 +5134,20 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   sourceAdmissionEvidence.result = sourceAdmissionResult;
   await writeFile(gateEvidencePaths.source_admission, JSON.stringify(sourceAdmissionEvidence));
 
+  for (const gateId of ["source_admission", "source_governance", "freshness_conditional_publish"]) {
+    const evidence = JSON.parse(readFileSync(gateEvidencePaths[gateId], "utf8"));
+    evidence.snapshotSetIdentity = "b".repeat(64);
+    evidence.result.snapshotSetIdentity = "b".repeat(64);
+    await writeFile(gateEvidencePaths[gateId], JSON.stringify(evidence));
+  }
+  await rejectsCurrent(/source datapack gate snapshotSetIdentity does not match RC sourceSnapshotSetHash/);
+  for (const gateId of ["source_admission", "source_governance", "freshness_conditional_publish"]) {
+    const evidence = JSON.parse(readFileSync(gateEvidencePaths[gateId], "utf8"));
+    evidence.snapshotSetIdentity = snapshotSetIdentity;
+    evidence.result.snapshotSetIdentity = snapshotSetIdentity;
+    await writeFile(gateEvidencePaths[gateId], JSON.stringify(evidence));
+  }
+
   const devicePerformanceEvidence = JSON.parse(readFileSync(gateEvidencePaths.device_performance, "utf8"));
   devicePerformanceEvidence.result.artifact.sha256 = "f".repeat(64);
   await writeFile(gateEvidencePaths.device_performance, JSON.stringify(devicePerformanceEvidence)); await rejectsCurrent(/device_performance artifact.sha256 does not match the RC identity/);
@@ -5169,7 +5201,7 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   const admissionEvidence = JSON.parse(readFileSync(gateEvidencePaths.source_admission, "utf8"));
   admissionEvidence.snapshotSetIdentity = "b".repeat(64);
   admissionEvidence.result.snapshotSetIdentity = admissionEvidence.snapshotSetIdentity;
-  await writeFile(gateEvidencePaths.source_admission, JSON.stringify(admissionEvidence)); await rejectsCurrent(/mixed snapshotSetIdentity/);
+  await writeFile(gateEvidencePaths.source_admission, JSON.stringify(admissionEvidence)); await rejectsCurrent(/snapshotSetIdentity does not match RC sourceSnapshotSetHash/);
   admissionEvidence.snapshotSetIdentity = snapshotSetIdentity;
   admissionEvidence.result.snapshotSetIdentity = snapshotSetIdentity;
   await writeFile(gateEvidencePaths.source_admission, JSON.stringify(admissionEvidence));

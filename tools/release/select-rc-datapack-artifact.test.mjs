@@ -39,6 +39,7 @@ async function fixture(outcome) {
     strictValidationPassed: true,
     publishAttempted: outcome === "PUBLISHED_AND_VERIFIED",
     remoteValidationPassed: true,
+    sourceSnapshotSetHash: "a".repeat(64),
     reasonCodes: [],
   }));
   return { root, packBytes };
@@ -50,6 +51,7 @@ test("PUBLISHED_AND_VERIFIED는 게시 candidate manifest와 일치하는 pack�
 
   assert.equal(result.outcome, "PUBLISHED_AND_VERIFIED");
   assert.equal(JSON.parse(await readFile(result.manifestPath, "utf8")).releaseSequence, 12);
+  assert.equal(JSON.parse(await readFile(result.decisionPath, "utf8")).sourceSnapshotSetHash, "a".repeat(64));
   assert.deepEqual(await readFile(result.artifactPath), packBytes);
 });
 
@@ -59,6 +61,7 @@ test("NO_CHANGE_VALID는 staged candidate가 아니라 current-production manife
 
   assert.equal(result.outcome, "NO_CHANGE_VALID");
   assert.equal(JSON.parse(await readFile(result.manifestPath, "utf8")).releaseSequence, 11);
+  assert.equal(JSON.parse(await readFile(result.decisionPath, "utf8")).sourceSnapshotSetHash, "a".repeat(64));
   assert.deepEqual(await readFile(result.artifactPath), packBytes);
 });
 
