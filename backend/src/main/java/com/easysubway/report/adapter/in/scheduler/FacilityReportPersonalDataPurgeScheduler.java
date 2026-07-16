@@ -47,12 +47,16 @@ public class FacilityReportPersonalDataPurgeScheduler {
 		this.retentionDays = retentionDays;
 	}
 
-	@Scheduled(fixedRate = DEFAULT_PURGE_INTERVAL_MILLIS)
+	@Scheduled(
+		fixedRate = DEFAULT_PURGE_INTERVAL_MILLIS,
+		scheduler = "facilityReportPersonalDataPurgeTaskScheduler"
+	)
 	public void purgeExpiredPersonalData() {
+		Duration safetyMargin = Duration.ofDays(Math.min(PURGE_SAFETY_MARGIN.toDays(), retentionDays - 1L));
 		LocalDateTime cutoff = LocalDateTime.ofInstant(
 			clock.instant()
 				.minus(Duration.ofDays(retentionDays))
-				.plus(PURGE_SAFETY_MARGIN),
+				.plus(safetyMargin),
 			ZoneOffset.UTC
 		);
 		int purged = purgePort.purgePersonalDataCreatedBefore(cutoff);

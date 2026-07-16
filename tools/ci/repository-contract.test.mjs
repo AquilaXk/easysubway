@@ -10900,6 +10900,7 @@ test("민감정보 백업 보존 작업은 일일 실행 지연을 포함해 30�
   const expiredDump = path.join(nested, "easysubway-postgres-20260601T000000Z.ABC123.dump");
   const expiredChecksum = `${expiredDump}.sha256`;
   const dailyBoundaryDump = path.join(nested, "easysubway-postgres-20260617T000000Z.GHI789.dump");
+  const copiedExpiredDump = path.join(nested, "easysubway-postgres-20260602T000000Z.CPY123.dump");
   const retainedDump = path.join(nested, "easysubway-postgres-20260716T000000Z.DEF456.dump");
   const unrelated = path.join(backupRoot, "operator-note.txt");
   const outsideRoot = await mkdtemp(path.join(tmpdir(), "easysubway-backup-outside-"));
@@ -10917,6 +10918,7 @@ test("민감정보 백업 보존 작업은 일일 실행 지연을 포함해 30�
   await writeFile(expiredDump, "expired dump");
   await writeFile(expiredChecksum, "expired checksum");
   await writeFile(dailyBoundaryDump, "daily boundary dump");
+  await writeFile(copiedExpiredDump, "copied expired dump");
   await writeFile(retainedDump, "retained dump");
   await writeFile(unrelated, "unrelated");
   await writeFile(outside, "outside");
@@ -10925,18 +10927,25 @@ test("민감정보 백업 보존 작업은 일일 실행 지연을 포함해 30�
     await utimes(candidate, old, old);
   }
   await utimes(dailyBoundaryDump, dailyBoundary, dailyBoundary);
+  await utimes(retainedDump, old, old);
 
   const output = execFileSync(
     process.execPath,
-    [pruneScript, "--root", backupRoot, "--retention-days", "30"],
+    [
+      pruneScript,
+      "--root", backupRoot,
+      "--retention-days", "30",
+      "--now", "2026-07-16T12:00:00Z",
+    ],
     { cwd: root, encoding: "utf8" },
   );
 
-  assert.match(output, /pruned=4 retention_days=30/);
+  assert.match(output, /pruned=5 retention_days=30/);
   assert.equal(existsSync(expiredPhotoDir), false);
   assert.equal(existsSync(expiredDump), false);
   assert.equal(existsSync(expiredChecksum), false);
   assert.equal(existsSync(dailyBoundaryDump), false);
+  assert.equal(existsSync(copiedExpiredDump), false);
   assert.equal(existsSync(retainedDump), true);
   assert.equal(existsSync(unrelated), true);
   assert.equal(existsSync(matchingSymlink), true);
@@ -12596,6 +12605,8 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
     "backend/src/main/java/com/easysubway/report/application/port/out/PurgeFacilityReportPersonalDataPort.java";
   const purgePersonalDataSchedulerPath =
     "backend/src/main/java/com/easysubway/report/adapter/in/scheduler/FacilityReportPersonalDataPurgeScheduler.java";
+  const purgePersonalDataSchedulingConfigurationPath =
+    "backend/src/main/java/com/easysubway/report/adapter/in/scheduler/FacilityReportPersonalDataPurgeSchedulingConfiguration.java";
   const saveFacilityStatusPort = read(
     "backend/src/main/java/com/easysubway/transit/application/port/out/SaveAccessibilityFacilityStatusPort.java",
   );
@@ -12710,6 +12721,7 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.equal(existsSync(path.join(root, deletePhotoPortPath)), true);
   assert.equal(existsSync(path.join(root, purgePersonalDataPortPath)), true);
   assert.equal(existsSync(path.join(root, purgePersonalDataSchedulerPath)), true);
+  assert.equal(existsSync(path.join(root, purgePersonalDataSchedulingConfigurationPath)), true);
   assert.match(read(photoStoragePortPath), /interface StoreFacilityReportPhotoPort/);
   assert.match(read(photoStoragePortPath), /storeFacilityReportPhoto/);
   assert.match(read(photoStoragePortPath), /storedBytes/);
@@ -12721,7 +12733,14 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(read(purgePersonalDataSchedulerPath), /personal-data-retention-days:365/);
   assert.match(read(purgePersonalDataSchedulerPath), /DEFAULT_PURGE_INTERVAL_MILLIS = 86_400_000L/);
   assert.match(read(purgePersonalDataSchedulerPath), /PURGE_SAFETY_MARGIN = Duration\.ofDays\(7\)/);
-  assert.match(read(purgePersonalDataSchedulerPath), /@Scheduled\(fixedRate = DEFAULT_PURGE_INTERVAL_MILLIS\)/);
+  assert.match(
+    read(purgePersonalDataSchedulerPath),
+    /@Scheduled\([\s\S]*fixedRate = DEFAULT_PURGE_INTERVAL_MILLIS,[\s\S]*scheduler = "facilityReportPersonalDataPurgeTaskScheduler"[\s\S]*\)/,
+  );
+  assert.match(
+    read(purgePersonalDataSchedulingConfigurationPath),
+    /@Bean\("facilityReportPersonalDataPurgeTaskScheduler"\)/,
+  );
   assert.doesNotMatch(read(purgePersonalDataSchedulerPath), /personal-data-purge-interval-ms/);
   assert.match(saveFacilityStatusPort, /interface SaveAccessibilityFacilityStatusPort/);
   assert.match(saveFacilityStatusPort, /saveFacilityStatus/);

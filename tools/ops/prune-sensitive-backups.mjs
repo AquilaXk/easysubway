@@ -19,10 +19,28 @@ if (!Number.isInteger(retentionDays) || retentionDays < 1 || retentionDays > 365
 }
 
 const dailySweepIntervalMs = 24 * 60 * 60 * 1000;
-const cutoff = Date.now() - retentionDays * dailySweepIntervalMs + dailySweepIntervalMs;
-const postgresBackup = /^easysubway-postgres-\d{8}T\d{6}Z\.[A-Za-z0-9]+\.dump(?:\.sha256)?$/;
-const photoBackup = /^easysubway-report-photos-\d{8}T\d{6}Z\.[A-Za-z0-9]+$/;
+const now = args.has("--now") ? Date.parse(args.get("--now")) : Date.now();
+if (!Number.isFinite(now)) {
+  throw new Error("--now must be a valid ISO-8601 timestamp");
+}
+const cutoff = now - retentionDays * dailySweepIntervalMs + dailySweepIntervalMs;
+const postgresBackup = /^easysubway-postgres-(\d{8}T\d{6}Z)\.[A-Za-z0-9]+\.dump(?:\.sha256)?$/;
+const photoBackup = /^easysubway-report-photos-(\d{8}T\d{6}Z)\.[A-Za-z0-9]+$/;
 let pruned = 0;
+
+function backupCreatedAt(name, pattern) {
+  const match = name.match(pattern);
+  if (!match) {
+    return null;
+  }
+  const compact = match[1];
+  const isoTimestamp = `${compact.slice(0, 4)}-${compact.slice(4, 6)}-${compact.slice(6, 11)}:${compact.slice(11, 13)}:${compact.slice(13, 15)}Z`;
+  const createdAt = Date.parse(isoTimestamp);
+  if (!Number.isFinite(createdAt)) {
+    throw new Error(`invalid backup creation timestamp: ${name}`);
+  }
+  return createdAt;
+}
 
 async function pruneDirectory(directory) {
   let entries;
@@ -42,9 +60,11 @@ async function pruneDirectory(directory) {
       continue;
     }
 
-    const isPostgresBackup = entry.isFile() && postgresBackup.test(entry.name);
-    const isPhotoBackup = entry.isDirectory() && photoBackup.test(entry.name);
-    if ((isPostgresBackup || isPhotoBackup) && metadata.mtimeMs <= cutoff) {
+    const postgresCreatedAt = entry.isFile() ? backupCreatedAt(entry.name, postgresBackup) : null;
+    const photoCreatedAt = entry.isDirectory() ? backupCreatedAt(entry.name, photoBackup) : null;
+    const isPhotoBackup = photoCreatedAt !== null;
+    const createdAt = postgresCreatedAt ?? photoCreatedAt;
+    if (createdAt !== null && createdAt <= cutoff) {
       await rm(candidate, { recursive: isPhotoBackup, force: true });
       pruned += 1;
       continue;

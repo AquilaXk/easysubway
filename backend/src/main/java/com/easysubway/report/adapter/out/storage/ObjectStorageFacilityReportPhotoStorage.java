@@ -19,6 +19,7 @@ import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -45,6 +46,8 @@ public class ObjectStorageFacilityReportPhotoStorage implements
 	private static final String HMAC_ALGORITHM = "HmacSHA256";
 	private static final String SIGNING_ALGORITHM = "AWS4-HMAC-SHA256";
 	private static final String OBJECT_KEY_PREFIX = "facility-reports/";
+	private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
+	private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
 	private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd")
 		.withZone(ZoneOffset.UTC);
 	private static final DateTimeFormatter DATE_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'")
@@ -58,6 +61,7 @@ public class ObjectStorageFacilityReportPhotoStorage implements
 	private final long maxBytes;
 	private final HttpClient httpClient;
 	private final Clock clock;
+	private final Duration requestTimeout;
 
 	@Autowired
 	public ObjectStorageFacilityReportPhotoStorage(
@@ -68,7 +72,17 @@ public class ObjectStorageFacilityReportPhotoStorage implements
 		@Value("${easysubway.report.upload.object-storage-secret-key:}") String secretKey,
 		@Value("${easysubway.report.upload.object-storage-region:us-east-1}") String region
 	) {
-		this(endpoint, bucket, maxBytes, accessKey, secretKey, region, HttpClient.newHttpClient(), Clock.systemUTC());
+		this(
+			endpoint,
+			bucket,
+			maxBytes,
+			accessKey,
+			secretKey,
+			region,
+			HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build(),
+			Clock.systemUTC(),
+			REQUEST_TIMEOUT
+		);
 	}
 
 	ObjectStorageFacilityReportPhotoStorage(
@@ -81,6 +95,20 @@ public class ObjectStorageFacilityReportPhotoStorage implements
 		HttpClient httpClient,
 		Clock clock
 	) {
+		this(endpoint, bucket, maxBytes, accessKey, secretKey, region, httpClient, clock, REQUEST_TIMEOUT);
+	}
+
+	ObjectStorageFacilityReportPhotoStorage(
+		String endpoint,
+		String bucket,
+		long maxBytes,
+		String accessKey,
+		String secretKey,
+		String region,
+		HttpClient httpClient,
+		Clock clock,
+		Duration requestTimeout
+	) {
 		this.endpoint = requireText(endpoint, "운영 object storage endpoint 설정이 필요합니다.");
 		this.bucket = requireText(bucket, "운영 report upload bucket 설정이 필요합니다.");
 		this.maxBytes = maxBytes;
@@ -89,6 +117,10 @@ public class ObjectStorageFacilityReportPhotoStorage implements
 		this.region = requireText(region, "운영 object storage region 설정이 필요합니다.");
 		this.httpClient = httpClient;
 		this.clock = clock;
+		if (requestTimeout == null || requestTimeout.isZero() || requestTimeout.isNegative()) {
+			throw new IllegalArgumentException("Object storage request timeout must be positive");
+		}
+		this.requestTimeout = requestTimeout;
 	}
 
 	@Override
@@ -202,6 +234,7 @@ public class ObjectStorageFacilityReportPhotoStorage implements
 		);
 		HttpRequest.Builder builder = HttpRequest.newBuilder()
 			.uri(URI.create(endpoint.replaceAll("/+$", "") + canonicalUri))
+			.timeout(requestTimeout)
 			.header("Authorization", authorization)
 			.header("x-amz-content-sha256", payloadHash)
 			.header("x-amz-date", dateTime);

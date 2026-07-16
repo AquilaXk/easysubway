@@ -11,7 +11,9 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.http.HttpClient;
+import java.net.http.HttpTimeoutException;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Map;
@@ -129,6 +131,34 @@ class ObjectStorageFacilityReportPhotoStorageTest {
 				.isInstanceOf(InvalidFacilityReportException.class)
 				.hasMessage("사진 첨부 정보를 확인해야 합니다.");
 		}
+	}
+
+	@Test
+	void boundsObjectStorageRequestsThatDoNotRespond() throws Exception {
+		server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+		server.createContext("/", exchange -> {
+			try {
+				Thread.sleep(500);
+			} catch (InterruptedException exception) {
+				Thread.currentThread().interrupt();
+			}
+			exchange.close();
+		});
+		server.start();
+		ObjectStorageFacilityReportPhotoStorage storage = new ObjectStorageFacilityReportPhotoStorage(
+			"http://127.0.0.1:" + server.getAddress().getPort(),
+			"easysubway-report-uploads",
+			900L * 1024L,
+			"prod-object-storage-access-key",
+			"prod-object-storage-secret-key-with-enough-entropy",
+			"ap-northeast-2",
+			HttpClient.newBuilder().connectTimeout(Duration.ofMillis(50)).build(),
+			Clock.fixed(Instant.parse("2026-06-20T00:00:00Z"), ZoneOffset.UTC),
+			Duration.ofMillis(50)
+		);
+
+		assertThatThrownBy(() -> storage.deleteFacilityReportPhoto("facility-reports/report-1/photo.jpg"))
+			.hasRootCauseInstanceOf(HttpTimeoutException.class);
 	}
 
 	private void startObjectStorageServer() throws IOException {

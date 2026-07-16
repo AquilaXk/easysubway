@@ -12,10 +12,15 @@ import java.time.ZoneOffset;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.Scheduled;
 
 @DisplayName("시설 신고 개인정보 자동 파기 스케줄러")
 class FacilityReportPersonalDataPurgeSchedulerTest {
+
+	private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+		.withUserConfiguration(FacilityReportPersonalDataPurgeSchedulingConfiguration.class);
 
 	@Test
 	@DisplayName("일일 주기와 실행시간 안전 여유를 포함해도 기본 1년 보관 상한을 넘기지 않는다")
@@ -40,6 +45,32 @@ class FacilityReportPersonalDataPurgeSchedulerTest {
 		assertThat(scheduledMethod.getAnnotation(Scheduled.class).fixedRate())
 			.isEqualTo(86_400_000L);
 		assertThat(scheduledMethod.getAnnotation(Scheduled.class).fixedDelay()).isEqualTo(-1L);
+		assertThat(scheduledMethod.getAnnotation(Scheduled.class).scheduler())
+			.isEqualTo("facilityReportPersonalDataPurgeTaskScheduler");
+		contextRunner.run(context -> {
+			assertThat(context).hasBean("facilityReportPersonalDataPurgeTaskScheduler");
+			assertThat(context.getBean("facilityReportPersonalDataPurgeTaskScheduler"))
+				.isInstanceOf(TaskScheduler.class);
+		});
+	}
+
+	@Test
+	@DisplayName("하루 보관 설정에서도 아직 만료되지 않은 신규 신고는 파기하지 않는다")
+	void limitsSafetyMarginBelowRetentionPeriod() {
+		Instant now = Instant.parse("2026-07-16T12:00:00Z");
+		AtomicReference<LocalDateTime> cutoff = new AtomicReference<>();
+		var scheduler = new FacilityReportPersonalDataPurgeScheduler(
+			value -> {
+				cutoff.set(value);
+				return 0;
+			},
+			Clock.fixed(now, ZoneOffset.UTC),
+			1
+		);
+
+		scheduler.purgeExpiredPersonalData();
+
+		assertThat(cutoff.get()).isEqualTo(LocalDateTime.of(2026, 7, 15, 12, 0));
 	}
 
 	@Test
