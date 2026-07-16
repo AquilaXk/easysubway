@@ -7400,10 +7400,10 @@
       {
         "station": "공항",
         "role": "ordinary",
-        "x": 348,
-        "y": 1513,
+        "x": 294,
+        "y": 1139,
         "anchor": "start",
-        "fontSizePx": 72
+        "fontSizePx": 54
       },
       {
         "station": "광주공고",
@@ -7446,12 +7446,12 @@
         "fontSizePx": 14
       },
       {
-        "station": "광주송정역",
+        "station": "광주송정",
         "role": "transfer",
         "x": 294,
-        "y": 981,
+        "y": 779,
         "anchor": "start",
-        "fontSizePx": 74
+        "fontSizePx": 56
       },
       {
         "station": "광주역",
@@ -7464,18 +7464,18 @@
       {
         "station": "금남로4가",
         "role": "ordinary",
-        "x": 1678,
-        "y": 308,
+        "x": 1490,
+        "y": 239,
         "anchor": "middle",
-        "fontSizePx": 72
+        "fontSizePx": 54
       },
       {
         "station": "금남로5가",
         "role": "ordinary",
-        "x": 1435,
-        "y": 450,
-        "anchor": "middle",
-        "fontSizePx": 72
+        "x": 1114,
+        "y": 599,
+        "anchor": "start",
+        "fontSizePx": 54
       },
       {
         "station": "금호",
@@ -7488,35 +7488,35 @@
       {
         "station": "김대중컨벤션센터",
         "role": "ordinary",
-        "x": 482,
-        "y": 1644,
-        "anchor": "middle",
-        "fontSizePx": 58
+        "x": 294,
+        "y": 1319,
+        "anchor": "start",
+        "fontSizePx": 43
       },
       {
         "station": "남광주",
         "role": "transfer",
         "x": 1934,
-        "y": 698,
+        "y": 679,
         "anchor": "start",
-        "fontSizePx": 74
+        "fontSizePx": 56
       },
       {
         "station": "녹동",
         "role": "terminal",
         "x": 1934,
-        "y": 1474,
+        "y": 1309,
         "anchor": "start",
-        "fontSizePx": 78,
+        "fontSizePx": 57,
         "hasLineTerminalBadge": true
       },
       {
         "station": "농성",
         "role": "ordinary",
         "x": 1114,
-        "y": 840,
+        "y": 1139,
         "anchor": "start",
-        "fontSizePx": 72
+        "fontSizePx": 54
       },
       {
         "station": "대광여고",
@@ -7530,17 +7530,17 @@
         "station": "도산",
         "role": "ordinary",
         "x": 294,
-        "y": 723,
+        "y": 599,
         "anchor": "start",
-        "fontSizePx": 72
+        "fontSizePx": 54
       },
       {
         "station": "돌고개",
         "role": "ordinary",
         "x": 1114,
-        "y": 581,
+        "y": 959,
         "anchor": "start",
-        "fontSizePx": 72
+        "fontSizePx": 54
       },
       {
         "station": "두암사거리",
@@ -7562,9 +7562,9 @@
         "station": "문화전당",
         "role": "ordinary",
         "x": 1934,
-        "y": 440,
+        "y": 469,
         "anchor": "start",
-        "fontSizePx": 58
+        "fontSizePx": 43
       },
       {
         "station": "방림",
@@ -7601,18 +7601,18 @@
       {
         "station": "상무",
         "role": "transfer",
-        "x": 741,
-        "y": 1460,
-        "anchor": "middle",
-        "fontSizePx": 74
+        "x": 294,
+        "y": 1499,
+        "anchor": "start",
+        "fontSizePx": 56
       },
       {
         "station": "소태",
         "role": "ordinary",
         "x": 1934,
-        "y": 1215,
+        "y": 1099,
         "anchor": "start",
-        "fontSizePx": 72
+        "fontSizePx": 54
       },
       {
         "station": "송암공단",
@@ -7626,9 +7626,9 @@
         "station": "송정공원",
         "role": "ordinary",
         "x": 294,
-        "y": 1240,
+        "y": 959,
         "anchor": "start",
-        "fontSizePx": 72
+        "fontSizePx": 54
       },
       {
         "station": "수완",
@@ -7674,17 +7674,17 @@
         "station": "쌍촌",
         "role": "ordinary",
         "x": 1114,
-        "y": 1357,
+        "y": 1499,
         "anchor": "start",
-        "fontSizePx": 72
+        "fontSizePx": 54
       },
       {
         "station": "양동시장",
         "role": "ordinary",
-        "x": 1204,
-        "y": 308,
-        "anchor": "middle",
-        "fontSizePx": 72
+        "x": 1114,
+        "y": 779,
+        "anchor": "start",
+        "fontSizePx": 54
       },
       {
         "station": "양산산단",
@@ -7729,10 +7729,10 @@
       {
         "station": "운천",
         "role": "ordinary",
-        "x": 960,
-        "y": 1644,
+        "x": 670,
+        "y": 1740,
         "anchor": "middle",
-        "fontSizePx": 72
+        "fontSizePx": 54
       },
       {
         "station": "운천저수지",
@@ -7842,9 +7842,9 @@
         "station": "평동",
         "role": "terminal",
         "x": 294,
-        "y": 464,
+        "y": 419,
         "anchor": "start",
-        "fontSizePx": 78,
+        "fontSizePx": 57,
         "hasLineTerminalBadge": true
       },
       {
@@ -7875,17 +7875,17 @@
         "station": "학동증심사입구",
         "role": "ordinary",
         "x": 1934,
-        "y": 923,
+        "y": 889,
         "anchor": "start",
-        "fontSizePx": 58
+        "fontSizePx": 43
       },
       {
         "station": "화정",
         "role": "ordinary",
         "x": 1114,
-        "y": 1098,
+        "y": 1319,
         "anchor": "start",
-        "fontSizePx": 72
+        "fontSizePx": 54
       },
       {
         "station": "효천",
