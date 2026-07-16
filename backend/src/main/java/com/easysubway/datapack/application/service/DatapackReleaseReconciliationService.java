@@ -123,6 +123,25 @@ public class DatapackReleaseReconciliationService {
 					null, "CONFLICT", mismatch, now);
 				return;
 			}
+			CatalogIdentity current = catalog.fetchCurrent(delivery.channel());
+			if (!current.signatureValid() || !delivery.channel().equals(current.channel())) {
+				markClaimed(delivery, State.DEAD_LETTER, delivery.attempts(),
+					null, "CONFLICT", "CATALOG_CURRENT_MISMATCH", now);
+				return;
+			}
+			if (current.releaseSequence() > delivery.releaseSequence()) {
+				markClaimed(delivery, State.DEAD_LETTER, delivery.attempts(),
+					null, "STALE", "CURRENT_RELEASE_ADVANCED", now);
+				return;
+			}
+			if (current.releaseSequence() < delivery.releaseSequence()) {
+				throw new DatapackReleaseCatalogPort.Unavailable();
+			}
+			if (!current.manifestSha256().equals(delivery.manifestSha256())) {
+				markClaimed(delivery, State.DEAD_LETTER, delivery.attempts(),
+					null, "CONFLICT", "CATALOG_CURRENT_MISMATCH", now);
+				return;
+			}
 			callbackService.reconcile(delivery, identity);
 		} catch (DatapackReleaseCatalogPort.Unavailable unavailable) {
 			if (!now.isBefore(delivery.deadLetterDeadline())) {

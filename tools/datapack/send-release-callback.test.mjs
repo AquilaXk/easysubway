@@ -124,15 +124,58 @@ test("transient failure를 모두 소진하면 bounded retry 계획을 기록한
   });
 });
 
+test("재시도 전에 current가 후속 release로 전진하면 stale callback을 보내지 않는다", async () => {
+  const currentBytes = Buffer.from(JSON.stringify({
+    channel: "production",
+    releaseSequence: 42,
+  }));
+  const guardedPayload = {
+    ...payload,
+    manifestSha256: createHash("sha256").update(currentBytes).digest("hex"),
+  };
+  let currentChecks = 0;
+  let callbackRequests = 0;
+  const artifact = await sendReleaseCallback({
+    payload: guardedPayload,
+    endpoint: "https://api.example.com/callback",
+    token,
+    currentManifestUrl: "https://datapack.example.com/catalog/current.json",
+    retryDelaysSeconds: [60],
+    sleep: async () => {},
+    fetchImpl: async (url) => {
+      if (url.includes("current.json")) {
+        currentChecks += 1;
+        const body = currentChecks === 1
+          ? currentBytes
+          : Buffer.from(JSON.stringify({ channel: "production", releaseSequence: 43 }));
+        return new Response(body, { status: 200 });
+      }
+      callbackRequests += 1;
+      return new Response(null, { status: 503 });
+    },
+  });
+
+  assert.equal(artifact.state, "STALE_SUPERSEDED");
+  assert.equal(artifact.terminalReason, "CURRENT_RELEASE_ADVANCED");
+  assert.equal(callbackRequests, 1);
+});
+
 test("CLI는 delivery state를 GitHub output에 기록한다", async () => {
-  await withServer((_request, response) => response.writeHead(200).end(), async (endpoint) => {
+  const currentBytes = Buffer.from(JSON.stringify({ channel: payload.channel, releaseSequence: payload.releaseSequence }));
+  await withServer((request, response) => {
+    if (request.url === "/catalog/current.json") return response.writeHead(200).end(currentBytes);
+    return response.writeHead(200).end();
+  }, async (endpoint) => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "callback-sender-"));
     const stage = path.join(directory, "easysubway-datapack-stage");
     const payloadPath = path.join(stage, "release-callback.json");
     const artifactPath = path.join(stage, "release-callback-delivery.json");
     const githubOutputPath = path.join(directory, "github-output");
     await mkdir(stage, { recursive: true });
-    await writeFile(payloadPath, JSON.stringify(payload));
+    await writeFile(payloadPath, JSON.stringify({
+      ...payload,
+      manifestSha256: createHash("sha256").update(currentBytes).digest("hex"),
+    }));
 
     const exitCode = await new Promise((resolve, reject) => {
       const child = spawn(process.execPath, [
@@ -144,6 +187,7 @@ test("CLI는 delivery state를 GitHub output에 기록한다", async () => {
           GITHUB_OUTPUT: githubOutputPath,
           EASYSUBWAY_DATAPACK_CALLBACK_URL: endpoint,
           EASYSUBWAY_DATAPACK_WORKFLOW_TOKEN: token,
+          EASYSUBWAY_DATA_PACK_BASE_URL: new URL(endpoint).origin,
         },
       });
       child.once("error", reject);
@@ -157,14 +201,21 @@ test("CLI는 delivery state를 GitHub output에 기록한다", async () => {
 });
 
 test("CLI는 terminal failure를 exit 2와 reconciliation output으로 기록한다", async () => {
-  await withServer((_request, response) => response.writeHead(400).end(), async (endpoint) => {
+  const currentBytes = Buffer.from(JSON.stringify({ channel: payload.channel, releaseSequence: payload.releaseSequence }));
+  await withServer((request, response) => {
+    if (request.url === "/catalog/current.json") return response.writeHead(200).end(currentBytes);
+    return response.writeHead(400).end();
+  }, async (endpoint) => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "callback-sender-failure-"));
     const stage = path.join(directory, "easysubway-datapack-stage");
     const payloadPath = path.join(stage, "release-callback.json");
     const artifactPath = path.join(stage, "release-callback-delivery.json");
     const githubOutputPath = path.join(directory, "github-output");
     await mkdir(stage, { recursive: true });
-    await writeFile(payloadPath, JSON.stringify(payload));
+    await writeFile(payloadPath, JSON.stringify({
+      ...payload,
+      manifestSha256: createHash("sha256").update(currentBytes).digest("hex"),
+    }));
 
     const exitCode = await new Promise((resolve, reject) => {
       const child = spawn(process.execPath, [
@@ -176,6 +227,7 @@ test("CLI는 terminal failure를 exit 2와 reconciliation output으로 기록한
           GITHUB_OUTPUT: githubOutputPath,
           EASYSUBWAY_DATAPACK_CALLBACK_URL: endpoint,
           EASYSUBWAY_DATAPACK_WORKFLOW_TOKEN: token,
+          EASYSUBWAY_DATA_PACK_BASE_URL: new URL(endpoint).origin,
         },
       });
       child.once("error", reject);

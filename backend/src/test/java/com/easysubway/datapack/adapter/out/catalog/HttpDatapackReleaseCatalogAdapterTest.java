@@ -151,7 +151,7 @@ class HttpDatapackReleaseCatalogAdapterTest {
 	}
 
 	@Test
-	void rejectsRequestWhenALaterReleaseReplacedTheCurrentPointer() throws Exception {
+	void returnsImmutableRequestIdentityWhenALaterReleaseReplacedTheCurrentPointer() throws Exception {
 		var keyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
 		byte[] manifest = signedManifest(keyPair, 42);
 		byte[] current = signedManifest(keyPair, 44);
@@ -171,8 +171,8 @@ class HttpDatapackReleaseCatalogAdapterTest {
 			var adapter = new HttpDatapackReleaseCatalogAdapter(
 				"http://127.0.0.1:" + server.getAddress().getPort(), publicKey, "production-v1");
 
-			assertThatThrownBy(() -> adapter.findByRequest("production", "request-2057"))
-				.isInstanceOf(com.easysubway.datapack.application.port.out.DatapackReleaseCatalogPort.Unavailable.class);
+			assertThat(adapter.findByRequest("production", "request-2057"))
+				.get().extracting(identity -> identity.releaseSequence()).isEqualTo(42L);
 		} finally {
 			server.stop(0);
 		}

@@ -24,6 +24,7 @@ export async function sendReleaseCallback({
   payload,
   endpoint,
   token,
+  currentManifestUrl,
   retryDelaysSeconds = CALLBACK_RETRY_DELAYS_SECONDS,
   sleep = (seconds) => new Promise((resolve) => setTimeout(resolve, seconds * 1000)),
   fetchImpl = fetch,
@@ -41,6 +42,34 @@ export async function sendReleaseCallback({
   };
 
   for (let index = 0; index <= retryDelaysSeconds.length; index += 1) {
+    if (currentManifestUrl) {
+      try {
+        const current = await fetchCurrentRelease(currentManifestUrl, fetchImpl);
+        if (current.releaseSequence > payload.releaseSequence) {
+          artifact.state = "STALE_SUPERSEDED";
+          artifact.terminalReason = "CURRENT_RELEASE_ADVANCED";
+          return artifact;
+        }
+        if (current.releaseSequence !== payload.releaseSequence
+          || current.channel !== payload.channel
+          || current.manifestSha256 !== payload.manifestSha256) {
+          throw new Error("current release identity mismatch");
+        }
+      } catch {
+        artifact.attempts.push({
+          attempt: index + 1,
+          httpClass: "CURRENT_UNAVAILABLE",
+          ...(index < retryDelaysSeconds.length
+            ? { nextRetrySeconds: retryDelaysSeconds[index] }
+            : {}),
+        });
+        if (index < retryDelaysSeconds.length) {
+          await sleep(retryDelaysSeconds[index]);
+          continue;
+        }
+        break;
+      }
+    }
     let status;
     try {
       const response = await fetchImpl(endpoint, {
@@ -81,15 +110,38 @@ export async function sendReleaseCallback({
   return artifact;
 }
 
+async function fetchCurrentRelease(url, fetchImpl) {
+  const response = await fetchImpl(validatedEndpoint(url), {
+    headers: { accept: "application/json" },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) throw new Error("current release unavailable");
+  const bytes = Buffer.from(await response.arrayBuffer());
+  const manifest = JSON.parse(bytes.toString("utf8"));
+  if (!Number.isSafeInteger(manifest.releaseSequence) || manifest.releaseSequence < 1
+    || typeof manifest.channel !== "string") {
+    throw new Error("current release identity invalid");
+  }
+  return {
+    releaseSequence: manifest.releaseSequence,
+    channel: manifest.channel,
+    manifestSha256: sha256(bytes),
+  };
+}
+
 async function main() {
   const { payloadPath, outputPath, githubOutputPath } = runnerPaths(process.env);
   const endpoint = process.env.EASYSUBWAY_DATAPACK_CALLBACK_URL;
   const token = process.env.EASYSUBWAY_DATAPACK_WORKFLOW_TOKEN;
-  if (!endpoint || !token) throw new Error("callback endpoint/token env is required");
+  const dataPackBaseUrl = process.env.EASYSUBWAY_DATA_PACK_BASE_URL;
+  if (!endpoint || !token || !dataPackBaseUrl) {
+    throw new Error("callback endpoint/token and data pack base URL env are required");
+  }
   const artifact = await sendReleaseCallback({
     payload: JSON.parse(await readFile(payloadPath, "utf8")),
     endpoint,
     token,
+    currentManifestUrl: `${dataPackBaseUrl.replace(/\/$/, "")}/catalog/current.json`,
   });
   await writeFile(outputPath, `${JSON.stringify(artifact, null, 2)}\n`);
   await appendFile(githubOutputPath, `state=${artifact.state}\n`);

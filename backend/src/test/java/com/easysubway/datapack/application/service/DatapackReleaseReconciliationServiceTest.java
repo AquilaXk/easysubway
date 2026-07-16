@@ -44,10 +44,28 @@ class DatapackReleaseReconciliationServiceTest {
 		var identity = new CatalogIdentity(42, SHA, "production", "request-2057", true, "b".repeat(64));
 		when(catalog.findByRequest("production", "request-2057"))
 			.thenReturn(java.util.Optional.of(identity));
+		when(catalog.fetchCurrent("production")).thenReturn(identity);
 
 		service.reconcile(delivery, T0.plusMinutes(10));
 
 		verify(callbackService).reconcile(delivery, identity);
+	}
+
+	@Test
+	@DisplayName("current가 후속 release로 전진한 유실 callback은 DEAD_LETTER로 수렴한다")
+	void supersededReleaseDeadLetters() {
+		var delivery = delivery();
+		var identity = new CatalogIdentity(42, SHA, "production", "request-2057", true, "b".repeat(64));
+		when(catalog.findByRequest("production", "request-2057"))
+			.thenReturn(java.util.Optional.of(identity));
+		when(catalog.fetchCurrent("production")).thenReturn(
+			new CatalogIdentity(43, "e".repeat(64), "production", "", true, "c".repeat(64)));
+
+		service.reconcile(delivery, T0.plusMinutes(10));
+
+		verify(repository).mark(delivery.idempotencyKey(), State.DEAD_LETTER, 0, null,
+			"STALE", "CURRENT_RELEASE_ADVANCED", T0.plusMinutes(10));
+		verify(callbackService, never()).reconcile(any(), any());
 	}
 
 	@Test
@@ -212,6 +230,7 @@ class DatapackReleaseReconciliationServiceTest {
 			.thenReturn(java.util.List.of(delivery));
 		when(catalog.findByRequest("production", "request-2057"))
 			.thenReturn(java.util.Optional.of(identity));
+		when(catalog.fetchCurrent("production")).thenReturn(identity);
 		doThrow(new IllegalStateException("persistent apply failure"))
 			.when(callbackService).reconcile(delivery, identity);
 
@@ -249,6 +268,7 @@ class DatapackReleaseReconciliationServiceTest {
 			.thenReturn(java.util.Optional.of(firstIdentity));
 		when(catalog.findByRequest("production", "request-2058"))
 			.thenReturn(java.util.Optional.of(secondIdentity));
+		when(catalog.fetchCurrent("production")).thenReturn(firstIdentity, secondIdentity);
 		doThrow(new IllegalStateException("first failed")).when(callbackService).reconcile(first, firstIdentity);
 
 		service.reconcileDue();

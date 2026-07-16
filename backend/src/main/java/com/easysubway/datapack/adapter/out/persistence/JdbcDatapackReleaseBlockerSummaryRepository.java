@@ -53,7 +53,16 @@ public class JdbcDatapackReleaseBlockerSummaryRepository implements DatapackRele
 		long callbackReconciliationBlockers = count("""
 			SELECT COUNT(*) FROM datapack_release_deliveries
 			WHERE channel = 'production' AND state <> 'DELIVERED'
-			""");
+			""") + count("""
+			SELECT COUNT(*) FROM datapack_release_request request
+			WHERE request.target_channel = 'production'
+			  AND request.status IN ('APPROVED', 'DISPATCHED')
+			  AND request.updated_at <= ?
+			  AND NOT EXISTS (
+				SELECT 1 FROM datapack_release_deliveries delivery
+				WHERE delivery.release_request_id = request.approval_id
+			  )
+			""", evaluationAt.minusMinutes(10));
 		EvidenceBundleSummary evidenceBundle = evidenceBundle(candidate);
 		ManifestSignatureSummary manifestSignature = evidenceBundle.manifestSignature();
 		ReleaseChannelSummary productionChannel = productionChannel();
@@ -343,6 +352,11 @@ public class JdbcDatapackReleaseBlockerSummaryRepository implements DatapackRele
 
 	private long count(String sql) {
 		Long result = jdbcTemplate.queryForObject(sql, Long.class);
+		return result == null ? 0L : result;
+	}
+
+	private long count(String sql, Object parameter) {
+		Long result = jdbcTemplate.queryForObject(sql, Long.class, parameter);
 		return result == null ? 0L : result;
 	}
 
