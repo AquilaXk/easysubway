@@ -30,6 +30,7 @@ class MainActivity : FlutterActivity() {
     private val locationTimeoutMillis = 10_000L
     private val nearbyLocationMaxAgeMillis = 5 * 60 * 1000L
     private val nearbyLocationMaxAccuracyMeters = 500f
+    private val requestHashPattern = Regex("^[A-Za-z0-9_-]{43}$")
 
     private var pendingLocationResult: MethodChannel.Result? = null
     private var pendingNotificationPermissionResult: MethodChannel.Result? = null
@@ -92,7 +93,7 @@ class MainActivity : FlutterActivity() {
             return
         }
         val projectNumber = cloudProjectNumber?.toLongOrNull()
-        if (requestHash == null || !requestHash.matches(Regex("^[A-Za-z0-9_-]{43}$")) || projectNumber == null || projectNumber <= 0) {
+        if (requestHash == null || !requestHash.matches(requestHashPattern) || projectNumber == null || projectNumber <= 0) {
             result.error("integrityInvalidRequest", "invalid integrity request", null)
             return
         }

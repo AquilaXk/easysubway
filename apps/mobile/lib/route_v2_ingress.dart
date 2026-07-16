@@ -47,13 +47,44 @@ class PlayIntegrityRouteV2SessionProvider {
     required this.apiClient,
     required this.attestor,
     String Function()? nonceFactory,
-  }) : _nonceFactory = nonceFactory ?? _secureNonce;
+    DateTime Function()? now,
+  }) : _nonceFactory = nonceFactory ?? _secureNonce,
+       _now = now ?? DateTime.now;
 
   final ApiClient apiClient;
   final PlayIntegrityAttestor attestor;
   final String Function() _nonceFactory;
+  final DateTime Function() _now;
+  _RouteV2Session? _cachedSession;
+  Future<_RouteV2Session>? _pendingSession;
 
   Future<String> issueToken() async {
+    final cached = _cachedSession;
+    if (cached != null && _now().toUtc().isBefore(cached.expiresAt)) {
+      return cached.token;
+    }
+    final pending = _pendingSession;
+    if (pending != null) {
+      return (await pending).token;
+    }
+    final issuance = _issueSession();
+    _pendingSession = issuance;
+    try {
+      final session = await issuance;
+      _cachedSession = session;
+      return session.token;
+    } finally {
+      if (identical(_pendingSession, issuance)) {
+        _pendingSession = null;
+      }
+    }
+  }
+
+  void invalidateSession() {
+    _cachedSession = null;
+  }
+
+  Future<_RouteV2Session> _issueSession() async {
     final nonce = _nonceFactory();
     final integrityToken = await attestor.requestToken(requestHash(nonce));
     final response = await apiClient.postJson(
@@ -71,14 +102,20 @@ class PlayIntegrityRouteV2SessionProvider {
     }
     final token = body['token'];
     final scope = body['scope'];
+    final expiresAtValue = body['expiresAt'];
+    final expiresAt = expiresAtValue is String
+        ? DateTime.tryParse(expiresAtValue)?.toUtc()
+        : null;
     if (token is! String ||
         !RegExp(r'^[A-Za-z0-9_-]{43}$').hasMatch(token) ||
-        scope != 'route:v2:itx') {
+        scope != 'route:v2:itx' ||
+        expiresAt == null ||
+        !expiresAt.isAfter(_now().toUtc())) {
       throw const RouteSearchOnlineException.unavailable(
         failureReason: 'ROUTE_SESSION_ATTESTATION_REJECTED',
       );
     }
-    return token;
+    return _RouteV2Session(token: token, expiresAt: expiresAt);
   }
 
   static String canonicalRequest(String nonce) =>
@@ -93,6 +130,13 @@ class PlayIntegrityRouteV2SessionProvider {
     final bytes = List<int>.generate(16, (_) => random.nextInt(256));
     return base64Url.encode(bytes).replaceAll('=', '');
   }
+}
+
+class _RouteV2Session {
+  const _RouteV2Session({required this.token, required this.expiresAt});
+
+  final String token;
+  final DateTime expiresAt;
 }
 
 class TransportScopedRouteSearchRepository implements RouteSearchRepository {

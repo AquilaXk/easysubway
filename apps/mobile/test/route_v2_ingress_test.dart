@@ -93,6 +93,7 @@ void main() {
         ),
         attestor: attestor,
         nonceFactory: () => 'AAAAAAAAAAAAAAAAAAAAAA',
+        now: () => DateTime.parse('2026-07-16T09:00:00Z'),
       );
 
       final token = await provider.issueToken();
@@ -108,6 +109,51 @@ void main() {
       });
     },
   );
+
+  test('session provider는 expiresAt 전 token을 재사용하고 만료 후에만 재발급한다', () async {
+    var requestCount = 0;
+    var now = DateTime.parse('2026-07-16T09:00:00Z');
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+    server.listen((request) async {
+      requestCount++;
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode({
+            'token': (requestCount == 1 ? 'A' : 'B') * 43,
+            'scope': 'route:v2:itx',
+            'issuedAt': now.toUtc().toIso8601String(),
+            'expiresAt': now
+                .add(const Duration(minutes: 10))
+                .toUtc()
+                .toIso8601String(),
+          }),
+        );
+      await request.response.close();
+    });
+    final attestor = _RecordingAttestor();
+    final provider = PlayIntegrityRouteV2SessionProvider(
+      apiClient: ApiClient(
+        baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+      ),
+      attestor: attestor,
+      nonceFactory: () => 'AAAAAAAAAAAAAAAAAAAAAA',
+      now: () => now,
+    );
+
+    expect(await provider.issueToken(), 'A' * 43);
+    now = now.add(const Duration(minutes: 9));
+    expect(await provider.issueToken(), 'A' * 43);
+    expect(requestCount, 1);
+    expect(attestor.requestCount, 1);
+
+    now = now.add(const Duration(minutes: 2));
+    expect(await provider.issueToken(), 'B' * 43);
+    expect(requestCount, 2);
+    expect(attestor.requestCount, 2);
+  });
 
   test('session 429는 exact code와 UI 문구를 보존하고 재시도하지 않는다', () async {
     var requestCount = 0;
@@ -243,6 +289,53 @@ void main() {
     );
     expect(requestCount, 1);
   });
+
+  test('search 401은 cached session을 무효화하고 자동 재시도하지 않는다', () async {
+    var invalidationCount = 0;
+    var requestCount = 0;
+    final server = await _errorServer(
+      statusCode: HttpStatus.unauthorized,
+      code: 'ROUTE_SESSION_REQUIRED',
+      onRequest: () => requestCount++,
+    );
+    addTearDown(server.close);
+    final repository = RouteSearchV2ApiRepository(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+      bearerTokenProvider: () async => 'T' * 43,
+      bearerTokenInvalidator: () => invalidationCount++,
+    );
+
+    await expectLater(
+      repository.searchRoute(
+        _request(RouteTransportScope.subwayAndItxCheongchun),
+      ),
+      throwsA(
+        isA<RouteSearchOnlineException>().having(
+          (error) => error.failureReason,
+          'failureReason',
+          'ROUTE_SESSION_REQUIRED',
+        ),
+      ),
+    );
+    expect(requestCount, 1);
+    expect(invalidationCount, 1);
+  });
+
+  test('refresh 미지원 결과는 lifecycle refresh를 repository에 전달하지 않는다', () async {
+    final repository = _RecordingRepository('online', supportsRefresh: false);
+    final controller = RouteSearchController(repository: repository);
+    addTearDown(controller.dispose);
+    await controller.search(
+      _request(RouteTransportScope.subwayAndItxCheongchun),
+    );
+
+    final outcome = await controller.refreshCurrentRoute();
+
+    expect(outcome.refreshed, isFalse);
+    expect(outcome.alarmRefreshRequired, isFalse);
+    expect(repository.refreshCount, 0);
+    expect(controller.state.refreshMessage, isEmpty);
+  });
 }
 
 Future<HttpServer> _errorServer({
@@ -271,20 +364,24 @@ RouteSearchRequest _request(RouteTransportScope scope) => RouteSearchRequest(
 
 class _RecordingAttestor implements PlayIntegrityAttestor {
   String? requestHash;
+  int requestCount = 0;
 
   @override
   Future<String> requestToken(String requestHash) async {
     this.requestHash = requestHash;
+    requestCount++;
     return 'integrity-token';
   }
 }
 
 class _RecordingRepository implements RouteSearchRepository {
-  _RecordingRepository(this.id, {this.error});
+  _RecordingRepository(this.id, {this.error, this.supportsRefresh = true});
 
   final String id;
   final Object? error;
+  final bool supportsRefresh;
   int searchCount = 0;
+  int refreshCount = 0;
 
   @override
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request) async {
@@ -313,11 +410,13 @@ class _RecordingRepository implements RouteSearchRepository {
       createdAt: '2026-07-16T09:00:00Z',
       etaSource: 'PLANNED',
       commercialEtaEligible: false,
+      supportsRefresh: supportsRefresh,
     );
   }
 
   @override
   Future<RouteRefreshResult> refreshRoute(String routeSearchId) {
+    refreshCount++;
     throw UnimplementedError();
   }
 }

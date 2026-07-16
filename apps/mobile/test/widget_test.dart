@@ -8423,6 +8423,57 @@ void main() {
     );
   });
 
+  testWidgets('transport scope 변경은 하차 알림 취소 실패 시 기존 scope와 경로를 유지한다', (
+    tester,
+  ) async {
+    final notifier = _RecordingGetOffAlarmNotifier();
+    final controller = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: _StubExactAlarmPermissionGate(),
+      notificationPermissionProvider: FakeNotificationPermissionProvider(
+        nextStatus: NotificationPermissionStatus.granted,
+      ),
+      repository: _MemoryGetOffAlarmStateRepository(),
+      now: () => DateTime.parse('2026-07-06T09:00:00+09:00'),
+    );
+    addTearDown(controller.dispose);
+    final routeRepository = FakeRouteSearchRepository(
+      result: _sampleGetOffAlarmRouteResult(),
+    );
+    await _pumpGetOffAlarmRouteScreen(
+      tester,
+      repository: routeRepository,
+      controller: controller,
+      itxTransportScopeEnabled: true,
+    );
+    await _enableSampleGetOffAlarm(controller);
+    notifier.reset();
+    final cancelError = StateError('cancel failed');
+    notifier.cancelError = cancelError;
+    final reports = <FlutterErrorDetails>[];
+
+    await runWithMobileErrorReporter(reports.add, () async {
+      await tester.tap(find.byKey(const Key('routeScopeItxChip')));
+      await tester.pumpAndSettle();
+    });
+
+    expect(reports.single.exception, same(cancelError));
+    expect(controller.state.enabled, isTrue);
+    expect(routeRepository.requests, hasLength(1));
+    expect(
+      routeRepository.requests.single.transportScope,
+      RouteTransportScope.subway,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('routeScopeSubwayChip')),
+        matching: find.byIcon(Icons.check),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
+  });
+
   testWidgets('경로 검색 strict switch는 STRICT_STEP_FREE 요청을 보낸다', (tester) async {
     final routeRepository = FakeRouteSearchRepository();
 
@@ -16680,6 +16731,7 @@ Future<void> _pumpGetOffAlarmRouteScreen(
   required GetOffAlarmController controller,
   StationSearchRepository? stationRepository,
   bool simpleViewEnabled = true,
+  bool itxTransportScopeEnabled = false,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -16688,6 +16740,7 @@ Future<void> _pumpGetOffAlarmRouteScreen(
         stationRepository: stationRepository ?? FakeStationSearchRepository(),
         getOffAlarmController: controller,
         simpleViewEnabled: simpleViewEnabled,
+        itxTransportScopeEnabled: itxTransportScopeEnabled,
         initialDraft: RouteDraft(
           origin: const RouteDraftStation(
             id: 'station-sangnoksu',

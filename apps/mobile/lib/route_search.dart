@@ -276,12 +276,14 @@ class RouteSearchV2ApiRepository implements RouteSearchRepository {
     ApiClient? apiClient,
     HttpClient? httpClient,
     this.bearerTokenProvider,
+    this.bearerTokenInvalidator,
   }) : _apiClient =
            apiClient ?? ApiClient(baseUri: baseUri, httpClient: httpClient);
 
   final Uri baseUri;
   final ApiClient _apiClient;
   final Future<String> Function()? bearerTokenProvider;
+  final void Function()? bearerTokenInvalidator;
 
   @override
   Future<RouteSearchResult> searchRoute(RouteSearchRequest routeRequest) async {
@@ -296,6 +298,9 @@ class RouteSearchV2ApiRepository implements RouteSearchRepository {
         },
       );
       if (!response.isSuccess) {
+        if (response.statusCode == HttpStatus.unauthorized) {
+          bearerTokenInvalidator?.call();
+        }
         throw RouteSearchOnlineException.response(response);
       }
       final decoded = response.jsonBody;
@@ -1118,6 +1123,7 @@ class RouteSearchResult {
     this.commercialEtaEligible = false,
     this.sourceUpdatedAt = '',
     this.officialOdFareQuote,
+    this.supportsRefresh = true,
   }) : // `burdenCost`는 API contract 이름이고 저장 필드는 private 값이다.
        // ignore: prefer_initializing_formals
        _accessibilityScore = accessibilityScore,
@@ -1284,6 +1290,7 @@ class RouteSearchResult {
       ),
       commercialEtaEligible: itinerary.commercialEtaEligible,
       sourceUpdatedAt: result.departureTime,
+      supportsRefresh: false,
     );
   }
 
@@ -1317,6 +1324,7 @@ class RouteSearchResult {
   final bool commercialEtaEligible;
   final String sourceUpdatedAt;
   final OfficialOdFareQuote? officialOdFareQuote;
+  final bool supportsRefresh;
 
   bool get hasOfficialOdFareQuote => officialOdFareQuote != null;
 
@@ -1502,6 +1510,7 @@ class RouteSearchResult {
       commercialEtaEligible: commercialEtaEligible,
       sourceUpdatedAt: sourceUpdatedAt,
       officialOdFareQuote: officialOdFareQuote ?? this.officialOdFareQuote,
+      supportsRefresh: supportsRefresh,
     );
   }
 
@@ -2356,6 +2365,7 @@ class RouteSearchController extends ChangeNotifier {
     if (_state.status != RouteSearchViewStatus.success ||
         currentResult == null ||
         currentResult.isLocalResult ||
+        !currentResult.supportsRefresh ||
         _state.isRefreshing) {
       return RouteRefreshOutcome(
         result: currentResult,
@@ -2989,16 +2999,22 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     );
   }
 
-  void _changeTransportScope(RouteTransportScope scope) {
+  Future<void> _changeTransportScope(RouteTransportScope scope) async {
     if (scope == _selectedTransportScope ||
         _controller.state.status == RouteSearchViewStatus.loading) {
+      return;
+    }
+    if (!await _disableActiveGetOffAlarm()) {
+      return;
+    }
+    if (!mounted) {
       return;
     }
     setState(() {
       _selectedTransportScope = scope;
       _autoSearchedSignature = null;
     });
-    unawaited(_submit());
+    await _submit(alarmAlreadyDisabled: true);
   }
 
   Widget _buildRouteStationPicker(_RouteStationRole role) {
