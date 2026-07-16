@@ -60,6 +60,7 @@ class DatabaseMigrationContainerTest {
 				"datapack_candidates",
 				"datapack_candidate_inputs",
 				"datapack_release_evidence_bundles",
+				"datapack_release_deliveries",
 				"datapack_release_channels",
 				"datapack_release_channel_events",
 				"external_alias_approvals",
@@ -74,7 +75,7 @@ class DatabaseMigrationContainerTest {
 				"transit_master_overrides",
 				"transit_master_override_audits"
 			);
-		assertThat(successfulMigrationVersions(jdbcTemplate)).contains("1", "14", "16", "17", "18", "19", "20", "21", "22", "23", "25", "26", "48", "51", "52", "53", "54", "55", "56", "57");
+		assertThat(successfulMigrationVersions(jdbcTemplate)).contains("1", "14", "16", "17", "18", "19", "20", "21", "22", "23", "25", "26", "48", "51", "52", "53", "54", "55", "56", "57", "59");
 		assertThat(jdbcTemplate.queryForObject("""
 			SELECT COUNT(*)
 			FROM pg_index i
@@ -135,6 +136,7 @@ class DatabaseMigrationContainerTest {
 				"chk_datapack_candidates_gate_status",
 				"chk_datapack_candidates_approval_status",
 				"chk_datapack_release_evidence_status",
+				"chk_datapack_release_delivery_state",
 				"chk_datapack_release_channels_operation",
 				"chk_datapack_release_channels_rollback_target",
 				"chk_datapack_release_channel_events_operation"
