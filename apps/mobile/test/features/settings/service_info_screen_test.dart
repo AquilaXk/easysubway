@@ -9,7 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-	// PR title check event refresh marker; removed in the immediately following commit.
   const accessInfo = SupportAccessInfo(
     termsOfServiceUrl: 'https://easysubway.example/terms',
     privacyPolicyUrl: 'https://easysubway.example/privacy',
