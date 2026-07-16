@@ -3061,7 +3061,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.equal(postLaunchOperationsReviewGate.releaseGate, "post-launch-operations-review");
   assert.equal(postLaunchOperationsReviewGate.issue, 1019);
   assert.equal(postLaunchOperationsReviewGate.status, "IN_PROGRESS");
-  assert.equal(postLaunchOperationsReviewGate.preLaunchReadiness.status, "PASS");
+  assert.equal(postLaunchOperationsReviewGate.preLaunchReadiness.status, "BLOCKED_EXTERNAL");
   const phaseAReleaseVersion = read("apps/mobile/pubspec.yaml").match(/^version:\s*([^+\s]+)\+([0-9]+)\s*$/m);
   assert.ok(phaseAReleaseVersion, "mobile pubspec must contain versionName+versionCode");
   assert.equal(
@@ -3220,6 +3220,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "privacy@aquilaxk.site",
   ]);
   assert.deepEqual(postLaunchOperationsReviewGate.latestQaEvidenceSummary.remainingExternalBlockers, [
+    "fixed-release-rehearsal-after-node24-runtime-change",
     "play-review-status-summary",
     "crash-anr-vitals-summary",
     "support-ticket-summary-after-public-release",
@@ -3229,7 +3230,15 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     postLaunchOperationsReviewGate.preLaunchReadiness.evidenceSummary.map((item) => item.id),
     postLaunchOperationsReviewGate.preLaunchReadiness.requiredEvidence,
   );
-  assert.ok(postLaunchOperationsReviewGate.preLaunchReadiness.evidenceSummary.every((item) => item.status === "PASS"));
+  const fixedReleaseEvidence = postLaunchOperationsReviewGate.preLaunchReadiness.evidenceSummary.find(
+    (item) => item.id === "fixed-release-versioncode-build-submit-procedure",
+  );
+  assert.equal(fixedReleaseEvidence.status, "BLOCKED_EXTERNAL");
+  assert.ok(
+    postLaunchOperationsReviewGate.preLaunchReadiness.evidenceSummary
+      .filter((item) => item.id !== fixedReleaseEvidence.id)
+      .every((item) => item.status === "PASS"),
+  );
   assert.deepEqual(
     postLaunchOperationsReviewGate.reviewWindows.map((window) => window.id),
     ["first_2h", "first_24h", "day_7", "day_30"],
