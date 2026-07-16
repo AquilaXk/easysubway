@@ -150,7 +150,7 @@
 			쉬운 지하철 backend의 경로 세션·상태는 사용자·기기·계정 ID와 연결하지 않지만, 위 Google 처리 범위는 이 backend 비연결 경계와 구분됩니다.
 		</p>
 		<p>
-			backend는 raw integrityToken 대신 token SHA-256, scope, issuedAt, expiresAt, requestCount를 논리적으로 10분 동안,
+			backend는 raw integrityToken을 저장하지 않고, 검증 후 발급한 Route V2 세션 token의 SHA-256, scope, issuedAt, expiresAt, requestCount를 논리적으로 10분 동안,
 			raw nonce 대신 nonce SHA-256을 논리적으로 2분 동안 저장합니다.
 			정상 동작 중 만료 데이터는 기본 5분 주기 purge로 물리 삭제하므로 세션은 발급 후 약 15분 이내,
 			nonce 해시는 수신 후 약 7분 이내 삭제됩니다.

@@ -14714,6 +14714,7 @@ test("Route V2 ITX 개인정보와 Data Safety 공개 기준은 실제 전송·�
   assert.match(publicPrivacyPolicy, /ITX-청춘 경로 검색은 사용자가 직접 선택할 때만/);
   assert.match(publicPrivacyPolicy, /tracking에 사용하지 않습니다/);
   assert.match(publicPrivacyPolicy, /128-bit clientNonce/);
+  assert.match(publicPrivacyPolicy, /발급한 Route V2 세션 token의 SHA-256/);
   assert.match(publicPrivacyPolicy, /세션은 발급 후 약 15분 이내/);
   assert.match(publicPrivacyPolicy, /nonce 해시는 수신 후 약 7분 이내/);
   assert.match(publicPrivacyPolicy, /expiresAt 뒤 5분 이내/);
