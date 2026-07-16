@@ -25,6 +25,13 @@ function fixtureEnv() {
   return read("tools/ci/fixtures/deployment-prod-valid.env");
 }
 
+function dotenvValues(source) {
+  return Object.fromEntries(source.split("\n").filter(Boolean).map((line) => {
+    const separator = line.indexOf("=");
+    return [line.slice(0, separator), line.slice(separator + 1)];
+  }));
+}
+
 afterEach(async () => {
   await Promise.all(
     [...deploymentTempDirs].map((dir) => rm(dir, { recursive: true, force: true })),
@@ -111,6 +118,26 @@ test("광고 asset origin은 backend env에만 변형 없이 전달한다", asyn
     0,
     "compose.env must not contain an asset origin key",
   );
+});
+
+test("callback reconciliation catalog trust 설정은 backend env에 전달한다", async () => {
+  const source = `${fixtureEnv()}\nEASYSUBWAY_DATAPACK_CATALOG_BASE_URL=https://datapacks.example.test\nEASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1\n`;
+  const outputDir = await prepare(source);
+  const backendEnv = await readFile(path.join(outputDir, "backend.env"), "utf8");
+  const composeEnv = await readFile(path.join(outputDir, "compose.env"), "utf8");
+  const sourceValues = dotenvValues(source);
+  const backendValues = dotenvValues(backendEnv);
+
+  for (const name of [
+    "EASYSUBWAY_DATAPACK_CATALOG_BASE_URL",
+    "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM",
+    "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID",
+  ]) {
+    assert.ok(Object.hasOwn(sourceValues, name), `${name} is required in source`);
+    assert.ok(Object.hasOwn(backendValues, name), `${name} is required in backend.env`);
+    assert.equal(backendValues[name], sourceValues[name]);
+    assert.doesNotMatch(composeEnv, new RegExp(`^${name}=`, "m"));
+  }
 });
 
 test("광고 asset origin production preflight는 unsafe 값을 차단한다", async () => {
