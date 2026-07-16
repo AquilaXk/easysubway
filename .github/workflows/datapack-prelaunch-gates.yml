@@ -81,10 +81,10 @@ jobs:
           working-directory: apps/mobile
           script: >-
             flutter test -d emulator-5554 integration_test/datapack_monotonic_rescue_test.dart
-              --reporter=expanded
-              --file-reporter=json:"${EVIDENCE_DIR}/android-device.jsonl"
-              --dart-define=EASYSUBWAY_RC_MANIFEST_SHA256=${{ steps.prepare.outputs.manifestSha256 }}
-              --dart-define=EASYSUBWAY_RC_RELEASE_SEQUENCE=${{ steps.prepare.outputs.releaseSequence }}
+            --reporter=expanded
+            --file-reporter=json:"${EVIDENCE_DIR}/android-device.jsonl"
+            --dart-define=EASYSUBWAY_RC_MANIFEST_SHA256=${{ steps.prepare.outputs.manifestSha256 }}
+            --dart-define=EASYSUBWAY_RC_RELEASE_SEQUENCE=${{ steps.prepare.outputs.releaseSequence }}
 
       - name: Validate launch source snapshot set at the fixed clock
         run: |

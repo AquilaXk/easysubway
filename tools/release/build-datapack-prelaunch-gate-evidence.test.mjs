@@ -223,6 +223,15 @@ test("prelaunch Android integration 명령은 하나의 shell invocation으로 �
 
   assert.match(emulatorStep, /script:\s*>-/);
   assert.doesNotMatch(emulatorStep, /\\\s*$/m);
+  const commandLines = emulatorStep
+    .slice(emulatorStep.indexOf("          script: >-") + "          script: >-\n".length)
+    .trimEnd()
+    .split("\n");
+  assert.deepEqual(
+    commandLines.map((line) => line.match(/^ */)[0].length),
+    commandLines.map(() => 12),
+    "folded scalar의 모든 줄은 같은 깊이여야 하나의 shell 명령으로 접힌다",
+  );
 });
 test("prelaunch workflow는 네 gate를 같은 RC final readiness에 결속한다", async () => {
   const workflow = await readFile(new URL(
