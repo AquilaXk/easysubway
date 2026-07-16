@@ -1976,6 +1976,53 @@ test("모바일 계정 삭제와 출처 화면은 삭제·asset load 순서를 �
   );
 });
 
+test("모바일 도움말 화면과 연결 계약은 support presentation canonical 파일이 소유한다", () => {
+  const main = read("apps/mobile/lib/main.dart");
+  const support = read(
+    "apps/mobile/lib/features/support/presentation/support_access_screen.dart",
+  );
+  const widgetTest = read("apps/mobile/test/widget_test.dart");
+  const supportInfoTest = read("apps/mobile/test/support_access_info_test.dart");
+  const appFixture = read("apps/mobile/test/support/easy_subway_app_fixture.dart");
+
+  for (const declaration of [
+    "SupportAccessLauncher",
+    "UrlLauncherSupportAccessLauncher",
+    "SupportAccessInfo",
+    "SupportAccessScreen",
+  ]) {
+    assert.match(support, new RegExp(`^(?:abstract interface )?class ${declaration}\\b`, "m"));
+    assert.doesNotMatch(main, new RegExp(`^(?:abstract interface )?class ${declaration}\\b`, "m"));
+  }
+  assert.match(
+    main,
+    /^import 'features\/support\/presentation\/support_access_screen\.dart';$/m,
+  );
+  assert.doesNotMatch(
+    main,
+    /^export 'features\/support\/presentation\/support_access_screen\.dart'/m,
+  );
+  for (const testSource of [widgetTest, supportInfoTest, appFixture]) {
+    assert.match(
+      testSource,
+      /^import 'package:easysubway_mobile\/features\/support\/presentation\/support_access_screen\.dart';$/m,
+    );
+  }
+  for (const helper of [
+    "_SupportSectionTitle",
+    "_SupportGroupCard",
+    "_SupportNavRow",
+    "_SecurityContactNotice",
+    "_SafetyDataNotice",
+    "_SupportAccessItem",
+  ]) {
+    assert.match(support, new RegExp(`^class ${helper}\\b`, "m"));
+    assert.doesNotMatch(main, new RegExp(`^class ${helper}\\b`, "m"));
+  }
+  assert.match(support, /^Uri\? _httpsUri\(/m);
+  assert.match(support, /^Uri\? _mailtoUri\(/m);
+});
+
 test("프로덕션 모바일 UI 위젯명은 prototype 명칭을 쓰지 않는다", () => {
   const mobileFiles = execFileSync("git", ["ls-files", "apps/mobile/lib/*.dart"], {
     cwd: root,
@@ -2771,6 +2818,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
       "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart",
       "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart",
       "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
+      "apps/mobile/lib/features/support/presentation/support_access_screen.dart",
       "apps/mobile/lib/main.dart",
       "apps/mobile/release/support-incident-response-gate.json",
     ],
@@ -13018,6 +13066,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const envExample = read(".env.example");
   const iosInfoPlist = read("apps/mobile/ios/Runner/Info.plist");
   const main = read("apps/mobile/lib/main.dart");
+  const supportAccessScreen = read(
+    "apps/mobile/lib/features/support/presentation/support_access_screen.dart",
+  );
   const appSettingsScreen = read(
     "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
   );
@@ -13356,13 +13407,13 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(widgetTest, /도움말은 개인정보 안내를 불릿 대신 처리방침 링크로 위임한다/);
   assert.match(widgetTest, /도움말은 이동 전 살펴보기 안내를 함께 보여준다/);
   assert.match(widgetTest, /도움말은 보안과 개인정보 문의 경로를 안내한다/);
-  assert.match(main, /보안 문의 안내/);
-  assert.match(main, /앱 보안이나 개인정보가 걱정되면 문의로 알려주세요\./);
-  assert.match(main, /EASYSUBWAY_SECURITY_EMAIL/);
-  assert.match(main, /validatedForBuild\(\{required bool isReleaseMode\}\)/);
-  assert.match(main, /Release \$label must use HTTPS\./);
-  assert.match(main, /Release \$label must be a valid email address\./);
-  assert.match(main, /Release \$label must be configured\./);
+  assert.match(supportAccessScreen, /보안 문의 안내/);
+  assert.match(supportAccessScreen, /앱 보안이나 개인정보가 걱정되면 문의로 알려주세요\./);
+  assert.match(supportAccessScreen, /EASYSUBWAY_SECURITY_EMAIL/);
+  assert.match(supportAccessScreen, /validatedForBuild\(\{required bool isReleaseMode\}\)/);
+  assert.match(supportAccessScreen, /Release \$label must use HTTPS\./);
+  assert.match(supportAccessScreen, /Release \$label must be a valid email address\./);
+  assert.match(supportAccessScreen, /Release \$label must be configured\./);
   assert.match(main, /supportAccessInfo\.validatedForBuild\([\s\S]*isReleaseMode: kReleaseMode/);
   assert.match(supportAccessInfoTest, /릴리즈 도움말 연락 경로는 모두 설정되어야 한다/);
   assert.match(supportAccessInfoTest, /릴리즈 도움말 연락 경로는 HTTPS와 메일 주소 형식만 허용한다/);
@@ -13409,12 +13460,12 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
     /class FavoriteRouteApiRepository[\s\S]*?_httpClient[\s\S]*?class FavoriteRouteException/,
   );
   // 개인정보 안내는 화면 불릿 대신 개인정보처리방침 링크로 위임한다(#1571).
-  assert.match(main, /개인정보처리방침/);
-  assert.doesNotMatch(main, /개인정보 사용 안내/);
-  assert.match(main, /이동 전 살펴보기/);
-  assert.match(main, /경로와 시설 정보는 이동을 돕는 참고 정보입니다/);
-  assert.match(main, /현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요/);
-  assert.match(main, /실시간 상태나 무조건 안전한 경로를 보장하지 않습니다/);
+  assert.match(supportAccessScreen, /개인정보처리방침/);
+  assert.doesNotMatch(supportAccessScreen, /개인정보 사용 안내/);
+  assert.match(supportAccessScreen, /이동 전 살펴보기/);
+  assert.match(supportAccessScreen, /경로와 시설 정보는 이동을 돕는 참고 정보입니다/);
+  assert.match(supportAccessScreen, /현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요/);
+  assert.match(supportAccessScreen, /실시간 상태나 무조건 안전한 경로를 보장하지 않습니다/);
   // 삭제 확인 화면은 지워지는 것 1줄 + 되돌릴 수 없음 강조 + 예외 1줄로 압축한다(#1571).
   assert.match(userDataDeletionScreen, /삭제 후에는 되돌릴 수 없어요/);
   assert.match(
@@ -14626,6 +14677,9 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
   const inventory = readJson(inventoryPath);
   const privacyManifest = read("apps/mobile/ios/Runner/PrivacyInfo.xcprivacy");
   const main = read("apps/mobile/lib/main.dart");
+  const supportAccessScreen = read(
+    "apps/mobile/lib/features/support/presentation/support_access_screen.dart",
+  );
   const stationSearch = read("apps/mobile/lib/station_search.dart");
   const facilityReport = read("apps/mobile/lib/facility_report.dart");
 
@@ -14650,8 +14704,8 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
   assert.ok(inventory.crashAnrProviderDecision.sourceOfTruth.includes("Android vitals"));
   assert.ok(inventory.crashAnrProviderDecision.sourceOfTruth.includes("Google Play pre-launch report"));
   assert.ok(inventory.crashAnrProviderDecision.requiredEvidence.includes("android-vitals-or-play-pre-launch-report-export"));
-  assert.match(main, /EASYSUBWAY_PRIVACY_POLICY_URL/);
-  assert.match(main, /EASYSUBWAY_DATA_DELETION_EMAIL/);
+  assert.match(supportAccessScreen, /EASYSUBWAY_PRIVACY_POLICY_URL/);
+  assert.match(supportAccessScreen, /EASYSUBWAY_DATA_DELETION_EMAIL/);
 
   const items = new Map(inventory.dataTypes.map((item) => [item.id, item]));
   const requiredIds = [
