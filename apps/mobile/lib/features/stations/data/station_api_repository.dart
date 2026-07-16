@@ -3,7 +3,8 @@ import 'dart:io';
 import '../../../auth_headers.dart';
 import '../../../core/network/api_client.dart';
 import '../../../mobile_error_reporter.dart';
-import '../../../station_search.dart';
+import '../domain/station_models.dart';
+import '../domain/station_repositories.dart';
 
 const _stationSearchErrorMessage = '역 정보를 불러오지 못했어요.';
 const _favoriteStationTimeout = Duration(seconds: 8);
