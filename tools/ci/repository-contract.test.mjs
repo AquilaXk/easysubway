@@ -5299,6 +5299,7 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
         schemaVersion: 1, currentReleaseSequence: 101, failedReleaseSequence: 101,
         catalogMaxReleaseSequence: 101, rescueReleaseSequence: 102,
         knownGoodPackSha256: evidenceRcIdentity.dataPackFallbackArtifactSha256,
+        failedPackSha256: "f".repeat(64),
         rescueManifestSha256: evidenceRcIdentity.dataPackManifestSha256,
         checks: passingChecks([
           "monotonicSequence", "signatureVerified", "sqliteIntegrityVerified", "immutableCatalogWritten", "channelManifestPublishedLast",
@@ -5538,6 +5539,9 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   rollbackEvidence.result = datapackGateResult("rollback_rescue");
   rollbackEvidence.result.knownGoodPackSha256 = "4".repeat(64);
   await writeFile(gateEvidencePaths.rollback_rescue, JSON.stringify(rollbackEvidence)); await rejectsCurrent(/rollback_rescue knownGoodPackSha256 does not match the RC identity/);
+  rollbackEvidence.result = datapackGateResult("rollback_rescue");
+  rollbackEvidence.result.failedPackSha256 = rollbackEvidence.result.knownGoodPackSha256;
+  await writeFile(gateEvidencePaths.rollback_rescue, JSON.stringify(rollbackEvidence)); await rejectsCurrent(/rollback_rescue failedPackSha256 must differ/);
   rollbackEvidence.result = datapackGateResult("rollback_rescue");
   rollbackEvidence.result.currentReleaseSequence -= 1;
   await writeFile(gateEvidencePaths.rollback_rescue, JSON.stringify(rollbackEvidence)); await rejectsCurrent(/rollback_rescue currentReleaseSequence must equal failedReleaseSequence/);

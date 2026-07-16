@@ -70,7 +70,19 @@ const dataPackReleaseDecision = readFinalDataPackReleaseDecision(
   dataPackReleaseDecisionPath,
   requireProductionDataPackBinding,
 );
-const sourceSnapshotSetHash = dataPackReleaseDecision?.sourceSnapshotSetHash ?? null;
+const dataPackRehearsalBindingPath = arg("dataPackRehearsalBinding", "data-pack-rehearsal-binding");
+if (dataPackReleaseDecisionPath && dataPackRehearsalBindingPath) {
+  fail("production decision and prelaunch rehearsal binding are mutually exclusive");
+}
+const dataPackRehearsalBinding = readDataPackRehearsalBinding(
+  dataPackRehearsalBindingPath,
+  dataPackManifestPath,
+  dataPackManifest,
+  dataPackArtifactPath,
+);
+const sourceSnapshotSetHash = dataPackReleaseDecision?.sourceSnapshotSetHash
+  ?? dataPackRehearsalBinding?.sourceSnapshotSetHash
+  ?? null;
 if (requireProductionDataPackBinding) {
   validateProductionDataPackBinding(
     dataPackManifest,
@@ -509,6 +521,28 @@ function readFinalDataPackReleaseDecision(filePath, required) {
     fail("data pack release decision is not finalized or has invalid sourceSnapshotSetHash");
   }
   return decision;
+}
+
+function readDataPackRehearsalBinding(filePath, manifestPath, manifest, artifactPath) {
+  if (!filePath) return null;
+  const binding = readJsonIfExists(resolvePath(filePath));
+  const manifestSha256 = sha256FileIfExists(manifestPath);
+  const artifactSha256 = sha256FileIfExists(artifactPath);
+  if (
+    binding?.schemaVersion !== 1
+    || binding.artifactKind !== "datapack-prelaunch-rehearsal-binding"
+    || binding.executionEnvironment !== "ISOLATED_PRELAUNCH"
+    || binding.productionExecuted !== false
+    || !/^[a-f0-9]{64}$/.test(binding.sourceSnapshotSetHash ?? "")
+    || binding.selectedManifestSha256 !== manifestSha256
+    || binding.selectedArtifactSha256 !== artifactSha256
+    || !Number.isSafeInteger(binding.selectedReleaseSequence)
+    || binding.selectedReleaseSequence < 1
+    || binding.selectedReleaseSequence !== manifest?.releaseSequence
+  ) {
+    fail("data pack prelaunch rehearsal binding is invalid");
+  }
+  return binding;
 }
 
 function validatePrePlayUploadReadiness(identity, metadata, productionBindingRequested, releaseDecision) {
@@ -958,6 +992,10 @@ function normalizeRollbackRescueResult(result, identity) {
     .includes(result.knownGoodPackSha256)) {
     fail(`${gateId} knownGoodPackSha256 does not match the RC identity`);
   }
+  requireSha256(result.failedPackSha256, `${gateId}.failedPackSha256`);
+  if (result.failedPackSha256 === result.knownGoodPackSha256) {
+    fail(`${gateId} failedPackSha256 must differ from knownGoodPackSha256`);
+  }
   requireSha256(result.rescueManifestSha256, `${gateId}.rescueManifestSha256`);
   if (result.rescueReleaseSequence !== identity.releaseSequence
     || result.rescueManifestSha256 !== identity.dataPackManifestSha256) {
@@ -971,7 +1009,10 @@ function normalizeRollbackRescueResult(result, identity) {
   return {
     schemaVersion: 1,
     ...Object.fromEntries(sequenceFields.map((field) => [field, result[field]])),
-    knownGoodPackSha256: result.knownGoodPackSha256, rescueManifestSha256: result.rescueManifestSha256, checks,
+    knownGoodPackSha256: result.knownGoodPackSha256,
+    failedPackSha256: result.failedPackSha256,
+    rescueManifestSha256: result.rescueManifestSha256,
+    checks,
     evidenceReferences: normalizeEvidenceReferences(gateId, result.evidenceReferences),
   };
 }
