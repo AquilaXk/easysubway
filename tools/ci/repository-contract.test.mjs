@@ -5362,6 +5362,7 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   );
   assert.match(routeV2GatewayProbe, /session success response must remain private, no-store/);
   assert.match(routeV2GatewayProbe, /search success response must remain private, no-store/);
+  assert.doesNotMatch(routeV2GatewayProbe, /(^|\n)\s*rg\s/, "gateway probe must use POSIX runner tools available in GitHub Actions");
   assert.match(
     securityConfig,
     /@Profile\("prod \| staging \| release \| prod-like"\)[\s\S]*SecurityFilterChain routeV2IngressSecurityFilterChain/,
