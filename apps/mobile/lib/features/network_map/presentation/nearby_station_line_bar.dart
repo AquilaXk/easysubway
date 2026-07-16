@@ -24,6 +24,30 @@ class NearbyStationLineBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label: _semanticsLabel(),
+      child: ExcludeSemantics(child: _buildBar()),
+    );
+  }
+
+  String _semanticsLabel() {
+    final parts = <String>[];
+    final left = leftName;
+    if (left != null && left.isNotEmpty) {
+      parts.add('이전역 $left');
+    }
+    parts.add(
+      badgeText.isEmpty ? '현재역 $stationName' : '현재역 $badgeText $stationName',
+    );
+    final right = rightName;
+    if (right != null && right.isNotEmpty) {
+      parts.add('다음역 $right');
+    }
+    return parts.join(', ');
+  }
+
+  Widget _buildBar() {
     return LayoutBuilder(
       builder: (context, constraints) {
         final fullWidth = constraints.maxWidth;
@@ -79,12 +103,14 @@ class NearbyStationLineBar extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _LineBadge(
-                          diameter: badgeDiameter,
-                          color: lineColor,
-                          text: badgeText,
-                        ),
-                        const SizedBox(width: 7),
+                        if (badgeText.isNotEmpty) ...[
+                          _LineBadge(
+                            diameter: badgeDiameter,
+                            color: lineColor,
+                            text: badgeText,
+                          ),
+                          const SizedBox(width: 7),
+                        ],
                         Flexible(
                           child: Text(
                             stationName,

@@ -2684,7 +2684,7 @@ class _NetworkMapNearbySuccessList extends StatelessWidget {
           leftName: adjacentStations.leftName,
           rightName: adjacentStations.rightName,
           stationName: primary.nameKo,
-          badgeText: selectedLine?.badgeText ?? primary.nameKo,
+          badgeText: selectedLine?.badgeText ?? '',
           lineColor: lineColor,
         ),
         const SizedBox(height: 17),

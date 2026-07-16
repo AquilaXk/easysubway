@@ -93,6 +93,47 @@ void main() {
         expect(tester.takeException(), isNull, reason: 'width=$width overflow');
       }
     });
+
+    Finder badgeCircleFinder() {
+      return find.byWidgetPredicate(
+        (widget) =>
+            widget is Container &&
+            widget.decoration is BoxDecoration &&
+            (widget.decoration! as BoxDecoration).shape == BoxShape.circle,
+      );
+    }
+
+    testWidgets('badgeText가 있으면 원형 노선 배지를 그린다', (tester) async {
+      await tester.pumpWidget(_hostBar(lineColor: _line2Green, badgeText: '2'));
+      expect(badgeCircleFinder(), findsOneWidget);
+    });
+
+    testWidgets('badgeText가 비면 빈 원 배지를 그리지 않고 역명만 남긴다', (tester) async {
+      await tester.pumpWidget(_hostBar(lineColor: _line2Green, badgeText: ''));
+      expect(badgeCircleFinder(), findsNothing);
+      expect(find.text('왕십리'), findsOneWidget);
+    });
+
+    testWidgets('노선 바 전체가 하나의 Semantics 그룹 라벨을 노출한다', (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(_hostBar(lineColor: _line2Green));
+
+      expect(
+        find.bySemanticsLabel('이전역 건대입구, 현재역 2 왕십리, 다음역 한양대'),
+        findsOneWidget,
+      );
+      handle.dispose();
+    });
+
+    testWidgets('이전/다음역이 null이면 그룹 라벨에서 생략한다', (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(
+        _hostBar(lineColor: _line2Green, leftName: null, rightName: null),
+      );
+
+      expect(find.bySemanticsLabel('현재역 2 왕십리'), findsOneWidget);
+      handle.dispose();
+    });
   });
 
   group('NearbyDataSourceToggle (Task 4)', () {
@@ -168,6 +209,41 @@ void main() {
       await tester.tap(find.text('실시간'));
       await tester.pump();
       expect(calls, 1, reason: '선택된 세그먼트 탭은 no-op');
+    });
+
+    testWidgets('enabled:false면 양쪽 세그먼트 탭이 onToggle을 호출하지 않는다', (tester) async {
+      var calls = 0;
+      await tester.pumpWidget(
+        hostToggle(isRealtime: true, enabled: false, onToggle: () => calls++),
+      );
+
+      await tester.tap(find.text('실시간'));
+      await tester.pump();
+      await tester.tap(find.text('시간표'));
+      await tester.pump();
+      expect(calls, 0, reason: '비활성 토글은 어느 세그먼트도 탭되지 않는다');
+    });
+
+    testWidgets('enabled:false면 선택 세그먼트도 비활성 시각(흰 배경·테두리 제거, mutedText)이다', (
+      tester,
+    ) async {
+      await tester.pumpWidget(hostToggle(isRealtime: true, enabled: false));
+
+      final realtimeDeco =
+          segmentContainer(tester, '실시간').decoration! as BoxDecoration;
+      expect(
+        realtimeDeco.color,
+        EasySubwayAccessibleColors.nearbyToggleIdleFill,
+        reason: '비활성 선택 세그먼트는 흰 배경을 쓰지 않는다',
+      );
+      expect(
+        realtimeDeco.border,
+        isNull,
+        reason: '비활성은 brandSignature 테두리를 걷어낸다',
+      );
+
+      final realtimeText = tester.widget<Text>(find.text('실시간'));
+      expect(realtimeText.style!.color, EasySubwayAccessibleColors.mutedText);
     });
 
     testWidgets('전환 애니메이션 위젯이 없다', (tester) async {

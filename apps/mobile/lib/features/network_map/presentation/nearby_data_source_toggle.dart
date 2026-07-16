@@ -61,6 +61,27 @@ class _Segment extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tappable = enabled && !selected;
+    // 비활성 상태는 선택 세그먼트의 흰 배경·brandSignature 테두리를 걷어내고
+    // 글자색을 mutedText로 낮춰, 활성 토글과 시각적으로 구분한다(여전히 비탭).
+    final Color fillColor;
+    final Border? borderSide;
+    final Color textColor;
+    if (!enabled) {
+      fillColor = EasySubwayAccessibleColors.nearbyToggleIdleFill;
+      borderSide = null;
+      textColor = EasySubwayAccessibleColors.mutedText;
+    } else if (selected) {
+      fillColor = Colors.white;
+      borderSide = Border.all(
+        color: EasySubwayAccessibleColors.brandSignature,
+        width: 2,
+      );
+      textColor = EasySubwayAccessibleColors.brandSignature;
+    } else {
+      fillColor = EasySubwayAccessibleColors.nearbyToggleIdleFill;
+      borderSide = null;
+      textColor = EasySubwayAccessibleColors.nearbyToggleIdleText;
+    }
     return Semantics(
       button: true,
       selected: selected,
@@ -81,25 +102,16 @@ class _Segment extends StatelessWidget {
               height: 32,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: selected
-                    ? Colors.white
-                    : EasySubwayAccessibleColors.nearbyToggleIdleFill,
+                color: fillColor,
                 borderRadius: NearbyDataSourceToggle._radius,
-                border: selected
-                    ? Border.all(
-                        color: EasySubwayAccessibleColors.brandSignature,
-                        width: 2,
-                      )
-                    : null,
+                border: borderSide,
               ),
               child: Text(
                 label,
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: selected
-                      ? EasySubwayAccessibleColors.brandSignature
-                      : EasySubwayAccessibleColors.nearbyToggleIdleText,
+                  color: textColor,
                 ),
               ),
             ),
