@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_secure_key_value_storage.dart';
+import 'support/easy_subway_app_fixture.dart';
 
 // Repository contract markers for permission onboarding scenarios:
 // 첫 실행 앱은 온보딩에서 위치 권한을 준비할 수 있다
@@ -241,7 +242,7 @@ EasySubwayApp _testApp({
       const _DefaultNotificationPermissionProvider(),
   CurrentLocationProvider? locationProvider,
 }) {
-  return EasySubwayApp(
+  return buildEasySubwayTestApp(
     repository: FakeStationSearchRepository(),
     reportRepository: FakeFacilityReportRepository(),
     routeRepository: FakeRouteSearchRepository(),

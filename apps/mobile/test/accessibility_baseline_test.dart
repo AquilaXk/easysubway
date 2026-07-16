@@ -12,6 +12,8 @@ import 'package:easysubway_mobile/station_search.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'support/easy_subway_app_fixture.dart';
+
 void main() {
   test('접근성 색상 토큰은 일반 텍스트 대비 기준을 넘는다', () {
     const appBackground = Color(0xFFF6F8F9);
@@ -47,7 +49,7 @@ void main() {
 
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: _AccessibilityStationSearchRepository(),
           reportRepository: _AccessibilityFacilityReportRepository(),
           routeRepository: _AccessibilityRouteSearchRepository(),
