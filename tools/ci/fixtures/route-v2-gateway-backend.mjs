@@ -20,7 +20,10 @@ http.createServer((request, response) => {
   }
   backendRequests += 1;
   const rawIpHeaderCount = rawIpHeaders.filter((name) => request.headers[name] !== undefined).length;
-  response.writeHead(200, { "content-type": "application/json" });
+  response.writeHead(200, {
+    "cache-control": "private, no-store",
+    "content-type": "application/json",
+  });
   response.end(JSON.stringify({
     rawIpHeaderCount,
     originVerified: request.headers["x-easysubway-origin-verify"] === "integration-origin-secret",

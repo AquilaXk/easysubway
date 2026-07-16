@@ -72,8 +72,12 @@ trap 'rm -f "$TMP_BODY" "$TMP_HEADERS" "$TMP_LOG"; cleanup' EXIT INT TERM
 
 wait_gateway
 
-BODY=$(curl -fsS -H 'CF-Connecting-IP: 198.51.100.10' -H 'True-Client-IP: 198.51.100.11' "$BASE/api/v2/routes/session")
+BODY=$(curl -fsS -D "$TMP_HEADERS" -H 'CF-Connecting-IP: 198.51.100.10' -H 'True-Client-IP: 198.51.100.11' "$BASE/api/v2/routes/session")
 [ "$BODY" = '{"rawIpHeaderCount":0,"originVerified":true}' ]
+rg -qi '^Cache-Control: private, no-store' "$TMP_HEADERS" || {
+	echo "session success response must remain private, no-store" >&2
+	exit 1
+}
 
 for attempt in 1 2; do
 	curl -fsS -o /dev/null -H 'CF-Connecting-IP: 198.51.100.10' "$BASE/api/v2/routes/session"
@@ -88,12 +92,16 @@ rg -qi '^Cache-Control: private, no-store' "$TMP_HEADERS"
 curl -fsS -o /dev/null -H 'CF-Connecting-IP: 198.51.100.20' "$BASE/api/v2/routes/session"
 
 for client_suffix in 31 32 33 34; do
-	curl -fsS -o /dev/null \
+	curl -fsS -D "$TMP_HEADERS" -o /dev/null \
 		-H "CF-Connecting-IP: 198.51.100.$client_suffix" \
 		-H 'Authorization: Bearer integration-token' \
 		"$BASE/api/v2/routes/search"
 	sleep 0.5
 done
+rg -qi '^Cache-Control: private, no-store' "$TMP_HEADERS" || {
+	echo "search success response must remain private, no-store" >&2
+	exit 1
+}
 STATUS=$(curl -sS -o "$TMP_BODY" -w '%{http_code}' \
 	-H 'CF-Connecting-IP: 198.51.100.35' \
 	-H 'Authorization: Bearer integration-token' \
