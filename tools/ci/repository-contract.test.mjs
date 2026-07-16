@@ -1785,22 +1785,25 @@ test("모바일 공통 상태 카드는 홈 즐겨찾기 노선도에서 사용�
   );
 });
 
-test("모바일 presentation canonical 선언과 기존 public export를 유지한다", () => {
+test("모바일 presentation canonical 선언은 consumer가 직접 import한다", () => {
   const main = read("apps/mobile/lib/main.dart");
   const appComponents = read("apps/mobile/lib/app/app_components.dart");
   const notificationInbox = read(
     "apps/mobile/lib/features/notifications/presentation/notification_inbox_screen.dart",
+  );
+  const home = read(
+    "apps/mobile/lib/features/home/presentation/home_screen.dart",
   );
 
   assert.match(notificationInbox, /^class NotificationInboxScreen extends StatefulWidget/m);
   assert.match(appComponents, /^class FeatureTile extends StatelessWidget/m);
   assert.match(appComponents, /^class AppSectionTitle extends StatelessWidget/m);
   assert.match(appComponents, /^class HomeStateCard extends StatelessWidget/m);
-  assert.match(main, /^export 'app\/app_components\.dart' show FeatureTile;$/m);
   assert.match(
-    main,
-    /^export 'features\/notifications\/presentation\/notification_inbox_screen\.dart'\s+show NotificationInboxScreen;$/m,
+    home,
+    /^import '\.\.\/\.\.\/notifications\/presentation\/notification_inbox_screen\.dart';$/m,
   );
+  assert.doesNotMatch(main, /^export /m);
   assert.doesNotMatch(
     main,
     /^class (?:NotificationInboxScreen|FeatureTile|AppSectionTitle|HomeStateCard)\b/m,
@@ -1809,6 +1812,7 @@ test("모바일 presentation canonical 선언과 기존 public export를 유지�
 
 test("모바일 demo dependency와 접근성 theme는 app canonical 파일이 소유한다", () => {
   const main = read("apps/mobile/lib/main.dart");
+  const appRoot = read("apps/mobile/lib/app/easy_subway_app.dart");
   const demoDependencies = read("apps/mobile/lib/app/demo_dependencies.dart");
   const accessibilityTheme = read("apps/mobile/lib/app/accessibility_theme.dart");
 
@@ -1827,20 +1831,41 @@ test("모바일 demo dependency와 접근성 theme는 app canonical 파일이 �
   assert.match(main, /const DemoFavoriteRouteRepository\(\)/);
   assert.match(main, /DemoSearchHistoryRepository\(\)/);
   assert.doesNotMatch(main, /^export 'app\/demo_dependencies\.dart'/m);
+  assert.match(appRoot, /^import 'demo_dependencies\.dart';$/m);
+  assert.match(appRoot, /const DemoFavoriteRouteRepository\(\)\.listFavoriteRoutes\(\)/);
 
   assert.match(accessibilityTheme, /^class OnboardingPreferenceScope extends StatelessWidget/m);
   assert.match(
     accessibilityTheme,
     /class OnboardingPreferenceScope extends StatelessWidget \{[\s\S]*?Widget build\(BuildContext context\) \{[\s\S]*?child: Theme\([\s\S]*?data: _themeForPlatformAccessibility\(\s*_themeForPreferences\(Theme\.of\(context\), preferences\),\s*mediaQuery,\s*\)/,
   );
-  assert.match(main, /^import 'app\/accessibility_theme\.dart';$/m);
-  assert.match(main, /OnboardingPreferenceScope\(/);
+  assert.match(appRoot, /^import 'accessibility_theme\.dart';$/m);
+  assert.match(appRoot, /OnboardingPreferenceScope\(/);
   assert.doesNotMatch(main, /^class _?OnboardingPreferenceScope\b/m);
   assert.doesNotMatch(main, /^ThemeData _themeForPreferences\b/m);
   assert.doesNotMatch(main, /^ThemeData _themeForPlatformAccessibility\b/m);
   assert.doesNotMatch(main, /^TextTheme _boldTextTheme\b/m);
   assert.doesNotMatch(main, /^ButtonStyle _boldButtonTextStyle\b/m);
   assert.doesNotMatch(main, /^TextStyle _boldTextStyle\b/m);
+});
+
+test("모바일 app root와 shell은 app canonical 파일이 소유한다", () => {
+  const main = read("apps/mobile/lib/main.dart");
+  const appRoot = read("apps/mobile/lib/app/easy_subway_app.dart");
+
+  assert.match(appRoot, /^class EasySubwayApp extends StatelessWidget/m);
+  assert.match(appRoot, /^class EasySubwayScrollBehavior extends MaterialScrollBehavior/m);
+  for (const helper of [
+    "_StartupLoadingScreen",
+    "_StartupLoadingScreenState",
+    "_EasySubwayHome",
+    "_EasySubwayHomeState",
+  ]) {
+    assert.match(appRoot, new RegExp(`^class ${helper}\\b`, "m"));
+    assert.doesNotMatch(main, new RegExp(`^class ${helper}\\b`, "m"));
+  }
+  assert.doesNotMatch(main, /^class EasySubwayApp\b/m);
+  assert.match(main, /^import 'app\/easy_subway_app\.dart';$/m);
 });
 
 test("모바일 설정 화면은 settings presentation canonical 파일이 소유한다", () => {
@@ -1863,8 +1888,8 @@ test("모바일 설정 화면은 settings presentation canonical 파일이 소�
     /^import '\.\.\/\.\.\/settings\/presentation\/app_settings_screen\.dart';$/m,
   );
   assert.match(
-    main,
-    /^export 'features\/settings\/presentation\/app_settings_screen\.dart'\s+show AppSettingsScreen;$/m,
+    read("apps/mobile/test/widget_test.dart"),
+    /^import 'package:easysubway_mobile\/features\/settings\/presentation\/app_settings_screen\.dart';$/m,
   );
   assert.doesNotMatch(main, /^const _settingsPagePadding = /m);
   assert.doesNotMatch(main, /^class AppSettingsScreen\b/m);
@@ -1896,8 +1921,8 @@ test("모바일 즐겨찾기 화면은 favorites presentation canonical 파일�
     /^import '\.\.\/\.\.\/favorites\/presentation\/favorite_home_screen\.dart';$/m,
   );
   assert.match(
-    main,
-    /^export 'features\/favorites\/presentation\/favorite_home_screen\.dart'\s+show FavoriteHomeScreen;$/m,
+    read("apps/mobile/test/widget_test.dart"),
+    /^import 'package:easysubway_mobile\/features\/favorites\/presentation\/favorite_home_screen\.dart';$/m,
   );
   assert.doesNotMatch(main, /^class _HomeSavedRouteCard\b/m);
   assert.doesNotMatch(main, /^String _stationNameWithSuffix\b/m);
@@ -1962,6 +1987,7 @@ test("모바일 즐겨찾기 화면은 새로고침·삭제·복귀 재조회 �
 
 test("모바일 계정 삭제와 출처 화면은 feature presentation canonical 파일이 소유한다", () => {
   const main = read("apps/mobile/lib/main.dart");
+  const appRoot = read("apps/mobile/lib/app/easy_subway_app.dart");
   const home = read(
     "apps/mobile/lib/features/home/presentation/home_screen.dart",
   );
@@ -1988,8 +2014,8 @@ test("모바일 계정 삭제와 출처 화면은 feature presentation canonical
   assert.match(attribution, /^class _AttributionCard extends StatelessWidget/m);
   assert.match(attribution, /^class _AttributionRow extends StatelessWidget/m);
   assert.match(
-    main,
-    /^import 'features\/account\/presentation\/user_data_deletion_screen\.dart';$/m,
+    appRoot,
+    /^import '\.\.\/features\/account\/presentation\/user_data_deletion_screen\.dart';$/m,
   );
   assert.match(
     home,
@@ -2051,6 +2077,7 @@ test("모바일 계정 삭제와 출처 화면은 삭제·asset load 순서를 �
 
 test("모바일 도움말 화면과 연결 계약은 support presentation canonical 파일이 소유한다", () => {
   const main = read("apps/mobile/lib/main.dart");
+  const appRoot = read("apps/mobile/lib/app/easy_subway_app.dart");
   const support = read(
     "apps/mobile/lib/features/support/presentation/support_access_screen.dart",
   );
@@ -2068,8 +2095,8 @@ test("모바일 도움말 화면과 연결 계약은 support presentation canoni
     assert.doesNotMatch(main, new RegExp(`^(?:abstract interface )?class ${declaration}\\b`, "m"));
   }
   assert.match(
-    main,
-    /^import 'features\/support\/presentation\/support_access_screen\.dart';$/m,
+    appRoot,
+    /^import '\.\.\/features\/support\/presentation\/support_access_screen\.dart';$/m,
   );
   assert.doesNotMatch(
     main,
@@ -2100,6 +2127,7 @@ test("모바일 도움말 화면과 연결 계약은 support presentation canoni
 
 test("모바일 홈 화면과 shell 상태는 home presentation canonical 파일이 소유한다", () => {
   const main = read("apps/mobile/lib/main.dart");
+  const appRoot = read("apps/mobile/lib/app/easy_subway_app.dart");
   const home = read(
     "apps/mobile/lib/features/home/presentation/home_screen.dart",
   );
@@ -2111,8 +2139,8 @@ test("모바일 홈 화면과 shell 상태는 home presentation canonical 파일
     assert.doesNotMatch(main, new RegExp(`^class ${helper}\\b`, "m"));
   }
   assert.match(
-    main,
-    /^import 'features\/home\/presentation\/home_screen\.dart';$/m,
+    appRoot,
+    /^import '\.\.\/features\/home\/presentation\/home_screen\.dart';$/m,
   );
   assert.doesNotMatch(
     main,
@@ -2928,6 +2956,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     [
       "apps/mobile/lib/app/accessibility_theme.dart",
       "apps/mobile/lib/app/app_components.dart",
+      "apps/mobile/lib/app/easy_subway_app.dart",
       "apps/mobile/lib/features/account/presentation/user_data_deletion_screen.dart",
       "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart",
       "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart",
@@ -13187,6 +13216,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const envExample = read(".env.example");
   const iosInfoPlist = read("apps/mobile/ios/Runner/Info.plist");
   const main = read("apps/mobile/lib/main.dart");
+  const appRoot = read("apps/mobile/lib/app/easy_subway_app.dart");
   const homeScreen = read(
     "apps/mobile/lib/features/home/presentation/home_screen.dart",
   );
@@ -13273,10 +13303,10 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(envExample, /^EASYSUBWAY_ANDROID_KEY_ALIAS=$/m);
   assert.match(envExample, /^EASYSUBWAY_ANDROID_KEY_PASSWORD=$/m);
   assert.match(iosInfoPlist, /CFBundleDisplayName[\s\S]*?<string>쉬운 지하철<\/string>/);
-  assert.match(main, /class EasySubwayApp extends StatelessWidget/);
-  assert.match(`${main}\n${homeScreen}\n${networkMap}\n${stationSearch}`, /역 검색/);
+  assert.match(appRoot, /class EasySubwayApp extends StatelessWidget/);
+  assert.match(`${appRoot}\n${homeScreen}\n${networkMap}\n${stationSearch}`, /역 검색/);
   assert.match(
-    `${main}\n${homeScreen}\n${networkMap}\n${routeSearch}\n${stationSearch}`,
+    `${appRoot}\n${homeScreen}\n${networkMap}\n${routeSearch}\n${stationSearch}`,
     /길찾기/,
   );
   assert.match(appSettingsScreen, /이동 조건/);
@@ -13287,8 +13317,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.doesNotMatch(`${main}\n${appDependencies}`, /AnonymousAuth|enableAnonymousAuth|anonymousAuth/);
   assert.match(`${main}\n${appDependencies}`, /FavoriteStationApiRepository/);
   assert.match(`${main}\n${appDependencies}`, /NotificationSettingsApiRepository/);
-  assert.match(main, /OnboardingScreen/);
-  assert.match(main, /initialOnboardingState/);
+  assert.match(appRoot, /OnboardingScreen/);
+  assert.match(appRoot, /initialOnboardingState/);
   assert.match(onboardingAppFlowTest, /첫 실행 앱은 온보딩을 완료한 뒤 홈으로 이동한다/);
   assert.match(onboardingAppFlowTest, /첫 실행 앱은 온보딩에서 위치 권한을 준비할 수 있다/);
   assert.match(onboardingAppFlowTest, /첫 실행 앱은 온보딩에서 알림 권한을 준비할 수 있다/);
@@ -13300,16 +13330,16 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(stationSearch, /stationSearchFailureNextAction/);
   assert.match(stationSearch, /역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다\./);
   assert.match(widgetTest, /역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다\./);
-  assert.match(main, /initialMobilityType: onboardingResult\?\.mobilityType/);
+  assert.match(appRoot, /initialMobilityType: onboardingResult\?\.mobilityType/);
   assert.match(homeScreen, /initialMobilityType: initialMobilityType/);
-  assert.match(main, /OnboardingPreferenceScope/);
+  assert.match(appRoot, /OnboardingPreferenceScope/);
   assert.doesNotMatch(accessibilityTheme, /mediaQuery\.textScaler\.clamp\(minScaleFactor: 1\.18\)/);
   assert.match(accessibilityTheme, /highContrast:[\s\S]*preferences\.highContrastEnabled \|\| mediaQuery\.highContrast/);
   assert.match(accessibilityTheme, /mediaQuery\.boldText/);
   assert.match(accessibilityTheme, /_themeForPlatformAccessibility/);
   assert.match(accessibilityTheme, /WidgetStateProperty\.resolveWith/);
   assert.match(accessibilityTheme, /_themeForPreferences/);
-  assert.match(main, /simpleViewEnabled: preferences\.simpleViewEnabled/);
+  assert.match(appRoot, /simpleViewEnabled: preferences\.simpleViewEnabled/);
   assert.match(
     homeScreen,
     /RouteSearchScreen\([\s\S]*simpleViewEnabled: simpleViewEnabled/,
@@ -13544,7 +13574,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(supportAccessScreen, /Release \$label must use HTTPS\./);
   assert.match(supportAccessScreen, /Release \$label must be a valid email address\./);
   assert.match(supportAccessScreen, /Release \$label must be configured\./);
-  assert.match(main, /supportAccessInfo\.validatedForBuild\([\s\S]*isReleaseMode: kReleaseMode/);
+  assert.match(appRoot, /supportAccessInfo\.validatedForBuild\([\s\S]*isReleaseMode: kReleaseMode/);
   assert.match(supportAccessInfoTest, /릴리즈 도움말 연락 경로는 모두 설정되어야 한다/);
   assert.match(supportAccessInfoTest, /릴리즈 도움말 연락 경로는 HTTPS와 메일 주소 형식만 허용한다/);
   assert.match(supportAccessInfoTest, /Release privacy policy URL must use HTTPS\./);
