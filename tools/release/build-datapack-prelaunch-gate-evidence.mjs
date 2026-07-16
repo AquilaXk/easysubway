@@ -1,15 +1,19 @@
 #!/usr/bin/env node
 
 import { execFile } from "node:child_process";
-import { createHash, createSign, generateKeyPairSync } from "node:crypto";
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { createHash, createSign, generateKeyPairSync, randomBytes } from "node:crypto";
+import { appendFile, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { gunzipSync } from "node:zlib";
 
 import { buildRescueManifest } from "../datapack/build-rescue-manifest.mjs";
+import { buildReleaseCallback } from "../datapack/build-release-callback.mjs";
+import { evaluateReleaseDecision } from "../datapack/decide-datapack-release.mjs";
 import { canonicalJson, withoutSignature } from "../datapack/lib/manifest-validation.mjs";
+import { sendReleaseCallback } from "../datapack/send-release-callback.mjs";
 
 const GATE_LIFETIME_MS = 14 * 86_400_000;
 const REQUIRED_SUITES = ["source", "freshness", "rollback", "android", "callback", "backend"];
@@ -18,7 +22,9 @@ const execFileAsync = promisify(execFile);
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 
 export function buildGateFragments({
-  candidate, buildSpec, sourceReport, rollbackReport, verifiedSuites, references, evaluatedAt,
+  candidate, buildSpec, sourceReport, rollbackReport, callbackReport, conditionalPublishReport,
+  androidDeviceReport, backendReconciliationReport,
+  verifiedSuites, references, evaluatedAt,
 }) {
   const identity = candidate?.releaseCandidateIdentity;
   if (candidate?.phase !== "CANDIDATE" || !identity || candidate.rcIdentity && !same(identity, candidate.rcIdentity)) {
@@ -40,31 +46,46 @@ export function buildGateFragments({
 
   validateSourceInputs(buildSpec, sourceReport, identity, evaluatedMillis);
   validateRollbackReport(rollbackReport, identity);
+  validateCallbackReport(callbackReport, identity);
+  validateConditionalPublishReport(conditionalPublishReport, identity);
+  validateAndroidDeviceReport(androidDeviceReport, identity);
+  validateBackendReconciliationReport(backendReconciliationReport, identity);
+  validateReference(references?.callbackExecution, "callback execution");
+  validateReference(references?.conditionalPublish, "conditional publish execution");
+  validateReference(references?.androidDevice, "Android device execution");
 
-  const envelope = (gateId, sourceIssue, result) => ({
+  const sourceExpiresAt = new Date(Math.min(
+    Date.parse(expiresAt),
+    ...buildSpec.sourceSnapshots.flatMap((snapshot) => [
+      Date.parse(snapshot.freshnessExpiresAt), Date.parse(snapshot.rawRetentionExpiresAt),
+    ]),
+  )).toISOString();
+
+  const envelope = (gateId, sourceIssue, result, evidenceExpiresAt = expiresAt) => ({
     schemaVersion: 1, gateId, sourceIssue, status: "SATISFIED", reasonCodes: [],
     rcIdentity: identity,
-    evidenceValidity: { evaluatedAt: new Date(evaluatedMillis).toISOString(), expiresAt },
+    evidenceValidity: { evaluatedAt: new Date(evaluatedMillis).toISOString(), expiresAt: evidenceExpiresAt },
     result,
   });
   const sourceInventory = buildSourceInventory(buildSpec.sourceSnapshots, evaluatedAt, expiresAt);
   const snapshotSetIdentity = identity.sourceSnapshotSetHash;
-  const releaseRequestId = `prelaunch-${identity.dataPackManifestSha256}`;
   const callbackIdentity = {
-    releaseRequestId,
-    releaseSequence: identity.releaseSequence,
-    manifestSha256: identity.dataPackManifestSha256,
-    idempotencyKeySha256: sha256(`${releaseRequestId}:${identity.releaseSequence}:${identity.dataPackManifestSha256}`),
+    releaseRequestId: callbackReport.payload.releaseRequestId,
+    releaseSequence: callbackReport.payload.releaseSequence,
+    manifestSha256: callbackReport.payload.manifestSha256,
+    idempotencyKeySha256: sha256(callbackReport.payload.idempotencyKey),
   };
 
   return {
     source_governance: {
-      ...envelope("source_governance", 2133, sourceResult(snapshotSetIdentity, [references.source, references.backend])),
+      ...envelope("source_governance", 2133,
+        sourceResult(snapshotSetIdentity, [references.source, references.backend]), sourceExpiresAt),
       snapshotSetIdentity,
       sourceInventory,
     },
     freshness_conditional_publish: {
-      ...envelope("freshness_conditional_publish", 2054, freshnessResult(snapshotSetIdentity, [references.freshness])),
+      ...envelope("freshness_conditional_publish", 2054,
+        freshnessResult(snapshotSetIdentity, [references.freshness, references.conditionalPublish]), sourceExpiresAt),
       snapshotSetIdentity,
     },
     rollback_rescue: envelope("rollback_rescue", 2051, {
@@ -84,19 +105,22 @@ export function buildGateFragments({
         "channelManifestPublishedLast", "idempotentRetryVerified", "androidReplayRecoveryVerified",
         "productionPreservedOnFailure", "secretRedactionVerified",
       ]),
-      evidenceReferences: [references.rollback, references.android],
+      evidenceReferences: [references.rollback, references.android, references.androidDevice],
     }),
     callback_reconciliation: envelope("callback_reconciliation", 2057, {
       schemaVersion: 1,
       deliveryIdentity: callbackIdentity,
-      metrics: { controlPlaneConvergenceP95Ms: 600_000, terminalDispositionMaxMs: 4_200_000 },
+      metrics: {
+        controlPlaneConvergenceP95Ms: callbackReport.metrics.controlPlaneConvergenceMs,
+        terminalDispositionMaxMs: callbackReport.metrics.terminalDispositionMs,
+      },
       checks: passing([
         "boundedRetryConverged", "independentReconciliationConverged", "duplicateSingleApply",
         "concurrentSingleApply", "identityMismatchDeadLetter", "invalidSignatureDeadLetter",
         "missingRequestDeadLetter", "rolloutCappedUntilConfirmed", "secretRedactionVerified",
         "manualRepairAudited",
       ]),
-      evidenceReferences: [references.callback, references.backend],
+      evidenceReferences: [references.callbackExecution, references.callback, references.backend],
     }),
   };
 }
@@ -130,13 +154,83 @@ function buildSourceInventory(snapshots, evaluatedAt, expiresAt) {
     producerVersion: 1,
     evidenceSha256: sha256(JSON.stringify(snapshot)),
     evaluatedAt: new Date(evaluatedAt).toISOString(),
-    expiresAt,
+    expiresAt: new Date(Math.min(
+      Date.parse(expiresAt), Date.parse(snapshot.freshnessExpiresAt), Date.parse(snapshot.rawRetentionExpiresAt),
+    )).toISOString(),
   })).sort((left, right) => left.sourceId.localeCompare(right.sourceId));
   return {
     inventoryAsOf: new Date(evaluatedAt).toISOString(),
     entries,
     statusCounts: { APPROVED: entries.length, REVIEW_REQUIRED: 0, BLOCKED: 0, EXPIRED: 0 },
   };
+}
+
+function validateCallbackReport(report, identity) {
+  const expectedIdempotencyKey = `${report?.payload?.releaseRequestId}:${identity.releaseSequence}:${identity.dataPackManifestSha256}`;
+  if (report?.schemaVersion !== 1 || report.executionEnvironment !== "ISOLATED_PRELAUNCH"
+    || report.productionExecuted !== false
+    || report.payload?.releaseSequence !== identity.releaseSequence
+    || report.payload?.manifestSha256 !== identity.dataPackManifestSha256
+    || report.payload?.idempotencyKey !== expectedIdempotencyKey
+    || report.delivery?.state !== "DELIVERED"
+    || report.delivery.idempotencyKey !== expectedIdempotencyKey
+    || report.terminalHandoff?.state !== "RECONCILIATION_REQUIRED"
+    || report.terminalHandoff.idempotencyKey !== expectedIdempotencyKey) {
+    throw new Error("callback execution identity mismatch");
+  }
+  const deliveredClasses = report.delivery.attempts?.map(({ httpClass }) => httpClass) ?? [];
+  const terminalClasses = report.terminalHandoff.attempts?.map(({ httpClass }) => httpClass) ?? [];
+  if (!deliveredClasses.includes("5XX") || deliveredClasses.at(-1) !== "2XX"
+    || terminalClasses.length !== 4 || terminalClasses.some((value) => value !== "5XX")
+    || report.metrics?.controlPlaneConvergenceMs !== 60_000
+    || report.metrics?.terminalDispositionMs !== 4_140_000) {
+    throw new Error("callback retry and reconciliation rehearsal did not pass");
+  }
+}
+
+function validateAndroidDeviceReport(report, identity) {
+  if (report?.artifactKind !== "android-datapack-monotonic-rescue-evidence"
+    || report.status !== "PASS"
+    || report.rcManifestSha256 !== identity.dataPackManifestSha256
+    || report.rescueReleaseSequence !== identity.releaseSequence
+    || report.knownGoodContentRestored !== true
+    || report.idempotentReplayVerified !== true
+    || report.corruptSuccessorPreservedKnownGood !== true
+    || report.lowerSequenceRejected !== true
+    || !Number.isSafeInteger(report.recoveryElapsedMs)
+    || report.recoveryElapsedMs < 0) {
+    throw new Error("Android device rescue evidence does not match the RC identity");
+  }
+}
+
+function validateConditionalPublishReport(report, identity) {
+  if (report?.schemaVersion !== 1 || report.executionEnvironment !== "ISOLATED_PRELAUNCH"
+    || report.productionExecuted !== false || report.productionWriteCount !== 0
+    || report.noChange?.outcome !== "NO_CHANGE_VALID"
+    || report.noChange.productionWriteAllowed !== false
+    || report.noChange.publishAttempted !== false
+    || report.candidatePublish?.outcome !== "PUBLISHED_AND_VERIFIED"
+    || report.candidatePublish.publishAttempted !== true
+    || report.candidatePublish.remoteValidationPassed !== true
+    || report.candidatePublish.selectedManifestSha256 !== identity.dataPackManifestSha256
+    || report.candidatePublish.selectedReleaseSequence !== identity.releaseSequence
+    || report.isolatedTarget?.manifestSha256 !== identity.dataPackManifestSha256
+    || report.isolatedTarget?.artifactSha256 !== identity.dataPackArtifactSha256
+    || report.isolatedTarget?.immutableManifestWritten !== true
+    || report.isolatedTarget?.channelManifestWrittenLast !== true
+    || report.isolatedTarget?.readBackVerified !== true) {
+    throw new Error("conditional publish rehearsal does not match the RC identity");
+  }
+}
+
+function validateBackendReconciliationReport(report, identity) {
+  if (report?.artifactKind !== "backend-datapack-reconciliation-evidence"
+    || report.status !== "PASS"
+    || report.manifestSha256 !== identity.dataPackManifestSha256
+    || report.releaseSequence !== identity.releaseSequence
+    || report.convergedWithinTenMinutes !== true) {
+    throw new Error("backend reconciliation evidence does not match the RC identity");
+  }
 }
 
 function validateSourceInputs(buildSpec, report, identity, evaluatedMillis) {
@@ -313,37 +407,56 @@ async function prepare(args) {
     ...rescue.evidence, status: "PASS", validatorStatus: "PASS", manifestLastStatus: "PASS",
     idempotentReplay: true, productionExecuted: false, executionEnvironment: "ISOLATED_PRELAUNCH",
   };
-  const releaseDecision = {
-    schemaVersion: 1, artifactKind: "datapack-release-decision",
-    outcome: "PUBLISHED_AND_VERIFIED", productionWriteAllowed: true,
-    materialChange: true, approvalValid: true, strictValidationPassed: true,
-    publishRequired: true, publishAttempted: true, remoteValidationPassed: true,
+  const rehearsalBinding = {
+    schemaVersion: 1, artifactKind: "datapack-prelaunch-rehearsal-binding",
+    executionEnvironment: "ISOLATED_PRELAUNCH", productionExecuted: false,
     sourceSnapshotSetHash: buildSpec.sourceSnapshotSetHash,
     selectedManifestSha256: sha256(rescue.manifestBytes),
+    selectedArtifactSha256: pack.sha256,
     selectedReleaseSequence: rescue.manifest.releaseSequence,
-    reasonCodes: [], evaluationAt: evaluatedAt,
   };
   await mkdir(path.join(outputDir, "catalog/releases"), { recursive: true });
   const paths = {
     manifest: path.join(outputDir, "rescue-manifest.json"),
-    decision: path.join(outputDir, "release-decision.json"),
     rollback: path.join(outputDir, "rollback-report.json"),
+    callback: path.join(outputDir, "callback-execution-report.json"),
+    conditionalPublish: path.join(outputDir, "conditional-publish-report.json"),
+    binding: path.join(outputDir, "rehearsal-binding.json"),
     publicKey: path.join(outputDir, "public-key.pem"),
     candidate: path.join(outputDir, "candidate-context.json"),
   };
   await Promise.all([
     writeFile(paths.manifest, rescue.manifestBytes),
-    writeFile(paths.decision, jsonBytes(releaseDecision)),
     writeFile(paths.rollback, jsonBytes(rollbackReport)),
+    writeFile(paths.binding, jsonBytes(rehearsalBinding)),
     writeFile(paths.publicKey, publicKeyPem, { mode: 0o600 }),
     writeFile(path.join(outputDir, `catalog/releases/${rescue.manifest.releaseSequence}.json`), rescue.manifestBytes),
   ]);
   await writeFile(path.join(outputDir, "catalog/current.json"), rescue.manifestBytes);
+  const conditionalPublishReport = await buildConditionalPublishReport({
+    buildSpec, buildSpecBytes, evaluatedAt, rescue, failed, artifactBytes,
+    isolatedManifestPath: path.join(outputDir, "catalog/current.json"),
+    isolatedImmutablePath: path.join(outputDir, `catalog/releases/${rescue.manifest.releaseSequence}.json`),
+  });
+  await writeFile(paths.conditionalPublish, jsonBytes(conditionalPublishReport));
   const gitSha = (await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: repoRoot })).stdout.trim();
   await runGenerator({
     repoRoot, gitSha, evaluatedAt, manifestPath: paths.manifest, artifactPath,
-    decisionPath: paths.decision, publicKeyPem, phase: "CANDIDATE", outputPath: paths.candidate,
+    rehearsalBindingPath: paths.binding, publicKeyPem, phase: "CANDIDATE", outputPath: paths.candidate,
   });
+  const candidate = await readJson(paths.candidate);
+  const callbackReport = await runCallbackRehearsal({
+    manifestBytes: rescue.manifestBytes, identity: candidate.releaseCandidateIdentity,
+    pack, rollbackReport,
+  });
+  await writeFile(paths.callback, jsonBytes(callbackReport));
+  const githubOutput = args.get("github-output");
+  if (githubOutput) {
+    await appendFile(githubOutput, [
+      `manifestSha256=${candidate.releaseCandidateIdentity.dataPackManifestSha256}`,
+      `releaseSequence=${candidate.releaseCandidateIdentity.releaseSequence}`,
+    ].join("\n") + "\n");
+  }
   process.stdout.write(`${JSON.stringify({
     status: "PASS", outputDir, dataPackArtifact: artifactPath,
     releaseSequence: rescue.manifest.releaseSequence,
@@ -357,11 +470,17 @@ async function collect(args) {
   const files = Object.fromEntries([
     "candidate", "build-spec", "source-validation-report", "rollback-report", "source-suite-report",
     "freshness-suite-report", "rollback-suite-report", "callback-suite-report", "android-suite-report",
-    "public-key", "data-pack-manifest", "data-pack-artifact", "release-decision",
+    "callback-execution-report", "conditional-publish-report", "android-device-report",
+    "data-pack-rehearsal-binding", "public-key",
+    "data-pack-manifest", "data-pack-artifact",
   ].map((name) => [name, path.resolve(requiredArg(args, name))]));
-  const [candidate, buildSpec, sourceReport, rollbackReport, publicKeyPem] = await Promise.all([
+  const [candidate, buildSpec, sourceReport, rollbackReport, callbackReport, conditionalPublishReport,
+    androidDeviceReport, publicKeyPem] = await Promise.all([
     readJson(files.candidate), readJson(files["build-spec"]), readJson(files["source-validation-report"]),
-    readJson(files["rollback-report"]), readFile(files["public-key"], "utf8"),
+    readJson(files["rollback-report"]), readJson(files["callback-execution-report"]),
+    readJson(files["conditional-publish-report"]),
+    readAndroidDeviceReport(files["android-device-report"]),
+    readFile(files["public-key"], "utf8"),
   ]);
   const suitePaths = {
     source: files["source-suite-report"], freshness: files["freshness-suite-report"],
@@ -377,7 +496,9 @@ async function collect(args) {
   }
   const backendJunitDir = path.resolve(requiredArg(args, "backend-junit-dir"));
   const backendFiles = await junitFiles(backendJunitDir);
-  await validateJunit(backendFiles);
+  const backendReconciliationReport = await validateJunit(
+    backendFiles, candidate.releaseCandidateIdentity,
+  );
   const verifiedSuites = new Set(REQUIRED_SUITES);
   const references = {};
   await mkdir(path.join(outputDir, "suite-evidence"), { recursive: true });
@@ -385,8 +506,17 @@ async function collect(args) {
     references[suite] = await writeSuiteEvidence(outputDir, suite, [suitePaths[suite]]);
   }
   references.backend = await writeSuiteEvidence(outputDir, "backend", backendFiles);
+  references.callbackExecution = await evidenceReference(
+    "callback-execution-report", files["callback-execution-report"],
+  );
+  references.conditionalPublish = await evidenceReference(
+    "conditional-publish-report", files["conditional-publish-report"],
+  );
+  references.androidDevice = await evidenceReference("android-device-report", files["android-device-report"]);
   const fragments = buildGateFragments({
-    candidate, buildSpec, sourceReport, rollbackReport, verifiedSuites, references, evaluatedAt,
+    candidate, buildSpec, sourceReport, rollbackReport, callbackReport, conditionalPublishReport,
+    androidDeviceReport, backendReconciliationReport,
+    verifiedSuites, references, evaluatedAt,
   });
   const gatePaths = {};
   await mkdir(path.join(outputDir, "gates"), { recursive: true });
@@ -398,14 +528,14 @@ async function collect(args) {
   const finalPath = path.join(outputDir, "final-readiness.json");
   await runGenerator({
     repoRoot, gitSha, evaluatedAt, manifestPath: files["data-pack-manifest"],
-    artifactPath: files["data-pack-artifact"], decisionPath: files["release-decision"],
+    artifactPath: files["data-pack-artifact"], rehearsalBindingPath: files["data-pack-rehearsal-binding"],
     publicKeyPem, phase: "FINAL", candidatePath: files.candidate, gatePaths, outputPath: finalPath,
   });
   process.stdout.write(`${JSON.stringify({ status: "PASS", finalReadiness: finalPath, gateIds: Object.keys(fragments) })}\n`);
 }
 
 async function runGenerator({
-  repoRoot, gitSha, evaluatedAt, manifestPath, artifactPath, decisionPath, publicKeyPem,
+  repoRoot, gitSha, evaluatedAt, manifestPath, artifactPath, rehearsalBindingPath, publicKeyPem,
   phase, candidatePath, gatePaths = {}, outputPath,
 }) {
   const argv = [
@@ -414,8 +544,7 @@ async function runGenerator({
     "--git-sha", gitSha, "--now", evaluatedAt,
     "--data-pack-manifest", manifestPath, "--data-pack-artifact", artifactPath,
     "--data-pack-fallback-artifact", artifactPath,
-    "--data-pack-release-decision", decisionPath,
-    "--require-production-data-pack-binding", "true",
+    "--data-pack-rehearsal-binding", rehearsalBindingPath,
     "--phase", phase, "--output", outputPath,
   ];
   if (candidatePath) argv.push("--candidate-context", candidatePath);
@@ -427,6 +556,141 @@ async function runGenerator({
     cwd: repoRoot,
     env: { ...process.env, EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: publicKeyPem },
   });
+}
+
+async function buildConditionalPublishReport({
+  buildSpec, buildSpecBytes, evaluatedAt, rescue, failed, artifactBytes,
+  isolatedManifestPath, isolatedImmutablePath,
+}) {
+  const candidateManifest = rescue.manifest;
+  const candidateManifestSha256 = sha256(rescue.manifestBytes);
+  const previousManifest = structuredClone(failed);
+  previousManifest.packs[0].version = `previous-${previousManifest.packs[0].version}`;
+  const previousManifestSha256 = sha256(jsonBytes(previousManifest));
+  const releaseRequest = {
+    artifactKind: "datapack-release-request", targetChannel: "production",
+    approvalId: `prelaunch-${candidateManifestSha256.slice(0, 16)}`,
+    requestedBy: "prelaunch-requester", approvedBy: "prelaunch-approver",
+    candidateId: buildSpec.candidateId, buildSpecSha256: sha256(buildSpecBytes),
+    sourceSnapshotSetHash: buildSpec.sourceSnapshotSetHash,
+    approvedLedgerHash: buildSpec.approvedAliasLedgerHash,
+  };
+  const noChange = evaluateReleaseDecision({
+    candidateManifest, currentManifest: candidateManifest,
+    candidateManifestSha256, currentManifestSha256: candidateManifestSha256,
+    buildSpec, buildSpecSha256: sha256(buildSpecBytes), releaseRequest,
+    strictValidationPassed: true, publishAttempted: false, remoteValidationPassed: true,
+    evaluationAt: evaluatedAt,
+  });
+  const candidatePublish = evaluateReleaseDecision({
+    candidateManifest, currentManifest: previousManifest,
+    candidateManifestSha256, currentManifestSha256: previousManifestSha256,
+    buildSpec, buildSpecSha256: sha256(buildSpecBytes), releaseRequest,
+    strictValidationPassed: true, publishAttempted: true, remoteValidationPassed: true,
+    evaluationAt: evaluatedAt,
+  });
+  const [channelBytes, immutableBytes] = await Promise.all([
+    readFile(isolatedManifestPath), readFile(isolatedImmutablePath),
+  ]);
+  const readBackVerified = sha256(channelBytes) === candidateManifestSha256
+    && sha256(immutableBytes) === candidateManifestSha256
+    && sha256(artifactBytes) === candidateManifest.packs[0].sha256;
+  return {
+    schemaVersion: 1, executionEnvironment: "ISOLATED_PRELAUNCH",
+    productionExecuted: false, productionWriteCount: 0,
+    noChange, candidatePublish,
+    isolatedTarget: {
+      manifestSha256: candidateManifestSha256,
+      artifactSha256: candidateManifest.packs[0].sha256,
+      immutableManifestWritten: true, channelManifestWrittenLast: true, readBackVerified,
+    },
+  };
+}
+
+async function runCallbackRehearsal({ manifestBytes, identity, pack, rollbackReport }) {
+  if (identity?.dataPackManifestSha256 !== sha256(manifestBytes)
+    || identity.dataPackArtifactSha256 !== pack.sha256) {
+    throw new Error("callback rehearsal RC identity mismatch");
+  }
+  const token = randomBytes(32).toString("base64url");
+  const payload = buildReleaseCallback({
+    RELEASE_REQUEST_ID: `prelaunch-${identity.dataPackManifestSha256}`,
+    RELEASE_SEQUENCE: String(identity.releaseSequence), TARGET_CHANNEL: "production",
+    WORKFLOW_RUN_URL: "https://github.com/AquilaXk/easysubway/actions/workflows/datapack-prelaunch-gates.yml",
+    MANIFEST_SHA256: identity.dataPackManifestSha256, SQLITE_SHA256: pack.sqliteSha256,
+    GZIP_SHA256: identity.dataPackArtifactSha256,
+    EVIDENCE_BUNDLE_SHA256: sha256(jsonBytes(rollbackReport)),
+    VALIDATOR_STATUS: "PASS", ROUTE_REGRESSION_STATUS: "PASS", PUBLISH_STATUS: "PASS",
+    EASYSUBWAY_DATAPACK_CALLBACK_HMAC_KEY: randomBytes(32).toString("base64url"),
+  });
+  let scenario = "DELIVERY";
+  let postCount = 0;
+  const server = createServer(async (request, response) => {
+    if (request.method === "GET" && request.url === "/catalog/current.json") {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(manifestBytes);
+      return;
+    }
+    if (request.method !== "POST" || request.url !== "/callback"
+      || request.headers.authorization !== `Bearer ${token}`) {
+      response.writeHead(404).end();
+      return;
+    }
+    const chunks = [];
+    for await (const chunk of request) chunks.push(chunk);
+    let received;
+    try {
+      received = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    } catch {
+      response.writeHead(400).end();
+      return;
+    }
+    if (received.idempotencyKey !== payload.idempotencyKey
+      || received.manifestSha256 !== identity.dataPackManifestSha256) {
+      response.writeHead(409).end();
+      return;
+    }
+    postCount += 1;
+    const status = scenario === "DELIVERY" && postCount > 1 ? 204 : 500;
+    response.writeHead(status).end();
+  });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  try {
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("callback rehearsal server address is invalid");
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    let deliveryElapsedMs = 0;
+    const delivery = await sendReleaseCallback({
+      payload, endpoint: `${baseUrl}/callback`, token,
+      currentManifestUrl: `${baseUrl}/catalog/current.json`, retryDelaysSeconds: [60],
+      sleep: async (seconds) => { deliveryElapsedMs += seconds * 1_000; },
+    });
+    scenario = "TERMINAL_HANDOFF";
+    postCount = 0;
+    let terminalElapsedMs = 0;
+    const terminalHandoff = await sendReleaseCallback({
+      payload, endpoint: `${baseUrl}/callback`, token,
+      currentManifestUrl: `${baseUrl}/catalog/current.json`,
+      sleep: async (seconds) => { terminalElapsedMs += seconds * 1_000; },
+    });
+    return {
+      schemaVersion: 1, executionEnvironment: "ISOLATED_PRELAUNCH", productionExecuted: false,
+      payload: {
+        releaseRequestId: payload.releaseRequestId, releaseSequence: payload.releaseSequence,
+        manifestSha256: payload.manifestSha256, idempotencyKey: payload.idempotencyKey,
+      },
+      delivery, terminalHandoff,
+      metrics: {
+        controlPlaneConvergenceMs: deliveryElapsedMs,
+        terminalDispositionMs: terminalElapsedMs,
+      },
+    };
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
 }
 
 function sign(value, privateKeyPem) {
@@ -450,7 +714,7 @@ async function junitFiles(root, required = true) {
   return files.sort();
 }
 
-async function validateJunit(files) {
+async function validateJunit(files, identity) {
   const requiredClasses = [
     "JdbcDataSourceSnapshotRepositoryContainerTest", "DatapackReleaseCallbackServiceTest",
     "DatapackReleaseReconciliationServiceTest", "DatapackReleaseReconciliationSchedulerTest",
@@ -464,6 +728,11 @@ async function validateJunit(files) {
   for (const className of requiredClasses) {
     if (!joined.includes(className)) throw new Error(`backend JUnit class is missing: ${className}`);
   }
+  const match = joined.match(/\{"artifactKind":"backend-datapack-reconciliation-evidence"[^\r\n<]*\}/);
+  if (!match) throw new Error("backend reconciliation machine evidence is missing");
+  const report = JSON.parse(match[0]);
+  validateBackendReconciliationReport(report, identity);
+  return report;
 }
 
 async function writeSuiteEvidence(outputDir, suite, files) {
@@ -476,6 +745,30 @@ async function writeSuiteEvidence(outputDir, suite, files) {
   const bytes = jsonBytes({ schemaVersion: 1, suite, status: "PASS", artifacts });
   await writeFile(summaryPath, bytes);
   return { artifactId: `${suite}-suite-evidence`, sha256: sha256(bytes) };
+}
+
+async function evidenceReference(artifactId, file) {
+  return { artifactId, sha256: sha256(await readFile(file)) };
+}
+
+async function readAndroidDeviceReport(file) {
+  const lines = (await readFile(file, "utf8")).split("\n").filter(Boolean);
+  for (const line of lines) {
+    let event;
+    try {
+      event = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (event?.type !== "print" || typeof event.message !== "string") continue;
+    try {
+      const report = JSON.parse(event.message);
+      if (report?.artifactKind === "android-datapack-monotonic-rescue-evidence") return report;
+    } catch {
+      // Ignore regular test runner output and continue to the machine evidence event.
+    }
+  }
+  throw new Error("Android device machine evidence is missing");
 }
 
 function parseArgs(argv) {

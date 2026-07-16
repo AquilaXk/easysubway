@@ -47,13 +47,30 @@ jobs:
         run: echo "EVALUATED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" >> "${GITHUB_ENV}"
 
       - name: Prepare isolated monotonic rescue RC
+        id: prepare
         run: |
           node tools/release/build-datapack-prelaunch-gate-evidence.mjs --mode prepare \
             --repo-root . \
             --output-dir "${EVIDENCE_DIR}" \
             --build-spec tools/datapack/release/candidate-build-spec.json \
             --reviewed-pack tools/datapack/release/capital-production-reviewed-pack.json \
-            --evaluated-at "${EVALUATED_AT}"
+            --evaluated-at "${EVALUATED_AT}" \
+            --github-output "${GITHUB_OUTPUT}"
+
+      - name: Rehearse monotonic rescue on Android emulator
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          ram-size: 2048M
+          script: |
+            cd apps/mobile
+            flutter test -d emulator-5554 integration_test/datapack_monotonic_rescue_test.dart \
+              --reporter=expanded \
+              --file-reporter=json:"${EVIDENCE_DIR}/android-device.jsonl" \
+              --dart-define=EASYSUBWAY_RC_MANIFEST_SHA256=${{ steps.prepare.outputs.manifestSha256 }} \
+              --dart-define=EASYSUBWAY_RC_RELEASE_SEQUENCE=${{ steps.prepare.outputs.releaseSequence }}
 
       - name: Validate launch source snapshot set at the fixed clock
         run: |
@@ -88,6 +105,9 @@ jobs:
             tools/datapack/send-release-callback.test.mjs
 
       - name: Rehearse PostgreSQL governance migration and backend reconciliation
+        env:
+          EASYSUBWAY_PRELAUNCH_MANIFEST_SHA256: ${{ steps.prepare.outputs.manifestSha256 }}
+          EASYSUBWAY_PRELAUNCH_RELEASE_SEQUENCE: ${{ steps.prepare.outputs.releaseSequence }}
         run: |
           backend/gradlew -p backend test --no-daemon \
             --tests '*JdbcDataSourceSnapshotRepositoryContainerTest' \
@@ -117,6 +137,9 @@ jobs:
             --build-spec tools/datapack/release/candidate-build-spec.json \
             --source-validation-report "${EVIDENCE_DIR}/source-validation.json" \
             --rollback-report "${EVIDENCE_DIR}/rollback-report.json" \
+            --callback-execution-report "${EVIDENCE_DIR}/callback-execution-report.json" \
+            --conditional-publish-report "${EVIDENCE_DIR}/conditional-publish-report.json" \
+            --android-device-report "${EVIDENCE_DIR}/android-device.jsonl" \
             --source-suite-report "${EVIDENCE_DIR}/source.tap" \
             --freshness-suite-report "${EVIDENCE_DIR}/freshness.tap" \
             --rollback-suite-report "${EVIDENCE_DIR}/rollback.tap" \
@@ -125,8 +148,8 @@ jobs:
             --backend-junit-dir backend/build/test-results/test \
             --public-key "${EVIDENCE_DIR}/public-key.pem" \
             --data-pack-manifest "${EVIDENCE_DIR}/rescue-manifest.json" \
-            --data-pack-artifact "${EVIDENCE_DIR}/built-datapack/catalog/capital-v1.sqlite.gz" \
-            --release-decision "${EVIDENCE_DIR}/release-decision.json"
+            --data-pack-rehearsal-binding "${EVIDENCE_DIR}/rehearsal-binding.json" \
+            --data-pack-artifact "${EVIDENCE_DIR}/built-datapack/catalog/capital-v1.sqlite.gz"
 
       - name: Upload prelaunch gate evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

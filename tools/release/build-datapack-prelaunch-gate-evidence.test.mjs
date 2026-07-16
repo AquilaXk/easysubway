@@ -31,8 +31,9 @@ function fixture() {
     governancePolicyVersion: "2026-07-15", governancePolicySha256: "9".repeat(64),
   }));
   const references = Object.fromEntries([
-    "source", "freshness", "rollback", "android", "callback", "backend",
-  ].map((id, index) => [id, { artifactId: `${id}-report`, sha256: String(index + 2).repeat(64) }]));
+    "source", "freshness", "rollback", "android", "callback", "backend", "callbackExecution",
+    "androidDevice", "conditionalPublish",
+  ].map((id, index) => [id, { artifactId: `${id}-report`, sha256: String((index % 8) + 2).repeat(64) }]));
   return {
     candidate: { phase: "CANDIDATE", releaseCandidateIdentity: rcIdentity },
     buildSpec: { sourceSnapshotSetHash: snapshotSetIdentity, sourceSnapshots: sources },
@@ -43,6 +44,50 @@ function fixture() {
       rescue: { releaseSequence: 3, manifestSha256 }, status: "PASS",
       validatorStatus: "PASS", manifestLastStatus: "PASS", idempotentReplay: true,
       productionExecuted: false, executionEnvironment: "ISOLATED_PRELAUNCH",
+    },
+    callbackReport: {
+      schemaVersion: 1, executionEnvironment: "ISOLATED_PRELAUNCH", productionExecuted: false,
+      payload: {
+        releaseRequestId: `prelaunch-${manifestSha256}`, releaseSequence: 3,
+        manifestSha256, idempotencyKey: `prelaunch-${manifestSha256}:3:${manifestSha256}`,
+      },
+      delivery: {
+        state: "DELIVERED", idempotencyKey: `prelaunch-${manifestSha256}:3:${manifestSha256}`,
+        attempts: [{ attempt: 1, httpClass: "5XX", nextRetrySeconds: 60 }, { attempt: 2, httpClass: "2XX" }],
+      },
+      terminalHandoff: {
+        state: "RECONCILIATION_REQUIRED", idempotencyKey: `prelaunch-${manifestSha256}:3:${manifestSha256}`,
+        attempts: [
+          { attempt: 1, httpClass: "5XX", nextRetrySeconds: 60 },
+          { attempt: 2, httpClass: "5XX", nextRetrySeconds: 480 },
+          { attempt: 3, httpClass: "5XX", nextRetrySeconds: 3600 },
+          { attempt: 4, httpClass: "5XX" },
+        ],
+      },
+      metrics: { controlPlaneConvergenceMs: 60_000, terminalDispositionMs: 4_140_000 },
+    },
+    conditionalPublishReport: {
+      schemaVersion: 1, executionEnvironment: "ISOLATED_PRELAUNCH",
+      productionExecuted: false, productionWriteCount: 0,
+      noChange: { outcome: "NO_CHANGE_VALID", productionWriteAllowed: false, publishAttempted: false },
+      candidatePublish: {
+        outcome: "PUBLISHED_AND_VERIFIED", publishAttempted: true, remoteValidationPassed: true,
+        selectedManifestSha256: manifestSha256, selectedReleaseSequence: 3,
+      },
+      isolatedTarget: {
+        manifestSha256, artifactSha256: packSha256, immutableManifestWritten: true,
+        channelManifestWrittenLast: true, readBackVerified: true,
+      },
+    },
+    androidDeviceReport: {
+      artifactKind: "android-datapack-monotonic-rescue-evidence", status: "PASS",
+      rcManifestSha256: manifestSha256, rescueReleaseSequence: 3,
+      knownGoodContentRestored: true, idempotentReplayVerified: true,
+      corruptSuccessorPreservedKnownGood: true, lowerSequenceRejected: true, recoveryElapsedMs: 125,
+    },
+    backendReconciliationReport: {
+      artifactKind: "backend-datapack-reconciliation-evidence", status: "PASS",
+      manifestSha256, releaseSequence: 3, convergedWithinTenMinutes: true,
     },
     verifiedSuites: new Set(["source", "freshness", "rollback", "android", "callback", "backend"]),
     references,
@@ -73,6 +118,17 @@ test("snapshot identity가 RC와 다르면 fail closed한다", () => {
   assert.throws(() => buildGateFragments(input), /source snapshot identity mismatch/);
 });
 
+test("source gate와 inventory 만료는 실제 snapshot 최단 만료를 넘지 않는다", () => {
+  const input = fixture();
+  input.buildSpec.sourceSnapshots[0].freshnessExpiresAt = "2026-07-20T00:00:00.000Z";
+  const fragments = buildGateFragments(input);
+  assert.equal(fragments.source_governance.evidenceValidity.expiresAt, "2026-07-20T00:00:00.000Z");
+  assert.equal(fragments.freshness_conditional_publish.evidenceValidity.expiresAt, "2026-07-20T00:00:00.000Z");
+  assert.equal(fragments.source_governance.sourceInventory.entries[0].expiresAt, "2026-07-20T00:00:00.000Z");
+  assert.equal(fragments.source_governance.sourceInventory.entries[1].expiresAt, "2026-07-31T00:00:00.000Z");
+  assert.equal(fragments.rollback_rescue.evidenceValidity.expiresAt, "2026-07-31T00:00:00.000Z");
+});
+
 test("rescue identity가 RC와 다르면 fail closed한다", () => {
   const input = fixture();
   input.rollbackReport.rescue.releaseSequence = 4;
@@ -91,16 +147,45 @@ test("public production 실행으로 표시된 report는 prelaunch evidence로 �
   assert.throws(() => buildGateFragments(input), /isolated prelaunch/);
 });
 
+test("동일 RC에 결속된 callback 실행 report가 없으면 fail closed한다", () => {
+  const input = fixture();
+  input.callbackReport.payload.manifestSha256 = "0".repeat(64);
+  assert.throws(() => buildGateFragments(input), /callback execution identity mismatch/);
+});
+
+test("Android device rescue report가 RC와 다르면 fail closed한다", () => {
+  const input = fixture();
+  input.androidDeviceReport.rescueReleaseSequence = 4;
+  assert.throws(() => buildGateFragments(input), /Android device rescue evidence/);
+});
+
+test("conditional publish report가 실제 isolated write와 RC에 결속되지 않으면 fail closed한다", () => {
+  const input = fixture();
+  input.conditionalPublishReport.productionWriteCount = 1;
+  assert.throws(() => buildGateFragments(input), /conditional publish rehearsal/);
+});
+
+test("backend reconciliation report가 RC와 다르면 fail closed한다", () => {
+  const input = fixture();
+  input.backendReconciliationReport.manifestSha256 = "0".repeat(64);
+  assert.throws(() => buildGateFragments(input), /backend reconciliation evidence/);
+});
+
 test("prelaunch workflow는 네 gate를 같은 RC final readiness에 결속한다", async () => {
   const workflow = await readFile(new URL(
     "../../.github/workflows/datapack-prelaunch-gates.yml", import.meta.url,
   ), "utf8");
   assert.match(workflow, /build-datapack-prelaunch-gate-evidence\.mjs --mode prepare/);
   assert.match(workflow, /build-datapack-prelaunch-gate-evidence\.mjs --mode collect/);
+  assert.match(workflow, /--callback-execution-report/);
+  assert.match(workflow, /integration_test\/datapack_monotonic_rescue_test\.dart/);
+  assert.match(workflow, /--android-device-report/);
+  assert.match(workflow, /--conditional-publish-report/);
   for (const gateId of [
     "source_governance", "freshness_conditional_publish", "rollback_rescue", "callback_reconciliation",
   ]) {
     assert.match(workflow, new RegExp(gateId));
   }
   assert.doesNotMatch(workflow, /EASYSUBWAY_DATA_PACK_BASE_URL|catalog\/current\.json.*(?:curl|PUT)/);
+  assert.doesNotMatch(workflow, /--release-decision|--data-pack-release-decision/);
 });
