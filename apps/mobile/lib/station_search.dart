@@ -20,12 +20,13 @@ import 'features/stations/domain/station_line.dart';
 import 'features/stations/domain/station_models.dart';
 import 'features/stations/domain/station_repositories.dart';
 import 'features/stations/presentation/station_detail_header.dart';
-import 'features/stations/presentation/station_detail_info_row.dart';
 import 'features/stations/presentation/station_detail_route_actions.dart';
 import 'features/stations/presentation/station_exit_card.dart';
 import 'features/stations/presentation/station_facility_card.dart';
 import 'features/stations/presentation/station_facility_status_summary.dart';
 import 'features/stations/presentation/station_info_basis_disclosure.dart';
+import 'features/stations/presentation/station_internal_route_guidance.dart';
+import 'features/stations/presentation/station_layout_summary.dart';
 import 'features/stations/presentation/station_recent_search_section.dart';
 import 'features/stations/presentation/station_realtime_summary.dart';
 import 'features/stations/presentation/station_search_body.dart';
@@ -47,7 +48,6 @@ export 'features/stations/presentation/station_timetable_screen.dart';
 const _searchHistoryChangeErrorMessage = '최근 검색을 지우지 못했어요.';
 const _stationSearchPagePadding = EdgeInsets.fromLTRB(20, 20, 20, 32);
 const _stationSearchLargePagePadding = EdgeInsets.fromLTRB(24, 24, 24, 40);
-const _stationDetailInfoCardRadius = BorderRadius.all(Radius.circular(16));
 
 class StationSearchScreen extends StatefulWidget {
   const StationSearchScreen({
@@ -968,14 +968,14 @@ class _StationDetailContent extends StatelessWidget {
         const _StationDetailSectionTitle(title: '역 안 이동'),
         const SizedBox(height: 12),
         if (layoutSummaryItems.isNotEmpty) ...[
-          _StationLayoutSummary(
+          StationLayoutSummary(
             items: layoutSummaryItems,
             semanticLabel: layoutSummarySemanticLabel,
           ),
           if (hasInternalRouteGuidance) const SizedBox(height: 16),
         ],
         if (hasInternalRouteGuidance)
-          _StationInternalRouteGuidance(state: internalRouteState!),
+          StationInternalRouteGuidance(state: internalRouteState!),
         const SizedBox(height: 24),
       ],
       const _StationDetailSectionTitle(title: '출구'),
@@ -1232,232 +1232,6 @@ class _StationDetailAdaptiveContent extends StatelessWidget {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StationLayoutSummary extends StatelessWidget {
-  const _StationLayoutSummary({
-    required this.items,
-    required this.semanticLabel,
-  });
-
-  final List<StationLayoutSummaryItem> items;
-  final String semanticLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Semantics(
-      label: semanticLabel,
-      child: ExcludeSemantics(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final itemWidth = (constraints.maxWidth - 12) / 2;
-            return Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                for (final item in items)
-                  _StationLayoutStep(
-                    item: item,
-                    textTheme: textTheme,
-                    width: itemWidth,
-                  ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _StationLayoutStep extends StatelessWidget {
-  const _StationLayoutStep({
-    required this.item,
-    required this.textTheme,
-    required this.width,
-  });
-
-  final StationLayoutSummaryItem item;
-  final TextTheme textTheme;
-  final double width;
-
-  @override
-  Widget build(BuildContext context) {
-    // 상용 앱 리스트 밀도에 맞춰 세로 타일을 아이콘+텍스트 가로 행으로 낮춰
-    // 높이를 줄인다(고정 minHeight 제거).
-    return Container(
-      width: width,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: EasySubwayAccessibleColors.surface,
-        borderRadius: _stationDetailInfoCardRadius,
-        border: Border.all(color: EasySubwayAccessibleColors.line),
-      ),
-      child: Row(
-        children: [
-          Icon(item.icon, color: EasySubwayAccessibleColors.primary, size: 22),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              item.text,
-              style: textTheme.bodyLarge?.copyWith(
-                color: EasySubwayAccessibleColors.text,
-                fontWeight: FontWeight.w700,
-                height: 1.2,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StationInternalRouteGuidance extends StatelessWidget {
-  const _StationInternalRouteGuidance({required this.state});
-
-  final InternalRouteState state;
-
-  @override
-  Widget build(BuildContext context) {
-    return switch (state.status) {
-      InternalRouteViewStatus.loading => Semantics(
-        label: '역 안 이동 순서 불러오는 중',
-        liveRegion: true,
-        child: const StationDetailInfoRow(
-          icon: Icons.sync,
-          text: '역 안 이동 순서를 불러오는 중입니다.',
-        ),
-      ),
-      InternalRouteViewStatus.failure => Semantics(
-        label: state.message,
-        liveRegion: true,
-        child: StationDetailInfoRow(
-          icon: Icons.error_outline,
-          text: state.message,
-        ),
-      ),
-      InternalRouteViewStatus.success => _StationInternalRouteResultCard(
-        result: state.result!,
-      ),
-      // 데이터 부재는 사과 문구 없이 숨긴다(#1577).
-      InternalRouteViewStatus.unavailable => const SizedBox.shrink(),
-    };
-  }
-}
-
-class _StationInternalRouteResultCard extends StatelessWidget {
-  const _StationInternalRouteResultCard({required this.result});
-
-  final InternalRouteResult result;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      container: true,
-      label: result.semanticLabel,
-      child: ExcludeSemantics(
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: EasySubwayAccessibleColors.surface,
-            borderRadius: _stationDetailInfoCardRadius,
-            border: Border.all(color: EasySubwayAccessibleColors.line),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              StationDetailInfoRow(
-                icon: result.statusIcon,
-                text: result.statusLabel,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                result.summaryLabel,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: EasySubwayAccessibleColors.text,
-                  fontWeight: FontWeight.w700,
-                  height: 1.25,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                result.totalBurdenLabel,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: EasySubwayAccessibleColors.secondaryText,
-                  fontWeight: FontWeight.w700,
-                  height: 1.3,
-                ),
-              ),
-              if (result.warnings.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                for (final warning in result.warnings)
-                  StationDetailInfoRow(
-                    icon: Icons.warning_amber,
-                    text: warning.message,
-                  ),
-              ],
-              if (result.steps.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                for (final step in result.steps)
-                  _StationInternalRouteStepTile(step: step),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StationInternalRouteStepTile extends StatelessWidget {
-  const _StationInternalRouteStepTile({required this.step});
-
-  final InternalRouteStep step;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      container: true,
-      label: step.semanticLabel,
-      child: ExcludeSemantics(
-        child: Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                step.title,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: EasySubwayAccessibleColors.text,
-                  fontWeight: FontWeight.w700,
-                  height: 1.3,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                step.burdenLabel,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: EasySubwayAccessibleColors.secondaryText,
-                  fontWeight: FontWeight.w700,
-                  height: 1.3,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                step.guidance,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: EasySubwayAccessibleColors.text,
-                  height: 1.35,
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );
