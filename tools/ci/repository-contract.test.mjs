@@ -10945,6 +10945,13 @@ test("민감정보 백업 보존 작업은 30일이 지난 DB·사진 사본만 
   );
   assert.match(workflow, /cron: "47 18 \* \* \*"/);
   assert.match(workflow, /self-hosted[\s\S]*easysubway-production/);
+  assert.match(
+    workflow,
+    /EASYSUBWAY_SENSITIVE_BACKUP_RETENTION_DAYS: \$\{\{ vars\.EASYSUBWAY_SENSITIVE_BACKUP_RETENTION_DAYS \}\}/,
+  );
+  assert.match(workflow, /EASYSUBWAY_SENSITIVE_BACKUP_RETENTION_DAYS="\$\{EASYSUBWAY_SENSITIVE_BACKUP_RETENTION_DAYS:-30\}"/);
+  assert.doesNotMatch(workflow, /\bRETENTION_DAYS\b/);
+  assert.match(workflow, /--root "\$\{DEPLOY_ROOT\}\/backups"/);
   assert.match(workflow, /prune-sensitive-backups\.mjs/);
 });
 
@@ -11228,6 +11235,14 @@ test("운영 백업 복구 리허설 gate는 필수 백업 대상과 dry-run 검
 
   const photoTarget = backupTargets.get("facility_report_photo_objects");
   const postgresTarget = backupTargets.get("postgres_application_database");
+  assert.equal(
+    postgresTarget.backupCommand,
+    "tools/ops/postgres-backup.sh <deploy-root>/backups/postgres",
+  );
+  assert.equal(
+    photoTarget.backupCommand,
+    "tools/ops/facility-report-photo-backup.sh <deploy-root>/backups/facility-report-photos",
+  );
   for (const target of [postgresTarget, photoTarget]) {
     assert.equal(target.retentionDays, 30);
     assert.match(target.retentionCommand, /prune-sensitive-backups\.mjs/);

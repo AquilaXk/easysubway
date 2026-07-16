@@ -37,8 +37,9 @@ class FacilityReportPersonalDataPurgeSchedulerTest {
 		assertThat(cutoff.get()).isEqualTo(LocalDateTime.of(2025, 7, 17, 12, 0));
 		Method scheduledMethod = FacilityReportPersonalDataPurgeScheduler.class
 			.getDeclaredMethod("purgeExpiredPersonalData");
-		assertThat(scheduledMethod.getAnnotation(Scheduled.class).fixedDelayString())
-			.isEqualTo("${easysubway.report.personal-data-purge-interval-ms:86400000}");
+		assertThat(scheduledMethod.getAnnotation(Scheduled.class).fixedDelay())
+			.isEqualTo(86_400_000L);
+		assertThat(scheduledMethod.getAnnotation(Scheduled.class).fixedDelayString()).isEmpty();
 	}
 
 	@Test
