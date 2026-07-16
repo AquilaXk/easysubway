@@ -2,7 +2,7 @@
 
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { canonicalScopeHash } from "../datapack/build-launch-denominator-report.mjs";
@@ -36,6 +36,11 @@ const dataPackManifestPath = resolvePath(
   arg("dataPackManifest", "data-pack-manifest") ?? path.join(appRoot, "assets/datapacks/metro_map_pack/manifest.json"),
 );
 const dataPackManifest = readJsonIfExists(dataPackManifestPath);
+const dataPackArtifactArg = arg("dataPackArtifact", "data-pack-artifact");
+const dataPackArtifactPath = dataPackArtifactArg ? resolvePath(dataPackArtifactArg) : null;
+const dataPackArtifactBytes = dataPackArtifactPath && existsSync(dataPackArtifactPath)
+  ? statSync(dataPackArtifactPath).size
+  : null;
 const backendIdentity = readBackendIdentity(args);
 const providedGateStatuses = parsePairs(arg("gateStatus", "gate-status"));
 const gateEvidencePaths = parsePairs(arg("gateEvidence", "gate-evidence"));
@@ -116,11 +121,14 @@ const identity = {
   backendImageDigest: backendIdentity.backendImageDigest,
   backendArtifactSha256: backendIdentity.backendArtifactSha256,
   dataPackManifestSha256: sha256FileIfExists(dataPackManifestPath),
-  dataPackArtifactSha256: sha256FileIfExists(arg("dataPackArtifact", "data-pack-artifact")),
+  dataPackArtifactSha256: sha256FileIfExists(dataPackArtifactPath),
   supportContactSetSha256: arg("supportContactSetSha256", "support-contact-set-sha256")
     ?? androidReleaseMetadata.supportContactSetSha256
     ?? null,
-  releaseSequence: arg("releaseSequence", "release-sequence") ?? dataPackManifest?.releaseSequence ?? dataPackManifest?.pack_version ?? null,
+  releaseSequence: normalizeReleaseSequence(
+    arg("releaseSequence", "release-sequence"),
+    dataPackManifest?.releaseSequence,
+  ),
   routeContractVersion: arg("routeContractVersion", "route-contract-version") ?? "route-map-contract-v1",
   realtimeContractVersion: arg("realtimeContractVersion", "realtime-contract-version") ?? readRealtimeContractVersion(repoRoot),
   launchScopeId: launchScope.routingLaunchScope.id,
@@ -177,7 +185,7 @@ const evidenceEntries = requiredEvidenceEntries(
 );
 const datapackGates = requiredDatapackGates(
   rcEvidenceContract.requiredDatapackGates, datapackGateStatuses, datapackGateEvidencePaths,
-  identity, generatedAt,
+  identity, generatedAt, dataPackArtifactBytes,
   launchScope.productionSourceSet?.requiredSourceIds,
 );
 const sourceInventory = buildSourceInventory(datapackGates, generatedAt, producerVersion);
@@ -595,7 +603,9 @@ function requiredEvidenceEntries(
   });
 }
 
-function requiredDatapackGates(contractGates, statuses, paths, identity, generatedAt, requiredSourceIds) {
+function requiredDatapackGates(
+  contractGates, statuses, paths, identity, generatedAt, dataPackArtifactBytes, requiredSourceIds,
+) {
   const contractIds = contractGates.map(({ id }) => id);
   const duplicateId = contractIds.find((id, index) => contractIds.indexOf(id) !== index);
   if (duplicateId) fail(`Duplicate datapack gate in contract: ${duplicateId}`);
@@ -675,18 +685,20 @@ function requiredDatapackGates(contractGates, statuses, paths, identity, generat
         requiredSourceIds,
       );
     }
-    const gateResult = normalizeDatapackGateResult(id, evidence, identity);
+    const gateResult = normalizeDatapackGateResult(id, evidence, identity, dataPackArtifactBytes);
     if (gateResult) normalized.gateResult = gateResult;
     return normalized;
   });
 }
 
-function normalizeDatapackGateResult(id, evidence, identity) {
+function normalizeDatapackGateResult(id, evidence, identity, dataPackArtifactBytes) {
   if (["source_admission", "source_governance", "freshness_conditional_publish"].includes(id)) {
     return normalizeSourceGateResult(id, evidence.result, evidence.snapshotSetIdentity);
   }
-  if (id === "rollback_rescue") return normalizeRollbackRescueResult(evidence.result);
-  if (id === "device_performance") return normalizeDevicePerformanceResult(evidence.result, identity);
+  if (id === "rollback_rescue") return normalizeRollbackRescueResult(evidence.result, identity);
+  if (id === "device_performance") {
+    return normalizeDevicePerformanceResult(evidence.result, identity, dataPackArtifactBytes);
+  }
   if (id === "callback_reconciliation") {
     return normalizeCallbackReconciliationResult(evidence.result, identity);
   }
@@ -710,7 +722,7 @@ function normalizeSourceGateResult(gateId, result, snapshotSetIdentity) {
   };
 }
 
-function normalizeRollbackRescueResult(result) {
+function normalizeRollbackRescueResult(result, identity) {
   const gateId = "rollback_rescue";
   requireResultSchema(result, gateId);
   const sequenceFields = [
@@ -726,6 +738,10 @@ function normalizeRollbackRescueResult(result) {
   }
   requireSha256(result.knownGoodPackSha256, `${gateId}.knownGoodPackSha256`);
   requireSha256(result.rescueManifestSha256, `${gateId}.rescueManifestSha256`);
+  if (result.rescueReleaseSequence !== identity.releaseSequence
+    || result.rescueManifestSha256 !== identity.dataPackManifestSha256) {
+    fail(`${gateId} result does not match the RC identity`);
+  }
   const checks = requirePassingChecks(gateId, result.checks, [
     "monotonicSequence", "signatureVerified", "sqliteIntegrityVerified", "immutableCatalogWritten",
     "channelManifestPublishedLast", "idempotentRetryVerified", "androidReplayRecoveryVerified",
@@ -739,7 +755,7 @@ function normalizeRollbackRescueResult(result) {
   };
 }
 
-function normalizeDevicePerformanceResult(result, identity) {
+function normalizeDevicePerformanceResult(result, identity, dataPackArtifactBytes) {
   const gateId = "device_performance";
   requireResultSchema(result, gateId);
   const profile = result.deviceProfile;
@@ -759,6 +775,9 @@ function normalizeDevicePerformanceResult(result, identity) {
   }
   requirePositiveSafeInteger(artifact?.compressedBytes, `${gateId}.artifact.compressedBytes`);
   requirePositiveSafeInteger(artifact?.uncompressedBytes, `${gateId}.artifact.uncompressedBytes`);
+  if (artifact.compressedBytes !== dataPackArtifactBytes) {
+    fail(`${gateId} compressedBytes does not match the supplied data pack artifact`);
+  }
   if (artifact.compressedBytes > 250 * 1024 * 1024) {
     fail(`${gateId} compressed artifact exceeds the 250 MiB cap`);
   }
@@ -906,6 +925,20 @@ function normalizeEvidenceReferences(gateId, references) {
 
 function requirePositiveSafeInteger(value, name) {
   if (!Number.isSafeInteger(value) || value <= 0) fail(`${name} must be a positive safe integer`);
+}
+
+function normalizeReleaseSequence(explicitValue, manifestValue) {
+  const value = explicitValue ?? manifestValue ?? null;
+  if (value === null) return null;
+  const parsed = typeof value === "string" && /^[1-9][0-9]*$/.test(value)
+    ? Number(value)
+    : value;
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    fail(explicitValue === undefined
+      ? "data pack manifest releaseSequence must be a positive safe integer"
+      : "--release-sequence must be a positive safe integer");
+  }
+  return parsed;
 }
 function requireNonNegativeSafeInteger(value, name) {
   if (!Number.isSafeInteger(value) || value < 0) fail(`${name} must be a non-negative safe integer`);

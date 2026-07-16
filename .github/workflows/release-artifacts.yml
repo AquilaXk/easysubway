@@ -25,6 +25,10 @@ on:
         options:
           - none
           - internal
+      datapack_run_id:
+        description: Data Pack Release run ID for the same Git SHA (required for production RC identity)
+        type: string
+        required: false
 
 concurrency:
   group: release-artifacts-${{ github.workflow }}-${{ github.ref }}
@@ -644,6 +648,7 @@ jobs:
       - android-production-rc-release
       - backend-release
     permissions:
+      actions: read
       contents: read
     if: ${{ always() && (needs.android-release.result == 'success' || needs.android-production-rc-release.result == 'success' || needs.backend-release.result == 'success') }}
 
@@ -674,18 +679,42 @@ jobs:
           name: easysubway-backend-release-${{ github.sha }}
           path: release-artifacts/downloaded/backend
 
+      - name: RC Evidence Manifest / Download production data pack artifact
+        if: ${{ inputs.datapack_run_id != '' }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: easysubway-datapacks-${{ github.sha }}
+          path: release-artifacts/downloaded/datapack
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.datapack_run_id }}
+
       - name: RC Evidence Manifest / Generate manifest
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p release-artifacts/rc
+          data_pack_manifest=apps/mobile/assets/datapacks/metro_map_pack/manifest.json
+          data_pack_artifact=apps/mobile/assets/datapacks/capital.sqlite.gz
+          if [[ "${{ inputs.android_rc_signing_mode }}" == production-upload-key && -z "${{ inputs.datapack_run_id }}" ]]; then
+            echo "datapack_run_id is required for production RC identity" >&2
+            exit 1
+          fi
+          if [[ -n "${{ inputs.datapack_run_id }}" ]]; then
+            data_pack_manifest=release-artifacts/downloaded/datapack/catalog/current.json
+            mapfile -t production_data_pack_artifacts < <(find release-artifacts/downloaded/datapack -type f -name '*.sqlite.gz' -print)
+            if [[ "${#production_data_pack_artifacts[@]}" -ne 1 ]]; then
+              echo "expected exactly one production data pack artifact, found ${#production_data_pack_artifacts[@]}" >&2
+              exit 1
+            fi
+            data_pack_artifact="${production_data_pack_artifacts[0]}"
+          fi
           generator_args=(
             --repo-root .
             --app-root apps/mobile
             --git-sha "${GITHUB_SHA}"
             --verify-github-sha true
-            --data-pack-manifest apps/mobile/assets/datapacks/metro_map_pack/manifest.json
-            --data-pack-artifact apps/mobile/assets/datapacks/capital.sqlite.gz
+            --data-pack-manifest "${data_pack_manifest}"
+            --data-pack-artifact "${data_pack_artifact}"
             --evidence-root ".codex/evidence/release/rc-evidence-manifest/${GITHUB_SHA}/"
             --device local_android_emulator
             --android-version android-15-or-16
