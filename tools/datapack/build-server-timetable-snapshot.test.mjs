@@ -49,6 +49,15 @@ async function inputs() {
   };
 }
 
+test("snapshot builder의 모든 sort는 type-safe comparator를 명시한다", async () => {
+  const source = await readFile(
+    path.join(root, "tools/datapack/build-server-timetable-snapshot.mjs"),
+    "utf8",
+  );
+
+  assert.doesNotMatch(source, /\.sort\(\)/);
+});
+
 test("#2135 ADMITTED source와 subway seed를 deterministic complete server snapshot으로 만든다", async () => {
   const value = await inputs();
   const first = buildServerTimetableSnapshot({ ...value, buildNow });

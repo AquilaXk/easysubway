@@ -576,15 +576,16 @@ function requiredSqlColumn(row, column) {
 
 function canonicalStationSet(source) {
   return [...new Set(source.stationRosters.flatMap(({ stations }) => stations)
-    .map(({ canonicalStationId, lineId }) => `${canonicalStationId}:${lineId}`))].sort();
+    .map(({ canonicalStationId, lineId }) => `${canonicalStationId}:${lineId}`))]
+    .sort((left, right) => left.localeCompare(right));
 }
 
 function earliestServiceDate(selectedServiceDates) {
-  return Object.values(selectedServiceDates).sort()[0];
+  return Object.values(selectedServiceDates).sort((left, right) => left.localeCompare(right))[0];
 }
 
 function latestServiceDate(selectedServiceDates) {
-  return Object.values(selectedServiceDates).sort().at(-1);
+  return Object.values(selectedServiceDates).sort((left, right) => left.localeCompare(right)).at(-1);
 }
 
 function parseJson(bytes, label) {
