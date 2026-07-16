@@ -19,6 +19,7 @@ class AppSettingsScreen extends StatefulWidget {
     required this.onViewPreferencesChanged,
     required this.onOpenMobilityProfile,
     required this.onOpenSupportAccess,
+    required this.onOpenServiceInfo,
     required this.onOpenMyReports,
     this.bottomNavigationBar,
     super.key,
@@ -32,6 +33,7 @@ class AppSettingsScreen extends StatefulWidget {
   onViewPreferencesChanged;
   final Future<MobilityPreset?> Function() onOpenMobilityProfile;
   final VoidCallback onOpenSupportAccess;
+  final VoidCallback onOpenServiceInfo;
   final VoidCallback onOpenMyReports;
   final Widget? bottomNavigationBar;
 
@@ -153,8 +155,14 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
               ),
               _AppSettingsSection(
                 key: const Key('settingsSection-help-privacy'),
-                title: '개인정보 및 도움말',
+                title: '서비스 정보 및 도움말',
                 children: [
+                  _AppSettingsActionTile(
+                    key: const Key('settingsServiceInfoButton'),
+                    icon: Icons.info_outline,
+                    title: '서비스 정보',
+                    onTap: widget.onOpenServiceInfo,
+                  ),
                   _AppSettingsActionTile(
                     key: const Key('settingsSupportPrivacyButton'),
                     icon: Icons.help_outline,
