@@ -31,6 +31,10 @@ test("production timetable evidence는 exact deploy에서 cache와 격리 rollba
   assert.match(script, /current_sha[^\n]+!=[^\n]+EXPECTED_DEPLOYED_SHA/);
   assert.match(script, /runtime_config_image[^\n]+backend_image/);
   assert.match(script, /runtime_image_id[^\n]+expected_image_id/);
+  assert.match(script, /shared\/current-image-digest/);
+  assert.match(script, /current_image_digest[^\n]+\^sha256:/);
+  assert.match(script, /ghcr\.io\/aquilaxk\/easysubway-backend@\$\{current_image_digest\}/);
+  assert.match(script, /RepoDigests/);
   assert.match(script, /timetable_snapshot_active/);
   assert.match(script, /history\.fresh_until::timestamptz/);
   assert.match(script, /fresh_until::timestamptz > CURRENT_TIMESTAMP/);

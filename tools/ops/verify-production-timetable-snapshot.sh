@@ -17,8 +17,14 @@ if [[ "${current_sha}" != "${EXPECTED_DEPLOYED_SHA}" ]]; then
 fi
 
 backend_image="easysubway-backend:${current_sha}"
+current_image_digest="$(<"${DEPLOY_ROOT}/shared/current-image-digest")"
+[[ "${current_image_digest}" =~ ^sha256:[0-9a-f]{64}$ ]] \
+	|| { echo 'deployed image digest marker is invalid' >&2; exit 1; }
 image_revision="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "${backend_image}")"
 [[ "${image_revision}" == "${current_sha}" ]] || { echo 'backend image revision mismatch' >&2; exit 1; }
+image_repo_digests="$(docker image inspect --format '{{join .RepoDigests "\n"}}' "${backend_image}")"
+grep -Fxq "ghcr.io/aquilaxk/easysubway-backend@${current_image_digest}" <<< "${image_repo_digests}" \
+	|| { echo 'backend image immutable digest mismatch' >&2; exit 1; }
 expected_image_id="$(docker image inspect --format '{{.Id}}' "${backend_image}")"
 runtime_config_image="$(docker inspect --format '{{.Config.Image}}' easysubway-backend)"
 runtime_image_id="$(docker inspect --format '{{.Image}}' easysubway-backend)"
