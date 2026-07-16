@@ -8,6 +8,7 @@ import { gunzipSync, gzipSync } from "node:zlib";
 
 const root = path.resolve(import.meta.dirname, "../..");
 const CATALOG_VERSION = 18;
+const EXPECTED_EDGE_COUNT = 48;
 const MAX_GZIP_DELTA_BYTES = 64 * 1024;
 
 function option(name, fallback) {
@@ -37,8 +38,22 @@ async function admittedSource(contractPath) {
     throw new Error("ITX topology source bytes do not match the coverage contract");
   }
   const source = JSON.parse(sourceBytes);
+  const completeness = JSON.parse(completenessBytes);
   if (source?.artifactId !== reference.artifactId || source?.serviceId !== "ITX_CHEONGCHUN"
-    || source?.validationStatus !== "SUPPORTED" || source?.freshUntil !== reference.freshUntil) {
+    || source?.validationStatus !== "SUPPORTED" || source?.freshUntil !== reference.freshUntil
+    || source?.completenessEvidenceSha256 !== reference.completenessEvidenceSha256
+    || completeness?.artifactKind !== "korail-itx-cheongchun-completeness-evidence"
+    || completeness?.serviceId !== "ITX_CHEONGCHUN"
+    || completeness?.validationMode !== "ADMISSION"
+    || completeness?.validationStatus !== "SUPPORTED"
+    || completeness?.materialization?.status !== "SUPPORTED"
+    || completeness?.sourceTimetableArtifact?.status !== "SUPPORTED"
+    || completeness?.sourceTimetableArtifact?.artifactId !== reference.artifactId
+    || completeness?.sourceTimetableArtifact?.policyVersion !== source.policyVersion
+    || completeness?.sourceTimetableArtifact?.freshUntil !== reference.freshUntil
+    || JSON.stringify(completeness?.selectedServiceDates) !== JSON.stringify(source.selectedServiceDates)
+    || !completeness?.allowedConsumerIssues?.includes("#1400")
+    || completeness?.credentialRedacted !== true) {
     throw new Error("ITX topology source identity is invalid");
   }
   return { contract, reference, source, sourceBytes };
@@ -48,12 +63,17 @@ function deriveTopology(source) {
   if (!Array.isArray(source?.stationSequences) || source.stationSequences.length === 0) {
     throw new Error("ITX topology stationSequences must be non-empty");
   }
-  const stations = new Map((source.stationRosters ?? [])
-    .flatMap(({ stations: rosterStations }) => rosterStations ?? [])
+  const rosterStations = (source.stationRosters ?? [])
+    .flatMap(({ stations }) => stations ?? []);
+  const stations = new Map(rosterStations
     .map(({ canonicalStationId, lineId }) => [
       `${canonicalStationId}:${lineId}`,
       { stationId: canonicalStationId, lineId },
     ]));
+  const corridorSequences = new Map(rosterStations.map((station) => [
+    `${station.canonicalStationId}:${station.lineId}`,
+    station.corridorSequence,
+  ]));
   if (stations.size === 0) throw new Error("ITX topology canonical station roster is empty");
   const servedStations = new Map();
   const edges = new Map();
@@ -80,6 +100,15 @@ function deriveTopology(source) {
       const toNodeId = `${to.stationId}:${to.lineId}:EXPRESS`;
       const fromKey = `${from.stationId}:${from.lineId}`;
       const toKey = `${to.stationId}:${to.lineId}`;
+      const fromSequence = corridorSequences.get(fromKey);
+      const toSequence = corridorSequences.get(toKey);
+      const increasing = sequence.directionId === "up" && fromSequence < toSequence;
+      const decreasing = sequence.directionId === "down" && fromSequence > toSequence;
+      if (!Number.isInteger(fromSequence) || !Number.isInteger(toSequence)
+        || from.corridorSequence !== fromSequence || to.corridorSequence !== toSequence
+        || (!increasing && !decreasing)) {
+        throw new Error(`ITX topology direction is invalid: ${sequence.trainNumber ?? "unknown"}`);
+      }
       if (!adjacency.has(fromKey)) adjacency.set(fromKey, new Set());
       if (!adjacency.has(toKey)) adjacency.set(toKey, new Set());
       adjacency.get(fromKey).add(toKey);
@@ -122,6 +151,14 @@ function deriveTopology(source) {
   if (visited.size !== expectedServedStationKeys.size) {
     throw new Error("ITX topology service stop graph must be connected");
   }
+  const edgeKeys = new Set(edges.keys());
+  if (edgeKeys.size !== EXPECTED_EDGE_COUNT
+    || [...edgeKeys].some((key) => {
+      const [from, to] = key.split("->");
+      return !edgeKeys.has(`${to}->${from}`);
+    })) {
+    throw new Error(`ITX topology requires ${EXPECTED_EDGE_COUNT} paired directed edges`);
+  }
   const topology = {
     stations: [...stations.values()].sort((left, right) => left.stationId.localeCompare(right.stationId)
       || left.lineId.localeCompare(right.lineId)),
@@ -138,6 +175,10 @@ function hasColumn(database, table, column) {
 }
 
 function ensureVersion18(database) {
+  const currentVersion = database.prepare("PRAGMA user_version").get().user_version;
+  if (currentVersion > CATALOG_VERSION) {
+    throw new Error(`ITX topology does not support catalog user_version ${currentVersion} newer than ${CATALOG_VERSION}`);
+  }
   if (!hasColumn(database, "transit_trips", "service_class")) {
     database.exec("ALTER TABLE transit_trips ADD COLUMN service_class TEXT NOT NULL DEFAULT 'SUBWAY'");
   }
@@ -256,14 +297,28 @@ async function main() {
     const index = JSON.parse(await readFile(indexPath, "utf8"));
     const pack = index.packs?.find(({ id }) => id === "capital");
     if (evidence?.sourceIssue !== 2135
+      || evidence?.serviceId !== "ITX_CHEONGCHUN"
       || evidence?.sourceArtifact?.id !== reference.artifactId
       || evidence?.sourceArtifact?.sha256 !== sha256(sourceBytes)
+      || evidence?.sourceArtifact?.completenessEvidenceSha256 !== reference.completenessEvidenceSha256
+      || evidence?.sourceArtifact?.freshUntil !== reference.freshUntil
+      || evidence?.topology?.stationMembershipCount !== topology.stations.length
+      || evidence?.topology?.servedStationCount !== topology.servedStations.length
       || evidence?.pack?.inputSha256 !== source.canonicalPackIdentity?.sha256
       || evidence?.pack?.inputSqliteSha256
         !== contract.officialEvidence?.korailCompletenessAdmission?.canonicalPackIdentity?.sqliteSha256
       || evidence?.topology?.sha256 !== topology.sha256
       || evidence?.topology?.edgeCount !== topology.edges.length
+      || JSON.stringify(evidence?.topology?.directions) !== JSON.stringify(["up", "down"])
+      || evidence?.topology?.connectedComponentCount !== 1
+      || evidence?.topology?.isolatedServedStationCount !== 0
+      || evidence?.topology?.durationSecondsEmbedded !== false
+      || evidence?.topology?.fareEmbedded !== false
+      || evidence?.pack?.id !== "capital"
       || evidence?.pack?.outputSha256 !== sha256(inputGzipBytes)
+      || evidence?.pack?.byteSize !== inputGzipBytes.length
+      || !Number.isInteger(evidence?.pack?.inputByteSize)
+      || evidence?.pack?.byteSizeDelta !== inputGzipBytes.length - evidence.pack.inputByteSize
       || pack?.sha256 !== sha256(inputGzipBytes)
       || pack?.sqliteSha256 !== evidence?.pack?.outputSqliteSha256
       || pack?.byteSize !== inputGzipBytes.length) {
@@ -333,6 +388,7 @@ async function main() {
         id: "capital",
         inputSha256: sha256(inputGzipBytes),
         inputSqliteSha256: sha256(inputSqliteBytes),
+        inputByteSize: inputGzipBytes.length,
         outputSha256: sha256(outputGzipBytes),
         outputSqliteSha256: sha256(outputSqliteBytes),
         byteSize: outputGzipBytes.length,

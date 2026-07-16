@@ -7,7 +7,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
 import { promisify } from "node:util";
-import { gunzipSync } from "node:zlib";
+import { gunzipSync, gzipSync } from "node:zlib";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
@@ -85,11 +85,14 @@ test("#2135 ADMITTED source를 Mobile topology-only edge와 evidence로 material
   const database = new DatabaseSync(sqlitePath);
   try {
     const edges = database.prepare(`
-      SELECT duration_seconds, service_pattern, service_class
+      SELECT id, from_node_id, to_node_id, duration_seconds, service_pattern, service_class
       FROM network_edges
       WHERE service_class = 'ITX_CHEONGCHUN'
     `).all();
-    assert.ok(edges.length > 0);
+    assert.equal(edges.length, 48);
+    assert.equal(new Set(edges.map(({ id }) => id)).size, 48);
+    assert.equal(new Set(edges.map(({ from_node_id, to_node_id }) =>
+      `${from_node_id}->${to_node_id}`)).size, 48);
     assert.ok(edges.every((edge) => edge.duration_seconds === 0));
     assert.ok(edges.every((edge) => edge.service_pattern === "EXPRESS"));
     assert.equal(database.prepare(`
@@ -103,7 +106,11 @@ test("#2135 ADMITTED source를 Mobile topology-only edge와 evidence로 material
   const evidence = JSON.parse(await readFile(evidencePath, "utf8"));
   assert.equal(evidence.sourceIssue, 2135);
   assert.equal(evidence.serviceId, "ITX_CHEONGCHUN");
-  assert.ok(evidence.topology.edgeCount > 0);
+  assert.equal(evidence.topology.stationMembershipCount, 18);
+  assert.equal(evidence.topology.servedStationCount, 14);
+  assert.equal(evidence.topology.edgeCount, 48);
+  assert.equal(evidence.topology.durationSecondsEmbedded, false);
+  assert.equal(evidence.topology.fareEmbedded, false);
   assert.match(evidence.topology.sha256, /^[a-f0-9]{64}$/);
 
   const beforeCheck = await Promise.all([
@@ -131,6 +138,216 @@ test("#2135 ADMITTED source를 Mobile topology-only edge와 evidence로 material
   assert.deepEqual(await Promise.all([
     readFile(packPath), readFile(indexPath), readFile(evidencePath),
   ]), beforeCheck);
+});
+
+test("tracked production ITX topology evidence와 bundled pack은 --check를 통과한다", async () => {
+  await execFileAsync(process.execPath, [
+    "tools/datapack/apply-itx-topology-to-bundled-pack.mjs",
+    "--check",
+  ], { cwd: root });
+});
+
+test("v16 bundled pack 변환은 ITX topology 외 timetable·calendar·fare row를 바꾸지 않는다", async (context) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "itx-topology-v16-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const packPath = path.join(directory, "capital.sqlite.gz");
+  const sqlitePath = path.join(directory, "capital.sqlite");
+  const indexPath = path.join(directory, "index.json");
+  const evidencePath = path.join(directory, "evidence.json");
+  const contractPath = path.join(directory, "contract.json");
+  const sourcePath = path.join(directory, "source.json");
+  await writeFile(sqlitePath, gunzipSync(await readFile(
+    path.join(root, "apps/mobile/assets/datapacks/capital.sqlite.gz"))));
+  const inputDatabase = new DatabaseSync(sqlitePath);
+  const preservedTables = [
+    "official_od_fare_quotes",
+    "service_calendar_dates",
+    "service_calendars",
+    "transit_feed_info",
+    "transit_frequencies",
+    "transit_routes",
+    "transit_stop_times",
+    "transit_trips",
+  ];
+  inputDatabase.exec(`
+    DELETE FROM network_edges WHERE service_class = 'ITX_CHEONGCHUN';
+    DROP TABLE route_service_artifact_evidence;
+    ALTER TABLE network_edges DROP COLUMN service_class;
+    ALTER TABLE transit_trips DROP COLUMN service_class;
+    PRAGMA user_version = 16;
+  `);
+  const beforeRows = Object.fromEntries(preservedTables.map((table) => [
+    table,
+    JSON.parse(JSON.stringify(inputDatabase.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all())),
+  ]));
+  inputDatabase.close();
+  const inputSqliteBytes = await readFile(sqlitePath);
+  const inputPackBytes = gzipSync(inputSqliteBytes, { level: 9, mtime: 0 });
+  await writeFile(packPath, inputPackBytes);
+
+  const index = JSON.parse(await readFile(
+    path.join(root, "apps/mobile/assets/datapacks/index.json"), "utf8"));
+  Object.assign(index.packs.find(({ id }) => id === "capital"), {
+    sha256: sha256(inputPackBytes),
+    sqliteSha256: sha256(inputSqliteBytes),
+    byteSize: inputPackBytes.length,
+  });
+  await writeFile(indexPath, `${JSON.stringify(index, null, 2)}\n`);
+  const contract = JSON.parse(await readFile(
+    path.join(root, "tools/datapack/itx-cheongchun-coverage-contract.json"), "utf8"));
+  const source = JSON.parse(await readFile(path.join(root, contract.sourceTimetableArtifact.artifactPath), "utf8"));
+  Object.assign(source.canonicalPackIdentity, {
+    sha256: sha256(inputPackBytes),
+    sqliteSha256: sha256(inputSqliteBytes),
+  });
+  Object.assign(contract.officialEvidence.korailCompletenessAdmission.canonicalPackIdentity, {
+    sha256: sha256(inputPackBytes),
+    sqliteSha256: sha256(inputSqliteBytes),
+  });
+  const sourceBytes = Buffer.from(`${JSON.stringify(source, null, 2)}\n`);
+  await writeFile(sourcePath, sourceBytes);
+  Object.assign(contract.sourceTimetableArtifact, {
+    artifactPath: sourcePath,
+    sha256: sha256(sourceBytes),
+  });
+  await writeFile(contractPath, `${JSON.stringify(contract, null, 2)}\n`);
+
+  await execFileAsync(process.execPath, [
+    "tools/datapack/apply-itx-topology-to-bundled-pack.mjs",
+    "--pack", packPath,
+    "--index", indexPath,
+    "--contract", contractPath,
+    "--evidence", evidencePath,
+  ], { cwd: root });
+
+  await writeFile(sqlitePath, gunzipSync(await readFile(packPath)));
+  const outputDatabase = new DatabaseSync(sqlitePath, { readOnly: true });
+  try {
+    assert.equal(outputDatabase.prepare("PRAGMA user_version").get().user_version, 18);
+    assert.equal(outputDatabase.prepare(`
+      SELECT COUNT(*) AS count FROM network_edges WHERE service_class = 'ITX_CHEONGCHUN'
+    `).get().count, 48);
+    for (const table of preservedTables) {
+      const afterRows = outputDatabase.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()
+        .map((row) => {
+          if (table !== "transit_trips") return row;
+          const { service_class: _serviceClass, ...unchanged } = row;
+          return unchanged;
+        });
+      assert.deepEqual(
+        JSON.parse(JSON.stringify(afterRows)),
+        beforeRows[table],
+        `${table} rows must stay unchanged`,
+      );
+    }
+  } finally {
+    outputDatabase.close();
+  }
+});
+
+test("ITX topology materializer는 newer catalog version을 변경 없이 거부한다", async (context) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "itx-topology-v19-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const packPath = path.join(directory, "capital.sqlite.gz");
+  const sqlitePath = path.join(directory, "capital.sqlite");
+  const indexPath = path.join(directory, "index.json");
+  const evidencePath = path.join(directory, "evidence.json");
+  const contractPath = path.join(directory, "contract.json");
+  const sourcePath = path.join(directory, "source.json");
+  await writeFile(sqlitePath, gunzipSync(await readFile(
+    path.join(root, "apps/mobile/assets/datapacks/capital.sqlite.gz"))));
+  const database = new DatabaseSync(sqlitePath);
+  database.exec("PRAGMA user_version = 19");
+  database.close();
+  const sqliteBytes = await readFile(sqlitePath);
+  const packBytes = gzipSync(sqliteBytes, { level: 9, mtime: 0 });
+  await writeFile(packPath, packBytes);
+  const index = JSON.parse(await readFile(
+    path.join(root, "apps/mobile/assets/datapacks/index.json"), "utf8"));
+  Object.assign(index.packs.find(({ id }) => id === "capital"), {
+    sha256: sha256(packBytes),
+    sqliteSha256: sha256(sqliteBytes),
+    byteSize: packBytes.length,
+  });
+  await writeFile(indexPath, `${JSON.stringify(index, null, 2)}\n`);
+  const contract = JSON.parse(await readFile(
+    path.join(root, "tools/datapack/itx-cheongchun-coverage-contract.json"), "utf8"));
+  const source = JSON.parse(await readFile(path.join(root, contract.sourceTimetableArtifact.artifactPath), "utf8"));
+  Object.assign(source.canonicalPackIdentity, {
+    sha256: sha256(packBytes),
+    sqliteSha256: sha256(sqliteBytes),
+  });
+  Object.assign(contract.officialEvidence.korailCompletenessAdmission.canonicalPackIdentity, {
+    sha256: sha256(packBytes),
+    sqliteSha256: sha256(sqliteBytes),
+  });
+  const sourceBytes = Buffer.from(`${JSON.stringify(source, null, 2)}\n`);
+  await writeFile(sourcePath, sourceBytes);
+  Object.assign(contract.sourceTimetableArtifact, {
+    artifactPath: sourcePath,
+    sha256: sha256(sourceBytes),
+  });
+  await writeFile(contractPath, `${JSON.stringify(contract, null, 2)}\n`);
+
+  await assert.rejects(execFileAsync(process.execPath, [
+    "tools/datapack/apply-itx-topology-to-bundled-pack.mjs",
+    "--pack", packPath,
+    "--index", indexPath,
+    "--contract", contractPath,
+    "--evidence", evidencePath,
+  ], { cwd: root }), /does not support catalog user_version 19 newer than 18/);
+  assert.equal(sha256(await readFile(packPath)), sha256(packBytes));
+});
+
+test("--check는 topology evidence의 파생 count 변조를 거부한다", async (context) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "itx-topology-stale-evidence-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const packPath = path.join(directory, "capital.sqlite.gz");
+  const indexPath = path.join(directory, "index.json");
+  const evidencePath = path.join(directory, "evidence.json");
+  await copyFile(path.join(root, "apps/mobile/assets/datapacks/capital.sqlite.gz"), packPath);
+  await copyFile(path.join(root, "apps/mobile/assets/datapacks/index.json"), indexPath);
+  const evidence = JSON.parse(await readFile(
+    path.join(root, "tools/datapack/itx-cheongchun-topology-evidence.json"), "utf8"));
+  evidence.topology.stationMembershipCount += 1;
+  evidence.pack.byteSizeDelta += 1;
+  await writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
+
+  await assert.rejects(execFileAsync(process.execPath, [
+    "tools/datapack/apply-itx-topology-to-bundled-pack.mjs",
+    "--pack", packPath,
+    "--index", indexPath,
+    "--evidence", evidencePath,
+    "--check",
+  ], { cwd: root }), /evidence or bundled pack index is stale/);
+});
+
+test("ITX topology는 canonical station/line endpoint가 bundled route map에 있어야 한다", async (context) => {
+  await rejectedMutatedSource(context, (source) => {
+    const station = source.stationRosters[0].stations[0];
+    const originalId = station.canonicalStationId;
+    station.canonicalStationId = "station-missing-itx-endpoint";
+    for (const stop of source.stationSequences.flatMap(({ stops }) => stops)) {
+      if (stop.stationId === originalId) stop.stationId = station.canonicalStationId;
+    }
+    for (const stopTime of source.transitStopTimes) {
+      if (stopTime.stationId === originalId) stopTime.stationId = station.canonicalStationId;
+    }
+  }, /canonical station membership is missing/);
+});
+
+test("ITX topology는 source와 completeness evidence의 exact 결합을 요구한다", async (context) => {
+  await rejectedMutatedSource(context, (source) => {
+    source.completenessEvidenceSha256 = "0".repeat(64);
+  }, /source identity is invalid/);
+});
+
+test("ITX topology는 down sequence가 up과 같은 방향이면 거부한다", async (context) => {
+  await rejectedMutatedSource(context, (source) => {
+    for (const sequence of source.stationSequences.filter(({ directionId }) => directionId === "down")) {
+      sequence.stops.reverse();
+    }
+  }, /direction is invalid/);
 });
 
 test("ITX topology는 U/D 양방향 station sequence가 모두 있어야 한다", async (context) => {
