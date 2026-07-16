@@ -52,11 +52,33 @@ const double _rInner = 155;
 /// notch 오른쪽 점([_closeNotchRight])에서 시작한다고 가정하고 왼쪽 점
 /// ([_closeNotchLeft])까지 잇는다. 두 번째 세그먼트의 t=0.5 접점이
 /// [kFanMenuTailTip]=(350,375)이다. 닫기 Path와 실루엣이 동일 꼬리를 쓰도록
-/// 단일 헬퍼로 둔다(좌표 중복 하드코딩 방지).
+/// 단일 헬퍼로 둔다(좌표 중복 하드코딩 방지). 제어점은 [kFanMenuTailTip]
+/// 기준 오프셋으로 유도해 팁 상수를 옮기면 꼬리 전체가 함께 따라가게 한다.
 Path _appendCloseTail(Path path) => path
-  ..cubicTo(374, 352, 360, 362, 354, 372)
-  ..cubicTo(352, 376, 348, 376, 346, 372)
-  ..cubicTo(340, 362, 326, 352, _closeNotchLeft.dx, _closeNotchLeft.dy);
+  ..cubicTo(
+    kFanMenuTailTip.dx + 24,
+    kFanMenuTailTip.dy - 23,
+    kFanMenuTailTip.dx + 10,
+    kFanMenuTailTip.dy - 13,
+    kFanMenuTailTip.dx + 4,
+    kFanMenuTailTip.dy - 3,
+  )
+  ..cubicTo(
+    kFanMenuTailTip.dx + 2,
+    kFanMenuTailTip.dy + 1,
+    kFanMenuTailTip.dx - 2,
+    kFanMenuTailTip.dy + 1,
+    kFanMenuTailTip.dx - 4,
+    kFanMenuTailTip.dy - 3,
+  )
+  ..cubicTo(
+    kFanMenuTailTip.dx - 10,
+    kFanMenuTailTip.dy - 13,
+    kFanMenuTailTip.dx - 24,
+    kFanMenuTailTip.dy - 23,
+    _closeNotchLeft.dx,
+    _closeNotchLeft.dy,
+  );
 
 Path _sector({
   required Offset outerStart,
