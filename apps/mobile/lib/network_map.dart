@@ -14,11 +14,13 @@ import 'design_tokens.dart';
 import 'facility_report.dart';
 import 'features/ads/ad_repository.dart';
 import 'features/network_map/domain/map_camera.dart';
+import 'features/network_map/domain/route_map_design_space.dart';
 import 'features/network_map/domain/route_map_major_stations.dart';
 import 'features/network_map/domain/structured_route_map.dart';
+import 'features/network_map/presentation/route_map_transfer_marker.dart';
 import 'features/network_map/presentation/station_fan_menu.dart';
 import 'features/network_map/presentation/station_fan_menu_geometry.dart'
-    show kFanMenuDesignSize;
+    show kFanMenuDesignSize, kFanMenuTailTip;
 import 'features/network_map/presentation/structured_route_map_painter.dart';
 import 'features/realtime/realtime_repository.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
@@ -3769,6 +3771,10 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   Map<String, Color>? _structuredLineColorsCache;
   Map<String, String>? _structuredLabelTextCache;
   Map<String, String>? _structuredLineBadgeLabelCache;
+  // 팬 메뉴 환승 앵커(#2192): 렌더 캡슐 중심 유도에 쓰는 파생값. structured 캐시와
+  // 같은 키로 무효화한다. designScale은 렌더러 모드 판정과 동일 값이어야 한다.
+  double? _structuredDesignScaleCache;
+  Map<String, RouteMapTransferGroup>? _structuredTransferGroupCache;
   NetworkMapStation? _selectedStation;
   // region → attribution 표시 문자열(#1951). manifest 로드 전에는 null로 두고
   // attribution을 표시하지 않는다(로드 실패 시에도 동일하게 조용히 미표기).
@@ -4026,10 +4032,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                 Builder(
                   builder: (context) {
                     final stationPoint = camera.sourceToViewportPoint(
-                      Offset(
-                        geometry.x(selectedStation),
-                        geometry.y(selectedStation),
-                      ),
+                      _fanMenuAnchorSource(selectedStation, geometry),
                     );
                     // #2109: 배치 규칙은 fanMenuPlacement 단일 함수가 소유한다
                     // (카메라 최소 패닝 _panCameraToRevealFanMenu와 동일 규칙 소비).
@@ -4322,7 +4325,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     }
     final geometry = _geometryFor(widget.data);
     final stationPoint = camera.sourceToViewportPoint(
-      Offset(geometry.x(station), geometry.y(station)),
+      _fanMenuAnchorSource(station, geometry),
     );
     const margin = kFanMenuViewportMargin;
     // #2109: 배치 bbox는 build와 동일하게 fanMenuPlacement가 계산한다
@@ -4330,11 +4333,12 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     // 패닝은 같은 viewport의 클램프 없는 이상적 배치로 최대한 노출을 시도하고,
     // 패닝이 .clamped() 한계로 다 못 드러내는 잔여는 build 경로의 viewport 클램프
     // 폴백이 처리한다.
-    final menuRect = fanMenuPlacement(
+    final placement = fanMenuPlacement(
       stationPoint: stationPoint,
       viewport: camera.viewportSize,
       clampPosition: false,
-    ).revealBounds;
+    );
+    final menuRect = placement.revealBounds;
     final viewport = Offset.zero & camera.viewportSize;
     var dx = 0.0;
     var dy = 0.0;
@@ -4353,10 +4357,16 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     }
     // 뷰포트 픽셀 이동 → source 좌표 center 이동(반대 방향).
     final nextCenter = camera.center - Offset(dx, dy) / camera.scale;
+    // #2192: v3는 flip을 제거하고 항상 노드 위에 배치하므로, 지도 최상단(경계)
+    // 역에서도 꼬리 팁이 노드에 닿은 채 메뉴 전체가 드러나려면 카메라가 source
+    // 경계를 메뉴 높이만큼 넘겨 패닝할 수 있어야 한다. clamped 헤드룸을 메뉴
+    // 높이+여백으로 열어 상단 여유를 준다(dx·dy는 필요한 방향으로만 이동하므로
+    // 다른 역 배치에는 영향 없음). 잔여는 build 경로의 viewport 클램프가 처리한다.
+    final headroom = placement.menuHeight + margin;
     _setCamera(
       camera
           .copyWith(center: nextCenter, revision: camera.revision + 1)
-          .clamped(),
+          .clamped(viewportMargin: headroom),
     );
   }
 
@@ -4388,7 +4398,14 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
       return;
     }
     _structuredCacheKey = key;
-    _structuredRouteMapCache = data.toStructuredRouteMap();
+    final structured = data.toStructuredRouteMap();
+    _structuredRouteMapCache = structured;
+    _structuredDesignScaleCache = routeMapDesignSpaceFor(
+      structured,
+    ).designScale;
+    _structuredTransferGroupCache = {
+      for (final group in structured.transferGroups) group.stationId: group,
+    };
     _structuredLineColorsCache = routeMapLineColors({
       for (final line in data.lines) line.id: line.color,
     });
@@ -4399,6 +4416,34 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     _structuredLineBadgeLabelCache = {
       for (final line in data.lines) line.id: routeMapLineBadgeLabel(line.name),
     };
+  }
+
+  /// 팬 메뉴 앵커의 source 좌표(#2192). 환승역은 렌더 캡슐의 시각 중심으로,
+  /// 일반역은 노드 좌표 그대로 유도한 뒤 [_MapGeometry] 원점을 빼
+  /// [MapCameraState.sourceToViewportPoint] 입력 좌표계로 맞춘다.
+  /// build(렌더)와 [_panCameraToRevealFanMenu](카메라)가 같은 앵커를 소비하도록
+  /// 단일 헬퍼로 둔다.
+  Offset _fanMenuAnchorSource(
+    NetworkMapStation station,
+    _MapGeometry geometry,
+  ) {
+    _ensureStructuredRouteMap();
+    final tapped = Offset(
+      station.position.x.toDouble(),
+      station.position.y.toDouble(),
+    );
+    final group = _structuredTransferGroupCache?[station.id];
+    final center = group == null
+        ? tapped
+        : fanMenuTransferAnchor(
+            memberPositions: group.memberPositions,
+            tappedPosition: tapped,
+            designScale: _structuredDesignScaleCache ?? 1.0,
+          );
+    return Offset(
+      center.dx - geometry.origin.dx,
+      center.dy - geometry.origin.dy,
+    );
   }
 }
 
@@ -5996,16 +6041,12 @@ const double kFanMenuViewportMargin = 12.0;
 
 class FanMenuPlacement {
   const FanMenuPlacement({
-    required this.placeBelow,
     required this.left,
     required this.top,
     required this.menuWidth,
     required this.menuHeight,
     required this.revealBounds,
   });
-
-  /// 위쪽 공간이 부족해 메뉴를 노드 아래로 뒤집었는지.
-  final bool placeBelow;
 
   /// 팬 메뉴 Positioned의 left/top.
   final double left;
@@ -6017,10 +6058,11 @@ class FanMenuPlacement {
   final Rect revealBounds;
 }
 
-/// 역 노드의 뷰포트 좌표([stationPoint])로 팬 메뉴 배치를 계산한다.
-/// 기본은 노드 위쪽에 메뉴 하단(닫기 노치)이 오도록 배치하되, 지도 상단 경계에
-/// 붙은 역은 위쪽 공간이 부족하므로 노드 아래로 뒤집어 항상 화면 안에 들어오게
-/// 한다(#2109).
+/// 역 노드의 뷰포트 좌표([stationPoint])로 팬 메뉴 배치를 계산한다(#2192 v3).
+/// 항상 노드 위쪽에 배치하되, 말풍선 꼬리 팁([kFanMenuTailTip])이 앵커 노드
+/// 정중앙에 닿도록 정렬한다(노드 위 8px 갭·flip 제거). 지도 최상단 역에서도
+/// 성립하도록 카메라 최소 패닝([_NetworkMapCanvasState._panCameraToRevealFanMenu])이
+/// 메뉴 높이만큼 상단 헤드룸을 열어 노출한다.
 ///
 /// 렌더와 카메라 패닝이 같은 viewport 기반 메뉴 크기를 사용한다. 렌더 경로는
 /// [clampPosition]을 켜 극단 경계에서도 메뉴를 화면 안에 두고, 카메라 경로는
@@ -6040,11 +6082,14 @@ FanMenuPlacement fanMenuPlacement({
   final menuWidth = fanMenuWidthForViewport(viewport.width);
   final menuHeight =
       menuWidth * (kFanMenuDesignSize.height / kFanMenuDesignSize.width);
-  var left = stationPoint.dx - menuWidth / 2;
-  final placeBelow = stationPoint.dy - menuHeight - 8 < 8;
-  var top = placeBelow
-      ? stationPoint.dy + 28
-      : stationPoint.dy - menuHeight - 8;
+  // 꼬리 팁(design 좌표 kFanMenuTailTip)이 앵커 노드 정중앙에 오도록 배치.
+  // 팁 x=350/700=중앙, 팁 y=375/380이므로 top은 노드에서 팁 높이만큼 위로 민다.
+  var left =
+      stationPoint.dx -
+      menuWidth * (kFanMenuTailTip.dx / kFanMenuDesignSize.width);
+  var top =
+      stationPoint.dy -
+      menuHeight * (kFanMenuTailTip.dy / kFanMenuDesignSize.height);
   if (clampPosition) {
     const margin = kFanMenuViewportMargin;
     final maxLeft = viewport.width - margin - menuWidth;
@@ -6057,13 +6102,48 @@ FanMenuPlacement fanMenuPlacement({
     }
   }
   return FanMenuPlacement(
-    placeBelow: placeBelow,
     left: left,
     top: top,
     menuWidth: menuWidth,
     menuHeight: menuHeight,
     revealBounds: Rect.fromLTWH(left, top, menuWidth, menuHeight),
   );
+}
+
+/// 환승 캡슐의 시각 중심(source 좌표)을 렌더러와 동일 규칙으로 유도한다(#2192).
+/// 팬 메뉴 앵커가 실제로 그려지는 캡슐 중심과 어긋나지 않도록
+/// [routeMapTransferMarkers]를 그대로 재사용한다(모드 판정 독립 재유도 금지):
+/// 스택·강등 스택은 평균, 스팬은 bounds 중심, separate는 탭한 멤버의 캡슐 중심.
+///
+/// [memberPositions]는 환승 그룹의 노선별 노드 좌표(source), [tappedPosition]은
+/// 탭한 멤버의 좌표(source). 멤버가 2개 미만이면 일반역으로 보고 그대로 반환한다.
+/// [designScale]은 렌더러가 모드 임계를 판정할 때 쓰는 값(source→design 배율)과
+/// 동일해야 한다.
+@visibleForTesting
+Offset fanMenuTransferAnchor({
+  required List<Offset> memberPositions,
+  required Offset tappedPosition,
+  required double designScale,
+}) {
+  if (memberPositions.length < 2) {
+    return tappedPosition;
+  }
+  final markers = routeMapTransferMarkers(
+    memberCenters: memberPositions,
+    // 캡슐 기하(중심)는 색과 무관하나 함수 계약상 길이가 멤버 수와 같아야 한다.
+    colors: List<Color>.filled(memberPositions.length, const Color(0xFF000000)),
+    designSpread: offsetsMaxPairwiseDistance(memberPositions) * designScale,
+    dotRadius: kRouteMapTransferDotRadiusPx,
+    dotGap: kRouteMapTransferDotGapPx,
+    padding: kRouteMapTransferDotPaddingPx,
+  );
+  // 스택·강등 스택·스팬 모드는 단일 캡슐 → 그 중심. horizontalDots는 캡슐 중심에
+  // 영향을 주지 않으므로 corridor 방향 계산 없이도 렌더 중심과 일치한다.
+  if (markers.length == 1) {
+    return markers.first.capsule.center;
+  }
+  // separate 모드: 멤버별 캡슐 → 탭한 멤버의 캡슐 중심(=탭 좌표).
+  return tappedPosition;
 }
 
 /// 팬 메뉴 배선용: 탭한 역이 이미 배정된 슬롯 집합(진한 채움 selected).
