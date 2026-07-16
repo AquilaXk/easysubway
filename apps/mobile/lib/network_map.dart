@@ -14,6 +14,7 @@ import 'design_tokens.dart';
 import 'facility_report.dart';
 import 'features/ads/ad_repository.dart';
 import 'features/network_map/domain/map_camera.dart';
+import 'features/network_map/domain/route_map_design_space.dart';
 import 'features/network_map/domain/route_map_major_stations.dart';
 import 'features/network_map/domain/route_map_owner_labels.dart';
 import 'features/network_map/domain/structured_route_map.dart';
@@ -3967,13 +3968,35 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   }
 
   _MapGeometry _geometryFor(NetworkMapData data) {
+    // basemap 오너 라벨 sidecar(로드는 async)를 geometry bounds에 반영한다(#2068).
+    // 로드 전엔 null → 라벨 rect 없이 계산되지만, 로드가 끝나면 setState로 rebuild
+    // 되며 ownerKey가 바뀌어 캐시가 무효화되고 라벨 extents를 포함해 재계산된다
+    // (stale bounds 방지 — sidecar 로드 전/후 캐시 키 구분).
+    final basemapAssetId = kRouteMapBasemapRegionToId[data.selectedRegion];
+    final ownerEntries = basemapAssetId == null
+        ? null
+        : _ownerLabelsByRegion?[basemapAssetId];
+    final ownerKey = ownerEntries == null
+        ? 'none'
+        : 'owner:${ownerEntries.length}';
     final cacheKey =
-        'generated:${data.selectedRegion}:${identityHashCode(data.stations)}:${data.stations.length}';
+        'generated:${data.selectedRegion}:${identityHashCode(data.stations)}:${data.stations.length}:$ownerKey';
     final cached = _geometryCache;
     if (_geometryCacheKey == cacheKey && cached != null) {
       return cached;
     }
-    final geometry = _MapGeometry.fromStations(data.stations);
+    final ownerLabelSourceRects = ownerEntries == null || ownerEntries.isEmpty
+        ? const <Rect>[]
+        : networkMapOwnerLabelSourceRects(
+            ownerLabels: ownerEntries.values,
+            designScale: routeMapDesignSpaceFor(
+              _currentStructuredMap(),
+            ).designScale,
+          );
+    final geometry = _MapGeometry.fromStations(
+      data.stations,
+      ownerLabelSourceRects: ownerLabelSourceRects,
+    );
     _geometryCacheKey = cacheKey;
     _geometryCache = geometry;
     return geometry;
@@ -4742,7 +4765,15 @@ class _MapGeometry {
   final double overlayStyleScale;
   final _StationSpatialIndex stationIndex;
 
-  factory _MapGeometry.fromStations(List<NetworkMapStation> stations) {
+  factory _MapGeometry.fromStations(
+    List<NetworkMapStation> stations, {
+    // basemap 오너 라벨(sidecar)의 실제 렌더 extents(source 단위). 오너 라벨은
+    // route_map_positions의 합성 label_polygon보다 훨씬 넓게 그려지므로(예: 광주
+    // '학동·증심사입구'가 anchor에서 오른쪽으로 수백 source px 확장), 이 rect들을
+    // bounds에 union하지 않으면 초기 fit·팬 한계가 라벨을 잘라낸다(#2068 실기기
+    // 반려). 미매치/무sidecar 지역은 빈 리스트라 기존 동작(label_polygon) 그대로.
+    List<Rect> ownerLabelSourceRects = const [],
+  }) {
     var minX = double.infinity;
     var minY = double.infinity;
     var maxX = 0.0;
@@ -4783,6 +4814,12 @@ class _MapGeometry {
         maxX = math.max(maxX, labelPolygonBounds.right);
         maxY = math.max(maxY, labelPolygonBounds.bottom);
       }
+    }
+    for (final rect in ownerLabelSourceRects) {
+      minX = math.min(minX, rect.left);
+      minY = math.min(minY, rect.top);
+      maxX = math.max(maxX, rect.right);
+      maxY = math.max(maxY, rect.bottom);
     }
     if (!minX.isFinite || !minY.isFinite) {
       return _MapGeometry(
@@ -5184,6 +5221,76 @@ String _stationGeometryKey(NetworkMapStation station) {
 Rect? _labelPolygonBoundsFor(NetworkMapStation station) {
   final polygon = _parseLabelPolygon(station.position.labelPolygon);
   return polygon == null ? null : _boundsForPolygon(polygon);
+}
+
+/// basemap 오너 라벨 1건의 실제 렌더 rect를 source 좌표로 산출한다(#2068).
+/// painter(route_map_label_layout.dart의 오너 라벨 경로)와 같은 규칙을 source
+/// 단위로 옮긴 것:
+/// - 렌더 font-size = min(kRouteMapDesignLabelFontPx design px,
+///   entry.fontSizePx × designScale) 을 painter가 그리므로, source 단위로
+///   되돌리면 min(kRouteMapDesignLabelFontPx / designScale, entry.fontSizePx).
+/// - baseline 근사 top = anchorY − 0.8 × fontSize (painter [_ownerLabelRect]와 동일).
+/// - text-anchor(start/middle/end) 의미대로 anchorX에서 폭을 배치.
+///
+/// 폭은 painter가 TextPainter 실측을 쓰지만, geometry 산정 시점에 전 라벨을
+/// TextPainter로 재는 것은 과하므로 "글자수 × fontSize_source"로 보수적 근사한다
+/// (한글 자폭 ≈ 1em이라 근사 방향은 과대 → bounds가 살짝 넓어질 뿐 라벨을 자르는
+/// 방향이 아니어서 안전). 매칭 텍스트(축약본)가 아니라 원본 nameKo(entry.station)
+/// 글자수를 써 항상 실렌더 텍스트 이상 폭을 잡는 것도 같은 안전 방향이다.
+Rect _ownerLabelSourceRect(RouteMapOwnerLabelEntry entry, double designScale) {
+  final fontSizeSource = math.min(
+    kRouteMapDesignLabelFontPx / designScale,
+    entry.fontSizePx,
+  );
+  final width = entry.station.runes.length * fontSizeSource;
+  // painter의 TextPainter 높이는 대략 fontSize × 1.3(줄 높이)이라 그만큼 잡는다
+  // (수직 여유 — 과대 방향이라 안전).
+  final height = fontSizeSource * 1.3;
+  final top = entry.position.dy - 0.8 * fontSizeSource;
+  final double left;
+  switch (entry.anchor) {
+    case RouteMapOwnerLabelAnchor.middle:
+      left = entry.position.dx - width / 2;
+    case RouteMapOwnerLabelAnchor.end:
+      left = entry.position.dx - width;
+    case RouteMapOwnerLabelAnchor.start:
+      left = entry.position.dx;
+  }
+  return Rect.fromLTWH(left, top, width, height);
+}
+
+/// basemap 지역 오너 라벨들의 실제 렌더 rect(source 좌표) 목록. geometry bounds가
+/// 라벨 extents까지 담도록 [_MapGeometry.fromStations]에 넘긴다(#2068). 매칭
+/// 여부와 무관하게 전 엔트리를 포함한다 — 매치 라벨은 정확히 이 앵커에 그려지고,
+/// 미매치 라벨은 솔버가 그 역 근처(이미 station±18 bounds 안)에 배치하므로,
+/// 전 엔트리 union은 실렌더 extents의 안전한 상위집합이다.
+@visibleForTesting
+List<Rect> networkMapOwnerLabelSourceRects({
+  required Iterable<RouteMapOwnerLabelEntry> ownerLabels,
+  required double designScale,
+}) {
+  return [
+    for (final entry in ownerLabels) _ownerLabelSourceRect(entry, designScale),
+  ];
+}
+
+/// 테스트용: 주어진 역·오너 라벨 rect로 산출한 지도 geometry의 전체 source
+/// bounds(팬 한계·초기 fit의 근거). #2068 오너 라벨 extents 포함 회귀 가드.
+@visibleForTesting
+Rect networkMapGeometrySourceBoundsFor(
+  List<NetworkMapStation> stations, {
+  List<Rect> ownerLabelSourceRects = const [],
+}) {
+  final geometry = _MapGeometry.fromStations(
+    stations,
+    ownerLabelSourceRects: ownerLabelSourceRects,
+  );
+  return Rect.fromLTWH(
+    geometry.origin.dx,
+    geometry.origin.dy,
+    geometry.width,
+    geometry.height,
+  );
 }
 
 List<Offset>? _labelPolygonFor(
