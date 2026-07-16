@@ -10504,7 +10504,10 @@ void main() {
       find.byKey(const Key('stationExitWalkingRouteButton-exit-sangnoksu-1')),
       findsOneWidget,
     );
-    expect(find.text('도보 길안내를 누르면 현재 위치와 출구 좌표가 카카오에 전달됩니다.'), findsOneWidget);
+    expect(
+      find.text('카카오맵 앱에서는 현재 위치와 출구 좌표를, 웹에서는 출구 좌표만 카카오에 전달합니다.'),
+      findsOneWidget,
+    );
 
     await tester.tap(
       find.byKey(const Key('stationExitWalkingRouteButton-exit-sangnoksu-1')),
@@ -10575,6 +10578,10 @@ void main() {
 
     expect(find.textContaining('현재 위치에서 역까지 직선'), findsOneWidget);
     expect(find.text('출구 좌표가 없어 역 위치 기준으로 안내합니다.'), findsOneWidget);
+    expect(
+      find.text('카카오맵 앱에서는 현재 위치와 역 좌표를, 웹에서는 역 좌표만 카카오에 전달합니다.'),
+      findsOneWidget,
+    );
 
     await tester.tap(
       find.byKey(const Key('stationExitWalkingRouteButton-exit-sangnoksu-2')),

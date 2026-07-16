@@ -14925,7 +14925,10 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   );
   assert.match(stationExitCard, /openWalkingRoute/);
   assert.match(stationExitCard, /_coordinateDistanceMeters/);
-  assert.match(stationExitCard, /현재 위치와 출구 좌표만 사용합니다/);
+  assert.match(
+    stationExitCard,
+    /카카오맵 앱에서는 현재 위치와 출구 좌표를, 웹에서는 출구 좌표만 카카오에 전달합니다/,
+  );
   assert.match(widgetTest, /출구 좌표가 없어 역 위치 기준으로 안내합니다/);
   assert.doesNotMatch(stationSearch, /EasySubwayMapAdapter\(\)\.markersForStationDetail/);
   assert.doesNotMatch(stationSearch, /Text\(\s*'지도 위치 목록'/);
