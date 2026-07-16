@@ -76,14 +76,15 @@ public interface RouteV2SearchUseCase {
 		List<RouteV2Status> statuses,
 		String plannerAdr,
 		OffsetDateTime nextServiceTime,
-		RouteV2PlanSource source
+		RouteV2PlanSource source,
+		String timetableArtifactId
 	) {
 		public RouteV2Plan(
 			List<RouteSearchResult> itineraries,
 			List<RouteV2Status> statuses,
 			String plannerAdr
 		) {
-			this(itineraries, statuses, plannerAdr, null, RouteV2PlanSource.LEGACY_GRAPH);
+			this(itineraries, statuses, plannerAdr, null, RouteV2PlanSource.LEGACY_GRAPH, null);
 		}
 
 		public RouteV2Plan(
@@ -92,7 +93,17 @@ public interface RouteV2SearchUseCase {
 			String plannerAdr,
 			OffsetDateTime nextServiceTime
 		) {
-			this(itineraries, statuses, plannerAdr, nextServiceTime, RouteV2PlanSource.LEGACY_GRAPH);
+			this(itineraries, statuses, plannerAdr, nextServiceTime, RouteV2PlanSource.LEGACY_GRAPH, null);
+		}
+
+		public RouteV2Plan(
+			List<RouteSearchResult> itineraries,
+			List<RouteV2Status> statuses,
+			String plannerAdr,
+			OffsetDateTime nextServiceTime,
+			RouteV2PlanSource source
+		) {
+			this(itineraries, statuses, plannerAdr, nextServiceTime, source, null);
 		}
 
 		public RouteV2Plan {

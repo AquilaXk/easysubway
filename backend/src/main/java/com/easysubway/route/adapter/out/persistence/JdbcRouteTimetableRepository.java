@@ -58,13 +58,17 @@ public class JdbcRouteTimetableRepository implements LoadRouteTimetablePort {
 
 	@Override
 	public String timetableCacheKey() {
-		return activeItxFreshUntil()
-			.map(value -> "ITX_CHEONGCHUN:" + value.toInstant())
+		return activeItxArtifact()
+			.map(artifact -> "ITX_CHEONGCHUN:" + artifact.id() + ":" + artifact.freshUntil())
 			.orElse("SUBWAY_ONLY");
 	}
 
 	@Override
 	public Optional<String> activeItxTimetableArtifactId() {
+		return activeItxArtifact().map(ItxArtifact::id);
+	}
+
+	private Optional<ItxArtifact> activeItxArtifact() {
 		return jdbcTemplate.query(
 			"""
 				SELECT timetable_artifact_id, fresh_until
@@ -81,10 +85,7 @@ public class JdbcRouteTimetableRepository implements LoadRouteTimetablePort {
 				resultSet.getString("timetable_artifact_id"),
 				resultSet.getString("fresh_until")
 			)
-		).stream()
-			.filter(artifact -> freshOffsetDateTime(artifact.freshUntil()).isPresent())
-			.map(ItxArtifact::id)
-			.findFirst();
+		).stream().filter(artifact -> freshOffsetDateTime(artifact.freshUntil()).isPresent()).findFirst();
 	}
 
 	@Override
@@ -202,20 +203,7 @@ public class JdbcRouteTimetableRepository implements LoadRouteTimetablePort {
 	}
 
 	private Optional<OffsetDateTime> activeItxFreshUntil() {
-		return jdbcTemplate.query(
-			"""
-				SELECT fresh_until
-				FROM route_service_artifact_evidence
-				WHERE service_class = 'ITX_CHEONGCHUN'
-					AND admission_status = 'ADMITTED'
-					AND admission_eligible = TRUE
-					AND EXISTS (
-						SELECT 1 FROM transit_trips
-						WHERE service_class = 'ITX_CHEONGCHUN'
-					)
-				""",
-			(resultSet, rowNumber) -> resultSet.getString("fresh_until")
-		).stream().findFirst().flatMap(JdbcRouteTimetableRepository::freshOffsetDateTime);
+		return activeItxArtifact().flatMap(artifact -> freshOffsetDateTime(artifact.freshUntil()));
 	}
 
 	private static Optional<OffsetDateTime> freshOffsetDateTime(String value) {

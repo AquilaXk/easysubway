@@ -64,6 +64,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -1158,6 +1159,38 @@ class RouteSearchServiceTest {
 		assertThat(plan.itineraries().getFirst().etaSource()).isEqualTo(EtaSource.PLANNED);
 		assertThat(repository.loadRouteSearch(plan.itineraries().getFirst().routeSearchId())).isEmpty();
 		assertThat(repository.summarizeRouteSearches().totalCount()).isZero();
+	}
+
+	@Test
+	@DisplayName("V2 planner는 실제 사용한 timetable snapshot의 artifact identity를 plan에 결합한다")
+	void routeV2PlannerBindsArtifactIdentityToUsedTimetableSnapshot() {
+		var delegate = routeTimetablePort();
+		var port = new LoadRouteTimetablePort() {
+			@Override
+			public RouteTimetable loadRouteTimetable() {
+				return delegate.loadRouteTimetable();
+			}
+
+			@Override
+			public String timetableCacheKey() {
+				return "ITX_CHEONGCHUN:artifact-used:2999-01-01T00:00:00Z";
+			}
+
+			@Override
+			public Optional<String> activeItxTimetableArtifactId() {
+				return Optional.of("artifact-used");
+			}
+		};
+		var repository = new InMemoryRouteSearchRepository();
+		var planner = new RouteV2Planner(
+			new RouteSearchService(repository, repository, new RampAccessibleTransitMasterPort(), CLOCK),
+			port
+		);
+
+		var plan = planner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3));
+
+		assertThat(plan.source()).isEqualTo(RouteV2PlanSource.TIMETABLE_RAPTOR);
+		assertThat(plan.timetableArtifactId()).isEqualTo("artifact-used");
 	}
 
 	@Test

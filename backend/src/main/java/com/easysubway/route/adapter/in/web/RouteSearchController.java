@@ -84,12 +84,10 @@ class RouteSearchController {
 		OffsetDateTime departureTime = request.parsedDepartureTime();
 		if (productionSupport != null) {
 			routeSearchUseCase.validateRouteSearch(request.toValidationCommand());
+			productionSupport.requireTimetableArtifact();
 		}
-		String timetableArtifactId = productionSupport == null ? null : productionSupport.requireTimetableArtifact();
 		RouteV2Plan plan = routeV2SearchUseCase.search(request.toV2Command(departureTime));
-		if (productionSupport != null) {
-			productionSupport.requireUsablePlan(plan);
-		}
+		String timetableArtifactId = productionSupport == null ? null : productionSupport.requireUsablePlan(plan);
 		RouteSearchV2Response response = RouteSearchV2Response.from(plan, request, departureTime);
 		saveProductionState(request, departureTime, response, timetableArtifactId);
 		return ResponseEntity.ok()

@@ -12416,7 +12416,9 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(planner, /ObjectProvider<LoadRouteTimetablePort>/);
   assert.match(planner, /getIfAvailable\(\)/);
   assert.match(planner, /timetableRequired && routeTimetablePort != null/);
-  assert.match(planner, /timetableRequired && canUseTimetableRaptor\(command\) && timetableCovers\(command\)/);
+  assert.match(planner, /timetableRequired[\s\S]*canUseTimetableRaptor\(command\)[\s\S]*routeTimetablePort\.hasRouteTimetable\(\)/);
+  assert.match(planner, /timetableCovers\(command, snapshot\)/);
+  assert.match(planner, /snapshot\.timetableArtifactId\(\)/);
   assert.match(planner, /coveredStationIds\(\)/);
   assert.match(planner, /hasRouteTimetable\(\)/);
   assert.doesNotMatch(planner, /!command\.useRealtime\(\)/);
@@ -12430,7 +12432,7 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(planner, /loadRouteTimetable\(\)/);
   assert.match(planner, /RouteTimetableRaptorPlanner/);
   assert.match(planner, /noTimetableServicePlan/);
-  assert.match(planner, /nextServiceTime\(command, routeTimetable\(\)\)/);
+  assert.match(planner, /nextServiceTime\(command, snapshot\.timetable\(\)\)/);
   assert.match(planner, /searchRouteAlternatives/);
   assert.match(planner, /statusesOf/);
   assert.match(raptorPlanner, /class RouteTimetableRaptorPlanner/);

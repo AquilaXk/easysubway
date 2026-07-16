@@ -73,6 +73,24 @@ class ProductionRouteV2SupportTest {
 	}
 
 	@Test
+	@DisplayName("계획 전후 timetable artifact identity가 바뀌면 fail closed한다")
+	void rejectsPlanWhenTimetableArtifactChangesDuringSearch() {
+		when(timetable.activeItxTimetableArtifactId()).thenReturn(Optional.of("artifact-after"));
+
+		var plan = new RouteV2Plan(
+			List.of(),
+			List.of(RouteV2Status.FOUND),
+			"planner",
+			null,
+			RouteV2PlanSource.TIMETABLE_RAPTOR,
+			"artifact-before"
+		);
+
+		assertThatThrownBy(() -> support.requireUsablePlan(plan))
+			.isInstanceOf(ItxTimetableUnavailableException.class);
+	}
+
+	@Test
 	@DisplayName("computed itinerary만 exact TTL과 artifact identity로 저장한다")
 	void storesAllowlistedEphemeralState() {
 		support.saveState(

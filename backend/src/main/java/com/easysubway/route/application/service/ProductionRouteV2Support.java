@@ -49,11 +49,15 @@ public class ProductionRouteV2Support {
 			.orElseThrow(ItxTimetableUnavailableException::new);
 	}
 
-	public void requireUsablePlan(RouteV2Plan plan) {
+	public String requireUsablePlan(RouteV2Plan plan) {
 		if (plan.source() != RouteV2PlanSource.TIMETABLE_RAPTOR
-			|| plan.statuses().contains(RouteV2Status.STALE_TIMETABLE)) {
+			|| plan.statuses().contains(RouteV2Status.STALE_TIMETABLE)
+			|| plan.timetableArtifactId() == null
+			|| plan.timetableArtifactId().isBlank()
+			|| timetablePort.activeItxTimetableArtifactId().filter(plan.timetableArtifactId()::equals).isEmpty()) {
 			throw new ItxTimetableUnavailableException();
 		}
+		return plan.timetableArtifactId();
 	}
 
 	public void saveState(
