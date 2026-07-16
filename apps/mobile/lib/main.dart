@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -9,9 +8,11 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'accessible_design.dart';
+import 'app/accessibility_theme.dart';
 import 'app/app_components.dart';
 import 'app/app_bootstrap.dart';
 import 'app/app_dependencies.dart';
+import 'app/demo_dependencies.dart';
 import 'core/datapack/data_pack_metered_consent_gate.dart';
 import 'core/datapack/bundled_data_pack_freshness.dart';
 import 'core/datapack/data_pack_update_state.dart';
@@ -69,16 +70,16 @@ Future<void> main() async {
   final bootstrap = await AppBootstrap.initialize(
     enablePushNotifications: defaultPushNotificationsEnabled,
     favoriteRepository: defaultDemoHomeDataEnabled
-        ? const _DemoFavoriteStationRepository()
+        ? const DemoFavoriteStationRepository()
         : null,
     favoriteFacilityRepository: defaultDemoHomeDataEnabled
-        ? const _DemoFavoriteFacilityRepository()
+        ? const DemoFavoriteFacilityRepository()
         : null,
     favoriteRouteRepository: defaultDemoHomeDataEnabled
-        ? const _DemoFavoriteRouteRepository()
+        ? const DemoFavoriteRouteRepository()
         : null,
     searchHistoryRepository: defaultDemoHomeDataEnabled
-        ? _DemoSearchHistoryRepository()
+        ? DemoSearchHistoryRepository()
         : null,
   );
   await restoreGetOffAlarmState(bootstrap.dependencies.getOffAlarmController);
@@ -194,146 +195,6 @@ void validateReleaseBuildFlags({
   }
 }
 
-class _DemoFavoriteStationRepository implements FavoriteStationRepository {
-  const _DemoFavoriteStationRepository();
-
-  static const _station = FavoriteStation(
-    userId: 'demo-user',
-    stationId: 'station-sangnoksu',
-    nameKo: '상록수',
-    nameEn: 'Sangnoksu',
-    region: '수도권',
-    dataQualityLevel: 'LEVEL_1',
-    dataSourceType: 'OFFICIAL_FILE',
-    lastVerifiedAt: '2026-06-13',
-    lines: [
-      StationSearchLine(
-        id: 'seoul-4',
-        name: '수도권 4호선',
-        color: '#00A5DE',
-        stationCode: '448',
-      ),
-    ],
-    addedAt: '2026-06-13T10:00:00',
-  );
-
-  @override
-  Future<List<FavoriteStation>> listFavoriteStations() async {
-    return const [_station];
-  }
-
-  @override
-  Future<FavoriteStation> saveFavoriteStation(String stationId) async {
-    return _station;
-  }
-
-  @override
-  Future<void> removeFavoriteStation(String stationId) async {}
-}
-
-class _DemoFavoriteFacilityRepository implements FavoriteFacilityRepository {
-  const _DemoFavoriteFacilityRepository();
-
-  static const _facility = FavoriteFacility(
-    userId: 'demo-user',
-    facilityId: 'facility-sangnoksu-elevator-3',
-    stationId: 'station-sangnoksu',
-    stationNameKo: '상록수',
-    stationNameEn: 'Sangnoksu',
-    exitId: 'exit-sangnoksu-3',
-    type: 'ELEVATOR',
-    name: '3번 출구 엘리베이터',
-    floorFrom: '1F',
-    floorTo: 'B1',
-    description: '3번 출구 앞',
-    status: 'NEEDS_CHECK',
-    dataConfidence: 'HIGH',
-    dataSourceType: 'OFFICIAL_FILE',
-    lastUpdatedAt: '2026-06-12',
-    addedAt: '2026-06-14T10:00:00',
-  );
-
-  @override
-  Future<List<FavoriteFacility>> listFavoriteFacilities() async {
-    return const [_facility];
-  }
-
-  @override
-  Future<FavoriteFacility> saveFavoriteFacility(String facilityId) async {
-    return _facility;
-  }
-
-  @override
-  Future<void> removeFavoriteFacility(String facilityId) async {}
-}
-
-class _DemoFavoriteRouteRepository implements FavoriteRouteRepository {
-  const _DemoFavoriteRouteRepository();
-
-  static const _route = FavoriteRoute(
-    userId: 'demo-user',
-    favoriteRouteId: 'route-1',
-    routeSearchId: 'route-1',
-    originStationId: 'station-sangnoksu',
-    originStationName: '상록수',
-    destinationStationId: 'station-sadang',
-    destinationStationName: '사당',
-    mobilityType: 'SENIOR',
-    status: 'FOUND',
-    lineId: 'seoul-4',
-    lineName: '수도권 4호선',
-    score: 92,
-    routeCreatedAt: '2026-06-13T09:00:00',
-    addedAt: '2026-06-14T10:00:00',
-  );
-
-  @override
-  Future<List<FavoriteRoute>> listFavoriteRoutes() async {
-    return const [_route];
-  }
-
-  @override
-  Future<FavoriteRoute> saveFavoriteRoute(
-    String routeSearchId, {
-    RouteSearchResult? result,
-  }) async {
-    return _route;
-  }
-
-  @override
-  Future<void> removeFavoriteRoute(String favoriteRouteId) async {}
-}
-
-class _DemoSearchHistoryRepository implements SearchHistoryRepository {
-  final _queries = <String>['상록수', '사당'];
-
-  @override
-  Future<void> recordSearch(String query) async {
-    final trimmed = query.trim();
-    if (trimmed.isEmpty) {
-      return;
-    }
-    _queries
-      ..remove(trimmed)
-      ..insert(0, trimmed);
-  }
-
-  @override
-  Future<List<String>> listRecentQueries() async {
-    return List.unmodifiable(_queries);
-  }
-
-  @override
-  Future<void> removeSearch(String query) async {
-    _queries.remove(query.trim());
-  }
-
-  @override
-  Future<void> clearSearches() async {
-    _queries.clear();
-  }
-}
-
 class EasySubwayApp extends StatelessWidget {
   EasySubwayApp({
     required AppDependencies dependencies,
@@ -372,7 +233,7 @@ class EasySubwayApp extends StatelessWidget {
          recentRoutesFuture:
              recentRoutesFuture ??
              (defaultDemoHomeDataEnabled
-                 ? const _DemoFavoriteRouteRepository().listFavoriteRoutes()
+                 ? const DemoFavoriteRouteRepository().listFavoriteRoutes()
                  : null),
          navigatorKey: navigatorKey,
          key: key,
@@ -864,7 +725,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome>
         onboardingResult?.preferences ??
         const OnboardingViewPreferences.defaults();
 
-    return _OnboardingPreferenceScope(
+    return OnboardingPreferenceScope(
       preferences: preferences,
       child: HomeScreen(
         repository: widget.repository,
@@ -1292,148 +1153,6 @@ FacilityReportLocationLoader _facilityReportLocationLoader(
       longitude: location.longitude,
     );
   };
-}
-
-class _OnboardingPreferenceScope extends StatelessWidget {
-  const _OnboardingPreferenceScope({
-    required this.preferences,
-    required this.child,
-  });
-
-  final OnboardingViewPreferences preferences;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final mediaQuery = MediaQuery.of(context);
-
-    return MediaQuery(
-      data: mediaQuery.copyWith(
-        highContrast:
-            preferences.highContrastEnabled || mediaQuery.highContrast,
-      ),
-      child: Theme(
-        data: _themeForPlatformAccessibility(
-          _themeForPreferences(Theme.of(context), preferences),
-          mediaQuery,
-        ),
-        child: child,
-      ),
-    );
-  }
-}
-
-ThemeData _themeForPreferences(
-  ThemeData baseTheme,
-  OnboardingViewPreferences preferences,
-) {
-  if (!preferences.highContrastEnabled) {
-    return baseTheme;
-  }
-
-  final colorScheme = baseTheme.colorScheme.copyWith(
-    primary: EasySubwayAccessibleColors.highContrastPrimary,
-    onPrimary: Colors.white,
-    secondary: EasySubwayAccessibleColors.highContrastSecondary,
-    onSecondary: Colors.white,
-    surface: Colors.white,
-    onSurface: EasySubwayAccessibleColors.highContrastText,
-    outline: EasySubwayAccessibleColors.highContrastText,
-  );
-
-  return baseTheme.copyWith(
-    colorScheme: colorScheme,
-    scaffoldBackgroundColor: Colors.white,
-    appBarTheme: baseTheme.appBarTheme.copyWith(
-      backgroundColor: Colors.white,
-      foregroundColor: EasySubwayAccessibleColors.highContrastText,
-      titleTextStyle: baseTheme.appBarTheme.titleTextStyle?.copyWith(
-        color: EasySubwayAccessibleColors.highContrastText,
-      ),
-    ),
-    // 보조 버튼이 중립 보더로 바뀌었으므로 고대비에서 보더·텍스트 대비를 보정.
-    outlinedButtonTheme: OutlinedButtonThemeData(
-      style: baseTheme.outlinedButtonTheme.style?.copyWith(
-        foregroundColor: const WidgetStatePropertyAll(
-          EasySubwayAccessibleColors.highContrastPrimary,
-        ),
-        side: const WidgetStatePropertyAll(
-          BorderSide(
-            color: EasySubwayAccessibleColors.highContrastText,
-            width: 1.5,
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-ThemeData _themeForPlatformAccessibility(
-  ThemeData baseTheme,
-  MediaQueryData mediaQuery,
-) {
-  if (!mediaQuery.boldText) {
-    return baseTheme;
-  }
-
-  return baseTheme.copyWith(
-    textTheme: _boldTextTheme(baseTheme.textTheme),
-    primaryTextTheme: _boldTextTheme(baseTheme.primaryTextTheme),
-    appBarTheme: baseTheme.appBarTheme.copyWith(
-      titleTextStyle: _boldTextStyle(baseTheme.appBarTheme.titleTextStyle),
-      toolbarTextStyle: _boldTextStyle(baseTheme.appBarTheme.toolbarTextStyle),
-    ),
-    filledButtonTheme: FilledButtonThemeData(
-      style: _boldButtonTextStyle(baseTheme.filledButtonTheme.style),
-    ),
-    outlinedButtonTheme: OutlinedButtonThemeData(
-      style: _boldButtonTextStyle(baseTheme.outlinedButtonTheme.style),
-    ),
-    textButtonTheme: TextButtonThemeData(
-      style: _boldButtonTextStyle(baseTheme.textButtonTheme.style),
-    ),
-  );
-}
-
-TextTheme _boldTextTheme(TextTheme textTheme) {
-  return textTheme.copyWith(
-    displayLarge: _boldTextStyle(textTheme.displayLarge),
-    displayMedium: _boldTextStyle(textTheme.displayMedium),
-    displaySmall: _boldTextStyle(textTheme.displaySmall),
-    headlineLarge: _boldTextStyle(textTheme.headlineLarge),
-    headlineMedium: _boldTextStyle(textTheme.headlineMedium),
-    headlineSmall: _boldTextStyle(textTheme.headlineSmall),
-    titleLarge: _boldTextStyle(textTheme.titleLarge),
-    titleMedium: _boldTextStyle(textTheme.titleMedium),
-    titleSmall: _boldTextStyle(textTheme.titleSmall),
-    bodyLarge: _boldTextStyle(textTheme.bodyLarge),
-    bodyMedium: _boldTextStyle(textTheme.bodyMedium),
-    bodySmall: _boldTextStyle(textTheme.bodySmall),
-    labelLarge: _boldTextStyle(textTheme.labelLarge),
-    labelMedium: _boldTextStyle(textTheme.labelMedium),
-    labelSmall: _boldTextStyle(textTheme.labelSmall),
-  );
-}
-
-ButtonStyle _boldButtonTextStyle(ButtonStyle? baseStyle) {
-  return (baseStyle ?? const ButtonStyle()).copyWith(
-    textStyle: WidgetStateProperty.resolveWith((states) {
-      return _boldTextStyle(baseStyle?.textStyle?.resolve(states));
-    }),
-  );
-}
-
-TextStyle _boldTextStyle(TextStyle? style) {
-  final currentWeight = style?.fontWeight ?? FontWeight.w400;
-  final currentIndex = FontWeight.values.indexOf(currentWeight);
-  final minimumBoldIndex = FontWeight.values.indexOf(FontWeight.w700);
-  final nextIndex = math.min(
-    FontWeight.values.length - 1,
-    math.max(currentIndex + 2, minimumBoldIndex),
-  );
-  return (style ?? const TextStyle()).copyWith(
-    fontWeight: FontWeight.values[nextIndex],
-  );
 }
 
 class HomeScreen extends StatefulWidget {
@@ -2361,7 +2080,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return _OnboardingPreferenceScope(
+    return OnboardingPreferenceScope(
       preferences: _viewPreferences,
       child: Scaffold(
         key: const Key('settingsScreen'),
