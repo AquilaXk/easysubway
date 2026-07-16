@@ -176,8 +176,8 @@ function hasColumn(database, table, column) {
 
 function ensureVersion18(database) {
   const currentVersion = database.prepare("PRAGMA user_version").get().user_version;
-  if (currentVersion > CATALOG_VERSION) {
-    throw new Error(`ITX topology does not support catalog user_version ${currentVersion} newer than ${CATALOG_VERSION}`);
+  if (currentVersion < 16 || currentVersion > CATALOG_VERSION) {
+    throw new Error(`ITX topology does not support catalog user_version ${currentVersion}`);
   }
   if (!hasColumn(database, "transit_trips", "service_class")) {
     database.exec("ALTER TABLE transit_trips ADD COLUMN service_class TEXT NOT NULL DEFAULT 'SUBWAY'");
@@ -296,7 +296,9 @@ async function main() {
     const evidence = JSON.parse(await readFile(evidencePath, "utf8"));
     const index = JSON.parse(await readFile(indexPath, "utf8"));
     const pack = index.packs?.find(({ id }) => id === "capital");
-    if (evidence?.sourceIssue !== 2135
+    if (evidence?.schemaVersion !== 1
+      || evidence?.artifactKind !== "itx-cheongchun-mobile-topology-evidence"
+      || evidence?.sourceIssue !== 2135
       || evidence?.serviceId !== "ITX_CHEONGCHUN"
       || evidence?.sourceArtifact?.id !== reference.artifactId
       || evidence?.sourceArtifact?.sha256 !== sha256(sourceBytes)
@@ -318,7 +320,9 @@ async function main() {
       || evidence?.pack?.outputSha256 !== sha256(inputGzipBytes)
       || evidence?.pack?.byteSize !== inputGzipBytes.length
       || !Number.isInteger(evidence?.pack?.inputByteSize)
+      || evidence.pack.inputByteSize <= 0
       || evidence?.pack?.byteSizeDelta !== inputGzipBytes.length - evidence.pack.inputByteSize
+      || evidence.pack.byteSizeDelta > MAX_GZIP_DELTA_BYTES
       || pack?.sha256 !== sha256(inputGzipBytes)
       || pack?.sqliteSha256 !== evidence?.pack?.outputSqliteSha256
       || pack?.byteSize !== inputGzipBytes.length) {

@@ -49,12 +49,36 @@ async function rejectedMutatedSource(context, mutate, expected) {
   ], { cwd: root }), expected);
 }
 
+async function rejectedTamperedEvidence(context, mutate) {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "itx-topology-stale-evidence-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const packPath = path.join(directory, "capital.sqlite.gz");
+  const indexPath = path.join(directory, "index.json");
+  const evidencePath = path.join(directory, "evidence.json");
+  await copyFile(path.join(root, "apps/mobile/assets/datapacks/capital.sqlite.gz"), packPath);
+  await copyFile(path.join(root, "apps/mobile/assets/datapacks/index.json"), indexPath);
+  const evidence = JSON.parse(await readFile(
+    path.join(root, "tools/datapack/itx-cheongchun-topology-evidence.json"), "utf8"));
+  mutate(evidence);
+  await writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
+  await assert.rejects(execFileAsync(process.execPath, [
+    "tools/datapack/apply-itx-topology-to-bundled-pack.mjs",
+    "--pack", packPath,
+    "--index", indexPath,
+    "--evidence", evidencePath,
+    "--check",
+  ], { cwd: root }), /evidence or bundled pack index is stale/);
+}
+
 test("#2135 ADMITTED source를 Mobile topology-only edge와 evidence로 materialize한다", async (context) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "itx-topology-pack-"));
   context.after(() => rm(directory, { recursive: true, force: true }));
   const packPath = path.join(directory, "capital.sqlite.gz");
   const indexPath = path.join(directory, "index.json");
   const evidencePath = path.join(directory, "evidence.json");
+  const secondPackPath = path.join(directory, "capital-second.sqlite.gz");
+  const secondIndexPath = path.join(directory, "index-second.json");
+  const secondEvidencePath = path.join(directory, "evidence-second.json");
   const contractPath = path.join(directory, "contract.json");
   const sourcePath = path.join(directory, "source.json");
   await copyFile(path.join(root, "apps/mobile/assets/datapacks/capital.sqlite.gz"), packPath);
@@ -71,6 +95,8 @@ test("#2135 ADMITTED source를 Mobile topology-only edge와 evidence로 material
   contract.sourceTimetableArtifact.artifactPath = sourcePath;
   contract.sourceTimetableArtifact.sha256 = sha256(sourceBytes);
   await writeFile(contractPath, `${JSON.stringify(contract, null, 2)}\n`);
+  await copyFile(packPath, secondPackPath);
+  await copyFile(indexPath, secondIndexPath);
 
   await execFileAsync(process.execPath, [
     "tools/datapack/apply-itx-topology-to-bundled-pack.mjs",
@@ -79,6 +105,17 @@ test("#2135 ADMITTED source를 Mobile topology-only edge와 evidence로 material
     "--contract", contractPath,
     "--evidence", evidencePath,
   ], { cwd: root });
+  await execFileAsync(process.execPath, [
+    "tools/datapack/apply-itx-topology-to-bundled-pack.mjs",
+    "--pack", secondPackPath,
+    "--index", secondIndexPath,
+    "--contract", contractPath,
+    "--evidence", secondEvidencePath,
+  ], { cwd: root });
+  assert.deepEqual(
+    await Promise.all([readFile(secondPackPath), readFile(secondIndexPath), readFile(secondEvidencePath)]),
+    await Promise.all([readFile(packPath), readFile(indexPath), readFile(evidencePath)]),
+  );
 
   const sqlitePath = path.join(directory, "capital.sqlite");
   await writeFile(sqlitePath, gunzipSync(await readFile(packPath)));
@@ -245,81 +282,81 @@ test("v16 bundled pack 변환은 ITX topology 외 timetable·calendar·fare row�
   }
 });
 
-test("ITX topology materializer는 newer catalog version을 변경 없이 거부한다", async (context) => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "itx-topology-v19-"));
-  context.after(() => rm(directory, { recursive: true, force: true }));
-  const packPath = path.join(directory, "capital.sqlite.gz");
-  const sqlitePath = path.join(directory, "capital.sqlite");
-  const indexPath = path.join(directory, "index.json");
-  const evidencePath = path.join(directory, "evidence.json");
-  const contractPath = path.join(directory, "contract.json");
-  const sourcePath = path.join(directory, "source.json");
-  await writeFile(sqlitePath, gunzipSync(await readFile(
-    path.join(root, "apps/mobile/assets/datapacks/capital.sqlite.gz"))));
-  const database = new DatabaseSync(sqlitePath);
-  database.exec("PRAGMA user_version = 19");
-  database.close();
-  const sqliteBytes = await readFile(sqlitePath);
-  const packBytes = gzipSync(sqliteBytes, { level: 9, mtime: 0 });
-  await writeFile(packPath, packBytes);
-  const index = JSON.parse(await readFile(
-    path.join(root, "apps/mobile/assets/datapacks/index.json"), "utf8"));
-  Object.assign(index.packs.find(({ id }) => id === "capital"), {
-    sha256: sha256(packBytes),
-    sqliteSha256: sha256(sqliteBytes),
-    byteSize: packBytes.length,
-  });
-  await writeFile(indexPath, `${JSON.stringify(index, null, 2)}\n`);
-  const contract = JSON.parse(await readFile(
-    path.join(root, "tools/datapack/itx-cheongchun-coverage-contract.json"), "utf8"));
-  const source = JSON.parse(await readFile(path.join(root, contract.sourceTimetableArtifact.artifactPath), "utf8"));
-  Object.assign(source.canonicalPackIdentity, {
-    sha256: sha256(packBytes),
-    sqliteSha256: sha256(sqliteBytes),
-  });
-  Object.assign(contract.officialEvidence.korailCompletenessAdmission.canonicalPackIdentity, {
-    sha256: sha256(packBytes),
-    sqliteSha256: sha256(sqliteBytes),
-  });
-  const sourceBytes = Buffer.from(`${JSON.stringify(source, null, 2)}\n`);
-  await writeFile(sourcePath, sourceBytes);
-  Object.assign(contract.sourceTimetableArtifact, {
-    artifactPath: sourcePath,
-    sha256: sha256(sourceBytes),
-  });
-  await writeFile(contractPath, `${JSON.stringify(contract, null, 2)}\n`);
+test("ITX topology materializer는 지원 범위 밖 catalog version을 변경 없이 거부한다", async (context) => {
+  for (const version of [15, 19]) {
+    const directory = await mkdtemp(path.join(os.tmpdir(), `itx-topology-v${version}-`));
+    context.after(() => rm(directory, { recursive: true, force: true }));
+    const packPath = path.join(directory, "capital.sqlite.gz");
+    const sqlitePath = path.join(directory, "capital.sqlite");
+    const indexPath = path.join(directory, "index.json");
+    const evidencePath = path.join(directory, "evidence.json");
+    const contractPath = path.join(directory, "contract.json");
+    const sourcePath = path.join(directory, "source.json");
+    await writeFile(sqlitePath, gunzipSync(await readFile(
+      path.join(root, "apps/mobile/assets/datapacks/capital.sqlite.gz"))));
+    const database = new DatabaseSync(sqlitePath);
+    database.exec(`PRAGMA user_version = ${version}`);
+    database.close();
+    const sqliteBytes = await readFile(sqlitePath);
+    const packBytes = gzipSync(sqliteBytes, { level: 9, mtime: 0 });
+    await writeFile(packPath, packBytes);
+    const index = JSON.parse(await readFile(
+      path.join(root, "apps/mobile/assets/datapacks/index.json"), "utf8"));
+    Object.assign(index.packs.find(({ id }) => id === "capital"), {
+      sha256: sha256(packBytes),
+      sqliteSha256: sha256(sqliteBytes),
+      byteSize: packBytes.length,
+    });
+    await writeFile(indexPath, `${JSON.stringify(index, null, 2)}\n`);
+    const contract = JSON.parse(await readFile(
+      path.join(root, "tools/datapack/itx-cheongchun-coverage-contract.json"), "utf8"));
+    const source = JSON.parse(await readFile(
+      path.join(root, contract.sourceTimetableArtifact.artifactPath), "utf8"));
+    Object.assign(source.canonicalPackIdentity, {
+      sha256: sha256(packBytes),
+      sqliteSha256: sha256(sqliteBytes),
+    });
+    Object.assign(contract.officialEvidence.korailCompletenessAdmission.canonicalPackIdentity, {
+      sha256: sha256(packBytes),
+      sqliteSha256: sha256(sqliteBytes),
+    });
+    const sourceBytes = Buffer.from(`${JSON.stringify(source, null, 2)}\n`);
+    await writeFile(sourcePath, sourceBytes);
+    Object.assign(contract.sourceTimetableArtifact, {
+      artifactPath: sourcePath,
+      sha256: sha256(sourceBytes),
+    });
+    await writeFile(contractPath, `${JSON.stringify(contract, null, 2)}\n`);
 
-  await assert.rejects(execFileAsync(process.execPath, [
-    "tools/datapack/apply-itx-topology-to-bundled-pack.mjs",
-    "--pack", packPath,
-    "--index", indexPath,
-    "--contract", contractPath,
-    "--evidence", evidencePath,
-  ], { cwd: root }), /does not support catalog user_version 19 newer than 18/);
-  assert.equal(sha256(await readFile(packPath)), sha256(packBytes));
+    await assert.rejects(execFileAsync(process.execPath, [
+      "tools/datapack/apply-itx-topology-to-bundled-pack.mjs",
+      "--pack", packPath,
+      "--index", indexPath,
+      "--contract", contractPath,
+      "--evidence", evidencePath,
+    ], { cwd: root }), /does not support catalog user_version/);
+    assert.equal(sha256(await readFile(packPath)), sha256(packBytes));
+  }
 });
 
 test("--check는 topology evidence의 파생 count 변조를 거부한다", async (context) => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "itx-topology-stale-evidence-"));
-  context.after(() => rm(directory, { recursive: true, force: true }));
-  const packPath = path.join(directory, "capital.sqlite.gz");
-  const indexPath = path.join(directory, "index.json");
-  const evidencePath = path.join(directory, "evidence.json");
-  await copyFile(path.join(root, "apps/mobile/assets/datapacks/capital.sqlite.gz"), packPath);
-  await copyFile(path.join(root, "apps/mobile/assets/datapacks/index.json"), indexPath);
-  const evidence = JSON.parse(await readFile(
-    path.join(root, "tools/datapack/itx-cheongchun-topology-evidence.json"), "utf8"));
-  evidence.topology.stationMembershipCount += 1;
-  evidence.pack.byteSizeDelta += 1;
-  await writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
+  await rejectedTamperedEvidence(context, (evidence) => {
+    evidence.topology.stationMembershipCount += 1;
+  });
+});
 
-  await assert.rejects(execFileAsync(process.execPath, [
-    "tools/datapack/apply-itx-topology-to-bundled-pack.mjs",
-    "--pack", packPath,
-    "--index", indexPath,
-    "--evidence", evidencePath,
-    "--check",
-  ], { cwd: root }), /evidence or bundled pack index is stale/);
+test("--check는 일관되게 조작된 size budget evidence도 거부한다", async (context) => {
+  await rejectedTamperedEvidence(context, (evidence) => {
+    evidence.pack.inputByteSize = 0;
+    evidence.pack.byteSizeDelta = evidence.pack.byteSize;
+  });
+});
+
+test("--check는 topology evidence schema identity 변조를 거부한다", async (context) => {
+  await rejectedTamperedEvidence(context, (evidence) => {
+    evidence.schemaVersion = 999;
+    evidence.artifactKind = "unrelated-artifact";
+  });
 });
 
 test("ITX topology는 canonical station/line endpoint가 bundled route map에 있어야 한다", async (context) => {
