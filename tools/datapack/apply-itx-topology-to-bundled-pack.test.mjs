@@ -257,6 +257,54 @@ test("tracked production ITX topology evidence와 bundled pack은 --check를 통
   ], { cwd: root, env: freshBuildEnv });
 });
 
+test("--check는 hash가 갱신된 bundled pack의 foreign key 손상도 거부한다", async (context) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "itx-topology-corrupt-pack-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const packPath = path.join(directory, "capital.sqlite.gz");
+  const sqlitePath = path.join(directory, "capital.sqlite");
+  const indexPath = path.join(directory, "index.json");
+  const evidencePath = path.join(directory, "evidence.json");
+  const packBytes = await readFile(path.join(root, "apps/mobile/assets/datapacks/capital.sqlite.gz"));
+  await writeFile(sqlitePath, gunzipSync(packBytes));
+  const database = new DatabaseSync(sqlitePath);
+  database.exec(`
+    PRAGMA foreign_keys = OFF;
+    UPDATE transit_stop_times
+    SET station_id = 'station-missing-itx-check'
+    WHERE rowid = (SELECT MIN(rowid) FROM transit_stop_times);
+  `);
+  database.close();
+
+  const sqliteBytes = await readFile(sqlitePath);
+  const corruptedPackBytes = gzipSync(sqliteBytes, { level: 9, mtime: 0 });
+  await writeFile(packPath, corruptedPackBytes);
+  const index = JSON.parse(await readFile(
+    path.join(root, "apps/mobile/assets/datapacks/index.json"), "utf8"));
+  Object.assign(index.packs.find(({ id }) => id === "capital"), {
+    sha256: sha256(corruptedPackBytes),
+    sqliteSha256: sha256(sqliteBytes),
+    byteSize: corruptedPackBytes.length,
+  });
+  await writeFile(indexPath, `${JSON.stringify(index, null, 2)}\n`);
+  const evidence = JSON.parse(await readFile(
+    path.join(root, "tools/datapack/itx-cheongchun-topology-evidence.json"), "utf8"));
+  Object.assign(evidence.pack, {
+    outputSha256: sha256(corruptedPackBytes),
+    outputSqliteSha256: sha256(sqliteBytes),
+    byteSize: corruptedPackBytes.length,
+    byteSizeDelta: corruptedPackBytes.length - evidence.pack.inputByteSize,
+  });
+  await writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
+
+  await assert.rejects(execFileAsync(process.execPath, [
+    "tools/datapack/apply-itx-topology-to-bundled-pack.mjs",
+    "--pack", packPath,
+    "--index", indexPath,
+    "--evidence", evidencePath,
+    "--check",
+  ], { cwd: root, env: freshBuildEnv }), /foreign_key_check failed/);
+});
+
 test("ITX topology check는 self-consistent input size evidence 변조를 거부한다", async (context) => {
   await rejectedTamperedEvidence(context, (evidence) => {
     evidence.pack.inputByteSize = evidence.pack.byteSize;

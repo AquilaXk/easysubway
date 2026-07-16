@@ -388,6 +388,10 @@ function applyTopology(sqlitePath, topology, admissionEvidence) {
 function assertStoredTopology(sqlitePath, topology, admissionEvidence) {
   const database = new DatabaseSync(sqlitePath, { readOnly: true });
   try {
+    const foreignKeys = database.prepare("PRAGMA foreign_key_check").all();
+    if (foreignKeys.length !== 0) throw new Error("ITX topology foreign_key_check failed");
+    const integrity = database.prepare("PRAGMA integrity_check").get();
+    if (integrity.integrity_check !== "ok") throw new Error("ITX topology integrity_check failed");
     if (database.prepare("PRAGMA user_version").get().user_version !== CATALOG_VERSION
       || !hasColumn(database, "network_edges", "service_class")) {
       throw new Error("ITX topology bundled schema is stale");
