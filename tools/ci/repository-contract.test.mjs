@@ -2034,7 +2034,11 @@ test("모바일 production 사용자 문구는 점수와 기본정보 같은 내
   assert.ok(mobileFiles.length > 0, "mobile production Dart files not found");
   for (const file of mobileFiles) {
     let source = read(file);
-    if (file === "apps/mobile/lib/main.dart") {
+    if (
+      file === "apps/mobile/lib/main.dart" ||
+      file ===
+        "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart"
+    ) {
       source = source
         .replaceAll("'데이터 및 지도 출처'", "''")
         .replaceAll("'지도와 경로 판단 자료의 출처와 이용 조건을 확인해요'", "''");
