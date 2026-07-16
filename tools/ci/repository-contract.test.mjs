@@ -1779,6 +1779,34 @@ test("모바일 demo dependency와 접근성 theme는 app canonical 파일이 �
   assert.doesNotMatch(main, /^TextStyle _boldTextStyle\b/m);
 });
 
+test("모바일 설정 화면은 settings presentation canonical 파일이 소유한다", () => {
+  const main = read("apps/mobile/lib/main.dart");
+  const settings = read(
+    "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
+  );
+
+  assert.match(settings, /^const _settingsPagePadding = /m);
+  assert.match(settings, /^class AppSettingsScreen extends StatefulWidget/m);
+  assert.match(settings, /^class _AppSettingsScreenState extends State<AppSettingsScreen>/m);
+  assert.match(settings, /^class _AppSettingsSection extends StatelessWidget/m);
+  assert.match(settings, /^class _AppSettingsActionTile extends StatelessWidget/m);
+  assert.match(settings, /^class _AppSettingsPreferenceTile extends StatelessWidget/m);
+  assert.match(
+    main,
+    /^import 'features\/settings\/presentation\/app_settings_screen\.dart';$/m,
+  );
+  assert.match(
+    main,
+    /^export 'features\/settings\/presentation\/app_settings_screen\.dart'\s+show AppSettingsScreen;$/m,
+  );
+  assert.doesNotMatch(main, /^const _settingsPagePadding = /m);
+  assert.doesNotMatch(main, /^class AppSettingsScreen\b/m);
+  assert.doesNotMatch(main, /^class _AppSettingsScreenState\b/m);
+  assert.doesNotMatch(main, /^class _AppSettingsSection\b/m);
+  assert.doesNotMatch(main, /^class _AppSettingsActionTile\b/m);
+  assert.doesNotMatch(main, /^class _AppSettingsPreferenceTile\b/m);
+});
+
 test("프로덕션 모바일 UI 위젯명은 prototype 명칭을 쓰지 않는다", () => {
   const mobileFiles = execFileSync("git", ["ls-files", "apps/mobile/lib/*.dart"], {
     cwd: root,
@@ -1942,7 +1970,9 @@ test("모바일 경로 결과 단계별 뒤로가기 회귀 테스트는 유지�
 });
 
 test("모바일 설정 저장 실패와 시설 제보 위치 실패 회귀 테스트는 유지된다", () => {
-  const main = read("apps/mobile/lib/main.dart");
+  const settings = read(
+    "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
+  );
   const facilityReport = read("apps/mobile/lib/facility_report.dart");
   const widgetTest = read("apps/mobile/test/widget_test.dart");
   const settingsFailurePattern = new RegExp([
@@ -1960,9 +1990,10 @@ test("모바일 설정 저장 실패와 시설 제보 위치 실패 회귀 테�
     "longitude, isNull",
   ].join("[\\s\\S]*"));
 
-  assert.match(main, /_updateViewPreferences/);
-  assert.match(main, /_viewPreferences\s*=\s*previous/);
-  assert.match(main, /설정을 저장하지 못했어요\. 이전 값으로 되돌렸어요\./);
+  assert.match(
+    settings,
+    /Future<void> _updateViewPreferences\([\s\S]*?final previous = _viewPreferences;[\s\S]*?_viewPreferences = preferences;[\s\S]*?await widget\.onViewPreferencesChanged\(preferences\);[\s\S]*?catch \(error, stackTrace\)[\s\S]*?if \(!mounted\)[\s\S]*?if \(_isSameViewPreferences\(_viewPreferences, preferences\)\)[\s\S]*?_viewPreferences = previous;[\s\S]*?SnackBar\(content: Text\('설정을 저장하지 못했어요\. 이전 값으로 되돌렸어요\.'\)\)/,
+  );
   assert.match(widgetTest, settingsFailurePattern);
   assert.match(facilityReport, /facilityReportAttachLocationButton/);
   assert.match(facilityReport, /facilityReportOpenLocationSettingsButton/);
@@ -2563,6 +2594,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     [
       "apps/mobile/lib/app/accessibility_theme.dart",
       "apps/mobile/lib/app/app_components.dart",
+      "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
       "apps/mobile/lib/main.dart",
       "apps/mobile/release/support-incident-response-gate.json",
     ],
@@ -4775,6 +4807,23 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   const routeSearchController = read(
     "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchController.java",
   );
+  const routeSessionController = read(
+    "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteV2SessionController.java",
+  );
+  const mobileRouteIngress = read("apps/mobile/lib/route_v2_ingress.dart");
+  const mobileRouteSearch = read("apps/mobile/lib/route_search.dart");
+  const routeV2Gateway = read("infra/nginx/route-v2-gateway.conf.template");
+  const routeV2ProxyHeaders = read("infra/nginx/route-v2-proxy-headers.conf.template");
+  const routeV2OriginGateFilter = read(
+    "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteV2OriginGateFilter.java",
+  );
+  const jdbcRouteTimetableRepository = read(
+    "backend/src/main/java/com/easysubway/route/adapter/out/persistence/JdbcRouteTimetableRepository.java",
+  );
+  const jdbcRouteTimetableRepositoryTest = read(
+    "backend/src/test/java/com/easysubway/route/adapter/out/persistence/JdbcRouteTimetableRepositoryTest.java",
+  );
+  const routeV2GatewayProbe = read("tools/test/run-route-v2-gateway-integration.sh");
   const internalApiIndex = readJson("contracts/api/internal-api-index.json");
 
   assert.equal(gate.schemaVersion, 1);
@@ -5143,6 +5192,76 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
     "/api/v2/routes/session",
     "/api/v2/routes/search",
   ]);
+  const routeV2Readiness = operationsEvidence.backendControlPlane.publicApiSurface.routeV2Readiness;
+  assert.equal(routeV2Readiness.issue, 2095);
+  assert.equal(routeV2Readiness.status, "BLOCKED_EXTERNAL");
+  assert.deepEqual(routeV2Readiness.productionReachabilityEvidence, {
+    observedAt: "2026-07-16T15:20:00+09:00",
+    candidateGitSha: "e317f3af90292b9e2dff5e7ec90c22792b845435",
+    rollbackRun: "https://github.com/AquilaXk/easysubway/actions/runs/29470369402",
+    ingressOpen: false,
+    activeProductionEndpoints: [],
+  });
+  assert.deepEqual(routeV2Readiness.intendedAndroidConsumers, [
+    {
+      method: "POST",
+      path: "/api/v2/routes/session",
+      consumer: "PlayIntegrityRouteV2SessionProvider",
+      auth: "Play Integrity attestation and gateway origin proof",
+      cacheControl: "private, no-store",
+    },
+    {
+      method: "POST",
+      path: "/api/v2/routes/search",
+      consumer: "RouteSearchV2ApiRepository",
+      auth: "Bearer route:v2:itx session and gateway origin proof",
+      cacheControl: "private, no-store",
+    },
+  ]);
+  assert.deepEqual(routeV2Readiness.closedRouteEndpoints, closedRouteEndpoints);
+  assert.deepEqual(routeV2Readiness.subwayLocalFirst, {
+    consumer: "TransportScopedRouteSearchRepository",
+    networkCalls: 0,
+  });
+  assert.deepEqual(routeV2Readiness.timetableSnapshotCache, {
+    status: "BLOCKED_EXTERNAL",
+    blockedByIssue: 2145,
+    requiredKey: {
+      format: "snapshotSha256 + freshUntil",
+      fields: ["snapshotSha256", "freshUntil"],
+      sameFreshnessDifferentHashReloadRequired: true,
+    },
+    currentImplementation: {
+      status: "BLOCKED_EXTERNAL",
+      fields: ["timetableArtifactId", "freshUntil"],
+      gap: "snapshotSha256 is not materialized until #2145",
+    },
+    sharedRouteResponseCacheAllowed: false,
+  });
+  assert.deepEqual(routeV2Readiness.realisticLoadEvidence, {
+    status: "NOT_STARTED",
+    requires: ["normal", "burst", "unavailable", "latency", "error", "resource", "purge"],
+  });
+  assert.deepEqual(routeV2Readiness.productionCanaryRollback, {
+    status: "BLOCKED_EXTERNAL",
+    explicitProductionApprovalRequired: true,
+    sameCandidateIdentityRequired: true,
+  });
+  assert.match(mobileRouteIngress, /'\/api\/v2\/routes\/session'/);
+  assert.match(mobileRouteSearch, /'\/api\/v2\/routes\/search'/);
+  assert.match(mobileRouteIngress, /request\.transportScope == RouteTransportScope\.subway[\s\S]*localRepository\.searchRoute/);
+  assert.match(mobileRouteSearch, /production ingress는 session\/search 두 경로만 열고 legacy refresh는 계속 닫는다/);
+  assert.match(routeSessionController, /header\(HttpHeaders\.CACHE_CONTROL, "private, no-store"\)/);
+  assert.match(routeSearchController, /header\(HttpHeaders\.CACHE_CONTROL, "private, no-store"\)/);
+  assert.match(routeV2OriginGateFilter, /ORIGIN_HEADER = "X-EasySubway-Origin-Verify"/);
+  assert.match(routeV2ProxyHeaders, /proxy_set_header X-EasySubway-Origin-Verify/);
+  assert.match(jdbcRouteTimetableRepository, /artifact\.id\(\) \+ ":" \+ artifact\.freshUntil\(\)/);
+  assert.match(
+    jdbcRouteTimetableRepositoryTest,
+    /동일 freshness에서도 ITX artifact identity가 바뀌면 cache key가 바뀐다/,
+  );
+  assert.match(routeV2GatewayProbe, /session success response must remain private, no-store/);
+  assert.match(routeV2GatewayProbe, /search success response must remain private, no-store/);
   assert.match(
     securityConfig,
     /@Profile\("prod \| staging \| release \| prod-like"\)[\s\S]*SecurityFilterChain routeV2IngressSecurityFilterChain/,
@@ -12618,6 +12737,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const envExample = read(".env.example");
   const iosInfoPlist = read("apps/mobile/ios/Runner/Info.plist");
   const main = read("apps/mobile/lib/main.dart");
+  const appSettingsScreen = read(
+    "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
+  );
   const accessibilityTheme = read("apps/mobile/lib/app/accessibility_theme.dart");
   const appDependencies = read("apps/mobile/lib/app/app_dependencies.dart");
   const authHeaders = read("apps/mobile/lib/auth_headers.dart");
@@ -12692,8 +12814,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(main, /class EasySubwayApp extends StatelessWidget/);
   assert.match(`${main}\n${networkMap}\n${stationSearch}`, /역 검색/);
   assert.match(`${main}\n${networkMap}\n${routeSearch}\n${stationSearch}`, /길찾기/);
-  assert.match(main, /이동 조건/);
-  assert.match(main, /알림 설정/);
+  assert.match(appSettingsScreen, /이동 조건/);
+  assert.match(appSettingsScreen, /알림 설정/);
   assert.match(main, /EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS/);
   assert.match(main, /defaultValue: false/);
   assert.match(main, /enablePushNotifications/);
