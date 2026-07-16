@@ -20,6 +20,7 @@ import 'features/network_map/presentation/station_fan_menu.dart';
 import 'features/network_map/presentation/station_fan_menu_geometry.dart'
     show kFanMenuDesignSize;
 import 'features/network_map/presentation/route_map_basemap_view.dart';
+import 'features/network_map/presentation/structured_route_map_painter.dart';
 import 'features/realtime/realtime_repository.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
 import 'features/route_draft/domain/route_draft.dart';
@@ -874,6 +875,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                 builder: (context, _) {
                   return _NetworkMapCanvas(
                     data: visibleData,
+                    showExpressOverlay: hasExpressLines && _expressView,
                     initialViewport: loadResult.initialViewport,
                     focusedStationId:
                         _searchFanMenuStationId ?? _nearbySelectedStationId,
@@ -3656,6 +3658,7 @@ void resetNetworkMapAttributionCacheForTest() {
 class _NetworkMapCanvas extends StatefulWidget {
   const _NetworkMapCanvas({
     required this.data,
+    required this.showExpressOverlay,
     required this.initialViewport,
     required this.focusedStationId,
     required this.selectedStationId,
@@ -3674,6 +3677,7 @@ class _NetworkMapCanvas extends StatefulWidget {
   });
 
   final NetworkMapData data;
+  final bool showExpressOverlay;
   final Rect? initialViewport;
   final String? focusedStationId;
   final String? selectedStationId;
@@ -3763,6 +3767,8 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   Offset? _gestureStartFocalPoint;
   String? _geometryCacheKey;
   _MapGeometry? _geometryCache;
+  NetworkMapData? _expressOverlayData;
+  StructuredRouteMap? _expressOverlayMap;
   NetworkMapStation? _selectedStation;
   // region → attribution 표시 문자열(#1951). manifest 로드 전에는 null로 두고
   // attribution을 표시하지 않는다(로드 실패 시에도 동일하게 조용히 미표기).
@@ -4362,12 +4368,46 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     MapCameraState camera,
     Offset sourceOrigin,
   ) {
-    return RouteMapBasemapView(
-      region: widget.data.selectedRegion,
-      camera: camera,
-      sourceOrigin: sourceOrigin,
-      attributionText: _attributionTextByRegion?[widget.data.selectedRegion],
+    final attribution = _attributionTextByRegion?[widget.data.selectedRegion];
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Opacity(
+          opacity: widget.showExpressOverlay ? 0.18 : 1,
+          child: RouteMapBasemapView(
+            region: widget.data.selectedRegion,
+            camera: camera,
+            sourceOrigin: sourceOrigin,
+            attributionText: attribution,
+          ),
+        ),
+        if (widget.showExpressOverlay)
+          StructuredRouteMapView(
+            map: _expressMap(),
+            camera: camera,
+            lineColors: routeMapLineColors({
+              for (final line in widget.data.lines) line.id: line.color,
+            }),
+            labelTextByStationId: {
+              for (final station in widget.data.stations)
+                station.id: routeMapStationLabel(station.nameKo),
+            },
+            lineBadgeLabelByLineId: {
+              for (final line in widget.data.lines)
+                line.id: routeMapLineBadgeLabel(line.name),
+            },
+            sourceOrigin: sourceOrigin,
+          ),
+      ],
     );
+  }
+
+  StructuredRouteMap _expressMap() {
+    if (!identical(_expressOverlayData, widget.data)) {
+      _expressOverlayData = widget.data;
+      _expressOverlayMap = widget.data.toStructuredRouteMap();
+    }
+    return _expressOverlayMap!;
   }
 }
 

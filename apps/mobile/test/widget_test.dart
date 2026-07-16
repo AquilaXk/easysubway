@@ -39,6 +39,7 @@ import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:easysubway_mobile/network_map.dart';
 import 'package:easysubway_mobile/search_field.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/route_map_basemap_view.dart';
+import 'package:easysubway_mobile/features/network_map/presentation/structured_route_map_painter.dart';
 import 'package:easysubway_mobile/notification_settings.dart';
 import 'package:easysubway_mobile/onboarding.dart';
 import 'package:easysubway_mobile/route_search.dart';
@@ -3461,6 +3462,41 @@ void main() {
       find.byKey(const Key('networkMapStation-express-a-line-express')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('노선도 급행 전환은 전체 바탕을 흐리고 급행 집합만 강조한다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(
+          networkMapData: _expressFilterMapData(),
+        ),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(StructuredRouteMapView), findsNothing);
+
+    await tester.tap(find.text('급행'));
+    await tester.pumpAndSettle();
+
+    final overlay = tester.widget<StructuredRouteMapView>(
+      find.byType(StructuredRouteMapView),
+    );
+    expect(overlay.map.lines.map((line) => line.lineId), ['line-express']);
+    expect(overlay.map.stations.map((station) => station.lineId).toSet(), {
+      'line-express',
+    });
+    final basemapOpacity = tester.widget<Opacity>(
+      find.ancestor(
+        of: find.byType(RouteMapBasemapView),
+        matching: find.byType(Opacity),
+      ),
+    );
+    expect(basemapOpacity.opacity, lessThan(0.5));
   });
 
   testWidgets('노선도 viewport 밖 station semantics는 생성하지 않는다', (tester) async {
