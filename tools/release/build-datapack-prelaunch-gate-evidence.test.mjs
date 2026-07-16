@@ -239,6 +239,12 @@ test("prelaunch workflow는 다섯 gate를 같은 RC final readiness에 결속�
   assert.match(workflow, /build-datapack-prelaunch-gate-evidence\.mjs --mode collect/);
   assert.match(workflow, /--callback-execution-report/);
   assert.match(workflow, /integration_test\/datapack_monotonic_rescue_test\.dart/);
+  const enableKvm = workflow.indexOf("- name: Enable KVM group perms");
+  const emulatorRunner = workflow.indexOf("reactivecircus/android-emulator-runner@");
+  assert.ok(enableKvm !== -1 && enableKvm < emulatorRunner, "KVM permissions must be enabled before emulator boot");
+  assert.match(workflow, /KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS\+="static_node=kvm"/);
+  assert.match(workflow, /sudo udevadm control --reload-rules/);
+  assert.match(workflow, /sudo udevadm trigger --name-match=kvm/);
   assert.match(workflow, /android-rc-bundle\.json/);
   assert.match(workflow, /--android-device-report/);
   assert.match(workflow, /--conditional-publish-report/);
