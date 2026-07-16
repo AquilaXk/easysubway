@@ -15,6 +15,7 @@ const applicationPath = "backend/src/main/java/com/easysubway/EasySubwayBackendA
 test("production timetable evidence는 exact deploy에서 cache와 격리 rollback을 검증한다", async () => {
   const workflow = await readFile(workflowPath, "utf8");
   const script = await readFile(scriptPath, "utf8");
+  const candidate = await readFile(candidatePath, "utf8");
   const application = await readFile(applicationPath, "utf8");
 
   assert.match(workflow, /workflow_dispatch:/);
@@ -66,6 +67,12 @@ test("production timetable evidence는 exact deploy에서 cache와 격리 rollba
   assert.match(script, /transit_stop_times/);
   assert.match(script, /fingerprint_before[^\n]+!=[^\n]+fingerprint_after/);
   assert.doesNotMatch(script, /docker pull|curl .*(github|aquilaxk\.site)/);
+  assert.match(candidate, /repositoryRoot/);
+  assert.match(candidate, /RUNNER_TEMP/);
+  assert.match(candidate, /tmpdir\(\)/);
+  assert.match(candidate, /realpath/);
+  assert.match(candidate, /path\.relative/);
+  assert.match(candidate, /path escapes allowed root/);
 });
 
 test("rollback 후보는 현재 seed를 다른 immutable identity로 만든다", async () => {

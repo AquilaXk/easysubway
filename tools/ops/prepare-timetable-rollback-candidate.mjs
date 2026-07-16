@@ -1,13 +1,50 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, realpath, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { gunzipSync, gzipSync } from "node:zlib";
 
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
+const repositoryRoot = path.resolve(import.meta.dirname, "../..");
+const allowedSeedPath = path.join(repositoryRoot, "backend/src/main/resources/timetable/line4-timetable-seed.sql.gz");
+const allowedEvidencePath = path.join(repositoryRoot, "backend/src/main/resources/timetable/server-timetable-snapshot-evidence.json");
+
+function resolveWithinRoot(root, candidate, label) {
+  const resolved = path.resolve(candidate);
+  const relative = path.relative(root, resolved);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new Error(`${label} path escapes allowed root`);
+  }
+  return resolved;
+}
 
 export async function prepareRollbackCandidate(seedPath, evidencePath, outputDirectory) {
-  const [seed, evidenceBytes] = await Promise.all([readFile(seedPath), readFile(evidencePath)]);
+  const resolvedSeedPath = resolveWithinRoot(repositoryRoot, seedPath, "seed");
+  const resolvedEvidencePath = resolveWithinRoot(repositoryRoot, evidencePath, "evidence");
+  if (resolvedSeedPath !== allowedSeedPath || resolvedEvidencePath !== allowedEvidencePath) {
+    throw new Error("rollback candidate inputs must use the checked-in timetable snapshot");
+  }
+  const [canonicalSeedPath, canonicalEvidencePath] = await Promise.all([
+    realpath(resolvedSeedPath),
+    realpath(resolvedEvidencePath),
+  ]);
+  if (canonicalSeedPath !== allowedSeedPath || canonicalEvidencePath !== allowedEvidencePath) {
+    throw new Error("rollback candidate inputs must not use symbolic links");
+  }
+  const outputRoot = path.resolve(process.env.RUNNER_TEMP ?? tmpdir());
+  const resolvedOutputDirectory = resolveWithinRoot(outputRoot, outputDirectory, "output");
+  await mkdir(resolvedOutputDirectory, { recursive: true });
+  const [canonicalOutputRoot, canonicalOutputDirectory] = await Promise.all([
+    realpath(outputRoot),
+    realpath(resolvedOutputDirectory),
+  ]);
+  resolveWithinRoot(canonicalOutputRoot, canonicalOutputDirectory, "output");
+
+  const [seed, evidenceBytes] = await Promise.all([
+    readFile(canonicalSeedPath),
+    readFile(canonicalEvidencePath),
+  ]);
   const evidence = JSON.parse(evidenceBytes);
   if (evidence.artifactKind !== "server-timetable-snapshot-evidence") {
     throw new Error("unexpected timetable snapshot evidence");
@@ -35,10 +72,9 @@ export async function prepareRollbackCandidate(seedPath, evidencePath, outputDir
   delete evidence.evidenceHash;
   evidence.evidenceHash = sha256(Buffer.from(JSON.stringify(evidence)));
 
-  await mkdir(outputDirectory, { recursive: true });
   await Promise.all([
-    writeFile(path.join(outputDirectory, "candidate.sql.gz"), compressed),
-    writeFile(path.join(outputDirectory, "evidence.json"), `${JSON.stringify(evidence, null, 2)}\n`),
+    writeFile(path.join(canonicalOutputDirectory, "candidate.sql.gz"), compressed, { flag: "wx" }),
+    writeFile(path.join(canonicalOutputDirectory, "evidence.json"), `${JSON.stringify(evidence, null, 2)}\n`, { flag: "wx" }),
   ]);
 }
 
