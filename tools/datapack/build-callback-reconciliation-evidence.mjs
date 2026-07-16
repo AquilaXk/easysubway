@@ -4,6 +4,13 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  canonicalJson,
+  signingKeyId,
+  signingPublicKey,
+  verifyRsaSha256Signature,
+  withoutSignature,
+} from "./lib/manifest-validation.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/;
 const CALLBACK_RECONCILIATION_SOURCE_ISSUE = 2057;
@@ -170,6 +177,7 @@ export function wrapCallbackReconciliationGateEvidence({ result, rcManifest, eva
 export function prepareCallbackReconciliationIdentity({
   rcManifest,
   releaseRequestId,
+  releaseRequestBinding,
   expectedGitSha,
 }) {
   const gate = Array.isArray(rcManifest?.datapackGates)
@@ -192,11 +200,39 @@ export function prepareCallbackReconciliationIdentity({
     || !SHA256.test(rcIdentity.dataPackManifestSha256 ?? "")) {
     throw new Error("#2056 final RC datapack identity is invalid");
   }
+  validatePublishedReleaseRequestBinding(releaseRequestBinding, {
+    releaseRequestId,
+    releaseSequence: rcIdentity.releaseSequence,
+    manifestSha256: rcIdentity.dataPackManifestSha256,
+  });
   return {
     releaseRequestId,
     releaseSequence: rcIdentity.releaseSequence,
     manifestSha256: rcIdentity.dataPackManifestSha256,
   };
+}
+
+function validatePublishedReleaseRequestBinding(binding, expectedIdentity) {
+  const signatureValue = binding?.signature?.value;
+  if (binding?.schemaVersion !== 1
+    || binding.artifactKind !== "datapack-release-request-binding"
+    || binding.releaseRequestId !== expectedIdentity.releaseRequestId
+    || binding.releaseSequence !== expectedIdentity.releaseSequence
+    || binding.manifestSha256 !== expectedIdentity.manifestSha256
+    || binding.channel !== "production"
+    || binding.keyId !== signingKeyId()
+    || !["PUBLISHED_AND_VERIFIED", "NO_CHANGE_VALID"].includes(binding.releaseOutcome)
+    || binding.signature?.algorithm !== "rsa-sha256-release-request-v1"
+    || typeof signatureValue !== "string" || !/^[A-Za-z0-9_-]+$/.test(signatureValue)) {
+    throw new Error("published release request binding mismatch");
+  }
+  if (!verifyRsaSha256Signature(
+    signingPublicKey(),
+    canonicalJson(withoutSignature(binding)),
+    signatureValue,
+  )) {
+    throw new Error("published release request binding signature is invalid");
+  }
 }
 
 function validateRawRehearsal(raw, expectedIdentity) {
@@ -305,11 +341,12 @@ async function main() {
 }
 
 async function prepareIdentityCommand(args) {
-  requireArgs(args, ["release-request-id", "expected-git-sha", "github-env"],
+  requireArgs(args, ["release-request-id", "release-request-binding", "expected-git-sha", "github-env"],
     " with --prepare-from-rc-manifest");
   const identity = prepareCallbackReconciliationIdentity({
     rcManifest: JSON.parse(await readFile(args["prepare-from-rc-manifest"], "utf8")),
     releaseRequestId: args["release-request-id"],
+    releaseRequestBinding: JSON.parse(await readFile(args["release-request-binding"], "utf8")),
     expectedGitSha: args["expected-git-sha"],
   });
   await writeFile(args["github-env"], [

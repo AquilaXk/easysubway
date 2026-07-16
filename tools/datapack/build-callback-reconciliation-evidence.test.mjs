@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, createSign, generateKeyPairSync } from "node:crypto";
 import test from "node:test";
 
 import {
@@ -8,6 +8,7 @@ import {
   wrapCallbackReconciliationGateEvidence,
   validateCallbackReconciliationEvidence,
 } from "./build-callback-reconciliation-evidence.mjs";
+import { canonicalJson, withoutSignature } from "./lib/manifest-validation.mjs";
 
 const manifestSha256 = "a".repeat(64);
 const releaseRequestId = "release-request-2057";
@@ -15,6 +16,50 @@ const releaseSequence = 42;
 const idempotencyKeySha256 = createHash("sha256")
   .update(`${releaseRequestId}:${releaseSequence}:${manifestSha256}`)
   .digest("hex");
+const { privateKey: bindingPrivateKey, publicKey: bindingPublicKey } = generateKeyPairSync("rsa", {
+  modulusLength: 2048,
+});
+
+function releaseRequestBinding(overrides = {}) {
+  const unsigned = {
+    schemaVersion: 1,
+    artifactKind: "datapack-release-request-binding",
+    releaseRequestId,
+    releaseSequence,
+    channel: "production",
+    manifestSha256,
+    keyId: "production-v1",
+    releaseOutcome: "PUBLISHED_AND_VERIFIED",
+    ...overrides,
+  };
+  return {
+    ...unsigned,
+    signature: {
+      algorithm: "rsa-sha256-release-request-v1",
+      value: createSign("RSA-SHA256")
+        .update(canonicalJson(withoutSignature(unsigned)))
+        .sign(bindingPrivateKey)
+        .toString("base64url"),
+    },
+  };
+}
+
+function withBindingPublicKey(run) {
+  const previousPem = process.env.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM;
+  const previousKeyId = process.env.EASYSUBWAY_DATAPACK_SIGNING_KEY_ID;
+  process.env.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM = bindingPublicKey.export({
+    type: "spki", format: "pem",
+  });
+  process.env.EASYSUBWAY_DATAPACK_SIGNING_KEY_ID = "production-v1";
+  try {
+    return run();
+  } finally {
+    if (previousPem === undefined) delete process.env.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM;
+    else process.env.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM = previousPem;
+    if (previousKeyId === undefined) delete process.env.EASYSUBWAY_DATAPACK_SIGNING_KEY_ID;
+    else process.env.EASYSUBWAY_DATAPACK_SIGNING_KEY_ID = previousKeyId;
+  }
+}
 
 function raw(overrides = {}) {
   return {
@@ -183,7 +228,7 @@ test("result identity가 #2056 final RC identity와 다르면 envelope 생성을
 });
 
 test("#2056 final manifest에서 rehearsal 입력 identity를 안전하게 추출한다", () => {
-  const prepared = prepareCallbackReconciliationIdentity({
+  const prepared = withBindingPublicKey(() => prepareCallbackReconciliationIdentity({
     rcManifest: {
       schemaVersion: 1,
       phase: "FINAL",
@@ -193,8 +238,9 @@ test("#2056 final manifest에서 rehearsal 입력 identity를 안전하게 추�
       } }],
     },
     releaseRequestId,
+    releaseRequestBinding: releaseRequestBinding(),
     expectedGitSha: "b".repeat(40),
-  });
+  }));
   assert.deepEqual(prepared, { releaseRequestId, releaseSequence, manifestSha256 });
 });
 
@@ -208,11 +254,42 @@ test("unsafe request ID와 다른 workflow SHA의 final manifest를 거부한다
     } }],
   };
   assert.throws(() => prepareCallbackReconciliationIdentity({
-    rcManifest, releaseRequestId: "unsafe\nGITHUB_ENV=injected", expectedGitSha: "b".repeat(40),
+    rcManifest, releaseRequestId: "unsafe\nGITHUB_ENV=injected",
+    releaseRequestBinding: releaseRequestBinding(), expectedGitSha: "b".repeat(40),
   }), /release request ID/);
   assert.throws(() => prepareCallbackReconciliationIdentity({
-    rcManifest, releaseRequestId, expectedGitSha: "c".repeat(40),
+    rcManifest, releaseRequestId, releaseRequestBinding: releaseRequestBinding(),
+    expectedGitSha: "c".repeat(40),
   }), /workflow SHA/);
+});
+
+test("signed publish binding이 request·sequence·manifest를 FINAL RC에 결속한다", () => {
+  const rcManifest = {
+    schemaVersion: 1,
+    phase: "FINAL",
+    gitSha: "b".repeat(40),
+    datapackGates: [{ id: "callback_reconciliation", sourceIssue: 2057, rcIdentity: {
+      gitSha: "b".repeat(40), dataPackManifestSha256: manifestSha256, releaseSequence,
+    } }],
+  };
+  for (const binding of [
+    releaseRequestBinding({ releaseRequestId: "another-request" }),
+    releaseRequestBinding({ releaseSequence: releaseSequence + 1 }),
+    releaseRequestBinding({ manifestSha256: "f".repeat(64) }),
+  ]) {
+    assert.throws(() => withBindingPublicKey(() => prepareCallbackReconciliationIdentity({
+      rcManifest, releaseRequestId, releaseRequestBinding: binding,
+      expectedGitSha: "b".repeat(40),
+    })), /published release request binding mismatch/);
+  }
+
+  const forged = releaseRequestBinding();
+  const replacement = forged.signature.value.endsWith("A") ? "B" : "A";
+  forged.signature.value = `${forged.signature.value.slice(0, -1)}${replacement}`;
+  assert.throws(() => withBindingPublicKey(() => prepareCallbackReconciliationIdentity({
+    rcManifest, releaseRequestId, releaseRequestBinding: forged,
+    expectedGitSha: "b".repeat(40),
+  })), /signature is invalid/);
 });
 
 test("#2056 final manifest의 callback gate source issue가 다르면 거부한다", () => {
