@@ -175,7 +175,7 @@ is_required_env_satisfied() {
     SLACK_CI_WEBHOOK_URL|SLACK_RELEASE_WEBHOOK_URL|SLACK_SECURITY_WEBHOOK_URL)
       true
       ;;
-    EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED)
+    EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED|EASYSUBWAY_TIMETABLE_SEED_ENABLED|EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX)
       if has_env_name "${name}"; then
         is_bool_env_value "${name}"
       else
@@ -219,6 +219,18 @@ done < <(sed -nE 's/^([A-Z0-9_]+)=.*/\1/p' .env.example)
 if (( ${#missing_names[@]} > 0 )); then
   printf 'Missing required deployment env names:\n' >&2
   printf ' - %s\n' "${missing_names[@]}" >&2
+  exit 1
+fi
+
+timetable_seed_invalid_names=()
+if is_truthy_env_value EASYSUBWAY_TIMETABLE_SEED_ENABLED \
+  && ! is_truthy_env_value EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX; then
+  timetable_seed_invalid_names+=(EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX)
+fi
+
+if (( ${#timetable_seed_invalid_names[@]} > 0 )); then
+  printf 'Invalid timetable seed env values:\n' >&2
+  printf ' - %s\n' "${timetable_seed_invalid_names[@]}" >&2
   exit 1
 fi
 

@@ -13,6 +13,22 @@ import { buildBackendTimetableSeed } from "./build-backend-timetable-seed.mjs";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const ARTIFACT_KIND = "server-timetable-snapshot-evidence";
 const SCHEMA_IDENTITY = "backend-timetable-snapshot-v1";
+const ITX_SERVICE_ID_BY_SOURCE = {
+  "weekday-kric": "itx-cheongchun-weekday-kric",
+  "saturday-kric": "itx-cheongchun-saturday-kric",
+  "holiday-kric": "itx-cheongchun-holiday-kric",
+};
+const ITX_SERVICE_CALENDAR_DAY_MAP = {
+  "itx-cheongchun-weekday-kric": {
+    monday: true, tuesday: true, wednesday: true, thursday: true, friday: true, saturday: false, sunday: false,
+  },
+  "itx-cheongchun-saturday-kric": {
+    monday: false, tuesday: false, wednesday: false, thursday: false, friday: false, saturday: true, sunday: false,
+  },
+  "itx-cheongchun-holiday-kric": {
+    monday: false, tuesday: false, wednesday: false, thursday: false, friday: false, saturday: false, sunday: true,
+  },
+};
 
 export function buildServerTimetableSnapshot({
   baselineGzipBytes,
@@ -54,7 +70,11 @@ export function buildServerTimetableSnapshot({
   );
   const existingCalendarIds = insertedIds(baselineSql, "service_calendars");
   const sortedTrips = [...source.transitTrips]
-    .map((trip) => ({ ...trip, serviceClass: "ITX_CHEONGCHUN" }))
+    .map((trip) => ({
+      ...trip,
+      serviceId: namespacedItxServiceId(trip.serviceId),
+      serviceClass: "ITX_CHEONGCHUN",
+    }))
     .sort((left, right) => left.id.localeCompare(right.id));
   const sortedStopTimes = [...source.transitStopTimes]
     .sort((left, right) => left.tripId.localeCompare(right.tripId)
@@ -79,6 +99,7 @@ export function buildServerTimetableSnapshot({
   }, {
     includeFeedInfo: false,
     excludeServiceCalendarIds: existingCalendarIds,
+    serviceCalendarDayMap: ITX_SERVICE_CALENDAR_DAY_MAP,
     startDate: earliestServiceDate(source.selectedServiceDates),
     endDate: latestServiceDate(source.selectedServiceDates),
     buildNow,
@@ -148,6 +169,12 @@ export function buildServerTimetableSnapshot({
     evidence,
     evidenceBytes: Buffer.from(`${JSON.stringify(evidence, null, 2)}\n`),
   };
+}
+
+function namespacedItxServiceId(sourceServiceId) {
+  const serviceId = ITX_SERVICE_ID_BY_SOURCE[sourceServiceId];
+  if (!serviceId) throw new Error(`unsupported ITX service calendar: ${sourceServiceId}`);
+  return serviceId;
 }
 
 function validateCanonicalTopologyPack({

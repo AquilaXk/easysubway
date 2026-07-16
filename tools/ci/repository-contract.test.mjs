@@ -1516,6 +1516,46 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
 
   await writeFile(envFile, [
     ...deploymentEnvLines,
+    "EASYSUBWAY_TIMETABLE_SEED_ENABLED=true",
+    "",
+  ].join("\n"));
+  await assert.rejects(
+    execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root }),
+    /EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX/,
+  );
+
+  await writeFile(envFile, [
+    ...deploymentEnvLines,
+    "EASYSUBWAY_TIMETABLE_SEED_ENABLED=true",
+    "EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX=false",
+    "",
+  ].join("\n"));
+  await assert.rejects(
+    execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root }),
+    /EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX/,
+  );
+
+  await writeFile(envFile, [
+    ...deploymentEnvLines,
+    "EASYSUBWAY_TIMETABLE_SEED_ENABLED=maybe",
+    "EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX=true",
+    "",
+  ].join("\n"));
+  await assert.rejects(
+    execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root }),
+    /EASYSUBWAY_TIMETABLE_SEED_ENABLED/,
+  );
+
+  await writeFile(envFile, [
+    ...deploymentEnvLines,
+    "EASYSUBWAY_TIMETABLE_SEED_ENABLED=true",
+    "EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX=true",
+    "",
+  ].join("\n"));
+  await execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root });
+
+  await writeFile(envFile, [
+    ...deploymentEnvLines,
     "EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED=true",
     "",
   ].join("\n"));
@@ -5234,8 +5274,8 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
     currentImplementation: {
       status: "SATISFIED",
       fields: ["snapshotSha256", "freshUntil"],
-      snapshotId: "server-timetable-snapshot-633929e028582c16",
-      snapshotSha256: "633929e028582c164eb84994e7f3a6d59e2793c5290c68a24f9b8928d3a28a36",
+      snapshotId: "server-timetable-snapshot-c8ae07b67e133c8e",
+      snapshotSha256: "c8ae07b67e133c8ee019069b1c11590aac1449398caf87eb68bca540615b9623",
       freshUntil: "2026-07-20T00:00:00+09:00",
       evidencePath: "tools/datapack/server-timetable-snapshot-evidence.json",
     },

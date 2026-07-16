@@ -87,7 +87,20 @@ test("#2135 ADMITTED source와 subway seed를 deterministic complete server snap
   assert.equal((first.sql.match(/INSERT INTO transit_feed_info/g) ?? []).length, 1);
   assert.equal((first.sql.match(/VALUES \('weekday-kric'/g) ?? []).length, 1);
   assert.equal((first.sql.match(/VALUES \('holiday-kric'/g) ?? []).length, 1);
-  assert.equal((first.sql.match(/VALUES \('saturday-kric'/g) ?? []).length, 1);
+  assert.match(first.sql, /VALUES \('itx-cheongchun-weekday-kric', '20260716', '20260719', 'Asia\/Seoul', TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE\)/);
+  assert.match(first.sql, /VALUES \('itx-cheongchun-saturday-kric', '20260716', '20260719', 'Asia\/Seoul', FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE\)/);
+  assert.match(first.sql, /VALUES \('itx-cheongchun-holiday-kric', '20260716', '20260719', 'Asia\/Seoul', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE\)/);
+  for (const [sourceServiceId, namespacedServiceId] of [
+    ["weekday-kric", "itx-cheongchun-weekday-kric"],
+    ["saturday-kric", "itx-cheongchun-saturday-kric"],
+    ["holiday-kric", "itx-cheongchun-holiday-kric"],
+  ]) {
+    const expectedTrips = source.transitTrips.filter(({ serviceId }) => serviceId === sourceServiceId).length;
+    assert.equal(
+      (first.sql.match(new RegExp(`INSERT INTO transit_trips \\([^\\n]+, '${namespacedServiceId}',`, "g")) ?? []).length,
+      expectedTrips,
+    );
+  }
   assert.doesNotMatch(first.sql, /'station-seoul-4-/);
   assert.match(first.sql, /'station-sadang'/);
   assert.match(first.sql, /'station-sangnoksu'/);

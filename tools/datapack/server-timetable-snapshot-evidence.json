@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "artifactKind": "server-timetable-snapshot-evidence",
   "schemaIdentity": "backend-timetable-snapshot-v1",
-  "snapshotId": "server-timetable-snapshot-633929e028582c16",
-  "snapshotSha256": "633929e028582c164eb84994e7f3a6d59e2793c5290c68a24f9b8928d3a28a36",
-  "snapshotSqlByteSize": 8371323,
-  "snapshotGzipSha256": "f85bfbcf33f515dae0be68160d3a45b08ff50cd0aedd32218e73a62e39078ea0",
-  "snapshotGzipByteSize": 321384,
+  "snapshotId": "server-timetable-snapshot-c8ae07b67e133c8e",
+  "snapshotSha256": "c8ae07b67e133c8ee019069b1c11590aac1449398caf87eb68bca540615b9623",
+  "snapshotSqlByteSize": 8373964,
+  "snapshotGzipSha256": "9824f18502fd4a794bfc6fe3b9d4784d094c0f98eb45269de6b7a1a0dd83a82a",
+  "snapshotGzipByteSize": 321382,
   "freshUntil": "2026-07-20T00:00:00+09:00",
   "serviceIdentity": {
     "serviceId": "ITX_CHEONGCHUN",
@@ -105,7 +105,7 @@
     }
   },
   "rowCounts": {
-    "calendars": 3,
+    "calendars": 5,
     "routes": 4,
     "trips": 1035,
     "stopTimes": 34070,
@@ -115,5 +115,5 @@
     "itxStopTimes": 1008,
     "routeServiceEvidence": 1
   },
-  "evidenceHash": "d2a2735e053a9e4a3686dea644cc3f93f353c7a7de67ccf181a45b22689b984f"
+  "evidenceHash": "8ab3f3884445ef2f649ada4cd63b2825104540edaae7b8ff12af698deeb3b0c1"
 }
