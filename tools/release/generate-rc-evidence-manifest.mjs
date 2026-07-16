@@ -100,7 +100,7 @@ const datapackGates = requiredDatapackGates(
 );
 const producerVersion = 1;
 const finalReleaseIdentity = createHash("sha256")
-  .update(JSON.stringify({ producerVersion, evaluatedAt: generatedAt, rcIdentity: identity, datapackGates }))
+  .update(JSON.stringify({ producerVersion, rcIdentity: identity, datapackGates }))
   .digest("hex");
 const blockers = [
   ...identityBlockers(identity),
@@ -283,13 +283,17 @@ function readRealtimeContractVersion(rootDir) {
 
 function parsePairs(value) {
   const values = value === undefined ? [] : Array.isArray(value) ? value : [value];
-  return Object.fromEntries(values.map((entry) => {
+  const pairs = {};
+  for (const entry of values) {
     const separatorIndex = entry.indexOf("=");
     if (separatorIndex === -1) {
       fail(`Expected key=value pair: ${entry}`);
     }
-    return [entry.slice(0, separatorIndex), entry.slice(separatorIndex + 1)];
-  }));
+    const key = entry.slice(0, separatorIndex);
+    if (Object.hasOwn(pairs, key)) fail(`Duplicate key=value pair: ${key}`);
+    pairs[key] = entry.slice(separatorIndex + 1);
+  }
+  return pairs;
 }
 
 function requiredEvidenceEntries(
@@ -364,7 +368,10 @@ function requiredEvidenceEntries(
 }
 
 function requiredDatapackGates(contractGates, statuses, paths, identity, generatedAt) {
-  const knownIds = new Set(contractGates.map(({ id }) => id));
+  const contractIds = contractGates.map(({ id }) => id);
+  const duplicateId = contractIds.find((id, index) => contractIds.indexOf(id) !== index);
+  if (duplicateId) fail(`Duplicate datapack gate in contract: ${duplicateId}`);
+  const knownIds = new Set(contractIds);
   for (const id of [...Object.keys(statuses), ...Object.keys(paths)]) {
     if (!knownIds.has(id)) fail(`Unknown datapack gate: ${id}`);
   }
@@ -384,7 +391,7 @@ function requiredDatapackGates(contractGates, statuses, paths, identity, generat
         status,
         reasonCodes: ["EVIDENCE_NOT_PROVIDED"],
         evidenceSha256: null,
-        evaluatedAt: generatedAt,
+        evaluatedAt: null,
         expiresAt: null,
         rcIdentity: { gitSha: identity.gitSha },
       };
@@ -396,6 +403,9 @@ function requiredDatapackGates(contractGates, statuses, paths, identity, generat
     }
     const evidenceBytes = readFileSync(resolvePath(evidencePath));
     const evidence = JSON.parse(evidenceBytes);
+    if (evidence.schemaVersion !== 1) {
+      fail(`SATISFIED datapack gate has unsupported schemaVersion: ${id}`);
+    }
     if (evidence.gateId !== id || evidence.sourceIssue !== sourceIssue || evidence.status !== "SATISFIED") {
       fail(`SATISFIED datapack gate identity mismatch: ${id}`);
     }
@@ -404,6 +414,9 @@ function requiredDatapackGates(contractGates, statuses, paths, identity, generat
     }
     if (!Array.isArray(evidence.reasonCodes) || evidence.reasonCodes.some((reason) => typeof reason !== "string")) {
       fail(`SATISFIED datapack gate reasonCodes must be a string array: ${id}`);
+    }
+    if (evidence.reasonCodes.length > 0) {
+      fail(`SATISFIED datapack gate reasonCodes must be empty: ${id}`);
     }
     const evaluatedAt = evidence.evidenceValidity?.evaluatedAt;
     const expiresAt = evidence.evidenceValidity?.expiresAt;
@@ -560,19 +573,13 @@ function evidenceBlockers(entries) {
 }
 
 function datapackGateBlockers(gates) {
-  const statusBlockers = gates
+  return gates
     .filter(({ status }) => status !== "SATISFIED")
     .map(({ id, sourceIssue, status }) => ({
       id: `datapack_gate_${id}_${status}`.toLowerCase(),
       severity: "P0",
       reason: `Datapack gate ${id} from #${sourceIssue} is ${status}`,
     }));
-  const reasonBlockers = gates.flatMap(({ id, sourceIssue, reasonCodes }) => reasonCodes.map((reasonCode) => ({
-    id: `datapack_gate_${id}_${reasonCode}`.toLowerCase(),
-    severity: "P0",
-    reason: `Datapack gate ${id} from #${sourceIssue} reported ${reasonCode}`,
-  })));
-  return [...statusBlockers, ...reasonBlockers];
 }
 
 function requiredGitSha() {
