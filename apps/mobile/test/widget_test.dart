@@ -2016,6 +2016,71 @@ void main() {
     expect(find.bySemanticsLabel(_fanDestinationLabel), findsOneWidget);
   });
 
+  testWidgets('#2200 노선도 역 탭은 팬 메뉴와 함께 하단 역 정보 패널을 연다', (tester) async {
+    final repository = FakeStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      },
+    );
+    await tester.pumpWidget(
+      buildEasySubwayTestApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const Key('networkMapStation-sangnoksu-seoul-4')),
+    );
+    await tester.pumpAndSettle();
+
+    // 팬 메뉴는 그대로 뜬다(기존 동작 보존).
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+    expect(find.bySemanticsLabel(_fanOriginLabel), findsOneWidget);
+
+    // 하단 역 정보 패널이 탭한 역 기준으로 함께 열린다.
+    final panel = find.byKey(const Key('networkMapNearbyStationPanel'));
+    expect(panel, findsOneWidget);
+    final track = find.byKey(const Key('nearbyStationLineBarTrack'));
+    expect(track, findsOneWidget);
+    final trackSize = tester.getSize(track);
+    expect(trackSize.width, greaterThan(0));
+    expect(trackSize.height, greaterThan(0));
+    expect(
+      find.descendant(of: panel, matching: find.text('상록수')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('#2200 검색 결과가 없는 역 탭은 크래시 없이 팬 메뉴만 유지한다', (tester) async {
+    // 탭한 역을 StationSearchResult로 해석하지 못하면(데이터 없음) 하단 패널을
+    // 열지 않고 기존 팬 메뉴 동작을 그대로 유지한다.
+    final repository = FakeStationSearchRepository();
+    await tester.pumpWidget(
+      buildEasySubwayTestApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const Key('networkMapStation-sangnoksu-seoul-4')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+    expect(find.bySemanticsLabel(_fanOriginLabel), findsOneWidget);
+    expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
+  });
+
   testWidgets(
     '#2109 검색 채널(focusStationRequestId)로 열린 팬 메뉴도 지도 탭과 같은 앵커·패닝 경로를 탄다',
     (tester) async {

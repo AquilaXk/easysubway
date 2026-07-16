@@ -486,6 +486,9 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   int _selectionClearRevision = 0;
   int _nearestStationRequestToken = 0;
   int _nearbyDataRequestToken = 0;
+  // #2200: 캔버스 역 탭 → StationSearchResult 해석은 비동기라 연속 탭 시 마지막
+  // 탭만 패널에 반영되도록 토큰으로 앞선 요청을 무효화한다.
+  int _canvasTapPanelToken = 0;
   RealtimeSnapshot _nearbyRealtime = const RealtimeSnapshot.loading();
   _NearbyPanelDataSource _nearbyDataSource = _NearbyPanelDataSource.realtime;
   StationTimetable? _nearbyTimetable;
@@ -612,6 +615,37 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     if (firstLine != null) {
       unawaited(_loadNearbyRealtime(result, firstLine));
     }
+  }
+
+  /// #2200 캔버스에서 역을 탭하면(팬 메뉴는 canvas가 이미 띄운다) 그 역을
+  /// 검색과 동일한 방식([StationSearchRepository.searchStations])으로
+  /// [StationSearchResult]로 해석해 [_showStationPanelFromSearch]와 같은 상태
+  /// 갱신으로 하단 역 정보 패널을 연다. 해석에 실패하면(저장소 없음·데이터 없음)
+  /// 패널을 열지 않고 canvas가 띄운 팬 메뉴만 유지한다.
+  Future<void> _handleCanvasStationTapped(NetworkMapStation station) async {
+    final repository = widget.stationSearchRepository;
+    if (repository == null) {
+      return;
+    }
+    final token = ++_canvasTapPanelToken;
+    List<StationSearchResult> results;
+    try {
+      results = await repository.searchStations(station.nameKo);
+    } catch (_) {
+      // 해석 실패 → 팬 메뉴만 유지(패널 없음).
+      return;
+    }
+    if (!mounted || token != _canvasTapPanelToken) {
+      return;
+    }
+    final match = results
+        .where((result) => result.id == station.id)
+        .firstOrNull;
+    if (match == null) {
+      // 데이터 없음 → 팬 메뉴만 유지(크래시·빈 패널 금지).
+      return;
+    }
+    _showStationPanelFromSearch(match);
   }
 
   /// #2109 검색 결과 탭으로 연 팬 메뉴가 닫히면(액션 선택·닫기·배경 탭·팬) 이
@@ -886,6 +920,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                     selectedStationId: _searchFanMenuStationId,
                     selectionClearRevision: _selectionClearRevision,
                     onSelectionDismissed: _dismissSearchFanMenu,
+                    onStationTapped: _handleCanvasStationTapped,
                     originStationId:
                         widget.routeDraftController.draft.origin?.id,
                     waypointStationId:
@@ -1316,18 +1351,37 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     widget.routeDraftController.setOrigin(
       RouteDraftStation(id: station.id, nameKo: station.nameKo),
     );
+    _dismissNearbyPanelForDraft();
   }
 
   void _setDestinationStation(NetworkMapStation station) {
     widget.routeDraftController.setDestination(
       RouteDraftStation(id: station.id, nameKo: station.nameKo),
     );
+    _dismissNearbyPanelForDraft();
   }
 
   void _setWaypointStation(NetworkMapStation station) {
     widget.routeDraftController.setWaypoint(
       RouteDraftStation(id: station.id, nameKo: station.nameKo),
     );
+    _dismissNearbyPanelForDraft();
+  }
+
+  /// #2200 팬 메뉴로 출발/경유/도착 슬롯을 지정하면 OD 경로 편집 모드로 넘어가므로
+  /// #2200에서 역 탭과 함께 열린 단일 역 정보 패널을 닫는다(검색 모드가 draft
+  /// 변경 시 닫히는 것과 같은 상호배제). 캔버스 팬 메뉴 대상 역 id도 함께 비워
+  /// 다음 프레임 rebuild가 패널을 되살리지 않게 한다. 패널·팬 메뉴가 이미 없으면
+  /// 불필요한 setState를 피한다.
+  void _dismissNearbyPanelForDraft() {
+    if (!_nearbyPanelVisible && _searchFanMenuStationId == null) {
+      return;
+    }
+    setState(() {
+      _canvasTapPanelToken++;
+      _searchFanMenuStationId = null;
+      _resetNearbyPanelState();
+    });
   }
 
   void _clearOriginStation() {
@@ -3565,6 +3619,7 @@ class _NetworkMapCanvas extends StatefulWidget {
     required this.onClearDestination,
     required this.onViewportChanged,
     required this.onSelectionDismissed,
+    required this.onStationTapped,
     this.originStationId,
     this.waypointStationId,
     this.destinationStationId,
@@ -3596,6 +3651,11 @@ class _NetworkMapCanvas extends StatefulWidget {
   /// 메뉴가 닫힐 때(액션 선택·닫기·배경 탭) 부모의 선택 상태도 비워야 한다.
   /// 내부 [_selectedStation]만 null로 두면 prop이 다시 메뉴를 띄운다.
   final VoidCallback onSelectionDismissed;
+
+  /// #2200 캔버스에서 역 노드를 탭하면(팬 메뉴 표시와 동시에) 부모가 그 역을
+  /// 해석해 하단 역 정보 패널을 함께 열도록 통지한다. 검색·focus 채널로 열린
+  /// 팬 메뉴([selectedStationId] prop 경로)는 이 콜백을 태우지 않는다.
+  final ValueChanged<NetworkMapStation> onStationTapped;
 
   @override
   State<_NetworkMapCanvas> createState() => _NetworkMapCanvasState();
@@ -4203,6 +4263,9 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
 
   void _selectStation(NetworkMapStation station) {
     setState(() => _selectedStation = station);
+    // #2200: 캔버스 역 탭은 팬 메뉴와 함께 하단 역 정보 패널도 열도록 부모에
+    // 통지한다(부모가 역을 StationSearchResult로 해석해 패널을 연다).
+    widget.onStationTapped(station);
     // #2109: 화면 경계에서 팬 메뉴가 잘리면 카메라를 최소 거리만 패닝해 전체
     // 노출한다. 다음 프레임(레이아웃 확정 후) 뷰포트 대비 메뉴 bbox를 계산한다.
     WidgetsBinding.instance.addPostFrameCallback((_) {
