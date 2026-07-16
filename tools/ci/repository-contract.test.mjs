@@ -1440,6 +1440,7 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_DATASOURCE_USERNAME=easysubway",
     "EASYSUBWAY_DATASOURCE_PASSWORD=secret",
     "EASYSUBWAY_DATA_PACK_BASE_URL=https://cdn.example.com/easysubway-datapacks",
+    "EASYSUBWAY_DATAPACK_CATALOG_BASE_URL=https://cdn.example.com/easysubway-datapacks",
     "EASYSUBWAY_REPORT_API_BASE_URL=https://api.example.com",
     "EASYSUBWAY_ADS_ASSET_ORIGIN=https://ads-assets.fixture.test-only.dev",
     "EASYSUBWAY_ADS_EVENT_DAILY_CAP=1000000",
@@ -5956,6 +5957,9 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
     "schemaVersion",
     "artifactKind",
     "releaseRequestId",
+    "releaseSequence",
+    "channel",
+    "idempotencyKey",
     "workflowRunUrl",
     "manifestSha256",
     "sqliteSha256",
@@ -14937,7 +14941,8 @@ test("build-release-callback.mjs는 스키마 유효 payload와 공유 fixture �
   const out = execFileSync("node", ["tools/datapack/build-release-callback.mjs"], {
     cwd: root, encoding: "utf8",
     env: { ...process.env,
-      RELEASE_REQUEST_ID: f.releaseRequestId, WORKFLOW_RUN_URL: f.workflowRunUrl,
+      RELEASE_REQUEST_ID: f.releaseRequestId, RELEASE_SEQUENCE: String(f.releaseSequence),
+      TARGET_CHANNEL: f.channel, WORKFLOW_RUN_URL: f.workflowRunUrl,
       MANIFEST_SHA256: f.manifestSha256, SQLITE_SHA256: f.sqliteSha256, GZIP_SHA256: f.gzipSha256,
       EVIDENCE_BUNDLE_SHA256: f.evidenceBundleSha256, VALIDATOR_STATUS: f.validatorStatus,
       ROUTE_REGRESSION_STATUS: f.routeRegressionStatus, PUBLISH_STATUS: f.publishStatus,
@@ -14945,11 +14950,11 @@ test("build-release-callback.mjs는 스키마 유효 payload와 공유 fixture �
   });
   const payload = JSON.parse(out);
   assert.equal(payload.artifactKind, "datapack-release-callback");
-  assert.equal(payload.schemaVersion, 1);
+  assert.equal(payload.schemaVersion, 2);
   assert.equal(payload.callbackVerifier.kind, "payload-signature");
   assert.equal(payload.callbackVerifier.value, vec.expectedHmacHex); // node↔Java 합의
-  // required 12필드 + additionalProperties:false 준수
-  assert.deepEqual(Object.keys(payload).sort(), ["artifactKind","callbackVerifier","evidenceBundleSha256","gzipSha256","manifestSha256","publishStatus","releaseRequestId","routeRegressionStatus","schemaVersion","sqliteSha256","validatorStatus","workflowRunUrl"]);
+  // required 15필드 + additionalProperties:false 준수
+  assert.deepEqual(Object.keys(payload).sort(), ["artifactKind","callbackVerifier","channel","evidenceBundleSha256","gzipSha256","idempotencyKey","manifestSha256","publishStatus","releaseRequestId","releaseSequence","routeRegressionStatus","schemaVersion","sqliteSha256","validatorStatus","workflowRunUrl"]);
 });
 
 async function classifyChangedFiles(files) {
