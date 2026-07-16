@@ -18,8 +18,8 @@ import org.springframework.stereotype.Component;
 public class FacilityReportPersonalDataPurgeScheduler {
 
 	private static final Logger log = LoggerFactory.getLogger(FacilityReportPersonalDataPurgeScheduler.class);
-	private static final Duration DEFAULT_PURGE_INTERVAL = Duration.ofDays(1);
 	private static final long DEFAULT_PURGE_INTERVAL_MILLIS = 86_400_000L;
+	private static final Duration PURGE_SAFETY_MARGIN = Duration.ofDays(7);
 	private static final int MAX_RETENTION_DAYS = 365;
 
 	private final PurgeFacilityReportPersonalDataPort purgePort;
@@ -47,12 +47,12 @@ public class FacilityReportPersonalDataPurgeScheduler {
 		this.retentionDays = retentionDays;
 	}
 
-	@Scheduled(fixedDelay = DEFAULT_PURGE_INTERVAL_MILLIS)
+	@Scheduled(fixedRate = DEFAULT_PURGE_INTERVAL_MILLIS)
 	public void purgeExpiredPersonalData() {
 		LocalDateTime cutoff = LocalDateTime.ofInstant(
 			clock.instant()
 				.minus(Duration.ofDays(retentionDays))
-				.plus(DEFAULT_PURGE_INTERVAL),
+				.plus(PURGE_SAFETY_MARGIN),
 			ZoneOffset.UTC
 		);
 		int purged = purgePort.purgePersonalDataCreatedBefore(cutoff);

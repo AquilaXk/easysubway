@@ -18,7 +18,8 @@ if (!Number.isInteger(retentionDays) || retentionDays < 1 || retentionDays > 365
   throw new Error("--retention-days must be an integer from 1 to 365");
 }
 
-const cutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
+const dailySweepIntervalMs = 24 * 60 * 60 * 1000;
+const cutoff = Date.now() - retentionDays * dailySweepIntervalMs + dailySweepIntervalMs;
 const postgresBackup = /^easysubway-postgres-\d{8}T\d{6}Z\.[A-Za-z0-9]+\.dump(?:\.sha256)?$/;
 const photoBackup = /^easysubway-report-photos-\d{8}T\d{6}Z\.[A-Za-z0-9]+$/;
 let pruned = 0;

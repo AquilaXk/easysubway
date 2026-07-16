@@ -514,7 +514,8 @@ public class JdbcFacilityReportRepository implements
 	@Override
 	public FacilityReport saveReport(FacilityReport report) {
 		upsertReport(report);
-		return report;
+		return loadReport(report.id())
+			.orElseThrow(() -> new IllegalStateException("Saved facility report is missing: " + report.id()));
 	}
 
 	@Override

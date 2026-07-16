@@ -439,9 +439,11 @@ class JdbcFacilityReportRepositoryTest {
 			staleReport.receiptTokenHash()
 		);
 
-		repository.saveReport(staleResolvedReport);
+		FacilityReport returned = repository.saveReport(staleResolvedReport);
 
 		FacilityReport saved = repository.loadReport(originalReport.id()).orElseThrow();
+		assertThat(returned).isEqualTo(saved);
+		assertThat(returned.description()).isEqualTo("사용자 데이터 삭제로 신고 내용이 삭제되었습니다.");
 		assertThat(saved.status()).isEqualTo(FacilityReportStatus.RESOLVED);
 		assertThat(saved.userId()).isEqualTo(FacilityReport.ANONYMIZED_USER_ID);
 		assertThat(saved.description()).isEqualTo("사용자 데이터 삭제로 신고 내용이 삭제되었습니다.");

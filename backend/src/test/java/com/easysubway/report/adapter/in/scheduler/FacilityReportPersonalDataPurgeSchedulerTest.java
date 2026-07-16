@@ -18,7 +18,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 class FacilityReportPersonalDataPurgeSchedulerTest {
 
 	@Test
-	@DisplayName("일일 실행 지연을 포함해도 기본 1년 보관 상한을 넘기지 않는다")
+	@DisplayName("일일 주기와 실행시간 안전 여유를 포함해도 기본 1년 보관 상한을 넘기지 않는다")
 	void purgesPersonalDataOlderThanRetentionLimit() throws Exception {
 		Instant now = Instant.parse("2026-07-16T12:00:00Z");
 		AtomicReference<LocalDateTime> cutoff = new AtomicReference<>();
@@ -34,12 +34,12 @@ class FacilityReportPersonalDataPurgeSchedulerTest {
 
 		scheduler.purgeExpiredPersonalData();
 
-		assertThat(cutoff.get()).isEqualTo(LocalDateTime.of(2025, 7, 17, 12, 0));
+		assertThat(cutoff.get()).isEqualTo(LocalDateTime.of(2025, 7, 23, 12, 0));
 		Method scheduledMethod = FacilityReportPersonalDataPurgeScheduler.class
 			.getDeclaredMethod("purgeExpiredPersonalData");
-		assertThat(scheduledMethod.getAnnotation(Scheduled.class).fixedDelay())
+		assertThat(scheduledMethod.getAnnotation(Scheduled.class).fixedRate())
 			.isEqualTo(86_400_000L);
-		assertThat(scheduledMethod.getAnnotation(Scheduled.class).fixedDelayString()).isEmpty();
+		assertThat(scheduledMethod.getAnnotation(Scheduled.class).fixedDelay()).isEqualTo(-1L);
 	}
 
 	@Test

@@ -10887,7 +10887,7 @@ test("시설 신고 사진 백업은 로컬 전용 객체와 manifest 기준선�
   assert.match(backupScript, /printf 'facility report photo backup written: %s\\n' "\$\{run_dir\}"/);
 });
 
-test("민감정보 백업 보존 작업은 30일이 지난 DB·사진 사본만 안전하게 삭제한다", async () => {
+test("민감정보 백업 보존 작업은 일일 실행 지연을 포함해 30일 상한 안에서 안전하게 삭제한다", async () => {
   const pruneScript = "tools/ops/prune-sensitive-backups.mjs";
   const workflow = read(".github/workflows/sensitive-backup-retention.yml");
   const backupRoot = await mkdtemp(path.join(tmpdir(), "easysubway-sensitive-backups-"));
@@ -10899,6 +10899,7 @@ test("민감정보 백업 보존 작업은 30일이 지난 DB·사진 사본만 
   );
   const expiredDump = path.join(nested, "easysubway-postgres-20260601T000000Z.ABC123.dump");
   const expiredChecksum = `${expiredDump}.sha256`;
+  const dailyBoundaryDump = path.join(nested, "easysubway-postgres-20260617T000000Z.GHI789.dump");
   const retainedDump = path.join(nested, "easysubway-postgres-20260716T000000Z.DEF456.dump");
   const unrelated = path.join(backupRoot, "operator-note.txt");
   const outsideRoot = await mkdtemp(path.join(tmpdir(), "easysubway-backup-outside-"));
@@ -10908,12 +10909,14 @@ test("민감정보 백업 보존 작업은 30일이 지난 DB·사진 사본만 
     "easysubway-postgres-20260601T000000Z.SYM123.dump",
   );
   const old = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000);
+  const dailyBoundary = new Date(Date.now() - 29.5 * 24 * 60 * 60 * 1000);
 
   await mkdir(expiredPhotoDir, { recursive: true });
   await mkdir(nested, { recursive: true });
   await writeFile(path.join(expiredPhotoDir, "manifest.tsv"), "expired");
   await writeFile(expiredDump, "expired dump");
   await writeFile(expiredChecksum, "expired checksum");
+  await writeFile(dailyBoundaryDump, "daily boundary dump");
   await writeFile(retainedDump, "retained dump");
   await writeFile(unrelated, "unrelated");
   await writeFile(outside, "outside");
@@ -10921,6 +10924,7 @@ test("민감정보 백업 보존 작업은 30일이 지난 DB·사진 사본만 
   for (const candidate of [expiredPhotoDir, expiredDump, expiredChecksum, unrelated]) {
     await utimes(candidate, old, old);
   }
+  await utimes(dailyBoundaryDump, dailyBoundary, dailyBoundary);
 
   const output = execFileSync(
     process.execPath,
@@ -10928,10 +10932,11 @@ test("민감정보 백업 보존 작업은 30일이 지난 DB·사진 사본만 
     { cwd: root, encoding: "utf8" },
   );
 
-  assert.match(output, /pruned=3 retention_days=30/);
+  assert.match(output, /pruned=4 retention_days=30/);
   assert.equal(existsSync(expiredPhotoDir), false);
   assert.equal(existsSync(expiredDump), false);
   assert.equal(existsSync(expiredChecksum), false);
+  assert.equal(existsSync(dailyBoundaryDump), false);
   assert.equal(existsSync(retainedDump), true);
   assert.equal(existsSync(unrelated), true);
   assert.equal(existsSync(matchingSymlink), true);
@@ -12715,7 +12720,8 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(read(purgePersonalDataPortPath), /purgePersonalDataCreatedBefore/);
   assert.match(read(purgePersonalDataSchedulerPath), /personal-data-retention-days:365/);
   assert.match(read(purgePersonalDataSchedulerPath), /DEFAULT_PURGE_INTERVAL_MILLIS = 86_400_000L/);
-  assert.match(read(purgePersonalDataSchedulerPath), /@Scheduled\(fixedDelay = DEFAULT_PURGE_INTERVAL_MILLIS\)/);
+  assert.match(read(purgePersonalDataSchedulerPath), /PURGE_SAFETY_MARGIN = Duration\.ofDays\(7\)/);
+  assert.match(read(purgePersonalDataSchedulerPath), /@Scheduled\(fixedRate = DEFAULT_PURGE_INTERVAL_MILLIS\)/);
   assert.doesNotMatch(read(purgePersonalDataSchedulerPath), /personal-data-purge-interval-ms/);
   assert.match(saveFacilityStatusPort, /interface SaveAccessibilityFacilityStatusPort/);
   assert.match(saveFacilityStatusPort, /saveFacilityStatus/);
@@ -17866,7 +17872,7 @@ test("서비스·위치정보 이용약관은 공개 경로와 사실 계약을 
   assert.match(locationTerms, /위치기반서비스는 무료/);
   assert.match(locationTerms, /접수일부터 최대 1년/);
   assert.match(locationTerms, /매일 보관 상한이 지난/);
-  assert.match(locationTerms, /백업 생성일부터 30일/);
+  assert.match(locationTerms, /백업 생성일부터 최대 30일/);
   assert.match(locationTerms, /운영 환경의 일일 자동 작업/);
   assert.match(locationTerms, /제공받는 자는 카카오/);
   assert.match(locationTerms, /카카오맵 앱에는 현재 위치의 시작 좌표와 목적지 좌표/);
