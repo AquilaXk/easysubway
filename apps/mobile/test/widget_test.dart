@@ -50,6 +50,8 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_test/flutter_test.dart';
 
+import 'support/easy_subway_app_fixture.dart';
+
 import 'fake_secure_key_value_storage.dart';
 import 'user_copy_guard.dart';
 
@@ -213,7 +215,7 @@ Future<void> _pumpNetworkMapForGpsTest(
   RealtimeRepository? realtimeRepository,
 }) async {
   await tester.pumpWidget(
-    EasySubwayApp(
+    buildEasySubwayTestApp(
       repository: repository,
       reportRepository: FakeFacilityReportRepository(),
       routeRepository: FakeRouteSearchRepository(),
@@ -517,7 +519,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: reportRepository,
         routeRepository: FakeRouteSearchRepository(),
@@ -562,7 +564,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: reportRepository,
         routeRepository: FakeRouteSearchRepository(),
@@ -618,7 +620,7 @@ void main() {
 
   testWidgets('온보딩을 마친 앱 세션은 홈을 바로 보여준다', (tester) async {
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -635,7 +637,7 @@ void main() {
 
   testWidgets('만료된 bundled datapack은 홈에 stale 안내를 표시한다', (tester) async {
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -675,7 +677,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -706,7 +708,7 @@ void main() {
       },
     );
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: stationRepository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -734,7 +736,7 @@ void main() {
 
     await runWithMobileErrorReporter(reportedErrors.add, () async {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: FakeStationSearchRepository(),
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -767,7 +769,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -797,7 +799,7 @@ void main() {
     addTearDown(tester.view.resetViewPadding);
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -829,7 +831,7 @@ void main() {
     final routeRepository = FakeRouteSearchRepository();
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: stationRepository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: routeRepository,
@@ -861,7 +863,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -888,7 +890,7 @@ void main() {
 
   testWidgets('온보딩 보기 설정은 완료 뒤 홈 UI에 적용된다', (tester) async {
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -948,7 +950,7 @@ void main() {
 
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: FakeStationSearchRepository(),
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -1053,7 +1055,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -1093,7 +1095,7 @@ void main() {
 
   testWidgets('홈 우측 상단 알림 버튼은 알림함으로 이동한다', (tester) async {
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -1139,7 +1141,7 @@ void main() {
 
     await runWithMobileErrorReporter(reportedErrors.add, () async {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: FakeStationSearchRepository(),
           reportRepository: reportRepository,
           routeRepository: FakeRouteSearchRepository(),
@@ -1182,7 +1184,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -1210,7 +1212,7 @@ void main() {
     final reportRepository = FakeFacilityReportRepository();
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: reportRepository,
         routeRepository: FakeRouteSearchRepository(),
@@ -1233,7 +1235,7 @@ void main() {
 
   testWidgets('홈 검색바는 idle에서 active로 전환돼도 시각 박스 높이가 그대로 유지된다', (tester) async {
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -1608,7 +1610,7 @@ void main() {
 
   testWidgets('#2003 상단 내비게이션(검색바·메뉴·힌트 텍스트)이 확대된 안 B 치수를 갖는다', (tester) async {
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -1695,7 +1697,7 @@ void main() {
       },
     );
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -1736,7 +1738,7 @@ void main() {
 
   testWidgets('알림함 시설 상태는 쉬운 안내와 할 일을 함께 보여준다', (tester) async {
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -1765,7 +1767,7 @@ void main() {
 
   testWidgets('홈 노선도 버튼은 v3 노선도 화면을 연다', (tester) async {
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(
           networkMapRegionNames: const ['수도권'],
         ),
@@ -1831,7 +1833,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: stationRepository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -1861,7 +1863,7 @@ void main() {
   testWidgets('홈 shell 즐겨찾기 경로 다시 찾기는 저장된 이동 조건을 유지한다', (tester) async {
     final routeRepository = FakeRouteSearchRepository();
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: routeRepository,
@@ -1894,7 +1896,7 @@ void main() {
 
   testWidgets('노선도에서 출발·도착을 정하면 길찾기 결과 화면으로 전환한다', (tester) async {
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -1917,7 +1919,7 @@ void main() {
 
   testWidgets('결과 화면에서 뒤로가기로 홈에 오면 상단바가 빈 검색바로 복귀한다', (tester) async {
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -1950,7 +1952,7 @@ void main() {
 
   testWidgets('노선도 메뉴에서 데이터 및 지도 출처 화면으로 이동한다', (tester) async {
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -2002,7 +2004,7 @@ void main() {
       networkMapRegionNames: const ['테스트권', '부산'],
     );
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -2032,7 +2034,7 @@ void main() {
       networkMapRegionNames: const ['테스트권', '부산'],
     );
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -2206,7 +2208,7 @@ void main() {
   testWidgets('노선도는 노선 필터 없이 전체 지도에서 역을 선택한다', (tester) async {
     final repository = FakeStationSearchRepository();
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -2862,7 +2864,7 @@ void main() {
 
   testWidgets('노선도는 노선별 보기 우회 sheet를 노출하지 않는다', (tester) async {
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -2884,7 +2886,7 @@ void main() {
 
   testWidgets('운행 공지 disruption은 홈 배너·좌측 메뉴·목록까지 배선된다', (tester) async {
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -2931,7 +2933,7 @@ void main() {
 
   testWidgets('운행 공지 배너는 닫기로 사라진다', (tester) async {
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -3288,7 +3290,7 @@ void main() {
 
   testWidgets('노선도는 카드가 아니라 공식 지도처럼 전면 캔버스로 보인다', (tester) async {
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(
           networkMapRegionNames: const ['수도권'],
         ),
@@ -3318,7 +3320,7 @@ void main() {
     tester.view.devicePixelRatio = 3;
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: FakeStationSearchRepository(
             networkMapRegionNames: const ['수도권'],
           ),
@@ -3430,7 +3432,7 @@ void main() {
 
   testWidgets('노선도 급행 전환은 필터 밖 선택 역 탭을 숨긴다', (tester) async {
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(
           networkMapData: _expressFilterMapData(),
         ),
@@ -3620,7 +3622,7 @@ void main() {
 
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: FakeStationSearchRepository(
             networkMapRegionNames: const ['테스트권'],
             networkMapData: map,
@@ -3706,7 +3708,7 @@ void main() {
 
   testWidgets('노선도 역을 누르면 출발 도착 설정 sheet를 보여준다', (tester) async {
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -3780,7 +3782,7 @@ void main() {
     final semanticsHandle = tester.ensureSemantics();
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: FakeStationSearchRepository(),
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -3892,7 +3894,7 @@ void main() {
       ),
     );
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -3967,7 +3969,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -4043,7 +4045,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -4116,7 +4118,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -4195,7 +4197,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -4307,7 +4309,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -4400,7 +4402,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -4511,7 +4513,7 @@ void main() {
 
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: repository,
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -4646,7 +4648,7 @@ void main() {
 
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: repository,
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -4680,7 +4682,7 @@ void main() {
 
   testWidgets('홈 화면은 v3 기준 큰 행동과 짧은 상태 카드로 구성된다', (tester) async {
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -4727,7 +4729,7 @@ void main() {
 
   testWidgets('홈 즐겨찾기는 여러 시설을 인라인 행으로 나열한다', (tester) async {
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -4766,7 +4768,7 @@ void main() {
 
   testWidgets('홈 시설 알림은 주의 상태 시설이 없으면 빈 상태를 보여준다', (tester) async {
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -4794,7 +4796,7 @@ void main() {
       ..error = const FavoriteRouteException('최근 경로 실패');
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -5323,7 +5325,7 @@ void main() {
 
   testWidgets('노선도 좌측 메뉴 하단에 광고 슬롯이 있다', (tester) async {
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -5362,7 +5364,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -5391,7 +5393,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -5442,7 +5444,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -5467,7 +5469,7 @@ void main() {
 
   testWidgets('노선도 좌측 메뉴에서 설정 화면으로 들어갈 수 있다', (tester) async {
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -5506,7 +5508,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -5542,7 +5544,7 @@ void main() {
   testWidgets('홈 이동 조건 pill은 모든 프리셋에 맞는 표시명을 보여준다', (tester) async {
     for (final preset in MobilityPreset.values) {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           key: ValueKey('home-preset-${preset.name}'),
           repository: FakeStationSearchRepository(),
           reportRepository: FakeFacilityReportRepository(),
@@ -5574,7 +5576,7 @@ void main() {
     });
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -5606,7 +5608,7 @@ void main() {
 
   testWidgets('홈 최근 경로 역명은 말줄임으로 자르지 않는다', (tester) async {
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -5638,7 +5640,7 @@ void main() {
 
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: FakeStationSearchRepository(),
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -5681,7 +5683,7 @@ void main() {
     await tester.pumpWidget(
       RepaintBoundary(
         key: screenshotKey,
-        child: EasySubwayApp(
+        child: buildEasySubwayTestApp(
           repository: FakeStationSearchRepository(),
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -5719,7 +5721,7 @@ void main() {
 
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: FakeStationSearchRepository(),
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -5749,7 +5751,7 @@ void main() {
       ..error = const FavoriteRouteException('즐겨찾기 경로를 불러오지 못했어요.');
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -5778,7 +5780,7 @@ void main() {
 
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: FakeStationSearchRepository(),
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -6002,7 +6004,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -6044,7 +6046,7 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -6088,7 +6090,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -6132,7 +6134,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -6169,7 +6171,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -6233,7 +6235,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -6297,7 +6299,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -6363,7 +6365,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -6416,7 +6418,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -6465,7 +6467,7 @@ void main() {
     });
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -6499,7 +6501,7 @@ void main() {
     final semanticsHandle = tester.ensureSemantics();
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -6536,7 +6538,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -6665,7 +6667,7 @@ void main() {
     final semanticsHandle = tester.ensureSemantics();
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: FakeStationSearchRepository(),
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -6748,7 +6750,7 @@ void main() {
     final semanticsHandle = tester.ensureSemantics();
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: FakeStationSearchRepository(),
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -6780,7 +6782,7 @@ void main() {
     final semanticsHandle = tester.ensureSemantics();
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: FakeStationSearchRepository(),
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -6827,7 +6829,7 @@ void main() {
     final launcher = RecordingSupportAccessLauncher();
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: FakeStationSearchRepository(),
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -6892,7 +6894,7 @@ void main() {
     final launcher = RecordingSupportAccessLauncher();
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -6923,7 +6925,7 @@ void main() {
     final launcher = RecordingSupportAccessLauncher();
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -6973,7 +6975,7 @@ void main() {
           'legacy-token-payload';
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -7096,7 +7098,7 @@ void main() {
 
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: FakeStationSearchRepository(),
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -7159,7 +7161,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -7195,7 +7197,7 @@ void main() {
     final launcher = RecordingSupportAccessLauncher();
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -7226,7 +7228,7 @@ void main() {
     final launcher = RecordingSupportAccessLauncher(openResult: false);
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -7258,7 +7260,7 @@ void main() {
 
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: FakeStationSearchRepository(),
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -7314,7 +7316,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -7354,7 +7356,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -7387,7 +7389,7 @@ void main() {
 
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: FakeStationSearchRepository(),
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -7437,7 +7439,7 @@ void main() {
 
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: FakeStationSearchRepository(),
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -7489,7 +7491,7 @@ void main() {
 
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: FakeStationSearchRepository(),
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -7536,7 +7538,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -7583,7 +7585,7 @@ void main() {
 
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: FakeStationSearchRepository(),
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -7655,7 +7657,7 @@ void main() {
     String? searchAgainMobilityType;
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -7702,7 +7704,7 @@ void main() {
     RouteDraft? restoredDraft;
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -7738,7 +7740,7 @@ void main() {
       },
     );
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -7795,7 +7797,7 @@ void main() {
 
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: repository,
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -7968,7 +7970,7 @@ void main() {
     await tester.pumpWidget(
       MediaQuery(
         data: const MediaQueryData(textScaler: TextScaler.linear(2.0)),
-        child: EasySubwayApp(
+        child: buildEasySubwayTestApp(
           repository: repository,
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -8025,7 +8027,7 @@ void main() {
     await tester.pumpWidget(
       MediaQuery(
         data: const MediaQueryData(textScaler: TextScaler.linear(2.0)),
-        child: EasySubwayApp(
+        child: buildEasySubwayTestApp(
           repository: repository,
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -8080,7 +8082,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -8138,7 +8140,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -8177,7 +8179,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -8218,7 +8220,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -8270,7 +8272,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -8321,7 +8323,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -9169,7 +9171,7 @@ void main() {
 
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: repository,
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -9240,7 +9242,7 @@ void main() {
     final searchHistoryRepository = FakeSearchHistoryRepository(['상록수', '사당']);
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -9317,7 +9319,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -9365,7 +9367,7 @@ void main() {
     final repository = FakeStationSearchRepository();
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -9397,7 +9399,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -9431,7 +9433,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -9491,7 +9493,7 @@ void main() {
 
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: repository,
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -9556,7 +9558,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -9612,7 +9614,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -9654,7 +9656,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -9703,7 +9705,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -9744,7 +9746,7 @@ void main() {
 
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: repository,
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -9789,7 +9791,7 @@ void main() {
     final repository = FakeStationSearchRepository();
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -9824,7 +9826,7 @@ void main() {
     final repository = FakeStationSearchRepository();
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -9860,7 +9862,7 @@ void main() {
       nextResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
     );
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: repository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -11279,7 +11281,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: stationRepository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -11318,7 +11320,7 @@ void main() {
 
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: FakeStationSearchRepository(),
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -11373,7 +11375,7 @@ void main() {
 
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: FakeStationSearchRepository(),
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -11412,7 +11414,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: stationRepository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: routeRepository,
@@ -11431,7 +11433,7 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: stationRepository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: routeRepository,
@@ -11460,7 +11462,7 @@ void main() {
 
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: stationRepository,
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: routeRepository,
@@ -11770,7 +11772,7 @@ void main() {
     final routeRepository = FakeRouteSearchRepository();
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: stationRepository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: routeRepository,
@@ -11811,7 +11813,7 @@ void main() {
     final routeRepository = FakeRouteSearchRepository();
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: stationRepository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: routeRepository,
@@ -11848,7 +11850,7 @@ void main() {
 
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: FakeStationSearchRepository(),
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -11880,7 +11882,7 @@ void main() {
     final favoriteRouteRepository = FakeFavoriteRouteRepository();
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: stationRepository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -12160,7 +12162,7 @@ void main() {
 
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: stationRepository,
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -12218,7 +12220,7 @@ void main() {
     final routeFeedbackRepository = FakeRouteFeedbackRepository();
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: stationRepository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -12325,7 +12327,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: stationRepository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: routeRepository,
@@ -14169,7 +14171,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: stationRepository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -14213,7 +14215,7 @@ void main() {
 
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: stationRepository,
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -14341,7 +14343,7 @@ void main() {
 
     try {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: stationRepository,
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: routeRepository,
@@ -14388,7 +14390,7 @@ void main() {
     final routeRepository = FakeRouteSearchRepository();
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: stationRepository,
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: routeRepository,
@@ -15055,7 +15057,7 @@ void main() {
     var restoreCount = 0;
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: reportRepository,
         routeRepository: FakeRouteSearchRepository(),
@@ -15135,7 +15137,7 @@ void main() {
     var restoreCount = 0;
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
@@ -15194,7 +15196,7 @@ void main() {
 
     await runWithMobileErrorReporter(reportedErrors.add, () async {
       await tester.pumpWidget(
-        EasySubwayApp(
+        buildEasySubwayTestApp(
           repository: FakeStationSearchRepository(),
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
