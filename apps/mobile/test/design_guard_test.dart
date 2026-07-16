@@ -163,7 +163,8 @@ void main() {
       // 의도 잔존: 시설 상태 카드 blocked/caution — 상태 의미 틴트 (v4 허용 예외)
       'lib/features/notifications/presentation/notification_inbox_screen.dart':
           2,
-      'lib/station_search.dart': 1,
+      'lib/features/stations/presentation/station_facility_status_summary.dart':
+          1,
       // 의도 잔존: 운행 공지 배너 — 운행 중단 상태 의미 (v4 허용 예외)
       'lib/features/service_notice/presentation/service_notice_banner.dart': 1,
     }, rule: '장식 Soft 틴트');
@@ -333,13 +334,16 @@ void main() {
     // 상한은 내리기만 한다.
     final actual = countPerFile(RegExp(r'\bCard\('));
     expectRatchet(actual, {
-      // 의도 잔존: 역 상세 카드 2곳 — 무박스(행+구분선) 전환 진행 중
-      'lib/station_search.dart': 2,
+      // 동일 총량 중 시설 상태 카드 1곳은 canonical presentation 경로로 이동했다.
+      'lib/features/stations/presentation/station_facility_status_summary.dart':
+          1,
       // 동일 총량 중 출구 카드 1곳은 canonical presentation 경로로 이동했다.
       'lib/features/stations/presentation/station_exit_card.dart': 1,
       // 동일 총량 중 시설 상세 카드 1곳은 canonical presentation 경로로 이동했다.
       'lib/features/stations/presentation/station_facility_detail_screen.dart':
           1,
+      // 동일 총량 중 시설 목록 카드 1곳은 canonical presentation 경로로 이동했다.
+      'lib/features/stations/presentation/station_facility_card.dart': 1,
       // 안내 확인 방법 카드는 두 화면이 공유하는 canonical component로 이동했다.
       'lib/features/stations/presentation/station_info_basis_disclosure.dart':
           1,
