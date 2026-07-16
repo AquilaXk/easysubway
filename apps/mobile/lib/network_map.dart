@@ -17,6 +17,9 @@ import 'features/network_map/domain/map_camera.dart';
 import 'features/network_map/domain/route_map_design_space.dart';
 import 'features/network_map/domain/route_map_major_stations.dart';
 import 'features/network_map/domain/structured_route_map.dart';
+import 'features/network_map/presentation/nearby_data_source_toggle.dart';
+import 'features/network_map/presentation/nearby_direction_title.dart';
+import 'features/network_map/presentation/nearby_station_line_bar.dart';
 import 'features/network_map/presentation/route_map_transfer_marker.dart';
 import 'features/network_map/presentation/station_fan_menu.dart';
 import 'features/network_map/presentation/station_fan_menu_geometry.dart'
@@ -1619,7 +1622,6 @@ class _NetworkMapChrome extends StatelessWidget {
               timetableLoading: nearbyTimetableLoading,
               adjacentStations: adjacentStations,
               onClose: onCloseNearbyPanel,
-              onRetry: onCurrentLocationTap,
               onLineSelected: onNearbyLineSelected,
               onDataSourceToggle: onNearbyDataSourceToggle,
             ),
@@ -2474,7 +2476,6 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
     required this.timetableLoading,
     required this.adjacentStations,
     required this.onClose,
-    required this.onRetry,
     required this.onLineSelected,
     required this.onDataSourceToggle,
   });
@@ -2487,7 +2488,6 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
   final bool timetableLoading;
   final _NetworkMapAdjacentStations adjacentStations;
   final VoidCallback onClose;
-  final VoidCallback onRetry;
   final ValueChanged<StationSearchLine> onLineSelected;
   final VoidCallback onDataSourceToggle;
 
@@ -2495,9 +2495,6 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final primary = data.results.isEmpty ? null : data.results.first;
     final dataSourceToggleEnabled = !(primary?.lines.isEmpty ?? true);
-    final dataSourceToggleLabel = dataSource == _NearbyPanelDataSource.realtime
-        ? '현재 실시간, 시간표로 전환'
-        : '현재 시간표, 실시간으로 전환';
     return Material(
       key: const Key('networkMapNearbyStationPanel'),
       color: Colors.white,
@@ -2539,57 +2536,11 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
                     ),
                     Padding(
                       padding: const EdgeInsets.only(bottom: 2),
-                      child: Semantics(
-                        button: true,
+                      child: NearbyDataSourceToggle(
+                        isRealtime:
+                            dataSource == _NearbyPanelDataSource.realtime,
                         enabled: dataSourceToggleEnabled,
-                        label: dataSourceToggleLabel,
-                        onTap: dataSourceToggleEnabled
-                            ? onDataSourceToggle
-                            : null,
-                        excludeSemantics: true,
-                        child: TextButton(
-                          key: const Key('networkMapNearbyDataSourceToggle'),
-                          onPressed: dataSourceToggleEnabled
-                              ? onDataSourceToggle
-                              : null,
-                          style: TextButton.styleFrom(
-                            minimumSize: const Size(58, 48),
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            foregroundColor: EasySubwayAccessibleColors.mint,
-                            side: const BorderSide(
-                              color: EasySubwayAccessibleColors.mintBorder,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                          ),
-                          child: Text(
-                            dataSource == _NearbyPanelDataSource.realtime
-                                ? '실시간'
-                                : '시간표',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 2),
-                      child: IconButton(
-                        tooltip: '다시 찾기',
-                        onPressed: onRetry,
-                        constraints: const BoxConstraints.tightFor(
-                          width: 48,
-                          height: 48,
-                        ),
-                        padding: EdgeInsets.zero,
-                        icon: const Icon(
-                          Icons.refresh,
-                          color: Color(0xFF5A5A5A),
-                          size: 27,
-                        ),
+                        onToggle: onDataSourceToggle,
                       ),
                     ),
                     Padding(
@@ -2618,6 +2569,7 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
               _NetworkMapNearbyPanelBody(
                 data: data,
                 realtime: realtime,
+                selectedLineId: selectedLineId,
                 dataSource: dataSource,
                 timetable: timetable,
                 timetableLoading: timetableLoading,
@@ -2635,6 +2587,7 @@ class _NetworkMapNearbyPanelBody extends StatelessWidget {
   const _NetworkMapNearbyPanelBody({
     required this.data,
     required this.realtime,
+    required this.selectedLineId,
     required this.dataSource,
     required this.timetable,
     required this.timetableLoading,
@@ -2643,6 +2596,7 @@ class _NetworkMapNearbyPanelBody extends StatelessWidget {
 
   final _NetworkMapNearbyPanelData data;
   final RealtimeSnapshot realtime;
+  final String? selectedLineId;
   final _NearbyPanelDataSource dataSource;
   final StationTimetable? timetable;
   final bool timetableLoading;
@@ -2659,6 +2613,7 @@ class _NetworkMapNearbyPanelBody extends StatelessWidget {
       _NetworkMapNearbyPanelStatus.success => _NetworkMapNearbySuccessList(
         results: data.results,
         realtime: realtime,
+        selectedLineId: selectedLineId,
         dataSource: dataSource,
         timetable: timetable,
         timetableLoading: timetableLoading,
@@ -2668,10 +2623,41 @@ class _NetworkMapNearbyPanelBody extends StatelessWidget {
   }
 }
 
+/// 주변역 패널의 선택 노선색 단일 소스. 카탈로그 색을 우선하고 값이 없으면
+/// 노선 이름·식별자 폴백을 쓴다(2호선 = #00A84D).
+Color _nearbySelectedLineColor(StationSearchLine? line) {
+  if (line == null) {
+    return stationLineColor(stationLineFallbackBrandHex);
+  }
+  final raw = line.color.trim();
+  if (raw.isEmpty) {
+    return stationLineColor(
+      fallbackLineColorHex(lineId: line.id, lineName: line.name),
+    );
+  }
+  return stationLineColor(raw);
+}
+
+StationSearchLine? _nearbySelectedLine(
+  StationSearchResult primary,
+  String? selectedLineId,
+) {
+  if (primary.lines.isEmpty) {
+    return null;
+  }
+  for (final line in primary.lines) {
+    if (line.id == selectedLineId) {
+      return line;
+    }
+  }
+  return primary.lines.first;
+}
+
 class _NetworkMapNearbySuccessList extends StatelessWidget {
   const _NetworkMapNearbySuccessList({
     required this.results,
     required this.realtime,
+    required this.selectedLineId,
     required this.dataSource,
     required this.timetable,
     required this.timetableLoading,
@@ -2680,6 +2666,7 @@ class _NetworkMapNearbySuccessList extends StatelessWidget {
 
   final List<StationSearchResult> results;
   final RealtimeSnapshot realtime;
+  final String? selectedLineId;
   final _NearbyPanelDataSource dataSource;
   final StationTimetable? timetable;
   final bool timetableLoading;
@@ -2688,83 +2675,27 @@ class _NetworkMapNearbySuccessList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final primary = results.first;
-    final leftName = adjacentStations.leftName;
-    final rightName = adjacentStations.rightName;
+    final selectedLine = _nearbySelectedLine(primary, selectedLineId);
+    final lineColor = _nearbySelectedLineColor(selectedLine);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(13, 18, 13, 0),
-          child: Container(
-            height: 26,
-            decoration: BoxDecoration(
-              color: EasySubwayAccessibleColors.mapSelectionAccent,
-              borderRadius: BorderRadius.circular(13),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    leftName == null ? '' : '< $leftName',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                Container(
-                  constraints: const BoxConstraints(minWidth: 126),
-                  height: 34,
-                  alignment: Alignment.center,
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: EasySubwayAccessibleColors.mapSelectionAccent,
-                      width: 3,
-                    ),
-                  ),
-                  child: Text(
-                    primary.nameKo,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF2C2C2C),
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    rightName == null ? '' : '$rightName >',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+        NearbyStationLineBar(
+          leftName: adjacentStations.leftName,
+          rightName: adjacentStations.rightName,
+          stationName: primary.nameKo,
+          badgeText: selectedLine?.badgeText ?? primary.nameKo,
+          lineColor: lineColor,
         ),
         const SizedBox(height: 17),
         Padding(
           padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
           child: dataSource == _NearbyPanelDataSource.realtime
-              ? _SubwayArrivalPanel(snapshot: realtime)
+              ? _SubwayArrivalPanel(snapshot: realtime, lineColor: lineColor)
               : _SubwayTimetablePanel(
                   timetable: timetable,
                   loading: timetableLoading,
+                  lineColor: lineColor,
                 ),
         ),
       ],
@@ -2859,9 +2790,10 @@ String _arrivalDirectionLabel(RealtimeArrival arrival) {
 /// 주변역 패널의 실시간 도착 정보. 선택 호선에 표시할 데이터가
 /// 없으면 상태 문구를 늘리지 않고 검정 대시 하나로 수렴한다.
 class _SubwayArrivalPanel extends StatelessWidget {
-  const _SubwayArrivalPanel({required this.snapshot});
+  const _SubwayArrivalPanel({required this.snapshot, required this.lineColor});
 
   final RealtimeSnapshot snapshot;
+  final Color lineColor;
 
   @override
   Widget build(BuildContext context) {
@@ -2928,16 +2860,26 @@ class _SubwayArrivalPanel extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: _SubwayArrivalColumn(arrivals: left)),
+                  Expanded(
+                    child: _SubwayArrivalColumn(
+                      arrivals: left,
+                      lineColor: lineColor,
+                    ),
+                  ),
                   if (right.isNotEmpty) ...[
                     const SizedBox(
                       height: 46,
                       child: VerticalDivider(
-                        color: Color(0xFFE0E0E0),
+                        color: EasySubwayAccessibleColors.arrivalColumnDivider,
                         width: 30,
                       ),
                     ),
-                    Expanded(child: _SubwayArrivalColumn(arrivals: right)),
+                    Expanded(
+                      child: _SubwayArrivalColumn(
+                        arrivals: right,
+                        lineColor: lineColor,
+                      ),
+                    ),
                   ],
                 ],
               ),
@@ -2976,10 +2918,15 @@ class _SubwayDataUnavailable extends StatelessWidget {
 }
 
 class _SubwayTimetablePanel extends StatelessWidget {
-  const _SubwayTimetablePanel({required this.timetable, required this.loading});
+  const _SubwayTimetablePanel({
+    required this.timetable,
+    required this.loading,
+    required this.lineColor,
+  });
 
   final StationTimetable? timetable;
   final bool loading;
+  final Color lineColor;
 
   @override
   Widget build(BuildContext context) {
@@ -3022,12 +2969,22 @@ class _SubwayTimetablePanel extends StatelessWidget {
             if (index > 0)
               const SizedBox(
                 height: 46,
-                child: VerticalDivider(color: Color(0xFFE0E0E0), width: 30),
+                child: VerticalDivider(
+                  color: EasySubwayAccessibleColors.arrivalColumnDivider,
+                  width: 30,
+                ),
               ),
             Expanded(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: NearbyDirectionTitle(
+                      label: columns[index].first.directionLabel,
+                      lineColor: lineColor,
+                    ),
+                  ),
                   for (var row = 0; row < columns[index].length; row++) ...[
                     if (row > 0) const SizedBox(height: 4),
                     _SubwayTimetableDepartureView(data: columns[index][row]),
@@ -3099,40 +3056,22 @@ class _SubwayTimetableDepartureView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Flexible(
-          child: Text(
-            data.directionLabel,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Color(0xFF2F2F2F),
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          data.departure.timeLabel,
-          style: const TextStyle(
-            color: Color(0xFFE23D3D),
-            fontSize: 15,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ],
+    return Text(
+      data.departure.timeLabel,
+      style: const TextStyle(
+        color: Color(0xFFE23D3D),
+        fontSize: 15,
+        fontWeight: FontWeight.w800,
+      ),
     );
   }
 }
 
 class _SubwayArrivalColumn extends StatelessWidget {
-  const _SubwayArrivalColumn({required this.arrivals});
+  const _SubwayArrivalColumn({required this.arrivals, required this.lineColor});
 
   final List<RealtimeArrival> arrivals;
+  final Color lineColor;
 
   @override
   Widget build(BuildContext context) {
@@ -3146,63 +3085,18 @@ class _SubwayArrivalColumn extends StatelessWidget {
       children: [
         if (directionLabel.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Text(
-              directionLabel,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: EasySubwayAccessibleColors.primary,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-              ),
+            padding: const EdgeInsets.only(bottom: 6),
+            child: NearbyDirectionTitle(
+              label: directionLabel,
+              lineColor: lineColor,
             ),
           ),
-        for (final arrival in visible) _SubwayArrivalRow(arrival: arrival),
+        for (final arrival in visible)
+          NearbyArrivalRow(
+            destination: arrival.destination.trim(),
+            eta: _formatArrivalEta(arrival),
+          ),
       ],
-    );
-  }
-}
-
-class _SubwayArrivalRow extends StatelessWidget {
-  const _SubwayArrivalRow({required this.arrival});
-
-  final RealtimeArrival arrival;
-
-  @override
-  Widget build(BuildContext context) {
-    final destination = arrival.destination.trim();
-    final eta = _formatArrivalEta(arrival);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Column(
-        children: [
-          if (destination.isNotEmpty)
-            Text(
-              '$destination행',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Color(0xFF2F2F2F),
-                fontSize: 13,
-                height: 1.3,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          if (eta.isNotEmpty)
-            Text(
-              eta,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: EasySubwayAccessibleColors.secondaryText,
-                fontSize: 12,
-                height: 1.3,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-        ],
-      ),
     );
   }
 }

@@ -2689,9 +2689,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // ① 홈 상단 disruption 배너.
-    expect(find.byKey(const Key('serviceNoticeBanner')), findsOneWidget);
-    expect(find.text('2호선 강남–역삼 지연 — 우회 경로를 확인하세요'), findsOneWidget);
+    // ① 홈 상단 통합 신규 알림 안내 바(disruption이 트리거). 제목이 아니라
+    //    통합 안내 문구를 노출한다(#2200 통합형 결정).
+    expect(find.byKey(const Key('newNotificationBar')), findsOneWidget);
+    expect(find.text('새로운 알림이 있어요'), findsOneWidget);
 
     // ② 좌측 메뉴 "운행 공지" 진입점 → 목록 화면.
     await tester.tap(find.byKey(const Key('networkMapMenuButton')));
@@ -2709,7 +2710,7 @@ void main() {
     expect(find.text('상행 지연이 이어지고 있어요.'), findsOneWidget);
   });
 
-  testWidgets('운행 공지 배너는 닫기로 사라진다', (tester) async {
+  testWidgets('알림이 없으면 홈 상단 안내 바를 그리지 않는다', (tester) async {
     await tester.pumpWidget(
       buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
@@ -2720,11 +2721,11 @@ void main() {
           ActiveNoticesResult(
             notices: [
               ServiceNotice(
-                id: 'n1',
+                id: 'i1',
                 scope: NoticeScope.all,
-                title: '1호선 지연 안내',
-                body: '지연이 이어지고 있어요.',
-                severity: NoticeSeverity.disruption,
+                title: '정보 공지',
+                body: '정보성 안내입니다.',
+                severity: NoticeSeverity.info,
                 publishedAt: DateTime(2026, 7, 6, 9, 0, 0),
               ),
             ],
@@ -2735,12 +2736,10 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('serviceNoticeBanner')), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('serviceNoticeBannerDismiss')));
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const Key('serviceNoticeBanner')), findsNothing);
+    // info 공지는 disruption이 아니고 알림함 새 항목도 없으므로 바가 없다.
+    expect(find.byKey(const Key('newNotificationBar')), findsNothing);
+    expect(find.text('새로운 알림이 있어요'), findsNothing);
   });
 
   test('노선도 camera revision은 같은 gesture update에서도 단조 증가한다', () {
@@ -4737,31 +4736,30 @@ void main() {
 
     await tester.tap(find.byKey(const Key('nearbyStationButton')));
     await tester.pumpAndSettle();
-    expect(find.bySemanticsLabel('현재 실시간, 시간표로 전환'), findsOneWidget);
+    // 2버튼 세그먼트 토글(#2200). 초기 선택은 실시간.
+    expect(find.bySemanticsLabel('실시간 선택됨'), findsOneWidget);
     expect(
-      tester
-          .widget<Text>(
-            find.descendant(
-              of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
-              matching: find.text('실시간'),
-            ),
-          )
-          .data,
-      '실시간',
+      find.descendant(
+        of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
+        matching: find.text('실시간'),
+      ),
+      findsOneWidget,
     );
 
-    await tester.tap(find.byKey(const Key('networkMapNearbyDataSourceToggle')));
+    // 비선택 '시간표' 세그먼트를 눌러 시간표로 전환.
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
+        matching: find.text('시간표'),
+      ),
+    );
     await tester.pumpAndSettle();
 
-    final directionTexts = find.text('오이도 방면');
-    expect(directionTexts, findsNWidgets(2));
-    for (final (index, item) in [departure, secondDeparture].indexed) {
+    // 방면 제목은 열당 1개 헤더로 올라가고, 그 아래 두 시각이 각각 한 줄.
+    expect(find.text('오이도 방면'), findsOneWidget);
+    for (final item in [departure, secondDeparture]) {
       final timeFinder = find.text(item.timeLabel);
       expect(timeFinder, findsOneWidget);
-      expect(
-        tester.getCenter(directionTexts.at(index)).dy,
-        closeTo(tester.getCenter(timeFinder).dy, 0.5),
-      );
       expect(
         tester.widget<Text>(timeFinder).style?.color,
         const Color(0xFFE23D3D),
@@ -4771,14 +4769,7 @@ void main() {
         findsOneWidget,
       );
     }
-    expect(
-      find.descendant(
-        of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
-        matching: find.text('시간표'),
-      ),
-      findsOneWidget,
-    );
-    expect(find.bySemanticsLabel('현재 시간표, 실시간으로 전환'), findsOneWidget);
+    expect(find.bySemanticsLabel('시간표 선택됨'), findsOneWidget);
     expect(
       tester
           .getSize(find.byKey(const Key('networkMapNearbyDataSourceToggle')))
@@ -4786,16 +4777,15 @@ void main() {
       greaterThanOrEqualTo(48),
     );
 
-    await tester.tap(find.byKey(const Key('networkMapNearbyDataSourceToggle')));
-    await tester.pumpAndSettle();
-    expect(
+    // 다시 '실시간' 세그먼트를 눌러 복귀.
+    await tester.tap(
       find.descendant(
         of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
         matching: find.text('실시간'),
       ),
-      findsOneWidget,
     );
-    expect(find.bySemanticsLabel('현재 실시간, 시간표로 전환'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('실시간 선택됨'), findsOneWidget);
   });
 
   testWidgets('GPS 하단 패널은 선택한 데이터가 없으면 검정 대시 하나만 보여준다', (tester) async {
