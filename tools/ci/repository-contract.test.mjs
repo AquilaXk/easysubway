@@ -1714,6 +1714,28 @@ test("모바일 공통 상태 카드는 홈 즐겨찾기 노선도에서 사용�
   assert.match(networkMap, /AccessibleStateCard\([\s\S]*networkMapRetryButton/);
 });
 
+test("모바일 presentation canonical 선언과 기존 public export를 유지한다", () => {
+  const main = read("apps/mobile/lib/main.dart");
+  const appComponents = read("apps/mobile/lib/app/app_components.dart");
+  const notificationInbox = read(
+    "apps/mobile/lib/features/notifications/presentation/notification_inbox_screen.dart",
+  );
+
+  assert.match(notificationInbox, /^class NotificationInboxScreen extends StatefulWidget/m);
+  assert.match(appComponents, /^class FeatureTile extends StatelessWidget/m);
+  assert.match(appComponents, /^class AppSectionTitle extends StatelessWidget/m);
+  assert.match(appComponents, /^class HomeStateCard extends StatelessWidget/m);
+  assert.match(main, /^export 'app\/app_components\.dart' show FeatureTile;$/m);
+  assert.match(
+    main,
+    /^export 'features\/notifications\/presentation\/notification_inbox_screen\.dart'\s+show NotificationInboxScreen;$/m,
+  );
+  assert.doesNotMatch(
+    main,
+    /^class (?:NotificationInboxScreen|FeatureTile|AppSectionTitle|HomeStateCard)\b/m,
+  );
+});
+
 test("프로덕션 모바일 UI 위젯명은 prototype 명칭을 쓰지 않는다", () => {
   const mobileFiles = execFileSync("git", ["ls-files", "apps/mobile/lib/*.dart"], {
     cwd: root,
