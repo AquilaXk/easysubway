@@ -78,8 +78,8 @@ jobs:
           target: google_apis
           arch: x86_64
           ram-size: 2048M
+          working-directory: apps/mobile
           script: |
-            cd apps/mobile
             flutter test -d emulator-5554 \
               --reporter=expanded \
               --file-reporter=json:"${EVIDENCE_DIR}/android-device.jsonl" \

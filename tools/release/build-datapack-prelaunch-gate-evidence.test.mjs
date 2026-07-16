@@ -244,6 +244,11 @@ test("prelaunch workflow는 다섯 gate를 같은 RC final readiness에 결속�
     /flutter test -d emulator-5554 \\\n\s+--reporter=expanded \\\n\s+--file-reporter=json:"\$\{EVIDENCE_DIR\}\/android-device\.jsonl" \\\n\s+--dart-define=EASYSUBWAY_RC_MANIFEST_SHA256=.* \\\n\s+--dart-define=EASYSUBWAY_RC_RELEASE_SEQUENCE=.* \\\n\s+integration_test\/datapack_monotonic_rescue_test\.dart/,
     "flutter test options must precede the positional integration test path",
   );
+  const emulatorStep = workflow.match(
+    /- name: Rehearse monotonic rescue on Android emulator[\s\S]*?\n\s+- name:/,
+  )?.[0] ?? "";
+  assert.match(emulatorStep, /working-directory: apps\/mobile/);
+  assert.doesNotMatch(emulatorStep, /script: \|\n\s+cd apps\/mobile/);
   const enableKvm = workflow.indexOf("- name: Enable KVM group perms");
   const emulatorRunner = workflow.indexOf("reactivecircus/android-emulator-runner@");
   assert.ok(enableKvm !== -1 && enableKvm < emulatorRunner, "KVM permissions must be enabled before emulator boot");
