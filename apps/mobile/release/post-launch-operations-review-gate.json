@@ -67,7 +67,7 @@
           "refreshOn": "support-contact-or-help-ui-change",
           "files": [
             {"path": "apps/mobile/release/support-incident-response-gate.json", "sha256": "82db73ed9b0e84ed140f8ebc16326844dd2cc58181b918806fa4aba29bfcb4ca"},
-            {"path": "apps/mobile/lib/main.dart", "sha256": "42948d0ab160eb576c0a1ccaa46324e5f39fa200030a68663a5b7e39982d83b6"}
+            {"path": "apps/mobile/lib/main.dart", "sha256": "9e0bf232a7fc7e9c86e0294479a9501e24d8579200526e36c7ea736902204841"}
           ]
         },
         {
