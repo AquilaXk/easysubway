@@ -199,7 +199,7 @@ function extractMapSvg(svgText) {
         svgText,
         gwangju
           ? { color: "#009088", radius: "5.8", strokeWidth: "2" }
-          : { color: "#00975A", radius: "4.8", strokeWidth: "1.8" },
+          : { color: "#00975A", radius: "15", strokeWidth: "4.5" },
       )
     : "";
   const layerIds = [

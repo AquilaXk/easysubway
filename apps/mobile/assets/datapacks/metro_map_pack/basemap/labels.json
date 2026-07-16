@@ -7196,50 +7196,50 @@
       {
         "station": "갈마",
         "role": "ordinary",
-        "x": 1104,
-        "y": 824,
-        "anchor": "middle",
-        "fontSizePx": 13.2
+        "x": 1076,
+        "y": 738,
+        "anchor": "start",
+        "fontSizePx": 54
       },
       {
         "station": "갑천",
         "role": "ordinary",
-        "x": 864,
-        "y": 824,
-        "anchor": "middle",
-        "fontSizePx": 13.2
+        "x": 1076,
+        "y": 378,
+        "anchor": "start",
+        "fontSizePx": 54
       },
       {
         "station": "구암",
         "role": "ordinary",
-        "x": 560,
-        "y": 762,
-        "anchor": "end",
-        "fontSizePx": 13.2
+        "x": 1472,
+        "y": 258,
+        "anchor": "start",
+        "fontSizePx": 54
       },
       {
         "station": "노은",
         "role": "ordinary",
-        "x": 344,
-        "y": 546,
-        "anchor": "end",
-        "fontSizePx": 13.2
+        "x": 1616,
+        "y": 822,
+        "anchor": "start",
+        "fontSizePx": 54
       },
       {
         "station": "대동하늘공원",
         "role": "transfer",
-        "x": 2131.7888,
-        "y": 1167.1332,
-        "anchor": "end",
-        "fontSizePx": 14.2
+        "x": 572,
+        "y": 740,
+        "anchor": "start",
+        "fontSizePx": 58
       },
       {
         "station": "대전역",
         "role": "transfer",
-        "x": 2102.5352,
-        "y": 1302.1578,
-        "anchor": "end",
-        "fontSizePx": 14.2
+        "x": 572,
+        "y": 920,
+        "anchor": "start",
+        "fontSizePx": 58
       },
       {
         "station": "도마·복수서부경찰서·대전과기대배재대·광역철도:도마",
@@ -7252,18 +7252,18 @@
       {
         "station": "반석",
         "role": "terminal",
-        "x": 216,
-        "y": 363,
-        "anchor": "middle",
-        "fontSizePx": 14
+        "x": 1616,
+        "y": 1243,
+        "anchor": "start",
+        "fontSizePx": 57
       },
       {
         "station": "서대전네거리서대전공원",
         "role": "transfer",
-        "x": 1806.7554,
-        "y": 1336.8792,
-        "anchor": "middle",
-        "fontSizePx": 14.2
+        "x": 572,
+        "y": 1460,
+        "anchor": "start",
+        "fontSizePx": 58
       },
       {
         "station": "서대전역",
@@ -7276,26 +7276,26 @@
       {
         "station": "시청",
         "role": "ordinary",
-        "x": 1528,
-        "y": 750,
+        "x": 1076,
+        "y": 1098,
         "anchor": "start",
-        "fontSizePx": 13.2
+        "fontSizePx": 54
       },
       {
         "station": "신흥",
         "role": "ordinary",
-        "x": 2216,
-        "y": 1266,
-        "anchor": "end",
-        "fontSizePx": 13.2
+        "x": 572,
+        "y": 558,
+        "anchor": "start",
+        "fontSizePx": 54
       },
       {
         "station": "오룡",
         "role": "ordinary",
-        "x": 1528,
-        "y": 1206,
-        "anchor": "start",
-        "fontSizePx": 13.2
+        "x": 792,
+        "y": 1632,
+        "anchor": "middle",
+        "fontSizePx": 54
       },
       {
         "station": "오정한남대",
@@ -7308,90 +7308,90 @@
       {
         "station": "용문",
         "role": "ordinary",
-        "x": 1528,
-        "y": 990,
+        "x": 1076,
+        "y": 1458,
         "anchor": "start",
-        "fontSizePx": 13.2
+        "fontSizePx": 54
       },
       {
         "station": "월드컵경기장",
         "role": "ordinary",
-        "x": 416,
-        "y": 618,
-        "anchor": "end",
-        "fontSizePx": 13.2
+        "x": 1616,
+        "y": 612,
+        "anchor": "start",
+        "fontSizePx": 54
       },
       {
         "station": "월평",
         "role": "ordinary",
-        "x": 984,
-        "y": 824,
-        "anchor": "middle",
-        "fontSizePx": 13.2
+        "x": 1076,
+        "y": 558,
+        "anchor": "start",
+        "fontSizePx": 54
       },
       {
         "station": "유성온천유성온천공원",
         "role": "transfer",
-        "x": 743.5498,
-        "y": 757.6955,
-        "anchor": "end",
-        "fontSizePx": 14.2
+        "x": 1260,
+        "y": 182,
+        "anchor": "middle",
+        "fontSizePx": 58
       },
       {
         "station": "정부청사서구청·둔산경찰서을지대병원",
         "role": "transfer",
-        "x": 1512,
-        "y": 584.1516,
-        "anchor": "middle",
-        "fontSizePx": 14.2
+        "x": 1076,
+        "y": 920,
+        "anchor": "start",
+        "fontSizePx": 58
       },
       {
         "station": "중구청",
         "role": "ordinary",
-        "x": 1873.2795,
-        "y": 1397.3906,
-        "anchor": "middle",
-        "fontSizePx": 13.2
+        "x": 572,
+        "y": 1278,
+        "anchor": "start",
+        "fontSizePx": 54
       },
       {
         "station": "중앙로",
         "role": "ordinary",
-        "x": 1968.3828,
-        "y": 1397.3199,
-        "anchor": "middle",
-        "fontSizePx": 13.2
+        "x": 572,
+        "y": 1098,
+        "anchor": "start",
+        "fontSizePx": 54
       },
       {
         "station": "지족",
         "role": "ordinary",
-        "x": 272,
-        "y": 474,
-        "anchor": "end",
-        "fontSizePx": 13.2
+        "x": 1616,
+        "y": 1032,
+        "anchor": "start",
+        "fontSizePx": 54
       },
       {
         "station": "탄방",
         "role": "ordinary",
-        "x": 1528,
-        "y": 870,
+        "x": 1076,
+        "y": 1278,
         "anchor": "start",
-        "fontSizePx": 13.2
+        "fontSizePx": 54
       },
       {
         "station": "판암",
         "role": "terminal",
-        "x": 2216,
-        "y": 1350,
-        "anchor": "end",
-        "fontSizePx": 14
+        "x": 572,
+        "y": 379,
+        "anchor": "start",
+        "fontSizePx": 57
       },
       {
         "station": "현충원",
         "role": "ordinary",
-        "x": 488,
-        "y": 690,
-        "anchor": "end",
-        "fontSizePx": 13.2
+        "x": 1616,
+        "y": 402,
+        "anchor": "start",
+        "fontSizePx": 54
       }
     ],
     "gwangju": [
