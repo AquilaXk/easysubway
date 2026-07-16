@@ -3479,6 +3479,7 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
   }
 
   void _openRouteSearchFromFavorite(FavoriteRoute favorite) {
+    widget.routeDraftController.clear();
     widget.routeDraftController.setOrigin(
       RouteDraftStation(
         id: favorite.originStationId,

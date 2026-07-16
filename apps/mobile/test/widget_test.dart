@@ -7695,7 +7695,11 @@ void main() {
       ],
     );
     final routeDraftController = RouteDraftController();
+    routeDraftController.setWaypoint(
+      const RouteDraftStation(id: 'station-old-waypoint', nameKo: '기존 경유역'),
+    );
     RouteTransportScope? restoredTransportScope;
+    RouteDraft? restoredDraft;
 
     await tester.pumpWidget(
       EasySubwayApp(
@@ -7714,6 +7718,7 @@ void main() {
       tester,
       routeDraftController: routeDraftController,
       onOpenRouteSearchWithScope: (draft, mobilityType, transportScope) async {
+        restoredDraft = draft;
         restoredTransportScope = transportScope;
       },
     );
@@ -7721,6 +7726,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(restoredTransportScope, RouteTransportScope.subwayAndItxCheongchun);
+    expect(restoredDraft?.origin?.id, 'station-sangnoksu');
+    expect(restoredDraft?.destination?.id, 'station-sadang');
+    expect(restoredDraft?.waypoint, isNull);
   });
 
   testWidgets('역 검색은 검색 버튼 없이 타이핑(디바운스)만으로 결과를 보여준다', (tester) async {
