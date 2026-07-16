@@ -1843,25 +1843,49 @@ test("모바일 즐겨찾기 화면은 새로고침·삭제·복귀 재조회 �
   const favorites = read(
     "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart",
   );
+  const sourceBlock = (start, next) => {
+    const startIndex = favorites.indexOf(start);
+    const nextIndex = favorites.indexOf(next, startIndex + start.length);
+    assert.notEqual(startIndex, -1, `${start} must exist`);
+    assert.ok(nextIndex > startIndex, `${next} must follow ${start}`);
+    return favorites.slice(startIndex, nextIndex);
+  };
+  const refreshBlock = sourceBlock("onRefresh: () async {", "child: ListView(");
+  const removeRouteBlock = sourceBlock(
+    "Future<void> _removeFavoriteRoute",
+    "Future<void> _openStationDetailFromFavorite",
+  );
+  const stationDetailBlock = sourceBlock(
+    "Future<void> _openStationDetailFromFavorite",
+    "Future<void> _openFacilityReportFromFavorite",
+  );
+  const facilityReportBlock = sourceBlock(
+    "Future<void> _openFacilityReportFromFavorite",
+    "Future<void> _reloadFavoritesAfterReturn",
+  );
+  const reloadBlock = sourceBlock(
+    "Future<void> _reloadFavoritesAfterReturn",
+    "class _FavoriteHomeData",
+  );
 
   assert.match(
-    favorites,
-    /onRefresh: \(\) async \{[\s\S]*?final next = _loadData\(\);[\s\S]*?setState\(\(\) \{[\s\S]*?_dataFuture = next;[\s\S]*?\}\);[\s\S]*?try \{[\s\S]*?await next;[\s\S]*?catch \(error, stackTrace\)[\s\S]*?context: '즐겨찾기 새로고침 중 예외가 발생했습니다\.',/,
+    refreshBlock,
+    /final next = _loadData\(\);[\s\S]*?setState\(\(\) \{[\s\S]*?_dataFuture = next;[\s\S]*?\}\);[\s\S]*?try \{[\s\S]*?await next;[\s\S]*?catch \(error, stackTrace\)[\s\S]*?context: '즐겨찾기 새로고침 중 예외가 발생했습니다\.',/,
   );
   assert.match(
-    favorites,
-    /Future<void> _removeFavoriteRoute\(FavoriteRoute favorite\) async \{[\s\S]*?await repository\.removeFavoriteRoute\(favorite\.favoriteRouteId\);[\s\S]*?catch \(error, stackTrace\)[\s\S]*?context: '즐겨찾기 경로 삭제 중 예외가 발생했습니다\.'[\s\S]*?await _reloadFavoritesAfterReturn\(\);/,
+    removeRouteBlock,
+    /await repository\.removeFavoriteRoute\(favorite\.favoriteRouteId\);[\s\S]*?catch \(error, stackTrace\)[\s\S]*?context: '즐겨찾기 경로 삭제 중 예외가 발생했습니다\.'[\s\S]*?await _reloadFavoritesAfterReturn\(\);/,
   );
   assert.match(
-    favorites,
-    /Future<void> _reloadFavoritesAfterReturn\(\) async \{[\s\S]*?if \(!mounted\)[\s\S]*?final next = _loadData\(\);[\s\S]*?setState\(\(\) \{[\s\S]*?_dataFuture = next;[\s\S]*?\}\);[\s\S]*?try \{[\s\S]*?await next;[\s\S]*?catch \(error, stackTrace\)[\s\S]*?context: '즐겨찾기 화면 복귀 후 새로고침 중 예외가 발생했습니다\.',/,
+    reloadBlock,
+    /if \(!mounted\)[\s\S]*?final next = _loadData\(\);[\s\S]*?setState\(\(\) \{[\s\S]*?_dataFuture = next;[\s\S]*?\}\);[\s\S]*?try \{[\s\S]*?await next;[\s\S]*?catch \(error, stackTrace\)[\s\S]*?context: '즐겨찾기 화면 복귀 후 새로고침 중 예외가 발생했습니다\.',/,
   );
   assert.match(
-    favorites,
+    stationDetailBlock,
     /await Navigator\.of\(context\)\.push\([\s\S]*?initiallyFavorite: true,[\s\S]*?\);[\s\S]*?await _reloadFavoritesAfterReturn\(\);/,
   );
   assert.match(
-    favorites,
+    facilityReportBlock,
     /await Navigator\.of\(context\)\.push\([\s\S]*?FacilityReportScreen\([\s\S]*?\);[\s\S]*?await _reloadFavoritesAfterReturn\(\);/,
   );
 });
