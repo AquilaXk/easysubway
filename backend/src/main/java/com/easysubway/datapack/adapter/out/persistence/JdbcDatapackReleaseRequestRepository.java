@@ -77,6 +77,15 @@ public class JdbcDatapackReleaseRequestRepository implements DatapackReleaseRequ
 			ROW_MAPPER, limit);
 	}
 
+	@Override
+	public List<DatapackReleaseRequest> findDispatchedDue(LocalDateTime cutoff) {
+		return jdbcTemplate.query("""
+			SELECT * FROM datapack_release_request
+			WHERE status = 'DISPATCHED' AND updated_at <= ?
+			ORDER BY updated_at, approval_id
+			""", ROW_MAPPER, toTs(cutoff));
+	}
+
 	private static Timestamp toTs(LocalDateTime v) {
 		return v == null ? null : Timestamp.valueOf(v);
 	}

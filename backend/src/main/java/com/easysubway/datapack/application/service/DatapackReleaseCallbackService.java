@@ -167,11 +167,18 @@ public class DatapackReleaseCallbackService {
 				"CONFLICT", "REQUEST_CATALOG_MISMATCH", now);
 			return new CallbackResult("DEAD_LETTER", false);
 		}
-		var evidenceSha = channelCommandPort.findPassingReleaseEvidenceSha256(request.candidateId())
-			.orElse(null);
-		if ("production".equals(request.targetChannel()) && evidenceSha == null) {
+		var evidence = channelCommandPort.findPassingReleaseEvidence(request.candidateId()).orElse(null);
+		if ("production".equals(request.targetChannel()) && evidence == null) {
 			markClaimed(delivery, State.DEAD_LETTER, delivery.attempts(), null,
 				"CONFLICT", "RELEASE_EVIDENCE_MISSING", now);
+			return new CallbackResult("DEAD_LETTER", false);
+		}
+		var workflowRunUrl = request.workflowRunUrl() != null
+			? request.workflowRunUrl()
+			: evidence == null ? null : evidence.workflowRunUrl();
+		if (workflowRunUrl == null || workflowRunUrl.isBlank()) {
+			markClaimed(delivery, State.DEAD_LETTER, delivery.attempts(), null,
+				"CONFLICT", "WORKFLOW_RUN_URL_MISSING", now);
 			return new CallbackResult("DEAD_LETTER", false);
 		}
 		if (request.status() != DatapackReleaseRequestStatus.PUBLISHED) {
@@ -181,9 +188,10 @@ public class DatapackReleaseCallbackService {
 					"CONFLICT", "REQUEST_STATE_MISMATCH", now);
 				return new CallbackResult("DEAD_LETTER", false);
 			}
-			request = request.markPublished(request.workflowRunUrl(), now);
+			request = request.markPublished(workflowRunUrl, now);
 			repository.save(request);
-			tryPromote(request, catalog.manifestSha256(), request.workflowRunUrl(), evidenceSha,
+			tryPromote(request, catalog.manifestSha256(), workflowRunUrl,
+				evidence == null ? null : evidence.evidenceBundleSha256(),
 				delivery.idempotencyKey());
 		}
 		markClaimed(delivery, State.DELIVERED, delivery.attempts() + 1, null,

@@ -53,7 +53,8 @@ class HttpDatapackReleaseCatalogAdapterTest {
 					.encodeToString(keyPair.getPublic().getEncoded())
 				+ "\n-----END PUBLIC KEY-----";
 			var adapter = new HttpDatapackReleaseCatalogAdapter(
-				"http://127.0.0.1:" + server.getAddress().getPort(), publicKey, "production-v1");
+				"http://127.0.0.1:" + server.getAddress().getPort(),
+				publicKey.replace("\n", "\\n"), "production-v1");
 
 			var identity = adapter.fetch("production", 42);
 
@@ -109,7 +110,7 @@ class HttpDatapackReleaseCatalogAdapterTest {
 	@Test
 	void findsRequestInImmutableManifestAfterCurrentAdvances() throws Exception {
 		var keyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
-		byte[] current = signedManifest(keyPair, 43, "request-next");
+		byte[] current = signedManifest(keyPair, 44, "request-next");
 		byte[] previous = signedManifest(keyPair, 42, "request-2057");
 		var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
 		server.createContext("/catalog/current.json", exchange -> respond(exchange, current));

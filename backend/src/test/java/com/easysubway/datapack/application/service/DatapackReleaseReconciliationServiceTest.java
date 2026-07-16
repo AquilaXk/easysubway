@@ -6,6 +6,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 
 import com.easysubway.datapack.adapter.out.persistence.JdbcDatapackReleaseDeliveryRepository;
@@ -16,7 +17,9 @@ import com.easysubway.datapack.application.port.out.DatapackReleaseRequestReposi
 import com.easysubway.datapack.domain.DatapackReleaseDelivery;
 import com.easysubway.datapack.domain.DatapackReleaseDelivery.State;
 import com.easysubway.datapack.domain.DatapackReleaseRequest;
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -101,7 +104,7 @@ class DatapackReleaseReconciliationServiceTest {
 			"b".repeat(64), "c".repeat(64), "d".repeat(64), "requester", T0)
 			.approve("approver", T0)
 			.markDispatched("https://github.com/run/42", "dispatch-42", T0);
-		when(requests.findRecent(100)).thenReturn(java.util.List.of(dispatched));
+		when(requests.findDispatchedDue(T0)).thenReturn(java.util.List.of(dispatched));
 		when(channels.candidateHasManifest("candidate-2057", SHA)).thenReturn(true);
 		when(catalog.fetchCurrent("production"))
 			.thenReturn(new CatalogIdentity(42, SHA, "production", "request-2057", true, "b".repeat(64)));
@@ -126,7 +129,7 @@ class DatapackReleaseReconciliationServiceTest {
 			"b".repeat(64), "c".repeat(64), "d".repeat(64), "requester", T0)
 			.approve("approver", T0)
 			.markDispatched("https://github.com/run/42", "dispatch-42", T0);
-		when(requests.findRecent(100)).thenReturn(java.util.List.of(dispatched));
+		when(requests.findDispatchedDue(T0)).thenReturn(java.util.List.of(dispatched));
 		when(catalog.fetchCurrent("production"))
 			.thenReturn(new CatalogIdentity(42, SHA, "production", "another-request", true, "b".repeat(64)));
 		var discovery = new DatapackReleaseReconciliationService(
@@ -147,7 +150,7 @@ class DatapackReleaseReconciliationServiceTest {
 			"b".repeat(64), "c".repeat(64), "d".repeat(64), "requester", T0)
 			.approve("approver", T0)
 			.markDispatched("https://github.com/run/42", "dispatch-42", T0);
-		when(requests.findRecent(100)).thenReturn(java.util.List.of(dispatched));
+		when(requests.findDispatchedDue(T0)).thenReturn(java.util.List.of(dispatched));
 		when(channels.candidateHasManifest("candidate-2057", SHA)).thenReturn(true);
 		when(catalog.findByRequest("production", "request-2057"))
 			.thenReturn(java.util.Optional.of(
@@ -161,6 +164,28 @@ class DatapackReleaseReconciliationServiceTest {
 			delivery.releaseRequestId().equals("request-2057")
 				&& delivery.releaseSequence() == 42
 				&& delivery.payloadSha256() == null));
+		verify(requests, never()).findRecent(anyInt());
+	}
+
+	@Test
+	@DisplayName("일반 reconciliation 오류도 70분 경계에서 DEAD_LETTER로 마감한다")
+	void generalFailureHonorsDeadLetterDeadline() {
+		var fixedClock = Clock.fixed(
+			T0.plusMinutes(70).toInstant(ZoneOffset.UTC), ZoneOffset.UTC);
+		var deadlineService = new DatapackReleaseReconciliationService(
+			repository, callbackService, catalog, null, null, fixedClock);
+		var delivery = delivery();
+		var identity = new CatalogIdentity(42, SHA, "production", "request-2057", true, "b".repeat(64));
+		when(repository.claimDue(T0.plusMinutes(70), "datapack-reconciler", 100))
+			.thenReturn(java.util.List.of(delivery));
+		when(catalog.fetch("production", 42)).thenReturn(identity);
+		doThrow(new IllegalStateException("persistent apply failure"))
+			.when(callbackService).reconcile(delivery, identity);
+
+		deadlineService.reconcileDue();
+
+		verify(repository).mark(delivery.idempotencyKey(), State.DEAD_LETTER, 0, null,
+			"ERROR", "RECONCILIATION_ERROR", T0.plusMinutes(70));
 	}
 
 	@Test

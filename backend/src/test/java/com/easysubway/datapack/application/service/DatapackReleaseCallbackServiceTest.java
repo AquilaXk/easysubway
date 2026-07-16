@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.easysubway.datapack.application.service.CallbackSignature.CanonicalFields;
 import com.easysubway.datapack.application.service.DatapackReleaseCallbackService.CallbackCommand;
 import com.easysubway.datapack.application.service.DatapackReleaseCallbackService.CallbackResult;
+import com.easysubway.datapack.application.port.out.DatapackReleaseCatalogPort.CatalogIdentity;
+import com.easysubway.datapack.domain.DatapackReleaseDelivery;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.BeforeEach;
@@ -271,11 +273,10 @@ class DatapackReleaseCallbackServiceTest {
                 validator_status, route_regression_status, manifest_signature_status,
                 android_evidence_status, created_at
             )
-            VALUES (?, ?, ?,
-                'https://github.com/AquilaXk/easysubway/actions/runs/9001',
+            VALUES (?, ?, ?, ?,
                 'PASS', 'PASS', 'PASS', 'PASS', '2026-07-01 00:00:00')
             """,
-            "evidence-cbk-" + candidateId, candidateId, evidenceBundleSha256);
+            "evidence-cbk-" + candidateId, candidateId, evidenceBundleSha256, WORKFLOW_URL);
     }
 
     @Test
@@ -316,7 +317,7 @@ class DatapackReleaseCallbackServiceTest {
 
     @Test
     @DisplayName("(i) PASS + production 채널 존재 + evidence bundle 미등록 → status PUBLISHED 유지 + promote_outcome=REJECTED")
-    void passWithChannelButNoEvidenceBundle_publishesAndRejectsPromote() {
+	void passWithChannelButNoEvidenceBundle_publishesAndRejectsPromote() {
         insertRow("DISPATCHED", "production");
         insertCallbackTestCandidate(CAND_PREV, SHA_PREV);
         insertCallbackTestCandidate("cand-1", SHA);
@@ -331,7 +332,29 @@ class DatapackReleaseCallbackServiceTest {
         assertThat(statusOf()).isEqualTo("PUBLISHED");
         assertThat(promoteOutcomeOf()).isEqualTo("REJECTED");
         assertThat(promoteDetailOf()).contains("evidence");
-    }
+	}
+
+	@Test
+	@DisplayName("유실 callback reconciliation은 passing evidence의 workflow URL로 promote한다")
+	void reconciliationRestoresWorkflowUrlFromPassingEvidence() {
+		insertRow("DISPATCHED", "production");
+		insertCallbackTestCandidate(CAND_PREV, SHA_PREV);
+		insertCallbackTestCandidate("cand-1", SHA);
+		insertCallbackTestChannel(CAND_PREV, SHA_PREV);
+		insertCallbackTestEvidenceBundle("cand-1", SHA);
+		var delivery = DatapackReleaseDelivery.pending(
+			APPROVAL_ID, RELEASE_SEQUENCE, SHA, CHANNEL, "cand-1", null, "b".repeat(64), T0);
+		var catalog = new CatalogIdentity(
+			RELEASE_SEQUENCE, SHA, CHANNEL, APPROVAL_ID, true, "b".repeat(64));
+
+		assertThat(service.reconcile(delivery, catalog).status()).isEqualTo("PUBLISHED");
+
+		assertThat(workflowRunUrlOf()).isEqualTo(WORKFLOW_URL);
+		assertThat(promoteOutcomeOf()).isEqualTo("SUCCEEDED");
+		assertThat(jdbcTemplate.queryForObject(
+			"SELECT candidate_id FROM datapack_release_channels WHERE channel = 'production'",
+			String.class)).isEqualTo("cand-1");
+	}
 
     @TestConfiguration
     static class CallbackSignatureTestConfig {
@@ -343,5 +366,5 @@ class DatapackReleaseCallbackServiceTest {
         CallbackSignature testCallbackSignature() {
             return new CallbackSignature("test-callback-hmac-key");
         }
-    }
+	}
 }

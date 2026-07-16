@@ -45,7 +45,7 @@ public class DatapackReleaseReconciliationService {
 		this(repository, callbackService, catalog, requestRepository, channelRepository, Clock.systemUTC());
 	}
 
-	private DatapackReleaseReconciliationService(DatapackReleaseDeliveryRepository repository,
+	DatapackReleaseReconciliationService(DatapackReleaseDeliveryRepository repository,
 		DatapackReleaseCallbackService callbackService, DatapackReleaseCatalogPort catalog,
 		DatapackReleaseRequestRepository requestRepository,
 		DatapackReleaseChannelCommandPort channelRepository, Clock clock) {
@@ -69,8 +69,13 @@ public class DatapackReleaseReconciliationService {
 				reconcile(delivery, now);
 			} catch (RuntimeException failure) {
 				try {
-					markClaimed(delivery, State.RETRY_SCHEDULED, delivery.attempts() + 1,
-						now.plusMinutes(5), "ERROR", "RECONCILIATION_ERROR", now);
+					if (!now.isBefore(delivery.deadLetterDeadline())) {
+						markClaimed(delivery, State.DEAD_LETTER, delivery.attempts(), null,
+							"ERROR", "RECONCILIATION_ERROR", now);
+					} else {
+						markClaimed(delivery, State.RETRY_SCHEDULED, delivery.attempts() + 1,
+							now.plusMinutes(5), "ERROR", "RECONCILIATION_ERROR", now);
+					}
 				} catch (IllegalStateException lostClaim) {
 					// lease가 이미 다른 worker로 넘어갔으면 새 owner가 처리한다.
 				}
@@ -80,9 +85,7 @@ public class DatapackReleaseReconciliationService {
 
 	void discoverMissing(LocalDateTime now) {
 		if (requestRepository == null || channelRepository == null) return;
-		requestRepository.findRecent(100).stream()
-			.filter(request -> request.status() == DatapackReleaseRequestStatus.DISPATCHED)
-			.filter(request -> !request.updatedAt().isAfter(now.minusMinutes(10)))
+		requestRepository.findDispatchedDue(now.minusMinutes(10)).stream()
 			.forEach(request -> {
 				try {
 					var identity = catalog.fetchCurrent(request.targetChannel());

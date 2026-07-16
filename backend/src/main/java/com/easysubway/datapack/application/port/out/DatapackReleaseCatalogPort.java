@@ -12,7 +12,11 @@ public interface DatapackReleaseCatalogPort {
 	record CatalogIdentity(long releaseSequence, String manifestSha256, String channel, String releaseRequestId,
 		boolean signatureValid, String signatureSha256) {}
 
-	final class Unavailable extends RuntimeException {
+	class Unavailable extends RuntimeException {
 		public Unavailable() { super("datapack release catalog unavailable"); }
+	}
+
+	final class NotFound extends Unavailable {
+		public NotFound() { super(); }
 	}
 }

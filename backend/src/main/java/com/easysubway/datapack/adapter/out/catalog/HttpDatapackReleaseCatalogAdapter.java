@@ -64,8 +64,12 @@ public class HttpDatapackReleaseCatalogAdapter implements DatapackReleaseCatalog
 		if (matches(current, channel, releaseRequestId)) return Optional.of(current);
 		long oldest = Math.max(1, current.releaseSequence() - MAX_RELEASE_LOOKBACK);
 		for (long sequence = current.releaseSequence() - 1; sequence >= oldest; sequence--) {
-			var identity = fetch(channel, sequence);
-			if (matches(identity, channel, releaseRequestId)) return Optional.of(identity);
+			try {
+				var identity = fetch(channel, sequence);
+				if (matches(identity, channel, releaseRequestId)) return Optional.of(identity);
+			} catch (NotFound ignored) {
+				// GITHUB_RUN_NUMBER 기반 sequence에는 publish되지 않은 gap이 존재할 수 있다.
+			}
 		}
 		return Optional.empty();
 	}
@@ -82,6 +86,7 @@ public class HttpDatapackReleaseCatalogAdapter implements DatapackReleaseCatalog
 			var request = HttpRequest.newBuilder(URI.create(baseUrl + path))
 				.timeout(TIMEOUT).GET().build();
 			var response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
+			if (response.statusCode() == 404) throw new NotFound();
 			if (response.statusCode() < 200 || response.statusCode() >= 300) throw new Unavailable();
 			byte[] bytes = response.body();
 			JsonNode manifest = JSON.readTree(bytes);
@@ -146,7 +151,7 @@ public class HttpDatapackReleaseCatalogAdapter implements DatapackReleaseCatalog
 	}
 
 	private static byte[] pemBytes(String pem) {
-		return Base64.getMimeDecoder().decode(pem
+		return Base64.getMimeDecoder().decode(pem.replace("\\n", "\n")
 			.replace("-----BEGIN PUBLIC KEY-----", "")
 			.replace("-----END PUBLIC KEY-----", ""));
 	}
