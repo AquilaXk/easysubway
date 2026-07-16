@@ -391,7 +391,6 @@ class NetworkMapScreen extends StatefulWidget {
     this.onOpenSavedItems,
     this.onOpenNearbyStations,
     this.onOpenSettings,
-    this.onOpenDataSources,
     this.onOpenServiceNotices,
     this.notificationAction,
     this.disruptionBanner,
@@ -443,7 +442,6 @@ class NetworkMapScreen extends StatefulWidget {
   /// 현재 선택 지역 표시명을 함께 전달한다(#2090 검색 화면 지역 표시 배선).
   final ValueChanged<String>? onOpenNearbyStations;
   final VoidCallback? onOpenSettings;
-  final VoidCallback? onOpenDataSources;
 
   /// 좌측 메뉴 "운행 공지" 목록 화면 열기.
   final VoidCallback? onOpenServiceNotices;
@@ -1338,7 +1336,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
           onOpenNearbyStations: _openNearbyStationsWithRegion,
           onOpenServiceNotices: widget.onOpenServiceNotices,
           onOpenSettings: widget.onOpenSettings,
-          onOpenDataSources: widget.onOpenDataSources,
         );
       },
       transitionBuilder: (context, animation, secondaryAnimation, child) {
@@ -3217,7 +3214,6 @@ class _NetworkMapMenuPanel extends StatelessWidget {
     required this.onOpenNearbyStations,
     required this.onOpenServiceNotices,
     required this.onOpenSettings,
-    required this.onOpenDataSources,
   });
 
   final VoidCallback onOpenStationSearch;
@@ -3225,16 +3221,10 @@ class _NetworkMapMenuPanel extends StatelessWidget {
   final VoidCallback? onOpenNearbyStations;
   final VoidCallback? onOpenServiceNotices;
   final VoidCallback? onOpenSettings;
-  final VoidCallback? onOpenDataSources;
 
   void _runAction(BuildContext context, VoidCallback action) {
     Navigator.of(context).pop();
     action();
-  }
-
-  void _runActionAfterMenuClose(BuildContext context, VoidCallback action) {
-    Navigator.of(context).pop();
-    Future<void>.delayed(const Duration(milliseconds: 180), action);
   }
 
   @override
@@ -3294,8 +3284,7 @@ class _NetworkMapMenuPanel extends StatelessWidget {
                             onTap: () => _runAction(context, onOpenSettings!),
                           ),
                       ],
-                      if (onOpenServiceNotices != null ||
-                          onOpenDataSources != null) ...[
+                      if (onOpenServiceNotices != null) ...[
                         const _NetworkMapMenuSectionLabel('안내'),
                         if (onOpenServiceNotices != null)
                           _NetworkMapMenuTile(
@@ -3306,16 +3295,6 @@ class _NetworkMapMenuPanel extends StatelessWidget {
                             label: '운행 공지',
                             onTap: () =>
                                 _runAction(context, onOpenServiceNotices!),
-                          ),
-                        if (onOpenDataSources != null)
-                          _NetworkMapMenuTile(
-                            key: const Key('networkMapMenuDataSourcesButton'),
-                            icon: Icons.source_outlined,
-                            label: '자료 제공 정보',
-                            onTap: () => _runActionAfterMenuClose(
-                              context,
-                              onOpenDataSources!,
-                            ),
                           ),
                       ],
                     ],

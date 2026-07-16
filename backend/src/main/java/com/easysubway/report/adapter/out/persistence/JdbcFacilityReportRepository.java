@@ -5,6 +5,7 @@ import com.easysubway.report.application.port.in.FacilityReportListQuery;
 import com.easysubway.report.application.port.in.FacilityReportPageRequest;
 import com.easysubway.report.application.port.out.DeleteFacilityReportPhotoPort;
 import com.easysubway.report.application.port.out.LoadFacilityReportPort;
+import com.easysubway.report.application.port.out.PurgeFacilityReportPersonalDataPort;
 import com.easysubway.report.application.port.out.SaveFacilityReportPort;
 import com.easysubway.report.domain.FacilityReport;
 import com.easysubway.report.domain.FacilityReportSummary;
@@ -36,7 +37,8 @@ import org.springframework.stereotype.Repository;
 public class JdbcFacilityReportRepository implements
 	LoadFacilityReportPort,
 	SaveFacilityReportPort,
-	AnonymizeUserFacilityReportPort {
+	AnonymizeUserFacilityReportPort,
+	PurgeFacilityReportPersonalDataPort {
 
 	private static final String DELETED_DESCRIPTION = "사용자 데이터 삭제로 신고 내용이 삭제되었습니다.";
 
@@ -601,6 +603,35 @@ public class JdbcFacilityReportRepository implements
 		return anonymizedCount;
 	}
 
+	@Override
+	public int purgePersonalDataCreatedBefore(LocalDateTime cutoff) {
+		List<String> photoObjectKeys = loadPhotoObjectKeysCreatedBefore(cutoff);
+		photoObjectKeys.forEach(deleteFacilityReportPhotoPort::deleteFacilityReportPhoto);
+		return jdbcTemplate.update(
+			"""
+				UPDATE facility_reports
+				SET user_id = ?,
+					description = ?,
+					photo_file_name = NULL,
+					photo_content_type = NULL,
+					photo_object_key = NULL,
+					photo_thumbnail_object_key = NULL,
+					photo_sha256 = NULL,
+					photo_size_bytes = NULL,
+					latitude = NULL,
+					longitude = NULL,
+					client_submission_id = NULL,
+					receipt_token_hash = NULL
+				WHERE created_at < ?
+					AND user_id <> ?
+				""",
+			FacilityReport.ANONYMIZED_USER_ID,
+			DELETED_DESCRIPTION,
+			cutoff,
+			FacilityReport.ANONYMIZED_USER_ID
+		);
+	}
+
 	private List<String> loadPhotoObjectKeysByUserId(String userId) {
 		return jdbcTemplate.query(
 			"""
@@ -619,6 +650,29 @@ public class JdbcFacilityReportRepository implements
 				return List.copyOf(objectKeys);
 			},
 			userId
+		);
+	}
+
+	private List<String> loadPhotoObjectKeysCreatedBefore(LocalDateTime cutoff) {
+		return jdbcTemplate.query(
+			"""
+				SELECT photo_object_key,
+					photo_thumbnail_object_key
+				FROM facility_reports
+				WHERE created_at < ?
+					AND user_id <> ?
+					AND (photo_object_key IS NOT NULL OR photo_thumbnail_object_key IS NOT NULL)
+				""",
+			resultSet -> {
+				java.util.ArrayList<String> objectKeys = new java.util.ArrayList<>();
+				while (resultSet.next()) {
+					addObjectKey(objectKeys, resultSet.getString("photo_object_key"));
+					addObjectKey(objectKeys, resultSet.getString("photo_thumbnail_object_key"));
+				}
+				return List.copyOf(objectKeys);
+			},
+			cutoff,
+			FacilityReport.ANONYMIZED_USER_ID
 		);
 	}
 

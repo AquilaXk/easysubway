@@ -26,6 +26,7 @@ import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_controlle
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_notifier.dart';
 import 'package:easysubway_mobile/features/home/presentation/home_screen.dart';
 import 'package:easysubway_mobile/features/settings/presentation/app_settings_screen.dart';
+import 'package:easysubway_mobile/features/settings/presentation/service_info_screen.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_schedule_mode.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_scheduler.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_subscription.dart';
@@ -397,6 +398,14 @@ Future<void> _openSettingsScreen(WidgetTester tester) async {
                   userDataDeletionRepository: home.userDataDeletionRepository,
                   onUserDataDeleted: home.onUserDataDeleted,
                 ),
+              ),
+            );
+          },
+          onOpenServiceInfo: () {
+            Navigator.of(homeContext).push(
+              MaterialPageRoute<void>(
+                builder: (_) =>
+                    ServiceInfoScreen(accessInfo: home.supportAccessInfo),
               ),
             );
           },
@@ -1729,7 +1738,7 @@ void main() {
     expect(find.byKey(const Key('networkMapRouteDraftOverlay')), findsNothing);
   });
 
-  testWidgets('노선도 메뉴에서 데이터 및 지도 출처 화면으로 이동한다', (tester) async {
+  testWidgets('노선도 메뉴에는 자료 제공 정보를 노출하지 않는다', (tester) async {
     await tester.pumpWidget(
       buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
@@ -1744,38 +1753,11 @@ void main() {
 
     await tester.tap(find.byKey(const Key('networkMapMenuButton')));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('networkMapMenuDataSourcesButton')),
-      120,
-    );
-    await tester.drag(find.byType(Scrollable).first, const Offset(0, -80));
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.descendant(
-        of: find.byKey(const Key('networkMapMenuDataSourcesButton')),
-        matching: find.byType(InkWell),
-      ),
-    );
-    for (var attempt = 0; attempt < 30; attempt += 1) {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 100)),
-      );
-      await tester.pump(const Duration(milliseconds: 100));
-      if (find.text('지도 표시용 asset').evaluate().isNotEmpty) {
-        break;
-      }
-    }
-
+    expect(find.text('자료 제공 정보'), findsNothing);
     expect(
-      find.byKey(const Key('dataSourceAttributionScreen')),
-      findsOneWidget,
+      find.byKey(const Key('networkMapMenuDataSourcesButton')),
+      findsNothing,
     );
-    expect(find.text('데이터 및 지도 출처'), findsOneWidget);
-    await tester.pump();
-    await tester.pump();
-    await tester.scrollUntilVisible(find.text('지도 표시용 asset'), 240);
-    expect(find.text('지도 표시용 asset'), findsOneWidget);
-    expect(find.text('지금은 상록수역·사당역 구간을 안내해요'), findsNothing);
   });
 
   testWidgets('노선도 지역 메뉴는 선택한 지역으로 지도를 다시 불러온다', (tester) async {
@@ -5680,7 +5662,7 @@ void main() {
 
       expect(find.text('알림'), findsOneWidget);
       expect(find.text('내 활동'), findsOneWidget);
-      expect(find.text('개인정보 및 도움말'), findsOneWidget);
+      expect(find.text('서비스 정보 및 도움말'), findsOneWidget);
       expect(
         find.byKey(const Key('settingsSection-help-privacy')),
         findsOneWidget,
@@ -5696,8 +5678,18 @@ void main() {
         findsNothing,
       );
       expect(
+        find.byKey(const Key('settingsServiceInfoButton')),
+        findsOneWidget,
+      );
+      expect(
         find.byKey(const Key('settingsSupportPrivacyButton')),
         findsOneWidget,
+      );
+      expect(
+        settingsActionSemantics(
+          '서비스 정보',
+        ).getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
       );
       expect(
         settingsActionSemantics(
@@ -5717,6 +5709,14 @@ void main() {
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('settingsServiceInfoButton')),
+        120,
+      );
+      await tester.tap(find.byKey(const Key('settingsServiceInfoButton')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('serviceInfoScreen')), findsOneWidget);
     } finally {
       semanticsHandle.dispose();
     }
@@ -6480,7 +6480,7 @@ void main() {
     expect(favoriteRepository.listCount, greaterThanOrEqualTo(2));
   });
 
-  testWidgets('홈은 도움말에서 개인정보와 삭제 요청 경로를 보여준다', (tester) async {
+  testWidgets('홈은 도움말에서 삭제 요청과 문의 경로를 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     try {
       await tester.pumpWidget(
@@ -6503,21 +6503,7 @@ void main() {
       await _openSupportAccessScreen(tester);
 
       expect(find.text('도움말·문의'), findsOneWidget);
-      expect(find.text('개인정보처리방침'), findsOneWidget);
-      expect(find.text('https://easysubway.example/privacy'), findsNothing);
-      expect(find.text('웹에서 확인'), findsOneWidget);
-      final privacyButtonSize = tester.getSize(
-        find.byKey(const Key('privacyPolicyAccessItem')),
-      );
-      expect(privacyButtonSize.height, greaterThanOrEqualTo(60));
-      final privacySemantics = tester
-          .getSemantics(find.byKey(const Key('privacyPolicyAccessItem')))
-          .getSemanticsData();
-      expect(
-        privacySemantics.label,
-        '개인정보처리방침, 웹에서 확인, https://easysubway.example/privacy',
-      );
-      expect(privacySemantics.hasAction(SemanticsAction.tap), isTrue);
+      expect(find.text('개인정보처리방침'), findsNothing);
 
       await tester.scrollUntilVisible(
         find.byKey(const Key('dataDeletionAccessItem')),
@@ -6563,7 +6549,7 @@ void main() {
     }
   });
 
-  testWidgets('도움말은 개인정보 안내를 불릿 대신 처리방침 링크로 위임한다', (tester) async {
+  testWidgets('도움말은 개인정보 처리방침 진입점을 서비스 정보로 분리한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     try {
       await tester.pumpWidget(
@@ -6584,12 +6570,11 @@ void main() {
 
       await _openSupportAccessScreen(tester);
 
-      // 개인정보 안내는 화면 카피(불릿) 대신 처리방침 링크로 위임한다.
       expect(find.byKey(const Key('privacyDataUseSummary')), findsNothing);
       expect(find.text('개인정보 사용 안내'), findsNothing);
       expect(find.text('현재 위치는 가까운 역 찾기와 시설 제보 위치 확인에만 사용됩니다.'), findsNothing);
       expect(find.text('법으로 꼭 필요한 기록은 정해진 기간 동안만 보관합니다.'), findsNothing);
-      expect(find.text('개인정보처리방침'), findsOneWidget);
+      expect(find.text('개인정보처리방침'), findsNothing);
     } finally {
       semanticsHandle.dispose();
     }
@@ -6705,37 +6690,6 @@ void main() {
     } finally {
       semanticsHandle.dispose();
     }
-  });
-
-  testWidgets('도움말은 개인정보 링크를 값 복사 화면이 아니라 외부 연결로 처리한다', (tester) async {
-    final launcher = RecordingSupportAccessLauncher();
-
-    await tester.pumpWidget(
-      buildEasySubwayTestApp(
-        repository: FakeStationSearchRepository(),
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: FakeFavoriteStationRepository(),
-        notificationRepository: FakeNotificationSettingsRepository(),
-        supportAccessLauncher: launcher,
-        supportAccessInfo: const SupportAccessInfo(
-          privacyPolicyUrl: 'https://easysubway.example/privacy',
-          supportEmail: 'support@easysubway.example',
-          dataDeletionEmail: 'privacy@easysubway.example',
-        ),
-        initialOnboardingState: _completedOnboardingState(),
-      ),
-    );
-
-    await _openSupportAccessScreen(tester);
-    await tester.tap(find.byKey(const Key('privacyPolicyAccessItem')));
-    await tester.pumpAndSettle();
-
-    expect(find.byType(AlertDialog), findsNothing);
-    expect(
-      launcher.openedUris.single.toString(),
-      'https://easysubway.example/privacy',
-    );
   });
 
   testWidgets('도움말은 고객지원을 메일 앱으로 연결한다', (tester) async {
@@ -7062,11 +7016,16 @@ void main() {
     );
 
     await _openSupportAccessScreen(tester);
-    await tester.tap(find.byKey(const Key('privacyPolicyAccessItem')));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('supportAccessItem')),
+      120,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.byKey(const Key('supportAccessItem')));
     await tester.pump();
 
     expect(
-      find.text('연결할 수 없습니다. 직접 확인해 주세요: https://easysubway.example/privacy'),
+      find.text('연결할 수 없습니다. 직접 확인해 주세요: support@easysubway.example'),
       findsOneWidget,
     );
   });
@@ -10545,6 +10504,7 @@ void main() {
       find.byKey(const Key('stationExitWalkingRouteButton-exit-sangnoksu-1')),
       findsOneWidget,
     );
+    expect(find.text('도보 길안내를 누르면 현재 위치와 출구 좌표가 카카오에 전달됩니다.'), findsOneWidget);
 
     await tester.tap(
       find.byKey(const Key('stationExitWalkingRouteButton-exit-sangnoksu-1')),

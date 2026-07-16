@@ -107,11 +107,11 @@ class HealthCheckControllerTest {
 					.contains(
 						"쉬운 지하철 개인정보처리방침",
 						"처리하는 개인정보 항목과 목적",
-						"제3자 제공, 처리 위탁, 추적",
+							"제3자 제공, 처리 위탁 및 추적",
 						"외부 지도 도보 길안내",
 						"카카오맵 앱",
 						"카카오맵 웹",
-						"권리 행사와 삭제 요청",
+							"이용자 및 법정대리인의 권리",
 						"개인정보 보호책임자",
 						"privacy@aquilaxk.site"
 					));
@@ -140,7 +140,7 @@ class HealthCheckControllerTest {
 				.andExpect(result -> assertThat(result.getResponse().getContentType())
 					.contains("text/html", "UTF-8"))
 				.andExpect(result -> assertThat(result.getResponse().getContentAsString())
-					.contains("쉬운 지하철 위치정보 이용약관", "위치정보의 이용 목적", "카카오맵 앱", "카카오맵 웹"));
+					.contains("쉬운 지하철 위치정보 이용약관", "제 4 조 (위치기반서비스의 내용)", "카카오맵 앱", "카카오맵 웹"));
 		}
 	}
 

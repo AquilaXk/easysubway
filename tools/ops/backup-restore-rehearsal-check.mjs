@@ -34,8 +34,16 @@ for (const id of requiredTargetIds) {
   }
 }
 
+for (const id of ["postgres_application_database", "facility_report_photo_objects"]) {
+  const target = targets.get(id);
+  assert.equal(target.retentionDays, 30);
+  assert.match(target.retentionCommand, /prune-sensitive-backups\.mjs/);
+  assert.ok(target.linkedArtifacts.includes(".github/workflows/sensitive-backup-retention.yml"));
+}
+
 assert.match(gate.rehearsalPolicy.frequencyKo, /월 1회|릴리즈/);
 assert.match(gate.rehearsalPolicy.dataSafetyKo, /운영 데이터 직접 복원 금지|격리/);
 assert.match(gate.rehearsalPolicy.requiredOutputKo, /backup-restore-rehearsal/);
+assert.match(gate.rehearsalPolicy.sensitiveBackupRetentionKo, /일일 workflow/);
 
 console.log("backup-restore-rehearsal gate ok");

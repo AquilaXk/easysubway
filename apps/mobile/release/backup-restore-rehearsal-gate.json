@@ -12,6 +12,8 @@
       "ownerKo": "백엔드 운영 담당자",
       "backupCommand": "tools/ops/postgres-backup.sh",
       "restoreRehearsalCommand": "tools/ops/postgres-restore-rehearsal.sh <backup-file>",
+      "retentionDays": 30,
+      "retentionCommand": "node tools/ops/prune-sensitive-backups.mjs --root <deploy-root>/backups --retention-days 30",
       "successEvidence": "restore rehearsal succeeded 로그와 격리 restore database 생성/삭제 확인",
       "failureConditions": [
         "pg_dump 산출물이 비어 있음",
@@ -20,6 +22,8 @@
       ],
       "linkedArtifacts": [
         "tools/ops/postgres-backup.sh",
+        "tools/ops/prune-sensitive-backups.mjs",
+        ".github/workflows/sensitive-backup-retention.yml",
         "tools/ops/postgres-restore-rehearsal.sh",
         "infra/docker-compose.yml",
         "backend/src/main/resources/application-prod.yml"
@@ -31,6 +35,8 @@
       "ownerKo": "신고 운영 담당자",
       "backupCommand": "tools/ops/facility-report-photo-backup.sh",
       "restoreRehearsalCommand": "node tools/ops/facility-report-photo-restore-check.mjs \"$EASYSUBWAY_PHOTO_RESTORE_DIR\"",
+      "retentionDays": 30,
+      "retentionCommand": "node tools/ops/prune-sensitive-backups.mjs --root <deploy-root>/backups --retention-days 30",
       "successEvidence": "manifest.tsv와 objects 경로가 생성되고 누락 object key가 없음을 확인",
       "failureConditions": [
         "photo object key가 비어 있거나 경로 traversal을 포함함",
@@ -39,6 +45,8 @@
       ],
       "linkedArtifacts": [
         "tools/ops/facility-report-photo-backup.sh",
+        "tools/ops/prune-sensitive-backups.mjs",
+        ".github/workflows/sensitive-backup-retention.yml",
         "tools/ops/facility-report-photo-restore-check.mjs",
         "backend/src/main/resources/db/migration/postgresql/V2__facility_report_photo_object_storage.sql"
       ]
@@ -85,6 +93,7 @@
   ],
   "rehearsalPolicy": {
     "frequencyKo": "월 1회 또는 릴리즈 후보 freeze 전 1회 실행한다.",
+    "sensitiveBackupRetentionKo": "개인정보가 포함될 수 있는 PostgreSQL dump와 시설 신고 사진 백업은 생성 시와 운영 환경의 일일 workflow에서 만료 사본을 삭제한다. 기본 보관은 생성일부터 30일이며 설정 가능한 상한은 365일이다.",
     "dataSafetyKo": "운영 데이터 직접 복원 금지, 격리 restore database와 로컬 전용 object directory에서만 리허설한다.",
     "requiredOutputKo": ".codex/evidence/backup-restore-rehearsal/<date>/ 아래 명령 출력, manifest checksum, 실패 조건 확인 결과를 로컬 전용으로 보관한다.",
     "sensitiveDataPolicyKo": "database dump, 사진 object, signed URL, credential, receipt token은 GitHub에 업로드하지 않는다."

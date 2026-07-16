@@ -2,132 +2,111 @@ import 'package:easysubway_mobile/features/support/presentation/support_access_s
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('릴리즈 도움말 연락 경로는 모두 설정되어야 한다', () {
-    expect(
-      () => const SupportAccessInfo(
-        privacyPolicyUrl: '',
-        supportEmail: 'support@easysubway.example',
-        dataDeletionEmail: 'privacy@easysubway.example',
-        securityEmail: 'security@easysubway.example',
-      ).validatedForBuild(isReleaseMode: true),
-      throwsA(
-        isA<StateError>().having(
-          (error) => error.message,
-          'message',
-          'Release privacy policy URL must be configured.',
+  SupportAccessInfo info({
+    String terms = 'https://easysubway.example/terms',
+    String privacy = 'https://easysubway.example/privacy',
+    String location = 'https://easysubway.example/location-terms',
+    String support = 'support@easysubway.example',
+    String deletion = 'privacy@easysubway.example',
+    String security = 'security@easysubway.example',
+  }) => SupportAccessInfo(
+    termsOfServiceUrl: terms,
+    privacyPolicyUrl: privacy,
+    locationTermsUrl: location,
+    supportEmail: support,
+    dataDeletionEmail: deletion,
+    securityEmail: security,
+  );
+
+  test('릴리즈 법적 문서 URL은 모두 설정되어야 한다', () {
+    for (final invalid in [
+      (info(terms: ''), 'Release terms of service URL must be configured.'),
+      (info(privacy: ''), 'Release privacy policy URL must be configured.'),
+      (info(location: ''), 'Release location terms URL must be configured.'),
+    ]) {
+      expect(
+        () => invalid.$1.validatedForBuild(isReleaseMode: true),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            invalid.$2,
+          ),
         ),
+      );
+    }
+  });
+
+  test('릴리즈 법적 문서는 HTTPS URL만 허용한다', () {
+    for (final invalid in [
+      (
+        info(terms: 'http://easysubway.example/terms'),
+        'Release terms of service URL must use HTTPS.',
       ),
-    );
-    expect(
-      () => const SupportAccessInfo(
-        privacyPolicyUrl: 'https://easysubway.example/privacy',
-        supportEmail: '',
-        dataDeletionEmail: 'privacy@easysubway.example',
-        securityEmail: 'security@easysubway.example',
-      ).validatedForBuild(isReleaseMode: true),
-      throwsA(
-        isA<StateError>().having(
-          (error) => error.message,
-          'message',
-          'Release support email must be configured.',
+      (
+        info(privacy: 'http://easysubway.example/privacy'),
+        'Release privacy policy URL must use HTTPS.',
+      ),
+      (
+        info(location: 'location-terms'),
+        'Release location terms URL must use HTTPS.',
+      ),
+    ]) {
+      expect(
+        () => invalid.$1.validatedForBuild(isReleaseMode: true),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            invalid.$2,
+          ),
         ),
-      ),
-    );
+      );
+    }
+  });
+
+  test('릴리즈 법적 문서 URL은 호스트를 포함해야 한다', () {
     expect(
-      () => const SupportAccessInfo(
-        privacyPolicyUrl: 'https://easysubway.example/privacy',
-        supportEmail: 'support@easysubway.example',
-        dataDeletionEmail: '',
-        securityEmail: 'security@easysubway.example',
+      () => info(
+        location: 'https:/location-terms',
       ).validatedForBuild(isReleaseMode: true),
       throwsA(
         isA<StateError>().having(
           (error) => error.message,
           'message',
-          'Release data deletion email must be configured.',
-        ),
-      ),
-    );
-    expect(
-      () => const SupportAccessInfo(
-        privacyPolicyUrl: 'https://easysubway.example/privacy',
-        supportEmail: 'support@easysubway.example',
-        dataDeletionEmail: 'privacy@easysubway.example',
-        securityEmail: '',
-      ).validatedForBuild(isReleaseMode: true),
-      throwsA(
-        isA<StateError>().having(
-          (error) => error.message,
-          'message',
-          'Release security email must be configured.',
+          'Release location terms URL must include a host.',
         ),
       ),
     );
   });
 
-  test('릴리즈 도움말 연락 경로는 HTTPS와 메일 주소 형식만 허용한다', () {
-    expect(
-      () => const SupportAccessInfo(
-        privacyPolicyUrl: 'http://easysubway.example/privacy',
-        supportEmail: 'support@easysubway.example',
-        dataDeletionEmail: 'privacy@easysubway.example',
-        securityEmail: 'security@easysubway.example',
-      ).validatedForBuild(isReleaseMode: true),
-      throwsA(
-        isA<StateError>().having(
-          (error) => error.message,
-          'message',
-          'Release privacy policy URL must use HTTPS.',
-        ),
+  test('릴리즈 문의 주소는 모두 유효해야 한다', () {
+    for (final invalid in [
+      (
+        info(support: 'support'),
+        'Release support email must be a valid email address.',
       ),
-    );
-    expect(
-      () => const SupportAccessInfo(
-        privacyPolicyUrl: 'https://easysubway.example/privacy',
-        supportEmail: 'support',
-        dataDeletionEmail: 'privacy@easysubway.example',
-        securityEmail: 'security@easysubway.example',
-      ).validatedForBuild(isReleaseMode: true),
-      throwsA(
-        isA<StateError>().having(
-          (error) => error.message,
-          'message',
-          'Release support email must be a valid email address.',
-        ),
-      ),
-    );
-    for (final invalidEmail in [
-      'support@example.com/path',
-      'support@-example.com',
+      (info(deletion: ''), 'Release data deletion email must be configured.'),
+      (info(security: ''), 'Release security email must be configured.'),
     ]) {
       expect(
-        () => SupportAccessInfo(
-          privacyPolicyUrl: 'https://easysubway.example/privacy',
-          supportEmail: invalidEmail,
-          dataDeletionEmail: 'privacy@easysubway.example',
-          securityEmail: 'security@easysubway.example',
-        ).validatedForBuild(isReleaseMode: true),
+        () => invalid.$1.validatedForBuild(isReleaseMode: true),
         throwsA(
           isA<StateError>().having(
             (error) => error.message,
             'message',
-            'Release support email must be a valid email address.',
+            invalid.$2,
           ),
         ),
       );
     }
     expect(
-      const SupportAccessInfo(
-        privacyPolicyUrl: 'https://easysubway.example/privacy',
-        supportEmail: 'support@easysubway.example',
-        dataDeletionEmail: 'privacy@easysubway.example',
-        securityEmail: 'security@easysubway.example',
-      ).validatedForBuild(isReleaseMode: true).securityEmail,
+      info().validatedForBuild(isReleaseMode: true).securityEmail,
       'security@easysubway.example',
     );
   });
 
-  test('디버그 도움말 연락 경로는 준비 중 표시를 위해 비어 있을 수 있다', () {
+  test('디버그에서는 미설정 값을 허용한다', () {
     expect(
       const SupportAccessInfo(
         privacyPolicyUrl: '',

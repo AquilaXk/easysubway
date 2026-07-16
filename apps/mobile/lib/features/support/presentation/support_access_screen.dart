@@ -9,7 +9,6 @@ import '../../../design_tokens.dart';
 import '../../../mobile_error_reporter.dart';
 import '../../../user_data_deletion.dart';
 import '../../account/presentation/user_data_deletion_screen.dart';
-import '../../attribution/presentation/data_source_attribution_screen.dart';
 
 abstract interface class SupportAccessLauncher {
   Future<bool> open(Uri uri);
@@ -26,15 +25,23 @@ class UrlLauncherSupportAccessLauncher implements SupportAccessLauncher {
 
 class SupportAccessInfo {
   const SupportAccessInfo({
+    this.termsOfServiceUrl = '',
     required this.privacyPolicyUrl,
+    this.locationTermsUrl = '',
     required this.supportEmail,
     required this.dataDeletionEmail,
     this.securityEmail = '',
   });
 
   const SupportAccessInfo.fromEnvironment()
-    : privacyPolicyUrl = const String.fromEnvironment(
+    : termsOfServiceUrl = const String.fromEnvironment(
+        'EASYSUBWAY_TERMS_OF_SERVICE_URL',
+      ),
+      privacyPolicyUrl = const String.fromEnvironment(
         'EASYSUBWAY_PRIVACY_POLICY_URL',
+      ),
+      locationTermsUrl = const String.fromEnvironment(
+        'EASYSUBWAY_LOCATION_TERMS_URL',
       ),
       supportEmail = const String.fromEnvironment('EASYSUBWAY_SUPPORT_EMAIL'),
       dataDeletionEmail = const String.fromEnvironment(
@@ -42,7 +49,9 @@ class SupportAccessInfo {
       ),
       securityEmail = const String.fromEnvironment('EASYSUBWAY_SECURITY_EMAIL');
 
+  final String termsOfServiceUrl;
   final String privacyPolicyUrl;
+  final String locationTermsUrl;
   final String supportEmail;
   final String dataDeletionEmail;
   final String securityEmail;
@@ -51,7 +60,9 @@ class SupportAccessInfo {
     if (!isReleaseMode) {
       return this;
     }
+    _validateHttpsUrl(label: 'terms of service URL', value: termsOfServiceUrl);
     _validateHttpsUrl(label: 'privacy policy URL', value: privacyPolicyUrl);
+    _validateHttpsUrl(label: 'location terms URL', value: locationTermsUrl);
     _validateEmail(label: 'support email', value: supportEmail);
     _validateEmail(label: 'data deletion email', value: dataDeletionEmail);
     _validateEmail(label: 'security email', value: securityEmail);
@@ -114,16 +125,6 @@ class SupportAccessScreen extends StatelessWidget {
             const _SupportSectionTitle(title: '내 정보와 개인정보'),
             _SupportGroupCard(
               children: [
-                if (_httpsUri(accessInfo.privacyPolicyUrl) != null)
-                  _SupportAccessItem(
-                    key: const Key('privacyPolicyAccessItem'),
-                    icon: Icons.privacy_tip_outlined,
-                    title: '개인정보처리방침',
-                    value: accessInfo.privacyPolicyUrl,
-                    displayValue: '웹에서 확인',
-                    uri: _httpsUri(accessInfo.privacyPolicyUrl),
-                    launcher: launcher,
-                  ),
                 if (userDataDeletionRepository != null)
                   UserDataDeletionAccessItem(
                     repository: userDataDeletionRepository!,
@@ -151,23 +152,6 @@ class SupportAccessScreen extends StatelessWidget {
             const SizedBox(height: 20),
             const _SupportSectionTitle(title: '이동 전 살펴보기'),
             const _SafetyDataNotice(),
-            const SizedBox(height: 12),
-            _SupportGroupCard(
-              children: [
-                _SupportNavRow(
-                  key: const Key('supportDataSourceAttributionButton'),
-                  icon: Icons.source_outlined,
-                  title: '데이터 및 지도 출처',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const DataSourceAttributionScreen(),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
             const SizedBox(height: 20),
             const _SupportSectionTitle(title: '문의'),
             _SupportGroupCard(
@@ -262,60 +246,6 @@ class _SupportGroupCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: rows,
-        ),
-      ),
-    );
-  }
-}
-
-class _SupportNavRow extends StatelessWidget {
-  const _SupportNavRow({
-    required this.icon,
-    required this.title,
-    required this.onTap,
-    super.key,
-  });
-
-  final IconData icon;
-  final String title;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: title,
-      onTap: onTap,
-      child: ExcludeSemantics(
-        child: InkWell(
-          onTap: onTap,
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 56),
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            child: Row(
-              children: [
-                Icon(icon, size: 24, color: EasySubwayAccessibleColors.primary),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      color: EasySubwayAccessibleColors.text,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      height: 1.25,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Icon(
-                  Icons.chevron_right,
-                  color: EasySubwayAccessibleColors.mutedText,
-                  size: 22,
-                ),
-              ],
-            ),
-          ),
         ),
       ),
     );
@@ -635,14 +565,6 @@ class _SupportAccessItem extends StatelessWidget {
       SnackBar(content: Text('연결할 수 없습니다. 직접 확인해 주세요: $targetText')),
     );
   }
-}
-
-Uri? _httpsUri(String value) {
-  final uri = Uri.tryParse(value.trim());
-  if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
-    return null;
-  }
-  return uri;
 }
 
 Uri? _mailtoUri(String value, String subject) {

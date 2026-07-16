@@ -17,6 +17,11 @@
   "encryptionInTransitRequired": true,
   "userDataDeletionSupported": true,
   "privacyPolicyUrlSource": "EASYSUBWAY_PRIVACY_POLICY_URL dart-define",
+  "legalDocumentUrlSources": {
+    "termsOfService": "EASYSUBWAY_TERMS_OF_SERVICE_URL dart-define",
+    "privacyPolicy": "EASYSUBWAY_PRIVACY_POLICY_URL dart-define",
+    "locationTerms": "EASYSUBWAY_LOCATION_TERMS_URL dart-define"
+  },
   "googlePlayDataSafetyRequiredFields": [
     "collected",
     "collectionType",
@@ -122,19 +127,22 @@
       "codeOwner": "mobile/backend",
       "collectionTrigger": "사용자가 가까운 역 검색, 시설 신고 위치 첨부, 출구 도보 길안내를 실행할 때만 사용",
       "backendTableOrService": ["stationSearch.currentLocation", "externalMap.walkingRoute.startCoordinate", "facility_reports.latitude", "facility_reports.longitude"],
-      "storageLocations": ["mobile-memory", "external-map-deeplink", "backend-report"],
-      "retentionKo": "주변 역 검색과 출구 도보 길안내 시작 좌표는 앱이 저장하지 않고, 시설 신고 위치는 신고 처리와 운영 검수 기간 동안 보관",
-      "deletionKo": "데이터 삭제 요청 시 신고자 연결을 제거하고 위치를 익명화 또는 삭제",
-      "deletionImplementation": "UserDataDeletionService가 AnonymizeUserFacilityReportPort를 통해 사용자의 신고 위치 연결을 익명화한다.",
+      "storageLocations": ["mobile-memory", "external-map-deeplink", "backend-report", "restricted-operations-backup"],
+      "retentionKo": "주변 역 검색과 출구 도보 길안내 시작 좌표는 앱이 저장하지 않는다. 시설 신고 위치는 운영 데이터에서 접수일부터 최대 1년, 제한된 운영 백업에서 생성일부터 30일 보관 후 자동 삭제 또는 익명화한다.",
+      "deletionKo": "운영 데이터는 접수일부터 최대 1년 뒤, 제한된 운영 백업은 생성일부터 30일 뒤 자동 파기하며 그 전 데이터 삭제 요청 시 신고자 연결과 위치를 삭제 또는 익명화",
+      "deletionImplementation": "UserDataDeletionService와 FacilityReportPersonalDataPurgeScheduler가 운영 데이터의 신고 위치 연결을 제거하고, prune-sensitive-backups.mjs 및 sensitive-backup-retention workflow가 만료 백업을 매일 삭제한다.",
       "evidence": [
         "apps/mobile/lib/station_search.dart",
         "apps/mobile/lib/facility_report.dart",
         "apps/mobile/release/external-map-deeplink-policy.json",
-        "backend/src/main/java/com/easysubway/user/application/service/UserDataDeletionService.java"
+        "backend/src/main/java/com/easysubway/user/application/service/UserDataDeletionService.java",
+        "backend/src/main/java/com/easysubway/report/adapter/in/scheduler/FacilityReportPersonalDataPurgeScheduler.java",
+        "tools/ops/prune-sensitive-backups.mjs",
+        ".github/workflows/sensitive-backup-retention.yml"
       ],
-      "lastVerifiedAt": "2026-07-09",
+      "lastVerifiedAt": "2026-07-16",
       "sharedWithThirdParties": true,
-      "thirdPartySharingKo": "사용자가 출구 도보 길안내를 명시적으로 누른 경우에만 카카오맵 앱/웹을 연다. 앱에는 현재 위치 시작 좌표와 목적지 좌표를, 웹에는 목적지 좌표만 전달한다. 서버로 전송하거나 앱에 저장하지 않고 tracking에 사용하지 않는다.",
+      "thirdPartySharingKo": "사용자가 출구 도보 길안내를 명시적으로 누른 경우에만 카카오맵 앱/웹을 연다. 앱에는 현재 위치 시작 좌표와 목적지 좌표를, 웹에는 목적지 좌표만 전달한다. 이 외부 지도 전달 좌표는 운영자 서버로 전송하거나 앱에 저장하지 않고 tracking에 사용하지 않는다.",
       "usedForTracking": false,
       "googlePlayDataSafety": {
         "dataType": "Location",
@@ -501,16 +509,19 @@
       "codeOwner": "mobile/backend",
       "collectionTrigger": "사용자가 시설 신고를 제출할 때 선택 항목과 자유 입력 내용이 저장",
       "backendTableOrService": ["facility_reports.description", "facility_reports.report_type", "facility_reports.status"],
-      "storageLocations": ["backend-database"],
-      "retentionKo": "신고 처리와 운영 검수에 필요한 기간 동안 보관",
-      "deletionKo": "데이터 삭제 요청 시 신고자 연결과 자유 입력 내용을 삭제 또는 익명화",
-      "deletionImplementation": "UserDataDeletionService가 AnonymizeUserFacilityReportPort를 통해 신고자와 자유 입력 내용을 익명화한다.",
+      "storageLocations": ["backend-database", "restricted-operations-backup"],
+      "retentionKo": "운영 데이터는 접수일부터 최대 1년, 제한된 운영 백업은 생성일부터 30일 보관 후 자동 파기 작업으로 사용자 연결과 자유 입력 내용을 삭제 또는 익명화",
+      "deletionKo": "운영 데이터는 접수일부터 최대 1년 뒤, 제한된 운영 백업은 생성일부터 30일 뒤 자동 파기하며 그 전 데이터 삭제 요청 시 신고자 연결과 자유 입력 내용을 삭제 또는 익명화",
+      "deletionImplementation": "UserDataDeletionService와 FacilityReportPersonalDataPurgeScheduler가 운영 데이터를 익명화하고, prune-sensitive-backups.mjs 및 sensitive-backup-retention workflow가 만료 백업을 매일 삭제한다.",
       "evidence": [
         "apps/mobile/lib/facility_report.dart",
         "backend/src/main/java/com/easysubway/report/application/service/FacilityReportService.java",
-        "backend/src/main/java/com/easysubway/user/application/service/UserDataDeletionService.java"
+        "backend/src/main/java/com/easysubway/user/application/service/UserDataDeletionService.java",
+        "backend/src/main/java/com/easysubway/report/adapter/in/scheduler/FacilityReportPersonalDataPurgeScheduler.java",
+        "tools/ops/prune-sensitive-backups.mjs",
+        ".github/workflows/sensitive-backup-retention.yml"
       ],
-      "lastVerifiedAt": "2026-06-19",
+      "lastVerifiedAt": "2026-07-16",
       "sharedWithThirdParties": false,
       "usedForTracking": false,
       "googlePlayDataSafety": {
@@ -540,27 +551,30 @@
       "collectionTrigger": "사용자가 시설 신고 제출 전에 사진을 첨부하고 전송할 때",
       "backendTableOrService": [
         "facility_reports.photo_object_key",
-        "facility_reports.photo_thumbnail_object_key",
-        "facility_reports.photo_data_base64 legacy"
+        "facility_reports.photo_thumbnail_object_key"
       ],
       "storageLocations": [
         "mobile-memory",
         "backend-object-storage",
         "backend-database-metadata",
-        "backend-database-legacy-column"
+        "restricted-operations-backup"
       ],
-      "retentionKo": "원본과 썸네일 object는 신고 처리와 운영 검수 기간 동안 보관하고, photo_data_base64 legacy 컬럼은 object backfill/export 완료 전까지만 호환용으로 유지",
-      "deletionKo": "데이터 삭제 요청 시 object storage의 원본과 썸네일을 삭제하고 legacy Base64 컬럼은 NULL 처리",
-      "deletionImplementation": "deleteFacilityReportPhoto로 원본과 썸네일 object를 삭제하고 JdbcFacilityReportRepository가 photo_data_base64 = NULL로 legacy 값을 제거한다.",
+      "retentionKo": "운영 object는 접수일부터 최대 1년, 제한된 운영 백업은 생성일부터 30일 보관 후 자동 파기 작업으로 삭제",
+      "deletionKo": "운영 object는 접수일부터 최대 1년 뒤, 제한된 운영 백업은 생성일부터 30일 뒤 자동 파기하며 그 전 데이터 삭제 요청 시 원본과 썸네일을 삭제",
+      "deletionImplementation": "UserDataDeletionService와 FacilityReportPersonalDataPurgeScheduler가 deleteFacilityReportPhoto를 통해 운영 object를 삭제하고, prune-sensitive-backups.mjs 및 sensitive-backup-retention workflow가 만료 백업을 매일 삭제한다.",
       "evidence": [
         "apps/mobile/lib/facility_report.dart",
         "backend/src/main/java/com/easysubway/report/application/service/FacilityReportPhotoProcessor.java",
         "backend/src/main/java/com/easysubway/report/adapter/out/storage/LocalFacilityReportPhotoStorage.java",
         "backend/src/main/java/com/easysubway/report/adapter/out/persistence/JdbcFacilityReportRepository.java",
         "backend/src/main/resources/db/migration/postgresql/V2__facility_report_photo_object_storage.sql",
-        "tools/ops/facility-report-photo-backup.sh"
+        "backend/src/main/resources/db/migration/postgresql/V4__drop_facility_report_base64_payload.sql",
+        "backend/src/main/java/com/easysubway/report/adapter/in/scheduler/FacilityReportPersonalDataPurgeScheduler.java",
+        "tools/ops/facility-report-photo-backup.sh",
+        "tools/ops/prune-sensitive-backups.mjs",
+        ".github/workflows/sensitive-backup-retention.yml"
       ],
-      "lastVerifiedAt": "2026-06-19",
+      "lastVerifiedAt": "2026-07-16",
       "sharedWithThirdParties": false,
       "usedForTracking": false,
       "googlePlayDataSafety": {
@@ -589,16 +603,19 @@
       "codeOwner": "mobile/backend",
       "collectionTrigger": "사용자가 시설 신고 대상 위치를 확인하고 신고를 제출할 때",
       "backendTableOrService": ["facility_reports.latitude", "facility_reports.longitude"],
-      "storageLocations": ["backend-database"],
-      "retentionKo": "신고 처리와 운영 검수에 필요한 기간 동안 보관",
-      "deletionKo": "데이터 삭제 요청 시 위치를 삭제 또는 익명화",
-      "deletionImplementation": "UserDataDeletionService가 AnonymizeUserFacilityReportPort를 통해 신고 위치를 사용자 식별자와 분리한다.",
+      "storageLocations": ["backend-database", "restricted-operations-backup"],
+      "retentionKo": "운영 데이터는 접수일부터 최대 1년, 제한된 운영 백업은 생성일부터 30일 보관 후 자동 파기 작업으로 좌표를 삭제 또는 익명화",
+      "deletionKo": "운영 데이터는 접수일부터 최대 1년 뒤, 제한된 운영 백업은 생성일부터 30일 뒤 자동 파기하며 그 전 데이터 삭제 요청 시 위치를 삭제 또는 익명화",
+      "deletionImplementation": "UserDataDeletionService와 FacilityReportPersonalDataPurgeScheduler가 운영 신고 위치를 사용자 식별자와 분리하고, prune-sensitive-backups.mjs 및 sensitive-backup-retention workflow가 만료 백업을 매일 삭제한다.",
       "evidence": [
         "apps/mobile/lib/facility_report.dart",
         "backend/src/main/java/com/easysubway/report/domain/FacilityReport.java",
-        "backend/src/main/java/com/easysubway/user/application/service/UserDataDeletionService.java"
+        "backend/src/main/java/com/easysubway/user/application/service/UserDataDeletionService.java",
+        "backend/src/main/java/com/easysubway/report/adapter/in/scheduler/FacilityReportPersonalDataPurgeScheduler.java",
+        "tools/ops/prune-sensitive-backups.mjs",
+        ".github/workflows/sensitive-backup-retention.yml"
       ],
-      "lastVerifiedAt": "2026-06-19",
+      "lastVerifiedAt": "2026-07-16",
       "sharedWithThirdParties": false,
       "usedForTracking": false,
       "googlePlayDataSafety": {

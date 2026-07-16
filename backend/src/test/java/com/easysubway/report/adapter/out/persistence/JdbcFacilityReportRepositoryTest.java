@@ -11,6 +11,7 @@ import com.easysubway.report.domain.FacilityReportSummary;
 import com.easysubway.report.domain.FacilityReportType;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -347,6 +348,35 @@ class JdbcFacilityReportRepositoryTest {
 		assertThat(anonymizedReport.status()).isEqualTo(targetReport.status());
 		assertThat(anonymizedReport.reviewedAt()).isEqualTo(targetReport.reviewedAt());
 		assertThat(anonymizedReport.reviewedBy()).isEqualTo(targetReport.reviewedBy());
+	}
+
+	@Test
+	@DisplayName("1년 보관 상한이 지난 신고는 운영 통계만 남기고 개인정보를 파기한다")
+	void purgePersonalDataCreatedBeforeKeepsOnlyOperationalMetadata() {
+		var deletedPhotoObjectKeys = new ArrayList<String>();
+		repository = new JdbcFacilityReportRepository(jdbcTemplate, deletedPhotoObjectKeys::add);
+		var expiredReport = submittedReport("report-expired", "anonymous-user-1", 8);
+		var retainedReport = submittedReport("report-retained", "anonymous-user-2", 10);
+		repository.saveReport(expiredReport);
+		repository.saveReport(retainedReport);
+
+		int purged = repository.purgePersonalDataCreatedBefore(
+			LocalDateTime.of(2026, 6, 17, 9, 0)
+		);
+
+		assertThat(purged).isEqualTo(1);
+		FacilityReport anonymized = repository.loadReport("report-expired").orElseThrow();
+		assertThat(anonymized.userId()).isEqualTo(FacilityReport.ANONYMIZED_USER_ID);
+		assertThat(anonymized.description()).isEqualTo("사용자 데이터 삭제로 신고 내용이 삭제되었습니다.");
+		assertThat(anonymized.photoObjectKey()).isNull();
+		assertThat(anonymized.photoThumbnailObjectKey()).isNull();
+		assertThat(anonymized.latitude()).isNull();
+		assertThat(anonymized.longitude()).isNull();
+		assertThat(anonymized.stationId()).isEqualTo(expiredReport.stationId());
+		assertThat(anonymized.facilityId()).isEqualTo(expiredReport.facilityId());
+		assertThat(anonymized.status()).isEqualTo(expiredReport.status());
+		assertThat(deletedPhotoObjectKeys).containsExactly(expiredReport.photoObjectKey());
+		assertThat(repository.loadReport("report-retained")).contains(retainedReport);
 	}
 
 	@Test
