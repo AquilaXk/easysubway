@@ -4703,15 +4703,21 @@ test("datapack readiness producer는 required gate를 동일 final identity로 �
 
   const firstOutput = path.join(tempDir, "first.json");
   const secondOutput = path.join(tempDir, "second.json");
+  const reevaluatedOutput = path.join(tempDir, "reevaluated.json");
   await execFileAsync(process.execPath, [...args, "--output", firstOutput], { cwd: root });
   await execFileAsync(process.execPath, [...args, "--output", secondOutput], { cwd: root });
+  const reevaluatedArgs = [...args];
+  reevaluatedArgs[reevaluatedArgs.indexOf("--now") + 1] = "2026-07-17T00:00:00.000Z";
+  await execFileAsync(process.execPath, [...reevaluatedArgs, "--output", reevaluatedOutput], { cwd: root });
 
   const firstBytes = readFileSync(firstOutput, "utf8");
   assert.equal(readFileSync(secondOutput, "utf8"), firstBytes);
   const manifest = JSON.parse(firstBytes);
+  const reevaluatedManifest = JSON.parse(readFileSync(reevaluatedOutput, "utf8"));
   assert.equal(manifest.producerVersion, 1);
   assert.equal(manifest.evaluatedAt, now);
   assert.match(manifest.finalReleaseIdentity, /^[a-f0-9]{64}$/);
+  assert.equal(reevaluatedManifest.finalReleaseIdentity, manifest.finalReleaseIdentity);
   assert.deepEqual(
     manifest.datapackGates.map(({ id, sourceIssue, status }) => ({ id, sourceIssue, status })),
     requiredDatapackGates.map(({ id, sourceIssue }) => ({ id, sourceIssue, status: "SATISFIED" })),
@@ -4738,6 +4744,14 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
     "--output", outputPath,
   ];
 
+  await execFileAsync(process.execPath, baseArgs, { cwd: root });
+  const blockedManifest = JSON.parse(readFileSync(outputPath, "utf8"));
+  assert.ok(blockedManifest.datapackGates.every(({ status }) => status === "BLOCKED_EXTERNAL"));
+  assert.equal(
+    blockedManifest.readiness.blockers.filter(({ id }) => id.startsWith("datapack_gate_")).length,
+    4,
+  );
+
   await assert.rejects(
     execFileAsync(process.execPath, [
       ...baseArgs,
@@ -4746,13 +4760,23 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
     /Unknown datapack gate/,
   );
 
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      ...baseArgs,
+      "--datapack-gate-status", "source_governance=BLOCKED_EXTERNAL",
+      "--datapack-gate-status", "source_governance=BLOCKED_EXTERNAL",
+    ], { cwd: root }),
+    /Duplicate key=value pair: source_governance/,
+  );
+
   const writeEvidence = async ({
+    schemaVersion = 1,
     evidenceGitSha = gitSha,
     expiresAt = "2026-07-30T00:00:00.000Z",
     reasonCodes = [],
   } = {}) => {
     await writeFile(evidencePath, JSON.stringify({
-      schemaVersion: 1,
+      schemaVersion,
       gateId: "source_governance",
       sourceIssue: 2133,
       status: "SATISFIED",
@@ -4772,6 +4796,16 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
     /RC identity mismatch/,
   );
 
+  await writeEvidence({ schemaVersion: 2 });
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      ...baseArgs,
+      "--datapack-gate-status", "source_governance=SATISFIED",
+      "--datapack-gate-evidence", `source_governance=${evidencePath}`,
+    ], { cwd: root }),
+    /unsupported schemaVersion/,
+  );
+
   await writeEvidence({ expiresAt: "2026-07-15T23:59:59.999Z" });
   await assert.rejects(
     execFileAsync(process.execPath, [
@@ -4783,14 +4817,40 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
   );
 
   await writeEvidence({ reasonCodes: ["SOURCE_LINEAGE_BROKEN"] });
-  await execFileAsync(process.execPath, [
-    ...baseArgs,
-    "--datapack-gate-status", "source_governance=SATISFIED",
-    "--datapack-gate-evidence", `source_governance=${evidencePath}`,
-  ], { cwd: root });
-  const manifest = JSON.parse(readFileSync(outputPath, "utf8"));
-  assert.ok(
-    manifest.readiness.blockers.some(({ id }) => id === "datapack_gate_source_governance_source_lineage_broken"),
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      ...baseArgs,
+      "--datapack-gate-status", "source_governance=SATISFIED",
+      "--datapack-gate-evidence", `source_governance=${evidencePath}`,
+    ], { cwd: root }),
+    /reasonCodes must be empty/,
+  );
+
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      ...baseArgs,
+      "--datapack-gate-status", "source_governance=SATISFIED",
+    ], { cwd: root }),
+    /requires existing --datapack-gate-evidence/,
+  );
+
+  const duplicateContractApp = path.join(tempDir, "duplicate-contract-app");
+  await mkdir(path.join(duplicateContractApp, "release"), { recursive: true });
+  await writeFile(path.join(duplicateContractApp, "pubspec.yaml"), read("apps/mobile/pubspec.yaml"));
+  const duplicateContract = readJson("apps/mobile/release/rc-evidence-manifest-contract.json");
+  duplicateContract.requiredDatapackGates.push(duplicateContract.requiredDatapackGates[0]);
+  await writeFile(
+    path.join(duplicateContractApp, "release/rc-evidence-manifest-contract.json"),
+    JSON.stringify(duplicateContract),
+  );
+  const duplicateContractArgs = [...baseArgs];
+  duplicateContractArgs[duplicateContractArgs.indexOf("--app-root") + 1] = duplicateContractApp;
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      ...duplicateContractArgs,
+      "--data-pack-manifest", path.join(root, "apps/mobile/assets/datapacks/metro_map_pack/manifest.json"),
+    ], { cwd: root }),
+    /Duplicate datapack gate in contract: source_governance/,
   );
 });
 
