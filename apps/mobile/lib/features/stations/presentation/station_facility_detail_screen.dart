@@ -5,6 +5,7 @@ import '../../../design_tokens.dart';
 import '../../../facility_status.dart';
 import '../application/station_detail_controller.dart';
 import '../domain/station_models.dart';
+import 'station_detail_info_row.dart';
 import 'station_info_basis_disclosure.dart';
 
 const _stationFacilityDetailPagePadding = EdgeInsets.fromLTRB(20, 20, 20, 32);
@@ -168,17 +169,17 @@ class FacilityDetailScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    _StationDetailInfoRow(
+                    StationDetailInfoRow(
                       icon: Icons.stairs_outlined,
                       text: _facilityFloorLabel(facility),
                     ),
                     const SizedBox(height: 10),
-                    _StationDetailInfoRow(
+                    StationDetailInfoRow(
                       icon: Icons.place_outlined,
                       text: facility.locationLabel,
                     ),
                     const SizedBox(height: 10),
-                    _StationDetailInfoRow(
+                    StationDetailInfoRow(
                       icon: Icons.event_available,
                       text: facility.updatedLabel,
                     ),
@@ -250,33 +251,6 @@ IconData _facilityStatusNoticeIcon(FacilityStatusSeverity severity) {
     FacilityStatusSeverity.needsInfo => Icons.info_outline,
     FacilityStatusSeverity.normal => Icons.check_circle,
   };
-}
-
-class _StationDetailInfoRow extends StatelessWidget {
-  const _StationDetailInfoRow({required this.icon, required this.text});
-
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 22, color: EasySubwayAccessibleColors.primary),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: EasySubwayAccessibleColors.secondaryText,
-              fontWeight: FontWeight.w700,
-              height: 1.3,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 }
 
 class _StationDetailSectionTitle extends StatelessWidget {
