@@ -19,14 +19,16 @@ import '../features/realtime/realtime_repository.dart';
 import '../features/search_history/data/drift_search_history_repository.dart';
 import '../features/service_notice/data/drift_notice_cache_store.dart';
 import '../features/service_notice/data/notice_repository.dart';
-import '../features/stations/data/station_api_repository.dart';
 import '../features/stations/data/drift_station_repository.dart';
+import '../features/stations/data/current_location_provider.dart';
+import '../features/stations/data/station_api_repository.dart';
+import '../features/stations/domain/station_repositories.dart';
 import '../internal_route.dart';
 import '../network_map.dart';
 import '../notification_settings.dart';
 import '../route_search.dart';
 import '../route_v2_ingress.dart';
-import '../station_search.dart';
+import '../station_search.dart' show defaultOptionalStationApiBaseUri;
 import '../user_data_deletion.dart';
 import '../features/internal_route/data/local_internal_route_repository.dart';
 import '../features/routes/data/local_route_repository.dart'

@@ -2153,6 +2153,64 @@ test("역 모델과 저장소 계약은 stations domain canonical 파일이 소�
   }
 });
 
+test("역 위치 채널과 controller는 stations data·application canonical 파일이 소유한다", () => {
+  const stationSearch = read("apps/mobile/lib/station_search.dart");
+  const locationProvider = read(
+    "apps/mobile/lib/features/stations/data/current_location_provider.dart",
+  );
+  const searchController = read(
+    "apps/mobile/lib/features/stations/application/station_search_controller.dart",
+  );
+  const detailController = read(
+    "apps/mobile/lib/features/stations/application/station_detail_controller.dart",
+  );
+  const locationTest = read(
+    "apps/mobile/test/current_location_provider_test.dart",
+  );
+
+  assert.match(
+    locationProvider,
+    /^class MethodChannelCurrentLocationProvider\b/m,
+  );
+  assert.doesNotMatch(
+    stationSearch,
+    /^class MethodChannelCurrentLocationProvider\b/m,
+  );
+  for (const declaration of [
+    "StationSearchState",
+    "StationSearchController",
+  ]) {
+    assert.match(
+      searchController,
+      new RegExp(`^class ${declaration}\\b`, "m"),
+    );
+    assert.doesNotMatch(
+      stationSearch,
+      new RegExp(`^class ${declaration}\\b`, "m"),
+    );
+  }
+  for (const declaration of [
+    "StationDetailState",
+    "StationDetailController",
+    "StationFavoriteToggleState",
+    "StationFavoriteToggleController",
+  ]) {
+    assert.match(
+      detailController,
+      new RegExp(`^class ${declaration}\\b`, "m"),
+    );
+    assert.doesNotMatch(
+      stationSearch,
+      new RegExp(`^class ${declaration}\\b`, "m"),
+    );
+  }
+  assert.match(
+    locationTest,
+    /^import 'package:easysubway_mobile\/features\/stations\/data\/current_location_provider\.dart';$/m,
+  );
+  assert.doesNotMatch(locationTest, /station_search\.dart/);
+});
+
 test("프로덕션 모바일 UI 위젯명은 prototype 명칭을 쓰지 않는다", () => {
   const mobileFiles = execFileSync("git", ["ls-files", "apps/mobile/lib/*.dart"], {
     cwd: root,

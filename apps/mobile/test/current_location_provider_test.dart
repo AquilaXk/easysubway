@@ -1,4 +1,6 @@
-import 'package:easysubway_mobile/station_search.dart';
+import 'package:easysubway_mobile/features/stations/data/current_location_provider.dart';
+import 'package:easysubway_mobile/features/stations/domain/station_models.dart';
+import 'package:easysubway_mobile/features/stations/domain/station_repositories.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
