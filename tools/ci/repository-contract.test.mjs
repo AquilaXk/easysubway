@@ -12851,7 +12851,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(widgetTest, /시설 신고 화면은 사진과 위치를 보내기 전에 공개 범위를 안내한다/);
   assert.match(widgetTest, /시설 신고 화면은 현재 위치를 보내기 전에 공개 범위를 안내한다/);
   assert.doesNotMatch(main, /빠른 길보다, 갈 수 있는 길을 먼저 안내합니다|고령자, 임산부, 장애인도 편하게 이동할 수 있도록|현장에서 발견한 불편 정보를 신고하고 검수할 수 있게/);
-  assert.match(widgetTest, /EasySubwayApp/);
+  assert.match(widgetTest, /buildEasySubwayTestApp\(/);
+  assert.doesNotMatch(widgetTest, /\bEasySubwayApp\(/);
   assert.match(easySubwayAppDefaultsTest, /기본 앱은 출시 범위에서 원격 개인 데이터 저장소를 만들지 않는다/);
   assert.match(easySubwayAppDefaultsTest, /푸시 알림을 명시적으로 켜도 인증 없는 원격 저장소는 만들지 않는다/);
   assert.match(easySubwayAppDefaultsTest, /enablePushNotifications: true/);
