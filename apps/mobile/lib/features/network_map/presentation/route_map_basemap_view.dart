@@ -23,10 +23,10 @@ import '../domain/map_camera.dart';
 /// 매핑에 없는 region은 basemap 미표시(빈 화면)로 안전 폴백한다(크래시 금지).
 const Map<String, String> kRouteMapBasemapRegionToId = {
   '수도권': 'seoul',
-  '부산': 'busan',
-  '광주': 'gwangju',
-  '대구': 'daegu',
-  '대전': 'daejeon',
+  '부산권': 'busan',
+  '광주권': 'gwangju',
+  '대구권': 'daegu',
+  '대전권': 'daejeon',
 };
 
 /// region → .vec 자산 경로. 매핑에 없으면 null(바탕 미표시 폴백).

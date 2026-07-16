@@ -22,6 +22,22 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('5권역 데이터 region을 각 바탕 .vec 자산에 매핑한다', () {
+    expect(
+      {
+        for (final region in ['수도권', '부산권', '대구권', '대전권', '광주권'])
+          region: routeMapBasemapAssetForRegion(region),
+      },
+      {
+        '수도권': 'assets/datapacks/metro_map_pack/basemap/seoul.vec',
+        '부산권': 'assets/datapacks/metro_map_pack/basemap/busan.vec',
+        '대구권': 'assets/datapacks/metro_map_pack/basemap/daegu.vec',
+        '대전권': 'assets/datapacks/metro_map_pack/basemap/daejeon.vec',
+        '광주권': 'assets/datapacks/metro_map_pack/basemap/gwangju.vec',
+      },
+    );
+  });
+
   // route_map_overlay_camera_sync_test.dart와 동일한 비영점 origin 유형.
   final base = const Offset(1000, 700);
   final origin = base - const Offset(54, 54);
