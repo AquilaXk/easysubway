@@ -27,10 +27,6 @@ jobs:
     permissions:
       actions: read
       contents: read
-    env:
-      EVIDENCE_DIR: ${{ runner.temp }}/datapack-callback-reconciliation-evidence
-      RAW_REHEARSAL_PATH: ${{ runner.temp }}/datapack-callback-reconciliation-raw-input.json
-      RAW_CALLBACK_OUTAGE_PATH: ${{ runner.temp }}/datapack-callback-backend-outage.json
 
     steps:
       - name: Callback reconciliation / Checkout default branch
@@ -99,6 +95,8 @@ jobs:
 
       - name: Callback reconciliation / Inject callback backend outage through production sender
         shell: bash
+        env:
+          RAW_CALLBACK_OUTAGE_PATH: ${{ runner.temp }}/datapack-callback-backend-outage.json
         run: |
           set -euo pipefail
           node tools/datapack/run-callback-backend-outage-rehearsal.mjs \
@@ -108,8 +106,8 @@ jobs:
         working-directory: backend
         shell: bash
         env:
-          EASYSUBWAY_CALLBACK_REHEARSAL_OUTPUT: ${{ env.RAW_REHEARSAL_PATH }}
-          EASYSUBWAY_CALLBACK_OUTAGE_ARTIFACT: ${{ env.RAW_CALLBACK_OUTAGE_PATH }}
+          EASYSUBWAY_CALLBACK_REHEARSAL_OUTPUT: ${{ runner.temp }}/datapack-callback-reconciliation-raw-input.json
+          EASYSUBWAY_CALLBACK_OUTAGE_ARTIFACT: ${{ runner.temp }}/datapack-callback-backend-outage.json
         run: |
           set -euo pipefail
           ./gradlew test \
@@ -130,6 +128,9 @@ jobs:
 
       - name: Callback reconciliation / Build and validate sanitized evidence
         shell: bash
+        env:
+          EVIDENCE_DIR: ${{ runner.temp }}/datapack-callback-reconciliation-evidence
+          RAW_REHEARSAL_PATH: ${{ runner.temp }}/datapack-callback-reconciliation-raw-input.json
         run: |
           set -euo pipefail
           node tools/datapack/build-callback-reconciliation-evidence.mjs \
