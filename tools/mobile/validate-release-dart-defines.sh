@@ -3,6 +3,9 @@ set -euo pipefail
 
 api_base_url=""
 api_base_url_seen=false
+route_v2_online_enabled=false
+play_integrity_cloud_project_number=""
+play_integrity_cloud_project_number_seen=false
 
 for arg in "$@"; do
   case "${arg}" in
@@ -18,8 +21,25 @@ for arg in "$@"; do
       api_base_url_seen=true
       api_base_url="${arg#--dart-define=EASYSUBWAY_API_BASE_URL=}"
       ;;
+    --dart-define=EASYSUBWAY_ROUTE_V2_ONLINE_FIRST_ENABLED=true)
+      route_v2_online_enabled=true
+      ;;
+    --dart-define=EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=*)
+      if [[ "${play_integrity_cloud_project_number_seen}" == "true" ]]; then
+        printf 'EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER must be defined exactly once.\n' >&2
+        exit 1
+      fi
+      play_integrity_cloud_project_number_seen=true
+      play_integrity_cloud_project_number="${arg#--dart-define=EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=}"
+      ;;
   esac
 done
+
+if [[ "${route_v2_online_enabled}" == "true" &&
+  ! "${play_integrity_cloud_project_number}" =~ ^[1-9][0-9]*$ ]]; then
+  printf 'EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER must be a positive integer when Route V2 online transport is enabled.\n' >&2
+  exit 1
+fi
 
 if [[ "${api_base_url_seen}" != "true" || -z "${api_base_url}" ]]; then
   printf 'EASYSUBWAY_API_BASE_URL is required for release.\n' >&2

@@ -45,6 +45,7 @@ class LocalRouteRepository implements RouteSearchRepository {
           ? waypoint
           : await catalogDatabase.resolveCanonicalStationId(waypoint),
       mobilityPreset: request.mobilityPreset,
+      transportScope: request.transportScope,
     );
   }
 
@@ -260,6 +261,7 @@ class LocalRouteRepository implements RouteSearchRepository {
       etaConfidence: 'STATIC',
       sourceUpdatedAt: catalog.sourceUpdatedAt,
       officialOdFareQuote: officialOdFareQuote,
+      transportScope: request.transportScope,
     );
   }
 
@@ -1054,10 +1056,12 @@ extension _OnlineRouteDisplayLabels on LocalRouteRepository {
       destinationStationName: catalog.stationName(result.destinationStationId),
       lineName: catalog.lineName(result.lineId),
       steps: steps,
-      officialOdFareQuote: await officialOdFareRepository.findExact(
-        originStationId: result.originStationId,
-        destinationStationId: result.destinationStationId,
-      ),
+      officialOdFareQuote: result.transportScope == RouteTransportScope.subway
+          ? await officialOdFareRepository.findExact(
+              originStationId: result.originStationId,
+              destinationStationId: result.destinationStationId,
+            )
+          : null,
     );
   }
 
@@ -1994,6 +1998,7 @@ class _RouteCatalogSnapshot {
           ? waypoint
           : canonicalStationId(waypoint),
       mobilityPreset: request.mobilityPreset,
+      transportScope: request.transportScope,
     );
   }
 }

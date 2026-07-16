@@ -275,21 +275,33 @@ class RouteSearchV2ApiRepository implements RouteSearchRepository {
     required this.baseUri,
     ApiClient? apiClient,
     HttpClient? httpClient,
+    this.bearerTokenProvider,
+    this.bearerTokenInvalidator,
   }) : _apiClient =
            apiClient ?? ApiClient(baseUri: baseUri, httpClient: httpClient);
 
   final Uri baseUri;
   final ApiClient _apiClient;
+  final Future<String> Function()? bearerTokenProvider;
+  final void Function()? bearerTokenInvalidator;
 
   @override
   Future<RouteSearchResult> searchRoute(RouteSearchRequest routeRequest) async {
     try {
+      final bearerToken = await bearerTokenProvider?.call();
       final response = await _apiClient.postJson(
         '/api/v2/routes/search',
         body: routeRequest.toV2Json(),
+        headers: {
+          if (bearerToken != null)
+            HttpHeaders.authorizationHeader: 'Bearer $bearerToken',
+        },
       );
       if (!response.isSuccess) {
-        throw RouteSearchOnlineException.http(response.statusCode);
+        if (response.statusCode == HttpStatus.unauthorized) {
+          bearerTokenInvalidator?.call();
+        }
+        throw RouteSearchOnlineException.response(response);
       }
       final decoded = response.jsonBody;
       if (decoded is! Map<String, Object?> || decoded['success'] != true) {
@@ -322,39 +334,9 @@ class RouteSearchV2ApiRepository implements RouteSearchRepository {
   }
 
   @override
-  Future<RouteRefreshResult> refreshRoute(String routeSearchId) async {
-    final trimmedRouteSearchId = routeSearchId.trim();
-    if (trimmedRouteSearchId.isEmpty) {
-      throw const RouteSearchException(_routeRefreshErrorMessage);
-    }
-
-    try {
-      final response = await _apiClient.postJson(
-        '/api/v2/routes/${Uri.encodeComponent(trimmedRouteSearchId)}/refresh',
-        body: const <String, Object?>{},
-      );
-      if (!response.isSuccess) {
-        throw const RouteSearchException(_routeRefreshErrorMessage);
-      }
-      final decoded = response.jsonBody;
-      if (decoded is! Map<String, Object?> || decoded['success'] != true) {
-        throw const RouteSearchException(_routeRefreshErrorMessage);
-      }
-      final data = decoded['data'];
-      if (data is! Map<String, Object?>) {
-        throw const RouteSearchException(_routeRefreshErrorMessage);
-      }
-      return RouteRefreshResult.fromJson(data);
-    } on RouteSearchException {
-      rethrow;
-    } catch (error, stackTrace) {
-      reportMobileError(
-        error,
-        stackTrace,
-        context: '경로 V2 ETA refresh API 응답 처리 중 예외가 발생했습니다.',
-      );
-      throw const RouteSearchException(_routeRefreshErrorMessage);
-    }
+  Future<RouteRefreshResult> refreshRoute(String routeSearchId) {
+    // #2153 production ingress는 session/search 두 경로만 열고 legacy refresh는 계속 닫는다.
+    return Future.error(const RouteSearchException(_routeRefreshErrorMessage));
   }
 }
 
@@ -362,7 +344,8 @@ class RouteSearchOnlineException extends RouteSearchException {
   const RouteSearchOnlineException.unavailable({
     this.statusCode,
     this.failureReason = 'online-unavailable',
-  }) : super(_routeOnlineSearchErrorMessage);
+    String message = _routeOnlineSearchErrorMessage,
+  }) : super(message);
 
   factory RouteSearchOnlineException.http(int statusCode) {
     final backend4xxFailure = statusCode >= 400 && statusCode < 500;
@@ -377,13 +360,51 @@ class RouteSearchOnlineException extends RouteSearchException {
     );
   }
 
+  factory RouteSearchOnlineException.response(ApiResponse response) {
+    final body = response.jsonBody;
+    final code = body is Map<String, Object?> ? body['code'] : null;
+    const messages = <String, String>{
+      'ROUTE_SESSION_ATTESTATION_REJECTED': 'ITX 시간표를 불러올 수 없어요',
+      'ROUTE_SESSION_ATTESTATION_UNAVAILABLE': 'ITX 시간표를 불러올 수 없어요',
+      'ROUTE_SESSION_REQUIRED': '다시 시도',
+      'ROUTE_SCOPE_INVALID': '지원하지 않는 경로예요',
+      'ROUTE_RATE_LIMITED': '잠시 후 다시 시도',
+      'ITX_TIMETABLE_UNAVAILABLE': 'ITX 시간표를 불러올 수 없어요',
+    };
+    if (code is String && messages.containsKey(code)) {
+      return RouteSearchOnlineException._(
+        statusCode: response.statusCode,
+        failureReason: code,
+        message: messages[code]!,
+      );
+    }
+    return RouteSearchOnlineException.http(response.statusCode);
+  }
+
   const RouteSearchOnlineException._({
     required this.statusCode,
     required this.failureReason,
-  }) : super(_routeOnlineSearchErrorMessage);
+    String message = _routeOnlineSearchErrorMessage,
+  }) : super(message);
 
   final int? statusCode;
   final String failureReason;
+}
+
+enum RouteTransportScope {
+  subway('SUBWAY'),
+  subwayAndItxCheongchun('SUBWAY_AND_ITX_CHEONGCHUN');
+
+  const RouteTransportScope(this.serverValue);
+
+  final String serverValue;
+}
+
+RouteTransportScope _routeTransportScopeFromValue(Object? value) {
+  return switch (value) {
+    'SUBWAY_AND_ITX_CHEONGCHUN' => RouteTransportScope.subwayAndItxCheongchun,
+    _ => RouteTransportScope.subway,
+  };
 }
 
 class RouteFeedbackApiRepository implements RouteFeedbackRepository {
@@ -667,6 +688,7 @@ class FavoriteRoute {
     required this.routeCreatedAt,
     required this.addedAt,
     this.etaSource = '',
+    this.transportScope = RouteTransportScope.subway,
   });
 
   factory FavoriteRoute.fromJson(Map<String, Object?> json) {
@@ -689,6 +711,7 @@ class FavoriteRoute {
       routeCreatedAt: _requiredRouteString(json, 'routeCreatedAt'),
       addedAt: _requiredRouteString(json, 'addedAt'),
       etaSource: _optionalRouteString(json, 'etaSource'),
+      transportScope: _routeTransportScopeFromValue(json['transportScope']),
     );
   }
 
@@ -707,6 +730,7 @@ class FavoriteRoute {
   final String routeCreatedAt;
   final String addedAt;
   final String etaSource;
+  final RouteTransportScope transportScope;
 
   String get summaryTitle => '$originStationName에서 $destinationStationName까지';
 
@@ -766,6 +790,7 @@ class RouteSearchRequest {
     this.constraintMode,
     this.waypointStationId,
     this.mobilityPreset,
+    this.transportScope = RouteTransportScope.subway,
   });
 
   final String originStationId;
@@ -776,6 +801,7 @@ class RouteSearchRequest {
 
   /// v2 요청에만 실리는 보행 프리셋 서버 문자열(하위호환으로 mobilityType도 유지).
   final String? mobilityPreset;
+  final RouteTransportScope transportScope;
 
   String get effectiveConstraintMode =>
       constraintMode ?? _defaultConstraintMode(mobilityType);
@@ -788,6 +814,7 @@ class RouteSearchRequest {
       constraintMode: constraintMode?.trim(),
       waypointStationId: waypointStationId?.trim(),
       mobilityPreset: mobilityPreset?.trim(),
+      transportScope: transportScope,
     );
   }
 
@@ -831,6 +858,7 @@ class RouteSearchV2Result {
     required this.alternativeCount,
     required this.statuses,
     required this.itineraries,
+    this.nextServiceTime = '',
   });
 
   factory RouteSearchV2Result.fromJson(Map<String, Object?> json) {
@@ -849,6 +877,8 @@ class RouteSearchV2Result {
       maxTransfers: _requiredRouteInt(json, 'maxTransfers'),
       alternativeCount: _requiredRouteInt(json, 'alternativeCount'),
       statuses: _routeStringList(json['statuses'], 'route v2 status'),
+      nextServiceTime:
+          _optionalNullableRouteString(json, 'nextServiceTime') ?? '',
       itineraries: rawItineraries
           .map((item) {
             if (item is! Map<String, Object?>) {
@@ -871,6 +901,7 @@ class RouteSearchV2Result {
   final int alternativeCount;
   final List<String> statuses;
   final List<RouteSearchV2Itinerary> itineraries;
+  final String nextServiceTime;
 }
 
 class RouteSearchV2Itinerary {
@@ -1106,6 +1137,9 @@ class RouteSearchResult {
     this.commercialEtaEligible = false,
     this.sourceUpdatedAt = '',
     this.officialOdFareQuote,
+    this.supportsRefresh = true,
+    this.nextServiceTime = '',
+    this.transportScope = RouteTransportScope.subway,
   }) : // `burdenCost`는 API contract 이름이고 저장 필드는 private 값이다.
        // ignore: prefer_initializing_formals
        _accessibilityScore = accessibilityScore,
@@ -1212,10 +1246,47 @@ class RouteSearchResult {
       commercialEtaEligible:
           _optionalRouteBool(json, 'commercialEtaEligible') ?? false,
       sourceUpdatedAt: _optionalRouteString(json, 'sourceUpdatedAt'),
+      nextServiceTime: _optionalRouteString(json, 'nextServiceTime'),
+      transportScope: _routeTransportScopeFromValue(json['transportScope']),
     );
   }
 
   factory RouteSearchResult.fromV2(RouteSearchV2Result result) {
+    if (result.itineraries.isEmpty) {
+      if (result.statuses.isEmpty) {
+        throw const FormatException(
+          'Route v2 response has neither status nor itinerary',
+        );
+      }
+      return RouteSearchResult(
+        routeSearchId:
+            'route-v2-${result.originStationId}-${result.destinationStationId}-${result.departureTime}',
+        originStationId: result.originStationId,
+        originStationName: result.originStationId,
+        destinationStationId: result.destinationStationId,
+        destinationStationName: result.destinationStationId,
+        mobilityType: result.mobilityType,
+        constraintMode: result.constraintMode,
+        status: 'BLOCKED',
+        lineId: '',
+        lineName: '',
+        score: 0,
+        burdenCost: 0,
+        estimatedDurationSeconds: 0,
+        walkingDistanceMeters: 0,
+        transferCount: 0,
+        evidenceSummary: result.statuses,
+        steps: const [],
+        warnings: const [],
+        blockedReasons: result.statuses,
+        createdAt: result.departureTime,
+        etaSource: result.nextServiceTime.isEmpty ? 'UNSUPPORTED' : 'PLANNED',
+        sourceUpdatedAt: result.departureTime,
+        supportsRefresh: false,
+        nextServiceTime: result.nextServiceTime,
+        transportScope: RouteTransportScope.subwayAndItxCheongchun,
+      );
+    }
     final itinerary = result.itineraries.firstWhere(
       (candidate) => candidate.status == 'FOUND',
       orElse: () => result.itineraries.first,
@@ -1272,6 +1343,8 @@ class RouteSearchResult {
       ),
       commercialEtaEligible: itinerary.commercialEtaEligible,
       sourceUpdatedAt: result.departureTime,
+      supportsRefresh: false,
+      transportScope: RouteTransportScope.subwayAndItxCheongchun,
     );
   }
 
@@ -1305,6 +1378,9 @@ class RouteSearchResult {
   final bool commercialEtaEligible;
   final String sourceUpdatedAt;
   final OfficialOdFareQuote? officialOdFareQuote;
+  final bool supportsRefresh;
+  final String nextServiceTime;
+  final RouteTransportScope transportScope;
 
   bool get hasOfficialOdFareQuote => officialOdFareQuote != null;
 
@@ -1330,7 +1406,11 @@ class RouteSearchResult {
   }
 
   List<String> get blockedReasonLabels {
-    return blockedReasons.map(_routeBlockedReasonLabel).toList(growable: false);
+    return [
+      ...blockedReasons.map(_routeBlockedReasonLabel),
+      if (nextServiceTime.isNotEmpty)
+        _routeNextServiceTimeLabel(nextServiceTime),
+    ];
   }
 
   String get stairAccessLabel {
@@ -1490,6 +1570,9 @@ class RouteSearchResult {
       commercialEtaEligible: commercialEtaEligible,
       sourceUpdatedAt: sourceUpdatedAt,
       officialOdFareQuote: officialOdFareQuote ?? this.officialOdFareQuote,
+      supportsRefresh: supportsRefresh,
+      nextServiceTime: nextServiceTime,
+      transportScope: transportScope,
     );
   }
 
@@ -2113,6 +2196,7 @@ String _routeDistanceLabel(int distanceMeters) {
 const _routeBlockedNoStepFreeRoute = '계단 없는 경로를 아직 찾지 못했어요.';
 const _routeBlockedFacilityUnavailable = '꼭 필요한 시설을 지금 이용하기 어려워요.';
 const _routeBlockedGeneric = '안내할 수 있는 경로를 아직 찾지 못했어요.';
+const _routeBlockedNoTimetableService = '이 시간에는 운행하는 열차가 없어요.';
 
 String _routeBlockedReasonLabel(String reason) {
   final normalizedReason = reason.trim().replaceAll('못했습니다.', '못했어요.');
@@ -2120,6 +2204,7 @@ String _routeBlockedReasonLabel(String reason) {
     // 하드 블록.
     'STAIR_ONLY_ACCESS' => _routeBlockedNoStepFreeRoute,
     'FACILITY_UNAVAILABLE' => _routeBlockedFacilityUnavailable,
+    'NO_TIMETABLE_SERVICE' => _routeBlockedNoTimetableService,
     // 불확실성 계열은 헤지 사전 한 벌로 위임한다(#1577).
     'STAIR_ONLY_ACCESS_UNKNOWN' => routeHedgeStepFreeUnknown,
     'GENERATED_CONNECTOR_UNVERIFIED' ||
@@ -2141,6 +2226,14 @@ String _routeBlockedReasonLabel(String reason) {
     '경로 연결 정보를 확인할 수 없습니다.' => routeHedgeConnectivityUnknown,
     _ => _routeBlockedGeneric,
   };
+}
+
+String _routeNextServiceTimeLabel(String value) {
+  final trimmed = value.trim();
+  if (trimmed.length < 16) {
+    return '다음 운행 시각을 확인해 주세요.';
+  }
+  return '다음 운행 ${trimmed.substring(0, 10)} ${trimmed.substring(11, 16)}';
 }
 
 String _routeStepReasonLabel(String reason) {
@@ -2344,6 +2437,7 @@ class RouteSearchController extends ChangeNotifier {
     if (_state.status != RouteSearchViewStatus.success ||
         currentResult == null ||
         currentResult.isLocalResult ||
+        !currentResult.supportsRefresh ||
         _state.isRefreshing) {
       return RouteRefreshOutcome(
         result: currentResult,
@@ -2477,7 +2571,12 @@ class RouteSearchScreen extends StatefulWidget {
     this.favoriteRouteRepository,
     this.adRepository,
     this.simpleViewEnabled = true,
+    this.itxTransportScopeEnabled = const bool.fromEnvironment(
+      'EASYSUBWAY_ROUTE_V2_ONLINE_FIRST_ENABLED',
+      defaultValue: false,
+    ),
     this.initialDraft,
+    this.initialTransportScope = RouteTransportScope.subway,
     this.shellNavigationBar,
     this.onShellBackToHome,
     this.getOffAlarmController,
@@ -2492,10 +2591,12 @@ class RouteSearchScreen extends StatefulWidget {
   final AdRepository? adRepository;
   final GetOffAlarmController? getOffAlarmController;
   final RouteDraft? initialDraft;
+  final RouteTransportScope initialTransportScope;
   final Widget? shellNavigationBar;
   final VoidCallback? onShellBackToHome;
   final String initialMobilityType;
   final bool simpleViewEnabled;
+  final bool itxTransportScopeEnabled;
 
   @override
   State<RouteSearchScreen> createState() => _RouteSearchScreenState();
@@ -2524,6 +2625,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
   late MobilityPreset _selectedPreset;
   late String _selectedMobilityType;
   late String _selectedConstraintMode;
+  late RouteTransportScope _selectedTransportScope;
   String _validationMessage = '';
 
   /// #1933 C: 출발·도착이 모두 채워진 draft로 진입하면 별도 "길찾기" 버튼을 누르지
@@ -2550,6 +2652,11 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
   bool get _hasCompleteDraft =>
       _originStation != null && _destinationStation != null;
 
+  bool get _itxTransportScopeAvailable =>
+      widget.itxTransportScopeEnabled &&
+      _selectedMobilityType != 'WHEELCHAIR' &&
+      _selectedConstraintMode != 'STRICT_STEP_FREE';
+
   /// 완성된 draft 없이(=출발·도착 미완) 이 화면에 들어온 경우, 폼을 보여주지 않고
   /// 곧바로 노선도로 되돌린다. 리다이렉트를 한 번만 예약하기 위한 플래그.
   bool _redirectToMapScheduled = false;
@@ -2568,6 +2675,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
         ) ??
         MobilityPreset.standard;
     _applyPresetDerivedState(_selectedPreset);
+    _selectedTransportScope = _itxTransportScopeAvailable
+        ? widget.initialTransportScope
+        : RouteTransportScope.subway;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _maybeAutoSearchFromDraft();
     });
@@ -2587,6 +2697,16 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
         _maybeAutoSearchFromDraft();
       });
     }
+    if (widget.initialTransportScope != oldWidget.initialTransportScope ||
+        widget.itxTransportScopeEnabled != oldWidget.itxTransportScopeEnabled) {
+      _selectedTransportScope = _itxTransportScopeAvailable
+          ? widget.initialTransportScope
+          : RouteTransportScope.subway;
+      _autoSearchedSignature = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _maybeAutoSearchFromDraft();
+      });
+    }
   }
 
   /// draft에 출발·도착이 모두 있으면 현재 이동 조건·계단 토글 상태로 자동 검색한다.
@@ -2600,7 +2720,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     final waypoint = _waypointStation;
     final waypointSegment = waypoint == null ? '' : '${waypoint.id} ';
     return '${origin.id} $waypointSegment${destination.id} '
-        '$_selectedMobilityType $_selectedConstraintMode';
+        '$_selectedMobilityType $_selectedConstraintMode ${_selectedTransportScope.serverValue}';
   }
 
   void _maybeAutoSearchFromDraft() {
@@ -2850,7 +2970,10 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
                     // 바꾸면 그 자리에서 바로 재검색한다(별도 폼·버튼 없음).
                     _RouteConditionChips(
                       preset: _selectedPreset,
+                      transportScope: _selectedTransportScope,
+                      itxTransportScopeEnabled: _itxTransportScopeAvailable,
                       onChangePreset: _showMobilityPresetPicker,
+                      onChangeTransportScope: _changeTransportScope,
                     ),
                     _RouteSearchBody(
                       state: _controller.state,
@@ -2944,6 +3067,23 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
       });
       return;
     }
+    if (_selectedTransportScope == RouteTransportScope.subwayAndItxCheongchun &&
+        _waypointStation != null) {
+      _controller.reset();
+      setState(() {
+        _validationMessage = 'ITX-청춘 경로는 경유역을 지원하지 않아요. 경유역을 빼거나 지하철만 이용해 주세요.';
+      });
+      return;
+    }
+    if (_selectedTransportScope == RouteTransportScope.subwayAndItxCheongchun &&
+        !_itxTransportScopeAvailable) {
+      _controller.reset();
+      setState(() {
+        _selectedTransportScope = RouteTransportScope.subway;
+        _validationMessage = '선택한 이동 조건에서는 지하철 경로만 이용할 수 있어요.';
+      });
+      return;
+    }
     setState(() {
       _validationMessage = '';
     });
@@ -2963,8 +3103,34 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
         constraintMode: _selectedConstraintMode,
         waypointStationId: _waypointStation?.id,
         mobilityPreset: mobilityPresetServerString(_selectedPreset),
+        transportScope: _selectedTransportScope,
       ),
     );
+  }
+
+  Future<void> _changeTransportScope(RouteTransportScope scope) async {
+    if (scope == _selectedTransportScope ||
+        _controller.state.status == RouteSearchViewStatus.loading) {
+      return;
+    }
+    if (scope == RouteTransportScope.subwayAndItxCheongchun &&
+        _waypointStation != null) {
+      setState(() {
+        _validationMessage = 'ITX-청춘 경로는 경유역을 지원하지 않아요. 경유역을 빼거나 지하철만 이용해 주세요.';
+      });
+      return;
+    }
+    if (!await _disableActiveGetOffAlarm()) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _selectedTransportScope = scope;
+      _autoSearchedSignature = null;
+    });
+    await _submit(alarmAlreadyDisabled: true);
   }
 
   Widget _buildRouteStationPicker(_RouteStationRole role) {
@@ -3089,6 +3255,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     setState(() {
       _selectedPreset = selectedPreset;
       _applyPresetDerivedState(selectedPreset);
+      if (!_itxTransportScopeAvailable) {
+        _selectedTransportScope = RouteTransportScope.subway;
+      }
     });
     // 결과-우선 화면에서 프리셋을 바꾸면 그 자리에서 바로 재검색한다. 활성 하차
     // 알림은 위에서 이미 취소했으므로 _submit에서 다시 취소하지 않는다.
@@ -5198,11 +5367,17 @@ class _RouteSummaryChip {
 class _RouteConditionChips extends StatelessWidget {
   const _RouteConditionChips({
     required this.preset,
+    required this.transportScope,
+    required this.itxTransportScopeEnabled,
     required this.onChangePreset,
+    required this.onChangeTransportScope,
   });
 
   final MobilityPreset preset;
+  final RouteTransportScope transportScope;
+  final bool itxTransportScopeEnabled;
   final VoidCallback onChangePreset;
+  final ValueChanged<RouteTransportScope> onChangeTransportScope;
 
   @override
   Widget build(BuildContext context) {
@@ -5222,6 +5397,27 @@ class _RouteConditionChips extends StatelessWidget {
             active: false,
             onTap: onChangePreset,
           ),
+          if (itxTransportScopeEnabled) ...[
+            _RouteConditionChipButton(
+              buttonKey: const Key('routeScopeSubwayChip'),
+              icon: Icons.subway,
+              label: '지하철만',
+              semanticLabel: '교통 범위, 지하철만',
+              active: transportScope == RouteTransportScope.subway,
+              onTap: () => onChangeTransportScope(RouteTransportScope.subway),
+            ),
+            _RouteConditionChipButton(
+              buttonKey: const Key('routeScopeItxChip'),
+              icon: Icons.train,
+              label: '지하철 + ITX-청춘',
+              semanticLabel: '교통 범위, 지하철과 ITX-청춘',
+              active:
+                  transportScope == RouteTransportScope.subwayAndItxCheongchun,
+              onTap: () => onChangeTransportScope(
+                RouteTransportScope.subwayAndItxCheongchun,
+              ),
+            ),
+          ],
         ],
       ),
     );

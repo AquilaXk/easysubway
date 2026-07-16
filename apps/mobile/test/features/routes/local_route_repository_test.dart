@@ -12,6 +12,7 @@ import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_route_map
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_scheduler.dart';
 import 'package:easysubway_mobile/features/mobility_profile/mobility_profile_policy.dart';
 import 'package:easysubway_mobile/route_search.dart';
+import 'package:easysubway_mobile/route_v2_ingress.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -146,6 +147,7 @@ void main() {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(server.close);
       server.listen((request) async {
+        if (await _respondWithRouteV2Session(request)) return;
         requestedPaths.add(request.uri.path);
         final requestBody = await utf8.decoder.bind(request).join();
         requestedBodies.add(jsonDecode(requestBody) as Map<String, Object?>);
@@ -171,14 +173,16 @@ void main() {
             Uri.parse('http://${server.address.host}:${server.port}'),
         enablePushNotifications: false,
         enableRouteV2OnlineFirst: true,
+        playIntegrityAttestor: const _FakePlayIntegrityAttestor(),
       );
 
       final result = await dependencies.routeRepository.searchRoute(
         const RouteSearchRequest(
           originStationId: 'station-sangnoksu',
           destinationStationId: 'station-sadang',
-          mobilityType: 'WHEELCHAIR',
-          mobilityPreset: 'STEP_FREE',
+          mobilityType: 'SENIOR',
+          mobilityPreset: 'STANDARD',
+          transportScope: RouteTransportScope.subwayAndItxCheongchun,
         ),
       );
 
@@ -189,12 +193,9 @@ void main() {
       // 프리셋은 v2 body에 실리고, mobilityType은 하위호환으로 함께 전송된다.
       expect(
         requestedBodies.single,
-        containsPair('mobilityPreset', 'STEP_FREE'),
+        containsPair('mobilityPreset', 'STANDARD'),
       );
-      expect(
-        requestedBodies.single,
-        containsPair('mobilityType', 'WHEELCHAIR'),
-      );
+      expect(requestedBodies.single, containsPair('mobilityType', 'SENIOR'));
       expect(requestedBodies.single['departureTime'], isA<String>());
       expect(result.routeSearchId, 'route-v2');
       expect(result.originStationName, '상록수');
@@ -215,26 +216,15 @@ void main() {
       );
       expect(result.etaSource, 'REALTIME');
       expect(result.isLocalResult, isFalse);
-      expect(result.hasOfficialOdFareQuote, isTrue);
-      expect(result.officialOdFareQuote!.gnrlCardFare, 1550);
-      expect(result.officialOdFareQuote!.gnrlCashFare, 1650);
-      expect(result.officialOdFareQuote!.yungCardFare, 800);
-      expect(result.officialOdFareQuote!.yungCashFare, 900);
-      expect(result.officialOdFareQuote!.childCardFare, 500);
-      expect(result.officialOdFareQuote!.childCashFare, 500);
+      expect(result.hasOfficialOdFareQuote, isFalse);
+      expect(result.officialOdFareQuote, isNull);
 
-      final refresh = await dependencies.routeRepository.refreshRoute(
-        result.routeSearchId,
+      await expectLater(
+        dependencies.routeRepository.refreshRoute(result.routeSearchId),
+        throwsA(isA<RouteSearchException>()),
       );
 
-      expect(requestedPaths, [
-        '/api/v2/routes/search',
-        '/api/v2/routes/route-v2/refresh',
-      ]);
-      expect(refresh.routeSearchId, 'route-v2');
-      expect(refresh.result.hasOfficialOdFareQuote, isTrue);
-      expect(refresh.result.officialOdFareQuote!.gnrlCardFare, 1550);
-      expect(refresh.result.officialOdFareQuote!.gnrlCashFare, 1650);
+      expect(requestedPaths, ['/api/v2/routes/search']);
     },
   );
 
@@ -262,6 +252,7 @@ void main() {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(server.close);
       server.listen((request) async {
+        if (await _respondWithRouteV2Session(request)) return;
         request.response
           ..statusCode = HttpStatus.serviceUnavailable
           ..headers.contentType = ContentType.json
@@ -278,6 +269,7 @@ void main() {
         enablePushNotifications: false,
         enableRouteV2OnlineFirst: true,
         routeSearchOnlineFirstMetrics: metrics,
+        playIntegrityAttestor: const _FakePlayIntegrityAttestor(),
       );
 
       await expectLater(
@@ -286,6 +278,7 @@ void main() {
             originStationId: 'station-sangnoksu',
             destinationStationId: 'station-sadang',
             mobilityType: 'WHEELCHAIR',
+            transportScope: RouteTransportScope.subwayAndItxCheongchun,
           ),
         ),
         throwsA(
@@ -318,6 +311,7 @@ void main() {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(server.close);
       server.listen((request) async {
+        if (await _respondWithRouteV2Session(request)) return;
         request.response
           ..statusCode = HttpStatus.notFound
           ..headers.contentType = ContentType.json
@@ -334,6 +328,7 @@ void main() {
         enablePushNotifications: false,
         enableRouteV2OnlineFirst: true,
         routeSearchOnlineFirstMetrics: metrics,
+        playIntegrityAttestor: const _FakePlayIntegrityAttestor(),
       );
 
       await expectLater(
@@ -342,6 +337,7 @@ void main() {
             originStationId: 'station-sangnoksu',
             destinationStationId: 'station-sadang',
             mobilityType: 'WHEELCHAIR',
+            transportScope: RouteTransportScope.subwayAndItxCheongchun,
           ),
         ),
         throwsA(
@@ -372,6 +368,7 @@ void main() {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(server.close);
     server.listen((request) async {
+      if (await _respondWithRouteV2Session(request)) return;
       request.response
         ..statusCode = HttpStatus.badRequest
         ..headers.contentType = ContentType.json
@@ -388,6 +385,7 @@ void main() {
       enablePushNotifications: false,
       enableRouteV2OnlineFirst: true,
       routeSearchOnlineFirstMetrics: metrics,
+      playIntegrityAttestor: const _FakePlayIntegrityAttestor(),
     );
 
     await expectLater(
@@ -396,6 +394,7 @@ void main() {
           originStationId: 'station-sangnoksu',
           destinationStationId: 'station-sadang',
           mobilityType: 'WHEELCHAIR',
+          transportScope: RouteTransportScope.subwayAndItxCheongchun,
         ),
       ),
       throwsA(
@@ -424,6 +423,7 @@ void main() {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(server.close);
     server.listen((request) async {
+      if (await _respondWithRouteV2Session(request)) return;
       request.response
         ..statusCode = HttpStatus.notModified
         ..headers.contentType = ContentType.json
@@ -440,6 +440,7 @@ void main() {
       enablePushNotifications: false,
       enableRouteV2OnlineFirst: true,
       routeSearchOnlineFirstMetrics: metrics,
+      playIntegrityAttestor: const _FakePlayIntegrityAttestor(),
     );
 
     await expectLater(
@@ -448,6 +449,7 @@ void main() {
           originStationId: 'station-sangnoksu',
           destinationStationId: 'station-sadang',
           mobilityType: 'WHEELCHAIR',
+          transportScope: RouteTransportScope.subwayAndItxCheongchun,
         ),
       ),
       throwsA(isA<RouteSearchException>()),
@@ -5308,4 +5310,32 @@ Future<void> _addDistanceMetersColumnIfMissing(CatalogDatabase database) async {
       'ALTER TABLE network_edges ADD COLUMN distance_meters INTEGER NOT NULL DEFAULT 0',
     );
   }
+}
+
+Future<bool> _respondWithRouteV2Session(HttpRequest request) async {
+  if (request.uri.path != '/api/v2/routes/session') return false;
+  await utf8.decoder.bind(request).join();
+  final issuedAt = DateTime.now().toUtc();
+  request.response
+    ..statusCode = HttpStatus.ok
+    ..headers.contentType = ContentType.json
+    ..write(
+      jsonEncode({
+        'token': 'T' * 43,
+        'scope': 'route:v2:itx',
+        'issuedAt': issuedAt.toIso8601String(),
+        'expiresAt': issuedAt
+            .add(const Duration(minutes: 10))
+            .toIso8601String(),
+      }),
+    );
+  await request.response.close();
+  return true;
+}
+
+class _FakePlayIntegrityAttestor implements PlayIntegrityAttestor {
+  const _FakePlayIntegrityAttestor();
+
+  @override
+  Future<String> requestToken(String requestHash) async => 'integrity-token';
 }
