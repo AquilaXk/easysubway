@@ -981,10 +981,7 @@ jobs:
           set -euo pipefail
           node --env-file="${EASYSUBWAY_ENV_FILE}" tools/datapack/build-release-callback.mjs \
             > "${EASYSUBWAY_DATAPACK_CALLBACK_PAYLOAD}"
-          node --env-file="${EASYSUBWAY_ENV_FILE}" tools/datapack/send-release-callback.mjs \
-            --payload "${EASYSUBWAY_DATAPACK_CALLBACK_PAYLOAD}" \
-            --output "${EASYSUBWAY_DATAPACK_CALLBACK_DELIVERY}" \
-            --github-output "${GITHUB_OUTPUT}"
+          node --env-file="${EASYSUBWAY_ENV_FILE}" tools/datapack/send-release-callback.mjs
 
       - name: Data Pack Release / Upload callback delivery evidence
         if: ${{ always() && steps.production-publish.outputs.manifestSha256 != '' }}

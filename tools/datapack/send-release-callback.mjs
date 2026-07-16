@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
 import { appendFile, readFile, writeFile } from "node:fs/promises";
-import { parseArgs } from "node:util";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { canonicalCallbackMessage } from "./build-release-callback.mjs";
 
@@ -82,27 +82,37 @@ export async function sendReleaseCallback({
 }
 
 async function main() {
-  const { values } = parseArgs({
-    options: {
-      payload: { type: "string" },
-      output: { type: "string" },
-      "github-output": { type: "string" },
-    },
-  });
-  if (!values.payload || !values.output) throw new Error("--payload and --output are required");
+  const { payloadPath, outputPath, githubOutputPath } = runnerPaths(process.env);
   const endpoint = process.env.EASYSUBWAY_DATAPACK_CALLBACK_URL;
   const token = process.env.EASYSUBWAY_DATAPACK_WORKFLOW_TOKEN;
   if (!endpoint || !token) throw new Error("callback endpoint/token env is required");
   const artifact = await sendReleaseCallback({
-    payload: JSON.parse(await readFile(values.payload, "utf8")),
+    payload: JSON.parse(await readFile(payloadPath, "utf8")),
     endpoint,
     token,
   });
-  await writeFile(values.output, `${JSON.stringify(artifact, null, 2)}\n`);
-  if (values["github-output"]) {
-    await appendFile(values["github-output"], `state=${artifact.state}\n`);
-  }
+  await writeFile(outputPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  await appendFile(githubOutputPath, `state=${artifact.state}\n`);
   if (artifact.state !== "DELIVERED") process.exitCode = 2;
+}
+
+function runnerPaths(env) {
+  if (!env.RUNNER_TEMP || !env.GITHUB_OUTPUT) {
+    throw new Error("RUNNER_TEMP and GITHUB_OUTPUT are required");
+  }
+  const runnerTemp = path.resolve(env.RUNNER_TEMP);
+  const githubOutputPath = path.resolve(env.GITHUB_OUTPUT);
+  const relativeGithubOutput = path.relative(runnerTemp, githubOutputPath);
+  if (relativeGithubOutput === "" || relativeGithubOutput === ".."
+    || relativeGithubOutput.startsWith(`..${path.sep}`) || path.isAbsolute(relativeGithubOutput)) {
+    throw new Error("GITHUB_OUTPUT must be inside RUNNER_TEMP");
+  }
+  const stage = path.join(runnerTemp, "easysubway-datapack-stage");
+  return {
+    payloadPath: path.join(stage, "release-callback.json"),
+    outputPath: path.join(stage, "release-callback-delivery.json"),
+    githubOutputPath,
+  };
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

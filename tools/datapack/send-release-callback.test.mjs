@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
@@ -127,20 +127,21 @@ test("transient failure를 모두 소진하면 bounded retry 계획을 기록한
 test("CLI는 delivery state를 GitHub output에 기록한다", async () => {
   await withServer((_request, response) => response.writeHead(200).end(), async (endpoint) => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "callback-sender-"));
-    const payloadPath = path.join(directory, "payload.json");
-    const artifactPath = path.join(directory, "delivery.json");
+    const stage = path.join(directory, "easysubway-datapack-stage");
+    const payloadPath = path.join(stage, "release-callback.json");
+    const artifactPath = path.join(stage, "release-callback-delivery.json");
     const githubOutputPath = path.join(directory, "github-output");
+    await mkdir(stage, { recursive: true });
     await writeFile(payloadPath, JSON.stringify(payload));
 
     const exitCode = await new Promise((resolve, reject) => {
       const child = spawn(process.execPath, [
         new URL("./send-release-callback.mjs", import.meta.url).pathname,
-        "--payload", payloadPath,
-        "--output", artifactPath,
-        "--github-output", githubOutputPath,
       ], {
         env: {
           ...process.env,
+          RUNNER_TEMP: directory,
+          GITHUB_OUTPUT: githubOutputPath,
           EASYSUBWAY_DATAPACK_CALLBACK_URL: endpoint,
           EASYSUBWAY_DATAPACK_WORKFLOW_TOKEN: token,
         },
@@ -158,20 +159,21 @@ test("CLI는 delivery state를 GitHub output에 기록한다", async () => {
 test("CLI는 terminal failure를 exit 2와 reconciliation output으로 기록한다", async () => {
   await withServer((_request, response) => response.writeHead(400).end(), async (endpoint) => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "callback-sender-failure-"));
-    const payloadPath = path.join(directory, "payload.json");
-    const artifactPath = path.join(directory, "delivery.json");
+    const stage = path.join(directory, "easysubway-datapack-stage");
+    const payloadPath = path.join(stage, "release-callback.json");
+    const artifactPath = path.join(stage, "release-callback-delivery.json");
     const githubOutputPath = path.join(directory, "github-output");
+    await mkdir(stage, { recursive: true });
     await writeFile(payloadPath, JSON.stringify(payload));
 
     const exitCode = await new Promise((resolve, reject) => {
       const child = spawn(process.execPath, [
         new URL("./send-release-callback.mjs", import.meta.url).pathname,
-        "--payload", payloadPath,
-        "--output", artifactPath,
-        "--github-output", githubOutputPath,
       ], {
         env: {
           ...process.env,
+          RUNNER_TEMP: directory,
+          GITHUB_OUTPUT: githubOutputPath,
           EASYSUBWAY_DATAPACK_CALLBACK_URL: endpoint,
           EASYSUBWAY_DATAPACK_WORKFLOW_TOKEN: token,
         },
@@ -184,4 +186,27 @@ test("CLI는 terminal failure를 exit 2와 reconciliation output으로 기록한
     assert.equal(await readFile(githubOutputPath, "utf8"), "state=RECONCILIATION_REQUIRED\n");
     assert.equal(JSON.parse(await readFile(artifactPath, "utf8")).state, "RECONCILIATION_REQUIRED");
   });
+});
+
+test("CLI는 RUNNER_TEMP 밖의 GitHub output 경로를 거부한다", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "callback-sender-boundary-"));
+  const outside = path.join(os.tmpdir(), `github-output-${path.basename(directory)}`);
+  const stderr = [];
+  const exitCode = await new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [
+      new URL("./send-release-callback.mjs", import.meta.url).pathname,
+    ], {
+      env: {
+        ...process.env,
+        RUNNER_TEMP: directory,
+        GITHUB_OUTPUT: outside,
+      },
+    });
+    child.stderr.on("data", (chunk) => stderr.push(chunk));
+    child.once("error", reject);
+    child.once("exit", resolve);
+  });
+
+  assert.equal(exitCode, 1);
+  assert.match(Buffer.concat(stderr).toString("utf8"), /GITHUB_OUTPUT must be inside RUNNER_TEMP/);
 });

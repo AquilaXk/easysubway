@@ -70,7 +70,7 @@ test("production callback은 bounded sender 증적을 항상 보존하고 실패
   assert.match(callbackStep, /id:\s*callback-delivery/);
   assert.match(callbackStep, /continue-on-error:\s*true/);
   assert.match(callbackStep, /send-release-callback\.mjs/);
-  assert.match(callbackStep, /--github-output/);
+  assert.doesNotMatch(callbackStep, /--(?:payload|output|github-output)/);
   assert.doesNotMatch(callbackStep, /curl|Authorization|Bearer|echo .*secret/i);
 
   const uploadStep = yml.match(
