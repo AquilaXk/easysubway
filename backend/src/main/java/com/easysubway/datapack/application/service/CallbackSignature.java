@@ -34,15 +34,30 @@ public class CallbackSignature {
         return MessageDigest.isEqual(a, b);
     }
 
+	public static String sha256(String value) {
+		try {
+			return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+				.digest(value.getBytes(StandardCharsets.UTF_8)));
+		} catch (java.security.GeneralSecurityException e) {
+			throw new IllegalStateException("SHA-256 계산 실패", e);
+		}
+	}
+
     public record CanonicalFields(int schemaVersion, String artifactKind, String releaseRequestId,
+        long releaseSequence, String channel, String idempotencyKey,
         String workflowRunUrl, String manifestSha256, String sqliteSha256, String gzipSha256,
         String evidenceBundleSha256, String validatorStatus, String routeRegressionStatus,
         String publishStatus) {
 
         String message() {
             return String.join("\n", String.valueOf(schemaVersion), artifactKind, releaseRequestId,
+                String.valueOf(releaseSequence), channel, idempotencyKey,
                 workflowRunUrl, manifestSha256, sqliteSha256, gzipSha256, evidenceBundleSha256,
                 validatorStatus, routeRegressionStatus, publishStatus);
         }
+
+		public String payloadSha256() {
+			return CallbackSignature.sha256(message());
+		}
     }
 }

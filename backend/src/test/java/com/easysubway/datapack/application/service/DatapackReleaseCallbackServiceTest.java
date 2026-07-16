@@ -28,6 +28,8 @@ class DatapackReleaseCallbackServiceTest {
     private static final String WORKFLOW_URL = "https://github.com/example/actions/runs/9001";
     private static final LocalDateTime T0 = LocalDateTime.parse("2026-07-06T00:00:00");
     private static final String CAND_PREV = "cand-cbk-prev";
+    private static final long RELEASE_SEQUENCE = 42;
+    private static final String CHANNEL = "production";
 
     @Autowired
     private DatapackReleaseCallbackService service;
@@ -38,6 +40,7 @@ class DatapackReleaseCallbackServiceTest {
 
     @BeforeEach
     void setUp() {
+		jdbcTemplate.update("DELETE FROM datapack_release_deliveries");
         // 채널 이벤트 → 채널 → 에비던스·candidate 순으로 FK 제약 만족하며 정리
         jdbcTemplate.update("DELETE FROM datapack_release_channel_events WHERE channel = 'production'");
         jdbcTemplate.update("DELETE FROM datapack_release_channels WHERE channel = 'production'");
@@ -50,7 +53,7 @@ class DatapackReleaseCallbackServiceTest {
     }
 
     private void insertRow(String status) {
-        insertRow(status, "staging");
+        insertRow(status, CHANNEL);
     }
 
     private void insertRow(String status, String targetChannel) {
@@ -69,16 +72,26 @@ class DatapackReleaseCallbackServiceTest {
     }
 
     private String computeSignature(String publishStatus) {
-        var fields = new CanonicalFields(1, "datapack-release-callback", APPROVAL_ID,
-            WORKFLOW_URL, SHA, SHA, SHA, SHA, "PASS", "PASS", publishStatus);
+        var fields = new CanonicalFields(2, "datapack-release-callback", APPROVAL_ID,
+            RELEASE_SEQUENCE, CHANNEL, idempotencyKey(SHA), WORKFLOW_URL, SHA, SHA, SHA, SHA,
+            "PASS", "PASS", publishStatus);
         return callbackSignature.sign(fields);
     }
 
     private CallbackCommand command(String publishStatus, String verifierValue) {
-        return new CallbackCommand(1, "datapack-release-callback", APPROVAL_ID,
-            WORKFLOW_URL, SHA, SHA, SHA, SHA, "PASS", "PASS", publishStatus,
+        return command(SHA, publishStatus, verifierValue);
+    }
+
+    private CallbackCommand command(String manifestSha, String publishStatus, String verifierValue) {
+        return new CallbackCommand(2, "datapack-release-callback", APPROVAL_ID,
+            RELEASE_SEQUENCE, CHANNEL, idempotencyKey(manifestSha), WORKFLOW_URL,
+            manifestSha, SHA, SHA, SHA, "PASS", "PASS", publishStatus,
             "payload-signature", verifierValue);
     }
+
+	private static String idempotencyKey(String manifestSha) {
+		return APPROVAL_ID + ":" + RELEASE_SEQUENCE + ":" + manifestSha;
+	}
 
     @Test
     @DisplayName("(a) 유효 HMAC + DISPATCHED + publishStatus=PASS → PUBLISHED, workflow_run_url 저장")
@@ -99,6 +112,8 @@ class DatapackReleaseCallbackServiceTest {
         assertThatThrownBy(() -> service.receive(command("PASS", "deadbeef")))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("verifier");
+		assertThat(jdbcTemplate.queryForObject(
+			"SELECT COUNT(*) FROM datapack_release_deliveries", Integer.class)).isZero();
     }
 
     @Test
@@ -123,6 +138,37 @@ class DatapackReleaseCallbackServiceTest {
         assertThat(result.status()).isEqualTo("PUBLISHED");
         assertThat(statusOf()).isEqualTo("PUBLISHED");
     }
+
+	@Test
+	@DisplayName("동일 payload 10회는 delivery와 release 상태를 한 번만 적용한다")
+	void repeatedPayloadAppliesOnce() {
+		insertRow("DISPATCHED");
+		String sig = computeSignature("PASS");
+		assertThat(service.receive(command("PASS", sig)).idempotentReplay()).isFalse();
+		for (int index = 0; index < 9; index++) {
+			assertThat(service.receive(command("PASS", sig)).idempotentReplay()).isTrue();
+		}
+		assertThat(jdbcTemplate.queryForObject(
+			"SELECT COUNT(*) FROM datapack_release_deliveries", Integer.class)).isEqualTo(1);
+		assertThat(jdbcTemplate.queryForObject(
+			"SELECT state FROM datapack_release_deliveries", String.class)).isEqualTo("DELIVERED");
+	}
+
+	@Test
+	@DisplayName("같은 request/sequence의 다른 manifest hash는 DEAD_LETTER다")
+	void differentHashForSameSequenceDeadLetters() {
+		insertRow("DISPATCHED");
+		service.receive(command("PASS", computeSignature("PASS")));
+		String other = "b".repeat(64);
+		var otherFields = new CanonicalFields(2, "datapack-release-callback", APPROVAL_ID,
+			RELEASE_SEQUENCE, CHANNEL, idempotencyKey(other), WORKFLOW_URL, other, SHA, SHA, SHA,
+			"PASS", "PASS", "PASS");
+
+		assertThat(service.receive(command(other, "PASS", callbackSignature.sign(otherFields))).status())
+			.isEqualTo("DEAD_LETTER");
+		assertThat(jdbcTemplate.queryForObject(
+			"SELECT state FROM datapack_release_deliveries", String.class)).isEqualTo("DEAD_LETTER");
+	}
 
     @Test
     @DisplayName("(e) status=REQUESTED(미승인) → IllegalStateException")

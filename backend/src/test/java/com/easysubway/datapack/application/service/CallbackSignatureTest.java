@@ -15,7 +15,8 @@ class CallbackSignatureTest {
 
     private static CanonicalFields fields(JsonNode f) {
         return new CanonicalFields(f.get("schemaVersion").asInt(), f.get("artifactKind").asText(),
-            f.get("releaseRequestId").asText(), f.get("workflowRunUrl").asText(),
+            f.get("releaseRequestId").asText(), f.get("releaseSequence").asLong(),
+			f.get("channel").asText(), f.get("idempotencyKey").asText(), f.get("workflowRunUrl").asText(),
             f.get("manifestSha256").asText(), f.get("sqliteSha256").asText(),
             f.get("gzipSha256").asText(), f.get("evidenceBundleSha256").asText(),
             f.get("validatorStatus").asText(), f.get("routeRegressionStatus").asText(),
@@ -26,7 +27,8 @@ class CallbackSignatureTest {
     @DisplayName("빈 키로 생성된 CallbackSignature의 verify는 false 반환(dormant 경로)")
     void emptyKeyVerifyReturnsFalse() {
         var sig = new CallbackSignature("");
-        var f = new CanonicalFields(1, "datapack-release-callback", "req-001",
+        var f = new CanonicalFields(2, "datapack-release-callback", "req-001", 42,
+			"production", "req-001:42:" + "a".repeat(64),
             "https://github.com/example/actions/runs/1",
             "a".repeat(64), "b".repeat(64), "c".repeat(64), "d".repeat(64),
             "PASS", "PASS", "PASS");

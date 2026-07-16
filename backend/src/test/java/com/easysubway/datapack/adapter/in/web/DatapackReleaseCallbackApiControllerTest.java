@@ -37,6 +37,8 @@ class DatapackReleaseCallbackApiControllerTest {
     private static final String WORKFLOW_URL =
         "https://github.com/AquilaXk/easysubway/actions/runs/9001";
     private static final LocalDateTime T0 = LocalDateTime.parse("2026-07-07T00:00:00");
+	private static final long RELEASE_SEQUENCE = 42;
+	private static final String CHANNEL = "staging";
 
     @Autowired
     private MockMvc mockMvc;
@@ -47,6 +49,7 @@ class DatapackReleaseCallbackApiControllerTest {
 
     @BeforeEach
     void setUp() {
+		jdbcTemplate.update("DELETE FROM datapack_release_deliveries WHERE release_request_id = ?", APPROVAL_ID);
         jdbcTemplate.update(
             "DELETE FROM datapack_release_request WHERE approval_id = ?", APPROVAL_ID);
     }
@@ -66,7 +69,8 @@ class DatapackReleaseCallbackApiControllerTest {
     }
 
     private String signPayload(String approvalId, String publishStatus) {
-        var fields = new CanonicalFields(1, "datapack-release-callback", approvalId,
+        var fields = new CanonicalFields(2, "datapack-release-callback", approvalId,
+			RELEASE_SEQUENCE, CHANNEL, idempotencyKey(approvalId),
             WORKFLOW_URL, SHA1, SHA2, SHA3, SHA4, "PASS", "PASS", publishStatus);
         return callbackSignature.sign(fields);
     }
@@ -74,9 +78,12 @@ class DatapackReleaseCallbackApiControllerTest {
     private String buildPayload(String approvalId, String publishStatus, String hmacValue) {
         return """
             {
-              "schemaVersion": 1,
+              "schemaVersion": 2,
               "artifactKind": "datapack-release-callback",
               "releaseRequestId": "%s",
+              "releaseSequence": %d,
+              "channel": "%s",
+              "idempotencyKey": "%s",
               "workflowRunUrl": "%s",
               "manifestSha256": "%s",
               "sqliteSha256": "%s",
@@ -87,9 +94,14 @@ class DatapackReleaseCallbackApiControllerTest {
               "publishStatus": "%s",
               "callbackVerifier": {"kind": "payload-signature", "value": "%s"}
             }
-            """.formatted(approvalId, WORKFLOW_URL, SHA1, SHA2, SHA3, SHA4,
+            """.formatted(approvalId, RELEASE_SEQUENCE, CHANNEL, idempotencyKey(approvalId),
+			WORKFLOW_URL, SHA1, SHA2, SHA3, SHA4,
             publishStatus, hmacValue);
     }
+
+	private static String idempotencyKey(String approvalId) {
+		return approvalId + ":" + RELEASE_SEQUENCE + ":" + SHA1;
+	}
 
     @Test
     @DisplayName("(a) 유효 payload+HMAC+Bearer → 200, status=PUBLISHED")

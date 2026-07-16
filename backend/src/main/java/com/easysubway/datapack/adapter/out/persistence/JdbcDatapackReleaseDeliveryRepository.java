@@ -53,6 +53,12 @@ public class JdbcDatapackReleaseDeliveryRepository {
 		}
 	}
 
+	public Optional<DatapackReleaseDelivery> findByRequestAndSequence(String requestId, long sequence) {
+		return jdbcTemplate.query(
+			"SELECT * FROM datapack_release_deliveries WHERE release_request_id=? AND release_sequence=?",
+			ROW_MAPPER, requestId, sequence).stream().findFirst();
+	}
+
 	public List<DatapackReleaseDelivery> claimDue(LocalDateTime now, String owner) {
 		var keys = jdbcTemplate.queryForList("""
 			SELECT idempotency_key FROM datapack_release_deliveries

@@ -50,6 +50,10 @@ public class JdbcDatapackReleaseBlockerSummaryRepository implements DatapackRele
 		long manualOverrideBlockers = countManualOverrideBlockers();
 		long facilityBlockers = countFacilityBlockers(null, evaluationAt);
 		long routeGateBlockers = countRouteGateBlockers(null);
+		long callbackReconciliationBlockers = count("""
+			SELECT COUNT(*) FROM datapack_release_deliveries
+			WHERE channel = 'production' AND state <> 'DELIVERED'
+			""");
 		EvidenceBundleSummary evidenceBundle = evidenceBundle(candidate);
 		ManifestSignatureSummary manifestSignature = evidenceBundle.manifestSignature();
 		ReleaseChannelSummary productionChannel = productionChannel();
@@ -60,6 +64,7 @@ public class JdbcDatapackReleaseBlockerSummaryRepository implements DatapackRele
 			+ manualOverrideBlockers
 			+ facilityBlockers
 			+ routeGateBlockers
+			+ callbackReconciliationBlockers
 			+ evidenceBundle.blockerCount();
 		return new DatapackReleaseBlockerSummary(
 			candidate.map(CandidateGateSummary::candidateId).orElse("-"),
@@ -88,6 +93,7 @@ public class JdbcDatapackReleaseBlockerSummaryRepository implements DatapackRele
 				manualOverrideBlockers,
 				facilityBlockers,
 				routeGateBlockers,
+				callbackReconciliationBlockers,
 				evidenceBundle,
 				manifestSignature
 			),
@@ -147,6 +153,7 @@ public class JdbcDatapackReleaseBlockerSummaryRepository implements DatapackRele
 		long manualOverrideBlockers,
 		long facilityBlockers,
 		long routeGateBlockers,
+		long callbackReconciliationBlockers,
 		EvidenceBundleSummary evidenceBundle,
 		ManifestSignatureSummary manifestSignature
 	) {
@@ -175,6 +182,13 @@ public class JdbcDatapackReleaseBlockerSummaryRepository implements DatapackRele
 			new ReleaseReadinessRow("Route gate", statusFor(routeBlockers), routeBlockers, "ENTRY/EXIT/TRANSFER and generated connector gates"),
 			new ReleaseReadinessRow("Android evidence", statusFor(androidBlockers), androidBlockers, "Android datapack adoption evidence"),
 			new ReleaseReadinessRow("Manifest signature", manifestSignature.status(), manifestSignature.blockerCount(), "release evidence bundle / signature"),
+			new ReleaseReadinessRow(
+				"Callback reconciliation",
+				candidate.isEmpty() && callbackReconciliationBlockers == 0
+					? "확인 필요" : statusFor(callbackReconciliationBlockers),
+				callbackReconciliationBlockers,
+				callbackReconciliationBlockers > 0
+					? "CALLBACK_RECONCILIATION_REQUIRED" : "delivery confirmed"),
 			new ReleaseReadinessRow("Manual override", statusFor(manualOverrideBlockers), manualOverrideBlockers, "approval / expiry / conflict gates")
 		);
 	}

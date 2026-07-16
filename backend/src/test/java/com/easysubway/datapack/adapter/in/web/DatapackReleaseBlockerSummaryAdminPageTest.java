@@ -149,6 +149,27 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 	}
 
 	@Test
+	@DisplayName("미확정 production callback은 rollout readiness를 차단한다")
+	void pendingCallbackBlocksReadiness() {
+		jdbcTemplate.update("""
+			INSERT INTO datapack_release_deliveries (
+			 idempotency_key, release_request_id, release_sequence, manifest_sha256,
+			 channel, candidate_id, payload_sha256, signature_sha256, state, attempts,
+			 next_attempt_at, reconcile_deadline, dead_letter_deadline, created_at, updated_at)
+			VALUES (?, 'request-blocked', 42, ?, 'production', 'candidate-release-blocked',
+			 ?, ?, 'RECONCILIATION_REQUIRED', 4, '2026-07-06 03:00:00',
+			 '2026-07-06 03:00:00', '2026-07-06 04:00:00',
+			 '2026-07-06 02:50:00', '2026-07-06 03:00:00')
+			""", "request-blocked:42:" + SHA_A, SHA_A, SHA_B, SHA_C);
+
+		var callback = blockerSummaryUseCase.summarize().readinessRows().stream()
+			.filter(row -> "Callback reconciliation".equals(row.label()))
+			.findFirst().orElseThrow();
+		assertThat(callback.blockerCount()).isEqualTo(1);
+		assertThat(callback.note()).isEqualTo("CALLBACK_RECONCILIATION_REQUIRED");
+	}
+
+	@Test
 	@DisplayName("datapack read 권한이 없으면 통합 대시보드 release blocker 요약을 숨긴다")
 	void dashboardHidesDatapackReleaseBlockerSummaryWithoutDatapackRead() throws Exception {
 		String html = getAdminHtmlWithoutDatapackRead("/admin/dashboard/page");
@@ -364,6 +385,7 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 	}
 
 	private void clearDatapackTables() {
+		jdbcTemplate.update("DELETE FROM datapack_release_deliveries");
 		jdbcTemplate.update("DELETE FROM datapack_release_channel_events");
 		jdbcTemplate.update("DELETE FROM datapack_release_channels");
 		jdbcTemplate.update("DELETE FROM datapack_release_evidence_bundles");
