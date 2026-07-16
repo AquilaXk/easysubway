@@ -2985,6 +2985,8 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.match(routeV2SessionServiceTest, /2분보다 오래됐거나 미래인 verdict와 다른 requestHash를 거부한다/);
   assert.match(routeV2SessionServiceTest, /128-bit base64url nonce 형식과 2분 replay를 거부한다/);
   assert.match(routeV2IngressFilterTest, /50회를 소비한 session은 exact 429와 정수 Retry-After를 반환한다/);
+  assert.match(routeV2IngressFilterTest, /만료 session은 exact 401이고 controller를 호출하지 않는다/);
+  assert.match(routeV2IngressFilterTest, /다른 scope session은 exact 422이고 controller를 호출하지 않는다/);
   assert.match(routeV2IngressFilterTest, /ROUTE_ORIGIN_FORBIDDEN/);
   assert.match(routeV2IngressFilterTest, /ROUTE_SESSION_REQUIRED/);
   assert.match(productionRouteClosureTest, /direct-origin Route V2는 handler와 DB write 전에 exact 403으로 거부한다/);
