@@ -303,8 +303,8 @@ test("signed publish binding이 request·sequence·manifest를 FINAL RC에 결�
   }
 
   const forged = releaseRequestBinding();
-  const replacement = forged.signature.value.endsWith("A") ? "B" : "A";
-  forged.signature.value = `${forged.signature.value.slice(0, -1)}${replacement}`;
+  const replacement = forged.signature.value.startsWith("A") ? "B" : "A";
+  forged.signature.value = `${replacement}${forged.signature.value.slice(1)}`;
   assert.throws(() => withBindingPublicKey(() => prepareCallbackReconciliationIdentity({
     rcManifest, releaseRequestId, releaseRequestBinding: forged,
     expectedGitSha: "b".repeat(40),
