@@ -429,14 +429,17 @@ test("markLineTerminalBadgeEntries: 있으면 terminal role 엔트리에만 표�
   assert.equal(entries[0].hasLineTerminalBadge, undefined);
 });
 
-test("labels.json sidecar: 광주·대전은 terminal 엔트리에 hasLineTerminalBadge, 다른 권역은 플래그 없음", () => {
+test("labels.json sidecar: 광주·대전·부산은 terminal 엔트리에 hasLineTerminalBadge, 다른 권역은 플래그 없음", () => {
   const root = path.resolve(import.meta.dirname, "../..");
   const sidecarPath = path.join(
     root,
     "apps/mobile/assets/datapacks/metro_map_pack/basemap/labels.json",
   );
   const sidecar = JSON.parse(readFileSync(sidecarPath, "utf8"));
-  for (const regionId of ["gwangju", "daejeon"]) {
+  // 부산(#2068): 6개 노선의 비환승 종점 7곳에 line-terminal-badge를 그려
+  // 앱 배지 억제를 켠다. markLineTerminalBadgeEntries는 권역 단위 감지라 terminal
+  // role 엔트리 전부에 플래그가 붙고, 부산 terminal 라벨 7건은 모두 그 종점이다.
+  for (const regionId of ["gwangju", "daejeon", "busan"]) {
     const terminals = sidecar.regions[regionId].filter(
       (entry) => entry.role === "terminal",
     );
@@ -445,7 +448,7 @@ test("labels.json sidecar: 광주·대전은 terminal 엔트리에 hasLineTermin
       assert.equal(entry.hasLineTerminalBadge, true, `${regionId}:${entry.station}`);
     }
   }
-  for (const regionId of ["seoul", "busan", "daegu"]) {
+  for (const regionId of ["seoul", "daegu"]) {
     for (const entry of sidecar.regions[regionId]) {
       assert.equal(
         entry.hasLineTerminalBadge,

@@ -116,12 +116,12 @@
 .legend-title { fill:#344258; font-size:15px; font-weight:900; }
 .legend-name { fill:#344258; font-size:12.5px; font-weight:760; }
 .legend-desc, .ui-note { fill:#6E7F8B; font-size:10.5px; font-weight:600; letter-spacing:-0.2px; }
-.route-line { fill:none; stroke-width:8px; stroke-linecap:round; stroke-linejoin:round; stroke-miterlimit:1; shape-rendering:geometricPrecision; }
+.route-line { fill:none; stroke-width:20.5px; stroke-linecap:round; stroke-linejoin:round; stroke-miterlimit:1; shape-rendering:geometricPrecision; }
 .station-symbol circle { shape-rendering:geometricPrecision; }
-.station-name { fill:#14293D; font-size:12.5px; font-weight:700; letter-spacing:-0.35px; paint-order:stroke fill; stroke:#FFFFFF; stroke-width:3px; stroke-linejoin:round; }
-.station-name.is-long { font-size:11.6px; }
-.station-name.is-terminal { fill:#344258; font-size:13px; font-weight:700; }
-.transfer-name { fill:#344258; font-size:14px; font-weight:800; letter-spacing:-0.4px; paint-order:stroke fill; stroke:#FFFFFF; stroke-width:3px; stroke-linejoin:round; }
+.station-name { fill:#14293D; font-size:37px; font-weight:700; letter-spacing:-0.9px; paint-order:stroke fill; stroke:#FFFFFF; stroke-width:6px; stroke-linejoin:round; }
+.station-name.is-long { font-size:34px; }
+.station-name.is-terminal { fill:#344258; font-size:38.5px; font-weight:700; }
+.transfer-name { fill:#344258; font-size:41.5px; font-weight:800; letter-spacing:-1px; paint-order:stroke fill; stroke:#FFFFFF; stroke-width:6px; stroke-linejoin:round; }
 .station-code { fill:#8B98A5; font-size:8.2px; font-weight:600; letter-spacing:0; paint-order:stroke fill; stroke:#FFFFFF; stroke-width:2.4px; stroke-linejoin:round; }
 .label-leader { stroke:#C4D0D8; stroke-width:0.9px; stroke-linecap:round; }
 .optional-label-layer { display:none; }
@@ -803,7 +803,7 @@
       <polyline
          id="route-line-donghae"
          class="route-line"
-         points="2210,1050 2030,1050 1868,888 2210,546 2336,672 2462,672 2588,672 2714,798 2840,924 3470,1554 3596,1680 3722,1680 3722,1554 3722,1428 3722,1302 3722,1176 3722,1050 3722,924 3722,798 3596,672 3470,672 3344,672 3218,672"
+         points="2210,1050 2030,1050 1868,888 2210,546 2336,672 2462,672 2588,672 2714,798 2840,924 3470,1554 3596,1680 3722,1680 3722,1554 3722,1428 3722,1302 3722,1176 3722,1050 3722,924 3722,798 3596,672 3470,672 3344,672 3218,672 3128,672"
          stroke="#1C63B7"
          data-line="donghae"
          data-line-name="동해선"
@@ -813,7 +813,7 @@
       <polyline
          id="route-line-bgl"
          class="route-line"
-         points="1148,1446 1004,1302 860,1158 716,1014 572,870 464,762 536,834 590,834 500,834 410,834 320,834 230,834 140,834 140,744 140,654 230,654 320,654 410,654 500,654 590,654 680,654 770,654"
+         points="1148,1446 1004,1302 860,1158 716,1014 572,870 464,762 536,834 590,834 500,834 410,834 320,834 230,834 140,834 140,744 140,654 230,654 320,654 410,654 500,654 590,654 680,654 770,654 860,654"
          stroke="#854EAC"
          data-line="bgl"
          data-line-name="부산김해경전철"
@@ -823,7 +823,7 @@
       <polyline
          id="route-line-line4"
          class="route-line"
-         points="1310,834 1724,420 2210,420 2336,420 2462,420 2588,420 2714,420 2840,420 2966,420 3092,420 3218,420 3344,420 3470,420 3596,420 3722,420"
+         points="1310,834 1724,420 2210,420 2336,420 2462,420 2588,420 2714,420 2840,420 2966,420 3092,420 3218,420 3344,420 3470,420 3596,420 3722,420 3812,420"
          stroke="#7189C5"
          data-line="line4"
          data-line-name="4호선"
@@ -843,7 +843,7 @@
       <polyline
          id="route-line-line2"
          class="route-line"
-         points="1580,1014 1580,924 1580,834 1580,744 1580,654 1490,654 1400,654 1310,654 1220,654 950,654 950,834 1040,924 1130,1014 1220,1104 1310,1194 1310,1284 1148,1446 1328,1446 1454,1446 1580,1446 1706,1446 1832,1446 1958,1446 2084,1320 2210,1194 2300,1284 2390,1374 2480,1464 2570,1554 2660,1644 2750,1734 2840,1824 2930,1824 3020,1824 3110,1824 3200,1824 3290,1734 3380,1644 3470,1554 3380,1464 3290,1374 3290,1284 3290,1194"
+         points="1580,1104 1580,1014 1580,924 1580,834 1580,744 1580,654 1490,654 1400,654 1310,654 1220,654 950,654 950,834 1040,924 1130,1014 1220,1104 1310,1194 1310,1284 1148,1446 1328,1446 1454,1446 1580,1446 1706,1446 1832,1446 1958,1446 2084,1320 2210,1194 2300,1284 2390,1374 2480,1464 2570,1554 2660,1644 2750,1734 2840,1824 2930,1824 3020,1824 3110,1824 3200,1824 3290,1734 3380,1644 3470,1554 3380,1464 3290,1374 3290,1284 3290,1194 3290,1104"
          stroke="#A6DA53"
          data-line="line2"
          data-line-name="2호선"
@@ -853,347 +853,43 @@
       <polyline
          id="route-line-line1"
          class="route-line"
-         points="680,2544 770,2544 860,2544 950,2544 1040,2544 1130,2544 1220,2544 1310,2544 1400,2544 1490,2544 1580,2454 1670,2364 1760,2274 1850,2184 1940,2094 2030,2004 2120,1914 2210,1824 2210,1734 2210,1644 2210,1554 2210,1464 2210,1374 2210,1284 2210,1194 2210,1050 2210,924 2210,798 2210,672 2210,546 2210,420 2210,330 2336,330 2462,330 2588,330 2714,330 2840,330 2966,330 3092,330 3218,330"
+         points="590,2544 680,2544 770,2544 860,2544 950,2544 1040,2544 1130,2544 1220,2544 1310,2544 1400,2544 1490,2544 1580,2454 1670,2364 1760,2274 1850,2184 1940,2094 2030,2004 2120,1914 2210,1824 2210,1734 2210,1644 2210,1554 2210,1464 2210,1374 2210,1284 2210,1194 2210,1050 2210,924 2210,798 2210,672 2210,546 2210,420 2210,330 2336,330 2462,330 2588,330 2714,330 2840,330 2966,330 3092,330 3218,330 3308,330"
          stroke="#F68712"
          data-line="line1"
          data-line-name="1호선"
          data-line-color="#F68712"
          data-direction-system="octolinear"
          data-curve-smoothing="none" />
-    </g>
-    <g
-       id="route-endpoint-markers-layer"
-       class="render-layer route-marker-layer">
-      <g
-         id="endpoint-chip-line1-ub2e4-ub300-ud3ec-ud574-uc218-uc695-uc7a5"
-         class="ui-chip route-chip"
-         data-line="line1"
-         data-line-name="1호선"
-         data-line-color="#F68712"
-         data-terminal-station="다대포해수욕장">
-        <rect
-           x="629"
-           y="2532.5"
-           width="26"
-           height="23"
-           rx="11.5"
-           ry="11.5"
-           fill="#F68712"
-           id="rect30" />
-        <text
-           x="642"
-           y="2544.5"
-           fill="#FFFFFF"
-           font-size="10.5"
-           font-weight="900"
-           text-anchor="middle"
-           dominant-baseline="central"
-           alignment-baseline="middle"
-           id="text31">1</text>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line1" id="line-terminal-badge-dadaepo">
+        <circle cx="590" cy="2544" r="31" fill="#F68712" data-role="line-terminal-badge" id="line-terminal-badge-circle-dadaepo" />
+        <text x="590" y="2544" fill="#FFFFFF" font-size="36" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge" id="line-terminal-badge-label-dadaepo">1</text>
       </g>
-      <g
-         id="endpoint-chip-line1-ub178-ud3ec"
-         class="ui-chip route-chip"
-         data-line="line1"
-         data-line-name="1호선"
-         data-line-color="#F68712"
-         data-terminal-station="노포">
-        <rect
-           x="3243"
-           y="318.5"
-           width="26"
-           height="23"
-           rx="11.5"
-           ry="11.5"
-           fill="#F68712"
-           id="rect31" />
-        <text
-           x="3256"
-           y="330.5"
-           fill="#FFFFFF"
-           font-size="10.5"
-           font-weight="900"
-           text-anchor="middle"
-           dominant-baseline="central"
-           alignment-baseline="middle"
-           id="text32">1</text>
+      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line1" id="line-terminal-badge-nopo">
+        <circle cx="3308" cy="330" r="31" fill="#F68712" data-role="line-terminal-badge" id="line-terminal-badge-circle-nopo" />
+        <text x="3308" y="330" fill="#FFFFFF" font-size="36" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge" id="line-terminal-badge-label-nopo">1</text>
       </g>
-      <g
-         id="endpoint-chip-line2-uc591-uc0b0"
-         class="ui-chip route-chip"
-         data-line="line2"
-         data-line-name="2호선"
-         data-line-color="#A6DA53"
-         data-terminal-station="양산">
-        <rect
-           x="1567"
-           y="1040.5"
-           width="26"
-           height="23"
-           rx="11.5"
-           ry="11.5"
-           fill="#A6DA53"
-           id="rect32" />
-        <text
-           x="1580"
-           y="1052.5"
-           fill="#344258"
-           font-size="10.5"
-           font-weight="900"
-           text-anchor="middle"
-           dominant-baseline="central"
-           alignment-baseline="middle"
-           id="text33">2</text>
+      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line2" id="line-terminal-badge-yangsan">
+        <circle cx="1580" cy="1104" r="31" fill="#A6DA53" data-role="line-terminal-badge" id="line-terminal-badge-circle-yangsan" />
+        <text x="1580" y="1104" fill="#344258" font-size="36" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge" id="line-terminal-badge-label-yangsan">2</text>
       </g>
-      <g
-         id="endpoint-chip-line2-uc7a5-uc0b0"
-         class="ui-chip route-chip"
-         data-line="line2"
-         data-line-name="2호선"
-         data-line-color="#A6DA53"
-         data-terminal-station="장산">
-        <rect
-           x="3277"
-           y="1144.5"
-           width="26"
-           height="23"
-           rx="11.5"
-           ry="11.5"
-           fill="#A6DA53"
-           id="rect33" />
-        <text
-           x="3290"
-           y="1156.5"
-           fill="#344258"
-           font-size="10.5"
-           font-weight="900"
-           text-anchor="middle"
-           dominant-baseline="central"
-           alignment-baseline="middle"
-           id="text34">2</text>
+      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line2" id="line-terminal-badge-jangsan">
+        <circle cx="3290" cy="1104" r="31" fill="#A6DA53" data-role="line-terminal-badge" id="line-terminal-badge-circle-jangsan" />
+        <text x="3290" y="1104" fill="#344258" font-size="36" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge" id="line-terminal-badge-label-jangsan">2</text>
       </g>
-      <g
-         id="endpoint-chip-line3-ub300-uc800"
-         class="ui-chip route-chip"
-         data-line="line3"
-         data-line-name="3호선"
-         data-line-color="#D49329"
-         data-terminal-station="대저"
-         transform="translate(94.277518,28.797496)">
-        <rect
-           x="539"
-           y="822.5"
-           width="26"
-           height="23"
-           rx="11.5"
-           ry="11.5"
-           fill="#d49329"
-           id="rect34" />
-        <text
-           x="552"
-           y="834.5"
-           fill="#ffffff"
-           font-size="10.5px"
-           font-weight="900"
-           text-anchor="middle"
-           dominant-baseline="central"
-           alignment-baseline="middle"
-           id="text35">3</text>
+      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line4" id="line-terminal-badge-anpyeong">
+        <circle cx="3812" cy="420" r="31" fill="#7189C5" data-role="line-terminal-badge" id="line-terminal-badge-circle-anpyeong" />
+        <text x="3812" y="420" fill="#FFFFFF" font-size="36" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge" id="line-terminal-badge-label-anpyeong">4</text>
       </g>
-      <g
-         id="endpoint-chip-line3-uc218-uc601"
-         class="ui-chip route-chip"
-         data-line="line3"
-         data-line-name="3호선"
-         data-line-color="#D49329"
-         data-terminal-station="수영"
-         transform="translate(-37.467361,-69.689291)">
-        <rect
-           x="3213.8701"
-           y="1839.37"
-           width="26"
-           height="23"
-           rx="11.5"
-           ry="11.5"
-           fill="#d49329"
-           id="rect35" />
-        <text
-           x="3226.8701"
-           y="1851.37"
-           fill="#ffffff"
-           font-size="10.5px"
-           font-weight="900"
-           text-anchor="middle"
-           dominant-baseline="central"
-           alignment-baseline="middle"
-           id="text36">3</text>
+      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="donghae" id="line-terminal-badge-taehwagang">
+        <rect x="3074" y="641" width="108" height="62" rx="31" ry="31" fill="#1C63B7" data-role="line-terminal-badge" id="line-terminal-badge-capsule-taehwagang" />
+        <text x="3128" y="672" fill="#FFFFFF" font-size="36" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge" id="line-terminal-badge-label-taehwagang">동해</text>
       </g>
-      <g
-         id="endpoint-chip-line4-ubbf8-ub0a8"
-         class="ui-chip route-chip"
-         data-line="line4"
-         data-line-name="4호선"
-         data-line-color="#7189C5"
-         data-terminal-station="미남"
-         transform="translate(42.809748,-78.598483)">
-        <rect
-           x="1270.13"
-           y="849.37"
-           width="26"
-           height="23"
-           rx="11.5"
-           ry="11.5"
-           fill="#7189c5"
-           id="rect36" />
-        <text
-           x="1283.13"
-           y="861.37"
-           fill="#ffffff"
-           font-size="10.5px"
-           font-weight="900"
-           text-anchor="middle"
-           dominant-baseline="central"
-           alignment-baseline="middle"
-           id="text37">4</text>
+      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="bgl" id="line-terminal-badge-gayadae">
+        <rect x="806" y="623" width="108" height="62" rx="31" ry="31" fill="#854EAC" data-role="line-terminal-badge" id="line-terminal-badge-capsule-gayadae" />
+        <text x="860" y="654" fill="#FFFFFF" font-size="36" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge" id="line-terminal-badge-label-gayadae">부김</text>
       </g>
-      <g
-         id="endpoint-chip-line4-uc548-ud3c9"
-         class="ui-chip route-chip"
-         data-line="line4"
-         data-line-name="4호선"
-         data-line-color="#7189C5"
-         data-terminal-station="안평">
-        <rect
-           x="3747"
-           y="408.5"
-           width="26"
-           height="23"
-           rx="11.5"
-           ry="11.5"
-           fill="#7189C5"
-           id="rect37" />
-        <text
-           x="3760"
-           y="420.5"
-           fill="#FFFFFF"
-           font-size="10.5"
-           font-weight="900"
-           text-anchor="middle"
-           dominant-baseline="central"
-           alignment-baseline="middle"
-           id="text38">4</text>
-      </g>
-      <g
-         id="endpoint-chip-donghae-ubd80-uc804"
-         class="ui-chip route-chip"
-         data-line="donghae"
-         data-line-name="동해선"
-         data-line-color="#1C63B7"
-         data-terminal-station="부전"
-         transform="translate(-74.146682,-29.343155)">
-        <rect
-           x="2226"
-           y="1038.5"
-           width="44"
-           height="23"
-           rx="11.5"
-           ry="11.5"
-           fill="#1c63b7"
-           id="rect38" />
-        <text
-           x="2248"
-           y="1050.5"
-           fill="#ffffff"
-           font-size="8px"
-           font-weight="900"
-           text-anchor="middle"
-           dominant-baseline="central"
-           alignment-baseline="middle"
-           id="text39">동해</text>
-      </g>
-      <g
-         id="endpoint-chip-donghae-ud0dc-ud654-uac15"
-         class="ui-chip route-chip"
-         data-line="donghae"
-         data-line-name="동해선"
-         data-line-color="#1C63B7"
-         data-terminal-station="태화강">
-        <rect
-           x="3158"
-           y="660.5"
-           width="44"
-           height="23"
-           rx="11.5"
-           ry="11.5"
-           fill="#1C63B7"
-           id="rect39" />
-        <text
-           x="3180"
-           y="672.5"
-           fill="#FFFFFF"
-           font-size="8.0"
-           font-weight="900"
-           text-anchor="middle"
-           dominant-baseline="central"
-           alignment-baseline="middle"
-           id="text40">동해</text>
-      </g>
-      <g
-         id="endpoint-chip-bgl-uc0ac-uc0c1"
-         class="ui-chip route-chip"
-         data-line="bgl"
-         data-line-name="부산김해경전철"
-         data-line-color="#854EAC"
-         data-terminal-station="사상"
-         transform="translate(-37.300511,-76.479464)">
-        <rect
-           x="1152.87"
-           y="1461.37"
-           width="44"
-           height="23"
-           rx="11.5"
-           ry="11.5"
-           fill="#854eac"
-           id="rect40" />
-        <text
-           x="1174.87"
-           y="1473.37"
-           fill="#ffffff"
-           font-size="8px"
-           font-weight="900"
-           text-anchor="middle"
-           dominant-baseline="central"
-           alignment-baseline="middle"
-           id="text41">부김</text>
-      </g>
-      <g
-         id="endpoint-chip-bgl-uac00-uc57c-ub300"
-         class="ui-chip route-chip"
-         data-line="bgl"
-         data-line-name="부산김해경전철"
-         data-line-color="#854EAC"
-         data-terminal-station="가야대">
-        <rect
-           x="786"
-           y="642.5"
-           width="44"
-           height="23"
-           rx="11.5"
-           ry="11.5"
-           fill="#854EAC"
-           id="rect41" />
-        <text
-           x="808"
-           y="654.5"
-           fill="#FFFFFF"
-           font-size="8.0"
-           font-weight="900"
-           text-anchor="middle"
-           dominant-baseline="central"
-           alignment-baseline="middle"
-           id="text42">부김</text>
-      </g>
-    </g>
+</g>
+
     <g
        id="station-symbols-layer"
        class="render-layer station-layer">
@@ -1212,10 +908,10 @@
            id="station-circle-ub2e4-ub300-ud3ec-ud574-uc218-uc695-uc7a5"
            cx="680"
            cy="2544"
-           r="6.5"
+           r="12.3"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="3" />
+           stroke-width="3.7" />
       </g>
       <g
          id="station-symbol-ub2e4-ub300-ud3ec-ud56d"
@@ -1232,10 +928,10 @@
            id="station-circle-ub2e4-ub300-ud3ec-ud56d"
            cx="770"
            cy="2544"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ub0ab-uac1c"
@@ -1252,10 +948,10 @@
            id="station-circle-ub0ab-uac1c"
            cx="860"
            cy="2544"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc2e0-uc7a5-ub9bc"
@@ -1272,10 +968,10 @@
            id="station-circle-uc2e0-uc7a5-ub9bc"
            cx="950"
            cy="2544"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc7a5-ub9bc"
@@ -1292,10 +988,10 @@
            id="station-circle-uc7a5-ub9bc"
            cx="1040"
            cy="2544"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ub3d9-ub9e4"
@@ -1312,10 +1008,10 @@
            id="station-circle-ub3d9-ub9e4"
            cx="1130"
            cy="2544"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc2e0-ud3c9"
@@ -1332,10 +1028,10 @@
            id="station-circle-uc2e0-ud3c9"
            cx="1220"
            cy="2544"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ud558-ub2e8"
@@ -1352,10 +1048,10 @@
            id="station-circle-ud558-ub2e8"
            cx="1310"
            cy="2544"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ub2f9-ub9ac"
@@ -1372,10 +1068,10 @@
            id="station-circle-ub2f9-ub9ac"
            cx="1400"
            cy="2544"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc0ac-ud558"
@@ -1392,10 +1088,10 @@
            id="station-circle-uc0ac-ud558"
            cx="1490"
            cy="2544"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uad34-uc815"
@@ -1412,10 +1108,10 @@
            id="station-circle-uad34-uc815"
            cx="1580"
            cy="2454"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ub300-ud2f0"
@@ -1432,10 +1128,10 @@
            id="station-circle-ub300-ud2f0"
            cx="1670"
            cy="2364"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc11c-ub300-uc2e0"
@@ -1452,10 +1148,10 @@
            id="station-circle-uc11c-ub300-uc2e0"
            cx="1760"
            cy="2274"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ub3d9-ub300-uc2e0"
@@ -1472,10 +1168,10 @@
            id="station-circle-ub3d9-ub300-uc2e0"
            cx="1850"
            cy="2184"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ud1a0-uc131"
@@ -1492,10 +1188,10 @@
            id="station-circle-ud1a0-uc131"
            cx="1940"
            cy="2094"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc790-uac08-uce58"
@@ -1512,10 +1208,10 @@
            id="station-circle-uc790-uac08-uce58"
            cx="2030"
            cy="2004"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ub0a8-ud3ec"
@@ -1532,10 +1228,10 @@
            id="station-circle-ub0a8-ud3ec"
            cx="2120"
            cy="1914"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc911-uc559"
@@ -1552,10 +1248,10 @@
            id="station-circle-uc911-uc559"
            cx="2210"
            cy="1824"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ubd80-uc0b0-uc5ed"
@@ -1572,10 +1268,10 @@
            id="station-circle-ubd80-uc0b0-uc5ed"
            cx="2210"
            cy="1734"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ucd08-ub7c9"
@@ -1592,10 +1288,10 @@
            id="station-circle-ucd08-ub7c9"
            cx="2210"
            cy="1644"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ubd80-uc0b0-uc9c4"
@@ -1612,10 +1308,10 @@
            id="station-circle-ubd80-uc0b0-uc9c4"
            cx="2210"
            cy="1554"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc88c-ucc9c_1"
@@ -1632,10 +1328,10 @@
            id="station-circle-uc88c-ucc9c_1"
            cx="2210"
            cy="1464"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ubc94-uc77c"
@@ -1652,10 +1348,10 @@
            id="station-circle-ubc94-uc77c"
            cx="2210"
            cy="1374"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ubc94-ub0b4-uace8"
@@ -1672,10 +1368,10 @@
            id="station-circle-ubc94-ub0b4-uace8"
            cx="2210"
            cy="1284"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc591-uc815"
@@ -1692,10 +1388,10 @@
            id="station-circle-uc591-uc815"
            cx="2210"
            cy="924"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc2dc-uccad"
@@ -1712,10 +1408,10 @@
            id="station-circle-uc2dc-uccad"
            cx="2210"
            cy="798"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uba85-ub95c"
@@ -1732,10 +1428,10 @@
            id="station-circle-uba85-ub95c"
            cx="2210"
            cy="330"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc628-ucc9c-uc7a5"
@@ -1752,10 +1448,10 @@
            id="station-circle-uc628-ucc9c-uc7a5"
            cx="2336"
            cy="330"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ubd80-uc0b0-ub300"
@@ -1772,10 +1468,10 @@
            id="station-circle-ubd80-uc0b0-ub300"
            cx="2462"
            cy="330"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc7a5-uc804"
@@ -1792,10 +1488,10 @@
            id="station-circle-uc7a5-uc804"
            cx="2588"
            cy="330"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uad6c-uc11c"
@@ -1812,10 +1508,10 @@
            id="station-circle-uad6c-uc11c"
            cx="2714"
            cy="330"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ub450-uc2e4"
@@ -1832,10 +1528,10 @@
            id="station-circle-ub450-uc2e4"
            cx="2840"
            cy="330"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ub0a8-uc0b0"
@@ -1852,10 +1548,10 @@
            id="station-circle-ub0a8-uc0b0"
            cx="2966"
            cy="330"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ubc94-uc5b4-uc0ac"
@@ -1872,10 +1568,10 @@
            id="station-circle-ubc94-uc5b4-uc0ac"
            cx="3092"
            cy="330"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ub178-ud3ec"
@@ -1892,10 +1588,10 @@
            id="station-circle-ub178-ud3ec"
            cx="3218"
            cy="330"
-           r="6.5"
+           r="12.3"
            fill="#FFFFFF"
            stroke="#F68712"
-           stroke-width="3" />
+           stroke-width="3.7" />
       </g>
       <g
          id="station-symbol-uc591-uc0b0"
@@ -1912,10 +1608,10 @@
            id="station-circle-uc591-uc0b0"
            cx="1580"
            cy="1014"
-           r="6.5"
+           r="12.3"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="3" />
+           stroke-width="3.7" />
       </g>
       <g
          id="station-symbol-ub0a8-uc591-uc0b0"
@@ -1932,10 +1628,10 @@
            id="station-circle-ub0a8-uc591-uc0b0"
            cx="1580"
            cy="924"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ubd80-uc0b0-ub300-uc591-uc0b0-ucea0-ud37c-uc2a4"
@@ -1952,10 +1648,10 @@
            id="station-circle-ubd80-uc0b0-ub300-uc591-uc0b0-ucea0-ud37c-uc2a4"
            cx="1580"
            cy="834"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc99d-uc0b0"
@@ -1972,10 +1668,10 @@
            id="station-circle-uc99d-uc0b0"
            cx="1580"
            cy="744"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ud638-ud3ec"
@@ -1992,10 +1688,10 @@
            id="station-circle-ud638-ud3ec"
            cx="1580"
            cy="654"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uae08-uace1"
@@ -2013,10 +1709,10 @@
            id="station-circle-uae08-uace1"
            cx="1490"
            cy="654"
-           r="5.5999999"
+           r="10.25"
            fill="#ffffff"
            stroke="#a6da53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ub3d9-uc6d0"
@@ -2034,10 +1730,10 @@
            id="station-circle-ub3d9-uc6d0"
            cx="1400"
            cy="654"
-           r="5.5999999"
+           r="10.25"
            fill="#ffffff"
            stroke="#a6da53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc728-ub9ac"
@@ -2055,10 +1751,10 @@
            id="station-circle-uc728-ub9ac"
            cx="1310"
            cy="654"
-           r="5.5999999"
+           r="10.25"
            fill="#ffffff"
            stroke="#a6da53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ud654-uba85"
@@ -2076,10 +1772,10 @@
            id="station-circle-ud654-uba85"
            cx="1220"
            cy="654"
-           r="5.5999999"
+           r="10.25"
            fill="#ffffff"
            stroke="#a6da53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc218-uc815"
@@ -2096,10 +1792,10 @@
            id="station-circle-uc218-uc815"
            cx="950"
            cy="654"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uad6c-uba85"
@@ -2116,10 +1812,10 @@
            id="station-circle-uad6c-uba85"
            cx="1040"
            cy="924"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uad6c-ub0a8"
@@ -2136,10 +1832,10 @@
            id="station-circle-uad6c-ub0a8"
            cx="1130"
            cy="1014"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ubaa8-ub77c"
@@ -2156,10 +1852,10 @@
            id="station-circle-ubaa8-ub77c"
            cx="1220"
            cy="1104"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ubaa8-ub355"
@@ -2176,10 +1872,10 @@
            id="station-circle-ubaa8-ub355"
            cx="1310"
            cy="1194"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ub355-ud3ec"
@@ -2196,10 +1892,10 @@
            id="station-circle-ub355-ud3ec"
            cx="1310"
            cy="1284"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uac10-uc804"
@@ -2216,10 +1912,10 @@
            id="station-circle-uac10-uc804"
            cx="1328"
            cy="1446"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc8fc-ub840"
@@ -2236,10 +1932,10 @@
            id="station-circle-uc8fc-ub840"
            cx="1454"
            cy="1446"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ub0c9-uc815"
@@ -2256,10 +1952,10 @@
            id="station-circle-ub0c9-uc815"
            cx="1580"
            cy="1446"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uac1c-uae08"
@@ -2276,10 +1972,10 @@
            id="station-circle-uac1c-uae08"
            cx="1706"
            cy="1446"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ub3d9-uc758-ub300"
@@ -2296,10 +1992,10 @@
            id="station-circle-ub3d9-uc758-ub300"
            cx="1832"
            cy="1446"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uac00-uc57c"
@@ -2316,10 +2012,10 @@
            id="station-circle-uac00-uc57c"
            cx="1958"
            cy="1446"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ubd80-uc554"
@@ -2336,10 +2032,10 @@
            id="station-circle-ubd80-uc554"
            cx="2084"
            cy="1320"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc804-ud3ec"
@@ -2356,10 +2052,10 @@
            id="station-circle-uc804-ud3ec"
            cx="2300"
            cy="1284"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uad6d-uc81c-uae08-uc735-uc13c-ud130-xb7-ubd80-uc0b0-uc740-ud589"
@@ -2376,10 +2072,10 @@
            id="station-circle-uad6d-uc81c-uae08-uc735-uc13c-ud130-xb7-ubd80-uc0b0-uc740-ud589"
            cx="2390"
            cy="1374"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ubb38-ud604"
@@ -2396,10 +2092,10 @@
            id="station-circle-ubb38-ud604"
            cx="2480"
            cy="1464"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc9c0-uac8c-uace8"
@@ -2416,10 +2112,10 @@
            id="station-circle-uc9c0-uac8c-uace8"
            cx="2570"
            cy="1554"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ubabb-uace8"
@@ -2436,10 +2132,10 @@
            id="station-circle-ubabb-uace8"
            cx="2660"
            cy="1644"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ub300-uc5f0"
@@ -2456,10 +2152,10 @@
            id="station-circle-ub300-uc5f0"
            cx="2750"
            cy="1734"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uacbd-uc131-ub300-xb7-ubd80-uacbd-ub300"
@@ -2476,10 +2172,10 @@
            id="station-circle-uacbd-uc131-ub300-xb7-ubd80-uacbd-ub300"
            cx="2840"
            cy="1824"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ub0a8-ucc9c"
@@ -2496,10 +2192,10 @@
            id="station-circle-ub0a8-ucc9c"
            cx="2930"
            cy="1824"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uae08-ub828-uc0b0"
@@ -2516,10 +2212,10 @@
            id="station-circle-uae08-ub828-uc0b0"
            cx="3020"
            cy="1824"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uad11-uc548"
@@ -2536,10 +2232,10 @@
            id="station-circle-uad11-uc548"
            cx="3110"
            cy="1824"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ubbfc-ub77d"
@@ -2556,10 +2252,10 @@
            id="station-circle-ubbfc-ub77d"
            cx="3290"
            cy="1734"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc13c-ud140-uc2dc-ud2f0"
@@ -2576,10 +2272,10 @@
            id="station-circle-uc13c-ud140-uc2dc-ud2f0"
            cx="3380"
            cy="1644"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ub3d9-ubc31"
@@ -2596,10 +2292,10 @@
            id="station-circle-ub3d9-ubc31"
            cx="3380"
            cy="1464"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ud574-uc6b4-ub300"
@@ -2616,10 +2312,10 @@
            id="station-circle-ud574-uc6b4-ub300"
            cx="3290"
            cy="1374"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc911-ub3d9"
@@ -2636,10 +2332,10 @@
            id="station-circle-uc911-ub3d9"
            cx="3290"
            cy="1284"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc7a5-uc0b0"
@@ -2656,10 +2352,10 @@
            id="station-circle-uc7a5-uc0b0"
            cx="3290"
            cy="1194"
-           r="6.5"
+           r="12.3"
            fill="#FFFFFF"
            stroke="#A6DA53"
-           stroke-width="3" />
+           stroke-width="3.7" />
       </g>
       <g
          id="station-symbol-uccb4-uc721-uacf5-uc6d0"
@@ -2676,10 +2372,10 @@
            id="station-circle-uccb4-uc721-uacf5-uc6d0"
            cx="680"
            cy="834"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#D49329"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uac15-uc11c-uad6c-uccad"
@@ -2696,10 +2392,10 @@
            id="station-circle-uac15-uc11c-uad6c-uccad"
            cx="770"
            cy="834"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#D49329"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uad6c-ud3ec"
@@ -2716,10 +2412,10 @@
            id="station-circle-uad6c-ud3ec"
            cx="860"
            cy="834"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#D49329"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc219-ub4f1"
@@ -2736,10 +2432,10 @@
            id="station-circle-uc219-ub4f1"
            cx="1040"
            cy="834"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#D49329"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ub0a8-uc0b0-uc815"
@@ -2756,10 +2452,10 @@
            id="station-circle-ub0a8-uc0b0-uc815"
            cx="1130"
            cy="834"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#D49329"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ub9cc-ub355"
@@ -2776,10 +2472,10 @@
            id="station-circle-ub9cc-ub355"
            cx="1220"
            cy="834"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#D49329"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc0ac-uc9c1"
@@ -2796,10 +2492,10 @@
            id="station-circle-uc0ac-uc9c1"
            cx="1400"
            cy="924"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#D49329"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc885-ud569-uc6b4-ub3d9-uc7a5"
@@ -2816,10 +2512,10 @@
            id="station-circle-uc885-ud569-uc6b4-ub3d9-uc7a5"
            cx="1490"
            cy="1014"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#D49329"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ubb3c-ub9cc-uace8"
@@ -2836,10 +2532,10 @@
            id="station-circle-ubb3c-ub9cc-uace8"
            cx="2336"
            cy="798"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#D49329"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ubc30-uc0b0"
@@ -2856,10 +2552,10 @@
            id="station-circle-ubc30-uc0b0"
            cx="2462"
            cy="924"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#D49329"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ub9dd-ubbf8"
@@ -2876,10 +2572,10 @@
            id="station-circle-ub9dd-ubbf8"
            cx="2840"
            cy="1464"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#D49329"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc218-uc548"
@@ -2896,10 +2592,10 @@
            id="station-circle-uc218-uc548"
            cx="2336"
            cy="420"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#7189C5"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ub099-ubbfc"
@@ -2916,10 +2612,10 @@
            id="station-circle-ub099-ubbfc"
            cx="2462"
            cy="420"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#7189C5"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ucda9-ub82c-uc0ac"
@@ -2936,10 +2632,10 @@
            id="station-circle-ucda9-ub82c-uc0ac"
            cx="2588"
            cy="420"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#7189C5"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uba85-uc7a5"
@@ -2956,10 +2652,10 @@
            id="station-circle-uba85-uc7a5"
            cx="2714"
            cy="420"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#7189C5"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc11c-ub3d9"
@@ -2976,10 +2672,10 @@
            id="station-circle-uc11c-ub3d9"
            cx="2840"
            cy="420"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#7189C5"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uae08-uc0ac"
@@ -2996,10 +2692,10 @@
            id="station-circle-uae08-uc0ac"
            cx="2966"
            cy="420"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#7189C5"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ubc18-uc5ec-ub18d-uc0b0-ubb3c-uc2dc-uc7a5"
@@ -3016,10 +2712,10 @@
            id="station-circle-ubc18-uc5ec-ub18d-uc0b0-ubb3c-uc2dc-uc7a5"
            cx="3092"
            cy="420"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#7189C5"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc11d-ub300"
@@ -3036,10 +2732,10 @@
            id="station-circle-uc11d-ub300"
            cx="3218"
            cy="420"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#7189C5"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc601-uc0b0-ub300"
@@ -3056,10 +2752,10 @@
            id="station-circle-uc601-uc0b0-ub300"
            cx="3344"
            cy="420"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#7189C5"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc717-ubc18-uc1a1"
@@ -3076,10 +2772,10 @@
            id="station-circle-uc717-ubc18-uc1a1"
            cx="3470"
            cy="420"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#7189C5"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uace0-ucd0c"
@@ -3096,10 +2792,10 @@
            id="station-circle-uace0-ucd0c"
            cx="3596"
            cy="420"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#7189C5"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc548-ud3c9"
@@ -3116,10 +2812,10 @@
            id="station-circle-uc548-ud3c9"
            cx="3722"
            cy="420"
-           r="6.5"
+           r="12.3"
            fill="#FFFFFF"
            stroke="#7189C5"
-           stroke-width="3" />
+           stroke-width="3.7" />
       </g>
       <g
          id="station-symbol-uac70-uc81c-ud574-ub9de-uc774"
@@ -3136,10 +2832,10 @@
            id="station-circle-uac70-uc81c-ud574-ub9de-uc774"
            cx="2030"
            cy="1050"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#1C63B7"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ub3d9-ub798_DH"
@@ -3156,10 +2852,10 @@
            id="station-circle-ub3d9-ub798_DH"
            cx="2336"
            cy="672"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#1C63B7"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc548-ub77d"
@@ -3176,10 +2872,10 @@
            id="station-circle-uc548-ub77d"
            cx="2462"
            cy="672"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#1C63B7"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ubd80-uc0b0-uc6d0-ub3d9"
@@ -3196,10 +2892,10 @@
            id="station-circle-ubd80-uc0b0-uc6d0-ub3d9"
            cx="2588"
            cy="672"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#1C63B7"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc7ac-uc1a1"
@@ -3216,10 +2912,10 @@
            id="station-circle-uc7ac-uc1a1"
            cx="2714"
            cy="798"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#1C63B7"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc13c-ud140"
@@ -3236,10 +2932,10 @@
            id="station-circle-uc13c-ud140"
            cx="2840"
            cy="924"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#1C63B7"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc2e0-ud574-uc6b4-ub300"
@@ -3256,10 +2952,10 @@
            id="station-circle-uc2e0-ud574-uc6b4-ub300"
            cx="3596"
            cy="1680"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#1C63B7"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc1a1-uc815"
@@ -3276,10 +2972,10 @@
            id="station-circle-uc1a1-uc815"
            cx="3722"
            cy="1680"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#1C63B7"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc624-uc2dc-ub9ac-uc544"
@@ -3296,10 +2992,10 @@
            id="station-circle-uc624-uc2dc-ub9ac-uc544"
            cx="3722"
            cy="1554"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#1C63B7"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uae30-uc7a5"
@@ -3316,10 +3012,10 @@
            id="station-circle-uae30-uc7a5"
            cx="3722"
            cy="1428"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#1C63B7"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc77c-uad11"
@@ -3336,10 +3032,10 @@
            id="station-circle-uc77c-uad11"
            cx="3722"
            cy="1302"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#1C63B7"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc88c-ucc9c_DH"
@@ -3356,10 +3052,10 @@
            id="station-circle-uc88c-ucc9c_DH"
            cx="3722"
            cy="1176"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#1C63B7"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc6d4-ub0b4"
@@ -3376,10 +3072,10 @@
            id="station-circle-uc6d4-ub0b4"
            cx="3722"
            cy="1050"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#1C63B7"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc11c-uc0dd"
@@ -3396,10 +3092,10 @@
            id="station-circle-uc11c-uc0dd"
            cx="3722"
            cy="924"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#1C63B7"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ub0a8-ucc3d"
@@ -3416,10 +3112,10 @@
            id="station-circle-ub0a8-ucc3d"
            cx="3722"
            cy="798"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#1C63B7"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ub9dd-uc591"
@@ -3436,10 +3132,10 @@
            id="station-circle-ub9dd-uc591"
            cx="3596"
            cy="672"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#1C63B7"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ub355-ud558"
@@ -3456,10 +3152,10 @@
            id="station-circle-ub355-ud558"
            cx="3470"
            cy="672"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#1C63B7"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uac1c-uc6b4-ud3ec"
@@ -3476,10 +3172,10 @@
            id="station-circle-uac1c-uc6b4-ud3ec"
            cx="3344"
            cy="672"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#1C63B7"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ud0dc-ud654-uac15"
@@ -3496,10 +3192,10 @@
            id="station-circle-ud0dc-ud654-uac15"
            cx="3218"
            cy="672"
-           r="6.5"
+           r="12.3"
            fill="#FFFFFF"
            stroke="#1C63B7"
-           stroke-width="3" />
+           stroke-width="3.7" />
       </g>
       <g
          id="station-symbol-uad18-ubc95-ub974-ub124-uc2dc-ub5bc"
@@ -3516,10 +3212,10 @@
            id="station-circle-uad18-ubc95-ub974-ub124-uc2dc-ub5bc"
            cx="1004"
            cy="1302"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#854EAC"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc11c-ubd80-uc0b0-uc720-ud1b5-uc9c0-uad6c"
@@ -3536,10 +3232,10 @@
            id="station-circle-uc11c-ubd80-uc0b0-uc720-ud1b5-uc9c0-uad6c"
            cx="860"
            cy="1158"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#854EAC"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uacf5-ud56d"
@@ -3556,10 +3252,10 @@
            id="station-circle-uacf5-ud56d"
            cx="716"
            cy="1014"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#854EAC"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ub355-ub450"
@@ -3576,10 +3272,10 @@
            id="station-circle-ub355-ub450"
            cx="572"
            cy="870"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#854EAC"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ub4f1-uad6c"
@@ -3596,10 +3292,10 @@
            id="station-circle-ub4f1-uad6c"
            cx="464"
            cy="762"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#854EAC"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ud3c9-uac15"
@@ -3616,10 +3312,10 @@
            id="station-circle-ud3c9-uac15"
            cx="500"
            cy="834"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#854EAC"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ub300-uc0ac"
@@ -3636,10 +3332,10 @@
            id="station-circle-ub300-uc0ac"
            cx="410"
            cy="834"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#854EAC"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ubd88-uc554"
@@ -3656,10 +3352,10 @@
            id="station-circle-ubd88-uc554"
            cx="320"
            cy="834"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#854EAC"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc9c0-ub0b4"
@@ -3676,10 +3372,10 @@
            id="station-circle-uc9c0-ub0b4"
            cx="230"
            cy="834"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#854EAC"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uae40-ud574-ub300-ud559"
@@ -3696,10 +3392,10 @@
            id="station-circle-uae40-ud574-ub300-ud559"
            cx="140"
            cy="834"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#854EAC"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc778-uc81c-ub300"
@@ -3716,10 +3412,10 @@
            id="station-circle-uc778-uc81c-ub300"
            cx="140"
            cy="744"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#854EAC"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uae40-ud574-uc2dc-uccad"
@@ -3736,10 +3432,10 @@
            id="station-circle-uae40-ud574-uc2dc-uccad"
            cx="140"
            cy="654"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#854EAC"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ubd80-uc6d0"
@@ -3756,10 +3452,10 @@
            id="station-circle-ubd80-uc6d0"
            cx="230"
            cy="654"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#854EAC"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ubd09-ud669"
@@ -3776,10 +3472,10 @@
            id="station-circle-ubd09-ud669"
            cx="320"
            cy="654"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#854EAC"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc218-ub85c-uc655-ub989"
@@ -3796,10 +3492,10 @@
            id="station-circle-uc218-ub85c-uc655-ub989"
            cx="410"
            cy="654"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#854EAC"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-ubc15-ubb3c-uad00"
@@ -3816,10 +3512,10 @@
            id="station-circle-ubc15-ubb3c-uad00"
            cx="500"
            cy="654"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#854EAC"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc5f0-uc9c0-uacf5-uc6d0"
@@ -3836,10 +3532,10 @@
            id="station-circle-uc5f0-uc9c0-uacf5-uc6d0"
            cx="590"
            cy="654"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#854EAC"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uc7a5-uc2e0-ub300"
@@ -3856,10 +3552,10 @@
            id="station-circle-uc7a5-uc2e0-ub300"
            cx="680"
            cy="654"
-           r="5.6"
+           r="10.25"
            fill="#FFFFFF"
            stroke="#854EAC"
-           stroke-width="2" />
+           stroke-width="3.1" />
       </g>
       <g
          id="station-symbol-uac00-uc57c-ub300"
@@ -3876,10 +3572,10 @@
            id="station-circle-uac00-uc57c-ub300"
            cx="770"
            cy="654"
-           r="6.5"
+           r="12.3"
            fill="#FFFFFF"
            stroke="#854EAC"
-           stroke-width="3" />
+           stroke-width="3.7" />
       </g>
     </g>
     <g
@@ -3899,88 +3595,18 @@
          data-base-unit-u="8px">
         <title
            id="title176">서면 환승 노드 — sma-v1 직선형 8방향 캡슐</title>
-        <g
-           class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule"
-           id="g177"
-           transform="rotate(-45.111788,2206.6931,1192.6265)">
-          <line
-             x1="2205.05"
-             y1="1189.05"
-             x2="2214.95"
-             y2="1198.95"
-             class="ourclass-transfer-shell-outline"
-             stroke="#3f4a5c"
-             stroke-width="26"
-             id="line176" />
-          <line
-             x1="2205.05"
-             y1="1189.05"
-             x2="2214.95"
-             y2="1198.95"
-             class="ourclass-transfer-shell-fill"
-             stroke="#ffffff"
-             stroke-width="20"
-             id="line177" />
+        <g class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule">
+          <line x1="2191.053" y1="1190.913" x2="2229.053" y2="1190.913" class="ourclass-transfer-shell-outline" stroke="#3F4A5C" stroke-width="63" />
+          <line x1="2191.053" y1="1190.913" x2="2229.053" y2="1190.913" class="ourclass-transfer-shell-fill" stroke="#FFFFFF" stroke-width="50" />
         </g>
-        <g
-           class="ourclass-transfer-route-badges"
-           id="g180"
-           transform="translate(40.778288,-1.7133735)">
-          <g
-             class="ourclass-transfer-badge"
-             data-line="line1"
-             data-line-name="1호선"
-             data-line-label="1"
-             data-line-color="#F68712"
-             data-slot-index="1"
-             id="g178"
-             transform="translate(-44.365111,3.5711854)">
-            <circle
-               cx="2205.05"
-               cy="1189.05"
-               r="7.4000001"
-               fill="#f68712"
-               class="ourclass-transfer-badge-circle"
-               id="circle177" />
-            <text
-               x="2205.05"
-               y="1189.45"
-               class="ourclass-transfer-badge-label"
-               fill="#ffffff"
-               font-size="8.2px"
-               font-weight="900"
-               text-anchor="middle"
-               dominant-baseline="central"
-               alignment-baseline="middle"
-               id="text177">1</text>
+        <g class="ourclass-transfer-route-badges">
+          <g class="ourclass-transfer-badge" data-line="line1" data-line-color="#F68712" data-slot-index="1">
+            <circle cx="2191.053" cy="1190.913" r="19" fill="#F68712" class="ourclass-transfer-badge-circle" />
+            <text x="2191.053" y="1190.913" class="ourclass-transfer-badge-label" fill="#FFFFFF" font-size="16.5" font-weight="900" text-anchor="middle" dominant-baseline="central" alignment-baseline="middle">1</text>
           </g>
-          <g
-             class="ourclass-transfer-badge"
-             data-line="line2"
-             data-line-name="2호선"
-             data-line-label="2"
-             data-line-color="#A6DA53"
-             data-slot-index="2"
-             id="g179"
-             transform="translate(-37.085387,-6.3182511)">
-            <circle
-               cx="2214.95"
-               cy="1198.95"
-               r="7.4000001"
-               fill="#a6da53"
-               class="ourclass-transfer-badge-circle"
-               id="circle178" />
-            <text
-               x="2214.95"
-               y="1199.35"
-               class="ourclass-transfer-badge-label"
-               fill="#344258"
-               font-size="8.2px"
-               font-weight="900"
-               text-anchor="middle"
-               dominant-baseline="central"
-               alignment-baseline="middle"
-               id="text178">2</text>
+          <g class="ourclass-transfer-badge" data-line="line2" data-line-color="#A6DA53" data-slot-index="2">
+            <circle cx="2229.053" cy="1190.913" r="19" fill="#A6DA53" class="ourclass-transfer-badge-circle" />
+            <text x="2229.053" y="1190.913" class="ourclass-transfer-badge-label" fill="#344258" font-size="16.5" font-weight="900" text-anchor="middle" dominant-baseline="central" alignment-baseline="middle">2</text>
           </g>
         </g>
       </g>
@@ -3998,86 +3624,18 @@
          data-base-unit-u="8px">
         <title
            id="title180">부전 환승 노드 — sma-v1 직선형 8방향 캡슐</title>
-        <g
-           class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule"
-           id="g181">
-          <line
-             x1="2203"
-             y1="1050"
-             x2="2217"
-             y2="1050"
-             class="ourclass-transfer-shell-outline"
-             stroke="#3F4A5C"
-             stroke-width="26"
-             id="line180" />
-          <line
-             x1="2203"
-             y1="1050"
-             x2="2217"
-             y2="1050"
-             class="ourclass-transfer-shell-fill"
-             stroke="#FFFFFF"
-             stroke-width="20"
-             id="line181" />
+        <g class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule">
+          <line x1="2191.059" y1="1050.000" x2="2229.059" y2="1050.000" class="ourclass-transfer-shell-outline" stroke="#3F4A5C" stroke-width="63" />
+          <line x1="2191.059" y1="1050.000" x2="2229.059" y2="1050.000" class="ourclass-transfer-shell-fill" stroke="#FFFFFF" stroke-width="50" />
         </g>
-        <g
-           class="ourclass-transfer-route-badges"
-           id="g184">
-          <g
-             class="ourclass-transfer-badge"
-             data-line="line1"
-             data-line-name="1호선"
-             data-line-label="1"
-             data-line-color="#F68712"
-             data-slot-index="1"
-             id="g182"
-             transform="translate(-1.5246015)">
-            <circle
-               cx="2203"
-               cy="1050"
-               r="7.4000001"
-               fill="#f68712"
-               class="ourclass-transfer-badge-circle"
-               id="circle181" />
-            <text
-               x="2203"
-               y="1050.4"
-               class="ourclass-transfer-badge-label"
-               fill="#ffffff"
-               font-size="8.2px"
-               font-weight="900"
-               text-anchor="middle"
-               dominant-baseline="central"
-               alignment-baseline="middle"
-               id="text181">1</text>
+        <g class="ourclass-transfer-route-badges">
+          <g class="ourclass-transfer-badge" data-line="line1" data-line-color="#F68712" data-slot-index="1">
+            <circle cx="2191.059" cy="1050.000" r="19" fill="#F68712" class="ourclass-transfer-badge-circle" />
+            <text x="2191.059" y="1050.000" class="ourclass-transfer-badge-label" fill="#FFFFFF" font-size="16.5" font-weight="900" text-anchor="middle" dominant-baseline="central" alignment-baseline="middle">1</text>
           </g>
-          <g
-             class="ourclass-transfer-badge"
-             data-line="donghae"
-             data-line-name="동해선"
-             data-line-label="동해"
-             data-line-color="#1C63B7"
-             data-slot-index="2"
-             id="g183"
-             transform="translate(1.6418785)">
-            <circle
-               cx="2217"
-               cy="1050"
-               r="7.4000001"
-               fill="#1c63b7"
-               class="ourclass-transfer-badge-circle"
-               id="circle182" />
-            <text
-               x="2217"
-               y="1050.4"
-               class="ourclass-transfer-badge-label"
-               fill="#ffffff"
-               font-size="5.2px"
-               font-weight="900"
-               text-anchor="middle"
-               dominant-baseline="central"
-               alignment-baseline="middle"
-               id="text182">동해</text>
+          <g class="ourclass-transfer-badge" data-line="donghae" data-line-color="#1C63B7" data-slot-index="2">
+            <circle cx="2229.059" cy="1050.000" r="19" fill="#1C63B7" class="ourclass-transfer-badge-circle" />
+            <text x="2229.059" y="1050.000" class="ourclass-transfer-badge-label" fill="#FFFFFF" font-size="16.5" font-weight="900" text-anchor="middle" dominant-baseline="central" alignment-baseline="middle">동해</text>
           </g>
         </g>
       </g>
@@ -4095,88 +3653,18 @@
          data-base-unit-u="8px">
         <title
            id="title184">연산 환승 노드 — sma-v1 직선형 8방향 캡슐</title>
-        <g
-           class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule"
-           id="g185"
-           transform="rotate(-45.056157,2206.0776,669.97622)">
-          <line
-             x1="2205.05"
-             y1="667.04999"
-             x2="2214.95"
-             y2="676.95001"
-             class="ourclass-transfer-shell-outline"
-             stroke="#3f4a5c"
-             stroke-width="26"
-             id="line184" />
-          <line
-             x1="2205.05"
-             y1="667.04999"
-             x2="2214.95"
-             y2="676.95001"
-             class="ourclass-transfer-shell-fill"
-             stroke="#ffffff"
-             stroke-width="20"
-             id="line185" />
+        <g class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule">
+          <line x1="2191.395" y1="668.332" x2="2229.395" y2="668.332" class="ourclass-transfer-shell-outline" stroke="#3F4A5C" stroke-width="63" />
+          <line x1="2191.395" y1="668.332" x2="2229.395" y2="668.332" class="ourclass-transfer-shell-fill" stroke="#FFFFFF" stroke-width="50" />
         </g>
-        <g
-           class="ourclass-transfer-route-badges"
-           id="g188"
-           transform="translate(39.856867,-2.5440553)">
-          <g
-             class="ourclass-transfer-badge"
-             data-line="line1"
-             data-line-name="1호선"
-             data-line-label="1"
-             data-line-color="#F68712"
-             data-slot-index="1"
-             id="g186"
-             transform="translate(-42.972786,3.9321504)">
-            <circle
-               cx="2205.05"
-               cy="667.04999"
-               r="7.4000001"
-               fill="#f68712"
-               class="ourclass-transfer-badge-circle"
-               id="circle185" />
-            <text
-               x="2205.05"
-               y="667.45001"
-               class="ourclass-transfer-badge-label"
-               fill="#ffffff"
-               font-size="8.2px"
-               font-weight="900"
-               text-anchor="middle"
-               dominant-baseline="central"
-               alignment-baseline="middle"
-               id="text185">1</text>
+        <g class="ourclass-transfer-route-badges">
+          <g class="ourclass-transfer-badge" data-line="line1" data-line-color="#F68712" data-slot-index="1">
+            <circle cx="2191.395" cy="668.332" r="19" fill="#F68712" class="ourclass-transfer-badge-circle" />
+            <text x="2191.395" y="668.332" class="ourclass-transfer-badge-label" fill="#FFFFFF" font-size="16.5" font-weight="900" text-anchor="middle" dominant-baseline="central" alignment-baseline="middle">1</text>
           </g>
-          <g
-             class="ourclass-transfer-badge"
-             data-line="line3"
-             data-line-name="3호선"
-             data-line-label="3"
-             data-line-color="#D49329"
-             data-slot-index="2"
-             id="g187"
-             transform="translate(-35.951089,-6.1790934)">
-            <circle
-               cx="2214.95"
-               cy="676.95001"
-               r="7.4000001"
-               fill="#d49329"
-               class="ourclass-transfer-badge-circle"
-               id="circle186" />
-            <text
-               x="2214.95"
-               y="677.34998"
-               class="ourclass-transfer-badge-label"
-               fill="#ffffff"
-               font-size="8.2px"
-               font-weight="900"
-               text-anchor="middle"
-               dominant-baseline="central"
-               alignment-baseline="middle"
-               id="text186">3</text>
+          <g class="ourclass-transfer-badge" data-line="line3" data-line-color="#D49329" data-slot-index="2">
+            <circle cx="2229.395" cy="668.332" r="19" fill="#D49329" class="ourclass-transfer-badge-circle" />
+            <text x="2229.395" y="668.332" class="ourclass-transfer-badge-label" fill="#FFFFFF" font-size="16.5" font-weight="900" text-anchor="middle" dominant-baseline="central" alignment-baseline="middle">3</text>
           </g>
         </g>
       </g>
@@ -4194,88 +3682,18 @@
          data-base-unit-u="8px">
         <title
            id="title188">교대 환승 노드 — sma-v1 직선형 8방향 캡슐</title>
-        <g
-           class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule"
-           id="g189"
-           transform="rotate(-45.258853,2210,546)">
-          <line
-             x1="2205.05"
-             y1="541.04999"
-             x2="2214.95"
-             y2="550.95001"
-             class="ourclass-transfer-shell-outline"
-             stroke="#3f4a5c"
-             stroke-width="26"
-             id="line188" />
-          <line
-             x1="2205.05"
-             y1="541.04999"
-             x2="2214.95"
-             y2="550.95001"
-             class="ourclass-transfer-shell-fill"
-             stroke="#ffffff"
-             stroke-width="20"
-             id="line189" />
+        <g class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule">
+          <line x1="2191.194" y1="545.903" x2="2229.194" y2="545.903" class="ourclass-transfer-shell-outline" stroke="#3F4A5C" stroke-width="63" />
+          <line x1="2191.194" y1="545.903" x2="2229.194" y2="545.903" class="ourclass-transfer-shell-fill" stroke="#FFFFFF" stroke-width="50" />
         </g>
-        <g
-           class="ourclass-transfer-route-badges"
-           id="g192"
-           transform="translate(-62.17224,2.7200355)">
-          <g
-             class="ourclass-transfer-badge"
-             data-line="line1"
-             data-line-name="1호선"
-             data-line-label="1"
-             data-line-color="#F68712"
-             data-slot-index="1"
-             id="g190"
-             transform="translate(59.257916,2.331459)">
-            <circle
-               cx="2205.05"
-               cy="541.04999"
-               r="7.4000001"
-               fill="#f68712"
-               class="ourclass-transfer-badge-circle"
-               id="circle189" />
-            <text
-               x="2205.05"
-               y="541.45001"
-               class="ourclass-transfer-badge-label"
-               fill="#ffffff"
-               font-size="8.2px"
-               font-weight="900"
-               text-anchor="middle"
-               dominant-baseline="central"
-               alignment-baseline="middle"
-               id="text189">1</text>
+        <g class="ourclass-transfer-route-badges">
+          <g class="ourclass-transfer-badge" data-line="line1" data-line-color="#F68712" data-slot-index="1">
+            <circle cx="2191.194" cy="545.903" r="19" fill="#F68712" class="ourclass-transfer-badge-circle" />
+            <text x="2191.194" y="545.903" class="ourclass-transfer-badge-label" fill="#FFFFFF" font-size="16.5" font-weight="900" text-anchor="middle" dominant-baseline="central" alignment-baseline="middle">1</text>
           </g>
-          <g
-             class="ourclass-transfer-badge"
-             data-line="donghae"
-             data-line-name="동해선"
-             data-line-label="동해"
-             data-line-color="#1C63B7"
-             data-slot-index="2"
-             id="g191"
-             transform="translate(65.47514,-7.9658182)">
-            <circle
-               cx="2214.95"
-               cy="550.95001"
-               r="7.4000001"
-               fill="#1c63b7"
-               class="ourclass-transfer-badge-circle"
-               id="circle190" />
-            <text
-               x="2214.95"
-               y="551.34998"
-               class="ourclass-transfer-badge-label"
-               fill="#ffffff"
-               font-size="5.2px"
-               font-weight="900"
-               text-anchor="middle"
-               dominant-baseline="central"
-               alignment-baseline="middle"
-               id="text190">동해</text>
+          <g class="ourclass-transfer-badge" data-line="donghae" data-line-color="#1C63B7" data-slot-index="2">
+            <circle cx="2229.194" cy="545.903" r="19" fill="#1C63B7" class="ourclass-transfer-badge-circle" />
+            <text x="2229.194" y="545.903" class="ourclass-transfer-badge-label" fill="#FFFFFF" font-size="16.5" font-weight="900" text-anchor="middle" dominant-baseline="central" alignment-baseline="middle">동해</text>
           </g>
         </g>
       </g>
@@ -4293,85 +3711,18 @@
          data-base-unit-u="8px">
         <title
            id="title192">동래 환승 노드 — sma-v1 직선형 8방향 캡슐</title>
-        <g
-           class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule"
-           id="g193">
-          <line
-             x1="2203"
-             y1="420"
-             x2="2217"
-             y2="420"
-             class="ourclass-transfer-shell-outline"
-             stroke="#3F4A5C"
-             stroke-width="26"
-             id="line192" />
-          <line
-             x1="2203"
-             y1="420"
-             x2="2217"
-             y2="420"
-             class="ourclass-transfer-shell-fill"
-             stroke="#FFFFFF"
-             stroke-width="20"
-             id="line193" />
+        <g class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule">
+          <line x1="2191.094" y1="420.066" x2="2229.094" y2="420.066" class="ourclass-transfer-shell-outline" stroke="#3F4A5C" stroke-width="63" />
+          <line x1="2191.094" y1="420.066" x2="2229.094" y2="420.066" class="ourclass-transfer-shell-fill" stroke="#FFFFFF" stroke-width="50" />
         </g>
-        <g
-           class="ourclass-transfer-route-badges"
-           id="g196">
-          <g
-             class="ourclass-transfer-badge"
-             data-line="line1"
-             data-line-name="1호선"
-             data-line-label="1"
-             data-line-color="#F68712"
-             data-slot-index="1"
-             id="g194"
-             transform="translate(-1.2580871,0.13140765)">
-            <circle
-               cx="2203"
-               cy="420"
-               r="7.4000001"
-               fill="#f68712"
-               class="ourclass-transfer-badge-circle"
-               id="circle193" />
-            <text
-               x="2203"
-               y="420.39999"
-               class="ourclass-transfer-badge-label"
-               fill="#ffffff"
-               font-size="8.2px"
-               font-weight="900"
-               text-anchor="middle"
-               dominant-baseline="central"
-               alignment-baseline="middle"
-               id="text193">1</text>
+        <g class="ourclass-transfer-route-badges">
+          <g class="ourclass-transfer-badge" data-line="line1" data-line-color="#F68712" data-slot-index="1">
+            <circle cx="2191.094" cy="420.066" r="19" fill="#F68712" class="ourclass-transfer-badge-circle" />
+            <text x="2191.094" y="420.066" class="ourclass-transfer-badge-label" fill="#FFFFFF" font-size="16.5" font-weight="900" text-anchor="middle" dominant-baseline="central" alignment-baseline="middle">1</text>
           </g>
-          <g
-             class="ourclass-transfer-badge"
-             data-line="line4"
-             data-line-name="4호선"
-             data-line-label="4"
-             data-line-color="#7189C5"
-             data-slot-index="2"
-             id="g195">
-            <circle
-               cx="2218.4456"
-               cy="420"
-               r="7.4000001"
-               fill="#7189c5"
-               class="ourclass-transfer-badge-circle"
-               id="circle194" />
-            <text
-               x="2218.4456"
-               y="420.39999"
-               class="ourclass-transfer-badge-label"
-               fill="#ffffff"
-               font-size="8.2px"
-               font-weight="900"
-               text-anchor="middle"
-               dominant-baseline="central"
-               alignment-baseline="middle"
-               id="text194">4</text>
+          <g class="ourclass-transfer-badge" data-line="line4" data-line-color="#7189C5" data-slot-index="2">
+            <circle cx="2229.094" cy="420.066" r="19" fill="#7189C5" class="ourclass-transfer-badge-circle" />
+            <text x="2229.094" y="420.066" class="ourclass-transfer-badge-label" fill="#FFFFFF" font-size="16.5" font-weight="900" text-anchor="middle" dominant-baseline="central" alignment-baseline="middle">4</text>
           </g>
         </g>
       </g>
@@ -4389,86 +3740,18 @@
          data-base-unit-u="8px">
         <title
            id="title196">덕천 환승 노드 — sma-v1 직선형 8방향 캡슐</title>
-        <g
-           class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule"
-           id="g197">
-          <line
-             x1="943"
-             y1="834"
-             x2="957"
-             y2="834"
-             class="ourclass-transfer-shell-outline"
-             stroke="#3F4A5C"
-             stroke-width="26"
-             id="line196" />
-          <line
-             x1="943"
-             y1="834"
-             x2="957"
-             y2="834"
-             class="ourclass-transfer-shell-fill"
-             stroke="#FFFFFF"
-             stroke-width="20"
-             id="line197" />
+        <g class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule">
+          <line x1="930.794" y1="834.000" x2="968.794" y2="834.000" class="ourclass-transfer-shell-outline" stroke="#3F4A5C" stroke-width="63" />
+          <line x1="930.794" y1="834.000" x2="968.794" y2="834.000" class="ourclass-transfer-shell-fill" stroke="#FFFFFF" stroke-width="50" />
         </g>
-        <g
-           class="ourclass-transfer-route-badges"
-           id="g200">
-          <g
-             class="ourclass-transfer-badge"
-             data-line="line2"
-             data-line-name="2호선"
-             data-line-label="2"
-             data-line-color="#A6DA53"
-             data-slot-index="1"
-             id="g198"
-             transform="translate(-1.4450008)">
-            <circle
-               cx="943"
-               cy="834"
-               r="7.4000001"
-               fill="#a6da53"
-               class="ourclass-transfer-badge-circle"
-               id="circle197" />
-            <text
-               x="943"
-               y="834.40002"
-               class="ourclass-transfer-badge-label"
-               fill="#344258"
-               font-size="8.2px"
-               font-weight="900"
-               text-anchor="middle"
-               dominant-baseline="central"
-               alignment-baseline="middle"
-               id="text197">2</text>
+        <g class="ourclass-transfer-route-badges">
+          <g class="ourclass-transfer-badge" data-line="line2" data-line-color="#A6DA53" data-slot-index="1">
+            <circle cx="930.794" cy="834.000" r="19" fill="#A6DA53" class="ourclass-transfer-badge-circle" />
+            <text x="930.794" y="834.000" class="ourclass-transfer-badge-label" fill="#344258" font-size="16.5" font-weight="900" text-anchor="middle" dominant-baseline="central" alignment-baseline="middle">2</text>
           </g>
-          <g
-             class="ourclass-transfer-badge"
-             data-line="line3"
-             data-line-name="3호선"
-             data-line-label="3"
-             data-line-color="#D49329"
-             data-slot-index="2"
-             id="g199"
-             transform="translate(1.0321434)">
-            <circle
-               cx="957"
-               cy="834"
-               r="7.4000001"
-               fill="#d49329"
-               class="ourclass-transfer-badge-circle"
-               id="circle198" />
-            <text
-               x="957"
-               y="834.40002"
-               class="ourclass-transfer-badge-label"
-               fill="#ffffff"
-               font-size="8.2px"
-               font-weight="900"
-               text-anchor="middle"
-               dominant-baseline="central"
-               alignment-baseline="middle"
-               id="text198">3</text>
+          <g class="ourclass-transfer-badge" data-line="line3" data-line-color="#D49329" data-slot-index="2">
+            <circle cx="968.794" cy="834.000" r="19" fill="#D49329" class="ourclass-transfer-badge-circle" />
+            <text x="968.794" y="834.000" class="ourclass-transfer-badge-label" fill="#FFFFFF" font-size="16.5" font-weight="900" text-anchor="middle" dominant-baseline="central" alignment-baseline="middle">3</text>
           </g>
         </g>
       </g>
@@ -4486,88 +3769,18 @@
          data-base-unit-u="8px">
         <title
            id="title200">사상 환승 노드 — sma-v1 직선형 8방향 캡슐</title>
-        <g
-           class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule"
-           id="g201"
-           transform="rotate(45.066929,1152.4483,1443.0172)">
-          <line
-             x1="1152.95"
-             y1="1441.05"
-             x2="1143.05"
-             y2="1450.95"
-             class="ourclass-transfer-shell-outline"
-             stroke="#3f4a5c"
-             stroke-width="26"
-             id="line200" />
-          <line
-             x1="1152.95"
-             y1="1441.05"
-             x2="1143.05"
-             y2="1450.95"
-             class="ourclass-transfer-shell-fill"
-             stroke="#ffffff"
-             stroke-width="20"
-             id="line201" />
+        <g class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule">
+          <line x1="1128.463" y1="1441.706" x2="1166.463" y2="1441.706" class="ourclass-transfer-shell-outline" stroke="#3F4A5C" stroke-width="63" />
+          <line x1="1128.463" y1="1441.706" x2="1166.463" y2="1441.706" class="ourclass-transfer-shell-fill" stroke="#FFFFFF" stroke-width="50" />
         </g>
-        <g
-           class="ourclass-transfer-route-badges"
-           id="g204"
-           transform="translate(28.176645,32.738578)">
-          <g
-             class="ourclass-transfer-badge"
-             data-line="line2"
-             data-line-name="2호선"
-             data-line-label="2"
-             data-line-color="#A6DA53"
-             data-slot-index="1"
-             id="g202"
-             transform="translate(-41.862444,-31.933531)">
-            <circle
-               cx="1152.95"
-               cy="1441.05"
-               r="7.4000001"
-               fill="#a6da53"
-               class="ourclass-transfer-badge-circle"
-               id="circle201" />
-            <text
-               x="1152.95"
-               y="1441.45"
-               class="ourclass-transfer-badge-label"
-               fill="#344258"
-               font-size="8.2px"
-               font-weight="900"
-               text-anchor="middle"
-               dominant-baseline="central"
-               alignment-baseline="middle"
-               id="text201">2</text>
+        <g class="ourclass-transfer-route-badges">
+          <g class="ourclass-transfer-badge" data-line="line2" data-line-color="#A6DA53" data-slot-index="1">
+            <circle cx="1128.463" cy="1441.706" r="19" fill="#A6DA53" class="ourclass-transfer-badge-circle" />
+            <text x="1128.463" y="1441.706" class="ourclass-transfer-badge-label" fill="#344258" font-size="16.5" font-weight="900" text-anchor="middle" dominant-baseline="central" alignment-baseline="middle">2</text>
           </g>
-          <g
-             class="ourclass-transfer-badge"
-             data-line="bgl"
-             data-line-name="부산김해경전철"
-             data-line-label="부김"
-             data-line-color="#854EAC"
-             data-slot-index="2"
-             id="g203"
-             transform="translate(-15.564242,-42.130793)">
-            <circle
-               cx="1143.05"
-               cy="1450.95"
-               r="7.4000001"
-               fill="#854eac"
-               class="ourclass-transfer-badge-circle"
-               id="circle202" />
-            <text
-               x="1143.05"
-               y="1451.35"
-               class="ourclass-transfer-badge-label"
-               fill="#ffffff"
-               font-size="5.2px"
-               font-weight="900"
-               text-anchor="middle"
-               dominant-baseline="central"
-               alignment-baseline="middle"
-               id="text202">부김</text>
+          <g class="ourclass-transfer-badge" data-line="bgl" data-line-color="#854EAC" data-slot-index="2">
+            <circle cx="1166.463" cy="1441.706" r="19" fill="#854EAC" class="ourclass-transfer-badge-circle" />
+            <text x="1166.463" y="1441.706" class="ourclass-transfer-badge-label" fill="#FFFFFF" font-size="16.5" font-weight="900" text-anchor="middle" dominant-baseline="central" alignment-baseline="middle">부김</text>
           </g>
         </g>
       </g>
@@ -4585,86 +3798,18 @@
          data-base-unit-u="8px">
         <title
            id="title204">수영 환승 노드 — sma-v1 직선형 8방향 캡슐</title>
-        <g
-           class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule"
-           id="g205">
-          <line
-             x1="3193"
-             y1="1824"
-             x2="3207"
-             y2="1824"
-             class="ourclass-transfer-shell-outline"
-             stroke="#3F4A5C"
-             stroke-width="26"
-             id="line204" />
-          <line
-             x1="3193"
-             y1="1824"
-             x2="3207"
-             y2="1824"
-             class="ourclass-transfer-shell-fill"
-             stroke="#FFFFFF"
-             stroke-width="20"
-             id="line205" />
+        <g class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule">
+          <line x1="3180.775" y1="1823.850" x2="3218.775" y2="1823.850" class="ourclass-transfer-shell-outline" stroke="#3F4A5C" stroke-width="63" />
+          <line x1="3180.775" y1="1823.850" x2="3218.775" y2="1823.850" class="ourclass-transfer-shell-fill" stroke="#FFFFFF" stroke-width="50" />
         </g>
-        <g
-           class="ourclass-transfer-route-badges"
-           id="g208">
-          <g
-             class="ourclass-transfer-badge"
-             data-line="line2"
-             data-line-name="2호선"
-             data-line-label="2"
-             data-line-color="#A6DA53"
-             data-slot-index="1"
-             id="g206"
-             transform="translate(-1.348825,-0.14986944)">
-            <circle
-               cx="3193"
-               cy="1824"
-               r="7.4000001"
-               fill="#a6da53"
-               class="ourclass-transfer-badge-circle"
-               id="circle205" />
-            <text
-               x="3193"
-               y="1824.4"
-               class="ourclass-transfer-badge-label"
-               fill="#344258"
-               font-size="8.2px"
-               font-weight="900"
-               text-anchor="middle"
-               dominant-baseline="central"
-               alignment-baseline="middle"
-               id="text205">2</text>
+        <g class="ourclass-transfer-route-badges">
+          <g class="ourclass-transfer-badge" data-line="line2" data-line-color="#A6DA53" data-slot-index="1">
+            <circle cx="3180.775" cy="1823.850" r="19" fill="#A6DA53" class="ourclass-transfer-badge-circle" />
+            <text x="3180.775" y="1823.850" class="ourclass-transfer-badge-label" fill="#344258" font-size="16.5" font-weight="900" text-anchor="middle" dominant-baseline="central" alignment-baseline="middle">2</text>
           </g>
-          <g
-             class="ourclass-transfer-badge"
-             data-line="line3"
-             data-line-name="3호선"
-             data-line-label="3"
-             data-line-color="#D49329"
-             data-slot-index="2"
-             id="g207"
-             transform="translate(0.89921666,-0.14986944)">
-            <circle
-               cx="3207"
-               cy="1824"
-               r="7.4000001"
-               fill="#d49329"
-               class="ourclass-transfer-badge-circle"
-               id="circle206" />
-            <text
-               x="3207"
-               y="1824.4"
-               class="ourclass-transfer-badge-label"
-               fill="#ffffff"
-               font-size="8.2px"
-               font-weight="900"
-               text-anchor="middle"
-               dominant-baseline="central"
-               alignment-baseline="middle"
-               id="text206">3</text>
+          <g class="ourclass-transfer-badge" data-line="line3" data-line-color="#D49329" data-slot-index="2">
+            <circle cx="3218.775" cy="1823.850" r="19" fill="#D49329" class="ourclass-transfer-badge-circle" />
+            <text x="3218.775" y="1823.850" class="ourclass-transfer-badge-label" fill="#FFFFFF" font-size="16.5" font-weight="900" text-anchor="middle" dominant-baseline="central" alignment-baseline="middle">3</text>
           </g>
         </g>
       </g>
@@ -4682,88 +3827,18 @@
          data-base-unit-u="8px">
         <title
            id="title208">벡스코 (시립미술관) 환승 노드 — sma-v1 직선형 8방향 캡슐</title>
-        <g
-           class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule"
-           id="g209"
-           transform="rotate(44.575151,3468.9968,1551.1043)">
-          <line
-             x1="3474.95"
-             y1="1549.05"
-             x2="3465.05"
-             y2="1558.95"
-             class="ourclass-transfer-shell-outline"
-             stroke="#3f4a5c"
-             stroke-width="26"
-             id="line208" />
-          <line
-             x1="3474.95"
-             y1="1549.05"
-             x2="3465.05"
-             y2="1558.95"
-             class="ourclass-transfer-shell-fill"
-             stroke="#ffffff"
-             stroke-width="20"
-             id="line209" />
+        <g class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule">
+          <line x1="3448.872" y1="1553.807" x2="3486.872" y2="1553.807" class="ourclass-transfer-shell-outline" stroke="#3F4A5C" stroke-width="63" />
+          <line x1="3448.872" y1="1553.807" x2="3486.872" y2="1553.807" class="ourclass-transfer-shell-fill" stroke="#FFFFFF" stroke-width="50" />
         </g>
-        <g
-           class="ourclass-transfer-route-badges"
-           id="g212"
-           transform="translate(42.937461,-1.8051785)">
-          <g
-             class="ourclass-transfer-badge"
-             data-line="line2"
-             data-line-name="2호선"
-             data-line-label="2"
-             data-line-color="#A6DA53"
-             data-slot-index="1"
-             id="g210"
-             transform="translate(-58.281479,6.7049489)">
-            <circle
-               cx="3474.95"
-               cy="1549.05"
-               r="7.4000001"
-               fill="#a6da53"
-               class="ourclass-transfer-badge-circle"
-               id="circle209" />
-            <text
-               x="3474.95"
-               y="1549.45"
-               class="ourclass-transfer-badge-label"
-               fill="#344258"
-               font-size="8.2px"
-               font-weight="900"
-               text-anchor="middle"
-               dominant-baseline="central"
-               alignment-baseline="middle"
-               id="text209">2</text>
+        <g class="ourclass-transfer-route-badges">
+          <g class="ourclass-transfer-badge" data-line="line2" data-line-color="#A6DA53" data-slot-index="1">
+            <circle cx="3448.872" cy="1553.807" r="19" fill="#A6DA53" class="ourclass-transfer-badge-circle" />
+            <text x="3448.872" y="1553.807" class="ourclass-transfer-badge-label" fill="#344258" font-size="16.5" font-weight="900" text-anchor="middle" dominant-baseline="central" alignment-baseline="middle">2</text>
           </g>
-          <g
-             class="ourclass-transfer-badge"
-             data-line="donghae"
-             data-line-name="동해선"
-             data-line-label="동해"
-             data-line-color="#1C63B7"
-             data-slot-index="2"
-             id="g211"
-             transform="translate(-31.848507,-3.4814158)">
-            <circle
-               cx="3465.05"
-               cy="1558.95"
-               r="7.4000001"
-               fill="#1c63b7"
-               class="ourclass-transfer-badge-circle"
-               id="circle210" />
-            <text
-               x="3465.05"
-               y="1559.35"
-               class="ourclass-transfer-badge-label"
-               fill="#ffffff"
-               font-size="5.2px"
-               font-weight="900"
-               text-anchor="middle"
-               dominant-baseline="central"
-               alignment-baseline="middle"
-               id="text210">동해</text>
+          <g class="ourclass-transfer-badge" data-line="donghae" data-line-color="#1C63B7" data-slot-index="2">
+            <circle cx="3486.872" cy="1553.807" r="19" fill="#1C63B7" class="ourclass-transfer-badge-circle" />
+            <text x="3486.872" y="1553.807" class="ourclass-transfer-badge-label" fill="#FFFFFF" font-size="16.5" font-weight="900" text-anchor="middle" dominant-baseline="central" alignment-baseline="middle">동해</text>
           </g>
         </g>
       </g>
@@ -4781,86 +3856,18 @@
          data-base-unit-u="8px">
         <title
            id="title212">대저 환승 노드 — sma-v1 직선형 8방향 캡슐</title>
-        <g
-           class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule"
-           id="g213">
-          <line
-             x1="582.31403"
-             y1="833.28802"
-             x2="596.31464"
-             y2="833.34064"
-             class="ourclass-transfer-shell-outline"
-             stroke="#3f4a5c"
-             stroke-width="26"
-             id="line212" />
-          <line
-             x1="582.31403"
-             y1="833.28802"
-             x2="596.31464"
-             y2="833.34064"
-             class="ourclass-transfer-shell-fill"
-             stroke="#ffffff"
-             stroke-width="20"
-             id="line213" />
+        <g class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule">
+          <line x1="570.143" y1="832.629" x2="608.143" y2="832.629" class="ourclass-transfer-shell-outline" stroke="#3F4A5C" stroke-width="63" />
+          <line x1="570.143" y1="832.629" x2="608.143" y2="832.629" class="ourclass-transfer-shell-fill" stroke="#FFFFFF" stroke-width="50" />
         </g>
-        <g
-           class="ourclass-transfer-route-badges"
-           id="g216"
-           transform="translate(47.995827,-48.681482)">
-          <g
-             class="ourclass-transfer-badge"
-             data-line="line3"
-             data-line-name="3호선"
-             data-line-label="3"
-             data-line-color="#D49329"
-             data-slot-index="1"
-             id="g214"
-             transform="translate(-35.99687,52.452583)">
-            <circle
-               cx="585.04999"
-               cy="829.04999"
-               r="7.4000001"
-               fill="#d49329"
-               class="ourclass-transfer-badge-circle"
-               id="circle213" />
-            <text
-               x="585.04999"
-               y="829.45001"
-               class="ourclass-transfer-badge-label"
-               fill="#ffffff"
-               font-size="8.2px"
-               font-weight="900"
-               text-anchor="middle"
-               dominant-baseline="central"
-               alignment-baseline="middle"
-               id="text213">3</text>
+        <g class="ourclass-transfer-route-badges">
+          <g class="ourclass-transfer-badge" data-line="bgl" data-line-color="#854EAC" data-slot-index="1">
+            <circle cx="570.143" cy="832.629" r="19" fill="#854EAC" class="ourclass-transfer-badge-circle" />
+            <text x="570.143" y="832.629" class="ourclass-transfer-badge-label" fill="#FFFFFF" font-size="16.5" font-weight="900" text-anchor="middle" dominant-baseline="central" alignment-baseline="middle">부김</text>
           </g>
-          <g
-             class="ourclass-transfer-badge"
-             data-line="bgl"
-             data-line-name="부산김해경전철"
-             data-line-label="부김"
-             data-line-color="#854EAC"
-             data-slot-index="2"
-             id="g215">
-            <circle
-               cx="533.24109"
-               cy="881.1178"
-               r="7.4000001"
-               fill="#854eac"
-               class="ourclass-transfer-badge-circle"
-               id="circle214" />
-            <text
-               x="533.24109"
-               y="881.51776"
-               class="ourclass-transfer-badge-label"
-               fill="#ffffff"
-               font-size="5.2px"
-               font-weight="900"
-               text-anchor="middle"
-               dominant-baseline="central"
-               alignment-baseline="middle"
-               id="text214">부김</text>
+          <g class="ourclass-transfer-badge" data-line="line3" data-line-color="#D49329" data-slot-index="2">
+            <circle cx="608.143" cy="832.629" r="19" fill="#D49329" class="ourclass-transfer-badge-circle" />
+            <text x="608.143" y="832.629" class="ourclass-transfer-badge-label" fill="#FFFFFF" font-size="16.5" font-weight="900" text-anchor="middle" dominant-baseline="central" alignment-baseline="middle">3</text>
           </g>
         </g>
       </g>
@@ -4878,88 +3885,18 @@
          data-base-unit-u="8px">
         <title
            id="title216">미남 환승 노드 — sma-v1 직선형 8방향 캡슐</title>
-        <g
-           class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule"
-           id="g217"
-           transform="rotate(44.568283,1310,834)">
-          <line
-             x1="1314.95"
-             y1="829.04999"
-             x2="1305.05"
-             y2="838.95001"
-             class="ourclass-transfer-shell-outline"
-             stroke="#3f4a5c"
-             stroke-width="26"
-             id="line216" />
-          <line
-             x1="1314.95"
-             y1="829.04999"
-             x2="1305.05"
-             y2="838.95001"
-             class="ourclass-transfer-shell-fill"
-             stroke="#ffffff"
-             stroke-width="20"
-             id="line217" />
+        <g class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule">
+          <line x1="1291.072" y1="833.928" x2="1329.072" y2="833.928" class="ourclass-transfer-shell-outline" stroke="#3F4A5C" stroke-width="63" />
+          <line x1="1291.072" y1="833.928" x2="1329.072" y2="833.928" class="ourclass-transfer-shell-fill" stroke="#FFFFFF" stroke-width="50" />
         </g>
-        <g
-           class="ourclass-transfer-route-badges"
-           id="g220"
-           transform="translate(9.5889825,28.766947)">
-          <g
-             class="ourclass-transfer-badge"
-             data-line="line3"
-             data-line-name="3호선"
-             data-line-label="3"
-             data-line-color="#D49329"
-             data-slot-index="1"
-             id="g218"
-             transform="translate(-22.469705,-23.900897)">
-            <circle
-               cx="1314.95"
-               cy="829.04999"
-               r="7.4000001"
-               fill="#d49329"
-               class="ourclass-transfer-badge-circle"
-               id="circle217" />
-            <text
-               x="1314.95"
-               y="829.45001"
-               class="ourclass-transfer-badge-label"
-               fill="#ffffff"
-               font-size="8.2px"
-               font-weight="900"
-               text-anchor="middle"
-               dominant-baseline="central"
-               alignment-baseline="middle"
-               id="text217">3</text>
+        <g class="ourclass-transfer-route-badges">
+          <g class="ourclass-transfer-badge" data-line="line3" data-line-color="#D49329" data-slot-index="1">
+            <circle cx="1291.072" cy="833.928" r="19" fill="#D49329" class="ourclass-transfer-badge-circle" />
+            <text x="1291.072" y="833.928" class="ourclass-transfer-badge-label" fill="#FFFFFF" font-size="16.5" font-weight="900" text-anchor="middle" dominant-baseline="central" alignment-baseline="middle">3</text>
           </g>
-          <g
-             class="ourclass-transfer-badge"
-             data-line="line4"
-             data-line-name="4호선"
-             data-line-label="4"
-             data-line-color="#7189C5"
-             data-slot-index="2"
-             id="g219"
-             transform="translate(3.4348594,-33.776117)">
-            <circle
-               cx="1305.05"
-               cy="838.95001"
-               r="7.4000001"
-               fill="#7189c5"
-               class="ourclass-transfer-badge-circle"
-               id="circle218" />
-            <text
-               x="1305.05"
-               y="839.34998"
-               class="ourclass-transfer-badge-label"
-               fill="#ffffff"
-               font-size="8.2px"
-               font-weight="900"
-               text-anchor="middle"
-               dominant-baseline="central"
-               alignment-baseline="middle"
-               id="text218">4</text>
+          <g class="ourclass-transfer-badge" data-line="line4" data-line-color="#7189C5" data-slot-index="2">
+            <circle cx="1329.072" cy="833.928" r="19" fill="#7189C5" class="ourclass-transfer-badge-circle" />
+            <text x="1329.072" y="833.928" class="ourclass-transfer-badge-label" fill="#FFFFFF" font-size="16.5" font-weight="900" text-anchor="middle" dominant-baseline="central" alignment-baseline="middle">4</text>
           </g>
         </g>
       </g>
@@ -4977,88 +3914,18 @@
          data-base-unit-u="8px">
         <title
            id="title220">거제 환승 노드 — sma-v1 직선형 8방향 캡슐</title>
-        <g
-           class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule"
-           id="g221"
-           transform="rotate(-44.831331,1867.9193,886.8882)">
-          <line
-             x1="1863.05"
-             y1="883.04999"
-             x2="1872.95"
-             y2="892.95001"
-             class="ourclass-transfer-shell-outline"
-             stroke="#3f4a5c"
-             stroke-width="26"
-             id="line220" />
-          <line
-             x1="1863.05"
-             y1="883.04999"
-             x2="1872.95"
-             y2="892.95001"
-             class="ourclass-transfer-shell-fill"
-             stroke="#ffffff"
-             stroke-width="20"
-             id="line221" />
+        <g class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule">
+          <line x1="1849.760" y1="887.620" x2="1887.760" y2="887.620" class="ourclass-transfer-shell-outline" stroke="#3F4A5C" stroke-width="63" />
+          <line x1="1849.760" y1="887.620" x2="1887.760" y2="887.620" class="ourclass-transfer-shell-fill" stroke="#FFFFFF" stroke-width="50" />
         </g>
-        <g
-           class="ourclass-transfer-route-badges"
-           id="g224"
-           transform="translate(-87.824936,-38.399647)">
-          <g
-             class="ourclass-transfer-badge"
-             data-line="line3"
-             data-line-name="3호선"
-             data-line-label="3"
-             data-line-color="#D49329"
-             data-slot-index="1"
-             id="g222"
-             transform="translate(101.89213,42.961982)">
-            <circle
-               cx="1863.05"
-               cy="883.04999"
-               r="7.4000001"
-               fill="#d49329"
-               class="ourclass-transfer-badge-circle"
-               id="circle221" />
-            <text
-               x="1863.05"
-               y="883.45001"
-               class="ourclass-transfer-badge-label"
-               fill="#ffffff"
-               font-size="8.2px"
-               font-weight="900"
-               text-anchor="middle"
-               dominant-baseline="central"
-               alignment-baseline="middle"
-               id="text221">3</text>
+        <g class="ourclass-transfer-route-badges">
+          <g class="ourclass-transfer-badge" data-line="donghae" data-line-color="#1C63B7" data-slot-index="1">
+            <circle cx="1849.760" cy="887.620" r="19" fill="#1C63B7" class="ourclass-transfer-badge-circle" />
+            <text x="1849.760" y="887.620" class="ourclass-transfer-badge-label" fill="#FFFFFF" font-size="16.5" font-weight="900" text-anchor="middle" dominant-baseline="central" alignment-baseline="middle">동해</text>
           </g>
-          <g
-             class="ourclass-transfer-badge"
-             data-line="donghae"
-             data-line-name="동해선"
-             data-line-label="동해"
-             data-line-color="#1C63B7"
-             data-slot-index="2"
-             id="g223"
-             transform="translate(75.278517,33.076924)">
-            <circle
-               cx="1872.95"
-               cy="892.95001"
-               r="7.4000001"
-               fill="#1c63b7"
-               class="ourclass-transfer-badge-circle"
-               id="circle222" />
-            <text
-               x="1872.95"
-               y="893.34998"
-               class="ourclass-transfer-badge-label"
-               fill="#ffffff"
-               font-size="5.2px"
-               font-weight="900"
-               text-anchor="middle"
-               dominant-baseline="central"
-               alignment-baseline="middle"
-               id="text222">동해</text>
+          <g class="ourclass-transfer-badge" data-line="line3" data-line-color="#D49329" data-slot-index="2">
+            <circle cx="1887.760" cy="887.620" r="19" fill="#D49329" class="ourclass-transfer-badge-circle" />
+            <text x="1887.760" y="887.620" class="ourclass-transfer-badge-label" fill="#FFFFFF" font-size="16.5" font-weight="900" text-anchor="middle" dominant-baseline="central" alignment-baseline="middle">3</text>
           </g>
         </g>
       </g>
@@ -5068,10 +3935,10 @@
        class="render-layer label-layer">
       <text
          id="station-label-ub2e4-ub300-ud3ec-ud574-uc218-uc695-uc7a5"
-         x="645.19598"
-         y="2525.1697"
+         x="657.52"
+         y="2466.96"
          text-anchor="start"
-         font-size="13"
+         font-size="38.5"
          font-weight="700"
          fill="#14293D"
          class="station-name is-terminal"
@@ -5079,15 +3946,15 @@
          data-station-key="다대포해수욕장"
          data-station="다대포해수욕장"
          data-label-mode="upper-right"><tspan
-           x="645.19598"
+           x="657.52"
            dy="0"
            id="tspan224">다대포해수욕장</tspan></text>
       <text
          id="station-label-ub2e4-ub300-ud3ec-ud56d"
          x="770"
-         y="2570.5"
+         y="2603"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5101,9 +3968,9 @@
       <text
          id="station-label-ub0ab-uac1c"
          x="860"
-         y="2528"
+         y="2407"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5117,9 +3984,9 @@
       <text
          id="station-label-uc2e0-uc7a5-ub9bc"
          x="950"
-         y="2570.5"
+         y="2603"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5133,9 +4000,9 @@
       <text
          id="station-label-uc7a5-ub9bc"
          x="1040"
-         y="2528"
+         y="2511"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5149,9 +4016,9 @@
       <text
          id="station-label-ub3d9-ub9e4"
          x="1130"
-         y="2570.5"
+         y="2603"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5165,9 +4032,9 @@
       <text
          id="station-label-uc2e0-ud3c9"
          x="1220"
-         y="2528"
+         y="2511"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5181,9 +4048,9 @@
       <text
          id="station-label-ud558-ub2e8"
          x="1310"
-         y="2570.5"
+         y="2603"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5197,9 +4064,9 @@
       <text
          id="station-label-ub2f9-ub9ac"
          x="1400"
-         y="2528"
+         y="2511"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5213,9 +4080,9 @@
       <text
          id="station-label-uc0ac-ud558"
          x="1490"
-         y="2570.5"
+         y="2603"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5228,10 +4095,10 @@
            id="tspan233">사하</tspan></text>
       <text
          id="station-label-uad34-uc815"
-         x="1593.5"
-         y="2459.25"
+         x="1640"
+         y="2467"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5239,15 +4106,15 @@
          data-station-key="괴정"
          data-station="괴정"
          data-label-mode="right"><tspan
-           x="1593.5"
+           x="1640"
            dy="0"
            id="tspan234">괴정</tspan></text>
       <text
          id="station-label-ub300-ud2f0"
-         x="1656.5"
-         y="2369.25"
+         x="1610"
+         y="2377"
          text-anchor="end"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5255,15 +4122,15 @@
          data-station-key="대티"
          data-station="대티"
          data-label-mode="left"><tspan
-           x="1656.5"
+           x="1610"
            dy="0"
            id="tspan235">대티</tspan></text>
       <text
          id="station-label-uc11c-ub300-uc2e0"
-         x="1773.5"
-         y="2279.25"
+         x="1820"
+         y="2287"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5271,15 +4138,15 @@
          data-station-key="서대신"
          data-station="서대신"
          data-label-mode="right"><tspan
-           x="1773.5"
+           x="1820"
            dy="0"
            id="tspan236">서대신</tspan></text>
       <text
          id="station-label-ub3d9-ub300-uc2e0"
-         x="1836.5"
-         y="2189.25"
+         x="1790"
+         y="2197"
          text-anchor="end"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5287,15 +4154,15 @@
          data-station-key="동대신"
          data-station="동대신"
          data-label-mode="left"><tspan
-           x="1836.5"
+           x="1790"
            dy="0"
            id="tspan237">동대신</tspan></text>
       <text
          id="station-label-ud1a0-uc131"
-         x="1953.5"
-         y="2099.25"
+         x="2000"
+         y="2107"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5303,15 +4170,15 @@
          data-station-key="토성"
          data-station="토성"
          data-label-mode="right"><tspan
-           x="1953.5"
+           x="2000"
            dy="0"
            id="tspan238">토성</tspan></text>
       <text
          id="station-label-uc790-uac08-uce58"
-         x="2016.5"
-         y="2009.25"
+         x="1970"
+         y="2017"
          text-anchor="end"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5319,15 +4186,15 @@
          data-station-key="자갈치"
          data-station="자갈치"
          data-label-mode="left"><tspan
-           x="2016.5"
+           x="1970"
            dy="0"
            id="tspan239">자갈치</tspan></text>
       <text
          id="station-label-ub0a8-ud3ec"
-         x="2133.5"
-         y="1919.25"
+         x="2180"
+         y="1927"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5335,15 +4202,15 @@
          data-station-key="남포"
          data-station="남포"
          data-label-mode="right"><tspan
-           x="2133.5"
+           x="2180"
            dy="0"
            id="tspan240">남포</tspan></text>
       <text
          id="station-label-uc911-uc559"
-         x="2196.5"
-         y="1829.25"
+         x="2150"
+         y="1837"
          text-anchor="end"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5351,15 +4218,15 @@
          data-station-key="중앙"
          data-station="중앙"
          data-label-mode="left"><tspan
-           x="2196.5"
+           x="2150"
            dy="0"
            id="tspan241">중앙</tspan></text>
       <text
          id="station-label-ubd80-uc0b0-uc5ed"
-         x="2196.5"
-         y="1739.25"
+         x="2186"
+         y="1747"
          text-anchor="end"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5367,15 +4234,15 @@
          data-station-key="부산역"
          data-station="부산역"
          data-label-mode="left"><tspan
-           x="2196.5"
+           x="2186"
            dy="0"
            id="tspan242">부산역</tspan></text>
       <text
          id="station-label-ucd08-ub7c9"
-         x="2223.5"
-         y="1649.25"
+         x="2234"
+         y="1657"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5383,15 +4250,15 @@
          data-station-key="초량"
          data-station="초량"
          data-label-mode="right"><tspan
-           x="2223.5"
+           x="2234"
            dy="0"
            id="tspan243">초량</tspan></text>
       <text
          id="station-label-ubd80-uc0b0-uc9c4"
-         x="2196.5"
-         y="1559.25"
+         x="2186"
+         y="1567"
          text-anchor="end"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5399,15 +4266,15 @@
          data-station-key="부산진"
          data-station="부산진"
          data-label-mode="left"><tspan
-           x="2196.5"
+           x="2186"
            dy="0"
            id="tspan244">부산진</tspan></text>
       <text
          id="station-label-uc88c-ucc9c_1"
-         x="2196.5"
-         y="1469.25"
+         x="2186"
+         y="1477"
          text-anchor="end"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5415,15 +4282,15 @@
          data-station-key="좌천_1"
          data-station="좌천"
          data-label-mode="left"><tspan
-           x="2196.5"
+           x="2186"
            dy="0"
            id="tspan245">좌천</tspan></text>
       <text
          id="station-label-ubc94-uc77c"
-         x="2196.5"
-         y="1379.25"
+         x="2186"
+         y="1387"
          text-anchor="end"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5431,15 +4298,15 @@
          data-station-key="범일"
          data-station="범일"
          data-label-mode="left"><tspan
-           x="2196.5"
+           x="2186"
            dy="0"
            id="tspan246">범일</tspan></text>
       <text
          id="station-label-ubc94-ub0b4-uace8"
-         x="2168.3101"
-         y="1287.5919"
+         x="2366"
+         y="1297"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5447,15 +4314,15 @@
          data-station-key="범내골"
          data-station="범내골"
          data-label-mode="right"><tspan
-           x="2168.3101"
+           x="2366"
            dy="0"
            id="tspan247">범내골</tspan></text>
       <text
          id="station-label-uc11c-uba74"
-         x="2186"
-         y="1200"
+         x="2070.05"
+         y="1205.91"
          text-anchor="end"
-         font-size="14"
+         font-size="41.5"
          font-weight="800"
          fill="#344258"
          class="transfer-name"
@@ -5463,31 +4330,31 @@
          data-station-key="서면"
          data-station="서면"
          data-label-mode="left"><tspan
-           x="2186"
+           x="2070.05"
            dy="0"
            id="tspan248">서면</tspan></text>
       <text
          id="station-label-ubd80-uc804"
-         x="2259.6614"
-         y="1052.4597"
+         x="2152.99"
+         y="1156.94"
          text-anchor="end"
-         font-size="14"
+         font-size="41.5"
          font-weight="800"
          fill="#344258"
          class="transfer-name"
          data-label-role="transfer"
          data-station-key="부전"
          data-station="부전"
-         data-label-mode="left"><tspan
-           x="2259.6614"
+         data-label-mode="lower-left"><tspan
+           x="2152.99"
            dy="0"
            id="tspan249">부전</tspan></text>
       <text
          id="station-label-uc591-uc815"
-         x="2196.5"
-         y="929.25"
+         x="2186"
+         y="937"
          text-anchor="end"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5495,15 +4362,15 @@
          data-station-key="양정"
          data-station="양정"
          data-label-mode="left"><tspan
-           x="2196.5"
+           x="2186"
            dy="0"
            id="tspan250">양정</tspan></text>
       <text
          id="station-label-uc2dc-uccad"
-         x="2223.5"
-         y="803.25"
+         x="2398"
+         y="811"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5511,15 +4378,15 @@
          data-station-key="시청"
          data-station="시청"
          data-label-mode="right"><tspan
-           x="2223.5"
+           x="2398"
            dy="0"
            id="tspan251">시청</tspan></text>
       <text
          id="station-label-uc5f0-uc0b0"
-         x="2184.6409"
-         y="672.83234"
+         x="2016.39"
+         y="683.33"
          text-anchor="end"
-         font-size="14"
+         font-size="41.5"
          font-weight="800"
          fill="#344258"
          class="transfer-name"
@@ -5527,15 +4394,15 @@
          data-station-key="연산"
          data-station="연산"
          data-label-mode="left"><tspan
-           x="2184.6409"
+           x="2016.39"
            dy="0"
            id="tspan252">연산</tspan></text>
       <text
          id="station-label-uad50-ub300"
-         x="2162.1133"
-         y="551.61145"
+         x="2272.19"
+         y="560.9"
          text-anchor="start"
-         font-size="14"
+         font-size="41.5"
          font-weight="800"
          fill="#344258"
          class="transfer-name"
@@ -5543,47 +4410,47 @@
          data-station-key="교대"
          data-station="교대"
          data-label-mode="right"><tspan
-           x="2162.1133"
+           x="2272.19"
            dy="0"
            id="tspan253">교대</tspan></text>
       <text
          id="station-label-ub3d9-ub798_M"
-         x="2190.7734"
-         y="400.66458"
+         x="2165.75"
+         y="355.85"
          text-anchor="end"
-         font-size="14"
+         font-size="41.5"
          font-weight="800"
          fill="#344258"
          class="transfer-name"
          data-label-role="transfer"
          data-station-key="동래_M"
          data-station="동래"
-         data-label-mode="left"><tspan
-           x="2190.7734"
+         data-label-mode="upper-left"><tspan
+           x="2165.75"
            dy="0"
            id="tspan254">동래</tspan></text>
       <text
          id="station-label-uba85-ub95c"
-         x="2199.4954"
-         y="314.97937"
+         x="2226.24"
+         y="295.68"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
          data-label-role="ordinary"
          data-station-key="명륜"
          data-station="명륜"
-         data-label-mode="right"><tspan
-           x="2199.4954"
+         data-label-mode="upper-right"><tspan
+           x="2226.24"
            dy="0"
            id="tspan255">명륜</tspan></text>
       <text
          id="station-label-uc628-ucc9c-uc7a5"
          x="2336"
-         y="314"
+         y="241"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5597,9 +4464,9 @@
       <text
          id="station-label-ubd80-uc0b0-ub300"
          x="2462"
-         y="356.5"
+         y="389"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5613,9 +4480,9 @@
       <text
          id="station-label-uc7a5-uc804"
          x="2588"
-         y="314"
+         y="297"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5629,9 +4496,9 @@
       <text
          id="station-label-uad6c-uc11c"
          x="2714"
-         y="356.5"
+         y="389"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5645,9 +4512,9 @@
       <text
          id="station-label-ub450-uc2e4"
          x="2840"
-         y="314"
+         y="297"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5661,9 +4528,9 @@
       <text
          id="station-label-ub0a8-uc0b0"
          x="2966"
-         y="356.5"
+         y="389"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5677,9 +4544,9 @@
       <text
          id="station-label-ubc94-uc5b4-uc0ac"
          x="3092"
-         y="314"
+         y="241"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5692,26 +4559,26 @@
            id="tspan262">범어사</tspan></text>
       <text
          id="station-label-ub178-ud3ec"
-         x="3229.3657"
-         y="356.98596"
+         x="3199.91"
+         y="293.53"
          text-anchor="end"
-         font-size="13"
+         font-size="38.5"
          font-weight="700"
          fill="#14293D"
          class="station-name is-terminal"
          data-label-role="terminal"
          data-station-key="노포"
          data-station="노포"
-         data-label-mode="left"><tspan
-           x="3229.3657"
+         data-label-mode="upper-left"><tspan
+           x="3199.91"
            dy="0"
            id="tspan263">노포</tspan></text>
       <text
          id="station-label-uc591-uc0b0"
-         x="1593.5"
-         y="1019.5"
+         x="1806"
+         y="1028"
          text-anchor="start"
-         font-size="13"
+         font-size="38.5"
          font-weight="700"
          fill="#14293D"
          class="station-name is-terminal"
@@ -5719,15 +4586,15 @@
          data-station-key="양산"
          data-station="양산"
          data-label-mode="right"><tspan
-           x="1593.5"
+           x="1806"
            dy="0"
            id="tspan264">양산</tspan></text>
       <text
          id="station-label-ub0a8-uc591-uc0b0"
-         x="1593.5"
-         y="929.25"
+         x="1604"
+         y="937"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5735,15 +4602,15 @@
          data-station-key="남양산"
          data-station="남양산"
          data-label-mode="right"><tspan
-           x="1593.5"
+           x="1604"
            dy="0"
            id="tspan265">남양산</tspan></text>
       <text
          id="station-label-ubd80-uc0b0-ub300-uc591-uc0b0-ucea0-ud37c-uc2a4"
-         x="1593.5"
-         y="832"
+         x="1686.53"
+         y="778.42"
          text-anchor="start"
-         font-size="11.6"
+         font-size="34"
          font-weight="700"
          fill="#14293D"
          class="station-name is-long"
@@ -5751,18 +4618,18 @@
          data-station-key="부산대양산캠퍼스"
          data-station="부산대양산캠퍼스"
          data-label-mode="right"><tspan
-           x="1593.5"
+           x="1686.53"
            dy="0"
            id="tspan266">부산대양산</tspan><tspan
-           x="1593.5"
-           dy="13.6"
+           x="1686.53"
+           dy="39.78"
            id="tspan267">캠퍼스</tspan></text>
       <text
          id="station-label-uc99d-uc0b0"
-         x="1593.5"
-         y="749.25"
+         x="1604"
+         y="757"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5770,15 +4637,15 @@
          data-station-key="증산"
          data-station="증산"
          data-label-mode="right"><tspan
-           x="1593.5"
+           x="1604"
            dy="0"
            id="tspan268">증산</tspan></text>
       <text
          id="station-label-ud638-ud3ec"
          x="1580"
-         y="638"
+         y="489"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5791,10 +4658,10 @@
            id="tspan269">호포</tspan></text>
       <text
          id="station-label-uae08-uace1"
-         x="1375.8569"
-         y="636.98541"
+         x="1490"
+         y="585"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5802,15 +4669,15 @@
          data-station-key="금곡"
          data-station="금곡"
          data-label-mode="above"><tspan
-           x="1375.8569"
+           x="1490"
            dy="0"
            id="tspan270">금곡</tspan></text>
       <text
          id="station-label-ub3d9-uc6d0"
-         x="1285.8569"
-         y="636.98541"
+         x="1400"
+         y="621"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5818,31 +4685,31 @@
          data-station-key="동원"
          data-station="동원"
          data-label-mode="above"><tspan
-           x="1285.8569"
+           x="1400"
            dy="0"
            id="tspan271">동원</tspan></text>
       <text
          id="station-label-uc728-ub9ac"
-         x="1196.3375"
-         y="638.63715"
-         text-anchor="middle"
-         font-size="12.5"
+         x="1419.58"
+         y="807.66"
+         text-anchor="start"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
          data-label-role="ordinary"
          data-station-key="율리"
          data-station="율리"
-         data-label-mode="below"><tspan
-           x="1196.3375"
+         data-label-mode="lower-right"><tspan
+           x="1419.58"
            dy="0"
            id="tspan272">율리</tspan></text>
       <text
          id="station-label-ud654-uba85"
-         x="1104.4153"
-         y="639.59833"
+         x="1220"
+         y="713"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5850,47 +4717,47 @@
          data-station-key="화명"
          data-station="화명"
          data-label-mode="below"><tspan
-           x="1104.4153"
+           x="1220"
            dy="0"
            id="tspan273">화명</tspan></text>
       <text
          id="station-label-uc218-uc815"
-         x="948.55829"
-         y="639.65173"
-         text-anchor="middle"
-         font-size="12.5"
+         x="966.24"
+         y="714.32"
+         text-anchor="start"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
          data-label-role="ordinary"
          data-station-key="수정"
          data-station="수정"
-         data-label-mode="below"><tspan
-           x="948.55829"
+         data-label-mode="lower-right"><tspan
+           x="966.24"
            dy="0"
            id="tspan274">수정</tspan></text>
       <text
          id="station-label-ub355-ucc9c"
-         x="951.08508"
-         y="860.92108"
-         text-anchor="middle"
-         font-size="14"
+         x="905.45"
+         y="769.79"
+         text-anchor="end"
+         font-size="41.5"
          font-weight="800"
          fill="#344258"
          class="transfer-name"
          data-label-role="transfer"
          data-station-key="덕천"
          data-station="덕천"
-         data-label-mode="above"><tspan
-           x="951.08508"
+         data-label-mode="upper-left"><tspan
+           x="905.45"
            dy="0"
            id="tspan275">덕천</tspan></text>
       <text
          id="station-label-uad6c-uba85"
-         x="1053.5"
-         y="929.25"
+         x="1100"
+         y="937"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5898,15 +4765,15 @@
          data-station-key="구명"
          data-station="구명"
          data-label-mode="right"><tspan
-           x="1053.5"
+           x="1100"
            dy="0"
            id="tspan276">구명</tspan></text>
       <text
          id="station-label-uad6c-ub0a8"
-         x="1116.5"
-         y="1019.25"
+         x="1070"
+         y="1027"
          text-anchor="end"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5914,15 +4781,15 @@
          data-station-key="구남"
          data-station="구남"
          data-label-mode="left"><tspan
-           x="1116.5"
+           x="1070"
            dy="0"
            id="tspan277">구남</tspan></text>
       <text
          id="station-label-ubaa8-ub77c"
-         x="1233.5"
-         y="1109.25"
+         x="1280"
+         y="1117"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5930,15 +4797,15 @@
          data-station-key="모라"
          data-station="모라"
          data-label-mode="right"><tspan
-           x="1233.5"
+           x="1280"
            dy="0"
            id="tspan278">모라</tspan></text>
       <text
          id="station-label-ubaa8-ub355"
-         x="1296.5"
-         y="1199.25"
+         x="1250"
+         y="1207"
          text-anchor="end"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5946,15 +4813,15 @@
          data-station-key="모덕"
          data-station="모덕"
          data-label-mode="left"><tspan
-           x="1296.5"
+           x="1250"
            dy="0"
            id="tspan279">모덕</tspan></text>
       <text
          id="station-label-ub355-ud3ec"
-         x="1323.5"
-         y="1289.25"
+         x="1334"
+         y="1297"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -5962,15 +4829,15 @@
          data-station-key="덕포"
          data-station="덕포"
          data-label-mode="right"><tspan
-           x="1323.5"
+           x="1334"
            dy="0"
            id="tspan280">덕포</tspan></text>
       <text
          id="station-label-uc0ac-uc0c1"
-         x="1148.2683"
-         y="1471.1079"
+         x="1147.46"
+         y="1370.71"
          text-anchor="middle"
-         font-size="14"
+         font-size="41.5"
          font-weight="800"
          fill="#344258"
          class="transfer-name"
@@ -5978,15 +4845,15 @@
          data-station-key="사상"
          data-station="사상"
          data-label-mode="above"><tspan
-           x="1148.2683"
+           x="1147.46"
            dy="0"
            id="tspan281">사상</tspan></text>
       <text
          id="station-label-uac10-uc804"
          x="1328"
-         y="1472.5"
+         y="1505"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6000,9 +4867,9 @@
       <text
          id="station-label-uc8fc-ub840"
          x="1454"
-         y="1430"
+         y="1413"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6016,9 +4883,9 @@
       <text
          id="station-label-ub0c9-uc815"
          x="1580"
-         y="1472.5"
+         y="1505"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6032,9 +4899,9 @@
       <text
          id="station-label-uac1c-uae08"
          x="1706"
-         y="1430"
+         y="1413"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6048,9 +4915,9 @@
       <text
          id="station-label-ub3d9-uc758-ub300"
          x="1832"
-         y="1472.5"
+         y="1505"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6064,9 +4931,9 @@
       <text
          id="station-label-uac00-uc57c"
          x="1958"
-         y="1430"
+         y="1377"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6080,9 +4947,9 @@
       <text
          id="station-label-ubd80-uc554"
          x="2084"
-         y="1346.5"
+         y="1415"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6095,10 +4962,10 @@
            id="tspan288">부암</tspan></text>
       <text
          id="station-label-uc804-ud3ec"
-         x="2313.5"
-         y="1289.25"
+         x="2488"
+         y="1297"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6106,15 +4973,15 @@
          data-station-key="전포"
          data-station="전포"
          data-label-mode="right"><tspan
-           x="2313.5"
+           x="2488"
            dy="0"
            id="tspan289">전포</tspan></text>
       <text
          id="station-label-uad6d-uc81c-uae08-uc735-uc13c-ud130-xb7-ubd80-uc0b0-uc740-ud589"
-         x="2403.5"
-         y="1372"
+         x="2470"
+         y="1366.11"
          text-anchor="start"
-         font-size="11.6"
+         font-size="34"
          font-weight="700"
          fill="#14293D"
          class="station-name is-long"
@@ -6122,18 +4989,18 @@
          data-station-key="국제금융센터·부산은행"
          data-station="국제금융센터·부산은행"
          data-label-mode="right"><tspan
-           x="2403.5"
+           x="2470"
            dy="0"
            id="tspan290">국제금융센터·</tspan><tspan
-           x="2403.5"
-           dy="13.6"
+           x="2470"
+           dy="39.78"
            id="tspan291">부산은행</tspan></text>
       <text
          id="station-label-ubb38-ud604"
-         x="2493.5"
-         y="1469.25"
+         x="2540"
+         y="1477"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6141,15 +5008,15 @@
          data-station-key="문현"
          data-station="문현"
          data-label-mode="right"><tspan
-           x="2493.5"
+           x="2540"
            dy="0"
            id="tspan292">문현</tspan></text>
       <text
          id="station-label-uc9c0-uac8c-uace8"
-         x="2583.5"
-         y="1559.25"
+         x="2630"
+         y="1567"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6157,15 +5024,15 @@
          data-station-key="지게골"
          data-station="지게골"
          data-label-mode="right"><tspan
-           x="2583.5"
+           x="2630"
            dy="0"
            id="tspan293">지게골</tspan></text>
       <text
          id="station-label-ubabb-uace8"
-         x="2673.5"
-         y="1649.25"
+         x="2720"
+         y="1657"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6173,15 +5040,15 @@
          data-station-key="못골"
          data-station="못골"
          data-label-mode="right"><tspan
-           x="2673.5"
+           x="2720"
            dy="0"
            id="tspan294">못골</tspan></text>
       <text
          id="station-label-ub300-uc5f0"
-         x="2763.5"
-         y="1739.25"
+         x="2810"
+         y="1747"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6189,15 +5056,15 @@
          data-station-key="대연"
          data-station="대연"
          data-label-mode="right"><tspan
-           x="2763.5"
+           x="2810"
            dy="0"
            id="tspan295">대연</tspan></text>
       <text
          id="station-label-uacbd-uc131-ub300-xb7-ubd80-uacbd-ub300"
          x="2840"
-         y="1850.5"
+         y="1883"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6211,9 +5078,9 @@
       <text
          id="station-label-ub0a8-ucc9c"
          x="2930"
-         y="1850.5"
+         y="1939"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6227,9 +5094,9 @@
       <text
          id="station-label-uae08-ub828-uc0b0"
          x="3020"
-         y="1850.5"
+         y="1883"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6243,9 +5110,9 @@
       <text
          id="station-label-uad11-uc548"
          x="3110"
-         y="1850.5"
+         y="1883"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6258,10 +5125,10 @@
            id="tspan299">광안</tspan></text>
       <text
          id="station-label-uc218-uc601"
-         x="3199.5503"
-         y="1852.4543"
+         x="3199.78"
+         y="1752.85"
          text-anchor="middle"
-         font-size="14"
+         font-size="41.5"
          font-weight="800"
          fill="#344258"
          class="transfer-name"
@@ -6269,15 +5136,15 @@
          data-station-key="수영"
          data-station="수영"
          data-label-mode="above"><tspan
-           x="3199.5503"
+           x="3199.78"
            dy="0"
            id="tspan300">수영</tspan></text>
       <text
          id="station-label-ubbfc-ub77d"
-         x="3303.5"
-         y="1739.25"
+         x="3350"
+         y="1747"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6285,15 +5152,15 @@
          data-station-key="민락"
          data-station="민락"
          data-label-mode="right"><tspan
-           x="3303.5"
+           x="3350"
            dy="0"
            id="tspan301">민락</tspan></text>
       <text
          id="station-label-uc13c-ud140-uc2dc-ud2f0"
-         x="3393.5"
-         y="1649.25"
+         x="3407.34"
+         y="1680.98"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6301,15 +5168,15 @@
          data-station-key="센텀시티"
          data-station="센텀시티"
          data-label-mode="right"><tspan
-           x="3393.5"
+           x="3407.34"
            dy="0"
            id="tspan302">센텀시티</tspan></text>
       <text
          id="station-label-ubca1-uc2a4-ucf54"
-         x="3446"
-         y="1552"
+         x="3387.87"
+         y="1544.53"
          text-anchor="end"
-         font-size="14"
+         font-size="41.5"
          font-weight="800"
          fill="#344258"
          class="transfer-name"
@@ -6317,18 +5184,18 @@
          data-station-key="벡스코"
          data-station="벡스코 (시립미술관)"
          data-label-mode="left"><tspan
-           x="3446"
+           x="3387.87"
            dy="0"
            id="tspan303">벡스코</tspan><tspan
-           x="3446"
-           dy="16"
+           x="3387.87"
+           dy="48.55"
            id="tspan304">(시립미술관)</tspan></text>
       <text
          id="station-label-ub3d9-ubc31"
-         x="3366.5"
-         y="1469.25"
+         x="3320"
+         y="1477"
          text-anchor="end"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6336,15 +5203,15 @@
          data-station-key="동백"
          data-station="동백"
          data-label-mode="left"><tspan
-           x="3366.5"
+           x="3320"
            dy="0"
            id="tspan305">동백</tspan></text>
       <text
          id="station-label-ud574-uc6b4-ub300"
-         x="3276.5"
-         y="1379.25"
+         x="3230"
+         y="1387"
          text-anchor="end"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6352,15 +5219,15 @@
          data-station-key="해운대"
          data-station="해운대"
          data-label-mode="left"><tspan
-           x="3276.5"
+           x="3230"
            dy="0"
            id="tspan306">해운대</tspan></text>
       <text
          id="station-label-uc911-ub3d9"
-         x="3326.8467"
-         y="1287.9591"
+         x="3134"
+         y="1297"
          text-anchor="end"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6368,15 +5235,15 @@
          data-station-key="중동"
          data-station="중동"
          data-label-mode="left"><tspan
-           x="3326.8467"
+           x="3134"
            dy="0"
            id="tspan307">중동</tspan></text>
       <text
          id="station-label-uc7a5-uc0b0"
-         x="3303.5"
-         y="1199.5"
+         x="3316"
+         y="1208"
          text-anchor="start"
-         font-size="13"
+         font-size="38.5"
          font-weight="700"
          fill="#14293D"
          class="station-name is-terminal"
@@ -6384,15 +5251,15 @@
          data-station-key="장산"
          data-station="장산"
          data-label-mode="right"><tspan
-           x="3303.5"
+           x="3316"
            dy="0"
            id="tspan308">장산</tspan></text>
       <text
          id="station-label-ub300-uc800"
-         x="589.31433"
-         y="813.42828"
+         x="589.14"
+         y="779.63"
          text-anchor="middle"
-         font-size="14"
+         font-size="41.5"
          font-weight="800"
          fill="#344258"
          class="transfer-name"
@@ -6400,31 +5267,31 @@
          data-station-key="대저"
          data-station="대저"
          data-label-mode="above"><tspan
-           x="589.31433"
+           x="589.14"
            dy="0"
            id="tspan309">대저</tspan></text>
       <text
          id="station-label-uccb4-uc721-uacf5-uc6d0"
-         x="680"
-         y="818"
-         text-anchor="middle"
-         font-size="12.5"
+         x="605.76"
+         y="710.6"
+         text-anchor="end"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
          data-label-role="ordinary"
          data-station-key="체육공원"
          data-station="체육공원"
-         data-label-mode="above"><tspan
-           x="680"
+         data-label-mode="upper-left"><tspan
+           x="605.76"
            dy="0"
            id="tspan310">체육공원</tspan></text>
       <text
          id="station-label-uac15-uc11c-uad6c-uccad"
-         x="770"
-         y="818"
+         x="753.37"
+         y="784.93"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6432,15 +5299,15 @@
          data-station-key="강서구청"
          data-station="강서구청"
          data-label-mode="above"><tspan
-           x="770"
+           x="753.37"
            dy="0"
            id="tspan311">강서구청</tspan></text>
       <text
          id="station-label-uad6c-ud3ec"
          x="860"
-         y="818"
+         y="601"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6454,9 +5321,9 @@
       <text
          id="station-label-uc219-ub4f1"
          x="1040"
-         y="818"
+         y="801"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6470,9 +5337,9 @@
       <text
          id="station-label-ub0a8-uc0b0-uc815"
          x="1130"
-         y="818"
+         y="801"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6486,9 +5353,9 @@
       <text
          id="station-label-ub9cc-ub355"
          x="1220"
-         y="818"
+         y="801"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6501,10 +5368,10 @@
            id="tspan315">만덕</tspan></text>
       <text
          id="station-label-ubbf8-ub0a8"
-         x="1310.2811"
-         y="815.34058"
+         x="1310.07"
+         y="762.93"
          text-anchor="middle"
-         font-size="14"
+         font-size="41.5"
          font-weight="800"
          fill="#344258"
          class="transfer-name"
@@ -6512,15 +5379,15 @@
          data-station-key="미남"
          data-station="미남"
          data-label-mode="above"><tspan
-           x="1310.2811"
+           x="1310.07"
            dy="0"
            id="tspan316">미남</tspan></text>
       <text
          id="station-label-uc0ac-uc9c1"
-         x="1413.5"
-         y="929.25"
+         x="1460"
+         y="937"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6528,34 +5395,34 @@
          data-station-key="사직"
          data-station="사직"
          data-label-mode="right"><tspan
-           x="1413.5"
+           x="1460"
            dy="0"
            id="tspan317">사직</tspan></text>
       <text
          id="station-label-uc885-ud569-uc6b4-ub3d9-uc7a5"
-         x="1490"
-         y="984.4"
-         text-anchor="middle"
-         font-size="11.6"
+         x="1410"
+         y="1006.11"
+         text-anchor="end"
+         font-size="34"
          font-weight="700"
          fill="#14293D"
          class="station-name is-long"
          data-label-role="ordinary"
          data-station-key="종합운동장"
          data-station="종합운동장"
-         data-label-mode="above"><tspan
-           x="1490"
+         data-label-mode="left"><tspan
+           x="1410"
            dy="0"
            id="tspan318">종합</tspan><tspan
-           x="1490"
-           dy="13.6"
+           x="1410"
+           dy="39.78"
            id="tspan319">운동장</tspan></text>
       <text
          id="station-label-uac70-uc81c"
-         x="1843.6198"
-         y="891.71887"
+         x="1806.76"
+         y="902.62"
          text-anchor="end"
-         font-size="14"
+         font-size="41.5"
          font-weight="800"
          fill="#344258"
          class="transfer-name"
@@ -6563,15 +5430,15 @@
          data-station-key="거제"
          data-station="거제"
          data-label-mode="left"><tspan
-           x="1843.6198"
+           x="1806.76"
            dy="0"
            id="tspan320">거제</tspan></text>
       <text
          id="station-label-ubb3c-ub9cc-uace8"
-         x="2349.5"
-         y="803.25"
+         x="2492"
+         y="811"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6579,15 +5446,15 @@
          data-station-key="물만골"
          data-station="물만골"
          data-label-mode="right"><tspan
-           x="2349.5"
+           x="2492"
            dy="0"
            id="tspan321">물만골</tspan></text>
       <text
          id="station-label-ubc30-uc0b0"
-         x="2475.5"
-         y="929.25"
+         x="2486"
+         y="937"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6595,15 +5462,15 @@
          data-station-key="배산"
          data-station="배산"
          data-label-mode="right"><tspan
-           x="2475.5"
+           x="2486"
            dy="0"
            id="tspan322">배산</tspan></text>
       <text
          id="station-label-ub9dd-ubbf8"
-         x="2853.5"
-         y="1469.25"
+         x="2900"
+         y="1477"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6611,15 +5478,15 @@
          data-station-key="망미"
          data-station="망미"
          data-label-mode="right"><tspan
-           x="2853.5"
+           x="2900"
            dy="0"
            id="tspan323">망미</tspan></text>
       <text
          id="station-label-uc218-uc548"
          x="2336"
-         y="404"
+         y="387"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6633,9 +5500,9 @@
       <text
          id="station-label-ub099-ubbfc"
          x="2462"
-         y="404"
+         y="283"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6649,9 +5516,9 @@
       <text
          id="station-label-ucda9-ub82c-uc0ac"
          x="2588"
-         y="404"
+         y="387"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6665,9 +5532,9 @@
       <text
          id="station-label-uba85-uc7a5"
          x="2714"
-         y="404"
+         y="283"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6681,9 +5548,9 @@
       <text
          id="station-label-uc11c-ub3d9"
          x="2840"
-         y="404"
+         y="387"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6697,9 +5564,9 @@
       <text
          id="station-label-uae08-uc0ac"
          x="2966"
-         y="404"
+         y="283"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6713,9 +5580,9 @@
       <text
          id="station-label-ubc18-uc5ec-ub18d-uc0b0-ubb3c-uc2dc-uc7a5"
          x="3092"
-         y="445.6"
+         y="476"
          text-anchor="middle"
-         font-size="11.6"
+         font-size="34"
          font-weight="700"
          fill="#14293D"
          class="station-name is-long"
@@ -6727,30 +5594,30 @@
            dy="0"
            id="tspan330">반여농산물</tspan><tspan
            x="3092"
-           dy="13.6"
+           dy="39.78"
            id="tspan331">시장</tspan></text>
       <text
          id="station-label-uc11d-ub300"
-         x="3207.7456"
-         y="445.04526"
+         x="3234.24"
+         y="480.32"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
          data-label-role="ordinary"
          data-station-key="석대"
          data-station="석대"
-         data-label-mode="right"><tspan
-           x="3207.7456"
+         data-label-mode="lower-right"><tspan
+           x="3234.24"
            dy="0"
            id="tspan332">석대</tspan></text>
       <text
          id="station-label-uc601-uc0b0-ub300"
          x="3344"
-         y="446.5"
+         y="535"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6764,9 +5631,9 @@
       <text
          id="station-label-uc717-ubc18-uc1a1"
          x="3470"
-         y="446.5"
+         y="479"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6780,9 +5647,9 @@
       <text
          id="station-label-uace0-ucd0c"
          x="3596"
-         y="446.5"
+         y="479"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6795,26 +5662,26 @@
            id="tspan335">고촌</tspan></text>
       <text
          id="station-label-uc548-ud3c9"
-         x="3734.2339"
-         y="444.50345"
+         x="3703.91"
+         y="484.47"
          text-anchor="end"
-         font-size="13"
+         font-size="38.5"
          font-weight="700"
          fill="#14293D"
          class="station-name is-terminal"
          data-label-role="terminal"
          data-station-key="안평"
          data-station="안평"
-         data-label-mode="left"><tspan
-           x="3734.2339"
+         data-label-mode="lower-left"><tspan
+           x="3703.91"
            dy="0"
            id="tspan336">안평</tspan></text>
       <text
          id="station-label-uac70-uc81c-ud574-ub9de-uc774"
-         x="2016.5"
-         y="1055.25"
+         x="2003.7"
+         y="1090.87"
          text-anchor="end"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6822,15 +5689,15 @@
          data-station-key="거제해맞이"
          data-station="거제해맞이"
          data-label-mode="left"><tspan
-           x="2016.5"
+           x="2003.7"
            dy="0"
            id="tspan337">거제해맞이</tspan></text>
       <text
          id="station-label-ub3d9-ub798_DH"
          x="2336"
-         y="698.5"
+         y="731"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6844,9 +5711,9 @@
       <text
          id="station-label-uc548-ub77d"
          x="2462"
-         y="656"
+         y="639"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6860,9 +5727,9 @@
       <text
          id="station-label-ubd80-uc0b0-uc6d0-ub3d9"
          x="2588"
-         y="656"
+         y="639"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6875,10 +5742,10 @@
            id="tspan340">부산원동</tspan></text>
       <text
          id="station-label-uc7ac-uc1a1"
-         x="2727.5"
-         y="803.25"
+         x="2774"
+         y="811"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6886,15 +5753,15 @@
          data-station-key="재송"
          data-station="재송"
          data-label-mode="right"><tspan
-           x="2727.5"
+           x="2774"
            dy="0"
            id="tspan341">재송</tspan></text>
       <text
          id="station-label-uc13c-ud140"
-         x="2853.5"
-         y="929.25"
+         x="2900"
+         y="937"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6902,47 +5769,47 @@
          data-station-key="센텀"
          data-station="센텀"
          data-label-mode="right"><tspan
-           x="2853.5"
+           x="2900"
            dy="0"
            id="tspan342">센텀</tspan></text>
       <text
          id="station-label-uc2e0-ud574-uc6b4-ub300"
-         x="3616.5364"
-         y="1703.5552"
+         x="3595.3"
+         y="1755.86"
          text-anchor="end"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
          data-label-role="ordinary"
          data-station-key="신해운대"
          data-station="신해운대"
-         data-label-mode="left"><tspan
-           x="3616.5364"
+         data-label-mode="lower-left"><tspan
+           x="3595.3"
            dy="0"
            id="tspan343">신해운대</tspan></text>
       <text
          id="station-label-uc1a1-uc815"
-         x="3734.5278"
-         y="1703.8412"
+         x="3705.76"
+         y="1740.32"
          text-anchor="end"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
          data-label-role="ordinary"
          data-station-key="송정"
          data-station="송정"
-         data-label-mode="left"><tspan
-           x="3734.5278"
+         data-label-mode="lower-left"><tspan
+           x="3705.76"
            dy="0"
            id="tspan344">송정</tspan></text>
       <text
          id="station-label-uc624-uc2dc-ub9ac-uc544"
-         x="3708.5"
-         y="1559.25"
+         x="3698"
+         y="1567"
          text-anchor="end"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6950,15 +5817,15 @@
          data-station-key="오시리아"
          data-station="오시리아"
          data-label-mode="left"><tspan
-           x="3708.5"
+           x="3698"
            dy="0"
            id="tspan345">오시리아</tspan></text>
       <text
          id="station-label-uae30-uc7a5"
-         x="3686.4639"
-         y="1431.118"
+         x="3746"
+         y="1441"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6966,15 +5833,15 @@
          data-station-key="기장"
          data-station="기장"
          data-label-mode="right"><tspan
-           x="3686.4639"
+           x="3746"
            dy="0"
            id="tspan346">기장</tspan></text>
       <text
          id="station-label-uc77c-uad11"
-         x="3708.5"
-         y="1307.25"
+         x="3698"
+         y="1315"
          text-anchor="end"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6982,15 +5849,15 @@
          data-station-key="일광"
          data-station="일광"
          data-label-mode="left"><tspan
-           x="3708.5"
+           x="3698"
            dy="0"
            id="tspan347">일광</tspan></text>
       <text
          id="station-label-uc88c-ucc9c_DH"
-         x="3708.5"
-         y="1181.25"
+         x="3698"
+         y="1189"
          text-anchor="end"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -6998,15 +5865,15 @@
          data-station-key="좌천_DH"
          data-station="좌천"
          data-label-mode="left"><tspan
-           x="3708.5"
+           x="3698"
            dy="0"
            id="tspan348">좌천</tspan></text>
       <text
          id="station-label-uc6d4-ub0b4"
-         x="3708.5"
-         y="1055.25"
+         x="3698"
+         y="1063"
          text-anchor="end"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -7014,15 +5881,15 @@
          data-station-key="월내"
          data-station="월내"
          data-label-mode="left"><tspan
-           x="3708.5"
+           x="3698"
            dy="0"
            id="tspan349">월내</tspan></text>
       <text
          id="station-label-uc11c-uc0dd"
-         x="3708.5"
-         y="929.25"
+         x="3698"
+         y="937"
          text-anchor="end"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -7030,15 +5897,15 @@
          data-station-key="서생"
          data-station="서생"
          data-label-mode="left"><tspan
-           x="3708.5"
+           x="3698"
            dy="0"
            id="tspan350">서생</tspan></text>
       <text
          id="station-label-ub0a8-ucc3d"
-         x="3735.5"
-         y="803.25"
+         x="3746"
+         y="811"
          text-anchor="start"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -7046,15 +5913,15 @@
          data-station-key="남창"
          data-station="남창"
          data-label-mode="right"><tspan
-           x="3735.5"
+           x="3746"
            dy="0"
            id="tspan351">남창</tspan></text>
       <text
          id="station-label-ub9dd-uc591"
          x="3596"
-         y="656"
+         y="639"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -7068,9 +5935,9 @@
       <text
          id="station-label-ub355-ud558"
          x="3470"
-         y="656"
+         y="639"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -7084,9 +5951,9 @@
       <text
          id="station-label-uac1c-uc6b4-ud3ec"
          x="3344"
-         y="656"
+         y="639"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -7100,9 +5967,9 @@
       <text
          id="station-label-ud0dc-ud654-uac15"
          x="3218"
-         y="656"
+         y="619"
          text-anchor="middle"
-         font-size="13"
+         font-size="38.5"
          font-weight="700"
          fill="#14293D"
          class="station-name is-terminal"
@@ -7115,10 +5982,10 @@
            id="tspan355">태화강</tspan></text>
       <text
          id="station-label-uad18-ubc95-ub974-ub124-uc2dc-ub5bc"
-         x="990.5"
-         y="1300"
+         x="924"
+         y="1294.11"
          text-anchor="end"
-         font-size="11.6"
+         font-size="34"
          font-weight="700"
          fill="#14293D"
          class="station-name is-long"
@@ -7126,18 +5993,18 @@
          data-station-key="괘법르네시떼"
          data-station="괘법 르네시떼"
          data-label-mode="left"><tspan
-           x="990.5"
+           x="924"
            dy="0"
            id="tspan356">괘법</tspan><tspan
-           x="990.5"
-           dy="13.6"
+           x="924"
+           dy="39.78"
            id="tspan357">르네시떼</tspan></text>
       <text
          id="station-label-uc11c-ubd80-uc0b0-uc720-ud1b5-uc9c0-uad6c"
-         x="846.5"
-         y="1156"
+         x="780"
+         y="1150.11"
          text-anchor="end"
-         font-size="11.6"
+         font-size="34"
          font-weight="700"
          fill="#14293D"
          class="station-name is-long"
@@ -7145,18 +6012,18 @@
          data-station-key="서부산유통지구"
          data-station="서부산 유통지구"
          data-label-mode="left"><tspan
-           x="846.5"
+           x="780"
            dy="0"
            id="tspan358">서부산</tspan><tspan
-           x="846.5"
-           dy="13.6"
+           x="780"
+           dy="39.78"
            id="tspan359">유통지구</tspan></text>
       <text
          id="station-label-uacf5-ud56d"
-         x="702.5"
-         y="1019.25"
+         x="656"
+         y="1027"
          text-anchor="end"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -7164,31 +6031,31 @@
          data-station-key="공항"
          data-station="공항"
          data-label-mode="left"><tspan
-           x="702.5"
+           x="656"
            dy="0"
            id="tspan360">공항</tspan></text>
       <text
          id="station-label-ub355-ub450"
-         x="558.5"
-         y="875.25"
+         x="543.03"
+         y="943.05"
          text-anchor="end"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
          data-label-role="ordinary"
          data-station-key="덕두"
          data-station="덕두"
-         data-label-mode="left"><tspan
-           x="558.5"
+         data-label-mode="lower-left"><tspan
+           x="543.03"
            dy="0"
            id="tspan361">덕두</tspan></text>
       <text
          id="station-label-ub4f1-uad6c"
-         x="450.5"
-         y="767.25"
+         x="440"
+         y="775"
          text-anchor="end"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -7196,15 +6063,15 @@
          data-station-key="등구"
          data-station="등구"
          data-label-mode="left"><tspan
-           x="450.5"
+           x="440"
            dy="0"
            id="tspan362">등구</tspan></text>
       <text
          id="station-label-ud3c9-uac15"
          x="500"
-         y="860.5"
+         y="893"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -7218,9 +6085,9 @@
       <text
          id="station-label-ub300-uc0ac"
          x="410"
-         y="860.5"
+         y="893"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -7234,9 +6101,9 @@
       <text
          id="station-label-ubd88-uc554"
          x="320"
-         y="860.5"
+         y="893"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -7250,9 +6117,9 @@
       <text
          id="station-label-uc9c0-ub0b4"
          x="230"
-         y="860.5"
+         y="893"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -7265,58 +6132,58 @@
            id="tspan366">지내</tspan></text>
       <text
          id="station-label-uae40-ud574-ub300-ud559"
-         x="126.5"
-         y="839.25"
-         text-anchor="end"
-         font-size="12.5"
+         x="140"
+         y="949"
+         text-anchor="middle"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
          data-label-role="ordinary"
          data-station-key="김해대학"
          data-station="김해대학"
-         data-label-mode="left"><tspan
-           x="126.5"
+         data-label-mode="below"><tspan
+           x="140"
            dy="0"
            id="tspan367">김해대학</tspan></text>
       <text
          id="station-label-uc778-uc81c-ub300"
-         x="126.5"
-         y="749.25"
-         text-anchor="end"
-         font-size="12.5"
+         x="104.22"
+         y="890.53"
+         text-anchor="middle"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
          data-label-role="ordinary"
          data-station-key="인제대"
          data-station="인제대"
-         data-label-mode="left"><tspan
-           x="126.5"
+         data-label-mode="below"><tspan
+           x="104.22"
            dy="0"
            id="tspan368">인제대</tspan></text>
       <text
          id="station-label-uae40-ud574-uc2dc-uccad"
-         x="126.5"
-         y="659.25"
-         text-anchor="end"
-         font-size="12.5"
+         x="140"
+         y="621"
+         text-anchor="middle"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
          data-label-role="ordinary"
          data-station-key="김해시청"
          data-station="김해시청"
-         data-label-mode="left"><tspan
-           x="126.5"
+         data-label-mode="above"><tspan
+           x="140"
            dy="0"
            id="tspan369">김해시청</tspan></text>
       <text
          id="station-label-ubd80-uc6d0"
          x="230"
-         y="638"
+         y="565"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -7330,9 +6197,9 @@
       <text
          id="station-label-ubd09-ud669"
          x="320"
-         y="638"
+         y="621"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -7346,9 +6213,9 @@
       <text
          id="station-label-uc218-ub85c-uc655-ub989"
          x="410"
-         y="638"
+         y="565"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -7362,9 +6229,9 @@
       <text
          id="station-label-ubc15-ubb3c-uad00"
          x="500"
-         y="638"
+         y="621"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -7378,9 +6245,9 @@
       <text
          id="station-label-uc5f0-uc9c0-uacf5-uc6d0"
          x="590"
-         y="638"
+         y="565"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -7394,9 +6261,9 @@
       <text
          id="station-label-uc7a5-uc2e0-ub300"
          x="680"
-         y="638"
+         y="621"
          text-anchor="middle"
-         font-size="12.5"
+         font-size="37"
          font-weight="700"
          fill="#14293D"
          class="station-name"
@@ -7409,18 +6276,18 @@
            id="tspan375">장신대</tspan></text>
       <text
          id="station-label-uac00-uc57c-ub300"
-         x="783.49908"
-         y="637.64362"
+         x="760"
+         y="726.56"
          text-anchor="end"
-         font-size="13"
+         font-size="38.5"
          font-weight="700"
          fill="#14293D"
          class="station-name is-terminal"
          data-label-role="terminal"
          data-station-key="가야대"
          data-station="가야대"
-         data-label-mode="left"><tspan
-           x="783.49908"
+         data-label-mode="lower-left"><tspan
+           x="760"
            dy="0"
            id="tspan376">가야대</tspan></text>
       <g
