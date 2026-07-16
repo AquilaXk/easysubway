@@ -14205,6 +14205,7 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     "favorite_stations_routes_facilities",
     "route_eta_feedback",
     "route_v2_itx_integrity",
+    "route_v2_itx_mobility_preferences",
     "route_v2_itx_request_state",
     "mobility_profile",
     "facility_report_content",
@@ -14288,9 +14289,10 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     assert.equal(typeof item.googlePlayDataSafety.purpose, "string", `${id} must declare Play purpose`);
     assert.equal(typeof item.googlePlayDataSafety.linkedToUser, "boolean", `${id} must declare Play linked-to-user value`);
     if (item.googlePlayDataSafety.collected) {
+      const routeV2ExpectedLinkage = id === "route_v2_itx_integrity";
       assert.equal(
         item.googlePlayDataSafety.linkedToUser,
-        !id.startsWith("route_v2_itx_"),
+        id.startsWith("route_v2_itx_") ? routeV2ExpectedLinkage : true,
         `${id} Play user linkage must match the release data model`,
       );
     }
@@ -14399,8 +14401,20 @@ test("Route V2 ITX 개인정보와 Data Safety 공개 기준은 실제 전송·�
   const inventory = readJson("apps/mobile/release/store-privacy-inventory.json");
   const playStoreContent = readJson("apps/mobile/release/play-store-submission-content.json");
   const publicPrivacyPolicy = read("backend/src/main/resources/templates/legal/privacy.html");
+  const mobileRouteSearch = read("apps/mobile/lib/route_search.dart");
+  const sessionService = read("backend/src/main/java/com/easysubway/route/application/service/RouteV2SessionService.java");
+  const purgeScheduler = read("backend/src/main/java/com/easysubway/route/adapter/in/scheduler/RouteV2StatePurgeScheduler.java");
+  const integrityDecoder = read("backend/src/main/java/com/easysubway/route/adapter/out/integrity/GooglePlayIntegrityDecoder.java");
+  const routeAccessStore = read("backend/src/main/java/com/easysubway/route/adapter/out/persistence/JdbcRouteV2AccessStore.java");
+  const routeController = read("backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchController.java");
+  const sessionController = read("backend/src/main/java/com/easysubway/route/adapter/in/web/RouteV2SessionController.java");
+  const productionRouteSupport = read("backend/src/main/java/com/easysubway/route/application/service/ProductionRouteV2Support.java");
+  const routeStateMigration = read("backend/src/main/resources/db/migration/postgresql/V57__route_v2_access_state.sql");
+  const nginxGateway = read("infra/nginx/route-v2-gateway.conf.template");
+  const nginxProxyHeaders = read("infra/nginx/route-v2-proxy-headers.conf.template");
   const items = new Map(inventory.dataTypes.map((item) => [item.id, item]));
   const integrity = items.get("route_v2_itx_integrity");
+  const mobility = items.get("route_v2_itx_mobility_preferences");
   const route = items.get("route_v2_itx_request_state");
   const officialPolicyReferences = [
     "https://support.google.com/googleplay/android-developer/answer/10787469?hl=en",
@@ -14414,9 +14428,12 @@ test("Route V2 ITX 개인정보와 Data Safety 공개 기준은 실제 전송·�
 
   assert.ok(integrity);
   assert.equal(integrity.googlePlayDataSafety.collected, true);
-  assert.equal(integrity.googlePlayDataSafety.linkedToUser, false);
+  assert.equal(integrity.googlePlayDataSafety.dataType, "Device or other IDs");
+  assert.equal(integrity.googlePlayDataSafety.linkedToUser, true);
   assert.equal(integrity.googlePlayDataSafety.optional, true);
   assert.equal(integrity.googlePlayDataSafety.processedEphemerally, false);
+  assert.equal(integrity.backendLinkedToUserDeviceOrAccountId, false);
+  assert.equal(integrity.googleProcessingMayBeLinkedToSignedInAccountOrDevice, true);
   assert.deepEqual(integrity.googlePlayProcessing.alwaysCollected, [
     "requestHashOrNonce",
     "appPackageName",
@@ -14429,6 +14446,11 @@ test("Route V2 ITX 개인정보와 Data Safety 공개 기준은 실제 전송·�
   assert.equal(integrity.googlePlayProcessing.sharedOnward, false);
   assert.equal(integrity.googlePlayProcessing.retention, "fixed-by-google-play-integrity-policy");
   assert.deepEqual(integrity.mobileToBackendFields, ["integrityToken", "128-bit clientNonce"]);
+  assert.deepEqual(integrity.backendToGoogleFields, ["rawIntegrityToken"]);
+  assert.equal(
+    integrity.googleDecodeEndpoint,
+    "https://playintegrity.googleapis.com/v1/com.easysubway.app:decodeIntegrityToken",
+  );
   assert.deepEqual(integrity.backendStoredFields, [
     "tokenSha256",
     "scope",
@@ -14437,8 +14459,24 @@ test("Route V2 ITX 개인정보와 Data Safety 공개 기준은 실제 전송·�
     "requestCount",
     "nonceSha256",
   ]);
-  assert.equal(integrity.retention.session, "10 minutes");
-  assert.equal(integrity.retention.nonceSha256, "2 minutes");
+  assert.equal(integrity.retention.sessionLogicalExpiry, "10 minutes");
+  assert.equal(integrity.retention.sessionPhysicalDeletionWithin, "approximately 15 minutes from issuance");
+  assert.equal(integrity.retention.nonceLogicalExpiry, "2 minutes");
+  assert.equal(integrity.retention.noncePhysicalDeletionWithin, "approximately 7 minutes from receipt");
+  assert.equal(integrity.retention.purgeInterval, "5 minutes");
+  assert.ok(integrity.evidence.includes("backend/src/main/java/com/easysubway/route/adapter/out/integrity/GooglePlayIntegrityDecoder.java"));
+  assert.ok(integrity.evidence.includes("backend/src/main/java/com/easysubway/route/adapter/in/scheduler/RouteV2StatePurgeScheduler.java"));
+
+  assert.ok(mobility);
+  assert.deepEqual(mobility.routeRequestFields, ["mobilityType", "mobilityPreset", "constraintMode"]);
+  assert.equal(mobility.googlePlayDataSafety.dataType, "Personal info");
+  assert.equal(mobility.googlePlayDataSafety.collected, true);
+  assert.equal(mobility.googlePlayDataSafety.optional, true);
+  assert.equal(mobility.googlePlayDataSafety.linkedToUser, false);
+  assert.equal(mobility.googlePlayDataSafety.processedEphemerally, false);
+  assert.equal(mobility.persistedRepresentation.mobilityPreset, "itinerary_json[].legs[].appliedPreset");
+  assert.equal(mobility.persistedRepresentation.mobilityTypeAndConstraintMode, "computed-itinerary-only");
+  assert.ok(mobility.evidence.includes("backend/src/main/java/com/easysubway/route/application/service/ProductionRouteV2Support.java"));
 
   assert.ok(route);
   assert.equal(route.googlePlayDataSafety.collected, true);
@@ -14446,49 +14484,61 @@ test("Route V2 ITX 개인정보와 Data Safety 공개 기준은 실제 전송·�
   assert.equal(route.googlePlayDataSafety.optional, true);
   assert.equal(route.googlePlayDataSafety.processedEphemerally, false);
   assert.deepEqual(route.routeRequestFields, [
-    "canonicalOriginStationId",
-    "canonicalDestinationStationId",
-    "transportScope",
-    "departureTime",
-    "mobilityPreset",
+    "originStationId",
+    "destinationStationId",
     "mobilityType",
     "constraintMode",
-    "realtimeFlag",
+    "mobilityPreset",
+    "departureTime",
+    "useRealtime",
     "maxTransfers",
     "alternativeCount",
   ]);
   assert.deepEqual(route.backendStoredFields, [
-    "originStationId",
-    "destinationStationId",
-    "transportScope",
-    "departureTime",
-    "itinerary",
-    "timetableArtifactId",
-    "createdAt",
-    "plannedArrivalAt",
-    "expiresAt",
+    "route_state_id",
+    "origin_station_id",
+    "destination_station_id",
+    "transport_scope",
+    "requested_departure_at",
+    "itinerary_json",
+    "timetable_artifact_id",
+    "created_at",
+    "planned_arrival_at",
+    "expires_at",
   ]);
-  assert.equal(
-    route.retention,
-    "min(createdAt+6h,max(createdAt+30m,plannedArrivalAt+30m))",
-  );
-
-  const neverPersistedOrLogged = [
+  assert.equal(route.backendStoredTransportScope, "SUBWAY_AND_ITX_CHEONGCHUN");
+  assert.equal(route.retention.logicalExpiresAt, "min(createdAt+6h,max(createdAt+30m,plannedArrivalAt+30m))");
+  assert.equal(route.retention.physicalDeletionWithin, "expiresAt+5m");
+  assert.equal(route.retention.purgeInterval, "5 minutes");
+  assert.ok(route.evidence.includes("backend/src/main/java/com/easysubway/route/adapter/in/scheduler/RouteV2StatePurgeScheduler.java"));
+  assert.deepEqual(integrity.backendNeverPersistedOrLogged, [
     "rawIntegrityToken",
     "rawClientNonce",
     "integrityPayloadOrVerdict",
-    "ipAddress",
-    "deviceId",
-    "accountId",
-    "rawSearchText",
-    "coordinates",
-  ];
-  assert.deepEqual(integrity.neverPersistedOrLogged, neverPersistedOrLogged);
-  assert.deepEqual(route.neverPersistedOrLogged, neverPersistedOrLogged);
+  ]);
+  assert.deepEqual(route.notSentOrStoredByRouteV2, ["rawSearchText", "coordinates"]);
   assert.equal(integrity.usedForTracking, false);
   assert.equal(route.usedForTracking, false);
   assert.equal(integrity.responseCacheControl, "private, no-store");
   assert.equal(route.responseCacheControl, "private, no-store");
+
+  assert.deepEqual(inventory.routeV2GatewayRateLimit.keys, [
+    {
+      nginxVariable: "$binary_remote_addr",
+      scopes: ["session", "search"],
+      processing: "nginx-shared-memory-rate-limit-key",
+      persistedToDatabase: false,
+      includedInAccessLog: false,
+    },
+    {
+      nginxVariable: "$http_authorization",
+      scopes: ["search"],
+      processing: "nginx-shared-memory-rate-limit-key",
+      persistedToDatabase: false,
+      includedInAccessLog: false,
+    },
+  ]);
+  assert.equal(inventory.routeV2GatewayRateLimit.rateLimitedLogContainsKeyValues, false);
 
   assert.deepEqual(
     playStoreContent.dataSafetyDeclarations.routeV2Itx.officialPolicyReferences,
@@ -14496,8 +14546,9 @@ test("Route V2 ITX 개인정보와 Data Safety 공개 기준은 실제 전송·�
   );
   assert.equal(playStoreContent.dataSafetyDeclarations.routeV2Itx.optionalUserTriggered, true);
   assert.equal(playStoreContent.dataSafetyDeclarations.routeV2Itx.tracking, false);
-  assert.equal(playStoreContent.dataSafetyDeclarations.routeV2Itx.linkedToUserDeviceOrAccountId, false);
-  assert.equal(playStoreContent.dataSafetyDeclarations.routeV2Itx.processedEphemerally, false);
+  assert.equal(playStoreContent.dataSafetyDeclarations.routeV2Itx.backendLinkedToUserDeviceOrAccountId, false);
+  assert.equal(playStoreContent.dataSafetyDeclarations.routeV2Itx.googleIntegrityMayBeLinkedToAccountOrDevice, true);
+  assert.equal(playStoreContent.dataSafetyDeclarations.routeV2Itx.storedFieldsProcessedEphemerally, false);
   assert.ok(
     playStoreContent.dataSafetyDeclarations.answerMatrix
       .find((item) => item.dataType === "App activity")
@@ -14505,19 +14556,67 @@ test("Route V2 ITX 개인정보와 Data Safety 공개 기준은 실제 전송·�
   );
   assert.ok(
     playStoreContent.dataSafetyDeclarations.answerMatrix
-      .find((item) => item.dataType === "Diagnostics")
+      .find((item) => item.dataType === "Device or other IDs")
       .inventoryDataIds.includes("route_v2_itx_integrity"),
   );
+  assert.ok(
+    playStoreContent.dataSafetyDeclarations.answerMatrix
+      .find((item) => item.dataType === "Personal info")
+      .inventoryDataIds.includes("route_v2_itx_mobility_preferences"),
+  );
+
+  const toJson = mobileRouteSearch.match(/Map<String, Object\?> toJson\(\) \{[\s\S]*?\n  \}/)?.[0] ?? "";
+  const toV2Json = mobileRouteSearch.match(/Map<String, Object\?> toV2Json\(\) \{[\s\S]*?\n  \}/)?.[0] ?? "";
+  const routeWireBuilders = `${toJson}\n${toV2Json}`;
+  for (const field of route.routeRequestFields) {
+    assert.match(routeWireBuilders, new RegExp(`'${field}'`), `mobile Route V2 wire must send ${field}`);
+  }
+  assert.doesNotMatch(routeWireBuilders, /canonicalOriginStationId|canonicalDestinationStationId|transportScope|realtimeFlag/);
+  assert.match(sessionService, /SESSION_TTL = Duration\.ofMinutes\(10\)/);
+  assert.match(sessionService, /VERDICT_MAX_AGE = Duration\.ofMinutes\(2\)/);
+  assert.match(purgeScheduler, /state-purge-interval-ms:300000/);
+  assert.match(routeAccessStore, /DELETE FROM route_v2_states WHERE expires_at <= \?/);
+  assert.match(routeAccessStore, /DELETE FROM route_v2_nonce_replays WHERE expires_at <= \?/);
+  assert.match(routeAccessStore, /DELETE FROM route_v2_sessions WHERE expires_at <= \?/);
+  assert.match(integrityDecoder, /playintegrity\.googleapis\.com\/v1\/com\.easysubway\.app:decodeIntegrityToken/);
+  assert.match(integrityDecoder, /body\(Map\.of\("integrityToken", integrityToken\)\)/);
+  assert.doesNotMatch(`${sessionService}\n${integrityDecoder}`, /log\.(?:info|warn|error|debug|trace)\([^\n]*integrityToken/);
+  assert.match(routeController, /String appliedPreset/);
+  assert.match(routeController, /walkSeconds > 0 \? mobilityPreset : ""/);
+  assert.match(productionRouteSupport, /saveState[\s\S]*json\(computedItinerary\)/);
+  assert.match(routeController, /header\(HttpHeaders\.CACHE_CONTROL, "private, no-store"\)/);
+  assert.match(sessionController, /header\(HttpHeaders\.CACHE_CONTROL, "private, no-store"\)/);
+  for (const column of route.backendStoredFields) {
+    assert.match(routeStateMigration, new RegExp(`\\b${column}\\b`), `route state migration must store ${column}`);
+  }
+  assert.match(nginxGateway, /limit_req_zone \$binary_remote_addr zone=route_session_ip/);
+  assert.match(nginxGateway, /limit_req_zone \$binary_remote_addr zone=route_search_ip/);
+  assert.match(nginxGateway, /limit_req_zone \$http_authorization zone=route_search_token/);
+  assert.match(nginxGateway, /limit_req zone=route_session_ip/);
+  assert.match(nginxGateway, /limit_req zone=route_search_ip/);
+  assert.match(nginxGateway, /limit_req zone=route_search_token/);
+  assert.match(nginxGateway, /access_log off;/);
+  assert.match(nginxGateway, /add_header Cache-Control "private, no-store" always/);
+  assert.match(nginxGateway, /log_format route_v2_session_rate_limited[^\n]*"status":429/);
+  assert.match(nginxGateway, /log_format route_v2_search_rate_limited[^\n]*"status":429/);
+  assert.doesNotMatch(nginxGateway, /log_format[^\n]*\$(?:binary_remote_addr|http_authorization)/);
+  assert.match(nginxProxyHeaders, /proxy_set_header X-Forwarded-For ""/);
+  assert.match(nginxProxyHeaders, /proxy_set_header X-Real-IP ""/);
 
   assert.match(publicPrivacyPolicy, /SUBWAY 경로 검색은 단말 안에서만 처리하며 서버로 전송하지 않습니다/);
   assert.match(publicPrivacyPolicy, /ITX-청춘 경로 검색은 사용자가 직접 선택할 때만/);
   assert.match(publicPrivacyPolicy, /tracking에 사용하지 않습니다/);
   assert.match(publicPrivacyPolicy, /128-bit clientNonce/);
-  assert.match(publicPrivacyPolicy, /10분/);
-  assert.match(publicPrivacyPolicy, /2분/);
-  assert.match(publicPrivacyPolicy, /최소 30분, 최대 6시간/);
+  assert.match(publicPrivacyPolicy, /세션은 발급 후 약 15분 이내/);
+  assert.match(publicPrivacyPolicy, /nonce 해시는 수신 후 약 7분 이내/);
+  assert.match(publicPrivacyPolicy, /expiresAt 뒤 5분 이내/);
+  assert.match(publicPrivacyPolicy, /mobilityType, mobilityPreset, constraintMode/);
+  assert.match(publicPrivacyPolicy, /raw integrityToken을 Google Play Integrity decode API로 전송/);
   assert.match(publicPrivacyPolicy, /raw 검색어와 좌표/);
-  assert.match(publicPrivacyPolicy, /IP 주소, 기기 ID, 계정 ID/);
+  assert.match(publicPrivacyPolicy, /\$binary_remote_addr/);
+  assert.match(publicPrivacyPolicy, /\$http_authorization/);
+  assert.match(publicPrivacyPolicy, /Nginx shared memory/);
+  assert.match(publicPrivacyPolicy, /DB나 access log에는 저장하지 않습니다/);
   assert.match(publicPrivacyPolicy, /private, no-store/);
 });
 

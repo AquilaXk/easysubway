@@ -36,6 +36,29 @@
     "ephemeralProcessingRequiresMemoryOnlyRealTime": true,
     "routeV2StoredDataIsEphemeral": false
   },
+  "routeV2GatewayRateLimit": {
+    "keys": [
+      {
+        "nginxVariable": "$binary_remote_addr",
+        "scopes": ["session", "search"],
+        "processing": "nginx-shared-memory-rate-limit-key",
+        "persistedToDatabase": false,
+        "includedInAccessLog": false
+      },
+      {
+        "nginxVariable": "$http_authorization",
+        "scopes": ["search"],
+        "processing": "nginx-shared-memory-rate-limit-key",
+        "persistedToDatabase": false,
+        "includedInAccessLog": false
+      }
+    ],
+    "rateLimitedLogContainsKeyValues": false,
+    "evidence": [
+      "infra/nginx/route-v2-gateway.conf.template",
+      "infra/nginx/route-v2-proxy-headers.conf.template"
+    ]
+  },
   "crashAnrProviderDecision": {
     "separateCrashProvider": false,
     "sourceOfTruth": ["Android vitals", "Google Play pre-launch report", "mobile runtime error reporter"],
@@ -212,18 +235,22 @@
         "route_v2_nonce_replays.nonce_sha256/expires_at"
       ],
       "storageLocations": ["google-play-integrity-processing", "backend-database"],
-      "retentionKo": "Google Play Integrity 처리 정보는 Google의 고정 보관 정책을 따르고, 서버는 세션 token SHA-256·scope·issuedAt·expiresAt·requestCount를 10분, nonce SHA-256을 2분 보관",
-      "deletionKo": "서버의 세션·nonce 해시는 각 만료 시각 뒤 자동 삭제하며 사용자·기기·계정 식별자와 연결하지 않음",
-      "deletionImplementation": "RouteV2AccessStore.purgeExpired가 2분 nonce replay와 10분 세션 레코드를 만료 시 삭제한다.",
+      "retentionKo": "Google Play Integrity 처리 정보는 Google의 고정 보관 정책을 따름. 서버 논리 만료는 세션 10분·nonce SHA-256 2분이고 5분 주기 purge로 물리 파기는 각각 발급 후 약 15분·수신 후 약 7분 이내",
+      "deletionKo": "서버의 세션·nonce 해시는 논리 만료 뒤 5분 이내 물리 삭제하며 backend 데이터는 사용자·기기·계정 식별자와 연결하지 않음",
+      "deletionImplementation": "RouteV2AccessStore.purgeExpired가 논리 만료된 nonce replay와 세션 레코드를 RouteV2StatePurgeScheduler의 기본 5분 주기마다 삭제한다.",
       "evidence": [
         "apps/mobile/lib/route_v2_ingress.dart",
         "apps/mobile/android/app/src/main/kotlin/com/easysubway/easysubway_mobile/MainActivity.kt",
         "backend/src/main/java/com/easysubway/route/application/service/RouteV2SessionService.java",
+        "backend/src/main/java/com/easysubway/route/adapter/out/integrity/GooglePlayIntegrityDecoder.java",
+        "backend/src/main/java/com/easysubway/route/adapter/in/scheduler/RouteV2StatePurgeScheduler.java",
         "backend/src/main/resources/db/migration/postgresql/V57__route_v2_access_state.sql"
       ],
       "lastVerifiedAt": "2026-07-16",
       "sharedWithThirdParties": false,
       "usedForTracking": false,
+      "backendLinkedToUserDeviceOrAccountId": false,
+      "googleProcessingMayBeLinkedToSignedInAccountOrDevice": true,
       "googlePlayProcessing": {
         "alwaysCollected": [
           "requestHashOrNonce",
@@ -238,27 +265,71 @@
         "retention": "fixed-by-google-play-integrity-policy"
       },
       "mobileToBackendFields": ["integrityToken", "128-bit clientNonce"],
+      "backendToGoogleFields": ["rawIntegrityToken"],
+      "googleDecodeEndpoint": "https://playintegrity.googleapis.com/v1/com.easysubway.app:decodeIntegrityToken",
       "backendStoredFields": ["tokenSha256", "scope", "issuedAt", "expiresAt", "requestCount", "nonceSha256"],
       "retention": {
-        "session": "10 minutes",
-        "nonceSha256": "2 minutes"
+        "sessionLogicalExpiry": "10 minutes",
+        "sessionPhysicalDeletionWithin": "approximately 15 minutes from issuance",
+        "nonceLogicalExpiry": "2 minutes",
+        "noncePhysicalDeletionWithin": "approximately 7 minutes from receipt",
+        "purgeInterval": "5 minutes"
       },
-      "neverPersistedOrLogged": [
+      "backendNeverPersistedOrLogged": [
         "rawIntegrityToken",
         "rawClientNonce",
-        "integrityPayloadOrVerdict",
-        "ipAddress",
-        "deviceId",
-        "accountId",
-        "rawSearchText",
-        "coordinates"
+        "integrityPayloadOrVerdict"
       ],
       "responseCacheControl": "private, no-store",
       "googlePlayDataSafety": {
-        "dataType": "Diagnostics",
+        "dataType": "Device or other IDs",
         "collected": true,
         "collectionType": "optional-user-triggered-itx-session",
         "purpose": "Fraud prevention, security, and compliance",
+        "linkedToUser": true,
+        "encryptedInTransit": true,
+        "optional": true,
+        "required": false,
+        "deletionSupported": true,
+        "processedEphemerally": false
+      }
+    },
+    {
+      "id": "route_v2_itx_mobility_preferences",
+      "displayNameKo": "ITX 경로 이동 조건",
+      "purposeKo": "사용자가 선택한 이동 유형·프리셋·제약 조건을 반영한 ITX-청춘 경로 계산",
+      "implementationStatus": "backend-collected",
+      "introducedInVersion": "1.0.4",
+      "codeOwner": "mobile/backend",
+      "collectionTrigger": "사용자가 ITX-청춘 경로 검색을 직접 선택할 때 mobilityType, mobilityPreset, constraintMode를 요청마다 전송",
+      "backendTableOrService": [
+        "RouteSearchV2Request mobilityType/mobilityPreset/constraintMode",
+        "route_v2_states.itinerary_json legs.appliedPreset"
+      ],
+      "storageLocations": ["backend-request-memory", "backend-database-itinerary-json"],
+      "retentionKo": "mobilityPreset은 계산된 itinerary의 appliedPreset으로 저장되어 경로 상태 expiresAt 뒤 5분 이내 삭제. mobilityType과 constraintMode는 raw 필드로 저장하지 않지만 계산 결과에 반영",
+      "deletionKo": "별도 사용자·기기·계정 연결 없이 경로 상태와 함께 expiresAt 뒤 5분 이내 삭제",
+      "deletionImplementation": "ProductionRouteV2Support가 계산 itinerary를 저장하고 RouteV2StatePurgeScheduler가 기본 5분 주기로 만료 경로 상태를 삭제한다.",
+      "evidence": [
+        "apps/mobile/lib/route_search.dart",
+        "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchController.java",
+        "backend/src/main/java/com/easysubway/route/application/service/ProductionRouteV2Support.java",
+        "backend/src/main/java/com/easysubway/route/adapter/in/scheduler/RouteV2StatePurgeScheduler.java",
+        "backend/src/main/resources/db/migration/postgresql/V57__route_v2_access_state.sql"
+      ],
+      "lastVerifiedAt": "2026-07-16",
+      "sharedWithThirdParties": false,
+      "usedForTracking": false,
+      "routeRequestFields": ["mobilityType", "mobilityPreset", "constraintMode"],
+      "persistedRepresentation": {
+        "mobilityPreset": "itinerary_json[].legs[].appliedPreset",
+        "mobilityTypeAndConstraintMode": "computed-itinerary-only"
+      },
+      "googlePlayDataSafety": {
+        "dataType": "Personal info",
+        "collected": true,
+        "collectionType": "optional-user-triggered-itx-search",
+        "purpose": "App functionality",
         "linkedToUser": false,
         "encryptedInTransit": true,
         "optional": true,
@@ -280,52 +351,49 @@
         "route_v2_states.origin_station_id/destination_station_id/transport_scope/requested_departure_at/itinerary_json/timetable_artifact_id/created_at/planned_arrival_at/expires_at"
       ],
       "storageLocations": ["backend-request-memory", "backend-database"],
-      "retentionKo": "경로 상태는 생성 시각부터 최소 30분, 도착 예정 시각 30분 뒤까지 필요하되 생성 시각부터 최대 6시간까지만 보관",
-      "deletionKo": "경로 상태는 expiresAt 뒤 자동 삭제하며 사용자·기기·계정 식별자와 연결하지 않음",
-      "deletionImplementation": "RouteV2EphemeralStateService가 expiresAt을 계산하고 RouteV2AccessStore.purgeExpired가 만료 상태를 삭제한다.",
+      "retentionKo": "논리 만료는 생성 시각부터 최소 30분, 도착 예정 시각 30분 뒤까지 필요하되 생성 시각부터 최대 6시간. 5분 주기 purge로 물리 파기는 expiresAt 뒤 5분 이내",
+      "deletionKo": "경로 상태는 논리 expiresAt 뒤 5분 이내 물리 삭제하며 사용자·기기·계정 식별자와 연결하지 않음",
+      "deletionImplementation": "RouteV2EphemeralStateService가 expiresAt을 계산하고 RouteV2AccessStore.purgeExpired가 RouteV2StatePurgeScheduler의 기본 5분 주기마다 만료 상태를 삭제한다.",
       "evidence": [
         "apps/mobile/lib/route_search.dart",
         "backend/src/main/java/com/easysubway/route/application/service/RouteV2EphemeralStateService.java",
         "backend/src/main/java/com/easysubway/route/adapter/out/persistence/JdbcRouteV2AccessStore.java",
+        "backend/src/main/java/com/easysubway/route/adapter/in/scheduler/RouteV2StatePurgeScheduler.java",
         "backend/src/main/resources/db/migration/postgresql/V57__route_v2_access_state.sql"
       ],
       "lastVerifiedAt": "2026-07-16",
       "sharedWithThirdParties": false,
       "usedForTracking": false,
       "routeRequestFields": [
-        "canonicalOriginStationId",
-        "canonicalDestinationStationId",
-        "transportScope",
-        "departureTime",
-        "mobilityPreset",
+        "originStationId",
+        "destinationStationId",
         "mobilityType",
         "constraintMode",
-        "realtimeFlag",
+        "mobilityPreset",
+        "departureTime",
+        "useRealtime",
         "maxTransfers",
         "alternativeCount"
       ],
       "backendStoredFields": [
-        "originStationId",
-        "destinationStationId",
-        "transportScope",
-        "departureTime",
-        "itinerary",
-        "timetableArtifactId",
-        "createdAt",
-        "plannedArrivalAt",
-        "expiresAt"
+        "route_state_id",
+        "origin_station_id",
+        "destination_station_id",
+        "transport_scope",
+        "requested_departure_at",
+        "itinerary_json",
+        "timetable_artifact_id",
+        "created_at",
+        "planned_arrival_at",
+        "expires_at"
       ],
-      "retention": "min(createdAt+6h,max(createdAt+30m,plannedArrivalAt+30m))",
-      "neverPersistedOrLogged": [
-        "rawIntegrityToken",
-        "rawClientNonce",
-        "integrityPayloadOrVerdict",
-        "ipAddress",
-        "deviceId",
-        "accountId",
-        "rawSearchText",
-        "coordinates"
-      ],
+      "backendStoredTransportScope": "SUBWAY_AND_ITX_CHEONGCHUN",
+      "retention": {
+        "logicalExpiresAt": "min(createdAt+6h,max(createdAt+30m,plannedArrivalAt+30m))",
+        "physicalDeletionWithin": "expiresAt+5m",
+        "purgeInterval": "5 minutes"
+      },
+      "notSentOrStoredByRouteV2": ["rawSearchText", "coordinates"],
       "responseCacheControl": "private, no-store",
       "googlePlayDataSafety": {
         "dataType": "App activity",
