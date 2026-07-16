@@ -3935,9 +3935,9 @@
        class="render-layer label-layer">
       <text
          id="station-label-ub2e4-ub300-ud3ec-ud574-uc218-uc695-uc7a5"
-         x="657.52"
-         y="2466.96"
-         text-anchor="start"
+         x="680"
+         y="2496.7"
+         text-anchor="middle"
          font-size="38.5"
          font-weight="700"
          fill="#14293D"
@@ -3945,14 +3945,14 @@
          data-label-role="terminal"
          data-station-key="다대포해수욕장"
          data-station="다대포해수욕장"
-         data-label-mode="upper-right"><tspan
-           x="657.52"
+         data-label-mode="above"><tspan
+           x="680"
            dy="0"
            id="tspan224">다대포해수욕장</tspan></text>
       <text
          id="station-label-ub2e4-ub300-ud3ec-ud56d"
          x="770"
-         y="2603"
+         y="2605.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -3968,7 +3968,7 @@
       <text
          id="station-label-ub0ab-uac1c"
          x="860"
-         y="2407"
+         y="2508.75"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -3984,7 +3984,7 @@
       <text
          id="station-label-uc2e0-uc7a5-ub9bc"
          x="950"
-         y="2603"
+         y="2605.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -4000,7 +4000,7 @@
       <text
          id="station-label-uc7a5-ub9bc"
          x="1040"
-         y="2511"
+         y="2508.75"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -4016,7 +4016,7 @@
       <text
          id="station-label-ub3d9-ub9e4"
          x="1130"
-         y="2603"
+         y="2605.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -4032,7 +4032,7 @@
       <text
          id="station-label-uc2e0-ud3c9"
          x="1220"
-         y="2511"
+         y="2508.75"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -4048,7 +4048,7 @@
       <text
          id="station-label-ud558-ub2e8"
          x="1310"
-         y="2603"
+         y="2605.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -4064,7 +4064,7 @@
       <text
          id="station-label-ub2f9-ub9ac"
          x="1400"
-         y="2511"
+         y="2508.75"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -4080,7 +4080,7 @@
       <text
          id="station-label-uc0ac-ud558"
          x="1490"
-         y="2603"
+         y="2605.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -4095,8 +4095,8 @@
            id="tspan233">사하</tspan></text>
       <text
          id="station-label-uad34-uc815"
-         x="1640"
-         y="2467"
+         x="1594.02"
+         y="2512.1"
          text-anchor="start"
          font-size="37"
          font-weight="700"
@@ -4105,14 +4105,14 @@
          data-label-role="ordinary"
          data-station-key="괴정"
          data-station="괴정"
-         data-label-mode="right"><tspan
-           x="1640"
+         data-label-mode="lower-right"><tspan
+           x="1594.02"
            dy="0"
            id="tspan234">괴정</tspan></text>
       <text
          id="station-label-ub300-ud2f0"
-         x="1610"
-         y="2377"
+         x="1655.98"
+         y="2331.9"
          text-anchor="end"
          font-size="37"
          font-weight="700"
@@ -4121,14 +4121,14 @@
          data-label-role="ordinary"
          data-station-key="대티"
          data-station="대티"
-         data-label-mode="left"><tspan
-           x="1610"
+         data-label-mode="upper-left"><tspan
+           x="1655.98"
            dy="0"
            id="tspan235">대티</tspan></text>
       <text
          id="station-label-uc11c-ub300-uc2e0"
-         x="1820"
-         y="2287"
+         x="1766.25"
+         y="2339.87"
          text-anchor="start"
          font-size="37"
          font-weight="700"
@@ -4137,14 +4137,14 @@
          data-label-role="ordinary"
          data-station-key="서대신"
          data-station="서대신"
-         data-label-mode="right"><tspan
-           x="1820"
+         data-label-mode="lower-right"><tspan
+           x="1766.25"
            dy="0"
            id="tspan236">서대신</tspan></text>
       <text
          id="station-label-ub3d9-ub300-uc2e0"
-         x="1790"
-         y="2197"
+         x="1843.75"
+         y="2144.13"
          text-anchor="end"
          font-size="37"
          font-weight="700"
@@ -4153,14 +4153,14 @@
          data-label-role="ordinary"
          data-station-key="동대신"
          data-station="동대신"
-         data-label-mode="left"><tspan
-           x="1790"
+         data-label-mode="upper-left"><tspan
+           x="1843.75"
            dy="0"
            id="tspan237">동대신</tspan></text>
       <text
          id="station-label-ud1a0-uc131"
-         x="2000"
-         y="2107"
+         x="1954.02"
+         y="2152.1"
          text-anchor="start"
          font-size="37"
          font-weight="700"
@@ -4169,14 +4169,14 @@
          data-label-role="ordinary"
          data-station-key="토성"
          data-station="토성"
-         data-label-mode="right"><tspan
-           x="2000"
+         data-label-mode="lower-right"><tspan
+           x="1954.02"
            dy="0"
            id="tspan238">토성</tspan></text>
       <text
          id="station-label-uc790-uac08-uce58"
-         x="1970"
-         y="2017"
+         x="2023.75"
+         y="1964.13"
          text-anchor="end"
          font-size="37"
          font-weight="700"
@@ -4185,14 +4185,14 @@
          data-label-role="ordinary"
          data-station-key="자갈치"
          data-station="자갈치"
-         data-label-mode="left"><tspan
-           x="1970"
+         data-label-mode="upper-left"><tspan
+           x="2023.75"
            dy="0"
            id="tspan239">자갈치</tspan></text>
       <text
          id="station-label-ub0a8-ud3ec"
-         x="2180"
-         y="1927"
+         x="2134.02"
+         y="1972.1"
          text-anchor="start"
          font-size="37"
          font-weight="700"
@@ -4201,15 +4201,15 @@
          data-label-role="ordinary"
          data-station-key="남포"
          data-station="남포"
-         data-label-mode="right"><tspan
-           x="2180"
+         data-label-mode="lower-right"><tspan
+           x="2134.02"
            dy="0"
            id="tspan240">남포</tspan></text>
       <text
          id="station-label-uc911-uc559"
-         x="2150"
-         y="1837"
-         text-anchor="end"
+         x="2223.91"
+         y="1882.21"
+         text-anchor="start"
          font-size="37"
          font-weight="700"
          fill="#14293D"
@@ -4217,13 +4217,13 @@
          data-label-role="ordinary"
          data-station-key="중앙"
          data-station="중앙"
-         data-label-mode="left"><tspan
-           x="2150"
+         data-label-mode="lower-right"><tspan
+           x="2223.91"
            dy="0"
            id="tspan241">중앙</tspan></text>
       <text
          id="station-label-ubd80-uc0b0-uc5ed"
-         x="2186"
+         x="2183.75"
          y="1747"
          text-anchor="end"
          font-size="37"
@@ -4234,12 +4234,12 @@
          data-station-key="부산역"
          data-station="부산역"
          data-label-mode="left"><tspan
-           x="2186"
+           x="2183.75"
            dy="0"
            id="tspan242">부산역</tspan></text>
       <text
          id="station-label-ucd08-ub7c9"
-         x="2234"
+         x="2236.25"
          y="1657"
          text-anchor="start"
          font-size="37"
@@ -4250,12 +4250,12 @@
          data-station-key="초량"
          data-station="초량"
          data-label-mode="right"><tspan
-           x="2234"
+           x="2236.25"
            dy="0"
            id="tspan243">초량</tspan></text>
       <text
          id="station-label-ubd80-uc0b0-uc9c4"
-         x="2186"
+         x="2183.75"
          y="1567"
          text-anchor="end"
          font-size="37"
@@ -4266,14 +4266,14 @@
          data-station-key="부산진"
          data-station="부산진"
          data-label-mode="left"><tspan
-           x="2186"
+           x="2183.75"
            dy="0"
            id="tspan244">부산진</tspan></text>
       <text
          id="station-label-uc88c-ucc9c_1"
-         x="2186"
+         x="2236.25"
          y="1477"
-         text-anchor="end"
+         text-anchor="start"
          font-size="37"
          font-weight="700"
          fill="#14293D"
@@ -4281,14 +4281,14 @@
          data-label-role="ordinary"
          data-station-key="좌천_1"
          data-station="좌천"
-         data-label-mode="left"><tspan
-           x="2186"
+         data-label-mode="right"><tspan
+           x="2236.25"
            dy="0"
            id="tspan245">좌천</tspan></text>
       <text
          id="station-label-ubc94-uc77c"
-         x="2186"
-         y="1387"
+         x="2188.91"
+         y="1439.17"
          text-anchor="end"
          font-size="37"
          font-weight="700"
@@ -4297,14 +4297,14 @@
          data-label-role="ordinary"
          data-station-key="범일"
          data-station="범일"
-         data-label-mode="left"><tspan
-           x="2186"
+         data-label-mode="lower-left"><tspan
+           x="2188.91"
            dy="0"
            id="tspan246">범일</tspan></text>
       <text
          id="station-label-ubc94-ub0b4-uace8"
-         x="2366"
-         y="1297"
+         x="2223.32"
+         y="1356.94"
          text-anchor="start"
          font-size="37"
          font-weight="700"
@@ -4313,13 +4313,13 @@
          data-label-role="ordinary"
          data-station-key="범내골"
          data-station="범내골"
-         data-label-mode="right"><tspan
-           x="2366"
+         data-label-mode="lower-right"><tspan
+           x="2223.32"
            dy="0"
            id="tspan247">범내골</tspan></text>
       <text
          id="station-label-uc11c-uba74"
-         x="2070.05"
+         x="2143.55"
          y="1205.91"
          text-anchor="end"
          font-size="41.5"
@@ -4330,13 +4330,13 @@
          data-station-key="서면"
          data-station="서면"
          data-label-mode="left"><tspan
-           x="2070.05"
+           x="2143.55"
            dy="0"
            id="tspan248">서면</tspan></text>
       <text
          id="station-label-ubd80-uc804"
-         x="2152.99"
-         y="1156.94"
+         x="2171.91"
+         y="991.98"
          text-anchor="end"
          font-size="41.5"
          font-weight="800"
@@ -4345,15 +4345,15 @@
          data-label-role="transfer"
          data-station-key="부전"
          data-station="부전"
-         data-label-mode="lower-left"><tspan
-           x="2152.99"
+         data-label-mode="upper-left"><tspan
+           x="2171.91"
            dy="0"
            id="tspan249">부전</tspan></text>
       <text
          id="station-label-uc591-uc815"
-         x="2186"
+         x="2236.25"
          y="937"
-         text-anchor="end"
+         text-anchor="start"
          font-size="37"
          font-weight="700"
          fill="#14293D"
@@ -4361,14 +4361,14 @@
          data-label-role="ordinary"
          data-station-key="양정"
          data-station="양정"
-         data-label-mode="left"><tspan
-           x="2186"
+         data-label-mode="right"><tspan
+           x="2236.25"
            dy="0"
            id="tspan250">양정</tspan></text>
       <text
          id="station-label-uc2dc-uccad"
-         x="2398"
-         y="811"
+         x="2231.09"
+         y="863.17"
          text-anchor="start"
          font-size="37"
          font-weight="700"
@@ -4377,13 +4377,13 @@
          data-label-role="ordinary"
          data-station-key="시청"
          data-station="시청"
-         data-label-mode="right"><tspan
-           x="2398"
+         data-label-mode="lower-right"><tspan
+           x="2231.09"
            dy="0"
            id="tspan251">시청</tspan></text>
       <text
          id="station-label-uc5f0-uc0b0"
-         x="2016.39"
+         x="2143.9"
          y="683.33"
          text-anchor="end"
          font-size="41.5"
@@ -4394,12 +4394,12 @@
          data-station-key="연산"
          data-station="연산"
          data-label-mode="left"><tspan
-           x="2016.39"
+           x="2143.9"
            dy="0"
            id="tspan252">연산</tspan></text>
       <text
          id="station-label-uad50-ub300"
-         x="2272.19"
+         x="2276.69"
          y="560.9"
          text-anchor="start"
          font-size="41.5"
@@ -4410,13 +4410,13 @@
          data-station-key="교대"
          data-station="교대"
          data-label-mode="right"><tspan
-           x="2272.19"
+           x="2276.69"
            dy="0"
            id="tspan253">교대</tspan></text>
       <text
          id="station-label-ub3d9-ub798_M"
-         x="2165.75"
-         y="355.85"
+         x="2171.94"
+         y="362.05"
          text-anchor="end"
          font-size="41.5"
          font-weight="800"
@@ -4426,13 +4426,13 @@
          data-station-key="동래_M"
          data-station="동래"
          data-label-mode="upper-left"><tspan
-           x="2165.75"
+           x="2171.94"
            dy="0"
            id="tspan254">동래</tspan></text>
       <text
          id="station-label-uba85-ub95c"
-         x="2226.24"
-         y="295.68"
+         x="2224.02"
+         y="297.9"
          text-anchor="start"
          font-size="37"
          font-weight="700"
@@ -4442,14 +4442,14 @@
          data-station-key="명륜"
          data-station="명륜"
          data-label-mode="upper-right"><tspan
-           x="2226.24"
+           x="2224.02"
            dy="0"
            id="tspan255">명륜</tspan></text>
       <text
          id="station-label-uc628-ucc9c-uc7a5"
-         x="2336"
-         y="241"
-         text-anchor="middle"
+         x="2342.15"
+         y="290.02"
+         text-anchor="start"
          font-size="37"
          font-weight="700"
          fill="#14293D"
@@ -4457,15 +4457,15 @@
          data-label-role="ordinary"
          data-station-key="온천장"
          data-station="온천장"
-         data-label-mode="above"><tspan
-           x="2336"
+         data-label-mode="upper-right"><tspan
+           x="2342.15"
            dy="0"
            id="tspan256">온천장</tspan></text>
       <text
          id="station-label-ubd80-uc0b0-ub300"
-         x="2462"
-         y="389"
-         text-anchor="middle"
+         x="2468.25"
+         y="290.13"
+         text-anchor="start"
          font-size="37"
          font-weight="700"
          fill="#14293D"
@@ -4473,15 +4473,15 @@
          data-label-role="ordinary"
          data-station-key="부산대"
          data-station="부산대"
-         data-label-mode="below"><tspan
-           x="2462"
+         data-label-mode="upper-right"><tspan
+           x="2468.25"
            dy="0"
            id="tspan257">부산대</tspan></text>
       <text
          id="station-label-uc7a5-uc804"
-         x="2588"
-         y="297"
-         text-anchor="middle"
+         x="2602.02"
+         y="297.9"
+         text-anchor="start"
          font-size="37"
          font-weight="700"
          fill="#14293D"
@@ -4489,14 +4489,14 @@
          data-label-role="ordinary"
          data-station-key="장전"
          data-station="장전"
-         data-label-mode="above"><tspan
-           x="2588"
+         data-label-mode="upper-right"><tspan
+           x="2602.02"
            dy="0"
            id="tspan258">장전</tspan></text>
       <text
          id="station-label-uad6c-uc11c"
          x="2714"
-         y="389"
+         y="294.75"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -4505,14 +4505,14 @@
          data-label-role="ordinary"
          data-station-key="구서"
          data-station="구서"
-         data-label-mode="below"><tspan
+         data-label-mode="above"><tspan
            x="2714"
            dy="0"
            id="tspan259">구서</tspan></text>
       <text
          id="station-label-ub450-uc2e4"
          x="2840"
-         y="297"
+         y="294.75"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -4528,7 +4528,7 @@
       <text
          id="station-label-ub0a8-uc0b0"
          x="2966"
-         y="389"
+         y="294.75"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -4537,14 +4537,14 @@
          data-label-role="ordinary"
          data-station-key="남산"
          data-station="남산"
-         data-label-mode="below"><tspan
+         data-label-mode="above"><tspan
            x="2966"
            dy="0"
            id="tspan261">남산</tspan></text>
       <text
          id="station-label-ubc94-uc5b4-uc0ac"
          x="3092"
-         y="241"
+         y="294.75"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -4559,9 +4559,9 @@
            id="tspan262">범어사</tspan></text>
       <text
          id="station-label-ub178-ud3ec"
-         x="3199.91"
-         y="293.53"
-         text-anchor="end"
+         x="3218"
+         y="292.7"
+         text-anchor="middle"
          font-size="38.5"
          font-weight="700"
          fill="#14293D"
@@ -4569,14 +4569,14 @@
          data-label-role="terminal"
          data-station-key="노포"
          data-station="노포"
-         data-label-mode="upper-left"><tspan
-           x="3199.91"
+         data-label-mode="above"><tspan
+           x="3218"
            dy="0"
            id="tspan263">노포</tspan></text>
       <text
          id="station-label-uc591-uc0b0"
-         x="1806"
-         y="1028"
+         x="1622.09"
+         y="1102.67"
          text-anchor="start"
          font-size="38.5"
          font-weight="700"
@@ -4585,13 +4585,13 @@
          data-label-role="terminal"
          data-station-key="양산"
          data-station="양산"
-         data-label-mode="right"><tspan
-           x="1806"
+         data-label-mode="lower-right"><tspan
+           x="1622.09"
            dy="0"
            id="tspan264">양산</tspan></text>
       <text
          id="station-label-ub0a8-uc591-uc0b0"
-         x="1604"
+         x="1606.25"
          y="937"
          text-anchor="start"
          font-size="37"
@@ -4602,14 +4602,14 @@
          data-station-key="남양산"
          data-station="남양산"
          data-label-mode="right"><tspan
-           x="1604"
+           x="1606.25"
            dy="0"
            id="tspan265">남양산</tspan></text>
       <text
          id="station-label-ubd80-uc0b0-ub300-uc591-uc0b0-ucea0-ud37c-uc2a4"
-         x="1686.53"
-         y="778.42"
-         text-anchor="start"
+         x="1553.75"
+         y="826.11"
+         text-anchor="end"
          font-size="34"
          font-weight="700"
          fill="#14293D"
@@ -4617,16 +4617,16 @@
          data-label-role="ordinary"
          data-station-key="부산대양산캠퍼스"
          data-station="부산대양산캠퍼스"
-         data-label-mode="right"><tspan
-           x="1686.53"
+         data-label-mode="left"><tspan
+           x="1553.75"
            dy="0"
            id="tspan266">부산대양산</tspan><tspan
-           x="1686.53"
+           x="1553.75"
            dy="39.78"
            id="tspan267">캠퍼스</tspan></text>
       <text
          id="station-label-uc99d-uc0b0"
-         x="1604"
+         x="1606.25"
          y="757"
          text-anchor="start"
          font-size="37"
@@ -4637,14 +4637,14 @@
          data-station-key="증산"
          data-station="증산"
          data-label-mode="right"><tspan
-           x="1604"
+           x="1606.25"
            dy="0"
            id="tspan268">증산</tspan></text>
       <text
          id="station-label-ud638-ud3ec"
-         x="1580"
-         y="489"
-         text-anchor="middle"
+         x="1606.25"
+         y="667"
+         text-anchor="start"
          font-size="37"
          font-weight="700"
          fill="#14293D"
@@ -4652,14 +4652,14 @@
          data-label-role="ordinary"
          data-station-key="호포"
          data-station="호포"
-         data-label-mode="above"><tspan
-           x="1580"
+         data-label-mode="right"><tspan
+           x="1606.25"
            dy="0"
            id="tspan269">호포</tspan></text>
       <text
          id="station-label-uae08-uace1"
-         x="1490"
-         y="585"
+         x="1374.84"
+         y="618.75"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -4669,13 +4669,13 @@
          data-station-key="금곡"
          data-station="금곡"
          data-label-mode="above"><tspan
-           x="1490"
+           x="1374.84"
            dy="0"
            id="tspan270">금곡</tspan></text>
       <text
          id="station-label-ub3d9-uc6d0"
-         x="1400"
-         y="621"
+         x="1284.84"
+         y="618.75"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -4685,14 +4685,14 @@
          data-station-key="동원"
          data-station="동원"
          data-label-mode="above"><tspan
-           x="1400"
+           x="1284.84"
            dy="0"
            id="tspan271">동원</tspan></text>
       <text
          id="station-label-uc728-ub9ac"
-         x="1419.58"
-         y="807.66"
-         text-anchor="start"
+         x="1194.84"
+         y="715.25"
+         text-anchor="middle"
          font-size="37"
          font-weight="700"
          fill="#14293D"
@@ -4700,14 +4700,14 @@
          data-label-role="ordinary"
          data-station-key="율리"
          data-station="율리"
-         data-label-mode="lower-right"><tspan
-           x="1419.58"
+         data-label-mode="below"><tspan
+           x="1194.84"
            dy="0"
            id="tspan272">율리</tspan></text>
       <text
          id="station-label-ud654-uba85"
-         x="1220"
-         y="713"
+         x="1104.84"
+         y="715.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -4717,14 +4717,14 @@
          data-station-key="화명"
          data-station="화명"
          data-label-mode="below"><tspan
-           x="1220"
+           x="1104.84"
            dy="0"
            id="tspan273">화명</tspan></text>
       <text
          id="station-label-uc218-uc815"
-         x="966.24"
-         y="714.32"
-         text-anchor="start"
+         x="950"
+         y="618.75"
+         text-anchor="middle"
          font-size="37"
          font-weight="700"
          fill="#14293D"
@@ -4732,14 +4732,14 @@
          data-label-role="ordinary"
          data-station-key="수정"
          data-station="수정"
-         data-label-mode="lower-right"><tspan
-           x="966.24"
+         data-label-mode="above"><tspan
+           x="950"
            dy="0"
            id="tspan274">수정</tspan></text>
       <text
          id="station-label-ub355-ucc9c"
-         x="905.45"
-         y="769.79"
+         x="911.64"
+         y="775.98"
          text-anchor="end"
          font-size="41.5"
          font-weight="800"
@@ -4749,14 +4749,14 @@
          data-station-key="덕천"
          data-station="덕천"
          data-label-mode="upper-left"><tspan
-           x="905.45"
+           x="911.64"
            dy="0"
            id="tspan275">덕천</tspan></text>
       <text
          id="station-label-uad6c-uba85"
-         x="1100"
-         y="937"
-         text-anchor="start"
+         x="1025.98"
+         y="982.1"
+         text-anchor="end"
          font-size="37"
          font-weight="700"
          fill="#14293D"
@@ -4764,14 +4764,14 @@
          data-label-role="ordinary"
          data-station-key="구명"
          data-station="구명"
-         data-label-mode="right"><tspan
-           x="1100"
+         data-label-mode="lower-left"><tspan
+           x="1025.98"
            dy="0"
            id="tspan276">구명</tspan></text>
       <text
          id="station-label-uad6c-ub0a8"
-         x="1070"
-         y="1027"
+         x="1116.09"
+         y="1072.21"
          text-anchor="end"
          font-size="37"
          font-weight="700"
@@ -4780,14 +4780,14 @@
          data-label-role="ordinary"
          data-station-key="구남"
          data-station="구남"
-         data-label-mode="left"><tspan
-           x="1070"
+         data-label-mode="lower-left"><tspan
+           x="1116.09"
            dy="0"
            id="tspan277">구남</tspan></text>
       <text
          id="station-label-ubaa8-ub77c"
-         x="1280"
-         y="1117"
+         x="1233.85"
+         y="1071.73"
          text-anchor="start"
          font-size="37"
          font-weight="700"
@@ -4796,15 +4796,15 @@
          data-label-role="ordinary"
          data-station-key="모라"
          data-station="모라"
-         data-label-mode="right"><tspan
-           x="1280"
+         data-label-mode="upper-right"><tspan
+           x="1233.85"
            dy="0"
            id="tspan278">모라</tspan></text>
       <text
          id="station-label-ubaa8-ub355"
-         x="1250"
-         y="1207"
-         text-anchor="end"
+         x="1324.02"
+         y="1161.9"
+         text-anchor="start"
          font-size="37"
          font-weight="700"
          fill="#14293D"
@@ -4812,13 +4812,13 @@
          data-label-role="ordinary"
          data-station-key="모덕"
          data-station="모덕"
-         data-label-mode="left"><tspan
-           x="1250"
+         data-label-mode="upper-right"><tspan
+           x="1324.02"
            dy="0"
            id="tspan279">모덕</tspan></text>
       <text
          id="station-label-ub355-ud3ec"
-         x="1334"
+         x="1336.25"
          y="1297"
          text-anchor="start"
          font-size="37"
@@ -4829,13 +4829,13 @@
          data-station-key="덕포"
          data-station="덕포"
          data-label-mode="right"><tspan
-           x="1334"
+           x="1336.25"
            dy="0"
            id="tspan280">덕포</tspan></text>
       <text
          id="station-label-uc0ac-uc0c1"
          x="1147.46"
-         y="1370.71"
+         y="1374.21"
          text-anchor="middle"
          font-size="41.5"
          font-weight="800"
@@ -4851,7 +4851,7 @@
       <text
          id="station-label-uac10-uc804"
          x="1328"
-         y="1505"
+         y="1507.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -4867,7 +4867,7 @@
       <text
          id="station-label-uc8fc-ub840"
          x="1454"
-         y="1413"
+         y="1410.75"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -4883,7 +4883,7 @@
       <text
          id="station-label-ub0c9-uc815"
          x="1580"
-         y="1505"
+         y="1507.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -4899,7 +4899,7 @@
       <text
          id="station-label-uac1c-uae08"
          x="1706"
-         y="1413"
+         y="1410.75"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -4915,7 +4915,7 @@
       <text
          id="station-label-ub3d9-uc758-ub300"
          x="1832"
-         y="1505"
+         y="1507.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -4930,9 +4930,9 @@
            id="tspan286">동의대</tspan></text>
       <text
          id="station-label-uac00-uc57c"
-         x="1958"
-         y="1377"
-         text-anchor="middle"
+         x="1944.1"
+         y="1413.77"
+         text-anchor="end"
          font-size="37"
          font-weight="700"
          fill="#14293D"
@@ -4940,15 +4940,15 @@
          data-label-role="ordinary"
          data-station-key="가야"
          data-station="가야"
-         data-label-mode="above"><tspan
-           x="1958"
+         data-label-mode="upper-left"><tspan
+           x="1944.1"
            dy="0"
            id="tspan287">가야</tspan></text>
       <text
          id="station-label-ubd80-uc554"
-         x="2084"
-         y="1415"
-         text-anchor="middle"
+         x="2097.91"
+         y="1378.21"
+         text-anchor="start"
          font-size="37"
          font-weight="700"
          fill="#14293D"
@@ -4956,14 +4956,14 @@
          data-label-role="ordinary"
          data-station-key="부암"
          data-station="부암"
-         data-label-mode="below"><tspan
-           x="2084"
+         data-label-mode="lower-right"><tspan
+           x="2097.91"
            dy="0"
            id="tspan288">부암</tspan></text>
       <text
          id="station-label-uc804-ud3ec"
-         x="2488"
-         y="1297"
+         x="2314.02"
+         y="1251.9"
          text-anchor="start"
          font-size="37"
          font-weight="700"
@@ -4972,14 +4972,14 @@
          data-label-role="ordinary"
          data-station-key="전포"
          data-station="전포"
-         data-label-mode="right"><tspan
-           x="2488"
+         data-label-mode="upper-right"><tspan
+           x="2314.02"
            dy="0"
            id="tspan289">전포</tspan></text>
       <text
          id="station-label-uad6d-uc81c-uae08-uc735-uc13c-ud130-xb7-ubd80-uc0b0-uc740-ud589"
-         x="2470"
-         y="1366.11"
+         x="2390.67"
+         y="1275.63"
          text-anchor="start"
          font-size="34"
          font-weight="700"
@@ -4988,17 +4988,17 @@
          data-label-role="ordinary"
          data-station-key="국제금융센터·부산은행"
          data-station="국제금융센터·부산은행"
-         data-label-mode="right"><tspan
-           x="2470"
+         data-label-mode="upper-right"><tspan
+           x="2390.67"
            dy="0"
            id="tspan290">국제금융센터·</tspan><tspan
-           x="2470"
+           x="2390.67"
            dy="39.78"
            id="tspan291">부산은행</tspan></text>
       <text
          id="station-label-ubb38-ud604"
-         x="2540"
-         y="1477"
+         x="2494.02"
+         y="1431.9"
          text-anchor="start"
          font-size="37"
          font-weight="700"
@@ -5007,14 +5007,14 @@
          data-label-role="ordinary"
          data-station-key="문현"
          data-station="문현"
-         data-label-mode="right"><tspan
-           x="2540"
+         data-label-mode="upper-right"><tspan
+           x="2494.02"
            dy="0"
            id="tspan292">문현</tspan></text>
       <text
          id="station-label-uc9c0-uac8c-uace8"
-         x="2630"
-         y="1567"
+         x="2576.25"
+         y="1514.13"
          text-anchor="start"
          font-size="37"
          font-weight="700"
@@ -5023,14 +5023,14 @@
          data-label-role="ordinary"
          data-station-key="지게골"
          data-station="지게골"
-         data-label-mode="right"><tspan
-           x="2630"
+         data-label-mode="upper-right"><tspan
+           x="2576.25"
            dy="0"
            id="tspan293">지게골</tspan></text>
       <text
          id="station-label-ubabb-uace8"
-         x="2720"
-         y="1657"
+         x="2674.02"
+         y="1611.9"
          text-anchor="start"
          font-size="37"
          font-weight="700"
@@ -5039,14 +5039,14 @@
          data-label-role="ordinary"
          data-station-key="못골"
          data-station="못골"
-         data-label-mode="right"><tspan
-           x="2720"
+         data-label-mode="upper-right"><tspan
+           x="2674.02"
            dy="0"
            id="tspan294">못골</tspan></text>
       <text
          id="station-label-ub300-uc5f0"
-         x="2810"
-         y="1747"
+         x="2764.02"
+         y="1701.9"
          text-anchor="start"
          font-size="37"
          font-weight="700"
@@ -5055,14 +5055,14 @@
          data-label-role="ordinary"
          data-station-key="대연"
          data-station="대연"
-         data-label-mode="right"><tspan
-           x="2810"
+         data-label-mode="upper-right"><tspan
+           x="2764.02"
            dy="0"
            id="tspan295">대연</tspan></text>
       <text
          id="station-label-uacbd-uc131-ub300-xb7-ubd80-uacbd-ub300"
          x="2840"
-         y="1883"
+         y="1885.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -5078,7 +5078,7 @@
       <text
          id="station-label-ub0a8-ucc9c"
          x="2930"
-         y="1939"
+         y="1788.75"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -5087,14 +5087,14 @@
          data-label-role="ordinary"
          data-station-key="남천"
          data-station="남천"
-         data-label-mode="below"><tspan
+         data-label-mode="above"><tspan
            x="2930"
            dy="0"
            id="tspan297">남천</tspan></text>
       <text
          id="station-label-uae08-ub828-uc0b0"
          x="3020"
-         y="1883"
+         y="1885.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -5110,7 +5110,7 @@
       <text
          id="station-label-uad11-uc548"
          x="3110"
-         y="1883"
+         y="1885.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -5125,8 +5125,8 @@
            id="tspan299">광안</tspan></text>
       <text
          id="station-label-uc218-uc601"
-         x="3199.78"
-         y="1752.85"
+         x="3199.77"
+         y="1756.35"
          text-anchor="middle"
          font-size="41.5"
          font-weight="800"
@@ -5136,13 +5136,13 @@
          data-station-key="수영"
          data-station="수영"
          data-label-mode="above"><tspan
-           x="3199.78"
+           x="3199.77"
            dy="0"
            id="tspan300">수영</tspan></text>
       <text
          id="station-label-ubbfc-ub77d"
-         x="3350"
-         y="1747"
+         x="3303.91"
+         y="1792.21"
          text-anchor="start"
          font-size="37"
          font-weight="700"
@@ -5151,14 +5151,14 @@
          data-label-role="ordinary"
          data-station-key="민락"
          data-station="민락"
-         data-label-mode="right"><tspan
-           x="3350"
+         data-label-mode="lower-right"><tspan
+           x="3303.91"
            dy="0"
            id="tspan301">민락</tspan></text>
       <text
          id="station-label-uc13c-ud140-uc2dc-ud2f0"
-         x="3407.34"
-         y="1680.98"
+         x="3378.48"
+         y="1717.64"
          text-anchor="start"
          font-size="37"
          font-weight="700"
@@ -5167,13 +5167,13 @@
          data-label-role="ordinary"
          data-station-key="센텀시티"
          data-station="센텀시티"
-         data-label-mode="right"><tspan
-           x="3407.34"
+         data-label-mode="lower-right"><tspan
+           x="3378.48"
            dy="0"
            id="tspan302">센텀시티</tspan></text>
       <text
          id="station-label-ubca1-uc2a4-ucf54"
-         x="3387.87"
+         x="3391.37"
          y="1544.53"
          text-anchor="end"
          font-size="41.5"
@@ -5184,17 +5184,17 @@
          data-station-key="벡스코"
          data-station="벡스코 (시립미술관)"
          data-label-mode="left"><tspan
-           x="3387.87"
+           x="3391.37"
            dy="0"
            id="tspan303">벡스코</tspan><tspan
-           x="3387.87"
+           x="3391.37"
            dy="48.55"
            id="tspan304">(시립미술관)</tspan></text>
       <text
          id="station-label-ub3d9-ubc31"
-         x="3320"
-         y="1477"
-         text-anchor="end"
+         x="3394.02"
+         y="1431.9"
+         text-anchor="start"
          font-size="37"
          font-weight="700"
          fill="#14293D"
@@ -5202,14 +5202,14 @@
          data-label-role="ordinary"
          data-station-key="동백"
          data-station="동백"
-         data-label-mode="left"><tspan
-           x="3320"
+         data-label-mode="upper-right"><tspan
+           x="3394.02"
            dy="0"
            id="tspan305">동백</tspan></text>
       <text
          id="station-label-ud574-uc6b4-ub300"
-         x="3230"
-         y="1387"
+         x="3283.75"
+         y="1439.87"
          text-anchor="end"
          font-size="37"
          font-weight="700"
@@ -5218,15 +5218,15 @@
          data-label-role="ordinary"
          data-station-key="해운대"
          data-station="해운대"
-         data-label-mode="left"><tspan
-           x="3230"
+         data-label-mode="lower-left"><tspan
+           x="3283.75"
            dy="0"
            id="tspan306">해운대</tspan></text>
       <text
          id="station-label-uc911-ub3d9"
-         x="3134"
+         x="3316.25"
          y="1297"
-         text-anchor="end"
+         text-anchor="start"
          font-size="37"
          font-weight="700"
          fill="#14293D"
@@ -5234,13 +5234,13 @@
          data-label-role="ordinary"
          data-station-key="중동"
          data-station="중동"
-         data-label-mode="left"><tspan
-           x="3134"
+         data-label-mode="right"><tspan
+           x="3316.25"
            dy="0"
            id="tspan307">중동</tspan></text>
       <text
          id="station-label-uc7a5-uc0b0"
-         x="3316"
+         x="3318.3"
          y="1208"
          text-anchor="start"
          font-size="38.5"
@@ -5251,13 +5251,13 @@
          data-station-key="장산"
          data-station="장산"
          data-label-mode="right"><tspan
-           x="3316"
+           x="3318.3"
            dy="0"
            id="tspan308">장산</tspan></text>
       <text
          id="station-label-ub300-uc800"
          x="589.14"
-         y="779.63"
+         y="775.13"
          text-anchor="middle"
          font-size="41.5"
          font-weight="800"
@@ -5272,9 +5272,9 @@
            id="tspan309">대저</tspan></text>
       <text
          id="station-label-uccb4-uc721-uacf5-uc6d0"
-         x="605.76"
-         y="710.6"
-         text-anchor="end"
+         x="678.48"
+         y="786.36"
+         text-anchor="start"
          font-size="37"
          font-weight="700"
          fill="#14293D"
@@ -5282,14 +5282,14 @@
          data-label-role="ordinary"
          data-station-key="체육공원"
          data-station="체육공원"
-         data-label-mode="upper-left"><tspan
-           x="605.76"
+         data-label-mode="upper-right"><tspan
+           x="678.48"
            dy="0"
            id="tspan310">체육공원</tspan></text>
       <text
          id="station-label-uac15-uc11c-uad6c-uccad"
-         x="753.37"
-         y="784.93"
+         x="770"
+         y="895.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -5298,15 +5298,15 @@
          data-label-role="ordinary"
          data-station-key="강서구청"
          data-station="강서구청"
-         data-label-mode="above"><tspan
-           x="753.37"
+         data-label-mode="below"><tspan
+           x="770"
            dy="0"
            id="tspan311">강서구청</tspan></text>
       <text
          id="station-label-uad6c-ud3ec"
-         x="860"
-         y="601"
-         text-anchor="middle"
+         x="881.09"
+         y="899.17"
+         text-anchor="start"
          font-size="37"
          font-weight="700"
          fill="#14293D"
@@ -5314,14 +5314,14 @@
          data-label-role="ordinary"
          data-station-key="구포"
          data-station="구포"
-         data-label-mode="above"><tspan
-           x="860"
+         data-label-mode="lower-right"><tspan
+           x="881.09"
            dy="0"
            id="tspan312">구포</tspan></text>
       <text
          id="station-label-uc219-ub4f1"
          x="1040"
-         y="801"
+         y="798.75"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -5337,7 +5337,7 @@
       <text
          id="station-label-ub0a8-uc0b0-uc815"
          x="1130"
-         y="801"
+         y="798.75"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -5353,7 +5353,7 @@
       <text
          id="station-label-ub9cc-ub355"
          x="1220"
-         y="801"
+         y="798.75"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -5369,7 +5369,7 @@
       <text
          id="station-label-ubbf8-ub0a8"
          x="1310.07"
-         y="762.93"
+         y="766.43"
          text-anchor="middle"
          font-size="41.5"
          font-weight="800"
@@ -5384,9 +5384,9 @@
            id="tspan316">미남</tspan></text>
       <text
          id="station-label-uc0ac-uc9c1"
-         x="1460"
-         y="937"
-         text-anchor="start"
+         x="1385.98"
+         y="982.1"
+         text-anchor="end"
          font-size="37"
          font-weight="700"
          fill="#14293D"
@@ -5394,14 +5394,14 @@
          data-label-role="ordinary"
          data-station-key="사직"
          data-station="사직"
-         data-label-mode="right"><tspan
-           x="1460"
+         data-label-mode="lower-left"><tspan
+           x="1385.98"
            dy="0"
            id="tspan317">사직</tspan></text>
       <text
          id="station-label-uc885-ud569-uc6b4-ub3d9-uc7a5"
-         x="1410"
-         y="1006.11"
+         x="1472.98"
+         y="1066.1"
          text-anchor="end"
          font-size="34"
          font-weight="700"
@@ -5410,16 +5410,16 @@
          data-label-role="ordinary"
          data-station-key="종합운동장"
          data-station="종합운동장"
-         data-label-mode="left"><tspan
-           x="1410"
+         data-label-mode="lower-left"><tspan
+           x="1472.98"
            dy="0"
            id="tspan318">종합</tspan><tspan
-           x="1410"
+           x="1472.98"
            dy="39.78"
            id="tspan319">운동장</tspan></text>
       <text
          id="station-label-uac70-uc81c"
-         x="1806.76"
+         x="1802.26"
          y="902.62"
          text-anchor="end"
          font-size="41.5"
@@ -5430,12 +5430,12 @@
          data-station-key="거제"
          data-station="거제"
          data-label-mode="left"><tspan
-           x="1806.76"
+           x="1802.26"
            dy="0"
            id="tspan320">거제</tspan></text>
       <text
          id="station-label-ubb3c-ub9cc-uace8"
-         x="2492"
+         x="2384.25"
          y="811"
          text-anchor="start"
          font-size="37"
@@ -5446,12 +5446,12 @@
          data-station-key="물만골"
          data-station="물만골"
          data-label-mode="right"><tspan
-           x="2492"
+           x="2384.25"
            dy="0"
            id="tspan321">물만골</tspan></text>
       <text
          id="station-label-ubc30-uc0b0"
-         x="2486"
+         x="2488.25"
          y="937"
          text-anchor="start"
          font-size="37"
@@ -5462,13 +5462,13 @@
          data-station-key="배산"
          data-station="배산"
          data-label-mode="right"><tspan
-           x="2486"
+           x="2488.25"
            dy="0"
            id="tspan322">배산</tspan></text>
       <text
          id="station-label-ub9dd-ubbf8"
-         x="2900"
-         y="1477"
+         x="2854.02"
+         y="1431.9"
          text-anchor="start"
          font-size="37"
          font-weight="700"
@@ -5477,14 +5477,14 @@
          data-label-role="ordinary"
          data-station-key="망미"
          data-station="망미"
-         data-label-mode="right"><tspan
-           x="2900"
+         data-label-mode="upper-right"><tspan
+           x="2854.02"
            dy="0"
            id="tspan323">망미</tspan></text>
       <text
          id="station-label-uc218-uc548"
          x="2336"
-         y="387"
+         y="481.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -5493,14 +5493,14 @@
          data-label-role="ordinary"
          data-station-key="수안"
          data-station="수안"
-         data-label-mode="above"><tspan
+         data-label-mode="below"><tspan
            x="2336"
            dy="0"
            id="tspan324">수안</tspan></text>
       <text
          id="station-label-ub099-ubbfc"
          x="2462"
-         y="283"
+         y="481.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -5509,14 +5509,14 @@
          data-label-role="ordinary"
          data-station-key="낙민"
          data-station="낙민"
-         data-label-mode="above"><tspan
+         data-label-mode="below"><tspan
            x="2462"
            dy="0"
            id="tspan325">낙민</tspan></text>
       <text
          id="station-label-ucda9-ub82c-uc0ac"
          x="2588"
-         y="387"
+         y="481.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -5525,14 +5525,14 @@
          data-label-role="ordinary"
          data-station-key="충렬사"
          data-station="충렬사"
-         data-label-mode="above"><tspan
+         data-label-mode="below"><tspan
            x="2588"
            dy="0"
            id="tspan326">충렬사</tspan></text>
       <text
          id="station-label-uba85-uc7a5"
          x="2714"
-         y="283"
+         y="481.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -5541,14 +5541,14 @@
          data-label-role="ordinary"
          data-station-key="명장"
          data-station="명장"
-         data-label-mode="above"><tspan
+         data-label-mode="below"><tspan
            x="2714"
            dy="0"
            id="tspan327">명장</tspan></text>
       <text
          id="station-label-uc11c-ub3d9"
          x="2840"
-         y="387"
+         y="481.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -5557,14 +5557,14 @@
          data-label-role="ordinary"
          data-station-key="서동"
          data-station="서동"
-         data-label-mode="above"><tspan
+         data-label-mode="below"><tspan
            x="2840"
            dy="0"
            id="tspan328">서동</tspan></text>
       <text
          id="station-label-uae08-uc0ac"
          x="2966"
-         y="283"
+         y="481.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -5573,14 +5573,14 @@
          data-label-role="ordinary"
          data-station-key="금사"
          data-station="금사"
-         data-label-mode="above"><tspan
+         data-label-mode="below"><tspan
            x="2966"
            dy="0"
            id="tspan329">금사</tspan></text>
       <text
          id="station-label-ubc18-uc5ec-ub18d-uc0b0-ubb3c-uc2dc-uc7a5"
          x="3092"
-         y="476"
+         y="478.25"
          text-anchor="middle"
          font-size="34"
          font-weight="700"
@@ -5598,9 +5598,9 @@
            id="tspan331">시장</tspan></text>
       <text
          id="station-label-uc11d-ub300"
-         x="3234.24"
-         y="480.32"
-         text-anchor="start"
+         x="3218"
+         y="481.25"
+         text-anchor="middle"
          font-size="37"
          font-weight="700"
          fill="#14293D"
@@ -5608,14 +5608,14 @@
          data-label-role="ordinary"
          data-station-key="석대"
          data-station="석대"
-         data-label-mode="lower-right"><tspan
-           x="3234.24"
+         data-label-mode="below"><tspan
+           x="3218"
            dy="0"
            id="tspan332">석대</tspan></text>
       <text
          id="station-label-uc601-uc0b0-ub300"
          x="3344"
-         y="535"
+         y="481.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -5631,7 +5631,7 @@
       <text
          id="station-label-uc717-ubc18-uc1a1"
          x="3470"
-         y="479"
+         y="481.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -5647,7 +5647,7 @@
       <text
          id="station-label-uace0-ucd0c"
          x="3596"
-         y="479"
+         y="481.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -5662,9 +5662,9 @@
            id="tspan335">고촌</tspan></text>
       <text
          id="station-label-uc548-ud3c9"
-         x="3703.91"
-         y="484.47"
-         text-anchor="end"
+         x="3722"
+         y="485.3"
+         text-anchor="middle"
          font-size="38.5"
          font-weight="700"
          fill="#14293D"
@@ -5672,15 +5672,15 @@
          data-label-role="terminal"
          data-station-key="안평"
          data-station="안평"
-         data-label-mode="lower-left"><tspan
-           x="3703.91"
+         data-label-mode="below"><tspan
+           x="3722"
            dy="0"
            id="tspan336">안평</tspan></text>
       <text
          id="station-label-uac70-uc81c-ud574-ub9de-uc774"
-         x="2003.7"
-         y="1090.87"
-         text-anchor="end"
+         x="2030"
+         y="1111.25"
+         text-anchor="middle"
          font-size="37"
          font-weight="700"
          fill="#14293D"
@@ -5688,14 +5688,14 @@
          data-label-role="ordinary"
          data-station-key="거제해맞이"
          data-station="거제해맞이"
-         data-label-mode="left"><tspan
-           x="2003.7"
+         data-label-mode="below"><tspan
+           x="2030"
            dy="0"
            id="tspan337">거제해맞이</tspan></text>
       <text
          id="station-label-ub3d9-ub798_DH"
          x="2336"
-         y="731"
+         y="733.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -5711,7 +5711,7 @@
       <text
          id="station-label-uc548-ub77d"
          x="2462"
-         y="639"
+         y="636.75"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -5727,7 +5727,7 @@
       <text
          id="station-label-ubd80-uc0b0-uc6d0-ub3d9"
          x="2588"
-         y="639"
+         y="636.75"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -5742,8 +5742,8 @@
            id="tspan340">부산원동</tspan></text>
       <text
          id="station-label-uc7ac-uc1a1"
-         x="2774"
-         y="811"
+         x="2728.02"
+         y="765.9"
          text-anchor="start"
          font-size="37"
          font-weight="700"
@@ -5752,14 +5752,14 @@
          data-label-role="ordinary"
          data-station-key="재송"
          data-station="재송"
-         data-label-mode="right"><tspan
-           x="2774"
+         data-label-mode="upper-right"><tspan
+           x="2728.02"
            dy="0"
            id="tspan341">재송</tspan></text>
       <text
          id="station-label-uc13c-ud140"
-         x="2900"
-         y="937"
+         x="2854.02"
+         y="891.9"
          text-anchor="start"
          font-size="37"
          font-weight="700"
@@ -5768,15 +5768,15 @@
          data-label-role="ordinary"
          data-station-key="센텀"
          data-station="센텀"
-         data-label-mode="right"><tspan
-           x="2900"
+         data-label-mode="upper-right"><tspan
+           x="2854.02"
            dy="0"
            id="tspan342">센텀</tspan></text>
       <text
          id="station-label-uc2e0-ud574-uc6b4-ub300"
-         x="3595.3"
-         y="1755.86"
-         text-anchor="end"
+         x="3596"
+         y="1741.25"
+         text-anchor="middle"
          font-size="37"
          font-weight="700"
          fill="#14293D"
@@ -5784,15 +5784,15 @@
          data-label-role="ordinary"
          data-station-key="신해운대"
          data-station="신해운대"
-         data-label-mode="lower-left"><tspan
-           x="3595.3"
+         data-label-mode="below"><tspan
+           x="3596"
            dy="0"
            id="tspan343">신해운대</tspan></text>
       <text
          id="station-label-uc1a1-uc815"
-         x="3705.76"
-         y="1740.32"
-         text-anchor="end"
+         x="3722"
+         y="1741.25"
+         text-anchor="middle"
          font-size="37"
          font-weight="700"
          fill="#14293D"
@@ -5800,13 +5800,13 @@
          data-label-role="ordinary"
          data-station-key="송정"
          data-station="송정"
-         data-label-mode="lower-left"><tspan
-           x="3705.76"
+         data-label-mode="below"><tspan
+           x="3722"
            dy="0"
            id="tspan344">송정</tspan></text>
       <text
          id="station-label-uc624-uc2dc-ub9ac-uc544"
-         x="3698"
+         x="3695.75"
          y="1567"
          text-anchor="end"
          font-size="37"
@@ -5817,12 +5817,12 @@
          data-station-key="오시리아"
          data-station="오시리아"
          data-label-mode="left"><tspan
-           x="3698"
+           x="3695.75"
            dy="0"
            id="tspan345">오시리아</tspan></text>
       <text
          id="station-label-uae30-uc7a5"
-         x="3746"
+         x="3748.25"
          y="1441"
          text-anchor="start"
          font-size="37"
@@ -5833,12 +5833,12 @@
          data-station-key="기장"
          data-station="기장"
          data-label-mode="right"><tspan
-           x="3746"
+           x="3748.25"
            dy="0"
            id="tspan346">기장</tspan></text>
       <text
          id="station-label-uc77c-uad11"
-         x="3698"
+         x="3695.75"
          y="1315"
          text-anchor="end"
          font-size="37"
@@ -5849,12 +5849,12 @@
          data-station-key="일광"
          data-station="일광"
          data-label-mode="left"><tspan
-           x="3698"
+           x="3695.75"
            dy="0"
            id="tspan347">일광</tspan></text>
       <text
          id="station-label-uc88c-ucc9c_DH"
-         x="3698"
+         x="3695.75"
          y="1189"
          text-anchor="end"
          font-size="37"
@@ -5865,12 +5865,12 @@
          data-station-key="좌천_DH"
          data-station="좌천"
          data-label-mode="left"><tspan
-           x="3698"
+           x="3695.75"
            dy="0"
            id="tspan348">좌천</tspan></text>
       <text
          id="station-label-uc6d4-ub0b4"
-         x="3698"
+         x="3695.75"
          y="1063"
          text-anchor="end"
          font-size="37"
@@ -5881,12 +5881,12 @@
          data-station-key="월내"
          data-station="월내"
          data-label-mode="left"><tspan
-           x="3698"
+           x="3695.75"
            dy="0"
            id="tspan349">월내</tspan></text>
       <text
          id="station-label-uc11c-uc0dd"
-         x="3698"
+         x="3695.75"
          y="937"
          text-anchor="end"
          font-size="37"
@@ -5897,12 +5897,12 @@
          data-station-key="서생"
          data-station="서생"
          data-label-mode="left"><tspan
-           x="3698"
+           x="3695.75"
            dy="0"
            id="tspan350">서생</tspan></text>
       <text
          id="station-label-ub0a8-ucc3d"
-         x="3746"
+         x="3748.25"
          y="811"
          text-anchor="start"
          font-size="37"
@@ -5913,13 +5913,13 @@
          data-station-key="남창"
          data-station="남창"
          data-label-mode="right"><tspan
-           x="3746"
+           x="3748.25"
            dy="0"
            id="tspan351">남창</tspan></text>
       <text
          id="station-label-ub9dd-uc591"
          x="3596"
-         y="639"
+         y="636.75"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -5935,7 +5935,7 @@
       <text
          id="station-label-ub355-ud558"
          x="3470"
-         y="639"
+         y="636.75"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -5951,7 +5951,7 @@
       <text
          id="station-label-uac1c-uc6b4-ud3ec"
          x="3344"
-         y="639"
+         y="636.75"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -5967,7 +5967,7 @@
       <text
          id="station-label-ud0dc-ud654-uac15"
          x="3218"
-         y="619"
+         y="624.7"
          text-anchor="middle"
          font-size="38.5"
          font-weight="700"
@@ -5982,8 +5982,8 @@
            id="tspan355">태화강</tspan></text>
       <text
          id="station-label-uad18-ubc95-ub974-ub124-uc2dc-ub5bc"
-         x="924"
-         y="1294.11"
+         x="993.98"
+         y="1361.1"
          text-anchor="end"
          font-size="34"
          font-weight="700"
@@ -5992,17 +5992,17 @@
          data-label-role="ordinary"
          data-station-key="괘법르네시떼"
          data-station="괘법 르네시떼"
-         data-label-mode="left"><tspan
-           x="924"
+         data-label-mode="lower-left"><tspan
+           x="993.98"
            dy="0"
            id="tspan356">괘법</tspan><tspan
-           x="924"
+           x="993.98"
            dy="39.78"
            id="tspan357">르네시떼</tspan></text>
       <text
          id="station-label-uc11c-ubd80-uc0b0-uc720-ud1b5-uc9c0-uad6c"
-         x="780"
-         y="1150.11"
+         x="850.1"
+         y="1217.22"
          text-anchor="end"
          font-size="34"
          font-weight="700"
@@ -6011,17 +6011,17 @@
          data-label-role="ordinary"
          data-station-key="서부산유통지구"
          data-station="서부산 유통지구"
-         data-label-mode="left"><tspan
-           x="780"
+         data-label-mode="lower-left"><tspan
+           x="850.1"
            dy="0"
            id="tspan358">서부산</tspan><tspan
-           x="780"
+           x="850.1"
            dy="39.78"
            id="tspan359">유통지구</tspan></text>
       <text
          id="station-label-uacf5-ud56d"
-         x="656"
-         y="1027"
+         x="702.09"
+         y="1072.21"
          text-anchor="end"
          font-size="37"
          font-weight="700"
@@ -6030,14 +6030,14 @@
          data-label-role="ordinary"
          data-station-key="공항"
          data-station="공항"
-         data-label-mode="left"><tspan
-           x="656"
+         data-label-mode="lower-left"><tspan
+           x="702.09"
            dy="0"
            id="tspan360">공항</tspan></text>
       <text
          id="station-label-ub355-ub450"
-         x="543.03"
-         y="943.05"
+         x="531.11"
+         y="954.97"
          text-anchor="end"
          font-size="37"
          font-weight="700"
@@ -6047,12 +6047,12 @@
          data-station-key="덕두"
          data-station="덕두"
          data-label-mode="lower-left"><tspan
-           x="543.03"
+           x="531.11"
            dy="0"
            id="tspan361">덕두</tspan></text>
       <text
          id="station-label-ub4f1-uad6c"
-         x="440"
+         x="437.75"
          y="775"
          text-anchor="end"
          font-size="37"
@@ -6063,13 +6063,13 @@
          data-station-key="등구"
          data-station="등구"
          data-label-mode="left"><tspan
-           x="440"
+           x="437.75"
            dy="0"
            id="tspan362">등구</tspan></text>
       <text
          id="station-label-ud3c9-uac15"
          x="500"
-         y="893"
+         y="895.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -6085,7 +6085,7 @@
       <text
          id="station-label-ub300-uc0ac"
          x="410"
-         y="893"
+         y="895.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -6101,7 +6101,7 @@
       <text
          id="station-label-ubd88-uc554"
          x="320"
-         y="893"
+         y="895.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -6117,7 +6117,7 @@
       <text
          id="station-label-uc9c0-ub0b4"
          x="230"
-         y="893"
+         y="798.75"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -6126,14 +6126,14 @@
          data-label-role="ordinary"
          data-station-key="지내"
          data-station="지내"
-         data-label-mode="below"><tspan
+         data-label-mode="above"><tspan
            x="230"
            dy="0"
            id="tspan366">지내</tspan></text>
       <text
          id="station-label-uae40-ud574-ub300-ud559"
          x="140"
-         y="949"
+         y="895.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -6148,9 +6148,9 @@
            id="tspan367">김해대학</tspan></text>
       <text
          id="station-label-uc778-uc81c-ub300"
-         x="104.22"
-         y="890.53"
-         text-anchor="middle"
+         x="126.68"
+         y="816.94"
+         text-anchor="end"
          font-size="37"
          font-weight="700"
          fill="#14293D"
@@ -6158,14 +6158,14 @@
          data-label-role="ordinary"
          data-station-key="인제대"
          data-station="인제대"
-         data-label-mode="below"><tspan
-           x="104.22"
+         data-label-mode="lower-left"><tspan
+           x="126.68"
            dy="0"
            id="tspan368">인제대</tspan></text>
       <text
          id="station-label-uae40-ud574-uc2dc-uccad"
          x="140"
-         y="621"
+         y="618.75"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -6181,7 +6181,7 @@
       <text
          id="station-label-ubd80-uc6d0"
          x="230"
-         y="565"
+         y="715.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -6190,14 +6190,14 @@
          data-label-role="ordinary"
          data-station-key="부원"
          data-station="부원"
-         data-label-mode="above"><tspan
+         data-label-mode="below"><tspan
            x="230"
            dy="0"
            id="tspan370">부원</tspan></text>
       <text
          id="station-label-ubd09-ud669"
          x="320"
-         y="621"
+         y="618.75"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -6212,9 +6212,9 @@
            id="tspan371">봉황</tspan></text>
       <text
          id="station-label-uc218-ub85c-uc655-ub989"
-         x="410"
-         y="565"
-         text-anchor="middle"
+         x="408.48"
+         y="606.36"
+         text-anchor="start"
          font-size="37"
          font-weight="700"
          fill="#14293D"
@@ -6222,14 +6222,14 @@
          data-label-role="ordinary"
          data-station-key="수로왕릉"
          data-station="수로왕릉"
-         data-label-mode="above"><tspan
-           x="410"
+         data-label-mode="upper-right"><tspan
+           x="408.48"
            dy="0"
            id="tspan372">수로왕릉</tspan></text>
       <text
          id="station-label-ubc15-ubb3c-uad00"
          x="500"
-         y="621"
+         y="715.25"
          text-anchor="middle"
          font-size="37"
          font-weight="700"
@@ -6238,15 +6238,15 @@
          data-label-role="ordinary"
          data-station-key="박물관"
          data-station="박물관"
-         data-label-mode="above"><tspan
+         data-label-mode="below"><tspan
            x="500"
            dy="0"
            id="tspan373">박물관</tspan></text>
       <text
          id="station-label-uc5f0-uc9c0-uacf5-uc6d0"
-         x="590"
-         y="565"
-         text-anchor="middle"
+         x="588.48"
+         y="606.36"
+         text-anchor="start"
          font-size="37"
          font-weight="700"
          fill="#14293D"
@@ -6254,15 +6254,15 @@
          data-label-role="ordinary"
          data-station-key="연지공원"
          data-station="연지공원"
-         data-label-mode="above"><tspan
-           x="590"
+         data-label-mode="upper-right"><tspan
+           x="588.48"
            dy="0"
            id="tspan374">연지공원</tspan></text>
       <text
          id="station-label-uc7a5-uc2e0-ub300"
-         x="680"
-         y="621"
-         text-anchor="middle"
+         x="653.75"
+         y="667"
+         text-anchor="end"
          font-size="37"
          font-weight="700"
          fill="#14293D"
@@ -6270,14 +6270,14 @@
          data-label-role="ordinary"
          data-station-key="장신대"
          data-station="장신대"
-         data-label-mode="above"><tspan
-           x="680"
+         data-label-mode="left"><tspan
+           x="653.75"
            dy="0"
            id="tspan375">장신대</tspan></text>
       <text
          id="station-label-uac00-uc57c-ub300"
-         x="760"
-         y="726.56"
+         x="762.77"
+         y="723.79"
          text-anchor="end"
          font-size="38.5"
          font-weight="700"
@@ -6287,7 +6287,7 @@
          data-station-key="가야대"
          data-station="가야대"
          data-label-mode="lower-left"><tspan
-           x="760"
+           x="762.77"
            dy="0"
            id="tspan376">가야대</tspan></text>
       <g
