@@ -1,13 +1,11 @@
 #!/usr/bin/env node
 
-import { createReadStream } from "node:fs";
 import { pipeline } from "node:stream/promises";
 import { Writable } from "node:stream";
 import { createGunzip } from "node:zlib";
 
-const artifactPath = process.argv[2];
-if (!artifactPath || process.argv.length !== 3) {
-  process.stderr.write("usage: count-gzip-uncompressed-bytes.mjs <artifact.gz>\n");
+if (process.argv.length !== 2) {
+  process.stderr.write("usage: count-gzip-uncompressed-bytes.mjs < artifact.gz\n");
   process.exit(1);
 }
 
@@ -23,5 +21,5 @@ const counter = new Writable({
   },
 });
 
-await pipeline(createReadStream(artifactPath), createGunzip(), counter);
+await pipeline(process.stdin, createGunzip(), counter);
 process.stdout.write(`${bytes}\n`);

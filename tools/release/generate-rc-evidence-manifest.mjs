@@ -2,7 +2,9 @@
 
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, statSync, writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { canonicalScopeHash } from "../datapack/build-launch-denominator-report.mjs";
@@ -1108,16 +1110,19 @@ function dataPackUncompressedBytes(artifactPath, gateId) {
   if (!artifactPath || !existsSync(artifactPath)) {
     fail(`${gateId} requires an existing data pack artifact`);
   }
+  let descriptor;
   try {
+    descriptor = openSync(artifactPath, "r");
     const output = execFileSync(process.execPath, [
       path.join(repoRoot, "tools/release/count-gzip-uncompressed-bytes.mjs"),
-      artifactPath,
-    ], { encoding: "utf8", maxBuffer: 64 * 1024, stdio: ["ignore", "pipe", "pipe"] }).trim();
+    ], { encoding: "utf8", maxBuffer: 64 * 1024, stdio: [descriptor, "pipe", "pipe"] }).trim();
     const bytes = Number(output);
     if (!/^(?:0|[1-9]\d*)$/.test(output) || !Number.isSafeInteger(bytes)) throw new Error("invalid byte count");
     return bytes;
   } catch {
     fail(`${gateId} data pack artifact must be valid gzip data`);
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
   }
 }
 
@@ -1632,8 +1637,7 @@ function gateStatusBlockers(statuses) {
     }));
 }
 
-function requiredOpenP0Count(value) {
-  const raw = value ?? "0";
+function requiredOpenP0Count(raw = "0") {
   const count = Number(raw);
   if (!/^(?:0|[1-9]\d*)$/.test(raw) || !Number.isSafeInteger(count)) {
     fail("--open-android-p0-count must be a non-negative integer");
