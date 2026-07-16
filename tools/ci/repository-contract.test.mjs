@@ -5012,6 +5012,16 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   };
   await writeFile(dataPackManifestPath, JSON.stringify({ ...productionManifest, signature: { ...productionManifest.signature, value: "invalid" } }));
   await assert.rejects(execFileAsync(process.execPath, [...args, "--phase", "CANDIDATE", "--output", baselineOutput], generatorOptions), /manifest signature mismatch/);
+  const expiredProductionManifest = signProductionManifest({
+    ...productionManifest,
+    publishedAt: "2026-07-15T00:00:00.000Z",
+    expiresAt: "2026-07-15T23:59:59.999Z",
+  });
+  await writeFile(dataPackManifestPath, JSON.stringify(expiredProductionManifest));
+  await assert.rejects(
+    execFileAsync(process.execPath, [...args, "--phase", "CANDIDATE", "--output", baselineOutput], generatorOptions),
+    /production data pack manifest is expired/,
+  );
   await rejectProductionManifest({ sha256: "f".repeat(64) }, /production data pack manifest sha256 does not match the supplied artifact/);
   await rejectProductionManifest({ sizeBytes: dataPackArtifactBytes + 1 }, /production data pack manifest sizeBytes does not match the supplied artifact/);
   await writeFile(dataPackManifestPath, JSON.stringify(productionManifest));

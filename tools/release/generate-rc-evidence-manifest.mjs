@@ -49,7 +49,12 @@ const sourceSnapshotSetHash = readFinalDataPackReleaseDecision(
   requireProductionDataPackBinding,
 );
 if (requireProductionDataPackBinding) {
-  validateProductionDataPackBinding(dataPackManifest, dataPackArtifactPath, dataPackArtifactBytes);
+  validateProductionDataPackBinding(
+    dataPackManifest,
+    dataPackArtifactPath,
+    dataPackArtifactBytes,
+    generatedAtMillis,
+  );
 }
 const backendIdentity = readBackendIdentity(args);
 const providedGateStatuses = parsePairs(arg("gateStatus", "gate-status"));
@@ -395,7 +400,7 @@ function readJsonIfExists(filePath) {
   return JSON.parse(readFileSync(filePath, "utf8"));
 }
 
-function validateProductionDataPackBinding(manifest, artifactPath, artifactBytes) {
+function validateProductionDataPackBinding(manifest, artifactPath, artifactBytes, evaluatedAtMillis) {
   if (!artifactPath || !existsSync(artifactPath) || !Number.isSafeInteger(artifactBytes) || artifactBytes <= 0) {
     fail("production data pack binding requires an existing non-empty artifact");
   }
@@ -406,6 +411,9 @@ function validateProductionDataPackBinding(manifest, artifactPath, artifactBytes
   }
   if (manifest.manifestVersion !== 2 || manifest.channel !== "production") {
     fail("production data pack manifest must be manifestVersion 2 on the production channel");
+  }
+  if (Date.parse(manifest.expiresAt) <= evaluatedAtMillis) {
+    fail("production data pack manifest is expired");
   }
   const activePack = manifest.activePack
     ? manifest.packs.find((pack) => (
