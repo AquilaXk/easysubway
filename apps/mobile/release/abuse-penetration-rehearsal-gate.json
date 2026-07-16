@@ -104,6 +104,39 @@
       ]
     }
   },
+  "routeV2IngressAttackMatrix": {
+    "issue": 1022,
+    "status": "BLOCKED_EXTERNAL",
+    "localRegressionStatus": "PASS",
+    "localAutomatedCases": [
+      {
+        "caseId": "attestation_nonce_request_hash",
+        "evidence": "RouteV2SessionServiceTest"
+      },
+      {
+        "caseId": "session_token_scope_expiry_quota",
+        "evidence": "RouteV2IngressFilterTest and ProductionRouteApiClosureTest"
+      },
+      {
+        "caseId": "gateway_401_origin_403_no_write",
+        "evidence": "ProductionRouteApiClosureTest"
+      },
+      {
+        "caseId": "gateway_ip_token_limiter_retry_after",
+        "evidence": "route-v2-gateway.test.mjs and run-route-v2-gateway-integration.sh"
+      }
+    ],
+    "requiredSameRcProductionEvidence": [
+      "play-installed-attestation-positive-negative-matrix",
+      "deployed-token-lifecycle-and-session-quota-rehearsal",
+      "deployed-gateway-401-origin-403-no-write-summary",
+      "deployed-limiter-boundary-burst-retry-after-summary",
+      "credential-log-metric-ui-analytics-absence-audit"
+    ],
+    "productionMutationPerformed": false,
+    "explicitProductionApprovalRequired": true,
+    "rawCredentialOrExploitPayloadStored": false
+  },
   "productionLikeEvidencePolicy": {
     "requiredForClosing": [
       "play-installed-or-play-generated-artifact-identity",

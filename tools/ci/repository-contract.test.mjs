@@ -2939,6 +2939,58 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
       "raw signed URL",
     ),
   );
+  const routeV2SessionServiceTest = read(
+    "backend/src/test/java/com/easysubway/route/application/service/RouteV2SessionServiceTest.java",
+  );
+  const routeV2IngressFilterTest = read(
+    "backend/src/test/java/com/easysubway/route/adapter/in/web/RouteV2IngressFilterTest.java",
+  );
+  const productionRouteClosureTest = read(
+    "backend/src/test/java/com/easysubway/route/adapter/in/web/ProductionRouteApiClosureTest.java",
+  );
+  const routeV2GatewayTest = read("tools/ci/route-v2-gateway.test.mjs");
+  const routeV2GatewayProbe = read("tools/test/run-route-v2-gateway-integration.sh");
+  const routeV2AttackMatrix = abusePenetrationRehearsalGate.routeV2IngressAttackMatrix;
+  assert.equal(routeV2AttackMatrix.issue, 1022);
+  assert.equal(routeV2AttackMatrix.status, "BLOCKED_EXTERNAL");
+  assert.equal(routeV2AttackMatrix.localRegressionStatus, "PASS");
+  assert.deepEqual(routeV2AttackMatrix.localAutomatedCases, [
+    {
+      caseId: "attestation_nonce_request_hash",
+      evidence: "RouteV2SessionServiceTest",
+    },
+    {
+      caseId: "session_token_scope_expiry_quota",
+      evidence: "RouteV2IngressFilterTest and ProductionRouteApiClosureTest",
+    },
+    {
+      caseId: "gateway_401_origin_403_no_write",
+      evidence: "ProductionRouteApiClosureTest",
+    },
+    {
+      caseId: "gateway_ip_token_limiter_retry_after",
+      evidence: "route-v2-gateway.test.mjs and run-route-v2-gateway-integration.sh",
+    },
+  ]);
+  assert.deepEqual(routeV2AttackMatrix.requiredSameRcProductionEvidence, [
+    "play-installed-attestation-positive-negative-matrix",
+    "deployed-token-lifecycle-and-session-quota-rehearsal",
+    "deployed-gateway-401-origin-403-no-write-summary",
+    "deployed-limiter-boundary-burst-retry-after-summary",
+    "credential-log-metric-ui-analytics-absence-audit",
+  ]);
+  assert.equal(routeV2AttackMatrix.productionMutationPerformed, false);
+  assert.equal(routeV2AttackMatrix.explicitProductionApprovalRequired, true);
+  assert.equal(routeV2AttackMatrix.rawCredentialOrExploitPayloadStored, false);
+  assert.match(routeV2SessionServiceTest, /2분보다 오래됐거나 미래인 verdict와 다른 requestHash를 거부한다/);
+  assert.match(routeV2SessionServiceTest, /128-bit base64url nonce 형식과 2분 replay를 거부한다/);
+  assert.match(routeV2IngressFilterTest, /50회를 소비한 session은 exact 429와 정수 Retry-After를 반환한다/);
+  assert.match(routeV2IngressFilterTest, /ROUTE_ORIGIN_FORBIDDEN/);
+  assert.match(routeV2IngressFilterTest, /ROUTE_SESSION_REQUIRED/);
+  assert.match(productionRouteClosureTest, /direct-origin Route V2는 handler와 DB write 전에 exact 403으로 거부한다/);
+  assert.match(productionRouteClosureTest, /session 전체 50회 초과는 integer Retry-After와 exact 429다/);
+  assert.match(routeV2GatewayTest, /IP·token limiter와 exact 429 계약/);
+  assert.match(routeV2GatewayProbe, /Retry-After: 60/);
   assert.deepEqual(abusePenetrationRehearsalGate.buildIdentityPolicy.requiredIssueLinks, ["#1015", "#1016", "#1020", "#1914"]);
   assert.ok(
     abusePenetrationRehearsalGate.productionLikeEvidencePolicy.requiredForClosing.includes(
