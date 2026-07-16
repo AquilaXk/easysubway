@@ -58,8 +58,8 @@ class JdbcDatapackReleaseDeliveryRepositoryTest {
 		repository.upsertSameDelivery(pending(SHA));
 		var start = new CountDownLatch(1);
 		try (var executor = Executors.newFixedThreadPool(2)) {
-			var a = executor.submit(() -> { start.await(); return repository.claimDue(T0, "worker-a"); });
-			var b = executor.submit(() -> { start.await(); return repository.claimDue(T0, "worker-b"); });
+			var a = executor.submit(() -> { start.await(); return repository.claimDue(T0, "worker-a", 100); });
+			var b = executor.submit(() -> { start.await(); return repository.claimDue(T0, "worker-b", 100); });
 			start.countDown();
 			assertThat(a.get().size() + b.get().size()).isEqualTo(1);
 		}
@@ -69,9 +69,9 @@ class JdbcDatapackReleaseDeliveryRepositoryTest {
 	@DisplayName("만료된 worker claim은 재획득하고 이전 worker의 완료 갱신은 거부한다")
 	void reclaimsExpiredLease() {
 		repository.upsertSameDelivery(pending(SHA));
-		assertThat(repository.claimDue(T0, "worker-a")).hasSize(1);
-		assertThat(repository.claimDue(T0.plusMinutes(4), "worker-b")).isEmpty();
-		assertThat(repository.claimDue(T0.plusMinutes(5), "worker-b")).hasSize(1);
+		assertThat(repository.claimDue(T0, "worker-a", 100)).hasSize(1);
+		assertThat(repository.claimDue(T0.plusMinutes(4), "worker-b", 100)).isEmpty();
+		assertThat(repository.claimDue(T0.plusMinutes(5), "worker-b", 100)).hasSize(1);
 		assertThatThrownBy(() -> repository.markClaimed(
 			pending(SHA).idempotencyKey(), "worker-a", DatapackReleaseDelivery.State.DELIVERED,
 			1, null, "RECONCILED", null, T0.plusMinutes(5)))

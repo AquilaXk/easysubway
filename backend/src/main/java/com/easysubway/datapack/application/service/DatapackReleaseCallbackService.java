@@ -68,8 +68,10 @@ public class DatapackReleaseCallbackService {
             cmd.releaseRequestId(), cmd.releaseSequence());
         if (existingSequence.isPresent()
             && !existingSequence.get().manifestSha256().equals(cmd.manifestSha256())) {
-            deliveryRepository.mark(existingSequence.get().idempotencyKey(), State.DEAD_LETTER,
-                existingSequence.get().attempts(), null, "CONFLICT", "MANIFEST_IDENTITY_MISMATCH", now);
+			if (existingSequence.get().state() != State.DELIVERED) {
+				deliveryRepository.mark(existingSequence.get().idempotencyKey(), State.DEAD_LETTER,
+					existingSequence.get().attempts(), null, "CONFLICT", "MANIFEST_IDENTITY_MISMATCH", now);
+			}
             return new CallbackResult("DEAD_LETTER", false);
         }
 

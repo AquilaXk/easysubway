@@ -158,6 +158,7 @@ test("워크플로는 rollout-update 모드·publish-rollout 스텝을 가지고
   )?.[0];
   assert.ok(rolloutStep, "rollout update 스텝을 찾지 못함");
   assert.match(rolloutStep, /CALLBACK_RECONCILIATION_REQUIRED/);
+  assert.match(rolloutStep, /!\s*\[\[.*ROLLOUT_PERCENTAGE.*\^\[0-9\]\+\$/);
   assert.match(rolloutStep, /ROLLOUT_PERCENTAGE\s*>\s*10\b/);
 });
 

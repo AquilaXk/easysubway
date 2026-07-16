@@ -24,6 +24,7 @@ class DatapackReleaseRequestAdminPageController {
 
 	private static final int CANDIDATE_LIMIT = 20;
 	private static final int REQUEST_LIMIT = 20;
+	private static final int DELIVERY_LIMIT = 20;
 	// 릴리스 요청 대상은 승인/승격을 통과한 candidate만(미승인·실패 후보의 게시 경로 차단).
 	private static final Set<String> RELEASE_ELIGIBLE_CANDIDATE_STATUSES = Set.of("APPROVED", "PROMOTED");
 
@@ -54,7 +55,7 @@ class DatapackReleaseRequestAdminPageController {
 		model.addAttribute("requests", releaseRequestRepository.findRecent(REQUEST_LIMIT).stream()
 			.map(ReleaseRequestView::from)
 			.toList());
-		model.addAttribute("deliveries", deliveryRepository.findRecent(REQUEST_LIMIT).stream()
+		model.addAttribute("deliveries", deliveryRepository.findRecent(DELIVERY_LIMIT).stream()
 			.map(DeliveryView::from).toList());
 		return "admin/datapack/release-requests/list";
 	}

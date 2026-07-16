@@ -167,6 +167,7 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 			.findFirst().orElseThrow();
 		assertThat(callback.blockerCount()).isEqualTo(1);
 		assertThat(callback.note()).isEqualTo("CALLBACK_RECONCILIATION_REQUIRED");
+		assertThat(callback.status()).isEqualTo("FAIL");
 	}
 
 	@Test

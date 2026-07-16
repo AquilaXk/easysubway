@@ -1032,8 +1032,8 @@ jobs:
           ROLLOUT_PERCENTAGE: ${{ steps.args.outputs.rolloutPercentage }}
         run: |
           set -euo pipefail
-          if [[ "${ROLLOUT_PERCENTAGE}" =~ ^[0-9]+$ ]] && (( ROLLOUT_PERCENTAGE > 10 )); then
-            echo "CALLBACK_RECONCILIATION_REQUIRED: rollout above 10% needs canonical readiness evidence" >&2
+          if ! [[ "${ROLLOUT_PERCENTAGE}" =~ ^[0-9]+$ ]] || (( ROLLOUT_PERCENTAGE > 10 )); then
+            echo "CALLBACK_RECONCILIATION_REQUIRED: rollout must be an integer from 0 to 10 until canonical readiness evidence is available" >&2
             exit 1
           fi
           node tools/datapack/publish-rollout.mjs \

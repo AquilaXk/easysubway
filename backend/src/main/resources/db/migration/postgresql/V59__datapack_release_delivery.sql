@@ -28,3 +28,5 @@ CREATE TABLE datapack_release_deliveries (
 
 CREATE INDEX idx_datapack_release_delivery_due
     ON datapack_release_deliveries (state, next_attempt_at, claimed_at);
+CREATE INDEX idx_datapack_release_delivery_channel_state
+    ON datapack_release_deliveries (channel, state);

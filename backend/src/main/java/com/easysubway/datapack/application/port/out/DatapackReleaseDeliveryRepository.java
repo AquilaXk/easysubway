@@ -10,7 +10,7 @@ public interface DatapackReleaseDeliveryRepository {
 	DatapackReleaseDelivery upsertSameDelivery(DatapackReleaseDelivery delivery);
 	Optional<DatapackReleaseDelivery> findByIdempotencyKey(String idempotencyKey);
 	Optional<DatapackReleaseDelivery> findByRequestAndSequence(String requestId, long sequence);
-	List<DatapackReleaseDelivery> claimDue(LocalDateTime now, String owner);
+	List<DatapackReleaseDelivery> claimDue(LocalDateTime now, String owner, int limit);
 	void mark(String idempotencyKey, State state, int attempts, LocalDateTime nextAttemptAt,
 		String httpClass, String detail, LocalDateTime now);
 	void markClaimed(String idempotencyKey, String owner, State state, int attempts,

@@ -62,7 +62,8 @@ public class JdbcDatapackReleaseDeliveryRepository implements DatapackReleaseDel
 			ROW_MAPPER, requestId, sequence).stream().findFirst();
 	}
 
-	public List<DatapackReleaseDelivery> claimDue(LocalDateTime now, String owner) {
+	public List<DatapackReleaseDelivery> claimDue(LocalDateTime now, String owner, int limit) {
+		if (limit < 1 || limit > 1000) throw new IllegalArgumentException("limit must be between 1 and 1000");
 		var reclaimBefore = now.minus(CLAIM_LEASE);
 		var keys = jdbcTemplate.queryForList("""
 			SELECT idempotency_key FROM datapack_release_deliveries
@@ -70,7 +71,8 @@ public class JdbcDatapackReleaseDeliveryRepository implements DatapackReleaseDel
 			  AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
 			  AND (claimed_at IS NULL OR claimed_at <= ?)
 			ORDER BY created_at, idempotency_key
-			""", String.class, ts(now), ts(reclaimBefore));
+			LIMIT ?
+			""", String.class, ts(now), ts(reclaimBefore), limit);
 		var claimed = new ArrayList<DatapackReleaseDelivery>();
 		for (String key : keys) {
 			int changed = jdbcTemplate.update("""

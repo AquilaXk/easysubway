@@ -63,7 +63,7 @@ public class DatapackReleaseReconciliationService {
 		} catch (RuntimeException ignored) {
 			// 한 discovery 오류가 이미 저장된 delivery reconciliation을 막지 않는다.
 		}
-		for (var delivery : repository.claimDue(now, "datapack-reconciler")) {
+		for (var delivery : repository.claimDue(now, "datapack-reconciler", 100)) {
 			try {
 				reconcile(delivery, now);
 			} catch (RuntimeException failure) {

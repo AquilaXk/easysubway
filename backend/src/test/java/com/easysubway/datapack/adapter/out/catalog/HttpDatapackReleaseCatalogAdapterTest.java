@@ -16,6 +16,13 @@ class HttpDatapackReleaseCatalogAdapterTest {
 	private static final ObjectMapper JSON = new ObjectMapper();
 
 	@Test
+	void fetchCurrentFailsClosedWithoutConfiguredTrustMaterial() {
+		var adapter = new HttpDatapackReleaseCatalogAdapter("", "", "production-v1");
+		assertThatThrownBy(() -> adapter.fetchCurrent("production"))
+			.isInstanceOf(com.easysubway.datapack.application.port.out.DatapackReleaseCatalogPort.Unavailable.class);
+	}
+
+	@Test
 	void verifiesImmutableManifestSignatureAndIdentity() throws Exception {
 		var keyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
 		var manifest = JSON.createObjectNode();
@@ -60,7 +67,7 @@ class HttpDatapackReleaseCatalogAdapterTest {
 	}
 
 	@Test
-	void rejectsSignedManifestWithDifferentRequestedIdentity() throws Exception {
+	void returnsSignedIdentityForServiceMismatchClassification() throws Exception {
 		var keyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
 		var manifest = JSON.createObjectNode();
 		manifest.put("manifestVersion", 2);
@@ -90,8 +97,10 @@ class HttpDatapackReleaseCatalogAdapterTest {
 				+ "\n-----END PUBLIC KEY-----";
 			var adapter = new HttpDatapackReleaseCatalogAdapter(
 				"http://127.0.0.1:" + server.getAddress().getPort(), publicKey, "production-v1");
-			assertThatThrownBy(() -> adapter.fetch("production", 42))
-				.isInstanceOf(com.easysubway.datapack.application.port.out.DatapackReleaseCatalogPort.Unavailable.class);
+			var identity = adapter.fetch("production", 42);
+			assertThat(identity.signatureValid()).isTrue();
+			assertThat(identity.channel()).isEqualTo("staging");
+			assertThat(identity.releaseSequence()).isEqualTo(41);
 		} finally {
 			server.stop(0);
 		}

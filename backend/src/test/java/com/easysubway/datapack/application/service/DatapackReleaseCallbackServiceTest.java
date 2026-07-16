@@ -170,7 +170,7 @@ class DatapackReleaseCallbackServiceTest {
 	}
 
 	@Test
-	@DisplayName("같은 request/sequence의 다른 manifest hash는 DEAD_LETTER다")
+	@DisplayName("같은 request/sequence의 다른 manifest hash는 거부하되 기존 DELIVERED를 보존한다")
 	void differentHashForSameSequenceDeadLetters() {
 		insertRow("DISPATCHED");
 		service.receive(command("PASS", computeSignature("PASS")));
@@ -182,7 +182,7 @@ class DatapackReleaseCallbackServiceTest {
 		assertThat(service.receive(command(other, "PASS", callbackSignature.sign(otherFields))).status())
 			.isEqualTo("DEAD_LETTER");
 		assertThat(jdbcTemplate.queryForObject(
-			"SELECT state FROM datapack_release_deliveries", String.class)).isEqualTo("DEAD_LETTER");
+			"SELECT state FROM datapack_release_deliveries", String.class)).isEqualTo("DELIVERED");
 	}
 
     @Test

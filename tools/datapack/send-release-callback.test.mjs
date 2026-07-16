@@ -79,6 +79,26 @@ test("callback producer는 safe integer가 아닌 release sequence를 거부한�
   }), /positive safe integer/);
 });
 
+test("callback producer는 서명 전 required gate와 hash를 검증한다", () => {
+  const env = {
+    RELEASE_SEQUENCE: "42",
+    RELEASE_REQUEST_ID: "req-2057",
+    TARGET_CHANNEL: "production",
+    WORKFLOW_RUN_URL: "https://github.com/AquilaXk/easysubway/actions/runs/1",
+    MANIFEST_SHA256: "a".repeat(64),
+    SQLITE_SHA256: "b".repeat(64),
+    GZIP_SHA256: "c".repeat(64),
+    EVIDENCE_BUNDLE_SHA256: "d".repeat(64),
+    VALIDATOR_STATUS: "PASS",
+    ROUTE_REGRESSION_STATUS: "PASS",
+    PUBLISH_STATUS: "PASS",
+    EASYSUBWAY_DATAPACK_CALLBACK_HMAC_KEY: secret,
+  };
+  assert.equal(buildReleaseCallback(env).releaseRequestId, "req-2057");
+  assert.throws(() => buildReleaseCallback({ ...env, MANIFEST_SHA256: "invalid" }), /SHA-256/);
+  assert.throws(() => buildReleaseCallback({ ...env, VALIDATOR_STATUS: "UNKNOWN" }), /is invalid/);
+});
+
 test("transient failure를 모두 소진하면 bounded retry 계획을 기록한다", async () => {
   await withServer((_request, response) => response.writeHead(503).end(), async (endpoint) => {
     const slept = [];
@@ -123,5 +143,36 @@ test("CLI는 delivery state를 GitHub output에 기록한다", async () => {
     assert.equal(exitCode, 0);
     assert.equal(await readFile(githubOutputPath, "utf8"), "state=DELIVERED\n");
     assert.equal(JSON.parse(await readFile(artifactPath, "utf8")).state, "DELIVERED");
+  });
+});
+
+test("CLI는 terminal failure를 exit 2와 reconciliation output으로 기록한다", async () => {
+  await withServer((_request, response) => response.writeHead(400).end(), async (endpoint) => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "callback-sender-failure-"));
+    const payloadPath = path.join(directory, "payload.json");
+    const artifactPath = path.join(directory, "delivery.json");
+    const githubOutputPath = path.join(directory, "github-output");
+    await writeFile(payloadPath, JSON.stringify(payload));
+
+    const exitCode = await new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, [
+        new URL("./send-release-callback.mjs", import.meta.url).pathname,
+        "--payload", payloadPath,
+        "--output", artifactPath,
+        "--github-output", githubOutputPath,
+      ], {
+        env: {
+          ...process.env,
+          EASYSUBWAY_DATAPACK_CALLBACK_URL: endpoint,
+          EASYSUBWAY_DATAPACK_WORKFLOW_TOKEN: token,
+        },
+      });
+      child.once("error", reject);
+      child.once("exit", resolve);
+    });
+
+    assert.equal(exitCode, 2);
+    assert.equal(await readFile(githubOutputPath, "utf8"), "state=RECONCILIATION_REQUIRED\n");
+    assert.equal(JSON.parse(await readFile(artifactPath, "utf8")).state, "RECONCILIATION_REQUIRED");
   });
 });

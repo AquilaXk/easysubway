@@ -48,6 +48,15 @@ public class CallbackSignature {
         String workflowRunUrl, String manifestSha256, String sqliteSha256, String gzipSha256,
         String evidenceBundleSha256, String validatorStatus, String routeRegressionStatus,
         String publishStatus) {
+		public CanonicalFields {
+			for (String value : new String[] {artifactKind, releaseRequestId, channel, idempotencyKey,
+				workflowRunUrl, manifestSha256, sqliteSha256, gzipSha256, evidenceBundleSha256,
+				validatorStatus, routeRegressionStatus, publishStatus}) {
+				if (value == null || value.isBlank()) {
+					throw new IllegalArgumentException("callback canonical field must not be blank");
+				}
+			}
+		}
 
         String message() {
             return String.join("\n", String.valueOf(schemaVersion), artifactKind, releaseRequestId,

@@ -48,15 +48,15 @@ public class HttpDatapackReleaseCatalogAdapter implements DatapackReleaseCatalog
 
 	@Override
 	public CatalogIdentity fetch(String channel, long releaseSequence) {
-		return fetchPath("/catalog/releases/" + releaseSequence + ".json", channel, releaseSequence);
+		return fetchPath("/catalog/releases/" + releaseSequence + ".json");
 	}
 
 	@Override
 	public CatalogIdentity fetchCurrent(String channel) {
-		return fetchPath("/catalog/current.json", channel, null);
+		return fetchPath("/catalog/current.json");
 	}
 
-	private CatalogIdentity fetchPath(String path, String expectedChannel, Long expectedSequence) {
+	private CatalogIdentity fetchPath(String path) {
 		if (baseUrl.isBlank() || publicKeyPem.isBlank()) throw new Unavailable();
 		try {
 			var request = HttpRequest.newBuilder(URI.create(baseUrl + path))
@@ -72,10 +72,6 @@ public class HttpDatapackReleaseCatalogAdapter implements DatapackReleaseCatalog
 				&& verify(manifest, signatureValue);
 			long actualSequence = manifest.path("releaseSequence").asLong(-1);
 			String actualChannel = manifest.path("channel").asText("");
-			if (!expectedChannel.equals(actualChannel)
-				|| (expectedSequence != null && expectedSequence.longValue() != actualSequence)) {
-				throw new Unavailable();
-			}
 			return new CatalogIdentity(
 				actualSequence, sha256(bytes), actualChannel,
 				manifest.path("releaseRequestId").asText(""), signatureValid,

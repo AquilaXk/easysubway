@@ -57,6 +57,26 @@ class DatapackReleaseReconciliationServiceTest {
 	}
 
 	@Test
+	@DisplayName("catalog identity 불일치는 각각의 sanitized reason으로 DEAD_LETTER다")
+	void identityMismatchesDeadLetter() {
+		var cases = java.util.Map.of(
+			"CATALOG_SEQUENCE_MISMATCH", new CatalogIdentity(43, SHA, "production", "request-2057", true, "b".repeat(64)),
+			"CATALOG_CHANNEL_MISMATCH", new CatalogIdentity(42, SHA, "staging", "request-2057", true, "b".repeat(64)),
+			"CATALOG_REQUEST_MISMATCH", new CatalogIdentity(42, SHA, "production", "other", true, "b".repeat(64)),
+			"CATALOG_MANIFEST_MISMATCH", new CatalogIdentity(42, "e".repeat(64), "production", "request-2057", true, "b".repeat(64)));
+		for (var entry : cases.entrySet()) {
+			var caseRepository = mock(JdbcDatapackReleaseDeliveryRepository.class);
+			var caseCatalog = mock(DatapackReleaseCatalogPort.class);
+			var caseService = new DatapackReleaseReconciliationService(
+				caseRepository, callbackService, caseCatalog);
+			when(caseCatalog.fetch("production", 42)).thenReturn(entry.getValue());
+			caseService.reconcile(delivery(), T0.plusMinutes(10));
+			verify(caseRepository).mark(delivery().idempotencyKey(), State.DEAD_LETTER, 0, null,
+				"CONFLICT", entry.getKey(), T0.plusMinutes(10));
+		}
+	}
+
+	@Test
 	@DisplayName("catalog unavailable은 70분 전 retry, 70분 경계부터 DEAD_LETTER다")
 	void unavailableHonorsDeadlines() {
 		var delivery = delivery();
@@ -124,7 +144,7 @@ class DatapackReleaseReconciliationServiceTest {
 		var second = DatapackReleaseDelivery.pending(
 			"request-2058", 43, "e".repeat(64), "production", "candidate-2058",
 			"c".repeat(64), "d".repeat(64), T0);
-		when(repository.claimDue(any(), eq("datapack-reconciler")))
+		when(repository.claimDue(any(), eq("datapack-reconciler"), eq(100)))
 			.thenReturn(java.util.List.of(first, second));
 		var firstIdentity = new CatalogIdentity(42, SHA, "production", "request-2057", true, "b".repeat(64));
 		var secondIdentity = new CatalogIdentity(43, "e".repeat(64), "production", "request-2058", true, "b".repeat(64));
