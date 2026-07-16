@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'dart:ui' show Color, Offset, Rect, Size;
 
+import 'package:meta/meta.dart';
+
 import '../domain/route_map_design_space.dart';
 import '../domain/route_map_owner_labels.dart';
 import '../domain/route_map_parallel_offsets.dart';
@@ -320,6 +322,25 @@ List<Rect> routeMapTransferObstacleRects(
   }
   return rects;
 }
+
+/// basemap 오너 라벨 매칭 판정을 테스트에서 그대로 재사용하기 위한 노출
+/// (#2068 재발 방지 게이트). solveRouteMapLabelLayout이 basemap 모드에서 쓰는
+/// [_resolveOwnerLabelsByCandidateKey]와 동일 결과 — 반환 맵의 각 키는 오너 SVG
+/// font-size로 렌더되는(=폴백 미니 크기가 아닌) candidate이며, 그 개수가 권역
+/// 오너 라벨 매치 수다. 이름 정규화(중점/마침표)·동명이역 최근접·위치 게이트
+/// 185px를 전부 앱과 동일하게 적용한다.
+@visibleForTesting
+Map<String, RouteMapOwnerLabelEntry> resolveRouteMapOwnerLabelsForTesting({
+  required StructuredRouteMap map,
+  required RouteMapDesignSpace design,
+  required Map<String, RouteMapOwnerLabelEntry> ownerLabelsByStationName,
+  required Map<String, String> stationNameByStationId,
+}) => _resolveOwnerLabelsByCandidateKey(
+  map: map,
+  design: design,
+  ownerLabelsByStationName: ownerLabelsByStationName,
+  stationNameByStationId: stationNameByStationId,
+);
 
 RouteMapStaticLabelLayout solveRouteMapLabelLayout({
   required StructuredRouteMap map,

@@ -1339,7 +1339,7 @@
            data-station="117"
            data-station-name="광주송정"
            data-label-role="transfer">
-          <text x="294" y="779" id="station-label-117" class="station-label station-label-transfer" text-anchor="start" font-size="56" style="font-size:56px">광주송정</text>
+          <text x="294" y="779" id="station-label-117" class="station-label station-label-transfer" text-anchor="start" font-size="56" style="font-size:56px">광주송정역</text>
         </g>
         <g
            id="station-label-group-116"
