@@ -1,0 +1,163 @@
+name: Datapack callback reconciliation evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_artifacts_run_id:
+        description: Release Artifacts run ID containing the #2056 final RC manifest for this SHA
+        required: true
+        type: string
+      datapack_run_id:
+        description: Data Pack Release run ID containing the signed published release request binding for this SHA
+        required: true
+        type: string
+      release_request_id:
+        description: Published datapack release request ID bound to the final RC datapack identity
+        required: true
+        type: string
+
+jobs:
+  rehearse:
+    name: Datapack callback reconciliation rehearsal
+    if: ${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production-datapack
+    permissions:
+      actions: read
+      contents: read
+    env:
+      EVIDENCE_DIR: ${{ runner.temp }}/datapack-callback-reconciliation-evidence
+      RAW_REHEARSAL_PATH: ${{ runner.temp }}/datapack-callback-reconciliation-raw-input.json
+      RAW_CALLBACK_OUTAGE_PATH: ${{ runner.temp }}/datapack-callback-backend-outage.json
+
+    steps:
+      - name: Callback reconciliation / Checkout default branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Callback reconciliation / Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+
+      - name: Callback reconciliation / Set up Java
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Callback reconciliation / Download #2056 final RC manifest
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: easysubway-rc-evidence-manifest-${{ github.sha }}
+          path: ${{ runner.temp }}/rc-evidence-manifest
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.release_artifacts_run_id }}
+
+      - name: Callback reconciliation / Download published release request binding
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: easysubway-published-release-request-binding-${{ github.sha }}
+          path: ${{ runner.temp }}/datapack-release
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.datapack_run_id }}
+
+      - name: Callback reconciliation / Restore signing validation environment
+        shell: bash
+        env:
+          EASYSUBWAY_ENV_SECRET: ${{ secrets.EASYSUBWAY_ENV }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${EASYSUBWAY_ENV_SECRET}" ]]; then
+            echo "EASYSUBWAY_ENV is required to validate the published release request binding" >&2
+            exit 1
+          fi
+          umask 077
+          env_file="${RUNNER_TEMP}/easysubway-callback-validation.env"
+          printf '%s' "${EASYSUBWAY_ENV_SECRET}" > "${env_file}"
+          chmod 600 "${env_file}"
+          echo "EASYSUBWAY_CALLBACK_VALIDATION_ENV=${env_file}" >> "${GITHUB_ENV}"
+
+      - name: Callback reconciliation / Bind rehearsal to final RC identity
+        shell: bash
+        env:
+          RELEASE_REQUEST_ID: ${{ inputs.release_request_id }}
+        run: |
+          set -euo pipefail
+          node --env-file="${EASYSUBWAY_CALLBACK_VALIDATION_ENV}" \
+            tools/datapack/build-callback-reconciliation-evidence.mjs \
+            --prepare-from-rc-manifest "${RUNNER_TEMP}/rc-evidence-manifest/final-readiness.json" \
+            --release-request-id "${RELEASE_REQUEST_ID}" \
+            --release-request-binding "${RUNNER_TEMP}/datapack-release/release-request-binding.json" \
+            --expected-git-sha "${GITHUB_SHA}" \
+            --github-env "${GITHUB_ENV}"
+
+      - name: Callback reconciliation / Inject callback backend outage through production sender
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tools/datapack/run-callback-backend-outage-rehearsal.mjs \
+            --output "${RAW_CALLBACK_OUTAGE_PATH}"
+
+      - name: Callback reconciliation / Run production-like isolated backend rehearsal
+        working-directory: backend
+        shell: bash
+        env:
+          EASYSUBWAY_CALLBACK_REHEARSAL_OUTPUT: ${{ env.RAW_REHEARSAL_PATH }}
+          EASYSUBWAY_CALLBACK_OUTAGE_ARTIFACT: ${{ env.RAW_CALLBACK_OUTAGE_PATH }}
+        run: |
+          set -euo pipefail
+          ./gradlew test \
+            --tests 'com.easysubway.datapack.application.service.DatapackCallbackReconciliationRehearsalTest' \
+            --tests 'com.easysubway.datapack.application.service.DatapackReleaseCallbackServiceTest' \
+            --tests 'com.easysubway.datapack.application.service.DatapackReleaseReconciliationServiceTest' \
+            --tests 'com.easysubway.datapack.adapter.out.persistence.JdbcDatapackReleaseDeliveryRepositoryTest' \
+            --tests 'com.easysubway.datapack.adapter.in.web.DatapackReleaseRequestAdminPageControllerTest'
+
+      - name: Callback reconciliation / Verify evidence and rollout contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test tools/datapack/build-callback-reconciliation-evidence.test.mjs
+          node --test tools/datapack/run-callback-backend-outage-rehearsal.test.mjs
+          node --test tools/ci/datapack-release-workflow.test.mjs
+          node --test tools/ci/datapack-callback-reconciliation-evidence-workflow.test.mjs
+
+      - name: Callback reconciliation / Build and validate sanitized evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tools/datapack/build-callback-reconciliation-evidence.mjs \
+            --raw "${RAW_REHEARSAL_PATH}" \
+            --junit-dir backend/build/test-results/test \
+            --workflow .github/workflows/datapack-release.yml \
+            --release-request-id "${EASYSUBWAY_CALLBACK_EVIDENCE_RELEASE_REQUEST_ID}" \
+            --release-sequence "${EASYSUBWAY_CALLBACK_EVIDENCE_RELEASE_SEQUENCE}" \
+            --manifest-sha256 "${EASYSUBWAY_CALLBACK_EVIDENCE_MANIFEST_SHA256}" \
+            --output-dir "${EVIDENCE_DIR}"
+          node tools/datapack/build-callback-reconciliation-evidence.mjs \
+            --validate-evidence "${EVIDENCE_DIR}/callback-reconciliation-evidence.json" \
+            --artifact-dir "${EVIDENCE_DIR}"
+          node tools/datapack/build-callback-reconciliation-evidence.mjs \
+            --wrap-result "${EVIDENCE_DIR}/callback-reconciliation-evidence.json" \
+            --rc-manifest "${RUNNER_TEMP}/rc-evidence-manifest/final-readiness.json" \
+            --output "${EVIDENCE_DIR}/callback-reconciliation-gate-evidence.json"
+
+      - name: Callback reconciliation / Upload sanitized evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: datapack-callback-reconciliation-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/datapack-callback-reconciliation-evidence/*.json
+          if-no-files-found: error
+          include-hidden-files: false
+          retention-days: 14
+
+      - name: Callback reconciliation / Remove signing validation environment
+        if: ${{ always() }}
+        shell: bash
+        run: rm -f "${RUNNER_TEMP}/easysubway-callback-validation.env"

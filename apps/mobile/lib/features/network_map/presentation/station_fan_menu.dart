@@ -353,12 +353,15 @@ class _StationFanMenuPainter extends CustomPainter {
   void _paintBorders(Canvas canvas) {
     final bounds = Offset.zero & kFanMenuDesignSize;
     final structuralStrokeWidth = 2.4 / scale;
+    // 내부 구분선은 외곽선과 색은 같지만(#2200 절충안) 굵기를 한 단계 가늘게
+    // 유지해 실루엣과의 위계를 만든다.
+    final dividerStrokeWidth = 1.6 / scale;
     canvas.saveLayer(bounds, Paint());
     canvas.drawPath(
       geometry.dividers,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = structuralStrokeWidth
+        ..strokeWidth = dividerStrokeWidth
         ..color = EasySubwayFanMenuColors.border,
     );
     canvas.drawPath(

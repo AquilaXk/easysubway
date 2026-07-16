@@ -171,8 +171,14 @@ abstract final class EasySubwayFanMenuColors {
   static const closeSurface = Color(0xFFF5F7FA);
   static const closePressed = Color(0xFFE9EDF2);
   static const closeInk = Color(0xFF475467);
-  static const border = Color(0xFFCBD2DC);
-  static const outline = Color(0xFFBCC5D2);
+  // 세그먼트 사이 내부 구분선 색. QA 결과 외곽선과 옅기 차이를 두면 위계가
+  // 흐릿해 보여, 외곽선(outline)과 동일 톤으로 통일한다(#2200 절충안, 오너
+  // 확정 2026-07-17). 굵기 차이(structuralStrokeWidth vs dividerStrokeWidth,
+  // station_fan_menu.dart 참고)로만 내부/외곽 위계를 만든다.
+  static const border = Color(0xE8404445);
+  // 팬 메뉴 도입 전(#2109/PR #2112) 사각형 역 액션 시트가 쓰던 외곽 색을 그대로
+  // 계승한다(구 시트 Material color 0xE8404445, 오너 지시 2026-07-16).
+  static const outline = Color(0xE8404445);
 
   /// 팬 메뉴 앵커 역명 라벨의 텍스트 잉크.
   static const ink = Color(0xFF20262E);

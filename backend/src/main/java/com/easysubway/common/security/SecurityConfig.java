@@ -190,6 +190,8 @@ public class SecurityConfig {
 				.hasAuthority(AdminPermission.DATAPACK_PRODUCTION_APPROVE.authority())
 				.requestMatchers(HttpMethod.POST, "/admin/datapack/release-requests/*/retry-dispatch")
 				.hasAuthority(AdminPermission.DATAPACK_PRODUCTION_APPROVE.authority())
+				.requestMatchers(HttpMethod.POST, "/admin/datapack/release-deliveries/*/repair")
+				.hasAuthority(AdminPermission.DATAPACK_PRODUCTION_APPROVE.authority())
 				.requestMatchers(HttpMethod.POST, "/admin/datapack/release-channels/**")
 				.hasAnyAuthority(
 					AdminPermission.DATAPACK_STAGING_PROMOTE.authority(),
@@ -359,6 +361,10 @@ public class SecurityConfig {
 					"/actuator/health/readiness",
 					"/privacy",
 					"/easysubway/privacy",
+					"/terms",
+					"/easysubway/terms",
+					"/location-terms",
+					"/easysubway/location-terms",
 					"/api/v1/realtime/**",
 					"/api/notices/active",
 					"/api/ads/active",

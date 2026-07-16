@@ -355,7 +355,7 @@ async function prepare(args) {
   });
   const builtManifest = await readJson(path.join(buildOutput, "current.json"));
   const pack = builtManifest.packs?.[0];
-  if (!pack || pack.artifactKind !== "production") throw new Error("production pack build failed");
+  if (pack?.artifactKind !== "production") throw new Error("production pack build failed");
   const artifactPath = path.join(buildOutput, `catalog/${pack.id}-v${pack.version}.sqlite.gz`);
   const artifactBytes = await readFile(artifactPath);
   const knownGoodSqliteBytes = gunzipSync(artifactBytes);
@@ -634,8 +634,7 @@ async function runGenerator({
   ];
   if (candidatePath) argv.push("--candidate-context", candidatePath);
   for (const [gateId, gatePath] of Object.entries(gatePaths)) {
-    argv.push("--datapack-gate-status", `${gateId}=SATISFIED`);
-    argv.push("--datapack-gate-evidence", `${gateId}=${gatePath}`);
+    argv.push("--datapack-gate-status", `${gateId}=SATISFIED`, "--datapack-gate-evidence", `${gateId}=${gatePath}`);
   }
   await execFileAsync(process.execPath, argv, {
     cwd: repoRoot,
@@ -916,7 +915,7 @@ async function junitFiles(root, required = true) {
     else if (entry.name.endsWith(".xml")) files.push(child);
   }
   if (required && files.length === 0) throw new Error("backend JUnit reports are missing");
-  return files.sort();
+  return files.sort((left, right) => left.localeCompare(right));
 }
 async function validateJunit(files, identity) {
   const requiredClasses = [
@@ -926,13 +925,13 @@ async function validateJunit(files, identity) {
   ];
   const texts = await Promise.all(files.map((file) => readFile(file, "utf8")));
   const joined = texts.join("\n");
-  if (texts.some((text) => /<(?:testsuite|testsuites)\b[^>]*(?:failures|errors)="[1-9][0-9]*"/.test(text))) {
+  if (texts.some((text) => /<(?:testsuite|testsuites)\b[^>]*(?:failures|errors)="[1-9]\d*"/.test(text))) {
     throw new Error("backend JUnit suite did not pass");
   }
   for (const className of requiredClasses) {
     if (!joined.includes(className)) throw new Error(`backend JUnit class is missing: ${className}`);
   }
-  const match = joined.match(/\{"artifactKind":"backend-datapack-reconciliation-evidence"[^\r\n<]*\}/);
+  const match = /\{"artifactKind":"backend-datapack-reconciliation-evidence"[^\r\n<]*\}/.exec(joined);
   if (!match) throw new Error("backend reconciliation machine evidence is missing");
   const report = JSON.parse(match[0]);
   validateBackendReconciliationReport(report, identity);

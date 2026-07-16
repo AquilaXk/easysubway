@@ -132,16 +132,48 @@ cleanup() {
 }
 trap cleanup EXIT
 
-backend_env="${work_dir}/backend.env"
-docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' easysubway-backend > "${backend_env}"
-chmod 600 "${backend_env}"
+backend_env_json="${work_dir}/backend-env.json"
+backend_env_nul="${work_dir}/backend-env.nul"
+docker inspect --format '{{json .Config.Env}}' easysubway-backend > "${backend_env_json}"
+chmod 600 "${backend_env_json}"
+node -e '
+const entries = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
+for (const entry of entries) {
+  const separator = entry.indexOf("=");
+  if (separator < 1) throw new Error("backend environment entry is invalid");
+  process.stdout.write(entry.slice(0, separator));
+  process.stdout.write(Buffer.from([0]));
+  process.stdout.write(entry.slice(separator + 1));
+  process.stdout.write(Buffer.from([0]));
+}
+' "${backend_env_json}" > "${backend_env_nul}"
+chmod 600 "${backend_env_nul}"
+run_backend_clone() (
+	local timeout_seconds="${1:?timeout is required}"
+	shift
+	[[ "${timeout_seconds}" =~ ^[0-9]+$ ]] || { echo 'backend clone timeout is invalid' >&2; exit 2; }
+	local docker_cli timeout_cli env_name env_value
+	local -a backend_env_args=()
+	docker_cli="$(command -v docker)"
+	timeout_cli="$(command -v timeout)"
+	[[ -x "${docker_cli}" && -x "${timeout_cli}" ]] \
+		|| { echo 'backend clone runtime is unavailable' >&2; exit 1; }
+	while IFS= read -r -d '' env_name && IFS= read -r -d '' env_value; do
+		[[ "${env_name}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] \
+			|| { echo 'backend environment name is invalid' >&2; exit 1; }
+		printf -v "${env_name}" '%s' "${env_value}"
+		export "${env_name}"
+		backend_env_args+=(--env "${env_name}")
+	done < "${backend_env_nul}"
+	(( ${#backend_env_args[@]} > 0 )) || { echo 'backend environment is empty' >&2; exit 1; }
+	"${timeout_cli}" "${timeout_seconds}" "${docker_cli}" run "${backend_env_args[@]}" "$@"
+)
 production_network="$(docker inspect --format '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' easysubway-backend | head -n 1)"
 [[ "${production_network}" =~ ^[A-Za-z0-9_.-]+$ ]] || { echo 'production Docker network is invalid' >&2; exit 1; }
 
-docker run -d --name "${cache_app}" --network "${production_network}" \
+run_backend_clone 30 -d --name "${cache_app}" --network "${production_network}" \
 	--cpus 1 --memory 1g --memory-swap 1g --pids-limit 256 \
 	--publish 127.0.0.1::8080 \
-	--env-file "${backend_env}" \
 	-e EASYSUBWAY_SCHEDULING_ENABLED=false \
 	-e EASYSUBWAY_PUSH_EXTERNAL_ENABLED=false \
 	-e EASYSUBWAY_PUSH_DELIVERY_ENABLED=false \
@@ -150,11 +182,11 @@ cache_binding="$(docker port "${cache_app}" 8080/tcp)"
 [[ "${cache_binding}" =~ ^127\.0\.0\.1:[0-9]+$ ]] || { echo 'controlled cache application port binding is invalid' >&2; exit 1; }
 cache_base_url="http://${cache_binding}"
 origin_secret="$(node -e '
-const lines = require("node:fs").readFileSync(process.argv[1], "utf8").split("\n");
-const entry = lines.find((line) => line.startsWith("EASYSUBWAY_ROUTE_V2_ORIGIN_SECRET="));
+const entries = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
+const entry = entries.find((value) => value.startsWith("EASYSUBWAY_ROUTE_V2_ORIGIN_SECRET="));
 if (!entry) throw new Error("route V2 origin secret is missing");
 process.stdout.write(entry.slice(entry.indexOf("=") + 1));
-' "${backend_env}")"
+' "${backend_env_json}")"
 [[ "${origin_secret}" =~ ^[A-Za-z0-9_-]{43,128}$ ]] \
 	|| { echo 'route V2 origin secret is invalid' >&2; exit 1; }
 cache_ready=false
@@ -324,10 +356,8 @@ node tools/ops/prepare-timetable-rollback-candidate.mjs \
 chmod 755 "${work_dir}" "${candidate_dir}"
 chmod 644 "${candidate_dir}/candidate.sql.gz" "${candidate_dir}/evidence.json"
 
-set +e
-timeout 120 docker run --name "${candidate_app}" --network "${network}" \
+run_backend_clone 30 -d --name "${candidate_app}" --network "${network}" \
 	--cpus 1 --memory 1g --memory-swap 1g --pids-limit 256 \
-	--env-file "${backend_env}" \
 	-e SPRING_PROFILES_ACTIVE=prod \
 	-e EASYSUBWAY_DATASOURCE_URL=jdbc:postgresql://db:5432/easysubway_rehearsal \
 	-e EASYSUBWAY_DATASOURCE_USERNAME=rehearsal \
@@ -340,15 +370,33 @@ timeout 120 docker run --name "${candidate_app}" --network "${network}" \
 	-e EASYSUBWAY_TIMETABLE_SEED_RESOURCE=file:/evidence/candidate.sql.gz \
 	-e EASYSUBWAY_TIMETABLE_SEED_EVIDENCE_RESOURCE=file:/evidence/evidence.json \
 	-v "${candidate_dir}:/evidence:ro" \
-	"${backend_image}" > "${work_dir}/candidate.log" 2>&1
-candidate_exit=$?
-set -e
-[[ "${candidate_exit}" != 0 && "${candidate_exit}" != 124 ]] \
-	|| { echo 'injected activation did not fail closed' >&2; exit 1; }
+	"${backend_image}" >/dev/null
+candidate_log="${work_dir}/candidate.log"
+candidate_failure_observed=false
+for _ in $(seq 1 300); do
+	docker logs "${candidate_app}" > "${candidate_log}" 2>&1 || true
+	if grep -Fq 'transit timetable snapshot activation failed' "${candidate_log}" \
+		&& grep -Fq 'issue 2145 injected trip failure' "${candidate_log}"; then
+		candidate_failure_observed=true
+		break
+	fi
+	if [[ "$(docker inspect --format '{{.State.Running}}' "${candidate_app}" 2>/dev/null || true)" != true ]]; then
+		break
+	fi
+	sleep 1
+done
+docker logs "${candidate_app}" > "${candidate_log}" 2>&1 || true
+if grep -Fq 'transit timetable snapshot activation failed' "${candidate_log}" \
+	&& grep -Fq 'issue 2145 injected trip failure' "${candidate_log}"; then
+	candidate_failure_observed=true
+fi
+[[ "${candidate_failure_observed}" == true ]] \
+	|| { echo 'injected activation failure was not observed within timeout' >&2; exit 1; }
 grep -Fq 'transit timetable snapshot activation failed' "${work_dir}/candidate.log" \
 	|| { echo 'candidate did not reach timetable activation' >&2; exit 1; }
 grep -Fq 'issue 2145 injected trip failure' "${work_dir}/candidate.log" \
 	|| { echo 'candidate did not reach the injected SQL failure' >&2; exit 1; }
+docker rm -f "${candidate_app}" >/dev/null
 
 clone_identity_after="$(clone_psql -c "${clone_identity_sql}")"
 [[ "${clone_identity_after}" == "${clone_identity_before}" ]] || { echo 'rollback changed active snapshot identity' >&2; exit 1; }

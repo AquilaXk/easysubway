@@ -5,6 +5,13 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 NETWORK="easysubway-route-v2-gateway-test-$$"
 BACKEND="route-v2-test-backend-$$"
 GATEWAY="route-v2-test-gateway-$$"
+GATEWAY_READY_ATTEMPTS="${GATEWAY_READY_ATTEMPTS:-100}"
+case "$GATEWAY_READY_ATTEMPTS" in
+	''|*[!0-9]*|0)
+		echo "GATEWAY_READY_ATTEMPTS must be a positive integer" >&2
+		exit 2
+		;;
+esac
 
 cleanup() {
 	docker rm -f "$GATEWAY" "$BACKEND" >/dev/null 2>&1 || true
@@ -45,15 +52,22 @@ set_gateway_base() {
 
 wait_gateway() {
 	ready=false
-	for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+	attempt=1
+	while [ "$attempt" -le "$GATEWAY_READY_ATTEMPTS" ]; do
 		if docker exec "$BACKEND" wget -qO- http://127.0.0.1:8080/probe >/dev/null 2>&1 \
 			&& curl -sS -o /dev/null "$BASE/"; then
 			ready=true
 			break
 		fi
 		sleep 0.2
+		attempt=$((attempt + 1))
 	done
-	[ "$ready" = true ]
+	if [ "$ready" != true ]; then
+		echo "gateway readiness timed out after $GATEWAY_READY_ATTEMPTS attempts" >&2
+		docker logs "$GATEWAY" >&2 || true
+		docker logs "$BACKEND" >&2 || true
+		return 1
+	fi
 }
 
 start_gateway ""
