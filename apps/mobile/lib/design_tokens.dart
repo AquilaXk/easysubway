@@ -172,7 +172,9 @@ abstract final class EasySubwayFanMenuColors {
   static const closePressed = Color(0xFFE9EDF2);
   static const closeInk = Color(0xFF475467);
   static const border = Color(0xFFCBD2DC);
-  static const outline = Color(0xFFBCC5D2);
+  // 팬 메뉴 도입 전(#2109/PR #2112) 사각형 역 액션 시트가 쓰던 외곽 색을 그대로
+  // 계승한다(구 시트 Material color 0xE8404445, 오너 지시 2026-07-16).
+  static const outline = Color(0xE8404445);
 
   /// 팬 메뉴 앵커 역명 라벨의 텍스트 잉크.
   static const ink = Color(0xFF20262E);
