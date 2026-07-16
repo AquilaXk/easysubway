@@ -3482,6 +3482,21 @@ void resetNetworkMapOwnerLabelsCacheForTest() {
   _sharedOwnerLabelsByRegionFuture = null;
 }
 
+/// 위젯 테스트가 실제 sidecar 로드 경로(rootBundle.loadString)를 거치지 않고
+/// 오너 라벨 캐시를 즉시 채운다(#2068 실기기 회귀 재현 테스트 전용). 이미
+/// 파싱한 결과(예: rootBundle.load로 바이트를 받아 테스트가 직접 디코드한 것)를
+/// 넘기면 다음 `_loadOwnerLabels()` 호출이 이 값을 즉시 받는다 — 대형 sidecar
+/// JSON(현재 170KB대, Flutter loadString의 동기 임계값을 넘어 compute() 격리
+/// isolate로 디코드된다)의 loadString 완료를 기다릴 필요가 없어, 그 경로가 느리게
+/// 동작하는 테스트 환경에서도 region 키 정규화 등 나머지 로직을 실데이터로
+/// 검증할 수 있다.
+@visibleForTesting
+void primeNetworkMapOwnerLabelsCacheForTest(
+  Map<String, Map<String, RouteMapOwnerLabelEntry>> byRegion,
+) {
+  _sharedOwnerLabelsByRegionFuture = Future.value(byRegion);
+}
+
 class _NetworkMapCanvas extends StatefulWidget {
   const _NetworkMapCanvas({
     required this.data,
@@ -3972,7 +3987,14 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     // 로드 전엔 null → 라벨 rect 없이 계산되지만, 로드가 끝나면 setState로 rebuild
     // 되며 ownerKey가 바뀌어 캐시가 무효화되고 라벨 extents를 포함해 재계산된다
     // (stale bounds 방지 — sidecar 로드 전/후 캐시 키 구분).
-    final basemapAssetId = kRouteMapBasemapRegionToId[data.selectedRegion];
+    //
+    // data.selectedRegion은 drift_station_repository._storedNetworkMapRegion이
+    // 만든 저장형('광주권' 등 접미 포함)이라 kRouteMapBasemapRegionToId의 짧은
+    // 키('광주')와 직접 안 맞는다 — _displayRegionName으로 정규화해야 조회가
+    // 성공한다(실기기 회귀: 정규화 누락으로 basemapAssetId가 항상 null이 돼
+    // 라벨이 bounds에 전혀 반영되지 않았다, #2068).
+    final basemapAssetId =
+        kRouteMapBasemapRegionToId[_displayRegionName(data.selectedRegion)];
     final ownerEntries = basemapAssetId == null
         ? null
         : _ownerLabelsByRegion?[basemapAssetId];
@@ -4250,8 +4272,13 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     final lineBadgeLabelByLineId = _structuredLineBadgeLabelByLineId!;
     // basemap 6차(#2068): asset id(예: '수도권'→'seoul')로 오너 라벨 sidecar를
     // 조회한다. 매핑에 없는 region·로드 전이면 빈 맵 → 4차 자동 솔버 폴백.
+    // widget.data.selectedRegion은 저장형('광주권' 등)이라 _geometryFor와 같이
+    // _displayRegionName으로 정규화해야 kRouteMapBasemapRegionToId 조회가
+    // 성공한다(정규화 누락 시 basemapAssetId가 항상 null 회귀, #2068).
     final basemapAssetId =
-        kRouteMapBasemapRegionToId[widget.data.selectedRegion];
+        kRouteMapBasemapRegionToId[_displayRegionName(
+          widget.data.selectedRegion,
+        )];
     final ownerLabelsByStationName = basemapAssetId == null
         ? const <String, RouteMapOwnerLabelEntry>{}
         : _ownerLabelsByRegion?[basemapAssetId] ??
