@@ -1325,128 +1325,128 @@
            data-station="119"
            data-station-name="평동"
            data-label-role="terminal">
-          <text x="294" y="419" id="station-label-119" class="station-label station-label-terminal" text-anchor="start" font-size="57" style="font-size:57px">평동</text>
+          <text x="302" y="419" id="station-label-119" class="station-label station-label-terminal" text-anchor="start" font-size="63" style="font-size:63px">평동</text>
         </g>
         <g
            id="station-label-group-118"
            data-station="118"
            data-station-name="도산"
            data-label-role="ordinary">
-          <text x="294" y="599" id="station-label-118" class="station-label station-label-ordinary" text-anchor="start" font-size="54" style="font-size:54px">도산</text>
+          <text x="302" y="599" id="station-label-118" class="station-label station-label-ordinary" text-anchor="start" font-size="60" style="font-size:60px">도산</text>
         </g>
         <g
            id="station-label-group-117"
            data-station="117"
            data-station-name="광주송정"
            data-label-role="transfer">
-          <text x="294" y="779" id="station-label-117" class="station-label station-label-transfer" text-anchor="start" font-size="56" style="font-size:56px">광주송정역</text>
+          <text x="302" y="779" id="station-label-117" class="station-label station-label-transfer" text-anchor="start" font-size="62" style="font-size:62px">광주송정역</text>
         </g>
         <g
            id="station-label-group-116"
            data-station="116"
            data-station-name="송정공원"
            data-label-role="ordinary">
-          <text x="294" y="959" id="station-label-116" class="station-label station-label-ordinary" text-anchor="start" font-size="54" style="font-size:54px">송정공원</text>
+          <text x="302" y="959" id="station-label-116" class="station-label station-label-ordinary" text-anchor="start" font-size="60" style="font-size:60px">송정공원</text>
         </g>
         <g
            id="station-label-group-115"
            data-station="115"
            data-station-name="공항"
            data-label-role="ordinary">
-          <text x="294" y="1139" id="station-label-115" class="station-label station-label-ordinary" text-anchor="start" font-size="54" style="font-size:54px">공항</text>
+          <text x="302" y="1139" id="station-label-115" class="station-label station-label-ordinary" text-anchor="start" font-size="60" style="font-size:60px">공항</text>
         </g>
         <g
            id="station-label-group-114"
            data-station="114"
            data-station-name="김대중컨벤션센터 (마륵)"
            data-label-role="ordinary">
-          <text x="294" y="1319" id="station-label-114" class="station-label station-label-ordinary station-label-small" text-anchor="start" font-size="43" style="font-size:43px">김대중컨벤션센터</text>
-          <text x="294" y="1368" id="station-label-114-2" class="station-label station-label-ordinary station-label-small" text-anchor="start" font-size="43" style="font-size:43px">(마륵)</text>
+          <text x="302" y="1319" id="station-label-114" class="station-label station-label-ordinary station-label-small" text-anchor="start" font-size="48" style="font-size:48px">김대중컨벤션센터</text>
+          <text x="302" y="1374" id="station-label-114-2" class="station-label station-label-ordinary station-label-small" text-anchor="start" font-size="48" style="font-size:48px">(마륵)</text>
         </g>
         <g
            id="station-label-group-112"
            data-station="112"
            data-station-name="운천"
            data-label-role="ordinary">
-          <text x="670" y="1740" id="station-label-112" class="station-label station-label-ordinary" text-anchor="middle" font-size="54" style="font-size:54px">운천</text>
+          <text x="670" y="1750" id="station-label-112" class="station-label station-label-ordinary" text-anchor="middle" font-size="60" style="font-size:60px">운천</text>
         </g>
         <g
            id="station-label-group-111"
            data-station="111"
            data-station-name="쌍촌"
            data-label-role="ordinary">
-          <text x="1114" y="1499" id="station-label-111" class="station-label station-label-ordinary" text-anchor="start" font-size="54" style="font-size:54px">쌍촌</text>
+          <text x="1122" y="1499" id="station-label-111" class="station-label station-label-ordinary" text-anchor="start" font-size="60" style="font-size:60px">쌍촌</text>
         </g>
         <g
            id="station-label-group-110"
            data-station="110"
            data-station-name="화정"
            data-label-role="ordinary">
-          <text x="1114" y="1319" id="station-label-110" class="station-label station-label-ordinary" text-anchor="start" font-size="54" style="font-size:54px">화정</text>
+          <text x="1122" y="1319" id="station-label-110" class="station-label station-label-ordinary" text-anchor="start" font-size="60" style="font-size:60px">화정</text>
         </g>
         <g
            id="station-label-group-109"
            data-station="109"
            data-station-name="농성"
            data-label-role="ordinary">
-          <text x="1114" y="1139" id="station-label-109" class="station-label station-label-ordinary" text-anchor="start" font-size="54" style="font-size:54px">농성</text>
+          <text x="1122" y="1139" id="station-label-109" class="station-label station-label-ordinary" text-anchor="start" font-size="60" style="font-size:60px">농성</text>
         </g>
         <g
            id="station-label-group-108"
            data-station="108"
            data-station-name="돌고개"
            data-label-role="ordinary">
-          <text x="1114" y="959" id="station-label-108" class="station-label station-label-ordinary" text-anchor="start" font-size="54" style="font-size:54px">돌고개</text>
+          <text x="1122" y="959" id="station-label-108" class="station-label station-label-ordinary" text-anchor="start" font-size="60" style="font-size:60px">돌고개</text>
         </g>
         <g
            id="station-label-group-107"
            data-station="107"
            data-station-name="양동시장"
            data-label-role="ordinary">
-          <text x="1114" y="779" id="station-label-107" class="station-label station-label-ordinary" text-anchor="start" font-size="54" style="font-size:54px">양동시장</text>
+          <text x="1122" y="779" id="station-label-107" class="station-label station-label-ordinary" text-anchor="start" font-size="60" style="font-size:60px">양동시장</text>
         </g>
         <g
            id="station-label-group-106"
            data-station="106"
            data-station-name="금남로5가"
            data-label-role="ordinary">
-          <text x="1114" y="599" id="station-label-106" class="station-label station-label-ordinary" text-anchor="start" font-size="54" style="font-size:54px">금남로5가</text>
+          <text x="1122" y="599" id="station-label-106" class="station-label station-label-ordinary" text-anchor="start" font-size="60" style="font-size:60px">금남로5가</text>
         </g>
         <g
            id="station-label-group-105"
            data-station="105"
            data-station-name="금남로4가"
            data-label-role="ordinary">
-          <text x="1490" y="239" id="station-label-105" class="station-label station-label-ordinary" text-anchor="middle" font-size="54" style="font-size:54px">금남로4가</text>
+          <text x="1490" y="218" id="station-label-105" class="station-label station-label-ordinary" text-anchor="middle" font-size="60" style="font-size:60px">금남로4가</text>
         </g>
         <g
            id="station-label-group-104"
            data-station="104"
            data-station-name="문화전당 (구도청)"
            data-label-role="ordinary">
-          <text x="1934" y="469" id="station-label-104" class="station-label station-label-ordinary station-label-small" text-anchor="start" font-size="43" style="font-size:43px">문화전당</text>
-          <text x="1934" y="518" id="station-label-104-2" class="station-label station-label-ordinary station-label-small" text-anchor="start" font-size="43" style="font-size:43px">(구도청)</text>
+          <text x="1942" y="469" id="station-label-104" class="station-label station-label-ordinary station-label-small" text-anchor="start" font-size="48" style="font-size:48px">문화전당</text>
+          <text x="1942" y="524" id="station-label-104-2" class="station-label station-label-ordinary station-label-small" text-anchor="start" font-size="48" style="font-size:48px">(구도청)</text>
         </g>
         <g
            id="station-label-group-102"
            data-station="102"
            data-station-name="학동·증심사입구"
            data-label-role="ordinary">
-          <text x="1934" y="889" id="station-label-102" class="station-label station-label-ordinary station-label-small" text-anchor="start" font-size="43" style="font-size:43px"><tspan x="1934" y="889">학동</tspan><tspan x="1934" y="938">증심사입구</tspan></text>
+          <text x="1942" y="889" id="station-label-102" class="station-label station-label-ordinary station-label-small" text-anchor="start" font-size="48" style="font-size:48px"><tspan x="1942" y="889">학동</tspan><tspan x="1942" y="944">증심사입구</tspan></text>
         </g>
         <g
            id="station-label-group-101"
            data-station="101"
            data-station-name="소태"
            data-label-role="ordinary">
-          <text x="1934" y="1099" id="station-label-101" class="station-label station-label-ordinary" text-anchor="start" font-size="54" style="font-size:54px">소태</text>
+          <text x="1942" y="1099" id="station-label-101" class="station-label station-label-ordinary" text-anchor="start" font-size="60" style="font-size:60px">소태</text>
         </g>
         <g
            id="station-label-group-100"
            data-station="100"
            data-station-name="녹동"
            data-label-role="terminal">
-          <text x="1934" y="1309" id="station-label-100" class="station-label station-label-terminal" text-anchor="start" font-size="57" style="font-size:57px">녹동</text>
+          <text x="1942" y="1309" id="station-label-100" class="station-label station-label-terminal" text-anchor="start" font-size="63" style="font-size:63px">녹동</text>
         </g>
         <g
            id="station-label-group-238"
@@ -1969,14 +1969,14 @@
            data-station="113-203"
            data-station-name="상무"
            data-label-role="transfer">
-          <text x="294" y="1499" id="station-label-113-203" class="station-label station-label-transfer" text-anchor="start" font-size="56" style="font-size:56px">상무</text>
+          <text x="302" y="1499" id="station-label-113-203" class="station-label station-label-transfer" text-anchor="start" font-size="62" style="font-size:62px">상무</text>
         </g>
         <g
            id="station-label-group-103-214"
            data-station="103-214"
            data-station-name="남광주"
            data-label-role="transfer">
-          <text x="1934" y="679" id="station-label-103-214" class="station-label station-label-transfer" text-anchor="start" font-size="56" style="font-size:56px">남광주</text>
+          <text x="1942" y="679" id="station-label-103-214" class="station-label station-label-transfer" text-anchor="start" font-size="62" style="font-size:62px">남광주</text>
         </g>
         <g
            id="station-label-group-211"
