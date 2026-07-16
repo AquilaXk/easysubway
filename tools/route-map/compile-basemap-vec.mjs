@@ -198,7 +198,7 @@ function extractMapSvg(svgText) {
     ? currentLineStationsFromFutureTransfers(
         svgText,
         gwangju
-          ? { color: "#009088", radius: "5.8", strokeWidth: "2" }
+          ? { color: "#009088", radius: "20", strokeWidth: "6" }
           : { color: "#00975A", radius: "15", strokeWidth: "4.5" },
       )
     : "";
@@ -499,6 +499,24 @@ export function extractOwnerLabels(svgText) {
   return entries;
 }
 
+// 종점 호선 마크 sidecar 플래그(#2068 광주 2차) — region의 원본 SVG가 자체
+// 종점 배지(<g data-role="line-terminal-badge">, route-lines-layer 내 원+숫자
+// 마감)를 그리면 앱 솔버가 같은 자리에 노선 뱃지 pill을 중복해 그리지 않도록
+// terminal role 오너 라벨 엔트리에 hasLineTerminalBadge:true를 표시한다.
+// region 단위 감지(개별 역 좌표 매칭 불필요 — 광주·대전 둘 다 노선이 1개뿐이라
+// terminal 엔트리 전부에 표시해도 의미가 동일하다). 플래그 없는 권역은 기존
+// 엔트리 그대로(추가 키 없음) — 하위 호환.
+export function markLineTerminalBadgeEntries(ownerLabels, sourceText) {
+  if (!/data-role="line-terminal-badge"/.test(sourceText)) {
+    return ownerLabels;
+  }
+  return ownerLabels.map((entry) =>
+    entry.role === "terminal"
+      ? { ...entry, hasLineTerminalBadge: true }
+      : entry,
+  );
+}
+
 // style="...font-size:<n>px?..." 선언 값을 ×k로 교체한다(px 접미사는 유지).
 // text·tspan 공통 — SVG에서 style 속성은 동명 presentation attribute보다 우선하므로
 // (예: 클래스가 준 font-size 속성 위에 개별 style로 덮어쓴 배지들) 실제 렌더 크기는
@@ -644,7 +662,10 @@ function main() {
       }
       compile(inputSvg, outputVec, normalizedSvgDir);
       const digest = sha256(outputVec);
-      const ownerLabels = extractOwnerLabels(sourceText);
+      const ownerLabels = markLineTerminalBadgeEntries(
+        extractOwnerLabels(sourceText),
+        sourceText,
+      );
       labelsByRegion[region.id] = ownerLabels;
       buildMaps.push({
         id: region.id,

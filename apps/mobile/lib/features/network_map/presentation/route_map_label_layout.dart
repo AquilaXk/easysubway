@@ -344,6 +344,10 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
   // 빈 맵이라 기존 호출부는 동작 불변(옵트인).
   Map<String, RouteMapOwnerLabelEntry> ownerLabelsByStationName = const {},
   Map<String, String> stationNameByStationId = const {},
+  // #2068 광주 2차: 오너 SVG에 종점 호선 마크(line-terminal-badge)가 있는
+  // region에서 앱 솔버의 노선 뱃지 pill과 중복되지 않도록 후보 생성을 건너
+  // 뛴다. 기본값 false — 플래그 없는 기존 권역은 동작 불변.
+  bool suppressLineBadges = false,
 }) {
   final terminusIds = routeMapTerminusStationIds(map);
   final candidates = <_Candidate>[];
@@ -371,7 +375,13 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
       : kRouteMapDesignBadgeFontPx;
 
   // 1) 노선 뱃지: 끝점 + arc length 반복 (스펙 S4 — 노선 중간 확대에도 식별).
+  // suppressLineBadges(#2068 광주 2차): basemap SVG 자체에 종점 호선 마크가
+  // 그려져 있는 region(광주·대전)은 여기서 만드는 뱃지 후보를 전부 건너뛴다
+  // — 그리지 않으면 배치도 안 하므로 다른 라벨 배치에 영향 없다.
   for (final line in map.lines) {
+    if (suppressLineBadges) {
+      break;
+    }
     final label = badgeLabelByLineId[line.lineId];
     if (label == null || label.isEmpty) {
       continue;

@@ -74,6 +74,25 @@ void main() {
       expect(result.length, 1);
       expect(result.containsKey('정상역'), isTrue);
     });
+
+    test(
+      '#2068 광주 2차: hasLineTerminalBadge 플래그를 파싱하고 미보유 시 false',
+      () {
+        const sidecar = '''
+      {
+        "regions": {
+          "gwangju": [
+            {"station": "평동", "role": "terminal", "x": 1.0, "y": 1.0, "anchor": "start", "fontSizePx": 78.0, "hasLineTerminalBadge": true},
+            {"station": "도산", "role": "ordinary", "x": 2.0, "y": 2.0, "anchor": "start", "fontSizePx": 72.0}
+          ]
+        }
+      }
+      ''';
+        final result = parseRouteMapOwnerLabelsForRegion(sidecar, 'gwangju');
+        expect(result['평동']!.hasLineTerminalBadge, isTrue);
+        expect(result['도산']!.hasLineTerminalBadge, isFalse);
+      },
+    );
   });
 
   group('routeMapOwnerLabelsByRegionFrom', () {

@@ -6,6 +6,7 @@ import test from "node:test";
 
 import {
   extractOwnerLabels,
+  markLineTerminalBadgeEntries,
   normalizeSvgForCompile,
 } from "./compile-basemap-vec.mjs";
 
@@ -381,5 +382,55 @@ test("build manifest가 source·normalized·vec hash와 viewBox를 결합한다"
       map.ownerLabelCount,
       map.id,
     );
+  }
+});
+
+test("markLineTerminalBadgeEntries: line-terminal-badge가 없으면 원본을 그대로 반환한다", () => {
+  const entries = [
+    { station: "평동", role: "terminal", x: 0, y: 0, anchor: "start", fontSizePx: 10 },
+  ];
+  const result = markLineTerminalBadgeEntries(entries, "<svg></svg>");
+  assert.equal(result, entries); // .map 없이 원본 참조 그대로.
+});
+
+test("markLineTerminalBadgeEntries: 있으면 terminal role 엔트리에만 표시하고 나머지는 불변", () => {
+  const entries = [
+    { station: "평동", role: "terminal", x: 0, y: 0, anchor: "start", fontSizePx: 10 },
+    { station: "녹동", role: "terminal", x: 1, y: 1, anchor: "start", fontSizePx: 10 },
+    { station: "도산", role: "ordinary", x: 2, y: 2, anchor: "start", fontSizePx: 10 },
+  ];
+  const svgText = '<g data-role="line-terminal-badge"><circle /></g>';
+  const result = markLineTerminalBadgeEntries(entries, svgText);
+  assert.equal(result[0].hasLineTerminalBadge, true);
+  assert.equal(result[1].hasLineTerminalBadge, true);
+  assert.equal(result[2].hasLineTerminalBadge, undefined);
+  // 원본 배열/객체는 변경하지 않는다(순수 함수).
+  assert.equal(entries[0].hasLineTerminalBadge, undefined);
+});
+
+test("labels.json sidecar: 광주·대전은 terminal 엔트리에 hasLineTerminalBadge, 다른 권역은 플래그 없음", () => {
+  const root = path.resolve(import.meta.dirname, "../..");
+  const sidecarPath = path.join(
+    root,
+    "apps/mobile/assets/datapacks/metro_map_pack/basemap/labels.json",
+  );
+  const sidecar = JSON.parse(readFileSync(sidecarPath, "utf8"));
+  for (const regionId of ["gwangju", "daejeon"]) {
+    const terminals = sidecar.regions[regionId].filter(
+      (entry) => entry.role === "terminal",
+    );
+    assert.ok(terminals.length > 0, regionId);
+    for (const entry of terminals) {
+      assert.equal(entry.hasLineTerminalBadge, true, `${regionId}:${entry.station}`);
+    }
+  }
+  for (const regionId of ["seoul", "busan", "daegu"]) {
+    for (const entry of sidecar.regions[regionId]) {
+      assert.equal(
+        entry.hasLineTerminalBadge,
+        undefined,
+        `${regionId}:${entry.station}`,
+      );
+    }
   }
 });

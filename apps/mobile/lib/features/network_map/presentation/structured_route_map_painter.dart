@@ -515,6 +515,13 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
       // 4차 자동 솔버로 전부 폴백, fail-safe).
       ownerLabelsByStationName: widget.ownerLabelsByStationName,
       stationNameByStationId: widget.stationNameByStationId,
+      // #2068 광주 2차: sidecar 엔트리 중 하나라도 종점 호선 마크 플래그를
+      // 가지면(=이 region의 오너 SVG가 자체 종점 배지를 그림) 앱 솔버의
+      // 노선 뱃지 pill 후보를 억제한다(network_map.dart 변경 없이, 이미
+      // 통과하는 ownerLabelsByStationName만으로 도출).
+      suppressLineBadges: widget.ownerLabelsByStationName.values.any(
+        (entry) => entry.hasLineTerminalBadge,
+      ),
     );
     _picture = recordRouteMapPicture(
       map: widget.map,

@@ -24,6 +24,7 @@ class RouteMapOwnerLabelEntry {
     required this.position,
     required this.anchor,
     required this.fontSizePx,
+    this.hasLineTerminalBadge = false,
   });
 
   /// SVG 라벨의 렌더 텍스트 내용(=역명, nameKo와 정확 일치 매칭 키).
@@ -38,6 +39,13 @@ class RouteMapOwnerLabelEntry {
 
   /// viewBox(source) 단위 로컬 font-size — design px 변환은 호출부가 한다.
   final double fontSizePx;
+
+  /// #2068 광주 2차: 이 역이 오너 SVG에 종점 호선 마크(line-terminal-badge,
+  /// 노선 끝단 원+숫자 마감)를 갖고 있으면 true — compile-basemap-vec.mjs가
+  /// region 내 `data-role="line-terminal-badge"` 존재를 감지해 terminal role
+  /// 엔트리에만 표시한다. 앱 솔버가 basemap 노선 뱃지 pill과 중복 그리지
+  /// 않도록 route_map_label_layout.dart가 이 플래그로 억제한다.
+  final bool hasLineTerminalBadge;
 }
 
 int _routeMapOwnerLabelRolePriority(String role) => switch (role) {
@@ -98,6 +106,7 @@ Map<String, RouteMapOwnerLabelEntry> parseRouteMapOwnerLabelsForRegion(
       position: Offset(x.toDouble(), y.toDouble()),
       anchor: _parseRouteMapOwnerLabelAnchor(raw['anchor']),
       fontSizePx: fontSizePx.toDouble(),
+      hasLineTerminalBadge: raw['hasLineTerminalBadge'] == true,
     );
     final existing = result[station];
     if (existing == null ||
