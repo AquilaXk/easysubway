@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -32,18 +33,44 @@ public class JdbcDatapackReleaseDeliveryRepository implements DatapackReleaseDel
 			ldt(rs.getTimestamp("updated_at")));
 
 	private final JdbcTemplate jdbcTemplate;
+	private final boolean postgresql;
 
 	public JdbcDatapackReleaseDeliveryRepository(JdbcTemplate jdbcTemplate) {
 		this.jdbcTemplate = jdbcTemplate;
+		this.postgresql = Boolean.TRUE.equals(jdbcTemplate.execute(
+			(ConnectionCallback<Boolean>) connection ->
+				"PostgreSQL".equals(connection.getMetaData().getDatabaseProductName())));
 	}
 
 	public DatapackReleaseDelivery upsertSameDelivery(DatapackReleaseDelivery delivery) {
+		if (postgresql) {
+			if (insertPostgresql(delivery) == 1) return delivery;
+			return findByIdempotencyKey(delivery.idempotencyKey())
+				.orElseThrow(() -> new DuplicateKeyException(
+					"release request/sequence already belongs to another manifest"));
+		}
 		try {
 			insert(delivery);
 			return delivery;
 		} catch (DuplicateKeyException duplicate) {
 			return findByIdempotencyKey(delivery.idempotencyKey()).orElseThrow(() -> duplicate);
 		}
+	}
+
+	private int insertPostgresql(DatapackReleaseDelivery d) {
+		return jdbcTemplate.update("""
+			INSERT INTO datapack_release_deliveries (
+			 idempotency_key, release_request_id, release_sequence, manifest_sha256, channel,
+			 candidate_id, payload_sha256, signature_sha256, state, attempts, next_attempt_at,
+			 reconcile_deadline, dead_letter_deadline, http_class, sanitized_detail,
+			 claimed_at, claim_owner, created_at, updated_at)
+			VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+			ON CONFLICT DO NOTHING
+			""", d.idempotencyKey(), d.releaseRequestId(), d.releaseSequence(), d.manifestSha256(),
+			d.channel(), d.candidateId(), d.payloadSha256(), d.signatureSha256(), d.state().name(),
+			d.attempts(), ts(d.nextAttemptAt()), ts(d.reconcileDeadline()), ts(d.deadLetterDeadline()),
+			d.httpClass(), d.sanitizedDetail(), ts(d.claimedAt()), d.claimOwner(),
+			ts(d.createdAt()), ts(d.updatedAt()));
 	}
 
 	public Optional<DatapackReleaseDelivery> findByIdempotencyKey(String idempotencyKey) {

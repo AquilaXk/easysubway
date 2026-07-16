@@ -5,7 +5,7 @@ CREATE TABLE datapack_release_deliveries (
     manifest_sha256       datapack_sha256 NOT NULL,
     channel               VARCHAR(32)     NOT NULL,
     candidate_id          VARCHAR(255)    NOT NULL,
-    payload_sha256        datapack_sha256 NOT NULL,
+    payload_sha256        datapack_sha256,
     signature_sha256      datapack_sha256 NOT NULL,
     state                 VARCHAR(32)     NOT NULL,
     attempts              INTEGER         NOT NULL DEFAULT 0,

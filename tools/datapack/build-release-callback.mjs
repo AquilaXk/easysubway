@@ -3,6 +3,16 @@
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 
+const CALLBACK_CANONICAL_ORDER = [
+  "schemaVersion", "artifactKind", "releaseRequestId", "releaseSequence", "channel",
+  "idempotencyKey", "workflowRunUrl", "manifestSha256", "sqliteSha256", "gzipSha256",
+  "evidenceBundleSha256", "validatorStatus", "routeRegressionStatus", "publishStatus",
+];
+
+export function canonicalCallbackMessage(payload) {
+  return CALLBACK_CANONICAL_ORDER.map((key) => String(payload[key])).join("\n");
+}
+
 export function buildReleaseCallback(e) {
   const releaseSequence = Number(e.RELEASE_SEQUENCE);
   if (!Number.isSafeInteger(releaseSequence) || releaseSequence < 1) {
@@ -41,11 +51,8 @@ export function buildReleaseCallback(e) {
     publishStatus: gate("PUBLISH_STATUS"),
   };
   fields.idempotencyKey = `${fields.releaseRequestId}:${fields.releaseSequence}:${fields.manifestSha256}`;
-  const order = ["schemaVersion","artifactKind","releaseRequestId","releaseSequence","channel","idempotencyKey","workflowRunUrl","manifestSha256",
-    "sqliteSha256","gzipSha256","evidenceBundleSha256","validatorStatus","routeRegressionStatus","publishStatus"];
-  const message = order.map((k) => String(fields[k])).join("\n");
   const value = crypto.createHmac("sha256", required("EASYSUBWAY_DATAPACK_CALLBACK_HMAC_KEY"))
-    .update(message, "utf8").digest("hex");
+    .update(canonicalCallbackMessage(fields), "utf8").digest("hex");
 
   return { ...fields, callbackVerifier: { kind: "payload-signature", value } };
 }

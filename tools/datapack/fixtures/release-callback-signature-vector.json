@@ -16,5 +16,6 @@
     "routeRegressionStatus": "PASS",
     "publishStatus": "PASS"
   },
+  "expectedPayloadSha256": "68f79bd7a3d89e10e431019401dd111607c91fc0e61046c5cf1620da09b797c8",
   "expectedHmacHex": "ffd3972f6e752b57bc82c25d167373902d21c52826eec4a9e22424d60ef4c1bd"
 }

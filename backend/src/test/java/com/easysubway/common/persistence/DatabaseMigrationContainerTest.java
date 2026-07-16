@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.easysubway.route.adapter.out.persistence.JdbcRouteV2AccessStore;
+import com.easysubway.datapack.adapter.out.persistence.JdbcDatapackReleaseDeliveryRepository;
+import com.easysubway.datapack.domain.DatapackReleaseDelivery;
 import com.easysubway.route.application.port.out.RouteV2AccessStore.RouteV2Session;
 import com.easysubway.route.application.port.out.RouteV2AccessStore.SessionStatus;
 import com.zaxxer.hikari.HikariDataSource;
@@ -20,6 +22,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -154,6 +158,35 @@ class DatabaseMigrationContainerTest {
 		assertDatapackPermissionMatrix(jdbcTemplate);
 		assertRouteServiceIdentityHashGuards(jdbcTemplate);
 		assertRouteV2AllowlistSchema(jdbcTemplate);
+	}
+
+	@Test
+	@DisplayName("PostgreSQL transaction 안의 동일 callback replay는 오류 없이 한 row로 수렴한다")
+	void postgresqlCallbackReplayIsIdempotentInsideTransaction() {
+		String schema = "datapack_callback_replay_" + System.nanoTime();
+		var migrationDataSource = new DriverManagerDataSource(
+			POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+		migrate(migrationDataSource, "classpath:db/migration/postgresql", schema);
+		try (var dataSource = new HikariDataSource()) {
+			dataSource.setJdbcUrl(POSTGRES.getJdbcUrl());
+			dataSource.setUsername(POSTGRES.getUsername());
+			dataSource.setPassword(POSTGRES.getPassword());
+			dataSource.setSchema(schema);
+			var jdbcTemplate = new JdbcTemplate(dataSource);
+			var repository = new JdbcDatapackReleaseDeliveryRepository(jdbcTemplate);
+			var transaction = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
+			var now = java.time.LocalDateTime.parse("2026-07-16T00:00:00");
+			var delivery = DatapackReleaseDelivery.pending(
+				"request-2057", 42, "a".repeat(64), "production", "candidate-2057",
+				"b".repeat(64), "c".repeat(64), now);
+
+			transaction.executeWithoutResult(ignored -> {
+				repository.upsertSameDelivery(delivery);
+				repository.upsertSameDelivery(delivery);
+				assertThat(jdbcTemplate.queryForObject(
+					"SELECT COUNT(*) FROM datapack_release_deliveries", Integer.class)).isEqualTo(1);
+			});
+		}
 	}
 
 	@Test

@@ -39,7 +39,7 @@ public record DatapackReleaseDelivery(
 			throw new IllegalArgumentException("channel is invalid");
 		}
 		manifestSha256 = sha(manifestSha256, "manifestSha256");
-		payloadSha256 = sha(payloadSha256, "payloadSha256");
+		payloadSha256 = payloadSha256 == null ? null : sha(payloadSha256, "payloadSha256");
 		signatureSha256 = sha(signatureSha256, "signatureSha256");
 		if (releaseSequence < 1) throw new IllegalArgumentException("releaseSequence must be positive");
 		if (!idempotencyKey.equals(releaseRequestId + ":" + releaseSequence + ":" + manifestSha256)) {

@@ -138,6 +138,32 @@ class DatapackReleaseReconciliationServiceTest {
 	}
 
 	@Test
+	@DisplayName("current가 후속 release로 전진해도 immutable catalog에서 유실 callback을 복원한다")
+	void discoversLostCallbackAfterCurrentAdvances() {
+		var requests = mock(DatapackReleaseRequestRepository.class);
+		var channels = mock(DatapackReleaseChannelCommandPort.class);
+		var dispatched = DatapackReleaseRequest.requested(
+			"request-2057", "candidate-2057", "scope", "production",
+			"b".repeat(64), "c".repeat(64), "d".repeat(64), "requester", T0)
+			.approve("approver", T0)
+			.markDispatched("https://github.com/run/42", "dispatch-42", T0);
+		when(requests.findRecent(100)).thenReturn(java.util.List.of(dispatched));
+		when(channels.candidateHasManifest("candidate-2057", SHA)).thenReturn(true);
+		when(catalog.findByRequest("production", "request-2057"))
+			.thenReturn(java.util.Optional.of(
+				new CatalogIdentity(42, SHA, "production", "request-2057", true, "b".repeat(64))));
+		var discovery = new DatapackReleaseReconciliationService(
+			repository, callbackService, catalog, requests, channels);
+
+		discovery.discoverMissing(T0.plusMinutes(10));
+
+		verify(repository).upsertSameDelivery(org.mockito.ArgumentMatchers.argThat(delivery ->
+			delivery.releaseRequestId().equals("request-2057")
+				&& delivery.releaseSequence() == 42
+				&& delivery.payloadSha256() == null));
+	}
+
+	@Test
 	@DisplayName("한 delivery 예외가 다음 reconciliation을 중단하지 않는다")
 	void isolatesDeliveryFailure() {
 		var first = delivery();

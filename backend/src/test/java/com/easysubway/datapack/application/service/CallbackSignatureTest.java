@@ -49,7 +49,7 @@ class CallbackSignatureTest {
         assertThat(sig.sign(f)).isEqualTo(expected);
         assertThat(sig.verify(f, expected)).isTrue();
         assertThat(sig.verify(f, "deadbeef")).isFalse();
-		assertThat(f.payloadSha256()).isEqualTo("68f79bd7a3d89e10e431019401dd111607c91fc0e61046c5cf1620da09b797c8");
+			assertThat(f.payloadSha256()).isEqualTo(node.get("expectedPayloadSha256").asText());
 		var changedSequence = new CanonicalFields(f.schemaVersion(), f.artifactKind(), f.releaseRequestId(), 43,
 			f.channel(), f.idempotencyKey(), f.workflowRunUrl(), f.manifestSha256(), f.sqliteSha256(),
 			f.gzipSha256(), f.evidenceBundleSha256(), f.validatorStatus(), f.routeRegressionStatus(),

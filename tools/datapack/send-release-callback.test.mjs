@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
@@ -6,20 +7,25 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { sendReleaseCallback } from "./send-release-callback.mjs";
-import { buildReleaseCallback } from "./build-release-callback.mjs";
+import { buildReleaseCallback, canonicalCallbackMessage } from "./build-release-callback.mjs";
 
 const secret = "callback-secret-never-log";
 const token = "bearer-token-never-log";
-const payload = {
-  schemaVersion: 2,
-  artifactKind: "datapack-release-callback",
-  releaseRequestId: "req-2057",
-  releaseSequence: 42,
-  channel: "production",
-  manifestSha256: "a".repeat(64),
-  idempotencyKey: `req-2057:42:${"a".repeat(64)}`,
-  callbackVerifier: { kind: "payload-signature", value: secret },
+const callbackEnv = {
+  RELEASE_SEQUENCE: "42",
+  RELEASE_REQUEST_ID: "req-2057",
+  TARGET_CHANNEL: "production",
+  WORKFLOW_RUN_URL: "https://github.com/AquilaXk/easysubway/actions/runs/1",
+  MANIFEST_SHA256: "a".repeat(64),
+  SQLITE_SHA256: "b".repeat(64),
+  GZIP_SHA256: "c".repeat(64),
+  EVIDENCE_BUNDLE_SHA256: "d".repeat(64),
+  VALIDATOR_STATUS: "PASS",
+  ROUTE_REGRESSION_STATUS: "PASS",
+  PUBLISH_STATUS: "PASS",
+  EASYSUBWAY_DATAPACK_CALLBACK_HMAC_KEY: secret,
 };
+const payload = buildReleaseCallback(callbackEnv);
 
 async function withServer(handler, callback) {
   const server = createServer(handler);
@@ -50,6 +56,11 @@ test("500 뒤 재시도해 전달하고 artifact에서 secret을 제거한다", 
     assert.equal(artifact.attempts.length, 2);
     assert.deepEqual(slept, [60]);
     assert.equal(artifact.attempts[0].httpClass, "5XX");
+    assert.equal(
+      artifact.payloadSha256,
+      createHash("sha256").update(canonicalCallbackMessage(payload)).digest("hex"),
+      "producer와 consumer가 verifier를 제외한 동일 canonical payload hash를 사용해야 한다",
+    );
     const serialized = JSON.stringify(artifact);
     assert.equal(serialized.includes(secret), false);
     assert.equal(serialized.includes(token), false);
@@ -80,23 +91,21 @@ test("callback producer는 safe integer가 아닌 release sequence를 거부한�
 });
 
 test("callback producer는 서명 전 required gate와 hash를 검증한다", () => {
-  const env = {
-    RELEASE_SEQUENCE: "42",
-    RELEASE_REQUEST_ID: "req-2057",
-    TARGET_CHANNEL: "production",
-    WORKFLOW_RUN_URL: "https://github.com/AquilaXk/easysubway/actions/runs/1",
-    MANIFEST_SHA256: "a".repeat(64),
-    SQLITE_SHA256: "b".repeat(64),
-    GZIP_SHA256: "c".repeat(64),
-    EVIDENCE_BUNDLE_SHA256: "d".repeat(64),
-    VALIDATOR_STATUS: "PASS",
-    ROUTE_REGRESSION_STATUS: "PASS",
-    PUBLISH_STATUS: "PASS",
-    EASYSUBWAY_DATAPACK_CALLBACK_HMAC_KEY: secret,
-  };
+  const env = callbackEnv;
   assert.equal(buildReleaseCallback(env).releaseRequestId, "req-2057");
   assert.throws(() => buildReleaseCallback({ ...env, MANIFEST_SHA256: "invalid" }), /SHA-256/);
   assert.throws(() => buildReleaseCallback({ ...env, VALIDATOR_STATUS: "UNKNOWN" }), /is invalid/);
+});
+
+test("Node producer와 Java consumer는 공유 canonical payload hash를 사용한다", async () => {
+  const vector = JSON.parse(await readFile(
+    new URL("./fixtures/release-callback-signature-vector.json", import.meta.url),
+    "utf8",
+  ));
+  assert.equal(
+    createHash("sha256").update(canonicalCallbackMessage(vector.fields)).digest("hex"),
+    vector.expectedPayloadSha256,
+  );
 });
 
 test("transient failure를 모두 소진하면 bounded retry 계획을 기록한다", async () => {

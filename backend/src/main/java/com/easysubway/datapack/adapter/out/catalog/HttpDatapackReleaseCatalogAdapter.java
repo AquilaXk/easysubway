@@ -17,6 +17,7 @@ import java.security.spec.X509EncodedKeySpec;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.Optional;
 import java.util.stream.StreamSupport;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -25,6 +26,7 @@ import org.springframework.stereotype.Component;
 public class HttpDatapackReleaseCatalogAdapter implements DatapackReleaseCatalogPort {
 	private static final ObjectMapper JSON = new ObjectMapper();
 	private static final Duration TIMEOUT = Duration.ofSeconds(10);
+	private static final int MAX_RELEASE_LOOKBACK = 100;
 
 	private final HttpClient httpClient;
 	private final String baseUrl;
@@ -54,6 +56,24 @@ public class HttpDatapackReleaseCatalogAdapter implements DatapackReleaseCatalog
 	@Override
 	public CatalogIdentity fetchCurrent(String channel) {
 		return fetchPath("/catalog/current.json");
+	}
+
+	@Override
+	public Optional<CatalogIdentity> findByRequest(String channel, String releaseRequestId) {
+		var current = fetchCurrent(channel);
+		if (matches(current, channel, releaseRequestId)) return Optional.of(current);
+		long oldest = Math.max(1, current.releaseSequence() - MAX_RELEASE_LOOKBACK);
+		for (long sequence = current.releaseSequence() - 1; sequence >= oldest; sequence--) {
+			var identity = fetch(channel, sequence);
+			if (matches(identity, channel, releaseRequestId)) return Optional.of(identity);
+		}
+		return Optional.empty();
+	}
+
+	private static boolean matches(CatalogIdentity identity, String channel, String releaseRequestId) {
+		return identity.signatureValid()
+			&& channel.equals(identity.channel())
+			&& releaseRequestId.equals(identity.releaseRequestId());
 	}
 
 	private CatalogIdentity fetchPath(String path) {

@@ -8,6 +8,7 @@ import com.easysubway.datapack.application.port.out.DatapackReleaseRequestReposi
 import com.easysubway.datapack.domain.DatapackReleaseRequestStatus;
 import com.easysubway.datapack.domain.DatapackReleaseDelivery;
 import com.easysubway.datapack.domain.DatapackReleaseDelivery.State;
+import com.easysubway.datapack.domain.DatapackReleaseRequest;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import org.springframework.beans.factory.ObjectProvider;
@@ -85,19 +86,28 @@ public class DatapackReleaseReconciliationService {
 			.forEach(request -> {
 				try {
 					var identity = catalog.fetchCurrent(request.targetChannel());
-					if (!identity.signatureValid()
-						|| !request.targetChannel().equals(identity.channel())
-						|| !request.approvalId().equals(identity.releaseRequestId())
+					if (!matchesRequest(request, identity)) {
+						identity = catalog.findByRequest(request.targetChannel(), request.approvalId())
+							.orElse(null);
+					}
+					if (!matchesRequest(request, identity)
 						|| !channelRepository.candidateHasManifest(
 							request.candidateId(), identity.manifestSha256())) return;
 					repository.upsertSameDelivery(DatapackReleaseDelivery.pending(
 						request.approvalId(), identity.releaseSequence(), identity.manifestSha256(),
-						request.targetChannel(), request.candidateId(), identity.manifestSha256(),
+						request.targetChannel(), request.candidateId(), null,
 						identity.signatureSha256(), now));
 				} catch (RuntimeException ignored) {
 					// fail closed: 다음 bounded scheduler tick에서 재시도한다.
 				}
 			});
+	}
+
+	private static boolean matchesRequest(DatapackReleaseRequest request, CatalogIdentity identity) {
+		return identity != null
+			&& identity.signatureValid()
+			&& request.targetChannel().equals(identity.channel())
+			&& request.approvalId().equals(identity.releaseRequestId());
 	}
 
 	void reconcile(DatapackReleaseDelivery delivery, LocalDateTime now) {

@@ -113,6 +113,22 @@ test("광고 asset origin은 backend env에만 변형 없이 전달한다", asyn
   );
 });
 
+test("callback reconciliation catalog trust 설정은 backend env에 전달한다", async () => {
+  const source = `${fixtureEnv()}\nEASYSUBWAY_DATAPACK_CATALOG_BASE_URL=https://datapacks.example.test\nEASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1\n`;
+  const outputDir = await prepare(source);
+  const backendEnv = await readFile(path.join(outputDir, "backend.env"), "utf8");
+  const composeEnv = await readFile(path.join(outputDir, "compose.env"), "utf8");
+
+  for (const name of [
+    "EASYSUBWAY_DATAPACK_CATALOG_BASE_URL",
+    "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM",
+    "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID",
+  ]) {
+    assert.match(backendEnv, new RegExp(`^${name}=`, "m"));
+    assert.doesNotMatch(composeEnv, new RegExp(`^${name}=`, "m"));
+  }
+});
+
 test("광고 asset origin production preflight는 unsafe 값을 차단한다", async () => {
   await assert.rejects(
     prepare(fixtureEnv().replace(`${ASSET_ORIGIN_LINE}\n`, "")),

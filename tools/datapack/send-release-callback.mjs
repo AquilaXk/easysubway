@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { appendFile, readFile, writeFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
 import { fileURLToPath } from "node:url";
+import { canonicalCallbackMessage } from "./build-release-callback.mjs";
 
 export const CALLBACK_RETRY_DELAYS_SECONDS = [60, 480, 3600];
 
@@ -33,7 +34,7 @@ export async function sendReleaseCallback({
     schemaVersion: 1,
     artifactKind: "datapack-release-callback-delivery",
     idempotencyKey: payload.idempotencyKey,
-    payloadSha256: sha256(payloadBytes),
+    payloadSha256: sha256(canonicalCallbackMessage(payload)),
     signatureSha256: sha256(payload.callbackVerifier?.value ?? ""),
     attempts: [],
     state: "PENDING",
