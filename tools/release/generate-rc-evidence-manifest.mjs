@@ -5,6 +5,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { gunzipSync } from "node:zlib";
 import { canonicalScopeHash } from "../datapack/build-launch-denominator-report.mjs";
 import { selectEffectiveDataPack, selectFallbackDataPack, validateManifest } from "../datapack/lib/manifest-validation.mjs";
 
@@ -49,8 +50,13 @@ const dataPackFallbackArtifactPath = dataPackFallbackArtifactArg
 const dataPackFallbackArtifactBytes = dataPackFallbackArtifactPath && existsSync(dataPackFallbackArtifactPath)
   ? statSync(dataPackFallbackArtifactPath).size
   : null;
-const requireProductionDataPackBinding = booleanArg("requireProductionDataPackBinding", "require-production-data-pack-binding");
+const requestedProductionDataPackBinding = booleanArg(
+  "requireProductionDataPackBinding",
+  "require-production-data-pack-binding",
+);
 const dataPackReleaseDecisionPath = arg("dataPackReleaseDecision", "data-pack-release-decision");
+const requireProductionDataPackBinding = requestedProductionDataPackBinding
+  || (requestedPhase === "FINAL" && Boolean(dataPackReleaseDecisionPath));
 const dataPackReleaseDecision = readFinalDataPackReleaseDecision(
   dataPackReleaseDecisionPath,
   requireProductionDataPackBinding,
@@ -213,7 +219,7 @@ const evidenceEntries = requiredEvidenceEntries(
 );
 const datapackGates = requiredDatapackGates(
   rcEvidenceContract.requiredDatapackGates, datapackGateStatuses, datapackGateEvidencePaths,
-  identity, generatedAt, dataPackArtifactBytes,
+  identity, generatedAt, dataPackArtifactPath, dataPackArtifactBytes,
   launchScope.productionSourceSet?.requiredSourceIds,
 );
 const sourceInventory = buildSourceInventory(datapackGates, generatedAt, producerVersion);
@@ -716,7 +722,8 @@ function requiredEvidenceEntries(
 }
 
 function requiredDatapackGates(
-  contractGates, statuses, paths, identity, generatedAt, dataPackArtifactBytes, requiredSourceIds,
+  contractGates, statuses, paths, identity, generatedAt,
+  dataPackArtifactPath, dataPackArtifactBytes, requiredSourceIds,
 ) {
   const contractIds = contractGates.map(({ id }) => id);
   const duplicateId = contractIds.find((id, index) => contractIds.indexOf(id) !== index);
@@ -795,7 +802,13 @@ function requiredDatapackGates(
         requiredSourceIds,
       );
     }
-    const gateResult = normalizeDatapackGateResult(id, evidence, identity, dataPackArtifactBytes);
+    const gateResult = normalizeDatapackGateResult(
+      id,
+      evidence,
+      identity,
+      dataPackArtifactPath,
+      dataPackArtifactBytes,
+    );
     if (gateResult) normalized.gateResult = gateResult;
     return normalized;
   });
@@ -815,13 +828,18 @@ function requiredDatapackGateStatus(statuses, id) {
   return status;
 }
 
-function normalizeDatapackGateResult(id, evidence, identity, dataPackArtifactBytes) {
+function normalizeDatapackGateResult(id, evidence, identity, dataPackArtifactPath, dataPackArtifactBytes) {
   if (["source_admission", "source_governance", "freshness_conditional_publish"].includes(id)) {
     return normalizeSourceGateResult(id, evidence.result, evidence.snapshotSetIdentity);
   }
   if (id === "rollback_rescue") return normalizeRollbackRescueResult(evidence.result, identity);
   if (id === "device_performance") {
-    return normalizeDevicePerformanceResult(evidence.result, identity, dataPackArtifactBytes);
+    return normalizeDevicePerformanceResult(
+      evidence.result,
+      identity,
+      dataPackArtifactPath,
+      dataPackArtifactBytes,
+    );
   }
   if (id === "callback_reconciliation") {
     return normalizeCallbackReconciliationResult(evidence.result, identity);
@@ -853,6 +871,9 @@ function normalizeRollbackRescueResult(result, identity) {
     "currentReleaseSequence", "failedReleaseSequence", "catalogMaxReleaseSequence", "rescueReleaseSequence",
   ];
   for (const field of sequenceFields) requirePositiveSafeInteger(result[field], `${gateId}.${field}`);
+  if (result.currentReleaseSequence !== result.failedReleaseSequence) {
+    fail(`${gateId} currentReleaseSequence must equal failedReleaseSequence`);
+  }
   if (result.rescueReleaseSequence <= Math.max(
     result.currentReleaseSequence,
     result.failedReleaseSequence,
@@ -861,6 +882,10 @@ function normalizeRollbackRescueResult(result, identity) {
     fail(`${gateId} rescueReleaseSequence must exceed current, failed, and catalog maximum sequences`);
   }
   requireSha256(result.knownGoodPackSha256, `${gateId}.knownGoodPackSha256`);
+  if (![identity.dataPackArtifactSha256, identity.dataPackFallbackArtifactSha256]
+    .includes(result.knownGoodPackSha256)) {
+    fail(`${gateId} knownGoodPackSha256 does not match the RC identity`);
+  }
   requireSha256(result.rescueManifestSha256, `${gateId}.rescueManifestSha256`);
   if (result.rescueReleaseSequence !== identity.releaseSequence
     || result.rescueManifestSha256 !== identity.dataPackManifestSha256) {
@@ -879,7 +904,12 @@ function normalizeRollbackRescueResult(result, identity) {
   };
 }
 
-function normalizeDevicePerformanceResult(result, identity, dataPackArtifactBytes) {
+function normalizeDevicePerformanceResult(
+  result,
+  identity,
+  dataPackArtifactPath,
+  dataPackArtifactBytes,
+) {
   const gateId = "device_performance";
   requireResultSchema(result, gateId);
   const profile = result.deviceProfile;
@@ -901,6 +931,10 @@ function normalizeDevicePerformanceResult(result, identity, dataPackArtifactByte
   requirePositiveSafeInteger(artifact?.uncompressedBytes, `${gateId}.artifact.uncompressedBytes`);
   if (artifact.compressedBytes !== dataPackArtifactBytes) {
     fail(`${gateId} compressedBytes does not match the supplied data pack artifact`);
+  }
+  const actualUncompressedBytes = dataPackUncompressedBytes(dataPackArtifactPath, gateId);
+  if (artifact.uncompressedBytes !== actualUncompressedBytes) {
+    fail(`${gateId} uncompressedBytes does not match the supplied data pack artifact`);
   }
   if (artifact.compressedBytes > 250 * 1024 * 1024) {
     fail(`${gateId} compressed artifact exceeds the 250 MiB cap`);
@@ -955,6 +989,17 @@ function normalizeDevicePerformanceResult(result, identity, dataPackArtifactByte
     checks,
     evidenceReferences: normalizeEvidenceReferences(gateId, result.evidenceReferences),
   };
+}
+
+function dataPackUncompressedBytes(artifactPath, gateId) {
+  if (!artifactPath || !existsSync(artifactPath)) {
+    fail(`${gateId} requires an existing data pack artifact`);
+  }
+  try {
+    return gunzipSync(readFileSync(artifactPath)).length;
+  } catch {
+    fail(`${gateId} data pack artifact must be valid gzip data`);
+  }
 }
 
 function normalizeCallbackReconciliationResult(result, identity) {

@@ -9,7 +9,7 @@ import { pathToFileURL } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import { promisify } from "node:util";
-import { gunzipSync, inflateSync } from "node:zlib";
+import { gzipSync, gunzipSync, inflateSync } from "node:zlib";
 import { REQUIRED_STATUS_CHECK_CONTEXTS } from "./apply-main-ruleset-required-checks.mjs";
 import { canonicalScopeHash } from "../datapack/build-launch-denominator-report.mjs";
 import { canonicalJson, withoutSignature } from "../datapack/lib/manifest-validation.mjs";
@@ -4945,10 +4945,12 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   await writeFile(aabPayloadPath, "datapack-readiness-aab");
   await execFileAsync("zip", ["-q", aabPath, path.basename(aabPayloadPath)], { cwd: tempDir });
   await writeFile(backendArtifactPath, "datapack-readiness-backend");
-  const dataPackArtifactContents = "datapack-readiness-pack";
-  const dataPackArtifactBytes = Buffer.byteLength(dataPackArtifactContents);
-  await writeFile(dataPackArtifactPath, dataPackArtifactContents);
-  const dataPackArtifactSha256 = createHash("sha256").update(dataPackArtifactContents).digest("hex");
+  const dataPackArtifactContents = Buffer.from("datapack-readiness-pack");
+  const compressedDataPackArtifact = gzipSync(dataPackArtifactContents);
+  const dataPackArtifactBytes = compressedDataPackArtifact.length;
+  const dataPackArtifactUncompressedBytes = dataPackArtifactContents.length;
+  await writeFile(dataPackArtifactPath, compressedDataPackArtifact);
+  const dataPackArtifactSha256 = createHash("sha256").update(compressedDataPackArtifact).digest("hex");
   const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
   const signProductionManifest = (manifest) => ({ ...manifest, signature: {
     algorithm: "rsa-sha256-manifest-v2",
@@ -5068,14 +5070,16 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
     [...args, "--phase", "CANDIDATE", "--output", baselineOutput],
     generatorOptions,
   );
+  const fallbackArtifactContents = Buffer.from("datapack-readiness-fallback");
+  const compressedFallbackArtifact = gzipSync(fallbackArtifactContents);
   const emergencyOverrideManifest = signProductionManifest({
     ...productionManifest,
     emergencyOverride: { id: "capital-rescue", version: "2", reason: "검증된 긴급 복구" },
     packs: [
       {
         ...productionManifest.packs[0],
-        sha256: createHash("sha256").update("datapack-readiness-fallback").digest("hex"),
-        sizeBytes: Buffer.byteLength("datapack-readiness-fallback"),
+        sha256: createHash("sha256").update(compressedFallbackArtifact).digest("hex"),
+        sizeBytes: compressedFallbackArtifact.length,
       },
       {
         ...productionManifest.packs[0],
@@ -5086,7 +5090,7 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
     ],
   });
   const fallbackArtifactPath = path.join(tempDir, "capital-fallback.sqlite.gz");
-  await writeFile(fallbackArtifactPath, "datapack-readiness-fallback");
+  await writeFile(fallbackArtifactPath, compressedFallbackArtifact);
   await writeBoundProductionManifest(emergencyOverrideManifest);
   await execFileAsync(
     process.execPath,
@@ -5128,8 +5132,9 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   const datapackGateResult = (gateId) => {
     if (gateId === "rollback_rescue") {
       return {
-        schemaVersion: 1, currentReleaseSequence: 100, failedReleaseSequence: 101,
-        catalogMaxReleaseSequence: 101, rescueReleaseSequence: 102, knownGoodPackSha256: "4".repeat(64),
+        schemaVersion: 1, currentReleaseSequence: 101, failedReleaseSequence: 101,
+        catalogMaxReleaseSequence: 101, rescueReleaseSequence: 102,
+        knownGoodPackSha256: evidenceRcIdentity.dataPackFallbackArtifactSha256,
         rescueManifestSha256: evidenceRcIdentity.dataPackManifestSha256,
         checks: passingChecks([
           "monotonicSequence", "signatureVerified", "sqliteIntegrityVerified", "immutableCatalogWritten", "channelManifestPublishedLast",
@@ -5143,12 +5148,17 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
         schemaVersion: 1,
         deviceProfile: { model: "production-equivalent-4gib", ramBytes: 4 * 1024 * 1024 * 1024,
           androidApiLevel: 36, osBuild: "android-16-test-build", repetitions: 20 },
-        artifact: { sha256: evidenceRcIdentity.dataPackArtifactSha256, compressedBytes: dataPackArtifactBytes, uncompressedBytes: 200 },
+        artifact: {
+          sha256: evidenceRcIdentity.dataPackArtifactSha256,
+          compressedBytes: dataPackArtifactBytes,
+          uncompressedBytes: dataPackArtifactUncompressedBytes,
+        },
         metrics: {
           manifestFetchP95Ms: 2_000, downloadChunkIdleMaxMs: 10_000, decompressP95Ms: 20_000,
           hashSignatureP95Ms: 8_000, sqliteValidationP95Ms: 12_000, activationP95Ms: 1_500,
           peakRssIncreaseBytes: 200 * 1024 * 1024, coldLoadP50Ms: 800, coldLoadP95Ms: 1_200, routeSearchP50Ms: 100,
-          routeSearchP95Ms: 250, temporaryStorageBytes: 300, temporaryStorageLimitBytes: dataPackArtifactBytes + 400,
+          routeSearchP95Ms: 250, temporaryStorageBytes: dataPackArtifactBytes,
+          temporaryStorageLimitBytes: dataPackArtifactBytes + (2 * dataPackArtifactUncompressedBytes),
         },
         checks: passingChecks([
           "productionTopologyArtifact", "lowestSupportedAndroidProfile", "allStageSlosPassed", "baselineRegressionPassed",
@@ -5285,6 +5295,18 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   const rejectsCurrent = (expected) => assert.rejects(
     execFileAsync(process.execPath, [...args, "--output", firstOutput], generatorOptions), expected,
   );
+  const releaseDecision = JSON.parse(readFileSync(dataPackReleaseDecisionPath, "utf8"));
+  releaseDecision.selectedManifestSha256 = "f".repeat(64);
+  await writeFile(dataPackReleaseDecisionPath, JSON.stringify(releaseDecision));
+  const bindingFlagIndex = args.indexOf("--require-production-data-pack-binding");
+  const argsWithoutBindingFlag = args.filter((_, index) => (
+    index !== bindingFlagIndex && index !== bindingFlagIndex + 1
+  ));
+  await assert.rejects(
+    execFileAsync(process.execPath, [...argsWithoutBindingFlag, "--output", firstOutput], generatorOptions),
+    /production data pack manifest does not match the finalized release decision/,
+  );
+  await writeBoundProductionManifest(productionManifest);
   await execFileAsync(process.execPath, [...args, "--output", firstOutput], generatorOptions);
   await execFileAsync(process.execPath, [...args, "--output", secondOutput], generatorOptions);
   const reevaluatedArgs = [...args];
@@ -5350,6 +5372,12 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   rollbackEvidence.result.rescueReleaseSequence += 1;
   await writeFile(gateEvidencePaths.rollback_rescue, JSON.stringify(rollbackEvidence)); await rejectsCurrent(/rollback_rescue result does not match the RC identity/);
   rollbackEvidence.result = datapackGateResult("rollback_rescue");
+  rollbackEvidence.result.knownGoodPackSha256 = "4".repeat(64);
+  await writeFile(gateEvidencePaths.rollback_rescue, JSON.stringify(rollbackEvidence)); await rejectsCurrent(/rollback_rescue knownGoodPackSha256 does not match the RC identity/);
+  rollbackEvidence.result = datapackGateResult("rollback_rescue");
+  rollbackEvidence.result.currentReleaseSequence -= 1;
+  await writeFile(gateEvidencePaths.rollback_rescue, JSON.stringify(rollbackEvidence)); await rejectsCurrent(/rollback_rescue currentReleaseSequence must equal failedReleaseSequence/);
+  rollbackEvidence.result = datapackGateResult("rollback_rescue");
   await writeFile(gateEvidencePaths.rollback_rescue, JSON.stringify(rollbackEvidence));
 
   const sourceAdmissionEvidence = JSON.parse(readFileSync(gateEvidencePaths.source_admission, "utf8"));
@@ -5379,6 +5407,10 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   devicePerformanceEvidence.result = datapackGateResult("device_performance");
   devicePerformanceEvidence.result.artifact.compressedBytes -= 1;
   await writeFile(gateEvidencePaths.device_performance, JSON.stringify(devicePerformanceEvidence)); await rejectsCurrent(/device_performance compressedBytes does not match the supplied data pack artifact/);
+  devicePerformanceEvidence.result = datapackGateResult("device_performance");
+  devicePerformanceEvidence.result.artifact.uncompressedBytes += 1;
+  devicePerformanceEvidence.result.metrics.temporaryStorageLimitBytes += 2;
+  await writeFile(gateEvidencePaths.device_performance, JSON.stringify(devicePerformanceEvidence)); await rejectsCurrent(/device_performance uncompressedBytes does not match the supplied data pack artifact/);
   devicePerformanceEvidence.result = datapackGateResult("device_performance");
   devicePerformanceEvidence.result.metrics.coldLoadP95Ms = devicePerformanceEvidence.result.metrics.coldLoadP50Ms - 1;
   await writeFile(gateEvidencePaths.device_performance, JSON.stringify(devicePerformanceEvidence)); await rejectsCurrent(/requires P95 metrics to be greater than or equal to P50 metrics/);
