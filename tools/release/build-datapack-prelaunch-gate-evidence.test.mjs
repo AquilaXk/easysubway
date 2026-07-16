@@ -249,7 +249,7 @@ test("prelaunch workflow는 다섯 gate를 같은 RC final readiness에 결속�
   )?.[0] ?? "";
   assert.match(emulatorStep, /working-directory: apps\/mobile/);
   assert.doesNotMatch(emulatorStep, /script: \|\n\s+cd apps\/mobile/);
-  const enableKvm = workflow.indexOf("- name: Enable KVM group perms");
+  const enableKvm = workflow.indexOf("- name: Enable KVM group permissions");
   const emulatorRunner = workflow.indexOf("reactivecircus/android-emulator-runner@");
   assert.ok(enableKvm !== -1 && enableKvm < emulatorRunner, "KVM permissions must be enabled before emulator boot");
   assert.match(workflow, /KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS\+="static_node=kvm"/);
