@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createHash } from "node:crypto";
 import { isIP } from "node:net";
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
@@ -109,17 +110,39 @@ function validateLegacyV1(summary, gate, requirePass) {
     }
   });
 }
-function validateEvidence(items, allowed, path, requireExact, gate) {
+function artifactIdentitySha256(identity) {
+  const canonical = Object.fromEntries(Object.keys(identity).sort().map((field) => [field, identity[field]]));
+  return createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
+}
+function validateEvidence(items, allowed, path, requireExact, gate, identity) {
   const actual = uniqueIds(items,"evidenceId",new Set(allowed),path);
   if (requireExact) exactSet(actual,allowed,path);
-  items.forEach((item,index) => { if (!gate.summaryContract.resultValues.includes(item.result)) fail("SUMMARY_V2_SCHEMA_INVALID",`${path}[${index}].result`,"controlled-result"); if (requireExact && item.result !== "PASS") fail("SUMMARY_ID_SET_MISMATCH",`${path}[${index}].result`,"pass-result"); });
+  const expectedIdentitySha256 = identity === undefined ? undefined : artifactIdentitySha256(identity);
+  const expectedPathPrefix = identity === undefined
+    ? undefined
+    : `.codex/evidence/security/abuse-penetration-rehearsal/${identity.gitSha}/`;
+  const paths = new Set();
+  items.forEach((item,index) => {
+    if (!gate.summaryContract.resultValues.includes(item.result)) fail("SUMMARY_V2_SCHEMA_INVALID",`${path}[${index}].result`,"controlled-result");
+    if (requireExact && item.result !== "PASS") fail("SUMMARY_ID_SET_MISMATCH",`${path}[${index}].result`,"pass-result");
+    if (expectedIdentitySha256 !== undefined && item.artifactIdentitySha256 !== expectedIdentitySha256) {
+      fail("SUMMARY_IDENTITY_INVALID",`${path}[${index}].artifactIdentitySha256`,"root-artifact-identity-digest");
+    }
+    if (expectedPathPrefix !== undefined && !item.localEvidencePath.startsWith(expectedPathPrefix)) {
+      fail("SUMMARY_IDENTITY_INVALID",`${path}[${index}].localEvidencePath`,"root-git-sha-path");
+    }
+    if (paths.has(item.localEvidencePath)) {
+      fail("SUMMARY_IDENTITY_INVALID",`${path}[${index}].localEvidencePath`,"duplicate-evidence-path");
+    }
+    paths.add(item.localEvidencePath);
+  });
 }
 function validateV2Semantics(summary, gate, catalog) {
   const pass = summary.status === "PASS";
   if (pass) for (const field of gate.summaryContract.requiredFields.rootAdditionalForPass) if (!(field in summary)) fail("SUMMARY_ID_SET_MISMATCH",`$.${field}`,"pass-required");
   if (summary.artifactIdentity !== undefined) validateIdentity(summary.artifactIdentity,gate,"$.artifactIdentity","SUMMARY_V2_SCHEMA_INVALID");
-  if (summary.evidence !== undefined) validateEvidence(summary.evidence,catalog.matrixEvidenceIds,"$.evidence",pass,gate);
-  if (summary.productionLikeEvidence !== undefined) validateEvidence(summary.productionLikeEvidence,catalog.productionLikeEvidenceIds,"$.productionLikeEvidence",pass,gate);
+  if (summary.evidence !== undefined) validateEvidence(summary.evidence,catalog.matrixEvidenceIds,"$.evidence",pass,gate,summary.artifactIdentity);
+  if (summary.productionLikeEvidence !== undefined) validateEvidence(summary.productionLikeEvidence,catalog.productionLikeEvidenceIds,"$.productionLikeEvidence",pass,gate,summary.artifactIdentity);
   if (summary.matrices === undefined) return;
   const matrixIds = uniqueIds(summary.matrices,"matrixId",new Set(catalog.matrixIds),"$.matrices");
   const procedureSets = [];

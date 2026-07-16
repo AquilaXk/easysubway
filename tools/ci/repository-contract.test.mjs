@@ -2955,6 +2955,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   );
   const routeV2GatewayTest = read("tools/ci/route-v2-gateway.test.mjs");
   const routeV2GatewayProbe = read("tools/test/run-route-v2-gateway-integration.sh");
+  const ciWorkflow = read(".github/workflows/ci.yml");
   const routeV2AttackMatrix = abusePenetrationRehearsalGate.routeV2IngressAttackMatrix;
   assert.equal(routeV2AttackMatrix.issue, 1022);
   assert.equal(routeV2AttackMatrix.status, "BLOCKED_EXTERNAL");
@@ -3004,6 +3005,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.match(productionRouteClosureTest, /session 전체 50회 초과는 integer Retry-After와 exact 429다/);
   assert.match(routeV2GatewayTest, /IP·token limiter와 exact 429 계약/);
   assert.match(routeV2GatewayProbe, /Retry-After: 60/);
+  assert.match(ciWorkflow, /tools\/test\/run-route-v2-gateway-integration\.sh/);
   assert.deepEqual(abusePenetrationRehearsalGate.buildIdentityPolicy.requiredIssueLinks, ["#1015", "#1016", "#1020", "#1914"]);
   assert.ok(
     abusePenetrationRehearsalGate.productionLikeEvidencePolicy.requiredForClosing.includes(
@@ -3038,6 +3040,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
       "provider_and_release_secret_exposure",
       "receipt_token_replay_and_status_abuse",
       "report_photo_upload_abuse",
+      "route_v2_ingress_abuse",
       "signed_url_lifecycle_abuse",
     ],
   );
@@ -3077,6 +3080,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "providerReleaseSecretExposure",
     "receiptTokenAbuse",
     "reportUploadLifecycle",
+    "routeV2IngressAbuse",
     "signedUploadUrlBoundary",
   ]);
   assert.deepEqual(
@@ -3507,7 +3511,7 @@ test("A RED repository locks summary v2 contract and catalog", async () => {
   assert.deepEqual(contract.fieldTypes, {
     root: { schemaVersion: "integer", releaseGate: "string", issue: "integer", status: "string", rawInvocationStored: "boolean", redactionPolicyId: "string", artifactIdentity: "object", evidence: "array", productionLikeEvidence: "array", matrices: "array" },
     artifactIdentity: { gitSha: "string", versionCode: "integer", androidApplicationId: "string", dataPackManifestSha256: "string", aabSha256: "string", generatedApkSha256: "string", backendImageDigest: "string", backendArtifactSha256: "string" },
-    evidence: { evidenceId: "string", result: "string", localEvidencePath: "string" },
+    evidence: { evidenceId: "string", result: "string", localEvidencePath: "string", artifactIdentitySha256: "string" },
     matrix: { matrixId: "string", result: "string", findingCounts: "object", mediumFindingDisposition: "object", cases: "array" },
     findingCounts: { critical: "integer", high: "integer", medium: "integer", low: "integer" },
     mediumFindingDisposition: { ownerAlias: "string", fixPlanEvidencePath: "string" },
@@ -3517,7 +3521,7 @@ test("A RED repository locks summary v2 contract and catalog", async () => {
     rootForAllStatuses: ["schemaVersion", "releaseGate", "issue", "status", "rawInvocationStored", "redactionPolicyId"],
     rootAdditionalForPass: ["artifactIdentity", "evidence", "productionLikeEvidence", "matrices"],
     artifactIdentity: ["gitSha", "versionCode", "androidApplicationId", "dataPackManifestSha256"],
-    evidence: ["evidenceId", "result", "localEvidencePath"],
+    evidence: ["evidenceId", "result", "localEvidencePath", "artifactIdentitySha256"],
     matrix: ["matrixId", "result", "findingCounts", "cases"],
     findingCounts: ["critical", "high", "medium", "low"],
     mediumFindingDisposition: ["ownerAlias", "fixPlanEvidencePath"],
@@ -3529,11 +3533,12 @@ test("A RED repository locks summary v2 contract and catalog", async () => {
     generatedApkSha256: "^[0-9a-f]{64}$", backendArtifactSha256: "^[0-9a-f]{64}$",
     backendImageDigest: "^sha256:[0-9a-f]{64}$",
   });
+  assert.deepEqual(contract.fieldPatterns.evidence, { artifactIdentitySha256: "^[0-9a-f]{64}$" });
   assert.equal(existsSync(path.join(root, "tools/security/abuse-penetration-summary-schema.mjs")), true);
   const { deriveSummaryCatalog } = await import("../security/abuse-penetration-summary-schema.mjs");
   const catalog = deriveSummaryCatalog(abusePenetrationRehearsalGate);
   assert.equal(Object.isFrozen(catalog), true);
-  assert.deepEqual(catalog.matrixIds, ["adCounterInflation", "adminOperatorSecurity", "distributedRateLimitAbuse", "objectStorageLifecycle", "providerReleaseSecretExposure", "receiptTokenAbuse", "reportUploadLifecycle", "signedUploadUrlBoundary"]);
+  assert.deepEqual(catalog.matrixIds, ["adCounterInflation", "adminOperatorSecurity", "distributedRateLimitAbuse", "objectStorageLifecycle", "providerReleaseSecretExposure", "receiptTokenAbuse", "reportUploadLifecycle", "routeV2IngressAbuse", "signedUploadUrlBoundary"]);
   const expectedProcedures = Object.entries(abusePenetrationRehearsalGate.rehearsalMatrices).flatMap(([matrixId, matrix]) =>
     matrix.requiredCases.map((caseId) => [
       `${matrixId}.${caseId}`,
@@ -3568,6 +3573,12 @@ test("A RED repository locks summary v2 contract and catalog", async () => {
     "cloudflare-ipv4-live-oci-set-equality-summary", "postgres-atomic-daily-cap-test-output",
     "identifier-zero-request-capture-summary", "origin-log-ip-ua-absence-summary", "cloudflare-logpush-ip-ua-absence-summary",
   ]);
+  const routeV2 = abusePenetrationRehearsalGate.rehearsalMatrices.routeV2IngressAbuse;
+  assert.deepEqual(routeV2.requiredCases, [
+    "attestation_nonce_request_hash", "session_token_scope_expiry_quota",
+    "gateway_401_origin_403_no_write", "gateway_ip_token_limiter_retry_after",
+  ]);
+  assert.deepEqual(routeV2.expectedStatusByCase.gateway_ip_token_limiter_retry_after, [429]);
   assert.equal(abusePenetrationRehearsalGate.status, "BLOCKED_EXTERNAL");
   assert.equal(abusePenetrationRehearsalGate.findingPolicy.criticalHighAllowed, 0);
 });

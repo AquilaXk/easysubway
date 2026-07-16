@@ -21,7 +21,7 @@
     "fieldTypes": {
       "root": { "schemaVersion": "integer", "releaseGate": "string", "issue": "integer", "status": "string", "rawInvocationStored": "boolean", "redactionPolicyId": "string", "artifactIdentity": "object", "evidence": "array", "productionLikeEvidence": "array", "matrices": "array" },
       "artifactIdentity": { "gitSha": "string", "versionCode": "integer", "androidApplicationId": "string", "dataPackManifestSha256": "string", "aabSha256": "string", "generatedApkSha256": "string", "backendImageDigest": "string", "backendArtifactSha256": "string" },
-      "evidence": { "evidenceId": "string", "result": "string", "localEvidencePath": "string" },
+      "evidence": { "evidenceId": "string", "result": "string", "localEvidencePath": "string", "artifactIdentitySha256": "string" },
       "matrix": { "matrixId": "string", "result": "string", "findingCounts": "object", "mediumFindingDisposition": "object", "cases": "array" },
       "findingCounts": { "critical": "integer", "high": "integer", "medium": "integer", "low": "integer" },
       "mediumFindingDisposition": { "ownerAlias": "string", "fixPlanEvidencePath": "string" },
@@ -31,7 +31,7 @@
       "rootForAllStatuses": ["schemaVersion", "releaseGate", "issue", "status", "rawInvocationStored", "redactionPolicyId"],
       "rootAdditionalForPass": ["artifactIdentity", "evidence", "productionLikeEvidence", "matrices"],
       "artifactIdentity": ["gitSha", "versionCode", "androidApplicationId", "dataPackManifestSha256"],
-      "evidence": ["evidenceId", "result", "localEvidencePath"],
+      "evidence": ["evidenceId", "result", "localEvidencePath", "artifactIdentitySha256"],
       "matrix": ["matrixId", "result", "findingCounts", "cases"],
       "findingCounts": ["critical", "high", "medium", "low"],
       "mediumFindingDisposition": ["ownerAlias", "fixPlanEvidencePath"],
@@ -46,6 +46,9 @@
         "generatedApkSha256": "^[0-9a-f]{64}$",
         "backendArtifactSha256": "^[0-9a-f]{64}$",
         "backendImageDigest": "^sha256:[0-9a-f]{64}$"
+      },
+      "evidence": {
+        "artifactIdentitySha256": "^[0-9a-f]{64}$"
       }
     }
   },
@@ -301,6 +304,18 @@
       "requiredEvidence": ["tracked-secret-search", "release-artifact-secret-scan-output", "backend-image-env-redaction-summary"]
     },
     {
+      "id": "route_v2_ingress_abuse",
+      "area": "route-v2-ingress",
+      "severity": "release-blocker",
+      "targetKo": "Play Integrity nonce/requestHash, session scope·expiry·quota, gateway origin 증명, IP·token limiter 우회",
+      "requiredEvidence": [
+        "route-v2-attestation-session-test-output",
+        "route-v2-session-scope-expiry-quota-test-output",
+        "route-v2-origin-auth-negative-test-output",
+        "route-v2-gateway-rate-limit-integration-output"
+      ]
+    },
+    {
       "id": "ad_counter_inflation",
       "area": "ads-public-api",
       "severity": "release-blocker",
@@ -536,6 +551,29 @@
         "pr_evidence_redaction": [0]
       },
       "forbiddenSummaryValues": ["provider secret", "object storage credential", "production password", "signing private key", "local or internal endpoint"]
+    },
+    "routeV2IngressAbuse": {
+      "scenarioId": "route_v2_ingress_abuse",
+      "requiredEvidence": [
+        "route-v2-attestation-session-test-output",
+        "route-v2-session-scope-expiry-quota-test-output",
+        "route-v2-origin-auth-negative-test-output",
+        "route-v2-gateway-rate-limit-integration-output"
+      ],
+      "requiredCases": [
+        "attestation_nonce_request_hash",
+        "session_token_scope_expiry_quota",
+        "gateway_401_origin_403_no_write",
+        "gateway_ip_token_limiter_retry_after"
+      ],
+      "summaryFields": ["caseId", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"],
+      "expectedStatusByCase": {
+        "attestation_nonce_request_hash": [200, 400, 401, 503],
+        "session_token_scope_expiry_quota": [200, 401, 422, 429],
+        "gateway_401_origin_403_no_write": [401, 403],
+        "gateway_ip_token_limiter_retry_after": [429]
+      },
+      "forbiddenSummaryValues": ["raw attestation token", "raw session token", "authorization header", "client IP full address", "origin secret"]
     }
   },
   "manualRehearsalPolicy": {

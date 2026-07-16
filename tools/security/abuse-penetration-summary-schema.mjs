@@ -131,6 +131,7 @@ function evidenceSchema(contract, ids) {
     evidenceId: typedField(contract, "evidence", "evidenceId", { enum: ids }),
     result: typedField(contract, "evidence", "result", { enum: contract.resultValues }),
     localEvidencePath: pathField(contract, "evidence", "localEvidencePath"),
+    artifactIdentitySha256: typedField(contract, "evidence", "artifactIdentitySha256"),
   }, contract.requiredFields.evidence);
 }
 
