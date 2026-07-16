@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile, execFileSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign as signBytes } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -1487,7 +1487,9 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_AUDIT_ENFORCEMENT=false",
     "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_LEGACY_ENV_ADMIN_FALLBACK=true",
     "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_BREAK_GLASS_BOOTSTRAP=true",
+    "EASYSUBWAY_TERMS_OF_SERVICE_URL=https://example.com/terms",
     "EASYSUBWAY_PRIVACY_POLICY_URL=https://example.com/privacy",
+    "EASYSUBWAY_LOCATION_TERMS_URL=https://example.com/location-terms",
     "EASYSUBWAY_SUPPORT_EMAIL=support@example.com",
     "EASYSUBWAY_SECURITY_EMAIL=security@example.com",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@example.com",
@@ -2001,8 +2003,8 @@ test("모바일 즐겨찾기 화면은 새로고침·삭제·복귀 재조회 �
 test("모바일 계정 삭제와 출처 화면은 feature presentation canonical 파일이 소유한다", () => {
   const main = read("apps/mobile/lib/main.dart");
   const appRoot = read("apps/mobile/lib/app/easy_subway_app.dart");
-  const home = read(
-    "apps/mobile/lib/features/home/presentation/home_screen.dart",
+  const serviceInfo = read(
+    "apps/mobile/lib/features/settings/presentation/service_info_screen.dart",
   );
   const widgetTest = read("apps/mobile/test/widget_test.dart");
   const account = read(
@@ -2031,7 +2033,7 @@ test("모바일 계정 삭제와 출처 화면은 feature presentation canonical
     /^import '\.\.\/features\/account\/presentation\/user_data_deletion_screen\.dart';$/m,
   );
   assert.match(
-    home,
+    serviceInfo,
     /^import '\.\.\/\.\.\/attribution\/presentation\/data_source_attribution_screen\.dart';$/m,
   );
   assert.doesNotMatch(
@@ -2088,15 +2090,22 @@ test("모바일 계정 삭제와 출처 화면은 삭제·asset load 순서를 �
   );
 });
 
-test("모바일 도움말 화면과 연결 계약은 support presentation canonical 파일이 소유한다", () => {
+test("모바일 도움말과 서비스 정보 연결 계약은 각 presentation canonical 파일이 소유한다", () => {
   const main = read("apps/mobile/lib/main.dart");
   const appRoot = read("apps/mobile/lib/app/easy_subway_app.dart");
   const support = read(
     "apps/mobile/lib/features/support/presentation/support_access_screen.dart",
   );
+  const serviceInfo = read(
+    "apps/mobile/lib/features/settings/presentation/service_info_screen.dart",
+  );
+  const openSourceLicenses = read(
+    "apps/mobile/lib/features/settings/presentation/open_source_licenses_screen.dart",
+  );
   const widgetTest = read("apps/mobile/test/widget_test.dart");
   const supportInfoTest = read("apps/mobile/test/support_access_info_test.dart");
   const appFixture = read("apps/mobile/test/support/easy_subway_app_fixture.dart");
+  const androidManifest = read("apps/mobile/android/app/src/main/AndroidManifest.xml");
 
   for (const declaration of [
     "SupportAccessLauncher",
@@ -2124,7 +2133,6 @@ test("모바일 도움말 화면과 연결 계약은 support presentation canoni
   for (const helper of [
     "_SupportSectionTitle",
     "_SupportGroupCard",
-    "_SupportNavRow",
     "_SecurityContactNotice",
     "_SecurityContactNoticeLine",
     "_SafetyDataNotice",
@@ -2134,8 +2142,19 @@ test("모바일 도움말 화면과 연결 계약은 support presentation canoni
     assert.match(support, new RegExp(`^class ${helper}\\b`, "m"));
     assert.doesNotMatch(main, new RegExp(`^class ${helper}\\b`, "m"));
   }
-  assert.match(support, /^Uri\? _httpsUri\(/m);
   assert.match(support, /^Uri\? _mailtoUri\(/m);
+  assert.match(serviceInfo, /^class ServiceInfoScreen\b/m);
+  assert.match(serviceInfo, /LaunchMode\.inAppBrowserView/);
+  assert.match(serviceInfo, /OpenSourceLicensesScreen/);
+  assert.match(openSourceLicenses, /^class OpenSourceLicensesScreen\b/m);
+  assert.match(openSourceLicenses, /LicenseRegistry\.licenses\.toList\(\)/);
+  assert.match(openSourceLicenses, /OSS Notice \| EasySubway/);
+  assert.doesNotMatch(serviceInfo, /showLicensePage|LicensePage/);
+  assert.match(
+    androidManifest,
+    /<queries>[\s\S]*?<action android:name="android\.support\.customtabs\.action\.CustomTabsService"\/>[\s\S]*?<\/queries>/,
+  );
+  assert.doesNotMatch(support, /privacyPolicyAccessItem|supportDataSourceAttributionButton/);
 });
 
 test("모바일 홈 화면과 shell 상태는 home presentation canonical 파일이 소유한다", () => {
@@ -2808,6 +2827,8 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
   assert.match(workflow, /Release Artifact \/ Record non-store-ready PR gate/);
   assert.match(workflow, /if: \$\{\{ env\.EASYSUBWAY_RELEASE_ARTIFACTS_SKIP_BUILD != 'true' \}\}/);
   assert.match(workflow, /--dart-define=EASYSUBWAY_PRIVACY_POLICY_URL="\$\{EASYSUBWAY_PRIVACY_POLICY_URL\}"/);
+  assert.match(workflow, /--dart-define=EASYSUBWAY_TERMS_OF_SERVICE_URL="\$\{EASYSUBWAY_TERMS_OF_SERVICE_URL\}"/);
+  assert.match(workflow, /--dart-define=EASYSUBWAY_LOCATION_TERMS_URL="\$\{EASYSUBWAY_LOCATION_TERMS_URL\}"/);
   assert.match(workflow, /--dart-define=EASYSUBWAY_SUPPORT_EMAIL="\$\{EASYSUBWAY_SUPPORT_EMAIL\}"/);
   assert.match(workflow, /--dart-define=EASYSUBWAY_DATA_DELETION_EMAIL="\$\{EASYSUBWAY_DATA_DELETION_EMAIL\}"/);
   assert.match(workflow, /--dart-define=EASYSUBWAY_SECURITY_EMAIL="\$\{EASYSUBWAY_SECURITY_EMAIL\}"/);
@@ -3160,6 +3181,8 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
       "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart",
       "apps/mobile/lib/features/home/presentation/home_screen.dart",
       "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
+      "apps/mobile/lib/features/settings/presentation/open_source_licenses_screen.dart",
+      "apps/mobile/lib/features/settings/presentation/service_info_screen.dart",
       "apps/mobile/lib/features/support/presentation/support_access_screen.dart",
       "apps/mobile/lib/main.dart",
       "apps/mobile/release/support-incident-response-gate.json",
@@ -6209,6 +6232,14 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
   assert.match(workflow, /--dart-define=EASYSUBWAY_SECURITY_EMAIL="\$\{EASYSUBWAY_SECURITY_EMAIL\}"/);
 
   assert.equal(privacyInventory.privacyPolicyUrlSource, "EASYSUBWAY_PRIVACY_POLICY_URL dart-define");
+  assert.equal(
+    privacyInventory.legalDocumentUrlSources.termsOfService,
+    "EASYSUBWAY_TERMS_OF_SERVICE_URL dart-define",
+  );
+  assert.equal(
+    privacyInventory.legalDocumentUrlSources.locationTerms,
+    "EASYSUBWAY_LOCATION_TERMS_URL dart-define",
+  );
   assert.equal(privacyInventory.userDataDeletionSupported, true);
   assert.equal(privacyInventory.encryptionInTransitRequired, true);
   assert.equal(privacyInventory.tracking, false);
@@ -6249,7 +6280,9 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
   const dir = await mkdtemp(path.join(tmpdir(), "easysubway-store-privacy-env-"));
   const validEnv = path.join(dir, "valid.env");
   await writeFile(validEnv, [
+    "EASYSUBWAY_TERMS_OF_SERVICE_URL=https://easysubway-api.aquilaxk.site/easysubway/terms",
     "EASYSUBWAY_PRIVACY_POLICY_URL=https://easysubway-api.aquilaxk.site/easysubway/privacy",
+    "EASYSUBWAY_LOCATION_TERMS_URL=https://easysubway-api.aquilaxk.site/easysubway/location-terms",
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
@@ -6265,6 +6298,8 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
   );
   const githubEnvOutput = readFileSync(githubEnv, "utf8");
   assert.match(githubEnvOutput, /^EASYSUBWAY_PRIVACY_POLICY_URL=https:\/\/easysubway-api\.aquilaxk\.site\/easysubway\/privacy$/m);
+  assert.match(githubEnvOutput, /^EASYSUBWAY_TERMS_OF_SERVICE_URL=https:\/\/easysubway-api\.aquilaxk\.site\/easysubway\/terms$/m);
+  assert.match(githubEnvOutput, /^EASYSUBWAY_LOCATION_TERMS_URL=https:\/\/easysubway-api\.aquilaxk\.site\/easysubway\/location-terms$/m);
   assert.match(githubEnvOutput, /^EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk\.site$/m);
   assert.match(githubEnvOutput, /^EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk\.site$/m);
   assert.match(githubEnvOutput, /^EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk\.site$/m);
@@ -6275,7 +6310,9 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
 
   const rcEnv = path.join(dir, "android-rc.env");
   await writeFile(rcEnv, [
+    "EASYSUBWAY_TERMS_OF_SERVICE_URL=https://easysubway-api.aquilaxk.site/easysubway/terms",
     "EASYSUBWAY_PRIVACY_POLICY_URL=https://easysubway-api.aquilaxk.site/easysubway/privacy",
+    "EASYSUBWAY_LOCATION_TERMS_URL=https://easysubway-api.aquilaxk.site/easysubway/location-terms",
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
@@ -6315,7 +6352,9 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
 
   const invalidEnv = path.join(dir, "invalid.env");
   await writeFile(invalidEnv, [
+    "EASYSUBWAY_TERMS_OF_SERVICE_URL=https://easysubway.local/terms",
     "EASYSUBWAY_PRIVACY_POLICY_URL=https://easysubway.local/privacy",
+    "EASYSUBWAY_LOCATION_TERMS_URL=https://easysubway.local/location-terms",
     "EASYSUBWAY_SUPPORT_EMAIL=support@easysubway.local",
     "EASYSUBWAY_SECURITY_EMAIL=security@easysubway.local",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@easysubway.local",
@@ -6330,7 +6369,9 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
 
   const invalidRcEnv = path.join(dir, "invalid-android-rc.env");
   await writeFile(invalidRcEnv, [
+    "EASYSUBWAY_TERMS_OF_SERVICE_URL=https://easysubway-api.aquilaxk.site/easysubway/terms",
     "EASYSUBWAY_PRIVACY_POLICY_URL=https://easysubway-api.aquilaxk.site/easysubway/privacy",
+    "EASYSUBWAY_LOCATION_TERMS_URL=https://easysubway-api.aquilaxk.site/easysubway/location-terms",
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
@@ -6357,7 +6398,9 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
 
   const invalidRcKeyEnv = path.join(dir, "invalid-android-rc-key.env");
   await writeFile(invalidRcKeyEnv, [
+    "EASYSUBWAY_TERMS_OF_SERVICE_URL=https://easysubway-api.aquilaxk.site/easysubway/terms",
     "EASYSUBWAY_PRIVACY_POLICY_URL=https://easysubway-api.aquilaxk.site/easysubway/privacy",
+    "EASYSUBWAY_LOCATION_TERMS_URL=https://easysubway-api.aquilaxk.site/easysubway/location-terms",
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
@@ -6384,7 +6427,9 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
 
   const invalidRcFingerprintEnv = path.join(dir, "invalid-android-rc-fingerprint.env");
   await writeFile(invalidRcFingerprintEnv, [
+    "EASYSUBWAY_TERMS_OF_SERVICE_URL=https://easysubway-api.aquilaxk.site/easysubway/terms",
     "EASYSUBWAY_PRIVACY_POLICY_URL=https://easysubway-api.aquilaxk.site/easysubway/privacy",
+    "EASYSUBWAY_LOCATION_TERMS_URL=https://easysubway-api.aquilaxk.site/easysubway/location-terms",
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
@@ -10788,6 +10833,9 @@ test("로컬 PostgreSQL 백업과 복구 리허설 기준선을 제공한다", (
   assert.doesNotMatch(backupScript, /pg_restore --list -/);
   assert.match(backupScript, /mv "\$\{temp_file\}" "\$\{backup_file\}"/);
   assert.match(backupScript, /sha256sum "\$\{backup_file\}" > "\$\{backup_file\}\.sha256"/);
+  assert.match(backupScript, /--retention-days "30"/);
+  assert.doesNotMatch(backupScript, /EASYSUBWAY_SENSITIVE_BACKUP_RETENTION_DAYS/);
+  assert.match(backupScript, /prune-sensitive-backups\.mjs/);
   assert.match(backupScript, /trap - EXIT/);
 
   assert.match(restoreScript, /set -euo pipefail/);
@@ -10833,7 +10881,96 @@ test("시설 신고 사진 백업은 로컬 전용 객체와 manifest 기준선�
   assert.match(backupScript, /printf 'report_id\\tfile_name\\tcontent_type\\tobject_key\\tthumbnail_object_key\\tsha256\\tsize_bytes\\tobject_path\\tthumbnail_path\\n'/);
   assert.match(backupScript, /printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n'/);
   assert.match(backupScript, /trap cleanup EXIT/);
+  assert.doesNotMatch(backupScript, /--retention-days/);
+  assert.doesNotMatch(backupScript, /prune-sensitive-backups\.mjs/);
   assert.match(backupScript, /printf 'facility report photo backup written: %s\\n' "\$\{run_dir\}"/);
+});
+
+test("민감정보 백업 보존 작업은 일일 실행 지연을 포함해 30일 상한 안에서 안전하게 삭제한다", async () => {
+  const pruneScript = "tools/ops/prune-sensitive-backups.mjs";
+  const workflow = read(".github/workflows/sensitive-backup-retention.yml");
+  const backupRoot = await mkdtemp(path.join(tmpdir(), "easysubway-sensitive-backups-"));
+  const nested = path.join(backupRoot, "postgres", "1913-route-purge");
+  const expiredPhotoDir = path.join(
+    backupRoot,
+    "facility-report-photos",
+    "easysubway-report-photos-20260601T000000Z.ABC123",
+  );
+  const expiredDump = path.join(nested, "easysubway-postgres-20260601T000000Z.ABC123.dump");
+  const expiredChecksum = `${expiredDump}.sha256`;
+  const dailyBoundaryDump = path.join(nested, "easysubway-postgres-20260617T000000Z.GHI789.dump");
+  const copiedExpiredDump = path.join(nested, "easysubway-postgres-20260602T000000Z.CPY123.dump");
+  const retainedDump = path.join(nested, "easysubway-postgres-20260716T000000Z.DEF456.dump");
+  const unrelated = path.join(backupRoot, "operator-note.txt");
+  const outsideRoot = await mkdtemp(path.join(tmpdir(), "easysubway-backup-outside-"));
+  const outside = path.join(outsideRoot, "outside.dump");
+  const matchingSymlink = path.join(
+    backupRoot,
+    "easysubway-postgres-20260601T000000Z.SYM123.dump",
+  );
+  const old = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000);
+  const dailyBoundary = new Date(Date.now() - 29.5 * 24 * 60 * 60 * 1000);
+
+  await mkdir(expiredPhotoDir, { recursive: true });
+  await mkdir(nested, { recursive: true });
+  await writeFile(path.join(expiredPhotoDir, "manifest.tsv"), "expired");
+  await writeFile(expiredDump, "expired dump");
+  await writeFile(expiredChecksum, "expired checksum");
+  await writeFile(dailyBoundaryDump, "daily boundary dump");
+  await writeFile(copiedExpiredDump, "copied expired dump");
+  await writeFile(retainedDump, "retained dump");
+  await writeFile(unrelated, "unrelated");
+  await writeFile(outside, "outside");
+  await symlink(outside, matchingSymlink);
+  for (const candidate of [expiredPhotoDir, expiredDump, expiredChecksum, unrelated]) {
+    await utimes(candidate, old, old);
+  }
+  await utimes(dailyBoundaryDump, dailyBoundary, dailyBoundary);
+  await utimes(retainedDump, old, old);
+
+  const output = execFileSync(
+    process.execPath,
+    [
+      pruneScript,
+      "--root", backupRoot,
+      "--retention-days", "30",
+      "--now", "2026-07-16T12:00:00Z",
+    ],
+    { cwd: root, encoding: "utf8" },
+  );
+
+  assert.match(output, /pruned=4 retention_days=30/);
+  assert.equal(existsSync(expiredPhotoDir), true);
+  assert.equal(existsSync(expiredDump), false);
+  assert.equal(existsSync(expiredChecksum), false);
+  assert.equal(existsSync(dailyBoundaryDump), false);
+  assert.equal(existsSync(copiedExpiredDump), false);
+  assert.equal(existsSync(retainedDump), true);
+  assert.equal(existsSync(unrelated), true);
+  assert.equal(existsSync(matchingSymlink), true);
+  assert.equal(existsSync(outside), true);
+  assert.throws(
+    () => execFileSync(
+      process.execPath,
+      [pruneScript, "--root", path.join(backupRoot, "missing"), "--retention-days", "30"],
+      { cwd: root, encoding: "utf8", stdio: "pipe" },
+    ),
+    /ENOENT/,
+  );
+  assert.throws(
+    () => execFileSync(
+      process.execPath,
+      [pruneScript, "--root", backupRoot, "--retention-days", "366"],
+      { cwd: root, encoding: "utf8", stdio: "pipe" },
+    ),
+    /retention-days must be an integer from 1 to 365/,
+  );
+  assert.match(workflow, /cron: "47 18 \* \* \*"/);
+  assert.match(workflow, /self-hosted[\s\S]*easysubway-production/);
+  assert.doesNotMatch(workflow, /SENSITIVE_BACKUP_RETENTION_DAYS|\bRETENTION_DAYS\b/);
+  assert.match(workflow, /--root "\$\{DEPLOY_ROOT\}\/backups"/);
+  assert.match(workflow, /--retention-days "30"/);
+  assert.match(workflow, /prune-sensitive-backups\.mjs/);
 });
 
 test("시설 신고 사진 복구 리허설은 manifest와 object 산출물을 검증한다", async () => {
@@ -11115,6 +11252,22 @@ test("운영 백업 복구 리허설 gate는 필수 백업 대상과 dry-run 검
   }
 
   const photoTarget = backupTargets.get("facility_report_photo_objects");
+  const postgresTarget = backupTargets.get("postgres_application_database");
+  assert.equal(
+    postgresTarget.backupCommand,
+    "tools/ops/postgres-backup.sh <deploy-root>/backups/postgres",
+  );
+  assert.equal(
+    photoTarget.backupCommand,
+    "tools/ops/facility-report-photo-backup.sh",
+  );
+  assert.equal(postgresTarget.retentionDays, 30);
+  assert.match(postgresTarget.retentionCommand, /prune-sensitive-backups\.mjs/);
+  assert.ok(postgresTarget.linkedArtifacts.includes(".github/workflows/sensitive-backup-retention.yml"));
+  assert.equal(photoTarget.scope, "local-rehearsal-only");
+  assert.equal(photoTarget.retentionDays, undefined);
+  assert.equal(photoTarget.retentionCommand, undefined);
+  assert.ok(!photoTarget.linkedArtifacts.includes(".github/workflows/sensitive-backup-retention.yml"));
   assert.equal(
     photoTarget.restoreRehearsalCommand,
     'node tools/ops/facility-report-photo-restore-check.mjs "$EASYSUBWAY_PHOTO_RESTORE_DIR"',
@@ -11136,6 +11289,8 @@ test("운영 백업 복구 리허설 gate는 필수 백업 대상과 dry-run 검
   assert.match(gate.rehearsalPolicy.frequencyKo, /월 1회|릴리즈/);
   assert.match(gate.rehearsalPolicy.dataSafetyKo, /운영 데이터 직접 복원 금지|격리/);
   assert.match(gate.rehearsalPolicy.requiredOutputKo, /backup-restore-rehearsal/);
+  assert.match(gate.rehearsalPolicy.sensitiveBackupRetentionKo, /일일 workflow/);
+  assert.match(gate.rehearsalPolicy.sensitiveBackupRetentionKo, /30일/);
   assert.match(checkScript, /backup-restore-rehearsal-gate\.json/);
   assert.match(checkScript, /postgres_application_database/);
   assert.match(checkScript, /datapack_release_manifest_history/);
@@ -12453,6 +12608,12 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   const uploadedPhotoStoragePortPath =
     "backend/src/main/java/com/easysubway/report/application/port/out/StoreFacilityReportUploadedPhotoPort.java";
   const deletePhotoPortPath = "backend/src/main/java/com/easysubway/report/application/port/out/DeleteFacilityReportPhotoPort.java";
+  const purgePersonalDataPortPath =
+    "backend/src/main/java/com/easysubway/report/application/port/out/PurgeFacilityReportPersonalDataPort.java";
+  const purgePersonalDataSchedulerPath =
+    "backend/src/main/java/com/easysubway/report/adapter/in/scheduler/FacilityReportPersonalDataPurgeScheduler.java";
+  const purgePersonalDataSchedulingConfigurationPath =
+    "backend/src/main/java/com/easysubway/report/adapter/in/scheduler/FacilityReportPersonalDataPurgeSchedulingConfiguration.java";
   const saveFacilityStatusPort = read(
     "backend/src/main/java/com/easysubway/transit/application/port/out/SaveAccessibilityFacilityStatusPort.java",
   );
@@ -12565,6 +12726,9 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.equal(existsSync(path.join(root, photoStoragePortPath)), true);
   assert.equal(existsSync(path.join(root, uploadedPhotoStoragePortPath)), true);
   assert.equal(existsSync(path.join(root, deletePhotoPortPath)), true);
+  assert.equal(existsSync(path.join(root, purgePersonalDataPortPath)), true);
+  assert.equal(existsSync(path.join(root, purgePersonalDataSchedulerPath)), true);
+  assert.equal(existsSync(path.join(root, purgePersonalDataSchedulingConfigurationPath)), true);
   assert.match(read(photoStoragePortPath), /interface StoreFacilityReportPhotoPort/);
   assert.match(read(photoStoragePortPath), /storeFacilityReportPhoto/);
   assert.match(read(photoStoragePortPath), /storedBytes/);
@@ -12572,6 +12736,20 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(read(uploadedPhotoStoragePortPath), /storeUploadedReportPhoto/);
   assert.match(read(deletePhotoPortPath), /interface DeleteFacilityReportPhotoPort/);
   assert.match(read(deletePhotoPortPath), /deleteFacilityReportPhoto/);
+  assert.match(read(purgePersonalDataPortPath), /purgePersonalDataCreatedBefore/);
+  assert.match(read(purgePersonalDataSchedulerPath), /personal-data-retention-days:365/);
+  assert.match(read(purgePersonalDataSchedulerPath), /DEFAULT_PURGE_INTERVAL_MILLIS = 86_400_000L/);
+  assert.match(read(purgePersonalDataSchedulerPath), /PURGE_SAFETY_MARGIN = Duration\.ofDays\(7\)/);
+  assert.match(read(purgePersonalDataSchedulerPath), /MIN_RETENTION_DAYS = 8/);
+  assert.match(
+    read(purgePersonalDataSchedulerPath),
+    /@Scheduled\([\s\S]*fixedRate = DEFAULT_PURGE_INTERVAL_MILLIS,[\s\S]*scheduler = "facilityReportPersonalDataPurgeTaskScheduler"[\s\S]*\)/,
+  );
+  assert.match(
+    read(purgePersonalDataSchedulingConfigurationPath),
+    /@Bean\("facilityReportPersonalDataPurgeTaskScheduler"\)/,
+  );
+  assert.doesNotMatch(read(purgePersonalDataSchedulerPath), /personal-data-purge-interval-ms/);
   assert.match(saveFacilityStatusPort, /interface SaveAccessibilityFacilityStatusPort/);
   assert.match(saveFacilityStatusPort, /saveFacilityStatus/);
   assert.match(service, /implements FacilityReportUseCase/);
@@ -12595,7 +12773,7 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(repository, /List<FacilityReport> loadReports\(\)/);
   assert.match(repository, /PageResult<FacilityReportSummary> loadReportSummaries/);
   assert.match(jdbcRepository, /@Profile\("prod \| staging \| release \| prod-like"\)/);
-  assert.match(jdbcRepository, /implements[\s\S]*LoadFacilityReportPort[\s\S]*SaveFacilityReportPort[\s\S]*AnonymizeUserFacilityReportPort/);
+  assert.match(jdbcRepository, /implements[\s\S]*LoadFacilityReportPort[\s\S]*SaveFacilityReportPort[\s\S]*AnonymizeUserFacilityReportPort[\s\S]*PurgeFacilityReportPersonalDataPort/);
   assert.match(jdbcRepository, /Optional<FacilityReport> loadReport\(String reportId\)/);
   assert.match(jdbcRepository, /List<FacilityReport> loadReports\(\)/);
   assert.match(jdbcRepository, /PageResult<FacilityReportSummary> loadReportSummaries/);
@@ -12604,6 +12782,15 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(jdbcRepository, /OFFSET \?/);
   assert.match(jdbcRepository, /FacilityReport saveReport\(FacilityReport report\)/);
   assert.match(jdbcRepository, /int anonymizeFacilityReportsByUserId\(String userId\)/);
+  assert.match(jdbcRepository, /int purgePersonalDataCreatedBefore\(LocalDateTime cutoff\)/);
+  assert.match(
+    jdbcRepository,
+    /PHOTO_DELETION_RETRY_BATCH_SIZE = 100[\s\S]*deletePendingAnonymizedPhotoObjects[\s\S]*LIMIT \?/,
+  );
+  assert.match(
+    jdbcRepository,
+    /while \(true\)[\s\S]*loadPendingAnonymizedPhotoObjectsAfter\(cursor\)[\s\S]*created_at > \?[\s\S]*report_id > \?/,
+  );
   assert.match(jdbcRepository, /ON CONFLICT \(report_id\) DO UPDATE/);
   assert.match(jdbcRepository, /FacilityReport\.ANONYMIZED_USER_ID/);
   assert.doesNotMatch(jdbcRepository, /photo_data_base64 = NULL/);
@@ -14442,6 +14629,12 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const supportAccessScreen = read(
     "apps/mobile/lib/features/support/presentation/support_access_screen.dart",
   );
+  const serviceInfoScreen = read(
+    "apps/mobile/lib/features/settings/presentation/service_info_screen.dart",
+  );
+  const openSourceLicensesScreen = read(
+    "apps/mobile/lib/features/settings/presentation/open_source_licenses_screen.dart",
+  );
   const appSettingsScreen = read(
     "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
   );
@@ -14731,7 +14924,10 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   );
   assert.match(stationExitCard, /openWalkingRoute/);
   assert.match(stationExitCard, /_coordinateDistanceMeters/);
-  assert.match(stationExitCard, /현재 위치와 출구 좌표만 사용합니다/);
+  assert.match(
+    stationExitCard,
+    /카카오맵 앱에서는 현재 위치와 출구 좌표를, 웹에서는 출구 좌표만 카카오에 전달합니다/,
+  );
   assert.match(widgetTest, /출구 좌표가 없어 역 위치 기준으로 안내합니다/);
   assert.doesNotMatch(stationSearch, /EasySubwayMapAdapter\(\)\.markersForStationDetail/);
   assert.doesNotMatch(stationSearch, /Text\(\s*'지도 위치 목록'/);
@@ -14795,7 +14991,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(easySubwayAppDefaultsTest, /인증 저장소가 없으면 홈 즐겨찾기를 노출하지 않는다/);
   assert.match(widgetTest, /노선도 첫 화면은 핵심 이동 행동과 보조 행동을 지도 위에 제공한다/);
   assert.match(widgetTest, /홈 즐겨찾기는 하나의 진입점에서 탭 목록을 바로 보여준다/);
-  assert.match(widgetTest, /도움말은 개인정보 안내를 불릿 대신 처리방침 링크로 위임한다/);
+  assert.match(widgetTest, /도움말은 개인정보 처리방침 진입점을 서비스 정보로 분리한다/);
   assert.match(widgetTest, /도움말은 이동 전 살펴보기 안내를 함께 보여준다/);
   assert.match(widgetTest, /도움말은 보안과 개인정보 문의 경로를 안내한다/);
   assert.match(supportAccessScreen, /보안 문의 안내/);
@@ -14806,8 +15002,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(supportAccessScreen, /Release \$label must be a valid email address\./);
   assert.match(supportAccessScreen, /Release \$label must be configured\./);
   assert.match(appRoot, /supportAccessInfo\.validatedForBuild\([\s\S]*isReleaseMode: kReleaseMode/);
-  assert.match(supportAccessInfoTest, /릴리즈 도움말 연락 경로는 모두 설정되어야 한다/);
-  assert.match(supportAccessInfoTest, /릴리즈 도움말 연락 경로는 HTTPS와 메일 주소 형식만 허용한다/);
+  assert.match(supportAccessInfoTest, /릴리즈 법적 문서 URL은 모두 설정되어야 한다/);
+  assert.match(supportAccessInfoTest, /릴리즈 법적 문서는 HTTPS URL만 허용한다/);
+  assert.match(supportAccessInfoTest, /릴리즈 문의 주소는 모두 유효해야 한다/);
   assert.match(supportAccessInfoTest, /Release privacy policy URL must use HTTPS\./);
   assert.match(supportAccessInfoTest, /Release support email must be a valid email address\./);
   assert.match(supportAccessInfoTest, /Release data deletion email must be configured\./);
@@ -14850,8 +15047,12 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
     routeSearch,
     /class FavoriteRouteApiRepository[\s\S]*?_httpClient[\s\S]*?class FavoriteRouteException/,
   );
-  // 개인정보 안내는 화면 불릿 대신 개인정보처리방침 링크로 위임한다(#1571).
-  assert.match(supportAccessScreen, /개인정보처리방침/);
+  // 법적 고지와 출처는 서비스 정보로 단일화하고 도움말에는 중복 진입점을 두지 않는다.
+  assert.match(serviceInfoScreen, /개인정보 처리방침/);
+  assert.match(serviceInfoScreen, /정보제공처/);
+  assert.match(serviceInfoScreen, /OpenSourceLicensesScreen/);
+  assert.match(openSourceLicensesScreen, /LicenseRegistry\.licenses/);
+  assert.doesNotMatch(supportAccessScreen, /개인정보처리방침|privacyPolicyAccessItem/);
   assert.doesNotMatch(supportAccessScreen, /개인정보 사용 안내/);
   assert.match(supportAccessScreen, /이동 전 살펴보기/);
   assert.match(supportAccessScreen, /경로와 시설 정보는 이동을 돕는 참고 정보입니다/);
@@ -15561,7 +15762,8 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
   const publicPrivacyPolicy = read("backend/src/main/resources/templates/legal/privacy.html");
   assert.match(publicPrivacyPolicy, /외부 지도 도보 길안내/);
   assert.match(publicPrivacyPolicy, /출구 도보 길안내/);
-  assert.match(publicPrivacyPolicy, /카카오맵 앱\/웹/);
+  assert.match(publicPrivacyPolicy, /카카오맵 앱에는 현재 위치 시작 좌표와 목적지 좌표/);
+  assert.match(publicPrivacyPolicy, /카카오맵 웹에는 목적지 좌표/);
   assert.equal(playStoreContent.storeMetadataRequirements.publicContactEmailMustMatchAppSupportEmail, true);
   assert.ok(playStoreContent.storeMetadataRequirements.requiredTagsKo.includes("대중교통"));
   assert.ok(playStoreContent.storeMetadataRequirements.requiredTagsKo.includes("접근성"));
@@ -16071,6 +16273,9 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
   const supportAccessScreen = read(
     "apps/mobile/lib/features/support/presentation/support_access_screen.dart",
   );
+  const serviceInfoScreen = read(
+    "apps/mobile/lib/features/settings/presentation/service_info_screen.dart",
+  );
   const stationSearch = read("apps/mobile/lib/station_search.dart");
   const stationSearchController = read(
     "apps/mobile/lib/features/stations/application/station_search_controller.dart",
@@ -16105,7 +16310,30 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
   assert.ok(inventory.crashAnrProviderDecision.sourceOfTruth.includes("Google Play pre-launch report"));
   assert.ok(inventory.crashAnrProviderDecision.requiredEvidence.includes("android-vitals-or-play-pre-launch-report-export"));
   assert.match(supportAccessScreen, /EASYSUBWAY_PRIVACY_POLICY_URL/);
+  assert.match(supportAccessScreen, /EASYSUBWAY_TERMS_OF_SERVICE_URL/);
+  assert.match(supportAccessScreen, /EASYSUBWAY_LOCATION_TERMS_URL/);
   assert.match(supportAccessScreen, /EASYSUBWAY_DATA_DELETION_EMAIL/);
+  assert.match(serviceInfoScreen, /LaunchMode\.inAppBrowserView/);
+  assert.match(serviceInfoScreen, /accessInfo\.termsOfServiceUrl/);
+  assert.match(serviceInfoScreen, /accessInfo\.privacyPolicyUrl/);
+  assert.match(serviceInfoScreen, /accessInfo\.locationTermsUrl/);
+  const openSourceLicensesScreen = read(
+    "apps/mobile/lib/features/settings/presentation/open_source_licenses_screen.dart",
+  );
+  assert.match(serviceInfoScreen, /OpenSourceLicensesScreen/);
+  assert.match(openSourceLicensesScreen, /LicenseRegistry\.licenses/);
+  assert.match(openSourceLicensesScreen, /OSS Notice \| EasySubway/);
+  assert.doesNotMatch(serviceInfoScreen, /showLicensePage|LicensePage/);
+  assert.deepEqual(
+    [...serviceInfoScreen.matchAll(/title: '([^']+)'/g)].map((match) => match[1]),
+    [
+      "서비스 이용약관",
+      "개인정보 처리방침",
+      "위치정보 이용약관",
+      "정보제공처",
+      "오픈 소스 라이선스",
+    ],
+  );
 
   const items = new Map(inventory.dataTypes.map((item) => [item.id, item]));
   const requiredIds = [
@@ -16164,11 +16392,15 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
         `${id} evidence artifact must exist: ${evidencePath}`,
       );
     }
-    const expectedLastVerifiedAt = id.startsWith("route_v2_")
+    const reviewedForLegalDisclosure = new Set([
+      "precise_location",
+      "facility_report_content",
+      "facility_report_photo",
+      "facility_report_location",
+    ]);
+    const expectedLastVerifiedAt = id.startsWith("route_v2_") || reviewedForLegalDisclosure.has(id)
       ? "2026-07-16"
-      : id === "precise_location"
-        ? "2026-07-09"
-        : "2026-06-19";
+      : "2026-06-19";
     assert.equal(item.lastVerifiedAt, expectedLastVerifiedAt, `${id} verification date must be current`);
     const expectedThirdPartySharing = id === "precise_location";
     assert.equal(
@@ -16275,19 +16507,29 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     "favorite station evidence must include the station search implementation",
   );
   assert.deepEqual(items.get("facility_report_photo").storageLocations.toSorted(), [
-    "backend-database-legacy-column",
     "backend-database-metadata",
     "backend-object-storage",
     "mobile-memory",
   ]);
   assert.match(
     items.get("facility_report_photo").backendTableOrService.join("\n"),
-    /facility_reports\.photo_object_key[\s\S]*facility_reports\.photo_thumbnail_object_key[\s\S]*facility_reports\.photo_data_base64/,
+    /facility_reports\.photo_object_key[\s\S]*facility_reports\.photo_thumbnail_object_key/,
   );
+  assert.doesNotMatch(items.get("facility_report_photo").backendTableOrService.join("\n"), /photo_data_base64/);
   assert.match(
     items.get("facility_report_photo").deletionImplementation,
-    /deleteFacilityReportPhoto[\s\S]*photo_data_base64 = NULL/,
+    /FacilityReportPersonalDataPurgeScheduler[\s\S]*deleteFacilityReportPhoto/,
   );
+  for (const id of ["precise_location", "facility_report_content", "facility_report_location"]) {
+    assert.match(items.get(id).retentionKo, /최대 1년/);
+    assert.match(items.get(id).retentionKo, /백업.*30일/);
+    assert.match(items.get(id).deletionImplementation, /FacilityReportPersonalDataPurgeScheduler/);
+    assert.match(items.get(id).deletionImplementation, /prune-sensitive-backups\.mjs/);
+    assert.ok(items.get(id).storageLocations.includes("restricted-operations-backup"));
+  }
+  assert.match(items.get("facility_report_photo").retentionKo, /최대 1년/);
+  assert.doesNotMatch(items.get("facility_report_photo").retentionKo, /백업|30일/);
+  assert.doesNotMatch(items.get("facility_report_photo").deletionImplementation, /prune-sensitive-backups\.mjs/);
 
   const excludedItems = new Map((inventory.excludedDataTypes ?? []).map((item) => [item.id, item]));
   assert.deepEqual([...excludedItems.keys()].sort(), ["push_notification_token"]);
@@ -17643,4 +17885,39 @@ test("#1702 STANDARD 환승 parity 리포트는 재현 가능하고 ±10% 이내
     assert.equal(pair.withinTolerance, true);
     assert.ok(Math.abs(pair.deviationPercent) <= report.toleranceProfile.maxDeviationPercent);
   }
+});
+
+test("서비스·위치정보 이용약관은 공개 경로와 사실 계약을 함께 유지한다", () => {
+  const controller = read(
+    "backend/src/main/java/com/easysubway/legal/adapter/in/web/PrivacyPolicyPageController.java",
+  );
+  const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
+  const terms = read("backend/src/main/resources/templates/legal/terms.html");
+  const locationTerms = read("backend/src/main/resources/templates/legal/location-terms.html");
+
+  for (const route of ["/terms", "/easysubway/terms", "/location-terms", "/easysubway/location-terms"]) {
+    assert.ok(controller.includes(`\"${route}\"`), `legal controller must map ${route}`);
+    assert.ok(security.includes(`\"${route}\"`), `public security must permit ${route}`);
+  }
+
+  assert.match(terms, /쉬운 지하철 서비스 이용약관/);
+  assert.match(terms, /제 16 조 \(운영자 정보 및 문의\)/);
+  assert.match(terms, /현장 안내를 우선/);
+  assert.match(terms, /서비스의 이용 요금은 무료/);
+  assert.match(terms, /support@aquilaxk\.site/);
+  assert.match(locationTerms, /쉬운 지하철 위치정보 이용약관/);
+  assert.match(locationTerms, /가까운 역/);
+  assert.match(locationTerms, /위치기반서비스는 무료/);
+  assert.match(locationTerms, /접수일부터 최대 1년/);
+  assert.match(locationTerms, /매일 보관 상한이 지난/);
+  assert.match(locationTerms, /백업 생성일부터 최대 30일/);
+  assert.match(locationTerms, /운영 환경의 일일 자동 작업/);
+  assert.match(locationTerms, /제공받는 자는 카카오/);
+  assert.match(locationTerms, /카카오맵 앱에는 현재 위치의 시작 좌표와 목적지 좌표/);
+  assert.match(locationTerms, /카카오맵 웹에는 목적지 좌표/);
+  assert.match(locationTerms, /privacy@aquilaxk\.site/);
+  assert.doesNotMatch(locationTerms, /법정대리인의 동의를 받습니다/);
+  assert.match(locationTerms, /제 16 조 \(사업자 및 위치정보관리책임자\)/);
+  assert.match(locationTerms, /약관을 단순히 게시하거나 이용자가 열람했다는 사실만으로 별도 동의를 받은 것으로 보지 않습니다/);
+  assert.doesNotMatch(`${terms}\n${locationTerms}`, /TBD|TODO|준비 중/);
 });

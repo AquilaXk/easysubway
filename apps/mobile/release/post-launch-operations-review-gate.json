@@ -73,9 +73,11 @@
             {"path": "apps/mobile/lib/features/account/presentation/user_data_deletion_screen.dart", "sha256": "e7636ee91d36df8033c3619167ee6b7712f1421faf91880abeff1cc6cfb95669"},
             {"path": "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart", "sha256": "7ef5b7236a008f54a22040931f294b00192987fe35cc56fc94ebc2d815ef4620"},
             {"path": "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart", "sha256": "bb293eb895b557c50c43079d5ca7e1ebc2f22367c171754c8ac7c8a4eb641c26"},
-            {"path": "apps/mobile/lib/features/home/presentation/home_screen.dart", "sha256": "528f0cc40cffb647869731df6348963445688e9fd178e37ea753d7d2757a6147"},
-            {"path": "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart", "sha256": "deaf6dc5abf28f164fca115737bcb47d4c9320bd02692f821e697c94e45a54e8"},
-            {"path": "apps/mobile/lib/features/support/presentation/support_access_screen.dart", "sha256": "b3e5ef1ae549b1a3af8932dcacfa9ccfa1ca6a508a33216f3eb29df5161a09d5"},
+            {"path": "apps/mobile/lib/features/home/presentation/home_screen.dart", "sha256": "f4372eb4ee1ff7cc09f044d47ce03caad36fe1c6001a048aac90368f6a2663ad"},
+            {"path": "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart", "sha256": "ba119a6b716528c943f31e7ba13ef0274db3f3b391ecfdb2f2d87e6605e968be"},
+            {"path": "apps/mobile/lib/features/settings/presentation/open_source_licenses_screen.dart", "sha256": "822762b61cd3824340c4e45cf5ffe3079e221d28712dd98d94fd9a03fe5fd591"},
+            {"path": "apps/mobile/lib/features/settings/presentation/service_info_screen.dart", "sha256": "62e036e62f5e5ce235d494d5d730a6dd6ea5659e1b53290d94a6c7c954bcdcd9"},
+            {"path": "apps/mobile/lib/features/support/presentation/support_access_screen.dart", "sha256": "d407c10fdf20cf821b0273065388885d2511b6eb14b6ef02183f1723d0a83112"},
             {"path": "apps/mobile/lib/main.dart", "sha256": "0b9370e0f69610bd9cf9a31735898373e89221cc2ee17be02d3b06869fdc8d6b"}
           ]
         },
@@ -94,8 +96,9 @@
           "files": [
             {"path": "apps/mobile/release/signed-release-artifact-gate.json", "sha256": "42c9f83dca5a1c2c24d921cf6ab748c9be5a901dd1b62212a81055098349fc67"},
             {"path": "apps/mobile/pubspec.yaml", "sha256": "8b831a4108c1c77f718a4b729e7d24f36dc024b83845a4ecfa7d2b99e5ad1971"},
-            {"path": ".github/workflows/release-artifacts.yml", "sha256": "ca84c4b505702c5805ef06e71ec7046d1231ffe437249a558b4916ebb0961b6a"},
+            {"path": ".github/workflows/release-artifacts.yml", "sha256": "568299ac1e3eb2728908b89aacca9b0f95113a26e53f4eaf5d0bfd4fbfeec454"},
             {"path": ".github/workflows/datapack-release.yml", "sha256": "77398afcd58935ff3bf305a8c01ea9d9229a0708c505e43a2b9dab2e7808d74b"},
+            {"path": "tools/ci/validate-store-privacy-env.mjs", "sha256": "18bb0dd8b93d6268c8f60f9cc12272d2ff31c03b60fbbafd6c1e8d16957ada2a"},
             {"path": "backend/build.gradle", "sha256": "00106be89d1834db166c0c4cfba04674e2a456e7e57648595b74feb933c31273"},
             {"path": "backend/Dockerfile", "sha256": "7d9608f490113e655aeaf9544f061896d20f391d5c309b50a42f6303e5eb676b"},
             {"path": "apps/mobile/release/rc-evidence-manifest-contract.json", "sha256": "7caaa17fc34e13e5e35076be4b4f35456f4fa57add102561e31267934bd6cd41"},

@@ -16,7 +16,6 @@ import '../../../route_search.dart';
 import '../../../station_search.dart';
 import '../../../user_data_deletion.dart';
 import '../../ads/ad_repository.dart';
-import '../../attribution/presentation/data_source_attribution_screen.dart';
 import '../../favorites/presentation/favorite_home_screen.dart';
 import '../../get_off_alarm/get_off_alarm_controller.dart';
 import '../../mobility_profile/mobility_preset_labels.dart';
@@ -31,6 +30,7 @@ import '../../service_notice/data/notice_repository.dart';
 import '../../service_notice/presentation/notice_controller.dart';
 import '../../service_notice/presentation/service_notice_list_screen.dart';
 import '../../settings/presentation/app_settings_screen.dart';
+import '../../settings/presentation/service_info_screen.dart';
 import '../../stations/presentation/station_search_screen.dart';
 import '../../support/presentation/support_access_screen.dart';
 
@@ -283,6 +283,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       );
     }
 
+    void openServiceInfo() {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => ServiceInfoScreen(accessInfo: supportAccessInfo),
+        ),
+      );
+    }
+
     void openMyReports() {
       Navigator.of(context).push(
         MaterialPageRoute<void>(
@@ -440,14 +448,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       await refreshHomeState();
     }
 
-    void openDataSources() {
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => const DataSourceAttributionScreen(),
-        ),
-      );
-    }
-
     final noticeController = _noticeController;
     void openServiceNotices() {
       if (noticeController == null) {
@@ -542,7 +542,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             openStationSearch(regionLabel, StationSearchEntryMode.nearby),
           ),
           onOpenSettings: openMoreTab,
-          onOpenDataSources: openDataSources,
           onOpenServiceNotices: noticeController == null
               ? null
               : openServiceNotices,
@@ -656,6 +655,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           onViewPreferencesChanged: widget.onViewPreferencesChanged,
           onOpenMobilityProfile: _openMobilityProfile,
           onOpenSupportAccess: openSupportAccess,
+          onOpenServiceInfo: openServiceInfo,
           onOpenMyReports: openMyReports,
         ),
       );

@@ -3,7 +3,9 @@ import { appendFileSync, readFileSync } from "node:fs";
 import { basename } from "node:path";
 
 const requiredKeys = [
+  "EASYSUBWAY_TERMS_OF_SERVICE_URL",
   "EASYSUBWAY_PRIVACY_POLICY_URL",
+  "EASYSUBWAY_LOCATION_TERMS_URL",
   "EASYSUBWAY_SUPPORT_EMAIL",
   "EASYSUBWAY_SECURITY_EMAIL",
   "EASYSUBWAY_DATA_DELETION_EMAIL",
@@ -219,7 +221,15 @@ function validateEnv(values, options = {}) {
     selected.set(key, requireSingleLineValue(values, key));
   }
 
+  validateHttpsUrl(
+    "EASYSUBWAY_TERMS_OF_SERVICE_URL",
+    selected.get("EASYSUBWAY_TERMS_OF_SERVICE_URL"),
+  );
   validateHttpsUrl("EASYSUBWAY_PRIVACY_POLICY_URL", selected.get("EASYSUBWAY_PRIVACY_POLICY_URL"));
+  validateHttpsUrl(
+    "EASYSUBWAY_LOCATION_TERMS_URL",
+    selected.get("EASYSUBWAY_LOCATION_TERMS_URL"),
+  );
   validateEmail("EASYSUBWAY_SUPPORT_EMAIL", selected.get("EASYSUBWAY_SUPPORT_EMAIL"));
   validateEmail("EASYSUBWAY_SECURITY_EMAIL", selected.get("EASYSUBWAY_SECURITY_EMAIL"));
   validateEmail("EASYSUBWAY_DATA_DELETION_EMAIL", selected.get("EASYSUBWAY_DATA_DELETION_EMAIL"));
