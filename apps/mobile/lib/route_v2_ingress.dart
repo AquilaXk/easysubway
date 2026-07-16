@@ -86,7 +86,20 @@ class PlayIntegrityRouteV2SessionProvider {
 
   Future<_RouteV2Session> _issueSession() async {
     final nonce = _nonceFactory();
-    final integrityToken = await attestor.requestToken(requestHash(nonce));
+    final String integrityToken;
+    try {
+      integrityToken = await attestor.requestToken(requestHash(nonce));
+    } catch (error) {
+      if (error is StateError ||
+          error is PlatformException ||
+          error is MissingPluginException) {
+        throw const RouteSearchOnlineException.unavailable(
+          failureReason: 'ROUTE_SESSION_ATTESTATION_REJECTED',
+          message: 'ITX 시간표를 불러올 수 없어요',
+        );
+      }
+      rethrow;
+    }
     final response = await apiClient.postJson(
       '/api/v2/routes/session',
       body: {'integrityToken': integrityToken, 'clientNonce': nonce},

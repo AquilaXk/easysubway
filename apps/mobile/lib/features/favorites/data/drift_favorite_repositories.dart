@@ -637,7 +637,7 @@ Map<String, Object?> _routeResultToJson(RouteSearchResult result) {
 }
 
 RouteTransportScope _routeTransportScopeFromSnapshot(Object? value) {
-  return value == 'SUBWAY_AND_ITX_CHEONGCHUN'
+  return value == RouteTransportScope.subwayAndItxCheongchun.serverValue
       ? RouteTransportScope.subwayAndItxCheongchun
       : RouteTransportScope.subway;
 }

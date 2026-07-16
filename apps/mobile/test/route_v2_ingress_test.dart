@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:easysubway_mobile/core/network/api_client.dart';
 import 'package:easysubway_mobile/route_search.dart';
 import 'package:easysubway_mobile/route_v2_ingress.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -62,6 +63,75 @@ void main() {
     );
     expect(local.searchCount, 0);
   });
+
+  test('SUBWAY 검색 결과 refresh는 local repository로 전달한다', () async {
+    final local = _RecordingRepository('local');
+    final online = _RecordingRepository('online');
+    final dispatcher = TransportScopedRouteSearchRepository(
+      localRepository: local,
+      itxOnlineRepository: online,
+    );
+    final search = await dispatcher.searchRoute(
+      _request(RouteTransportScope.subway),
+    );
+
+    final refresh = await dispatcher.refreshRoute(search.routeSearchId);
+
+    expect(refresh.routeSearchId, 'local');
+    expect(local.refreshCount, 1);
+    expect(online.refreshCount, 0);
+  });
+
+  test('ITX 검색 결과 refresh는 authenticated online repository로 전달한다', () async {
+    final local = _RecordingRepository('local');
+    final online = _RecordingRepository('online');
+    final dispatcher = TransportScopedRouteSearchRepository(
+      localRepository: local,
+      itxOnlineRepository: online,
+    );
+    final search = await dispatcher.searchRoute(
+      _request(RouteTransportScope.subwayAndItxCheongchun),
+    );
+
+    final refresh = await dispatcher.refreshRoute(search.routeSearchId);
+
+    expect(refresh.routeSearchId, 'online');
+    expect(local.refreshCount, 0);
+    expect(online.refreshCount, 1);
+  });
+
+  for (final failure in <Object>[
+    StateError('Play Integrity unavailable'),
+    PlatformException(code: 'PLAY_INTEGRITY_UNAVAILABLE'),
+  ]) {
+    test(
+      'attestor ${failure.runtimeType}는 session fail-closed 오류로 정규화한다',
+      () async {
+        final provider = PlayIntegrityRouteV2SessionProvider(
+          apiClient: ApiClient(baseUri: Uri.parse('https://example.invalid')),
+          attestor: _ThrowingAttestor(failure),
+          nonceFactory: () => 'AAAAAAAAAAAAAAAAAAAAAA',
+        );
+
+        await expectLater(
+          provider.issueToken(),
+          throwsA(
+            isA<RouteSearchOnlineException>()
+                .having(
+                  (error) => error.failureReason,
+                  'failureReason',
+                  'ROUTE_SESSION_ATTESTATION_REJECTED',
+                )
+                .having(
+                  (error) => error.message,
+                  'message',
+                  'ITX 시간표를 불러올 수 없어요',
+                ),
+          ),
+        );
+      },
+    );
+  }
 
   test(
     'session provider는 canonical requestHash와 nonce로 attestation 후 token을 발급받는다',
@@ -421,6 +491,15 @@ class _RecordingAttestor implements PlayIntegrityAttestor {
   }
 }
 
+class _ThrowingAttestor implements PlayIntegrityAttestor {
+  const _ThrowingAttestor(this.failure);
+
+  final Object failure;
+
+  @override
+  Future<String> requestToken(String requestHash) => Future.error(failure);
+}
+
 class _RecordingRepository implements RouteSearchRepository {
   _RecordingRepository(this.id, {this.error, this.supportsRefresh = true});
 
@@ -434,6 +513,10 @@ class _RecordingRepository implements RouteSearchRepository {
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request) async {
     searchCount++;
     if (error != null) throw error!;
+    return _result();
+  }
+
+  RouteSearchResult _result() {
     return RouteSearchResult(
       routeSearchId: id,
       originStationId: 'origin',
@@ -462,8 +545,16 @@ class _RecordingRepository implements RouteSearchRepository {
   }
 
   @override
-  Future<RouteRefreshResult> refreshRoute(String routeSearchId) {
+  Future<RouteRefreshResult> refreshRoute(String routeSearchId) async {
     refreshCount++;
-    throw UnimplementedError();
+    return RouteRefreshResult(
+      routeSearchId: id,
+      status: 'UNCHANGED',
+      result: _result(),
+      refreshedAt: '2026-07-16T09:01:00Z',
+      etaSource: 'PLANNED',
+      etaConfidence: 'HIGH',
+      sourceLabel: '시간표',
+    );
   }
 }
