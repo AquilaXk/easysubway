@@ -268,6 +268,66 @@ test("extractOwnerLabels: scale 없는 권역(main-map-scaled-layer 부재)은 �
   assert.equal(entries[0].fontSizePx, 12.5);
 });
 
+test("extractOwnerLabels: text-anchor가 속성 없이 style 선언 안에만 있으면(Inkscape 수작업) 그 값을 읽는다(#2068 수도권 게이트 회귀 — 신검단중앙 사례)", () => {
+  const entries = extractOwnerLabels(`
+    <svg>
+      <text data-station="신검단중앙" data-label-role="ordinary"
+            font-size="26.374px" x="913.08093" y="1191.6017"
+            style="text-align:center;text-anchor:middle"
+            ><tspan x="879.59833" y="1191.6017">신검단</tspan></text>
+    </svg>
+  `);
+  assert.equal(entries.length, 1);
+  assert.equal(
+    entries[0].anchor,
+    "middle",
+    "style형 text-anchor를 못 읽으면 start로 오판(좌측 쏠림 → 이웃 라벨과 겹침)",
+  );
+});
+
+test("extractOwnerLabels: 첫 tspan이 부모 <text>와 다른 x/y를 선언하면(여러 줄 라벨) tspan 값을 우선한다(#2068 수도권 게이트 회귀 — 신검단중앙 사례)", () => {
+  const entries = extractOwnerLabels(`
+    <svg>
+      <text data-station="신검단중앙" data-label-role="ordinary"
+            font-size="26.374px" x="913.08093" y="1191.6017"
+            style="text-align:center;text-anchor:middle"
+            ><tspan x="879.59833" y="1191.6017">신검단</tspan><tspan
+             x="879.59833" y="1220.4017">중앙</tspan></text>
+    </svg>
+  `);
+  assert.equal(entries.length, 1);
+  assert.equal(
+    entries[0].x,
+    879.5983,
+    'tspan x(실제 앵커 기준)가 아니라 부모 <text> x(913.08)를 쓰면 앵커가 오른쪽으로 밀려 이웃 라벨과 오탐 겹침이 난다',
+  );
+  assert.equal(entries[0].y, 1191.6017);
+});
+
+test("extractOwnerLabels: tspan에 x/y가 없으면(daegu 다음 줄 tspan 관례) 부모 <text>의 x/y를 그대로 쓴다", () => {
+  const entries = extractOwnerLabels(`
+    <svg>
+      <text data-station="동대구" data-label-role="ordinary"
+            font-size="13" x="100" y="200"
+            ><tspan>동대구</tspan></text>
+    </svg>
+  `);
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].x, 100);
+  assert.equal(entries[0].y, 200);
+});
+
+test("extractOwnerLabels: 속성형 text-anchor가 style형보다 우선한다", () => {
+  const entries = extractOwnerLabels(`
+    <svg>
+      <text data-station="가야" data-label-role="ordinary" text-anchor="end"
+            font-size="12.5" x="1958" y="1430" style="text-anchor:middle"
+            >가야</text>
+    </svg>
+  `);
+  assert.equal(entries[0].anchor, "end");
+});
+
 test("extractOwnerLabels: <g data-label-role>에 감싸인 gwangju형은 g의 transform도 더하고 CSS class font-size로 폴백한다", () => {
   const entries = extractOwnerLabels(`
     <svg>

@@ -79,17 +79,96 @@ const TextStyle _badgeStyle = TextStyle(
   fontWeight: FontWeight.w700,
 );
 
+/// #2068: basemap 라벨 전용 폰트 family. 오너 SVG(Pretendard)와 동일 자폭으로
+/// 렌더해야 오너가 손배치한 라벨이 겹침 없이 그대로 성립한다(pubspec.yaml에
+/// weight 400/600/700 번들). 기본 모드(구조화 노선도)는 시스템 폰트를 유지한다.
+const String _basemapLabelFontFamily = 'Pretendard';
+
 /// #2068 9차: 라벨별 font-size(오너 매치는 오너 SVG 크기, 폴백은 권역 중앙값
 /// 또는 기본 13px)로 스타일을 만든다. 색·굵기는 [_labelStyle]/[_boldLabelStyle]
 /// 과 동일 — fontSize만 다르게 오버라이드한다.
-TextStyle _labelStyleFor({required bool bold, required double fontSizePx}) {
-  return (bold ? _boldLabelStyle : _labelStyle).copyWith(fontSize: fontSizePx);
+///
+/// [basemap]이 true면 오너 SVG와 동일한 Pretendard로 렌더한다(#2068). SVG
+/// font-weight 매핑: ordinary=400(Regular), transfer=600(SemiBold). 오너 SVG의
+/// terminal은 700이지만 [bold] 불리언은 transfer(600)와 terminal(700)을 구분하지
+/// 못하므로, 대다수인 transfer(600)에 맞춰 bold를 600으로 그린다 — 소수 terminal
+/// 라벨은 600<700이라 SVG(700) 배치가 비워둔 영역의 부분집합이 되어 겹침을
+/// 만들지 않는다(수학적으로 안전한 방향). 기본 모드는 기존 굵기(500/700)·시스템
+/// 폰트를 그대로 유지한다.
+TextStyle _labelStyleFor({
+  required bool bold,
+  required double fontSizePx,
+  required bool basemap,
+}) {
+  final base = (bold ? _boldLabelStyle : _labelStyle).copyWith(
+    fontSize: fontSizePx,
+  );
+  if (!basemap) {
+    return base;
+  }
+  return base.copyWith(
+    fontFamily: _basemapLabelFontFamily,
+    fontWeight: bold ? FontWeight.w600 : FontWeight.w400,
+  );
 }
 
 /// #2068 9차: 뱃지 font-size(basemap은 권역 오너 라벨 중앙값, 기본 모드는
-/// [kRouteMapDesignBadgeFontPx] 불변)로 스타일을 만든다.
-TextStyle _badgeStyleFor({required double fontSizePx}) {
-  return _badgeStyle.copyWith(fontSize: fontSizePx);
+/// [kRouteMapDesignBadgeFontPx] 불변)로 스타일을 만든다. [basemap]이 true면
+/// 라벨과 같은 Pretendard로 그린다(굵기는 기존 700 유지).
+TextStyle _badgeStyleFor({required double fontSizePx, required bool basemap}) {
+  final base = _badgeStyle.copyWith(fontSize: fontSizePx);
+  if (!basemap) {
+    return base;
+  }
+  return base.copyWith(fontFamily: _basemapLabelFontFamily);
+}
+
+/// #2068: 솔버 시드 rect와 렌더가 정확히 같은 폰트 메트릭을 쓰도록, 라벨 실측을
+/// [_labelStyleFor]를 통해 단일화한다. [StructuredRouteMapView]와 게이트 테스트가
+/// 공유한다 — 테스트가 이 함수로 실측하면 앱과 100% 동일한(Pretendard 포함) 폭을
+/// 얻는다(테스트는 FontLoader로 Pretendard를 미리 로드해야 실메트릭이 나온다).
+@visibleForTesting
+Size measureRouteMapLabel(
+  String text, {
+  required bool bold,
+  required double fontSize,
+  required bool basemap,
+}) {
+  final painter = TextPainter(
+    text: TextSpan(
+      text: text,
+      style: _labelStyleFor(bold: bold, fontSizePx: fontSize, basemap: basemap),
+    ),
+    textDirection: TextDirection.ltr,
+    maxLines: 1,
+  )..layout();
+  final size = painter.size;
+  painter.dispose();
+  return size;
+}
+
+/// #2068: 뱃지 pill 실측(폭 = max(최소지름, 텍스트폭+좌우패딩), 높이 = 최소지름).
+/// pill 기하는 fontSize와 무관하게 불변 — 텍스트 크기만 통일한다(#2068 9차).
+@visibleForTesting
+Size measureRouteMapBadge(
+  String text, {
+  required double fontSize,
+  required bool basemap,
+}) {
+  final painter = TextPainter(
+    text: TextSpan(
+      text: text,
+      style: _badgeStyleFor(fontSizePx: fontSize, basemap: basemap),
+    ),
+    textDirection: TextDirection.ltr,
+    maxLines: 1,
+  )..layout();
+  final size = Size(
+    math.max(kRouteMapDesignBadgeRadiusPx * 2, painter.size.width + 10),
+    kRouteMapDesignBadgeRadiusPx * 2,
+  );
+  painter.dispose();
+  return size;
 }
 
 const TextStyle _attributionStyle = TextStyle(
@@ -261,11 +340,17 @@ ui.Picture recordRouteMapPicture({
 
   // 4) 역명 라벨(볼드=환승·종착) — 녹화 시에만 TextPainter 생성·즉시 dispose.
   // #2068 9차: label.fontSizePx로 그린다(오너 매치는 오너 SVG 크기 그대로).
+  // basemap 모드(역 심벌 미렌더)는 오너 SVG와 동일한 Pretendard로 그린다(#2068).
+  final basemap = !drawStationSymbols;
   for (final label in layout.labels) {
     final painter = TextPainter(
       text: TextSpan(
         text: label.text,
-        style: _labelStyleFor(bold: label.bold, fontSizePx: label.fontSizePx),
+        style: _labelStyleFor(
+          bold: label.bold,
+          fontSizePx: label.fontSizePx,
+          basemap: basemap,
+        ),
       ),
       textDirection: TextDirection.ltr,
       maxLines: 1,
@@ -290,7 +375,7 @@ ui.Picture recordRouteMapPicture({
     final painter = TextPainter(
       text: TextSpan(
         text: badge.label,
-        style: _badgeStyleFor(fontSizePx: badge.fontSizePx),
+        style: _badgeStyleFor(fontSizePx: badge.fontSizePx, basemap: basemap),
       ),
       textDirection: TextDirection.ltr,
       maxLines: 1,
@@ -463,43 +548,23 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
     _design = design;
     // #2068 9차: fontSize를 인자로 받아 라벨별(오너 매치=오너 크기, 폴백=권역
     // 중앙값/기본 13px) 다른 크기로 실측한다 — 솔버 시드 rect와 렌더가 같은
-    // 크기를 쓰도록 반드시 이 인자로 측정해야 한다.
+    // 크기를 쓰도록 반드시 이 인자로 측정해야 한다. basemap 모드는 오너 SVG와
+    // 동일한 Pretendard로 실측·렌더한다(#2068) — 실측·렌더가 [measureRouteMapLabel]
+    // /[_labelStyleFor]로 단일화돼 게이트 테스트와도 동일 메트릭을 공유한다.
+    final basemap = !widget.drawStationSymbols;
     Size measureLabel(
       String text, {
       required bool bold,
       required double fontSize,
-    }) {
-      final painter = TextPainter(
-        text: TextSpan(
-          text: text,
-          style: _labelStyleFor(bold: bold, fontSizePx: fontSize),
-        ),
-        textDirection: TextDirection.ltr,
-        maxLines: 1,
-      )..layout();
-      final size = painter.size;
-      painter.dispose();
-      return size;
-    }
+    }) => measureRouteMapLabel(
+      text,
+      bold: bold,
+      fontSize: fontSize,
+      basemap: basemap,
+    );
 
-    Size measureBadge(String text, {required double fontSize}) {
-      final painter = TextPainter(
-        text: TextSpan(
-          text: text,
-          style: _badgeStyleFor(fontSizePx: fontSize),
-        ),
-        textDirection: TextDirection.ltr,
-        maxLines: 1,
-      )..layout();
-      // pill 좌우 패딩 5px + 최소 지름 유지(기존 뱃지 규칙 — pill 기하는
-      // fontSize와 무관하게 불변, #2068 9차는 텍스트 크기만 통일한다).
-      final size = Size(
-        math.max(kRouteMapDesignBadgeRadiusPx * 2, painter.size.width + 10),
-        kRouteMapDesignBadgeRadiusPx * 2,
-      );
-      painter.dispose();
-      return size;
-    }
+    Size measureBadge(String text, {required double fontSize}) =>
+        measureRouteMapBadge(text, fontSize: fontSize, basemap: basemap);
 
     final layout = solveRouteMapLabelLayout(
       map: widget.map,

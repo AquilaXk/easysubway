@@ -245,24 +245,13 @@ Map<String, RouteMapOwnerLabelEntry> _resolveOwnerLabelsByCandidateKey({
   return resolved;
 }
 
-/// 오너 SVG font-size(design 환산)를 앱 기본 폰트(13 design px) 이하로
-/// 클램프한다(#2068 10차) — 9차에서 오너 크기를 그대로 그리자 수도권(오너
-/// 17.85 > 13)에서 인접 라벨 겹침이 15→32쌍(REAL측정)으로 늘었다. 원인은
-/// SVG가 Pretendard, 앱은 fontFamily 미지정(시스템 기본) 폰트를 써 동일
-/// point size에서도 한글 자폭이 달라 SVG에서 안 겹치던 배치가 앱 렌더에서
-/// 겹친 것으로 추정(Pretendard 번들은 후속 과제, 이번엔 폰트 자산을 추가하지
-/// 않는다). 앱 기본 폰트로 그리는 **작은** 글자는 오너가 비워둔 영역의
-/// 부분집합이라 겹침을 만들지 않는다(수학적으로 안전한 방향) — 6~8차에서
-/// 이미 검증된 13px 렌더로 사실상 복귀한다. 비수도권(오너 4.87~7.23 < 13)은
-/// 클램프가 발동하지 않아 9차 효과(pairs 0)를 그대로 유지한다.
-double _clampOwnerFontSizeDesign(double ownerFontSizeDesign) =>
-    math.min(kRouteMapDesignLabelFontPx, ownerFontSizeDesign);
-
-/// 권역 오너 라벨 font-size의 중앙값(design px, #2068 9~10차). basemap
+/// 권역 오너 라벨 font-size의 중앙값(design px, #2068 9차~). basemap
 /// 모드의 폴백 라벨(미매치 역)·노선 뱃지 pill을 이 크기로 통일해 권역 내
 /// 시각 일관성을 준다(오너 매치 라벨은 각자 entry.fontSizePx를 그대로 쓴다
-/// — 중앙값이 아니다). 각 항목에 [_clampOwnerFontSizeDesign]을 먼저 적용한
-/// 뒤 중앙값을 낸다 — 오너 매치 라벨과 동일한 클램프 규칙을 공유한다.
+/// — 중앙값이 아니다). 각 항목은 오너 SVG font-size(design 환산)를 클램프 없이
+/// 그대로 쓴다 — Pretendard 번들(#2068)로 앱 렌더 자폭이 SVG와 동일해져
+/// 오너의 배치·크기가 겹침 없이 성립하므로, 10차의 13px 상한 클램프
+/// (`min(13, 오너값)`)는 제거했다(오너의 "글자 키워" 요청을 막던 원인).
 /// [ownerLabelsByStationName]이 비어 있으면(sidecar 없음)
 /// [kRouteMapDesignLabelFontPx](기존 고정값)로 안전 폴백한다.
 double _medianOwnerLabelFontSizeDesign(
@@ -274,7 +263,7 @@ double _medianOwnerLabelFontSizeDesign(
   }
   final sizes = [
     for (final entry in ownerLabelsByStationName.values)
-      _clampOwnerFontSizeDesign(entry.fontSizePx * design.designScale),
+      entry.fontSizePx * design.designScale,
   ]..sort();
   return sizes[sizes.length ~/ 2];
 }
@@ -470,12 +459,11 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
     if (basemap) {
       final entry = resolvedOwnerLabels['transfer:${group.stationId}'];
       if (entry != null) {
-        // #2068 9~10차: 오너 SVG font-size(design 환산)를 앱 기본(13) 이하로
-        // 클램프해 렌더 — 앵커는 스케일 보정 없이 오너 좌표 그대로 쓴다(8차
-        // fontRatio 확대 제거).
-        final fontSizePx = _clampOwnerFontSizeDesign(
-          entry.fontSizePx * design.designScale,
-        );
+        // #2068: 오너 SVG font-size(design 환산)를 클램프 없이 그대로 렌더한다
+        // — Pretendard 번들로 앱 자폭이 SVG와 동일해 오너 배치가 겹침 없이
+        // 성립한다(10차 13px 상한 클램프 제거). 앵커도 스케일 보정 없이 오너
+        // 좌표 그대로 쓴다.
+        final fontSizePx = entry.fontSizePx * design.designScale;
         final size = measureLabel(text, bold: true, fontSize: fontSizePx);
         ownerFixedLabels.add(
           RouteMapStaticLabel(
@@ -534,12 +522,11 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
       final entry =
           resolvedOwnerLabels['${station.stationId}:${station.lineId}'];
       if (entry != null) {
-        // #2068 9~10차: 오너 SVG font-size(design 환산)를 앱 기본(13) 이하로
-        // 클램프해 렌더 — 앵커는 스케일 보정 없이 오너 좌표 그대로 쓴다(8차
-        // fontRatio 확대 제거).
-        final fontSizePx = _clampOwnerFontSizeDesign(
-          entry.fontSizePx * design.designScale,
-        );
+        // #2068: 오너 SVG font-size(design 환산)를 클램프 없이 그대로 렌더한다
+        // — Pretendard 번들로 앱 자폭이 SVG와 동일해 오너 배치가 겹침 없이
+        // 성립한다(10차 13px 상한 클램프 제거). 앵커도 스케일 보정 없이 오너
+        // 좌표 그대로 쓴다.
+        final fontSizePx = entry.fontSizePx * design.designScale;
         final size = measureLabel(text, bold: bold, fontSize: fontSizePx);
         ownerFixedLabels.add(
           RouteMapStaticLabel(

@@ -86,6 +86,20 @@ flutter:
     - assets/datapacks/metro_map_pack/basemap/
     - assets/metro_symbols/line_badges/
 
+  # #2068: 노선도 basemap 라벨을 오너 SVG와 동일한 자폭으로 렌더하기 위해
+  # Pretendard(SIL OFL 1.1)를 번들한다. 앱 전역 폰트는 시스템 기본을 유지하고,
+  # basemap 라벨(structured_route_map_painter의 basemap 스타일)만 이 family를
+  # 쓴다. 라이선스 원문은 fonts/OFL.txt.
+  fonts:
+    - family: Pretendard
+      fonts:
+        - asset: fonts/Pretendard-Regular.otf
+          weight: 400
+        - asset: fonts/Pretendard-SemiBold.otf
+          weight: 600
+        - asset: fonts/Pretendard-Bold.otf
+          weight: 700
+
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 

@@ -430,18 +430,36 @@ function ownerLabelEntryFrom(
     ? parseTranslate(firstAttr(groupOpenTag, "transform"))
     : { dx: 0, dy: 0 };
   const textTranslate = parseTranslate(firstAttr(textOpenTag, "transform"));
-  let x = firstAttr(textOpenTag, "x");
-  let y = firstAttr(textOpenTag, "y");
-  if (x == null || y == null) {
-    const firstTspan = textBlock.match(/<tspan\b[^>]*>/);
-    if (firstTspan) {
-      x = x ?? firstAttr(firstTspan[0], "x");
-      y = y ?? firstAttr(firstTspan[0], "y");
-    }
-  }
+  // 첫 tspan이 스스로 x/y를 선언하면 SVG 텍스트 청크 규칙상 그 지점이 실제
+  // 앵커 기준이다(text-anchor는 그 청크 기준으로 계산됨) — 부모 <text>의 x/y
+  // 보다 우선한다. 일반 라벨은 tspan이 부모와 같은 x/y를 반복해(무의미) 결과가
+  // 같지만, 여러 줄 라벨 4건(#2068 수도권 게이트 조사 실측 — 영등포구청·이수·
+  // 부천종합운동장·신검단중앙)은 tspan이 부모보다 작은 x를 가져, 부모 값을
+  // 쓰면 앵커가 실제보다 오른쪽으로 밀려 이웃 라벨과 오탐 겹침을 만들었다.
+  // tspan에 x/y가 없으면(daegu 등 transform 전용 다음 줄 tspan 관례, 뚝섬형
+  // 위치형 포함) 부모 값을 그대로 쓴다.
+  const firstTspan = textBlock.match(/<tspan\b[^>]*>/)?.[0] ?? null;
+  const x =
+    (firstTspan && firstAttr(firstTspan, "x")) ??
+    firstAttr(textOpenTag, "x");
+  const y =
+    (firstTspan && firstAttr(firstTspan, "y")) ??
+    firstAttr(textOpenTag, "y");
   const localX = groupTranslate.dx + textTranslate.dx + Number(x ?? NaN);
   const localY = groupTranslate.dy + textTranslate.dy + Number(y ?? NaN);
-  const anchorRaw = firstAttr(textOpenTag, "text-anchor") ?? "start";
+  // text-anchor는 속성형(`text-anchor="middle"`)뿐 아니라 style 선언 안
+  // (`style="text-align:center;text-anchor:middle"`, Inkscape 수작업 라벨 —
+  // sma-v2 6건 실측: 영등포구청·이수·부천종합운동장·송도달빛축제공원·
+  // 신검단중앙·국제업무지구)으로도 온다. 속성형만 읽으면 이 라벨들이 전부
+  // "start"로 오판돼 앵커가 실제보다 좌측으로 쏠려 이웃 라벨과 겹친다(#2068
+  // 수도권 게이트 회귀 조사). style font-size를 이미 파싱하는 관례
+  // (scaleStyleFontSize)와 같은 자리에서 style text-anchor도 폴백으로 읽는다.
+  const styleValue = firstAttr(textOpenTag, "style");
+  const styleAnchorRaw = styleValue?.match(
+    /text-anchor\s*:\s*(start|middle|end)/,
+  )?.[1];
+  const anchorRaw =
+    firstAttr(textOpenTag, "text-anchor") ?? styleAnchorRaw ?? "start";
   const anchor = ["start", "middle", "end"].includes(anchorRaw)
     ? anchorRaw
     : "start";

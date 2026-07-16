@@ -688,7 +688,7 @@
         "role": "ordinary",
         "x": 448.1875,
         "y": 1673.6763,
-        "anchor": "start",
+        "anchor": "middle",
         "fontSizePx": 12.0002
       },
       {
@@ -2094,9 +2094,9 @@
       {
         "station": "부천종합운동장",
         "role": "transfer",
-        "x": 651.0652,
+        "x": 623.2629,
         "y": 1034.5543,
-        "anchor": "start",
+        "anchor": "middle",
         "fontSizePx": 12.9998
       },
       {
@@ -2808,7 +2808,7 @@
         "role": "terminal",
         "x": 408.042,
         "y": 1714.4673,
-        "anchor": "start",
+        "anchor": "middle",
         "fontSizePx": 12.9998
       },
       {
@@ -3022,9 +3022,9 @@
       {
         "station": "신검단중앙",
         "role": "ordinary",
-        "x": 485.4518,
+        "x": 470.2172,
         "y": 680.1788,
-        "anchor": "start",
+        "anchor": "middle",
         "fontSizePx": 12.0002
       },
       {
@@ -3670,9 +3670,9 @@
       {
         "station": "영등포구청",
         "role": "transfer",
-        "x": 880.4446,
+        "x": 863.9664,
         "y": 1042.7101,
-        "anchor": "start",
+        "anchor": "middle",
         "fontSizePx": 12.9998
       },
       {
@@ -4798,9 +4798,9 @@
       {
         "station": "총신대입구(이수)",
         "role": "transfer",
-        "x": 1182.1426,
+        "x": 1154.4419,
         "y": 1164.0968,
-        "anchor": "start",
+        "anchor": "middle",
         "fontSizePx": 12.9998
       },
       {

@@ -13,7 +13,7 @@
   },
   "ownerLabelsSidecar": {
     "path": "apps/mobile/assets/datapacks/metro_map_pack/basemap/labels.json",
-    "sha256": "fa3386b8485e274cba36772e14bbdcb7f30a38a0ffd521601433f4e9482e8a0c"
+    "sha256": "b28fef20a6c822fd8da9d2edab0b01bf9bffcf93b6b73f20e1bfcddf3cc549ef"
   },
   "maps": [
     {
