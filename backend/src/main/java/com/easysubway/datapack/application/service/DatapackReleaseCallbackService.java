@@ -5,6 +5,7 @@ import com.easysubway.datapack.application.port.out.DatapackReleaseCatalogPort;
 import com.easysubway.datapack.application.port.out.DatapackReleaseRequestRepository;
 import com.easysubway.datapack.application.port.out.DatapackReleaseDeliveryRepository;
 import com.easysubway.datapack.application.service.CallbackSignature.CanonicalFields;
+import com.easysubway.datapack.application.service.CallbackSignature.LegacyCanonicalFields;
 import com.easysubway.datapack.application.service.DatapackReleaseChannelCommandService.ReleaseChannelCommand;
 import com.easysubway.datapack.application.port.out.DatapackReleaseCatalogPort.CatalogIdentity;
 import com.easysubway.datapack.domain.DatapackReleaseRequest;
@@ -54,6 +55,9 @@ public class DatapackReleaseCallbackService {
 
     @Transactional
     public CallbackResult receive(CallbackCommand cmd) {
+		if (cmd.schemaVersion() == 1) {
+			return receiveLegacy(cmd);
+		}
         // HMAC 검증 — verifierKind 불일치 또는 서명 불일치 시 거부
         var fields = new CanonicalFields(cmd.schemaVersion(), cmd.artifactKind(),
             cmd.releaseRequestId(), cmd.releaseSequence(), cmd.channel(), cmd.idempotencyKey(),
@@ -148,6 +152,42 @@ public class DatapackReleaseCallbackService {
 
         return new CallbackResult(terminal.name(), false);
     }
+
+	private CallbackResult receiveLegacy(CallbackCommand cmd) {
+		var fields = new LegacyCanonicalFields(cmd.schemaVersion(), cmd.artifactKind(),
+			cmd.releaseRequestId(), cmd.workflowRunUrl(), cmd.manifestSha256(), cmd.sqliteSha256(),
+			cmd.gzipSha256(), cmd.evidenceBundleSha256(), cmd.validatorStatus(),
+			cmd.routeRegressionStatus(), cmd.publishStatus());
+		if (!"datapack-release-callback".equals(cmd.artifactKind())
+			|| !"payload-signature".equals(cmd.verifierKind())
+			|| !signature.verify(fields, cmd.verifierValue())) {
+			throw new IllegalArgumentException("callback verifier mismatch");
+		}
+
+		var request = repository.findByApprovalId(cmd.releaseRequestId())
+			.orElseThrow(() -> new IllegalArgumentException(
+				"release request not found: " + cmd.releaseRequestId()));
+		boolean pass = "PASS".equals(cmd.publishStatus());
+		var terminal = pass ? DatapackReleaseRequestStatus.PUBLISHED : DatapackReleaseRequestStatus.FAILED;
+		if (request.status() == terminal) {
+			return new CallbackResult(terminal.name(), true);
+		}
+		if (request.status() != DatapackReleaseRequestStatus.APPROVED
+			&& request.status() != DatapackReleaseRequestStatus.DISPATCHED) {
+			throw new IllegalStateException("callback not accepted from state: " + request.status());
+		}
+
+		var now = LocalDateTime.now(clock);
+		var updated = pass
+			? request.markPublished(cmd.workflowRunUrl(), now)
+			: request.markFailed("publish " + cmd.publishStatus(), now);
+		repository.save(updated);
+		if (pass) {
+			tryPromote(updated, cmd.manifestSha256(), cmd.workflowRunUrl(),
+				cmd.evidenceBundleSha256(), updated.approvalId());
+		}
+		return new CallbackResult(terminal.name(), false);
+	}
 
 	private static String expectedIdempotencyKey(CallbackCommand cmd) {
 		return cmd.releaseRequestId() + ":" + cmd.releaseSequence() + ":" + cmd.manifestSha256();

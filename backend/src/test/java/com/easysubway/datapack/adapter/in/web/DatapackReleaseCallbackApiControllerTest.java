@@ -9,8 +9,12 @@ import com.easysubway.datapack.application.service.CallbackSignature;
 import com.easysubway.datapack.application.service.CallbackSignature.CanonicalFields;
 import com.easysubway.datapack.application.port.out.DatapackReleaseCatalogPort;
 import com.easysubway.datapack.application.port.out.DatapackReleaseCatalogPort.CatalogIdentity;
+import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.util.HexFormat;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -111,8 +115,64 @@ class DatapackReleaseCallbackApiControllerTest {
 		return approvalId + ":" + RELEASE_SEQUENCE + ":" + SHA1;
 	}
 
-    @Test
-    @DisplayName("(a) 유효 payload+HMAC+Bearer → 200, status=PUBLISHED")
+	private static String legacySignature(String approvalId, String publishStatus) throws Exception {
+		var message = String.join("\n", "1", "datapack-release-callback", approvalId,
+			WORKFLOW_URL, SHA1, SHA2, SHA3, SHA4, "PASS", "PASS", publishStatus);
+		var mac = Mac.getInstance("HmacSHA256");
+		mac.init(new SecretKeySpec("test-callback-hmac-key".getBytes(StandardCharsets.UTF_8),
+			"HmacSHA256"));
+		return HexFormat.of().formatHex(mac.doFinal(message.getBytes(StandardCharsets.UTF_8)));
+	}
+
+	private static String buildLegacyPayload(String approvalId, String publishStatus, String hmacValue) {
+		return """
+			{
+			  "schemaVersion": 1,
+			  "artifactKind": "datapack-release-callback",
+			  "releaseRequestId": "%s",
+			  "workflowRunUrl": "%s",
+			  "manifestSha256": "%s",
+			  "sqliteSha256": "%s",
+			  "gzipSha256": "%s",
+			  "evidenceBundleSha256": "%s",
+			  "validatorStatus": "PASS",
+			  "routeRegressionStatus": "PASS",
+			  "publishStatus": "%s",
+			  "callbackVerifier": {"kind": "payload-signature", "value": "%s"}
+			}
+			""".formatted(approvalId, WORKFLOW_URL, SHA1, SHA2, SHA3, SHA4,
+			publishStatus, hmacValue);
+	}
+
+	@Test
+	@DisplayName("배포 전 시작된 schema v1 callback도 canonical HMAC 검증 후 완료한다")
+	void legacySchemaCallbackCompletesDispatchedRequest() throws Exception {
+		insertDispatched(APPROVAL_ID);
+		var payload = buildLegacyPayload(APPROVAL_ID, "PASS", legacySignature(APPROVAL_ID, "PASS"));
+
+		mockMvc.perform(post("/admin/api/datapack/release-callbacks")
+				.header("Authorization", "Bearer test-workflow-token")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(payload))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status").value("PUBLISHED"));
+	}
+
+	@Test
+	@DisplayName("schema v1 callback도 위조 HMAC은 거부한다")
+	void forgedLegacySchemaCallbackIsRejected() throws Exception {
+		insertDispatched(APPROVAL_ID);
+		var payload = buildLegacyPayload(APPROVAL_ID, "PASS", "deadbeef".repeat(8));
+
+		mockMvc.perform(post("/admin/api/datapack/release-callbacks")
+				.header("Authorization", "Bearer test-workflow-token")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(payload))
+			.andExpect(status().isForbidden());
+	}
+
+	@Test
+	@DisplayName("(a) 유효 payload+HMAC+Bearer → 200, status=PUBLISHED")
     void validPayloadAndBearerReturns200() throws Exception {
         insertDispatched(APPROVAL_ID);
         String hmac = signPayload(APPROVAL_ID, "PASS");
