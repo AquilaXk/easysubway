@@ -1,4 +1,4 @@
-import { createHash, createVerify } from "node:crypto";
+import { createHash, createPublicKey, createVerify } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { usesLocalPlaceholderHost } from "../production-url-policy.mjs";
@@ -21,10 +21,20 @@ export function verifyRsaSha256Signature(publicKey, value, signature) {
 
 export function signingPublicKey() {
   const key = process.env.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM?.trim();
-  if (!key) {
-    throw new Error("EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM is required for production data pack validation");
+  if (key) return key;
+  const n = process.env.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N?.trim();
+  const e = process.env.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E?.trim();
+  if (n && e) {
+    try {
+      return createPublicKey({ key: { kty: "RSA", n, e }, format: "jwk" })
+        .export({ type: "spki", format: "pem" });
+    } catch {
+      throw new Error("production data pack RSA public key parameters are invalid");
+    }
   }
-  return key;
+  throw new Error(
+    "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM or RSA N/E is required for production data pack validation",
+  );
 }
 
 export function signingKeyId() {
@@ -516,10 +526,7 @@ export function validateManifestSignature(manifest) {
   }
 }
 
-export function validateManifest(
-  manifest,
-  { requireProduction = false, releasesTarget = false, verifySignature = true } = {},
-) {
+export function validateManifest(manifest, { requireProduction = false, releasesTarget = false } = {}) {
   validateManifestJsonSchema(manifest);
   if (!manifest || typeof manifest !== "object") {
     throw new Error("manifest must be an object");
@@ -611,7 +618,7 @@ export function validateManifest(
     }
     validateMinimumTableRows(pack, artifactKind, `${pack.id}@${pack.version}`);
   }
-  if (manifestVersion === 2 && verifySignature) {
+  if (manifestVersion === 2) {
     validateManifestSignature(manifest);
   }
 }
