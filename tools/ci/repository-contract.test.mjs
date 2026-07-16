@@ -1743,6 +1743,42 @@ test("모바일 presentation canonical 선언과 기존 public export를 유지�
   );
 });
 
+test("모바일 demo dependency와 접근성 theme는 app canonical 파일이 소유한다", () => {
+  const main = read("apps/mobile/lib/main.dart");
+  const demoDependencies = read("apps/mobile/lib/app/demo_dependencies.dart");
+  const accessibilityTheme = read("apps/mobile/lib/app/accessibility_theme.dart");
+
+  for (const declaration of [
+    "DemoFavoriteStationRepository",
+    "DemoFavoriteFacilityRepository",
+    "DemoFavoriteRouteRepository",
+    "DemoSearchHistoryRepository",
+  ]) {
+    assert.match(demoDependencies, new RegExp(`^class ${declaration}\\b`, "m"));
+    assert.doesNotMatch(main, new RegExp(`^class _?${declaration}\\b`, "m"));
+  }
+  assert.match(main, /^import 'app\/demo_dependencies\.dart';$/m);
+  assert.match(main, /const DemoFavoriteStationRepository\(\)/);
+  assert.match(main, /const DemoFavoriteFacilityRepository\(\)/);
+  assert.match(main, /const DemoFavoriteRouteRepository\(\)/);
+  assert.match(main, /DemoSearchHistoryRepository\(\)/);
+  assert.doesNotMatch(main, /^export 'app\/demo_dependencies\.dart'/m);
+
+  assert.match(accessibilityTheme, /^class OnboardingPreferenceScope extends StatelessWidget/m);
+  assert.match(
+    accessibilityTheme,
+    /class OnboardingPreferenceScope extends StatelessWidget \{[\s\S]*?Widget build\(BuildContext context\) \{[\s\S]*?child: Theme\([\s\S]*?data: _themeForPlatformAccessibility\(\s*_themeForPreferences\(Theme\.of\(context\), preferences\),\s*mediaQuery,\s*\)/,
+  );
+  assert.match(main, /^import 'app\/accessibility_theme\.dart';$/m);
+  assert.match(main, /OnboardingPreferenceScope\(/);
+  assert.doesNotMatch(main, /^class _?OnboardingPreferenceScope\b/m);
+  assert.doesNotMatch(main, /^ThemeData _themeForPreferences\b/m);
+  assert.doesNotMatch(main, /^ThemeData _themeForPlatformAccessibility\b/m);
+  assert.doesNotMatch(main, /^TextTheme _boldTextTheme\b/m);
+  assert.doesNotMatch(main, /^ButtonStyle _boldButtonTextStyle\b/m);
+  assert.doesNotMatch(main, /^TextStyle _boldTextStyle\b/m);
+});
+
 test("프로덕션 모바일 UI 위젯명은 prototype 명칭을 쓰지 않는다", () => {
   const mobileFiles = execFileSync("git", ["ls-files", "apps/mobile/lib/*.dart"], {
     cwd: root,
@@ -2525,6 +2561,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.deepEqual(
     supportContactBinding.files.map((file) => file.path).toSorted(),
     [
+      "apps/mobile/lib/app/accessibility_theme.dart",
       "apps/mobile/lib/app/app_components.dart",
       "apps/mobile/lib/main.dart",
       "apps/mobile/release/support-incident-response-gate.json",
@@ -12577,6 +12614,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const envExample = read(".env.example");
   const iosInfoPlist = read("apps/mobile/ios/Runner/Info.plist");
   const main = read("apps/mobile/lib/main.dart");
+  const accessibilityTheme = read("apps/mobile/lib/app/accessibility_theme.dart");
   const appDependencies = read("apps/mobile/lib/app/app_dependencies.dart");
   const authHeaders = read("apps/mobile/lib/auth_headers.dart");
   const secureKeyValueStorage = read("apps/mobile/lib/secure_key_value_storage.dart");
@@ -12673,13 +12711,13 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(widgetTest, /역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다\./);
   assert.match(main, /initialMobilityType: onboardingResult\?\.mobilityType/);
   assert.match(main, /initialMobilityType: initialMobilityType/);
-  assert.match(main, /_OnboardingPreferenceScope/);
-  assert.doesNotMatch(main, /mediaQuery\.textScaler\.clamp\(minScaleFactor: 1\.18\)/);
-  assert.match(main, /highContrast:[\s\S]*preferences\.highContrastEnabled \|\| mediaQuery\.highContrast/);
-  assert.match(main, /mediaQuery\.boldText/);
-  assert.match(main, /_themeForPlatformAccessibility/);
-  assert.match(main, /WidgetStateProperty\.resolveWith/);
-  assert.match(main, /_themeForPreferences/);
+  assert.match(main, /OnboardingPreferenceScope/);
+  assert.doesNotMatch(accessibilityTheme, /mediaQuery\.textScaler\.clamp\(minScaleFactor: 1\.18\)/);
+  assert.match(accessibilityTheme, /highContrast:[\s\S]*preferences\.highContrastEnabled \|\| mediaQuery\.highContrast/);
+  assert.match(accessibilityTheme, /mediaQuery\.boldText/);
+  assert.match(accessibilityTheme, /_themeForPlatformAccessibility/);
+  assert.match(accessibilityTheme, /WidgetStateProperty\.resolveWith/);
+  assert.match(accessibilityTheme, /_themeForPreferences/);
   assert.match(main, /simpleViewEnabled: preferences\.simpleViewEnabled/);
   assert.match(main, /RouteSearchScreen\([\s\S]*simpleViewEnabled: simpleViewEnabled/);
   assert.match(main, /AppBar\(title: const Text\('즐겨찾기'\)\)/);
