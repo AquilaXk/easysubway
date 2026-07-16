@@ -64,6 +64,13 @@ jobs:
         shell: bash
         run: cp "${EVIDENCE_DIR}/android-rc-bundle.json" apps/mobile/assets/datapacks/prelaunch/android-rc-bundle.json
 
+      - name: Enable KVM group permissions
+        shell: bash
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
       - name: Rehearse monotonic rescue on Android emulator
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
         with:
