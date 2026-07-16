@@ -89,13 +89,16 @@ class PlayIntegrityRouteV2SessionProvider {
     final String integrityToken;
     try {
       integrityToken = await attestor.requestToken(requestHash(nonce));
-    } catch (error) {
+    } catch (error, stackTrace) {
       if (error is StateError ||
           error is PlatformException ||
           error is MissingPluginException) {
-        throw const RouteSearchOnlineException.unavailable(
-          failureReason: 'ROUTE_SESSION_ATTESTATION_REJECTED',
-          message: 'ITX 시간표를 불러올 수 없어요',
+        Error.throwWithStackTrace(
+          const RouteSearchOnlineException.unavailable(
+            failureReason: 'ROUTE_SESSION_ATTESTATION_REJECTED',
+            message: 'ITX 시간표를 불러올 수 없어요',
+          ),
+          stackTrace,
         );
       }
       rethrow;
