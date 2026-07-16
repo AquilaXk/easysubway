@@ -322,7 +322,7 @@
       },
       {
         "dataType": "Device or other IDs",
-        "inventoryDataIds": ["route_v2_itx_integrity"],
+        "inventoryDataIds": ["route_v2_itx_integrity", "route_v2_gateway_abuse_rate_limit_state"],
         "containsCollectedData": true,
         "containsRequiredData": false,
         "containsOptionalData": true,
@@ -346,6 +346,7 @@
       "mobility profile",
       "favorites",
       "ITX Route V2 integrity session",
+      "ITX Route V2 gateway abuse prevention state",
       "ITX Route V2 mobility preferences",
       "ITX Route V2 route request and state"
     ],
@@ -357,6 +358,7 @@
       "backendLinkedToUserDeviceOrAccountId": false,
       "googleIntegrityMayBeLinkedToAccountOrDevice": true,
       "storedFieldsProcessedEphemerally": false,
+      "gatewayRateLimitStateProcessedEphemerally": false,
       "officialPolicyReferences": [
         "https://support.google.com/googleplay/android-developer/answer/10787469?hl=en",
         "https://developer.android.com/google/play/integrity/terms"

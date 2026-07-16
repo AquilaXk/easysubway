@@ -37,6 +37,7 @@
     "routeV2StoredDataIsEphemeral": false
   },
   "routeV2GatewayRateLimit": {
+    "zoneSizeIsRetention": false,
     "keys": [
       {
         "nginxVariable": "$binary_remote_addr",
@@ -66,6 +67,52 @@
     "privacyAnswerKo": "Android v1은 별도 crash SDK를 사용하지 않고 Android vitals와 Play pre-launch report를 충돌/ANR 기준 증거로 삼는다."
   },
   "dataTypes": [
+    {
+      "id": "route_v2_gateway_abuse_rate_limit_state",
+      "displayNameKo": "Route V2 gateway 악용 방지 상태",
+      "purposeKo": "선택형 ITX-청춘 서버 경로의 과도한 요청과 자동화 악용 방지",
+      "implementationStatus": "backend-collected",
+      "introducedInVersion": "1.0.4",
+      "codeOwner": "gateway",
+      "collectionTrigger": "사용자가 ITX-청춘 Route V2 session 또는 search 요청을 보낼 때 gateway가 요청 제한 상태를 갱신",
+      "backendTableOrService": [
+        "Nginx limit_req_zone route_session_ip",
+        "Nginx limit_req_zone route_search_ip",
+        "Nginx limit_req_zone route_search_token"
+      ],
+      "storageLocations": ["nginx-shared-memory"],
+      "retentionKo": "요청 종료 뒤에도 shared memory에 남을 수 있으며 고정 TTL은 없음. zone 메모리가 부족할 때 LRU 방식으로 퇴출되고, 최종적으로 gateway process 또는 shared-memory zone 수명 종료 시 삭제",
+      "deletionKo": "사용자 계정 DB나 access log에는 저장하지 않으며, zone 메모리 압박에 따른 LRU 퇴출 또는 gateway process·shared-memory zone 수명 종료로 자동 삭제",
+      "deletionImplementation": "Nginx limit_req_zone이 IP 이진 표현과 Authorization bearer session token별 요청 상태를 shared memory에서 관리한다. zone 용량 10m은 보관 기간이 아니며 별도 고정 TTL은 없다.",
+      "evidence": [
+        "infra/nginx/route-v2-gateway.conf.template",
+        "infra/nginx/route-v2-proxy-headers.conf.template",
+        "tools/ci/route-v2-gateway.test.mjs"
+      ],
+      "lastVerifiedAt": "2026-07-16",
+      "sharedWithThirdParties": false,
+      "usedForTracking": false,
+      "gatewayKeyFields": ["$binary_remote_addr", "$http_authorization"],
+      "retention": {
+        "fixedTtl": false,
+        "zoneSizeIsRetention": false,
+        "evictionBoundary": "LRU under zone memory pressure",
+        "finalDeletionBoundary": "gateway process or shared-memory zone lifecycle end"
+      },
+      "operationReference": "https://nginx.org/en/docs/http/ngx_http_limit_req_module.html",
+      "googlePlayDataSafety": {
+        "dataType": "Device or other IDs",
+        "collected": true,
+        "collectionType": "optional-user-triggered-route-v2-gateway",
+        "purpose": "Fraud prevention, security, and compliance",
+        "linkedToUser": true,
+        "encryptedInTransit": true,
+        "optional": true,
+        "required": false,
+        "deletionSupported": true,
+        "processedEphemerally": false
+      }
+    },
     {
       "id": "precise_location",
       "displayNameKo": "현재 위치",

@@ -14207,6 +14207,7 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     "route_v2_itx_integrity",
     "route_v2_itx_mobility_preferences",
     "route_v2_itx_request_state",
+    "route_v2_gateway_abuse_rate_limit_state",
     "mobility_profile",
     "facility_report_content",
     "facility_report_photo",
@@ -14254,7 +14255,7 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
         `${id} evidence artifact must exist: ${evidencePath}`,
       );
     }
-    const expectedLastVerifiedAt = id.startsWith("route_v2_itx_")
+    const expectedLastVerifiedAt = id.startsWith("route_v2_")
       ? "2026-07-16"
       : id === "precise_location"
         ? "2026-07-09"
@@ -14289,7 +14290,10 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     assert.equal(typeof item.googlePlayDataSafety.purpose, "string", `${id} must declare Play purpose`);
     assert.equal(typeof item.googlePlayDataSafety.linkedToUser, "boolean", `${id} must declare Play linked-to-user value`);
     if (item.googlePlayDataSafety.collected) {
-      const routeV2ExpectedLinkage = id === "route_v2_itx_integrity";
+      const routeV2ExpectedLinkage = [
+        "route_v2_itx_integrity",
+        "route_v2_gateway_abuse_rate_limit_state",
+      ].includes(id);
       assert.equal(
         item.googlePlayDataSafety.linkedToUser,
         id.startsWith("route_v2_itx_") ? routeV2ExpectedLinkage : true,
@@ -14416,6 +14420,7 @@ test("Route V2 ITX 개인정보와 Data Safety 공개 기준은 실제 전송·�
   const integrity = items.get("route_v2_itx_integrity");
   const mobility = items.get("route_v2_itx_mobility_preferences");
   const route = items.get("route_v2_itx_request_state");
+  const gatewayRateLimitState = items.get("route_v2_gateway_abuse_rate_limit_state");
   const officialPolicyReferences = [
     "https://support.google.com/googleplay/android-developer/answer/10787469?hl=en",
     "https://developer.android.com/google/play/integrity/terms",
@@ -14522,6 +14527,25 @@ test("Route V2 ITX 개인정보와 Data Safety 공개 기준은 실제 전송·�
   assert.equal(integrity.responseCacheControl, "private, no-store");
   assert.equal(route.responseCacheControl, "private, no-store");
 
+  assert.ok(gatewayRateLimitState);
+  assert.equal(gatewayRateLimitState.googlePlayDataSafety.dataType, "Device or other IDs");
+  assert.equal(gatewayRateLimitState.googlePlayDataSafety.collected, true);
+  assert.equal(gatewayRateLimitState.googlePlayDataSafety.linkedToUser, true);
+  assert.equal(gatewayRateLimitState.googlePlayDataSafety.optional, true);
+  assert.equal(gatewayRateLimitState.googlePlayDataSafety.processedEphemerally, false);
+  assert.deepEqual(gatewayRateLimitState.gatewayKeyFields, [
+    "$binary_remote_addr",
+    "$http_authorization",
+  ]);
+  assert.equal(gatewayRateLimitState.retention.fixedTtl, false);
+  assert.equal(gatewayRateLimitState.retention.zoneSizeIsRetention, false);
+  assert.equal(gatewayRateLimitState.retention.evictionBoundary, "LRU under zone memory pressure");
+  assert.equal(gatewayRateLimitState.retention.finalDeletionBoundary, "gateway process or shared-memory zone lifecycle end");
+  assert.equal(
+    gatewayRateLimitState.operationReference,
+    "https://nginx.org/en/docs/http/ngx_http_limit_req_module.html",
+  );
+
   assert.deepEqual(inventory.routeV2GatewayRateLimit.keys, [
     {
       nginxVariable: "$binary_remote_addr",
@@ -14539,6 +14563,7 @@ test("Route V2 ITX 개인정보와 Data Safety 공개 기준은 실제 전송·�
     },
   ]);
   assert.equal(inventory.routeV2GatewayRateLimit.rateLimitedLogContainsKeyValues, false);
+  assert.equal(inventory.routeV2GatewayRateLimit.zoneSizeIsRetention, false);
 
   assert.deepEqual(
     playStoreContent.dataSafetyDeclarations.routeV2Itx.officialPolicyReferences,
@@ -14558,6 +14583,15 @@ test("Route V2 ITX 개인정보와 Data Safety 공개 기준은 실제 전송·�
     playStoreContent.dataSafetyDeclarations.answerMatrix
       .find((item) => item.dataType === "Device or other IDs")
       .inventoryDataIds.includes("route_v2_itx_integrity"),
+  );
+  assert.ok(
+    playStoreContent.dataSafetyDeclarations.answerMatrix
+      .find((item) => item.dataType === "Device or other IDs")
+      .inventoryDataIds.includes("route_v2_gateway_abuse_rate_limit_state"),
+  );
+  assert.equal(
+    playStoreContent.dataSafetyDeclarations.routeV2Itx.gatewayRateLimitStateProcessedEphemerally,
+    false,
   );
   assert.ok(
     playStoreContent.dataSafetyDeclarations.answerMatrix
@@ -14616,6 +14650,10 @@ test("Route V2 ITX 개인정보와 Data Safety 공개 기준은 실제 전송·�
   assert.match(publicPrivacyPolicy, /\$binary_remote_addr/);
   assert.match(publicPrivacyPolicy, /\$http_authorization/);
   assert.match(publicPrivacyPolicy, /Nginx shared memory/);
+  assert.match(publicPrivacyPolicy, /요청이 끝난 뒤에도 shared memory에 남을 수 있어 ephemeral 처리로 분류하지 않습니다/);
+  assert.match(publicPrivacyPolicy, /고정 TTL은 없으며/);
+  assert.match(publicPrivacyPolicy, /zone 메모리가 부족할 때 LRU 방식으로 퇴출/);
+  assert.match(publicPrivacyPolicy, /gateway process 또는 shared-memory zone 수명 종료/);
   assert.match(publicPrivacyPolicy, /DB나 access log에는 저장하지 않습니다/);
   assert.match(publicPrivacyPolicy, /private, no-store/);
 });
