@@ -16,6 +16,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
+import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Clock;
@@ -28,6 +29,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -159,7 +165,7 @@ public class ObjectStorageFacilityReportPhotoStorage implements
 			if (contentLength > maxBytes) {
 				throw oversizedPhoto();
 			}
-			byte[] bytes = readBounded(responseBody);
+			byte[] bytes = readBoundedWithTimeout(responseBody);
 			String contentType = response.headers()
 				.firstValue("content-type")
 				.map(value -> value.split(";", 2)[0].trim().toLowerCase(Locale.ROOT))
@@ -285,6 +291,42 @@ public class ObjectStorageFacilityReportPhotoStorage implements
 			output.write(buffer, 0, readBytes);
 		}
 		return output.toByteArray();
+	}
+
+	private byte[] readBoundedWithTimeout(InputStream inputStream) throws IOException {
+		AtomicBoolean timedOut = new AtomicBoolean(false);
+		ScheduledExecutorService timeoutExecutor = Executors.newSingleThreadScheduledExecutor(task -> {
+			Thread thread = new Thread(task, "facility-report-photo-body-timeout");
+			thread.setDaemon(true);
+			return thread;
+		});
+		ScheduledFuture<?> timeout = timeoutExecutor.schedule(() -> {
+			timedOut.set(true);
+			try {
+				inputStream.close();
+			} catch (IOException ignored) {
+				// The read path below reports the timeout with a stable exception type.
+			}
+		}, Math.max(1L, requestTimeout.toMillis()), TimeUnit.MILLISECONDS);
+		try {
+			byte[] bytes = readBounded(inputStream);
+			if (timedOut.get()) {
+				throw new HttpTimeoutException("Timed out while reading facility report photo object");
+			}
+			return bytes;
+		} catch (IOException exception) {
+			if (!timedOut.get() || exception instanceof HttpTimeoutException) {
+				throw exception;
+			}
+			HttpTimeoutException timeoutException = new HttpTimeoutException(
+				"Timed out while reading facility report photo object"
+			);
+			timeoutException.initCause(exception);
+			throw timeoutException;
+		} finally {
+			timeout.cancel(false);
+			timeoutExecutor.shutdownNow();
+		}
 	}
 
 	private InvalidFacilityReportException oversizedPhoto() {

@@ -109,7 +109,4 @@ done < "${rows_file}"
 
 trap - EXIT
 cleanup
-node "${ROOT_DIR}/tools/ops/prune-sensitive-backups.mjs" \
-	--root "${BACKUP_DIR}" \
-	--retention-days "30"
 printf 'facility report photo backup written: %s\n' "${run_dir}"

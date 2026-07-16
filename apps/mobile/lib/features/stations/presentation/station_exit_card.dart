@@ -208,8 +208,8 @@ class _StationExitCardState extends State<StationExitCard> {
                 button: true,
                 enabled: !_isOpeningWalkingRoute,
                 label: mapTarget.usesStationFallback
-                    ? '${exit.name} 역 위치 기준 카카오맵 도보 길안내, 앱에서는 현재 위치와 역 좌표를, 웹에서는 역 좌표만 카카오에 전달합니다'
-                    : '${exit.name}까지 카카오맵 도보 길안내, 앱에서는 현재 위치와 출구 좌표를, 웹에서는 출구 좌표만 카카오에 전달합니다',
+                    ? '${exit.name} 역 위치 기준 카카오맵 도보 길안내'
+                    : '${exit.name}까지 카카오맵 도보 길안내',
                 onTap: _isOpeningWalkingRoute
                     ? null
                     : () => _openWalkingRoute(context),

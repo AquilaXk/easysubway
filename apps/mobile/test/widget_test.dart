@@ -10446,6 +10446,7 @@ void main() {
   });
 
   testWidgets('역 상세는 현재 위치 기준 출구 직선거리와 카카오맵 도보 길안내를 보여준다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
     final mapLauncher = _FakeKakaoMapLauncher();
     var locationRequestCount = 0;
     final locationProvider = FakeCurrentLocationProvider(
@@ -10508,6 +10509,13 @@ void main() {
       find.text('카카오맵 앱에서는 현재 위치와 출구 좌표를, 웹에서는 출구 좌표만 카카오에 전달합니다.'),
       findsOneWidget,
     );
+    expect(find.bySemanticsLabel('1번 출구까지 카카오맵 도보 길안내'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(
+        '1번 출구까지 카카오맵 도보 길안내, 앱에서는 현재 위치와 출구 좌표를, 웹에서는 출구 좌표만 카카오에 전달합니다',
+      ),
+      findsNothing,
+    );
 
     await tester.tap(
       find.byKey(const Key('stationExitWalkingRouteButton-exit-sangnoksu-1')),
@@ -10522,6 +10530,7 @@ void main() {
     expect(mapLauncher.routeTargets.single.end.latitude, 37.3021);
     expect(mapLauncher.routeTargets.single.end.longitude, 126.8661);
     expect(find.text('카카오맵 도보 길안내를 열었습니다.'), findsOneWidget);
+    semanticsHandle.dispose();
   });
 
   testWidgets('역 상세는 출구 좌표가 없으면 역 좌표 기준으로 직선거리와 도보 길안내를 강등한다', (tester) async {

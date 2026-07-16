@@ -161,6 +161,39 @@ class ObjectStorageFacilityReportPhotoStorageTest {
 			.hasRootCauseInstanceOf(HttpTimeoutException.class);
 	}
 
+	@Test
+	void boundsObjectStorageResponseBodyReadsThatStopAfterHeaders() throws Exception {
+		server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+		server.createContext("/", exchange -> {
+			exchange.getResponseHeaders().set("Content-Type", "image/jpeg");
+			exchange.sendResponseHeaders(200, 4);
+			exchange.getResponseBody().write(new byte[] {1});
+			exchange.getResponseBody().flush();
+			try {
+				Thread.sleep(250);
+			} catch (InterruptedException exception) {
+				Thread.currentThread().interrupt();
+			} finally {
+				exchange.close();
+			}
+		});
+		server.start();
+		ObjectStorageFacilityReportPhotoStorage storage = new ObjectStorageFacilityReportPhotoStorage(
+			"http://127.0.0.1:" + server.getAddress().getPort(),
+			"easysubway-report-uploads",
+			900L * 1024L,
+			"prod-object-storage-access-key",
+			"prod-object-storage-secret-key-with-enough-entropy",
+			"ap-northeast-2",
+			HttpClient.newBuilder().connectTimeout(Duration.ofMillis(50)).build(),
+			Clock.fixed(Instant.parse("2026-06-20T00:00:00Z"), ZoneOffset.UTC),
+			Duration.ofMillis(50)
+		);
+
+		assertThatThrownBy(() -> storage.loadFacilityReportPhoto("facility-reports/report-1/photo.jpg"))
+			.hasCauseInstanceOf(HttpTimeoutException.class);
+	}
+
 	private void startObjectStorageServer() throws IOException {
 		server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
 		server.createContext("/", this::handleObjectRequest);

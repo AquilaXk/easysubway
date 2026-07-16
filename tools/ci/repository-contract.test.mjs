@@ -10881,9 +10881,8 @@ test("시설 신고 사진 백업은 로컬 전용 객체와 manifest 기준선�
   assert.match(backupScript, /printf 'report_id\\tfile_name\\tcontent_type\\tobject_key\\tthumbnail_object_key\\tsha256\\tsize_bytes\\tobject_path\\tthumbnail_path\\n'/);
   assert.match(backupScript, /printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n'/);
   assert.match(backupScript, /trap cleanup EXIT/);
-  assert.match(backupScript, /--retention-days "30"/);
-  assert.doesNotMatch(backupScript, /EASYSUBWAY_SENSITIVE_BACKUP_RETENTION_DAYS/);
-  assert.match(backupScript, /prune-sensitive-backups\.mjs/);
+  assert.doesNotMatch(backupScript, /--retention-days/);
+  assert.doesNotMatch(backupScript, /prune-sensitive-backups\.mjs/);
   assert.match(backupScript, /printf 'facility report photo backup written: %s\\n' "\$\{run_dir\}"/);
 });
 
@@ -10940,8 +10939,8 @@ test("민감정보 백업 보존 작업은 일일 실행 지연을 포함해 30�
     { cwd: root, encoding: "utf8" },
   );
 
-  assert.match(output, /pruned=5 retention_days=30/);
-  assert.equal(existsSync(expiredPhotoDir), false);
+  assert.match(output, /pruned=4 retention_days=30/);
+  assert.equal(existsSync(expiredPhotoDir), true);
   assert.equal(existsSync(expiredDump), false);
   assert.equal(existsSync(expiredChecksum), false);
   assert.equal(existsSync(dailyBoundaryDump), false);

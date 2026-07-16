@@ -25,7 +25,6 @@ if (!Number.isFinite(now)) {
 }
 const cutoff = now - retentionDays * dailySweepIntervalMs + dailySweepIntervalMs;
 const postgresBackup = /^easysubway-postgres-(\d{8}T\d{6}Z)\.[A-Za-z0-9]+\.dump(?:\.sha256)?$/;
-const photoBackup = /^easysubway-report-photos-(\d{8}T\d{6}Z)\.[A-Za-z0-9]+$/;
 let pruned = 0;
 
 function backupCreatedAt(name, pattern) {
@@ -60,16 +59,13 @@ async function pruneDirectory(directory, required = false) {
       continue;
     }
 
-    const postgresCreatedAt = entry.isFile() ? backupCreatedAt(entry.name, postgresBackup) : null;
-    const photoCreatedAt = entry.isDirectory() ? backupCreatedAt(entry.name, photoBackup) : null;
-    const isPhotoBackup = photoCreatedAt !== null;
-    const createdAt = postgresCreatedAt ?? photoCreatedAt;
+    const createdAt = entry.isFile() ? backupCreatedAt(entry.name, postgresBackup) : null;
     if (createdAt !== null && createdAt <= cutoff) {
-      await rm(candidate, { recursive: isPhotoBackup, force: true });
+      await rm(candidate, { force: true });
       pruned += 1;
       continue;
     }
-    if (entry.isDirectory() && !isPhotoBackup) {
+    if (entry.isDirectory()) {
       await pruneDirectory(candidate);
     }
   }
