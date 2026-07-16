@@ -74,6 +74,12 @@ function raw(overrides = {}) {
     },
     metrics: { controlPlaneConvergenceP95Ms: 600_000, terminalDispositionMaxMs: 4_200_000 },
     observations: {
+      candidateNoChange: false,
+      callbackDelivery: {
+        state: "RECONCILIATION_REQUIRED",
+        attempts: [1, 2, 3, 4].map((attempt) => ({ attempt, httpClass: "5XX" })),
+      },
+      virtualRetryDelaysSeconds: [60, 480, 3600],
       convergedState: "DELIVERED",
       convergedHttpClass: "RECONCILED",
       terminalState: "DEAD_LETTER",
@@ -143,6 +149,19 @@ test("10분/70분 virtual boundary 초과를 거부한다", () => {
       raw: raw({ metrics }), junitXmlByCheck: junitXmlByCheck(), workflow,
       expectedIdentity: { releaseRequestId, releaseSequence, manifestSha256 },
     }), /virtual time metric exceeds/);
+  }
+});
+
+test("production sender 5xx와 candidate publish가 없는 rehearsal을 거부한다", () => {
+  for (const observations of [
+    { ...raw().observations, candidateNoChange: true },
+    { ...raw().observations, callbackDelivery: { state: "DELIVERED", attempts: [] } },
+    { ...raw().observations, virtualRetryDelaysSeconds: [60, 480] },
+  ]) {
+    assert.throws(() => buildCallbackReconciliationEvidence({
+      raw: raw({ observations }), junitXmlByCheck: junitXmlByCheck(), workflow,
+      expectedIdentity: { releaseRequestId, releaseSequence, manifestSha256 },
+    }), /production sender outage rehearsal is invalid/);
   }
 });
 

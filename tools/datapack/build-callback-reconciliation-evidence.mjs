@@ -271,6 +271,15 @@ function validateRawRehearsal(raw, expectedIdentity) {
     || raw.observations?.terminalReason !== "CATALOG_UNAVAILABLE") {
     throw new Error("isolated rehearsal observations are invalid");
   }
+  const callbackDelivery = raw.observations.callbackDelivery;
+  const retryDelays = raw.observations.virtualRetryDelaysSeconds;
+  if (raw.observations.candidateNoChange !== false
+    || callbackDelivery?.state !== "RECONCILIATION_REQUIRED"
+    || !Array.isArray(callbackDelivery.attempts) || callbackDelivery.attempts.length !== 4
+    || callbackDelivery.attempts.some((attempt) => attempt?.httpClass !== "5XX")
+    || JSON.stringify(retryDelays) !== JSON.stringify([60, 480, 3600])) {
+    throw new Error("production sender outage rehearsal is invalid");
+  }
 }
 
 function validateMetrics(metrics) {

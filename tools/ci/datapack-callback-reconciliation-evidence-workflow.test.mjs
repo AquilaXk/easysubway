@@ -26,19 +26,24 @@ test("pinned Node 24·Java 21과 동일 SHA의 final RC·publish binding을 사�
   assert.match(workflow, /run-id:\s*\$\{\{ inputs\.release_artifacts_run_id \}\}/);
   assert.match(workflow, /easysubway-rc-evidence-manifest-\$\{\{ github\.sha \}\}/);
   assert.match(workflow, /run-id:\s*\$\{\{ inputs\.datapack_run_id \}\}/);
-  assert.match(workflow, /easysubway-datapacks-\$\{\{ github\.sha \}\}/);
+  assert.match(workflow,
+    /easysubway-published-release-request-binding-\$\{\{ github\.sha \}\}/);
   assert.match(workflow, /environment:\s*\n\s*name:\s*production-datapack/);
   assert.match(workflow, /EASYSUBWAY_ENV_SECRET:\s*\$\{\{ secrets\.EASYSUBWAY_ENV \}\}/);
   assert.match(workflow, /EASYSUBWAY_CALLBACK_VALIDATION_ENV=\$\{env_file\}/);
   assert.match(workflow, /node --env-file="\$\{EASYSUBWAY_CALLBACK_VALIDATION_ENV\}"/);
   assert.match(workflow, /--prepare-from-rc-manifest[\s\S]*?--expected-git-sha "\$\{GITHUB_SHA\}"/);
   assert.match(workflow,
-    /--release-request-binding "\$\{RUNNER_TEMP\}\/datapack-release\/catalog\/release-request-binding\.json"/);
+    /--release-request-binding "\$\{RUNNER_TEMP\}\/datapack-release\/release-request-binding\.json"/);
   assert.match(workflow,
     /if:\s*\$\{\{ always\(\) \}\}[\s\S]*?rm -f "\$\{RUNNER_TEMP\}\/easysubway-callback-validation\.env"/);
 });
 
 test("실제 H2 rehearsal과 canonical regression tests를 실행한다", () => {
+  assert.match(workflow,
+    /node tools\/datapack\/run-callback-backend-outage-rehearsal\.mjs[\s\S]*?--output "\$\{RAW_CALLBACK_OUTAGE_PATH\}"/);
+  assert.match(workflow,
+    /EASYSUBWAY_CALLBACK_OUTAGE_ARTIFACT:\s*\$\{\{ env\.RAW_CALLBACK_OUTAGE_PATH \}\}/);
   for (const testClass of [
     "DatapackCallbackReconciliationRehearsalTest",
     "DatapackReleaseCallbackServiceTest",

@@ -30,6 +30,7 @@ jobs:
     env:
       EVIDENCE_DIR: ${{ runner.temp }}/datapack-callback-reconciliation-evidence
       RAW_REHEARSAL_PATH: ${{ runner.temp }}/datapack-callback-reconciliation-raw-input.json
+      RAW_CALLBACK_OUTAGE_PATH: ${{ runner.temp }}/datapack-callback-backend-outage.json
 
     steps:
       - name: Callback reconciliation / Checkout default branch
@@ -61,7 +62,7 @@ jobs:
       - name: Callback reconciliation / Download published release request binding
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          name: easysubway-datapacks-${{ github.sha }}
+          name: easysubway-published-release-request-binding-${{ github.sha }}
           path: ${{ runner.temp }}/datapack-release
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ inputs.datapack_run_id }}
@@ -92,15 +93,23 @@ jobs:
             tools/datapack/build-callback-reconciliation-evidence.mjs \
             --prepare-from-rc-manifest "${RUNNER_TEMP}/rc-evidence-manifest/final-readiness.json" \
             --release-request-id "${RELEASE_REQUEST_ID}" \
-            --release-request-binding "${RUNNER_TEMP}/datapack-release/catalog/release-request-binding.json" \
+            --release-request-binding "${RUNNER_TEMP}/datapack-release/release-request-binding.json" \
             --expected-git-sha "${GITHUB_SHA}" \
             --github-env "${GITHUB_ENV}"
+
+      - name: Callback reconciliation / Inject callback backend outage through production sender
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tools/datapack/run-callback-backend-outage-rehearsal.mjs \
+            --output "${RAW_CALLBACK_OUTAGE_PATH}"
 
       - name: Callback reconciliation / Run production-like isolated backend rehearsal
         working-directory: backend
         shell: bash
         env:
           EASYSUBWAY_CALLBACK_REHEARSAL_OUTPUT: ${{ env.RAW_REHEARSAL_PATH }}
+          EASYSUBWAY_CALLBACK_OUTAGE_ARTIFACT: ${{ env.RAW_CALLBACK_OUTAGE_PATH }}
         run: |
           set -euo pipefail
           ./gradlew test \
@@ -115,6 +124,7 @@ jobs:
         run: |
           set -euo pipefail
           node --test tools/datapack/build-callback-reconciliation-evidence.test.mjs
+          node --test tools/datapack/run-callback-backend-outage-rehearsal.test.mjs
           node --test tools/ci/datapack-release-workflow.test.mjs
           node --test tools/ci/datapack-callback-reconciliation-evidence-workflow.test.mjs
 
