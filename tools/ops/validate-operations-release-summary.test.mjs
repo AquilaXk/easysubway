@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { mkdir, rm, writeFile } from "node:fs/promises";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -10,6 +10,7 @@ import test from "node:test";
 const rawExecFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
 const validatorPath = "tools/ops/validate-operations-release-summary.mjs";
+let validatorPostLaunchGatePath;
 
 function execFileAsync(file, args, options) {
   const resolvedArgs = [...args];
@@ -25,6 +26,9 @@ function execFileAsync(file, args, options) {
       );
     }
   }
+  if (args[0] === validatorPath && !resolvedArgs.includes("--post-launch-gate")) {
+    resolvedArgs.push("--post-launch-gate", validatorPostLaunchGatePath);
+  }
   return rawExecFileAsync(file, resolvedArgs, options);
 }
 const observabilityGate = JSON.parse(
@@ -33,6 +37,20 @@ const observabilityGate = JSON.parse(
 const postLaunchGate = JSON.parse(
   readFileSync(path.join(root, "apps/mobile/release/post-launch-operations-review-gate.json"), "utf8"),
 );
+// Validator unit cases exercise a hypothetical gate after the required fixed-release rehearsal.
+postLaunchGate.preLaunchReadiness.status = "PASS";
+postLaunchGate.preLaunchReadiness.evidenceSummary.find(
+  (item) => item.id === "fixed-release-versioncode-build-submit-procedure",
+).status = "PASS";
+postLaunchGate.latestQaEvidenceSummary.remainingExternalBlockers =
+  postLaunchGate.latestQaEvidenceSummary.remainingExternalBlockers.filter(
+    (item) => item !== "fixed-release-rehearsal-after-node24-runtime-change",
+  );
+validatorPostLaunchGatePath = path.join(
+  mkdtempSync(path.join(tmpdir(), "operations-validator-gate-")),
+  "post-launch-operations-review-gate.json",
+);
+writeFileSync(validatorPostLaunchGatePath, `${JSON.stringify(postLaunchGate, null, 2)}\n`);
 const supportGate = JSON.parse(
   readFileSync(path.join(root, "apps/mobile/release/support-incident-response-gate.json"), "utf8"),
 );
