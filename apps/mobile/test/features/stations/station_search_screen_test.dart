@@ -1,9 +1,11 @@
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/features/route_draft/domain/route_draft.dart';
+import 'package:easysubway_mobile/features/stations/domain/station_line.dart';
 import 'package:easysubway_mobile/features/stations/domain/station_models.dart';
 import 'package:easysubway_mobile/features/stations/domain/station_repositories.dart';
 import 'package:easysubway_mobile/features/stations/presentation/station_search_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -230,9 +232,205 @@ void main() {
     expect(find.bySemanticsLabel('출발역'), findsNothing);
     handle.dispose();
   });
+
+  testWidgets('역 검색 화면은 최근 검색어를 탭해 빠르게 다시 검색한다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    final repository = _EmptyStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult()],
+      },
+    );
+    final searchHistoryRepository = _MemorySearchHistoryRepository([
+      '상록수',
+      '사당',
+    ]);
+
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StationSearchScreen(
+            repository: repository,
+            reportRepository: const UnavailableFacilityReportRepository(),
+            locationProvider: const _FixedCurrentLocationProvider(),
+            searchHistoryRepository: searchHistoryRepository,
+            regionLabel: '수도권',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('stationSearchInput')), findsOneWidget);
+      expect(
+        find.byKey(const Key('stationRecentSearchSection')),
+        findsOneWidget,
+      );
+      expect(find.text('최근 검색'), findsOneWidget);
+      expect(find.textContaining('최근 사용 순서'), findsNothing);
+      expect(find.text('최근 사용 1번째'), findsOneWidget);
+      expect(
+        find.byKey(const Key('stationRecentSearchQuery-상록수')),
+        findsOneWidget,
+      );
+      expect(find.bySemanticsLabel('최근 검색어 상록수 검색, 최근 사용 1번째'), findsOneWidget);
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel('최근 검색어 상록수 검색, 최근 사용 1번째'))
+            .getSemanticsData()
+            .hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+
+      await tester.tap(find.byKey(const Key('stationRecentSearchQuery-상록수')));
+      await tester.pumpAndSettle();
+
+      final searchInput = tester.widget<TextField>(
+        find.byKey(const Key('stationSearchInput')),
+      );
+      expect(searchInput.controller?.text, '상록수');
+      expect(repository.requestedQueries, ['상록수']);
+      expect(searchHistoryRepository.recordedQueries, ['상록수']);
+      expect(
+        find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('stationRoleOrigin-station-sangnoksu')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const Key('stationRoleDestination-station-sangnoksu')),
+        findsNothing,
+      );
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
+  testWidgets('역 검색 화면 안에서 최근 검색을 개별·전체 삭제한다', (tester) async {
+    final searchHistoryRepository = _MemorySearchHistoryRepository([
+      '상록수',
+      '사당',
+    ]);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StationSearchScreen(
+          repository: _EmptyStationSearchRepository(),
+          reportRepository: const UnavailableFacilityReportRepository(),
+          locationProvider: const _FixedCurrentLocationProvider(),
+          searchHistoryRepository: searchHistoryRepository,
+          regionLabel: '수도권',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('stationRecentSearchRemove-상록수')));
+    await tester.pumpAndSettle();
+
+    expect(searchHistoryRepository.removedQueries, ['상록수']);
+    expect(find.byKey(const Key('stationRecentSearchQuery-상록수')), findsNothing);
+    expect(find.byKey(const Key('stationRecentSearchSection')), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const Key('stationRecentSearchClearAllButton')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(searchHistoryRepository.clearCount, 1);
+    expect(find.byKey(const Key('stationRecentSearchSection')), findsNothing);
+    expect(find.text('최근 검색한 역이 없습니다.'), findsNothing);
+    expect(find.byKey(const Key('stationSearchInput')), findsOneWidget);
+  });
+
+  testWidgets('역 검색 결과는 환승 역을 노선마다 한 행으로 펼쳐 보여준다', (tester) async {
+    final repository = _EmptyStationSearchRepository(
+      queryResults: {
+        '환승': [
+          const StationSearchResult(
+            id: 'station-transfer',
+            nameKo: '환승역',
+            nameEn: 'Transfer',
+            region: '수도권',
+            dataQualityLevel: 'LEVEL_1',
+            lastVerifiedAt: '2026-06-12',
+            lines: [
+              StationSearchLine(
+                id: 'seoul-4',
+                name: '수도권 4호선',
+                color: '#00A5DE',
+                stationCode: '448',
+              ),
+              StationSearchLine(
+                id: 'korail-gyeongui-jungang',
+                name: '경의중앙선',
+                color: '#75C5A1',
+                stationCode: 'K232',
+              ),
+              StationSearchLine(
+                id: 'suin-bundang',
+                name: '수인분당선',
+                color: '#F5A200',
+                stationCode: 'K249',
+              ),
+              StationSearchLine(
+                id: 'shinbundang',
+                name: '신분당선',
+                color: '#D4003B',
+                stationCode: 'D14',
+              ),
+            ],
+          ),
+        ],
+      },
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StationSearchScreen(
+          repository: repository,
+          reportRepository: const UnavailableFacilityReportRepository(),
+          locationProvider: const _FixedCurrentLocationProvider(),
+          regionLabel: '수도권',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '환승');
+    await tester.pumpAndSettle();
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('stationLineBadge-seoul-4')), findsOneWidget);
+    expect(
+      find.byKey(const Key('stationLineBadge-korail-gyeongui-jungang')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('stationLineBadge-suin-bundang')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('stationLineBadge-shinbundang')),
+      findsOneWidget,
+    );
+    expect(find.text('+3'), findsNothing);
+    expect(find.byKey(const Key('stationLineBadgeOverflow')), findsNothing);
+    expect(
+      find.byKey(const Key('stationSearchResult-station-transfer')),
+      findsOneWidget,
+    );
+    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+  });
 }
 
 class _EmptyStationSearchRepository implements StationSearchRepository {
+  _EmptyStationSearchRepository({this.queryResults = const {}});
+
+  final Map<String, List<StationSearchResult>> queryResults;
+  final requestedQueries = <String>[];
+
   @override
   Future<StationDetail> getStationDetail(String stationId) =>
       throw UnimplementedError();
@@ -253,7 +451,66 @@ class _EmptyStationSearchRepository implements StationSearchRepository {
   }) async => [];
 
   @override
-  Future<List<StationSearchResult>> searchStations(String query) async => [];
+  Future<List<StationSearchResult>> searchStations(String query) async {
+    requestedQueries.add(query);
+    return queryResults[query] ?? [];
+  }
+}
+
+class _MemorySearchHistoryRepository implements SearchHistoryRepository {
+  _MemorySearchHistoryRepository(List<String> queries) : queries = [...queries];
+
+  final List<String> queries;
+  final recordedQueries = <String>[];
+  final removedQueries = <String>[];
+  int clearCount = 0;
+
+  @override
+  Future<void> clearSearches() async {
+    clearCount++;
+    queries.clear();
+  }
+
+  @override
+  Future<List<String>> listRecentQueries() async => [...queries];
+
+  @override
+  Future<void> recordSearch(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
+      return;
+    }
+    recordedQueries.add(trimmed);
+    queries
+      ..remove(trimmed)
+      ..insert(0, trimmed);
+  }
+
+  @override
+  Future<void> removeSearch(String query) async {
+    final trimmed = query.trim();
+    removedQueries.add(trimmed);
+    queries.remove(trimmed);
+  }
+}
+
+StationSearchResult _stationResult() {
+  return const StationSearchResult(
+    id: 'station-sangnoksu',
+    nameKo: '상록수',
+    nameEn: 'Sangnoksu',
+    region: '수도권',
+    dataQualityLevel: 'LEVEL_1',
+    lastVerifiedAt: '2026-06-13',
+    lines: [
+      StationSearchLine(
+        id: 'seoul-4',
+        name: '수도권 4호선',
+        color: '#00A5DE',
+        stationCode: '448',
+      ),
+    ],
+  );
 }
 
 class _FixedCurrentLocationProvider implements CurrentLocationProvider {
