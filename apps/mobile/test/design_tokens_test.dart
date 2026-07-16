@@ -99,7 +99,7 @@ void main() {
     expect(EasySubwayFanMenuColors.closeSurface, const Color(0xFFF5F7FA));
     expect(EasySubwayFanMenuColors.closePressed, const Color(0xFFE9EDF2));
     expect(EasySubwayFanMenuColors.closeInk, const Color(0xFF475467));
-    expect(EasySubwayFanMenuColors.border, const Color(0xFFB7BEC8));
+    expect(EasySubwayFanMenuColors.border, const Color(0xE8404445));
     expect(EasySubwayFanMenuColors.outline, const Color(0xE8404445));
   });
 }
