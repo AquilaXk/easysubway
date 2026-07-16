@@ -326,6 +326,7 @@
         "containsCollectedData": true,
         "containsRequiredData": false,
         "containsOptionalData": true,
+        "containsDeletionUnsupportedData": true,
         "requiredConsoleFields": [
           "collected",
           "collectionType",

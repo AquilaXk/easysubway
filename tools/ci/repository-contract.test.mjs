@@ -14571,7 +14571,11 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     } else {
       assert.equal(item.googlePlayDataSafety.required, false, `${id} not-collected Play data must not be required`);
     }
-    assert.equal(item.googlePlayDataSafety.deletionSupported, true, `${id} must declare data deletion support`);
+    assert.equal(
+      item.googlePlayDataSafety.deletionSupported,
+      id !== "route_v2_gateway_abuse_rate_limit_state",
+      `${id} must declare the implemented data deletion boundary`,
+    );
   }
 
   const appStoreTypes = [...new Set(
@@ -14743,6 +14747,10 @@ test("Route V2 ITX 개인정보와 Data Safety 공개 기준은 실제 전송·�
   assert.equal(route.googlePlayDataSafety.linkedToUser, false);
   assert.equal(route.googlePlayDataSafety.optional, true);
   assert.equal(route.googlePlayDataSafety.processedEphemerally, false);
+  assert.equal(
+    route.purposeKo,
+    "사용자가 선택한 ITX-청춘 경로 계산 결과를 제한된 기간 동안 보관",
+  );
   assert.deepEqual(route.routeRequestFields, [
     "originStationId",
     "destinationStationId",
@@ -14787,6 +14795,7 @@ test("Route V2 ITX 개인정보와 Data Safety 공개 기준은 실제 전송·�
   assert.equal(gatewayRateLimitState.googlePlayDataSafety.collected, true);
   assert.equal(gatewayRateLimitState.googlePlayDataSafety.linkedToUser, true);
   assert.equal(gatewayRateLimitState.googlePlayDataSafety.optional, true);
+  assert.equal(gatewayRateLimitState.googlePlayDataSafety.deletionSupported, false);
   assert.equal(gatewayRateLimitState.googlePlayDataSafety.processedEphemerally, false);
   assert.deepEqual(gatewayRateLimitState.gatewayKeyFields, [
     "$binary_remote_addr",
@@ -14847,6 +14856,12 @@ test("Route V2 ITX 개인정보와 Data Safety 공개 기준은 실제 전송·�
   assert.equal(
     playStoreContent.dataSafetyDeclarations.routeV2Itx.gatewayRateLimitStateProcessedEphemerally,
     false,
+  );
+  assert.equal(
+    playStoreContent.dataSafetyDeclarations.answerMatrix
+      .find((item) => item.dataType === "Device or other IDs")
+      .containsDeletionUnsupportedData,
+    true,
   );
   assert.ok(
     playStoreContent.dataSafetyDeclarations.answerMatrix
