@@ -191,6 +191,9 @@ class _RouteMapBasemapViewState extends State<RouteMapBasemapView> {
     final token = Object();
     _loadToken = token;
     _loadedAsset = asset;
+    final previous = _picture;
+    _picture = null;
+    previous?.dispose();
     // context=null: 바탕은 정적 도식이라 locale/textDirection 의존이 없고, null을
     // 넘겨 inherited widget 의존(및 그로 인한 재로드)을 피한다(플랫폼 로케일·LTR 폴백).
     vg
@@ -206,6 +209,9 @@ class _RouteMapBasemapViewState extends State<RouteMapBasemapView> {
           });
         })
         .catchError((Object error, StackTrace stack) {
+          if (!mounted || !identical(_loadToken, token)) {
+            return;
+          }
           // 로드 실패 시 바탕만 비고 인터랙션은 계속 동작한다(무해 폴백).
           FlutterError.reportError(
             FlutterErrorDetails(

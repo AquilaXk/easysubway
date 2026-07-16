@@ -16,6 +16,7 @@ test("컴파일 전에 단순 class 스타일을 SVG 속성으로 인라인한�
       </style>
       <g id="header-title"><text>통합 노선도</text></g>
       <g id="map-card-clipped-content-layer">
+        <g id="main-map-scaled-layer" transform="translate(70 138) scale(0.455)">
         <g id="route-lines-layer">
           <polyline class="route-line" points="0,0 10,10" />
           <g data-state="construction">
@@ -24,12 +25,14 @@ test("컴파일 전에 단순 class 스타일을 SVG 속성으로 인라인한�
           <polyline class="route-line" data-line="line2-phase1" points="0,0 30,30" />
         </g>
         <text class="station-name is-long">테스트역</text>
+        </g>
       </g>
     </svg>
   `);
 
   assert.doesNotMatch(normalized, /통합 노선도/);
   assert.match(normalized, /route-lines-layer/);
+  assert.match(normalized, /transform="translate\(70 138\) scale\(0\.455\)"/);
   assert.doesNotMatch(normalized, /construction|line2-phase1|20 20|30,30/);
   assert.match(normalized, /<polyline[^>]*fill="none"[^>]*stroke-width="8px"/);
   assert.match(
@@ -70,11 +73,19 @@ test("5권역 basemap에는 노선·기존 역 심벌만 남기고 미개통 노
     readFileSync(path.join(sources, "easy-subway-daejeon-v1.svg"), "utf8"),
   );
   assert.doesNotMatch(daejeon, /data-state="construction"/);
+  assert.equal(
+    (daejeon.match(/data-role="current-line-station"/g) ?? []).length,
+    5,
+  );
 
   const gwangju = normalizeSvgForCompile(
     readFileSync(path.join(sources, "easy-subway-gwangju-v1.svg"), "utf8"),
   );
   assert.doesNotMatch(gwangju, /data-line="line2-phase/);
+  assert.equal(
+    (gwangju.match(/data-role="current-line-station"/g) ?? []).length,
+    2,
+  );
   const gwangjuStations = gwangju.match(
     /id="station-symbols-layer"[\s\S]*?<\/g>/,
   )?.[0];

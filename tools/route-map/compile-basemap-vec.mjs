@@ -150,6 +150,33 @@ function keepGwangjuLine1Stations(group) {
   );
 }
 
+function currentLineStationsFromFutureTransfers(svgText, config) {
+  let transferLayer = extractGroup(svgText, "transfer-station-symbols-layer");
+  for (const match of transferLayer.matchAll(
+    /<g\b(?=[^>]*\bid="([^"]+)")(?=[^>]*\bdata-state="planned")[^>]*>/g,
+  )) {
+    transferLayer = transferLayer.replace(extractGroup(transferLayer, match[1]), "");
+  }
+  const circles = [...transferLayer.matchAll(/<circle\b[^>]*>/g)]
+    .map((match) => match[0])
+    .filter((circle) =>
+      new RegExp(`\\bfill="${config.color}"`, "i").test(circle),
+    )
+    .map((circle, index) => {
+      const cx = circle.match(/\bcx="([^"]+)"/)?.[1];
+      const cy = circle.match(/\bcy="([^"]+)"/)?.[1];
+      if (cx == null || cy == null) {
+        throw new Error("미개통 환승 노드의 현재 노선 좌표를 찾지 못했습니다.");
+      }
+      return `    <circle id="current-line-transfer-station-${index + 1}" data-role="current-line-station" cx="${cx}" cy="${cy}" r="${config.radius}" fill="#FFFFFF" stroke="${config.color}" stroke-width="${config.strokeWidth}" />`;
+    });
+  return [
+    '  <g id="current-line-transfer-station-symbols-layer">',
+    ...circles,
+    "  </g>",
+  ].join("\n");
+}
+
 function extractMapSvg(svgText) {
   const svgStart = svgText.match(/<svg\b[^>]*>/)?.[0];
   if (!svgStart) throw new Error("SVG 루트 태그를 찾지 못했습니다.");
@@ -162,8 +189,19 @@ function extractMapSvg(svgText) {
     : [...svgText.matchAll(/<style\b[^>]*>[\s\S]*?<\/style>/g)]
         .map((match) => match[0])
         .join("\n");
+  const mapTransform = svgText.match(
+    /<g\b(?=[^>]*\bid="main-map-scaled-layer")(?=[^>]*\btransform="([^"]+)")[^>]*>/,
+  )?.[1];
   const regionalSingleLine = /id="(?:gwangju|daejeon)-metro-/.test(svgStart);
   const gwangju = svgStart.includes('id="gwangju-metro-');
+  const currentLineTransferStations = regionalSingleLine
+    ? currentLineStationsFromFutureTransfers(
+        svgText,
+        gwangju
+          ? { color: "#009088", radius: "5.8", strokeWidth: "2" }
+          : { color: "#00975A", radius: "4.8", strokeWidth: "1.8" },
+      )
+    : "";
   const layerIds = [
     "transfer-station-shell-underlay-layer",
     "route-lines-layer",
@@ -199,11 +237,17 @@ function extractMapSvg(svgText) {
       /<circle\b(?=[^>]*stroke="#E63332")[^>]*\/>/g,
       regionalSingleLine ? "" : "$&",
     )
-    .replace(/<title\b[^>]*>[\s\S]*?<\/title>/g, "")
+    .replace(/<title\b[^>]*>[\s\S]*?<\/title>/g, "");
+  let renderedMap = currentLineTransferStations
+    ? `${mapGroup}\n${currentLineTransferStations}`
+    : mapGroup;
+  if (mapTransform) {
+    renderedMap = `<g id="compiled-map-coordinate-layer" transform="${mapTransform}">\n${renderedMap}\n</g>`;
+  }
   if (!mapGroup.includes('id="route-lines-layer"')) {
     throw new Error("route-lines-layer를 SVG에서 찾지 못했습니다.");
   }
-  return `${svgStart}\n${defs || styles}\n${mapGroup}\n</svg>`;
+  return `${svgStart}\n${defs || styles}\n${renderedMap}\n</svg>`;
 }
 
 function inlineSimpleClassStyles(svgText) {

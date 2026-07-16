@@ -3769,6 +3769,9 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   _MapGeometry? _geometryCache;
   NetworkMapData? _structuredMapData;
   StructuredRouteMap? _structuredMap;
+  Map<String, Color>? _structuredLineColors;
+  Map<String, String>? _structuredLabelTextByStationId;
+  Map<String, String>? _structuredLineBadgeLabelByLineId;
   NetworkMapStation? _selectedStation;
   // region → attribution 표시 문자열(#1951). manifest 로드 전에는 null로 두고
   // attribution을 표시하지 않는다(로드 실패 시에도 동일하게 조용히 미표기).
@@ -4369,20 +4372,13 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     Offset sourceOrigin,
   ) {
     final attribution = _attributionTextByRegion?[widget.data.selectedRegion];
-    final lineColors = routeMapLineColors({
-      for (final line in widget.data.lines) line.id: line.color,
-    });
-    final labelTextByStationId = {
-      for (final station in widget.data.stations)
-        station.id: routeMapStationLabel(station.nameKo),
-    };
-    final lineBadgeLabelByLineId = {
-      for (final line in widget.data.lines)
-        line.id: routeMapLineBadgeLabel(line.name),
-    };
+    final map = _currentStructuredMap();
+    final lineColors = _structuredLineColors!;
+    final labelTextByStationId = _structuredLabelTextByStationId!;
+    final lineBadgeLabelByLineId = _structuredLineBadgeLabelByLineId!;
     if (widget.showExpressOverlay) {
       return StructuredRouteMapView(
-        map: _currentStructuredMap(),
+        map: map,
         camera: camera,
         lineColors: lineColors,
         labelTextByStationId: labelTextByStationId,
@@ -4400,7 +4396,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
           attributionText: attribution,
         ),
         StructuredRouteMapView(
-          map: _currentStructuredMap(),
+          map: map,
           camera: camera,
           lineColors: lineColors,
           labelTextByStationId: labelTextByStationId,
@@ -4417,6 +4413,17 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     if (!identical(_structuredMapData, widget.data)) {
       _structuredMapData = widget.data;
       _structuredMap = widget.data.toStructuredRouteMap();
+      _structuredLineColors = routeMapLineColors({
+        for (final line in widget.data.lines) line.id: line.color,
+      });
+      _structuredLabelTextByStationId = {
+        for (final station in widget.data.stations)
+          station.id: routeMapStationLabel(station.nameKo),
+      };
+      _structuredLineBadgeLabelByLineId = {
+        for (final line in widget.data.lines)
+          line.id: routeMapLineBadgeLabel(line.name),
+      };
     }
     return _structuredMap!;
   }
