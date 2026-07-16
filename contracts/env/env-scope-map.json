@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "scopes": ["backend", "mobile-build", "datapack-release", "infra", "ops-alerting", "store-release", "shared"],
+  "scopes": ["backend", "mobile-build", "datapack-release", "infra", "ops-alerting", "ops-backup", "store-release", "shared"],
   "keys": {
     "EASYSUBWAY_POSTGRES_DB": ["infra"],
     "EASYSUBWAY_POSTGRES_USER": ["infra"],
@@ -69,7 +69,9 @@
     "SLACK_CI_WEBHOOK_URL": ["shared"],
     "SLACK_RELEASE_WEBHOOK_URL": ["shared"],
     "SLACK_SECURITY_WEBHOOK_URL": ["shared"],
+    "EASYSUBWAY_TERMS_OF_SERVICE_URL": ["mobile-build"],
     "EASYSUBWAY_PRIVACY_POLICY_URL": ["mobile-build"],
+    "EASYSUBWAY_LOCATION_TERMS_URL": ["mobile-build"],
     "EASYSUBWAY_SUPPORT_EMAIL": ["mobile-build"],
     "EASYSUBWAY_SECURITY_EMAIL": ["mobile-build"],
     "EASYSUBWAY_DATA_DELETION_EMAIL": ["mobile-build"],
