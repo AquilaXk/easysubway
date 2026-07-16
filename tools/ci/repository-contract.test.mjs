@@ -13363,6 +13363,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const onboardingTest = read("apps/mobile/test/onboarding_test.dart");
   const routeSearch = read("apps/mobile/lib/route_search.dart");
   const stationSearch = read("apps/mobile/lib/station_search.dart");
+  const stationExitCard = read(
+    "apps/mobile/lib/features/stations/presentation/station_exit_card.dart",
+  );
   const stationSearchBody = read(
     "apps/mobile/lib/features/stations/presentation/station_search_body.dart",
   );
@@ -13625,9 +13628,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
     externalMapDeeplinkPolicy.privacyContract.locationPersistenceAllowed,
     false,
   );
-  assert.match(stationSearch, /openWalkingRoute/);
-  assert.match(stationSearch, /_coordinateDistanceMeters/);
-  assert.match(stationSearch, /현재 위치와 출구 좌표만 사용합니다/);
+  assert.match(stationExitCard, /openWalkingRoute/);
+  assert.match(stationExitCard, /_coordinateDistanceMeters/);
+  assert.match(stationExitCard, /현재 위치와 출구 좌표만 사용합니다/);
   assert.match(widgetTest, /출구 좌표가 없어 역 위치 기준으로 안내합니다/);
   assert.doesNotMatch(stationSearch, /EasySubwayMapAdapter\(\)\.markersForStationDetail/);
   assert.doesNotMatch(stationSearch, /Text\(\s*'지도 위치 목록'/);
