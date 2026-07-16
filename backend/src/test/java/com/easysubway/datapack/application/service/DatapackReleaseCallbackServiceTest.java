@@ -128,6 +128,21 @@ class DatapackReleaseCallbackServiceTest {
         assertThat(promoteDetailOf()).contains("FAIL");
     }
 
+	@Test
+	@DisplayName("validator 또는 route regression이 FAIL이면 publishStatus PASS여도 FAILED다")
+	void failedGateCannotPublish() {
+		insertRow("DISPATCHED");
+		var fields = new CanonicalFields(2, "datapack-release-callback", APPROVAL_ID,
+			RELEASE_SEQUENCE, CHANNEL, idempotencyKey(SHA), WORKFLOW_URL, SHA, SHA, SHA, SHA,
+			"FAIL", "PASS", "PASS");
+		var cmd = new CallbackCommand(2, "datapack-release-callback", APPROVAL_ID,
+			RELEASE_SEQUENCE, CHANNEL, idempotencyKey(SHA), WORKFLOW_URL, SHA, SHA, SHA, SHA,
+			"FAIL", "PASS", "PASS", "payload-signature", callbackSignature.sign(fields));
+
+		assertThat(service.receive(cmd).status()).isEqualTo("FAILED");
+		assertThat(statusOf()).isEqualTo("FAILED");
+	}
+
     @Test
     @DisplayName("(d) 이미 PUBLISHED + 동일 payload 재수신 → idempotentReplay=true, 상태 불변")
     void alreadyPublishedIdempotentReplay() {

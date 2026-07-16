@@ -10,6 +10,15 @@ const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const httpClass = (status) => `${Math.floor(status / 100)}XX`;
 const retryable = (status) => status === 408 || status === 429 || status >= 500;
 
+function validatedEndpoint(value) {
+  const url = new URL(value);
+  const loopback = url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]";
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) {
+    throw new Error("callback endpoint must use HTTPS except for loopback testing");
+  }
+  return url.toString();
+}
+
 export async function sendReleaseCallback({
   payload,
   endpoint,
@@ -18,6 +27,7 @@ export async function sendReleaseCallback({
   sleep = (seconds) => new Promise((resolve) => setTimeout(resolve, seconds * 1000)),
   fetchImpl = fetch,
 }) {
+  endpoint = validatedEndpoint(endpoint);
   const payloadBytes = JSON.stringify(payload);
   const artifact = {
     schemaVersion: 1,

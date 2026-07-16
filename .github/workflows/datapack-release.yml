@@ -472,6 +472,7 @@ jobs:
           if [[ "${EASYSUBWAY_DATAPACK_RELEASE_MODE}" =~ ^(release-candidate|production-publish)$ ]]; then
             node tools/datapack/build-datapack.mjs \
               --build-spec "${EASYSUBWAY_DATAPACK_BUILD_SPEC_PATH}" \
+              --release-request-id "${EASYSUBWAY_DATAPACK_RELEASE_REQUEST_ID}" \
               --output "${EASYSUBWAY_DATAPACK_OUTPUT}"
           else
             node tools/datapack/build-datapack.mjs \

@@ -1,8 +1,10 @@
 package com.easysubway.datapack.adapter.out.persistence;
 
+import com.easysubway.datapack.application.port.out.DatapackReleaseDeliveryRepository;
 import com.easysubway.datapack.domain.DatapackReleaseDelivery;
 import com.easysubway.datapack.domain.DatapackReleaseDelivery.State;
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,7 +16,8 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public class JdbcDatapackReleaseDeliveryRepository {
+public class JdbcDatapackReleaseDeliveryRepository implements DatapackReleaseDeliveryRepository {
+	private static final Duration CLAIM_LEASE = Duration.ofMinutes(5);
 	private static final RowMapper<DatapackReleaseDelivery> ROW_MAPPER = (rs, rowNum) ->
 		new DatapackReleaseDelivery(
 			rs.getString("idempotency_key"), rs.getString("release_request_id"),
@@ -60,20 +63,21 @@ public class JdbcDatapackReleaseDeliveryRepository {
 	}
 
 	public List<DatapackReleaseDelivery> claimDue(LocalDateTime now, String owner) {
+		var reclaimBefore = now.minus(CLAIM_LEASE);
 		var keys = jdbcTemplate.queryForList("""
 			SELECT idempotency_key FROM datapack_release_deliveries
 			WHERE state IN ('PENDING', 'RETRY_SCHEDULED', 'RECONCILIATION_REQUIRED')
 			  AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
-			  AND claimed_at IS NULL
+			  AND (claimed_at IS NULL OR claimed_at <= ?)
 			ORDER BY created_at, idempotency_key
-			""", String.class, ts(now));
+			""", String.class, ts(now), ts(reclaimBefore));
 		var claimed = new ArrayList<DatapackReleaseDelivery>();
 		for (String key : keys) {
 			int changed = jdbcTemplate.update("""
 				UPDATE datapack_release_deliveries SET claimed_at=?, claim_owner=?, updated_at=?
-				WHERE idempotency_key=? AND claimed_at IS NULL
+				WHERE idempotency_key=? AND (claimed_at IS NULL OR claimed_at <= ?)
 				  AND state IN ('PENDING', 'RETRY_SCHEDULED', 'RECONCILIATION_REQUIRED')
-				""", ts(now), owner, ts(now), key);
+				""", ts(now), owner, ts(now), key, ts(reclaimBefore));
 			if (changed == 1) findByIdempotencyKey(key).ifPresent(claimed::add);
 		}
 		return claimed;
@@ -87,6 +91,19 @@ public class JdbcDatapackReleaseDeliveryRepository {
 			    claimed_at=NULL, claim_owner=NULL, updated_at=?
 			WHERE idempotency_key=?
 			""", state.name(), attempts, ts(nextAttemptAt), httpClass, detail, ts(now), idempotencyKey);
+	}
+
+	@Override
+	public void markClaimed(String idempotencyKey, String owner, State state, int attempts,
+		LocalDateTime nextAttemptAt, String httpClass, String detail, LocalDateTime now) {
+		int changed = jdbcTemplate.update("""
+			UPDATE datapack_release_deliveries
+			SET state=?, attempts=?, next_attempt_at=?, http_class=?, sanitized_detail=?,
+			    claimed_at=NULL, claim_owner=NULL, updated_at=?
+			WHERE idempotency_key=? AND claim_owner=?
+			""", state.name(), attempts, ts(nextAttemptAt), httpClass, detail, ts(now),
+			idempotencyKey, owner);
+		if (changed != 1) throw new IllegalStateException("delivery claim is no longer owned");
 	}
 
 	public List<DatapackReleaseDelivery> findRecent(int limit) {

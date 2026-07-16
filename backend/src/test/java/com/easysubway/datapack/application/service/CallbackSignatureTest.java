@@ -49,5 +49,18 @@ class CallbackSignatureTest {
         assertThat(sig.sign(f)).isEqualTo(expected);
         assertThat(sig.verify(f, expected)).isTrue();
         assertThat(sig.verify(f, "deadbeef")).isFalse();
+		assertThat(f.payloadSha256()).isEqualTo("68f79bd7a3d89e10e431019401dd111607c91fc0e61046c5cf1620da09b797c8");
+		assertThat(new CanonicalFields(f.schemaVersion(), f.artifactKind(), f.releaseRequestId(), 43,
+			f.channel(), f.idempotencyKey(), f.workflowRunUrl(), f.manifestSha256(), f.sqliteSha256(),
+			f.gzipSha256(), f.evidenceBundleSha256(), f.validatorStatus(), f.routeRegressionStatus(),
+			f.publishStatus()).payloadSha256()).isNotEqualTo(f.payloadSha256());
+		assertThat(new CanonicalFields(f.schemaVersion(), f.artifactKind(), f.releaseRequestId(),
+			f.releaseSequence(), "staging", f.idempotencyKey(), f.workflowRunUrl(), f.manifestSha256(),
+			f.sqliteSha256(), f.gzipSha256(), f.evidenceBundleSha256(), f.validatorStatus(),
+			f.routeRegressionStatus(), f.publishStatus()).payloadSha256()).isNotEqualTo(f.payloadSha256());
+		assertThat(new CanonicalFields(f.schemaVersion(), f.artifactKind(), f.releaseRequestId(),
+			f.releaseSequence(), f.channel(), "different", f.workflowRunUrl(), f.manifestSha256(),
+			f.sqliteSha256(), f.gzipSha256(), f.evidenceBundleSha256(), f.validatorStatus(),
+			f.routeRegressionStatus(), f.publishStatus()).payloadSha256()).isNotEqualTo(f.payloadSha256());
     }
 }

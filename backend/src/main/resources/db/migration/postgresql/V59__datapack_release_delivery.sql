@@ -22,6 +22,7 @@ CREATE TABLE datapack_release_deliveries (
     CONSTRAINT chk_datapack_release_delivery_state CHECK (state IN ('PENDING', 'DELIVERED', 'RETRY_SCHEDULED', 'RECONCILIATION_REQUIRED', 'DEAD_LETTER')),
     CONSTRAINT chk_datapack_release_delivery_channel CHECK (channel IN ('dev', 'staging', 'production')),
     CONSTRAINT chk_datapack_release_delivery_attempts CHECK (attempts >= 0),
+    CONSTRAINT chk_datapack_release_delivery_sequence CHECK (release_sequence > 0),
     CONSTRAINT chk_datapack_release_delivery_deadlines CHECK (reconcile_deadline <= dead_letter_deadline)
 );
 

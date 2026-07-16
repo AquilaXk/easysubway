@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { sendReleaseCallback } from "./send-release-callback.mjs";
+import { buildReleaseCallback } from "./build-release-callback.mjs";
 
 const secret = "callback-secret-never-log";
 const token = "bearer-token-never-log";
@@ -63,6 +64,19 @@ test("400은 재시도하지 않고 reconciliation 대상으로 남긴다", asyn
     assert.equal(artifact.attempts.length, 1);
     assert.equal(artifact.attempts[0].httpClass, "4XX");
   });
+});
+
+test("Bearer 전송 전 non-loopback HTTP endpoint를 거부한다", async () => {
+  await assert.rejects(
+    sendReleaseCallback({ payload, endpoint: "http://example.com/callback", token }),
+    /must use HTTPS/,
+  );
+});
+
+test("callback producer는 safe integer가 아닌 release sequence를 거부한다", () => {
+  assert.throws(() => buildReleaseCallback({
+    RELEASE_SEQUENCE: "9007199254740992",
+  }), /positive safe integer/);
 });
 
 test("transient failure를 모두 소진하면 bounded retry 계획을 기록한다", async () => {

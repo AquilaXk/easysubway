@@ -2,7 +2,7 @@ package com.easysubway.datapack.application.service;
 
 import com.easysubway.datapack.application.port.out.DatapackReleaseChannelCommandPort;
 import com.easysubway.datapack.application.port.out.DatapackReleaseRequestRepository;
-import com.easysubway.datapack.adapter.out.persistence.JdbcDatapackReleaseDeliveryRepository;
+import com.easysubway.datapack.application.port.out.DatapackReleaseDeliveryRepository;
 import com.easysubway.datapack.application.service.CallbackSignature.CanonicalFields;
 import com.easysubway.datapack.application.service.DatapackReleaseChannelCommandService.ReleaseChannelCommand;
 import com.easysubway.datapack.application.port.out.DatapackReleaseCatalogPort.CatalogIdentity;
@@ -33,16 +33,16 @@ public class DatapackReleaseCallbackService {
     private final Clock clock;
     private final DatapackReleaseChannelCommandPort channelCommandPort;
     private final DatapackReleasePromoteDelegate promoteDelegate;
-    private final JdbcDatapackReleaseDeliveryRepository deliveryRepository;
+    private final DatapackReleaseDeliveryRepository deliveryRepository;
 
     public DatapackReleaseCallbackService(DatapackReleaseRequestRepository repository,
         CallbackSignature signature, ObjectProvider<Clock> clockProvider,
         DatapackReleaseChannelCommandPort channelCommandPort,
         DatapackReleasePromoteDelegate promoteDelegate,
-        JdbcDatapackReleaseDeliveryRepository deliveryRepository) {
+        DatapackReleaseDeliveryRepository deliveryRepository) {
         this.repository = repository;
         this.signature = signature;
-        this.clock = clockProvider.getIfAvailable(Clock::systemDefaultZone);
+        this.clock = clockProvider.getIfAvailable(Clock::systemUTC);
         this.channelCommandPort = channelCommandPort;
         this.promoteDelegate = promoteDelegate;
         this.deliveryRepository = deliveryRepository;
@@ -95,7 +95,9 @@ public class DatapackReleaseCallbackService {
             return new CallbackResult("DEAD_LETTER", true);
         }
 
-        boolean pass = "PASS".equals(cmd.publishStatus());
+        boolean pass = "PASS".equals(cmd.publishStatus())
+            && "PASS".equals(cmd.validatorStatus())
+            && "PASS".equals(cmd.routeRegressionStatus());
         var terminal = pass ? DatapackReleaseRequestStatus.PUBLISHED : DatapackReleaseRequestStatus.FAILED;
 
         // 멱등: 이미 terminal 상태 + 동일 결과 → no-op
@@ -159,22 +161,22 @@ public class DatapackReleaseCallbackService {
 			|| !request.candidateId().equals(delivery.candidateId())
 			|| !request.targetChannel().equals(delivery.channel())
 			|| !channelCommandPort.candidateHasManifest(request.candidateId(), catalog.manifestSha256())) {
-			deliveryRepository.mark(delivery.idempotencyKey(), State.DEAD_LETTER,
-				delivery.attempts(), null, "CONFLICT", "REQUEST_CATALOG_MISMATCH", now);
+			markClaimed(delivery, State.DEAD_LETTER, delivery.attempts(), null,
+				"CONFLICT", "REQUEST_CATALOG_MISMATCH", now);
 			return new CallbackResult("DEAD_LETTER", false);
 		}
 		var evidenceSha = channelCommandPort.findPassingReleaseEvidenceSha256(request.candidateId())
 			.orElse(null);
 		if ("production".equals(request.targetChannel()) && evidenceSha == null) {
-			deliveryRepository.mark(delivery.idempotencyKey(), State.DEAD_LETTER,
-				delivery.attempts(), null, "CONFLICT", "RELEASE_EVIDENCE_MISSING", now);
+			markClaimed(delivery, State.DEAD_LETTER, delivery.attempts(), null,
+				"CONFLICT", "RELEASE_EVIDENCE_MISSING", now);
 			return new CallbackResult("DEAD_LETTER", false);
 		}
 		if (request.status() != DatapackReleaseRequestStatus.PUBLISHED) {
 			if (request.status() != DatapackReleaseRequestStatus.APPROVED
 				&& request.status() != DatapackReleaseRequestStatus.DISPATCHED) {
-				deliveryRepository.mark(delivery.idempotencyKey(), State.DEAD_LETTER,
-					delivery.attempts(), null, "CONFLICT", "REQUEST_STATE_MISMATCH", now);
+				markClaimed(delivery, State.DEAD_LETTER, delivery.attempts(), null,
+					"CONFLICT", "REQUEST_STATE_MISMATCH", now);
 				return new CallbackResult("DEAD_LETTER", false);
 			}
 			request = request.markPublished(request.workflowRunUrl(), now);
@@ -182,9 +184,20 @@ public class DatapackReleaseCallbackService {
 			tryPromote(request, catalog.manifestSha256(), request.workflowRunUrl(), evidenceSha,
 				delivery.idempotencyKey());
 		}
-		deliveryRepository.mark(delivery.idempotencyKey(), State.DELIVERED,
-			delivery.attempts() + 1, null, "RECONCILED", null, now);
+		markClaimed(delivery, State.DELIVERED, delivery.attempts() + 1, null,
+			"RECONCILED", null, now);
 		return new CallbackResult("PUBLISHED", false);
+	}
+
+	private void markClaimed(DatapackReleaseDelivery delivery, State state, int attempts,
+		LocalDateTime nextAttemptAt, String httpClass, String detail, LocalDateTime now) {
+		if (delivery.claimOwner() == null) {
+			deliveryRepository.mark(delivery.idempotencyKey(), state, attempts, nextAttemptAt,
+				httpClass, detail, now);
+		} else {
+			deliveryRepository.markClaimed(delivery.idempotencyKey(), delivery.claimOwner(), state,
+				attempts, nextAttemptAt, httpClass, detail, now);
+		}
 	}
 
     public record CallbackCommand(

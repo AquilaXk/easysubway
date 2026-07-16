@@ -5,7 +5,7 @@ public interface DatapackReleaseCatalogPort {
 
 	CatalogIdentity fetchCurrent(String channel);
 
-	record CatalogIdentity(long releaseSequence, String manifestSha256, String channel,
+	record CatalogIdentity(long releaseSequence, String manifestSha256, String channel, String releaseRequestId,
 		boolean signatureValid, String signatureSha256) {}
 
 	final class Unavailable extends RuntimeException {

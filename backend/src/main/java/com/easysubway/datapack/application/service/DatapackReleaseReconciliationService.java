@@ -1,6 +1,6 @@
 package com.easysubway.datapack.application.service;
 
-import com.easysubway.datapack.adapter.out.persistence.JdbcDatapackReleaseDeliveryRepository;
+import com.easysubway.datapack.application.port.out.DatapackReleaseDeliveryRepository;
 import com.easysubway.datapack.application.port.out.DatapackReleaseCatalogPort;
 import com.easysubway.datapack.application.port.out.DatapackReleaseCatalogPort.CatalogIdentity;
 import com.easysubway.datapack.application.port.out.DatapackReleaseChannelCommandPort;
@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class DatapackReleaseReconciliationService {
-	private final JdbcDatapackReleaseDeliveryRepository repository;
+	private final DatapackReleaseDeliveryRepository repository;
 	private final DatapackReleaseCallbackService callbackService;
 	private final DatapackReleaseCatalogPort catalog;
 	private final Clock clock;
@@ -23,7 +23,7 @@ public class DatapackReleaseReconciliationService {
 	private final DatapackReleaseChannelCommandPort channelRepository;
 
 	@org.springframework.beans.factory.annotation.Autowired
-	public DatapackReleaseReconciliationService(JdbcDatapackReleaseDeliveryRepository repository,
+	public DatapackReleaseReconciliationService(DatapackReleaseDeliveryRepository repository,
 		DatapackReleaseCallbackService callbackService, DatapackReleaseCatalogPort catalog,
 		DatapackReleaseRequestRepository requestRepository,
 		DatapackReleaseChannelCommandPort channelRepository,
@@ -32,19 +32,19 @@ public class DatapackReleaseReconciliationService {
 			clockProvider.getIfAvailable(Clock::systemUTC));
 	}
 
-	DatapackReleaseReconciliationService(JdbcDatapackReleaseDeliveryRepository repository,
+	DatapackReleaseReconciliationService(DatapackReleaseDeliveryRepository repository,
 		DatapackReleaseCallbackService callbackService, DatapackReleaseCatalogPort catalog) {
 		this(repository, callbackService, catalog, null, null, Clock.systemUTC());
 	}
 
-	DatapackReleaseReconciliationService(JdbcDatapackReleaseDeliveryRepository repository,
+	DatapackReleaseReconciliationService(DatapackReleaseDeliveryRepository repository,
 		DatapackReleaseCallbackService callbackService, DatapackReleaseCatalogPort catalog,
 		DatapackReleaseRequestRepository requestRepository,
 		DatapackReleaseChannelCommandPort channelRepository) {
 		this(repository, callbackService, catalog, requestRepository, channelRepository, Clock.systemUTC());
 	}
 
-	private DatapackReleaseReconciliationService(JdbcDatapackReleaseDeliveryRepository repository,
+	private DatapackReleaseReconciliationService(DatapackReleaseDeliveryRepository repository,
 		DatapackReleaseCallbackService callbackService, DatapackReleaseCatalogPort catalog,
 		DatapackReleaseRequestRepository requestRepository,
 		DatapackReleaseChannelCommandPort channelRepository, Clock clock) {
@@ -58,9 +58,22 @@ public class DatapackReleaseReconciliationService {
 
 	public void reconcileDue() {
 		var now = LocalDateTime.now(clock);
-		discoverMissing(now);
+		try {
+			discoverMissing(now);
+		} catch (RuntimeException ignored) {
+			// 한 discovery 오류가 이미 저장된 delivery reconciliation을 막지 않는다.
+		}
 		for (var delivery : repository.claimDue(now, "datapack-reconciler")) {
-			reconcile(delivery, now);
+			try {
+				reconcile(delivery, now);
+			} catch (RuntimeException failure) {
+				try {
+					markClaimed(delivery, State.RETRY_SCHEDULED, delivery.attempts() + 1,
+						now.plusMinutes(5), "ERROR", "RECONCILIATION_ERROR", now);
+				} catch (IllegalStateException lostClaim) {
+					// lease가 이미 다른 worker로 넘어갔으면 새 owner가 처리한다.
+				}
+			}
 		}
 	}
 
@@ -74,13 +87,14 @@ public class DatapackReleaseReconciliationService {
 					var identity = catalog.fetchCurrent(request.targetChannel());
 					if (!identity.signatureValid()
 						|| !request.targetChannel().equals(identity.channel())
+						|| !request.approvalId().equals(identity.releaseRequestId())
 						|| !channelRepository.candidateHasManifest(
 							request.candidateId(), identity.manifestSha256())) return;
 					repository.upsertSameDelivery(DatapackReleaseDelivery.pending(
 						request.approvalId(), identity.releaseSequence(), identity.manifestSha256(),
 						request.targetChannel(), request.candidateId(), identity.manifestSha256(),
 						identity.signatureSha256(), now));
-				} catch (DatapackReleaseCatalogPort.Unavailable ignored) {
+				} catch (RuntimeException ignored) {
 					// fail closed: 다음 bounded scheduler tick에서 재시도한다.
 				}
 			});
@@ -91,20 +105,30 @@ public class DatapackReleaseReconciliationService {
 			CatalogIdentity identity = catalog.fetch(delivery.channel(), delivery.releaseSequence());
 			String mismatch = mismatch(delivery, identity);
 			if (mismatch != null) {
-				repository.mark(delivery.idempotencyKey(), State.DEAD_LETTER, delivery.attempts(),
+				markClaimed(delivery, State.DEAD_LETTER, delivery.attempts(),
 					null, "CONFLICT", mismatch, now);
 				return;
 			}
 			callbackService.reconcile(delivery, identity);
 		} catch (DatapackReleaseCatalogPort.Unavailable unavailable) {
 			if (!now.isBefore(delivery.deadLetterDeadline())) {
-				repository.mark(delivery.idempotencyKey(), State.DEAD_LETTER, delivery.attempts(),
+				markClaimed(delivery, State.DEAD_LETTER, delivery.attempts(),
 					null, "UNAVAILABLE", "CATALOG_UNAVAILABLE", now);
 			} else {
-				repository.mark(delivery.idempotencyKey(), State.RETRY_SCHEDULED,
+				markClaimed(delivery, State.RETRY_SCHEDULED,
 					delivery.attempts() + 1, now.plusMinutes(5), "UNAVAILABLE",
 					"CATALOG_UNAVAILABLE", now);
 			}
+		}
+	}
+
+	private void markClaimed(DatapackReleaseDelivery delivery, State state, int attempts,
+		LocalDateTime nextAttemptAt, String httpClass, String detail, LocalDateTime now) {
+		if (delivery.claimOwner() == null) {
+			repository.mark(delivery.idempotencyKey(), state, attempts, nextAttemptAt, httpClass, detail, now);
+		} else {
+			repository.markClaimed(delivery.idempotencyKey(), delivery.claimOwner(), state, attempts,
+				nextAttemptAt, httpClass, detail, now);
 		}
 	}
 
@@ -112,6 +136,7 @@ public class DatapackReleaseReconciliationService {
 		if (!identity.signatureValid()) return "CATALOG_SIGNATURE_MISMATCH";
 		if (identity.releaseSequence() != delivery.releaseSequence()) return "CATALOG_SEQUENCE_MISMATCH";
 		if (!identity.channel().equals(delivery.channel())) return "CATALOG_CHANNEL_MISMATCH";
+		if (!identity.releaseRequestId().equals(delivery.releaseRequestId())) return "CATALOG_REQUEST_MISMATCH";
 		if (!identity.manifestSha256().equals(delivery.manifestSha256())) return "CATALOG_MANIFEST_MISMATCH";
 		return null;
 	}

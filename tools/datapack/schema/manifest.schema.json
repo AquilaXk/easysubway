@@ -36,6 +36,10 @@
       "type": "integer",
       "minimum": 1
     },
+    "releaseRequestId": {
+      "type": "string",
+      "minLength": 1
+    },
     "publishedAt": {
       "type": "string",
       "format": "date-time"

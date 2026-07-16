@@ -48,15 +48,15 @@ public class HttpDatapackReleaseCatalogAdapter implements DatapackReleaseCatalog
 
 	@Override
 	public CatalogIdentity fetch(String channel, long releaseSequence) {
-		return fetchPath("/catalog/releases/" + releaseSequence + ".json");
+		return fetchPath("/catalog/releases/" + releaseSequence + ".json", channel, releaseSequence);
 	}
 
 	@Override
 	public CatalogIdentity fetchCurrent(String channel) {
-		return fetchPath("/catalog/current.json");
+		return fetchPath("/catalog/current.json", channel, null);
 	}
 
-	private CatalogIdentity fetchPath(String path) {
+	private CatalogIdentity fetchPath(String path, String expectedChannel, Long expectedSequence) {
 		if (baseUrl.isBlank() || publicKeyPem.isBlank()) throw new Unavailable();
 		try {
 			var request = HttpRequest.newBuilder(URI.create(baseUrl + path))
@@ -70,9 +70,15 @@ public class HttpDatapackReleaseCatalogAdapter implements DatapackReleaseCatalog
 				manifest.path("signature").path("algorithm").asText())
 				&& keyId.equals(manifest.path("keyId").asText())
 				&& verify(manifest, signatureValue);
+			long actualSequence = manifest.path("releaseSequence").asLong(-1);
+			String actualChannel = manifest.path("channel").asText("");
+			if (!expectedChannel.equals(actualChannel)
+				|| (expectedSequence != null && expectedSequence.longValue() != actualSequence)) {
+				throw new Unavailable();
+			}
 			return new CatalogIdentity(
-				manifest.path("releaseSequence").asLong(-1), sha256(bytes),
-				manifest.path("channel").asText(""), signatureValid,
+				actualSequence, sha256(bytes), actualChannel,
+				manifest.path("releaseRequestId").asText(""), signatureValid,
 				sha256(signatureValue.getBytes(StandardCharsets.UTF_8)));
 		} catch (IOException | InterruptedException | RuntimeException exception) {
 			if (exception instanceof InterruptedException) Thread.currentThread().interrupt();

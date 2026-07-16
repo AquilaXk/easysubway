@@ -65,6 +65,19 @@ class JdbcDatapackReleaseDeliveryRepositoryTest {
 		}
 	}
 
+	@Test
+	@DisplayName("만료된 worker claim은 재획득하고 이전 worker의 완료 갱신은 거부한다")
+	void reclaimsExpiredLease() {
+		repository.upsertSameDelivery(pending(SHA));
+		assertThat(repository.claimDue(T0, "worker-a")).hasSize(1);
+		assertThat(repository.claimDue(T0.plusMinutes(4), "worker-b")).isEmpty();
+		assertThat(repository.claimDue(T0.plusMinutes(5), "worker-b")).hasSize(1);
+		assertThatThrownBy(() -> repository.markClaimed(
+			pending(SHA).idempotencyKey(), "worker-a", DatapackReleaseDelivery.State.DELIVERED,
+			1, null, "RECONCILED", null, T0.plusMinutes(5)))
+			.isInstanceOf(IllegalStateException.class);
+	}
+
 	private static DatapackReleaseDelivery pending(String manifestSha256) {
 		return DatapackReleaseDelivery.pending(
 			"request-2057", 42, manifestSha256, "production", "candidate-2057",

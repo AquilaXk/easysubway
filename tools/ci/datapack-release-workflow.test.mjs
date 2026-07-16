@@ -86,6 +86,7 @@ test("production callback은 bounded sender 증적을 항상 보존하고 실패
   assert.ok(gateStep, "callback delivery 확인 gate를 찾지 못함");
   assert.match(gateStep, /steps\.callback-delivery\.outputs\.state/);
   assert.match(gateStep, /CALLBACK_RECONCILIATION_REQUIRED/);
+  assert.match(gateStep, /exit\s+1/);
 });
 
 test("coverage gap 스텝은 release 모드에서만 production provenance와 release-scope를 배선한다", () => {
@@ -157,7 +158,7 @@ test("워크플로는 rollout-update 모드·publish-rollout 스텝을 가지고
   )?.[0];
   assert.ok(rolloutStep, "rollout update 스텝을 찾지 못함");
   assert.match(rolloutStep, /CALLBACK_RECONCILIATION_REQUIRED/);
-  assert.match(rolloutStep, />\s*10/);
+  assert.match(rolloutStep, /ROLLOUT_PERCENTAGE\s*>\s*10\b/);
 });
 
 test("rollback 모드는 trusted approval·원격 catalog inventory와 sanitized report를 강제한다", () => {

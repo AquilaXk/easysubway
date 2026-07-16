@@ -137,6 +137,7 @@ class DatabaseMigrationContainerTest {
 				"chk_datapack_candidates_approval_status",
 				"chk_datapack_release_evidence_status",
 				"chk_datapack_release_delivery_state",
+				"chk_datapack_release_delivery_sequence",
 				"chk_datapack_release_channels_operation",
 				"chk_datapack_release_channels_rollback_target",
 				"chk_datapack_release_channel_events_operation"
