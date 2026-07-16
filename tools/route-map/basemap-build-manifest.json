@@ -13,7 +13,7 @@
   },
   "ownerLabelsSidecar": {
     "path": "apps/mobile/assets/datapacks/metro_map_pack/basemap/labels.json",
-    "sha256": "7bc667219190906f401efd9fbed86c6b3f826a28874e124df3bb79370b4aec6c"
+    "sha256": "bdad482e735c7c56b60be594b645c162d2098d0a433606bfc48cd40eecd5c3d7"
   },
   "maps": [
     {
@@ -65,7 +65,7 @@
       "id": "daejeon",
       "source": "tools/route-map/route-map-defs/svg-sources/easy-subway-daejeon-v1.svg",
       "compiledVector": "apps/mobile/assets/datapacks/metro_map_pack/basemap/daejeon.vec",
-      "sourceSvgSha256": "bc1992518d632593ba9510cd2b9579d38c80c41b4d348e932a38a2ba32585d21",
+      "sourceSvgSha256": "6718c8ae3249a36218e504d14390ae5e023fa7ca8a67dc5adadda86c978e463d",
       "normalizedSvgSha256": "b15a3bcd3459b20741e2e665927f87aa7854a3a9e31cb207a9f5187fec632d5c",
       "compiledVectorSha256": "c68acd47c97cbcb39925a34613822a2b0d61752067974139656079685e654f86",
       "viewBox": [
@@ -80,7 +80,7 @@
       "id": "gwangju",
       "source": "tools/route-map/route-map-defs/svg-sources/easy-subway-gwangju-v1.svg",
       "compiledVector": "apps/mobile/assets/datapacks/metro_map_pack/basemap/gwangju.vec",
-      "sourceSvgSha256": "f3c4d253755c3f15676f87c2dbed7a66dd9d832497783943f004199d95c25acb",
+      "sourceSvgSha256": "b29e71e9444c5b35c699f12b3ef2da9186ee06d4ebb08a2ee7f75677c4825bd0",
       "normalizedSvgSha256": "5ca55fc36ada16ec3c5ccc5a4c83fd65d9c89db25f1fefca5ff43ac1490a0d72",
       "compiledVectorSha256": "31ab2b4b21e15e7cb0b418e18cf1c9bf13f5488e2d695fbd36c38530f8b1d1a4",
       "viewBox": [

@@ -3422,9 +3422,9 @@
       <text
          id="station-label-line1-117"
          class="station-label ordinary"
-         x="1472"
-         y="258"
-         text-anchor="start"
+         x="1440"
+         y="182"
+         text-anchor="middle"
          font-size="54"
          font-weight="400"
          fill="#4F5964"
@@ -3432,12 +3432,12 @@
          data-line="1"
          data-station-code="117"
          data-full-official-name="구암"
-         data-label-side="W"
+         data-label-side="N"
          data-node-x="1440"
          data-node-y="240"
          data-status="active"><tspan
            class="station-main"
-           x="1472"
+           x="1440"
            dy="0"
            id="tspan104">구암</tspan></text>
       <text

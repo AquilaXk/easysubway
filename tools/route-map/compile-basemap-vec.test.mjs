@@ -309,6 +309,27 @@ test("extractOwnerLabels: code role과 construction/planned 상태는 제외한�
   assert.equal(entries[0].station, "정상역");
 });
 
+test("extractOwnerLabels: daejeon 환승 복합 표기는 data-full-official-name의 canonical 1호선 역명을 station 키로 쓴다(#2068 실기기 확정 — 텍스트 flatten 대신)", () => {
+  const entries = extractOwnerLabels(`
+    <svg>
+      <text data-label-role="transfer" font-size="14.2" x="0" y="0"
+            data-full-official-name="1호선 대동 | 2호선 208 대동(하늘공원)"
+            ><tspan x="0" dy="0">대동</tspan><tspan x="0" dy="10.8">하늘공원</tspan></text>
+      <text data-label-role="transfer" font-size="14.2" x="0" y="0"
+            data-full-official-name="1호선 대전역 | 2호선 206 대전역(중앙시장)"
+            >대전역</text>
+      <text data-label-role="ordinary" font-size="13.2" x="0" y="0"
+            data-full-official-name="구암">구암</text>
+    </svg>
+  `);
+  const byStation = Object.fromEntries(entries.map((e) => [e.station, e]));
+  assert.ok(byStation["대동"], "복합 표기 flatten(대동하늘공원) 대신 canonical 키(대동)여야 한다");
+  assert.ok(!byStation["대동하늘공원"]);
+  assert.ok(byStation["대전"], "역 접미 정규화(대전역→대전)까지 적용돼야 한다");
+  assert.ok(!byStation["대전역"]);
+  assert.ok(byStation["구암"], "data-full-official-name이 단순 역명이면 그대로 유지");
+});
+
 test("extractOwnerLabels: 5권역 실 SVG에서 ordinary/transfer/terminal 개수가 실측과 일치한다", () => {
   const sources = path.join(import.meta.dirname, "route-map-defs/svg-sources");
   const expected = {

@@ -31,6 +31,8 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { DAEJEON } from "./sma-region-configs.mjs";
+
 const root = path.resolve(import.meta.dirname, "../..");
 const svgSourceDir = path.join(
   root,
@@ -383,6 +385,25 @@ function ownerLabelTextContent(textBlock) {
     .trim();
 }
 
+// station 키 결정: daejeon 환승 라벨(5역)은 텍스트 내용이 메인+부기 tspan을
+// 이어붙인 복합 표기("1호선 대동"+"하늘공원" → "대동하늘공원")라 카탈로그 표기
+// ("대동")와 매치되지 않는다(#2068 실기기 확정 — 좌열 왼쪽 폴백 배치로 화면 밖
+// 잘림). daejeon <text>에만 있는 data-full-official-name("1호선 대동 | 2호선
+// 208 대동(하늘공원)")은 sma-region-configs.mjs DAEJEON.canonicalRules가 이미
+// 정확히 같은 정규화(파이프 앞 "1호선 " 접두 제거·괄호 제거·"역" 접미 제거)를
+// 파이프라인 노드 매칭에 쓰고 있으므로 그 정본 규칙을 그대로 재사용해 station
+// 키를 뽑는다 — 텍스트 flatten보다 우선한다. 다른 권역 SVG는 <text>에
+// data-full-official-name이 없으므로(daejeon 전용 마크업) 이 분기는 daejeon
+// 외에는 발동하지 않는다(그 외 권역 회귀 0).
+function ownerLabelStationKey(textOpenTag, textBlock) {
+  const fullOfficialName = firstAttr(textOpenTag, "data-full-official-name");
+  if (fullOfficialName) {
+    const canonical = DAEJEON.canonicalRules(fullOfficialName)?.name;
+    if (canonical) return canonical;
+  }
+  return ownerLabelTextContent(textBlock);
+}
+
 // [groupOpenTag]는 gwangju처럼 role이 감싸는 <g>에 있을 때만 넘긴다(그 외 null).
 function ownerLabelEntryFrom(
   groupOpenTag,
@@ -428,7 +449,7 @@ function ownerLabelEntryFrom(
   const fontSizeLocal = fontSizeAttr
     ? Number(fontSizeAttr.replace(/px$/, ""))
     : cssFontSizeByRole[role];
-  const station = ownerLabelTextContent(textBlock);
+  const station = ownerLabelStationKey(textOpenTag, textBlock);
   if (
     !station ||
     !Number.isFinite(localX) ||

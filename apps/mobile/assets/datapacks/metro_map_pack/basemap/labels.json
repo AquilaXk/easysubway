@@ -7194,6 +7194,30 @@
     ],
     "daejeon": [
       {
+        "station": "2호선 201 서대전",
+        "role": "transfer",
+        "x": 1680,
+        "y": 1498,
+        "anchor": "middle",
+        "fontSizePx": 14.2
+      },
+      {
+        "station": "2호선 214 오정",
+        "role": "transfer",
+        "x": 1980,
+        "y": 591.2,
+        "anchor": "middle",
+        "fontSizePx": 14.2
+      },
+      {
+        "station": "2호선 237 도마·복수",
+        "role": "transfer",
+        "x": 1284,
+        "y": 1412.4,
+        "anchor": "middle",
+        "fontSizePx": 14.2
+      },
+      {
         "station": "갈마",
         "role": "ordinary",
         "x": 1076,
@@ -7212,9 +7236,9 @@
       {
         "station": "구암",
         "role": "ordinary",
-        "x": 1472,
-        "y": 258,
-        "anchor": "start",
+        "x": 1440,
+        "y": 182,
+        "anchor": "middle",
         "fontSizePx": 54
       },
       {
@@ -7226,7 +7250,7 @@
         "fontSizePx": 54
       },
       {
-        "station": "대동하늘공원",
+        "station": "대동",
         "role": "transfer",
         "x": 572,
         "y": 740,
@@ -7234,20 +7258,12 @@
         "fontSizePx": 58
       },
       {
-        "station": "대전역",
+        "station": "대전",
         "role": "transfer",
         "x": 572,
         "y": 920,
         "anchor": "start",
         "fontSizePx": 58
-      },
-      {
-        "station": "도마·복수서부경찰서·대전과기대배재대·광역철도:도마",
-        "role": "transfer",
-        "x": 1284,
-        "y": 1412.4,
-        "anchor": "middle",
-        "fontSizePx": 14.2
       },
       {
         "station": "반석",
@@ -7259,20 +7275,12 @@
         "hasLineTerminalBadge": true
       },
       {
-        "station": "서대전네거리서대전공원",
+        "station": "서대전네거리",
         "role": "transfer",
         "x": 572,
         "y": 1460,
         "anchor": "start",
         "fontSizePx": 58
-      },
-      {
-        "station": "서대전역",
-        "role": "transfer",
-        "x": 1680,
-        "y": 1498,
-        "anchor": "middle",
-        "fontSizePx": 14.2
       },
       {
         "station": "시청",
@@ -7299,14 +7307,6 @@
         "fontSizePx": 54
       },
       {
-        "station": "오정한남대",
-        "role": "transfer",
-        "x": 1980,
-        "y": 591.2,
-        "anchor": "middle",
-        "fontSizePx": 14.2
-      },
-      {
         "station": "용문",
         "role": "ordinary",
         "x": 1076,
@@ -7331,7 +7331,7 @@
         "fontSizePx": 54
       },
       {
-        "station": "유성온천유성온천공원",
+        "station": "유성온천",
         "role": "transfer",
         "x": 1260,
         "y": 182,
@@ -7339,7 +7339,7 @@
         "fontSizePx": 58
       },
       {
-        "station": "정부청사서구청·둔산경찰서을지대병원",
+        "station": "정부청사",
         "role": "transfer",
         "x": 1076,
         "y": 920,
@@ -7446,7 +7446,7 @@
         "fontSizePx": 14
       },
       {
-        "station": "광주송정",
+        "station": "광주송정역",
         "role": "transfer",
         "x": 294,
         "y": 981,
@@ -7872,7 +7872,7 @@
         "fontSizePx": 14
       },
       {
-        "station": "학동",
+        "station": "학동증심사입구",
         "role": "ordinary",
         "x": 1934,
         "y": 923,

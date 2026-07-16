@@ -1339,7 +1339,7 @@
            data-station="117"
            data-station-name="광주송정"
            data-label-role="transfer">
-          <text x="294" y="981" id="station-label-117" class="station-label station-label-transfer" text-anchor="start" font-size="74" style="font-size:74px">광주송정</text>
+          <text x="294" y="981" id="station-label-117" class="station-label station-label-transfer" text-anchor="start" font-size="74" style="font-size:74px">광주송정역</text>
         </g>
         <g
            id="station-label-group-116"
@@ -1432,7 +1432,7 @@
            data-station="102"
            data-station-name="학동·증심사입구"
            data-label-role="ordinary">
-          <text x="1934" y="923" id="station-label-102" class="station-label" text-anchor="start" font-size="58" style="font-size:58px">학동</text><text x="1934" y="995" id="station-label-102-2" class="station-label" text-anchor="start" font-size="58" style="font-size:58px">증심사입구</text>
+          <text x="1934" y="923" id="station-label-102" class="station-label station-label-ordinary station-label-small" text-anchor="start" font-size="58" style="font-size:58px"><tspan x="1934" y="923">학동</tspan><tspan x="1934" y="995">증심사입구</tspan></text>
         </g>
         <g
            id="station-label-group-101"
