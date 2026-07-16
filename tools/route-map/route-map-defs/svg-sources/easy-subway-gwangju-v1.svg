@@ -575,8 +575,8 @@
          id="route-lines-layer"
          data-name="노선"
          class="render-layer route-layer">
-        <polyline
-           points="110,930 210,930 330,930 450,930 570,930 690,930 820,930 940,930 1060,930 1180,930 1300,930 1420,930 1540,930 1660,930 1780,930 1880,930 1980,930 2060,1010 2140,1090 2140,1210"
+        <path
+           d="M 320 440 L 320 1450 Q 320 1560 430 1560 L 830 1560 Q 940 1560 940 1450 L 940 440 Q 940 330 1050 330 L 1450 330 Q 1560 330 1560 440 L 1560 1450"
            id="route-line1"
            class="route"
            stroke="#009088"
@@ -639,120 +639,120 @@
          data-name="역"
          class="render-layer station-layer">
         <circle
-           cx="110"
-           cy="930"
+           cx="320"
+           cy="440"
            r="6.5"
            class="station-node station-node-terminal"
            stroke="#009088"
            id="circle19" />
         <circle
-           cx="210"
-           cy="930"
+           cx="320"
+           cy="679"
            r="5.8"
            class="station-node"
            stroke="#009088"
            id="circle20" />
         <circle
-           cx="450"
-           cy="930"
+           cx="320"
+           cy="1158"
            r="5.8"
            class="station-node"
            stroke="#009088"
            id="circle21" />
         <circle
-           cx="570"
-           cy="930"
+           cx="320"
+           cy="1397"
            r="5.8"
            class="station-node"
            stroke="#009088"
            id="circle22" />
         <circle
-           cx="690"
-           cy="930"
+           cx="429"
+           cy="1560"
            r="5.8"
            class="station-node"
            stroke="#009088"
            id="circle23" />
         <circle
-           cx="940"
-           cy="930"
+           cx="849"
+           cy="1549"
            r="5.8"
            class="station-node"
            stroke="#009088"
            id="circle24" />
         <circle
-           cx="1060"
-           cy="930"
+           cx="940"
+           cy="1304"
            r="5.8"
            class="station-node"
            stroke="#009088"
            id="circle25" />
         <circle
-           cx="1180"
-           cy="930"
+           cx="940"
+           cy="1065"
            r="5.8"
            class="station-node"
            stroke="#009088"
            id="circle26" />
         <circle
-           cx="1300"
-           cy="930"
+           cx="940"
+           cy="825"
            r="5.8"
            class="station-node"
            stroke="#009088"
            id="circle27" />
         <circle
-           cx="1420"
-           cy="930"
+           cx="940"
+           cy="586"
            r="5.8"
            class="station-node"
            stroke="#009088"
            id="circle28" />
         <circle
-           cx="1540"
-           cy="930"
+           cx="1027"
+           cy="346"
            r="5.8"
            class="station-node"
            stroke="#009088"
            id="circle29" />
         <circle
-           cx="1660"
-           cy="930"
+           cx="1222"
+           cy="330"
            r="5.8"
            class="station-node"
            stroke="#009088"
            id="circle30" />
         <circle
-           cx="1780"
-           cy="930"
+           cx="1443"
+           cy="330"
            r="5.8"
            class="station-node"
            stroke="#009088"
            id="circle31" />
         <circle
-           cx="1880"
-           cy="930"
+           cx="1560"
+           cy="493"
            r="5.8"
            class="station-node"
            stroke="#009088"
            id="circle32" />
         <circle
-           cx="2060"
-           cy="1010"
+           cx="1560"
+           cy="972"
            r="5.8"
            class="station-node"
            stroke="#009088"
            id="circle33" />
         <circle
-           cx="2140"
-           cy="1090"
+           cx="1560"
+           cy="1211"
            r="5.8"
            class="station-node"
            stroke="#009088"
            id="circle34" />
         <circle
-           cx="2140"
-           cy="1210"
+           cx="1560"
+           cy="1450"
            r="6.5"
            class="station-node station-node-terminal"
            stroke="#009088"
@@ -1028,8 +1028,8 @@
            stroke="#8A5AA8"
            id="circle73" />
         <circle
-           cx="330"
-           cy="930"
+           cx="320"
+           cy="918"
            r="5.5"
            fill="#FFFFFF"
            stroke="#009088"
@@ -1058,8 +1058,8 @@
            data-role="rail-transfer"
            id="circle76" />
         <circle
-           cx="330"
-           cy="930"
+           cx="320"
+           cy="918"
            r="9.5"
            fill="#FFFFFF"
            stroke="#7A8895"
@@ -1075,7 +1075,7 @@
            id="transfer-station-symbol-상무"
            class="ourclass-transfer-symbol">
           <path
-             d="M 813.0 930 L 827.0 930"
+             d="M 647 1560 L 661 1560"
              fill="none"
              stroke="#3F4A5C"
              stroke-width="20.0"
@@ -1083,7 +1083,7 @@
              stroke-linejoin="round"
              id="path77" />
           <path
-             d="M 813.0 930 L 827.0 930"
+             d="M 647 1560 L 661 1560"
              fill="none"
              stroke="#FFFFFF"
              stroke-width="14.0"
@@ -1091,26 +1091,26 @@
              stroke-linejoin="round"
              id="path78" />
           <circle
-             cx="814.0"
-             cy="930"
+             cx="648"
+             cy="1560"
              r="5.2"
              fill="#009088"
              id="circle78" />
           <text
-             x="814.0"
-             y="930.2"
+             x="648"
+             y="1560.2"
              class="transfer-badge-label"
              font-size="6.5"
              id="text78">1</text>
           <circle
-             cx="826.0"
-             cy="930"
+             cx="660"
+             cy="1560"
              r="5.2"
              fill="#E63332"
              id="circle79" />
           <text
-             x="826.0"
-             y="930.2"
+             x="660"
+             y="1560.2"
              class="transfer-badge-label"
              font-size="6.5"
              id="text79">2</text>
@@ -1119,7 +1119,7 @@
            id="transfer-station-symbol-남광주"
            class="ourclass-transfer-symbol">
           <path
-             d="M 1973.0 930 L 1987.0 930"
+             d="M 1553 732 L 1567 732"
              fill="none"
              stroke="#3F4A5C"
              stroke-width="20.0"
@@ -1127,7 +1127,7 @@
              stroke-linejoin="round"
              id="path79" />
           <path
-             d="M 1973.0 930 L 1987.0 930"
+             d="M 1553 732 L 1567 732"
              fill="none"
              stroke="#FFFFFF"
              stroke-width="14.0"
@@ -1135,26 +1135,26 @@
              stroke-linejoin="round"
              id="path80" />
           <circle
-             cx="1974.0"
-             cy="930"
+             cx="1554"
+             cy="732"
              r="5.2"
              fill="#009088"
              id="circle80" />
           <text
-             x="1974.0"
-             y="930.2"
+             x="1554"
+             y="732.2"
              class="transfer-badge-label"
              font-size="6.5"
              id="text80">1</text>
           <circle
-             cx="1986.0"
-             cy="930"
+             cx="1566"
+             cy="732"
              r="5.2"
              fill="#E63332"
              id="circle81" />
           <text
-             x="1986.0"
-             y="930.2"
+             x="1566"
+             y="732.2"
              class="transfer-badge-label"
              font-size="6.5"
              id="text81">2</text>
@@ -1315,244 +1315,129 @@
            id="station-label-group-119"
            data-station="119"
            data-station-name="평동"
-           data-label-role="terminal"
-           transform="translate(3.0637434,55.147382)">
-          <text
-             x="110"
-             y="918"
-             id="station-label-119"
-             class="station-label station-label-terminal"
-             text-anchor="middle">평동</text>
+           data-label-role="terminal">
+          <text x="354" y="464" id="station-label-119" class="station-label station-label-terminal" text-anchor="start" font-size="72" style="font-size:72px">평동</text>
         </g>
         <g
            id="station-label-group-118"
            data-station="118"
            data-station-name="도산"
-           data-label-role="ordinary"
-           transform="translate(0.5106239,-9.7018542)">
-          <text
-             x="210"
-             y="984"
-             id="station-label-118"
-             class="station-label station-label-ordinary"
-             text-anchor="middle">도산</text>
+           data-label-role="ordinary">
+          <text x="354" y="703" id="station-label-118" class="station-label station-label-ordinary" text-anchor="start" font-size="66" style="font-size:66px">도산</text>
         </g>
         <g
            id="station-label-group-117"
            data-station="117"
            data-station-name="광주송정"
-           data-label-role="transfer"
-           transform="translate(2.5531195,54.24062)">
-          <text
-             x="330"
-             y="918"
-             id="station-label-117"
-             class="station-label station-label-transfer"
-             text-anchor="middle">광주송정</text>
+           data-label-role="transfer">
+          <text x="354" y="942" id="station-label-117" class="station-label station-label-transfer" text-anchor="start" font-size="68" style="font-size:68px">광주송정</text>
         </g>
         <g
            id="station-label-group-116"
            data-station="116"
            data-station-name="송정공원"
-           data-label-role="ordinary"
-           inkscape:transform-center-x="-0.46894988"
-           inkscape:transform-center-y="10.316897"
-           transform="translate(0.93789976,-10.316897)">
-          <text
-             x="450"
-             y="984"
-             id="station-label-116"
-             class="station-label station-label-ordinary"
-             text-anchor="middle">송정공원</text>
+           data-label-role="ordinary">
+          <text x="354" y="1182" id="station-label-116" class="station-label station-label-ordinary" text-anchor="start" font-size="66" style="font-size:66px">송정공원</text>
         </g>
         <g
            id="station-label-group-115"
            data-station="115"
            data-station-name="공항"
-           data-label-role="ordinary"
-           transform="translate(-0.5106239,51.603221)">
-          <text
-             x="570"
-             y="918"
-             id="station-label-115"
-             class="station-label station-label-ordinary"
-             text-anchor="middle">공항</text>
+           data-label-role="ordinary">
+          <text x="354" y="1421" id="station-label-115" class="station-label station-label-ordinary" text-anchor="start" font-size="66" style="font-size:66px">공항</text>
         </g>
         <g
            id="station-label-group-114"
            data-station="114"
            data-station-name="김대중컨벤션센터 (마륵)"
            data-label-role="ordinary">
-          <text
-             x="690"
-             y="976"
-             id="station-label-114"
-             class="station-label station-label-ordinary station-label-small"
-             text-anchor="middle">김대중컨벤션센터</text>
-          <text
-             x="690"
-             y="992"
-             id="station-label-114-2"
-             class="station-label station-label-ordinary station-label-small"
-             text-anchor="middle">(마륵)</text>
+          <text x="429" y="1644" id="station-label-114" class="station-label station-label-ordinary station-label-small" text-anchor="middle" font-size="54" style="font-size:54px">김대중컨벤션센터</text>
+          <text x="429" y="1698" id="station-label-114-2" class="station-label station-label-ordinary station-label-small" text-anchor="middle" font-size="54" style="font-size:54px">(마륵)</text>
         </g>
         <g
            id="station-label-group-112"
            data-station="112"
            data-station-name="운천"
-           data-label-role="ordinary"
-           transform="translate(1.1646325,-78.739688)">
-          <text
-             x="940"
-             y="984"
-             id="station-label-112"
-             class="station-label station-label-ordinary"
-             text-anchor="middle">운천</text>
+           data-label-role="ordinary">
+          <text x="849" y="1644" id="station-label-112" class="station-label station-label-ordinary" text-anchor="middle" font-size="66" style="font-size:66px">운천</text>
         </g>
         <g
            id="station-label-group-111"
            data-station="111"
            data-station-name="쌍촌"
-           data-label-role="ordinary"
-           transform="translate(0,-14.235529)">
-          <text
-             x="1060"
-             y="918"
-             id="station-label-111"
-             class="station-label station-label-ordinary"
-             text-anchor="middle">쌍촌</text>
+           data-label-role="ordinary">
+          <text x="974" y="1328" id="station-label-111" class="station-label station-label-ordinary" text-anchor="start" font-size="66" style="font-size:66px">쌍촌</text>
         </g>
         <g
            id="station-label-group-110"
            data-station="110"
            data-station-name="화정"
-           data-label-role="ordinary"
-           transform="translate(3.5276623e-8,-81.458861)">
-          <text
-             x="1180"
-             y="984"
-             id="station-label-110"
-             class="station-label station-label-ordinary"
-             text-anchor="middle">화정</text>
+           data-label-role="ordinary">
+          <text x="974" y="1089" id="station-label-110" class="station-label station-label-ordinary" text-anchor="start" font-size="66" style="font-size:66px">화정</text>
         </g>
         <g
            id="station-label-group-109"
            data-station="109"
            data-station-name="농성"
-           data-label-role="ordinary"
-           transform="translate(0,-12.653804)">
-          <text
-             x="1300"
-             y="918"
-             id="station-label-109"
-             class="station-label station-label-ordinary"
-             text-anchor="middle">농성</text>
+           data-label-role="ordinary">
+          <text x="974" y="849" id="station-label-109" class="station-label station-label-ordinary" text-anchor="start" font-size="66" style="font-size:66px">농성</text>
         </g>
         <g
            id="station-label-group-108"
            data-station="108"
            data-station-name="돌고개"
-           data-label-role="ordinary"
-           transform="translate(-0.79086273,-79.877136)">
-          <text
-             x="1420"
-             y="984"
-             id="station-label-108"
-             class="station-label station-label-ordinary"
-             text-anchor="middle">돌고개</text>
+           data-label-role="ordinary">
+          <text x="974" y="610" id="station-label-108" class="station-label station-label-ordinary" text-anchor="start" font-size="66" style="font-size:66px">돌고개</text>
         </g>
         <g
            id="station-label-group-107"
            data-station="107"
            data-station-name="양동시장"
-           data-label-role="ordinary"
-           transform="translate(0,-12.653804)">
-          <text
-             x="1540"
-             y="918"
-             id="station-label-107"
-             class="station-label station-label-ordinary"
-             text-anchor="middle">양동시장</text>
+           data-label-role="ordinary">
+          <text x="1027" y="308" id="station-label-107" class="station-label station-label-ordinary" text-anchor="middle" font-size="66" style="font-size:66px">양동시장</text>
         </g>
         <g
            id="station-label-group-106"
            data-station="106"
            data-station-name="금남로5가"
            data-label-role="ordinary">
-          <text
-             x="1662.3726"
-             y="907.28632"
-             id="station-label-106"
-             class="station-label station-label-ordinary"
-             text-anchor="middle">금남로5가</text>
+          <text x="1222" y="410" id="station-label-106" class="station-label station-label-ordinary" text-anchor="middle" font-size="66" style="font-size:66px">금남로5가</text>
         </g>
         <g
            id="station-label-group-105"
            data-station="105"
            data-station-name="금남로4가"
-           data-label-role="ordinary"
-           transform="translate(-0.79086273,-11.072078)">
-          <text
-             x="1780"
-             y="918"
-             id="station-label-105"
-             class="station-label station-label-ordinary"
-             text-anchor="middle">금남로4가</text>
+           data-label-role="ordinary">
+          <text x="1443" y="308" id="station-label-105" class="station-label station-label-ordinary" text-anchor="middle" font-size="66" style="font-size:66px">금남로4가</text>
         </g>
         <g
            id="station-label-group-104"
            data-station="104"
            data-station-name="문화전당 (구도청)"
-           data-label-role="ordinary"
-           transform="translate(-1.4903063,-77.992697)">
-          <text
-             x="1880"
-             y="976"
-             id="station-label-104"
-             class="station-label station-label-ordinary station-label-small"
-             text-anchor="middle">문화전당</text>
-          <text
-             x="1880"
-             y="992"
-             id="station-label-104-2"
-             class="station-label station-label-ordinary station-label-small"
-             text-anchor="middle">(구도청)</text>
+           data-label-role="ordinary">
+          <text x="1594" y="485" id="station-label-104" class="station-label station-label-ordinary station-label-small" text-anchor="start" font-size="54" style="font-size:54px">문화전당</text>
+          <text x="1594" y="543" id="station-label-104-2" class="station-label station-label-ordinary station-label-small" text-anchor="start" font-size="54" style="font-size:54px">(구도청)</text>
         </g>
         <g
            id="station-label-group-102"
            data-station="102"
            data-station-name="학동·증심사입구"
            data-label-role="ordinary">
-          <text
-             x="2080"
-             y="1014"
-             id="station-label-102"
-             class="station-label station-label-ordinary"
-             text-anchor="start">학동·증심사입구</text>
+          <text x="1594" y="996" id="station-label-102" class="station-label station-label-ordinary" text-anchor="start" font-size="66" style="font-size:66px">학동·증심사입구</text>
         </g>
         <g
            id="station-label-group-101"
            data-station="101"
            data-station-name="소태"
            data-label-role="ordinary">
-          <text
-             x="2160"
-             y="1094"
-             id="station-label-101"
-             class="station-label station-label-ordinary"
-             text-anchor="start">소태</text>
+          <text x="1594" y="1235" id="station-label-101" class="station-label station-label-ordinary" text-anchor="start" font-size="66" style="font-size:66px">소태</text>
         </g>
         <g
            id="station-label-group-100"
            data-station="100"
            data-station-name="녹동"
            data-label-role="terminal">
-          <text
-             x="2160"
-             y="1214"
-             id="station-label-100"
-             class="station-label station-label-terminal"
-             text-anchor="start">녹동</text>
+          <text x="1594" y="1474" id="station-label-100" class="station-label station-label-terminal" text-anchor="start" font-size="72" style="font-size:72px">녹동</text>
         </g>
         <g
            id="station-label-group-238"
@@ -2074,27 +1959,15 @@
            id="station-label-group-113-203"
            data-station="113-203"
            data-station-name="상무"
-           data-label-role="transfer"
-           transform="translate(-29.115813,6.9877951)">
-          <text
-             x="848"
-             y="899"
-             id="station-label-113-203"
-             class="station-label station-label-transfer"
-             text-anchor="start">상무</text>
+           data-label-role="transfer">
+          <text x="654" y="1460" id="station-label-113-203" class="station-label station-label-transfer" text-anchor="middle" font-size="68" style="font-size:68px">상무</text>
         </g>
         <g
            id="station-label-group-103-214"
            data-station="103-214"
            data-station-name="남광주"
-           data-label-role="transfer"
-           transform="translate(40.735039,1.9870751)">
-          <text
-             x="1956"
-             y="895"
-             id="station-label-103-214"
-             class="station-label station-label-transfer"
-             text-anchor="end">남광주</text>
+           data-label-role="transfer">
+          <text x="1594" y="756" id="station-label-103-214" class="station-label station-label-transfer" text-anchor="start" font-size="68" style="font-size:68px">남광주</text>
         </g>
         <g
            id="station-label-group-211"
@@ -2118,7 +1991,7 @@
            data-services="KTX,SRT"
            data-logo-mode="inline-svg-paths"
            data-logo-source="Wikimedia-Commons-KTX_logo.svg-and-SRT_logo.svg"
-           transform="translate(0.5106239,102.12478)">
+           transform="translate(-9.4894,90.1248)">
           <title
              id="rail-chip-gwangju-songjeong-title">광주송정역 KTX·SRT 환승</title>
           <g
