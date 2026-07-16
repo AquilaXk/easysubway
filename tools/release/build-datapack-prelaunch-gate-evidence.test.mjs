@@ -192,6 +192,16 @@ test("prelaunch workflow는 네 gate를 같은 RC final readiness에 결속한�
   const workflow = await readFile(new URL(
     "../../.github/workflows/datapack-prelaunch-gates.yml", import.meta.url,
   ), "utf8");
+  const jobStart = workflow.indexOf("\n  rehearsal:");
+  const stepsStart = workflow.indexOf("\n    steps:", jobStart);
+  assert.notEqual(jobStart, -1);
+  assert.notEqual(stepsStart, -1);
+  assert.ok(jobStart < stepsStart);
+  assert.doesNotMatch(
+    workflow.slice(jobStart, stepsStart),
+    /\$\{\{\s*runner\./,
+    "job-level configuration cannot use runner context",
+  );
   const producer = await readFile(new URL(
     "./build-datapack-prelaunch-gate-evidence.mjs", import.meta.url,
   ), "utf8");

@@ -14,10 +14,13 @@ jobs:
     permissions:
       contents: read
     env:
-      EVIDENCE_DIR: ${{ runner.temp }}/datapack-prelaunch-gates
       REQUIRED_GATE_IDS: source_governance,freshness_conditional_publish,rollback_rescue,callback_reconciliation
 
     steps:
+      - name: Configure rehearsal paths
+        shell: bash
+        run: echo "EVIDENCE_DIR=${RUNNER_TEMP}/datapack-prelaunch-gates" >> "${GITHUB_ENV}"
+
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
