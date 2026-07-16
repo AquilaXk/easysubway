@@ -26,6 +26,9 @@ export function buildGateFragments({
   if (candidate?.phase !== "CANDIDATE" || !identity || candidate.rcIdentity && !same(identity, candidate.rcIdentity)) {
     throw new Error("candidate context identity is invalid");
   }
+  if (JSON.stringify(candidate.consumerIssues) !== JSON.stringify([2058, 1393])) {
+    throw new Error("candidate context consumers are invalid");
+  }
   for (const field of ["dataPackManifestSha256", "dataPackArtifactSha256", "sourceSnapshotSetHash"]) {
     requiredSha(identity[field], `RC ${field}`);
   }
@@ -39,6 +42,7 @@ export function buildGateFragments({
     if (!verifiedSuites?.has(suite)) throw new Error(`missing verified suite: ${suite}`);
     validateReference(references?.[suite], suite);
   }
+  validateReference(references?.candidateContext, "candidate context");
   validateSourceInputs(buildSpec, sourceReport, identity, evaluatedMillis);
   validateRollbackReport(rollbackReport, identity);
   validateCallbackReport(callbackReport, identity);
@@ -69,6 +73,15 @@ export function buildGateFragments({
     idempotencyKeySha256: sha256(callbackReport.payload.idempotencyKey),
   };
   return {
+    source_admission: {
+      ...envelope("source_admission", 2133,
+        sourceAdmissionResult(
+          snapshotSetIdentity,
+          sourceReport.schemaFingerprintSetHash,
+          [references.candidateContext, references.source],
+        ), sourceExpiresAt),
+      snapshotSetIdentity,
+    },
     source_governance: {
       ...envelope("source_governance", 2133,
         sourceResult(snapshotSetIdentity, [references.source, references.backend]), sourceExpiresAt),
@@ -115,6 +128,16 @@ export function buildGateFragments({
       ]),
       evidenceReferences: [references.callbackExecution, references.callback, references.backend],
     }),
+  };
+}
+function sourceAdmissionResult(snapshotSetIdentity, schemaFingerprintSetHash, evidenceReferences) {
+  return {
+    schemaVersion: 1, snapshotSetIdentity, schemaFingerprintSetHash,
+    checks: passing([
+      "schemaValidated", "licenseApproved", "redistributionApproved", "credentialRedacted",
+      "snapshotLocked",
+    ]),
+    evidenceReferences,
   };
 }
 function sourceResult(snapshotSetIdentity, evidenceReferences) {
@@ -255,8 +278,15 @@ function validateSourceInputs(buildSpec, report, identity, evaluatedMillis) {
       throw new Error("source inventory contains an unapproved or stale snapshot");
     }
     requiredSha(snapshot.rawSha256, "snapshot rawSha256");
+    requiredSha(snapshot.schemaFingerprint, "snapshot schemaFingerprint");
     requiredSha(snapshot.governancePolicySha256, "snapshot governancePolicySha256");
     sourceIds.add(snapshot.sourceId);
+  }
+  const schemaFingerprintSetHash = sha256(JSON.stringify(buildSpec.sourceSnapshots
+    .map(({ snapshotId, schemaFingerprint }) => ({ snapshotId, schemaFingerprint }))
+    .sort((left, right) => left.snapshotId.localeCompare(right.snapshotId))));
+  if (report.schemaFingerprintSetHash !== schemaFingerprintSetHash) {
+    throw new Error("source admission schema fingerprint evidence mismatch");
   }
 }
 function validateRollbackReport(report, identity) {
@@ -599,6 +629,7 @@ async function collect(args) {
     "conditional-publish-report", files["conditional-publish-report"],
   );
   references.androidDevice = await evidenceReference("android-device-report", files["android-device-report"]);
+  references.candidateContext = await evidenceReference("candidate-context", files.candidate);
   const fragments = buildGateFragments({
     candidate, buildSpec, sourceReport, rollbackReport, callbackReport, conditionalPublishReport,
     androidDeviceReport, backendReconciliationReport,

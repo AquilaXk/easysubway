@@ -22,6 +22,7 @@ function fixture() {
   };
   const sources = ["source-a", "source-b"].map((sourceId, index) => ({
     sourceId, snapshotId: `${sourceId}-snapshot`, rawSha256: String(index + 2).repeat(64),
+    schemaFingerprint: String(index + 4).repeat(64),
     licenseStatus: "PASS", redistributionAllowed: true, snapshotStatus: "LOCKED",
     credentialRedacted: true, freshnessExpiresAt: "2026-08-16T00:00:00.000Z",
     rawRetentionExpiresAt: "2026-10-16T00:00:00.000Z",
@@ -29,12 +30,18 @@ function fixture() {
   }));
   const references = Object.fromEntries([
     "source", "freshness", "rollback", "android", "callback", "backend", "callbackExecution",
-    "androidDevice", "conditionalPublish",
+    "androidDevice", "conditionalPublish", "candidateContext",
   ].map((id, index) => [id, { artifactId: `${id}-report`, sha256: String((index % 8) + 2).repeat(64) }]));
+  const schemaFingerprintSetHash = sha(JSON.stringify(sources.map(({ snapshotId, schemaFingerprint }) => ({
+    snapshotId, schemaFingerprint,
+  }))));
   return {
-    candidate: { phase: "CANDIDATE", releaseCandidateIdentity: rcIdentity },
+    candidate: { phase: "CANDIDATE", releaseCandidateIdentity: rcIdentity, consumerIssues: [2058, 1393] },
     buildSpec: { sourceSnapshotSetHash: snapshotSetIdentity, sourceSnapshots: sources },
-    sourceReport: { status: "PASS", governanceDecision: "GO", snapshotCount: 2, sourceSnapshotSetHash: snapshotSetIdentity },
+    sourceReport: {
+      status: "PASS", governanceDecision: "GO", snapshotCount: 2,
+      sourceSnapshotSetHash: snapshotSetIdentity, schemaFingerprintSetHash,
+    },
     rollbackReport: {
       from: { releaseSequence: 2 }, failed: { releaseSequence: 2, manifestSha256: "6".repeat(64) },
       knownGood: { releaseSequence: 1, manifestSha256: "7".repeat(64), packs: [{ sha256: packSha256 }] },
@@ -101,10 +108,11 @@ function fixture() {
     evaluatedAt,
   };
 }
-test("동일 RC의 네 prelaunch gate fragment를 생성한다", () => {
+test("동일 RC의 다섯 prelaunch gate fragment를 생성한다", () => {
   const fragments = buildGateFragments(fixture());
   assert.deepEqual(Object.keys(fragments).sort(), [
-    "callback_reconciliation", "freshness_conditional_publish", "rollback_rescue", "source_governance",
+    "callback_reconciliation", "freshness_conditional_publish", "rollback_rescue", "source_admission",
+    "source_governance",
   ]);
   for (const [gateId, fragment] of Object.entries(fragments)) {
     assert.equal(fragment.gateId, gateId);
@@ -113,9 +121,31 @@ test("동일 RC의 네 prelaunch gate fragment를 생성한다", () => {
     assert.equal(fragment.rcIdentity.dataPackManifestSha256, manifestSha256);
   }
   assert.equal(fragments.source_governance.sourceInventory.statusCounts.APPROVED, 2);
+  assert.deepEqual(fragments.source_admission.result.checks, {
+    schemaValidated: true,
+    licenseApproved: true,
+    redistributionApproved: true,
+    credentialRedacted: true,
+    snapshotLocked: true,
+  });
+  assert.match(fragments.source_admission.result.schemaFingerprintSetHash, /^[0-9a-f]{64}$/);
+  assert.equal(
+    fragments.source_admission.result.evidenceReferences[0].artifactId,
+    "candidateContext-report",
+  );
   assert.equal(fragments.rollback_rescue.result.rescueReleaseSequence, 3);
   assert.equal(fragments.callback_reconciliation.result.deliveryIdentity.idempotencyKeySha256,
     sha(`prelaunch-${manifestSha256}:3:${manifestSha256}`));
+});
+test("#2058 consumer binding이 없는 candidate-context는 source admission을 생성하지 않는다", () => {
+  const input = fixture();
+  input.candidate.consumerIssues = [1393];
+  assert.throws(() => buildGateFragments(input), /candidate context consumers/);
+});
+test("actual admission schema fingerprint와 build spec이 다르면 source admission을 생성하지 않는다", () => {
+  const input = fixture();
+  input.buildSpec.sourceSnapshots[0].schemaFingerprint = "f".repeat(64);
+  assert.throws(() => buildGateFragments(input), /schema fingerprint evidence mismatch/);
 });
 test("snapshot identity가 RC와 다르면 fail closed한다", () => {
   const input = fixture();
@@ -188,32 +218,7 @@ test("backend reconciliation report가 RC와 다르면 fail closed한다", () =>
   input.backendReconciliationReport.manifestSha256 = "0".repeat(64);
   assert.throws(() => buildGateFragments(input), /backend reconciliation evidence/);
 });
-test("prelaunch Android emulator 실행 전에 KVM 권한을 활성화한다", async () => {
-  const workflow = await readFile(new URL(
-    "../../.github/workflows/datapack-prelaunch-gates.yml", import.meta.url,
-  ), "utf8");
-  const kvmStep = workflow.indexOf("      - name: Enable KVM group permissions");
-  const emulatorStep = workflow.indexOf("      - name: Rehearse monotonic rescue on Android emulator");
-
-  assert.notEqual(kvmStep, -1, "KVM 권한 활성화 단계가 필요하다");
-  assert.notEqual(emulatorStep, -1, "Android emulator 단계가 필요하다");
-  assert.ok(kvmStep < emulatorStep, "KVM 권한은 emulator 실행 전에 활성화해야 한다");
-  assert.match(workflow, /KERNEL=="kvm", GROUP="kvm", MODE="0666"/);
-  assert.match(workflow, /sudo udevadm control --reload-rules/);
-  assert.match(workflow, /sudo udevadm trigger --name-match=kvm/);
-});
-test("prelaunch Android integration test는 mobile 작업 디렉터리에서 실행한다", async () => {
-  const workflow = await readFile(new URL(
-    "../../.github/workflows/datapack-prelaunch-gates.yml", import.meta.url,
-  ), "utf8");
-  const emulatorStart = workflow.indexOf("      - name: Rehearse monotonic rescue on Android emulator");
-  const nextStep = workflow.indexOf("\n      - name:", emulatorStart + 1);
-  const emulatorStep = workflow.slice(emulatorStart, nextStep);
-
-  assert.match(emulatorStep, /working-directory:\s*apps\/mobile/);
-  assert.doesNotMatch(emulatorStep, /script:\s*\|\s*\n\s*cd apps\/mobile/);
-});
-test("prelaunch workflow는 네 gate를 같은 RC final readiness에 결속한다", async () => {
+test("prelaunch workflow는 다섯 gate를 같은 RC final readiness에 결속한다", async () => {
   const workflow = await readFile(new URL(
     "../../.github/workflows/datapack-prelaunch-gates.yml", import.meta.url,
   ), "utf8");
@@ -234,12 +239,30 @@ test("prelaunch workflow는 네 gate를 같은 RC final readiness에 결속한�
   assert.match(workflow, /build-datapack-prelaunch-gate-evidence\.mjs --mode collect/);
   assert.match(workflow, /--callback-execution-report/);
   assert.match(workflow, /integration_test\/datapack_monotonic_rescue_test\.dart/);
+  assert.match(
+    workflow,
+    /script: >-\n\s+flutter test -d emulator-5554\n\s+--reporter=expanded\n\s+--file-reporter=json:"\$\{EVIDENCE_DIR\}\/android-device\.jsonl"\n\s+--dart-define=EASYSUBWAY_RC_MANIFEST_SHA256=.*\n\s+--dart-define=EASYSUBWAY_RC_RELEASE_SEQUENCE=.*\n\s+integration_test\/datapack_monotonic_rescue_test\.dart/,
+    "the action must fold the script into one shell command with options before the positional path",
+  );
+  const emulatorStep = workflow.match(
+    /- name: Rehearse monotonic rescue on Android emulator[\s\S]*?\n\s+- name:/,
+  )?.[0] ?? "";
+  assert.doesNotMatch(emulatorStep, /script: \|[\s\S]*?\\\n/);
+  assert.match(emulatorStep, /working-directory: apps\/mobile/);
+  assert.doesNotMatch(emulatorStep, /script: \|\n\s+cd apps\/mobile/);
+  const enableKvm = workflow.indexOf("- name: Enable KVM group permissions");
+  const emulatorRunner = workflow.indexOf("reactivecircus/android-emulator-runner@");
+  assert.ok(enableKvm !== -1 && enableKvm < emulatorRunner, "KVM permissions must be enabled before emulator boot");
+  assert.match(workflow, /KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS\+="static_node=kvm"/);
+  assert.match(workflow, /sudo udevadm control --reload-rules/);
+  assert.match(workflow, /sudo udevadm trigger --name-match=kvm/);
   assert.match(workflow, /android-rc-bundle\.json/);
   assert.match(workflow, /--android-device-report/);
   assert.match(workflow, /--conditional-publish-report/);
   assert.match(producer, /tools\/datapack\/publish-object-storage\.mjs/);
   for (const gateId of [
-    "source_governance", "freshness_conditional_publish", "rollback_rescue", "callback_reconciliation",
+    "source_admission", "source_governance", "freshness_conditional_publish", "rollback_rescue",
+    "callback_reconciliation",
   ]) {
     assert.match(workflow, new RegExp(gateId));
   }
