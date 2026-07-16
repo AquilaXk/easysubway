@@ -3351,7 +3351,10 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.equal(rcEvidenceManifestContract.releaseGate, "rc-evidence-manifest");
   assert.equal(rcEvidenceManifestContract.issue, 1020);
   assert.deepEqual(rcEvidenceManifestContract.parentIssues, [1014, 1020]);
-  assert.deepEqual(rcEvidenceManifestContract.linkedEvidenceIssues, [547, 571, 1015, 1016, 1017, 1018, 1019, 1021, 1022, 1914]);
+  assert.deepEqual(
+    rcEvidenceManifestContract.linkedEvidenceIssues,
+    [547, 571, 1015, 1016, 1017, 1018, 1019, 1021, 1022, 1914, 2051, 2054, 2056, 2057, 2133],
+  );
   assert.equal(rcEvidenceManifestContract.androidRcEvidenceManifest, androidRcEvidencePath);
   assert.equal(rcEvidenceManifestContract.signedReleaseArtifactGate, gatePath);
   assert.equal(rcEvidenceManifestContract.releaseGovernanceGate, "apps/mobile/release/release-governance-gate.json");
@@ -4276,6 +4279,153 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   const corruptManifest = JSON.parse(readFileSync(corruptManifestPath, "utf8"));
   assert.equal(corruptManifest.aabPayloadSha256, null);
   assert.ok(corruptManifest.readiness.blockers.some((blocker) => blocker.id === "missing_aabPayloadSha256"));
+});
+
+test("datapack readiness producer는 required gate를 동일 final identity로 결정론적으로 결합한다", async () => {
+  const contract = readJson("apps/mobile/release/rc-evidence-manifest-contract.json");
+  const requiredDatapackGates = [
+    { id: "source_governance", sourceIssue: 2133, expiresAfterDays: 14 },
+    { id: "rollback_rescue", sourceIssue: 2051, expiresAfterDays: 14 },
+    { id: "freshness_conditional_publish", sourceIssue: 2054, expiresAfterDays: 14 },
+    { id: "callback_reconciliation", sourceIssue: 2057, expiresAfterDays: 14 },
+  ];
+  assert.deepEqual(contract.requiredDatapackGates, requiredDatapackGates);
+
+  const tempDir = await mkdtemp(path.join(tmpdir(), "easysubway-datapack-readiness-"));
+  const gitSha = "0123456789abcdef0123456789abcdef01234567";
+  const now = "2026-07-16T00:00:00.000Z";
+  const args = [
+    "tools/release/generate-rc-evidence-manifest.mjs",
+    "--repo-root", ".",
+    "--app-root", "apps/mobile",
+    "--git-sha", gitSha,
+    "--now", now,
+  ];
+
+  for (const gate of requiredDatapackGates) {
+    const evidencePath = path.join(tempDir, `${gate.id}.json`);
+    await writeFile(evidencePath, `${JSON.stringify({
+      schemaVersion: 1,
+      gateId: gate.id,
+      sourceIssue: gate.sourceIssue,
+      status: "SATISFIED",
+      reasonCodes: [],
+      rcIdentity: { gitSha },
+      evidenceValidity: {
+        evaluatedAt: now,
+        expiresAt: "2026-07-30T00:00:00.000Z",
+      },
+    }, null, 2)}\n`);
+    args.push("--datapack-gate-status", `${gate.id}=SATISFIED`);
+    args.push("--datapack-gate-evidence", `${gate.id}=${evidencePath}`);
+  }
+
+  const firstOutput = path.join(tempDir, "first.json");
+  const secondOutput = path.join(tempDir, "second.json");
+  await execFileAsync(process.execPath, [...args, "--output", firstOutput], { cwd: root });
+  await execFileAsync(process.execPath, [...args, "--output", secondOutput], { cwd: root });
+
+  const firstBytes = readFileSync(firstOutput, "utf8");
+  assert.equal(readFileSync(secondOutput, "utf8"), firstBytes);
+  const manifest = JSON.parse(firstBytes);
+  assert.equal(manifest.producerVersion, 1);
+  assert.equal(manifest.evaluatedAt, now);
+  assert.match(manifest.finalReleaseIdentity, /^[a-f0-9]{64}$/);
+  assert.deepEqual(
+    manifest.datapackGates.map(({ id, sourceIssue, status }) => ({ id, sourceIssue, status })),
+    requiredDatapackGates.map(({ id, sourceIssue }) => ({ id, sourceIssue, status: "SATISFIED" })),
+  );
+  assert.ok(manifest.datapackGates.every(({ rcIdentity }) => rcIdentity.gitSha === gitSha));
+  assert.equal(
+    manifest.readiness.blockers.some(({ id }) => id.startsWith("datapack_gate_")),
+    false,
+  );
+});
+
+test("datapack readiness producer는 unknown·mixed identity·expired evidence를 거부한다", async () => {
+  const tempDir = await mkdtemp(path.join(tmpdir(), "easysubway-datapack-readiness-negative-"));
+  const outputPath = path.join(tempDir, "manifest.json");
+  const evidencePath = path.join(tempDir, "source-governance.json");
+  const gitSha = "0123456789abcdef0123456789abcdef01234567";
+  const now = "2026-07-16T00:00:00.000Z";
+  const baseArgs = [
+    "tools/release/generate-rc-evidence-manifest.mjs",
+    "--repo-root", ".",
+    "--app-root", "apps/mobile",
+    "--git-sha", gitSha,
+    "--now", now,
+    "--output", outputPath,
+  ];
+
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      ...baseArgs,
+      "--datapack-gate-status", "unknown_gate=BLOCKED_EXTERNAL",
+    ], { cwd: root }),
+    /Unknown datapack gate/,
+  );
+
+  const writeEvidence = async ({
+    evidenceGitSha = gitSha,
+    expiresAt = "2026-07-30T00:00:00.000Z",
+    reasonCodes = [],
+  } = {}) => {
+    await writeFile(evidencePath, JSON.stringify({
+      schemaVersion: 1,
+      gateId: "source_governance",
+      sourceIssue: 2133,
+      status: "SATISFIED",
+      reasonCodes,
+      rcIdentity: { gitSha: evidenceGitSha },
+      evidenceValidity: { evaluatedAt: now, expiresAt },
+    }));
+  };
+
+  await writeEvidence({ evidenceGitSha: "f".repeat(40) });
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      ...baseArgs,
+      "--datapack-gate-status", "source_governance=SATISFIED",
+      "--datapack-gate-evidence", `source_governance=${evidencePath}`,
+    ], { cwd: root }),
+    /RC identity mismatch/,
+  );
+
+  await writeEvidence({ expiresAt: "2026-07-15T23:59:59.999Z" });
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      ...baseArgs,
+      "--datapack-gate-status", "source_governance=SATISFIED",
+      "--datapack-gate-evidence", `source_governance=${evidencePath}`,
+    ], { cwd: root }),
+    /expired evidenceValidity/,
+  );
+
+  await writeEvidence({ reasonCodes: ["SOURCE_LINEAGE_BROKEN"] });
+  await execFileAsync(process.execPath, [
+    ...baseArgs,
+    "--datapack-gate-status", "source_governance=SATISFIED",
+    "--datapack-gate-evidence", `source_governance=${evidencePath}`,
+  ], { cwd: root });
+  const manifest = JSON.parse(readFileSync(outputPath, "utf8"));
+  assert.ok(
+    manifest.readiness.blockers.some(({ id }) => id === "datapack_gate_source_governance_source_lineage_broken"),
+  );
+});
+
+test("RC evidence manifest workflow는 datapack required gate를 fail closed로 연결한다", () => {
+  const workflow = read(".github/workflows/release-artifacts.yml");
+  for (const gate of [
+    "source_governance",
+    "rollback_rescue",
+    "freshness_conditional_publish",
+    "callback_reconciliation",
+  ]) {
+    assert.ok(
+      workflow.includes(`--datapack-gate-status ${gate}=BLOCKED_EXTERNAL`),
+      `${gate} must be wired into the RC manifest producer`,
+    );
+  }
 });
 
 test("Android 16 KB page-size gate는 AAB alignment와 16384 runtime smoke 계약을 고정한다", () => {

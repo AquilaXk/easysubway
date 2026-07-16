@@ -36,6 +36,8 @@ const backendIdentity = readBackendIdentity(args);
 const gateStatuses = parsePairs(arg("gateStatus", "gate-status"));
 const evidenceStatuses = parsePairs(arg("evidenceStatus", "evidence-status"));
 const evidencePaths = parsePairs(arg("evidencePath", "evidence-path"));
+const datapackGateStatuses = parsePairs(arg("datapackGateStatus", "datapack-gate-status"));
+const datapackGateEvidencePaths = parsePairs(arg("datapackGateEvidence", "datapack-gate-evidence"));
 const expectedValues = parsePairs(args.expect);
 const androidReleaseMetadata = readKeyValueFileIfExists(arg("androidReleaseMetadata", "android-release-metadata"));
 const gitSha = arg("gitSha", "git-sha") ?? process.env.GITHUB_SHA ?? requiredGitSha();
@@ -44,6 +46,9 @@ const rcEvidenceContract = readJsonIfExists(
 );
 if (!Array.isArray(rcEvidenceContract?.requiredEvidenceEntries)) {
   fail("RC evidence manifest contract with requiredEvidenceEntries is required");
+}
+if (!Array.isArray(rcEvidenceContract.requiredDatapackGates)) {
+  fail("RC evidence manifest contract with requiredDatapackGates is required");
 }
 const launchScope = readJsonIfExists(path.join(repoRoot, "apps/mobile/release/production-datapack-scope.json"));
 if (!launchScope?.routingLaunchScope || !launchScope?.identityMatrix) {
@@ -86,6 +91,17 @@ const evidenceEntries = requiredEvidenceEntries(
   rcEvidenceContract.requiredEvidenceEntries,
   { identity, repoRoot, androidApplicationId: "com.easysubway.app" },
 );
+const datapackGates = requiredDatapackGates(
+  rcEvidenceContract.requiredDatapackGates,
+  datapackGateStatuses,
+  datapackGateEvidencePaths,
+  identity,
+  generatedAt,
+);
+const producerVersion = 1;
+const finalReleaseIdentity = createHash("sha256")
+  .update(JSON.stringify({ producerVersion, evaluatedAt: generatedAt, rcIdentity: identity, datapackGates }))
+  .digest("hex");
 const blockers = [
   ...identityBlockers(identity),
   ...androidReleaseMetadataMismatchBlockers(identity, androidReleaseMetadata),
@@ -93,18 +109,23 @@ const blockers = [
   ...gateStatusBlockers(gateStatuses),
   ...openP0Blockers(arg("openAndroidP0Count", "open-android-p0-count")),
   ...evidenceBlockers(evidenceEntries),
+  ...datapackGateBlockers(datapackGates),
 ];
 
 const manifest = {
   schemaVersion: 1,
   releaseGate: "rc-evidence-manifest",
   issue: 1020,
+  producerVersion,
+  evaluatedAt: generatedAt,
+  finalReleaseIdentity,
   applicationId: "easysubway",
   androidApplicationId: "com.easysubway.app",
   generatedAt,
   ...identity,
   rcIdentity: identity,
   evidenceEntries,
+  datapackGates,
   readiness: {
     status: blockers.length === 0 ? "GO" : "NO_GO",
     gateStatus: blockers.length === 0 ? "SATISFIED" : "BLOCKED_RC_EVIDENCE",
@@ -342,6 +363,75 @@ function requiredEvidenceEntries(
   });
 }
 
+function requiredDatapackGates(contractGates, statuses, paths, identity, generatedAt) {
+  const knownIds = new Set(contractGates.map(({ id }) => id));
+  for (const id of [...Object.keys(statuses), ...Object.keys(paths)]) {
+    if (!knownIds.has(id)) fail(`Unknown datapack gate: ${id}`);
+  }
+
+  return contractGates.map(({ id, sourceIssue, expiresAfterDays }) => {
+    if (!id || !Number.isInteger(sourceIssue) || !Number.isInteger(expiresAfterDays) || expiresAfterDays <= 0) {
+      fail(`Invalid datapack gate contract entry: ${id ?? "<missing>"}`);
+    }
+    const status = statuses[id] ?? "BLOCKED_EXTERNAL";
+    if (!["SATISFIED", "BLOCKED_EXTERNAL"].includes(status)) {
+      fail(`Invalid datapack gate status for ${id}: ${status}`);
+    }
+    if (status !== "SATISFIED") {
+      return {
+        id,
+        sourceIssue,
+        status,
+        reasonCodes: ["EVIDENCE_NOT_PROVIDED"],
+        evidenceSha256: null,
+        evaluatedAt: generatedAt,
+        expiresAt: null,
+        rcIdentity: { gitSha: identity.gitSha },
+      };
+    }
+
+    const evidencePath = paths[id];
+    if (!evidencePath || !existsSync(resolvePath(evidencePath))) {
+      fail(`SATISFIED datapack gate requires existing --datapack-gate-evidence: ${id}`);
+    }
+    const evidenceBytes = readFileSync(resolvePath(evidencePath));
+    const evidence = JSON.parse(evidenceBytes);
+    if (evidence.gateId !== id || evidence.sourceIssue !== sourceIssue || evidence.status !== "SATISFIED") {
+      fail(`SATISFIED datapack gate identity mismatch: ${id}`);
+    }
+    if (evidence.rcIdentity?.gitSha !== identity.gitSha) {
+      fail(`SATISFIED datapack gate RC identity mismatch: ${id}`);
+    }
+    if (!Array.isArray(evidence.reasonCodes) || evidence.reasonCodes.some((reason) => typeof reason !== "string")) {
+      fail(`SATISFIED datapack gate reasonCodes must be a string array: ${id}`);
+    }
+    const evaluatedAt = evidence.evidenceValidity?.evaluatedAt;
+    const expiresAt = evidence.evidenceValidity?.expiresAt;
+    if (
+      !Number.isFinite(Date.parse(evaluatedAt))
+      || !Number.isFinite(Date.parse(expiresAt))
+      || Date.parse(evaluatedAt) > Date.parse(generatedAt)
+      || Date.parse(expiresAt) < Date.parse(generatedAt)
+      || Date.parse(expiresAt) < Date.parse(evaluatedAt)
+    ) {
+      fail(`SATISFIED datapack gate has invalid, future, or expired evidenceValidity: ${id}`);
+    }
+    if (Date.parse(expiresAt) > Date.parse(addDays(evaluatedAt, expiresAfterDays))) {
+      fail(`SATISFIED datapack gate exceeds the ${expiresAfterDays}-day evidence lifetime: ${id}`);
+    }
+    return {
+      id,
+      sourceIssue,
+      status,
+      reasonCodes: [...evidence.reasonCodes].sort(),
+      evidenceSha256: createHash("sha256").update(evidenceBytes).digest("hex"),
+      evaluatedAt: new Date(evaluatedAt).toISOString(),
+      expiresAt: new Date(expiresAt).toISOString(),
+      rcIdentity: { gitSha: evidence.rcIdentity.gitSha },
+    };
+  });
+}
+
 function validateSatisfiedEvidence(id, evidencePath, generatedAt, context) {
   if (id !== "post_launch_operations") {
     fail(`SATISFIED evidence entry has no canonical validator: ${id}`);
@@ -467,6 +557,22 @@ function evidenceBlockers(entries) {
       severity: "P0",
       reason: `Evidence entry ${entry.id} from #${entry.sourceIssue} is not satisfied`,
     }));
+}
+
+function datapackGateBlockers(gates) {
+  const statusBlockers = gates
+    .filter(({ status }) => status !== "SATISFIED")
+    .map(({ id, sourceIssue, status }) => ({
+      id: `datapack_gate_${id}_${status}`.toLowerCase(),
+      severity: "P0",
+      reason: `Datapack gate ${id} from #${sourceIssue} is ${status}`,
+    }));
+  const reasonBlockers = gates.flatMap(({ id, sourceIssue, reasonCodes }) => reasonCodes.map((reasonCode) => ({
+    id: `datapack_gate_${id}_${reasonCode}`.toLowerCase(),
+    severity: "P0",
+    reason: `Datapack gate ${id} from #${sourceIssue} reported ${reasonCode}`,
+  })));
+  return [...statusBlockers, ...reasonBlockers];
 }
 
 function requiredGitSha() {
