@@ -575,7 +575,6 @@ public class JdbcFacilityReportRepository implements
 
 	@Override
 	public int anonymizeFacilityReportsByUserId(String userId) {
-		List<String> photoObjectKeys = loadPhotoObjectKeysByUserId(userId);
 		int anonymizedCount = jdbcTemplate.update(
 			"""
 				UPDATE facility_reports
@@ -583,8 +582,6 @@ public class JdbcFacilityReportRepository implements
 					description = ?,
 					photo_file_name = NULL,
 					photo_content_type = NULL,
-					photo_object_key = NULL,
-					photo_thumbnail_object_key = NULL,
 					photo_sha256 = NULL,
 					photo_size_bytes = NULL,
 					latitude = NULL,
@@ -597,25 +594,19 @@ public class JdbcFacilityReportRepository implements
 			DELETED_DESCRIPTION,
 			userId
 		);
-		if (anonymizedCount > 0) {
-			photoObjectKeys.forEach(deleteFacilityReportPhotoPort::deleteFacilityReportPhoto);
-		}
+		deletePendingAnonymizedPhotoObjects();
 		return anonymizedCount;
 	}
 
 	@Override
 	public int purgePersonalDataCreatedBefore(LocalDateTime cutoff) {
-		List<String> photoObjectKeys = loadPhotoObjectKeysCreatedBefore(cutoff);
-		photoObjectKeys.forEach(deleteFacilityReportPhotoPort::deleteFacilityReportPhoto);
-		return jdbcTemplate.update(
+		int purgedCount = jdbcTemplate.update(
 			"""
 				UPDATE facility_reports
 				SET user_id = ?,
 					description = ?,
 					photo_file_name = NULL,
 					photo_content_type = NULL,
-					photo_object_key = NULL,
-					photo_thumbnail_object_key = NULL,
 					photo_sha256 = NULL,
 					photo_size_bytes = NULL,
 					latitude = NULL,
@@ -630,56 +621,82 @@ public class JdbcFacilityReportRepository implements
 			cutoff,
 			FacilityReport.ANONYMIZED_USER_ID
 		);
+		deletePendingAnonymizedPhotoObjects();
+		return purgedCount;
 	}
 
-	private List<String> loadPhotoObjectKeysByUserId(String userId) {
-		return jdbcTemplate.query(
+	private void deletePendingAnonymizedPhotoObjects() {
+		List<AnonymizedPhotoObjects> pendingObjects = jdbcTemplate.query(
 			"""
-				SELECT photo_object_key,
+				SELECT report_id,
+					photo_object_key,
 					photo_thumbnail_object_key
 				FROM facility_reports
 				WHERE user_id = ?
 					AND (photo_object_key IS NOT NULL OR photo_thumbnail_object_key IS NOT NULL)
 				""",
 			resultSet -> {
-				java.util.ArrayList<String> objectKeys = new java.util.ArrayList<>();
+				ArrayList<AnonymizedPhotoObjects> objects = new ArrayList<>();
 				while (resultSet.next()) {
-					addObjectKey(objectKeys, resultSet.getString("photo_object_key"));
-					addObjectKey(objectKeys, resultSet.getString("photo_thumbnail_object_key"));
+					objects.add(new AnonymizedPhotoObjects(
+						resultSet.getString("report_id"),
+						resultSet.getString("photo_object_key"),
+						resultSet.getString("photo_thumbnail_object_key")
+					));
 				}
-				return List.copyOf(objectKeys);
+				return List.copyOf(objects);
 			},
-			userId
-		);
-	}
-
-	private List<String> loadPhotoObjectKeysCreatedBefore(LocalDateTime cutoff) {
-		return jdbcTemplate.query(
-			"""
-				SELECT photo_object_key,
-					photo_thumbnail_object_key
-				FROM facility_reports
-				WHERE created_at < ?
-					AND user_id <> ?
-					AND (photo_object_key IS NOT NULL OR photo_thumbnail_object_key IS NOT NULL)
-				""",
-			resultSet -> {
-				java.util.ArrayList<String> objectKeys = new java.util.ArrayList<>();
-				while (resultSet.next()) {
-					addObjectKey(objectKeys, resultSet.getString("photo_object_key"));
-					addObjectKey(objectKeys, resultSet.getString("photo_thumbnail_object_key"));
-				}
-				return List.copyOf(objectKeys);
-			},
-			cutoff,
 			FacilityReport.ANONYMIZED_USER_ID
 		);
+		for (AnonymizedPhotoObjects objects : pendingObjects) {
+			deletePrimaryPhotoObject(objects.reportId(), objects.primaryObjectKey());
+			deleteThumbnailPhotoObject(objects.reportId(), objects.thumbnailObjectKey());
+		}
 	}
 
-	private void addObjectKey(List<String> objectKeys, String objectKey) {
-		if (objectKey != null && !objectKey.isBlank()) {
-			objectKeys.add(objectKey);
+	private void deletePrimaryPhotoObject(String reportId, String objectKey) {
+		if (objectKey == null || objectKey.isBlank()) {
+			return;
 		}
+		deleteFacilityReportPhotoPort.deleteFacilityReportPhoto(objectKey);
+		jdbcTemplate.update(
+			"""
+				UPDATE facility_reports
+				SET photo_object_key = NULL
+				WHERE report_id = ?
+					AND user_id = ?
+					AND photo_object_key = ?
+				""",
+			reportId,
+			FacilityReport.ANONYMIZED_USER_ID,
+			objectKey
+		);
+	}
+
+	private void deleteThumbnailPhotoObject(String reportId, String objectKey) {
+		if (objectKey == null || objectKey.isBlank()) {
+			return;
+		}
+		deleteFacilityReportPhotoPort.deleteFacilityReportPhoto(objectKey);
+		jdbcTemplate.update(
+			"""
+				UPDATE facility_reports
+				SET photo_thumbnail_object_key = NULL
+				WHERE report_id = ?
+					AND user_id = ?
+					AND photo_thumbnail_object_key = ?
+				""",
+			reportId,
+			FacilityReport.ANONYMIZED_USER_ID,
+			objectKey
+		);
+	}
+
+	private record AnonymizedPhotoObjects(
+		String reportId,
+		String primaryObjectKey,
+		String thumbnailObjectKey
+	) {
 	}
 
 	private void upsertReport(FacilityReport report) {

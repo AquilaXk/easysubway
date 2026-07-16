@@ -18,6 +18,7 @@ import org.springframework.stereotype.Component;
 public class FacilityReportPersonalDataPurgeScheduler {
 
 	private static final Logger log = LoggerFactory.getLogger(FacilityReportPersonalDataPurgeScheduler.class);
+	private static final Duration DEFAULT_PURGE_INTERVAL = Duration.ofDays(1);
 
 	private final PurgeFacilityReportPersonalDataPort purgePort;
 	private final Clock clock;
@@ -47,7 +48,9 @@ public class FacilityReportPersonalDataPurgeScheduler {
 	@Scheduled(fixedDelayString = "${easysubway.report.personal-data-purge-interval-ms:86400000}")
 	public void purgeExpiredPersonalData() {
 		LocalDateTime cutoff = LocalDateTime.ofInstant(
-			clock.instant().minus(Duration.ofDays(retentionDays)),
+			clock.instant()
+				.minus(Duration.ofDays(retentionDays))
+				.plus(DEFAULT_PURGE_INTERVAL),
 			ZoneOffset.UTC
 		);
 		int purged = purgePort.purgePersonalDataCreatedBefore(cutoff);

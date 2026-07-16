@@ -1,6 +1,7 @@
 package com.easysubway.report.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
 import com.easysubway.report.application.port.in.FacilityReportListQuery;
@@ -377,6 +378,37 @@ class JdbcFacilityReportRepositoryTest {
 		assertThat(anonymized.status()).isEqualTo(expiredReport.status());
 		assertThat(deletedPhotoObjectKeys).containsExactly(expiredReport.photoObjectKey());
 		assertThat(repository.loadReport("report-retained")).contains(retainedReport);
+	}
+
+	@Test
+	@DisplayName("사진 객체 삭제 실패 시 익명화와 재시도 키를 먼저 영속화한다")
+	void purgePersonalDataPersistsRetryablePhotoDeletionState() {
+		var expiredReport = submittedReport("report-expired", "anonymous-user-1", 8);
+		repository.saveReport(expiredReport);
+		repository = new JdbcFacilityReportRepository(jdbcTemplate, objectKey -> {
+			throw new IllegalStateException("object storage unavailable");
+		});
+		LocalDateTime cutoff = LocalDateTime.of(2026, 6, 17, 9, 0);
+
+		assertThatThrownBy(() -> repository.purgePersonalDataCreatedBefore(cutoff))
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessage("object storage unavailable");
+
+		FacilityReport pendingDeletion = repository.loadReport("report-expired").orElseThrow();
+		assertThat(pendingDeletion.userId()).isEqualTo(FacilityReport.ANONYMIZED_USER_ID);
+		assertThat(pendingDeletion.description())
+			.isEqualTo("사용자 데이터 삭제로 신고 내용이 삭제되었습니다.");
+		assertThat(pendingDeletion.photoFileName()).isNull();
+		assertThat(pendingDeletion.photoContentType()).isNull();
+		assertThat(pendingDeletion.photoObjectKey()).isEqualTo(expiredReport.photoObjectKey());
+		assertThat(pendingDeletion.latitude()).isNull();
+		assertThat(pendingDeletion.receiptTokenHash()).isNull();
+
+		var deletedPhotoObjectKeys = new ArrayList<String>();
+		repository = new JdbcFacilityReportRepository(jdbcTemplate, deletedPhotoObjectKeys::add);
+		assertThat(repository.purgePersonalDataCreatedBefore(cutoff)).isZero();
+		assertThat(repository.loadReport("report-expired").orElseThrow().photoObjectKey()).isNull();
+		assertThat(deletedPhotoObjectKeys).containsExactly(expiredReport.photoObjectKey());
 	}
 
 	@Test
