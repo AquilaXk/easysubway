@@ -3061,7 +3061,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.equal(postLaunchOperationsReviewGate.releaseGate, "post-launch-operations-review");
   assert.equal(postLaunchOperationsReviewGate.issue, 1019);
   assert.equal(postLaunchOperationsReviewGate.status, "IN_PROGRESS");
-  assert.equal(postLaunchOperationsReviewGate.preLaunchReadiness.status, "PASS");
+  assert.equal(postLaunchOperationsReviewGate.preLaunchReadiness.status, "BLOCKED_EXTERNAL");
   const phaseAReleaseVersion = read("apps/mobile/pubspec.yaml").match(/^version:\s*([^+\s]+)\+([0-9]+)\s*$/m);
   assert.ok(phaseAReleaseVersion, "mobile pubspec must contain versionName+versionCode");
   assert.equal(
@@ -3220,6 +3220,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "privacy@aquilaxk.site",
   ]);
   assert.deepEqual(postLaunchOperationsReviewGate.latestQaEvidenceSummary.remainingExternalBlockers, [
+    "fixed-release-rehearsal-after-node24-runtime-change",
     "play-review-status-summary",
     "crash-anr-vitals-summary",
     "support-ticket-summary-after-public-release",
@@ -3229,7 +3230,15 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     postLaunchOperationsReviewGate.preLaunchReadiness.evidenceSummary.map((item) => item.id),
     postLaunchOperationsReviewGate.preLaunchReadiness.requiredEvidence,
   );
-  assert.ok(postLaunchOperationsReviewGate.preLaunchReadiness.evidenceSummary.every((item) => item.status === "PASS"));
+  const fixedReleaseEvidence = postLaunchOperationsReviewGate.preLaunchReadiness.evidenceSummary.find(
+    (item) => item.id === "fixed-release-versioncode-build-submit-procedure",
+  );
+  assert.equal(fixedReleaseEvidence.status, "BLOCKED_EXTERNAL");
+  assert.ok(
+    postLaunchOperationsReviewGate.preLaunchReadiness.evidenceSummary
+      .filter((item) => item.id !== fixedReleaseEvidence.id)
+      .every((item) => item.status === "PASS"),
+  );
   assert.deepEqual(
     postLaunchOperationsReviewGate.reviewWindows.map((window) => window.id),
     ["first_2h", "first_24h", "day_7", "day_30"],
@@ -3979,6 +3988,14 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.match(workflow, /android-production-rc/);
   assert.match(workflow, /android-production-rc-release:/);
   assert.match(workflow, /name: Android Production RC Artifact/);
+  const productionRcJob = workflow.slice(
+    workflow.indexOf("  android-production-rc-release:"),
+    workflow.indexOf("  play-internal-upload:"),
+  );
+  assert.match(
+    productionRcJob,
+    /Android Production RC Artifact \/ Set up Node[\s\S]*actions\/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e[\s\S]*node-version: "24"/,
+  );
   assert.match(workflow, /if: \$\{\{ github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/main' && inputs\.android_rc_signing_mode == 'production-upload-key' \}\}/);
   assert.match(workflow, /environment:\s*\n\s*name: android-production-rc/);
   assert.match(workflow, /EASYSUBWAY_ANDROID_UPLOAD_KEYSTORE_BASE64: \$\{\{ secrets\.EASYSUBWAY_ANDROID_UPLOAD_KEYSTORE_BASE64 \}\}/);
@@ -4034,6 +4051,14 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.match(workflow, /cp release\/rc-evidence-manifest-contract\.json release-artifacts\/android\/rc-evidence-manifest-contract\.json/);
   assert.match(workflow, /rc-evidence-manifest:/);
   assert.match(workflow, /name: RC Evidence Manifest/);
+  const rcEvidenceManifestJob = workflow.slice(
+    workflow.indexOf("  rc-evidence-manifest:"),
+    workflow.indexOf("  notify-slack-release-result:"),
+  );
+  assert.match(
+    rcEvidenceManifestJob,
+    /RC Evidence Manifest \/ Set up Node[\s\S]*actions\/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e[\s\S]*node-version: "24"/,
+  );
   assert.match(workflow, /uses: actions\/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093/);
   assert.match(workflow, /name: easysubway-android-release-\$\{\{ github\.sha \}\}/);
   assert.match(workflow, /name: easysubway-android-production-rc-\$\{\{ github\.sha \}\}/);

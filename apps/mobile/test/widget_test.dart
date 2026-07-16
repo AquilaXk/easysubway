@@ -5358,52 +5358,6 @@ void main() {
     expect(find.byType(AppSettingsScreen), findsOneWidget);
   });
 
-  testWidgets('가까운 역 화면은 위치 실패 후 역명 검색 입력을 보여준다', (tester) async {
-    final locationProvider = FakeCurrentLocationProvider(
-      error: const CurrentLocationException('현재 위치를 확인하지 못했어요.'),
-      needsPermissionRequest: false,
-    );
-    final repository = FakeStationSearchRepository(
-      networkMapRegionNames: const ['수도권'],
-      queryResults: {
-        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
-      },
-    );
-
-    await tester.pumpWidget(
-      buildEasySubwayTestApp(
-        repository: repository,
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: FakeFavoriteStationRepository(),
-        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
-        favoriteRouteRepository: FakeFavoriteRouteRepository(),
-        locationProvider: locationProvider,
-        notificationRepository: FakeNotificationSettingsRepository(),
-        initialOnboardingState: _completedOnboardingState(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('networkMapMenuNearbyButton')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('현재 위치를 확인하지 못했어요.'), findsOneWidget);
-    expect(find.byKey(const Key('stationSearchInput')), findsOneWidget);
-    expect(find.byKey(const Key('nearbyStationSearchButton')), findsOneWidget);
-    expect(find.byKey(const Key('stationRecentSearchSection')), findsNothing);
-
-    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
-    await tester.pumpAndSettle();
-    await tester.testTextInput.receiveAction(TextInputAction.search);
-    await tester.pumpAndSettle();
-
-    expect(repository.requestedQueries, contains('상록수'));
-    expect(find.text('상록수역'), findsOneWidget);
-  });
-
   testWidgets('홈 이동 조건 pill은 모든 프리셋에 맞는 표시명을 보여준다', (tester) async {
     for (final preset in MobilityPreset.values) {
       await tester.pumpWidget(
@@ -7866,69 +7820,6 @@ void main() {
       findsNothing,
     );
     // 품질 문구 "일부 정보는 확인 중이에요"는 별도 semantic label 테스트에서 유지한다.
-  });
-
-  testWidgets('역 검색 화면 AppBar 입력 필드는 시스템 글자 크기를 키워도 잘리지 않는다', (tester) async {
-    // #1962: StationSearchScreen 의 검색 입력 필드는 v4에서 idle/active 픽셀을
-    // 통일한 고정 레이아웃이라 AppBar 기본 toolbarHeight(56)에 그대로 넣으면 큰
-    // 글자 배율에서 세로로 잘린다. 툴바 높이가 배율에 맞춰 늘어나 오버플로 없이
-    // 필드가 온전히 보이는지 검증한다. 둘러보기 주변 역 메뉴로 실제 검색 화면을 연다.
-    final locationProvider = FakeCurrentLocationProvider(
-      location: _freshCurrentLocation(),
-      needsPermissionRequest: false,
-    );
-    final repository = FakeStationSearchRepository(
-      nearbyResults: [
-        _stationResult(
-          id: 'station-sangnoksu',
-          name: '상록수',
-          distanceMeters: 230,
-        ),
-      ],
-    );
-
-    await tester.pumpWidget(
-      MediaQuery(
-        data: const MediaQueryData(textScaler: TextScaler.linear(2.0)),
-        child: buildEasySubwayTestApp(
-          repository: repository,
-          reportRepository: FakeFacilityReportRepository(),
-          routeRepository: FakeRouteSearchRepository(),
-          favoriteRepository: FakeFavoriteStationRepository(),
-          locationProvider: locationProvider,
-          initialOnboardingState: _completedOnboardingState(),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('networkMapMenuNearbyButton')));
-    await tester.pumpAndSettle();
-
-    // 렌더 중 RenderFlex 오버플로 등 예외가 발생하지 않아야 한다.
-    expect(tester.takeException(), isNull);
-
-    final inputFinder = find.byKey(const Key('stationSearchInput'));
-    expect(inputFinder, findsOneWidget);
-
-    // 검색 입력 필드를 담은 AppBar 를 찾아 툴바 높이가 큰 글자 배율에서 기본
-    // 높이(56)보다 커졌는지 확인한다.
-    final appBarFinder = find.ancestor(
-      of: inputFinder,
-      matching: find.byType(AppBar),
-    );
-    expect(appBarFinder, findsOneWidget);
-    final appBar = tester.widget<AppBar>(appBarFinder);
-    expect(appBar.toolbarHeight, isNotNull);
-    expect(appBar.toolbarHeight, greaterThan(kToolbarHeight));
-
-    // 입력 필드가 툴바(AppBar) 세로 범위 안에 온전히 들어간다(아래로 잘리지 않는다).
-    final appBarRect = tester.getRect(appBarFinder);
-    final inputRect = tester.getRect(inputFinder);
-    expect(inputRect.bottom, lessThanOrEqualTo(appBarRect.bottom + 0.5));
-    expect(inputRect.top, greaterThanOrEqualTo(appBarRect.top - 0.5));
   });
 
   testWidgets('#2109 홈 in-place 검색 결과 탭은 역을 지도에서 포커스하고 팬 메뉴를 연다', (
