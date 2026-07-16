@@ -6,7 +6,9 @@ import '../../../core/database/catalog/canonical_station_id.dart';
 import '../../../core/database/catalog/catalog_database.dart';
 import '../../../core/database/catalog/station_timetable_query.dart';
 import '../../../network_map.dart';
-import '../../../station_search.dart';
+import '../domain/station_line.dart';
+import '../domain/station_models.dart';
+import '../domain/station_repositories.dart';
 
 class DriftStationRepository
     implements
