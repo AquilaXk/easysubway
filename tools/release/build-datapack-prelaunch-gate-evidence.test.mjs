@@ -2,15 +2,12 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-
 import { buildGateFragments } from "./build-datapack-prelaunch-gate-evidence.mjs";
-
 const sha = (value) => createHash("sha256").update(value).digest("hex");
 const evaluatedAt = "2026-07-17T00:00:00.000Z";
 const snapshotSetIdentity = "a".repeat(64);
 const manifestSha256 = "b".repeat(64);
 const packSha256 = "c".repeat(64);
-
 function fixture() {
   const rcIdentity = {
     gitSha: "d".repeat(40), appVersionName: "1.0.0", versionCode: "1",
@@ -39,8 +36,11 @@ function fixture() {
     buildSpec: { sourceSnapshotSetHash: snapshotSetIdentity, sourceSnapshots: sources },
     sourceReport: { status: "PASS", governanceDecision: "GO", snapshotCount: 2, sourceSnapshotSetHash: snapshotSetIdentity },
     rollbackReport: {
-      from: { releaseSequence: 2 }, failed: { releaseSequence: 2 },
-      knownGood: { releaseSequence: 1, packs: [{ sha256: packSha256 }] },
+      from: { releaseSequence: 2 }, failed: { releaseSequence: 2, manifestSha256: "6".repeat(64) },
+      knownGood: { releaseSequence: 1, manifestSha256: "7".repeat(64), packs: [{ sha256: packSha256 }] },
+      knownGoodArtifactSha256: packSha256,
+      failedArtifactSha256: "8".repeat(64),
+      distinctFailedAndKnownGoodPayloads: true,
       rescue: { releaseSequence: 3, manifestSha256 }, status: "PASS",
       validatorStatus: "PASS", manifestLastStatus: "PASS", idempotentReplay: true,
       productionExecuted: false, executionEnvironment: "ISOLATED_PRELAUNCH",
@@ -86,6 +86,9 @@ function fixture() {
       rcManifestSha256: manifestSha256, rcArtifactSha256: packSha256, rescueReleaseSequence: 3,
       rcManifestBytesVerified: true, rcArtifactBytesVerified: true,
       rcSignatureVerified: true, rcSqliteIntegrityVerified: true,
+      rcUpdaterReplayVerified: true,
+      knownGoodManifestSha256: "7".repeat(64), knownGoodArtifactSha256: packSha256,
+      failedManifestSha256: "6".repeat(64), failedArtifactSha256: "8".repeat(64),
       knownGoodContentRestored: true, idempotentReplayVerified: true,
       corruptSuccessorPreservedKnownGood: true, lowerSequenceRejected: true, recoveryElapsedMs: 125,
     },
@@ -98,7 +101,6 @@ function fixture() {
     evaluatedAt,
   };
 }
-
 test("동일 RC의 네 prelaunch gate fragment를 생성한다", () => {
   const fragments = buildGateFragments(fixture());
   assert.deepEqual(Object.keys(fragments).sort(), [
@@ -115,13 +117,11 @@ test("동일 RC의 네 prelaunch gate fragment를 생성한다", () => {
   assert.equal(fragments.callback_reconciliation.result.deliveryIdentity.idempotencyKeySha256,
     sha(`prelaunch-${manifestSha256}:3:${manifestSha256}`));
 });
-
 test("snapshot identity가 RC와 다르면 fail closed한다", () => {
   const input = fixture();
   input.sourceReport.sourceSnapshotSetHash = "0".repeat(64);
   assert.throws(() => buildGateFragments(input), /source snapshot identity mismatch/);
 });
-
 test("source gate와 inventory 만료는 실제 snapshot 최단 만료를 넘지 않는다", () => {
   const input = fixture();
   input.buildSpec.sourceSnapshots[0].freshnessExpiresAt = "2026-07-20T00:00:00.000Z";
@@ -132,61 +132,62 @@ test("source gate와 inventory 만료는 실제 snapshot 최단 만료를 넘지
   assert.equal(fragments.source_governance.sourceInventory.entries[1].expiresAt, "2026-07-31T00:00:00.000Z");
   assert.equal(fragments.rollback_rescue.evidenceValidity.expiresAt, "2026-07-31T00:00:00.000Z");
 });
-
 test("rescue identity가 RC와 다르면 fail closed한다", () => {
   const input = fixture();
   input.rollbackReport.rescue.releaseSequence = 4;
   assert.throws(() => buildGateFragments(input), /rollback rescue identity mismatch/);
 });
-
 test("필수 machine suite가 없으면 SATISFIED를 만들지 않는다", () => {
   const input = fixture();
   input.verifiedSuites.delete("android");
   assert.throws(() => buildGateFragments(input), /missing verified suite: android/);
 });
-
 test("public production 실행으로 표시된 report는 prelaunch evidence로 거부한다", () => {
   const input = fixture();
   input.rollbackReport.productionExecuted = true;
   assert.throws(() => buildGateFragments(input), /isolated prelaunch/);
 });
-
 test("동일 RC에 결속된 callback 실행 report가 없으면 fail closed한다", () => {
   const input = fixture();
   input.callbackReport.payload.manifestSha256 = "0".repeat(64);
   assert.throws(() => buildGateFragments(input), /callback execution identity mismatch/);
 });
-
 test("Android device rescue report가 RC와 다르면 fail closed한다", () => {
   const input = fixture();
   input.androidDeviceReport.rescueReleaseSequence = 4;
   assert.throws(() => buildGateFragments(input), /Android device rescue evidence/);
 });
-
 test("Android가 실제 RC bytes와 signature를 검증하지 않으면 fail closed한다", () => {
   const input = fixture();
   input.androidDeviceReport.rcSignatureVerified = false;
   assert.throws(() => buildGateFragments(input), /Android device rescue evidence/);
 });
-
+test("failed와 known-good payload가 같으면 rollback gate를 만들지 않는다", () => {
+  const input = fixture();
+  input.rollbackReport.failedArtifactSha256 = packSha256;
+  input.androidDeviceReport.failedArtifactSha256 = packSha256;
+  assert.throws(() => buildGateFragments(input), /not distinct/);
+});
+test("Android updater가 실제 RC를 replay하지 않으면 fail closed한다", () => {
+  const input = fixture();
+  input.androidDeviceReport.rcUpdaterReplayVerified = false;
+  assert.throws(() => buildGateFragments(input), /Android device rescue evidence/);
+});
 test("conditional publish report가 실제 isolated write와 RC에 결속되지 않으면 fail closed한다", () => {
   const input = fixture();
   input.conditionalPublishReport.productionWriteCount = 1;
   assert.throws(() => buildGateFragments(input), /conditional publish rehearsal/);
 });
-
 test("실제 executor의 immutable conflict 검증이 없으면 fail closed한다", () => {
   const input = fixture();
   input.conditionalPublishReport.isolatedTarget.immutableConflictRejected = false;
   assert.throws(() => buildGateFragments(input), /conditional publish rehearsal/);
 });
-
 test("backend reconciliation report가 RC와 다르면 fail closed한다", () => {
   const input = fixture();
   input.backendReconciliationReport.manifestSha256 = "0".repeat(64);
   assert.throws(() => buildGateFragments(input), /backend reconciliation evidence/);
 });
-
 test("prelaunch workflow는 네 gate를 같은 RC final readiness에 결속한다", async () => {
   const workflow = await readFile(new URL(
     "../../.github/workflows/datapack-prelaunch-gates.yml", import.meta.url,

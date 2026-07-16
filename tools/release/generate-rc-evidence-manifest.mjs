@@ -992,6 +992,10 @@ function normalizeRollbackRescueResult(result, identity) {
     .includes(result.knownGoodPackSha256)) {
     fail(`${gateId} knownGoodPackSha256 does not match the RC identity`);
   }
+  requireSha256(result.failedPackSha256, `${gateId}.failedPackSha256`);
+  if (result.failedPackSha256 === result.knownGoodPackSha256) {
+    fail(`${gateId} failedPackSha256 must differ from knownGoodPackSha256`);
+  }
   requireSha256(result.rescueManifestSha256, `${gateId}.rescueManifestSha256`);
   if (result.rescueReleaseSequence !== identity.releaseSequence
     || result.rescueManifestSha256 !== identity.dataPackManifestSha256) {
@@ -1005,7 +1009,10 @@ function normalizeRollbackRescueResult(result, identity) {
   return {
     schemaVersion: 1,
     ...Object.fromEntries(sequenceFields.map((field) => [field, result[field]])),
-    knownGoodPackSha256: result.knownGoodPackSha256, rescueManifestSha256: result.rescueManifestSha256, checks,
+    knownGoodPackSha256: result.knownGoodPackSha256,
+    failedPackSha256: result.failedPackSha256,
+    rescueManifestSha256: result.rescueManifestSha256,
+    checks,
     evidenceReferences: normalizeEvidenceReferences(gateId, result.evidenceReferences),
   };
 }

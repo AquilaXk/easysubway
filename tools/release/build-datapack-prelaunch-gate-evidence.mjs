@@ -1,26 +1,22 @@
 #!/usr/bin/env node
-
 import { execFile } from "node:child_process";
 import { createHash, createSign, generateKeyPairSync, randomBytes } from "node:crypto";
 import { appendFile, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
+import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { gunzipSync } from "node:zlib";
-
+import { gunzipSync, gzipSync } from "node:zlib";
 import { buildRescueManifest } from "../datapack/build-rescue-manifest.mjs";
 import { buildReleaseCallback } from "../datapack/build-release-callback.mjs";
 import { evaluateReleaseDecision } from "../datapack/decide-datapack-release.mjs";
 import { canonicalJson, withoutSignature } from "../datapack/lib/manifest-validation.mjs";
 import { sendReleaseCallback } from "../datapack/send-release-callback.mjs";
-
 const GATE_LIFETIME_MS = 14 * 86_400_000;
 const REQUIRED_SUITES = ["source", "freshness", "rollback", "android", "callback", "backend"];
 const execFileAsync = promisify(execFile);
-
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
-
 export function buildGateFragments({
   candidate, buildSpec, sourceReport, rollbackReport, callbackReport, conditionalPublishReport,
   androidDeviceReport, backendReconciliationReport,
@@ -43,24 +39,21 @@ export function buildGateFragments({
     if (!verifiedSuites?.has(suite)) throw new Error(`missing verified suite: ${suite}`);
     validateReference(references?.[suite], suite);
   }
-
   validateSourceInputs(buildSpec, sourceReport, identity, evaluatedMillis);
   validateRollbackReport(rollbackReport, identity);
   validateCallbackReport(callbackReport, identity);
   validateConditionalPublishReport(conditionalPublishReport, identity);
-  validateAndroidDeviceReport(androidDeviceReport, identity);
+  validateAndroidDeviceReport(androidDeviceReport, identity, rollbackReport);
   validateBackendReconciliationReport(backendReconciliationReport, identity);
   validateReference(references?.callbackExecution, "callback execution");
   validateReference(references?.conditionalPublish, "conditional publish execution");
   validateReference(references?.androidDevice, "Android device execution");
-
   const sourceExpiresAt = new Date(Math.min(
     Date.parse(expiresAt),
     ...buildSpec.sourceSnapshots.flatMap((snapshot) => [
       Date.parse(snapshot.freshnessExpiresAt), Date.parse(snapshot.rawRetentionExpiresAt),
     ]),
   )).toISOString();
-
   const envelope = (gateId, sourceIssue, result, evidenceExpiresAt = expiresAt) => ({
     schemaVersion: 1, gateId, sourceIssue, status: "SATISFIED", reasonCodes: [],
     rcIdentity: identity,
@@ -75,7 +68,6 @@ export function buildGateFragments({
     manifestSha256: callbackReport.payload.manifestSha256,
     idempotencyKeySha256: sha256(callbackReport.payload.idempotencyKey),
   };
-
   return {
     source_governance: {
       ...envelope("source_governance", 2133,
@@ -99,6 +91,7 @@ export function buildGateFragments({
       ),
       rescueReleaseSequence: rollbackReport.rescue.releaseSequence,
       knownGoodPackSha256: rollbackReport.knownGood.packs[0].sha256,
+      failedPackSha256: rollbackReport.failedArtifactSha256,
       rescueManifestSha256: rollbackReport.rescue.manifestSha256,
       checks: passing([
         "monotonicSequence", "signatureVerified", "sqliteIntegrityVerified", "immutableCatalogWritten",
@@ -124,7 +117,6 @@ export function buildGateFragments({
     }),
   };
 }
-
 function sourceResult(snapshotSetIdentity, evidenceReferences) {
   return {
     schemaVersion: 1, snapshotSetIdentity,
@@ -135,7 +127,6 @@ function sourceResult(snapshotSetIdentity, evidenceReferences) {
     evidenceReferences,
   };
 }
-
 function freshnessResult(snapshotSetIdentity, evidenceReferences) {
   return {
     schemaVersion: 1, snapshotSetIdentity,
@@ -146,7 +137,6 @@ function freshnessResult(snapshotSetIdentity, evidenceReferences) {
     evidenceReferences,
   };
 }
-
 function buildSourceInventory(snapshots, evaluatedAt, expiresAt) {
   const entries = snapshots.map((snapshot) => ({
     sourceId: snapshot.sourceId,
@@ -164,7 +154,6 @@ function buildSourceInventory(snapshots, evaluatedAt, expiresAt) {
     statusCounts: { APPROVED: entries.length, REVIEW_REQUIRED: 0, BLOCKED: 0, EXPIRED: 0 },
   };
 }
-
 function validateCallbackReport(report, identity) {
   const expectedIdempotencyKey = `${report?.payload?.releaseRequestId}:${identity.releaseSequence}:${identity.dataPackManifestSha256}`;
   if (report?.schemaVersion !== 1 || report.executionEnvironment !== "ISOLATED_PRELAUNCH"
@@ -187,8 +176,7 @@ function validateCallbackReport(report, identity) {
     throw new Error("callback retry and reconciliation rehearsal did not pass");
   }
 }
-
-function validateAndroidDeviceReport(report, identity) {
+function validateAndroidDeviceReport(report, identity, rollbackReport) {
   if (report?.artifactKind !== "android-datapack-monotonic-rescue-evidence"
     || report.status !== "PASS"
     || report.rcManifestSha256 !== identity.dataPackManifestSha256
@@ -198,6 +186,12 @@ function validateAndroidDeviceReport(report, identity) {
     || report.rcArtifactBytesVerified !== true
     || report.rcSignatureVerified !== true
     || report.rcSqliteIntegrityVerified !== true
+    || report.rcUpdaterReplayVerified !== true
+    || report.knownGoodManifestSha256 !== rollbackReport.knownGood.manifestSha256
+    || report.knownGoodArtifactSha256 !== rollbackReport.knownGoodArtifactSha256
+    || report.failedManifestSha256 !== rollbackReport.failed.manifestSha256
+    || report.failedArtifactSha256 !== rollbackReport.failedArtifactSha256
+    || report.failedArtifactSha256 === report.knownGoodArtifactSha256
     || report.knownGoodContentRestored !== true
     || report.idempotentReplayVerified !== true
     || report.corruptSuccessorPreservedKnownGood !== true
@@ -207,7 +201,6 @@ function validateAndroidDeviceReport(report, identity) {
     throw new Error("Android device rescue evidence does not match the RC identity");
   }
 }
-
 function validateConditionalPublishReport(report, identity) {
   if (report?.schemaVersion !== 1 || report.executionEnvironment !== "ISOLATED_PRELAUNCH"
     || report.productionExecuted !== false || report.productionWriteCount !== 0
@@ -230,7 +223,6 @@ function validateConditionalPublishReport(report, identity) {
     throw new Error("conditional publish rehearsal does not match the RC identity");
   }
 }
-
 function validateBackendReconciliationReport(report, identity) {
   if (report?.artifactKind !== "backend-datapack-reconciliation-evidence"
     || report.status !== "PASS"
@@ -240,7 +232,6 @@ function validateBackendReconciliationReport(report, identity) {
     throw new Error("backend reconciliation evidence does not match the RC identity");
   }
 }
-
 function validateSourceInputs(buildSpec, report, identity, evaluatedMillis) {
   if (buildSpec?.sourceSnapshotSetHash !== identity.sourceSnapshotSetHash
     || report?.sourceSnapshotSetHash !== identity.sourceSnapshotSetHash) {
@@ -268,7 +259,6 @@ function validateSourceInputs(buildSpec, report, identity, evaluatedMillis) {
     sourceIds.add(snapshot.sourceId);
   }
 }
-
 function validateRollbackReport(report, identity) {
   if (report?.status !== "PASS" || report.validatorStatus !== "PASS"
     || report.manifestLastStatus !== "PASS" || report.idempotentReplay !== true) {
@@ -296,27 +286,29 @@ function validateRollbackReport(report, identity) {
       .includes(report.knownGood.packs[0].sha256)) {
     throw new Error("rollback known-good pack identity mismatch");
   }
+  requiredSha(report.knownGoodArtifactSha256, "rollback known-good artifact sha256");
+  requiredSha(report.failedArtifactSha256, "rollback failed artifact sha256");
+  if (report.distinctFailedAndKnownGoodPayloads !== true
+    || report.knownGoodArtifactSha256 !== report.knownGood.packs[0].sha256
+    || report.failedArtifactSha256 === report.knownGoodArtifactSha256) {
+    throw new Error("rollback failed and known-good payloads are not distinct");
+  }
 }
-
 function validateReference(value, suite) {
   if (typeof value?.artifactId !== "string" || value.artifactId.length === 0) {
     throw new Error(`missing evidence reference: ${suite}`);
   }
   requiredSha(value.sha256, `${suite} evidence sha256`);
 }
-
 function requiredSha(value, label) {
   if (!/^[a-f0-9]{64}$/.test(value ?? "")) throw new Error(`${label} is invalid`);
 }
-
 function passing(names) {
   return Object.fromEntries([...names].sort((left, right) => left.localeCompare(right)).map((name) => [name, true]));
 }
-
 function same(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
-
 async function main(argv) {
   const args = parseArgs(argv);
   const mode = requiredArg(args, "mode");
@@ -324,7 +316,6 @@ async function main(argv) {
   if (mode === "collect") return collect(args);
   throw new Error("--mode must be prepare or collect");
 }
-
 async function prepare(args) {
   const repoRoot = path.resolve(args.get("repo-root") ?? ".");
   const outputDir = path.resolve(requiredArg(args, "output-dir"));
@@ -367,16 +358,39 @@ async function prepare(args) {
   if (!pack || pack.artifactKind !== "production") throw new Error("production pack build failed");
   const artifactPath = path.join(buildOutput, `catalog/${pack.id}-v${pack.version}.sqlite.gz`);
   const artifactBytes = await readFile(artifactPath);
-  if (pack.sha256 !== sha256(artifactBytes) || pack.sqliteSha256 !== sha256(gunzipSync(artifactBytes))) {
+  const knownGoodSqliteBytes = gunzipSync(artifactBytes);
+  if (pack.sha256 !== sha256(artifactBytes) || pack.sqliteSha256 !== sha256(knownGoodSqliteBytes)) {
     throw new Error("built data pack identity mismatch");
   }
-  const manifest = (releaseSequence, publishedAt) => {
+  const failedSqlitePath = path.join(outputDir, "failed-datapack.sqlite");
+  await writeFile(failedSqlitePath, knownGoodSqliteBytes);
+  const failedDatabase = new DatabaseSync(failedSqlitePath);
+  try {
+    failedDatabase.prepare(
+      "INSERT OR REPLACE INTO catalog_metadata(key, value) VALUES (?, ?)",
+    ).run("prelaunchRollbackState", "failed-release");
+  } finally {
+    failedDatabase.close();
+  }
+  const failedSqliteBytes = await readFile(failedSqlitePath);
+  const failedArtifactBytes = gzipSync(failedSqliteBytes, { level: 9, mtime: 0 });
+  const failedPack = signedProductionPack({
+    pack,
+    version: String(BigInt(pack.version) + 1n),
+    artifactBytes: failedArtifactBytes,
+    sqliteBytes: failedSqliteBytes,
+    privateKeyPem,
+  });
+  if (failedPack.sha256 === pack.sha256 || failedPack.sqliteSha256 === pack.sqliteSha256) {
+    throw new Error("failed and known-good payloads must be distinct");
+  }
+  const manifest = (releaseSequence, publishedAt, selectedPack) => {
     const value = {
       manifestVersion: 2, channel: "production", releaseSequence, publishedAt,
       expiresAt: new Date(evaluatedMillis + 30 * 86_400_000).toISOString(),
       keyId: "production-v1", ttlSeconds: 3_600,
-      activePack: { id: pack.id, version: pack.version },
-      packs: [structuredClone(pack)],
+      activePack: { id: selectedPack.id, version: selectedPack.version },
+      packs: [structuredClone(selectedPack)],
     };
     value.signature = {
       algorithm: "rsa-sha256-manifest-v2",
@@ -384,8 +398,8 @@ async function prepare(args) {
     };
     return value;
   };
-  const knownGood = manifest(1, new Date(evaluatedMillis - 7_200_000).toISOString());
-  const failed = manifest(2, new Date(evaluatedMillis - 3_600_000).toISOString());
+  const knownGood = manifest(1, new Date(evaluatedMillis - 7_200_000).toISOString(), pack);
+  const failed = manifest(2, new Date(evaluatedMillis - 3_600_000).toISOString(), failedPack);
   const knownGoodBytes = jsonBytes(knownGood);
   const failedBytes = jsonBytes(failed);
   const approval = {
@@ -414,6 +428,10 @@ async function prepare(args) {
   }
   const rollbackReport = {
     ...rescue.evidence, status: "PASS", validatorStatus: "PASS", manifestLastStatus: "PASS",
+    knownGoodArtifactSha256: pack.sha256,
+    failedArtifactSha256: failedPack.sha256,
+    distinctFailedAndKnownGoodPayloads: failedPack.sha256 !== pack.sha256
+      && failedPack.sqliteSha256 !== pack.sqliteSha256,
     idempotentReplay: true, productionExecuted: false, executionEnvironment: "ISOLATED_PRELAUNCH",
   };
   const rehearsalBinding = {
@@ -431,11 +449,17 @@ async function prepare(args) {
     conditionalPublish: path.join(outputDir, "conditional-publish-report.json"),
     binding: path.join(outputDir, "rehearsal-binding.json"),
     androidBundle: path.join(outputDir, "android-rc-bundle.json"),
+    knownGoodManifest: path.join(outputDir, "known-good-manifest.json"),
+    failedManifest: path.join(outputDir, "failed-manifest.json"),
+    failedArtifact: path.join(outputDir, "failed-datapack.sqlite.gz"),
     publicKey: path.join(outputDir, "public-key.pem"),
     candidate: path.join(outputDir, "candidate-context.json"),
   };
   await Promise.all([
     writeFile(paths.manifest, rescue.manifestBytes),
+    writeFile(paths.knownGoodManifest, knownGoodBytes),
+    writeFile(paths.failedManifest, failedBytes),
+    writeFile(paths.failedArtifact, failedArtifactBytes),
     writeFile(paths.rollback, jsonBytes(rollbackReport)),
     writeFile(paths.binding, jsonBytes(rehearsalBinding)),
     writeFile(paths.androidBundle, jsonBytes({
@@ -445,6 +469,12 @@ async function prepare(args) {
       artifactSha256: pack.sha256,
       manifestBytesBase64: rescue.manifestBytes.toString("base64"),
       artifactBytesBase64: artifactBytes.toString("base64"),
+      knownGoodManifestSha256: sha256(knownGoodBytes),
+      knownGoodManifestBytesBase64: knownGoodBytes.toString("base64"),
+      failedManifestSha256: sha256(failedBytes),
+      failedArtifactSha256: failedPack.sha256,
+      failedManifestBytesBase64: failedBytes.toString("base64"),
+      failedArtifactBytesBase64: failedArtifactBytes.toString("base64"),
       publicKey: {
         keyId: "production-v1",
         modulusBase64Url: publicKeyJwk.n,
@@ -484,7 +514,41 @@ async function prepare(args) {
     releaseSequence: rescue.manifest.releaseSequence,
   })}\n`);
 }
-
+function signedProductionPack({ pack, version, artifactBytes, sqliteBytes, privateKeyPem }) {
+  const url = new URL(pack.url);
+  const suffix = `/${pack.id}-v${pack.version}.sqlite.gz`;
+  if (!url.pathname.endsWith(suffix)) {
+    throw new Error("production pack URL does not match its identity");
+  }
+  url.pathname = `${url.pathname.slice(0, -suffix.length)}/${pack.id}-v${version}.sqlite.gz`;
+  const next = {
+    ...structuredClone(pack),
+    version,
+    url: url.toString(),
+    sha256: sha256(artifactBytes),
+    sqliteSha256: sha256(sqliteBytes),
+    sizeBytes: artifactBytes.length,
+  };
+  const identityPayload = [
+    next.id, next.version, next.sha256, next.sqliteSha256, next.sizeBytes,
+  ].join(":");
+  next.signature = {
+    algorithm: "rsa-sha256-pack-manifest-v2",
+    value: sign(`${identityPayload}:${new URL(next.url).toString()}`, privateKeyPem),
+  };
+  const routePayload = JSON.stringify((next.representativeRouteRegressions ?? []).map((route) => ({
+    id: route.id,
+    pattern: route.pattern,
+    fromNodeId: route.fromNodeId,
+    toNodeId: route.toNodeId,
+    requiredEdgeIds: route.requiredEdgeIds,
+  })));
+  next.representativeRouteRegressionSignature = {
+    algorithm: "rsa-sha256-route-regression-v1",
+    value: sign(`${identityPayload}:${routePayload}:${new URL(next.url).toString()}`, privateKeyPem),
+  };
+  return next;
+}
 async function collect(args) {
   const repoRoot = path.resolve(args.get("repo-root") ?? ".");
   const outputDir = path.resolve(requiredArg(args, "output-dir"));
@@ -555,7 +619,6 @@ async function collect(args) {
   });
   process.stdout.write(`${JSON.stringify({ status: "PASS", finalReadiness: finalPath, gateIds: Object.keys(fragments) })}\n`);
 }
-
 async function runGenerator({
   repoRoot, gitSha, evaluatedAt, manifestPath, artifactPath, rehearsalBindingPath, publicKeyPem,
   phase, candidatePath, gatePaths = {}, outputPath,
@@ -579,7 +642,6 @@ async function runGenerator({
     env: { ...process.env, EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: publicKeyPem },
   });
 }
-
 async function buildConditionalPublishReport({
   buildSpec, buildSpecBytes, evaluatedAt, rescue, failed, artifactBytes,
   isolatedPublish,
@@ -637,7 +699,6 @@ async function buildConditionalPublishReport({
     },
   };
 }
-
 async function runIsolatedPublishExecutor({ repoRoot, outputDir, rescue, artifactBytes, publicKeyPem }) {
   const stageRoot = path.join(outputDir, "isolated-publish-stage");
   const pack = rescue.manifest.packs[0];
@@ -658,7 +719,6 @@ async function runIsolatedPublishExecutor({ repoRoot, outputDir, rescue, artifac
     cwd: repoRoot,
     env: { ...process.env, EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: publicKeyPem },
   });
-
   const objects = new Map();
   const operations = [];
   const server = createServer(async (request, response) => {
@@ -725,7 +785,6 @@ async function runIsolatedPublishExecutor({ repoRoot, outputDir, rescue, artifac
     const channelManifestWrittenLast = putIndex(packKey) >= 0
       && putIndex(immutableKey) > putIndex(packKey)
       && putIndex(channelKey) > putIndex(immutableKey);
-
     await runExecutor();
     const idempotentReplayVerified = sha256(objects.get(immutableKey)?.body ?? Buffer.alloc(0))
       === sha256(rescue.manifestBytes);
@@ -756,7 +815,6 @@ async function runIsolatedPublishExecutor({ repoRoot, outputDir, rescue, artifac
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
 }
-
 async function runCallbackRehearsal({ manifestBytes, identity, pack, rollbackReport }) {
   if (identity?.dataPackManifestSha256 !== sha256(manifestBytes)
     || identity.dataPackArtifactSha256 !== pack.sha256) {
@@ -842,17 +900,14 @@ async function runCallbackRehearsal({ manifestBytes, identity, pack, rollbackRep
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
 }
-
 function sign(value, privateKeyPem) {
   return createSign("RSA-SHA256").update(value).sign(privateKeyPem).toString("base64url");
 }
-
 function validateTap(text, suite) {
   if (!/(?:^|\n)# fail 0(?:\n|$)/.test(text) || /(?:^|\n)not ok\b/.test(text)) {
     throw new Error(`${suite} suite did not pass`);
   }
 }
-
 async function junitFiles(root, required = true) {
   const files = [];
   for (const entry of await readdir(root, { withFileTypes: true })) {
@@ -863,7 +918,6 @@ async function junitFiles(root, required = true) {
   if (required && files.length === 0) throw new Error("backend JUnit reports are missing");
   return files.sort();
 }
-
 async function validateJunit(files, identity) {
   const requiredClasses = [
     "JdbcDataSourceSnapshotRepositoryContainerTest", "DatapackReleaseCallbackServiceTest",
@@ -884,7 +938,6 @@ async function validateJunit(files, identity) {
   validateBackendReconciliationReport(report, identity);
   return report;
 }
-
 async function writeSuiteEvidence(outputDir, suite, files) {
   const artifacts = [];
   for (const file of files) {
@@ -896,11 +949,9 @@ async function writeSuiteEvidence(outputDir, suite, files) {
   await writeFile(summaryPath, bytes);
   return { artifactId: `${suite}-suite-evidence`, sha256: sha256(bytes) };
 }
-
 async function evidenceReference(artifactId, file) {
   return { artifactId, sha256: sha256(await readFile(file)) };
 }
-
 async function readAndroidDeviceReport(file) {
   const lines = (await readFile(file, "utf8")).split("\n").filter(Boolean);
   for (const line of lines) {
@@ -920,7 +971,6 @@ async function readAndroidDeviceReport(file) {
   }
   throw new Error("Android device machine evidence is missing");
 }
-
 function parseArgs(argv) {
   const args = new Map();
   for (let index = 0; index < argv.length; index += 2) {
@@ -935,13 +985,11 @@ function parseArgs(argv) {
   }
   return args;
 }
-
 function requiredArg(args, name) {
   const value = args.get(name);
   if (!value) throw new Error(`--${name} is required`);
   return value;
 }
-
 function requiredInstant(value, label) {
   const millis = Date.parse(value);
   if (!Number.isFinite(millis) || !/(Z|[+-]\d{2}:\d{2})$/.test(value)) {
@@ -949,15 +997,12 @@ function requiredInstant(value, label) {
   }
   return new Date(millis).toISOString();
 }
-
 async function readJson(file) {
   return JSON.parse(await readFile(file, "utf8"));
 }
-
 function jsonBytes(value) {
   return Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
 }
-
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   try {
     await main(process.argv.slice(2));

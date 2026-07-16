@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
-import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart';
 import 'package:easysubway_mobile/core/database/user/user_database.dart'
     as user_db;
 import 'package:easysubway_mobile/core/datapack/data_pack_client.dart';
@@ -53,13 +52,16 @@ void main() {
       expect(computedManifestSha256, rcBundle['manifestSha256']);
       expect(computedArtifactSha256, rcBundle['artifactSha256']);
       final publicKeyJson = rcBundle['publicKey']! as Map<String, Object?>;
+      final productionSigningPublicKey = DataPackSigningPublicKey(
+        modulusBase64Url: publicKeyJson['modulusBase64Url']! as String,
+        exponentBase64Url: publicKeyJson['exponentBase64Url']! as String,
+        keyId: publicKeyJson['keyId']! as String,
+      );
+      final rcManifestJson =
+          jsonDecode(utf8.decode(rcManifestBytes)) as Map<String, Object?>;
       final rcManifest = DataPackManifest.fromJson(
-        jsonDecode(utf8.decode(rcManifestBytes)) as Map<String, Object?>,
-        productionSigningPublicKey: DataPackSigningPublicKey(
-          modulusBase64Url: publicKeyJson['modulusBase64Url']! as String,
-          exponentBase64Url: publicKeyJson['exponentBase64Url']! as String,
-          keyId: publicKeyJson['keyId']! as String,
-        ),
+        rcManifestJson,
+        productionSigningPublicKey: productionSigningPublicKey,
       );
       expect(rcManifest.releaseSequence, _rcReleaseSequence);
       final rcPack = rcManifest.packs.singleWhere(
@@ -84,59 +86,84 @@ void main() {
       } finally {
         rcSqlite.close();
       }
+      final knownGoodManifestBytes = base64Decode(
+        rcBundle['knownGoodManifestBytesBase64']! as String,
+      );
+      final failedManifestBytes = base64Decode(
+        rcBundle['failedManifestBytesBase64']! as String,
+      );
+      final failedArtifactBytes = base64Decode(
+        rcBundle['failedArtifactBytesBase64']! as String,
+      );
+      final knownGoodManifestJson =
+          jsonDecode(utf8.decode(knownGoodManifestBytes))
+              as Map<String, Object?>;
+      final failedManifestJson =
+          jsonDecode(utf8.decode(failedManifestBytes)) as Map<String, Object?>;
+      final knownGoodManifest = DataPackManifest.fromJson(
+        knownGoodManifestJson,
+        productionSigningPublicKey: productionSigningPublicKey,
+      );
+      final failedManifest = DataPackManifest.fromJson(
+        failedManifestJson,
+        productionSigningPublicKey: productionSigningPublicKey,
+      );
+      final knownGoodPack = knownGoodManifest.packs.single;
+      final failedPack = failedManifest.packs.single;
+      expect(knownGoodManifest.releaseSequence, _rcReleaseSequence - 2);
+      expect(failedManifest.releaseSequence, _rcReleaseSequence - 1);
+      expect(knownGoodPack.compressedSha256, computedArtifactSha256);
+      expect(
+        sha256.convert(knownGoodManifestBytes).toString(),
+        rcBundle['knownGoodManifestSha256'],
+      );
+      expect(
+        sha256.convert(failedManifestBytes).toString(),
+        rcBundle['failedManifestSha256'],
+      );
+      expect(
+        sha256.convert(failedArtifactBytes).toString(),
+        rcBundle['failedArtifactSha256'],
+      );
+      expect(failedPack.compressedSha256, rcBundle['failedArtifactSha256']);
+      expect(
+        failedPack.compressedSha256,
+        isNot(knownGoodPack.compressedSha256),
+      );
+      expect(failedPack.sqliteSha256, isNot(knownGoodPack.sqliteSha256));
       final userDatabase = user_db.UserDatabase.memory();
       final catalogDirectory = Directory('${directory.path}/catalog');
-      final knownGoodSqliteBytes = await _catalogSqliteBytesWithMarker(
-        directory,
-        fileName: 'known-good.sqlite',
-        marker: 'known-good',
-      );
-      final failedSqliteBytes = await _catalogSqliteBytesWithMarker(
-        directory,
-        fileName: 'failed.sqlite',
-        marker: 'failed',
-      );
-      final knownGoodCompressedBytes = gzip.encode(knownGoodSqliteBytes);
-      final failedCompressedBytes = gzip.encode(failedSqliteBytes);
       final corruptBytes = <int>[1, 2, 3, 4];
-      final knownGoodSequence = _rcReleaseSequence - 2;
-      final failedSequence = _rcReleaseSequence - 1;
-      var now = DateTime.utc(2026, 7, 17);
-      var manifestJson = _signedV2PackManifest(
-        sequence: knownGoodSequence,
-        version: '18',
-        compressedBytes: knownGoodCompressedBytes,
-        sqliteBytes: knownGoodSqliteBytes,
-      );
-      DataPackManifest.fromJson(manifestJson);
+      var now = knownGoodManifest.publishedAt!.add(const Duration(seconds: 1));
+      var manifestJson = knownGoodManifestJson;
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       server.listen((request) {
-        switch (request.uri.path) {
-          case '/datapacks/catalog/current.json':
-            request.response
-              ..statusCode = HttpStatus.ok
-              ..headers.contentType = ContentType.json
-              ..write(jsonEncode(manifestJson))
-              ..close();
-          case '/datapacks/catalog/capital-v18.sqlite.gz':
-            request.response
-              ..statusCode = HttpStatus.ok
-              ..add(knownGoodCompressedBytes)
-              ..close();
-          case '/datapacks/catalog/capital-v19.sqlite.gz':
-            request.response
-              ..statusCode = HttpStatus.ok
-              ..add(failedCompressedBytes)
-              ..close();
-          case '/datapacks/catalog/capital-v20.sqlite.gz':
-            request.response
-              ..statusCode = HttpStatus.ok
-              ..add(corruptBytes)
-              ..close();
-          default:
-            request.response
-              ..statusCode = HttpStatus.notFound
-              ..close();
+        if (request.uri.path == '/datapacks/catalog/current.json') {
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..headers.contentType = ContentType.json
+            ..write(jsonEncode(manifestJson))
+            ..close();
+        } else if (request.uri.path == knownGoodPack.url.path) {
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..add(rcArtifactBytes)
+            ..close();
+        } else if (request.uri.path == failedPack.url.path) {
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..add(failedArtifactBytes)
+            ..close();
+        } else if (request.uri.path ==
+            '/datapacks/catalog/capital-v20.sqlite.gz') {
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..add(corruptBytes)
+            ..close();
+        } else {
+          request.response
+            ..statusCode = HttpStatus.notFound
+            ..close();
         }
       });
       final stateRepository = DataPackUpdateStateRepository(
@@ -147,11 +174,27 @@ void main() {
         catalogDirectory: catalogDirectory,
         userDatabase: userDatabase,
       );
+      final manifestUri = Uri.parse(
+        'http://${server.address.host}:${server.port}/datapacks/catalog/current.json',
+      );
+      final productionClient = DataPackClient(
+        manifestUri: manifestUri,
+        stateRepository: stateRepository,
+        productionSigningPublicKey: productionSigningPublicKey,
+        now: () => now,
+      );
       final updater = DataPackUpdater(
+        client: productionClient,
+        installer: installer,
+        httpClient: _LoopbackArtifactHttpClient(
+          serverAddress: server.address,
+          serverPort: server.port,
+        ),
+        now: () => now,
+      );
+      final fixtureUpdater = DataPackUpdater(
         client: DataPackClient(
-          manifestUri: Uri.parse(
-            'http://${server.address.host}:${server.port}/datapacks/catalog/current.json',
-          ),
+          manifestUri: manifestUri,
           stateRepository: stateRepository,
           now: () => now,
         ),
@@ -161,43 +204,28 @@ void main() {
 
       try {
         await updater.checkForUpdates();
-        manifestJson = _signedV2PackManifest(
-          sequence: failedSequence,
-          version: '19',
-          compressedBytes: failedCompressedBytes,
-          sqliteBytes: failedSqliteBytes,
+        expect(
+          (await installer.readCurrentPointer())?.version,
+          knownGoodPack.version,
         );
-        now = now.add(const Duration(seconds: 2));
+        manifestJson = failedManifestJson;
+        now = now.add(const Duration(seconds: 3601));
         await updater.checkForUpdates();
-        expect((await installer.readCurrentPointer())?.version, '19');
-
-        manifestJson = _signedV2PackManifest(
-          sequence: _rcReleaseSequence,
-          version: '18',
-          compressedBytes: knownGoodCompressedBytes,
-          sqliteBytes: knownGoodSqliteBytes,
-          rollbackProvenance: {
-            'kind': 'MONOTONIC_RESCUE',
-            'currentReleaseSequence': failedSequence,
-            'failedReleaseSequence': failedSequence,
-            'failedManifestSha256': 'b' * 64,
-            'knownGoodReleaseSequence': knownGoodSequence,
-            'knownGoodManifestSha256': 'a' * 64,
-            'releaseRequestId': 'prelaunch-$_rcManifestSha256',
-            'approvedByRole': 'release-manager',
-            'approvedAt': '2026-07-17T00:00:00.000Z',
-            'reasonCode': 'PRELAUNCH_REHEARSAL',
-          },
+        expect(
+          (await installer.readCurrentPointer())?.version,
+          failedPack.version,
         );
-        now = now.add(const Duration(seconds: 2));
+
+        manifestJson = rcManifestJson;
+        now = now.add(const Duration(seconds: 3601));
         final rescueStopwatch = Stopwatch()..start();
         await updater.checkForUpdates();
         rescueStopwatch.stop();
         final rescuedPointer = await installer.readCurrentPointer();
-        expect(rescuedPointer?.version, '18');
+        expect(rescuedPointer?.version, rcPack.version);
         expect(
           sha256.convert(await File(rescuedPointer!.path).readAsBytes()),
-          sha256.convert(knownGoodSqliteBytes),
+          sha256.convert(rcSqliteBytes),
         );
         expect(
           (await stateRepository.readAcceptedManifestState(
@@ -206,9 +234,9 @@ void main() {
           _rcReleaseSequence,
         );
 
-        now = now.add(const Duration(seconds: 2));
+        now = now.add(const Duration(seconds: 3601));
         await updater.checkForUpdates();
-        expect((await installer.readCurrentPointer())?.version, '18');
+        expect((await installer.readCurrentPointer())?.version, rcPack.version);
 
         manifestJson = _signedV2PackManifest(
           sequence: _rcReleaseSequence + 1,
@@ -216,23 +244,18 @@ void main() {
           compressedBytes: corruptBytes,
           sqliteBytes: const [5, 6, 7, 8],
         );
-        now = now.add(const Duration(seconds: 2));
-        final rejected = await updater.checkForUpdates();
+        now = now.add(const Duration(seconds: 3601));
+        final rejected = await fixtureUpdater.checkForUpdates();
         expect(rejected.single.status, DataPackInstallStatus.rejected);
-        expect((await installer.readCurrentPointer())?.version, '18');
+        expect((await installer.readCurrentPointer())?.version, rcPack.version);
 
-        manifestJson = _signedV2PackManifest(
-          sequence: knownGoodSequence,
-          version: '18',
-          compressedBytes: knownGoodCompressedBytes,
-          sqliteBytes: knownGoodSqliteBytes,
-        );
-        now = now.add(const Duration(seconds: 2));
+        manifestJson = knownGoodManifestJson;
+        now = now.add(const Duration(seconds: 3601));
         await expectLater(
           updater.checkForUpdates(trigger: UpdateTrigger.userConsent),
           throwsA(isA<DataPackClientException>()),
         );
-        expect((await installer.readCurrentPointer())?.version, '18');
+        expect((await installer.readCurrentPointer())?.version, rcPack.version);
         debugPrint(
           jsonEncode({
             'artifactKind': 'android-datapack-monotonic-rescue-evidence',
@@ -244,6 +267,15 @@ void main() {
             'rcArtifactBytesVerified': true,
             'rcSignatureVerified': true,
             'rcSqliteIntegrityVerified': true,
+            'rcUpdaterReplayVerified': true,
+            'knownGoodManifestSha256': sha256
+                .convert(knownGoodManifestBytes)
+                .toString(),
+            'knownGoodArtifactSha256': knownGoodPack.compressedSha256,
+            'failedManifestSha256': sha256
+                .convert(failedManifestBytes)
+                .toString(),
+            'failedArtifactSha256': failedPack.compressedSha256,
             'knownGoodContentRestored': true,
             'idempotentReplayVerified': true,
             'corruptSuccessorPreservedKnownGood': true,
@@ -258,6 +290,28 @@ void main() {
       }
     },
   );
+}
+
+class _LoopbackArtifactHttpClient implements HttpClient {
+  _LoopbackArtifactHttpClient({
+    required this.serverAddress,
+    required this.serverPort,
+  });
+
+  final InternetAddress serverAddress;
+  final int serverPort;
+  final HttpClient _delegate = HttpClient();
+
+  @override
+  Future<HttpClientRequest> getUrl(Uri url) => _delegate.getUrl(
+    url.replace(scheme: 'http', host: serverAddress.host, port: serverPort),
+  );
+
+  @override
+  void close({bool force = false}) => _delegate.close(force: force);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 const _representativeRouteRegressions = [
@@ -412,20 +466,4 @@ Object? _canonicalValue(Object? value) {
     return {for (final key in keys) key: _canonicalValue(value[key])};
   }
   throw ArgumentError('Unsupported canonical value: ${value.runtimeType}');
-}
-
-Future<List<int>> _catalogSqliteBytesWithMarker(
-  Directory directory, {
-  required String fileName,
-  required String marker,
-}) async {
-  final file = File('${directory.path}/$fileName');
-  final database = CatalogDatabase.file(file);
-  await database.seedBaselineIfEmpty();
-  await database.customStatement(
-    'INSERT OR REPLACE INTO catalog_metadata(key, value) VALUES (?, ?)',
-    ['rescueTestMarker', marker],
-  );
-  await database.close();
-  return file.readAsBytes();
 }
