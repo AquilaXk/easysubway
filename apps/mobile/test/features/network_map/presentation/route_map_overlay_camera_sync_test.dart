@@ -22,7 +22,11 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// 모든 역을 [base] 부근에 두어 비영점 origin이 되도록 구성한 맵.
 StructuredRouteMap _mapAround(Offset base) {
-  final positions = [base, base + const Offset(24, 0), base + const Offset(48, 0)];
+  final positions = [
+    base,
+    base + const Offset(24, 0),
+    base + const Offset(48, 0),
+  ];
   return StructuredRouteMap(
     lines: [
       RouteMapLineGeometry(lineId: 'L1', polylines: [positions]),

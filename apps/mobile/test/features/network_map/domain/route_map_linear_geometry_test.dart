@@ -72,10 +72,7 @@ void main() {
       // 정점0(0)→정점1(10) 사이 절반 → x=5.
       expect(geometry.pointBetweenVertices(0, 1, 0.5), const Offset(5, 0));
       // 정점1(10)→정점2(40) 사이 1/3 → 거리 10 + 30/3 = 20 → x=20.
-      expect(
-        geometry.pointBetweenVertices(1, 2, 1 / 3).dx,
-        closeTo(20, 1e-9),
-      );
+      expect(geometry.pointBetweenVertices(1, 2, 1 / 3).dx, closeTo(20, 1e-9));
     });
 
     test('fraction 범위 밖·정점 index 밖을 clamp한다', () {

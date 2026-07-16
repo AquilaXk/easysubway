@@ -241,10 +241,7 @@ void main() {
     expect(unknownLabel, '약 1분 · 0m');
     expect(unknownLabel, isNot(contains('최근 확인한 기록이 없어요')));
 
-    final staleLabel = await burdenLabelFor(
-      'node-stale-from',
-      'node-stale-to',
-    );
+    final staleLabel = await burdenLabelFor('node-stale-from', 'node-stale-to');
     expect(staleLabel, '약 1분 · 0m');
     expect(staleLabel, isNot(contains('최신 상태를 준비 중이에요')));
   });
@@ -322,10 +319,7 @@ void main() {
 
     expect(wheelchairResult.status, 'BLOCKED');
     expect(wheelchairResult.steps, isEmpty);
-    expect(
-      wheelchairResult.blockedReasons,
-      contains('엘리베이터·통로 상태를 확인하고 있어요.'),
-    );
+    expect(wheelchairResult.blockedReasons, contains('엘리베이터·통로 상태를 확인하고 있어요.'));
   });
 
   test('로컬 내부 이동 데이터가 없으면 API fallback 없이 빈 노드 목록을 반환한다', () async {

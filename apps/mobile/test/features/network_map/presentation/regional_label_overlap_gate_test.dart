@@ -69,7 +69,11 @@ void main() {
       );
 
       // 라벨-선·뱃지 겹침(실기기 클러터) 0.
-      final labelLine = routeMapLabelLineOverlapCount(layout, fixture.map, design);
+      final labelLine = routeMapLabelLineOverlapCount(
+        layout,
+        fixture.map,
+        design,
+      );
       final badge = routeMapBadgeOverlapCounts(layout, fixture.map, design);
       expect(labelLine, 0, reason: '$region 라벨-선 겹침 $labelLine');
       expect(badge.line, 0, reason: '$region 뱃지-선 겹침 ${badge.line}');

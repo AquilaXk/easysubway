@@ -43,9 +43,7 @@ void main() {
     expect(find.text('빠른 길보다\n갈 수 있는 길을\n안내합니다'), findsOneWidget);
   });
 
-  testWidgets('앱 시작 로딩 스피너는 온보딩 복원이 300ms 넘게 걸릴 때만 나타난다', (
-    tester,
-  ) async {
+  testWidgets('앱 시작 로딩 스피너는 온보딩 복원이 300ms 넘게 걸릴 때만 나타난다', (tester) async {
     await tester.pumpWidget(
       _testApp(
         onboardingStore: MemoryOnboardingResultStore(

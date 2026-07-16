@@ -106,7 +106,8 @@ StructuredRouteMapPainter _findRouteMapPainter(WidgetTester tester) {
   final customPaintFinder = find.descendant(
     of: find.byType(StructuredRouteMapView),
     matching: find.byWidgetPredicate(
-      (widget) => widget is CustomPaint && widget.painter is StructuredRouteMapPainter,
+      (widget) =>
+          widget is CustomPaint && widget.painter is StructuredRouteMapPainter,
     ),
   );
   final painter = tester.widget<CustomPaint>(customPaintFinder).painter;
@@ -114,29 +115,28 @@ StructuredRouteMapPainter _findRouteMapPainter(WidgetTester tester) {
 }
 
 void main() {
-  testWidgets(
-    '광주 노선도는 자작 전환으로 attribution을 표시하지 않는다(#2011 계약 전환)',
-    (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: NetworkMapScreen(
-            repository: _FakeNetworkMapRepository(selectedRegion: '광주'),
-            routeDraftController: RouteDraftController(),
-            onOpenStationSearch: (_) {},
-          ),
+  testWidgets('광주 노선도는 자작 전환으로 attribution을 표시하지 않는다(#2011 계약 전환)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NetworkMapScreen(
+          repository: _FakeNetworkMapRepository(selectedRegion: '광주'),
+          routeDraftController: RouteDraftController(),
+          onOpenStationSearch: (_) {},
         ),
-      );
-      await tester.pump();
-      await tester.pump(Duration.zero);
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pump();
+    await tester.pump(Duration.zero);
+    await tester.pumpAndSettle();
 
-      // 오너 자작 도식으로 전환돼 CC-BY-SA(kiwitree) attribution 체인이 배포
-      // 렌더링에 부착되지 않는다 — 수도권 등과 동일하게 미표시.
-      expect(find.byType(StructuredRouteMapView), findsOneWidget);
-      final painter = _findRouteMapPainter(tester);
-      expect(painter.attributionText, isNull);
-    },
-  );
+    // 오너 자작 도식으로 전환돼 CC-BY-SA(kiwitree) attribution 체인이 배포
+    // 렌더링에 부착되지 않는다 — 수도권 등과 동일하게 미표시.
+    expect(find.byType(StructuredRouteMapView), findsOneWidget);
+    final painter = _findRouteMapPainter(tester);
+    expect(painter.attributionText, isNull);
+  });
 
   test('manifest 파싱: 자작 전환 후 어떤 권역도 attribution을 요구하지 않는다(#2011)', () {
     // parseNetworkMapAttributionByRegion은 license.attributionRequired=true인

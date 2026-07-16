@@ -3,26 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('광고 슬롯은 debug 표준 placeholder를 지킨다', (
-    tester,
-  ) async {
+  testWidgets('광고 슬롯은 debug 표준 placeholder를 지킨다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     const slotKey = Key('adSlotTest');
     await tester.pumpWidget(
       const MaterialApp(
         home: Center(
-          child: SizedBox(
-            width: 400,
-            child: AdBannerSlot(slotKey: slotKey),
-          ),
+          child: SizedBox(width: 400, child: AdBannerSlot(slotKey: slotKey)),
         ),
       ),
     );
 
-    expect(
-      tester.getSize(find.byKey(slotKey)).height,
-      96,
-    );
+    expect(tester.getSize(find.byKey(slotKey)).height, 96);
     expect(
       find.byWidgetPredicate(
         (widget) => widget is Semantics && widget.properties.label == '광고',
