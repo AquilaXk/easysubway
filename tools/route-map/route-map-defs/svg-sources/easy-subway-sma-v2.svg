@@ -45730,6 +45730,131 @@
             </g>
           </g>
         </g>
+        <g
+           id="line-terminal-badges-layer"
+           data-name="종점 호선 마크"
+           class="render-layer line-terminal-badge-layer">
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="1" id="line-terminal-badge-1-1536-2575">
+            <circle cx="1535.7" cy="2563.0" r="19.5" fill="#004A85" data-role="line-terminal-badge" />
+            <text x="1535.7" y="2563.0" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">1</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="1" id="line-terminal-badge-1-1915-726">
+            <circle cx="1915.2" cy="714.3" r="19.5" fill="#004A85" data-role="line-terminal-badge" />
+            <text x="1915.2" y="714.3" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">1</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="1" id="line-terminal-badge-1-4421-3312">
+            <circle cx="4420.7" cy="3300.4" r="19.5" fill="#004A85" data-role="line-terminal-badge" />
+            <text x="4420.7" y="3300.4" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">1</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="3" id="line-terminal-badge-3-617-858">
+            <circle cx="618.5" cy="870.4" r="19.5" fill="#ED6C00" data-role="line-terminal-badge" />
+            <text x="618.5" y="870.4" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">3</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="4" id="line-terminal-badge-4-4239-766">
+            <circle cx="4238.7" cy="754.5" r="19.5" fill="#009BCE" data-role="line-terminal-badge" />
+            <text x="4238.7" y="754.5" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">4</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="5" id="line-terminal-badge-5-1078-1223">
+            <circle cx="1073.5" cy="1196.0" r="19.5" fill="#794698" data-role="line-terminal-badge" />
+            <text x="1073.5" y="1196.0" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">5</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="5" id="line-terminal-badge-5-4105-2487">
+            <circle cx="4106.4" cy="2499.2" r="19.5" fill="#794698" data-role="line-terminal-badge" />
+            <text x="4106.4" y="2499.2" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">5</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="5" id="line-terminal-badge-5-4285-1526">
+            <circle cx="4273.6" cy="1523.3" r="19.5" fill="#794698" data-role="line-terminal-badge" />
+            <text x="4273.6" y="1523.3" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">5</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="7" id="line-terminal-badge-7-3296-831">
+            <circle cx="3284.5" cy="831.2" r="19.5" fill="#6E7E31" data-role="line-terminal-badge" />
+            <text x="3284.5" y="831.2" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">7</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="9" id="line-terminal-badge-9-1012-1283">
+            <circle cx="1024.5" cy="1282.8" r="19.5" fill="#A49D87" data-role="line-terminal-badge" />
+            <text x="1024.5" y="1282.8" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">9</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="9" id="line-terminal-badge-9-4005-2034">
+            <circle cx="3993.9" cy="2030.1" r="19.5" fill="#A49D87" data-role="line-terminal-badge" />
+            <text x="3993.9" y="2030.1" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">9</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="airport-railroad" id="line-terminal-badge-airport-railroad-566-2797">
+            <rect x="545.4" y="2778.0" width="64.9" height="39.0" rx="19.5" ry="19.5" fill="#0079AC" data-role="line-terminal-badge" />
+            <text x="577.9" y="2797.5" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">공항</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="everline" id="line-terminal-badge-everline-4321-3196">
+            <rect x="4286.4" y="3164.7" width="64.9" height="39.0" rx="19.5" ry="19.5" fill="#44A436" data-role="line-terminal-badge" />
+            <text x="4318.8" y="3184.2" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">에버</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="gimpo-goldline" id="line-terminal-badge-gimpo-goldline-411-1023">
+            <rect x="378.6" y="991.6" width="64.9" height="39.0" rx="19.5" ry="19.5" fill="#957326" data-role="line-terminal-badge" />
+            <text x="411.0" y="1011.1" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">김포</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="gtx-a" id="line-terminal-badge-gtx-a-499-907">
+            <rect x="476.9" y="876.0" width="39.0" height="39.0" rx="19.5" ry="19.5" fill="#9A6292" data-role="line-terminal-badge" />
+            <text x="496.4" y="895.5" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">A</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="gtx-a" id="line-terminal-badge-gtx-a-2589-3047">
+            <rect x="2568.9" y="3015.2" width="39.0" height="39.0" rx="19.5" ry="19.5" fill="#9A6292" data-role="line-terminal-badge" />
+            <text x="2588.4" y="3034.7" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">A</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="gyeongchun" id="line-terminal-badge-gyeongchun-3946-643">
+            <rect x="3912.7" y="611.6" width="64.9" height="39.0" rx="19.5" ry="19.5" fill="#007A62" data-role="line-terminal-badge" />
+            <text x="3945.1" y="631.1" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">경춘</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="gyeonggang" id="line-terminal-badge-gyeonggang-4321-3083">
+            <rect x="4288.1" y="3051.5" width="64.9" height="39.0" rx="19.5" ry="19.5" fill="#0B318F" data-role="line-terminal-badge" />
+            <text x="4320.5" y="3071.0" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">경강</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="gyeongui-jungang" id="line-terminal-badge-gyeongui-jungang-1133-469">
+            <rect x="1101.2" y="461.4" width="64.9" height="39.0" rx="19.5" ry="19.5" fill="#6AC2B3" data-role="line-terminal-badge" />
+            <text x="1133.7" y="480.9" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">경의</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="gyeongui-jungang" id="line-terminal-badge-gyeongui-jungang-3820-650">
+            <rect x="3799.6" y="630.8" width="64.9" height="39.0" rx="19.5" ry="19.5" fill="#6AC2B3" data-role="line-terminal-badge" />
+            <text x="3832.0" y="650.3" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">경의</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="incheon-1" id="line-terminal-badge-incheon-1-680-1126">
+            <rect x="646.4" y="1094.5" width="64.9" height="39.0" rx="19.5" ry="19.5" fill="#B4C7E7" data-role="line-terminal-badge" />
+            <text x="678.9" y="1114.0" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">인1</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="incheon-1" id="line-terminal-badge-incheon-1-739-3422">
+            <rect x="705.9" y="3391.0" width="64.9" height="39.0" rx="19.5" ry="19.5" fill="#B4C7E7" data-role="line-terminal-badge" />
+            <text x="738.4" y="3410.5" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">인1</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="incheon-2" id="line-terminal-badge-incheon-2-411-1216">
+            <rect x="378.2" y="1184.5" width="64.9" height="39.0" rx="19.5" ry="19.5" fill="#F4A462" data-role="line-terminal-badge" />
+            <text x="410.6" y="1204.0" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">인2</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="incheon-2" id="line-terminal-badge-incheon-2-1329-2869">
+            <rect x="1315.5" y="2848.8" width="64.9" height="39.0" rx="19.5" ry="19.5" fill="#F4A462" data-role="line-terminal-badge" />
+            <text x="1348.0" y="2868.3" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">인2</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="seohae" id="line-terminal-badge-seohae-1919-3296">
+            <rect x="1886.6" y="3264.2" width="64.9" height="39.0" rx="19.5" ry="19.5" fill="#5EAC41" data-role="line-terminal-badge" />
+            <text x="1919.1" y="3283.7" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">서해</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="shinbundang" id="line-terminal-badge-shinbundang-2489-2793">
+            <rect x="2456.1" y="2785.5" width="64.9" height="39.0" rx="19.5" ry="19.5" fill="#B81B30" data-role="line-terminal-badge" />
+            <text x="2488.5" y="2805.0" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">신분</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="sillim" id="line-terminal-badge-sillim-2336-2569">
+            <rect x="2310.2" y="2539.6" width="64.9" height="39.0" rx="19.5" ry="19.5" fill="#5E7DBB" data-role="line-terminal-badge" />
+            <text x="2342.7" y="2559.1" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">신림</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="ui-sinseol" id="line-terminal-badge-ui-sinseol-3110-922">
+            <rect x="3080.2" y="891.1" width="64.9" height="39.0" rx="19.5" ry="19.5" fill="#BACC50" data-role="line-terminal-badge" />
+            <text x="3112.6" y="910.6" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">우이</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="uijeongbu-lrt" id="line-terminal-badge-uijeongbu-lrt-2017-643">
+            <rect x="1984.0" y="635.5" width="64.9" height="39.0" rx="19.5" ry="19.5" fill="#F0831E" data-role="line-terminal-badge" />
+            <text x="2016.5" y="655.0" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">의정</text>
+          </g>
+          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="uijeongbu-lrt" id="line-terminal-badge-uijeongbu-lrt-3126-831">
+            <rect x="3074.6" y="812.1" width="64.9" height="39.0" rx="19.5" ry="19.5" fill="#F0831E" data-role="line-terminal-badge" />
+            <text x="3107.0" y="831.6" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">의정</text>
+          </g>
+        </g>
       </g>
     </g>
   </g>

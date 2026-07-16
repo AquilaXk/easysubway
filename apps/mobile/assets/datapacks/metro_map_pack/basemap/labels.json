@@ -295,7 +295,8 @@
         "y": 726.0875,
         "anchor": "start",
         "fontSizePx": 12.9998,
-        "lines": []
+        "lines": [],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "개화산",
@@ -371,7 +372,8 @@
             "x": 246.176,
             "y": 722.948
           }
-        ]
+        ],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "검단호수공원",
@@ -380,7 +382,8 @@
         "y": 668.439,
         "anchor": "start",
         "fontSizePx": 12.9998,
-        "lines": []
+        "lines": [],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "검바위",
@@ -687,7 +690,8 @@
         "y": 1325.095,
         "anchor": "start",
         "fontSizePx": 12.9998,
-        "lines": []
+        "lines": [],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "광교",
@@ -696,7 +700,8 @@
         "y": 1399.8515,
         "anchor": "start",
         "fontSizePx": 12.9998,
-        "lines": []
+        "lines": [],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "광교중앙",
@@ -734,7 +739,8 @@
         "y": 1327.279,
         "anchor": "start",
         "fontSizePx": 12.9998,
-        "lines": []
+        "lines": [],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "광명사거리",
@@ -1502,7 +1508,8 @@
         "y": 521.6105,
         "anchor": "start",
         "fontSizePx": 12.9998,
-        "lines": []
+        "lines": [],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "대흥",
@@ -1841,7 +1848,8 @@
         "y": 1541.3565,
         "anchor": "start",
         "fontSizePx": 12.9998,
-        "lines": []
+        "lines": [],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "두정",
@@ -1996,7 +2004,8 @@
         "y": 1262.0229,
         "anchor": "start",
         "fontSizePx": 12.9998,
-        "lines": []
+        "lines": [],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "마포",
@@ -2315,7 +2324,8 @@
         "y": 519.6995,
         "anchor": "start",
         "fontSizePx": 12.9998,
-        "lines": []
+        "lines": [],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "발산",
@@ -2360,7 +2370,8 @@
         "y": 698.7875,
         "anchor": "start",
         "fontSizePx": 12.9998,
-        "lines": []
+        "lines": [],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "배방",
@@ -2699,7 +2710,8 @@
             "x": 1475.222,
             "y": 589.8605
           }
-        ]
+        ],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "불광",
@@ -3556,7 +3568,8 @@
             "x": 408.042,
             "y": 1728.767
           }
-        ]
+        ],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "송산",
@@ -4112,7 +4125,8 @@
         "y": 1662.8415,
         "anchor": "start",
         "fontSizePx": 12.9998,
-        "lines": []
+        "lines": [],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "신천",
@@ -4478,7 +4492,8 @@
         "y": 620.2545,
         "anchor": "start",
         "fontSizePx": 12.9998,
-        "lines": []
+        "lines": [],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "양평",
@@ -4579,7 +4594,8 @@
         "y": 1557.145,
         "anchor": "start",
         "fontSizePx": 12.9998,
-        "lines": []
+        "lines": [],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "역곡",
@@ -4633,7 +4649,8 @@
         "y": 485.9385,
         "anchor": "start",
         "fontSizePx": 12.9998,
-        "lines": []
+        "lines": [],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "염창",
@@ -4990,7 +5007,8 @@
         "y": 1448.1725,
         "anchor": "start",
         "fontSizePx": 12.9998,
-        "lines": []
+        "lines": [],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "운정",
@@ -5008,7 +5026,8 @@
         "y": 567.1105,
         "anchor": "start",
         "fontSizePx": 12.9998,
-        "lines": []
+        "lines": [],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "운천",
@@ -5044,7 +5063,8 @@
         "y": 1654.6328,
         "anchor": "start",
         "fontSizePx": 12.9998,
-        "lines": []
+        "lines": [],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "원인재",
@@ -5375,7 +5395,8 @@
             "x": 268.7566,
             "y": 1421.1993
           }
-        ]
+        ],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "인천논현",
@@ -5456,7 +5477,8 @@
         "y": 341.8855,
         "anchor": "start",
         "fontSizePx": 12.9998,
-        "lines": []
+        "lines": [],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "임학",
@@ -5568,7 +5590,8 @@
         "y": 519.6995,
         "anchor": "start",
         "fontSizePx": 12.9998,
-        "lines": []
+        "lines": [],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "장자호수공원",
@@ -5624,7 +5647,8 @@
             "x": 2017.036,
             "y": 1622.301
           }
-        ]
+        ],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "정릉",
@@ -5879,7 +5903,8 @@
             "x": 1904.1505,
             "y": 1084.946
           }
-        ]
+        ],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "중화",
@@ -5942,7 +5967,8 @@
         "y": 437.845,
         "anchor": "end",
         "fontSizePx": 12.9998,
-        "lines": []
+        "lines": [],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "지행",
@@ -5978,7 +6004,8 @@
         "y": 504.093,
         "anchor": "start",
         "fontSizePx": 12.9998,
-        "lines": []
+        "lines": [],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "창동",
@@ -6178,7 +6205,8 @@
         "y": 446.8995,
         "anchor": "start",
         "fontSizePx": 12.9998,
-        "lines": []
+        "lines": [],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "충무로",
@@ -6232,7 +6260,8 @@
         "y": 423.285,
         "anchor": "start",
         "fontSizePx": 12.9998,
-        "lines": []
+        "lines": [],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "탕정",
@@ -6376,7 +6405,8 @@
         "y": 846.89,
         "anchor": "start",
         "fontSizePx": 12.9998,
-        "lines": []
+        "lines": [],
+        "hasLineTerminalBadge": true
       },
       {
         "station": "하남시청",

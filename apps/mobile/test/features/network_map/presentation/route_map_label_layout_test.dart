@@ -111,26 +111,23 @@ void main() {
     expect(layout.badges.length, 2);
   });
 
-  test(
-    '#2068 광주 2차: suppressLineBadges=true면 노선 뱃지 후보를 만들지 않는다',
-    () {
-      final map = _gridMap(count: 60);
-      final layout = solveRouteMapLabelLayout(
-        map: map,
-        design: routeMapDesignSpaceFor(map),
-        labelTextByStationId: {
-          for (final s in map.stations) s.stationId: '역${s.stationId}',
-        },
-        badgeLabelByLineId: const {'L1': '1'},
-        measureLabel: _measureLabel,
-        measureBadge: _measureBadge,
-        suppressLineBadges: true,
-      );
-      expect(layout.badges, isEmpty);
-      // 역 라벨 자체는 불변(뱃지만 억제, 다른 배치에 영향 없음).
-      expect(layout.labels.length, 60);
-    },
-  );
+  test('#2068 광주 2차: suppressLineBadges=true면 노선 뱃지 후보를 만들지 않는다', () {
+    final map = _gridMap(count: 60);
+    final layout = solveRouteMapLabelLayout(
+      map: map,
+      design: routeMapDesignSpaceFor(map),
+      labelTextByStationId: {
+        for (final s in map.stations) s.stationId: '역${s.stationId}',
+      },
+      badgeLabelByLineId: const {'L1': '1'},
+      measureLabel: _measureLabel,
+      measureBadge: _measureBadge,
+      suppressLineBadges: true,
+    );
+    expect(layout.badges, isEmpty);
+    // 역 라벨 자체는 불변(뱃지만 억제, 다른 배치에 영향 없음).
+    expect(layout.labels.length, 60);
+  });
 
   test('전부 충돌이어도 숨기지 않고 최소 겹침 배치 + unresolved 집계', () {
     // 같은 좌표에 역 30개 → gap 사다리 슬롯(방향 8 × gap 4 = 32)을 채워도 물리적

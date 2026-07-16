@@ -211,6 +211,11 @@ function extractMapSvg(svgText) {
     "terminal-station-symbols-layer",
     "station-symbols-layer",
     ...(!regionalSingleLine ? ["transfer-station-symbols-layer"] : []),
+    // #2068 수도권: 종점 호선 마크(대전 스타일 원+숫자/캡슐)를 전용 레이어에 담아
+    // 맨 위에 렌더한다 — 비환승 종점의 종착역 심벌(흰 r6.5 dot) 위로 배지가 덮여
+    // 숫자가 가려지지 않는다. 다른 권역 SVG엔 이 레이어가 없어(배지는
+    // route-lines-layer 내부) extractGroup이 빈 문자열을 반환하므로 영향이 없다.
+    "line-terminal-badges-layer",
   ];
   const mapGroup = layerIds
     .map((id) => {

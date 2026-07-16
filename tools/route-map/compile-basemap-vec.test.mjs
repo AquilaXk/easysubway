@@ -570,7 +570,7 @@ test("markLineTerminalBadgeEntries: 있으면 terminal role 엔트리에만 표�
   assert.equal(entries[0].hasLineTerminalBadge, undefined);
 });
 
-test("labels.json sidecar: 광주·대전·부산은 terminal 엔트리에 hasLineTerminalBadge, 다른 권역은 플래그 없음", () => {
+test("labels.json sidecar: 5권역 모두 terminal 엔트리에 hasLineTerminalBadge, 비-terminal은 플래그 없음", () => {
   const root = path.resolve(import.meta.dirname, "../..");
   const sidecarPath = path.join(
     root,
@@ -582,7 +582,10 @@ test("labels.json sidecar: 광주·대전·부산은 terminal 엔트리에 hasLi
   // role 엔트리 전부에 플래그가 붙고, 부산 terminal 라벨 7건은 모두 그 종점이다.
   // 대구(#2068): 1·2·3호선(원+숫자)·대경선(캡슐+대경) 종점 8곳에 동일 배지를 그려
   // 같은 억제를 켠다 — terminal 라벨 8건 전부에 플래그가 붙는다.
-  for (const regionId of ["gwangju", "daejeon", "busan", "daegu"]) {
+  // 수도권(#2068): 24개 노선의 비환승 종점 30곳(대전 스타일 원+숫자/캡슐 배지)에
+  // line-terminal-badge를 그려 같은 억제를 켠다 — terminal 라벨 30건 전부에 플래그가
+  // 붙는다. 환승 종점은 기존 환승 캡슐이 노선을 표시하므로 배지를 두지 않는다.
+  for (const regionId of ["gwangju", "daejeon", "busan", "daegu", "seoul"]) {
     const terminals = sidecar.regions[regionId].filter(
       (entry) => entry.role === "terminal",
     );
@@ -590,14 +593,15 @@ test("labels.json sidecar: 광주·대전·부산은 terminal 엔트리에 hasLi
     for (const entry of terminals) {
       assert.equal(entry.hasLineTerminalBadge, true, `${regionId}:${entry.station}`);
     }
-  }
-  for (const regionId of ["seoul"]) {
+    // 비-terminal(ordinary/transfer) 엔트리에는 플래그가 붙지 않는다.
     for (const entry of sidecar.regions[regionId]) {
-      assert.equal(
-        entry.hasLineTerminalBadge,
-        undefined,
-        `${regionId}:${entry.station}`,
-      );
+      if (entry.role !== "terminal") {
+        assert.equal(
+          entry.hasLineTerminalBadge,
+          undefined,
+          `${regionId}:${entry.station}`,
+        );
+      }
     }
   }
 });
