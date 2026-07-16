@@ -2977,6 +2977,13 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
                     ),
                     _RouteSearchBody(
                       state: _controller.state,
+                      onSearchSubwayOnly:
+                          _selectedTransportScope ==
+                              RouteTransportScope.subwayAndItxCheongchun
+                          ? () => _changeTransportScope(
+                              RouteTransportScope.subway,
+                            )
+                          : null,
                       routeFeedbackRepository: widget.routeFeedbackRepository,
                       favoriteRouteRepository: widget.favoriteRouteRepository,
                       adRepository: widget.adRepository,
@@ -3903,6 +3910,7 @@ class _RouteStationOptionTile extends StatelessWidget {
 class _RouteSearchBody extends StatelessWidget {
   const _RouteSearchBody({
     required this.state,
+    this.onSearchSubwayOnly,
     required this.routeFeedbackRepository,
     required this.favoriteRouteRepository,
     required this.adRepository,
@@ -3912,6 +3920,7 @@ class _RouteSearchBody extends StatelessWidget {
   });
 
   final RouteSearchState state;
+  final AsyncCallback? onSearchSubwayOnly;
   final RouteFeedbackRepository? routeFeedbackRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
   final AdRepository? adRepository;
@@ -3935,6 +3944,7 @@ class _RouteSearchBody extends StatelessWidget {
       ),
       RouteSearchViewStatus.failure => _RouteSearchFailureMessage(
         message: state.message,
+        onSearchSubwayOnly: onSearchSubwayOnly,
       ),
       RouteSearchViewStatus.success => _RouteSearchResultCard(
         result: state.result!,
@@ -3952,9 +3962,13 @@ class _RouteSearchBody extends StatelessWidget {
 }
 
 class _RouteSearchFailureMessage extends StatelessWidget {
-  const _RouteSearchFailureMessage({required this.message});
+  const _RouteSearchFailureMessage({
+    required this.message,
+    this.onSearchSubwayOnly,
+  });
 
   final String message;
+  final AsyncCallback? onSearchSubwayOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -3966,6 +3980,14 @@ class _RouteSearchFailureMessage extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _RouteSearchMessage(message: message, liveRegion: true),
+        if (onSearchSubwayOnly != null) ...[
+          const SizedBox(height: 12),
+          OutlinedButton(
+            key: const Key('routeSearchSubwayOnlyAction'),
+            onPressed: onSearchSubwayOnly,
+            child: const Text('지하철만 보기'),
+          ),
+        ],
         if (shouldShowNextAction) ...[
           const SizedBox(height: 8),
           Semantics(
