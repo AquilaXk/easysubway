@@ -62,6 +62,32 @@ test("production-publish는 release request 조회 스텝과 !cancelled() 콜백
   assert.doesNotMatch(yml, /steps\.evidence-bundle\.outputs\.manifestSha256/);
 });
 
+test("production callback은 bounded sender 증적을 항상 보존하고 실패를 fail-closed한다", () => {
+  const callbackStep = yml.match(
+    /- name: Data Pack Release \/ Send release callback[\s\S]*?\n\s+- name:/,
+  )?.[0];
+  assert.ok(callbackStep, "release callback 스텝을 찾지 못함");
+  assert.match(callbackStep, /id:\s*callback-delivery/);
+  assert.match(callbackStep, /continue-on-error:\s*true/);
+  assert.match(callbackStep, /send-release-callback\.mjs/);
+  assert.match(callbackStep, /--github-output/);
+  assert.doesNotMatch(callbackStep, /curl|Authorization|Bearer|echo .*secret/i);
+
+  const uploadStep = yml.match(
+    /- name: Data Pack Release \/ Upload callback delivery evidence[\s\S]*?\n\s+- name:/,
+  )?.[0];
+  assert.ok(uploadStep, "callback delivery 증적 업로드 스텝을 찾지 못함");
+  assert.match(uploadStep, /always\(\)/);
+  assert.match(uploadStep, /EASYSUBWAY_DATAPACK_CALLBACK_DELIVERY/);
+
+  const gateStep = yml.match(
+    /- name: Data Pack Release \/ Require confirmed callback delivery[\s\S]*?\n\s+- name:/,
+  )?.[0];
+  assert.ok(gateStep, "callback delivery 확인 gate를 찾지 못함");
+  assert.match(gateStep, /steps\.callback-delivery\.outputs\.state/);
+  assert.match(gateStep, /CALLBACK_RECONCILIATION_REQUIRED/);
+});
+
 test("coverage gap 스텝은 release 모드에서만 production provenance와 release-scope를 배선한다", () => {
   // release-scope 게이트는 게시 범위(pilot region/operator × capitalPilotTargets domains) 내 gap만 차단한다(#1999).
   assert.match(yml, /--release-scope apps\/mobile\/release\/production-datapack-scope\.json/);
@@ -126,6 +152,12 @@ test("워크플로는 rollout-update 모드·publish-rollout 스텝을 가지고
   assert.match(yml, /rolloutTargetSequence/);
   assert.match(yml, /is-pointer-only/);            // 빌드 스텝 게이팅 output
   assert.doesNotMatch(yml, /mode != 'rollback'/);  // 구 게이트가 pointer-only로 통합됨
+  const rolloutStep = yml.match(
+    /- name: Data Pack Release \/ Rollout update pointer swap[\s\S]*?\n\s+- name:/,
+  )?.[0];
+  assert.ok(rolloutStep, "rollout update 스텝을 찾지 못함");
+  assert.match(rolloutStep, /CALLBACK_RECONCILIATION_REQUIRED/);
+  assert.match(rolloutStep, />\s*10/);
 });
 
 test("rollback 모드는 trusted approval·원격 catalog inventory와 sanitized report를 강제한다", () => {

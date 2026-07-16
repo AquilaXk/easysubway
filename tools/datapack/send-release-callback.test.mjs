@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { spawn } from "node:child_process";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 import { sendReleaseCallback } from "./send-release-callback.mjs";
 
@@ -74,5 +78,36 @@ test("transient failure를 모두 소진하면 bounded retry 계획을 기록한
     assert.equal(artifact.state, "RECONCILIATION_REQUIRED");
     assert.equal(artifact.attempts.length, 4);
     assert.deepEqual(slept, [60, 480, 3600]);
+  });
+});
+
+test("CLI는 delivery state를 GitHub output에 기록한다", async () => {
+  await withServer((_request, response) => response.writeHead(200).end(), async (endpoint) => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "callback-sender-"));
+    const payloadPath = path.join(directory, "payload.json");
+    const artifactPath = path.join(directory, "delivery.json");
+    const githubOutputPath = path.join(directory, "github-output");
+    await writeFile(payloadPath, JSON.stringify(payload));
+
+    const exitCode = await new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, [
+        new URL("./send-release-callback.mjs", import.meta.url).pathname,
+        "--payload", payloadPath,
+        "--output", artifactPath,
+        "--github-output", githubOutputPath,
+      ], {
+        env: {
+          ...process.env,
+          EASYSUBWAY_DATAPACK_CALLBACK_URL: endpoint,
+          EASYSUBWAY_DATAPACK_WORKFLOW_TOKEN: token,
+        },
+      });
+      child.once("error", reject);
+      child.once("exit", resolve);
+    });
+
+    assert.equal(exitCode, 0);
+    assert.equal(await readFile(githubOutputPath, "utf8"), "state=DELIVERED\n");
+    assert.equal(JSON.parse(await readFile(artifactPath, "utf8")).state, "DELIVERED");
   });
 });

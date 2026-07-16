@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
+import { appendFile, readFile, writeFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
 import { fileURLToPath } from "node:url";
 
@@ -75,6 +75,7 @@ async function main() {
     options: {
       payload: { type: "string" },
       output: { type: "string" },
+      "github-output": { type: "string" },
     },
   });
   if (!values.payload || !values.output) throw new Error("--payload and --output are required");
@@ -87,6 +88,9 @@ async function main() {
     token,
   });
   await writeFile(values.output, `${JSON.stringify(artifact, null, 2)}\n`);
+  if (values["github-output"]) {
+    await appendFile(values["github-output"], `state=${artifact.state}\n`);
+  }
   if (artifact.state !== "DELIVERED") process.exitCode = 2;
 }
 
