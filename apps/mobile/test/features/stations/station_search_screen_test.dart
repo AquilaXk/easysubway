@@ -12,6 +12,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/easy_subway_app_fixture.dart';
 
+const _completedOnboardingState = OnboardingState.completed(
+  result: OnboardingResult(
+    preset: MobilityPreset.standard,
+    preferences: OnboardingViewPreferences.defaults(),
+  ),
+);
+
 void main() {
   testWidgets('#2083 역 검색 화면은 홈 편집 모드와 같은 46px 시각 박스·중앙 정렬 입력 필드를 렌더한다', (
     tester,
@@ -246,12 +253,7 @@ void main() {
         reportRepository: const UnavailableFacilityReportRepository(),
         searchHistoryRepository: searchHistoryRepository,
         locationProvider: const _FixedCurrentLocationProvider(),
-        initialOnboardingState: const OnboardingState.completed(
-          result: OnboardingResult(
-            preset: MobilityPreset.standard,
-            preferences: OnboardingViewPreferences.defaults(),
-          ),
-        ),
+        initialOnboardingState: _completedOnboardingState,
       ),
     );
     await tester.pumpAndSettle();
@@ -267,6 +269,88 @@ void main() {
       find.byKey(const Key('stationRecentSearchQuery-상록수')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('가까운 역 화면은 위치 실패 후 역명 검색 입력을 보여준다', (tester) async {
+    final repository = _EmptyStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult()],
+      },
+    );
+
+    await tester.pumpWidget(
+      buildEasySubwayTestApp(
+        repository: repository,
+        reportRepository: const UnavailableFacilityReportRepository(),
+        locationProvider: const _FixedCurrentLocationProvider(
+          error: CurrentLocationException('현재 위치를 확인하지 못했어요.'),
+        ),
+        initialOnboardingState: _completedOnboardingState,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('networkMapMenuNearbyButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('현재 위치를 확인하지 못했어요.'), findsOneWidget);
+    expect(find.byKey(const Key('stationSearchInput')), findsOneWidget);
+    expect(find.byKey(const Key('nearbyStationSearchButton')), findsOneWidget);
+    expect(find.byKey(const Key('stationRecentSearchSection')), findsNothing);
+
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.pumpAndSettle();
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+
+    expect(repository.requestedQueries, contains('상록수'));
+    expect(find.text('상록수역'), findsOneWidget);
+  });
+
+  testWidgets('역 검색 화면 AppBar 입력 필드는 시스템 글자 크기를 키워도 잘리지 않는다', (tester) async {
+    // #1962: 고정 높이 검색 필드가 큰 글자 배율에서도 AppBar 경계를 넘지 않아야 한다.
+    final repository = _EmptyStationSearchRepository(
+      nearbyResults: [_stationResult()],
+    );
+
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(textScaler: TextScaler.linear(2.0)),
+        child: buildEasySubwayTestApp(
+          repository: repository,
+          reportRepository: const UnavailableFacilityReportRepository(),
+          locationProvider: const _FixedCurrentLocationProvider(),
+          initialOnboardingState: _completedOnboardingState,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('networkMapMenuNearbyButton')));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+
+    final inputFinder = find.byKey(const Key('stationSearchInput'));
+    expect(inputFinder, findsOneWidget);
+
+    final appBarFinder = find.ancestor(
+      of: inputFinder,
+      matching: find.byType(AppBar),
+    );
+    expect(appBarFinder, findsOneWidget);
+    final appBar = tester.widget<AppBar>(appBarFinder);
+    expect(appBar.toolbarHeight, isNotNull);
+    expect(appBar.toolbarHeight, greaterThan(kToolbarHeight));
+
+    final appBarRect = tester.getRect(appBarFinder);
+    final inputRect = tester.getRect(inputFinder);
+    expect(inputRect.bottom, lessThanOrEqualTo(appBarRect.bottom + 0.5));
+    expect(inputRect.top, greaterThanOrEqualTo(appBarRect.top - 0.5));
   });
 
   testWidgets('역 검색 화면은 최근 검색어를 탭해 빠르게 다시 검색한다', (tester) async {
@@ -462,9 +546,13 @@ void main() {
 }
 
 class _EmptyStationSearchRepository implements StationSearchRepository {
-  _EmptyStationSearchRepository({this.queryResults = const {}});
+  _EmptyStationSearchRepository({
+    this.queryResults = const {},
+    this.nearbyResults = const [],
+  });
 
   final Map<String, List<StationSearchResult>> queryResults;
+  final List<StationSearchResult> nearbyResults;
   final requestedQueries = <String>[];
 
   @override
@@ -484,7 +572,7 @@ class _EmptyStationSearchRepository implements StationSearchRepository {
     CurrentLocation location, {
     int radiusMeters = 2000,
     int limit = 10,
-  }) async => [];
+  }) async => nearbyResults.take(limit).toList(growable: false);
 
   @override
   Future<List<StationSearchResult>> searchStations(String query) async {
@@ -550,17 +638,25 @@ StationSearchResult _stationResult() {
 }
 
 class _FixedCurrentLocationProvider implements CurrentLocationProvider {
-  const _FixedCurrentLocationProvider();
+  const _FixedCurrentLocationProvider({this.error});
+
+  final CurrentLocationException? error;
 
   @override
-  Future<CurrentLocation> currentLocation() async => CurrentLocation(
-    latitude: 37.3028,
-    longitude: 126.8665,
-    accuracyMeters: 25,
-    measuredAt: DateTime.now(),
-    provider: 'test',
-    permissionPrecision: LocationPermissionPrecision.precise,
-  );
+  Future<CurrentLocation> currentLocation() async {
+    final currentError = error;
+    if (currentError != null) {
+      throw currentError;
+    }
+    return CurrentLocation(
+      latitude: 37.3028,
+      longitude: 126.8665,
+      accuracyMeters: 25,
+      measuredAt: DateTime.now(),
+      provider: 'test',
+      permissionPrecision: LocationPermissionPrecision.precise,
+    );
+  }
 
   @override
   Future<bool> needsLocationPermissionRequest() async => false;
