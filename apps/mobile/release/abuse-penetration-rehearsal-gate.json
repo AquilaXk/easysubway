@@ -58,7 +58,7 @@
   "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
   "securityPrivacyEvidenceManifest": "apps/mobile/release/security-privacy-release-evidence.json",
   "releaseSecurityGate": "apps/mobile/release/release-security-gate.json",
-  "evidenceRoot": ".codex/evidence/security/abuse-penetration-rehearsal/<rc-or-run>/",
+  "evidenceRoot": ".codex/evidence/security/abuse-penetration-rehearsal/<git-sha>/",
   "latestQaEvidenceStatus": {
     "qaEvidenceDateKst": "2026-06-28",
     "playAndStorePreflight": {
