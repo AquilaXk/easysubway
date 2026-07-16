@@ -300,8 +300,8 @@ function routeServiceEvidenceInsert(row) {
       throw new Error(`routeServiceArtifactEvidence.${label} must be a lowercase sha256`);
     }
   }
-  if (![2116, 2135].includes(row.sourceIssue)) {
-    throw new Error("routeServiceArtifactEvidence.sourceIssue must be 2116 or 2135");
+  if (row.sourceIssue !== 2116) {
+    throw new Error("routeServiceArtifactEvidence.sourceIssue must be 2116");
   }
   return (
     "INSERT INTO route_service_artifact_evidence (service_class, timetable_artifact_id, timetable_artifact_sha256, canonical_pack_id, canonical_pack_sha256, canonical_pack_sqlite_sha256, admission_status, admission_eligible, fresh_until, source_issue) VALUES (" +

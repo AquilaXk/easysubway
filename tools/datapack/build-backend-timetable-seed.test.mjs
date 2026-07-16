@@ -121,18 +121,6 @@ test("ITX seed는 test-only timetable·canonical pack identity evidence를 같�
   assert.match(sql, /'EXPRESS', 'ITX_CHEONGCHUN', 0/);
   assert.match(sql, /'ITX-청춘'/);
   assert.match(sql, /'청량리 → 춘천'/);
-  artifact.routeServiceArtifactEvidence[0].sourceIssue = 2135;
-  const { sql: admittedSql } = buildBackendTimetableSeed(artifact, {
-    ...OPTIONS,
-    lineId: artifact.canonicalLineId,
-    timetableArtifactSha256: createHash("sha256").update(artifactBytes).digest("hex"),
-    canonicalPackIdentity: artifact.canonicalPackIdentity,
-    serviceCalendarDayMap: Object.fromEntries(artifact.serviceCalendars.map((calendar) => [
-      calendar.serviceId,
-      calendar,
-    ])),
-  });
-  assert.match(admittedSql, /, 2135\);/);
   assert.throws(
     () => buildBackendTimetableSeed({ ...artifact, transitRoutes: [] }, {
       ...OPTIONS,
