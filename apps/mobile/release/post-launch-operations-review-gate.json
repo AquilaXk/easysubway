@@ -106,6 +106,7 @@
             {"path": "tools/datapack/decide-datapack-release.mjs", "sha256": "19df0719c5c030db1981bd34622a42b98e610ac35851a4d0219c70c51dda675c"},
             {"path": "tools/datapack/validate-remote-datapack-artifact.mjs", "sha256": "153a5888903c503fb572b5596afac58d1b0ac1ae973f3e8fda5806948d168b26"},
             {"path": "tools/release/generate-rc-evidence-manifest.mjs", "sha256": "d4dcae15ee381ce16463ad4a8235353327b53adce6fb4d56f25dd6db8c0547c4"},
+            {"path": "tools/release/count-gzip-uncompressed-bytes.mjs", "sha256": "e44ccdd89af5260c6a8027b6b03fdd660640bc52c99be9ba5d024a629d24dbb9"},
             {"path": "tools/release/select-rc-datapack-artifact.mjs", "sha256": "06b1d4e60c041e7cd44e461722a7e5519c515e1135612a16429845bdeac32287"},
             {"path": "tools/release/upload-play-internal.mjs", "sha256": "7bc41b1fb3ce86b2e24043a9a43e47e91577ab33c5170535c8e8c85c09b5c5eb"}
           ]

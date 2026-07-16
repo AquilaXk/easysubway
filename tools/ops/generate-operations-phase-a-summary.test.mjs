@@ -320,6 +320,28 @@ test("Phase A summary generator fails closed when a refresh-bound surface change
   await assert.rejects(readFile(output.summary, "utf8"), /ENOENT/);
 });
 
+test("Phase A summary generator rejects a changed gzip evidence helper", async () => {
+  const output = await paths();
+  const gate = JSON.parse(await readFile(path.join(root, "apps/mobile/release/post-launch-operations-review-gate.json"), "utf8"));
+  markFixedReleaseRevalidated(gate);
+  const fixedReleaseBinding = gate.preLaunchReadiness.finalRcBinding.refreshBindings.find(
+    (binding) => binding.refreshOn === "fixed-release-procedure-change",
+  );
+  const helper = fixedReleaseBinding.files.find(
+    (file) => file.path === "tools/release/count-gzip-uncompressed-bytes.mjs",
+  );
+  assert.ok(helper, "gzip evidence helper must invalidate Phase A evidence");
+  helper.sha256 = "0".repeat(64);
+  const gatePath = path.join(output.dir, "post-launch-operations-review-gate.json");
+  await writeFile(output.manifest, `${JSON.stringify(rcManifest(), null, 2)}\n`);
+  await writeFile(gatePath, `${JSON.stringify(gate, null, 2)}\n`);
+
+  await generate(output, ["--post-launch-gate", gatePath]);
+
+  assert.equal((await readFile(output.status, "utf8")).trim(), "BLOCKED_EXTERNAL");
+  await assert.rejects(readFile(output.summary, "utf8"), /ENOENT/);
+});
+
 test("Phase A summary generator rejects a noncanonical Android application ID", async () => {
   const output = await paths();
   const manifest = rcManifest();
