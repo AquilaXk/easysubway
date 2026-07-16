@@ -8,17 +8,16 @@ import '../../../user_data_deletion.dart';
 class UserDataDeletionAccessItem extends StatelessWidget {
   const UserDataDeletionAccessItem({
     required this.repository,
-    required this.deletionScope,
     required this.onDeleted,
     super.key,
   });
 
   final UserDataDeletionRepository repository;
-  final UserDataDeletionScope deletionScope;
   final Future<void> Function(UserDataDeletionResult result)? onDeleted;
 
   @override
   Widget build(BuildContext context) {
+    final deletionScope = _userDataDeletionScope(repository);
     final copy = _UserDataDeletionCopy.forScope(deletionScope);
     void openDeletionScreen() {
       Navigator.of(context).push(
@@ -85,7 +84,7 @@ enum UserDataDeletionScope {
   remoteAndDevice,
 }
 
-UserDataDeletionScope userDataDeletionScope(
+UserDataDeletionScope _userDataDeletionScope(
   UserDataDeletionRepository? repository,
 ) {
   if (repository == null) {

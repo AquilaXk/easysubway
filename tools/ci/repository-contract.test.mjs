@@ -1892,6 +1892,7 @@ test("모바일 즐겨찾기 화면은 새로고침·삭제·복귀 재조회 �
 
 test("모바일 계정 삭제와 출처 화면은 feature presentation canonical 파일이 소유한다", () => {
   const main = read("apps/mobile/lib/main.dart");
+  const widgetTest = read("apps/mobile/test/widget_test.dart");
   const account = read(
     "apps/mobile/lib/features/account/presentation/user_data_deletion_screen.dart",
   );
@@ -1901,7 +1902,7 @@ test("모바일 계정 삭제와 출처 화면은 feature presentation canonical
 
   assert.match(account, /^class UserDataDeletionAccessItem extends StatelessWidget/m);
   assert.match(account, /^enum UserDataDeletionScope\b/m);
-  assert.match(account, /^UserDataDeletionScope userDataDeletionScope\(/m);
+  assert.match(account, /^UserDataDeletionScope _userDataDeletionScope\(/m);
   assert.match(account, /^class _UserDataDeletionCopy\b/m);
   assert.match(account, /^class UserDataDeletionScreen extends StatefulWidget/m);
   assert.match(account, /^class _UserDataDeletionScreenState extends State<UserDataDeletionScreen>/m);
@@ -1921,13 +1922,17 @@ test("모바일 계정 삭제와 출처 화면은 feature presentation canonical
     main,
     /^import 'features\/attribution\/presentation\/data_source_attribution_screen\.dart';$/m,
   );
-  assert.match(
+  assert.doesNotMatch(
     main,
-    /^export 'features\/account\/presentation\/user_data_deletion_screen\.dart'\s+show\s+UserDataDeletionScope,\s+UserDataDeletionScreen,\s+UserDataDeletionResultScreen;$/m,
+    /^export 'features\/(?:account|attribution)\/presentation\//m,
   );
   assert.match(
-    main,
-    /^export 'features\/attribution\/presentation\/data_source_attribution_screen\.dart'\s+show DataSourceAttributionScreen;$/m,
+    widgetTest,
+    /^import 'package:easysubway_mobile\/features\/account\/presentation\/user_data_deletion_screen\.dart';$/m,
+  );
+  assert.match(
+    widgetTest,
+    /^import 'package:easysubway_mobile\/features\/attribution\/presentation\/data_source_attribution_screen\.dart';$/m,
   );
   assert.doesNotMatch(main, /^class _UserDataDeletionAccessItem\b/m);
   assert.doesNotMatch(main, /^enum UserDataDeletionScope\b/m);

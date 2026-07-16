@@ -49,13 +49,6 @@ import 'mobile_error_reporter.dart';
 import 'user_data_deletion.dart';
 
 export 'app/app_components.dart' show FeatureTile;
-export 'features/account/presentation/user_data_deletion_screen.dart'
-    show
-        UserDataDeletionScope,
-        UserDataDeletionScreen,
-        UserDataDeletionResultScreen;
-export 'features/attribution/presentation/data_source_attribution_screen.dart'
-    show DataSourceAttributionScreen;
 export 'features/notifications/presentation/notification_inbox_screen.dart'
     show NotificationInboxScreen;
 export 'features/favorites/presentation/favorite_home_screen.dart'
@@ -1952,7 +1945,6 @@ class SupportAccessScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final deletionScope = userDataDeletionScope(userDataDeletionRepository);
     return Scaffold(
       appBar: AppBar(title: const Text('도움말·문의')),
       body: SafeArea(
@@ -1975,7 +1967,6 @@ class SupportAccessScreen extends StatelessWidget {
                 if (userDataDeletionRepository != null)
                   UserDataDeletionAccessItem(
                     repository: userDataDeletionRepository!,
-                    deletionScope: deletionScope,
                     onDeleted: onUserDataDeleted,
                   )
                 else if (_mailtoUri(
