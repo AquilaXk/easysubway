@@ -688,6 +688,34 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ inputs.datapack_run_id }}
 
+      - name: RC Evidence Manifest / Restore production data pack validation environment
+        if: ${{ inputs.datapack_run_id != '' }}
+        shell: bash
+        env:
+          EASYSUBWAY_ENV_SECRET: ${{ secrets.EASYSUBWAY_ENV }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${EASYSUBWAY_ENV_SECRET}" ]]; then
+            echo "EASYSUBWAY_ENV is required for production data pack signature validation" >&2
+            exit 1
+          fi
+          rc_env_file="${RUNNER_TEMP}/easysubway-rc-evidence.env"
+          umask 077
+          printf '%s' "${EASYSUBWAY_ENV_SECRET}" > "${rc_env_file}"
+          node tools/ci/validate-store-privacy-env.mjs \
+            --env-file "${rc_env_file}" \
+            --github-env "${GITHUB_ENV}" \
+            --require-android-rc-production
+          rm -f "${rc_env_file}"
+
+      - name: RC Evidence Manifest / Select finalized production data pack
+        if: ${{ inputs.datapack_run_id != '' }}
+        run: |
+          set -euo pipefail
+          node tools/release/select-rc-datapack-artifact.mjs \
+            --artifact-root release-artifacts/downloaded/datapack \
+            --output-root release-artifacts/downloaded/datapack-selected
+
       - name: RC Evidence Manifest / Generate manifest
         shell: bash
         env:
@@ -703,13 +731,8 @@ jobs:
             exit 1
           fi
           if [[ -n "${DATAPACK_RUN_ID}" ]]; then
-            data_pack_manifest=release-artifacts/downloaded/datapack/catalog/current.json
-            mapfile -t production_data_pack_artifacts < <(find release-artifacts/downloaded/datapack -type f -name '*.sqlite.gz' -print)
-            if [[ "${#production_data_pack_artifacts[@]}" -ne 1 ]]; then
-              echo "expected exactly one production data pack artifact, found ${#production_data_pack_artifacts[@]}" >&2
-              exit 1
-            fi
-            data_pack_artifact="${production_data_pack_artifacts[0]}"
+            data_pack_manifest=release-artifacts/downloaded/datapack-selected/current.json
+            data_pack_artifact=release-artifacts/downloaded/datapack-selected/active.sqlite.gz
           fi
           generator_args=(
             --repo-root .

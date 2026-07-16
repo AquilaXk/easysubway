@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile, execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync, sign as signBytes } from "node:crypto";
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -12,6 +12,7 @@ import { promisify } from "node:util";
 import { gunzipSync, inflateSync } from "node:zlib";
 import { REQUIRED_STATUS_CHECK_CONTEXTS } from "./apply-main-ruleset-required-checks.mjs";
 import { canonicalScopeHash } from "../datapack/build-launch-denominator-report.mjs";
+import { canonicalJson, withoutSignature } from "../datapack/lib/manifest-validation.mjs";
 
 const root = process.cwd();
 const execFileAsync = promisify(execFile);
@@ -2676,6 +2677,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   const rcEvidenceManifestContractPath = "apps/mobile/release/rc-evidence-manifest-contract.json";
   const rcEvidenceManifestContract = readJson(rcEvidenceManifestContractPath);
   const workflow = read(".github/workflows/release-artifacts.yml");
+  const generator = read("tools/release/generate-rc-evidence-manifest.mjs");
   const backendBuild = read("backend/build.gradle");
 
   assert.equal(gate.schemaVersion, 1);
@@ -3857,6 +3859,11 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.match(workflow, /ANDROID_RC_SIGNING_MODE: \$\{\{ inputs\.android_rc_signing_mode \}\}/);
   assert.doesNotMatch(workflow, /if \[\[.*\$\{\{ inputs\.(?:datapack_run_id|android_rc_signing_mode) \}\}/);
   assert.match(workflow, /--require-production-data-pack-binding true/);
+  assert.match(workflow, /RC Evidence Manifest \/ Restore production data pack validation environment/);
+  assert.match(workflow, /tools\/ci\/validate-store-privacy-env\.mjs/);
+  assert.match(workflow, /tools\/release\/select-rc-datapack-artifact\.mjs/);
+  assert.doesNotMatch(workflow, /data_pack_manifest=release-artifacts\/downloaded\/datapack\/catalog\/current\.json/);
+  assert.doesNotMatch(generator, /verifySignature:\s*false/);
   assert.match(workflow, /--data-pack-manifest "\$\{data_pack_manifest\}"/);
   assert.match(workflow, /--data-pack-artifact "\$\{data_pack_artifact\}"/);
   assert.match(workflow, /--phase FINAL/);
@@ -4813,7 +4820,12 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   const dataPackArtifactBytes = Buffer.byteLength(dataPackArtifactContents);
   await writeFile(dataPackArtifactPath, dataPackArtifactContents);
   const dataPackArtifactSha256 = createHash("sha256").update(dataPackArtifactContents).digest("hex");
-  const productionManifest = {
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const signProductionManifest = (manifest) => ({ ...manifest, signature: {
+    algorithm: "rsa-sha256-manifest-v2",
+    value: signBytes("RSA-SHA256", canonicalJson(withoutSignature(manifest)), privateKey).toString("base64url"),
+  } });
+  const productionManifest = signProductionManifest({
     manifestVersion: 2, channel: "production", releaseSequence: 102,
     publishedAt: now, expiresAt: "2026-07-30T00:00:00.000Z", ttlSeconds: 3600,
     keyId: "production-v1", signature: { algorithm: "rsa-sha256-manifest-v2", value: "test-signature" },
@@ -4843,7 +4855,7 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
       representativeRouteRegressions: [{ id: "direct-1", pattern: "DIRECT", fromNodeId: "A", toNodeId: "B", requiredEdgeIds: ["A-B"] }],
       representativeRouteRegressionSignature: { algorithm: "rsa-sha256-route-regression-v1", value: "test-signature" },
     }],
-  };
+  });
   await writeFile(dataPackManifestPath, JSON.stringify(productionManifest));
   const args = [
     "tools/release/generate-rc-evidence-manifest.mjs",
@@ -4854,15 +4866,25 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
     "--support-contact-set-sha256", "d".repeat(64),
     "--device", "qa-device-a", "--android-version", "Android 16 API 36",
   ];
+  const publicJwk = publicKey.export({ format: "jwk" });
+  const generatorOptions = { cwd: root, env: {
+    ...process.env,
+    EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: "",
+    EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N: publicJwk.n,
+    EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E: publicJwk.e,
+  } };
   const baselineOutput = path.join(tempDir, "baseline.json");
   const rejectProductionManifest = async (packOverride, expected) => {
-    await writeFile(dataPackManifestPath, JSON.stringify({ ...productionManifest, packs: [{ ...productionManifest.packs[0], ...packOverride }] }));
-    await assert.rejects(execFileAsync(process.execPath, [...args, "--phase", "CANDIDATE", "--output", baselineOutput], { cwd: root }), expected);
+    const manifest = signProductionManifest({ ...productionManifest, packs: [{ ...productionManifest.packs[0], ...packOverride }] });
+    await writeFile(dataPackManifestPath, JSON.stringify(manifest));
+    await assert.rejects(execFileAsync(process.execPath, [...args, "--phase", "CANDIDATE", "--output", baselineOutput], generatorOptions), expected);
   };
+  await writeFile(dataPackManifestPath, JSON.stringify({ ...productionManifest, signature: { ...productionManifest.signature, value: "invalid" } }));
+  await assert.rejects(execFileAsync(process.execPath, [...args, "--phase", "CANDIDATE", "--output", baselineOutput], generatorOptions), /manifest signature mismatch/);
   await rejectProductionManifest({ sha256: "f".repeat(64) }, /production data pack manifest sha256 does not match the supplied artifact/);
   await rejectProductionManifest({ sizeBytes: dataPackArtifactBytes + 1 }, /production data pack manifest sizeBytes does not match the supplied artifact/);
   await writeFile(dataPackManifestPath, JSON.stringify(productionManifest));
-  await execFileAsync(process.execPath, [...args, "--phase", "CANDIDATE", "--output", baselineOutput], { cwd: root });
+  await execFileAsync(process.execPath, [...args, "--phase", "CANDIDATE", "--output", baselineOutput], generatorOptions);
   const candidateManifest = JSON.parse(readFileSync(baselineOutput, "utf8"));
   assert.equal(candidateManifest.phase, "CANDIDATE");
   assert.deepEqual(candidateManifest.consumerIssues, [2058, 1393]);
@@ -4872,13 +4894,13 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   assert.doesNotMatch(JSON.stringify(candidateManifest), /\b(?:GO|NO_GO)\b/);
   assert.equal(candidateManifest.releaseCandidateIdentity.releaseSequence, 102);
   await assert.rejects(execFileAsync(process.execPath, [...args, "--release-sequence", "2026.07.12",
-    "--phase", "CANDIDATE", "--output", path.join(tempDir, "invalid-release-sequence.json")], { cwd: root }),
+    "--phase", "CANDIDATE", "--output", path.join(tempDir, "invalid-release-sequence.json")], generatorOptions),
   /--release-sequence must be a positive safe integer/);
   const evidenceRcIdentity = candidateManifest.releaseCandidateIdentity;
   const invalidCandidatePath = path.join(tempDir, "invalid-candidate-context.json");
   await writeFile(invalidCandidatePath, JSON.stringify({ ...candidateManifest, decision: "GO" }));
   await assert.rejects(execFileAsync(process.execPath, [...args, "--phase", "FINAL",
-    "--candidate-context", invalidCandidatePath, "--output", path.join(tempDir, "invalid-final.json")], { cwd: root }),
+    "--candidate-context", invalidCandidatePath, "--output", path.join(tempDir, "invalid-final.json")], generatorOptions),
   /without readiness or decision fields/);
   args.push("--phase", "FINAL", "--candidate-context", baselineOutput);
   const gateEvidencePaths = {};
@@ -5030,16 +5052,16 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   const firstOutput = path.join(tempDir, "first.json"), secondOutput = path.join(tempDir, "second.json");
   const reevaluatedOutput = path.join(tempDir, "reevaluated.json"), otherDeviceOutput = path.join(tempDir, "other-device.json");
   const rejectsCurrent = (expected) => assert.rejects(
-    execFileAsync(process.execPath, [...args, "--output", firstOutput], { cwd: root }), expected,
+    execFileAsync(process.execPath, [...args, "--output", firstOutput], generatorOptions), expected,
   );
-  await execFileAsync(process.execPath, [...args, "--output", firstOutput], { cwd: root });
-  await execFileAsync(process.execPath, [...args, "--output", secondOutput], { cwd: root });
+  await execFileAsync(process.execPath, [...args, "--output", firstOutput], generatorOptions);
+  await execFileAsync(process.execPath, [...args, "--output", secondOutput], generatorOptions);
   const reevaluatedArgs = [...args];
   reevaluatedArgs[reevaluatedArgs.indexOf("--now") + 1] = "2026-07-17T00:00:00.000Z";
-  await execFileAsync(process.execPath, [...reevaluatedArgs, "--output", reevaluatedOutput], { cwd: root });
+  await execFileAsync(process.execPath, [...reevaluatedArgs, "--output", reevaluatedOutput], generatorOptions);
   const otherDeviceArgs = [...args];
   otherDeviceArgs[otherDeviceArgs.indexOf("--device") + 1] = "qa-device-b";
-  await execFileAsync(process.execPath, [...otherDeviceArgs, "--output", otherDeviceOutput], { cwd: root });
+  await execFileAsync(process.execPath, [...otherDeviceArgs, "--output", otherDeviceOutput], generatorOptions);
 
   const firstBytes = readFileSync(firstOutput, "utf8");
   assert.equal(readFileSync(secondOutput, "utf8"), firstBytes);

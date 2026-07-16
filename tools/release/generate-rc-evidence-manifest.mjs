@@ -394,7 +394,7 @@ function validateProductionDataPackBinding(manifest, artifactPath, artifactBytes
     fail("production data pack binding requires an existing non-empty artifact");
   }
   try {
-    validateManifest(manifest, { requireProduction: true, verifySignature: false });
+    validateManifest(manifest, { requireProduction: true });
   } catch (error) {
     fail(`production data pack manifest schema validation failed: ${error.message}`);
   }
