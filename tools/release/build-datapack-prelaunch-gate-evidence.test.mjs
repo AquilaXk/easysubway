@@ -29,10 +29,10 @@ function fixture() {
   }));
   const references = Object.fromEntries([
     "source", "freshness", "rollback", "android", "callback", "backend", "callbackExecution",
-    "androidDevice", "conditionalPublish",
+    "androidDevice", "conditionalPublish", "candidateContext",
   ].map((id, index) => [id, { artifactId: `${id}-report`, sha256: String((index % 8) + 2).repeat(64) }]));
   return {
-    candidate: { phase: "CANDIDATE", releaseCandidateIdentity: rcIdentity },
+    candidate: { phase: "CANDIDATE", releaseCandidateIdentity: rcIdentity, consumerIssues: [2058, 1393] },
     buildSpec: { sourceSnapshotSetHash: snapshotSetIdentity, sourceSnapshots: sources },
     sourceReport: { status: "PASS", governanceDecision: "GO", snapshotCount: 2, sourceSnapshotSetHash: snapshotSetIdentity },
     rollbackReport: {
@@ -101,10 +101,11 @@ function fixture() {
     evaluatedAt,
   };
 }
-test("동일 RC의 네 prelaunch gate fragment를 생성한다", () => {
+test("동일 RC의 다섯 prelaunch gate fragment를 생성한다", () => {
   const fragments = buildGateFragments(fixture());
   assert.deepEqual(Object.keys(fragments).sort(), [
-    "callback_reconciliation", "freshness_conditional_publish", "rollback_rescue", "source_governance",
+    "callback_reconciliation", "freshness_conditional_publish", "rollback_rescue", "source_admission",
+    "source_governance",
   ]);
   for (const [gateId, fragment] of Object.entries(fragments)) {
     assert.equal(fragment.gateId, gateId);
@@ -113,9 +114,25 @@ test("동일 RC의 네 prelaunch gate fragment를 생성한다", () => {
     assert.equal(fragment.rcIdentity.dataPackManifestSha256, manifestSha256);
   }
   assert.equal(fragments.source_governance.sourceInventory.statusCounts.APPROVED, 2);
+  assert.deepEqual(fragments.source_admission.result.checks, {
+    schemaValidated: true,
+    licenseApproved: true,
+    redistributionApproved: true,
+    credentialRedacted: true,
+    snapshotLocked: true,
+  });
+  assert.equal(
+    fragments.source_admission.result.evidenceReferences[0].artifactId,
+    "candidateContext-report",
+  );
   assert.equal(fragments.rollback_rescue.result.rescueReleaseSequence, 3);
   assert.equal(fragments.callback_reconciliation.result.deliveryIdentity.idempotencyKeySha256,
     sha(`prelaunch-${manifestSha256}:3:${manifestSha256}`));
+});
+test("#2058 consumer binding이 없는 candidate-context는 source admission을 생성하지 않는다", () => {
+  const input = fixture();
+  input.candidate.consumerIssues = [1393];
+  assert.throws(() => buildGateFragments(input), /candidate context consumers/);
 });
 test("snapshot identity가 RC와 다르면 fail closed한다", () => {
   const input = fixture();
@@ -188,7 +205,7 @@ test("backend reconciliation report가 RC와 다르면 fail closed한다", () =>
   input.backendReconciliationReport.manifestSha256 = "0".repeat(64);
   assert.throws(() => buildGateFragments(input), /backend reconciliation evidence/);
 });
-test("prelaunch workflow는 네 gate를 같은 RC final readiness에 결속한다", async () => {
+test("prelaunch workflow는 다섯 gate를 같은 RC final readiness에 결속한다", async () => {
   const workflow = await readFile(new URL(
     "../../.github/workflows/datapack-prelaunch-gates.yml", import.meta.url,
   ), "utf8");
@@ -214,7 +231,8 @@ test("prelaunch workflow는 네 gate를 같은 RC final readiness에 결속한�
   assert.match(workflow, /--conditional-publish-report/);
   assert.match(producer, /tools\/datapack\/publish-object-storage\.mjs/);
   for (const gateId of [
-    "source_governance", "freshness_conditional_publish", "rollback_rescue", "callback_reconciliation",
+    "source_admission", "source_governance", "freshness_conditional_publish", "rollback_rescue",
+    "callback_reconciliation",
   ]) {
     assert.match(workflow, new RegExp(gateId));
   }

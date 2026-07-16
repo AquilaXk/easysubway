@@ -14,7 +14,7 @@ jobs:
     permissions:
       contents: read
     env:
-      REQUIRED_GATE_IDS: source_governance,freshness_conditional_publish,rollback_rescue,callback_reconciliation
+      REQUIRED_GATE_IDS: source_admission,source_governance,freshness_conditional_publish,rollback_rescue,callback_reconciliation
 
     steps:
       - name: Configure rehearsal paths
@@ -134,7 +134,7 @@ jobs:
             test/core/datapack/data_pack_update_state_test.dart \
             | tee "${EVIDENCE_DIR}/android.txt"
 
-      - name: Bind four gate fragments to one final RC identity
+      - name: Bind five gate fragments to one final RC identity
         run: |
           node tools/release/build-datapack-prelaunch-gate-evidence.mjs --mode collect \
             --repo-root . \
