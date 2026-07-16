@@ -76,14 +76,15 @@ test("production timetable evidence는 exact deploy에서 cache와 격리 rollba
 });
 
 test("rollback 후보는 현재 seed를 다른 immutable identity로 만든다", async () => {
-  const output = await mkdtemp(path.join(tmpdir(), "issue-2145-candidate-"));
+  const runnerTemp = await mkdtemp(path.join(tmpdir(), "issue-2145-runner-"));
+  const output = path.join(runnerTemp, "candidate");
   try {
     execFileSync("node", [
       candidatePath,
       "backend/src/main/resources/timetable/line4-timetable-seed.sql.gz",
       "backend/src/main/resources/timetable/server-timetable-snapshot-evidence.json",
       output,
-    ]);
+    ], { env: { ...process.env, RUNNER_TEMP: runnerTemp } });
     const original = JSON.parse(await readFile(
       "backend/src/main/resources/timetable/server-timetable-snapshot-evidence.json",
       "utf8",
@@ -117,6 +118,6 @@ test("rollback 후보는 현재 seed를 다른 immutable identity로 만든다",
       { stdio: "pipe" },
     ));
   } finally {
-    await rm(output, { recursive: true, force: true });
+    await rm(runnerTemp, { recursive: true, force: true });
   }
 });
