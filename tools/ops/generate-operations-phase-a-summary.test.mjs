@@ -40,8 +40,31 @@ async function paths() {
   };
 }
 
+function markFixedReleaseRevalidated(gate) {
+  gate.preLaunchReadiness.status = "PASS";
+  gate.preLaunchReadiness.evidenceSummary.find(
+    (item) => item.id === "fixed-release-versioncode-build-submit-procedure",
+  ).status = "PASS";
+  gate.latestQaEvidenceSummary.remainingExternalBlockers =
+    gate.latestQaEvidenceSummary.remainingExternalBlockers.filter(
+      (item) => item !== "fixed-release-rehearsal-after-node24-runtime-change",
+    );
+  return gate;
+}
+
 async function generate(output, extraArgs = []) {
   const timeArgs = extraArgs.includes("--now") ? [] : ["--now", validPhaseANow];
+  const gateArgs = extraArgs.includes("--post-launch-gate") ? [] : [
+    "--post-launch-gate",
+    path.join(output.dir, "revalidated-post-launch-gate.json"),
+  ];
+  if (gateArgs.length > 0) {
+    const gate = markFixedReleaseRevalidated(JSON.parse(await readFile(
+      path.join(root, "apps/mobile/release/post-launch-operations-review-gate.json"),
+      "utf8",
+    )));
+    await writeFile(gateArgs[1], `${JSON.stringify(gate, null, 2)}\n`);
+  }
   await execFileAsync(process.execPath, [
     "tools/ops/generate-operations-phase-a-summary.mjs",
     "--rc-manifest",
@@ -50,10 +73,31 @@ async function generate(output, extraArgs = []) {
     output.summary,
     "--status-output",
     output.status,
+    ...gateArgs,
     ...timeArgs,
     ...extraArgs,
   ], { cwd: root });
 }
+
+test("canonical Phase A gate blocks until the Node 24 fixed-release rehearsal is refreshed", async () => {
+  const output = await paths();
+  await writeFile(output.manifest, `${JSON.stringify(rcManifest(), null, 2)}\n`);
+
+  await execFileAsync(process.execPath, [
+    "tools/ops/generate-operations-phase-a-summary.mjs",
+    "--rc-manifest",
+    output.manifest,
+    "--summary",
+    output.summary,
+    "--status-output",
+    output.status,
+    "--now",
+    validPhaseANow,
+  ], { cwd: root });
+
+  assert.equal((await readFile(output.status, "utf8")).trim(), "BLOCKED_EXTERNAL");
+  await assert.rejects(readFile(output.summary, "utf8"), /ENOENT/);
+});
 
 test("Phase A summary generator binds a complete RC and validator accepts it", async () => {
   const output = await paths();
@@ -73,6 +117,8 @@ test("Phase A summary generator binds a complete RC and validator accepts it", a
     "tools/ops/validate-operations-release-summary.mjs",
     "--summary",
     output.summary,
+    "--post-launch-gate",
+    path.join(output.dir, "revalidated-post-launch-gate.json"),
     "--rc-manifest",
     output.manifest,
     "--now",
@@ -130,6 +176,7 @@ for (const [field, value] of [
       path.join(root, "apps/mobile/release/post-launch-operations-review-gate.json"),
       "utf8",
     ));
+    markFixedReleaseRevalidated(gate);
     gate.preLaunchReadiness.finalRcBinding.validatedArtifactIdentity = rcManifest().rcIdentity;
     const gatePath = path.join(output.dir, "post-launch-operations-review-gate.json");
     await writeFile(output.manifest, `${JSON.stringify(rcManifest({ [field]: value }), null, 2)}\n`);
@@ -210,6 +257,7 @@ for (const [label, receivedAt] of [
 test("Phase A summary generator requires a PASS summary for every required evidence ID", async () => {
   const output = await paths();
   const gate = JSON.parse(await readFile(path.join(root, "apps/mobile/release/post-launch-operations-review-gate.json"), "utf8"));
+  markFixedReleaseRevalidated(gate);
   gate.preLaunchReadiness.requiredEvidence.push("new-unproven-required-evidence");
   const gatePath = path.join(output.dir, "post-launch-operations-review-gate.json");
   await writeFile(output.manifest, `${JSON.stringify(rcManifest(), null, 2)}\n`);
@@ -260,6 +308,7 @@ test("Phase A summary generator removes a stale PASS summary when a later run is
 test("Phase A summary generator fails closed when a refresh-bound surface changes", async () => {
   const output = await paths();
   const gate = JSON.parse(await readFile(path.join(root, "apps/mobile/release/post-launch-operations-review-gate.json"), "utf8"));
+  markFixedReleaseRevalidated(gate);
   gate.preLaunchReadiness.finalRcBinding.refreshBindings[0].files[0].sha256 = "0".repeat(64);
   const gatePath = path.join(output.dir, "post-launch-operations-review-gate.json");
   await writeFile(output.manifest, `${JSON.stringify(rcManifest(), null, 2)}\n`);
