@@ -10,6 +10,11 @@ import {
   stagedPackPath,
 } from "../datapack/lib/manifest-validation.mjs";
 
+const SUCCESSFUL_FRESHNESS_REASON_CODES = new Set([
+  "PACK_PUBLISH_FRESHNESS_EXPIRED",
+  "PACK_PUBLISH_FRESHNESS_EXPIRING",
+]);
+
 export async function selectRcDataPackArtifact(artifactRoot, outputRoot) {
   const root = path.resolve(artifactRoot);
   const decisionSource = path.join(root, "final-release-decision.json");
@@ -72,13 +77,18 @@ function validateFinalDecision(decision) {
     || !/^[a-f0-9]{64}$/.test(decision.selectedManifestSha256 ?? "")
     || !Number.isSafeInteger(decision.selectedReleaseSequence)
     || decision.selectedReleaseSequence < 1
-    || !Array.isArray(decision.reasonCodes)
-    || decision.reasonCodes.length !== 0
+    || invalidFinalReasonCodes(decision.reasonCodes, published)
     || decision.publishAttempted !== published
     || decision.productionWriteAllowed !== published
   ) {
     throw new Error("final data pack release decision is not RC eligible");
   }
+}
+
+function invalidFinalReasonCodes(reasonCodes, published) {
+  if (!Array.isArray(reasonCodes) || new Set(reasonCodes).size !== reasonCodes.length) return true;
+  const allowed = published ? SUCCESSFUL_FRESHNESS_REASON_CODES : new Set();
+  return reasonCodes.some((reasonCode) => !allowed.has(reasonCode));
 }
 
 function validateSelectedManifest(manifest) {

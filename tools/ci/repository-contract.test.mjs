@@ -5098,6 +5098,27 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
     generatorOptions,
   );
   await writeBoundProductionManifest(productionManifest);
+  const freshnessRenewalDecision = JSON.parse(readFileSync(dataPackReleaseDecisionPath, "utf8"));
+  freshnessRenewalDecision.reasonCodes = ["PACK_PUBLISH_FRESHNESS_EXPIRED"];
+  await writeFile(dataPackReleaseDecisionPath, JSON.stringify(freshnessRenewalDecision));
+  await execFileAsync(
+    process.execPath,
+    [...args, "--phase", "CANDIDATE", "--output", baselineOutput],
+    generatorOptions,
+  );
+  freshnessRenewalDecision.reasonCodes = ["POST_PUBLISH_REMOTE_VALIDATION_FAILED"];
+  await writeFile(dataPackReleaseDecisionPath, JSON.stringify(freshnessRenewalDecision));
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [...args, "--phase", "CANDIDATE", "--output", baselineOutput],
+      generatorOptions,
+    ),
+    /data pack release decision is not finalized/,
+  );
+  freshnessRenewalDecision.reasonCodes = [];
+  await writeFile(dataPackReleaseDecisionPath, JSON.stringify(freshnessRenewalDecision));
+  await writeBoundProductionManifest(productionManifest);
   const releaseDecisionArgIndex = args.indexOf("--data-pack-release-decision");
   const argsWithoutReleaseDecision = args.filter((_, index) => (
     index !== releaseDecisionArgIndex && index !== releaseDecisionArgIndex + 1
@@ -7439,6 +7460,10 @@ test("Play internal track 업로드는 versionCode 정책·mapping·evidence를 
     /play-internal-upload:\n\s*name:[^\n]+\n\s*runs-on:[^\n]+\n\s*needs:\n\s*- android-production-rc-release\n\s*- rc-evidence-manifest/,
   );
   assert.match(workflow, /inputs\.play_upload == 'internal'[\s\S]*needs\.rc-evidence-manifest\.result == 'success'/);
+  assert.match(
+    workflow,
+    /PLAY_UPLOAD: \$\{\{ inputs\.play_upload \}\}[\s\S]*\[\[ "\$\{PLAY_UPLOAD\}" == internal \]\][\s\S]*--fail-on-blocked true/,
+  );
   assert.match(workflow, /inputs\.play_upload == 'internal'/);
   assert.match(workflow, /environment:\n\s*name: android-production-rc/);
   assert.match(workflow, /node tools\/release\/upload-play-internal\.mjs/);

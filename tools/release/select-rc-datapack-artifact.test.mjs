@@ -9,7 +9,7 @@ import { selectRcDataPackArtifact } from "./select-rc-datapack-artifact.mjs";
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
-async function fixture(outcome) {
+async function fixture(outcome, reasonCodes = []) {
   const root = await mkdtemp(path.join(tmpdir(), "easysubway-rc-datapack-"));
   const catalog = path.join(root, "catalog");
   await mkdir(catalog, { recursive: true });
@@ -45,7 +45,7 @@ async function fixture(outcome) {
     sourceSnapshotSetHash: "a".repeat(64),
     selectedManifestSha256: sha256(selectedManifest),
     selectedReleaseSequence: outcome === "PUBLISHED_AND_VERIFIED" ? 12 : 11,
-    reasonCodes: [],
+    reasonCodes,
   }));
   return { root, packBytes };
 }
@@ -58,6 +58,27 @@ test("PUBLISHED_AND_VERIFIED는 게시 candidate manifest와 일치하는 pack�
   assert.equal(JSON.parse(await readFile(result.manifestPath, "utf8")).releaseSequence, 12);
   assert.equal(JSON.parse(await readFile(result.decisionPath, "utf8")).sourceSnapshotSetHash, "a".repeat(64));
   assert.deepEqual(await readFile(result.artifactPath), packBytes);
+});
+
+test("freshness 갱신 성공 reason code는 RC 선택을 막지 않는다", async () => {
+  for (const reasonCode of ["PACK_PUBLISH_FRESHNESS_EXPIRED", "PACK_PUBLISH_FRESHNESS_EXPIRING"]) {
+    const { root } = await fixture("PUBLISHED_AND_VERIFIED", [reasonCode]);
+    const result = await selectRcDataPackArtifact(root, path.join(root, "selected"));
+    assert.equal(result.outcome, "PUBLISHED_AND_VERIFIED");
+  }
+});
+
+test("차단 reason code와 NO_CHANGE의 freshness reason code는 RC 선택에서 거부한다", async () => {
+  for (const [outcome, reasonCode] of [
+    ["PUBLISHED_AND_VERIFIED", "POST_PUBLISH_REMOTE_VALIDATION_FAILED"],
+    ["NO_CHANGE_VALID", "PACK_PUBLISH_FRESHNESS_EXPIRED"],
+  ]) {
+    const { root } = await fixture(outcome, [reasonCode]);
+    await assert.rejects(
+      selectRcDataPackArtifact(root, path.join(root, "selected")),
+      /final data pack release decision is not RC eligible/,
+    );
+  }
 });
 
 test("NO_CHANGE_VALID는 staged candidate가 아니라 current-production manifest를 선택한다", async () => {

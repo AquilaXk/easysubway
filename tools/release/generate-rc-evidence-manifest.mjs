@@ -9,6 +9,11 @@ import { gunzipSync } from "node:zlib";
 import { canonicalScopeHash } from "../datapack/build-launch-denominator-report.mjs";
 import { selectEffectiveDataPack, selectFallbackDataPack, validateManifest } from "../datapack/lib/manifest-validation.mjs";
 
+const SUCCESSFUL_FRESHNESS_REASON_CODES = new Set([
+  "PACK_PUBLISH_FRESHNESS_EXPIRED",
+  "PACK_PUBLISH_FRESHNESS_EXPIRING",
+]);
+
 const args = parseArgs(process.argv.slice(2));
 const cwd = process.cwd();
 const requestedPhase = arg("phase") ?? "FINAL";
@@ -480,8 +485,7 @@ function readFinalDataPackReleaseDecision(filePath, required) {
     || decision.strictValidationPassed !== true
     || decision.publishAttempted !== published
     || decision.remoteValidationPassed !== true
-    || !Array.isArray(decision.reasonCodes)
-    || decision.reasonCodes.length !== 0
+    || invalidFinalReasonCodes(decision.reasonCodes, published)
     || !/^[a-f0-9]{64}$/.test(decision.sourceSnapshotSetHash ?? "")
     || !/^[a-f0-9]{64}$/.test(decision.selectedManifestSha256 ?? "")
     || !Number.isSafeInteger(decision.selectedReleaseSequence)
@@ -490,6 +494,12 @@ function readFinalDataPackReleaseDecision(filePath, required) {
     fail("data pack release decision is not finalized or has invalid sourceSnapshotSetHash");
   }
   return decision;
+}
+
+function invalidFinalReasonCodes(reasonCodes, published) {
+  if (!Array.isArray(reasonCodes) || new Set(reasonCodes).size !== reasonCodes.length) return true;
+  const allowed = published ? SUCCESSFUL_FRESHNESS_REASON_CODES : new Set();
+  return reasonCodes.some((reasonCode) => !allowed.has(reasonCode));
 }
 
 function readKeyValueFileIfExists(filePath) {

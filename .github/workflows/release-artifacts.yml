@@ -733,6 +733,7 @@ jobs:
         env:
           ANDROID_RC_SIGNING_MODE: ${{ inputs.android_rc_signing_mode }}
           DATAPACK_RUN_ID: ${{ inputs.datapack_run_id }}
+          PLAY_UPLOAD: ${{ inputs.play_upload }}
         run: |
           set -euo pipefail
           mkdir -p release-artifacts/rc
@@ -828,6 +829,10 @@ jobs:
           fi
           operations_evidence_args=(--evidence-status "post_launch_operations=${operations_status}")
           operations_gate_args=(--gate-status "postLaunchOperations=${operations_status}")
+          final_readiness_args=()
+          if [[ "${PLAY_UPLOAD}" == internal ]]; then
+            final_readiness_args+=(--fail-on-blocked true)
+          fi
           if [[ "${operations_status}" == "SATISFIED" ]]; then
             operations_evidence_args+=(--evidence-path post_launch_operations=release-artifacts/rc/operations-phase-a-summary.json)
             operations_gate_args+=(--gate-evidence postLaunchOperations=release-artifacts/rc/operations-phase-a-summary.json)
@@ -837,6 +842,7 @@ jobs:
             "${blocked_evidence_args[@]}" \
             "${operations_evidence_args[@]}" \
             "${operations_gate_args[@]}" \
+            "${final_readiness_args[@]}" \
             --phase FINAL \
             --candidate-context release-artifacts/rc/candidate-context.json \
             --output release-artifacts/rc/final-readiness.json
