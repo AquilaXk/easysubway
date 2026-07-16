@@ -2922,6 +2922,11 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "play-installed-build-smoke",
     "play-pre-launch-report-crash-anr-policy-summary",
     "network-trace-redaction-summary-from-play-installed-build",
+    "play-installed-attestation-positive-negative-matrix",
+    "deployed-token-lifecycle-and-session-quota-rehearsal",
+    "deployed-gateway-401-origin-403-no-write-summary",
+    "deployed-limiter-boundary-burst-retry-after-summary",
+    "credential-log-metric-ui-analytics-absence-audit",
     "deployed-public-https-backend-report-admin-base-url-evidence",
     "deployed-admin-operator-auth-session-csrf-summary",
     "deployed-signed-url-boundary-summary",
@@ -2979,6 +2984,12 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "deployed-limiter-boundary-burst-retry-after-summary",
     "credential-log-metric-ui-analytics-absence-audit",
   ]);
+  for (const evidenceId of routeV2AttackMatrix.requiredSameRcProductionEvidence) {
+    assert.ok(
+      abusePenetrationRehearsalGate.productionLikeEvidencePolicy.requiredForClosing.includes(evidenceId),
+      `${evidenceId} must be enforced by the PASS summary evidence catalog`,
+    );
+  }
   assert.equal(routeV2AttackMatrix.productionMutationPerformed, false);
   assert.equal(routeV2AttackMatrix.explicitProductionApprovalRequired, true);
   assert.equal(routeV2AttackMatrix.rawCredentialOrExploitPayloadStored, false);

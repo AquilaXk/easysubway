@@ -80,6 +80,11 @@
       "play-installed-build-smoke",
       "play-pre-launch-report-crash-anr-policy-summary",
       "network-trace-redaction-summary-from-play-installed-build",
+      "play-installed-attestation-positive-negative-matrix",
+      "deployed-token-lifecycle-and-session-quota-rehearsal",
+      "deployed-gateway-401-origin-403-no-write-summary",
+      "deployed-limiter-boundary-burst-retry-after-summary",
+      "credential-log-metric-ui-analytics-absence-audit",
       "deployed-public-https-backend-report-admin-base-url-evidence",
       "deployed-admin-operator-auth-session-csrf-summary",
       "deployed-signed-url-boundary-summary",
@@ -149,7 +154,12 @@
       "deployed-ad-event-edge-rate-limit",
       "deployed-ad-event-origin-bypass-denial",
       "deployed-ad-event-privacy-redaction",
-      "container-hardening-negative-controls"
+      "container-hardening-negative-controls",
+      "play-installed-attestation-positive-negative-matrix",
+      "deployed-token-lifecycle-and-session-quota-rehearsal",
+      "deployed-gateway-401-origin-403-no-write-summary",
+      "deployed-limiter-boundary-burst-retry-after-summary",
+      "credential-log-metric-ui-analytics-absence-audit"
     ],
     "forbiddenClosureEvidence": [
       "static gate JSON",
