@@ -199,4 +199,85 @@ void main() {
       }
     }
   });
+
+  test('basemap 모드 캡슐 장애물은 SVG 실측 반폭으로 부풀린다', () {
+    // 멤버 2점 이격 12 → design(designScale=1) bounding box는 12×0(폭 12, 높이 0).
+    // basemap은 max(dot 4, 캡슐 반폭 13)=13만큼 inflate → 38×26 (중심 (0,0)).
+    final map = StructuredRouteMap(
+      lines: const [],
+      stations: const [],
+      transferGroups: [
+        RouteMapTransferGroup(
+          stationId: 't',
+          lineIds: const ['L1', 'L2'],
+          centroid: const Offset(0, 0),
+          memberPositions: const [Offset(-6, 0), Offset(6, 0)],
+        ),
+      ],
+    );
+    const design = RouteMapDesignSpace(designScale: 1);
+
+    final express = routeMapTransferObstacleRects(map, design);
+    final basemap = routeMapTransferObstacleRects(map, design, basemap: true);
+    expect(express, hasLength(1));
+    expect(basemap, hasLength(1));
+    // basemap rect는 실측 반폭 13으로 부풀어 express(구조화 캡슐)보다 크다.
+    expect(basemap.first, const Rect.fromLTRB(-19, -13, 19, 13));
+    expect(basemap.first.height, greaterThan(express.first.height));
+    expect(basemap.first.width, greaterThan(express.first.width));
+  });
+
+  test('basemap 모드 환승 라벨은 확대된 캡슐 장애물을 덮지 않는다', () {
+    final map = StructuredRouteMap(
+      lines: const [],
+      stations: [
+        RouteMapStructuredStation(
+          stationId: 't',
+          lineId: 'L1',
+          sequence: 0,
+          position: const Offset(0, 0),
+          labelPolygon: const [],
+          labelClass: RouteMapLabelClass.transfer,
+        ),
+        RouteMapStructuredStation(
+          stationId: 'r',
+          lineId: 'L1',
+          sequence: 1,
+          position: const Offset(30, 0),
+          labelPolygon: const [],
+          labelClass: RouteMapLabelClass.regular,
+        ),
+      ],
+      transferGroups: [
+        RouteMapTransferGroup(
+          stationId: 't',
+          lineIds: const ['L1', 'L2'],
+          centroid: const Offset(0, 0),
+          memberPositions: const [Offset(-6, 0), Offset(6, 0)],
+        ),
+      ],
+    );
+    const design = RouteMapDesignSpace(designScale: 1);
+    final obstacles = routeMapTransferObstacleRects(map, design, basemap: true);
+
+    final layout = solveRouteMapLabelLayout(
+      map: map,
+      design: design,
+      labelTextByStationId: const {'t': '환승역명', 'r': '일반역명'},
+      badgeLabelByLineId: const {},
+      measureLabel: _measureLabel,
+      measureBadge: _measureBadge,
+      basemap: true,
+    );
+    for (final label in layout.labels) {
+      for (final obstacle in obstacles) {
+        final overlap = label.rect.intersect(obstacle);
+        expect(
+          overlap.width > 0 && overlap.height > 0,
+          isFalse,
+          reason: '${label.id} 라벨이 basemap 캡슐을 덮음',
+        );
+      }
+    }
+  });
 }

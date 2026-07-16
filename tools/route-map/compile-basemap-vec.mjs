@@ -299,8 +299,90 @@ function inlineSimpleClassStyles(svgText) {
   });
 }
 
+// compiled-map-coordinate-layer 래퍼의 `scale(k)`에서 k를 파싱한다(없으면 1).
+// `scale(x y)` 2값 형식은 첫 값을 쓴다(축정렬 가정과 정합).
+function scaleFromMapTransform(transform) {
+  if (!transform) return 1;
+  const match = transform.match(/scale\(\s*(-?[\d.]+)/);
+  const k = match ? Number(match[1]) : 1;
+  return Number.isFinite(k) ? k : 1;
+}
+
+// 결정성 유지를 위해 고정 소수 4자리로 직렬화(trailing zero는 Number가 정리).
+function roundCoord(value) {
+  return Number(value.toFixed(4));
+}
+
+// style="...font-size:<n>px?..." 선언 값을 ×k로 교체한다(px 접미사는 유지).
+// text·tspan 공통 — SVG에서 style 속성은 동명 presentation attribute보다 우선하므로
+// (예: 클래스가 준 font-size 속성 위에 개별 style로 덮어쓴 배지들) 실제 렌더 크기는
+// style 값이 결정한다. Inkscape 수작업 stray 텍스트(예: GTX-A 배지 옆 tspan, class
+// 없음)는 font-size가 style에만 있어 속성형 스케일링을 비껴간다 — 별도로 보정한다.
+function scaleStyleFontSize(tag, k) {
+  return tag.replace(/style="([^"]*)"/, (_m, styleValue) => {
+    if (!/font-size\s*:/.test(styleValue)) return `style="${styleValue}"`;
+    const scaled = styleValue.replace(
+      /font-size\s*:\s*([\d.]+)(px)?/,
+      (_fm, num, px) => `font-size:${roundCoord(Number(num) * k)}${px ?? ""}`,
+    );
+    return `style="${scaled}"`;
+  });
+}
+
+// vector_graphics_compiler 1.2.6은 축정렬 transform을 소비하며 텍스트 x/y만 변환하고
+// transform을 버린다(node.dart computeTextPosition). 런타임은 fontSize를 그대로 쓰므로
+// scale(k) 레이어 안 텍스트가 viewBox 좌표계에서 k배 안 된 크기로 렌더된다. 또한
+// dominant-baseline central/alignment-baseline middle을 컴파일러·런타임이 지원하지 않아
+// 글리프가 의도한 세로 중심보다 위로 뜬다. 정규화 단계에서 결정적으로 보정한다:
+//   1) font-size(속성형·style형 모두)를 로컬 값 × k로 교체(px 접미사는 속성형만 제거,
+//      style형은 유지) — k=1이면 값 유지.
+//   2) baseline이 central/middle이면 y를 로컬 단위 0.35*fontSize만큼 내리고
+//      baseline 속성을 제거(이후 컴파일러가 point를 k배 변환하므로 로컬 단위가 맞다).
+//      style형 전용 stray 텍스트(Inkscape 수작업)에는 baseline 속성이 없어 대상이
+//      아니다 — 이미 alphabetic 기준으로 배치돼 있으므로 y는 건드리지 않는다.
+// inlineSimpleClassStyles 이후에 적용해 class에서 온 font-size·baseline도 속성으로
+// 정리된 상태를 다룬다. text·tspan 이외 요소는 건드리지 않으며, 텍스트 내용은 불변이다.
+function normalizeTextBaselineAndScale(svgText, k) {
+  const withStyleFontSizeScaled = svgText.replace(
+    /<(?:text|tspan)\b[^>]*>/g,
+    (tag) => scaleStyleFontSize(tag, k),
+  );
+  return withStyleFontSizeScaled.replace(/<text\b[^>]*>/g, (tag) => {
+    const fontSizeMatch = tag.match(/\sfont-size="([\d.]+)(?:px)?"/);
+    if (!fontSizeMatch) return tag;
+    const fontSizeLocal = Number(fontSizeMatch[1]);
+    if (!Number.isFinite(fontSizeLocal)) return tag;
+    let result = tag;
+    const central =
+      /\sdominant-baseline="central"/.test(result) ||
+      /\salignment-baseline="(?:middle|central)"/.test(result);
+    if (central) {
+      const yMatch = result.match(/\sy="(-?[\d.]+)"/);
+      if (yMatch && Number.isFinite(Number(yMatch[1]))) {
+        result = result.replace(
+          /\sy="-?[\d.]+"/,
+          ` y="${roundCoord(Number(yMatch[1]) + 0.35 * fontSizeLocal)}"`,
+        );
+      }
+      result = result
+        .replace(/\sdominant-baseline="[^"]*"/g, "")
+        .replace(/\salignment-baseline="[^"]*"/g, "");
+    }
+    return result.replace(
+      /\sfont-size="[\d.]+(?:px)?"/,
+      ` font-size="${roundCoord(fontSizeLocal * k)}"`,
+    );
+  });
+}
+
 export function normalizeSvgForCompile(svgText) {
-  return inlineSimpleClassStyles(extractMapSvg(svgText))
+  const extracted = extractMapSvg(svgText);
+  const k = scaleFromMapTransform(
+    extracted.match(
+      /<g id="compiled-map-coordinate-layer" transform="([^"]+)"/,
+    )?.[1],
+  );
+  const inlined = inlineSimpleClassStyles(extracted)
     .replace(
       /font-weight="(\d+)"/g,
       (_m, v) => `font-weight="${normalizeFontWeightValue(v)}"`,
@@ -316,6 +398,7 @@ export function normalizeSvgForCompile(svgText) {
         return `${boundary}${attr}="${first}"`;
       },
     );
+  return normalizeTextBaselineAndScale(inlined, k);
 }
 
 // vector_graphics_compiler를 apps/mobile 컨텍스트에서 실행한다. `--packages`가

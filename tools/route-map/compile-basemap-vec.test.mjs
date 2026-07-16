@@ -95,6 +95,123 @@ test("5권역 basemap에는 노선·기존 역 심벌만 남기고 미개통 노
   }
 });
 
+test("scale 레이어 안 텍스트는 font-size를 k배하고 baseline central은 y를 보정한다", () => {
+  const normalized = normalizeSvgForCompile(`
+    <svg>
+      <g id="main-map-scaled-layer" transform="translate(70 138) scale(0.455)">
+        <g id="route-lines-layer"><polyline points="0,0 10,10" /></g>
+        <g id="transfer-station-symbols-layer">
+          <text x="100" y="200" font-size="10.3"
+                dominant-baseline="central" alignment-baseline="middle">1</text>
+        </g>
+      </g>
+    </svg>
+  `);
+  const text = normalized.match(/<text\b[^>]*>/)[0];
+  // 10.3 × 0.455 = 4.6865
+  assert.match(text, /font-size="4\.6865"/);
+  // 200 + 0.35 × 10.3 = 203.605 (로컬 단위)
+  assert.match(text, /\sy="203\.605"/);
+  assert.doesNotMatch(text, /dominant-baseline|alignment-baseline/);
+});
+
+test("scale 없는 권역은 font-size를 유지하고 baseline y만 보정한다", () => {
+  const normalized = normalizeSvgForCompile(`
+    <svg>
+      <g id="route-lines-layer"><polyline points="0,0 10,10" /></g>
+      <g id="transfer-station-symbols-layer">
+        <text x="100" y="200" font-size="10.3" dominant-baseline="central">1</text>
+      </g>
+    </svg>
+  `);
+  const text = normalized.match(/<text\b[^>]*>/)[0];
+  assert.match(text, /font-size="10\.3"/); // k=1 → 불변
+  assert.match(text, /\sy="203\.605"/);
+  assert.doesNotMatch(text, /dominant-baseline/);
+});
+
+test("font-size의 px 접미사를 제거하고 k배 순수 숫자로 직렬화한다", () => {
+  const normalized = normalizeSvgForCompile(`
+    <svg>
+      <g id="main-map-scaled-layer" transform="translate(0 0) scale(0.5)">
+        <g id="route-lines-layer"><polyline points="0,0 10,10" /></g>
+        <g id="transfer-station-symbols-layer">
+          <text x="100" y="200" font-size="10.3px" dominant-baseline="central">1</text>
+        </g>
+      </g>
+    </svg>
+  `);
+  const text = normalized.match(/<text\b[^>]*>/)[0];
+  // 10.3 × 0.5 = 5.15, px 접미사 제거
+  assert.match(text, /font-size="5\.15"/);
+  assert.doesNotMatch(text, /font-size="[^"]*px"/);
+});
+
+test("class에서 인라인된 baseline 속성도 제거한다(인라인 이후 적용)", () => {
+  const normalized = normalizeSvgForCompile(`
+    <svg>
+      <style>
+        .badge-label { dominant-baseline: central; alignment-baseline: middle; }
+      </style>
+      <g id="main-map-scaled-layer" transform="translate(0 0) scale(0.5)">
+        <g id="route-lines-layer"><polyline points="0,0 10,10" /></g>
+        <g id="transfer-station-symbols-layer">
+          <text class="badge-label" x="100" y="200" font-size="10">1</text>
+        </g>
+      </g>
+    </svg>
+  `);
+  const text = normalized.match(/<text\b[^>]*>/)[0];
+  assert.doesNotMatch(text, /dominant-baseline|alignment-baseline/);
+  assert.match(text, /font-size="5"/); // 10 × 0.5
+  assert.match(text, /\sy="203\.5"/); // 200 + 0.35 × 10
+});
+
+test("style형 font-size(px 있음)는 text·tspan 모두 ×k 되고 baseline 보정은 없다", () => {
+  const normalized = normalizeSvgForCompile(`
+    <svg>
+      <g id="main-map-scaled-layer" transform="translate(0 0) scale(0.5)">
+        <g id="route-lines-layer"><polyline points="0,0 10,10" /></g>
+        <g id="transfer-station-symbols-layer">
+          <text xml:space="preserve" style="font-weight:bold;font-size:9.37729px;line-height:0.9" x="100" y="200" id="text1"><tspan
+            style="font-size:8.79121px;stroke-width:2.1978" x="100" y="200">GTX</tspan><tspan
+            style="font-size:8.79121px;stroke-width:2.1978" x="100" y="208" id="tspan2">A</tspan></text>
+        </g>
+      </g>
+    </svg>
+  `);
+  const outerText = normalized.match(/<text\b[^>]*id="text1"[^>]*>/)[0];
+  const tspans = [...normalized.matchAll(/<tspan\b[^>]*>/g)].map((m) => m[0]);
+  // 9.37729 × 0.5 = 4.688645 → roundCoord(4자리) = 4.6886
+  assert.match(outerText, /font-size:4\.6886px/);
+  assert.doesNotMatch(outerText, /dominant-baseline|alignment-baseline/);
+  // y는 baseline 보정 대상이 아니라 불변.
+  assert.match(outerText, /\sy="200"/);
+  // 8.79121 × 0.5 = 4.395605 → roundCoord(4자리) = 4.3956
+  assert.equal(tspans.length, 2);
+  for (const tspan of tspans) {
+    assert.match(tspan, /font-size:4\.3956px/);
+  }
+  assert.match(normalized, />GTX</);
+  assert.match(normalized, />A</);
+});
+
+test("style형 font-size(px 없음)도 동일하게 ×k 스케일한다", () => {
+  const normalized = normalizeSvgForCompile(`
+    <svg>
+      <g id="main-map-scaled-layer" transform="translate(0 0) scale(0.5)">
+        <g id="route-lines-layer"><polyline points="0,0 10,10" /></g>
+        <g id="transfer-station-symbols-layer">
+          <text style="font-size:10" x="100" y="200">A</text>
+        </g>
+      </g>
+    </svg>
+  `);
+  const text = normalized.match(/<text\b[^>]*>/)[0];
+  assert.match(text, /font-size:5(?!\d)/); // 10 × 0.5, px 접미사 없음 유지
+  assert.doesNotMatch(text, /font-size:5px/);
+});
+
 test("build manifest가 source·normalized·vec hash와 viewBox를 결합한다", () => {
   const root = path.resolve(import.meta.dirname, "../..");
   const manifest = JSON.parse(

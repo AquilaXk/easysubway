@@ -463,6 +463,9 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
       badgeLabelByLineId: widget.lineBadgeLabelByLineId,
       measureLabel: measureLabel,
       measureBadge: measureBadge,
+      // 바탕층 모드(역 심벌 미렌더)에서는 화면 캡슐이 오너 SVG 것이라 실측
+      // 반폭이 크다 — 라벨 장애물·anchorPadding을 그 크기로 부풀린다(#2068).
+      basemap: !widget.drawStationSymbols,
     );
     _picture = recordRouteMapPicture(
       map: widget.map,

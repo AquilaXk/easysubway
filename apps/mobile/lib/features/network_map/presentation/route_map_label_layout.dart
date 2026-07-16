@@ -95,11 +95,35 @@ class _Candidate {
 /// (색은 캡슐 기하에 영향이 없어 placeholder를 넘긴다).
 List<Rect> routeMapTransferObstacleRects(
   StructuredRouteMap map,
-  RouteMapDesignSpace design,
-) {
+  RouteMapDesignSpace design, {
+  bool basemap = false,
+}) {
   final rects = <Rect>[];
   for (final group in map.transferGroups) {
     final centers = [for (final p in group.memberPositions) design.toDesign(p)];
+    if (basemap) {
+      // basemap 모드의 화면 캡슐은 오너 SVG 것(구조화 캡슐 아님)이라 실측 반폭이
+      // 크다. SVG 캡슐은 멤버 배지 중심을 잇는 직선 스타디움이므로, 멤버 design
+      // 좌표 bounding box를 실측 반폭만큼 부풀린 rect가 실기 캡슐에 더 가깝다.
+      if (centers.isEmpty) {
+        continue;
+      }
+      var bounds = Rect.fromCenter(center: centers.first, width: 0, height: 0);
+      for (final center in centers.skip(1)) {
+        bounds = bounds.expandToInclude(
+          Rect.fromCenter(center: center, width: 0, height: 0),
+        );
+      }
+      rects.add(
+        bounds.inflate(
+          math.max(
+            kRouteMapTransferDotRadiusPx + kRouteMapTransferDotPaddingPx,
+            kRouteMapBasemapTransferCapsuleHalfWidthPx,
+          ),
+        ),
+      );
+      continue;
+    }
     final markers = routeMapTransferMarkers(
       memberCenters: centers,
       colors: List<Color>.filled(centers.length, const Color(0xFF000000)),
@@ -124,6 +148,7 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
   required Map<String, String> badgeLabelByLineId,
   required Size Function(String text, {required bool bold}) measureLabel,
   required Size Function(String text) measureBadge,
+  bool basemap = false,
 }) {
   final terminusIds = routeMapTerminusStationIds(map);
   final candidates = <_Candidate>[];
@@ -201,8 +226,14 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
         size: measureLabel(text, bold: true),
         priority: _priorityFor(RouteMapLabelClass.transfer),
         // 캡슐이 걸치는 폭까지 띄운다: 캡슐 짧은축 절반 + 멤버 이격 절반.
+        // basemap 모드는 SVG 캡슐 실측 반폭이 더 크므로 그 값으로 상향한다.
         anchorPadding:
-            kRouteMapDesignBadgeRadiusPx +
+            (basemap
+                ? math.max(
+                    kRouteMapDesignBadgeRadiusPx,
+                    kRouteMapBasemapTransferCapsuleHalfWidthPx,
+                  )
+                : kRouteMapDesignBadgeRadiusPx) +
             _memberSpread(group.memberPositions) * design.designScale / 2,
         bold: true,
       ),
@@ -240,7 +271,9 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
   final lineGrid = _RouteMapLineGrid.build(map, design);
   // 환승 캡슐은 라벨보다 먼저 자리를 선점한 장애물이다 — 라벨이 캡슐을 덮지
   // 않도록 시드한다(출력에는 포함되지 않음).
-  final placedRects = <Rect>[...routeMapTransferObstacleRects(map, design)];
+  final placedRects = <Rect>[
+    ...routeMapTransferObstacleRects(map, design, basemap: basemap),
+  ];
   final labels = <RouteMapStaticLabel>[];
   final badges = <RouteMapStaticBadge>[];
   var unresolved = 0;
