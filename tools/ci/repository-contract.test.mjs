@@ -2013,7 +2013,9 @@ test("모바일 도움말 화면과 연결 계약은 support presentation canoni
     "_SupportGroupCard",
     "_SupportNavRow",
     "_SecurityContactNotice",
+    "_SecurityContactNoticeLine",
     "_SafetyDataNotice",
+    "_SafetyDataNoticeLine",
     "_SupportAccessItem",
   ]) {
     assert.match(support, new RegExp(`^class ${helper}\\b`, "m"));

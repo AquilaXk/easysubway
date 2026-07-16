@@ -96,6 +96,26 @@ void main() {
         ),
       ),
     );
+    for (final invalidEmail in [
+      'support@example.com/path',
+      'support@-example.com',
+    ]) {
+      expect(
+        () => SupportAccessInfo(
+          privacyPolicyUrl: 'https://easysubway.example/privacy',
+          supportEmail: invalidEmail,
+          dataDeletionEmail: 'privacy@easysubway.example',
+          securityEmail: 'security@easysubway.example',
+        ).validatedForBuild(isReleaseMode: true),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            'Release support email must be a valid email address.',
+          ),
+        ),
+      );
+    }
     expect(
       const SupportAccessInfo(
         privacyPolicyUrl: 'https://easysubway.example/privacy',

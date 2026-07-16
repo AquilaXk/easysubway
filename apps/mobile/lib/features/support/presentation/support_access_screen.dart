@@ -80,7 +80,9 @@ class SupportAccessInfo {
     if (normalizedValue.isEmpty) {
       throw StateError('Release $label must be configured.');
     }
-    final emailPattern = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+    final emailPattern = RegExp(
+      r'^[^\s@]+@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$',
+    );
     if (!emailPattern.hasMatch(normalizedValue)) {
       throw StateError('Release $label must be a valid email address.');
     }
