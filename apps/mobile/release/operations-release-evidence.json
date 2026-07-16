@@ -247,6 +247,65 @@
         "issue": 1913,
         "androidRouteMode": "LOCAL_FIRST"
       },
+      "routeV2Readiness": {
+        "issue": 2095,
+        "status": "BLOCKED_EXTERNAL",
+        "productionReachabilityEvidence": {
+          "observedAt": "2026-07-16T15:20:00+09:00",
+          "candidateGitSha": "e317f3af90292b9e2dff5e7ec90c22792b845435",
+          "rollbackRun": "https://github.com/AquilaXk/easysubway/actions/runs/29470369402",
+          "ingressOpen": false,
+          "activeProductionEndpoints": []
+        },
+        "intendedAndroidConsumers": [
+          {
+            "method": "POST",
+            "path": "/api/v2/routes/session",
+            "consumer": "PlayIntegrityRouteV2SessionProvider",
+            "auth": "Play Integrity attestation and gateway origin proof",
+            "cacheControl": "private, no-store"
+          },
+          {
+            "method": "POST",
+            "path": "/api/v2/routes/search",
+            "consumer": "RouteSearchV2ApiRepository",
+            "auth": "Bearer route:v2:itx session and gateway origin proof",
+            "cacheControl": "private, no-store"
+          }
+        ],
+        "closedRouteEndpoints": [
+          "/api/v1/routes/search",
+          "/api/v2/routes/{routeSearchId}/refresh"
+        ],
+        "subwayLocalFirst": {
+          "consumer": "TransportScopedRouteSearchRepository",
+          "networkCalls": 0
+        },
+        "timetableSnapshotCache": {
+          "status": "BLOCKED_EXTERNAL",
+          "blockedByIssue": 2145,
+          "requiredKey": {
+            "format": "snapshotSha256 + freshUntil",
+            "fields": ["snapshotSha256", "freshUntil"],
+            "sameFreshnessDifferentHashReloadRequired": true
+          },
+          "currentImplementation": {
+            "status": "BLOCKED_EXTERNAL",
+            "fields": ["timetableArtifactId", "freshUntil"],
+            "gap": "snapshotSha256 is not materialized until #2145"
+          },
+          "sharedRouteResponseCacheAllowed": false
+        },
+        "realisticLoadEvidence": {
+          "status": "NOT_STARTED",
+          "requires": ["normal", "burst", "unavailable", "latency", "error", "resource", "purge"]
+        },
+        "productionCanaryRollback": {
+          "status": "BLOCKED_EXTERNAL",
+          "explicitProductionApprovalRequired": true,
+          "sameCandidateIdentityRequired": true
+        }
+      },
       "requiredEvidence": [
         "backend-public-api-surface-inventory",
         "default-deny-public-chain-test-output",
