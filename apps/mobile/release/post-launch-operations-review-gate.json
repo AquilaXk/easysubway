@@ -73,7 +73,8 @@
             {"path": "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart", "sha256": "7ef5b7236a008f54a22040931f294b00192987fe35cc56fc94ebc2d815ef4620"},
             {"path": "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart", "sha256": "fb01b6443e4e3583b81fe2fb4ab0d48fd0ace4ddd9494235e001f787a22e1940"},
             {"path": "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart", "sha256": "deaf6dc5abf28f164fca115737bcb47d4c9320bd02692f821e697c94e45a54e8"},
-            {"path": "apps/mobile/lib/main.dart", "sha256": "c5ec4c07df63023b5b990741ff46f88865a76f5c6ac1df5b72272520c8af64c2"}
+            {"path": "apps/mobile/lib/features/support/presentation/support_access_screen.dart", "sha256": "b3e5ef1ae549b1a3af8932dcacfa9ccfa1ca6a508a33216f3eb29df5161a09d5"},
+            {"path": "apps/mobile/lib/main.dart", "sha256": "8c71f16a7d597b29c9e07a5dd2df8a2c5dd61a7724f60bab99dfbb8142390e5b"}
           ]
         },
         {

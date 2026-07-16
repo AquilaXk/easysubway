@@ -18,6 +18,7 @@ import 'package:easysubway_mobile/features/ads/active_ad_banner.dart';
 import 'package:easysubway_mobile/features/ads/ad_repository.dart';
 import 'package:easysubway_mobile/features/account/presentation/user_data_deletion_screen.dart';
 import 'package:easysubway_mobile/features/attribution/presentation/data_source_attribution_screen.dart';
+import 'package:easysubway_mobile/features/support/presentation/support_access_screen.dart';
 import 'package:easysubway_mobile/features/fare/official_od_fare_quote.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/data/get_off_alarm_state_repository.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/exact_alarm_permission.dart';
