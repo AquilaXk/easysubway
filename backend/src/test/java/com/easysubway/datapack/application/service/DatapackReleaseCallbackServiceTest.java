@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import com.easysubway.datapack.application.port.out.DatapackReleaseCatalogPort;
 import com.easysubway.datapack.application.service.CallbackSignature.CanonicalFields;
+import com.easysubway.datapack.application.service.CallbackSignature.LegacyCanonicalFields;
 import com.easysubway.datapack.application.service.DatapackReleaseCallbackService.CallbackCommand;
 import com.easysubway.datapack.application.service.DatapackReleaseCallbackService.CallbackResult;
 import com.easysubway.datapack.application.port.out.DatapackReleaseCatalogPort.CatalogIdentity;
@@ -100,6 +101,14 @@ class DatapackReleaseCallbackServiceTest {
 
 	private static String idempotencyKey(String manifestSha) {
 		return APPROVAL_ID + ":" + RELEASE_SEQUENCE + ":" + manifestSha;
+	}
+
+	private CallbackCommand legacyCommand(String publishStatus) {
+		var fields = new LegacyCanonicalFields(1, "datapack-release-callback", APPROVAL_ID,
+			WORKFLOW_URL, SHA, SHA, SHA, SHA, "PASS", "PASS", publishStatus);
+		return new CallbackCommand(1, "datapack-release-callback", APPROVAL_ID,
+			0, null, null, WORKFLOW_URL, SHA, SHA, SHA, SHA,
+			"PASS", "PASS", publishStatus, "payload-signature", callbackSignature.sign(fields));
 	}
 
     @Test
@@ -325,8 +334,28 @@ class DatapackReleaseCallbackServiceTest {
             "evidence-cbk-" + candidateId, candidateId, evidenceBundleSha256, WORKFLOW_URL);
     }
 
-    @Test
-    @DisplayName("(g) PASS + production 채널 없음 → status PUBLISHED 유지 + promote_outcome=REJECTED + promote_detail에 사유")
+	@Test
+	@DisplayName("늦은 schema v1 PASS는 request만 종결하고 최신 production 채널을 되돌리지 않는다")
+	void staleLegacyCallbackCannotPromoteOverCurrentRelease() {
+		insertRow("DISPATCHED", "production");
+		insertCallbackTestCandidate("cand-cbk-current", "b".repeat(64));
+		insertCallbackTestCandidate("cand-1", SHA);
+		insertCallbackTestChannel("cand-cbk-current", "b".repeat(64));
+		insertCallbackTestEvidenceBundle("cand-1", SHA);
+		when(releaseCatalog.fetchCurrent(CHANNEL)).thenReturn(new CatalogIdentity(
+			RELEASE_SEQUENCE + 1, "b".repeat(64), CHANNEL, "request-newer", true, "c".repeat(64)));
+
+		assertThat(service.receive(legacyCommand("PASS")).status()).isEqualTo("PUBLISHED");
+
+		assertThat(statusOf()).isEqualTo("PUBLISHED");
+		assertThat(promoteOutcomeOf()).isEqualTo("REJECTED");
+		assertThat(jdbcTemplate.queryForObject(
+			"SELECT candidate_id FROM datapack_release_channels WHERE channel = 'production'",
+			String.class)).isEqualTo("cand-cbk-current");
+	}
+
+	@Test
+	@DisplayName("(g) PASS + production 채널 없음 → status PUBLISHED 유지 + promote_outcome=REJECTED + promote_detail에 사유")
     void passWithNoProductionChannel_publishesAndRejectsPromote() {
         insertRow("DISPATCHED", "production");
         // 채널을 삽입하지 않음 → findChannel returns empty → promote REJECTED

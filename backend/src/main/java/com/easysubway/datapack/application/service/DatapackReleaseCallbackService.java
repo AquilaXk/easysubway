@@ -183,10 +183,27 @@ public class DatapackReleaseCallbackService {
 			: request.markFailed("publish " + cmd.publishStatus(), now);
 		repository.save(updated);
 		if (pass) {
-			tryPromote(updated, cmd.manifestSha256(), cmd.workflowRunUrl(),
-				cmd.evidenceBundleSha256(), updated.approvalId());
+			if (legacyCurrentReleaseMatches(updated, cmd)) {
+				tryPromote(updated, cmd.manifestSha256(), cmd.workflowRunUrl(),
+					cmd.evidenceBundleSha256(), updated.approvalId());
+			} else {
+				repository.save(updated.withPromoteOutcome(
+					"REJECTED", "LEGACY_CURRENT_RELEASE_MISMATCH"));
+			}
 		}
 		return new CallbackResult(terminal.name(), false);
+	}
+
+	private boolean legacyCurrentReleaseMatches(DatapackReleaseRequest request, CallbackCommand cmd) {
+		try {
+			var current = releaseCatalog.fetchCurrent(request.targetChannel());
+			return current.signatureValid()
+				&& request.targetChannel().equals(current.channel())
+				&& cmd.manifestSha256().equals(current.manifestSha256());
+		} catch (RuntimeException e) {
+			log.warn("legacy callback current release unavailable for {}", request.approvalId());
+			return false;
+		}
 	}
 
 	private static String expectedIdempotencyKey(CallbackCommand cmd) {
