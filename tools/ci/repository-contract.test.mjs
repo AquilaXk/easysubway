@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile, execFileSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign as signBytes } from "node:crypto";
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -3859,6 +3859,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "aabPayloadSha256",
     "dataPackManifestSha256",
     "dataPackArtifactSha256",
+    "dataPackFallbackArtifactSha256",
     "sourceSnapshotSetHash",
     "supportContactSetSha256",
     "releaseSequence",
@@ -3991,6 +3992,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.doesNotMatch(generator, /verifySignature:\s*false/);
   assert.match(workflow, /--data-pack-manifest "\$\{data_pack_manifest\}"/);
   assert.match(workflow, /--data-pack-artifact "\$\{data_pack_artifact\}"/);
+  assert.match(workflow, /--data-pack-fallback-artifact "\$\{data_pack_fallback_artifact\}"/);
   assert.match(workflow, /--data-pack-release-decision "\$\{data_pack_release_decision\}"/);
   assert.match(workflow, /--phase FINAL/);
   assert.match(workflow, /--candidate-context release-artifacts\/rc\/candidate-context\.json/);
@@ -4988,7 +4990,17 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
     schemaVersion: 1, artifactKind: "datapack-release-decision", outcome: "PUBLISHED_AND_VERIFIED",
     productionWriteAllowed: true, strictValidationPassed: true, publishAttempted: true,
     remoteValidationPassed: true, sourceSnapshotSetHash: snapshotSetIdentity, reasonCodes: [],
+    selectedManifestSha256: createHash("sha256").update(JSON.stringify(productionManifest)).digest("hex"),
+    selectedReleaseSequence: productionManifest.releaseSequence,
   }));
+  const writeBoundProductionManifest = async (manifest) => {
+    const manifestBytes = JSON.stringify(manifest);
+    await writeFile(dataPackManifestPath, manifestBytes);
+    const decision = JSON.parse(await readFile(dataPackReleaseDecisionPath, "utf8"));
+    decision.selectedManifestSha256 = createHash("sha256").update(manifestBytes).digest("hex");
+    decision.selectedReleaseSequence = manifest.releaseSequence;
+    await writeFile(dataPackReleaseDecisionPath, JSON.stringify(decision));
+  };
   const args = [
     "tools/release/generate-rc-evidence-manifest.mjs",
     "--repo-root", validationRepo, "--app-root", "apps/mobile", "--git-sha", gitSha, "--now", now,
@@ -5050,7 +5062,7 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
       },
     ],
   });
-  await writeFile(dataPackManifestPath, JSON.stringify(defaultCapitalManifest));
+  await writeBoundProductionManifest(defaultCapitalManifest);
   await execFileAsync(
     process.execPath,
     [...args, "--phase", "CANDIDATE", "--output", baselineOutput],
@@ -5060,7 +5072,11 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
     ...productionManifest,
     emergencyOverride: { id: "capital-rescue", version: "2", reason: "검증된 긴급 복구" },
     packs: [
-      { ...productionManifest.packs[0], sha256: "f".repeat(64) },
+      {
+        ...productionManifest.packs[0],
+        sha256: createHash("sha256").update("datapack-readiness-fallback").digest("hex"),
+        sizeBytes: Buffer.byteLength("datapack-readiness-fallback"),
+      },
       {
         ...productionManifest.packs[0],
         id: "capital-rescue",
@@ -5069,13 +5085,15 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
       },
     ],
   });
-  await writeFile(dataPackManifestPath, JSON.stringify(emergencyOverrideManifest));
+  const fallbackArtifactPath = path.join(tempDir, "capital-fallback.sqlite.gz");
+  await writeFile(fallbackArtifactPath, "datapack-readiness-fallback");
+  await writeBoundProductionManifest(emergencyOverrideManifest);
   await execFileAsync(
     process.execPath,
-    [...args, "--phase", "CANDIDATE", "--output", baselineOutput],
+    [...args, "--data-pack-fallback-artifact", fallbackArtifactPath, "--phase", "CANDIDATE", "--output", baselineOutput],
     generatorOptions,
   );
-  await writeFile(dataPackManifestPath, JSON.stringify(productionManifest));
+  await writeBoundProductionManifest(productionManifest);
   const releaseDecisionArgIndex = args.indexOf("--data-pack-release-decision");
   const argsWithoutReleaseDecision = args.filter((_, index) => (
     index !== releaseDecisionArgIndex && index !== releaseDecisionArgIndex + 1

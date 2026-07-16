@@ -31,6 +31,9 @@ async function fixture(outcome) {
   }));
   await writeFile(path.join(root, "current-production.json"), JSON.stringify({ ...manifest, releaseSequence: 11 }));
   await writeFile(path.join(catalog, "capital-v12.sqlite.gz"), packBytes);
+  const selectedManifest = outcome === "PUBLISHED_AND_VERIFIED"
+    ? await readFile(path.join(catalog, "current.json"))
+    : await readFile(path.join(root, "current-production.json"));
   await writeFile(path.join(root, "final-release-decision.json"), JSON.stringify({
     schemaVersion: 1,
     artifactKind: "datapack-release-decision",
@@ -40,6 +43,8 @@ async function fixture(outcome) {
     publishAttempted: outcome === "PUBLISHED_AND_VERIFIED",
     remoteValidationPassed: true,
     sourceSnapshotSetHash: "a".repeat(64),
+    selectedManifestSha256: sha256(selectedManifest),
+    selectedReleaseSequence: outcome === "PUBLISHED_AND_VERIFIED" ? 12 : 11,
     reasonCodes: [],
   }));
   return { root, packBytes };
@@ -79,10 +84,37 @@ test("emergencyOverride가 있으면 activePack보다 override pack을 선택한
   });
   await writeFile(manifestPath, JSON.stringify(manifest));
   await writeFile(path.join(root, "catalog/capital-rescue-v13.sqlite.gz"), overrideBytes);
+  const decisionPath = path.join(root, "final-release-decision.json");
+  const decision = JSON.parse(await readFile(decisionPath, "utf8"));
+  decision.selectedManifestSha256 = sha256(await readFile(manifestPath));
+  await writeFile(decisionPath, JSON.stringify(decision));
 
   const result = await selectRcDataPackArtifact(root, path.join(root, "selected"));
 
   assert.deepEqual(await readFile(result.artifactPath), overrideBytes);
+  assert.deepEqual(await readFile(result.fallbackArtifactPath), Buffer.from("pack-PUBLISHED_AND_VERIFIED"));
+});
+
+test("decision에 결속된 manifest digest나 sequence가 다르면 거부한다", async () => {
+  const digestMismatch = await fixture("NO_CHANGE_VALID");
+  const digestDecisionPath = path.join(digestMismatch.root, "final-release-decision.json");
+  const digestDecision = JSON.parse(await readFile(digestDecisionPath, "utf8"));
+  digestDecision.selectedManifestSha256 = "f".repeat(64);
+  await writeFile(digestDecisionPath, JSON.stringify(digestDecision));
+  await assert.rejects(
+    selectRcDataPackArtifact(digestMismatch.root, path.join(digestMismatch.root, "selected")),
+    /selected manifest does not match the final release decision/,
+  );
+
+  const sequenceMismatch = await fixture("PUBLISHED_AND_VERIFIED");
+  const sequenceDecisionPath = path.join(sequenceMismatch.root, "final-release-decision.json");
+  const sequenceDecision = JSON.parse(await readFile(sequenceDecisionPath, "utf8"));
+  sequenceDecision.selectedReleaseSequence += 1;
+  await writeFile(sequenceDecisionPath, JSON.stringify(sequenceDecision));
+  await assert.rejects(
+    selectRcDataPackArtifact(sequenceMismatch.root, path.join(sequenceMismatch.root, "selected")),
+    /selected manifest does not match the final release decision/,
+  );
 });
 
 test("activePack이 없으면 런타임과 같이 최신 capital pack을 선택한다", async () => {
@@ -96,6 +128,10 @@ test("activePack이 없으면 런타임과 같이 최신 capital pack을 선택�
     manifest.packs[0],
   ];
   await writeFile(manifestPath, JSON.stringify(manifest));
+  const decisionPath = path.join(root, "final-release-decision.json");
+  const decision = JSON.parse(await readFile(decisionPath, "utf8"));
+  decision.selectedManifestSha256 = sha256(await readFile(manifestPath));
+  await writeFile(decisionPath, JSON.stringify(decision));
 
   const result = await selectRcDataPackArtifact(root, path.join(root, "selected-default"));
 
@@ -117,6 +153,6 @@ test("실패·미검증 decision과 manifest에 결속되지 않은 pack은 거�
   await writeFile(path.join(mismatched.root, "catalog/capital-v12.sqlite.gz"), "different-pack");
   await assert.rejects(
     selectRcDataPackArtifact(mismatched.root, path.join(mismatched.root, "selected")),
-    /exactly one staged pack must match the selected production manifest/,
+    /exactly one staged pack must match each selected production manifest identity/,
   );
 });

@@ -718,6 +718,16 @@ jobs:
             --artifact-root release-artifacts/downloaded/datapack \
             --output-root release-artifacts/downloaded/datapack-selected
 
+      - name: RC Evidence Manifest / Revalidate current production data pack
+        if: ${{ inputs.datapack_run_id != '' }}
+        run: |
+          set -euo pipefail
+          node tools/datapack/validate-remote-datapack-artifact.mjs \
+            --manifest-url "${EASYSUBWAY_DATA_PACK_BASE_URL%/}/catalog/current.json" \
+            --expected-manifest release-artifacts/downloaded/datapack-selected/current.json \
+            --output "${RUNNER_TEMP}/rc-current-datapack-validation" \
+            --require-production
+
       - name: RC Evidence Manifest / Generate manifest
         shell: bash
         env:
@@ -728,6 +738,7 @@ jobs:
           mkdir -p release-artifacts/rc
           data_pack_manifest=apps/mobile/assets/datapacks/metro_map_pack/manifest.json
           data_pack_artifact=apps/mobile/assets/datapacks/capital.sqlite.gz
+          data_pack_fallback_artifact="${data_pack_artifact}"
           data_pack_release_decision=""
           if [[ "${ANDROID_RC_SIGNING_MODE}" == production-upload-key && -z "${DATAPACK_RUN_ID}" ]]; then
             echo "datapack_run_id is required for production RC identity" >&2
@@ -736,6 +747,7 @@ jobs:
           if [[ -n "${DATAPACK_RUN_ID}" ]]; then
             data_pack_manifest=release-artifacts/downloaded/datapack-selected/current.json
             data_pack_artifact=release-artifacts/downloaded/datapack-selected/active.sqlite.gz
+            data_pack_fallback_artifact=release-artifacts/downloaded/datapack-selected/fallback.sqlite.gz
             data_pack_release_decision=release-artifacts/downloaded/datapack-selected/release-decision.json
           fi
           generator_args=(
@@ -745,6 +757,7 @@ jobs:
             --verify-github-sha true
             --data-pack-manifest "${data_pack_manifest}"
             --data-pack-artifact "${data_pack_artifact}"
+            --data-pack-fallback-artifact "${data_pack_fallback_artifact}"
             --evidence-root ".codex/evidence/release/rc-evidence-manifest/${GITHUB_SHA}/"
             --device local_android_emulator
             --android-version android-15-or-16

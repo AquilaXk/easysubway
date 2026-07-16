@@ -372,6 +372,12 @@ test("publish run은 remote artifact validation 뒤 최종 decision과 callback�
   assert.match(yml, /GITHUB_STEP_SUMMARY/);
 });
 
+test("RC producer는 현재 remote production manifest를 다시 검증한다", () => {
+  const releaseWorkflow = readFileSync(path.join(root, ".github/workflows/release-artifacts.yml"), "utf8");
+  assert.match(releaseWorkflow, /validate-remote-datapack-artifact\.mjs/);
+  assert.match(releaseWorkflow, /--expected-manifest release-artifacts\/downloaded\/datapack-selected\/current\.json/);
+});
+
 test("expiry alert는 publish 없이 같은 decision engine을 소비한다", () => {
   const expiryWorkflow = readFileSync(path.join(root, ".github/workflows/datapack-expiry-alert.yml"), "utf8");
   assert.match(expiryWorkflow, /decide-datapack-release\.mjs/);

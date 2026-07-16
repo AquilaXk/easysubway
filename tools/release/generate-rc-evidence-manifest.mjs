@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, wri
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { canonicalScopeHash } from "../datapack/build-launch-denominator-report.mjs";
-import { selectEffectiveDataPack, validateManifest } from "../datapack/lib/manifest-validation.mjs";
+import { selectEffectiveDataPack, selectFallbackDataPack, validateManifest } from "../datapack/lib/manifest-validation.mjs";
 
 const args = parseArgs(process.argv.slice(2));
 const cwd = process.cwd();
@@ -42,17 +42,28 @@ const dataPackArtifactPath = dataPackArtifactArg ? resolvePath(dataPackArtifactA
 const dataPackArtifactBytes = dataPackArtifactPath && existsSync(dataPackArtifactPath)
   ? statSync(dataPackArtifactPath).size
   : null;
+const dataPackFallbackArtifactArg = arg("dataPackFallbackArtifact", "data-pack-fallback-artifact");
+const dataPackFallbackArtifactPath = dataPackFallbackArtifactArg
+  ? resolvePath(dataPackFallbackArtifactArg)
+  : dataPackArtifactPath;
+const dataPackFallbackArtifactBytes = dataPackFallbackArtifactPath && existsSync(dataPackFallbackArtifactPath)
+  ? statSync(dataPackFallbackArtifactPath).size
+  : null;
 const requireProductionDataPackBinding = booleanArg("requireProductionDataPackBinding", "require-production-data-pack-binding");
 const dataPackReleaseDecisionPath = arg("dataPackReleaseDecision", "data-pack-release-decision");
-const sourceSnapshotSetHash = readFinalDataPackReleaseDecision(
+const dataPackReleaseDecision = readFinalDataPackReleaseDecision(
   dataPackReleaseDecisionPath,
   requireProductionDataPackBinding,
 );
+const sourceSnapshotSetHash = dataPackReleaseDecision?.sourceSnapshotSetHash ?? null;
 if (requireProductionDataPackBinding) {
   validateProductionDataPackBinding(
     dataPackManifest,
     dataPackArtifactPath,
     dataPackArtifactBytes,
+    dataPackFallbackArtifactPath,
+    dataPackFallbackArtifactBytes,
+    dataPackReleaseDecision,
     generatedAtMillis,
   );
 }
@@ -137,6 +148,7 @@ const identity = {
   backendArtifactSha256: backendIdentity.backendArtifactSha256,
   dataPackManifestSha256: sha256FileIfExists(dataPackManifestPath),
   dataPackArtifactSha256: sha256FileIfExists(dataPackArtifactPath),
+  dataPackFallbackArtifactSha256: sha256FileIfExists(dataPackFallbackArtifactPath),
   sourceSnapshotSetHash,
   supportContactSetSha256: arg("supportContactSetSha256", "support-contact-set-sha256")
     ?? androidReleaseMetadata.supportContactSetSha256
@@ -400,7 +412,10 @@ function readJsonIfExists(filePath) {
   return JSON.parse(readFileSync(filePath, "utf8"));
 }
 
-function validateProductionDataPackBinding(manifest, artifactPath, artifactBytes, evaluatedAtMillis) {
+function validateProductionDataPackBinding(
+  manifest, artifactPath, artifactBytes, fallbackArtifactPath, fallbackArtifactBytes,
+  releaseDecision, evaluatedAtMillis,
+) {
   if (!artifactPath || !existsSync(artifactPath) || !Number.isSafeInteger(artifactBytes) || artifactBytes <= 0) {
     fail("production data pack binding requires an existing non-empty artifact");
   }
@@ -416,6 +431,7 @@ function validateProductionDataPackBinding(manifest, artifactPath, artifactBytes
     fail("production data pack manifest is expired");
   }
   const activePack = selectEffectiveDataPack(manifest);
+  const fallbackPack = selectFallbackDataPack(manifest);
   if (!activePack) {
     fail("production data pack manifest must identify exactly one active pack");
   }
@@ -425,6 +441,20 @@ function validateProductionDataPackBinding(manifest, artifactPath, artifactBytes
   }
   if (activePack.sizeBytes !== artifactBytes) {
     fail("production data pack manifest sizeBytes does not match the supplied artifact");
+  }
+  if (!fallbackPack || !fallbackArtifactPath || !existsSync(fallbackArtifactPath)) {
+    fail("production data pack binding requires an existing fallback artifact");
+  }
+  const fallbackArtifactSha256 = createHash("sha256").update(readFileSync(fallbackArtifactPath)).digest("hex");
+  if (fallbackPack.sha256 !== fallbackArtifactSha256 || fallbackPack.sizeBytes !== fallbackArtifactBytes) {
+    fail("production data pack fallback does not match the selected manifest");
+  }
+  const manifestSha256 = createHash("sha256").update(readFileSync(dataPackManifestPath)).digest("hex");
+  if (
+    releaseDecision?.selectedManifestSha256 !== manifestSha256
+    || releaseDecision?.selectedReleaseSequence !== manifest.releaseSequence
+  ) {
+    fail("production data pack manifest does not match the finalized release decision");
   }
 }
 
@@ -447,10 +477,13 @@ function readFinalDataPackReleaseDecision(filePath, required) {
     || !Array.isArray(decision.reasonCodes)
     || decision.reasonCodes.length !== 0
     || !/^[a-f0-9]{64}$/.test(decision.sourceSnapshotSetHash ?? "")
+    || !/^[a-f0-9]{64}$/.test(decision.selectedManifestSha256 ?? "")
+    || !Number.isSafeInteger(decision.selectedReleaseSequence)
+    || decision.selectedReleaseSequence < 1
   ) {
     fail("data pack release decision is not finalized or has invalid sourceSnapshotSetHash");
   }
-  return decision.sourceSnapshotSetHash;
+  return decision;
 }
 
 function readKeyValueFileIfExists(filePath) {
@@ -1368,6 +1401,7 @@ function identityBlockers(values) {
     "aabPayloadSha256",
     "dataPackManifestSha256",
     "dataPackArtifactSha256",
+    "dataPackFallbackArtifactSha256",
     "sourceSnapshotSetHash",
     "supportContactSetSha256",
     "releaseSequence",

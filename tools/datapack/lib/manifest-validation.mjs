@@ -170,6 +170,12 @@ export function selectEffectiveDataPack(manifest, defaultPackId = "capital") {
   ), null);
 }
 
+export function selectFallbackDataPack(manifest, defaultPackId = "capital") {
+  if (!manifest?.emergencyOverride) return selectEffectiveDataPack(manifest, defaultPackId);
+  const { emergencyOverride: _emergencyOverride, ...withoutEmergencyOverride } = manifest;
+  return selectEffectiveDataPack(withoutEmergencyOverride, defaultPackId);
+}
+
 export function validatePackUrl(packUrl, label) {
   if (/%[0-9a-f]{2}/i.test(packUrl)) {
     throw new Error(`${label} must be a safe relative path or absolute HTTPS URL`);

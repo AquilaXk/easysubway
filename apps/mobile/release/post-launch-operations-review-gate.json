@@ -94,14 +94,16 @@
           "files": [
             {"path": "apps/mobile/release/signed-release-artifact-gate.json", "sha256": "42c9f83dca5a1c2c24d921cf6ab748c9be5a901dd1b62212a81055098349fc67"},
             {"path": "apps/mobile/pubspec.yaml", "sha256": "8b831a4108c1c77f718a4b729e7d24f36dc024b83845a4ecfa7d2b99e5ad1971"},
-            {"path": ".github/workflows/release-artifacts.yml", "sha256": "b376d1f63516b43b58a6b4848b644e7ce50b3619df08b9f0d029cfea4ee7b974"},
+            {"path": ".github/workflows/release-artifacts.yml", "sha256": "ba156f6ac8c1baf9b4670e0d8d128106e72f78093fcf0dfd19a05f40c049bbf6"},
             {"path": ".github/workflows/datapack-release.yml", "sha256": "1c449f274f0486c7de8dbecf771cc6813045309277a7a8123b56bee7c1567008"},
             {"path": "backend/build.gradle", "sha256": "00106be89d1834db166c0c4cfba04674e2a456e7e57648595b74feb933c31273"},
             {"path": "backend/Dockerfile", "sha256": "7d9608f490113e655aeaf9544f061896d20f391d5c309b50a42f6303e5eb676b"},
-            {"path": "apps/mobile/release/rc-evidence-manifest-contract.json", "sha256": "518e3a641eb0a88c97e892679ad53292de09fc3d02e1c9adde901f232ea18739"},
-            {"path": "tools/datapack/lib/manifest-validation.mjs", "sha256": "d898d7c18aff0e5cb299eb41a823819b8cb4c76879397054d38cb9db47c3fbd9"},
-            {"path": "tools/release/generate-rc-evidence-manifest.mjs", "sha256": "4f0972e6e6ad54ab026925f9b5621e5e9b13739b1a7c72dae10c8fb2faaf97d0"},
-            {"path": "tools/release/select-rc-datapack-artifact.mjs", "sha256": "b02297d82370fe8afa7756bc9281c45fb534d17946d4b5ecf0722a6ba3c80e0c"},
+            {"path": "apps/mobile/release/rc-evidence-manifest-contract.json", "sha256": "7caaa17fc34e13e5e35076be4b4f35456f4fa57add102561e31267934bd6cd41"},
+            {"path": "tools/datapack/lib/manifest-validation.mjs", "sha256": "410f383ddec25ac854e98f0b61b74d0b8bd21538be1572baac25a5fbe6c61b75"},
+            {"path": "tools/datapack/decide-datapack-release.mjs", "sha256": "68403f0ac4f7e165ab51b696a7697f7b8cf965214d74f34bdf7b04cd31921c14"},
+            {"path": "tools/datapack/validate-remote-datapack-artifact.mjs", "sha256": "153a5888903c503fb572b5596afac58d1b0ac1ae973f3e8fda5806948d168b26"},
+            {"path": "tools/release/generate-rc-evidence-manifest.mjs", "sha256": "5cd140f03792f304c0c8bc39e77d9ae119851e2b34d8a2ec726129b422642695"},
+            {"path": "tools/release/select-rc-datapack-artifact.mjs", "sha256": "48e5fddf300e6a53d40cba7778c10fe3c2d727cf45991eb52b5d93cbc359d4ba"},
             {"path": "tools/release/upload-play-internal.mjs", "sha256": "7bc41b1fb3ce86b2e24043a9a43e47e91577ab33c5170535c8e8c85c09b5c5eb"}
           ]
         }
