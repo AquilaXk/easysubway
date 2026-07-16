@@ -816,10 +816,9 @@ void main() {
     expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
     expect(find.byKey(const Key('nearbyStationButton')), findsOneWidget);
     expect(find.byKey(const Key('networkMapBottomAdBanner')), findsOneWidget);
-    expect(
-      find.byKey(const Key('networkMapServicePatternToggle')),
-      findsOneWidget,
-    );
+    // #2068: 노선도는 일반/급행 선택 없는 단일 통합 지도라 운행종별 토글이 없다.
+    expect(find.text('일반'), findsNothing);
+    expect(find.text('급행'), findsNothing);
   });
 
   testWidgets('온보딩 이동 조건은 경로 검색 기본값으로 이어진다', (tester) async {
@@ -3416,30 +3415,16 @@ void main() {
     );
   });
 
-  test('급행 노선도 필터는 station-line endpoint edge를 유지한다', () {
-    final expressMap = networkMapExpressOnlyMapData(_expressFilterMapData());
+  testWidgets('노선도는 일반 급행 선택 없이 모든 노선을 함께 표시한다', (tester) async {
+    // #2068: 노선도는 단일 통합 지도다. LOCAL/EXPRESS가 섞인 fixture에서도
+    // 운행종별 필터 없이 모든 노선·역·edge를 함께 렌더하고, 일반/급행 선택
+    // control(토글·selected semantics)은 어느 상태에서도 만들지 않는다.
+    final semanticsHandle = tester.ensureSemantics();
+    final fixture = _unifiedRouteMapData();
 
-    expect(expressMap.lines.map((line) => line.id), ['line-express']);
-    expect(expressMap.stations.map((station) => station.lineId).toSet(), {
-      'line-express',
-    });
-    expect(expressMap.edges, hasLength(1));
-    expect(
-      expressMap.edges.single.fromStationId,
-      'station-express-a:line-express',
-    );
-    expect(
-      expressMap.edges.single.toStationId,
-      'station-express-b:line-express',
-    );
-  });
-
-  testWidgets('노선도 급행 전환은 필터 밖 선택 역 탭을 숨긴다', (tester) async {
     await tester.pumpWidget(
       buildEasySubwayTestApp(
-        repository: FakeStationSearchRepository(
-          networkMapData: _expressFilterMapData(),
-        ),
+        repository: FakeStationSearchRepository(networkMapData: fixture),
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
         notificationRepository: FakeNotificationSettingsRepository(),
@@ -3448,63 +3433,62 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(
-      find.byKey(const Key('networkMapStation-local-a-line-local')),
-    );
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
-
-    await tester.tap(find.text('급행'));
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const Key('networkMapStationSheet')), findsNothing);
-    expect(
-      find.byKey(const Key('networkMapStation-express-a-line-express')),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('노선도는 앱 라벨을 쓰고 급행 전환 시 급행 집합만 표시한다', (tester) async {
-    await tester.pumpWidget(
-      buildEasySubwayTestApp(
-        repository: FakeStationSearchRepository(
-          networkMapData: _expressFilterMapData(),
-        ),
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        notificationRepository: FakeNotificationSettingsRepository(),
-        initialOnboardingState: _completedOnboardingState(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.byType(StructuredRouteMapView), findsOneWidget);
-    expect(
-      tester
-          .widget<StructuredRouteMapView>(find.byType(StructuredRouteMapView))
-          .drawLines,
-      isFalse,
-    );
-    expect(
-      tester
-          .widget<StructuredRouteMapView>(find.byType(StructuredRouteMapView))
-          .drawStationSymbols,
-      isFalse,
-    );
-
-    await tester.tap(find.text('급행'));
-    await tester.pumpAndSettle();
-
+    // (a) 단일 통합 basemap 위에 라벨-온리 오버레이만 얹는다. express-only 분기
+    // (basemap 없는 경로)는 사라졌다.
+    expect(find.byType(RouteMapBasemapView), findsOneWidget);
     final overlay = tester.widget<StructuredRouteMapView>(
       find.byType(StructuredRouteMapView),
     );
-    expect(overlay.drawLines, isTrue);
-    expect(overlay.drawStationSymbols, isTrue);
-    expect(overlay.map.lines.map((line) => line.lineId), ['line-express']);
-    expect(overlay.map.stations.map((station) => station.lineId).toSet(), {
-      'line-express',
-    });
-    expect(find.byType(RouteMapBasemapView), findsNothing);
+    expect(overlay.drawLines, isFalse);
+    expect(overlay.drawStationSymbols, isFalse);
+
+    // (a) 입력 NetworkMapData의 노선·역이 필터로 줄지 않는다(개수 불감소).
+    expect(
+      overlay.map.lines.map((line) => line.lineId).toSet(),
+      fixture.lines.map((line) => line.id).toSet(),
+    );
+    expect(
+      overlay.map.stations.length,
+      greaterThanOrEqualTo(fixture.stations.length),
+    );
+    expect(
+      overlay.map.stations.map((station) => station.lineId).toSet(),
+      fixture.lines.map((line) => line.id).toSet(),
+    );
+
+    // (a) edge 양끝 역(일반·급행 각 노선)이 모두 상호작용 대상으로 남는다.
+    for (final key in const [
+      'networkMapStation-local-a-line-local',
+      'networkMapStation-local-b-line-local',
+      'networkMapStation-express-a-line-express',
+      'networkMapStation-express-b-line-express',
+    ]) {
+      expect(find.byKey(Key(key)), findsOneWidget);
+    }
+
+    // (b)+(c) 어느 상태에서도 운행종별 토글(일반/급행 선택 control)이 트리에
+    // 만들어지지 않는다. 토글은 '일반'/'급행' 세그먼트로 렌더됐으므로 그 부재로
+    // 토글 미생성을 확인한다(역 라벨 '일반A' 등은 정확 일치가 아니라 무관).
+    expect(find.text('일반'), findsNothing);
+    expect(find.text('급행'), findsNothing);
+    final servicePatternControlLabels = <String>[];
+    void collectServicePatternControls(SemanticsNode node) {
+      final label = node.getSemanticsData().label;
+      if (label == '일반' || label == '급행') {
+        servicePatternControlLabels.add(label);
+      }
+      node.visitChildren((child) {
+        collectServicePatternControls(child);
+        return true;
+      });
+    }
+
+    collectServicePatternControls(
+      tester.getSemantics(find.byKey(const Key('networkMapScreen'))),
+    );
+    expect(servicePatternControlLabels, isEmpty);
+
+    semanticsHandle.dispose();
   });
 
   testWidgets('노선도 viewport 밖 station semantics는 생성하지 않는다', (tester) async {
@@ -16256,7 +16240,7 @@ FavoriteRoute _favoriteRoute({
   );
 }
 
-NetworkMapData _expressFilterMapData() {
+NetworkMapData _unifiedRouteMapData() {
   return const NetworkMapData(
     regions: [NetworkMapRegion(name: '테스트권')],
     selectedRegion: '테스트권',
@@ -16290,7 +16274,7 @@ NetworkMapData _expressFilterMapData() {
           labelDy: 0,
           upPath: '',
           downPath: '',
-          sourceId: 'fixture-express-filter',
+          sourceId: 'fixture-unified-route-map',
         ),
       ),
       NetworkMapStation(
@@ -16308,7 +16292,7 @@ NetworkMapData _expressFilterMapData() {
           labelDy: 0,
           upPath: '',
           downPath: '',
-          sourceId: 'fixture-express-filter',
+          sourceId: 'fixture-unified-route-map',
         ),
       ),
       NetworkMapStation(
@@ -16326,7 +16310,7 @@ NetworkMapData _expressFilterMapData() {
           labelDy: 0,
           upPath: '',
           downPath: '',
-          sourceId: 'fixture-express-filter',
+          sourceId: 'fixture-unified-route-map',
         ),
       ),
       NetworkMapStation(
@@ -16344,7 +16328,7 @@ NetworkMapData _expressFilterMapData() {
           labelDy: 0,
           upPath: '',
           downPath: '',
-          sourceId: 'fixture-express-filter',
+          sourceId: 'fixture-unified-route-map',
         ),
       ),
     ],
@@ -16368,8 +16352,8 @@ NetworkMapData _expressFilterMapData() {
     ],
     positionSources: [
       NetworkMapPositionSource(
-        id: 'fixture-express-filter',
-        name: '급행 필터 fixture',
+        id: 'fixture-unified-route-map',
+        name: '통합 노선도 fixture',
         licenseStatus: 'fixture-only',
       ),
     ],
