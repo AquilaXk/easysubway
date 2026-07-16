@@ -17644,3 +17644,26 @@ test("#1702 STANDARD 환승 parity 리포트는 재현 가능하고 ±10% 이내
     assert.ok(Math.abs(pair.deviationPercent) <= report.toleranceProfile.maxDeviationPercent);
   }
 });
+
+test("서비스·위치정보 이용약관은 공개 경로와 사실 계약을 함께 유지한다", () => {
+  const controller = read(
+    "backend/src/main/java/com/easysubway/legal/adapter/in/web/PrivacyPolicyPageController.java",
+  );
+  const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
+  const terms = read("backend/src/main/resources/templates/legal/terms.html");
+  const locationTerms = read("backend/src/main/resources/templates/legal/location-terms.html");
+
+  for (const route of ["/terms", "/easysubway/terms", "/location-terms", "/easysubway/location-terms"]) {
+    assert.ok(controller.includes(`\"${route}\"`), `legal controller must map ${route}`);
+    assert.ok(security.includes(`\"${route}\"`), `public security must permit ${route}`);
+  }
+
+  assert.match(terms, /쉬운 지하철 서비스 이용약관/);
+  assert.match(terms, /현장 안내를 우선/);
+  assert.match(terms, /support@aquilaxk\.site/);
+  assert.match(locationTerms, /쉬운 지하철 위치정보 이용약관/);
+  assert.match(locationTerms, /가까운 역/);
+  assert.match(locationTerms, /카카오맵 앱\/웹/);
+  assert.match(locationTerms, /privacy@aquilaxk\.site/);
+  assert.doesNotMatch(`${terms}\n${locationTerms}`, /TBD|TODO|준비 중/);
+});
