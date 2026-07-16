@@ -211,6 +211,28 @@ class DatapackReleaseCallbackServiceTest {
 			.isEqualTo("CURRENT_RELEASE_ADVANCED");
 	}
 
+	@Test
+	@DisplayName("binding 오류 callback은 재조정 상태를 유지하고 이후 PASS로 복구한다")
+	void bindingFailureCanBeReconciledByLaterPass() {
+		insertRow("DISPATCHED");
+		var blockedFields = new CanonicalFields(2, "datapack-release-callback", APPROVAL_ID,
+			RELEASE_SEQUENCE, CHANNEL, idempotencyKey(SHA), WORKFLOW_URL, SHA, SHA, SHA, SHA,
+			"PASS", "PASS", "BLOCKED_EXTERNAL");
+		var blocked = command("BLOCKED_EXTERNAL", callbackSignature.sign(blockedFields));
+
+		assertThat(service.receive(blocked).status()).isEqualTo("RECONCILIATION_REQUIRED");
+		assertThat(statusOf()).isEqualTo("DISPATCHED");
+		assertThat(jdbcTemplate.queryForObject(
+			"SELECT state FROM datapack_release_deliveries", String.class))
+			.isEqualTo("RECONCILIATION_REQUIRED");
+
+		assertThat(service.receive(command("PASS", computeSignature("PASS"))).status())
+			.isEqualTo("PUBLISHED");
+		assertThat(statusOf()).isEqualTo("PUBLISHED");
+		assertThat(jdbcTemplate.queryForObject(
+			"SELECT state FROM datapack_release_deliveries", String.class)).isEqualTo("DELIVERED");
+	}
+
     @Test
     @DisplayName("(e) status=REQUESTED(미승인) → IllegalStateException")
     void requestedStatusThrowsIllegalState() {

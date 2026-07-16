@@ -48,20 +48,18 @@ public class JdbcDatapackReleaseDeliveryRepository implements DatapackReleaseDel
 			var existing = findByIdempotencyKey(delivery.idempotencyKey())
 				.orElseThrow(() -> new DuplicateKeyException(
 					"release request/sequence already belongs to another manifest"));
-			ensureSameDelivery(existing, delivery);
-			return existing;
+			return sameOrRefresh(existing, delivery);
 		}
 		try {
 			insert(delivery);
 			return delivery;
 		} catch (DuplicateKeyException duplicate) {
 			var existing = findByIdempotencyKey(delivery.idempotencyKey()).orElseThrow(() -> duplicate);
-			ensureSameDelivery(existing, delivery);
-			return existing;
+			return sameOrRefresh(existing, delivery);
 		}
 	}
 
-	private static void ensureSameDelivery(
+	private DatapackReleaseDelivery sameOrRefresh(
 		DatapackReleaseDelivery existing,
 		DatapackReleaseDelivery incoming
 	) {
@@ -70,13 +68,29 @@ public class JdbcDatapackReleaseDeliveryRepository implements DatapackReleaseDel
 			&& existing.manifestSha256().equals(incoming.manifestSha256())
 			&& existing.channel().equals(incoming.channel())
 			&& existing.candidateId().equals(incoming.candidateId());
-		boolean sameCallbackPayload = existing.payloadSha256() == null
-			|| incoming.payloadSha256() == null
-			|| (existing.payloadSha256().equals(incoming.payloadSha256())
-				&& existing.signatureSha256().equals(incoming.signatureSha256()));
-		if (!sameIdentity || !sameCallbackPayload) {
+		if (!sameIdentity) {
 			throw new DuplicateKeyException("idempotency key already belongs to another callback payload");
 		}
+		if (incoming.payloadSha256() == null
+			|| (incoming.payloadSha256().equals(existing.payloadSha256())
+				&& incoming.signatureSha256().equals(existing.signatureSha256()))) return existing;
+		if (existing.payloadSha256() != null && existing.state() != State.RECONCILIATION_REQUIRED) {
+			throw new DuplicateKeyException("idempotency key already belongs to another callback payload");
+		}
+		int changed = jdbcTemplate.update("""
+			UPDATE datapack_release_deliveries
+			SET payload_sha256=?, signature_sha256=?, updated_at=?
+			WHERE idempotency_key=?
+			  AND (payload_sha256 IS NULL OR state='RECONCILIATION_REQUIRED')
+			""", incoming.payloadSha256(), incoming.signatureSha256(), ts(incoming.updatedAt()),
+			incoming.idempotencyKey());
+		var refreshed = findByIdempotencyKey(incoming.idempotencyKey())
+			.orElseThrow(() -> new DuplicateKeyException("callback delivery disappeared during refresh"));
+		if (changed != 1 && (!incoming.payloadSha256().equals(refreshed.payloadSha256())
+			|| !incoming.signatureSha256().equals(refreshed.signatureSha256()))) {
+			throw new DuplicateKeyException("idempotency key already belongs to another callback payload");
+		}
+		return refreshed;
 	}
 
 	private int insertPostgresql(DatapackReleaseDelivery d) {

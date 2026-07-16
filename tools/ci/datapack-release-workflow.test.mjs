@@ -108,6 +108,7 @@ test("production request identity는 manifest 밖의 서명된 immutable binding
   assert.match(bindingStep, /--verify-only/);
   const callbackStep = yml.slice(callback, yml.indexOf("Data Pack Release / Upload callback delivery evidence"));
   assert.match(callbackStep, /steps\.release-request-binding\.outcome == 'success'/);
+  assert.match(callbackStep, /'BLOCKED_EXTERNAL'/);
 });
 
 test("coverage gap 스텝은 release 모드에서만 production provenance와 release-scope를 배선한다", () => {

@@ -63,6 +63,22 @@ class JdbcDatapackReleaseDeliveryRepositoryTest {
 	}
 
 	@Test
+	@DisplayName("재조정 상태는 같은 release identity의 새 callback 증적으로 갱신한다")
+	void refreshesCallbackEvidenceWhileReconciliationIsRequired() {
+		var original = repository.upsertSameDelivery(
+			pending(SHA, "c".repeat(64), "d".repeat(64)));
+		repository.mark(original.idempotencyKey(), DatapackReleaseDelivery.State.RECONCILIATION_REQUIRED,
+			1, T0.plusMinutes(5), "BLOCKED", "BINDING_UNAVAILABLE", T0);
+
+		var refreshed = repository.upsertSameDelivery(
+			pending(SHA, "e".repeat(64), "f".repeat(64)));
+
+		assertThat(refreshed.payloadSha256()).isEqualTo("e".repeat(64));
+		assertThat(refreshed.signatureSha256()).isEqualTo("f".repeat(64));
+		assertThat(refreshed.state()).isEqualTo(DatapackReleaseDelivery.State.RECONCILIATION_REQUIRED);
+	}
+
+	@Test
 	@DisplayName("동시 claim은 delivery 한 건을 한 worker에게만 준다")
 	void claimsDueOnce() throws Exception {
 		repository.upsertSameDelivery(pending(SHA));

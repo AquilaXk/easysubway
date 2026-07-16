@@ -53,6 +53,9 @@ public class JdbcDatapackReleaseBlockerSummaryRepository implements DatapackRele
 		long callbackReconciliationBlockers = count("""
 			SELECT COUNT(*) FROM datapack_release_deliveries
 			WHERE channel = 'production' AND state <> 'DELIVERED'
+			  AND NOT (state = 'DEAD_LETTER'
+				AND http_class = 'STALE'
+				AND sanitized_detail = 'CURRENT_RELEASE_ADVANCED')
 			""") + count("""
 			SELECT COUNT(*) FROM datapack_release_request request
 			WHERE request.target_channel = 'production'

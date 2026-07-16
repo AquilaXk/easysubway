@@ -171,6 +171,27 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 	}
 
 	@Test
+	@DisplayName("후속 release로 해소된 stale dead-letter는 readiness를 차단하지 않는다")
+	void supersededStaleCallbackDoesNotBlockReadiness() {
+		jdbcTemplate.update("""
+			INSERT INTO datapack_release_deliveries (
+			 idempotency_key, release_request_id, release_sequence, manifest_sha256,
+			 channel, candidate_id, payload_sha256, signature_sha256, state, attempts,
+			 reconcile_deadline, dead_letter_deadline, http_class, sanitized_detail,
+			 created_at, updated_at)
+			VALUES (?, 'request-superseded', 41, ?, 'production', 'candidate-release-blocked',
+			 ?, ?, 'DEAD_LETTER', 1, '2026-07-06 03:00:00', '2026-07-06 04:00:00',
+			 'STALE', 'CURRENT_RELEASE_ADVANCED', '2026-07-06 02:50:00', '2026-07-06 03:00:00')
+			""", "request-superseded:41:" + SHA_A, SHA_A, SHA_B, SHA_C);
+
+		var callback = blockerSummaryUseCase.summarize().readinessRows().stream()
+			.filter(row -> "Callback reconciliation".equals(row.label()))
+			.findFirst().orElseThrow();
+
+		assertThat(callback.blockerCount()).isZero();
+	}
+
+	@Test
 	@DisplayName("기한이 지난 production request에 delivery 행이 없으면 rollout readiness를 차단한다")
 	void missingCallbackDeliveryBlocksReadiness() {
 		jdbcTemplate.update("""

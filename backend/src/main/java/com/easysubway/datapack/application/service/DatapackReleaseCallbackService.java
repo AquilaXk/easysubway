@@ -104,6 +104,14 @@ public class DatapackReleaseCallbackService {
         boolean pass = "PASS".equals(cmd.publishStatus())
             && "PASS".equals(cmd.validatorStatus())
             && "PASS".equals(cmd.routeRegressionStatus());
+		boolean reconciliationRequired = "BLOCKED_EXTERNAL".equals(cmd.publishStatus())
+			&& "PASS".equals(cmd.validatorStatus())
+			&& "PASS".equals(cmd.routeRegressionStatus());
+		if (reconciliationRequired) {
+			deliveryRepository.mark(delivery.idempotencyKey(), State.RECONCILIATION_REQUIRED,
+				delivery.attempts() + 1, now.plusMinutes(5), "BLOCKED", "BINDING_UNAVAILABLE", now);
+			return new CallbackResult("RECONCILIATION_REQUIRED", false);
+		}
 		if (pass) {
 			var currentMismatch = currentReleaseMismatch(cmd);
 			if (currentMismatch != null) {
