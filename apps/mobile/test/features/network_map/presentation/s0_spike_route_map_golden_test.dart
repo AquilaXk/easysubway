@@ -27,12 +27,16 @@ const String _spikePackPath =
 // 서울 2호선(도심 루프) line_id — 도심 프레이밍 기준.
 const String _loopLineId = 'seoul-2';
 
-Size _measureLabel(String text, {required bool bold}) {
+Size _measureLabel(
+  String text, {
+  required bool bold,
+  required double fontSize,
+}) {
   final painter = TextPainter(
     text: TextSpan(
       text: text,
       style: TextStyle(
-        fontSize: kRouteMapDesignLabelFontPx,
+        fontSize: fontSize,
         fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
       ),
     ),
@@ -44,14 +48,11 @@ Size _measureLabel(String text, {required bool bold}) {
   return size;
 }
 
-Size _measureBadge(String text) {
+Size _measureBadge(String text, {required double fontSize}) {
   final painter = TextPainter(
     text: TextSpan(
       text: text,
-      style: const TextStyle(
-        fontSize: kRouteMapDesignBadgeFontPx,
-        fontWeight: FontWeight.w700,
-      ),
+      style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w700),
     ),
     textDirection: TextDirection.ltr,
     maxLines: 1,

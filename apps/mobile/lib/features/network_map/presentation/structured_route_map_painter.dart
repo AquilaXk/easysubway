@@ -78,6 +78,20 @@ const TextStyle _badgeStyle = TextStyle(
   fontSize: kRouteMapDesignBadgeFontPx,
   fontWeight: FontWeight.w700,
 );
+
+/// #2068 9차: 라벨별 font-size(오너 매치는 오너 SVG 크기, 폴백은 권역 중앙값
+/// 또는 기본 13px)로 스타일을 만든다. 색·굵기는 [_labelStyle]/[_boldLabelStyle]
+/// 과 동일 — fontSize만 다르게 오버라이드한다.
+TextStyle _labelStyleFor({required bool bold, required double fontSizePx}) {
+  return (bold ? _boldLabelStyle : _labelStyle).copyWith(fontSize: fontSizePx);
+}
+
+/// #2068 9차: 뱃지 font-size(basemap은 권역 오너 라벨 중앙값, 기본 모드는
+/// [kRouteMapDesignBadgeFontPx] 불변)로 스타일을 만든다.
+TextStyle _badgeStyleFor({required double fontSizePx}) {
+  return _badgeStyle.copyWith(fontSize: fontSizePx);
+}
+
 const TextStyle _attributionStyle = TextStyle(
   color: Color(0xFF466467),
   fontSize: 10,
@@ -246,11 +260,12 @@ ui.Picture recordRouteMapPicture({
   }
 
   // 4) 역명 라벨(볼드=환승·종착) — 녹화 시에만 TextPainter 생성·즉시 dispose.
+  // #2068 9차: label.fontSizePx로 그린다(오너 매치는 오너 SVG 크기 그대로).
   for (final label in layout.labels) {
     final painter = TextPainter(
       text: TextSpan(
         text: label.text,
-        style: label.bold ? _boldLabelStyle : _labelStyle,
+        style: _labelStyleFor(bold: label.bold, fontSizePx: label.fontSizePx),
       ),
       textDirection: TextDirection.ltr,
       maxLines: 1,
@@ -259,7 +274,7 @@ ui.Picture recordRouteMapPicture({
     painter.dispose();
   }
 
-  // 5) 노선 뱃지 pill.
+  // 5) 노선 뱃지 pill. #2068 9차: badge.fontSizePx로 그린다.
   final badgeFill = Paint()
     ..style = PaintingStyle.fill
     ..isAntiAlias = true;
@@ -273,7 +288,10 @@ ui.Picture recordRouteMapPicture({
       badgeFill,
     );
     final painter = TextPainter(
-      text: TextSpan(text: badge.label, style: _badgeStyle),
+      text: TextSpan(
+        text: badge.label,
+        style: _badgeStyleFor(fontSizePx: badge.fontSizePx),
+      ),
       textDirection: TextDirection.ltr,
       maxLines: 1,
     )..layout();
@@ -443,9 +461,19 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
     _ownerLabelsByStationName = widget.ownerLabelsByStationName;
     final design = routeMapDesignSpaceFor(widget.map);
     _design = design;
-    Size measureLabel(String text, {required bool bold}) {
+    // #2068 9차: fontSize를 인자로 받아 라벨별(오너 매치=오너 크기, 폴백=권역
+    // 중앙값/기본 13px) 다른 크기로 실측한다 — 솔버 시드 rect와 렌더가 같은
+    // 크기를 쓰도록 반드시 이 인자로 측정해야 한다.
+    Size measureLabel(
+      String text, {
+      required bool bold,
+      required double fontSize,
+    }) {
       final painter = TextPainter(
-        text: TextSpan(text: text, style: bold ? _boldLabelStyle : _labelStyle),
+        text: TextSpan(
+          text: text,
+          style: _labelStyleFor(bold: bold, fontSizePx: fontSize),
+        ),
         textDirection: TextDirection.ltr,
         maxLines: 1,
       )..layout();
@@ -454,13 +482,17 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
       return size;
     }
 
-    Size measureBadge(String text) {
+    Size measureBadge(String text, {required double fontSize}) {
       final painter = TextPainter(
-        text: TextSpan(text: text, style: _badgeStyle),
+        text: TextSpan(
+          text: text,
+          style: _badgeStyleFor(fontSizePx: fontSize),
+        ),
         textDirection: TextDirection.ltr,
         maxLines: 1,
       )..layout();
-      // pill 좌우 패딩 5px + 최소 지름 유지(기존 뱃지 규칙).
+      // pill 좌우 패딩 5px + 최소 지름 유지(기존 뱃지 규칙 — pill 기하는
+      // fontSize와 무관하게 불변, #2068 9차는 텍스트 크기만 통일한다).
       final size = Size(
         math.max(kRouteMapDesignBadgeRadiusPx * 2, painter.size.width + 10),
         kRouteMapDesignBadgeRadiusPx * 2,

@@ -8,14 +8,13 @@ import '../../../support/capital_route_map_fixture.dart';
 
 // 결정적 보수 측정: 한글 전각 폭 ≈ 폰트 px/자. 실기기 TextPainter 실측(비전각
 // 혼재)보다 넓게 잡는다 — 이 근사로 겹침이 없으면 실기기에서도 없다.
-Size _measureLabel(String text, {required bool bold}) => Size(
-  text.length * kRouteMapDesignLabelFontPx,
-  kRouteMapDesignLabelFontPx + 4,
-);
-Size _measureBadge(String text) => Size(
-  text.length * kRouteMapDesignBadgeFontPx + 12,
-  kRouteMapDesignBadgeFontPx + 7,
-);
+Size _measureLabel(
+  String text, {
+  required bool bold,
+  required double fontSize,
+}) => Size(text.length * fontSize, fontSize + 4);
+Size _measureBadge(String text, {required double fontSize}) =>
+    Size(text.length * fontSize + 12, fontSize + 7);
 
 // 재간격 + 부역명 축약 + gap 확장 반영(2026-07-06 실측): 64→2. 잔여 기약 1쌍은
 // 라벨 배치로 분리 불가한 근접 평역명 케이스로, v1에서는 임진강/운천(경의중앙

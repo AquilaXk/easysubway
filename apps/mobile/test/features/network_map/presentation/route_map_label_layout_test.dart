@@ -7,10 +7,16 @@ import 'package:easysubway_mobile/features/network_map/domain/structured_route_m
 import 'package:easysubway_mobile/features/network_map/presentation/route_map_label_layout.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-// 결정적 실측: 글자 수 × 9px, 높이 13px (bold 동일 — 판정에 크기 차 불필요).
-Size _measureLabel(String text, {required bool bold}) =>
-    Size(text.length * 9.0, 13.0);
-Size _measureBadge(String text) => Size(text.length * 8.0 + 10, 18.0);
+// 결정적 실측: 글자 수 × 9px, 높이 13px (bold·fontSize 무관 — 이 파일 전
+// 테스트가 fontSize=13(기본값 또는 entry(fontSizePx:13.0)·designScale 1)만
+// 쓰므로 fontSize 인자는 시그니처만 맞추고 무시해도 안전하다, #2068 9차).
+Size _measureLabel(
+  String text, {
+  required bool bold,
+  required double fontSize,
+}) => Size(text.length * 9.0, 13.0);
+Size _measureBadge(String text, {required double fontSize}) =>
+    Size(text.length * 8.0 + 10, 18.0);
 
 /// 환승 1 + 일반 N을 design 기준 간격으로 배치한 대표 지도.
 StructuredRouteMap _gridMap({double sourceSpacing = 24, int count = 30}) {

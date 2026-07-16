@@ -23,12 +23,19 @@ class RouteMapStaticLabel {
     required this.text,
     required this.rect,
     required this.bold,
+    required this.fontSizePx,
   });
 
   /// `transfer:<stationId>` 또는 `<stationId>:<lineId>`.
   final String id;
   final String text;
   final Rect rect; // design space px
+
+  /// #2068 9차: 렌더 font-size(design px). 오너 매치 라벨은 오너 SVG의 실제
+  /// font-size(entry.fontSizePx × designScale) 그대로, 폴백 라벨은 권역
+  /// 오너 라벨 크기 중앙값(basemap) 또는 [kRouteMapDesignLabelFontPx](기본
+  /// 모드). recordRouteMapPicture가 라벨별로 다른 크기를 그리기 위한 필드.
+  final double fontSizePx;
   final bool bold;
 }
 
@@ -38,11 +45,16 @@ class RouteMapStaticBadge {
     required this.lineId,
     required this.label,
     required this.rect,
+    required this.fontSizePx,
   });
 
   final String lineId;
   final String label;
   final Rect rect; // design space px
+
+  /// #2068 9차: 렌더 font-size(design px) — basemap은 권역 오너 라벨 크기
+  /// 중앙값, 기본 모드는 [kRouteMapDesignBadgeFontPx](불변).
+  final double fontSizePx;
 }
 
 /// 정적 레이아웃 결과. [unresolvedOverlapCount]는 최소 겹침 fallback으로 강제
@@ -80,6 +92,7 @@ class _Candidate {
     required this.priority,
     required this.anchorPadding,
     required this.bold,
+    required this.fontSizePx,
     this.badgeLineId,
   });
   final String id;
@@ -89,6 +102,7 @@ class _Candidate {
   final int priority;
   final double anchorPadding;
   final bool bold;
+  final double fontSizePx; // #2068 9차: 렌더 font-size(design px).
   final String? badgeLineId; // null이면 역 라벨.
 }
 
@@ -104,18 +118,20 @@ double _basemapCapsuleHalfWidthFor(int memberCount) => math.max(
 );
 
 /// 오너 SVG 앵커 [anchorDesign](design px)에 [anchor] 의미(start=좌측·middle=
-/// 수평중앙·end=우측, 전부 baseline)대로 앱 실측 [size] 텍스트를 배치한다
-/// (#2068 6차). baseline 근사: SVG는 y가 baseline이므로
-/// `rect.top = anchorY − 0.8×appFontPx` — 앱 폰트([appFontPx], design px)가
-/// 오너 SVG font-size(design 환산 ≈16.5~17.8px)보다 작아 오너가 비워둔
-/// 영역 안에 들어간다.
+/// 수평중앙·end=우측, 전부 baseline)대로 [size] 텍스트를 배치한다(#2068 6차,
+/// 9차 갱신). baseline 근사: SVG는 y가 baseline이므로
+/// `rect.top = anchorY − 0.8×fontPx`. 9차부터 라벨을 오너 SVG font-size
+/// 그대로 렌더하므로([fontPx] = entry.fontSizePx × designScale, 렌더 크기와
+/// 동일 기준) 8차의 앵커 오프셋 확대(`_scaledOwnerAnchorDesign`, 렌더가 앱
+/// 고정 13px이라 SVG보다 커서 필요했던 보정)는 더 이상 필요 없어 제거했다 —
+/// 오너 좌표를 그대로 쓰는 것이 이제 정답이다.
 Rect _ownerLabelRect(
   Offset anchorDesign,
   Size size,
   RouteMapOwnerLabelAnchor anchor,
-  double appFontPx,
+  double fontPx,
 ) {
-  final top = anchorDesign.dy - 0.8 * appFontPx;
+  final top = anchorDesign.dy - 0.8 * fontPx;
   switch (anchor) {
     case RouteMapOwnerLabelAnchor.middle:
       return Rect.fromLTWH(
@@ -227,6 +243,40 @@ Map<String, RouteMapOwnerLabelEntry> _resolveOwnerLabelsByCandidateKey({
   return resolved;
 }
 
+/// 오너 SVG font-size(design 환산)를 앱 기본 폰트(13 design px) 이하로
+/// 클램프한다(#2068 10차) — 9차에서 오너 크기를 그대로 그리자 수도권(오너
+/// 17.85 > 13)에서 인접 라벨 겹침이 15→32쌍(REAL측정)으로 늘었다. 원인은
+/// SVG가 Pretendard, 앱은 fontFamily 미지정(시스템 기본) 폰트를 써 동일
+/// point size에서도 한글 자폭이 달라 SVG에서 안 겹치던 배치가 앱 렌더에서
+/// 겹친 것으로 추정(Pretendard 번들은 후속 과제, 이번엔 폰트 자산을 추가하지
+/// 않는다). 앱 기본 폰트로 그리는 **작은** 글자는 오너가 비워둔 영역의
+/// 부분집합이라 겹침을 만들지 않는다(수학적으로 안전한 방향) — 6~8차에서
+/// 이미 검증된 13px 렌더로 사실상 복귀한다. 비수도권(오너 4.87~7.23 < 13)은
+/// 클램프가 발동하지 않아 9차 효과(pairs 0)를 그대로 유지한다.
+double _clampOwnerFontSizeDesign(double ownerFontSizeDesign) =>
+    math.min(kRouteMapDesignLabelFontPx, ownerFontSizeDesign);
+
+/// 권역 오너 라벨 font-size의 중앙값(design px, #2068 9~10차). basemap
+/// 모드의 폴백 라벨(미매치 역)·노선 뱃지 pill을 이 크기로 통일해 권역 내
+/// 시각 일관성을 준다(오너 매치 라벨은 각자 entry.fontSizePx를 그대로 쓴다
+/// — 중앙값이 아니다). 각 항목에 [_clampOwnerFontSizeDesign]을 먼저 적용한
+/// 뒤 중앙값을 낸다 — 오너 매치 라벨과 동일한 클램프 규칙을 공유한다.
+/// [ownerLabelsByStationName]이 비어 있으면(sidecar 없음)
+/// [kRouteMapDesignLabelFontPx](기존 고정값)로 안전 폴백한다.
+double _medianOwnerLabelFontSizeDesign(
+  Map<String, RouteMapOwnerLabelEntry> ownerLabelsByStationName,
+  RouteMapDesignSpace design,
+) {
+  if (ownerLabelsByStationName.isEmpty) {
+    return kRouteMapDesignLabelFontPx;
+  }
+  final sizes = [
+    for (final entry in ownerLabelsByStationName.values)
+      _clampOwnerFontSizeDesign(entry.fontSizePx * design.designScale),
+  ]..sort();
+  return sizes[sizes.length ~/ 2];
+}
+
 /// 환승 캡슐의 design space 외접 Rect — 라벨 배치의 선점 장애물(#1789).
 /// painter와 같은 [routeMapTransferMarkers] 호출로 기하 정합을 보장한다
 /// (색은 캡슐 기하에 영향이 없어 placeholder를 넘긴다).
@@ -276,8 +326,17 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
   required RouteMapDesignSpace design,
   required Map<String, String> labelTextByStationId,
   required Map<String, String> badgeLabelByLineId,
-  required Size Function(String text, {required bool bold}) measureLabel,
-  required Size Function(String text) measureBadge,
+  // #2068 9차: 라벨별로 다른 font-size를 그려야 하므로(오너 매치는 오너
+  // font-size, 폴백/뱃지는 권역 중앙값) measureLabel/measureBadge가 fontSize를
+  // 받는다. 기본 모드 호출부는 항상 kRouteMapDesignLabelFontPx/
+  // kRouteMapDesignBadgeFontPx를 넘겨 기존 동작을 그대로 유지한다.
+  required Size Function(
+    String text, {
+    required bool bold,
+    required double fontSize,
+  })
+  measureLabel,
+  required Size Function(String text, {required double fontSize}) measureBadge,
   bool basemap = false,
   // basemap 6차(#2068): 오너가 SVG에서 손배치한 라벨 앵커. station 원본 이름
   // (축약 전 nameKo) 기준 정확 일치로 조회한다 — labelTextByStationId는 화면
@@ -288,10 +347,10 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
 }) {
   final terminusIds = routeMapTerminusStationIds(map);
   final candidates = <_Candidate>[];
-  // basemap 모드 오너 라벨 고정 배치(#2068 6~7차) — 검색(gap 사다리)을 거치지
-  // 않고 SVG 실측 앵커에 즉시 확정한다. 미매치(원본명 없음·sidecar 미보유·
-  // 이름 정규화 후에도 미매치·위치 게이트 밖·동명이역 중 비최근접)는
-  // candidates에 담겨 기존 4차 자동 솔버 경로로 폴백한다.
+  // basemap 모드 오너 라벨 고정 배치(#2068 6~9차) — 검색(gap 사다리)을 거치지
+  // 않고 SVG 실측 앵커·실측 font-size에 즉시 확정한다. 미매치(원본명 없음·
+  // sidecar 미보유·이름 정규화 후에도 미매치·위치 게이트 밖·동명이역 중
+  // 비최근접)는 candidates에 담겨 기존 4차 자동 솔버 경로로 폴백한다.
   final ownerFixedLabels = <RouteMapStaticLabel>[];
   // candidate id → 채택된 오너 라벨(동명이역 최근접 해소·위치 게이트 적용 후).
   final resolvedOwnerLabels = basemap
@@ -302,6 +361,14 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
           stationNameByStationId: stationNameByStationId,
         )
       : const <String, RouteMapOwnerLabelEntry>{};
+  // #2068 9차: 폴백 라벨·뱃지 pill의 공통 font-size. basemap은 권역 오너 라벨
+  // 중앙값(시각 일관성), 기본 모드는 각자 고정값(완전 불변).
+  final fallbackLabelFontSizePx = basemap
+      ? _medianOwnerLabelFontSizeDesign(ownerLabelsByStationName, design)
+      : kRouteMapDesignLabelFontPx;
+  final badgeFontSizePx = basemap
+      ? _medianOwnerLabelFontSizeDesign(ownerLabelsByStationName, design)
+      : kRouteMapDesignBadgeFontPx;
 
   // 1) 노선 뱃지: 끝점 + arc length 반복 (스펙 S4 — 노선 중간 확대에도 식별).
   for (final line in map.lines) {
@@ -309,7 +376,7 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
     if (label == null || label.isEmpty) {
       continue;
     }
-    final size = measureBadge(label);
+    final size = measureBadge(label, fontSize: badgeFontSizePx);
     var emitted = 0;
     void emit(Offset source) {
       candidates.add(
@@ -321,6 +388,7 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
           priority: -1,
           anchorPadding: kRouteMapDesignBadgeRadiusPx,
           bold: false,
+          fontSizePx: badgeFontSizePx,
           badgeLineId: line.lineId,
         ),
       );
@@ -368,10 +436,16 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
     if (text == null || text.isEmpty) {
       continue;
     }
-    final size = measureLabel(text, bold: true);
     if (basemap) {
       final entry = resolvedOwnerLabels['transfer:${group.stationId}'];
       if (entry != null) {
+        // #2068 9~10차: 오너 SVG font-size(design 환산)를 앱 기본(13) 이하로
+        // 클램프해 렌더 — 앵커는 스케일 보정 없이 오너 좌표 그대로 쓴다(8차
+        // fontRatio 확대 제거).
+        final fontSizePx = _clampOwnerFontSizeDesign(
+          entry.fontSizePx * design.designScale,
+        );
+        final size = measureLabel(text, bold: true, fontSize: fontSizePx);
         ownerFixedLabels.add(
           RouteMapStaticLabel(
             id: 'transfer:${group.stationId}',
@@ -380,14 +454,20 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
               design.toDesign(entry.position),
               size,
               entry.anchor,
-              kRouteMapDesignLabelFontPx,
+              fontSizePx,
             ),
             bold: true,
+            fontSizePx: fontSizePx,
           ),
         );
         continue;
       }
     }
+    final size = measureLabel(
+      text,
+      bold: true,
+      fontSize: fallbackLabelFontSizePx,
+    );
     candidates.add(
       _Candidate(
         id: 'transfer:${group.stationId}',
@@ -406,6 +486,7 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
                 : kRouteMapDesignBadgeRadiusPx) +
             _memberSpread(group.memberPositions) * design.designScale / 2,
         bold: true,
+        fontSizePx: fallbackLabelFontSizePx,
       ),
     );
   }
@@ -418,11 +499,17 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
       continue;
     }
     final bold = terminusIds.contains(station.stationId);
-    final size = measureLabel(text, bold: bold);
     if (basemap) {
       final entry =
           resolvedOwnerLabels['${station.stationId}:${station.lineId}'];
       if (entry != null) {
+        // #2068 9~10차: 오너 SVG font-size(design 환산)를 앱 기본(13) 이하로
+        // 클램프해 렌더 — 앵커는 스케일 보정 없이 오너 좌표 그대로 쓴다(8차
+        // fontRatio 확대 제거).
+        final fontSizePx = _clampOwnerFontSizeDesign(
+          entry.fontSizePx * design.designScale,
+        );
+        final size = measureLabel(text, bold: bold, fontSize: fontSizePx);
         ownerFixedLabels.add(
           RouteMapStaticLabel(
             id: '${station.stationId}:${station.lineId}',
@@ -431,14 +518,20 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
               design.toDesign(entry.position),
               size,
               entry.anchor,
-              kRouteMapDesignLabelFontPx,
+              fontSizePx,
             ),
             bold: bold,
+            fontSizePx: fontSizePx,
           ),
         );
         continue;
       }
     }
+    final size = measureLabel(
+      text,
+      bold: bold,
+      fontSize: fallbackLabelFontSizePx,
+    );
     candidates.add(
       _Candidate(
         id: '${station.stationId}:${station.lineId}',
@@ -457,6 +550,7 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
               )
             : kRouteMapDesignStationRadiusPx,
         bold: bold,
+        fontSizePx: fallbackLabelFontSizePx,
       ),
     );
   }
@@ -586,6 +680,7 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
           lineId: candidate.badgeLineId!,
           label: candidate.text,
           rect: rect,
+          fontSizePx: candidate.fontSizePx,
         ),
       );
     } else {
@@ -595,6 +690,7 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
           text: candidate.text,
           rect: rect,
           bold: candidate.bold,
+          fontSizePx: candidate.fontSizePx,
         ),
       );
     }
