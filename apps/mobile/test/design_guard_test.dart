@@ -131,7 +131,7 @@ void main() {
       RegExp(r'^const _\w*Color\b\s*=', multiLine: true),
       exclude: {'accessible_design.dart', 'design_tokens.dart'},
     );
-    expectRatchet(actual, {'lib/main.dart': 8}, rule: '로컬 색 상수');
+    expectRatchet(actual, const {}, rule: '로컬 색 상수');
   });
 
   test('FontWeight.w900 ratchet — 전면 제거 대상', () {
@@ -310,7 +310,7 @@ void main() {
       // 의도 잔존: AppCard(20)·공용 control radius(12) — v4 정리 대상
       'lib/app/app_components.dart': 2,
       // 의도 잔존: 앱 shell 입력 필드(12) — v4 정리 대상
-      'lib/main.dart': 1,
+      'lib/app/easy_subway_app.dart': 1,
       // 의도 잔존: 홈 알림 control radius(12) — v4 정리 대상
       'lib/features/home/presentation/home_screen.dart': 1,
       // 의도 잔존: 노선 선택 헤더 캡슐(13)·역명 배지(24) — 노선도 룩 불변, 완전 원 아님
