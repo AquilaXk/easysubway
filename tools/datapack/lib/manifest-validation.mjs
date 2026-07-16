@@ -516,7 +516,10 @@ export function validateManifestSignature(manifest) {
   }
 }
 
-export function validateManifest(manifest, { requireProduction = false, releasesTarget = false } = {}) {
+export function validateManifest(
+  manifest,
+  { requireProduction = false, releasesTarget = false, verifySignature = true } = {},
+) {
   validateManifestJsonSchema(manifest);
   if (!manifest || typeof manifest !== "object") {
     throw new Error("manifest must be an object");
@@ -608,7 +611,7 @@ export function validateManifest(manifest, { requireProduction = false, releases
     }
     validateMinimumTableRows(pack, artifactKind, `${pack.id}@${pack.version}`);
   }
-  if (manifestVersion === 2) {
+  if (manifestVersion === 2 && verifySignature) {
     validateManifestSignature(manifest);
   }
 }

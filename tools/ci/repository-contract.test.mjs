@@ -3853,6 +3853,10 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.match(workflow, /run-id: \$\{\{ inputs\.datapack_run_id \}\}/);
   assert.match(workflow, /github-token: \$\{\{ secrets\.GITHUB_TOKEN \}\}/);
   assert.match(workflow, /datapack_run_id is required for production RC identity/);
+  assert.match(workflow, /DATAPACK_RUN_ID: \$\{\{ inputs\.datapack_run_id \}\}/);
+  assert.match(workflow, /ANDROID_RC_SIGNING_MODE: \$\{\{ inputs\.android_rc_signing_mode \}\}/);
+  assert.doesNotMatch(workflow, /if \[\[.*\$\{\{ inputs\.(?:datapack_run_id|android_rc_signing_mode) \}\}/);
+  assert.match(workflow, /--require-production-data-pack-binding true/);
   assert.match(workflow, /--data-pack-manifest "\$\{data_pack_manifest\}"/);
   assert.match(workflow, /--data-pack-artifact "\$\{data_pack_artifact\}"/);
   assert.match(workflow, /--phase FINAL/);
@@ -4805,19 +4809,59 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   await writeFile(aabPayloadPath, "datapack-readiness-aab");
   await execFileAsync("zip", ["-q", aabPath, path.basename(aabPayloadPath)], { cwd: tempDir });
   await writeFile(backendArtifactPath, "datapack-readiness-backend");
-  await writeFile(dataPackManifestPath, JSON.stringify({ manifestVersion: 2, channel: "production", releaseSequence: 102 }));
   const dataPackArtifactContents = "datapack-readiness-pack";
   const dataPackArtifactBytes = Buffer.byteLength(dataPackArtifactContents);
   await writeFile(dataPackArtifactPath, dataPackArtifactContents);
+  const dataPackArtifactSha256 = createHash("sha256").update(dataPackArtifactContents).digest("hex");
+  const productionManifest = {
+    manifestVersion: 2, channel: "production", releaseSequence: 102,
+    publishedAt: now, expiresAt: "2026-07-30T00:00:00.000Z", ttlSeconds: 3600,
+    keyId: "production-v1", signature: { algorithm: "rsa-sha256-manifest-v2", value: "test-signature" },
+    activePack: { id: "capital", version: "1" },
+    packs: [{
+      id: "capital", version: "1", artifactKind: "production", payloadKind: "sqlite_catalog",
+      url: "https://datapack.example.com/catalog/capital-v1.sqlite.gz", sha256: dataPackArtifactSha256,
+      sqliteSha256: "e".repeat(64), sizeBytes: dataPackArtifactBytes,
+      signature: { algorithm: "rsa-sha256-pack-manifest-v2", value: "test-signature" },
+      schemaVersion: "3", requiredTables: ["stations"],
+      minimumTableRows: { stations: 1, station_lines: 1, network_edges: 1, facilities: 1, station_facility_evidence: 1 },
+      sourceInventory: [{
+        id: "official-source", owner: "official-owner", url: "https://source.example.com/data",
+        license: "public", licenseStatus: "redistributable", redistributionAllowed: true,
+        updateFrequency: "daily", updatedAt: now, fields: ["stations"], coverageScope: {
+          regionIds: ["capital"], operatorIds: ["metro"], sourceDomains: ["topology"],
+        },
+      }],
+      regionalQualityMetrics: {
+        stationCount: 1, facilityCoverageRatio: 1, requiredFacilityEvidenceCoverageRatio: 1,
+        strictRouteEligibleFacilityRatio: 1, operationalKnownRatio: 1, freshnessValidRatio: 1,
+        fieldVerifiedPathwayRatio: 1, edgeCount: 1, unknownAccessibilityRatio: 0, unknownEdgeRatioByProfile: {
+          wheelchair: 0, stroller: 0, lowMobility: 0,
+        },
+      },
+      routeRegressionScope: { mode: "DIRECT_ONLY", excludedPatterns: [], claim: "capital pilot" },
+      representativeRouteRegressions: [{ id: "direct-1", pattern: "DIRECT", fromNodeId: "A", toNodeId: "B", requiredEdgeIds: ["A-B"] }],
+      representativeRouteRegressionSignature: { algorithm: "rsa-sha256-route-regression-v1", value: "test-signature" },
+    }],
+  };
+  await writeFile(dataPackManifestPath, JSON.stringify(productionManifest));
   const args = [
     "tools/release/generate-rc-evidence-manifest.mjs",
     "--repo-root", validationRepo, "--app-root", "apps/mobile", "--git-sha", gitSha, "--now", now,
     "--aab", aabPath, "--backend-artifact", backendArtifactPath,
     "--data-pack-manifest", dataPackManifestPath, "--data-pack-artifact", dataPackArtifactPath,
+    "--require-production-data-pack-binding", "true",
     "--support-contact-set-sha256", "d".repeat(64),
     "--device", "qa-device-a", "--android-version", "Android 16 API 36",
   ];
   const baselineOutput = path.join(tempDir, "baseline.json");
+  const rejectProductionManifest = async (packOverride, expected) => {
+    await writeFile(dataPackManifestPath, JSON.stringify({ ...productionManifest, packs: [{ ...productionManifest.packs[0], ...packOverride }] }));
+    await assert.rejects(execFileAsync(process.execPath, [...args, "--phase", "CANDIDATE", "--output", baselineOutput], { cwd: root }), expected);
+  };
+  await rejectProductionManifest({ sha256: "f".repeat(64) }, /production data pack manifest sha256 does not match the supplied artifact/);
+  await rejectProductionManifest({ sizeBytes: dataPackArtifactBytes + 1 }, /production data pack manifest sizeBytes does not match the supplied artifact/);
+  await writeFile(dataPackManifestPath, JSON.stringify(productionManifest));
   await execFileAsync(process.execPath, [...args, "--phase", "CANDIDATE", "--output", baselineOutput], { cwd: root });
   const candidateManifest = JSON.parse(readFileSync(baselineOutput, "utf8"));
   assert.equal(candidateManifest.phase, "CANDIDATE");
@@ -4997,7 +5041,7 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
     evidenceValidity: { evaluatedAt: now, expiresAt: "2026-07-30T00:00:00.000Z" },
     sourceTimetableArtifact: { artifactId: "source-timetable-v1", sha256: "1".repeat(64), freshUntil: "2026-07-30T00:00:00.000Z", identity: sharedIdentity },
     serverTimetableSnapshot: { artifactId: "server-timetable-v1", sha256: "2".repeat(64), freshUntil: "2026-07-30T00:00:00.000Z", identity: sharedIdentity },
-    mobileTopologyPack: { artifactId: "mobile-topology-v1", sha256: "3".repeat(64), freshUntil: "2026-07-30T00:00:00.000Z", identity: sharedIdentity },
+    mobileTopologyPack: { artifactId: "mobile-topology-v1", sha256: evidenceRcIdentity.dataPackArtifactSha256, freshUntil: "2026-07-30T00:00:00.000Z", identity: sharedIdentity },
   }, null, 2)}\n`);
   args.push("--identity-linkage-evidence", identityLinkagePath);
 
@@ -5054,82 +5098,74 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
 
   const rollbackEvidence = JSON.parse(readFileSync(gateEvidencePaths.rollback_rescue, "utf8"));
   delete rollbackEvidence.result;
-  await writeFile(gateEvidencePaths.rollback_rescue, JSON.stringify(rollbackEvidence));
-  await rejectsCurrent(/rollback_rescue requires result schemaVersion 1/);
+  await writeFile(gateEvidencePaths.rollback_rescue, JSON.stringify(rollbackEvidence)); await rejectsCurrent(/rollback_rescue requires result schemaVersion 1/);
   rollbackEvidence.result = datapackGateResult("rollback_rescue");
   rollbackEvidence.result.rescueReleaseSequence += 1;
-  await writeFile(gateEvidencePaths.rollback_rescue, JSON.stringify(rollbackEvidence));
-  await rejectsCurrent(/rollback_rescue result does not match the RC identity/);
+  await writeFile(gateEvidencePaths.rollback_rescue, JSON.stringify(rollbackEvidence)); await rejectsCurrent(/rollback_rescue result does not match the RC identity/);
   rollbackEvidence.result = datapackGateResult("rollback_rescue");
   await writeFile(gateEvidencePaths.rollback_rescue, JSON.stringify(rollbackEvidence));
 
   const sourceAdmissionEvidence = JSON.parse(readFileSync(gateEvidencePaths.source_admission, "utf8"));
   const sourceAdmissionResult = sourceAdmissionEvidence.result;
   delete sourceAdmissionEvidence.result;
-  await writeFile(gateEvidencePaths.source_admission, JSON.stringify(sourceAdmissionEvidence));
-  await rejectsCurrent(/source_admission requires result schemaVersion 1/);
+  await writeFile(gateEvidencePaths.source_admission, JSON.stringify(sourceAdmissionEvidence)); await rejectsCurrent(/source_admission requires result schemaVersion 1/);
   sourceAdmissionEvidence.result = sourceAdmissionResult;
   await writeFile(gateEvidencePaths.source_admission, JSON.stringify(sourceAdmissionEvidence));
 
   const devicePerformanceEvidence = JSON.parse(readFileSync(gateEvidencePaths.device_performance, "utf8"));
   devicePerformanceEvidence.result.artifact.sha256 = "f".repeat(64);
-  await writeFile(gateEvidencePaths.device_performance, JSON.stringify(devicePerformanceEvidence));
-  await rejectsCurrent(/device_performance artifact.sha256 does not match the RC identity/);
+  await writeFile(gateEvidencePaths.device_performance, JSON.stringify(devicePerformanceEvidence)); await rejectsCurrent(/device_performance artifact.sha256 does not match the RC identity/);
   devicePerformanceEvidence.result = datapackGateResult("device_performance");
   devicePerformanceEvidence.result.artifact.compressedBytes -= 1;
-  await writeFile(gateEvidencePaths.device_performance, JSON.stringify(devicePerformanceEvidence));
-  await rejectsCurrent(/device_performance compressedBytes does not match the supplied data pack artifact/);
+  await writeFile(gateEvidencePaths.device_performance, JSON.stringify(devicePerformanceEvidence)); await rejectsCurrent(/device_performance compressedBytes does not match the supplied data pack artifact/);
   devicePerformanceEvidence.result = datapackGateResult("device_performance");
   devicePerformanceEvidence.result.metrics.coldLoadP95Ms = devicePerformanceEvidence.result.metrics.coldLoadP50Ms - 1;
-  await writeFile(gateEvidencePaths.device_performance, JSON.stringify(devicePerformanceEvidence));
-  await rejectsCurrent(/requires P95 metrics to be greater than or equal to P50 metrics/);
+  await writeFile(gateEvidencePaths.device_performance, JSON.stringify(devicePerformanceEvidence)); await rejectsCurrent(/requires P95 metrics to be greater than or equal to P50 metrics/);
   devicePerformanceEvidence.result = datapackGateResult("device_performance");
   await writeFile(gateEvidencePaths.device_performance, JSON.stringify(devicePerformanceEvidence));
 
   const callbackEvidence = JSON.parse(readFileSync(gateEvidencePaths.callback_reconciliation, "utf8"));
   callbackEvidence.result.deliveryIdentity.releaseSequence = 103;
-  await writeFile(gateEvidencePaths.callback_reconciliation, JSON.stringify(callbackEvidence));
-  await rejectsCurrent(/callback_reconciliation releaseSequence does not match the RC identity/);
+  await writeFile(gateEvidencePaths.callback_reconciliation, JSON.stringify(callbackEvidence)); await rejectsCurrent(/callback_reconciliation releaseSequence does not match the RC identity/);
   callbackEvidence.result = datapackGateResult("callback_reconciliation");
   callbackEvidence.result.deliveryIdentity.idempotencyKeySha256 = "8".repeat(64);
-  await writeFile(gateEvidencePaths.callback_reconciliation, JSON.stringify(callbackEvidence));
-  await rejectsCurrent(/callback_reconciliation idempotencyKeySha256 does not match the delivery identity/);
+  await writeFile(gateEvidencePaths.callback_reconciliation, JSON.stringify(callbackEvidence)); await rejectsCurrent(/callback_reconciliation idempotencyKeySha256 does not match the delivery identity/);
   callbackEvidence.result = datapackGateResult("callback_reconciliation");
   await writeFile(gateEvidencePaths.callback_reconciliation, JSON.stringify(callbackEvidence));
 
   const linkageEvidence = JSON.parse(readFileSync(identityLinkagePath, "utf8"));
   linkageEvidence.mobileTopologyPack.identity.apiKey = "must-not-be-published";
-  await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence));
-  await rejectsCurrent(/identity linkage has unsafe or non-scalar mobileTopologyPack.identity/);
+  await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence)); await rejectsCurrent(/identity linkage has unsafe or non-scalar mobileTopologyPack.identity/);
   delete linkageEvidence.mobileTopologyPack.identity.apiKey;
   await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence));
   linkageEvidence.mobileTopologyPack.identity.corridorId = "different-corridor";
-  await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence));
-  await rejectsCurrent(/identity linkage shared field mismatch: corridorId/);
+  await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence)); await rejectsCurrent(/identity linkage shared field mismatch: corridorId/);
   linkageEvidence.mobileTopologyPack.identity.corridorId = "capital";
+  await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence));
+
+  linkageEvidence.mobileTopologyPack.sha256 = "f".repeat(64);
+  await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence)); await rejectsCurrent(/mobileTopologyPack sha256 does not match the RC data pack artifact/);
+  linkageEvidence.mobileTopologyPack.sha256 = evidenceRcIdentity.dataPackArtifactSha256;
   await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence));
 
   for (const artifact of ["sourceTimetableArtifact", "serverTimetableSnapshot", "mobileTopologyPack"]) {
     linkageEvidence[artifact].identity.schemaVersion = "3";
   }
-  await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence));
-  await rejectsCurrent(/missing or invalid shared field: schemaVersion/);
+  await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence)); await rejectsCurrent(/missing or invalid shared field: schemaVersion/);
   for (const artifact of ["sourceTimetableArtifact", "serverTimetableSnapshot", "mobileTopologyPack"]) {
     linkageEvidence[artifact].identity.schemaVersion = 3;
   }
   await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence));
 
   linkageEvidence.mobileTopologyPack.freshUntil = "2026-07-20T00:00:00.000Z";
-  await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence));
-  await rejectsCurrent(/identity linkage freshness does not cover evidence expiry: mobileTopologyPack/);
+  await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence)); await rejectsCurrent(/identity linkage freshness does not cover evidence expiry: mobileTopologyPack/);
   linkageEvidence.mobileTopologyPack.freshUntil = "2026-07-30T00:00:00.000Z";
   await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence));
 
   const admissionEvidence = JSON.parse(readFileSync(gateEvidencePaths.source_admission, "utf8"));
   admissionEvidence.snapshotSetIdentity = "b".repeat(64);
   admissionEvidence.result.snapshotSetIdentity = admissionEvidence.snapshotSetIdentity;
-  await writeFile(gateEvidencePaths.source_admission, JSON.stringify(admissionEvidence));
-  await rejectsCurrent(/mixed snapshotSetIdentity/);
+  await writeFile(gateEvidencePaths.source_admission, JSON.stringify(admissionEvidence)); await rejectsCurrent(/mixed snapshotSetIdentity/);
   admissionEvidence.snapshotSetIdentity = snapshotSetIdentity;
   admissionEvidence.result.snapshotSetIdentity = snapshotSetIdentity;
   await writeFile(gateEvidencePaths.source_admission, JSON.stringify(admissionEvidence));
@@ -5137,24 +5173,19 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   const governanceEvidence = JSON.parse(readFileSync(gateEvidencePaths.source_governance, "utf8"));
   const omittedRequiredSource = governanceEvidence.sourceInventory.entries.pop();
   governanceEvidence.sourceInventory.statusCounts.APPROVED -= 1;
-  await writeFile(gateEvidencePaths.source_governance, JSON.stringify(governanceEvidence));
-  await rejectsCurrent(/include every required production source/);
+  await writeFile(gateEvidencePaths.source_governance, JSON.stringify(governanceEvidence)); await rejectsCurrent(/include every required production source/);
   governanceEvidence.sourceInventory.entries.push(omittedRequiredSource);
   governanceEvidence.sourceInventory.statusCounts.APPROVED += 1;
   governanceEvidence.sourceInventory.inventoryAsOf = "2026-07-15T23:59:59.999Z";
-  await writeFile(gateEvidencePaths.source_governance, JSON.stringify(governanceEvidence));
-  await rejectsCurrent(/sourceInventory.inventoryAsOf must cover child evidence/);
+  await writeFile(gateEvidencePaths.source_governance, JSON.stringify(governanceEvidence)); await rejectsCurrent(/sourceInventory.inventoryAsOf must cover child evidence/);
   governanceEvidence.sourceInventory.inventoryAsOf = "2026-07-17T00:00:00.000Z";
-  await writeFile(gateEvidencePaths.source_governance, JSON.stringify(governanceEvidence));
-  await rejectsCurrent(/requires sourceInventory.inventoryAsOf/);
+  await writeFile(gateEvidencePaths.source_governance, JSON.stringify(governanceEvidence)); await rejectsCurrent(/requires sourceInventory.inventoryAsOf/);
   governanceEvidence.sourceInventory.inventoryAsOf = now;
   governanceEvidence.sourceInventory.entries[0].expiresAt = "2026-07-29T23:59:59.999Z";
-  await writeFile(gateEvidencePaths.source_governance, JSON.stringify(governanceEvidence));
-  await rejectsCurrent(/invalid, duplicate, stale, or contradictory sourceInventory.entries/);
+  await writeFile(gateEvidencePaths.source_governance, JSON.stringify(governanceEvidence)); await rejectsCurrent(/invalid, duplicate, stale, or contradictory sourceInventory.entries/);
   governanceEvidence.sourceInventory.entries[0].expiresAt = "2026-07-30T00:00:00.000Z";
   governanceEvidence.sourceInventory.statusCounts.APPROVED = requiredSourceIds.length - 1;
-  await writeFile(gateEvidencePaths.source_governance, JSON.stringify(governanceEvidence));
-  await rejectsCurrent(/statusCounts must match current sourceInventory.entries/);
+  await writeFile(gateEvidencePaths.source_governance, JSON.stringify(governanceEvidence)); await rejectsCurrent(/statusCounts must match current sourceInventory.entries/);
 });
 
 test("datapack readiness producer는 unknown·mixed identity·expired evidence를 거부한다", async () => {

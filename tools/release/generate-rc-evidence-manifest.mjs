@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, wri
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { canonicalScopeHash } from "../datapack/build-launch-denominator-report.mjs";
+import { validateManifest } from "../datapack/lib/manifest-validation.mjs";
 
 const args = parseArgs(process.argv.slice(2));
 const cwd = process.cwd();
@@ -41,6 +42,10 @@ const dataPackArtifactPath = dataPackArtifactArg ? resolvePath(dataPackArtifactA
 const dataPackArtifactBytes = dataPackArtifactPath && existsSync(dataPackArtifactPath)
   ? statSync(dataPackArtifactPath).size
   : null;
+const requireProductionDataPackBinding = booleanArg("requireProductionDataPackBinding", "require-production-data-pack-binding");
+if (requireProductionDataPackBinding) {
+  validateProductionDataPackBinding(dataPackManifest, dataPackArtifactPath, dataPackArtifactBytes);
+}
 const backendIdentity = readBackendIdentity(args);
 const providedGateStatuses = parsePairs(arg("gateStatus", "gate-status"));
 const gateEvidencePaths = parsePairs(arg("gateEvidence", "gate-evidence"));
@@ -328,6 +333,15 @@ function arg(camelName, kebabName) {
   return args[camelName] ?? args[kebabName];
 }
 
+function booleanArg(camelName, kebabName) {
+  const value = arg(camelName, kebabName);
+  if (value === undefined) return false;
+  if (value !== "true" && value !== "false") {
+    fail(`--${kebabName} must be true or false`);
+  }
+  return value === "true";
+}
+
 function readFlutterVersion(pubspecPath) {
   const pubspec = readFileSync(pubspecPath, "utf8");
   const match = pubspec.match(/^version:\s*([0-9A-Za-z.+-]+)\s*$/m);
@@ -373,6 +387,35 @@ function readJsonIfExists(filePath) {
     return null;
   }
   return JSON.parse(readFileSync(filePath, "utf8"));
+}
+
+function validateProductionDataPackBinding(manifest, artifactPath, artifactBytes) {
+  if (!artifactPath || !existsSync(artifactPath) || !Number.isSafeInteger(artifactBytes) || artifactBytes <= 0) {
+    fail("production data pack binding requires an existing non-empty artifact");
+  }
+  try {
+    validateManifest(manifest, { requireProduction: true, verifySignature: false });
+  } catch (error) {
+    fail(`production data pack manifest schema validation failed: ${error.message}`);
+  }
+  if (manifest.manifestVersion !== 2 || manifest.channel !== "production") {
+    fail("production data pack manifest must be manifestVersion 2 on the production channel");
+  }
+  const activePack = manifest.activePack
+    ? manifest.packs.find((pack) => (
+        pack.id === manifest.activePack.id && pack.version === manifest.activePack.version
+      ))
+    : manifest.packs.length === 1 ? manifest.packs[0] : null;
+  if (!activePack) {
+    fail("production data pack manifest must identify exactly one active pack");
+  }
+  const artifactSha256 = createHash("sha256").update(readFileSync(artifactPath)).digest("hex");
+  if (activePack.sha256 !== artifactSha256) {
+    fail("production data pack manifest sha256 does not match the supplied artifact");
+  }
+  if (activePack.sizeBytes !== artifactBytes) {
+    fail("production data pack manifest sizeBytes does not match the supplied artifact");
+  }
 }
 
 function readKeyValueFileIfExists(filePath) {
@@ -1099,6 +1142,9 @@ function readIdentityLinkage(evidencePath, identity, identityMatrix, generatedAt
     }
     if (Date.parse(artifact.freshUntil) < Date.parse(expiresAt)) {
       fail(`identity linkage freshness does not cover evidence expiry: ${name}`);
+    }
+    if (name === "mobileTopologyPack" && artifact.sha256 !== identity.dataPackArtifactSha256) {
+      fail("mobileTopologyPack sha256 does not match the RC data pack artifact");
     }
     artifact.identity = normalizeArtifactIdentity(name, artifact.identity, requiredFields);
     artifactIds.add(artifact.artifactId);

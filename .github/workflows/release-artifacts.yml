@@ -690,16 +690,19 @@ jobs:
 
       - name: RC Evidence Manifest / Generate manifest
         shell: bash
+        env:
+          ANDROID_RC_SIGNING_MODE: ${{ inputs.android_rc_signing_mode }}
+          DATAPACK_RUN_ID: ${{ inputs.datapack_run_id }}
         run: |
           set -euo pipefail
           mkdir -p release-artifacts/rc
           data_pack_manifest=apps/mobile/assets/datapacks/metro_map_pack/manifest.json
           data_pack_artifact=apps/mobile/assets/datapacks/capital.sqlite.gz
-          if [[ "${{ inputs.android_rc_signing_mode }}" == production-upload-key && -z "${{ inputs.datapack_run_id }}" ]]; then
+          if [[ "${ANDROID_RC_SIGNING_MODE}" == production-upload-key && -z "${DATAPACK_RUN_ID}" ]]; then
             echo "datapack_run_id is required for production RC identity" >&2
             exit 1
           fi
-          if [[ -n "${{ inputs.datapack_run_id }}" ]]; then
+          if [[ -n "${DATAPACK_RUN_ID}" ]]; then
             data_pack_manifest=release-artifacts/downloaded/datapack/catalog/current.json
             mapfile -t production_data_pack_artifacts < <(find release-artifacts/downloaded/datapack -type f -name '*.sqlite.gz' -print)
             if [[ "${#production_data_pack_artifacts[@]}" -ne 1 ]]; then
@@ -719,6 +722,9 @@ jobs:
             --device local_android_emulator
             --android-version android-15-or-16
           )
+          if [[ -n "${DATAPACK_RUN_ID}" ]]; then
+            generator_args+=(--require-production-data-pack-binding true)
+          fi
           blocked_evidence_args=(
             --gate-status androidRcEvidence=BLOCKED_EXTERNAL
             --gate-status productionDatapack=BLOCKED_EXTERNAL
