@@ -113,7 +113,7 @@ class HttpDatapackReleaseCatalogAdapterTest {
 	void findsRequestThroughSignedBindingWithoutChangingManifestIdentity() throws Exception {
 		var keyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
 		byte[] manifest = signedManifest(keyPair, 42);
-		byte[] current = signedManifest(keyPair, 44);
+		byte[] current = manifest;
 		byte[] binding = signedBinding(keyPair, 42, "request-2057", sha256(manifest));
 		var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
 		server.createContext("/catalog/release-requests/"
@@ -134,6 +134,34 @@ class HttpDatapackReleaseCatalogAdapterTest {
 
 			assertThat(found).get().extracting(identity -> identity.releaseSequence()).isEqualTo(42L);
 			assertThat(found).get().extracting(identity -> identity.manifestSha256()).isEqualTo(sha256(manifest));
+		} finally {
+			server.stop(0);
+		}
+	}
+
+	@Test
+	void rejectsRequestWhenALaterReleaseReplacedTheCurrentPointer() throws Exception {
+		var keyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
+		byte[] manifest = signedManifest(keyPair, 42);
+		byte[] current = signedManifest(keyPair, 44);
+		byte[] binding = signedBinding(keyPair, 42, "request-2057", sha256(manifest));
+		var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+		server.createContext("/catalog/release-requests/"
+			+ sha256("request-2057".getBytes(StandardCharsets.UTF_8)) + ".json",
+			exchange -> respond(exchange, binding));
+		server.createContext("/catalog/releases/42.json", exchange -> respond(exchange, manifest));
+		server.createContext("/catalog/current.json", exchange -> respond(exchange, current));
+		server.start();
+		try {
+			String publicKey = "-----BEGIN PUBLIC KEY-----\n"
+				+ Base64.getMimeEncoder(64, "\n".getBytes(StandardCharsets.US_ASCII))
+					.encodeToString(keyPair.getPublic().getEncoded())
+				+ "\n-----END PUBLIC KEY-----";
+			var adapter = new HttpDatapackReleaseCatalogAdapter(
+				"http://127.0.0.1:" + server.getAddress().getPort(), publicKey, "production-v1");
+
+			assertThatThrownBy(() -> adapter.findByRequest("production", "request-2057"))
+				.isInstanceOf(com.easysubway.datapack.application.port.out.DatapackReleaseCatalogPort.Unavailable.class);
 		} finally {
 			server.stop(0);
 		}

@@ -124,14 +124,19 @@ public class JdbcDatapackReleaseDeliveryRepository implements DatapackReleaseDel
 			""", String.class, ts(now), ts(reclaimBefore), limit);
 		var claimed = new ArrayList<DatapackReleaseDelivery>();
 		for (String key : keys) {
-			int changed = jdbcTemplate.update("""
-				UPDATE datapack_release_deliveries SET claimed_at=?, claim_owner=?, updated_at=?
-				WHERE idempotency_key=? AND (claimed_at IS NULL OR claimed_at <= ?)
-				  AND state IN ('PENDING', 'RETRY_SCHEDULED', 'RECONCILIATION_REQUIRED')
-				""", ts(now), owner, ts(now), key, ts(reclaimBefore));
+			int changed = claimKeyIfDue(now, owner, reclaimBefore, key);
 			if (changed == 1) findByIdempotencyKey(key).ifPresent(claimed::add);
 		}
 		return claimed;
+	}
+
+	int claimKeyIfDue(LocalDateTime now, String owner, LocalDateTime reclaimBefore, String key) {
+		return jdbcTemplate.update("""
+			UPDATE datapack_release_deliveries SET claimed_at=?, claim_owner=?, updated_at=?
+			WHERE idempotency_key=? AND (claimed_at IS NULL OR claimed_at <= ?)
+			  AND state IN ('PENDING', 'RETRY_SCHEDULED', 'RECONCILIATION_REQUIRED')
+			  AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
+			""", ts(now), owner, ts(now), key, ts(reclaimBefore), ts(now));
 	}
 
 	public void mark(String idempotencyKey, State state, int attempts, LocalDateTime nextAttemptAt,

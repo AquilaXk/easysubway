@@ -83,7 +83,8 @@ public class HttpDatapackReleaseCatalogAdapter implements DatapackReleaseCatalog
 				|| !boundManifestSha256.equals(manifest.manifestSha256())) throw new Unavailable();
 			var current = fetchCurrent(channel);
 			if (!current.signatureValid() || !channel.equals(current.channel())
-				|| current.releaseSequence() < sequence) throw new Unavailable();
+				|| current.releaseSequence() != sequence
+				|| !boundManifestSha256.equals(current.manifestSha256())) throw new Unavailable();
 			return Optional.of(new CatalogIdentity(
 				sequence, boundManifestSha256, channel, releaseRequestId, true,
 				sha256(signatureValue.getBytes(StandardCharsets.UTF_8))));

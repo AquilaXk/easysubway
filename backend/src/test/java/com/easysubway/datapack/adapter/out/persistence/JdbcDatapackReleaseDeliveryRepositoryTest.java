@@ -88,6 +88,24 @@ class JdbcDatapackReleaseDeliveryRepositoryTest {
 			.isInstanceOf(IllegalStateException.class);
 	}
 
+	@Test
+	@DisplayName("select 뒤 backoff가 예약되면 지연된 claim 갱신을 거부한다")
+	void refusesAStaleClaimAfterBackoffWasScheduled() {
+		var delivery = repository.upsertSameDelivery(pending(SHA));
+		jdbcTemplate.update("""
+			UPDATE datapack_release_deliveries
+			SET state='RETRY_SCHEDULED', next_attempt_at=?
+			WHERE idempotency_key=?
+			""", T0.plusMinutes(1), delivery.idempotencyKey());
+
+		int changed = repository.claimKeyIfDue(
+			T0, "stale-worker", T0.minusMinutes(5), delivery.idempotencyKey());
+
+		assertThat(changed).isZero();
+		assertThat(repository.findByIdempotencyKey(delivery.idempotencyKey()))
+			.get().extracting(DatapackReleaseDelivery::claimOwner).isNull();
+	}
+
 	private static DatapackReleaseDelivery pending(String manifestSha256) {
 		return pending(manifestSha256, "c".repeat(64), "d".repeat(64));
 	}
