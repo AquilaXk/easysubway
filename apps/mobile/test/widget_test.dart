@@ -8491,6 +8491,61 @@ void main() {
     );
   });
 
+  testWidgets('ITX 실패는 명시적 지하철만 보기 선택 뒤에만 SUBWAY로 재검색한다', (tester) async {
+    final routeRepository = FakeRouteSearchRepository(
+      errorForRequest: (request) =>
+          request.transportScope == RouteTransportScope.subwayAndItxCheongchun
+          ? const RouteSearchOnlineException.unavailable(
+              failureReason: 'ITX_TIMETABLE_UNAVAILABLE',
+              message: 'ITX 시간표를 불러올 수 없어요',
+            )
+          : null,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: routeRepository,
+          stationRepository: FakeStationSearchRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
+          itxTransportScopeEnabled: true,
+          initialTransportScope: RouteTransportScope.subwayAndItxCheongchun,
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 16),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(routeRepository.requests, hasLength(1));
+    expect(
+      routeRepository.requests.single.transportScope,
+      RouteTransportScope.subwayAndItxCheongchun,
+    );
+    expect(
+      find.byKey(const Key('routeSearchSubwayOnlyAction')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const Key('routeSearchSubwayOnlyAction')));
+    await tester.pumpAndSettle();
+
+    expect(routeRepository.requests, hasLength(2));
+    expect(
+      routeRepository.requests.last.transportScope,
+      RouteTransportScope.subway,
+    );
+    expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
+  });
+
   testWidgets('즐겨찾기에서 복원한 ITX transport scope로 첫 검색을 시작한다', (tester) async {
     final routeRepository = FakeRouteSearchRepository();
     await tester.pumpWidget(
@@ -16959,11 +17014,15 @@ Future<void> _enableSampleGetOffAlarm(GetOffAlarmController controller) {
 }
 
 class FakeRouteSearchRepository implements RouteSearchRepository {
-  FakeRouteSearchRepository({RouteSearchResult? result, this.error})
-    : result = result ?? _sampleRouteSearchResult();
+  FakeRouteSearchRepository({
+    RouteSearchResult? result,
+    this.error,
+    this.errorForRequest,
+  }) : result = result ?? _sampleRouteSearchResult();
 
   final RouteSearchResult result;
   final Object? error;
+  final Object? Function(RouteSearchRequest request)? errorForRequest;
   final requests = <RouteSearchRequest>[];
   final refreshRouteSearchIds = <String>[];
   RouteRefreshResult? refreshResult;
@@ -16973,7 +17032,7 @@ class FakeRouteSearchRepository implements RouteSearchRepository {
   @override
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request) async {
     requests.add(request);
-    final currentError = error;
+    final currentError = errorForRequest?.call(request) ?? error;
     if (currentError != null) {
       throw currentError;
     }
