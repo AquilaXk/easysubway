@@ -250,13 +250,19 @@
       "routeV2Readiness": {
         "issue": 2095,
         "status": "BLOCKED_EXTERNAL",
-        "productionIngressOpen": false,
-        "androidConsumers": [
+        "productionReachabilityEvidence": {
+          "observedAt": "2026-07-16T15:20:00+09:00",
+          "candidateGitSha": "e317f3af90292b9e2dff5e7ec90c22792b845435",
+          "rollbackRun": "https://github.com/AquilaXk/easysubway/actions/runs/29470369402",
+          "ingressOpen": false,
+          "activeProductionEndpoints": []
+        },
+        "intendedAndroidConsumers": [
           {
             "method": "POST",
             "path": "/api/v2/routes/session",
             "consumer": "PlayIntegrityRouteV2SessionProvider",
-            "auth": "Play Integrity attestation",
+            "auth": "Play Integrity attestation and gateway origin proof",
             "cacheControl": "private, no-store"
           },
           {
@@ -278,7 +284,16 @@
         "timetableSnapshotCache": {
           "status": "BLOCKED_EXTERNAL",
           "blockedByIssue": 2145,
-          "requiredKey": "immutable timetable artifact identity",
+          "requiredKey": {
+            "format": "snapshotSha256 + freshUntil",
+            "fields": ["snapshotSha256", "freshUntil"],
+            "sameFreshnessDifferentHashReloadRequired": true
+          },
+          "currentImplementation": {
+            "status": "BLOCKED_EXTERNAL",
+            "fields": ["timetableArtifactId", "freshUntil"],
+            "gap": "snapshotSha256 is not materialized until #2145"
+          },
           "sharedRouteResponseCacheAllowed": false
         },
         "realisticLoadEvidence": {

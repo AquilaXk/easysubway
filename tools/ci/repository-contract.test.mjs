@@ -4832,6 +4832,17 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   const mobileRouteIngress = read("apps/mobile/lib/route_v2_ingress.dart");
   const mobileRouteSearch = read("apps/mobile/lib/route_search.dart");
   const routeV2Gateway = read("infra/nginx/route-v2-gateway.conf.template");
+  const routeV2ProxyHeaders = read("infra/nginx/route-v2-proxy-headers.conf.template");
+  const routeV2OriginGateFilter = read(
+    "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteV2OriginGateFilter.java",
+  );
+  const jdbcRouteTimetableRepository = read(
+    "backend/src/main/java/com/easysubway/route/adapter/out/persistence/JdbcRouteTimetableRepository.java",
+  );
+  const jdbcRouteTimetableRepositoryTest = read(
+    "backend/src/test/java/com/easysubway/route/adapter/out/persistence/JdbcRouteTimetableRepositoryTest.java",
+  );
+  const routeV2GatewayProbe = read("tools/test/run-route-v2-gateway-integration.sh");
   const internalApiIndex = readJson("contracts/api/internal-api-index.json");
 
   assert.equal(gate.schemaVersion, 1);
@@ -5203,13 +5214,19 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   const routeV2Readiness = operationsEvidence.backendControlPlane.publicApiSurface.routeV2Readiness;
   assert.equal(routeV2Readiness.issue, 2095);
   assert.equal(routeV2Readiness.status, "BLOCKED_EXTERNAL");
-  assert.equal(routeV2Readiness.productionIngressOpen, false);
-  assert.deepEqual(routeV2Readiness.androidConsumers, [
+  assert.deepEqual(routeV2Readiness.productionReachabilityEvidence, {
+    observedAt: "2026-07-16T15:20:00+09:00",
+    candidateGitSha: "e317f3af90292b9e2dff5e7ec90c22792b845435",
+    rollbackRun: "https://github.com/AquilaXk/easysubway/actions/runs/29470369402",
+    ingressOpen: false,
+    activeProductionEndpoints: [],
+  });
+  assert.deepEqual(routeV2Readiness.intendedAndroidConsumers, [
     {
       method: "POST",
       path: "/api/v2/routes/session",
       consumer: "PlayIntegrityRouteV2SessionProvider",
-      auth: "Play Integrity attestation",
+      auth: "Play Integrity attestation and gateway origin proof",
       cacheControl: "private, no-store",
     },
     {
@@ -5228,7 +5245,16 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   assert.deepEqual(routeV2Readiness.timetableSnapshotCache, {
     status: "BLOCKED_EXTERNAL",
     blockedByIssue: 2145,
-    requiredKey: "immutable timetable artifact identity",
+    requiredKey: {
+      format: "snapshotSha256 + freshUntil",
+      fields: ["snapshotSha256", "freshUntil"],
+      sameFreshnessDifferentHashReloadRequired: true,
+    },
+    currentImplementation: {
+      status: "BLOCKED_EXTERNAL",
+      fields: ["timetableArtifactId", "freshUntil"],
+      gap: "snapshotSha256 is not materialized until #2145",
+    },
     sharedRouteResponseCacheAllowed: false,
   });
   assert.deepEqual(routeV2Readiness.realisticLoadEvidence, {
@@ -5246,7 +5272,15 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   assert.match(mobileRouteSearch, /production ingress는 session\/search 두 경로만 열고 legacy refresh는 계속 닫는다/);
   assert.match(routeSessionController, /header\(HttpHeaders\.CACHE_CONTROL, "private, no-store"\)/);
   assert.match(routeSearchController, /header\(HttpHeaders\.CACHE_CONTROL, "private, no-store"\)/);
-  assert.match(routeV2Gateway, /add_header Cache-Control "private, no-store" always/);
+  assert.match(routeV2OriginGateFilter, /ORIGIN_HEADER = "X-EasySubway-Origin-Verify"/);
+  assert.match(routeV2ProxyHeaders, /proxy_set_header X-EasySubway-Origin-Verify/);
+  assert.match(jdbcRouteTimetableRepository, /artifact\.id\(\) \+ ":" \+ artifact\.freshUntil\(\)/);
+  assert.match(
+    jdbcRouteTimetableRepositoryTest,
+    /동일 freshness에서도 ITX artifact identity가 바뀌면 cache key가 바뀐다/,
+  );
+  assert.match(routeV2GatewayProbe, /session success response must remain private, no-store/);
+  assert.match(routeV2GatewayProbe, /search success response must remain private, no-store/);
   assert.match(
     securityConfig,
     /@Profile\("prod \| staging \| release \| prod-like"\)[\s\S]*SecurityFilterChain routeV2IngressSecurityFilterChain/,

@@ -81,7 +81,11 @@ test("Compose gateway는 loopback 전용 포트와 동일 origin secret을 사�
 
 test("Route V2 gateway runtime integration probe는 privacy·bucket·identifier-free log 경계를 검증한다", async () => {
   const probe = await read("tools/test/run-route-v2-gateway-integration.sh");
+  const backendFixture = await read("tools/ci/fixtures/route-v2-gateway-backend.mjs");
 
+  assert.match(backendFixture, /"cache-control": "private, no-store"/);
+  assert.match(probe, /session success response must remain private, no-store/);
+  assert.match(probe, /search success response must remain private, no-store/);
   assert.match(probe, /CF-Connecting-IP: 198\.51\.100\.10/);
   assert.match(probe, /CF-Connecting-IP: 198\.51\.100\.20/);
   assert.match(probe, /CF-Connecting-IP: 198\.51\.100\.40/);
