@@ -3607,10 +3607,30 @@ test("A RED repository locks summary v2 contract and catalog", async () => {
   ]);
   const routeV2 = abusePenetrationRehearsalGate.rehearsalMatrices.routeV2IngressAbuse;
   assert.deepEqual(routeV2.requiredCases, [
-    "attestation_nonce_request_hash", "session_token_scope_expiry_quota",
-    "gateway_401_origin_403_no_write", "gateway_ip_token_limiter_retry_after",
+    "attestation_valid",
+    "attestation_nonce_replay",
+    "attestation_stale_verdict",
+    "attestation_future_verdict",
+    "attestation_request_hash_mismatch",
+    "attestation_wrong_request_package",
+    "attestation_wrong_app_package",
+    "attestation_certificate_mismatch",
+    "attestation_app_recognition_mismatch",
+    "attestation_licensing_mismatch",
+    "attestation_device_integrity_mismatch",
+    "attestation_provider_unavailable",
+    "session_expired",
+    "session_wrong_scope",
+    "session_quota_exhausted",
+    "gateway_session_missing",
+    "direct_origin_bypass_no_write",
+    "gateway_ip_limiter",
+    "gateway_token_limiter",
   ]);
-  assert.deepEqual(routeV2.expectedStatusByCase.gateway_ip_token_limiter_retry_after, [429]);
+  for (const caseId of routeV2.requiredCases) {
+    assert.equal(routeV2.expectedStatusByCase[caseId].length, 1, `${caseId} must require one exact result`);
+  }
+  assert.deepEqual(routeV2.expectedStatusByCase.gateway_token_limiter, [429]);
   assert.equal(abusePenetrationRehearsalGate.status, "BLOCKED_EXTERNAL");
   assert.equal(abusePenetrationRehearsalGate.findingPolicy.criticalHighAllowed, 0);
 });

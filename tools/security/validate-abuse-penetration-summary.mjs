@@ -114,14 +114,13 @@ function artifactIdentitySha256(identity) {
   const canonical = Object.fromEntries(Object.keys(identity).sort().map((field) => [field, identity[field]]));
   return createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
 }
-function validateEvidence(items, allowed, path, requireExact, gate, identity) {
+function validateEvidence(items, allowed, path, requireExact, gate, identity, paths) {
   const actual = uniqueIds(items,"evidenceId",new Set(allowed),path);
   if (requireExact) exactSet(actual,allowed,path);
   const expectedIdentitySha256 = identity === undefined ? undefined : artifactIdentitySha256(identity);
   const expectedPathPrefix = identity === undefined
     ? undefined
     : `.codex/evidence/security/abuse-penetration-rehearsal/${identity.gitSha}/`;
-  const paths = new Set();
   items.forEach((item,index) => {
     if (!gate.summaryContract.resultValues.includes(item.result)) fail("SUMMARY_V2_SCHEMA_INVALID",`${path}[${index}].result`,"controlled-result");
     if (requireExact && item.result !== "PASS") fail("SUMMARY_ID_SET_MISMATCH",`${path}[${index}].result`,"pass-result");
@@ -141,8 +140,9 @@ function validateV2Semantics(summary, gate, catalog) {
   const pass = summary.status === "PASS";
   if (pass) for (const field of gate.summaryContract.requiredFields.rootAdditionalForPass) if (!(field in summary)) fail("SUMMARY_ID_SET_MISMATCH",`$.${field}`,"pass-required");
   if (summary.artifactIdentity !== undefined) validateIdentity(summary.artifactIdentity,gate,"$.artifactIdentity","SUMMARY_V2_SCHEMA_INVALID");
-  if (summary.evidence !== undefined) validateEvidence(summary.evidence,catalog.matrixEvidenceIds,"$.evidence",pass,gate,summary.artifactIdentity);
-  if (summary.productionLikeEvidence !== undefined) validateEvidence(summary.productionLikeEvidence,catalog.productionLikeEvidenceIds,"$.productionLikeEvidence",pass,gate,summary.artifactIdentity);
+  const evidencePaths = new Set();
+  if (summary.evidence !== undefined) validateEvidence(summary.evidence,catalog.matrixEvidenceIds,"$.evidence",pass,gate,summary.artifactIdentity,evidencePaths);
+  if (summary.productionLikeEvidence !== undefined) validateEvidence(summary.productionLikeEvidence,catalog.productionLikeEvidenceIds,"$.productionLikeEvidence",pass,gate,summary.artifactIdentity,evidencePaths);
   if (summary.matrices === undefined) return;
   const matrixIds = uniqueIds(summary.matrices,"matrixId",new Set(catalog.matrixIds),"$.matrices");
   const procedureSets = [];

@@ -80,7 +80,7 @@ function schemaV2Validate(summary, gateValue = gate) {
 test("A RED Route V2 ingress cases are part of the validated matrix catalog", () => {
   const catalog = deriveSummaryCatalog(gate);
   assert.ok(catalog.matrixIds.includes("routeV2IngressAbuse"));
-  assert.ok(catalog.procedureIds.includes("routeV2IngressAbuse.gateway_ip_token_limiter_retry_after"));
+  assert.ok(catalog.procedureIds.includes("routeV2IngressAbuse.gateway_token_limiter"));
 });
 
 test("A RED v2 PASS evidence is bound to the root artifact identity", () => {
@@ -101,6 +101,13 @@ test("A RED v2 PASS evidence is bound to the root artifact identity", () => {
   duplicate.productionLikeEvidence[1].localEvidencePath = duplicate.productionLikeEvidence[0].localEvidencePath;
   assert.throws(
     () => validateAbusePenetrationSummary(duplicate, gate, true),
+    (error) => error.code === "SUMMARY_IDENTITY_INVALID" && error.rule === "duplicate-evidence-path",
+  );
+  const crossCollectionDuplicate = schemaV2Pass();
+  crossCollectionDuplicate.productionLikeEvidence[0].localEvidencePath =
+    crossCollectionDuplicate.evidence[0].localEvidencePath;
+  assert.throws(
+    () => validateAbusePenetrationSummary(crossCollectionDuplicate, gate, true),
     (error) => error.code === "SUMMARY_IDENTITY_INVALID" && error.rule === "duplicate-evidence-path",
   );
 });
