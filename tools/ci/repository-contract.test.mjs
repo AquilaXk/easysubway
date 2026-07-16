@@ -11238,13 +11238,15 @@ test("운영 백업 복구 리허설 gate는 필수 백업 대상과 dry-run 검
   );
   assert.equal(
     photoTarget.backupCommand,
-    "tools/ops/facility-report-photo-backup.sh <deploy-root>/backups/facility-report-photos",
+    "tools/ops/facility-report-photo-backup.sh",
   );
-  for (const target of [postgresTarget, photoTarget]) {
-    assert.equal(target.retentionDays, 30);
-    assert.match(target.retentionCommand, /prune-sensitive-backups\.mjs/);
-    assert.ok(target.linkedArtifacts.includes(".github/workflows/sensitive-backup-retention.yml"));
-  }
+  assert.equal(postgresTarget.retentionDays, 30);
+  assert.match(postgresTarget.retentionCommand, /prune-sensitive-backups\.mjs/);
+  assert.ok(postgresTarget.linkedArtifacts.includes(".github/workflows/sensitive-backup-retention.yml"));
+  assert.equal(photoTarget.scope, "local-rehearsal-only");
+  assert.equal(photoTarget.retentionDays, undefined);
+  assert.equal(photoTarget.retentionCommand, undefined);
+  assert.ok(!photoTarget.linkedArtifacts.includes(".github/workflows/sensitive-backup-retention.yml"));
   assert.equal(
     photoTarget.restoreRehearsalCommand,
     'node tools/ops/facility-report-photo-restore-check.mjs "$EASYSUBWAY_PHOTO_RESTORE_DIR"',
@@ -16464,7 +16466,6 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     "backend-database-metadata",
     "backend-object-storage",
     "mobile-memory",
-    "restricted-operations-backup",
   ]);
   assert.match(
     items.get("facility_report_photo").backendTableOrService.join("\n"),
@@ -16475,13 +16476,16 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     items.get("facility_report_photo").deletionImplementation,
     /FacilityReportPersonalDataPurgeScheduler[\s\S]*deleteFacilityReportPhoto/,
   );
-  for (const id of ["precise_location", "facility_report_content", "facility_report_photo", "facility_report_location"]) {
+  for (const id of ["precise_location", "facility_report_content", "facility_report_location"]) {
     assert.match(items.get(id).retentionKo, /최대 1년/);
     assert.match(items.get(id).retentionKo, /백업.*30일/);
     assert.match(items.get(id).deletionImplementation, /FacilityReportPersonalDataPurgeScheduler/);
     assert.match(items.get(id).deletionImplementation, /prune-sensitive-backups\.mjs/);
     assert.ok(items.get(id).storageLocations.includes("restricted-operations-backup"));
   }
+  assert.match(items.get("facility_report_photo").retentionKo, /최대 1년/);
+  assert.doesNotMatch(items.get("facility_report_photo").retentionKo, /백업|30일/);
+  assert.doesNotMatch(items.get("facility_report_photo").deletionImplementation, /prune-sensitive-backups\.mjs/);
 
   const excludedItems = new Map((inventory.excludedDataTypes ?? []).map((item) => [item.id, item]));
   assert.deepEqual([...excludedItems.keys()].sort(), ["push_notification_token"]);

@@ -19,6 +19,7 @@ import java.sql.SQLException;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
@@ -521,6 +522,10 @@ public class JdbcFacilityReportRepository implements
 		FacilityReport report,
 		FacilityReportStatus expectedStatus
 	) {
+		int anonymizedUpdatedCount = updateAnonymizedReportOperationalFields(report, expectedStatus);
+		if (anonymizedUpdatedCount > 0) {
+			return loadReport(report.id());
+		}
 		int updatedCount = jdbcTemplate.update(
 			"""
 				UPDATE facility_reports
@@ -546,6 +551,7 @@ public class JdbcFacilityReportRepository implements
 					receipt_token_hash = ?
 				WHERE report_id = ?
 					AND status = ?
+					AND user_id <> ?
 				""",
 			report.publicReceiptCode(),
 			report.userId(),
@@ -568,8 +574,12 @@ public class JdbcFacilityReportRepository implements
 			report.clientSubmissionId(),
 			report.receiptTokenHash(),
 			report.id(),
-			expectedStatus.name()
+			expectedStatus.name(),
+			FacilityReport.ANONYMIZED_USER_ID
 		);
+		if (updatedCount == 0) {
+			updatedCount = updateAnonymizedReportOperationalFields(report, expectedStatus);
+		}
 		if (updatedCount == 0) {
 			return Optional.empty();
 		}
@@ -617,12 +627,25 @@ public class JdbcFacilityReportRepository implements
 					client_submission_id = NULL,
 					receipt_token_hash = NULL
 				WHERE created_at < ?
-					AND user_id <> ?
+					AND (
+						user_id <> ?
+						OR description IS NULL
+						OR description <> ?
+						OR photo_file_name IS NOT NULL
+						OR photo_content_type IS NOT NULL
+						OR photo_sha256 IS NOT NULL
+						OR photo_size_bytes IS NOT NULL
+						OR latitude IS NOT NULL
+						OR longitude IS NOT NULL
+						OR client_submission_id IS NOT NULL
+						OR receipt_token_hash IS NOT NULL
+					)
 				""",
 			FacilityReport.ANONYMIZED_USER_ID,
 			DELETED_DESCRIPTION,
 			cutoff,
-			FacilityReport.ANONYMIZED_USER_ID
+			FacilityReport.ANONYMIZED_USER_ID,
+			DELETED_DESCRIPTION
 		);
 		deletePendingAnonymizedPhotoObjects();
 		return purgedCount;
@@ -721,9 +744,14 @@ public class JdbcFacilityReportRepository implements
 	}
 
 	private void upsertReport(FacilityReport report) {
+		if (updateAnonymizedReportOperationalFields(report) > 0) {
+			return;
+		}
 		if (databaseDialect == DatabaseDialect.H2) {
 			if (updateReportPreservingCreatedAt(report) == 0) {
-				insertReport(report);
+				if (updateAnonymizedReportOperationalFields(report) == 0) {
+					insertReport(report);
+				}
 			}
 			return;
 		}
@@ -732,7 +760,7 @@ public class JdbcFacilityReportRepository implements
 
 	private void upsertReportWithPostgresql(FacilityReport report) {
 		// 확인 상태 갱신과 재저장을 같은 SQL 경로로 처리해 운영 저장소의 행 단위 일관성을 유지한다.
-		jdbcTemplate.update(
+		int updatedCount = jdbcTemplate.update(
 			"""
 				INSERT INTO facility_reports (
 					report_id,
@@ -780,9 +808,13 @@ public class JdbcFacilityReportRepository implements
 					reviewed_by = EXCLUDED.reviewed_by,
 					client_submission_id = EXCLUDED.client_submission_id,
 					receipt_token_hash = EXCLUDED.receipt_token_hash
+				WHERE facility_reports.user_id <> ?
 				""",
-			reportParameters(report)
+			append(reportParameters(report), FacilityReport.ANONYMIZED_USER_ID)
 		);
+		if (updatedCount == 0) {
+			updateAnonymizedReportOperationalFields(report);
+		}
 	}
 
 	private int updateReportPreservingCreatedAt(FacilityReport report) {
@@ -810,6 +842,7 @@ public class JdbcFacilityReportRepository implements
 					client_submission_id = ?,
 					receipt_token_hash = ?
 				WHERE report_id = ?
+					AND user_id <> ?
 				""",
 			report.publicReceiptCode(),
 			report.userId(),
@@ -831,7 +864,53 @@ public class JdbcFacilityReportRepository implements
 			report.reviewedBy(),
 			report.clientSubmissionId(),
 			report.receiptTokenHash(),
-			report.id()
+			report.id(),
+			FacilityReport.ANONYMIZED_USER_ID
+		);
+	}
+
+	private int updateAnonymizedReportOperationalFields(FacilityReport report) {
+		return jdbcTemplate.update(
+			"""
+				UPDATE facility_reports
+				SET duplicate_of_report_id = ?,
+					status = ?,
+					reviewed_at = ?,
+					reviewed_by = ?
+				WHERE report_id = ?
+					AND user_id = ?
+				""",
+			report.duplicateOfReportId(),
+			report.status().name(),
+			report.reviewedAt(),
+			report.reviewedBy(),
+			report.id(),
+			FacilityReport.ANONYMIZED_USER_ID
+		);
+	}
+
+	private int updateAnonymizedReportOperationalFields(
+		FacilityReport report,
+		FacilityReportStatus expectedStatus
+	) {
+		return jdbcTemplate.update(
+			"""
+				UPDATE facility_reports
+				SET duplicate_of_report_id = ?,
+					status = ?,
+					reviewed_at = ?,
+					reviewed_by = ?
+				WHERE report_id = ?
+					AND status = ?
+					AND user_id = ?
+				""",
+			report.duplicateOfReportId(),
+			report.status().name(),
+			report.reviewedAt(),
+			report.reviewedBy(),
+			report.id(),
+			expectedStatus.name(),
+			FacilityReport.ANONYMIZED_USER_ID
 		);
 	}
 
@@ -939,6 +1018,12 @@ public class JdbcFacilityReportRepository implements
 			report.clientSubmissionId(),
 			report.receiptTokenHash()
 		};
+	}
+
+	private Object[] append(Object[] parameters, Object value) {
+		Object[] appended = Arrays.copyOf(parameters, parameters.length + 1);
+		appended[parameters.length] = value;
+		return appended;
 	}
 
 	private FacilityReportSummary mapFacilityReportSummary(ResultSet resultSet, int rowNumber) throws SQLException {

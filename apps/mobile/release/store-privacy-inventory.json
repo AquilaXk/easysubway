@@ -556,12 +556,11 @@
       "storageLocations": [
         "mobile-memory",
         "backend-object-storage",
-        "backend-database-metadata",
-        "restricted-operations-backup"
+        "backend-database-metadata"
       ],
-      "retentionKo": "운영 object는 접수일부터 최대 1년, 제한된 운영 백업은 생성일부터 30일 보관 후 자동 파기 작업으로 삭제",
-      "deletionKo": "운영 object는 접수일부터 최대 1년 뒤, 제한된 운영 백업은 생성일부터 30일 뒤 자동 파기하며 그 전 데이터 삭제 요청 시 원본과 썸네일을 삭제",
-      "deletionImplementation": "UserDataDeletionService와 FacilityReportPersonalDataPurgeScheduler가 deleteFacilityReportPhoto를 통해 운영 object를 삭제하고, prune-sensitive-backups.mjs 및 sensitive-backup-retention workflow가 만료 백업을 매일 삭제한다.",
+      "retentionKo": "운영 object는 접수일부터 최대 1년 보관 후 자동 파기 작업으로 삭제",
+      "deletionKo": "운영 object는 접수일부터 최대 1년 뒤 자동 파기하며 그 전 데이터 삭제 요청 시 원본과 썸네일을 삭제",
+      "deletionImplementation": "UserDataDeletionService와 FacilityReportPersonalDataPurgeScheduler가 deleteFacilityReportPhoto를 통해 운영 object를 삭제한다.",
       "evidence": [
         "apps/mobile/lib/facility_report.dart",
         "backend/src/main/java/com/easysubway/report/application/service/FacilityReportPhotoProcessor.java",
@@ -569,10 +568,7 @@
         "backend/src/main/java/com/easysubway/report/adapter/out/persistence/JdbcFacilityReportRepository.java",
         "backend/src/main/resources/db/migration/postgresql/V2__facility_report_photo_object_storage.sql",
         "backend/src/main/resources/db/migration/postgresql/V4__drop_facility_report_base64_payload.sql",
-        "backend/src/main/java/com/easysubway/report/adapter/in/scheduler/FacilityReportPersonalDataPurgeScheduler.java",
-        "tools/ops/facility-report-photo-backup.sh",
-        "tools/ops/prune-sensitive-backups.mjs",
-        ".github/workflows/sensitive-backup-retention.yml"
+        "backend/src/main/java/com/easysubway/report/adapter/in/scheduler/FacilityReportPersonalDataPurgeScheduler.java"
       ],
       "lastVerifiedAt": "2026-07-16",
       "sharedWithThirdParties": false,

@@ -382,6 +382,128 @@ class JdbcFacilityReportRepositoryTest {
 	}
 
 	@Test
+	@DisplayName("과거 익명 신고도 보관 상한이 지나면 남아 있는 개인정보를 파기한다")
+	void purgePersonalDataCreatedBeforeClearsLegacyAnonymizedReportPersonalData() {
+		var legacyReport = submittedReport("report-legacy", "legacy-guest", 8);
+		repository.saveReport(legacyReport);
+		jdbcTemplate.update(
+			"UPDATE facility_reports SET user_id = ? WHERE report_id = ?",
+			FacilityReport.ANONYMIZED_USER_ID,
+			legacyReport.id()
+		);
+
+		int purged = repository.purgePersonalDataCreatedBefore(
+			LocalDateTime.of(2026, 6, 17, 9, 0)
+		);
+
+		assertThat(purged).isEqualTo(1);
+		FacilityReport anonymized = repository.loadReport(legacyReport.id()).orElseThrow();
+		assertThat(anonymized.userId()).isEqualTo(FacilityReport.ANONYMIZED_USER_ID);
+		assertThat(anonymized.description()).isEqualTo("사용자 데이터 삭제로 신고 내용이 삭제되었습니다.");
+		assertThat(anonymized.photoFileName()).isNull();
+		assertThat(anonymized.photoContentType()).isNull();
+		assertThat(anonymized.photoObjectKey()).isNull();
+		assertThat(anonymized.latitude()).isNull();
+		assertThat(anonymized.longitude()).isNull();
+	}
+
+	@Test
+	@DisplayName("파기 전에 읽은 신고를 다시 저장해도 개인정보는 복원되지 않는다")
+	void saveReportDoesNotRestorePurgedPersonalDataFromStaleAggregate() {
+		var originalReport = submittedReport("report-stale", "anonymous-user-1", 8);
+		repository.saveReport(originalReport);
+		FacilityReport staleReport = repository.loadReport(originalReport.id()).orElseThrow();
+		repository.purgePersonalDataCreatedBefore(LocalDateTime.of(2026, 6, 17, 9, 0));
+		var staleResolvedReport = new FacilityReport(
+			staleReport.id(),
+			staleReport.publicReceiptCode(),
+			staleReport.userId(),
+			staleReport.stationId(),
+			staleReport.facilityId(),
+			staleReport.reportType(),
+			staleReport.description(),
+			staleReport.photoFileName(),
+			staleReport.photoContentType(),
+			staleReport.photoObjectKey(),
+			staleReport.photoThumbnailObjectKey(),
+			staleReport.photoSha256(),
+			staleReport.photoSizeBytes(),
+			staleReport.latitude(),
+			staleReport.longitude(),
+			staleReport.duplicateOfReportId(),
+			FacilityReportStatus.RESOLVED,
+			staleReport.createdAt(),
+			LocalDateTime.of(2026, 6, 17, 10, 0),
+			"admin-user",
+			staleReport.clientSubmissionId(),
+			staleReport.receiptTokenHash()
+		);
+
+		repository.saveReport(staleResolvedReport);
+
+		FacilityReport saved = repository.loadReport(originalReport.id()).orElseThrow();
+		assertThat(saved.status()).isEqualTo(FacilityReportStatus.RESOLVED);
+		assertThat(saved.userId()).isEqualTo(FacilityReport.ANONYMIZED_USER_ID);
+		assertThat(saved.description()).isEqualTo("사용자 데이터 삭제로 신고 내용이 삭제되었습니다.");
+		assertThat(saved.photoFileName()).isNull();
+		assertThat(saved.photoContentType()).isNull();
+		assertThat(saved.photoObjectKey()).isNull();
+		assertThat(saved.latitude()).isNull();
+		assertThat(saved.longitude()).isNull();
+		assertThat(saved.clientSubmissionId()).isNull();
+		assertThat(saved.receiptTokenHash()).isNull();
+	}
+
+	@Test
+	@DisplayName("파기 전에 읽은 신고를 검수 저장해도 개인정보는 복원되지 않는다")
+	void saveReviewedReportDoesNotRestorePurgedPersonalDataFromStaleAggregate() {
+		var originalReport = submittedReport("report-stale-review", "anonymous-user-1", 8);
+		repository.saveReport(originalReport);
+		FacilityReport staleReport = repository.loadReport(originalReport.id()).orElseThrow();
+		repository.purgePersonalDataCreatedBefore(LocalDateTime.of(2026, 6, 17, 9, 0));
+		var staleReviewedReport = new FacilityReport(
+			staleReport.id(),
+			staleReport.publicReceiptCode(),
+			staleReport.userId(),
+			staleReport.stationId(),
+			staleReport.facilityId(),
+			staleReport.reportType(),
+			staleReport.description(),
+			staleReport.photoFileName(),
+			staleReport.photoContentType(),
+			staleReport.photoObjectKey(),
+			staleReport.photoThumbnailObjectKey(),
+			staleReport.photoSha256(),
+			staleReport.photoSizeBytes(),
+			staleReport.latitude(),
+			staleReport.longitude(),
+			staleReport.duplicateOfReportId(),
+			FacilityReportStatus.ACCEPTED,
+			staleReport.createdAt(),
+			LocalDateTime.of(2026, 6, 17, 10, 0),
+			"admin-user",
+			staleReport.clientSubmissionId(),
+			staleReport.receiptTokenHash()
+		);
+
+		var savedResult = repository.saveReviewedReportIfStatus(
+			staleReviewedReport,
+			FacilityReportStatus.SUBMITTED
+		);
+
+		assertThat(savedResult).isPresent();
+		FacilityReport saved = savedResult.orElseThrow();
+		assertThat(saved.status()).isEqualTo(FacilityReportStatus.ACCEPTED);
+		assertThat(saved.userId()).isEqualTo(FacilityReport.ANONYMIZED_USER_ID);
+		assertThat(saved.description()).isEqualTo("사용자 데이터 삭제로 신고 내용이 삭제되었습니다.");
+		assertThat(saved.photoObjectKey()).isNull();
+		assertThat(saved.latitude()).isNull();
+		assertThat(saved.longitude()).isNull();
+		assertThat(saved.clientSubmissionId()).isNull();
+		assertThat(saved.receiptTokenHash()).isNull();
+	}
+
+	@Test
 	@DisplayName("사진 객체 하나의 삭제 실패를 격리하고 나머지를 처리한 뒤 재시도한다")
 	void purgePersonalDataIsolatesPhotoDeletionFailureAndRetainsRetryState() {
 		var expiredReport = submittedReport("report-expired", "anonymous-user-1", 8);
