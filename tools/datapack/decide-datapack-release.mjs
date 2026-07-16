@@ -59,11 +59,13 @@ export function evaluateReleaseDecision({
   if (materialChange && !approvalValid) reasonCodes.push("MATERIAL_CHANGE_UNAPPROVED");
   if (scheduled.outcome === "PUBLISH_REQUIRED") reasonCodes.push("PUBLISH_REQUIRED_NOT_COMPLETED");
   if (publishAttempted && !remoteValidationPassed) reasonCodes.push("POST_PUBLISH_REMOTE_VALIDATION_FAILED");
-  const selectedManifest = scheduled.outcome === "PUBLISHED_AND_VERIFIED"
-    ? { sha256: candidateManifestSha256, releaseSequence: candidateManifest.releaseSequence }
-    : scheduled.outcome === "NO_CHANGE_VALID"
-      ? { sha256: currentManifestSha256, releaseSequence: currentManifest?.releaseSequence }
-      : null;
+  const selectedManifest = selectedManifestIdentity({
+    outcome: scheduled.outcome,
+    candidateManifest,
+    candidateManifestSha256,
+    currentManifest,
+    currentManifestSha256,
+  });
   if (selectedManifest && (!isSha256(selectedManifest.sha256)
     || !Number.isSafeInteger(selectedManifest.releaseSequence)
     || selectedManifest.releaseSequence < 1)) {
@@ -86,6 +88,18 @@ export function evaluateReleaseDecision({
     reasonCodes,
     evaluationAt: new Date(evaluatedMillis).toISOString(),
   };
+}
+
+function selectedManifestIdentity({
+  outcome, candidateManifest, candidateManifestSha256, currentManifest, currentManifestSha256,
+}) {
+  if (outcome === "PUBLISHED_AND_VERIFIED") {
+    return { sha256: candidateManifestSha256, releaseSequence: candidateManifest.releaseSequence };
+  }
+  if (outcome === "NO_CHANGE_VALID") {
+    return { sha256: currentManifestSha256, releaseSequence: currentManifest?.releaseSequence };
+  }
+  return null;
 }
 
 function stableManifestIdentity(manifest) {

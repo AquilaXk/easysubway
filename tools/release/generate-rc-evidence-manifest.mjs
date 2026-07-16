@@ -121,8 +121,8 @@ const finalFragmentEntries = rcEvidenceContract.requiredEvidenceEntries.filter((
 if (
   new Set(rcEvidenceContract.requiredFinalFragmentIssues).size !== rcEvidenceContract.requiredFinalFragmentIssues.length
   || finalFragmentEntries.length !== rcEvidenceContract.requiredFinalFragmentIssues.length
-  || finalFragmentEntries.map(({ sourceIssue }) => sourceIssue).sort().join(",")
-    !== [...rcEvidenceContract.requiredFinalFragmentIssues].sort().join(",")
+  || finalFragmentEntries.map(({ sourceIssue }) => sourceIssue).sort((left, right) => left - right).join(",")
+    !== [...rcEvidenceContract.requiredFinalFragmentIssues].sort((left, right) => left - right).join(",")
 ) {
   fail("requiredFinalFragmentIssues must exactly match required evidence entries");
 }
@@ -556,15 +556,16 @@ function parsePairs(value) {
 
 function sameRcIdentity(evidenceIdentity, currentIdentity) {
   if (!evidenceIdentity || typeof evidenceIdentity !== "object" || Array.isArray(evidenceIdentity)) return false;
-  const expectedKeys = Object.keys(currentIdentity).sort();
-  const actualKeys = Object.keys(evidenceIdentity).sort();
+  const expectedKeys = Object.keys(currentIdentity).sort((left, right) => left.localeCompare(right));
+  const actualKeys = Object.keys(evidenceIdentity).sort((left, right) => left.localeCompare(right));
   return expectedKeys.length === actualKeys.length
     && expectedKeys.every((key, index) => key === actualKeys[index] && evidenceIdentity[key] === currentIdentity[key]);
 }
 
 function requiredGateEntries(requiredIds, requiredChecksById, provided, paths, identity, generatedAt, validationContext) {
   if (
-    Object.keys(requiredChecksById).sort().join(",") !== [...requiredIds].sort().join(",")
+    Object.keys(requiredChecksById).sort((left, right) => left.localeCompare(right)).join(",")
+      !== [...requiredIds].sort((left, right) => left.localeCompare(right)).join(",")
     || requiredIds.some((id) => !Array.isArray(requiredChecksById[id]) || requiredChecksById[id].length === 0)
   ) {
     fail("requiredGateChecks must exactly cover requiredGateStatuses");
@@ -638,7 +639,7 @@ function validateIssueDag(activeBlockerIssues, states) {
     fail("activeBlockerIssues must contain positive issue numbers");
   }
   for (const [issue, state] of Object.entries(states)) {
-    if (!/^[1-9][0-9]*$/.test(issue) || !["OPEN", "CLOSED"].includes(state)) {
+    if (!/^[1-9]\d*$/.test(issue) || !["OPEN", "CLOSED"].includes(state)) {
       fail(`Invalid issue state: ${issue}=${state}`);
     }
   }
@@ -726,13 +727,8 @@ function requiredDatapackGates(
   }
 
   return contractGates.map(({ id, sourceIssue, expiresAfterDays }) => {
-    if (!id || !Number.isInteger(sourceIssue) || !Number.isInteger(expiresAfterDays) || expiresAfterDays <= 0) {
-      fail(`Invalid datapack gate contract entry: ${id ?? "<missing>"}`);
-    }
-    const status = statuses[id] ?? "BLOCKED_EXTERNAL";
-    if (!["SATISFIED", "BLOCKED_EXTERNAL"].includes(status)) {
-      fail(`Invalid datapack gate status for ${id}: ${status}`);
-    }
+    validateDatapackGateContract(id, sourceIssue, expiresAfterDays);
+    const status = requiredDatapackGateStatus(statuses, id);
     if (status !== "SATISFIED") {
       return {
         id, sourceIssue, status, reasonCodes: ["EVIDENCE_NOT_PROVIDED"],
@@ -777,7 +773,7 @@ function requiredDatapackGates(
     }
     const normalized = {
       id, sourceIssue, status,
-      reasonCodes: [...evidence.reasonCodes].sort(),
+      reasonCodes: [...evidence.reasonCodes].sort((left, right) => left.localeCompare(right)),
       evidenceSha256: createHash("sha256").update(evidenceBytes).digest("hex"),
       evaluatedAt: new Date(evaluatedAt).toISOString(), expiresAt: new Date(expiresAt).toISOString(),
       rcIdentity: identity,
@@ -803,6 +799,20 @@ function requiredDatapackGates(
     if (gateResult) normalized.gateResult = gateResult;
     return normalized;
   });
+}
+
+function validateDatapackGateContract(id, sourceIssue, expiresAfterDays) {
+  if (!id || !Number.isInteger(sourceIssue) || !Number.isInteger(expiresAfterDays) || expiresAfterDays <= 0) {
+    fail(`Invalid datapack gate contract entry: ${id ?? "<missing>"}`);
+  }
+}
+
+function requiredDatapackGateStatus(statuses, id) {
+  const status = statuses[id] ?? "BLOCKED_EXTERNAL";
+  if (!["SATISFIED", "BLOCKED_EXTERNAL"].includes(status)) {
+    fail(`Invalid datapack gate status for ${id}: ${status}`);
+  }
+  return status;
 }
 
 function normalizeDatapackGateResult(id, evidence, identity, dataPackArtifactBytes) {
@@ -1006,15 +1016,17 @@ function requireResultSchema(result, gateId) {
 
 function requirePassingChecks(gateId, checks, requiredFields) {
   const suppliedFields = checks && typeof checks === "object" && !Array.isArray(checks)
-    ? Object.keys(checks).sort()
+    ? Object.keys(checks).sort((left, right) => left.localeCompare(right))
     : [];
   if (
-    suppliedFields.join(",") !== [...requiredFields].sort().join(",")
+    suppliedFields.join(",") !== [...requiredFields].sort((left, right) => left.localeCompare(right)).join(",")
     || requiredFields.some((field) => checks[field] !== true)
   ) {
     fail(`${gateId} requires every canonical result check to pass`);
   }
-  return Object.fromEntries([...requiredFields].sort().map((field) => [field, true]));
+  return Object.fromEntries(
+    [...requiredFields].sort((left, right) => left.localeCompare(right)).map((field) => [field, true]),
+  );
 }
 
 function normalizeEvidenceReferences(gateId, references) {
@@ -1025,7 +1037,7 @@ function normalizeEvidenceReferences(gateId, references) {
   return references.map((reference) => {
     if (
       !reference || typeof reference !== "object" || Array.isArray(reference)
-      || Object.keys(reference).sort().join(",") !== "artifactId,sha256"
+      || Object.keys(reference).sort((left, right) => left.localeCompare(right)).join(",") !== "artifactId,sha256"
       || typeof reference.artifactId !== "string" || reference.artifactId.trim().length === 0
       || artifactIds.has(reference.artifactId)
     ) {
@@ -1044,7 +1056,7 @@ function requirePositiveSafeInteger(value, name) {
 function normalizeReleaseSequence(explicitValue, manifestValue) {
   const value = explicitValue ?? manifestValue ?? null;
   if (value === null) return null;
-  const parsed = typeof value === "string" && /^[1-9][0-9]*$/.test(value)
+  const parsed = typeof value === "string" && /^[1-9]\d*$/.test(value)
     ? Number(value)
     : value;
   if (!Number.isSafeInteger(parsed) || parsed <= 0) {
@@ -1126,7 +1138,8 @@ function normalizeSourceInventory(inventory, generatedAt, gateExpiresAt, require
   }
   if (
     !inventory?.statusCounts
-    || Object.keys(inventory.statusCounts).sort().join(",") !== [...requiredStatuses].sort().join(",")
+    || Object.keys(inventory.statusCounts).sort((left, right) => left.localeCompare(right)).join(",")
+      !== [...requiredStatuses].sort((left, right) => left.localeCompare(right)).join(",")
     || requiredStatuses.some((status) => inventory.statusCounts[status] !== statusCounts[status])
   ) {
     fail("source governance evidence statusCounts must match current sourceInventory.entries");
@@ -1514,7 +1527,7 @@ function githubWorkflowRunUrl(env) {
 
 function currentGitSha(repositoryRoot) {
   try {
-    return execFileSync("git", ["rev-parse", "HEAD"], { cwd: repositoryRoot, encoding: "utf8" }).trim();
+    return execFileSync("/usr/bin/git", ["rev-parse", "HEAD"], { cwd: repositoryRoot, encoding: "utf8" }).trim();
   } catch {
     fail("current checkout Git SHA is required");
   }

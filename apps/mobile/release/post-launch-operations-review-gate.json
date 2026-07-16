@@ -99,10 +99,10 @@
             {"path": "backend/build.gradle", "sha256": "00106be89d1834db166c0c4cfba04674e2a456e7e57648595b74feb933c31273"},
             {"path": "backend/Dockerfile", "sha256": "7d9608f490113e655aeaf9544f061896d20f391d5c309b50a42f6303e5eb676b"},
             {"path": "apps/mobile/release/rc-evidence-manifest-contract.json", "sha256": "7caaa17fc34e13e5e35076be4b4f35456f4fa57add102561e31267934bd6cd41"},
-            {"path": "tools/datapack/lib/manifest-validation.mjs", "sha256": "410f383ddec25ac854e98f0b61b74d0b8bd21538be1572baac25a5fbe6c61b75"},
-            {"path": "tools/datapack/decide-datapack-release.mjs", "sha256": "68403f0ac4f7e165ab51b696a7697f7b8cf965214d74f34bdf7b04cd31921c14"},
+            {"path": "tools/datapack/lib/manifest-validation.mjs", "sha256": "8ac183f1aa33864a5fc309efe6089961e1dbcd7a0ed7c9b0aff138961e8845ac"},
+            {"path": "tools/datapack/decide-datapack-release.mjs", "sha256": "19df0719c5c030db1981bd34622a42b98e610ac35851a4d0219c70c51dda675c"},
             {"path": "tools/datapack/validate-remote-datapack-artifact.mjs", "sha256": "153a5888903c503fb572b5596afac58d1b0ac1ae973f3e8fda5806948d168b26"},
-            {"path": "tools/release/generate-rc-evidence-manifest.mjs", "sha256": "5cd140f03792f304c0c8bc39e77d9ae119851e2b34d8a2ec726129b422642695"},
+            {"path": "tools/release/generate-rc-evidence-manifest.mjs", "sha256": "24e244da199e9e64399df1fb7b3b4f0c0396873592bfdc2c6de30bb49ff59706"},
             {"path": "tools/release/select-rc-datapack-artifact.mjs", "sha256": "48e5fddf300e6a53d40cba7778c10fe3c2d727cf45991eb52b5d93cbc359d4ba"},
             {"path": "tools/release/upload-play-internal.mjs", "sha256": "7bc41b1fb3ce86b2e24043a9a43e47e91577ab33c5170535c8e8c85c09b5c5eb"}
           ]

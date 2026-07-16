@@ -172,7 +172,8 @@ export function selectEffectiveDataPack(manifest, defaultPackId = "capital") {
 
 export function selectFallbackDataPack(manifest, defaultPackId = "capital") {
   if (!manifest?.emergencyOverride) return selectEffectiveDataPack(manifest, defaultPackId);
-  const { emergencyOverride: _emergencyOverride, ...withoutEmergencyOverride } = manifest;
+  const withoutEmergencyOverride = { ...manifest };
+  delete withoutEmergencyOverride.emergencyOverride;
   return selectEffectiveDataPack(withoutEmergencyOverride, defaultPackId);
 }
 
