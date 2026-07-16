@@ -27,6 +27,15 @@
     "encryptedInTransit",
     "deletionSupported"
   ],
+  "googlePlayDataSafetyPolicy": {
+    "officialReferences": [
+      "https://support.google.com/googleplay/android-developer/answer/10787469?hl=en",
+      "https://developer.android.com/google/play/integrity/terms"
+    ],
+    "offDeviceEphemeralProcessingMustBeDeclared": true,
+    "ephemeralProcessingRequiresMemoryOnlyRealTime": true,
+    "routeV2StoredDataIsEphemeral": false
+  },
   "crashAnrProviderDecision": {
     "separateCrashProvider": false,
     "sourceOfTruth": ["Android vitals", "Google Play pre-launch report", "mobile runtime error reporter"],
@@ -187,6 +196,148 @@
         "dataType": "NSPrivacyCollectedDataTypeOtherUserContent",
         "linkedToUser": true,
         "purpose": "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+      }
+    },
+    {
+      "id": "route_v2_itx_integrity",
+      "displayNameKo": "ITX 경로 세션 무결성 정보",
+      "purposeKo": "선택형 ITX-청춘 서버 경로 검색의 변조·자동화 악용 방지",
+      "implementationStatus": "backend-collected",
+      "introducedInVersion": "1.0.4",
+      "codeOwner": "mobile/backend",
+      "collectionTrigger": "사용자가 ITX-청춘이 포함된 경로 검색을 직접 선택해 Route V2 세션을 요청할 때만 처리",
+      "backendTableOrService": [
+        "Google Play Integrity API",
+        "route_v2_sessions.token_sha256/scope/issued_at/expires_at/request_count",
+        "route_v2_nonce_replays.nonce_sha256/expires_at"
+      ],
+      "storageLocations": ["google-play-integrity-processing", "backend-database"],
+      "retentionKo": "Google Play Integrity 처리 정보는 Google의 고정 보관 정책을 따르고, 서버는 세션 token SHA-256·scope·issuedAt·expiresAt·requestCount를 10분, nonce SHA-256을 2분 보관",
+      "deletionKo": "서버의 세션·nonce 해시는 각 만료 시각 뒤 자동 삭제하며 사용자·기기·계정 식별자와 연결하지 않음",
+      "deletionImplementation": "RouteV2AccessStore.purgeExpired가 2분 nonce replay와 10분 세션 레코드를 만료 시 삭제한다.",
+      "evidence": [
+        "apps/mobile/lib/route_v2_ingress.dart",
+        "apps/mobile/android/app/src/main/kotlin/com/easysubway/easysubway_mobile/MainActivity.kt",
+        "backend/src/main/java/com/easysubway/route/application/service/RouteV2SessionService.java",
+        "backend/src/main/resources/db/migration/postgresql/V57__route_v2_access_state.sql"
+      ],
+      "lastVerifiedAt": "2026-07-16",
+      "sharedWithThirdParties": false,
+      "usedForTracking": false,
+      "googlePlayProcessing": {
+        "alwaysCollected": [
+          "requestHashOrNonce",
+          "appPackageName",
+          "appVersion",
+          "appCertificate",
+          "appLicensingStatus",
+          "deviceAttestationInformation"
+        ],
+        "encryptedInTransit": true,
+        "sharedOnward": false,
+        "retention": "fixed-by-google-play-integrity-policy"
+      },
+      "mobileToBackendFields": ["integrityToken", "128-bit clientNonce"],
+      "backendStoredFields": ["tokenSha256", "scope", "issuedAt", "expiresAt", "requestCount", "nonceSha256"],
+      "retention": {
+        "session": "10 minutes",
+        "nonceSha256": "2 minutes"
+      },
+      "neverPersistedOrLogged": [
+        "rawIntegrityToken",
+        "rawClientNonce",
+        "integrityPayloadOrVerdict",
+        "ipAddress",
+        "deviceId",
+        "accountId",
+        "rawSearchText",
+        "coordinates"
+      ],
+      "responseCacheControl": "private, no-store",
+      "googlePlayDataSafety": {
+        "dataType": "Diagnostics",
+        "collected": true,
+        "collectionType": "optional-user-triggered-itx-session",
+        "purpose": "Fraud prevention, security, and compliance",
+        "linkedToUser": false,
+        "encryptedInTransit": true,
+        "optional": true,
+        "required": false,
+        "deletionSupported": true,
+        "processedEphemerally": false
+      }
+    },
+    {
+      "id": "route_v2_itx_request_state",
+      "displayNameKo": "ITX 경로 요청과 단기 경로 상태",
+      "purposeKo": "사용자가 선택한 ITX-청춘 경로 계산과 같은 결과의 단기 새로고침",
+      "implementationStatus": "backend-collected",
+      "introducedInVersion": "1.0.4",
+      "codeOwner": "mobile/backend",
+      "collectionTrigger": "사용자가 ITX-청춘이 포함된 경로 검색을 직접 선택할 때만 서버로 전송",
+      "backendTableOrService": [
+        "Route V2 search request",
+        "route_v2_states.origin_station_id/destination_station_id/transport_scope/requested_departure_at/itinerary_json/timetable_artifact_id/created_at/planned_arrival_at/expires_at"
+      ],
+      "storageLocations": ["backend-request-memory", "backend-database"],
+      "retentionKo": "경로 상태는 생성 시각부터 최소 30분, 도착 예정 시각 30분 뒤까지 필요하되 생성 시각부터 최대 6시간까지만 보관",
+      "deletionKo": "경로 상태는 expiresAt 뒤 자동 삭제하며 사용자·기기·계정 식별자와 연결하지 않음",
+      "deletionImplementation": "RouteV2EphemeralStateService가 expiresAt을 계산하고 RouteV2AccessStore.purgeExpired가 만료 상태를 삭제한다.",
+      "evidence": [
+        "apps/mobile/lib/route_search.dart",
+        "backend/src/main/java/com/easysubway/route/application/service/RouteV2EphemeralStateService.java",
+        "backend/src/main/java/com/easysubway/route/adapter/out/persistence/JdbcRouteV2AccessStore.java",
+        "backend/src/main/resources/db/migration/postgresql/V57__route_v2_access_state.sql"
+      ],
+      "lastVerifiedAt": "2026-07-16",
+      "sharedWithThirdParties": false,
+      "usedForTracking": false,
+      "routeRequestFields": [
+        "canonicalOriginStationId",
+        "canonicalDestinationStationId",
+        "transportScope",
+        "departureTime",
+        "mobilityPreset",
+        "mobilityType",
+        "constraintMode",
+        "realtimeFlag",
+        "maxTransfers",
+        "alternativeCount"
+      ],
+      "backendStoredFields": [
+        "originStationId",
+        "destinationStationId",
+        "transportScope",
+        "departureTime",
+        "itinerary",
+        "timetableArtifactId",
+        "createdAt",
+        "plannedArrivalAt",
+        "expiresAt"
+      ],
+      "retention": "min(createdAt+6h,max(createdAt+30m,plannedArrivalAt+30m))",
+      "neverPersistedOrLogged": [
+        "rawIntegrityToken",
+        "rawClientNonce",
+        "integrityPayloadOrVerdict",
+        "ipAddress",
+        "deviceId",
+        "accountId",
+        "rawSearchText",
+        "coordinates"
+      ],
+      "responseCacheControl": "private, no-store",
+      "googlePlayDataSafety": {
+        "dataType": "App activity",
+        "collected": true,
+        "collectionType": "optional-user-triggered-itx-search",
+        "purpose": "App functionality",
+        "linkedToUser": false,
+        "encryptedInTransit": true,
+        "optional": true,
+        "required": false,
+        "deletionSupported": true,
+        "processedEphemerally": false
       }
     },
     {

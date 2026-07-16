@@ -14204,6 +14204,8 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     "search_queries",
     "favorite_stations_routes_facilities",
     "route_eta_feedback",
+    "route_v2_itx_integrity",
+    "route_v2_itx_request_state",
     "mobility_profile",
     "facility_report_content",
     "facility_report_photo",
@@ -14251,7 +14253,11 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
         `${id} evidence artifact must exist: ${evidencePath}`,
       );
     }
-    const expectedLastVerifiedAt = id === "precise_location" ? "2026-07-09" : "2026-06-19";
+    const expectedLastVerifiedAt = id.startsWith("route_v2_itx_")
+      ? "2026-07-16"
+      : id === "precise_location"
+        ? "2026-07-09"
+        : "2026-06-19";
     assert.equal(item.lastVerifiedAt, expectedLastVerifiedAt, `${id} verification date must be current`);
     const expectedThirdPartySharing = id === "precise_location";
     assert.equal(
@@ -14282,7 +14288,11 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     assert.equal(typeof item.googlePlayDataSafety.purpose, "string", `${id} must declare Play purpose`);
     assert.equal(typeof item.googlePlayDataSafety.linkedToUser, "boolean", `${id} must declare Play linked-to-user value`);
     if (item.googlePlayDataSafety.collected) {
-      assert.equal(item.googlePlayDataSafety.linkedToUser, true, `${id} collected Play data must be linked to user`);
+      assert.equal(
+        item.googlePlayDataSafety.linkedToUser,
+        !id.startsWith("route_v2_itx_"),
+        `${id} Play user linkage must match the release data model`,
+      );
     }
     assert.equal(
       item.googlePlayDataSafety.encryptedInTransit,
@@ -14383,6 +14393,132 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
   assert.match(facilityReport, /latitude/);
   const appDependencies = read("apps/mobile/lib/app/app_dependencies.dart");
   assert.match(`${main}\n${appDependencies}`, /pushNotificationsEnabled/);
+});
+
+test("Route V2 ITX 개인정보와 Data Safety 공개 기준은 실제 전송·보관 경계를 고정한다", () => {
+  const inventory = readJson("apps/mobile/release/store-privacy-inventory.json");
+  const playStoreContent = readJson("apps/mobile/release/play-store-submission-content.json");
+  const publicPrivacyPolicy = read("backend/src/main/resources/templates/legal/privacy.html");
+  const items = new Map(inventory.dataTypes.map((item) => [item.id, item]));
+  const integrity = items.get("route_v2_itx_integrity");
+  const route = items.get("route_v2_itx_request_state");
+  const officialPolicyReferences = [
+    "https://support.google.com/googleplay/android-developer/answer/10787469?hl=en",
+    "https://developer.android.com/google/play/integrity/terms",
+  ];
+
+  assert.deepEqual(inventory.googlePlayDataSafetyPolicy.officialReferences, officialPolicyReferences);
+  assert.equal(inventory.googlePlayDataSafetyPolicy.offDeviceEphemeralProcessingMustBeDeclared, true);
+  assert.equal(inventory.googlePlayDataSafetyPolicy.ephemeralProcessingRequiresMemoryOnlyRealTime, true);
+  assert.equal(inventory.googlePlayDataSafetyPolicy.routeV2StoredDataIsEphemeral, false);
+
+  assert.ok(integrity);
+  assert.equal(integrity.googlePlayDataSafety.collected, true);
+  assert.equal(integrity.googlePlayDataSafety.linkedToUser, false);
+  assert.equal(integrity.googlePlayDataSafety.optional, true);
+  assert.equal(integrity.googlePlayDataSafety.processedEphemerally, false);
+  assert.deepEqual(integrity.googlePlayProcessing.alwaysCollected, [
+    "requestHashOrNonce",
+    "appPackageName",
+    "appVersion",
+    "appCertificate",
+    "appLicensingStatus",
+    "deviceAttestationInformation",
+  ]);
+  assert.equal(integrity.googlePlayProcessing.encryptedInTransit, true);
+  assert.equal(integrity.googlePlayProcessing.sharedOnward, false);
+  assert.equal(integrity.googlePlayProcessing.retention, "fixed-by-google-play-integrity-policy");
+  assert.deepEqual(integrity.mobileToBackendFields, ["integrityToken", "128-bit clientNonce"]);
+  assert.deepEqual(integrity.backendStoredFields, [
+    "tokenSha256",
+    "scope",
+    "issuedAt",
+    "expiresAt",
+    "requestCount",
+    "nonceSha256",
+  ]);
+  assert.equal(integrity.retention.session, "10 minutes");
+  assert.equal(integrity.retention.nonceSha256, "2 minutes");
+
+  assert.ok(route);
+  assert.equal(route.googlePlayDataSafety.collected, true);
+  assert.equal(route.googlePlayDataSafety.linkedToUser, false);
+  assert.equal(route.googlePlayDataSafety.optional, true);
+  assert.equal(route.googlePlayDataSafety.processedEphemerally, false);
+  assert.deepEqual(route.routeRequestFields, [
+    "canonicalOriginStationId",
+    "canonicalDestinationStationId",
+    "transportScope",
+    "departureTime",
+    "mobilityPreset",
+    "mobilityType",
+    "constraintMode",
+    "realtimeFlag",
+    "maxTransfers",
+    "alternativeCount",
+  ]);
+  assert.deepEqual(route.backendStoredFields, [
+    "originStationId",
+    "destinationStationId",
+    "transportScope",
+    "departureTime",
+    "itinerary",
+    "timetableArtifactId",
+    "createdAt",
+    "plannedArrivalAt",
+    "expiresAt",
+  ]);
+  assert.equal(
+    route.retention,
+    "min(createdAt+6h,max(createdAt+30m,plannedArrivalAt+30m))",
+  );
+
+  const neverPersistedOrLogged = [
+    "rawIntegrityToken",
+    "rawClientNonce",
+    "integrityPayloadOrVerdict",
+    "ipAddress",
+    "deviceId",
+    "accountId",
+    "rawSearchText",
+    "coordinates",
+  ];
+  assert.deepEqual(integrity.neverPersistedOrLogged, neverPersistedOrLogged);
+  assert.deepEqual(route.neverPersistedOrLogged, neverPersistedOrLogged);
+  assert.equal(integrity.usedForTracking, false);
+  assert.equal(route.usedForTracking, false);
+  assert.equal(integrity.responseCacheControl, "private, no-store");
+  assert.equal(route.responseCacheControl, "private, no-store");
+
+  assert.deepEqual(
+    playStoreContent.dataSafetyDeclarations.routeV2Itx.officialPolicyReferences,
+    officialPolicyReferences,
+  );
+  assert.equal(playStoreContent.dataSafetyDeclarations.routeV2Itx.optionalUserTriggered, true);
+  assert.equal(playStoreContent.dataSafetyDeclarations.routeV2Itx.tracking, false);
+  assert.equal(playStoreContent.dataSafetyDeclarations.routeV2Itx.linkedToUserDeviceOrAccountId, false);
+  assert.equal(playStoreContent.dataSafetyDeclarations.routeV2Itx.processedEphemerally, false);
+  assert.ok(
+    playStoreContent.dataSafetyDeclarations.answerMatrix
+      .find((item) => item.dataType === "App activity")
+      .inventoryDataIds.includes("route_v2_itx_request_state"),
+  );
+  assert.ok(
+    playStoreContent.dataSafetyDeclarations.answerMatrix
+      .find((item) => item.dataType === "Diagnostics")
+      .inventoryDataIds.includes("route_v2_itx_integrity"),
+  );
+
+  assert.match(publicPrivacyPolicy, /SUBWAY 경로 검색은 단말 안에서만 처리하며 서버로 전송하지 않습니다/);
+  assert.match(publicPrivacyPolicy, /ITX-청춘 경로 검색은 사용자가 직접 선택할 때만/);
+  assert.match(publicPrivacyPolicy, /tracking에 사용하지 않습니다/);
+  assert.match(publicPrivacyPolicy, /128-bit clientNonce/);
+  assert.match(publicPrivacyPolicy, /10분/);
+  assert.match(publicPrivacyPolicy, /2분/);
+  assert.match(publicPrivacyPolicy, /최소 30분, 최대 6시간/);
+  assert.match(publicPrivacyPolicy, /raw 검색어와 좌표/);
+  assert.match(publicPrivacyPolicy, /IP 주소, 기기 ID, 계정 ID/);
+  assert.match(publicPrivacyPolicy, /private, no-store/);
 });
 
 test("iOS 위치 권한은 앱 사용 중 목적만 설명한다", () => {
