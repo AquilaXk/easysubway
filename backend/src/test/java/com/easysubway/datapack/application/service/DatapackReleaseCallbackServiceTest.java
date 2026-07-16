@@ -195,6 +195,21 @@ class DatapackReleaseCallbackServiceTest {
 			.isEqualTo("PUBLISHED");
 	}
 
+	@Test
+	@DisplayName("완료된 callback 재전송은 catalog 장애와 무관하게 멱등 처리한다")
+	void terminalReplayDoesNotFetchCatalog() {
+		insertRow("PUBLISHED");
+		when(releaseCatalog.fetchCurrent(CHANNEL))
+			.thenThrow(new DatapackReleaseCatalogPort.Unavailable());
+		when(releaseCatalog.findByRequest(CHANNEL, APPROVAL_ID))
+			.thenThrow(new DatapackReleaseCatalogPort.Unavailable());
+
+		var result = service.receive(command("PASS", computeSignature("PASS")));
+
+		assertThat(result.status()).isEqualTo("PUBLISHED");
+		assertThat(result.idempotentReplay()).isTrue();
+	}
+
     @Test
     @DisplayName("(d) 이미 PUBLISHED + 동일 payload 재수신 → idempotentReplay=true, 상태 불변")
     void alreadyPublishedIdempotentReplay() {
@@ -416,6 +431,19 @@ class DatapackReleaseCallbackServiceTest {
 	}
 
 	@Test
+	@DisplayName("완료된 legacy callback 재전송도 catalog 장애와 무관하게 멱등 처리한다")
+	void terminalLegacyReplayDoesNotFetchCatalog() {
+		insertRow("PUBLISHED", "production");
+		when(releaseCatalog.fetchCurrent(CHANNEL))
+			.thenThrow(new DatapackReleaseCatalogPort.Unavailable());
+
+		var result = service.receive(legacyCommand("PASS"));
+
+		assertThat(result.status()).isEqualTo("PUBLISHED");
+		assertThat(result.idempotentReplay()).isTrue();
+	}
+
+	@Test
 	@DisplayName("(g) PASS + production 채널 없음 → status PUBLISHED 유지 + promote_outcome=REJECTED + promote_detail에 사유")
     void passWithNoProductionChannel_publishesAndRejectsPromote() {
         insertRow("DISPATCHED", "production");
@@ -493,13 +521,11 @@ class DatapackReleaseCallbackServiceTest {
 	}
 
 	@Test
-	@DisplayName("NO_CHANGE reconciliation은 current identity로 request를 종결하고 promote를 생략한다")
+	@DisplayName("NO_CHANGE reconciliation은 passing evidence URL로 request를 종결하고 promote를 생략한다")
 	void reconciliationCompletesNoChangeWithoutCandidatePromotion() {
-		insertRow("DISPATCHED", "production");
-		jdbcTemplate.update(
-			"UPDATE datapack_release_request SET workflow_run_url=? WHERE approval_id=?",
-			WORKFLOW_URL, APPROVAL_ID);
+		insertRow("APPROVED", "production");
 		insertCallbackTestCandidate("cand-1", "e".repeat(64));
+		insertCallbackTestEvidenceBundle("cand-1", SHA);
 		var delivery = DatapackReleaseDelivery.pending(
 			APPROVAL_ID, RELEASE_SEQUENCE, SHA, CHANNEL, "cand-1", null, "b".repeat(64), T0);
 		var catalog = new CatalogIdentity(
@@ -508,6 +534,7 @@ class DatapackReleaseCallbackServiceTest {
 		assertThat(service.reconcile(delivery, catalog).status()).isEqualTo("PUBLISHED");
 
 		assertThat(statusOf()).isEqualTo("PUBLISHED");
+		assertThat(workflowRunUrlOf()).isEqualTo(WORKFLOW_URL);
 		assertThat(promoteOutcomeOf()).isEqualTo("NO_CHANGE");
 	}
 

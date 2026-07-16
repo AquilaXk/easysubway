@@ -1,6 +1,7 @@
 package com.easysubway.datapack.application.service;
 
 import com.easysubway.datapack.application.port.out.DatapackReleaseChannelCommandPort;
+import com.easysubway.datapack.application.port.out.DatapackReleaseChannelCommandPort.PassingReleaseEvidence;
 import com.easysubway.datapack.application.port.out.DatapackReleaseCatalogPort;
 import com.easysubway.datapack.application.port.out.DatapackReleaseRequestRepository;
 import com.easysubway.datapack.application.port.out.DatapackReleaseDeliveryRepository;
@@ -73,11 +74,40 @@ public class DatapackReleaseCallbackService {
             || !"payload-signature".equals(cmd.verifierKind())
             || !signature.verify(fields, cmd.verifierValue())) {
             throw new IllegalArgumentException("callback verifier mismatch");
-        }
+		}
 		boolean pass = allGatesPass(cmd);
+		var terminalReplay = transactionTemplate.execute(
+			status -> receiveTerminalReplay(cmd, fields, pass));
+		if (terminalReplay != null) return terminalReplay;
 		boolean knownRequest = repository.findByApprovalId(cmd.releaseRequestId()).isPresent();
 		var catalogValidation = pass && knownRequest ? validatePublishedCatalog(cmd) : null;
 		return transactionTemplate.execute(status -> receiveVerified(cmd, fields, catalogValidation));
+	}
+
+	private CallbackResult receiveTerminalReplay(CallbackCommand cmd, CanonicalFields fields,
+		boolean pass) {
+		var existingSequence = deliveryRepository.findByRequestAndSequence(
+			cmd.releaseRequestId(), cmd.releaseSequence());
+		if (existingSequence.isPresent()
+			&& !existingSequence.get().manifestSha256().equals(cmd.manifestSha256())) {
+			if (existingSequence.get().state() != State.DELIVERED) {
+				var now = LocalDateTime.now(clock);
+				deliveryRepository.mark(existingSequence.get().idempotencyKey(), State.DEAD_LETTER,
+					existingSequence.get().attempts(), null, "CONFLICT",
+					"MANIFEST_IDENTITY_MISMATCH", now);
+			}
+			return new CallbackResult("DEAD_LETTER", false);
+		}
+		var request = repository.findByApprovalId(cmd.releaseRequestId()).orElse(null);
+		if (request == null) return null;
+		var terminal = pass ? DatapackReleaseRequestStatus.PUBLISHED
+			: DatapackReleaseRequestStatus.FAILED;
+		var deliveryTerminal = existingSequence.isPresent()
+			&& (existingSequence.get().state() == State.DELIVERED
+				|| existingSequence.get().state() == State.DEAD_LETTER);
+		if (request.status() != terminal && !deliveryTerminal
+			&& cmd.channel().equals(request.targetChannel())) return null;
+		return receiveVerified(cmd, fields, null);
 	}
 
 	private CallbackResult receiveVerified(CallbackCommand cmd, CanonicalFields fields,
@@ -177,11 +207,13 @@ public class DatapackReleaseCallbackService {
 			throw new IllegalArgumentException("callback verifier mismatch");
 		}
 		boolean pass = "PASS".equals(cmd.publishStatus());
-		var targetChannel = repository.findByApprovalId(cmd.releaseRequestId())
-			.map(DatapackReleaseRequest::targetChannel)
+		var request = repository.findByApprovalId(cmd.releaseRequestId())
 			.orElseThrow(() -> new IllegalArgumentException(
 				"release request not found: " + cmd.releaseRequestId()));
-		var current = pass ? releaseCatalog.fetchCurrent(targetChannel) : null;
+		var terminal = pass ? DatapackReleaseRequestStatus.PUBLISHED
+			: DatapackReleaseRequestStatus.FAILED;
+		if (request.status() == terminal) return new CallbackResult(terminal.name(), true);
+		var current = pass ? releaseCatalog.fetchCurrent(request.targetChannel()) : null;
 		return transactionTemplate.execute(status -> receiveLegacyVerified(cmd, current));
 	}
 
@@ -311,13 +343,13 @@ public class DatapackReleaseCallbackService {
 				"CONFLICT", "REQUEST_CATALOG_MISMATCH", now);
 			return new CallbackResult("DEAD_LETTER", false);
 		}
+		var evidence = channelCommandPort.findPassingReleaseEvidence(request.candidateId()).orElse(null);
 		if (!channelCommandPort.candidateHasManifest(request.candidateId(), catalog.manifestSha256())) {
-			if (catalog.noChange()) return completeNoChange(delivery, request, now);
+			if (catalog.noChange()) return completeNoChange(delivery, request, evidence, now);
 			markClaimed(delivery, State.DEAD_LETTER, delivery.attempts(), null,
 				"CONFLICT", "REQUEST_CATALOG_MISMATCH", now);
 			return new CallbackResult("DEAD_LETTER", false);
 		}
-		var evidence = channelCommandPort.findPassingReleaseEvidence(request.candidateId()).orElse(null);
 		if ("production".equals(request.targetChannel()) && evidence == null) {
 			markClaimed(delivery, State.DEAD_LETTER, delivery.attempts(), null,
 				"CONFLICT", "RELEASE_EVIDENCE_MISSING", now);
@@ -350,8 +382,11 @@ public class DatapackReleaseCallbackService {
 	}
 
 	private CallbackResult completeNoChange(DatapackReleaseDelivery delivery,
-		DatapackReleaseRequest request, LocalDateTime now) {
-		if (request.workflowRunUrl() == null || request.workflowRunUrl().isBlank()) {
+		DatapackReleaseRequest request, PassingReleaseEvidence evidence, LocalDateTime now) {
+		var workflowRunUrl = request.workflowRunUrl() != null
+			? request.workflowRunUrl()
+			: evidence == null ? null : evidence.workflowRunUrl();
+		if (workflowRunUrl == null || workflowRunUrl.isBlank()) {
 			markClaimed(delivery, State.DEAD_LETTER, delivery.attempts(), null,
 				"CONFLICT", "WORKFLOW_RUN_URL_MISSING", now);
 			return new CallbackResult("DEAD_LETTER", false);
@@ -363,7 +398,7 @@ public class DatapackReleaseCallbackService {
 					"CONFLICT", "REQUEST_STATE_MISMATCH", now);
 				return new CallbackResult("DEAD_LETTER", false);
 			}
-			request = request.markPublished(request.workflowRunUrl(), now)
+			request = request.markPublished(workflowRunUrl, now)
 				.withPromoteOutcome("NO_CHANGE", null);
 			repository.save(request);
 		}
