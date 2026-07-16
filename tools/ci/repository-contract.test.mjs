@@ -4774,6 +4774,12 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   const routeSearchController = read(
     "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchController.java",
   );
+  const routeSessionController = read(
+    "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteV2SessionController.java",
+  );
+  const mobileRouteIngress = read("apps/mobile/lib/route_v2_ingress.dart");
+  const mobileRouteSearch = read("apps/mobile/lib/route_search.dart");
+  const routeV2Gateway = read("infra/nginx/route-v2-gateway.conf.template");
   const internalApiIndex = readJson("contracts/api/internal-api-index.json");
 
   assert.equal(gate.schemaVersion, 1);
@@ -5142,6 +5148,53 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
     "/api/v2/routes/session",
     "/api/v2/routes/search",
   ]);
+  const routeV2Readiness = operationsEvidence.backendControlPlane.publicApiSurface.routeV2Readiness;
+  assert.equal(routeV2Readiness.issue, 2095);
+  assert.equal(routeV2Readiness.status, "BLOCKED_EXTERNAL");
+  assert.equal(routeV2Readiness.productionIngressOpen, false);
+  assert.deepEqual(routeV2Readiness.androidConsumers, [
+    {
+      method: "POST",
+      path: "/api/v2/routes/session",
+      consumer: "PlayIntegrityRouteV2SessionProvider",
+      auth: "Play Integrity attestation",
+      cacheControl: "private, no-store",
+    },
+    {
+      method: "POST",
+      path: "/api/v2/routes/search",
+      consumer: "RouteSearchV2ApiRepository",
+      auth: "Bearer route:v2:itx session and gateway origin proof",
+      cacheControl: "private, no-store",
+    },
+  ]);
+  assert.deepEqual(routeV2Readiness.closedRouteEndpoints, closedRouteEndpoints);
+  assert.deepEqual(routeV2Readiness.subwayLocalFirst, {
+    consumer: "TransportScopedRouteSearchRepository",
+    networkCalls: 0,
+  });
+  assert.deepEqual(routeV2Readiness.timetableSnapshotCache, {
+    status: "BLOCKED_EXTERNAL",
+    blockedByIssue: 2145,
+    requiredKey: "immutable timetable artifact identity",
+    sharedRouteResponseCacheAllowed: false,
+  });
+  assert.deepEqual(routeV2Readiness.realisticLoadEvidence, {
+    status: "NOT_STARTED",
+    requires: ["normal", "burst", "unavailable", "latency", "error", "resource", "purge"],
+  });
+  assert.deepEqual(routeV2Readiness.productionCanaryRollback, {
+    status: "BLOCKED_EXTERNAL",
+    explicitProductionApprovalRequired: true,
+    sameCandidateIdentityRequired: true,
+  });
+  assert.match(mobileRouteIngress, /'\/api\/v2\/routes\/session'/);
+  assert.match(mobileRouteSearch, /'\/api\/v2\/routes\/search'/);
+  assert.match(mobileRouteIngress, /request\.transportScope == RouteTransportScope\.subway[\s\S]*localRepository\.searchRoute/);
+  assert.match(mobileRouteSearch, /production ingress는 session\/search 두 경로만 열고 legacy refresh는 계속 닫는다/);
+  assert.match(routeSessionController, /header\(HttpHeaders\.CACHE_CONTROL, "private, no-store"\)/);
+  assert.match(routeSearchController, /header\(HttpHeaders\.CACHE_CONTROL, "private, no-store"\)/);
+  assert.match(routeV2Gateway, /add_header Cache-Control "private, no-store" always/);
   assert.match(
     securityConfig,
     /@Profile\("prod \| staging \| release \| prod-like"\)[\s\S]*SecurityFilterChain routeV2IngressSecurityFilterChain/,

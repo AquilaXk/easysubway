@@ -247,6 +247,50 @@
         "issue": 1913,
         "androidRouteMode": "LOCAL_FIRST"
       },
+      "routeV2Readiness": {
+        "issue": 2095,
+        "status": "BLOCKED_EXTERNAL",
+        "productionIngressOpen": false,
+        "androidConsumers": [
+          {
+            "method": "POST",
+            "path": "/api/v2/routes/session",
+            "consumer": "PlayIntegrityRouteV2SessionProvider",
+            "auth": "Play Integrity attestation",
+            "cacheControl": "private, no-store"
+          },
+          {
+            "method": "POST",
+            "path": "/api/v2/routes/search",
+            "consumer": "RouteSearchV2ApiRepository",
+            "auth": "Bearer route:v2:itx session and gateway origin proof",
+            "cacheControl": "private, no-store"
+          }
+        ],
+        "closedRouteEndpoints": [
+          "/api/v1/routes/search",
+          "/api/v2/routes/{routeSearchId}/refresh"
+        ],
+        "subwayLocalFirst": {
+          "consumer": "TransportScopedRouteSearchRepository",
+          "networkCalls": 0
+        },
+        "timetableSnapshotCache": {
+          "status": "BLOCKED_EXTERNAL",
+          "blockedByIssue": 2145,
+          "requiredKey": "immutable timetable artifact identity",
+          "sharedRouteResponseCacheAllowed": false
+        },
+        "realisticLoadEvidence": {
+          "status": "NOT_STARTED",
+          "requires": ["normal", "burst", "unavailable", "latency", "error", "resource", "purge"]
+        },
+        "productionCanaryRollback": {
+          "status": "BLOCKED_EXTERNAL",
+          "explicitProductionApprovalRequired": true,
+          "sameCandidateIdentityRequired": true
+        }
+      },
       "requiredEvidence": [
         "backend-public-api-surface-inventory",
         "default-deny-public-chain-test-output",
