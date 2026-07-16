@@ -213,6 +213,17 @@ test("prelaunch Android integration test는 mobile 작업 디렉터리에서 실
   assert.match(emulatorStep, /working-directory:\s*apps\/mobile/);
   assert.doesNotMatch(emulatorStep, /script:\s*\|\s*\n\s*cd apps\/mobile/);
 });
+test("prelaunch Android integration 명령은 하나의 shell invocation으로 전달한다", async () => {
+  const workflow = await readFile(new URL(
+    "../../.github/workflows/datapack-prelaunch-gates.yml", import.meta.url,
+  ), "utf8");
+  const emulatorStart = workflow.indexOf("      - name: Rehearse monotonic rescue on Android emulator");
+  const nextStep = workflow.indexOf("\n      - name:", emulatorStart + 1);
+  const emulatorStep = workflow.slice(emulatorStart, nextStep);
+
+  assert.match(emulatorStep, /script:\s*>-/);
+  assert.doesNotMatch(emulatorStep, /\\\s*$/m);
+});
 test("prelaunch workflow는 네 gate를 같은 RC final readiness에 결속한다", async () => {
   const workflow = await readFile(new URL(
     "../../.github/workflows/datapack-prelaunch-gates.yml", import.meta.url,
