@@ -59,6 +59,10 @@ const requestedProductionDataPackBinding = booleanArg(
   "requireProductionDataPackBinding",
   "require-production-data-pack-binding",
 );
+const requirePrePlayUploadReady = booleanArg(
+  "requirePrePlayUploadReady",
+  "require-pre-play-upload-ready",
+);
 const dataPackReleaseDecisionPath = arg("dataPackReleaseDecision", "data-pack-release-decision");
 const requireProductionDataPackBinding = requestedProductionDataPackBinding
   || (requestedPhase === "FINAL" && Boolean(dataPackReleaseDecisionPath));
@@ -176,6 +180,17 @@ const identity = {
   nationwideRoadmapScopeSha256: canonicalScopeHash(launchScope.nationwideRoadmapScope),
   identityLinkageMatrixSha256: canonicalScopeHash(launchScope.identityMatrix),
 };
+if (requirePrePlayUploadReady) {
+  if (requestedPhase !== "FINAL") {
+    fail("pre-Play upload readiness is only valid for FINAL manifests");
+  }
+  validatePrePlayUploadReadiness(
+    identity,
+    androidReleaseMetadata,
+    requestedProductionDataPackBinding,
+    dataPackReleaseDecision,
+  );
+}
 const producerVersion = 2;
 const releaseCandidateIdentity = identity;
 const candidateContext = {
@@ -494,6 +509,53 @@ function readFinalDataPackReleaseDecision(filePath, required) {
     fail("data pack release decision is not finalized or has invalid sourceSnapshotSetHash");
   }
   return decision;
+}
+
+function validatePrePlayUploadReadiness(identity, metadata, productionBindingRequested, releaseDecision) {
+  const requiredIdentityFields = [
+    "gitSha",
+    "appVersionName",
+    "versionCode",
+    "aabSha256",
+    "aabPayloadSha256",
+    "dataPackManifestSha256",
+    "dataPackArtifactSha256",
+    "dataPackFallbackArtifactSha256",
+    "sourceSnapshotSetHash",
+    "supportContactSetSha256",
+    "releaseSequence",
+  ];
+  const expectedMetadata = {
+    gitSha: identity.gitSha,
+    storeReadyCandidate: "true",
+    signingKeyType: "production-upload-key",
+    packageId: "com.easysubway.app",
+    versionName: String(identity.appVersionName),
+    versionCode: String(identity.versionCode),
+    aabSha256: identity.aabSha256,
+    aabPayloadSha256: identity.aabPayloadSha256,
+    supportContactSetSha256: identity.supportContactSetSha256,
+  };
+  const missingIdentity = requiredIdentityFields.filter((field) => !identity[field]);
+  const invalidMetadata = Object.entries(expectedMetadata)
+    .filter(([field, expected]) => String(metadata[field] ?? "") !== String(expected))
+    .map(([field]) => field);
+  const missingSigningIdentity = ["uploadKeySha256Fingerprint", "appSigningKeySha256Fingerprint"]
+    .filter((field) => typeof metadata[field] !== "string" || metadata[field].trim().length === 0);
+  if (
+    !productionBindingRequested
+    || !releaseDecision
+    || missingIdentity.length > 0
+    || invalidMetadata.length > 0
+    || missingSigningIdentity.length > 0
+  ) {
+    fail(`pre-Play upload readiness failed: ${[
+      ...missingIdentity.map((field) => `identity.${field}`),
+      ...invalidMetadata.map((field) => `metadata.${field}`),
+      ...missingSigningIdentity.map((field) => `metadata.${field}`),
+      ...(!productionBindingRequested || !releaseDecision ? ["productionDataPackBinding"] : []),
+    ].join(", ")}`);
+  }
 }
 
 function invalidFinalReasonCodes(reasonCodes, published) {

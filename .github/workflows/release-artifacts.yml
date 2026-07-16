@@ -831,7 +831,7 @@ jobs:
           operations_gate_args=(--gate-status "postLaunchOperations=${operations_status}")
           final_readiness_args=()
           if [[ "${PLAY_UPLOAD}" == internal ]]; then
-            final_readiness_args+=(--fail-on-blocked true)
+            final_readiness_args+=(--require-pre-play-upload-ready true)
           fi
           if [[ "${operations_status}" == "SATISFIED" ]]; then
             operations_evidence_args+=(--evidence-path post_launch_operations=release-artifacts/rc/operations-phase-a-summary.json)

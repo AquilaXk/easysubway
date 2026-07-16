@@ -5180,6 +5180,36 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
     "--candidate-context", invalidCandidatePath, "--output", path.join(tempDir, "invalid-final.json")], generatorOptions),
   /without readiness or decision fields/);
   args.push("--phase", "FINAL", "--candidate-context", baselineOutput);
+  const prePlayMetadataPath = path.join(tempDir, "pre-play-release-metadata.txt");
+  const prePlayOutputPath = path.join(tempDir, "pre-play-final-readiness.json");
+  await writeFile(prePlayMetadataPath, [
+    `gitSha=${evidenceRcIdentity.gitSha}`,
+    "storeReadyCandidate=true",
+    "signingKeyType=production-upload-key",
+    "packageId=com.easysubway.app",
+    `versionName=${evidenceRcIdentity.appVersionName}`,
+    `versionCode=${evidenceRcIdentity.versionCode}`,
+    `aabSha256=${evidenceRcIdentity.aabSha256}`,
+    `aabPayloadSha256=${evidenceRcIdentity.aabPayloadSha256}`,
+    `supportContactSetSha256=${evidenceRcIdentity.supportContactSetSha256}`,
+    `uploadKeySha256Fingerprint=${"a".repeat(64)}`,
+    `appSigningKeySha256Fingerprint=${"b".repeat(64)}`,
+  ].join("\n"));
+  await execFileAsync(process.execPath, [
+    ...args,
+    "--android-release-metadata", prePlayMetadataPath,
+    "--require-pre-play-upload-ready", "true",
+    "--output", prePlayOutputPath,
+  ], generatorOptions);
+  assert.equal(JSON.parse(readFileSync(prePlayOutputPath, "utf8")).decision, "NO_GO");
+  await writeFile(prePlayMetadataPath, readFileSync(prePlayMetadataPath, "utf8")
+    .replace("signingKeyType=production-upload-key", "signingKeyType=ci-ephemeral"));
+  await assert.rejects(execFileAsync(process.execPath, [
+    ...args,
+    "--android-release-metadata", prePlayMetadataPath,
+    "--require-pre-play-upload-ready", "true",
+    "--output", prePlayOutputPath,
+  ], generatorOptions), /pre-Play upload readiness/);
   const gateEvidencePaths = {};
   const evidenceReference = (artifactId, digit) => ({ artifactId, sha256: digit.repeat(64) });
   const passingChecks = (names) => Object.fromEntries(names.map((name) => [name, true]));
@@ -7495,8 +7525,9 @@ test("Play internal track 업로드는 versionCode 정책·mapping·evidence를 
   assert.match(workflow, /inputs\.play_upload == 'internal'[\s\S]*needs\.rc-evidence-manifest\.result == 'success'/);
   assert.match(
     workflow,
-    /PLAY_UPLOAD: \$\{\{ inputs\.play_upload \}\}[\s\S]*\[\[ "\$\{PLAY_UPLOAD\}" == internal \]\][\s\S]*--fail-on-blocked true/,
+    /PLAY_UPLOAD: \$\{\{ inputs\.play_upload \}\}[\s\S]*\[\[ "\$\{PLAY_UPLOAD\}" == internal \]\][\s\S]*--require-pre-play-upload-ready true/,
   );
+  assert.doesNotMatch(workflow, /final_readiness_args\+\=\(--fail-on-blocked true\)/);
   assert.match(workflow, /inputs\.play_upload == 'internal'/);
   assert.match(workflow, /environment:\n\s*name: android-production-rc/);
   assert.match(workflow, /node tools\/release\/upload-play-internal\.mjs/);
