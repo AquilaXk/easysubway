@@ -59,7 +59,7 @@ SELECT active.snapshot_sha256, history.snapshot_id, history.schema_identity,
       AND evidence.canonical_pack_sqlite_sha256 = history.canonical_pack_sqlite_sha256
       AND evidence.admission_status = 'ADMITTED' AND evidence.admission_eligible = TRUE
       AND evidence.fresh_until = history.fresh_until AND evidence.source_issue = 2135),
-  TO_CHAR(history.fresh_until::timestamptz AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+  TO_CHAR(history.fresh_until::timestamptz AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')
 FROM timetable_snapshot_active active
 JOIN timetable_snapshot_history history ON history.snapshot_sha256 = active.snapshot_sha256
 WHERE active.singleton_id = 1 AND history.fresh_until::timestamptz > CURRENT_TIMESTAMP;"

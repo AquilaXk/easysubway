@@ -38,6 +38,7 @@ test("production timetable evidence는 exact deploy에서 cache와 격리 rollba
   assert.match(script, /timetable_snapshot_active/);
   assert.match(script, /history\.fresh_until::timestamptz/);
   assert.match(script, /fresh_until::timestamptz > CURRENT_TIMESTAMP/);
+  assert.match(script, /TO_CHAR\([^\n]+, 'YYYY-MM-DD\\"T\\"HH24:MI:SS\\"Z\\"'\)/);
   assert.doesNotMatch(script, /history\.schema_identity, history\.fresh_until/);
   assert.match(script, /replace\(\/\\\.\\d\{3\}Z\$\/, "Z"\)/);
   assert.match(script, /active_identity[^\n]+!=[^\n]+expected_identity/);
