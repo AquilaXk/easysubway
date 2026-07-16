@@ -99,7 +99,7 @@ export function buildCallbackReconciliationEvidence({
 }
 
 export function validateCallbackReconciliationEvidence(evidence) {
-  if (!evidence || evidence.schemaVersion !== 1) {
+  if (evidence?.schemaVersion !== 1) {
     throw new Error("callback evidence schemaVersion must be 1");
   }
   const identity = evidence.deliveryIdentity;
@@ -116,9 +116,9 @@ export function validateCallbackReconciliationEvidence(evidence) {
   }
   validateMetrics(evidence.metrics);
   const suppliedChecks = evidence.checks && typeof evidence.checks === "object"
-    ? Object.keys(evidence.checks).sort()
+    ? Object.keys(evidence.checks).sort(compareAscii)
     : [];
-  if (suppliedChecks.join(",") !== [...CANONICAL_CHECKS].sort().join(",")
+  if (suppliedChecks.join(",") !== [...CANONICAL_CHECKS].sort(compareAscii).join(",")
     || CANONICAL_CHECKS.some((check) => evidence.checks[check] !== true)) {
     throw new Error("callback evidence requires every canonical checks value to be true");
   }
@@ -126,7 +126,7 @@ export function validateCallbackReconciliationEvidence(evidence) {
     || evidence.evidenceReferences.some((reference) =>
       !reference || typeof reference.artifactId !== "string" || reference.artifactId.length === 0
       || !SHA256.test(reference.sha256 ?? "")
-      || Object.keys(reference).sort().join(",") !== "artifactId,sha256")) {
+      || Object.keys(reference).sort(compareAscii).join(",") !== "artifactId,sha256")) {
     throw new Error("callback evidence reference is invalid");
   }
   return evidence;
@@ -225,7 +225,7 @@ function validateRawRehearsal(raw, expectedIdentity) {
   for (const field of ["candidatePublishedAt", "callbackBackendUnavailableAt",
     "reconciliationConvergedAt", "terminalBoundaryAt"]) {
     if (Number.isNaN(Date.parse(timeline?.[field] ?? ""))) {
-      throw new Error(`virtual event timeline is invalid: ${field}`);
+      throw new TypeError(`virtual event timeline is invalid: ${field}`);
     }
   }
   if (raw.observations?.convergedState !== "DELIVERED"
@@ -286,51 +286,63 @@ function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+function compareAscii(left, right) {
+  return left.localeCompare(right, "en");
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args["prepare-from-rc-manifest"]) {
-    for (const required of ["release-request-id", "expected-git-sha", "github-env"]) {
-      if (!args[required]) throw new Error(`--${required} is required with --prepare-from-rc-manifest`);
-    }
-    const identity = prepareCallbackReconciliationIdentity({
-      rcManifest: JSON.parse(await readFile(args["prepare-from-rc-manifest"], "utf8")),
-      releaseRequestId: args["release-request-id"],
-      expectedGitSha: args["expected-git-sha"],
-    });
-    await writeFile(args["github-env"], [
-      `EASYSUBWAY_CALLBACK_EVIDENCE_RELEASE_REQUEST_ID=${identity.releaseRequestId}`,
-      `EASYSUBWAY_CALLBACK_EVIDENCE_RELEASE_SEQUENCE=${identity.releaseSequence}`,
-      `EASYSUBWAY_CALLBACK_EVIDENCE_MANIFEST_SHA256=${identity.manifestSha256}`,
-      "",
-    ].join("\n"), { flag: "a" });
-    process.stdout.write(`${JSON.stringify({ status: "PASS", releaseSequence: identity.releaseSequence })}\n`);
-    return;
+    return prepareIdentityCommand(args);
   }
   if (args["wrap-result"]) {
-    for (const required of ["rc-manifest", "output"]) {
-      if (!args[required]) throw new Error(`--${required} is required with --wrap-result`);
-    }
-    const envelope = wrapCallbackReconciliationGateEvidence({
-      result: JSON.parse(await readFile(args["wrap-result"], "utf8")),
-      rcManifest: JSON.parse(await readFile(args["rc-manifest"], "utf8")),
-      evaluatedAt: args["evaluated-at"] ?? new Date().toISOString(),
-    });
-    await mkdir(path.dirname(args.output), { recursive: true });
-    await writeFile(args.output, jsonBytes(envelope));
-    process.stdout.write(`${JSON.stringify({ status: "PASS", gateId: envelope.gateId, output: args.output })}\n`);
-    return;
+    return wrapEvidenceCommand(args);
   }
   if (args["validate-evidence"]) {
-    const evidence = JSON.parse(await readFile(args["validate-evidence"], "utf8"));
-    validateCallbackReconciliationEvidence(evidence);
-    if (args["artifact-dir"]) await verifyArtifactHashes(evidence, args["artifact-dir"]);
-    process.stdout.write(`${JSON.stringify({ status: "PASS", gateId: "callback_reconciliation" })}\n`);
-    return;
+    return validateEvidenceCommand(args);
   }
-  for (const required of ["raw", "junit-dir", "workflow", "release-request-id",
-    "release-sequence", "manifest-sha256", "output-dir"]) {
-    if (!args[required]) throw new Error(`--${required} is required`);
-  }
+  return buildEvidenceCommand(args);
+}
+
+async function prepareIdentityCommand(args) {
+  requireArgs(args, ["release-request-id", "expected-git-sha", "github-env"],
+    " with --prepare-from-rc-manifest");
+  const identity = prepareCallbackReconciliationIdentity({
+    rcManifest: JSON.parse(await readFile(args["prepare-from-rc-manifest"], "utf8")),
+    releaseRequestId: args["release-request-id"],
+    expectedGitSha: args["expected-git-sha"],
+  });
+  await writeFile(args["github-env"], [
+    `EASYSUBWAY_CALLBACK_EVIDENCE_RELEASE_REQUEST_ID=${identity.releaseRequestId}`,
+    `EASYSUBWAY_CALLBACK_EVIDENCE_RELEASE_SEQUENCE=${identity.releaseSequence}`,
+    `EASYSUBWAY_CALLBACK_EVIDENCE_MANIFEST_SHA256=${identity.manifestSha256}`,
+    "",
+  ].join("\n"), { flag: "a" });
+  process.stdout.write(`${JSON.stringify({ status: "PASS", releaseSequence: identity.releaseSequence })}\n`);
+}
+
+async function wrapEvidenceCommand(args) {
+  requireArgs(args, ["rc-manifest", "output"], " with --wrap-result");
+  const envelope = wrapCallbackReconciliationGateEvidence({
+    result: JSON.parse(await readFile(args["wrap-result"], "utf8")),
+    rcManifest: JSON.parse(await readFile(args["rc-manifest"], "utf8")),
+    evaluatedAt: args["evaluated-at"] ?? new Date().toISOString(),
+  });
+  await mkdir(path.dirname(args.output), { recursive: true });
+  await writeFile(args.output, jsonBytes(envelope));
+  process.stdout.write(`${JSON.stringify({ status: "PASS", gateId: envelope.gateId, output: args.output })}\n`);
+}
+
+async function validateEvidenceCommand(args) {
+  const evidence = JSON.parse(await readFile(args["validate-evidence"], "utf8"));
+  validateCallbackReconciliationEvidence(evidence);
+  if (args["artifact-dir"]) await verifyArtifactHashes(evidence, args["artifact-dir"]);
+  process.stdout.write(`${JSON.stringify({ status: "PASS", gateId: "callback_reconciliation" })}\n`);
+}
+
+async function buildEvidenceCommand(args) {
+  requireArgs(args, ["raw", "junit-dir", "workflow", "release-request-id",
+    "release-sequence", "manifest-sha256", "output-dir"]);
   const junitXmlByCheck = {};
   for (const [key, file] of Object.entries(JUNIT_FILES)) {
     junitXmlByCheck[key] = await readFile(path.join(args["junit-dir"], file), "utf8");
@@ -350,6 +362,12 @@ async function main() {
   await writeFile(path.join(args["output-dir"], "callback-reconciliation-test-attestation.json"), built.attestationBytes);
   await writeFile(path.join(args["output-dir"], "callback-reconciliation-evidence.json"), jsonBytes(built.evidence));
   process.stdout.write(`${JSON.stringify({ status: "PASS", outputDir: args["output-dir"] })}\n`);
+}
+
+function requireArgs(args, requiredArgs, suffix = "") {
+  for (const required of requiredArgs) {
+    if (!args[required]) throw new Error(`--${required} is required${suffix}`);
+  }
 }
 
 async function verifyArtifactHashes(evidence, artifactDir) {
@@ -381,10 +399,12 @@ function parseArgs(argv) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     process.stderr.write(`${error.message}\n`);
     process.exitCode = 1;
-  });
+  }
 }
 
 export { CANONICAL_CHECKS, CHECK_SOURCES, JUNIT_EXPECTATIONS, JUNIT_FILES };
