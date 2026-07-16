@@ -4871,27 +4871,15 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   assert.equal(Object.hasOwn(candidateManifest, "summaryArtifactDigest"), false);
   assert.doesNotMatch(JSON.stringify(candidateManifest), /\b(?:GO|NO_GO)\b/);
   assert.equal(candidateManifest.releaseCandidateIdentity.releaseSequence, 102);
-  await assert.rejects(
-    execFileAsync(process.execPath, [
-      ...args,
-      "--release-sequence", "2026.07.12",
-      "--phase", "CANDIDATE",
-      "--output", path.join(tempDir, "invalid-release-sequence.json"),
-    ], { cwd: root }),
-    /--release-sequence must be a positive safe integer/,
-  );
+  await assert.rejects(execFileAsync(process.execPath, [...args, "--release-sequence", "2026.07.12",
+    "--phase", "CANDIDATE", "--output", path.join(tempDir, "invalid-release-sequence.json")], { cwd: root }),
+  /--release-sequence must be a positive safe integer/);
   const evidenceRcIdentity = candidateManifest.releaseCandidateIdentity;
   const invalidCandidatePath = path.join(tempDir, "invalid-candidate-context.json");
   await writeFile(invalidCandidatePath, JSON.stringify({ ...candidateManifest, decision: "GO" }));
-  await assert.rejects(
-    execFileAsync(process.execPath, [
-      ...args,
-      "--phase", "FINAL",
-      "--candidate-context", invalidCandidatePath,
-      "--output", path.join(tempDir, "invalid-final.json"),
-    ], { cwd: root }),
-    /without readiness or decision fields/,
-  );
+  await assert.rejects(execFileAsync(process.execPath, [...args, "--phase", "FINAL",
+    "--candidate-context", invalidCandidatePath, "--output", path.join(tempDir, "invalid-final.json")], { cwd: root }),
+  /without readiness or decision fields/);
   args.push("--phase", "FINAL", "--candidate-context", baselineOutput);
   const gateEvidencePaths = {};
   const evidenceReference = (artifactId, digit) => ({ artifactId, sha256: digit.repeat(64) });
@@ -4899,10 +4887,8 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   const datapackGateResult = (gateId) => {
     if (gateId === "rollback_rescue") {
       return {
-        schemaVersion: 1,
-        currentReleaseSequence: 100, failedReleaseSequence: 101,
-        catalogMaxReleaseSequence: 101, rescueReleaseSequence: 102,
-        knownGoodPackSha256: "4".repeat(64),
+        schemaVersion: 1, currentReleaseSequence: 100, failedReleaseSequence: 101,
+        catalogMaxReleaseSequence: 101, rescueReleaseSequence: 102, knownGoodPackSha256: "4".repeat(64),
         rescueManifestSha256: evidenceRcIdentity.dataPackManifestSha256,
         checks: passingChecks([
           "monotonicSequence", "signatureVerified", "sqliteIntegrityVerified", "immutableCatalogWritten", "channelManifestPublishedLast",
@@ -4914,16 +4900,14 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
     if (gateId === "device_performance") {
       return {
         schemaVersion: 1,
-        deviceProfile: {
-          model: "production-equivalent-4gib", ramBytes: 4 * 1024 * 1024 * 1024,
-          androidApiLevel: 36, osBuild: "android-16-test-build", repetitions: 20,
-        },
+        deviceProfile: { model: "production-equivalent-4gib", ramBytes: 4 * 1024 * 1024 * 1024,
+          androidApiLevel: 36, osBuild: "android-16-test-build", repetitions: 20 },
         artifact: { sha256: evidenceRcIdentity.dataPackArtifactSha256, compressedBytes: dataPackArtifactBytes, uncompressedBytes: 200 },
         metrics: {
           manifestFetchP95Ms: 2_000, downloadChunkIdleMaxMs: 10_000, decompressP95Ms: 20_000,
           hashSignatureP95Ms: 8_000, sqliteValidationP95Ms: 12_000, activationP95Ms: 1_500,
-          peakRssIncreaseBytes: 200 * 1024 * 1024, coldLoadP50Ms: 800, coldLoadP95Ms: 1_200,
-          routeSearchP50Ms: 100, routeSearchP95Ms: 250, temporaryStorageBytes: 300, temporaryStorageLimitBytes: dataPackArtifactBytes + 400,
+          peakRssIncreaseBytes: 200 * 1024 * 1024, coldLoadP50Ms: 800, coldLoadP95Ms: 1_200, routeSearchP50Ms: 100,
+          routeSearchP95Ms: 250, temporaryStorageBytes: 300, temporaryStorageLimitBytes: dataPackArtifactBytes + 400,
         },
         checks: passingChecks([
           "productionTopologyArtifact", "lowestSupportedAndroidProfile", "allStageSlosPassed", "baselineRegressionPassed",
@@ -4936,13 +4920,11 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
     if (gateId === "callback_reconciliation") {
       return {
         schemaVersion: 1,
-        deliveryIdentity: {
-          releaseRequestId: "release-request-2057", releaseSequence: 102,
+        deliveryIdentity: { releaseRequestId: "release-request-2057", releaseSequence: 102,
           manifestSha256: evidenceRcIdentity.dataPackManifestSha256,
           idempotencyKeySha256: createHash("sha256")
             .update(`release-request-2057:102:${evidenceRcIdentity.dataPackManifestSha256}`)
-            .digest("hex"),
-        },
+            .digest("hex") },
         metrics: { controlPlaneConvergenceP95Ms: 8 * 60 * 1_000, terminalDispositionMaxMs: 60 * 60 * 1_000 },
         checks: passingChecks([
           "boundedRetryConverged", "independentReconciliationConverged", "duplicateSingleApply", "concurrentSingleApply",
@@ -5248,18 +5230,14 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
     ...finalFragment,
     rcIdentity: { ...finalFragment.rcIdentity, gitSha: "f".repeat(40) },
   }));
-  await rejects([
-      "--evidence-status", "production_equivalent_rehearsal=SATISFIED",
-      "--evidence-path", `production_equivalent_rehearsal=${finalFragmentPath}`,
-    ], /failed canonical envelope validation/);
+  await rejects(["--evidence-status", "production_equivalent_rehearsal=SATISFIED",
+    "--evidence-path", `production_equivalent_rehearsal=${finalFragmentPath}`], /failed canonical envelope validation/);
   await writeFile(finalFragmentPath, JSON.stringify({
     ...finalFragment,
     evidenceValidity: { testedAt: now, expiresWhen: "2026-07-15T23:59:59.999Z" },
   }));
-  await rejects([
-      "--evidence-status", "production_equivalent_rehearsal=SATISFIED",
-      "--evidence-path", `production_equivalent_rehearsal=${finalFragmentPath}`,
-    ], /expired evidenceValidity/);
+  await rejects(["--evidence-status", "production_equivalent_rehearsal=SATISFIED",
+    "--evidence-path", `production_equivalent_rehearsal=${finalFragmentPath}`], /expired evidenceValidity/);
   await rejects(["--gate-status", "scopeCoverage=SATISFIED"], /requires existing --gate-evidence: scopeCoverage/);
   await rejects(["--gate-status", "scopeCoverage=DEFERRED_OUT_OF_SCOPE"], /Invalid gate status for scopeCoverage/);
   const genericGateEvidencePath = path.join(tempDir, "scope-coverage.json");
@@ -5302,10 +5280,8 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
   assert.notEqual(evidenceStatusManifest.summaryArtifactDigest, blockedManifest.summaryArtifactDigest);
 
   await rejects(["--datapack-gate-status", "unknown_gate=BLOCKED_EXTERNAL"], /Unknown datapack gate/);
-  await rejects([
-      "--datapack-gate-status", "source_governance=BLOCKED_EXTERNAL",
-      "--datapack-gate-status", "source_governance=BLOCKED_EXTERNAL",
-    ], /Duplicate key=value pair: source_governance/);
+  await rejects(["--datapack-gate-status", "source_governance=BLOCKED_EXTERNAL",
+    "--datapack-gate-status", "source_governance=BLOCKED_EXTERNAL"], /Duplicate key=value pair: source_governance/);
 
   const writeEvidence = async ({
     schemaVersion = 1,
@@ -5331,34 +5307,24 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
   };
 
   await writeEvidence({ evidenceGitSha: "f".repeat(40) });
-  await rejects([
-      "--datapack-gate-status", "source_governance=SATISFIED",
-      "--datapack-gate-evidence", `source_governance=${evidencePath}`,
-    ], /RC identity mismatch/);
+  await rejects(["--datapack-gate-status", "source_governance=SATISFIED",
+    "--datapack-gate-evidence", `source_governance=${evidencePath}`], /RC identity mismatch/);
 
   await writeEvidence({ dataPackManifestSha256: "f".repeat(64) });
-  await rejects([
-      "--datapack-gate-status", "source_governance=SATISFIED",
-      "--datapack-gate-evidence", `source_governance=${evidencePath}`,
-    ], /RC identity mismatch/);
+  await rejects(["--datapack-gate-status", "source_governance=SATISFIED",
+    "--datapack-gate-evidence", `source_governance=${evidencePath}`], /RC identity mismatch/);
 
   await writeEvidence({ schemaVersion: 2 });
-  await rejects([
-      "--datapack-gate-status", "source_governance=SATISFIED",
-      "--datapack-gate-evidence", `source_governance=${evidencePath}`,
-    ], /unsupported schemaVersion/);
+  await rejects(["--datapack-gate-status", "source_governance=SATISFIED",
+    "--datapack-gate-evidence", `source_governance=${evidencePath}`], /unsupported schemaVersion/);
 
   await writeEvidence({ expiresAt: "2026-07-15T23:59:59.999Z" });
-  await rejects([
-      "--datapack-gate-status", "source_governance=SATISFIED",
-      "--datapack-gate-evidence", `source_governance=${evidencePath}`,
-    ], /expired evidenceValidity/);
+  await rejects(["--datapack-gate-status", "source_governance=SATISFIED",
+    "--datapack-gate-evidence", `source_governance=${evidencePath}`], /expired evidenceValidity/);
 
   await writeEvidence({ reasonCodes: ["SOURCE_LINEAGE_BROKEN"] });
-  await rejects([
-      "--datapack-gate-status", "source_governance=SATISFIED",
-      "--datapack-gate-evidence", `source_governance=${evidencePath}`,
-    ], /reasonCodes must be empty/);
+  await rejects(["--datapack-gate-status", "source_governance=SATISFIED",
+    "--datapack-gate-evidence", `source_governance=${evidencePath}`], /reasonCodes must be empty/);
 
   await rejects(
     ["--datapack-gate-status", "source_governance=SATISFIED"],
