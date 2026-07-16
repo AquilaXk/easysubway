@@ -17,6 +17,9 @@ const baselinePath = path.join(
   "backend/src/main/resources/timetable/line4-subway-timetable-seed.sql.gz",
 );
 const contractPath = path.join(root, "tools/datapack/itx-cheongchun-coverage-contract.json");
+const canonicalPackPath = path.join(root, "apps/mobile/assets/datapacks/capital.sqlite.gz");
+const topologyEvidencePath = path.join(root, "tools/datapack/itx-cheongchun-topology-evidence.json");
+const subwayRosterPath = path.join(root, "tools/datapack/sources/kric-line4-route-roster-20260706.json");
 const buildNow = new Date("2026-07-16T00:00:00.000Z");
 
 function sha256(value) {
@@ -32,7 +35,18 @@ async function inputs() {
     root,
     contract.sourceTimetableArtifact.completenessEvidencePath,
   ));
-  return { baselineGzipBytes, contractBytes, sourceBytes, completenessBytes };
+  const canonicalPackGzipBytes = await readFile(canonicalPackPath);
+  const topologyEvidenceBytes = await readFile(topologyEvidencePath);
+  const subwayRosterBytes = await readFile(subwayRosterPath);
+  return {
+    baselineGzipBytes,
+    contractBytes,
+    sourceBytes,
+    completenessBytes,
+    canonicalPackGzipBytes,
+    topologyEvidenceBytes,
+    subwayRosterBytes,
+  };
 }
 
 test("#2135 ADMITTED source와 subway seed를 deterministic complete server snapshot으로 만든다", async () => {
@@ -49,6 +63,15 @@ test("#2135 ADMITTED source와 subway seed를 deterministic complete server snap
   assert.equal(first.evidence.sourceArtifact.sha256, sha256(value.sourceBytes));
   assert.equal(first.evidence.sourceArtifact.completenessEvidenceSha256, sha256(value.completenessBytes));
   assert.equal(first.evidence.freshUntil, source.freshUntil);
+  assert.deepEqual(first.evidence.canonicalPackIdentity, {
+    id: "capital",
+    sha256: sha256(value.canonicalPackGzipBytes),
+    sqliteSha256: sha256(gunzipSync(value.canonicalPackGzipBytes)),
+  });
+  assert.equal(
+    first.evidence.canonicalPackLineage.topologyEvidenceSha256,
+    sha256(value.topologyEvidenceBytes),
+  );
   assert.deepEqual(first.evidence.serviceIdentity, {
     serviceId: "ITX_CHEONGCHUN",
     canonicalLineId: contract.canonicalLineId,
@@ -65,6 +88,9 @@ test("#2135 ADMITTED source와 subway seed를 deterministic complete server snap
   assert.equal((first.sql.match(/VALUES \('weekday-kric'/g) ?? []).length, 1);
   assert.equal((first.sql.match(/VALUES \('holiday-kric'/g) ?? []).length, 1);
   assert.equal((first.sql.match(/VALUES \('saturday-kric'/g) ?? []).length, 1);
+  assert.doesNotMatch(first.sql, /'station-seoul-4-/);
+  assert.match(first.sql, /'station-sadang'/);
+  assert.match(first.sql, /'station-sangnoksu'/);
   const localPattern = first.evidence.servicePatternEvidence.representativeLocal;
   const expressPattern = first.evidence.servicePatternEvidence.representativeExpress;
   assert.ok(localPattern.stopStationIds.length > 1);
@@ -94,6 +120,24 @@ test("complete snapshot은 source·completeness identity와 freshness를 fail cl
       buildNow: new Date("2026-07-19T15:00:00.000Z"),
     }),
     /source artifact is stale/,
+  );
+  assert.throws(
+    () => buildServerTimetableSnapshot({
+      ...value,
+      canonicalPackGzipBytes: Buffer.concat([value.canonicalPackGzipBytes, Buffer.from("tampered")]),
+      buildNow,
+    }),
+    /canonical topology pack identity mismatch/,
+  );
+  const topologyEvidence = JSON.parse(value.topologyEvidenceBytes);
+  topologyEvidence.pack.outputSha256 = "0".repeat(64);
+  assert.throws(
+    () => buildServerTimetableSnapshot({
+      ...value,
+      topologyEvidenceBytes: Buffer.from(`${JSON.stringify(topologyEvidence, null, 2)}\n`),
+      buildNow,
+    }),
+    /canonical topology pack identity mismatch/,
   );
 });
 

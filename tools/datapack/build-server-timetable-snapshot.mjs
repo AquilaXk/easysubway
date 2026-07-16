@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 import { gunzipSync, gzipSync } from "node:zlib";
 
@@ -16,13 +19,18 @@ export function buildServerTimetableSnapshot({
   contractBytes,
   sourceBytes,
   completenessBytes,
+  canonicalPackGzipBytes,
+  topologyEvidenceBytes,
+  subwayRosterBytes,
   buildNow = new Date(),
 }) {
-  const baselineSql = normalizeBaselineSql(baselineGzipBytes);
+  const rawBaselineSql = normalizeBaselineSql(baselineGzipBytes);
   const contract = parseJson(contractBytes, "coverage contract");
   const source = parseJson(sourceBytes, "source artifact");
   const completeness = parseJson(completenessBytes, "completeness evidence");
-  const canonicalPackIdentity = validateAdmission({
+  const topologyEvidence = parseJson(topologyEvidenceBytes, "topology evidence");
+  const subwayRoster = parseJson(subwayRosterBytes, "subway roster");
+  const admittedCanonicalPackIdentity = validateAdmission({
     contract,
     source,
     sourceBytes,
@@ -30,6 +38,20 @@ export function buildServerTimetableSnapshot({
     completenessBytes,
     buildNow,
   });
+  const { canonicalPackIdentity, canonicalPackLineage } = validateCanonicalTopologyPack({
+    contract,
+    source,
+    sourceBytes,
+    topologyEvidence,
+    topologyEvidenceBytes,
+    canonicalPackGzipBytes,
+    admittedCanonicalPackIdentity,
+  });
+  const baselineSql = normalizeSubwayStationIds(
+    rawBaselineSql,
+    canonicalPackGzipBytes,
+    subwayRoster,
+  );
   const existingCalendarIds = insertedIds(baselineSql, "service_calendars");
   const sortedTrips = [...source.transitTrips]
     .map((trip) => ({ ...trip, serviceClass: "ITX_CHEONGCHUN" }))
@@ -94,6 +116,7 @@ export function buildServerTimetableSnapshot({
       completenessEvidenceSha256: sha256(completenessBytes),
     },
     canonicalPackIdentity,
+    canonicalPackLineage,
     canonicalStationSet: {
       version: `sha256:${canonicalStationSetHash}`,
       sha256: canonicalStationSetHash,
@@ -125,6 +148,136 @@ export function buildServerTimetableSnapshot({
     evidence,
     evidenceBytes: Buffer.from(`${JSON.stringify(evidence, null, 2)}\n`),
   };
+}
+
+function validateCanonicalTopologyPack({
+  contract,
+  source,
+  sourceBytes,
+  topologyEvidence,
+  topologyEvidenceBytes,
+  canonicalPackGzipBytes,
+  admittedCanonicalPackIdentity,
+}) {
+  let canonicalPackSqliteBytes;
+  try {
+    canonicalPackSqliteBytes = gunzipSync(canonicalPackGzipBytes);
+  } catch {
+    throw new Error("canonical topology pack identity mismatch");
+  }
+  const outputSha256 = sha256(canonicalPackGzipBytes);
+  const outputSqliteSha256 = sha256(canonicalPackSqliteBytes);
+  if (source.canonicalPackIdentity?.path !== "apps/mobile/assets/datapacks/capital.sqlite.gz"
+    || topologyEvidence?.schemaVersion !== 1
+    || topologyEvidence.artifactKind !== "itx-cheongchun-mobile-topology-evidence"
+    || topologyEvidence.serviceId !== "ITX_CHEONGCHUN"
+    || topologyEvidence.sourceIssue !== 2135
+    || topologyEvidence.sourceArtifact?.id !== source.artifactId
+    || topologyEvidence.sourceArtifact?.sha256 !== sha256(sourceBytes)
+    || topologyEvidence.sourceArtifact?.completenessEvidenceSha256
+      !== source.completenessEvidenceSha256
+    || topologyEvidence.sourceArtifact?.freshUntil !== source.freshUntil
+    || topologyEvidence.pack?.id !== "capital"
+    || topologyEvidence.pack.inputSha256 !== admittedCanonicalPackIdentity.sha256
+    || topologyEvidence.pack.inputSqliteSha256 !== admittedCanonicalPackIdentity.sqliteSha256
+    || topologyEvidence.pack.outputSha256 !== outputSha256
+    || topologyEvidence.pack.outputSqliteSha256 !== outputSqliteSha256
+    || topologyEvidence.pack.byteSize !== canonicalPackGzipBytes.length
+    || topologyEvidence.topology?.stationMembershipCount <= 0
+    || topologyEvidence.topology?.connectedComponentCount !== 1
+    || topologyEvidence.topology?.isolatedServedStationCount !== 0
+    || !lowercaseSha(topologyEvidence.topology?.sha256)
+    || !contract.allowedConsumerIssues?.includes("#1400")) {
+    throw new Error("canonical topology pack identity mismatch");
+  }
+  return {
+    canonicalPackIdentity: {
+      id: topologyEvidence.pack.id,
+      sha256: outputSha256,
+      sqliteSha256: outputSqliteSha256,
+    },
+    canonicalPackLineage: {
+      topologyEvidenceSha256: sha256(topologyEvidenceBytes),
+      topologySha256: topologyEvidence.topology.sha256,
+      admittedInputSha256: admittedCanonicalPackIdentity.sha256,
+      admittedInputSqliteSha256: admittedCanonicalPackIdentity.sqliteSha256,
+    },
+  };
+}
+
+function normalizeSubwayStationIds(sql, canonicalPackGzipBytes, subwayRoster) {
+  const stationMapping = canonicalSubwayStationMapping(canonicalPackGzipBytes, subwayRoster);
+  let normalized = sql;
+  for (const [sourceStationId, canonicalStationId] of stationMapping) {
+    normalized = normalized.replaceAll(`'${sourceStationId}'`, `'${canonicalStationId}'`);
+  }
+  const unresolved = normalized.split("\n")
+    .filter((line) => line.startsWith("INSERT INTO transit_stop_times "))
+    .map((line) => values(line)[2])
+    .filter((stationId) => stationId.startsWith("station-seoul-4-"));
+  if (unresolved.length > 0) {
+    throw new Error(`subway baseline has unmapped canonical stations: ${unresolved[0]}`);
+  }
+  return normalized;
+}
+
+function canonicalSubwayStationMapping(canonicalPackGzipBytes, subwayRoster) {
+  if (!Array.isArray(subwayRoster?.stations) || subwayRoster.stations.length === 0) {
+    throw new Error("subway roster stations are required for canonical mapping");
+  }
+  const directory = mkdtempSync(path.join(tmpdir(), "server-snapshot-canonical-"));
+  const sqlitePath = path.join(directory, "capital.sqlite");
+  let db;
+  try {
+    writeFileSync(sqlitePath, gunzipSync(canonicalPackGzipBytes));
+    db = new DatabaseSync(sqlitePath, { readOnly: true });
+    const canonicalStations = db.prepare(`
+      SELECT stations.id, stations.name_ko, station_lines.line_sequence
+      FROM station_lines
+      JOIN stations ON stations.id = station_lines.station_id
+      WHERE station_lines.line_id = 'seoul-4'
+      ORDER BY station_lines.line_sequence, stations.id
+    `).all();
+    if (canonicalStations.length !== subwayRoster.stations.length) {
+      throw new Error("subway roster and canonical pack station counts differ");
+    }
+    const canonicalBySequence = new Map(canonicalStations.map((station) => [
+      Number(station.line_sequence),
+      station,
+    ]));
+    const mapping = new Map();
+    for (const station of subwayRoster.stations) {
+      const canonical = canonicalBySequence.get(Number(station.stinConsOrdr));
+      const sourceName = canonicalSubwayStationName(station.stinNm);
+      if (!canonical || sourceName !== normalizeStationName(canonical.name_ko)) {
+        throw new Error(`subway roster canonical station mismatch: ${station.stinCd}`);
+      }
+      const sourceStationId = `station-seoul-4-${station.stinCd}`;
+      if (mapping.has(sourceStationId)) {
+        throw new Error(`subway roster duplicate station identity: ${sourceStationId}`);
+      }
+      mapping.set(sourceStationId, canonical.id);
+    }
+    return mapping;
+  } catch (error) {
+    if (error?.message?.startsWith("subway roster")) throw error;
+    throw new Error("canonical topology pack SQLite mapping is invalid", { cause: error });
+  } finally {
+    db?.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+function canonicalSubwayStationName(value) {
+  const normalized = normalizeStationName(value);
+  return normalized === "능길" ? "신길온천" : normalized;
+}
+
+function normalizeStationName(value) {
+  return String(value ?? "")
+    .replace(/\([^)]*\)/g, "")
+    .replace(/[^\p{L}\p{N}]+/gu, "")
+    .toLocaleLowerCase("ko-KR");
 }
 
 function representativeServicePatternEvidence(sql, source) {
@@ -407,6 +560,12 @@ async function main() {
     ?? "tools/datapack/server-timetable-snapshot-evidence.json");
   const runtimeEvidencePath = path.resolve(root, args["runtime-evidence"]
     ?? "backend/src/main/resources/timetable/server-timetable-snapshot-evidence.json");
+  const canonicalPackPath = path.resolve(root, args["canonical-pack"]
+    ?? "apps/mobile/assets/datapacks/capital.sqlite.gz");
+  const topologyEvidencePath = path.resolve(root, args["topology-evidence"]
+    ?? "tools/datapack/itx-cheongchun-topology-evidence.json");
+  const subwayRosterPath = path.resolve(root, args["subway-roster"]
+    ?? "tools/datapack/sources/kric-line4-route-roster-20260706.json");
   const contractBytes = await readFile(contractPath);
   const contract = parseJson(contractBytes, "coverage contract");
   const result = buildServerTimetableSnapshot({
@@ -417,6 +576,9 @@ async function main() {
       root,
       contract.sourceTimetableArtifact.completenessEvidencePath,
     )),
+    canonicalPackGzipBytes: await readFile(canonicalPackPath),
+    topologyEvidenceBytes: await readFile(topologyEvidencePath),
+    subwayRosterBytes: await readFile(subwayRosterPath),
     buildNow: buildClock(),
   });
   if (args.check) {
