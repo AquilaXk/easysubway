@@ -8521,6 +8521,78 @@ void main() {
     );
   });
 
+  testWidgets('경유역이 있는 draft는 ITX scope를 fail closed하고 요청하지 않는다', (
+    tester,
+  ) async {
+    final routeRepository = FakeRouteSearchRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: routeRepository,
+          stationRepository: FakeStationSearchRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
+          itxTransportScopeEnabled: true,
+          initialTransportScope: RouteTransportScope.subwayAndItxCheongchun,
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            waypoint: const RouteDraftStation(
+              id: 'station-seolleung',
+              nameKo: '선릉',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 16),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(routeRepository.requests, isEmpty);
+    expect(find.textContaining('ITX-청춘 경로는 경유역을 지원하지 않아요'), findsOneWidget);
+    expect(find.byKey(const Key('routeScopeSubwayChip')), findsOneWidget);
+  });
+
+  testWidgets('휠체어 프리셋은 복원된 ITX scope를 SUBWAY로 제한한다', (tester) async {
+    final routeRepository = FakeRouteSearchRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: routeRepository,
+          stationRepository: FakeStationSearchRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
+          initialMobilityType: 'WHEELCHAIR',
+          itxTransportScopeEnabled: true,
+          initialTransportScope: RouteTransportScope.subwayAndItxCheongchun,
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 16),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(routeRepository.requests, hasLength(1));
+    expect(
+      routeRepository.requests.single.transportScope,
+      RouteTransportScope.subway,
+    );
+    expect(find.byKey(const Key('routeScopeItxChip')), findsNothing);
+  });
+
   testWidgets('transport scope 변경은 하차 알림 취소 실패 시 기존 scope와 경로를 유지한다', (
     tester,
   ) async {

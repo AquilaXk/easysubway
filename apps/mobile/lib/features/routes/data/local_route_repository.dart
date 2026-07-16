@@ -1056,10 +1056,12 @@ extension _OnlineRouteDisplayLabels on LocalRouteRepository {
       destinationStationName: catalog.stationName(result.destinationStationId),
       lineName: catalog.lineName(result.lineId),
       steps: steps,
-      officialOdFareQuote: await officialOdFareRepository.findExact(
-        originStationId: result.originStationId,
-        destinationStationId: result.destinationStationId,
-      ),
+      officialOdFareQuote: result.transportScope == RouteTransportScope.subway
+          ? await officialOdFareRepository.findExact(
+              originStationId: result.originStationId,
+              destinationStationId: result.destinationStationId,
+            )
+          : null,
     );
   }
 

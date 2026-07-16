@@ -180,8 +180,8 @@ void main() {
         const RouteSearchRequest(
           originStationId: 'station-sangnoksu',
           destinationStationId: 'station-sadang',
-          mobilityType: 'WHEELCHAIR',
-          mobilityPreset: 'STEP_FREE',
+          mobilityType: 'SENIOR',
+          mobilityPreset: 'STANDARD',
           transportScope: RouteTransportScope.subwayAndItxCheongchun,
         ),
       );
@@ -193,12 +193,9 @@ void main() {
       // 프리셋은 v2 body에 실리고, mobilityType은 하위호환으로 함께 전송된다.
       expect(
         requestedBodies.single,
-        containsPair('mobilityPreset', 'STEP_FREE'),
+        containsPair('mobilityPreset', 'STANDARD'),
       );
-      expect(
-        requestedBodies.single,
-        containsPair('mobilityType', 'WHEELCHAIR'),
-      );
+      expect(requestedBodies.single, containsPair('mobilityType', 'SENIOR'));
       expect(requestedBodies.single['departureTime'], isA<String>());
       expect(result.routeSearchId, 'route-v2');
       expect(result.originStationName, '상록수');
@@ -219,13 +216,8 @@ void main() {
       );
       expect(result.etaSource, 'REALTIME');
       expect(result.isLocalResult, isFalse);
-      expect(result.hasOfficialOdFareQuote, isTrue);
-      expect(result.officialOdFareQuote!.gnrlCardFare, 1550);
-      expect(result.officialOdFareQuote!.gnrlCashFare, 1650);
-      expect(result.officialOdFareQuote!.yungCardFare, 800);
-      expect(result.officialOdFareQuote!.yungCashFare, 900);
-      expect(result.officialOdFareQuote!.childCardFare, 500);
-      expect(result.officialOdFareQuote!.childCashFare, 500);
+      expect(result.hasOfficialOdFareQuote, isFalse);
+      expect(result.officialOdFareQuote, isNull);
 
       await expectLater(
         dependencies.routeRepository.refreshRoute(result.routeSearchId),

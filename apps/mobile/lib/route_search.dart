@@ -2652,6 +2652,11 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
   bool get _hasCompleteDraft =>
       _originStation != null && _destinationStation != null;
 
+  bool get _itxTransportScopeAvailable =>
+      widget.itxTransportScopeEnabled &&
+      _selectedMobilityType != 'WHEELCHAIR' &&
+      _selectedConstraintMode != 'STRICT_STEP_FREE';
+
   /// 완성된 draft 없이(=출발·도착 미완) 이 화면에 들어온 경우, 폼을 보여주지 않고
   /// 곧바로 노선도로 되돌린다. 리다이렉트를 한 번만 예약하기 위한 플래그.
   bool _redirectToMapScheduled = false;
@@ -2664,15 +2669,15 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     _originStation = _stationFromDraft(widget.initialDraft?.origin);
     _destinationStation = _stationFromDraft(widget.initialDraft?.destination);
     _waypointStation = _stationFromDraft(widget.initialDraft?.waypoint);
-    _selectedTransportScope = widget.itxTransportScopeEnabled
-        ? widget.initialTransportScope
-        : RouteTransportScope.subway;
     _selectedPreset =
         mobilityPresetFromRepresentativeMobilityType(
           widget.initialMobilityType,
         ) ??
         MobilityPreset.standard;
     _applyPresetDerivedState(_selectedPreset);
+    _selectedTransportScope = _itxTransportScopeAvailable
+        ? widget.initialTransportScope
+        : RouteTransportScope.subway;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _maybeAutoSearchFromDraft();
     });
@@ -2694,7 +2699,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     }
     if (widget.initialTransportScope != oldWidget.initialTransportScope ||
         widget.itxTransportScopeEnabled != oldWidget.itxTransportScopeEnabled) {
-      _selectedTransportScope = widget.itxTransportScopeEnabled
+      _selectedTransportScope = _itxTransportScopeAvailable
           ? widget.initialTransportScope
           : RouteTransportScope.subway;
       _autoSearchedSignature = null;
@@ -2966,7 +2971,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
                     _RouteConditionChips(
                       preset: _selectedPreset,
                       transportScope: _selectedTransportScope,
-                      itxTransportScopeEnabled: widget.itxTransportScopeEnabled,
+                      itxTransportScopeEnabled: _itxTransportScopeAvailable,
                       onChangePreset: _showMobilityPresetPicker,
                       onChangeTransportScope: _changeTransportScope,
                     ),
@@ -3062,6 +3067,23 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
       });
       return;
     }
+    if (_selectedTransportScope == RouteTransportScope.subwayAndItxCheongchun &&
+        _waypointStation != null) {
+      _controller.reset();
+      setState(() {
+        _validationMessage = 'ITX-청춘 경로는 경유역을 지원하지 않아요. 경유역을 빼거나 지하철만 이용해 주세요.';
+      });
+      return;
+    }
+    if (_selectedTransportScope == RouteTransportScope.subwayAndItxCheongchun &&
+        !_itxTransportScopeAvailable) {
+      _controller.reset();
+      setState(() {
+        _selectedTransportScope = RouteTransportScope.subway;
+        _validationMessage = '선택한 이동 조건에서는 지하철 경로만 이용할 수 있어요.';
+      });
+      return;
+    }
     setState(() {
       _validationMessage = '';
     });
@@ -3089,6 +3111,13 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
   Future<void> _changeTransportScope(RouteTransportScope scope) async {
     if (scope == _selectedTransportScope ||
         _controller.state.status == RouteSearchViewStatus.loading) {
+      return;
+    }
+    if (scope == RouteTransportScope.subwayAndItxCheongchun &&
+        _waypointStation != null) {
+      setState(() {
+        _validationMessage = 'ITX-청춘 경로는 경유역을 지원하지 않아요. 경유역을 빼거나 지하철만 이용해 주세요.';
+      });
       return;
     }
     if (!await _disableActiveGetOffAlarm()) {
@@ -3226,6 +3255,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     setState(() {
       _selectedPreset = selectedPreset;
       _applyPresetDerivedState(selectedPreset);
+      if (!_itxTransportScopeAvailable) {
+        _selectedTransportScope = RouteTransportScope.subway;
+      }
     });
     // 결과-우선 화면에서 프리셋을 바꾸면 그 자리에서 바로 재검색한다. 활성 하차
     // 알림은 위에서 이미 취소했으므로 _submit에서 다시 취소하지 않는다.
