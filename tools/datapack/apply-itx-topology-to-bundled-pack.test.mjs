@@ -53,6 +53,53 @@ async function rejectedMutatedSource(context, mutate, expected) {
   ], { cwd: root, env: freshBuildEnv }), expected);
 }
 
+async function rejectedMutatedAdmissionDocuments(context, mutate, expected) {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "itx-topology-admission-reject-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const packPath = path.join(directory, "capital.sqlite.gz");
+  const indexPath = path.join(directory, "index.json");
+  const evidencePath = path.join(directory, "evidence.json");
+  const contractPath = path.join(directory, "contract.json");
+  const sourcePath = path.join(directory, "source.json");
+  const completenessPath = path.join(directory, "completeness.json");
+  await copyFile(path.join(root, "apps/mobile/assets/datapacks/capital.sqlite.gz"), packPath);
+  await copyFile(path.join(root, "apps/mobile/assets/datapacks/index.json"), indexPath);
+  const contract = JSON.parse(await readFile(
+    path.join(root, "tools/datapack/itx-cheongchun-coverage-contract.json"), "utf8"));
+  const source = JSON.parse(await readFile(path.join(root, contract.sourceTimetableArtifact.artifactPath), "utf8"));
+  const completeness = JSON.parse(await readFile(
+    path.join(root, contract.sourceTimetableArtifact.completenessEvidencePath), "utf8"));
+  const packBytes = await readFile(packPath);
+  Object.assign(source.canonicalPackIdentity, {
+    sha256: sha256(packBytes),
+  });
+  Object.assign(contract.officialEvidence.korailCompletenessAdmission.canonicalPackIdentity, {
+    sha256: sha256(packBytes),
+    sqliteSha256: sha256(gunzipSync(packBytes)),
+  });
+  mutate({ contract, source, completeness });
+  const completenessBytes = Buffer.from(`${JSON.stringify(completeness, null, 2)}\n`);
+  await writeFile(completenessPath, completenessBytes);
+  source.completenessEvidenceSha256 = sha256(completenessBytes);
+  const sourceBytes = Buffer.from(`${JSON.stringify(source, null, 2)}\n`);
+  await writeFile(sourcePath, sourceBytes);
+  Object.assign(contract.sourceTimetableArtifact, {
+    artifactPath: sourcePath,
+    sha256: sha256(sourceBytes),
+    completenessEvidencePath: completenessPath,
+    completenessEvidenceSha256: sha256(completenessBytes),
+  });
+  await writeFile(contractPath, `${JSON.stringify(contract, null, 2)}\n`);
+
+  return assert.rejects(execFileAsync(process.execPath, [
+    "tools/datapack/apply-itx-topology-to-bundled-pack.mjs",
+    "--pack", packPath,
+    "--index", indexPath,
+    "--contract", contractPath,
+    "--evidence", evidencePath,
+  ], { cwd: root, env: freshBuildEnv }), expected);
+}
+
 async function rejectedTamperedEvidence(context, mutate) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "itx-topology-stale-evidence-"));
   context.after(() => rm(directory, { recursive: true, force: true }));
@@ -229,6 +276,115 @@ test("ITX topology는 freshUntil 경계부터 ADMITTED source를 거부한다", 
       EASYSUBWAY_DATAPACK_BUILD_NOW: "2026-07-19T15:00:00.000Z",
     },
   }), /ITX topology source artifact is expired/);
+});
+
+test("ITX topology는 admission document schema identity 변조를 거부한다", async (context) => {
+  const cases = [
+    ["contract", ({ contract }) => { contract.schemaVersion = 999; }],
+    ["source", ({ source }) => { source.schemaVersion = 999; }],
+    ["completeness", ({ completeness }) => { completeness.schemaVersion = 999; }],
+  ];
+  for (const [name, mutate] of cases) {
+    await context.test(name, async (childContext) => {
+      await rejectedMutatedAdmissionDocuments(
+        childContext,
+        mutate,
+        /ADMITTED source contract|source identity is invalid/,
+      );
+    });
+  }
+});
+
+test("ITX topology는 contract canonical gzip identity 변조를 거부한다", async (context) => {
+  await rejectedMutatedAdmissionDocuments(context, ({ contract }) => {
+    contract.officialEvidence.korailCompletenessAdmission.canonicalPackIdentity.sha256 = "0".repeat(64);
+  }, /canonical input pack identity mismatch/);
+});
+
+test("ITX topology는 contract canonical SQLite identity 변조를 거부한다", async (context) => {
+  await rejectedMutatedAdmissionDocuments(context, ({ contract }) => {
+    contract.officialEvidence.korailCompletenessAdmission.canonicalPackIdentity.sqliteSha256 = "0".repeat(64);
+  }, /canonical input pack identity mismatch/);
+});
+
+test("기존 source_issue=2116 제약의 v18 pack을 2135 admission schema로 migration한다", async (context) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "itx-topology-v18-evidence-migration-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const packPath = path.join(directory, "capital.sqlite.gz");
+  const sqlitePath = path.join(directory, "capital.sqlite");
+  const indexPath = path.join(directory, "index.json");
+  const evidencePath = path.join(directory, "evidence.json");
+  const contractPath = path.join(directory, "contract.json");
+  const sourcePath = path.join(directory, "source.json");
+  await writeFile(sqlitePath, gunzipSync(await readFile(
+    path.join(root, "apps/mobile/assets/datapacks/capital.sqlite.gz"))));
+  const database = new DatabaseSync(sqlitePath);
+  database.exec(`
+    DROP TABLE route_service_artifact_evidence;
+    CREATE TABLE route_service_artifact_evidence (
+      service_class TEXT NOT NULL PRIMARY KEY,
+      timetable_artifact_id TEXT NOT NULL,
+      timetable_artifact_sha256 TEXT NOT NULL,
+      canonical_pack_id TEXT NOT NULL,
+      canonical_pack_sha256 TEXT NOT NULL,
+      canonical_pack_sqlite_sha256 TEXT NOT NULL,
+      admission_status TEXT NOT NULL,
+      admission_eligible INTEGER NOT NULL,
+      fresh_until TEXT,
+      source_issue INTEGER NOT NULL,
+      CHECK (source_issue = 2116)
+    );
+    PRAGMA user_version = 18;
+  `);
+  database.close();
+  const inputSqliteBytes = await readFile(sqlitePath);
+  const inputPackBytes = gzipSync(inputSqliteBytes, { level: 9, mtime: 0 });
+  await writeFile(packPath, inputPackBytes);
+  const index = JSON.parse(await readFile(
+    path.join(root, "apps/mobile/assets/datapacks/index.json"), "utf8"));
+  Object.assign(index.packs.find(({ id }) => id === "capital"), {
+    sha256: sha256(inputPackBytes),
+    sqliteSha256: sha256(inputSqliteBytes),
+    byteSize: inputPackBytes.length,
+  });
+  await writeFile(indexPath, `${JSON.stringify(index, null, 2)}\n`);
+  const contract = JSON.parse(await readFile(
+    path.join(root, "tools/datapack/itx-cheongchun-coverage-contract.json"), "utf8"));
+  const source = JSON.parse(await readFile(path.join(root, contract.sourceTimetableArtifact.artifactPath), "utf8"));
+  Object.assign(source.canonicalPackIdentity, { sha256: sha256(inputPackBytes) });
+  Object.assign(contract.officialEvidence.korailCompletenessAdmission.canonicalPackIdentity, {
+    sha256: sha256(inputPackBytes),
+    sqliteSha256: sha256(inputSqliteBytes),
+  });
+  const sourceBytes = Buffer.from(`${JSON.stringify(source, null, 2)}\n`);
+  await writeFile(sourcePath, sourceBytes);
+  Object.assign(contract.sourceTimetableArtifact, {
+    artifactPath: sourcePath,
+    sha256: sha256(sourceBytes),
+  });
+  await writeFile(contractPath, `${JSON.stringify(contract, null, 2)}\n`);
+
+  await execFileAsync(process.execPath, [
+    "tools/datapack/apply-itx-topology-to-bundled-pack.mjs",
+    "--pack", packPath,
+    "--index", indexPath,
+    "--contract", contractPath,
+    "--evidence", evidencePath,
+  ], { cwd: root, env: freshBuildEnv });
+
+  await writeFile(sqlitePath, gunzipSync(await readFile(packPath)));
+  const migrated = new DatabaseSync(sqlitePath, { readOnly: true });
+  try {
+    assert.equal(migrated.prepare(`
+      SELECT source_issue FROM route_service_artifact_evidence
+      WHERE service_class = 'ITX_CHEONGCHUN'
+    `).get().source_issue, 2135);
+    assert.match(migrated.prepare(`
+      SELECT sql FROM sqlite_schema WHERE type = 'table' AND name = 'route_service_artifact_evidence'
+    `).get().sql, /source_issue IN \(2116, 2135\)/);
+  } finally {
+    migrated.close();
+  }
 });
 
 test("v16 bundled pack 변환은 ITX topology 외 timetable·calendar·fare row를 바꾸지 않는다", async (context) => {

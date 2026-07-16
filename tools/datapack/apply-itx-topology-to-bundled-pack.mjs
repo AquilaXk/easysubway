@@ -10,6 +10,29 @@ const root = path.resolve(import.meta.dirname, "../..");
 const CATALOG_VERSION = 18;
 const EXPECTED_EDGE_COUNT = 48;
 const MAX_GZIP_DELTA_BYTES = 64 * 1024;
+const ROUTE_SERVICE_EVIDENCE_COLUMNS = `
+  service_class TEXT NOT NULL PRIMARY KEY,
+  timetable_artifact_id TEXT NOT NULL,
+  timetable_artifact_sha256 TEXT NOT NULL,
+  canonical_pack_id TEXT NOT NULL,
+  canonical_pack_sha256 TEXT NOT NULL,
+  canonical_pack_sqlite_sha256 TEXT NOT NULL,
+  admission_status TEXT NOT NULL,
+  admission_eligible INTEGER NOT NULL,
+  fresh_until TEXT,
+  source_issue INTEGER NOT NULL,
+  CHECK (service_class = 'ITX_CHEONGCHUN'),
+  CHECK (length(timetable_artifact_sha256) = 64 AND timetable_artifact_sha256 NOT GLOB '*[^0-9a-f]*'),
+  CHECK (length(canonical_pack_sha256) = 64 AND canonical_pack_sha256 NOT GLOB '*[^0-9a-f]*'),
+  CHECK (length(canonical_pack_sqlite_sha256) = 64 AND canonical_pack_sqlite_sha256 NOT GLOB '*[^0-9a-f]*'),
+  CHECK (admission_status IN ('MISSING', 'ADMITTED')),
+  CHECK (admission_eligible IN (0, 1)),
+  CHECK (
+    (admission_status = 'ADMITTED' AND admission_eligible = 1 AND fresh_until IS NOT NULL)
+    OR (admission_status = 'MISSING' AND admission_eligible = 0)
+  ),
+  CHECK (source_issue IN (2116, 2135))
+`;
 
 function option(name, fallback) {
   const index = process.argv.indexOf(name);
@@ -36,7 +59,10 @@ function candidateBuildNow() {
 async function admittedSource(contractPath) {
   const contract = JSON.parse(await readFile(contractPath, "utf8"));
   const reference = contract?.sourceTimetableArtifact;
-  if (contract?.serviceId !== "ITX_CHEONGCHUN"
+  if (contract?.schemaVersion !== 2
+    || contract?.artifactKind !== "itx-cheongchun-coverage-contract"
+    || contract?.serviceId !== "ITX_CHEONGCHUN"
+    || reference?.schemaVersion !== 1
     || reference?.status !== "ADMITTED" || reference?.admissionEligible !== true) {
     throw new Error("ITX topology requires #2135 ADMITTED source contract");
   }
@@ -52,9 +78,12 @@ async function admittedSource(contractPath) {
   if (!Number.isFinite(freshUntilMillis) || freshUntilMillis <= candidateBuildNow().getTime()) {
     throw new Error("ITX topology source artifact is expired");
   }
-  if (source?.artifactId !== reference.artifactId || source?.serviceId !== "ITX_CHEONGCHUN"
+  if (source?.schemaVersion !== 1
+    || source?.artifactKind !== "itx-cheongchun-source-timetable"
+    || source?.artifactId !== reference.artifactId || source?.serviceId !== "ITX_CHEONGCHUN"
     || source?.validationStatus !== "SUPPORTED" || source?.freshUntil !== reference.freshUntil
     || source?.completenessEvidenceSha256 !== reference.completenessEvidenceSha256
+    || completeness?.schemaVersion !== 2
     || completeness?.artifactKind !== "korail-itx-cheongchun-completeness-evidence"
     || completeness?.serviceId !== "ITX_CHEONGCHUN"
     || completeness?.validationMode !== "ADMISSION"
@@ -70,6 +99,18 @@ async function admittedSource(contractPath) {
     throw new Error("ITX topology source identity is invalid");
   }
   return { contract, reference, source, sourceBytes };
+}
+
+function assertCanonicalInputIdentity(contract, source, gzipSha256, sqliteSha256) {
+  const sourceIdentity = source?.canonicalPackIdentity;
+  const canonical = contract?.officialEvidence?.korailCompletenessAdmission?.canonicalPackIdentity;
+  if (sourceIdentity?.path !== "apps/mobile/assets/datapacks/capital.sqlite.gz"
+    || canonical?.id !== "capital"
+    || canonical?.sha256 !== sourceIdentity.sha256
+    || canonical?.sha256 !== gzipSha256
+    || canonical?.sqliteSha256 !== sqliteSha256) {
+    throw new Error("ITX topology canonical input pack identity mismatch");
+  }
 }
 
 function routeServiceEvidence(contract, reference) {
@@ -203,6 +244,33 @@ function hasColumn(database, table, column) {
   return database.prepare(`PRAGMA table_info(${table})`).all().some(({ name }) => name === column);
 }
 
+function ensureRouteServiceEvidenceSchema(database) {
+  const table = database.prepare(`
+    SELECT sql FROM sqlite_schema
+    WHERE type = 'table' AND name = 'route_service_artifact_evidence'
+  `).get();
+  if (table == null) {
+    database.exec(`CREATE TABLE route_service_artifact_evidence (${ROUTE_SERVICE_EVIDENCE_COLUMNS})`);
+    return;
+  }
+  if (!/CHECK\s*\(\s*source_issue\s*=\s*2116\s*\)/i.test(table.sql)) return;
+  database.exec(`
+    ALTER TABLE route_service_artifact_evidence
+      RENAME TO route_service_artifact_evidence_legacy_source_issue;
+    CREATE TABLE route_service_artifact_evidence (${ROUTE_SERVICE_EVIDENCE_COLUMNS});
+    INSERT INTO route_service_artifact_evidence (
+      service_class, timetable_artifact_id, timetable_artifact_sha256,
+      canonical_pack_id, canonical_pack_sha256, canonical_pack_sqlite_sha256,
+      admission_status, admission_eligible, fresh_until, source_issue
+    )
+    SELECT service_class, timetable_artifact_id, timetable_artifact_sha256,
+           canonical_pack_id, canonical_pack_sha256, canonical_pack_sqlite_sha256,
+           admission_status, admission_eligible, fresh_until, source_issue
+    FROM route_service_artifact_evidence_legacy_source_issue;
+    DROP TABLE route_service_artifact_evidence_legacy_source_issue;
+  `);
+}
+
 function ensureVersion18(database) {
   const currentVersion = database.prepare("PRAGMA user_version").get().user_version;
   if (currentVersion < 16 || currentVersion > CATALOG_VERSION) {
@@ -214,20 +282,7 @@ function ensureVersion18(database) {
   if (!hasColumn(database, "network_edges", "service_class")) {
     database.exec("ALTER TABLE network_edges ADD COLUMN service_class TEXT NOT NULL DEFAULT 'SUBWAY'");
   }
-  database.exec(`
-    CREATE TABLE IF NOT EXISTS route_service_artifact_evidence (
-      service_class TEXT NOT NULL PRIMARY KEY,
-      timetable_artifact_id TEXT NOT NULL,
-      timetable_artifact_sha256 TEXT NOT NULL,
-      canonical_pack_id TEXT NOT NULL,
-      canonical_pack_sha256 TEXT NOT NULL,
-      canonical_pack_sqlite_sha256 TEXT NOT NULL,
-      admission_status TEXT NOT NULL,
-      admission_eligible INTEGER NOT NULL,
-      fresh_until TEXT,
-      source_issue INTEGER NOT NULL
-    )
-  `);
+  ensureRouteServiceEvidenceSchema(database);
   database.exec(`PRAGMA user_version = ${CATALOG_VERSION}`);
 }
 
@@ -367,6 +422,12 @@ async function main() {
     const evidence = JSON.parse(await readFile(evidencePath, "utf8"));
     const index = JSON.parse(await readFile(indexPath, "utf8"));
     const pack = index.packs?.find(({ id }) => id === "capital");
+    assertCanonicalInputIdentity(
+      contract,
+      source,
+      evidence?.pack?.inputSha256,
+      evidence?.pack?.inputSqliteSha256,
+    );
     if (evidence?.schemaVersion !== 1
       || evidence?.artifactKind !== "itx-cheongchun-mobile-topology-evidence"
       || evidence?.sourceIssue !== 2135
@@ -413,13 +474,16 @@ async function main() {
     }
     return;
   }
-  if (source.canonicalPackIdentity?.sha256 !== sha256(inputGzipBytes)) {
-    throw new Error("ITX topology canonical input pack identity mismatch");
-  }
   const directory = await mkdtemp(path.join(os.tmpdir(), `itx-topology-${randomUUID()}-`));
   try {
     const sqlitePath = path.join(directory, "capital.sqlite");
     const inputSqliteBytes = gunzipSync(inputGzipBytes);
+    assertCanonicalInputIdentity(
+      contract,
+      source,
+      sha256(inputGzipBytes),
+      sha256(inputSqliteBytes),
+    );
     await writeFile(sqlitePath, inputSqliteBytes);
     applyTopology(sqlitePath, topology, admissionEvidence);
     const outputSqliteBytes = await readFile(sqlitePath);
