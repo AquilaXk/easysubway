@@ -8,9 +8,11 @@ import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
+import android.os.CancellationSignal
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationManagerCompat
 import com.google.android.play.core.integrity.IntegrityManagerFactory
 import com.google.android.play.core.integrity.StandardIntegrityManager
@@ -38,6 +40,8 @@ class MainActivity : FlutterActivity() {
     private var integrityTokenProvider: StandardIntegrityManager.StandardIntegrityTokenProvider? = null
     private var integrityCloudProjectNumber: Long? = null
     private var pendingLocationListener: LocationListener? = null
+    private var pendingLocationCancellationSignal: CancellationSignal? = null
+    private var pendingLocationTimeoutRunnable: Runnable? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -160,7 +164,7 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun handleCurrentLocation(result: MethodChannel.Result) {
-        if (pendingLocationResult != null || pendingLocationListener != null) {
+        if (pendingLocationResult != null || isLocationRequestInFlight()) {
             result.error("locationUnavailable", "location request already running", null)
             return
         }
@@ -261,10 +265,69 @@ class MainActivity : FlutterActivity() {
         provider: String,
         result: MethodChannel.Result,
     ) {
-        // 마지막 위치가 없을 때만 1회 위치 갱신을 요청해 검색 버튼 대기 시간을 짧게 제한한다.
+        // 마지막 위치가 없을 때만 1회 위치를 능동으로 요청해 검색 버튼 대기 시간을 짧게 제한한다.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            requestCurrentLocation(locationManager, provider, result)
+        } else {
+            requestSingleLocationLegacy(locationManager, provider, result)
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.R)
+    private fun requestCurrentLocation(
+        locationManager: LocationManager,
+        provider: String,
+        result: MethodChannel.Result,
+    ) {
+        // API 30+는 CancellationSignal로 취소 가능한 단발 위치 요청을 사용한다.
+        val cancellationSignal = CancellationSignal()
+        val timeoutRunnable = Runnable {
+            if (pendingLocationCancellationSignal === cancellationSignal) {
+                clearPendingLocation()
+                result.error("locationUnavailable", "location unavailable", null)
+            }
+        }
+        pendingLocationCancellationSignal = cancellationSignal
+        pendingLocationTimeoutRunnable = timeoutRunnable
+        mainHandler.postDelayed(timeoutRunnable, locationTimeoutMillis)
+
+        try {
+            locationManager.getCurrentLocation(
+                provider,
+                cancellationSignal,
+                mainExecutor,
+            ) { location ->
+                if (pendingLocationCancellationSignal !== cancellationSignal) {
+                    return@getCurrentLocation
+                }
+                clearPendingLocation()
+                if (location != null) {
+                    result.success(location.toFlutterMap())
+                } else {
+                    result.error("locationUnavailable", "location unavailable", null)
+                }
+            }
+        } catch (exception: SecurityException) {
+            clearPendingLocation()
+            result.error("permissionDenied", "location permission denied", null)
+        } catch (exception: IllegalArgumentException) {
+            clearPendingLocation()
+            result.error("locationUnavailable", "location unavailable", null)
+        }
+    }
+
+    private fun requestSingleLocationLegacy(
+        locationManager: LocationManager,
+        provider: String,
+        result: MethodChannel.Result,
+    ) {
+        // getCurrentLocation이 없는 하위 API에서는 requestSingleUpdate로 단발 위치를 요청한다.
         val listener = object : LocationListener {
             override fun onLocationChanged(location: Location) {
-                clearPendingLocation(locationManager)
+                if (pendingLocationListener !== this) {
+                    return
+                }
+                clearPendingLocation()
                 result.success(location.toFlutterMap())
             }
 
@@ -274,32 +337,56 @@ class MainActivity : FlutterActivity() {
             override fun onProviderEnabled(provider: String) = Unit
 
             override fun onProviderDisabled(provider: String) {
-                clearPendingLocation(locationManager)
+                if (pendingLocationListener !== this) {
+                    return
+                }
+                clearPendingLocation()
                 result.error("locationDisabled", "location provider disabled", null)
             }
         }
+        val timeoutRunnable = Runnable {
+            if (pendingLocationListener === listener) {
+                clearPendingLocation()
+                result.error("locationUnavailable", "location unavailable", null)
+            }
+        }
         pendingLocationListener = listener
+        pendingLocationTimeoutRunnable = timeoutRunnable
+        mainHandler.postDelayed(timeoutRunnable, locationTimeoutMillis)
 
         try {
+            @Suppress("DEPRECATION")
             locationManager.requestSingleUpdate(provider, listener, Looper.getMainLooper())
-            mainHandler.postDelayed({
-                if (pendingLocationListener === listener) {
-                    clearPendingLocation(locationManager)
-                    result.error("locationUnavailable", "location unavailable", null)
-                }
-            }, locationTimeoutMillis)
         } catch (exception: SecurityException) {
-            clearPendingLocation(locationManager)
+            clearPendingLocation()
             result.error("permissionDenied", "location permission denied", null)
         } catch (exception: IllegalArgumentException) {
-            clearPendingLocation(locationManager)
+            clearPendingLocation()
             result.error("locationUnavailable", "location unavailable", null)
         }
     }
 
-    private fun clearPendingLocation(locationManager: LocationManager) {
-        pendingLocationListener?.let { listener -> locationManager.removeUpdates(listener) }
+    private fun isLocationRequestInFlight(): Boolean {
+        return pendingLocationListener != null || pendingLocationCancellationSignal != null
+    }
+
+    private fun clearPendingLocation() {
+        pendingLocationTimeoutRunnable?.let { runnable -> mainHandler.removeCallbacks(runnable) }
+        pendingLocationTimeoutRunnable = null
+
+        pendingLocationListener?.let { listener ->
+            (getSystemService(LOCATION_SERVICE) as? LocationManager)?.removeUpdates(listener)
+        }
         pendingLocationListener = null
+
+        pendingLocationCancellationSignal?.cancel()
+        pendingLocationCancellationSignal = null
+    }
+
+    override fun onDestroy() {
+        // 화면이 사라질 때 진행 중인 위치 요청을 취소해 콜백 누수와 크래시를 막는다.
+        clearPendingLocation()
+        super.onDestroy()
     }
 
     private fun hasLocationPermission(): Boolean {
