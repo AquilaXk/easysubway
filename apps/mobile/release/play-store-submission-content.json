@@ -188,7 +188,7 @@
   "dataSafetyDeclarations": {
     "tracking": false,
     "sharesDataWithThirdParties": true,
-    "thirdPartySharingScopeKo": "현재 위치는 사용자가 출구 도보 길안내를 명시적으로 누른 경우에만 카카오맵 앱/웹에 시작 좌표로 전달한다. 서버 저장과 tracking은 하지 않는다.",
+    "thirdPartySharingScopeKo": "사용자가 출구 도보 길안내를 명시적으로 누른 경우에만 카카오맵 앱/웹을 연다. 앱에는 현재 위치 시작 좌표와 목적지 좌표를, 웹에는 목적지 좌표만 전달한다. 서버 저장과 tracking은 하지 않는다.",
     "dataEncryptedInTransit": true,
     "dataDeletionRequestSupported": true,
     "requiredFieldsPerDataType": [

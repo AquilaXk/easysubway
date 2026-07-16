@@ -15561,7 +15561,8 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
   const publicPrivacyPolicy = read("backend/src/main/resources/templates/legal/privacy.html");
   assert.match(publicPrivacyPolicy, /외부 지도 도보 길안내/);
   assert.match(publicPrivacyPolicy, /출구 도보 길안내/);
-  assert.match(publicPrivacyPolicy, /카카오맵 앱\/웹/);
+  assert.match(publicPrivacyPolicy, /카카오맵 앱에는 현재 위치 시작 좌표와 목적지 좌표/);
+  assert.match(publicPrivacyPolicy, /카카오맵 웹에는 목적지 좌표/);
   assert.equal(playStoreContent.storeMetadataRequirements.publicContactEmailMustMatchAppSupportEmail, true);
   assert.ok(playStoreContent.storeMetadataRequirements.requiredTagsKo.includes("대중교통"));
   assert.ok(playStoreContent.storeMetadataRequirements.requiredTagsKo.includes("접근성"));
@@ -17663,7 +17664,9 @@ test("서비스·위치정보 이용약관은 공개 경로와 사실 계약을 
   assert.match(terms, /support@aquilaxk\.site/);
   assert.match(locationTerms, /쉬운 지하철 위치정보 이용약관/);
   assert.match(locationTerms, /가까운 역/);
-  assert.match(locationTerms, /카카오맵 앱\/웹/);
+  assert.match(locationTerms, /카카오맵 앱에는 현재 위치의 시작 좌표와 목적지 좌표/);
+  assert.match(locationTerms, /카카오맵 웹에는 목적지 좌표/);
   assert.match(locationTerms, /privacy@aquilaxk\.site/);
+  assert.doesNotMatch(locationTerms, /법정대리인의 동의를 받습니다/);
   assert.doesNotMatch(`${terms}\n${locationTerms}`, /TBD|TODO|준비 중/);
 });

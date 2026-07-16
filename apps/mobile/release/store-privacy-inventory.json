@@ -134,7 +134,7 @@
       ],
       "lastVerifiedAt": "2026-07-09",
       "sharedWithThirdParties": true,
-      "thirdPartySharingKo": "사용자가 출구 도보 길안내를 명시적으로 누른 경우에만 카카오맵 앱/웹에 현재 위치 시작 좌표를 전달한다. 서버로 전송하거나 앱에 저장하지 않고 tracking에 사용하지 않는다.",
+      "thirdPartySharingKo": "사용자가 출구 도보 길안내를 명시적으로 누른 경우에만 카카오맵 앱/웹을 연다. 앱에는 현재 위치 시작 좌표와 목적지 좌표를, 웹에는 목적지 좌표만 전달한다. 서버로 전송하거나 앱에 저장하지 않고 tracking에 사용하지 않는다.",
       "usedForTracking": false,
       "googlePlayDataSafety": {
         "dataType": "Location",
