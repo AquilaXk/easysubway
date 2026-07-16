@@ -53,7 +53,7 @@
         {
           "refreshOn": "operations-contract-change",
           "files": [
-            {"path": "apps/mobile/release/operations-release-evidence.json", "sha256": "a2547abb148ed8b7172db82def62b21b52626d93fc58b0d5dbe225b087c27f5a"},
+            {"path": "apps/mobile/release/operations-release-evidence.json", "sha256": "4fcec1321402f4189c18ad5f1be6db73d2224e15e3d4c0c22d0ab01ff43a7115"},
             {"path": "apps/mobile/release/operations-observability-gate.json", "sha256": "6955ac139fbc57be0721bb955e834164015050f397f2562e4402298578027afe"},
             {"path": "tools/ops/generate-operations-phase-a-summary.mjs", "sha256": "e89a520d6b229c5fd042ef8bcaf74873476c7253cd03b48fac1de21cf55e0c4d"},
             {"path": "tools/ops/validate-operations-release-summary.mjs", "sha256": "71a2a51da2b9c3a20d14512b608bccfbfee9022ca5718b77d44ff9254cc67979"},
@@ -69,7 +69,8 @@
             {"path": "apps/mobile/release/support-incident-response-gate.json", "sha256": "82db73ed9b0e84ed140f8ebc16326844dd2cc58181b918806fa4aba29bfcb4ca"},
             {"path": "apps/mobile/lib/app/app_components.dart", "sha256": "f0a53231cc819a6136049b979334d215968a54f0ce5cf8f17c1952674c926ac5"},
             {"path": "apps/mobile/lib/app/accessibility_theme.dart", "sha256": "a13c1ded6008a883060ef34bb52d3e54a83b103d0c0bcfba05fd6e9370e9128a"},
-            {"path": "apps/mobile/lib/main.dart", "sha256": "74f86422ede17b03e85b0ab2a895cfbb6cc5dcd5c8c6622e70342d02d1eb1d2a"}
+            {"path": "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart", "sha256": "deaf6dc5abf28f164fca115737bcb47d4c9320bd02692f821e697c94e45a54e8"},
+            {"path": "apps/mobile/lib/main.dart", "sha256": "9ec1df72bc562488a7bf68b643c5f3e172696dfa13397571b0aa5f3c35a527be"}
           ]
         },
         {
