@@ -1778,6 +1778,34 @@ test("모바일 demo dependency와 접근성 theme는 app canonical 파일이 �
   assert.doesNotMatch(main, /^TextStyle _boldTextStyle\b/m);
 });
 
+test("모바일 설정 화면은 settings presentation canonical 파일이 소유한다", () => {
+  const main = read("apps/mobile/lib/main.dart");
+  const settings = read(
+    "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
+  );
+
+  assert.match(settings, /^const _settingsPagePadding = /m);
+  assert.match(settings, /^class AppSettingsScreen extends StatefulWidget/m);
+  assert.match(settings, /^class _AppSettingsScreenState extends State<AppSettingsScreen>/m);
+  assert.match(settings, /^class _AppSettingsSection extends StatelessWidget/m);
+  assert.match(settings, /^class _AppSettingsActionTile extends StatelessWidget/m);
+  assert.match(settings, /^class _AppSettingsPreferenceTile extends StatelessWidget/m);
+  assert.match(
+    main,
+    /^import 'features\/settings\/presentation\/app_settings_screen\.dart';$/m,
+  );
+  assert.match(
+    main,
+    /^export 'features\/settings\/presentation\/app_settings_screen\.dart'\s+show AppSettingsScreen;$/m,
+  );
+  assert.doesNotMatch(main, /^const _settingsPagePadding = /m);
+  assert.doesNotMatch(main, /^class AppSettingsScreen\b/m);
+  assert.doesNotMatch(main, /^class _AppSettingsScreenState\b/m);
+  assert.doesNotMatch(main, /^class _AppSettingsSection\b/m);
+  assert.doesNotMatch(main, /^class _AppSettingsActionTile\b/m);
+  assert.doesNotMatch(main, /^class _AppSettingsPreferenceTile\b/m);
+});
+
 test("프로덕션 모바일 UI 위젯명은 prototype 명칭을 쓰지 않는다", () => {
   const mobileFiles = execFileSync("git", ["ls-files", "apps/mobile/lib/*.dart"], {
     cwd: root,
@@ -1941,7 +1969,9 @@ test("모바일 경로 결과 단계별 뒤로가기 회귀 테스트는 유지�
 });
 
 test("모바일 설정 저장 실패와 시설 제보 위치 실패 회귀 테스트는 유지된다", () => {
-  const main = read("apps/mobile/lib/main.dart");
+  const settings = read(
+    "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
+  );
   const facilityReport = read("apps/mobile/lib/facility_report.dart");
   const widgetTest = read("apps/mobile/test/widget_test.dart");
   const settingsFailurePattern = new RegExp([
@@ -1959,9 +1989,10 @@ test("모바일 설정 저장 실패와 시설 제보 위치 실패 회귀 테�
     "longitude, isNull",
   ].join("[\\s\\S]*"));
 
-  assert.match(main, /_updateViewPreferences/);
-  assert.match(main, /_viewPreferences\s*=\s*previous/);
-  assert.match(main, /설정을 저장하지 못했어요\. 이전 값으로 되돌렸어요\./);
+  assert.match(
+    settings,
+    /Future<void> _updateViewPreferences\([\s\S]*?final previous = _viewPreferences;[\s\S]*?_viewPreferences = preferences;[\s\S]*?await widget\.onViewPreferencesChanged\(preferences\);[\s\S]*?catch \(error, stackTrace\)[\s\S]*?if \(!mounted\)[\s\S]*?if \(_isSameViewPreferences\(_viewPreferences, preferences\)\)[\s\S]*?_viewPreferences = previous;[\s\S]*?SnackBar\(content: Text\('설정을 저장하지 못했어요\. 이전 값으로 되돌렸어요\.'\)\)/,
+  );
   assert.match(widgetTest, settingsFailurePattern);
   assert.match(facilityReport, /facilityReportAttachLocationButton/);
   assert.match(facilityReport, /facilityReportOpenLocationSettingsButton/);
@@ -2562,6 +2593,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     [
       "apps/mobile/lib/app/accessibility_theme.dart",
       "apps/mobile/lib/app/app_components.dart",
+      "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
       "apps/mobile/lib/main.dart",
       "apps/mobile/release/support-incident-response-gate.json",
     ],
@@ -12610,6 +12642,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const envExample = read(".env.example");
   const iosInfoPlist = read("apps/mobile/ios/Runner/Info.plist");
   const main = read("apps/mobile/lib/main.dart");
+  const appSettingsScreen = read(
+    "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
+  );
   const accessibilityTheme = read("apps/mobile/lib/app/accessibility_theme.dart");
   const appDependencies = read("apps/mobile/lib/app/app_dependencies.dart");
   const authHeaders = read("apps/mobile/lib/auth_headers.dart");
@@ -12684,8 +12719,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(main, /class EasySubwayApp extends StatelessWidget/);
   assert.match(`${main}\n${networkMap}\n${stationSearch}`, /역 검색/);
   assert.match(`${main}\n${networkMap}\n${routeSearch}\n${stationSearch}`, /길찾기/);
-  assert.match(main, /이동 조건/);
-  assert.match(main, /알림 설정/);
+  assert.match(appSettingsScreen, /이동 조건/);
+  assert.match(appSettingsScreen, /알림 설정/);
   assert.match(main, /EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS/);
   assert.match(main, /defaultValue: false/);
   assert.match(main, /enablePushNotifications/);
