@@ -6,7 +6,6 @@ ENV_FILE="${EASYSUBWAY_ENV_FILE:-${ROOT_DIR}/.env.example}"
 COMPOSE_FILE="${EASYSUBWAY_COMPOSE_FILE:-${ROOT_DIR}/infra/docker-compose.yml}"
 COMPOSE_PROJECT="${EASYSUBWAY_COMPOSE_PROJECT:-}"
 BACKUP_DIR="${1:-${EASYSUBWAY_BACKUP_DIR:-${ROOT_DIR}/.codex/backups}}"
-SENSITIVE_BACKUP_RETENTION_DAYS="${EASYSUBWAY_SENSITIVE_BACKUP_RETENTION_DAYS:-30}"
 
 umask 077
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -44,5 +43,5 @@ chmod 600 "${backup_file}" "${backup_file}.sha256"
 trap - EXIT
 node "${ROOT_DIR}/tools/ops/prune-sensitive-backups.mjs" \
 	--root "${BACKUP_DIR}" \
-	--retention-days "${SENSITIVE_BACKUP_RETENTION_DAYS}"
+	--retention-days "30"
 printf '%s\n' "${backup_file}"

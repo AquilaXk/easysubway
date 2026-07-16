@@ -22,7 +22,6 @@ jobs:
       name: production
     env:
       DEPLOY_ROOT: ${{ vars.DEPLOY_ROOT }}
-      EASYSUBWAY_SENSITIVE_BACKUP_RETENTION_DAYS: ${{ vars.EASYSUBWAY_SENSITIVE_BACKUP_RETENTION_DAYS }}
 
     steps:
       - name: Sensitive backup retention / Checkout repository
@@ -41,11 +40,10 @@ jobs:
           set -euo pipefail
 
           DEPLOY_ROOT="${DEPLOY_ROOT:-/opt/easysubway}"
-          EASYSUBWAY_SENSITIVE_BACKUP_RETENTION_DAYS="${EASYSUBWAY_SENSITIVE_BACKUP_RETENTION_DAYS:-30}"
           if [[ ! "${DEPLOY_ROOT}" =~ ^/[A-Za-z0-9._/-]+$ || "${DEPLOY_ROOT}" == *..* ]]; then
             echo "DEPLOY_ROOT is invalid" >&2
             exit 1
           fi
           node tools/ops/prune-sensitive-backups.mjs \
             --root "${DEPLOY_ROOT}/backups" \
-            --retention-days "${EASYSUBWAY_SENSITIVE_BACKUP_RETENTION_DAYS}"
+            --retention-days "30"

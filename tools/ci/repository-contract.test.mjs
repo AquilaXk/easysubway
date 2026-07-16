@@ -1490,7 +1490,6 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_TERMS_OF_SERVICE_URL=https://example.com/terms",
     "EASYSUBWAY_PRIVACY_POLICY_URL=https://example.com/privacy",
     "EASYSUBWAY_LOCATION_TERMS_URL=https://example.com/location-terms",
-    "EASYSUBWAY_SENSITIVE_BACKUP_RETENTION_DAYS=30",
     "EASYSUBWAY_SUPPORT_EMAIL=support@example.com",
     "EASYSUBWAY_SECURITY_EMAIL=security@example.com",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@example.com",
@@ -10834,7 +10833,8 @@ test("로컬 PostgreSQL 백업과 복구 리허설 기준선을 제공한다", (
   assert.doesNotMatch(backupScript, /pg_restore --list -/);
   assert.match(backupScript, /mv "\$\{temp_file\}" "\$\{backup_file\}"/);
   assert.match(backupScript, /sha256sum "\$\{backup_file\}" > "\$\{backup_file\}\.sha256"/);
-  assert.match(backupScript, /EASYSUBWAY_SENSITIVE_BACKUP_RETENTION_DAYS:-30/);
+  assert.match(backupScript, /--retention-days "30"/);
+  assert.doesNotMatch(backupScript, /EASYSUBWAY_SENSITIVE_BACKUP_RETENTION_DAYS/);
   assert.match(backupScript, /prune-sensitive-backups\.mjs/);
   assert.match(backupScript, /trap - EXIT/);
 
@@ -10881,7 +10881,8 @@ test("시설 신고 사진 백업은 로컬 전용 객체와 manifest 기준선�
   assert.match(backupScript, /printf 'report_id\\tfile_name\\tcontent_type\\tobject_key\\tthumbnail_object_key\\tsha256\\tsize_bytes\\tobject_path\\tthumbnail_path\\n'/);
   assert.match(backupScript, /printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n'/);
   assert.match(backupScript, /trap cleanup EXIT/);
-  assert.match(backupScript, /EASYSUBWAY_SENSITIVE_BACKUP_RETENTION_DAYS:-30/);
+  assert.match(backupScript, /--retention-days "30"/);
+  assert.doesNotMatch(backupScript, /EASYSUBWAY_SENSITIVE_BACKUP_RETENTION_DAYS/);
   assert.match(backupScript, /prune-sensitive-backups\.mjs/);
   assert.match(backupScript, /printf 'facility report photo backup written: %s\\n' "\$\{run_dir\}"/);
 });
@@ -10945,13 +10946,9 @@ test("민감정보 백업 보존 작업은 30일이 지난 DB·사진 사본만 
   );
   assert.match(workflow, /cron: "47 18 \* \* \*"/);
   assert.match(workflow, /self-hosted[\s\S]*easysubway-production/);
-  assert.match(
-    workflow,
-    /EASYSUBWAY_SENSITIVE_BACKUP_RETENTION_DAYS: \$\{\{ vars\.EASYSUBWAY_SENSITIVE_BACKUP_RETENTION_DAYS \}\}/,
-  );
-  assert.match(workflow, /EASYSUBWAY_SENSITIVE_BACKUP_RETENTION_DAYS="\$\{EASYSUBWAY_SENSITIVE_BACKUP_RETENTION_DAYS:-30\}"/);
-  assert.doesNotMatch(workflow, /\bRETENTION_DAYS\b/);
+  assert.doesNotMatch(workflow, /SENSITIVE_BACKUP_RETENTION_DAYS|\bRETENTION_DAYS\b/);
   assert.match(workflow, /--root "\$\{DEPLOY_ROOT\}\/backups"/);
+  assert.match(workflow, /--retention-days "30"/);
   assert.match(workflow, /prune-sensitive-backups\.mjs/);
 });
 
@@ -12715,7 +12712,9 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(read(deletePhotoPortPath), /deleteFacilityReportPhoto/);
   assert.match(read(purgePersonalDataPortPath), /purgePersonalDataCreatedBefore/);
   assert.match(read(purgePersonalDataSchedulerPath), /personal-data-retention-days:365/);
-  assert.match(read(purgePersonalDataSchedulerPath), /personal-data-purge-interval-ms:86400000/);
+  assert.match(read(purgePersonalDataSchedulerPath), /DEFAULT_PURGE_INTERVAL_MILLIS = 86_400_000L/);
+  assert.match(read(purgePersonalDataSchedulerPath), /@Scheduled\(fixedDelay = DEFAULT_PURGE_INTERVAL_MILLIS\)/);
+  assert.doesNotMatch(read(purgePersonalDataSchedulerPath), /personal-data-purge-interval-ms/);
   assert.match(saveFacilityStatusPort, /interface SaveAccessibilityFacilityStatusPort/);
   assert.match(saveFacilityStatusPort, /saveFacilityStatus/);
   assert.match(service, /implements FacilityReportUseCase/);

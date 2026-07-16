@@ -6,7 +6,6 @@ ENV_FILE="${EASYSUBWAY_ENV_FILE:-${ROOT_DIR}/.env.example}"
 COMPOSE_FILE="${EASYSUBWAY_COMPOSE_FILE:-${ROOT_DIR}/infra/docker-compose.yml}"
 BACKUP_DIR="${1:-${EASYSUBWAY_PHOTO_BACKUP_DIR:-${ROOT_DIR}/.codex/backups/facility-report-photos}}"
 PHOTO_STORAGE_DIR="${EASYSUBWAY_REPORTS_PHOTOS_STORAGE_DIR:-${TMPDIR:-/tmp}/easysubway-report-photos}"
-SENSITIVE_BACKUP_RETENTION_DAYS="${EASYSUBWAY_SENSITIVE_BACKUP_RETENTION_DAYS:-30}"
 
 umask 077
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -112,5 +111,5 @@ trap - EXIT
 cleanup
 node "${ROOT_DIR}/tools/ops/prune-sensitive-backups.mjs" \
 	--root "${BACKUP_DIR}" \
-	--retention-days "${SENSITIVE_BACKUP_RETENTION_DAYS}"
+	--retention-days "30"
 printf 'facility report photo backup written: %s\n' "${run_dir}"
