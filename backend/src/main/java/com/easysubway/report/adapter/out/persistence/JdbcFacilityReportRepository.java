@@ -45,6 +45,7 @@ public class JdbcFacilityReportRepository implements
 
 	private static final Logger log = LoggerFactory.getLogger(JdbcFacilityReportRepository.class);
 	private static final String DELETED_DESCRIPTION = "사용자 데이터 삭제로 신고 내용이 삭제되었습니다.";
+	private static final int PHOTO_DELETION_RETRY_BATCH_SIZE = 100;
 
 	private final JdbcTemplate jdbcTemplate;
 	private final DatabaseDialect databaseDialect;
@@ -589,6 +590,7 @@ public class JdbcFacilityReportRepository implements
 
 	@Override
 	public int anonymizeFacilityReportsByUserId(String userId) {
+		List<AnonymizedPhotoObjects> targetPhotoObjects = loadPhotoObjectsByUserId(userId);
 		int anonymizedCount = jdbcTemplate.update(
 			"""
 				UPDATE facility_reports
@@ -608,7 +610,7 @@ public class JdbcFacilityReportRepository implements
 			DELETED_DESCRIPTION,
 			userId
 		);
-		deletePendingAnonymizedPhotoObjects();
+		deletePendingPhotoObjects(targetPhotoObjects);
 		return anonymizedCount;
 	}
 
@@ -661,6 +663,8 @@ public class JdbcFacilityReportRepository implements
 				FROM facility_reports
 				WHERE user_id = ?
 					AND (photo_object_key IS NOT NULL OR photo_thumbnail_object_key IS NOT NULL)
+				ORDER BY created_at ASC, report_id ASC
+				LIMIT ?
 				""",
 			resultSet -> {
 				ArrayList<AnonymizedPhotoObjects> objects = new ArrayList<>();
@@ -673,8 +677,33 @@ public class JdbcFacilityReportRepository implements
 				}
 				return List.copyOf(objects);
 			},
-			FacilityReport.ANONYMIZED_USER_ID
+			FacilityReport.ANONYMIZED_USER_ID,
+			PHOTO_DELETION_RETRY_BATCH_SIZE
 		);
+		deletePendingPhotoObjects(pendingObjects);
+	}
+
+	private List<AnonymizedPhotoObjects> loadPhotoObjectsByUserId(String userId) {
+		return jdbcTemplate.query(
+			"""
+				SELECT report_id,
+					photo_object_key,
+					photo_thumbnail_object_key
+				FROM facility_reports
+				WHERE user_id = ?
+					AND (photo_object_key IS NOT NULL OR photo_thumbnail_object_key IS NOT NULL)
+				ORDER BY created_at ASC, report_id ASC
+				""",
+			(resultSet, rowNumber) -> new AnonymizedPhotoObjects(
+				resultSet.getString("report_id"),
+				resultSet.getString("photo_object_key"),
+				resultSet.getString("photo_thumbnail_object_key")
+			),
+			userId
+		);
+	}
+
+	private void deletePendingPhotoObjects(List<AnonymizedPhotoObjects> pendingObjects) {
 		for (AnonymizedPhotoObjects objects : pendingObjects) {
 			tryDeletePendingPhotoObject(
 				() -> deletePrimaryPhotoObject(objects.reportId(), objects.primaryObjectKey()),

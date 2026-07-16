@@ -20,6 +20,7 @@ public class FacilityReportPersonalDataPurgeScheduler {
 	private static final Logger log = LoggerFactory.getLogger(FacilityReportPersonalDataPurgeScheduler.class);
 	private static final long DEFAULT_PURGE_INTERVAL_MILLIS = 86_400_000L;
 	private static final Duration PURGE_SAFETY_MARGIN = Duration.ofDays(7);
+	private static final int MIN_RETENTION_DAYS = 8;
 	private static final int MAX_RETENTION_DAYS = 365;
 
 	private final PurgeFacilityReportPersonalDataPort purgePort;
@@ -39,8 +40,8 @@ public class FacilityReportPersonalDataPurgeScheduler {
 		Clock clock,
 		int retentionDays
 	) {
-		if (retentionDays < 1 || retentionDays > MAX_RETENTION_DAYS) {
-			throw new IllegalArgumentException("Facility report personal data retention days must be between 1 and 365");
+		if (retentionDays < MIN_RETENTION_DAYS || retentionDays > MAX_RETENTION_DAYS) {
+			throw new IllegalArgumentException("Facility report personal data retention days must be between 8 and 365");
 		}
 		this.purgePort = purgePort;
 		this.clock = clock;

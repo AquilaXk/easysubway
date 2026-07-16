@@ -55,8 +55,8 @@ class FacilityReportPersonalDataPurgeSchedulerTest {
 	}
 
 	@Test
-	@DisplayName("하루 보관 설정에서도 아직 만료되지 않은 신규 신고는 파기하지 않는다")
-	void limitsSafetyMarginBelowRetentionPeriod() {
+	@DisplayName("최소 8일 보관 설정은 일일 실행 지연을 보정할 하루의 파기 경계를 남긴다")
+	void keepsOneDayBoundaryAtMinimumRetentionPeriod() {
 		Instant now = Instant.parse("2026-07-16T12:00:00Z");
 		AtomicReference<LocalDateTime> cutoff = new AtomicReference<>();
 		var scheduler = new FacilityReportPersonalDataPurgeScheduler(
@@ -65,7 +65,7 @@ class FacilityReportPersonalDataPurgeSchedulerTest {
 				return 0;
 			},
 			Clock.fixed(now, ZoneOffset.UTC),
-			1
+			8
 		);
 
 		scheduler.purgeExpiredPersonalData();
@@ -74,12 +74,12 @@ class FacilityReportPersonalDataPurgeSchedulerTest {
 	}
 
 	@Test
-	@DisplayName("보관 기간은 하루 이상이어야 한다")
+	@DisplayName("보관 기간은 일일 실행과 7일 안전 여유를 적용할 수 있는 8일 이상이어야 한다")
 	void rejectsInvalidRetentionDays() {
 		assertThatThrownBy(() -> new FacilityReportPersonalDataPurgeScheduler(
 			cutoff -> 0,
 			Clock.systemUTC(),
-			0
+			7
 		)).isInstanceOf(IllegalArgumentException.class);
 	}
 

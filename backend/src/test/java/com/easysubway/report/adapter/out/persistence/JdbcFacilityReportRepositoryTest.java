@@ -328,6 +328,28 @@ class JdbcFacilityReportRepositoryTest {
 	}
 
 	@Test
+	@DisplayName("사용자 데이터 삭제는 다른 사용자의 과거 사진 삭제 backlog를 동기 재시도하지 않는다")
+	void anonymizeFacilityReportsByUserIdDeletesOnlyTargetUserPhotoObjects() {
+		var targetReport = submittedReport("report-target", "anonymous-user-1", 8);
+		var backlogReport = submittedReport("report-backlog", "anonymous-user-2", 8);
+		repository.saveReport(targetReport);
+		repository.saveReport(backlogReport);
+		jdbcTemplate.update(
+			"UPDATE facility_reports SET user_id = ? WHERE report_id = ?",
+			FacilityReport.ANONYMIZED_USER_ID,
+			backlogReport.id()
+		);
+		var deletedPhotoObjectKeys = new ArrayList<String>();
+		repository = new JdbcFacilityReportRepository(jdbcTemplate, deletedPhotoObjectKeys::add);
+
+		repository.anonymizeFacilityReportsByUserId("anonymous-user-1");
+
+		assertThat(deletedPhotoObjectKeys).containsExactly(targetReport.photoObjectKey());
+		assertThat(repository.loadReport(backlogReport.id()).orElseThrow().photoObjectKey())
+			.isEqualTo(backlogReport.photoObjectKey());
+	}
+
+	@Test
 	@DisplayName("사용자 데이터 삭제 요청은 검수 완료 신고의 검수 정보를 유지한다")
 	void anonymizeFacilityReportsByUserIdKeepsReviewedReportMetadata() {
 		repository.saveReport(submittedReport("report-0", "anonymous-user-2", 8));

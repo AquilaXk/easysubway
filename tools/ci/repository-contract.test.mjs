@@ -10953,6 +10953,14 @@ test("민감정보 백업 보존 작업은 일일 실행 지연을 포함해 30�
   assert.throws(
     () => execFileSync(
       process.execPath,
+      [pruneScript, "--root", path.join(backupRoot, "missing"), "--retention-days", "30"],
+      { cwd: root, encoding: "utf8", stdio: "pipe" },
+    ),
+    /ENOENT/,
+  );
+  assert.throws(
+    () => execFileSync(
+      process.execPath,
       [pruneScript, "--root", backupRoot, "--retention-days", "366"],
       { cwd: root, encoding: "utf8", stdio: "pipe" },
     ),
@@ -12733,6 +12741,7 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(read(purgePersonalDataSchedulerPath), /personal-data-retention-days:365/);
   assert.match(read(purgePersonalDataSchedulerPath), /DEFAULT_PURGE_INTERVAL_MILLIS = 86_400_000L/);
   assert.match(read(purgePersonalDataSchedulerPath), /PURGE_SAFETY_MARGIN = Duration\.ofDays\(7\)/);
+  assert.match(read(purgePersonalDataSchedulerPath), /MIN_RETENTION_DAYS = 8/);
   assert.match(
     read(purgePersonalDataSchedulerPath),
     /@Scheduled\([\s\S]*fixedRate = DEFAULT_PURGE_INTERVAL_MILLIS,[\s\S]*scheduler = "facilityReportPersonalDataPurgeTaskScheduler"[\s\S]*\)/,
@@ -12775,6 +12784,10 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(jdbcRepository, /FacilityReport saveReport\(FacilityReport report\)/);
   assert.match(jdbcRepository, /int anonymizeFacilityReportsByUserId\(String userId\)/);
   assert.match(jdbcRepository, /int purgePersonalDataCreatedBefore\(LocalDateTime cutoff\)/);
+  assert.match(
+    jdbcRepository,
+    /PHOTO_DELETION_RETRY_BATCH_SIZE = 100[\s\S]*deletePendingAnonymizedPhotoObjects[\s\S]*LIMIT \?/,
+  );
   assert.match(jdbcRepository, /ON CONFLICT \(report_id\) DO UPDATE/);
   assert.match(jdbcRepository, /FacilityReport\.ANONYMIZED_USER_ID/);
   assert.doesNotMatch(jdbcRepository, /photo_data_base64 = NULL/);

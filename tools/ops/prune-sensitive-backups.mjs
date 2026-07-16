@@ -42,12 +42,12 @@ function backupCreatedAt(name, pattern) {
   return createdAt;
 }
 
-async function pruneDirectory(directory) {
+async function pruneDirectory(directory, required = false) {
   let entries;
   try {
     entries = await opendir(directory);
   } catch (error) {
-    if (error?.code === "ENOENT") {
+    if (error?.code === "ENOENT" && !required) {
       return;
     }
     throw error;
@@ -75,5 +75,5 @@ async function pruneDirectory(directory) {
   }
 }
 
-await pruneDirectory(root);
+await pruneDirectory(root, true);
 console.log(`sensitive-backup-retention: pruned=${pruned} retention_days=${retentionDays}`);
