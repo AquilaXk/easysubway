@@ -64,6 +64,8 @@ class DatapackReleaseCallbackApiControllerTest {
             "DELETE FROM datapack_release_request WHERE approval_id = ?", APPROVAL_ID);
 		when(releaseCatalog.fetchCurrent(CHANNEL)).thenReturn(new CatalogIdentity(
 			RELEASE_SEQUENCE, SHA1, CHANNEL, APPROVAL_ID, true, SHA4));
+		when(releaseCatalog.findByRequest(CHANNEL, APPROVAL_ID)).thenReturn(java.util.Optional.of(
+			new CatalogIdentity(RELEASE_SEQUENCE, SHA1, CHANNEL, APPROVAL_ID, true, SHA4)));
     }
 
     private void insertDispatched(String approvalId) {
