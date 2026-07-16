@@ -63,6 +63,15 @@ test("production timetable evidence는 exact deploy에서 cache와 격리 rollba
   assert.match(script, /curl[^\n]+"\$\{cache_base_url\}/);
   assert.doesNotMatch(script, /docker exec[^\n]+"\$\{cache_app\}"[^\n]+curl/);
   assert.match(application, /@ConditionalOnProperty\([\s\S]*prefix = "easysubway\.scheduling"[\s\S]*matchIfMissing = true[\s\S]*@EnableScheduling/);
+  assert.match(script, /pg_database_size\(current_database\(\)\)/);
+  assert.match(script, /docker info --format '\{\{\.DockerRootDir\}\}'/);
+  assert.match(script, /df -Pk/);
+  assert.match(script, /database_size_bytes \* 4 \+ 2147483648/);
+  assert.match(script, /dump_available_bytes[\s\S]*docker_available_bytes/);
+  const capacityPreflight = script.indexOf('database_size_bytes="$(production_psql');
+  assert.ok(capacityPreflight > 0);
+  assert.ok(capacityPreflight < script.indexOf("pg_dump --format=custom"));
+  assert.ok(capacityPreflight < script.indexOf('docker volume create "${volume}"'));
   assert.match(script, /pg_dump --format=custom/);
   assert.match(script, /pg_restore --clean --if-exists --no-owner --no-privileges/);
   assert.match(script, /issue_2145_reject_trip/);

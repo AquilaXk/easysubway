@@ -220,6 +220,27 @@ deleted_session_count="$(production_psql "WITH deleted AS (DELETE FROM route_v2_
 [[ "${deleted_session_count}" == 2 ]] || { echo 'controlled timetable sessions were not deleted exactly' >&2; exit 1; }
 sessions_created=false
 
+available_bytes() {
+	local path="${1:?filesystem path is required}"
+	local available_kib
+	available_kib="$(df -Pk "${path}" | awk 'NR == 2 { print $4 }')"
+	[[ "${available_kib}" =~ ^[0-9]+$ ]] || { echo 'filesystem available capacity is invalid' >&2; exit 1; }
+	printf '%s\n' "$((available_kib * 1024))"
+}
+
+database_size_bytes="$(production_psql 'SELECT pg_database_size(current_database());')"
+[[ "${database_size_bytes}" =~ ^[1-9][0-9]*$ ]] || { echo 'production database size is invalid' >&2; exit 1; }
+required_copy_bytes="$((database_size_bytes * 4 + 2147483648))"
+docker_root_dir="$(docker info --format '{{.DockerRootDir}}')"
+[[ "${docker_root_dir}" =~ ^/[A-Za-z0-9._/-]+$ && "${docker_root_dir}" != *..* && -d "${docker_root_dir}" ]] \
+	|| { echo 'Docker data root is invalid' >&2; exit 1; }
+dump_available_bytes="$(available_bytes "${work_dir}")"
+docker_available_bytes="$(available_bytes "${docker_root_dir}")"
+if (( dump_available_bytes < required_copy_bytes || docker_available_bytes < required_copy_bytes )); then
+	echo 'insufficient capacity for production dump and isolated restore' >&2
+	exit 1
+fi
+
 backup_file="${work_dir}/production.dump"
 docker exec easysubway-postgres sh -lc \
 	'pg_dump --format=custom --no-owner --no-privileges -U "$POSTGRES_USER" "$POSTGRES_DB"' > "${backup_file}"
