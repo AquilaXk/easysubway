@@ -1,12 +1,16 @@
 import 'package:easysubway_mobile/facility_report.dart';
+import 'package:easysubway_mobile/features/mobility_profile/mobility_profile_policy.dart';
 import 'package:easysubway_mobile/features/route_draft/domain/route_draft.dart';
 import 'package:easysubway_mobile/features/stations/domain/station_line.dart';
 import 'package:easysubway_mobile/features/stations/domain/station_models.dart';
 import 'package:easysubway_mobile/features/stations/domain/station_repositories.dart';
 import 'package:easysubway_mobile/features/stations/presentation/station_search_screen.dart';
+import 'package:easysubway_mobile/onboarding.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../../support/easy_subway_app_fixture.dart';
 
 void main() {
   testWidgets('#2083 역 검색 화면은 홈 편집 모드와 같은 46px 시각 박스·중앙 정렬 입력 필드를 렌더한다', (
@@ -231,6 +235,38 @@ void main() {
     // 출발역 맥락이 새어 나오지 않는다.
     expect(find.bySemanticsLabel('출발역'), findsNothing);
     handle.dispose();
+  });
+
+  testWidgets('앱 메뉴 검색 진입은 최근 검색 저장소를 화면에 전달한다', (tester) async {
+    final searchHistoryRepository = _MemorySearchHistoryRepository(['상록수']);
+
+    await tester.pumpWidget(
+      buildEasySubwayTestApp(
+        repository: _EmptyStationSearchRepository(),
+        reportRepository: const UnavailableFacilityReportRepository(),
+        searchHistoryRepository: searchHistoryRepository,
+        locationProvider: const _FixedCurrentLocationProvider(),
+        initialOnboardingState: const OnboardingState.completed(
+          result: OnboardingResult(
+            preset: MobilityPreset.standard,
+            preferences: OnboardingViewPreferences.defaults(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('networkMapMenuStationSearchButton')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('stationRecentSearchQuery-상록수')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('역 검색 화면은 최근 검색어를 탭해 빠르게 다시 검색한다', (tester) async {
