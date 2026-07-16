@@ -98,6 +98,13 @@ test("production request identity는 manifest 밖의 서명된 immutable binding
   )?.[0];
   assert.ok(buildStep, "data pack build 스텝을 찾지 못함");
   assert.doesNotMatch(buildStep, /--release-request-id/);
+  const finalize = yml.indexOf("Data Pack Release / Finalize published decision");
+  const publishBinding = yml.indexOf("Data Pack Release / Publish finalized release request binding");
+  const callback = yml.indexOf("Data Pack Release / Send release callback");
+  assert.ok(finalize >= 0 && publishBinding > finalize && callback > publishBinding);
+  const bindingStep = yml.slice(publishBinding, callback);
+  assert.match(bindingStep, /--only release-request-binding/);
+  assert.match(bindingStep, /--verify-only/);
 });
 
 test("coverage gap 스텝은 release 모드에서만 production provenance와 release-scope를 배선한다", () => {

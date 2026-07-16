@@ -3,8 +3,11 @@ package com.easysubway.datapack.adapter.out.catalog;
 import com.easysubway.datapack.application.port.out.DatapackReleaseCatalogPort;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.cfg.JsonNodeFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -24,7 +27,10 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class HttpDatapackReleaseCatalogAdapter implements DatapackReleaseCatalogPort {
-	private static final ObjectMapper JSON = new ObjectMapper();
+	private static final ObjectMapper JSON = JsonMapper.builder()
+		.enable(JsonNodeFeature.USE_BIG_DECIMAL_FOR_FLOATS)
+		.disable(JsonNodeFeature.STRIP_TRAILING_BIGDECIMAL_ZEROES)
+		.build();
 	private static final Duration TIMEOUT = Duration.ofSeconds(10);
 
 	private final HttpClient httpClient;
@@ -166,7 +172,18 @@ public class HttpDatapackReleaseCatalogAdapter implements DatapackReleaseCatalog
 				.map(HttpDatapackReleaseCatalogAdapter::canonicalText)
 				.collect(java.util.stream.Collectors.joining(",")) + "]";
 		}
-		return value.isTextual() ? quoted(value.textValue()) : value.toString();
+		if (value.isTextual()) return quoted(value.textValue());
+		if (value.isNumber()) return ecmascriptNumber(value.decimalValue());
+		return value.toString();
+	}
+
+	private static String ecmascriptNumber(BigDecimal value) {
+		if (value.signum() == 0) return "0";
+		var decimal = value.stripTrailingZeros();
+		var absolute = decimal.abs();
+		if (absolute.compareTo(new BigDecimal("0.000001")) >= 0
+			&& absolute.compareTo(new BigDecimal("1e21")) < 0) return decimal.toPlainString();
+		return decimal.toString().replace('E', 'e');
 	}
 
 	private static String quoted(String value) {

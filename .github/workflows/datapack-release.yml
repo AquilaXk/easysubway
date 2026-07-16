@@ -775,13 +775,6 @@ jobs:
             --root "${EASYSUBWAY_DATAPACK_STAGE}"
             --output "${EASYSUBWAY_DATAPACK_PUBLISH_PLAN}"
           )
-          if [[ "${EASYSUBWAY_DATAPACK_RELEASE_MODE}" == "production-publish" ]]; then
-            node tools/datapack/build-release-request-binding.mjs \
-              --manifest "${EASYSUBWAY_DATAPACK_STAGE}/catalog/current.json" \
-              --release-request-id "${EASYSUBWAY_DATAPACK_RELEASE_REQUEST_ID}" \
-              --output "${EASYSUBWAY_DATAPACK_RELEASE_REQUEST_BINDING}"
-            publish_plan_args+=(--release-request-binding "${EASYSUBWAY_DATAPACK_RELEASE_REQUEST_BINDING}")
-          fi
           node tools/datapack/create-publish-plan.mjs "${publish_plan_args[@]}"
           test -f "${EASYSUBWAY_DATAPACK_PUBLISH_PLAN}"
 
@@ -959,6 +952,28 @@ jobs:
           fi
           node tools/datapack/decide-datapack-release.mjs "${final_decision_args[@]}"
           node -e "const d=require(process.env.EASYSUBWAY_DATAPACK_FINAL_RELEASE_DECISION); if (d.outcome !== 'PUBLISHED_AND_VERIFIED') process.exit(1);"
+
+      - name: Data Pack Release / Publish finalized release request binding
+        if: ${{ !cancelled() && steps.final-release-decision.outputs.outcome == 'PUBLISHED_AND_VERIFIED' }}
+        run: |
+          set -euo pipefail
+          node tools/datapack/build-release-request-binding.mjs \
+            --manifest "${EASYSUBWAY_DATAPACK_STAGE}/catalog/current.json" \
+            --release-request-id "${EASYSUBWAY_DATAPACK_RELEASE_REQUEST_ID}" \
+            --output "${EASYSUBWAY_DATAPACK_RELEASE_REQUEST_BINDING}"
+          node tools/datapack/create-publish-plan.mjs \
+            --manifest "${EASYSUBWAY_DATAPACK_STAGE}/catalog/current.json" \
+            --root "${EASYSUBWAY_DATAPACK_STAGE}" \
+            --output "${EASYSUBWAY_DATAPACK_PUBLISH_PLAN}" \
+            --release-request-binding "${EASYSUBWAY_DATAPACK_RELEASE_REQUEST_BINDING}" \
+            --only release-request-binding
+          node tools/datapack/publish-object-storage.mjs \
+            --plan "${EASYSUBWAY_DATAPACK_PUBLISH_PLAN}" \
+            --root "${EASYSUBWAY_DATAPACK_STAGE}"
+          node tools/datapack/publish-object-storage.mjs \
+            --plan "${EASYSUBWAY_DATAPACK_PUBLISH_PLAN}" \
+            --root "${EASYSUBWAY_DATAPACK_STAGE}" \
+            --verify-only
 
       - name: Data Pack Release / Send release callback
         if: ${{ !cancelled() && steps.final-release-decision.outputs.outcome != '' }}

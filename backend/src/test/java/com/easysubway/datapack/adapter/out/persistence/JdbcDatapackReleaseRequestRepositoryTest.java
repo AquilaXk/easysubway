@@ -59,4 +59,23 @@ class JdbcDatapackReleaseRequestRepositoryTest {
 	void emptyWhenMissing() {
 		assertThat(repository.findByApprovalId("nope")).isEmpty();
 	}
+
+	@Test
+	@DisplayName("reconciliation 후보는 bounded batch이며 defer 후 10분 동안 제외된다")
+	void boundsAndDefersReconciliationCandidates() {
+		for (int index = 0; index < 3; index++) {
+			repository.save(DatapackReleaseRequest.requested(
+				"appr-" + index, "cand-" + index, "scope-1", "production",
+				SHA, SHA, SHA, "alice", T0).approve("bob", T0));
+		}
+
+		var due = repository.findReconciliationDue(T0.plusMinutes(10), T0.plusMinutes(10), 2);
+		assertThat(due).hasSize(2);
+
+		repository.deferReconciliation(due.getFirst().approvalId(), T0.plusMinutes(20));
+
+		assertThat(repository.findReconciliationDue(T0.plusMinutes(10), T0.plusMinutes(10), 3))
+			.extracting(DatapackReleaseRequest::approvalId)
+			.doesNotContain(due.getFirst().approvalId());
+	}
 }

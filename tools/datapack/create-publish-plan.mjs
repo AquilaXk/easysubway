@@ -12,6 +12,25 @@ async function main() {
   const manifest = JSON.parse(manifestBytes.toString("utf8"));
   validateManifestShape(manifest);
 
+  const only = args.get("only");
+  if (only) {
+    if (only !== "release-request-binding" || !args.has("release-request-binding")) {
+      throw new Error("--only release-request-binding requires --release-request-binding");
+    }
+    const plan = {
+      schemaVersion: 3,
+      mode: "object-storage-preflight",
+      manifestObjectKey: "catalog/current.json",
+      steps: await releaseRequestBindingSteps(args, root, manifest, manifestBytes),
+    };
+    await mkdir(path.dirname(outputPath), { recursive: true });
+    await writeFile(outputPath, `${JSON.stringify(plan, null, 2)}\n`);
+    return;
+  }
+  if (args.has("release-request-binding")) {
+    throw new Error("release request binding requires --only release-request-binding after final validation");
+  }
+
   const packPlans = [];
   for (const pack of manifest.packs) {
     const stagedPath = stagedPackPathForUrl(pack);
@@ -42,34 +61,6 @@ async function main() {
     ? manifestBytes
     : await readFile(currentManifestPath);
 
-  const releaseRequestBindingSteps = [];
-  if (args.has("release-request-binding")) {
-    const bindingPath = path.resolve(args.get("release-request-binding"));
-    const bindingBytes = await readFile(bindingPath);
-    const binding = JSON.parse(bindingBytes.toString("utf8"));
-    validateReleaseRequestBinding(binding, manifest, manifestBytes);
-    const sourcePath = safeRelativeObjectPath(path.relative(root, bindingPath), "release request binding path");
-    const requestHash = sha256(Buffer.from(binding.releaseRequestId, "utf8"));
-    const objectKey = `catalog/release-requests/${requestHash}.json`;
-    releaseRequestBindingSteps.push(
-      {
-        type: "put-release-request-binding-object",
-        sourcePath,
-        objectKey,
-        sha256: sha256(bindingBytes),
-        sizeBytes: bindingBytes.length,
-        immutable: true,
-      },
-      {
-        type: "verify-release-request-binding-object",
-        objectKey,
-        sha256: sha256(bindingBytes),
-        sizeBytes: bindingBytes.length,
-        immutable: true,
-      },
-    );
-  }
-
   const releaseSequence = manifest.releaseSequence;
   const includeReleaseManifest = Number.isInteger(releaseSequence) && releaseSequence >= 1;
   const releaseSteps = includeReleaseManifest
@@ -94,10 +85,8 @@ async function main() {
       ]
     : [];
 
-  let schemaVersion = includeReleaseManifest ? 2 : 1;
-  if (releaseRequestBindingSteps.length > 0) schemaVersion = 3;
   const plan = {
-    schemaVersion,
+    schemaVersion: includeReleaseManifest ? 2 : 1,
     mode: "object-storage-preflight",
     manifestObjectKey: "catalog/current.json",
     steps: [
@@ -111,7 +100,6 @@ async function main() {
         sizeBytes: packPlan.sizeBytes,
       })),
       ...releaseSteps,
-      ...releaseRequestBindingSteps,
       {
         type: "put-manifest-object",
         sourcePath: "catalog/current.json",
@@ -132,6 +120,32 @@ async function main() {
 
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(plan, null, 2)}\n`);
+}
+
+async function releaseRequestBindingSteps(args, root, manifest, manifestBytes) {
+  const bindingPath = path.resolve(args.get("release-request-binding"));
+  const bindingBytes = await readFile(bindingPath);
+  const binding = JSON.parse(bindingBytes.toString("utf8"));
+  validateReleaseRequestBinding(binding, manifest, manifestBytes);
+  const sourcePath = safeRelativeObjectPath(path.relative(root, bindingPath), "release request binding path");
+  const objectKey = `catalog/release-requests/${sha256(Buffer.from(binding.releaseRequestId, "utf8"))}.json`;
+  return [
+    {
+      type: "put-release-request-binding-object",
+      sourcePath,
+      objectKey,
+      sha256: sha256(bindingBytes),
+      sizeBytes: bindingBytes.length,
+      immutable: true,
+    },
+    {
+      type: "verify-release-request-binding-object",
+      objectKey,
+      sha256: sha256(bindingBytes),
+      sizeBytes: bindingBytes.length,
+      immutable: true,
+    },
+  ];
 }
 
 function validateReleaseRequestBinding(binding, manifest, manifestBytes) {

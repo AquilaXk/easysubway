@@ -14,11 +14,15 @@ public interface DatapackReleaseRequestRepository {
 
 	List<DatapackReleaseRequest> findRecent(int limit);
 
-	default List<DatapackReleaseRequest> findReconciliationDue(LocalDateTime cutoff) {
-		return findRecent(Integer.MAX_VALUE).stream()
+	default List<DatapackReleaseRequest> findReconciliationDue(
+		LocalDateTime cutoff, LocalDateTime now, int limit) {
+		return findRecent(limit).stream()
 			.filter(request -> request.status() == DatapackReleaseRequestStatus.APPROVED
 				|| request.status() == DatapackReleaseRequestStatus.DISPATCHED)
 			.filter(request -> !request.updatedAt().isAfter(cutoff))
 			.toList();
+	}
+
+	default void deferReconciliation(String approvalId, LocalDateTime nextEligibleAt) {
 	}
 }

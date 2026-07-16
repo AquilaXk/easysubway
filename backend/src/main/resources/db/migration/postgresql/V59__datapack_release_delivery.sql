@@ -30,3 +30,8 @@ CREATE INDEX idx_datapack_release_delivery_due
     ON datapack_release_deliveries (state, next_attempt_at, claimed_at);
 CREATE INDEX idx_datapack_release_delivery_channel_state
     ON datapack_release_deliveries (channel, state);
+
+ALTER TABLE datapack_release_request
+    ADD COLUMN reconciliation_next_attempt_at TIMESTAMP;
+CREATE INDEX idx_datapack_release_request_reconciliation_due
+    ON datapack_release_request (status, reconciliation_next_attempt_at, updated_at);

@@ -44,7 +44,7 @@ test("release request binding은 manifest identity를 변경하지 않고 요청
   assert.equal(JSON.parse(manifestBytes).releaseRequestId, undefined);
 });
 
-test("publish plan은 request binding을 current pointer보다 먼저 immutable 게시한다", async () => {
+test("최종 검증 뒤 binding-only plan이 request identity를 immutable 게시한다", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "datapack-request-binding-"));
   await mkdir(path.join(root, "catalog"), { recursive: true });
   const packBytes = Buffer.from("pack");
@@ -83,12 +83,16 @@ test("publish plan은 request binding을 current pointer보다 먼저 immutable 
     "--root", root,
     "--output", planPath,
     "--release-request-binding", bindingPath,
+    "--only", "release-request-binding",
   ]);
   const plan = JSON.parse(await readFile(planPath, "utf8"));
   const bindingPut = plan.steps.findIndex((step) => step.type === "put-release-request-binding-object");
-  const currentPut = plan.steps.findIndex((step) => step.type === "put-manifest-object");
   assert.equal(plan.schemaVersion, 3);
-  assert.ok(bindingPut >= 0 && bindingPut < currentPut);
+  assert.equal(bindingPut, 0);
+  assert.deepEqual(plan.steps.map((step) => step.type), [
+    "put-release-request-binding-object",
+    "verify-release-request-binding-object",
+  ]);
   assert.match(plan.steps[bindingPut].objectKey, /^catalog\/release-requests\/[a-f0-9]{64}\.json$/);
 
   await execFileAsync(process.execPath, [

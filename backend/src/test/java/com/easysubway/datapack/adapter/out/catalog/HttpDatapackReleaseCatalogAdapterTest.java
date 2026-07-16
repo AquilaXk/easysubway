@@ -18,6 +18,17 @@ class HttpDatapackReleaseCatalogAdapterTest {
 	private static final ObjectMapper JSON = new ObjectMapper();
 
 	@Test
+	void canonicalNumbersMatchEcmascriptJsonStringify() throws Exception {
+		var value = JSON.readTree("""
+			{"plainSmall":0.0001,"scientificSmall":0.0000001,"plainLarge":100000000000000000000,"scientificLarge":1e21,"negativeZero":-0.0}
+			""");
+
+		assertThat(new String(HttpDatapackReleaseCatalogAdapter.canonical(value), StandardCharsets.UTF_8))
+			.isEqualTo("{\"negativeZero\":0,\"plainLarge\":100000000000000000000,\"plainSmall\":0.0001,"
+				+ "\"scientificLarge\":1e+21,\"scientificSmall\":1e-7}");
+	}
+
+	@Test
 	void fetchCurrentFailsClosedWithoutConfiguredTrustMaterial() {
 		var adapter = new HttpDatapackReleaseCatalogAdapter("", "", "production-v1");
 		assertThatThrownBy(() -> adapter.fetchCurrent("production"))

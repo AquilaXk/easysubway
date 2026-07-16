@@ -111,7 +111,7 @@ class DatapackReleaseReconciliationServiceTest {
 			"b".repeat(64), "c".repeat(64), "d".repeat(64), "requester", T0)
 			.approve("approver", T0)
 			.markDispatched("https://github.com/run/42", "dispatch-42", T0);
-		when(requests.findReconciliationDue(T0)).thenReturn(java.util.List.of(dispatched));
+		when(requests.findReconciliationDue(T0, T0.plusMinutes(10), 100)).thenReturn(java.util.List.of(dispatched));
 		when(channels.candidateHasManifest("candidate-2057", SHA)).thenReturn(true);
 		when(catalog.findByRequest("production", "request-2057"))
 			.thenReturn(java.util.Optional.of(
@@ -125,6 +125,7 @@ class DatapackReleaseReconciliationServiceTest {
 			delivery.releaseRequestId().equals("request-2057")
 				&& delivery.releaseSequence() == 42
 				&& delivery.manifestSha256().equals(SHA)));
+		verify(requests).deferReconciliation("request-2057", T0.plusMinutes(20));
 	}
 
 	@Test
@@ -137,7 +138,7 @@ class DatapackReleaseReconciliationServiceTest {
 			"b".repeat(64), "c".repeat(64), "d".repeat(64), "requester", T0)
 			.approve("approver", T0)
 			.markDispatched("https://github.com/run/42", "dispatch-42", T0);
-		when(requests.findReconciliationDue(T0)).thenReturn(java.util.List.of(dispatched));
+		when(requests.findReconciliationDue(T0, T0.plusMinutes(10), 100)).thenReturn(java.util.List.of(dispatched));
 		when(catalog.findByRequest("production", "request-2057"))
 			.thenReturn(java.util.Optional.of(
 				new CatalogIdentity(42, SHA, "production", "another-request", true, "b".repeat(64))));
@@ -159,7 +160,7 @@ class DatapackReleaseReconciliationServiceTest {
 			"b".repeat(64), "c".repeat(64), "d".repeat(64), "requester", T0)
 			.approve("approver", T0)
 			.markDispatched("https://github.com/run/42", "dispatch-42", T0);
-		when(requests.findReconciliationDue(T0)).thenReturn(java.util.List.of(dispatched));
+		when(requests.findReconciliationDue(T0, T0.plusMinutes(10), 100)).thenReturn(java.util.List.of(dispatched));
 		when(channels.candidateHasManifest("candidate-2057", SHA)).thenReturn(true);
 		when(catalog.findByRequest("production", "request-2057"))
 			.thenReturn(java.util.Optional.of(
@@ -185,7 +186,7 @@ class DatapackReleaseReconciliationServiceTest {
 			"request-2057", "candidate-2057", "scope", "production",
 			"b".repeat(64), "c".repeat(64), "d".repeat(64), "requester", T0)
 			.approve("approver", T0);
-		when(requests.findReconciliationDue(T0)).thenReturn(java.util.List.of(approved));
+		when(requests.findReconciliationDue(T0, T0.plusMinutes(10), 100)).thenReturn(java.util.List.of(approved));
 		when(channels.candidateHasManifest("candidate-2057", SHA)).thenReturn(true);
 		when(catalog.findByRequest("production", "request-2057"))
 			.thenReturn(java.util.Optional.of(

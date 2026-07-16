@@ -78,12 +78,23 @@ public class JdbcDatapackReleaseRequestRepository implements DatapackReleaseRequ
 	}
 
 	@Override
-	public List<DatapackReleaseRequest> findReconciliationDue(LocalDateTime cutoff) {
+	public List<DatapackReleaseRequest> findReconciliationDue(
+		LocalDateTime cutoff, LocalDateTime now, int limit) {
 		return jdbcTemplate.query("""
 			SELECT * FROM datapack_release_request
 			WHERE status IN ('APPROVED', 'DISPATCHED') AND updated_at <= ?
-			ORDER BY updated_at, approval_id
-			""", ROW_MAPPER, toTs(cutoff));
+			  AND (reconciliation_next_attempt_at IS NULL OR reconciliation_next_attempt_at <= ?)
+			ORDER BY COALESCE(reconciliation_next_attempt_at, updated_at), approval_id
+			LIMIT ?
+			""", ROW_MAPPER, toTs(cutoff), toTs(now), limit);
+	}
+
+	@Override
+	public void deferReconciliation(String approvalId, LocalDateTime nextEligibleAt) {
+		jdbcTemplate.update("""
+			UPDATE datapack_release_request SET reconciliation_next_attempt_at = ?
+			WHERE approval_id = ? AND status IN ('APPROVED', 'DISPATCHED')
+			""", toTs(nextEligibleAt), approvalId);
 	}
 
 	private static Timestamp toTs(LocalDateTime v) {
