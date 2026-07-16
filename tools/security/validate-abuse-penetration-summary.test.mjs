@@ -53,6 +53,7 @@ function schemaV2Pass(gateValue = gate, withDisposition = true) {
         procedureId: `${matrixId}.${caseId}`, targetAlias: `target.${matrixId}`,
         expectedStatus: matrix.expectedStatusByCase[caseId][0], observedStatus: matrix.expectedStatusByCase[caseId][0],
         redactionResult: "PASS", localEvidencePath: schemaV2EvidencePath,
+        artifactIdentitySha256: schemaV2IdentitySha256(),
       })),
     })),
   });
@@ -126,6 +127,17 @@ test("A RED v2 PASS evidence is bound to the root artifact identity", () => {
     (error) => error.code === "SUMMARY_IDENTITY_INVALID" && error.rule === "root-git-sha-path",
   );
 });
+test("A RED v2 matrix cases are bound to the complete root artifact identity", () => {
+  const summary = schemaV2Pass();
+  assert.equal(schemaV2Validate(summary).ok, true);
+  summary.matrices[0].cases[0].artifactIdentitySha256 = "0".repeat(64);
+  assert.throws(
+    () => validateAbusePenetrationSummary(summary, gate, true),
+    (error) => error.code === "SUMMARY_IDENTITY_INVALID" &&
+      error.path.endsWith(".artifactIdentitySha256") &&
+      error.rule === "root-artifact-identity-digest",
+  );
+});
 test("A RED direct schema rejects every missing required and extra field", () => {
   const requiredByKind = {
     root: ["schemaVersion", "releaseGate", "issue", "status", "rawInvocationStored", "redactionPolicyId"],
@@ -133,7 +145,7 @@ test("A RED direct schema rejects every missing required and extra field", () =>
     evidence: ["evidenceId", "result", "localEvidencePath"], matrix: ["matrixId", "result", "findingCounts", "cases"],
     findingCounts: ["critical", "high", "medium", "low"],
     mediumFindingDisposition: ["ownerAlias", "fixPlanEvidencePath"],
-    case: ["procedureId", "targetAlias", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"],
+    case: ["procedureId", "targetAlias", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath", "artifactIdentitySha256"],
   };
   for (const [kind, fields] of Object.entries(requiredByKind)) {
     for (const field of fields) {
@@ -247,6 +259,9 @@ function freshV2Pass(gateValue = gate) { return structuredClone(schemaV2Pass(gat
 function rebindEvidenceToIdentity(summary) {
   const digest = schemaV2IdentitySha256(summary.artifactIdentity);
   for (const item of [...summary.evidence, ...summary.productionLikeEvidence]) item.artifactIdentitySha256 = digest;
+  for (const matrix of summary.matrices) {
+    for (const caseItem of matrix.cases) caseItem.artifactIdentitySha256 = digest;
+  }
 }
 function v1Minimal(status = "BLOCKED_EXTERNAL") {
   return { schemaVersion: 1, releaseGate: gate.releaseGate, issue: gate.issue, status };

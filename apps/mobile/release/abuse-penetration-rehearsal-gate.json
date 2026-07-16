@@ -25,7 +25,7 @@
       "matrix": { "matrixId": "string", "result": "string", "findingCounts": "object", "mediumFindingDisposition": "object", "cases": "array" },
       "findingCounts": { "critical": "integer", "high": "integer", "medium": "integer", "low": "integer" },
       "mediumFindingDisposition": { "ownerAlias": "string", "fixPlanEvidencePath": "string" },
-      "case": { "procedureId": "string", "targetAlias": "string", "expectedStatus": "integer", "observedStatus": "integer", "redactionResult": "string", "localEvidencePath": "string" }
+      "case": { "procedureId": "string", "targetAlias": "string", "expectedStatus": "integer", "observedStatus": "integer", "redactionResult": "string", "localEvidencePath": "string", "artifactIdentitySha256": "string" }
     },
     "requiredFields": {
       "rootForAllStatuses": ["schemaVersion", "releaseGate", "issue", "status", "rawInvocationStored", "redactionPolicyId"],
@@ -35,7 +35,7 @@
       "matrix": ["matrixId", "result", "findingCounts", "cases"],
       "findingCounts": ["critical", "high", "medium", "low"],
       "mediumFindingDisposition": ["ownerAlias", "fixPlanEvidencePath"],
-      "case": ["procedureId", "targetAlias", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"]
+      "case": ["procedureId", "targetAlias", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath", "artifactIdentitySha256"]
     },
     "fieldPatterns": {
       "artifactIdentity": {
@@ -48,6 +48,9 @@
         "backendImageDigest": "^sha256:[0-9a-f]{64}$"
       },
       "evidence": {
+        "artifactIdentitySha256": "^[0-9a-f]{64}$"
+      },
+      "case": {
         "artifactIdentitySha256": "^[0-9a-f]{64}$"
       }
     }

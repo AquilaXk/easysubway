@@ -3632,7 +3632,7 @@ test("A RED repository locks summary v2 contract and catalog", async () => {
     matrix: { matrixId: "string", result: "string", findingCounts: "object", mediumFindingDisposition: "object", cases: "array" },
     findingCounts: { critical: "integer", high: "integer", medium: "integer", low: "integer" },
     mediumFindingDisposition: { ownerAlias: "string", fixPlanEvidencePath: "string" },
-    case: { procedureId: "string", targetAlias: "string", expectedStatus: "integer", observedStatus: "integer", redactionResult: "string", localEvidencePath: "string" },
+    case: { procedureId: "string", targetAlias: "string", expectedStatus: "integer", observedStatus: "integer", redactionResult: "string", localEvidencePath: "string", artifactIdentitySha256: "string" },
   });
   assert.deepEqual(contract.requiredFields, {
     rootForAllStatuses: ["schemaVersion", "releaseGate", "issue", "status", "rawInvocationStored", "redactionPolicyId"],
@@ -3642,7 +3642,7 @@ test("A RED repository locks summary v2 contract and catalog", async () => {
     matrix: ["matrixId", "result", "findingCounts", "cases"],
     findingCounts: ["critical", "high", "medium", "low"],
     mediumFindingDisposition: ["ownerAlias", "fixPlanEvidencePath"],
-    case: ["procedureId", "targetAlias", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"],
+    case: ["procedureId", "targetAlias", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath", "artifactIdentitySha256"],
   });
   assert.deepEqual(contract.fieldPatterns.artifactIdentity, {
     gitSha: "^[0-9a-f]{40}$", androidApplicationId: "^com\\.easysubway\\.app$",
@@ -3651,6 +3651,7 @@ test("A RED repository locks summary v2 contract and catalog", async () => {
     backendImageDigest: "^sha256:[0-9a-f]{64}$",
   });
   assert.deepEqual(contract.fieldPatterns.evidence, { artifactIdentitySha256: "^[0-9a-f]{64}$" });
+  assert.deepEqual(contract.fieldPatterns.case, { artifactIdentitySha256: "^[0-9a-f]{64}$" });
   assert.equal(existsSync(path.join(root, "tools/security/abuse-penetration-summary-schema.mjs")), true);
   const { deriveSummaryCatalog } = await import("../security/abuse-penetration-summary-schema.mjs");
   const catalog = deriveSummaryCatalog(abusePenetrationRehearsalGate);
