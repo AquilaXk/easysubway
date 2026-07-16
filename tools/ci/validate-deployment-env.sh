@@ -63,6 +63,18 @@ is_bool_env_value() {
   esac
 }
 
+is_spring_bool_env_value() {
+  local name="$1"
+  case "$(normalized_env_value "${name}")" in
+    true|false)
+      true
+      ;;
+    *)
+      false
+      ;;
+  esac
+}
+
 is_admin_basic_auth_enabled() {
   case "$(normalized_env_value EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED)" in
     true|on|yes|1)
@@ -127,7 +139,7 @@ is_satisfied_by_runtime_fallback() {
     EASYSUBWAY_REPORT_ABUSE_STORE_MODE)
       true
       ;;
-    EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED)
+    EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED|EASYSUBWAY_TIMETABLE_SEED_ENABLED|EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX)
       true
       ;;
     EASYSUBWAY_ADMIN_REVISION)
@@ -175,6 +187,13 @@ is_required_env_satisfied() {
     SLACK_CI_WEBHOOK_URL|SLACK_RELEASE_WEBHOOK_URL|SLACK_SECURITY_WEBHOOK_URL)
       true
       ;;
+    EASYSUBWAY_TIMETABLE_SEED_ENABLED|EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX)
+      if has_env_name "${name}"; then
+        is_spring_bool_env_value "${name}"
+      else
+        is_satisfied_by_runtime_fallback "${name}"
+      fi
+      ;;
     EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED)
       if has_env_name "${name}"; then
         is_bool_env_value "${name}"
@@ -219,6 +238,18 @@ done < <(sed -nE 's/^([A-Z0-9_]+)=.*/\1/p' .env.example)
 if (( ${#missing_names[@]} > 0 )); then
   printf 'Missing required deployment env names:\n' >&2
   printf ' - %s\n' "${missing_names[@]}" >&2
+  exit 1
+fi
+
+timetable_seed_invalid_names=()
+if [[ "$(normalized_env_value EASYSUBWAY_TIMETABLE_SEED_ENABLED)" == "true" ]] \
+  && [[ "$(normalized_env_value EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX)" != "true" ]]; then
+  timetable_seed_invalid_names+=(EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX)
+fi
+
+if (( ${#timetable_seed_invalid_names[@]} > 0 )); then
+  printf 'Invalid timetable seed env values:\n' >&2
+  printf ' - %s\n' "${timetable_seed_invalid_names[@]}" >&2
   exit 1
 fi
 
