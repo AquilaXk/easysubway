@@ -5224,17 +5224,20 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
     networkCalls: 0,
   });
   assert.deepEqual(routeV2Readiness.timetableSnapshotCache, {
-    status: "BLOCKED_EXTERNAL",
-    blockedByIssue: 2145,
+    status: "SATISFIED",
+    implementedByIssue: 2145,
     requiredKey: {
       format: "snapshotSha256 + freshUntil",
       fields: ["snapshotSha256", "freshUntil"],
       sameFreshnessDifferentHashReloadRequired: true,
     },
     currentImplementation: {
-      status: "BLOCKED_EXTERNAL",
-      fields: ["timetableArtifactId", "freshUntil"],
-      gap: "snapshotSha256 is not materialized until #2145",
+      status: "SATISFIED",
+      fields: ["snapshotSha256", "freshUntil"],
+      snapshotId: "server-timetable-snapshot-37c49598955e581d",
+      snapshotSha256: "37c49598955e581d3f7e36ef4851d2a2112af7290b9200681243d9fa15e53e87",
+      freshUntil: "2026-07-20T00:00:00+09:00",
+      evidencePath: "tools/datapack/server-timetable-snapshot-evidence.json",
     },
     sharedRouteResponseCacheAllowed: false,
   });
@@ -5255,10 +5258,13 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   assert.match(routeSearchController, /header\(HttpHeaders\.CACHE_CONTROL, "private, no-store"\)/);
   assert.match(routeV2OriginGateFilter, /ORIGIN_HEADER = "X-EasySubway-Origin-Verify"/);
   assert.match(routeV2ProxyHeaders, /proxy_set_header X-EasySubway-Origin-Verify/);
-  assert.match(jdbcRouteTimetableRepository, /artifact\.id\(\) \+ ":" \+ artifact\.freshUntil\(\)/);
+  assert.match(
+    jdbcRouteTimetableRepository,
+    /artifact\.snapshotSha256\(\) \+ artifact\.freshUntil\(\)/,
+  );
   assert.match(
     jdbcRouteTimetableRepositoryTest,
-    /동일 freshness에서도 ITX artifact identity가 바뀌면 cache key가 바뀐다/,
+    /동일 freshness에서도 active snapshot SHA가 바뀌면 cache key가 바뀐다/,
   );
   assert.match(routeV2GatewayProbe, /session success response must remain private, no-store/);
   assert.match(routeV2GatewayProbe, /search success response must remain private, no-store/);

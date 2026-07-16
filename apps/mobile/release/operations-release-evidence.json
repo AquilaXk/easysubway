@@ -282,17 +282,20 @@
           "networkCalls": 0
         },
         "timetableSnapshotCache": {
-          "status": "BLOCKED_EXTERNAL",
-          "blockedByIssue": 2145,
+          "status": "SATISFIED",
+          "implementedByIssue": 2145,
           "requiredKey": {
             "format": "snapshotSha256 + freshUntil",
             "fields": ["snapshotSha256", "freshUntil"],
             "sameFreshnessDifferentHashReloadRequired": true
           },
           "currentImplementation": {
-            "status": "BLOCKED_EXTERNAL",
-            "fields": ["timetableArtifactId", "freshUntil"],
-            "gap": "snapshotSha256 is not materialized until #2145"
+            "status": "SATISFIED",
+            "fields": ["snapshotSha256", "freshUntil"],
+            "snapshotId": "server-timetable-snapshot-37c49598955e581d",
+            "snapshotSha256": "37c49598955e581d3f7e36ef4851d2a2112af7290b9200681243d9fa15e53e87",
+            "freshUntil": "2026-07-20T00:00:00+09:00",
+            "evidencePath": "tools/datapack/server-timetable-snapshot-evidence.json"
           },
           "sharedRouteResponseCacheAllowed": false
         },
