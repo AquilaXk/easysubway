@@ -67,6 +67,7 @@ test("Compose gateway는 loopback 전용 포트와 동일 origin secret을 사�
   assert.match(block, /image: nginx:/);
   assert.match(block, /user: "10001:10001"/);
   assert.match(block, /entrypoint: \["\/bin\/sh", "\/etc\/nginx\/route-v2-entrypoint\.sh"\]/);
+  assert.match(block, /command: \["nginx", "-g", "daemon off;"\]/);
   assert.match(block, /- \/tmp:rw,nosuid,nodev/);
   assert.match(block, /NGINX_ENVSUBST_OUTPUT_DIR: \/tmp\/nginx-conf\.d/);
   assert.match(block, /\.\/nginx\/nginx\.conf:\/etc\/nginx\/nginx\.conf:ro/);
