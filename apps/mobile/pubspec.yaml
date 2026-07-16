@@ -50,6 +50,8 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  integration_test:
+    sdk: flutter
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -80,6 +82,7 @@ flutter:
     - assets/datapacks/metro_map_pack/manifest.json
     - assets/datapacks/metro_map_pack/SOURCE_URLS.txt
     - assets/datapacks/metro_map_pack/SHA256SUMS.txt
+    - assets/datapacks/prelaunch/
     - assets/metro_symbols/line_badges/
 
   # An image asset can refer to one or more resolution-specific "variants", see
