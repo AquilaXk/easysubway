@@ -1,5 +1,6 @@
 import 'package:easysubway_mobile/accessible_design.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/nearby_data_source_toggle.dart';
+import 'package:easysubway_mobile/features/network_map/presentation/nearby_direction_columns.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/nearby_direction_title.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/nearby_station_line_bar.dart';
 import 'dart:ui' show Tristate;
@@ -379,6 +380,155 @@ void main() {
       expect(eta.style!.fontSize, 12);
       expect(eta.style!.fontWeight, FontWeight.w600);
       expect(eta.style!.color, EasySubwayAccessibleColors.secondaryText);
+    });
+  });
+
+  // 실시간·시간표 패널이 공유하는 열 구성 로직(#2200 QA): 열차 정보가 없어도
+  // 인접역에서 방면 제목을 유도해 두 열 스켈레톤을 유지한다.
+  group('resolveNearbyColumnSlots (#2200 QA)', () {
+    test('(a) 데이터 전무 + 인접 2개 → 좌(이전)-우(다음) 두 대시 열', () {
+      final slots = resolveNearbyColumnSlots(
+        dataTitles: const [],
+        leftName: '건대입구',
+        rightName: '한양대',
+      );
+      expect(slots.map((s) => s.title).toList(), ['건대입구 방면', '한양대 방면']);
+      expect(slots.every((s) => s.dataIndex == null), isTrue);
+    });
+
+    test('(b) 데이터 1방면 + 인접 2개 → 데이터 열 + 대시 열(포함되지 않은 인접역)', () {
+      // 라벨에 어느 인접역도 없으면 rightName을 대시 열로(오른쪽에) 배치한다.
+      final slots = resolveNearbyColumnSlots(
+        dataTitles: const ['성수 방면'],
+        leftName: '건대입구',
+        rightName: '뚝섬',
+      );
+      expect(slots.length, 2);
+      expect(slots[0].title, '성수 방면');
+      expect(slots[0].dataIndex, 0);
+      expect(slots[1].title, '뚝섬 방면');
+      expect(slots[1].dataIndex, isNull);
+    });
+
+    test('(b\') 데이터 라벨에 포함된 인접역은 대시 열에서 제외한다(contains)', () {
+      // 라벨이 rightName(뚝섬)을 포함 → 대시 열은 leftName(건대입구), 왼쪽 배치.
+      final slots = resolveNearbyColumnSlots(
+        dataTitles: const ['뚝섬 방면'],
+        leftName: '건대입구',
+        rightName: '뚝섬',
+      );
+      expect(slots.length, 2);
+      expect(slots[0].title, '건대입구 방면');
+      expect(slots[0].dataIndex, isNull);
+      expect(slots[1].title, '뚝섬 방면');
+      expect(slots[1].dataIndex, 0);
+    });
+
+    test('(b\'\') 인접역 판단 불가(모두 라벨 포함)면 rightName을 대시 열로 우선한다', () {
+      final slots = resolveNearbyColumnSlots(
+        dataTitles: const ['성수·건대입구 방면'],
+        leftName: '건대입구',
+        rightName: '성수',
+      );
+      expect(slots.length, 2);
+      expect(slots.firstWhere((s) => s.dataIndex == null).title, '성수 방면');
+    });
+
+    test('(c) 인접 1개(종착) → 한 열만(구분선 없음)', () {
+      final slots = resolveNearbyColumnSlots(
+        dataTitles: const [],
+        leftName: '건대입구',
+        rightName: null,
+      );
+      expect(slots.length, 1);
+      expect(slots.single.title, '건대입구 방면');
+      expect(slots.single.dataIndex, isNull);
+    });
+
+    test('(c\') 데이터 1방면 + 인접 0개 → 데이터 한 열만', () {
+      final slots = resolveNearbyColumnSlots(
+        dataTitles: const ['성수 방면'],
+        leftName: null,
+        rightName: null,
+      );
+      expect(slots.length, 1);
+      expect(slots.single.dataIndex, 0);
+    });
+
+    test('(d) 인접 0개 + 데이터 0개 → 빈 리스트(호출부 대시 폴백)', () {
+      final slots = resolveNearbyColumnSlots(
+        dataTitles: const [],
+        leftName: null,
+        rightName: '   ',
+      );
+      expect(slots, isEmpty);
+    });
+
+    test('(e) 데이터 2방면 → 인접역과 무관하게 기존 두 데이터 열 유지', () {
+      final slots = resolveNearbyColumnSlots(
+        dataTitles: const ['성수 방면', '신도림 방면'],
+        leftName: '건대입구',
+        rightName: '한양대',
+      );
+      expect(slots.map((s) => s.title).toList(), ['성수 방면', '신도림 방면']);
+      expect(slots.map((s) => s.dataIndex).toList(), [0, 1]);
+    });
+  });
+
+  group('NearbyPanelColumns (#2200 QA)', () {
+    Widget host(List<NearbyPanelColumn> columns) {
+      return MaterialApp(
+        home: Scaffold(
+          body: NearbyPanelColumns(columns: columns, lineColor: _line2Green),
+        ),
+      );
+    }
+
+    testWidgets('데이터 없는 두 열은 제목 + 대시 + 1개 구분선을 그린다', (tester) async {
+      await tester.pumpWidget(
+        host(const [
+          NearbyPanelColumn(title: '건대입구 방면'),
+          NearbyPanelColumn(title: '한양대 방면'),
+        ]),
+      );
+
+      expect(find.byType(NearbyDirectionTitle), findsNWidgets(2));
+      expect(find.text('-'), findsNWidgets(2));
+      expect(find.byType(VerticalDivider), findsOneWidget);
+    });
+
+    testWidgets('데이터 열 + 대시 열: 데이터 열은 도착 행, 나머지는 대시', (tester) async {
+      await tester.pumpWidget(
+        host(const [
+          NearbyPanelColumn(
+            title: '성수 방면',
+            rows: [NearbyArrivalRow(destination: '성수', eta: '약 3분')],
+          ),
+          NearbyPanelColumn(title: '뚝섬 방면'),
+        ]),
+      );
+
+      expect(find.text('성수행'), findsOneWidget);
+      expect(find.text('-'), findsOneWidget);
+      expect(find.byType(VerticalDivider), findsOneWidget);
+    });
+
+    testWidgets('한 열만 있으면 구분선을 그리지 않는다', (tester) async {
+      await tester.pumpWidget(
+        host(const [NearbyPanelColumn(title: '건대입구 방면')]),
+      );
+      expect(find.byType(VerticalDivider), findsNothing);
+      expect(find.text('-'), findsOneWidget);
+    });
+
+    testWidgets('대시 스타일은 16sp w700 #2F2F2F이다', (tester) async {
+      await tester.pumpWidget(
+        host(const [NearbyPanelColumn(title: '건대입구 방면')]),
+      );
+      final dash = tester.widget<Text>(find.text('-'));
+      expect(dash.style!.fontSize, 16);
+      expect(dash.style!.fontWeight, FontWeight.w700);
+      expect(dash.style!.color, const Color(0xFF2F2F2F));
     });
   });
 }

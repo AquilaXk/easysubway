@@ -45,6 +45,7 @@ import 'package:easysubway_mobile/legacy_credential_cleanup.dart';
 import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:easysubway_mobile/network_map.dart';
 import 'package:easysubway_mobile/search_field.dart';
+import 'package:easysubway_mobile/features/network_map/presentation/nearby_direction_title.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/structured_route_map_painter.dart';
 import 'package:easysubway_mobile/notification_settings.dart';
 import 'package:easysubway_mobile/onboarding.dart';
@@ -4853,7 +4854,11 @@ void main() {
     expect(find.bySemanticsLabel('실시간 선택됨'), findsOneWidget);
   });
 
-  testWidgets('GPS 하단 패널은 선택한 데이터가 없으면 검정 대시 하나만 보여준다', (tester) async {
+  testWidgets('GPS 하단 패널은 열차 정보가 없어도 인접역 두 방면 스켈레톤(제목+대시+구분선)을 유지한다', (
+    tester,
+  ) async {
+    // #2200 QA: 실시간/시간표 데이터가 전무해도 인접역이 둘이면 "○○ 방면" 제목
+    // 두 열 + 1×46 구분선을 유지하고, 데이터 없는 열에는 대시('-')만 그린다.
     final repository = FakeTimetableStationRepository(
       stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
       networkMapRegionNames: const ['수도권'],
@@ -4875,15 +4880,40 @@ void main() {
 
     await tester.tap(find.byKey(const Key('nearbyStationButton')));
     await tester.pumpAndSettle();
-    expect(find.text('-'), findsOneWidget);
+
+    final panel = find.byKey(const Key('networkMapNearbyStationPanel'));
     expect(
-      tester.widget<Text>(find.text('-')).style?.color,
+      find.descendant(of: panel, matching: find.byType(NearbyDirectionTitle)),
+      findsNWidgets(2),
+    );
+    expect(
+      find.descendant(of: panel, matching: find.text('-')),
+      findsNWidgets(2),
+    );
+    expect(
+      tester
+          .widget<Text>(
+            find.descendant(of: panel, matching: find.text('-')).first,
+          )
+          .style
+          ?.color,
       const Color(0xFF2F2F2F),
+    );
+    expect(
+      find.descendant(of: panel, matching: find.byType(VerticalDivider)),
+      findsOneWidget,
     );
 
     await tester.tap(find.byKey(const Key('networkMapNearbyDataSourceToggle')));
     await tester.pumpAndSettle();
-    expect(find.text('-'), findsOneWidget);
+    expect(
+      find.descendant(of: panel, matching: find.text('-')),
+      findsNWidgets(2),
+    );
+    expect(
+      find.descendant(of: panel, matching: find.byType(VerticalDivider)),
+      findsOneWidget,
+    );
   });
 
   testWidgets('GPS 탭은 지도 직접 선택을 즉시 해제하고 카메라를 유지한다', (tester) async {

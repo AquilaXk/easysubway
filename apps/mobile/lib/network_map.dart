@@ -18,6 +18,7 @@ import 'features/network_map/domain/route_map_design_space.dart';
 import 'features/network_map/domain/route_map_major_stations.dart';
 import 'features/network_map/domain/structured_route_map.dart';
 import 'features/network_map/presentation/nearby_data_source_toggle.dart';
+import 'features/network_map/presentation/nearby_direction_columns.dart';
 import 'features/network_map/presentation/nearby_direction_title.dart';
 import 'features/network_map/presentation/nearby_station_line_bar.dart';
 import 'features/network_map/presentation/route_map_transfer_marker.dart';
@@ -2750,11 +2751,18 @@ class _NetworkMapNearbySuccessList extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
           child: dataSource == _NearbyPanelDataSource.realtime
-              ? _SubwayArrivalPanel(snapshot: realtime, lineColor: lineColor)
+              ? _SubwayArrivalPanel(
+                  snapshot: realtime,
+                  lineColor: lineColor,
+                  leftName: adjacentStations.leftName,
+                  rightName: adjacentStations.rightName,
+                )
               : _SubwayTimetablePanel(
                   timetable: timetable,
                   loading: timetableLoading,
                   lineColor: lineColor,
+                  leftName: adjacentStations.leftName,
+                  rightName: adjacentStations.rightName,
                 ),
         ),
       ],
@@ -2846,106 +2854,125 @@ String _arrivalDirectionLabel(RealtimeArrival arrival) {
   return destination.isEmpty ? '' : '$destination 방면';
 }
 
-/// 주변역 패널의 실시간 도착 정보. 선택 호선에 표시할 데이터가
-/// 없으면 상태 문구를 늘리지 않고 검정 대시 하나로 수렴한다.
+/// 주변역 패널의 실시간 도착 정보. 열차 정보가 없어도(전체 또는 한쪽) 인접역에서
+/// "○○ 방면" 제목을 유도해 두 열 + 구분선 스켈레톤을 유지하고, 데이터 없는 열에는
+/// 대시('-')를 그린다(오너 스펙 #2200 QA). 인접역 정보도 없고 데이터도 없으면
+/// 기존 대시 폴백(`_SubwayDataUnavailable`)으로 수렴한다.
 class _SubwayArrivalPanel extends StatelessWidget {
-  const _SubwayArrivalPanel({required this.snapshot, required this.lineColor});
+  const _SubwayArrivalPanel({
+    required this.snapshot,
+    required this.lineColor,
+    required this.leftName,
+    required this.rightName,
+  });
 
   final RealtimeSnapshot snapshot;
   final Color lineColor;
+  final String? leftName;
+  final String? rightName;
 
   @override
   Widget build(BuildContext context) {
-    switch (snapshot.status) {
-      case RealtimeSnapshotStatus.loading:
-        return const SizedBox(
-          key: Key('networkMapNearbyArrivalLoading'),
-          height: 46,
-          child: Center(
-            child: SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
+    if (snapshot.status == RealtimeSnapshotStatus.loading) {
+      return const SizedBox(
+        key: Key('networkMapNearbyArrivalLoading'),
+        height: 46,
+        child: Center(
+          child: SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2),
           ),
-        );
-      case RealtimeSnapshotStatus.unsupported:
-      case RealtimeSnapshotStatus.unavailable:
-        return const _SubwayDataUnavailable();
-      case RealtimeSnapshotStatus.fresh:
-      case RealtimeSnapshotStatus.stale:
-        if (snapshot.arrivals.isEmpty) {
-          return const _SubwayDataUnavailable();
-        }
-        final groups = <String, List<RealtimeArrival>>{};
-        for (final arrival in snapshot.arrivals) {
-          groups.putIfAbsent(arrival.direction, () => []).add(arrival);
-        }
-        final directions = groups.keys.toList(growable: false);
-        final left = groups[directions.first]!;
-        final right = directions.length > 1
-            ? groups[directions[1]]!
-            : const <RealtimeArrival>[];
-        final isStale = snapshot.status == RealtimeSnapshotStatus.stale;
-        final semanticParts = <String>[
-          for (final arrival in [...left, ...right])
-            [
-              _arrivalDirectionLabel(arrival),
-              arrival.destination.trim().isEmpty
-                  ? ''
-                  : '${arrival.destination.trim()}행',
-              _formatArrivalEta(arrival),
-            ].where((part) => part.isNotEmpty).join(' '),
-        ].where((part) => part.isNotEmpty).toList(growable: false);
-        return Semantics(
-          liveRegion: true,
-          label: semanticParts.isEmpty ? '도착 정보 없음' : semanticParts.join(', '),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (isStale) ...[
-                Text(
-                  snapshot.receivedAt.trim().isEmpty
-                      ? '최근 도착 정보'
-                      : '최근 도착 정보 · ${snapshot.receivedAt.trim()}',
-                  style: const TextStyle(
-                    color: EasySubwayAccessibleColors.mutedText,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 6),
-              ],
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: _SubwayArrivalColumn(
-                      arrivals: left,
-                      lineColor: lineColor,
-                    ),
-                  ),
-                  if (right.isNotEmpty) ...[
-                    const SizedBox(
-                      height: 46,
-                      child: VerticalDivider(
-                        color: EasySubwayAccessibleColors.arrivalColumnDivider,
-                        width: 30,
-                      ),
-                    ),
-                    Expanded(
-                      child: _SubwayArrivalColumn(
-                        arrivals: right,
-                        lineColor: lineColor,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ],
-          ),
-        );
+        ),
+      );
     }
+
+    final hasData =
+        (snapshot.status == RealtimeSnapshotStatus.fresh ||
+            snapshot.status == RealtimeSnapshotStatus.stale) &&
+        snapshot.arrivals.isNotEmpty;
+    final dataGroups = <List<RealtimeArrival>>[];
+    if (hasData) {
+      final groups = <String, List<RealtimeArrival>>{};
+      for (final arrival in snapshot.arrivals) {
+        groups.putIfAbsent(arrival.direction, () => []).add(arrival);
+      }
+      for (final key in groups.keys) {
+        dataGroups.add(groups[key]!);
+      }
+    }
+    final dataTitles = [
+      for (final group in dataGroups) _arrivalDirectionLabel(group.first),
+    ];
+    final slots = resolveNearbyColumnSlots(
+      dataTitles: dataTitles,
+      leftName: leftName,
+      rightName: rightName,
+    );
+    if (slots.isEmpty) {
+      return const _SubwayDataUnavailable();
+    }
+
+    final columns = <NearbyPanelColumn>[];
+    final semanticParts = <String>[];
+    for (final slot in slots) {
+      final dataIndex = slot.dataIndex;
+      if (dataIndex == null) {
+        columns.add(NearbyPanelColumn(title: slot.title));
+        semanticParts.add('${slot.title} 정보 없음');
+        continue;
+      }
+      final visible = dataGroups[dataIndex].take(2).toList(growable: false);
+      columns.add(
+        NearbyPanelColumn(
+          title: slot.title,
+          rows: [
+            for (final arrival in visible)
+              NearbyArrivalRow(
+                destination: arrival.destination.trim(),
+                eta: _formatArrivalEta(arrival),
+              ),
+          ],
+        ),
+      );
+      for (final arrival in visible) {
+        final part = [
+          _arrivalDirectionLabel(arrival),
+          arrival.destination.trim().isEmpty
+              ? ''
+              : '${arrival.destination.trim()}행',
+          _formatArrivalEta(arrival),
+        ].where((part) => part.isNotEmpty).join(' ');
+        if (part.isNotEmpty) {
+          semanticParts.add(part);
+        }
+      }
+    }
+
+    final isStale = snapshot.status == RealtimeSnapshotStatus.stale && hasData;
+    return Semantics(
+      liveRegion: true,
+      label: semanticParts.isEmpty ? '도착 정보 없음' : semanticParts.join(', '),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isStale) ...[
+            Text(
+              snapshot.receivedAt.trim().isEmpty
+                  ? '최근 도착 정보'
+                  : '최근 도착 정보 · ${snapshot.receivedAt.trim()}',
+              style: const TextStyle(
+                color: EasySubwayAccessibleColors.mutedText,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+          ],
+          NearbyPanelColumns(columns: columns, lineColor: lineColor),
+        ],
+      ),
+    );
   }
 }
 
@@ -2981,11 +3008,15 @@ class _SubwayTimetablePanel extends StatelessWidget {
     required this.timetable,
     required this.loading,
     required this.lineColor,
+    required this.leftName,
+    required this.rightName,
   });
 
   final StationTimetable? timetable;
   final bool loading;
   final Color lineColor;
+  final String? leftName;
+  final String? rightName;
 
   @override
   Widget build(BuildContext context) {
@@ -3003,57 +3034,54 @@ class _SubwayTimetablePanel extends StatelessWidget {
       );
     }
     final departures = _nextTimetableDepartures(timetable, DateTime.now());
-    if (departures.isEmpty) {
-      return const _SubwayDataUnavailable();
-    }
-    final columns = <List<_NextTimetableDeparture>>[];
+    // 방면별로 그룹핑(실시간과 동일한 열 구성 원칙 적용).
+    final dataGroups = <List<_NextTimetableDeparture>>[];
     for (final departure in departures) {
-      if (columns.isEmpty ||
-          columns.last.first.directionLabel != departure.directionLabel) {
-        columns.add([departure]);
+      if (dataGroups.isEmpty ||
+          dataGroups.last.first.directionLabel != departure.directionLabel) {
+        dataGroups.add([departure]);
       } else {
-        columns.last.add(departure);
+        dataGroups.last.add(departure);
       }
     }
+    final dataTitles = [
+      for (final group in dataGroups) group.first.directionLabel,
+    ];
+    final slots = resolveNearbyColumnSlots(
+      dataTitles: dataTitles,
+      leftName: leftName,
+      rightName: rightName,
+    );
+    if (slots.isEmpty) {
+      return const _SubwayDataUnavailable();
+    }
+
+    final columns = <NearbyPanelColumn>[];
+    final semanticParts = <String>[];
+    for (final slot in slots) {
+      final dataIndex = slot.dataIndex;
+      if (dataIndex == null) {
+        columns.add(NearbyPanelColumn(title: slot.title));
+        semanticParts.add('${slot.title} 정보 없음');
+        continue;
+      }
+      final group = dataGroups[dataIndex];
+      final rows = <Widget>[];
+      for (var row = 0; row < group.length; row++) {
+        if (row > 0) {
+          rows.add(const SizedBox(height: 4));
+        }
+        rows.add(_SubwayTimetableDepartureView(data: group[row]));
+        semanticParts.add(group[row].departure.semanticLabel);
+      }
+      columns.add(NearbyPanelColumn(title: slot.title, rows: rows));
+    }
+
     return Semantics(
       liveRegion: true,
       excludeSemantics: true,
-      label: departures
-          .map((entry) => entry.departure.semanticLabel)
-          .join(', '),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (var index = 0; index < columns.length; index++) ...[
-            if (index > 0)
-              const SizedBox(
-                height: 46,
-                child: VerticalDivider(
-                  color: EasySubwayAccessibleColors.arrivalColumnDivider,
-                  width: 30,
-                ),
-              ),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: NearbyDirectionTitle(
-                      label: columns[index].first.directionLabel,
-                      lineColor: lineColor,
-                    ),
-                  ),
-                  for (var row = 0; row < columns[index].length; row++) ...[
-                    if (row > 0) const SizedBox(height: 4),
-                    _SubwayTimetableDepartureView(data: columns[index][row]),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
+      label: semanticParts.isEmpty ? '정보 없음' : semanticParts.join(', '),
+      child: NearbyPanelColumns(columns: columns, lineColor: lineColor),
     );
   }
 }
@@ -3122,40 +3150,6 @@ class _SubwayTimetableDepartureView extends StatelessWidget {
         fontSize: 15,
         fontWeight: FontWeight.w800,
       ),
-    );
-  }
-}
-
-class _SubwayArrivalColumn extends StatelessWidget {
-  const _SubwayArrivalColumn({required this.arrivals, required this.lineColor});
-
-  final List<RealtimeArrival> arrivals;
-  final Color lineColor;
-
-  @override
-  Widget build(BuildContext context) {
-    final visible = arrivals.take(2).toList(growable: false);
-    final directionLabel = visible.isEmpty
-        ? ''
-        : _arrivalDirectionLabel(visible.first);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (directionLabel.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: NearbyDirectionTitle(
-              label: directionLabel,
-              lineColor: lineColor,
-            ),
-          ),
-        for (final arrival in visible)
-          NearbyArrivalRow(
-            destination: arrival.destination.trim(),
-            eta: _formatArrivalEta(arrival),
-          ),
-      ],
     );
   }
 }
