@@ -117,6 +117,28 @@ test("decision에 결속된 manifest digest나 sequence가 다르면 거부한�
   );
 });
 
+test("서로 다른 pack identity가 같은 payload를 공유해도 선택한 staged path를 사용한다", async () => {
+  const { root, packBytes } = await fixture("PUBLISHED_AND_VERIFIED");
+  const manifestPath = path.join(root, "catalog/current.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  manifest.packs.push({
+    id: "aux",
+    version: "1",
+    sha256: sha256(packBytes),
+    sizeBytes: packBytes.length,
+  });
+  await writeFile(manifestPath, JSON.stringify(manifest));
+  await writeFile(path.join(root, "catalog/aux-v1.sqlite.gz"), packBytes);
+  const decisionPath = path.join(root, "final-release-decision.json");
+  const decision = JSON.parse(await readFile(decisionPath, "utf8"));
+  decision.selectedManifestSha256 = sha256(await readFile(manifestPath));
+  await writeFile(decisionPath, JSON.stringify(decision));
+
+  const result = await selectRcDataPackArtifact(root, path.join(root, "selected-shared-payload"));
+
+  assert.deepEqual(await readFile(result.artifactPath), packBytes);
+});
+
 test("activePack이 없으면 런타임과 같이 최신 capital pack을 선택한다", async () => {
   const { root, packBytes } = await fixture("PUBLISHED_AND_VERIFIED");
   const manifestPath = path.join(root, "catalog/current.json");
@@ -153,6 +175,6 @@ test("실패·미검증 decision과 manifest에 결속되지 않은 pack은 거�
   await writeFile(path.join(mismatched.root, "catalog/capital-v12.sqlite.gz"), "different-pack");
   await assert.rejects(
     selectRcDataPackArtifact(mismatched.root, path.join(mismatched.root, "selected")),
-    /exactly one staged pack must match each selected production manifest identity/,
+    /staged pack does not match the selected production manifest identity/,
   );
 });

@@ -1,10 +1,14 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
-import { copyFile, mkdir, readFile, readdir } from "node:fs/promises";
+import { copyFile, mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { selectEffectiveDataPack, selectFallbackDataPack } from "../datapack/lib/manifest-validation.mjs";
+import {
+  selectEffectiveDataPack,
+  selectFallbackDataPack,
+  stagedPackPath,
+} from "../datapack/lib/manifest-validation.mjs";
 
 export async function selectRcDataPackArtifact(artifactRoot, outputRoot) {
   const root = path.resolve(artifactRoot);
@@ -30,12 +34,8 @@ export async function selectRcDataPackArtifact(artifactRoot, outputRoot) {
   if (!fallbackPack) throw new Error("selected production manifest must identify exactly one fallback pack");
   validateSelectedPack(activePack);
   validateSelectedPack(fallbackPack);
-  const packPaths = (await recursiveFiles(root)).filter((file) => file.endsWith(".sqlite.gz"));
-  const matchingPacks = await matchingStagedPacks(packPaths, activePack);
-  const matchingFallbackPacks = await matchingStagedPacks(packPaths, fallbackPack);
-  if (matchingPacks.length !== 1 || matchingFallbackPacks.length !== 1) {
-    throw new Error("exactly one staged pack must match each selected production manifest identity");
-  }
+  const activeArtifact = await verifiedStagedPack(root, activePack);
+  const fallbackArtifact = await verifiedStagedPack(root, fallbackPack);
 
   const output = path.resolve(outputRoot);
   await mkdir(output, { recursive: true });
@@ -44,19 +44,19 @@ export async function selectRcDataPackArtifact(artifactRoot, outputRoot) {
   const fallbackArtifactPath = path.join(output, "fallback.sqlite.gz");
   const decisionPath = path.join(output, "release-decision.json");
   await copyFile(manifestSource, manifestPath);
-  await copyFile(matchingPacks[0].file, artifactPath);
-  await copyFile(matchingFallbackPacks[0].file, fallbackArtifactPath);
+  await copyFile(activeArtifact.file, artifactPath);
+  await copyFile(fallbackArtifact.file, fallbackArtifactPath);
   await copyFile(decisionSource, decisionPath);
   return { outcome: decision.outcome, manifestPath, artifactPath, fallbackArtifactPath, decisionPath };
 }
 
-async function matchingStagedPacks(packPaths, pack) {
-  const matches = [];
-  for (const file of packPaths) {
-    const bytes = await readFile(file);
-    if (bytes.length === pack.sizeBytes && sha256(bytes) === pack.sha256) matches.push({ file, bytes });
+async function verifiedStagedPack(root, pack) {
+  const file = path.join(root, stagedPackPath(pack));
+  const bytes = await readFile(file);
+  if (bytes.length !== pack.sizeBytes || sha256(bytes) !== pack.sha256) {
+    throw new Error("staged pack does not match the selected production manifest identity");
   }
-  return matches;
+  return { file, bytes };
 }
 
 function validateFinalDecision(decision) {
@@ -91,17 +91,6 @@ function validateSelectedPack(pack) {
   if (!/^[a-f0-9]{64}$/.test(pack?.sha256 ?? "") || !Number.isSafeInteger(pack?.sizeBytes) || pack.sizeBytes <= 0) {
     throw new Error("selected production manifest active pack identity is invalid");
   }
-}
-
-async function recursiveFiles(directory) {
-  const entries = await readdir(directory, { withFileTypes: true });
-  const files = [];
-  for (const entry of entries) {
-    const target = path.join(directory, entry.name);
-    if (entry.isDirectory()) files.push(...await recursiveFiles(target));
-    else if (entry.isFile()) files.push(target);
-  }
-  return files;
 }
 
 async function readJson(file) {
