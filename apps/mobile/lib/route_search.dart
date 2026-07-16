@@ -360,6 +360,7 @@ class RouteSearchOnlineException extends RouteSearchException {
     final code = body is Map<String, Object?> ? body['code'] : null;
     const messages = <String, String>{
       'ROUTE_SESSION_ATTESTATION_REJECTED': 'ITX 시간표를 불러올 수 없어요',
+      'ROUTE_SESSION_ATTESTATION_UNAVAILABLE': 'ITX 시간표를 불러올 수 없어요',
       'ROUTE_SESSION_REQUIRED': '다시 시도',
       'ROUTE_SCOPE_INVALID': '지원하지 않는 경로예요',
       'ROUTE_RATE_LIMITED': '잠시 후 다시 시도',

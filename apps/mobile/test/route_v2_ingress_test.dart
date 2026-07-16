@@ -165,11 +165,36 @@ void main() {
               'failureReason',
               'ROUTE_SESSION_ATTESTATION_REJECTED',
             )
+            .having((error) => error.message, 'message', 'ITX 시간표를 불러올 수 없어요'),
+      ),
+    );
+  });
+
+  test('session attestation provider 503은 exact code와 UI 문구를 보존한다', () async {
+    final server = await _errorServer(
+      statusCode: HttpStatus.serviceUnavailable,
+      code: 'ROUTE_SESSION_ATTESTATION_UNAVAILABLE',
+    );
+    addTearDown(server.close);
+    final provider = PlayIntegrityRouteV2SessionProvider(
+      apiClient: ApiClient(
+        baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+      ),
+      attestor: _RecordingAttestor(),
+      nonceFactory: () => 'AAAAAAAAAAAAAAAAAAAAAA',
+    );
+
+    await expectLater(
+      provider.issueToken(),
+      throwsA(
+        isA<RouteSearchOnlineException>()
+            .having((error) => error.statusCode, 'statusCode', 503)
             .having(
-              (error) => error.message,
-              'message',
-              'ITX 시간표를 불러올 수 없어요',
-            ),
+              (error) => error.failureReason,
+              'failureReason',
+              'ROUTE_SESSION_ATTESTATION_UNAVAILABLE',
+            )
+            .having((error) => error.message, 'message', 'ITX 시간표를 불러올 수 없어요'),
       ),
     );
   });
