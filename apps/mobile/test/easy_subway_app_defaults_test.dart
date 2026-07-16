@@ -1,15 +1,16 @@
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/features/mobility_profile/mobility_profile_policy.dart';
-import 'package:easysubway_mobile/main.dart';
 import 'package:easysubway_mobile/onboarding.dart';
 import 'package:easysubway_mobile/route_search.dart';
 import 'package:easysubway_mobile/station_search.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'support/easy_subway_app_fixture.dart';
+
 void main() {
   test('기본 앱은 출시 범위에서 원격 개인 데이터 저장소를 만들지 않는다', () {
-    final app = EasySubwayApp(
+    final app = buildEasySubwayTestApp(
       repository: _UnusedStationSearchRepository(),
       reportRepository: _UnusedFacilityReportRepository(),
       routeRepository: _UnusedRouteSearchRepository(),
@@ -23,7 +24,7 @@ void main() {
   });
 
   test('푸시 알림을 명시적으로 켜도 인증 없는 원격 저장소는 만들지 않는다', () {
-    final app = EasySubwayApp(
+    final app = buildEasySubwayTestApp(
       repository: _UnusedStationSearchRepository(),
       reportRepository: _UnusedFacilityReportRepository(),
       routeRepository: _UnusedRouteSearchRepository(),
@@ -37,7 +38,7 @@ void main() {
 
   testWidgets('인증 저장소가 없으면 홈 즐겨찾기를 노출하지 않는다', (tester) async {
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: _UnusedStationSearchRepository(),
         reportRepository: _UnusedFacilityReportRepository(),
         routeRepository: _UnusedRouteSearchRepository(),
