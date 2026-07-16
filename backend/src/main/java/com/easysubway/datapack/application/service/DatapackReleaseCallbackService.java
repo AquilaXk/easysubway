@@ -5,6 +5,7 @@ import com.easysubway.datapack.application.port.out.DatapackReleaseRequestReposi
 import com.easysubway.datapack.adapter.out.persistence.JdbcDatapackReleaseDeliveryRepository;
 import com.easysubway.datapack.application.service.CallbackSignature.CanonicalFields;
 import com.easysubway.datapack.application.service.DatapackReleaseChannelCommandService.ReleaseChannelCommand;
+import com.easysubway.datapack.application.port.out.DatapackReleaseCatalogPort.CatalogIdentity;
 import com.easysubway.datapack.domain.DatapackReleaseRequest;
 import com.easysubway.datapack.domain.DatapackReleaseRequestStatus;
 import com.easysubway.datapack.domain.DatapackReleaseDelivery;
@@ -129,20 +130,62 @@ public class DatapackReleaseCallbackService {
 	}
 
     private void tryPromote(DatapackReleaseRequest r, CallbackCommand cmd) {
+		tryPromote(r, cmd.manifestSha256(), cmd.workflowRunUrl(), cmd.evidenceBundleSha256(),
+			cmd.idempotencyKey());
+	}
+
+	private void tryPromote(DatapackReleaseRequest r, String manifestSha256, String workflowRunUrl,
+		String evidenceBundleSha256, String idempotencyKey) {
         try {
             var channel = channelCommandPort.findChannel(r.targetChannel())
                 .orElseThrow(() -> new IllegalStateException(r.targetChannel() + " channel missing"));
             promoteDelegate.promote(new ReleaseChannelCommand(
                 r.targetChannel(), channel.candidateId(), r.candidateId(),
-                channel.manifestSha256(), cmd.manifestSha256(),
+                channel.manifestSha256(), manifestSha256,
                 r.requestedBy(), r.approvedBy(), "auto-promote via release callback",
-                "callback:" + r.approvalId(), cmd.workflowRunUrl(), cmd.evidenceBundleSha256()));
+                "callback:" + idempotencyKey, workflowRunUrl, evidenceBundleSha256));
             repository.save(r.withPromoteOutcome("SUCCEEDED", null));
         } catch (RuntimeException e) {
             log.warn("auto-promote rejected for {}: {}", r.approvalId(), e.getMessage());
             repository.save(r.withPromoteOutcome("REJECTED", e.getMessage()));
         }
     }
+
+	@Transactional
+	public CallbackResult reconcile(DatapackReleaseDelivery delivery, CatalogIdentity catalog) {
+		var now = LocalDateTime.now(clock);
+		var request = repository.findByApprovalId(delivery.releaseRequestId()).orElse(null);
+		if (request == null
+			|| !request.candidateId().equals(delivery.candidateId())
+			|| !request.targetChannel().equals(delivery.channel())
+			|| !channelCommandPort.candidateHasManifest(request.candidateId(), catalog.manifestSha256())) {
+			deliveryRepository.mark(delivery.idempotencyKey(), State.DEAD_LETTER,
+				delivery.attempts(), null, "CONFLICT", "REQUEST_CATALOG_MISMATCH", now);
+			return new CallbackResult("DEAD_LETTER", false);
+		}
+		var evidenceSha = channelCommandPort.findPassingReleaseEvidenceSha256(request.candidateId())
+			.orElse(null);
+		if ("production".equals(request.targetChannel()) && evidenceSha == null) {
+			deliveryRepository.mark(delivery.idempotencyKey(), State.DEAD_LETTER,
+				delivery.attempts(), null, "CONFLICT", "RELEASE_EVIDENCE_MISSING", now);
+			return new CallbackResult("DEAD_LETTER", false);
+		}
+		if (request.status() != DatapackReleaseRequestStatus.PUBLISHED) {
+			if (request.status() != DatapackReleaseRequestStatus.APPROVED
+				&& request.status() != DatapackReleaseRequestStatus.DISPATCHED) {
+				deliveryRepository.mark(delivery.idempotencyKey(), State.DEAD_LETTER,
+					delivery.attempts(), null, "CONFLICT", "REQUEST_STATE_MISMATCH", now);
+				return new CallbackResult("DEAD_LETTER", false);
+			}
+			request = request.markPublished(request.workflowRunUrl(), now);
+			repository.save(request);
+			tryPromote(request, catalog.manifestSha256(), request.workflowRunUrl(), evidenceSha,
+				delivery.idempotencyKey());
+		}
+		deliveryRepository.mark(delivery.idempotencyKey(), State.DELIVERED,
+			delivery.attempts() + 1, null, "RECONCILED", null, now);
+		return new CallbackResult("PUBLISHED", false);
+	}
 
     public record CallbackCommand(
         int schemaVersion,

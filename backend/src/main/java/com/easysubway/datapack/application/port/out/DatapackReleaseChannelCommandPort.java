@@ -16,6 +16,8 @@ public interface DatapackReleaseChannelCommandPort {
 
 	boolean candidateHasPassingReleaseEvidence(String candidateId, String evidenceBundleSha256);
 
+	Optional<String> findPassingReleaseEvidenceSha256(String candidateId);
+
 	void updateChannel(
 		String channel,
 		String nextCandidateId,
