@@ -3,7 +3,7 @@
 // 반입한다. catalog-schema.sql v16은 이미 이 테이블을 정의하지만(#2033) 번들 팩엔 rows만
 // 누락되어 실사용자에게 힌트가 보이지 않았다(#2066/#2039 맥락). 이 스크립트는 시간 데이터가
 // 아니라 admission·검증 완료된 정적 힌트 행을 번들 팩에 idempotent하게 반입한다.
-// catalog user_version은 16을 유지한다(증가 금지).
+// catalog user_version은 현재 bundled schema와 같은 18을 유지한다.
 import { createHash, randomUUID } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -12,7 +12,7 @@ import { gunzipSync, gzipSync } from "node:zlib";
 import { DatabaseSync } from "node:sqlite";
 
 const root = path.resolve(import.meta.dirname, "../..");
-const BUNDLED_CATALOG_USER_VERSION = 16;
+const BUNDLED_CATALOG_USER_VERSION = 18;
 const FACILITY_TYPES = new Set(["STAIR", "ELEVATOR", "ESCALATOR", "TRANSFER"]);
 
 function option(name, fallback) {

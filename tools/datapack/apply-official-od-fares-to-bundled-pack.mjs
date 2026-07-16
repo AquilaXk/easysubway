@@ -15,7 +15,7 @@ const root = path.resolve(import.meta.dirname, "../..");
 const FARE_COLUMNS = [
   "gnrlCardFare", "gnrlCashFare", "yungCardFare", "yungCashFare", "childCardFare", "childCashFare",
 ];
-const BUNDLED_CATALOG_USER_VERSION = 16;
+const BUNDLED_CATALOG_USER_VERSION = 18;
 
 function option(name, fallback) {
   const index = process.argv.indexOf(name);
