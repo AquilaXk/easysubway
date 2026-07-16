@@ -261,6 +261,7 @@ class LocalRouteRepository implements RouteSearchRepository {
       etaConfidence: 'STATIC',
       sourceUpdatedAt: catalog.sourceUpdatedAt,
       officialOdFareQuote: officialOdFareQuote,
+      transportScope: request.transportScope,
     );
   }
 

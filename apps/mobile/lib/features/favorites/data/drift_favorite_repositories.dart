@@ -509,6 +509,9 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
       routeCreatedAt: routeCreatedAt,
       addedAt: addedAt,
       etaSource: _string(snapshot['etaSource']),
+      transportScope: _routeTransportScopeFromSnapshot(
+        snapshot['transportScope'],
+      ),
     );
   }
 
@@ -582,6 +585,7 @@ FavoriteRoute _favoriteRouteFromResult({
     routeCreatedAt: result.createdAt,
     addedAt: addedAt,
     etaSource: result.etaSource,
+    transportScope: result.transportScope,
   );
 }
 
@@ -596,7 +600,10 @@ String _favoriteRouteStorageId({
   if (baseId.isEmpty || mobilityType.isEmpty) {
     return baseId;
   }
-  return '$baseId::$mobilityType';
+  final transportScope = result.transportScope;
+  return transportScope == RouteTransportScope.subway
+      ? '$baseId::$mobilityType'
+      : '$baseId::$mobilityType::${transportScope.serverValue}';
 }
 
 Map<String, Object?> _routeResultToJson(RouteSearchResult result) {
@@ -625,7 +632,14 @@ Map<String, Object?> _routeResultToJson(RouteSearchResult result) {
     'blockedReasons': result.blockedReasons,
     'createdAt': result.createdAt,
     'etaSource': result.etaSource,
+    'transportScope': result.transportScope.serverValue,
   };
+}
+
+RouteTransportScope _routeTransportScopeFromSnapshot(Object? value) {
+  return value == 'SUBWAY_AND_ITX_CHEONGCHUN'
+      ? RouteTransportScope.subwayAndItxCheongchun
+      : RouteTransportScope.subway;
 }
 
 Map<String, Object?> _routeStepToJson(RouteSearchStep step) {

@@ -1553,6 +1553,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _selectedTabIndex = 0;
   late String _mobilityType;
   String? _routeTabMobilityType;
+  RouteTransportScope _routeTabTransportScope = RouteTransportScope.subway;
   late final RouteDraftController _routeDraftController;
   Future<List<FavoriteFacility>>? _favoriteFacilitiesFuture;
   late Future<bool> _hasNotificationItemsFuture;
@@ -1640,6 +1641,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (_selectedTabIndex != 2) {
         setState(() {
           _routeTabMobilityType = _mobilityType;
+          _routeTabTransportScope = RouteTransportScope.subway;
           _selectedTabIndex = 2;
         });
       } else {
@@ -1752,13 +1754,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       });
     }
 
-    void openRouteTab([String? mobilityType]) {
+    void openRouteTab([
+      String? mobilityType,
+      RouteTransportScope transportScope = RouteTransportScope.subway,
+    ]) {
       final nextMobilityType = mobilityType ?? initialMobilityType;
-      if (_selectedTabIndex == 2 && _routeTabMobilityType == nextMobilityType) {
+      if (_selectedTabIndex == 2 &&
+          _routeTabMobilityType == nextMobilityType &&
+          _routeTabTransportScope == transportScope) {
         return;
       }
       setState(() {
         _routeTabMobilityType = nextMobilityType;
+        _routeTabTransportScope = transportScope;
         _selectedTabIndex = 2;
       });
     }
@@ -2036,6 +2044,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           favoriteRouteRepository: favoriteRouteRepository,
           adRepository: adRepository,
           initialMobilityType: _routeTabMobilityType ?? initialMobilityType,
+          initialTransportScope: _routeTabTransportScope,
           initialDraft: _routeDraftController.draft,
           simpleViewEnabled: simpleViewEnabled,
           onShellBackToHome: () {
@@ -2061,8 +2070,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           realtimeRepository: realtimeRepository,
           routeDraftController: _routeDraftController,
           initialMobilityType: initialMobilityType,
-          onOpenRouteSearch: ([mobilityType]) async =>
-              openRouteTab(mobilityType),
+          onOpenRouteSearch: ([mobilityType, transportScope]) async =>
+              openRouteTab(
+                mobilityType,
+                transportScope ?? RouteTransportScope.subway,
+              ),
         ),
       );
     }
@@ -3324,7 +3336,11 @@ class FavoriteHomeScreen extends StatefulWidget {
   final RealtimeRepository realtimeRepository;
   final RouteDraftController routeDraftController;
   final String initialMobilityType;
-  final Future<void> Function([String? mobilityType])? onOpenRouteSearch;
+  final Future<void> Function([
+    String? mobilityType,
+    RouteTransportScope? transportScope,
+  ])?
+  onOpenRouteSearch;
   final Widget? bottomNavigationBar;
 
   @override
@@ -3480,7 +3496,7 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
       return;
     }
     Navigator.of(context).popUntil((route) => route.isFirst);
-    unawaited(openRouteSearch(favorite.mobilityType));
+    unawaited(openRouteSearch(favorite.mobilityType, favorite.transportScope));
   }
 
   Future<void> _removeFavoriteRoute(FavoriteRoute favorite) async {

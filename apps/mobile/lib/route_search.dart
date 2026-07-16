@@ -400,6 +400,13 @@ enum RouteTransportScope {
   final String serverValue;
 }
 
+RouteTransportScope _routeTransportScopeFromValue(Object? value) {
+  return switch (value) {
+    'SUBWAY_AND_ITX_CHEONGCHUN' => RouteTransportScope.subwayAndItxCheongchun,
+    _ => RouteTransportScope.subway,
+  };
+}
+
 class RouteFeedbackApiRepository implements RouteFeedbackRepository {
   RouteFeedbackApiRepository({
     required this.baseUri,
@@ -681,6 +688,7 @@ class FavoriteRoute {
     required this.routeCreatedAt,
     required this.addedAt,
     this.etaSource = '',
+    this.transportScope = RouteTransportScope.subway,
   });
 
   factory FavoriteRoute.fromJson(Map<String, Object?> json) {
@@ -703,6 +711,7 @@ class FavoriteRoute {
       routeCreatedAt: _requiredRouteString(json, 'routeCreatedAt'),
       addedAt: _requiredRouteString(json, 'addedAt'),
       etaSource: _optionalRouteString(json, 'etaSource'),
+      transportScope: _routeTransportScopeFromValue(json['transportScope']),
     );
   }
 
@@ -721,6 +730,7 @@ class FavoriteRoute {
   final String routeCreatedAt;
   final String addedAt;
   final String etaSource;
+  final RouteTransportScope transportScope;
 
   String get summaryTitle => '$originStationName에서 $destinationStationName까지';
 
@@ -1129,6 +1139,7 @@ class RouteSearchResult {
     this.officialOdFareQuote,
     this.supportsRefresh = true,
     this.nextServiceTime = '',
+    this.transportScope = RouteTransportScope.subway,
   }) : // `burdenCost`는 API contract 이름이고 저장 필드는 private 값이다.
        // ignore: prefer_initializing_formals
        _accessibilityScore = accessibilityScore,
@@ -1236,6 +1247,7 @@ class RouteSearchResult {
           _optionalRouteBool(json, 'commercialEtaEligible') ?? false,
       sourceUpdatedAt: _optionalRouteString(json, 'sourceUpdatedAt'),
       nextServiceTime: _optionalRouteString(json, 'nextServiceTime'),
+      transportScope: _routeTransportScopeFromValue(json['transportScope']),
     );
   }
 
@@ -1272,6 +1284,7 @@ class RouteSearchResult {
         sourceUpdatedAt: result.departureTime,
         supportsRefresh: false,
         nextServiceTime: result.nextServiceTime,
+        transportScope: RouteTransportScope.subwayAndItxCheongchun,
       );
     }
     final itinerary = result.itineraries.firstWhere(
@@ -1331,6 +1344,7 @@ class RouteSearchResult {
       commercialEtaEligible: itinerary.commercialEtaEligible,
       sourceUpdatedAt: result.departureTime,
       supportsRefresh: false,
+      transportScope: RouteTransportScope.subwayAndItxCheongchun,
     );
   }
 
@@ -1366,6 +1380,7 @@ class RouteSearchResult {
   final OfficialOdFareQuote? officialOdFareQuote;
   final bool supportsRefresh;
   final String nextServiceTime;
+  final RouteTransportScope transportScope;
 
   bool get hasOfficialOdFareQuote => officialOdFareQuote != null;
 
@@ -1557,6 +1572,7 @@ class RouteSearchResult {
       officialOdFareQuote: officialOdFareQuote ?? this.officialOdFareQuote,
       supportsRefresh: supportsRefresh,
       nextServiceTime: nextServiceTime,
+      transportScope: transportScope,
     );
   }
 
@@ -2560,6 +2576,7 @@ class RouteSearchScreen extends StatefulWidget {
       defaultValue: false,
     ),
     this.initialDraft,
+    this.initialTransportScope = RouteTransportScope.subway,
     this.shellNavigationBar,
     this.onShellBackToHome,
     this.getOffAlarmController,
@@ -2574,6 +2591,7 @@ class RouteSearchScreen extends StatefulWidget {
   final AdRepository? adRepository;
   final GetOffAlarmController? getOffAlarmController;
   final RouteDraft? initialDraft;
+  final RouteTransportScope initialTransportScope;
   final Widget? shellNavigationBar;
   final VoidCallback? onShellBackToHome;
   final String initialMobilityType;
@@ -2607,7 +2625,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
   late MobilityPreset _selectedPreset;
   late String _selectedMobilityType;
   late String _selectedConstraintMode;
-  RouteTransportScope _selectedTransportScope = RouteTransportScope.subway;
+  late RouteTransportScope _selectedTransportScope;
   String _validationMessage = '';
 
   /// #1933 C: 출발·도착이 모두 채워진 draft로 진입하면 별도 "길찾기" 버튼을 누르지
@@ -2646,6 +2664,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     _originStation = _stationFromDraft(widget.initialDraft?.origin);
     _destinationStation = _stationFromDraft(widget.initialDraft?.destination);
     _waypointStation = _stationFromDraft(widget.initialDraft?.waypoint);
+    _selectedTransportScope = widget.itxTransportScopeEnabled
+        ? widget.initialTransportScope
+        : RouteTransportScope.subway;
     _selectedPreset =
         mobilityPresetFromRepresentativeMobilityType(
           widget.initialMobilityType,
@@ -2667,6 +2688,16 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
       _originStation = _stationFromDraft(draft?.origin);
       _destinationStation = _stationFromDraft(draft?.destination);
       _waypointStation = _stationFromDraft(draft?.waypoint);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _maybeAutoSearchFromDraft();
+      });
+    }
+    if (widget.initialTransportScope != oldWidget.initialTransportScope ||
+        widget.itxTransportScopeEnabled != oldWidget.itxTransportScopeEnabled) {
+      _selectedTransportScope = widget.itxTransportScopeEnabled
+          ? widget.initialTransportScope
+          : RouteTransportScope.subway;
+      _autoSearchedSignature = null;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _maybeAutoSearchFromDraft();
       });

@@ -104,6 +104,12 @@ Future<void> _openFavoriteList(
   RouteDraftController? routeDraftController,
   Future<void> Function(RouteDraft draft, String mobilityType)?
   onOpenRouteSearch,
+  Future<void> Function(
+    RouteDraft draft,
+    String mobilityType,
+    RouteTransportScope transportScope,
+  )?
+  onOpenRouteSearchWithScope,
 }) async {
   final homeContext = tester.element(find.byType(HomeScreen));
   final home = tester.widget<HomeScreen>(find.byType(HomeScreen));
@@ -123,12 +129,27 @@ Future<void> _openFavoriteList(
           realtimeRepository: home.realtimeRepository,
           routeDraftController: draftController,
           initialMobilityType: home.initialMobilityType,
-          onOpenRouteSearch: onOpenRouteSearch == null
+          onOpenRouteSearch:
+              onOpenRouteSearch == null && onOpenRouteSearchWithScope == null
               ? null
-              : ([mobilityType]) => onOpenRouteSearch(
-                  draftController.draft,
-                  mobilityType ?? home.initialMobilityType,
-                ),
+              : ([mobilityType, transportScope]) async {
+                  final restoredMobilityType =
+                      mobilityType ?? home.initialMobilityType;
+                  final restoredTransportScope =
+                      transportScope ?? RouteTransportScope.subway;
+                  if (onOpenRouteSearchWithScope != null) {
+                    await onOpenRouteSearchWithScope(
+                      draftController.draft,
+                      restoredMobilityType,
+                      restoredTransportScope,
+                    );
+                    return;
+                  }
+                  await onOpenRouteSearch!(
+                    draftController.draft,
+                    restoredMobilityType,
+                  );
+                },
         ),
       ),
     ),
@@ -7665,6 +7686,43 @@ void main() {
     expect(searchAgainMobilityType, 'WHEELCHAIR');
   });
 
+  testWidgets('즐겨찾기 ITX 경로 다시 찾기는 저장된 transport scope로 연다', (tester) async {
+    final favoriteRouteRepository = FakeFavoriteRouteRepository(
+      favorites: [
+        _favoriteRoute(
+          transportScope: RouteTransportScope.subwayAndItxCheongchun,
+        ),
+      ],
+    );
+    final routeDraftController = RouteDraftController();
+    RouteTransportScope? restoredTransportScope;
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+        favoriteRouteRepository: favoriteRouteRepository,
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await _openFavoriteList(
+      tester,
+      routeDraftController: routeDraftController,
+      onOpenRouteSearchWithScope: (draft, mobilityType, transportScope) async {
+        restoredTransportScope = transportScope;
+      },
+    );
+    await tester.tap(find.text('상록수역 → 사당역'));
+    await tester.pumpAndSettle();
+
+    expect(restoredTransportScope, RouteTransportScope.subwayAndItxCheongchun);
+  });
+
   testWidgets('역 검색은 검색 버튼 없이 타이핑(디바운스)만으로 결과를 보여준다', (tester) async {
     final repository = FakeStationSearchRepository(
       queryResults: {
@@ -8420,6 +8478,46 @@ void main() {
     expect(
       routeRepository.requests.last.transportScope,
       RouteTransportScope.subwayAndItxCheongchun,
+    );
+  });
+
+  testWidgets('즐겨찾기에서 복원한 ITX transport scope로 첫 검색을 시작한다', (tester) async {
+    final routeRepository = FakeRouteSearchRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: routeRepository,
+          stationRepository: FakeStationSearchRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
+          itxTransportScopeEnabled: true,
+          initialTransportScope: RouteTransportScope.subwayAndItxCheongchun,
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 16),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(routeRepository.requests, hasLength(1));
+    expect(
+      routeRepository.requests.single.transportScope,
+      RouteTransportScope.subwayAndItxCheongchun,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('routeScopeItxChip')),
+        matching: find.byIcon(Icons.check),
+      ),
+      findsOneWidget,
     );
   });
 
@@ -16006,7 +16104,10 @@ FavoriteFacility _favoriteFacility({
   );
 }
 
-FavoriteRoute _favoriteRoute({String mobilityType = 'SENIOR'}) {
+FavoriteRoute _favoriteRoute({
+  String mobilityType = 'SENIOR',
+  RouteTransportScope transportScope = RouteTransportScope.subway,
+}) {
   return FavoriteRoute(
     userId: 'anonymous-user-1',
     favoriteRouteId: 'route-1',
@@ -16022,6 +16123,7 @@ FavoriteRoute _favoriteRoute({String mobilityType = 'SENIOR'}) {
     score: 92,
     routeCreatedAt: '2026-06-13T04:20:00',
     addedAt: '2026-06-14T10:00:00',
+    transportScope: transportScope,
   );
 }
 
