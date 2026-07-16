@@ -1710,8 +1710,14 @@ test("모바일 공통 상태 카드는 홈 즐겨찾기 노선도에서 사용�
   const networkMap = read("apps/mobile/lib/network_map.dart");
 
   assert.match(accessibleDesign, /class AccessibleStateCard extends StatelessWidget/);
-  assert.match(appComponents, /class HomeStateCard extends StatelessWidget[\s\S]*AccessibleStateCard\(/);
-  assert.match(networkMap, /AccessibleStateCard\([\s\S]*networkMapRetryButton/);
+  assert.match(
+    appComponents,
+    /class HomeStateCard extends StatelessWidget \{[\s\S]*?Widget build\(BuildContext context\) \{[\s\S]*?return AppCard\([\s\S]*?child: AccessibleStateCard\(/,
+  );
+  assert.match(
+    networkMap,
+    /child: AccessibleStateCard\([\s\S]*?key: const Key\('networkMapRetryButton'\)/,
+  );
 });
 
 test("모바일 presentation canonical 선언과 기존 public export를 유지한다", () => {
