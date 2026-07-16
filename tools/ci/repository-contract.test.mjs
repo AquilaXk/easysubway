@@ -2321,6 +2321,38 @@ test("역 상세 화면은 stations presentation canonical 파일이 소유한�
   }
 });
 
+test("역 검색 화면은 stations presentation canonical 파일이 소유한다", () => {
+  const stationSearch = read("apps/mobile/lib/station_search.dart");
+  const stationSearchScreen = read(
+    "apps/mobile/lib/features/stations/presentation/station_search_screen.dart",
+  );
+
+  assert.match(stationSearchScreen, /^class StationSearchScreen\b/m);
+  assert.match(stationSearchScreen, /^enum StationSearchEntryMode\b/m);
+  assert.doesNotMatch(stationSearch, /^class StationSearchScreen\b/m);
+  assert.doesNotMatch(stationSearch, /^enum StationSearchEntryMode\b/m);
+  assert.doesNotMatch(
+    stationSearch,
+    /^export 'features\/stations\/presentation\/station_search_screen\.dart';$/m,
+  );
+  for (const [consumerPath, importPattern] of [
+    [
+      "apps/mobile/lib/features/home/presentation/home_screen.dart",
+      /^import '\.\.\/\.\.\/stations\/presentation\/station_search_screen\.dart';$/m,
+    ],
+    [
+      "apps/mobile/lib/network_map.dart",
+      /^import 'features\/stations\/presentation\/station_search_screen\.dart';$/m,
+    ],
+    [
+      "apps/mobile/test/widget_test.dart",
+      /^import 'package:easysubway_mobile\/features\/stations\/presentation\/station_search_screen\.dart';$/m,
+    ],
+  ]) {
+    assert.match(read(consumerPath), importPattern);
+  }
+});
+
 test("프로덕션 모바일 UI 위젯명은 prototype 명칭을 쓰지 않는다", () => {
   const mobileFiles = execFileSync("git", ["ls-files", "apps/mobile/lib/*.dart"], {
     cwd: root,

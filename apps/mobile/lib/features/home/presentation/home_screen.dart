@@ -31,6 +31,7 @@ import '../../service_notice/presentation/notice_controller.dart';
 import '../../service_notice/presentation/service_notice_banner.dart';
 import '../../service_notice/presentation/service_notice_list_screen.dart';
 import '../../settings/presentation/app_settings_screen.dart';
+import '../../stations/presentation/station_search_screen.dart';
 import '../../support/presentation/support_access_screen.dart';
 
 const _mainIconControlRadius = BorderRadius.all(Radius.circular(12));

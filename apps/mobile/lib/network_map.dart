@@ -25,6 +25,7 @@ import 'features/network_map/presentation/structured_route_map_painter.dart';
 import 'features/realtime/realtime_repository.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
 import 'features/route_draft/domain/route_draft.dart';
+import 'features/stations/presentation/station_search_screen.dart';
 import 'internal_route.dart';
 import 'mobile_error_reporter.dart';
 import 'search_field.dart';
