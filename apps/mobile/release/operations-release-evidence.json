@@ -234,9 +234,12 @@
         "/api/notices/active",
         "/api/ads/active"
       ],
+      "allowedAuthenticatedEndpoints": [
+        "/api/v2/routes/session",
+        "/api/v2/routes/search"
+      ],
       "closedProductionEndpoints": [
         "/api/v1/routes/search",
-        "/api/v2/routes/search",
         "/api/v2/routes/{routeSearchId}/refresh"
       ],
       "closedProductionEndpointPolicy": {

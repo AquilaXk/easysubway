@@ -1486,7 +1486,15 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256=AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA",
     "EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE=0",
     "EASYSUBWAY_GOOGLE_PLAY_SERVICE_ACCOUNT_BASE64=base64-json",
+    "EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=123456789012",
+    "EASYSUBWAY_ROUTE_V2_GATEWAY_PORT=8081",
+    "EASYSUBWAY_ROUTE_V2_INGRESS_ENABLED=false",
+    "EASYSUBWAY_ROUTE_V2_TRUSTED_PROXY_CIDR=172.16.0.0/12",
     "EASYSUBWAY_ROUTE_V2_ORIGIN_SECRET=OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO",
+    "EASYSUBWAY_ROUTE_V2_SESSION_RATE_PER_MINUTE=5",
+    "EASYSUBWAY_ROUTE_V2_SESSION_BURST=2",
+    "EASYSUBWAY_ROUTE_V2_SEARCH_RATE_PER_MINUTE=10",
+    "EASYSUBWAY_ROUTE_V2_SEARCH_BURST=3",
     "EASYSUBWAY_ROUTE_V2_SESSION_MAX_REQUESTS=50",
     "EASYSUBWAY_ROUTE_V2_PLAY_INTEGRITY_CERTIFICATE_SHA256=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
     "EASYSUBWAY_PLAY_INTEGRITY_CREDENTIALS_BASE64=e30=",
@@ -4464,6 +4472,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1",
     "EASYSUBWAY_DATAPACK_CHANNEL=production",
     `EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256=${validPlayAppSigningFingerprint}`,
+    "EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=123456789",
     "",
   ].join("\n"));
   const rcGithubEnv = path.join(dir, "android-rc-github.env");
@@ -4489,6 +4498,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     rcGithubEnvOutput,
     new RegExp(`^EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256=${escapeRegExp(validPlayAppSigningFingerprint)}$`, "m"),
   );
+  assert.match(rcGithubEnvOutput, /^EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=123456789$/m);
 
   const invalidEnv = path.join(dir, "invalid.env");
   await writeFile(invalidEnv, [
@@ -4517,6 +4527,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1",
     "EASYSUBWAY_DATAPACK_CHANNEL=staging",
     `EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256=${validPlayAppSigningFingerprint}`,
+    "EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=123456789",
     "",
   ].join("\n"));
   await assert.rejects(
@@ -4543,6 +4554,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1",
     "EASYSUBWAY_DATAPACK_CHANNEL=production",
     "EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256=AA:BB:CC",
+    "EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=123456789",
     "",
   ].join("\n"));
   await assert.rejects(
@@ -4569,6 +4581,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1",
     "EASYSUBWAY_DATAPACK_CHANNEL=production",
     "EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256=AA:BB:CC",
+    "EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=123456789",
     "",
   ].join("\n"));
   await assert.rejects(
@@ -4955,7 +4968,6 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   assert.equal(operationsEvidence.backendControlPlane.publicApiSurface.securityMatcherComparisonRequired, true);
   const closedRouteEndpoints = [
     "/api/v1/routes/search",
-    "/api/v2/routes/search",
     "/api/v2/routes/{routeSearchId}/refresh",
   ];
   assert.deepEqual(
@@ -5021,9 +5033,15 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
       `production public endpoints must exclude ${endpoint}`,
     );
   }
+  assert.match(routeSearchController, /@RestController/);
+  assert.doesNotMatch(routeSearchController, /@Profile\("!prod & !staging & !release & !prod-like"\)/);
+  assert.deepEqual(operationsEvidence.backendControlPlane.publicApiSurface.allowedAuthenticatedEndpoints, [
+    "/api/v2/routes/session",
+    "/api/v2/routes/search",
+  ]);
   assert.match(
-    routeSearchController,
-    /@Profile\("!prod & !staging & !release & !prod-like"\)[\s\S]*@RestController/,
+    securityConfig,
+    /@Profile\("prod \| staging \| release \| prod-like"\)[\s\S]*SecurityFilterChain routeV2IngressSecurityFilterChain/,
   );
   assert.match(
     securityConfig,
@@ -8774,7 +8792,7 @@ test("Docker Compose는 backend 필수 서비스를 기본값으로 노출하고
   const compose = read("infra/docker-compose.yml");
   const postgresBlock = compose.match(/  postgres:\n[\s\S]*?\n\n  object-storage:/)?.[0] ?? "";
   const objectStorageBlock = compose.match(/  object-storage:\n[\s\S]*?\n\n  backend:/)?.[0] ?? "";
-  const backWorkerBlock = compose.match(/  back-worker:\n[\s\S]*?\n\n  public-edge-probe:/)?.[0] ?? "";
+  const backWorkerBlock = compose.match(/  back-worker:\n[\s\S]*?\n\n  route-v2-gateway:/)?.[0] ?? "";
 
   assert.match(compose, /postgres:\n/);
   assert.match(
@@ -12365,6 +12383,7 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   const timetablePortPath = "backend/src/main/java/com/easysubway/route/application/port/out/LoadRouteTimetablePort.java";
   const plannerPath = "backend/src/main/java/com/easysubway/route/application/service/RouteV2Planner.java";
   const raptorPlannerPath = "backend/src/main/java/com/easysubway/route/application/service/RouteTimetableRaptorPlanner.java";
+  const routeV2PortPath = "backend/src/main/java/com/easysubway/route/application/port/in/RouteSearchUseCase.java";
 
   assert.equal(existsSync(path.join(root, useCasePath)), true, "RouteV2SearchUseCase must expose the V2 planning port");
   assert.equal(existsSync(path.join(root, timetablePortPath)), true, "RouteV2Planner must get timetable data through a port");
@@ -12375,8 +12394,13 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   const timetablePort = read(timetablePortPath);
   const planner = read(plannerPath);
   const raptorPlanner = read(raptorPlannerPath);
+  const routeV2Port = read(routeV2PortPath);
+  const postgresStateMigration = read("backend/src/main/resources/db/migration/postgresql/V57__route_v2_access_state.sql");
+  const h2StateMigration = read("backend/src/main/resources/db/migration/h2/V57__route_v2_access_state.sql");
+  const postgresArtifactIdMigration = read("backend/src/main/resources/db/migration/postgresql/V58__widen_route_v2_timetable_artifact_id.sql");
+  const h2ArtifactIdMigration = read("backend/src/main/resources/db/migration/h2/V58__widen_route_v2_timetable_artifact_id.sql");
   const v2Endpoint = controller.match(
-    /@PostMapping\("\/api\/v2\/routes\/search"\)[\s\S]*?ApiResponse<RouteSearchV2Response> searchRouteV2[\s\S]*?\n\t}/,
+    /@PostMapping\("\/api\/v2\/routes\/search"\)[\s\S]*?searchRouteV2[\s\S]*?\n\t}/,
   )?.[0] ?? "";
 
   assert.match(v2Endpoint, /routeV2SearchUseCase\.search/);
@@ -12392,15 +12416,23 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(planner, /ObjectProvider<LoadRouteTimetablePort>/);
   assert.match(planner, /getIfAvailable\(\)/);
   assert.match(planner, /timetableRequired && routeTimetablePort != null/);
-  assert.match(planner, /timetableRequired && canUseTimetableRaptor\(command\) && timetableCovers\(command\)/);
+  assert.match(planner, /timetableRequired[\s\S]*canUseTimetableRaptor\(command\)[\s\S]*routeTimetablePort\.hasRouteTimetable\(\)/);
+  assert.match(planner, /timetableCovers\(command, snapshot\)/);
+  assert.match(planner, /snapshot\.timetableArtifactId\(\)/);
   assert.match(planner, /coveredStationIds\(\)/);
   assert.match(planner, /hasRouteTimetable\(\)/);
-  assert.match(planner, /!command\.useRealtime\(\)/);
+  assert.doesNotMatch(planner, /!command\.useRealtime\(\)/);
+  assert.match(planner, /applyRealtimeToTimetableCandidates/);
+  assert.match(routeV2Port, /applyRealtimeToTimetableCandidates/);
+  assert.match(postgresStateMigration, /timetable_artifact_id VARCHAR\(160\) NOT NULL/);
+  assert.match(h2StateMigration, /timetable_artifact_id VARCHAR\(160\) NOT NULL/);
+  assert.match(postgresArtifactIdMigration, /ALTER COLUMN timetable_artifact_id TYPE VARCHAR\(200\)/);
+  assert.match(h2ArtifactIdMigration, /ALTER COLUMN timetable_artifact_id VARCHAR\(200\)/);
   assert.match(planner, /canUseTimetableRaptor/);
   assert.match(planner, /loadRouteTimetable\(\)/);
   assert.match(planner, /RouteTimetableRaptorPlanner/);
   assert.match(planner, /noTimetableServicePlan/);
-  assert.match(planner, /nextServiceTime\(command, routeTimetable\(\)\)/);
+  assert.match(planner, /nextServiceTime\(command, snapshot\.timetable\(\)\)/);
   assert.match(planner, /searchRouteAlternatives/);
   assert.match(planner, /statusesOf/);
   assert.match(raptorPlanner, /class RouteTimetableRaptorPlanner/);

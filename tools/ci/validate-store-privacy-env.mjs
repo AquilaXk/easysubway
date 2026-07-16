@@ -16,6 +16,7 @@ const androidRcProductionKeys = [
   "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID",
   "EASYSUBWAY_DATAPACK_CHANNEL",
   "EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256",
+  "EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER",
 ];
 
 function usage() {
@@ -207,6 +208,9 @@ function validateAndroidRcProduction(values, selected) {
     "EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256",
     selected.get("EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256"),
   );
+  if (!/^[1-9][0-9]*$/.test(selected.get("EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER"))) {
+    throw new Error("EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER must be a positive integer");
+  }
 }
 
 function validateEnv(values, options = {}) {
