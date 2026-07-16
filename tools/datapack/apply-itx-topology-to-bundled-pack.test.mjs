@@ -257,6 +257,13 @@ test("tracked production ITX topology evidence와 bundled pack은 --check를 통
   ], { cwd: root, env: freshBuildEnv });
 });
 
+test("ITX topology check는 self-consistent input size evidence 변조를 거부한다", async (context) => {
+  await rejectedTamperedEvidence(context, (evidence) => {
+    evidence.pack.inputByteSize = evidence.pack.byteSize;
+    evidence.pack.byteSizeDelta = 0;
+  });
+});
+
 test("ITX topology는 freshUntil 경계부터 ADMITTED source를 거부한다", async () => {
   const command = [
     "tools/datapack/apply-itx-topology-to-bundled-pack.mjs",

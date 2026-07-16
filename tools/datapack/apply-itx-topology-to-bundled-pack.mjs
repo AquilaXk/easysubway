@@ -10,6 +10,18 @@ const root = path.resolve(import.meta.dirname, "../..");
 const CATALOG_VERSION = 18;
 const EXPECTED_EDGE_COUNT = 48;
 const MAX_GZIP_DELTA_BYTES = 64 * 1024;
+const PRODUCTION_CONTRACT_PATH = repositoryPath(
+  "tools/datapack/itx-cheongchun-coverage-contract.json",
+);
+const ADMITTED_CANONICAL_INPUTS = new Map([
+  [
+    "e3c4f942a02712904d44d642627eb909523d55189efce96296a0d2b96e3ea4ad",
+    {
+      gzipSha256: "580814a58ce8d94b174de1ca8753ef7f350ce806dd793f6a7f43e07e7aa155b9",
+      byteSize: 354980,
+    },
+  ],
+]);
 const ROUTE_SERVICE_EVIDENCE_COLUMNS = `
   service_class TEXT NOT NULL PRIMARY KEY,
   timetable_artifact_id TEXT NOT NULL,
@@ -111,6 +123,20 @@ function assertCanonicalInputIdentity(contract, source, gzipSha256, sqliteSha256
     || canonical?.sqliteSha256 !== sqliteSha256) {
     throw new Error("ITX topology canonical input pack identity mismatch");
   }
+}
+
+function admittedCanonicalInputByteSize(reference, source, contractPath) {
+  const admitted = ADMITTED_CANONICAL_INPUTS.get(reference?.sha256);
+  if (admitted == null) {
+    if (contractPath === PRODUCTION_CONTRACT_PATH) {
+      throw new Error("ITX topology production source identity is not admitted");
+    }
+    return null;
+  }
+  if (source?.canonicalPackIdentity?.sha256 !== admitted.gzipSha256) {
+    throw new Error("ITX topology admitted canonical input identity mismatch");
+  }
+  return admitted.byteSize;
 }
 
 function routeServiceEvidence(contract, reference) {
@@ -422,6 +448,7 @@ async function main() {
     const evidence = JSON.parse(await readFile(evidencePath, "utf8"));
     const index = JSON.parse(await readFile(indexPath, "utf8"));
     const pack = index.packs?.find(({ id }) => id === "capital");
+    const admittedInputByteSize = admittedCanonicalInputByteSize(reference, source, contractPath);
     assertCanonicalInputIdentity(
       contract,
       source,
@@ -453,6 +480,8 @@ async function main() {
       || evidence?.pack?.byteSize !== inputGzipBytes.length
       || !Number.isInteger(evidence?.pack?.inputByteSize)
       || evidence.pack.inputByteSize <= 0
+      || (admittedInputByteSize !== null
+        && evidence.pack.inputByteSize !== admittedInputByteSize)
       || evidence?.pack?.byteSizeDelta !== inputGzipBytes.length - evidence.pack.inputByteSize
       || evidence.pack.byteSizeDelta > MAX_GZIP_DELTA_BYTES
       || pack?.sha256 !== sha256(inputGzipBytes)
