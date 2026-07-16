@@ -2,6 +2,8 @@ package com.easysubway.datapack.adapter.in.web;
 
 import com.easysubway.datapack.adapter.out.persistence.JdbcDatapackCandidateRepository;
 import com.easysubway.datapack.adapter.out.persistence.JdbcDatapackCandidateRepository.CandidateRow;
+import com.easysubway.datapack.adapter.out.persistence.JdbcDatapackReleaseDeliveryRepository;
+import com.easysubway.datapack.domain.DatapackReleaseDelivery;
 import com.easysubway.datapack.application.port.out.DatapackReleaseRequestRepository;
 import com.easysubway.datapack.application.service.DatapackReleaseRequestService;
 import com.easysubway.datapack.application.service.DatapackReleaseRequestService.CreateReleaseRequestCommand;
@@ -28,15 +30,18 @@ class DatapackReleaseRequestAdminPageController {
 	private final JdbcDatapackCandidateRepository candidateRepository;
 	private final DatapackReleaseRequestRepository releaseRequestRepository;
 	private final DatapackReleaseRequestService releaseRequestService;
+	private final JdbcDatapackReleaseDeliveryRepository deliveryRepository;
 
 	DatapackReleaseRequestAdminPageController(
 		JdbcDatapackCandidateRepository candidateRepository,
 		DatapackReleaseRequestRepository releaseRequestRepository,
-		DatapackReleaseRequestService releaseRequestService
+		DatapackReleaseRequestService releaseRequestService,
+		JdbcDatapackReleaseDeliveryRepository deliveryRepository
 	) {
 		this.candidateRepository = candidateRepository;
 		this.releaseRequestRepository = releaseRequestRepository;
 		this.releaseRequestService = releaseRequestService;
+		this.deliveryRepository = deliveryRepository;
 	}
 
 	@GetMapping("/admin/datapack/release-requests/page")
@@ -49,7 +54,21 @@ class DatapackReleaseRequestAdminPageController {
 		model.addAttribute("requests", releaseRequestRepository.findRecent(REQUEST_LIMIT).stream()
 			.map(ReleaseRequestView::from)
 			.toList());
+		model.addAttribute("deliveries", deliveryRepository.findRecent(REQUEST_LIMIT).stream()
+			.map(DeliveryView::from).toList());
 		return "admin/datapack/release-requests/list";
+	}
+
+	record DeliveryView(String releaseRequestId, long releaseSequence, String channel, String state,
+		int attempts, LocalDateTime nextAttemptAt, LocalDateTime reconcileDeadline,
+		LocalDateTime deadLetterDeadline, String httpClass, String detail,
+		String payloadSha256, String signatureSha256) {
+		static DeliveryView from(DatapackReleaseDelivery delivery) {
+			return new DeliveryView(delivery.releaseRequestId(), delivery.releaseSequence(),
+				delivery.channel(), delivery.state().name(), delivery.attempts(), delivery.nextAttemptAt(),
+				delivery.reconcileDeadline(), delivery.deadLetterDeadline(), delivery.httpClass(),
+				delivery.sanitizedDetail(), delivery.payloadSha256(), delivery.signatureSha256());
+		}
 	}
 
 	@PostMapping("/admin/datapack/release-requests")
