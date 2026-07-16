@@ -19,12 +19,15 @@ import 'features/stations/application/station_search_controller.dart';
 import 'features/stations/domain/station_line.dart';
 import 'features/stations/domain/station_models.dart';
 import 'features/stations/domain/station_repositories.dart';
+import 'features/stations/presentation/station_detail_header.dart';
 import 'features/stations/presentation/station_detail_info_row.dart';
+import 'features/stations/presentation/station_detail_route_actions.dart';
 import 'features/stations/presentation/station_exit_card.dart';
 import 'features/stations/presentation/station_facility_card.dart';
+import 'features/stations/presentation/station_facility_status_summary.dart';
 import 'features/stations/presentation/station_info_basis_disclosure.dart';
-import 'features/stations/presentation/station_line_badges.dart';
 import 'features/stations/presentation/station_recent_search_section.dart';
+import 'features/stations/presentation/station_realtime_summary.dart';
 import 'features/stations/presentation/station_search_body.dart';
 import 'features/stations/presentation/station_timetable_screen.dart';
 import 'internal_route.dart';
@@ -45,8 +48,6 @@ const _searchHistoryChangeErrorMessage = '최근 검색을 지우지 못했어�
 const _stationSearchPagePadding = EdgeInsets.fromLTRB(20, 20, 20, 32);
 const _stationSearchLargePagePadding = EdgeInsets.fromLTRB(24, 24, 24, 40);
 const _stationDetailInfoCardRadius = BorderRadius.all(Radius.circular(16));
-const _stationDetailActionButtonRadius = BorderRadius.all(Radius.circular(12));
-const _stationDetailFacilityCardRadius = BorderRadius.all(Radius.circular(16));
 
 class StationSearchScreen extends StatefulWidget {
   const StationSearchScreen({
@@ -932,10 +933,10 @@ class _StationDetailContent extends StatelessWidget {
     // 행동이 보이도록 실시간을 위로, 메타는 맨 아래로, 중복 "지도 위치 목록"과
     // 상시 안전 안내는 제거, "역 안 이동 안내"+"순서"는 한 섹션으로 통합한다.
     final primaryChildren = <Widget>[
-      _StationDetailHeader(detail: detail),
+      StationDetailHeader(detail: detail),
       const SizedBox(height: 12),
       if (facilityAttentionSummary.isNotEmpty) ...[
-        _StationFacilityStatusSummary(
+        StationFacilityStatusSummary(
           text: facilityAttentionSummary,
           semanticLabel: facilityAttentionSemanticLabel,
         ),
@@ -943,12 +944,12 @@ class _StationDetailContent extends StatelessWidget {
       ],
       const _StationDetailSectionTitle(title: '실시간 열차'),
       const SizedBox(height: 12),
-      _StationRealtimeSummary(
+      StationRealtimeSummary(
         snapshot: realtimeSnapshot,
         onRetry: onRetryRealtime,
       ),
       const SizedBox(height: 20),
-      _StationDetailRouteActions(
+      StationDetailRouteActions(
         detail: detail,
         routeDraftController: routeDraftController,
         favoriteController: favoriteController,
@@ -1237,273 +1238,6 @@ class _StationDetailAdaptiveContent extends StatelessWidget {
   }
 }
 
-class _StationRealtimeSummary extends StatelessWidget {
-  const _StationRealtimeSummary({
-    required this.snapshot,
-    required this.onRetry,
-  });
-
-  final RealtimeSnapshot snapshot;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final title = switch (snapshot.status) {
-      RealtimeSnapshotStatus.fresh => '도착 정보',
-      RealtimeSnapshotStatus.stale => '최근 도착 정보',
-      RealtimeSnapshotStatus.unsupported => '지원 준비 중',
-      RealtimeSnapshotStatus.unavailable => '실시간 정보 확인 불가',
-      RealtimeSnapshotStatus.loading => '실시간 정보 확인 중',
-    };
-    // 실시간 조회가 실패로 끝난 경우에만 다시 시도를 권한다. 미지원 노선은
-    // 재시도해도 결과가 같으므로 버튼을 노출하지 않는다.
-    final canRetry = snapshot.status == RealtimeSnapshotStatus.unavailable;
-    final summary = snapshot.summaryText.trim().isEmpty
-        ? '역 정보와 경로 검색은 계속 이용할 수 있습니다.'
-        : snapshot.summaryText.trim();
-    final updatedLabel = snapshot.receivedAt.trim().isEmpty
-        ? ''
-        : '마지막 갱신 ${snapshot.receivedAt}';
-    final semanticParts = [
-      '실시간 열차',
-      title,
-      summary,
-      if (updatedLabel.isNotEmpty) updatedLabel,
-      if (canRetry) '다시 시도할 수 있어요',
-    ];
-    return Semantics(
-      label: semanticParts.join(', '),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: _stationDetailInfoCardRadius,
-          border: Border.all(color: EasySubwayAccessibleColors.line),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(
-                  Icons.schedule,
-                  color: EasySubwayAccessibleColors.primary,
-                  size: 28,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: EasySubwayAccessibleColors.text,
-                      fontWeight: FontWeight.w700,
-                      height: 1.25,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              summary,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: EasySubwayAccessibleColors.text,
-                height: 1.35,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            if (updatedLabel.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Text(
-                updatedLabel,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: EasySubwayAccessibleColors.mutedText,
-                  height: 1.3,
-                ),
-              ),
-            ],
-            if (canRetry) ...[
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: OutlinedButton.icon(
-                  key: const Key('stationRealtimeRetryButton'),
-                  onPressed: onRetry,
-                  icon: const Icon(Icons.refresh, size: 20),
-                  label: const Text('다시 시도'),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StationDetailRouteActions extends StatelessWidget {
-  const _StationDetailRouteActions({
-    required this.detail,
-    required this.routeDraftController,
-    required this.favoriteController,
-  });
-
-  final StationDetail detail;
-  final RouteDraftController? routeDraftController;
-  final StationFavoriteToggleController? favoriteController;
-
-  @override
-  Widget build(BuildContext context) {
-    // 상용 지도·교통 앱(카카오맵·구글맵)처럼 출발·도착·저장(즐겨찾기)을 한 줄의
-    // 동등한 액션으로 묶는다. 즐겨찾기는 별도 큰 버튼이 아니라 이 행의 피어다.
-    final draftController = routeDraftController;
-    final favController = favoriteController;
-    final station = RouteDraftStation(id: detail.id, nameKo: detail.nameKo);
-    final buttons = <Widget>[
-      if (draftController != null) ...[
-        _StationPointButton(
-          key: const Key('stationDetailSetOriginButton'),
-          icon: Icons.trip_origin,
-          label: '출발',
-          onPressed: () {
-            draftController.setOrigin(station);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('${station.displayName}을 출발역으로 설정했습니다')),
-            );
-          },
-        ),
-        _StationPointButton(
-          key: const Key('stationDetailSetDestinationButton'),
-          icon: Icons.flag_outlined,
-          label: '도착',
-          onPressed: () {
-            draftController.setDestination(station);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('${station.displayName}을 도착역으로 설정했습니다')),
-            );
-          },
-        ),
-      ],
-      if (favController != null)
-        _StationFavoriteButton(detail: detail, controller: favController),
-    ];
-    if (buttons.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return Row(
-      children: [
-        for (var i = 0; i < buttons.length; i++) ...[
-          if (i > 0) const SizedBox(width: 10),
-          Expanded(child: buttons[i]),
-        ],
-      ],
-    );
-  }
-}
-
-class _StationFavoriteButton extends StatelessWidget {
-  const _StationFavoriteButton({
-    required this.detail,
-    required this.controller,
-  });
-
-  final StationDetail detail;
-  final StationFavoriteToggleController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, _) {
-        final state = controller.state;
-        final isFavorite = state.isFavorite;
-        final label = switch (state.status) {
-          StationFavoriteToggleStatus.checking => '확인 중',
-          StationFavoriteToggleStatus.saving => '저장 중',
-          StationFavoriteToggleStatus.removing => '해제 중',
-          StationFavoriteToggleStatus.ready ||
-          StationFavoriteToggleStatus.failure => isFavorite ? '저장됨' : '저장',
-        };
-        final actionLabel = state.status == StationFavoriteToggleStatus.checking
-            ? '즐겨찾기 확인 중'
-            : isFavorite
-            ? '즐겨찾기 해제'
-            : '즐겨찾기 저장';
-        final onPressed = state.isBusy
-            ? null
-            : () async {
-                if (isFavorite) {
-                  await controller.remove();
-                } else {
-                  await controller.save();
-                }
-                if (!context.mounted) {
-                  return;
-                }
-                // 저장·해제 결과(및 실패 사유)는 상용 앱과 동일하게 스낵바로 알린다.
-                // 직전 스낵바는 지워 연속 토글 시 최신 결과가 바로 보이게 한다.
-                final message = controller.state.message;
-                if (message.isNotEmpty) {
-                  ScaffoldMessenger.of(context)
-                    ..clearSnackBars()
-                    ..showSnackBar(SnackBar(content: Text(message)));
-                }
-              };
-        return Semantics(
-          container: true,
-          label: '${detail.nameKo}역 $actionLabel',
-          button: true,
-          onTap: onPressed,
-          child: ExcludeSemantics(
-            child: _StationPointButton(
-              key: const Key('stationFavoriteToggleButton'),
-              icon: isFavorite ? Icons.star : Icons.star_border,
-              label: label,
-              onPressed: onPressed,
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _StationPointButton extends StatelessWidget {
-  const _StationPointButton({
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-    super.key,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    // 같은 성격 행동은 화면이 달라도 같은 패턴: 검색 결과의 _StationRoleButton과
-    // 동일하게 아웃라인 아이콘 + 라벨, 단일 primary 계열.
-    return OutlinedButton.icon(
-      onPressed: onPressed,
-      style: OutlinedButton.styleFrom(
-        minimumSize: const Size.fromHeight(EasySubwayTouchTarget.general),
-        backgroundColor: Colors.white,
-        foregroundColor: EasySubwayAccessibleColors.primary,
-        side: const BorderSide(color: EasySubwayAccessibleColors.line),
-        shape: const RoundedRectangleBorder(
-          borderRadius: _stationDetailActionButtonRadius,
-        ),
-        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-      ),
-      icon: Icon(icon, size: 22),
-      label: Text(label),
-    );
-  }
-}
-
 class _StationLayoutSummary extends StatelessWidget {
   const _StationLayoutSummary({
     required this.items,
@@ -1579,146 +1313,6 @@ class _StationLayoutStep extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _StationFacilityStatusSummary extends StatelessWidget {
-  const _StationFacilityStatusSummary({
-    required this.text,
-    required this.semanticLabel,
-  });
-
-  final String text;
-  final String semanticLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: semanticLabel,
-      child: ExcludeSemantics(
-        child: Card(
-          margin: EdgeInsets.zero,
-          color: EasySubwayAccessibleColors.redSoft,
-          elevation: 0,
-          shape: const RoundedRectangleBorder(
-            borderRadius: _stationDetailFacilityCardRadius,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.warning_amber,
-                  color: EasySubwayAccessibleColors.red,
-                  size: 24,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    text,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: EasySubwayAccessibleColors.red,
-                      fontWeight: FontWeight.w700,
-                      height: 1.3,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StationDetailHeader extends StatelessWidget {
-  const _StationDetailHeader({required this.detail});
-
-  final StationDetail detail;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return Semantics(
-      label: detail.semanticLabel,
-      header: true,
-      child: ExcludeSemantics(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              StationLineBadges(lines: detail.lines, size: 34),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${detail.nameKo}역',
-                      style: textTheme.headlineSmall?.copyWith(
-                        color: EasySubwayAccessibleColors.text,
-                        fontWeight: FontWeight.w700,
-                        height: 1.2,
-                      ),
-                    ),
-                    // 부역명(#1789 P0.2). name_ko에서 분리한 부역명을 역명 아래
-                    // 보조 표기로 노출한다(있을 때만).
-                    if (detail.nameSub.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        detail.nameSub,
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: EasySubwayAccessibleColors.secondaryText,
-                          fontWeight: FontWeight.w600,
-                          height: 1.2,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 4),
-                    Text(
-                      detail.lineLabel,
-                      style: textTheme.bodyLarge?.copyWith(
-                        color: EasySubwayAccessibleColors.secondaryText,
-                        fontWeight: FontWeight.w600,
-                        height: 1.3,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  const Text(
-                    '마지막 확인',
-                    style: TextStyle(
-                      color: EasySubwayAccessibleColors.mutedText,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                      height: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    stationVerifiedRelativeLabel(detail.lastVerifiedAt),
-                    style: const TextStyle(
-                      color: EasySubwayAccessibleColors.mutedText,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      height: 1.2,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
