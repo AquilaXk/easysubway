@@ -2391,9 +2391,11 @@ test("모바일 홈 shell과 주요 상태 UI 회귀 테스트는 유지된다",
 });
 
 test("모바일 역 검색 결과 시스템 글자 크기 문구 회귀 테스트는 유지된다", () => {
-  const stationSearch = read("apps/mobile/lib/station_search.dart");
+  const stationSearchBody = read(
+    "apps/mobile/lib/features/stations/presentation/station_search_body.dart",
+  );
   const widgetTest = read("apps/mobile/test/widget_test.dart");
-  const resultTileMatch = stationSearch.match(
+  const resultTileMatch = stationSearchBody.match(
     /class _StationSearchResultTile[\s\S]*?class _StationRoleActionBar/,
   );
   const largeTextTestMatch = widgetTest.match(
@@ -13361,6 +13363,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const onboardingTest = read("apps/mobile/test/onboarding_test.dart");
   const routeSearch = read("apps/mobile/lib/route_search.dart");
   const stationSearch = read("apps/mobile/lib/station_search.dart");
+  const stationSearchBody = read(
+    "apps/mobile/lib/features/stations/presentation/station_search_body.dart",
+  );
   const stationModels = read(
     "apps/mobile/lib/features/stations/domain/station_models.dart",
   );
@@ -13449,8 +13454,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(onboardingAppFlowTest, /첫 실행 앱은 알림 권한 제공자가 직접 주입되면 온보딩 알림 권한을 요청한다/);
   assert.match(onboardingAppFlowTest, /앱은 저장된 온보딩 설정으로 홈을 바로 보여준다/);
   assert.match(onboardingAppFlowTest, /앱은 온보딩 저장소를 읽지 못하면 다시 설정을 고르게 한다/);
-  assert.match(stationSearch, /stationSearchFailureNextAction/);
-  assert.match(stationSearch, /역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다\./);
+  assert.match(stationSearchBody, /stationSearchFailureNextAction/);
+  assert.match(stationSearchBody, /역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다\./);
   assert.match(widgetTest, /역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다\./);
   assert.match(appRoot, /initialMobilityType: onboardingResult\?\.mobilityType/);
   assert.match(homeScreen, /initialMobilityType: initialMobilityType/);
