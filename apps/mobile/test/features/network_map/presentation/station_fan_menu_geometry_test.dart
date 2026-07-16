@@ -35,11 +35,27 @@ void main() {
     expect(geo.silhouette.contains(const Offset(350, 277)), isTrue);
   });
 
-  test('v2 닫기 섹터와 silhouette는 원본 좌표를 포함한다', () {
+  test('닫기 섹터와 silhouette는 아이콘·라벨 코어 좌표를 포함한다', () {
     final geo = buildStationFanMenuGeometry();
     expect(geo.close.contains(const Offset(350, 250.93905)), isTrue);
     expect(geo.close.contains(const Offset(350, 302.93903)), isTrue);
     expect(geo.silhouette.contains(const Offset(350, 302.93903)), isTrue);
+  });
+
+  test('v3 말풍선 꼬리 팁 상수는 (350,375)이고 닫기·silhouette 하단이 꼬리를 이룬다', () {
+    // 팁 상수는 배치(placement)가 소비하는 단일 출처.
+    expect(kFanMenuTailTip, const Offset(350, 375));
+    final geo = buildStationFanMenuGeometry();
+    // 꼬리 내부(팁 바로 위 중심선)는 닫기·silhouette에 포함된다.
+    expect(geo.close.contains(const Offset(350, 373)), isTrue);
+    expect(geo.silhouette.contains(const Offset(350, 373)), isTrue);
+    // 팁 아래(설계 꼬리 밖)는 포함되지 않는다 — 하단이 팁에서 닫힘.
+    expect(geo.close.contains(const Offset(350, 377)), isFalse);
+    expect(geo.silhouette.contains(const Offset(350, 377)), isFalse);
+    // 늘어난 꼬리는 다른 섹터를 침범하지 않는다(#2109 비겹침 유지).
+    expect(geo.departure.contains(const Offset(350, 373)), isFalse);
+    expect(geo.arrival.contains(const Offset(350, 373)), isFalse);
+    expect(geo.waypoint.contains(const Offset(350, 373)), isFalse);
   });
 
   test('내부 구분선은 SVG의 세 contour만 가진다', () {
