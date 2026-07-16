@@ -3464,7 +3464,7 @@ void main() {
     );
   });
 
-  testWidgets('노선도 급행 전환은 전체 바탕을 흐리고 급행 집합만 강조한다', (tester) async {
+  testWidgets('노선도는 앱 라벨을 쓰고 급행 전환 시 급행 집합만 표시한다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(
         repository: FakeStationSearchRepository(
@@ -3478,7 +3478,19 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byType(StructuredRouteMapView), findsNothing);
+    expect(find.byType(StructuredRouteMapView), findsOneWidget);
+    expect(
+      tester
+          .widget<StructuredRouteMapView>(find.byType(StructuredRouteMapView))
+          .drawLines,
+      isFalse,
+    );
+    expect(
+      tester
+          .widget<StructuredRouteMapView>(find.byType(StructuredRouteMapView))
+          .drawStationSymbols,
+      isFalse,
+    );
 
     await tester.tap(find.text('급행'));
     await tester.pumpAndSettle();
@@ -3486,17 +3498,13 @@ void main() {
     final overlay = tester.widget<StructuredRouteMapView>(
       find.byType(StructuredRouteMapView),
     );
+    expect(overlay.drawLines, isTrue);
+    expect(overlay.drawStationSymbols, isTrue);
     expect(overlay.map.lines.map((line) => line.lineId), ['line-express']);
     expect(overlay.map.stations.map((station) => station.lineId).toSet(), {
       'line-express',
     });
-    final basemapOpacity = tester.widget<Opacity>(
-      find.ancestor(
-        of: find.byType(RouteMapBasemapView),
-        matching: find.byType(Opacity),
-      ),
-    );
-    expect(basemapOpacity.opacity, lessThan(0.5));
+    expect(find.byType(RouteMapBasemapView), findsNothing);
   });
 
   testWidgets('노선도 viewport 밖 station semantics는 생성하지 않는다', (tester) async {

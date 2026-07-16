@@ -22,18 +22,18 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('5권역 데이터 region을 각 바탕 .vec 자산에 매핑한다', () {
+  test('5권역 표시명을 각 바탕 .vec 자산에 매핑한다', () {
     expect(
       {
-        for (final region in ['수도권', '부산권', '대구권', '대전권', '광주권'])
+        for (final region in ['수도권', '부산', '대구', '대전', '광주'])
           region: routeMapBasemapAssetForRegion(region),
       },
       {
         '수도권': 'assets/datapacks/metro_map_pack/basemap/seoul.vec',
-        '부산권': 'assets/datapacks/metro_map_pack/basemap/busan.vec',
-        '대구권': 'assets/datapacks/metro_map_pack/basemap/daegu.vec',
-        '대전권': 'assets/datapacks/metro_map_pack/basemap/daejeon.vec',
-        '광주권': 'assets/datapacks/metro_map_pack/basemap/gwangju.vec',
+        '부산': 'assets/datapacks/metro_map_pack/basemap/busan.vec',
+        '대구': 'assets/datapacks/metro_map_pack/basemap/daegu.vec',
+        '대전': 'assets/datapacks/metro_map_pack/basemap/daejeon.vec',
+        '광주': 'assets/datapacks/metro_map_pack/basemap/gwangju.vec',
       },
     );
   });
@@ -126,17 +126,63 @@ void main() {
   //   track projection·parallel offset 후처리로 발생하는 worst-case 편차(#2068
   //   이슈 "11~30px 이내")에 헤드룸을 둔 값 — 두 좌표가 같은 원점·스케일의 viewBox
   //   좌표계를 공유한다는 사실을 고정한다(권역 대표로 seoul만; 5권역 확장 안 함).
-  const seoulFixture = <({String name, Offset svgNode, Offset pack, double measured})>[
-    (name: '강남', svgNode: Offset(1369.617, 1266.787), pack: Offset(1369.8, 1266.9), measured: 0.17),
-    (name: '잠실', svgNode: Offset(1532.203, 1121.976), pack: Offset(1529.4, 1120.3), measured: 3.26),
-    (name: '사당', svgNode: Offset(1184.615, 1262.218), pack: Offset(1186.5, 1261.9), measured: 1.91),
-    (name: '서울역', svgNode: Offset(1055.9, 905.304), pack: Offset(1053.5, 897.7), measured: 7.97),
-    (name: '청량리', svgNode: Offset(1553.242, 753.882), pack: Offset(1551.8, 753.2), measured: 1.57),
-    (name: '인천', svgNode: Offset(391.867, 1419.985), pack: Offset(391.0, 1417.9), measured: 2.27),
-    (name: '수원', svgNode: Offset(1148.164, 1631.347), pack: Offset(1146.3, 1630.4), measured: 2.08),
-    (name: '의정부', svgNode: Offset(1456.977, 468.558), pack: Offset(1457.1, 468.4), measured: 0.26),
-    (name: '동두천', svgNode: Offset(1129.377, 468.558), pack: Offset(1125.4, 468.4), measured: 3.99),
-  ];
+  const seoulFixture =
+      <({String name, Offset svgNode, Offset pack, double measured})>[
+        (
+          name: '강남',
+          svgNode: Offset(1369.617, 1266.787),
+          pack: Offset(1369.8, 1266.9),
+          measured: 0.17,
+        ),
+        (
+          name: '잠실',
+          svgNode: Offset(1532.203, 1121.976),
+          pack: Offset(1529.4, 1120.3),
+          measured: 3.26,
+        ),
+        (
+          name: '사당',
+          svgNode: Offset(1184.615, 1262.218),
+          pack: Offset(1186.5, 1261.9),
+          measured: 1.91,
+        ),
+        (
+          name: '서울역',
+          svgNode: Offset(1055.9, 905.304),
+          pack: Offset(1053.5, 897.7),
+          measured: 7.97,
+        ),
+        (
+          name: '청량리',
+          svgNode: Offset(1553.242, 753.882),
+          pack: Offset(1551.8, 753.2),
+          measured: 1.57,
+        ),
+        (
+          name: '인천',
+          svgNode: Offset(391.867, 1419.985),
+          pack: Offset(391.0, 1417.9),
+          measured: 2.27,
+        ),
+        (
+          name: '수원',
+          svgNode: Offset(1148.164, 1631.347),
+          pack: Offset(1146.3, 1630.4),
+          measured: 2.08,
+        ),
+        (
+          name: '의정부',
+          svgNode: Offset(1456.977, 468.558),
+          pack: Offset(1457.1, 468.4),
+          measured: 0.26,
+        ),
+        (
+          name: '동두천',
+          svgNode: Offset(1129.377, 468.558),
+          pack: Offset(1125.4, 468.4),
+          measured: 3.99,
+        ),
+      ];
 
   const alignmentThresholdPx = 40.0;
 

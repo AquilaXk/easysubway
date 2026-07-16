@@ -14,27 +14,24 @@ import '../domain/map_camera.dart';
 // 유지하므로, 인터랙션 좌표(station.position = route_map_positions)와 동일 원점·
 // 동일 스케일이다 → designScale 곱셈/나눗셈 없이 카메라 변환만으로 1:1 정렬한다.
 //
-// [설계 결정: 병존] 이 위젯은 기존 StructuredRouteMapView/Painter를 대체하지 않고
-// 병존한다. structured painter는 s0 골든·attribution·painter 테스트 계약에서
-// 여전히 참조되므로 삭제하지 않는다(#2068 회귀 안전). 프로덕션 렌더링 경로만
-// StructuredRouteMapView → RouteMapBasemapView로 전환한다.
+// [설계 결정: 병존] 이 위젯은 노선 형상과 오너 SVG의 기존 역·환승 심벌을 그리고,
+// 구조화 painter는 충돌 회피 역명·뱃지를 같은 카메라 좌표계에 그린다.
+// SVG의 제목·범례·역명·미개통 형상은 컴파일 입력에서 제외한다.
 
 /// `widget.data.selectedRegion`(한글) → manifest map id. .vec 자산 파일명 결정.
 /// 매핑에 없는 region은 basemap 미표시(빈 화면)로 안전 폴백한다(크래시 금지).
 const Map<String, String> kRouteMapBasemapRegionToId = {
   '수도권': 'seoul',
-  '부산권': 'busan',
-  '광주권': 'gwangju',
-  '대구권': 'daegu',
-  '대전권': 'daejeon',
+  '부산': 'busan',
+  '광주': 'gwangju',
+  '대구': 'daegu',
+  '대전': 'daejeon',
 };
 
 /// region → .vec 자산 경로. 매핑에 없으면 null(바탕 미표시 폴백).
 String? routeMapBasemapAssetForRegion(String region) {
   final id = kRouteMapBasemapRegionToId[region];
-  return id == null
-      ? null
-      : 'assets/datapacks/metro_map_pack/basemap/$id.vec';
+  return id == null ? null : 'assets/datapacks/metro_map_pack/basemap/$id.vec';
 }
 
 const TextStyle _attributionStyle = TextStyle(
@@ -215,9 +212,7 @@ class _RouteMapBasemapViewState extends State<RouteMapBasemapView> {
               exception: error,
               stack: stack,
               library: 'network_map',
-              context: ErrorDescription(
-                '노선도 바탕 .vec 로드 실패($asset)',
-              ),
+              context: ErrorDescription('노선도 바탕 .vec 로드 실패($asset)'),
             ),
           );
         });

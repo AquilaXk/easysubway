@@ -19,6 +19,8 @@
       "route_map_strategy": {
         "rendering_strategy": "self-drawn-hybrid-basemap",
         "bundled_svg_role": "hybrid-basemap-source",
+        "compiled_content": "route-lines-and-station-symbols",
+        "structured_overlay": "labels-interaction",
         "commercial_production_ready": true,
         "decision_ref": "tools/route-map/route-map-license-decision.json"
       },
@@ -56,6 +58,8 @@
       "route_map_strategy": {
         "rendering_strategy": "self-drawn-hybrid-basemap",
         "bundled_svg_role": "hybrid-basemap-source",
+        "compiled_content": "route-lines-and-station-symbols",
+        "structured_overlay": "labels-interaction",
         "commercial_production_ready": true,
         "decision_ref": "tools/route-map/route-map-license-decision.json"
       },
@@ -81,6 +85,10 @@
         "derivativeWorkAllowed": true,
         "redistributionAllowed": true,
         "reviewStatus": "self-drawn-confirmed",
+        "excludedThirdPartyContent": [
+          "Font Awesome Free plane icon (FortAwesome, CC BY 4.0)",
+          "KTX/SRT and other brand marks"
+        ],
         "changes": "App rendering uses structured coordinates (route_map_positions) derived from the owner's self-drawn 8-linear Busan schematic (easy-subway-busan-v1), not the raw SVG. The self-drawn SVG is now the basemap paint source (build-time compiled, hybrid rendering), while interaction (station tap hit-testing, focus camera, popover anchoring, route highlighting) still trusts the structured coordinates. The compiled basemap `.vec` (vector_graphics binary, compiled from the self-drawn SVG via tools/route-map/compile-basemap-vec.mjs) is now bundled offline (offline.included=true, type vector-graphics-vec)."
       }
     },
@@ -93,6 +101,8 @@
       "route_map_strategy": {
         "rendering_strategy": "self-drawn-hybrid-basemap",
         "bundled_svg_role": "hybrid-basemap-source",
+        "compiled_content": "route-lines-and-station-symbols",
+        "structured_overlay": "labels-interaction",
         "commercial_production_ready": true,
         "decision_ref": "tools/route-map/route-map-license-decision.json"
       },
@@ -129,6 +139,8 @@
       "route_map_strategy": {
         "rendering_strategy": "self-drawn-hybrid-basemap",
         "bundled_svg_role": "hybrid-basemap-source",
+        "compiled_content": "route-lines-and-station-symbols",
+        "structured_overlay": "labels-interaction",
         "commercial_production_ready": true,
         "decision_ref": "tools/route-map/route-map-license-decision.json"
       },
@@ -166,6 +178,8 @@
       "route_map_strategy": {
         "rendering_strategy": "self-drawn-hybrid-basemap",
         "bundled_svg_role": "hybrid-basemap-source",
+        "compiled_content": "route-lines-and-station-symbols",
+        "structured_overlay": "labels-interaction",
         "commercial_production_ready": true,
         "decision_ref": "tools/route-map/route-map-license-decision.json"
       },

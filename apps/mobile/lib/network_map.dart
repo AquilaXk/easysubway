@@ -3767,8 +3767,8 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   Offset? _gestureStartFocalPoint;
   String? _geometryCacheKey;
   _MapGeometry? _geometryCache;
-  NetworkMapData? _expressOverlayData;
-  StructuredRouteMap? _expressOverlayMap;
+  NetworkMapData? _structuredMapData;
+  StructuredRouteMap? _structuredMap;
   NetworkMapStation? _selectedStation;
   // region → attribution 표시 문자열(#1951). manifest 로드 전에는 null로 두고
   // attribution을 표시하지 않는다(로드 실패 시에도 동일하게 조용히 미표기).
@@ -4369,45 +4369,56 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     Offset sourceOrigin,
   ) {
     final attribution = _attributionTextByRegion?[widget.data.selectedRegion];
+    final lineColors = routeMapLineColors({
+      for (final line in widget.data.lines) line.id: line.color,
+    });
+    final labelTextByStationId = {
+      for (final station in widget.data.stations)
+        station.id: routeMapStationLabel(station.nameKo),
+    };
+    final lineBadgeLabelByLineId = {
+      for (final line in widget.data.lines)
+        line.id: routeMapLineBadgeLabel(line.name),
+    };
+    if (widget.showExpressOverlay) {
+      return StructuredRouteMapView(
+        map: _currentStructuredMap(),
+        camera: camera,
+        lineColors: lineColors,
+        labelTextByStationId: labelTextByStationId,
+        lineBadgeLabelByLineId: lineBadgeLabelByLineId,
+        sourceOrigin: sourceOrigin,
+      );
+    }
     return Stack(
       fit: StackFit.expand,
       children: [
-        Opacity(
-          opacity: widget.showExpressOverlay ? 0.18 : 1,
-          child: RouteMapBasemapView(
-            region: widget.data.selectedRegion,
-            camera: camera,
-            sourceOrigin: sourceOrigin,
-            attributionText: attribution,
-          ),
+        RouteMapBasemapView(
+          region: _displayRegionName(widget.data.selectedRegion),
+          camera: camera,
+          sourceOrigin: sourceOrigin,
+          attributionText: attribution,
         ),
-        if (widget.showExpressOverlay)
-          StructuredRouteMapView(
-            map: _expressMap(),
-            camera: camera,
-            lineColors: routeMapLineColors({
-              for (final line in widget.data.lines) line.id: line.color,
-            }),
-            labelTextByStationId: {
-              for (final station in widget.data.stations)
-                station.id: routeMapStationLabel(station.nameKo),
-            },
-            lineBadgeLabelByLineId: {
-              for (final line in widget.data.lines)
-                line.id: routeMapLineBadgeLabel(line.name),
-            },
-            sourceOrigin: sourceOrigin,
-          ),
+        StructuredRouteMapView(
+          map: _currentStructuredMap(),
+          camera: camera,
+          lineColors: lineColors,
+          labelTextByStationId: labelTextByStationId,
+          lineBadgeLabelByLineId: lineBadgeLabelByLineId,
+          drawLines: false,
+          drawStationSymbols: false,
+          sourceOrigin: sourceOrigin,
+        ),
       ],
     );
   }
 
-  StructuredRouteMap _expressMap() {
-    if (!identical(_expressOverlayData, widget.data)) {
-      _expressOverlayData = widget.data;
-      _expressOverlayMap = widget.data.toStructuredRouteMap();
+  StructuredRouteMap _currentStructuredMap() {
+    if (!identical(_structuredMapData, widget.data)) {
+      _structuredMapData = widget.data;
+      _structuredMap = widget.data.toStructuredRouteMap();
     }
-    return _expressOverlayMap!;
+    return _structuredMap!;
   }
 }
 

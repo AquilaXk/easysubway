@@ -154,86 +154,92 @@ ui.Picture recordRouteMapPicture({
   required RouteMapStaticLabelLayout layout,
   required Map<String, Color> lineColors,
   required Map<String, List<List<Offset>>> lineOffsets,
+  bool drawLines = true,
+  bool drawStationSymbols = true,
 }) {
   final recorder = ui.PictureRecorder();
   final canvas = Canvas(recorder);
-  final linePaint = Paint()
-    ..style = PaintingStyle.stroke
-    ..strokeWidth = kRouteMapDesignLineWidthPx
-    ..strokeJoin = StrokeJoin.round
-    ..strokeCap = StrokeCap.round
-    ..isAntiAlias = true;
+  if (drawLines) {
+    final linePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = kRouteMapDesignLineWidthPx
+      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.round
+      ..isAntiAlias = true;
 
-  // 1) 선: 정점을 design으로 투영 + G4 평행 오프셋(design px 그대로 적용).
-  for (final line in map.lines) {
-    linePaint.color = lineColors[line.lineId] ?? _fallbackLineColor;
-    final offsetsByPolyline = lineOffsets[line.lineId];
-    for (var p = 0; p < line.polylines.length; p += 1) {
-      final polyline = line.polylines[p];
-      if (polyline.isEmpty) continue;
-      final vertexOffsets =
-          offsetsByPolyline != null && p < offsetsByPolyline.length
-          ? offsetsByPolyline[p]
-          : null;
-      final path = Path();
-      for (var v = 0; v < polyline.length; v += 1) {
-        var point = design.toDesign(polyline[v]);
-        if (vertexOffsets != null && v < vertexOffsets.length) {
-          point += vertexOffsets[v] * kRouteMapDesignLineWidthPx;
+    // 1) 선: 정점을 design으로 투영 + G4 평행 오프셋(design px 그대로 적용).
+    for (final line in map.lines) {
+      linePaint.color = lineColors[line.lineId] ?? _fallbackLineColor;
+      final offsetsByPolyline = lineOffsets[line.lineId];
+      for (var p = 0; p < line.polylines.length; p += 1) {
+        final polyline = line.polylines[p];
+        if (polyline.isEmpty) continue;
+        final vertexOffsets =
+            offsetsByPolyline != null && p < offsetsByPolyline.length
+            ? offsetsByPolyline[p]
+            : null;
+        final path = Path();
+        for (var v = 0; v < polyline.length; v += 1) {
+          var point = design.toDesign(polyline[v]);
+          if (vertexOffsets != null && v < vertexOffsets.length) {
+            point += vertexOffsets[v] * kRouteMapDesignLineWidthPx;
+          }
+          v == 0
+              ? path.moveTo(point.dx, point.dy)
+              : path.lineTo(point.dx, point.dy);
         }
-        v == 0
-            ? path.moveTo(point.dx, point.dy)
-            : path.lineTo(point.dx, point.dy);
+        canvas.drawPath(path, linePaint);
       }
-      canvas.drawPath(path, linePaint);
     }
   }
 
-  // 2) 일반역 노드(흰 채움 + 노선색 테두리) — 상시 표시(스펙 S5).
-  for (final station in map.stations) {
-    if (station.labelClass == RouteMapLabelClass.transfer) continue;
-    final center = design.toDesign(station.position);
-    canvas.drawCircle(
-      center,
-      kRouteMapDesignStationRadiusPx,
-      _regularStationFillPaint,
-    );
-    _regularStationBorderPaint.color =
-        lineColors[station.lineId] ?? _fallbackLineColor;
-    canvas.drawCircle(
-      center,
-      kRouteMapDesignStationRadiusPx,
-      _regularStationBorderPaint,
-    );
-  }
+  if (drawStationSymbols) {
+    // 2) 일반역 노드(흰 채움 + 노선색 테두리) — 상시 표시(스펙 S5).
+    for (final station in map.stations) {
+      if (station.labelClass == RouteMapLabelClass.transfer) continue;
+      final center = design.toDesign(station.position);
+      canvas.drawCircle(
+        center,
+        kRouteMapDesignStationRadiusPx,
+        _regularStationFillPaint,
+      );
+      _regularStationBorderPaint.color =
+          lineColors[station.lineId] ?? _fallbackLineColor;
+      canvas.drawCircle(
+        center,
+        kRouteMapDesignStationRadiusPx,
+        _regularStationBorderPaint,
+      );
+    }
 
-  // 3) 환승 캡슐 — 기존 routeMapTransferMarkers를 design 좌표로 호출.
-  for (final group in map.transferGroups) {
-    final markers = routeMapTransferMarkers(
-      memberCenters: [
-        for (final p in group.memberPositions) design.toDesign(p),
-      ],
-      colors: [
-        for (final id in group.lineIds) lineColors[id] ?? _fallbackLineColor,
-      ],
-      designSpread:
-          offsetsMaxPairwiseDistance(group.memberPositions) *
-          design.designScale,
-      dotRadius: kRouteMapTransferDotRadiusPx,
-      dotGap: kRouteMapTransferDotGapPx,
-      padding: kRouteMapTransferDotPaddingPx,
-      horizontalDots: _transferDotsHorizontal(map, group, design),
-    );
-    for (final marker in markers) {
-      canvas.drawRRect(marker.capsule, _transferFillPaint);
-      canvas.drawRRect(marker.capsule, _transferBorderPaint);
-      for (final dot in marker.dots) {
-        _transferDotPaint.color = dot.color;
-        canvas.drawCircle(
-          dot.center,
-          kRouteMapTransferDotRadiusPx,
-          _transferDotPaint,
-        );
+    // 3) 환승 캡슐 — 기존 routeMapTransferMarkers를 design 좌표로 호출.
+    for (final group in map.transferGroups) {
+      final markers = routeMapTransferMarkers(
+        memberCenters: [
+          for (final p in group.memberPositions) design.toDesign(p),
+        ],
+        colors: [
+          for (final id in group.lineIds) lineColors[id] ?? _fallbackLineColor,
+        ],
+        designSpread:
+            offsetsMaxPairwiseDistance(group.memberPositions) *
+            design.designScale,
+        dotRadius: kRouteMapTransferDotRadiusPx,
+        dotGap: kRouteMapTransferDotGapPx,
+        padding: kRouteMapTransferDotPaddingPx,
+        horizontalDots: _transferDotsHorizontal(map, group, design),
+      );
+      for (final marker in markers) {
+        canvas.drawRRect(marker.capsule, _transferFillPaint);
+        canvas.drawRRect(marker.capsule, _transferBorderPaint);
+        for (final dot in marker.dots) {
+          _transferDotPaint.color = dot.color;
+          canvas.drawCircle(
+            dot.center,
+            kRouteMapTransferDotRadiusPx,
+            _transferDotPaint,
+          );
+        }
       }
     }
   }
@@ -375,6 +381,8 @@ class StructuredRouteMapView extends StatefulWidget {
     required this.lineColors,
     this.labelTextByStationId = const {},
     this.lineBadgeLabelByLineId = const {},
+    this.drawLines = true,
+    this.drawStationSymbols = true,
     this.sourceOrigin = Offset.zero,
     this.attributionText,
     super.key,
@@ -385,6 +393,8 @@ class StructuredRouteMapView extends StatefulWidget {
   final Map<String, Color> lineColors;
   final Map<String, String> labelTextByStationId;
   final Map<String, String> lineBadgeLabelByLineId;
+  final bool drawLines;
+  final bool drawStationSymbols;
 
   /// 오버레이·카메라의 geometry origin. Picture 재생을 origin-뺀 공간으로 맞춰
   /// 캔버스와 오버레이 좌표계를 일치시킨다(#1970).
@@ -398,6 +408,8 @@ class StructuredRouteMapView extends StatefulWidget {
 
 class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
   StructuredRouteMap? _sourceMap;
+  bool? _drawLines;
+  bool? _drawStationSymbols;
   RouteMapDesignSpace? _design;
   ui.Picture? _picture;
   // attribution TextPainter는 region(텍스트) 변경 시에만 재생성한다. 매 pan 프레임의
@@ -406,11 +418,16 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
   String? _attributionPainterText;
 
   void _ensurePicture() {
-    if (identical(_sourceMap, widget.map) && _picture != null) {
+    if (identical(_sourceMap, widget.map) &&
+        _drawLines == widget.drawLines &&
+        _drawStationSymbols == widget.drawStationSymbols &&
+        _picture != null) {
       return;
     }
     _picture?.dispose();
     _sourceMap = widget.map;
+    _drawLines = widget.drawLines;
+    _drawStationSymbols = widget.drawStationSymbols;
     final design = routeMapDesignSpaceFor(widget.map);
     _design = design;
     Size measureLabel(String text, {required bool bold}) {
@@ -453,6 +470,8 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
       layout: layout,
       lineColors: widget.lineColors,
       lineOffsets: routeMapParallelLineOffsets(widget.map.lines),
+      drawLines: widget.drawLines,
+      drawStationSymbols: widget.drawStationSymbols,
     );
   }
 
