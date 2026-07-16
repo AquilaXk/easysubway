@@ -3060,7 +3060,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.equal(abusePenetrationRehearsalGate.status, "BLOCKED_EXTERNAL");
   assert.equal(abusePenetrationRehearsalGate.androidRcEvidenceManifest, androidRcEvidencePath);
   assert.equal(abusePenetrationRehearsalGate.securityPrivacyEvidenceManifest, "apps/mobile/release/security-privacy-release-evidence.json");
-  assert.match(abusePenetrationRehearsalGate.evidenceRoot, /\.codex\/evidence\/security\/abuse-penetration-rehearsal\/<rc-or-run>/);
+  assert.equal(abusePenetrationRehearsalGate.evidenceRoot, ".codex/evidence/security/abuse-penetration-rehearsal/<git-sha>/");
   const adGuardrails = abusePenetrationRehearsalGate.adEventAbuseGuardrails;
   assert.equal(adGuardrails.issue, 1912);
   assert.deepEqual(adGuardrails.edge, {
