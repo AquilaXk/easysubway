@@ -1890,6 +1890,92 @@ test("모바일 즐겨찾기 화면은 새로고침·삭제·복귀 재조회 �
   );
 });
 
+test("모바일 계정 삭제와 출처 화면은 feature presentation canonical 파일이 소유한다", () => {
+  const main = read("apps/mobile/lib/main.dart");
+  const widgetTest = read("apps/mobile/test/widget_test.dart");
+  const account = read(
+    "apps/mobile/lib/features/account/presentation/user_data_deletion_screen.dart",
+  );
+  const attribution = read(
+    "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart",
+  );
+
+  assert.match(account, /^class UserDataDeletionAccessItem extends StatelessWidget/m);
+  assert.match(account, /^enum UserDataDeletionScope\b/m);
+  assert.match(account, /^UserDataDeletionScope _userDataDeletionScope\(/m);
+  assert.match(account, /^class _UserDataDeletionCopy\b/m);
+  assert.match(account, /^class UserDataDeletionScreen extends StatefulWidget/m);
+  assert.match(account, /^class _UserDataDeletionScreenState extends State<UserDataDeletionScreen>/m);
+  assert.match(account, /^class UserDataDeletionResultScreen extends StatelessWidget/m);
+  assert.match(attribution, /^class DataSourceAttributionScreen extends StatefulWidget/m);
+  assert.match(
+    attribution,
+    /^class _DataSourceAttributionScreenState\s+extends State<DataSourceAttributionScreen>/m,
+  );
+  assert.match(attribution, /^class _AttributionCard extends StatelessWidget/m);
+  assert.match(attribution, /^class _AttributionRow extends StatelessWidget/m);
+  assert.match(
+    main,
+    /^import 'features\/account\/presentation\/user_data_deletion_screen\.dart';$/m,
+  );
+  assert.match(
+    main,
+    /^import 'features\/attribution\/presentation\/data_source_attribution_screen\.dart';$/m,
+  );
+  assert.doesNotMatch(
+    main,
+    /^export 'features\/(?:account|attribution)\/presentation\//m,
+  );
+  assert.match(
+    widgetTest,
+    /^import 'package:easysubway_mobile\/features\/account\/presentation\/user_data_deletion_screen\.dart';$/m,
+  );
+  assert.match(
+    widgetTest,
+    /^import 'package:easysubway_mobile\/features\/attribution\/presentation\/data_source_attribution_screen\.dart';$/m,
+  );
+  assert.doesNotMatch(main, /^class _UserDataDeletionAccessItem\b/m);
+  assert.doesNotMatch(main, /^enum UserDataDeletionScope\b/m);
+  assert.doesNotMatch(main, /^class _UserDataDeletionCopy\b/m);
+  assert.doesNotMatch(main, /^class UserDataDeletionScreen\b/m);
+  assert.doesNotMatch(main, /^class _UserDataDeletionScreenState\b/m);
+  assert.doesNotMatch(main, /^class UserDataDeletionResultScreen\b/m);
+  assert.doesNotMatch(main, /^class DataSourceAttributionScreen\b/m);
+  assert.doesNotMatch(main, /^class _DataSourceAttributionScreenState\b/m);
+  assert.doesNotMatch(main, /^class _AttributionCard\b/m);
+  assert.doesNotMatch(main, /^class _AttributionRow\b/m);
+});
+
+test("모바일 계정 삭제와 출처 화면은 삭제·asset load 순서를 유지한다", () => {
+  const account = read(
+    "apps/mobile/lib/features/account/presentation/user_data_deletion_screen.dart",
+  );
+  const attribution = read(
+    "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart",
+  );
+  const accountBlock = account.slice(
+    account.indexOf("Future<void> _deleteCurrentUserData()"),
+    account.indexOf("class UserDataDeletionResultScreen"),
+  );
+  const attributionBlock = attribution.slice(
+    attribution.indexOf("Future<({Map<String, Object?> manifest"),
+    attribution.indexOf("@override\n  Widget build"),
+  );
+
+  assert.match(
+    accountBlock,
+    /setState\(\(\) \{[\s\S]*?_isDeleting = true;[\s\S]*?await widget\.repository\.deleteCurrentUserData\(\);[\s\S]*?await widget\.onDeleted\?\.call\(result\);[\s\S]*?if \(!mounted\)[\s\S]*?Navigator\.of\(context\)\.popUntil\(\(route\) => route\.isFirst\);/,
+  );
+  assert.match(
+    accountBlock,
+    /on UserDataDeletionException catch \(error\)[\s\S]*?SnackBar\(content: Text\(error\.message\)\)[\s\S]*?catch \(error, stackTrace\)[\s\S]*?context: '사용자 정보 삭제 처리 중 예외가 발생했습니다\.'[\s\S]*?finally \{[\s\S]*?if \(mounted\)[\s\S]*?_isDeleting = false;/,
+  );
+  assert.match(
+    attributionBlock,
+    /if \(initialManifest != null && initialInventory != null\)[\s\S]*?return \(manifest: initialManifest, inventory: initialInventory\);[\s\S]*?Future\.wait\(\[[\s\S]*?rootBundle\.loadString\(_mapManifestAsset\)[\s\S]*?rootBundle\.loadString\(_sourceInventoryAsset\)/,
+  );
+});
+
 test("프로덕션 모바일 UI 위젯명은 prototype 명칭을 쓰지 않는다", () => {
   const mobileFiles = execFileSync("git", ["ls-files", "apps/mobile/lib/*.dart"], {
     cwd: root,
@@ -1953,7 +2039,11 @@ test("모바일 production 사용자 문구는 점수와 기본정보 같은 내
   assert.ok(mobileFiles.length > 0, "mobile production Dart files not found");
   for (const file of mobileFiles) {
     let source = read(file);
-    if (file === "apps/mobile/lib/main.dart") {
+    if (
+      file === "apps/mobile/lib/main.dart" ||
+      file ===
+        "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart"
+    ) {
       source = source
         .replaceAll("'데이터 및 지도 출처'", "''")
         .replaceAll("'지도와 경로 판단 자료의 출처와 이용 조건을 확인해요'", "''");
@@ -2677,6 +2767,8 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     [
       "apps/mobile/lib/app/accessibility_theme.dart",
       "apps/mobile/lib/app/app_components.dart",
+      "apps/mobile/lib/features/account/presentation/user_data_deletion_screen.dart",
+      "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart",
       "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart",
       "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
       "apps/mobile/lib/main.dart",
@@ -3039,6 +3131,11 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "play-installed-build-smoke",
     "play-pre-launch-report-crash-anr-policy-summary",
     "network-trace-redaction-summary-from-play-installed-build",
+    "play-installed-attestation-positive-negative-matrix",
+    "deployed-token-lifecycle-and-session-quota-rehearsal",
+    "deployed-gateway-401-origin-403-no-write-summary",
+    "deployed-limiter-boundary-burst-retry-after-summary",
+    "credential-log-metric-ui-analytics-absence-audit",
     "deployed-public-https-backend-report-admin-base-url-evidence",
     "deployed-admin-operator-auth-session-csrf-summary",
     "deployed-signed-url-boundary-summary",
@@ -3056,6 +3153,68 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
       "raw signed URL",
     ),
   );
+  const routeV2SessionServiceTest = read(
+    "backend/src/test/java/com/easysubway/route/application/service/RouteV2SessionServiceTest.java",
+  );
+  const routeV2IngressFilterTest = read(
+    "backend/src/test/java/com/easysubway/route/adapter/in/web/RouteV2IngressFilterTest.java",
+  );
+  const productionRouteClosureTest = read(
+    "backend/src/test/java/com/easysubway/route/adapter/in/web/ProductionRouteApiClosureTest.java",
+  );
+  const routeV2GatewayTest = read("tools/ci/route-v2-gateway.test.mjs");
+  const routeV2GatewayProbe = read("tools/test/run-route-v2-gateway-integration.sh");
+  const ciWorkflow = read(".github/workflows/ci.yml");
+  const routeV2AttackMatrix = abusePenetrationRehearsalGate.routeV2IngressAttackMatrix;
+  assert.equal(routeV2AttackMatrix.issue, 1022);
+  assert.equal(routeV2AttackMatrix.status, "BLOCKED_EXTERNAL");
+  assert.equal(routeV2AttackMatrix.localRegressionStatus, "PASS");
+  assert.deepEqual(routeV2AttackMatrix.localAutomatedCases, [
+    {
+      caseId: "attestation_nonce_request_hash",
+      evidence: "RouteV2SessionServiceTest",
+    },
+    {
+      caseId: "session_token_scope_expiry_quota",
+      evidence: "RouteV2IngressFilterTest and ProductionRouteApiClosureTest",
+    },
+    {
+      caseId: "gateway_401_origin_403_no_write",
+      evidence: "ProductionRouteApiClosureTest",
+    },
+    {
+      caseId: "gateway_ip_token_limiter_retry_after",
+      evidence: "route-v2-gateway.test.mjs and run-route-v2-gateway-integration.sh",
+    },
+  ]);
+  assert.deepEqual(routeV2AttackMatrix.requiredSameRcProductionEvidence, [
+    "play-installed-attestation-positive-negative-matrix",
+    "deployed-token-lifecycle-and-session-quota-rehearsal",
+    "deployed-gateway-401-origin-403-no-write-summary",
+    "deployed-limiter-boundary-burst-retry-after-summary",
+    "credential-log-metric-ui-analytics-absence-audit",
+  ]);
+  for (const evidenceId of routeV2AttackMatrix.requiredSameRcProductionEvidence) {
+    assert.ok(
+      abusePenetrationRehearsalGate.productionLikeEvidencePolicy.requiredForClosing.includes(evidenceId),
+      `${evidenceId} must be enforced by the PASS summary evidence catalog`,
+    );
+  }
+  assert.equal(routeV2AttackMatrix.productionMutationPerformed, false);
+  assert.equal(routeV2AttackMatrix.explicitProductionApprovalRequired, true);
+  assert.equal(routeV2AttackMatrix.rawCredentialOrExploitPayloadStored, false);
+  assert.match(routeV2SessionServiceTest, /2분보다 오래됐거나 미래인 verdict와 다른 requestHash를 거부한다/);
+  assert.match(routeV2SessionServiceTest, /128-bit base64url nonce 형식과 2분 replay를 거부한다/);
+  assert.match(routeV2IngressFilterTest, /50회를 소비한 session은 exact 429와 정수 Retry-After를 반환한다/);
+  assert.match(routeV2IngressFilterTest, /만료 session은 exact 401이고 controller를 호출하지 않는다/);
+  assert.match(routeV2IngressFilterTest, /다른 scope session은 exact 422이고 controller를 호출하지 않는다/);
+  assert.match(routeV2IngressFilterTest, /ROUTE_ORIGIN_FORBIDDEN/);
+  assert.match(routeV2IngressFilterTest, /ROUTE_SESSION_REQUIRED/);
+  assert.match(productionRouteClosureTest, /direct-origin Route V2는 handler와 DB write 전에 exact 403으로 거부한다/);
+  assert.match(productionRouteClosureTest, /session 전체 50회 초과는 integer Retry-After와 exact 429다/);
+  assert.match(routeV2GatewayTest, /IP·token limiter와 exact 429 계약/);
+  assert.match(routeV2GatewayProbe, /Retry-After: 60/);
+  assert.match(ciWorkflow, /tools\/test\/run-route-v2-gateway-integration\.sh/);
   assert.deepEqual(abusePenetrationRehearsalGate.buildIdentityPolicy.requiredIssueLinks, ["#1015", "#1016", "#1020", "#1914"]);
   assert.ok(
     abusePenetrationRehearsalGate.productionLikeEvidencePolicy.requiredForClosing.includes(
@@ -3090,6 +3249,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
       "provider_and_release_secret_exposure",
       "receipt_token_replay_and_status_abuse",
       "report_photo_upload_abuse",
+      "route_v2_ingress_abuse",
       "signed_url_lifecycle_abuse",
     ],
   );
@@ -3129,6 +3289,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "providerReleaseSecretExposure",
     "receiptTokenAbuse",
     "reportUploadLifecycle",
+    "routeV2IngressAbuse",
     "signedUploadUrlBoundary",
   ]);
   assert.deepEqual(
@@ -3558,25 +3719,25 @@ test("A RED repository locks summary v2 contract and catalog", async () => {
   assert.equal(contract.procedureIdDerivation, "matrixId + '.' + caseId");
   assert.equal(contract.targetAliasDerivation, "'target.' + matrixId");
   assert.equal(contract.ownerAliasDerivation, "'owner.' + matrixId");
-  assert.equal(contract.relativeEvidencePathPattern, "^\\.codex/evidence/security/abuse-penetration-rehearsal/[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$");
+  assert.equal(contract.relativeEvidencePathPattern, "^\\.codex/evidence/security/abuse-penetration-rehearsal/(?!\\.{1,2}(?:/|$))[A-Za-z0-9._-]+(?:/(?!\\.{1,2}(?:/|$))[A-Za-z0-9._-]+)*$");
   assert.deepEqual(contract.fieldTypes, {
     root: { schemaVersion: "integer", releaseGate: "string", issue: "integer", status: "string", rawInvocationStored: "boolean", redactionPolicyId: "string", artifactIdentity: "object", evidence: "array", productionLikeEvidence: "array", matrices: "array" },
     artifactIdentity: { gitSha: "string", versionCode: "integer", androidApplicationId: "string", dataPackManifestSha256: "string", aabSha256: "string", generatedApkSha256: "string", backendImageDigest: "string", backendArtifactSha256: "string" },
-    evidence: { evidenceId: "string", result: "string", localEvidencePath: "string" },
+    evidence: { evidenceId: "string", result: "string", localEvidencePath: "string", artifactIdentitySha256: "string" },
     matrix: { matrixId: "string", result: "string", findingCounts: "object", mediumFindingDisposition: "object", cases: "array" },
     findingCounts: { critical: "integer", high: "integer", medium: "integer", low: "integer" },
     mediumFindingDisposition: { ownerAlias: "string", fixPlanEvidencePath: "string" },
-    case: { procedureId: "string", targetAlias: "string", expectedStatus: "integer", observedStatus: "integer", redactionResult: "string", localEvidencePath: "string" },
+    case: { procedureId: "string", targetAlias: "string", expectedStatus: "integer", observedStatus: "integer", redactionResult: "string", localEvidencePath: "string", artifactIdentitySha256: "string" },
   });
   assert.deepEqual(contract.requiredFields, {
     rootForAllStatuses: ["schemaVersion", "releaseGate", "issue", "status", "rawInvocationStored", "redactionPolicyId"],
     rootAdditionalForPass: ["artifactIdentity", "evidence", "productionLikeEvidence", "matrices"],
     artifactIdentity: ["gitSha", "versionCode", "androidApplicationId", "dataPackManifestSha256"],
-    evidence: ["evidenceId", "result", "localEvidencePath"],
+    evidence: ["evidenceId", "result", "localEvidencePath", "artifactIdentitySha256"],
     matrix: ["matrixId", "result", "findingCounts", "cases"],
     findingCounts: ["critical", "high", "medium", "low"],
     mediumFindingDisposition: ["ownerAlias", "fixPlanEvidencePath"],
-    case: ["procedureId", "targetAlias", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"],
+    case: ["procedureId", "targetAlias", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath", "artifactIdentitySha256"],
   });
   assert.deepEqual(contract.fieldPatterns.artifactIdentity, {
     gitSha: "^[0-9a-f]{40}$", androidApplicationId: "^com\\.easysubway\\.app$",
@@ -3584,11 +3745,13 @@ test("A RED repository locks summary v2 contract and catalog", async () => {
     generatedApkSha256: "^[0-9a-f]{64}$", backendArtifactSha256: "^[0-9a-f]{64}$",
     backendImageDigest: "^sha256:[0-9a-f]{64}$",
   });
+  assert.deepEqual(contract.fieldPatterns.evidence, { artifactIdentitySha256: "^[0-9a-f]{64}$" });
+  assert.deepEqual(contract.fieldPatterns.case, { artifactIdentitySha256: "^[0-9a-f]{64}$" });
   assert.equal(existsSync(path.join(root, "tools/security/abuse-penetration-summary-schema.mjs")), true);
   const { deriveSummaryCatalog } = await import("../security/abuse-penetration-summary-schema.mjs");
   const catalog = deriveSummaryCatalog(abusePenetrationRehearsalGate);
   assert.equal(Object.isFrozen(catalog), true);
-  assert.deepEqual(catalog.matrixIds, ["adCounterInflation", "adminOperatorSecurity", "distributedRateLimitAbuse", "objectStorageLifecycle", "providerReleaseSecretExposure", "receiptTokenAbuse", "reportUploadLifecycle", "signedUploadUrlBoundary"]);
+  assert.deepEqual(catalog.matrixIds, ["adCounterInflation", "adminOperatorSecurity", "distributedRateLimitAbuse", "objectStorageLifecycle", "providerReleaseSecretExposure", "receiptTokenAbuse", "reportUploadLifecycle", "routeV2IngressAbuse", "signedUploadUrlBoundary"]);
   const expectedProcedures = Object.entries(abusePenetrationRehearsalGate.rehearsalMatrices).flatMap(([matrixId, matrix]) =>
     matrix.requiredCases.map((caseId) => [
       `${matrixId}.${caseId}`,
@@ -3623,6 +3786,37 @@ test("A RED repository locks summary v2 contract and catalog", async () => {
     "cloudflare-ipv4-live-oci-set-equality-summary", "postgres-atomic-daily-cap-test-output",
     "identifier-zero-request-capture-summary", "origin-log-ip-ua-absence-summary", "cloudflare-logpush-ip-ua-absence-summary",
   ]);
+  const routeV2 = abusePenetrationRehearsalGate.rehearsalMatrices.routeV2IngressAbuse;
+  assert.deepEqual(routeV2.requiredCases, [
+    "attestation_valid",
+    "attestation_invalid_nonce_format",
+    "attestation_nonce_replay",
+    "attestation_stale_verdict",
+    "attestation_future_verdict",
+    "attestation_request_hash_mismatch",
+    "attestation_wrong_request_package",
+    "attestation_wrong_app_package",
+    "attestation_certificate_mismatch",
+    "attestation_app_recognition_mismatch",
+    "attestation_licensing_mismatch",
+    "attestation_device_integrity_mismatch",
+    "attestation_provider_unavailable",
+    "session_expired",
+    "session_wrong_scope",
+    "session_quota_exhausted",
+    "gateway_session_missing",
+    "direct_origin_bypass_no_write",
+    "gateway_ip_limiter",
+    "gateway_token_limiter",
+  ]);
+  for (const caseId of routeV2.requiredCases) {
+    assert.equal(routeV2.expectedStatusByCase[caseId].length, 1, `${caseId} must require one exact result`);
+  }
+  assert.deepEqual(routeV2.expectedStatusByCase.gateway_token_limiter, [429]);
+  const gatewayScriptClassification = await classifyChangedFiles([
+    "tools/test/run-route-v2-gateway-integration.sh",
+  ]);
+  assert.equal(gatewayScriptClassification.repository, "true");
   assert.equal(abusePenetrationRehearsalGate.status, "BLOCKED_EXTERNAL");
   assert.equal(abusePenetrationRehearsalGate.findingPolicy.criticalHighAllowed, 0);
 });
@@ -5556,6 +5750,7 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   );
   assert.match(routeV2GatewayProbe, /session success response must remain private, no-store/);
   assert.match(routeV2GatewayProbe, /search success response must remain private, no-store/);
+  assert.doesNotMatch(routeV2GatewayProbe, /(^|\n)\s*rg\s/, "gateway probe must use POSIX runner tools available in GitHub Actions");
   assert.match(
     securityConfig,
     /@Profile\("prod \| staging \| release \| prod-like"\)[\s\S]*SecurityFilterChain routeV2IngressSecurityFilterChain/,
@@ -6635,7 +6830,9 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   const inventory = readJson("tools/datapack/source-inventory.json");
   const appInventory = readJson("apps/mobile/assets/datapacks/source-inventory.json");
   const pubspec = read("apps/mobile/pubspec.yaml");
-  const mobileMain = read("apps/mobile/lib/main.dart");
+  const attributionScreen = read(
+    "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart",
+  );
   const targets = readJson("tools/datapack/nationwide-coverage-targets.json");
   const productionScope = readJson("apps/mobile/release/production-datapack-scope.json");
   const sourceCandidates = readJson("tools/datapack/source-candidates.json");
@@ -6643,11 +6840,11 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
 
   assert.deepEqual(appInventory, inventory);
   assert.match(pubspec, /assets\/datapacks\/source-inventory\.json/);
-  assert.match(mobileMain, /class DataSourceAttributionScreen/);
-  assert.match(mobileMain, /assets\/datapacks\/metro_map_pack\/manifest\.json/);
-  assert.match(mobileMain, /assets\/datapacks\/source-inventory\.json/);
-  assert.match(mobileMain, /지도 표시용 asset/);
-  assert.match(mobileMain, /경로·시설 안내용 데이터/);
+  assert.match(attributionScreen, /class DataSourceAttributionScreen/);
+  assert.match(attributionScreen, /assets\/datapacks\/metro_map_pack\/manifest\.json/);
+  assert.match(attributionScreen, /assets\/datapacks\/source-inventory\.json/);
+  assert.match(attributionScreen, /지도 표시용 asset/);
+  assert.match(attributionScreen, /경로·시설 안내용 데이터/);
 
   assert.equal(inventory.schemaVersion, 1);
   assert.equal(inventory.region, "nationwide");
@@ -13042,6 +13239,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const authHeaders = read("apps/mobile/lib/auth_headers.dart");
   const secureKeyValueStorage = read("apps/mobile/lib/secure_key_value_storage.dart");
   const userDataDeletion = read("apps/mobile/lib/user_data_deletion.dart");
+  const userDataDeletionScreen = read(
+    "apps/mobile/lib/features/account/presentation/user_data_deletion_screen.dart",
+  );
   const userDataDeletionTest = read("apps/mobile/test/user_data_deletion_test.dart");
   const onboarding = read("apps/mobile/lib/onboarding.dart");
   const onboardingTest = read("apps/mobile/test/onboarding_test.dart");
@@ -13426,9 +13626,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(main, /현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요/);
   assert.match(main, /실시간 상태나 무조건 안전한 경로를 보장하지 않습니다/);
   // 삭제 확인 화면은 지워지는 것 1줄 + 되돌릴 수 없음 강조 + 예외 1줄로 압축한다(#1571).
-  assert.match(main, /삭제 후에는 되돌릴 수 없어요/);
+  assert.match(userDataDeletionScreen, /삭제 후에는 되돌릴 수 없어요/);
   assert.match(
-    main,
+    userDataDeletionScreen,
     /이 기기의 즐겨찾기·최근 검색·설정과 보낸 제보·사진이 삭제되거나 익명 처리돼요/,
   );
   assert.match(apiClient, /class ApiClient/);
@@ -13470,8 +13670,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(userDataDeletionTest, /기존 인증 갱신 실패 시 새 사용자 삭제로 처리하지 않는다/);
   assert.match(widgetTest, /도움말은 앱 안에서 데이터 삭제를 재확인하고 로컬 상태를 정리한다/);
   assert.match(widgetTest, /데이터 삭제 실패 시 로컬 상태를 유지하고 오류를 안내한다/);
-  assert.match(main, /UserDataDeletionScreen/);
-  assert.match(main, /dataDeletionConfirmButton/);
+  assert.match(userDataDeletionScreen, /UserDataDeletionScreen/);
+  assert.match(userDataDeletionScreen, /dataDeletionConfirmButton/);
   assert.match(widgetTest, /알림 설정 화면은 현재 설정을 불러오고 바꾼 값을 저장한다/);
   assert.match(widgetTest, /bySemanticsLabel/);
   assert.match(widgetTest, /greaterThanOrEqualTo\(60\)/);
@@ -14781,7 +14981,11 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     } else {
       assert.equal(item.googlePlayDataSafety.required, false, `${id} not-collected Play data must not be required`);
     }
-    assert.equal(item.googlePlayDataSafety.deletionSupported, true, `${id} must declare data deletion support`);
+    assert.equal(
+      item.googlePlayDataSafety.deletionSupported,
+      id !== "route_v2_gateway_abuse_rate_limit_state",
+      `${id} must declare the implemented data deletion boundary`,
+    );
   }
 
   const appStoreTypes = [...new Set(
@@ -14953,6 +15157,10 @@ test("Route V2 ITX 개인정보와 Data Safety 공개 기준은 실제 전송·�
   assert.equal(route.googlePlayDataSafety.linkedToUser, false);
   assert.equal(route.googlePlayDataSafety.optional, true);
   assert.equal(route.googlePlayDataSafety.processedEphemerally, false);
+  assert.equal(
+    route.purposeKo,
+    "사용자가 선택한 ITX-청춘 경로 계산 결과를 제한된 기간 동안 보관",
+  );
   assert.deepEqual(route.routeRequestFields, [
     "originStationId",
     "destinationStationId",
@@ -14997,6 +15205,7 @@ test("Route V2 ITX 개인정보와 Data Safety 공개 기준은 실제 전송·�
   assert.equal(gatewayRateLimitState.googlePlayDataSafety.collected, true);
   assert.equal(gatewayRateLimitState.googlePlayDataSafety.linkedToUser, true);
   assert.equal(gatewayRateLimitState.googlePlayDataSafety.optional, true);
+  assert.equal(gatewayRateLimitState.googlePlayDataSafety.deletionSupported, false);
   assert.equal(gatewayRateLimitState.googlePlayDataSafety.processedEphemerally, false);
   assert.deepEqual(gatewayRateLimitState.gatewayKeyFields, [
     "$binary_remote_addr",
@@ -15057,6 +15266,12 @@ test("Route V2 ITX 개인정보와 Data Safety 공개 기준은 실제 전송·�
   assert.equal(
     playStoreContent.dataSafetyDeclarations.routeV2Itx.gatewayRateLimitStateProcessedEphemerally,
     false,
+  );
+  assert.equal(
+    playStoreContent.dataSafetyDeclarations.answerMatrix
+      .find((item) => item.dataType === "Device or other IDs")
+      .containsDeletionUnsupportedData,
+    true,
   );
   assert.ok(
     playStoreContent.dataSafetyDeclarations.answerMatrix

@@ -109,7 +109,7 @@
         "encryptedInTransit": true,
         "optional": true,
         "required": false,
-        "deletionSupported": true,
+        "deletionSupported": false,
         "processedEphemerally": false
       }
     },
@@ -388,7 +388,7 @@
     {
       "id": "route_v2_itx_request_state",
       "displayNameKo": "ITX 경로 요청과 단기 경로 상태",
-      "purposeKo": "사용자가 선택한 ITX-청춘 경로 계산과 같은 결과의 단기 새로고침",
+      "purposeKo": "사용자가 선택한 ITX-청춘 경로 계산 결과를 제한된 기간 동안 보관",
       "implementationStatus": "backend-collected",
       "introducedInVersion": "1.0.4",
       "codeOwner": "mobile/backend",
