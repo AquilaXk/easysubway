@@ -631,7 +631,12 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     List<StationSearchResult> results;
     try {
       results = await repository.searchStations(station.nameKo);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '노선도 역 탭 패널 해석 중 예외가 발생했습니다.',
+      );
       // 해석 실패 → 팬 메뉴만 유지(패널 없음).
       return;
     }
