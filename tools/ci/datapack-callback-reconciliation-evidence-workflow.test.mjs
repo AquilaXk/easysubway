@@ -18,7 +18,12 @@ test("callback reconciliation evidence는 default branch 수동 실행과 세 id
 });
 
 test("job-level env는 runner가 배정되기 전 runner context를 참조하지 않는다", () => {
-  const jobPrelude = workflow.slice(workflow.indexOf("  rehearse:"), workflow.indexOf("\n    steps:"));
+  const jobStart = workflow.indexOf("  rehearse:");
+  const stepsStart = workflow.indexOf("\n    steps:", jobStart);
+  assert.notEqual(jobStart, -1);
+  assert.notEqual(stepsStart, -1);
+  assert.ok(jobStart < stepsStart);
+  const jobPrelude = workflow.slice(jobStart, stepsStart);
   assert.doesNotMatch(jobPrelude, /\$\{\{\s*runner\./);
 });
 
