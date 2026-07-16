@@ -224,6 +224,15 @@ public class DatapackReleaseCallbackService {
 		if (!current.manifestSha256().equals(cmd.manifestSha256())) {
 			return new CurrentReleaseMismatch("CONFLICT", "CATALOG_CURRENT_MISMATCH");
 		}
+		var binding = releaseCatalog.findByRequest(cmd.channel(), cmd.releaseRequestId())
+			.orElseThrow(DatapackReleaseCatalogPort.Unavailable::new);
+		if (!binding.signatureValid()
+			|| !cmd.releaseRequestId().equals(binding.releaseRequestId())
+			|| !cmd.channel().equals(binding.channel())
+			|| cmd.releaseSequence() != binding.releaseSequence()
+			|| !cmd.manifestSha256().equals(binding.manifestSha256())) {
+			return new CurrentReleaseMismatch("CONFLICT", "RELEASE_REQUEST_BINDING_MISMATCH");
+		}
 		return null;
 	}
 

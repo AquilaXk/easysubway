@@ -60,6 +60,8 @@ class DatapackReleaseCallbackServiceTest {
             "DELETE FROM datapack_release_request WHERE approval_id = ?", APPROVAL_ID);
 		when(releaseCatalog.fetchCurrent(CHANNEL)).thenReturn(new CatalogIdentity(
 			RELEASE_SEQUENCE, SHA, CHANNEL, APPROVAL_ID, true, "b".repeat(64)));
+		when(releaseCatalog.findByRequest(CHANNEL, APPROVAL_ID)).thenReturn(java.util.Optional.of(
+			new CatalogIdentity(RELEASE_SEQUENCE, SHA, CHANNEL, APPROVAL_ID, true, "b".repeat(64))));
     }
 
     private void insertRow(String status) {
@@ -218,6 +220,21 @@ class DatapackReleaseCallbackServiceTest {
 		assertThat(jdbcTemplate.queryForObject(
 			"SELECT sanitized_detail FROM datapack_release_deliveries", String.class))
 			.isEqualTo("CURRENT_RELEASE_ADVANCED");
+	}
+
+	@Test
+	@DisplayName("current manifest가 같아도 서명 binding의 request ID가 다르면 PASS callback을 거부한다")
+	void mismatchedReleaseRequestBindingCannotPublish() {
+		insertRow("DISPATCHED");
+		when(releaseCatalog.findByRequest(CHANNEL, APPROVAL_ID)).thenReturn(java.util.Optional.of(
+			new CatalogIdentity(RELEASE_SEQUENCE, SHA, CHANNEL, "different-request", true, "b".repeat(64))));
+
+		assertThat(service.receive(command("PASS", computeSignature("PASS"))).status())
+			.isEqualTo("DEAD_LETTER");
+		assertThat(statusOf()).isEqualTo("DISPATCHED");
+		assertThat(jdbcTemplate.queryForObject(
+			"SELECT sanitized_detail FROM datapack_release_deliveries", String.class))
+			.isEqualTo("RELEASE_REQUEST_BINDING_MISMATCH");
 	}
 
 	@Test
