@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile, execFileSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign as signBytes } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rm, symlink, utimes, writeFile } from "node:fs/promises";
+import { lstat as fsLstat, mkdir, mkdtemp, readFile, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -10975,6 +10975,51 @@ test("민감정보 백업 보존 작업은 일일 실행 지연을 포함해 30�
   assert.match(workflow, /--root "\$\{DEPLOY_ROOT\}\/backups"/);
   assert.match(workflow, /--retention-days "30"/);
   assert.match(workflow, /prune-sensitive-backups\.mjs/);
+});
+
+test("민감정보 백업 보존 작업은 동시 파기로 이미 사라진 항목을 건너뛴다", async () => {
+  const pruneScript = path.join(root, "tools/ops/prune-sensitive-backups.mjs");
+  const backupRoot = await mkdtemp(path.join(tmpdir(), "easysubway-sensitive-backup-race-"));
+  const racedDump = path.join(backupRoot, "easysubway-postgres-20260601T000000Z.RACE01.dump");
+  const remainingDump = path.join(backupRoot, "easysubway-postgres-20260601T000001Z.RACE02.dump");
+  await writeFile(racedDump, "removed by concurrent pruner");
+  await writeFile(remainingDump, "removed by this pruner");
+
+  const { pruneSensitiveBackups } = await import(
+    `${pathToFileURL(pruneScript).href}?race=${Date.now()}`
+  );
+  let simulatedRace = false;
+  const pruned = await pruneSensitiveBackups({
+    root: backupRoot,
+    retentionDays: 30,
+    now: Date.parse("2026-07-16T12:00:00Z"),
+    lstat: async (candidate) => {
+      if (!simulatedRace && candidate === racedDump) {
+        simulatedRace = true;
+        await rm(candidate);
+      }
+      return fsLstat(candidate);
+    },
+  });
+
+  assert.equal(simulatedRace, true);
+  assert.equal(pruned, 1);
+  assert.equal(existsSync(racedDump), false);
+  assert.equal(existsSync(remainingDump), false);
+
+  const deniedDump = path.join(backupRoot, "easysubway-postgres-20260601T000002Z.DENIED.dump");
+  await writeFile(deniedDump, "must surface unexpected filesystem errors");
+  await assert.rejects(
+    pruneSensitiveBackups({
+      root: backupRoot,
+      retentionDays: 30,
+      now: Date.parse("2026-07-16T12:00:00Z"),
+      lstat: async () => {
+        throw Object.assign(new Error("metadata access denied"), { code: "EACCES" });
+      },
+    }),
+    /metadata access denied/,
+  );
 });
 
 test("시설 신고 사진 복구 리허설은 manifest와 object 산출물을 검증한다", async () => {
