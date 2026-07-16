@@ -1440,6 +1440,7 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_DATASOURCE_USERNAME=easysubway",
     "EASYSUBWAY_DATASOURCE_PASSWORD=secret",
     "EASYSUBWAY_DATA_PACK_BASE_URL=https://cdn.example.com/easysubway-datapacks",
+    "EASYSUBWAY_DATAPACK_CATALOG_BASE_URL=https://cdn.example.com/easysubway-datapacks",
     "EASYSUBWAY_REPORT_API_BASE_URL=https://api.example.com",
     "EASYSUBWAY_ADS_ASSET_ORIGIN=https://ads-assets.fixture.test-only.dev",
     "EASYSUBWAY_ADS_EVENT_DAILY_CAP=1000000",
@@ -1804,6 +1805,89 @@ test("모바일 설정 화면은 settings presentation canonical 파일이 소�
   assert.doesNotMatch(main, /^class _AppSettingsSection\b/m);
   assert.doesNotMatch(main, /^class _AppSettingsActionTile\b/m);
   assert.doesNotMatch(main, /^class _AppSettingsPreferenceTile\b/m);
+});
+
+test("모바일 즐겨찾기 화면은 favorites presentation canonical 파일이 소유한다", () => {
+  const main = read("apps/mobile/lib/main.dart");
+  const favorites = read(
+    "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart",
+  );
+
+  assert.match(favorites, /^class _HomeSavedRouteCard extends StatelessWidget/m);
+  assert.match(favorites, /^String _stationNameWithSuffix\(String name\)/m);
+  assert.match(favorites, /^class _HomeMiniBadge extends StatelessWidget/m);
+  assert.match(favorites, /^class FavoriteHomeScreen extends StatefulWidget/m);
+  assert.match(favorites, /^class _FavoriteHomeScreenState extends State<FavoriteHomeScreen>/m);
+  assert.match(favorites, /^class _FavoriteHomeData\b/m);
+  assert.match(favorites, /^class _FavoriteHomeStationRow extends StatelessWidget/m);
+  assert.match(favorites, /^class _FavoriteHomeFacilityRow extends StatelessWidget/m);
+  assert.match(
+    main,
+    /^import 'features\/favorites\/presentation\/favorite_home_screen\.dart';$/m,
+  );
+  assert.match(
+    main,
+    /^export 'features\/favorites\/presentation\/favorite_home_screen\.dart'\s+show FavoriteHomeScreen;$/m,
+  );
+  assert.doesNotMatch(main, /^class _HomeSavedRouteCard\b/m);
+  assert.doesNotMatch(main, /^String _stationNameWithSuffix\b/m);
+  assert.doesNotMatch(main, /^class _HomeMiniBadge\b/m);
+  assert.doesNotMatch(main, /^class FavoriteHomeScreen\b/m);
+  assert.doesNotMatch(main, /^class _FavoriteHomeScreenState\b/m);
+  assert.doesNotMatch(main, /^class _FavoriteHomeData\b/m);
+  assert.doesNotMatch(main, /^class _FavoriteHomeStationRow\b/m);
+  assert.doesNotMatch(main, /^class _FavoriteHomeFacilityRow\b/m);
+});
+
+test("모바일 즐겨찾기 화면은 새로고침·삭제·복귀 재조회 순서를 유지한다", () => {
+  const favorites = read(
+    "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart",
+  );
+  const sourceBlock = (start, next) => {
+    const startIndex = favorites.indexOf(start);
+    const nextIndex = favorites.indexOf(next, startIndex + start.length);
+    assert.notEqual(startIndex, -1, `${start} must exist`);
+    assert.ok(nextIndex > startIndex, `${next} must follow ${start}`);
+    return favorites.slice(startIndex, nextIndex);
+  };
+  const refreshBlock = sourceBlock("onRefresh: () async {", "child: ListView(");
+  const removeRouteBlock = sourceBlock(
+    "Future<void> _removeFavoriteRoute",
+    "Future<void> _openStationDetailFromFavorite",
+  );
+  const stationDetailBlock = sourceBlock(
+    "Future<void> _openStationDetailFromFavorite",
+    "Future<void> _openFacilityReportFromFavorite",
+  );
+  const facilityReportBlock = sourceBlock(
+    "Future<void> _openFacilityReportFromFavorite",
+    "Future<void> _reloadFavoritesAfterReturn",
+  );
+  const reloadBlock = sourceBlock(
+    "Future<void> _reloadFavoritesAfterReturn",
+    "class _FavoriteHomeData",
+  );
+
+  assert.match(
+    refreshBlock,
+    /final next = _loadData\(\);[\s\S]*?setState\(\(\) \{[\s\S]*?_dataFuture = next;[\s\S]*?\}\);[\s\S]*?try \{[\s\S]*?await next;[\s\S]*?catch \(error, stackTrace\)[\s\S]*?context: '즐겨찾기 새로고침 중 예외가 발생했습니다\.',/,
+  );
+  assert.match(
+    removeRouteBlock,
+    /await repository\.removeFavoriteRoute\(favorite\.favoriteRouteId\);[\s\S]*?catch \(error, stackTrace\)[\s\S]*?context: '즐겨찾기 경로 삭제 중 예외가 발생했습니다\.'[\s\S]*?await _reloadFavoritesAfterReturn\(\);/,
+  );
+  assert.match(
+    reloadBlock,
+    /if \(!mounted\)[\s\S]*?final next = _loadData\(\);[\s\S]*?setState\(\(\) \{[\s\S]*?_dataFuture = next;[\s\S]*?\}\);[\s\S]*?try \{[\s\S]*?await next;[\s\S]*?catch \(error, stackTrace\)[\s\S]*?context: '즐겨찾기 화면 복귀 후 새로고침 중 예외가 발생했습니다\.',/,
+  );
+  assert.match(
+    stationDetailBlock,
+    /await Navigator\.of\(context\)\.push\([\s\S]*?initiallyFavorite: true,[\s\S]*?\);[\s\S]*?await _reloadFavoritesAfterReturn\(\);/,
+  );
+  assert.match(
+    facilityReportBlock,
+    /await Navigator\.of\(context\)\.push\([\s\S]*?FacilityReportScreen\([\s\S]*?\);[\s\S]*?await _reloadFavoritesAfterReturn\(\);/,
+  );
 });
 
 test("프로덕션 모바일 UI 위젯명은 prototype 명칭을 쓰지 않는다", () => {
@@ -2593,6 +2677,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     [
       "apps/mobile/lib/app/accessibility_theme.dart",
       "apps/mobile/lib/app/app_components.dart",
+      "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart",
       "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
       "apps/mobile/lib/main.dart",
       "apps/mobile/release/support-incident-response-gate.json",
@@ -6249,10 +6334,17 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
     "targetChannel",
   ]);
   assert.equal(releaseCallbackSchema.properties.artifactKind.const, "datapack-release-callback");
+  assert.equal(
+    releaseCallbackSchema.properties.idempotencyKey.pattern,
+    "^[^:]+:[1-9][0-9]*:[a-f0-9]{64}$",
+  );
   assert.deepEqual(releaseCallbackSchema.required, [
     "schemaVersion",
     "artifactKind",
     "releaseRequestId",
+    "releaseSequence",
+    "channel",
+    "idempotencyKey",
     "workflowRunUrl",
     "manifestSha256",
     "sqliteSha256",
@@ -12834,6 +12926,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const appSettingsScreen = read(
     "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
   );
+  const favoriteHomeScreen = read(
+    "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart",
+  );
   const accessibilityTheme = read("apps/mobile/lib/app/accessibility_theme.dart");
   const appDependencies = read("apps/mobile/lib/app/app_dependencies.dart");
   const authHeaders = read("apps/mobile/lib/auth_headers.dart");
@@ -12940,17 +13035,17 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(accessibilityTheme, /_themeForPreferences/);
   assert.match(main, /simpleViewEnabled: preferences\.simpleViewEnabled/);
   assert.match(main, /RouteSearchScreen\([\s\S]*simpleViewEnabled: simpleViewEnabled/);
-  assert.match(main, /AppBar\(title: const Text\('즐겨찾기'\)\)/);
+  assert.match(favoriteHomeScreen, /AppBar\(title: const Text\('즐겨찾기'\)\)/);
   // 즐겨찾기 홈은 #1569에서 카테고리 카드를 없애고 역/경로/시설 인라인 섹션으로 바꿨다.
-  assert.match(main, /AppSectionTitle\(title: '역'\)/);
-  assert.match(main, /AppSectionTitle\(title: '시설'\)/);
-  assert.match(main, /AppSectionTitle\(title: '경로'\)/);
+  assert.match(favoriteHomeScreen, /AppSectionTitle\(title: '역'\)/);
+  assert.match(favoriteHomeScreen, /AppSectionTitle\(title: '시설'\)/);
+  assert.match(favoriteHomeScreen, /AppSectionTitle\(title: '경로'\)/);
   assert.match(main, /FavoriteHomeScreen/);
   // #1569: 하위 목록 화면 진입 대신 즐겨찾기 항목을 인라인 행으로 바로 나열한다.
   // (하위 목록 위젯 클래스는 각 소스 파일에 유지, main에서 진입만 제거)
-  assert.match(main, /class _FavoriteHomeStationRow/);
-  assert.match(main, /class _FavoriteHomeFacilityRow/);
-  assert.match(main, /_HomeSavedRouteCard\([\s\S]*onRemove:/);
+  assert.match(favoriteHomeScreen, /class _FavoriteHomeStationRow/);
+  assert.match(favoriteHomeScreen, /class _FavoriteHomeFacilityRow/);
+  assert.match(favoriteHomeScreen, /_HomeSavedRouteCard\([\s\S]*onRemove:/);
   assert.match(onboarding, /class OnboardingViewPreferences/);
   assert.match(onboarding, /const OnboardingViewPreferences\.defaults/);
   assert.match(onboarding, /class OnboardingResult/);
@@ -14466,6 +14561,10 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     "search_queries",
     "favorite_stations_routes_facilities",
     "route_eta_feedback",
+    "route_v2_itx_integrity",
+    "route_v2_itx_mobility_preferences",
+    "route_v2_itx_request_state",
+    "route_v2_gateway_abuse_rate_limit_state",
     "mobility_profile",
     "facility_report_content",
     "facility_report_photo",
@@ -14513,7 +14612,11 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
         `${id} evidence artifact must exist: ${evidencePath}`,
       );
     }
-    const expectedLastVerifiedAt = id === "precise_location" ? "2026-07-09" : "2026-06-19";
+    const expectedLastVerifiedAt = id.startsWith("route_v2_")
+      ? "2026-07-16"
+      : id === "precise_location"
+        ? "2026-07-09"
+        : "2026-06-19";
     assert.equal(item.lastVerifiedAt, expectedLastVerifiedAt, `${id} verification date must be current`);
     const expectedThirdPartySharing = id === "precise_location";
     assert.equal(
@@ -14544,7 +14647,15 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     assert.equal(typeof item.googlePlayDataSafety.purpose, "string", `${id} must declare Play purpose`);
     assert.equal(typeof item.googlePlayDataSafety.linkedToUser, "boolean", `${id} must declare Play linked-to-user value`);
     if (item.googlePlayDataSafety.collected) {
-      assert.equal(item.googlePlayDataSafety.linkedToUser, true, `${id} collected Play data must be linked to user`);
+      const routeV2ExpectedLinkage = [
+        "route_v2_itx_integrity",
+        "route_v2_gateway_abuse_rate_limit_state",
+      ].includes(id);
+      assert.equal(
+        item.googlePlayDataSafety.linkedToUser,
+        id.startsWith("route_v2_itx_") ? routeV2ExpectedLinkage : true,
+        `${id} Play user linkage must match the release data model`,
+      );
     }
     assert.equal(
       item.googlePlayDataSafety.encryptedInTransit,
@@ -14562,7 +14673,11 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     } else {
       assert.equal(item.googlePlayDataSafety.required, false, `${id} not-collected Play data must not be required`);
     }
-    assert.equal(item.googlePlayDataSafety.deletionSupported, true, `${id} must declare data deletion support`);
+    assert.equal(
+      item.googlePlayDataSafety.deletionSupported,
+      id !== "route_v2_gateway_abuse_rate_limit_state",
+      `${id} must declare the implemented data deletion boundary`,
+    );
   }
 
   const appStoreTypes = [...new Set(
@@ -14645,6 +14760,275 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
   assert.match(facilityReport, /latitude/);
   const appDependencies = read("apps/mobile/lib/app/app_dependencies.dart");
   assert.match(`${main}\n${appDependencies}`, /pushNotificationsEnabled/);
+});
+
+test("Route V2 ITX 개인정보와 Data Safety 공개 기준은 실제 전송·보관 경계를 고정한다", () => {
+  const inventory = readJson("apps/mobile/release/store-privacy-inventory.json");
+  const playStoreContent = readJson("apps/mobile/release/play-store-submission-content.json");
+  const publicPrivacyPolicy = read("backend/src/main/resources/templates/legal/privacy.html");
+  const mobileRouteSearch = read("apps/mobile/lib/route_search.dart");
+  const sessionService = read("backend/src/main/java/com/easysubway/route/application/service/RouteV2SessionService.java");
+  const purgeScheduler = read("backend/src/main/java/com/easysubway/route/adapter/in/scheduler/RouteV2StatePurgeScheduler.java");
+  const integrityDecoder = read("backend/src/main/java/com/easysubway/route/adapter/out/integrity/GooglePlayIntegrityDecoder.java");
+  const routeAccessStore = read("backend/src/main/java/com/easysubway/route/adapter/out/persistence/JdbcRouteV2AccessStore.java");
+  const routeController = read("backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchController.java");
+  const sessionController = read("backend/src/main/java/com/easysubway/route/adapter/in/web/RouteV2SessionController.java");
+  const productionRouteSupport = read("backend/src/main/java/com/easysubway/route/application/service/ProductionRouteV2Support.java");
+  const routeStateMigration = read("backend/src/main/resources/db/migration/postgresql/V57__route_v2_access_state.sql");
+  const nginxGateway = read("infra/nginx/route-v2-gateway.conf.template");
+  const nginxProxyHeaders = read("infra/nginx/route-v2-proxy-headers.conf.template");
+  const items = new Map(inventory.dataTypes.map((item) => [item.id, item]));
+  const integrity = items.get("route_v2_itx_integrity");
+  const mobility = items.get("route_v2_itx_mobility_preferences");
+  const route = items.get("route_v2_itx_request_state");
+  const gatewayRateLimitState = items.get("route_v2_gateway_abuse_rate_limit_state");
+  const officialPolicyReferences = [
+    "https://support.google.com/googleplay/android-developer/answer/10787469?hl=en",
+    "https://developer.android.com/google/play/integrity/terms",
+  ];
+
+  assert.deepEqual(inventory.googlePlayDataSafetyPolicy.officialReferences, officialPolicyReferences);
+  assert.equal(inventory.googlePlayDataSafetyPolicy.offDeviceEphemeralProcessingMustBeDeclared, true);
+  assert.equal(inventory.googlePlayDataSafetyPolicy.ephemeralProcessingRequiresMemoryOnlyRealTime, true);
+  assert.equal(inventory.googlePlayDataSafetyPolicy.routeV2StoredDataIsEphemeral, false);
+
+  assert.ok(integrity);
+  assert.equal(integrity.googlePlayDataSafety.collected, true);
+  assert.equal(integrity.googlePlayDataSafety.dataType, "Device or other IDs");
+  assert.equal(integrity.googlePlayDataSafety.linkedToUser, true);
+  assert.equal(integrity.googlePlayDataSafety.optional, true);
+  assert.equal(integrity.googlePlayDataSafety.processedEphemerally, false);
+  assert.equal(integrity.backendLinkedToUserDeviceOrAccountId, false);
+  assert.equal(integrity.googleProcessingMayBeLinkedToSignedInAccountOrDevice, true);
+  assert.deepEqual(integrity.googlePlayProcessing.alwaysCollected, [
+    "requestHashOrNonce",
+    "appPackageName",
+    "appVersion",
+    "appCertificate",
+    "appLicensingStatus",
+    "deviceAttestationInformation",
+  ]);
+  assert.equal(integrity.googlePlayProcessing.encryptedInTransit, true);
+  assert.equal(integrity.googlePlayProcessing.sharedOnward, false);
+  assert.equal(integrity.googlePlayProcessing.retention, "fixed-by-google-play-integrity-policy");
+  assert.deepEqual(integrity.mobileToBackendFields, ["integrityToken", "128-bit clientNonce"]);
+  assert.deepEqual(integrity.backendToGoogleFields, ["rawIntegrityToken"]);
+  assert.equal(
+    integrity.googleDecodeEndpoint,
+    "https://playintegrity.googleapis.com/v1/com.easysubway.app:decodeIntegrityToken",
+  );
+  assert.deepEqual(integrity.backendStoredFields, [
+    "tokenSha256",
+    "scope",
+    "issuedAt",
+    "expiresAt",
+    "requestCount",
+    "nonceSha256",
+  ]);
+  assert.equal(integrity.retention.sessionLogicalExpiry, "10 minutes");
+  assert.equal(integrity.retention.sessionPhysicalDeletionWithin, "approximately 15 minutes from issuance");
+  assert.equal(integrity.retention.nonceLogicalExpiry, "2 minutes");
+  assert.equal(integrity.retention.noncePhysicalDeletionWithin, "approximately 7 minutes from receipt");
+  assert.equal(integrity.retention.purgeInterval, "5 minutes");
+  assert.ok(integrity.evidence.includes("backend/src/main/java/com/easysubway/route/adapter/out/integrity/GooglePlayIntegrityDecoder.java"));
+  assert.ok(integrity.evidence.includes("backend/src/main/java/com/easysubway/route/adapter/in/scheduler/RouteV2StatePurgeScheduler.java"));
+
+  assert.ok(mobility);
+  assert.deepEqual(mobility.routeRequestFields, ["mobilityType", "mobilityPreset", "constraintMode"]);
+  assert.equal(mobility.googlePlayDataSafety.dataType, "Personal info");
+  assert.equal(mobility.googlePlayDataSafety.collected, true);
+  assert.equal(mobility.googlePlayDataSafety.optional, true);
+  assert.equal(mobility.googlePlayDataSafety.linkedToUser, false);
+  assert.equal(mobility.googlePlayDataSafety.processedEphemerally, false);
+  assert.equal(mobility.persistedRepresentation.mobilityPreset, "itinerary_json[].legs[].appliedPreset");
+  assert.equal(mobility.persistedRepresentation.mobilityTypeAndConstraintMode, "computed-itinerary-only");
+  assert.ok(mobility.evidence.includes("backend/src/main/java/com/easysubway/route/application/service/ProductionRouteV2Support.java"));
+
+  assert.ok(route);
+  assert.equal(route.googlePlayDataSafety.collected, true);
+  assert.equal(route.googlePlayDataSafety.linkedToUser, false);
+  assert.equal(route.googlePlayDataSafety.optional, true);
+  assert.equal(route.googlePlayDataSafety.processedEphemerally, false);
+  assert.equal(
+    route.purposeKo,
+    "사용자가 선택한 ITX-청춘 경로 계산 결과를 제한된 기간 동안 보관",
+  );
+  assert.deepEqual(route.routeRequestFields, [
+    "originStationId",
+    "destinationStationId",
+    "mobilityType",
+    "constraintMode",
+    "mobilityPreset",
+    "departureTime",
+    "useRealtime",
+    "maxTransfers",
+    "alternativeCount",
+  ]);
+  assert.deepEqual(route.backendStoredFields, [
+    "route_state_id",
+    "origin_station_id",
+    "destination_station_id",
+    "transport_scope",
+    "requested_departure_at",
+    "itinerary_json",
+    "timetable_artifact_id",
+    "created_at",
+    "planned_arrival_at",
+    "expires_at",
+  ]);
+  assert.equal(route.backendStoredTransportScope, "SUBWAY_AND_ITX_CHEONGCHUN");
+  assert.equal(route.retention.logicalExpiresAt, "min(createdAt+6h,max(createdAt+30m,plannedArrivalAt+30m))");
+  assert.equal(route.retention.physicalDeletionWithin, "expiresAt+5m");
+  assert.equal(route.retention.purgeInterval, "5 minutes");
+  assert.ok(route.evidence.includes("backend/src/main/java/com/easysubway/route/adapter/in/scheduler/RouteV2StatePurgeScheduler.java"));
+  assert.deepEqual(integrity.backendNeverPersistedOrLogged, [
+    "rawIntegrityToken",
+    "rawClientNonce",
+    "integrityPayloadOrVerdict",
+  ]);
+  assert.deepEqual(route.notSentOrStoredByRouteV2, ["rawSearchText", "coordinates"]);
+  assert.equal(integrity.usedForTracking, false);
+  assert.equal(route.usedForTracking, false);
+  assert.equal(integrity.responseCacheControl, "private, no-store");
+  assert.equal(route.responseCacheControl, "private, no-store");
+
+  assert.ok(gatewayRateLimitState);
+  assert.equal(gatewayRateLimitState.googlePlayDataSafety.dataType, "Device or other IDs");
+  assert.equal(gatewayRateLimitState.googlePlayDataSafety.collected, true);
+  assert.equal(gatewayRateLimitState.googlePlayDataSafety.linkedToUser, true);
+  assert.equal(gatewayRateLimitState.googlePlayDataSafety.optional, true);
+  assert.equal(gatewayRateLimitState.googlePlayDataSafety.deletionSupported, false);
+  assert.equal(gatewayRateLimitState.googlePlayDataSafety.processedEphemerally, false);
+  assert.deepEqual(gatewayRateLimitState.gatewayKeyFields, [
+    "$binary_remote_addr",
+    "$http_authorization",
+  ]);
+  assert.equal(gatewayRateLimitState.retention.fixedTtl, false);
+  assert.equal(gatewayRateLimitState.retention.zoneSizeIsRetention, false);
+  assert.equal(gatewayRateLimitState.retention.evictionBoundary, "LRU under zone memory pressure");
+  assert.equal(gatewayRateLimitState.retention.finalDeletionBoundary, "gateway process or shared-memory zone lifecycle end");
+  assert.equal(
+    gatewayRateLimitState.operationReference,
+    "https://nginx.org/en/docs/http/ngx_http_limit_req_module.html",
+  );
+
+  assert.deepEqual(inventory.routeV2GatewayRateLimit.keys, [
+    {
+      nginxVariable: "$binary_remote_addr",
+      scopes: ["session", "search"],
+      processing: "nginx-shared-memory-rate-limit-key",
+      persistedToDatabase: false,
+      includedInAccessLog: false,
+    },
+    {
+      nginxVariable: "$http_authorization",
+      scopes: ["search"],
+      processing: "nginx-shared-memory-rate-limit-key",
+      persistedToDatabase: false,
+      includedInAccessLog: false,
+    },
+  ]);
+  assert.equal(inventory.routeV2GatewayRateLimit.rateLimitedLogContainsKeyValues, false);
+  assert.equal(inventory.routeV2GatewayRateLimit.zoneSizeIsRetention, false);
+
+  assert.deepEqual(
+    playStoreContent.dataSafetyDeclarations.routeV2Itx.officialPolicyReferences,
+    officialPolicyReferences,
+  );
+  assert.equal(playStoreContent.dataSafetyDeclarations.routeV2Itx.optionalUserTriggered, true);
+  assert.equal(playStoreContent.dataSafetyDeclarations.routeV2Itx.tracking, false);
+  assert.equal(playStoreContent.dataSafetyDeclarations.routeV2Itx.backendLinkedToUserDeviceOrAccountId, false);
+  assert.equal(playStoreContent.dataSafetyDeclarations.routeV2Itx.googleIntegrityMayBeLinkedToAccountOrDevice, true);
+  assert.equal(playStoreContent.dataSafetyDeclarations.routeV2Itx.storedFieldsProcessedEphemerally, false);
+  assert.ok(
+    playStoreContent.dataSafetyDeclarations.answerMatrix
+      .find((item) => item.dataType === "App activity")
+      .inventoryDataIds.includes("route_v2_itx_request_state"),
+  );
+  assert.ok(
+    playStoreContent.dataSafetyDeclarations.answerMatrix
+      .find((item) => item.dataType === "Device or other IDs")
+      .inventoryDataIds.includes("route_v2_itx_integrity"),
+  );
+  assert.ok(
+    playStoreContent.dataSafetyDeclarations.answerMatrix
+      .find((item) => item.dataType === "Device or other IDs")
+      .inventoryDataIds.includes("route_v2_gateway_abuse_rate_limit_state"),
+  );
+  assert.equal(
+    playStoreContent.dataSafetyDeclarations.routeV2Itx.gatewayRateLimitStateProcessedEphemerally,
+    false,
+  );
+  assert.equal(
+    playStoreContent.dataSafetyDeclarations.answerMatrix
+      .find((item) => item.dataType === "Device or other IDs")
+      .containsDeletionUnsupportedData,
+    true,
+  );
+  assert.ok(
+    playStoreContent.dataSafetyDeclarations.answerMatrix
+      .find((item) => item.dataType === "Personal info")
+      .inventoryDataIds.includes("route_v2_itx_mobility_preferences"),
+  );
+
+  const toJson = mobileRouteSearch.match(/Map<String, Object\?> toJson\(\) \{[\s\S]*?\n  \}/)?.[0] ?? "";
+  const toV2Json = mobileRouteSearch.match(/Map<String, Object\?> toV2Json\(\) \{[\s\S]*?\n  \}/)?.[0] ?? "";
+  const routeWireBuilders = `${toJson}\n${toV2Json}`;
+  for (const field of route.routeRequestFields) {
+    assert.match(routeWireBuilders, new RegExp(`'${field}'`), `mobile Route V2 wire must send ${field}`);
+  }
+  assert.doesNotMatch(routeWireBuilders, /canonicalOriginStationId|canonicalDestinationStationId|transportScope|realtimeFlag/);
+  assert.match(sessionService, /SESSION_TTL = Duration\.ofMinutes\(10\)/);
+  assert.match(sessionService, /VERDICT_MAX_AGE = Duration\.ofMinutes\(2\)/);
+  assert.match(purgeScheduler, /state-purge-interval-ms:300000/);
+  assert.match(routeAccessStore, /DELETE FROM route_v2_states WHERE expires_at <= \?/);
+  assert.match(routeAccessStore, /DELETE FROM route_v2_nonce_replays WHERE expires_at <= \?/);
+  assert.match(routeAccessStore, /DELETE FROM route_v2_sessions WHERE expires_at <= \?/);
+  assert.match(integrityDecoder, /playintegrity\.googleapis\.com\/v1\/com\.easysubway\.app:decodeIntegrityToken/);
+  assert.match(integrityDecoder, /body\(Map\.of\("integrityToken", integrityToken\)\)/);
+  assert.doesNotMatch(`${sessionService}\n${integrityDecoder}`, /log\.(?:info|warn|error|debug|trace)\([^\n]*integrityToken/);
+  assert.match(routeController, /String appliedPreset/);
+  assert.match(routeController, /walkSeconds > 0 \? mobilityPreset : ""/);
+  assert.match(productionRouteSupport, /saveState[\s\S]*json\(computedItinerary\)/);
+  assert.match(routeController, /header\(HttpHeaders\.CACHE_CONTROL, "private, no-store"\)/);
+  assert.match(sessionController, /header\(HttpHeaders\.CACHE_CONTROL, "private, no-store"\)/);
+  for (const column of route.backendStoredFields) {
+    assert.match(routeStateMigration, new RegExp(`\\b${column}\\b`), `route state migration must store ${column}`);
+  }
+  assert.match(nginxGateway, /limit_req_zone \$binary_remote_addr zone=route_session_ip/);
+  assert.match(nginxGateway, /limit_req_zone \$binary_remote_addr zone=route_search_ip/);
+  assert.match(nginxGateway, /limit_req_zone \$http_authorization zone=route_search_token/);
+  assert.match(nginxGateway, /limit_req zone=route_session_ip/);
+  assert.match(nginxGateway, /limit_req zone=route_search_ip/);
+  assert.match(nginxGateway, /limit_req zone=route_search_token/);
+  assert.match(nginxGateway, /access_log off;/);
+  assert.match(nginxGateway, /add_header Cache-Control "private, no-store" always/);
+  assert.match(nginxGateway, /log_format route_v2_session_rate_limited[^\n]*"status":429/);
+  assert.match(nginxGateway, /log_format route_v2_search_rate_limited[^\n]*"status":429/);
+  assert.doesNotMatch(nginxGateway, /log_format[^\n]*\$(?:binary_remote_addr|http_authorization)/);
+  assert.match(nginxProxyHeaders, /proxy_set_header X-Forwarded-For ""/);
+  assert.match(nginxProxyHeaders, /proxy_set_header X-Real-IP ""/);
+
+  assert.match(publicPrivacyPolicy, /SUBWAY 경로 검색은 단말 안에서만 처리하며 서버로 전송하지 않습니다/);
+  assert.match(publicPrivacyPolicy, /ITX-청춘 경로 검색은 사용자가 직접 선택할 때만/);
+  assert.match(publicPrivacyPolicy, /tracking에 사용하지 않습니다/);
+  assert.match(publicPrivacyPolicy, /128-bit clientNonce/);
+  assert.match(publicPrivacyPolicy, /발급한 Route V2 세션 token의 SHA-256/);
+  assert.match(publicPrivacyPolicy, /세션은 발급 후 약 15분 이내/);
+  assert.match(publicPrivacyPolicy, /nonce 해시는 수신 후 약 7분 이내/);
+  assert.match(publicPrivacyPolicy, /expiresAt 뒤 5분 이내/);
+  assert.match(publicPrivacyPolicy, /mobilityType, mobilityPreset, constraintMode/);
+  assert.match(publicPrivacyPolicy, /raw integrityToken을 Google Play Integrity decode API로 전송/);
+  assert.match(publicPrivacyPolicy, /raw 검색어와 좌표/);
+  assert.match(publicPrivacyPolicy, /\$binary_remote_addr/);
+  assert.match(publicPrivacyPolicy, /\$http_authorization/);
+  assert.match(publicPrivacyPolicy, /Nginx shared memory/);
+  assert.match(publicPrivacyPolicy, /요청이 끝난 뒤에도 shared memory에 남을 수 있어 ephemeral 처리로 분류하지 않습니다/);
+  assert.match(publicPrivacyPolicy, /고정 TTL은 없으며/);
+  assert.match(publicPrivacyPolicy, /zone 메모리가 부족할 때 LRU 방식으로 퇴출/);
+  assert.match(publicPrivacyPolicy, /gateway process 또는 shared-memory zone 수명 종료/);
+  assert.match(publicPrivacyPolicy, /DB나 access log에는 저장하지 않습니다/);
+  assert.match(publicPrivacyPolicy, /private, no-store/);
 });
 
 test("iOS 위치 권한은 앱 사용 중 목적만 설명한다", () => {
@@ -15239,7 +15623,8 @@ test("build-release-callback.mjs는 스키마 유효 payload와 공유 fixture �
   const out = execFileSync("node", ["tools/datapack/build-release-callback.mjs"], {
     cwd: root, encoding: "utf8",
     env: { ...process.env,
-      RELEASE_REQUEST_ID: f.releaseRequestId, WORKFLOW_RUN_URL: f.workflowRunUrl,
+      RELEASE_REQUEST_ID: f.releaseRequestId, RELEASE_SEQUENCE: String(f.releaseSequence),
+      TARGET_CHANNEL: f.channel, WORKFLOW_RUN_URL: f.workflowRunUrl,
       MANIFEST_SHA256: f.manifestSha256, SQLITE_SHA256: f.sqliteSha256, GZIP_SHA256: f.gzipSha256,
       EVIDENCE_BUNDLE_SHA256: f.evidenceBundleSha256, VALIDATOR_STATUS: f.validatorStatus,
       ROUTE_REGRESSION_STATUS: f.routeRegressionStatus, PUBLISH_STATUS: f.publishStatus,
@@ -15247,11 +15632,11 @@ test("build-release-callback.mjs는 스키마 유효 payload와 공유 fixture �
   });
   const payload = JSON.parse(out);
   assert.equal(payload.artifactKind, "datapack-release-callback");
-  assert.equal(payload.schemaVersion, 1);
+  assert.equal(payload.schemaVersion, 2);
   assert.equal(payload.callbackVerifier.kind, "payload-signature");
   assert.equal(payload.callbackVerifier.value, vec.expectedHmacHex); // node↔Java 합의
-  // required 12필드 + additionalProperties:false 준수
-  assert.deepEqual(Object.keys(payload).sort(), ["artifactKind","callbackVerifier","evidenceBundleSha256","gzipSha256","manifestSha256","publishStatus","releaseRequestId","routeRegressionStatus","schemaVersion","sqliteSha256","validatorStatus","workflowRunUrl"]);
+  // required 15필드 + additionalProperties:false 준수
+  assert.deepEqual(Object.keys(payload).sort(), ["artifactKind","callbackVerifier","channel","evidenceBundleSha256","gzipSha256","idempotencyKey","manifestSha256","publishStatus","releaseRequestId","releaseSequence","routeRegressionStatus","schemaVersion","sqliteSha256","validatorStatus","workflowRunUrl"]);
 });
 
 async function classifyChangedFiles(files) {
