@@ -1821,6 +1821,9 @@ test("모바일 demo dependency와 접근성 theme는 app canonical 파일이 �
 
 test("모바일 설정 화면은 settings presentation canonical 파일이 소유한다", () => {
   const main = read("apps/mobile/lib/main.dart");
+  const home = read(
+    "apps/mobile/lib/features/home/presentation/home_screen.dart",
+  );
   const settings = read(
     "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
   );
@@ -1832,8 +1835,8 @@ test("모바일 설정 화면은 settings presentation canonical 파일이 소�
   assert.match(settings, /^class _AppSettingsActionTile extends StatelessWidget/m);
   assert.match(settings, /^class _AppSettingsPreferenceTile extends StatelessWidget/m);
   assert.match(
-    main,
-    /^import 'features\/settings\/presentation\/app_settings_screen\.dart';$/m,
+    home,
+    /^import '\.\.\/\.\.\/settings\/presentation\/app_settings_screen\.dart';$/m,
   );
   assert.match(
     main,
@@ -1845,6 +1848,262 @@ test("모바일 설정 화면은 settings presentation canonical 파일이 소�
   assert.doesNotMatch(main, /^class _AppSettingsSection\b/m);
   assert.doesNotMatch(main, /^class _AppSettingsActionTile\b/m);
   assert.doesNotMatch(main, /^class _AppSettingsPreferenceTile\b/m);
+});
+
+test("모바일 즐겨찾기 화면은 favorites presentation canonical 파일이 소유한다", () => {
+  const main = read("apps/mobile/lib/main.dart");
+  const home = read(
+    "apps/mobile/lib/features/home/presentation/home_screen.dart",
+  );
+  const favorites = read(
+    "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart",
+  );
+
+  assert.match(favorites, /^class _HomeSavedRouteCard extends StatelessWidget/m);
+  assert.match(favorites, /^String _stationNameWithSuffix\(String name\)/m);
+  assert.match(favorites, /^class _HomeMiniBadge extends StatelessWidget/m);
+  assert.match(favorites, /^class FavoriteHomeScreen extends StatefulWidget/m);
+  assert.match(favorites, /^class _FavoriteHomeScreenState extends State<FavoriteHomeScreen>/m);
+  assert.match(favorites, /^class _FavoriteHomeData\b/m);
+  assert.match(favorites, /^class _FavoriteHomeStationRow extends StatelessWidget/m);
+  assert.match(favorites, /^class _FavoriteHomeFacilityRow extends StatelessWidget/m);
+  assert.match(
+    home,
+    /^import '\.\.\/\.\.\/favorites\/presentation\/favorite_home_screen\.dart';$/m,
+  );
+  assert.match(
+    main,
+    /^export 'features\/favorites\/presentation\/favorite_home_screen\.dart'\s+show FavoriteHomeScreen;$/m,
+  );
+  assert.doesNotMatch(main, /^class _HomeSavedRouteCard\b/m);
+  assert.doesNotMatch(main, /^String _stationNameWithSuffix\b/m);
+  assert.doesNotMatch(main, /^class _HomeMiniBadge\b/m);
+  assert.doesNotMatch(main, /^class FavoriteHomeScreen\b/m);
+  assert.doesNotMatch(main, /^class _FavoriteHomeScreenState\b/m);
+  assert.doesNotMatch(main, /^class _FavoriteHomeData\b/m);
+  assert.doesNotMatch(main, /^class _FavoriteHomeStationRow\b/m);
+  assert.doesNotMatch(main, /^class _FavoriteHomeFacilityRow\b/m);
+});
+
+test("모바일 즐겨찾기 화면은 새로고침·삭제·복귀 재조회 순서를 유지한다", () => {
+  const favorites = read(
+    "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart",
+  );
+  const sourceBlock = (start, next) => {
+    const startIndex = favorites.indexOf(start);
+    const nextIndex = favorites.indexOf(next, startIndex + start.length);
+    assert.notEqual(startIndex, -1, `${start} must exist`);
+    assert.ok(nextIndex > startIndex, `${next} must follow ${start}`);
+    return favorites.slice(startIndex, nextIndex);
+  };
+  const refreshBlock = sourceBlock("onRefresh: () async {", "child: ListView(");
+  const removeRouteBlock = sourceBlock(
+    "Future<void> _removeFavoriteRoute",
+    "Future<void> _openStationDetailFromFavorite",
+  );
+  const stationDetailBlock = sourceBlock(
+    "Future<void> _openStationDetailFromFavorite",
+    "Future<void> _openFacilityReportFromFavorite",
+  );
+  const facilityReportBlock = sourceBlock(
+    "Future<void> _openFacilityReportFromFavorite",
+    "Future<void> _reloadFavoritesAfterReturn",
+  );
+  const reloadBlock = sourceBlock(
+    "Future<void> _reloadFavoritesAfterReturn",
+    "class _FavoriteHomeData",
+  );
+
+  assert.match(
+    refreshBlock,
+    /final next = _loadData\(\);[\s\S]*?setState\(\(\) \{[\s\S]*?_dataFuture = next;[\s\S]*?\}\);[\s\S]*?try \{[\s\S]*?await next;[\s\S]*?catch \(error, stackTrace\)[\s\S]*?context: '즐겨찾기 새로고침 중 예외가 발생했습니다\.',/,
+  );
+  assert.match(
+    removeRouteBlock,
+    /await repository\.removeFavoriteRoute\(favorite\.favoriteRouteId\);[\s\S]*?catch \(error, stackTrace\)[\s\S]*?context: '즐겨찾기 경로 삭제 중 예외가 발생했습니다\.'[\s\S]*?await _reloadFavoritesAfterReturn\(\);/,
+  );
+  assert.match(
+    reloadBlock,
+    /if \(!mounted\)[\s\S]*?final next = _loadData\(\);[\s\S]*?setState\(\(\) \{[\s\S]*?_dataFuture = next;[\s\S]*?\}\);[\s\S]*?try \{[\s\S]*?await next;[\s\S]*?catch \(error, stackTrace\)[\s\S]*?context: '즐겨찾기 화면 복귀 후 새로고침 중 예외가 발생했습니다\.',/,
+  );
+  assert.match(
+    stationDetailBlock,
+    /await Navigator\.of\(context\)\.push\([\s\S]*?initiallyFavorite: true,[\s\S]*?\);[\s\S]*?await _reloadFavoritesAfterReturn\(\);/,
+  );
+  assert.match(
+    facilityReportBlock,
+    /await Navigator\.of\(context\)\.push\([\s\S]*?FacilityReportScreen\([\s\S]*?\);[\s\S]*?await _reloadFavoritesAfterReturn\(\);/,
+  );
+});
+
+test("모바일 계정 삭제와 출처 화면은 feature presentation canonical 파일이 소유한다", () => {
+  const main = read("apps/mobile/lib/main.dart");
+  const home = read(
+    "apps/mobile/lib/features/home/presentation/home_screen.dart",
+  );
+  const widgetTest = read("apps/mobile/test/widget_test.dart");
+  const account = read(
+    "apps/mobile/lib/features/account/presentation/user_data_deletion_screen.dart",
+  );
+  const attribution = read(
+    "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart",
+  );
+
+  assert.match(account, /^class UserDataDeletionAccessItem extends StatelessWidget/m);
+  assert.match(account, /^enum UserDataDeletionScope\b/m);
+  assert.match(account, /^UserDataDeletionScope _userDataDeletionScope\(/m);
+  assert.match(account, /^class _UserDataDeletionCopy\b/m);
+  assert.match(account, /^class UserDataDeletionScreen extends StatefulWidget/m);
+  assert.match(account, /^class _UserDataDeletionScreenState extends State<UserDataDeletionScreen>/m);
+  assert.match(account, /^class UserDataDeletionResultScreen extends StatelessWidget/m);
+  assert.match(attribution, /^class DataSourceAttributionScreen extends StatefulWidget/m);
+  assert.match(
+    attribution,
+    /^class _DataSourceAttributionScreenState\s+extends State<DataSourceAttributionScreen>/m,
+  );
+  assert.match(attribution, /^class _AttributionCard extends StatelessWidget/m);
+  assert.match(attribution, /^class _AttributionRow extends StatelessWidget/m);
+  assert.match(
+    main,
+    /^import 'features\/account\/presentation\/user_data_deletion_screen\.dart';$/m,
+  );
+  assert.match(
+    home,
+    /^import '\.\.\/\.\.\/attribution\/presentation\/data_source_attribution_screen\.dart';$/m,
+  );
+  assert.doesNotMatch(
+    main,
+    /^export 'features\/(?:account|attribution)\/presentation\//m,
+  );
+  assert.match(
+    widgetTest,
+    /^import 'package:easysubway_mobile\/features\/account\/presentation\/user_data_deletion_screen\.dart';$/m,
+  );
+  assert.match(
+    widgetTest,
+    /^import 'package:easysubway_mobile\/features\/attribution\/presentation\/data_source_attribution_screen\.dart';$/m,
+  );
+  assert.doesNotMatch(main, /^class _UserDataDeletionAccessItem\b/m);
+  assert.doesNotMatch(main, /^enum UserDataDeletionScope\b/m);
+  assert.doesNotMatch(main, /^class _UserDataDeletionCopy\b/m);
+  assert.doesNotMatch(main, /^class UserDataDeletionScreen\b/m);
+  assert.doesNotMatch(main, /^class _UserDataDeletionScreenState\b/m);
+  assert.doesNotMatch(main, /^class UserDataDeletionResultScreen\b/m);
+  assert.doesNotMatch(main, /^class DataSourceAttributionScreen\b/m);
+  assert.doesNotMatch(main, /^class _DataSourceAttributionScreenState\b/m);
+  assert.doesNotMatch(main, /^class _AttributionCard\b/m);
+  assert.doesNotMatch(main, /^class _AttributionRow\b/m);
+});
+
+test("모바일 계정 삭제와 출처 화면은 삭제·asset load 순서를 유지한다", () => {
+  const account = read(
+    "apps/mobile/lib/features/account/presentation/user_data_deletion_screen.dart",
+  );
+  const attribution = read(
+    "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart",
+  );
+  const accountBlock = account.slice(
+    account.indexOf("Future<void> _deleteCurrentUserData()"),
+    account.indexOf("class UserDataDeletionResultScreen"),
+  );
+  const attributionBlock = attribution.slice(
+    attribution.indexOf("Future<({Map<String, Object?> manifest"),
+    attribution.indexOf("@override\n  Widget build"),
+  );
+
+  assert.match(
+    accountBlock,
+    /setState\(\(\) \{[\s\S]*?_isDeleting = true;[\s\S]*?await widget\.repository\.deleteCurrentUserData\(\);[\s\S]*?await widget\.onDeleted\?\.call\(result\);[\s\S]*?if \(!mounted\)[\s\S]*?Navigator\.of\(context\)\.popUntil\(\(route\) => route\.isFirst\);/,
+  );
+  assert.match(
+    accountBlock,
+    /on UserDataDeletionException catch \(error\)[\s\S]*?SnackBar\(content: Text\(error\.message\)\)[\s\S]*?catch \(error, stackTrace\)[\s\S]*?context: '사용자 정보 삭제 처리 중 예외가 발생했습니다\.'[\s\S]*?finally \{[\s\S]*?if \(mounted\)[\s\S]*?_isDeleting = false;/,
+  );
+  assert.match(
+    attributionBlock,
+    /if \(initialManifest != null && initialInventory != null\)[\s\S]*?return \(manifest: initialManifest, inventory: initialInventory\);[\s\S]*?Future\.wait\(\[[\s\S]*?rootBundle\.loadString\(_mapManifestAsset\)[\s\S]*?rootBundle\.loadString\(_sourceInventoryAsset\)/,
+  );
+});
+
+test("모바일 도움말 화면과 연결 계약은 support presentation canonical 파일이 소유한다", () => {
+  const main = read("apps/mobile/lib/main.dart");
+  const support = read(
+    "apps/mobile/lib/features/support/presentation/support_access_screen.dart",
+  );
+  const widgetTest = read("apps/mobile/test/widget_test.dart");
+  const supportInfoTest = read("apps/mobile/test/support_access_info_test.dart");
+  const appFixture = read("apps/mobile/test/support/easy_subway_app_fixture.dart");
+
+  for (const declaration of [
+    "SupportAccessLauncher",
+    "UrlLauncherSupportAccessLauncher",
+    "SupportAccessInfo",
+    "SupportAccessScreen",
+  ]) {
+    assert.match(support, new RegExp(`^(?:abstract interface )?class ${declaration}\\b`, "m"));
+    assert.doesNotMatch(main, new RegExp(`^(?:abstract interface )?class ${declaration}\\b`, "m"));
+  }
+  assert.match(
+    main,
+    /^import 'features\/support\/presentation\/support_access_screen\.dart';$/m,
+  );
+  assert.doesNotMatch(
+    main,
+    /^export 'features\/support\/presentation\/support_access_screen\.dart'/m,
+  );
+  for (const testSource of [widgetTest, supportInfoTest, appFixture]) {
+    assert.match(
+      testSource,
+      /^import 'package:easysubway_mobile\/features\/support\/presentation\/support_access_screen\.dart';$/m,
+    );
+  }
+  for (const helper of [
+    "_SupportSectionTitle",
+    "_SupportGroupCard",
+    "_SupportNavRow",
+    "_SecurityContactNotice",
+    "_SecurityContactNoticeLine",
+    "_SafetyDataNotice",
+    "_SafetyDataNoticeLine",
+    "_SupportAccessItem",
+  ]) {
+    assert.match(support, new RegExp(`^class ${helper}\\b`, "m"));
+    assert.doesNotMatch(main, new RegExp(`^class ${helper}\\b`, "m"));
+  }
+  assert.match(support, /^Uri\? _httpsUri\(/m);
+  assert.match(support, /^Uri\? _mailtoUri\(/m);
+});
+
+test("모바일 홈 화면과 shell 상태는 home presentation canonical 파일이 소유한다", () => {
+  const main = read("apps/mobile/lib/main.dart");
+  const home = read(
+    "apps/mobile/lib/features/home/presentation/home_screen.dart",
+  );
+
+  assert.match(home, /^class HomeScreen\b/m);
+  assert.doesNotMatch(main, /^class HomeScreen\b/m);
+  for (const helper of ["_HomeScreenState", "_HomeNotificationButton"]) {
+    assert.match(home, new RegExp(`^class ${helper}\\b`, "m"));
+    assert.doesNotMatch(main, new RegExp(`^class ${helper}\\b`, "m"));
+  }
+  assert.match(
+    main,
+    /^import 'features\/home\/presentation\/home_screen\.dart';$/m,
+  );
+  assert.doesNotMatch(
+    main,
+    /^export 'features\/home\/presentation\/home_screen\.dart'/m,
+  );
+  for (const testPath of [
+    "apps/mobile/test/accessibility_baseline_test.dart",
+    "apps/mobile/test/onboarding_app_flow_test.dart",
+    "apps/mobile/test/widget_test.dart",
+  ]) {
+    assert.match(
+      read(testPath),
+      /^import 'package:easysubway_mobile\/features\/home\/presentation\/home_screen\.dart';$/m,
+    );
+  }
 });
 
 test("프로덕션 모바일 UI 위젯명은 prototype 명칭을 쓰지 않는다", () => {
@@ -1910,7 +2169,12 @@ test("모바일 production 사용자 문구는 점수와 기본정보 같은 내
   assert.ok(mobileFiles.length > 0, "mobile production Dart files not found");
   for (const file of mobileFiles) {
     let source = read(file);
-    if (file === "apps/mobile/lib/main.dart") {
+    if (
+      file ===
+        "apps/mobile/lib/features/support/presentation/support_access_screen.dart" ||
+      file ===
+        "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart"
+    ) {
       source = source
         .replaceAll("'데이터 및 지도 출처'", "''")
         .replaceAll("'지도와 경로 판단 자료의 출처와 이용 조건을 확인해요'", "''");
@@ -1935,12 +2199,14 @@ test("노선도 탭 화면은 자체 하단 NavigationBar를 만들지 않는다
 });
 
 test("모바일 홈 shell과 주요 상태 UI 회귀 테스트는 유지된다", () => {
-  const main = read("apps/mobile/lib/main.dart");
+  const home = read(
+    "apps/mobile/lib/features/home/presentation/home_screen.dart",
+  );
   const widgetTest = read("apps/mobile/test/widget_test.dart");
 
-  assert.match(main, /int _selectedTabIndex = 0/);
-  assert.match(main, /if \(_selectedTabIndex == 0\)[\s\S]*NetworkMapScreen\(/);
-  assert.doesNotMatch(main, /homeBottomNavigationBar/);
+  assert.match(home, /int _selectedTabIndex = 0/);
+  assert.match(home, /if \(_selectedTabIndex == 0\)[\s\S]*NetworkMapScreen\(/);
+  assert.doesNotMatch(home, /homeBottomNavigationBar/);
   assert.match(widgetTest, /기본 앱은 저장소가 없어도 노선도 중심 첫 화면을 보여준다/);
   assert.match(widgetTest, /노선도 첫 화면은 하단 광고 위에 지도 조작을 유지한다/);
   // #1933: 폼 페이지 제거로 대체된 현행 전환 테스트 앵커
@@ -1950,9 +2216,9 @@ test("모바일 홈 shell과 주요 상태 UI 회귀 테스트는 유지된다",
   assert.match(widgetTest, /find\.byKey\(const Key\('bottomNavSaved'\)\), findsNothing/);
   assert.match(widgetTest, /홈은 시설 알림과 최근 경로 로드 실패를 인라인 오류 없이 넘긴다/);
   assert.match(widgetTest, /노선도 로드 실패는 재시도만 보여준다/);
-  assert.doesNotMatch(main, /class _HomeHero/);
-  assert.doesNotMatch(main, /class _HomeAdaptiveContent/);
-  assert.match(main, /return const SizedBox\.shrink\(\);/);
+  assert.doesNotMatch(home, /class _HomeHero/);
+  assert.doesNotMatch(home, /class _HomeAdaptiveContent/);
+  assert.match(home, /return const SizedBox\.shrink\(\);/);
 });
 
 test("모바일 역 검색 결과 시스템 글자 크기 문구 회귀 테스트는 유지된다", () => {
@@ -2046,16 +2312,20 @@ test("모바일 설정 저장 실패와 시설 제보 위치 실패 회귀 테�
 
 test("모바일 오프라인 안내 화면(OfflineDataScreen)은 완전히 제거됐다 (#1570)", () => {
   const main = read("apps/mobile/lib/main.dart");
+  const homeScreen = read(
+    "apps/mobile/lib/features/home/presentation/home_screen.dart",
+  );
+  const appAndHome = `${main}\n${homeScreen}`;
   const widgetTest = read("apps/mobile/test/widget_test.dart");
   const finalQaEvidence = readJson("apps/mobile/release/issue-1075-final-qa-evidence.json");
   // 진입점 없는 dead screen이라 화면·상태 헬퍼·스레딩(offlineDataExpiresAtLoader)까지
   // 완전 삭제했다(#1570 후속). 오프라인 동작은 설명 없이 그냥 되는 것.
-  assert.doesNotMatch(main, /class OfflineDataScreen/);
-  assert.doesNotMatch(main, /title:\s*'인터넷 없이 이용'/);
-  assert.doesNotMatch(main, /저장된 안내 상태/);
-  assert.doesNotMatch(main, /_offlineDataSourceOfTruth/);
-  assert.doesNotMatch(main, /[Oo]fflineDataExpiresAtLoader/);
-  assert.doesNotMatch(main, /offlineDataSettingsButton/);
+  assert.doesNotMatch(appAndHome, /class OfflineDataScreen/);
+  assert.doesNotMatch(appAndHome, /title:\s*'인터넷 없이 이용'/);
+  assert.doesNotMatch(appAndHome, /저장된 안내 상태/);
+  assert.doesNotMatch(appAndHome, /_offlineDataSourceOfTruth/);
+  assert.doesNotMatch(appAndHome, /[Oo]fflineDataExpiresAtLoader/);
+  assert.doesNotMatch(appAndHome, /offlineDataSettingsButton/);
   assert.doesNotMatch(widgetTest, /OfflineDataScreen/);
   assert.match(widgetTest, /testWidgets\('홈 200% 글자 screenshot smoke는 핵심 CTA 렌더 이미지를 만든다'/);
   assert.match(widgetTest, /RepaintBoundary[\s\S]*toImage\(/);
@@ -2634,7 +2904,12 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     [
       "apps/mobile/lib/app/accessibility_theme.dart",
       "apps/mobile/lib/app/app_components.dart",
+      "apps/mobile/lib/features/account/presentation/user_data_deletion_screen.dart",
+      "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart",
+      "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart",
+      "apps/mobile/lib/features/home/presentation/home_screen.dart",
       "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
+      "apps/mobile/lib/features/support/presentation/support_access_screen.dart",
       "apps/mobile/lib/main.dart",
       "apps/mobile/release/support-incident-response-gate.json",
     ],
@@ -2924,7 +3199,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.equal(abusePenetrationRehearsalGate.status, "BLOCKED_EXTERNAL");
   assert.equal(abusePenetrationRehearsalGate.androidRcEvidenceManifest, androidRcEvidencePath);
   assert.equal(abusePenetrationRehearsalGate.securityPrivacyEvidenceManifest, "apps/mobile/release/security-privacy-release-evidence.json");
-  assert.match(abusePenetrationRehearsalGate.evidenceRoot, /\.codex\/evidence\/security\/abuse-penetration-rehearsal\/<rc-or-run>/);
+  assert.equal(abusePenetrationRehearsalGate.evidenceRoot, ".codex/evidence/security/abuse-penetration-rehearsal/<git-sha>/");
   const adGuardrails = abusePenetrationRehearsalGate.adEventAbuseGuardrails;
   assert.equal(adGuardrails.issue, 1912);
   assert.deepEqual(adGuardrails.edge, {
@@ -2995,6 +3270,11 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "play-installed-build-smoke",
     "play-pre-launch-report-crash-anr-policy-summary",
     "network-trace-redaction-summary-from-play-installed-build",
+    "play-installed-attestation-positive-negative-matrix",
+    "deployed-token-lifecycle-and-session-quota-rehearsal",
+    "deployed-gateway-401-origin-403-no-write-summary",
+    "deployed-limiter-boundary-burst-retry-after-summary",
+    "credential-log-metric-ui-analytics-absence-audit",
     "deployed-public-https-backend-report-admin-base-url-evidence",
     "deployed-admin-operator-auth-session-csrf-summary",
     "deployed-signed-url-boundary-summary",
@@ -3012,6 +3292,68 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
       "raw signed URL",
     ),
   );
+  const routeV2SessionServiceTest = read(
+    "backend/src/test/java/com/easysubway/route/application/service/RouteV2SessionServiceTest.java",
+  );
+  const routeV2IngressFilterTest = read(
+    "backend/src/test/java/com/easysubway/route/adapter/in/web/RouteV2IngressFilterTest.java",
+  );
+  const productionRouteClosureTest = read(
+    "backend/src/test/java/com/easysubway/route/adapter/in/web/ProductionRouteApiClosureTest.java",
+  );
+  const routeV2GatewayTest = read("tools/ci/route-v2-gateway.test.mjs");
+  const routeV2GatewayProbe = read("tools/test/run-route-v2-gateway-integration.sh");
+  const ciWorkflow = read(".github/workflows/ci.yml");
+  const routeV2AttackMatrix = abusePenetrationRehearsalGate.routeV2IngressAttackMatrix;
+  assert.equal(routeV2AttackMatrix.issue, 1022);
+  assert.equal(routeV2AttackMatrix.status, "BLOCKED_EXTERNAL");
+  assert.equal(routeV2AttackMatrix.localRegressionStatus, "PASS");
+  assert.deepEqual(routeV2AttackMatrix.localAutomatedCases, [
+    {
+      caseId: "attestation_nonce_request_hash",
+      evidence: "RouteV2SessionServiceTest",
+    },
+    {
+      caseId: "session_token_scope_expiry_quota",
+      evidence: "RouteV2IngressFilterTest and ProductionRouteApiClosureTest",
+    },
+    {
+      caseId: "gateway_401_origin_403_no_write",
+      evidence: "ProductionRouteApiClosureTest",
+    },
+    {
+      caseId: "gateway_ip_token_limiter_retry_after",
+      evidence: "route-v2-gateway.test.mjs and run-route-v2-gateway-integration.sh",
+    },
+  ]);
+  assert.deepEqual(routeV2AttackMatrix.requiredSameRcProductionEvidence, [
+    "play-installed-attestation-positive-negative-matrix",
+    "deployed-token-lifecycle-and-session-quota-rehearsal",
+    "deployed-gateway-401-origin-403-no-write-summary",
+    "deployed-limiter-boundary-burst-retry-after-summary",
+    "credential-log-metric-ui-analytics-absence-audit",
+  ]);
+  for (const evidenceId of routeV2AttackMatrix.requiredSameRcProductionEvidence) {
+    assert.ok(
+      abusePenetrationRehearsalGate.productionLikeEvidencePolicy.requiredForClosing.includes(evidenceId),
+      `${evidenceId} must be enforced by the PASS summary evidence catalog`,
+    );
+  }
+  assert.equal(routeV2AttackMatrix.productionMutationPerformed, false);
+  assert.equal(routeV2AttackMatrix.explicitProductionApprovalRequired, true);
+  assert.equal(routeV2AttackMatrix.rawCredentialOrExploitPayloadStored, false);
+  assert.match(routeV2SessionServiceTest, /2분보다 오래됐거나 미래인 verdict와 다른 requestHash를 거부한다/);
+  assert.match(routeV2SessionServiceTest, /128-bit base64url nonce 형식과 2분 replay를 거부한다/);
+  assert.match(routeV2IngressFilterTest, /50회를 소비한 session은 exact 429와 정수 Retry-After를 반환한다/);
+  assert.match(routeV2IngressFilterTest, /만료 session은 exact 401이고 controller를 호출하지 않는다/);
+  assert.match(routeV2IngressFilterTest, /다른 scope session은 exact 422이고 controller를 호출하지 않는다/);
+  assert.match(routeV2IngressFilterTest, /ROUTE_ORIGIN_FORBIDDEN/);
+  assert.match(routeV2IngressFilterTest, /ROUTE_SESSION_REQUIRED/);
+  assert.match(productionRouteClosureTest, /direct-origin Route V2는 handler와 DB write 전에 exact 403으로 거부한다/);
+  assert.match(productionRouteClosureTest, /session 전체 50회 초과는 integer Retry-After와 exact 429다/);
+  assert.match(routeV2GatewayTest, /IP·token limiter와 exact 429 계약/);
+  assert.match(routeV2GatewayProbe, /Retry-After: 60/);
+  assert.match(ciWorkflow, /tools\/test\/run-route-v2-gateway-integration\.sh/);
   assert.deepEqual(abusePenetrationRehearsalGate.buildIdentityPolicy.requiredIssueLinks, ["#1015", "#1016", "#1020", "#1914"]);
   assert.ok(
     abusePenetrationRehearsalGate.productionLikeEvidencePolicy.requiredForClosing.includes(
@@ -3046,6 +3388,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
       "provider_and_release_secret_exposure",
       "receipt_token_replay_and_status_abuse",
       "report_photo_upload_abuse",
+      "route_v2_ingress_abuse",
       "signed_url_lifecycle_abuse",
     ],
   );
@@ -3085,6 +3428,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "providerReleaseSecretExposure",
     "receiptTokenAbuse",
     "reportUploadLifecycle",
+    "routeV2IngressAbuse",
     "signedUploadUrlBoundary",
   ]);
   assert.deepEqual(
@@ -3511,25 +3855,25 @@ test("A RED repository locks summary v2 contract and catalog", async () => {
   assert.equal(contract.procedureIdDerivation, "matrixId + '.' + caseId");
   assert.equal(contract.targetAliasDerivation, "'target.' + matrixId");
   assert.equal(contract.ownerAliasDerivation, "'owner.' + matrixId");
-  assert.equal(contract.relativeEvidencePathPattern, "^\\.codex/evidence/security/abuse-penetration-rehearsal/[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$");
+  assert.equal(contract.relativeEvidencePathPattern, "^\\.codex/evidence/security/abuse-penetration-rehearsal/(?!\\.{1,2}(?:/|$))[A-Za-z0-9._-]+(?:/(?!\\.{1,2}(?:/|$))[A-Za-z0-9._-]+)*$");
   assert.deepEqual(contract.fieldTypes, {
     root: { schemaVersion: "integer", releaseGate: "string", issue: "integer", status: "string", rawInvocationStored: "boolean", redactionPolicyId: "string", artifactIdentity: "object", evidence: "array", productionLikeEvidence: "array", matrices: "array" },
     artifactIdentity: { gitSha: "string", versionCode: "integer", androidApplicationId: "string", dataPackManifestSha256: "string", aabSha256: "string", generatedApkSha256: "string", backendImageDigest: "string", backendArtifactSha256: "string" },
-    evidence: { evidenceId: "string", result: "string", localEvidencePath: "string" },
+    evidence: { evidenceId: "string", result: "string", localEvidencePath: "string", artifactIdentitySha256: "string" },
     matrix: { matrixId: "string", result: "string", findingCounts: "object", mediumFindingDisposition: "object", cases: "array" },
     findingCounts: { critical: "integer", high: "integer", medium: "integer", low: "integer" },
     mediumFindingDisposition: { ownerAlias: "string", fixPlanEvidencePath: "string" },
-    case: { procedureId: "string", targetAlias: "string", expectedStatus: "integer", observedStatus: "integer", redactionResult: "string", localEvidencePath: "string" },
+    case: { procedureId: "string", targetAlias: "string", expectedStatus: "integer", observedStatus: "integer", redactionResult: "string", localEvidencePath: "string", artifactIdentitySha256: "string" },
   });
   assert.deepEqual(contract.requiredFields, {
     rootForAllStatuses: ["schemaVersion", "releaseGate", "issue", "status", "rawInvocationStored", "redactionPolicyId"],
     rootAdditionalForPass: ["artifactIdentity", "evidence", "productionLikeEvidence", "matrices"],
     artifactIdentity: ["gitSha", "versionCode", "androidApplicationId", "dataPackManifestSha256"],
-    evidence: ["evidenceId", "result", "localEvidencePath"],
+    evidence: ["evidenceId", "result", "localEvidencePath", "artifactIdentitySha256"],
     matrix: ["matrixId", "result", "findingCounts", "cases"],
     findingCounts: ["critical", "high", "medium", "low"],
     mediumFindingDisposition: ["ownerAlias", "fixPlanEvidencePath"],
-    case: ["procedureId", "targetAlias", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"],
+    case: ["procedureId", "targetAlias", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath", "artifactIdentitySha256"],
   });
   assert.deepEqual(contract.fieldPatterns.artifactIdentity, {
     gitSha: "^[0-9a-f]{40}$", androidApplicationId: "^com\\.easysubway\\.app$",
@@ -3537,11 +3881,13 @@ test("A RED repository locks summary v2 contract and catalog", async () => {
     generatedApkSha256: "^[0-9a-f]{64}$", backendArtifactSha256: "^[0-9a-f]{64}$",
     backendImageDigest: "^sha256:[0-9a-f]{64}$",
   });
+  assert.deepEqual(contract.fieldPatterns.evidence, { artifactIdentitySha256: "^[0-9a-f]{64}$" });
+  assert.deepEqual(contract.fieldPatterns.case, { artifactIdentitySha256: "^[0-9a-f]{64}$" });
   assert.equal(existsSync(path.join(root, "tools/security/abuse-penetration-summary-schema.mjs")), true);
   const { deriveSummaryCatalog } = await import("../security/abuse-penetration-summary-schema.mjs");
   const catalog = deriveSummaryCatalog(abusePenetrationRehearsalGate);
   assert.equal(Object.isFrozen(catalog), true);
-  assert.deepEqual(catalog.matrixIds, ["adCounterInflation", "adminOperatorSecurity", "distributedRateLimitAbuse", "objectStorageLifecycle", "providerReleaseSecretExposure", "receiptTokenAbuse", "reportUploadLifecycle", "signedUploadUrlBoundary"]);
+  assert.deepEqual(catalog.matrixIds, ["adCounterInflation", "adminOperatorSecurity", "distributedRateLimitAbuse", "objectStorageLifecycle", "providerReleaseSecretExposure", "receiptTokenAbuse", "reportUploadLifecycle", "routeV2IngressAbuse", "signedUploadUrlBoundary"]);
   const expectedProcedures = Object.entries(abusePenetrationRehearsalGate.rehearsalMatrices).flatMap(([matrixId, matrix]) =>
     matrix.requiredCases.map((caseId) => [
       `${matrixId}.${caseId}`,
@@ -3576,6 +3922,37 @@ test("A RED repository locks summary v2 contract and catalog", async () => {
     "cloudflare-ipv4-live-oci-set-equality-summary", "postgres-atomic-daily-cap-test-output",
     "identifier-zero-request-capture-summary", "origin-log-ip-ua-absence-summary", "cloudflare-logpush-ip-ua-absence-summary",
   ]);
+  const routeV2 = abusePenetrationRehearsalGate.rehearsalMatrices.routeV2IngressAbuse;
+  assert.deepEqual(routeV2.requiredCases, [
+    "attestation_valid",
+    "attestation_invalid_nonce_format",
+    "attestation_nonce_replay",
+    "attestation_stale_verdict",
+    "attestation_future_verdict",
+    "attestation_request_hash_mismatch",
+    "attestation_wrong_request_package",
+    "attestation_wrong_app_package",
+    "attestation_certificate_mismatch",
+    "attestation_app_recognition_mismatch",
+    "attestation_licensing_mismatch",
+    "attestation_device_integrity_mismatch",
+    "attestation_provider_unavailable",
+    "session_expired",
+    "session_wrong_scope",
+    "session_quota_exhausted",
+    "gateway_session_missing",
+    "direct_origin_bypass_no_write",
+    "gateway_ip_limiter",
+    "gateway_token_limiter",
+  ]);
+  for (const caseId of routeV2.requiredCases) {
+    assert.equal(routeV2.expectedStatusByCase[caseId].length, 1, `${caseId} must require one exact result`);
+  }
+  assert.deepEqual(routeV2.expectedStatusByCase.gateway_token_limiter, [429]);
+  const gatewayScriptClassification = await classifyChangedFiles([
+    "tools/test/run-route-v2-gateway-integration.sh",
+  ]);
+  assert.equal(gatewayScriptClassification.repository, "true");
   assert.equal(abusePenetrationRehearsalGate.status, "BLOCKED_EXTERNAL");
   assert.equal(abusePenetrationRehearsalGate.findingPolicy.criticalHighAllowed, 0);
 });
@@ -5308,6 +5685,7 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   );
   assert.match(routeV2GatewayProbe, /session success response must remain private, no-store/);
   assert.match(routeV2GatewayProbe, /search success response must remain private, no-store/);
+  assert.doesNotMatch(routeV2GatewayProbe, /(^|\n)\s*rg\s/, "gateway probe must use POSIX runner tools available in GitHub Actions");
   assert.match(
     securityConfig,
     /@Profile\("prod \| staging \| release \| prod-like"\)[\s\S]*SecurityFilterChain routeV2IngressSecurityFilterChain/,
@@ -6387,7 +6765,9 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   const inventory = readJson("tools/datapack/source-inventory.json");
   const appInventory = readJson("apps/mobile/assets/datapacks/source-inventory.json");
   const pubspec = read("apps/mobile/pubspec.yaml");
-  const mobileMain = read("apps/mobile/lib/main.dart");
+  const attributionScreen = read(
+    "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart",
+  );
   const targets = readJson("tools/datapack/nationwide-coverage-targets.json");
   const productionScope = readJson("apps/mobile/release/production-datapack-scope.json");
   const sourceCandidates = readJson("tools/datapack/source-candidates.json");
@@ -6395,11 +6775,11 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
 
   assert.deepEqual(appInventory, inventory);
   assert.match(pubspec, /assets\/datapacks\/source-inventory\.json/);
-  assert.match(mobileMain, /class DataSourceAttributionScreen/);
-  assert.match(mobileMain, /assets\/datapacks\/metro_map_pack\/manifest\.json/);
-  assert.match(mobileMain, /assets\/datapacks\/source-inventory\.json/);
-  assert.match(mobileMain, /지도 표시용 asset/);
-  assert.match(mobileMain, /경로·시설 안내용 데이터/);
+  assert.match(attributionScreen, /class DataSourceAttributionScreen/);
+  assert.match(attributionScreen, /assets\/datapacks\/metro_map_pack\/manifest\.json/);
+  assert.match(attributionScreen, /assets\/datapacks\/source-inventory\.json/);
+  assert.match(attributionScreen, /지도 표시용 asset/);
+  assert.match(attributionScreen, /경로·시설 안내용 데이터/);
 
   assert.equal(inventory.schemaVersion, 1);
   assert.equal(inventory.region, "nationwide");
@@ -12783,14 +13163,26 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const envExample = read(".env.example");
   const iosInfoPlist = read("apps/mobile/ios/Runner/Info.plist");
   const main = read("apps/mobile/lib/main.dart");
+  const homeScreen = read(
+    "apps/mobile/lib/features/home/presentation/home_screen.dart",
+  );
+  const supportAccessScreen = read(
+    "apps/mobile/lib/features/support/presentation/support_access_screen.dart",
+  );
   const appSettingsScreen = read(
     "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
+  );
+  const favoriteHomeScreen = read(
+    "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart",
   );
   const accessibilityTheme = read("apps/mobile/lib/app/accessibility_theme.dart");
   const appDependencies = read("apps/mobile/lib/app/app_dependencies.dart");
   const authHeaders = read("apps/mobile/lib/auth_headers.dart");
   const secureKeyValueStorage = read("apps/mobile/lib/secure_key_value_storage.dart");
   const userDataDeletion = read("apps/mobile/lib/user_data_deletion.dart");
+  const userDataDeletionScreen = read(
+    "apps/mobile/lib/features/account/presentation/user_data_deletion_screen.dart",
+  );
   const userDataDeletionTest = read("apps/mobile/test/user_data_deletion_test.dart");
   const onboarding = read("apps/mobile/lib/onboarding.dart");
   const onboardingTest = read("apps/mobile/test/onboarding_test.dart");
@@ -12858,8 +13250,11 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(envExample, /^EASYSUBWAY_ANDROID_KEY_PASSWORD=$/m);
   assert.match(iosInfoPlist, /CFBundleDisplayName[\s\S]*?<string>쉬운 지하철<\/string>/);
   assert.match(main, /class EasySubwayApp extends StatelessWidget/);
-  assert.match(`${main}\n${networkMap}\n${stationSearch}`, /역 검색/);
-  assert.match(`${main}\n${networkMap}\n${routeSearch}\n${stationSearch}`, /길찾기/);
+  assert.match(`${main}\n${homeScreen}\n${networkMap}\n${stationSearch}`, /역 검색/);
+  assert.match(
+    `${main}\n${homeScreen}\n${networkMap}\n${routeSearch}\n${stationSearch}`,
+    /길찾기/,
+  );
   assert.match(appSettingsScreen, /이동 조건/);
   assert.match(appSettingsScreen, /알림 설정/);
   assert.match(main, /EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS/);
@@ -12882,7 +13277,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(stationSearch, /역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다\./);
   assert.match(widgetTest, /역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다\./);
   assert.match(main, /initialMobilityType: onboardingResult\?\.mobilityType/);
-  assert.match(main, /initialMobilityType: initialMobilityType/);
+  assert.match(homeScreen, /initialMobilityType: initialMobilityType/);
   assert.match(main, /OnboardingPreferenceScope/);
   assert.doesNotMatch(accessibilityTheme, /mediaQuery\.textScaler\.clamp\(minScaleFactor: 1\.18\)/);
   assert.match(accessibilityTheme, /highContrast:[\s\S]*preferences\.highContrastEnabled \|\| mediaQuery\.highContrast/);
@@ -12891,18 +13286,21 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(accessibilityTheme, /WidgetStateProperty\.resolveWith/);
   assert.match(accessibilityTheme, /_themeForPreferences/);
   assert.match(main, /simpleViewEnabled: preferences\.simpleViewEnabled/);
-  assert.match(main, /RouteSearchScreen\([\s\S]*simpleViewEnabled: simpleViewEnabled/);
-  assert.match(main, /AppBar\(title: const Text\('즐겨찾기'\)\)/);
+  assert.match(
+    homeScreen,
+    /RouteSearchScreen\([\s\S]*simpleViewEnabled: simpleViewEnabled/,
+  );
+  assert.match(favoriteHomeScreen, /AppBar\(title: const Text\('즐겨찾기'\)\)/);
   // 즐겨찾기 홈은 #1569에서 카테고리 카드를 없애고 역/경로/시설 인라인 섹션으로 바꿨다.
-  assert.match(main, /AppSectionTitle\(title: '역'\)/);
-  assert.match(main, /AppSectionTitle\(title: '시설'\)/);
-  assert.match(main, /AppSectionTitle\(title: '경로'\)/);
-  assert.match(main, /FavoriteHomeScreen/);
+  assert.match(favoriteHomeScreen, /AppSectionTitle\(title: '역'\)/);
+  assert.match(favoriteHomeScreen, /AppSectionTitle\(title: '시설'\)/);
+  assert.match(favoriteHomeScreen, /AppSectionTitle\(title: '경로'\)/);
+  assert.match(homeScreen, /FavoriteHomeScreen/);
   // #1569: 하위 목록 화면 진입 대신 즐겨찾기 항목을 인라인 행으로 바로 나열한다.
   // (하위 목록 위젯 클래스는 각 소스 파일에 유지, main에서 진입만 제거)
-  assert.match(main, /class _FavoriteHomeStationRow/);
-  assert.match(main, /class _FavoriteHomeFacilityRow/);
-  assert.match(main, /_HomeSavedRouteCard\([\s\S]*onRemove:/);
+  assert.match(favoriteHomeScreen, /class _FavoriteHomeStationRow/);
+  assert.match(favoriteHomeScreen, /class _FavoriteHomeFacilityRow/);
+  assert.match(favoriteHomeScreen, /_HomeSavedRouteCard\([\s\S]*onRemove:/);
   assert.match(onboarding, /class OnboardingViewPreferences/);
   assert.match(onboarding, /const OnboardingViewPreferences\.defaults/);
   assert.match(onboarding, /class OnboardingResult/);
@@ -13115,13 +13513,13 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(widgetTest, /도움말은 개인정보 안내를 불릿 대신 처리방침 링크로 위임한다/);
   assert.match(widgetTest, /도움말은 이동 전 살펴보기 안내를 함께 보여준다/);
   assert.match(widgetTest, /도움말은 보안과 개인정보 문의 경로를 안내한다/);
-  assert.match(main, /보안 문의 안내/);
-  assert.match(main, /앱 보안이나 개인정보가 걱정되면 문의로 알려주세요\./);
-  assert.match(main, /EASYSUBWAY_SECURITY_EMAIL/);
-  assert.match(main, /validatedForBuild\(\{required bool isReleaseMode\}\)/);
-  assert.match(main, /Release \$label must use HTTPS\./);
-  assert.match(main, /Release \$label must be a valid email address\./);
-  assert.match(main, /Release \$label must be configured\./);
+  assert.match(supportAccessScreen, /보안 문의 안내/);
+  assert.match(supportAccessScreen, /앱 보안이나 개인정보가 걱정되면 문의로 알려주세요\./);
+  assert.match(supportAccessScreen, /EASYSUBWAY_SECURITY_EMAIL/);
+  assert.match(supportAccessScreen, /validatedForBuild\(\{required bool isReleaseMode\}\)/);
+  assert.match(supportAccessScreen, /Release \$label must use HTTPS\./);
+  assert.match(supportAccessScreen, /Release \$label must be a valid email address\./);
+  assert.match(supportAccessScreen, /Release \$label must be configured\./);
   assert.match(main, /supportAccessInfo\.validatedForBuild\([\s\S]*isReleaseMode: kReleaseMode/);
   assert.match(supportAccessInfoTest, /릴리즈 도움말 연락 경로는 모두 설정되어야 한다/);
   assert.match(supportAccessInfoTest, /릴리즈 도움말 연락 경로는 HTTPS와 메일 주소 형식만 허용한다/);
@@ -13168,16 +13566,16 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
     /class FavoriteRouteApiRepository[\s\S]*?_httpClient[\s\S]*?class FavoriteRouteException/,
   );
   // 개인정보 안내는 화면 불릿 대신 개인정보처리방침 링크로 위임한다(#1571).
-  assert.match(main, /개인정보처리방침/);
-  assert.doesNotMatch(main, /개인정보 사용 안내/);
-  assert.match(main, /이동 전 살펴보기/);
-  assert.match(main, /경로와 시설 정보는 이동을 돕는 참고 정보입니다/);
-  assert.match(main, /현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요/);
-  assert.match(main, /실시간 상태나 무조건 안전한 경로를 보장하지 않습니다/);
+  assert.match(supportAccessScreen, /개인정보처리방침/);
+  assert.doesNotMatch(supportAccessScreen, /개인정보 사용 안내/);
+  assert.match(supportAccessScreen, /이동 전 살펴보기/);
+  assert.match(supportAccessScreen, /경로와 시설 정보는 이동을 돕는 참고 정보입니다/);
+  assert.match(supportAccessScreen, /현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요/);
+  assert.match(supportAccessScreen, /실시간 상태나 무조건 안전한 경로를 보장하지 않습니다/);
   // 삭제 확인 화면은 지워지는 것 1줄 + 되돌릴 수 없음 강조 + 예외 1줄로 압축한다(#1571).
-  assert.match(main, /삭제 후에는 되돌릴 수 없어요/);
+  assert.match(userDataDeletionScreen, /삭제 후에는 되돌릴 수 없어요/);
   assert.match(
-    main,
+    userDataDeletionScreen,
     /이 기기의 즐겨찾기·최근 검색·설정과 보낸 제보·사진이 삭제되거나 익명 처리돼요/,
   );
   assert.match(apiClient, /class ApiClient/);
@@ -13219,8 +13617,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(userDataDeletionTest, /기존 인증 갱신 실패 시 새 사용자 삭제로 처리하지 않는다/);
   assert.match(widgetTest, /도움말은 앱 안에서 데이터 삭제를 재확인하고 로컬 상태를 정리한다/);
   assert.match(widgetTest, /데이터 삭제 실패 시 로컬 상태를 유지하고 오류를 안내한다/);
-  assert.match(main, /UserDataDeletionScreen/);
-  assert.match(main, /dataDeletionConfirmButton/);
+  assert.match(userDataDeletionScreen, /UserDataDeletionScreen/);
+  assert.match(userDataDeletionScreen, /dataDeletionConfirmButton/);
   assert.match(widgetTest, /알림 설정 화면은 현재 설정을 불러오고 바꾼 값을 저장한다/);
   assert.match(widgetTest, /bySemanticsLabel/);
   assert.match(widgetTest, /greaterThanOrEqualTo\(60\)/);
@@ -14385,6 +14783,9 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
   const inventory = readJson(inventoryPath);
   const privacyManifest = read("apps/mobile/ios/Runner/PrivacyInfo.xcprivacy");
   const main = read("apps/mobile/lib/main.dart");
+  const supportAccessScreen = read(
+    "apps/mobile/lib/features/support/presentation/support_access_screen.dart",
+  );
   const stationSearch = read("apps/mobile/lib/station_search.dart");
   const facilityReport = read("apps/mobile/lib/facility_report.dart");
 
@@ -14409,8 +14810,8 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
   assert.ok(inventory.crashAnrProviderDecision.sourceOfTruth.includes("Android vitals"));
   assert.ok(inventory.crashAnrProviderDecision.sourceOfTruth.includes("Google Play pre-launch report"));
   assert.ok(inventory.crashAnrProviderDecision.requiredEvidence.includes("android-vitals-or-play-pre-launch-report-export"));
-  assert.match(main, /EASYSUBWAY_PRIVACY_POLICY_URL/);
-  assert.match(main, /EASYSUBWAY_DATA_DELETION_EMAIL/);
+  assert.match(supportAccessScreen, /EASYSUBWAY_PRIVACY_POLICY_URL/);
+  assert.match(supportAccessScreen, /EASYSUBWAY_DATA_DELETION_EMAIL/);
 
   const items = new Map(inventory.dataTypes.map((item) => [item.id, item]));
   const requiredIds = [
@@ -14530,7 +14931,11 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     } else {
       assert.equal(item.googlePlayDataSafety.required, false, `${id} not-collected Play data must not be required`);
     }
-    assert.equal(item.googlePlayDataSafety.deletionSupported, true, `${id} must declare data deletion support`);
+    assert.equal(
+      item.googlePlayDataSafety.deletionSupported,
+      id !== "route_v2_gateway_abuse_rate_limit_state",
+      `${id} must declare the implemented data deletion boundary`,
+    );
   }
 
   const appStoreTypes = [...new Set(
@@ -14702,6 +15107,10 @@ test("Route V2 ITX 개인정보와 Data Safety 공개 기준은 실제 전송·�
   assert.equal(route.googlePlayDataSafety.linkedToUser, false);
   assert.equal(route.googlePlayDataSafety.optional, true);
   assert.equal(route.googlePlayDataSafety.processedEphemerally, false);
+  assert.equal(
+    route.purposeKo,
+    "사용자가 선택한 ITX-청춘 경로 계산 결과를 제한된 기간 동안 보관",
+  );
   assert.deepEqual(route.routeRequestFields, [
     "originStationId",
     "destinationStationId",
@@ -14746,6 +15155,7 @@ test("Route V2 ITX 개인정보와 Data Safety 공개 기준은 실제 전송·�
   assert.equal(gatewayRateLimitState.googlePlayDataSafety.collected, true);
   assert.equal(gatewayRateLimitState.googlePlayDataSafety.linkedToUser, true);
   assert.equal(gatewayRateLimitState.googlePlayDataSafety.optional, true);
+  assert.equal(gatewayRateLimitState.googlePlayDataSafety.deletionSupported, false);
   assert.equal(gatewayRateLimitState.googlePlayDataSafety.processedEphemerally, false);
   assert.deepEqual(gatewayRateLimitState.gatewayKeyFields, [
     "$binary_remote_addr",
@@ -14806,6 +15216,12 @@ test("Route V2 ITX 개인정보와 Data Safety 공개 기준은 실제 전송·�
   assert.equal(
     playStoreContent.dataSafetyDeclarations.routeV2Itx.gatewayRateLimitStateProcessedEphemerally,
     false,
+  );
+  assert.equal(
+    playStoreContent.dataSafetyDeclarations.answerMatrix
+      .find((item) => item.dataType === "Device or other IDs")
+      .containsDeletionUnsupportedData,
+    true,
   );
   assert.ok(
     playStoreContent.dataSafetyDeclarations.answerMatrix
