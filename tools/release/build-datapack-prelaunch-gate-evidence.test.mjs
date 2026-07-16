@@ -188,6 +188,20 @@ test("backend reconciliation report가 RC와 다르면 fail closed한다", () =>
   input.backendReconciliationReport.manifestSha256 = "0".repeat(64);
   assert.throws(() => buildGateFragments(input), /backend reconciliation evidence/);
 });
+test("prelaunch Android emulator 실행 전에 KVM 권한을 활성화한다", async () => {
+  const workflow = await readFile(new URL(
+    "../../.github/workflows/datapack-prelaunch-gates.yml", import.meta.url,
+  ), "utf8");
+  const kvmStep = workflow.indexOf("      - name: Enable KVM group permissions");
+  const emulatorStep = workflow.indexOf("      - name: Rehearse monotonic rescue on Android emulator");
+
+  assert.notEqual(kvmStep, -1, "KVM 권한 활성화 단계가 필요하다");
+  assert.notEqual(emulatorStep, -1, "Android emulator 단계가 필요하다");
+  assert.ok(kvmStep < emulatorStep, "KVM 권한은 emulator 실행 전에 활성화해야 한다");
+  assert.match(workflow, /KERNEL=="kvm", GROUP="kvm", MODE="0666"/);
+  assert.match(workflow, /sudo udevadm control --reload-rules/);
+  assert.match(workflow, /sudo udevadm trigger --name-match=kvm/);
+});
 test("prelaunch workflow는 네 gate를 같은 RC final readiness에 결속한다", async () => {
   const workflow = await readFile(new URL(
     "../../.github/workflows/datapack-prelaunch-gates.yml", import.meta.url,
