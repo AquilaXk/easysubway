@@ -2454,16 +2454,31 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   const validatedArtifactIdentity =
     postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.validatedArtifactIdentity;
   assert.match(validatedArtifactIdentity.aabPayloadSha256, /^[0-9a-f]{64}$/);
+  // #2068 datapack manifest 변경으로 live manifest 해시가 b764943b…로 바뀌면서 게이트에 고정된
+  // 1.0.4 RC identity는 중단(superseded)되었다. aabPayload·backend identity는 기존 evidence 체인과
+  // 동등해야 하지만, dataPackManifestSha256은 중단된 RC의 고정 기록값이며 재사용이 계약상 금지되므로
+  // live manifest 해시와 반드시 달라야 한다(의도된 불일치). (오너 결정 2026-07-16)
+  const liveDataPackManifestSha256 = createHash("sha256")
+    .update(read("apps/mobile/assets/datapacks/metro_map_pack/manifest.json"))
+    .digest("hex");
   assert.deepEqual(
     validatedArtifactIdentity,
     {
       aabPayloadSha256: validatedArtifactIdentity.aabPayloadSha256,
       backendArtifactSha256:
         operationsEvidence.backendControlPlane.latestQaEvidenceStatus.phaseACurrentRcArtifact.backendArtifactSha256,
-      dataPackManifestSha256: createHash("sha256")
-        .update(read("apps/mobile/assets/datapacks/metro_map_pack/manifest.json"))
-        .digest("hex"),
+      // 게이트 기록값은 중단된 1.0.4 RC evidence 체인의 고정 해시(#2068 이전 manifest에서 산출)로
+      // 고정 검증한다. live manifest 해시를 여기에 재기입하지 않는다.
+      dataPackManifestSha256: "2ee9f38f3e748d7bbc6d9eba124b34e6b5c8ad539338a6cdeee7a472515456e5",
     },
+  );
+  // 중단된 RC identity 재사용 불가 계약: 게이트 기록 dataPackManifestSha256은 #2068로 바뀐 live
+  // manifest 해시와 반드시 달라야 한다. #1016(final RC) 재개 시 새 RC 전체 identity + Play evidence를
+  // 함께 재바인딩하면서 이 검증을 동등성(assert.equal)으로 복귀시킨다. (오너 결정 2026-07-16)
+  assert.notEqual(
+    validatedArtifactIdentity.dataPackManifestSha256,
+    liveDataPackManifestSha256,
+    "중단된 1.0.4 RC identity는 재사용 불가 — 게이트 기록 dataPackManifestSha256은 #2068 변경 후 live manifest 해시와 달라야 한다",
   );
   assert.deepEqual(
     postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.validatedArtifactIdentityEvidence,
@@ -2493,8 +2508,28 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   for (const binding of refreshBindings) {
     assert.ok(binding.files.length > 0, `${binding.refreshOn} must bind at least one file`);
     for (const file of binding.files) {
+      const liveSha256 = createHash("sha256").update(read(file.path)).digest("hex");
+      if (file.path === "apps/mobile/pubspec.yaml") {
+        // #2068 datapack/렌더 전환(vector_graphics 의존성·basemap/ 자산 추가)으로
+        // apps/mobile/pubspec.yaml 해시가 바뀌면서 1.0.4 RC "fixed-release-procedure-change"
+        // evidence는 중단(superseded)되었다. dataPackManifestSha256와 동일 원칙: 게이트 기록값
+        // 8b831a41…은 중단된 RC evidence 체인의 고정 해시로 그대로 검증하고, live 해시와는
+        // 반드시 달라야 한다(의도된 불일치). #1016(final RC) 재개 시 새 RC 전체 identity +
+        // Play evidence를 함께 재바인딩하면서 이 검증을 동등성으로 복귀시킨다. (오너 결정 2026-07-16)
+        assert.equal(
+          file.sha256,
+          "8b831a4108c1c77f718a4b729e7d24f36dc024b83845a4ecfa7d2b99e5ad1971",
+          `${binding.refreshOn} recorded hash for ${file.path} must stay pinned to the superseded 1.0.4 RC evidence`,
+        );
+        assert.notEqual(
+          liveSha256,
+          file.sha256,
+          `중단된 1.0.4 RC identity는 재사용 불가 — ${file.path}의 기록 해시는 #2068 변경 후 live 해시와 달라야 한다`,
+        );
+        continue;
+      }
       assert.equal(
-        createHash("sha256").update(read(file.path)).digest("hex"),
+        liveSha256,
         file.sha256,
         `${binding.refreshOn} evidence is stale for ${file.path}`,
       );
