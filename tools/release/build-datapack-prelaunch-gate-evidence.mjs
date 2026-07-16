@@ -75,7 +75,11 @@ export function buildGateFragments({
   return {
     source_admission: {
       ...envelope("source_admission", 2133,
-        sourceAdmissionResult(snapshotSetIdentity, [references.candidateContext, references.source]), sourceExpiresAt),
+        sourceAdmissionResult(
+          snapshotSetIdentity,
+          sourceReport.schemaFingerprintSetHash,
+          [references.candidateContext, references.source],
+        ), sourceExpiresAt),
       snapshotSetIdentity,
     },
     source_governance: {
@@ -126,9 +130,9 @@ export function buildGateFragments({
     }),
   };
 }
-function sourceAdmissionResult(snapshotSetIdentity, evidenceReferences) {
+function sourceAdmissionResult(snapshotSetIdentity, schemaFingerprintSetHash, evidenceReferences) {
   return {
-    schemaVersion: 1, snapshotSetIdentity,
+    schemaVersion: 1, snapshotSetIdentity, schemaFingerprintSetHash,
     checks: passing([
       "schemaValidated", "licenseApproved", "redistributionApproved", "credentialRedacted",
       "snapshotLocked",
@@ -274,8 +278,15 @@ function validateSourceInputs(buildSpec, report, identity, evaluatedMillis) {
       throw new Error("source inventory contains an unapproved or stale snapshot");
     }
     requiredSha(snapshot.rawSha256, "snapshot rawSha256");
+    requiredSha(snapshot.schemaFingerprint, "snapshot schemaFingerprint");
     requiredSha(snapshot.governancePolicySha256, "snapshot governancePolicySha256");
     sourceIds.add(snapshot.sourceId);
+  }
+  const schemaFingerprintSetHash = sha256(JSON.stringify(buildSpec.sourceSnapshots
+    .map(({ snapshotId, schemaFingerprint }) => ({ snapshotId, schemaFingerprint }))
+    .sort((left, right) => left.snapshotId.localeCompare(right.snapshotId))));
+  if (report.schemaFingerprintSetHash !== schemaFingerprintSetHash) {
+    throw new Error("source admission schema fingerprint evidence mismatch");
   }
 }
 function validateRollbackReport(report, identity) {

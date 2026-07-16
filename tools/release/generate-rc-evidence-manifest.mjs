@@ -5,7 +5,6 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { gunzipSync } from "node:zlib";
 import { canonicalScopeHash } from "../datapack/build-launch-denominator-report.mjs";
 import { selectEffectiveDataPack, selectFallbackDataPack, validateManifest } from "../datapack/lib/manifest-validation.mjs";
 
@@ -63,6 +62,7 @@ const requirePrePlayUploadReady = booleanArg(
   "requirePrePlayUploadReady",
   "require-pre-play-upload-ready",
 );
+const failOnBlocked = booleanArg("failOnBlocked", "fail-on-blocked");
 const dataPackReleaseDecisionPath = arg("dataPackReleaseDecision", "data-pack-release-decision");
 const requireProductionDataPackBinding = requestedProductionDataPackBinding
   || (requestedPhase === "FINAL" && Boolean(dataPackReleaseDecisionPath));
@@ -199,7 +199,7 @@ if (requirePrePlayUploadReady) {
   validatePrePlayUploadReadiness(
     identity,
     androidReleaseMetadata,
-    requestedProductionDataPackBinding,
+    requireProductionDataPackBinding,
     dataPackReleaseDecision,
   );
 }
@@ -230,7 +230,7 @@ if (requestedPhase === "CANDIDATE") {
 }
 
 const candidateContextPath = arg("candidateContext", "candidate-context");
-if (arg("phase") === "FINAL" && !candidateContextPath) {
+if (requestedPhase === "FINAL" && !candidateContextPath) {
   fail("FINAL phase requires --candidate-context");
 }
 if (candidateContextPath) {
@@ -330,7 +330,7 @@ const manifest = {
 
 writeManifest(outputPath, manifest);
 
-if (arg("failOnBlocked", "fail-on-blocked") === "true" && blockers.length > 0) {
+if (failOnBlocked && blockers.length > 0) {
   fail(`RC evidence manifest is blocked: ${blockers.map((blocker) => blocker.id).join(", ")}`);
 }
 
@@ -1045,12 +1045,12 @@ function normalizeDevicePerformanceResult(
   if (artifact.compressedBytes !== dataPackArtifactBytes) {
     fail(`${gateId} compressedBytes does not match the supplied data pack artifact`);
   }
+  if (artifact.compressedBytes > 250 * 1024 * 1024) {
+    fail(`${gateId} compressed artifact exceeds the 250 MiB cap`);
+  }
   const actualUncompressedBytes = dataPackUncompressedBytes(dataPackArtifactPath, gateId);
   if (artifact.uncompressedBytes !== actualUncompressedBytes) {
     fail(`${gateId} uncompressedBytes does not match the supplied data pack artifact`);
-  }
-  if (artifact.compressedBytes > 250 * 1024 * 1024) {
-    fail(`${gateId} compressed artifact exceeds the 250 MiB cap`);
   }
   const metrics = result.metrics;
   const metricLimits = {
@@ -1109,7 +1109,13 @@ function dataPackUncompressedBytes(artifactPath, gateId) {
     fail(`${gateId} requires an existing data pack artifact`);
   }
   try {
-    return gunzipSync(readFileSync(artifactPath)).length;
+    const output = execFileSync(process.execPath, [
+      path.join(repoRoot, "tools/release/count-gzip-uncompressed-bytes.mjs"),
+      artifactPath,
+    ], { encoding: "utf8", maxBuffer: 64 * 1024, stdio: ["ignore", "pipe", "pipe"] }).trim();
+    const bytes = Number(output);
+    if (!/^(?:0|[1-9]\d*)$/.test(output) || !Number.isSafeInteger(bytes)) throw new Error("invalid byte count");
+    return bytes;
   } catch {
     fail(`${gateId} data pack artifact must be valid gzip data`);
   }
@@ -1627,8 +1633,9 @@ function gateStatusBlockers(statuses) {
 }
 
 function requiredOpenP0Count(value) {
-  const count = Number.parseInt(value ?? "0", 10);
-  if (Number.isNaN(count) || count < 0) {
+  const raw = value ?? "0";
+  const count = Number(raw);
+  if (!/^(?:0|[1-9]\d*)$/.test(raw) || !Number.isSafeInteger(count)) {
     fail("--open-android-p0-count must be a non-negative integer");
   }
   return count;

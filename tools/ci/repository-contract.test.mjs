@@ -4560,6 +4560,19 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   const androidReleaseMetadataPath = path.join(tempDir, "release-metadata.txt");
   const phaseASummaryPath = path.join(tempDir, "operations-phase-a-summary.json");
   const outputPath = path.join(tempDir, "rc-evidence-manifest.json");
+  const runFinalGenerator = async (generatorArgs, options) => {
+    const outputIndex = generatorArgs.indexOf("--output");
+    assert.notEqual(outputIndex, -1, "generator test invocation requires --output");
+    const finalOutput = generatorArgs[outputIndex + 1];
+    const withoutOutput = generatorArgs.filter((_, index) => index !== outputIndex && index !== outputIndex + 1);
+    const candidateOutput = `${finalOutput}.candidate-context.json`;
+    await execFileAsync(process.execPath, [
+      ...withoutOutput, "--phase", "CANDIDATE", "--output", candidateOutput,
+    ], options);
+    return execFileAsync(process.execPath, [
+      ...withoutOutput, "--phase", "FINAL", "--candidate-context", candidateOutput, "--output", finalOutput,
+    ], options);
+  };
   const appVersion = read("apps/mobile/pubspec.yaml").match(/^version:\s*([^+\s]+)\+([0-9]+)\s*$/m);
   assert.ok(appVersion, "mobile pubspec must contain versionName+versionCode");
 
@@ -4583,7 +4596,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     JSON.stringify([{ RepoDigests: ["ghcr.io/aquilaxk/easysubway-backend@sha256:abcdef"] }]),
   );
 
-  await execFileAsync(process.execPath, [
+  await runFinalGenerator([
     "tools/release/generate-rc-evidence-manifest.mjs",
     "--repo-root",
     ".",
@@ -4677,7 +4690,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   assert.ok(manifest.evidenceEntries.every((entry) => entry.expiresWhen === "2026-07-10T00:00:00.000Z"));
 
   const outsideCwdOutputPath = path.join(tempDir, "outside-cwd.json");
-  await execFileAsync(process.execPath, [
+  await runFinalGenerator([
     path.join(root, "tools/release/generate-rc-evidence-manifest.mjs"),
     "--repo-root", root,
     "--app-root", path.join(root, "apps/mobile"),
@@ -4696,7 +4709,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     },
   }));
   await assert.rejects(
-    execFileAsync(process.execPath, [
+    runFinalGenerator([
       "tools/release/generate-rc-evidence-manifest.mjs",
       "--repo-root", ".",
       "--app-root", "apps/mobile",
@@ -4722,7 +4735,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     },
   }));
   await assert.rejects(
-    execFileAsync(process.execPath, [
+    runFinalGenerator([
       "tools/release/generate-rc-evidence-manifest.mjs",
       "--repo-root", ".",
       "--app-root", "apps/mobile",
@@ -4748,7 +4761,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     },
   }));
   await assert.rejects(
-    execFileAsync(process.execPath, [
+    runFinalGenerator([
       "tools/release/generate-rc-evidence-manifest.mjs",
       "--repo-root", ".",
       "--app-root", "apps/mobile",
@@ -4766,7 +4779,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
 
   await writeFile(phaseASummaryPath, "{}");
   await assert.rejects(
-    execFileAsync(process.execPath, [
+    runFinalGenerator([
       "tools/release/generate-rc-evidence-manifest.mjs",
       "--repo-root", ".",
       "--app-root", "apps/mobile",
@@ -4791,7 +4804,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     },
   }));
   await assert.rejects(
-    execFileAsync(process.execPath, [
+    runFinalGenerator([
       "tools/release/generate-rc-evidence-manifest.mjs",
       "--repo-root", ".",
       "--app-root", "apps/mobile",
@@ -4831,7 +4844,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
       evidenceReferences: [{ artifactId: "rc-device-qa-report", sha256: "1".repeat(64) }],
     },
   }));
-  await execFileAsync(process.execPath, [
+  await runFinalGenerator([
     "tools/release/generate-rc-evidence-manifest.mjs",
     "--repo-root", ".",
     "--app-root", "apps/mobile",
@@ -4864,7 +4877,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     },
   }));
   await assert.rejects(
-    execFileAsync(process.execPath, [
+    runFinalGenerator([
       "tools/release/generate-rc-evidence-manifest.mjs",
       "--repo-root", ".",
       "--app-root", "apps/mobile",
@@ -4890,7 +4903,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   );
   const incompleteRepoGitSha = await initializeFixtureGitRepo(incompleteRepo);
   await assert.rejects(
-    execFileAsync(process.execPath, [
+    runFinalGenerator([
       "tools/release/generate-rc-evidence-manifest.mjs",
       "--repo-root", incompleteRepo,
       "--app-root", path.join(root, "apps/mobile"),
@@ -4910,7 +4923,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     localImageInspectPath,
     JSON.stringify([{ RepoDigests: [], Id: "sha256:2076c88dbc6590b239f6762e9c209d7ae189f2bc53725ca94d42c81c5d8e4521" }]),
   );
-  await execFileAsync(process.execPath, [
+  await runFinalGenerator([
     "tools/release/generate-rc-evidence-manifest.mjs",
     "--repo-root",
     ".",
@@ -4944,7 +4957,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   const metadataOnlyInspect = JSON.stringify([{ RepoDigests: [], Size: 367184804 }]);
   const metadataOnlyInspectSha256 = createHash("sha256").update(metadataOnlyInspect).digest("hex");
   await writeFile(metadataOnlyInspectPath, metadataOnlyInspect);
-  await execFileAsync(process.execPath, [
+  await runFinalGenerator([
     "tools/release/generate-rc-evidence-manifest.mjs",
     "--repo-root",
     ".",
@@ -4971,7 +4984,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   );
 
   await assert.rejects(
-    execFileAsync(process.execPath, [
+    runFinalGenerator([
       "tools/release/generate-rc-evidence-manifest.mjs",
       "--repo-root",
       ".",
@@ -4998,7 +5011,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   const corruptAabPath = path.join(tempDir, "corrupt.aab");
   const corruptManifestPath = path.join(tempDir, "corrupt-aab-manifest.json");
   await writeFile(corruptAabPath, "not-a-zip");
-  await execFileAsync(process.execPath, [
+  await runFinalGenerator([
     "tools/release/generate-rc-evidence-manifest.mjs",
     "--repo-root", ".",
     "--app-root", "apps/mobile",
@@ -5024,6 +5037,14 @@ test("datapack readiness producer는 required gate를 동일 final identity로 �
   const producerFiles = execFileSync("git", ["grep", "-l", "summaryArtifactDigest", "--", "tools", "apps", ".github"],
     { cwd: root, encoding: "utf8" }).trim().split("\n").filter((file) => !file.includes(".test."));
   assert.deepEqual(producerFiles, ["tools/release/generate-rc-evidence-manifest.mjs"]);
+  const producerSource = read("tools/release/generate-rc-evidence-manifest.mjs");
+  assert.doesNotMatch(producerSource, /gunzipSync/);
+  assert.match(producerSource, /count-gzip-uncompressed-bytes\.mjs/);
+  assert.ok(
+    producerSource.indexOf("compressed artifact exceeds the 250 MiB cap")
+      < producerSource.indexOf("count-gzip-uncompressed-bytes.mjs"),
+    "compressed size cap must be checked before streaming decompression",
+  );
 
   const tempDir = await mkdtemp(path.join(tmpdir(), "easysubway-datapack-readiness-"));
   const validationRepo = path.join(tempDir, "validation-repo");
@@ -5032,6 +5053,7 @@ test("datapack readiness producer는 required gate를 동일 final identity로 �
   }
   await symlink(path.join(root, "apps/mobile/release/production-datapack-scope.json"), path.join(validationRepo, "apps/mobile/release/production-datapack-scope.json"));
   await symlink(path.join(root, "tools/release/hash-android-bundle-payload.mjs"), path.join(validationRepo, "tools/release/hash-android-bundle-payload.mjs"));
+  await symlink(path.join(root, "tools/release/count-gzip-uncompressed-bytes.mjs"), path.join(validationRepo, "tools/release/count-gzip-uncompressed-bytes.mjs"));
   await writeFile(path.join(validationRepo, "tools/ops/validate-operations-release-summary.mjs"), `import { readFileSync } from "node:fs";
 const value = (name) => process.argv[process.argv.indexOf(name) + 1];
 const summary = JSON.parse(readFileSync(value("--summary"), "utf8"));
@@ -5250,6 +5272,10 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   assert.doesNotMatch(JSON.stringify(candidateManifest), /\b(?:GO|NO_GO)\b/);
   assert.equal(candidateManifest.releaseCandidateIdentity.releaseSequence, 102);
   assert.equal(candidateManifest.releaseCandidateIdentity.sourceSnapshotSetHash, snapshotSetIdentity);
+  await assert.rejects(
+    execFileAsync(process.execPath, [...args, "--output", path.join(tempDir, "default-final-without-candidate.json")], generatorOptions),
+    /FINAL phase requires --candidate-context/,
+  );
   await assert.rejects(execFileAsync(process.execPath, [...args, "--release-sequence", "2026.07.12",
     "--phase", "CANDIDATE", "--output", path.join(tempDir, "invalid-release-sequence.json")], generatorOptions),
   /--release-sequence must be a positive safe integer/);
@@ -5260,6 +5286,15 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
     "--candidate-context", invalidCandidatePath, "--output", path.join(tempDir, "invalid-final.json")], generatorOptions),
   /without readiness or decision fields/);
   args.push("--phase", "FINAL", "--candidate-context", baselineOutput);
+  for (const invalidCount of ["1abc", "1.5", "-0.5"]) {
+    await assert.rejects(execFileAsync(process.execPath, [
+      ...args, "--open-android-p0-count", invalidCount,
+      "--output", path.join(tempDir, `invalid-p0-${invalidCount}.json`),
+    ], generatorOptions), /--open-android-p0-count must be a non-negative integer/);
+  }
+  await assert.rejects(execFileAsync(process.execPath, [
+    ...args, "--fail-on-blocked", "TRUE", "--output", path.join(tempDir, "invalid-fail-on-blocked.json"),
+  ], generatorOptions), /--fail-on-blocked must be true or false/);
   const prePlayMetadataPath = path.join(tempDir, "pre-play-release-metadata.txt");
   const prePlayOutputPath = path.join(tempDir, "pre-play-final-readiness.json");
   await writeFile(prePlayMetadataPath, [
@@ -5282,6 +5317,16 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
     "--output", prePlayOutputPath,
   ], generatorOptions);
   assert.equal(JSON.parse(readFileSync(prePlayOutputPath, "utf8")).decision, "NO_GO");
+  const prePlayBindingFlagIndex = args.indexOf("--require-production-data-pack-binding");
+  const implicitlyBoundArgs = args.filter((_, index) => (
+    index !== prePlayBindingFlagIndex && index !== prePlayBindingFlagIndex + 1
+  ));
+  await execFileAsync(process.execPath, [
+    ...implicitlyBoundArgs,
+    "--android-release-metadata", prePlayMetadataPath,
+    "--require-pre-play-upload-ready", "true",
+    "--output", path.join(tempDir, "implicit-production-binding.json"),
+  ], generatorOptions);
   await writeFile(prePlayMetadataPath, readFileSync(prePlayMetadataPath, "utf8")
     .replace("signingKeyType=production-upload-key", "signingKeyType=ci-ephemeral"));
   await assert.rejects(execFileAsync(process.execPath, [
@@ -5663,8 +5708,21 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
     "--repo-root", ".", "--app-root", "apps/mobile", "--git-sha", gitSha,
     "--now", now, "--output", outputPath,
   ];
+  const runFinalGenerator = async (generatorArgs, options = { cwd: root }) => {
+    const outputIndex = generatorArgs.indexOf("--output");
+    assert.notEqual(outputIndex, -1, "generator test invocation requires --output");
+    const finalOutput = generatorArgs[outputIndex + 1];
+    const withoutOutput = generatorArgs.filter((_, index) => index !== outputIndex && index !== outputIndex + 1);
+    const candidateOutput = `${finalOutput}.candidate-context.json`;
+    await execFileAsync(process.execPath, [
+      ...withoutOutput, "--phase", "CANDIDATE", "--output", candidateOutput,
+    ], options);
+    return execFileAsync(process.execPath, [
+      ...withoutOutput, "--phase", "FINAL", "--candidate-context", candidateOutput, "--output", finalOutput,
+    ], options);
+  };
   const rejects = (extraArgs, expected) => assert.rejects(
-    execFileAsync(process.execPath, [...baseArgs, ...extraArgs], { cwd: root }), expected,
+    runFinalGenerator([...baseArgs, ...extraArgs]), expected,
   );
   const contractArgs = async (name, mutate) => {
     const app = path.join(tempDir, name);
@@ -5678,7 +5736,7 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
     return [...result, "--data-pack-manifest", path.join(root, "apps/mobile/assets/datapacks/metro_map_pack/manifest.json")];
   };
 
-  await execFileAsync(process.execPath, baseArgs, { cwd: root });
+  await runFinalGenerator(baseArgs);
   const blockedManifest = JSON.parse(readFileSync(outputPath, "utf8"));
   assert.ok(blockedManifest.datapackGates.every(({ status }) => status === "BLOCKED_EXTERNAL"));
   assert.equal(blockedManifest.identityLinkage.status, "BLOCKED_EXTERNAL");
@@ -5729,7 +5787,7 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
       evidenceReferences: [{ artifactId: "scope-coverage-report", sha256: "2".repeat(64) }],
     },
   }));
-  await execFileAsync(process.execPath, [
+  await runFinalGenerator([
     ...baseArgs,
     "--gate-status", "scopeCoverage=SATISFIED",
     "--gate-evidence", `scopeCoverage=${genericGateEvidencePath}`,
@@ -5742,7 +5800,7 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
   const p0OutputPath = path.join(tempDir, "p0-manifest.json");
   const p0Args = [...baseArgs];
   p0Args[p0Args.indexOf("--output") + 1] = p0OutputPath;
-  await execFileAsync(process.execPath, [...p0Args, "--open-android-p0-count", "1"], { cwd: root });
+  await runFinalGenerator([...p0Args, "--open-android-p0-count", "1"]);
   const p0Manifest = JSON.parse(readFileSync(p0OutputPath, "utf8"));
   assert.deepEqual(p0Manifest.releaseCandidateIdentity, blockedManifest.releaseCandidateIdentity);
   assert.notEqual(p0Manifest.summaryArtifactDigest, blockedManifest.summaryArtifactDigest);
@@ -5750,7 +5808,7 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
   const evidenceStatusOutputPath = path.join(tempDir, "evidence-status-manifest.json");
   const evidenceStatusArgs = [...baseArgs];
   evidenceStatusArgs[evidenceStatusArgs.indexOf("--output") + 1] = evidenceStatusOutputPath;
-  await execFileAsync(process.execPath, [
+  await runFinalGenerator([
     ...evidenceStatusArgs,
     "--evidence-status", "rc_device_qa=BLOCKED_EXTERNAL",
   ], { cwd: root });
@@ -5814,7 +5872,7 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
     contract.requiredDatapackGates.push(contract.requiredDatapackGates[0]);
   });
   await assert.rejects(
-    execFileAsync(process.execPath, duplicateContractArgs, { cwd: root }),
+    runFinalGenerator(duplicateContractArgs),
     /Duplicate datapack gate in contract: source_admission/,
   );
 
@@ -5824,12 +5882,12 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
     );
   });
   await assert.rejects(
-    execFileAsync(process.execPath, missingFinalFragmentArgs, { cwd: root }),
+    runFinalGenerator(missingFinalFragmentArgs),
     /requiredFinalFragmentIssues must exactly match required evidence entries/,
   );
 
   await assert.rejects(
-    execFileAsync(process.execPath, [
+    runFinalGenerator([
       ...baseArgs.slice(0, baseArgs.indexOf("--git-sha") + 1),
       "0".repeat(40),
       ...baseArgs.slice(baseArgs.indexOf("--git-sha") + 2),
@@ -5838,7 +5896,7 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
   );
 
   await assert.rejects(
-    execFileAsync(process.execPath, [...baseArgs, "--verify-github-sha", "true"], {
+    runFinalGenerator([...baseArgs, "--verify-github-sha", "true"], {
       cwd: root,
       env: { ...process.env, GITHUB_SHA: "f".repeat(40) },
     }),
@@ -5848,14 +5906,14 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
   const closedBlockerArgs = await contractArgs("closed-blocker-app", (contract) => {
     contract.activeBlockerIssues = [2133];
   });
-  await execFileAsync(process.execPath, [
+  await runFinalGenerator([
     ...closedBlockerArgs,
     "--issue-state", "2133=OPEN",
   ], { cwd: root });
   const openBlockerManifest = JSON.parse(readFileSync(outputPath, "utf8"));
   assert.ok(openBlockerManifest.readiness.blockers.some(({ id }) => id === "active_blocker_issue_2133"));
   await assert.rejects(
-    execFileAsync(process.execPath, [
+    runFinalGenerator([
       ...closedBlockerArgs,
       "--issue-state", "2133=CLOSED",
     ], { cwd: root }),
@@ -7632,6 +7690,10 @@ test("Play internal track 업로드는 versionCode 정책·mapping·evidence를 
   assert.match(
     workflow,
     /PLAY_UPLOAD: \$\{\{ inputs\.play_upload \}\}[\s\S]*\[\[ "\$\{PLAY_UPLOAD\}" == internal \]\][\s\S]*--require-pre-play-upload-ready true/,
+  );
+  assert.match(
+    workflow,
+    /if \[\[ "\$\{PLAY_UPLOAD\}" == internal && "\$\{operations_status\}" != "SATISFIED" \]\]; then[\s\S]*exit 1/,
   );
   assert.doesNotMatch(workflow, /final_readiness_args\+\=\(--fail-on-blocked true\)/);
   assert.match(workflow, /inputs\.play_upload == 'internal'/);

@@ -22,6 +22,7 @@ function fixture() {
   };
   const sources = ["source-a", "source-b"].map((sourceId, index) => ({
     sourceId, snapshotId: `${sourceId}-snapshot`, rawSha256: String(index + 2).repeat(64),
+    schemaFingerprint: String(index + 4).repeat(64),
     licenseStatus: "PASS", redistributionAllowed: true, snapshotStatus: "LOCKED",
     credentialRedacted: true, freshnessExpiresAt: "2026-08-16T00:00:00.000Z",
     rawRetentionExpiresAt: "2026-10-16T00:00:00.000Z",
@@ -31,10 +32,16 @@ function fixture() {
     "source", "freshness", "rollback", "android", "callback", "backend", "callbackExecution",
     "androidDevice", "conditionalPublish", "candidateContext",
   ].map((id, index) => [id, { artifactId: `${id}-report`, sha256: String((index % 8) + 2).repeat(64) }]));
+  const schemaFingerprintSetHash = sha(JSON.stringify(sources.map(({ snapshotId, schemaFingerprint }) => ({
+    snapshotId, schemaFingerprint,
+  }))));
   return {
     candidate: { phase: "CANDIDATE", releaseCandidateIdentity: rcIdentity, consumerIssues: [2058, 1393] },
     buildSpec: { sourceSnapshotSetHash: snapshotSetIdentity, sourceSnapshots: sources },
-    sourceReport: { status: "PASS", governanceDecision: "GO", snapshotCount: 2, sourceSnapshotSetHash: snapshotSetIdentity },
+    sourceReport: {
+      status: "PASS", governanceDecision: "GO", snapshotCount: 2,
+      sourceSnapshotSetHash: snapshotSetIdentity, schemaFingerprintSetHash,
+    },
     rollbackReport: {
       from: { releaseSequence: 2 }, failed: { releaseSequence: 2, manifestSha256: "6".repeat(64) },
       knownGood: { releaseSequence: 1, manifestSha256: "7".repeat(64), packs: [{ sha256: packSha256 }] },
@@ -121,6 +128,7 @@ test("동일 RC의 다섯 prelaunch gate fragment를 생성한다", () => {
     credentialRedacted: true,
     snapshotLocked: true,
   });
+  assert.match(fragments.source_admission.result.schemaFingerprintSetHash, /^[0-9a-f]{64}$/);
   assert.equal(
     fragments.source_admission.result.evidenceReferences[0].artifactId,
     "candidateContext-report",
@@ -133,6 +141,11 @@ test("#2058 consumer binding이 없는 candidate-context는 source admission을 
   const input = fixture();
   input.candidate.consumerIssues = [1393];
   assert.throws(() => buildGateFragments(input), /candidate context consumers/);
+});
+test("actual admission schema fingerprint와 build spec이 다르면 source admission을 생성하지 않는다", () => {
+  const input = fixture();
+  input.buildSpec.sourceSnapshots[0].schemaFingerprint = "f".repeat(64);
+  assert.throws(() => buildGateFragments(input), /schema fingerprint evidence mismatch/);
 });
 test("snapshot identity가 RC와 다르면 fail closed한다", () => {
   const input = fixture();
