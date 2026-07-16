@@ -2518,6 +2518,17 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     refreshBindings.map((binding) => binding.refreshOn).sort(),
     postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.evidenceValidity.refreshOn.toSorted(),
   );
+  const supportContactBinding = refreshBindings.find(
+    (binding) => binding.refreshOn === "support-contact-or-help-ui-change",
+  );
+  assert.deepEqual(
+    supportContactBinding.files.map((file) => file.path).toSorted(),
+    [
+      "apps/mobile/lib/app/app_components.dart",
+      "apps/mobile/lib/main.dart",
+      "apps/mobile/release/support-incident-response-gate.json",
+    ],
+  );
   for (const binding of refreshBindings) {
     assert.ok(binding.files.length > 0, `${binding.refreshOn} must bind at least one file`);
     for (const file of binding.files) {
