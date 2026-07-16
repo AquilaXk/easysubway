@@ -71,6 +71,7 @@ export function buildServerTimetableSnapshot({
   const canonicalStationIds = canonicalStationSet(source);
   const canonicalStationSetHash = sha256(Buffer.from(JSON.stringify(canonicalStationIds)));
   const baselineCounts = statementCounts(baselineSql);
+  const servicePatternEvidence = representativeServicePatternEvidence(baselineSql, source);
   const evidenceWithoutHash = {
     schemaVersion: 1,
     artifactKind: ARTIFACT_KIND,
@@ -81,6 +82,12 @@ export function buildServerTimetableSnapshot({
     snapshotGzipSha256: sha256(gzipBytes),
     snapshotGzipByteSize: gzipBytes.length,
     freshUntil: source.freshUntil,
+    serviceIdentity: {
+      serviceId: contract.serviceId,
+      canonicalLineId: contract.canonicalLineId,
+      servicePattern: contract.servicePattern,
+      timezone: contract.timezone,
+    },
     sourceArtifact: {
       id: source.artifactId,
       sha256: sha256(sourceBytes),
@@ -95,6 +102,7 @@ export function buildServerTimetableSnapshot({
     sourceLineageSha256: sha256(Buffer.from(JSON.stringify(
       [...source.sourceLineage].sort((left, right) => left.dayCd.localeCompare(right.dayCd)),
     ))),
+    servicePatternEvidence,
     rowCounts: {
       calendars: baselineCounts.calendars + itxSeed.calendars.length,
       routes: baselineCounts.routes + itxSeed.routes.length,
@@ -117,6 +125,97 @@ export function buildServerTimetableSnapshot({
     evidence,
     evidenceBytes: Buffer.from(`${JSON.stringify(evidence, null, 2)}\n`),
   };
+}
+
+function representativeServicePatternEvidence(sql, source) {
+  const trips = sql.split("\n")
+    .filter((line) => line.startsWith("INSERT INTO transit_trips "))
+    .map((line) => {
+      const row = values(line);
+      return {
+        id: row[0],
+        routeId: row[1],
+        servicePattern: row[3],
+        terminalStationId: row[5],
+        directionId: row[6],
+      };
+    });
+  const stopsByTrip = new Map();
+  for (const line of sql.split("\n").filter((value) => value.startsWith("INSERT INTO transit_stop_times "))) {
+    const row = values(line);
+    const stops = stopsByTrip.get(row[0]) ?? [];
+    stops.push({ sequence: Number(row[1]), stationId: row[2] });
+    stopsByTrip.set(row[0], stops);
+  }
+  const localTrips = trips.filter(({ servicePattern }) => servicePattern === "LOCAL");
+  const expressTrips = trips.filter(({ servicePattern }) => servicePattern === "EXPRESS");
+  const local = localTrips.sort((left, right) => left.id.localeCompare(right.id))
+    .find((candidate) => orderedStationIds(stopsByTrip.get(candidate.id)).length > 1);
+  const express = representativeItxExpressPattern(source);
+  if (!local || !express) {
+    throw new Error("complete snapshot must contain representative LOCAL and EXPRESS stop patterns");
+  }
+  return {
+    localTripCount: localTrips.length,
+    expressTripCount: expressTrips.length + source.transitTrips.length,
+    representativeLocal: tripPatternSummary(local, stopsByTrip),
+    representativeExpress: express,
+  };
+}
+
+function representativeItxExpressPattern(source) {
+  const stopTimesByTrip = new Map();
+  for (const stop of source.transitStopTimes) {
+    const stops = stopTimesByTrip.get(stop.tripId) ?? [];
+    stops.push({ sequence: stop.stopSequence, stationId: stop.stationId });
+    stopTimesByTrip.set(stop.tripId, stops);
+  }
+  for (const trip of [...source.transitTrips].sort((left, right) => left.id.localeCompare(right.id))) {
+    const stopStationIds = orderedStationIds(stopTimesByTrip.get(trip.id));
+    const dayCd = trip.id.split("-").at(-1);
+    const roster = source.stationRosters.find((candidate) => candidate.dayCd === dayCd);
+    const corridor = [...new Map([...(roster?.stations ?? [])]
+      .sort((left, right) => left.corridorSequence - right.corridorSequence)
+      .map((station) => [station.canonicalStationId, station])).values()]
+      .map(({ canonicalStationId }) => canonicalStationId);
+    const first = corridor.indexOf(stopStationIds[0]);
+    const last = corridor.indexOf(stopStationIds.at(-1));
+    if (first < 0 || last < 0) continue;
+    const start = Math.min(first, last);
+    const end = Math.max(first, last);
+    const passThroughStationIds = corridor.slice(start, end + 1)
+      .filter((stationId) => !stopStationIds.includes(stationId));
+    if (passThroughStationIds.length === 0) continue;
+    return {
+      tripId: trip.id,
+      routeId: trip.routeId,
+      directionId: trip.directionId,
+      terminalStationId: stopStationIds.at(-1),
+      stopStationIds,
+      passThroughStationIds,
+      stopPatternSha256: sha256(Buffer.from(JSON.stringify(stopStationIds))),
+    };
+  }
+  return null;
+}
+
+function tripPatternSummary(trip, stopsByTrip) {
+  const stopStationIds = orderedStationIds(stopsByTrip.get(trip.id));
+  return {
+    tripId: trip.id,
+    routeId: trip.routeId,
+    directionId: trip.directionId,
+    terminalStationId: trip.terminalStationId,
+    stopStationIds,
+    passThroughStationIds: [],
+    stopPatternSha256: sha256(Buffer.from(JSON.stringify(stopStationIds))),
+  };
+}
+
+function orderedStationIds(stops = []) {
+  return [...stops]
+    .sort((left, right) => left.sequence - right.sequence)
+    .map(({ stationId }) => stationId);
 }
 
 function validateAdmission({
@@ -196,6 +295,12 @@ function normalizeBaselineSql(baselineGzipBytes) {
     throw new Error("subway baseline must contain one complete SQL statement per line");
   }
   const value = `${normalized.join("\n")}\n`;
+  const tripPatterns = normalized
+    .filter((line) => line.startsWith("INSERT INTO transit_trips "))
+    .map((line) => values(line)[3]);
+  if (tripPatterns.length === 0 || tripPatterns.some((pattern) => !["LOCAL", "EXPRESS"].includes(pattern))) {
+    throw new Error("subway baseline trips must explicitly declare LOCAL or EXPRESS service_pattern");
+  }
   if (/ITX_CHEONGCHUN|route_service_artifact_evidence/.test(value)) {
     throw new Error("subway baseline must not contain additive ITX rows or evidence");
   }
@@ -300,6 +405,8 @@ async function main() {
     ?? "backend/src/main/resources/timetable/line4-timetable-seed.sql.gz");
   const evidencePath = path.resolve(root, args.evidence
     ?? "tools/datapack/server-timetable-snapshot-evidence.json");
+  const runtimeEvidencePath = path.resolve(root, args["runtime-evidence"]
+    ?? "backend/src/main/resources/timetable/server-timetable-snapshot-evidence.json");
   const contractBytes = await readFile(contractPath);
   const contract = parseJson(contractBytes, "coverage contract");
   const result = buildServerTimetableSnapshot({
@@ -313,17 +420,21 @@ async function main() {
     buildNow: buildClock(),
   });
   if (args.check) {
-    const [storedSnapshot, storedEvidence] = await Promise.all([
+    const [storedSnapshot, storedEvidence, storedRuntimeEvidence] = await Promise.all([
       readFile(outputPath),
       readFile(evidencePath),
+      readFile(runtimeEvidencePath),
     ]);
-    if (!storedSnapshot.equals(result.gzipBytes) || !storedEvidence.equals(result.evidenceBytes)) {
+    if (!storedSnapshot.equals(result.gzipBytes)
+      || !storedEvidence.equals(result.evidenceBytes)
+      || !storedRuntimeEvidence.equals(result.evidenceBytes)) {
       throw new Error("server timetable snapshot is stale");
     }
   } else {
     await Promise.all([
       writeFile(outputPath, result.gzipBytes),
       writeFile(evidencePath, result.evidenceBytes),
+      writeFile(runtimeEvidencePath, result.evidenceBytes),
     ]);
   }
   process.stdout.write(`${JSON.stringify({

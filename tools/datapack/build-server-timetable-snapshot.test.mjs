@@ -49,6 +49,12 @@ test("#2135 ADMITTED source와 subway seed를 deterministic complete server snap
   assert.equal(first.evidence.sourceArtifact.sha256, sha256(value.sourceBytes));
   assert.equal(first.evidence.sourceArtifact.completenessEvidenceSha256, sha256(value.completenessBytes));
   assert.equal(first.evidence.freshUntil, source.freshUntil);
+  assert.deepEqual(first.evidence.serviceIdentity, {
+    serviceId: "ITX_CHEONGCHUN",
+    canonicalLineId: contract.canonicalLineId,
+    servicePattern: "EXPRESS",
+    timezone: "Asia/Seoul",
+  });
   assert.equal(first.evidence.rowCounts.itxTrips, source.transitTrips.length);
   assert.equal(first.evidence.rowCounts.itxStopTimes, source.transitStopTimes.length);
   assert.ok(first.evidence.rowCounts.subwayTrips > 0);
@@ -59,6 +65,17 @@ test("#2135 ADMITTED source와 subway seed를 deterministic complete server snap
   assert.equal((first.sql.match(/VALUES \('weekday-kric'/g) ?? []).length, 1);
   assert.equal((first.sql.match(/VALUES \('holiday-kric'/g) ?? []).length, 1);
   assert.equal((first.sql.match(/VALUES \('saturday-kric'/g) ?? []).length, 1);
+  const localPattern = first.evidence.servicePatternEvidence.representativeLocal;
+  const expressPattern = first.evidence.servicePatternEvidence.representativeExpress;
+  assert.ok(localPattern.stopStationIds.length > 1);
+  assert.deepEqual(localPattern.passThroughStationIds, []);
+  assert.ok(expressPattern.stopStationIds.length > 1);
+  assert.ok(expressPattern.passThroughStationIds.length > 0);
+  assert.ok(expressPattern.passThroughStationIds.every(
+    (stationId) => !expressPattern.stopStationIds.includes(stationId),
+  ));
+  assert.ok(first.evidence.servicePatternEvidence.localTripCount > 0);
+  assert.ok(first.evidence.servicePatternEvidence.expressTripCount > 0);
 });
 
 test("complete snapshot은 source·completeness identity와 freshness를 fail closed한다", async () => {
@@ -85,19 +102,30 @@ test("CLI는 tracked snapshot/evidence를 생성하고 --check에서 byte identi
   context.after(() => rm(directory, { recursive: true, force: true }));
   const outputPath = path.join(directory, "snapshot.sql.gz");
   const evidencePath = path.join(directory, "evidence.json");
+  const runtimeEvidencePath = path.join(directory, "runtime-evidence.json");
   const args = [
     "tools/datapack/build-server-timetable-snapshot.mjs",
     "--baseline", baselinePath,
     "--contract", contractPath,
     "--output", outputPath,
     "--evidence", evidencePath,
+    "--runtime-evidence", runtimeEvidencePath,
   ];
   const env = { ...process.env, EASYSUBWAY_TIMETABLE_SNAPSHOT_BUILD_NOW: buildNow.toISOString() };
 
   await execFileAsync(process.execPath, args, { cwd: root, env });
-  const before = await Promise.all([readFile(outputPath), readFile(evidencePath)]);
+  const before = await Promise.all([
+    readFile(outputPath),
+    readFile(evidencePath),
+    readFile(runtimeEvidencePath),
+  ]);
+  assert.deepEqual(before[2], before[1]);
   await execFileAsync(process.execPath, [...args, "--check"], { cwd: root, env });
-  assert.deepEqual(await Promise.all([readFile(outputPath), readFile(evidencePath)]), before);
+  assert.deepEqual(await Promise.all([
+    readFile(outputPath),
+    readFile(evidencePath),
+    readFile(runtimeEvidencePath),
+  ]), before);
 
   await writeFile(outputPath, Buffer.concat([before[0], Buffer.from("tampered")]));
   await assert.rejects(

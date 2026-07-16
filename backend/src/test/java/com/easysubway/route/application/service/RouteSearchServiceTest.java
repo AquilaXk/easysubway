@@ -1593,7 +1593,7 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
-	@DisplayName("V2 planner는 timetable cache key 변경 시 snapshot을 다시 읽는다")
+	@DisplayName("V2 planner는 동일 freshness라도 snapshot SHA가 바뀌면 시간표를 다시 읽는다")
 	void routeV2PlannerReloadsTimetableWhenCacheKeyChanges() {
 		var repository = new InMemoryRouteSearchRepository();
 		var routeSearchService = new RouteSearchService(repository, repository, new RampAccessibleTransitMasterPort(), CLOCK);
@@ -1601,7 +1601,7 @@ class RouteSearchServiceTest {
 		var planner = new RouteV2Planner(routeSearchService, timetablePort);
 
 		planner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3));
-		timetablePort.expireItxAdmission();
+		timetablePort.replaceSnapshotAtSameFreshness();
 		planner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3));
 
 		assertThat(timetablePort.loadCount()).isEqualTo(2);
@@ -3075,7 +3075,7 @@ class RouteSearchServiceTest {
 
 	private static class CountingRouteTimetablePort implements LoadRouteTimetablePort {
 		private int loadCount;
-		private String cacheKey = "ITX_CHEONGCHUN:2999-01-01T00:00:00Z";
+		private String cacheKey = "a".repeat(64) + "2999-01-01T00:00:00Z";
 
 		@Override
 		public boolean hasRouteTimetable() {
@@ -3093,8 +3093,8 @@ class RouteSearchServiceTest {
 			return cacheKey;
 		}
 
-		void expireItxAdmission() {
-			cacheKey = "SUBWAY_ONLY";
+		void replaceSnapshotAtSameFreshness() {
+			cacheKey = "b".repeat(64) + "2999-01-01T00:00:00Z";
 		}
 
 		int loadCount() {
