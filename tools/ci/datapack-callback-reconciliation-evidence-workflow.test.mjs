@@ -17,6 +17,16 @@ test("callback reconciliation evidence는 default branch 수동 실행과 세 id
     /github\.ref\s*==\s*format\('refs\/heads\/\{0\}',\s*github\.event\.repository\.default_branch\)/);
 });
 
+test("job-level env는 runner가 배정되기 전 runner context를 참조하지 않는다", () => {
+  const jobStart = workflow.indexOf("  rehearse:");
+  const stepsStart = workflow.indexOf("\n    steps:", jobStart);
+  assert.notEqual(jobStart, -1);
+  assert.notEqual(stepsStart, -1);
+  assert.ok(jobStart < stepsStart);
+  const jobPrelude = workflow.slice(jobStart, stepsStart);
+  assert.doesNotMatch(jobPrelude, /\$\{\{\s*runner\./);
+});
+
 test("pinned Node 24·Java 21과 동일 SHA의 final RC·publish binding을 사용한다", () => {
   assert.match(workflow, /actions\/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e/);
   assert.match(workflow, /node-version:\s*["']24["']/);
@@ -43,7 +53,7 @@ test("실제 H2 rehearsal과 canonical regression tests를 실행한다", () => 
   assert.match(workflow,
     /node tools\/datapack\/run-callback-backend-outage-rehearsal\.mjs[\s\S]*?--output "\$\{RAW_CALLBACK_OUTAGE_PATH\}"/);
   assert.match(workflow,
-    /EASYSUBWAY_CALLBACK_OUTAGE_ARTIFACT:\s*\$\{\{ env\.RAW_CALLBACK_OUTAGE_PATH \}\}/);
+    /EASYSUBWAY_CALLBACK_OUTAGE_ARTIFACT:\s*\$\{\{ runner\.temp \}\}\/datapack-callback-backend-outage\.json/);
   for (const testClass of [
     "DatapackCallbackReconciliationRehearsalTest",
     "DatapackReleaseCallbackServiceTest",
