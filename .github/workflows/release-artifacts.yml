@@ -682,6 +682,8 @@ jobs:
           generator_args=(
             --repo-root .
             --app-root apps/mobile
+            --git-sha "${GITHUB_SHA}"
+            --verify-github-sha true
             --data-pack-manifest apps/mobile/assets/datapacks/metro_map_pack/manifest.json
             --evidence-root ".codex/evidence/release/rc-evidence-manifest/${GITHUB_SHA}/"
             --device local_android_emulator
@@ -692,9 +694,17 @@ jobs:
             --gate-status backendOperations=BLOCKED_EXTERNAL
             --gate-status androidReleaseQuality=BLOCKED_EXTERNAL
             --gate-status abusePenetrationRehearsal=BLOCKED_EXTERNAL
+            --gate-status scopeCoverage=BLOCKED_EXTERNAL
+            --gate-status strictArtifactValidation=BLOCKED_EXTERNAL
+            --gate-status routeAccessibilityQuality=BLOCKED_EXTERNAL
+            --gate-status appSchemaCompatibility=BLOCKED_EXTERNAL
+            --gate-status stagedRollout=BLOCKED_EXTERNAL
+            --gate-status publicClaims=BLOCKED_EXTERNAL
+            --datapack-gate-status source_admission=BLOCKED_EXTERNAL
             --datapack-gate-status source_governance=BLOCKED_EXTERNAL
-            --datapack-gate-status rollback_rescue=BLOCKED_EXTERNAL
             --datapack-gate-status freshness_conditional_publish=BLOCKED_EXTERNAL
+            --datapack-gate-status rollback_rescue=BLOCKED_EXTERNAL
+            --datapack-gate-status device_performance=BLOCKED_EXTERNAL
             --datapack-gate-status callback_reconciliation=BLOCKED_EXTERNAL
           )
           android_artifact_source="none"
@@ -736,14 +746,16 @@ jobs:
             printf 'BLOCKED_EXTERNAL\n' > release-artifacts/rc/operations-phase-a-status.txt
           fi
           operations_evidence_args=(--evidence-status "post_launch_operations=${operations_status}")
+          operations_gate_args=(--gate-status "postLaunchOperations=${operations_status}")
           if [[ "${operations_status}" == "SATISFIED" ]]; then
             operations_evidence_args+=(--evidence-path post_launch_operations=release-artifacts/rc/operations-phase-a-summary.json)
+            operations_gate_args+=(--gate-evidence postLaunchOperations=release-artifacts/rc/operations-phase-a-summary.json)
           fi
           node tools/release/generate-rc-evidence-manifest.mjs \
             "${generator_args[@]}" \
             "${operations_evidence_args[@]}" \
-            --output release-artifacts/rc/rc-evidence-manifest.json \
-            --gate-status "postLaunchOperations=${operations_status}"
+            "${operations_gate_args[@]}" \
+            --output release-artifacts/rc/rc-evidence-manifest.json
           cp apps/mobile/release/post-launch-operations-review-gate.json release-artifacts/rc/post-launch-operations-review-gate.json
           cp apps/mobile/release/support-incident-response-gate.json release-artifacts/rc/support-incident-response-gate.json
           cp apps/mobile/release/operations-observability-gate.json release-artifacts/rc/operations-observability-gate.json

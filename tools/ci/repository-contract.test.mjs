@@ -15,6 +15,7 @@ import { canonicalScopeHash } from "../datapack/build-launch-denominator-report.
 
 const root = process.cwd();
 const execFileAsync = promisify(execFile);
+const currentGitSha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
 const validDataPackPublicKeyModulus =
   "itNBIH_FyHbqONXe_z8LNzWes4rh3veI4_8RY76rb7onamA-WDoJlvFyvBG-ihBOl7LtgW1rV54hCLHz95VFLmm028-tll9ThDzSs3Bu9ychED-m0vny16tK8ZgB6gf7sJkjGBJn8MLDaiVWoVvD5TEjv433f_vMFIljdNUKZC2Xf0qHYlYv18dAwbJHKeOsmJkky13HNVn40HuEn5FWEJvFI5qqVgpJ-k1V3ip39ga2-Ek5SOVHAL6U44ypjSXUjo7NCKVpuQRwN7hAnvlYutXDdrEQ6Oa3iUtbQJIgkl-ZmTwNkYHCEIhd_ZLB9n_EEHdvyJAmUKCtAKLX5FOa9w";
 const validPlayAppSigningFingerprint =
@@ -22,6 +23,17 @@ const validPlayAppSigningFingerprint =
 
 function read(relativePath) {
   return readFileSync(path.join(root, relativePath), "utf8");
+}
+
+async function initializeFixtureGitRepo(repoPath) {
+  await execFileAsync("git", ["init", "-q"], { cwd: repoPath });
+  await execFileAsync("git", ["add", "."], { cwd: repoPath });
+  await execFileAsync("git", [
+    "-c", "user.name=EasySubway Contract Test",
+    "-c", "user.email=contract-test@easysubway.local",
+    "commit", "-q", "-m", "fixture",
+  ], { cwd: repoPath });
+  return execFileSync("git", ["rev-parse", "HEAD"], { cwd: repoPath, encoding: "utf8" }).trim();
 }
 
 function mobileProductionDartFiles() {
@@ -3701,8 +3713,10 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.deepEqual(rcEvidenceManifestContract.parentIssues, [1014, 1020]);
   assert.deepEqual(
     rcEvidenceManifestContract.linkedEvidenceIssues,
-    [547, 571, 1015, 1016, 1017, 1018, 1019, 1021, 1022, 1914, 2051, 2054, 2056, 2057, 2133],
+    [547, 571, 1015, 1016, 1017, 1018, 1019, 1021, 1022, 1393, 1914, 2051, 2054, 2055, 2056, 2057, 2058, 2133],
   );
+  assert.deepEqual(rcEvidenceManifestContract.consumerIssues, [2058, 1393, 1020]);
+  assert.deepEqual(rcEvidenceManifestContract.activeBlockerIssues, []);
   assert.equal(rcEvidenceManifestContract.androidRcEvidenceManifest, androidRcEvidencePath);
   assert.equal(rcEvidenceManifestContract.signedReleaseArtifactGate, gatePath);
   assert.equal(rcEvidenceManifestContract.releaseGovernanceGate, "apps/mobile/release/release-governance-gate.json");
@@ -4307,7 +4321,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     "--app-root",
     "apps/mobile",
     "--git-sha",
-    "0123456789abcdef0123456789abcdef01234567",
+    currentGitSha,
     "--now",
     "2026-07-16T00:00:00.000Z",
     "--android-release-metadata",
@@ -4333,7 +4347,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   const manifest = JSON.parse(readFileSync(outputPath, "utf8"));
   assert.equal(manifest.releaseGate, "rc-evidence-manifest");
   assert.equal(manifest.issue, 1020);
-  assert.equal(manifest.gitSha, "0123456789abcdef0123456789abcdef01234567");
+  assert.equal(manifest.gitSha, currentGitSha);
   assert.equal(manifest.generatedAt, "2026-07-16T00:00:00.000Z");
   assert.equal(manifest.supportContactSetSha256, "d".repeat(64));
   assert.equal(manifest.appVersionName, appVersion[1]);
@@ -4391,6 +4405,17 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   assert.ok(manifest.evidenceEntries.every((entry) => entry.testedAt === "2026-06-26T00:00:00.000Z"));
   assert.ok(manifest.evidenceEntries.every((entry) => entry.expiresWhen === "2026-07-10T00:00:00.000Z"));
 
+  const outsideCwdOutputPath = path.join(tempDir, "outside-cwd.json");
+  await execFileAsync(process.execPath, [
+    path.join(root, "tools/release/generate-rc-evidence-manifest.mjs"),
+    "--repo-root", root,
+    "--app-root", path.join(root, "apps/mobile"),
+    "--git-sha", currentGitSha,
+    "--data-pack-manifest", path.join(root, "apps/mobile/assets/datapacks/metro_map_pack/manifest.json"),
+    "--output", outsideCwdOutputPath,
+  ], { cwd: tempDir });
+  assert.equal(JSON.parse(readFileSync(outsideCwdOutputPath, "utf8")).gitSha, currentGitSha);
+
   await writeFile(phaseASummaryPath, JSON.stringify({
     status: "PASS",
     issue: 1019,
@@ -4404,7 +4429,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
       "tools/release/generate-rc-evidence-manifest.mjs",
       "--repo-root", ".",
       "--app-root", "apps/mobile",
-      "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+      "--git-sha", currentGitSha,
       "--now", "2026-07-11T00:00:00Z",
       "--aab", aabPath,
       "--backend-image-inspect", backendInspectPath,
@@ -4430,7 +4455,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
       "tools/release/generate-rc-evidence-manifest.mjs",
       "--repo-root", ".",
       "--app-root", "apps/mobile",
-      "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+      "--git-sha", currentGitSha,
       "--now", "2026-07-16T00:00:00Z",
       "--aab", aabPath,
       "--backend-image-inspect", backendInspectPath,
@@ -4456,7 +4481,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
       "tools/release/generate-rc-evidence-manifest.mjs",
       "--repo-root", ".",
       "--app-root", "apps/mobile",
-      "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+      "--git-sha", currentGitSha,
       "--aab", aabPath,
       "--backend-image-inspect", backendInspectPath,
       "--data-pack-manifest", "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
@@ -4474,7 +4499,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
       "tools/release/generate-rc-evidence-manifest.mjs",
       "--repo-root", ".",
       "--app-root", "apps/mobile",
-      "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+      "--git-sha", currentGitSha,
       "--aab", aabPath,
       "--backend-image-inspect", backendInspectPath,
       "--data-pack-manifest", "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
@@ -4499,7 +4524,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
       "tools/release/generate-rc-evidence-manifest.mjs",
       "--repo-root", ".",
       "--app-root", "apps/mobile",
-      "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+      "--git-sha", currentGitSha,
       "--now", "2026-07-16T00:00:00Z",
       "--aab", aabPath,
       "--backend-image-inspect", backendInspectPath,
@@ -4512,22 +4537,76 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     /failed canonical validation/,
   );
 
+  await writeFile(phaseASummaryPath, JSON.stringify({
+    schemaVersion: 1,
+    evidenceId: "rc_device_qa",
+    sourceIssue: 571,
+    status: "SATISFIED",
+    reasonCodes: [],
+    rcIdentity: manifest.rcIdentity,
+    evidenceValidity: {
+      testedAt: "2026-07-15T00:00:00Z",
+      expiresWhen: "2026-07-20T00:00:00Z",
+    },
+    result: {
+      schemaVersion: 1,
+      checks: {
+        exactRcInstalled: true,
+        launchSmokePassed: true,
+        accessibilityPassed: true,
+        crashFree: true,
+        evidenceRedacted: true,
+      },
+      evidenceReferences: [{ artifactId: "rc-device-qa-report", sha256: "1".repeat(64) }],
+    },
+  }));
+  await execFileAsync(process.execPath, [
+    "tools/release/generate-rc-evidence-manifest.mjs",
+    "--repo-root", ".",
+    "--app-root", "apps/mobile",
+    "--git-sha", currentGitSha,
+    "--now", "2026-07-16T00:00:00Z",
+    "--android-release-metadata", androidReleaseMetadataPath,
+    "--aab", aabPath,
+    "--backend-image-inspect", backendInspectPath,
+    "--data-pack-manifest", "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
+    "--output", outputPath,
+    "--tested-at", "2026-07-15T00:00:00Z",
+    "--evidence-status", "rc_device_qa=SATISFIED",
+    "--evidence-path", `rc_device_qa=${phaseASummaryPath}`,
+  ], { cwd: root });
+  const genericEvidenceManifest = JSON.parse(readFileSync(outputPath, "utf8"));
+  assert.match(
+    genericEvidenceManifest.evidenceEntries.find(({ id }) => id === "rc_device_qa").evidenceSha256,
+    /^[a-f0-9]{64}$/,
+  );
+  await writeFile(phaseASummaryPath, JSON.stringify({
+    schemaVersion: 1,
+    evidenceId: "post_launch_operations",
+    sourceIssue: 1019,
+    status: "SATISFIED",
+    reasonCodes: [],
+    rcIdentity: manifest.rcIdentity,
+    evidenceValidity: {
+      testedAt: "2026-07-15T00:00:00Z",
+      expiresWhen: "2026-07-20T00:00:00Z",
+    },
+  }));
   await assert.rejects(
     execFileAsync(process.execPath, [
       "tools/release/generate-rc-evidence-manifest.mjs",
       "--repo-root", ".",
       "--app-root", "apps/mobile",
-      "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+      "--git-sha", currentGitSha,
       "--now", "2026-07-16T00:00:00Z",
+      "--android-release-metadata", androidReleaseMetadataPath,
       "--aab", aabPath,
       "--backend-image-inspect", backendInspectPath,
-      "--data-pack-manifest", "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
       "--output", outputPath,
-      "--tested-at", "2026-07-15T00:00:00Z",
-      "--evidence-status", "rc_device_qa=SATISFIED",
-      "--evidence-path", `rc_device_qa=${phaseASummaryPath}`,
+      "--evidence-status", "post_launch_operations=SATISFIED",
+      "--evidence-path", `post_launch_operations=${phaseASummaryPath}`,
     ], { cwd: root }),
-    /has no canonical validator/,
+    /failed canonical validation: post_launch_operations/,
   );
 
   const incompleteRepo = path.join(tempDir, "incomplete-scope-repo");
@@ -4538,12 +4617,13 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     path.join(incompleteRepo, "apps/mobile/release/production-datapack-scope.json"),
     JSON.stringify(incompleteScope),
   );
+  const incompleteRepoGitSha = await initializeFixtureGitRepo(incompleteRepo);
   await assert.rejects(
     execFileAsync(process.execPath, [
       "tools/release/generate-rc-evidence-manifest.mjs",
       "--repo-root", incompleteRepo,
       "--app-root", path.join(root, "apps/mobile"),
-      "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+      "--git-sha", incompleteRepoGitSha,
       "--aab", aabPath,
       "--backend-image-inspect", backendInspectPath,
       "--data-pack-manifest", path.join(root, "apps/mobile/assets/datapacks/metro_map_pack/manifest.json"),
@@ -4566,7 +4646,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     "--app-root",
     "apps/mobile",
     "--git-sha",
-    "0123456789abcdef0123456789abcdef01234567",
+    currentGitSha,
     "--aab",
     aabPath,
     "--backend-image-inspect",
@@ -4600,7 +4680,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     "--app-root",
     "apps/mobile",
     "--git-sha",
-    "0123456789abcdef0123456789abcdef01234567",
+    currentGitSha,
     "--aab",
     aabPath,
     "--backend-image-inspect",
@@ -4627,7 +4707,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
       "--app-root",
       "apps/mobile",
       "--git-sha",
-      "0123456789abcdef0123456789abcdef01234567",
+      currentGitSha,
       "--aab",
       aabPath,
       "--backend-image-inspect",
@@ -4651,7 +4731,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     "tools/release/generate-rc-evidence-manifest.mjs",
     "--repo-root", ".",
     "--app-root", "apps/mobile",
-    "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+    "--git-sha", currentGitSha,
     "--aab", corruptAabPath,
     "--backend-image-inspect", backendInspectPath,
     "--data-pack-manifest", "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
@@ -4665,59 +4745,348 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
 test("datapack readiness producer는 required gate를 동일 final identity로 결정론적으로 결합한다", async () => {
   const contract = readJson("apps/mobile/release/rc-evidence-manifest-contract.json");
   const requiredDatapackGates = [
+    { id: "source_admission", sourceIssue: 2133, expiresAfterDays: 14 },
     { id: "source_governance", sourceIssue: 2133, expiresAfterDays: 14 },
-    { id: "rollback_rescue", sourceIssue: 2051, expiresAfterDays: 14 },
     { id: "freshness_conditional_publish", sourceIssue: 2054, expiresAfterDays: 14 },
+    { id: "rollback_rescue", sourceIssue: 2051, expiresAfterDays: 14 },
+    { id: "device_performance", sourceIssue: 2055, expiresAfterDays: 14 },
     { id: "callback_reconciliation", sourceIssue: 2057, expiresAfterDays: 14 },
   ];
   assert.deepEqual(contract.requiredDatapackGates, requiredDatapackGates);
+  assert.deepEqual(contract.consumerIssues, [2058, 1393, 1020]);
+  assert.deepEqual(contract.activeBlockerIssues, []);
+  const producerFiles = execFileSync("git", ["grep", "-l", "finalReleaseIdentity", "--", "tools", "apps", ".github"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim().split("\n").filter((file) => !file.includes(".test."));
+  assert.deepEqual(producerFiles, ["tools/release/generate-rc-evidence-manifest.mjs"]);
 
   const tempDir = await mkdtemp(path.join(tmpdir(), "easysubway-datapack-readiness-"));
-  const gitSha = "0123456789abcdef0123456789abcdef01234567";
+  const validationRepo = path.join(tempDir, "validation-repo");
+  await mkdir(path.join(validationRepo, "apps/mobile/release"), { recursive: true });
+  await mkdir(path.join(validationRepo, "tools/release"), { recursive: true });
+  await mkdir(path.join(validationRepo, "tools/ops"), { recursive: true });
+  await mkdir(path.join(validationRepo, "tools/security"), { recursive: true });
+  await symlink(
+    path.join(root, "apps/mobile/release/production-datapack-scope.json"),
+    path.join(validationRepo, "apps/mobile/release/production-datapack-scope.json"),
+  );
+  await symlink(
+    path.join(root, "tools/release/hash-android-bundle-payload.mjs"),
+    path.join(validationRepo, "tools/release/hash-android-bundle-payload.mjs"),
+  );
+  await writeFile(
+    path.join(validationRepo, "tools/ops/validate-operations-release-summary.mjs"),
+    `import { readFileSync } from "node:fs";
+const value = (name) => process.argv[process.argv.indexOf(name) + 1];
+const summary = JSON.parse(readFileSync(value("--summary"), "utf8"));
+const manifest = JSON.parse(readFileSync(value("--rc-manifest"), "utf8"));
+if (summary.evidenceId !== "post_launch_operations" || summary.status !== "SATISFIED") process.exit(1);
+if (JSON.stringify(summary.rcIdentity) !== JSON.stringify(manifest.rcIdentity)) process.exit(1);
+`,
+  );
+  await writeFile(
+    path.join(validationRepo, "tools/security/validate-abuse-penetration-summary.mjs"),
+    `import { existsSync } from "node:fs";
+const value = (name) => process.argv[process.argv.indexOf(name) + 1];
+if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass")) process.exit(1);
+`,
+  );
+  const gitSha = await initializeFixtureGitRepo(validationRepo);
   const now = "2026-07-16T00:00:00.000Z";
+  const snapshotSetIdentity = "a".repeat(64);
+  const requiredSourceIds = readJson(
+    "apps/mobile/release/production-datapack-scope.json",
+  ).productionSourceSet.requiredSourceIds;
+  const sourceInventoryEntries = requiredSourceIds.map((sourceId, index) => ({
+    sourceId,
+    status: "APPROVED",
+    producerVersion: 1,
+    evidenceSha256: `${(index % 9) + 1}`.repeat(64),
+    evaluatedAt: now,
+    expiresAt: "2026-07-30T00:00:00.000Z",
+  }));
+  const aabPayloadPath = path.join(tempDir, "payload.bin");
+  const aabPath = path.join(tempDir, "app-release.aab");
+  const backendArtifactPath = path.join(tempDir, "backend.jar");
+  await writeFile(aabPayloadPath, "datapack-readiness-aab");
+  await execFileAsync("zip", ["-q", aabPath, path.basename(aabPayloadPath)], { cwd: tempDir });
+  await writeFile(backendArtifactPath, "datapack-readiness-backend");
   const args = [
     "tools/release/generate-rc-evidence-manifest.mjs",
-    "--repo-root", ".",
+    "--repo-root", validationRepo,
     "--app-root", "apps/mobile",
     "--git-sha", gitSha,
     "--now", now,
+    "--aab", aabPath,
+    "--backend-artifact", backendArtifactPath,
+    "--support-contact-set-sha256", "d".repeat(64),
+    "--device", "qa-device-a",
+    "--android-version", "Android 16 API 36",
   ];
+  const baselineOutput = path.join(tempDir, "baseline.json");
+  await execFileAsync(process.execPath, [...args, "--output", baselineOutput], { cwd: root });
+  const evidenceRcIdentity = JSON.parse(readFileSync(baselineOutput, "utf8")).rcIdentity;
+  const gateEvidencePaths = {};
+  const evidenceReference = (artifactId, digit) => ({ artifactId, sha256: digit.repeat(64) });
+  const datapackGateResult = (gateId) => {
+    if (gateId === "rollback_rescue") {
+      return {
+        schemaVersion: 1,
+        currentReleaseSequence: 100,
+        failedReleaseSequence: 101,
+        catalogMaxReleaseSequence: 101,
+        rescueReleaseSequence: 102,
+        knownGoodPackSha256: "4".repeat(64),
+        rescueManifestSha256: "5".repeat(64),
+        checks: {
+          monotonicSequence: true,
+          signatureVerified: true,
+          sqliteIntegrityVerified: true,
+          immutableCatalogWritten: true,
+          channelManifestPublishedLast: true,
+          idempotentRetryVerified: true,
+          androidReplayRecoveryVerified: true,
+          productionPreservedOnFailure: true,
+          secretRedactionVerified: true,
+        },
+        evidenceReferences: [evidenceReference("rollback-report", "6")],
+      };
+    }
+    if (gateId === "device_performance") {
+      return {
+        schemaVersion: 1,
+        deviceProfile: {
+          model: "production-equivalent-4gib",
+          ramBytes: 4 * 1024 * 1024 * 1024,
+          androidApiLevel: 36,
+          osBuild: "android-16-test-build",
+          repetitions: 20,
+        },
+        artifact: {
+          sha256: evidenceRcIdentity.dataPackManifestSha256,
+          compressedBytes: 100 * 1024 * 1024,
+          uncompressedBytes: 200 * 1024 * 1024,
+        },
+        metrics: {
+          manifestFetchP95Ms: 2_000,
+          downloadChunkIdleMaxMs: 10_000,
+          decompressP95Ms: 20_000,
+          hashSignatureP95Ms: 8_000,
+          sqliteValidationP95Ms: 12_000,
+          activationP95Ms: 1_500,
+          peakRssIncreaseBytes: 200 * 1024 * 1024,
+          coldLoadP50Ms: 800,
+          coldLoadP95Ms: 1_200,
+          routeSearchP50Ms: 100,
+          routeSearchP95Ms: 250,
+          temporaryStorageBytes: 400 * 1024 * 1024,
+          temporaryStorageLimitBytes: 500 * 1024 * 1024,
+        },
+        checks: {
+          productionTopologyArtifact: true,
+          lowestSupportedAndroidProfile: true,
+          allStageSlosPassed: true,
+          baselineRegressionPassed: true,
+          atomicRecoveryPassed: true,
+          rolloutBlockerConnected: true,
+          zeroCrashAnrOom: true,
+          zeroMainThreadStallOver700Ms: true,
+          meteredNetworkConsentVerified: true,
+          secretRedactionVerified: true,
+        },
+        evidenceReferences: [evidenceReference("device-performance-report", "7")],
+      };
+    }
+    if (gateId === "callback_reconciliation") {
+      return {
+        schemaVersion: 1,
+        deliveryIdentity: {
+          releaseRequestId: "release-request-2057",
+          releaseSequence: 102,
+          manifestSha256: evidenceRcIdentity.dataPackManifestSha256,
+          idempotencyKeySha256: "8".repeat(64),
+        },
+        metrics: {
+          controlPlaneConvergenceP95Ms: 8 * 60 * 1_000,
+          terminalDispositionMaxMs: 60 * 60 * 1_000,
+        },
+        checks: {
+          boundedRetryConverged: true,
+          independentReconciliationConverged: true,
+          duplicateSingleApply: true,
+          concurrentSingleApply: true,
+          identityMismatchDeadLetter: true,
+          invalidSignatureDeadLetter: true,
+          missingRequestDeadLetter: true,
+          rolloutCappedUntilConfirmed: true,
+          secretRedactionVerified: true,
+          manualRepairAudited: true,
+        },
+        evidenceReferences: [evidenceReference("callback-reconciliation-report", "9")],
+      };
+    }
+    return undefined;
+  };
+
+  for (const gateId of contract.requiredGateStatuses) {
+    const evidencePath = path.join(tempDir, `required-gate-${gateId}.json`);
+    await writeFile(evidencePath, `${JSON.stringify({
+      schemaVersion: 1,
+      gateId,
+      status: "SATISFIED",
+      reasonCodes: [],
+      rcIdentity: evidenceRcIdentity,
+      evidenceValidity: { evaluatedAt: now, expiresAt: "2026-07-30T00:00:00.000Z" },
+    }, null, 2)}\n`);
+    args.push("--gate-status", `${gateId}=SATISFIED`, "--gate-evidence", `${gateId}=${evidencePath}`);
+  }
+
+  let postLaunchEvidencePath;
+  for (const entry of contract.requiredEvidenceEntries) {
+    const evidencePath = path.join(tempDir, `required-evidence-${entry.id}.json`);
+    if (entry.id === "post_launch_operations") postLaunchEvidencePath = evidencePath;
+    const evidence = {
+      schemaVersion: 1,
+      evidenceId: entry.id,
+      sourceIssue: entry.sourceIssue,
+      status: "SATISFIED",
+      reasonCodes: [],
+      rcIdentity: evidenceRcIdentity,
+      evidenceValidity: { testedAt: now, expiresWhen: "2026-07-30T00:00:00.000Z" },
+    };
+    if (Array.isArray(entry.requiredChecks)) {
+      evidence.result = {
+        schemaVersion: 1,
+        checks: Object.fromEntries(entry.requiredChecks.map((check) => [check, true])),
+        evidenceReferences: [evidenceReference(`${entry.id}-report`, "1")],
+      };
+    }
+    if (entry.id === "abuse_penetration_rehearsal") {
+      const canonicalSummaryPath = path.join(tempDir, "abuse-penetration-summary.json");
+      await writeFile(canonicalSummaryPath, "{}\n");
+      evidence.canonicalSummaryPath = canonicalSummaryPath;
+      evidence.canonicalSummarySha256 = createHash("sha256").update(readFileSync(canonicalSummaryPath)).digest("hex");
+    }
+    await writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
+    args.push("--evidence-status", `${entry.id}=SATISFIED`, "--evidence-path", `${entry.id}=${evidencePath}`);
+  }
+  const postLaunchGateEvidenceIndex = args.findIndex((value, index) => (
+    args[index - 1] === "--gate-evidence" && value.startsWith("postLaunchOperations=")
+  ));
+  args[postLaunchGateEvidenceIndex] = `postLaunchOperations=${postLaunchEvidencePath}`;
 
   for (const gate of requiredDatapackGates) {
     const evidencePath = path.join(tempDir, `${gate.id}.json`);
-    await writeFile(evidencePath, `${JSON.stringify({
+    gateEvidencePaths[gate.id] = evidencePath;
+    const evidence = {
       schemaVersion: 1,
       gateId: gate.id,
       sourceIssue: gate.sourceIssue,
       status: "SATISFIED",
       reasonCodes: [],
-      rcIdentity: { gitSha },
+      rcIdentity: evidenceRcIdentity,
       evidenceValidity: {
         evaluatedAt: now,
         expiresAt: "2026-07-30T00:00:00.000Z",
       },
-    }, null, 2)}\n`);
+    };
+    if (["source_admission", "source_governance", "freshness_conditional_publish"].includes(gate.id)) {
+      evidence.snapshotSetIdentity = snapshotSetIdentity;
+    }
+    if (gate.id === "source_governance") {
+      evidence.sourceInventory = {
+        inventoryAsOf: now,
+        statusCounts: { APPROVED: requiredSourceIds.length, REVIEW_REQUIRED: 0, BLOCKED: 0, EXPIRED: 0 },
+        entries: [...sourceInventoryEntries].reverse(),
+      };
+    }
+    if (["rollback_rescue", "device_performance", "callback_reconciliation"].includes(gate.id)) {
+      evidence.result = datapackGateResult(gate.id);
+    }
+    await writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
     args.push("--datapack-gate-status", `${gate.id}=SATISFIED`);
     args.push("--datapack-gate-evidence", `${gate.id}=${evidencePath}`);
   }
 
+  const identityLinkagePath = path.join(tempDir, "identity-linkage.json");
+  const sharedIdentity = {
+    canonicalStationVersion: "station-v3",
+    corridorId: "capital",
+    serviceId: "SUBWAY",
+    lineageId: "lineage-2026-07-16",
+    schemaVersion: 3,
+  };
+  await writeFile(identityLinkagePath, `${JSON.stringify({
+    schemaVersion: 1,
+    status: "SATISFIED",
+    reasonCodes: [],
+    rcIdentity: evidenceRcIdentity,
+    evidenceValidity: { evaluatedAt: now, expiresAt: "2026-07-30T00:00:00.000Z" },
+    sourceTimetableArtifact: {
+      artifactId: "source-timetable-v1",
+      sha256: "1".repeat(64),
+      freshUntil: "2026-07-30T00:00:00.000Z",
+      identity: sharedIdentity,
+    },
+    serverTimetableSnapshot: {
+      artifactId: "server-timetable-v1",
+      sha256: "2".repeat(64),
+      freshUntil: "2026-07-30T00:00:00.000Z",
+      identity: sharedIdentity,
+    },
+    mobileTopologyPack: {
+      artifactId: "mobile-topology-v1",
+      sha256: "3".repeat(64),
+      freshUntil: "2026-07-30T00:00:00.000Z",
+      identity: sharedIdentity,
+    },
+  }, null, 2)}\n`);
+  args.push("--identity-linkage-evidence", identityLinkagePath);
+
   const firstOutput = path.join(tempDir, "first.json");
   const secondOutput = path.join(tempDir, "second.json");
   const reevaluatedOutput = path.join(tempDir, "reevaluated.json");
+  const otherDeviceOutput = path.join(tempDir, "other-device.json");
   await execFileAsync(process.execPath, [...args, "--output", firstOutput], { cwd: root });
   await execFileAsync(process.execPath, [...args, "--output", secondOutput], { cwd: root });
   const reevaluatedArgs = [...args];
   reevaluatedArgs[reevaluatedArgs.indexOf("--now") + 1] = "2026-07-17T00:00:00.000Z";
   await execFileAsync(process.execPath, [...reevaluatedArgs, "--output", reevaluatedOutput], { cwd: root });
+  const otherDeviceArgs = [...args];
+  otherDeviceArgs[otherDeviceArgs.indexOf("--device") + 1] = "qa-device-b";
+  await execFileAsync(process.execPath, [...otherDeviceArgs, "--output", otherDeviceOutput], { cwd: root });
 
   const firstBytes = readFileSync(firstOutput, "utf8");
   assert.equal(readFileSync(secondOutput, "utf8"), firstBytes);
   const manifest = JSON.parse(firstBytes);
   const reevaluatedManifest = JSON.parse(readFileSync(reevaluatedOutput, "utf8"));
+  const otherDeviceManifest = JSON.parse(readFileSync(otherDeviceOutput, "utf8"));
   assert.equal(manifest.producerVersion, 1);
   assert.equal(manifest.evaluatedAt, now);
   assert.match(manifest.finalReleaseIdentity, /^[a-f0-9]{64}$/);
   assert.equal(reevaluatedManifest.finalReleaseIdentity, manifest.finalReleaseIdentity);
+  assert.notEqual(otherDeviceManifest.finalReleaseIdentity, manifest.finalReleaseIdentity);
+  assert.deepEqual(manifest.consumerIssues, [2058, 1393, 1020]);
+  assert.deepEqual(manifest.activeBlockerIssues, []);
+  assert.deepEqual(manifest.sourceInventory, {
+    inventoryAsOf: now,
+    generatedAt: now,
+    producerVersion: 1,
+    statusCounts: { APPROVED: requiredSourceIds.length, REVIEW_REQUIRED: 0, BLOCKED: 0, EXPIRED: 0 },
+    entries: [...sourceInventoryEntries].sort((left, right) => left.sourceId.localeCompare(right.sourceId)),
+    snapshotSetIdentity,
+  });
+  assert.equal(manifest.identityLinkage.status, "SATISFIED");
+  assert.deepEqual(manifest.identityLinkage.sharedIdentity, sharedIdentity);
+  for (const artifact of ["sourceTimetableArtifact", "serverTimetableSnapshot", "mobileTopologyPack"]) {
+    assert.deepEqual(manifest.identityLinkage[artifact].identity, sharedIdentity);
+  }
+  assert.equal(manifest.closureEvidence.finalReleaseIdentity, manifest.finalReleaseIdentity);
+  assert.equal(
+    manifest.closureEvidence.producerCommand,
+    "node tools/release/generate-rc-evidence-manifest.mjs",
+  );
   assert.deepEqual(
     manifest.datapackGates.map(({ id, sourceIssue, status }) => ({ id, sourceIssue, status })),
     requiredDatapackGates.map(({ id, sourceIssue }) => ({ id, sourceIssue, status: "SATISFIED" })),
@@ -4727,14 +5096,133 @@ test("datapack readiness producer는 required gate를 동일 final identity로 �
     manifest.readiness.blockers.some(({ id }) => id.startsWith("datapack_gate_")),
     false,
   );
+  assert.equal(manifest.readiness.status, "GO");
+  assert.equal(manifest.readiness.blockers.length, 0);
+
+  const rollbackEvidence = JSON.parse(readFileSync(gateEvidencePaths.rollback_rescue, "utf8"));
+  delete rollbackEvidence.result;
+  await writeFile(gateEvidencePaths.rollback_rescue, JSON.stringify(rollbackEvidence));
+  await assert.rejects(
+    execFileAsync(process.execPath, [...args, "--output", firstOutput], { cwd: root }),
+    /rollback_rescue requires result schemaVersion 1/,
+  );
+  rollbackEvidence.result = datapackGateResult("rollback_rescue");
+  await writeFile(gateEvidencePaths.rollback_rescue, JSON.stringify(rollbackEvidence));
+
+  const devicePerformanceEvidence = JSON.parse(readFileSync(gateEvidencePaths.device_performance, "utf8"));
+  devicePerformanceEvidence.result.artifact.sha256 = "f".repeat(64);
+  await writeFile(gateEvidencePaths.device_performance, JSON.stringify(devicePerformanceEvidence));
+  await assert.rejects(
+    execFileAsync(process.execPath, [...args, "--output", firstOutput], { cwd: root }),
+    /device_performance artifact.sha256 does not match the RC identity/,
+  );
+  devicePerformanceEvidence.result = datapackGateResult("device_performance");
+  devicePerformanceEvidence.result.metrics.coldLoadP95Ms = devicePerformanceEvidence.result.metrics.coldLoadP50Ms - 1;
+  await writeFile(gateEvidencePaths.device_performance, JSON.stringify(devicePerformanceEvidence));
+  await assert.rejects(
+    execFileAsync(process.execPath, [...args, "--output", firstOutput], { cwd: root }),
+    /requires P95 metrics to be greater than or equal to P50 metrics/,
+  );
+  devicePerformanceEvidence.result = datapackGateResult("device_performance");
+  await writeFile(gateEvidencePaths.device_performance, JSON.stringify(devicePerformanceEvidence));
+
+  const linkageEvidence = JSON.parse(readFileSync(identityLinkagePath, "utf8"));
+  linkageEvidence.mobileTopologyPack.identity.apiKey = "must-not-be-published";
+  await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence));
+  await assert.rejects(
+    execFileAsync(process.execPath, [...args, "--output", firstOutput], { cwd: root }),
+    /identity linkage has unsafe or non-scalar mobileTopologyPack.identity/,
+  );
+  delete linkageEvidence.mobileTopologyPack.identity.apiKey;
+  await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence));
+  linkageEvidence.mobileTopologyPack.identity.corridorId = "different-corridor";
+  await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence));
+  await assert.rejects(
+    execFileAsync(process.execPath, [...args, "--output", firstOutput], { cwd: root }),
+    /identity linkage shared field mismatch: corridorId/,
+  );
+  linkageEvidence.mobileTopologyPack.identity.corridorId = "capital";
+  await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence));
+
+  for (const artifact of ["sourceTimetableArtifact", "serverTimetableSnapshot", "mobileTopologyPack"]) {
+    linkageEvidence[artifact].identity.schemaVersion = "3";
+  }
+  await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence));
+  await assert.rejects(
+    execFileAsync(process.execPath, [...args, "--output", firstOutput], { cwd: root }),
+    /missing or invalid shared field: schemaVersion/,
+  );
+  for (const artifact of ["sourceTimetableArtifact", "serverTimetableSnapshot", "mobileTopologyPack"]) {
+    linkageEvidence[artifact].identity.schemaVersion = 3;
+  }
+  await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence));
+
+  linkageEvidence.mobileTopologyPack.freshUntil = "2026-07-20T00:00:00.000Z";
+  await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence));
+  await assert.rejects(
+    execFileAsync(process.execPath, [...args, "--output", firstOutput], { cwd: root }),
+    /identity linkage freshness does not cover evidence expiry: mobileTopologyPack/,
+  );
+  linkageEvidence.mobileTopologyPack.freshUntil = "2026-07-30T00:00:00.000Z";
+  await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence));
+
+  const admissionEvidence = JSON.parse(readFileSync(gateEvidencePaths.source_admission, "utf8"));
+  admissionEvidence.snapshotSetIdentity = "b".repeat(64);
+  await writeFile(gateEvidencePaths.source_admission, JSON.stringify(admissionEvidence));
+  await assert.rejects(
+    execFileAsync(process.execPath, [...args, "--output", firstOutput], { cwd: root }),
+    /mixed snapshotSetIdentity/,
+  );
+  admissionEvidence.snapshotSetIdentity = snapshotSetIdentity;
+  await writeFile(gateEvidencePaths.source_admission, JSON.stringify(admissionEvidence));
+
+  const governanceEvidence = JSON.parse(readFileSync(gateEvidencePaths.source_governance, "utf8"));
+  const omittedRequiredSource = governanceEvidence.sourceInventory.entries.pop();
+  governanceEvidence.sourceInventory.statusCounts.APPROVED -= 1;
+  await writeFile(gateEvidencePaths.source_governance, JSON.stringify(governanceEvidence));
+  await assert.rejects(
+    execFileAsync(process.execPath, [...args, "--output", firstOutput], { cwd: root }),
+    /include every required production source/,
+  );
+  governanceEvidence.sourceInventory.entries.push(omittedRequiredSource);
+  governanceEvidence.sourceInventory.statusCounts.APPROVED += 1;
+  governanceEvidence.sourceInventory.inventoryAsOf = "2026-07-15T23:59:59.999Z";
+  await writeFile(gateEvidencePaths.source_governance, JSON.stringify(governanceEvidence));
+  await assert.rejects(
+    execFileAsync(process.execPath, [...args, "--output", firstOutput], { cwd: root }),
+    /sourceInventory.inventoryAsOf must cover child evidence/,
+  );
+  governanceEvidence.sourceInventory.inventoryAsOf = "2026-07-17T00:00:00.000Z";
+  await writeFile(gateEvidencePaths.source_governance, JSON.stringify(governanceEvidence));
+  await assert.rejects(
+    execFileAsync(process.execPath, [...args, "--output", firstOutput], { cwd: root }),
+    /requires sourceInventory.inventoryAsOf/,
+  );
+  governanceEvidence.sourceInventory.inventoryAsOf = now;
+  governanceEvidence.sourceInventory.entries[0].expiresAt = "2026-07-29T23:59:59.999Z";
+  await writeFile(gateEvidencePaths.source_governance, JSON.stringify(governanceEvidence));
+  await assert.rejects(
+    execFileAsync(process.execPath, [...args, "--output", firstOutput], { cwd: root }),
+    /invalid, duplicate, stale, or contradictory sourceInventory.entries/,
+  );
+  governanceEvidence.sourceInventory.entries[0].expiresAt = "2026-07-30T00:00:00.000Z";
+  governanceEvidence.sourceInventory.statusCounts.APPROVED = requiredSourceIds.length - 1;
+  await writeFile(gateEvidencePaths.source_governance, JSON.stringify(governanceEvidence));
+  await assert.rejects(
+    execFileAsync(process.execPath, [...args, "--output", firstOutput], { cwd: root }),
+    /statusCounts must match current sourceInventory.entries/,
+  );
 });
 
 test("datapack readiness producer는 unknown·mixed identity·expired evidence를 거부한다", async () => {
   const tempDir = await mkdtemp(path.join(tmpdir(), "easysubway-datapack-readiness-negative-"));
   const outputPath = path.join(tempDir, "manifest.json");
   const evidencePath = path.join(tempDir, "source-governance.json");
-  const gitSha = "0123456789abcdef0123456789abcdef01234567";
+  const gitSha = currentGitSha;
   const now = "2026-07-16T00:00:00.000Z";
+  const requiredSourceIds = readJson(
+    "apps/mobile/release/production-datapack-scope.json",
+  ).productionSourceSet.requiredSourceIds;
   const baseArgs = [
     "tools/release/generate-rc-evidence-manifest.mjs",
     "--repo-root", ".",
@@ -4747,10 +5235,61 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
   await execFileAsync(process.execPath, baseArgs, { cwd: root });
   const blockedManifest = JSON.parse(readFileSync(outputPath, "utf8"));
   assert.ok(blockedManifest.datapackGates.every(({ status }) => status === "BLOCKED_EXTERNAL"));
+  assert.equal(blockedManifest.identityLinkage.status, "BLOCKED_EXTERNAL");
+  assert.equal(blockedManifest.sourceInventory, null);
   assert.equal(
     blockedManifest.readiness.blockers.filter(({ id }) => id.startsWith("datapack_gate_")).length,
-    4,
+    6,
   );
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      ...baseArgs,
+      "--gate-status", "scopeCoverage=SATISFIED",
+    ], { cwd: root }),
+    /requires existing --gate-evidence: scopeCoverage/,
+  );
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      ...baseArgs,
+      "--gate-status", "scopeCoverage=DEFERRED_OUT_OF_SCOPE",
+    ], { cwd: root }),
+    /Invalid gate status for scopeCoverage/,
+  );
+  const genericGateEvidencePath = path.join(tempDir, "scope-coverage.json");
+  await writeFile(genericGateEvidencePath, JSON.stringify({
+    schemaVersion: 1,
+    gateId: "scopeCoverage",
+    status: "SATISFIED",
+    reasonCodes: [],
+    rcIdentity: blockedManifest.rcIdentity,
+    evidenceValidity: { evaluatedAt: now, expiresAt: "2026-07-30T00:00:00.000Z" },
+  }));
+  await execFileAsync(process.execPath, [
+    ...baseArgs,
+    "--gate-status", "scopeCoverage=SATISFIED",
+    "--gate-evidence", `scopeCoverage=${genericGateEvidencePath}`,
+  ], { cwd: root });
+  const gateEvidenceManifest = JSON.parse(readFileSync(outputPath, "utf8"));
+  assert.match(
+    gateEvidenceManifest.gateEntries.find(({ id }) => id === "scopeCoverage").evidenceSha256,
+    /^[a-f0-9]{64}$/,
+  );
+  const p0OutputPath = path.join(tempDir, "p0-manifest.json");
+  const p0Args = [...baseArgs];
+  p0Args[p0Args.indexOf("--output") + 1] = p0OutputPath;
+  await execFileAsync(process.execPath, [...p0Args, "--open-android-p0-count", "1"], { cwd: root });
+  const p0Manifest = JSON.parse(readFileSync(p0OutputPath, "utf8"));
+  assert.notEqual(p0Manifest.finalReleaseIdentity, blockedManifest.finalReleaseIdentity);
+
+  const evidenceStatusOutputPath = path.join(tempDir, "evidence-status-manifest.json");
+  const evidenceStatusArgs = [...baseArgs];
+  evidenceStatusArgs[evidenceStatusArgs.indexOf("--output") + 1] = evidenceStatusOutputPath;
+  await execFileAsync(process.execPath, [
+    ...evidenceStatusArgs,
+    "--evidence-status", "rc_device_qa=BLOCKED_EXTERNAL",
+  ], { cwd: root });
+  const evidenceStatusManifest = JSON.parse(readFileSync(evidenceStatusOutputPath, "utf8"));
+  assert.notEqual(evidenceStatusManifest.finalReleaseIdentity, blockedManifest.finalReleaseIdentity);
 
   await assert.rejects(
     execFileAsync(process.execPath, [
@@ -4772,6 +5311,7 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
   const writeEvidence = async ({
     schemaVersion = 1,
     evidenceGitSha = gitSha,
+    dataPackManifestSha256 = blockedManifest.rcIdentity.dataPackManifestSha256,
     expiresAt = "2026-07-30T00:00:00.000Z",
     reasonCodes = [],
   } = {}) => {
@@ -4781,12 +5321,35 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
       sourceIssue: 2133,
       status: "SATISFIED",
       reasonCodes,
-      rcIdentity: { gitSha: evidenceGitSha },
+      rcIdentity: { ...blockedManifest.rcIdentity, gitSha: evidenceGitSha, dataPackManifestSha256 },
       evidenceValidity: { evaluatedAt: now, expiresAt },
+      snapshotSetIdentity: "a".repeat(64),
+      sourceInventory: {
+        inventoryAsOf: now,
+        statusCounts: { APPROVED: requiredSourceIds.length, REVIEW_REQUIRED: 0, BLOCKED: 0, EXPIRED: 0 },
+        entries: requiredSourceIds.map((sourceId) => ({
+          sourceId,
+          status: "APPROVED",
+          producerVersion: 1,
+          evidenceSha256: "9".repeat(64),
+          evaluatedAt: now,
+          expiresAt: "2026-07-30T00:00:00.000Z",
+        })),
+      },
     }));
   };
 
   await writeEvidence({ evidenceGitSha: "f".repeat(40) });
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      ...baseArgs,
+      "--datapack-gate-status", "source_governance=SATISFIED",
+      "--datapack-gate-evidence", `source_governance=${evidencePath}`,
+    ], { cwd: root }),
+    /RC identity mismatch/,
+  );
+
+  await writeEvidence({ dataPackManifestSha256: "f".repeat(64) });
   await assert.rejects(
     execFileAsync(process.execPath, [
       ...baseArgs,
@@ -4850,16 +5413,80 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
       ...duplicateContractArgs,
       "--data-pack-manifest", path.join(root, "apps/mobile/assets/datapacks/metro_map_pack/manifest.json"),
     ], { cwd: root }),
-    /Duplicate datapack gate in contract: source_governance/,
+    /Duplicate datapack gate in contract: source_admission/,
+  );
+
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      ...baseArgs.slice(0, baseArgs.indexOf("--git-sha") + 1),
+      "0".repeat(40),
+      ...baseArgs.slice(baseArgs.indexOf("--git-sha") + 2),
+    ], { cwd: root }),
+    /must match the current checkout HEAD/,
+  );
+
+  await assert.rejects(
+    execFileAsync(process.execPath, [...baseArgs, "--verify-github-sha", "true"], {
+      cwd: root,
+      env: { ...process.env, GITHUB_SHA: "f".repeat(40) },
+    }),
+    /GITHUB_SHA does not match --git-sha/,
+  );
+
+  const closedBlockerApp = path.join(tempDir, "closed-blocker-app");
+  await mkdir(path.join(closedBlockerApp, "release"), { recursive: true });
+  await writeFile(path.join(closedBlockerApp, "pubspec.yaml"), read("apps/mobile/pubspec.yaml"));
+  const closedBlockerContract = readJson("apps/mobile/release/rc-evidence-manifest-contract.json");
+  closedBlockerContract.activeBlockerIssues = [2133];
+  await writeFile(
+    path.join(closedBlockerApp, "release/rc-evidence-manifest-contract.json"),
+    JSON.stringify(closedBlockerContract),
+  );
+  const closedBlockerArgs = [...baseArgs];
+  closedBlockerArgs[closedBlockerArgs.indexOf("--app-root") + 1] = closedBlockerApp;
+  await execFileAsync(process.execPath, [
+    ...closedBlockerArgs,
+    "--data-pack-manifest", path.join(root, "apps/mobile/assets/datapacks/metro_map_pack/manifest.json"),
+    "--issue-state", "2133=OPEN",
+  ], { cwd: root });
+  const openBlockerManifest = JSON.parse(readFileSync(outputPath, "utf8"));
+  assert.ok(openBlockerManifest.readiness.blockers.some(({ id }) => id === "active_blocker_issue_2133"));
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      ...closedBlockerArgs,
+      "--data-pack-manifest", path.join(root, "apps/mobile/assets/datapacks/metro_map_pack/manifest.json"),
+      "--issue-state", "2133=CLOSED",
+    ], { cwd: root }),
+    /Closed issue is still referenced as an active blocker: 2133/,
   );
 });
 
 test("RC evidence manifest workflow는 datapack required gate를 fail closed로 연결한다", () => {
   const workflow = read(".github/workflows/release-artifacts.yml");
+  assert.ok(workflow.includes('--git-sha "${GITHUB_SHA}"'));
+  assert.ok(workflow.includes("--verify-github-sha true"));
+  assert.ok(
+    workflow.includes("--gate-evidence postLaunchOperations=release-artifacts/rc/operations-phase-a-summary.json"),
+  );
   for (const gate of [
+    "scopeCoverage",
+    "strictArtifactValidation",
+    "routeAccessibilityQuality",
+    "appSchemaCompatibility",
+    "stagedRollout",
+    "publicClaims",
+  ]) {
+    assert.ok(
+      workflow.includes(`--gate-status ${gate}=BLOCKED_EXTERNAL`),
+      `${gate} must be wired into the RC manifest producer`,
+    );
+  }
+  for (const gate of [
+    "source_admission",
     "source_governance",
-    "rollback_rescue",
     "freshness_conditional_publish",
+    "rollback_rescue",
+    "device_performance",
     "callback_reconciliation",
   ]) {
     assert.ok(

@@ -33,14 +33,28 @@ const dataPackManifestPath = resolvePath(
 );
 const dataPackManifest = readJsonIfExists(dataPackManifestPath);
 const backendIdentity = readBackendIdentity(args);
-const gateStatuses = parsePairs(arg("gateStatus", "gate-status"));
+const providedGateStatuses = parsePairs(arg("gateStatus", "gate-status"));
+const gateEvidencePaths = parsePairs(arg("gateEvidence", "gate-evidence"));
 const evidenceStatuses = parsePairs(arg("evidenceStatus", "evidence-status"));
 const evidencePaths = parsePairs(arg("evidencePath", "evidence-path"));
 const datapackGateStatuses = parsePairs(arg("datapackGateStatus", "datapack-gate-status"));
 const datapackGateEvidencePaths = parsePairs(arg("datapackGateEvidence", "datapack-gate-evidence"));
+const issueStates = parsePairs(arg("issueState", "issue-state"));
 const expectedValues = parsePairs(args.expect);
 const androidReleaseMetadata = readKeyValueFileIfExists(arg("androidReleaseMetadata", "android-release-metadata"));
-const gitSha = arg("gitSha", "git-sha") ?? process.env.GITHUB_SHA ?? requiredGitSha();
+const suppliedGitSha = arg("gitSha", "git-sha");
+const verifyGithubSha = arg("verifyGithubSha", "verify-github-sha") === "true";
+const checkoutGitSha = currentGitSha(repoRoot);
+if (verifyGithubSha && (!suppliedGitSha || !process.env.GITHUB_SHA)) {
+  fail("--verify-github-sha requires --git-sha and GITHUB_SHA");
+}
+if (verifyGithubSha && suppliedGitSha !== process.env.GITHUB_SHA) {
+  fail("GITHUB_SHA does not match --git-sha");
+}
+const gitSha = suppliedGitSha ?? process.env.GITHUB_SHA ?? checkoutGitSha;
+if (!/^[a-f0-9]{40}$/.test(gitSha) || gitSha !== checkoutGitSha) {
+  fail("--git-sha must match the current checkout HEAD");
+}
 const rcEvidenceContract = readJsonIfExists(
   path.join(appRoot, "release/rc-evidence-manifest-contract.json"),
 );
@@ -50,6 +64,16 @@ if (!Array.isArray(rcEvidenceContract?.requiredEvidenceEntries)) {
 if (!Array.isArray(rcEvidenceContract.requiredDatapackGates)) {
   fail("RC evidence manifest contract with requiredDatapackGates is required");
 }
+if (!Array.isArray(rcEvidenceContract.requiredGateStatuses)) {
+  fail("RC evidence manifest contract with requiredGateStatuses is required");
+}
+if (!Array.isArray(rcEvidenceContract.consumerIssues)) {
+  fail("RC evidence manifest contract with consumerIssues is required");
+}
+if (!Array.isArray(rcEvidenceContract.activeBlockerIssues)) {
+  fail("RC evidence manifest contract with activeBlockerIssues is required");
+}
+validateIssueDag(rcEvidenceContract.activeBlockerIssues, issueStates);
 const launchScope = readJsonIfExists(path.join(repoRoot, "apps/mobile/release/production-datapack-scope.json"));
 if (!launchScope?.routingLaunchScope || !launchScope?.identityMatrix) {
   fail("production routing launch scope and identity matrix are required");
@@ -80,6 +104,16 @@ const identity = {
   identityLinkageMatrixSha256: canonicalScopeHash(launchScope.identityMatrix),
 };
 
+const gateEntries = requiredGateEntries(
+  rcEvidenceContract.requiredGateStatuses,
+  providedGateStatuses,
+  gateEvidencePaths,
+  identity,
+  generatedAt,
+  { identity, repoRoot, androidApplicationId: "com.easysubway.app" },
+);
+const gateStatuses = Object.fromEntries(gateEntries.map(({ id, status }) => [id, status]));
+
 const evidenceEntries = requiredEvidenceEntries(
   testedAt,
   evidenceRoot,
@@ -97,20 +131,62 @@ const datapackGates = requiredDatapackGates(
   datapackGateEvidencePaths,
   identity,
   generatedAt,
+  launchScope.productionSourceSet?.requiredSourceIds,
 );
 const producerVersion = 1;
-const finalReleaseIdentity = createHash("sha256")
-  .update(JSON.stringify({ producerVersion, rcIdentity: identity, datapackGates }))
-  .digest("hex");
+const sourceInventory = buildSourceInventory(datapackGates, generatedAt, producerVersion);
+const identityLinkage = readIdentityLinkage(
+  arg("identityLinkageEvidence", "identity-linkage-evidence"),
+  identity,
+  launchScope.identityMatrix,
+  generatedAt,
+);
+const openAndroidP0Count = requiredOpenP0Count(arg("openAndroidP0Count", "open-android-p0-count"));
 const blockers = [
   ...identityBlockers(identity),
   ...androidReleaseMetadataMismatchBlockers(identity, androidReleaseMetadata),
   ...expectedMismatchBlockers(identity, expectedValues),
   ...gateStatusBlockers(gateStatuses),
-  ...openP0Blockers(arg("openAndroidP0Count", "open-android-p0-count")),
+  ...openP0Blockers(openAndroidP0Count),
   ...evidenceBlockers(evidenceEntries),
   ...datapackGateBlockers(datapackGates),
+  ...identityLinkageBlockers(identityLinkage),
+  ...activeIssueBlockers(rcEvidenceContract.activeBlockerIssues),
 ];
+const finalReleaseIdentity = createHash("sha256")
+  .update(JSON.stringify({
+    producerVersion,
+    rcIdentity: identity,
+    gateEntries,
+    evidenceEntries: evidenceEntries.map((entry) => ({
+      id: entry.id,
+      sourceIssue: entry.sourceIssue,
+      device: entry.device,
+      androidVersion: entry.androidVersion,
+      status: entry.status,
+      evidenceSha256: entry.evidenceSha256,
+      testedAt: entry.status === "SATISFIED" ? entry.testedAt : null,
+      expiresWhen: entry.status === "SATISFIED" ? entry.expiresWhen : null,
+    })),
+    datapackGates,
+    sourceInventory: sourceInventory && {
+      inventoryAsOf: sourceInventory.inventoryAsOf,
+      producerVersion: sourceInventory.producerVersion,
+      statusCounts: sourceInventory.statusCounts,
+      entries: sourceInventory.entries,
+      snapshotSetIdentity: sourceInventory.snapshotSetIdentity,
+    },
+    identityLinkage,
+    consumerIssues: rcEvidenceContract.consumerIssues,
+    activeBlockerIssues: rcEvidenceContract.activeBlockerIssues,
+    openAndroidP0Count,
+    blockers,
+  }))
+  .digest("hex");
+
+const workflowRunUrl = arg("workflowRunUrl", "workflow-run-url")
+  ?? githubWorkflowRunUrl(process.env)
+  ?? null;
 
 const manifest = {
   schemaVersion: 1,
@@ -126,11 +202,21 @@ const manifest = {
   rcIdentity: identity,
   evidenceEntries,
   datapackGates,
+  gateEntries,
+  sourceInventory,
+  identityLinkage,
+  consumerIssues: rcEvidenceContract.consumerIssues,
+  activeBlockerIssues: rcEvidenceContract.activeBlockerIssues,
+  closureEvidence: {
+    finalReleaseIdentity,
+    producerCommand: "node tools/release/generate-rc-evidence-manifest.mjs",
+    workflowRunUrl,
+  },
   readiness: {
     status: blockers.length === 0 ? "GO" : "NO_GO",
     gateStatus: blockers.length === 0 ? "SATISFIED" : "BLOCKED_RC_EVIDENCE",
     blockers,
-    openAndroidP0Count: Number.parseInt(arg("openAndroidP0Count", "open-android-p0-count") ?? "0", 10),
+    openAndroidP0Count,
     gateStatuses,
   },
   sourceManifests: {
@@ -296,6 +382,105 @@ function parsePairs(value) {
   return pairs;
 }
 
+function sameRcIdentity(evidenceIdentity, currentIdentity) {
+  if (!evidenceIdentity || typeof evidenceIdentity !== "object" || Array.isArray(evidenceIdentity)) return false;
+  const expectedKeys = Object.keys(currentIdentity).sort();
+  const actualKeys = Object.keys(evidenceIdentity).sort();
+  return expectedKeys.length === actualKeys.length
+    && expectedKeys.every((key, index) => key === actualKeys[index] && evidenceIdentity[key] === currentIdentity[key]);
+}
+
+function requiredGateEntries(requiredIds, provided, paths, identity, generatedAt, validationContext) {
+  const duplicateId = requiredIds.find((id, index) => requiredIds.indexOf(id) !== index);
+  if (duplicateId) fail(`Duplicate required gate status in contract: ${duplicateId}`);
+  const knownIds = new Set(requiredIds);
+  for (const id of [...Object.keys(provided), ...Object.keys(paths)]) {
+    if (!knownIds.has(id)) fail(`Unknown gate status: ${id}`);
+  }
+  return requiredIds.map((id) => {
+    const status = provided[id] ?? "BLOCKED_EXTERNAL";
+    if (!["SATISFIED", "BLOCKED_EXTERNAL"].includes(status)) {
+      fail(`Invalid gate status for ${id}: ${status}`);
+    }
+    if (status !== "SATISFIED") {
+      return {
+        id,
+        status,
+        reasonCodes: ["EVIDENCE_NOT_PROVIDED"],
+        evidenceSha256: null,
+        evaluatedAt: null,
+        expiresAt: null,
+        rcIdentity: identity,
+      };
+    }
+    const evidencePath = paths[id];
+    if (!evidencePath || !existsSync(resolvePath(evidencePath))) {
+      fail(`SATISFIED gate requires existing --gate-evidence: ${id}`);
+    }
+    const evidenceBytes = readFileSync(resolvePath(evidencePath));
+    const evidence = JSON.parse(evidenceBytes);
+    const canonicalEnvelope = evidence.schemaVersion === 1
+      && evidence.gateId === id
+      && evidence.status === "SATISFIED"
+      && Array.isArray(evidence.reasonCodes)
+      && evidence.reasonCodes.length === 0
+      && sameRcIdentity(evidence.rcIdentity, identity);
+    if (!canonicalEnvelope && id !== "postLaunchOperations") {
+      fail(`SATISFIED gate evidence identity or status mismatch: ${id}`);
+    }
+    if (id === "postLaunchOperations") {
+      validateSatisfiedEvidence(
+        "post_launch_operations",
+        1019,
+        evidencePath,
+        generatedAt,
+        validationContext,
+      );
+    }
+    const evaluatedAt = evidence.evidenceValidity?.evaluatedAt ?? evidence.evidenceValidity?.testedAt;
+    const expiresAt = evidence.evidenceValidity?.expiresAt ?? evidence.evidenceValidity?.expiresWhen;
+    if (
+      !Number.isFinite(Date.parse(evaluatedAt))
+      || !Number.isFinite(Date.parse(expiresAt))
+      || Date.parse(evaluatedAt) > Date.parse(generatedAt)
+      || Date.parse(expiresAt) < Date.parse(generatedAt)
+      || Date.parse(expiresAt) < Date.parse(evaluatedAt)
+      || Date.parse(expiresAt) > Date.parse(addDays(evaluatedAt, 14))
+    ) {
+      fail(`SATISFIED gate has invalid, future, expired, or overlong evidenceValidity: ${id}`);
+    }
+    return {
+      id,
+      status,
+      reasonCodes: [],
+      evidenceSha256: createHash("sha256").update(evidenceBytes).digest("hex"),
+      evaluatedAt: new Date(evaluatedAt).toISOString(),
+      expiresAt: new Date(expiresAt).toISOString(),
+      rcIdentity: identity,
+    };
+  });
+}
+
+function validateIssueDag(activeBlockerIssues, states) {
+  const duplicateIssue = activeBlockerIssues.find(
+    (issue, index) => activeBlockerIssues.indexOf(issue) !== index,
+  );
+  if (duplicateIssue !== undefined) fail(`Duplicate active blocker issue in contract: ${duplicateIssue}`);
+  if (activeBlockerIssues.some((issue) => !Number.isInteger(issue) || issue <= 0)) {
+    fail("activeBlockerIssues must contain positive issue numbers");
+  }
+  for (const [issue, state] of Object.entries(states)) {
+    if (!/^[1-9][0-9]*$/.test(issue) || !["OPEN", "CLOSED"].includes(state)) {
+      fail(`Invalid issue state: ${issue}=${state}`);
+    }
+  }
+  for (const issue of activeBlockerIssues) {
+    if (states[issue] === "CLOSED") {
+      fail(`Closed issue is still referenced as an active blocker: ${issue}`);
+    }
+  }
+}
+
 function requiredEvidenceEntries(
   baseTestedAt,
   rootPath,
@@ -322,13 +507,14 @@ function requiredEvidenceEntries(
       fail(`SATISFIED evidence path does not exist for ${id}: ${paths[id]}`);
     }
   }
-  return contractEntries.map(({ id, sourceIssue, expiresAfterDays }) => {
+  return contractEntries.map(({ id, sourceIssue, expiresAfterDays, requiredChecks }) => {
     if (!id || !Number.isInteger(sourceIssue) || !Number.isInteger(expiresAfterDays) || expiresAfterDays <= 0) {
       fail(`Invalid RC evidence contract entry: ${id ?? "<missing>"}`);
     }
     const evidencePaths = [`${rootPath}${id}/`];
     if (paths[id]) evidencePaths.push(paths[id]);
-    const evidence = statuses[id] === "SATISFIED" ? readJsonIfExists(resolvePath(paths[id])) : null;
+    const evidenceBytes = statuses[id] === "SATISFIED" ? readFileSync(resolvePath(paths[id])) : null;
+    const evidence = evidenceBytes ? JSON.parse(evidenceBytes) : null;
     if (statuses[id] === "SATISFIED" && (
       evidence?.evidenceValidity?.testedAt === undefined
       || evidence?.evidenceValidity?.expiresWhen === undefined
@@ -352,7 +538,7 @@ function requiredEvidenceEntries(
       fail(`SATISFIED evidence entry exceeds the ${expiresAfterDays}-day evidence lifetime: ${id}`);
     }
     if (statuses[id] === "SATISFIED") {
-      validateSatisfiedEvidence(id, paths[id], generatedAt, validationContext);
+      validateSatisfiedEvidence(id, sourceIssue, paths[id], generatedAt, validationContext, requiredChecks);
     }
     return {
       id,
@@ -361,13 +547,16 @@ function requiredEvidenceEntries(
       androidVersion: androidVersion ?? "android-15-or-16",
       testedAt: evidenceTestedAt,
       evidencePaths,
+      evidenceSha256: evidenceBytes
+        ? createHash("sha256").update(evidenceBytes).digest("hex")
+        : null,
       expiresWhen: evidenceExpiresWhen,
       status: statuses[id] ?? "PENDING_LOCAL_EVIDENCE",
     };
   });
 }
 
-function requiredDatapackGates(contractGates, statuses, paths, identity, generatedAt) {
+function requiredDatapackGates(contractGates, statuses, paths, identity, generatedAt, requiredSourceIds) {
   const contractIds = contractGates.map(({ id }) => id);
   const duplicateId = contractIds.find((id, index) => contractIds.indexOf(id) !== index);
   if (duplicateId) fail(`Duplicate datapack gate in contract: ${duplicateId}`);
@@ -393,7 +582,7 @@ function requiredDatapackGates(contractGates, statuses, paths, identity, generat
         evidenceSha256: null,
         evaluatedAt: null,
         expiresAt: null,
-        rcIdentity: { gitSha: identity.gitSha },
+        rcIdentity: identity,
       };
     }
 
@@ -409,7 +598,7 @@ function requiredDatapackGates(contractGates, statuses, paths, identity, generat
     if (evidence.gateId !== id || evidence.sourceIssue !== sourceIssue || evidence.status !== "SATISFIED") {
       fail(`SATISFIED datapack gate identity mismatch: ${id}`);
     }
-    if (evidence.rcIdentity?.gitSha !== identity.gitSha) {
+    if (!sameRcIdentity(evidence.rcIdentity, identity)) {
       fail(`SATISFIED datapack gate RC identity mismatch: ${id}`);
     }
     if (!Array.isArray(evidence.reasonCodes) || evidence.reasonCodes.some((reason) => typeof reason !== "string")) {
@@ -432,7 +621,7 @@ function requiredDatapackGates(contractGates, statuses, paths, identity, generat
     if (Date.parse(expiresAt) > Date.parse(addDays(evaluatedAt, expiresAfterDays))) {
       fail(`SATISFIED datapack gate exceeds the ${expiresAfterDays}-day evidence lifetime: ${id}`);
     }
-    return {
+    const normalized = {
       id,
       sourceIssue,
       status,
@@ -440,15 +629,546 @@ function requiredDatapackGates(contractGates, statuses, paths, identity, generat
       evidenceSha256: createHash("sha256").update(evidenceBytes).digest("hex"),
       evaluatedAt: new Date(evaluatedAt).toISOString(),
       expiresAt: new Date(expiresAt).toISOString(),
-      rcIdentity: { gitSha: evidence.rcIdentity.gitSha },
+      rcIdentity: identity,
     };
+    if (["source_admission", "source_governance", "freshness_conditional_publish"].includes(id)) {
+      if (!/^[a-f0-9]{64}$/.test(evidence.snapshotSetIdentity ?? "")) {
+        fail(`SATISFIED source datapack gate requires snapshotSetIdentity: ${id}`);
+      }
+      normalized.snapshotSetIdentity = evidence.snapshotSetIdentity;
+    }
+    if (id === "source_governance") {
+      normalized.sourceInventory = normalizeSourceInventory(
+        evidence.sourceInventory,
+        generatedAt,
+        expiresAt,
+        requiredSourceIds,
+      );
+    }
+    const gateResult = normalizeDatapackGateResult(id, evidence, identity);
+    if (gateResult) normalized.gateResult = gateResult;
+    return normalized;
   });
 }
 
-function validateSatisfiedEvidence(id, evidencePath, generatedAt, context) {
-  if (id !== "post_launch_operations") {
-    fail(`SATISFIED evidence entry has no canonical validator: ${id}`);
+function normalizeDatapackGateResult(id, evidence, identity) {
+  if (id === "rollback_rescue") return normalizeRollbackRescueResult(evidence.result);
+  if (id === "device_performance") return normalizeDevicePerformanceResult(evidence.result, identity);
+  if (id === "callback_reconciliation") {
+    return normalizeCallbackReconciliationResult(evidence.result, identity);
   }
+  return null;
+}
+
+function normalizeRollbackRescueResult(result) {
+  const gateId = "rollback_rescue";
+  requireResultSchema(result, gateId);
+  const sequenceFields = [
+    "currentReleaseSequence",
+    "failedReleaseSequence",
+    "catalogMaxReleaseSequence",
+    "rescueReleaseSequence",
+  ];
+  for (const field of sequenceFields) requirePositiveSafeInteger(result[field], `${gateId}.${field}`);
+  if (result.rescueReleaseSequence <= Math.max(
+    result.currentReleaseSequence,
+    result.failedReleaseSequence,
+    result.catalogMaxReleaseSequence,
+  )) {
+    fail(`${gateId} rescueReleaseSequence must exceed current, failed, and catalog maximum sequences`);
+  }
+  requireSha256(result.knownGoodPackSha256, `${gateId}.knownGoodPackSha256`);
+  requireSha256(result.rescueManifestSha256, `${gateId}.rescueManifestSha256`);
+  const checks = requirePassingChecks(gateId, result.checks, [
+    "monotonicSequence",
+    "signatureVerified",
+    "sqliteIntegrityVerified",
+    "immutableCatalogWritten",
+    "channelManifestPublishedLast",
+    "idempotentRetryVerified",
+    "androidReplayRecoveryVerified",
+    "productionPreservedOnFailure",
+    "secretRedactionVerified",
+  ]);
+  return {
+    schemaVersion: 1,
+    ...Object.fromEntries(sequenceFields.map((field) => [field, result[field]])),
+    knownGoodPackSha256: result.knownGoodPackSha256,
+    rescueManifestSha256: result.rescueManifestSha256,
+    checks,
+    evidenceReferences: normalizeEvidenceReferences(gateId, result.evidenceReferences),
+  };
+}
+
+function normalizeDevicePerformanceResult(result, identity) {
+  const gateId = "device_performance";
+  requireResultSchema(result, gateId);
+  const profile = result.deviceProfile;
+  if (
+    typeof profile?.model !== "string" || profile.model.trim().length === 0
+    || !Number.isSafeInteger(profile.ramBytes) || profile.ramBytes <= 0 || profile.ramBytes > 4 * 1024 * 1024 * 1024
+    || !Number.isSafeInteger(profile.androidApiLevel) || profile.androidApiLevel <= 0
+    || typeof profile.osBuild !== "string" || profile.osBuild.trim().length === 0
+    || !Number.isSafeInteger(profile.repetitions) || profile.repetitions <= 0
+  ) {
+    fail(`${gateId} requires an exact device profile and positive repetition count`);
+  }
+  const artifact = result.artifact;
+  requireSha256(artifact?.sha256, `${gateId}.artifact.sha256`);
+  if (artifact.sha256 !== identity.dataPackManifestSha256) {
+    fail(`${gateId} artifact.sha256 does not match the RC identity`);
+  }
+  requirePositiveSafeInteger(artifact?.compressedBytes, `${gateId}.artifact.compressedBytes`);
+  requirePositiveSafeInteger(artifact?.uncompressedBytes, `${gateId}.artifact.uncompressedBytes`);
+  if (artifact.compressedBytes > 250 * 1024 * 1024) {
+    fail(`${gateId} compressed artifact exceeds the 250 MiB cap`);
+  }
+  const metrics = result.metrics;
+  const metricLimits = {
+    manifestFetchP95Ms: 3_000,
+    downloadChunkIdleMaxMs: 20_000,
+    decompressP95Ms: 30_000,
+    hashSignatureP95Ms: 10_000,
+    sqliteValidationP95Ms: 15_000,
+    activationP95Ms: 2_000,
+    peakRssIncreaseBytes: 256 * 1024 * 1024,
+  };
+  for (const [field, limit] of Object.entries(metricLimits)) {
+    requirePositiveFiniteNumber(metrics?.[field], `${gateId}.metrics.${field}`);
+    if (metrics[field] > limit) fail(`${gateId}.${field} exceeds its release SLO`);
+  }
+  for (const field of ["coldLoadP50Ms", "coldLoadP95Ms", "routeSearchP50Ms", "routeSearchP95Ms"]) {
+    requirePositiveFiniteNumber(metrics?.[field], `${gateId}.metrics.${field}`);
+  }
+  if (metrics.coldLoadP95Ms < metrics.coldLoadP50Ms || metrics.routeSearchP95Ms < metrics.routeSearchP50Ms) {
+    fail(`${gateId} requires P95 metrics to be greater than or equal to P50 metrics`);
+  }
+  for (const field of ["temporaryStorageBytes", "temporaryStorageLimitBytes"]) {
+    requirePositiveSafeInteger(metrics?.[field], `${gateId}.metrics.${field}`);
+  }
+  const calculatedTemporaryStorageLimit = artifact.compressedBytes + (2 * artifact.uncompressedBytes);
+  if (!Number.isSafeInteger(calculatedTemporaryStorageLimit)
+    || metrics.temporaryStorageLimitBytes !== calculatedTemporaryStorageLimit) {
+    fail(`${gateId} temporary storage limit must equal compressedBytes + 2 * uncompressedBytes`);
+  }
+  if (metrics.temporaryStorageBytes > metrics.temporaryStorageLimitBytes) {
+    fail(`${gateId} temporary storage exceeds its calculated limit`);
+  }
+  const checks = requirePassingChecks(gateId, result.checks, [
+    "productionTopologyArtifact",
+    "lowestSupportedAndroidProfile",
+    "allStageSlosPassed",
+    "baselineRegressionPassed",
+    "atomicRecoveryPassed",
+    "rolloutBlockerConnected",
+    "zeroCrashAnrOom",
+    "zeroMainThreadStallOver700Ms",
+    "meteredNetworkConsentVerified",
+    "secretRedactionVerified",
+  ]);
+  return {
+    schemaVersion: 1,
+    deviceProfile: {
+      model: profile.model,
+      ramBytes: profile.ramBytes,
+      androidApiLevel: profile.androidApiLevel,
+      osBuild: profile.osBuild,
+      repetitions: profile.repetitions,
+    },
+    artifact: {
+      sha256: artifact.sha256,
+      compressedBytes: artifact.compressedBytes,
+      uncompressedBytes: artifact.uncompressedBytes,
+    },
+    metrics: Object.fromEntries([
+      ...Object.keys(metricLimits),
+      "coldLoadP50Ms",
+      "coldLoadP95Ms",
+      "routeSearchP50Ms",
+      "routeSearchP95Ms",
+      "temporaryStorageBytes",
+      "temporaryStorageLimitBytes",
+    ].map((field) => [field, metrics[field]])),
+    checks,
+    evidenceReferences: normalizeEvidenceReferences(gateId, result.evidenceReferences),
+  };
+}
+
+function normalizeCallbackReconciliationResult(result, identity) {
+  const gateId = "callback_reconciliation";
+  requireResultSchema(result, gateId);
+  const delivery = result.deliveryIdentity;
+  if (
+    typeof delivery?.releaseRequestId !== "string" || delivery.releaseRequestId.trim().length === 0
+    || !Number.isSafeInteger(delivery.releaseSequence) || delivery.releaseSequence <= 0
+  ) {
+    fail(`${gateId} requires releaseRequestId and a positive releaseSequence`);
+  }
+  requireSha256(delivery.manifestSha256, `${gateId}.deliveryIdentity.manifestSha256`);
+  requireSha256(delivery.idempotencyKeySha256, `${gateId}.deliveryIdentity.idempotencyKeySha256`);
+  if (delivery.manifestSha256 !== identity.dataPackManifestSha256) {
+    fail(`${gateId} manifestSha256 does not match the RC identity`);
+  }
+  requireNonNegativeFiniteNumber(result.metrics?.controlPlaneConvergenceP95Ms, `${gateId}.metrics.controlPlaneConvergenceP95Ms`);
+  requireNonNegativeFiniteNumber(result.metrics?.terminalDispositionMaxMs, `${gateId}.metrics.terminalDispositionMaxMs`);
+  if (result.metrics.controlPlaneConvergenceP95Ms > 10 * 60 * 1_000) {
+    fail(`${gateId} control-plane convergence P95 exceeds 10 minutes`);
+  }
+  if (result.metrics.terminalDispositionMaxMs > 70 * 60 * 1_000) {
+    fail(`${gateId} terminal disposition exceeds 70 minutes`);
+  }
+  const checks = requirePassingChecks(gateId, result.checks, [
+    "boundedRetryConverged",
+    "independentReconciliationConverged",
+    "duplicateSingleApply",
+    "concurrentSingleApply",
+    "identityMismatchDeadLetter",
+    "invalidSignatureDeadLetter",
+    "missingRequestDeadLetter",
+    "rolloutCappedUntilConfirmed",
+    "secretRedactionVerified",
+    "manualRepairAudited",
+  ]);
+  return {
+    schemaVersion: 1,
+    deliveryIdentity: {
+      releaseRequestId: delivery.releaseRequestId,
+      releaseSequence: delivery.releaseSequence,
+      manifestSha256: delivery.manifestSha256,
+      idempotencyKeySha256: delivery.idempotencyKeySha256,
+    },
+    metrics: {
+      controlPlaneConvergenceP95Ms: result.metrics.controlPlaneConvergenceP95Ms,
+      terminalDispositionMaxMs: result.metrics.terminalDispositionMaxMs,
+    },
+    checks,
+    evidenceReferences: normalizeEvidenceReferences(gateId, result.evidenceReferences),
+  };
+}
+
+function requireResultSchema(result, gateId) {
+  if (result?.schemaVersion !== 1) fail(`${gateId} requires result schemaVersion 1`);
+}
+
+function requirePassingChecks(gateId, checks, requiredFields) {
+  const suppliedFields = checks && typeof checks === "object" && !Array.isArray(checks)
+    ? Object.keys(checks).sort()
+    : [];
+  if (
+    suppliedFields.join(",") !== [...requiredFields].sort().join(",")
+    || requiredFields.some((field) => checks[field] !== true)
+  ) {
+    fail(`${gateId} requires every canonical result check to pass`);
+  }
+  return Object.fromEntries([...requiredFields].sort().map((field) => [field, true]));
+}
+
+function normalizeEvidenceReferences(gateId, references) {
+  if (!Array.isArray(references) || references.length === 0) {
+    fail(`${gateId} requires machine-readable evidenceReferences`);
+  }
+  const artifactIds = new Set();
+  return references.map((reference) => {
+    if (
+      !reference || typeof reference !== "object" || Array.isArray(reference)
+      || Object.keys(reference).sort().join(",") !== "artifactId,sha256"
+      || typeof reference.artifactId !== "string" || reference.artifactId.trim().length === 0
+      || artifactIds.has(reference.artifactId)
+    ) {
+      fail(`${gateId} has invalid or duplicate evidenceReferences`);
+    }
+    requireSha256(reference.sha256, `${gateId}.evidenceReferences.sha256`);
+    artifactIds.add(reference.artifactId);
+    return { artifactId: reference.artifactId, sha256: reference.sha256 };
+  }).sort((left, right) => left.artifactId.localeCompare(right.artifactId));
+}
+
+function requirePositiveSafeInteger(value, name) {
+  if (!Number.isSafeInteger(value) || value <= 0) fail(`${name} must be a positive safe integer`);
+}
+
+function requireNonNegativeSafeInteger(value, name) {
+  if (!Number.isSafeInteger(value) || value < 0) fail(`${name} must be a non-negative safe integer`);
+}
+
+function requireNonNegativeFiniteNumber(value, name) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    fail(`${name} must be a non-negative finite number`);
+  }
+}
+
+function requirePositiveFiniteNumber(value, name) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    fail(`${name} must be a positive finite number`);
+  }
+}
+
+function requireSha256(value, name) {
+  if (!/^[a-f0-9]{64}$/.test(value ?? "")) fail(`${name} must be a SHA-256 digest`);
+}
+
+function normalizeSourceInventory(inventory, generatedAt, gateExpiresAt, requiredSourceIds) {
+  const requiredStatuses = ["APPROVED", "REVIEW_REQUIRED", "BLOCKED", "EXPIRED"];
+  const inventoryAsOfMillis = Date.parse(inventory?.inventoryAsOf);
+  if (!Number.isFinite(inventoryAsOfMillis) || inventoryAsOfMillis > Date.parse(generatedAt)) {
+    fail("source governance evidence requires sourceInventory.inventoryAsOf");
+  }
+  if (!Array.isArray(inventory.entries) || inventory.entries.length === 0) {
+    fail("source governance evidence requires current sourceInventory.entries");
+  }
+  if (inventory.entries.some((entry) => Date.parse(entry?.evaluatedAt) > Date.parse(inventory.inventoryAsOf))) {
+    fail("sourceInventory.inventoryAsOf must cover child evidence");
+  }
+  const sourceIds = new Set();
+  const entries = inventory.entries.map((entry) => {
+    if (
+      typeof entry?.sourceId !== "string"
+      || entry.sourceId.length === 0
+      || sourceIds.has(entry.sourceId)
+      || !requiredStatuses.includes(entry.status)
+      || !Number.isInteger(entry.producerVersion)
+      || entry.producerVersion <= 0
+      || !/^[a-f0-9]{64}$/.test(entry.evidenceSha256 ?? "")
+      || !Number.isFinite(Date.parse(entry.evaluatedAt))
+      || !Number.isFinite(Date.parse(entry.expiresAt))
+      || Date.parse(entry.evaluatedAt) > Date.parse(generatedAt)
+      || Date.parse(entry.expiresAt) < Date.parse(entry.evaluatedAt)
+      || Date.parse(entry.expiresAt) < Date.parse(gateExpiresAt)
+      || (entry.status === "EXPIRED") !== (Date.parse(entry.expiresAt) < Date.parse(generatedAt))
+    ) {
+      fail("source governance evidence has invalid, duplicate, stale, or contradictory sourceInventory.entries");
+    }
+    sourceIds.add(entry.sourceId);
+    return {
+      sourceId: entry.sourceId,
+      status: entry.status,
+      producerVersion: entry.producerVersion,
+      evidenceSha256: entry.evidenceSha256,
+      evaluatedAt: new Date(entry.evaluatedAt).toISOString(),
+      expiresAt: new Date(entry.expiresAt).toISOString(),
+    };
+  }).sort((left, right) => left.sourceId.localeCompare(right.sourceId));
+  const statusCounts = Object.fromEntries(requiredStatuses.map((status) => [
+    status,
+    entries.filter((entry) => entry.status === status).length,
+  ]));
+  const latestChildEvidenceMillis = Math.max(...entries.map(({ evaluatedAt }) => Date.parse(evaluatedAt)));
+  if (inventoryAsOfMillis !== latestChildEvidenceMillis) {
+    fail("sourceInventory.inventoryAsOf must equal the latest child evidence evaluatedAt");
+  }
+  if (
+    !Array.isArray(requiredSourceIds)
+    || requiredSourceIds.length === 0
+    || new Set(requiredSourceIds).size !== requiredSourceIds.length
+    || requiredSourceIds.some((sourceId) => typeof sourceId !== "string" || !sourceIds.has(sourceId))
+  ) {
+    fail("source governance inventory must include every required production source");
+  }
+  if (statusCounts.REVIEW_REQUIRED + statusCounts.BLOCKED + statusCounts.EXPIRED > 0) {
+    fail("SATISFIED source governance requires every current inventory entry to be APPROVED");
+  }
+  if (
+    !inventory?.statusCounts
+    || Object.keys(inventory.statusCounts).sort().join(",") !== [...requiredStatuses].sort().join(",")
+    || requiredStatuses.some((status) => inventory.statusCounts[status] !== statusCounts[status])
+  ) {
+    fail("source governance evidence statusCounts must match current sourceInventory.entries");
+  }
+  return {
+    inventoryAsOf: new Date(inventory.inventoryAsOf).toISOString(),
+    statusCounts,
+    entries,
+  };
+}
+
+function buildSourceInventory(gates, generatedAt, producerVersion) {
+  const sourceGateIds = ["source_admission", "source_governance", "freshness_conditional_publish"];
+  const sourceGates = sourceGateIds.map((id) => gates.find((gate) => gate.id === id));
+  if (sourceGates.some((gate) => gate?.status !== "SATISFIED")) return null;
+  const snapshotSetIdentity = sourceGates[0].snapshotSetIdentity;
+  if (sourceGates.some((gate) => gate.snapshotSetIdentity !== snapshotSetIdentity)) {
+    fail("SATISFIED source datapack gates have mixed snapshotSetIdentity");
+  }
+  const governance = sourceGates.find(({ id }) => id === "source_governance");
+  const inventoryAsOfMillis = Date.parse(governance.sourceInventory.inventoryAsOf);
+  const latestEvidenceMillis = Math.max(...sourceGates.map(({ evaluatedAt }) => Date.parse(evaluatedAt)));
+  if (inventoryAsOfMillis !== latestEvidenceMillis || inventoryAsOfMillis > Date.parse(generatedAt)) {
+    fail("sourceInventory.inventoryAsOf must equal the latest source gate evidence and not be in the future");
+  }
+  return {
+    inventoryAsOf: new Date(inventoryAsOfMillis).toISOString(),
+    generatedAt,
+    producerVersion,
+    statusCounts: Object.fromEntries(
+      ["APPROVED", "REVIEW_REQUIRED", "BLOCKED", "EXPIRED"]
+        .map((status) => [status, governance.sourceInventory.statusCounts[status]]),
+    ),
+    entries: governance.sourceInventory.entries,
+    snapshotSetIdentity,
+  };
+}
+
+function readIdentityLinkage(evidencePath, identity, identityMatrix, generatedAt) {
+  if (!evidencePath) {
+    return {
+      status: "BLOCKED_EXTERNAL",
+      reasonCodes: ["EVIDENCE_NOT_PROVIDED"],
+      evidenceSha256: null,
+      evaluatedAt: null,
+      expiresAt: null,
+      sharedIdentity: null,
+    };
+  }
+  const resolved = resolvePath(evidencePath);
+  if (!existsSync(resolved)) fail("--identity-linkage-evidence path does not exist");
+  const evidenceBytes = readFileSync(resolved);
+  const evidence = JSON.parse(evidenceBytes);
+  if (
+    evidence.schemaVersion !== 1
+    || evidence.status !== "SATISFIED"
+    || !Array.isArray(evidence.reasonCodes)
+    || evidence.reasonCodes.length > 0
+  ) {
+    fail("identity linkage evidence must be schemaVersion 1 SATISFIED with empty reasonCodes");
+  }
+  if (!sameRcIdentity(evidence.rcIdentity, identity)) {
+    fail("identity linkage evidence RC identity mismatch");
+  }
+  const evaluatedAt = evidence.evidenceValidity?.evaluatedAt;
+  const expiresAt = evidence.evidenceValidity?.expiresAt;
+  if (
+    !Number.isFinite(Date.parse(evaluatedAt))
+    || !Number.isFinite(Date.parse(expiresAt))
+    || Date.parse(evaluatedAt) > Date.parse(generatedAt)
+    || Date.parse(expiresAt) < Date.parse(generatedAt)
+    || Date.parse(expiresAt) > Date.parse(addDays(evaluatedAt, 14))
+  ) {
+    fail("identity linkage evidence has invalid, future, expired, or overlong evidenceValidity");
+  }
+  const artifactNames = ["sourceTimetableArtifact", "serverTimetableSnapshot", "mobileTopologyPack"];
+  const requiredFields = identityMatrix.requiredSharedFields;
+  if (!Array.isArray(requiredFields) || requiredFields.length === 0) {
+    fail("identity linkage matrix requires shared fields");
+  }
+  const artifacts = artifactNames.map((name) => [name, evidence[name]]);
+  const artifactIds = new Set();
+  for (const [name, artifact] of artifacts) {
+    if (
+      typeof artifact?.artifactId !== "string"
+      || artifact.artifactId.length === 0
+      || !/^[a-f0-9]{64}$/.test(artifact.sha256 ?? "")
+      || !Number.isFinite(Date.parse(artifact.freshUntil))
+      || Date.parse(artifact.freshUntil) < Date.parse(generatedAt)
+    ) {
+      fail(`identity linkage has invalid or expired ${name}`);
+    }
+    if (Date.parse(artifact.freshUntil) < Date.parse(expiresAt)) {
+      fail(`identity linkage freshness does not cover evidence expiry: ${name}`);
+    }
+    artifact.identity = normalizeArtifactIdentity(name, artifact.identity, requiredFields);
+    artifactIds.add(artifact.artifactId);
+  }
+  if (artifactIds.size !== artifactNames.length) fail("identity linkage artifactId values must be distinct");
+  const sharedIdentity = Object.fromEntries(requiredFields.map((field) => {
+    const value = artifacts[0][1].identity?.[field];
+    if (!validSharedIdentityField(field, value)) {
+      fail(`identity linkage has missing or invalid shared field: ${field}`);
+    }
+    if (artifacts.some(([, artifact]) => artifact.identity?.[field] !== value)) {
+      fail(`identity linkage shared field mismatch: ${field}`);
+    }
+    return [field, value];
+  }));
+  return {
+    status: "SATISFIED",
+    reasonCodes: [],
+    evidenceSha256: createHash("sha256").update(evidenceBytes).digest("hex"),
+    evaluatedAt: new Date(evaluatedAt).toISOString(),
+    expiresAt: new Date(expiresAt).toISOString(),
+    sharedIdentity,
+    ...Object.fromEntries(artifacts.map(([name, artifact]) => [name, {
+      artifactId: artifact.artifactId,
+      sha256: artifact.sha256,
+      freshUntil: new Date(artifact.freshUntil).toISOString(),
+      identity: artifact.identity,
+    }])),
+  };
+}
+
+function normalizeArtifactIdentity(name, identity, requiredFields) {
+  if (!identity || typeof identity !== "object" || Array.isArray(identity)) {
+    fail(`identity linkage has invalid ${name}.identity`);
+  }
+  const entries = Object.entries(identity).sort(([left], [right]) => left.localeCompare(right));
+  const allowedFields = new Set(requiredFields);
+  if (
+    entries.length === 0
+    || entries.some(([key, value]) => (
+      !allowedFields.has(key)
+      || !/^[A-Za-z][A-Za-z0-9]*$/.test(key)
+      || /(secret|token|credential|password|privatekey)/i.test(key)
+      || !["string", "number", "boolean"].includes(typeof value)
+      || (typeof value === "string" && value.trim().length === 0)
+      || (typeof value === "number" && !Number.isFinite(value))
+    ))
+  ) {
+    fail(`identity linkage has unsafe or non-scalar ${name}.identity`);
+  }
+  return Object.fromEntries(requiredFields.map((field) => [field, identity[field]]));
+}
+
+function validSharedIdentityField(field, value) {
+  return field === "schemaVersion"
+    ? Number.isSafeInteger(value) && value > 0
+    : typeof value === "string" && value.trim().length > 0;
+}
+
+function validateSatisfiedEvidence(id, sourceIssue, evidencePath, generatedAt, context, requiredChecks) {
+  const evidence = readJsonIfExists(resolvePath(evidencePath));
+  if (id === "post_launch_operations") {
+    validatePostLaunchOperationsEvidence(evidencePath, generatedAt, context);
+    return;
+  }
+  if (!(
+    evidence?.schemaVersion === 1
+    && evidence?.evidenceId === id
+    && evidence?.sourceIssue === sourceIssue
+    && evidence?.status === "SATISFIED"
+    && Array.isArray(evidence?.reasonCodes)
+    && evidence.reasonCodes.length === 0
+    && sameRcIdentity(evidence?.rcIdentity, context.identity)
+  )) {
+    fail(`SATISFIED evidence entry failed canonical envelope validation: ${id}`);
+  }
+  if (id === "abuse_penetration_rehearsal") {
+    if (typeof evidence.canonicalSummaryPath !== "string" || evidence.canonicalSummaryPath.length === 0) {
+      fail(`${id} requires an existing canonicalSummaryPath`);
+    }
+    const canonicalSummaryPath = resolvePath(evidence.canonicalSummaryPath);
+    if (!existsSync(canonicalSummaryPath)) {
+      fail(`${id} requires an existing canonicalSummaryPath`);
+    }
+    const canonicalSummarySha256 = sha256FileIfExists(canonicalSummaryPath);
+    if (evidence.canonicalSummarySha256 !== canonicalSummarySha256) {
+      fail(`${id} canonicalSummarySha256 mismatch`);
+    }
+    runCanonicalValidator(id, context.repoRoot, [
+      path.join(context.repoRoot, "tools/security/validate-abuse-penetration-summary.mjs"),
+      "--summary",
+      canonicalSummaryPath,
+      "--require-pass",
+    ]);
+    return;
+  }
+  if (!Array.isArray(requiredChecks) || requiredChecks.length === 0) {
+    fail(`SATISFIED evidence entry has no canonical validator or required checks: ${id}`);
+  }
+  requireResultSchema(evidence.result, id);
+  requirePassingChecks(id, evidence.result.checks, requiredChecks);
+  normalizeEvidenceReferences(id, evidence.result.evidenceReferences);
+}
+
+function validatePostLaunchOperationsEvidence(evidencePath, generatedAt, context) {
   const validationDir = mkdtempSync(path.join(tmpdir(), "easysubway-rc-evidence-validation-"));
   const rcManifestPath = path.join(validationDir, "rc-evidence-manifest.json");
   writeFileSync(rcManifestPath, `${JSON.stringify({
@@ -475,7 +1195,16 @@ function validateSatisfiedEvidence(id, evidencePath, generatedAt, context) {
     rmSync(validationDir, { recursive: true, force: true });
   }
   if (validationError) {
-    fail(`SATISFIED evidence entry failed canonical validation: ${id}: ${validationError}`);
+    fail(`SATISFIED evidence entry failed canonical validation: post_launch_operations: ${validationError}`);
+  }
+}
+
+function runCanonicalValidator(id, repositoryRoot, validatorArgs) {
+  try {
+    execFileSync(process.execPath, validatorArgs, { cwd: repositoryRoot, stdio: "pipe" });
+  } catch (error) {
+    const detail = error.stderr?.toString().trim() || error.message;
+    fail(`SATISFIED evidence entry failed canonical validation: ${id}: ${detail}`);
   }
 }
 
@@ -552,14 +1281,26 @@ function gateStatusBlockers(statuses) {
     }));
 }
 
-function openP0Blockers(value) {
+function requiredOpenP0Count(value) {
   const count = Number.parseInt(value ?? "0", 10);
   if (Number.isNaN(count) || count < 0) {
     fail("--open-android-p0-count must be a non-negative integer");
   }
+  return count;
+}
+
+function openP0Blockers(count) {
   return count > 0
     ? [{ id: "open_android_p0", severity: "P0", reason: `${count} Android P0 issue(s) are open` }]
     : [];
+}
+
+function activeIssueBlockers(issues) {
+  return issues.map((issue) => ({
+    id: `active_blocker_issue_${issue}`,
+    severity: "P0",
+    reason: `Issue #${issue} is declared as an active release blocker`,
+  }));
 }
 
 function evidenceBlockers(entries) {
@@ -582,8 +1323,27 @@ function datapackGateBlockers(gates) {
     }));
 }
 
-function requiredGitSha() {
-  fail("--git-sha or GITHUB_SHA is required");
+function identityLinkageBlockers(linkage) {
+  return linkage.status === "SATISFIED"
+    ? []
+    : [{
+        id: "identity_linkage_blocked_external",
+        severity: "P0",
+        reason: "Source, server, and mobile artifact identity linkage evidence is not satisfied",
+      }];
+}
+
+function githubWorkflowRunUrl(env) {
+  if (!env.GITHUB_SERVER_URL || !env.GITHUB_REPOSITORY || !env.GITHUB_RUN_ID) return null;
+  return `${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}`;
+}
+
+function currentGitSha(repositoryRoot) {
+  try {
+    return execFileSync("git", ["rev-parse", "HEAD"], { cwd: repositoryRoot, encoding: "utf8" }).trim();
+  } catch {
+    fail("current checkout Git SHA is required");
+  }
 }
 
 function fail(message) {
