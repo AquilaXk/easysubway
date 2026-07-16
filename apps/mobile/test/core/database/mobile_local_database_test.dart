@@ -532,12 +532,21 @@ void main() {
           FROM transit_trips
           WHERE service_class = 'ITX_CHEONGCHUN'
           ''').getSingle();
+    final admission = await database.customSelect('''
+          SELECT admission_status, admission_eligible, fresh_until, source_issue
+          FROM route_service_artifact_evidence
+          WHERE service_class = 'ITX_CHEONGCHUN'
+          ''').getSingle();
 
     expect(topology.read<int>('edge_count'), 48);
     expect(topology.read<int>('from_node_count'), greaterThan(0));
     expect(topology.read<int>('min_duration'), 0);
     expect(topology.read<int>('max_duration'), 0);
     expect(timetable.read<int>('trip_count'), 0);
+    expect(admission.read<String>('admission_status'), 'ADMITTED');
+    expect(admission.read<int>('admission_eligible'), 1);
+    expect(admission.read<String>('fresh_until'), '2026-07-20T00:00:00+09:00');
+    expect(admission.read<int>('source_issue'), 2135);
   });
 
   test('내장 데이터팩은 실제 open 경로에서 expiry 경계의 stale 상태를 기록한다', () async {

@@ -11,6 +11,10 @@ import { gunzipSync, gzipSync } from "node:zlib";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
+const freshBuildEnv = {
+  ...process.env,
+  EASYSUBWAY_DATAPACK_BUILD_NOW: "2026-07-16T00:00:00.000Z",
+};
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
@@ -46,7 +50,7 @@ async function rejectedMutatedSource(context, mutate, expected) {
     "--index", indexPath,
     "--contract", contractPath,
     "--evidence", evidencePath,
-  ], { cwd: root }), expected);
+  ], { cwd: root, env: freshBuildEnv }), expected);
 }
 
 async function rejectedTamperedEvidence(context, mutate) {
@@ -67,7 +71,7 @@ async function rejectedTamperedEvidence(context, mutate) {
     "--index", indexPath,
     "--evidence", evidencePath,
     "--check",
-  ], { cwd: root }), /evidence or bundled pack index is stale/);
+  ], { cwd: root, env: freshBuildEnv }), /evidence or bundled pack index is stale/);
 }
 
 test("#2135 ADMITTED source를 Mobile topology-only edge와 evidence로 materialize한다", async (context) => {
@@ -104,14 +108,14 @@ test("#2135 ADMITTED source를 Mobile topology-only edge와 evidence로 material
     "--index", indexPath,
     "--contract", contractPath,
     "--evidence", evidencePath,
-  ], { cwd: root });
+  ], { cwd: root, env: freshBuildEnv });
   await execFileAsync(process.execPath, [
     "tools/datapack/apply-itx-topology-to-bundled-pack.mjs",
     "--pack", secondPackPath,
     "--index", secondIndexPath,
     "--contract", contractPath,
     "--evidence", secondEvidencePath,
-  ], { cwd: root });
+  ], { cwd: root, env: freshBuildEnv });
   assert.deepEqual(
     await Promise.all([readFile(secondPackPath), readFile(secondIndexPath), readFile(secondEvidencePath)]),
     await Promise.all([readFile(packPath), readFile(indexPath), readFile(evidencePath)]),
@@ -135,6 +139,28 @@ test("#2135 ADMITTED source를 Mobile topology-only edge와 evidence로 material
     assert.equal(database.prepare(`
       SELECT COUNT(*) AS count FROM transit_trips WHERE service_class = 'ITX_CHEONGCHUN'
     `).get().count, 0);
+    assert.deepEqual({ ...database.prepare(`
+      SELECT service_class AS serviceClass, timetable_artifact_id AS timetableArtifactId,
+             timetable_artifact_sha256 AS timetableArtifactSha256,
+             canonical_pack_id AS canonicalPackId, canonical_pack_sha256 AS canonicalPackSha256,
+             canonical_pack_sqlite_sha256 AS canonicalPackSqliteSha256,
+             admission_status AS admissionStatus, admission_eligible AS admissionEligible,
+             fresh_until AS freshUntil, source_issue AS sourceIssue
+      FROM route_service_artifact_evidence
+      WHERE service_class = 'ITX_CHEONGCHUN'
+    `).get() }, {
+      serviceClass: "ITX_CHEONGCHUN",
+      timetableArtifactId: contract.sourceTimetableArtifact.artifactId,
+      timetableArtifactSha256: contract.sourceTimetableArtifact.sha256,
+      canonicalPackId: contract.officialEvidence.korailCompletenessAdmission.canonicalPackIdentity.id,
+      canonicalPackSha256: contract.officialEvidence.korailCompletenessAdmission.canonicalPackIdentity.sha256,
+      canonicalPackSqliteSha256:
+        contract.officialEvidence.korailCompletenessAdmission.canonicalPackIdentity.sqliteSha256,
+      admissionStatus: "ADMITTED",
+      admissionEligible: 1,
+      freshUntil: contract.sourceTimetableArtifact.freshUntil,
+      sourceIssue: 2135,
+    });
     assert.equal(database.prepare("PRAGMA user_version").get().user_version, 18);
   } finally {
     database.close();
@@ -160,7 +186,7 @@ test("#2135 ADMITTED source를 Mobile topology-only edge와 evidence로 material
     "--contract", contractPath,
     "--evidence", evidencePath,
     "--check",
-  ], { cwd: root });
+  ], { cwd: root, env: freshBuildEnv });
   const afterCheck = await Promise.all([
     readFile(packPath), readFile(indexPath), readFile(evidencePath),
   ]);
@@ -171,7 +197,7 @@ test("#2135 ADMITTED source를 Mobile topology-only edge와 evidence로 material
     "--index", indexPath,
     "--contract", contractPath,
     "--evidence", evidencePath,
-  ], { cwd: root });
+  ], { cwd: root, env: freshBuildEnv });
   assert.deepEqual(await Promise.all([
     readFile(packPath), readFile(indexPath), readFile(evidencePath),
   ]), beforeCheck);
@@ -181,7 +207,28 @@ test("tracked production ITX topology evidence와 bundled pack은 --check를 통
   await execFileAsync(process.execPath, [
     "tools/datapack/apply-itx-topology-to-bundled-pack.mjs",
     "--check",
-  ], { cwd: root });
+  ], { cwd: root, env: freshBuildEnv });
+});
+
+test("ITX topology는 freshUntil 경계부터 ADMITTED source를 거부한다", async () => {
+  const command = [
+    "tools/datapack/apply-itx-topology-to-bundled-pack.mjs",
+    "--check",
+  ];
+  await execFileAsync(process.execPath, command, {
+    cwd: root,
+    env: {
+      ...process.env,
+      EASYSUBWAY_DATAPACK_BUILD_NOW: "2026-07-19T14:59:59.999Z",
+    },
+  });
+  await assert.rejects(execFileAsync(process.execPath, command, {
+    cwd: root,
+    env: {
+      ...process.env,
+      EASYSUBWAY_DATAPACK_BUILD_NOW: "2026-07-19T15:00:00.000Z",
+    },
+  }), /ITX topology source artifact is expired/);
 });
 
 test("v16 bundled pack 변환은 ITX topology 외 timetable·calendar·fare row를 바꾸지 않는다", async (context) => {
@@ -255,7 +302,7 @@ test("v16 bundled pack 변환은 ITX topology 외 timetable·calendar·fare row�
     "--index", indexPath,
     "--contract", contractPath,
     "--evidence", evidencePath,
-  ], { cwd: root });
+  ], { cwd: root, env: freshBuildEnv });
 
   await writeFile(sqlitePath, gunzipSync(await readFile(packPath)));
   const outputDatabase = new DatabaseSync(sqlitePath, { readOnly: true });
@@ -334,7 +381,7 @@ test("ITX topology materializer는 지원 범위 밖 catalog version을 변경 �
       "--index", indexPath,
       "--contract", contractPath,
       "--evidence", evidencePath,
-    ], { cwd: root }), /does not support catalog user_version/);
+    ], { cwd: root, env: freshBuildEnv }), /does not support catalog user_version/);
     assert.equal(sha256(await readFile(packPath)), sha256(packBytes));
   }
 });

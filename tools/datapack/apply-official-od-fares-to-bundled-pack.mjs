@@ -86,9 +86,6 @@ function applyQuotes(sqlitePath, quotes) {
       );
     `);
     if (JSON.stringify(storedQuotes(database)) === JSON.stringify(canonicalQuotes(quotes))) {
-      if (database.prepare("PRAGMA user_version").get().user_version !== BUNDLED_CATALOG_USER_VERSION) {
-        database.exec(`PRAGMA user_version = ${BUNDLED_CATALOG_USER_VERSION}`);
-      }
       assertIntegrity(database);
       return;
     }
@@ -104,7 +101,6 @@ function applyQuotes(sqlitePath, quotes) {
           quote.mappingLedgerHash, ...FARE_COLUMNS.map((field) => quote[field]),
         );
       }
-      database.exec(`PRAGMA user_version = ${BUNDLED_CATALOG_USER_VERSION}`);
       database.exec("COMMIT");
     } catch (error) {
       database.exec("ROLLBACK");

@@ -106,6 +106,27 @@ test("route graph topology report는 ITX service layer row를 별도 집계한�
   assert.deepEqual(report.violations.nonAdjacentExpressRide, []);
 });
 
+test("route graph topology report는 ITX corridor의 노선 경계 edge를 허용한다", () => {
+  const sqlitePath = createTopologySqlite({
+    stationLines: [
+      ["station-a", "line-k1", 10],
+      ["station-b", "line-k2", 20],
+    ],
+    edges: [
+      ["edge-a-b-itx", "station-a:line-k1:EXPRESS", "station-b:line-k2:EXPRESS", "RIDE", "EXPRESS", 0, 0, "ITX_CHEONGCHUN"],
+    ],
+  });
+
+  const report = buildRouteGraphTopologyReport(sqlitePath, {
+    id: "capital",
+    version: "1",
+    artifactKind: "fixture",
+  });
+
+  assert.equal(report.itxServiceLayerSegmentCount, 1);
+  assert.deepEqual(report.violations.nonAdjacentExpressRide, []);
+});
+
 test("route graph topology report는 SUBWAY 연결성을 ITX edge로 보완하지 않는다", () => {
   const sqlitePath = createTopologySqlite({
     stationLines: [

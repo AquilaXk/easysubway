@@ -24,6 +24,15 @@ function repositoryPath(value) {
   return path.resolve(root, value);
 }
 
+function candidateBuildNow() {
+  const value = process.env.EASYSUBWAY_DATAPACK_BUILD_NOW;
+  const buildNow = value == null ? new Date() : new Date(value);
+  if (Number.isNaN(buildNow.getTime()) || (value != null && !value.endsWith("Z"))) {
+    throw new Error("EASYSUBWAY_DATAPACK_BUILD_NOW must be UTC ISO-8601");
+  }
+  return buildNow;
+}
+
 async function admittedSource(contractPath) {
   const contract = JSON.parse(await readFile(contractPath, "utf8"));
   const reference = contract?.sourceTimetableArtifact;
@@ -39,6 +48,10 @@ async function admittedSource(contractPath) {
   }
   const source = JSON.parse(sourceBytes);
   const completeness = JSON.parse(completenessBytes);
+  const freshUntilMillis = Date.parse(reference.freshUntil);
+  if (!Number.isFinite(freshUntilMillis) || freshUntilMillis <= candidateBuildNow().getTime()) {
+    throw new Error("ITX topology source artifact is expired");
+  }
   if (source?.artifactId !== reference.artifactId || source?.serviceId !== "ITX_CHEONGCHUN"
     || source?.validationStatus !== "SUPPORTED" || source?.freshUntil !== reference.freshUntil
     || source?.completenessEvidenceSha256 !== reference.completenessEvidenceSha256
@@ -57,6 +70,22 @@ async function admittedSource(contractPath) {
     throw new Error("ITX topology source identity is invalid");
   }
   return { contract, reference, source, sourceBytes };
+}
+
+function routeServiceEvidence(contract, reference) {
+  const canonical = contract?.officialEvidence?.korailCompletenessAdmission?.canonicalPackIdentity;
+  return {
+    serviceClass: "ITX_CHEONGCHUN",
+    timetableArtifactId: reference.artifactId,
+    timetableArtifactSha256: reference.sha256,
+    canonicalPackId: canonical.id,
+    canonicalPackSha256: canonical.sha256,
+    canonicalPackSqliteSha256: canonical.sqliteSha256,
+    admissionStatus: "ADMITTED",
+    admissionEligible: 1,
+    freshUntil: reference.freshUntil,
+    sourceIssue: 2135,
+  };
 }
 
 function deriveTopology(source) {
@@ -202,7 +231,7 @@ function ensureVersion18(database) {
   database.exec(`PRAGMA user_version = ${CATALOG_VERSION}`);
 }
 
-function applyTopology(sqlitePath, topology) {
+function applyTopology(sqlitePath, topology, admissionEvidence) {
   const database = new DatabaseSync(sqlitePath);
   try {
     database.exec("PRAGMA foreign_keys = ON");
@@ -233,6 +262,34 @@ function applyTopology(sqlitePath, topology) {
         insert.run(edge.id, edge.fromNodeId, edge.toNodeId, edge.durationSeconds,
           edge.distanceMeters, edge.edgeType, edge.servicePattern, edge.serviceClass);
       }
+      database.prepare(`
+        INSERT INTO route_service_artifact_evidence (
+          service_class, timetable_artifact_id, timetable_artifact_sha256,
+          canonical_pack_id, canonical_pack_sha256, canonical_pack_sqlite_sha256,
+          admission_status, admission_eligible, fresh_until, source_issue
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(service_class) DO UPDATE SET
+          timetable_artifact_id = excluded.timetable_artifact_id,
+          timetable_artifact_sha256 = excluded.timetable_artifact_sha256,
+          canonical_pack_id = excluded.canonical_pack_id,
+          canonical_pack_sha256 = excluded.canonical_pack_sha256,
+          canonical_pack_sqlite_sha256 = excluded.canonical_pack_sqlite_sha256,
+          admission_status = excluded.admission_status,
+          admission_eligible = excluded.admission_eligible,
+          fresh_until = excluded.fresh_until,
+          source_issue = excluded.source_issue
+      `).run(
+        admissionEvidence.serviceClass,
+        admissionEvidence.timetableArtifactId,
+        admissionEvidence.timetableArtifactSha256,
+        admissionEvidence.canonicalPackId,
+        admissionEvidence.canonicalPackSha256,
+        admissionEvidence.canonicalPackSqliteSha256,
+        admissionEvidence.admissionStatus,
+        admissionEvidence.admissionEligible,
+        admissionEvidence.freshUntil,
+        admissionEvidence.sourceIssue,
+      );
       const foreignKeys = database.prepare("PRAGMA foreign_key_check").all();
       if (foreignKeys.length !== 0) throw new Error("ITX topology foreign_key_check failed");
       const integrity = database.prepare("PRAGMA integrity_check").get();
@@ -247,7 +304,7 @@ function applyTopology(sqlitePath, topology) {
   }
 }
 
-function assertStoredTopology(sqlitePath, topology) {
+function assertStoredTopology(sqlitePath, topology, admissionEvidence) {
   const database = new DatabaseSync(sqlitePath, { readOnly: true });
   try {
     if (database.prepare("PRAGMA user_version").get().user_version !== CATALOG_VERSION
@@ -270,6 +327,19 @@ function assertStoredTopology(sqlitePath, topology) {
       SELECT COUNT(*) AS count FROM transit_trips WHERE service_class = 'ITX_CHEONGCHUN'
     `).get().count;
     if (timetableRows !== 0) throw new Error("Mobile pack must not contain ITX timetable rows");
+    const storedEvidence = database.prepare(`
+      SELECT service_class AS serviceClass, timetable_artifact_id AS timetableArtifactId,
+             timetable_artifact_sha256 AS timetableArtifactSha256,
+             canonical_pack_id AS canonicalPackId, canonical_pack_sha256 AS canonicalPackSha256,
+             canonical_pack_sqlite_sha256 AS canonicalPackSqliteSha256,
+             admission_status AS admissionStatus, admission_eligible AS admissionEligible,
+             fresh_until AS freshUntil, source_issue AS sourceIssue
+      FROM route_service_artifact_evidence
+      WHERE service_class = 'ITX_CHEONGCHUN'
+    `).get();
+    if (JSON.stringify(storedEvidence) !== JSON.stringify(admissionEvidence)) {
+      throw new Error("ITX topology route service admission evidence is stale");
+    }
   } finally {
     database.close();
   }
@@ -283,6 +353,7 @@ async function main() {
   let check = process.argv.includes("--check");
   const { contract, reference, source, sourceBytes } = await admittedSource(contractPath);
   const topology = deriveTopology(source);
+  const admissionEvidence = routeServiceEvidence(contract, reference);
   const inputGzipBytes = await readFile(packPath);
   if (!check && source.canonicalPackIdentity?.sha256 !== sha256(inputGzipBytes)) {
     try {
@@ -336,7 +407,7 @@ async function main() {
         throw new Error("ITX topology bundled SQLite identity is stale");
       }
       await writeFile(sqlitePath, sqliteBytes);
-      assertStoredTopology(sqlitePath, topology);
+      assertStoredTopology(sqlitePath, topology, admissionEvidence);
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
@@ -350,7 +421,7 @@ async function main() {
     const sqlitePath = path.join(directory, "capital.sqlite");
     const inputSqliteBytes = gunzipSync(inputGzipBytes);
     await writeFile(sqlitePath, inputSqliteBytes);
-    applyTopology(sqlitePath, topology);
+    applyTopology(sqlitePath, topology, admissionEvidence);
     const outputSqliteBytes = await readFile(sqlitePath);
     const outputGzipBytes = gzipSync(outputSqliteBytes, { level: 9, mtime: 0 });
     if (outputGzipBytes.length - inputGzipBytes.length > MAX_GZIP_DELTA_BYTES) {

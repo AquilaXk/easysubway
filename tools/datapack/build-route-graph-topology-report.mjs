@@ -114,11 +114,10 @@ export function buildRouteGraphTopologyReport(sqlitePath, pack = {}) {
       const to = stationLineByNode.get(toNode);
       if (edgeType === "RIDE" && from && to) {
         const isItxSkipStop = serviceClass === "ITX_CHEONGCHUN"
-          && servicePattern === "EXPRESS"
-          && from.line_id === to.line_id;
+          && servicePattern === "EXPRESS";
         if (
-          from.line_id !== to.line_id
-          || (Math.abs(from.line_sequence - to.line_sequence) !== 1 && !isItxSkipStop)
+          !isItxSkipStop
+          && (from.line_id !== to.line_id || Math.abs(from.line_sequence - to.line_sequence) !== 1)
         ) {
           const violation = {
             edgeId: edge.id,
