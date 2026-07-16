@@ -110,7 +110,8 @@ RouteMapBasemapPainter _findRouteMapPainter(WidgetTester tester) {
   final customPaintFinder = find.descendant(
     of: find.byType(RouteMapBasemapView),
     matching: find.byWidgetPredicate(
-      (widget) => widget is CustomPaint && widget.painter is RouteMapBasemapPainter,
+      (widget) =>
+          widget is CustomPaint && widget.painter is RouteMapBasemapPainter,
     ),
   );
   final painter = tester.widget<CustomPaint>(customPaintFinder).painter;

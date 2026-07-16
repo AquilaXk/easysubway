@@ -3466,7 +3466,7 @@ void main() {
 
   testWidgets('노선도는 앱 라벨을 쓰고 급행 전환 시 급행 집합만 표시한다', (tester) async {
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(
           networkMapData: _expressFilterMapData(),
         ),
