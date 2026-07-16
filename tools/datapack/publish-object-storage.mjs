@@ -87,14 +87,16 @@ async function main() {
     if (step.type === "put-release-request-binding-object") {
       const bytes = await readAndVerifySource(root, step);
       if (!dryRun && !verifyOnly) {
-        const existing = await client.readObject(step.objectKey);
-        if (existing.exists) {
+        const created = await client.putObjectIfAbsent(step.objectKey, bytes, step);
+        if (!created) {
+          const existing = await client.readObject(step.objectKey);
+          if (!existing.exists) {
+            throw new Error(`${step.objectKey} conditional create conflict but object is unavailable`);
+          }
           const storedSha256 = sha256(existing.body);
           if (storedSha256 !== step.sha256) {
             throw new Error(`${step.objectKey} immutable violation: stored sha ${storedSha256} != ${step.sha256}`);
           }
-        } else {
-          await client.putObject(step.objectKey, bytes, step);
         }
       }
       continue;
@@ -149,6 +151,31 @@ function objectStorageClient() {
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw new Error(`${key} PUT failed with HTTP ${response.statusCode}`);
       }
+    },
+    putObjectIfAbsent: async (key, bytes, step) => {
+      const response = await signedRequest({
+        endpoint,
+        bucket,
+        key,
+        region,
+        accessKey,
+        secretKey,
+        method: "PUT",
+        body: bytes,
+        headers: {
+          "content-length": String(bytes.length),
+          "content-type": contentTypeForKey(key),
+          "cache-control": cacheControlForKey(key),
+          "if-none-match": "*",
+          "x-amz-meta-sha256": step.sha256,
+          "x-amz-meta-size-bytes": String(step.sizeBytes),
+        },
+      });
+      if (response.statusCode === 412) return false;
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw new Error(`${key} conditional PUT failed with HTTP ${response.statusCode}`);
+      }
+      return true;
     },
     verifyObject: async (key, step) => {
       const response = await signedRequest({
@@ -218,6 +245,26 @@ function preauthenticatedObjectStorageClient(baseUrl) {
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw new Error(`${key} PUT failed with HTTP ${response.statusCode}${errorBodySuffix(response.body)}`);
       }
+    },
+    putObjectIfAbsent: async (key, bytes, step) => {
+      const response = await unsignedRequest({
+        url: preauthObjectUrl(baseUrl, key),
+        method: "PUT",
+        body: bytes,
+        headers: {
+          "content-length": String(bytes.length),
+          "content-type": contentTypeForKey(key),
+          "cache-control": cacheControlForKey(key),
+          "if-none-match": "*",
+          "opc-meta-sha256": step.sha256,
+          "opc-meta-size-bytes": String(step.sizeBytes),
+        },
+      });
+      if (response.statusCode === 412) return false;
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw new Error(`${key} conditional PUT failed with HTTP ${response.statusCode}${errorBodySuffix(response.body)}`);
+      }
+      return true;
     },
     verifyObject: async (key, step) => {
       const response = await unsignedRequest({

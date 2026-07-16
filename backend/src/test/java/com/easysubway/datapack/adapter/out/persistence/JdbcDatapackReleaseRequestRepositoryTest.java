@@ -6,6 +6,9 @@ import com.easysubway.datapack.application.port.out.DatapackReleaseRequestReposi
 import com.easysubway.datapack.domain.DatapackReleaseRequest;
 import com.easysubway.datapack.domain.DatapackReleaseRequestStatus;
 import java.time.LocalDateTime;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -69,14 +72,40 @@ class JdbcDatapackReleaseRequestRepositoryTest {
 				SHA, SHA, SHA, "alice", T0).approve("bob", T0));
 		}
 
-		var due = repository.findReconciliationDue(T0.plusMinutes(10), T0.plusMinutes(10), 2);
+		var due = repository.claimReconciliationDue(
+			T0.plusMinutes(10), T0.plusMinutes(10), T0.plusMinutes(20), 2);
 		assertThat(due).hasSize(2);
 
-		repository.deferReconciliation(due.getFirst().approvalId(), T0.plusMinutes(20));
+		assertThat(repository.claimReconciliationDue(
+			T0.plusMinutes(10), T0.plusMinutes(10), T0.plusMinutes(20), 3))
+				.extracting(DatapackReleaseRequest::approvalId)
+				.containsExactly("appr-2");
+	}
 
-		assertThat(repository.findReconciliationDue(T0.plusMinutes(10), T0.plusMinutes(10), 3))
-			.extracting(DatapackReleaseRequest::approvalId)
-			.doesNotContain(due.getFirst().approvalId());
+	@Test
+	@DisplayName("동시 reconciliation discovery는 request 한 건을 한 worker에게만 임대한다")
+	void claimsReconciliationCandidateOnce() throws Exception {
+		repository.save(DatapackReleaseRequest.requested(
+			"appr-1", "cand-1", "scope-1", "production",
+			SHA, SHA, SHA, "alice", T0).approve("bob", T0));
+		var start = new CountDownLatch(1);
+
+		try (var executor = Executors.newFixedThreadPool(2)) {
+			var a = executor.submit(() -> {
+				start.await();
+				return repository.claimReconciliationDue(
+					T0.plusMinutes(10), T0.plusMinutes(10), T0.plusMinutes(20), 100);
+			});
+			var b = executor.submit(() -> {
+				start.await();
+				return repository.claimReconciliationDue(
+					T0.plusMinutes(10), T0.plusMinutes(10), T0.plusMinutes(20), 100);
+			});
+			start.countDown();
+
+			assertThat(a.get(10, TimeUnit.SECONDS).size()
+				+ b.get(10, TimeUnit.SECONDS).size()).isEqualTo(1);
+		}
 	}
 
 	@Test

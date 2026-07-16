@@ -27,6 +27,13 @@ const callbackEnv = {
 };
 const payload = buildReleaseCallback(callbackEnv);
 
+test("release request id의 구분자 문자는 idempotency identity 생성 전에 거부한다", () => {
+  assert.throws(
+    () => buildReleaseCallback({ ...callbackEnv, RELEASE_REQUEST_ID: "req:2057" }),
+    /RELEASE_REQUEST_ID must not contain ':'/,
+  );
+});
+
 async function withServer(handler, callback) {
   const server = createServer(handler);
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -277,6 +284,47 @@ test("current identity 불일치는 조회 장애로 재시도하지 않고 reco
   assert.equal(artifact.state, "RECONCILIATION_REQUIRED");
   assert.equal(artifact.terminalReason, "CURRENT_RELEASE_IDENTITY_MISMATCH");
   assert.equal(callbackRequests, 0);
+});
+
+test("current가 callback sequence보다 뒤면 publish 전파를 기다렸다가 다시 확인한다", async () => {
+  const previousBytes = Buffer.from(JSON.stringify({
+    channel: payload.channel,
+    releaseSequence: payload.releaseSequence - 1,
+  }));
+  const currentBytes = Buffer.from(JSON.stringify({
+    channel: payload.channel,
+    releaseSequence: payload.releaseSequence,
+  }));
+  const guardedPayload = {
+    ...payload,
+    manifestSha256: createHash("sha256").update(currentBytes).digest("hex"),
+  };
+  const slept = [];
+  let currentChecks = 0;
+  let callbackRequests = 0;
+
+  const artifact = await sendReleaseCallback({
+    payload: guardedPayload,
+    endpoint: "https://api.example.com/callback",
+    token,
+    currentManifestUrl: "https://datapack.example.com/catalog/current.json",
+    retryDelaysSeconds: [60],
+    sleep: async (seconds) => slept.push(seconds),
+    fetchImpl: async (url) => {
+      if (url.includes("current.json")) {
+        currentChecks += 1;
+        return new Response(currentChecks === 1 ? previousBytes : currentBytes, { status: 200 });
+      }
+      callbackRequests += 1;
+      return new Response(null, { status: 200 });
+    },
+  });
+
+  assert.equal(artifact.state, "DELIVERED");
+  assert.equal(currentChecks, 2);
+  assert.equal(callbackRequests, 1);
+  assert.deepEqual(slept, [60]);
+  assert.equal(artifact.attempts[0].httpClass, "CURRENT_UNAVAILABLE");
 });
 
 test("CLI는 delivery state를 GitHub output에 기록한다", async () => {

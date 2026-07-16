@@ -16,9 +16,18 @@ const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 // preauth(opc-meta-sha256)·signed(x-amz-meta-sha256) 양쪽 메타 헤더 모두 저장하고 응답에 포함.
 function startMockStorage() {
   const objects = new Map(); // key -> { body, sha256, cacheControl }
+  const conditionalPutAttempts = new Map();
   const server = createServer((req, res) => {
     const key = decodeURIComponent(req.url.replace(/^\//, ""));
     if (req.method === "PUT") {
+      if (req.headers["if-none-match"] === "*") {
+        conditionalPutAttempts.set(key, (conditionalPutAttempts.get(key) ?? 0) + 1);
+        if (objects.has(key)) {
+          res.statusCode = 412;
+          res.end();
+          return;
+        }
+      }
       const chunks = [];
       req.on("data", (c) => chunks.push(c));
       req.on("end", () => {
@@ -42,7 +51,9 @@ function startMockStorage() {
     res.end(req.method === "HEAD" ? undefined : found.body);
   });
   return new Promise((resolve) => {
-    server.listen(0, "127.0.0.1", () => resolve({ server, objects, port: server.address().port }));
+    server.listen(0, "127.0.0.1", () => resolve({
+      server, objects, conditionalPutAttempts, port: server.address().port,
+    }));
   });
 }
 
@@ -110,6 +121,11 @@ test("게시 실행기는 동일 sha의 releases 객체 재게시를 멱등 skip
 
     // 2회차: 동일 바이트 재게시 → 멱등 성공(에러 없음).
     await runPublish(planPath, workspace, baseUrl);
+    assert.equal(
+      mock.conditionalPutAttempts.get(`catalog/release-requests/${"a".repeat(64)}.json`),
+      2,
+      "immutable binding은 매번 atomic conditional create를 사용해야 한다",
+    );
 
     // 상이 바이트를 같은 seq로: releases/5.json에 다른 sha를 심어두고 재실행 → 거부.
     mock.objects.set("catalog/releases/5.json", { body: Buffer.from("different"), sha256: sha256(Buffer.from("different")), cacheControl: "public, max-age=31536000, immutable" });
@@ -167,6 +183,7 @@ test("signed 클라이언트는 releases 객체 불변 제약과 멱등 skip을 
 
     // 2회차: 동일 sha → 멱등 skip (에러 없음).
     await runPublishSigned(planPath, workspace, mock.port);
+    assert.equal(mock.conditionalPutAttempts.get(BINDING_KEY), 2);
 
     // metadata가 원래 checksum을 주장해도 실제 immutable binding body가 바뀌면 거부한다.
     mock.objects.set(BINDING_KEY, {

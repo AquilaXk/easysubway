@@ -34,8 +34,8 @@ async function currentReleaseState(payload, currentManifestUrl, fetchImpl) {
     return "CURRENT_UNAVAILABLE";
   }
   if (current.releaseSequence > payload.releaseSequence) return "STALE_SUPERSEDED";
-  if (current.releaseSequence !== payload.releaseSequence
-    || current.channel !== payload.channel
+  if (current.releaseSequence < payload.releaseSequence) return "CURRENT_UNAVAILABLE";
+  if (current.channel !== payload.channel
     || current.manifestSha256 !== payload.manifestSha256) {
     return "IDENTITY_MISMATCH";
   }

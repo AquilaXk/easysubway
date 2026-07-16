@@ -7,6 +7,7 @@ import com.easysubway.datapack.domain.DatapackReleaseDelivery;
 import java.time.LocalDateTime;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -96,7 +97,8 @@ class JdbcDatapackReleaseDeliveryRepositoryTest {
 			var a = executor.submit(() -> { start.await(); return repository.claimDue(T0, "worker-a", 100); });
 			var b = executor.submit(() -> { start.await(); return repository.claimDue(T0, "worker-b", 100); });
 			start.countDown();
-			assertThat(a.get().size() + b.get().size()).isEqualTo(1);
+			assertThat(a.get(10, TimeUnit.SECONDS).size()
+				+ b.get(10, TimeUnit.SECONDS).size()).isEqualTo(1);
 		}
 	}
 

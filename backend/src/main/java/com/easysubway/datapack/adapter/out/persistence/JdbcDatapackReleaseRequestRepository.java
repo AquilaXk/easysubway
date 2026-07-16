@@ -5,6 +5,7 @@ import com.easysubway.datapack.domain.DatapackReleaseRequest;
 import com.easysubway.datapack.domain.DatapackReleaseRequestStatus;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -77,8 +78,7 @@ public class JdbcDatapackReleaseRequestRepository implements DatapackReleaseRequ
 			ROW_MAPPER, limit);
 	}
 
-	@Override
-	public List<DatapackReleaseRequest> findReconciliationDue(
+	private List<DatapackReleaseRequest> findReconciliationDue(
 		LocalDateTime cutoff, LocalDateTime now, int limit) {
 		return jdbcTemplate.query("""
 			SELECT * FROM datapack_release_request
@@ -90,11 +90,21 @@ public class JdbcDatapackReleaseRequestRepository implements DatapackReleaseRequ
 	}
 
 	@Override
-	public void deferReconciliation(String approvalId, LocalDateTime nextEligibleAt) {
-		jdbcTemplate.update("""
-			UPDATE datapack_release_request SET reconciliation_next_attempt_at = ?
-			WHERE approval_id = ? AND status IN ('APPROVED', 'DISPATCHED')
-			""", toTs(nextEligibleAt), approvalId);
+	public List<DatapackReleaseRequest> claimReconciliationDue(
+		LocalDateTime cutoff, LocalDateTime now, LocalDateTime leaseUntil, int limit) {
+		var candidates = findReconciliationDue(cutoff, now, limit);
+		var claimed = new ArrayList<DatapackReleaseRequest>(candidates.size());
+		for (var candidate : candidates) {
+			int updated = jdbcTemplate.update("""
+				UPDATE datapack_release_request SET reconciliation_next_attempt_at = ?
+				WHERE approval_id = ?
+				  AND status IN ('APPROVED', 'DISPATCHED')
+				  AND updated_at <= ?
+				  AND (reconciliation_next_attempt_at IS NULL OR reconciliation_next_attempt_at <= ?)
+				""", toTs(leaseUntil), candidate.approvalId(), toTs(cutoff), toTs(now));
+			if (updated == 1) claimed.add(candidate);
+		}
+		return claimed;
 	}
 
 	private static Timestamp toTs(LocalDateTime v) {

@@ -160,7 +160,8 @@ class HttpDatapackReleaseCatalogAdapterTest {
 		var keyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
 		byte[] manifest = signedManifest(keyPair, 42);
 		byte[] current = manifest;
-		byte[] binding = signedBinding(keyPair, 42, "request-2057", sha256(manifest));
+		byte[] binding = signedBinding(
+			keyPair, 42, "request-2057", sha256(manifest), "NO_CHANGE_VALID");
 		var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
 		server.createContext("/catalog/release-requests/"
 			+ sha256("request-2057".getBytes(StandardCharsets.UTF_8)) + ".json",
@@ -180,6 +181,7 @@ class HttpDatapackReleaseCatalogAdapterTest {
 
 			assertThat(found).get().extracting(identity -> identity.releaseSequence()).isEqualTo(42L);
 			assertThat(found).get().extracting(identity -> identity.manifestSha256()).isEqualTo(sha256(manifest));
+			assertThat(found).get().extracting(identity -> identity.noChange()).isEqualTo(true);
 		} finally {
 			server.stop(0);
 		}
@@ -246,6 +248,11 @@ class HttpDatapackReleaseCatalogAdapterTest {
 
 	private static byte[] signedBinding(java.security.KeyPair keyPair, long sequence,
 		String requestId, String manifestSha256) throws Exception {
+		return signedBinding(keyPair, sequence, requestId, manifestSha256, "PUBLISHED_AND_VERIFIED");
+	}
+
+	private static byte[] signedBinding(java.security.KeyPair keyPair, long sequence,
+		String requestId, String manifestSha256, String releaseOutcome) throws Exception {
 		var binding = JSON.createObjectNode();
 		binding.put("schemaVersion", 1);
 		binding.put("artifactKind", "datapack-release-request-binding");
@@ -254,7 +261,7 @@ class HttpDatapackReleaseCatalogAdapterTest {
 		binding.put("channel", "production");
 		binding.put("manifestSha256", manifestSha256);
 		binding.put("keyId", "production-v1");
-		binding.put("releaseOutcome", "PUBLISHED_AND_VERIFIED");
+		binding.put("releaseOutcome", releaseOutcome);
 		var signer = Signature.getInstance("SHA256withRSA");
 		signer.initSign(keyPair.getPrivate());
 		signer.update(HttpDatapackReleaseCatalogAdapter.canonical(binding));

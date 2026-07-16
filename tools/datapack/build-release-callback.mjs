@@ -35,10 +35,14 @@ export function buildReleaseCallback(e) {
     if (!["PASS", "FAIL", "BLOCKED_EXTERNAL"].includes(value)) throw new Error(`${name} is invalid`);
     return value;
   };
+  const releaseRequestId = required("RELEASE_REQUEST_ID");
+  if (releaseRequestId.includes(":")) {
+    throw new Error("RELEASE_REQUEST_ID must not contain ':'");
+  }
   const fields = {
     schemaVersion: 2,
     artifactKind: "datapack-release-callback",
-    releaseRequestId: required("RELEASE_REQUEST_ID"),
+    releaseRequestId,
     releaseSequence,
     channel,
     workflowRunUrl: required("WORKFLOW_RUN_URL"),

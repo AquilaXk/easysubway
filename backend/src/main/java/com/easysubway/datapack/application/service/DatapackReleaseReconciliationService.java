@@ -86,7 +86,8 @@ public class DatapackReleaseReconciliationService {
 
 	void discoverMissing(LocalDateTime now) {
 		if (requestRepository == null || channelRepository == null) return;
-		requestRepository.findReconciliationDue(now.minusMinutes(10), now, 100).stream()
+		requestRepository.claimReconciliationDue(
+			now.minusMinutes(10), now, now.plusMinutes(10), 100).stream()
 			.forEach(request -> {
 				try {
 					var identity = catalog.findByRequest(request.targetChannel(), request.approvalId())
@@ -100,13 +101,6 @@ public class DatapackReleaseReconciliationService {
 						identity.signatureSha256(), now));
 				} catch (RuntimeException ignored) {
 					// fail closed: 다음 bounded scheduler tick에서 재시도한다.
-				} finally {
-					try {
-						requestRepository.deferReconciliation(
-							request.approvalId(), now.plusMinutes(10));
-					} catch (RuntimeException ignored) {
-						// due 상태를 유지하고 다음 request discovery를 계속한다.
-					}
 				}
 			});
 	}

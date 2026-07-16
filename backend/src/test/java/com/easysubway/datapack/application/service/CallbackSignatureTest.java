@@ -23,7 +23,7 @@ class CallbackSignatureTest {
 
 	private static CanonicalFields fields(int schemaVersion, long releaseSequence) {
 		return new CanonicalFields(schemaVersion, "datapack-release-callback", "req-001",
-			releaseSequence, "production", "req-001:42:" + "a".repeat(64),
+				releaseSequence, "production", "req-001:" + releaseSequence + ":" + "a".repeat(64),
 			"https://github.com/example/actions/runs/1", "a".repeat(64), "b".repeat(64),
 			"c".repeat(64), "d".repeat(64), "PASS", "PASS", "PASS");
 	}

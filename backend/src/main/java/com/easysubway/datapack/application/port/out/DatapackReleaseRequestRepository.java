@@ -13,8 +13,6 @@ public interface DatapackReleaseRequestRepository {
 
 	List<DatapackReleaseRequest> findRecent(int limit);
 
-	List<DatapackReleaseRequest> findReconciliationDue(
-		LocalDateTime cutoff, LocalDateTime now, int limit);
-
-	void deferReconciliation(String approvalId, LocalDateTime nextEligibleAt);
+	List<DatapackReleaseRequest> claimReconciliationDue(
+		LocalDateTime cutoff, LocalDateTime now, LocalDateTime leaseUntil, int limit);
 }

@@ -133,6 +133,8 @@ test("callback reconciliation catalog trust 설정은 backend env에 전달한�
     "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM",
     "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID",
   ]) {
+    assert.ok(Object.hasOwn(sourceValues, name), `${name} is required in source`);
+    assert.ok(Object.hasOwn(backendValues, name), `${name} is required in backend.env`);
     assert.equal(backendValues[name], sourceValues[name]);
     assert.doesNotMatch(composeEnv, new RegExp(`^${name}=`, "m"));
   }
