@@ -309,8 +309,10 @@ void main() {
       'lib/station_search.dart': 4,
       // 의도 잔존: AppCard(20)·공용 control radius(12) — v4 정리 대상
       'lib/app/app_components.dart': 2,
-      // 의도 잔존: 역 정보 컨테이너(16)·입력 필드(12) — v4 정리 대상
-      'lib/main.dart': 2,
+      // 의도 잔존: 앱 shell 입력 필드(12) — v4 정리 대상
+      'lib/main.dart': 1,
+      // 의도 잔존: 홈 알림 control radius(12) — v4 정리 대상
+      'lib/features/home/presentation/home_screen.dart': 1,
       // 의도 잔존: 노선 선택 헤더 캡슐(13)·역명 배지(24) — 노선도 룩 불변, 완전 원 아님
       'lib/network_map.dart': 2,
       // 의도 잔존: 시설 신고 카드 radius(16) — 무박스 전환 대상
