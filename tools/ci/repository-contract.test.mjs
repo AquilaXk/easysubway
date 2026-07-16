@@ -1529,6 +1529,70 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
 
   await writeFile(envFile, [
     ...deploymentEnvLines,
+    "EASYSUBWAY_TIMETABLE_SEED_ENABLED=true",
+    "",
+  ].join("\n"));
+  await assert.rejects(
+    execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root }),
+    /EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX/,
+  );
+
+  await writeFile(envFile, [
+    ...deploymentEnvLines,
+    "EASYSUBWAY_TIMETABLE_SEED_ENABLED=true",
+    "EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX=false",
+    "",
+  ].join("\n"));
+  await assert.rejects(
+    execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root }),
+    /EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX/,
+  );
+
+  await writeFile(envFile, [
+    ...deploymentEnvLines,
+    "EASYSUBWAY_TIMETABLE_SEED_ENABLED=maybe",
+    "EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX=true",
+    "",
+  ].join("\n"));
+  await assert.rejects(
+    execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root }),
+    /EASYSUBWAY_TIMETABLE_SEED_ENABLED/,
+  );
+
+  for (const truthyAlias of ["on", "yes", "1"]) {
+    await writeFile(envFile, [
+      ...deploymentEnvLines,
+      `EASYSUBWAY_TIMETABLE_SEED_ENABLED=${truthyAlias}`,
+      "EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX=true",
+      "",
+    ].join("\n"));
+    await assert.rejects(
+      execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root }),
+      /EASYSUBWAY_TIMETABLE_SEED_ENABLED/,
+    );
+
+    await writeFile(envFile, [
+      ...deploymentEnvLines,
+      "EASYSUBWAY_TIMETABLE_SEED_ENABLED=true",
+      `EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX=${truthyAlias}`,
+      "",
+    ].join("\n"));
+    await assert.rejects(
+      execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root }),
+      /EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX/,
+    );
+  }
+
+  await writeFile(envFile, [
+    ...deploymentEnvLines,
+    "EASYSUBWAY_TIMETABLE_SEED_ENABLED=true",
+    "EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX=true",
+    "",
+  ].join("\n"));
+  await execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root });
+
+  await writeFile(envFile, [
+    ...deploymentEnvLines,
     "EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED=true",
     "",
   ].join("\n"));
@@ -2164,6 +2228,64 @@ test("역 모델과 저장소 계약은 stations domain canonical 파일이 소�
     assert.match(data, /domain\/station_models\.dart/);
     assert.match(data, /domain\/station_repositories\.dart/);
   }
+});
+
+test("역 위치 채널과 controller는 stations data·application canonical 파일이 소유한다", () => {
+  const stationSearch = read("apps/mobile/lib/station_search.dart");
+  const locationProvider = read(
+    "apps/mobile/lib/features/stations/data/current_location_provider.dart",
+  );
+  const searchController = read(
+    "apps/mobile/lib/features/stations/application/station_search_controller.dart",
+  );
+  const detailController = read(
+    "apps/mobile/lib/features/stations/application/station_detail_controller.dart",
+  );
+  const locationTest = read(
+    "apps/mobile/test/current_location_provider_test.dart",
+  );
+
+  assert.match(
+    locationProvider,
+    /^class MethodChannelCurrentLocationProvider\b/m,
+  );
+  assert.doesNotMatch(
+    stationSearch,
+    /^class MethodChannelCurrentLocationProvider\b/m,
+  );
+  for (const declaration of [
+    "StationSearchState",
+    "StationSearchController",
+  ]) {
+    assert.match(
+      searchController,
+      new RegExp(`^class ${declaration}\\b`, "m"),
+    );
+    assert.doesNotMatch(
+      stationSearch,
+      new RegExp(`^class ${declaration}\\b`, "m"),
+    );
+  }
+  for (const declaration of [
+    "StationDetailState",
+    "StationDetailController",
+    "StationFavoriteToggleState",
+    "StationFavoriteToggleController",
+  ]) {
+    assert.match(
+      detailController,
+      new RegExp(`^class ${declaration}\\b`, "m"),
+    );
+    assert.doesNotMatch(
+      stationSearch,
+      new RegExp(`^class ${declaration}\\b`, "m"),
+    );
+  }
+  assert.match(
+    locationTest,
+    /^import 'package:easysubway_mobile\/features\/stations\/data\/current_location_provider\.dart';$/m,
+  );
+  assert.doesNotMatch(locationTest, /station_search\.dart/);
 });
 
 test("프로덕션 모바일 UI 위젯명은 prototype 명칭을 쓰지 않는다", () => {
@@ -6503,17 +6625,20 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
     networkCalls: 0,
   });
   assert.deepEqual(routeV2Readiness.timetableSnapshotCache, {
-    status: "BLOCKED_EXTERNAL",
-    blockedByIssue: 2145,
+    status: "SATISFIED",
+    implementedByIssue: 2145,
     requiredKey: {
       format: "snapshotSha256 + freshUntil",
       fields: ["snapshotSha256", "freshUntil"],
       sameFreshnessDifferentHashReloadRequired: true,
     },
     currentImplementation: {
-      status: "BLOCKED_EXTERNAL",
-      fields: ["timetableArtifactId", "freshUntil"],
-      gap: "snapshotSha256 is not materialized until #2145",
+      status: "SATISFIED",
+      fields: ["snapshotSha256", "freshUntil"],
+      snapshotId: "server-timetable-snapshot-c8ae07b67e133c8e",
+      snapshotSha256: "c8ae07b67e133c8ee019069b1c11590aac1449398caf87eb68bca540615b9623",
+      freshUntil: "2026-07-20T00:00:00+09:00",
+      evidencePath: "tools/datapack/server-timetable-snapshot-evidence.json",
     },
     sharedRouteResponseCacheAllowed: false,
   });
@@ -6534,10 +6659,13 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   assert.match(routeSearchController, /header\(HttpHeaders\.CACHE_CONTROL, "private, no-store"\)/);
   assert.match(routeV2OriginGateFilter, /ORIGIN_HEADER = "X-EasySubway-Origin-Verify"/);
   assert.match(routeV2ProxyHeaders, /proxy_set_header X-EasySubway-Origin-Verify/);
-  assert.match(jdbcRouteTimetableRepository, /artifact\.id\(\) \+ ":" \+ artifact\.freshUntil\(\)/);
+  assert.match(
+    jdbcRouteTimetableRepository,
+    /artifact\.snapshotSha256\(\) \+ artifact\.freshUntil\(\)/,
+  );
   assert.match(
     jdbcRouteTimetableRepositoryTest,
-    /동일 freshness에서도 ITX artifact identity가 바뀌면 cache key가 바뀐다/,
+    /동일 freshness에서도 active snapshot SHA가 바뀌면 cache key가 바뀐다/,
   );
   assert.match(routeV2GatewayProbe, /session success response must remain private, no-store/);
   assert.match(routeV2GatewayProbe, /search success response must remain private, no-store/);
@@ -13948,7 +14076,7 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(postgresArtifactIdMigration, /ALTER COLUMN timetable_artifact_id TYPE VARCHAR\(200\)/);
   assert.match(h2ArtifactIdMigration, /ALTER COLUMN timetable_artifact_id VARCHAR\(200\)/);
   assert.match(planner, /canUseTimetableRaptor/);
-  assert.match(planner, /loadRouteTimetable\(\)/);
+  assert.match(planner, /loadRouteTimetableSnapshot\(\)/);
   assert.match(planner, /RouteTimetableRaptorPlanner/);
   assert.match(planner, /noTimetableServicePlan/);
   assert.match(planner, /nextServiceTime\(command, snapshot\.timetable\(\)\)/);
