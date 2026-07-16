@@ -591,6 +591,7 @@ public class JdbcFacilityReportRepository implements
 	@Override
 	public int anonymizeFacilityReportsByUserId(String userId) {
 		List<AnonymizedPhotoObjects> targetPhotoObjects = loadPhotoObjectsByUserId(userId);
+		deleteUserRequestedPhotoObjects(targetPhotoObjects);
 		int anonymizedCount = jdbcTemplate.update(
 			"""
 				UPDATE facility_reports
@@ -598,6 +599,8 @@ public class JdbcFacilityReportRepository implements
 					description = ?,
 					photo_file_name = NULL,
 					photo_content_type = NULL,
+					photo_object_key = NULL,
+					photo_thumbnail_object_key = NULL,
 					photo_sha256 = NULL,
 					photo_size_bytes = NULL,
 					latitude = NULL,
@@ -610,8 +613,20 @@ public class JdbcFacilityReportRepository implements
 			DELETED_DESCRIPTION,
 			userId
 		);
-		deletePendingPhotoObjects(targetPhotoObjects);
 		return anonymizedCount;
+	}
+
+	private void deleteUserRequestedPhotoObjects(List<AnonymizedPhotoObjects> targetPhotoObjects) {
+		for (AnonymizedPhotoObjects objects : targetPhotoObjects) {
+			deleteUserRequestedPhotoObject(objects.primaryObjectKey());
+			deleteUserRequestedPhotoObject(objects.thumbnailObjectKey());
+		}
+	}
+
+	private void deleteUserRequestedPhotoObject(String objectKey) {
+		if (objectKey != null && !objectKey.isBlank()) {
+			deleteFacilityReportPhotoPort.deleteFacilityReportPhoto(objectKey);
+		}
 	}
 
 	@Override

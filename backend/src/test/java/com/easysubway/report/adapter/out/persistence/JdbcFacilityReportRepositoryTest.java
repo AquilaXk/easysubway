@@ -328,6 +328,27 @@ class JdbcFacilityReportRepositoryTest {
 	}
 
 	@Test
+	@DisplayName("사용자 데이터 삭제는 사진 객체 삭제 실패를 성공으로 숨기지 않고 재시도할 수 있다")
+	void anonymizeFacilityReportsByUserIdPropagatesPhotoDeletionFailure() {
+		var targetReport = submittedReport("report-1", "anonymous-user-1", 9);
+		repository.saveReport(targetReport);
+		repository = new JdbcFacilityReportRepository(jdbcTemplate, objectKey -> {
+			throw new IllegalStateException("object storage unavailable");
+		});
+
+		assertThatThrownBy(() -> repository.anonymizeFacilityReportsByUserId("anonymous-user-1"))
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessage("object storage unavailable");
+		assertThat(repository.loadReport(targetReport.id())).contains(targetReport);
+
+		var deletedPhotoObjectKeys = new ArrayList<String>();
+		repository = new JdbcFacilityReportRepository(jdbcTemplate, deletedPhotoObjectKeys::add);
+		assertThat(repository.anonymizeFacilityReportsByUserId("anonymous-user-1")).isEqualTo(1);
+		assertThat(deletedPhotoObjectKeys).containsExactly(targetReport.photoObjectKey());
+		assertThat(repository.loadReport(targetReport.id()).orElseThrow().photoObjectKey()).isNull();
+	}
+
+	@Test
 	@DisplayName("사용자 데이터 삭제는 다른 사용자의 과거 사진 삭제 backlog를 동기 재시도하지 않는다")
 	void anonymizeFacilityReportsByUserIdDeletesOnlyTargetUserPhotoObjects() {
 		var targetReport = submittedReport("report-target", "anonymous-user-1", 8);
