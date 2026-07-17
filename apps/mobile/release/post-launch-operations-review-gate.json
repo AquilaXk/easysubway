@@ -96,7 +96,7 @@
           "files": [
             {"path": "apps/mobile/release/signed-release-artifact-gate.json", "sha256": "42c9f83dca5a1c2c24d921cf6ab748c9be5a901dd1b62212a81055098349fc67"},
             {"path": "apps/mobile/pubspec.yaml", "sha256": "b0ca261e81f1ded21492c7eddd96d99b42765146fe2d93f8ea48d57a253b3713"},
-            {"path": ".github/workflows/release-artifacts.yml", "sha256": "63eccd92158367d2b62abeea3f3e540673397245add853e2119112a9f1a24d9e"},
+            {"path": ".github/workflows/release-artifacts.yml", "sha256": "dc786c8629a0930a0678d51eba68259f77cb9fe6ea7e15e59d0731f0757a1af6"},
             {"path": ".github/workflows/datapack-release.yml", "sha256": "907aa513c9b2cb0c2002e0c240d7d404c73dc8ed5691ab8d89da68e38251b7bc"},
             {"path": "tools/ci/validate-store-privacy-env.mjs", "sha256": "18bb0dd8b93d6268c8f60f9cc12272d2ff31c03b60fbbafd6c1e8d16957ada2a"},
             {"path": "backend/build.gradle", "sha256": "00106be89d1834db166c0c4cfba04674e2a456e7e57648595b74feb933c31273"},
