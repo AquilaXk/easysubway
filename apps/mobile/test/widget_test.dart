@@ -4982,6 +4982,135 @@ void main() {
     }
   });
 
+  testWidgets('길찾기 ITX-청춘 승차 leg은 선택 UI 없이 ITX-청춘 서비스 식별을 표시한다', (
+    tester,
+  ) async {
+    // #1414/#2099: ITX-청춘은 별도 운임의 좌석 지정 서비스라 같은 노선의 일반
+    // 전동차와 화면에서 구분되어야 한다. serviceClass=ITX_CHEONGCHUN 승차 step에만
+    // `ITX-청춘` 배지가 1회 붙고, generic 급행 배지·선택 컨트롤은 없다.
+    final semanticsHandle = tester.ensureSemantics();
+    final routeRepository = FakeRouteSearchRepository(
+      result: _sampleRouteSearchResult(
+        steps: const [
+          RouteSearchStep(
+            sequence: 1,
+            stepType: 'ride',
+            title: '상록수역에서 춘천행 승차',
+            description: '승강장에서 열차를 타고 이동합니다.',
+            lineId: 'gyeongchun',
+            lineName: '수도권 경춘',
+            fromStationId: 'station-sangnoksu',
+            toStationId: 'station-sadang',
+            estimatedMinutes: 40,
+            distanceMeters: 30000,
+            includesStairs: false,
+            requiresAccessibilityCheck: false,
+            actionTitle: '춘천행 열차 승차',
+            serviceClass: 'ITX_CHEONGCHUN',
+            servicePattern: 'EXPRESS',
+          ),
+        ],
+      ),
+    );
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RouteSearchScreen(
+            repository: routeRepository,
+            stationRepository: FakeStationSearchRepository(),
+            favoriteRouteRepository: FakeFavoriteRouteRepository(),
+            initialDraft: RouteDraft(
+              origin: const RouteDraftStation(
+                id: 'station-sangnoksu',
+                nameKo: '상록수',
+              ),
+              destination: const RouteDraftStation(
+                id: 'station-sadang',
+                nameKo: '사당',
+              ),
+              lastModifiedAt: DateTime(2026, 7, 17),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 승차 leg에 ITX-청춘 배지 1회, 텍스트도 1회.
+      expect(
+        find.byKey(const Key('servicePatternItxCheongchunBadge')),
+        findsOneWidget,
+      );
+      expect(find.text('ITX-청춘'), findsOneWidget);
+      // TalkBack은 ITX-청춘을 정확히 한 번만 읽는다(배지는 장식, 라벨은 leg가 1회).
+      expect(find.bySemanticsLabel(RegExp('ITX-청춘')), findsOneWidget);
+      // generic 급행 배지·라벨은 ITX leg에 0건.
+      expect(find.byKey(const Key('servicePatternExpressBadge')), findsNothing);
+      expect(find.text('급행'), findsNothing);
+      expect(find.bySemanticsLabel(RegExp('급행')), findsNothing);
+      // 서비스 식별은 실제 운행 정보다 — toggle/chip/filter 선택 컨트롤 0건.
+      expect(find.byType(ChoiceChip), findsNothing);
+      expect(find.byType(FilterChip), findsNothing);
+      expect(find.byType(Switch), findsNothing);
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
+  testWidgets('길찾기 SUBWAY 승차 leg에는 ITX-청춘 표시가 붙지 않는다', (tester) async {
+    // ITX-청춘 식별은 serviceClass=ITX_CHEONGCHUN 승차 leg에만 붙는다. SUBWAY
+    // 일반/급행 leg에는 ITX-청춘 배지·텍스트가 0건이어야 한다.
+    final routeRepository = FakeRouteSearchRepository(
+      result: _sampleRouteSearchResult(
+        steps: const [
+          RouteSearchStep(
+            sequence: 1,
+            stepType: 'ride',
+            title: '상록수역에서 오이도행 승차',
+            description: '승강장에서 열차를 타고 이동합니다.',
+            lineId: 'seoul-4',
+            lineName: '수도권 4호선',
+            fromStationId: 'station-sangnoksu',
+            toStationId: 'station-sadang',
+            estimatedMinutes: 18,
+            distanceMeters: 12000,
+            includesStairs: false,
+            requiresAccessibilityCheck: false,
+            actionTitle: '오이도행 열차 승차',
+            serviceClass: 'SUBWAY',
+            servicePattern: 'LOCAL',
+          ),
+        ],
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: routeRepository,
+          stationRepository: FakeStationSearchRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 17),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('servicePatternItxCheongchunBadge')),
+      findsNothing,
+    );
+    expect(find.text('ITX-청춘'), findsNothing);
+  });
+
   testWidgets('GPS 하단 패널은 열차 정보가 없어도 인접역 두 방면 스켈레톤(제목+대시+구분선)을 유지한다', (
     tester,
   ) async {
