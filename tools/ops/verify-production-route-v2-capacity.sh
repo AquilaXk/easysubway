@@ -88,6 +88,7 @@ metrics_file="${work_dir}/metrics.tsv"
 logs_file="${work_dir}/service.log"
 resource_metrics_file="${work_dir}/resource.tsv"
 resource_stop_file="${work_dir}/resource.stop"
+resource_ready_file="${work_dir}/resource.ready"
 resource_sampler_pid=""
 
 stop_resource_sampler() {
@@ -405,11 +406,22 @@ send_search() {
 	while [[ ! -e "${resource_stop_file}" ]]; do
 		backend_resource="$(docker stats --no-stream --format '{{.MemPerc}} {{.CPUPerc}}' "${clone_backend}")"
 		gateway_resource="$(docker stats --no-stream --format '{{.MemPerc}} {{.CPUPerc}}' "${clone_gateway}")"
-		printf '%s %s\n' "${backend_resource}" "${gateway_resource}" >> "${resource_metrics_file}"
+		sampled_at_ms="$(date +%s%3N)"
+		printf '%s %s %s\n' "${sampled_at_ms}" "${backend_resource}" "${gateway_resource}" >> "${resource_metrics_file}"
+		: > "${resource_ready_file}"
 		sleep 1
 	done
 ) &
 resource_sampler_pid=$!
+resource_ready_attempt=0
+while [[ ! -e "${resource_ready_file}" ]]; do
+	resource_ready_attempt=$((resource_ready_attempt + 1))
+	(( resource_ready_attempt <= 100 )) || { echo 'load resource sampler readiness timed out' >&2; exit 1; }
+	kill -0 "${resource_sampler_pid}" >/dev/null 2>&1 \
+		|| { echo 'load resource sampler exited before readiness' >&2; exit 1; }
+	sleep 0.1
+done
+load_started_ms="$(date +%s%3N)"
 
 mapfile -t tokens < <(cut -f 1 "${tokens_file}")
 (( ${#tokens[@]} >= search_rate + 3 )) || { echo 'not enough synthetic sessions' >&2; exit 1; }
@@ -490,18 +502,28 @@ node -e '
 const value = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
 if (value.code !== "ITX_TIMETABLE_UNAVAILABLE") process.exit(1);
 ' "${last_body}" || { echo 'unavailable response machine code mismatch' >&2; exit 1; }
+load_finished_ms="$(date +%s%3N)"
 stop_resource_sampler || { echo 'load resource sampler failed' >&2; exit 1; }
 resource_summary="$(node -e '
 const rows = require("node:fs").readFileSync(process.argv[1], "utf8").trim().split(/\n/).filter(Boolean);
 if (rows.length === 0) process.exit(1);
 const samples = rows.map((line) => line.trim().split(/\s+/).map((value) => Number(value.replace(/%$/, ""))));
-if (samples.some((sample) => sample.length !== 4 || sample.some((value) => !Number.isFinite(value)))) process.exit(1);
-const backendMemoryPeak = Math.max(...samples.map(([memory]) => memory));
-const backendCpuPeak = Math.max(...samples.map(([, cpu]) => cpu));
-const gatewayMemoryPeak = Math.max(...samples.map(([, , memory]) => memory));
-const gatewayCpuPeak = Math.max(...samples.map(([, , , cpu]) => cpu));
-process.stdout.write(`${backendMemoryPeak} ${backendCpuPeak} ${gatewayMemoryPeak} ${gatewayCpuPeak} ${samples.length}`);
-' "${resource_metrics_file}")" || { echo 'load resource samples are invalid' >&2; exit 1; }
+const loadStartedMs = Number(process.argv[2]);
+const loadFinishedMs = Number(process.argv[3]);
+if (!Number.isSafeInteger(loadStartedMs) || !Number.isSafeInteger(loadFinishedMs) || loadFinishedMs < loadStartedMs) process.exit(1);
+if (samples.some((sample) => sample.length !== 5 || sample.some((value) => !Number.isFinite(value)))) process.exit(1);
+const loadSamples = samples.filter(([sampledAtMs]) => sampledAtMs >= loadStartedMs && sampledAtMs <= loadFinishedMs);
+if (loadSamples.length === 0) {
+  process.stderr.write("load interval has no resource sample\n");
+  process.exit(1);
+}
+const backendMemoryPeak = Math.max(...loadSamples.map(([, memory]) => memory));
+const backendCpuPeak = Math.max(...loadSamples.map(([, , cpu]) => cpu));
+const gatewayMemoryPeak = Math.max(...loadSamples.map(([, , , memory]) => memory));
+const gatewayCpuPeak = Math.max(...loadSamples.map(([, , , , cpu]) => cpu));
+process.stdout.write(`${backendMemoryPeak} ${backendCpuPeak} ${gatewayMemoryPeak} ${gatewayCpuPeak} ${loadSamples.length}`);
+' "${resource_metrics_file}" "${load_started_ms}" "${load_finished_ms}")" \
+	|| { echo 'load resource samples are invalid' >&2; exit 1; }
 read -r backend_memory_peak backend_cpu_peak gateway_memory_peak gateway_cpu_peak resource_sample_count <<< "${resource_summary}"
 [[ "${backend_memory_peak}" =~ ^[0-9]+([.][0-9]+)?$ && "${backend_cpu_peak}" =~ ^[0-9]+([.][0-9]+)?$ \
 	&& "${gateway_memory_peak}" =~ ^[0-9]+([.][0-9]+)?$ && "${gateway_cpu_peak}" =~ ^[0-9]+([.][0-9]+)?$ \

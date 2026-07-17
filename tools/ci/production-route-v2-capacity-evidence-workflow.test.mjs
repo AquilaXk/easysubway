@@ -92,6 +92,12 @@ test("capacity runner는 동일 candidate·격리 load·privacy·closed ingress�
   assert.match(runner, /synthetic_purge_remaining="1\|1\|1"\nwhile true; do/);
   assert.doesNotMatch(runner, /synthetic_purge_remaining="1\|1\|1"\nfor _ in \$\(seq 1 120\)/);
   assert.match(runner, /resource_sampler_pid/);
+  assert.match(runner, /resource_ready_file/);
+  assert.match(runner, /sampled_at_ms="\$\(date \+%s%3N\)"/);
+  assert.match(runner, /load_started_ms="\$\(date \+%s%3N\)"/);
+  assert.match(runner, /load_finished_ms="\$\(date \+%s%3N\)"/);
+  assert.match(runner, /sampledAtMs >= loadStartedMs && sampledAtMs <= loadFinishedMs/);
+  assert.match(runner, /load interval has no resource sample/);
   assert.match(runner, /memory_peak/);
   assert.match(runner, /cpu_peak/);
   assert.match(runner, /backend_memory_peak/);
