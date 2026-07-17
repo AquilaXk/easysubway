@@ -69,12 +69,6 @@ class RouteMapOwnerLabelEntry {
   final List<RouteMapOwnerLabelLine> lines;
 }
 
-int _routeMapOwnerLabelRolePriority(String role) => switch (role) {
-  'transfer' => 0,
-  'terminal' => 1,
-  _ => 2,
-};
-
 RouteMapOwnerLabelAnchor _parseRouteMapOwnerLabelAnchor(Object? value) =>
     switch (value) {
       'middle' => RouteMapOwnerLabelAnchor.middle,
@@ -103,14 +97,17 @@ List<RouteMapOwnerLabelLine> _parseRouteMapOwnerLabelLines(Object? raw) {
   return lines;
 }
 
-/// sidecar 전체 JSON에서 [regionId](예: `seoul`)의 라벨만 station명 키 맵으로
+/// sidecar 전체 JSON에서 [regionId](예: `seoul`)의 라벨을 station명 키 맵으로
 /// 파싱한다. 형식이 어긋나거나 regionId가 없으면 빈 맵(호출부가 안전 폴백).
 ///
-/// 중복 station명(#2068 6차 실측: seoul 1건·busan 2건, 서로 다른 물리역이
-/// 같은 이름을 공유하거나 잔여 중복 라벨)은 role 우선순위(transfer>terminal>
-/// ordinary) → 먼저 나온 항목 순으로 하나만 남긴다 — 결정적이되 완전한 동명
-/// 역 구분은 하지 않는다(알려진 한계, #2068 6차 보고).
-Map<String, RouteMapOwnerLabelEntry> parseRouteMapOwnerLabelsForRegion(
+/// 동명이역(#2068 실측: seoul 신촌·양평, busan 좌천·동래 — 서로 다른 물리역이
+/// 같은 렌더 텍스트를 공유)은 **한 이름 아래 모든 라벨을 위치로 구분해 리스트로
+/// 보존한다**. 이전엔 role 우선순위로 하나만 남겨(6차 한계) busan 1호선 좌천
+/// 노드가 실기기에서 무명으로 보였다 — 이제 각 물리역이 자기 최근접 라벨을
+/// 독립적으로 짝지을 수 있도록(route_map_label_layout.dart의
+/// _resolveOwnerLabelsByCandidateKey 1:1 최근접 매칭) 전부 넘긴다.
+/// 리스트 안 순서는 sidecar 등장 순(=station→role 정렬)으로 결정적이다.
+Map<String, List<RouteMapOwnerLabelEntry>> parseRouteMapOwnerLabelsForRegion(
   String sidecarJson,
   String regionId,
 ) {
@@ -127,7 +124,7 @@ Map<String, RouteMapOwnerLabelEntry> parseRouteMapOwnerLabelsForRegion(
   if (regionEntries is! List) {
     return const {};
   }
-  final result = <String, RouteMapOwnerLabelEntry>{};
+  final result = <String, List<RouteMapOwnerLabelEntry>>{};
   for (final raw in regionEntries) {
     if (raw is! Map) continue;
     final station = raw['station'];
@@ -151,18 +148,13 @@ Map<String, RouteMapOwnerLabelEntry> parseRouteMapOwnerLabelsForRegion(
       hasLineTerminalBadge: raw['hasLineTerminalBadge'] == true,
       lines: _parseRouteMapOwnerLabelLines(raw['lines']),
     );
-    final existing = result[station];
-    if (existing == null ||
-        _routeMapOwnerLabelRolePriority(entry.role) <
-            _routeMapOwnerLabelRolePriority(existing.role)) {
-      result[station] = entry;
-    }
+    result.putIfAbsent(station, () => []).add(entry);
   }
   return result;
 }
 
 /// sidecar 전체 JSON을 region별로 한 번에 파싱한다(로더가 1회 호출해 캐시).
-Map<String, Map<String, RouteMapOwnerLabelEntry>>
+Map<String, Map<String, List<RouteMapOwnerLabelEntry>>>
 routeMapOwnerLabelsByRegionFrom(String sidecarJson) {
   final Object? decoded;
   try {

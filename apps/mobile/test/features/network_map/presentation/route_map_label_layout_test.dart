@@ -599,7 +599,7 @@ void main() {
           measureBadge: _measureBadge,
           basemap: true,
           ownerLabelsByStationName: {
-            '역명전체': entry(position: const Offset(100, 50), anchor: anchor),
+            '역명전체': [entry(position: const Offset(100, 50), anchor: anchor)],
           },
           stationNameByStationId: const {'s': '역명전체'},
         );
@@ -630,7 +630,9 @@ void main() {
         measureLabel: _measureLabel,
         measureBadge: _measureBadge,
         basemap: true,
-        ownerLabelsByStationName: {'역명전체': entry(position: const Offset(0, 0))},
+        ownerLabelsByStationName: {
+          '역명전체': [entry(position: const Offset(0, 0))],
+        },
         stationNameByStationId: const {'s': '역명전체'},
       );
       // anchor(0,0), start → rect.left=0, top=0-0.8*13=-10.4. 자기 노드
@@ -654,7 +656,7 @@ void main() {
         measureBadge: _measureBadge,
         basemap: true,
         ownerLabelsByStationName: {
-          '역명전체': entry(position: const Offset(999, 999)),
+          '역명전체': [entry(position: const Offset(999, 999))],
         },
         // stationNameByStationId 기본값(빈 맵) — 원본명 없어 매치 불가.
       );
@@ -705,7 +707,7 @@ void main() {
         basemap: true,
         ownerLabelsByStationName: {
           // centroid(5,0)에서 위치 게이트(185px) 이내(#2068 7차).
-          '환승역전체': entry(position: const Offset(50, 30), role: 'transfer'),
+          '환승역전체': [entry(position: const Offset(50, 30), role: 'transfer')],
         },
         stationNameByStationId: const {'t': '환승역전체'},
       );
@@ -728,7 +730,7 @@ void main() {
         ownerLabelsByStationName: {
           // station(0,0)에서 200px — kRouteMapOwnerLabelMaxAnchorDistancePx
           // (185)를 넘는 병리적 오배치(#2068 7차 양평 케이스 재현).
-          '역명전체': entry(position: const Offset(200, 0)),
+          '역명전체': [entry(position: const Offset(200, 0))],
         },
         stationNameByStationId: const {'s': '역명전체'},
       );
@@ -770,7 +772,7 @@ void main() {
         measureBadge: _measureBadge,
         basemap: true,
         ownerLabelsByStationName: {
-          '동명역전체': entry(position: const Offset(0, 0)),
+          '동명역전체': [entry(position: const Offset(0, 0))],
         },
         stationNameByStationId: const {'near': '동명역전체', 'far': '동명역전체'},
       );
@@ -787,6 +789,56 @@ void main() {
       expect(nearLabel.rect.overlaps(farLabel.rect), isFalse);
     });
 
+    test('동명이역(#2068 부산 좌천·동래): 같은 이름 라벨이 둘이면 각 역이 자기 최근접 라벨을 1:1로 갖는다', () {
+      const design = RouteMapDesignSpace(designScale: 1);
+      final map = StructuredRouteMap(
+        lines: const [],
+        stations: [
+          RouteMapStructuredStation(
+            stationId: 'a',
+            lineId: 'L1',
+            sequence: 0,
+            position: const Offset(0, 0),
+            labelPolygon: const [],
+            labelClass: RouteMapLabelClass.regular,
+          ),
+          RouteMapStructuredStation(
+            stationId: 'b',
+            lineId: 'L2',
+            sequence: 0,
+            position: const Offset(500, 0),
+            labelPolygon: const [],
+            labelClass: RouteMapLabelClass.regular,
+          ),
+        ],
+        transferGroups: const [],
+      );
+      // 라벨 2개: 하나는 a(0,0) 근방, 하나는 b(500,0) 근방. 각자 최근접으로
+      // 1:1 매치돼 둘 다 오너 앵커를 써야 한다(이전엔 이름당 1엔트리 가정이라
+      // 하나가 소실됐다).
+      final layout = solveRouteMapLabelLayout(
+        map: map,
+        design: design,
+        labelTextByStationId: const {'a': '좌천', 'b': '좌천'},
+        badgeLabelByLineId: const {},
+        measureLabel: _measureLabel,
+        measureBadge: _measureBadge,
+        basemap: true,
+        ownerLabelsByStationName: {
+          '좌천': [
+            entry(position: const Offset(10, 0)),
+            entry(position: const Offset(490, 0)),
+          ],
+        },
+        stationNameByStationId: const {'a': '좌천', 'b': '좌천'},
+      );
+      final aLabel = layout.labels.firstWhere((l) => l.id == 'a:L1');
+      final bLabel = layout.labels.firstWhere((l) => l.id == 'b:L2');
+      // start anchor → rect.left == 오너 앵커 x. 각자 자기 최근접 라벨을 가진다.
+      expect(aLabel.rect.left, 10);
+      expect(bLabel.rect.left, 490);
+    });
+
     test('이름 정규화(#2068 7차): 중점(·)↔마침표(.) 표기 차를 매칭한다', () {
       const design = RouteMapDesignSpace(designScale: 1);
       final map = soloStationMap();
@@ -800,7 +852,7 @@ void main() {
         measureBadge: _measureBadge,
         basemap: true,
         ownerLabelsByStationName: {
-          '4·19민주묘지': entry(position: const Offset(0, 0)),
+          '4·19민주묘지': [entry(position: const Offset(0, 0))],
         },
         stationNameByStationId: const {'s': '4.19민주묘지'},
       );

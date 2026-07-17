@@ -22,18 +22,18 @@ void main() {
     test('region별 station명 키 맵으로 파싱한다', () {
       final seoul = parseRouteMapOwnerLabelsForRegion(sidecar, 'seoul');
       expect(seoul.length, 2);
-      expect(seoul['시청']!.role, 'transfer');
-      expect(seoul['시청']!.position, const Offset(1069.29, 817.38));
-      expect(seoul['시청']!.anchor, RouteMapOwnerLabelAnchor.start);
-      expect(seoul['가야']!.anchor, RouteMapOwnerLabelAnchor.middle);
-      expect(seoul['가야']!.fontSizePx, 12.5);
+      expect(seoul['시청']!.single.role, 'transfer');
+      expect(seoul['시청']!.single.position, const Offset(1069.29, 817.38));
+      expect(seoul['시청']!.single.anchor, RouteMapOwnerLabelAnchor.start);
+      expect(seoul['가야']!.single.anchor, RouteMapOwnerLabelAnchor.middle);
+      expect(seoul['가야']!.single.fontSizePx, 12.5);
     });
 
     test('다른 region은 섞이지 않는다', () {
       final busan = parseRouteMapOwnerLabelsForRegion(sidecar, 'busan');
       expect(busan.length, 1);
-      expect(busan['가야']!.role, 'terminal');
-      expect(busan['가야']!.anchor, RouteMapOwnerLabelAnchor.end);
+      expect(busan['가야']!.single.role, 'terminal');
+      expect(busan['가야']!.single.anchor, RouteMapOwnerLabelAnchor.end);
     });
 
     test('없는 region·잘못된 JSON은 빈 맵(안전 폴백)', () {
@@ -42,21 +42,24 @@ void main() {
       expect(parseRouteMapOwnerLabelsForRegion('{}', 'seoul'), isEmpty);
     });
 
-    test('중복 station명은 role 우선순위(transfer>terminal>ordinary)로 하나만 남긴다', () {
+    test('동명이역(같은 이름)은 위치로 구분해 모두 리스트로 보존한다(#2068 busan 좌천·동래 소실 회귀)', () {
       const dup = '''
       {
         "regions": {
-          "seoul": [
-            {"station": "신촌", "role": "ordinary", "x": 1.0, "y": 1.0, "anchor": "start", "fontSizePx": 12.0},
-            {"station": "신촌", "role": "transfer", "x": 2.0, "y": 2.0, "anchor": "start", "fontSizePx": 12.0}
+          "busan": [
+            {"station": "좌천", "role": "ordinary", "x": 4765.675, "y": 2108.1, "anchor": "start", "fontSizePx": 12.0},
+            {"station": "좌천", "role": "ordinary", "x": 7538.725, "y": 1733.7, "anchor": "start", "fontSizePx": 12.0}
           ]
         }
       }
       ''';
-      final result = parseRouteMapOwnerLabelsForRegion(dup, 'seoul');
+      final result = parseRouteMapOwnerLabelsForRegion(dup, 'busan');
       expect(result.length, 1);
-      expect(result['신촌']!.role, 'transfer');
-      expect(result['신촌']!.position, const Offset(2.0, 2.0));
+      final jwacheon = result['좌천']!;
+      expect(jwacheon.length, 2, reason: '두 좌천 라벨이 모두 보존돼야 한다');
+      // 리스트 순서는 sidecar 등장 순으로 결정적이다.
+      expect(jwacheon[0].position, const Offset(4765.675, 2108.1));
+      expect(jwacheon[1].position, const Offset(7538.725, 1733.7));
     });
 
     test('필드 누락 항목은 건너뛴다', () {
@@ -77,7 +80,7 @@ void main() {
 
     test('필드 누락 항목의 station·anchor는 그대로 skip과 무관 — lines 필드 없으면 빈 리스트', () {
       final seoul = parseRouteMapOwnerLabelsForRegion(sidecar, 'seoul');
-      expect(seoul['시청']!.lines, isEmpty);
+      expect(seoul['시청']!.single.lines, isEmpty);
     });
 
     test('#2068 다줄 라벨 렌더: lines가 있으면 텍스트·좌표를 순서대로 파싱한다', () {
@@ -96,7 +99,7 @@ void main() {
       }
       ''';
       final result = parseRouteMapOwnerLabelsForRegion(sidecar, 'seoul');
-      final entry = result['검단사거리']!;
+      final entry = result['검단사거리']!.single;
       expect(entry.lines.length, 2);
       expect(entry.lines[0].text, '검단');
       expect(entry.lines[0].position, const Offset(541.0, 1253.4));
@@ -122,7 +125,7 @@ void main() {
       }
       ''';
       final result = parseRouteMapOwnerLabelsForRegion(sidecar, 'seoul');
-      final entry = result['테스트역']!;
+      final entry = result['테스트역']!.single;
       expect(entry.lines.length, 2);
       expect(entry.lines[0].text, '정상줄');
       expect(entry.lines[1].text, '정상줄2');
@@ -140,8 +143,8 @@ void main() {
       }
       ''';
       final result = parseRouteMapOwnerLabelsForRegion(sidecar, 'gwangju');
-      expect(result['평동']!.hasLineTerminalBadge, isTrue);
-      expect(result['도산']!.hasLineTerminalBadge, isFalse);
+      expect(result['평동']!.single.hasLineTerminalBadge, isTrue);
+      expect(result['도산']!.single.hasLineTerminalBadge, isFalse);
     });
   });
 
@@ -157,7 +160,7 @@ void main() {
       ''';
       final byRegion = routeMapOwnerLabelsByRegionFrom(sidecar);
       expect(byRegion.keys.toSet(), {'seoul', 'busan'});
-      expect(byRegion['seoul']!['시청']!.role, 'transfer');
+      expect(byRegion['seoul']!['시청']!.single.role, 'transfer');
       expect(byRegion['busan'], isEmpty);
     });
   });

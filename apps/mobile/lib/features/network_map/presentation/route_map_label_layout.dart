@@ -269,24 +269,30 @@ String _normalizeOwnerLabelNameKey(String name) => name.replaceAll('·', '.');
 
 /// basemap 모드에서 candidate id(`transfer:<stationId>` 또는
 /// `<stationId>:<lineId>`) → 채택된 오너 라벨을 사전 해소한다(#2068 7차).
-/// 1) 이름 정규화(중점/마침표) 후 station 원본명으로 오너 라벨을 찾는다.
-/// 2) 같은 정규화 이름을 가진 후보(동명이역)가 여럿이면, 오너 앵커에서 가장
-///    가까운 후보 1개만 채택한다 — 나머지는 결과 맵에 없어(null) 기존 솔버로
-///    폴백한다(신촌·양평 케이스 해소).
-/// 3) 채택된 후보도 [kRouteMapOwnerLabelMaxAnchorDistancePx] 위치 게이트를
+/// 1) 이름 정규화(중점/마침표) 후 station 원본명으로 오너 라벨 목록을 찾는다.
+/// 2) 같은 정규화 이름을 가진 라벨·후보(동명이역)가 여럿이면, (라벨↔후보) 쌍을
+///    거리 오름차순으로 훑어 가장 가까운 쌍부터 1:1로 확정한다 — 이미 쓰인
+///    라벨·후보는 재사용하지 않는다(같은 라벨 이중 귀속 금지). 이로써 busan
+///    좌천 2역·동래 2역이 각자 자기 최근접 라벨을 독립적으로 갖는다. 라벨이
+///    후보보다 적으면(seoul 신촌·양평처럼 SVG에 한쪽만 그려진 경우) 남는 후보는
+///    결과 맵에 없어(null) 기존 솔버로 폴백한다.
+/// 3) 채택된 쌍도 [kRouteMapOwnerLabelMaxAnchorDistancePx] 위치 게이트를
 ///    통과해야 한다(양평의 원거리 오배치 등 병리적 케이스 방어).
 Map<String, RouteMapOwnerLabelEntry> _resolveOwnerLabelsByCandidateKey({
   required StructuredRouteMap map,
   required RouteMapDesignSpace design,
-  required Map<String, RouteMapOwnerLabelEntry> ownerLabelsByStationName,
+  required Map<String, List<RouteMapOwnerLabelEntry>> ownerLabelsByStationName,
   required Map<String, String> stationNameByStationId,
 }) {
   if (ownerLabelsByStationName.isEmpty || stationNameByStationId.isEmpty) {
     return const {};
   }
-  final normalizedOwnerLabels = <String, RouteMapOwnerLabelEntry>{};
+  // 정규화 이름 → 그 이름의 오너 라벨 목록(동명이역이면 복수).
+  final normalizedOwnerLabels = <String, List<RouteMapOwnerLabelEntry>>{};
   for (final entry in ownerLabelsByStationName.entries) {
-    normalizedOwnerLabels[_normalizeOwnerLabelNameKey(entry.key)] = entry.value;
+    normalizedOwnerLabels
+        .putIfAbsent(_normalizeOwnerLabelNameKey(entry.key), () => [])
+        .addAll(entry.value);
   }
   // 정규화 이름 → 후보(candidateKey, design 좌표) 목록.
   final candidatesByName = <String, List<(String key, Offset anchor)>>{};
@@ -315,21 +321,37 @@ Map<String, RouteMapOwnerLabelEntry> _resolveOwnerLabelsByCandidateKey({
     if (candidates == null || candidates.isEmpty) {
       continue;
     }
-    final anchorDesign = design.toDesign(labelEntry.value.position);
-    String? bestKey;
-    var bestDistance = double.infinity;
-    for (final (key, stationAnchor) in candidates) {
-      final distance = (stationAnchor - anchorDesign).distance;
-      if (distance > kRouteMapOwnerLabelMaxAnchorDistancePx) {
-        continue;
-      }
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestKey = key;
+    final labels = labelEntry.value;
+    // 위치 게이트를 통과하는 (라벨, 후보) 쌍을 모아 거리 오름차순 1:1 그리디로
+    // 확정한다. 단일 라벨(대부분)이면 기존 "최근접 후보 1개 채택"과 동치다.
+    final pairs = <({int labelIndex, String key, double distance})>[];
+    for (var i = 0; i < labels.length; i++) {
+      final anchorDesign = design.toDesign(labels[i].position);
+      for (final (key, stationAnchor) in candidates) {
+        final distance = (stationAnchor - anchorDesign).distance;
+        if (distance > kRouteMapOwnerLabelMaxAnchorDistancePx) {
+          continue;
+        }
+        pairs.add((labelIndex: i, key: key, distance: distance));
       }
     }
-    if (bestKey != null) {
-      resolved[bestKey] = labelEntry.value;
+    // 거리 동률은 (labelIndex, key)로 결정적 정렬해 안정적으로 짝짓는다.
+    pairs.sort((a, b) {
+      final byDistance = a.distance.compareTo(b.distance);
+      if (byDistance != 0) return byDistance;
+      final byLabel = a.labelIndex.compareTo(b.labelIndex);
+      if (byLabel != 0) return byLabel;
+      return a.key.compareTo(b.key);
+    });
+    final usedLabels = <int>{};
+    final usedKeys = <String>{};
+    for (final pair in pairs) {
+      if (usedLabels.contains(pair.labelIndex) || usedKeys.contains(pair.key)) {
+        continue;
+      }
+      resolved[pair.key] = labels[pair.labelIndex];
+      usedLabels.add(pair.labelIndex);
+      usedKeys.add(pair.key);
     }
   }
   return resolved;
@@ -345,16 +367,16 @@ Map<String, RouteMapOwnerLabelEntry> _resolveOwnerLabelsByCandidateKey({
 /// [ownerLabelsByStationName]이 비어 있으면(sidecar 없음)
 /// [kRouteMapDesignLabelFontPx](기존 고정값)로 안전 폴백한다.
 double _medianOwnerLabelFontSizeDesign(
-  Map<String, RouteMapOwnerLabelEntry> ownerLabelsByStationName,
+  Map<String, List<RouteMapOwnerLabelEntry>> ownerLabelsByStationName,
   RouteMapDesignSpace design,
 ) {
-  if (ownerLabelsByStationName.isEmpty) {
+  final sizes = [
+    for (final entries in ownerLabelsByStationName.values)
+      for (final entry in entries) entry.fontSizePx * design.designScale,
+  ]..sort();
+  if (sizes.isEmpty) {
     return kRouteMapDesignLabelFontPx;
   }
-  final sizes = [
-    for (final entry in ownerLabelsByStationName.values)
-      entry.fontSizePx * design.designScale,
-  ]..sort();
   return sizes[sizes.length ~/ 2];
 }
 
@@ -412,7 +434,7 @@ List<Rect> routeMapTransferObstacleRects(
 Map<String, RouteMapOwnerLabelEntry> resolveRouteMapOwnerLabelsForTesting({
   required StructuredRouteMap map,
   required RouteMapDesignSpace design,
-  required Map<String, RouteMapOwnerLabelEntry> ownerLabelsByStationName,
+  required Map<String, List<RouteMapOwnerLabelEntry>> ownerLabelsByStationName,
   required Map<String, String> stationNameByStationId,
 }) => _resolveOwnerLabelsByCandidateKey(
   map: map,
@@ -442,7 +464,8 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
   // (축약 전 nameKo) 기준 정확 일치로 조회한다 — labelTextByStationId는 화면
   // 표시용 축약(괄호 부역명 제거) 텍스트라 매칭 키로 못 쓴다. 둘 다 기본값이
   // 빈 맵이라 기존 호출부는 동작 불변(옵트인).
-  Map<String, RouteMapOwnerLabelEntry> ownerLabelsByStationName = const {},
+  Map<String, List<RouteMapOwnerLabelEntry>> ownerLabelsByStationName =
+      const {},
   Map<String, String> stationNameByStationId = const {},
   // #2068 광주 2차: 오너 SVG에 종점 호선 마크(line-terminal-badge)가 있는
   // region에서 앱 솔버의 노선 뱃지 pill과 중복되지 않도록 후보 생성을 건너

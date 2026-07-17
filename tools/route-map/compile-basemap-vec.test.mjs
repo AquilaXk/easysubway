@@ -268,6 +268,24 @@ test("extractOwnerLabels: scale 없는 권역(main-map-scaled-layer 부재)은 �
   assert.equal(entries[0].fontSizePx, 12.5);
 });
 
+test("extractOwnerLabels: 동명이역(같은 렌더 텍스트, 다른 위치)은 두 엔트리로 모두 보존한다(#2068 부산 좌천·동래 소실 회귀)", () => {
+  // 부산 1호선 좌천·동해선 좌천은 물리적으로 다른 역이나 렌더 텍스트가 같다.
+  // 추출은 텍스트를 키로 잡되 두 엔트리를 위치로 구분해 전부 남겨야 한다
+  // (하나가 소실되면 실기기에서 1호선 좌천 노드가 무명으로 보임).
+  const entries = extractOwnerLabels(`
+    <svg>
+      <text data-station-key="좌천_1" data-label-role="ordinary" text-anchor="middle"
+            font-size="12.5" x="1900" y="1400"><tspan x="1900" y="1400">좌천</tspan></text>
+      <text data-station-key="좌천_DH" data-label-role="ordinary" text-anchor="middle"
+            font-size="12.5" x="3400" y="800"><tspan x="3400" y="800">좌천</tspan></text>
+    </svg>
+  `);
+  const jwacheon = entries.filter((entry) => entry.station === "좌천");
+  assert.equal(jwacheon.length, 2, "동명 라벨 2건이 모두 보존돼야 한다");
+  const xs = jwacheon.map((entry) => entry.x).sort((a, b) => a - b);
+  assert.deepEqual(xs, [1900, 3400], "두 좌천 라벨은 위치로 구분돼 남는다");
+});
+
 test("extractOwnerLabels: text-anchor가 속성 없이 style 선언 안에만 있으면(Inkscape 수작업) 그 값을 읽는다(#2068 수도권 게이트 회귀 — 신검단중앙 사례)", () => {
   const entries = extractOwnerLabels(`
     <svg>

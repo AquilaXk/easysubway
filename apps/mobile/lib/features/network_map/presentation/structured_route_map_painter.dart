@@ -532,7 +532,7 @@ class StructuredRouteMapView extends StatefulWidget {
 
   /// basemap 6차(#2068): 오너 SVG 라벨 sidecar(현재 region분). 빈 맵이면
   /// 미보유·로드전으로 취급해 4차 자동 솔버로 전부 폴백한다(fail-safe).
-  final Map<String, RouteMapOwnerLabelEntry> ownerLabelsByStationName;
+  final Map<String, List<RouteMapOwnerLabelEntry>> ownerLabelsByStationName;
 
   /// stationId → 원본 nameKo(축약 전). ownerLabelsByStationName 매칭 키.
   final Map<String, String> stationNameByStationId;
@@ -545,7 +545,7 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
   StructuredRouteMap? _sourceMap;
   bool? _drawLines;
   bool? _drawStationSymbols;
-  Map<String, RouteMapOwnerLabelEntry>? _ownerLabelsByStationName;
+  Map<String, List<RouteMapOwnerLabelEntry>>? _ownerLabelsByStationName;
   RouteMapDesignSpace? _design;
   ui.Picture? _picture;
   // attribution TextPainter는 region(텍스트) 변경 시에만 재생성한다. 매 pan 프레임의
@@ -606,9 +606,9 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
       // 가지면(=이 region의 오너 SVG가 자체 종점 배지를 그림) 앱 솔버의
       // 노선 뱃지 pill 후보를 억제한다(network_map.dart 변경 없이, 이미
       // 통과하는 ownerLabelsByStationName만으로 도출).
-      suppressLineBadges: widget.ownerLabelsByStationName.values.any(
-        (entry) => entry.hasLineTerminalBadge,
-      ),
+      suppressLineBadges: widget.ownerLabelsByStationName.values
+          .expand((entries) => entries)
+          .any((entry) => entry.hasLineTerminalBadge),
     );
     _picture = recordRouteMapPicture(
       map: widget.map,

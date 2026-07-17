@@ -3466,10 +3466,10 @@ void resetNetworkMapAttributionCacheForTest() {
 // 같은 모듈 캐시 관례로 1회만 로드해 공유한다(region 전환마다 다시 읽지 않음).
 // 로드 실패 시 캐시를 비워 다음 마운트에서 재시도하고, 그때까지 basemap 라벨은
 // 4차 자동 솔버로 전부 폴백한다(fail-safe, 크래시 금지).
-Future<Map<String, Map<String, RouteMapOwnerLabelEntry>>>?
+Future<Map<String, Map<String, List<RouteMapOwnerLabelEntry>>>>?
 _sharedOwnerLabelsByRegionFuture;
 
-Future<Map<String, Map<String, RouteMapOwnerLabelEntry>>>
+Future<Map<String, Map<String, List<RouteMapOwnerLabelEntry>>>>
 _loadNetworkMapOwnerLabelsByRegion() {
   return _sharedOwnerLabelsByRegionFuture ??= rootBundle
       .loadString(kRouteMapOwnerLabelsAssetPath)
@@ -3491,7 +3491,7 @@ void resetNetworkMapOwnerLabelsCacheForTest() {
 /// 검증할 수 있다.
 @visibleForTesting
 void primeNetworkMapOwnerLabelsCacheForTest(
-  Map<String, Map<String, RouteMapOwnerLabelEntry>> byRegion,
+  Map<String, Map<String, List<RouteMapOwnerLabelEntry>>> byRegion,
 ) {
   _sharedOwnerLabelsByRegionFuture = Future.value(byRegion);
 }
@@ -3619,7 +3619,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   Map<String, String>? _attributionTextByRegion;
   // basemap 6차(#2068): asset id(seoul/busan/...) → station명 → 오너 라벨 앵커.
   // 로드 전·실패 시 null → basemap 라벨은 4차 자동 솔버로 전부 폴백(fail-safe).
-  Map<String, Map<String, RouteMapOwnerLabelEntry>>? _ownerLabelsByRegion;
+  Map<String, Map<String, List<RouteMapOwnerLabelEntry>>>? _ownerLabelsByRegion;
   // onTapUp 경로에서만 쓰는 stationLinesById를 매 build(팬 프레임)마다 재계산하지 않도록
   // region·stations identity로 캐시한다(#1973). 800역/24노선 재계산이 build 스파이크 원인.
   Map<String, List<NetworkMapLine>>? _stationLinesByIdCache;
@@ -4008,7 +4008,9 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     }
     final ownerLabelSourceRects = ownerEntries == null || ownerEntries.isEmpty
         ? const <Rect>[]
-        : networkMapOwnerLabelSourceRects(ownerLabels: ownerEntries.values);
+        : networkMapOwnerLabelSourceRects(
+            ownerLabels: ownerEntries.values.expand((entries) => entries),
+          );
     final geometry = _MapGeometry.fromStations(
       data.stations,
       ownerLabelSourceRects: ownerLabelSourceRects,
@@ -4274,9 +4276,9 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
           widget.data.selectedRegion,
         )];
     final ownerLabelsByStationName = basemapAssetId == null
-        ? const <String, RouteMapOwnerLabelEntry>{}
+        ? const <String, List<RouteMapOwnerLabelEntry>>{}
         : _ownerLabelsByRegion?[basemapAssetId] ??
-              const <String, RouteMapOwnerLabelEntry>{};
+              const <String, List<RouteMapOwnerLabelEntry>>{};
     return Stack(
       fit: StackFit.expand,
       children: [

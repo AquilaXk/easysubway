@@ -197,7 +197,7 @@ void main() {
     expect(ownerLabels, isNotEmpty, reason: 'gwangju sidecar 엔트리가 없다');
 
     final expectedOwnerRects = networkMapOwnerLabelSourceRects(
-      ownerLabels: ownerLabels.values,
+      ownerLabels: ownerLabels.values.expand((entries) => entries),
     );
 
     // 프로덕션 _MapGeometry.fromStations와 동일 계산(테스트 노출 함수)으로
