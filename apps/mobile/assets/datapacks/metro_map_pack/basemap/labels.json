@@ -8484,7 +8484,7 @@
         "lines": []
       },
       {
-        "station": "부호(경일대·호산대)",
+        "station": "부호",
         "role": "ordinary",
         "x": 4224.707,
         "y": 1757.6,
@@ -8549,7 +8549,7 @@
         "lines": []
       },
       {
-        "station": "서대구",
+        "station": "서대구역",
         "role": "ordinary",
         "x": 1979.4046,
         "y": 1313.5577,
@@ -8814,7 +8814,7 @@
         "station": "용지",
         "role": "terminal",
         "x": 4332,
-        "y": 716.3,
+        "y": 746,
         "anchor": "middle",
         "fontSizePx": 29,
         "lines": [],
@@ -8932,7 +8932,7 @@
         "station": "칠곡경대병원",
         "role": "terminal",
         "x": 1577,
-        "y": 1926.6,
+        "y": 1954,
         "anchor": "middle",
         "fontSizePx": 29,
         "lines": [],
@@ -8993,7 +8993,7 @@
         "lines": []
       },
       {
-        "station": "하양(대구가톨릭대)",
+        "station": "하양",
         "role": "terminal",
         "x": 4332,
         "y": 1657.5,
@@ -9108,7 +9108,7 @@
       {
         "station": "구암",
         "role": "ordinary",
-        "x": 1440,
+        "x": 1462,
         "y": 182,
         "anchor": "middle",
         "fontSizePx": 54,
@@ -9217,7 +9217,7 @@
       {
         "station": "유성온천",
         "role": "transfer",
-        "x": 1260,
+        "x": 1238,
         "y": 182,
         "anchor": "middle",
         "fontSizePx": 58,

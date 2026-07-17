@@ -3422,7 +3422,7 @@
       <text
          id="station-label-line1-117"
          class="station-label ordinary"
-         x="1440"
+         x="1462"
          y="182"
          text-anchor="middle"
          font-size="54"
@@ -3437,7 +3437,7 @@
          data-node-y="240"
          data-status="active"><tspan
            class="station-main"
-           x="1440"
+           x="1462"
            dy="0"
            id="tspan104">구암</tspan></text>
       <text
@@ -4858,7 +4858,7 @@
       <text
          id="station-label-transfer-116-225"
          class="station-label transfer"
-         x="1260"
+         x="1238"
          y="182"
          text-anchor="middle"
          font-size="58"
@@ -4874,11 +4874,11 @@
          data-status="active"
          data-construction-lines="2"><tspan
            class="station-main"
-           x="1260"
+           x="1238"
            dy="0"
            id="tspan196">유성온천</tspan><tspan
            class="station-sub"
-           x="1260"
+           x="1238"
            dy="44.11"
            font-size="37.58px"
            fill="#687681"

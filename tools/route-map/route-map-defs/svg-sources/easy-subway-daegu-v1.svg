@@ -619,7 +619,7 @@
          stroke-width="8"
          stroke-linecap="round"
          stroke-linejoin="round"
-         d="M 285 1352 H 1976 C 2052 1352 2052 1404 2052 1456 C 2052 1573 2242 1716 2394 1716 H 2508 C 2536.5 1716 2555.5 1742 2584 1742 H 2755 C 2793 1742 2821.5 1722.5 2848.879 1703 C 2983 1612 3173 1352 3361.879 1352 H 4332"
+         d="M 205 1352 H 1976 C 2052 1352 2052 1404 2052 1456 C 2052 1573 2242 1716 2394 1716 H 2508 C 2536.5 1716 2555.5 1742 2584 1742 H 2755 C 2793 1742 2821.5 1722.5 2848.879 1703 C 2983 1612 3173 1352 3361.879 1352 H 4413"
          data-geometry="soft-cubic-connected-daegyeong"
          data-curve-policy="soft-cubic-at-every-direction-change"
          data-straight-segments="preserved-between-curves" />
@@ -672,38 +672,6 @@
          data-geometry="soft-cubic-connected-line1"
          data-curve-policy="soft-cubic-at-every-direction-change"
          data-straight-segments="preserved-between-curves" />
-          <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line1" id="line-terminal-badge-line1-209-676">
-        <circle cx="209.00" cy="676.00" r="30" fill="#EE265B" data-role="line-terminal-badge" />
-        <text x="209.00" y="676.00" fill="#FFFFFF" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">1</text>
-      </g>
-      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line1" id="line-terminal-badge-line1-4332-1716">
-        <circle cx="4332.00" cy="1716.00" r="30" fill="#EE265B" data-role="line-terminal-badge" />
-        <text x="4332.00" y="1716.00" fill="#FFFFFF" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">1</text>
-      </g>
-      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line2" id="line-terminal-badge-line2-209-1066">
-        <circle cx="209.00" cy="1066.00" r="30" fill="#00B794" data-role="line-terminal-badge" />
-        <text x="209.00" y="1066.00" fill="#FFFFFF" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">2</text>
-      </g>
-      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line2" id="line-terminal-badge-line2-4332-1066">
-        <circle cx="4332.00" cy="1066.00" r="30" fill="#00B794" data-role="line-terminal-badge" />
-        <text x="4332.00" y="1066.00" fill="#FFFFFF" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">2</text>
-      </g>
-      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line3" id="line-terminal-badge-line3-1577-1885">
-        <circle cx="1577.00" cy="1885.00" r="30" fill="#FFC513" data-role="line-terminal-badge" />
-        <text x="1577.00" y="1885.00" fill="#344258" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">3</text>
-      </g>
-      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line3" id="line-terminal-badge-line3-4332-676">
-        <circle cx="4332.00" cy="676.00" r="30" fill="#FFC513" data-role="line-terminal-badge" />
-        <text x="4332.00" y="676.00" fill="#344258" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">3</text>
-      </g>
-      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="daegyeong" id="line-terminal-badge-daegyeong-285-1352">
-        <rect x="237.00" y="1324.00" width="96" height="56" rx="28" ry="28" fill="#0066B3" data-role="line-terminal-badge" />
-        <text x="285.00" y="1352.00" fill="#FFFFFF" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">대경</text>
-      </g>
-      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="daegyeong" id="line-terminal-badge-daegyeong-4332-1352">
-        <rect x="4284.00" y="1324.00" width="96" height="56" rx="28" ry="28" fill="#0066B3" data-role="line-terminal-badge" />
-        <text x="4332.00" y="1352.00" fill="#FFFFFF" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">대경</text>
-      </g>
 </g>
 
     <g
@@ -2805,6 +2773,43 @@
       </g>
     </g>
     <g
+       id="line-terminal-badges-layer"
+       data-name="종점 호선 마크"
+       class="render-layer line-terminal-badge-layer">
+      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line1" id="line-terminal-badge-line1-209-676">
+        <circle cx="209.00" cy="676.00" r="30" fill="#EE265B" data-role="line-terminal-badge" />
+        <text x="209.00" y="676.00" fill="#FFFFFF" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">1</text>
+      </g>
+      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line1" id="line-terminal-badge-line1-4332-1716">
+        <circle cx="4332.00" cy="1716.00" r="30" fill="#EE265B" data-role="line-terminal-badge" />
+        <text x="4332.00" y="1716.00" fill="#FFFFFF" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">1</text>
+      </g>
+      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line2" id="line-terminal-badge-line2-209-1066">
+        <circle cx="209.00" cy="1066.00" r="30" fill="#00B794" data-role="line-terminal-badge" />
+        <text x="209.00" y="1066.00" fill="#FFFFFF" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">2</text>
+      </g>
+      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line2" id="line-terminal-badge-line2-4332-1066">
+        <circle cx="4332.00" cy="1066.00" r="30" fill="#00B794" data-role="line-terminal-badge" />
+        <text x="4332.00" y="1066.00" fill="#FFFFFF" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">2</text>
+      </g>
+      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line3" id="line-terminal-badge-line3-1577-1885">
+        <circle cx="1577.00" cy="1885.00" r="30" fill="#FFC513" data-role="line-terminal-badge" />
+        <text x="1577.00" y="1885.00" fill="#344258" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">3</text>
+      </g>
+      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line3" id="line-terminal-badge-line3-4332-676">
+        <circle cx="4332.00" cy="676.00" r="30" fill="#FFC513" data-role="line-terminal-badge" />
+        <text x="4332.00" y="676.00" fill="#344258" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">3</text>
+      </g>
+      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="daegyeong" id="line-terminal-badge-daegyeong-205-1352">
+        <rect x="157.00" y="1324.00" width="96" height="56" rx="28" ry="28" fill="#0066B3" data-role="line-terminal-badge" />
+        <text x="205.00" y="1352.00" fill="#FFFFFF" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">대경</text>
+      </g>
+      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="daegyeong" id="line-terminal-badge-daegyeong-4413-1352">
+        <rect x="4365.00" y="1324.00" width="96" height="56" rx="28" ry="28" fill="#0066B3" data-role="line-terminal-badge" />
+        <text x="4413.00" y="1352.00" fill="#FFFFFF" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">대경</text>
+      </g>
+    </g>
+    <g
        id="station-name-labels-layer"
        class="render-layer label-layer">
       <text
@@ -3758,7 +3763,7 @@
            id="tspan218">범물</tspan></text>
       <text
          x="4332.0000"
-         y="716.3000"
+         y="746.0000"
          text-anchor="middle"
          font-size="29"
          font-weight="700"
@@ -3839,7 +3844,7 @@
          data-label-side="below">
         <text
            x="1577.0000"
-           y="1926.6000"
+           y="1954.0000"
            text-anchor="middle"
            font-size="29"
            font-weight="800"
