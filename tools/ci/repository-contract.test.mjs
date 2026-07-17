@@ -3145,14 +3145,14 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.deepEqual(
     postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.validatedArtifactIdentityEvidence,
     {
-      aabPayload: ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/fixed-release-rehearsal-summary.json",
+      aabPayload: ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260717/fixed-release-rehearsal-summary.json",
       backend: "apps/mobile/release/operations-release-evidence.json",
       dataPackManifest: "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
     },
   );
   assert.deepEqual(postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.evidenceValidity, {
-    appVersionName: "1.0.4",
-    versionCode: 10005,
+    appVersionName: "1.0.5",
+    versionCode: 10006,
     validFromKst: "2026-07-15",
     validUntilKst: "2026-07-28",
     refreshOn: [
@@ -3350,7 +3350,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     ),
   );
   assert.equal(supportIncidentResponseGate.latestQaEvidenceSummary.helpScreenDeviceQa.result, "PASS");
-  assert.equal(supportIncidentResponseGate.latestQaEvidenceSummary.helpScreenDeviceQa.versionCode, 10005);
+  assert.equal(supportIncidentResponseGate.latestQaEvidenceSummary.helpScreenDeviceQa.versionCode, 10006);
   assert.match(
     supportIncidentResponseGate.latestQaEvidenceSummary.helpScreenDeviceQa.localOnlyEvidence,
     /fixed-release-help-ui-summary\.json$/,

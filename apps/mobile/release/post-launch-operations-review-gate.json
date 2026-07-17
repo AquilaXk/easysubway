@@ -28,18 +28,18 @@
       "requiredFields": ["gitSha", "versionCode", "aabSha256", "aabPayloadSha256", "dataPackManifestSha256", "supportContactSetSha256"],
       "backendIdentityFieldsAnyOf": ["backendImageDigest", "backendArtifactSha256"],
       "validatedArtifactIdentity": {
-        "aabPayloadSha256": "6c4962a7858d7b6887d22770adaa1a3988dbed17f36d76e1298bd789639ad281",
-        "backendArtifactSha256": "8bc8f71f92fa82b38739a02424c6758f317b6dd4d3f07398cdf29a886c4b5f98",
+        "aabPayloadSha256": "e83fc611df261ab99ce268ae9ac47e2d193253a01cc28801a32d4cca8507b663",
+        "backendArtifactSha256": "74a3e35762d1973c0b05a0c0bd6f0fc6aa2a4657ef23cde359cf100e0830f631",
         "dataPackManifestSha256": "2ee9f38f3e748d7bbc6d9eba124b34e6b5c8ad539338a6cdeee7a472515456e5"
       },
       "validatedArtifactIdentityEvidence": {
-        "aabPayload": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/fixed-release-rehearsal-summary.json",
+        "aabPayload": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260717/fixed-release-rehearsal-summary.json",
         "backend": "apps/mobile/release/operations-release-evidence.json",
         "dataPackManifest": "apps/mobile/assets/datapacks/metro_map_pack/manifest.json"
       },
       "evidenceValidity": {
-        "appVersionName": "1.0.4",
-        "versionCode": 10005,
+        "appVersionName": "1.0.5",
+        "versionCode": 10006,
         "validFromKst": "2026-07-15",
         "validUntilKst": "2026-07-28",
         "refreshOn": [
@@ -53,7 +53,7 @@
         {
           "refreshOn": "operations-contract-change",
           "files": [
-            {"path": "apps/mobile/release/operations-release-evidence.json", "sha256": "cd82b6d68201b6e9be6e060ca3ea84af23b5f8226564bfcfdeebb761484d33cd"},
+            {"path": "apps/mobile/release/operations-release-evidence.json", "sha256": "4b9a020a318fc88fd01940f5dd8d642d281dcecec9a28dab9871a895c5599ba6"},
             {"path": "apps/mobile/release/operations-observability-gate.json", "sha256": "6955ac139fbc57be0721bb955e834164015050f397f2562e4402298578027afe"},
             {"path": "tools/ops/generate-operations-phase-a-summary.mjs", "sha256": "e89a520d6b229c5fd042ef8bcaf74873476c7253cd03b48fac1de21cf55e0c4d"},
             {"path": "tools/ops/validate-operations-release-summary.mjs", "sha256": "71a2a51da2b9c3a20d14512b608bccfbfee9022ca5718b77d44ff9254cc67979"},
@@ -66,7 +66,7 @@
         {
           "refreshOn": "support-contact-or-help-ui-change",
           "files": [
-            {"path": "apps/mobile/release/support-incident-response-gate.json", "sha256": "82db73ed9b0e84ed140f8ebc16326844dd2cc58181b918806fa4aba29bfcb4ca"},
+            {"path": "apps/mobile/release/support-incident-response-gate.json", "sha256": "2b1942f223b63aa18cae0481649d46fa41a671ddae4dccab041098ca3e2d6903"},
             {"path": "apps/mobile/lib/app/easy_subway_app.dart", "sha256": "511b39bfbda4d6196218bb488f9e7a1bf606f193eeea550d4cc0336c6a7d2e42"},
             {"path": "apps/mobile/lib/app/app_components.dart", "sha256": "f0a53231cc819a6136049b979334d215968a54f0ce5cf8f17c1952674c926ac5"},
             {"path": "apps/mobile/lib/app/accessibility_theme.dart", "sha256": "a13c1ded6008a883060ef34bb52d3e54a83b103d0c0bcfba05fd6e9370e9128a"},
@@ -95,7 +95,7 @@
           "refreshOn": "fixed-release-procedure-change",
           "files": [
             {"path": "apps/mobile/release/signed-release-artifact-gate.json", "sha256": "42c9f83dca5a1c2c24d921cf6ab748c9be5a901dd1b62212a81055098349fc67"},
-            {"path": "apps/mobile/pubspec.yaml", "sha256": "b0ca261e81f1ded21492c7eddd96d99b42765146fe2d93f8ea48d57a253b3713"},
+            {"path": "apps/mobile/pubspec.yaml", "sha256": "ec5ef88e660b4841a0e96a1b88076348caa1c70d4e0ee8fe6fbe5a0704690ed3"},
             {"path": ".github/workflows/release-artifacts.yml", "sha256": "dc786c8629a0930a0678d51eba68259f77cb9fe6ea7e15e59d0731f0757a1af6"},
             {"path": ".github/workflows/datapack-release.yml", "sha256": "907aa513c9b2cb0c2002e0c240d7d404c73dc8ed5691ab8d89da68e38251b7bc"},
             {"path": "tools/ci/validate-store-privacy-env.mjs", "sha256": "18bb0dd8b93d6268c8f60f9cc12272d2ff31c03b60fbbafd6c1e8d16957ada2a"},
