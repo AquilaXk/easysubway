@@ -2170,6 +2170,10 @@ class RouteSearchStep {
   bool get isSubwayExpress =>
       serviceClass == 'SUBWAY' && servicePattern == 'EXPRESS';
 
+  /// 승차 정보 영역에 `ITX-청춘` 서비스 식별 배지를 노출하는 유일한 조건. 별도
+  /// 운임의 좌석 지정 서비스라 같은 노선의 일반 전동차와 구분해 표시한다.
+  bool get isItxCheongchun => serviceClass == 'ITX_CHEONGCHUN';
+
   RouteSearchStep withDisplayLabels({
     required String title,
     required String lineName,
@@ -6089,6 +6093,20 @@ class _RouteStepTile extends StatelessWidget {
               child: Semantics(
                 label: '급행',
                 child: const ServicePatternBadge.express(),
+              ),
+            ),
+          ],
+          // ITX-청춘 승차 leg는 별도 운임의 좌석 지정 서비스라 같은 노선 일반 전동차와
+          // 구분해 표시한다. serviceClass=SUBWAY와 상호 배타라 급행 배지와 동시에
+          // 붙지 않는다. 배지는 장식이라 ExcludeSemantics로 두고 TalkBack용
+          // `ITX-청춘`은 이 Semantics가 한 번만 준다.
+          if (step.stepType == 'ride' && step.isItxCheongchun) ...[
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Semantics(
+                label: 'ITX-청춘',
+                child: const ServicePatternBadge.itxCheongchun(),
               ),
             ),
           ],
