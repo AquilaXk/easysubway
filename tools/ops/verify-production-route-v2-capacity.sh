@@ -85,21 +85,44 @@ gateway_env_file="${work_dir}/gateway.env"
 tokens_file="${work_dir}/tokens.tsv"
 metrics_file="${work_dir}/metrics.tsv"
 logs_file="${work_dir}/service.log"
+resource_metrics_file="${work_dir}/resource.tsv"
+resource_stop_file="${work_dir}/resource.stop"
+resource_sampler_pid=""
+
+stop_resource_sampler() {
+	[[ -n "${resource_sampler_pid}" ]] || return 0
+	if kill -0 "${resource_sampler_pid}" >/dev/null 2>&1; then
+		: > "${resource_stop_file}" || return 1
+	fi
+	if ! wait "${resource_sampler_pid}"; then
+		return 1
+	fi
+	resource_sampler_pid=""
+}
 
 cleanup() {
 	local cleanup_failed=0
-	local container
+	local container existing_object
+	if ! stop_resource_sampler; then
+		cleanup_failed=1
+	fi
 	for container in "${clone_gateway}" "${clone_backend}" "${clone_db}"; do
-		if docker container inspect "${container}" >/dev/null 2>&1 \
+		if ! existing_object="$(docker container ls -a --filter "name=^/${container}$" --format '{{.Names}}')"; then
+			cleanup_failed=1
+		elif [[ "${existing_object}" == "${container}" ]] \
 			&& ! docker rm -f "${container}" >/dev/null 2>&1; then
 			cleanup_failed=1
 		fi
 	done
-	if docker volume inspect "${volume}" >/dev/null 2>&1 \
+	if ! existing_object="$(docker volume ls --filter "name=^${volume}$" --format '{{.Name}}')"; then
+		cleanup_failed=1
+	elif [[ "${existing_object}" == "${volume}" ]] \
 		&& ! docker volume rm "${volume}" >/dev/null 2>&1; then
 		cleanup_failed=1
 	fi
-	if docker network inspect "${network}" >/dev/null 2>&1 \
+	if ! existing_object="$(docker network ls --filter "name=^${network}$" --format '{{.Name}}')"; then
+		cleanup_failed=1
+	elif [[ "${existing_object}" == "${network}" ]] \
 		&& ! docker network rm "${network}" >/dev/null 2>&1; then
 		cleanup_failed=1
 	fi
@@ -128,6 +151,31 @@ postgres_user="$(read_env_value "${postgres_env_file}" POSTGRES_USER)"
 postgres_db="$(read_env_value "${postgres_env_file}" POSTGRES_DB)"
 [[ "${postgres_user}" =~ ^[A-Za-z0-9_.-]+$ && "${postgres_db}" =~ ^[A-Za-z0-9_.-]+$ ]] \
 	|| { echo 'production PostgreSQL identity is invalid' >&2; exit 1; }
+
+production_psql() {
+	local sql="${1:?SQL is required}"
+	docker exec easysubway-postgres sh -lc \
+		'psql -X -v ON_ERROR_STOP=1 -A -t -U "$POSTGRES_USER" "$POSTGRES_DB" -c "$1"' sh "${sql}"
+}
+available_bytes() {
+	local path="${1:?filesystem path is required}"
+	local available_kib
+	available_kib="$(df -Pk "${path}" | awk 'NR == 2 { print $4 }')"
+	[[ "${available_kib}" =~ ^[0-9]+$ ]] || { echo 'filesystem available capacity is invalid' >&2; exit 1; }
+	printf '%s\n' "$((available_kib * 1024))"
+}
+database_size_bytes="$(production_psql 'SELECT pg_database_size(current_database());')"
+[[ "${database_size_bytes}" =~ ^[1-9][0-9]*$ ]] || { echo 'production database size is invalid' >&2; exit 1; }
+required_copy_bytes="$((database_size_bytes * 4 + 2147483648))"
+docker_root_dir="$(docker info --format '{{.DockerRootDir}}')"
+[[ "${docker_root_dir}" =~ ^/[A-Za-z0-9._/-]+$ && "${docker_root_dir}" != *..* && -d "${docker_root_dir}" ]] \
+	|| { echo 'Docker data root is invalid' >&2; exit 1; }
+dump_available_bytes="$(available_bytes "${work_dir}")"
+docker_available_bytes="$(available_bytes "${docker_root_dir}")"
+if (( dump_available_bytes < required_copy_bytes || docker_available_bytes < required_copy_bytes )); then
+	echo 'insufficient capacity for production dump and isolated restore' >&2
+	exit 1
+fi
 
 docker exec easysubway-postgres sh -lc \
 	'pg_dump --format=custom --no-owner --no-privileges -U "$POSTGRES_USER" "$POSTGRES_DB"' > "${backup_file}"
@@ -182,7 +230,8 @@ process.stdout.write(new Date(departure + 9 * 60 * 60_000).toISOString().replace
 docker run -d --name "${clone_backend}" --network "${network}" --network-alias backend \
 	--env-file "${backend_env_file}" \
 	-e "EASYSUBWAY_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${postgres_db}" \
-	-e EASYSUBWAY_SCHEDULING_ENABLED=false \
+	-e EASYSUBWAY_SCHEDULING_ENABLED=true \
+	-e EASYSUBWAY_ROUTE_V2_STATE_PURGE_INTERVAL_MS=1000 \
 	-e EASYSUBWAY_PUSH_EXTERNAL_ENABLED=false \
 	-e EASYSUBWAY_PUSH_DELIVERY_ENABLED=false \
 	-e EASYSUBWAY_TIMETABLE_SEED_ENABLED=false \
@@ -300,6 +349,14 @@ send_search() {
 		|| { echo 'Route V2 response is missing Cache-Control: private, no-store' >&2; exit 1; }
 }
 
+(
+	while [[ ! -e "${resource_stop_file}" ]]; do
+		docker stats --no-stream --format '{{.MemPerc}} {{.CPUPerc}}' "${clone_backend}" >> "${resource_metrics_file}"
+		sleep 1
+	done
+) &
+resource_sampler_pid=$!
+
 mapfile -t tokens < <(cut -f 1 "${tokens_file}")
 (( ${#tokens[@]} >= search_rate + 3 )) || { echo 'not enough synthetic sessions' >&2; exit 1; }
 unexpected_error_count=0
@@ -386,42 +443,57 @@ node -e '
 const value = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
 if (value.code !== "ITX_TIMETABLE_UNAVAILABLE") process.exit(1);
 ' "${last_body}" || { echo 'unavailable response machine code mismatch' >&2; exit 1; }
+stop_resource_sampler || { echo 'load resource sampler failed' >&2; exit 1; }
+resource_summary="$(node -e '
+const rows = require("node:fs").readFileSync(process.argv[1], "utf8").trim().split(/\n/).filter(Boolean);
+if (rows.length === 0) process.exit(1);
+const samples = rows.map((line) => line.trim().split(/\s+/).map((value) => Number(value.replace(/%$/, ""))));
+if (samples.some(([memory, cpu]) => !Number.isFinite(memory) || !Number.isFinite(cpu))) process.exit(1);
+const memoryPeak = Math.max(...samples.map(([memory]) => memory));
+const cpuPeak = Math.max(...samples.map(([, cpu]) => cpu));
+process.stdout.write(`${memoryPeak} ${cpuPeak} ${samples.length}`);
+' "${resource_metrics_file}")" || { echo 'load resource samples are invalid' >&2; exit 1; }
+read -r memory_peak cpu_peak resource_sample_count <<< "${resource_summary}"
+[[ "${memory_peak}" =~ ^[0-9]+([.][0-9]+)?$ && "${cpu_peak}" =~ ^[0-9]+([.][0-9]+)?$ \
+	&& "${resource_sample_count}" =~ ^[1-9][0-9]*$ ]] || { echo 'load resource peak summary is invalid' >&2; exit 1; }
 
 expired_hash="$(node -e 'process.stdout.write(require("node:crypto").createHash("sha256").update("issue-2095-expired-session").digest("hex"))')"
-expired_baseline="$(clone_psql "SELECT
-  (SELECT COUNT(*) FROM route_v2_states WHERE expires_at <= CURRENT_TIMESTAMP),
-  (SELECT COUNT(*) FROM route_v2_sessions WHERE expires_at <= CURRENT_TIMESTAMP),
-  (SELECT COUNT(*) FROM route_v2_nonce_replays WHERE expires_at <= CURRENT_TIMESTAMP);")"
-IFS='|' read -r baseline_expired_states baseline_expired_sessions baseline_expired_nonces <<< "${expired_baseline}"
-for baseline_count in "${baseline_expired_states}" "${baseline_expired_sessions}" "${baseline_expired_nonces}"; do
-	[[ "${baseline_count}" =~ ^[0-9]+$ ]] || { echo 'expired-row baseline is invalid' >&2; exit 1; }
-done
-expected_purged_states=$((baseline_expired_states + 1))
-expected_purged_sessions=$((baseline_expired_sessions + 1))
-expected_purged_nonces=${baseline_expired_nonces}
+expired_nonce_hash="$(node -e 'process.stdout.write(require("node:crypto").createHash("sha256").update("issue-2095-expired-nonce").digest("hex"))')"
+purge_started_ms="$(date +%s%3N)"
 clone_psql "
 INSERT INTO route_v2_sessions (token_sha256, scope, issued_at, expires_at, request_count)
 VALUES ('${expired_hash}', 'route:v2:itx', CURRENT_TIMESTAMP - INTERVAL '20 minutes', CURRENT_TIMESTAMP - INTERVAL '10 minutes', 0);
+INSERT INTO route_v2_nonce_replays (nonce_sha256, expires_at)
+VALUES ('${expired_nonce_hash}', CURRENT_TIMESTAMP - INTERVAL '10 minutes');
 INSERT INTO route_v2_states (route_state_id, origin_station_id, destination_station_id, transport_scope,
   requested_departure_at, itinerary_json, timetable_artifact_id, created_at, planned_arrival_at, expires_at)
 VALUES ('route-2095-expired', 'synthetic-origin', 'synthetic-destination', 'SUBWAY_AND_ITX_CHEONGCHUN',
-  CURRENT_TIMESTAMP - INTERVAL '7 hours', '{}', 'synthetic-2095',
-  CURRENT_TIMESTAMP - INTERVAL '7 hours', CURRENT_TIMESTAMP - INTERVAL '7 hours', CURRENT_TIMESTAMP - INTERVAL '6 hours 30 minutes');" >/dev/null
-purge_started_ms="$(date +%s%3N)"
-purged_counts="$(clone_psql "WITH states AS (DELETE FROM route_v2_states WHERE expires_at <= CURRENT_TIMESTAMP RETURNING 1), sessions AS (DELETE FROM route_v2_sessions WHERE expires_at <= CURRENT_TIMESTAMP RETURNING 1), nonces AS (DELETE FROM route_v2_nonce_replays WHERE expires_at <= CURRENT_TIMESTAMP RETURNING 1) SELECT (SELECT COUNT(*) FROM states), (SELECT COUNT(*) FROM sessions), (SELECT COUNT(*) FROM nonces);")"
+	  CURRENT_TIMESTAMP - INTERVAL '7 hours', '{}', 'synthetic-2095',
+	  CURRENT_TIMESTAMP - INTERVAL '7 hours', CURRENT_TIMESTAMP - INTERVAL '7 hours', CURRENT_TIMESTAMP - INTERVAL '6 hours 30 minutes');" >/dev/null
+synthetic_purge_remaining="1|1|1"
+for _ in $(seq 1 120); do
+	synthetic_purge_remaining="$(clone_psql "SELECT
+  (SELECT COUNT(*) FROM route_v2_states WHERE route_state_id = 'route-2095-expired'),
+  (SELECT COUNT(*) FROM route_v2_sessions WHERE token_sha256 = '${expired_hash}'),
+  (SELECT COUNT(*) FROM route_v2_nonce_replays WHERE nonce_sha256 = '${expired_nonce_hash}');")"
+	[[ "${synthetic_purge_remaining}" == "0|0|0" ]] && break
+	sleep 1
+done
 purge_finished_ms="$(date +%s%3N)"
 purge_ms=$((purge_finished_ms - purge_started_ms))
-IFS='|' read -r purged_states purged_sessions purged_nonces <<< "${purged_counts}"
-[[ "${purged_states}" == "${expected_purged_states}" \
-	&& "${purged_sessions}" == "${expected_purged_sessions}" \
-	&& "${purged_nonces}" == "${expected_purged_nonces}" ]] \
-	|| { echo 'purge profile did not delete the baseline plus synthetic expired rows' >&2; exit 1; }
+[[ "${synthetic_purge_remaining}" == "0|0|0" ]] \
+	|| { echo 'application purge path did not delete all synthetic expired rows' >&2; exit 1; }
 (( purge_ms <= 600000 )) || { echo 'purge exceeded the 10 minute deletion budget' >&2; exit 1; }
+purged_states=1
+purged_sessions=1
+purged_nonces=1
 
 docker logs "${clone_backend}" > "${logs_file}" 2>&1
 docker logs "${clone_gateway}" >> "${logs_file}" 2>&1
 grep -Fq 'route V2 timetable cache result=miss' "${logs_file}" || { echo 'cache miss evidence is missing' >&2; exit 1; }
 grep -Fq 'route V2 timetable cache result=hit' "${logs_file}" || { echo 'cache hit evidence is missing' >&2; exit 1; }
+grep -Eq 'Purged [1-9][0-9]* expired Route V2 state rows' "${logs_file}" \
+	|| { echo 'application purge scheduler evidence is missing' >&2; exit 1; }
 if grep -Eqi 'Authorization:|Bearer [A-Za-z0-9_-]+|CF-Connecting-IP|station-sangnoksu|station-sadang' "${logs_file}"; then
 	echo 'service logs contain a forbidden request identifier' >&2
 	exit 1
@@ -461,8 +533,6 @@ p99="$(sed -nE 's/.*p99=([0-9]+).*/\1/p' <<< "${latency_summary}")"
 oom_killed="$(docker inspect --format '{{.State.OOMKilled}}' "${clone_backend}")"
 restart_count="$(docker inspect --format '{{.RestartCount}}' "${clone_backend}")"
 [[ "${oom_killed}" == false && "${restart_count}" == 0 ]] || { echo 'isolated backend restarted or was OOM-killed' >&2; exit 1; }
-resource_sample="$(docker stats --no-stream --format '{{.MemPerc}} memory, {{.CPUPerc}} cpu' "${clone_backend}")"
-[[ -n "${resource_sample}" ]] || { echo 'resource sample is missing' >&2; exit 1; }
 
 [[ "$(public_status /api/v2/routes/session)" == 404 && "$(public_status /api/v2/routes/search)" == 404 ]] \
 	|| { echo 'production Route V2 ingress changed during isolated evidence' >&2; exit 1; }
@@ -485,7 +555,7 @@ summary_file="${GITHUB_STEP_SUMMARY:-/dev/stdout}"
 	echo '- profile=unavailable: PASS, exact 503 ITX_TIMETABLE_UNAVAILABLE'
 	echo "- HTTP status counts: ${status_summary}"
 	echo "- latency: ${latency_summary} ms"
-	echo "- resource: ${resource_sample}, OOM=false, restart=0"
+	echo "- resource during load: memory_peak=${memory_peak}% cpu_peak=${cpu_peak}% samples=${resource_sample_count}, OOM=false, restart=0"
 	echo "- purge: states=${purged_states} sessions=${purged_sessions} nonces=${purged_nonces} duration_ms=${purge_ms}, budget_ms=600000"
 	echo '- isolated synthetic data cleanup: PASS'
 	echo '- cache: miss=1+, hit=1+'
