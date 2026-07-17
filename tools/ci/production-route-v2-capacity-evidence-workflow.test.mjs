@@ -51,6 +51,9 @@ test("capacity runner는 동일 candidate·격리 load·privacy·closed ingress�
   assert.match(runner, /profile=normal/);
   assert.match(runner, /profile=burst/);
   assert.match(runner, /profile=unavailable/);
+  assert.match(runner, /normal search profile did not return exact 200/);
+  assert.match(runner, /search burst profile did not return exact 200 before rate limiting/);
+  assert.doesNotMatch(runner, /capacity accepts its current 200\/503 contract states/);
   assert.match(runner, /EASYSUBWAY_ROUTE_V2_SESSION_RATE_PER_MINUTE/);
   assert.match(runner, /EASYSUBWAY_ROUTE_V2_SEARCH_RATE_PER_MINUTE/);
   assert.match(runner, /Retry-After/);

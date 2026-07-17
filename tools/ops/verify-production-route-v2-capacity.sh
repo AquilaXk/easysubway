@@ -435,14 +435,10 @@ grep -Eqi '^Retry-After: [1-9][0-9]*' "${last_headers}" || { echo 'session 429 i
 
 for ((index = 0; index < search_rate; index += 1)); do
 	send_search normal "${tokens[${index}]}" "198.51.100.$((index + 1))"
-	case "${last_status}" in
-		200|503) ;;
-		*) unexpected_error_count=$((unexpected_error_count + 1)) ;;
-	esac
+	[[ "${last_status}" == 200 ]] || { echo 'normal search profile did not return exact 200' >&2; exit 1; }
 done
 (( unexpected_error_count == 0 )) || { echo 'normal profile observed an unexpected status' >&2; exit 1; }
 
-# ponytail: planner completion belongs to #2098; capacity accepts its current 200/503 contract states.
 burst_token="${tokens[${search_rate}]}"
 burst_pids=()
 burst_headers_files=()
@@ -476,11 +472,8 @@ for index in "${!burst_pids[@]}"; do
 	printf '%s\t%s\t%s\n' burst "${last_status}" "${burst_latency_ms}" >> "${metrics_file}"
 	grep -Eqi '^Cache-Control:[[:space:]]*private,[[:space:]]*no-store[[:space:]]*\r?$' "${burst_headers_files[${index}]}" \
 		|| { echo 'concurrent Route V2 response is missing Cache-Control: private, no-store' >&2; exit 1; }
-	case "${last_status}" in
-		200|503) ;;
-		429) echo 'burst limiter rejected before the configured burst was consumed' >&2; exit 1 ;;
-		*) echo 'search burst profile observed an unexpected status' >&2; exit 1 ;;
-	esac
+	[[ "${last_status}" == 200 ]] \
+		|| { echo 'search burst profile did not return exact 200 before rate limiting' >&2; exit 1; }
 done
 send_search burst "${burst_token}" 198.51.100.200
 [[ "${last_status}" == 429 ]] || { echo 'burst profile did not return exact 429' >&2; exit 1; }
