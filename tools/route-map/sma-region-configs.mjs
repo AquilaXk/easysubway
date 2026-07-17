@@ -136,9 +136,10 @@ const BUSAN = {
     if (name === "좌천") return { name, disambiguateByLine: true };
     return { name };
   },
-  // 범례 노선 swatch(medY≈166, len 42px)는 콘텐츠 밴드 밖으로 배제한다. 실 노선
-  // polyline의 medY는 420~1644이므로 minY 300이면 범례만 걸러진다.
-  contentBand: { minY: 300, maxY: 2700 },
+  // 범례 노선 swatch(medY≈216, len ~107px)는 콘텐츠 밴드 밖으로 배제한다. 전면
+  // 재설계(viewBox 12000×7040) 실 노선 polyline의 medY는 2116~4780이므로 minY 300
+  // (범례 216 초과)·maxY 6000이면 범례만 걸러지고 6개 노선 stroke가 전부 포함된다.
+  contentBand: { minY: 300, maxY: 6000 },
 };
 
 // ── 대구(daegu): #2011 3단계. 오너 자작 easy-subway-daegu-v1. ─────────────────

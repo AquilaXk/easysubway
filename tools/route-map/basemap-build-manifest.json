@@ -13,7 +13,7 @@
   },
   "ownerLabelsSidecar": {
     "path": "apps/mobile/assets/datapacks/metro_map_pack/basemap/labels.json",
-    "sha256": "8984094e1981778674364f455c8b61bf86678a634659d955b7efcb907da4e54a"
+    "sha256": "9e4c7e3721770d8950c8826f12468e7f42b37c13bd259449a7b01fbb4258270c"
   },
   "maps": [
     {
@@ -35,16 +35,16 @@
       "id": "busan",
       "source": "tools/route-map/route-map-defs/svg-sources/easy-subway-busan-v1.svg",
       "compiledVector": "apps/mobile/assets/datapacks/metro_map_pack/basemap/busan.vec",
-      "sourceSvgSha256": "ff0c992550d737df14850a3ab0e01e65f023a4f38784236ed8e7b55d3b1c3dfd",
-      "normalizedSvgSha256": "e43af0010f9596b51fe440766e1f5f8096ad6b79f334f831ce906dd677217da1",
-      "compiledVectorSha256": "96e3f815610012f7ebdf7569ec870d5e810f785285539385754532f36387b1a1",
+      "sourceSvgSha256": "2c241574c1f0e426422af5df474e688b03afa023d5701e5d166a027b48175182",
+      "normalizedSvgSha256": "eb6535b090437751b4b11002dd7abe13b9ef713ed9ab2ab293e1e661d5902e59",
+      "compiledVectorSha256": "08c67c18d609b3f17a9f64147f4c14c1c8bbc71ed62e7b4a293ab47475e8ef88",
       "viewBox": [
         0,
         0,
-        8116.8,
-        3698
+        12000,
+        7040
       ],
-      "ownerLabelCount": 146
+      "ownerLabelCount": 148
     },
     {
       "id": "daegu",
