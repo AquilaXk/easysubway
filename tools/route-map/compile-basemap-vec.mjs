@@ -691,6 +691,14 @@ function scaleStyleFontSize(tag, k) {
 //      baseline 속성을 제거(이후 컴파일러가 point를 k배 변환하므로 로컬 단위가 맞다).
 //      style형 전용 stray 텍스트(Inkscape 수작업)에는 baseline 속성이 없어 대상이
 //      아니다 — 이미 alphabetic 기준으로 배치돼 있으므로 y는 건드리지 않는다.
+//      계수 0.35는 번들 Pretendard 실측(컴파일 .vec 픽셀 실측, 숫자 배지 bbox
+//      중심 오차 ≤ fontSize의 2%)으로 유지가 정답임을 확인했다.
+//      주의: scale(-1)+rotate(180) 중첩 프레임(수도권 마곡나루 9호선·공항철도
+//      배지 — 전 권역 유일)에서는 이 로컬 +보정이 렌더에서 반대로 작동해 배지
+//      글자가 원 밖으로 이탈했다(#2068 오너 강반려). 그 2개 배지는 소스에서
+//      alphabetic 기준 y로 사전 중심 정렬하고 central/middle 속성을 제거해 이
+//      보정 대상에서 뺐다(easy-subway-sma-v2.svg). 따라서 여기 규칙은 축정렬(비
+//      반전) central 텍스트에만 적용되며 반전 프레임 특례가 필요 없다.
 // inlineSimpleClassStyles 이후에 적용해 class에서 온 font-size·baseline도 속성으로
 // 정리된 상태를 다룬다. text·tspan 이외 요소는 건드리지 않으며, 텍스트 내용은 불변이다.
 function normalizeTextBaselineAndScale(svgText, k) {
