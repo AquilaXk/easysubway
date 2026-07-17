@@ -1592,6 +1592,44 @@ void main() {
       expect(RouteSearchStep.fromV2(1, leg).isSubwayExpress, isFalse);
     });
 
+    test('RIDE ITX_CHEONGCHUN leg은 ITX-청춘 서비스 식별로 파생된다', () {
+      final leg = RouteSearchV2Leg.fromJson(
+        _rideLegJson(serviceClass: 'ITX_CHEONGCHUN', servicePattern: 'EXPRESS'),
+      );
+      final step = RouteSearchStep.fromV2(1, leg);
+      expect(step.isItxCheongchun, isTrue);
+      // ITX-청춘은 급행 배지와 상호 배타다.
+      expect(step.isSubwayExpress, isFalse);
+    });
+
+    test('RIDE ITX_CHEONGCHUN/LOCAL leg도 ITX-청춘 서비스 식별을 유지한다', () {
+      // isItxCheongchun은 servicePattern과 무관하게 serviceClass만 본다(의도 동작).
+      // EXPRESS 케이스만 고정되어 있으면 LOCAL 회귀를 못 잡으므로 별도로 고정한다.
+      final leg = RouteSearchV2Leg.fromJson(
+        _rideLegJson(serviceClass: 'ITX_CHEONGCHUN', servicePattern: 'LOCAL'),
+      );
+      final step = RouteSearchStep.fromV2(1, leg);
+      expect(step.isItxCheongchun, isTrue);
+      expect(step.isSubwayExpress, isFalse);
+    });
+
+    test('RIDE SUBWAY leg은 ITX-청춘이 아니다', () {
+      final local = RouteSearchStep.fromV2(
+        1,
+        RouteSearchV2Leg.fromJson(
+          _rideLegJson(serviceClass: 'SUBWAY', servicePattern: 'LOCAL'),
+        ),
+      );
+      final express = RouteSearchStep.fromV2(
+        1,
+        RouteSearchV2Leg.fromJson(
+          _rideLegJson(serviceClass: 'SUBWAY', servicePattern: 'EXPRESS'),
+        ),
+      );
+      expect(local.isItxCheongchun, isFalse);
+      expect(express.isItxCheongchun, isFalse);
+    });
+
     test('non-ride leg의 service 필드는 null만 허용한다', () {
       final walk = _rideLegJson(legType: 'WALK')
         ..remove('serviceClass')
