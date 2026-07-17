@@ -214,12 +214,13 @@ test("CANDIDATE context가 아니면 거부한다", async () => {
   );
 });
 
-test("현재 작업 브랜치 tracked source에 대해 실행하면 E1/E7/E8 PASS, E9는 ITX 배지 fix 병합 전이라 FAIL을 재현한다", () => {
+test("현재 작업 브랜치 tracked source에 대해 실행하면 E1/E7/E8/E9 모두 PASS를 재현한다(ITX 배지 fix #2245가 main에 병합됨, 4c5c93ef)", () => {
   const repoRoot = path.resolve(import.meta.dirname, "../..");
   const evidence = buildMobileConsumptionEvidence({ candidate: candidate(), repoRoot });
 
   assert.equal(evidence.integrationScenarios.E1, "PASS");
   assert.equal(evidence.integrationScenarios.E7, "PASS");
   assert.equal(evidence.integrationScenarios.E8, "PASS");
-  assert.equal(evidence.integrationScenarios.E9, "FAIL");
+  assert.equal(evidence.integrationScenarios.E9, "PASS");
+  assert.equal(evidence.status, "SATISFIED");
 });
