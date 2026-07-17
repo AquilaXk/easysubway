@@ -1592,6 +1592,33 @@ void main() {
       expect(RouteSearchStep.fromV2(1, leg).isSubwayExpress, isFalse);
     });
 
+    test('RIDE ITX_CHEONGCHUN leg은 ITX-청춘 서비스 식별로 파생된다', () {
+      final leg = RouteSearchV2Leg.fromJson(
+        _rideLegJson(serviceClass: 'ITX_CHEONGCHUN', servicePattern: 'EXPRESS'),
+      );
+      final step = RouteSearchStep.fromV2(1, leg);
+      expect(step.isItxCheongchun, isTrue);
+      // ITX-청춘은 급행 배지와 상호 배타다.
+      expect(step.isSubwayExpress, isFalse);
+    });
+
+    test('RIDE SUBWAY leg은 ITX-청춘이 아니다', () {
+      final local = RouteSearchStep.fromV2(
+        1,
+        RouteSearchV2Leg.fromJson(
+          _rideLegJson(serviceClass: 'SUBWAY', servicePattern: 'LOCAL'),
+        ),
+      );
+      final express = RouteSearchStep.fromV2(
+        1,
+        RouteSearchV2Leg.fromJson(
+          _rideLegJson(serviceClass: 'SUBWAY', servicePattern: 'EXPRESS'),
+        ),
+      );
+      expect(local.isItxCheongchun, isFalse);
+      expect(express.isItxCheongchun, isFalse);
+    });
+
     test('non-ride leg의 service 필드는 null만 허용한다', () {
       final walk = _rideLegJson(legType: 'WALK')
         ..remove('serviceClass')
