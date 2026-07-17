@@ -16,7 +16,10 @@ test("Route V2 capacity evidence는 main-only production approval을 강제한�
   assert.match(workflow, /actions\/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e/);
   assert.match(workflow, /node-version: "24"/);
   assert.match(workflow, /bash tools\/ops\/verify-production-route-v2-capacity\.sh/);
-  assert.match(workflow, /production Route V2 capacity evidence must run from main/);
+  assert.match(
+    workflow,
+    /if \[\[ "\$\{GITHUB_REF\}" != "refs\/heads\/main" \]\]; then\s+echo "production Route V2 capacity evidence must run from main" >&2\s+exit 1\s+fi/,
+  );
 });
 
 test("capacity runner는 동일 candidate·격리 load·privacy·closed ingress를 검증한다", async () => {
@@ -43,7 +46,18 @@ test("capacity runner는 동일 candidate·격리 load·privacy·closed ingress�
   assert.match(runner, /undeclared_data_transfer_count=0/);
   assert.match(runner, /sensitive_payload_count=0/);
   assert.match(runner, /ingress_closed=true/);
-  assert.match(runner, /trap cleanup EXIT/);
+  assert.match(runner, /trap cleanup_on_exit EXIT/);
+  assert.match(runner, /departure_time="\$\(node[\s\S]*?snapshot_fresh_until/);
+  assert.doesNotMatch(runner, /2026-07-17T15:00:00\+09:00/);
+  assert.match(runner, /burst_pids/);
+  assert.match(runner, /wait "\$\{burst_pid\}"/);
+  assert.match(runner, /expired_baseline/);
+  assert.match(runner, /expected_purged_states/);
+  assert.doesNotMatch(runner, /purged_counts.*1\|1\|0/);
+  assert.match(runner, /cleanup_failed/);
+  assert.doesNotMatch(runner, /docker rm[^\n]*\|\| true/);
+  assert.ok(runner.indexOf("trap - EXIT") < runner.indexOf("### Production Route V2 capacity evidence"));
+  assert.match(runner, /profile=normal: PASS, session_requests=\$\{session_rate\}, search_requests=\$\{search_rate\}/);
   assert.doesNotMatch(runner, /upload-artifact|set -x/);
   assert.doesNotMatch(runner, /gh secret set|EASYSUBWAY_ROUTE_V2_INGRESS_ENABLED=true/);
 });

@@ -7039,7 +7039,10 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   const routeCapacityRunner = read("tools/ops/verify-production-route-v2-capacity.sh");
   assert.match(routeCapacityWorkflow, /workflow_dispatch:/);
   assert.match(routeCapacityWorkflow, /environment: production/);
-  assert.match(routeCapacityWorkflow, /production Route V2 capacity evidence must run from main/);
+  assert.match(
+    routeCapacityWorkflow,
+    /if \[\[ "\$\{GITHUB_REF\}" != "refs\/heads\/main" \]\]; then\s+echo "production Route V2 capacity evidence must run from main" >&2\s+exit 1\s+fi/,
+  );
   assert.match(routeCapacityWorkflow, /tools\/ops\/verify-production-route-v2-capacity\.sh/);
   assert.match(routeCapacityRunner, /docker network create --internal/);
   assert.match(routeCapacityRunner, /--cpus 1 --memory 1g --memory-swap 1g --pids-limit 256/);
@@ -7049,7 +7052,7 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   assert.match(routeCapacityRunner, /unexpected_error_count=0/);
   assert.match(routeCapacityRunner, /undeclared_data_transfer_count=0/);
   assert.match(routeCapacityRunner, /sensitive_payload_count=0/);
-  assert.match(routeCapacityRunner, /trap cleanup EXIT/);
+  assert.match(routeCapacityRunner, /trap cleanup_on_exit EXIT/);
   assert.match(routeCapacityRunner, /ingress_closed=true/);
   assert.doesNotMatch(routeCapacityRunner, /gh secret set|EASYSUBWAY_ROUTE_V2_INGRESS_ENABLED=true/);
   assert.match(mobileRouteIngress, /'\/api\/v2\/routes\/session'/);

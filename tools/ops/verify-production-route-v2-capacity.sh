@@ -87,12 +87,37 @@ metrics_file="${work_dir}/metrics.tsv"
 logs_file="${work_dir}/service.log"
 
 cleanup() {
-	docker rm -f "${clone_gateway}" "${clone_backend}" "${clone_db}" >/dev/null 2>&1 || true
-	docker volume rm "${volume}" >/dev/null 2>&1 || true
-	docker network rm "${network}" >/dev/null 2>&1 || true
-	rm -rf "${work_dir}"
+	local cleanup_failed=0
+	local container
+	for container in "${clone_gateway}" "${clone_backend}" "${clone_db}"; do
+		if docker container inspect "${container}" >/dev/null 2>&1 \
+			&& ! docker rm -f "${container}" >/dev/null 2>&1; then
+			cleanup_failed=1
+		fi
+	done
+	if docker volume inspect "${volume}" >/dev/null 2>&1 \
+		&& ! docker volume rm "${volume}" >/dev/null 2>&1; then
+		cleanup_failed=1
+	fi
+	if docker network inspect "${network}" >/dev/null 2>&1 \
+		&& ! docker network rm "${network}" >/dev/null 2>&1; then
+		cleanup_failed=1
+	fi
+	if ! rm -rf "${work_dir}"; then
+		cleanup_failed=1
+	fi
+	return "${cleanup_failed}"
 }
-trap cleanup EXIT
+cleanup_on_exit() {
+	local original_status=$?
+	trap - EXIT
+	if ! cleanup; then
+		echo 'isolated capacity evidence cleanup failed' >&2
+		exit 1
+	fi
+	exit "${original_status}"
+}
+trap cleanup_on_exit EXIT
 
 docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' easysubway-postgres > "${postgres_env_file}"
 docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' easysubway-backend > "${backend_env_file}"
@@ -146,6 +171,13 @@ process.stdout.write(`${evidence.snapshotId}|${evidence.snapshotSha256}|${new Da
 [[ "${active_timetable_identity}" == "${expected_timetable_identity}" ]] \
 	|| { echo 'isolated restore timetable identity does not match checked-in evidence' >&2; exit 1; }
 IFS='|' read -r snapshot_id snapshot_sha256 snapshot_fresh_until <<< "${active_timetable_identity}"
+departure_time="$(node -e '
+const now = Date.now();
+const freshUntil = Date.parse(process.argv[1]);
+const departure = Math.min(now + 5 * 60_000, freshUntil - 5 * 60_000);
+if (!Number.isFinite(freshUntil) || departure <= now) process.exit(1);
+process.stdout.write(new Date(departure + 9 * 60 * 60_000).toISOString().replace(/\.\d{3}Z$/, "+09:00"));
+' "${snapshot_fresh_until}")" || { echo 'fresh timetable window is too short for capacity evidence' >&2; exit 1; }
 
 docker run -d --name "${clone_backend}" --network "${network}" --network-alias backend \
 	--env-file "${backend_env_file}" \
@@ -209,7 +241,18 @@ while IFS=$'\t' read -r _ hash; do
 done < "${tokens_file}"
 clone_psql "INSERT INTO route_v2_sessions (token_sha256, scope, issued_at, expires_at, request_count) VALUES ${session_values};" >/dev/null
 
-request_body='{"originStationId":"station-sangnoksu","destinationStationId":"station-sadang","departureTime":"2026-07-17T15:00:00+09:00","mobilityType":"SENIOR","constraintMode":"ALLOW_WITH_WARNINGS","useRealtime":false,"maxTransfers":3,"alternativeCount":1}'
+request_body="$(node -e '
+process.stdout.write(JSON.stringify({
+  originStationId: "station-sangnoksu",
+  destinationStationId: "station-sadang",
+  departureTime: process.argv[1],
+  mobilityType: "SENIOR",
+  constraintMode: "ALLOW_WITH_WARNINGS",
+  useRealtime: false,
+  maxTransfers: 3,
+  alternativeCount: 1,
+}));
+' "${departure_time}")"
 request_index=0
 last_status=""
 last_headers=""
@@ -290,8 +333,38 @@ done
 
 # ponytail: planner completion belongs to #2098; capacity accepts its current 200/503 contract states.
 burst_token="${tokens[${search_rate}]}"
+burst_pids=()
+burst_headers_files=()
+burst_result_files=()
 for ((index = 0; index <= search_burst; index += 1)); do
-	send_search burst "${burst_token}" 198.51.100.200
+	request_index=$((request_index + 1))
+	burst_headers="${work_dir}/headers-${request_index}.txt"
+	burst_body="${work_dir}/body-${request_index}.json"
+	burst_result="${work_dir}/result-${request_index}.txt"
+	(
+		curl -sS --noproxy '*' --connect-timeout 2 --max-time 10 \
+			-D "${burst_headers}" -o "${burst_body}" -w '%{http_code} %{time_total}' \
+			--request POST --header 'content-type: application/json' \
+			--header 'CF-Connecting-IP: 198.51.100.200' --header "Authorization: Bearer ${burst_token}" \
+			--data-binary "${request_body}" "${gateway_base}/api/v2/routes/search" > "${burst_result}"
+	) &
+	burst_pids+=("$!")
+	burst_headers_files+=("${burst_headers}")
+	burst_result_files+=("${burst_result}")
+done
+for index in "${!burst_pids[@]}"; do
+	burst_pid="${burst_pids[${index}]}"
+	if ! wait "${burst_pid}"; then
+		echo 'concurrent search burst request failed' >&2
+		exit 1
+	fi
+	burst_result="$(<"${burst_result_files[${index}]}")"
+	last_status="${burst_result%% *}"
+	burst_time_seconds="${burst_result#* }"
+	burst_latency_ms="$(node -e 'const value = Number(process.argv[1]); if (!Number.isFinite(value)) process.exit(1); process.stdout.write(String(Math.round(value * 1000)));' "${burst_time_seconds}")"
+	printf '%s\t%s\t%s\n' burst "${last_status}" "${burst_latency_ms}" >> "${metrics_file}"
+	grep -Eqi '^Cache-Control: private, no-store' "${burst_headers_files[${index}]}" \
+		|| { echo 'concurrent Route V2 response is missing Cache-Control: private, no-store' >&2; exit 1; }
 	case "${last_status}" in
 		200|503) ;;
 		429) echo 'burst limiter rejected before the configured burst was consumed' >&2; exit 1 ;;
@@ -315,6 +388,17 @@ if (value.code !== "ITX_TIMETABLE_UNAVAILABLE") process.exit(1);
 ' "${last_body}" || { echo 'unavailable response machine code mismatch' >&2; exit 1; }
 
 expired_hash="$(node -e 'process.stdout.write(require("node:crypto").createHash("sha256").update("issue-2095-expired-session").digest("hex"))')"
+expired_baseline="$(clone_psql "SELECT
+  (SELECT COUNT(*) FROM route_v2_states WHERE expires_at <= CURRENT_TIMESTAMP),
+  (SELECT COUNT(*) FROM route_v2_sessions WHERE expires_at <= CURRENT_TIMESTAMP),
+  (SELECT COUNT(*) FROM route_v2_nonce_replays WHERE expires_at <= CURRENT_TIMESTAMP);")"
+IFS='|' read -r baseline_expired_states baseline_expired_sessions baseline_expired_nonces <<< "${expired_baseline}"
+for baseline_count in "${baseline_expired_states}" "${baseline_expired_sessions}" "${baseline_expired_nonces}"; do
+	[[ "${baseline_count}" =~ ^[0-9]+$ ]] || { echo 'expired-row baseline is invalid' >&2; exit 1; }
+done
+expected_purged_states=$((baseline_expired_states + 1))
+expected_purged_sessions=$((baseline_expired_sessions + 1))
+expected_purged_nonces=${baseline_expired_nonces}
 clone_psql "
 INSERT INTO route_v2_sessions (token_sha256, scope, issued_at, expires_at, request_count)
 VALUES ('${expired_hash}', 'route:v2:itx', CURRENT_TIMESTAMP - INTERVAL '20 minutes', CURRENT_TIMESTAMP - INTERVAL '10 minutes', 0);
@@ -327,7 +411,11 @@ purge_started_ms="$(date +%s%3N)"
 purged_counts="$(clone_psql "WITH states AS (DELETE FROM route_v2_states WHERE expires_at <= CURRENT_TIMESTAMP RETURNING 1), sessions AS (DELETE FROM route_v2_sessions WHERE expires_at <= CURRENT_TIMESTAMP RETURNING 1), nonces AS (DELETE FROM route_v2_nonce_replays WHERE expires_at <= CURRENT_TIMESTAMP RETURNING 1) SELECT (SELECT COUNT(*) FROM states), (SELECT COUNT(*) FROM sessions), (SELECT COUNT(*) FROM nonces);")"
 purge_finished_ms="$(date +%s%3N)"
 purge_ms=$((purge_finished_ms - purge_started_ms))
-[[ "${purged_counts}" == "1|1|0" ]] || { echo 'purge profile did not delete the exact expired rows' >&2; exit 1; }
+IFS='|' read -r purged_states purged_sessions purged_nonces <<< "${purged_counts}"
+[[ "${purged_states}" == "${expected_purged_states}" \
+	&& "${purged_sessions}" == "${expected_purged_sessions}" \
+	&& "${purged_nonces}" == "${expected_purged_nonces}" ]] \
+	|| { echo 'purge profile did not delete the baseline plus synthetic expired rows' >&2; exit 1; }
 (( purge_ms <= 600000 )) || { echo 'purge exceeded the 10 minute deletion budget' >&2; exit 1; }
 
 docker logs "${clone_backend}" > "${logs_file}" 2>&1
@@ -379,8 +467,11 @@ resource_sample="$(docker stats --no-stream --format '{{.MemPerc}} memory, {{.CP
 [[ "$(public_status /api/v2/routes/session)" == 404 && "$(public_status /api/v2/routes/search)" == 404 ]] \
 	|| { echo 'production Route V2 ingress changed during isolated evidence' >&2; exit 1; }
 
-cleanup
 trap - EXIT
+if ! cleanup; then
+	echo 'isolated capacity evidence cleanup failed' >&2
+	exit 1
+fi
 
 summary_file="${GITHUB_STEP_SUMMARY:-/dev/stdout}"
 {
@@ -389,13 +480,13 @@ summary_file="${GITHUB_STEP_SUMMARY:-/dev/stdout}"
 	echo "- image digest: \`${current_digest}\`"
 	echo "- timetable: \`${snapshot_id}\`, SHA-256 \`${snapshot_sha256}\`, freshUntil \`${snapshot_fresh_until}\`"
 	echo "- configured limits: session ${session_rate}/m burst ${session_burst}; search ${search_rate}/m burst ${search_burst}"
-	echo "- profile=normal: PASS, requests=${search_rate}, unexpected_error_count=0"
+	echo "- profile=normal: PASS, session_requests=${session_rate}, search_requests=${search_rate}, unexpected_error_count=0"
 	echo "- profile=burst: PASS, exact 429 + Retry-After + private, no-store"
 	echo '- profile=unavailable: PASS, exact 503 ITX_TIMETABLE_UNAVAILABLE'
 	echo "- HTTP status counts: ${status_summary}"
 	echo "- latency: ${latency_summary} ms"
 	echo "- resource: ${resource_sample}, OOM=false, restart=0"
-	echo "- purge: states=1 sessions=1 duration_ms=${purge_ms}, budget_ms=600000"
+	echo "- purge: states=${purged_states} sessions=${purged_sessions} nonces=${purged_nonces} duration_ms=${purge_ms}, budget_ms=600000"
 	echo '- isolated synthetic data cleanup: PASS'
 	echo '- cache: miss=1+, hit=1+'
 	echo '- privacy: undeclared_data_transfer_count=0, sensitive_payload_count=0'
