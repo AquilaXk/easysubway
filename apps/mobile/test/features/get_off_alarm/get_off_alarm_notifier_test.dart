@@ -34,6 +34,43 @@ void main() {
   });
 
   group('LocalGetOffAlarmNotifier', () {
+    test('목적지와 환승 알림은 canonical 한국어 역명 카피를 plugin에 전달한다', () async {
+      final delivered = <({String title, String body})>[];
+      final arrivalAt = DateTime(2026, 7, 10, 10);
+      final notifier = LocalGetOffAlarmNotifier(
+        FlutterLocalNotificationsPlugin(),
+        isAndroid: true,
+        initializePlugin: () async {},
+        pendingIds: () async => const [],
+        cancelId: (_) async {},
+        scheduleAlarm: (_, title, body, _, _) async {
+          delivered.add((title: title, body: body));
+        },
+      );
+
+      await notifier.scheduleAlarms([
+        ScheduledGetOffAlarm(
+          stationId: 'station-sangnoksu',
+          stationName: '상록수',
+          kind: GetOffAlarmKind.destination,
+          fireAt: arrivalAt.subtract(const Duration(minutes: 2)),
+          arrivalAt: arrivalAt,
+        ),
+        ScheduledGetOffAlarm(
+          stationId: 'station-geumjeong',
+          stationName: '금정',
+          kind: GetOffAlarmKind.transfer,
+          fireAt: arrivalAt.subtract(const Duration(minutes: 5)),
+          arrivalAt: arrivalAt,
+        ),
+      ], mode: GetOffAlarmScheduleMode.exact);
+
+      expect(delivered, [
+        (title: '곧 상록수 도착', body: '내릴 준비를 하세요.'),
+        (title: '곧 금정 환승', body: '환승할 준비를 하세요.'),
+      ]);
+    });
+
     test('대기 건수는 전용 ID 범위만 세고 다른 알림을 취소하지 않는다', () async {
       final canceledIds = <int>[];
       final first = LocalGetOffAlarmNotifier.baseNotificationId;
