@@ -352,6 +352,14 @@ class LocalRouteRepository implements RouteSearchRepository {
             carDoorCarNumber: carDoorHint?.carNumber,
             carDoorDoorNumber: carDoorHint?.doorNumber,
             carDoorFacilityType: carDoorHint?.facilityType ?? '',
+            // 오프라인 catalog는 지하철 전용이라 승차 leg의 운행 클래스는 SUBWAY로
+            // 보존한다. 운행종별은 로컬 데이터가 있으면 그대로 싣고, 없으면 null로 둬
+            // 급행 배지를 붙이지 않는다(급행 정보가 없으면 배지 없음이 정상).
+            serviceClass: step.type.name == 'ride' ? 'SUBWAY' : null,
+            servicePattern:
+                step.type.name == 'ride' && step.servicePattern.isNotEmpty
+                ? step.servicePattern
+                : null,
           );
         })
         .toList(growable: false);

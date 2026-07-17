@@ -15,13 +15,23 @@ import '../domain/station_models.dart';
 /// 바뀌지 않으며 toggle/chip/filter semantics를 갖지 않는다. 배지는 장식이므로
 /// semantics에서 제외하고, TalkBack용 `급행`은 행 semanticLabel이 한 번만 제공한다.
 class ServicePatternBadge extends StatelessWidget {
-  const ServicePatternBadge({required this.departure, super.key});
+  const ServicePatternBadge({required this.departure, super.key})
+    : _alwaysExpress = false;
 
-  final StationTimetableDeparture departure;
+  /// 시간표 출발 행이 아닌 곳(길찾기 승차 leg 등)에서 급행 배지를 재사용하기 위한
+  /// 생성자. 호출부가 `serviceClass=SUBWAY && servicePattern=EXPRESS`를 이미 판정한
+  /// 뒤 항상 배지를 그린다. 시각·semantics 규칙은 시간표 배지와 동일하다.
+  const ServicePatternBadge.express({super.key})
+    : departure = null,
+      _alwaysExpress = true;
+
+  final StationTimetableDeparture? departure;
+  final bool _alwaysExpress;
 
   @override
   Widget build(BuildContext context) {
-    if (!departure.isExpress) {
+    final isExpress = _alwaysExpress || (departure?.isExpress ?? false);
+    if (!isExpress) {
       return const SizedBox.shrink();
     }
     return ExcludeSemantics(

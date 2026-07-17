@@ -4503,6 +4503,8 @@ Map<String, Object?> _routeV2Payload({
             'distanceMeters': 180,
             'etaSource': 'REALTIME',
             'confidence': 'HIGH',
+            'serviceClass': 'SUBWAY',
+            'servicePattern': 'LOCAL',
             'accessibilityRisk': {
               'stairCount': 0,
               'unknownAccessibilityCount': 0,

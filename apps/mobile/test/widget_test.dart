@@ -832,10 +832,13 @@ void main() {
     expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
     expect(find.byKey(const Key('nearbyStationButton')), findsOneWidget);
     expect(find.byKey(const Key('networkMapBottomAdBanner')), findsOneWidget);
+    // #2099 DoD: 노선도에 일반/급행 선택 control과 별도 상태는 0건이다. 일반/급행은
+    // 선택 UI가 아니라 실제 운행 정보이므로 노선도 뷰 토글을 두지 않는다.
     expect(
       find.byKey(const Key('networkMapServicePatternToggle')),
-      findsOneWidget,
+      findsNothing,
     );
+    expect(find.widgetWithText(InkWell, '급행'), findsNothing);
   });
 
   testWidgets('온보딩 이동 조건은 경로 검색 기본값으로 이어진다', (tester) async {
@@ -3237,53 +3240,9 @@ void main() {
     );
   });
 
-  test('급행 노선도 필터는 station-line endpoint edge를 유지한다', () {
-    final expressMap = networkMapExpressOnlyMapData(_expressFilterMapData());
-
-    expect(expressMap.lines.map((line) => line.id), ['line-express']);
-    expect(expressMap.stations.map((station) => station.lineId).toSet(), {
-      'line-express',
-    });
-    expect(expressMap.edges, hasLength(1));
-    expect(
-      expressMap.edges.single.fromStationId,
-      'station-express-a:line-express',
-    );
-    expect(
-      expressMap.edges.single.toStationId,
-      'station-express-b:line-express',
-    );
-  });
-
-  testWidgets('노선도 급행 전환은 필터 밖 선택 역 탭을 숨긴다', (tester) async {
-    await tester.pumpWidget(
-      buildEasySubwayTestApp(
-        repository: FakeStationSearchRepository(
-          networkMapData: _expressFilterMapData(),
-        ),
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        notificationRepository: FakeNotificationSettingsRepository(),
-        initialOnboardingState: _completedOnboardingState(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(
-      find.byKey(const Key('networkMapStation-local-a-line-local')),
-    );
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
-
-    await tester.tap(find.text('급행'));
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const Key('networkMapStationSheet')), findsNothing);
-    expect(
-      find.byKey(const Key('networkMapStation-express-a-line-express')),
-      findsOneWidget,
-    );
-  });
+  // #2099 WP2: 노선도의 일반/급행 뷰 토글과 급행 전용 필터 데이터 경로는
+  // 제거됐다(일반/급행은 선택 UI가 아니라 실제 운행 정보). 노선도에 선택 control이
+  // 0건임은 '노선도 첫 화면은 하단 광고 위에 지도 조작을 유지한다' 테스트가 지킨다.
 
   testWidgets('노선도 viewport 밖 station semantics는 생성하지 않는다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
@@ -4958,8 +4917,66 @@ void main() {
         findsNothing,
       );
 
-      // --- 길찾기 부분(#2099 WP2에서 확장 예정) ---
-      // WP2가 같은 테스트에 길찾기 경로의 급행 표시 검증을 이어서 덧붙인다.
+      // --- 길찾기 부분(#2099 WP2) ---
+      // 같은 급행 배지 위젯을 길찾기 경로 타임라인의 승차 leg에서도 쓴다. SUBWAY/
+      // EXPRESS 승차 step에만 `급행` 배지가 1회 붙고, 별도 선택 컨트롤은 없다.
+      final routeRepository = FakeRouteSearchRepository(
+        result: _sampleRouteSearchResult(
+          steps: const [
+            RouteSearchStep(
+              sequence: 1,
+              stepType: 'ride',
+              title: '상록수역에서 오이도행 승차',
+              description: '승강장에서 열차를 타고 이동합니다.',
+              lineId: 'seoul-4',
+              lineName: '수도권 4호선',
+              fromStationId: 'station-sangnoksu',
+              toStationId: 'station-sadang',
+              estimatedMinutes: 18,
+              distanceMeters: 12000,
+              includesStairs: false,
+              requiresAccessibilityCheck: false,
+              actionTitle: '오이도행 열차 승차',
+              serviceClass: 'SUBWAY',
+              servicePattern: 'EXPRESS',
+            ),
+          ],
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RouteSearchScreen(
+            repository: routeRepository,
+            stationRepository: FakeStationSearchRepository(),
+            favoriteRouteRepository: FakeFavoriteRouteRepository(),
+            initialDraft: RouteDraft(
+              origin: const RouteDraftStation(
+                id: 'station-sangnoksu',
+                nameKo: '상록수',
+              ),
+              destination: const RouteDraftStation(
+                id: 'station-sadang',
+                nameKo: '사당',
+              ),
+              lastModifiedAt: DateTime(2026, 7, 17),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 승차 leg에 급행 배지 1회, 시각 텍스트도 1회.
+      expect(
+        find.byKey(const Key('servicePatternExpressBadge')),
+        findsOneWidget,
+      );
+      expect(find.text('급행'), findsOneWidget);
+      // TalkBack은 급행을 정확히 한 번만 읽는다(배지는 장식, 라벨은 승차 leg가 1회).
+      expect(find.bySemanticsLabel(RegExp('급행')), findsOneWidget);
+      // 급행/일반은 실제 운행 정보다 — 길찾기에도 toggle/chip/filter 선택 컨트롤 0건.
+      expect(find.byType(ChoiceChip), findsNothing);
+      expect(find.byType(FilterChip), findsNothing);
+      expect(find.byType(Switch), findsNothing);
     } finally {
       semanticsHandle.dispose();
     }
@@ -8437,6 +8454,198 @@ void main() {
       routeRepository.requests.last.transportScope,
       RouteTransportScope.subwayAndItxCheongchun,
     );
+  });
+
+  testWidgets('길찾기 기본값은 최단시간(FASTEST)과 지하철(SUBWAY)이다', (tester) async {
+    final routeRepository = FakeRouteSearchRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: routeRepository,
+          stationRepository: FakeStationSearchRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 17),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(routeRepository.requests, hasLength(1));
+    expect(routeRepository.requests.single.objective, RouteObjective.fastest);
+    expect(
+      routeRepository.requests.single.transportScope,
+      RouteTransportScope.subway,
+    );
+    expect(find.byKey(const Key('routeObjectiveFastestChip')), findsOneWidget);
+    expect(
+      find.byKey(const Key('routeObjectiveFewestTransfersChip')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('routeObjectiveFastestChip')),
+        matching: find.byIcon(Icons.check),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('objective 탭을 최소환승으로 바꾸면 scope는 유지한 채 objective만 재검색한다', (
+    tester,
+  ) async {
+    final routeRepository = FakeRouteSearchRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: routeRepository,
+          stationRepository: FakeStationSearchRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 17),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const Key('routeObjectiveFewestTransfersChip')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(routeRepository.requests, hasLength(2));
+    expect(
+      routeRepository.requests.last.objective,
+      RouteObjective.fewestTransfers,
+    );
+    // objective만 바뀌고 scope는 SUBWAY로 유지된다(로컬-우선 동작 보존).
+    expect(
+      routeRepository.requests.last.transportScope,
+      RouteTransportScope.subway,
+    );
+    expect(
+      routeRepository.requests.every(
+        (request) => request.transportScope == RouteTransportScope.subway,
+      ),
+      isTrue,
+    );
+  });
+
+  testWidgets('같은 objective를 다시 눌러도 재검색하지 않는다', (tester) async {
+    final routeRepository = FakeRouteSearchRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: routeRepository,
+          stationRepository: FakeStationSearchRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 17),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('routeObjectiveFastestChip')));
+    await tester.pumpAndSettle();
+
+    expect(routeRepository.requests, hasLength(1));
+  });
+
+  testWidgets('objective 탭은 TalkBack 라벨·선택 상태·48dp·글자 확대를 지킨다', (tester) async {
+    tester.view.physicalSize = const Size(320, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final semanticsHandle = tester.ensureSemantics();
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: const TextScaler.linear(2.0)),
+            child: child!,
+          ),
+          home: RouteSearchScreen(
+            repository: FakeRouteSearchRepository(),
+            stationRepository: FakeStationSearchRepository(),
+            favoriteRouteRepository: FakeFavoriteRouteRepository(),
+            initialDraft: RouteDraft(
+              origin: const RouteDraftStation(
+                id: 'station-sangnoksu',
+                nameKo: '상록수',
+              ),
+              destination: const RouteDraftStation(
+                id: 'station-sadang',
+                nameKo: '사당',
+              ),
+              lastModifiedAt: DateTime(2026, 7, 17),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // TalkBack 라벨은 objective 두 탭 모두 정확히 한 번씩.
+      expect(find.bySemanticsLabel('경로 목표, 최단시간'), findsOneWidget);
+      expect(find.bySemanticsLabel('경로 목표, 최소환승'), findsOneWidget);
+      // 글자 2배·320dp에서도 오버플로 없이 렌더된다.
+      expect(tester.takeException(), isNull);
+      // 최소 48dp 터치 타깃.
+      expect(
+        tester
+            .getSize(find.byKey(const Key('routeObjectiveFastestChip')))
+            .height,
+        greaterThanOrEqualTo(48.0),
+      );
+      // 선택 상태(체크 표시)는 현재 objective에만.
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('routeObjectiveFastestChip')),
+          matching: find.byIcon(Icons.check),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('routeObjectiveFewestTransfersChip')),
+          matching: find.byIcon(Icons.check),
+        ),
+        findsNothing,
+      );
+    } finally {
+      semanticsHandle.dispose();
+    }
   });
 
   testWidgets('ITX 실패는 명시적 지하철만 보기 선택 뒤에만 SUBWAY로 재검색한다', (tester) async {
@@ -16291,127 +16500,6 @@ FavoriteRoute _favoriteRoute({
     routeCreatedAt: '2026-06-13T04:20:00',
     addedAt: '2026-06-14T10:00:00',
     transportScope: transportScope,
-  );
-}
-
-NetworkMapData _expressFilterMapData() {
-  return const NetworkMapData(
-    regions: [NetworkMapRegion(name: '테스트권')],
-    selectedRegion: '테스트권',
-    lines: [
-      NetworkMapLine(
-        id: 'line-local',
-        name: '일반 노선',
-        color: '#444444',
-        region: '테스트권',
-      ),
-      NetworkMapLine(
-        id: 'line-express',
-        name: '급행 노선',
-        color: '#D71920',
-        region: '테스트권',
-      ),
-    ],
-    stations: [
-      NetworkMapStation(
-        id: 'station-local-a',
-        nameKo: '일반A',
-        nameEn: 'Local A',
-        region: '테스트권',
-        lineId: 'line-local',
-        stationCode: 'L01',
-        sequence: 1,
-        position: NetworkMapPosition(
-          x: 100,
-          y: 100,
-          labelDx: 0,
-          labelDy: 0,
-          upPath: '',
-          downPath: '',
-          sourceId: 'fixture-express-filter',
-        ),
-      ),
-      NetworkMapStation(
-        id: 'station-local-b',
-        nameKo: '일반B',
-        nameEn: 'Local B',
-        region: '테스트권',
-        lineId: 'line-local',
-        stationCode: 'L02',
-        sequence: 2,
-        position: NetworkMapPosition(
-          x: 180,
-          y: 100,
-          labelDx: 0,
-          labelDy: 0,
-          upPath: '',
-          downPath: '',
-          sourceId: 'fixture-express-filter',
-        ),
-      ),
-      NetworkMapStation(
-        id: 'station-express-a',
-        nameKo: '급행A',
-        nameEn: 'Express A',
-        region: '테스트권',
-        lineId: 'line-express',
-        stationCode: 'E01',
-        sequence: 1,
-        position: NetworkMapPosition(
-          x: 100,
-          y: 180,
-          labelDx: 0,
-          labelDy: 0,
-          upPath: '',
-          downPath: '',
-          sourceId: 'fixture-express-filter',
-        ),
-      ),
-      NetworkMapStation(
-        id: 'station-express-b',
-        nameKo: '급행B',
-        nameEn: 'Express B',
-        region: '테스트권',
-        lineId: 'line-express',
-        stationCode: 'E02',
-        sequence: 2,
-        position: NetworkMapPosition(
-          x: 180,
-          y: 180,
-          labelDx: 0,
-          labelDy: 0,
-          upPath: '',
-          downPath: '',
-          sourceId: 'fixture-express-filter',
-        ),
-      ),
-    ],
-    edges: [
-      NetworkMapEdge(
-        id: 'edge-local',
-        lineId: 'line-local',
-        fromStationId: 'station-local-a:line-local',
-        toStationId: 'station-local-b:line-local',
-        accessibilityStatus: 'AVAILABLE',
-        reliabilityScore: 100,
-      ),
-      NetworkMapEdge(
-        id: 'edge-express',
-        lineId: 'line-express',
-        fromStationId: 'station-express-a:line-express',
-        toStationId: 'station-express-b:line-express',
-        accessibilityStatus: 'AVAILABLE',
-        reliabilityScore: 100,
-      ),
-    ],
-    positionSources: [
-      NetworkMapPositionSource(
-        id: 'fixture-express-filter',
-        name: '급행 필터 fixture',
-        licenseStatus: 'fixture-only',
-      ),
-    ],
-    stationLineMemberships: [],
   );
 }
 
