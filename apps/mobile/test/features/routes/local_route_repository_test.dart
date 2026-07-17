@@ -643,6 +643,126 @@ void main() {
     expect(ride.plannedArrivalTimeIso, isEmpty);
   });
 
+  test('로컬 경로는 소문자·공백 servicePattern을 정규화해 급행 시간표와 매칭한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    // edge에 소문자·공백 'express '가 와도 대문자 'EXPRESS' 시간표를 찾도록
+    // 조회 전 정규화한다(UI 투영과 같은 값).
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'express-edge-a-b',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-b:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 600,
+      servicePattern: 'express ',
+    );
+    await database.customStatement('''
+      INSERT INTO service_calendars (
+        service_id, monday, tuesday, wednesday, thursday, friday,
+        saturday, sunday, start_date, end_date
+      ) VALUES (
+        'express-weekday', 1, 1, 1, 1, 1, 0, 0, '20260101', '20261231'
+      )
+    ''');
+    await database.customStatement('''
+      INSERT INTO transit_routes (id, line_id, route_short_name)
+      VALUES ('express-route', 'line-test', '4')
+    ''');
+    await database.customStatement('''
+      INSERT INTO transit_trips (
+        id, route_id, service_id, service_pattern, service_class
+      ) VALUES (
+        'express-trip', 'express-route', 'express-weekday', 'EXPRESS', 'SUBWAY'
+      )
+    ''');
+    await database.customStatement('''
+      INSERT INTO transit_stop_times (
+        trip_id, stop_sequence, station_id, line_id,
+        arrival_seconds, departure_seconds
+      ) VALUES
+        ('express-trip', 1, 'station-a', 'line-test', 28770, 28800),
+        ('express-trip', 2, 'station-b', 'line-test', 29400, 29430)
+    ''');
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      now: () => DateTime.parse('2026-07-10T07:58:00+09:00'),
+    );
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    final ride = result.steps.singleWhere((step) => step.stepType == 'ride');
+    expect(result.status, 'FOUND');
+    expect(ride.plannedArrivalTimeIso, '2026-07-10T08:10:00+09:00');
+  });
+
+  test('로컬 경로는 미상 servicePattern이면 도착 시각 조회를 포기한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    // 화이트리스트 밖 값은 어떤 시간표와도 신뢰성 있게 매칭할 수 없으므로 도착
+    // 시각을 비운다(fail-safe). 급행 시간표가 있어도 조회하지 않는다.
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'mystery-edge-a-b',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-b:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 600,
+      servicePattern: 'MYSTERY',
+    );
+    await database.customStatement('''
+      INSERT INTO service_calendars (
+        service_id, monday, tuesday, wednesday, thursday, friday,
+        saturday, sunday, start_date, end_date
+      ) VALUES (
+        'mystery-weekday', 1, 1, 1, 1, 1, 0, 0, '20260101', '20261231'
+      )
+    ''');
+    await database.customStatement('''
+      INSERT INTO transit_routes (id, line_id, route_short_name)
+      VALUES ('mystery-route', 'line-test', '4')
+    ''');
+    await database.customStatement('''
+      INSERT INTO transit_trips (
+        id, route_id, service_id, service_pattern, service_class
+      ) VALUES (
+        'mystery-trip', 'mystery-route', 'mystery-weekday', 'MYSTERY', 'SUBWAY'
+      )
+    ''');
+    await database.customStatement('''
+      INSERT INTO transit_stop_times (
+        trip_id, stop_sequence, station_id, line_id,
+        arrival_seconds, departure_seconds
+      ) VALUES
+        ('mystery-trip', 1, 'station-a', 'line-test', 28770, 28800),
+        ('mystery-trip', 2, 'station-b', 'line-test', 29400, 29430)
+    ''');
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      now: () => DateTime.parse('2026-07-10T07:58:00+09:00'),
+    );
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    final ride = result.steps.singleWhere((step) => step.stepType == 'ride');
+    expect(result.status, 'FOUND');
+    expect(ride.plannedArrivalTimeIso, isEmpty);
+  });
+
   test('SLOW 프리셋은 보행 스텝 시간을 늘리고 ride 스텝은 그대로 둔다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);

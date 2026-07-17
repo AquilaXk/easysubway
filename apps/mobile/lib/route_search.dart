@@ -1885,16 +1885,29 @@ class RouteRefreshResult {
 
 /// objective-tagged 대표 itinerary 중 현재 목표에 맞는 것을 고른다. 백엔드가 두
 /// objective를 하나로 dedupe하면 그 하나가 두 태그를 모두 달고 있어 어느 목표에서도
-/// 선택된다. 태그가 없는(레거시) 응답은 첫 FOUND, 그마저 없으면 첫 itinerary로 폴백해
-/// 기존 동작을 보존한다.
+/// 선택된다. FOUND itinerary가 전부 무태그(레거시)일 때만 첫 FOUND, 그마저 없으면 첫
+/// itinerary로 폴백해 기존 동작을 보존한다. 태그가 하나라도 있는데 요청 objective와
+/// 매칭되는 FOUND가 없으면 silent fallback(계약 위반)을 피해 payload 오류로 fail
+/// closed한다(generic unavailable 흐름으로 흐른다).
 RouteSearchV2Itinerary _selectRouteV2Itinerary(
   List<RouteSearchV2Itinerary> itineraries,
   RouteObjective objective,
 ) {
-  for (final itinerary in itineraries) {
-    if (itinerary.status == 'FOUND' && itinerary.matchesObjective(objective)) {
+  final foundItineraries = itineraries
+      .where((itinerary) => itinerary.status == 'FOUND')
+      .toList(growable: false);
+  for (final itinerary in foundItineraries) {
+    if (itinerary.matchesObjective(objective)) {
       return itinerary;
     }
+  }
+  final hasTaggedFound = foundItineraries.any(
+    (itinerary) => itinerary.objectiveTags.isNotEmpty,
+  );
+  if (hasTaggedFound) {
+    throw const FormatException(
+      'Route v2 FOUND itineraries missing requested objective tag',
+    );
   }
   return itineraries.firstWhere(
     (candidate) => candidate.status == 'FOUND',
@@ -3087,6 +3100,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
                       objective: _selectedObjective,
                       transportScope: _selectedTransportScope,
                       itxTransportScopeEnabled: _itxTransportScopeAvailable,
+                      loading:
+                          _controller.state.status ==
+                          RouteSearchViewStatus.loading,
                       onChangePreset: _showMobilityPresetPicker,
                       onChangeObjective: _changeObjective,
                       onChangeTransportScope: _changeTransportScope,
@@ -5511,6 +5527,7 @@ class _RouteConditionChips extends StatelessWidget {
     required this.objective,
     required this.transportScope,
     required this.itxTransportScopeEnabled,
+    required this.loading,
     required this.onChangePreset,
     required this.onChangeObjective,
     required this.onChangeTransportScope,
@@ -5520,6 +5537,9 @@ class _RouteConditionChips extends StatelessWidget {
   final RouteObjective objective;
   final RouteTransportScope transportScope;
   final bool itxTransportScopeEnabled;
+  // 재검색 로딩 중에는 objective·교통범위 변경 핸들러가 입력을 조용히 무시하므로,
+  // 해당 칩을 시각·semantics 모두 비활성으로 표기해 활성으로 보이지 않게 한다.
+  final bool loading;
   final VoidCallback onChangePreset;
   final ValueChanged<RouteObjective> onChangeObjective;
   final ValueChanged<RouteTransportScope> onChangeTransportScope;
@@ -5552,6 +5572,7 @@ class _RouteConditionChips extends StatelessWidget {
             label: RouteObjective.fastest.label,
             semanticLabel: '경로 목표, ${RouteObjective.fastest.label}',
             active: objective == RouteObjective.fastest,
+            enabled: !loading,
             onTap: () => onChangeObjective(RouteObjective.fastest),
           ),
           _RouteConditionChipButton(
@@ -5560,6 +5581,7 @@ class _RouteConditionChips extends StatelessWidget {
             label: RouteObjective.fewestTransfers.label,
             semanticLabel: '경로 목표, ${RouteObjective.fewestTransfers.label}',
             active: objective == RouteObjective.fewestTransfers,
+            enabled: !loading,
             onTap: () => onChangeObjective(RouteObjective.fewestTransfers),
           ),
           if (itxTransportScopeEnabled) ...[
@@ -5569,6 +5591,7 @@ class _RouteConditionChips extends StatelessWidget {
               label: '지하철만',
               semanticLabel: '교통 범위, 지하철만',
               active: transportScope == RouteTransportScope.subway,
+              enabled: !loading,
               onTap: () => onChangeTransportScope(RouteTransportScope.subway),
             ),
             _RouteConditionChipButton(
@@ -5578,6 +5601,7 @@ class _RouteConditionChips extends StatelessWidget {
               semanticLabel: '교통 범위, 지하철과 ITX-청춘',
               active:
                   transportScope == RouteTransportScope.subwayAndItxCheongchun,
+              enabled: !loading,
               onTap: () => onChangeTransportScope(
                 RouteTransportScope.subwayAndItxCheongchun,
               ),
@@ -5596,6 +5620,7 @@ class _RouteConditionChipButton extends StatelessWidget {
     required this.label,
     required this.semanticLabel,
     required this.active,
+    this.enabled = true,
     required this.onTap,
   });
 
@@ -5604,34 +5629,43 @@ class _RouteConditionChipButton extends StatelessWidget {
   final String label;
   final String semanticLabel;
   final bool active;
+  final bool enabled;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final foreground = active
+    // 비활성(재검색 로딩 중)일 때는 무채색 원칙 안에서 기존 muted 토큰만 재사용해
+    // 흐리게 표기하고 tap·semantics 모두 막는다(새 색·새 디자인 없음).
+    final foreground = !enabled
+        ? EasySubwayAccessibleColors.iconMuted
+        : active
         ? EasySubwayAccessibleColors.primary
         : EasySubwayAccessibleColors.secondaryText;
+    final tapHandler = enabled ? onTap : null;
     return Semantics(
       button: true,
+      enabled: enabled,
       toggled: active,
       label: semanticLabel,
-      onTap: onTap,
+      onTap: tapHandler,
       child: ExcludeSemantics(
         child: Material(
           color: Colors.transparent,
           child: InkWell(
             key: buttonKey,
-            onTap: onTap,
+            onTap: tapHandler,
             borderRadius: _routeSearchPillRadius,
             child: Ink(
               decoration: BoxDecoration(
                 color: EasySubwayAccessibleColors.surface,
                 borderRadius: _routeSearchPillRadius,
                 border: Border.all(
-                  color: active
+                  color: !enabled
+                      ? EasySubwayAccessibleColors.line
+                      : active
                       ? EasySubwayAccessibleColors.primary
                       : EasySubwayAccessibleColors.line,
-                  width: active ? 2 : 1,
+                  width: active && enabled ? 2 : 1,
                 ),
               ),
               child: Container(
@@ -5655,10 +5689,12 @@ class _RouteConditionChipButton extends StatelessWidget {
                     ),
                     if (active) ...[
                       const SizedBox(width: 6),
-                      const Icon(
+                      Icon(
                         Icons.check,
                         size: 16,
-                        color: EasySubwayAccessibleColors.primary,
+                        color: enabled
+                            ? EasySubwayAccessibleColors.primary
+                            : EasySubwayAccessibleColors.iconMuted,
                       ),
                     ],
                   ],

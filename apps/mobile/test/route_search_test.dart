@@ -1700,6 +1700,22 @@ void main() {
       );
     });
 
+    test('태그가 있는데 요청 objective와 매칭되는 FOUND가 없으면 fail closed', () {
+      // FASTEST 전용 경로만 있는데 최소환승을 요청하면 silent fallback(계약 위반)을
+      // 피해 payload 오류로 실패시킨다. RouteSearchV2ApiRepository.searchRoute의 generic
+      // catch가 이 FormatException을 unavailable로 흘려보낸다.
+      final result = _objectiveResult([
+        _taggedItinerary(lineId: 'line-fast', objectiveTags: const ['FASTEST']),
+      ]);
+      expect(
+        () => RouteSearchResult.fromV2(
+          result,
+          objective: RouteObjective.fewestTransfers,
+        ),
+        throwsFormatException,
+      );
+    });
+
     test('이전 objective 검색의 늦은 응답은 현재 화면을 덮지 않는다', () async {
       final repository = _ManualRouteSearchRepository();
       final controller = RouteSearchController(repository: repository);

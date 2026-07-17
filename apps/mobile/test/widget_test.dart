@@ -8648,6 +8648,65 @@ void main() {
     }
   });
 
+  testWidgets('objective 칩은 재검색 로딩 중 비활성이고 완료 후 재활성된다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    final routeRepository = ControlledRouteSearchRepository();
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RouteSearchScreen(
+            repository: routeRepository,
+            stationRepository: FakeStationSearchRepository(),
+            favoriteRouteRepository: FakeFavoriteRouteRepository(),
+            initialDraft: RouteDraft(
+              origin: const RouteDraftStation(
+                id: 'station-sangnoksu',
+                nameKo: '상록수',
+              ),
+              destination: const RouteDraftStation(
+                id: 'station-sadang',
+                nameKo: '사당',
+              ),
+              lastModifiedAt: DateTime(2026, 7, 17),
+            ),
+          ),
+        ),
+      );
+      // 자동 검색이 시작돼 로딩 상태로 멈춘다(응답 미완료).
+      await tester.pump();
+      expect(routeRepository.requests, hasLength(1));
+
+      final chipFinder = find.byKey(
+        const Key('routeObjectiveFewestTransfersChip'),
+      );
+      // 로딩 중: semantics enabled=false, tap 액션 없음.
+      final loadingData = tester.getSemantics(chipFinder).getSemanticsData();
+      expect(loadingData.flagsCollection.isEnabled.toBoolOrNull(), isFalse);
+      expect(loadingData.hasAction(SemanticsAction.tap), isFalse);
+      // TalkBack 라벨 계약은 로딩 중에도 불변.
+      expect(find.bySemanticsLabel('경로 목표, 최소환승'), findsOneWidget);
+      // 로딩 중 tap은 무효 — 재검색이 시작되지 않는다.
+      await tester.tap(chipFinder);
+      await tester.pump();
+      expect(routeRepository.requests, hasLength(1));
+
+      // 검색 완료 → 칩 재활성.
+      routeRepository.complete(_sampleRouteSearchResult());
+      await tester.pumpAndSettle();
+      final readyData = tester.getSemantics(chipFinder).getSemanticsData();
+      expect(readyData.flagsCollection.isEnabled.toBoolOrNull(), isTrue);
+      await tester.tap(chipFinder);
+      await tester.pumpAndSettle();
+      expect(routeRepository.requests.length, greaterThan(1));
+      expect(
+        routeRepository.requests.last.objective,
+        RouteObjective.fewestTransfers,
+      );
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
   testWidgets('ITX 실패는 명시적 지하철만 보기 선택 뒤에만 SUBWAY로 재검색한다', (tester) async {
     final routeRepository = FakeRouteSearchRepository(
       errorForRequest: (request) =>

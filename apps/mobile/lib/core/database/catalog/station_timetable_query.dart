@@ -169,7 +169,7 @@ class CatalogStationTimetableQuery {
           WHERE st.station_id = ?
             AND st.line_id = ?
             AND st.pickup_type = 0
-            AND t.service_class = 'SUBWAY'
+            AND UPPER(TRIM(t.service_class)) = 'SUBWAY'
             AND r.line_id = st.line_id
             AND TRIM(r.direction_name) <> ''
             $dayFilter

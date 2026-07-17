@@ -376,6 +376,49 @@ void main() {
     expect(local.serviceClass, 'SUBWAY');
   });
 
+  test('로컬 역 시간표는 소문자·공백 service_class도 지하철 출발로 매칭한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await _seedStationTimetable(database);
+    // 저장소 레벨 정규화(trim/upper)와 비대칭인 정확 일치 SQL이 소문자·공백 값을
+    // 조용히 누락하지 않는지 검증한다.
+    await database.customStatement('''
+      INSERT INTO transit_trips (
+        id, route_id, service_id, trip_headsign, direction_id,
+        service_pattern, service_class, service_day_start_seconds
+      ) VALUES (
+        'weekday-down-1919-messy', 'line4-down-1919', 'weekday-1919', '사당', 'down',
+        'LOCAL', '  subway  ', 0
+      )
+    ''');
+    await database.customStatement('''
+      INSERT INTO transit_stop_times (
+        trip_id, stop_sequence, station_id, line_id,
+        arrival_seconds, departure_seconds, pickup_type, drop_off_type
+      ) VALUES (
+        'weekday-down-1919-messy', 1, 'station-sadang', 'seoul-4', 19380, 19380, 0, 0
+      )
+    ''');
+    final repository = DriftStationRepository(database: database);
+
+    final timetable = await repository.loadStationTimetable(
+      stationId: 'station-sadang',
+      lineId: 'seoul-4',
+      dayType: StationTimetableDayType.weekday,
+      referenceDate: DateTime(2026, 7, 12),
+    );
+
+    final sadang = timetable.directions.singleWhere(
+      (direction) => direction.name == '사당 방면',
+    );
+    final messy = sadang.departures.singleWhere(
+      (departure) => departure.timeLabel == '05:23',
+    );
+    expect(messy.serviceClass, 'SUBWAY');
+    expect(messy.servicePattern, 'LOCAL');
+  });
+
   test('로컬 역 시간표는 지하철 미상·공백 운행종별을 경계에서 실패시킨다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);

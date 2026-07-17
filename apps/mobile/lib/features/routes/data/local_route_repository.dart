@@ -381,11 +381,23 @@ class LocalRouteRepository implements RouteSearchRepository {
         cursor = cursor.add(Duration(seconds: step.durationSeconds));
         continue;
       }
+      // 시간표 조회는 UI 투영과 같은 정규화 값을 쓴다. edge에 'express '(소문자·
+      // 공백)가 와도 대문자 'EXPRESS' 시간표와 매칭되도록 정규화한 뒤 넘긴다.
+      final rawServicePattern = step.servicePattern.trim();
+      final normalizedServicePattern = _normalizedServicePattern(
+        rawServicePattern,
+      );
+      // non-empty인데 화이트리스트 밖(미상)이면 어떤 시간표와도 신뢰성 있게 매칭할
+      // 수 없으므로 도착 시각 조회를 포기한다(fail-safe: 빈 결과). 빈 값은 종전대로
+      // 운행종별 필터 없이 조회한다(LOCAL/미표기 동작 보존).
+      if (rawServicePattern.isNotEmpty && normalizedServicePattern == null) {
+        return const {};
+      }
       final arrival = await _nextTimetableArrival(
         fromStationId: catalog.stationIdForNode(step.fromNodeId),
         toStationId: catalog.stationIdForNode(step.toNodeId),
         lineId: step.lineId,
-        servicePattern: step.servicePattern,
+        servicePattern: normalizedServicePattern ?? '',
         cursor: cursor,
       );
       if (arrival == null) {
@@ -736,7 +748,13 @@ String? _normalizedRideServicePattern(route_step.RouteStep step) {
   if (step.type.name != 'ride') {
     return null;
   }
-  final normalized = step.servicePattern.trim().toUpperCase();
+  return _normalizedServicePattern(step.servicePattern);
+}
+
+/// raw servicePattern을 화이트리스트({'LOCAL','EXPRESS'}) 대문자 enum으로 정규화한다.
+/// 공백·미상 값은 null. UI 투영과 시간표 조회가 같은 정규화를 쓰도록 공유한다.
+String? _normalizedServicePattern(String raw) {
+  final normalized = raw.trim().toUpperCase();
   return _localRideServicePatterns.contains(normalized) ? normalized : null;
 }
 
