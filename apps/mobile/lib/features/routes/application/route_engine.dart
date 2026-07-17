@@ -30,6 +30,7 @@ class LocalRouteEngine {
       mobilityType: request.mobilityType,
       constraintMode: request.effectiveConstraintMode,
       searchMode: request.searchMode,
+      objective: request.objective,
     );
     final path = pathResult.path;
     if (path == null) {
@@ -131,6 +132,7 @@ class AccessGraphRouter {
     required MobilityType mobilityType,
     required ConstraintMode constraintMode,
     RouteSearchMode searchMode = RouteSearchMode.stationToStation,
+    RouteObjective objective = RouteObjective.fastest,
   }) {
     if (graph.nodes.isEmpty || graph.edges.isEmpty) {
       return AccessPathResult.noPath(
@@ -147,6 +149,7 @@ class AccessGraphRouter {
       constraintMode,
       RouteTraversalPolicy(searchMode),
       blockedReasonCodes,
+      objective,
     );
     if (edges != null) {
       return AccessPathResult.found(
@@ -199,6 +202,12 @@ class AccessGraphRouter {
     return AccessNoPathReason.blocked;
   }
 
+  /// fewestTransfers 목표에서 환승 edge마다 얹는 큰 사전식(lexicographic) 페널티.
+  /// 어떤 대안 경로의 총 일반화 비용보다도 크게 잡아, 탐색이 환승 수를 1차로
+  /// 최소화하고 동률에서만 일반화 비용(대체로 소요시간)으로 tie-break하게 한다.
+  /// 이 페널티는 경로 선택에만 쓰이고 결과에 보고되는 비용에는 반영되지 않는다.
+  static const int _fewestTransfersEdgePenalty = 100000000;
+
   List<RouteEdge>? _findLowestCostPath(
     String originNodeId,
     String destinationNodeId,
@@ -206,6 +215,7 @@ class AccessGraphRouter {
     ConstraintMode constraintMode,
     RouteTraversalPolicy traversalPolicy,
     Set<String> blockedReasonCodes,
+    RouteObjective objective,
   ) {
     final bestCostByNode = <String, int>{originNodeId: 0};
     final previousNode = <String, String>{};
@@ -249,7 +259,12 @@ class AccessGraphRouter {
           blockedReasonCodes.addAll(edgeCost.warningCodes);
           continue;
         }
-        final nextCost = candidate.cost + edgeCost.cost;
+        var stepCost = edgeCost.cost;
+        if (objective == RouteObjective.fewestTransfers &&
+            isRouteTransferEdgeType(edge.type)) {
+          stepCost += _fewestTransfersEdgePenalty;
+        }
+        final nextCost = candidate.cost + stepCost;
         if (nextCost < (bestCostByNode[edge.toNodeId] ?? 1 << 62)) {
           bestCostByNode[edge.toNodeId] = nextCost;
           previousNode[edge.toNodeId] = candidate.nodeId;

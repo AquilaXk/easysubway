@@ -7,6 +7,7 @@ import '../../../mobile_error_reporter.dart';
 import '../domain/station_line.dart';
 import '../domain/station_models.dart';
 import '../domain/station_repositories.dart';
+import 'service_pattern_badge.dart';
 
 const _stationTimetablePagePadding = EdgeInsets.fromLTRB(20, 20, 20, 32);
 
@@ -201,7 +202,19 @@ class _StationTimetableScreenState extends State<StationTimetableScreen> {
                     child: ExcludeSemantics(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        child: Text(direction.departures[index].timeLabel),
+                        // text scale·좁은 폭에서 시각·배지가 겹치지 않게 Wrap으로
+                        // 다음 줄 배치. 급행이 아니면 배지는 빈 위젯이라 시각만 남는다.
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text(direction.departures[index].timeLabel),
+                            ServicePatternBadge(
+                              departure: direction.departures[index],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),

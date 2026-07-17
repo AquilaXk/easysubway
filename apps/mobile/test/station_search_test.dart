@@ -24,6 +24,67 @@ void main() {
     debugStationVerifiedClock = DateTime.now;
   });
 
+  test('시간표 출발 모델은 일반·급행 운행종별을 시각순으로 유지한다', () {
+    const local = StationTimetableDeparture(
+      directionName: '사당 방면',
+      seconds: 28800, // 08:00
+    );
+    const express = StationTimetableDeparture(
+      directionName: '사당 방면',
+      seconds: 28980, // 08:03
+      servicePattern: 'EXPRESS',
+      serviceClass: 'SUBWAY',
+    );
+    const direction = StationTimetableDirection(
+      name: '사당 방면',
+      departures: [local, express],
+    );
+
+    expect(direction.departures.map((departure) => departure.seconds), [
+      28800,
+      28980,
+    ]);
+    expect(local.timeLabel, '08:00');
+    expect(express.timeLabel, '08:03');
+    expect(local.isExpress, isFalse);
+    expect(express.isExpress, isTrue);
+    expect(direction.firstDeparture.timeLabel, '08:00');
+    expect(direction.lastDeparture.timeLabel, '08:03');
+    expect(express.semanticLabel, contains('급행'));
+    expect(local.semanticLabel, isNot(contains('급행')));
+  });
+
+  test('시간표 방향은 일반·급행 출발을 시각순으로 묶고 첫차·막차를 유지한다', () {
+    // LOCAL 08:00과 EXPRESS 08:03이 한 방향 목록에 시각순으로 함께 놓이고,
+    // 급행 판정은 08:03에만 참이며, 첫차/막차는 목록 양끝을 그대로 가리킨다.
+    // (화면 렌더링 회귀는 widget_test.dart의 역 시간표 화면 테스트가 담당한다.)
+    const direction = StationTimetableDirection(
+      name: '사당 방면',
+      departures: [
+        StationTimetableDeparture(directionName: '사당 방면', seconds: 28800),
+        StationTimetableDeparture(
+          directionName: '사당 방면',
+          seconds: 28980,
+          servicePattern: 'EXPRESS',
+          serviceClass: 'SUBWAY',
+        ),
+      ],
+    );
+
+    expect(
+      direction.departures.map((departure) => departure.timeLabel).toList(),
+      ['08:00', '08:03'],
+    );
+    expect(
+      direction.departures.map((departure) => departure.isExpress).toList(),
+      [false, true],
+    );
+    expect(direction.firstDeparture.timeLabel, '08:00');
+    expect(direction.firstDeparture.isExpress, isFalse);
+    expect(direction.lastDeparture.timeLabel, '08:03');
+    expect(direction.lastDeparture.isExpress, isTrue);
+  });
+
   test('릴리즈 빌드는 API 기본 주소를 반드시 설정해야 한다', () {
     expect(
       () => stationApiBaseUriForEnvironment(

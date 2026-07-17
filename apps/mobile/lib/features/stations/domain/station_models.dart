@@ -56,10 +56,21 @@ class StationTimetableDeparture {
   const StationTimetableDeparture({
     required this.directionName,
     required this.seconds,
+    this.servicePattern = 'LOCAL',
+    this.serviceClass = 'SUBWAY',
   });
 
   final String directionName;
   final int seconds;
+
+  /// 운행종별(예: `LOCAL`·`EXPRESS`). 선택 컨트롤이 아니라 실제 운행 정보다.
+  final String servicePattern;
+
+  /// 운행 클래스(예: `SUBWAY`).
+  final String serviceClass;
+
+  /// 지하철 급행 운행 여부. 이 값이 참일 때만 `급행` 배지를 노출한다.
+  bool get isExpress => serviceClass == 'SUBWAY' && servicePattern == 'EXPRESS';
 
   String get timeLabel {
     final prefix = seconds >= Duration.secondsPerDay ? '다음 날 ' : '';
@@ -72,7 +83,9 @@ class StationTimetableDeparture {
     final minute =
         (normalized % Duration.secondsPerHour) ~/ Duration.secondsPerMinute;
     final prefix = seconds >= Duration.secondsPerDay ? '다음 날 ' : '';
-    return '$directionName, $prefix${hour.toString().padLeft(2, '0')}시 '
+    final expressLabel = isExpress ? '급행, ' : '';
+    return '$directionName, $expressLabel$prefix'
+        '${hour.toString().padLeft(2, '0')}시 '
         '${minute.toString().padLeft(2, '0')}분 출발';
   }
 }

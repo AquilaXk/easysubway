@@ -29,6 +29,7 @@ import 'features/network_map/presentation/structured_route_map_painter.dart';
 import 'features/realtime/realtime_repository.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
 import 'features/route_draft/domain/route_draft.dart';
+import 'features/stations/presentation/service_pattern_badge.dart';
 import 'features/stations/presentation/station_search_screen.dart';
 import 'internal_route.dart';
 import 'mobile_error_reporter.dart';
@@ -36,7 +37,6 @@ import 'search_field.dart';
 import 'station_search.dart';
 
 const _networkMapTopBarHeight = 60.0;
-const _networkMapPillRadius = BorderRadius.all(Radius.circular(8));
 
 abstract interface class NetworkMapRepository {
   Future<NetworkMapData> getNetworkMap({String? region, String? lineId});
@@ -470,7 +470,6 @@ class NetworkMapScreen extends StatefulWidget {
 
 class _NetworkMapScreenState extends State<NetworkMapScreen> {
   String? _selectedRegion;
-  bool _expressView = false;
   bool _nearbyPanelVisible = false;
   _NetworkMapNearbyPanelData _nearbyPanelData =
       const _NetworkMapNearbyPanelData.idle();
@@ -749,8 +748,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               return _NetworkMapChrome(
                 regions: const [NetworkMapRegion(name: '수도권')],
                 selectedRegion: _selectedRegion ?? '수도권',
-                expressView: _expressView,
-                showServicePatternToggle: true,
                 notificationAction: widget.notificationAction,
                 disruptionBanner: widget.disruptionBanner,
                 onMenuTap: _openMapMenu,
@@ -763,9 +760,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                 onSearchSubmitted: _submitSearch,
                 onSearchClear: _searchQueryController.clear,
                 onRegionSelected: (region) => _reload(region: region),
-                onExpressViewChanged: (value) {
-                  setState(() => _expressView = value);
-                },
                 nearbyPanelVisible: _nearbyPanelVisible,
                 nearbyPanelData: _nearbyPanelData,
                 realtime: _nearbyRealtime,
@@ -802,8 +796,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               return _NetworkMapChrome(
                 regions: const [NetworkMapRegion(name: '수도권')],
                 selectedRegion: _selectedRegion ?? '수도권',
-                expressView: _expressView,
-                showServicePatternToggle: true,
                 notificationAction: widget.notificationAction,
                 disruptionBanner: widget.disruptionBanner,
                 onMenuTap: _openMapMenu,
@@ -816,9 +808,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                 onSearchSubmitted: _submitSearch,
                 onSearchClear: _searchQueryController.clear,
                 onRegionSelected: (region) => _reload(region: region),
-                onExpressViewChanged: (value) {
-                  setState(() => _expressView = value);
-                },
                 nearbyPanelVisible: _nearbyPanelVisible,
                 nearbyPanelData: _nearbyPanelData,
                 realtime: _nearbyRealtime,
@@ -853,18 +842,10 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
             }
             final loadResult = snapshot.data!;
             final data = loadResult.data;
-            final hasExpressLines = _expressLineIds(data).isNotEmpty;
-            // #1641: 모든 지역이 구조화 canvas로 렌더되므로 express 필터·서비스 패턴
-            // 토글이 전 지역에 균일 적용된다(과거 SVG 지역 예외 제거).
-            final visibleData = hasExpressLines && _expressView
-                ? _expressOnlyMapData(data)
-                : data;
             _startInitialNearbyFocus();
             return _NetworkMapChrome(
               regions: data.regions,
               selectedRegion: data.selectedRegion,
-              expressView: _expressView,
-              showServicePatternToggle: true,
               notificationAction: widget.notificationAction,
               disruptionBanner: widget.disruptionBanner,
               onMenuTap: _openMapMenu,
@@ -877,9 +858,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               onSearchSubmitted: _submitSearch,
               onSearchClear: _searchQueryController.clear,
               onRegionSelected: (region) => _reload(region: region),
-              onExpressViewChanged: (value) {
-                setState(() => _expressView = value);
-              },
               nearbyPanelVisible: _nearbyPanelVisible,
               nearbyPanelData: _nearbyPanelData,
               realtime: _nearbyRealtime,
@@ -917,7 +895,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                 listenable: widget.routeDraftController,
                 builder: (context, _) {
                   return _NetworkMapCanvas(
-                    data: visibleData,
+                    data: data,
                     initialViewport: loadResult.initialViewport,
                     focusedStationId:
                         _searchFanMenuStationId ?? _nearbySelectedStationId,
@@ -1516,14 +1494,11 @@ class _NetworkMapChrome extends StatelessWidget {
   const _NetworkMapChrome({
     required this.regions,
     required this.selectedRegion,
-    required this.expressView,
-    required this.showServicePatternToggle,
     required this.notificationAction,
     required this.disruptionBanner,
     required this.onMenuTap,
     required this.onSearchTap,
     required this.onRegionSelected,
-    required this.onExpressViewChanged,
     required this.nearbyPanelVisible,
     required this.nearbyPanelData,
     required this.realtime,
@@ -1559,14 +1534,11 @@ class _NetworkMapChrome extends StatelessWidget {
 
   final List<NetworkMapRegion> regions;
   final String selectedRegion;
-  final bool expressView;
-  final bool showServicePatternToggle;
   final Widget? notificationAction;
   final Widget? disruptionBanner;
   final VoidCallback onMenuTap;
   final VoidCallback onSearchTap;
   final ValueChanged<String> onRegionSelected;
-  final ValueChanged<bool> onExpressViewChanged;
   final bool nearbyPanelVisible;
   final _NetworkMapNearbyPanelData nearbyPanelData;
   final RealtimeSnapshot realtime;
@@ -1655,15 +1627,6 @@ class _NetworkMapChrome extends StatelessWidget {
             right: 0,
             top: topPadding + _networkMapTopBarHeight,
             child: disruptionBanner!,
-          ),
-        if (showServicePatternToggle && !inSearchMode)
-          Positioned(
-            left: 16,
-            bottom: 26,
-            child: _NetworkMapServicePatternToggle(
-              expressView: expressView,
-              onChanged: onExpressViewChanged,
-            ),
           ),
         if (nearbyPanelVisible && !inSearchMode)
           Positioned(
@@ -2409,52 +2372,6 @@ class _NetworkMapSearchSessionState extends State<_NetworkMapSearchSession> {
   }
 }
 
-class _NetworkMapServicePatternToggle extends StatelessWidget {
-  const _NetworkMapServicePatternToggle({
-    required this.expressView,
-    required this.onChanged,
-  });
-
-  final bool expressView;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      key: const Key('networkMapServicePatternToggle'),
-      color: Colors.white,
-      elevation: 0,
-      shape: const RoundedRectangleBorder(
-        borderRadius: _networkMapPillRadius,
-        side: BorderSide(color: EasySubwayAccessibleColors.line),
-      ),
-      child: Container(
-        height: 58,
-        padding: const EdgeInsets.all(3),
-        decoration: BoxDecoration(
-          borderRadius: _networkMapPillRadius,
-          border: Border.all(color: const Color(0xFFE8E8E8)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _NetworkMapToggleSegment(
-              label: '일반',
-              selected: !expressView,
-              onTap: () => onChanged(false),
-            ),
-            _NetworkMapToggleSegment(
-              label: '급행',
-              selected: expressView,
-              onTap: () => onChanged(true),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _NetworkMapCurrentLocationButton extends StatelessWidget {
   const _NetworkMapCurrentLocationButton({required this.onTap});
 
@@ -3140,7 +3057,7 @@ class _SubwayTimetableDepartureView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
+    final time = Text(
       data.departure.timeLabel,
       style: const TextStyle(
         color: Color(0xFFE23D3D),
@@ -3148,48 +3065,19 @@ class _SubwayTimetableDepartureView extends StatelessWidget {
         fontWeight: FontWeight.w800,
       ),
     );
-  }
-}
-
-class _NetworkMapToggleSegment extends StatelessWidget {
-  const _NetworkMapToggleSegment({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: _networkMapPillRadius,
-      splashFactory: NoSplash.splashFactory,
-      splashColor: Colors.transparent,
-      highlightColor: Colors.transparent,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        height: 52,
-        width: 50,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: selected
-              ? EasySubwayAccessibleColors.mapRegionAccent
-              : Colors.transparent,
-          borderRadius: _networkMapPillRadius,
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? Colors.white : const Color(0xFF242424),
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ),
+    if (!data.departure.isExpress) {
+      return time;
+    }
+    // 급행 출발은 시각 옆에 배지를 붙인다. text scale·좁은 폭·landscape에서
+    // 시각과 배지가 겹치지 않게 Wrap으로 다음 줄 배치한다(clipping 금지).
+    return Wrap(
+      spacing: 4,
+      runSpacing: 2,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        time,
+        ServicePatternBadge(departure: data.departure),
+      ],
     );
   }
 }
@@ -3426,75 +3314,6 @@ class _NetworkMapMenuTile extends StatelessWidget {
       ),
     );
   }
-}
-
-Set<String> _expressLineIds(NetworkMapData data) {
-  return data.lines
-      .where(
-        (line) =>
-            line.name.contains('급행') ||
-            line.shortName.contains('급행') ||
-            line.id.toLowerCase().contains('express'),
-      )
-      .map((line) => line.id)
-      .toSet();
-}
-
-NetworkMapData _expressOnlyMapData(NetworkMapData data) {
-  final lineIds = _expressLineIds(data);
-  final stationIdsFromMemberships = data.stationLineMemberships
-      .where((membership) => lineIds.contains(membership.lineId))
-      .map((membership) => membership.stationId)
-      .toSet();
-  final stations = data.stations
-      .where(
-        (station) =>
-            lineIds.contains(station.lineId) ||
-            stationIdsFromMemberships.contains(station.id),
-      )
-      .toList(growable: false);
-  final stationsById = <String, List<NetworkMapStation>>{};
-  final stationByLineKey = <String, NetworkMapStation>{};
-  for (final station in stations) {
-    stationsById.putIfAbsent(station.id, () => []).add(station);
-    stationByLineKey[_networkMapStationLineKey(station.id, station.lineId)] =
-        station;
-  }
-  bool hasFilteredEndpoint(NetworkMapEdge edge, String endpoint) {
-    return _stationForMapEdgeEndpoint(
-          endpoint,
-          edge.lineId,
-          stationByLineKey,
-          stationsById,
-        ) !=
-        null;
-  }
-
-  return NetworkMapData(
-    regions: data.regions,
-    selectedRegion: data.selectedRegion,
-    lines: data.lines
-        .where((line) => lineIds.contains(line.id))
-        .toList(growable: false),
-    stations: stations,
-    edges: data.edges
-        .where(
-          (edge) =>
-              lineIds.contains(edge.lineId) &&
-              hasFilteredEndpoint(edge, edge.fromStationId) &&
-              hasFilteredEndpoint(edge, edge.toStationId),
-        )
-        .toList(growable: false),
-    positionSources: data.positionSources,
-    stationLineMemberships: data.stationLineMemberships
-        .where((membership) => lineIds.contains(membership.lineId))
-        .toList(growable: false),
-  );
-}
-
-@visibleForTesting
-NetworkMapData networkMapExpressOnlyMapData(NetworkMapData data) {
-  return _expressOnlyMapData(data);
 }
 
 class _NetworkMapLoadFailure extends StatelessWidget {

@@ -13,6 +13,7 @@ import 'features/ads/active_ad_banner.dart';
 import 'features/ads/ad_repository.dart';
 import 'features/fare/official_od_fare_quote.dart';
 import 'features/route_draft/domain/route_draft.dart';
+import 'features/stations/presentation/service_pattern_badge.dart';
 import 'features/stations/presentation/station_line_badges.dart';
 import 'mobile_error_reporter.dart';
 import 'features/get_off_alarm/get_off_alarm_controller.dart';
@@ -311,7 +312,10 @@ class RouteSearchV2ApiRepository implements RouteSearchRepository {
       if (data is! Map<String, Object?>) {
         throw const RouteSearchOnlineException.unavailable();
       }
-      return RouteSearchResult.fromV2(RouteSearchV2Result.fromJson(data));
+      return RouteSearchResult.fromV2(
+        RouteSearchV2Result.fromJson(data),
+        objective: routeRequest.objective,
+      );
     } on RouteSearchOnlineException {
       rethrow;
     } on ApiException catch (error, stackTrace) {
@@ -405,6 +409,18 @@ RouteTransportScope _routeTransportScopeFromValue(Object? value) {
     'SUBWAY_AND_ITX_CHEONGCHUN' => RouteTransportScope.subwayAndItxCheongchun,
     _ => RouteTransportScope.subway,
   };
+}
+
+/// 길찾기 최적화 목표. 선택 컨트롤이지만 실제 운행 정보(급행 여부)와는 무관한
+/// 별개 차원이다. 서버는 null을 FASTEST로 해석하므로 기본값도 FASTEST다.
+enum RouteObjective {
+  fastest('FASTEST', '최단시간'),
+  fewestTransfers('FEWEST_TRANSFERS', '최소환승');
+
+  const RouteObjective(this.serverValue, this.label);
+
+  final String serverValue;
+  final String label;
 }
 
 class RouteFeedbackApiRepository implements RouteFeedbackRepository {
@@ -791,6 +807,7 @@ class RouteSearchRequest {
     this.waypointStationId,
     this.mobilityPreset,
     this.transportScope = RouteTransportScope.subway,
+    this.objective = RouteObjective.fastest,
   });
 
   final String originStationId;
@@ -802,6 +819,10 @@ class RouteSearchRequest {
   /// v2 요청에만 실리는 보행 프리셋 서버 문자열(하위호환으로 mobilityType도 유지).
   final String? mobilityPreset;
   final RouteTransportScope transportScope;
+
+  /// 최적화 목표(FASTEST·FEWEST_TRANSFERS). 급행 여부와는 무관한 별개 차원이며,
+  /// 요청 serialization에는 이 값만 싣고 servicePattern/expressOnly는 싣지 않는다.
+  final RouteObjective objective;
 
   String get effectiveConstraintMode =>
       constraintMode ?? _defaultConstraintMode(mobilityType);
@@ -815,6 +836,7 @@ class RouteSearchRequest {
       waypointStationId: waypointStationId?.trim(),
       mobilityPreset: mobilityPreset?.trim(),
       transportScope: transportScope,
+      objective: objective,
     );
   }
 
@@ -834,6 +856,7 @@ class RouteSearchRequest {
       ...toJson(),
       if (trimmedPreset != null && trimmedPreset.isNotEmpty)
         'mobilityPreset': trimmedPreset,
+      'objective': objective.serverValue,
       'departureTime': _routeV2DepartureTimeNow(),
       'useRealtime': true,
       'maxTransfers': 3,
@@ -918,6 +941,7 @@ class RouteSearchV2Itinerary {
     required this.accessibilityRisk,
     required this.legs,
     required this.commercialEtaEligible,
+    this.objectiveTags = const [],
   });
 
   factory RouteSearchV2Itinerary.fromJson(Map<String, Object?> json) {
@@ -952,6 +976,10 @@ class RouteSearchV2Itinerary {
           })
           .toList(growable: false),
       commercialEtaEligible: _requiredRouteBool(json, 'commercialEtaEligible'),
+      objectiveTags: _routeStringList(
+        json['objectiveTags'] ?? const <Object?>[],
+        'route v2 objective tag',
+      ),
     );
   }
 
@@ -967,6 +995,13 @@ class RouteSearchV2Itinerary {
   final RouteSearchV2AccessibilityRisk accessibilityRisk;
   final List<RouteSearchV2Leg> legs;
   final bool commercialEtaEligible;
+
+  /// 백엔드가 dual-tag dedupe한 대표 itinerary에 붙이는 objective 태그
+  /// (FASTEST·FEWEST_TRANSFERS). 두 objective가 같은 경로면 두 태그를 모두 담는다.
+  final List<String> objectiveTags;
+
+  bool matchesObjective(RouteObjective objective) =>
+      objectiveTags.contains(objective.serverValue);
 }
 
 class RouteSearchV2Leg {
@@ -990,6 +1025,8 @@ class RouteSearchV2Leg {
     required this.etaSource,
     required this.confidence,
     required this.accessibilityRisk,
+    this.serviceClass,
+    this.servicePattern,
   });
 
   factory RouteSearchV2Leg.fromJson(Map<String, Object?> json) {
@@ -997,8 +1034,14 @@ class RouteSearchV2Leg {
     if (rawAccessibilityRisk is! Map<String, Object?>) {
       throw const FormatException('Invalid route v2 leg payload');
     }
+    final legType = _requiredRouteString(json, 'legType');
+    final (serviceClass, servicePattern) = _routeV2LegServiceFields(
+      legType,
+      json['serviceClass'],
+      json['servicePattern'],
+    );
     return RouteSearchV2Leg(
-      legType: _requiredRouteString(json, 'legType'),
+      legType: legType,
       fromStationId: _optionalRouteString(json, 'fromStationId'),
       toStationId: _optionalRouteString(json, 'toStationId'),
       fromNodeId: _optionalRouteString(json, 'fromNodeId'),
@@ -1025,6 +1068,8 @@ class RouteSearchV2Leg {
       accessibilityRisk: RouteSearchV2AccessibilityRisk.fromJson(
         rawAccessibilityRisk,
       ),
+      serviceClass: serviceClass,
+      servicePattern: servicePattern,
     );
   }
 
@@ -1047,6 +1092,47 @@ class RouteSearchV2Leg {
   final String etaSource;
   final String confidence;
   final RouteSearchV2AccessibilityRisk accessibilityRisk;
+
+  /// 운행 클래스(SUBWAY·ITX_CHEONGCHUN). RIDE leg에서만 채워지고, 그 외에는 null.
+  final String? serviceClass;
+
+  /// 운행종별(LOCAL·EXPRESS). RIDE leg에서만 채워지고, 그 외에는 null.
+  final String? servicePattern;
+
+  /// 지하철 급행 leg 여부. `급행` 배지를 노출하는 유일한 조건이다.
+  bool get isSubwayExpress =>
+      serviceClass == 'SUBWAY' && servicePattern == 'EXPRESS';
+}
+
+const _routeV2ServiceClasses = {'SUBWAY', 'ITX_CHEONGCHUN'};
+const _routeV2ServicePatterns = {'LOCAL', 'EXPRESS'};
+
+/// RIDE leg의 serviceClass·servicePattern을 필수 enum으로 검증하고, non-ride leg은
+/// null만 허용한다. unknown·blank·non-ride 값 존재는 payload error로 처리해
+/// LOCAL 추정 없이 unavailable로 흐르게 한다.
+(String?, String?) _routeV2LegServiceFields(
+  String legType,
+  Object? rawServiceClass,
+  Object? rawServicePattern,
+) {
+  final isRide = legType == 'RIDE';
+  if (!isRide) {
+    if (rawServiceClass != null || rawServicePattern != null) {
+      throw const FormatException(
+        'Non-ride route v2 leg must not carry service fields',
+      );
+    }
+    return (null, null);
+  }
+  if (rawServiceClass is! String ||
+      !_routeV2ServiceClasses.contains(rawServiceClass)) {
+    throw const FormatException('Invalid route v2 ride serviceClass');
+  }
+  if (rawServicePattern is! String ||
+      !_routeV2ServicePatterns.contains(rawServicePattern)) {
+    throw const FormatException('Invalid route v2 ride servicePattern');
+  }
+  return (rawServiceClass, rawServicePattern);
 }
 
 class RouteSearchV2AccessibilityRisk {
@@ -1251,7 +1337,10 @@ class RouteSearchResult {
     );
   }
 
-  factory RouteSearchResult.fromV2(RouteSearchV2Result result) {
+  factory RouteSearchResult.fromV2(
+    RouteSearchV2Result result, {
+    RouteObjective objective = RouteObjective.fastest,
+  }) {
     if (result.itineraries.isEmpty) {
       if (result.statuses.isEmpty) {
         throw const FormatException(
@@ -1287,10 +1376,7 @@ class RouteSearchResult {
         transportScope: RouteTransportScope.subwayAndItxCheongchun,
       );
     }
-    final itinerary = result.itineraries.firstWhere(
-      (candidate) => candidate.status == 'FOUND',
-      orElse: () => result.itineraries.first,
-    );
+    final itinerary = _selectRouteV2Itinerary(result.itineraries, objective);
     final lineId = _routeV2SummaryLineId(itinerary.legs);
     return RouteSearchResult(
       routeSearchId: _routeV2RouteSearchId(itinerary.itineraryId),
@@ -1797,6 +1883,38 @@ class RouteRefreshResult {
   }
 }
 
+/// objective-tagged 대표 itinerary 중 현재 목표에 맞는 것을 고른다. 백엔드가 두
+/// objective를 하나로 dedupe하면 그 하나가 두 태그를 모두 달고 있어 어느 목표에서도
+/// 선택된다. FOUND itinerary가 전부 무태그(레거시)일 때만 첫 FOUND, 그마저 없으면 첫
+/// itinerary로 폴백해 기존 동작을 보존한다. 태그가 하나라도 있는데 요청 objective와
+/// 매칭되는 FOUND가 없으면 silent fallback(계약 위반)을 피해 payload 오류로 fail
+/// closed한다(generic unavailable 흐름으로 흐른다).
+RouteSearchV2Itinerary _selectRouteV2Itinerary(
+  List<RouteSearchV2Itinerary> itineraries,
+  RouteObjective objective,
+) {
+  final foundItineraries = itineraries
+      .where((itinerary) => itinerary.status == 'FOUND')
+      .toList(growable: false);
+  for (final itinerary in foundItineraries) {
+    if (itinerary.matchesObjective(objective)) {
+      return itinerary;
+    }
+  }
+  final hasTaggedFound = foundItineraries.any(
+    (itinerary) => itinerary.objectiveTags.isNotEmpty,
+  );
+  if (hasTaggedFound) {
+    throw const FormatException(
+      'Route v2 FOUND itineraries missing requested objective tag',
+    );
+  }
+  return itineraries.firstWhere(
+    (candidate) => candidate.status == 'FOUND',
+    orElse: () => itineraries.first,
+  );
+}
+
 int _scoreFromRisk(RouteSearchV2AccessibilityRisk risk) {
   final penalty =
       risk.stairCount * 30 +
@@ -1925,6 +2043,8 @@ class RouteSearchStep {
     this.carDoorCarNumber,
     this.carDoorDoorNumber,
     this.carDoorFacilityType = '',
+    this.serviceClass,
+    this.servicePattern,
   });
 
   factory RouteSearchStep.fromJson(Map<String, Object?> json) {
@@ -2004,6 +2124,8 @@ class RouteSearchStep {
       confidenceLabel: leg.confidence,
       plannedArrivalTimeIso: leg.plannedArrivalTime,
       realtimeArrivalTimeIso: leg.realtimeArrivalTime ?? '',
+      serviceClass: leg.serviceClass,
+      servicePattern: leg.servicePattern,
     );
   }
 
@@ -2038,6 +2160,15 @@ class RouteSearchStep {
   final int? carDoorCarNumber;
   final int? carDoorDoorNumber;
   final String carDoorFacilityType;
+
+  /// 승차 leg의 운행 클래스·운행종별(실제 운행 정보). 급행 배지 노출 판단에만 쓰고,
+  /// 선택 컨트롤·요청 identity에는 싣지 않는다. 승차가 아닌 step에서는 null이다.
+  final String? serviceClass;
+  final String? servicePattern;
+
+  /// 승차 정보 영역에 `급행` 배지를 노출하는 유일한 조건.
+  bool get isSubwayExpress =>
+      serviceClass == 'SUBWAY' && servicePattern == 'EXPRESS';
 
   RouteSearchStep withDisplayLabels({
     required String title,
@@ -2074,6 +2205,8 @@ class RouteSearchStep {
       carDoorCarNumber: carDoorCarNumber,
       carDoorDoorNumber: carDoorDoorNumber,
       carDoorFacilityType: carDoorFacilityType,
+      serviceClass: serviceClass,
+      servicePattern: servicePattern,
     );
   }
 
@@ -2626,6 +2759,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
   late String _selectedMobilityType;
   late String _selectedConstraintMode;
   late RouteTransportScope _selectedTransportScope;
+  // objective/scope 선택은 현재 검색 화면 lifecycle 동안만 유지하고 app restart에
+  // 영속화하지 않는다. 기본값은 FASTEST(+ SUBWAY).
+  RouteObjective _selectedObjective = RouteObjective.fastest;
   String _validationMessage = '';
 
   /// #1933 C: 출발·도착이 모두 채워진 draft로 진입하면 별도 "길찾기" 버튼을 누르지
@@ -2720,7 +2856,8 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     final waypoint = _waypointStation;
     final waypointSegment = waypoint == null ? '' : '${waypoint.id} ';
     return '${origin.id} $waypointSegment${destination.id} '
-        '$_selectedMobilityType $_selectedConstraintMode ${_selectedTransportScope.serverValue}';
+        '$_selectedMobilityType $_selectedConstraintMode '
+        '${_selectedTransportScope.serverValue} ${_selectedObjective.serverValue}';
   }
 
   void _maybeAutoSearchFromDraft() {
@@ -2960,9 +3097,14 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
                     // 바꾸면 그 자리에서 바로 재검색한다(별도 폼·버튼 없음).
                     _RouteConditionChips(
                       preset: _selectedPreset,
+                      objective: _selectedObjective,
                       transportScope: _selectedTransportScope,
                       itxTransportScopeEnabled: _itxTransportScopeAvailable,
+                      loading:
+                          _controller.state.status ==
+                          RouteSearchViewStatus.loading,
                       onChangePreset: _showMobilityPresetPicker,
+                      onChangeObjective: _changeObjective,
                       onChangeTransportScope: _changeTransportScope,
                     ),
                     _RouteSearchBody(
@@ -3101,8 +3243,27 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
         waypointStationId: _waypointStation?.id,
         mobilityPreset: mobilityPresetServerString(_selectedPreset),
         transportScope: _selectedTransportScope,
+        objective: _selectedObjective,
       ),
     );
+  }
+
+  Future<void> _changeObjective(RouteObjective objective) async {
+    if (objective == _selectedObjective ||
+        _controller.state.status == RouteSearchViewStatus.loading) {
+      return;
+    }
+    if (!await _disableActiveGetOffAlarm()) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _selectedObjective = objective;
+      _autoSearchedSignature = null;
+    });
+    await _submit(alarmAlreadyDisabled: true);
   }
 
   Future<void> _changeTransportScope(RouteTransportScope scope) async {
@@ -5363,21 +5524,31 @@ class _RouteSummaryChip {
 class _RouteConditionChips extends StatelessWidget {
   const _RouteConditionChips({
     required this.preset,
+    required this.objective,
     required this.transportScope,
     required this.itxTransportScopeEnabled,
+    required this.loading,
     required this.onChangePreset,
+    required this.onChangeObjective,
     required this.onChangeTransportScope,
   });
 
   final MobilityPreset preset;
+  final RouteObjective objective;
   final RouteTransportScope transportScope;
   final bool itxTransportScopeEnabled;
+  // 재검색 로딩 중에는 objective·교통범위 변경 핸들러가 입력을 조용히 무시하므로,
+  // 해당 칩을 시각·semantics 모두 비활성으로 표기해 활성으로 보이지 않게 한다.
+  final bool loading;
   final VoidCallback onChangePreset;
+  final ValueChanged<RouteObjective> onChangeObjective;
   final ValueChanged<RouteTransportScope> onChangeTransportScope;
 
   @override
   Widget build(BuildContext context) {
     final displayName = mobilityPresetDisplayName(preset);
+    // 일반 폭에서는 한 행에 배치되고, 큰 글자·좁은 폭에서는 objective 행 다음으로
+    // scope 행이 자연스럽게 내려가도록 Wrap이 재배치한다.
     return Padding(
       key: const Key('routeConditionChips'),
       padding: const EdgeInsets.only(bottom: 16),
@@ -5393,6 +5564,26 @@ class _RouteConditionChips extends StatelessWidget {
             active: false,
             onTap: onChangePreset,
           ),
+          // objective 탭: 기존 transport toggle 세그먼트 패턴을 재사용(무채색·radius 8·
+          // 그림자 0). 좌측에 놓고 항상 노출한다(기본값 FASTEST).
+          _RouteConditionChipButton(
+            buttonKey: const Key('routeObjectiveFastestChip'),
+            icon: Icons.bolt,
+            label: RouteObjective.fastest.label,
+            semanticLabel: '경로 목표, ${RouteObjective.fastest.label}',
+            active: objective == RouteObjective.fastest,
+            enabled: !loading,
+            onTap: () => onChangeObjective(RouteObjective.fastest),
+          ),
+          _RouteConditionChipButton(
+            buttonKey: const Key('routeObjectiveFewestTransfersChip'),
+            icon: Icons.swap_calls,
+            label: RouteObjective.fewestTransfers.label,
+            semanticLabel: '경로 목표, ${RouteObjective.fewestTransfers.label}',
+            active: objective == RouteObjective.fewestTransfers,
+            enabled: !loading,
+            onTap: () => onChangeObjective(RouteObjective.fewestTransfers),
+          ),
           if (itxTransportScopeEnabled) ...[
             _RouteConditionChipButton(
               buttonKey: const Key('routeScopeSubwayChip'),
@@ -5400,6 +5591,7 @@ class _RouteConditionChips extends StatelessWidget {
               label: '지하철만',
               semanticLabel: '교통 범위, 지하철만',
               active: transportScope == RouteTransportScope.subway,
+              enabled: !loading,
               onTap: () => onChangeTransportScope(RouteTransportScope.subway),
             ),
             _RouteConditionChipButton(
@@ -5409,6 +5601,7 @@ class _RouteConditionChips extends StatelessWidget {
               semanticLabel: '교통 범위, 지하철과 ITX-청춘',
               active:
                   transportScope == RouteTransportScope.subwayAndItxCheongchun,
+              enabled: !loading,
               onTap: () => onChangeTransportScope(
                 RouteTransportScope.subwayAndItxCheongchun,
               ),
@@ -5427,6 +5620,7 @@ class _RouteConditionChipButton extends StatelessWidget {
     required this.label,
     required this.semanticLabel,
     required this.active,
+    this.enabled = true,
     required this.onTap,
   });
 
@@ -5435,34 +5629,43 @@ class _RouteConditionChipButton extends StatelessWidget {
   final String label;
   final String semanticLabel;
   final bool active;
+  final bool enabled;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final foreground = active
+    // 비활성(재검색 로딩 중)일 때는 무채색 원칙 안에서 기존 muted 토큰만 재사용해
+    // 흐리게 표기하고 tap·semantics 모두 막는다(새 색·새 디자인 없음).
+    final foreground = !enabled
+        ? EasySubwayAccessibleColors.iconMuted
+        : active
         ? EasySubwayAccessibleColors.primary
         : EasySubwayAccessibleColors.secondaryText;
+    final tapHandler = enabled ? onTap : null;
     return Semantics(
       button: true,
+      enabled: enabled,
       toggled: active,
       label: semanticLabel,
-      onTap: onTap,
+      onTap: tapHandler,
       child: ExcludeSemantics(
         child: Material(
           color: Colors.transparent,
           child: InkWell(
             key: buttonKey,
-            onTap: onTap,
+            onTap: tapHandler,
             borderRadius: _routeSearchPillRadius,
             child: Ink(
               decoration: BoxDecoration(
                 color: EasySubwayAccessibleColors.surface,
                 borderRadius: _routeSearchPillRadius,
                 border: Border.all(
-                  color: active
+                  color: !enabled
+                      ? EasySubwayAccessibleColors.line
+                      : active
                       ? EasySubwayAccessibleColors.primary
                       : EasySubwayAccessibleColors.line,
-                  width: active ? 2 : 1,
+                  width: active && enabled ? 2 : 1,
                 ),
               ),
               child: Container(
@@ -5486,10 +5689,12 @@ class _RouteConditionChipButton extends StatelessWidget {
                     ),
                     if (active) ...[
                       const SizedBox(width: 6),
-                      const Icon(
+                      Icon(
                         Icons.check,
                         size: 16,
-                        color: EasySubwayAccessibleColors.primary,
+                        color: enabled
+                            ? EasySubwayAccessibleColors.primary
+                            : EasySubwayAccessibleColors.iconMuted,
                       ),
                     ],
                   ],
@@ -5871,6 +6076,19 @@ class _RouteStepTile extends StatelessWidget {
                 color: EasySubwayAccessibleColors.secondaryText,
                 fontWeight: FontWeight.w700,
                 height: 1.3,
+              ),
+            ),
+          ],
+          // 승차 정보 영역에만 급행 배지를 붙인다(요약 카드 전체가 아니라 leg별).
+          // SUBWAY/EXPRESS만 대상이고, ITX-청춘·LOCAL은 배지 없음. 배지는 장식이라
+          // ExcludeSemantics로 두고 TalkBack용 `급행`은 이 Semantics가 한 번만 준다.
+          if (step.stepType == 'ride' && step.isSubwayExpress) ...[
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Semantics(
+                label: '급행',
+                child: const ServicePatternBadge.express(),
               ),
             ),
           ],
