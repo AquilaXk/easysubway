@@ -69,9 +69,9 @@
       },
       "phaseACurrentRcArtifact": {
         "result": "PASS_TWO_CLEAN_REPRODUCIBLE_BOOTJAR_BUILDS",
-        "sourceCommit": "dd49d5e7df7382df85e600c28344c35b5b7f9147",
+        "sourceCommit": "9252a8a33839f8c2aef3adc1a4a901a1d18d8de4",
         "artifact": "backend-boot.jar",
-        "backendArtifactSha256": "8bc8f71f92fa82b38739a02424c6758f317b6dd4d3f07398cdf29a886c4b5f98",
+        "backendArtifactSha256": "74a3e35762d1973c0b05a0c0bd6f0fc6aa2a4657ef23cde359cf100e0830f631",
         "productionMutationPerformed": false
       },
       "datapackArtifact": {

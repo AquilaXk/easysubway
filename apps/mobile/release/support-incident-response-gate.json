@@ -67,8 +67,8 @@
     ],
     "helpScreenDeviceQa": {
       "result": "PASS",
-      "versionName": "1.0.4",
-      "versionCode": 10005,
+      "versionName": "1.0.5",
+      "versionCode": 10006,
       "contactSetSha256": "e361e4d770796fc6dc2ade2eb560b2e6885917c027a67661b3644ea8ff30044a",
       "contacts": ["support@aquilaxk.site", "security@aquilaxk.site"],
       "dataDeletionRoute": "in-app deletion confirmation",
