@@ -29,6 +29,7 @@ import 'features/network_map/presentation/structured_route_map_painter.dart';
 import 'features/realtime/realtime_repository.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
 import 'features/route_draft/domain/route_draft.dart';
+import 'features/stations/presentation/service_pattern_badge.dart';
 import 'features/stations/presentation/station_search_screen.dart';
 import 'internal_route.dart';
 import 'mobile_error_reporter.dart';
@@ -3140,13 +3141,27 @@ class _SubwayTimetableDepartureView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
+    final time = Text(
       data.departure.timeLabel,
       style: const TextStyle(
         color: Color(0xFFE23D3D),
         fontSize: 15,
         fontWeight: FontWeight.w800,
       ),
+    );
+    if (!data.departure.isExpress) {
+      return time;
+    }
+    // 급행 출발은 시각 옆에 배지를 붙인다. text scale·좁은 폭·landscape에서
+    // 시각과 배지가 겹치지 않게 Wrap으로 다음 줄 배치한다(clipping 금지).
+    return Wrap(
+      spacing: 4,
+      runSpacing: 2,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        time,
+        ServicePatternBadge(departure: data.departure),
+      ],
     );
   }
 }

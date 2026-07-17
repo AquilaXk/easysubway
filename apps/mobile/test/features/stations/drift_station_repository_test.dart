@@ -328,6 +328,89 @@ void main() {
     );
   });
 
+  test('로컬 역 시간표는 지하철 급행·일반 운행종별을 손실 없이 전달한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await _seedStationTimetable(database);
+    await database.customStatement('''
+      INSERT INTO transit_trips (
+        id, route_id, service_id, trip_headsign, direction_id,
+        service_pattern, service_class, service_day_start_seconds
+      ) VALUES (
+        'weekday-down-1919-express', 'line4-down-1919', 'weekday-1919', '사당', 'down',
+        'EXPRESS', 'SUBWAY', 0
+      )
+    ''');
+    await database.customStatement('''
+      INSERT INTO transit_stop_times (
+        trip_id, stop_sequence, station_id, line_id,
+        arrival_seconds, departure_seconds, pickup_type, drop_off_type
+      ) VALUES (
+        'weekday-down-1919-express', 1, 'station-sadang', 'seoul-4', 19260, 19260, 0, 0
+      )
+    ''');
+    final repository = DriftStationRepository(database: database);
+
+    final timetable = await repository.loadStationTimetable(
+      stationId: 'station-sadang',
+      lineId: 'seoul-4',
+      dayType: StationTimetableDayType.weekday,
+      referenceDate: DateTime(2026, 7, 12),
+    );
+
+    final sadang = timetable.directions.singleWhere(
+      (direction) => direction.name == '사당 방면',
+    );
+    final express = sadang.departures.singleWhere(
+      (departure) => departure.isExpress,
+    );
+    expect(express.timeLabel, '05:21');
+    expect(express.servicePattern, 'EXPRESS');
+    expect(express.serviceClass, 'SUBWAY');
+    final local = sadang.departures.singleWhere(
+      (departure) => departure.timeLabel == '05:20',
+    );
+    expect(local.isExpress, isFalse);
+    expect(local.servicePattern, 'LOCAL');
+    expect(local.serviceClass, 'SUBWAY');
+  });
+
+  test('로컬 역 시간표는 지하철 미상·공백 운행종별을 경계에서 실패시킨다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await _seedStationTimetable(database);
+    await database.customStatement('''
+      INSERT INTO transit_trips (
+        id, route_id, service_id, trip_headsign, direction_id,
+        service_pattern, service_class, service_day_start_seconds
+      ) VALUES (
+        'weekday-down-1919-unknown', 'line4-down-1919', 'weekday-1919', '사당', 'down',
+        '', 'SUBWAY', 0
+      )
+    ''');
+    await database.customStatement('''
+      INSERT INTO transit_stop_times (
+        trip_id, stop_sequence, station_id, line_id,
+        arrival_seconds, departure_seconds, pickup_type, drop_off_type
+      ) VALUES (
+        'weekday-down-1919-unknown', 1, 'station-sadang', 'seoul-4', 19320, 19320, 0, 0
+      )
+    ''');
+    final repository = DriftStationRepository(database: database);
+
+    await expectLater(
+      repository.loadStationTimetable(
+        stationId: 'station-sadang',
+        lineId: 'seoul-4',
+        dayType: StationTimetableDayType.weekday,
+        referenceDate: DateTime(2026, 7, 12),
+      ),
+      throwsA(isA<StateError>()),
+    );
+  });
+
   test('흡수된 station ID로도 대표 역 시간표를 반환한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);

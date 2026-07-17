@@ -4836,6 +4836,135 @@ void main() {
     expect(find.bySemanticsLabel('실시간 선택됨'), findsOneWidget);
   });
 
+  testWidgets('급행 운행 정보는 선택 UI 없이 시간표와 길찾기에 표시된다', (tester) async {
+    tester.view.physicalSize = const Size(320, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final semanticsHandle = tester.ensureSemantics();
+    final now = DateTime.now();
+    final baseSeconds =
+        now.hour * Duration.secondsPerHour +
+        now.minute * Duration.secondsPerMinute +
+        now.second;
+    final localDeparture = StationTimetableDeparture(
+      directionName: '오이도',
+      seconds: baseSeconds + 120,
+    );
+    final expressDeparture = StationTimetableDeparture(
+      directionName: '오이도',
+      seconds: baseSeconds + 300,
+      servicePattern: 'EXPRESS',
+      serviceClass: 'SUBWAY',
+    );
+    final repository = FakeTimetableStationRepository(
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+      networkMapRegionNames: const ['수도권'],
+      nearbyResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      timetables: {
+        for (final dayType in StationTimetableDayType.values)
+          dayType: _stationTimetable(
+            dayType,
+            directions: [
+              StationTimetableDirection(
+                name: '오이도',
+                departures: [localDeparture, expressDeparture],
+              ),
+            ],
+          ),
+      },
+    );
+
+    try {
+      await _pumpNetworkMapForGpsTest(
+        tester,
+        repository: repository,
+        locationProvider: FakeCurrentLocationProvider(
+          location: _freshCurrentLocation(),
+          needsPermissionRequest: false,
+        ),
+        realtimeRepository: _RecordingRealtimeRepository(),
+      );
+
+      await tester.tap(find.byKey(const Key('nearbyStationButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
+          matching: find.text('시간표'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // --- 시간표 부분(#2099 WP1) ---
+      // 인접역 시간표 패널로 범위를 좁힌다. 노선도 자체의 일반/급행 노선 뷰
+      // 전환 컨트롤(networkMapServicePatternToggle)은 시간표 급행 정보와 무관한
+      // 별개 기능이므로 이 검증에 섞이지 않게 한다.
+      final panel = find.byKey(const Key('networkMapNearbyStationPanel'));
+      expect(panel, findsOneWidget);
+      // 급행 출발 행에만 배지 1회, 일반 행에는 배지 없음.
+      expect(
+        find.descendant(
+          of: panel,
+          matching: find.byKey(const Key('servicePatternExpressBadge')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: panel, matching: find.text('급행')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: panel, matching: find.text('일반')),
+        findsNothing,
+      );
+      // 두 시각 모두 노출.
+      expect(
+        find.descendant(
+          of: panel,
+          matching: find.text(localDeparture.timeLabel),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: panel,
+          matching: find.text(expressDeparture.timeLabel),
+        ),
+        findsOneWidget,
+      );
+      // TalkBack은 급행을 정확히 한 번만 읽는다(배지는 장식이라 semantics 제외).
+      expect(
+        find.descendant(
+          of: panel,
+          matching: find.bySemanticsLabel(RegExp('급행')),
+        ),
+        findsOneWidget,
+      );
+      // 급행/일반은 실제 운행 정보다 — 시간표 패널 안에 toggle/chip/filter 선택
+      // 컨트롤 0건.
+      expect(
+        find.descendant(of: panel, matching: find.byType(ChoiceChip)),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: panel, matching: find.byType(FilterChip)),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: panel, matching: find.byType(Switch)),
+        findsNothing,
+      );
+
+      // --- 길찾기 부분(#2099 WP2에서 확장 예정) ---
+      // WP2가 같은 테스트에 길찾기 경로의 급행 표시 검증을 이어서 덧붙인다.
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
   testWidgets('GPS 하단 패널은 열차 정보가 없어도 인접역 두 방면 스켈레톤(제목+대시+구분선)을 유지한다', (
     tester,
   ) async {
@@ -10268,6 +10397,90 @@ void main() {
       );
     } finally {
       semanticsHandle.dispose();
+      debugStationVerifiedClock = DateTime.now;
+    }
+  });
+
+  testWidgets('역 시간표 화면은 일반·급행을 한 목록에 시각순으로 표시하고 급행 행에만 배지를 단다', (
+    tester,
+  ) async {
+    // #2099 WP1: LOCAL 08:00과 EXPRESS 08:03이 한 방향 목록에 시각순으로 함께
+    // 놓이고, 08:03에만 급행 배지가 붙으며 방향·첫차·막차 동작은 유지된다.
+    debugStationVerifiedClock = () => DateTime(2026, 7, 6); // 월요일(평일)
+    const line = StationSearchLine(
+      id: 'seoul-4',
+      name: '수도권 4호선',
+      color: '#00A5DE',
+      stationCode: '433',
+    );
+    final repository = FakeTimetableStationRepository(
+      stationDetail: _stationDetail(id: 'station-sadang', name: '사당'),
+      timetableLineId: 'seoul-4',
+      timetables: {
+        for (final dayType in StationTimetableDayType.values)
+          dayType: _stationTimetable(
+            dayType,
+            stationId: 'station-sadang',
+            lineId: 'seoul-4',
+            directions: const [
+              StationTimetableDirection(
+                name: '사당 방면',
+                departures: [
+                  StationTimetableDeparture(
+                    directionName: '사당 방면',
+                    seconds: 28800, // 08:00 일반
+                  ),
+                  StationTimetableDeparture(
+                    directionName: '사당 방면',
+                    seconds: 28980, // 08:03 급행
+                    servicePattern: 'EXPRESS',
+                    serviceClass: 'SUBWAY',
+                  ),
+                ],
+              ),
+            ],
+          ),
+      },
+    );
+
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StationTimetableScreen(
+            stationId: 'station-sadang',
+            stationName: '사당',
+            lines: const [line],
+            repository: repository,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 두 시각이 한 목록에 시각순으로 함께 노출된다.
+      expect(find.text('08:00'), findsOneWidget);
+      expect(find.text('08:03'), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.text('08:00')).dy,
+        lessThan(tester.getTopLeft(find.text('08:03')).dy),
+      );
+
+      // 첫차·막차 동작 유지.
+      expect(find.text('첫차 08:00'), findsOneWidget);
+      expect(find.text('막차 08:03'), findsOneWidget);
+
+      // 급행 행에만 배지 1회, 일반 행에는 배지 없음.
+      expect(find.text('급행'), findsOneWidget);
+      expect(
+        find.byKey(const Key('servicePatternExpressBadge')),
+        findsOneWidget,
+      );
+      expect(find.text('일반'), findsNothing);
+
+      // 급행/일반은 실제 운행 정보다 — 선택 컨트롤(칩·필터)로 노출하지 않는다.
+      expect(find.widgetWithText(ChoiceChip, '급행'), findsNothing);
+      expect(find.widgetWithText(ChoiceChip, '일반'), findsNothing);
+      expect(find.widgetWithText(FilterChip, '급행'), findsNothing);
+    } finally {
       debugStationVerifiedClock = DateTime.now;
     }
   });
