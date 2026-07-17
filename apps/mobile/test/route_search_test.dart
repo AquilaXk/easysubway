@@ -1602,6 +1602,17 @@ void main() {
       expect(step.isSubwayExpress, isFalse);
     });
 
+    test('RIDE ITX_CHEONGCHUN/LOCAL leg도 ITX-청춘 서비스 식별을 유지한다', () {
+      // isItxCheongchun은 servicePattern과 무관하게 serviceClass만 본다(의도 동작).
+      // EXPRESS 케이스만 고정되어 있으면 LOCAL 회귀를 못 잡으므로 별도로 고정한다.
+      final leg = RouteSearchV2Leg.fromJson(
+        _rideLegJson(serviceClass: 'ITX_CHEONGCHUN', servicePattern: 'LOCAL'),
+      );
+      final step = RouteSearchStep.fromV2(1, leg);
+      expect(step.isItxCheongchun, isTrue);
+      expect(step.isSubwayExpress, isFalse);
+    });
+
     test('RIDE SUBWAY leg은 ITX-청춘이 아니다', () {
       final local = RouteSearchStep.fromV2(
         1,
