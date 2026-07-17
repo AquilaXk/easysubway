@@ -143,15 +143,70 @@ cleanup_on_exit() {
 }
 trap cleanup_on_exit EXIT
 
-docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' easysubway-postgres > "${postgres_env_file}"
-docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' easysubway-backend > "${backend_env_file}"
-docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' easysubway-route-v2-gateway > "${gateway_env_file}"
-chmod 600 "${postgres_env_file}" "${backend_env_file}" "${gateway_env_file}"
-
-postgres_user="$(read_env_value "${postgres_env_file}" POSTGRES_USER)"
-postgres_db="$(read_env_value "${postgres_env_file}" POSTGRES_DB)"
+postgres_user="$(read_env_value "${compose_env}" EASYSUBWAY_POSTGRES_USER)"
+postgres_db="$(read_env_value "${compose_env}" EASYSUBWAY_POSTGRES_DB)"
 [[ "${postgres_user}" =~ ^[A-Za-z0-9_.-]+$ && "${postgres_db}" =~ ^[A-Za-z0-9_.-]+$ ]] \
 	|| { echo 'production PostgreSQL identity is invalid' >&2; exit 1; }
+mapfile -t synthetic_secrets < <(node -e '
+const { randomBytes } = require("node:crypto");
+console.log(randomBytes(32).toString("hex"));
+console.log(randomBytes(32).toString("hex"));
+console.log(randomBytes(32).toString("base64url"));
+')
+(( ${#synthetic_secrets[@]} == 3 )) || { echo 'synthetic credential generation failed' >&2; exit 1; }
+clone_db_password="${synthetic_secrets[0]}"
+synthetic_secret="${synthetic_secrets[1]}"
+synthetic_certificate_digest="${synthetic_secrets[2]}"
+[[ "${clone_db_password}" =~ ^[0-9a-f]{64}$ && "${synthetic_secret}" =~ ^[0-9a-f]{64}$ \
+	&& "${synthetic_certificate_digest}" =~ ^[A-Za-z0-9_-]{43}$ ]] \
+	|| { echo 'synthetic credential format is invalid' >&2; exit 1; }
+{
+	printf 'POSTGRES_USER=%s\n' "${postgres_user}"
+	printf 'POSTGRES_DB=%s\n' "${postgres_db}"
+	printf 'POSTGRES_PASSWORD=%s\n' "${clone_db_password}"
+} > "${postgres_env_file}"
+{
+	printf 'SPRING_PROFILES_ACTIVE=prod\n'
+	printf 'EASYSUBWAY_DATASOURCE_URL=jdbc:postgresql://postgres:5432/%s\n' "${postgres_db}"
+	printf 'EASYSUBWAY_DATASOURCE_USERNAME=%s\n' "${postgres_user}"
+	printf 'EASYSUBWAY_DATASOURCE_PASSWORD=%s\n' "${clone_db_password}"
+	printf 'EASYSUBWAY_ADS_ASSET_ORIGIN=https://assets.easysubway.invalid\n'
+	printf 'EASYSUBWAY_ADS_EVENT_DAILY_CAP=1\n'
+	printf 'EASYSUBWAY_REPORT_RECEIPT_PEPPER=%s\n' "${synthetic_secret}"
+	printf 'EASYSUBWAY_REPORT_UPLOAD_BUCKET=capacity-evidence\n'
+	printf 'EASYSUBWAY_REPORT_UPLOAD_INTENT_SIGNING_KEY=%s\n' "${synthetic_secret}"
+	printf 'EASYSUBWAY_REPORT_ABUSE_STORE_MODE=local\n'
+	printf 'EASYSUBWAY_REPORT_OBJECT_STORAGE_INTERNAL_ENDPOINT=http://127.0.0.1:9\n'
+	printf 'EASYSUBWAY_REPORT_UPLOAD_PUBLIC_BASE_URL=https://uploads.easysubway.invalid\n'
+	printf 'EASYSUBWAY_OBJECT_STORAGE_ACCESS_KEY=capacity-evidence\n'
+	printf 'EASYSUBWAY_OBJECT_STORAGE_SECRET_KEY=%s\n' "${synthetic_secret}"
+	printf 'EASYSUBWAY_OBJECT_STORAGE_REGION=us-east-1\n'
+	printf 'EASYSUBWAY_ADMIN_USERNAME=capacity-admin\n'
+	printf 'EASYSUBWAY_ADMIN_PASSWORD=%s\n' "${synthetic_secret}"
+	printf 'EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED=false\n'
+	printf 'EASYSUBWAY_TRUSTED_PROXY_CIDRS=172.16.0.0/12\n'
+	printf 'EASYSUBWAY_ROUTE_V2_ORIGIN_SECRET=%s\n' "${synthetic_secret}"
+	printf 'EASYSUBWAY_ROUTE_V2_SESSION_MAX_REQUESTS=50\n'
+	printf 'EASYSUBWAY_ROUTE_V2_PLAY_INTEGRITY_CERTIFICATE_SHA256=%s\n' "${synthetic_certificate_digest}"
+	printf 'EASYSUBWAY_PLAY_INTEGRITY_CREDENTIALS_BASE64=e30=\n'
+	printf 'EASYSUBWAY_PUSH_EXTERNAL_ENABLED=false\n'
+	printf 'EASYSUBWAY_PUSH_DELIVERY_ENABLED=false\n'
+	printf 'EASYSUBWAY_TIMETABLE_SEED_ENABLED=false\n'
+	printf 'EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX=false\n'
+	printf 'EASYSUBWAY_SCHEDULING_ENABLED=true\n'
+	printf 'EASYSUBWAY_ROUTE_V2_STATE_PURGE_INTERVAL_MS=1000\n'
+} > "${backend_env_file}"
+{
+	printf 'NGINX_ENVSUBST_FILTER=EASYSUBWAY_\n'
+	printf 'NGINX_ENVSUBST_OUTPUT_DIR=/tmp/nginx-conf.d\n'
+	printf 'EASYSUBWAY_ROUTE_V2_ORIGIN_SECRET=%s\n' "${synthetic_secret}"
+	printf 'EASYSUBWAY_ROUTE_V2_SESSION_RATE_PER_MINUTE=%s\n' "${session_rate}"
+	printf 'EASYSUBWAY_ROUTE_V2_SESSION_BURST=%s\n' "${session_burst}"
+	printf 'EASYSUBWAY_ROUTE_V2_SEARCH_RATE_PER_MINUTE=%s\n' "${search_rate}"
+	printf 'EASYSUBWAY_ROUTE_V2_SEARCH_BURST=%s\n' "${search_burst}"
+	printf 'EASYSUBWAY_ROUTE_V2_TRUSTED_PROXY_CIDR=172.16.0.0/12\n'
+} > "${gateway_env_file}"
+chmod 600 "${postgres_env_file}" "${backend_env_file}" "${gateway_env_file}"
 
 production_psql() {
 	local sql="${1:?SQL is required}"
@@ -231,14 +286,8 @@ process.stdout.write(new Date(departure + 9 * 60 * 60_000).toISOString().replace
 
 docker run -d --name "${clone_backend}" --network "${network}" --network-alias backend \
 	--env-file "${backend_env_file}" \
-	-e "EASYSUBWAY_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${postgres_db}" \
-	-e EASYSUBWAY_SCHEDULING_ENABLED=true \
-	-e EASYSUBWAY_ROUTE_V2_STATE_PURGE_INTERVAL_MS=1000 \
-	-e EASYSUBWAY_PUSH_EXTERNAL_ENABLED=false \
-	-e EASYSUBWAY_PUSH_DELIVERY_ENABLED=false \
-	-e EASYSUBWAY_TIMETABLE_SEED_ENABLED=false \
 	--cpus 1 --memory 1g --memory-swap 1g --pids-limit 256 \
-	--publish 127.0.0.1::8080 "${backend_image}" >/dev/null
+	--publish 127.0.0.1::8080 "${expected_image_id}" >/dev/null
 
 backend_binding="$(docker port "${clone_backend}" 8080/tcp)"
 [[ "${backend_binding}" =~ ^127\.0\.0\.1:[0-9]+$ ]] || { echo 'isolated backend binding is invalid' >&2; exit 1; }
@@ -255,6 +304,7 @@ done
 docker run -d --name "${clone_gateway}" --network "${network}" --user 10001:10001 --read-only \
 	--tmpfs /tmp:rw,nosuid,nodev --publish 127.0.0.1::8081 \
 	--env-file "${gateway_env_file}" \
+	--cpus 1 --memory 256m --memory-swap 256m --pids-limit 128 \
 	--entrypoint /etc/nginx/route-v2-entrypoint.sh \
 	-v "${PWD}/infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro" \
 	-v "${PWD}/infra/nginx/route-v2-entrypoint.sh:/etc/nginx/route-v2-entrypoint.sh:ro" \
@@ -353,7 +403,9 @@ send_search() {
 
 (
 	while [[ ! -e "${resource_stop_file}" ]]; do
-		docker stats --no-stream --format '{{.MemPerc}} {{.CPUPerc}}' "${clone_backend}" >> "${resource_metrics_file}"
+		backend_resource="$(docker stats --no-stream --format '{{.MemPerc}} {{.CPUPerc}}' "${clone_backend}")"
+		gateway_resource="$(docker stats --no-stream --format '{{.MemPerc}} {{.CPUPerc}}' "${clone_gateway}")"
+		printf '%s %s\n' "${backend_resource}" "${gateway_resource}" >> "${resource_metrics_file}"
 		sleep 1
 	done
 ) &
@@ -450,13 +502,16 @@ resource_summary="$(node -e '
 const rows = require("node:fs").readFileSync(process.argv[1], "utf8").trim().split(/\n/).filter(Boolean);
 if (rows.length === 0) process.exit(1);
 const samples = rows.map((line) => line.trim().split(/\s+/).map((value) => Number(value.replace(/%$/, ""))));
-if (samples.some(([memory, cpu]) => !Number.isFinite(memory) || !Number.isFinite(cpu))) process.exit(1);
-const memoryPeak = Math.max(...samples.map(([memory]) => memory));
-const cpuPeak = Math.max(...samples.map(([, cpu]) => cpu));
-process.stdout.write(`${memoryPeak} ${cpuPeak} ${samples.length}`);
+if (samples.some((sample) => sample.length !== 4 || sample.some((value) => !Number.isFinite(value)))) process.exit(1);
+const backendMemoryPeak = Math.max(...samples.map(([memory]) => memory));
+const backendCpuPeak = Math.max(...samples.map(([, cpu]) => cpu));
+const gatewayMemoryPeak = Math.max(...samples.map(([, , memory]) => memory));
+const gatewayCpuPeak = Math.max(...samples.map(([, , , cpu]) => cpu));
+process.stdout.write(`${backendMemoryPeak} ${backendCpuPeak} ${gatewayMemoryPeak} ${gatewayCpuPeak} ${samples.length}`);
 ' "${resource_metrics_file}")" || { echo 'load resource samples are invalid' >&2; exit 1; }
-read -r memory_peak cpu_peak resource_sample_count <<< "${resource_summary}"
-[[ "${memory_peak}" =~ ^[0-9]+([.][0-9]+)?$ && "${cpu_peak}" =~ ^[0-9]+([.][0-9]+)?$ \
+read -r backend_memory_peak backend_cpu_peak gateway_memory_peak gateway_cpu_peak resource_sample_count <<< "${resource_summary}"
+[[ "${backend_memory_peak}" =~ ^[0-9]+([.][0-9]+)?$ && "${backend_cpu_peak}" =~ ^[0-9]+([.][0-9]+)?$ \
+	&& "${gateway_memory_peak}" =~ ^[0-9]+([.][0-9]+)?$ && "${gateway_cpu_peak}" =~ ^[0-9]+([.][0-9]+)?$ \
 	&& "${resource_sample_count}" =~ ^[1-9][0-9]*$ ]] || { echo 'load resource peak summary is invalid' >&2; exit 1; }
 
 expired_hash="$(node -e 'process.stdout.write(require("node:crypto").createHash("sha256").update("issue-2095-expired-session").digest("hex"))')"
@@ -539,6 +594,10 @@ p99="$(sed -nE 's/.*p99=([0-9]+).*/\1/p' <<< "${latency_summary}")"
 oom_killed="$(docker inspect --format '{{.State.OOMKilled}}' "${clone_backend}")"
 restart_count="$(docker inspect --format '{{.RestartCount}}' "${clone_backend}")"
 [[ "${oom_killed}" == false && "${restart_count}" == 0 ]] || { echo 'isolated backend restarted or was OOM-killed' >&2; exit 1; }
+gateway_oom_killed="$(docker inspect --format '{{.State.OOMKilled}}' "${clone_gateway}")"
+gateway_restart_count="$(docker inspect --format '{{.RestartCount}}' "${clone_gateway}")"
+[[ "${gateway_oom_killed}" == false && "${gateway_restart_count}" == 0 ]] \
+	|| { echo 'isolated gateway restarted or was OOM-killed' >&2; exit 1; }
 
 [[ "$(public_status /api/v2/routes/session)" == 404 && "$(public_status /api/v2/routes/search)" == 404 ]] \
 	|| { echo 'production Route V2 ingress changed during isolated evidence' >&2; exit 1; }
@@ -561,7 +620,8 @@ summary_file="${GITHUB_STEP_SUMMARY:-/dev/stdout}"
 	echo '- profile=unavailable: PASS, exact 503 ITX_TIMETABLE_UNAVAILABLE'
 	echo "- HTTP status counts: ${status_summary}"
 	echo "- latency: ${latency_summary} ms"
-	echo "- resource during load: memory_peak=${memory_peak}% cpu_peak=${cpu_peak}% samples=${resource_sample_count}, OOM=false, restart=0"
+	echo "- backend resource during load: memory_peak=${backend_memory_peak}% cpu_peak=${backend_cpu_peak}% samples=${resource_sample_count}, OOM=false, restart=0"
+	echo "- gateway resource during load: memory_peak=${gateway_memory_peak}% cpu_peak=${gateway_cpu_peak}% samples=${resource_sample_count}, OOM=false, restart=0"
 	echo "- purge: states=${purged_states} sessions=${purged_sessions} nonces=${purged_nonces} duration_ms=${purge_ms}, budget_ms=600000"
 	echo '- isolated synthetic data cleanup: PASS'
 	echo '- cache: miss=1+, hit=1+'

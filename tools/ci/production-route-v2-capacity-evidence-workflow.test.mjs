@@ -41,6 +41,13 @@ test("capacity runner는 동일 candidate·격리 load·privacy·closed ingress�
   assert.match(runner, /gateway_image="\$\(docker inspect --format '\{\{\.Image\}\}' easysubway-route-v2-gateway\)"/);
   assert.match(runner, /gateway image ID is invalid/);
   assert.match(runner, /--cpus 1 --memory 1g --memory-swap 1g --pids-limit 256/);
+  assert.match(runner, /clone_db_password/);
+  assert.match(runner, /synthetic_secret/);
+  assert.match(runner, /synthetic_certificate_digest/);
+  assert.doesNotMatch(runner, /range \.Config\.Env/);
+  assert.match(runner, /--publish 127\.0\.0\.1::8080 "\$\{expected_image_id\}"/);
+  const gatewayRun = runner.match(/docker run -d --name "\$\{clone_gateway\}"[\s\S]*?nginx -g 'daemon off;' >\/dev\/null/)?.[0] ?? "";
+  assert.match(gatewayRun, /--cpus 1 --memory 256m --memory-swap 256m --pids-limit 128/);
   assert.match(runner, /profile=normal/);
   assert.match(runner, /profile=burst/);
   assert.match(runner, /profile=unavailable/);
@@ -84,6 +91,11 @@ test("capacity runner는 동일 candidate·격리 load·privacy·closed ingress�
   assert.match(runner, /resource_sampler_pid/);
   assert.match(runner, /memory_peak/);
   assert.match(runner, /cpu_peak/);
+  assert.match(runner, /backend_memory_peak/);
+  assert.match(runner, /gateway_memory_peak/);
+  assert.match(runner, /gateway_oom_killed/);
+  assert.match(runner, /gateway_restart_count/);
+  assert.match(runner, /docker stats[\s\S]*?"\$\{clone_backend\}"[\s\S]*?"\$\{clone_gateway\}"/);
   assert.ok(runner.indexOf("resource_sampler_pid=$!") < runner.indexOf("send_session normal"));
   assert.match(runner, /docker container ls -a/);
   assert.match(runner, /docker volume ls/);

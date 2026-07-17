@@ -7046,6 +7046,13 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   assert.match(routeCapacityWorkflow, /tools\/ops\/verify-production-route-v2-capacity\.sh/);
   assert.match(routeCapacityRunner, /docker network create --internal/);
   assert.match(routeCapacityRunner, /--cpus 1 --memory 1g --memory-swap 1g --pids-limit 256/);
+  const routeCapacityGatewayRun = routeCapacityRunner.match(
+    /docker run -d --name "\$\{clone_gateway\}"[\s\S]*?nginx -g 'daemon off;' >\/dev\/null/,
+  )?.[0] ?? "";
+  assert.match(routeCapacityGatewayRun, /--cpus 1 --memory 256m --memory-swap 256m --pids-limit 128/);
+  assert.doesNotMatch(routeCapacityRunner, /range \.Config\.Env/);
+  assert.match(routeCapacityRunner, /gateway_memory_peak/);
+  assert.match(routeCapacityRunner, /gateway_oom_killed/);
   for (const profile of ["normal", "burst", "unavailable"]) {
     assert.match(routeCapacityRunner, new RegExp(`profile=${profile}`));
   }
