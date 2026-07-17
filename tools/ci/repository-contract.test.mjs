@@ -13,6 +13,11 @@ import { gzipSync, gunzipSync, inflateSync } from "node:zlib";
 import { REQUIRED_STATUS_CHECK_CONTEXTS } from "./apply-main-ruleset-required-checks.mjs";
 import { canonicalScopeHash } from "../datapack/build-launch-denominator-report.mjs";
 import { canonicalJson, withoutSignature } from "../datapack/lib/manifest-validation.mjs";
+import {
+  ROUTE_INTEGRATION_SCENARIOS,
+  ROUTE_SEARCH_CATALOG_ID,
+  buildRouteIntegrationVerdict,
+} from "../release/generate-route-integration-verdict.mjs";
 
 const root = process.cwd();
 const execFileAsync = promisify(execFile);
@@ -416,6 +421,110 @@ test("route release readiness tracker keeps issue 1414 as a release blocker", ()
 
   assert.match(prTemplate, /Route release readiness tracker impact/);
   assert.match(prTemplate, /route-release-readiness-tracker\.json/);
+});
+
+test("route integration verdict producer가 issue 1414 E1~E9 matrix를 실존 evidence에 연결한다", () => {
+  const producer = "tools/release/generate-route-integration-verdict.mjs";
+  assert.equal(existsSync(path.join(root, producer)), true, "route integration verdict producer must exist");
+
+  // E1~E9 전부를 카탈로그로 유지한다.
+  assert.deepEqual(
+    ROUTE_INTEGRATION_SCENARIOS.map((scenario) => scenario.id),
+    ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9"],
+  );
+
+  // request/response 계약은 route search v2 API catalog ID에 연결한다.
+  assert.equal(
+    ROUTE_SEARCH_CATALOG_ID,
+    "internal:POST:/api/v2/routes/search:com.easysubway.route.adapter.in.web.RouteSearchController#searchRouteV2",
+  );
+  const catalogShow = execFileSync(
+    process.execPath,
+    ["tools/ci/api-catalog.mjs", "show", ROUTE_SEARCH_CATALOG_ID],
+    { cwd: root, encoding: "utf8" },
+  );
+  assert.match(catalogShow, /\/api\/v2\/routes\/search/);
+
+  // 각 시나리오는 producer issue와, docs/ 로컬 evidence를 제외한 tracked test 파일에 연결된다.
+  for (const scenario of ROUTE_INTEGRATION_SCENARIOS) {
+    assert.equal(Number.isInteger(scenario.producerIssue), true, `${scenario.id} must reference a producer issue`);
+    assert.ok(scenario.evidenceTests.length > 0, `${scenario.id} must reference evidence tests`);
+    for (const reference of scenario.evidenceTests) {
+      const filePart = reference.split("::")[0];
+      if (filePart.startsWith("docs/")) continue; // docs/2099-qa는 gitignore 로컬 evidence.
+      assert.equal(
+        existsSync(path.join(root, filePart)),
+        true,
+        `${scenario.id} references a missing evidence file: ${filePart}`,
+      );
+    }
+  }
+});
+
+test("route integration verdict는 mixed identity·누락 입력을 fail closed하고 same-RC만 GO한다", () => {
+  const identity = {
+    gitSha: "26d1461210a36d9d969e5a18d5f13725519abdcd",
+    appVersionName: "1.0.4",
+    versionCode: "10005",
+    backendImageDigest: null,
+    backendArtifactSha256: "74a3e35762d1973c0b05a0c0bd6f0fc6aa2a4657ef23cde359cf100e0830f631",
+    dataPackManifestSha256: "2ee9f38f3e748d7bbc6d9eba124b34e6b5c8ad539338a6cdeee7a472515456e5",
+    dataPackArtifactSha256: "7bb4bb68f0642e45377d98b083e93cd8c1c92aaa58dd353f32189e3f325a1562",
+    routeContractVersion: "route-map-contract-v1",
+    realtimeContractVersion: "seoul-topis-schema-v1",
+  };
+  const planner = {
+    sourceIssue: 2098,
+    provenance: "final-candidate",
+    releaseCandidateIdentity: { ...identity },
+    plannerIdentity: { canonicalPackSha256: identity.dataPackArtifactSha256, timetableSnapshotSha256: "a".repeat(64) },
+    checks: { unknownPatternDefaultedToLocal: false },
+    integrationScenarios: { E2: "PASS", E3: "PASS", E4: "PASS", E5: "PASS", E6: "PASS", E9: "PASS" },
+    canaryResult: {
+      plan: {
+        itineraries: [{
+          steps: [
+            { stepType: "ride", serviceClass: "SUBWAY", servicePattern: "LOCAL" },
+            { stepType: "ride", serviceClass: "ITX_CHEONGCHUN", servicePattern: "EXPRESS" },
+          ],
+        }],
+      },
+    },
+  };
+  const mobile = {
+    sourceIssue: 2099,
+    provenance: "manual-observation",
+    releaseCandidateIdentity: { ...identity },
+    integrationScenarios: { E7: "PASS", E8: "PASS" },
+  };
+  const routeMap = {
+    sourceIssue: 2068,
+    provenance: "final-candidate",
+    releaseCandidateIdentity: { ...identity },
+    integrationScenarios: { E1: "PASS" },
+  };
+  const base = {
+    rcManifest: { rcIdentity: { ...identity } },
+    plannerEvidence: planner,
+    mobileEvidence: mobile,
+    routeMapEvidence: routeMap,
+    generatedAt: "2026-07-17T15:00:00.000Z",
+  };
+
+  assert.equal(buildRouteIntegrationVerdict(base).decision, "GO");
+
+  const missing = buildRouteIntegrationVerdict({ ...base, plannerEvidence: null });
+  assert.equal(missing.decision, "NO_GO");
+
+  const mixed = buildRouteIntegrationVerdict({
+    ...base,
+    mobileEvidence: { ...mobile, releaseCandidateIdentity: { ...identity, gitSha: "0".repeat(40) } },
+  });
+  assert.equal(mixed.decision, "NO_GO");
+  assert.equal(
+    mixed.noGoConditions.find((condition) => condition.id === "mixed_rc_or_artifact_identity").triggered,
+    true,
+  );
 });
 
 function currentMobileVersionCode() {

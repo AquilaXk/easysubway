@@ -906,6 +906,22 @@ jobs:
             --phase FINAL \
             --candidate-context release-artifacts/rc/candidate-context.json \
             --output release-artifacts/rc/final-readiness.json
+          # #1414 route/datapack 통합 판정. same-RC identity로 E1~E9 matrix를 결합한다.
+          # planner(#2098)/Mobile(#2099)/route-map(#2068) evidence artifact는 이 job에서
+          # 생성하지 않으므로, evidence가 붙기 전에는 fail-closed NO_GO matrix skeleton을 남긴다.
+          verdict_args=(--rc-manifest release-artifacts/rc/final-readiness.json)
+          if [[ -f release-artifacts/downloaded/route-evidence/planner-success-evidence.json ]]; then
+            verdict_args+=(--planner-evidence release-artifacts/downloaded/route-evidence/planner-success-evidence.json)
+          fi
+          if [[ -f release-artifacts/downloaded/route-evidence/mobile-consumed-identity-evidence.json ]]; then
+            verdict_args+=(--mobile-evidence release-artifacts/downloaded/route-evidence/mobile-consumed-identity-evidence.json)
+          fi
+          if [[ -f release-artifacts/downloaded/route-evidence/route-map-evidence.json ]]; then
+            verdict_args+=(--route-map-evidence release-artifacts/downloaded/route-evidence/route-map-evidence.json)
+          fi
+          node tools/release/generate-route-integration-verdict.mjs \
+            "${verdict_args[@]}" \
+            --output release-artifacts/rc/route-integration-verdict.json
           cp apps/mobile/release/post-launch-operations-review-gate.json release-artifacts/rc/post-launch-operations-review-gate.json
           cp apps/mobile/release/support-incident-response-gate.json release-artifacts/rc/support-incident-response-gate.json
           cp apps/mobile/release/operations-observability-gate.json release-artifacts/rc/operations-observability-gate.json
