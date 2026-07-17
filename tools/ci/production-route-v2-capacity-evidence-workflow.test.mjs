@@ -60,6 +60,9 @@ test("capacity runner는 동일 candidate·격리 load·privacy·closed ingress�
   assert.doesNotMatch(runner, /docker rm[^\n]*\|\| true/);
   assert.match(runner, /database_size_bytes/);
   assert.match(runner, /required_copy_bytes/);
+  assert.match(runner, /history\.fresh_until::timestamptz AT TIME ZONE 'UTC'/);
+  assert.match(runner, /history\.fresh_until::timestamptz > CURRENT_TIMESTAMP/);
+  assert.match(runner, /SET fresh_until = TO_CHAR\(\(CURRENT_TIMESTAMP - INTERVAL '1 second'\) AT TIME ZONE 'UTC'/);
   assert.match(runner, /docker_root_dir/);
   assert.match(runner, /dump_available_bytes/);
   assert.match(runner, /docker_available_bytes/);

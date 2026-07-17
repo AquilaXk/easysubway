@@ -208,10 +208,10 @@ clone_psql() {
 }
 
 active_timetable_identity="$(clone_psql "
-SELECT history.snapshot_id || '|' || history.snapshot_sha256 || '|' || TO_CHAR(history.fresh_until AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')
+SELECT history.snapshot_id || '|' || history.snapshot_sha256 || '|' || TO_CHAR(history.fresh_until::timestamptz AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')
 FROM timetable_snapshot_active active
 JOIN timetable_snapshot_history history ON history.snapshot_sha256 = active.snapshot_sha256
-WHERE active.singleton_id = 1 AND history.fresh_until > CURRENT_TIMESTAMP;")"
+WHERE active.singleton_id = 1 AND history.fresh_until::timestamptz > CURRENT_TIMESTAMP;")"
 expected_timetable_identity="$(node -e '
 const evidence = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
 process.stdout.write(`${evidence.snapshotId}|${evidence.snapshotSha256}|${new Date(evidence.freshUntil).toISOString().replace(/\.\d{3}Z$/, "Z")}`);
@@ -436,7 +436,7 @@ const value = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"
 if (value.code !== "ROUTE_RATE_LIMITED") process.exit(1);
 ' "${last_body}" || { echo '429 response machine code mismatch' >&2; exit 1; }
 
-clone_psql "UPDATE timetable_snapshot_history SET fresh_until = CURRENT_TIMESTAMP - INTERVAL '1 second' WHERE snapshot_sha256 = (SELECT snapshot_sha256 FROM timetable_snapshot_active WHERE singleton_id = 1);" >/dev/null
+clone_psql "UPDATE timetable_snapshot_history SET fresh_until = TO_CHAR((CURRENT_TIMESTAMP - INTERVAL '1 second') AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') WHERE snapshot_sha256 = (SELECT snapshot_sha256 FROM timetable_snapshot_active WHERE singleton_id = 1);" >/dev/null
 send_search unavailable "${tokens[$((search_rate + 1))]}" 198.51.100.210
 [[ "${last_status}" == 503 ]] || { echo 'unavailable profile did not return exact 503' >&2; exit 1; }
 node -e '
