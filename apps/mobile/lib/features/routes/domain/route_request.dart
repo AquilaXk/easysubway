@@ -23,6 +23,11 @@ enum RouteSearchMode {
   debugAllEdges,
 }
 
+/// 로컬 탐색 최적화 목표. fastest는 기존 일반화 비용 최소화(기본), fewestTransfers는
+/// 환승 수를 우선 최소화하고 동률이면 일반화 비용이 낮은(대체로 소요시간이 짧은)
+/// 경로를 고른다.
+enum RouteObjective { fastest, fewestTransfers }
+
 class RouteRequest {
   const RouteRequest({
     required this.originStationId,
@@ -30,6 +35,7 @@ class RouteRequest {
     required this.mobilityType,
     this.constraintMode,
     this.searchMode = RouteSearchMode.stationToStation,
+    this.objective = RouteObjective.fastest,
   });
 
   final String originStationId;
@@ -37,6 +43,7 @@ class RouteRequest {
   final MobilityType mobilityType;
   final ConstraintMode? constraintMode;
   final RouteSearchMode searchMode;
+  final RouteObjective objective;
 
   ConstraintMode get effectiveConstraintMode =>
       constraintMode ?? mobilityType.defaultConstraintMode;

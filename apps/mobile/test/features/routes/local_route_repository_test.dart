@@ -4411,6 +4411,101 @@ void main() {
     expect(ride.carDoorCarNumber, 3);
     expect(ride.carDoorDoorNumber, 4);
   });
+
+  test('fewestTransfers 요청은 환승이 더 적은 대안을, fastest는 기존 경로를 반환한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedTwoLegRoute(database);
+    // 환승 없는 직통 대안(비쌈): fastest는 피하고 fewestTransfers만 고른다.
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'ride-a-c-direct-test',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-c:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 900,
+    );
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final fastest = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-c',
+        mobilityType: 'STANDARD',
+      ),
+    );
+    final fewestTransfers = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-c',
+        mobilityType: 'STANDARD',
+        objective: RouteObjective.fewestTransfers,
+      ),
+    );
+
+    expect(fastest.status, 'FOUND');
+    expect(fastest.transferCount, 1);
+    expect(fewestTransfers.status, 'FOUND');
+    expect(fewestTransfers.transferCount, 0);
+    expect(
+      fewestTransfers.steps.expand((step) => step.evidenceSources),
+      contains('edge:ride-a-c-direct-test'),
+    );
+  });
+
+  test('로컬 ride servicePattern은 대문자 enum으로 정규화한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'ride-a-b-line-test',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-b:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 90,
+      servicePattern: 'express',
+    );
+
+    final result = await LocalRouteRepository(catalogDatabase: database)
+        .searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-a',
+            destinationStationId: 'station-b',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        );
+
+    final ride = result.steps.firstWhere((s) => s.stepType == 'ride');
+    expect(ride.servicePattern, 'EXPRESS');
+  });
+
+  test('로컬 ride servicePattern이 LOCAL·EXPRESS가 아니면 배지 없이 null로 둔다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'ride-a-b-line-test',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-b:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 90,
+      servicePattern: 'RAPID',
+    );
+
+    final result = await LocalRouteRepository(catalogDatabase: database)
+        .searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-a',
+            destinationStationId: 'station-b',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        );
+
+    final ride = result.steps.firstWhere((s) => s.stepType == 'ride');
+    expect(ride.servicePattern, isNull);
+  });
 }
 
 Map<String, Object?> _routeV2Payload({

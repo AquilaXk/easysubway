@@ -113,6 +113,7 @@ class LocalRouteRepository implements RouteSearchRepository {
     final request = catalog.canonicalRequest(rawRequest);
     final mobilityType = _mobilityType(request.mobilityType);
     final constraintMode = _constraintMode(request.effectiveConstraintMode);
+    final objective = _localObjective(request.objective);
     // #1975: 경유 요청의 strict 강등 판정은 전역 strict 지원이 아니라 두 구간을
     // 각각 본다(한 구간만 미지원이어도 강등). 경유 없는 단일 구간은 엔진이 이미
     // 구간별 strict 근거를 강제하고 구체 사유를 내므로 전역 pre-filter를 유지한다.
@@ -135,6 +136,7 @@ class LocalRouteRepository implements RouteSearchRepository {
                 searchMode: local
                     .RouteSearchMode
                     .stationToStationWithOutOfStationTransfers,
+                objective: objective,
               ),
             );
     } else if (blocksStairOnly &&
@@ -160,6 +162,7 @@ class LocalRouteRepository implements RouteSearchRepository {
           constraintMode: constraintMode,
           searchMode:
               local.RouteSearchMode.stationToStationWithOutOfStationTransfers,
+          objective: objective,
         ),
       );
       final second = engine.search(
@@ -170,6 +173,7 @@ class LocalRouteRepository implements RouteSearchRepository {
           constraintMode: constraintMode,
           searchMode:
               local.RouteSearchMode.stationToStationWithOutOfStationTransfers,
+          objective: objective,
         ),
       );
       result = mergeWaypointRouteResults(first, second);
@@ -353,13 +357,11 @@ class LocalRouteRepository implements RouteSearchRepository {
             carDoorDoorNumber: carDoorHint?.doorNumber,
             carDoorFacilityType: carDoorHint?.facilityType ?? '',
             // 오프라인 catalog는 지하철 전용이라 승차 leg의 운행 클래스는 SUBWAY로
-            // 보존한다. 운행종별은 로컬 데이터가 있으면 그대로 싣고, 없으면 null로 둬
-            // 급행 배지를 붙이지 않는다(급행 정보가 없으면 배지 없음이 정상).
+            // 보존한다. 운행종별은 온라인 파서와 대칭으로 대문자 enum(LOCAL·EXPRESS)만
+            // 정규화해 싣고, 그 외(공백·미상)는 null로 둬 급행 배지를 붙이지 않는다
+            // (급행 정보가 없으면 배지 없음이 정상).
             serviceClass: step.type.name == 'ride' ? 'SUBWAY' : null,
-            servicePattern:
-                step.type.name == 'ride' && step.servicePattern.isNotEmpty
-                ? step.servicePattern
-                : null,
+            servicePattern: _normalizedRideServicePattern(step),
           );
         })
         .toList(growable: false);
@@ -711,6 +713,31 @@ class LocalRouteRepository implements RouteSearchRepository {
       _ => throw const RouteSearchException('지원하지 않는 이동 제약 조건입니다.'),
     };
   }
+
+  local.RouteObjective _localObjective(RouteObjective objective) {
+    return switch (objective) {
+      RouteObjective.fastest => local.RouteObjective.fastest,
+      RouteObjective.fewestTransfers => local.RouteObjective.fewestTransfers,
+    };
+  }
+}
+
+/// 오프라인 catalog network edge의 운행종별 화이트리스트. 온라인 파서와 대칭으로
+/// 대문자 enum({'LOCAL','EXPRESS'})만 인정한다.
+const Set<String> _localRideServicePatterns = {'LOCAL', 'EXPRESS'};
+
+/// ride 승차 leg의 servicePattern을 정규화한다. datapack 파이프라인은
+/// network_edges.service_pattern에 대문자 enum을 강제하지 않으므로(build-datapack의
+/// 삽입은 `row.servicePattern ?? ''`로 검증 없이 통과), 계약이 불명확한 값은
+/// fail-safe로 null 처리해 급행 배지를 붙이지 않는다(온라인 파서의 fail-closed와
+/// 달리 오프라인은 배지 없음이 정상 — 기존 로컬 정책 유지). ride가 아니거나 공백·
+/// 미상 값도 모두 null.
+String? _normalizedRideServicePattern(route_step.RouteStep step) {
+  if (step.type.name != 'ride') {
+    return null;
+  }
+  final normalized = step.servicePattern.trim().toUpperCase();
+  return _localRideServicePatterns.contains(normalized) ? normalized : null;
 }
 
 /// 경유역 지원 1단계: 출발→경유, 경유→도착 두 구간의 탐색 결과를 하나로 합성한다.
@@ -2007,6 +2034,7 @@ class _RouteCatalogSnapshot {
           : canonicalStationId(waypoint),
       mobilityPreset: request.mobilityPreset,
       transportScope: request.transportScope,
+      objective: request.objective,
     );
   }
 }
