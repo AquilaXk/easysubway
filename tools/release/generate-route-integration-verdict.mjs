@@ -41,7 +41,7 @@ export const ROUTE_INTEGRATION_SCENARIOS = [
     producerIssue: 2068,
     owner: "routeMap",
     evidenceTests: [
-      "apps/mobile/test/widget_test.dart::노선도는 노선별 보기 우회 sheet를 노출하지 않는다",
+      "apps/mobile/test/widget_test.dart::노선도 첫 화면은 하단 광고 위에 지도 조작을 유지한다",
       "docs/2099-qa/item4_routemap_no_express_toggle.png",
       "docs/2099-qa/item5_talkback_dump.xml",
     ],
@@ -107,7 +107,8 @@ export const ROUTE_INTEGRATION_SCENARIOS = [
     producerIssue: 2099,
     owner: "mobile",
     evidenceTests: [
-      "backend/src/test/java/com/easysubway/route/adapter/out/persistence/TimetableSeedLoaderTest.java",
+      "apps/mobile/test/widget_test.dart::급행 운행 정보는 선택 UI 없이 시간표와 길찾기에 표시된다",
+      "apps/mobile/test/widget_test.dart::역 시간표 화면은 일반·급행을 한 목록에 시각순으로 표시하고 급행 행에만 배지를 단다",
       "docs/2099-qa/item3_express_badge_timetable.png",
       "docs/2099-qa/item5_talkback_dump.xml",
     ],
@@ -361,6 +362,19 @@ export function buildRouteIntegrationVerdict(inputs) {
       result = "FAIL";
       reasons.push("planner canary has no ITX_CHEONGCHUN EXPRESS RIDE leg");
     }
+    // 구조적 override: E9는 backend 표현뿐 아니라 실제 Mobile 표시(ITX-청춘 vs generic 급행)까지
+    // 요구한다. mobile evidence가 identity-bound로 존재하고 E9를 FAIL로 attest하면 planner의
+    // PASS를 덮어써 Mobile 미구현을 fail closed로 반영한다.
+    if (scenario.id === "E9" && result === "PASS") {
+      const mobileEvaluation = evaluations.mobile;
+      if (mobileEvaluation.present && mobileEvaluation.identityMatches) {
+        const mobileE9 = scenarioAttestation(mobileEvidence, "E9");
+        if (mobileE9 === "FAIL") {
+          result = "FAIL";
+          reasons.push("mobile evidence attests E9 as FAIL (ITX-청춘 표시 미구현)");
+        }
+      }
+    }
 
     // scenario 결과를 연결된 NO_GO 조건으로 전파.
     for (const conditionId of scenario.guardsNoGo) {
@@ -464,7 +478,7 @@ export function buildRouteIntegrationVerdict(inputs) {
     },
   };
 
-  verdict.summaryArtifactDigest = createHash("sha256")
+  verdict.verdictDigestSha256 = createHash("sha256")
     .update(JSON.stringify(verdict))
     .digest("hex");
 

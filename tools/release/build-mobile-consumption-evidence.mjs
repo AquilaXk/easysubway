@@ -1,0 +1,198 @@
+#!/usr/bin/env node
+
+// #1414 route/datapack 통합 판정의 #2099 fragment. Mobile이 실제로 소비한 RC identity와
+// E1(노선도 control 부재)/E7(mixed timetable 급행 배지)/E8(request 필드 0건)/E9(ITX 표시) 시나리오
+// 근거를 tracked source·test 참조로 결합한다. UI 렌더링/길찾기 로직을 재구현하지 않고, 이미
+// tracked된 위젯 test 이름과 request 직렬화 소스의 존재·내용만 정적으로 검증한다.
+
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const API_CATALOG_ID = "internal:POST:/api/v2/routes/search:com.easysubway.route.adapter.in.web.RouteSearchController#searchRouteV2";
+
+// E8: 요청 serialization에 있으면 안 되는 일반/급행 선택 필드 이름.
+const FORBIDDEN_REQUEST_FIELDS = [
+  "servicePattern",
+  "serviceClass",
+  "expressOnly",
+  "localOnly",
+  "expressPreference",
+  "transportPattern",
+  "routePreference",
+];
+
+const MOBILE_SCENARIO_EVIDENCE = {
+  E1: {
+    testFile: "apps/mobile/test/widget_test.dart",
+    testNames: ["노선도 첫 화면은 하단 광고 위에 지도 조작을 유지한다"],
+    localEvidencePaths: [
+      "docs/2099-qa/item4_routemap_no_express_toggle.png",
+      "docs/2099-qa/item5_talkback_dump.xml",
+    ],
+  },
+  E7: {
+    testFile: "apps/mobile/test/widget_test.dart",
+    testNames: [
+      "급행 운행 정보는 선택 UI 없이 시간표와 길찾기에 표시된다",
+      "역 시간표 화면은 일반·급행을 한 목록에 시각순으로 표시하고 급행 행에만 배지를 단다",
+    ],
+    localEvidencePaths: [
+      "docs/2099-qa/item3_express_badge_timetable.png",
+      "docs/2099-qa/item5_talkback_dump.xml",
+    ],
+  },
+  E8: {
+    testFile: "apps/mobile/test/route_search_request_test.dart",
+    testNames: [
+      "toV2Json은 mobilityPreset이 있으면 body에 싣고 mobilityType도 함께 보낸다",
+      "toV2Json은 mobilityPreset이 없으면 키를 넣지 않는다",
+    ],
+    requestSourceFile: "apps/mobile/lib/route_search.dart",
+    requestClassMarker: "class RouteSearchRequest {",
+  },
+};
+
+// E9: 2026-07-18 기준 mobile lib에 ITX_CHEONGCHUN/ITX-청춘 전용 표시 구현이 없다(grep 실측).
+// service_pattern_badge.dart의 isExpress는 serviceClass=='SUBWAY'만 인정해 ITX 승차 leg는
+// generic 급행 배지도 받지 못하고 무배지로 렌더링된다. 날조하지 않고 FAIL로 명시한다.
+const E9_MOBILE_GAP = {
+  result: "FAIL",
+  reasonKo: "mobile lib에 ITX_CHEONGCHUN/ITX-청춘 표시 위젯·테스트가 없음"
+    + " (apps/mobile/lib grep: 'ITX_CHEONGCHUN' 0건, '청춘' 0건; service_pattern_badge.dart의"
+    + " isExpress는 serviceClass=='SUBWAY'만 인정해 ITX ride leg는 배지 없이 렌더링됨)",
+  checkedFiles: [
+    "apps/mobile/lib/features/stations/presentation/service_pattern_badge.dart",
+    "apps/mobile/lib/features/stations/domain/station_models.dart",
+  ],
+};
+
+function checkTestNamesExist(repoRoot, testFile, testNames) {
+  const filePath = path.join(repoRoot, testFile);
+  if (!existsSync(filePath)) {
+    return { pass: false, missing: testNames, filePath: testFile };
+  }
+  const source = readFileSync(filePath, "utf8");
+  const missing = testNames.filter((name) => !source.includes(`'${name}'`));
+  return { pass: missing.length === 0, missing, filePath: testFile };
+}
+
+// E8 소스 레벨 검증: RouteSearchRequest 클래스 본문(다음 top-level class 선언 전까지)에
+// FORBIDDEN_REQUEST_FIELDS 중 어느 것도 quoted map key로 등장하지 않는지 확인한다.
+function checkRequestFieldAbsence(repoRoot, requestSourceFile, requestClassMarker) {
+  const filePath = path.join(repoRoot, requestSourceFile);
+  if (!existsSync(filePath)) {
+    return { pass: false, missing: ["<file-not-found>"], filePath: requestSourceFile };
+  }
+  const source = readFileSync(filePath, "utf8");
+  const classStart = source.indexOf(requestClassMarker);
+  if (classStart === -1) {
+    return { pass: false, missing: ["<class-not-found>"], filePath: requestSourceFile };
+  }
+  const nextClassStart = source.indexOf("\nclass ", classStart + requestClassMarker.length);
+  const classBody = nextClassStart === -1 ? source.slice(classStart) : source.slice(classStart, nextClassStart);
+  const found = FORBIDDEN_REQUEST_FIELDS.filter((field) => classBody.includes(`'${field}'`));
+  return { pass: found.length === 0, found, filePath: requestSourceFile };
+}
+
+export function buildMobileConsumptionEvidence({
+  candidate,
+  repoRoot = process.cwd(),
+  generatedAt = new Date().toISOString(),
+  provenance = "final-candidate",
+}) {
+  const identity = candidate?.releaseCandidateIdentity;
+  if (candidate?.phase !== "CANDIDATE" || candidate?.issue !== 2056 || !identity) {
+    throw new Error("mobile consumption evidence requires the #2056 CANDIDATE context");
+  }
+
+  const e1 = checkTestNamesExist(repoRoot, MOBILE_SCENARIO_EVIDENCE.E1.testFile, MOBILE_SCENARIO_EVIDENCE.E1.testNames);
+  const e7 = checkTestNamesExist(repoRoot, MOBILE_SCENARIO_EVIDENCE.E7.testFile, MOBILE_SCENARIO_EVIDENCE.E7.testNames);
+  const e8Tests = checkTestNamesExist(repoRoot, MOBILE_SCENARIO_EVIDENCE.E8.testFile, MOBILE_SCENARIO_EVIDENCE.E8.testNames);
+  const e8Fields = checkRequestFieldAbsence(
+    repoRoot,
+    MOBILE_SCENARIO_EVIDENCE.E8.requestSourceFile,
+    MOBILE_SCENARIO_EVIDENCE.E8.requestClassMarker,
+  );
+  const e8Pass = e8Tests.pass && e8Fields.pass;
+
+  const scenarioChecks = {
+    E1: e1,
+    E7: e7,
+    E8: { pass: e8Pass, tests: e8Tests, requestFields: e8Fields },
+    E9: E9_MOBILE_GAP,
+  };
+
+  const integrationScenarios = {
+    E1: e1.pass ? "PASS" : "FAIL",
+    E7: e7.pass ? "PASS" : "FAIL",
+    E8: e8Pass ? "PASS" : "FAIL",
+    E9: E9_MOBILE_GAP.result,
+  };
+
+  const coreScenariosSatisfied = e1.pass && e7.pass && e8Pass;
+
+  return {
+    schemaVersion: 1,
+    artifactKind: "route-v2-mobile-consumption-evidence",
+    sourceIssue: 2099,
+    consumerIssue: 2056,
+    generatedAt,
+    provenance,
+    status: coreScenariosSatisfied ? "SATISFIED" : "BLOCKED_MOBILE_SCENARIO_EVIDENCE",
+    releaseCandidateIdentity: identity,
+    apiContract: { catalogId: API_CATALOG_ID, contractVersion: "ROUTE_SEARCH_V2" },
+    integrationScenarios,
+    scenarioEvidence: {
+      E1: {
+        testFile: MOBILE_SCENARIO_EVIDENCE.E1.testFile,
+        testNames: MOBILE_SCENARIO_EVIDENCE.E1.testNames,
+        localEvidencePaths: MOBILE_SCENARIO_EVIDENCE.E1.localEvidencePaths,
+        result: integrationScenarios.E1,
+      },
+      E7: {
+        testFile: MOBILE_SCENARIO_EVIDENCE.E7.testFile,
+        testNames: MOBILE_SCENARIO_EVIDENCE.E7.testNames,
+        localEvidencePaths: MOBILE_SCENARIO_EVIDENCE.E7.localEvidencePaths,
+        result: integrationScenarios.E7,
+      },
+      E8: {
+        testFile: MOBILE_SCENARIO_EVIDENCE.E8.testFile,
+        testNames: MOBILE_SCENARIO_EVIDENCE.E8.testNames,
+        requestSourceFile: MOBILE_SCENARIO_EVIDENCE.E8.requestSourceFile,
+        forbiddenFieldsChecked: FORBIDDEN_REQUEST_FIELDS,
+        forbiddenFieldsFound: e8Fields.found ?? [],
+        result: integrationScenarios.E8,
+      },
+      E9: {
+        result: integrationScenarios.E9,
+        reasonKo: E9_MOBILE_GAP.reasonKo,
+        checkedFiles: E9_MOBILE_GAP.checkedFiles,
+      },
+    },
+    checks: scenarioChecks,
+  };
+}
+
+function argument(name) {
+  const index = process.argv.indexOf(`--${name}`);
+  return index < 0 ? null : process.argv[index + 1];
+}
+
+const entry = process.argv[1] ? path.resolve(process.argv[1]) : null;
+if (entry === fileURLToPath(import.meta.url)) {
+  const candidatePath = argument("candidate-context");
+  const outputPath = argument("output");
+  if (!candidatePath || !outputPath) {
+    throw new Error("--candidate-context and --output are required");
+  }
+  const repoRoot = argument("repo-root") ? path.resolve(argument("repo-root")) : process.cwd();
+  const provenance = argument("provenance") ?? "final-candidate";
+  const evidence = buildMobileConsumptionEvidence({
+    candidate: JSON.parse(readFileSync(candidatePath, "utf8")),
+    repoRoot,
+    provenance,
+  });
+  mkdirSync(path.dirname(outputPath), { recursive: true });
+  writeFileSync(outputPath, `${JSON.stringify(evidence, null, 2)}\n`);
+}

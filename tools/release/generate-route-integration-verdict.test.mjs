@@ -106,7 +106,7 @@ test("완전히 일치하는 same-RC 증거 조합은 GO로 판정하고 E1~E9�
   assert.ok(verdict.scenarioMatrix.every((scenario) => scenario.result === "PASS"));
   assert.ok(verdict.noGoConditions.every((condition) => !condition.triggered && !condition.unresolved));
   assert.equal(verdict.artifactIdentityLinkage.timetableSnapshotSha256, "a".repeat(64));
-  assert.match(verdict.summaryArtifactDigest, /^[0-9a-f]{64}$/);
+  assert.match(verdict.verdictDigestSha256, /^[0-9a-f]{64}$/);
   // 각 시나리오는 실존 producer issue와 test에 연결된다.
   for (const scenario of verdict.scenarioMatrix) {
     assert.match(scenario.producerIssueUrl, /github\.com\/.+\/issues\/\d+$/);
@@ -241,4 +241,15 @@ test("seed의 unknown pattern을 LOCAL로 default하면 NO_GO한다", () => {
 
 test("rcManifest 없이는 판정하지 않는다", () => {
   assert.throws(() => buildRouteIntegrationVerdict({}), /rcManifest is required/);
+});
+
+test("planner canary가 ITX EXPRESS ride를 가져도 mobile evidence가 E9를 FAIL로 attest하면 덮어쓴다", () => {
+  const verdict = buildRouteIntegrationVerdict(goInputs({
+    mobileEvidence: mobileEvidence({ integrationScenarios: { E7: "PASS", E8: "PASS", E9: "FAIL" } }),
+  }));
+
+  const e9 = verdict.scenarioMatrix.find((scenario) => scenario.id === "E9");
+  assert.equal(e9.result, "FAIL");
+  assert.ok(e9.reasons.some((reason) => reason.includes("mobile evidence attests E9")));
+  assert.equal(verdict.decision, "NO_GO");
 });

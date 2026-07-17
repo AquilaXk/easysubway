@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildPlannerSuccessEvidence } from "./build-planner-success-evidence.mjs";
+import { buildPlannerSuccessEvidence, evaluateRouteV2RegressionFixtures } from "./build-planner-success-evidence.mjs";
 
 const identity = {
   gitSha: "1".repeat(40),
@@ -94,4 +94,70 @@ test("official fare나 typed ITX RIDE가 없는 canary는 거부한다", () => {
     candidate: { phase: "CANDIDATE", issue: 2056, releaseCandidateIdentity: identity },
     canary: invalid,
   }), /official fare/);
+});
+
+test("provenance는 기본 final-candidate이며 unknownPatternDefaultedToLocal은 false를 명시한다", () => {
+  const evidence = buildPlannerSuccessEvidence({
+    candidate: { phase: "CANDIDATE", issue: 2056, releaseCandidateIdentity: identity },
+    canary: canary(),
+  });
+
+  assert.equal(evidence.provenance, "final-candidate");
+  assert.equal(evidence.checks.unknownPatternDefaultedToLocal, false);
+  // E9는 regressionEvidence 없이도 canary 자체의 ITX_CHEONGCHUN/EXPRESS ride 존재로 attest된다.
+  assert.deepEqual(evidence.integrationScenarios, { E9: "PASS" });
+  assert.equal(evidence.regression1228, null);
+});
+
+test("E9는 canary에 ITX_CHEONGCHUN/EXPRESS ride가 없으면 FAIL로 attest한다", () => {
+  const noItxCanary = canary();
+  noItxCanary.plan.itineraries[0].steps = noItxCanary.plan.itineraries[0].steps.map((step) =>
+    step.serviceClass === "ITX_CHEONGCHUN" ? { ...step, servicePattern: "LOCAL" } : step);
+
+  const evidence = buildPlannerSuccessEvidence({
+    candidate: { phase: "CANDIDATE", issue: 2056, releaseCandidateIdentity: identity },
+    canary: noItxCanary,
+  });
+
+  assert.equal(evidence.integrationScenarios.E9, "FAIL");
+});
+
+test("provenance는 override 가능하다(fixture-only 판정 테스트용)", () => {
+  const evidence = buildPlannerSuccessEvidence({
+    candidate: { phase: "CANDIDATE", issue: 2056, releaseCandidateIdentity: identity },
+    canary: canary(),
+    provenance: "fixture",
+  });
+
+  assert.equal(evidence.provenance, "fixture");
+});
+
+test("regressionEvidence가 주어지면 E2~E6 integrationScenarios와 #1228 checks로 매핑한다", () => {
+  const evidence = buildPlannerSuccessEvidence({
+    candidate: { phase: "CANDIDATE", issue: 2056, releaseCandidateIdentity: identity },
+    canary: canary(),
+    regressionEvidence: {
+      scenarios: { E2: true, E3: true, E4: false, E5: true, E6: true },
+      regression1228: { expressSkip: true, expressFaster: true, localFasterWhenWaiting: false, shortTurn: true, unmatchedRealtime: true },
+      fixturesSha256: "a".repeat(64),
+    },
+  });
+
+  assert.deepEqual(evidence.integrationScenarios, { E2: "PASS", E3: "PASS", E4: "FAIL", E5: "PASS", E6: "PASS", E9: "PASS" });
+  assert.equal(evidence.regression1228.localFasterWhenWaiting, "FAILED");
+  assert.equal(evidence.regressionFixturesSha256, "a".repeat(64));
+});
+
+test("evaluateRouteV2RegressionFixtures는 tracked #1228 fixture를 실제로 재실행해 전부 PASS를 산출한다", async () => {
+  const result = await evaluateRouteV2RegressionFixtures();
+
+  assert.deepEqual(result.scenarios, { E2: true, E3: true, E4: true, E5: true, E6: true });
+  assert.deepEqual(result.regression1228, {
+    expressSkip: true,
+    expressFaster: true,
+    localFasterWhenWaiting: true,
+    shortTurn: true,
+    unmatchedRealtime: true,
+  });
+  assert.match(result.fixturesSha256, /^[0-9a-f]{64}$/);
 });
