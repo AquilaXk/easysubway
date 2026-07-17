@@ -7,6 +7,9 @@ import com.easysubway.route.application.port.in.RouteSearchUseCase;
 import com.easysubway.route.application.port.in.SearchRouteCommand;
 import com.easysubway.route.application.port.in.RouteV2SearchUseCase;
 import com.easysubway.route.application.port.in.RouteV2SearchUseCase.RouteV2Plan;
+import com.easysubway.route.application.port.in.RouteV2SearchUseCase.RouteObjective;
+import com.easysubway.route.application.port.in.RouteV2SearchUseCase.RouteTransportScope;
+import com.easysubway.route.application.port.out.LoadRouteTimetablePort.PlannerIdentity;
 import com.easysubway.route.application.service.ProductionRouteV2Support;
 import com.easysubway.route.domain.BoardingSlackPolicy;
 import com.easysubway.route.domain.ConstraintMode;
@@ -82,6 +85,7 @@ class RouteSearchController {
 	@PostMapping("/api/v2/routes/search")
 	ResponseEntity<ApiResponse<RouteSearchV2Response>> searchRouteV2(@Valid @RequestBody RouteSearchV2Request request) {
 		OffsetDateTime departureTime = request.parsedDepartureTime();
+		request.requireSupportedTransportScope();
 		if (productionSupport != null) {
 			routeSearchUseCase.validateRouteSearch(request.toValidationCommand());
 			productionSupport.requireTimetableArtifact();
@@ -205,6 +209,8 @@ class RouteSearchController {
 			message = "출발 시간은 ISO offset 형식이어야 합니다."
 		)
 		String departureTime,
+		RouteTransportScope transportScope,
+		RouteObjective objective,
 		@NotNull(message = "이동 유형을 선택해야 합니다.")
 		MobilityType mobilityType,
 		String mobilityPreset,
@@ -231,7 +237,9 @@ class RouteSearchController {
 				parseConstraintMode(mobilityType, constraintMode),
 				Boolean.TRUE.equals(useRealtime),
 				maxTransfers,
-				alternativeCount
+				alternativeCount,
+				transportScope == null ? RouteTransportScope.SUBWAY_AND_ITX_CHEONGCHUN : transportScope,
+				objective == null ? RouteObjective.FASTEST : objective
 			);
 		}
 
@@ -257,6 +265,12 @@ class RouteSearchController {
 			return (parsedMobilityPreset == null
 				? ProfileWalkTimeCalculator.presetFor(mobilityType)
 				: parsedMobilityPreset).name();
+		}
+
+		void requireSupportedTransportScope() {
+			if (transportScope != null && transportScope != RouteTransportScope.SUBWAY_AND_ITX_CHEONGCHUN) {
+				throw new InvalidRequestException("authenticated Route V2는 지하철·ITX-청춘 통합 검색만 지원합니다.");
+			}
 		}
 
 	}
@@ -291,6 +305,8 @@ class RouteSearchController {
 		String originStationId,
 		String destinationStationId,
 		String departureTime,
+		RouteTransportScope transportScope,
+		RouteObjective objective,
 		MobilityType mobilityType,
 		String mobilityPreset,
 		String constraintMode,
@@ -299,6 +315,7 @@ class RouteSearchController {
 		int alternativeCount,
 		List<String> statuses,
 		String nextServiceTime,
+		PlannerIdentityDto plannerIdentity,
 		List<ItineraryDto> itineraries
 	) {
 
@@ -312,6 +329,8 @@ class RouteSearchController {
 				request.originStationId(),
 				request.destinationStationId(),
 				request.departureTime(),
+				request.transportScope() == null ? RouteTransportScope.SUBWAY_AND_ITX_CHEONGCHUN : request.transportScope(),
+				request.objective() == null ? RouteObjective.FASTEST : request.objective(),
 				request.mobilityType(),
 				request.mobilityPresetName(),
 				request.constraintMode(),
@@ -322,9 +341,32 @@ class RouteSearchController {
 					.map(Enum::name)
 					.toList(),
 				plan.nextServiceTime() == null ? null : formatOffset(plan.nextServiceTime()),
+				PlannerIdentityDto.from(plan.plannerIdentity()),
 				plan.itineraries().stream()
 					.map(result -> ItineraryDto.from(result, departureTime, request.mobilityPresetName()))
 					.toList()
+			);
+		}
+	}
+
+	private record PlannerIdentityDto(
+		String timetableSnapshotSha256,
+		String canonicalPackSha256,
+		String canonicalPackSqliteSha256,
+		String canonicalStationVersion,
+		String canonicalStationSetSha256,
+		String sourceLineageSha256,
+		String evidenceHash
+	) {
+		private static PlannerIdentityDto from(PlannerIdentity identity) {
+			return identity == null ? null : new PlannerIdentityDto(
+				identity.timetableSnapshotSha256(),
+				identity.canonicalPackSha256(),
+				identity.canonicalPackSqliteSha256(),
+				identity.canonicalStationVersion(),
+				identity.canonicalStationSetSha256(),
+				identity.sourceLineageSha256(),
+				identity.evidenceHash()
 			);
 		}
 	}
@@ -340,6 +382,8 @@ class RouteSearchController {
 		int transferCount,
 		int walkingDistanceMeters,
 		AccessibilityRiskDto accessibilityRisk,
+		List<String> objectiveTags,
+		OfficialFareDto officialFare,
 		List<LegDto> legs,
 		boolean commercialEtaEligible
 	) {
@@ -361,6 +405,8 @@ class RouteSearchController {
 				result.transferCount(),
 				result.walkingDistanceMeters(),
 				AccessibilityRiskDto.from(result),
+				result.objectiveTags(),
+				OfficialFareDto.from(result.officialFare()),
 				legs,
 				false
 			);
@@ -379,6 +425,20 @@ class RouteSearchController {
 				case MIXED -> "MEDIUM";
 				case STATIC_BACKEND_ESTIMATE, PLANNED, FALLBACK -> "LOW";
 			};
+		}
+	}
+
+	private record OfficialFareDto(
+		int adultFareWon,
+		String currency,
+		String policy,
+		List<String> sourceIds,
+		List<String> sourceSnapshotIds
+	) {
+		private static OfficialFareDto from(RouteSearchResult.OfficialFare fare) {
+			return fare == null ? null : new OfficialFareDto(
+				fare.adultFareWon(), fare.currency(), fare.policy(), fare.sourceIds(), fare.sourceSnapshotIds()
+			);
 		}
 	}
 
@@ -542,6 +602,8 @@ class RouteSearchController {
 		String lineId,
 		String tripId,
 		String trainNo,
+		String serviceClass,
+		String servicePattern,
 		String plannedDepartureTime,
 		String realtimeDepartureTime,
 		String plannedArrivalTime,
@@ -575,8 +637,13 @@ class RouteSearchController {
 				String legType = legTypeOf(step);
 				int durationSeconds = Math.max(0, step.estimatedMinutes()) * 60;
 				int slackSeconds = slackSeconds(step, legType, mobilityType);
-				OffsetDateTime plannedDepartureTime = cursor.plusSeconds(slackSeconds);
-				OffsetDateTime plannedArrivalTime = plannedDepartureTime.plusSeconds(durationSeconds);
+				OffsetDateTime plannedDepartureTime = step.plannedDepartureTime() == null
+					? cursor.plusSeconds(slackSeconds)
+					: OffsetDateTime.parse(step.plannedDepartureTime());
+				OffsetDateTime plannedArrivalTime = step.plannedArrivalTime() == null
+					? plannedDepartureTime.plusSeconds(durationSeconds)
+					: OffsetDateTime.parse(step.plannedArrivalTime());
+				durationSeconds = Math.toIntExact(Duration.between(plannedDepartureTime, plannedArrivalTime).toSeconds());
 				legs.add(from(step, legType, plannedDepartureTime, plannedArrivalTime, durationSeconds, slackSeconds, mobilityPreset));
 				cursor = plannedArrivalTime;
 			}
@@ -601,8 +668,10 @@ class RouteSearchController {
 				"",
 				"",
 				step.lineId(),
-				"",
-				"",
+				"RIDE".equals(legType) ? step.tripId() : null,
+				"RIDE".equals(legType) ? step.trainNo() : null,
+				"RIDE".equals(legType) ? step.serviceClass() : null,
+				"RIDE".equals(legType) ? step.servicePattern() : null,
 				formatOffset(departureTime),
 				null,
 				formatOffset(plannedArrivalTime),
