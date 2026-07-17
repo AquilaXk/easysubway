@@ -56,6 +56,71 @@ void main() {
       expect(result.includesStairs, isFalse);
     });
 
+    test('fewestTransfers는 환승이 더 적은 대안을 고르고 fastest는 기존 최저비용 경로를 유지한다', () {
+      final engine = LocalRouteEngine(graph: _objectiveTradeoffFixtureGraph());
+
+      final fastest = engine.search(
+        const RouteRequest(
+          originStationId: 'station-a',
+          destinationStationId: 'station-d',
+          mobilityType: MobilityType.senior,
+        ),
+      );
+      final fewestTransfers = engine.search(
+        const RouteRequest(
+          originStationId: 'station-a',
+          destinationStationId: 'station-d',
+          mobilityType: MobilityType.senior,
+          objective: RouteObjective.fewestTransfers,
+        ),
+      );
+
+      // fastest(기본)은 환승 1회지만 총 일반화 비용이 낮은 경로를 유지한다.
+      expect(fastest.status, RouteStatus.found);
+      expect(fastest.edgeIds, [
+        'entry-a-line-1',
+        'ride-a-b-line-1',
+        'transfer-b-line-1-line-2',
+        'ride-b-d-line-2',
+        'exit-d-line-2',
+      ]);
+      expect(fastest.transferStationIds, ['station-b']);
+      expect(fastest.totalCost, 550);
+
+      // fewestTransfers는 더 비싸지만 환승 0회인 직통 경로를 고른다.
+      expect(fewestTransfers.status, RouteStatus.found);
+      expect(fewestTransfers.edgeIds, [
+        'entry-a-line-1',
+        'ride-a-d-direct-line-1',
+        'exit-d-line-1',
+      ]);
+      expect(fewestTransfers.transferStationIds, isEmpty);
+      expect(fewestTransfers.totalCost, 1098);
+    });
+
+    test('fewestTransfers는 환승 수가 같으면 총 비용이 낮은(빠른) 경로로 tie-break한다', () {
+      final engine = LocalRouteEngine(graph: _sameTransferCountFixtureGraph());
+
+      final result = engine.search(
+        const RouteRequest(
+          originStationId: 'station-a',
+          destinationStationId: 'station-d',
+          mobilityType: MobilityType.senior,
+          objective: RouteObjective.fewestTransfers,
+        ),
+      );
+
+      expect(result.status, RouteStatus.found);
+      expect(result.edgeIds, [
+        'entry-a-line-1',
+        'ride-a-b-line-1',
+        'transfer-b-line-1-line-2',
+        'ride-b-d-line-2-cheap',
+        'exit-d-line-2',
+      ]);
+      expect(result.transferStationIds, ['station-b']);
+    });
+
     test('access graph contract는 진입, 환승, 진출 시간을 분리한다', () {
       final router = AccessGraphRouter(graph: _capitalFixtureGraph());
 
@@ -1621,6 +1686,216 @@ NetworkGraph _lowQualityFixtureGraph() {
         type: RouteEdgeType.exit,
         baseCost: 90,
         isDataStale: true,
+        stairAccessState: RouteStairAccessState.stepFree,
+      ),
+    ],
+  );
+}
+
+NetworkGraph _objectiveTradeoffFixtureGraph() {
+  // A→D를 두 방식으로 연결한다: 환승 0회지만 비싼 직통 ride와, 환승 1회지만
+  // 더 저렴한 우회 ride. fastest는 저렴한 우회를, fewestTransfers는 직통을 골라야 한다.
+  return NetworkGraph(
+    nodes: const [
+      RouteNode(
+        id: 'station-a:line-1',
+        stationId: 'station-a',
+        lineId: 'line-1',
+      ),
+      RouteNode(
+        id: 'station-b:line-1',
+        stationId: 'station-b',
+        lineId: 'line-1',
+      ),
+      RouteNode(
+        id: 'station-b:line-2',
+        stationId: 'station-b',
+        lineId: 'line-2',
+      ),
+      RouteNode(
+        id: 'station-d:line-1',
+        stationId: 'station-d',
+        lineId: 'line-1',
+      ),
+      RouteNode(
+        id: 'station-d:line-2',
+        stationId: 'station-d',
+        lineId: 'line-2',
+      ),
+    ],
+    edges: const [
+      RouteEdge(
+        id: 'entry-a-line-1',
+        fromNodeId: 'station-a',
+        toNodeId: 'station-a:line-1',
+        type: RouteEdgeType.entry,
+        baseCost: 90,
+        stairAccessState: RouteStairAccessState.stepFree,
+      ),
+      RouteEdge(
+        id: 'ride-a-d-direct-line-1',
+        fromNodeId: 'station-a:line-1',
+        toNodeId: 'station-d:line-1',
+        type: RouteEdgeType.ride,
+        baseCost: 900,
+        lineId: 'line-1',
+      ),
+      RouteEdge(
+        id: 'exit-d-line-1',
+        fromNodeId: 'station-d:line-1',
+        toNodeId: 'station-d',
+        type: RouteEdgeType.exit,
+        baseCost: 90,
+        stairAccessState: RouteStairAccessState.stepFree,
+      ),
+      RouteEdge(
+        id: 'ride-a-b-line-1',
+        fromNodeId: 'station-a:line-1',
+        toNodeId: 'station-b:line-1',
+        type: RouteEdgeType.ride,
+        baseCost: 100,
+        lineId: 'line-1',
+      ),
+      RouteEdge(
+        id: 'transfer-b-line-1-line-2',
+        fromNodeId: 'station-b:line-1',
+        toNodeId: 'station-b:line-2',
+        type: RouteEdgeType.inStationTransfer,
+        baseCost: 140,
+        stairAccessState: RouteStairAccessState.stepFree,
+      ),
+      RouteEdge(
+        id: 'ride-b-d-line-2',
+        fromNodeId: 'station-b:line-2',
+        toNodeId: 'station-d:line-2',
+        type: RouteEdgeType.ride,
+        baseCost: 100,
+        lineId: 'line-2',
+      ),
+      RouteEdge(
+        id: 'exit-d-line-2',
+        fromNodeId: 'station-d:line-2',
+        toNodeId: 'station-d',
+        type: RouteEdgeType.exit,
+        baseCost: 90,
+        stairAccessState: RouteStairAccessState.stepFree,
+      ),
+    ],
+  );
+}
+
+NetworkGraph _sameTransferCountFixtureGraph() {
+  // A→D를 각각 환승 1회로 잇는 두 경로. fewestTransfers에서 환승 수가 같으므로
+  // 총 비용이 낮은(빠른) line-2 경유 경로로 tie-break되어야 한다.
+  return NetworkGraph(
+    nodes: const [
+      RouteNode(
+        id: 'station-a:line-1',
+        stationId: 'station-a',
+        lineId: 'line-1',
+      ),
+      RouteNode(
+        id: 'station-b:line-1',
+        stationId: 'station-b',
+        lineId: 'line-1',
+      ),
+      RouteNode(
+        id: 'station-b:line-2',
+        stationId: 'station-b',
+        lineId: 'line-2',
+      ),
+      RouteNode(
+        id: 'station-c:line-1',
+        stationId: 'station-c',
+        lineId: 'line-1',
+      ),
+      RouteNode(
+        id: 'station-c:line-3',
+        stationId: 'station-c',
+        lineId: 'line-3',
+      ),
+      RouteNode(
+        id: 'station-d:line-2',
+        stationId: 'station-d',
+        lineId: 'line-2',
+      ),
+      RouteNode(
+        id: 'station-d:line-3',
+        stationId: 'station-d',
+        lineId: 'line-3',
+      ),
+    ],
+    edges: const [
+      RouteEdge(
+        id: 'entry-a-line-1',
+        fromNodeId: 'station-a',
+        toNodeId: 'station-a:line-1',
+        type: RouteEdgeType.entry,
+        baseCost: 90,
+        stairAccessState: RouteStairAccessState.stepFree,
+      ),
+      RouteEdge(
+        id: 'ride-a-b-line-1',
+        fromNodeId: 'station-a:line-1',
+        toNodeId: 'station-b:line-1',
+        type: RouteEdgeType.ride,
+        baseCost: 100,
+        lineId: 'line-1',
+      ),
+      RouteEdge(
+        id: 'transfer-b-line-1-line-2',
+        fromNodeId: 'station-b:line-1',
+        toNodeId: 'station-b:line-2',
+        type: RouteEdgeType.inStationTransfer,
+        baseCost: 140,
+        stairAccessState: RouteStairAccessState.stepFree,
+      ),
+      RouteEdge(
+        id: 'ride-b-d-line-2-cheap',
+        fromNodeId: 'station-b:line-2',
+        toNodeId: 'station-d:line-2',
+        type: RouteEdgeType.ride,
+        baseCost: 100,
+        lineId: 'line-2',
+      ),
+      RouteEdge(
+        id: 'exit-d-line-2',
+        fromNodeId: 'station-d:line-2',
+        toNodeId: 'station-d',
+        type: RouteEdgeType.exit,
+        baseCost: 90,
+        stairAccessState: RouteStairAccessState.stepFree,
+      ),
+      RouteEdge(
+        id: 'ride-a-c-line-1',
+        fromNodeId: 'station-a:line-1',
+        toNodeId: 'station-c:line-1',
+        type: RouteEdgeType.ride,
+        baseCost: 100,
+        lineId: 'line-1',
+      ),
+      RouteEdge(
+        id: 'transfer-c-line-1-line-3',
+        fromNodeId: 'station-c:line-1',
+        toNodeId: 'station-c:line-3',
+        type: RouteEdgeType.inStationTransfer,
+        baseCost: 140,
+        stairAccessState: RouteStairAccessState.stepFree,
+      ),
+      RouteEdge(
+        id: 'ride-c-d-line-3-expensive',
+        fromNodeId: 'station-c:line-3',
+        toNodeId: 'station-d:line-3',
+        type: RouteEdgeType.ride,
+        baseCost: 400,
+        lineId: 'line-3',
+      ),
+      RouteEdge(
+        id: 'exit-d-line-3',
+        fromNodeId: 'station-d:line-3',
+        toNodeId: 'station-d',
+        type: RouteEdgeType.exit,
+        baseCost: 90,
         stairAccessState: RouteStairAccessState.stepFree,
       ),
     ],
