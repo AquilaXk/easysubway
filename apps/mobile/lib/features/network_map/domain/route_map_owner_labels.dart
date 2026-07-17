@@ -177,3 +177,72 @@ routeMapOwnerLabelsByRegionFrom(String sidecarJson) {
 /// 디렉터리째 등록돼 있어 별도 자산 선언이 필요 없다.
 const String kRouteMapOwnerLabelsAssetPath =
     'assets/datapacks/metro_map_pack/basemap/labels.json';
+
+/// 오너 SVG service-tag(KTX·SRT·AIR 표장) 1건의 장애물 사각형(#2068 마감
+/// 라운드 item 3). compile-basemap-vec.mjs의 extractServiceTagObstacles가
+/// 표장 도형(중첩 transform·scale 전부 합성) 외접 바운딩박스를 실측해 낸다.
+/// 좌표계는 [RouteMapOwnerLabelEntry.position]과 같은 viewBox(source) 단위 —
+/// 호출부가 design.toDesign()으로 변환한다.
+class RouteMapServiceTagObstacle {
+  const RouteMapServiceTagObstacle({
+    required this.station,
+    required this.center,
+    required this.halfWidth,
+    required this.halfHeight,
+  });
+
+  /// SVG data-station 원문(참고용 — 매칭에는 쓰지 않는다. 장애물은 위치
+  /// 기반으로만 회피하면 충분하고, 이름 매칭은 오배치 위험만 늘린다).
+  final String station;
+
+  /// viewBox(source) 좌표.
+  final Offset center;
+  final double halfWidth;
+  final double halfHeight;
+}
+
+/// sidecar의 `serviceTagObstacles[regionId]`를 파싱한다. 필드가 없거나
+/// 형식이 어긋나면 빈 리스트(호출부가 안전 폴백 — 장애물 없이 기존 동작).
+List<RouteMapServiceTagObstacle> parseRouteMapServiceTagObstaclesForRegion(
+  String sidecarJson,
+  String regionId,
+) {
+  final Object? decoded;
+  try {
+    decoded = jsonDecode(sidecarJson);
+  } on FormatException {
+    return const [];
+  }
+  if (decoded is! Map || decoded['serviceTagObstacles'] is! Map) {
+    return const [];
+  }
+  final regionEntries = (decoded['serviceTagObstacles'] as Map)[regionId];
+  if (regionEntries is! List) {
+    return const [];
+  }
+  final result = <RouteMapServiceTagObstacle>[];
+  for (final raw in regionEntries) {
+    if (raw is! Map) continue;
+    final station = raw['station'];
+    final x = raw['x'];
+    final y = raw['y'];
+    final halfWidth = raw['halfWidth'];
+    final halfHeight = raw['halfHeight'];
+    if (station is! String ||
+        x is! num ||
+        y is! num ||
+        halfWidth is! num ||
+        halfHeight is! num) {
+      continue;
+    }
+    result.add(
+      RouteMapServiceTagObstacle(
+        station: station,
+        center: Offset(x.toDouble(), y.toDouble()),
+        halfWidth: halfWidth.toDouble(),
+        halfHeight: halfHeight.toDouble(),
+      ),
+    );
+  }
+  return result;
+}

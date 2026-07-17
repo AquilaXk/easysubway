@@ -13,7 +13,7 @@
   },
   "ownerLabelsSidecar": {
     "path": "apps/mobile/assets/datapacks/metro_map_pack/basemap/labels.json",
-    "sha256": "9e4c7e3721770d8950c8826f12468e7f42b37c13bd259449a7b01fbb4258270c"
+    "sha256": "dd8465d248e12b32eaaab02db34a143b8017cfa805c2a1e498bab192ef47169e"
   },
   "maps": [
     {
@@ -35,9 +35,9 @@
       "id": "busan",
       "source": "tools/route-map/route-map-defs/svg-sources/easy-subway-busan-v1.svg",
       "compiledVector": "apps/mobile/assets/datapacks/metro_map_pack/basemap/busan.vec",
-      "sourceSvgSha256": "2c241574c1f0e426422af5df474e688b03afa023d5701e5d166a027b48175182",
-      "normalizedSvgSha256": "eb6535b090437751b4b11002dd7abe13b9ef713ed9ab2ab293e1e661d5902e59",
-      "compiledVectorSha256": "08c67c18d609b3f17a9f64147f4c14c1c8bbc71ed62e7b4a293ab47475e8ef88",
+      "sourceSvgSha256": "8d91965c5c0a4d5fa6a211fae187de2726fc7617cdad8413ebf0a5b3fc8b3e6b",
+      "normalizedSvgSha256": "d20af43f05d4c478ab6b0e288321507e3185615ad57c5a0980255df743404ad1",
+      "compiledVectorSha256": "c7fc531abc35a887a2c621244d2b105984779cf4a1564516e11ed119afce3dbd",
       "viewBox": [
         0,
         0,
@@ -51,8 +51,8 @@
       "source": "tools/route-map/route-map-defs/svg-sources/easy-subway-daegu-v1.svg",
       "compiledVector": "apps/mobile/assets/datapacks/metro_map_pack/basemap/daegu.vec",
       "sourceSvgSha256": "1724375fbe6cce3aa1710872f5399fd65442ac5a8ec759c88a2a179f27ef0f30",
-      "normalizedSvgSha256": "5dcfa0aa77c955f8f35a70228f2374da43b1378d9fa4e053b2594f62b16ba366",
-      "compiledVectorSha256": "8aaea85093d0831aabd1cbadd12c1109dbf5763189efe3e19f9182d562ab5917",
+      "normalizedSvgSha256": "8758876f2c0f16787997764075143fabd6ff144df85305c04f5ca229be144460",
+      "compiledVectorSha256": "28d9217117484682cb9b907178ae7028e346afd0fafdac114cb6f74da45f77e3",
       "viewBox": [
         0,
         0,

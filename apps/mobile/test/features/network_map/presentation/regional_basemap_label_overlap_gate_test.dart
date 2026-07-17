@@ -104,24 +104,51 @@ void main() {
     'assets/datapacks/metro_map_pack/basemap/labels.json',
   ).readAsStringSync();
 
-  // (dbRegion, sidecarId, 매치율 하한, 라벨-라벨 겹침 쌍 baseline).
+  // (dbRegion, sidecarId, 매치율 하한, 라벨-라벨 겹침 쌍 baseline,
+  //  labelNode baseline, labelCapsule baseline).
   // 광주(오너 60px→15.5 design, 앱 기본 13보다 큼)는 10차 클램프 대상이었으나
   // Pretendard 번들·클램프 제거 후 오너 크기 그대로 렌더한다 — 겹침 회귀를
   // 감시하기 위해 이 게이트에 포함한다(#2068).
-  const cases = <(String, String, double, int)>[
-    ('부산권', 'busan', 0.90, 0),
-    ('대구권', 'daegu', 0.90, 0),
-    ('대전권', 'daejeon', 0.70, 0),
-    ('광주권', 'gwangju', 0.90, 0),
+  //
+  // #2068 부산 마감 라운드: 생성기 라벨 solver를 앱 충실 모델(실 Pretendard
+  // 실측·designScale·노드 반경/캡슐/선폭 실측 상수)로 교체해 부산 오너 라벨
+  // 147건을 전부 재배치 — labelNode 33→0·labelCapsule 10→0·labelBand 49→0
+  // (2026-07-18 실측). 부산만 하드 0 게이트로 승격한다. 타 권역(대구·대전·광주)
+  // 은 아직 이 재배치를 거치지 않아 참고 지표로 남기되, 현재 실측 baseline을
+  // 명시해 악화만 방지한다(대구 12/5, 대전·광주 0/0 — 이미 0).
+  //
+  // labelServiceTag(item 3: KTX·SRT·AIR 표장 회피)는 4권역 전부 0 하드 게이트
+  // — 표장이 있는 곳은 부산뿐이고(부산역·부전·센텀·태화강·공항) 부산 라벨을
+  // 표장 장애물까지 포함해 재배치했으므로 0. 타 3권역은 표장 자체가 없어(또는
+  // 기장처럼 시각 내용 없는 결측이라) 항상 0 — 향후 표장이 추가돼도 즉시
+  // 회귀를 잡는다.
+  const cases = <(String, String, double, int, int, int, int)>[
+    ('부산권', 'busan', 0.90, 0, 0, 0, 0),
+    ('대구권', 'daegu', 0.90, 0, 12, 5, 0),
+    ('대전권', 'daejeon', 0.70, 0, 0, 0, 0),
+    ('광주권', 'gwangju', 0.90, 0, 0, 0, 0),
   ];
 
-  for (final (dbRegion, sidecarId, matchRateFloor, pairBaseline) in cases) {
+  for (final (
+        dbRegion,
+        sidecarId,
+        matchRateFloor,
+        pairBaseline,
+        labelNodeBaseline,
+        labelCapsuleBaseline,
+        labelServiceTagBaseline,
+      )
+      in cases) {
     test(
       '$dbRegion basemap: 오너 라벨 매치율 · 전 라벨 표시 · 라벨-라벨 겹침 ≤$pairBaseline쌍 (#2068 10차)',
       () {
         final fixture = loadCapitalRouteMapFixture(region: dbRegion);
         final design = routeMapDesignSpaceFor(fixture.map);
         final ownerLabels = parseRouteMapOwnerLabelsForRegion(
+          sidecarJson,
+          sidecarId,
+        );
+        final serviceTagObstacles = parseRouteMapServiceTagObstaclesForRegion(
           sidecarJson,
           sidecarId,
         );
@@ -154,6 +181,7 @@ void main() {
           basemap: true,
           ownerLabelsByStationName: ownerLabels,
           stationNameByStationId: fixture.stationNameByStationId,
+          serviceTagObstacles: serviceTagObstacles,
         );
 
         // 숨김 금지: 전 역이 라벨을 가진다(미매치는 폴백 솔버 경로).
@@ -175,7 +203,9 @@ void main() {
           reason: '$dbRegion 라벨-라벨 겹침 쌍 $pairs — baseline $pairBaseline 악화 금지',
         );
 
-        // 참고 보고(하드 게이트 아님) — 구조화 오버레이 근사 장애물 모델 기준.
+        // 구조화 오버레이 근사 장애물 모델 기준. labelNode·labelCapsule은
+        // #2068 부산 마감 라운드부터 하드 게이트(위 baseline 표 참고) —
+        // labelBand·labelLine·unresolved는 여전히 참고 보고.
         final nodeRects = [
           for (final s in fixture.map.stations)
             if (s.labelClass != RouteMapLabelClass.transfer)
@@ -190,11 +220,22 @@ void main() {
           design,
           basemap: true,
         );
-        var labelNode = 0, labelCapsule = 0, labelBand = 0;
+        final serviceTagRects = [
+          for (final tag in serviceTagObstacles)
+            Rect.fromCenter(
+              center: design.toDesign(tag.center),
+              width: tag.halfWidth * 2 * design.designScale,
+              height: tag.halfHeight * 2 * design.designScale,
+            ),
+        ];
+        var labelNode = 0, labelCapsule = 0, labelBand = 0, labelServiceTag = 0;
         for (final l in layout.labels) {
           if (nodeRects.any((n) => _rectOverlaps(l.rect, n))) labelNode += 1;
           if (capsules.any((c) => _rectOverlaps(l.rect, c))) labelCapsule += 1;
           if (_bandHit(l.rect, fixture.map, design)) labelBand += 1;
+          if (serviceTagRects.any((s) => _rectOverlaps(l.rect, s))) {
+            labelServiceTag += 1;
+          }
         }
         final labelLine = routeMapLabelLineOverlapCount(
           layout,
@@ -205,7 +246,27 @@ void main() {
         print(
           '[$dbRegion 참고] labelNode=$labelNode labelCapsule=$labelCapsule '
           'labelBand=$labelBand labelLine=$labelLine '
+          'labelServiceTag=$labelServiceTag '
           'unresolved(오너 겹침 감사)=${layout.unresolvedOverlapCount}',
+        );
+        expect(
+          labelNode,
+          lessThanOrEqualTo(labelNodeBaseline),
+          reason:
+              '$dbRegion 라벨-노드 겹침 $labelNode — baseline $labelNodeBaseline 악화 금지',
+        );
+        expect(
+          labelCapsule,
+          lessThanOrEqualTo(labelCapsuleBaseline),
+          reason:
+              '$dbRegion 라벨-캡슐 겹침 $labelCapsule — baseline $labelCapsuleBaseline 악화 금지',
+        );
+        expect(
+          labelServiceTag,
+          lessThanOrEqualTo(labelServiceTagBaseline),
+          reason:
+              '$dbRegion 라벨-표장(KTX·SRT·AIR) 겹침 $labelServiceTag — '
+              'baseline $labelServiceTagBaseline 악화 금지',
         );
       },
     );

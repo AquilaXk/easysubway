@@ -471,6 +471,10 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
   // region에서 앱 솔버의 노선 뱃지 pill과 중복되지 않도록 후보 생성을 건너
   // 뛴다. 기본값 false — 플래그 없는 기존 권역은 동작 불변.
   bool suppressLineBadges = false,
+  // #2068 마감 라운드 item 3: KTX·SRT·AIR 표장(service-tag) 장애물. basemap
+  // 모드에서 라벨이 표장 위에 올라앉지 않도록 노드·캡슐과 같은 방식으로
+  // 회피 대상에 더한다. 기본값 빈 리스트 — 넘기지 않는 기존 호출부는 불변.
+  List<RouteMapServiceTagObstacle> serviceTagObstacles = const [],
 }) {
   final terminusIds = routeMapTerminusStationIds(map);
   final candidates = <_Candidate>[];
@@ -762,11 +766,24 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
             height: kRouteMapBasemapStationNodeRadiusPx * 2,
           ),
   ];
+  // #2068 마감 라운드 item 3: KTX·SRT·AIR 표장도 노드·캡슐과 동급 장애물로
+  // 시드한다 — 라벨이 표장 아이콘 위에 얹히지 않게 한다. basemap 전용(기본
+  // 모드는 오너 SVG 표장 자체가 없다).
+  final serviceTagObstacleRects = <Rect>[
+    if (basemap)
+      for (final tag in serviceTagObstacles)
+        Rect.fromCenter(
+          center: design.toDesign(tag.center),
+          width: tag.halfWidth * 2 * design.designScale,
+          height: tag.halfHeight * 2 * design.designScale,
+        ),
+  ];
   // basemap 모드: 오너 고정 라벨도 뱃지·폴백 검색보다 먼저 자리를 선점한
   // 장애물이다(#2068 6차 지시 2) — 뱃지가 오너 라벨을 덮지 않게 한다.
   final placedRects = <Rect>[
     ...transferObstacles,
     ...nodeObstacles,
+    ...serviceTagObstacleRects,
     for (final label in ownerFixedLabels) label.rect,
   ];
   final labels = <RouteMapStaticLabel>[...ownerFixedLabels];
@@ -866,7 +883,11 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
   // 동치로 unresolved에 더한다 — 실측 감사용(#2068 6차, 게이트가 하드
   // 실패시키지 않고 실측치로 보고).
   if (ownerFixedLabels.isNotEmpty) {
-    final staticObstacles = <Rect>[...transferObstacles, ...nodeObstacles];
+    final staticObstacles = <Rect>[
+      ...transferObstacles,
+      ...nodeObstacles,
+      ...serviceTagObstacleRects,
+    ];
     for (var i = 0; i < ownerFixedLabels.length; i += 1) {
       final rect = ownerFixedLabels[i].rect;
       var overlapped = staticObstacles.any((o) => rect.overlaps(o));

@@ -216,6 +216,10 @@ function extractMapSvg(svgText) {
     // 숫자가 가려지지 않는다. 다른 권역 SVG엔 이 레이어가 없어(배지는
     // route-lines-layer 내부) extractGroup이 빈 문자열을 반환하므로 영향이 없다.
     "line-terminal-badges-layer",
+    // #2068 KTX·SRT·공항 표장: service-tag(inline-svg-paths 벡터 로고)를 바탕층에
+    // 포함한다. 마크가 라벨·심벌 위에 오도록 맨 위에 렌더한다. 텍스트 없는 벡터
+    // path라 폰트 정규화·baseline 경로와 무관하다. 미보유 권역은 빈 문자열.
+    "service-tags-layer",
   ];
   const mapGroup = layerIds
     .map((id) => {
@@ -362,6 +366,254 @@ function parseTranslate(transformValue) {
 function firstAttr(tag, name) {
   const match = tag.match(new RegExp(`\\s${name}="([^"]*)"`));
   return match ? match[1] : null;
+}
+
+// 2D 아핀 [a,b,c,d,e,f]: x'=a*x+c*y+e, y'=b*x+d*y+f. SVG transform 속성 합성 관례.
+const IDENTITY_MATRIX = [1, 0, 0, 1, 0, 0];
+
+function composeMatrix(A, B) {
+  const [a1, b1, c1, d1, e1, f1] = A;
+  const [a2, b2, c2, d2, e2, f2] = B;
+  return [
+    a1 * a2 + c1 * b2,
+    b1 * a2 + d1 * b2,
+    a1 * c2 + c1 * d2,
+    b1 * c2 + d1 * d2,
+    a1 * e2 + c1 * f2 + e1,
+    b1 * e2 + d1 * f2 + f1,
+  ];
+}
+
+function applyMatrix([a, b, c, d, e, f], x, y) {
+  return [a * x + c * y + e, b * x + d * y + f];
+}
+
+/**
+ * `translate(dx,dy)`·`matrix(a,b,c,d,e,f)`·`scale(sx[,sy])` 체인을 순서대로
+ * 합성한 단일 행렬. scale 누락 시 로고 내부 path 로컬 좌표(수백~수천 단위)가
+ * 거의 미스케일된 채로 절대화돼 바운딩박스가 터무니없이 커진다(#2068 마감
+ * 라운드 실측: 센텀·태화강·공항 KTX/AIR 로고가 `scale(0.036)`류를 쓴다).
+ */
+function parseTransformChain(transformValue) {
+  let M = IDENTITY_MATRIX;
+  if (!transformValue) return M;
+  for (const m of transformValue.matchAll(
+    /(translate|matrix|scale)\(([^)]*)\)/g,
+  )) {
+    const args = m[2]
+      .trim()
+      .split(/[,\s]+/)
+      .map(Number);
+    let T;
+    if (m[1] === "translate") {
+      T = [1, 0, 0, 1, args[0], args[1] ?? 0];
+    } else if (m[1] === "scale") {
+      const sx = args[0];
+      const sy = args[1] ?? sx;
+      T = [sx, 0, 0, sy, 0, 0];
+    } else {
+      T = args;
+    }
+    M = composeMatrix(M, T);
+  }
+  return M;
+}
+
+// service-tag(KTX·SRT·AIR 표장) 장애물 목록(#2068 마감 라운드 item 3) — 라벨
+// solver가 이 표장 위에 라벨을 얹지 않도록 회피 대상으로 쓴다. 각
+// `<g class="service-tag">` 서브그룹의 transform 체인(중첩 `<g transform>`
+// 포함)을 실제로 합성해 내부 <path>/<circle>/<rect> 좌표를 절대 좌표로 변환한
+// 외접 바운딩박스를 낸다(근사 상수가 아니라 실측) — path는 curve 제어점도
+// 좌표 토큰으로 잡아 실제보다 살짝 넓게 잡히는 보수적 근사(안전 방향). 시각
+// 내용이 없는 빈 그룹(예: 부산 기장 KTX — title만 있고 실제 로고 도형이 없는
+// 소스 데이터 결측)은 회피할 것이 없으므로 건너뛴다. 같은 역에 서브그룹이
+// 여럿(예: 부전 KTX 아이콘+배경 pill)이면 각자 별도 obstacle로 낸다 — 합집합
+// 커버리지가 되어 더 안전하다.
+export function extractServiceTagObstacles(svgText) {
+  const layerStart = svgText.indexOf('id="service-tags-layer"');
+  if (layerStart < 0) return [];
+  const groupStart = svgText.lastIndexOf("<g", layerStart);
+  let depth = 0;
+  let layerEnd = -1;
+  const tagRe = /<g\b|<\/g>/g;
+  tagRe.lastIndex = groupStart;
+  let m;
+  while ((m = tagRe.exec(svgText))) {
+    depth += m[0] === "</g>" ? -1 : 1;
+    if (depth === 0) {
+      layerEnd = tagRe.lastIndex;
+      break;
+    }
+  }
+  if (layerEnd < 0) return [];
+  const layer = svgText.slice(groupStart, layerEnd);
+
+  const obstacles = [];
+  const tagOpenRe =
+    /<g\s+id="service-tag-[^"]*"\s*\n?\s*class="service-tag"\s*\n?\s*data-station="([^"]*)"[^>]*\btransform="([^"]*)"[^>]*>/g;
+  for (const tm of layer.matchAll(tagOpenRe)) {
+    const [openTag, station, rootTransform] = tm;
+    const blockStart = tm.index;
+    let d = 0;
+    const innerRe = /<g\b|<\/g>/g;
+    innerRe.lastIndex = blockStart;
+    let im;
+    let blockEnd = -1;
+    while ((im = innerRe.exec(layer))) {
+      d += im[0] === "</g>" ? -1 : 1;
+      if (d === 0) {
+        blockEnd = innerRe.lastIndex;
+        break;
+      }
+    }
+    if (blockEnd < 0) continue;
+    const block = layer.slice(blockStart + openTag.length, blockEnd);
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    const visit = (x, y) => {
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    };
+    collectShapeBoundsRecursive(
+      block,
+      parseTransformChain(rootTransform),
+      visit,
+    );
+    if (!Number.isFinite(minX)) {
+      continue; // 시각 내용 없는 빈 표장(예: 기장 KTX) — 회피 대상 아님.
+    }
+    obstacles.push({
+      station,
+      x: (minX + maxX) / 2,
+      y: (minY + maxY) / 2,
+      halfWidth: (maxX - minX) / 2,
+      halfHeight: (maxY - minY) / 2,
+    });
+  }
+  return obstacles;
+}
+
+/**
+ * [text](임의 중첩 깊이의 <g transform>·<path>·<circle>·<rect> 혼재) 안의
+ * 도형 좌표를 [matrix] 기준으로 재귀 합성해 절대 좌표로 [visit]에 넘긴다.
+ * 중첩 <g transform>은 그 balanced 내용만 재귀 처리하고, 그 구간을 제외한
+ * "직계" 텍스트(= <g> 바깥에 직접 놓인 <path>/<circle>/<rect>, 예: 센텀
+ * 배경 rect)는 현재 [matrix]로 처리한다 — 이중 계산·누락을 모두 막는다.
+ */
+function collectShapeBoundsRecursive(text, matrix, visit) {
+  const nestedGroupRe = /<g\b[^>]*>/g;
+  let cursor = 0;
+  let m;
+  while ((m = nestedGroupRe.exec(text))) {
+    if (m.index < cursor) continue;
+    collectShapeBounds(text.slice(cursor, m.index), matrix, visit);
+    const openTag = m[0];
+    const childTransform = firstAttr(openTag, "transform");
+    const childMatrix = childTransform
+      ? composeMatrix(matrix, parseTransformChain(childTransform))
+      : matrix;
+    let d = 1;
+    const innerRe = /<g\b|<\/g>/g;
+    innerRe.lastIndex = m.index + openTag.length;
+    let im;
+    let innerEnd = -1;
+    while ((im = innerRe.exec(text))) {
+      d += im[0] === "</g>" ? -1 : 1;
+      if (d === 0) {
+        innerEnd = innerRe.lastIndex;
+        break;
+      }
+    }
+    if (innerEnd < 0) {
+      cursor = m.index + openTag.length;
+      continue;
+    }
+    const innerBody = text.slice(m.index + openTag.length, innerEnd - "</g>".length);
+    collectShapeBoundsRecursive(innerBody, childMatrix, visit);
+    cursor = innerEnd;
+    nestedGroupRe.lastIndex = innerEnd;
+  }
+  collectShapeBounds(text.slice(cursor), matrix, visit);
+}
+
+/**
+ * [text] 안의 <path d>/<circle>/<rect> 좌표를 [matrix]로 절대화해 [visit]에
+ * 넘긴다. 도형 태그 자체에 `transform`이 직접 붙은 경우(예: 부산 공항 AIR
+ * 픽토그램 `<path transform="matrix(...)">`, `<g>` 래핑 없이 도형 태그
+ * 자체에 스케일이 온다)도 [matrix]와 합성해 반영한다.
+ */
+function collectShapeBounds(text, matrix, visit) {
+  // path는 좌표쌍만 뽑는 정식 파서 대신, 커맨드 문자를 무시하고 숫자 토큰만
+  // 순서대로 2개씩 x,y로 짝짓는 간이 방식을 쓴다 — curve 제어점까지 좌표로
+  // 잡혀 실제 외곽보다 넉넉한(장애물 회피에는 안전한 방향) bbox가 나온다.
+  for (const pm of text.matchAll(/<path\b[^>]*\/?>/g)) {
+    const tag = pm[0];
+    const d = firstAttr(tag, "d");
+    if (!d) continue;
+    const pathTransform = firstAttr(tag, "transform");
+    const pathMatrix = pathTransform
+      ? composeMatrix(matrix, parseTransformChain(pathTransform))
+      : matrix;
+    const nums = [...d.matchAll(/-?\d+\.?\d*/g)].map((x) => Number(x[0]));
+    for (let i = 0; i + 1 < nums.length; i += 2) {
+      const [x, y] = applyMatrix(pathMatrix, nums[i], nums[i + 1]);
+      visit(x, y);
+    }
+  }
+  for (const cm of text.matchAll(/<circle\b[^>]*\/?>/g)) {
+    const tag = cm[0];
+    const cx = Number(firstAttr(tag, "cx"));
+    const cy = Number(firstAttr(tag, "cy"));
+    const r = Number(firstAttr(tag, "r"));
+    if (!Number.isFinite(cx) || !Number.isFinite(cy) || !Number.isFinite(r)) {
+      continue;
+    }
+    const shapeTransform = firstAttr(tag, "transform");
+    const shapeMatrix = shapeTransform
+      ? composeMatrix(matrix, parseTransformChain(shapeTransform))
+      : matrix;
+    for (const [dx, dy] of [
+      [-r, 0],
+      [r, 0],
+      [0, -r],
+      [0, r],
+    ]) {
+      const [x, y] = applyMatrix(shapeMatrix, cx + dx, cy + dy);
+      visit(x, y);
+    }
+  }
+  for (const rm of text.matchAll(/<rect\b[^>]*\/?>/g)) {
+    const tag = rm[0];
+    const x = Number(firstAttr(tag, "x"));
+    const y = Number(firstAttr(tag, "y"));
+    const w = Number(firstAttr(tag, "width"));
+    const h = Number(firstAttr(tag, "height"));
+    if (
+      !Number.isFinite(x) ||
+      !Number.isFinite(y) ||
+      !Number.isFinite(w) ||
+      !Number.isFinite(h)
+    ) {
+      continue;
+    }
+    const shapeTransform = firstAttr(tag, "transform");
+    const shapeMatrix = shapeTransform
+      ? composeMatrix(matrix, parseTransformChain(shapeTransform))
+      : matrix;
+    for (const [px, py] of [
+      [x, y],
+      [x + w, y],
+      [x, y + h],
+      [x + w, y + h],
+    ]) {
+      const [ax, ay] = applyMatrix(shapeMatrix, px, py);
+      visit(ax, ay);
+    }
+  }
 }
 
 // <style> 블록에서 .station-label-<role> { ... font-size:<n>px ... } 규칙을
@@ -800,6 +1052,7 @@ function main() {
   let allMatch = true;
   const buildMaps = [];
   const labelsByRegion = {};
+  const serviceTagObstaclesByRegion = {};
   try {
     for (const region of regions) {
       const inputSvg = path.join(svgSourceDir, region.svg);
@@ -822,6 +1075,8 @@ function main() {
         sourceText,
       );
       labelsByRegion[region.id] = ownerLabels;
+      serviceTagObstaclesByRegion[region.id] =
+        extractServiceTagObstacles(sourceText);
       buildMaps.push({
         id: region.id,
         source: path.relative(root, inputSvg).replaceAll(path.sep, "/"),
@@ -870,6 +1125,9 @@ function main() {
       schemaVersion: 1,
       artifactKind: "route-map-basemap-owner-labels",
       regions: labelsByRegion,
+      // #2068 마감 라운드 item 3: KTX·SRT·AIR 표장 장애물(라벨 회피용) —
+      // 추가 필드라 기존 파서(regions만 읽음)와 하위호환.
+      serviceTagObstacles: serviceTagObstaclesByRegion,
     },
     null,
     2,
