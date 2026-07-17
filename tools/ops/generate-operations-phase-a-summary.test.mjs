@@ -17,12 +17,12 @@ function rcManifest(overrides = {}) {
     androidApplicationId: "com.easysubway.app",
     rcIdentity: {
       gitSha: "abcdef1234567890",
-      appVersionName: "1.0.4",
-      versionCode: "10005",
+      appVersionName: "1.0.5",
+      versionCode: "10006",
       aabSha256: "15d9c7a3ff98c770a6b757f776ad102ad10c5b1dda81a0847a84e6d65b689a69",
-      aabPayloadSha256: "6c4962a7858d7b6887d22770adaa1a3988dbed17f36d76e1298bd789639ad281",
+      aabPayloadSha256: "e83fc611df261ab99ce268ae9ac47e2d193253a01cc28801a32d4cca8507b663",
       backendImageDigest: null,
-      backendArtifactSha256: "8bc8f71f92fa82b38739a02424c6758f317b6dd4d3f07398cdf29a886c4b5f98",
+      backendArtifactSha256: "74a3e35762d1973c0b05a0c0bd6f0fc6aa2a4657ef23cde359cf100e0830f631",
       dataPackManifestSha256: "2ee9f38f3e748d7bbc6d9eba124b34e6b5c8ad539338a6cdeee7a472515456e5",
       supportContactSetSha256: "e361e4d770796fc6dc2ade2eb560b2e6885917c027a67661b3644ea8ff30044a",
       ...overrides,
@@ -203,7 +203,7 @@ test("Phase A summary generator binds a newly signed AAB with the validated payl
   assert.equal(summary.artifactIdentity.aabSha256, "d".repeat(64));
   assert.equal(
     summary.artifactIdentity.aabPayloadSha256,
-    "6c4962a7858d7b6887d22770adaa1a3988dbed17f36d76e1298bd789639ad281",
+    "e83fc611df261ab99ce268ae9ac47e2d193253a01cc28801a32d4cca8507b663",
   );
 });
 
