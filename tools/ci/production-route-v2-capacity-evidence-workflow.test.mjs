@@ -13,6 +13,8 @@ test("Route V2 capacity evidence는 main-only production approval을 강제한�
   assert.match(workflow, /environment: production/);
   assert.match(workflow, /group: production-route-v2-capacity-evidence/);
   assert.match(workflow, /EXPECTED_DEPLOYED_SHA: \$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /actions\/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e/);
+  assert.match(workflow, /node-version: "24"/);
   assert.match(workflow, /bash tools\/ops\/verify-production-route-v2-capacity\.sh/);
   assert.match(workflow, /production Route V2 capacity evidence must run from main/);
 });

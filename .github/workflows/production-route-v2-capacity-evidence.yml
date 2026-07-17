@@ -1,0 +1,44 @@
+name: Production Route V2 capacity evidence
+
+on:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    name: Verify production Route V2 capacity
+    permissions:
+      contents: read
+    runs-on:
+      - self-hosted
+      - easysubway-production
+    timeout-minutes: 30
+    environment: production
+    concurrency:
+      group: production-route-v2-capacity-evidence
+      cancel-in-progress: false
+    env:
+      DEPLOY_ROOT: ${{ vars.DEPLOY_ROOT }}
+      EXPECTED_DEPLOYED_SHA: ${{ github.sha }}
+
+    steps:
+      - name: Reject non-main manual execution
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "production Route V2 capacity evidence must run from main" >&2
+            exit 1
+          fi
+
+      - name: Checkout reviewed main
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+
+      - name: Verify capacity, privacy, and closed ingress
+        shell: bash
+        run: bash tools/ops/verify-production-route-v2-capacity.sh

@@ -7035,6 +7035,23 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
     explicitProductionApprovalRequired: true,
     sameCandidateIdentityRequired: true,
   });
+  const routeCapacityWorkflow = read(".github/workflows/production-route-v2-capacity-evidence.yml");
+  const routeCapacityRunner = read("tools/ops/verify-production-route-v2-capacity.sh");
+  assert.match(routeCapacityWorkflow, /workflow_dispatch:/);
+  assert.match(routeCapacityWorkflow, /environment: production/);
+  assert.match(routeCapacityWorkflow, /production Route V2 capacity evidence must run from main/);
+  assert.match(routeCapacityWorkflow, /tools\/ops\/verify-production-route-v2-capacity\.sh/);
+  assert.match(routeCapacityRunner, /docker network create --internal/);
+  assert.match(routeCapacityRunner, /--cpus 1 --memory 1g --memory-swap 1g --pids-limit 256/);
+  for (const profile of ["normal", "burst", "unavailable"]) {
+    assert.match(routeCapacityRunner, new RegExp(`profile=${profile}`));
+  }
+  assert.match(routeCapacityRunner, /unexpected_error_count=0/);
+  assert.match(routeCapacityRunner, /undeclared_data_transfer_count=0/);
+  assert.match(routeCapacityRunner, /sensitive_payload_count=0/);
+  assert.match(routeCapacityRunner, /trap cleanup EXIT/);
+  assert.match(routeCapacityRunner, /ingress_closed=true/);
+  assert.doesNotMatch(routeCapacityRunner, /gh secret set|EASYSUBWAY_ROUTE_V2_INGRESS_ENABLED=true/);
   assert.match(mobileRouteIngress, /'\/api\/v2\/routes\/session'/);
   assert.match(mobileRouteSearch, /'\/api\/v2\/routes\/search'/);
   assert.match(mobileRouteIngress, /request\.transportScope == RouteTransportScope\.subway[\s\S]*localRepository\.searchRoute/);
