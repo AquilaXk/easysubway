@@ -96,8 +96,18 @@ test("capacity runner는 동일 candidate·격리 load·privacy·closed ingress�
   assert.match(runner, /sampled_at_ms="\$\(date \+%s%3N\)"/);
   assert.match(runner, /load_started_ms="\$\(date \+%s%3N\)"/);
   assert.match(runner, /load_finished_ms="\$\(date \+%s%3N\)"/);
+  assert.match(runner, /sample_resources\(\)/);
+  assert.match(runner, /load_started_ms="\$\(date \+%s%3N\)"\n(?:[^\n]*\n)*?sample_resources/);
+  assert.match(runner, /sample_resources\nload_finished_ms="\$\(date \+%s%3N\)"/);
   assert.match(runner, /sampledAtMs >= loadStartedMs && sampledAtMs <= loadFinishedMs/);
   assert.match(runner, /load interval has no resource sample/);
+  assert.match(runner, /normal search response has no itinerary/);
+  assert.match(runner, /normal search response planner identity mismatch/);
+  assert.match(runner, /timetable snapshot identity is invalid/);
+  assert.match(runner, /normal_state_count_before/);
+  assert.match(runner, /normal_state_count_after/);
+  assert.match(runner, /normal search profile did not persist one state per request/);
+  assert.match(runner, /synthetic credential appeared in service logs/);
   assert.match(runner, /memory_peak/);
   assert.match(runner, /cpu_peak/);
   assert.match(runner, /backend_memory_peak/);

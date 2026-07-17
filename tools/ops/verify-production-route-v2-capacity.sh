@@ -277,6 +277,9 @@ process.stdout.write(`${evidence.snapshotId}|${evidence.snapshotSha256}|${new Da
 [[ "${active_timetable_identity}" == "${expected_timetable_identity}" ]] \
 	|| { echo 'isolated restore timetable identity does not match checked-in evidence' >&2; exit 1; }
 IFS='|' read -r snapshot_id snapshot_sha256 snapshot_fresh_until <<< "${active_timetable_identity}"
+[[ "${snapshot_id}" =~ ^[A-Za-z0-9._-]+$ && "${snapshot_sha256}" =~ ^[0-9a-f]{64}$ \
+	&& "${snapshot_fresh_until}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] \
+	|| { echo 'timetable snapshot identity is invalid' >&2; exit 1; }
 departure_time="$(node -e '
 const now = Date.now();
 const freshUntil = Date.parse(process.argv[1]);
@@ -402,12 +405,54 @@ send_search() {
 		|| { echo 'Route V2 response is missing Cache-Control: private, no-store' >&2; exit 1; }
 }
 
+validate_normal_search_body() {
+	local body_file="${1:?body file is required}"
+	local validation_status
+	if node -e '
+const value = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
+const data = value?.data;
+const itineraries = data?.itineraries;
+if (!value?.success || !Array.isArray(itineraries) || itineraries.length === 0
+    || data.statuses?.includes("NO_TIMETABLE_SERVICE") || data.statuses?.includes("STALE_TIMETABLE")
+    || itineraries.some((itinerary) => !Array.isArray(itinerary.legs)
+      || !itinerary.legs.some((leg) => leg.legType === "RIDE"))) {
+  process.exit(10);
+}
+const identity = data.plannerIdentity;
+const sha256 = (candidate) => typeof candidate === "string" && /^[0-9a-f]{64}$/.test(candidate);
+if (identity?.timetableSnapshotSha256 !== process.argv[2]
+    || !sha256(identity.canonicalPackSha256)
+    || !sha256(identity.canonicalPackSqliteSha256)
+    || !/^sha256:[0-9a-f]{64}$/.test(identity.canonicalStationVersion ?? "")
+    || !sha256(identity.canonicalStationSetSha256)
+    || !sha256(identity.sourceLineageSha256)
+    || !sha256(identity.evidenceHash)) {
+  process.exit(11);
+}
+' "${body_file}" "${snapshot_sha256}"; then
+		return 0
+	else
+		validation_status=$?
+	fi
+	case "${validation_status}" in
+		10) echo 'normal search response has no itinerary' >&2 ;;
+		11) echo 'normal search response planner identity mismatch' >&2 ;;
+		*) echo 'normal search response is invalid' >&2 ;;
+	esac
+	return 1
+}
+
+sample_resources() {
+	local backend_resource gateway_resource sampled_at_ms
+	backend_resource="$(docker stats --no-stream --format '{{.MemPerc}} {{.CPUPerc}}' "${clone_backend}")"
+	gateway_resource="$(docker stats --no-stream --format '{{.MemPerc}} {{.CPUPerc}}' "${clone_gateway}")"
+	sampled_at_ms="$(date +%s%3N)"
+	printf '%s %s %s\n' "${sampled_at_ms}" "${backend_resource}" "${gateway_resource}" >> "${resource_metrics_file}"
+}
+
 (
 	while [[ ! -e "${resource_stop_file}" ]]; do
-		backend_resource="$(docker stats --no-stream --format '{{.MemPerc}} {{.CPUPerc}}' "${clone_backend}")"
-		gateway_resource="$(docker stats --no-stream --format '{{.MemPerc}} {{.CPUPerc}}' "${clone_gateway}")"
-		sampled_at_ms="$(date +%s%3N)"
-		printf '%s %s %s\n' "${sampled_at_ms}" "${backend_resource}" "${gateway_resource}" >> "${resource_metrics_file}"
+		sample_resources
 		: > "${resource_ready_file}"
 		sleep 1
 	done
@@ -422,6 +467,7 @@ while [[ ! -e "${resource_ready_file}" ]]; do
 	sleep 0.1
 done
 load_started_ms="$(date +%s%3N)"
+sample_resources
 
 mapfile -t tokens < <(cut -f 1 "${tokens_file}")
 (( ${#tokens[@]} >= search_rate + 3 )) || { echo 'not enough synthetic sessions' >&2; exit 1; }
@@ -445,10 +491,25 @@ send_session burst 198.51.100.180
 [[ "${last_status}" == 429 ]] || { echo 'session burst profile did not return exact 429' >&2; exit 1; }
 grep -Eqi '^Retry-After: [1-9][0-9]*' "${last_headers}" || { echo 'session 429 is missing integer Retry-After' >&2; exit 1; }
 
+normal_state_count_before="$(clone_psql "SELECT COUNT(*) FROM route_v2_states
+WHERE origin_station_id = 'station-sangnoksu'
+  AND destination_station_id = 'station-sadang'
+  AND requested_departure_at = '${departure_time}'::timestamptz
+  AND timetable_artifact_id = '${snapshot_id}';")"
+[[ "${normal_state_count_before}" =~ ^[0-9]+$ ]] || { echo 'normal state baseline is invalid' >&2; exit 1; }
 for ((index = 0; index < search_rate; index += 1)); do
 	send_search normal "${tokens[${index}]}" "198.51.100.$((index + 1))"
 	[[ "${last_status}" == 200 ]] || { echo 'normal search profile did not return exact 200' >&2; exit 1; }
+	validate_normal_search_body "${last_body}" || exit 1
 done
+normal_state_count_after="$(clone_psql "SELECT COUNT(*) FROM route_v2_states
+WHERE origin_station_id = 'station-sangnoksu'
+  AND destination_station_id = 'station-sadang'
+  AND requested_departure_at = '${departure_time}'::timestamptz
+  AND timetable_artifact_id = '${snapshot_id}';")"
+[[ "${normal_state_count_after}" =~ ^[0-9]+$ ]] || { echo 'normal state result is invalid' >&2; exit 1; }
+(( normal_state_count_after - normal_state_count_before == search_rate )) \
+	|| { echo 'normal search profile did not persist one state per request' >&2; exit 1; }
 (( unexpected_error_count == 0 )) || { echo 'normal profile observed an unexpected status' >&2; exit 1; }
 
 burst_token="${tokens[${search_rate}]}"
@@ -502,6 +563,7 @@ node -e '
 const value = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
 if (value.code !== "ITX_TIMETABLE_UNAVAILABLE") process.exit(1);
 ' "${last_body}" || { echo 'unavailable response machine code mismatch' >&2; exit 1; }
+sample_resources
 load_finished_ms="$(date +%s%3N)"
 stop_resource_sampler || { echo 'load resource sampler failed' >&2; exit 1; }
 resource_summary="$(node -e '
@@ -566,6 +628,12 @@ purged_nonces=1
 
 docker logs "${clone_backend}" > "${logs_file}" 2>&1
 docker logs "${clone_gateway}" >> "${logs_file}" 2>&1
+for synthetic_credential in "${clone_db_password}" "${synthetic_secret}" "${synthetic_certificate_digest}"; do
+	if grep -Fq -- "${synthetic_credential}" "${logs_file}"; then
+		echo 'synthetic credential appeared in service logs' >&2
+		exit 1
+	fi
+done
 grep -Fq 'route V2 timetable cache result=miss' "${logs_file}" || { echo 'cache miss evidence is missing' >&2; exit 1; }
 grep -Fq 'route V2 timetable cache result=hit' "${logs_file}" || { echo 'cache hit evidence is missing' >&2; exit 1; }
 grep -Eq 'Purged [1-9][0-9]* expired Route V2 state rows' "${logs_file}" \
