@@ -5,12 +5,9 @@
 // 근거를 tracked source·test 참조로 결합한다. UI 렌더링/길찾기 로직을 재구현하지 않고, 이미
 // tracked된 위젯 test 이름과 request 직렬화 소스의 존재·내용만 정적으로 검증한다.
 
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { gunzipSync } from "node:zlib";
-import { DatabaseSync } from "node:sqlite";
 
 const API_CATALOG_ID = "internal:POST:/api/v2/routes/search:com.easysubway.route.adapter.in.web.RouteSearchController#searchRouteV2";
 
@@ -56,85 +53,66 @@ const MOBILE_SCENARIO_EVIDENCE = {
   },
 };
 
-// E9: online V2 leg 라벨은 하드코딩이 아니라 데이터 주도다. 코드 경로 실측:
-// RouteSearchV2Leg.fromJson(serviceClass/servicePattern 파싱, route_search.dart:1032)
-// -> RouteSearchStep.fromV2(lineName은 leg.lineId placeholder, route_search.dart:2097)
-// -> OnlineFirstRouteSearchRepository.searchRoute(local_route_repository.dart:1049)가
-// localRepository.resolveDisplayLabels(onlineResult) 호출(local_route_repository.dart:1057)
-// -> resolveDisplayLabels 확장이 catalog.lineName(step.lineId)로 lineName을 실제 채운다
-// (local_route_repository.dart:1093, lineName lookup은 2023행 catalog.lineName).
-// 급행 배지는 serviceClass=='SUBWAY'만 대상이라(service_pattern_badge.dart의 isExpress,
-// route_search.dart:6083 주석이 "ITX-청춘·LOCAL은 배지 없음"을 명시) ITX leg 식별은 이
-// line name 하나에 전적으로 의존한다.
-//
-// 이 line name의 실제 값은 하드코딩이 아니라 번들 datapack(lines.name_ko)에서 나오므로,
-// PASS/FAIL을 정적 문자열이 아니라 tracked datapack 실측으로 판정한다(checkItxLineDisplayIdentity).
-// generic 급행 배지 미부착은 route_search_test.dart:1586(#2099 WP2)로 이미 검증되지만, 그것만으로는
-// "ITX-청춘 표시"를 충족하지 않는다 — line name 식별과 배지 부재를 모두 요구한다.
-const ITX_CANONICAL_LINE_ID = "line-54a7b980b7c3"; // korail-itx-cheongchun-station-sequence-20260713.json의 canonicalLineId
-const BUNDLED_DATAPACK_ASSET = "apps/mobile/assets/datapacks/capital.sqlite.gz";
-const ITX_DISPLAY_CHECK_FILES = [
-  "apps/mobile/lib/route_search.dart",
-  "apps/mobile/lib/features/routes/data/local_route_repository.dart",
-  "apps/mobile/lib/features/stations/presentation/service_pattern_badge.dart",
+// E9: ITX-청춘 서비스 식별은 datapack 노선명이 아니라 전용 배지로 구현됐다
+// (#1414 fix/1414-e9-itx-service-display, 551a57ab). 코드 경로 실측:
+// service_pattern_badge.dart에 `ServicePatternBadge.itxCheongchun` 생성자(key
+// `servicePatternItxCheongchunBadge`)가 있고, route_search.dart의
+// `RouteSearchStep.isItxCheongchun`(serviceClass=='ITX_CHEONGCHUN') getter를
+// ride leg 렌더 조건(`step.isItxCheongchun`)으로 연결해 그 배지를 그린다.
+// "ITX-청춘 표시 1회 + generic 급행 배지 0건 + TalkBack semantics 1회"를 검증하는
+// widget test가 함께 있어야 PASS다. 소스·test 중 하나라도 없으면 fail closed FAIL.
+const E9_BADGE_SOURCE_FILE = "apps/mobile/lib/features/stations/presentation/service_pattern_badge.dart";
+const E9_BADGE_SOURCE_MARKERS = [
+  "ServicePatternBadge.itxCheongchun(",
+  "'servicePatternItxCheongchunBadge'",
 ];
-// 급행 배지가 SUBWAY/EXPRESS에만 붙고 ITX_CHEONGCHUN에는 generic 배지를 만들지 않음을
-// 검증하는 실존 unit test(route_search_test.dart:1586, #2099 WP2).
-const E9_NO_GENERIC_BADGE_TEST = {
-  testFile: "apps/mobile/test/route_search_test.dart",
-  testNames: ["RIDE ITX_CHEONGCHUN/EXPRESS leg은 generic 급행 배지를 만들지 않는다"],
+const E9_STEP_SOURCE_FILE = "apps/mobile/lib/route_search.dart";
+const E9_STEP_SOURCE_MARKERS = [
+  "bool get isItxCheongchun",
+  "serviceClass == 'ITX_CHEONGCHUN'",
+  "step.isItxCheongchun",
+  "ServicePatternBadge.itxCheongchun()",
+];
+const E9_WIDGET_TEST = {
+  testFile: "apps/mobile/test/widget_test.dart",
+  testNames: ["길찾기 ITX-청춘 승차 leg은 선택 UI 없이 ITX-청춘 서비스 식별을 표시한다"],
 };
 
-// 번들 production datapack의 lines.name_ko를 직접 질의해 online ITX leg이 실제로
-// "ITX-청춘"으로 식별되는지 실측한다(문자열 comment가 아니라 tracked 산출물 재질의).
-function checkItxLineDisplayIdentity(repoRoot) {
-  const assetPath = path.join(repoRoot, BUNDLED_DATAPACK_ASSET);
-  if (!existsSync(assetPath)) {
-    return { pass: false, lineId: ITX_CANONICAL_LINE_ID, lineNameKo: null, assetPath: BUNDLED_DATAPACK_ASSET };
+// repoRoot/file을 utf8로 읽어 markers 전부가 원문에 등장하는지 확인한다. route_search.dart는
+// 바이너리 오인 바이트가 있어 grep -a가 필요하므로(coordinator 지적), grep 대신 Node
+// readFileSync로 직접 검사해 이 문제를 피한다.
+function checkSourceMarkers(repoRoot, file, markers) {
+  const filePath = path.join(repoRoot, file);
+  if (!existsSync(filePath)) {
+    return { pass: false, missing: markers, filePath: file };
   }
-  const sqliteBytes = gunzipSync(readFileSync(assetPath));
-  const workDir = mkdtempSync(path.join(tmpdir(), "easysubway-mobile-evidence-datapack-"));
-  const sqlitePath = path.join(workDir, "capital.sqlite");
-  writeFileSync(sqlitePath, sqliteBytes);
-  const database = new DatabaseSync(sqlitePath, { readOnly: true });
-  try {
-    const row = database.prepare("SELECT name_ko FROM lines WHERE id = ?").get(ITX_CANONICAL_LINE_ID);
-    const lineNameKo = typeof row?.name_ko === "string" ? row.name_ko : null;
-    const identifiesAsItx = lineNameKo !== null
-      && (lineNameKo.includes("ITX") || lineNameKo.includes("청춘"));
-    return { pass: identifiesAsItx, lineId: ITX_CANONICAL_LINE_ID, lineNameKo, assetPath: BUNDLED_DATAPACK_ASSET };
-  } finally {
-    database.close();
-    rmSync(workDir, { recursive: true, force: true });
-  }
+  const source = readFileSync(filePath, "utf8");
+  const missing = markers.filter((marker) => !source.includes(marker));
+  return { pass: missing.length === 0, missing, filePath: file };
 }
 
 function buildE9MobileAttestation(repoRoot) {
-  const lineDisplay = checkItxLineDisplayIdentity(repoRoot);
-  const noGenericBadge = checkTestNamesExist(
-    repoRoot,
-    E9_NO_GENERIC_BADGE_TEST.testFile,
-    E9_NO_GENERIC_BADGE_TEST.testNames,
-  );
-  // 두 조건 모두 필요하다: (1) online ITX leg의 line name이 실제로 ITX-청춘을 식별하고,
-  // (2) generic 급행 배지가 붙지 않음을 실존 test가 지킨다. (1)이 false면 (2)만으로는
-  // "ITX-청춘으로 표시"를 충족하지 못한다 — 무표시와 무배지를 혼동하지 않는다.
-  const pass = lineDisplay.pass && noGenericBadge.pass;
-  const reasonKo = lineDisplay.pass
-    ? `online ITX leg은 catalog 기반 line name으로 ITX-청춘으로 식별된다(${BUNDLED_DATAPACK_ASSET}의 `
-      + `lines.name_ko='${lineDisplay.lineNameKo}'), generic 급행 배지 미부착은 `
-      + `${E9_NO_GENERIC_BADGE_TEST.testFile}로 검증됨`
-    : `online ITX leg의 line name은 catalog 기반이지만(하드코딩 아님) ITX-청춘을 식별하지 않는다: `
-      + `${BUNDLED_DATAPACK_ASSET}의 lines.id='${lineDisplay.lineId}' name_ko='${lineDisplay.lineNameKo}'. `
-      + `serviceClass=='SUBWAY'만 급행 배지 대상이라(service_pattern_badge.dart, route_search.dart:6083 `
-      + `주석 "ITX-청춘·LOCAL은 배지 없음") ITX leg은 이 line name 외에 보조 표시가 없다 `
-      + `(generic 급행 배지 미부착은 검증되지만 그것만으로 "ITX-청춘 표시"를 충족하지 않음).`;
+  const badgeSource = checkSourceMarkers(repoRoot, E9_BADGE_SOURCE_FILE, E9_BADGE_SOURCE_MARKERS);
+  const stepSource = checkSourceMarkers(repoRoot, E9_STEP_SOURCE_FILE, E9_STEP_SOURCE_MARKERS);
+  const widgetTest = checkTestNamesExist(repoRoot, E9_WIDGET_TEST.testFile, E9_WIDGET_TEST.testNames);
+  // 세 조건 모두 필요하다: (1) 배지 위젯 소스, (2) ride leg 렌더 연결, (3) 이를 검증하는
+  // widget test. 하나라도 없으면 "ITX-청춘 표시"가 실제로 있다고 단정하지 않는다.
+  const pass = badgeSource.pass && stepSource.pass && widgetTest.pass;
+  const reasonKo = pass
+    ? `ITX-청춘 서비스 식별 배지가 소스에 존재하고(${E9_BADGE_SOURCE_FILE}) `
+      + `ride leg 렌더에 연결되며(${E9_STEP_SOURCE_FILE}), ${E9_WIDGET_TEST.testFile}의 `
+      + `"${E9_WIDGET_TEST.testNames[0]}" 테스트가 표시 1회·급행 0건을 검증한다.`
+    : `ITX-청춘 서비스 식별 배지 구현이 불완전하다: `
+      + `${E9_BADGE_SOURCE_FILE} 누락 마커=${JSON.stringify(badgeSource.missing)}, `
+      + `${E9_STEP_SOURCE_FILE} 누락 마커=${JSON.stringify(stepSource.missing)}, `
+      + `${E9_WIDGET_TEST.testFile} 누락 test=${JSON.stringify(widgetTest.missing)}.`;
   return {
     result: pass ? "PASS" : "FAIL",
     reasonKo,
-    checkedFiles: [...ITX_DISPLAY_CHECK_FILES, E9_NO_GENERIC_BADGE_TEST.testFile],
-    lineDisplay,
-    noGenericBadge,
+    checkedFiles: [E9_BADGE_SOURCE_FILE, E9_STEP_SOURCE_FILE, E9_WIDGET_TEST.testFile],
+    badgeSource,
+    stepSource,
+    widgetTest,
   };
 }
 
@@ -240,8 +218,9 @@ export function buildMobileConsumptionEvidence({
         result: integrationScenarios.E9,
         reasonKo: e9.reasonKo,
         checkedFiles: e9.checkedFiles,
-        lineDisplay: e9.lineDisplay,
-        noGenericBadge: e9.noGenericBadge,
+        badgeSource: e9.badgeSource,
+        stepSource: e9.stepSource,
+        widgetTest: e9.widgetTest,
       },
     },
     checks: scenarioChecks,
