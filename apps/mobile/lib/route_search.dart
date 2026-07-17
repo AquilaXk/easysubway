@@ -2791,14 +2791,6 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
           activeSubscription?.routeId != result.routeSearchId) {
         return;
       }
-      final activeStationNames = <String, String>{
-        if (activeSubscription != null)
-          for (final transfer in activeSubscription.transfers)
-            transfer.stationId: transfer.stationName,
-        if (activeSubscription != null)
-          activeSubscription.destination.stationId:
-              activeSubscription.destination.stationName,
-      };
       final stationNames = <String, String>{};
       for (final leg in rideLegs) {
         final stationId = leg.toStationId;
@@ -2807,9 +2799,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
         }
         final stationName = await _resolveGetOffAlarmStationName(
           stationId: stationId,
-          result: result,
           stationRepository: widget.stationRepository,
-          preferredStationNames: activeStationNames,
         );
         if (stationName == null) {
           throw StateError('하차 알림 역명을 확인하지 못했습니다.');
@@ -4297,7 +4287,6 @@ class _GetOffAlarmEntryPoint extends StatelessWidget {
         rideLegs: rideLegs,
         stationName: (id) => _resolveGetOffAlarmStationName(
           stationId: id,
-          result: result,
           stationRepository: stationRepository,
         ),
       ),
@@ -4307,23 +4296,8 @@ class _GetOffAlarmEntryPoint extends StatelessWidget {
 
 Future<String?> _resolveGetOffAlarmStationName({
   required String stationId,
-  required RouteSearchResult result,
   required StationSearchRepository stationRepository,
-  Map<String, String> preferredStationNames = const {},
 }) async {
-  final preferredName = _usableGetOffAlarmStationName(
-    preferredStationNames[stationId],
-    stationId,
-  );
-  if (preferredName != null) {
-    return preferredName;
-  }
-  if (stationId == result.destinationStationId) {
-    return _usableGetOffAlarmStationName(
-      result.destinationStationName,
-      stationId,
-    );
-  }
   final detail = await stationRepository.getStationDetail(stationId);
   if (detail.id != stationId) {
     return null;

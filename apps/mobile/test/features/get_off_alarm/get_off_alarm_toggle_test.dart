@@ -213,7 +213,59 @@ void main() {
     expect(active?.destination.stationName, '사당');
   });
 
-  testWidgets('역명이 비어 있으면 하차 알림을 예약하거나 저장하지 않는다', (tester) async {
+  for (final invalidName in <({String label, String? value})>[
+    (label: 'null', value: null),
+    (label: 'blank', value: '   '),
+    (label: 'raw ID', value: 'sadang'),
+  ]) {
+    testWidgets('${invalidName.label} 역명은 하차 알림을 예약하거나 저장하지 않는다', (
+      tester,
+    ) async {
+      final notifier = _RecordingNotifier();
+      final repository = _FakeRepo();
+      final controller = GetOffAlarmController(
+        notifier: notifier,
+        permissionGate: _StubGate(true),
+        notificationPermissionProvider:
+            const _StubNotificationPermissionProvider(),
+        repository: repository,
+        now: () => DateTime(2026, 7, 6, 9, 0),
+      );
+      addTearDown(controller.dispose);
+      final reports = <FlutterErrorDetails>[];
+
+      await runWithMobileErrorReporter(reports.add, () async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: GetOffAlarmToggle(
+                controller: controller,
+                routeId: 'r1',
+                rideLegs: const [
+                  RideLegArrival(
+                    toStationId: 'sadang',
+                    plannedArrivalIso: '2026-07-06T09:30:00',
+                  ),
+                ],
+                stationName: (_) async => invalidName.value,
+              ),
+            ),
+          ),
+        );
+
+        await tester.tap(find.byType(Switch));
+        await tester.pumpAndSettle();
+      });
+
+      expect(reports, hasLength(1));
+      expect(find.text('하차 알림을 바꾸지 못했어요. 다시 시도해 주세요.'), findsOneWidget);
+      expect(notifier.scheduled, isNull);
+      expect(await repository.loadActive(), isNull);
+      expect(controller.state.enabled, isFalse);
+    });
+  }
+
+  testWidgets('새 경로의 raw ID 역명은 기존 하차 알림과 구독을 보존한다', (tester) async {
     final notifier = _RecordingNotifier();
     final repository = _FakeRepo();
     final controller = GetOffAlarmController(
@@ -222,9 +274,23 @@ void main() {
       notificationPermissionProvider:
           const _StubNotificationPermissionProvider(),
       repository: repository,
-      now: () => DateTime(2026, 7, 6, 9, 0),
+      now: () => DateTime(2026, 7, 6, 9),
     );
     addTearDown(controller.dispose);
+    await controller.enable(
+      routeId: 'existing-route',
+      stops: [
+        GetOffAlarmStop(
+          stationId: 'existing-station',
+          stationName: '기존역',
+          arrivalAt: DateTime(2026, 7, 6, 9, 30),
+          kind: GetOffAlarmKind.destination,
+        ),
+      ],
+      transferAlarmEnabled: false,
+    );
+    final subscriptionBefore = await repository.loadActive();
+    final scheduledBefore = notifier.scheduled;
     final reports = <FlutterErrorDetails>[];
 
     await runWithMobileErrorReporter(reports.add, () async {
@@ -233,28 +299,27 @@ void main() {
           home: Scaffold(
             body: GetOffAlarmToggle(
               controller: controller,
-              routeId: 'r1',
+              routeId: 'new-route',
               rideLegs: const [
                 RideLegArrival(
-                  toStationId: 'sadang',
-                  plannedArrivalIso: '2026-07-06T09:30:00',
+                  toStationId: 'station-sadang',
+                  plannedArrivalIso: '2026-07-06T09:40:00',
                 ),
               ],
-              stationName: (_) async => '   ',
+              stationName: (_) async => 'station-sadang',
             ),
           ),
         ),
       );
-
       await tester.tap(find.byType(Switch));
       await tester.pumpAndSettle();
     });
 
     expect(reports, hasLength(1));
-    expect(find.text('하차 알림을 바꾸지 못했어요. 다시 시도해 주세요.'), findsOneWidget);
-    expect(notifier.scheduled, isNull);
-    expect(await repository.loadActive(), isNull);
-    expect(controller.state.enabled, isFalse);
+    expect(notifier.cancelCount, 0);
+    expect(notifier.scheduled, same(scheduledBefore));
+    expect(await repository.loadActive(), same(subscriptionBefore));
+    expect(controller.state.activeRouteId, 'existing-route');
   });
 
   testWidgets('역명 해소가 실패하면 하차 알림을 예약하거나 저장하지 않는다', (tester) async {
