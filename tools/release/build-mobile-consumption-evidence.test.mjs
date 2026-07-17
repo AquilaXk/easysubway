@@ -135,7 +135,11 @@ test("E9는 ride leg 렌더 연결이 없으면 fail closed FAIL한다(배지·g
 
   assert.equal(evidence.integrationScenarios.E9, "FAIL");
   assert.equal(evidence.scenarioEvidence.E9.stepSource.pass, false);
-  assert.ok(evidence.scenarioEvidence.E9.stepSource.missing.includes("step.isItxCheongchun"));
+  assert.ok(
+    evidence.scenarioEvidence.E9.stepSource.missing.includes(
+      "step.stepType == 'ride' && step.isItxCheongchun",
+    ),
+  );
 });
 
 test("E9는 소스가 모두 있어도 widget test가 없으면 fail closed FAIL한다", async () => {
@@ -156,6 +160,40 @@ test("E1/E7 test 이름이 tracked 파일에 없으면 FAIL로 fail closed한다
   assert.equal(evidence.integrationScenarios.E1, "FAIL");
   assert.equal(evidence.integrationScenarios.E7, "FAIL");
   assert.equal(evidence.status, "BLOCKED_MOBILE_SCENARIO_EVIDENCE");
+});
+
+test("test 이름이 testWidgets(...) 선언이 아니라 주석에만 있으면 FAIL로 fail closed한다(오탐 회귀 가드)", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "easysubway-mobile-evidence-"));
+  await mkdir(path.join(root, "apps/mobile/test"), { recursive: true });
+  await mkdir(path.join(root, "apps/mobile/lib/features/stations/presentation"), { recursive: true });
+  // 실제 testWidgets() 호출이 아니라 코멘트에만 테스트명 문자열이 등장한다 —
+  // 예전 단순 substring 매칭이었다면 이 상태에서도 오탐 PASS했을 것이다.
+  await writeFile(
+    path.join(root, "apps/mobile/test/widget_test.dart"),
+    "// TODO: add testWidgets('노선도 첫 화면은 하단 광고 위에 지도 조작을 유지한다', ...) later\n",
+  );
+  await writeFile(path.join(root, "apps/mobile/test/route_search_request_test.dart"), "");
+  await writeFile(path.join(root, "apps/mobile/lib/route_search.dart"), "class RouteSearchRequest {}\n");
+  await writeFile(path.join(root, "apps/mobile/lib/features/stations/presentation/service_pattern_badge.dart"), "");
+
+  const evidence = buildMobileConsumptionEvidence({ candidate: candidate(), repoRoot: root });
+
+  assert.equal(evidence.integrationScenarios.E1, "FAIL");
+  assert.ok(evidence.scenarioEvidence.E1.testNames.length > 0);
+});
+
+test("E9 배지 마커가 주석에만 있으면 FAIL로 fail closed한다(오탐 회귀 가드)", async () => {
+  const repoRoot = await fixtureRepoRoot({
+    // 실제 생성자 선언이 아니라 설명 주석에만 문자열이 등장한다.
+    itxBadgeSource: "// ServicePatternBadge.itxCheongchun( 생성자를 여기에 추가할 예정\n"
+      + "// key: 'servicePatternItxCheongchunBadge'\n",
+    itxStepSource: ITX_STEP_SOURCE_FULL,
+    itxWidgetTestNames: [ITX_WIDGET_TEST_NAME],
+  });
+  const evidence = buildMobileConsumptionEvidence({ candidate: candidate(), repoRoot });
+
+  assert.equal(evidence.integrationScenarios.E9, "FAIL");
+  assert.equal(evidence.scenarioEvidence.E9.badgeSource.pass, false);
 });
 
 test("E8은 request 직렬화에 servicePattern/expressOnly 등 금지 필드가 있으면 FAIL한다", async () => {

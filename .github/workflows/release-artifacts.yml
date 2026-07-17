@@ -866,10 +866,14 @@ jobs:
           fi
           # #1414 #2099 fragment. Mobile이 실제로 소비한 RC identity와 E1/E7/E8/E9 시나리오
           # 근거(tracked widget/contract test·request 직렬화 소스)를 같은 candidate-context로 emit한다.
-          node tools/release/build-mobile-consumption-evidence.mjs \
-            --candidate-context release-artifacts/rc/candidate-context.json \
-            --repo-root . \
-            --output release-artifacts/rc/mobile-consumption-evidence.json
+          # planner step과 동일하게 입력 artifact 존재를 먼저 확인한다(verdict 단계는 이 파일이
+          # 없어도 fail-closed로 처리하므로 이 job이 강제로 실패하지 않는다).
+          if [[ -f release-artifacts/rc/candidate-context.json ]]; then
+            node tools/release/build-mobile-consumption-evidence.mjs \
+              --candidate-context release-artifacts/rc/candidate-context.json \
+              --repo-root . \
+              --output release-artifacts/rc/mobile-consumption-evidence.json
+          fi
           if [[ "${android_artifact_source}" == easysubway-android-production-rc-* ]]; then
             node tools/ops/generate-operations-phase-a-summary.mjs \
               --rc-manifest release-artifacts/rc/candidate-context.json \
@@ -920,10 +924,12 @@ jobs:
           # PENDING으로 남긴다.
           verdict_args=(
             --rc-manifest release-artifacts/rc/final-readiness.json
-            --mobile-evidence release-artifacts/rc/mobile-consumption-evidence.json
           )
           if [[ -f release-artifacts/rc/planner-success-evidence.json ]]; then
             verdict_args+=(--planner-evidence release-artifacts/rc/planner-success-evidence.json)
+          fi
+          if [[ -f release-artifacts/rc/mobile-consumption-evidence.json ]]; then
+            verdict_args+=(--mobile-evidence release-artifacts/rc/mobile-consumption-evidence.json)
           fi
           node tools/release/generate-route-integration-verdict.mjs \
             "${verdict_args[@]}" \

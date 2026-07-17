@@ -29,6 +29,9 @@ const RC_IDENTITY_FIELDS = [
 ];
 // 최소한 값이 있어야 하는(fail-closed) 앵커 필드.
 const RC_IDENTITY_ANCHOR_FIELDS = ["gitSha", "versionCode", "dataPackArtifactSha256"];
+// backend identity는 anyOf 관계다(backendImageDigest 또는 backendArtifactSha256 중 하나만 있으면
+// 된다) — 둘 다 null이면 backend가 어떤 candidate에 묶였는지 anchor할 수 없어 fail-closed blocker.
+const RC_IDENTITY_BACKEND_ANCHOR_FIELDS = ["backendArtifactSha256", "backendImageDigest"];
 
 const VALID_PROVENANCE = new Set(["final-candidate", "production", "manual-observation"]);
 
@@ -169,13 +172,21 @@ function identityMismatchFields(canonical, candidate) {
 }
 
 function anchorIncomplete(identity) {
-  return RC_IDENTITY_ANCHOR_FIELDS.filter(
+  const missing = RC_IDENTITY_ANCHOR_FIELDS.filter(
     (field) => identity?.[field] === undefined || identity?.[field] === null || identity?.[field] === "",
   );
+  const hasBackendAnchor = RC_IDENTITY_BACKEND_ANCHOR_FIELDS.some(
+    (field) => identity?.[field] !== undefined && identity?.[field] !== null && identity?.[field] !== "",
+  );
+  if (!hasBackendAnchor) {
+    missing.push(RC_IDENTITY_BACKEND_ANCHOR_FIELDS.join("|"));
+  }
+  return missing;
 }
 
 // planner canary itinerary의 모든 RIDE step이 serviceClass/servicePattern을 갖는지 검사한다(NO_GO #3).
-// 반환: { rideLegs, missingMetadata, expressSkipBoardable, hasItxExpress }
+// 반환: { rideLegs, missingMetadata, hasItxExpress, structureMissing? }
+// structureMissing은 itineraries 구조 자체가 없을 때만 true로 추가된다(그 외에는 필드가 없음).
 function inspectPlannerRideMetadata(plannerEvidence) {
   const result = { rideLegs: 0, missingMetadata: false, hasItxExpress: false };
   const itineraries = plannerEvidence?.canaryResult?.plan?.itineraries;

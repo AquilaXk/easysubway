@@ -53,41 +53,66 @@ const MOBILE_SCENARIO_EVIDENCE = {
   },
 };
 
-// E9: ITX-청춘 서비스 식별은 datapack 노선명이 아니라 전용 배지로 구현됐다
-// (#1414 fix/1414-e9-itx-service-display, 551a57ab). 코드 경로 실측:
-// service_pattern_badge.dart에 `ServicePatternBadge.itxCheongchun` 생성자(key
-// `servicePatternItxCheongchunBadge`)가 있고, route_search.dart의
-// `RouteSearchStep.isItxCheongchun`(serviceClass=='ITX_CHEONGCHUN') getter를
-// ride leg 렌더 조건(`step.isItxCheongchun`)으로 연결해 그 배지를 그린다.
-// "ITX-청춘 표시 1회 + generic 급행 배지 0건 + TalkBack semantics 1회"를 검증하는
-// widget test가 함께 있어야 PASS다. 소스·test 중 하나라도 없으면 fail closed FAIL.
+// E9: ITX-청춘 서비스 식별은 datapack 노선명이 아니라 전용 배지로 구현되는 설계다
+// (#1414 fix/1414-e9-itx-service-display, 551a57ab에서 제안됨). 이 브랜치가 아직 병합되지
+// 않았으면 아래 마커가 없어 fail-closed FAIL로 남는 것이 정상이다. fix 병합 후 PASS가
+// 되려면 다음이 모두 성립해야 한다:
+// - service_pattern_badge.dart에 `ServicePatternBadge.itxCheongchun` 생성자(key
+//   `servicePatternItxCheongchunBadge`)가 존재해야 한다.
+// - route_search.dart의 `RouteSearchStep.isItxCheongchun`(serviceClass=='ITX_CHEONGCHUN')
+//   getter가 ride leg 렌더 조건(`step.isItxCheongchun`)에 실제로 연결돼야 한다.
+// - "ITX-청춘 표시 1회 + generic 급행 배지 0건 + TalkBack semantics 1회"를 검증하는
+//   widget test가 존재해야 한다.
+// 소스·test 중 하나라도 없으면 fail closed FAIL이다.
 const E9_BADGE_SOURCE_FILE = "apps/mobile/lib/features/stations/presentation/service_pattern_badge.dart";
+// 각 마커는 "선언 prefix + 핵심 토큰" 결합으로 주석·설명 텍스트만으로는 우연히 매칭되지 않게 한다
+// (완전한 Dart 파서는 과도하므로 만들지 않는다). Key(...)는 실제 소스가 여러 줄로 감싸므로
+// 정규식으로 개행을 허용한다.
 const E9_BADGE_SOURCE_MARKERS = [
-  "ServicePatternBadge.itxCheongchun(",
-  "'servicePatternItxCheongchunBadge'",
+  /const\s+ServicePatternBadge\.itxCheongchun\(/,
+  /Key\(\s*'servicePatternItxCheongchunBadge'/,
 ];
 const E9_STEP_SOURCE_FILE = "apps/mobile/lib/route_search.dart";
 const E9_STEP_SOURCE_MARKERS = [
-  "bool get isItxCheongchun",
-  "serviceClass == 'ITX_CHEONGCHUN'",
-  "step.isItxCheongchun",
-  "ServicePatternBadge.itxCheongchun()",
+  "bool get isItxCheongchun => serviceClass == 'ITX_CHEONGCHUN'",
+  "step.stepType == 'ride' && step.isItxCheongchun",
+  "ServicePatternBadge.itxCheongchun(",
 ];
 const E9_WIDGET_TEST = {
   testFile: "apps/mobile/test/widget_test.dart",
   testNames: ["길찾기 ITX-청춘 승차 leg은 선택 UI 없이 ITX-청춘 서비스 식별을 표시한다"],
 };
 
-// repoRoot/file을 utf8로 읽어 markers 전부가 원문에 등장하는지 확인한다. route_search.dart는
-// 바이너리 오인 바이트가 있어 grep -a가 필요하므로(coordinator 지적), grep 대신 Node
-// readFileSync로 직접 검사해 이 문제를 피한다.
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// //, /* */ 주석을 제거해 "주석에만 선언 문구가 있는" 오탐(예: TODO 주석에 실제 호출
+// syntax를 그대로 적어 둔 경우)을 막는다. 문자열 리터럴 안의 `//`(URL 등)는 못 걸러내는
+// 단순 근사치이지만, 이 저장소가 검사하는 파일들의 관련 문자열에는 `//`가 없어 실무적으로
+// 충분하다 — 완전한 Dart 토크나이저/파서는 만들지 않는다.
+function stripDartComments(source) {
+  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+}
+
+function matchesMarker(source, marker) {
+  return marker instanceof RegExp ? marker.test(source) : source.includes(marker);
+}
+
+function markerLabel(marker) {
+  return marker instanceof RegExp ? marker.source : marker;
+}
+
+// repoRoot/file을 utf8로 읽어 markers 전부가 (주석 제외) 원문에 등장하는지 확인한다.
+// route_search.dart는 바이너리 오인 바이트가 있어 grep -a가 필요하므로(coordinator 지적),
+// grep 대신 Node readFileSync로 직접 검사해 이 문제를 피한다.
 function checkSourceMarkers(repoRoot, file, markers) {
   const filePath = path.join(repoRoot, file);
   if (!existsSync(filePath)) {
-    return { pass: false, missing: markers, filePath: file };
+    return { pass: false, missing: markers.map(markerLabel), filePath: file };
   }
-  const source = readFileSync(filePath, "utf8");
-  const missing = markers.filter((marker) => !source.includes(marker));
+  const source = stripDartComments(readFileSync(filePath, "utf8"));
+  const missing = markers.filter((marker) => !matchesMarker(source, marker)).map(markerLabel);
   return { pass: missing.length === 0, missing, filePath: file };
 }
 
@@ -116,13 +141,20 @@ function buildE9MobileAttestation(repoRoot) {
   };
 }
 
+// test 이름이 실제 test(...)/testWidgets(...) 선언에 쓰였는지 확인한다. 단순
+// `source.includes("'name'")`는 주석·설명 문구에 같은 문자열이 있어도 오탐 PASS를
+// 낸다 — `test(`/`testWidgets(` 선언 prefix와 결합해야만 매칭되도록 강화한다(완전한
+// Dart 파서는 과도하므로 만들지 않는다).
 function checkTestNamesExist(repoRoot, testFile, testNames) {
   const filePath = path.join(repoRoot, testFile);
   if (!existsSync(filePath)) {
     return { pass: false, missing: testNames, filePath: testFile };
   }
-  const source = readFileSync(filePath, "utf8");
-  const missing = testNames.filter((name) => !source.includes(`'${name}'`));
+  const source = stripDartComments(readFileSync(filePath, "utf8"));
+  const missing = testNames.filter((name) => {
+    const declarationPattern = new RegExp(`\\btest(Widgets)?\\(\\s*'${escapeRegExp(name)}'`);
+    return !declarationPattern.test(source);
+  });
   return { pass: missing.length === 0, missing, filePath: testFile };
 }
 

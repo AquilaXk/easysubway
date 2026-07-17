@@ -114,6 +114,35 @@ test("완전히 일치하는 same-RC 증거 조합은 GO로 판정하고 E1~E9�
   }
 });
 
+test("backendArtifactSha256/backendImageDigest가 모두 null이면 anchor 미완성으로 NO_GO한다", () => {
+  const verdict = buildRouteIntegrationVerdict(goInputs({
+    rcManifest: rcManifest({ ...CANONICAL_IDENTITY, backendArtifactSha256: null, backendImageDigest: null }),
+  }));
+
+  assert.equal(verdict.decision, "NO_GO");
+  const mixed = verdict.noGoConditions.find((condition) => condition.id === "mixed_rc_or_artifact_identity");
+  assert.equal(mixed.triggered, true);
+  assert.ok(mixed.reasons.some((reason) => reason.includes("backendArtifactSha256|backendImageDigest")));
+});
+
+test("backendImageDigest만 있어도(backendArtifactSha256 null) anchor는 충족된다", () => {
+  const verdict = buildRouteIntegrationVerdict(goInputs({
+    rcManifest: rcManifest({ ...CANONICAL_IDENTITY, backendArtifactSha256: null, backendImageDigest: "sha256:" + "1".repeat(64) }),
+    plannerEvidence: plannerEvidence({
+      releaseCandidateIdentity: { ...CANONICAL_IDENTITY, backendArtifactSha256: null, backendImageDigest: "sha256:" + "1".repeat(64) },
+    }),
+    mobileEvidence: mobileEvidence({
+      releaseCandidateIdentity: { ...CANONICAL_IDENTITY, backendArtifactSha256: null, backendImageDigest: "sha256:" + "1".repeat(64) },
+    }),
+    routeMapEvidence: routeMapEvidence({
+      releaseCandidateIdentity: { ...CANONICAL_IDENTITY, backendArtifactSha256: null, backendImageDigest: "sha256:" + "1".repeat(64) },
+    }),
+  }));
+
+  const mixed = verdict.noGoConditions.find((condition) => condition.id === "mixed_rc_or_artifact_identity");
+  assert.equal(mixed.triggered, false);
+});
+
 test("서로 다른 RC identity 증거를 조합하면 mixed identity로 NO_GO한다", () => {
   const verdict = buildRouteIntegrationVerdict(goInputs({
     plannerEvidence: plannerEvidence({
