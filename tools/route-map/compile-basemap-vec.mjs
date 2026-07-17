@@ -31,7 +31,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { DAEJEON, DAEGU } from "./sma-region-configs.mjs";
+import { DAEJEON, DAEGU, BUSAN } from "./sma-region-configs.mjs";
 
 const root = path.resolve(import.meta.dirname, "../..");
 const svgSourceDir = path.join(
@@ -401,13 +401,15 @@ function ownerLabelTextContent(textBlock) {
 // data-full-official-name이 없으므로(daejeon 전용 마크업) 이 분기는 daejeon
 // 외에는 발동하지 않는다(그 외 권역 회귀 0).
 //
-// daegu(#2068 대구 QA): 오너 라벨 <text> 내용이 카탈로그 name_ko와 어긋나는
-// 3역(부호(경일대·호산대)→부호, 하양(대구가톨릭대)→하양, 서대구→서대구역)이
-// data-full-official-name 없이 순수 <text> 내용으로만 온다. daejeon처럼
-// 파이프라인 노드 매칭에 이미 쓰는 정본 규칙(DAEGU.canonicalRules)을 그대로
-// flatten 텍스트에 적용해 station 키를 카탈로그 표기와 맞춘다 — 매칭 실패로
-// 앱이 폴백 미니 크기로 잘못 배치하던 회귀(실기기)를 없앤다. [canonicalize]는
-// daegu에서만 넘어오므로(extractOwnerLabels가 regionId로 판정) 다른 권역 불변.
+// daegu/busan(#2068 QA): 오너 라벨 <text> 내용이 카탈로그 name_ko와 어긋나는
+// 역이 data-full-official-name 없이 순수 <text> 내용으로만 온다 — daegu 3역
+// (부호(경일대·호산대)→부호, 하양(대구가톨릭대)→하양, 서대구→서대구역), busan
+// 4역(벡스코(시립미술관)→벡스코, 부산역→부산, 경성대·부경대→경성대.부경대,
+// 국제금융센터·부산은행→국제금융센터.부산은행). daejeon처럼 파이프라인 노드
+// 매칭에 이미 쓰는 정본 규칙(DAEGU/BUSAN.canonicalRules)을 그대로 flatten
+// 텍스트에 적용해 station 키를 카탈로그 표기와 맞춘다 — 매칭 실패로 앱이 폴백
+// 미니 크기로 잘못 배치하던 회귀(실기기)를 없앤다. [canonicalize]는 daegu/busan
+// 에서만 넘어오므로(extractOwnerLabels가 regionId로 판정) 다른 권역 불변.
 function ownerLabelStationKey(textOpenTag, textBlock, canonicalize) {
   const fullOfficialName = firstAttr(textOpenTag, "data-full-official-name");
   if (fullOfficialName) {
@@ -588,9 +590,18 @@ export function extractOwnerLabels(svgText, regionId) {
   const mapTranslate = parseTranslate(mapTransform);
   const cssFontSizeByRole = stationLabelFontSizesByRole(svgText);
   const rolePattern = ownerLabelRoles.join("|");
-  // #2068 대구: flatten 텍스트 station 키를 카탈로그 표기로 정규화(부호/하양/서대구역).
-  // daegu에서만 적용해 다른 권역 매치 수 불변(daejeon은 data-full-official-name 경로).
-  const canonicalize = regionId === "daegu" ? DAEGU.canonicalRules : null;
+  // #2068 대구/부산: flatten 텍스트 station 키를 카탈로그 표기로 정규화한다.
+  //   daegu(부호/하양/서대구역), busan(벡스코(시립미술관)→벡스코·부산역→부산·
+  //   경성대·부경대→경성대.부경대·국제금융센터·부산은행→국제금융센터.부산은행).
+  // 파이프라인 노드 매칭이 이미 쓰는 정본 규칙(DAEGU/BUSAN.canonicalRules)을 그대로
+  // sidecar 키에 적용해 매칭 실패(폴백 미니) 회귀를 없앤다. daejeon은
+  // data-full-official-name 경로라 여기 canonicalize를 타지 않는다.
+  const canonicalize =
+    regionId === "daegu"
+      ? DAEGU.canonicalRules
+      : regionId === "busan"
+        ? BUSAN.canonicalRules
+        : null;
 
   const entries = [];
   const textRe = new RegExp(

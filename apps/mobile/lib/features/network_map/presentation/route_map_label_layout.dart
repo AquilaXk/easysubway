@@ -497,6 +497,41 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
       ? _medianOwnerLabelFontSizeDesign(ownerLabelsByStationName, design)
       : kRouteMapDesignBadgeFontPx;
 
+  // #2068 부산 5차: 동명 폴백 억제 준비. 같은 물리역명이 별개 station_id 2개로
+  // 모델링되고(평행 코리더 동명역 — 부전 1호선/동해선, 벡스코 2호선/동해선 등)
+  // 오너 SVG 라벨이 1개뿐이면, 최근접 후보 1개만 오너 라벨을 받고 나머지는 폴백
+  // 미니 라벨로 그려져 화면에 같은 이름이 2번 보인다(오너 QA "부전 2개"). 오너
+  // 매치 라벨의 (원본명 → design 앵커) 색인을 미리 만들어, 폴백 후보가 같은
+  // 이름의 매치 라벨과 근접(<= 위치 게이트)하면 그 폴백 생성을 생략한다. 이는
+  // 시각 중복만 제거하며, 히트 타깃·접근성 semantics는 이 레이아웃과 무관한
+  // route_map_positions 경로에서 만들어져 불변이다(#2068). basemap 전용.
+  final ownerMatchedAnchorsByName = <String, List<Offset>>{};
+  if (basemap) {
+    resolvedOwnerLabels.forEach((key, entry) {
+      final sid = key.startsWith('transfer:')
+          ? key.substring('transfer:'.length)
+          : key.substring(0, key.indexOf(':'));
+      final name = stationNameByStationId[sid];
+      if (name == null) return;
+      ownerMatchedAnchorsByName
+          .putIfAbsent(name, () => <Offset>[])
+          .add(design.toDesign(entry.position));
+    });
+  }
+  bool isDuplicateOfOwnerMatched(String stationId, Offset anchorDesign) {
+    final name = stationNameByStationId[stationId];
+    if (name == null) return false;
+    final anchors = ownerMatchedAnchorsByName[name];
+    if (anchors == null) return false;
+    for (final anchor in anchors) {
+      if ((anchor - anchorDesign).distance <=
+          kRouteMapOwnerLabelMaxAnchorDistancePx) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   // 1) 노선 뱃지: 끝점 + arc length 반복 (스펙 S4 — 노선 중간 확대에도 식별).
   // suppressLineBadges(#2068 광주 2차): basemap SVG 자체에 종점 호선 마크가
   // 그려져 있는 region(광주·대전)은 여기서 만드는 뱃지 후보를 전부 건너뛴다
@@ -647,6 +682,14 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
             measureLabel: measureLabel,
           ),
         );
+        continue;
+      }
+      // #2068 부산 5차: 같은 이름의 오너 매치 라벨이 근접해 있으면(평행 코리더
+      // 동명역의 중복 노드) 이 폴백 라벨을 생략해 화면 이름 중복을 없앤다.
+      if (isDuplicateOfOwnerMatched(
+        station.stationId,
+        design.toDesign(station.position),
+      )) {
         continue;
       }
     }

@@ -346,6 +346,79 @@ void main() {
     }
   });
 
+  test('#2068 부산 5차: 동명 폴백 억제 — 같은 이름 오너 매치 근접 시 중복 폴백 생략', () {
+    // 같은 물리역명("동명역")이 별개 station_id 2개(a=L1, b=L2)로 모델링되고
+    // 오너 SVG 라벨이 1개(a 근접)뿐인 상황(부전 1호선/동해선, 벡스코 2호선/동해선
+    // 실측 케이스). a는 오너 라벨을 받고 b는 미매치 → 기존엔 b가 폴백 미니로
+    // 그려져 화면에 같은 이름이 2번(오너 QA "부전 2개"). basemap 억제로 b 폴백을
+    // 생략해 1번만 보이게 한다.
+    final map = StructuredRouteMap(
+      lines: const [],
+      stations: [
+        RouteMapStructuredStation(
+          stationId: 'a',
+          lineId: 'L1',
+          sequence: 0,
+          position: const Offset(0, 0),
+          labelPolygon: const [],
+          labelClass: RouteMapLabelClass.regular,
+        ),
+        RouteMapStructuredStation(
+          stationId: 'b',
+          lineId: 'L2',
+          sequence: 0,
+          position: const Offset(50, 0),
+          labelPolygon: const [],
+          labelClass: RouteMapLabelClass.regular,
+        ),
+      ],
+      transferGroups: const [],
+    );
+    const design = RouteMapDesignSpace(designScale: 1);
+    const ownerLabels = <String, List<RouteMapOwnerLabelEntry>>{
+      '동명역': [
+        RouteMapOwnerLabelEntry(
+          station: '동명역',
+          role: 'ordinary',
+          position: Offset(0, 0),
+          anchor: RouteMapOwnerLabelAnchor.middle,
+          fontSizePx: 13.0,
+        ),
+      ],
+    };
+    const names = <String, String>{'a': '동명역', 'b': '동명역'};
+    RouteMapStaticLabelLayout run({
+      required Map<String, List<RouteMapOwnerLabelEntry>> owner,
+    }) => solveRouteMapLabelLayout(
+      map: map,
+      design: design,
+      labelTextByStationId: const {'a': '동명', 'b': '동명'},
+      badgeLabelByLineId: const {},
+      measureLabel: _measureLabel,
+      measureBadge: _measureBadge,
+      basemap: true,
+      ownerLabelsByStationName: owner,
+      stationNameByStationId: names,
+    );
+
+    // 오너 라벨 1개 → a 매치, b 폴백은 억제 → "동명" 라벨 1개만.
+    final suppressed = run(owner: ownerLabels);
+    expect(
+      suppressed.labels.where((l) => l.text == '동명').length,
+      1,
+      reason: '같은 이름 오너 매치가 근접하므로 b 폴백 라벨은 억제돼야 한다',
+    );
+
+    // 대조군: 오너 라벨이 없으면 억제 조건(동명 오너 매치)이 없어 둘 다 폴백 →
+    // "동명" 라벨 2개(억제가 무조건이 아니라 오너 매치 존재에 조건적임을 검증).
+    final control = run(owner: const {});
+    expect(
+      control.labels.where((l) => l.text == '동명').length,
+      2,
+      reason: '오너 매치가 없으면 두 폴백 모두 표시된다(억제는 조건적)',
+    );
+  });
+
   test('기본 모드는 일반 역 노드 장애물을 시드하지 않는다 (basemap 전용 — baseline 불변)', () {
     // 겹치는 좌표 두 역: basemap이면 노드 rect가 서로를 밀어내지만, 기본 모드는
     // 노드 장애물이 없어 라벨이 상대 노드 좌표 근처에 놓일 수 있다. 두 모드의
@@ -777,16 +850,18 @@ void main() {
         stationNameByStationId: const {'near': '동명역전체', 'far': '동명역전체'},
       );
       final nearLabel = layout.labels.firstWhere((l) => l.id == 'near:L1');
-      final farLabel = layout.labels.firstWhere((l) => l.id == 'far:L2');
       // near만 오너 앵커(0,0)를 쓴다 — start anchor → rect.left == 0.
       expect(nearLabel.rect.left, 0);
-      // far는 폴백 검색 배치 — 자기 station(60,0) 근방, 오너 앵커(0,0)와 무관.
+      // #2068 부산 5차: far는 같은 이름("동명역전체")의 오너 매치(near)가 근접
+      // (거리 60 ≤ 위치 게이트 185)해 있으므로 중복 폴백 라벨이 억제된다 —
+      // 라벨이 생성되지 않는다. 이전엔 far가 폴백 미니로 그려졌으나 오너 QA에서
+      // 화면에 같은 이름이 2번 보이는 문제로 반려됐다(부전·벡스코 동해선 중복
+      // 노드). 억제는 시각 전용 — 히트/semantics는 route_map_positions 경로라 불변.
       expect(
-        (farLabel.rect.center - const Offset(0, 0)).distance,
-        greaterThan(30),
+        layout.labels.any((l) => l.id == 'far:L2'),
+        isFalse,
+        reason: '같은 이름 오너 매치가 근접하므로 far 폴백은 억제돼야 한다',
       );
-      // 두 라벨은 서로 겹치지 않아야 한다(동명이역 겹침 해소가 핵심 목적).
-      expect(nearLabel.rect.overlaps(farLabel.rect), isFalse);
     });
 
     test('동명이역(#2068 부산 좌천·동래): 같은 이름 라벨이 둘이면 각 역이 자기 최근접 라벨을 1:1로 갖는다', () {

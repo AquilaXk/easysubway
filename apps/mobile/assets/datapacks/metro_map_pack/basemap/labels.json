@@ -6774,7 +6774,7 @@
         "lines": []
       },
       {
-        "station": "경성대·부경대",
+        "station": "경성대.부경대",
         "role": "ordinary",
         "x": 5912.8,
         "y": 2638.825,
@@ -6884,7 +6884,7 @@
         "lines": []
       },
       {
-        "station": "국제금융센터·부산은행",
+        "station": "국제금융센터.부산은행",
         "role": "ordinary",
         "x": 5030,
         "y": 1875,
@@ -7403,7 +7403,7 @@
         "lines": []
       },
       {
-        "station": "벡스코(시립미술관)",
+        "station": "벡스코",
         "role": "transfer",
         "x": 7132.95,
         "y": 2023.01,
@@ -7428,6 +7428,15 @@
         "x": 746.72,
         "y": 810.125,
         "anchor": "middle",
+        "fontSizePx": 51.803,
+        "lines": []
+      },
+      {
+        "station": "부산",
+        "role": "ordinary",
+        "x": 4665.925,
+        "y": 2459.1,
+        "anchor": "end",
         "fontSizePx": 51.803,
         "lines": []
       },
@@ -7459,15 +7468,6 @@
             "y": 1243.2142
           }
         ]
-      },
-      {
-        "station": "부산역",
-        "role": "ordinary",
-        "x": 4665.925,
-        "y": 2459.1,
-        "anchor": "end",
-        "fontSizePx": 51.803,
-        "lines": []
       },
       {
         "station": "부산원동",
