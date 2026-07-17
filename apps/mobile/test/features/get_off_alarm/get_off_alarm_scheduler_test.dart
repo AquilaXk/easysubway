@@ -124,5 +124,46 @@ void main() {
 
       expect(alarms.single.fireAt, DateTime(2026, 7, 7, 0, 1, 0));
     });
+
+    test('모든 정차역이 미래면 slot은 입력 순서와 같다', () {
+      final now = DateTime(2026, 7, 6, 9, 0, 0);
+      final alarms = computeGetOffAlarms(
+        stops: [
+          stop(
+            'transfer',
+            DateTime(2026, 7, 6, 9, 15, 0),
+            kind: GetOffAlarmKind.transfer,
+          ),
+          stop('dest', DateTime(2026, 7, 6, 9, 30, 0)),
+        ],
+        policy: policy,
+        now: now,
+      );
+
+      expect(alarms.map((a) => a.slot), [0, 1]);
+    });
+
+    test('만료된 앞 정차역이 빠져도 남은 정차역 slot은 원본 위치로 고정된다', () {
+      // transfer fireAt=9:13, destination fireAt=9:28. now=9:20이면 transfer만
+      // 만료되어 결과에서 빠지지만, destination의 slot은 앞으로 당겨지지 않고
+      // 입력 위치(1)를 유지해야 재부팅 재예약 ID가 어긋나지 않는다.
+      final now = DateTime(2026, 7, 6, 9, 20, 0);
+      final alarms = computeGetOffAlarms(
+        stops: [
+          stop(
+            'transfer',
+            DateTime(2026, 7, 6, 9, 15, 0),
+            kind: GetOffAlarmKind.transfer,
+          ),
+          stop('dest', DateTime(2026, 7, 6, 9, 30, 0)),
+        ],
+        policy: policy,
+        now: now,
+      );
+
+      expect(alarms, hasLength(1));
+      expect(alarms.single.kind, GetOffAlarmKind.destination);
+      expect(alarms.single.slot, 1);
+    });
   });
 }

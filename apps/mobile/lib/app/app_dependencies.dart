@@ -9,10 +9,12 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../features/favorites/data/drift_favorite_repositories.dart';
 import '../features/fare/official_od_fare_repository.dart';
 import '../features/ads/ad_repository.dart';
+import '../features/get_off_alarm/data/get_off_alarm_recovery_notice_store.dart';
 import '../features/get_off_alarm/data/get_off_alarm_state_repository.dart';
 import '../features/get_off_alarm/exact_alarm_permission.dart';
 import '../features/get_off_alarm/get_off_alarm_controller.dart';
 import '../features/get_off_alarm/get_off_alarm_notifier.dart';
+import '../features/get_off_alarm/get_off_alarm_reconcile_worker.dart';
 import '../features/network_map/data/drift_network_map_viewport_repository.dart';
 import '../features/preferences/data/drift_notification_settings_repository.dart';
 import '../features/realtime/realtime_repository.dart';
@@ -414,6 +416,11 @@ GetOffAlarmController? _resolveGetOffAlarmController(
         notificationPermissionProvider ??
         MethodChannelNotificationPermissionProvider(),
     repository: DriftGetOffAlarmStateRepository(userDatabase: userDatabase),
+    recoveryNoticeStore: DriftGetOffAlarmRecoveryNoticeStore(
+      userDatabase: userDatabase,
+    ),
+    onActivateReconcileWork: registerGetOffAlarmReconcile,
+    onDeactivateReconcileWork: cancelGetOffAlarmReconcile,
   );
 }
 

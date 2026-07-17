@@ -159,12 +159,12 @@ class LocalGetOffAlarmNotifier implements GetOffAlarmNotifier {
     await cancelAll();
     final scheduleMode = androidScheduleModeFor(mode);
     var scheduledCount = 0;
-    final attemptCount = alarms.length < notificationCapacity
-        ? alarms.length
-        : notificationCapacity;
-    for (var index = 0; index < attemptCount; index++) {
-      final alarm = alarms[index];
-      final id = baseNotificationId + index;
+    for (final alarm in alarms) {
+      // slot이 전용 ID capacity를 벗어나면 예약하지 않고 실패로 센다.
+      if (alarm.slot < 0 || alarm.slot >= notificationCapacity) {
+        continue;
+      }
+      final id = baseNotificationId + alarm.slot;
       try {
         await _scheduleAlarm(
           id,
