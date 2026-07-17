@@ -17014,6 +17014,29 @@ test("Android 릴리즈 권한은 앱 기능에 필요한 항목만 선언한다
     "android.permission.VIBRATE",
     "android.permission.WAKE_LOCK",
   ]);
+  // #2154: 재부팅·package replace 뒤 예약을 앱 실행 없이 복원하려면 merged
+  // manifest가 공식 boot receiver를 exported=false로 등록하고 네 부팅 계열 action을
+  // 정확히 포함해야 한다. RECEIVE_BOOT_COMPLETED 권한은 위 permissions 목록에서 검증한다.
+  const mergedBootReceiver = androidManifest.match(
+    /<receiver[^>]*android:name="com\.dexterous\.flutterlocalnotifications\.ScheduledNotificationBootReceiver"[\s\S]*?<\/receiver>/,
+  );
+  assert.ok(
+    mergedBootReceiver,
+    "Merged manifest must register ScheduledNotificationBootReceiver for boot restore.",
+  );
+  assert.match(mergedBootReceiver[0], /android:exported="false"/);
+  for (const action of [
+    "android.intent.action.BOOT_COMPLETED",
+    "android.intent.action.MY_PACKAGE_REPLACED",
+    "android.intent.action.QUICKBOOT_POWERON",
+    "com.htc.intent.action.QUICKBOOT_POWERON",
+  ]) {
+    assert.match(
+      mergedBootReceiver[0],
+      new RegExp(`android:name="${action.replace(/\./g, "\\.")}"`),
+      `merged boot receiver must include intent action ${action}`,
+    );
+  }
   // regular periodic worker는 foreground promotion을 사용하지 않으므로 FGS 권한은
   // 제거한다. 향후 long-running worker 도입 시 별도 Play/permission 검토가 필요하다.
   assert.doesNotMatch(androidManifest, /android\.permission\.USE_EXACT_ALARM/);
@@ -17607,19 +17630,38 @@ test("get-off-alarm policy contract pins the no-location, degrade-ladder invaria
   assert.equal(policy.realtimeCorrection.correctionOverlayIssue, 1416);
 });
 
-test("하차 알림 Android source manifest는 boot receiver 없이 예약 receiver만 선언한다", () => {
+test("하차 알림 Android source manifest는 예약·부팅 복원 receiver를 exported=false로 선언한다", () => {
   const androidManifest = read("apps/mobile/android/app/src/main/AndroidManifest.xml");
 
   assert.match(
     androidManifest,
     /<receiver\s+android:name="com\.dexterous\.flutterlocalnotifications\.ScheduledNotificationReceiver"\s+android:exported="false"\s*\/>/,
   );
-  assert.doesNotMatch(androidManifest, /ScheduledNotificationBootReceiver/);
-  // BOOT permission은 #1768 WorkManager의 release merge가 소유하며,
-  // 하차 알림 source manifest가 직접 선언하지 않는다.
-  assert.doesNotMatch(
+  // #2154: 재부팅·package replace 뒤 예약 자동 복원용 공식 boot receiver를
+  // exported=false로 등록하고 네 부팅 계열 action을 명시 선언한다.
+  const bootReceiver = androidManifest.match(
+    /<receiver\s+android:name="com\.dexterous\.flutterlocalnotifications\.ScheduledNotificationBootReceiver"\s+android:exported="false"\s*>([\s\S]*?)<\/receiver>/,
+  );
+  assert.ok(
+    bootReceiver,
+    "ScheduledNotificationBootReceiver must be declared with android:exported=\"false\".",
+  );
+  for (const action of [
+    "android.intent.action.BOOT_COMPLETED",
+    "android.intent.action.MY_PACKAGE_REPLACED",
+    "android.intent.action.QUICKBOOT_POWERON",
+    "com.htc.intent.action.QUICKBOOT_POWERON",
+  ]) {
+    assert.match(
+      bootReceiver[1],
+      new RegExp(`<action\\s+android:name="${action.replace(/\./g, "\\.")}"\\s*/>`),
+      `boot receiver must include intent action ${action}`,
+    );
+  }
+  // #2154: 부팅 복원 권한을 source manifest가 직접 선언한다(WorkManager도 병합).
+  assert.match(
     androidManifest,
-    /android\.permission\.RECEIVE_BOOT_COMPLETED/,
+    /<uses-permission\s+android:name="android\.permission\.RECEIVE_BOOT_COMPLETED"\s*\/>/,
   );
 });
 

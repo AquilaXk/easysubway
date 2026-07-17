@@ -59,6 +59,7 @@ class ScheduledGetOffAlarm {
     required this.kind,
     required this.fireAt,
     required this.arrivalAt,
+    required this.slot,
   });
 
   final String stationId;
@@ -66,6 +67,12 @@ class ScheduledGetOffAlarm {
   final GetOffAlarmKind kind;
   final DateTime fireAt;
   final DateTime arrivalAt;
+
+  /// 결정적 알림 슬롯. 입력 [stops] 목록에서의 위치로 정해지며, 만료된 알림이
+  /// 목록에서 빠져도 값이 바뀌지 않는다. 알림 ID는 `baseNotificationId + slot`으로
+  /// 매핑되어, 재부팅 복원과 WorkManager 재조정이 어떤 순서로 실행되든 같은
+  /// 정차역이 같은 ID로 재예약(idempotent)되어 최종 중복이 생기지 않는다.
+  final int slot;
 }
 
 /// [now]를 기준으로 [policy]에 따라 [stops]에 예약할 알림들을 계산한다. 환승
@@ -78,7 +85,11 @@ List<ScheduledGetOffAlarm> computeGetOffAlarms({
   required DateTime now,
 }) {
   final alarms = <ScheduledGetOffAlarm>[];
-  for (final stop in stops) {
+  for (var index = 0; index < stops.length; index++) {
+    final stop = stops[index];
+    // slot은 필터링 전 원본 위치로 고정한다. 만료된 알림이 빠져 결과 목록이
+    // 짧아져도 남은 정차역의 slot(=알림 ID)은 그대로여서 재예약이 idempotent하다.
+    final slot = index;
     if (stop.kind == GetOffAlarmKind.transfer && !policy.transferAlarmEnabled) {
       continue;
     }
@@ -96,6 +107,7 @@ List<ScheduledGetOffAlarm> computeGetOffAlarms({
         kind: stop.kind,
         fireAt: fireAt,
         arrivalAt: stop.arrivalAt,
+        slot: slot,
       ),
     );
   }

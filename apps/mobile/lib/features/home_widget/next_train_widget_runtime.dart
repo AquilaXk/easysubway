@@ -14,6 +14,8 @@ import '../../core/database/catalog/catalog_database_opener.dart';
 import '../../core/database/user/user_database.dart';
 import '../../core/database/user/user_database_opener.dart';
 import '../../core/datapack/emergency_override_repository.dart';
+import '../../mobile_error_reporter.dart';
+import '../get_off_alarm/get_off_alarm_reconcile_worker.dart';
 import 'next_train_widget_configuration_screen.dart';
 import 'next_train_widget_repository.dart';
 import 'next_train_widget_service.dart';
@@ -167,19 +169,36 @@ Future<void> refreshInstalledNextTrainWidgets({
   }
 }
 
-Future<void> initializeNextTrainWidgetRefresh() async {
+/// process-wide WorkManager dispatcher를 초기화한다. app bootstrap에서 정확히
+/// 한 번만 호출한다(다음 열차 위젯·하차 알림 reconcile이 이 단일 dispatcher를
+/// 공유한다). 등록(register*)은 initialize와 분리해 개별적으로 수행한다.
+Future<void> initializeWorkManagerDispatcher() async {
   if (!Platform.isAndroid) {
     return;
   }
-  final workmanager = WorkmanagerAndroid();
-  await workmanager.initialize(nextTrainWidgetCallbackDispatcher);
-  await workmanager.registerPeriodicTask(
+  await WorkmanagerAndroid().initialize(nextTrainWidgetCallbackDispatcher);
+}
+
+/// 다음 열차 위젯 unique periodic work만 등록/update한다(initialize하지 않음).
+Future<void> registerNextTrainWidgetRefresh() async {
+  if (!Platform.isAndroid) {
+    return;
+  }
+  await WorkmanagerAndroid().registerPeriodicTask(
     nextTrainWidgetRefreshUniqueName,
     nextTrainWidgetRefreshTask,
     frequency: const Duration(minutes: 30),
     existingWorkPolicy: ExistingPeriodicWorkPolicy.update,
     constraints: Constraints(networkType: NetworkType.notRequired),
   );
+}
+
+/// 위젯 설정 activity(별도 engine)의 진입점 전용: 그 engine에는 dispatcher가
+/// 초기화돼 있지 않으므로 initialize와 register를 함께 수행한다. main bootstrap은
+/// 이 함수를 쓰지 않고 [initializeWorkManagerDispatcher]로 1회만 초기화한다.
+Future<void> initializeAndRegisterNextTrainWidgetRefresh() async {
+  await initializeWorkManagerDispatcher();
+  await registerNextTrainWidgetRefresh();
 }
 
 Future<void> cancelNextTrainWidgetRefresh() async {
@@ -245,8 +264,21 @@ void nextTrainWidgetCallbackDispatcher() {
 
 // ponytail: the federated public Android API keeps iOS SwiftPM-only; replace
 // this adapter when workmanager ships an official Android-only facade.
+//
+// 단일 process-wide dispatcher가 task 이름으로 각 handler에 라우팅한다. 알 수 없는
+// task는 성공으로 삼키지 않고 fail-closed(false)로 돌려준다(두 번째 dispatcher 금지).
 @visibleForTesting
 class NextTrainWidgetWorkmanagerApi extends WorkmanagerFlutterApi {
+  NextTrainWidgetWorkmanagerApi({
+    Future<bool> Function()? runWidgetRefresh,
+    Future<bool> Function()? runGetOffAlarmReconcile,
+  }) : _runWidgetRefresh = runWidgetRefresh ?? _defaultRunWidgetRefresh,
+       _runGetOffAlarmReconcile =
+           runGetOffAlarmReconcile ?? _defaultRunGetOffAlarmReconcile;
+
+  final Future<bool> Function() _runWidgetRefresh;
+  final Future<bool> Function() _runGetOffAlarmReconcile;
+
   @override
   Future<void> backgroundChannelInitialized() async {}
 
@@ -255,9 +287,17 @@ class NextTrainWidgetWorkmanagerApi extends WorkmanagerFlutterApi {
     String task,
     Map<String?, Object?>? inputData,
   ) async {
-    if (task != nextTrainWidgetRefreshTask) {
-      return true;
+    switch (task) {
+      case nextTrainWidgetRefreshTask:
+        return _runWidgetRefresh();
+      case getOffAlarmReconcileTask:
+        return _runGetOffAlarmReconcile();
+      default:
+        return false;
     }
+  }
+
+  static Future<bool> _defaultRunWidgetRefresh() async {
     WidgetsFlutterBinding.ensureInitialized();
     DartPluginRegistrant.ensureInitialized();
     final databases = await _openWidgetDatabases();
@@ -272,6 +312,18 @@ class NextTrainWidgetWorkmanagerApi extends WorkmanagerFlutterApi {
       await databases.close();
     }
     return true;
+  }
+
+  static Future<bool> _defaultRunGetOffAlarmReconcile() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    DartPluginRegistrant.ensureInitialized();
+    return runGetOffAlarmReconcileTask(
+      reportError: (error, stackTrace) => reportMobileError(
+        error,
+        stackTrace,
+        context: '하차 알림 headless reconcile 중 예외가 발생했습니다.',
+      ),
+    );
   }
 }
 
@@ -309,7 +361,7 @@ Future<void> configureMain() async {
                       now: DateTime.now(),
                     ),
               ),
-              registerRefresh: initializeNextTrainWidgetRefresh,
+              registerRefresh: initializeAndRegisterNextTrainWidgetRefresh,
               finish: HomeWidget.finishHomeWidgetConfigure,
               cancelRefresh: () async {
                 final installedWidgetIds = await installedNextTrainWidgetIds();

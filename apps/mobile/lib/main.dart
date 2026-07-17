@@ -42,6 +42,9 @@ Future<void> main() async {
         ? DemoSearchHistoryRepository()
         : null,
   );
+  // process-wide WorkManager dispatcher를 app bootstrap에서 정확히 1회 초기화한다.
+  // 이후 하차 알림 복원과 위젯 startup은 각자 등록만 수행한다(재초기화 금지).
+  await next_train_widget_runtime.initializeWorkManagerDispatcher();
   await restoreGetOffAlarmState(bootstrap.dependencies.getOffAlarmController);
   final nextTrainWidgetRepository = NextTrainWidgetRepository(
     catalogDatabase: bootstrap.catalogDatabase,
@@ -49,7 +52,7 @@ Future<void> main() async {
   );
   await next_train_widget_runtime.runNextTrainWidgetStartup(
     installedWidgetIds: next_train_widget_runtime.installedNextTrainWidgetIds,
-    registerRefresh: next_train_widget_runtime.initializeNextTrainWidgetRefresh,
+    registerRefresh: next_train_widget_runtime.registerNextTrainWidgetRefresh,
     cancelRefresh: next_train_widget_runtime.cancelNextTrainWidgetRefresh,
     refresh: (widgetIds) => next_train_widget_runtime.refreshNextTrainWidgets(
       nextTrainWidgetRepository,
