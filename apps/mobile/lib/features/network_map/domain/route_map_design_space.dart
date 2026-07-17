@@ -34,6 +34,10 @@ const double kRouteMapBasemapLabelGapPx = 6.0;
 /// 더해 13.0으로 상향한다 — 11.0에서는 실기기 확인 결과 약수·옥수·청구 라벨이
 /// 캡슐 끝에 닿아 보였다(여유 ~1.6px 불충분). (부산·대구는 designScale이 작아
 /// 실측 반폭이 더 작다 — 과대 시 라벨이 조금 더 밀릴 뿐 겹침 방향으로는 안전).
+/// #2068 수도권 노드 간격 최소 기준 패스(2026-07-18) 후 재실측: 중앙값 간격이
+/// 48px로 정규화되며 designScale=1.340070912085764로 소폭 하향(≈-2.4%) — 위
+/// 12.5 design px 추정도 12.2로 낮아지지만 13.0 여유폭 안에 그대로 들어와
+/// 상수 조정은 불필요하다(아래 파생값들도 동일 논리로 안전).
 const double kRouteMapBasemapTransferCapsuleHalfWidthPx = 13.0;
 
 /// basemap 캡슐 장축(멤버 수) 반폭 기여분(design px) — SVG data-slot-size=3u=

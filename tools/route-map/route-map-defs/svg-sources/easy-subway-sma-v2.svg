@@ -32614,7 +32614,7 @@
           <text
              id="station-label-신풍"
              data-name="신풍"
-             transform="translate(1748 2307.4)"
+             transform="translate(1755.7269,2270.0664)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -32705,7 +32705,7 @@
           <text
              id="station-label-보라매병원"
              data-name="보라매병원"
-             transform="translate(-36.0947,-37.9958) translate(1841.2 2416.7) rotate(0) scale(1)"
+             transform="translate(1805.1053,2378.7042) rotate(0) scale(1)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -34119,7 +34119,7 @@
           <text
              id="station-label-서초"
              data-name="서초"
-             transform="translate(18.4945,0.0000) translate(2607 2509.3) rotate(0)"
+             transform="translate(2569.0066,2520.9970) rotate(0)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -35150,7 +35150,7 @@
           <text
              id="station-label-구파발"
              data-name="구파발"
-             transform="translate(1621.0725,924.7000)"
+             transform="translate(1620.7320,963.8587)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -35857,7 +35857,7 @@
           <text
              id="station-label-동인천"
              data-name="동인천"
-             transform="translate(727.2000,2853.9835)"
+             transform="translate(775.1729,2894.7974)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -35874,7 +35874,7 @@
           <text
              id="station-label-부개"
              data-name="부개"
-             transform="translate(764.2165,2180.0000)"
+             transform="translate(737.2124,2206.0374)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -35979,7 +35979,7 @@
           <text
              id="station-label-천왕"
              data-name="천왕"
-             transform="translate(1203.0097,2260.6042)"
+             transform="translate(1203.1603,2282.3846)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -36232,7 +36232,7 @@
           <text
              id="station-label-신정"
              data-name="신정"
-             transform="translate(1350.6112,1772.9134)"
+             transform="translate(1330.7739,1836.7637)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -36352,7 +36352,7 @@
           <text
              id="station-label-송정"
              data-name="송정"
-             transform="translate(990.0165,1405.7165)"
+             transform="translate(954.0256,1340.0835)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -36447,10 +36447,10 @@
              data-station="신방화"
              data-label-role="ordinary"
              font-weight="400"
-             x="1234.64"
-             y="1395.778"><tspan
-               x="1234.64"
-               y="1395.778"
+             x="1186.7123"
+             y="1323.1318"><tspan
+               x="1186.7123"
+               y="1323.1318"
                font-family="Pretendard"
                id="tspan456">신방화</tspan></text>
           <text
@@ -36653,7 +36653,7 @@
              data-label-role="ordinary"
              font-weight="400"
              x="964.04248"
-             y="2380.4839" transform="translate(22.7343,77.8640)"><tspan
+             y="2380.4839" transform="translate(4.0359,6.4373)"><tspan
                x="964.04248"
                y="2380.4839"
                font-family="Pretendard"
@@ -36852,7 +36852,7 @@
           <text
              id="station-label-신연수"
              data-name="신연수"
-             transform="translate(967.6000,2965.7780)"
+             transform="translate(968.0849,2906.6048)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -37089,7 +37089,7 @@
           <text
              id="station-label-부평시장"
              data-name="부평시장"
-             transform="translate(850.1 2129.7)"
+             transform="translate(896.3590,2140.7121)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -37106,7 +37106,7 @@
           <text
              id="station-label-작전"
              data-name="작전"
-             transform="translate(850.0000,2010.9725)"
+             transform="translate(853.7262,1972.5626)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -37178,7 +37178,7 @@
           <text
              id="station-label-공항화물청사"
              data-name="공항화물청사"
-             transform="translate(507.9000,2630.6890)"
+             transform="translate(507.2726,2593.5450)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -37785,7 +37785,7 @@
           <text
              id="station-label-명학"
              data-name="명학"
-             transform="translate(1696.8 2713.2)"
+             transform="translate(1677.5518,2693.2307)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -37887,7 +37887,7 @@
           <text
              id="station-label-독산"
              data-name="독산"
-             transform="translate(1492.8123,2353.5112)"
+             transform="translate(1523.7251,2385.5340)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -38249,7 +38249,7 @@
           <text
              id="station-label-병점"
              data-name="병점"
-             transform="translate(-172.7516,0.0000) translate(2567.2 3351.3) rotate(.7) scale(1) skewX(0)"
+             transform="translate(2396.5489,3351.6122) rotate(.7) scale(1) skewX(0)"
              fill="#111"
              font-family="Pretendard"
              font-size="26.374"
@@ -38368,7 +38368,7 @@
           <text
              id="station-label-청명"
              data-name="청명"
-             transform="translate(2632.9848,2931.0163)"
+             transform="translate(2667.2509,2842.5421)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -38385,7 +38385,7 @@
           <text
              id="station-label-상갈"
              data-name="상갈"
-             transform="translate(2739.9804,2931.0163)"
+             transform="translate(2730.9922,2937.5102)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -38471,7 +38471,7 @@
           <text
              id="station-label-오리"
              data-name="오리"
-             transform="translate(3070.1890,3003.1000)"
+             transform="translate(3051.1576,2993.7700)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -40423,7 +40423,7 @@
              data-label-role="ordinary"
              font-weight="400"
              x="3763.4341"
-             y="2719.5825" transform="translate(-50.1899,-52.3481)"><tspan
+             y="2719.5825" transform="translate(-45.5843,-32.5712)"><tspan
                x="3763.4341"
                y="2719.5825"
                font-family="Pretendard"
@@ -41227,7 +41227,7 @@
           <text
              id="station-label-평내호평"
              data-name="평내호평"
-             transform="translate(4369.0866,1463.5629)"
+             transform="translate(4376.0755,1468.8297)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -41560,7 +41560,7 @@
           <text
              id="station-label-의정부"
              data-name="의정부"
-             transform="translate(3254.8330,763.0000)"
+             transform="translate(3328.0700,804.0285)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -41645,7 +41645,7 @@
           <text
              id="station-label-가능"
              data-name="가능"
-             transform="translate(3158.6385,763.0000)"
+             transform="translate(3192.8227,769.2450)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -41858,7 +41858,7 @@
           <text
              id="station-label-동오"
              data-name="동오"
-             transform="translate(-79.4725,0.0000) translate(2623.4 627.4) rotate(-.1)"
+             transform="translate(2543.9275,627.4000) rotate(-.1)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -41875,7 +41875,7 @@
           <text
              id="station-label-새말"
              data-name="새말"
-             transform="translate(-94.9670,0.0000) translate(2533.4 627.4) rotate(-.1)"
+             transform="translate(2438.4330,627.4000) rotate(-.1)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -41892,7 +41892,7 @@
           <text
              id="station-label-경기도청북부청사"
              data-name="경기도청북부청사"
-             transform="translate(-110.4615,0.0000) translate(2420.7 598.6) rotate(-.1)"
+             transform="translate(2310.2385,598.6000) rotate(-.1)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -41913,7 +41913,7 @@
           <text
              id="station-label-효자"
              data-name="효자"
-             transform="translate(-125.9560,0.0000) translate(2350.6 627.4) rotate(-.1)"
+             transform="translate(2224.6440,627.4000) rotate(-.1)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -41930,7 +41930,7 @@
           <text
              id="station-label-곤제"
              data-name="곤제"
-             transform="translate(-141.4505,0.0000) translate(2259.3 627.4) rotate(-.1)"
+             transform="translate(2117.8495,627.4000) rotate(-.1)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -41947,7 +41947,7 @@
           <text
              id="station-label-어룡"
              data-name="어룡"
-             transform="translate(-156.9451,0.0000) translate(2171.1 627.4) rotate(-.1)"
+             transform="translate(2014.1549,627.4000) rotate(-.1)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -41964,7 +41964,7 @@
           <text
              id="station-label-송산"
              data-name="송산"
-             transform="translate(-172.4396,0.0000) translate(2081.4 627.4) rotate(-.1)"
+             transform="translate(1908.9604,627.4000) rotate(-.1)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -42040,7 +42040,7 @@
           <text
              id="station-label-흥선"
              data-name="흥선"
-             transform="translate(-48.4835,0.0000) translate(2801.8 627.4) rotate(-1) scale(1)"
+             transform="translate(2753.3165,627.4000) rotate(-1) scale(1)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -42433,7 +42433,7 @@
              data-name="신포"
              isolation="isolate">
             <text
-               transform="translate(727.2 2875.2)"
+               transform="translate(728.7084,2889.6681)"
                fill="#666"
                font-family="Pretendard"
                font-size="26.374"
@@ -42746,7 +42746,7 @@
              id="station-label-group-완정"
              data-name="완정">
             <text
-               transform="translate(782.9848,1300.5958)"
+               transform="translate(781.4738,1292.9868)"
                fill="#666"
                font-family="Pretendard"
                font-size="26.374"
@@ -42765,7 +42765,7 @@
              id="station-label-group-독정"
              data-name="독정">
             <text
-               transform="translate(782.9848,1405.4903)"
+               transform="translate(734.0050,1432.1922)"
                fill="#666"
                font-family="Pretendard"
                font-size="26.374"
@@ -42864,7 +42864,7 @@
              id="station-label-group-가정중앙시장"
              data-name="가정중앙시장">
             <text
-               transform="translate(705.4000,1873.8780)"
+               transform="translate(715.7284,1840.8263)"
                fill="#666"
                font-family="Pretendard"
                font-size="26.374"
@@ -43016,7 +43016,7 @@
           <text
              id="station-label-솔밭공원"
              data-name="솔밭공원"
-             transform="translate(3013.9 875.6)"
+             transform="translate(2998.3291,813.7606)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -43160,7 +43160,7 @@
           <text
              id="station-label-정릉"
              data-name="정릉"
-             transform="translate(2343.6330,1150.4912)"
+             transform="translate(2388.8179,1139.8670)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
