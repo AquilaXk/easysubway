@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { promisify } from "node:util";
 import test from "node:test";
 
 const workflowPath = ".github/workflows/production-route-v2-capacity-evidence.yml";
 const runnerPath = "tools/ops/verify-production-route-v2-capacity.sh";
+const execFileAsync = promisify(execFile);
 
 test("Route V2 capacity evidence는 main-only production approval을 강제한다", async () => {
   const workflow = await readFile(workflowPath, "utf8");
@@ -28,6 +33,10 @@ test("Route V2 capacity evidence는 main-only production approval을 강제한�
 
 test("capacity runner는 동일 candidate·격리 load·privacy·closed ingress를 검증한다", async () => {
   const runner = await readFile(runnerPath, "utf8");
+  const capacityDecoder = await readFile(
+    "backend/src/main/java/com/easysubway/route/adapter/out/integrity/CapacityEvidencePlayIntegrityDecoder.java",
+    "utf8",
+  );
 
   assert.match(runner, /^set -euo pipefail$/m);
   assert.match(runner, /^umask 077$/m);
@@ -67,7 +76,11 @@ test("capacity runner는 동일 candidate·격리 load·privacy·closed ingress�
   assert.match(runner, /sensitive_payload_count=0/);
   assert.match(runner, /ingress_closed=true/);
   assert.match(runner, /trap cleanup_on_exit EXIT/);
-  assert.match(runner, /departure_time="\$\(node[\s\S]*?snapshot_fresh_until/);
+  assert.match(runner, /generate_series/);
+  assert.match(runner, /service_calendars/);
+  assert.match(runner, /service_calendar_dates/);
+  assert.match(runner, /trips\.service_class = 'ITX_CHEONGCHUN'/);
+  assert.match(runner, /fresh_until::timestamptz/);
   assert.doesNotMatch(runner, /2026-07-17T15:00:00\+09:00/);
   assert.match(runner, /burst_pids/);
   assert.match(runner, /wait "\$\{burst_pid\}"/);
@@ -102,7 +115,27 @@ test("capacity runner는 동일 candidate·격리 load·privacy·closed ingress�
   assert.match(runner, /sampledAtMs >= loadStartedMs && sampledAtMs <= loadFinishedMs/);
   assert.match(runner, /load interval has no resource sample/);
   assert.match(runner, /normal search response has no itinerary/);
+  assert.match(runner, /normal search response has no ITX-청춘 ride/);
   assert.match(runner, /normal search response planner identity mismatch/);
+  for (const field of [
+    "timetableSnapshotSha256",
+    "canonicalPackSha256",
+    "canonicalPackSqliteSha256",
+    "canonicalStationVersion",
+    "canonicalStationSetSha256",
+    "sourceLineageSha256",
+    "evidenceHash",
+  ]) {
+    assert.match(runner, new RegExp(`identity\\?\\.${field} !== expected\\.${field}`));
+  }
+  assert.match(runner, /SPRING_PROFILES_ACTIVE=prod,capacity-evidence/);
+  assert.match(runner, /EASYSUBWAY_ROUTE_V2_CAPACITY_EVIDENCE_ATTESTATION_KEY/);
+  assert.match(runner, /normal session profile did not return exact 200/);
+  assert.match(runner, /normal session response is invalid/);
+  assert.doesNotMatch(runner, /case "\$\{last_status\}" in\s+403\|503/);
+  assert.match(capacityDecoder, /@Profile\("capacity-evidence"\)/);
+  assert.match(capacityDecoder, /MessageDigest\.isEqual/);
+  assert.match(capacityDecoder, /MEETS_DEVICE_INTEGRITY/);
   assert.match(runner, /timetable snapshot identity is invalid/);
   assert.match(runner, /normal_state_count_before/);
   assert.match(runner, /normal_state_count_after/);
@@ -123,4 +156,22 @@ test("capacity runner는 동일 candidate·격리 load·privacy·closed ingress�
   assert.match(runner, /profile=normal: PASS, session_requests=\$\{session_rate\}, search_requests=\$\{search_rate\}/);
   assert.doesNotMatch(runner, /upload-artifact|set -x/);
   assert.doesNotMatch(runner, /gh secret set|EASYSUBWAY_ROUTE_V2_INGRESS_ENABLED=true/);
+});
+
+test("capacity runner dotenv parser는 배포 parser와 동일하게 외부 따옴표를 제거한다", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "route-capacity-env-"));
+  const envPath = path.join(tempDir, "compose.env");
+  try {
+    await writeFile(envPath, [
+      'EASYSUBWAY_ROUTE_V2_INGRESS_ENABLED="false"',
+      "EASYSUBWAY_ROUTE_V2_SESSION_RATE_PER_MINUTE='5'",
+      "",
+    ].join("\n"));
+    const ingress = await execFileAsync("bash", [runnerPath, "--test-read-env-value", envPath, "EASYSUBWAY_ROUTE_V2_INGRESS_ENABLED"]);
+    const rate = await execFileAsync("bash", [runnerPath, "--test-read-env-value", envPath, "EASYSUBWAY_ROUTE_V2_SESSION_RATE_PER_MINUTE"]);
+    assert.equal(ingress.stdout, "false\n");
+    assert.equal(rate.stdout, "5\n");
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
 });

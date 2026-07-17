@@ -4,8 +4,31 @@ set -euo pipefail
 umask 077
 
 DEPLOY_ROOT="${DEPLOY_ROOT:-/opt/easysubway}"
-EXPECTED_DEPLOYED_SHA="${EXPECTED_DEPLOYED_SHA:?EXPECTED_DEPLOYED_SHA is required}"
+EXPECTED_DEPLOYED_SHA="${EXPECTED_DEPLOYED_SHA:-}"
 PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://easysubway-api.aquilaxk.site}"
+
+read_env_value() {
+	local file="${1:?file is required}"
+	local name="${2:?name is required}"
+	local line
+	while IFS= read -r line || [[ -n "${line}" ]]; do
+		[[ "${line}" == "${name}="* ]] || continue
+		local value="${line#*=}"
+		if [[ "${value}" == \"*\" && "${value}" == *\" ]] || [[ "${value}" == \'*\' && "${value}" == *\' ]]; then
+			value="${value:1:${#value}-2}"
+		fi
+		printf '%s\n' "${value}"
+		return 0
+	done < "${file}"
+	return 1
+}
+
+if [[ "${1:-}" == --test-read-env-value ]]; then
+	[[ $# -eq 3 && -f "${2}" && "${3}" =~ ^[A-Z0-9_]+$ ]] || exit 2
+	read_env_value "${2}" "${3}"
+	exit
+fi
+
 [[ "${EXPECTED_DEPLOYED_SHA}" =~ ^[0-9a-f]{40}$ ]] || { echo 'expected deployed SHA is invalid' >&2; exit 2; }
 [[ "${PUBLIC_BASE_URL}" == https://easysubway-api.aquilaxk.site ]] \
 	|| { echo 'public base URL must be the approved production origin' >&2; exit 2; }
@@ -19,18 +42,6 @@ compose_env="${DEPLOY_ROOT}/shared/current-env/compose.env"
 [[ "${current_sha}" == "${EXPECTED_DEPLOYED_SHA}" ]] || { echo 'deployed SHA does not match requested evidence SHA' >&2; exit 1; }
 [[ "${current_digest}" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo 'deployed image digest marker is invalid' >&2; exit 1; }
 [[ -f "${compose_env}" ]] || { echo 'current compose environment is missing' >&2; exit 1; }
-
-read_env_value() {
-	local file="${1:?file is required}"
-	local name="${2:?name is required}"
-	local line
-	while IFS= read -r line || [[ -n "${line}" ]]; do
-		[[ "${line}" == "${name}="* ]] || continue
-		printf '%s\n' "${line#*=}"
-		return 0
-	done < "${file}"
-	return 1
-}
 
 require_bounded_limit() {
 	local name="${1:?name is required}"
@@ -84,6 +95,8 @@ postgres_env_file="${work_dir}/postgres.env"
 backend_env_file="${work_dir}/backend.env"
 gateway_env_file="${work_dir}/gateway.env"
 tokens_file="${work_dir}/tokens.tsv"
+issued_tokens_file="${work_dir}/issued-tokens.tsv"
+planner_identity_file="${work_dir}/planner-identity.json"
 metrics_file="${work_dir}/metrics.tsv"
 logs_file="${work_dir}/service.log"
 resource_metrics_file="${work_dir}/resource.tsv"
@@ -167,7 +180,7 @@ synthetic_certificate_digest="${synthetic_secrets[2]}"
 	printf 'POSTGRES_PASSWORD=%s\n' "${clone_db_password}"
 } > "${postgres_env_file}"
 {
-	printf 'SPRING_PROFILES_ACTIVE=prod\n'
+	printf 'SPRING_PROFILES_ACTIVE=prod,capacity-evidence\n'
 	printf 'EASYSUBWAY_DATASOURCE_URL=jdbc:postgresql://postgres:5432/%s\n' "${postgres_db}"
 	printf 'EASYSUBWAY_DATASOURCE_USERNAME=%s\n' "${postgres_user}"
 	printf 'EASYSUBWAY_DATASOURCE_PASSWORD=%s\n' "${clone_db_password}"
@@ -189,6 +202,7 @@ synthetic_certificate_digest="${synthetic_secrets[2]}"
 	printf 'EASYSUBWAY_ROUTE_V2_ORIGIN_SECRET=%s\n' "${synthetic_secret}"
 	printf 'EASYSUBWAY_ROUTE_V2_SESSION_MAX_REQUESTS=50\n'
 	printf 'EASYSUBWAY_ROUTE_V2_PLAY_INTEGRITY_CERTIFICATE_SHA256=%s\n' "${synthetic_certificate_digest}"
+	printf 'EASYSUBWAY_ROUTE_V2_CAPACITY_EVIDENCE_ATTESTATION_KEY=%s\n' "${synthetic_secret}"
 	printf 'EASYSUBWAY_PLAY_INTEGRITY_CREDENTIALS_BASE64=e30=\n'
 	printf 'EASYSUBWAY_PUSH_EXTERNAL_ENABLED=false\n'
 	printf 'EASYSUBWAY_PUSH_DELIVERY_ENABLED=false\n'
@@ -280,13 +294,68 @@ IFS='|' read -r snapshot_id snapshot_sha256 snapshot_fresh_until <<< "${active_t
 [[ "${snapshot_id}" =~ ^[A-Za-z0-9._-]+$ && "${snapshot_sha256}" =~ ^[0-9a-f]{64}$ \
 	&& "${snapshot_fresh_until}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] \
 	|| { echo 'timetable snapshot identity is invalid' >&2; exit 1; }
-departure_time="$(node -e '
-const now = Date.now();
-const freshUntil = Date.parse(process.argv[1]);
-const departure = Math.min(now + 5 * 60_000, freshUntil - 5 * 60_000);
-if (!Number.isFinite(freshUntil) || departure <= now) process.exit(1);
-process.stdout.write(new Date(departure + 9 * 60 * 60_000).toISOString().replace(/\.\d{3}Z$/, "+09:00"));
-' "${snapshot_fresh_until}")" || { echo 'fresh timetable window is too short for capacity evidence' >&2; exit 1; }
+node -e '
+const evidence = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
+require("node:fs").writeFileSync(process.argv[2], JSON.stringify({
+  timetableSnapshotSha256: evidence.snapshotSha256,
+  canonicalPackSha256: evidence.canonicalPackIdentity.sha256,
+  canonicalPackSqliteSha256: evidence.canonicalPackIdentity.sqliteSha256,
+  canonicalStationVersion: evidence.canonicalStationSet.version,
+  canonicalStationSetSha256: evidence.canonicalStationSet.sha256,
+  sourceLineageSha256: evidence.sourceLineageSha256,
+  evidenceHash: evidence.evidenceHash,
+}));
+' backend/src/main/resources/timetable/server-timetable-snapshot-evidence.json "${planner_identity_file}"
+itx_load_target="$(clone_psql "
+WITH snapshot AS (
+  SELECT history.fresh_until::timestamptz AS fresh_until
+  FROM timetable_snapshot_active active
+  JOIN timetable_snapshot_history history ON history.snapshot_sha256 = active.snapshot_sha256
+  WHERE active.singleton_id = 1
+), dates AS (
+  SELECT day::date AS service_date, snapshot.fresh_until
+  FROM snapshot
+  CROSS JOIN LATERAL generate_series(
+    (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date,
+    (snapshot.fresh_until AT TIME ZONE 'Asia/Seoul')::date,
+    INTERVAL '1 day'
+  ) day
+), active_services AS (
+  SELECT dates.service_date, dates.fresh_until, calendars.service_id
+  FROM dates
+  JOIN service_calendars calendars
+    ON dates.service_date BETWEEN TO_DATE(calendars.start_date, 'YYYYMMDD') AND TO_DATE(calendars.end_date, 'YYYYMMDD')
+  LEFT JOIN service_calendar_dates exceptions
+    ON exceptions.service_id = calendars.service_id
+   AND exceptions.date = TO_CHAR(dates.service_date, 'YYYYMMDD')
+  WHERE (CASE EXTRACT(ISODOW FROM dates.service_date)
+      WHEN 1 THEN calendars.monday WHEN 2 THEN calendars.tuesday WHEN 3 THEN calendars.wednesday
+      WHEN 4 THEN calendars.thursday WHEN 5 THEN calendars.friday WHEN 6 THEN calendars.saturday
+      WHEN 7 THEN calendars.sunday END
+    AND COALESCE(exceptions.exception_type, 0) <> 2)
+    OR exceptions.exception_type = 1
+), candidates AS (
+  SELECT origin.station_id AS origin_station_id, destination.station_id AS destination_station_id,
+    ((active.service_date::timestamp + MAKE_INTERVAL(secs => origin.departure_seconds)) AT TIME ZONE 'Asia/Seoul') AS train_departure,
+    ((active.service_date::timestamp + MAKE_INTERVAL(secs => destination.arrival_seconds)) AT TIME ZONE 'Asia/Seoul') AS train_arrival,
+    active.fresh_until, destination.stop_sequence - origin.stop_sequence AS stop_span
+  FROM active_services active
+  JOIN transit_trips trips ON trips.service_id = active.service_id AND trips.service_class = 'ITX_CHEONGCHUN'
+  JOIN transit_stop_times origin ON origin.trip_id = trips.id AND origin.pickup_type = 0
+  JOIN transit_stop_times destination ON destination.trip_id = trips.id
+    AND destination.stop_sequence > origin.stop_sequence AND destination.drop_off_type = 0
+)
+SELECT origin_station_id || '|' || destination_station_id || '|' ||
+  TO_CHAR((train_departure - INTERVAL '15 minutes') AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+09:00\"')
+FROM candidates
+WHERE train_departure - INTERVAL '15 minutes' > CURRENT_TIMESTAMP + INTERVAL '1 minute'
+  AND train_arrival < fresh_until
+ORDER BY train_departure, stop_span DESC
+LIMIT 1;")"
+IFS='|' read -r origin_station_id destination_station_id departure_time <<< "${itx_load_target}"
+[[ "${origin_station_id}" =~ ^station-[A-Za-z0-9_-]+$ && "${destination_station_id}" =~ ^station-[A-Za-z0-9_-]+$ \
+	&& "${departure_time}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\+09:00$ ]] \
+	|| { echo 'no fresh active ITX-청춘 load target is available' >&2; exit 1; }
 
 docker run -d --name "${clone_backend}" --network "${network}" --network-alias backend \
 	--env-file "${backend_env_file}" \
@@ -337,6 +406,7 @@ const rows = Array.from({ length: 20 }, () => {
 });
 writeFileSync(process.argv[1], `${rows.join("\n")}\n`, { mode: 0o600 });
 ' "${tokens_file}"
+: > "${issued_tokens_file}"
 
 session_values=""
 while IFS=$'\t' read -r _ hash; do
@@ -348,16 +418,18 @@ clone_psql "INSERT INTO route_v2_sessions (token_sha256, scope, issued_at, expir
 
 request_body="$(node -e '
 process.stdout.write(JSON.stringify({
-  originStationId: "station-sangnoksu",
-  destinationStationId: "station-sadang",
-  departureTime: process.argv[1],
+  originStationId: process.argv[1],
+  destinationStationId: process.argv[2],
+  departureTime: process.argv[3],
+  transportScope: "SUBWAY_AND_ITX_CHEONGCHUN",
+  objective: "FASTEST",
   mobilityType: "SENIOR",
   constraintMode: "ALLOW_WITH_WARNINGS",
   useRealtime: false,
-  maxTransfers: 3,
+  maxTransfers: 0,
   alternativeCount: 1,
 }));
-' "${departure_time}")"
+' "${origin_station_id}" "${destination_station_id}" "${departure_time}")"
 request_index=0
 last_status=""
 last_headers=""
@@ -369,12 +441,18 @@ send_session() {
 	request_index=$((request_index + 1))
 	last_headers="${work_dir}/headers-${request_index}.txt"
 	last_body="${work_dir}/body-${request_index}.json"
-	local result time_seconds latency_ms
+	local result time_seconds latency_ms session_request
+	session_request="$(node -e '
+const { createHmac, randomBytes } = require("node:crypto");
+const nonce = randomBytes(16).toString("base64url");
+const signature = createHmac("sha256", Buffer.from(process.argv[1], "hex")).update(nonce).digest("base64url");
+process.stdout.write(JSON.stringify({ integrityToken: `${nonce}.${signature}`, clientNonce: nonce }));
+' "${synthetic_secret}")"
 	result="$(curl -sS --noproxy '*' --connect-timeout 2 --max-time 10 \
 		-D "${last_headers}" -o "${last_body}" -w '%{http_code} %{time_total}' \
 		--request POST --header 'content-type: application/json' \
 		--header "CF-Connecting-IP: ${client_ip}" \
-		--data-binary '{"integrityToken":"invalid","clientNonce":"AAAAAAAAAAAAAAAAAAAAAA"}' \
+		--data-binary "${session_request}" \
 		"${gateway_base}/api/v2/routes/session")"
 	last_status="${result%% *}"
 	time_seconds="${result#* }"
@@ -382,6 +460,21 @@ send_session() {
 	printf '%s\t%s\t%s\n' "${profile}" "${last_status}" "${latency_ms}" >> "${metrics_file}"
 	grep -Eqi '^Cache-Control:[[:space:]]*private,[[:space:]]*no-store[[:space:]]*\r?$' "${last_headers}" \
 		|| { echo 'Route V2 session response is missing Cache-Control: private, no-store' >&2; exit 1; }
+}
+
+capture_issued_session() {
+	node -e '
+const { appendFileSync, readFileSync } = require("node:fs");
+const { createHash } = require("node:crypto");
+const value = JSON.parse(readFileSync(process.argv[1], "utf8"));
+if (!/^[A-Za-z0-9_-]{43}$/.test(value?.token ?? "") || value.scope !== "route:v2:itx"
+    || !Number.isFinite(Date.parse(value.issuedAt)) || !Number.isFinite(Date.parse(value.expiresAt))
+    || Date.parse(value.expiresAt) <= Date.parse(value.issuedAt)) process.exit(1);
+const row = `${value.token}\t${createHash("sha256").update(value.token).digest("hex")}\n`;
+appendFileSync(process.argv[2], row);
+appendFileSync(process.argv[3], row);
+' "${last_body}" "${issued_tokens_file}" "${tokens_file}" \
+		|| { echo 'normal session response is invalid' >&2; exit 1; }
 }
 
 send_search() {
@@ -418,18 +511,20 @@ if (!value?.success || !Array.isArray(itineraries) || itineraries.length === 0
       || !itinerary.legs.some((leg) => leg.legType === "RIDE"))) {
   process.exit(10);
 }
+if (itineraries.some((itinerary) => !itinerary.legs.some((leg) =>
+  leg.legType === "RIDE" && leg.serviceClass === "ITX_CHEONGCHUN"))) process.exit(12);
 const identity = data.plannerIdentity;
-const sha256 = (candidate) => typeof candidate === "string" && /^[0-9a-f]{64}$/.test(candidate);
-if (identity?.timetableSnapshotSha256 !== process.argv[2]
-    || !sha256(identity.canonicalPackSha256)
-    || !sha256(identity.canonicalPackSqliteSha256)
-    || !/^sha256:[0-9a-f]{64}$/.test(identity.canonicalStationVersion ?? "")
-    || !sha256(identity.canonicalStationSetSha256)
-    || !sha256(identity.sourceLineageSha256)
-    || !sha256(identity.evidenceHash)) {
+const expected = JSON.parse(require("node:fs").readFileSync(process.argv[2], "utf8"));
+if (identity?.timetableSnapshotSha256 !== expected.timetableSnapshotSha256
+    || identity?.canonicalPackSha256 !== expected.canonicalPackSha256
+    || identity?.canonicalPackSqliteSha256 !== expected.canonicalPackSqliteSha256
+    || identity?.canonicalStationVersion !== expected.canonicalStationVersion
+    || identity?.canonicalStationSetSha256 !== expected.canonicalStationSetSha256
+    || identity?.sourceLineageSha256 !== expected.sourceLineageSha256
+    || identity?.evidenceHash !== expected.evidenceHash) {
   process.exit(11);
 }
-' "${body_file}" "${snapshot_sha256}"; then
+' "${body_file}" "${planner_identity_file}"; then
 		return 0
 	else
 		validation_status=$?
@@ -437,6 +532,7 @@ if (identity?.timetableSnapshotSha256 !== process.argv[2]
 	case "${validation_status}" in
 		10) echo 'normal search response has no itinerary' >&2 ;;
 		11) echo 'normal search response planner identity mismatch' >&2 ;;
+		12) echo 'normal search response has no ITX-청춘 ride' >&2 ;;
 		*) echo 'normal search response is invalid' >&2 ;;
 	esac
 	return 1
@@ -469,42 +565,39 @@ done
 load_started_ms="$(date +%s%3N)"
 sample_resources
 
-mapfile -t tokens < <(cut -f 1 "${tokens_file}")
-(( ${#tokens[@]} >= search_rate + 3 )) || { echo 'not enough synthetic sessions' >&2; exit 1; }
 unexpected_error_count=0
 for ((index = 0; index < session_rate; index += 1)); do
 	send_session normal "198.51.100.$((index + 101))"
-	case "${last_status}" in
-		403|503) ;;
-		*) echo 'normal session profile observed an unexpected status' >&2; exit 1 ;;
-	esac
+	[[ "${last_status}" == 200 ]] || { echo 'normal session profile did not return exact 200' >&2; exit 1; }
+	capture_issued_session
 done
 for ((index = 0; index <= session_burst; index += 1)); do
 	send_session burst 198.51.100.180
-	case "${last_status}" in
-		403|503) ;;
-		429) echo 'session limiter rejected before the configured burst was consumed' >&2; exit 1 ;;
-		*) echo 'session burst profile observed an unexpected status' >&2; exit 1 ;;
-	esac
+	[[ "${last_status}" == 200 ]] || { echo 'session limiter rejected before the configured burst was consumed' >&2; exit 1; }
+	capture_issued_session
 done
 send_session burst 198.51.100.180
 [[ "${last_status}" == 429 ]] || { echo 'session burst profile did not return exact 429' >&2; exit 1; }
 grep -Eqi '^Retry-After: [1-9][0-9]*' "${last_headers}" || { echo 'session 429 is missing integer Retry-After' >&2; exit 1; }
 
+mapfile -t tokens < <(cut -f 1 "${issued_tokens_file}")
+mapfile -t seeded_tokens < <(head -n 20 "${tokens_file}" | cut -f 1)
+(( ${#tokens[@]} >= session_rate && ${#seeded_tokens[@]} >= 2 )) || { echo 'not enough synthetic sessions' >&2; exit 1; }
+
 normal_state_count_before="$(clone_psql "SELECT COUNT(*) FROM route_v2_states
-WHERE origin_station_id = 'station-sangnoksu'
-  AND destination_station_id = 'station-sadang'
+WHERE origin_station_id = '${origin_station_id}'
+  AND destination_station_id = '${destination_station_id}'
   AND requested_departure_at = '${departure_time}'::timestamptz
   AND timetable_artifact_id = '${snapshot_id}';")"
 [[ "${normal_state_count_before}" =~ ^[0-9]+$ ]] || { echo 'normal state baseline is invalid' >&2; exit 1; }
 for ((index = 0; index < search_rate; index += 1)); do
-	send_search normal "${tokens[${index}]}" "198.51.100.$((index + 1))"
+	send_search normal "${tokens[$((index % session_rate))]}" "198.51.100.$((index + 1))"
 	[[ "${last_status}" == 200 ]] || { echo 'normal search profile did not return exact 200' >&2; exit 1; }
 	validate_normal_search_body "${last_body}" || exit 1
 done
 normal_state_count_after="$(clone_psql "SELECT COUNT(*) FROM route_v2_states
-WHERE origin_station_id = 'station-sangnoksu'
-  AND destination_station_id = 'station-sadang'
+WHERE origin_station_id = '${origin_station_id}'
+  AND destination_station_id = '${destination_station_id}'
   AND requested_departure_at = '${departure_time}'::timestamptz
   AND timetable_artifact_id = '${snapshot_id}';")"
 [[ "${normal_state_count_after}" =~ ^[0-9]+$ ]] || { echo 'normal state result is invalid' >&2; exit 1; }
@@ -512,7 +605,7 @@ WHERE origin_station_id = 'station-sangnoksu'
 	|| { echo 'normal search profile did not persist one state per request' >&2; exit 1; }
 (( unexpected_error_count == 0 )) || { echo 'normal profile observed an unexpected status' >&2; exit 1; }
 
-burst_token="${tokens[${search_rate}]}"
+burst_token="${seeded_tokens[0]}"
 burst_pids=()
 burst_headers_files=()
 burst_result_files=()
@@ -557,7 +650,7 @@ if (value.code !== "ROUTE_RATE_LIMITED") process.exit(1);
 ' "${last_body}" || { echo '429 response machine code mismatch' >&2; exit 1; }
 
 clone_psql "UPDATE timetable_snapshot_history SET fresh_until = TO_CHAR((CURRENT_TIMESTAMP - INTERVAL '1 second') AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') WHERE snapshot_sha256 = (SELECT snapshot_sha256 FROM timetable_snapshot_active WHERE singleton_id = 1);" >/dev/null
-send_search unavailable "${tokens[$((search_rate + 1))]}" 198.51.100.210
+send_search unavailable "${seeded_tokens[1]}" 198.51.100.210
 [[ "${last_status}" == 503 ]] || { echo 'unavailable profile did not return exact 503' >&2; exit 1; }
 node -e '
 const value = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
@@ -638,7 +731,9 @@ grep -Fq 'route V2 timetable cache result=miss' "${logs_file}" || { echo 'cache 
 grep -Fq 'route V2 timetable cache result=hit' "${logs_file}" || { echo 'cache hit evidence is missing' >&2; exit 1; }
 grep -Eq 'Purged [1-9][0-9]* expired Route V2 state rows' "${logs_file}" \
 	|| { echo 'application purge scheduler evidence is missing' >&2; exit 1; }
-if grep -Eqi 'Authorization:|Bearer [A-Za-z0-9_-]+|CF-Connecting-IP|station-sangnoksu|station-sadang' "${logs_file}"; then
+if grep -Eqi 'Authorization:|Bearer [A-Za-z0-9_-]+|CF-Connecting-IP' "${logs_file}" \
+	|| grep -Fq -- "${origin_station_id}" "${logs_file}" \
+	|| grep -Fq -- "${destination_station_id}" "${logs_file}"; then
 	echo 'service logs contain a forbidden request identifier' >&2
 	exit 1
 fi
