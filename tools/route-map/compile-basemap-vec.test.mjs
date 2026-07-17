@@ -493,7 +493,10 @@ test("extractOwnerLabels: 5권역 실 SVG에서 ordinary/transfer/terminal 개�
   const sources = path.join(import.meta.dirname, "route-map-defs/svg-sources");
   const expected = {
     "easy-subway-sma-v2.svg": { ordinary: 501, transfer: 124, terminal: 30 },
-    "easy-subway-busan-v1.svg": { ordinary: 129, transfer: 12, terminal: 7 },
+    // #2068 벡스코 병합: 2호선·동해선을 단일 환승 station_id로 합치면서, 동해선
+    // 노드용 중복 ordinary 라벨(벡스코_DH)을 제거했다(단일 환승 캡슐이 전사 라벨을
+    // 이미 가지므로 중복 표기 불필요) → ordinary 129→128.
+    "easy-subway-busan-v1.svg": { ordinary: 128, transfer: 12, terminal: 7 },
     "easy-subway-daegu-v1.svg": { ordinary: 84, transfer: 5, terminal: 8 },
     // daejeon: SVG상 ordinary/transfer/terminal 64건 중 39건이 미개통(2호선
     // 트램) data-status="construction"이라 제외 → 25건(15/8/2)만 남는다.

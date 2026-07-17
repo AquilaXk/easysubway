@@ -13,7 +13,7 @@
   },
   "ownerLabelsSidecar": {
     "path": "apps/mobile/assets/datapacks/metro_map_pack/basemap/labels.json",
-    "sha256": "656bcdc81aef8bd0faba0e8ab50450f0a335a1a7ff665074a5b3b4b1c141b5ca"
+    "sha256": "0545c555d23616c07db9f36d03dbd2cf7e9326ed23a56d66f78a1b57b9bafa70"
   },
   "maps": [
     {
@@ -35,7 +35,7 @@
       "id": "busan",
       "source": "tools/route-map/route-map-defs/svg-sources/easy-subway-busan-v1.svg",
       "compiledVector": "apps/mobile/assets/datapacks/metro_map_pack/basemap/busan.vec",
-      "sourceSvgSha256": "8d91965c5c0a4d5fa6a211fae187de2726fc7617cdad8413ebf0a5b3fc8b3e6b",
+      "sourceSvgSha256": "c88606ca97984af9057ce320afa1bba0ae242cdbb005ebb8e991310745079fdc",
       "normalizedSvgSha256": "d20af43f05d4c478ab6b0e288321507e3185615ad57c5a0980255df743404ad1",
       "compiledVectorSha256": "c7fc531abc35a887a2c621244d2b105984779cf4a1564516e11ed119afce3dbd",
       "viewBox": [
@@ -44,7 +44,7 @@
         12000,
         7040
       ],
-      "ownerLabelCount": 148
+      "ownerLabelCount": 147
     },
     {
       "id": "daegu",
