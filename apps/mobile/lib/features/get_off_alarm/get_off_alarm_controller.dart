@@ -150,11 +150,16 @@ class GetOffAlarmController extends ChangeNotifier {
     );
     // 활성 구독을 복원하므로 남은 복구 안내 플래그는 조용히 소비해 지운다.
     await _consumeRecoveryNotice();
+    // 위에서 만료 판정에 쓴 단일 now 스냅샷 결과를 그대로 넘겨 restore 경로를
+    // 원자화한다. _schedule가 now()로 재계산하면 두 스냅샷 사이에 마지막 발화
+    // 시각이 지날 때 alarms.isEmpty 분기와 달리 복구 안내 소비 없이 off로
+    // 정리되는 계약 분열이 생긴다.
     await _schedule(
       routeId: subscription.routeId,
       stops: stops,
       transferAlarmEnabled: subscription.transferAlarmEnabled,
       resolution: resolution,
+      precomputedAlarms: alarms,
     );
   }
 
@@ -311,20 +316,23 @@ class GetOffAlarmController extends ChangeNotifier {
     return GetOffAlarmRefreshResult.refreshed;
   }
 
+  /// [precomputedAlarms]가 주어지면 그 단일 now 스냅샷 계산 결과를 그대로
+  /// 예약한다(restore 경로 원자화용). 없으면 현재 now()로 새로 계산한다
+  /// (enable/refresh 경로의 기존 동작).
   Future<void> _schedule({
     required String routeId,
     required List<GetOffAlarmStop> stops,
     required bool transferAlarmEnabled,
     required GetOffAlarmScheduleResolution resolution,
+    List<ScheduledGetOffAlarm>? precomputedAlarms,
   }) async {
-    final effectivePolicy = policy.copyWith(
-      transferAlarmEnabled: transferAlarmEnabled,
-    );
-    final alarms = computeGetOffAlarms(
-      stops: stops,
-      policy: effectivePolicy,
-      now: now(),
-    );
+    final alarms =
+        precomputedAlarms ??
+        computeGetOffAlarms(
+          stops: stops,
+          policy: policy.copyWith(transferAlarmEnabled: transferAlarmEnabled),
+          now: now(),
+        );
 
     final delivery = await notifier.scheduleAlarms(
       alarms,

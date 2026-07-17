@@ -70,11 +70,33 @@ Future<bool> reconcileGetOffAlarmHeadless({
 
 /// WorkManager headless isolate에서 실행되는 프로덕션 진입점. Drift user DB를 열고
 /// 컨트롤러를 조립해 단일 활성 구독을 재조정한 뒤, finally에서 DB·컨트롤러를 닫는다.
+///
+/// [openUserDatabase]·[createController]는 프로덕션 DB opener·컨트롤러 조립을
+/// 기본값으로 갖는 주입 seam이다(테스트에서 close 경로 — controller.dispose와
+/// userDatabase.close 호출 — 를 성공·예외 양쪽에서 고정하기 위함). 프로덕션
+/// 기본값 동작은 불변이다.
 Future<bool> runGetOffAlarmReconcileTask({
   required void Function(Object error, StackTrace stackTrace) reportError,
+  Future<UserDatabase> Function() openUserDatabase = _openUserDatabase,
+  GetOffAlarmController Function(UserDatabase userDatabase) createController =
+      _createReconcileController,
 }) async {
-  final UserDatabase userDatabase = await _openUserDatabase();
-  final controller = GetOffAlarmController(
+  final UserDatabase userDatabase = await openUserDatabase();
+  final controller = createController(userDatabase);
+  return reconcileGetOffAlarmHeadless(
+    reconcile: controller.reconcile,
+    close: () async {
+      controller.dispose();
+      await userDatabase.close();
+    },
+    reportError: reportError,
+  );
+}
+
+/// headless reconcile용 프로덕션 컨트롤러 조립. [userDatabase]를 공유해 상태
+/// 저장소·복구 안내 저장소를 구성한다.
+GetOffAlarmController _createReconcileController(UserDatabase userDatabase) {
+  return GetOffAlarmController(
     notifier: LocalGetOffAlarmNotifier(FlutterLocalNotificationsPlugin()),
     permissionGate: PluginExactAlarmPermissionGate(
       FlutterLocalNotificationsPlugin(),
@@ -87,14 +109,6 @@ Future<bool> runGetOffAlarmReconcileTask({
     ),
     onActivateReconcileWork: registerGetOffAlarmReconcile,
     onDeactivateReconcileWork: cancelGetOffAlarmReconcile,
-  );
-  return reconcileGetOffAlarmHeadless(
-    reconcile: controller.reconcile,
-    close: () async {
-      controller.dispose();
-      await userDatabase.close();
-    },
-    reportError: reportError,
   );
 }
 

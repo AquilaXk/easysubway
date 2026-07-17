@@ -187,6 +187,21 @@ class _StubNotificationPermissionProvider
   }
 }
 
+/// 호출마다 다음 시각을 돌려주는 주입용 시계. 마지막 원소에 도달하면 그대로
+/// 유지한다. now()가 몇 번 소비됐는지([calls])로 단일 스냅샷 여부를 검증한다.
+class _AdvancingClock {
+  _AdvancingClock(this._instants);
+
+  final List<DateTime> _instants;
+  int calls = 0;
+
+  DateTime now() {
+    final index = calls < _instants.length ? calls : _instants.length - 1;
+    calls += 1;
+    return _instants[index];
+  }
+}
+
 void main() {
   final now = DateTime(2026, 7, 6, 9, 0, 0);
 
@@ -376,6 +391,45 @@ void main() {
     expect(restored.state.enabled, isTrue);
     expect(restored.state.activeRouteId, 'r1');
     expect((await repository.loadActive())?.routeId, 'r1');
+  });
+
+  test('restore는 단일 now 스냅샷으로 계산해 마지막 알림 경계에서 갈라지지 않는다', () async {
+    // 저장: 환승 9:15(fireAt 9:13)·도착 9:30(fireAt 9:28).
+    final first = controller(exactPermitted: true);
+    await first.enable(
+      routeId: 'r1',
+      stops: stops(),
+      transferAlarmEnabled: true,
+    );
+
+    // restore 시점의 두 후보 스냅샷: 첫 스냅샷은 마지막 fireAt(9:28) 직전이라
+    // 도착 알림 1건이 미래이고, 다음 스냅샷은 직후라 0건이다. 원자화 전이라면
+    // _restore의 만료 판정(1건)과 _schedule의 재계산(0건)이 갈려 복구가 조용히
+    // off로 정리됐다. 원자화 후에는 첫 스냅샷 결과로만 예약한다.
+    final clock = _AdvancingClock([
+      DateTime(2026, 7, 6, 9, 27, 59),
+      DateTime(2026, 7, 6, 9, 28, 1),
+    ]);
+    notifier.scheduleCalls = 0;
+    final restored = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: _StubExactAlarmGate(true),
+      notificationPermissionProvider: _StubNotificationPermissionProvider(
+        NotificationPermissionStatus.granted,
+      ),
+      repository: repository,
+      now: clock.now,
+    );
+    addTearDown(restored.dispose);
+
+    await restored.restore();
+
+    // 첫 스냅샷 결과(도착 1건)로 예약되고 켜진 상태를 유지한다.
+    expect(restored.state.enabled, isTrue);
+    expect(notifier.scheduleCalls, 1);
+    expect(notifier.scheduledAlarms, hasLength(1));
+    // restore 경로 전체가 now를 정확히 한 번만 읽어 두 스냅샷 갈림이 불가능하다.
+    expect(clock.calls, 1);
   });
 
   test('restore는 미래 구독을 결정적 재예약하고 실제 예약 수를 저장한다', () async {
