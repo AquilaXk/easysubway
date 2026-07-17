@@ -131,6 +131,9 @@ const BUSAN = {
     name = name.replace(/\s+/g, "");
     // 역 접미 제거(부산역→부산). 카탈로그는 접미 없는 표기.
     if (name.length > 1 && name.endsWith("역")) name = name.slice(0, -1);
+    // #2068 좌천: 1호선·동해선 좌천은 별개 물리역(오병합 분리 대상). 도식이 두
+    // 노드를 각자 그리므로 노선 힌트로 각 station_id에 1:1 정합한다(broadcast 금지).
+    if (name === "좌천") return { name, disambiguateByLine: true };
     return { name };
   },
   // 범례 노선 swatch(medY≈166, len 42px)는 콘텐츠 밴드 밖으로 배제한다. 실 노선

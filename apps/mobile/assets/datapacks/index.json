@@ -16,9 +16,9 @@
     {
       "id": "capital",
       "asset": "assets/datapacks/capital.sqlite.gz",
-      "sha256": "a85f733c245376a35922561fa34d89399a178da27f4415b04eaaf7d1d6938dca",
-      "sqliteSha256": "39e451cd2f3606a8b35ce33fc93dc9c01f7c16f93b11de14b00a439a8cac5545",
-      "byteSize": 355928
+      "sha256": "4e04047260dd02eec034dc201a4c9017e0b14933ac671c861dd8912895518827",
+      "sqliteSha256": "48e174d24f82ff9684139460dc80fe77da72195aead0722e3c971e9e73bab9b5",
+      "byteSize": 356024
     }
   ]
 }
