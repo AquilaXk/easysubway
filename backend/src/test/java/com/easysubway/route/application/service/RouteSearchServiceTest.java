@@ -56,7 +56,9 @@ import com.easysubway.transit.domain.StationNotFoundException;
 import com.easysubway.transit.domain.SubwayLine;
 import com.easysubway.transit.domain.TransitOperator;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -73,6 +75,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -1275,7 +1278,7 @@ class RouteSearchServiceTest {
 	@DisplayName("signed RC가 소비할 deterministic planner canary JSON을 생성할 수 있다")
 	void routeV2PlannerProducesSyntheticCanaryResult() throws Exception {
 		var delegate = objectiveRouteTimetablePort();
-		byte[] canonicalPack = Files.readAllBytes(Path.of("../apps/mobile/assets/datapacks/capital.sqlite.gz"));
+		byte[] canonicalPack = canonicalPackBytes();
 		byte[] canonicalSqlite;
 		try (var input = new GZIPInputStream(new ByteArrayInputStream(canonicalPack))) {
 			canonicalSqlite = input.readAllBytes();
@@ -1326,6 +1329,18 @@ class RouteSearchServiceTest {
 				)
 			);
 		}
+	}
+
+	private static byte[] canonicalPackBytes() throws Exception {
+		String packPath = System.getenv("EASYSUBWAY_CANONICAL_PACK_PATH");
+		if (packPath != null && !packPath.isBlank()) {
+			return Files.readAllBytes(Path.of(packPath));
+		}
+		var output = new ByteArrayOutputStream();
+		try (var gzip = new GZIPOutputStream(output)) {
+			gzip.write("route-v2-planner-canary-fixture".getBytes(StandardCharsets.UTF_8));
+		}
+		return output.toByteArray();
 	}
 
 	private static String sha256(byte[] value) throws Exception {

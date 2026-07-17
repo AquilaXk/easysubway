@@ -619,6 +619,7 @@ jobs:
         working-directory: backend
         env:
           EASYSUBWAY_PLANNER_SUCCESS_OUTPUT: ../release-artifacts/backend/planner-canary-result.json
+          EASYSUBWAY_CANONICAL_PACK_PATH: ../apps/mobile/assets/datapacks/capital.sqlite.gz
         run: >-
           ./gradlew test --no-daemon
           --tests com.easysubway.route.application.service.RouteSearchServiceTest.routeV2PlannerProducesSyntheticCanaryResult
