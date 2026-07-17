@@ -7,7 +7,8 @@ DEPLOY_ROOT="${DEPLOY_ROOT:-/opt/easysubway}"
 EXPECTED_DEPLOYED_SHA="${EXPECTED_DEPLOYED_SHA:?EXPECTED_DEPLOYED_SHA is required}"
 PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://easysubway-api.aquilaxk.site}"
 [[ "${EXPECTED_DEPLOYED_SHA}" =~ ^[0-9a-f]{40}$ ]] || { echo 'expected deployed SHA is invalid' >&2; exit 2; }
-[[ "${PUBLIC_BASE_URL}" == https://* ]] || { echo 'public base URL must use HTTPS' >&2; exit 2; }
+[[ "${PUBLIC_BASE_URL}" == https://easysubway-api.aquilaxk.site ]] \
+	|| { echo 'public base URL must be the approved production origin' >&2; exit 2; }
 
 exec 9>"${DEPLOY_ROOT}/deploy.lock"
 flock -w 300 9 || { echo 'timed out waiting for deployment lock' >&2; exit 1; }
@@ -182,7 +183,8 @@ docker exec easysubway-postgres sh -lc \
 [[ -s "${backup_file}" ]] || { echo 'production backup is empty' >&2; exit 1; }
 
 postgres_image="$(docker inspect --format '{{.Config.Image}}' easysubway-postgres)"
-gateway_image="$(docker inspect --format '{{.Config.Image}}' easysubway-route-v2-gateway)"
+gateway_image="$(docker inspect --format '{{.Image}}' easysubway-route-v2-gateway)"
+[[ "${gateway_image}" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo 'gateway image ID is invalid' >&2; exit 1; }
 docker network create --internal "${network}" >/dev/null
 docker volume create "${volume}" >/dev/null
 docker run -d --name "${clone_db}" --network "${network}" --network-alias postgres \
@@ -324,7 +326,7 @@ send_session() {
 	time_seconds="${result#* }"
 	latency_ms="$(node -e 'const value = Number(process.argv[1]); if (!Number.isFinite(value)) process.exit(1); process.stdout.write(String(Math.round(value * 1000)));' "${time_seconds}")"
 	printf '%s\t%s\t%s\n' "${profile}" "${last_status}" "${latency_ms}" >> "${metrics_file}"
-	grep -Eqi '^Cache-Control: private, no-store' "${last_headers}" \
+	grep -Eqi '^Cache-Control:[[:space:]]*private,[[:space:]]*no-store[[:space:]]*\r?$' "${last_headers}" \
 		|| { echo 'Route V2 session response is missing Cache-Control: private, no-store' >&2; exit 1; }
 }
 
@@ -345,7 +347,7 @@ send_search() {
 	time_seconds="${result#* }"
 	latency_ms="$(node -e 'const value = Number(process.argv[1]); if (!Number.isFinite(value)) process.exit(1); process.stdout.write(String(Math.round(value * 1000)));' "${time_seconds}")"
 	printf '%s\t%s\t%s\n' "${profile}" "${last_status}" "${latency_ms}" >> "${metrics_file}"
-	grep -Eqi '^Cache-Control: private, no-store' "${last_headers}" \
+	grep -Eqi '^Cache-Control:[[:space:]]*private,[[:space:]]*no-store[[:space:]]*\r?$' "${last_headers}" \
 		|| { echo 'Route V2 response is missing Cache-Control: private, no-store' >&2; exit 1; }
 }
 
@@ -420,7 +422,7 @@ for index in "${!burst_pids[@]}"; do
 	burst_time_seconds="${burst_result#* }"
 	burst_latency_ms="$(node -e 'const value = Number(process.argv[1]); if (!Number.isFinite(value)) process.exit(1); process.stdout.write(String(Math.round(value * 1000)));' "${burst_time_seconds}")"
 	printf '%s\t%s\t%s\n' burst "${last_status}" "${burst_latency_ms}" >> "${metrics_file}"
-	grep -Eqi '^Cache-Control: private, no-store' "${burst_headers_files[${index}]}" \
+	grep -Eqi '^Cache-Control:[[:space:]]*private,[[:space:]]*no-store[[:space:]]*\r?$' "${burst_headers_files[${index}]}" \
 		|| { echo 'concurrent Route V2 response is missing Cache-Control: private, no-store' >&2; exit 1; }
 	case "${last_status}" in
 		200|503) ;;
@@ -459,7 +461,9 @@ read -r memory_peak cpu_peak resource_sample_count <<< "${resource_summary}"
 
 expired_hash="$(node -e 'process.stdout.write(require("node:crypto").createHash("sha256").update("issue-2095-expired-session").digest("hex"))')"
 expired_nonce_hash="$(node -e 'process.stdout.write(require("node:crypto").createHash("sha256").update("issue-2095-expired-nonce").digest("hex"))')"
+purge_budget_ms=600000
 purge_started_ms="$(date +%s%3N)"
+purge_deadline_ms=$((purge_started_ms + purge_budget_ms))
 clone_psql "
 INSERT INTO route_v2_sessions (token_sha256, scope, issued_at, expires_at, request_count)
 VALUES ('${expired_hash}', 'route:v2:itx', CURRENT_TIMESTAMP - INTERVAL '20 minutes', CURRENT_TIMESTAMP - INTERVAL '10 minutes', 0);
@@ -471,19 +475,21 @@ VALUES ('route-2095-expired', 'synthetic-origin', 'synthetic-destination', 'SUBW
 	  CURRENT_TIMESTAMP - INTERVAL '7 hours', '{}', 'synthetic-2095',
 	  CURRENT_TIMESTAMP - INTERVAL '7 hours', CURRENT_TIMESTAMP - INTERVAL '7 hours', CURRENT_TIMESTAMP - INTERVAL '6 hours 30 minutes');" >/dev/null
 synthetic_purge_remaining="1|1|1"
-for _ in $(seq 1 120); do
+while true; do
 	synthetic_purge_remaining="$(clone_psql "SELECT
   (SELECT COUNT(*) FROM route_v2_states WHERE route_state_id = 'route-2095-expired'),
   (SELECT COUNT(*) FROM route_v2_sessions WHERE token_sha256 = '${expired_hash}'),
   (SELECT COUNT(*) FROM route_v2_nonce_replays WHERE nonce_sha256 = '${expired_nonce_hash}');")"
 	[[ "${synthetic_purge_remaining}" == "0|0|0" ]] && break
+	current_time_ms="$(date +%s%3N)"
+	(( current_time_ms < purge_deadline_ms )) || break
 	sleep 1
 done
 purge_finished_ms="$(date +%s%3N)"
 purge_ms=$((purge_finished_ms - purge_started_ms))
 [[ "${synthetic_purge_remaining}" == "0|0|0" ]] \
 	|| { echo 'application purge path did not delete all synthetic expired rows' >&2; exit 1; }
-(( purge_ms <= 600000 )) || { echo 'purge exceeded the 10 minute deletion budget' >&2; exit 1; }
+(( purge_ms <= purge_budget_ms )) || { echo 'purge exceeded the 10 minute deletion budget' >&2; exit 1; }
 purged_states=1
 purged_sessions=1
 purged_nonces=1

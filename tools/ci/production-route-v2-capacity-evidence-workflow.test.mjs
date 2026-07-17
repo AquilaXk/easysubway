@@ -32,10 +32,14 @@ test("capacity runner는 동일 candidate·격리 load·privacy·closed ingress�
   assert.match(runner, /^set -euo pipefail$/m);
   assert.match(runner, /^umask 077$/m);
   assert.match(runner, /EXPECTED_DEPLOYED_SHA/);
+  assert.match(runner, /PUBLIC_BASE_URL.*https:\/\/easysubway-api\.aquilaxk\.site/);
+  assert.match(runner, /PUBLIC_BASE_URL.*==.*https:\/\/easysubway-api\.aquilaxk\.site/);
   assert.match(runner, /shared\/current-sha/);
   assert.match(runner, /shared\/current-image-digest/);
   assert.match(runner, /org\.opencontainers\.image\.revision/);
   assert.match(runner, /docker network create --internal/);
+  assert.match(runner, /gateway_image="\$\(docker inspect --format '\{\{\.Image\}\}' easysubway-route-v2-gateway\)"/);
+  assert.match(runner, /gateway image ID is invalid/);
   assert.match(runner, /--cpus 1 --memory 1g --memory-swap 1g --pids-limit 256/);
   assert.match(runner, /profile=normal/);
   assert.match(runner, /profile=burst/);
@@ -47,6 +51,8 @@ test("capacity runner는 동일 candidate·격리 load·privacy·closed ingress�
   assert.match(runner, /route_v2_sessions/);
   assert.match(runner, /Cache-Control/);
   assert.match(runner, /private, no-store/);
+  assert.match(runner, /no-store\[\[:space:\]\]\*\\r\?\$/);
+  assert.doesNotMatch(runner, /\^Cache-Control: private, no-store'/);
   assert.match(runner, /undeclared_data_transfer_count=0/);
   assert.match(runner, /sensitive_payload_count=0/);
   assert.match(runner, /ingress_closed=true/);
@@ -71,6 +77,10 @@ test("capacity runner는 동일 candidate·격리 load·privacy·closed ingress�
   assert.doesNotMatch(runner, /EASYSUBWAY_SCHEDULING_ENABLED=false/);
   assert.doesNotMatch(runner, /WITH states AS \(DELETE FROM route_v2_states/);
   assert.match(runner, /synthetic_purge_remaining/);
+  assert.match(runner, /purge_budget_ms=600000/);
+  assert.match(runner, /purge_deadline_ms=\$\(\(purge_started_ms \+ purge_budget_ms\)\)/);
+  assert.match(runner, /synthetic_purge_remaining="1\|1\|1"\nwhile true; do/);
+  assert.doesNotMatch(runner, /synthetic_purge_remaining="1\|1\|1"\nfor _ in \$\(seq 1 120\)/);
   assert.match(runner, /resource_sampler_pid/);
   assert.match(runner, /memory_peak/);
   assert.match(runner, /cpu_peak/);
