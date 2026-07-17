@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../mobile_error_reporter.dart';
 import '../../notification_settings.dart';
+import 'data/get_off_alarm_recovery_notice_store.dart';
 import 'data/get_off_alarm_state_repository.dart';
 import 'exact_alarm_permission.dart';
 import 'get_off_alarm_notifier.dart';
@@ -53,6 +54,9 @@ class GetOffAlarmController extends ChangeNotifier {
     required this.permissionGate,
     required this.notificationPermissionProvider,
     required this.repository,
+    this.recoveryNoticeStore,
+    this.onActivateReconcileWork,
+    this.onDeactivateReconcileWork,
     this.policy = GetOffAlarmPolicyDefaults.policy,
     this.now = DateTime.now,
   });
@@ -61,6 +65,17 @@ class GetOffAlarmController extends ChangeNotifier {
   final ExactAlarmPermissionGate permissionGate;
   final NotificationPermissionProvider notificationPermissionProvider;
   final GetOffAlarmStateRepository repository;
+
+  /// headless reconcile가 알림 권한 거부로 정리했음을 다음 UI init에 한 번만
+  /// 알리는 one-shot 플래그 저장소(없으면 안내를 건너뛴다).
+  final GetOffAlarmRecoveryNoticeStore? recoveryNoticeStore;
+
+  /// 활성 구독을 저장/재예약할 때 unique periodic reconcile work를 등록/update한다.
+  final Future<void> Function()? onActivateReconcileWork;
+
+  /// off·만료·알림 권한 거부 정리 시 unique periodic reconcile work만 취소한다.
+  final Future<void> Function()? onDeactivateReconcileWork;
+
   final GetOffAlarmPolicy policy;
   final DateTime Function() now;
 
@@ -77,46 +92,125 @@ class GetOffAlarmController extends ChangeNotifier {
   /// 현재 영속 구독에 재조정한다.
   Future<void> reconcile() => _enqueueMutation(_restore);
 
+  /// 재부팅·package replace·포그라운드 복귀 뒤 영속 구독을 OS 상태에 맞춰
+  /// 재조정한다. 포그라운드 restore와 headless reconcile이 공유하는 단일 계약이다.
+  ///
+  /// 분기:
+  /// - 구독 없음(사용자가 끔): 복원하지 않고 잔여 pending만 정리한다.
+  /// - 알림 권한 거부: 관련 pending 취소·구독 삭제 후 복구 안내 플래그를 기록한다.
+  /// - 만료 구독(미래 알림 없음): 관련 pending 취소 후 구독을 삭제한다.
+  /// - 미래 구독: 결정적 ID로 전체 idempotent 재예약한다(중복 0건). 정확 알람
+  ///   권한이 있으면 exact, 없으면 silent failure 없이 inexact로 복원한다.
   Future<void> _restore() async {
     final subscription = await repository.loadActive();
     if (subscription == null) {
-      await _turnOff();
+      final recoveryPending = await _consumeRecoveryNotice();
+      await _turnOff(
+        permissionNotice: recoveryPending
+            ? notificationPermissionDeniedNotice
+            : null,
+      );
       return;
     }
     final notificationPermission = await notificationPermissionProvider
         .notificationPermissionStatus();
     if (notificationPermission != NotificationPermissionStatus.granted) {
-      await _turnOff(permissionNotice: notificationPermissionDeniedNotice);
+      await _cleanUpInactiveSubscription();
+      await _recordRecoveryNotice();
+      _emit(
+        const GetOffAlarmState(
+          permissionNotice: notificationPermissionDeniedNotice,
+        ),
+      );
       return;
     }
-    final pendingCount = await notifier.pendingAlarmCount();
-    if (pendingCount == 0) {
-      await _turnOff();
+    final stops = _stopsFrom(subscription);
+    final alarms = computeGetOffAlarms(
+      stops: stops,
+      policy: policy.copyWith(
+        transferAlarmEnabled: subscription.transferAlarmEnabled,
+      ),
+      now: now(),
+    );
+    if (alarms.isEmpty) {
+      final recoveryPending = await _consumeRecoveryNotice();
+      await _cleanUpInactiveSubscription();
+      _emit(
+        GetOffAlarmState(
+          permissionNotice: recoveryPending
+              ? notificationPermissionDeniedNotice
+              : null,
+        ),
+      );
       return;
     }
     final permitted = await permissionGate.isExactAlarmPermitted();
     final resolution = resolveGetOffAlarmScheduleMode(
       exactAlarmPermitted: permitted,
     );
-    final maxExpectedCount =
-        1 +
-        (subscription.transferAlarmEnabled ? subscription.transfers.length : 0);
-    if (resolution.mode != subscription.scheduleMode ||
-        pendingCount > maxExpectedCount) {
-      await _schedule(
-        routeId: subscription.routeId,
-        stops: _stopsFrom(subscription),
-        transferAlarmEnabled: subscription.transferAlarmEnabled,
-        resolution: resolution,
-      );
+    // 활성 구독을 복원하므로 남은 복구 안내 플래그는 조용히 소비해 지운다.
+    await _consumeRecoveryNotice();
+    // 위에서 만료 판정에 쓴 단일 now 스냅샷 결과를 그대로 넘겨 restore 경로를
+    // 원자화한다. _schedule가 now()로 재계산하면 두 스냅샷 사이에 마지막 발화
+    // 시각이 지날 때 alarms.isEmpty 분기와 달리 복구 안내 소비 없이 off로
+    // 정리되는 계약 분열이 생긴다.
+    await _schedule(
+      routeId: subscription.routeId,
+      stops: stops,
+      transferAlarmEnabled: subscription.transferAlarmEnabled,
+      resolution: resolution,
+      precomputedAlarms: alarms,
+    );
+  }
+
+  Future<void> _cleanUpInactiveSubscription() async {
+    await notifier.cancelAll();
+    await repository.clearActive();
+    await _deactivateReconcileWork();
+  }
+
+  Future<bool> _consumeRecoveryNotice() async {
+    final store = recoveryNoticeStore;
+    if (store == null) {
+      return false;
+    }
+    return store.consume();
+  }
+
+  Future<void> _recordRecoveryNotice() async {
+    await recoveryNoticeStore?.record();
+  }
+
+  Future<void> _activateReconcileWork() async {
+    final activate = onActivateReconcileWork;
+    if (activate == null) {
       return;
     }
-    var reconciled = subscription;
-    if (pendingCount != subscription.scheduledCount) {
-      reconciled = _subscriptionWithScheduledCount(subscription, pendingCount);
-      await repository.saveActive(reconciled);
+    try {
+      await activate();
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '하차 알림 reconcile work 등록 중 예외가 발생했습니다.',
+      );
     }
-    _emitSubscription(reconciled);
+  }
+
+  Future<void> _deactivateReconcileWork() async {
+    final deactivate = onDeactivateReconcileWork;
+    if (deactivate == null) {
+      return;
+    }
+    try {
+      await deactivate();
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '하차 알림 reconcile work 취소 중 예외가 발생했습니다.',
+      );
+    }
   }
 
   /// 하차 알림을 켠다: 정확 알람 권한을 확인해 강등 여부를 정하고, 알림을
@@ -222,20 +316,23 @@ class GetOffAlarmController extends ChangeNotifier {
     return GetOffAlarmRefreshResult.refreshed;
   }
 
+  /// [precomputedAlarms]가 주어지면 그 단일 now 스냅샷 계산 결과를 그대로
+  /// 예약한다(restore 경로 원자화용). 없으면 현재 now()로 새로 계산한다
+  /// (enable/refresh 경로의 기존 동작).
   Future<void> _schedule({
     required String routeId,
     required List<GetOffAlarmStop> stops,
     required bool transferAlarmEnabled,
     required GetOffAlarmScheduleResolution resolution,
+    List<ScheduledGetOffAlarm>? precomputedAlarms,
   }) async {
-    final effectivePolicy = policy.copyWith(
-      transferAlarmEnabled: transferAlarmEnabled,
-    );
-    final alarms = computeGetOffAlarms(
-      stops: stops,
-      policy: effectivePolicy,
-      now: now(),
-    );
+    final alarms =
+        precomputedAlarms ??
+        computeGetOffAlarms(
+          stops: stops,
+          policy: policy.copyWith(transferAlarmEnabled: transferAlarmEnabled),
+          now: now(),
+        );
 
     final delivery = await notifier.scheduleAlarms(
       alarms,
@@ -243,6 +340,7 @@ class GetOffAlarmController extends ChangeNotifier {
     );
     if (delivery.scheduledCount == 0) {
       await repository.clearActive();
+      await _deactivateReconcileWork();
       _emit(GetOffAlarmState.off);
       return;
     }
@@ -260,6 +358,8 @@ class GetOffAlarmController extends ChangeNotifier {
       await _compensateFailedSave();
       Error.throwWithStackTrace(error, stackTrace);
     }
+    // 활성 구독을 저장했으므로 unique periodic reconcile work를 등록/update한다.
+    await _activateReconcileWork();
 
     _emitSubscription(subscription);
   }
@@ -280,6 +380,7 @@ class GetOffAlarmController extends ChangeNotifier {
   Future<void> _turnOff({String? permissionNotice}) async {
     await notifier.cancelAll();
     await repository.clearActive();
+    await _deactivateReconcileWork();
     _emit(GetOffAlarmState(permissionNotice: permissionNotice));
   }
 
@@ -294,6 +395,7 @@ class GetOffAlarmController extends ChangeNotifier {
     } catch (error, stackTrace) {
       _reportCompensationError(error, stackTrace);
     }
+    await _deactivateReconcileWork();
     _emit(GetOffAlarmState.off);
   }
 
@@ -357,21 +459,6 @@ class GetOffAlarmController extends ChangeNotifier {
         kind: GetOffAlarmKind.destination,
       ),
     ];
-  }
-
-  GetOffAlarmSubscription _subscriptionWithScheduledCount(
-    GetOffAlarmSubscription subscription,
-    int scheduledCount,
-  ) {
-    return GetOffAlarmSubscription(
-      routeId: subscription.routeId,
-      transferAlarmEnabled: subscription.transferAlarmEnabled,
-      scheduledCount: scheduledCount,
-      scheduleMode: subscription.scheduleMode,
-      inexactNotice: subscription.inexactNotice,
-      destination: subscription.destination,
-      transfers: subscription.transfers,
-    );
   }
 
   void _emitSubscription(GetOffAlarmSubscription subscription) {

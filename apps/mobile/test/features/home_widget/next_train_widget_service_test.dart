@@ -1,3 +1,4 @@
+import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_reconcile_worker.dart';
 import 'package:easysubway_mobile/features/home_widget/next_train_widget_repository.dart';
 import 'package:easysubway_mobile/features/home_widget/next_train_widget_runtime.dart';
 import 'package:easysubway_mobile/features/home_widget/next_train_widget_service.dart';
@@ -168,10 +169,41 @@ void main() {
     expect(launched, isFalse);
   });
 
-  test('알 수 없는 WorkManager task는 성공으로 무시한다', () async {
-    final worker = NextTrainWidgetWorkmanagerApi();
+  test('알 수 없는 WorkManager task는 fail-closed로 false를 돌려준다', () async {
+    var widgetRan = false;
+    var reconcileRan = false;
+    final worker = NextTrainWidgetWorkmanagerApi(
+      runWidgetRefresh: () async {
+        widgetRan = true;
+        return true;
+      },
+      runGetOffAlarmReconcile: () async {
+        reconcileRan = true;
+        return true;
+      },
+    );
 
-    expect(await worker.executeTask('other-task', null), isTrue);
+    expect(await worker.executeTask('other-task', null), isFalse);
+    expect(widgetRan, isFalse);
+    expect(reconcileRan, isFalse);
+  });
+
+  test('단일 dispatcher가 task 이름별로 각 handler에 라우팅한다', () async {
+    final calls = <String>[];
+    final worker = NextTrainWidgetWorkmanagerApi(
+      runWidgetRefresh: () async {
+        calls.add('widget');
+        return true;
+      },
+      runGetOffAlarmReconcile: () async {
+        calls.add('reconcile');
+        return true;
+      },
+    );
+
+    expect(await worker.executeTask(nextTrainWidgetRefreshTask, null), isTrue);
+    expect(await worker.executeTask(getOffAlarmReconcileTask, null), isTrue);
+    expect(calls, ['widget', 'reconcile']);
   });
 
   test('configure는 widget id별 시간표 snapshot을 저장하고 provider를 갱신한다', () async {

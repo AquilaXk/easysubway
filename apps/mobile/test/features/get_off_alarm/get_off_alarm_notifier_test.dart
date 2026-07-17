@@ -14,6 +14,7 @@ void main() {
       kind: GetOffAlarmKind.transfer,
       fireAt: arrivalAt.subtract(const Duration(minutes: 2)),
       arrivalAt: arrivalAt,
+      slot: index,
     );
   }
 
@@ -55,6 +56,7 @@ void main() {
           kind: GetOffAlarmKind.destination,
           fireAt: arrivalAt.subtract(const Duration(minutes: 2)),
           arrivalAt: arrivalAt,
+          slot: 0,
         ),
         ScheduledGetOffAlarm(
           stationId: 'station-geumjeong',
@@ -62,6 +64,7 @@ void main() {
           kind: GetOffAlarmKind.transfer,
           fireAt: arrivalAt.subtract(const Duration(minutes: 5)),
           arrivalAt: arrivalAt,
+          slot: 1,
         ),
       ], mode: GetOffAlarmScheduleMode.exact);
 
@@ -160,6 +163,96 @@ void main() {
 
       expect(result.scheduledCount, 2);
       expect(result.failedCount, 1);
+    });
+
+    test('예약 ID는 slot 기반이며 만료로 목록이 줄어도 같은 ID를 재사용한다', () async {
+      final pending = <int>{};
+      final base = LocalGetOffAlarmNotifier.baseNotificationId;
+      final arrivalAt = DateTime(2026, 7, 10, 10);
+      LocalGetOffAlarmNotifier build() => LocalGetOffAlarmNotifier(
+        FlutterLocalNotificationsPlugin(),
+        isAndroid: true,
+        initializePlugin: () async {},
+        pendingIds: () async => pending.toList(),
+        cancelId: (id) async => pending.remove(id),
+        scheduleAlarm: (id, _, _, _, _) async => pending.add(id),
+      );
+
+      await build().scheduleAlarms([
+        ScheduledGetOffAlarm(
+          stationId: 't',
+          stationName: '환승',
+          kind: GetOffAlarmKind.transfer,
+          fireAt: arrivalAt.subtract(const Duration(minutes: 5)),
+          arrivalAt: arrivalAt,
+          slot: 0,
+        ),
+        ScheduledGetOffAlarm(
+          stationId: 'd',
+          stationName: '목적',
+          kind: GetOffAlarmKind.destination,
+          fireAt: arrivalAt.subtract(const Duration(minutes: 2)),
+          arrivalAt: arrivalAt,
+          slot: 1,
+        ),
+      ], mode: GetOffAlarmScheduleMode.exact);
+      expect(pending, {base, base + 1});
+
+      // 재부팅 후: transfer는 이미 만료돼 목록에서 빠지고 destination만 남지만
+      // slot은 1로 고정. base+1을 재사용해 부팅 복원분과 겹쳐도 중복이 없다.
+      await build().scheduleAlarms([
+        ScheduledGetOffAlarm(
+          stationId: 'd',
+          stationName: '목적',
+          kind: GetOffAlarmKind.destination,
+          fireAt: arrivalAt.subtract(const Duration(minutes: 2)),
+          arrivalAt: arrivalAt,
+          slot: 1,
+        ),
+      ], mode: GetOffAlarmScheduleMode.exact);
+      expect(pending, {base + 1});
+    });
+
+    test('공식 boot receiver와 reconcile은 실행 순서와 무관하게 중복 pending이 없다', () async {
+      final base = LocalGetOffAlarmNotifier.baseNotificationId;
+      final arrivalAt = DateTime(2026, 7, 10, 10);
+
+      for (final reconcileFirst in [true, false]) {
+        final pending = <int>{};
+        LocalGetOffAlarmNotifier build() => LocalGetOffAlarmNotifier(
+          FlutterLocalNotificationsPlugin(),
+          isAndroid: true,
+          initializePlugin: () async {},
+          pendingIds: () async => pending.toList(),
+          cancelId: (id) async => pending.remove(id),
+          scheduleAlarm: (id, _, _, _, _) async => pending.add(id),
+        );
+        // 부팅 전 persisted 상태: destination(slot 1)만 예약돼 있었다.
+        const prebootIds = {1};
+        // 공식 ScheduledNotificationBootReceiver는 persisted ID를 그대로 되살린다.
+        void bootRestore() => pending.addAll(prebootIds.map((s) => base + s));
+        // WorkManager reconcile은 slot 기반으로 destination(slot 1)만 재예약한다.
+        Future<void> reconcile() => build().scheduleAlarms([
+          ScheduledGetOffAlarm(
+            stationId: 'd',
+            stationName: '목적',
+            kind: GetOffAlarmKind.destination,
+            fireAt: arrivalAt.subtract(const Duration(minutes: 2)),
+            arrivalAt: arrivalAt,
+            slot: 1,
+          ),
+        ], mode: GetOffAlarmScheduleMode.exact);
+
+        if (reconcileFirst) {
+          await reconcile();
+          bootRestore();
+        } else {
+          bootRestore();
+          await reconcile();
+        }
+
+        expect(pending, {base + 1});
+      }
     });
 
     test('pending 목록 조회 실패를 취소 성공으로 삼키지 않는다', () async {
