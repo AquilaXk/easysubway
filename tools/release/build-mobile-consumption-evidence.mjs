@@ -159,7 +159,9 @@ function checkTestNamesExist(repoRoot, testFile, testNames) {
 }
 
 // E8 소스 레벨 검증: RouteSearchRequest 클래스 본문(다음 top-level class 선언 전까지)에
-// FORBIDDEN_REQUEST_FIELDS 중 어느 것도 quoted map key로 등장하지 않는지 확인한다.
+// FORBIDDEN_REQUEST_FIELDS 중 어느 것도 quoted map key로 등장하지 않는지 확인한다. Dart는
+// single/double quote 문자열을 모두 허용하므로("expressOnly"도 유효한 map key literal)
+// 양쪽 quote 스타일을 모두 검사해야 quote 스타일만 바꿔 우회하는 경우를 막는다.
 function checkRequestFieldAbsence(repoRoot, requestSourceFile, requestClassMarker) {
   const filePath = path.join(repoRoot, requestSourceFile);
   if (!existsSync(filePath)) {
@@ -172,7 +174,9 @@ function checkRequestFieldAbsence(repoRoot, requestSourceFile, requestClassMarke
   }
   const nextClassStart = source.indexOf("\nclass ", classStart + requestClassMarker.length);
   const classBody = nextClassStart === -1 ? source.slice(classStart) : source.slice(classStart, nextClassStart);
-  const found = FORBIDDEN_REQUEST_FIELDS.filter((field) => classBody.includes(`'${field}'`));
+  const found = FORBIDDEN_REQUEST_FIELDS.filter(
+    (field) => classBody.includes(`'${field}'`) || classBody.includes(`"${field}"`),
+  );
   return { pass: found.length === 0, found, filePath: requestSourceFile };
 }
 

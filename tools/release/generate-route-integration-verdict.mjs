@@ -16,10 +16,15 @@ export const ROUTE_SEARCH_CATALOG_ID =
 const ROUTE_SEARCH_CONTRACT_VERSION = "ROUTE_SEARCH_V2";
 
 // 같은 RC identity 판정에 사용하는 필드. 서로 다른 producer evidence가 같은 후보를 소비했는지 검증한다.
+// aabSha256/aabPayloadSha256을 포함해 mobile bundle 자체의 identity도 결속한다 — appVersionName/
+// versionCode만으로는 버전 번호는 같지만 실제 서명된 산출물이 다른 재빌드를 구분하지 못한다.
+// generate-rc-evidence-manifest.mjs도 이 두 필드를 RC identity 필수 항목으로 취급한다(동일 관행).
 const RC_IDENTITY_FIELDS = [
   "gitSha",
   "appVersionName",
   "versionCode",
+  "aabSha256",
+  "aabPayloadSha256",
   "backendImageDigest",
   "backendArtifactSha256",
   "dataPackManifestSha256",
@@ -27,8 +32,10 @@ const RC_IDENTITY_FIELDS = [
   "routeContractVersion",
   "realtimeContractVersion",
 ];
-// 최소한 값이 있어야 하는(fail-closed) 앵커 필드.
-const RC_IDENTITY_ANCHOR_FIELDS = ["gitSha", "versionCode", "dataPackArtifactSha256"];
+// 최소한 값이 있어야 하는(fail-closed) 앵커 필드. aabSha256/aabPayloadSha256은 backend와 달리
+// anyOf가 아니라 둘 다 필수다(Android 빌드 job은 이 저장소의 모든 RC 파이프라인에서 항상 실행되며,
+// 264645ca 실 final-readiness 등 실측 RC artifact에서도 항상 채워져 있었다).
+const RC_IDENTITY_ANCHOR_FIELDS = ["gitSha", "versionCode", "dataPackArtifactSha256", "aabSha256", "aabPayloadSha256"];
 // backend identity는 anyOf 관계다(backendImageDigest 또는 backendArtifactSha256 중 하나만 있으면
 // 된다) — 둘 다 null이면 backend가 어떤 candidate에 묶였는지 anchor할 수 없어 fail-closed blocker.
 const RC_IDENTITY_BACKEND_ANCHOR_FIELDS = ["backendArtifactSha256", "backendImageDigest"];
@@ -239,6 +246,189 @@ function evaluateEvidenceInput(name, evidence, canonicalIdentity, allowFixturePr
   };
 }
 
+// #7 mixed RC/artifact identity NO_GO 판정(evidence identity mismatch + canonical anchor 미완성
+// + planner artifact identity linkage).
+function evaluateIdentityNoGo({ evaluations, canonicalIdentity, plannerEvidence, trip }) {
+  for (const evaluation of Object.values(evaluations)) {
+    if (!evaluation.present) continue;
+    if (!evaluation.identityMatches) {
+      trip(
+        "mixed_rc_or_artifact_identity",
+        `${evaluation.name} identity mismatch: ${(evaluation.mismatchFields ?? []).join(", ") || "missing identity"}`,
+      );
+    }
+  }
+  const canonicalAnchorGaps = anchorIncomplete(canonicalIdentity);
+  if (canonicalAnchorGaps.length > 0) {
+    trip("mixed_rc_or_artifact_identity", `canonical identity missing anchor fields: ${canonicalAnchorGaps.join(", ")}`);
+  }
+  // planner artifact identity linkage: canonicalPackSha256이 datapack artifact와 일치해야 한다.
+  if (plannerEvidence) {
+    const canonicalPackSha256 = plannerEvidence?.plannerIdentity?.canonicalPackSha256 ?? null;
+    if (canonicalPackSha256 !== (canonicalIdentity.dataPackArtifactSha256 ?? null)) {
+      trip(
+        "mixed_rc_or_artifact_identity",
+        "planner canonicalPackSha256 does not match RC dataPackArtifactSha256",
+      );
+    }
+  }
+}
+
+// fixture-only fail-closed 판정.
+function evaluateProvenanceNoGo({ evaluations, allowFixtureProvenance, trip, unresolved }) {
+  for (const evaluation of Object.values(evaluations)) {
+    if (!evaluation.present) continue;
+    if (evaluation.fixtureOnly && !allowFixtureProvenance) {
+      trip("fixture_only_evidence", `${evaluation.name} evidence is fixture-only`);
+    } else if (!evaluation.provenanceValid) {
+      unresolved(
+        "fixture_only_evidence",
+        `${evaluation.name} evidence provenance is not one of ${[...VALID_PROVENANCE].join(", ")}`,
+      );
+    }
+  }
+}
+
+// #3 ride leg가 serviceClass/servicePattern 없이 성공 응답하는지 NO_GO 판정.
+function evaluatePlannerRideMetadataNoGo({ plannerEvidence, plannerRide, trip, unresolved }) {
+  if (plannerEvidence) {
+    if (plannerRide.structureMissing) {
+      unresolved("ride_leg_missing_service_metadata", "planner evidence has no canary itinerary structure");
+    } else if (plannerRide.rideLegs === 0) {
+      unresolved("ride_leg_missing_service_metadata", "planner evidence exposes no RIDE legs");
+    } else if (plannerRide.missingMetadata) {
+      trip("ride_leg_missing_service_metadata", "a planner RIDE leg is missing serviceClass or servicePattern");
+    }
+  } else {
+    unresolved("ride_leg_missing_service_metadata", "planner evidence not provided");
+  }
+}
+
+// #2 final seed의 unknown pattern이 LOCAL로 default되는지 NO_GO 판정(planner evidence의 명시
+// attestation을 요구한다).
+function evaluateSeedPatternNoGo({ plannerEvidence, trip, unresolved }) {
+  const seedPatternAttestation = plannerEvidence?.checks?.unknownPatternDefaultedToLocal;
+  if (!plannerEvidence) {
+    unresolved("unknown_pattern_defaulted_to_local", "planner evidence not provided");
+  } else if (seedPatternAttestation === true) {
+    trip("unknown_pattern_defaulted_to_local", "planner seed defaults unknown pattern to LOCAL");
+  } else if (seedPatternAttestation !== false) {
+    unresolved("unknown_pattern_defaulted_to_local", "planner evidence does not attest seed pattern handling");
+  }
+}
+
+// 단일 시나리오의 base 판정 + 구조적 override(E3/E9) + 연결된 NO_GO 조건 전파를 수행한다.
+function evaluateScenario(scenario, { evaluations, evidenceByOwner, plannerRide, allowFixtureProvenance, mobileEvidence, trip, unresolved }) {
+  const evaluation = evaluations[scenario.owner];
+  const reasons = [];
+  let result;
+  if (!evaluation.present) {
+    result = "PENDING";
+    reasons.push(`${scenario.owner} evidence not provided`);
+  } else if (!evaluation.identityMatches) {
+    result = "FAIL";
+    reasons.push(`${scenario.owner} evidence identity does not match the RC candidate`);
+  } else if (evaluation.fixtureOnly && !allowFixtureProvenance) {
+    result = "FAIL";
+    reasons.push(`${scenario.owner} evidence is fixture-only`);
+  } else if (!evaluation.provenanceValid) {
+    result = "PENDING";
+    reasons.push(`${scenario.owner} evidence provenance is not a releasable source`);
+  } else {
+    const attestation = scenarioAttestation(evidenceByOwner[scenario.owner], scenario.id);
+    if (attestation === "PASS") {
+      result = "PASS";
+    } else if (attestation === "FAIL") {
+      result = "FAIL";
+      reasons.push(`${scenario.owner} evidence attests ${scenario.id} as FAIL`);
+    } else {
+      result = "PENDING";
+      reasons.push(`${scenario.owner} evidence does not attest ${scenario.id}`);
+    }
+  }
+
+  // 구조적 override: E3는 planner ride metadata 결손 시 FAIL(NO_GO #3와 연동).
+  if (scenario.id === "E3" && plannerRide && plannerRide.missingMetadata && result === "PASS") {
+    result = "FAIL";
+    reasons.push("planner RIDE metadata is incomplete");
+  }
+  // 구조적 override: E9는 planner canary에 ITX_CHEONGCHUN/EXPRESS ride가 있어야 PASS 유지.
+  if (scenario.id === "E9" && plannerRide && !plannerRide.hasItxExpress && result === "PASS") {
+    result = "FAIL";
+    reasons.push("planner canary has no ITX_CHEONGCHUN EXPRESS RIDE leg");
+  }
+  // 구조적 override: E9는 backend 표현뿐 아니라 실제 Mobile 표시(ITX-청춘 vs generic 급행)까지
+  // 요구한다. planner 쪽만으로 PASS에 도달했더라도, identity·provenance가 유효한 mobile
+  // evidence가 E9를 명시적으로 PASS attest했을 때만 PASS를 유지한다(fail-closed) — mobile
+  // evidence가 없거나 E9를 attest하지 않으면 PASS를 그대로 두지 않고(fail-open 금지) PENDING으로
+  // 낮춘다. 명시적 FAIL이면 FAIL로 덮어쓴다.
+  if (scenario.id === "E9" && result === "PASS") {
+    const mobileEvaluation = evaluations.mobile;
+    const mobileEvidenceUsable = mobileEvaluation.present
+      && mobileEvaluation.identityMatches
+      && !(mobileEvaluation.fixtureOnly && !allowFixtureProvenance)
+      && mobileEvaluation.provenanceValid;
+    const mobileE9 = mobileEvidenceUsable ? scenarioAttestation(mobileEvidence, "E9") : undefined;
+    if (mobileE9 === "FAIL") {
+      result = "FAIL";
+      reasons.push("mobile evidence attests E9 as FAIL (ITX-청춘 표시 미구현)");
+    } else if (mobileE9 !== "PASS") {
+      result = "PENDING";
+      reasons.push("mobile evidence does not explicitly attest E9 as PASS");
+    }
+  }
+
+  // scenario 결과를 연결된 NO_GO 조건으로 전파.
+  for (const conditionId of scenario.guardsNoGo) {
+    if (result === "FAIL") {
+      trip(conditionId, `${scenario.id} failed`);
+    } else if (result !== "PASS") {
+      unresolved(conditionId, `${scenario.id} is ${result}`);
+    }
+  }
+
+  return {
+    id: scenario.id,
+    titleKo: scenario.titleKo,
+    producerIssue: scenario.producerIssue,
+    producerIssueUrl: issueUrl(scenario.producerIssue),
+    owner: scenario.owner,
+    evidenceTests: scenario.evidenceTests,
+    testRunUrl: evaluation.present ? evaluation.testRunUrl : null,
+    guardsNoGo: scenario.guardsNoGo,
+    artifactIdentity: evaluation.present ? evaluation.identity : null,
+    result,
+    reasons,
+  };
+}
+
+// E1~E9 전체 scenario matrix를 판정한다.
+function evaluateScenarioMatrix(context) {
+  return ROUTE_INTEGRATION_SCENARIOS.map((scenario) => evaluateScenario(scenario, context));
+}
+
+// noGo Map과 scenarioMatrix로부터 blockers 목록을 만든다.
+function buildBlockers(noGoConditions, scenarioMatrix) {
+  const blockers = [];
+  for (const condition of noGoConditions) {
+    if (condition.triggered) {
+      blockers.push({ id: `no_go_${condition.id}`, severity: "P0", reasons: condition.reasons });
+    } else if (condition.unresolved) {
+      blockers.push({ id: `unresolved_${condition.id}`, severity: "P0", reasons: condition.reasons });
+    }
+  }
+  for (const scenario of scenarioMatrix) {
+    if (scenario.result !== "PASS") {
+      blockers.push({
+        id: `scenario_${scenario.id.toLowerCase()}_${scenario.result.toLowerCase()}`,
+        severity: "P0",
+        reasons: scenario.reasons,
+      });
+    }
+  }
+  return blockers;
+}
+
 export function buildRouteIntegrationVerdict(inputs) {
   const {
     rcManifest,
@@ -282,163 +472,24 @@ export function buildRouteIntegrationVerdict(inputs) {
     entry.reasons.push(reason);
   };
 
-  // #7 mixed RC/artifact identity.
-  for (const evaluation of Object.values(evaluations)) {
-    if (!evaluation.present) continue;
-    if (!evaluation.identityMatches) {
-      trip(
-        "mixed_rc_or_artifact_identity",
-        `${evaluation.name} identity mismatch: ${(evaluation.mismatchFields ?? []).join(", ") || "missing identity"}`,
-      );
-    }
-  }
-  const canonicalAnchorGaps = anchorIncomplete(canonicalIdentity);
-  if (canonicalAnchorGaps.length > 0) {
-    trip("mixed_rc_or_artifact_identity", `canonical identity missing anchor fields: ${canonicalAnchorGaps.join(", ")}`);
-  }
-  // planner artifact identity linkage: canonicalPackSha256이 datapack artifact와 일치해야 한다.
-  if (plannerEvidence) {
-    const canonicalPackSha256 = plannerEvidence?.plannerIdentity?.canonicalPackSha256 ?? null;
-    if (canonicalPackSha256 !== (canonicalIdentity.dataPackArtifactSha256 ?? null)) {
-      trip(
-        "mixed_rc_or_artifact_identity",
-        "planner canonicalPackSha256 does not match RC dataPackArtifactSha256",
-      );
-    }
-  }
+  evaluateIdentityNoGo({ evaluations, canonicalIdentity, plannerEvidence, trip });
+  evaluateProvenanceNoGo({ evaluations, allowFixtureProvenance, trip, unresolved });
+  evaluatePlannerRideMetadataNoGo({ plannerEvidence, plannerRide, trip, unresolved });
 
-  // fixture-only fail-closed.
-  for (const evaluation of Object.values(evaluations)) {
-    if (!evaluation.present) continue;
-    if (evaluation.fixtureOnly && !allowFixtureProvenance) {
-      trip("fixture_only_evidence", `${evaluation.name} evidence is fixture-only`);
-    } else if (!evaluation.provenanceValid) {
-      unresolved(
-        "fixture_only_evidence",
-        `${evaluation.name} evidence provenance is not one of ${[...VALID_PROVENANCE].join(", ")}`,
-      );
-    }
-  }
-
-  // #3 ride leg가 serviceClass/servicePattern 없이 성공 응답.
-  if (plannerEvidence) {
-    if (plannerRide.structureMissing) {
-      unresolved("ride_leg_missing_service_metadata", "planner evidence has no canary itinerary structure");
-    } else if (plannerRide.rideLegs === 0) {
-      unresolved("ride_leg_missing_service_metadata", "planner evidence exposes no RIDE legs");
-    } else if (plannerRide.missingMetadata) {
-      trip("ride_leg_missing_service_metadata", "a planner RIDE leg is missing serviceClass or servicePattern");
-    }
-  } else {
-    unresolved("ride_leg_missing_service_metadata", "planner evidence not provided");
-  }
-
-  // scenario matrix 판정.
-  const scenarioMatrix = ROUTE_INTEGRATION_SCENARIOS.map((scenario) => {
-    const evaluation = evaluations[scenario.owner];
-    const reasons = [];
-    let result;
-    if (!evaluation.present) {
-      result = "PENDING";
-      reasons.push(`${scenario.owner} evidence not provided`);
-    } else if (!evaluation.identityMatches) {
-      result = "FAIL";
-      reasons.push(`${scenario.owner} evidence identity does not match the RC candidate`);
-    } else if (evaluation.fixtureOnly && !allowFixtureProvenance) {
-      result = "FAIL";
-      reasons.push(`${scenario.owner} evidence is fixture-only`);
-    } else if (!evaluation.provenanceValid) {
-      result = "PENDING";
-      reasons.push(`${scenario.owner} evidence provenance is not a releasable source`);
-    } else {
-      const attestation = scenarioAttestation(evidenceByOwner[scenario.owner], scenario.id);
-      if (attestation === "PASS") {
-        result = "PASS";
-      } else if (attestation === "FAIL") {
-        result = "FAIL";
-        reasons.push(`${scenario.owner} evidence attests ${scenario.id} as FAIL`);
-      } else {
-        result = "PENDING";
-        reasons.push(`${scenario.owner} evidence does not attest ${scenario.id}`);
-      }
-    }
-
-    // 구조적 override: E3는 planner ride metadata 결손 시 FAIL(NO_GO #3와 연동).
-    if (scenario.id === "E3" && plannerRide && plannerRide.missingMetadata && result === "PASS") {
-      result = "FAIL";
-      reasons.push("planner RIDE metadata is incomplete");
-    }
-    // 구조적 override: E9는 planner canary에 ITX_CHEONGCHUN/EXPRESS ride가 있어야 PASS 유지.
-    if (scenario.id === "E9" && plannerRide && !plannerRide.hasItxExpress && result === "PASS") {
-      result = "FAIL";
-      reasons.push("planner canary has no ITX_CHEONGCHUN EXPRESS RIDE leg");
-    }
-    // 구조적 override: E9는 backend 표현뿐 아니라 실제 Mobile 표시(ITX-청춘 vs generic 급행)까지
-    // 요구한다. mobile evidence가 identity-bound로 존재하고 E9를 FAIL로 attest하면 planner의
-    // PASS를 덮어써 Mobile 미구현을 fail closed로 반영한다.
-    if (scenario.id === "E9" && result === "PASS") {
-      const mobileEvaluation = evaluations.mobile;
-      if (mobileEvaluation.present && mobileEvaluation.identityMatches) {
-        const mobileE9 = scenarioAttestation(mobileEvidence, "E9");
-        if (mobileE9 === "FAIL") {
-          result = "FAIL";
-          reasons.push("mobile evidence attests E9 as FAIL (ITX-청춘 표시 미구현)");
-        }
-      }
-    }
-
-    // scenario 결과를 연결된 NO_GO 조건으로 전파.
-    for (const conditionId of scenario.guardsNoGo) {
-      if (result === "FAIL") {
-        trip(conditionId, `${scenario.id} failed`);
-      } else if (result !== "PASS") {
-        unresolved(conditionId, `${scenario.id} is ${result}`);
-      }
-    }
-
-    return {
-      id: scenario.id,
-      titleKo: scenario.titleKo,
-      producerIssue: scenario.producerIssue,
-      producerIssueUrl: issueUrl(scenario.producerIssue),
-      owner: scenario.owner,
-      evidenceTests: scenario.evidenceTests,
-      testRunUrl: evaluation.present ? evaluation.testRunUrl : null,
-      guardsNoGo: scenario.guardsNoGo,
-      artifactIdentity: evaluation.present ? evaluation.identity : null,
-      result,
-      reasons,
-    };
+  const scenarioMatrix = evaluateScenarioMatrix({
+    evaluations,
+    evidenceByOwner,
+    plannerRide,
+    allowFixtureProvenance,
+    mobileEvidence,
+    trip,
+    unresolved,
   });
 
-  // 판정 조건: seed의 unknown pattern default(#2)는 planner evidence의 명시 attestation을 요구한다.
-  const seedPatternAttestation = plannerEvidence?.checks?.unknownPatternDefaultedToLocal;
-  if (!plannerEvidence) {
-    unresolved("unknown_pattern_defaulted_to_local", "planner evidence not provided");
-  } else if (seedPatternAttestation === true) {
-    trip("unknown_pattern_defaulted_to_local", "planner seed defaults unknown pattern to LOCAL");
-  } else if (seedPatternAttestation !== false) {
-    unresolved("unknown_pattern_defaulted_to_local", "planner evidence does not attest seed pattern handling");
-  }
+  evaluateSeedPatternNoGo({ plannerEvidence, trip, unresolved });
 
   const noGoConditions = NO_GO_CONDITIONS.map((id) => noGo.get(id));
-  const blockers = [];
-  for (const condition of noGoConditions) {
-    if (condition.triggered) {
-      blockers.push({ id: `no_go_${condition.id}`, severity: "P0", reasons: condition.reasons });
-    } else if (condition.unresolved) {
-      blockers.push({ id: `unresolved_${condition.id}`, severity: "P0", reasons: condition.reasons });
-    }
-  }
-  for (const scenario of scenarioMatrix) {
-    if (scenario.result !== "PASS") {
-      blockers.push({
-        id: `scenario_${scenario.id.toLowerCase()}_${scenario.result.toLowerCase()}`,
-        severity: "P0",
-        reasons: scenario.reasons,
-      });
-    }
-  }
+  const blockers = buildBlockers(noGoConditions, scenarioMatrix);
 
   const decision = blockers.length === 0 ? "GO" : "NO_GO";
 

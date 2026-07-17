@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildPlannerSuccessEvidence, evaluateRouteV2RegressionFixtures } from "./build-planner-success-evidence.mjs";
+import {
+  buildPlannerSuccessEvidence,
+  evaluateRouteV2RegressionFixtures,
+  verifySeedRejectsUnknownServicePattern,
+} from "./build-planner-success-evidence.mjs";
 
 const identity = {
   gitSha: "1".repeat(40),
@@ -104,6 +108,13 @@ test("provenance는 기본 final-candidate이며 unknownPatternDefaultedToLocal�
 
   assert.equal(evidence.provenance, "final-candidate");
   assert.equal(evidence.checks.unknownPatternDefaultedToLocal, false);
+  // 하드코딩 주장이 아니라 tracked build-backend-timetable-seed.mjs를 실제로 undefined
+  // pattern으로 호출해 예외가 실제로 발생함을 재현한 결과여야 한다.
+  assert.equal(evidence.seedPatternGuardProbe.rejected, true);
+  assert.match(
+    evidence.seedPatternGuardProbe.errorMessage,
+    /service_pattern must be explicitly LOCAL or EXPRESS/,
+  );
   // E9는 regressionEvidence 없이도 canary 자체의 ITX_CHEONGCHUN/EXPRESS ride 존재로 attest된다.
   assert.deepEqual(evidence.integrationScenarios, { E9: "PASS" });
   assert.equal(evidence.regression1228, null);
@@ -160,4 +171,11 @@ test("evaluateRouteV2RegressionFixtures는 tracked #1228 fixture를 실제로 �
     unmatchedRealtime: true,
   });
   assert.match(result.fixturesSha256, /^[0-9a-f]{64}$/);
+});
+
+test("verifySeedRejectsUnknownServicePattern은 tracked seed builder를 실제로 호출해 undefined pattern 거부를 재현한다", () => {
+  const result = verifySeedRejectsUnknownServicePattern();
+
+  assert.equal(result.rejected, true);
+  assert.match(result.errorMessage, /service_pattern must be explicitly LOCAL or EXPRESS/);
 });

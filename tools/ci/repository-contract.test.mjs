@@ -466,6 +466,8 @@ test("route integration verdict는 mixed identity·누락 입력을 fail closed�
     gitSha: "26d1461210a36d9d969e5a18d5f13725519abdcd",
     appVersionName: "1.0.4",
     versionCode: "10005",
+    aabSha256: "87df6fd89fd8490a8af0d754e48a17288b880f3e918bde87729b79fee88435cc",
+    aabPayloadSha256: "e2b9753619285e685a713e101b996129781f9067de5bc6a90a125c5c9de95758",
     backendImageDigest: null,
     backendArtifactSha256: "74a3e35762d1973c0b05a0c0bd6f0fc6aa2a4657ef23cde359cf100e0830f631",
     dataPackManifestSha256: "2ee9f38f3e748d7bbc6d9eba124b34e6b5c8ad539338a6cdeee7a472515456e5",
@@ -495,7 +497,7 @@ test("route integration verdict는 mixed identity·누락 입력을 fail closed�
     sourceIssue: 2099,
     provenance: "manual-observation",
     releaseCandidateIdentity: { ...identity },
-    integrationScenarios: { E7: "PASS", E8: "PASS" },
+    integrationScenarios: { E7: "PASS", E8: "PASS", E9: "PASS" },
   };
   const routeMap = {
     sourceIssue: 2068,

@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadFixtures, runRangeRaptor, runTimeDependentDijkstra } from "../routes/prototype-route-v2.mjs";
+import { buildBackendTimetableSeed } from "../datapack/build-backend-timetable-seed.mjs";
 
 const API_CATALOG_ID = "internal:POST:/api/v2/routes/search:com.easysubway.route.adapter.in.web.RouteSearchController#searchRouteV2";
 const SHA256 = /^[0-9a-f]{64}$/;
@@ -28,14 +29,40 @@ const REGRESSION_1228_FIXTURE_IDS = {
   unmatchedRealtime: "unmatched_realtime_express_does_not_override_planned_local",
 };
 
-// 이슈 #1414 NO_GO #2("final seed의 missing/unknown pattern을 LOCAL로 default함")를 구조적으로
-// 방지하는 backend 증거 참조. TimetableSeedLoader는 로드 시 service_pattern이 LOCAL/EXPRESS가
-// 아닌 trip이 하나라도 있으면 활성화를 fail-closed로 거부한다(defaulting이 아니라 거부).
+// 이슈 #1414 NO_GO #2("final seed의 missing/unknown pattern을 LOCAL로 default함")를 방지하는
+// backend 증거 참조(보조 정보 — 아래 verifySeedRejectsUnknownServicePattern이 실측하는
+// seed-authoring-time guard와는 다른 계층이다). TimetableSeedLoader는 로드 시 service_pattern이
+// LOCAL/EXPRESS가 아닌 trip이 하나라도 있으면 활성화를 fail-closed로 거부한다.
 const SEED_PATTERN_GUARD = {
   assertionSourceFile: "backend/src/main/java/com/easysubway/route/adapter/out/persistence/TimetableSeedLoader.java",
   assertionLabel: "trip service pattern identity",
   verifiedByTest: "backend/src/test/java/com/easysubway/route/adapter/out/persistence/TimetableSeedLoaderTest.java::trackedCompleteSnapshotLoadsWithExactEvidenceCounts",
 };
+
+// checks.unknownPatternDefaultedToLocal을 하드코딩 주장이 아니라 실제 실행으로 검증한다.
+// tools/datapack/build-backend-timetable-seed.mjs의 buildBackendTimetableSeed는 production
+// backend seed SQL을 만드는 데도 쓰이는 동일 함수이며, 내부 validateTrips가 servicePattern이
+// 명시적으로 LOCAL/EXPRESS가 아니면 예외를 던진다(tools/datapack/build-backend-timetable-seed.test.mjs
+// :91 "final seed는 모든 trip의 explicit LOCAL/EXPRESS servicePattern을 요구한다"가 이를 고정).
+// 여기서는 그 test를 재작성하지 않고, undefined pattern으로 이 tracked 함수를 실제 호출해
+// 예외가 실제로 나는지 동적으로 재현한다.
+export function verifySeedRejectsUnknownServicePattern() {
+  const probeTrip = {
+    id: "evidence-probe-trip",
+    routeId: "evidence-probe-route",
+    serviceId: "evidence-probe-service",
+    tripHeadsign: "evidence-probe-headsign",
+    directionId: "up",
+    servicePattern: undefined,
+  };
+  try {
+    buildBackendTimetableSeed({ transitTrips: [probeTrip] });
+    return { rejected: false, errorMessage: null };
+  } catch (error) {
+    const rejected = /service_pattern must be explicitly LOCAL or EXPRESS/.test(error.message);
+    return { rejected, errorMessage: error.message };
+  }
+}
 
 function fixtureResultMatches(query, result) {
   if (query.expectedArrival === null) return result === null;
@@ -120,6 +147,23 @@ export function buildPlannerSuccessEvidence({
       Object.entries(regressionEvidence.regression1228).map(([key, passed]) => [key, passed ? "SATISFIED" : "FAILED"]),
     )
     : null;
+  const seedPatternGuardProbe = verifySeedRejectsUnknownServicePattern();
+  const checks = {
+    deterministicRepresentativeRanking: "SATISFIED",
+    officialFare: "SATISFIED",
+    exactPlannedTimes: "SATISFIED",
+    typedRideMetadata: "SATISFIED",
+    topologyTimetableLinkage: "SATISFIED",
+    candidateTopologyIdentity: topologyBound ? "SATISFIED" : "BLOCKED",
+    signedReleaseCandidate: signedRcBound ? "SATISFIED" : "BLOCKED",
+  };
+  // seedPatternGuardProbe.rejected가 실제로 true일 때만(즉 tracked seed builder를 방금 실행해
+  // undefined pattern이 실제로 거부됨을 확인했을 때만) false를 채운다. 예상과 다르게 거부되지
+  // 않으면(가드가 깨졌거나 에러 메시지가 바뀜) 안전하다고 단정하지 않고 필드를 비워
+  // verdict가 "attestation 없음"으로 fail-closed 처리하게 한다.
+  if (seedPatternGuardProbe.rejected) {
+    checks.unknownPatternDefaultedToLocal = false;
+  }
   return {
     schemaVersion: 1,
     artifactKind: "route-v2-planner-success-evidence",
@@ -140,19 +184,8 @@ export function buildPlannerSuccessEvidence({
     regression1228: regression1228Checks,
     regressionFixturesSha256: regressionEvidence?.fixturesSha256 ?? null,
     seedPatternGuard: SEED_PATTERN_GUARD,
-    checks: {
-      deterministicRepresentativeRanking: "SATISFIED",
-      officialFare: "SATISFIED",
-      exactPlannedTimes: "SATISFIED",
-      typedRideMetadata: "SATISFIED",
-      topologyTimetableLinkage: "SATISFIED",
-      candidateTopologyIdentity: topologyBound ? "SATISFIED" : "BLOCKED",
-      signedReleaseCandidate: signedRcBound ? "SATISFIED" : "BLOCKED",
-      // canary의 모든 RIDE leg가 LOCAL/EXPRESS 중 하나로 명시된다(validateCanary가 이를 강제하므로
-      // 이 함수에 도달했다는 것 자체가 unknown pattern이 관측되지 않았다는 증거다). backend seed
-      // loader는 이를 defaulting이 아니라 fail-closed 거부로 구조적으로 보장한다(SEED_PATTERN_GUARD).
-      unknownPatternDefaultedToLocal: false,
-    },
+    seedPatternGuardProbe,
+    checks,
   };
 }
 

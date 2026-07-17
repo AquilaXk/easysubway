@@ -206,6 +206,18 @@ test("E8은 request 직렬화에 servicePattern/expressOnly 등 금지 필드가
   assert.deepEqual(evidence.scenarioEvidence.E8.forbiddenFieldsFound, ["servicePattern"]);
 });
 
+test("E8은 double-quote로 직렬화된 금지 필드도 우회 없이 FAIL한다(quote 스타일 회귀 가드)", async () => {
+  const repoRoot = await fixtureRepoRoot({
+    // Dart는 single/double quote 문자열 리터럴을 모두 허용한다 — double quote만 써서
+    // single-quote 전용 검사를 우회할 수 있었던 과거 결함의 회귀 가드.
+    requestClassBody: "class RouteSearchRequest {\n  Map<String, Object?> toV2Json() => {\"expressOnly\": true};\n}\n",
+  });
+  const evidence = buildMobileConsumptionEvidence({ candidate: candidate(), repoRoot });
+
+  assert.equal(evidence.integrationScenarios.E8, "FAIL");
+  assert.deepEqual(evidence.scenarioEvidence.E8.forbiddenFieldsFound, ["expressOnly"]);
+});
+
 test("CANDIDATE context가 아니면 거부한다", async () => {
   const repoRoot = await fixtureRepoRoot();
   assert.throws(
