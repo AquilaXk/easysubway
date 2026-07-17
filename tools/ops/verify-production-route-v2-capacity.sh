@@ -10,17 +10,22 @@ PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://easysubway-api.aquilaxk.site}"
 read_env_value() {
 	local file="${1:?file is required}"
 	local name="${2:?name is required}"
-	local line
+	local line value="" match_count=0
 	while IFS= read -r line || [[ -n "${line}" ]]; do
 		[[ "${line}" == "${name}="* ]] || continue
-		local value="${line#*=}"
+		match_count=$((match_count + 1))
+		value="${line#*=}"
 		if [[ "${value}" == \"*\" && "${value}" == *\" ]] || [[ "${value}" == \'*\' && "${value}" == *\' ]]; then
 			value="${value:1:${#value}-2}"
 		fi
-		printf '%s\n' "${value}"
-		return 0
 	done < "${file}"
-	return 1
+	if (( match_count > 1 )); then
+		echo "${name} is defined ${match_count} times in the deployment environment" >&2
+		return 1
+	fi
+	(( match_count == 1 )) || return 1
+	printf '%s\n' "${value}"
+	return 0
 }
 
 if [[ "${1:-}" == --test-read-env-value ]]; then

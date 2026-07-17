@@ -175,3 +175,25 @@ test("capacity runner dotenv parser는 배포 parser와 동일하게 외부 따�
     await rm(tempDir, { recursive: true, force: true });
   }
 });
+
+test("capacity runner dotenv parser는 중복 정의된 키를 fail-closed로 거부한다", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "route-capacity-env-dup-"));
+  const envPath = path.join(tempDir, "compose.env");
+  try {
+    await writeFile(envPath, [
+      "EASYSUBWAY_ROUTE_V2_SESSION_RATE_PER_MINUTE=5",
+      "EASYSUBWAY_ROUTE_V2_SESSION_RATE_PER_MINUTE=99",
+      "",
+    ].join("\n"));
+    await assert.rejects(
+      execFileAsync("bash", [
+        runnerPath,
+        "--test-read-env-value",
+        envPath,
+        "EASYSUBWAY_ROUTE_V2_SESSION_RATE_PER_MINUTE",
+      ]),
+    );
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
