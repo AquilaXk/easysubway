@@ -38,6 +38,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -395,7 +396,7 @@ class RouteSearchController {
 				: OffsetDateTime.parse(legs.getLast().plannedArrivalTime());
 			int durationSeconds = Math.toIntExact(Duration.between(departureTime, plannedArrivalTime).toSeconds());
 			return new ItineraryDto(
-				result.routeSearchId() + "-primary",
+				"route-v2-state-" + UUID.randomUUID(),
 				statusOf(result),
 				formatOffset(plannedArrivalTime),
 				null,

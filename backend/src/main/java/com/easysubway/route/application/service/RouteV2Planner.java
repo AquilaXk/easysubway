@@ -140,7 +140,11 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 						timetableItineraries
 					);
 				}
-				timetableItineraries = rankTimetableItineraries(timetableItineraries, command.objective());
+				timetableItineraries = rankTimetableItineraries(
+					timetableItineraries,
+					command.objective(),
+					command.alternativeCount()
+				);
 				return new RouteV2Plan(
 					timetableItineraries,
 					statusesOf(timetableItineraries, command.useRealtime()),
@@ -296,7 +300,8 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 
 	private List<RouteSearchResult> rankTimetableItineraries(
 		List<RouteSearchResult> itineraries,
-		RouteObjective requestedObjective
+		RouteObjective requestedObjective,
+		int alternativeCount
 	) {
 		if (itineraries.isEmpty()) {
 			return List.of();
@@ -318,9 +323,10 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 		}
 		RouteSearchResult fastestResult = withObjectiveTags(fastestItinerary, List.of("FASTEST"));
 		RouteSearchResult fewestResult = withObjectiveTags(fewestTransferItinerary, List.of("FEWEST_TRANSFERS"));
-		return requestedObjective == RouteObjective.FASTEST
+		List<RouteSearchResult> representatives = requestedObjective == RouteObjective.FASTEST
 			? List.of(fastestResult, fewestResult)
 			: List.of(fewestResult, fastestResult);
+		return representatives.stream().limit(alternativeCount).toList();
 	}
 
 	private long plannedArrivalEpochSecond(RouteSearchResult itinerary) {

@@ -37,7 +37,7 @@ class RouteTimetableRaptorPlanner {
 
 	private static final ZoneId SERVICE_ZONE = ZoneId.of("Asia/Seoul");
 	private static final int SERVICE_DAY_CUTOFF_HOUR = 3;
-	private static final int PARETO_LIMIT = 3;
+	private static final int PARETO_LIMIT = 4;
 	private static final int ENTRY_DURATION_SECONDS = 240;
 	private static final int ENTRY_DISTANCE_METERS = 180;
 	private static final int TRANSFER_DURATION_SECONDS = 360;
@@ -49,7 +49,7 @@ class RouteTimetableRaptorPlanner {
 		ServiceDay serviceDay = serviceDay(command);
 		return scanDestinationLabels(command, timetable, serviceDay, serviceDay.departureSeconds()).labels().stream()
 			.sorted(RouteTimetableRaptorPlanner::compareLabels)
-			.limit(Math.min(command.alternativeCount(), PARETO_LIMIT))
+			.limit(candidateLimit(command))
 			.map(label -> toRouteSearchResult(command, label, serviceDay, timetable))
 			.toList();
 	}
@@ -236,7 +236,7 @@ class RouteTimetableRaptorPlanner {
 		List<Label> destinationLabels = labels.getOrDefault(command.destinationStationId(), List.of()).stream()
 			.filter(label -> !label.path().isEmpty())
 			.sorted(RouteTimetableRaptorPlanner::compareLabels)
-			.limit(PARETO_LIMIT)
+			.limit(candidateLimit(command))
 			.toList();
 		return new ScanResult(serviceDay, destinationLabels);
 	}
@@ -304,7 +304,17 @@ class RouteTimetableRaptorPlanner {
 		}
 		kept.add(candidate);
 		kept.sort(RouteTimetableRaptorPlanner::compareLabels);
-		labels.put(candidate.stationId(), List.copyOf(kept.stream().limit(PARETO_LIMIT).toList()));
+		List<Label> bestByBoardings = new ArrayList<>();
+		for (Label label : kept) {
+			if (bestByBoardings.stream().noneMatch(existing -> existing.boardings() == label.boardings())) {
+				bestByBoardings.add(label);
+			}
+		}
+		labels.put(candidate.stationId(), List.copyOf(bestByBoardings.stream().limit(PARETO_LIMIT).toList()));
+	}
+
+	private static int candidateLimit(SearchRouteV2Command command) {
+		return Math.max(command.alternativeCount(), command.maxTransfers() + 1);
 	}
 
 	private static boolean dominates(Label left, Label right) {

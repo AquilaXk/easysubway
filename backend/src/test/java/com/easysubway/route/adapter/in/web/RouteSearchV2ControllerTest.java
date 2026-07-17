@@ -2,6 +2,7 @@ package com.easysubway.route.adapter.in.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -25,6 +26,7 @@ import com.easysubway.route.domain.RouteSearchStatus;
 import com.easysubway.route.domain.RouteStep;
 import com.easysubway.route.domain.RouteWarning;
 import com.easysubway.route.domain.RouteWarningCode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -52,6 +54,9 @@ class RouteSearchV2ControllerTest {
 
 	@Autowired
 	private MockMvc mockMvc;
+
+	@Autowired
+	private ObjectMapper objectMapper;
 
 	@MockitoBean
 	private RouteSearchUseCase routeSearchUseCase;
@@ -207,7 +212,8 @@ class RouteSearchV2ControllerTest {
 			.andExpect(jsonPath("$.data.statuses[0]").value("FOUND"))
 			.andExpect(jsonPath("$.data.statuses[1]").value("REALTIME_UNAVAILABLE_PLANNED_USED"))
 			.andExpect(jsonPath("$.data.statuses[2]").value("BLOCKED_ACCESSIBILITY"))
-			.andExpect(jsonPath("$.data.itineraries[0].itineraryId").value("route-search-1-primary"))
+			.andExpect(jsonPath("$.data.itineraries[0].itineraryId")
+				.value(org.hamcrest.Matchers.startsWith("route-v2-state-")))
 			.andExpect(jsonPath("$.data.itineraries[0].status").value("FOUND"))
 			.andExpect(jsonPath("$.data.itineraries[0].plannedArrivalTime").value("2026-06-30T09:22:00+09:00"))
 			.andExpect(jsonPath("$.data.itineraries[0].realtimeArrivalTime").doesNotExist())
@@ -235,6 +241,35 @@ class RouteSearchV2ControllerTest {
 			.andExpect(jsonPath("$.data.itineraries[0].commercialEtaEligible").value(false))
 			.andExpect(jsonPath("$.data.itineraries[1].status").value("BLOCKED_ACCESSIBILITY"))
 			.andExpect(jsonPath("$.data.itineraries[2]").doesNotExist());
+	}
+
+	@Test
+	@DisplayName("동일한 V2 요청도 persisted itinerary ID는 매번 고유하다")
+	void routeSearchV2UsesUniqueItineraryIdPerRequest() throws Exception {
+		when(routeSearchUseCase.searchRouteAlternatives(any(), eq(1))).thenReturn(List.of(foundRouteSearch()));
+		String body = """
+			{
+			  "originStationId": "station-sangnoksu",
+			  "destinationStationId": "station-sadang",
+			  "departureTime": "2026-06-30T09:15:00+09:00",
+			  "mobilityType": "WHEELCHAIR",
+			  "constraintMode": "STRICT_STEP_FREE",
+			  "useRealtime": false,
+			  "maxTransfers": 1,
+			  "alternativeCount": 1
+			}
+			""";
+
+		String first = mockMvc.perform(post("/api/v2/routes/search")
+				.contentType(MediaType.APPLICATION_JSON).content(body))
+			.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+		String second = mockMvc.perform(post("/api/v2/routes/search")
+				.contentType(MediaType.APPLICATION_JSON).content(body))
+			.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+		String firstId = objectMapper.readTree(first).at("/data/itineraries/0/itineraryId").asText();
+		String secondId = objectMapper.readTree(second).at("/data/itineraries/0/itineraryId").asText();
+		assertThat(firstId).startsWith("route-v2-state-").isNotEqualTo(secondId);
 	}
 
 	@Test

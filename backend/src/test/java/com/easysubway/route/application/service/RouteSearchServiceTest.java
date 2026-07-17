@@ -1222,6 +1222,30 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
+	@DisplayName("V2 objective 대표는 요청한 alternativeCount를 넘지 않는다")
+	void routeV2PlannerCapsObjectiveRepresentativesByAlternativeCount() {
+		var planner = new RouteV2Planner(legacySearchMustNotBeCalled(), objectiveRouteTimetablePort());
+
+		var plan = planner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 1));
+
+		assertThat(plan.itineraries()).singleElement().satisfies(itinerary ->
+			assertThat(itinerary.objectiveTags()).containsExactly("FASTEST"));
+	}
+
+	@Test
+	@DisplayName("V2 FEWEST_TRANSFERS는 세 빠른 환승 후보 뒤의 느린 직통도 보존한다")
+	void routeV2PlannerPreservesSlowDirectCandidateForFewestTransfers() {
+		var planner = new RouteV2Planner(legacySearchMustNotBeCalled(), objectiveOverflowRouteTimetablePort());
+
+		var plan = planner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 3, 2));
+
+		assertThat(plan.itineraries()).hasSize(2);
+		assertThat(plan.itineraries().getFirst().transferCount()).isEqualTo(3);
+		assertThat(plan.itineraries().getLast().transferCount()).isZero();
+		assertThat(plan.itineraries().getLast().objectiveTags()).containsExactly("FEWEST_TRANSFERS");
+	}
+
+	@Test
 	@DisplayName("V2 objective 결과는 candidate row 순서가 바뀌어도 결정적이다")
 	void routeV2PlannerRankingIsDeterministicAcrossCandidateOrder() {
 		var original = objectiveRouteTimetablePort().loadRouteTimetable();
@@ -3391,6 +3415,43 @@ class RouteSearchServiceTest {
 				new LoadRouteTimetablePort.OfficialFare("trip-b", "station-transfer", "station-b", 1_500, "KRW", "official", "snapshot")
 			),
 			null
+		);
+	}
+
+	private static LoadRouteTimetablePort objectiveOverflowRouteTimetablePort() {
+		List<LoadRouteTimetablePort.TransitRoute> routes = new ArrayList<>();
+		List<LoadRouteTimetablePort.TransitTrip> trips = new ArrayList<>();
+		List<LoadRouteTimetablePort.TransitStopTime> stopTimes = new ArrayList<>();
+		List<LoadRouteTimetablePort.OfficialFare> fares = new ArrayList<>();
+		int[] arrivals = {40_000, 39_000, 38_000, 37_000};
+		for (int transfers = 0; transfers <= 3; transfers += 1) {
+			int legs = transfers + 1;
+			int departure = 33_000;
+			for (int leg = 0; leg < legs; leg += 1) {
+				String id = transfers + "-" + leg;
+				String routeId = "route-" + id;
+				String tripId = "trip-" + id;
+				String from = leg == 0 ? "station-a" : "station-" + transfers + "-" + leg;
+				String to = leg == legs - 1 ? "station-b" : "station-" + transfers + "-" + (leg + 1);
+				int arrival = leg == legs - 1 ? arrivals[transfers] : departure + 60;
+				routes.add(new LoadRouteTimetablePort.TransitRoute(
+					routeId, "line-" + id, id, id, "도착 방면", "Asia/Seoul"));
+				trips.add(new LoadRouteTimetablePort.TransitTrip(
+					tripId, routeId, "weekday-2026", "도착", "0", "SUBWAY", "LOCAL", null, 0));
+				stopTimes.add(new LoadRouteTimetablePort.TransitStopTime(
+					tripId, 1, from, "line-" + id, departure, departure, 0, 0));
+				stopTimes.add(new LoadRouteTimetablePort.TransitStopTime(
+					tripId, 2, to, "line-" + id, arrival, arrival, 0, 0));
+				fares.add(new LoadRouteTimetablePort.OfficialFare(
+					tripId, from, to, 1_000, "KRW", "official", "snapshot"));
+				departure = arrival + 600;
+			}
+		}
+		return () -> new LoadRouteTimetablePort.RouteTimetable(
+			List.of(new LoadRouteTimetablePort.ServiceCalendar(
+				"weekday-2026", true, true, true, true, true, false, false,
+				LocalDate.parse("2026-07-01"), LocalDate.parse("2026-12-31"), "Asia/Seoul")),
+			List.of(), routes, trips, stopTimes, List.of(), fares, null
 		);
 	}
 
