@@ -75,7 +75,7 @@ String _routeDateLabel(String value) {
 }
 
 const routeEtaSourceLabels = <String, String>{
-  'REALTIME': '실시간 도착정보 준비 중',
+  'REALTIME': '실시간 도착정보',
   'MIXED': '일부 실시간 도착정보',
   'PLANNED': '시간표 기준',
   'STATIC_BACKEND_ESTIMATE': '시간표 기준',
@@ -2163,7 +2163,7 @@ class RouteSearchStep {
       confidenceLabel: _optionalRouteString(
         json,
         'confidenceLabel',
-        fallback: '안내를 준비 중이에요',
+        fallback: '',
       ),
     );
   }
@@ -2307,7 +2307,7 @@ class RouteSearchStep {
       _routeDurationLabel(estimatedMinutes),
       _routeDistanceLabel(distanceMeters),
       if (includesStairs) '계단 포함',
-      if (requiresAccessibilityCheck) '엘리베이터 안내 준비 중',
+      if (requiresAccessibilityCheck) '엘리베이터 안내 미확인',
     ];
     return labels.join(' · ');
   }
@@ -5515,7 +5515,7 @@ class _RouteFeedbackWorkflowView extends StatelessWidget {
         const SizedBox(height: 14),
         if (feedbackRepository == null)
           const _RouteNotice(
-            title: '피드백 준비 중',
+            title: '의견을 지금 받을 수 없어요',
             text: '잠시 후 다시 시도해 주세요.',
             icon: Icons.info_outline,
           )

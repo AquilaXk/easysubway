@@ -335,11 +335,12 @@ class _StationDetailContent extends StatelessWidget {
           StationInternalRouteGuidance(state: internalRouteState!),
         const SizedBox(height: 24),
       ],
-      const _StationDetailSectionTitle(title: '출구'),
-      const SizedBox(height: 12),
-      if (exits.isEmpty)
-        const _StationDetailEmptyMessage(message: '출구 안내를 준비 중이에요.')
-      else
+      // 데이터가 없으면 섹션 자체를 그리지 않는다(#2078 무표시 원칙). 사과·준비
+      // 중 문구 없이 제목·간격까지 함께 감춰 빈 섹션 헤더나 잔여 간격을 남기지
+      // 않는다.
+      if (exits.isNotEmpty) ...[
+        const _StationDetailSectionTitle(title: '출구'),
+        const SizedBox(height: 12),
         for (final exit in exits)
           StationExitCard(
             station: detail,
@@ -347,19 +348,19 @@ class _StationDetailContent extends StatelessWidget {
             mapLauncher: mapLauncher,
             locationProvider: locationProvider,
           ),
-      const SizedBox(height: 24),
-      const _StationDetailSectionTitle(title: '시설'),
-      const SizedBox(height: 12),
-      if (facilities.isEmpty)
-        const _StationDetailEmptyMessage(message: '시설 안내를 준비 중이에요.')
-      else
+        const SizedBox(height: 24),
+      ],
+      if (facilities.isNotEmpty) ...[
+        const _StationDetailSectionTitle(title: '시설'),
+        const SizedBox(height: 12),
         for (final facility in facilities)
           StationFacilityCard(
             facility: facility,
             station: detail,
             onReportTap: () => _openFacilityReport(context, facility),
           ),
-      const SizedBox(height: 24),
+        const SizedBox(height: 24),
+      ],
       // 메타 정보(안내 출처·마지막 확인)는 맨 아래로.
       StationInfoBasisDisclosure(
         labels: [
@@ -517,7 +518,9 @@ class _StationTimetableEntryState extends State<_StationTimetableEntry> {
       children: [
         const _StationDetailSectionTitle(title: '시간표'),
         const SizedBox(height: 8),
-        if (timetable != null && timetable.isAvailable)
+        // 로컬 coverage가 없으면 준비 중 문구 대신 요약 줄을 그리지 않는다(#2078).
+        // '시간표 보기' 버튼은 남겨 전체 시간표 화면으로 진입할 수 있게 한다.
+        if (timetable != null && timetable.isAvailable) ...[
           for (final direction in timetable.directions)
             Padding(
               padding: const EdgeInsets.only(bottom: 4),
@@ -525,10 +528,9 @@ class _StationTimetableEntryState extends State<_StationTimetableEntry> {
                 '${direction.name} · 첫차 ${direction.firstDeparture.timeLabel} · '
                 '막차 ${direction.lastDeparture.timeLabel}',
               ),
-            )
-        else
-          const Text('시간표를 준비 중이에요.'),
-        const SizedBox(height: 4),
+            ),
+          const SizedBox(height: 4),
+        ],
         TextButton.icon(
           key: const Key('stationTimetableButton'),
           onPressed: () => Navigator.of(context).push(
@@ -611,24 +613,6 @@ class _StationDetailSectionTitle extends StatelessWidget {
           fontWeight: FontWeight.w700,
           height: 1.25,
         ),
-      ),
-    );
-  }
-}
-
-class _StationDetailEmptyMessage extends StatelessWidget {
-  const _StationDetailEmptyMessage({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      message,
-      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-        color: EasySubwayAccessibleColors.secondaryText,
-        fontWeight: FontWeight.w700,
-        height: 1.35,
       ),
     );
   }
