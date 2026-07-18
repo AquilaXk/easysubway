@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.easysubway.profile.domain.MobilityType;
 import com.easysubway.route.adapter.out.persistence.InMemoryRouteSearchRepository;
 import com.easysubway.route.application.port.in.RouteSearchUseCase;
+import com.easysubway.route.application.port.in.RouteSearchUseCase.TimetableCandidateSource;
 import com.easysubway.route.application.port.in.SearchInternalRouteCommand;
 import com.easysubway.route.application.port.in.SearchRouteCommand;
 import com.easysubway.route.application.port.in.RouteV2SearchUseCase;
@@ -1505,6 +1506,32 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
+	@DisplayName("legacyGraphCandidateAllowed=true면 접근성 신호가 있는 레거시 결과를 LEGACY_ACCESSIBILITY_CHECK로 채택한다")
+	void stabilizeTimetableRouteCandidatesWithSourceAdoptsLegacyWhenAllowedAndAccessibilitySignalPresent() {
+		// #2292 Minor 2: RouteV2Planner가 legacyGraphCandidateAllowed=false로 고정 호출하게
+		// 되면서 stabilizeTimetableRouteCandidatesWithSource(..., true)의 원래 동작(접근성
+		// 신호가 있는 레거시 결과를 채택)을 직접 검증하는 테스트가 없어졌다. 이 메서드 자체의
+		// 계약은 살아있음을 고정한다.
+		var repository = new InMemoryRouteSearchRepository();
+		var routeSearchService = new RouteSearchService(repository, repository, new StairOnlyTransitMasterPort(), CLOCK);
+
+		var selection = routeSearchService.stabilizeTimetableRouteCandidatesWithSource(
+			new SearchRouteCommand("station-a", "station-b", MobilityType.SENIOR, ConstraintMode.PREFER_STEP_FREE, 1),
+			3,
+			1,
+			List.of(routeSearchResultWithAccessState("route-timetable", "AVAILABLE", false)),
+			List::copyOf,
+			true
+		);
+
+		assertThat(selection.source()).isEqualTo(TimetableCandidateSource.LEGACY_ACCESSIBILITY_CHECK);
+		assertThat(selection.itineraries()).isNotEmpty();
+		assertThat(selection.itineraries().getFirst().warnings())
+			.extracting("code")
+			.contains(RouteWarningCode.STAIR_ONLY_ACCESS);
+	}
+
+	@Test
 	@DisplayName("V2 planner는 legacy graph가 놓친 시간표 경로를 NO_TIMETABLE_SERVICE로 버리지 않는다")
 	void routeV2PlannerKeepsTimetableRouteWhenLegacyGraphMisses() {
 		var repository = new InMemoryRouteSearchRepository();
@@ -1551,16 +1578,16 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
-	@DisplayName("V2 planner는 stair-only 위험이 있어도 레거시 그래프로 새치기하지 않고 시간표 scan을 그대로 쓴다")
+	@DisplayName("V2 planner는 stair-only 위험이 있어도 레거시 그래프로 새치기하지 않고 시간표 scan을 그대로 쓰되 접근성 경고는 재부착한다")
 	void routeV2PlannerAlwaysPrefersTimetableScanEvenWithLegacyAccessibilitySignal() {
-		// #2095/#2286: 인증 Route V2(prod 게이트가 TIMETABLE_RAPTOR 출처만 허용)는 접근성
-		// warning이 있어도 레거시 그래프를 먼저 시도하지 않는다 — 레거시가 채택되면
+		// #2095/#2286/#2292: 인증 Route V2(prod 게이트가 TIMETABLE_RAPTOR 출처만 허용)는
+		// 접근성 warning이 있어도 레거시 그래프를 먼저 시도하지 않는다 — 레거시가 채택되면
 		// timetableArtifactId가 null이 돼 그 게이트에서 막히기 때문이다(ITX pilot 역처럼
-		// STATION_LINES는 있지만 접근성 시설 데이터가 없는 역에서 실제로 발생했다). 이 테스트가
-		// 쓰는 StairOnlyTransitMasterPort는 레거시 그래프라면 STAIR_ONLY_ACCESS 경고를 냈을
-		// 것이지만(레거시 로직은 stabilizeTimetableRouteCandidatesWithSource의
-		// legacyGraphCandidateAllowed=true 경로에만 남아 있다), RAPTOR는 접근성 시설 데이터를
-		// 참조하지 않으므로 경고 없이 FOUND를 낸다.
+		// STATION_LINES는 있지만 접근성 시설 데이터가 없는 역에서 실제로 발생했다). 다만
+		// RAPTOR 자체는 접근성 시설 데이터를 참조하지 않으므로, RouteSearchService가
+		// ephemeralTimetableRouteResult()에서 레거시와 같은 기준(hasStairOnlyAccess/
+		// routeWarnings, 같은 LoadTransitMasterPort 데이터)으로 STAIR_ONLY_ACCESS 경고를
+		// 재부착한다 — source는 TIMETABLE_RAPTOR로 유지하면서 접근성 경고 정보는 잃지 않는다.
 		var delegate = routeTimetablePort();
 		var port = new LoadRouteTimetablePort() {
 			@Override
@@ -1588,7 +1615,9 @@ class RouteSearchServiceTest {
 		assertThat(plan.source()).isEqualTo(RouteV2PlanSource.TIMETABLE_RAPTOR);
 		assertThat(plan.timetableArtifactId()).isEqualTo("artifact-legacy-conflict");
 		assertThat(plan.itineraries().getFirst().etaSource()).isEqualTo(EtaSource.PLANNED);
-		assertThat(plan.itineraries().getFirst().warnings()).isEmpty();
+		assertThat(plan.itineraries().getFirst().warnings())
+			.extracting("code")
+			.containsExactly(RouteWarningCode.STAIR_ONLY_ACCESS);
 	}
 
 	@Test
