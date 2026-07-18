@@ -275,6 +275,8 @@ test("배포 env 준비는 Compose 서버 env와 backend 앱 env를 분리한다
   assert.match(backendEnv, /^EASYSUBWAY_DATASOURCE_URL=jdbc:postgresql:\/\/postgres:5432\/easysubway$/m);
   assert.match(backendEnv, /^EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY=prod-topis-service-key$/m);
   assert.match(backendEnv, /^EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY=prod-tago-train-service-key$/m);
+  assert.match(backendEnv, /^EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_MINUTE=60$/m);
+  assert.match(backendEnv, /^EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_DAY=1000$/m);
   assert.match(backendEnv, /^EASYSUBWAY_REPORT_OBJECT_STORAGE_INTERNAL_ENDPOINT=http:\/\/object-storage:9000$/m);
   assert.match(backendEnv, /^EASYSUBWAY_REPORT_UPLOAD_PUBLIC_BASE_URL=https:\/\/uploads.easysubway.example$/m);
   assert.match(backendEnv, /^EASYSUBWAY_REPORT_ABUSE_WINDOW_SECONDS=45$/m);
@@ -298,6 +300,7 @@ test("배포 env 준비는 Compose 서버 env와 backend 앱 env를 분리한다
 
 test("TAGO 기차검색 key는 공용 GitHub secret에서 backend 전용 env로만 주입한다", () => {
   const cd = read(".github/workflows/cd.yml");
+  const example = read(".env.example");
   const allowlist = read("tools/deploy/backend-app-env.allowlist");
   const scopeMap = JSON.parse(read("contracts/env/env-scope-map.json"));
 
@@ -307,6 +310,14 @@ test("TAGO 기차검색 key는 공용 GitHub secret에서 backend 전용 env로�
   assert.doesNotMatch(allowlist, /^DATA_GO_KR_SERVICE_KEY$/m);
   assert.deepEqual(scopeMap.keys.EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY, ["backend"]);
   assert.equal(scopeMap.keys.DATA_GO_KR_SERVICE_KEY, undefined);
+  for (const [key, value] of [
+    ["EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_MINUTE", "60"],
+    ["EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_DAY", "1000"],
+  ]) {
+    assert.match(example, new RegExp(`^${key}=${value}$`, "m"));
+    assert.match(allowlist, new RegExp(`^${key}$`, "m"));
+    assert.deepEqual(scopeMap.keys[key], ["backend"]);
+  }
 });
 
 test("배포 env 준비는 중복, interpolation, 내부 공개 URL을 차단한다", async () => {
