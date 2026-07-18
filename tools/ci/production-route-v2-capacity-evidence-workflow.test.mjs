@@ -206,6 +206,16 @@ test("capacity runner는 동일 candidate·격리 load·privacy·closed ingress�
   // with "No default constructor found" and the isolated backend never
   // becomes ready — see #2095 run 29625986367.
   assert.match(capacityDecoder, /@Autowired\s+CapacityEvidencePlayIntegrityDecoder\(/);
+  // RouteV2SessionService.issue() captures its own `now` BEFORE calling
+  // decoder.decode(). If the synthetic verdict is stamped with the current
+  // instant (as opposed to a real Play Integrity verdict, which is always
+  // already in the past by the time it reaches us), that timestamp is always
+  // strictly after the caller's `now` — real time only moves forward — and
+  // validateVerdict()'s freshness check (`requestTimestamp().isAfter(now)`)
+  // rejects every single session unconditionally. This is unrelated to
+  // attestation crypto and was 100% reproducible — see #2095 run 29639318566.
+  assert.match(capacityDecoder, /TIMESTAMP_SAFETY_MARGIN/);
+  assert.match(capacityDecoder, /clock\.instant\(\)\.minus\(TIMESTAMP_SAFETY_MARGIN\)/);
   assert.match(runner, /dump_readiness_diagnostics\(\) \{/);
   assert.match(runner, /docker logs --tail 40 "\$\{container\}"/);
   assert.match(
@@ -216,6 +226,17 @@ test("capacity runner는 동일 candidate·격리 load·privacy·closed ingress�
   assert.match(runner, /dump_readiness_diagnostics "\$\{clone_curl\}"/);
   assert.match(runner, /dump_readiness_diagnostics "\$\{clone_backend\}"/);
   assert.match(runner, /dump_readiness_diagnostics "\$\{clone_gateway\}"/);
+  // On an unexpected status code during load profiles, dump the actual
+  // response status/headers/body instead of only "did not return exact NNN" —
+  // this is what made the timestamp-ordering bug above tractable to diagnose.
+  assert.match(runner, /dump_request_diagnostics\(\) \{/);
+  assert.equal((runner.match(/dump_request_diagnostics "\$\{last_headers\}" "\$\{last_body\}"/g) ?? []).length, 6);
+  assert.match(runner, /burst_body_files=\(\)/);
+  assert.match(runner, /burst_body_files\+=\("\$\{burst_body\}"\)/);
+  assert.match(
+    runner,
+    /dump_request_diagnostics "\$\{burst_headers_files\[\$\{index\}\]\}" "\$\{burst_body_files\[\$\{index\}\]\}"/,
+  );
   assert.match(runner, /timetable snapshot identity is invalid/);
   assert.match(runner, /normal_state_count_before/);
   assert.match(runner, /normal_state_count_after/);
