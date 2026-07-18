@@ -1,7 +1,9 @@
 package com.easysubway.train.adapter.in.web;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -13,16 +15,19 @@ import com.easysubway.train.application.TrainSearchService.TrainSearchFailure;
 import com.easysubway.train.application.TrainSearchService.StationSearchSnapshot;
 import com.easysubway.train.application.TrainSearchService.TrainSearchSnapshot;
 import com.easysubway.train.domain.TrainSearchModels.Journey;
+import com.easysubway.train.domain.TrainSearchModels.SearchCriteria;
 import com.easysubway.train.domain.TrainSearchModels.SearchResult;
 import com.easysubway.train.domain.TrainSearchModels.Station;
-import java.time.OffsetDateTime;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -128,12 +133,23 @@ class TrainSearchContractControllerTest {
 				.param("departureStationId", "NAT010000")
 				.param("arrivalStationId", "NAT011668")
 				.param("departureDate", "2026-07-19")
+				.param("returnDate", "2026-07-20")
 				.param("trainType", "KTX"))
 			.andExpect(status().isOk())
 			.andExpect(header().string("Cache-Control", "max-age=60, public, s-maxage=300"))
 			.andExpect(jsonPath("$.data.outbound[0].trainNumber").value("101"))
 			.andExpect(jsonPath("$.data.outbound[0].adultFareWon").value(23700))
 			.andExpect(jsonPath("$.data.inbound").isEmpty());
+
+		ArgumentCaptor<SearchCriteria> criteria = ArgumentCaptor.forClass(SearchCriteria.class);
+		verify(service).searchWithMetadata(criteria.capture());
+		assertThat(criteria.getValue()).isEqualTo(new SearchCriteria(
+			"NAT010000",
+			"NAT011668",
+			LocalDate.parse("2026-07-19"),
+			LocalDate.parse("2026-07-20"),
+			"KTX"
+		));
 	}
 
 	@Test
@@ -154,6 +170,11 @@ class TrainSearchContractControllerTest {
 
 	@Test
 	void malformedDateAndServiceFailuresUseStableNoStoreCodes() throws Exception {
+		mockMvc.perform(get("/api/v1/trains/search"))
+			.andExpect(status().isBadRequest())
+			.andExpect(header().string("Cache-Control", "no-store"))
+			.andExpect(jsonPath("$.data.code").value("TRAIN_SEARCH_INVALID_ARGUMENT"));
+
 		mockMvc.perform(get("/api/v1/trains/search").param("departureDate", "not-a-date"))
 			.andExpect(status().isBadRequest())
 			.andExpect(header().string("Cache-Control", "no-store"))

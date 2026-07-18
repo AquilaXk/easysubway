@@ -59,6 +59,7 @@ class TrainSearchServiceTest {
 		var first = CompletableFuture.supplyAsync(() -> service.search(criteria(null)));
 		assertThat(provider.searchStarted.await(5, TimeUnit.SECONDS)).isTrue();
 		var second = CompletableFuture.supplyAsync(() -> service.search(criteria(null)));
+		assertThat(cache.secondLegRead.await(5, TimeUnit.SECONDS)).isTrue();
 		provider.continueSearch.countDown();
 
 		assertThat(first.get(5, TimeUnit.SECONDS)).isEqualTo(second.get(5, TimeUnit.SECONDS));
@@ -114,8 +115,36 @@ class TrainSearchServiceTest {
 	}
 
 	@Test
+	void waitsForTheLegLeaseUntilItsExecutionBoundaryBeforeReturningUnavailable() {
+		service.catalog();
+		cache.denyLeases = true;
+		Duration[] slept = { Duration.ZERO };
+		service = serviceWith(Clock.fixed(NOW, ZoneOffset.UTC), duration -> slept[0] = slept[0].plus(duration));
+
+		assertThatThrownBy(() -> service.search(criteria(null)))
+			.isInstanceOf(TrainSearchService.TrainSearchFailure.class)
+			.extracting("code")
+			.isEqualTo("TRAIN_SEARCH_UNAVAILABLE");
+		assertThat(slept[0]).isGreaterThanOrEqualTo(Duration.ofMinutes(15));
+	}
+
+	@Test
 	void scheduledCatalogRefreshReplacesAStillFreshCatalog() {
 		service.catalog();
+
+		service.refreshCatalog();
+
+		assertThat(provider.catalogCalls).hasValue(2);
+	}
+
+	@Test
+	void forcedCatalogRefreshReacquiresTheLeaseAfterTheOtherOwnerFails() {
+		service.catalog();
+		cache.leases.put("catalog-refresh-v1", "other-owner");
+		service = serviceWith(
+			Clock.fixed(NOW, ZoneOffset.UTC),
+			duration -> cache.leases.remove("catalog-refresh-v1", "other-owner")
+		);
 
 		service.refreshCatalog();
 
@@ -179,13 +208,46 @@ class TrainSearchServiceTest {
 	}
 
 	@Test
+	void rejectsALegWhoseNormalizedQueryDoesNotMatchItsCacheKey() {
+		service.search(criteria(null));
+		CachedLeg leg = cache.legs.values().iterator().next();
+		cache.legs.put(leg.key(), new CachedLeg(
+			leg.key(),
+			leg.normalizedQueryJson().replace("NAT010000", "NAT999999"),
+			leg.payloadJson(),
+			leg.payloadSha256(),
+			leg.observedAt(),
+			leg.expiresAt()
+		));
+
+		assertThatThrownBy(() -> newService().search(criteria(null)))
+			.isInstanceOf(TrainSearchService.TrainSearchFailure.class)
+			.extracting("code")
+			.isEqualTo("TRAIN_SEARCH_UNAVAILABLE");
+	}
+
+	@Test
 	void mapsCacheReadFailureToUnavailable() {
 		cache.failCatalogRead = true;
 
 		assertThatThrownBy(service::catalog)
 			.isInstanceOf(TrainSearchService.TrainSearchFailure.class)
-			.extracting("code")
-			.isEqualTo("TRAIN_SEARCH_UNAVAILABLE");
+			.hasFieldOrPropertyWithValue("code", "TRAIN_SEARCH_UNAVAILABLE")
+			.hasCauseInstanceOf(IllegalStateException.class);
+	}
+
+	@Test
+	void startsTodayTtlWhenTheProviderCallCompletes() {
+		var clock = new TestClock(NOW);
+		service = serviceWith(clock, duration -> {});
+		provider.beforeSearchReturn = () -> clock.advance(Duration.ofMinutes(10));
+
+		service.search(criteria(null));
+
+		assertThat(cache.legs.values()).singleElement().satisfies(leg -> {
+			assertThat(leg.observedAt()).isEqualTo(NOW.plus(Duration.ofMinutes(10)));
+			assertThat(leg.expiresAt()).isEqualTo(NOW.plus(Duration.ofMinutes(15)));
+		});
 	}
 
 	@Test
@@ -232,12 +294,16 @@ class TrainSearchServiceTest {
 	}
 
 	private TrainSearchService serviceAt(Instant instant) {
+		return serviceWith(Clock.fixed(instant, ZoneOffset.UTC), duration -> {});
+	}
+
+	private TrainSearchService serviceWith(Clock clock, TrainSearchService.Sleeper sleeper) {
 		return new TrainSearchService(
 			provider,
 			cache,
 			new ObjectMapper().registerModule(new JavaTimeModule()),
-			Clock.fixed(instant, ZoneOffset.UTC),
-			duration -> {},
+			clock,
+			sleeper,
 			() -> "owner"
 		);
 	}
@@ -261,6 +327,7 @@ class TrainSearchServiceTest {
 		private final CountDownLatch continueSearch = new CountDownLatch(1);
 		private volatile boolean blockSearch;
 		private volatile String failureCode;
+		private volatile Runnable beforeSearchReturn = () -> {};
 
 		@Override
 		public Catalog catalog() {
@@ -288,6 +355,7 @@ class TrainSearchServiceTest {
 					Thread.currentThread().interrupt();
 				}
 			}
+			beforeSearchReturn.run();
 			return List.of(new Journey(
 				"101", "KTX",
 				query.departureStationId(), query.departureStationName(),
@@ -304,7 +372,10 @@ class TrainSearchServiceTest {
 		private final Map<String, CachedLeg> legs = new ConcurrentHashMap<>();
 		private final Map<String, String> leases = new ConcurrentHashMap<>();
 		private final Map<String, Duration> leaseTtls = new ConcurrentHashMap<>();
+		private final AtomicInteger freshLegCalls = new AtomicInteger();
+		private final CountDownLatch secondLegRead = new CountDownLatch(1);
 		private volatile boolean failCatalogRead;
+		private volatile boolean denyLeases;
 
 		@Override
 		public Optional<CachedCatalog> freshCatalog(String kind, Instant now) {
@@ -320,12 +391,14 @@ class TrainSearchServiceTest {
 
 		@Override
 		public Optional<CachedLeg> freshLeg(String key, Instant now) {
+			if (freshLegCalls.incrementAndGet() >= 2) secondLegRead.countDown();
 			return Optional.ofNullable(legs.get(key)).filter(value -> value.expiresAt().isAfter(now));
 		}
 
 		@Override
 		public boolean tryAcquireLease(String key, String owner, Instant now, Duration ttl) {
 			leaseTtls.put(key, ttl);
+			if (denyLeases) return false;
 			return leases.putIfAbsent(key, owner) == null;
 		}
 
@@ -351,6 +424,33 @@ class TrainSearchServiceTest {
 			int before = legs.size();
 			legs.values().removeIf(value -> value.expiresAt().isBefore(cutoff));
 			return before - legs.size();
+		}
+	}
+
+	private static final class TestClock extends Clock {
+		private Instant instant;
+
+		private TestClock(Instant instant) {
+			this.instant = instant;
+		}
+
+		void advance(Duration duration) {
+			instant = instant.plus(duration);
+		}
+
+		@Override
+		public ZoneId getZone() {
+			return ZoneOffset.UTC;
+		}
+
+		@Override
+		public Clock withZone(ZoneId zone) {
+			return Clock.fixed(instant, zone);
+		}
+
+		@Override
+		public Instant instant() {
+			return instant;
 		}
 	}
 }

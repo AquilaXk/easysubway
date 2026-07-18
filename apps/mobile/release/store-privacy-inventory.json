@@ -180,7 +180,7 @@
       "displayNameKo": "기차검색 악용 방지 상태",
       "purposeKo": "공개 전국 기차검색 endpoint의 과도한 요청과 제공기관 quota 악용 방지",
       "implementationStatus": "backend-collected",
-      "introducedInVersion": "1.0.4",
+      "introducedInVersion": "1.0.5",
       "codeOwner": "train",
       "collectionTrigger": "사용자가 기차역 또는 여객열차 검색 요청을 보낼 때 filter가 요청 IP별 요청 제한 상태를 갱신",
       "backendTableOrService": [
@@ -189,9 +189,9 @@
         "TrainSearchClientIdentityResolver ip:remoteAddr key"
       ],
       "storageLocations": ["backend-jvm-memory"],
-      "retentionKo": "고정 TTL은 없다. 역 검색과 열차 검색 limiter가 각각 요청 IP별 카운터를 JVM heap에 보관하고 60초 window마다 재설정한다. 새 IP가 들어올 때 이전 window 항목을 제거하며 limiter별 최대 4096개를 넘으면 새 IP 요청을 거절한다. 최종적으로 JVM 프로세스 종료 시 모두 삭제된다.",
-      "deletionKo": "요청 IP는 사용자 계정 DB나 access log에 저장하지 않고 filter도 IP를 로그로 남기지 않는다. window 경과 뒤 새 IP 삽입 시 제거되거나 JVM 프로세스 종료 시 자동 삭제되며, 사용자가 직접 삭제할 영속 저장소는 없다.",
-      "deletionImplementation": "TrainSearchRateLimiter가 ip:clientIdentity별 WindowCounter를 역 검색과 열차 검색용 JVM heap ConcurrentHashMap에서 각각 관리한다. 새 키 생성 시 이전 window 카운터를 제거하고 maxKeys(기본 4096) 초과 시 저장 대신 요청을 거절한다.",
+      "retentionKo": "고정 TTL은 없다. 역 검색과 열차 검색 limiter가 각각 요청 IP별 카운터를 JVM heap에 보관한다. 각 limiter는 다음 60초 고정 window의 첫 요청에서 이전 window의 전체 map을 한 번 비우며, limiter별 최대 4096개를 넘으면 새 IP 요청을 거절한다. 최종적으로 JVM 프로세스 종료 시 모두 삭제된다.",
+      "deletionKo": "요청 IP는 사용자 계정 DB나 access log에 저장하지 않고 filter도 IP를 로그로 남기지 않는다. 각 limiter의 다음 60초 window 첫 요청 또는 JVM 프로세스 종료 시 자동 삭제되며, 사용자가 직접 삭제할 영속 저장소는 없다.",
+      "deletionImplementation": "TrainSearchRateLimiter가 ip:clientIdentity별 WindowCounter를 역 검색과 열차 검색용 JVM heap ConcurrentHashMap에서 각각 관리한다. 고정 window 변경을 감지한 첫 요청이 해당 limiter의 map을 한 번 clear하고, maxKeys(기본 4096) 초과 시 저장 대신 요청을 거절한다.",
       "evidence": [
         "backend/src/main/java/com/easysubway/train/adapter/in/web/TrainSearchRateLimitFilter.java",
         "backend/src/test/java/com/easysubway/train/adapter/in/web/TrainSearchRateLimitFilterTest.java"
@@ -211,7 +211,7 @@
         "fixedTtl": false,
         "windowSeconds": 60,
         "maxCounterKeysPerLimiter": 4096,
-        "evictionBoundary": "prior-window entries removed on next identity insertion; over-capacity identities rejected without storage",
+        "evictionBoundary": "each limiter clears all prior-window entries on the first request in the next fixed window; over-capacity identities rejected without storage",
         "finalDeletionBoundary": "JVM process lifecycle end"
       },
       "operationReference": "https://docs.spring.io/spring-framework/reference/web/webmvc/filters.html",

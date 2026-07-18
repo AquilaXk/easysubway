@@ -52,14 +52,8 @@ public class TrainSearchService {
 	// 한 구간도 영업일 2일, 페이지네이션, 복수 열차종 코드, 요청별 재시도를 순차 수행할 수 있다.
 	private static final Duration LEG_LEASE_TTL = Duration.ofMinutes(15);
 	private static final Duration CATALOG_LEASE_TTL = Duration.ofMinutes(5);
-	private static final List<Duration> LEASE_POLLS = List.of(
-		Duration.ofMillis(100),
-		Duration.ofMillis(200),
-		Duration.ofMillis(400),
-		Duration.ofMillis(800),
-		Duration.ofSeconds(1),
-		Duration.ofSeconds(1)
-	);
+	private static final List<Duration> CATALOG_LEASE_POLLS = leasePolls(CATALOG_LEASE_TTL);
+	private static final List<Duration> LEG_LEASE_POLLS = leasePolls(LEG_LEASE_TTL);
 	private static final int L1_LIMIT = 20_000;
 	private static final TypeReference<List<Journey>> JOURNEYS = new TypeReference<>() {};
 
@@ -115,7 +109,7 @@ public class TrainSearchService {
 		} catch (TrainSearchFailure failure) {
 			throw failure;
 		} catch (RuntimeException exception) {
-			throw failure("TRAIN_SEARCH_UNAVAILABLE");
+			throw failure("TRAIN_SEARCH_UNAVAILABLE", exception);
 		}
 	}
 
@@ -178,7 +172,7 @@ public class TrainSearchService {
 		} catch (TrainSearchFailure failure) {
 			throw failure;
 		} catch (RuntimeException exception) {
-			throw failure("TRAIN_SEARCH_UNAVAILABLE");
+			throw failure("TRAIN_SEARCH_UNAVAILABLE", exception);
 		}
 	}
 
@@ -188,7 +182,7 @@ public class TrainSearchService {
 		} catch (TrainSearchFailure failure) {
 			throw failure;
 		} catch (RuntimeException exception) {
-			throw failure("TRAIN_SEARCH_UNAVAILABLE");
+			throw failure("TRAIN_SEARCH_UNAVAILABLE", exception);
 		}
 	}
 
@@ -198,51 +192,66 @@ public class TrainSearchService {
 
 	private CatalogEntry refreshCatalogEntry(Instant now, boolean force) {
 		synchronized (catalogLock) {
-			if (!force) {
-				var existing = cache.freshCatalog(CATALOG_KIND, now);
-				if (existing.isPresent()) {
-					CachedCatalog cached = existing.orElseThrow();
-					return new CatalogEntry(decodeCatalog(cached), cached.expiresAt());
-				}
+			var existing = cache.freshCatalog(CATALOG_KIND, now);
+			if (!force && existing.isPresent()) {
+				CachedCatalog cached = existing.orElseThrow();
+				return new CatalogEntry(decodeCatalog(cached), cached.expiresAt());
 			}
 			String owner = ownerSupplier.get();
 			if (!cache.tryAcquireLease(CATALOG_LEASE_KEY, owner, now, CATALOG_LEASE_TTL)) {
-				return pollForCatalog();
+				return pollForCatalog(force ? existing.orElse(null) : null);
 			}
-			try {
-				Catalog loaded = provider.catalog();
-				Catalog filtered = new Catalog(
-					loaded.observedAt(),
-					loaded.stations(),
-					TrainSearchScopePolicy.retainSupported(loaded.trainTypes(), TrainType::code)
-				);
-				String payload = write(filtered);
-				cache.replaceCatalog(List.of(new CachedCatalog(
-					CATALOG_KIND,
-					payload,
-					sha256(payload),
-					filtered.observedAt(),
-					now.plus(CATALOG_TTL)
-				)));
-				return new CatalogEntry(filtered, now.plus(CATALOG_TTL));
-			} catch (ProviderFailure exception) {
-				throw failure(providerFailureCode(exception));
-			} finally {
-				cache.releaseLease(CATALOG_LEASE_KEY, owner);
-			}
+			return loadCatalog(owner);
 		}
 	}
 
-	private CatalogEntry pollForCatalog() {
-		for (Duration delay : LEASE_POLLS) {
+	private CatalogEntry pollForCatalog(CachedCatalog baseline) {
+		for (Duration delay : CATALOG_LEASE_POLLS) {
 			sleep(delay);
-			var cached = cache.freshCatalog(CATALOG_KIND, clock.instant());
-			if (cached.isPresent()) {
+			Instant now = clock.instant();
+			var cached = cache.freshCatalog(CATALOG_KIND, now);
+			if (cached.isPresent() && catalogChanged(baseline, cached.orElseThrow())) {
 				CachedCatalog value = cached.orElseThrow();
 				return new CatalogEntry(decodeCatalog(value), value.expiresAt());
 			}
+			String owner = ownerSupplier.get();
+			if (cache.tryAcquireLease(CATALOG_LEASE_KEY, owner, now, CATALOG_LEASE_TTL)) {
+				return loadCatalog(owner);
+			}
 		}
 		throw failure("TRAIN_SEARCH_UNAVAILABLE");
+	}
+
+	private boolean catalogChanged(CachedCatalog baseline, CachedCatalog current) {
+		return baseline == null
+			|| !Objects.equals(baseline.payloadSha256(), current.payloadSha256())
+			|| !Objects.equals(baseline.expiresAt(), current.expiresAt());
+	}
+
+	private CatalogEntry loadCatalog(String owner) {
+		try {
+			Catalog loaded = provider.catalog();
+			Instant completedAt = clock.instant();
+			Catalog filtered = new Catalog(
+				loaded.observedAt(),
+				loaded.stations(),
+				TrainSearchScopePolicy.retainSupported(loaded.trainTypes(), TrainType::code)
+			);
+			String payload = write(filtered);
+			Instant expiresAt = completedAt.plus(CATALOG_TTL);
+			cache.replaceCatalog(List.of(new CachedCatalog(
+				CATALOG_KIND,
+				payload,
+				sha256(payload),
+				filtered.observedAt(),
+				expiresAt
+			)));
+			return new CatalogEntry(filtered, expiresAt);
+		} catch (ProviderFailure exception) {
+			throw failure(providerFailureCode(exception), exception);
+		} finally {
+			cache.releaseLease(CATALOG_LEASE_KEY, owner);
+		}
 	}
 
 	private LegResult direction(
@@ -288,11 +297,12 @@ public class TrainSearchService {
 		String key = key(query);
 		Instant now = clock.instant();
 		CachedLeg local = l1.get(key);
-		if (local != null && local.expiresAt().isAfter(now)) return local;
+		if (local != null && local.expiresAt().isAfter(now)) return validLeg(key, local);
 		var shared = cache.freshLeg(key, now);
 		if (shared.isPresent()) {
-			remember(key, shared.orElseThrow());
-			return shared.orElseThrow();
+			CachedLeg value = validLeg(key, shared.orElseThrow());
+			remember(key, value);
+			return value;
 		}
 		var pending = new CompletableFuture<CachedLeg>();
 		var existing = singleFlights.putIfAbsent(key, pending);
@@ -315,6 +325,7 @@ public class TrainSearchService {
 		boolean released = false;
 		try {
 			List<Journey> journeys = provider.search(query);
+			Instant completedAt = clock.instant();
 			String normalizedQuery = write(canonical(query));
 			String payload = write(journeys);
 			var loaded = new CachedLeg(
@@ -322,15 +333,16 @@ public class TrainSearchService {
 				normalizedQuery,
 				payload,
 				sha256(payload),
-				now,
-				expiresAt(query, now)
+				completedAt,
+				expiresAt(query, completedAt)
 			);
+			validLeg(key, loaded);
 			if (!cache.storeLegAndRelease(key, owner, loaded)) throw failure("TRAIN_SEARCH_UNAVAILABLE");
 			released = true;
 			remember(key, loaded);
 			return loaded;
 		} catch (ProviderFailure exception) {
-			throw failure(providerFailureCode(exception));
+			throw failure(providerFailureCode(exception), exception);
 		} finally {
 			if (!released) cache.releaseLease(key, owner);
 		}
@@ -346,12 +358,13 @@ public class TrainSearchService {
 	}
 
 	private CachedLeg pollForShared(String key) {
-		for (Duration delay : LEASE_POLLS) {
+		for (Duration delay : LEG_LEASE_POLLS) {
 			sleep(delay);
 			var cached = cache.freshLeg(key, clock.instant());
 			if (cached.isPresent()) {
-				remember(key, cached.orElseThrow());
-				return cached.orElseThrow();
+				CachedLeg value = validLeg(key, cached.orElseThrow());
+				remember(key, value);
+				return value;
 			}
 		}
 		throw failure("TRAIN_SEARCH_UNAVAILABLE");
@@ -391,7 +404,7 @@ public class TrainSearchService {
 		try {
 			return TrainSearchScopePolicy.requireSupported(trainType);
 		} catch (IllegalArgumentException exception) {
-			throw failure("TRAIN_SEARCH_UNSUPPORTED_TRAIN_TYPE");
+			throw failure("TRAIN_SEARCH_UNSUPPORTED_TRAIN_TYPE", exception);
 		}
 	}
 
@@ -433,8 +446,16 @@ public class TrainSearchService {
 		try {
 			return objectMapper.readValue(cached.payloadJson(), Catalog.class);
 		} catch (JsonProcessingException exception) {
+			throw failure("TRAIN_SEARCH_UNAVAILABLE", exception);
+		}
+	}
+
+	private CachedLeg validLeg(String requestedKey, CachedLeg cached) {
+		if (!Objects.equals(requestedKey, cached.key())
+			|| !Objects.equals(requestedKey, sha256(cached.normalizedQueryJson()))) {
 			throw failure("TRAIN_SEARCH_UNAVAILABLE");
 		}
+		return cached;
 	}
 
 	private List<Journey> decodeJourneys(CachedLeg cached) {
@@ -444,7 +465,7 @@ public class TrainSearchService {
 		try {
 			return objectMapper.readValue(cached.payloadJson(), JOURNEYS);
 		} catch (JsonProcessingException exception) {
-			throw failure("TRAIN_SEARCH_UNAVAILABLE");
+			throw failure("TRAIN_SEARCH_UNAVAILABLE", exception);
 		}
 	}
 
@@ -452,7 +473,7 @@ public class TrainSearchService {
 		try {
 			return objectMapper.writeValueAsString(value);
 		} catch (JsonProcessingException exception) {
-			throw failure("TRAIN_SEARCH_UNAVAILABLE");
+			throw failure("TRAIN_SEARCH_UNAVAILABLE", exception);
 		}
 	}
 
@@ -480,7 +501,7 @@ public class TrainSearchService {
 			return future.join();
 		} catch (CompletionException exception) {
 			if (exception.getCause() instanceof RuntimeException runtime) throw runtime;
-			throw failure("TRAIN_SEARCH_UNAVAILABLE");
+			throw failure("TRAIN_SEARCH_UNAVAILABLE", exception);
 		}
 	}
 
@@ -489,7 +510,7 @@ public class TrainSearchService {
 			sleeper.sleep(duration);
 		} catch (InterruptedException exception) {
 			Thread.currentThread().interrupt();
-			throw failure("TRAIN_SEARCH_UNAVAILABLE");
+			throw failure("TRAIN_SEARCH_UNAVAILABLE", exception);
 		}
 	}
 
@@ -510,6 +531,31 @@ public class TrainSearchService {
 
 	private TrainSearchFailure failure(String code) {
 		return new TrainSearchFailure(code);
+	}
+
+	private TrainSearchFailure failure(String code, Throwable cause) {
+		return new TrainSearchFailure(code, cause);
+	}
+
+	private static List<Duration> leasePolls(Duration budget) {
+		var result = new java.util.ArrayList<Duration>();
+		Duration elapsed = Duration.ZERO;
+		for (Duration delay : List.of(
+			Duration.ofMillis(100),
+			Duration.ofMillis(200),
+			Duration.ofMillis(400),
+			Duration.ofMillis(800)
+		)) {
+			result.add(delay);
+			elapsed = elapsed.plus(delay);
+		}
+		while (elapsed.compareTo(budget) < 0) {
+			Duration remaining = budget.minus(elapsed);
+			Duration delay = remaining.compareTo(Duration.ofSeconds(1)) < 0 ? remaining : Duration.ofSeconds(1);
+			result.add(delay);
+			elapsed = elapsed.plus(delay);
+		}
+		return List.copyOf(result);
 	}
 
 	private record CatalogEntry(Catalog catalog, Instant expiresAt) {}
@@ -534,6 +580,11 @@ public class TrainSearchService {
 
 		public TrainSearchFailure(String code) {
 			super(code);
+			this.code = code;
+		}
+
+		public TrainSearchFailure(String code, Throwable cause) {
+			super(code, cause);
 			this.code = code;
 		}
 

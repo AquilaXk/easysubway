@@ -117,6 +117,7 @@ final class TrainSearchRateLimiter {
 	private final int maxKeys;
 	private final Clock clock;
 	private final Map<String, WindowCounter> counters = new ConcurrentHashMap<>();
+	private long countersWindow = Long.MIN_VALUE;
 
 	TrainSearchRateLimiter(int limit, int maxKeys, Clock clock) {
 		if (limit < 1 || maxKeys < 1) throw new IllegalArgumentException("train-search rate limit must be positive");
@@ -129,6 +130,10 @@ final class TrainSearchRateLimiter {
 		if (cost < 1) throw new IllegalArgumentException("train-search request cost must be positive");
 		long now = Instant.now(clock).getEpochSecond();
 		long window = now - Math.floorMod(now, WINDOW_SECONDS);
+		if (countersWindow != window) {
+			counters.clear();
+			countersWindow = window;
+		}
 		WindowCounter counter = counterFor(identity, window);
 		long retryAfter = WINDOW_SECONDS - Math.floorMod(now, WINDOW_SECONDS);
 		return counter != null && counter.acquire(window, cost, limit)
@@ -139,7 +144,6 @@ final class TrainSearchRateLimiter {
 	private WindowCounter counterFor(String identity, long window) {
 		WindowCounter existing = counters.get(identity);
 		if (existing != null) return existing;
-		counters.entrySet().removeIf(entry -> entry.getValue().isBefore(window));
 		if (counters.size() >= maxKeys) return null;
 		WindowCounter created = new WindowCounter(window);
 		counters.put(identity, created);
@@ -166,9 +170,6 @@ final class TrainSearchRateLimiter {
 			return true;
 		}
 
-		private synchronized boolean isBefore(long currentWindow) {
-			return window < currentWindow;
-		}
 	}
 }
 

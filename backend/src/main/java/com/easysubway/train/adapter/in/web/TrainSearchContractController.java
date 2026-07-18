@@ -91,7 +91,7 @@ class TrainSearchContractController {
 				: FUTURE_CACHE;
 			var snapshot = service.searchWithMetadata(criteria);
 			return success(snapshot.result(), snapshot.expiresAt(), cachePolicy, webRequest);
-		} catch (DateTimeParseException | NullPointerException exception) {
+		} catch (DateTimeParseException exception) {
 			return error(HttpStatus.BAD_REQUEST, "TRAIN_SEARCH_INVALID_ARGUMENT", "검색 조건을 확인해 주세요.");
 		} catch (IllegalArgumentException exception) {
 			return error(HttpStatus.BAD_REQUEST, "TRAIN_SEARCH_UNSUPPORTED_TRAIN_TYPE", "지원하지 않는 열차종입니다.");
@@ -169,7 +169,9 @@ class TrainSearchContractController {
 	}
 
 	private LocalDate parseRequiredDate(String value) {
-		if (value == null || value.isBlank()) throw new NullPointerException("departureDate is required");
+		if (value == null || value.isBlank()) {
+			throw new DateTimeParseException("departureDate is required", value == null ? "" : value, 0);
+		}
 		return LocalDate.parse(value);
 	}
 

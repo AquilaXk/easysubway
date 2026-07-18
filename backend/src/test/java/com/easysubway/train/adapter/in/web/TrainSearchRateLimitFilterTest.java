@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.lang.reflect.Modifier;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockFilterChain;
@@ -79,6 +80,19 @@ class TrainSearchRateLimitFilterTest {
 	}
 
 	@Test
+	void clearsTheWholeIdentityMapOnceWhenTheFixedWindowChanges() {
+		var clock = new TestClock(Instant.parse("2026-07-19T00:00:30Z"));
+		var limiter = new TrainSearchRateLimiter(24, 1, clock);
+		assertThat(limiter.acquire("first", 1).allowed()).isTrue();
+		assertThat(limiter.acquire("second", 1).allowed()).isFalse();
+
+		clock.advanceSeconds(30);
+
+		assertThat(limiter.acquire("second", 1).allowed()).isTrue();
+		assertThat(limiter.acquire("first", 1).allowed()).isFalse();
+	}
+
+	@Test
 	void acquireSerializesLookupCleanupRolloverAndTokenConsumption() throws Exception {
 		var acquire = TrainSearchRateLimiter.class.getDeclaredMethod("acquire", String.class, int.class);
 
@@ -110,5 +124,32 @@ class TrainSearchRateLimitFilterTest {
 
 	private Clock fixedClock() {
 		return Clock.fixed(Instant.parse("2026-07-19T00:00:30Z"), ZoneOffset.UTC);
+	}
+
+	private static final class TestClock extends Clock {
+		private Instant instant;
+
+		private TestClock(Instant instant) {
+			this.instant = instant;
+		}
+
+		void advanceSeconds(long seconds) {
+			instant = instant.plusSeconds(seconds);
+		}
+
+		@Override
+		public ZoneId getZone() {
+			return ZoneOffset.UTC;
+		}
+
+		@Override
+		public Clock withZone(ZoneId zone) {
+			return this;
+		}
+
+		@Override
+		public Instant instant() {
+			return instant;
+		}
 	}
 }

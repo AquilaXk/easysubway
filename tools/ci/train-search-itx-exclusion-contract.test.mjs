@@ -1,9 +1,17 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const read = (path) => readFileSync(path, "utf8");
 const readJson = (path) => JSON.parse(read(path));
+const readYaml = (path) => JSON.parse(execFileSync("ruby", [
+  "-rjson",
+  "-ryaml",
+  "-e",
+  "puts JSON.generate(YAML.safe_load(File.read(ARGV.fetch(0)), permitted_classes: [], aliases: false))",
+  path,
+], { encoding: "utf8" }));
 
 const supportedTrainTypes = [
   "KTX",
@@ -32,45 +40,57 @@ test("train-search canonical allowlist와 OpenAPI enum은 ITX-청춘을 제외�
 });
 
 test("OpenAPI는 역검색·왕복검색 성공 envelope와 안정 오류 계약을 공개한다", () => {
-  const openapi = read("contracts/api/train-api.openapi.yaml");
+  const openapi = readYaml("contracts/api/train-api.openapi.yaml");
+  const stations = openapi.paths["/api/v1/trains/stations"].get;
+  const search = openapi.paths["/api/v1/trains/search"].get;
+  const parameters = (operation) => Object.fromEntries(operation.parameters.map((parameter) => [parameter.name, parameter]));
+  const stationParameters = parameters(stations);
+  const searchParameters = parameters(search);
 
-  for (const parameter of [
-    "query",
-    "departureStationId",
-    "arrivalStationId",
-    "departureDate",
-    "returnDate",
-    "trainType",
-  ]) {
-    assert.match(openapi, new RegExp(`- name: ${parameter}(?:\\n|\\r\\n)`));
+  assert.deepEqual(Object.keys(stationParameters), ["query", "trainType"]);
+  assert.equal(stationParameters.query.required, true);
+  assert.equal(stationParameters.query.schema.minLength, 2);
+  assert.deepEqual(Object.keys(searchParameters), [
+    "departureStationId", "arrivalStationId", "departureDate", "returnDate", "trainType",
+  ]);
+  for (const required of ["departureStationId", "arrivalStationId", "departureDate"]) {
+    assert.equal(searchParameters[required].required, true);
   }
-  for (const schema of [
-    "StationSearchEnvelope",
-    "TrainSearchEnvelope",
-    "Station",
-    "Journey",
-    "TrainSearchResult",
-  ]) {
-    assert.match(openapi, new RegExp(`\\n    ${schema}:\\n`));
+  assert.equal(searchParameters.returnDate.required, false);
+  assert.deepEqual(Object.keys(stations.responses), ["200", "304", "400", "422", "429", "502", "503"]);
+  assert.deepEqual(Object.keys(search.responses), ["200", "304", "400", "422", "429", "502", "503"]);
+  for (const operation of [stations, search]) {
+    for (const status of ["200", "304"]) {
+      assert.deepEqual(Object.keys(operation.responses[status].headers), ["ETag", "Cache-Control"]);
+    }
   }
-  for (const status of ["200", "400", "422", "429", "502", "503"]) {
-    assert.match(openapi, new RegExp(`        "${status}":`));
+  assert.equal(stations.responses["200"].content["application/json"].schema.$ref,
+    "#/components/schemas/StationSearchEnvelope");
+  assert.equal(search.responses["200"].content["application/json"].schema.$ref,
+    "#/components/schemas/TrainSearchEnvelope");
+  assert.equal(stations.responses["400"].$ref, "#/components/responses/UnsupportedTrainType");
+  assert.equal(search.responses["400"].content["application/json"].schema.$ref,
+    "#/components/schemas/TrainSearchErrorEnvelope");
+  for (const schema of ["TrainType", "StationSearchEnvelope", "TrainSearchEnvelope", "Station", "Journey", "TrainSearchResult"]) {
+    assert.ok(openapi.components.schemas[schema]);
   }
-  for (const code of [
-    "TRAIN_SEARCH_INVALID_ARGUMENT",
-    "TRAIN_SEARCH_UNSUPPORTED_TRAIN_TYPE",
-    "TRAIN_SEARCH_RATE_LIMITED",
-    "TRAIN_SEARCH_PROVIDER_ERROR",
-    "TRAIN_SEARCH_NO_VALID_ROWS",
-    "TRAIN_SEARCH_UNAVAILABLE",
-  ]) {
-    assert.match(openapi, new RegExp(`(?:- |code: )${code}(?:\\n|,|\\])`));
+  assert.deepEqual(openapi.components.schemas.TrainType.enum, supportedTrainTypes);
+  for (const response of ["UnsupportedTrainType", "InvalidArgument", "RateLimited", "ProviderFailure", "TrainSearchUnavailable"]) {
+    assert.ok(openapi.components.responses[response]);
   }
-  assert.match(openapi, /name: query[\s\S]*?required: true[\s\S]*?minLength: 2/);
-  assert.match(openapi, /name: departureStationId[\s\S]*?required: true/);
-  assert.match(openapi, /name: arrivalStationId[\s\S]*?required: true/);
-  assert.match(openapi, /name: departureDate[\s\S]*?required: true/);
-  assert.match(openapi, /headers:[\s\S]*?ETag:[\s\S]*?Cache-Control:/);
+  assert.equal(openapi.components.responses.UnsupportedTrainType.content["application/json"].example.data.code,
+    "TRAIN_SEARCH_UNSUPPORTED_TRAIN_TYPE");
+  assert.equal(openapi.components.responses.InvalidArgument.content["application/json"].example.data.code,
+    "TRAIN_SEARCH_INVALID_ARGUMENT");
+  assert.equal(openapi.components.responses.RateLimited.content["application/json"].example.data.code,
+    "TRAIN_SEARCH_RATE_LIMITED");
+  assert.deepEqual(
+    Object.values(openapi.components.responses.ProviderFailure.content["application/json"].examples)
+      .map(({ value }) => value.data.code),
+    ["TRAIN_SEARCH_PROVIDER_ERROR", "TRAIN_SEARCH_NO_VALID_ROWS"],
+  );
+  assert.equal(openapi.components.responses.TrainSearchUnavailable.content["application/json"].example.data.code,
+    "TRAIN_SEARCH_UNAVAILABLE");
 });
 
 test("backend·Mobile allowlist는 canonical 열차종과 drift하지 않는다", () => {
