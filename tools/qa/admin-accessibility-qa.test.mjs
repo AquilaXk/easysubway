@@ -35,6 +35,10 @@ test("admin accessibility QA script captures text 200 percent reflow evidence on
   assert.match(source, /report\.textScale\.push/);
   assert.match(source, /noHorizontalScroll: doc\.scrollWidth <= doc\.clientWidth/);
   assert.match(source, /clippedContainers/);
+  // #1988: pass가 실제로 호출되는지, clipping 집계가 summary에 보존되는지 계약으로 고정한다.
+  assert.match(source, /await textScalePass\(page, baseUrl, outputDir, report, ADMIN_TEXT_SCALE_PAGES\)/);
+  assert.match(source, /await textScalePass\(operatorPage, baseUrl, outputDir, report, OPERATOR_TEXT_SCALE_PAGES\)/);
+  assert.match(source, /textScaleClippedContainers: report\.textScale\.reduce/);
 });
 
 test("admin accessibility QA script captures login NONE and RETRY_WARNING public parity", () => {
@@ -49,6 +53,17 @@ test("admin accessibility QA script captures login NONE and RETRY_WARNING public
   assert.match(source, /waitFor\(\{ state: "visible", timeout: 10000 \}\)/);
   assert.match(source, /retryWarningRendered/);
   assert.match(source, /login parity 계산 불가/);
+  // #1988: pass가 실제로 호출되고, 양쪽 동일 실패가 parity를 green으로 통과시키지 않도록
+  // 각 surface 기대 상태 충족을 parity에 포함하는 계약을 고정한다.
+  assert.match(source, /await runLoginStatePass\(browser, baseUrl, outputDir, report\)/);
+  assert.match(source, /function loginSurfaceMeetsExpectedState\(entry\)/);
+  assert.match(source, /entry\.noneStatus >= 200/);
+  assert.match(source, /entry\.noneAlerts === 0/);
+  assert.match(source, /entry\.alertVisible === true/);
+  assert.match(source, /entry\.retryWarningRendered === true/);
+  assert.match(source, /const adminExpectedStateOk = loginSurfaceMeetsExpectedState\(admin\)/);
+  assert.match(source, /const operatorExpectedStateOk = loginSurfaceMeetsExpectedState\(operator\)/);
+  assert.match(source, /&& adminExpectedStateOk\s*\n\s*&& operatorExpectedStateOk/);
 });
 
 test("admin accessibility QA script verifies admin-table-scroll keyboard and focus outline", () => {
@@ -59,6 +74,11 @@ test("admin accessibility QA script verifies admin-table-scroll keyboard and foc
   assert.match(source, /outlineVisible/);
   assert.match(source, /ArrowRight/);
   assert.match(source, /ArrowLeft/);
+  // #1988: pass가 실제로 호출되고, 검사 실패가 blocking 위반으로 표면화되는 계약을 고정한다.
+  assert.match(source, /await keyboardTableCheck\(page, baseUrl, report\)/);
+  assert.match(source, /entry\.check === "admin-table-scroll-keyboard"/);
+  assert.match(source, /id: "admin-table-scroll-keyboard"/);
+  assert.match(source, /id: "login-public-state-expectation"/);
 });
 
 test("admin accessibility QA script records manual-only screen reader and contrast work", () => {

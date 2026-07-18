@@ -126,6 +126,32 @@ function finalizeReport(report) {
         nodes: violation.nodes.length,
       })),
   );
+  // #1988: table keyboard 검사가 전부 false여도 evidence만 남기고 실행은 성공하던 허위 green을 막는다.
+  // axe blocking과 같은 패턴으로 위반 항목에 편입해 exit code로 실패를 표면화한다(report는 이미 기록됨).
+  const tableKeyboard = report.keyboard.find((entry) => entry.check === "admin-table-scroll-keyboard");
+  if (tableKeyboard
+    && !(tableKeyboard.tabFocusable
+      && tableKeyboard.scrolledRight
+      && tableKeyboard.scrolledBackLeft
+      && tableKeyboard.outlineVisible)) {
+    blockingViolations.push({
+      page: "/admin/stations/page",
+      id: "admin-table-scroll-keyboard",
+      impact: "serious",
+      nodes: 0,
+    });
+  }
+  // #1988: 로그인 공개 상태 기대치 미충족(허위 parity의 근원)도 위반으로 편입한다.
+  if (report.loginParity
+    && (report.loginParity.adminExpectedStateOk === false
+      || report.loginParity.operatorExpectedStateOk === false)) {
+    blockingViolations.push({
+      page: "login-parity",
+      id: "login-public-state-expectation",
+      impact: "serious",
+      nodes: 0,
+    });
+  }
   const criticalViolations = blockingViolations.filter((violation) => violation.impact === "critical");
   const seriousViolations = blockingViolations.filter((violation) => violation.impact === "serious");
   report.summary = {
@@ -137,6 +163,9 @@ function finalizeReport(report) {
     keyboardChecks: report.keyboard.length,
     textScaleChecks: report.textScale.length,
     textScaleReflowFailures: report.textScale.filter((entry) => !entry.noHorizontalScroll).length,
+    // #1988: 수평 스크롤만 세면 overflow:hidden/clip으로 잘린 컨테이너 증거가 사라진다.
+    // 각 entry의 clippedContainers를 합산해 clipping 규모를 summary에 보존한다.
+    textScaleClippedContainers: report.textScale.reduce((sum, entry) => sum + (entry.clippedContainers || 0), 0),
     loginStateCaptures: report.loginStates.length,
     loginParityOk: report.loginParity ? report.loginParity.parity : null,
   };
@@ -276,6 +305,16 @@ async function textScalePass(page, baseUrl, outputDir, report, pages) {
   }
 }
 
+// #1988: 각 surface가 기대 공개 상태(NONE 2xx·alert 없음, RETRY_WARNING alert 가시·copy 일치)를
+// 충족하는지 판정한다. parity 비교가 "동일하게 실패"를 green으로 통과시키는 것을 막는다.
+function loginSurfaceMeetsExpectedState(entry) {
+  return entry.noneStatus >= 200
+    && entry.noneStatus < 300
+    && entry.noneAlerts === 0
+    && entry.alertVisible === true
+    && entry.retryWarningRendered === true;
+}
+
 // #1988: 로그인 공개 상태(NONE·RETRY_WARNING)를 admin·operator 각각 캡처하고 parity를 검사한다.
 // 실제 계정 잠금을 유발하지 않도록 존재하지 않는 사용자명으로 실패를 만든다.
 async function runLoginStatePass(browser, baseUrl, outputDir, report) {
@@ -347,17 +386,25 @@ async function runLoginStatePass(browser, baseUrl, outputDir, report) {
   const alertVisibleParity = admin.alertVisible === operator.alertVisible;
   const alertStructureParity = admin.warningAlerts === operator.warningAlerts
     && admin.noneAlerts === operator.noneAlerts;
+  // #1988: 양쪽 surface가 동일하게 실패해도(alert 없음·copy null) 동등성 비교가 모두 참이라
+  // parity=true가 되는 허위 green을 막기 위해, 각 surface가 기대 공개 상태를 충족하는지도 함께 요구한다.
+  const adminExpectedStateOk = loginSurfaceMeetsExpectedState(admin);
+  const operatorExpectedStateOk = loginSurfaceMeetsExpectedState(operator);
   report.loginParity = {
     parity: noneStatusParity
       && warningCopyParity
       && retryWarningParity
       && alertVisibleParity
-      && alertStructureParity,
+      && alertStructureParity
+      && adminExpectedStateOk
+      && operatorExpectedStateOk,
     noneStatusParity,
     warningCopyParity,
     retryWarningParity,
     alertVisibleParity,
     alertStructureParity,
+    adminExpectedStateOk,
+    operatorExpectedStateOk,
     adminRetryWarningRendered: admin.retryWarningRendered,
     operatorRetryWarningRendered: operator.retryWarningRendered,
     adminWarningCopy: admin.warningCopy,
