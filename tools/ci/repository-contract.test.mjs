@@ -14797,7 +14797,7 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(planner, /loadRouteTimetableSnapshot\(\)/);
   assert.match(planner, /RouteTimetableRaptorPlanner/);
   assert.match(planner, /noTimetableServicePlan/);
-  assert.match(planner, /nextServiceTime\(command, snapshot\.timetable\(\)\)/);
+  assert.match(planner, /nextServiceTime\(\s*command,\s*snapshot\.compiledTimetable\(\)\s*\)/);
   assert.match(planner, /searchRouteAlternatives/);
   assert.match(planner, /statusesOf/);
   assert.match(raptorPlanner, /class RouteTimetableRaptorPlanner/);
