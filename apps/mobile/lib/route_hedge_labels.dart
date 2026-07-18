@@ -19,6 +19,9 @@ const routeHedgeConnectivityUnknown = '길이 이어지는지 확인하고 있�
 /// 세부 원인을 특정할 수 없는 일반 불확실성.
 const routeHedgeGenericUnknown = '일부 안내를 확인하고 있어요.';
 
+/// 소요 시간을 아직 계산하지 못한 불확실성(경로 warning·engine 공통 한 벌).
+const routeDurationUnknown = '소요 시간을 확인하고 있어요.';
+
 /// 실측된 보수중/점검/중지/공사 상태(#1996). 확인 불가와 달리 '지금은 이용
 /// 어려움'을 정직하게 알린다. 숨기지 않되 가용으로 오인되지 않게 구분한다.
 const routeFacilityUnderMaintenance = '지금은 보수중이라 이용하기 어려워요.';
@@ -46,7 +49,7 @@ String routeWarningLabel(String code) {
     'LOW_DATA_CONFIDENCE' => '일부 시설 안내를 준비 중이에요.',
     'STALE_ACCESSIBILITY_DATA' => '시설 상태 안내가 오래됐을 수 있어요.',
     'STAIR_ONLY_ACCESS' => '계단 포함 구간이 있습니다.',
-    'DURATION_UNKNOWN' => '소요 시간을 확인하고 있어요.',
+    'DURATION_UNKNOWN' => routeDurationUnknown,
     'FACILITY_UNDER_MAINTENANCE' => routeFacilityUnderMaintenance,
     'FACILITY_UNAVAILABLE' => routeFacilityUnavailable,
     _ => routeUncertaintyHedgeLabel(code),

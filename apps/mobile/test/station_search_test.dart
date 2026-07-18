@@ -1367,10 +1367,10 @@ void main() {
       '비상벨',
       '1번 출구 엘리베이터',
     ]);
-    expect(state.facilityAttentionSummary, '고장·폐쇄 1개 · 가기 전 살펴보기 1개 · 확인 중 1개');
+    expect(state.facilityAttentionSummary, '고장·폐쇄 1개 · 가기 전 살펴보기 1개 · 미확인 1개');
     expect(
       state.facilityAttentionSemanticLabel,
-      '살펴볼 시설, 고장·폐쇄 1개, 가기 전 살펴보기 1개, 확인 중 1개',
+      '살펴볼 시설, 고장·폐쇄 1개, 가기 전 살펴보기 1개, 미확인 1개',
     );
   });
 
