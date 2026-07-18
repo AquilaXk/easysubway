@@ -197,6 +197,22 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 	}
 
 	@Test
+	@DisplayName("후행 trip이 downstream에서 합류해도 기존 trip-id 동률 순서를 유지한다")
+	void preservesLegacyTripOrderWhenLaterTripMergesDownstream() {
+		var results = planner.search(
+			command("station-a", "station-c", "2026-07-01T08:50:00+09:00"),
+			planner.compile(mergingTimetable())
+		);
+
+		assertThat(results).hasSize(1);
+		assertThat(results.getFirst().steps())
+			.filteredOn(step -> "ride".equals(step.stepType()))
+			.extracting("tripId", "plannedArrivalTime")
+			.containsExactly(org.assertj.core.groups.Tuple.tuple(
+				"a-late", "2026-07-01T09:20:00+09:00"));
+	}
+
+	@Test
 	@DisplayName("같은 정차열에서 하차 정책이 다른 후속 trip을 잃지 않는다")
 	void preservesLaterTripWhenEarlierTripBlocksDropOff() {
 		var results = planner.search(
@@ -426,6 +442,28 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 				stop("a-fast", 1, "station-a", 33000),
 				stop("a-fast", 2, "station-b", 33300),
 				stop("a-fast", 3, "station-c", 34500)
+			),
+			List.of()
+		);
+	}
+
+	private static RouteTimetable mergingTimetable() {
+		return timetable(
+			List.of(weekday("weekday")),
+			List.of(),
+			List.of(
+				new LoadRouteTimetablePort.TransitTrip(
+					"z-early", "route", "weekday", "도착", "0", "LOCAL", 0),
+				new LoadRouteTimetablePort.TransitTrip(
+					"a-late", "route", "weekday", "도착", "0", "LOCAL", 0)
+			),
+			List.of(
+				stop("z-early", 1, "station-a", 32400),
+				stop("z-early", 2, "station-b", 33000),
+				stop("z-early", 3, "station-c", 33600),
+				stop("a-late", 1, "station-a", 32700),
+				stop("a-late", 2, "station-b", 33000),
+				stop("a-late", 3, "station-c", 33600)
 			),
 			List.of()
 		);

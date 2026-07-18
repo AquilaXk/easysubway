@@ -981,7 +981,7 @@ class RouteTimetableRaptorPlanner {
 				for (ScheduledTrip trip : orderedTrips) {
 					List<ScheduledTrip> selectedGroup = null;
 					for (List<ScheduledTrip> group : nonOvertakingGroups) {
-						if (doesNotOvertake(group.getLast(), trip)) {
+						if (canShareScanPattern(group.getLast(), trip)) {
 							selectedGroup = group;
 							break;
 						}
@@ -1004,10 +1004,13 @@ class RouteTimetableRaptorPlanner {
 			return new CompiledRoutePatterns(Map.copyOf(stopsByPattern), Map.copyOf(tripsByPattern));
 		}
 
-		private static boolean doesNotOvertake(ScheduledTrip earlier, ScheduledTrip later) {
+		private static boolean canShareScanPattern(ScheduledTrip earlier, ScheduledTrip later) {
 			for (int stop = 0; stop < earlier.stopTimes().size(); stop += 1) {
 				if (earlier.arrivalSeconds(stop) > later.arrivalSeconds(stop)
-					|| earlier.departureSeconds(stop) > later.departureSeconds(stop)) {
+					|| earlier.departureSeconds(stop) > later.departureSeconds(stop)
+					|| (stop > 0
+						&& earlier.arrivalSeconds(stop) == later.arrivalSeconds(stop)
+						&& later.index() < earlier.index())) {
 					return false;
 				}
 			}
