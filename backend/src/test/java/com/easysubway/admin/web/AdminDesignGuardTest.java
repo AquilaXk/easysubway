@@ -244,6 +244,12 @@ class AdminDesignGuardTest {
 		assertThat(rule(css, "\\.admin-main")).doesNotContain("overflow-x: auto;");
 		assertThat(rule(css, "\\.admin-v3 section,\\s*\\.admin-card"))
 			.doesNotContain("overflow-x: auto;");
+		assertThat(rule(css, "\\.admin-v3 th"))
+			.doesNotContain("position: sticky;")
+			.doesNotContain("top: 0;");
+		assertThat(rule(css, "\\.admin-v3 thead th"))
+			.contains("position: sticky;")
+			.contains("top: 0;");
 		assertThat(rule(css,
 			"\\.admin-v3 \\.admin-table-scroll table\\.static-table tbody tr:hover "
 				+ "td:first-child:not\\(\\[colspan\\]\\)"))

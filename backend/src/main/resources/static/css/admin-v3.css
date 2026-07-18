@@ -467,13 +467,16 @@ body.admin-v3 {
 }
 
 .admin-v3 th {
-	position: sticky;
-	top: 0;
-	z-index: 1;
 	background: var(--admin-header-bg);
 	color: var(--admin-ink-2);
 	font-size: 13px;
 	font-weight: var(--admin-w-medium);
+}
+
+.admin-v3 thead th {
+	position: sticky;
+	top: 0;
+	z-index: 1;
 }
 
 .admin-v3 td {
