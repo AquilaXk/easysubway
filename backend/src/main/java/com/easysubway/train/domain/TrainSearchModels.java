@@ -2,6 +2,7 @@ package com.easysubway.train.domain;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.List;
 
 public final class TrainSearchModels {
 
@@ -9,9 +10,13 @@ public final class TrainSearchModels {
 
 	public record Station(String id, String name) {}
 
-	public record TrainType(String code, String name, String providerCode) {
+	public record TrainType(String code, String name, List<String> providerCodes) {
+		public TrainType {
+			providerCodes = List.copyOf(providerCodes);
+		}
+
 		public TrainType(String code, String name) {
-			this(code, name, null);
+			this(code, name, List.of());
 		}
 	}
 
@@ -20,15 +25,29 @@ public final class TrainSearchModels {
 		String arrivalStationId,
 		LocalDate departureDate,
 		String trainType,
-		String providerTrainGradeCode
+		List<String> providerTrainGradeCodes
 	) {
+		public LegQuery {
+			providerTrainGradeCodes = List.copyOf(providerTrainGradeCodes);
+		}
+
 		public LegQuery(
 			String departureStationId,
 			String arrivalStationId,
 			LocalDate departureDate,
 			String trainType
 		) {
-			this(departureStationId, arrivalStationId, departureDate, trainType, null);
+			this(departureStationId, arrivalStationId, departureDate, trainType, List.of());
+		}
+
+		public LegQuery(
+			String departureStationId,
+			String arrivalStationId,
+			LocalDate departureDate,
+			String trainType,
+			String providerTrainGradeCode
+		) {
+			this(departureStationId, arrivalStationId, departureDate, trainType, List.of(providerTrainGradeCode));
 		}
 	}
 
@@ -42,8 +61,8 @@ public final class TrainSearchModels {
 
 	public record SearchResult(
 		OffsetDateTime observedAt,
-		java.util.List<Journey> outbound,
-		java.util.List<Journey> inbound
+		List<Journey> outbound,
+		List<Journey> inbound
 	) {}
 
 	public record Journey(

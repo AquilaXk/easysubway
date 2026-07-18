@@ -77,6 +77,7 @@ class TagoTrainSearchProviderTest {
 					[
 					  {"vehiclekndid":"00","vehiclekndnm":"KTX"},
 					  {"vehiclekndid":"01","vehiclekndnm":"KTX-산천"},
+					  {"vehiclekndid":"10","vehiclekndnm":"KTX-산천"},
 					  {"vehiclekndid":"02","vehiclekndnm":"SRT"},
 					  {"vehiclekndid":"03","vehiclekndnm":"ITX-마음"},
 					  {"vehiclekndid":"04","vehiclekndnm":"ITX-새마을"},
@@ -108,6 +109,11 @@ class TagoTrainSearchProviderTest {
 					"ITX_MAUM", "ITX_SAEMAEUL", "KTX", "KTX_SANCHEON",
 					"MUGUNGHWA", "NURIRO", "SAEMAEUL", "SRT"
 				);
+			assertThat(catalog.trainTypes())
+				.filteredOn(type -> "KTX_SANCHEON".equals(type.code()))
+				.singleElement()
+				.extracting(type -> type.providerCodes())
+				.isEqualTo(java.util.List.of("01", "10"));
 			assertThat(requests.get("GetCtyCodeList")).doesNotContainKeys("pageNo", "numOfRows");
 			assertThat(requests.get("GetVhcleKndList")).doesNotContainKeys("pageNo", "numOfRows");
 			assertThat(requests.get("GetCtyAcctoTrainSttnList"))
@@ -153,6 +159,35 @@ class TagoTrainSearchProviderTest {
 				.hasMessage("TRAIN_SEARCH_PROVIDER_ERROR")
 				.hasMessageNotContaining("literal-secret-value")
 				.hasMessageNotContaining("secret must not escape");
+		} finally {
+			server.stop(0);
+		}
+	}
+
+	@Test
+	void searchesEveryProviderCodeForOneCanonicalTrainType() throws Exception {
+		var requestedCodes = ConcurrentHashMap.<String>newKeySet();
+		var server = server(exchange -> {
+			String providerCode = query(exchange.getRequestURI()).get("trainGradeCode");
+			requestedCodes.add(providerCode);
+			String trainNumber = "01".equals(providerCode) ? "101" : "102";
+			respond(exchange, paginatedResponse("""
+				{"trainno":"%s","traingradename":"KTX-산천","depplandtime":"20260720090000","arrplandtime":"20260720100200","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"}
+				""".formatted(trainNumber), 1));
+		});
+		try {
+			var query = new LegQuery(
+				"NAT010000",
+				"NAT011668",
+				LocalDate.parse("2026-07-20"),
+				"KTX_SANCHEON",
+				java.util.List.of("01", "10")
+			);
+
+			assertThat(provider(server, "test-key").search(query))
+				.extracting(Journey::trainNumber)
+				.containsExactly("101", "102");
+			assertThat(requestedCodes).containsExactlyInAnyOrder("01", "10");
 		} finally {
 			server.stop(0);
 		}
@@ -263,6 +298,51 @@ class TagoTrainSearchProviderTest {
 	void malformedJourneyIsTypedAsNoValidRows() throws Exception {
 		var server = server(exchange -> respond(exchange, paginatedResponse("""
 			{"trainno":"101","traingradename":"KTX","depplandtime":"not-a-time","arrplandtime":"20260720100200","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"}
+			""", 1)));
+		try {
+			var query = new LegQuery("NAT010000", "NAT011668", LocalDate.parse("2026-07-20"), "KTX", "00");
+			assertThatThrownBy(() -> provider(server, "test-key").search(query))
+				.isInstanceOf(ProviderFailure.class)
+				.hasMessage("TRAIN_SEARCH_NO_VALID_ROWS");
+		} finally {
+			server.stop(0);
+		}
+	}
+
+	@Test
+	void rejectsInvalidCalendarDateInsteadOfNormalizingIt() throws Exception {
+		var server = server(exchange -> respond(exchange, paginatedResponse("""
+			{"trainno":"101","traingradename":"KTX","depplandtime":"20260230090000","arrplandtime":"20260230100200","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"}
+			""", 1)));
+		try {
+			var query = new LegQuery("NAT010000", "NAT011668", LocalDate.parse("2026-02-28"), "KTX", "00");
+			assertThatThrownBy(() -> provider(server, "test-key").search(query))
+				.isInstanceOf(ProviderFailure.class)
+				.hasMessage("TRAIN_SEARCH_NO_VALID_ROWS");
+		} finally {
+			server.stop(0);
+		}
+	}
+
+	@Test
+	void rejectsJourneyOutsideRequestedDate() throws Exception {
+		var server = server(exchange -> respond(exchange, paginatedResponse("""
+			{"trainno":"101","traingradename":"KTX","depplandtime":"20260721090000","arrplandtime":"20260721100200","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"}
+			""", 1)));
+		try {
+			var query = new LegQuery("NAT010000", "NAT011668", LocalDate.parse("2026-07-20"), "KTX", "00");
+			assertThatThrownBy(() -> provider(server, "test-key").search(query))
+				.isInstanceOf(ProviderFailure.class)
+				.hasMessage("TRAIN_SEARCH_NO_VALID_ROWS");
+		} finally {
+			server.stop(0);
+		}
+	}
+
+	@Test
+	void rejectsJourneyWhoseTrainTypeDiffersFromRequestedGrade() throws Exception {
+		var server = server(exchange -> respond(exchange, paginatedResponse("""
+			{"trainno":"301","traingradename":"SRT","depplandtime":"20260720090000","arrplandtime":"20260720100200","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"}
 			""", 1)));
 		try {
 			var query = new LegQuery("NAT010000", "NAT011668", LocalDate.parse("2026-07-20"), "KTX", "00");

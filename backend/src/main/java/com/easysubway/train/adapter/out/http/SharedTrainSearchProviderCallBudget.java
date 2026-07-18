@@ -5,6 +5,7 @@ import com.easysubway.train.application.TrainSearchProvider.ProviderFailure;
 import com.easysubway.train.application.TrainSearchProviderCallBudget;
 import java.time.ZoneId;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -29,8 +30,13 @@ final class SharedTrainSearchProviderCallBudget implements TrainSearchProviderCa
 
 	@Override
 	public void acquire() {
-		if (!cache.tryAcquireProviderCall(PROVIDER_ID, PROVIDER_ZONE, minuteLimit, dayLimit)) {
+		try {
+			if (cache.tryAcquireProviderCall(PROVIDER_ID, PROVIDER_ZONE, minuteLimit, dayLimit)) {
+				return;
+			}
+		} catch (DataAccessException exception) {
 			throw new ProviderFailure("TRAIN_SEARCH_UNAVAILABLE");
 		}
+		throw new ProviderFailure("TRAIN_SEARCH_UNAVAILABLE");
 	}
 }

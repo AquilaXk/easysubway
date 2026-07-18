@@ -26,6 +26,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.format.ResolverStyle;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -43,8 +44,9 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 	private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(5);
 	private static final int PAGE_SIZE = 100;
 	private static final ZoneId PROVIDER_ZONE = ZoneId.of("Asia/Seoul");
-	private static final DateTimeFormatter PROVIDER_TIME = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
-	private static final DateTimeFormatter PROVIDER_DATE = DateTimeFormatter.ofPattern("yyyyMMdd");
+	private static final DateTimeFormatter PROVIDER_TIME = DateTimeFormatter.ofPattern("uuuuMMddHHmmss")
+		.withResolverStyle(ResolverStyle.STRICT);
+	private static final DateTimeFormatter PROVIDER_DATE = DateTimeFormatter.ofPattern("uuuuMMdd");
 	private static final Map<String, String> TRAIN_TYPES = Map.ofEntries(
 		Map.entry("KTX", "KTX"),
 		Map.entry("KTX산천", "KTX_SANCHEON"),
@@ -138,34 +140,61 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 			}
 		}
 
-		Map<String, TrainType> trainTypes = new LinkedHashMap<>();
+		Map<String, List<ProviderTrainGrade>> gradesByTrainType = new LinkedHashMap<>();
 		for (JsonNode grade : grades) {
 			String name = requiredText(grade, "vehiclekndnm");
 			String code = trainType(name);
 			if (TrainSearchScopePolicy.supportedTrainTypes().contains(code)) {
-				trainTypes.putIfAbsent(code, new TrainType(code, name, requiredText(grade, "vehiclekndid")));
+				gradesByTrainType.computeIfAbsent(code, ignored -> new ArrayList<>())
+					.add(new ProviderTrainGrade(name, requiredText(grade, "vehiclekndid")));
 			}
 		}
-		if (stations.isEmpty() || !trainTypes.keySet().equals(TrainSearchScopePolicy.supportedTrainTypes())) {
+		if (stations.isEmpty() || !gradesByTrainType.keySet().equals(TrainSearchScopePolicy.supportedTrainTypes())) {
 			throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
 		}
+		List<TrainType> trainTypes = gradesByTrainType.entrySet().stream()
+			.map(entry -> new TrainType(
+				entry.getKey(),
+				entry.getValue().stream().map(ProviderTrainGrade::name).min(Comparator.naturalOrder()).orElseThrow(),
+				entry.getValue().stream().map(ProviderTrainGrade::code).distinct().sorted().toList()
+			))
+			.sorted(Comparator.comparing(TrainType::code))
+			.toList();
 		return new Catalog(
 			clock.instant(),
 			stations.values().stream().sorted(Comparator.comparing(Station::name).thenComparing(Station::id)).toList(),
-			trainTypes.values().stream().sorted(Comparator.comparing(TrainType::code)).toList()
+			trainTypes
 		);
 	}
 
 	@Override
 	public List<Journey> search(LegQuery query) {
-		if (query.providerTrainGradeCode() == null || query.providerTrainGradeCode().isBlank()) {
+		List<String> providerCodes = query.providerTrainGradeCodes().stream()
+			.map(String::trim)
+			.distinct()
+			.sorted()
+			.toList();
+		if (providerCodes.isEmpty() || providerCodes.stream().anyMatch(String::isBlank)) {
 			throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
 		}
+		Map<String, Journey> unique = new LinkedHashMap<>();
+		for (String providerCode : providerCodes) {
+			search(query, providerCode).forEach(journey -> unique.putIfAbsent(journeyKey(journey), journey));
+		}
+		return unique.values().stream()
+			.sorted(Comparator.comparing(Journey::departureAt)
+				.thenComparing(Journey::arrivalAt)
+				.thenComparing(Journey::trainType)
+				.thenComparing(Journey::trainNumber))
+			.toList();
+	}
+
+	private List<Journey> search(LegQuery query, String providerCode) {
 		Map<String, String> parameters = Map.of(
 			"depPlaceId", query.departureStationId(),
 			"arrPlaceId", query.arrivalStationId(),
 			"depPlandTime", PROVIDER_DATE.format(query.departureDate()),
-			"trainGradeCode", query.providerTrainGradeCode()
+			"trainGradeCode", providerCode
 		);
 		List<JsonNode> rows = paginated("GetStrtpntAlocFndTrainInfo", parameters);
 		ObjectNode payload = objectMapper.createObjectNode();
@@ -180,6 +209,18 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 		} catch (RuntimeException exception) {
 			throw new ProviderFailure("TRAIN_SEARCH_NO_VALID_ROWS");
 		}
+	}
+
+	private String journeyKey(Journey journey) {
+		return String.join(
+			"|",
+			journey.trainType(),
+			journey.trainNumber(),
+			journey.departureStationId(),
+			journey.departureAt().toString(),
+			journey.arrivalStationId(),
+			journey.arrivalAt().toString()
+		);
 	}
 
 	List<Journey> parseJourneys(JsonNode payload, LegQuery query) {
@@ -197,7 +238,6 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 		}
 		List<Journey> journeys = rows.stream().map(row -> journey(row, query)).toList();
 		return TrainSearchScopePolicy.retainSupported(journeys, Journey::trainType).stream()
-			.filter(journey -> query.trainType() == null || query.trainType().equals(journey.trainType()))
 			.sorted(java.util.Comparator.comparing(Journey::departureAt)
 				.thenComparing(Journey::arrivalAt)
 				.thenComparing(Journey::trainType)
@@ -213,7 +253,11 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 			.atZone(PROVIDER_ZONE).toOffsetDateTime();
 		long durationMinutes = Duration.between(departureAt, arrivalAt).toMinutes();
 		int fare = integer(row, "adultcharge");
-		if (durationMinutes <= 0 || durationMinutes > Integer.MAX_VALUE || fare < 0) {
+		if (!departureAt.toLocalDate().equals(query.departureDate())
+			|| (query.trainType() != null && !query.trainType().equals(trainType))
+			|| durationMinutes <= 0
+			|| durationMinutes > Integer.MAX_VALUE
+			|| fare < 0) {
 			throw new IllegalArgumentException("TRAIN_SEARCH_NO_VALID_ROWS");
 		}
 		return new Journey(
@@ -377,4 +421,6 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 	private String encode(String value) {
 		return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
 	}
+
+	private record ProviderTrainGrade(String name, String code) {}
 }
