@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -16,6 +17,121 @@ import 'package:easysubway_mobile/route_v2_ingress.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('동일 artifact identity의 route API는 snapshot과 graph를 한 번만 빌드한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    var snapshotBuildCount = 0;
+    var graphBuildCount = 0;
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      routeCatalogBuildObserver: (event) {
+        if (event == 'snapshot') snapshotBuildCount += 1;
+        if (event == 'graph') graphBuildCount += 1;
+      },
+    );
+    const request = RouteSearchRequest(
+      originStationId: 'station-sangnoksu',
+      destinationStationId: 'station-sadang',
+      mobilityType: 'STANDARD',
+    );
+
+    await repository.routeCapability(request);
+    await repository.canSearchRoute(request);
+    await repository.searchRoute(request);
+
+    expect(snapshotBuildCount, 1);
+    expect(graphBuildCount, 1);
+  });
+
+  test('동시 cold route 호출은 하나의 snapshot build를 공유한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    final buildStarted = Completer<void>();
+    final releaseBuild = Completer<void>();
+    var snapshotBuildCount = 0;
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      routeCatalogBuildObserver: (event) async {
+        if (event != 'snapshot') return;
+        snapshotBuildCount += 1;
+        if (!buildStarted.isCompleted) buildStarted.complete();
+        await releaseBuild.future;
+      },
+    );
+    const request = RouteSearchRequest(
+      originStationId: 'station-sangnoksu',
+      destinationStationId: 'station-sadang',
+      mobilityType: 'STANDARD',
+    );
+
+    final calls = [
+      repository.canSearchRoute(request),
+      repository.canSearchRoute(request),
+      repository.canSearchRoute(request),
+    ];
+    await buildStarted.future;
+    releaseBuild.complete();
+
+    expect(await Future.wait(calls), [isTrue, isTrue, isTrue]);
+    expect(snapshotBuildCount, 1);
+  });
+
+  test('실패한 cold graph build는 부분 publish 없이 다음 호출에서 재시도한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    var snapshotBuildCount = 0;
+    var graphBuildCount = 0;
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      routeCatalogBuildObserver: (event) {
+        if (event == 'snapshot') snapshotBuildCount += 1;
+        if (event != 'graph') return;
+        graphBuildCount += 1;
+        if (graphBuildCount != 2) throw StateError('graph build failed');
+      },
+    );
+    const request = RouteSearchRequest(
+      originStationId: 'station-sangnoksu',
+      destinationStationId: 'station-sadang',
+      mobilityType: 'STANDARD',
+    );
+
+    await expectLater(repository.canSearchRoute(request), throwsStateError);
+    expect(await repository.canSearchRoute(request), isTrue);
+    expect(await repository.canSearchRoute(request), isTrue);
+
+    expect(snapshotBuildCount, 2);
+    expect(graphBuildCount, 2);
+  });
+
+  test('warm route API는 PRAGMA table_info를 다시 실행하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    var schemaDiscoveryCount = 0;
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      routeCatalogBuildObserver: (event) {
+        if (event == 'schema') schemaDiscoveryCount += 1;
+      },
+    );
+    const request = RouteSearchRequest(
+      originStationId: 'station-sangnoksu',
+      destinationStationId: 'station-sadang',
+      mobilityType: 'STANDARD',
+    );
+
+    await repository.canSearchRoute(request);
+    expect(schemaDiscoveryCount, 2);
+
+    await repository.routeCapability(request);
+    await repository.searchRoute(request);
+    expect(schemaDiscoveryCount, 2);
+  });
+
   test('흡수된 station ID는 대표 station ID로 정규화해 경로를 검색한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);

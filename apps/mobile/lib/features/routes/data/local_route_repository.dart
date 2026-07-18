@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart' show Variable;
 
 import '../../../core/database/catalog/canonical_station_id.dart';
@@ -19,6 +21,7 @@ class LocalRouteRepository implements RouteSearchRepository {
     required this.catalogDatabase,
     OfficialOdFareRepository? officialOdFareRepository,
     DateTime Function()? now,
+    this.routeCatalogBuildObserver,
   }) : now = now ?? DateTime.now,
        officialOdFareRepository =
            officialOdFareRepository ??
@@ -27,6 +30,43 @@ class LocalRouteRepository implements RouteSearchRepository {
   final CatalogDatabase catalogDatabase;
   final DateTime Function() now;
   final OfficialOdFareRepository officialOdFareRepository;
+  final FutureOr<void> Function(String event)? routeCatalogBuildObserver;
+  Future<({_RouteCatalogSnapshot catalog, graph.NetworkGraph graph})>?
+  _routeCatalogBundleFuture;
+
+  Future<({_RouteCatalogSnapshot catalog, graph.NetworkGraph graph})>
+  _routeCatalogBundle() {
+    final existing = _routeCatalogBundleFuture;
+    if (existing != null) {
+      return existing;
+    }
+    late final Future<
+      ({_RouteCatalogSnapshot catalog, graph.NetworkGraph graph})
+    >
+    future;
+    future = _buildRouteCatalogBundle().onError((
+      Object error,
+      StackTrace stackTrace,
+    ) {
+      if (identical(_routeCatalogBundleFuture, future)) {
+        _routeCatalogBundleFuture = null;
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    });
+    _routeCatalogBundleFuture = future;
+    return future;
+  }
+
+  Future<({_RouteCatalogSnapshot catalog, graph.NetworkGraph graph})>
+  _buildRouteCatalogBundle() async {
+    await routeCatalogBuildObserver?.call('snapshot');
+    final catalog = await _RouteCatalogSnapshot.load(
+      catalogDatabase,
+      buildObserver: routeCatalogBuildObserver,
+    );
+    await routeCatalogBuildObserver?.call('graph');
+    return (catalog: catalog, graph: catalog.toGraph());
+  }
 
   Future<RouteSearchRequest> canonicalRequest(
     RouteSearchRequest request,
@@ -52,7 +92,9 @@ class LocalRouteRepository implements RouteSearchRepository {
   Future<RouteCapabilityMetadata> routeCapability(
     RouteSearchRequest request,
   ) async {
-    final catalog = await _RouteCatalogSnapshot.load(catalogDatabase);
+    final bundle = await _routeCatalogBundle();
+    final catalog = bundle.catalog;
+    final searchMode = await _stationSearchMode();
     final stationExists =
         catalog.hasStation(request.originStationId) &&
         catalog.hasStation(request.destinationStationId);
@@ -60,6 +102,8 @@ class LocalRouteRepository implements RouteSearchRepository {
         ? catalog.routeResult(
             request.originStationId,
             request.destinationStationId,
+            routeGraph: bundle.graph,
+            searchMode: searchMode,
             mobilityType: local.MobilityType.luggage,
             constraintMode: local.ConstraintMode.allowWithWarnings,
           )
@@ -73,6 +117,8 @@ class LocalRouteRepository implements RouteSearchRepository {
           catalog.strictEvidenceSupportedFor(
             request.originStationId,
             request.destinationStationId,
+            routeGraph: bundle.graph,
+            searchMode: searchMode,
           ),
       realtimeSupported: catalog.realtimeSupported(
         request.originStationId,
@@ -102,14 +148,16 @@ class LocalRouteRepository implements RouteSearchRepository {
   }
 
   Future<bool> canSearchRoute(RouteSearchRequest request) async {
-    final catalog = await _RouteCatalogSnapshot.load(catalogDatabase);
+    final catalog = (await _routeCatalogBundle()).catalog;
     return catalog.hasStation(request.originStationId) &&
         catalog.hasStation(request.destinationStationId);
   }
 
   @override
   Future<RouteSearchResult> searchRoute(RouteSearchRequest rawRequest) async {
-    final catalog = await _RouteCatalogSnapshot.load(catalogDatabase);
+    final bundle = await _routeCatalogBundle();
+    final catalog = bundle.catalog;
+    final searchMode = await _stationSearchMode();
     final request = catalog.canonicalRequest(rawRequest);
     final mobilityType = _mobilityType(request.mobilityType);
     final constraintMode = _constraintMode(request.effectiveConstraintMode);
@@ -127,15 +175,13 @@ class LocalRouteRepository implements RouteSearchRepository {
           ? local.LocalRouteResult.unknown(const [
               'STRICT_EVIDENCE_UNSUPPORTED',
             ])
-          : LocalRouteEngine(graph: catalog.toGraph()).search(
+          : LocalRouteEngine(graph: bundle.graph).search(
               local.RouteRequest(
                 originStationId: request.originStationId,
                 destinationStationId: request.destinationStationId,
                 mobilityType: mobilityType,
                 constraintMode: constraintMode,
-                searchMode: local
-                    .RouteSearchMode
-                    .stationToStationWithOutOfStationTransfers,
+                searchMode: searchMode,
                 objective: objective,
               ),
             );
@@ -143,25 +189,27 @@ class LocalRouteRepository implements RouteSearchRepository {
         !(catalog.strictEvidenceSupportedFor(
               request.originStationId,
               waypointStationId,
+              routeGraph: bundle.graph,
+              searchMode: searchMode,
             ) &&
             catalog.strictEvidenceSupportedFor(
               waypointStationId,
               request.destinationStationId,
+              routeGraph: bundle.graph,
+              searchMode: searchMode,
             ))) {
       result = local.LocalRouteResult.unknown(const [
         'STRICT_EVIDENCE_UNSUPPORTED',
       ]);
     } else {
-      final graphSnapshot = catalog.toGraph();
-      final engine = LocalRouteEngine(graph: graphSnapshot);
+      final engine = LocalRouteEngine(graph: bundle.graph);
       final first = engine.search(
         local.RouteRequest(
           originStationId: request.originStationId,
           destinationStationId: waypointStationId,
           mobilityType: mobilityType,
           constraintMode: constraintMode,
-          searchMode:
-              local.RouteSearchMode.stationToStationWithOutOfStationTransfers,
+          searchMode: searchMode,
           objective: objective,
         ),
       );
@@ -171,8 +219,7 @@ class LocalRouteRepository implements RouteSearchRepository {
           destinationStationId: request.destinationStationId,
           mobilityType: mobilityType,
           constraintMode: constraintMode,
-          searchMode:
-              local.RouteSearchMode.stationToStationWithOutOfStationTransfers,
+          searchMode: searchMode,
           objective: objective,
         ),
       );
@@ -191,6 +238,18 @@ class LocalRouteRepository implements RouteSearchRepository {
       plannedArrivals: plannedArrivals,
       officialOdFareQuote: quote,
     );
+  }
+
+  Future<local.RouteSearchMode> _stationSearchMode() async {
+    final row = await catalogDatabase.customSelect('''
+      SELECT value
+      FROM catalog_metadata
+      WHERE key = 'route.outOfStationTransfer.runtimeEnabled'
+      LIMIT 1
+    ''').getSingleOrNull();
+    return row?.read<String>('value').toLowerCase() == 'false'
+        ? local.RouteSearchMode.stationToStation
+        : local.RouteSearchMode.stationToStationWithOutOfStationTransfers;
   }
 
   @override
@@ -1210,7 +1269,10 @@ class _RouteCatalogSnapshot {
   /// 로컬 catalog에 station_car_door_hints가 있을 때만 채워진다.
   final Map<String, List<_CarDoorHintSnapshot>> carDoorHintsByStationLine;
 
-  static Future<_RouteCatalogSnapshot> load(CatalogDatabase database) async {
+  static Future<_RouteCatalogSnapshot> load(
+    CatalogDatabase database, {
+    FutureOr<void> Function(String event)? buildObserver,
+  }) async {
     final sourceUpdatedAtRow = await database.customSelect('''
           SELECT MAX(CAST(updated_at AS INTEGER)) AS source_updated_at
           FROM catalog_metadata
@@ -1301,6 +1363,7 @@ class _RouteCatalogSnapshot {
             );
       }
     }
+    await buildObserver?.call('schema');
     final networkEdgeColumns = await database
         .customSelect('PRAGMA table_info(network_edges)')
         .get();
@@ -1385,6 +1448,7 @@ class _RouteCatalogSnapshot {
         networkEdgeColumnNames.contains('service_class')
         ? "WHERE service_class = 'SUBWAY'"
         : '';
+    await buildObserver?.call('schema');
     final facilityColumns = await database
         .customSelect('PRAGMA table_info(facilities)')
         .get();
@@ -1617,33 +1681,38 @@ class _RouteCatalogSnapshot {
   local.LocalRouteResult routeResult(
     String originStationId,
     String destinationStationId, {
+    required graph.NetworkGraph routeGraph,
+    required local.RouteSearchMode searchMode,
     required local.MobilityType mobilityType,
     required local.ConstraintMode constraintMode,
   }) {
     originStationId = canonicalStationId(originStationId);
     destinationStationId = canonicalStationId(destinationStationId);
-    return LocalRouteEngine(graph: toGraph()).search(
+    return LocalRouteEngine(graph: routeGraph).search(
       local.RouteRequest(
         originStationId: originStationId,
         destinationStationId: destinationStationId,
         mobilityType: mobilityType,
         constraintMode: constraintMode,
-        searchMode:
-            local.RouteSearchMode.stationToStationWithOutOfStationTransfers,
+        searchMode: searchMode,
       ),
     );
   }
 
   bool strictEvidenceSupportedFor(
     String originStationId,
-    String destinationStationId,
-  ) {
+    String destinationStationId, {
+    required graph.NetworkGraph routeGraph,
+    required local.RouteSearchMode searchMode,
+  }) {
     if (!strictEvidenceSupported) {
       return false;
     }
     return routeResult(
           originStationId,
           destinationStationId,
+          routeGraph: routeGraph,
+          searchMode: searchMode,
           mobilityType: local.MobilityType.wheelchair,
           constraintMode: local.ConstraintMode.strictStepFree,
         ).status ==
