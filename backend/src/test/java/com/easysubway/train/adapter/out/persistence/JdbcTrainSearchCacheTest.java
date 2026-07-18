@@ -1,6 +1,7 @@
 package com.easysubway.train.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.easysubway.train.application.TrainSearchCache.CachedCatalog;
 import com.easysubway.train.application.TrainSearchCache.CachedLeg;
@@ -47,16 +48,22 @@ class JdbcTrainSearchCacheTest {
 	}
 
 	@Test
-	void replacesCatalogAtomicallyAndReadsOnlyFreshRows() {
-		Instant observedAt = Instant.parse("2026-07-19T00:00:00Z");
-		Instant expiresAt = observedAt.plus(Duration.ofHours(24));
+	void replacesCatalogAtomicallyAndUsesDatabaseTimeForFreshness() {
+		Instant databaseNow = databaseNow();
+		Instant observedAt = databaseNow.minus(Duration.ofHours(2));
+		Instant expiresAt = databaseNow.plus(Duration.ofHours(1));
 		var stations = new CachedCatalog("stations", "[{\"id\":\"NAT010000\"}]", hash('a'), observedAt, expiresAt);
 		var trainTypes = new CachedCatalog("train-types", "[{\"code\":\"KTX\"}]", hash('b'), observedAt, expiresAt);
 
 		repository.replaceCatalog(List.of(stations, trainTypes));
 
-		assertThat(repository.freshCatalog("stations", observedAt.plusSeconds(1))).contains(stations);
-		assertThat(repository.freshCatalog("stations", expiresAt)).isEmpty();
+		assertThat(repository.freshCatalog("stations", databaseNow.plus(Duration.ofDays(1)))).contains(stations);
+		jdbcTemplate.update(
+			"UPDATE train_catalog_cache SET observed_at = ?, expires_at = ? WHERE catalog_kind = 'stations'",
+			java.sql.Timestamp.from(databaseNow.minus(Duration.ofHours(2))),
+			java.sql.Timestamp.from(databaseNow.minus(Duration.ofHours(1)))
+		);
+		assertThat(repository.freshCatalog("stations", databaseNow.minus(Duration.ofDays(1)))).isEmpty();
 		assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM train_catalog_cache", Integer.class))
 			.isEqualTo(2);
 	}
@@ -128,19 +135,44 @@ class JdbcTrainSearchCacheTest {
 
 	@Test
 	void ownerStoresFreshLegAndPurgeRemovesOnlyOldExpiredRows() {
-		Instant observedAt = Instant.parse("2026-07-19T00:00:00Z");
-		var expired = leg("expired", observedAt, observedAt.plusSeconds(60));
-		var fresh = leg("fresh", observedAt, observedAt.plus(Duration.ofHours(6)));
+		Instant databaseNow = databaseNow();
+		Instant observedAt = databaseNow.minus(Duration.ofMinutes(2));
+		var expired = leg("expired", observedAt, databaseNow.minus(Duration.ofMinutes(1)));
+		var fresh = leg("fresh", observedAt, databaseNow.plus(Duration.ofHours(6)));
 		assertThat(repository.tryAcquireLease("expired", "owner", observedAt, Duration.ofSeconds(15))).isTrue();
 		assertThat(repository.storeLegAndRelease("expired", "owner", expired)).isTrue();
 		assertThat(repository.tryAcquireLease("fresh", "owner", observedAt, Duration.ofSeconds(15))).isTrue();
 		assertThat(repository.storeLegAndRelease("fresh", "owner", fresh)).isTrue();
 
-		assertThat(repository.freshLeg("expired", observedAt.plusSeconds(60))).isEmpty();
-		assertThat(repository.freshLeg("fresh", observedAt.plusSeconds(60))).contains(fresh);
-		assertThat(repository.purgeExpiredBefore(observedAt.plusSeconds(61))).isEqualTo(1);
+		assertThat(repository.freshLeg("expired", databaseNow.minus(Duration.ofDays(1)))).isEmpty();
+		assertThat(repository.freshLeg("fresh", databaseNow.plus(Duration.ofDays(1)))).contains(fresh);
+		assertThat(repository.purgeExpiredBefore(databaseNow)).isEqualTo(1);
 		assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM train_search_cache", Integer.class))
 			.isEqualTo(1);
+	}
+
+	@Test
+	void freshLegReadIsReadOnlyAndRejectsMismatchedStoredKey() {
+		Instant databaseNow = databaseNow();
+		var fresh = leg("leased", databaseNow.minusSeconds(1), databaseNow.plus(Duration.ofHours(1)));
+		assertThat(repository.tryAcquireLease("leased", "owner", databaseNow, Duration.ofSeconds(15))).isTrue();
+		assertThatThrownBy(() -> repository.storeLegAndRelease(
+			"leased", "owner", leg("different", databaseNow.minusSeconds(1), databaseNow.plus(Duration.ofHours(1)))))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessage("leg key must match lease key");
+		assertThat(jdbcTemplate.queryForObject(
+			"SELECT payload_json IS NULL FROM train_search_cache WHERE cache_key = 'leased'", Boolean.class)).isTrue();
+		assertThat(repository.storeLegAndRelease("leased", "owner", fresh)).isTrue();
+
+		Instant lastAccessAt = databaseNow.minus(Duration.ofHours(3));
+		jdbcTemplate.update(
+			"UPDATE train_search_cache SET last_access_at = ? WHERE cache_key = 'leased'",
+			java.sql.Timestamp.from(lastAccessAt)
+		);
+		assertThat(repository.freshLeg("leased", databaseNow.plus(Duration.ofDays(1)))).contains(fresh);
+		assertThat(jdbcTemplate.queryForObject(
+			"SELECT last_access_at FROM train_search_cache WHERE cache_key = 'leased'", java.sql.Timestamp.class).toInstant())
+			.isEqualTo(lastAccessAt);
 	}
 
 	@Test
@@ -190,5 +222,9 @@ class JdbcTrainSearchCacheTest {
 			new AnnotationTransactionAttributeSource()
 		));
 		return (JdbcTrainSearchCache) proxyFactory.getProxy();
+	}
+
+	private Instant databaseNow() {
+		return jdbcTemplate.queryForObject("SELECT CURRENT_TIMESTAMP", java.sql.Timestamp.class).toInstant();
 	}
 }

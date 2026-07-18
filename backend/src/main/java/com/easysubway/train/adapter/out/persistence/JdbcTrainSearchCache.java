@@ -36,7 +36,7 @@ public class JdbcTrainSearchCache implements TrainSearchCache {
 			"""
 				SELECT catalog_kind, payload_json, payload_sha256, observed_at, expires_at
 				FROM train_catalog_cache
-				WHERE catalog_kind = ? AND expires_at > ?
+				WHERE catalog_kind = ? AND expires_at > CURRENT_TIMESTAMP
 				""",
 			(rs, rowNum) -> new CachedCatalog(
 				rs.getString("catalog_kind"),
@@ -45,8 +45,7 @@ public class JdbcTrainSearchCache implements TrainSearchCache {
 				rs.getTimestamp("observed_at").toInstant(),
 				rs.getTimestamp("expires_at").toInstant()
 			),
-			kind,
-			Timestamp.from(now)
+			kind
 		).stream().findFirst();
 	}
 
@@ -80,7 +79,7 @@ public class JdbcTrainSearchCache implements TrainSearchCache {
 			"""
 				SELECT cache_key, normalized_query_json, payload_json, payload_sha256, observed_at, expires_at
 				FROM train_search_cache
-				WHERE cache_key = ? AND payload_json IS NOT NULL AND expires_at > ?
+				WHERE cache_key = ? AND payload_json IS NOT NULL AND expires_at > CURRENT_TIMESTAMP
 				""",
 			(rs, rowNum) -> new CachedLeg(
 				rs.getString("cache_key"),
@@ -90,12 +89,8 @@ public class JdbcTrainSearchCache implements TrainSearchCache {
 				rs.getTimestamp("observed_at").toInstant(),
 				rs.getTimestamp("expires_at").toInstant()
 			),
-			key,
-			Timestamp.from(now)
+			key
 		);
-		if (!rows.isEmpty()) {
-			jdbcTemplate.update("UPDATE train_search_cache SET last_access_at = CURRENT_TIMESTAMP WHERE cache_key = ?", key);
-		}
 		return rows.stream().findFirst();
 	}
 
@@ -152,6 +147,9 @@ public class JdbcTrainSearchCache implements TrainSearchCache {
 	@Transactional(timeout = 2)
 	public boolean storeLegAndRelease(String key, String owner, CachedLeg leg) {
 		Objects.requireNonNull(leg, "leg must not be null");
+		if (!Objects.equals(key, leg.key())) {
+			throw new IllegalArgumentException("leg key must match lease key");
+		}
 		return jdbcTemplate.update(
 			"""
 				UPDATE train_search_cache
