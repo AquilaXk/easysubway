@@ -54,6 +54,46 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 	}
 
 	@Test
+	@DisplayName("search의 비교와 결과 시각은 compiled primitive 배열을 사용한다")
+	void usesPrimitiveTimesForSearchAndResultTimes() throws Exception {
+		var compiled = planner.compile(everyDayTimetable());
+		primitiveIntArray(compiled, "departureSeconds")[0] = 32520;
+		primitiveIntArray(compiled, "arrivalSeconds")[1] = 33120;
+
+		var results = planner.search(command(WEDNESDAY, 8, 50), compiled);
+
+		assertThat(results).hasSize(1);
+		assertThat(results.getFirst().steps())
+			.filteredOn(step -> "ride".equals(step.stepType()))
+			.extracting("plannedDepartureTime", "plannedArrivalTime")
+			.containsExactly(org.assertj.core.groups.Tuple.tuple(
+				"2026-07-01T09:02:00+09:00",
+				"2026-07-01T09:12:00+09:00"));
+	}
+
+	@Test
+	@DisplayName("search의 승하차 허용 판단은 compiled primitive 배열을 사용한다")
+	void usesPrimitivePickupAndDropOffTypesForSearch() throws Exception {
+		var pickupBlocked = planner.compile(everyDayTimetable());
+		primitiveByteArray(pickupBlocked, "pickupTypes")[0] = 1;
+		var dropOffBlocked = planner.compile(everyDayTimetable());
+		primitiveByteArray(dropOffBlocked, "dropOffTypes")[1] = 1;
+
+		assertThat(planner.search(command(WEDNESDAY, 8, 50), pickupBlocked)).isEmpty();
+		assertThat(planner.search(command(WEDNESDAY, 8, 50), dropOffBlocked)).isEmpty();
+	}
+
+	@Test
+	@DisplayName("nextServiceTime 비교는 compiled primitive 출발 시각을 사용한다")
+	void usesPrimitiveDepartureTimeForNextServiceTime() throws Exception {
+		var compiled = planner.compile(everyDayTimetable());
+		primitiveIntArray(compiled, "departureSeconds")[0] = 32700;
+
+		assertThat(planner.nextServiceTime(command(WEDNESDAY, 8, 50), compiled))
+			.contains(OffsetDateTime.parse("2026-07-01T09:05:00+09:00"));
+	}
+
+	@Test
 	@DisplayName("같은 service day의 immutable active snapshot을 재사용한다")
 	void reusesSameActiveServiceDay() {
 		var compiled = planner.compile(frequencyTimetable());
@@ -215,5 +255,34 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 			0,
 			3
 		);
+	}
+
+	private static int[] primitiveIntArray(
+		RouteTimetableRaptorPlanner.CompiledTimetable compiled,
+		String fieldName
+	) throws Exception {
+		return (int[]) primitiveArray(compiled, fieldName);
+	}
+
+	private static byte[] primitiveByteArray(
+		RouteTimetableRaptorPlanner.CompiledTimetable compiled,
+		String fieldName
+	) throws Exception {
+		return (byte[]) primitiveArray(compiled, fieldName);
+	}
+
+	private static Object primitiveArray(
+		RouteTimetableRaptorPlanner.CompiledTimetable compiled,
+		String fieldName
+	) throws Exception {
+		var scheduledTripsField = compiled.getClass().getDeclaredField("scheduledTrips");
+		scheduledTripsField.setAccessible(true);
+		var scheduledTrip = ((List<?>) scheduledTripsField.get(compiled)).getFirst();
+		var timesField = scheduledTrip.getClass().getDeclaredField("times");
+		timesField.setAccessible(true);
+		var times = timesField.get(scheduledTrip);
+		var primitiveArrayField = times.getClass().getDeclaredField(fieldName);
+		primitiveArrayField.setAccessible(true);
+		return primitiveArrayField.get(times);
 	}
 }
