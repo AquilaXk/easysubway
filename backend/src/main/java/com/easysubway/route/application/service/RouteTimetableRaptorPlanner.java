@@ -351,13 +351,20 @@ class RouteTimetableRaptorPlanner {
 			if (readySeconds == UNREACHED) {
 				continue;
 			}
+			int earliestDepartureSeconds = readySeconds + accessSeconds + slackSeconds;
+			if (boardedTrip != null
+				&& readySeconds < boardingReadySeconds
+				&& boardedTrip.allowsPickup(position)
+				&& boardedTrip.departureSeconds(position) >= earliestDepartureSeconds) {
+				boardingPosition = position;
+				boardingReadySeconds = readySeconds;
+			}
 			ScheduledTrip candidate = earliestBoardableTrip(
 				trips,
 				position,
-				readySeconds + accessSeconds + slackSeconds
+				earliestDepartureSeconds
 			);
 			if (candidate != null && (boardedTrip == null
-				|| readySeconds < boardingReadySeconds
 				|| candidate.departureSeconds(position) < boardedTrip.departureSeconds(position)
 				|| (candidate != boardedTrip
 					&& candidate.departureSeconds(position) == boardedTrip.departureSeconds(position)

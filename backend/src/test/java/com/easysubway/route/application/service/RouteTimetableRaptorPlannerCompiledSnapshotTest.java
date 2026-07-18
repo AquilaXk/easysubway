@@ -285,7 +285,7 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 		assertThat(results.getFirst().steps())
 			.filteredOn(step -> "ride".equals(step.stepType()))
 			.extracting("tripId")
-			.containsExactly("feeder-a", "z-fast");
+			.containsExactly("feeder-b", "z-fast");
 		assertThat(results.getFirst().steps())
 			.filteredOn(step -> "ride".equals(step.stepType()))
 			.extracting("plannedArrivalTime")
@@ -664,7 +664,7 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 			),
 			List.of(
 				new LoadRouteTimetablePort.TransitStopTime(
-					"a-slow", 1, "station-a", "line-main", 33300, 33300, 0, 0),
+					"a-slow", 1, "station-a", "line-main", 33600, 33600, 0, 0),
 				new LoadRouteTimetablePort.TransitStopTime(
 					"a-slow", 2, "station-b", "line-main", 33900, 34200, 0, 0),
 				new LoadRouteTimetablePort.TransitStopTime(
@@ -672,13 +672,13 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 				new LoadRouteTimetablePort.TransitStopTime(
 					"feeder-a", 1, "station-origin", "line-fa", 31620, 31620, 0, 0),
 				new LoadRouteTimetablePort.TransitStopTime(
-					"feeder-a", 2, "station-a", "line-fa", 32400, 32400, 0, 0),
+					"feeder-a", 2, "station-a", "line-fa", 32700, 32700, 0, 0),
 				new LoadRouteTimetablePort.TransitStopTime(
 					"feeder-b", 1, "station-origin", "line-fb", 31680, 31680, 0, 0),
 				new LoadRouteTimetablePort.TransitStopTime(
-					"feeder-b", 2, "station-b", "line-fb", 33300, 33300, 0, 0),
+					"feeder-b", 2, "station-b", "line-fb", 32400, 32400, 0, 0),
 				new LoadRouteTimetablePort.TransitStopTime(
-					"z-fast", 1, "station-a", "line-main", 33000, 33000, 0, 0),
+					"z-fast", 1, "station-a", "line-main", 33300, 33300, 0, 0),
 				new LoadRouteTimetablePort.TransitStopTime(
 					"z-fast", 2, "station-b", "line-main", 33600, 34200, 0, 0),
 				new LoadRouteTimetablePort.TransitStopTime(
