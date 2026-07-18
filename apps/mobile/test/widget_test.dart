@@ -12254,6 +12254,70 @@ void main() {
     expect(find.text('경로 요약을 공유하지 못했어요.'), findsOneWidget);
   });
 
+  testWidgets('공유 처리 중에는 버튼과 semantics 재진입을 막는다', (tester) async {
+    final shareCompleter = Completer<void>();
+    var shareCalls = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(
+            result: _sampleRouteSearchResult(),
+          ),
+          stationRepository: FakeStationSearchRepository(),
+          routeShareInvoker: (text, origin) {
+            shareCalls++;
+            return shareCompleter.future;
+          },
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 18),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _tapFirstRouteResultListItem(tester);
+    await tester.pumpAndSettle();
+
+    final shareButton = find.byKey(const Key('routeShareButton'));
+    final shareSemantics = find.bySemanticsLabel('경로 요약 공유');
+    await tester.ensureVisible(shareButton);
+    await tester.tap(shareButton);
+    await tester.pump();
+    await tester.tap(shareButton, warnIfMissed: false);
+    await tester.pump();
+
+    expect(shareCalls, 1);
+    expect(tester.widget<OutlinedButton>(shareButton).onPressed, isNull);
+    expect(
+      tester
+          .getSemantics(shareSemantics)
+          .getSemanticsData()
+          .hasAction(SemanticsAction.tap),
+      isFalse,
+    );
+
+    shareCompleter.complete();
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<OutlinedButton>(shareButton).onPressed, isNotNull);
+    expect(
+      tester
+          .getSemantics(shareSemantics)
+          .getSemanticsData()
+          .hasAction(SemanticsAction.tap),
+      isTrue,
+    );
+  });
+
   testWidgets('광고 repository는 경로 결과와 상세에만 같은 placement로 배선된다', (tester) async {
     final apiClient = _NoInventoryAdApiClient();
     final adRepository = AdRepository(apiClient);

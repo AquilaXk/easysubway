@@ -222,7 +222,7 @@ class RouteSearchApiRepository implements RouteSearchRepository {
       return RouteSearchResult.fromJson(
         data,
         constraintMode: routeRequest.effectiveConstraintMode,
-        objective: routeRequest.objective,
+        objective: RouteObjective.fastest,
       );
     } on RouteSearchException {
       rethrow;
@@ -4808,17 +4808,24 @@ class _RouteDetailWorkflowView extends StatelessWidget {
   }
 }
 
-class _RouteShareButton extends StatelessWidget {
+class _RouteShareButton extends StatefulWidget {
   const _RouteShareButton({required this.result, required this.invoker});
 
   final RouteSearchResult result;
   final RouteShareInvoker? invoker;
 
   @override
+  State<_RouteShareButton> createState() => _RouteShareButtonState();
+}
+
+class _RouteShareButtonState extends State<_RouteShareButton> {
+  var _isSharing = false;
+
+  @override
   Widget build(BuildContext context) {
     return Builder(
       builder: (buttonContext) {
-        void onShare() => _share(buttonContext);
+        final onShare = _isSharing ? null : () => _share(buttonContext);
         return Semantics(
           button: true,
           label: '경로 요약 공유',
@@ -4836,14 +4843,18 @@ class _RouteShareButton extends StatelessWidget {
   }
 
   Future<void> _share(BuildContext context) async {
+    if (_isSharing) {
+      return;
+    }
+    setState(() => _isSharing = true);
     try {
       final renderBox = context.findRenderObject();
       if (renderBox is! RenderBox || !renderBox.hasSize) {
         throw StateError('Route share trigger is unavailable');
       }
       final origin = renderBox.localToGlobal(Offset.zero) & renderBox.size;
-      final text = buildRouteShareSummary(_routeShareSnapshot(result));
-      final invoke = invoker;
+      final text = buildRouteShareSummary(_routeShareSnapshot(widget.result));
+      final invoke = widget.invoker;
       if (invoke != null) {
         await invoke(text, origin);
       } else {
@@ -4856,6 +4867,10 @@ class _RouteShareButton extends StatelessWidget {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('경로 요약을 공유하지 못했어요.')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSharing = false);
       }
     }
   }

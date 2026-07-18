@@ -266,7 +266,7 @@ void main() {
       'constraintMode': 'STRICT_STEP_FREE',
     });
     expect(result.routeSearchId, 'route-1');
-    expect(result.objective, RouteObjective.fewestTransfers);
+    expect(result.objective, RouteObjective.fastest);
     expect(result.constraintMode, 'STRICT_STEP_FREE');
     expect(result.summaryTitle, '상록수에서 사당까지');
     expect(result.lineName, '수도권 4호선');
