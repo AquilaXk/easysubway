@@ -42,7 +42,7 @@
 	        aria-controls="admin-toolbar-filter-sheet">필터</button>
 	<div class="admin-toolbar-sheet admin-toolbar-filter-sheet" id="admin-toolbar-filter-sheet"
 	     role="group" aria-label="필터" x-bind:class="filterSheetClass"
-	     x-on:click.outside="closeFilter" x-on:keydown.escape="closeFilterFromKeyboard">
+	     x-on:click.outside="closeFilter" x-on:keydown.escape.window="closeFilterFromKeyboard">
 		<th:block th:if="${filters}" th:replace="${filters}"></th:block>
 	</div>
 
@@ -52,7 +52,7 @@
 	        aria-controls="admin-toolbar-view-sheet">보기 설정</button>
 	<div class="admin-toolbar-sheet admin-toolbar-view-sheet" id="admin-toolbar-view-sheet"
 	     role="group" aria-label="보기 설정" x-bind:class="viewSheetClass"
-	     x-on:click.outside="closeView" x-on:keydown.escape="closeViewFromKeyboard">
+	     x-on:click.outside="closeView" x-on:keydown.escape.window="closeViewFromKeyboard">
 		<th:block th:if="${viewSettings}" th:replace="${viewSettings}"></th:block>
 	</div>
 </div>

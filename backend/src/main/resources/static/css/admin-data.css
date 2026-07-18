@@ -497,6 +497,17 @@
 	background: var(--admin-header-bg);
 }
 
+/* 첫 열 sticky와 동일 패턴(admin-components.css)으로 행 hover·선택 배경을 sticky action 열에도
+   동기화한다. 동기화하지 않으면 sticky 열만 hover/선택 배경이 어긋나 보인다(#2301 리뷰). */
+.admin-v3 .admin-table-scroll tbody tr:hover td.cell-sticky-action:not([colspan]) {
+	background: var(--admin-header-bg);
+}
+
+.admin-v3 .admin-table-scroll tbody tr[aria-selected="true"] td.cell-sticky-action:not([colspan]),
+.admin-v3 .admin-table-scroll tbody tr.is-selected td.cell-sticky-action:not([colspan]) {
+	background: var(--admin-accent-soft);
+}
+
 /* compact: 필터·보기 설정을 시트로 접는다. JS가 있을 때만(has-js) 트리거를 노출하고 시트를 접어
    direct control을 5개 이하로 유지한다. no-JS(has-js 미부착)는 시트 내용이 인라인으로 남는다. */
 @media (max-width: 768px) {

@@ -163,13 +163,16 @@ function finalizeReport(report) {
     });
   }
   // #2278 V6-06: 목록 툴바 시트 계약을 위반으로 편입한다. body가 가로 overflow를 소유하거나(§9),
-  // 툴바가 있는데 outside close가 입력을 버리거나 Esc가 포커스를 복원하지 못하면 실패를 표면화한다.
+  // 툴바가 있는데 outside close가 입력을 버리거나, Esc(window 스코프, #2301 리뷰)가 시트를 실제로
+  // 닫지 못하거나(is-open 잔존) 포커스를 복원하지 못하면 실패를 표면화한다.
   const listToolbar = report.keyboard.find((entry) => entry.check === "list-toolbar-sheet");
   if (listToolbar
     && (listToolbar.bodyOverflowX0 === false
       || (listToolbar.present === true
         && listToolbar.sheetPresent === true
-        && (listToolbar.inputPreserved === false || listToolbar.focusRestored === false)))) {
+        && (listToolbar.inputPreserved === false
+          || listToolbar.sheetClosed === false
+          || listToolbar.focusRestored === false)))) {
     blockingViolations.push({
       page: "/admin/reports/page",
       id: "list-toolbar-sheet",
@@ -620,6 +623,7 @@ async function listToolbarSheetCheck(page, baseUrl, report) {
   });
 
   let inputPreserved = null;
+  let sheetClosed = null;
   let focusRestored = null;
   if (sheet.sheetPresent) {
     await page.click(".admin-toolbar-filter-trigger");
@@ -630,11 +634,21 @@ async function listToolbarSheetCheck(page, baseUrl, report) {
       return sheetInput ? sheetInput.value === expected : false;
     }, sheet.savedValue);
     await page.click(".admin-toolbar-filter-trigger");
+    // window 스코프 Esc(#2301 리뷰)는 시트 내부 포커스와 무관하게 발화하므로, 시트 내부 컨트롤에
+    // 포커스를 둔 채로 Esc를 눌러도 닫히는지까지 확인한다.
+    await page.evaluate(() => {
+      const sheetInput = document.querySelector(".admin-toolbar-filter-sheet input, .admin-toolbar-filter-sheet select");
+      sheetInput?.focus();
+    });
     await page.keyboard.press("Escape");
     await page.waitForTimeout(100);
-    focusRestored = await page.evaluate(() =>
-      Boolean(document.activeElement
-        && document.activeElement.classList.contains("admin-toolbar-filter-trigger")));
+    const afterEscape = await page.evaluate(() => ({
+      sheetClosed: !document.querySelector(".admin-toolbar-filter-sheet")?.classList.contains("is-open"),
+      focusRestored: Boolean(document.activeElement
+        && document.activeElement.classList.contains("admin-toolbar-filter-trigger")),
+    }));
+    sheetClosed = afterEscape.sheetClosed;
+    focusRestored = afterEscape.focusRestored;
   }
 
   report.keyboard.push({
@@ -642,6 +656,7 @@ async function listToolbarSheetCheck(page, baseUrl, report) {
     ...base,
     sheetPresent: sheet.sheetPresent,
     inputPreserved,
+    sheetClosed,
     focusRestored,
   });
 }

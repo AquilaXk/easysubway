@@ -391,8 +391,8 @@ class AdminDesignGuardTest {
 			.contains("aria-controls=\"admin-toolbar-view-sheet\"")
 			.contains("x-on:click.outside=\"closeFilter\"")
 			.contains("x-on:click.outside=\"closeView\"")
-			.contains("x-on:keydown.escape=\"closeFilterFromKeyboard\"")
-			.contains("x-on:keydown.escape=\"closeViewFromKeyboard\"")
+			.contains("x-on:keydown.escape.window=\"closeFilterFromKeyboard\"")
+			.contains("x-on:keydown.escape.window=\"closeViewFromKeyboard\"")
 			.contains("x-bind:class=\"filterSheetClass\"")
 			.contains("x-bind:class=\"viewSheetClass\"");
 
