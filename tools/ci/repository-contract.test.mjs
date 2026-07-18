@@ -16595,6 +16595,7 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     "route_v2_itx_mobility_preferences",
     "route_v2_itx_request_state",
     "route_v2_gateway_abuse_rate_limit_state",
+    "facility_report_abuse_rate_limit_state",
     "mobility_profile",
     "facility_report_content",
     "facility_report_photo",
@@ -16648,9 +16649,12 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
       "facility_report_photo",
       "facility_report_location",
     ]);
-    const expectedLastVerifiedAt = id.startsWith("route_v2_") || reviewedForLegalDisclosure.has(id)
-      ? "2026-07-16"
-      : "2026-06-19";
+    const auditedForPrivacyInventory = new Set(["facility_report_abuse_rate_limit_state"]);
+    const expectedLastVerifiedAt = auditedForPrivacyInventory.has(id)
+      ? "2026-07-18"
+      : id.startsWith("route_v2_") || reviewedForLegalDisclosure.has(id)
+        ? "2026-07-16"
+        : "2026-06-19";
     assert.equal(item.lastVerifiedAt, expectedLastVerifiedAt, `${id} verification date must be current`);
     const expectedThirdPartySharing = id === "precise_location";
     assert.equal(
@@ -16707,12 +16711,83 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     } else {
       assert.equal(item.googlePlayDataSafety.required, false, `${id} not-collected Play data must not be required`);
     }
+    const noUserDeletionBoundary = new Set([
+      "route_v2_gateway_abuse_rate_limit_state",
+      "facility_report_abuse_rate_limit_state",
+    ]);
     assert.equal(
       item.googlePlayDataSafety.deletionSupported,
-      id !== "route_v2_gateway_abuse_rate_limit_state",
+      !noUserDeletionBoundary.has(id),
       `${id} must declare the implemented data deletion boundary`,
     );
   }
+
+  const preciseLocationException = items.get("precise_location").userInitiatedSharingException;
+  assert.ok(preciseLocationException, "precise_location must document the user-initiated sharing exception");
+  assert.equal(preciseLocationException.applies, true, "precise_location sharing exception must be applied");
+  assert.equal(
+    preciseLocationException.consoleThirdPartySharingDeclared,
+    false,
+    "precise_location Console third-party sharing must stay declared as none under the exception",
+  );
+  assert.equal(preciseLocationException.policyClause, "user-initiated-action");
+  assert.equal(
+    preciseLocationException.policyReference,
+    "https://support.google.com/googleplay/android-developer/answer/10787469?hl=en",
+  );
+  assert.match(preciseLocationException.rationaleKo, /버튼/, "exception rationale must cite the dedicated user tap");
+  assert.match(preciseLocationException.rationaleKo, /자동 실행이나 백그라운드 전송은 없다/);
+  assert.match(preciseLocationException.rationaleKo, /user-initiated action/);
+  assert.deepEqual(preciseLocationException.evidence, [
+    "apps/mobile/lib/features/stations/presentation/station_exit_card.dart",
+    "apps/mobile/lib/core/external/kakao_map_launcher.dart",
+    "apps/mobile/release/external-map-deeplink-policy.json",
+  ]);
+  for (const evidencePath of preciseLocationException.evidence) {
+    assert.ok(
+      existsSync(path.join(root, evidencePath)),
+      `precise_location exception evidence must exist: ${evidencePath}`,
+    );
+  }
+
+  const reportAbuseState = items.get("facility_report_abuse_rate_limit_state");
+  assert.equal(reportAbuseState.implementationStatus, "backend-collected");
+  assert.equal(reportAbuseState.sharedWithThirdParties, false);
+  assert.equal(reportAbuseState.storeMode, "local");
+  assert.equal(reportAbuseState.persistedToDatabase, false);
+  assert.equal(reportAbuseState.includedInAccessLog, false);
+  assert.deepEqual(reportAbuseState.storageLocations, ["backend-jvm-memory"]);
+  assert.equal(reportAbuseState.retention.fixedTtl, false);
+  assert.equal(reportAbuseState.retention.windowSeconds, 60);
+  assert.equal(reportAbuseState.retention.maxCounterKeys, 4096);
+  assert.equal(reportAbuseState.retention.finalDeletionBoundary, "JVM process lifecycle end");
+  assert.equal(reportAbuseState.googlePlayDataSafety.dataType, "Device or other IDs");
+  assert.equal(reportAbuseState.googlePlayDataSafety.purpose, "Fraud prevention, security, and compliance");
+  assert.equal(reportAbuseState.googlePlayDataSafety.deletionSupported, false);
+  assert.equal(reportAbuseState.googlePlayDataSafety.processedEphemerally, false);
+  assert.equal(reportAbuseState.googlePlayDataSafety.linkedToUser, true);
+  assert.deepEqual(reportAbuseState.rateLimitedEndpoints, [
+    "POST /api/v1/report-uploads",
+    "PUT /api/v1/report-uploads/{uploadId}",
+    "POST /api/v1/reports",
+    "GET /api/v1/reports/{reportId}",
+    "POST /api/v1/reports/{reportId}/confirm",
+  ]);
+  assert.match(reportAbuseState.clientIdentityKey, /ip:remoteAddr/);
+  assert.ok(
+    reportAbuseState.evidence.includes(
+      "backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportAbuseControl.java",
+    ),
+  );
+  const reportAbuseControlSource = read(
+    "backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportAbuseControl.java",
+  );
+  assert.match(reportAbuseControlSource, /Map<LimiterKey, WindowCounter> counters = new ConcurrentHashMap<>/);
+  assert.match(reportAbuseControlSource, /return "ip:" \+ remoteAddress/);
+  assert.match(
+    reportAbuseControlSource,
+    /report abuse control store mode must be local until distributed store is implemented/,
+  );
 
   const appStoreTypes = [...new Set(
     inventory.dataTypes
@@ -17001,6 +17076,11 @@ test("Route V2 ITX 개인정보와 Data Safety 공개 기준은 실제 전송·�
     playStoreContent.dataSafetyDeclarations.answerMatrix
       .find((item) => item.dataType === "Device or other IDs")
       .inventoryDataIds.includes("route_v2_gateway_abuse_rate_limit_state"),
+  );
+  assert.ok(
+    playStoreContent.dataSafetyDeclarations.answerMatrix
+      .find((item) => item.dataType === "Device or other IDs")
+      .inventoryDataIds.includes("facility_report_abuse_rate_limit_state"),
   );
   assert.equal(
     playStoreContent.dataSafetyDeclarations.routeV2Itx.gatewayRateLimitStateProcessedEphemerally,

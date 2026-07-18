@@ -322,7 +322,7 @@
       },
       {
         "dataType": "Device or other IDs",
-        "inventoryDataIds": ["route_v2_itx_integrity", "route_v2_gateway_abuse_rate_limit_state"],
+        "inventoryDataIds": ["route_v2_itx_integrity", "route_v2_gateway_abuse_rate_limit_state", "facility_report_abuse_rate_limit_state"],
         "containsCollectedData": true,
         "containsRequiredData": false,
         "containsOptionalData": true,
