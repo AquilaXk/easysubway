@@ -41,8 +41,26 @@ const DEFAULT_ROOT = join(HERE, '..', '..');
 // 상태 요약 voice 신호. 이 중 하나라도 포함한 리터럴만 인벤토리 후보다.
 const SIGNAL = /확인하고 있어요|확인 중|불러오는 중|조회 중|준비\s?중|미확인/;
 
-// 규칙 카탈로그. 위에서부터 첫 매칭이 이긴다. 각 규칙은 리터럴 text(정규식)와
-// 선택적으로 파일 경로 조건(fileRe)·원본 라인 포함 조건(lineHas)을 본다.
+// route_search.dart 등 일부 소스에 섞인 NUL 바이트 제거용. 정규식 리터럴에
+// 제어문자 코드포인트를 직접 담지 않도록 String.fromCharCode로 만든다.
+const NUL_CHARACTER = String.fromCharCode(0);
+
+// 실측을 거쳐 실제 loading으로 확인된 문구만 여기 명시적으로 나열한다. 새
+// '확인 중'류 문자열이 발견되면 이 목록에 없는 한 review로 떨어져야 한다
+// (CodeRabbit finding: 포괄 정규식은 drift 감시 계약을 깨뜨린다).
+const VERIFIED_LOADING_TEXTS = new Set([
+  '확인 중',
+  '제보 진행 상황 확인 중',
+  '즐겨찾기 확인 중',
+  '현재 위치 확인 중',
+  '실시간 정보 확인 중',
+  '알림 확인 중',
+  '신뢰도 확인 중',
+]);
+
+// 규칙 카탈로그. 위에서부터 첫 매칭이 이긴다. 각 규칙은 리터럴 text(정규식)·
+// 정확히 일치하는 문자열 집합(oneOf)과 선택적으로 파일 경로 조건(fileRe)·
+// 원본 라인 포함 조건(lineHas)을 본다.
 const RULES = [
   // 운영/진단 로그: context: 인자로 넘어가는 문자열은 사용자 비노출.
   {
@@ -219,13 +237,16 @@ const RULES = [
     note: '사실형 미확인 voice',
   },
 
-  // 남은 진행 중/확인 중 라벨은 실제 진행 상태로 본다.
+  // 검증된 실제 loading 문구만 명시적으로 열거한다(포괄 '확인 중' 정규식 금지).
+  // 이 allowlist에 없는 새 진행형/'확인 중' 계열 문자열은 아래 fallback을 타
+  // review로 떨어지므로, drift는 사람이 판단하기 전까지 자동 loading으로
+  // 확정되지 않는다.
   {
-    text: /확인 중/,
+    oneOf: VERIFIED_LOADING_TEXTS,
     stateClass: 'loading',
     owner: '#1778',
     disposition: 'keep',
-    note: '진행 중 상태 라벨',
+    note: '검증된 진행 중 상태 라벨(allowlist)',
   },
 ];
 
@@ -278,12 +299,27 @@ function extractSingleQuoted(line) {
   return out;
 }
 
+// entries 정렬 비교자. 중첩 삼항 대신 독립 조건문으로 file → line → text
+// 우선순위를 판정한다.
+function compareEntries(a, b) {
+  if (a.file !== b.file) {
+    return a.file.localeCompare(b.file);
+  }
+  if (a.line !== b.line) {
+    return a.line - b.line;
+  }
+  return a.text.localeCompare(b.text);
+}
+
 function classify(text, relFile, rawLine) {
   for (const rule of RULES) {
     if (rule.lineHas && !rawLine.includes(rule.lineHas)) {
       continue;
     }
     if (rule.text && !rule.text.test(text)) {
+      continue;
+    }
+    if (rule.oneOf && !rule.oneOf.has(text)) {
       continue;
     }
     if (rule.fileRe && !rule.fileRe.test(relFile)) {
@@ -309,8 +345,9 @@ export function buildInventory(root = DEFAULT_ROOT) {
   const files = listDartFiles(libDir, []);
   const entries = [];
   for (const file of files) {
-    // NUL 바이트가 섞인 소스도 있어(route_search.dart) 제거 후 읽는다.
-    const content = readFileSync(file, 'utf8').replace(/\x00/g, '');
+    // NUL 바이트가 섞인 소스도 있어(route_search.dart) 제거 후 읽는다. 정규식에
+    // 제어문자를 담지 않도록 String.fromCharCode로 문자를 만들어 전역 치환한다.
+    const content = readFileSync(file, 'utf8').replaceAll(NUL_CHARACTER, '');
     const relFile = relative(root, file).split(sep).join('/');
     const lines = content.split('\n');
     for (let idx = 0; idx < lines.length; idx += 1) {
@@ -324,13 +361,7 @@ export function buildInventory(root = DEFAULT_ROOT) {
       }
     }
   }
-  entries.sort((a, b) =>
-    a.file === b.file
-      ? a.line === b.line
-        ? a.text.localeCompare(b.text)
-        : a.line - b.line
-      : a.file.localeCompare(b.file),
-  );
+  entries.sort(compareEntries);
   const byDisposition = {};
   const byStateClass = {};
   const byOwner = {};

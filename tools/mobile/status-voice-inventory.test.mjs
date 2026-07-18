@@ -61,6 +61,53 @@ test('facility_status의 확인 중 severity는 reword, 그 외 확인 중은 ke
   );
 });
 
+test('allowlist에 있는 검증된 loading 문구는 여전히 keep/loading이다', () => {
+  const verifiedTexts = [
+    '확인 중',
+    '제보 진행 상황 확인 중',
+    '즐겨찾기 확인 중',
+    '현재 위치 확인 중',
+    '실시간 정보 확인 중',
+    '알림 확인 중',
+    '신뢰도 확인 중',
+  ];
+  const files = Object.fromEntries(
+    verifiedTexts.map((text, i) => [
+      `allowlist_${i}.dart`,
+      `const x = '${text}';\n`,
+    ]),
+  );
+  withFixture(files, (report) => {
+    for (const text of verifiedTexts) {
+      const e = entryFor(report, text);
+      assert.equal(e.stateClass, 'loading', `${text} stateClass`);
+      assert.equal(e.disposition, 'keep', `${text} disposition`);
+    }
+  });
+});
+
+test('allowlist에 없는 새 진행형/확인 중 문구는 review로 떨어진다(drift 회귀)', () => {
+  withFixture(
+    { 'new_screen.dart': "const label = '새 기능 확인 중';\n" },
+    (report) => {
+      const e = entryFor(report, '새 기능 확인 중');
+      assert.equal(e.stateClass, 'unclassified');
+      assert.equal(e.disposition, 'review');
+    },
+  );
+});
+
+test('allowlist에 없는 새 확인하고 있어요 계열도 review로 떨어진다(drift 회귀)', () => {
+  withFixture(
+    { 'new_screen.dart': "const label = '새 항목을 확인하고 있어요';\n" },
+    (report) => {
+      const e = entryFor(report, '새 항목을 확인하고 있어요');
+      assert.equal(e.stateClass, 'unclassified');
+      assert.equal(e.disposition, 'review');
+    },
+  );
+});
+
 test("'준비 중'은 #2078 out-of-scope로 소유권만 표시한다", () => {
   withFixture(
     { 'route_search.dart': "const p = '실시간 도착정보 준비 중';\n" },
