@@ -296,6 +296,22 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 	}
 
 	@Test
+	@DisplayName("출발 stop의 동일 출발 trip은 non-overtaking pattern 우위 순서를 유지한다")
+	void preservesDominantPatternOrderForSameDepartureAtOrigin() {
+		var results = planner.search(
+			command("station-b", "station-d", "2026-07-01T09:20:00+09:00"),
+			planner.compile(sameDepartureSlowerCandidateTimetable())
+		);
+
+		assertThat(results).hasSize(1);
+		assertThat(results.getFirst().steps())
+			.filteredOn(step -> "ride".equals(step.stepType()))
+			.extracting("tripId", "plannedArrivalTime")
+			.containsExactly(org.assertj.core.groups.Tuple.tuple(
+				"z-fast", "2026-07-01T09:35:00+09:00"));
+	}
+
+	@Test
 	@DisplayName("같은 정차열에서 하차 정책이 다른 후속 trip을 잃지 않는다")
 	void preservesLaterTripWhenEarlierTripBlocksDropOff() {
 		var results = planner.search(

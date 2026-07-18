@@ -912,9 +912,9 @@ class RouteTimetableRaptorPlanner {
 					List<List<ScheduledTrip>> tripsByStop = new ArrayList<>();
 					for (int stop = 0; stop < stopsByPattern.get(entry.getKey()).length; stop += 1) {
 						int stopIndex = stop;
+						// Stable sorting keeps the non-overtaking pattern order when departures tie.
 						tripsByStop.add(patternTrips.stream()
-							.sorted(Comparator.comparingInt((ScheduledTrip trip) -> trip.departureSeconds(stopIndex))
-								.thenComparingInt(ScheduledTrip::index))
+							.sorted(Comparator.comparingInt((ScheduledTrip trip) -> trip.departureSeconds(stopIndex)))
 							.toList());
 					}
 					activeTripsByPattern.put(entry.getKey(), List.copyOf(tripsByStop));
