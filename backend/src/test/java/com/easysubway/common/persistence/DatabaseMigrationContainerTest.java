@@ -83,9 +83,12 @@ class DatabaseMigrationContainerTest {
 				"transit_master_override_audits",
 				"timetable_snapshot_lock",
 				"timetable_snapshot_history",
-				"timetable_snapshot_active"
+				"timetable_snapshot_active",
+				"train_catalog_cache",
+				"train_search_cache",
+				"train_provider_call_quota_state"
 			);
-		assertThat(successfulMigrationVersions(jdbcTemplate)).contains("1", "14", "16", "17", "18", "19", "20", "21", "22", "23", "25", "26", "48", "51", "52", "53", "54", "55", "56", "57", "59", "60", "61");
+		assertThat(successfulMigrationVersions(jdbcTemplate)).contains("1", "14", "16", "17", "18", "19", "20", "21", "22", "23", "25", "26", "48", "51", "52", "53", "54", "55", "56", "57", "59", "60", "61", "65");
 		assertThat(jdbcTemplate.queryForObject("""
 			SELECT COUNT(*)
 			FROM pg_index i
@@ -154,7 +157,12 @@ class DatabaseMigrationContainerTest {
 				"chk_datapack_release_channel_events_operation",
 				"chk_timetable_snapshot_lock_singleton",
 				"chk_timetable_snapshot_counts",
-				"chk_timetable_snapshot_active_singleton"
+				"chk_timetable_snapshot_active_singleton",
+				"chk_train_catalog_cache_hash",
+				"chk_train_catalog_cache_expiry",
+				"chk_train_search_cache_payload",
+				"chk_train_search_cache_lease",
+				"chk_train_provider_call_quota_counts"
 			);
 		assertNormalizationRunGuards(jdbcTemplate);
 		assertSnapshotSourceForeignKeysRejectMismatch(jdbcTemplate);
