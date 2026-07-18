@@ -1606,6 +1606,8 @@
            id="route-lines-layer"
            data-name="노선"
            class="render-layer route-layer">
+          
+                    
           <g
              id="route-line-gimpo-goldline"
              data-name="김포골드라인"
@@ -1827,6 +1829,21 @@
              data-line-color="#5EAC41"
              data-line-category="regional-rail"
              class="line-seohae route-category-regional-rail route-line">
+<path id="_seohae-octo-connector-chojiji" data-name="서해선"
+               fill="none"
+               stroke="#5EAC41"
+               stroke-linecap="round"
+               stroke-linejoin="round"
+               stroke-width="13"
+               stroke-miterlimit="1"
+               data-ui-fix="#2068 한대앞~오이도 회랑 정비 — 초지 재배치에 맞춘 서해선 접속 커넥터"
+               data-line="seohae"
+               data-line-name="서해선"
+               data-line-color="#5EAC41"
+               shape-rendering="geometricPrecision"
+               data-geometry-system="octilinear-8dir-rounded-v1"
+               d="M 802.00 4283.097582 L 802.00 4427.75" />
+
             <title
                id="title60">서해선</title>
             <path id="_seohae-octo-0" data-name="서해선"
@@ -2036,6 +2053,24 @@
              data-line-color="#ECA300"
              data-line-category="metro-heavy"
              class="line-suin-bundang route-category-metro-heavy route-line">
+<path id="_suin-bundang-octo-corridor-handaeap-oido" data-name="수인분당"
+               fill="none"
+               stroke="#eca300"
+               stroke-linecap="round"
+               stroke-linejoin="round"
+               stroke-width="13"
+               stroke-miterlimit="1"
+               data-bend-smoothing="round-cap-round-join-global-pass"
+               data-ui-fix="#2068 한대앞~오이도 회랑 정비 — 8방향 신설 스트로크(중앙·고잔·초지·안산·신길온천·정왕 경유)"
+               data-line="suin-bundang"
+               data-line-name="수인분당선"
+               data-line-color="#ECA300"
+               shape-rendering="geometricPrecision"
+               data-curve-refactor="local-rounded-cubic-v2"
+               data-geometry-system="octilinear-8dir-rounded-v1"
+               data-parallel-offset="#2068 한대앞~오이도 회랑 병렬 corridor 오프셋(5 local unit ≈ 2.3 render px, 수인분당측)"
+               d="M 1100.7952 4160.0238 L 1002.3755 4258.4455 L 903.9555 4356.8655 L 805.5355 4455.2855 L 707.1055 4553.7155 L 648.2711 4612.5500 L 588.1800 4612.5500 L 449.0200 4612.5500 L 309.8580 4612.5481" />
+
             <title
                id="title47">수인분당선</title>
             <path id="_suin-bundang-octo-0" data-name="수인분당"
@@ -2306,6 +2341,24 @@
              data-line-color="#009BCE"
              data-line-category="seoul-urban"
              class="line-4 route-category-seoul-urban route-line">
+<path id="_4-octo-corridor-handaeap-oido" data-name="4호선"
+               fill="none"
+               stroke="#009BCE"
+               stroke-linecap="round"
+               stroke-linejoin="round"
+               stroke-width="13"
+               stroke-miterlimit="1"
+               data-bend-smoothing="round-cap-round-join-global-pass"
+               data-ui-fix="#2068 한대앞~오이도 회랑 정비 — 8방향 신설 스트로크(중앙·고잔·초지·안산·신길온천·정왕 경유)"
+               data-line="4"
+               data-line-name="4호선"
+               data-line-color="#009BCE"
+               shape-rendering="geometricPrecision"
+               data-curve-refactor="local-rounded-cubic-v2"
+               data-geometry-system="octilinear-8dir-rounded-v1"
+               data-parallel-offset="#2068 한대앞~오이도 회랑 병렬 corridor 오프셋(5 local unit ≈ 2.3 render px, 4호선측)"
+               d="M 1093.7242 4152.9527 L 995.3045 4251.3745 L 896.8845 4349.7945 L 798.4645 4448.2145 L 700.0345 4546.6445 L 644.1289 4602.5500 L 588.1800 4602.5500 L 449.0200 4602.5500 L 309.8580 4602.5481" />
+
             <title
                id="title55">4호선</title>
             <path id="_4-octo-0" data-name="4호선"
@@ -9581,7 +9634,7 @@
              data-line="suin-bundang"
              data-line-name="수인분당선"
              data-line-color="#ECA300"
-             transform="translate(111.401,111.401) translate(4.241366 15.386743) translate(-988.507415 1149.732257)" />
+             transform="translate(-964.78,1184.60)" />
           <circle
              id="_파주"
              data-name="파주"
@@ -32067,346 +32120,7 @@
               </g>
             </g>
           </g>
-          <g
-             id="transfer-station-symbol-한대앞-3"
-             class="ourclass-transfer-symbol ourclass-transfer-node-style ourclass-transfer-symbol-straight-v14"
-             data-name="한대앞"
-             data-station="한대앞"
-             data-station-name="한대앞"
-             data-node-role="transfer"
-             data-transfer-line-count="2"
-             data-transfer-lines="suin-bundang 4"
-             data-capsule-geometry="straight-8dir-only"
-             data-capsule-axis-deg="90"
-             data-badge-radius="12"
-             data-slot-size="3u"
-             data-base-unit-u="8px"
-             data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="suin-bundang"
-             style="font-family:Pretendard;isolation:isolate"
-             transform="translate(-31.868,0) translate(-581.348057 1068.342193) translate(-0.64394387,75.027972)">
-            <title
-               id="title-transfer-station-한대앞-8"
-               data-station="한대앞"
-               data-station-name="한대앞">한대앞 환승 노드: 수인분당선 / 4호선 — 직선형 8방향 캡슐</title>
-            <g
-               id="transfer-station-shell-network-한대앞-5"
-               class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule"
-               data-station="한대앞"
-               data-station-name="한대앞"
-               data-capsule-geometry="straight-8dir-only"
-               data-capsule-axis-deg="90"
-               transform="rotate(90,1696.5852,3098.9668)">
-              <path
-                 id="transfer-station-shell-outline-한대앞-1"
-                 d="m 1683.5,3078.3 v 24"
-                 fill="none"
-                 stroke-linecap="round"
-                 stroke-linejoin="round"
-                 stroke-miterlimit="1"
-                 shape-rendering="geometricPrecision"
-                 data-station="한대앞"
-                 data-station-name="한대앞"
-                 data-capsule-geometry="straight-8dir-only"
-                 data-capsule-axis-deg="90"
-                 data-slot-size="3u"
-                 stroke="#3f4a5c"
-                 stroke-width="40"
-                 class="ourclass-transfer-shell-outline"
-                 style="stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:1;shape-rendering:geometricPrecision" />
-              <path
-                 id="transfer-station-shell-fill-한대앞-2"
-                 d="m 1683.5,3078.3 v 24"
-                 fill="none"
-                 stroke-linecap="round"
-                 stroke-linejoin="round"
-                 stroke-miterlimit="1"
-                 shape-rendering="geometricPrecision"
-                 data-station="한대앞"
-                 data-station-name="한대앞"
-                 data-capsule-geometry="straight-8dir-only"
-                 data-capsule-axis-deg="90"
-                 data-slot-size="3u"
-                 stroke="#ffffff"
-                 stroke-width="32"
-                 class="ourclass-transfer-shell-fill"
-                 style="stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:1;shape-rendering:geometricPrecision" />
-            </g>
-            <g
-               id="transfer-station-route-badges-한대앞-4"
-               class="ourclass-transfer-route-badges"
-               data-station="한대앞"
-               data-station-name="한대앞"
-               data-capsule-geometry="straight-8dir-only"
-               transform="translate(-41.804561,-35.346946)">
-              <g
-                 id="transfer-station-badge-한대앞-수인분당선-1-6"
-                 class="ourclass-transfer-badge"
-                 data-station="한대앞"
-                 data-station-name="한대앞"
-                 data-line="suin-bundang"
-                 data-line-name="수인분당선"
-                 data-line-label="수인"
-                 data-line-color="#ECA300"
-                 data-slot-index="1"
-                 data-capsule-axis-deg="90"
-                 transform="translate(77.151508,42.48431)">
-                <circle
-                   id="transfer-station-badge-circle-한대앞-수인분당선-1-7"
-                   cx="1683.5"
-                   cy="3078.3"
-                   r="12"
-                   fill="#eca300"
-                   class="ourclass-transfer-badge-circle"
-                   data-station="한대앞"
-                   data-station-name="한대앞"
-                   data-line="suin-bundang"
-                   data-line-name="수인분당선"
-                   data-line-color="#ECA300"
-                   data-center-x="1683.5"
-                   data-center-y="3078.3" />
-                <text
-                   id="transfer-station-badge-label-한대앞-수인분당선-1-5"
-                   x="1683.5"
-                   y="3078.3"
-                   fill="#ffffff"
-                   class="ourclass-transfer-badge-label"
-                   font-family="Pretendard"
-                   font-size="10.3px"
-                   font-weight="900"
-                   text-anchor="middle"
-                   dominant-baseline="central"
-                   alignment-baseline="middle"
-                   paint-order="stroke"
-                   text-rendering="geometricPrecision"
-                   pointer-events="none"
-                   data-station="한대앞"
-                   data-station-name="한대앞"
-                   data-line="suin-bundang"
-                   data-line-name="수인분당선"
-                   data-line-color="#ECA300"
-                   style="font-weight:900;font-family:Pretendard;dominant-baseline:central;text-anchor:middle;text-rendering:geometricPrecision">수인</text>
-              </g>
-              <g
-                 id="transfer-station-badge-한대앞-4호선-2-5"
-                 class="ourclass-transfer-badge"
-                 data-station="한대앞"
-                 data-station-name="한대앞"
-                 data-line="4"
-                 data-line-name="4호선"
-                 data-line-label="4"
-                 data-line-color="#009BCE"
-                 data-slot-index="2"
-                 data-capsule-axis-deg="90"
-                 transform="translate(50.641298,18.353222)">
-                <circle
-                   id="transfer-station-badge-circle-한대앞-4호선-2-0"
-                   cx="1683.5"
-                   cy="3102.3"
-                   r="12"
-                   fill="#009bce"
-                   class="ourclass-transfer-badge-circle"
-                   data-station="한대앞"
-                   data-station-name="한대앞"
-                   data-line="4"
-                   data-line-name="4호선"
-                   data-line-color="#009BCE"
-                   data-center-x="1683.5"
-                   data-center-y="3102.3" />
-                <text
-                   id="transfer-station-badge-label-한대앞-4호선-2-5"
-                   x="1683.5"
-                   y="3102.3"
-                   fill="#ffffff"
-                   class="ourclass-transfer-badge-label"
-                   font-family="Pretendard"
-                   font-size="18px"
-                   font-weight="900"
-                   text-anchor="middle"
-                   dominant-baseline="central"
-                   alignment-baseline="middle"
-                   paint-order="stroke"
-                   text-rendering="geometricPrecision"
-                   pointer-events="none"
-                   data-station="한대앞"
-                   data-station-name="한대앞"
-                   data-line="4"
-                   data-line-name="4호선"
-                   data-line-color="#009BCE"
-                   style="font-weight:900;font-family:Pretendard;dominant-baseline:central;text-anchor:middle;text-rendering:geometricPrecision">4</text>
-              </g>
-            </g>
-          </g>
-          <g
-             id="transfer-station-symbol-한대앞-0"
-             class="ourclass-transfer-symbol ourclass-transfer-node-style ourclass-transfer-symbol-straight-v14"
-             data-name="한대앞"
-             data-station="한대앞"
-             data-station-name="한대앞"
-             data-node-role="transfer"
-             data-transfer-line-count="2"
-             data-transfer-lines="suin-bundang 4"
-             data-capsule-geometry="straight-8dir-only"
-             data-capsule-axis-deg="90"
-             data-badge-radius="12"
-             data-slot-size="3u"
-             data-base-unit-u="8px"
-             data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="suin-bundang"
-             style="font-family:Pretendard;isolation:isolate"
-             transform="translate(-31.868,0) translate(-581.348057 1068.342193) translate(0.94393545,144.19155)">
-            <title
-               id="title-transfer-station-한대앞-7"
-               data-station="한대앞"
-               data-station-name="한대앞">한대앞 환승 노드: 수인분당선 / 4호선 — 직선형 8방향 캡슐</title>
-            <g
-               id="transfer-station-shell-network-한대앞-7"
-               class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule"
-               data-station="한대앞"
-               data-station-name="한대앞"
-               data-capsule-geometry="straight-8dir-only"
-               data-capsule-axis-deg="90"
-               transform="rotate(90,1696.5852,3098.9668)">
-              <path
-                 id="transfer-station-shell-outline-한대앞-9"
-                 d="m 1683.5,3078.3 v 24"
-                 fill="none"
-                 stroke-linecap="round"
-                 stroke-linejoin="round"
-                 stroke-miterlimit="1"
-                 shape-rendering="geometricPrecision"
-                 data-station="한대앞"
-                 data-station-name="한대앞"
-                 data-capsule-geometry="straight-8dir-only"
-                 data-capsule-axis-deg="90"
-                 data-slot-size="3u"
-                 stroke="#3f4a5c"
-                 stroke-width="40"
-                 class="ourclass-transfer-shell-outline"
-                 style="stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:1;shape-rendering:geometricPrecision" />
-              <path
-                 id="transfer-station-shell-fill-한대앞-7"
-                 d="m 1683.5,3078.3 v 24"
-                 fill="none"
-                 stroke-linecap="round"
-                 stroke-linejoin="round"
-                 stroke-miterlimit="1"
-                 shape-rendering="geometricPrecision"
-                 data-station="한대앞"
-                 data-station-name="한대앞"
-                 data-capsule-geometry="straight-8dir-only"
-                 data-capsule-axis-deg="90"
-                 data-slot-size="3u"
-                 stroke="#ffffff"
-                 stroke-width="32"
-                 class="ourclass-transfer-shell-fill"
-                 style="stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:1;shape-rendering:geometricPrecision" />
-            </g>
-            <g
-               id="transfer-station-route-badges-한대앞-5"
-               class="ourclass-transfer-route-badges"
-               data-station="한대앞"
-               data-station-name="한대앞"
-               data-capsule-geometry="straight-8dir-only"
-               transform="translate(-41.804561,-35.346946)">
-              <g
-                 id="transfer-station-badge-한대앞-수인분당선-1-3"
-                 class="ourclass-transfer-badge"
-                 data-station="한대앞"
-                 data-station-name="한대앞"
-                 data-line="suin-bundang"
-                 data-line-name="수인분당선"
-                 data-line-label="수인"
-                 data-line-color="#ECA300"
-                 data-slot-index="1"
-                 data-capsule-axis-deg="90"
-                 transform="translate(77.151508,42.48431)">
-                <circle
-                   id="transfer-station-badge-circle-한대앞-수인분당선-1-9"
-                   cx="1683.5"
-                   cy="3078.3"
-                   r="12"
-                   fill="#eca300"
-                   class="ourclass-transfer-badge-circle"
-                   data-station="한대앞"
-                   data-station-name="한대앞"
-                   data-line="suin-bundang"
-                   data-line-name="수인분당선"
-                   data-line-color="#ECA300"
-                   data-center-x="1683.5"
-                   data-center-y="3078.3" />
-                <text
-                   id="transfer-station-badge-label-한대앞-수인분당선-1-9"
-                   x="1683.5"
-                   y="3078.3"
-                   fill="#ffffff"
-                   class="ourclass-transfer-badge-label"
-                   font-family="Pretendard"
-                   font-size="10.3px"
-                   font-weight="900"
-                   text-anchor="middle"
-                   dominant-baseline="central"
-                   alignment-baseline="middle"
-                   paint-order="stroke"
-                   text-rendering="geometricPrecision"
-                   pointer-events="none"
-                   data-station="한대앞"
-                   data-station-name="한대앞"
-                   data-line="suin-bundang"
-                   data-line-name="수인분당선"
-                   data-line-color="#ECA300"
-                   style="font-weight:900;font-family:Pretendard;dominant-baseline:central;text-anchor:middle;text-rendering:geometricPrecision">수인</text>
-              </g>
-              <g
-                 id="transfer-station-badge-한대앞-4호선-2-4"
-                 class="ourclass-transfer-badge"
-                 data-station="한대앞"
-                 data-station-name="한대앞"
-                 data-line="4"
-                 data-line-name="4호선"
-                 data-line-label="4"
-                 data-line-color="#009BCE"
-                 data-slot-index="2"
-                 data-capsule-axis-deg="90"
-                 transform="translate(50.641298,18.353222)">
-                <circle
-                   id="transfer-station-badge-circle-한대앞-4호선-2-9"
-                   cx="1683.5"
-                   cy="3102.3"
-                   r="12"
-                   fill="#009bce"
-                   class="ourclass-transfer-badge-circle"
-                   data-station="한대앞"
-                   data-station-name="한대앞"
-                   data-line="4"
-                   data-line-name="4호선"
-                   data-line-color="#009BCE"
-                   data-center-x="1683.5"
-                   data-center-y="3102.3" />
-                <text
-                   id="transfer-station-badge-label-한대앞-4호선-2-1"
-                   x="1683.5"
-                   y="3102.3"
-                   fill="#ffffff"
-                   class="ourclass-transfer-badge-label"
-                   font-family="Pretendard"
-                   font-size="18px"
-                   font-weight="900"
-                   text-anchor="middle"
-                   dominant-baseline="central"
-                   alignment-baseline="middle"
-                   paint-order="stroke"
-                   text-rendering="geometricPrecision"
-                   pointer-events="none"
-                   data-station="한대앞"
-                   data-station-name="한대앞"
-                   data-line="4"
-                   data-line-name="4호선"
-                   data-line-color="#009BCE"
-                   style="font-weight:900;font-family:Pretendard;dominant-baseline:central;text-anchor:middle;text-rendering:geometricPrecision">4</text>
-              </g>
-            </g>
-          </g>
+          
           <g
              id="transfer-station-symbol-수원"
              class="ourclass-transfer-symbol ourclass-transfer-node-style ourclass-transfer-symbol-straight-v14"
@@ -32568,7 +32282,331 @@
               </g>
             </g>
           </g>
+                    <g
+             id="transfer-station-symbol-중앙"
+             class="ourclass-transfer-symbol ourclass-transfer-node-style ourclass-transfer-symbol-straight-v14"
+             data-name="중앙"
+             data-station="중앙"
+             data-station-name="중앙"
+             data-node-role="transfer"
+             data-transfer-line-count="2"
+             data-transfer-lines="4 suin-bundang"
+             data-capsule-geometry="straight-8dir-only"
+             data-capsule-axis-deg="90"
+             data-badge-radius="12"
+             data-slot-size="3u"
+             data-base-unit-u="8px"
+             data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
+             data-line="4"
+             transform="translate(-360.2940,924.0100)">
+            <title
+               id="title-transfer-station-중앙"
+               data-station="중앙"
+               data-station-name="중앙">중앙 환승 노드: 4호선 / 수인분당선 — 직선형 8방향 캡슐(#2068 한대앞~오이도 회랑 정비)</title>
+            <g
+               id="transfer-station-shell-network-중앙"
+               class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule"
+               data-station="중앙"
+               data-station-name="중앙"
+               data-capsule-geometry="straight-8dir-only"
+               data-capsule-axis-deg="90">
+              <path
+                 id="transfer-station-shell-outline-중앙"
+                 d="m 1359.134,3318.9 v 24"
+                 fill="none"
+                 stroke-linecap="round"
+                 stroke-linejoin="round"
+                 stroke-miterlimit="1"
+                 shape-rendering="geometricPrecision"
+                 data-station="중앙"
+                 data-station-name="중앙"
+                 data-capsule-geometry="straight-8dir-only"
+                 data-capsule-axis-deg="90"
+                 data-slot-size="3u"
+                 stroke="#3f4a5c"
+                 stroke-width="40"
+                 class="ourclass-transfer-shell-outline" />
+              <path
+                 id="transfer-station-shell-fill-중앙"
+                 d="m 1359.134,3318.9 v 24"
+                 fill="none"
+                 stroke-linecap="round"
+                 stroke-linejoin="round"
+                 stroke-miterlimit="1"
+                 shape-rendering="geometricPrecision"
+                 data-station="중앙"
+                 data-station-name="중앙"
+                 data-capsule-geometry="straight-8dir-only"
+                 data-capsule-axis-deg="90"
+                 data-slot-size="3u"
+                 stroke="#ffffff"
+                 stroke-width="32"
+                 class="ourclass-transfer-shell-fill" />
+            </g>
+            <g
+               id="transfer-station-route-badges-중앙"
+               class="ourclass-transfer-route-badges"
+               data-station="중앙"
+               data-station-name="중앙"
+               data-capsule-geometry="straight-8dir-only">
+              <g
+                 id="transfer-station-badge-중앙-4호선-1"
+                 class="ourclass-transfer-badge"
+                 data-station="중앙"
+                 data-station-name="중앙"
+                 data-line="4"
+                 data-line-name="4호선"
+                 data-line-label="4"
+                 data-line-color="#009BCE"
+                 data-slot-index="1"
+                 data-capsule-axis-deg="90">
+                <circle
+                   id="transfer-station-badge-circle-중앙-4호선-1"
+                   cx="1359.134"
+                   cy="3318.9"
+                   r="12"
+                   fill="#009bce"
+                   class="ourclass-transfer-badge-circle"
+                   data-station="중앙"
+                   data-station-name="중앙"
+                   data-line="4"
+                   data-line-name="4호선"
+                   data-line-color="#009BCE"
+                   data-center-x="1359.134"
+                   data-center-y="3318.9" />
+                <text
+                   id="transfer-station-badge-label-중앙-4호선-1"
+                   x="1359.134"
+                   y="3318.9"
+                   fill="#ffffff"
+                   class="ourclass-transfer-badge-label"
+                   font-family="Pretendard"
+                   font-size="18px"
+                   font-weight="900"
+                   text-anchor="middle"
+                   dominant-baseline="central"
+                   alignment-baseline="middle"
+                   paint-order="stroke"
+                   text-rendering="geometricPrecision"
+                   pointer-events="none"
+                   data-station="중앙"
+                   data-station-name="중앙"
+                   data-line="4"
+                   data-line-name="4호선"
+                   data-line-color="#009BCE">4</text>
+              </g>
+              <g
+                 id="transfer-station-badge-중앙-수인분당선-2"
+                 class="ourclass-transfer-badge"
+                 data-station="중앙"
+                 data-station-name="중앙"
+                 data-line="suin-bundang"
+                 data-line-name="수인분당선"
+                 data-line-label="수인"
+                 data-line-color="#ECA300"
+                 data-slot-index="2"
+                 data-capsule-axis-deg="90">
+                <circle
+                   id="transfer-station-badge-circle-중앙-수인분당선-2"
+                   cx="1359.134"
+                   cy="3342.9"
+                   r="12"
+                   fill="#eca300"
+                   class="ourclass-transfer-badge-circle"
+                   data-station="중앙"
+                   data-station-name="중앙"
+                   data-line="suin-bundang"
+                   data-line-name="수인분당선"
+                   data-line-color="#ECA300"
+                   data-center-x="1359.134"
+                   data-center-y="3342.9" />
+                <text
+                   id="transfer-station-badge-label-중앙-수인분당선-2"
+                   x="1359.134"
+                   y="3342.9"
+                   fill="#ffffff"
+                   class="ourclass-transfer-badge-label"
+                   font-family="Pretendard"
+                   font-size="10.3px"
+                   font-weight="900"
+                   text-anchor="middle"
+                   dominant-baseline="central"
+                   alignment-baseline="middle"
+                   paint-order="stroke"
+                   text-rendering="geometricPrecision"
+                   pointer-events="none"
+                   data-station="중앙"
+                   data-station-name="중앙"
+                   data-line="suin-bundang"
+                   data-line-name="수인분당선"
+                   data-line-color="#ECA300">수인</text>
+              </g>
+            </g>
+          </g>
+
           <g
+             id="transfer-station-symbol-고잔"
+             class="ourclass-transfer-symbol ourclass-transfer-node-style ourclass-transfer-symbol-straight-v14"
+             data-name="고잔"
+             data-station="고잔"
+             data-station-name="고잔"
+             data-node-role="transfer"
+             data-transfer-line-count="2"
+             data-transfer-lines="4 suin-bundang"
+             data-capsule-geometry="straight-8dir-only"
+             data-capsule-axis-deg="90"
+             data-badge-radius="12"
+             data-slot-size="3u"
+             data-base-unit-u="8px"
+             data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
+             data-line="4"
+             transform="translate(-458.7140,1022.4300)">
+            <title
+               id="title-transfer-station-고잔"
+               data-station="고잔"
+               data-station-name="고잔">고잔 환승 노드: 4호선 / 수인분당선 — 직선형 8방향 캡슐(#2068 한대앞~오이도 회랑 정비)</title>
+            <g
+               id="transfer-station-shell-network-고잔"
+               class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule"
+               data-station="고잔"
+               data-station-name="고잔"
+               data-capsule-geometry="straight-8dir-only"
+               data-capsule-axis-deg="90">
+              <path
+                 id="transfer-station-shell-outline-고잔"
+                 d="m 1359.134,3318.9 v 24"
+                 fill="none"
+                 stroke-linecap="round"
+                 stroke-linejoin="round"
+                 stroke-miterlimit="1"
+                 shape-rendering="geometricPrecision"
+                 data-station="고잔"
+                 data-station-name="고잔"
+                 data-capsule-geometry="straight-8dir-only"
+                 data-capsule-axis-deg="90"
+                 data-slot-size="3u"
+                 stroke="#3f4a5c"
+                 stroke-width="40"
+                 class="ourclass-transfer-shell-outline" />
+              <path
+                 id="transfer-station-shell-fill-고잔"
+                 d="m 1359.134,3318.9 v 24"
+                 fill="none"
+                 stroke-linecap="round"
+                 stroke-linejoin="round"
+                 stroke-miterlimit="1"
+                 shape-rendering="geometricPrecision"
+                 data-station="고잔"
+                 data-station-name="고잔"
+                 data-capsule-geometry="straight-8dir-only"
+                 data-capsule-axis-deg="90"
+                 data-slot-size="3u"
+                 stroke="#ffffff"
+                 stroke-width="32"
+                 class="ourclass-transfer-shell-fill" />
+            </g>
+            <g
+               id="transfer-station-route-badges-고잔"
+               class="ourclass-transfer-route-badges"
+               data-station="고잔"
+               data-station-name="고잔"
+               data-capsule-geometry="straight-8dir-only">
+              <g
+                 id="transfer-station-badge-고잔-4호선-1"
+                 class="ourclass-transfer-badge"
+                 data-station="고잔"
+                 data-station-name="고잔"
+                 data-line="4"
+                 data-line-name="4호선"
+                 data-line-label="4"
+                 data-line-color="#009BCE"
+                 data-slot-index="1"
+                 data-capsule-axis-deg="90">
+                <circle
+                   id="transfer-station-badge-circle-고잔-4호선-1"
+                   cx="1359.134"
+                   cy="3318.9"
+                   r="12"
+                   fill="#009bce"
+                   class="ourclass-transfer-badge-circle"
+                   data-station="고잔"
+                   data-station-name="고잔"
+                   data-line="4"
+                   data-line-name="4호선"
+                   data-line-color="#009BCE"
+                   data-center-x="1359.134"
+                   data-center-y="3318.9" />
+                <text
+                   id="transfer-station-badge-label-고잔-4호선-1"
+                   x="1359.134"
+                   y="3318.9"
+                   fill="#ffffff"
+                   class="ourclass-transfer-badge-label"
+                   font-family="Pretendard"
+                   font-size="18px"
+                   font-weight="900"
+                   text-anchor="middle"
+                   dominant-baseline="central"
+                   alignment-baseline="middle"
+                   paint-order="stroke"
+                   text-rendering="geometricPrecision"
+                   pointer-events="none"
+                   data-station="고잔"
+                   data-station-name="고잔"
+                   data-line="4"
+                   data-line-name="4호선"
+                   data-line-color="#009BCE">4</text>
+              </g>
+              <g
+                 id="transfer-station-badge-고잔-수인분당선-2"
+                 class="ourclass-transfer-badge"
+                 data-station="고잔"
+                 data-station-name="고잔"
+                 data-line="suin-bundang"
+                 data-line-name="수인분당선"
+                 data-line-label="수인"
+                 data-line-color="#ECA300"
+                 data-slot-index="2"
+                 data-capsule-axis-deg="90">
+                <circle
+                   id="transfer-station-badge-circle-고잔-수인분당선-2"
+                   cx="1359.134"
+                   cy="3342.9"
+                   r="12"
+                   fill="#eca300"
+                   class="ourclass-transfer-badge-circle"
+                   data-station="고잔"
+                   data-station-name="고잔"
+                   data-line="suin-bundang"
+                   data-line-name="수인분당선"
+                   data-line-color="#ECA300"
+                   data-center-x="1359.134"
+                   data-center-y="3342.9" />
+                <text
+                   id="transfer-station-badge-label-고잔-수인분당선-2"
+                   x="1359.134"
+                   y="3342.9"
+                   fill="#ffffff"
+                   class="ourclass-transfer-badge-label"
+                   font-family="Pretendard"
+                   font-size="10.3px"
+                   font-weight="900"
+                   text-anchor="middle"
+                   dominant-baseline="central"
+                   alignment-baseline="middle"
+                   paint-order="stroke"
+                   text-rendering="geometricPrecision"
+                   pointer-events="none"
+                   data-station="고잔"
+                   data-station-name="고잔"
+                   data-line="suin-bundang"
+                   data-line-name="수인분당선"
+                   data-line-color="#ECA300">수인</text>
+              </g>
+            </g>
+          </g>
+
+                    <g
              id="transfer-station-symbol-초지"
              class="ourclass-transfer-symbol ourclass-transfer-node-style ourclass-transfer-symbol-straight-v14"
              data-name="초지"
@@ -32584,11 +32622,11 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="seohae"
-             transform="translate(-155.22,-155.22) translate(-652.730771 1125.357255) translate(0,5.0488672)">
+             transform="translate(0,0)">
             <title
                id="title-transfer-station-초지"
                data-station="초지"
-               data-station-name="초지">초지 환승 노드: 서해선 / 4호선 / 수인분당선 — 직선형 8방향 캡슐</title>
+               data-station-name="초지">초지 환승 노드: 서해선 / 4호선 / 수인분당선 — 직선형 8방향 캡슐(#2068 한대앞~오이도 회랑 정비)</title>
             <g
                id="transfer-station-shell-network-초지"
                class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule"
@@ -32598,7 +32636,7 @@
                data-capsule-axis-deg="90">
               <path
                  id="transfer-station-shell-outline-초지"
-                 d="m 1614.367,3284.767 v 48"
+                 d="m 802.0,4427.75 v 48"
                  fill="none"
                  stroke-linecap="round"
                  stroke-linejoin="round"
@@ -32614,7 +32652,7 @@
                  class="ourclass-transfer-shell-outline" />
               <path
                  id="transfer-station-shell-fill-초지"
-                 d="m 1614.367,3284.767 v 48"
+                 d="m 802.0,4427.75 v 48"
                  fill="none"
                  stroke-linecap="round"
                  stroke-linejoin="round"
@@ -32648,8 +32686,8 @@
                  data-capsule-axis-deg="90">
                 <circle
                    id="transfer-station-badge-circle-초지-서해선-1"
-                   cx="1614.3669"
-                   cy="3284.7671"
+                   cx="802.0"
+                   cy="4427.75"
                    r="12"
                    fill="#5eac41"
                    class="ourclass-transfer-badge-circle"
@@ -32658,12 +32696,12 @@
                    data-line="seohae"
                    data-line-name="서해선"
                    data-line-color="#5EAC41"
-                   data-center-x="1614.367"
-                   data-center-y="3284.767" />
+                   data-center-x="802.0"
+                   data-center-y="4427.75" />
                 <text
                    id="transfer-station-badge-label-초지-서해선-1"
-                   x="1614.3669"
-                   y="3284.7671"
+                   x="802.0"
+                   y="4427.75"
                    fill="#ffffff"
                    class="ourclass-transfer-badge-label"
                    font-family="Pretendard"
@@ -32694,8 +32732,8 @@
                  data-capsule-axis-deg="90">
                 <circle
                    id="transfer-station-badge-circle-초지-4호선-2"
-                   cx="1614.3669"
-                   cy="3308.7671"
+                   cx="802.0"
+                   cy="4451.75"
                    r="12"
                    fill="#009bce"
                    class="ourclass-transfer-badge-circle"
@@ -32704,12 +32742,12 @@
                    data-line="4"
                    data-line-name="4호선"
                    data-line-color="#009BCE"
-                   data-center-x="1614.367"
-                   data-center-y="3308.767" />
+                   data-center-x="802.0"
+                   data-center-y="4451.75" />
                 <text
                    id="transfer-station-badge-label-초지-4호선-2"
-                   x="1614.3669"
-                   y="3308.7671"
+                   x="802.0"
+                   y="4451.75"
                    fill="#ffffff"
                    class="ourclass-transfer-badge-label"
                    font-family="Pretendard"
@@ -32740,8 +32778,8 @@
                  data-capsule-axis-deg="90">
                 <circle
                    id="transfer-station-badge-circle-초지-수인분당선-3"
-                   cx="1614.3669"
-                   cy="3332.7671"
+                   cx="802.0"
+                   cy="4475.75"
                    r="12"
                    fill="#eca300"
                    class="ourclass-transfer-badge-circle"
@@ -32750,12 +32788,12 @@
                    data-line="suin-bundang"
                    data-line-name="수인분당선"
                    data-line-color="#ECA300"
-                   data-center-x="1614.367"
-                   data-center-y="3332.767" />
+                   data-center-x="802.0"
+                   data-center-y="4475.75" />
                 <text
                    id="transfer-station-badge-label-초지-수인분당선-3"
-                   x="1614.3669"
-                   y="3332.7671"
+                   x="802.0"
+                   y="4475.75"
                    fill="#ffffff"
                    class="ourclass-transfer-badge-label"
                    font-family="Pretendard"
@@ -32775,8 +32813,334 @@
               </g>
             </g>
           </g>
+
+
           <g
-             id="transfer-station-symbol-정왕-3"
+             id="transfer-station-symbol-안산"
+             class="ourclass-transfer-symbol ourclass-transfer-node-style ourclass-transfer-symbol-straight-v14"
+             data-name="안산"
+             data-station="안산"
+             data-station-name="안산"
+             data-node-role="transfer"
+             data-transfer-line-count="2"
+             data-transfer-lines="4 suin-bundang"
+             data-capsule-geometry="straight-8dir-only"
+             data-capsule-axis-deg="90"
+             data-badge-radius="12"
+             data-slot-size="3u"
+             data-base-unit-u="8px"
+             data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
+             data-line="4"
+             transform="translate(-655.5640,1219.2800)">
+            <title
+               id="title-transfer-station-안산"
+               data-station="안산"
+               data-station-name="안산">안산 환승 노드: 4호선 / 수인분당선 — 직선형 8방향 캡슐(#2068 한대앞~오이도 회랑 정비)</title>
+            <g
+               id="transfer-station-shell-network-안산"
+               class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule"
+               data-station="안산"
+               data-station-name="안산"
+               data-capsule-geometry="straight-8dir-only"
+               data-capsule-axis-deg="90">
+              <path
+                 id="transfer-station-shell-outline-안산"
+                 d="m 1359.134,3318.9 v 24"
+                 fill="none"
+                 stroke-linecap="round"
+                 stroke-linejoin="round"
+                 stroke-miterlimit="1"
+                 shape-rendering="geometricPrecision"
+                 data-station="안산"
+                 data-station-name="안산"
+                 data-capsule-geometry="straight-8dir-only"
+                 data-capsule-axis-deg="90"
+                 data-slot-size="3u"
+                 stroke="#3f4a5c"
+                 stroke-width="40"
+                 class="ourclass-transfer-shell-outline" />
+              <path
+                 id="transfer-station-shell-fill-안산"
+                 d="m 1359.134,3318.9 v 24"
+                 fill="none"
+                 stroke-linecap="round"
+                 stroke-linejoin="round"
+                 stroke-miterlimit="1"
+                 shape-rendering="geometricPrecision"
+                 data-station="안산"
+                 data-station-name="안산"
+                 data-capsule-geometry="straight-8dir-only"
+                 data-capsule-axis-deg="90"
+                 data-slot-size="3u"
+                 stroke="#ffffff"
+                 stroke-width="32"
+                 class="ourclass-transfer-shell-fill" />
+            </g>
+            <g
+               id="transfer-station-route-badges-안산"
+               class="ourclass-transfer-route-badges"
+               data-station="안산"
+               data-station-name="안산"
+               data-capsule-geometry="straight-8dir-only">
+              <g
+                 id="transfer-station-badge-안산-4호선-1"
+                 class="ourclass-transfer-badge"
+                 data-station="안산"
+                 data-station-name="안산"
+                 data-line="4"
+                 data-line-name="4호선"
+                 data-line-label="4"
+                 data-line-color="#009BCE"
+                 data-slot-index="1"
+                 data-capsule-axis-deg="90">
+                <circle
+                   id="transfer-station-badge-circle-안산-4호선-1"
+                   cx="1359.134"
+                   cy="3318.9"
+                   r="12"
+                   fill="#009bce"
+                   class="ourclass-transfer-badge-circle"
+                   data-station="안산"
+                   data-station-name="안산"
+                   data-line="4"
+                   data-line-name="4호선"
+                   data-line-color="#009BCE"
+                   data-center-x="1359.134"
+                   data-center-y="3318.9" />
+                <text
+                   id="transfer-station-badge-label-안산-4호선-1"
+                   x="1359.134"
+                   y="3318.9"
+                   fill="#ffffff"
+                   class="ourclass-transfer-badge-label"
+                   font-family="Pretendard"
+                   font-size="18px"
+                   font-weight="900"
+                   text-anchor="middle"
+                   dominant-baseline="central"
+                   alignment-baseline="middle"
+                   paint-order="stroke"
+                   text-rendering="geometricPrecision"
+                   pointer-events="none"
+                   data-station="안산"
+                   data-station-name="안산"
+                   data-line="4"
+                   data-line-name="4호선"
+                   data-line-color="#009BCE">4</text>
+              </g>
+              <g
+                 id="transfer-station-badge-안산-수인분당선-2"
+                 class="ourclass-transfer-badge"
+                 data-station="안산"
+                 data-station-name="안산"
+                 data-line="suin-bundang"
+                 data-line-name="수인분당선"
+                 data-line-label="수인"
+                 data-line-color="#ECA300"
+                 data-slot-index="2"
+                 data-capsule-axis-deg="90">
+                <circle
+                   id="transfer-station-badge-circle-안산-수인분당선-2"
+                   cx="1359.134"
+                   cy="3342.9"
+                   r="12"
+                   fill="#eca300"
+                   class="ourclass-transfer-badge-circle"
+                   data-station="안산"
+                   data-station-name="안산"
+                   data-line="suin-bundang"
+                   data-line-name="수인분당선"
+                   data-line-color="#ECA300"
+                   data-center-x="1359.134"
+                   data-center-y="3342.9" />
+                <text
+                   id="transfer-station-badge-label-안산-수인분당선-2"
+                   x="1359.134"
+                   y="3342.9"
+                   fill="#ffffff"
+                   class="ourclass-transfer-badge-label"
+                   font-family="Pretendard"
+                   font-size="10.3px"
+                   font-weight="900"
+                   text-anchor="middle"
+                   dominant-baseline="central"
+                   alignment-baseline="middle"
+                   paint-order="stroke"
+                   text-rendering="geometricPrecision"
+                   pointer-events="none"
+                   data-station="안산"
+                   data-station-name="안산"
+                   data-line="suin-bundang"
+                   data-line-name="수인분당선"
+                   data-line-color="#ECA300">수인</text>
+              </g>
+            </g>
+          </g>
+
+          <g
+             id="transfer-station-symbol-신길온천"
+             class="ourclass-transfer-symbol ourclass-transfer-node-style ourclass-transfer-symbol-straight-v14"
+             data-name="신길온천"
+             data-station="신길온천"
+             data-station-name="신길온천"
+             data-node-role="transfer"
+             data-transfer-line-count="2"
+             data-transfer-lines="4 suin-bundang"
+             data-capsule-geometry="straight-8dir-only"
+             data-capsule-axis-deg="90"
+             data-badge-radius="12"
+             data-slot-size="3u"
+             data-base-unit-u="8px"
+             data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
+             data-line="4"
+             transform="translate(-770.9540,1276.6500)">
+            <title
+               id="title-transfer-station-신길온천"
+               data-station="신길온천"
+               data-station-name="신길온천">신길온천 환승 노드: 4호선 / 수인분당선 — 직선형 8방향 캡슐(#2068 한대앞~오이도 회랑 정비)</title>
+            <g
+               id="transfer-station-shell-network-신길온천"
+               class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule"
+               data-station="신길온천"
+               data-station-name="신길온천"
+               data-capsule-geometry="straight-8dir-only"
+               data-capsule-axis-deg="90">
+              <path
+                 id="transfer-station-shell-outline-신길온천"
+                 d="m 1359.134,3318.9 v 24"
+                 fill="none"
+                 stroke-linecap="round"
+                 stroke-linejoin="round"
+                 stroke-miterlimit="1"
+                 shape-rendering="geometricPrecision"
+                 data-station="신길온천"
+                 data-station-name="신길온천"
+                 data-capsule-geometry="straight-8dir-only"
+                 data-capsule-axis-deg="90"
+                 data-slot-size="3u"
+                 stroke="#3f4a5c"
+                 stroke-width="40"
+                 class="ourclass-transfer-shell-outline" />
+              <path
+                 id="transfer-station-shell-fill-신길온천"
+                 d="m 1359.134,3318.9 v 24"
+                 fill="none"
+                 stroke-linecap="round"
+                 stroke-linejoin="round"
+                 stroke-miterlimit="1"
+                 shape-rendering="geometricPrecision"
+                 data-station="신길온천"
+                 data-station-name="신길온천"
+                 data-capsule-geometry="straight-8dir-only"
+                 data-capsule-axis-deg="90"
+                 data-slot-size="3u"
+                 stroke="#ffffff"
+                 stroke-width="32"
+                 class="ourclass-transfer-shell-fill" />
+            </g>
+            <g
+               id="transfer-station-route-badges-신길온천"
+               class="ourclass-transfer-route-badges"
+               data-station="신길온천"
+               data-station-name="신길온천"
+               data-capsule-geometry="straight-8dir-only">
+              <g
+                 id="transfer-station-badge-신길온천-4호선-1"
+                 class="ourclass-transfer-badge"
+                 data-station="신길온천"
+                 data-station-name="신길온천"
+                 data-line="4"
+                 data-line-name="4호선"
+                 data-line-label="4"
+                 data-line-color="#009BCE"
+                 data-slot-index="1"
+                 data-capsule-axis-deg="90">
+                <circle
+                   id="transfer-station-badge-circle-신길온천-4호선-1"
+                   cx="1359.134"
+                   cy="3318.9"
+                   r="12"
+                   fill="#009bce"
+                   class="ourclass-transfer-badge-circle"
+                   data-station="신길온천"
+                   data-station-name="신길온천"
+                   data-line="4"
+                   data-line-name="4호선"
+                   data-line-color="#009BCE"
+                   data-center-x="1359.134"
+                   data-center-y="3318.9" />
+                <text
+                   id="transfer-station-badge-label-신길온천-4호선-1"
+                   x="1359.134"
+                   y="3318.9"
+                   fill="#ffffff"
+                   class="ourclass-transfer-badge-label"
+                   font-family="Pretendard"
+                   font-size="18px"
+                   font-weight="900"
+                   text-anchor="middle"
+                   dominant-baseline="central"
+                   alignment-baseline="middle"
+                   paint-order="stroke"
+                   text-rendering="geometricPrecision"
+                   pointer-events="none"
+                   data-station="신길온천"
+                   data-station-name="신길온천"
+                   data-line="4"
+                   data-line-name="4호선"
+                   data-line-color="#009BCE">4</text>
+              </g>
+              <g
+                 id="transfer-station-badge-신길온천-수인분당선-2"
+                 class="ourclass-transfer-badge"
+                 data-station="신길온천"
+                 data-station-name="신길온천"
+                 data-line="suin-bundang"
+                 data-line-name="수인분당선"
+                 data-line-label="수인"
+                 data-line-color="#ECA300"
+                 data-slot-index="2"
+                 data-capsule-axis-deg="90">
+                <circle
+                   id="transfer-station-badge-circle-신길온천-수인분당선-2"
+                   cx="1359.134"
+                   cy="3342.9"
+                   r="12"
+                   fill="#eca300"
+                   class="ourclass-transfer-badge-circle"
+                   data-station="신길온천"
+                   data-station-name="신길온천"
+                   data-line="suin-bundang"
+                   data-line-name="수인분당선"
+                   data-line-color="#ECA300"
+                   data-center-x="1359.134"
+                   data-center-y="3342.9" />
+                <text
+                   id="transfer-station-badge-label-신길온천-수인분당선-2"
+                   x="1359.134"
+                   y="3342.9"
+                   fill="#ffffff"
+                   class="ourclass-transfer-badge-label"
+                   font-family="Pretendard"
+                   font-size="10.3px"
+                   font-weight="900"
+                   text-anchor="middle"
+                   dominant-baseline="central"
+                   alignment-baseline="middle"
+                   paint-order="stroke"
+                   text-rendering="geometricPrecision"
+                   pointer-events="none"
+                   data-station="신길온천"
+                   data-station-name="신길온천"
+                   data-line="suin-bundang"
+                   data-line-name="수인분당선"
+                   data-line-color="#ECA300">수인</text>
+              </g>
+            </g>
+          </g>
+
+          <g
+             id="transfer-station-symbol-정왕"
              class="ourclass-transfer-symbol ourclass-transfer-node-style ourclass-transfer-symbol-straight-v14"
              data-name="정왕"
              data-station="정왕"
@@ -32791,21 +33155,20 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="4"
-             style="font-family:Pretendard;isolation:isolate"
-             transform="translate(-69.918,-69.918) translate(-922.799951 1135.100046) translate(165.40137,-8.9225508)">
+             transform="translate(-910.1140,1276.6500)">
             <title
-               id="title-transfer-station-정왕-0"
+               id="title-transfer-station-정왕"
                data-station="정왕"
-               data-station-name="정왕">정왕 환승 노드: 4호선 / 수인분당선 — 직선형 8방향 캡슐</title>
+               data-station-name="정왕">정왕 환승 노드: 4호선 / 수인분당선 — 직선형 8방향 캡슐(#2068 한대앞~오이도 회랑 정비)</title>
             <g
-               id="transfer-station-shell-network-정왕-9"
+               id="transfer-station-shell-network-정왕"
                class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule"
                data-station="정왕"
                data-station-name="정왕"
                data-capsule-geometry="straight-8dir-only"
                data-capsule-axis-deg="90">
               <path
-                 id="transfer-station-shell-outline-정왕-0"
+                 id="transfer-station-shell-outline-정왕"
                  d="m 1359.134,3318.9 v 24"
                  fill="none"
                  stroke-linecap="round"
@@ -32819,10 +33182,9 @@
                  data-slot-size="3u"
                  stroke="#3f4a5c"
                  stroke-width="40"
-                 class="ourclass-transfer-shell-outline"
-                 style="stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:1;shape-rendering:geometricPrecision" />
+                 class="ourclass-transfer-shell-outline" />
               <path
-                 id="transfer-station-shell-fill-정왕-7"
+                 id="transfer-station-shell-fill-정왕"
                  d="m 1359.134,3318.9 v 24"
                  fill="none"
                  stroke-linecap="round"
@@ -32836,17 +33198,16 @@
                  data-slot-size="3u"
                  stroke="#ffffff"
                  stroke-width="32"
-                 class="ourclass-transfer-shell-fill"
-                 style="stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:1;shape-rendering:geometricPrecision" />
+                 class="ourclass-transfer-shell-fill" />
             </g>
             <g
-               id="transfer-station-route-badges-정왕-6"
+               id="transfer-station-route-badges-정왕"
                class="ourclass-transfer-route-badges"
                data-station="정왕"
                data-station-name="정왕"
                data-capsule-geometry="straight-8dir-only">
               <g
-                 id="transfer-station-badge-정왕-4호선-1-8"
+                 id="transfer-station-badge-정왕-4호선-1"
                  class="ourclass-transfer-badge"
                  data-station="정왕"
                  data-station-name="정왕"
@@ -32855,12 +33216,11 @@
                  data-line-label="4"
                  data-line-color="#009BCE"
                  data-slot-index="1"
-                 data-capsule-axis-deg="90"
-                 transform="translate(-0.3883744,-1.5534976)">
+                 data-capsule-axis-deg="90">
                 <circle
-                   id="transfer-station-badge-circle-정왕-4호선-1-3"
+                   id="transfer-station-badge-circle-정왕-4호선-1"
                    cx="1359.134"
-                   cy="3318.8999"
+                   cy="3318.9"
                    r="12"
                    fill="#009bce"
                    class="ourclass-transfer-badge-circle"
@@ -32872,9 +33232,9 @@
                    data-center-x="1359.134"
                    data-center-y="3318.9" />
                 <text
-                   id="transfer-station-badge-label-정왕-4호선-1-8"
+                   id="transfer-station-badge-label-정왕-4호선-1"
                    x="1359.134"
-                   y="3318.8999"
+                   y="3318.9"
                    fill="#ffffff"
                    class="ourclass-transfer-badge-label"
                    font-family="Pretendard"
@@ -32890,11 +33250,10 @@
                    data-station-name="정왕"
                    data-line="4"
                    data-line-name="4호선"
-                   data-line-color="#009BCE"
-                   style="font-weight:900;font-family:Pretendard;dominant-baseline:central;text-anchor:middle;text-rendering:geometricPrecision">4</text>
+                   data-line-color="#009BCE">4</text>
               </g>
               <g
-                 id="transfer-station-badge-정왕-수인분당선-2-6"
+                 id="transfer-station-badge-정왕-수인분당선-2"
                  class="ourclass-transfer-badge"
                  data-station="정왕"
                  data-station-name="정왕"
@@ -32903,12 +33262,11 @@
                  data-line-label="수인"
                  data-line-color="#ECA300"
                  data-slot-index="2"
-                 data-capsule-axis-deg="90"
-                 transform="translate(0,1.5534976)">
+                 data-capsule-axis-deg="90">
                 <circle
-                   id="transfer-station-badge-circle-정왕-수인분당선-2-1"
+                   id="transfer-station-badge-circle-정왕-수인분당선-2"
                    cx="1359.134"
-                   cy="3342.8999"
+                   cy="3342.9"
                    r="12"
                    fill="#eca300"
                    class="ourclass-transfer-badge-circle"
@@ -32920,9 +33278,9 @@
                    data-center-x="1359.134"
                    data-center-y="3342.9" />
                 <text
-                   id="transfer-station-badge-label-정왕-수인분당선-2-9"
+                   id="transfer-station-badge-label-정왕-수인분당선-2"
                    x="1359.134"
-                   y="3342.8999"
+                   y="3342.9"
                    fill="#ffffff"
                    class="ourclass-transfer-badge-label"
                    font-family="Pretendard"
@@ -32938,17 +33296,17 @@
                    data-station-name="정왕"
                    data-line="suin-bundang"
                    data-line-name="수인분당선"
-                   data-line-color="#ECA300"
-                   style="font-weight:900;font-family:Pretendard;dominant-baseline:central;text-anchor:middle;text-rendering:geometricPrecision">수인</text>
+                   data-line-color="#ECA300">수인</text>
               </g>
             </g>
           </g>
+
           <g
-             id="transfer-station-symbol-정왕-3-94"
+             id="transfer-station-symbol-오이도"
              class="ourclass-transfer-symbol ourclass-transfer-node-style ourclass-transfer-symbol-straight-v14"
-             data-name="정왕"
-             data-station="정왕"
-             data-station-name="정왕"
+             data-name="오이도"
+             data-station="오이도"
+             data-station-name="오이도"
              data-node-role="transfer"
              data-transfer-line-count="2"
              data-transfer-lines="4 suin-bundang"
@@ -32959,259 +33317,86 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="4"
-             style="font-family:Pretendard;isolation:isolate"
-             transform="translate(-69.918,-69.918) translate(-922.799951 1135.100046) translate(4.1703874,-7.6249342)">
+             transform="translate(-1049.2760,1276.6481)">
             <title
-               id="title-transfer-station-정왕-0-3"
-               data-station="정왕"
-               data-station-name="정왕">정왕 환승 노드: 4호선 / 수인분당선 — 직선형 8방향 캡슐</title>
+               id="title-transfer-station-오이도"
+               data-station="오이도"
+               data-station-name="오이도">오이도 환승 노드: 4호선 / 수인분당선 — 직선형 8방향 캡슐(#2068 한대앞~오이도 회랑 정비)</title>
             <g
-               id="transfer-station-shell-network-정왕-9-9"
+               id="transfer-station-shell-network-오이도"
                class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule"
-               data-station="정왕"
-               data-station-name="정왕"
-               data-capsule-geometry="straight-8dir-only"
-               data-capsule-axis-deg="90"
-               transform="translate(0,0.3883744)">
-              <path
-                 id="transfer-station-shell-outline-정왕-0-51"
-                 d="m 1359.134,3318.9 v 24"
-                 fill="none"
-                 stroke-linecap="round"
-                 stroke-linejoin="round"
-                 stroke-miterlimit="1"
-                 shape-rendering="geometricPrecision"
-                 data-station="정왕"
-                 data-station-name="정왕"
-                 data-capsule-geometry="straight-8dir-only"
-                 data-capsule-axis-deg="90"
-                 data-slot-size="3u"
-                 stroke="#3f4a5c"
-                 stroke-width="40"
-                 class="ourclass-transfer-shell-outline"
-                 style="stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:1;shape-rendering:geometricPrecision" />
-              <path
-                 id="transfer-station-shell-fill-정왕-7-7"
-                 d="m 1359.134,3318.9 v 24"
-                 fill="none"
-                 stroke-linecap="round"
-                 stroke-linejoin="round"
-                 stroke-miterlimit="1"
-                 shape-rendering="geometricPrecision"
-                 data-station="정왕"
-                 data-station-name="정왕"
-                 data-capsule-geometry="straight-8dir-only"
-                 data-capsule-axis-deg="90"
-                 data-slot-size="3u"
-                 stroke="#ffffff"
-                 stroke-width="32"
-                 class="ourclass-transfer-shell-fill"
-                 style="stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:1;shape-rendering:geometricPrecision" />
-            </g>
-            <g
-               id="transfer-station-route-badges-정왕-6-45"
-               class="ourclass-transfer-route-badges"
-               data-station="정왕"
-               data-station-name="정왕"
-               data-capsule-geometry="straight-8dir-only">
-              <g
-                 id="transfer-station-badge-정왕-4호선-1-8-1"
-                 class="ourclass-transfer-badge"
-                 data-station="정왕"
-                 data-station-name="정왕"
-                 data-line="4"
-                 data-line-name="4호선"
-                 data-line-label="4"
-                 data-line-color="#009BCE"
-                 data-slot-index="1"
-                 data-capsule-axis-deg="90"
-                 transform="translate(-0.3883744,-1.5534976)">
-                <circle
-                   id="transfer-station-badge-circle-정왕-4호선-1-3-46"
-                   cx="1359.134"
-                   cy="3318.8999"
-                   r="12"
-                   fill="#009bce"
-                   class="ourclass-transfer-badge-circle"
-                   data-station="정왕"
-                   data-station-name="정왕"
-                   data-line="4"
-                   data-line-name="4호선"
-                   data-line-color="#009BCE"
-                   data-center-x="1359.134"
-                   data-center-y="3318.9" />
-                <text
-                   id="transfer-station-badge-label-정왕-4호선-1-8-0"
-                   x="1359.134"
-                   y="3318.8999"
-                   fill="#ffffff"
-                   class="ourclass-transfer-badge-label"
-                   font-family="Pretendard"
-                   font-size="18px"
-                   font-weight="900"
-                   text-anchor="middle"
-                   dominant-baseline="central"
-                   alignment-baseline="middle"
-                   paint-order="stroke"
-                   text-rendering="geometricPrecision"
-                   pointer-events="none"
-                   data-station="정왕"
-                   data-station-name="정왕"
-                   data-line="4"
-                   data-line-name="4호선"
-                   data-line-color="#009BCE"
-                   style="font-weight:900;font-family:Pretendard;dominant-baseline:central;text-anchor:middle;text-rendering:geometricPrecision">4</text>
-              </g>
-              <g
-                 id="transfer-station-badge-정왕-수인분당선-2-6-3"
-                 class="ourclass-transfer-badge"
-                 data-station="정왕"
-                 data-station-name="정왕"
-                 data-line="suin-bundang"
-                 data-line-name="수인분당선"
-                 data-line-label="수인"
-                 data-line-color="#ECA300"
-                 data-slot-index="2"
-                 data-capsule-axis-deg="90"
-                 transform="translate(0,1.5534976)">
-                <circle
-                   id="transfer-station-badge-circle-정왕-수인분당선-2-1-2"
-                   cx="1359.134"
-                   cy="3342.8999"
-                   r="12"
-                   fill="#eca300"
-                   class="ourclass-transfer-badge-circle"
-                   data-station="정왕"
-                   data-station-name="정왕"
-                   data-line="suin-bundang"
-                   data-line-name="수인분당선"
-                   data-line-color="#ECA300"
-                   data-center-x="1359.134"
-                   data-center-y="3342.9" />
-                <text
-                   id="transfer-station-badge-label-정왕-수인분당선-2-9-2"
-                   x="1359.134"
-                   y="3342.8999"
-                   fill="#ffffff"
-                   class="ourclass-transfer-badge-label"
-                   font-family="Pretendard"
-                   font-size="10.3px"
-                   font-weight="900"
-                   text-anchor="middle"
-                   dominant-baseline="central"
-                   alignment-baseline="middle"
-                   paint-order="stroke"
-                   text-rendering="geometricPrecision"
-                   pointer-events="none"
-                   data-station="정왕"
-                   data-station-name="정왕"
-                   data-line="suin-bundang"
-                   data-line-name="수인분당선"
-                   data-line-color="#ECA300"
-                   style="font-weight:900;font-family:Pretendard;dominant-baseline:central;text-anchor:middle;text-rendering:geometricPrecision">수인</text>
-              </g>
-            </g>
-          </g>
-          <g
-             id="transfer-station-symbol-정왕-3-9"
-             class="ourclass-transfer-symbol ourclass-transfer-node-style ourclass-transfer-symbol-straight-v14"
-             data-name="정왕"
-             data-station="정왕"
-             data-station-name="정왕"
-             data-node-role="transfer"
-             data-transfer-line-count="2"
-             data-transfer-lines="4 suin-bundang"
-             data-capsule-geometry="straight-8dir-only"
-             data-capsule-axis-deg="90"
-             data-badge-radius="12"
-             data-slot-size="3u"
-             data-base-unit-u="8px"
-             data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="4"
-             style="font-family:Pretendard;isolation:isolate"
-             transform="translate(-69.918,-69.918) translate(-922.799951 1135.100046) translate(88.059257,-8.7900574)">
-            <title
-               id="title-transfer-station-정왕-0-7"
-               data-station="정왕"
-               data-station-name="정왕">정왕 환승 노드: 4호선 / 수인분당선 — 직선형 8방향 캡슐</title>
-            <g
-               id="transfer-station-shell-network-정왕-9-5"
-               class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule"
-               data-station="정왕"
-               data-station-name="정왕"
+               data-station="오이도"
+               data-station-name="오이도"
                data-capsule-geometry="straight-8dir-only"
                data-capsule-axis-deg="90">
               <path
-                 id="transfer-station-shell-outline-정왕-0-5"
+                 id="transfer-station-shell-outline-오이도"
                  d="m 1359.134,3318.9 v 24"
                  fill="none"
                  stroke-linecap="round"
                  stroke-linejoin="round"
                  stroke-miterlimit="1"
                  shape-rendering="geometricPrecision"
-                 data-station="정왕"
-                 data-station-name="정왕"
+                 data-station="오이도"
+                 data-station-name="오이도"
                  data-capsule-geometry="straight-8dir-only"
                  data-capsule-axis-deg="90"
                  data-slot-size="3u"
                  stroke="#3f4a5c"
                  stroke-width="40"
-                 class="ourclass-transfer-shell-outline"
-                 style="stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:1;shape-rendering:geometricPrecision" />
+                 class="ourclass-transfer-shell-outline" />
               <path
-                 id="transfer-station-shell-fill-정왕-7-2"
+                 id="transfer-station-shell-fill-오이도"
                  d="m 1359.134,3318.9 v 24"
                  fill="none"
                  stroke-linecap="round"
                  stroke-linejoin="round"
                  stroke-miterlimit="1"
                  shape-rendering="geometricPrecision"
-                 data-station="정왕"
-                 data-station-name="정왕"
+                 data-station="오이도"
+                 data-station-name="오이도"
                  data-capsule-geometry="straight-8dir-only"
                  data-capsule-axis-deg="90"
                  data-slot-size="3u"
                  stroke="#ffffff"
                  stroke-width="32"
-                 class="ourclass-transfer-shell-fill"
-                 style="stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:1;shape-rendering:geometricPrecision" />
+                 class="ourclass-transfer-shell-fill" />
             </g>
             <g
-               id="transfer-station-route-badges-정왕-6-4"
+               id="transfer-station-route-badges-오이도"
                class="ourclass-transfer-route-badges"
-               data-station="정왕"
-               data-station-name="정왕"
+               data-station="오이도"
+               data-station-name="오이도"
                data-capsule-geometry="straight-8dir-only">
               <g
-                 id="transfer-station-badge-정왕-4호선-1-8-9"
+                 id="transfer-station-badge-오이도-4호선-1"
                  class="ourclass-transfer-badge"
-                 data-station="정왕"
-                 data-station-name="정왕"
+                 data-station="오이도"
+                 data-station-name="오이도"
                  data-line="4"
                  data-line-name="4호선"
                  data-line-label="4"
                  data-line-color="#009BCE"
                  data-slot-index="1"
-                 data-capsule-axis-deg="90"
-                 transform="translate(-0.3883744,-1.5534976)">
+                 data-capsule-axis-deg="90">
                 <circle
-                   id="transfer-station-badge-circle-정왕-4호선-1-3-4"
+                   id="transfer-station-badge-circle-오이도-4호선-1"
                    cx="1359.134"
-                   cy="3318.8999"
+                   cy="3318.9"
                    r="12"
                    fill="#009bce"
                    class="ourclass-transfer-badge-circle"
-                   data-station="정왕"
-                   data-station-name="정왕"
+                   data-station="오이도"
+                   data-station-name="오이도"
                    data-line="4"
                    data-line-name="4호선"
                    data-line-color="#009BCE"
                    data-center-x="1359.134"
                    data-center-y="3318.9" />
                 <text
-                   id="transfer-station-badge-label-정왕-4호선-1-8-4"
+                   id="transfer-station-badge-label-오이도-4호선-1"
                    x="1359.134"
-                   y="3318.8999"
+                   y="3318.9"
                    fill="#ffffff"
                    class="ourclass-transfer-badge-label"
                    font-family="Pretendard"
@@ -33223,43 +33408,41 @@
                    paint-order="stroke"
                    text-rendering="geometricPrecision"
                    pointer-events="none"
-                   data-station="정왕"
-                   data-station-name="정왕"
+                   data-station="오이도"
+                   data-station-name="오이도"
                    data-line="4"
                    data-line-name="4호선"
-                   data-line-color="#009BCE"
-                   style="font-weight:900;font-family:Pretendard;dominant-baseline:central;text-anchor:middle;text-rendering:geometricPrecision">4</text>
+                   data-line-color="#009BCE">4</text>
               </g>
               <g
-                 id="transfer-station-badge-정왕-수인분당선-2-6-7"
+                 id="transfer-station-badge-오이도-수인분당선-2"
                  class="ourclass-transfer-badge"
-                 data-station="정왕"
-                 data-station-name="정왕"
+                 data-station="오이도"
+                 data-station-name="오이도"
                  data-line="suin-bundang"
                  data-line-name="수인분당선"
                  data-line-label="수인"
                  data-line-color="#ECA300"
                  data-slot-index="2"
-                 data-capsule-axis-deg="90"
-                 transform="translate(0,1.5534976)">
+                 data-capsule-axis-deg="90">
                 <circle
-                   id="transfer-station-badge-circle-정왕-수인분당선-2-1-9"
+                   id="transfer-station-badge-circle-오이도-수인분당선-2"
                    cx="1359.134"
-                   cy="3342.8999"
+                   cy="3342.9"
                    r="12"
                    fill="#eca300"
                    class="ourclass-transfer-badge-circle"
-                   data-station="정왕"
-                   data-station-name="정왕"
+                   data-station="오이도"
+                   data-station-name="오이도"
                    data-line="suin-bundang"
                    data-line-name="수인분당선"
                    data-line-color="#ECA300"
                    data-center-x="1359.134"
                    data-center-y="3342.9" />
                 <text
-                   id="transfer-station-badge-label-정왕-수인분당선-2-9-5"
+                   id="transfer-station-badge-label-오이도-수인분당선-2"
                    x="1359.134"
-                   y="3342.8999"
+                   y="3342.9"
                    fill="#ffffff"
                    class="ourclass-transfer-badge-label"
                    font-family="Pretendard"
@@ -33271,183 +33454,15 @@
                    paint-order="stroke"
                    text-rendering="geometricPrecision"
                    pointer-events="none"
-                   data-station="정왕"
-                   data-station-name="정왕"
+                   data-station="오이도"
+                   data-station-name="오이도"
                    data-line="suin-bundang"
                    data-line-name="수인분당선"
-                   data-line-color="#ECA300"
-                   style="font-weight:900;font-family:Pretendard;dominant-baseline:central;text-anchor:middle;text-rendering:geometricPrecision">수인</text>
+                   data-line-color="#ECA300">수인</text>
               </g>
             </g>
           </g>
-          <g
-             id="transfer-station-symbol-정왕-3-97"
-             class="ourclass-transfer-symbol ourclass-transfer-node-style ourclass-transfer-symbol-straight-v14"
-             data-name="정왕"
-             data-station="정왕"
-             data-station-name="정왕"
-             data-node-role="transfer"
-             data-transfer-line-count="2"
-             data-transfer-lines="4 suin-bundang"
-             data-capsule-geometry="straight-8dir-only"
-             data-capsule-axis-deg="90"
-             data-badge-radius="12"
-             data-slot-size="3u"
-             data-base-unit-u="8px"
-             data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="4"
-             style="font-family:Pretendard;isolation:isolate"
-             transform="translate(-69.918,-69.918) translate(-922.799951 1135.100046) translate(-86.159591,-8.6396971)">
-            <title
-               id="title-transfer-station-정왕-0-6"
-               data-station="정왕"
-               data-station-name="정왕">정왕 환승 노드: 4호선 / 수인분당선 — 직선형 8방향 캡슐</title>
-            <g
-               id="transfer-station-shell-network-정왕-9-8"
-               class="ourclass-transfer-shell-network ourclass-transfer-shell-capsule"
-               data-station="정왕"
-               data-station-name="정왕"
-               data-capsule-geometry="straight-8dir-only"
-               data-capsule-axis-deg="90">
-              <path
-                 id="transfer-station-shell-outline-정왕-0-2"
-                 d="m 1359.134,3318.9 v 24"
-                 fill="none"
-                 stroke-linecap="round"
-                 stroke-linejoin="round"
-                 stroke-miterlimit="1"
-                 shape-rendering="geometricPrecision"
-                 data-station="정왕"
-                 data-station-name="정왕"
-                 data-capsule-geometry="straight-8dir-only"
-                 data-capsule-axis-deg="90"
-                 data-slot-size="3u"
-                 stroke="#3f4a5c"
-                 stroke-width="40"
-                 class="ourclass-transfer-shell-outline"
-                 style="stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:1;shape-rendering:geometricPrecision" />
-              <path
-                 id="transfer-station-shell-fill-정왕-7-9"
-                 d="m 1359.134,3318.9 v 24"
-                 fill="none"
-                 stroke-linecap="round"
-                 stroke-linejoin="round"
-                 stroke-miterlimit="1"
-                 shape-rendering="geometricPrecision"
-                 data-station="정왕"
-                 data-station-name="정왕"
-                 data-capsule-geometry="straight-8dir-only"
-                 data-capsule-axis-deg="90"
-                 data-slot-size="3u"
-                 stroke="#ffffff"
-                 stroke-width="32"
-                 class="ourclass-transfer-shell-fill"
-                 style="stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:1;shape-rendering:geometricPrecision" />
-            </g>
-            <g
-               id="transfer-station-route-badges-정왕-6-9"
-               class="ourclass-transfer-route-badges"
-               data-station="정왕"
-               data-station-name="정왕"
-               data-capsule-geometry="straight-8dir-only">
-              <g
-                 id="transfer-station-badge-정왕-4호선-1-8-8"
-                 class="ourclass-transfer-badge"
-                 data-station="정왕"
-                 data-station-name="정왕"
-                 data-line="4"
-                 data-line-name="4호선"
-                 data-line-label="4"
-                 data-line-color="#009BCE"
-                 data-slot-index="1"
-                 data-capsule-axis-deg="90"
-                 transform="translate(-0.3883744,-1.5534976)">
-                <circle
-                   id="transfer-station-badge-circle-정왕-4호선-1-3-3"
-                   cx="1359.134"
-                   cy="3318.8999"
-                   r="12"
-                   fill="#009bce"
-                   class="ourclass-transfer-badge-circle"
-                   data-station="정왕"
-                   data-station-name="정왕"
-                   data-line="4"
-                   data-line-name="4호선"
-                   data-line-color="#009BCE"
-                   data-center-x="1359.134"
-                   data-center-y="3318.9" />
-                <text
-                   id="transfer-station-badge-label-정왕-4호선-1-8-7"
-                   x="1359.134"
-                   y="3318.8999"
-                   fill="#ffffff"
-                   class="ourclass-transfer-badge-label"
-                   font-family="Pretendard"
-                   font-size="18px"
-                   font-weight="900"
-                   text-anchor="middle"
-                   dominant-baseline="central"
-                   alignment-baseline="middle"
-                   paint-order="stroke"
-                   text-rendering="geometricPrecision"
-                   pointer-events="none"
-                   data-station="정왕"
-                   data-station-name="정왕"
-                   data-line="4"
-                   data-line-name="4호선"
-                   data-line-color="#009BCE"
-                   style="font-weight:900;font-family:Pretendard;dominant-baseline:central;text-anchor:middle;text-rendering:geometricPrecision">4</text>
-              </g>
-              <g
-                 id="transfer-station-badge-정왕-수인분당선-2-6-1"
-                 class="ourclass-transfer-badge"
-                 data-station="정왕"
-                 data-station-name="정왕"
-                 data-line="suin-bundang"
-                 data-line-name="수인분당선"
-                 data-line-label="수인"
-                 data-line-color="#ECA300"
-                 data-slot-index="2"
-                 data-capsule-axis-deg="90"
-                 transform="translate(0,1.5534976)">
-                <circle
-                   id="transfer-station-badge-circle-정왕-수인분당선-2-1-26"
-                   cx="1359.134"
-                   cy="3342.8999"
-                   r="12"
-                   fill="#eca300"
-                   class="ourclass-transfer-badge-circle"
-                   data-station="정왕"
-                   data-station-name="정왕"
-                   data-line="suin-bundang"
-                   data-line-name="수인분당선"
-                   data-line-color="#ECA300"
-                   data-center-x="1359.134"
-                   data-center-y="3342.9" />
-                <text
-                   id="transfer-station-badge-label-정왕-수인분당선-2-9-1"
-                   x="1359.134"
-                   y="3342.8999"
-                   fill="#ffffff"
-                   class="ourclass-transfer-badge-label"
-                   font-family="Pretendard"
-                   font-size="10.3px"
-                   font-weight="900"
-                   text-anchor="middle"
-                   dominant-baseline="central"
-                   alignment-baseline="middle"
-                   paint-order="stroke"
-                   text-rendering="geometricPrecision"
-                   pointer-events="none"
-                   data-station="정왕"
-                   data-station-name="정왕"
-                   data-line="suin-bundang"
-                   data-line-name="수인분당선"
-                   data-line-color="#ECA300"
-                   style="font-weight:900;font-family:Pretendard;dominant-baseline:central;text-anchor:middle;text-rendering:geometricPrecision">수인</text>
-              </g>
-            </g>
-          </g>
+
         </g>
         <g
            id="station-label-group-전곡"
@@ -38529,7 +38544,7 @@
           <text
              id="station-label-달월"
              data-name="달월"
-             transform="translate(111.401,111.401) translate(4.241366 15.386743) translate(-988.507415 1149.732257) translate(1162.5 3369.4)"
+             transform="translate(-964.78,1184.60) translate(1162.5 3369.4)"
              fill="#666"
              font-family="Pretendard"
              font-size="26.374"
@@ -38592,10 +38607,10 @@
              data-station="오이도"
              data-label-role="transfer"
              font-weight="600"
-             x="1237.0186"
-             y="3382.7512" transform="translate(135.577,135.577)"><tspan
-               x="1237.0186"
-               y="3382.7512"
+             x="309.8580"
+             y="4562.5481"><tspan
+               x="309.8580"
+               y="4562.5481"
                font-family="Pretendard"
                id="tspan513">오이도</tspan></text>
           <text
@@ -38856,10 +38871,10 @@
              data-station="중앙"
              data-label-role="transfer"
              font-weight="600"
-             x="1610.197"
-             y="3169.6438" transform="translate(225.824,225.824)"><tspan
-               x="1610.197"
-               y="3169.6438"
+             x="1033.8400"
+             y="4219.9100"><tspan
+               x="1033.8400"
+               y="4219.9100"
                font-family="Pretendard"
                id="tspan530">중앙</tspan></text>
           <text
@@ -38874,11 +38889,10 @@
              data-station="정왕"
              data-label-role="transfer"
              font-weight="600"
-             x="1338.3442"
-             y="3384.9351"
-             transform="translate(-992.718,1065.182)"><tspan
-               x="1338.3442"
-               y="3384.9351"
+             x="449.0200"
+             y="4562.5500"><tspan
+               x="449.0200"
+               y="4562.5500"
                font-family="Pretendard"
                id="tspan531">정왕</tspan></text>
           <text
@@ -38893,14 +38907,14 @@
              data-station="신길온천"
              data-label-role="transfer"
              font-weight="600"
-             x="1422.6278"
-             y="3385.3232" transform="translate(0,79.945)"><tspan
-               x="1422.6278"
-               y="3385.3232"
+             x="588.1800"
+             y="4562.5500"><tspan
+               x="588.1800"
+               y="4562.5500"
                font-family="Pretendard"
                id="tspan532">신길</tspan><tspan
-               x="1422.6278"
-               y="3414.1233"
+               x="588.1800"
+               y="4594.5500"
                font-family="Pretendard"
                id="tspan533">온천</tspan></text>
           <text
@@ -38915,10 +38929,10 @@
              data-station="안산"
              data-label-role="transfer"
              font-weight="600"
-             x="1501.451"
-             y="3384.5466" transform="translate(95.33,95.33)"><tspan
-               x="1501.451"
-               y="3384.5466"
+             x="738.5700"
+             y="4515.1800"><tspan
+               x="738.5700"
+               y="4515.1800"
                font-family="Pretendard"
                id="tspan534">안산</tspan></text>
           <text
@@ -38933,11 +38947,10 @@
              data-station="초지"
              data-label-role="transfer"
              font-weight="600"
-             x="1591.1069"
-             y="3385.3232"
-             transform="translate(-807.951,970.137)"><tspan
-               x="1591.1069"
-               y="3385.3232"
+             x="837.0000"
+             y="4416.7500"><tspan
+               x="837.0000"
+               y="4416.7500"
                font-family="Pretendard"
                id="tspan535">초지</tspan></text>
           <text
@@ -45343,10 +45356,10 @@
              data-station="고잔"
              data-label-role="transfer"
              font-weight="600"
-             x="1610.7532"
-             y="3240.2" transform="translate(225.824,0)"><tspan
-               x="1610.7532"
-               y="3240.2"
+             x="935.4200"
+             y="4318.3300"><tspan
+               x="935.4200"
+               y="4318.3300"
                font-family="Pretendard"
                id="tspan917">고잔</tspan></text>
           <text
