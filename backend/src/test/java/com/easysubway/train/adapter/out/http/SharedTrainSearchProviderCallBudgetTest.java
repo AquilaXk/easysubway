@@ -10,6 +10,7 @@ import com.easysubway.train.application.TrainSearchProvider.ProviderFailure;
 import java.time.ZoneId;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.QueryTimeoutException;
+import org.springframework.transaction.CannotCreateTransactionException;
 
 class SharedTrainSearchProviderCallBudgetTest {
 
@@ -31,6 +32,19 @@ class SharedTrainSearchProviderCallBudgetTest {
 		var cache = mock(TrainSearchCache.class);
 		when(cache.tryAcquireProviderCall("tago-train", ZoneId.of("Asia/Seoul"), 10, 1000))
 			.thenThrow(new QueryTimeoutException("quota timeout"));
+		var budget = new SharedTrainSearchProviderCallBudget(cache, 10, 1000);
+
+		assertThatThrownBy(budget::acquire)
+			.isInstanceOf(ProviderFailure.class)
+			.hasMessage("TRAIN_SEARCH_UNAVAILABLE");
+		verify(cache).tryAcquireProviderCall("tago-train", ZoneId.of("Asia/Seoul"), 10, 1000);
+	}
+
+	@Test
+	void quotaTransactionBoundaryFailureFailsClosedAsUnavailable() {
+		var cache = mock(TrainSearchCache.class);
+		when(cache.tryAcquireProviderCall("tago-train", ZoneId.of("Asia/Seoul"), 10, 1000))
+			.thenThrow(new CannotCreateTransactionException("cannot open quota transaction"));
 		var budget = new SharedTrainSearchProviderCallBudget(cache, 10, 1000);
 
 		assertThatThrownBy(budget::acquire)
