@@ -73,6 +73,10 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -1370,6 +1374,49 @@ class RouteSearchServiceTest {
 		assertThat(plan.timetableArtifactId()).isEqualTo("snapshot-b");
 		assertThat(port.atomicLoadCount()).isOne();
 		assertThat(port.legacyLoadCount()).isZero();
+	}
+
+	@Test
+	@DisplayName("V2 planner는 concurrent artifact 교체 중 구·신 snapshot을 섞지 않는다")
+	void routeV2PlannerPublishesOnlyCompleteOldOrNewCompiledSnapshotDuringReplacement() throws Exception {
+		var port = new ConcurrentSwitchingRouteTimetablePort();
+		var planner = new RouteV2Planner(legacySearchMustNotBeCalled(), port);
+		var observed = new ConcurrentLinkedQueue<List<String>>();
+		var start = new CountDownLatch(1);
+
+		try (var executor = Executors.newFixedThreadPool(4)) {
+			var writer = executor.submit(() -> {
+				start.await();
+				for (int index = 0; index < 80; index += 1) {
+					port.use(index % 2 == 0 ? "b" : "a");
+				}
+				return null;
+			});
+			var readers = java.util.stream.IntStream.range(0, 3).mapToObj(ignored -> executor.submit(() -> {
+				start.await();
+				for (int index = 0; index < 100; index += 1) {
+					var plan = planner.search(routeV2Command(
+						ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3));
+					String tripId = plan.itineraries().getFirst().steps().stream()
+						.filter(step -> "ride".equals(step.stepType()))
+						.findFirst()
+						.orElseThrow()
+						.tripId();
+					observed.add(List.of(plan.timetableArtifactId(), tripId));
+				}
+				return null;
+			})).toList();
+			start.countDown();
+			writer.get(10, TimeUnit.SECONDS);
+			for (var reader : readers) {
+				reader.get(10, TimeUnit.SECONDS);
+			}
+		}
+
+		assertThat(observed).hasSize(300).allSatisfy(pair -> assertThat(pair).isIn(
+			List.of("artifact-a", "trip-a"),
+			List.of("artifact-b", "trip-b")
+		));
 	}
 
 	@Test
@@ -3388,6 +3435,52 @@ class RouteSearchServiceTest {
 
 		int legacyLoadCount() {
 			return legacyLoadCount;
+		}
+	}
+
+	private static class ConcurrentSwitchingRouteTimetablePort implements LoadRouteTimetablePort {
+
+		private volatile RouteTimetableSnapshot active = snapshot("a");
+
+		@Override
+		public boolean hasRouteTimetable() {
+			return true;
+		}
+
+		@Override
+		public RouteTimetable loadRouteTimetable() {
+			return active.timetable();
+		}
+
+		@Override
+		public RouteTimetableSnapshot loadRouteTimetableSnapshot() {
+			return active;
+		}
+
+		@Override
+		public String timetableCacheKey() {
+			return active.cacheKey();
+		}
+
+		void use(String version) {
+			active = snapshot(version);
+		}
+
+		private static RouteTimetableSnapshot snapshot(String version) {
+			String tripId = "trip-" + version;
+			return new RouteTimetableSnapshot(
+				"cache-" + version,
+				"artifact-" + version,
+				routeTimetable(
+					List.of(
+						new LoadRouteTimetablePort.TransitStopTime(
+							tripId, 1, "station-a", "seoul-4", 32820, 32820, 0, 0),
+						new LoadRouteTimetablePort.TransitStopTime(
+							tripId, 2, "station-b", "seoul-4", 33420, 33420, 0, 0)
+					),
+					List.of()
+				)
+			);
 		}
 	}
 

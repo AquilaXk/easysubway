@@ -1,0 +1,184 @@
+package com.easysubway.route.application.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.easysubway.profile.domain.MobilityType;
+import com.easysubway.route.application.port.in.RouteV2SearchUseCase.SearchRouteV2Command;
+import com.easysubway.route.application.port.out.LoadRouteTimetablePort;
+import com.easysubway.route.application.port.out.LoadRouteTimetablePort.RouteTimetable;
+import com.easysubway.route.domain.ConstraintMode;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.List;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+@DisplayName("#2249 timetable compiled snapshot")
+class RouteTimetableRaptorPlannerCompiledSnapshotTest {
+
+	private static final LocalDate WEDNESDAY = LocalDate.of(2026, 7, 1);
+	private final RouteTimetableRaptorPlanner planner = new RouteTimetableRaptorPlanner();
+
+	@Test
+	@DisplayName("feed grouping·정렬·frequency 전개 결과를 한 번 compile한다")
+	void compilesDenseIndexesPatternsAndFrequencyTrips() {
+		var compiled = planner.compile(frequencyTimetable());
+
+		assertThat(compiled.stationCount()).isEqualTo(2);
+		assertThat(compiled.routeCount()).isOne();
+		assertThat(compiled.tripCount()).isOne();
+		assertThat(compiled.routePatternCount()).isOne();
+		assertThat(compiled.scheduledTripCount()).isEqualTo(3);
+		assertThat(compiled.primitiveTimeArrayCount()).isEqualTo(3);
+	}
+
+	@Test
+	@DisplayName("compiled frequency 출발은 반복 검색에서도 기존 시각을 유지한다")
+	void preservesFrequencyDeparturesAcrossRepeatedSearches() {
+		var compiled = planner.compile(frequencyTimetable());
+		var command = command(WEDNESDAY, 9, 5);
+
+		var first = planner.search(command, compiled);
+		var second = planner.search(command, compiled);
+
+		assertThat(first).hasSize(1);
+		assertThat(second).extracting("estimatedDurationSeconds")
+			.containsExactly(first.getFirst().estimatedDurationSeconds());
+		assertThat(first.getFirst().steps())
+			.filteredOn(step -> "ride".equals(step.stepType()))
+			.extracting("plannedDepartureTime")
+			.containsExactly("2026-07-01T09:20:00+09:00");
+	}
+
+	@Test
+	@DisplayName("같은 service day의 immutable active snapshot을 재사용한다")
+	void reusesSameActiveServiceDay() {
+		var compiled = planner.compile(frequencyTimetable());
+
+		var first = compiled.activeServiceDay(WEDNESDAY);
+		var second = compiled.activeServiceDay(WEDNESDAY);
+
+		assertThat(second).isSameAs(first);
+		assertThat(compiled.activeServiceDayCacheSize()).isOne();
+	}
+
+	@Test
+	@DisplayName("active service day cache는 access-order 최근 8일만 유지한다")
+	void evictsLeastRecentlyUsedServiceDayAfterEightEntries() {
+		var compiled = planner.compile(everyDayTimetable());
+		for (int offset = 0; offset < 9; offset += 1) {
+			compiled.activeServiceDay(WEDNESDAY.plusDays(offset));
+		}
+
+		assertThat(compiled.activeServiceDayCacheSize()).isEqualTo(8);
+		assertThat(compiled.isServiceDayCached(WEDNESDAY)).isFalse();
+		compiled.activeServiceDay(WEDNESDAY.plusDays(1));
+		compiled.activeServiceDay(WEDNESDAY.plusDays(9));
+		assertThat(compiled.isServiceDayCached(WEDNESDAY.plusDays(1))).isTrue();
+		assertThat(compiled.isServiceDayCached(WEDNESDAY.plusDays(2))).isFalse();
+	}
+
+	@Test
+	@DisplayName("평일·주말과 calendar exception add/remove semantics를 보존한다")
+	void preservesCalendarAndExceptionSemantics() {
+		var compiled = planner.compile(calendarExceptionTimetable());
+
+		assertThat(compiled.activeTripCount(WEDNESDAY)).isOne();
+		assertThat(compiled.activeTripCount(WEDNESDAY.plusDays(3))).isZero();
+		assertThat(compiled.activeTripCount(WEDNESDAY.plusDays(4))).isOne();
+	}
+
+	private static RouteTimetable frequencyTimetable() {
+		return timetable(
+			List.of(weekday("weekday")),
+			List.of(),
+			List.of(new LoadRouteTimetablePort.TransitTrip(
+				"trip-frequency", "route", "weekday", "도착", "0", "LOCAL", 0)),
+			List.of(
+				stop("trip-frequency", 1, "station-a", 32400),
+				stop("trip-frequency", 2, "station-b", 33300)
+			),
+			List.of(new LoadRouteTimetablePort.TransitFrequency(
+				"trip-frequency", 32400, 34200, 600, false))
+		);
+	}
+
+	private static RouteTimetable everyDayTimetable() {
+		return timetable(
+			List.of(new LoadRouteTimetablePort.ServiceCalendar(
+				"daily", true, true, true, true, true, true, true,
+				WEDNESDAY, WEDNESDAY.plusDays(30), "Asia/Seoul")),
+			List.of(),
+			List.of(new LoadRouteTimetablePort.TransitTrip(
+				"trip-daily", "route", "daily", "도착", "0", "LOCAL", 0)),
+			List.of(stop("trip-daily", 1, "station-a", 32400), stop("trip-daily", 2, "station-b", 33000)),
+			List.of()
+		);
+	}
+
+	private static RouteTimetable calendarExceptionTimetable() {
+		return timetable(
+			List.of(weekday("weekday")),
+			List.of(
+				new LoadRouteTimetablePort.ServiceCalendarDate("weekday", WEDNESDAY.plusDays(3), 2),
+				new LoadRouteTimetablePort.ServiceCalendarDate("special", WEDNESDAY.plusDays(4), 1)
+			),
+			List.of(
+				new LoadRouteTimetablePort.TransitTrip("trip-weekday", "route", "weekday", "도착", "0", "LOCAL", 0),
+				new LoadRouteTimetablePort.TransitTrip("trip-special", "route", "special", "도착", "0", "LOCAL", 0)
+			),
+			List.of(
+				stop("trip-weekday", 1, "station-a", 32400), stop("trip-weekday", 2, "station-b", 33000),
+				stop("trip-special", 1, "station-a", 32400), stop("trip-special", 2, "station-b", 33000)
+			),
+			List.of()
+		);
+	}
+
+	private static LoadRouteTimetablePort.ServiceCalendar weekday(String serviceId) {
+		return new LoadRouteTimetablePort.ServiceCalendar(
+			serviceId, true, true, true, true, true, false, false,
+			WEDNESDAY, WEDNESDAY.plusDays(30), "Asia/Seoul");
+	}
+
+	private static RouteTimetable timetable(
+		List<LoadRouteTimetablePort.ServiceCalendar> calendars,
+		List<LoadRouteTimetablePort.ServiceCalendarDate> exceptions,
+		List<LoadRouteTimetablePort.TransitTrip> trips,
+		List<LoadRouteTimetablePort.TransitStopTime> stopTimes,
+		List<LoadRouteTimetablePort.TransitFrequency> frequencies
+	) {
+		return new RouteTimetable(
+			calendars,
+			exceptions,
+			List.of(new LoadRouteTimetablePort.TransitRoute(
+				"route", "line", "L", "테스트", "도착 방면", "Asia/Seoul")),
+			trips,
+			stopTimes,
+			frequencies
+		);
+	}
+
+	private static LoadRouteTimetablePort.TransitStopTime stop(
+		String tripId,
+		int sequence,
+		String stationId,
+		int seconds
+	) {
+		return new LoadRouteTimetablePort.TransitStopTime(
+			tripId, sequence, stationId, "line", seconds, seconds, 0, 0);
+	}
+
+	private static SearchRouteV2Command command(LocalDate date, int hour, int minute) {
+		return new SearchRouteV2Command(
+			"station-a",
+			"station-b",
+			OffsetDateTime.parse("%sT%02d:%02d:00+09:00".formatted(date, hour, minute)),
+			MobilityType.SENIOR,
+			ConstraintMode.ALLOW_WITH_WARNINGS,
+			false,
+			0,
+			3
+		);
+	}
+}

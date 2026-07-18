@@ -18,6 +18,7 @@ import com.easysubway.route.domain.RouteSearchStatus;
 import com.easysubway.route.domain.RouteStep;
 import com.easysubway.route.domain.RouteSearchResult.OfficialFare;
 import java.time.Duration;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -26,10 +27,13 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
@@ -44,22 +48,35 @@ class RouteTimetableRaptorPlanner {
 	private static final int TRANSFER_DISTANCE_METERS = 260;
 	private static final int EXIT_DURATION_SECONDS = 180;
 	private static final int EXIT_DISTANCE_METERS = 120;
+	private static final int ACTIVE_SERVICE_DAY_CACHE_SIZE = 8;
 
 	List<RouteSearchResult> search(SearchRouteV2Command command, RouteTimetable timetable) {
+		return search(command, compile(timetable));
+	}
+
+	List<RouteSearchResult> search(SearchRouteV2Command command, CompiledTimetable timetable) {
 		ServiceDay serviceDay = serviceDay(command);
 		return scanDestinationLabels(command, timetable, serviceDay, serviceDay.departureSeconds()).labels().stream()
 			.sorted(RouteTimetableRaptorPlanner::compareLabels)
 			.limit(candidateLimit(command))
-			.map(label -> toRouteSearchResult(command, label, serviceDay, timetable))
+			.map(label -> toRouteSearchResult(command, label, serviceDay, timetable.source()))
 			.toList();
 	}
 
 	boolean isFeedStale(SearchRouteV2Command command, RouteTimetable timetable) {
-		LocalDate feedEndDate = timetable.feedEndDate();
+		return isFeedStale(command, compile(timetable));
+	}
+
+	boolean isFeedStale(SearchRouteV2Command command, CompiledTimetable timetable) {
+		LocalDate feedEndDate = timetable.source().feedEndDate();
 		return feedEndDate != null && serviceDay(command).date().isAfter(feedEndDate);
 	}
 
 	Optional<OffsetDateTime> nextServiceTime(SearchRouteV2Command command, RouteTimetable timetable) {
+		return nextServiceTime(command, compile(timetable));
+	}
+
+	Optional<OffsetDateTime> nextServiceTime(SearchRouteV2Command command, CompiledTimetable timetable) {
 		ServiceDay serviceDay = serviceDay(command);
 		for (int dayOffset = 0; dayOffset <= 7; dayOffset += 1) {
 			LocalDate candidateServiceDate = serviceDay.date().plusDays(dayOffset);
@@ -92,12 +109,11 @@ class RouteTimetableRaptorPlanner {
 
 	private Optional<Integer> firstFeasibleDepartureSeconds(
 		SearchRouteV2Command command,
-		RouteTimetable timetable,
+		CompiledTimetable timetable,
 		LocalDate serviceDate,
 		int startSeconds
 	) {
-		List<ScheduledTrip> trips = activeScheduledTrips(timetable, serviceDate);
-		Map<String, List<BoardingStop>> boardingsByStation = boardingsByStation(trips);
+		Map<String, List<BoardingStop>> boardingsByStation = timetable.activeServiceDay(serviceDate).boardingsByStation();
 		Map<ReachabilityState, Boolean> reachabilityCache = new HashMap<>();
 		Integer firstDepartureSeconds = null;
 		int entrySeconds = profiledWalkSeconds(command, ENTRY_DURATION_SECONDS);
@@ -209,11 +225,11 @@ class RouteTimetableRaptorPlanner {
 
 	private ScanResult scanDestinationLabels(
 		SearchRouteV2Command command,
-		RouteTimetable timetable,
+		CompiledTimetable timetable,
 		ServiceDay serviceDay,
 		int startSeconds
 	) {
-		List<ScheduledTrip> trips = activeScheduledTrips(timetable, serviceDay.date());
+		List<ScheduledTrip> trips = timetable.activeServiceDay(serviceDay.date()).trips();
 		if (trips.isEmpty()) {
 			return new ScanResult(serviceDay, List.of());
 		}
@@ -565,6 +581,10 @@ class RouteTimetableRaptorPlanner {
 		return Integer.toUnsignedString(key.toString().hashCode(), 36);
 	}
 
+	CompiledTimetable compile(RouteTimetable timetable) {
+		return new CompiledTimetable(timetable);
+	}
+
 	private static Map<String, TransitRoute> routesById(RouteTimetable timetable) {
 		Map<String, TransitRoute> routes = new HashMap<>();
 		for (TransitRoute route : timetable.transitRoutes()) {
@@ -601,7 +621,7 @@ class RouteTimetableRaptorPlanner {
 		List<TransitFrequency> frequencies
 	) {
 		if (frequencies.isEmpty()) {
-			return List.of(new ScheduledTrip(trip, route, stopTimes));
+			return List.of(new ScheduledTrip(trip, route, stopTimes, new PrimitiveTripTimes(stopTimes)));
 		}
 		int firstDepartureSeconds = stopTimes.getFirst().departureSeconds();
 		List<ScheduledTrip> scheduledTrips = new ArrayList<>();
@@ -613,7 +633,8 @@ class RouteTimetableRaptorPlanner {
 				 departureSeconds < frequency.endTimeSeconds();
 				 departureSeconds += frequency.headwaySeconds()) {
 				shiftedStopTimes(stopTimes, departureSeconds - firstDepartureSeconds)
-					.ifPresent(shifted -> scheduledTrips.add(new ScheduledTrip(trip, route, shifted)));
+					.ifPresent(shifted -> scheduledTrips.add(
+						new ScheduledTrip(trip, route, shifted, new PrimitiveTripTimes(shifted))));
 			}
 		}
 		return List.copyOf(scheduledTrips);
@@ -644,24 +665,7 @@ class RouteTimetableRaptorPlanner {
 		return java.util.Optional.of(List.copyOf(shifted));
 	}
 
-	private List<ScheduledTrip> activeScheduledTrips(RouteTimetable timetable, LocalDate serviceDate) {
-		Set<String> activeServiceIds = activeServiceIds(timetable, serviceDate);
-		if (activeServiceIds.isEmpty()) {
-			return List.of();
-		}
-		Map<String, TransitRoute> routesById = routesById(timetable);
-		Map<String, List<TransitStopTime>> stopTimesByTrip = stopTimesByTrip(timetable);
-		Map<String, List<TransitFrequency>> frequenciesByTrip = frequenciesByTrip(timetable);
-		return timetable.transitTrips().stream()
-			.filter(trip -> activeServiceIds.contains(trip.serviceId()))
-			.filter(trip -> stopTimesByTrip.getOrDefault(trip.id(), List.of()).size() > 1)
-			.flatMap(trip -> scheduledTrips(trip, routesById.get(trip.routeId()), stopTimesByTrip.get(trip.id()), frequenciesByTrip.getOrDefault(trip.id(), List.of())).stream())
-			.sorted(Comparator.comparing((ScheduledTrip scheduledTrip) -> scheduledTrip.trip().id())
-				.thenComparingInt(scheduledTrip -> scheduledTrip.stopTimes().getFirst().departureSeconds()))
-			.toList();
-	}
-
-	private Map<String, List<BoardingStop>> boardingsByStation(List<ScheduledTrip> trips) {
+	private static Map<String, List<BoardingStop>> boardingsByStation(List<ScheduledTrip> trips) {
 		Map<String, List<BoardingStop>> boardings = new HashMap<>();
 		for (ScheduledTrip trip : trips) {
 			List<TransitStopTime> stopTimes = trip.stopTimes();
@@ -679,30 +683,8 @@ class RouteTimetableRaptorPlanner {
 		return Map.copyOf(boardings);
 	}
 
-	private static Set<String> activeServiceIds(RouteTimetable timetable, LocalDate serviceDate) {
-		Set<String> active = new HashSet<>();
-		for (ServiceCalendar calendar : timetable.serviceCalendars()) {
-			if (!serviceDate.isBefore(calendar.startDate())
-				&& !serviceDate.isAfter(calendar.endDate())
-				&& runsOn(calendar, serviceDate)) {
-				active.add(calendar.serviceId());
-			}
-		}
-		for (ServiceCalendarDate exception : timetable.serviceCalendarDates()) {
-			if (!serviceDate.equals(exception.date())) {
-				continue;
-			}
-			if (exception.exceptionType() == 1) {
-				active.add(exception.serviceId());
-			} else {
-				active.remove(exception.serviceId());
-			}
-		}
-		return active;
-	}
-
-	private static boolean runsOn(ServiceCalendar calendar, LocalDate serviceDate) {
-		return switch (serviceDate.getDayOfWeek()) {
+	private static boolean runsOn(ServiceCalendar calendar, DayOfWeek dayOfWeek) {
+		return switch (dayOfWeek) {
 			case MONDAY -> calendar.monday();
 			case TUESDAY -> calendar.tuesday();
 			case WEDNESDAY -> calendar.wednesday();
@@ -711,6 +693,257 @@ class RouteTimetableRaptorPlanner {
 			case SATURDAY -> calendar.saturday();
 			case SUNDAY -> calendar.sunday();
 		};
+	}
+
+	static final class CompiledTimetable {
+
+		private final RouteTimetable source;
+		private final Map<String, Integer> stationIndex;
+		private final Map<String, Integer> routeIndex;
+		private final Map<String, Integer> tripIndex;
+		private final Map<Integer, int[]> stopsByRoute;
+		private final Map<Integer, int[]> routesByStop;
+		private final Map<Integer, List<ScheduledTrip>> tripsByRoute;
+		private final Map<DayOfWeek, List<ServiceCalendar>> calendarsByDay;
+		private final Map<LocalDate, List<ServiceCalendarDate>> exceptionsByDate;
+		private final List<ScheduledTrip> scheduledTrips;
+		private final LinkedHashMap<LocalDate, ActiveServiceDay> activeServiceDays = new LinkedHashMap<>(16, 0.75f, true);
+
+		private CompiledTimetable(RouteTimetable source) {
+			this.source = Objects.requireNonNull(source, "timetable must not be null");
+			stationIndex = denseIndex(source.transitStopTimes().stream().map(TransitStopTime::stationId).toList());
+			routeIndex = denseIndex(source.transitRoutes().stream().map(TransitRoute::id).toList());
+			tripIndex = denseIndex(source.transitTrips().stream().map(TransitTrip::id).toList());
+
+			Map<String, TransitRoute> routesById = routesById(source);
+			Map<String, List<TransitStopTime>> stopTimesByTrip = stopTimesByTrip(source);
+			Map<String, List<TransitFrequency>> frequenciesByTrip = frequenciesByTrip(source);
+			List<ScheduledTrip> compiledTrips = new ArrayList<>();
+			for (TransitTrip trip : source.transitTrips()) {
+				List<TransitStopTime> stopTimes = stopTimesByTrip.getOrDefault(trip.id(), List.of());
+				if (stopTimes.size() < 2) {
+					continue;
+				}
+				compiledTrips.addAll(scheduledTrips(
+					trip,
+					routesById.get(trip.routeId()),
+					stopTimes,
+					frequenciesByTrip.getOrDefault(trip.id(), List.of())
+				));
+			}
+			compiledTrips.sort(Comparator.comparing((ScheduledTrip scheduledTrip) -> scheduledTrip.trip().id())
+				.thenComparingInt(scheduledTrip -> scheduledTrip.stopTimes().getFirst().departureSeconds()));
+			scheduledTrips = List.copyOf(compiledTrips);
+			stopsByRoute = compileStopsByRoute(source, stopTimesByTrip, routeIndex, stationIndex);
+			routesByStop = invertPatterns(stopsByRoute, stationIndex.size());
+			tripsByRoute = compileTripsByRoute(scheduledTrips, routeIndex);
+			calendarsByDay = compileCalendarsByDay(source.serviceCalendars());
+			exceptionsByDate = Map.copyOf(source.serviceCalendarDates().stream().collect(
+				java.util.stream.Collectors.groupingBy(
+					ServiceCalendarDate::date,
+					java.util.stream.Collectors.collectingAndThen(java.util.stream.Collectors.toList(), List::copyOf)
+				)
+			));
+		}
+
+		RouteTimetable source() {
+			return source;
+		}
+
+		int stationCount() {
+			return stationIndex.size();
+		}
+
+		Set<String> coveredStationIds() {
+			return stationIndex.keySet();
+		}
+
+		int routeCount() {
+			return routeIndex.size();
+		}
+
+		int tripCount() {
+			return tripIndex.size();
+		}
+
+		int routePatternCount() {
+			return stopsByRoute.size();
+		}
+
+		int scheduledTripCount() {
+			return scheduledTrips.size();
+		}
+
+		int primitiveTimeArrayCount() {
+			return Math.toIntExact(scheduledTrips.stream().filter(trip -> trip.times() != null).count());
+		}
+
+		synchronized ActiveServiceDay activeServiceDay(LocalDate serviceDate) {
+			ActiveServiceDay cached = activeServiceDays.get(serviceDate);
+			if (cached != null) {
+				return cached;
+			}
+			Set<String> activeServiceIds = activeServiceIds(serviceDate);
+			List<ScheduledTrip> activeTrips = scheduledTrips.stream()
+				.filter(trip -> activeServiceIds.contains(trip.trip().serviceId()))
+				.toList();
+			ActiveServiceDay compiled = new ActiveServiceDay(activeTrips, boardingsByStation(activeTrips));
+			activeServiceDays.put(serviceDate, compiled);
+			if (activeServiceDays.size() > ACTIVE_SERVICE_DAY_CACHE_SIZE) {
+				activeServiceDays.remove(activeServiceDays.sequencedKeySet().getFirst());
+			}
+			return compiled;
+		}
+
+		synchronized int activeServiceDayCacheSize() {
+			return activeServiceDays.size();
+		}
+
+		synchronized boolean isServiceDayCached(LocalDate serviceDate) {
+			return activeServiceDays.containsKey(serviceDate);
+		}
+
+		int activeTripCount(LocalDate serviceDate) {
+			return activeServiceDay(serviceDate).trips().size();
+		}
+
+		private Set<String> activeServiceIds(LocalDate serviceDate) {
+			Set<String> active = new HashSet<>();
+			for (ServiceCalendar calendar : calendarsByDay.getOrDefault(serviceDate.getDayOfWeek(), List.of())) {
+				if (!serviceDate.isBefore(calendar.startDate()) && !serviceDate.isAfter(calendar.endDate())) {
+					active.add(calendar.serviceId());
+				}
+			}
+			for (ServiceCalendarDate exception : exceptionsByDate.getOrDefault(serviceDate, List.of())) {
+				if (exception.exceptionType() == 1) {
+					active.add(exception.serviceId());
+				} else {
+					active.remove(exception.serviceId());
+				}
+			}
+			return active;
+		}
+
+		private static Map<String, Integer> denseIndex(List<String> ids) {
+			Map<String, Integer> index = new HashMap<>();
+			ids.stream().distinct().sorted().forEach(id -> index.put(id, index.size()));
+			return Map.copyOf(index);
+		}
+
+		private static Map<Integer, int[]> compileStopsByRoute(
+			RouteTimetable source,
+			Map<String, List<TransitStopTime>> stopTimesByTrip,
+			Map<String, Integer> routeIndex,
+			Map<String, Integer> stationIndex
+		) {
+			Map<String, List<TransitStopTime>> longestByRoute = new HashMap<>();
+			for (TransitTrip trip : source.transitTrips()) {
+				List<TransitStopTime> candidate = stopTimesByTrip.getOrDefault(trip.id(), List.of());
+				List<TransitStopTime> current = longestByRoute.get(trip.routeId());
+				if (current == null || candidate.size() > current.size()) {
+					longestByRoute.put(trip.routeId(), candidate);
+				}
+			}
+			Map<Integer, int[]> patterns = new HashMap<>();
+			for (Map.Entry<String, List<TransitStopTime>> entry : longestByRoute.entrySet()) {
+				Integer denseRoute = routeIndex.get(entry.getKey());
+				if (denseRoute == null || entry.getValue().isEmpty()) {
+					continue;
+				}
+				patterns.put(denseRoute, entry.getValue().stream()
+					.mapToInt(stopTime -> stationIndex.get(stopTime.stationId()))
+					.toArray());
+			}
+			return Map.copyOf(patterns);
+		}
+
+		private static Map<Integer, int[]> invertPatterns(Map<Integer, int[]> stopsByRoute, int stationCount) {
+			List<List<Integer>> routeLists = new ArrayList<>(stationCount);
+			for (int index = 0; index < stationCount; index += 1) {
+				routeLists.add(new ArrayList<>());
+			}
+			for (Map.Entry<Integer, int[]> entry : stopsByRoute.entrySet()) {
+				for (int station : entry.getValue()) {
+					List<Integer> routes = routeLists.get(station);
+					if (!routes.contains(entry.getKey())) {
+						routes.add(entry.getKey());
+					}
+				}
+			}
+			Map<Integer, int[]> routesByStop = new HashMap<>();
+			for (int index = 0; index < routeLists.size(); index += 1) {
+				if (!routeLists.get(index).isEmpty()) {
+					routesByStop.put(index, routeLists.get(index).stream().mapToInt(Integer::intValue).sorted().toArray());
+				}
+			}
+			return Map.copyOf(routesByStop);
+		}
+
+		private static Map<Integer, List<ScheduledTrip>> compileTripsByRoute(
+			List<ScheduledTrip> scheduledTrips,
+			Map<String, Integer> routeIndex
+		) {
+			Map<Integer, List<ScheduledTrip>> byRoute = new HashMap<>();
+			for (ScheduledTrip trip : scheduledTrips) {
+				Integer denseRoute = routeIndex.get(trip.trip().routeId());
+				if (denseRoute != null) {
+					byRoute.computeIfAbsent(denseRoute, ignored -> new ArrayList<>()).add(trip);
+				}
+			}
+			byRoute.replaceAll((ignored, trips) -> trips.stream()
+				.sorted(Comparator.comparingInt(trip -> trip.stopTimes().getFirst().departureSeconds()))
+				.toList());
+			return Map.copyOf(byRoute);
+		}
+
+		private static Map<DayOfWeek, List<ServiceCalendar>> compileCalendarsByDay(List<ServiceCalendar> calendars) {
+			Map<DayOfWeek, List<ServiceCalendar>> byDay = new EnumMap<>(DayOfWeek.class);
+			for (DayOfWeek day : DayOfWeek.values()) {
+				byDay.put(day, calendars.stream().filter(calendar -> runsOn(calendar, day)).toList());
+			}
+			return Map.copyOf(byDay);
+		}
+	}
+
+	static final class ActiveServiceDay {
+
+		private final List<ScheduledTrip> trips;
+		private final Map<String, List<BoardingStop>> boardingsByStation;
+
+		private ActiveServiceDay(List<ScheduledTrip> trips, Map<String, List<BoardingStop>> boardingsByStation) {
+			this.trips = List.copyOf(trips);
+			this.boardingsByStation = Map.copyOf(boardingsByStation);
+		}
+
+		private List<ScheduledTrip> trips() {
+			return trips;
+		}
+
+		private Map<String, List<BoardingStop>> boardingsByStation() {
+			return boardingsByStation;
+		}
+	}
+
+	private static final class PrimitiveTripTimes {
+
+		private final int[] arrivalSeconds;
+		private final int[] departureSeconds;
+		private final byte[] pickupTypes;
+		private final byte[] dropOffTypes;
+
+		private PrimitiveTripTimes(List<TransitStopTime> stopTimes) {
+			arrivalSeconds = new int[stopTimes.size()];
+			departureSeconds = new int[stopTimes.size()];
+			pickupTypes = new byte[stopTimes.size()];
+			dropOffTypes = new byte[stopTimes.size()];
+			for (int index = 0; index < stopTimes.size(); index += 1) {
+				TransitStopTime stopTime = stopTimes.get(index);
+				arrivalSeconds[index] = stopTime.arrivalSeconds();
+				departureSeconds[index] = stopTime.departureSeconds();
+				pickupTypes[index] = (byte) stopTime.pickupType();
+				dropOffTypes[index] = (byte) stopTime.dropOffType();
+			}
+		}
 	}
 
 	private static ServiceDay serviceDay(SearchRouteV2Command command) {
@@ -738,7 +971,12 @@ class RouteTimetableRaptorPlanner {
 	private record Boarding(Label label, TransitStopTime stopTime) {
 	}
 
-	private record ScheduledTrip(TransitTrip trip, TransitRoute route, List<TransitStopTime> stopTimes) {
+	private record ScheduledTrip(
+		TransitTrip trip,
+		TransitRoute route,
+		List<TransitStopTime> stopTimes,
+		PrimitiveTripTimes times
+	) {
 	}
 
 	private record BoardingStop(ScheduledTrip trip, int stopIndex, TransitStopTime stopTime) {
