@@ -11,8 +11,6 @@ import com.easysubway.train.domain.TrainSearchModels.TrainType;
 import com.easysubway.train.domain.TrainSearchScopePolicy;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLDecoder;
@@ -236,25 +234,40 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 	}
 
 	private List<Journey> search(LegQuery query, String providerCode) {
-		Map<String, String> parameters = Map.of(
-			"depPlaceId", query.departureStationId(),
-			"arrPlaceId", query.arrivalStationId(),
-			"depPlandTime", PROVIDER_DATE.format(query.departureDate()),
-			"trainGradeCode", providerCode
-		);
-		List<JsonNode> rows = paginated("GetStrtpntAlocFndTrainInfo", parameters);
-		ObjectNode payload = objectMapper.createObjectNode();
-		ObjectNode response = payload.putObject("response");
-		response.putObject("header").put("resultCode", "00");
-		ArrayNode items = response.putObject("body").putObject("items").putArray("item");
-		rows.forEach(items::add);
 		try {
-			return parseJourneys(payload, query);
+			return java.util.stream.Stream.of(query.departureDate(), query.departureDate().plusDays(1))
+				.flatMap(calendarDate -> searchCalendarDate(query, providerCode, calendarDate).stream())
+				.sorted(Comparator.comparing(Journey::departureAt)
+					.thenComparing(Journey::arrivalAt)
+					.thenComparing(Journey::trainType)
+					.thenComparing(Journey::trainNumber))
+				.toList();
 		} catch (ProviderFailure failure) {
 			throw failure;
 		} catch (RuntimeException exception) {
 			throw new ProviderFailure("TRAIN_SEARCH_NO_VALID_ROWS");
 		}
+	}
+
+	private List<Journey> searchCalendarDate(LegQuery query, String providerCode, LocalDate calendarDate) {
+		Map<String, String> parameters = Map.of(
+			"depPlaceId", query.departureStationId(),
+			"arrPlaceId", query.arrivalStationId(),
+			"depPlandTime", PROVIDER_DATE.format(calendarDate),
+			"trainGradeCode", providerCode
+		);
+		return paginated("GetStrtpntAlocFndTrainInfo", parameters).stream()
+			.map(row -> journeyForCalendarDate(row, query, calendarDate))
+			.filter(journey -> serviceDay(journey.departureAt()).equals(query.departureDate()))
+			.toList();
+	}
+
+	private Journey journeyForCalendarDate(JsonNode row, LegQuery query, LocalDate calendarDate) {
+		Journey journey = journey(row, query);
+		if (!journey.departureAt().toLocalDate().equals(calendarDate)) {
+			throw new IllegalArgumentException("TRAIN_SEARCH_NO_VALID_ROWS");
+		}
+		return journey;
 	}
 
 	private String journeyKey(Journey journey) {
@@ -341,16 +354,20 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 		LocalDate requestedServiceDay
 	) {
 		LocalDate calendarDay = journey.departureAt().toLocalDate();
-		LocalDate serviceDay = journey.departureAt().toLocalTime().isBefore(LocalTime.of(3, 0))
-			? calendarDay.minusDays(1)
-			: calendarDay;
-		if (serviceDay.equals(requestedServiceDay)) {
+		if (serviceDay(journey.departureAt()).equals(requestedServiceDay)) {
 			return java.util.stream.Stream.of(journey);
 		}
 		if (calendarDay.equals(requestedServiceDay)) {
 			return java.util.stream.Stream.empty();
 		}
 		throw new IllegalArgumentException("TRAIN_SEARCH_NO_VALID_ROWS");
+	}
+
+	private LocalDate serviceDay(java.time.OffsetDateTime departureAt) {
+		LocalDate calendarDay = departureAt.toLocalDate();
+		return departureAt.toLocalTime().isBefore(LocalTime.of(3, 0))
+			? calendarDay.minusDays(1)
+			: calendarDay;
 	}
 
 	private boolean stationNameMatches(String expected, String actual) {

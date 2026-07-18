@@ -173,10 +173,13 @@ class TagoTrainSearchProviderTest {
 	@Test
 	void searchesWithNormalizedQueryAndDoesNotExposeSecretOnProviderFailure() throws Exception {
 		var requests = new ConcurrentHashMap<String, Map<String, String>>();
+		var requestedDates = ConcurrentHashMap.<String>newKeySet();
 		var server = server((exchange) -> {
 			String operation = exchange.getRequestURI().getPath().substring(1);
 			requests.put(operation, query(exchange.getRequestURI()));
 			if ("GetStrtpntAlocFndTrainInfo".equals(operation)) {
+				requestedDates.add(query(exchange.getRequestURI()).get("depPlandTime"));
+				if (respondEmptyForNextDay(exchange)) return;
 				respond(exchange, paginatedResponse("""
 					[{"trainno":"101","traingradename":"KTX","depplandtime":"20260720090000","arrplandtime":"20260720100200","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"}]
 					""", 1));
@@ -189,10 +192,10 @@ class TagoTrainSearchProviderTest {
 			var query = legQuery(LocalDate.parse("2026-07-20"), "KTX", "00");
 
 			assertThat(provider.search(query)).hasSize(1);
+			assertThat(requestedDates).containsExactlyInAnyOrder("20260720", "20260721");
 			assertThat(requests.get("GetStrtpntAlocFndTrainInfo"))
 				.containsEntry("depPlaceId", "NAT010000")
 				.containsEntry("arrPlaceId", "NAT011668")
-				.containsEntry("depPlandTime", "20260720")
 				.containsEntry("trainGradeCode", "00")
 				.containsEntry("pageNo", "1")
 				.containsEntry("numOfRows", "100");
@@ -212,6 +215,7 @@ class TagoTrainSearchProviderTest {
 	void searchesEveryProviderCodeForOneCanonicalTrainType() throws Exception {
 		var requestedCodes = ConcurrentHashMap.<String>newKeySet();
 		var server = server(exchange -> {
+			if (respondEmptyForNextDay(exchange)) return;
 			String providerCode = query(exchange.getRequestURI()).get("trainGradeCode");
 			requestedCodes.add(providerCode);
 			String trainNumber = "01".equals(providerCode) ? "101" : "102";
@@ -242,10 +246,10 @@ class TagoTrainSearchProviderTest {
 	@Test
 	void rejectsDuplicateRowsWithinOneProviderCode() throws Exception {
 		String duplicate = journeyRow(101);
-		var server = server(exchange -> respond(exchange, paginatedResponse(
-			"[" + duplicate + "," + duplicate + "]",
-			2
-		)));
+		var server = server(exchange -> {
+			if (respondEmptyForNextDay(exchange)) return;
+			respond(exchange, paginatedResponse("[" + duplicate + "," + duplicate + "]", 2));
+		});
 		try {
 			assertThatThrownBy(() -> provider(server, "test-key")
 				.search(legQuery(LocalDate.parse("2026-07-20"), "KTX", "00")))
@@ -259,6 +263,7 @@ class TagoTrainSearchProviderTest {
 	@Test
 	void rejectsConflictingCopiesAcrossProviderCodes() throws Exception {
 		var server = server(exchange -> {
+			if (respondEmptyForNextDay(exchange)) return;
 			String providerCode = query(exchange.getRequestURI()).get("trainGradeCode");
 			String fare = "01".equals(providerCode) ? "23700" : "23800";
 			respond(exchange, paginatedResponse("""
@@ -284,6 +289,10 @@ class TagoTrainSearchProviderTest {
 		var requestedPages = new java.util.concurrent.CopyOnWriteArrayList<String>();
 		var budgetCalls = new AtomicInteger();
 		var server = server(exchange -> {
+			if (respondEmptyForNextDay(exchange)) {
+				requestedPages.add("1");
+				return;
+			}
 			Map<String, String> parameters = query(exchange.getRequestURI());
 			requestedPages.add(parameters.get("pageNo"));
 			int page = Integer.parseInt(parameters.get("pageNo"));
@@ -295,8 +304,8 @@ class TagoTrainSearchProviderTest {
 			var query = legQuery(LocalDate.parse("2026-07-20"), "KTX", "00");
 
 			assertThat(provider.search(query)).hasSize(101);
-			assertThat(requestedPages).containsExactly("1", "2");
-			assertThat(budgetCalls).hasValue(2);
+			assertThat(requestedPages).containsExactly("1", "2", "1");
+			assertThat(budgetCalls).hasValue(3);
 		} finally {
 			server.stop(0);
 		}
@@ -309,16 +318,21 @@ class TagoTrainSearchProviderTest {
 		var httpClient = mock(HttpClient.class);
 		@SuppressWarnings("unchecked")
 		var response = (HttpResponse<String>) mock(HttpResponse.class);
+		@SuppressWarnings("unchecked")
+		var emptyResponse = (HttpResponse<String>) mock(HttpResponse.class);
 		when(response.statusCode()).thenReturn(200);
 		when(response.body()).thenReturn(paginatedResponse("""
 			{"trainno":"101","traingradename":"KTX","depplandtime":"20260720090000","arrplandtime":"20260720100200","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"}
 			""", 1));
+		when(emptyResponse.statusCode()).thenReturn(200);
+		when(emptyResponse.body()).thenReturn(paginatedResponse("[]", 0));
 		when(httpClient.<String>send(any(HttpRequest.class), any()))
 			.thenAnswer(invocation -> {
 			if (attempts.incrementAndGet() == 1) {
 				throw new IOException("transient transport failure");
 			}
-			return response;
+			HttpRequest request = invocation.getArgument(0);
+			return request.uri().getRawQuery().contains("depPlandTime=20260721") ? emptyResponse : response;
 		});
 		var provider = new TagoTrainSearchProvider(
 			"test-key",
@@ -332,8 +346,8 @@ class TagoTrainSearchProviderTest {
 		var query = legQuery(LocalDate.parse("2026-07-20"), "KTX", "00");
 
 		assertThat(provider.search(query)).hasSize(1);
-		assertThat(attempts).hasValue(2);
-		assertThat(budgetCalls).hasValue(2);
+		assertThat(attempts).hasValue(3);
+		assertThat(budgetCalls).hasValue(3);
 	}
 
 	@Test
@@ -346,6 +360,7 @@ class TagoTrainSearchProviderTest {
 					respond(exchange, status, "temporary");
 					return;
 				}
+				if (respondEmptyForNextDay(exchange)) return;
 				respond(exchange, paginatedResponse("""
 					{"trainno":"101","traingradename":"KTX","depplandtime":"20260720090000","arrplandtime":"20260720100200","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"}
 					""", 1));
@@ -357,8 +372,8 @@ class TagoTrainSearchProviderTest {
 				);
 
 				assertThat(provider(server, "test-key", budgetCalls::incrementAndGet).search(query)).hasSize(1);
-				assertThat(attempts).hasValue(2);
-				assertThat(budgetCalls).hasValue(2);
+				assertThat(attempts).hasValue(3);
+				assertThat(budgetCalls).hasValue(3);
 			} finally {
 				server.stop(0);
 			}
@@ -473,9 +488,12 @@ class TagoTrainSearchProviderTest {
 
 	@Test
 	void acceptsDigitStringPaginationMetadataFromOfficialSchema() throws Exception {
-		var server = server(exchange -> respond(exchange, """
-			{"response":{"header":{"resultCode":"00"},"body":{"items":{"item":{"trainno":"101","traingradename":"KTX","depplandtime":"20260720090000","arrplandtime":"20260720100200","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"}},"pageNo":"1","numOfRows":"100","totalCount":"1"}}}
-			"""));
+		var server = server(exchange -> {
+			if (respondEmptyForNextDay(exchange)) return;
+			respond(exchange, """
+				{"response":{"header":{"resultCode":"00"},"body":{"items":{"item":{"trainno":"101","traingradename":"KTX","depplandtime":"20260720090000","arrplandtime":"20260720100200","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"}},"pageNo":"1","numOfRows":"100","totalCount":"1"}}}
+				""");
+		});
 		try {
 			assertThat(provider(server, "test-key")
 				.search(legQuery(LocalDate.parse("2026-07-20"), "KTX", "00")))
@@ -618,6 +636,33 @@ class TagoTrainSearchProviderTest {
 	}
 
 	@Test
+	void fetchesNextCalendarDayToCompleteTheThreeAmServiceDay() throws Exception {
+		var requestedDates = ConcurrentHashMap.<String>newKeySet();
+		var server = server(exchange -> {
+			String date = query(exchange.getRequestURI()).get("depPlandTime");
+			requestedDates.add(date);
+			String rows = "20260720".equals(date) ? """
+				[{"trainno":"101","traingradename":"KTX","depplandtime":"20260720090000","arrplandtime":"20260720100200","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"}]
+				""" : """
+				[
+				  {"trainno":"102","traingradename":"KTX","depplandtime":"20260721025900","arrplandtime":"20260721040000","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"},
+				  {"trainno":"103","traingradename":"KTX","depplandtime":"20260721030000","arrplandtime":"20260721040200","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"}
+				]
+				""";
+			respond(exchange, paginatedResponse(rows, "20260720".equals(date) ? 1 : 2));
+		});
+		try {
+			var journeys = provider(server, "test-key")
+				.search(legQuery(LocalDate.parse("2026-07-20"), "KTX", "00"));
+
+			assertThat(requestedDates).containsExactlyInAnyOrder("20260720", "20260721");
+			assertThat(journeys).extracting(Journey::trainNumber).containsExactly("101", "102");
+		} finally {
+			server.stop(0);
+		}
+	}
+
+	@Test
 	void rejectsResponseStationNamesThatDoNotMatchTheRequestedLeg() throws Exception {
 		var server = server(exchange -> respond(exchange, paginatedResponse("""
 			{"trainno":"101","traingradename":"KTX","depplandtime":"20260720090000","arrplandtime":"20260720100200","depplacename":"부산","arrplacename":"대전","adultcharge":"23700"}
@@ -750,6 +795,14 @@ class TagoTrainSearchProviderTest {
 			);
 		});
 		return values;
+	}
+
+	private boolean respondEmptyForNextDay(HttpExchange exchange) throws IOException {
+		if (!"20260721".equals(query(exchange.getRequestURI()).get("depPlandTime"))) {
+			return false;
+		}
+		respond(exchange, paginatedResponse("[]", 0));
+		return true;
 	}
 
 	private void respond(HttpExchange exchange, String body) throws IOException {
