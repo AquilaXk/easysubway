@@ -5016,6 +5016,14 @@ String _routeShareTime(String value, {bool allowEmpty = false}) {
   if (allowEmpty && trimmed.isEmpty) {
     return '';
   }
+  if (RegExp(r'(?:[zZ]|[+-]\d{2}:\d{2})$').hasMatch(trimmed)) {
+    final instant = DateTime.tryParse(trimmed);
+    if (instant == null) {
+      throw StateError('Route time is unavailable');
+    }
+    final koreanTime = instant.toUtc().add(const Duration(hours: 9));
+    return '${koreanTime.hour.toString().padLeft(2, '0')}:${koreanTime.minute.toString().padLeft(2, '0')}';
+  }
   final match = RegExp(r'(?:T|^)(\d{2}):(\d{2})').firstMatch(trimmed);
   if (match == null) {
     throw StateError('Route time is unavailable');

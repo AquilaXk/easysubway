@@ -12112,6 +12112,46 @@ void main() {
     expect(find.text('경로 요약을 공유하지 못했어요.'), findsNothing);
   });
 
+  testWidgets('서로 다른 offset의 V2 공유 시각을 한국 시간대로 통일한다', (tester) async {
+    String? sharedText;
+    final result = _sampleRouteSearchResult(
+      departureTimeIso: '2026-07-18T09:00:00Z',
+      arrivalTimeIso: '2026-07-18T18:30:00+09:00',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(result: result),
+          stationRepository: FakeStationSearchRepository(),
+          routeShareInvoker: (text, origin) async => sharedText = text,
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 18),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _tapFirstRouteResultListItem(tester);
+    await tester.pumpAndSettle();
+    final shareButton = find.byKey(const Key('routeShareButton'));
+    await tester.ensureVisible(shareButton);
+    await tester.tap(shareButton);
+    await tester.pumpAndSettle();
+
+    expect(sharedText, contains('시간: 18:00 → 18:30'));
+    expect(sharedText, isNot(contains('시간: 09:00')));
+    expect(find.text('경로 요약을 공유하지 못했어요.'), findsNothing);
+  });
+
   testWidgets('영어 기기의 MIXED 로컬 경로도 한국어 사실 안내와 보완 시각으로 공유한다', (tester) async {
     tester.binding.platformDispatcher.localeTestValue = const Locale('en');
     addTearDown(tester.binding.platformDispatcher.clearLocaleTestValue);
