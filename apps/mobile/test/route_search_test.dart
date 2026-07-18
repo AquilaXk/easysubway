@@ -1678,6 +1678,67 @@ void main() {
   });
 
   group('#2099 objective-tagged itinerary 보존·선택', () {
+    test('선택 objective와 공식 운임, exact leg 시각을 공유 입력까지 보존한다', () {
+      final itinerary = RouteSearchV2Itinerary.fromJson({
+        'itineraryId': 'route-itx-primary',
+        'status': 'FOUND',
+        'plannedArrivalTime': '2026-06-30T11:42:00+09:00',
+        'realtimeArrivalTime': null,
+        'etaSource': 'PLANNED',
+        'etaConfidence': 'MEDIUM',
+        'durationSeconds': 9120,
+        'transferCount': 1,
+        'walkingDistanceMeters': 180,
+        'accessibilityRisk': <String, Object?>{
+          'stairCount': 0,
+          'unknownAccessibilityCount': 0,
+          'generatedConnectorCount': 0,
+          'staleDataCount': 0,
+          'lowConfidenceCount': 0,
+          'unavailableFacilityCount': 0,
+          'riskLevel': 'LOW',
+          'reasonCodes': <String>[],
+          'level': 'LOW',
+          'reasons': <String>[],
+        },
+        'legs': [
+          _rideLegJson(
+            serviceClass: 'ITX_CHEONGCHUN',
+            servicePattern: 'EXPRESS',
+          ),
+        ],
+        'commercialEtaEligible': true,
+        'objectiveTags': ['FEWEST_TRANSFERS'],
+        'officialFare': <String, Object?>{
+          'adultFareWon': 9800,
+          'currency': 'KRW',
+          'policy': 'SUM_OF_OFFICIAL_RIDE_OD_FARES',
+          'sourceIds': ['tago-train-schedule-fares'],
+          'sourceSnapshotIds': ['itx-20260630'],
+        },
+      });
+      final result = _objectiveResult([itinerary]);
+
+      final display = RouteSearchResult.fromV2(
+        result,
+        objective: RouteObjective.fewestTransfers,
+      );
+
+      expect(display.objective, RouteObjective.fewestTransfers);
+      expect(display.departureTimeIso, '2026-06-30T09:15:00+09:00');
+      expect(display.arrivalTimeIso, '2026-06-30T11:42:00+09:00');
+      expect(display.officialFare?.adultFareWon, 9800);
+      expect(display.officialFare?.currency, 'KRW');
+      expect(
+        display.steps.single.plannedDepartureTimeIso,
+        '2026-06-30T09:17:00+09:00',
+      );
+      expect(
+        display.steps.single.plannedArrivalTimeIso,
+        '2026-06-30T09:42:00+09:00',
+      );
+    });
+
     test('dual-tag dedupe된 대표 itinerary는 두 objective에서 모두 선택된다', () {
       final result = _objectiveResult([
         _taggedItinerary(

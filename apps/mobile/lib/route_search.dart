@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
 import 'accessible_design.dart';
 import 'ad_slot.dart';
@@ -23,7 +24,11 @@ import 'features/mobility_profile/mobility_preset_labels.dart';
 import 'features/mobility_profile/mobility_preset_picker.dart';
 import 'features/mobility_profile/mobility_profile_policy.dart';
 import 'route_hedge_labels.dart';
+import 'route_share_summary.dart';
 import 'station_search.dart';
+
+typedef RouteShareInvoker =
+    Future<void> Function(String text, Rect sharePositionOrigin);
 
 const _routeSearchTimeout = Duration(seconds: 8);
 const _routeSearchErrorMessage = '경로 정보를 불러오지 못했어요.';
@@ -942,6 +947,7 @@ class RouteSearchV2Itinerary {
     required this.legs,
     required this.commercialEtaEligible,
     this.objectiveTags = const [],
+    this.officialFare,
   });
 
   factory RouteSearchV2Itinerary.fromJson(Map<String, Object?> json) {
@@ -980,6 +986,11 @@ class RouteSearchV2Itinerary {
         json['objectiveTags'] ?? const <Object?>[],
         'route v2 objective tag',
       ),
+      officialFare: switch (json['officialFare']) {
+        null => null,
+        Map<String, Object?> value => RouteSearchOfficialFare.fromJson(value),
+        _ => throw const FormatException('Invalid route v2 official fare'),
+      },
     );
   }
 
@@ -995,6 +1006,7 @@ class RouteSearchV2Itinerary {
   final RouteSearchV2AccessibilityRisk accessibilityRisk;
   final List<RouteSearchV2Leg> legs;
   final bool commercialEtaEligible;
+  final RouteSearchOfficialFare? officialFare;
 
   /// 백엔드가 dual-tag dedupe한 대표 itinerary에 붙이는 objective 태그
   /// (FASTEST·FEWEST_TRANSFERS). 두 objective가 같은 경로면 두 태그를 모두 담는다.
@@ -1002,6 +1014,43 @@ class RouteSearchV2Itinerary {
 
   bool matchesObjective(RouteObjective objective) =>
       objectiveTags.contains(objective.serverValue);
+}
+
+class RouteSearchOfficialFare {
+  const RouteSearchOfficialFare({
+    required this.adultFareWon,
+    required this.currency,
+    required this.policy,
+    required this.sourceIds,
+    required this.sourceSnapshotIds,
+  });
+
+  factory RouteSearchOfficialFare.fromJson(Map<String, Object?> json) {
+    final fare = RouteSearchOfficialFare(
+      adultFareWon: _requiredRouteInt(json, 'adultFareWon'),
+      currency: _requiredRouteString(json, 'currency'),
+      policy: _requiredRouteString(json, 'policy'),
+      sourceIds: _routeStringList(json['sourceIds'], 'official fare source'),
+      sourceSnapshotIds: _routeStringList(
+        json['sourceSnapshotIds'],
+        'official fare source snapshot',
+      ),
+    );
+    if (fare.adultFareWon <= 0 ||
+        fare.currency != 'KRW' ||
+        fare.policy != 'SUM_OF_OFFICIAL_RIDE_OD_FARES' ||
+        fare.sourceIds.isEmpty ||
+        fare.sourceSnapshotIds.isEmpty) {
+      throw const FormatException('Invalid route v2 official fare');
+    }
+    return fare;
+  }
+
+  final int adultFareWon;
+  final String currency;
+  final String policy;
+  final List<String> sourceIds;
+  final List<String> sourceSnapshotIds;
 }
 
 class RouteSearchV2Leg {
@@ -1226,6 +1275,10 @@ class RouteSearchResult {
     this.supportsRefresh = true,
     this.nextServiceTime = '',
     this.transportScope = RouteTransportScope.subway,
+    this.objective = RouteObjective.fastest,
+    this.departureTimeIso = '',
+    this.arrivalTimeIso = '',
+    this.officialFare,
   }) : // `burdenCost`는 API contract 이름이고 저장 필드는 private 값이다.
        // ignore: prefer_initializing_formals
        _accessibilityScore = accessibilityScore,
@@ -1374,6 +1427,8 @@ class RouteSearchResult {
         supportsRefresh: false,
         nextServiceTime: result.nextServiceTime,
         transportScope: RouteTransportScope.subwayAndItxCheongchun,
+        objective: objective,
+        departureTimeIso: result.departureTime,
       );
     }
     final itinerary = _selectRouteV2Itinerary(result.itineraries, objective);
@@ -1431,6 +1486,11 @@ class RouteSearchResult {
       sourceUpdatedAt: result.departureTime,
       supportsRefresh: false,
       transportScope: RouteTransportScope.subwayAndItxCheongchun,
+      objective: objective,
+      departureTimeIso: result.departureTime,
+      arrivalTimeIso:
+          itinerary.realtimeArrivalTime ?? itinerary.plannedArrivalTime,
+      officialFare: itinerary.officialFare,
     );
   }
 
@@ -1467,6 +1527,10 @@ class RouteSearchResult {
   final bool supportsRefresh;
   final String nextServiceTime;
   final RouteTransportScope transportScope;
+  final RouteObjective objective;
+  final String departureTimeIso;
+  final String arrivalTimeIso;
+  final RouteSearchOfficialFare? officialFare;
 
   bool get hasOfficialOdFareQuote => officialOdFareQuote != null;
 
@@ -1659,6 +1723,10 @@ class RouteSearchResult {
       supportsRefresh: supportsRefresh,
       nextServiceTime: nextServiceTime,
       transportScope: transportScope,
+      objective: objective,
+      departureTimeIso: departureTimeIso,
+      arrivalTimeIso: arrivalTimeIso,
+      officialFare: officialFare,
     );
   }
 
@@ -2040,6 +2108,8 @@ class RouteSearchStep {
     this.confidenceLabel = '',
     this.plannedArrivalTimeIso = '',
     this.realtimeArrivalTimeIso = '',
+    this.plannedDepartureTimeIso = '',
+    this.realtimeDepartureTimeIso = '',
     this.carDoorCarNumber,
     this.carDoorDoorNumber,
     this.carDoorFacilityType = '',
@@ -2124,6 +2194,8 @@ class RouteSearchStep {
       confidenceLabel: leg.confidence,
       plannedArrivalTimeIso: leg.plannedArrivalTime,
       realtimeArrivalTimeIso: leg.realtimeArrivalTime ?? '',
+      plannedDepartureTimeIso: leg.plannedDepartureTime,
+      realtimeDepartureTimeIso: leg.realtimeDepartureTime ?? '',
       serviceClass: leg.serviceClass,
       servicePattern: leg.servicePattern,
     );
@@ -2147,6 +2219,8 @@ class RouteSearchStep {
   /// 그 외 경로/step에서는 빈 문자열이다.
   final String plannedArrivalTimeIso;
   final String realtimeArrivalTimeIso;
+  final String plannedDepartureTimeIso;
+  final String realtimeDepartureTimeIso;
   final String actionTitle;
   final String actionDetail;
   final String reason;
@@ -2206,6 +2280,8 @@ class RouteSearchStep {
           plannedArrivalTimeIso ?? this.plannedArrivalTimeIso,
       realtimeArrivalTimeIso:
           realtimeArrivalTimeIso ?? this.realtimeArrivalTimeIso,
+      plannedDepartureTimeIso: plannedDepartureTimeIso,
+      realtimeDepartureTimeIso: realtimeDepartureTimeIso,
       carDoorCarNumber: carDoorCarNumber,
       carDoorDoorNumber: carDoorDoorNumber,
       carDoorFacilityType: carDoorFacilityType,
@@ -2717,6 +2793,7 @@ class RouteSearchScreen extends StatefulWidget {
     this.shellNavigationBar,
     this.onShellBackToHome,
     this.getOffAlarmController,
+    this.routeShareInvoker,
     String? initialMobilityType,
     super.key,
   }) : initialMobilityType = _resolveInitialMobilityType(initialMobilityType);
@@ -2727,6 +2804,7 @@ class RouteSearchScreen extends StatefulWidget {
   final FavoriteRouteRepository? favoriteRouteRepository;
   final AdRepository? adRepository;
   final GetOffAlarmController? getOffAlarmController;
+  final RouteShareInvoker? routeShareInvoker;
   final RouteDraft? initialDraft;
   final RouteTransportScope initialTransportScope;
   final Widget? shellNavigationBar;
@@ -3128,6 +3206,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
                           : _endRoute,
                       getOffAlarmController: widget.getOffAlarmController,
                       stationRepository: widget.stationRepository,
+                      routeShareInvoker: widget.routeShareInvoker,
                     ),
                   ],
                 ),
@@ -4072,6 +4151,7 @@ class _RouteSearchBody extends StatelessWidget {
     required this.onShellBackToHome,
     required this.getOffAlarmController,
     required this.stationRepository,
+    required this.routeShareInvoker,
   });
 
   final RouteSearchState state;
@@ -4082,6 +4162,7 @@ class _RouteSearchBody extends StatelessWidget {
   final AsyncCallback? onShellBackToHome;
   final GetOffAlarmController? getOffAlarmController;
   final StationSearchRepository stationRepository;
+  final RouteShareInvoker? routeShareInvoker;
 
   @override
   Widget build(BuildContext context) {
@@ -4111,6 +4192,7 @@ class _RouteSearchBody extends StatelessWidget {
         onShellBackToHome: onShellBackToHome,
         getOffAlarmController: getOffAlarmController,
         stationRepository: stationRepository,
+        routeShareInvoker: routeShareInvoker,
       ),
     };
   }
@@ -4266,6 +4348,7 @@ class _RouteSearchResultCard extends StatefulWidget {
     required this.onShellBackToHome,
     required this.getOffAlarmController,
     required this.stationRepository,
+    required this.routeShareInvoker,
   });
 
   final RouteSearchResult result;
@@ -4277,6 +4360,7 @@ class _RouteSearchResultCard extends StatefulWidget {
   final AsyncCallback? onShellBackToHome;
   final GetOffAlarmController? getOffAlarmController;
   final StationSearchRepository stationRepository;
+  final RouteShareInvoker? routeShareInvoker;
 
   @override
   State<_RouteSearchResultCard> createState() => _RouteSearchResultCardState();
@@ -4366,6 +4450,7 @@ class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
               )
             : null,
         adRepository: widget.adRepository,
+        routeShareInvoker: widget.routeShareInvoker,
       ),
     );
   }
@@ -4636,6 +4721,7 @@ class _RouteDetailWorkflowView extends StatelessWidget {
     required this.onOpenFeedback,
     required this.favoriteSaveButton,
     required this.adRepository,
+    required this.routeShareInvoker,
   });
 
   final RouteSearchResult result;
@@ -4644,6 +4730,7 @@ class _RouteDetailWorkflowView extends StatelessWidget {
   final VoidCallback? onOpenFeedback;
   final Widget? favoriteSaveButton;
   final AdRepository? adRepository;
+  final RouteShareInvoker? routeShareInvoker;
 
   @override
   Widget build(BuildContext context) {
@@ -4680,6 +4767,8 @@ class _RouteDetailWorkflowView extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 12),
+        _RouteShareButton(result: result, invoker: routeShareInvoker),
+        const SizedBox(height: 10),
         ?favoriteSaveButton,
         if (onStartGuidance != null) ...[
           const SizedBox(height: 10),
@@ -4710,6 +4799,195 @@ class _RouteDetailWorkflowView extends StatelessWidget {
       ],
     );
   }
+}
+
+class _RouteShareButton extends StatelessWidget {
+  const _RouteShareButton({required this.result, required this.invoker});
+
+  final RouteSearchResult result;
+  final RouteShareInvoker? invoker;
+
+  @override
+  Widget build(BuildContext context) {
+    return Builder(
+      builder: (buttonContext) {
+        void onShare() => _share(buttonContext);
+        return Semantics(
+          button: true,
+          label: '경로 요약 공유',
+          onTap: onShare,
+          excludeSemantics: true,
+          child: OutlinedButton.icon(
+            key: const Key('routeShareButton'),
+            onPressed: onShare,
+            icon: const Icon(Icons.share_outlined),
+            label: const Text('공유'),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _share(BuildContext context) async {
+    try {
+      final renderBox = context.findRenderObject();
+      if (renderBox is! RenderBox || !renderBox.hasSize) {
+        throw StateError('Route share trigger is unavailable');
+      }
+      final origin = renderBox.localToGlobal(Offset.zero) & renderBox.size;
+      final text = buildRouteShareSummary(
+        _routeShareSnapshot(
+          result,
+          View.of(context).platformDispatcher.locale.languageCode,
+        ),
+      );
+      final invoke = invoker;
+      if (invoke != null) {
+        await invoke(text, origin);
+      } else {
+        await SharePlus.instance.share(
+          ShareParams(text: text, sharePositionOrigin: origin),
+        );
+      }
+    } on Object {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('경로 요약을 공유하지 못했어요.')));
+      }
+    }
+  }
+}
+
+RouteShareSnapshot _routeShareSnapshot(
+  RouteSearchResult result,
+  String languageCode,
+) {
+  if (result.isBlocked || result.status != 'FOUND') {
+    throw StateError('Route is unavailable');
+  }
+  final originName = result.originStationName.trim();
+  final destinationName = result.destinationStationName.trim();
+  if (originName.isEmpty ||
+      destinationName.isEmpty ||
+      originName == result.originStationId ||
+      destinationName == result.destinationStationId) {
+    throw StateError('Canonical station names are unavailable');
+  }
+
+  final steps = result.movementSteps;
+  if (steps.isEmpty) {
+    throw StateError('Route itinerary is unavailable');
+  }
+  final forbiddenIdentifiers = <String>{
+    result.routeSearchId,
+    result.originStationId,
+    result.destinationStationId,
+    for (final step in steps) ...[
+      step.fromStationId,
+      step.toStationId,
+      step.lineId,
+    ],
+  }.where((value) => value.trim().isNotEmpty).toSet();
+  final legs = steps
+      .map((step) {
+        final description = step.title.trim();
+        if (description.isEmpty ||
+            forbiddenIdentifiers.any(description.contains)) {
+          throw StateError('Route leg display labels are unavailable');
+        }
+        return RouteShareLeg(
+          description: description,
+          departureTime: _routeShareTime(
+            step.realtimeDepartureTimeIso.isNotEmpty
+                ? step.realtimeDepartureTimeIso
+                : step.plannedDepartureTimeIso,
+            allowEmpty: true,
+          ),
+          arrivalTime: _routeShareTime(
+            step.realtimeArrivalTimeIso.isNotEmpty
+                ? step.realtimeArrivalTimeIso
+                : step.plannedArrivalTimeIso,
+            allowEmpty: true,
+          ),
+        );
+      })
+      .toList(growable: false);
+
+  var departureSource = result.departureTimeIso.isNotEmpty
+      ? result.departureTimeIso
+      : steps.first.realtimeDepartureTimeIso.isNotEmpty
+      ? steps.first.realtimeDepartureTimeIso
+      : steps.first.plannedDepartureTimeIso;
+  var arrivalSource = result.arrivalTimeIso.isNotEmpty
+      ? result.arrivalTimeIso
+      : steps.last.realtimeArrivalTimeIso.isNotEmpty
+      ? steps.last.realtimeArrivalTimeIso
+      : steps.last.plannedArrivalTimeIso;
+  final durationMinutes = (result.estimatedDurationSeconds / 60).ceil();
+  if (result.isLocalResult &&
+      departureSource.isEmpty &&
+      arrivalSource.isEmpty) {
+    final departure = DateTime.tryParse(result.createdAt);
+    if (departure == null) {
+      throw StateError('Local route time is unavailable');
+    }
+    departureSource = departure.toIso8601String();
+    arrivalSource = departure
+        .add(Duration(seconds: result.estimatedDurationSeconds))
+        .toIso8601String();
+  }
+
+  RouteShareFare? fare;
+  if (result.officialFare case final officialFare?) {
+    fare = RouteShareFare(
+      adultFareWon: officialFare.adultFareWon,
+      currency: officialFare.currency,
+    );
+  } else if (result.transportScope ==
+      RouteTransportScope.subwayAndItxCheongchun) {
+    throw StateError('Official ITX fare is unavailable');
+  } else if (result.officialOdFareQuote case final quote?) {
+    fare = RouteShareFare(adultFareWon: quote.gnrlCardFare, currency: 'KRW');
+  }
+
+  return RouteShareSnapshot(
+    languageCode: languageCode == 'en' ? 'en' : 'ko',
+    originName: originName,
+    destinationName: destinationName,
+    objective: switch (result.objective) {
+      RouteObjective.fastest => RouteShareObjective.fastest,
+      RouteObjective.fewestTransfers => RouteShareObjective.fewestTransfers,
+    },
+    transportScope: switch (result.transportScope) {
+      RouteTransportScope.subway => RouteShareTransportScope.subway,
+      RouteTransportScope.subwayAndItxCheongchun =>
+        RouteShareTransportScope.subwayAndItxCheongchun,
+    },
+    departureTime: _routeShareTime(departureSource),
+    arrivalTime: _routeShareTime(arrivalSource),
+    durationMinutes: durationMinutes,
+    transferCount: result.transferCount,
+    freshness: switch (result.etaSource) {
+      'REALTIME' => RouteShareFreshness.realtime,
+      'STATIC_LOCAL' || 'STATIC_ESTIMATE' => RouteShareFreshness.staticData,
+      _ => RouteShareFreshness.planned,
+    },
+    legs: legs,
+    fare: fare,
+  );
+}
+
+String _routeShareTime(String value, {bool allowEmpty = false}) {
+  final trimmed = value.trim();
+  if (allowEmpty && trimmed.isEmpty) {
+    return '';
+  }
+  final match = RegExp(r'(?:T|^)(\d{2}):(\d{2})').firstMatch(trimmed);
+  if (match == null) {
+    throw StateError('Route time is unavailable');
+  }
+  return '${match.group(1)}:${match.group(2)}';
 }
 
 class _OfficialOdFareSection extends StatelessWidget {
