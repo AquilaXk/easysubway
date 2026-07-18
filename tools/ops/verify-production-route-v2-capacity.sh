@@ -377,6 +377,20 @@ docker run -d --name "${clone_backend}" --network "${network}" --network-alias b
 # helper for that purpose — built from the already-pulled backend image (which ships
 # curl), kept out of docker_stats/OOM/restart sampling so load-generation traffic
 # never taints the backend/gateway resource-peak evidence.
+#
+# On a readiness timeout (curl helper, backend, or gateway), tail the failing
+# container's own log to surface the actual boot failure (e.g. a Spring bean
+# creation error) instead of only the generic "timed out" message. Filter out
+# anything shaped like a raw KEY=VALUE env dump line or an obviously
+# secret/credential/DB-URL-bearing line, since these clones are started from
+# files containing synthetic credentials and a production DB URL.
+dump_readiness_diagnostics() {
+	local container="${1:?container name is required}"
+	echo "--- ${container} last log lines (tail 40, env-dump/secret lines filtered) ---" >&2
+	docker logs --tail 40 "${container}" 2>&1 \
+		| grep -iEv '^[A-Za-z_][A-Za-z0-9_.-]*=|password|secret|_key|-key|pepper|attestation|token|credential|private|jdbc:|://[^ ]*@' >&2 || true
+}
+
 docker run -d --name "${clone_curl}" --network "${network}" --user "$(id -u):$(id -g)" --entrypoint sh \
 	--cpus 1 --memory 128m --memory-swap 128m --pids-limit 64 \
 	-v "${work_dir}:${work_dir}" \
@@ -389,7 +403,11 @@ for _ in $(seq 1 30); do
 	fi
 	sleep 1
 done
-[[ "${curl_helper_ready}" == true ]] || { echo 'isolated curl helper is missing curl or failed to start' >&2; exit 1; }
+if [[ "${curl_helper_ready}" != true ]]; then
+	echo 'isolated curl helper is missing curl or failed to start' >&2
+	dump_readiness_diagnostics "${clone_curl}"
+	exit 1
+fi
 
 backend_ready=false
 for _ in $(seq 1 120); do
@@ -399,7 +417,11 @@ for _ in $(seq 1 120); do
 	fi
 	sleep 1
 done
-[[ "${backend_ready}" == true ]] || { echo 'isolated backend readiness timed out' >&2; exit 1; }
+if [[ "${backend_ready}" != true ]]; then
+	echo 'isolated backend readiness timed out' >&2
+	dump_readiness_diagnostics "${clone_backend}"
+	exit 1
+fi
 
 docker run -d --name "${clone_gateway}" --network "${network}" --network-alias gateway --user 10001:10001 --read-only \
 	--tmpfs /tmp:rw,nosuid,nodev \
@@ -420,7 +442,11 @@ for _ in $(seq 1 60); do
 	fi
 	sleep 1
 done
-[[ "${gateway_ready}" == true ]] || { echo 'isolated gateway readiness timed out' >&2; exit 1; }
+if [[ "${gateway_ready}" != true ]]; then
+	echo 'isolated gateway readiness timed out' >&2
+	dump_readiness_diagnostics "${clone_gateway}"
+	exit 1
+fi
 
 node -e '
 const { createHash, randomBytes } = require("node:crypto");
