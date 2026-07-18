@@ -37,7 +37,7 @@ class LocalRouteRepository implements RouteSearchRepository {
   final FutureOr<void> Function(String event)? routeRuntimeRefreshObserver;
   _RouteCatalogBundle? _activeBundle;
   Future<_RouteCatalogBundle>? _routeCatalogBundleFuture;
-  Future<void> _activationQueue = Future<void>.value();
+  Future<void> _lifecycleQueue = Future<void>.value();
   final Set<Future<void>> _inFlightActivations = {};
   final Set<Future<void>> _inFlightRuntimeRefreshes = {};
   final Set<_RouteCatalogBundle> _retiredBundles = {};
@@ -122,16 +122,12 @@ class LocalRouteRepository implements RouteSearchRepository {
       return _rejectClosedActivation(catalogDatabase, ownsDatabase);
     }
     late final Future<void> activation;
-    activation = _activationQueue.then(
-      (_) => _activateDataPack(
+    activation = _enqueueLifecycleOperation(
+      () => _activateDataPack(
         catalogDatabase: catalogDatabase,
         artifactIdentity: artifactIdentity,
         ownsDatabase: ownsDatabase,
       ),
-    );
-    _activationQueue = activation.then<void>(
-      (_) {},
-      onError: (Object _, StackTrace _) {},
     );
     _inFlightActivations.add(activation);
     return activation.whenComplete(() {
@@ -200,7 +196,6 @@ class LocalRouteRepository implements RouteSearchRepository {
       await candidate.dispose();
       return;
     }
-    await _waitForRuntimeRefreshes();
     if (_isClosed || activation != _activationSequence) {
       await candidate.dispose();
       return;
@@ -235,7 +230,10 @@ class LocalRouteRepository implements RouteSearchRepository {
       return Future.error(StateError('LocalRouteRepository is closed.'));
     }
     late final Future<void> refresh;
-    refresh = _refreshRuntimeState();
+    refresh = _enqueueLifecycleOperation(() {
+      if (_isClosed) return Future<void>.value();
+      return _refreshRuntimeState();
+    });
     _inFlightRuntimeRefreshes.add(refresh);
     return refresh.whenComplete(() {
       _inFlightRuntimeRefreshes.remove(refresh);
@@ -248,17 +246,27 @@ class LocalRouteRepository implements RouteSearchRepository {
     bundle.runtimeState = await _RouteRuntimeState.load(bundle.catalogDatabase);
   }
 
+  Future<void> _enqueueLifecycleOperation(Future<void> Function() operation) {
+    final queued = _lifecycleQueue.then((_) => operation());
+    _lifecycleQueue = queued.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    return queued;
+  }
+
   Future<void> _waitForRuntimeRefreshes() async {
     while (_inFlightRuntimeRefreshes.isNotEmpty) {
       final pending = _inFlightRuntimeRefreshes.toList(growable: false);
       await Future.wait(
-        pending.map((refresh) async {
-          try {
-            await refresh;
-          } catch (_) {
-            // 호출자에게 전달되는 refresh 오류가 lifecycle 정리를 막지는 않는다.
-          }
-        }),
+        pending.map(
+          (refresh) => refresh.then<void>(
+            (_) {},
+            onError: (Object error, StackTrace stackTrace) {
+              // 호출자에게 전달되는 refresh 오류가 lifecycle 정리를 막지는 않는다.
+            },
+          ),
+        ),
       );
     }
   }

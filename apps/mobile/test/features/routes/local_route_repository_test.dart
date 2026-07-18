@@ -562,6 +562,56 @@ void main() {
     await initialDatabase.close();
   });
 
+  test('activation 중 새 runtime refresh는 candidate 게시 뒤 실행한다', () async {
+    final initialDatabase = CatalogDatabase.memory();
+    final activeDatabase = CatalogDatabase.memory();
+    final candidateDatabase = CatalogDatabase.memory();
+    await initialDatabase.seedBaselineIfEmpty();
+    await activeDatabase.seedBaselineIfEmpty();
+    await candidateDatabase.seedBaselineIfEmpty();
+    final candidateGraphStarted = Completer<void>();
+    final releaseCandidateGraph = Completer<void>();
+    final refreshStarted = Completer<void>();
+    var blockCandidate = false;
+    final repository = LocalRouteRepository(
+      catalogDatabase: initialDatabase,
+      artifactIdentity: 'artifact-initial',
+      routeCatalogBuildObserver: (event) async {
+        if (blockCandidate && event == 'graph') {
+          candidateGraphStarted.complete();
+          await releaseCandidateGraph.future;
+        }
+      },
+      routeRuntimeRefreshObserver: (event) {
+        if (event == 'load') refreshStarted.complete();
+      },
+    );
+    await repository.activateDataPack(
+      catalogDatabase: activeDatabase,
+      artifactIdentity: 'artifact-active',
+      ownsDatabase: true,
+    );
+    blockCandidate = true;
+
+    final activation = repository.activateDataPack(
+      catalogDatabase: candidateDatabase,
+      artifactIdentity: 'artifact-candidate',
+      ownsDatabase: true,
+    );
+    await candidateGraphStarted.future;
+    final refresh = repository.refreshRuntimeState();
+    await Future<void>.delayed(Duration.zero);
+    final startedBeforeCandidatePublish = refreshStarted.isCompleted;
+    releaseCandidateGraph.complete();
+
+    await activation;
+    await refresh;
+    expect(startedBeforeCandidatePublish, isFalse);
+    expect(refreshStarted.isCompleted, isTrue);
+    await repository.close();
+    await initialDatabase.close();
+  });
+
   test('실패한 cold graph build는 부분 publish 없이 다음 호출에서 재시도한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
