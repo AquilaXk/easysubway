@@ -1,0 +1,380 @@
+package com.easysubway.train.adapter.out.http;
+
+import com.easysubway.train.application.TrainSearchProvider;
+import com.easysubway.train.application.TrainSearchProvider.Catalog;
+import com.easysubway.train.application.TrainSearchProvider.ProviderFailure;
+import com.easysubway.train.application.TrainSearchProviderCallBudget;
+import com.easysubway.train.domain.TrainSearchModels.Journey;
+import com.easysubway.train.domain.TrainSearchModels.LegQuery;
+import com.easysubway.train.domain.TrainSearchModels.Station;
+import com.easysubway.train.domain.TrainSearchModels.TrainType;
+import com.easysubway.train.domain.TrainSearchScopePolicy;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.http.HttpClient;
+import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+@Component
+public final class TagoTrainSearchProvider implements TrainSearchProvider {
+
+	private static final URI DEFAULT_BASE_URI = URI.create("https://apis.data.go.kr/1613000/TrainInfo/");
+	private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(5);
+	private static final int PAGE_SIZE = 100;
+	private static final ZoneId PROVIDER_ZONE = ZoneId.of("Asia/Seoul");
+	private static final DateTimeFormatter PROVIDER_TIME = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+	private static final DateTimeFormatter PROVIDER_DATE = DateTimeFormatter.ofPattern("yyyyMMdd");
+	private static final Map<String, String> TRAIN_TYPES = Map.ofEntries(
+		Map.entry("KTX", "KTX"),
+		Map.entry("KTX산천", "KTX_SANCHEON"),
+		Map.entry("SRT", "SRT"),
+		Map.entry("ITX마음", "ITX_MAUM"),
+		Map.entry("ITX새마을", "ITX_SAEMAEUL"),
+		Map.entry("ITX청춘", "ITX_CHEONGCHUN"),
+		Map.entry("새마을", "SAEMAEUL"),
+		Map.entry("새마을호", "SAEMAEUL"),
+		Map.entry("무궁화", "MUGUNGHWA"),
+		Map.entry("무궁화호", "MUGUNGHWA"),
+		Map.entry("누리로", "NURIRO")
+	);
+
+	private final String serviceKey;
+	private final ObjectMapper objectMapper;
+	private final HttpClient httpClient;
+	private final Clock clock;
+	private final URI baseUri;
+	private final TrainSearchProviderCallBudget callBudget;
+
+	@Autowired
+	TagoTrainSearchProvider(
+		@Value("${EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY:}") String serviceKey,
+		ObjectMapper objectMapper,
+		TrainSearchProviderCallBudget callBudget
+	) {
+		this(
+			serviceKey,
+			objectMapper,
+			HttpClient.newBuilder().connectTimeout(REQUEST_TIMEOUT).build(),
+			Clock.systemUTC(),
+			DEFAULT_BASE_URI,
+			callBudget
+		);
+	}
+
+	TagoTrainSearchProvider(String serviceKey, ObjectMapper objectMapper, HttpClient httpClient, Clock clock) {
+		this(serviceKey, objectMapper, httpClient, clock, DEFAULT_BASE_URI, () -> {});
+	}
+
+	TagoTrainSearchProvider(
+		String serviceKey,
+		ObjectMapper objectMapper,
+		HttpClient httpClient,
+		Clock clock,
+		URI baseUri
+	) {
+		this(serviceKey, objectMapper, httpClient, clock, baseUri, () -> {});
+	}
+
+	TagoTrainSearchProvider(
+		String serviceKey,
+		ObjectMapper objectMapper,
+		HttpClient httpClient,
+		Clock clock,
+		URI baseUri,
+		TrainSearchProviderCallBudget callBudget
+	) {
+		this.serviceKey = decodedServiceKey(serviceKey);
+		this.objectMapper = objectMapper;
+		this.httpClient = httpClient;
+		this.clock = clock;
+		this.baseUri = baseUri;
+		this.callBudget = callBudget;
+	}
+
+	@Override
+	public Catalog catalog() {
+		try {
+			return loadCatalog();
+		} catch (ProviderFailure failure) {
+			throw failure;
+		} catch (RuntimeException exception) {
+			throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
+		}
+	}
+
+	private Catalog loadCatalog() {
+		List<JsonNode> cities = nonPaginated("GetCtyCodeList", Map.of());
+		List<JsonNode> grades = nonPaginated("GetVhcleKndList", Map.of());
+		if (cities.isEmpty() || grades.isEmpty()) {
+			throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
+		}
+		Map<String, Station> stations = new LinkedHashMap<>();
+		for (JsonNode city : cities) {
+			String cityCode = requiredText(city, "citycode");
+			for (JsonNode station : paginated("GetCtyAcctoTrainSttnList", Map.of("cityCode", cityCode))) {
+				String id = requiredText(station, "nodeid");
+				stations.putIfAbsent(id, new Station(id, requiredText(station, "nodename")));
+			}
+		}
+
+		Map<String, TrainType> trainTypes = new LinkedHashMap<>();
+		for (JsonNode grade : grades) {
+			String name = requiredText(grade, "vehiclekndnm");
+			String code = trainType(name);
+			if (TrainSearchScopePolicy.supportedTrainTypes().contains(code)) {
+				trainTypes.putIfAbsent(code, new TrainType(code, name, requiredText(grade, "vehiclekndid")));
+			}
+		}
+		if (stations.isEmpty() || !trainTypes.keySet().equals(TrainSearchScopePolicy.supportedTrainTypes())) {
+			throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
+		}
+		return new Catalog(
+			clock.instant(),
+			stations.values().stream().sorted(Comparator.comparing(Station::name).thenComparing(Station::id)).toList(),
+			trainTypes.values().stream().sorted(Comparator.comparing(TrainType::code)).toList()
+		);
+	}
+
+	@Override
+	public List<Journey> search(LegQuery query) {
+		if (query.providerTrainGradeCode() == null || query.providerTrainGradeCode().isBlank()) {
+			throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
+		}
+		Map<String, String> parameters = Map.of(
+			"depPlaceId", query.departureStationId(),
+			"arrPlaceId", query.arrivalStationId(),
+			"depPlandTime", PROVIDER_DATE.format(query.departureDate()),
+			"trainGradeCode", query.providerTrainGradeCode()
+		);
+		List<JsonNode> rows = paginated("GetStrtpntAlocFndTrainInfo", parameters);
+		ObjectNode payload = objectMapper.createObjectNode();
+		ObjectNode response = payload.putObject("response");
+		response.putObject("header").put("resultCode", "00");
+		ArrayNode items = response.putObject("body").putObject("items").putArray("item");
+		rows.forEach(items::add);
+		try {
+			return parseJourneys(payload, query);
+		} catch (ProviderFailure failure) {
+			throw failure;
+		} catch (RuntimeException exception) {
+			throw new ProviderFailure("TRAIN_SEARCH_NO_VALID_ROWS");
+		}
+	}
+
+	List<Journey> parseJourneys(JsonNode payload, LegQuery query) {
+		if (!"00".equals(payload.path("response").path("header").path("resultCode").asText())) {
+			throw new IllegalArgumentException("TRAIN_SEARCH_PROVIDER_ERROR");
+		}
+		JsonNode item = payload.path("response").path("body").path("items").path("item");
+		List<JsonNode> rows = new ArrayList<>();
+		if (item.isArray()) {
+			item.forEach(rows::add);
+		} else if (item.isObject()) {
+			rows.add(item);
+		} else if (!item.isMissingNode() && !item.isNull()) {
+			throw new IllegalArgumentException("TRAIN_SEARCH_PROVIDER_ERROR");
+		}
+		List<Journey> journeys = rows.stream().map(row -> journey(row, query)).toList();
+		return TrainSearchScopePolicy.retainSupported(journeys, Journey::trainType).stream()
+			.filter(journey -> query.trainType() == null || query.trainType().equals(journey.trainType()))
+			.sorted(java.util.Comparator.comparing(Journey::departureAt)
+				.thenComparing(Journey::arrivalAt)
+				.thenComparing(Journey::trainType)
+				.thenComparing(Journey::trainNumber))
+			.toList();
+	}
+
+	private Journey journey(JsonNode row, LegQuery query) {
+		String trainType = trainType(requiredText(row, "traingradename"));
+		var departureAt = LocalDateTime.parse(requiredText(row, "depplandtime"), PROVIDER_TIME)
+			.atZone(PROVIDER_ZONE).toOffsetDateTime();
+		var arrivalAt = LocalDateTime.parse(requiredText(row, "arrplandtime"), PROVIDER_TIME)
+			.atZone(PROVIDER_ZONE).toOffsetDateTime();
+		long durationMinutes = Duration.between(departureAt, arrivalAt).toMinutes();
+		int fare = integer(row, "adultcharge");
+		if (durationMinutes <= 0 || durationMinutes > Integer.MAX_VALUE || fare < 0) {
+			throw new IllegalArgumentException("TRAIN_SEARCH_NO_VALID_ROWS");
+		}
+		return new Journey(
+			requiredText(row, "trainno"),
+			trainType,
+			query.departureStationId(),
+			requiredText(row, "depplacename"),
+			departureAt,
+			query.arrivalStationId(),
+			requiredText(row, "arrplacename"),
+			arrivalAt,
+			(int) durationMinutes,
+			fare
+		);
+	}
+
+	private String trainType(String value) {
+		String normalized = value.replaceAll("[^0-9A-Za-z가-힣]", "").toUpperCase(Locale.ROOT);
+		return TRAIN_TYPES.getOrDefault(normalized, normalized);
+	}
+
+	private String requiredText(JsonNode row, String field) {
+		JsonNode value = row.path(field);
+		if ((!value.isTextual() && !value.isNumber()) || value.asText().isBlank()) {
+			throw new IllegalArgumentException("TRAIN_SEARCH_NO_VALID_ROWS");
+		}
+		return value.asText().trim();
+	}
+
+	private int integer(JsonNode row, String field) {
+		try {
+			return Integer.parseInt(requiredText(row, field));
+		} catch (NumberFormatException exception) {
+			throw new IllegalArgumentException("TRAIN_SEARCH_NO_VALID_ROWS");
+		}
+	}
+
+	private List<JsonNode> nonPaginated(String operation, Map<String, String> parameters) {
+		return itemRows(request(operation, parameters).path("response").path("body"));
+	}
+
+	private List<JsonNode> paginated(String operation, Map<String, String> parameters) {
+		List<JsonNode> rows = new ArrayList<>();
+		int page = 1;
+		Integer expectedTotalCount = null;
+		int expectedPages = 1;
+		while (page <= expectedPages) {
+			Map<String, String> pageParameters = new LinkedHashMap<>(parameters);
+			pageParameters.put("pageNo", Integer.toString(page));
+			pageParameters.put("numOfRows", Integer.toString(PAGE_SIZE));
+			JsonNode body = request(operation, pageParameters).path("response").path("body");
+			int responsePage = requiredInteger(body, "pageNo");
+			int responsePageSize = requiredInteger(body, "numOfRows");
+			int totalCount = requiredInteger(body, "totalCount");
+			if (responsePage != page || responsePageSize != PAGE_SIZE) {
+				throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
+			}
+			if (expectedTotalCount == null) {
+				expectedTotalCount = totalCount;
+				expectedPages = Math.max(1, (totalCount + PAGE_SIZE - 1) / PAGE_SIZE);
+			} else if (expectedTotalCount != totalCount) {
+				throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
+			}
+			List<JsonNode> pageRows = itemRows(body);
+			if (pageRows.isEmpty() && rows.size() < totalCount) {
+				throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
+			}
+			rows.addAll(pageRows);
+			page++;
+		}
+		if (expectedTotalCount == null || rows.size() != expectedTotalCount) {
+			throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
+		}
+		return rows;
+	}
+
+	private JsonNode request(String operation, Map<String, String> parameters) {
+		if (serviceKey.isBlank()) {
+			throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
+		}
+		HttpRequest request = HttpRequest.newBuilder(uri(operation, parameters))
+				.timeout(REQUEST_TIMEOUT)
+				.GET()
+				.build();
+		HttpResponse<String> response;
+		try {
+			response = sendWithOneRetry(request);
+		} catch (IOException exception) {
+			throw new ProviderFailure("TRAIN_SEARCH_UNAVAILABLE");
+		}
+		try {
+			if (response.statusCode() < 200 || response.statusCode() >= 300) {
+				throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
+			}
+			JsonNode payload = objectMapper.readTree(response.body());
+			if (!"00".equals(payload.path("response").path("header").path("resultCode").asText())) {
+				throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
+			}
+			return payload;
+		} catch (IOException | IllegalArgumentException exception) {
+			throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
+		}
+	}
+
+	private HttpResponse<String> sendWithOneRetry(HttpRequest request) throws IOException {
+		for (int attempt = 0; attempt < 2; attempt++) {
+			try {
+				callBudget.acquire();
+				return httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+			} catch (InterruptedException exception) {
+				Thread.currentThread().interrupt();
+				throw new ProviderFailure("TRAIN_SEARCH_UNAVAILABLE");
+			} catch (IOException exception) {
+				if (attempt == 1) {
+					throw exception;
+				}
+			}
+		}
+		throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
+	}
+
+	private URI uri(String operation, Map<String, String> parameters) {
+		Map<String, String> query = new LinkedHashMap<>();
+		query.put("serviceKey", serviceKey);
+		query.put("_type", "json");
+		query.putAll(parameters);
+		String encodedQuery = query.entrySet().stream()
+			.map(entry -> encode(entry.getKey()) + "=" + encode(entry.getValue()))
+			.collect(java.util.stream.Collectors.joining("&"));
+		return URI.create(baseUri.resolve(operation).toString() + "?" + encodedQuery);
+	}
+
+	private List<JsonNode> itemRows(JsonNode body) {
+		JsonNode item = body.path("items").path("item");
+		List<JsonNode> rows = new ArrayList<>();
+		if (item.isArray()) {
+			item.forEach(rows::add);
+		} else if (item.isObject()) {
+			rows.add(item);
+		} else if (!item.isMissingNode() && !item.isNull()) {
+			throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
+		}
+		return rows;
+	}
+
+	private int requiredInteger(JsonNode row, String field) {
+		JsonNode value = row.path(field);
+		if (!value.canConvertToInt() || value.intValue() < 0) {
+			throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
+		}
+		return value.intValue();
+	}
+
+	private static String decodedServiceKey(String value) {
+		String trimmed = value == null ? "" : value.trim();
+		return trimmed.matches(".*%[0-9A-Fa-f]{2}.*")
+			? URLDecoder.decode(trimmed, StandardCharsets.UTF_8)
+			: trimmed;
+	}
+
+	private String encode(String value) {
+		return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
+	}
+}
