@@ -391,9 +391,26 @@ dump_readiness_diagnostics() {
 		| grep -iEv '^[A-Za-z_][A-Za-z0-9_.-]*=|password|secret|_key|-key|pepper|attestation|token|credential|private|jdbc:|://[^ ]*@' >&2 || true
 }
 
+# clone_curl runs as the runner's own uid:gid (least privilege — no root), which
+# owns work_dir (umask 077, mode 0700) on the host. Bind-mounting at the SAME path
+# inside the container (-v "${work_dir}:${work_dir}") is unsafe here: intermediate
+# path components are resolved against the CONTAINER's own filesystem, and the
+# backend image (eclipse-temurin) already ships its own /home/ubuntu (a different,
+# image-baked uid, mode 0750, no "other" access) that happens to collide with
+# RUNNER_TEMP paths nested under a real /home/<user> on self-hosted runners — the
+# runner's uid then fails to even traverse into the mount point (confirmed on the
+# production runner: `stat` on the mounted dir returned EACCES for the runner uid,
+# while root could read it fine). Mounting at a synthetic top-level container path
+# instead avoids any collision with the image's own filesystem, so the runner uid
+# only ever needs to satisfy the mount point's own (host-inherited) permissions.
+curl_mount="/capacity-evidence-http"
+to_curl_mount_path() {
+	local host_path="${1:?host path is required}"
+	printf '%s' "${curl_mount}${host_path#"${work_dir}"}"
+}
 docker run -d --name "${clone_curl}" --network "${network}" --user "$(id -u):$(id -g)" --entrypoint sh \
 	--cpus 1 --memory 128m --memory-swap 128m --pids-limit 64 \
-	-v "${work_dir}:${work_dir}" \
+	-v "${work_dir}:${curl_mount}" \
 	"${expected_image_id}" -c 'sleep infinity' >/dev/null
 curl_helper_ready=false
 for _ in $(seq 1 30); do
@@ -500,7 +517,7 @@ const signature = createHmac("sha256", Buffer.from(process.argv[1], "hex")).upda
 process.stdout.write(JSON.stringify({ integrityToken: `${nonce}.${signature}`, clientNonce: nonce }));
 ' "${synthetic_secret}")"
 	result="$(docker exec "${clone_curl}" curl -sS --noproxy '*' --connect-timeout 2 --max-time 10 \
-		-D "${last_headers}" -o "${last_body}" -w '%{http_code} %{time_total}' \
+		-D "$(to_curl_mount_path "${last_headers}")" -o "$(to_curl_mount_path "${last_body}")" -w '%{http_code} %{time_total}' \
 		--request POST --header 'content-type: application/json' \
 		--header "CF-Connecting-IP: ${client_ip}" \
 		--data-binary "${session_request}" \
@@ -537,7 +554,7 @@ send_search() {
 	last_body="${work_dir}/body-${request_index}.json"
 	local result time_seconds latency_ms
 	result="$(docker exec "${clone_curl}" curl -sS --noproxy '*' --connect-timeout 2 --max-time 10 \
-		-D "${last_headers}" -o "${last_body}" -w '%{http_code} %{time_total}' \
+		-D "$(to_curl_mount_path "${last_headers}")" -o "$(to_curl_mount_path "${last_body}")" -w '%{http_code} %{time_total}' \
 		--request POST --header 'content-type: application/json' \
 		--header "CF-Connecting-IP: ${client_ip}" --header "Authorization: Bearer ${token}" \
 		--data-binary "${request_body}" "${gateway_base}/api/v2/routes/search")"
@@ -667,7 +684,7 @@ for ((index = 0; index <= search_burst; index += 1)); do
 	burst_result="${work_dir}/result-${request_index}.txt"
 	(
 		docker exec "${clone_curl}" curl -sS --noproxy '*' --connect-timeout 2 --max-time 10 \
-			-D "${burst_headers}" -o "${burst_body}" -w '%{http_code} %{time_total}' \
+			-D "$(to_curl_mount_path "${burst_headers}")" -o "$(to_curl_mount_path "${burst_body}")" -w '%{http_code} %{time_total}' \
 			--request POST --header 'content-type: application/json' \
 			--header 'CF-Connecting-IP: 198.51.100.200' --header "Authorization: Bearer ${burst_token}" \
 			--data-binary "${request_body}" "${gateway_base}/api/v2/routes/search" > "${burst_result}"
