@@ -1,0 +1,100 @@
+{
+  "exceptions": [
+    {
+      "lineId": "line-54a7b980b7c3",
+      "a": "station-d5e344125b52",
+      "b": "station-dd14cfb89cbc",
+      "reason": "남춘천 <-> 춘천 (47.8px, 수도권 경춘): 실 파이프라인(run-sma-pipeline.sh) 재실행 시 respace --pin-stations의 트랙 정리 단계(#2068 P-65)가 SVG 편집과 무관하게 이 한 쌍만 부동소수 경계(47.8px)로 밀어넣음 — SVG 좌표 자체는 48px 이상. 파이프라인 재실행마다 재실측 필요."
+    },
+    {
+      "lineId": "line-558d0bd8312d",
+      "a": "station-6144b1b933c6",
+      "b": "station-021157f2f07e",
+      "reason": "안산 <-> 정왕 (24px, 수도권 수인분당): SVG dataStation 명칭이 DB canonical명과 달라(콜론 접미 동명이역 구분 표기 등) 이번 좌표 이동 패스가 대상 element를 찾지 못함 — 후속 커밋에서 canonical 별칭 매핑 확장 필요"
+    },
+    {
+      "lineId": "seoul-4",
+      "a": "station-6144b1b933c6",
+      "b": "station-021157f2f07e",
+      "reason": "안산 <-> 정왕 (24px, 수도권 4호선): SVG dataStation 명칭이 DB canonical명과 달라(콜론 접미 동명이역 구분 표기 등) 이번 좌표 이동 패스가 대상 element를 찾지 못함 — 후속 커밋에서 canonical 별칭 매핑 확장 필요"
+    },
+    {
+      "lineId": "line-558d0bd8312d",
+      "a": "station-62830a2b0d00",
+      "b": "station-237d697179f3",
+      "reason": "중앙 <-> 고잔 (32px, 수도권 수인분당): SVG dataStation 명칭이 DB canonical명과 달라(콜론 접미 동명이역 구분 표기 등) 이번 좌표 이동 패스가 대상 element를 찾지 못함 — 후속 커밋에서 canonical 별칭 매핑 확장 필요"
+    },
+    {
+      "lineId": "seoul-4",
+      "a": "station-62830a2b0d00",
+      "b": "station-237d697179f3",
+      "reason": "중앙 <-> 고잔 (32px, 수도권 4호선): SVG dataStation 명칭이 DB canonical명과 달라(콜론 접미 동명이역 구분 표기 등) 이번 좌표 이동 패스가 대상 element를 찾지 못함 — 후속 커밋에서 canonical 별칭 매핑 확장 필요"
+    },
+    {
+      "lineId": "line-80fc4d5350d4",
+      "a": "station-4b301ea7fbac",
+      "b": "station-d5909895c7d7",
+      "reason": "오목교 <-> 양평 (35.4px, 수도권 5호선): SVG dataStation 명칭이 DB canonical명과 달라(콜론 접미 동명이역 구분 표기 등) 이번 좌표 이동 패스가 대상 element를 찾지 못함 — 후속 커밋에서 canonical 별칭 매핑 확장 필요"
+    },
+    {
+      "lineId": "line-558d0bd8312d",
+      "a": "station-6144b1b933c6",
+      "b": "station-47b514f305d8",
+      "reason": "안산 <-> 신길온천 (35.7px, 수도권 수인분당): SVG dataStation 명칭이 DB canonical명과 달라(콜론 접미 동명이역 구분 표기 등) 이번 좌표 이동 패스가 대상 element를 찾지 못함 — 후속 커밋에서 canonical 별칭 매핑 확장 필요"
+    },
+    {
+      "lineId": "seoul-4",
+      "a": "station-6144b1b933c6",
+      "b": "station-47b514f305d8",
+      "reason": "안산 <-> 신길온천 (35.7px, 수도권 4호선): SVG dataStation 명칭이 DB canonical명과 달라(콜론 접미 동명이역 구분 표기 등) 이번 좌표 이동 패스가 대상 element를 찾지 못함 — 후속 커밋에서 canonical 별칭 매핑 확장 필요"
+    },
+    {
+      "lineId": "line-15b3b8a93259",
+      "a": "station-2a2d0080fa4a",
+      "b": "station-034861bc6d7b",
+      "reason": "총신대입구 <-> 남성 (42px, 수도권 7호선): SVG dataStation 명칭이 DB canonical명과 달라(콜론 접미 동명이역 구분 표기 등) 이번 좌표 이동 패스가 대상 element를 찾지 못함 — 후속 커밋에서 canonical 별칭 매핑 확장 필요"
+    },
+    {
+      "lineId": "seoul-2",
+      "a": "station-762641d3cd03",
+      "b": "station-4e123a19a88f",
+      "reason": "이대 <-> 신촌 (44px, 수도권 2호선): SVG dataStation 명칭이 DB canonical명과 달라(콜론 접미 동명이역 구분 표기 등) 이번 좌표 이동 패스가 대상 element를 찾지 못함 — 후속 커밋에서 canonical 별칭 매핑 확장 필요"
+    },
+    {
+      "lineId": "line-e9e9a5b520a4",
+      "a": "station-fce26411d581",
+      "b": "station-00ac443982bf",
+      "reason": "인천공항1터미널 <-> 인천공항2터미널 (45px, 수도권 공항): SVG dataStation 명칭이 DB canonical명과 달라(콜론 접미 동명이역 구분 표기 등) 이번 좌표 이동 패스가 대상 element를 찾지 못함 — 후속 커밋에서 canonical 별칭 매핑 확장 필요"
+    },
+    {
+      "lineId": "line-80fc4d5350d4",
+      "a": "station-e9d7ff9d3e76",
+      "b": "station-b35616704ce3",
+      "reason": "화곡 <-> 까치산 (46.7px, 수도권 5호선): 밀집 다체(多體) 국소 클러스터 — 반복 pairwise 반발 솔버가 fixed point에 도달(9라운드 수렴, 잔여 1건), 레이아웃 국소 재설계(간격 확보 위한 코리더 자체 조정) 필요 — 후속 커밋"
+    },
+    {
+      "lineId": "line-558d0bd8312d",
+      "a": "station-47b514f305d8",
+      "b": "station-021157f2f07e",
+      "reason": "신길온천 <-> 정왕 (46.8px, 수도권 수인분당): SVG dataStation 명칭이 DB canonical명과 달라(콜론 접미 동명이역 구분 표기 등) 이번 좌표 이동 패스가 대상 element를 찾지 못함 — 후속 커밋에서 canonical 별칭 매핑 확장 필요"
+    },
+    {
+      "lineId": "seoul-4",
+      "a": "station-47b514f305d8",
+      "b": "station-021157f2f07e",
+      "reason": "신길온천 <-> 정왕 (46.8px, 수도권 4호선): SVG dataStation 명칭이 DB canonical명과 달라(콜론 접미 동명이역 구분 표기 등) 이번 좌표 이동 패스가 대상 element를 찾지 못함 — 후속 커밋에서 canonical 별칭 매핑 확장 필요"
+    },
+    {
+      "lineId": "line-472a81add377",
+      "a": "station-86fdc698524b",
+      "b": "station-7a13ff168b6d",
+      "reason": "수원 <-> 병점 (47.7px, 수도권 1호선): SVG dataStation 명칭이 DB canonical명과 달라(콜론 접미 동명이역 구분 표기 등) 이번 좌표 이동 패스가 대상 element를 찾지 못함 — 후속 커밋에서 canonical 별칭 매핑 확장 필요"
+    },
+    {
+      "lineId": "seoul-2",
+      "a": "station-4e123a19a88f",
+      "b": "station-0f50a307ac33",
+      "reason": "신촌 <-> 홍대입구 (47.7px, 수도권 2호선): SVG dataStation 명칭이 DB canonical명과 달라(콜론 접미 동명이역 구분 표기 등) 이번 좌표 이동 패스가 대상 element를 찾지 못함 — 후속 커밋에서 canonical 별칭 매핑 확장 필요"
+    }
+  ]
+}

@@ -20,9 +20,9 @@
       "id": "seoul",
       "source": "tools/route-map/route-map-defs/svg-sources/easy-subway-sma-v2.svg",
       "compiledVector": "apps/mobile/assets/datapacks/metro_map_pack/basemap/seoul.vec",
-      "sourceSvgSha256": "3e58dd42706ae9ca1b33ee14bafe1fb44e121432ef275b60d7ec824638fdabc8",
-      "normalizedSvgSha256": "da610545a496a242d6189181be950936b4b07c9f29a202b2d6b606acfb718665",
-      "compiledVectorSha256": "d22b2b1200b4bee0ed7d66f6f8b63f2b93587fa0d34de36f5166c178654ef2fa",
+      "sourceSvgSha256": "515e67b64545736efb771569526c63affa5d34ca26e0955b5721723610a278f3",
+      "normalizedSvgSha256": "1712934a8395f28672d688aad0bfc11f223d225bb5c7282ee1decade36fe8354",
+      "compiledVectorSha256": "dcf1310bca3f417e9a34a6ab60d5951977f10e5cfde0eb650af424e6f5c6627e",
       "viewBox": [
         0,
         0,

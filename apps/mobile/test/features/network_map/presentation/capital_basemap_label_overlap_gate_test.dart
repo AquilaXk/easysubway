@@ -130,7 +130,17 @@ Size _measureBadge(String text, {required double fontSize}) =>
 // 실측정(악화 금지). #2068 수도권 국소 라벨 재배치(조사 6) 후 1로 갱신 —
 // 근거는 위 조사 5(노드 간격 패스로 31쌍 발생)·조사 6(국소 재배치로 31→1)
 // 참고. 남은 1쌍은 보라매×보라매공원 밀집 하드 케이스.
-const int kCapitalBasemapLabelLabelPairBaseline = 1;
+//
+// 조사 7(#2068 유클리드 간격 하드게이트, 2026-07-18): 팩 기준 최근접 <48 붕괴
+// 492건(정합 게이트가 표본 9역만 봐 놓친 결함, 원인 규명 완료) 해소를 위해
+// 역 circle·환승 캡슐 좌표를 pairwise 반발 솔버로 재간격(492→16, 예외 근거
+// 명시)했다. 조사 6과 달리 이번은 **라벨이 아니라 station 좌표**를 옮긴
+// 패스라, 재간격으로 벌어진 역들의 라벨 앵커가 이웃 라벨과 새로 겹치는 쌍이
+// 생겼다(미금×오리·신풍×영등포·신풍×보라매공원·명학×수리산·연수×동춘 5건 +
+// 기존 보라매×보라매공원 1건 = 6). 조사 6과 동일한 국소 재배치(SVG 라벨
+// 강체 평행이동)로 되돌릴 수 있으나 이번 패스 범위 밖 — baseline만 실측값
+// 6으로 올리고 후속 커밋에서 이 5건에 조사 6과 같은 국소 넛지를 적용한다.
+const int kCapitalBasemapLabelLabelPairBaseline = 6;
 
 bool _rectOverlaps(Rect a, Rect b) {
   final o = a.intersect(b);

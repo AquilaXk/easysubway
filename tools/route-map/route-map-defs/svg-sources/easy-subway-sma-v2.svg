@@ -2499,7 +2499,7 @@
              data-node-role="terminal"
              data-line="incheon-2"
              data-line-name="인천2호선"
-             data-line-color="#F4A462"  transform="translate(-33.9956,0.0000)"/>
+             data-line-color="#F4A462"  transform="translate(-43.936,0)"/>
           <circle
              id="_검단호수공원"
              data-name="검단호수공원"
@@ -2531,7 +2531,7 @@
              data-node-role="terminal"
              data-line="incheon-2"
              data-line-name="인천2호선"
-             data-line-color="#F4A462"  transform="translate(10.2888,88.9767)"/>
+             data-line-color="#F4A462"  transform="translate(10.289,94.506)"/>
           <circle
              id="_관악산"
              data-name="관악산"
@@ -2563,7 +2563,7 @@
              data-node-role="terminal"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85" />
+             data-line-color="#004A85"  transform="translate(-9.391,15.246)"/>
           <circle
              id="_신창"
              data-name="신창"
@@ -2579,7 +2579,7 @@
              data-node-role="terminal"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(3.7956,0.1011)"/>
+             data-line-color="#004A85"  transform="translate(9.657,0.101)"/>
           <circle
              id="_연천"
              data-name="연천"
@@ -2595,7 +2595,7 @@
              data-node-role="terminal"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85" />
+             data-line-color="#004A85"  transform="translate(-82.514,0)"/>
           <circle
              id="_대화"
              data-name="대화"
@@ -2611,7 +2611,7 @@
              data-node-role="terminal"
              data-line="3"
              data-line-name="3호선"
-             data-line-color="#ED6C00"  transform="translate(-31.1956,0.0000)"/>
+             data-line-color="#ED6C00"  transform="translate(-41.393,0)"/>
           <circle
              id="_진접"
              data-name="진접"
@@ -2643,7 +2643,7 @@
              data-node-role="terminal"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698"  transform="translate(0.0000,-45.7956)"/>
+             data-line-color="#794698"  transform="translate(0,-68.264)"/>
           <circle
              id="_개화"
              data-name="개화"
@@ -2659,7 +2659,7 @@
              data-node-role="terminal"
              data-line="9"
              data-line-name="9호선"
-             data-line-color="#A49D87" />
+             data-line-color="#A49D87"  transform="translate(-4.037,-4.037)"/>
           <circle
              id="_마천"
              data-name="마천"
@@ -2707,7 +2707,7 @@
              data-node-role="terminal"
              data-line="incheon-1"
              data-line-name="인천1호선"
-             data-line-color="#B4C7E7"  transform="translate(-73.3848,253.3673)"/>
+             data-line-color="#B4C7E7"  transform="translate(-83.271,253.367)"/>
           <circle
              id="_임진강"
              data-name="임진강"
@@ -2755,7 +2755,7 @@
              data-node-role="terminal"
              data-line="uijeongbu-lrt"
              data-line-name="의정부경전철"
-             data-line-color="#F0831E"  transform="translate(-191.9341,0.0000)"/>
+             data-line-color="#F0831E"  transform="translate(-197.796,0)"/>
           <circle
              id="_발곡"
              data-name="발곡"
@@ -2771,7 +2771,7 @@
              data-node-role="terminal"
              data-line="uijeongbu-lrt"
              data-line-name="의정부경전철"
-             data-line-color="#F0831E" />
+             data-line-color="#F0831E"  transform="translate(0,10.826)"/>
           <circle
              id="_춘천"
              data-name="춘천"
@@ -3114,7 +3114,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-19.0969,54.7892)"/>
+             data-line-color="#004A85"  transform="translate(-156.139,50.747)"/>
           <circle
              id="_왕길"
              data-name="왕길"
@@ -3130,7 +3130,7 @@
              data-node-role="ordinary"
              data-line="incheon-2"
              data-line-name="인천2호선"
-             data-line-color="#F4A462" />
+             data-line-color="#F4A462"  transform="translate(-4.092,0)"/>
           <path
              id="_검단사거리"
              data-name="검단사거리"
@@ -3160,7 +3160,7 @@
              data-node-role="ordinary"
              data-line="incheon-2"
              data-line-name="인천2호선"
-             data-line-color="#F4A462"  transform="translate(54.2879,0.0000)"/>
+             data-line-color="#F4A462"  transform="translate(55.793,-50.84)"/>
           <circle
              id="_완정"
              data-name="완정"
@@ -3176,7 +3176,7 @@
              data-node-role="ordinary"
              data-line="incheon-2"
              data-line-name="인천2호선"
-             data-line-color="#F4A462"  transform="translate(78.9848,27.9958)"/>
+             data-line-color="#F4A462"  transform="translate(93.086,24.268)"/>
           <circle
              id="_독정"
              data-name="독정"
@@ -3192,7 +3192,7 @@
              data-node-role="ordinary"
              data-line="incheon-2"
              data-line-name="인천2호선"
-             data-line-color="#F4A462"  transform="translate(78.9848,77.4903)"/>
+             data-line-color="#F4A462"  transform="translate(100.552,77.989)"/>
           <circle
              id="_검바위"
              data-name="검바위"
@@ -3208,7 +3208,7 @@
              data-node-role="ordinary"
              data-line="incheon-2"
              data-line-name="인천2호선"
-             data-line-color="#F4A462" />
+             data-line-color="#F4A462"  transform="translate(-7.549,-80.752)"/>
           <circle
              id="_아시아드경기장"
              data-name="아시아드경기장"
@@ -3224,7 +3224,7 @@
              data-node-role="ordinary"
              data-line="incheon-2"
              data-line-name="인천2호선"
-             data-line-color="#F4A462"  transform="translate(0.0000,15.4945)"/>
+             data-line-color="#F4A462"  transform="translate(0,-62.62)"/>
           <circle
              id="_서구청"
              data-name="서구청"
@@ -3240,7 +3240,7 @@
              data-node-role="ordinary"
              data-line="incheon-2"
              data-line-name="인천2호선"
-             data-line-color="#F4A462"  transform="translate(0.0000,30.9890)"/>
+             data-line-color="#F4A462"  transform="translate(0,-47)"/>
           <circle
              id="_가정"
              data-name="가정"
@@ -3256,7 +3256,7 @@
              data-node-role="ordinary"
              data-line="incheon-2"
              data-line-name="인천2호선"
-             data-line-color="#F4A462"  transform="translate(0.0000,46.4835)"/>
+             data-line-color="#F4A462"  transform="translate(0,-29.068)"/>
           <circle
              id="_가정중앙시장"
              data-name="가정중앙시장"
@@ -3272,7 +3272,7 @@
              data-node-role="ordinary"
              data-line="incheon-2"
              data-line-name="인천2호선"
-             data-line-color="#F4A462"  transform="translate(0.0000,61.9780)"/>
+             data-line-color="#F4A462"  transform="translate(0,-13.626)"/>
           <circle
              id="_서부여성회관"
              data-name="서부여성회관"
@@ -3288,7 +3288,7 @@
              data-node-role="ordinary"
              data-line="incheon-2"
              data-line-name="인천2호선"
-             data-line-color="#F4A462" />
+             data-line-color="#F4A462"  transform="translate(0,16.881)"/>
           <circle
              id="_인천가좌"
              data-name="인천가좌"
@@ -3304,7 +3304,7 @@
              data-node-role="ordinary"
              data-line="incheon-2"
              data-line-name="인천2호선"
-             data-line-color="#F4A462"  transform="translate(0.0000,15.4945)"/>
+             data-line-color="#F4A462"  transform="translate(0,32.587)"/>
           <circle
              id="_가재울"
              data-name="가재울"
@@ -3320,7 +3320,7 @@
              data-node-role="ordinary"
              data-line="incheon-2"
              data-line-name="인천2호선"
-             data-line-color="#F4A462"  transform="translate(0.0000,30.9890)"/>
+             data-line-color="#F4A462"  transform="translate(0,51.365)"/>
           <circle
              id="_주안국가산단"
              data-name="주안국가산단"
@@ -3336,7 +3336,7 @@
              data-node-role="ordinary"
              data-line="incheon-2"
              data-line-name="인천2호선"
-             data-line-color="#F4A462"  transform="translate(0.0000,56.4835)"/>
+             data-line-color="#F4A462"  transform="translate(0,78.497)"/>
           <circle
              id="_시민공원"
              data-name="시민공원"
@@ -3352,7 +3352,7 @@
              data-node-role="ordinary"
              data-line="incheon-2"
              data-line-name="인천2호선"
-             data-line-color="#F4A462" />
+             data-line-color="#F4A462"  transform="translate(-22.035,0)"/>
           <circle
              id="_석바위시장"
              data-name="석바위시장"
@@ -3368,7 +3368,7 @@
              data-node-role="ordinary"
              data-line="incheon-2"
              data-line-name="인천2호선"
-             data-line-color="#F4A462"  transform="translate(25.4945,0.0000)"/>
+             data-line-color="#F4A462"  transform="translate(6.196,0)"/>
           <circle
              id="_석천사거리"
              data-name="석천사거리"
@@ -3384,7 +3384,7 @@
              data-node-role="ordinary"
              data-line="incheon-2"
              data-line-name="인천2호선"
-             data-line-color="#F4A462" />
+             data-line-color="#F4A462"  transform="translate(-2.87,-2.87)"/>
           <circle
              id="_모래내시장"
              data-name="모래내시장"
@@ -3400,7 +3400,7 @@
              data-node-role="ordinary"
              data-line="incheon-2"
              data-line-name="인천2호선"
-             data-line-color="#F4A462"  transform="translate(15.0969,15.5958)"/>
+             data-line-color="#F4A462"  transform="translate(14.385,14.884)"/>
           <circle
              id="_만수"
              data-name="만수"
@@ -3416,7 +3416,7 @@
              data-node-role="ordinary"
              data-line="incheon-2"
              data-line-name="인천2호선"
-             data-line-color="#F4A462"  transform="translate(30.0930,31.1919)"/>
+             data-line-color="#F4A462"  transform="translate(29.807,30.906)"/>
           <circle
              id="_남동구청"
              data-name="남동구청"
@@ -3432,7 +3432,7 @@
              data-node-role="ordinary"
              data-line="incheon-2"
              data-line-name="인천2호선"
-             data-line-color="#F4A462"  transform="translate(44.7877,46.3877)"/>
+             data-line-color="#F4A462"  transform="translate(48.656,45.221)"/>
           <circle
              id="_인천대공원"
              data-name="인천대공원"
@@ -3448,7 +3448,7 @@
              data-node-role="ordinary"
              data-line="incheon-2"
              data-line-name="인천2호선"
-             data-line-color="#F4A462"  transform="translate(10.2888,63.4822)"/>
+             data-line-color="#F4A462"  transform="translate(10.289,62.985)"/>
           <circle
              id="_동인천"
              data-name="동인천"
@@ -3464,7 +3464,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(0.0000,106.4835)"/>
+             data-line-color="#004A85"  transform="translate(0,239.848)"/>
           <circle
              id="_도원"
              data-name="도원"
@@ -3480,7 +3480,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(0.0000,70.9890)"/>
+             data-line-color="#004A85"  transform="translate(0,92.543)"/>
           <circle
              id="_제물포"
              data-name="제물포"
@@ -3496,7 +3496,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(0.0000,35.4945)"/>
+             data-line-color="#004A85"  transform="translate(0,53.147)"/>
           <circle
              id="_도화"
              data-name="도화"
@@ -3512,7 +3512,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85" />
+             data-line-color="#004A85"  transform="translate(0,16.303)"/>
           <circle
              id="_동암"
              data-name="동암"
@@ -3528,7 +3528,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-23.5958,19.1958)"/>
+             data-line-color="#004A85"  transform="translate(-87.945,7.912)"/>
           <circle
              id="_백운"
              data-name="백운"
@@ -3544,7 +3544,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85" />
+             data-line-color="#004A85"  transform="translate(-33.886,71.945)"/>
           <circle
              id="_부개"
              data-name="부개"
@@ -3560,7 +3560,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-121.4835,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(-180.635,-42.835)"/>
           <circle
              id="_송내"
              data-name="송내"
@@ -3576,7 +3576,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-80.9890,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(-128.229,-68.991)"/>
           <circle
              id="_중동"
              data-name="중동"
@@ -3592,7 +3592,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-40.4945,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(-145.473,26.868)"/>
           <circle
              id="_부천"
              data-name="부천"
@@ -3608,7 +3608,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85" />
+             data-line-color="#004A85"  transform="translate(-107.103,0)"/>
           <circle
              id="_역곡"
              data-name="역곡"
@@ -3624,7 +3624,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85" />
+             data-line-color="#004A85"  transform="translate(-24.842,22.42)"/>
           <circle
              id="_오류동"
              data-name="오류동"
@@ -3641,7 +3641,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-81.5934,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(-65.327,-76.503)"/>
           <circle
              id="_개봉"
              data-name="개봉"
@@ -3657,7 +3657,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-48.1341,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(-2.453,0)"/>
           <circle
              id="_구일"
              data-name="구일"
@@ -3673,7 +3673,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85" />
+             data-line-color="#004A85"  transform="translate(45.615,-3.927)"/>
           <circle
              id="_영등포"
              data-name="영등포"
@@ -3689,7 +3689,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85" />
+             data-line-color="#004A85"  transform="translate(70.84,0)"/>
           <circle
              id="_독산"
              data-name="독산"
@@ -3705,7 +3705,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-63.9877,-64.0888)"/>
+             data-line-color="#004A85"  transform="translate(-147.396,-88.682)"/>
           <circle
              id="_석수"
              data-name="석수"
@@ -3721,7 +3721,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-63.9877,-64.0888)"/>
+             data-line-color="#004A85"  transform="translate(-134.366,-113.834)"/>
           <circle
              id="_관악"
              data-name="관악"
@@ -3737,7 +3737,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-43.1919,-43.2930)"/>
+             data-line-color="#004A85"  transform="translate(-17.179,-36.064)"/>
           <circle
              id="_안양"
              data-name="안양"
@@ -3753,7 +3753,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-21.5958,-21.5958)"/>
+             data-line-color="#004A85"  transform="translate(-3.765,-3.765)"/>
           <circle
              id="_명학"
              data-name="명학"
@@ -3769,7 +3769,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85" />
+             data-line-color="#004A85"  transform="translate(18.787,18.787)"/>
           <circle
              id="_군포"
              data-name="군포"
@@ -3785,7 +3785,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85" />
+             data-line-color="#004A85"  transform="translate(26.213,26.213)"/>
           <circle
              id="_당정"
              data-name="당정"
@@ -3801,7 +3801,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85" />
+             data-line-color="#004A85"  transform="translate(9.514,9.514)"/>
           <circle
              id="_의왕"
              data-name="의왕"
@@ -3849,7 +3849,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85" />
+             data-line-color="#004A85"  transform="translate(-18.17,-18.17)"/>
           <circle
              id="_세류"
              data-name="세류"
@@ -3865,7 +3865,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-177.2462,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(-215.459,38.213)"/>
           <circle
              id="_세마"
              data-name="세마"
@@ -3881,7 +3881,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-166.2571,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(-163.496,-3.035)"/>
           <circle
              id="_오산대"
              data-name="오산대"
@@ -3897,7 +3897,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-155.7626,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(-153.727,0)"/>
           <circle
              id="_오산"
              data-name="오산"
@@ -3913,7 +3913,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-145.2681,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(-142.275,0)"/>
           <circle
              id="_진위"
              data-name="진위"
@@ -3929,7 +3929,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-134.7736,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(-129.987,0)"/>
           <circle
              id="_송탄"
              data-name="송탄"
@@ -3945,7 +3945,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-124.2791,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(-120.292,0)"/>
           <circle
              id="_서정리"
              data-name="서정리"
@@ -3961,7 +3961,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-100.4396,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(-95.653,0)"/>
           <circle
              id="_평택지제"
              data-name="평택지제"
@@ -3977,7 +3977,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-100.4396,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(-99.429,0)"/>
           <circle
              id="_평택"
              data-name="평택"
@@ -3993,7 +3993,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-89.9451,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(-88.503,0)"/>
           <circle
              id="_성환"
              data-name="성환"
@@ -4009,7 +4009,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-79.4505,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(-77.719,0)"/>
           <circle
              id="_직산"
              data-name="직산"
@@ -4025,7 +4025,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-68.9560,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(-67.035,0)"/>
           <circle
              id="_두정"
              data-name="두정"
@@ -4041,7 +4041,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-58.4615,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(-52.78,0)"/>
           <circle
              id="_천안"
              data-name="천안"
@@ -4057,7 +4057,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-47.9670,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(-42.193,0)"/>
           <circle
              id="_봉명"
              data-name="봉명"
@@ -4073,7 +4073,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-37.4725,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(-31.653,0)"/>
           <circle
              id="_쌍용"
              data-name="쌍용"
@@ -4089,7 +4089,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-26.9780,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(-21.119,0)"/>
           <circle
              id="_아산"
              data-name="아산"
@@ -4105,7 +4105,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-16.4835,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(-10.637,0)"/>
           <circle
              id="_탕정"
              data-name="탕정"
@@ -4121,7 +4121,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-10.9890,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(-5.134,0)"/>
           <circle
              id="_배방"
              data-name="배방"
@@ -4137,7 +4137,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-5.4945,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(0.365,0)"/>
           <circle
              id="_온양온천"
              data-name="온양온천"
@@ -4153,7 +4153,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85" />
+             data-line-color="#004A85"  transform="translate(5.862,0)"/>
           <circle
              id="_남영"
              data-name="남영"
@@ -4169,7 +4169,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85" />
+             data-line-color="#004A85"  transform="translate(0,-22.143)"/>
           <circle
              id="_종각"
              data-name="종각"
@@ -4185,7 +4185,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85" />
+             data-line-color="#004A85"  transform="translate(0,-11.429)"/>
           <circle
              id="_종로5가"
              data-name="종로5가"
@@ -4201,7 +4201,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85" />
+             data-line-color="#004A85"  transform="translate(-10.538,0)"/>
           <circle
              id="_제기동"
              data-name="제기동"
@@ -4233,7 +4233,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85" />
+             data-line-color="#004A85"  transform="translate(2.226,30.596)"/>
           <circle
              id="_신이문"
              data-name="신이문"
@@ -4249,7 +4249,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85" />
+             data-line-color="#004A85"  transform="translate(27.851,58.549)"/>
           <circle
              id="_월계"
              data-name="월계"
@@ -4265,7 +4265,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(0.0000,35.4945)"/>
+             data-line-color="#004A85"  transform="translate(0,35.639)"/>
           <circle
              id="_녹천"
              data-name="녹천"
@@ -4281,7 +4281,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85" />
+             data-line-color="#004A85"  transform="translate(0,0.594)"/>
           <circle
              id="_방학"
              data-name="방학"
@@ -4297,7 +4297,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(15.2945,-37.2000)"/>
+             data-line-color="#004A85"  transform="translate(172.718,-75.32)"/>
           <circle
              id="_도봉"
              data-name="도봉"
@@ -4313,7 +4313,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85" />
+             data-line-color="#004A85"  transform="translate(156.127,-76.675)"/>
           <circle
              id="_망월사"
              data-name="망월사"
@@ -4329,7 +4329,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85" />
+             data-line-color="#004A85"  transform="translate(181.886,12.651)"/>
           <circle
              id="_의정부"
              data-name="의정부"
@@ -4345,7 +4345,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(239.0330,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(400.105,-78.613)"/>
           <circle
              id="_가능"
              data-name="가능"
@@ -4361,7 +4361,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(213.5385,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(244.536,0)"/>
           <circle
              id="_녹양"
              data-name="녹양"
@@ -4377,7 +4377,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(188.0440,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(113.495,0)"/>
           <circle
              id="_양주"
              data-name="양주"
@@ -4393,7 +4393,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(162.5495,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(86.492,0)"/>
           <circle
              id="_덕계"
              data-name="덕계"
@@ -4409,7 +4409,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(137.0549,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(60.837,0)"/>
           <circle
              id="_덕정"
              data-name="덕정"
@@ -4425,7 +4425,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(111.5604,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(34.18,0)"/>
           <circle
              id="_지행"
              data-name="지행"
@@ -4441,7 +4441,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(86.0659,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(7.767,0)"/>
           <circle
              id="_동두천중앙"
              data-name="동두천중앙"
@@ -4457,7 +4457,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(60.5714,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(-18.356,0)"/>
           <circle
              id="_보산"
              data-name="보산"
@@ -4473,7 +4473,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(35.0769,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(-42.519,0)"/>
           <circle
              id="_동두천"
              data-name="동두천"
@@ -4489,7 +4489,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(9.5824,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(-69.998,0)"/>
           <circle
              id="_소요산"
              data-name="소요산"
@@ -4505,7 +4505,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(3.0879,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(-78.686,0)"/>
           <circle
              id="_청산"
              data-name="청산"
@@ -4521,7 +4521,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(2.4945,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(-79.418,0)"/>
           <circle
              id="_전곡"
              data-name="전곡"
@@ -4537,7 +4537,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85" />
+             data-line-color="#004A85"  transform="translate(-82.149,0)"/>
           <circle
              id="_신촌:2호선"
              data-name="신촌:2호선"
@@ -4569,7 +4569,7 @@
              data-node-role="ordinary"
              data-line="2"
              data-line-name="2호선"
-             data-line-color="#00A23F"  transform="translate(-35.4945,0.0000)"/>
+             data-line-color="#00A23F"  transform="translate(-45.813,0)"/>
           <circle
              id="_아현"
              data-name="아현"
@@ -4585,7 +4585,7 @@
              data-node-role="ordinary"
              data-line="2"
              data-line-name="2호선"
-             data-line-color="#00A23F" />
+             data-line-color="#00A23F"  transform="translate(-5.565,0)"/>
           <circle
              id="_을지로입구"
              data-name="을지로입구"
@@ -4601,7 +4601,7 @@
              data-node-role="ordinary"
              data-line="2"
              data-line-name="2호선"
-             data-line-color="#00A23F" />
+             data-line-color="#00A23F"  transform="translate(10.352,0)"/>
           <circle
              id="_상왕십리"
              data-name="상왕십리"
@@ -4617,7 +4617,7 @@
              data-node-role="ordinary"
              data-line="2"
              data-line-name="2호선"
-             data-line-color="#00A23F" />
+             data-line-color="#00A23F"  transform="translate(6.785,0)"/>
           <circle
              id="_한양대"
              data-name="한양대"
@@ -4633,7 +4633,7 @@
              data-node-role="ordinary"
              data-line="2"
              data-line-name="2호선"
-             data-line-color="#00A23F"  transform="translate(-20.5958,-20.5958)"/>
+             data-line-color="#00A23F"  transform="translate(-23.919,-23.919)"/>
           <circle
              id="_뚝섬"
              data-name="뚝섬"
@@ -4649,7 +4649,7 @@
              data-node-role="ordinary"
              data-line="2"
              data-line-name="2호선"
-             data-line-color="#00A23F" />
+             data-line-color="#00A23F"  transform="translate(-20.244,12.8)"/>
           <circle
              id="_구의"
              data-name="구의"
@@ -4665,7 +4665,7 @@
              data-node-role="ordinary"
              data-line="2"
              data-line-name="2호선"
-             data-line-color="#00A23F"  transform="translate(0.0000,-60.9890)"/>
+             data-line-color="#00A23F"  transform="translate(0,-59.284)"/>
           <circle
              id="_강변"
              data-name="강변"
@@ -4681,7 +4681,7 @@
              data-node-role="ordinary"
              data-line="2"
              data-line-name="2호선"
-             data-line-color="#00A23F"  transform="translate(0.0000,-25.2945)"/>
+             data-line-color="#00A23F"  transform="translate(0,-22.866)"/>
           <circle
              id="_잠실나루"
              data-name="잠실나루"
@@ -4697,7 +4697,7 @@
              data-node-role="ordinary"
              data-line="2"
              data-line-name="2호선"
-             data-line-color="#00A23F" />
+             data-line-color="#00A23F"  transform="translate(0,5.248)"/>
           <circle
              id="_잠실새내"
              data-name="잠실새내"
@@ -4713,7 +4713,7 @@
              data-node-role="ordinary"
              data-line="2"
              data-line-name="2호선"
-             data-line-color="#00A23F" />
+             data-line-color="#00A23F"  transform="translate(-9.985,75.292)"/>
           <circle
              id="_삼성"
              data-name="삼성"
@@ -4729,7 +4729,7 @@
              data-node-role="ordinary"
              data-line="2"
              data-line-name="2호선"
-             data-line-color="#00A23F" />
+             data-line-color="#00A23F"  transform="translate(22.222,0)"/>
           <circle
              id="_역삼"
              data-name="역삼"
@@ -4745,7 +4745,7 @@
              data-node-role="ordinary"
              data-line="2"
              data-line-name="2호선"
-             data-line-color="#00A23F" />
+             data-line-color="#00A23F"  transform="translate(43.857,23.925)"/>
           <circle
              id="_서초"
              data-name="서초"
@@ -4761,7 +4761,7 @@
              data-node-role="ordinary"
              data-line="2"
              data-line-name="2호선"
-             data-line-color="#00A23F"  transform="translate(18.4945,0.0000)"/>
+             data-line-color="#00A23F"  transform="translate(26.853,0)"/>
           <circle
              id="_방배"
              data-name="방배"
@@ -4777,7 +4777,7 @@
              data-node-role="ordinary"
              data-line="2"
              data-line-name="2호선"
-             data-line-color="#00A23F" />
+             data-line-color="#00A23F"  transform="translate(8.516,0)"/>
           <circle
              id="_낙성대"
              data-name="낙성대"
@@ -4793,7 +4793,7 @@
              data-node-role="ordinary"
              data-line="2"
              data-line-name="2호선"
-             data-line-color="#00A23F" />
+             data-line-color="#00A23F"  transform="translate(-44.486,0)"/>
           <circle
              id="_서울대입구"
              data-name="서울대입구"
@@ -4809,7 +4809,7 @@
              data-node-role="ordinary"
              data-line="2"
              data-line-name="2호선"
-             data-line-color="#00A23F" />
+             data-line-color="#00A23F"  transform="translate(-38.396,0)"/>
           <circle
              id="_봉천"
              data-name="봉천"
@@ -4825,7 +4825,7 @@
              data-node-role="ordinary"
              data-line="2"
              data-line-name="2호선"
-             data-line-color="#00A23F" />
+             data-line-color="#00A23F"  transform="translate(-38.727,-8.558)"/>
           <circle
              id="_서울대벤처타운"
              data-name="서울대벤처타운"
@@ -4841,7 +4841,7 @@
              data-node-role="ordinary"
              data-line="sillim"
              data-line-name="신림선"
-             data-line-color="#5E7DBB" />
+             data-line-color="#5E7DBB"  transform="translate(8.301,8.301)"/>
           <circle
              id="_서원"
              data-name="서원"
@@ -4857,7 +4857,7 @@
              data-node-role="ordinary"
              data-line="sillim"
              data-line-name="신림선"
-             data-line-color="#5E7DBB"  transform="translate(18.9031,-31.0947)"/>
+             data-line-color="#5E7DBB"  transform="translate(44.143,-42.238)"/>
           <circle
              id="_당곡"
              data-name="당곡"
@@ -4873,7 +4873,7 @@
              data-node-role="ordinary"
              data-line="sillim"
              data-line-name="신림선"
-             data-line-color="#5E7DBB" />
+             data-line-color="#5E7DBB"  transform="translate(27.789,14.49)"/>
           <circle
              id="_보라매병원"
              data-name="보라매병원"
@@ -4889,7 +4889,7 @@
              data-node-role="ordinary"
              data-line="sillim"
              data-line-name="신림선"
-             data-line-color="#5E7DBB"  transform="translate(-36.0947,-37.9958)"/>
+             data-line-color="#5E7DBB"  transform="translate(-2.435,-38.484)"/>
           <circle
              id="_보라매공원"
              data-name="보라매공원"
@@ -4905,7 +4905,7 @@
              data-node-role="ordinary"
              data-line="sillim"
              data-line-name="신림선"
-             data-line-color="#5E7DBB"  transform="translate(-74.1919,-78.0908)"/>
+             data-line-color="#5E7DBB"  transform="translate(-124.941,-116.671)"/>
           <circle
              id="_서울지방병무청"
              data-name="서울지방병무청"
@@ -4921,7 +4921,7 @@
              data-node-role="ordinary"
              data-line="sillim"
              data-line-name="신림선"
-             data-line-color="#5E7DBB" />
+             data-line-color="#5E7DBB"  transform="translate(-11.569,-8.947)"/>
           <circle
              id="_신대방"
              data-name="신대방"
@@ -4953,7 +4953,7 @@
              data-node-role="ordinary"
              data-line="2"
              data-line-name="2호선"
-             data-line-color="#00A23F" />
+             data-line-color="#00A23F"  transform="translate(5.716,5.716)"/>
           <circle
              id="_문래"
              data-name="문래"
@@ -4969,7 +4969,7 @@
              data-node-role="ordinary"
              data-line="2"
              data-line-name="2호선"
-             data-line-color="#00A23F" />
+             data-line-color="#00A23F"  transform="translate(5.037,5.264)"/>
           <circle
              id="_도림천"
              data-name="도림천"
@@ -4985,7 +4985,7 @@
              data-node-role="ordinary"
              data-line="2"
              data-line-name="2호선"
-             data-line-color="#00A23F" />
+             data-line-color="#00A23F"  transform="translate(-5.037,0)"/>
           <circle
              id="_양천구청"
              data-name="양천구청"
@@ -5033,7 +5033,7 @@
              data-node-role="ordinary"
              data-line="2"
              data-line-name="2호선"
-             data-line-color="#00A23F" />
+             data-line-color="#00A23F"  transform="translate(20.514,0)"/>
           <circle
              id="_신답"
              data-name="신답"
@@ -5065,7 +5065,7 @@
              data-node-role="ordinary"
              data-line="2"
              data-line-name="2호선"
-             data-line-color="#00A23F" />
+             data-line-color="#00A23F"  transform="translate(14.545,-38.701)"/>
           <circle
              id="_주엽"
              data-name="주엽"
@@ -5081,7 +5081,7 @@
              data-node-role="ordinary"
              data-line="3"
              data-line-name="3호선"
-             data-line-color="#ED6C00" />
+             data-line-color="#ED6C00"  transform="translate(-9.013,0)"/>
           <circle
              id="_정발산"
              data-name="정발산"
@@ -5097,7 +5097,7 @@
              data-node-role="ordinary"
              data-line="3"
              data-line-name="3호선"
-             data-line-color="#ED6C00"  transform="translate(24.4945,0.0000)"/>
+             data-line-color="#ED6C00"  transform="translate(16.222,0)"/>
           <circle
              id="_마두"
              data-name="마두"
@@ -5113,7 +5113,7 @@
              data-node-role="ordinary"
              data-line="3"
              data-line-name="3호선"
-             data-line-color="#ED6C00"  transform="translate(44.9890,0.0000)"/>
+             data-line-color="#ED6C00"  transform="translate(40.27,2.609)"/>
           <circle
              id="_백석"
              data-name="백석"
@@ -5129,7 +5129,7 @@
              data-node-role="ordinary"
              data-line="3"
              data-line-name="3호선"
-             data-line-color="#ED6C00"  transform="translate(65.4835,0.0000)"/>
+             data-line-color="#ED6C00"  transform="translate(51.782,-52.451)"/>
           <circle
              id="_화정"
              data-name="화정"
@@ -5145,7 +5145,7 @@
              data-node-role="ordinary"
              data-line="3"
              data-line-name="3호선"
-             data-line-color="#ED6C00" />
+             data-line-color="#ED6C00"  transform="translate(-44.2,-13.576)"/>
           <circle
              id="_원당"
              data-name="원당"
@@ -5161,7 +5161,7 @@
              data-node-role="ordinary"
              data-line="3"
              data-line-name="3호선"
-             data-line-color="#ED6C00"  transform="translate(32.4945,0.0000)"/>
+             data-line-color="#ED6C00"  transform="translate(-10.598,0)"/>
           <circle
              id="_원흥"
              data-name="원흥"
@@ -5177,7 +5177,7 @@
              data-node-role="ordinary"
              data-line="3"
              data-line-name="3호선"
-             data-line-color="#ED6C00"  transform="translate(64.9890,0.0000)"/>
+             data-line-color="#ED6C00"  transform="translate(28.288,0)"/>
           <circle
              id="_삼송"
              data-name="삼송"
@@ -5193,7 +5193,7 @@
              data-node-role="ordinary"
              data-line="3"
              data-line-name="3호선"
-             data-line-color="#ED6C00"  transform="translate(97.4835,0.0000)"/>
+             data-line-color="#ED6C00"  transform="translate(62.033,0)"/>
           <circle
              id="_지축"
              data-name="지축"
@@ -5209,7 +5209,7 @@
              data-node-role="ordinary"
              data-line="3"
              data-line-name="3호선"
-             data-line-color="#ED6C00"  transform="translate(129.9780,0.0000)"/>
+             data-line-color="#ED6C00"  transform="translate(200.24,0)"/>
           <circle
              id="_구파발"
              data-name="구파발"
@@ -5225,7 +5225,7 @@
              data-node-role="ordinary"
              data-line="3"
              data-line-name="3호선"
-             data-line-color="#ED6C00"  transform="translate(162.4725,0.0000)"/>
+             data-line-color="#ED6C00"  transform="translate(233.736,0)"/>
           <circle
              id="_녹번"
              data-name="녹번"
@@ -5241,7 +5241,7 @@
              data-node-role="ordinary"
              data-line="3"
              data-line-name="3호선"
-             data-line-color="#ED6C00" />
+             data-line-color="#ED6C00"  transform="translate(-2.495,5.116)"/>
           <circle
              id="_홍제"
              data-name="홍제"
@@ -5257,7 +5257,7 @@
              data-node-role="ordinary"
              data-line="3"
              data-line-name="3호선"
-             data-line-color="#ED6C00"  transform="translate(0.3958,0.6947)"/>
+             data-line-color="#ED6C00"  transform="translate(1.328,6.275)"/>
           <circle
              id="_무악재"
              data-name="무악재"
@@ -5273,7 +5273,7 @@
              data-node-role="ordinary"
              data-line="3"
              data-line-name="3호선"
-             data-line-color="#ED6C00"  transform="translate(21.0903,-29.1053)"/>
+             data-line-color="#ED6C00"  transform="translate(22.121,-29.105)"/>
           <circle
              id="_독립문"
              data-name="독립문"
@@ -5289,7 +5289,7 @@
              data-node-role="ordinary"
              data-line="3"
              data-line-name="3호선"
-             data-line-color="#ED6C00"  transform="translate(21.0903,-29.1053)"/>
+             data-line-color="#ED6C00"  transform="translate(24.708,-29.105)"/>
           <circle
              id="_경복궁"
              data-name="경복궁"
@@ -5337,7 +5337,7 @@
              data-node-role="ordinary"
              data-line="3"
              data-line-name="3호선"
-             data-line-color="#ED6C00" />
+             data-line-color="#ED6C00"  transform="translate(9.67,0)"/>
           <circle
              id="_금호"
              data-name="금호"
@@ -5353,7 +5353,7 @@
              data-node-role="ordinary"
              data-line="3"
              data-line-name="3호선"
-             data-line-color="#ED6C00" />
+             data-line-color="#ED6C00"  transform="translate(0,-11.363)"/>
           <circle
              id="_압구정"
              data-name="압구정"
@@ -5369,7 +5369,7 @@
              data-node-role="ordinary"
              data-line="3"
              data-line-name="3호선"
-             data-line-color="#ED6C00" />
+             data-line-color="#ED6C00"  transform="translate(0,1.991)"/>
           <circle
              id="_잠원"
              data-name="잠원"
@@ -5385,7 +5385,7 @@
              data-node-role="ordinary"
              data-line="3"
              data-line-name="3호선"
-             data-line-color="#ED6C00" />
+             data-line-color="#ED6C00"  transform="translate(21.569,92.605)"/>
           <circle
              id="_남부터미널"
              data-name="남부터미널"
@@ -5401,7 +5401,7 @@
              data-node-role="ordinary"
              data-line="3"
              data-line-name="3호선"
-             data-line-color="#ED6C00" />
+             data-line-color="#ED6C00"  transform="translate(2.991,-15.393)"/>
           <circle
              id="_매봉"
              data-name="매봉"
@@ -5417,7 +5417,7 @@
              data-node-role="ordinary"
              data-line="3"
              data-line-name="3호선"
-             data-line-color="#ED6C00" />
+             data-line-color="#ED6C00"  transform="translate(-4.371,0)"/>
           <circle
              id="_대치"
              data-name="대치"
@@ -5433,7 +5433,7 @@
              data-node-role="ordinary"
              data-line="3"
              data-line-name="3호선"
-             data-line-color="#ED6C00" />
+             data-line-color="#ED6C00"  transform="translate(31.857,0)"/>
           <circle
              id="_학여울"
              data-name="학여울"
@@ -5449,7 +5449,7 @@
              data-node-role="ordinary"
              data-line="3"
              data-line-name="3호선"
-             data-line-color="#ED6C00"  transform="translate(25.4945,0.0000)"/>
+             data-line-color="#ED6C00"  transform="translate(56.98,0)"/>
           <circle
              id="_대청"
              data-name="대청"
@@ -5465,7 +5465,7 @@
              data-node-role="ordinary"
              data-line="3"
              data-line-name="3호선"
-             data-line-color="#ED6C00"  transform="translate(50.9890,0.0000)"/>
+             data-line-color="#ED6C00"  transform="translate(85.077,0)"/>
           <circle
              id="_일원"
              data-name="일원"
@@ -5481,7 +5481,7 @@
              data-node-role="ordinary"
              data-line="3"
              data-line-name="3호선"
-             data-line-color="#ED6C00"  transform="translate(85.9846,-3.8000)"/>
+             data-line-color="#ED6C00"  transform="translate(120.24,-26.277)"/>
           <circle
              id="_경찰병원"
              data-name="경찰병원"
@@ -5513,7 +5513,7 @@
              data-node-role="ordinary"
              data-line="4"
              data-line-name="4호선"
-             data-line-color="#009BCE" />
+             data-line-color="#009BCE"  transform="translate(0,-9.811)"/>
           <circle
              id="_반월"
              data-name="반월"
@@ -5529,7 +5529,7 @@
              data-node-role="ordinary"
              data-line="4"
              data-line-name="4호선"
-             data-line-color="#009BCE"  transform="translate(0.0000,-35.4945)"/>
+             data-line-color="#009BCE"  transform="translate(0,-46.284)"/>
           <circle
              id="_대야미"
              data-name="대야미"
@@ -5545,7 +5545,7 @@
              data-node-role="ordinary"
              data-line="4"
              data-line-name="4호선"
-             data-line-color="#009BCE"  transform="translate(0.0000,-70.9890)"/>
+             data-line-color="#009BCE"  transform="translate(-14.101,-81.932)"/>
           <circle
              id="_수리산"
              data-name="수리산"
@@ -5561,7 +5561,7 @@
              data-node-role="ordinary"
              data-line="4"
              data-line-name="4호선"
-             data-line-color="#009BCE"  transform="translate(41.0969,-87.8837)"/>
+             data-line-color="#009BCE"  transform="translate(12.257,-114.719)"/>
           <circle
              id="_산본"
              data-name="산본"
@@ -5577,7 +5577,7 @@
              data-node-role="ordinary"
              data-line="4"
              data-line-name="4호선"
-             data-line-color="#009BCE"  transform="translate(72.6930,-119.4798)"/>
+             data-line-color="#009BCE"  transform="translate(48.445,-153.57)"/>
           <circle
              id="_범계"
              data-name="범계"
@@ -5593,7 +5593,7 @@
              data-node-role="ordinary"
              data-line="4"
              data-line-name="4호선"
-             data-line-color="#009BCE" />
+             data-line-color="#009BCE"  transform="translate(1.415,-4.666)"/>
           <circle
              id="_평촌"
              data-name="평촌"
@@ -5609,7 +5609,7 @@
              data-node-role="ordinary"
              data-line="4"
              data-line-name="4호선"
-             data-line-color="#009BCE"  transform="translate(20.4945,0.0000)"/>
+             data-line-color="#009BCE"  transform="translate(22.712,0)"/>
           <circle
              id="_인덕원"
              data-name="인덕원"
@@ -5625,7 +5625,7 @@
              data-node-role="ordinary"
              data-line="4"
              data-line-name="4호선"
-             data-line-color="#009BCE"  transform="translate(40.9890,0.0000)"/>
+             data-line-color="#009BCE"  transform="translate(43.941,0)"/>
           <circle
              id="_정부과천청사"
              data-name="정부과천청사"
@@ -5641,7 +5641,7 @@
              data-node-role="ordinary"
              data-line="4"
              data-line-name="4호선"
-             data-line-color="#009BCE"  transform="translate(61.4835,0.0000)"/>
+             data-line-color="#009BCE"  transform="translate(65.589,0)"/>
           <circle
              id="_과천"
              data-name="과천"
@@ -5657,7 +5657,7 @@
              data-node-role="ordinary"
              data-line="4"
              data-line-name="4호선"
-             data-line-color="#009BCE"  transform="translate(81.9780,0.0000)"/>
+             data-line-color="#009BCE"  transform="translate(92.396,0)"/>
           <circle
              id="_대공원"
              data-name="대공원"
@@ -5673,7 +5673,7 @@
              data-node-role="ordinary"
              data-line="4"
              data-line-name="4호선"
-             data-line-color="#009BCE"  transform="translate(102.4725,0.0000)"/>
+             data-line-color="#009BCE"  transform="translate(114.448,0)"/>
           <circle
              id="_경마공원"
              data-name="경마공원"
@@ -5689,7 +5689,7 @@
              data-node-role="ordinary"
              data-line="4"
              data-line-name="4호선"
-             data-line-color="#009BCE"  transform="translate(122.9670,0.0000)"/>
+             data-line-color="#009BCE"  transform="translate(136.719,6.323)"/>
           <circle
              id="_선바위"
              data-name="선바위"
@@ -5705,7 +5705,7 @@
              data-node-role="ordinary"
              data-line="4"
              data-line-name="4호선"
-             data-line-color="#009BCE"  transform="translate(151.9629,-1.2969)"/>
+             data-line-color="#009BCE"  transform="translate(158.286,-2.69)"/>
           <circle
              id="_남태령"
              data-name="남태령"
@@ -5721,7 +5721,7 @@
              data-node-role="ordinary"
              data-line="4"
              data-line-name="4호선"
-             data-line-color="#009BCE"  transform="translate(151.9629,-26.7914)"/>
+             data-line-color="#009BCE"  transform="translate(151.963,-31.721)"/>
           <circle
              id="_신용산"
              data-name="신용산"
@@ -5737,7 +5737,7 @@
              data-node-role="ordinary"
              data-line="4"
              data-line-name="4호선"
-             data-line-color="#009BCE" />
+             data-line-color="#009BCE"  transform="translate(-16.066,20.255)"/>
           <circle
              id="_숙대입구"
              data-name="숙대입구"
@@ -5753,7 +5753,7 @@
              data-node-role="ordinary"
              data-line="4"
              data-line-name="4호선"
-             data-line-color="#009BCE" />
+             data-line-color="#009BCE"  transform="translate(30.965,-3.769)"/>
           <circle
              id="_회현"
              data-name="회현"
@@ -5769,7 +5769,7 @@
              data-node-role="ordinary"
              data-line="4"
              data-line-name="4호선"
-             data-line-color="#009BCE" />
+             data-line-color="#009BCE"  transform="translate(3.71,-5.752)"/>
           <circle
              id="_명동"
              data-name="명동"
@@ -5785,7 +5785,7 @@
              data-node-role="ordinary"
              data-line="4"
              data-line-name="4호선"
-             data-line-color="#009BCE" />
+             data-line-color="#009BCE"  transform="translate(2.042,0)"/>
           <circle
              id="_혜화"
              data-name="혜화"
@@ -5801,7 +5801,7 @@
              data-node-role="ordinary"
              data-line="4"
              data-line-name="4호선"
-             data-line-color="#009BCE" />
+             data-line-color="#009BCE"  transform="translate(-10.059,10.059)"/>
           <circle
              id="_한성대입구"
              data-name="한성대입구"
@@ -5817,7 +5817,7 @@
              data-node-role="ordinary"
              data-line="4"
              data-line-name="4호선"
-             data-line-color="#009BCE"  transform="translate(14.8969,-14.5958)"/>
+             data-line-color="#009BCE"  transform="translate(6.123,-5.822)"/>
           <circle
              id="_길음"
              data-name="길음"
@@ -5977,7 +5977,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698" />
+             data-line-color="#794698"  transform="translate(4.235,-21.4)"/>
           <circle
              id="_송정"
              data-name="송정"
@@ -5993,7 +5993,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698"  transform="translate(-79.5835,-79.5835)"/>
+             data-line-color="#794698"  transform="translate(-153.01,-75.348)"/>
           <circle
              id="_마곡"
              data-name="마곡"
@@ -6009,7 +6009,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698"  transform="translate(-54.8888,-54.8866)"/>
+             data-line-color="#794698"  transform="translate(-119.728,-15.566)"/>
           <circle
              id="_발산"
              data-name="발산"
@@ -6025,7 +6025,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698"  transform="translate(-36.7919,-36.7919)"/>
+             data-line-color="#794698"  transform="translate(-76.126,-117.164)"/>
           <circle
              id="_우장산"
              data-name="우장산"
@@ -6041,7 +6041,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698"  transform="translate(-18.8969,-18.8947)"/>
+             data-line-color="#794698"  transform="translate(-81.594,-81.591)"/>
           <circle
              id="_화곡"
              data-name="화곡"
@@ -6057,7 +6057,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698" />
+             data-line-color="#794698"  transform="translate(-60.865,-60.865)"/>
           <circle
              id="_공항시장"
              data-name="공항시장"
@@ -6073,7 +6073,7 @@
              data-node-role="ordinary"
              data-line="9"
              data-line-name="9호선"
-             data-line-color="#A49D87" />
+             data-line-color="#A49D87"  transform="translate(-28.09,-69.198)"/>
           <circle
              id="_신방화"
              data-name="신방화"
@@ -6089,7 +6089,7 @@
              data-node-role="ordinary"
              data-line="9"
              data-line-name="9호선"
-             data-line-color="#A49D87" />
+             data-line-color="#A49D87"  transform="translate(5.191,2.244)"/>
           <circle
              id="_신방화-5"
              data-name="신방화"
@@ -6122,7 +6122,7 @@
              data-node-role="ordinary"
              data-line="9"
              data-line-name="9호선"
-             data-line-color="#A49D87"  transform="translate(-132.4743,-132.0743)"/>
+             data-line-color="#A49D87"  transform="translate(-75.6,-215.087)"/>
           <circle
              id="_가양"
              data-name="가양"
@@ -6138,7 +6138,7 @@
              data-node-role="ordinary"
              data-line="9"
              data-line-name="9호선"
-             data-line-color="#A49D87"  transform="translate(-109.0782,-108.5793)"/>
+             data-line-color="#A49D87"  transform="translate(-161.412,-30.186)"/>
           <circle
              id="_증미"
              data-name="증미"
@@ -6154,7 +6154,7 @@
              data-node-role="ordinary"
              data-line="9"
              data-line-name="9호선"
-             data-line-color="#A49D87"  transform="translate(-87.3835,-87.0824)"/>
+             data-line-color="#A49D87"  transform="translate(-107.063,-50.298)"/>
           <circle
              id="_등촌"
              data-name="등촌"
@@ -6170,7 +6170,7 @@
              data-node-role="ordinary"
              data-line="9"
              data-line-name="9호선"
-             data-line-color="#A49D87"  transform="translate(-65.7877,-65.5877)"/>
+             data-line-color="#A49D87"  transform="translate(-62.258,-62.058)"/>
           <circle
              id="_염창"
              data-name="염창"
@@ -6186,7 +6186,7 @@
              data-node-role="ordinary"
              data-line="9"
              data-line-name="9호선"
-             data-line-color="#A49D87"  transform="translate(-44.1919,-43.9919)"/>
+             data-line-color="#A49D87"  transform="translate(-38.73,-38.53)"/>
           <circle
              id="_신목동"
              data-name="신목동"
@@ -6202,7 +6202,7 @@
              data-node-role="ordinary"
              data-line="9"
              data-line-name="9호선"
-             data-line-color="#A49D87"  transform="translate(-22.5958,-22.4947)"/>
+             data-line-color="#A49D87"  transform="translate(-16.587,-16.486)"/>
           <circle
              id="_선유도"
              data-name="선유도"
@@ -6218,7 +6218,7 @@
              data-node-role="ordinary"
              data-line="9"
              data-line-name="9호선"
-             data-line-color="#A49D87" />
+             data-line-color="#A49D87"  transform="translate(6.519,6.519)"/>
           <circle
              id="_국회의사당"
              data-name="국회의사당"
@@ -6250,7 +6250,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698"  transform="translate(-54.0888,-54.0866)"/>
+             data-line-color="#794698"  transform="translate(-36.062,-36.06)"/>
           <circle
              id="_목동"
              data-name="목동"
@@ -6266,7 +6266,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698"  transform="translate(-36.0930,-36.0908)"/>
+             data-line-color="#794698"  transform="translate(-16.913,-16.91)"/>
           <circle
              id="_오목교"
              data-name="오목교"
@@ -6282,7 +6282,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698"  transform="translate(-17.9958,-17.9958)"/>
+             data-line-color="#794698"  transform="translate(2.14,2.14)"/>
           <circle
              id="_양평:5호선"
              data-name="양평:5호선"
@@ -6314,7 +6314,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698" />
+             data-line-color="#794698"  transform="translate(8.664,12.646)"/>
           <circle
              id="_여의나루"
              data-name="여의나루"
@@ -6330,7 +6330,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698" />
+             data-line-color="#794698"  transform="translate(27.158,7.42)"/>
           <circle
              id="_마포"
              data-name="마포"
@@ -6346,7 +6346,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698" />
+             data-line-color="#794698"  transform="translate(0,-19.785)"/>
           <circle
              id="_애오개"
              data-name="애오개"
@@ -6442,7 +6442,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698"  transform="translate(-12.4945,0.0000)"/>
+             data-line-color="#794698"  transform="translate(-5.552,0)"/>
           <circle
              id="_답십리"
              data-name="답십리"
@@ -6490,7 +6490,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698"  transform="translate(0.0000,-15.4945)"/>
+             data-line-color="#794698"  transform="translate(-30.756,8.578)"/>
           <circle
              id="_광나루"
              data-name="광나루"
@@ -6506,7 +6506,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698" />
+             data-line-color="#794698"  transform="translate(0,22.508)"/>
           <circle
              id="_둔촌동"
              data-name="둔촌동"
@@ -6522,7 +6522,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698" />
+             data-line-color="#794698"  transform="translate(-5.613,-5.613)"/>
           <circle
              id="_방이"
              data-name="방이"
@@ -6538,7 +6538,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698" />
+             data-line-color="#794698"  transform="translate(0,15.978)"/>
           <circle
              id="_개롱"
              data-name="개롱"
@@ -6554,7 +6554,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698"  transform="translate(-25.7187,0.6725)"/>
+             data-line-color="#794698"  transform="translate(-11.58,0.673)"/>
           <circle
              id="_거여"
              data-name="거여"
@@ -6570,7 +6570,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698" />
+             data-line-color="#794698"  transform="translate(15.519,0)"/>
           <circle
              id="_독바위"
              data-name="독바위"
@@ -6602,7 +6602,7 @@
              data-node-role="ordinary"
              data-line="6"
              data-line-name="6호선"
-             data-line-color="#7C4932"  transform="translate(0.0000,-10.4945)"/>
+             data-line-color="#7C4932"  transform="translate(3.327,-7.167)"/>
           <circle
              id="_역촌"
              data-name="역촌"
@@ -6634,7 +6634,7 @@
              data-node-role="ordinary"
              data-line="6"
              data-line-name="6호선"
-             data-line-color="#7C4932"  transform="translate(-76.9231,0.0000)"/>
+             data-line-color="#7C4932"  transform="translate(-79.615,-2.692)"/>
           <circle
              id="_새절"
              data-name="새절"
@@ -6650,7 +6650,7 @@
              data-node-role="ordinary"
              data-line="6"
              data-line-name="6호선"
-             data-line-color="#7C4932"  transform="translate(0.0000,-10.4945)"/>
+             data-line-color="#7C4932"  transform="translate(2.692,-22.044)"/>
           <circle
              id="_증산"
              data-name="증산"
@@ -6666,7 +6666,7 @@
              data-node-role="ordinary"
              data-line="6"
              data-line-name="6호선"
-             data-line-color="#7C4932" />
+             data-line-color="#7C4932"  transform="translate(0,-10.174)"/>
           <circle
              id="_월드컵경기장"
              data-name="월드컵경기장"
@@ -6682,7 +6682,7 @@
              data-node-role="ordinary"
              data-line="6"
              data-line-name="6호선"
-             data-line-color="#7C4932"  transform="translate(-11.8969,-37.0903)"/>
+             data-line-color="#7C4932"  transform="translate(-11.897,-23.794)"/>
           <circle
              id="_마포구청"
              data-name="마포구청"
@@ -6698,7 +6698,7 @@
              data-node-role="ordinary"
              data-line="6"
              data-line-name="6호선"
-             data-line-color="#7C4932"  transform="translate(-19.5958,-17.7958)"/>
+             data-line-color="#7C4932"  transform="translate(-57.55,-7.413)"/>
           <circle
              id="_망원"
              data-name="망원"
@@ -6714,7 +6714,7 @@
              data-node-role="ordinary"
              data-line="6"
              data-line-name="6호선"
-             data-line-color="#7C4932" />
+             data-line-color="#7C4932"  transform="translate(-17.618,-17.618)"/>
           <circle
              id="_상수"
              data-name="상수"
@@ -6730,7 +6730,7 @@
              data-node-role="ordinary"
              data-line="6"
              data-line-name="6호선"
-             data-line-color="#7C4932"  transform="translate(-8.5958,-9.0969)"/>
+             data-line-color="#7C4932"  transform="translate(16.958,7.973)"/>
           <circle
              id="_광흥창"
              data-name="광흥창"
@@ -6746,7 +6746,7 @@
              data-node-role="ordinary"
              data-line="6"
              data-line-name="6호선"
-             data-line-color="#7C4932" />
+             data-line-color="#7C4932"  transform="translate(-35.374,49.809)"/>
           <circle
              id="_대흥"
              data-name="대흥"
@@ -6762,7 +6762,7 @@
              data-node-role="ordinary"
              data-line="6"
              data-line-name="6호선"
-             data-line-color="#7C4932" />
+             data-line-color="#7C4932"  transform="translate(-30.334,0)"/>
           <circle
              id="_녹사평"
              data-name="녹사평"
@@ -6778,7 +6778,7 @@
              data-node-role="ordinary"
              data-line="6"
              data-line-name="6호선"
-             data-line-color="#7C4932"  transform="translate(-36.4835,0.0000)"/>
+             data-line-color="#7C4932"  transform="translate(-26.409,0)"/>
           <circle
              id="_이태원"
              data-name="이태원"
@@ -6794,7 +6794,7 @@
              data-node-role="ordinary"
              data-line="6"
              data-line-name="6호선"
-             data-line-color="#7C4932"  transform="translate(-30.9890,0.0000)"/>
+             data-line-color="#7C4932"  transform="translate(-20.998,0)"/>
           <circle
              id="_한강진"
              data-name="한강진"
@@ -6810,7 +6810,7 @@
              data-node-role="ordinary"
              data-line="6"
              data-line-name="6호선"
-             data-line-color="#7C4932"  transform="translate(-15.4945,0.0000)"/>
+             data-line-color="#7C4932"  transform="translate(-4.952,0)"/>
           <circle
              id="_버티고개"
              data-name="버티고개"
@@ -6826,7 +6826,7 @@
              data-node-role="ordinary"
              data-line="6"
              data-line-name="6호선"
-             data-line-color="#7C4932" />
+             data-line-color="#7C4932"  transform="translate(12.413,0)"/>
           <circle
              id="_창신"
              data-name="창신"
@@ -6842,7 +6842,7 @@
              data-node-role="ordinary"
              data-line="6"
              data-line-name="6호선"
-             data-line-color="#7C4932" />
+             data-line-color="#7C4932"  transform="translate(0,-1.163)"/>
           <circle
              id="_안암"
              data-name="안암"
@@ -6922,7 +6922,7 @@
              data-node-role="ordinary"
              data-line="6"
              data-line-name="6호선"
-             data-line-color="#7C4932" />
+             data-line-color="#7C4932"  transform="translate(-4.059,0)"/>
           <circle
              id="_화랑대"
              data-name="화랑대"
@@ -6970,7 +6970,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31" />
+             data-line-color="#6E7E31"  transform="translate(9.048,-13.158)"/>
           <circle
              id="_마들"
              data-name="마들"
@@ -7002,7 +7002,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31" />
+             data-line-color="#6E7E31"  transform="translate(0,-75.593)"/>
           <circle
              id="_하계"
              data-name="하계"
@@ -7018,7 +7018,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31"  transform="translate(0.0000,35.4945)"/>
+             data-line-color="#6E7E31"  transform="translate(0,-38.389)"/>
           <circle
              id="_공릉"
              data-name="공릉"
@@ -7034,7 +7034,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31"  transform="translate(0.0000,70.9890)"/>
+             data-line-color="#6E7E31"  transform="translate(0,-1.081)"/>
           <circle
              id="_먹골"
              data-name="먹골"
@@ -7050,7 +7050,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31" />
+             data-line-color="#6E7E31"  transform="translate(0,48.374)"/>
           <circle
              id="_중화"
              data-name="중화"
@@ -7066,7 +7066,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31"  transform="translate(0.0000,15.4945)"/>
+             data-line-color="#6E7E31"  transform="translate(0,65.949)"/>
           <circle
              id="_면목"
              data-name="면목"
@@ -7082,7 +7082,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31" />
+             data-line-color="#6E7E31"  transform="translate(-32.268,32.268)"/>
           <circle
              id="_사가정"
              data-name="사가정"
@@ -7098,7 +7098,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31"  transform="translate(-17.9958,18.0947)"/>
+             data-line-color="#6E7E31"  transform="translate(-54.901,55)"/>
           <circle
              id="_용마산"
              data-name="용마산"
@@ -7114,7 +7114,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31"  transform="translate(-35.9919,36.0908)"/>
+             data-line-color="#6E7E31"  transform="translate(-82.957,66.46)"/>
           <circle
              id="_중곡"
              data-name="중곡"
@@ -7130,7 +7130,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31"  transform="translate(-53.9877,53.9877)"/>
+             data-line-color="#6E7E31"  transform="translate(-135.678,13.306)"/>
           <circle
              id="_어린이대공원"
              data-name="어린이대공원"
@@ -7146,7 +7146,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31" />
+             data-line-color="#6E7E31"  transform="translate(3.655,0)"/>
           <circle
              id="_자양"
              data-name="자양"
@@ -7162,7 +7162,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31" />
+             data-line-color="#6E7E31"  transform="translate(21.143,-21.143)"/>
           <circle
              id="_청담"
              data-name="청담"
@@ -7178,7 +7178,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31"  transform="translate(-16.5958,16.5958)"/>
+             data-line-color="#6E7E31"  transform="translate(1.929,-1.929)"/>
           <circle
              id="_학동"
              data-name="학동"
@@ -7194,7 +7194,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31" />
+             data-line-color="#6E7E31"  transform="translate(-7.468,7.468)"/>
           <circle
              id="_반포"
              data-name="반포"
@@ -7210,7 +7210,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31" />
+             data-line-color="#6E7E31"  transform="translate(-18.288,18.288)"/>
           <circle
              id="_내방"
              data-name="내방"
@@ -7226,7 +7226,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31" />
+             data-line-color="#6E7E31"  transform="translate(28.974,-11.316)"/>
           <circle
              id="_남성"
              data-name="남성"
@@ -7242,7 +7242,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31" />
+             data-line-color="#6E7E31"  transform="translate(-20.415,0)"/>
           <circle
              id="_숭실대입구"
              data-name="숭실대입구"
@@ -7258,7 +7258,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31"  transform="translate(-15.4945,0.0000)"/>
+             data-line-color="#6E7E31"  transform="translate(-35.66,0)"/>
           <circle
              id="_상도"
              data-name="상도"
@@ -7274,7 +7274,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31"  transform="translate(-43.9890,0.0000)"/>
+             data-line-color="#6E7E31"  transform="translate(-67.238,0)"/>
           <circle
              id="_장승배기"
              data-name="장승배기"
@@ -7290,7 +7290,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31"  transform="translate(-64.4835,0.0000)"/>
+             data-line-color="#6E7E31"  transform="translate(-87.987,0)"/>
           <circle
              id="_신대방삼거리"
              data-name="신대방삼거리"
@@ -7306,7 +7306,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31"  transform="translate(-68.9780,0.0000)"/>
+             data-line-color="#6E7E31"  transform="translate(-92.017,-11.786)"/>
           <circle
              id="_신풍"
              data-name="신풍"
@@ -7322,7 +7322,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31" />
+             data-line-color="#6E7E31"  transform="translate(43.815,-30.949)"/>
           <circle
              id="_남구로"
              data-name="남구로"
@@ -7338,7 +7338,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31" />
+             data-line-color="#6E7E31"  transform="translate(-2.758,0)"/>
           <circle
              id="_철산"
              data-name="철산"
@@ -7354,7 +7354,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31" />
+             data-line-color="#6E7E31"  transform="translate(-51.932,0)"/>
           <circle
              id="_광명사거리"
              data-name="광명사거리"
@@ -7370,7 +7370,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31"  transform="translate(-25.4945,0.0000)"/>
+             data-line-color="#6E7E31"  transform="translate(-77.246,21.393)"/>
           <circle
              id="_천왕"
              data-name="천왕"
@@ -7386,7 +7386,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31"  transform="translate(-33.2903,-36.7958)"/>
+             data-line-color="#6E7E31"  transform="translate(-82.277,-18.763)"/>
           <circle
              id="_까치울"
              data-name="까치울"
@@ -7402,7 +7402,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31" />
+             data-line-color="#6E7E31"  transform="translate(0,22.268)"/>
           <circle
              id="_춘의"
              data-name="춘의"
@@ -7418,7 +7418,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31" />
+             data-line-color="#6E7E31"  transform="translate(0,-17.448)"/>
           <circle
              id="_신중동"
              data-name="신중동"
@@ -7434,7 +7434,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31" />
+             data-line-color="#6E7E31"  transform="translate(5.866,0)"/>
           <circle
              id="_부천시청"
              data-name="부천시청"
@@ -7450,7 +7450,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31"  transform="translate(-24.4945,0.0000)"/>
+             data-line-color="#6E7E31"  transform="translate(-19.462,0)"/>
           <circle
              id="_상동"
              data-name="상동"
@@ -7466,7 +7466,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31"  transform="translate(-49.9890,-20.4989)"/>
+             data-line-color="#6E7E31"  transform="translate(-47.565,-33.822)"/>
           <circle
              id="_삼산체육관"
              data-name="삼산체육관"
@@ -7482,7 +7482,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31"  transform="translate(-64.5848,-5.8042)"/>
+             data-line-color="#6E7E31"  transform="translate(-61.013,-9.376)"/>
           <circle
              id="_굴포천"
              data-name="굴포천"
@@ -7498,7 +7498,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31"  transform="translate(-76.1809,5.8930)"/>
+             data-line-color="#6E7E31"  transform="translate(-69.172,7.915)"/>
           <circle
              id="_산곡"
              data-name="산곡"
@@ -7514,7 +7514,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31" />
+             data-line-color="#6E7E31"  transform="translate(-10.989,-32.402)"/>
           <circle
              id="_길동"
              data-name="길동"
@@ -7530,7 +7530,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698" />
+             data-line-color="#794698"  transform="translate(-1.125,1.125)"/>
           <circle
              id="_굽은다리"
              data-name="굽은다리"
@@ -7546,7 +7546,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698"  transform="translate(14.5958,-14.5958)"/>
+             data-line-color="#794698"  transform="translate(18.103,-18.103)"/>
           <circle
              id="_명일"
              data-name="명일"
@@ -7562,7 +7562,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698"  transform="translate(29.1919,-29.1919)"/>
+             data-line-color="#794698"  transform="translate(34.381,-34.381)"/>
           <circle
              id="_고덕"
              data-name="고덕"
@@ -7578,7 +7578,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698"  transform="translate(43.7877,-43.7877)"/>
+             data-line-color="#794698"  transform="translate(50.744,-50.744)"/>
           <circle
              id="_상일동"
              data-name="상일동"
@@ -7674,7 +7674,7 @@
              data-node-role="ordinary"
              data-line="8"
              data-line-name="8호선"
-             data-line-color="#D11D70"  transform="translate(-9.4327,-14.6947)"/>
+             data-line-color="#D11D70"  transform="translate(-4.057,1.004)"/>
           <circle
              id="_암사"
              data-name="암사"
@@ -7722,7 +7722,7 @@
              data-node-role="ordinary"
              data-line="8"
              data-line-name="8호선"
-             data-line-color="#D11D70" />
+             data-line-color="#D11D70"  transform="translate(-10.567,10.567)"/>
           <circle
              id="_동구릉"
              data-name="동구릉"
@@ -7738,7 +7738,7 @@
              data-node-role="ordinary"
              data-line="8"
              data-line-name="8호선"
-             data-line-color="#D11D70" />
+             data-line-color="#D11D70"  transform="translate(-1.255,1.255)"/>
           <circle
              id="_다산"
              data-name="다산"
@@ -7754,7 +7754,7 @@
              data-node-role="ordinary"
              data-line="8"
              data-line-name="8호선"
-             data-line-color="#D11D70"  transform="translate(21.1826,-20.7189)"/>
+             data-line-color="#D11D70"  transform="translate(22.912,-22.448)"/>
           <circle
              id="_몽촌토성"
              data-name="몽촌토성"
@@ -7770,7 +7770,7 @@
              data-node-role="ordinary"
              data-line="8"
              data-line-name="8호선"
-             data-line-color="#D11D70" />
+             data-line-color="#D11D70"  transform="translate(-5.376,5.376)"/>
           <circle
              id="_송파"
              data-name="송파"
@@ -7786,7 +7786,7 @@
              data-node-role="ordinary"
              data-line="8"
              data-line-name="8호선"
-             data-line-color="#D11D70" />
+             data-line-color="#D11D70"  transform="translate(-2.132,-2.132)"/>
           <circle
              id="_문정"
              data-name="문정"
@@ -7802,7 +7802,7 @@
              data-node-role="ordinary"
              data-line="8"
              data-line-name="8호선"
-             data-line-color="#D11D70"  transform="translate(-14.6947,-14.5958)"/>
+             data-line-color="#D11D70"  transform="translate(-17.152,-17.053)"/>
           <circle
              id="_장지"
              data-name="장지"
@@ -7818,7 +7818,7 @@
              data-node-role="ordinary"
              data-line="8"
              data-line-name="8호선"
-             data-line-color="#D11D70" />
+             data-line-color="#D11D70"  transform="translate(17.22,-28.046)"/>
           <circle
              id="_남위례"
              data-name="남위례"
@@ -7834,7 +7834,7 @@
              data-node-role="ordinary"
              data-line="8"
              data-line-name="8호선"
-             data-line-color="#D11D70"  transform="translate(-50.1899,-52.3481)"/>
+             data-line-color="#D11D70"  transform="translate(12.931,-69.656)"/>
           <circle
              id="_산성"
              data-name="산성"
@@ -7850,7 +7850,7 @@
              data-node-role="ordinary"
              data-line="8"
              data-line-name="8호선"
-             data-line-color="#D11D70"  transform="translate(-26.0622,-33.6820)"/>
+             data-line-color="#D11D70"  transform="translate(-36.205,-17.928)"/>
           <circle
              id="_남한산성입구"
              data-name="남한산성입구"
@@ -7866,7 +7866,7 @@
              data-node-role="ordinary"
              data-line="8"
              data-line-name="8호선"
-             data-line-color="#D11D70"  transform="translate(4.3141,-8.5035)"/>
+             data-line-color="#D11D70"  transform="translate(7.024,-5.794)"/>
           <circle
              id="_단대오거리"
              data-name="단대오거리"
@@ -7882,7 +7882,7 @@
              data-node-role="ordinary"
              data-line="8"
              data-line-name="8호선"
-             data-line-color="#D11D70"  transform="translate(19.8022,-0.0176)"/>
+             data-line-color="#D11D70"  transform="translate(33.675,0.976)"/>
           <circle
              id="_신흥"
              data-name="신흥"
@@ -7898,7 +7898,7 @@
              data-node-role="ordinary"
              data-line="8"
              data-line-name="8호선"
-             data-line-color="#D11D70"  transform="translate(19.8022,-0.0176)"/>
+             data-line-color="#D11D70"  transform="translate(45.695,6.422)"/>
           <circle
              id="_수진"
              data-name="수진"
@@ -7914,7 +7914,7 @@
              data-node-role="ordinary"
              data-line="8"
              data-line-name="8호선"
-             data-line-color="#D11D70" />
+             data-line-color="#D11D70"  transform="translate(23.609,0)"/>
           <circle
              id="_노들"
              data-name="노들"
@@ -7930,7 +7930,7 @@
              data-node-role="ordinary"
              data-line="9"
              data-line-name="9호선"
-             data-line-color="#A49D87"  transform="translate(-10.4945,0.0000)"/>
+             data-line-color="#A49D87"  transform="translate(-2.305,0)"/>
           <circle
              id="_흑석"
              data-name="흑석"
@@ -7946,7 +7946,7 @@
              data-node-role="ordinary"
              data-line="9"
              data-line-name="9호선"
-             data-line-color="#A49D87" />
+             data-line-color="#A49D87"  transform="translate(9.218,0)"/>
           <circle
              id="_구반포"
              data-name="구반포"
@@ -7962,7 +7962,7 @@
              data-node-role="ordinary"
              data-line="9"
              data-line-name="9호선"
-             data-line-color="#A49D87"  transform="translate(-9.5958,-9.5958)"/>
+             data-line-color="#A49D87"  transform="translate(21.897,9.444)"/>
           <circle
              id="_신반포"
              data-name="신반포"
@@ -7978,7 +7978,7 @@
              data-node-role="ordinary"
              data-line="9"
              data-line-name="9호선"
-             data-line-color="#A49D87" />
+             data-line-color="#A49D87"  transform="translate(-18.457,49.591)"/>
           <circle
              id="_사평"
              data-name="사평"
@@ -7994,7 +7994,7 @@
              data-node-role="ordinary"
              data-line="9"
              data-line-name="9호선"
-             data-line-color="#A49D87" />
+             data-line-color="#A49D87"  transform="translate(-102.727,-16.182)"/>
           <circle
              id="_언주"
              data-name="언주"
@@ -8010,7 +8010,7 @@
              data-node-role="ordinary"
              data-line="9"
              data-line-name="9호선"
-             data-line-color="#A49D87" />
+             data-line-color="#A49D87"  transform="translate(-31.101,0)"/>
           <circle
              id="_삼성중앙"
              data-name="삼성중앙"
@@ -8026,7 +8026,7 @@
              data-node-role="ordinary"
              data-line="9"
              data-line-name="9호선"
-             data-line-color="#A49D87"  transform="translate(-38.4945,0.0000)"/>
+             data-line-color="#A49D87"  transform="translate(41.418,0)"/>
           <circle
              id="_봉은사"
              data-name="봉은사"
@@ -8042,7 +8042,7 @@
              data-node-role="ordinary"
              data-line="9"
              data-line-name="9호선"
-             data-line-color="#A49D87" />
+             data-line-color="#A49D87"  transform="translate(78.938,-36.679)"/>
           <circle
              id="_청라국제도시"
              data-name="청라국제도시"
@@ -8071,7 +8071,7 @@
              data-node-role="ordinary"
              data-line="incheon-1"
              data-line-name="인천1호선"
-             data-line-color="#B4C7E7" />
+             data-line-color="#B4C7E7"  transform="translate(0,-0.418)"/>
           <circle
              id="_아라"
              data-name="아라"
@@ -8087,7 +8087,7 @@
              data-node-role="ordinary"
              data-line="incheon-1"
              data-line-name="인천1호선"
-             data-line-color="#B4C7E7"  transform="translate(0.0000,29.3912)"/>
+             data-line-color="#B4C7E7"  transform="translate(0,-11.499)"/>
           <circle
              id="_신검단중앙"
              data-name="신검단중앙"
@@ -8103,7 +8103,7 @@
              data-node-role="ordinary"
              data-line="incheon-1"
              data-line-name="인천1호선"
-             data-line-color="#B4C7E7" />
+             data-line-color="#B4C7E7"  transform="translate(0,-48.365)"/>
           <circle
              id="_박촌"
              data-name="박촌"
@@ -8119,7 +8119,7 @@
              data-node-role="ordinary"
              data-line="incheon-1"
              data-line-name="인천1호선"
-             data-line-color="#B4C7E7"  transform="translate(0.0000,25.4945)"/>
+             data-line-color="#B4C7E7"  transform="translate(0,26.725)"/>
           <circle
              id="_임학"
              data-name="임학"
@@ -8135,7 +8135,7 @@
              data-node-role="ordinary"
              data-line="incheon-1"
              data-line-name="인천1호선"
-             data-line-color="#B4C7E7"  transform="translate(0.0000,50.9890)"/>
+             data-line-color="#B4C7E7"  transform="translate(0,52.624)"/>
           <circle
              id="_계산"
              data-name="계산"
@@ -8151,7 +8151,7 @@
              data-node-role="ordinary"
              data-line="incheon-1"
              data-line-name="인천1호선"
-             data-line-color="#B4C7E7"  transform="translate(0.0000,76.4835)"/>
+             data-line-color="#B4C7E7"  transform="translate(0,78.209)"/>
           <circle
              id="_경인교대입구"
              data-name="경인교대입구"
@@ -8167,7 +8167,7 @@
              data-node-role="ordinary"
              data-line="incheon-1"
              data-line-name="인천1호선"
-             data-line-color="#B4C7E7"  transform="translate(0.0000,101.9780)"/>
+             data-line-color="#B4C7E7"  transform="translate(0,103.932)"/>
           <circle
              id="_작전"
              data-name="작전"
@@ -8183,7 +8183,7 @@
              data-node-role="ordinary"
              data-line="incheon-1"
              data-line-name="인천1호선"
-             data-line-color="#B4C7E7"  transform="translate(0.0000,127.4725)"/>
+             data-line-color="#B4C7E7"  transform="translate(24.037,127.747)"/>
           <circle
              id="_갈산"
              data-name="갈산"
@@ -8199,7 +8199,7 @@
              data-node-role="ordinary"
              data-line="incheon-1"
              data-line-name="인천1호선"
-             data-line-color="#B4C7E7"  transform="translate(0.0000,152.9670)"/>
+             data-line-color="#B4C7E7"  transform="translate(-74.182,89.387)"/>
           <circle
              id="_부평시장"
              data-name="부평시장"
@@ -8215,7 +8215,7 @@
              data-node-role="ordinary"
              data-line="incheon-1"
              data-line-name="인천1호선"
-             data-line-color="#B4C7E7" />
+             data-line-color="#B4C7E7"  transform="translate(-20.112,18.119)"/>
           <circle
              id="_동수"
              data-name="동수"
@@ -8231,7 +8231,7 @@
              data-node-role="ordinary"
              data-line="incheon-1"
              data-line-name="인천1호선"
-             data-line-color="#B4C7E7" />
+             data-line-color="#B4C7E7"  transform="translate(12.525,-2.552)"/>
           <circle
              id="_부평삼거리"
              data-name="부평삼거리"
@@ -8247,7 +8247,7 @@
              data-node-role="ordinary"
              data-line="incheon-1"
              data-line-name="인천1호선"
-             data-line-color="#B4C7E7"  transform="translate(29.1958,25.4969)"/>
+             data-line-color="#B4C7E7"  transform="translate(69.108,-6.191)"/>
           <circle
              id="_간석오거리"
              data-name="간석오거리"
@@ -8263,7 +8263,7 @@
              data-node-role="ordinary"
              data-line="incheon-1"
              data-line-name="인천1호선"
-             data-line-color="#B4C7E7"  transform="translate(22.7343,77.8640)"/>
+             data-line-color="#B4C7E7"  transform="translate(166.339,96.921)"/>
           <circle
              id="_예술회관"
              data-name="예술회관"
@@ -8279,7 +8279,7 @@
              data-node-role="ordinary"
              data-line="incheon-1"
              data-line-name="인천1호선"
-             data-line-color="#B4C7E7" />
+             data-line-color="#B4C7E7"  transform="translate(-76.338,-26.596)"/>
           <circle
              id="_인천터미널"
              data-name="인천터미널"
@@ -8295,7 +8295,7 @@
              data-node-role="ordinary"
              data-line="incheon-1"
              data-line-name="인천1호선"
-             data-line-color="#B4C7E7"  transform="translate(0.0000,20.4945)"/>
+             data-line-color="#B4C7E7"  transform="translate(9.697,-47.367)"/>
           <circle
              id="_문학경기장"
              data-name="문학경기장"
@@ -8311,7 +8311,7 @@
              data-node-role="ordinary"
              data-line="incheon-1"
              data-line-name="인천1호선"
-             data-line-color="#B4C7E7"  transform="translate(0.0000,40.9890)"/>
+             data-line-color="#B4C7E7"  transform="translate(0,-26.011)"/>
           <circle
              id="_선학"
              data-name="선학"
@@ -8327,7 +8327,7 @@
              data-node-role="ordinary"
              data-line="incheon-1"
              data-line-name="인천1호선"
-             data-line-color="#B4C7E7"  transform="translate(0.0000,57.4835)"/>
+             data-line-color="#B4C7E7"  transform="translate(0,-6.89)"/>
           <circle
              id="_신연수"
              data-name="신연수"
@@ -8343,7 +8343,7 @@
              data-node-role="ordinary"
              data-line="incheon-1"
              data-line-name="인천1호선"
-             data-line-color="#B4C7E7"  transform="translate(0.0000,77.9780)"/>
+             data-line-color="#B4C7E7"  transform="translate(0,14.215)"/>
           <circle
              id="_동춘"
              data-name="동춘"
@@ -8359,7 +8359,7 @@
              data-node-role="ordinary"
              data-line="incheon-1"
              data-line-name="인천1호선"
-             data-line-color="#B4C7E7" />
+             data-line-color="#B4C7E7"  transform="translate(0,52.809)"/>
           <circle
              id="_동막"
              data-name="동막"
@@ -8375,7 +8375,7 @@
              data-node-role="ordinary"
              data-line="incheon-1"
              data-line-name="인천1호선"
-             data-line-color="#B4C7E7"  transform="translate(0.0000,45.4945)"/>
+             data-line-color="#B4C7E7"  transform="translate(0,101.574)"/>
           <circle
              id="_캠퍼스타운"
              data-name="캠퍼스타운"
@@ -8391,7 +8391,7 @@
              data-node-role="ordinary"
              data-line="incheon-1"
              data-line-name="인천1호선"
-             data-line-color="#B4C7E7"  transform="translate(0.0000,90.9890)"/>
+             data-line-color="#B4C7E7"  transform="translate(0,145.816)"/>
           <circle
              id="_테크노파크"
              data-name="테크노파크"
@@ -8407,7 +8407,7 @@
              data-node-role="ordinary"
              data-line="incheon-1"
              data-line-name="인천1호선"
-             data-line-color="#B4C7E7"  transform="translate(0.0000,138.4835)"/>
+             data-line-color="#B4C7E7"  transform="translate(0,194.642)"/>
           <circle
              id="_지식정보단지"
              data-name="지식정보단지"
@@ -8423,7 +8423,7 @@
              data-node-role="ordinary"
              data-line="incheon-1"
              data-line-name="인천1호선"
-             data-line-color="#B4C7E7"  transform="translate(0.1011,187.2769)"/>
+             data-line-color="#B4C7E7"  transform="translate(0.101,244.057)"/>
           <circle
              id="_인천대입구"
              data-name="인천대입구"
@@ -8439,7 +8439,7 @@
              data-node-role="ordinary"
              data-line="incheon-1"
              data-line-name="인천1호선"
-             data-line-color="#B4C7E7"  transform="translate(0.1011,236.7714)"/>
+             data-line-color="#B4C7E7"  transform="translate(20.824,292.666)"/>
           <circle
              id="_센트럴파크"
              data-name="센트럴파크"
@@ -8455,7 +8455,7 @@
              data-node-role="ordinary"
              data-line="incheon-1"
              data-line-name="인천1호선"
-             data-line-color="#B4C7E7"  transform="translate(-34.4947,253.3673)"/>
+             data-line-color="#B4C7E7"  transform="translate(-38.512,274.09)"/>
           <circle
              id="_신포"
              data-name="신포"
@@ -8471,7 +8471,7 @@
              data-node-role="ordinary"
              data-line="suin-bundang"
              data-line-name="수인분당선"
-             data-line-color="#ECA300" />
+             data-line-color="#ECA300"  transform="translate(0,103.347)"/>
           <circle
              id="_숭의"
              data-name="숭의"
@@ -8487,7 +8487,7 @@
              data-node-role="ordinary"
              data-line="suin-bundang"
              data-line-name="수인분당선"
-             data-line-color="#ECA300"  transform="translate(0.0000,53.4945)"/>
+             data-line-color="#ECA300"  transform="translate(0,158.945)"/>
           <circle
              id="_인하대"
              data-name="인하대"
@@ -8503,7 +8503,7 @@
              data-node-role="ordinary"
              data-line="suin-bundang"
              data-line-name="수인분당선"
-             data-line-color="#ECA300"  transform="translate(-19.4989,108.9890)"/>
+             data-line-color="#ECA300"  transform="translate(-19.499,221.169)"/>
           <circle
              id="_송도"
              data-name="송도"
@@ -8535,7 +8535,7 @@
              data-node-role="ordinary"
              data-line="suin-bundang"
              data-line-name="수인분당선"
-             data-line-color="#ECA300"  transform="translate(33.9890,91.9890)"/>
+             data-line-color="#ECA300"  transform="translate(24.525,145.508)"/>
           <circle
              id="_남동인더스파크"
              data-name="남동인더스파크"
@@ -8631,7 +8631,7 @@
              data-node-role="ordinary"
              data-line="suin-bundang"
              data-line-name="수인분당선"
-             data-line-color="#ECA300"  transform="translate(31.1919,121.6754)"/>
+             data-line-color="#ECA300"  transform="translate(24.231,128.636)"/>
           <circle
              id="_파주"
              data-name="파주"
@@ -8647,7 +8647,7 @@
              data-node-role="ordinary"
              data-line="gyeongui-jungang"
              data-line-name="경의중앙선"
-             data-line-color="#6AC2B3"  transform="translate(197.9670,0.0000)"/>
+             data-line-color="#6AC2B3"  transform="translate(211.925,0)"/>
           <circle
              id="_월롱"
              data-name="월롱"
@@ -8663,7 +8663,7 @@
              data-node-role="ordinary"
              data-line="gyeongui-jungang"
              data-line-name="경의중앙선"
-             data-line-color="#6AC2B3"  transform="translate(162.4725,0.0000)"/>
+             data-line-color="#6AC2B3"  transform="translate(174.301,0)"/>
           <circle
              id="_금촌"
              data-name="금촌"
@@ -8679,7 +8679,7 @@
              data-node-role="ordinary"
              data-line="gyeongui-jungang"
              data-line-name="경의중앙선"
-             data-line-color="#6AC2B3"  transform="translate(129.9780,0.0000)"/>
+             data-line-color="#6AC2B3"  transform="translate(139.925,0)"/>
           <circle
              id="_금릉"
              data-name="금릉"
@@ -8695,7 +8695,7 @@
              data-node-role="ordinary"
              data-line="gyeongui-jungang"
              data-line-name="경의중앙선"
-             data-line-color="#6AC2B3"  transform="translate(97.4835,0.0000)"/>
+             data-line-color="#6AC2B3"  transform="translate(105.51,0)"/>
           <circle
              id="_운정"
              data-name="운정"
@@ -8711,7 +8711,7 @@
              data-node-role="ordinary"
              data-line="gyeongui-jungang"
              data-line-name="경의중앙선"
-             data-line-color="#6AC2B3"  transform="translate(64.9890,0.0000)"/>
+             data-line-color="#6AC2B3"  transform="translate(70.796,0)"/>
           <circle
              id="_야당"
              data-name="야당"
@@ -8727,7 +8727,7 @@
              data-node-role="ordinary"
              data-line="gyeongui-jungang"
              data-line-name="경의중앙선"
-             data-line-color="#6AC2B3"  transform="translate(30.3956,0.0000)"/>
+             data-line-color="#6AC2B3"  transform="translate(29.684,0)"/>
           <circle
              id="_탄현"
              data-name="탄현"
@@ -8743,7 +8743,7 @@
              data-node-role="ordinary"
              data-line="gyeongui-jungang"
              data-line-name="경의중앙선"
-             data-line-color="#6AC2B3" />
+             data-line-color="#6AC2B3"  transform="translate(-3.02,17.547)"/>
           <circle
              id="_행신"
              data-name="행신"
@@ -8775,7 +8775,7 @@
              data-node-role="ordinary"
              data-line="gyeongui-jungang"
              data-line-name="경의중앙선"
-             data-line-color="#6AC2B3" />
+             data-line-color="#6AC2B3"  transform="translate(-3.211,-3.211)"/>
           <circle
              id="_한국항공대"
              data-name="한국항공대"
@@ -8791,7 +8791,7 @@
              data-node-role="ordinary"
              data-line="gyeongui-jungang"
              data-line-name="경의중앙선"
-             data-line-color="#6AC2B3" />
+             data-line-color="#6AC2B3"  transform="translate(0.163,0.163)"/>
           <circle
              id="_수색"
              data-name="수색"
@@ -8807,7 +8807,7 @@
              data-node-role="ordinary"
              data-line="gyeongui-jungang"
              data-line-name="경의중앙선"
-             data-line-color="#6AC2B3" />
+             data-line-color="#6AC2B3"  transform="translate(0.409,0.409)"/>
           <circle
              id="_신촌:경의중앙선"
              data-name="신촌:경의중앙선"
@@ -8839,7 +8839,7 @@
              data-node-role="ordinary"
              data-line="gyeongui-jungang"
              data-line-name="경의중앙선"
-             data-line-color="#6AC2B3" />
+             data-line-color="#6AC2B3"  transform="translate(7.613,7.613)"/>
           <circle
              id="_서빙고"
              data-name="서빙고"
@@ -8903,7 +8903,7 @@
              data-node-role="ordinary"
              data-line="gyeongui-jungang"
              data-line-name="경의중앙선"
-             data-line-color="#6AC2B3" />
+             data-line-color="#6AC2B3"  transform="translate(9.237,-23.389)"/>
           <circle
              id="_도농"
              data-name="도농"
@@ -8919,7 +8919,7 @@
              data-node-role="ordinary"
              data-line="gyeongui-jungang"
              data-line-name="경의중앙선"
-             data-line-color="#6AC2B3"  transform="translate(-9.3101,31.2332)"/>
+             data-line-color="#6AC2B3"  transform="translate(5.099,31.233)"/>
           <circle
              id="_양정"
              data-name="양정"
@@ -8951,7 +8951,7 @@
              data-node-role="ordinary"
              data-line="gyeongui-jungang"
              data-line-name="경의중앙선"
-             data-line-color="#6AC2B3"  transform="translate(-9.3101,31.2332)"/>
+             data-line-color="#6AC2B3"  transform="translate(-13.038,31.233)"/>
           <circle
              id="_도심"
              data-name="도심"
@@ -8967,7 +8967,7 @@
              data-node-role="ordinary"
              data-line="gyeongui-jungang"
              data-line-name="경의중앙선"
-             data-line-color="#6AC2B3"  transform="translate(-9.3101,31.2332)"/>
+             data-line-color="#6AC2B3"  transform="translate(-5.583,31.233)"/>
           <circle
              id="_팔당"
              data-name="팔당"
@@ -9143,7 +9143,7 @@
              data-node-role="ordinary"
              data-line="uijeongbu-lrt"
              data-line-name="의정부경전철"
-             data-line-color="#F0831E"  transform="translate(-172.4396,0.0000)"/>
+             data-line-color="#F0831E"  transform="translate(-178.299,0)"/>
           <circle
              id="_어룡"
              data-name="어룡"
@@ -9159,7 +9159,7 @@
              data-node-role="ordinary"
              data-line="uijeongbu-lrt"
              data-line-name="의정부경전철"
-             data-line-color="#F0831E"  transform="translate(-156.9451,0.0000)"/>
+             data-line-color="#F0831E"  transform="translate(-162.8,0)"/>
           <circle
              id="_곤제"
              data-name="곤제"
@@ -9207,7 +9207,7 @@
              data-node-role="ordinary"
              data-line="uijeongbu-lrt"
              data-line-name="의정부경전철"
-             data-line-color="#F0831E"  transform="translate(-110.4615,0.0000)"/>
+             data-line-color="#F0831E"  transform="translate(-110.422,0)"/>
           <circle
              id="_새말"
              data-name="새말"
@@ -9223,7 +9223,7 @@
              data-node-role="ordinary"
              data-line="uijeongbu-lrt"
              data-line-name="의정부경전철"
-             data-line-color="#F0831E"  transform="translate(-94.9670,0.0000)"/>
+             data-line-color="#F0831E"  transform="translate(-94.877,0)"/>
           <circle
              id="_동오"
              data-name="동오"
@@ -9239,7 +9239,7 @@
              data-node-role="ordinary"
              data-line="uijeongbu-lrt"
              data-line-name="의정부경전철"
-             data-line-color="#F0831E"  transform="translate(-79.4725,0.0000)"/>
+             data-line-color="#F0831E"  transform="translate(-79.275,0)"/>
           <circle
              id="_의정부중앙"
              data-name="의정부중앙"
@@ -9255,7 +9255,7 @@
              data-node-role="ordinary"
              data-line="uijeongbu-lrt"
              data-line-name="의정부경전철"
-             data-line-color="#F0831E"  transform="translate(-63.9780,0.0000)"/>
+             data-line-color="#F0831E"  transform="translate(-63.549,0)"/>
           <circle
              id="_흥선"
              data-name="흥선"
@@ -9271,7 +9271,7 @@
              data-node-role="ordinary"
              data-line="uijeongbu-lrt"
              data-line-name="의정부경전철"
-             data-line-color="#F0831E"  transform="translate(-48.4835,0.0000)"/>
+             data-line-color="#F0831E"  transform="translate(-47.582,0)"/>
           <circle
              id="_의정부시청"
              data-name="의정부시청"
@@ -9287,7 +9287,7 @@
              data-node-role="ordinary"
              data-line="uijeongbu-lrt"
              data-line-name="의정부경전철"
-             data-line-color="#F0831E"  transform="translate(-32.9890,0.0000)"/>
+             data-line-color="#F0831E"  transform="translate(-31.178,0)"/>
           <circle
              id="_경전철의정부"
              data-name="경전철의정부"
@@ -9303,7 +9303,7 @@
              data-node-role="ordinary"
              data-line="uijeongbu-lrt"
              data-line-name="의정부경전철"
-             data-line-color="#F0831E"  transform="translate(-17.4945,0.0000)"/>
+             data-line-color="#F0831E"  transform="translate(-14.11,0)"/>
           <circle
              id="_범골"
              data-name="범골"
@@ -9319,7 +9319,7 @@
              data-node-role="ordinary"
              data-line="uijeongbu-lrt"
              data-line-name="의정부경전철"
-             data-line-color="#F0831E" />
+             data-line-color="#F0831E"  transform="translate(3.433,-20.688)"/>
           <circle
              id="_남춘천"
              data-name="남춘천"
@@ -9399,7 +9399,7 @@
              data-node-role="ordinary"
              data-line="gyeongchun"
              data-line-name="경춘선"
-             data-line-color="#007A62"  transform="translate(18.7824,0.0000)"/>
+             data-line-color="#007A62"  transform="translate(18.782,-5.853)"/>
           <circle
              id="_가평"
              data-name="가평"
@@ -9415,7 +9415,7 @@
              data-node-role="ordinary"
              data-line="gyeongchun"
              data-line-name="경춘선"
-             data-line-color="#007A62"  transform="translate(18.7824,35.4945)"/>
+             data-line-color="#007A62"  transform="translate(18.782,29.714)"/>
           <circle
              id="_상천"
              data-name="상천"
@@ -9431,7 +9431,7 @@
              data-node-role="ordinary"
              data-line="gyeongchun"
              data-line-name="경춘선"
-             data-line-color="#007A62"  transform="translate(18.7824,70.9890)"/>
+             data-line-color="#007A62"  transform="translate(18.782,71.103)"/>
           <circle
              id="_청평"
              data-name="청평"
@@ -9447,7 +9447,7 @@
              data-node-role="ordinary"
              data-line="gyeongchun"
              data-line-name="경춘선"
-             data-line-color="#007A62"  transform="translate(18.7824,106.4835)"/>
+             data-line-color="#007A62"  transform="translate(18.782,106.741)"/>
           <circle
              id="_대성리"
              data-name="대성리"
@@ -9463,7 +9463,7 @@
              data-node-role="ordinary"
              data-line="gyeongchun"
              data-line-name="경춘선"
-             data-line-color="#007A62"  transform="translate(18.7824,141.9780)"/>
+             data-line-color="#007A62"  transform="translate(18.782,142.549)"/>
           <circle
              id="_마석"
              data-name="마석"
@@ -9479,7 +9479,7 @@
              data-node-role="ordinary"
              data-line="gyeongchun"
              data-line-name="경춘선"
-             data-line-color="#007A62"  transform="translate(18.7824,177.4725)"/>
+             data-line-color="#007A62"  transform="translate(18.782,178.721)"/>
           <circle
              id="_천마산"
              data-name="천마산"
@@ -9495,7 +9495,7 @@
              data-node-role="ordinary"
              data-line="gyeongchun"
              data-line-name="경춘선"
-             data-line-color="#007A62"  transform="translate(18.7824,212.9670)"/>
+             data-line-color="#007A62"  transform="translate(25.789,215.404)"/>
           <circle
              id="_평내호평"
              data-name="평내호평"
@@ -9527,7 +9527,7 @@
              data-node-role="ordinary"
              data-line="gyeongchun"
              data-line-name="경춘선"
-             data-line-color="#007A62"  transform="translate(-41.1105,253.3589)"/>
+             data-line-color="#007A62"  transform="translate(-42.324,254.572)"/>
           <circle
              id="_사릉"
              data-name="사릉"
@@ -9543,7 +9543,7 @@
              data-node-role="ordinary"
              data-line="gyeongchun"
              data-line-name="경춘선"
-             data-line-color="#007A62"  transform="translate(-66.0053,278.5547)"/>
+             data-line-color="#007A62"  transform="translate(-62.851,284.361)"/>
           <path
              id="_퇴계원"
              data-name="퇴계원"
@@ -9573,7 +9573,7 @@
              data-node-role="ordinary"
              data-line="gyeongchun"
              data-line-name="경춘선"
-             data-line-color="#007A62" />
+             data-line-color="#007A62"  transform="translate(64.418,0)"/>
           <circle
              id="_광교중앙"
              data-name="광교중앙"
@@ -9733,7 +9733,7 @@
              data-node-role="ordinary"
              data-line="suin-bundang"
              data-line-name="수인분당선"
-             data-line-color="#ECA300" />
+             data-line-color="#ECA300"  transform="translate(0,-13.87)"/>
           <circle
              id="_구룡"
              data-name="구룡"
@@ -9749,7 +9749,7 @@
              data-node-role="ordinary"
              data-line="suin-bundang"
              data-line-name="수인분당선"
-             data-line-color="#ECA300" />
+             data-line-color="#ECA300"  transform="translate(25.47,33.004)"/>
           <circle
              id="_개포동"
              data-name="개포동"
@@ -9765,7 +9765,7 @@
              data-node-role="ordinary"
              data-line="suin-bundang"
              data-line-name="수인분당선"
-             data-line-color="#ECA300" />
+             data-line-color="#ECA300"  transform="translate(7.536,0)"/>
           <circle
              id="_대모산입구"
              data-name="대모산입구"
@@ -9797,7 +9797,7 @@
              data-node-role="ordinary"
              data-line="suin-bundang"
              data-line-name="수인분당선"
-             data-line-color="#ECA300"  transform="translate(0.0000,-15.4945)"/>
+             data-line-color="#ECA300"  transform="translate(16.971,-3.727)"/>
           <circle
              id="_태평"
              data-name="태평"
@@ -9813,7 +9813,7 @@
              data-node-role="ordinary"
              data-line="suin-bundang"
              data-line-name="수인분당선"
-             data-line-color="#ECA300" />
+             data-line-color="#ECA300"  transform="translate(15.488,15.829)"/>
           <circle
              id="_야탑"
              data-name="야탑"
@@ -9829,7 +9829,7 @@
              data-node-role="ordinary"
              data-line="suin-bundang"
              data-line-name="수인분당선"
-             data-line-color="#ECA300" />
+             data-line-color="#ECA300"  transform="translate(32.255,0)"/>
           <circle
              id="_삼동"
              data-name="삼동"
@@ -9973,7 +9973,7 @@
              data-node-role="ordinary"
              data-line="suin-bundang"
              data-line-name="수인분당선"
-             data-line-color="#ECA300"  transform="translate(15.4945,0.0000)"/>
+             data-line-color="#ECA300"  transform="translate(-1.835,0)"/>
           <circle
              id="_수내"
              data-name="수내"
@@ -9989,7 +9989,7 @@
              data-node-role="ordinary"
              data-line="suin-bundang"
              data-line-name="수인분당선"
-             data-line-color="#ECA300" />
+             data-line-color="#ECA300"  transform="translate(-19.037,0)"/>
           <circle
              id="_오리"
              data-name="오리"
@@ -10005,7 +10005,7 @@
              data-node-role="ordinary"
              data-line="suin-bundang"
              data-line-name="수인분당선"
-             data-line-color="#ECA300"  transform="translate(70.9890,0.0000)"/>
+             data-line-color="#ECA300"  transform="translate(48.376,90.266)"/>
           <circle
              id="_죽전"
              data-name="죽전"
@@ -10021,7 +10021,7 @@
              data-node-role="ordinary"
              data-line="suin-bundang"
              data-line-name="수인분당선"
-             data-line-color="#ECA300"  transform="translate(35.4945,0.0000)"/>
+             data-line-color="#ECA300"  transform="translate(34.143,12.738)"/>
           <circle
              id="_보정"
              data-name="보정"
@@ -10037,7 +10037,7 @@
              data-node-role="ordinary"
              data-line="suin-bundang"
              data-line-name="수인분당선"
-             data-line-color="#ECA300" />
+             data-line-color="#ECA300"  transform="translate(1.053,43.585)"/>
           <circle
              id="_신갈"
              data-name="신갈"
@@ -10053,7 +10053,7 @@
              data-node-role="ordinary"
              data-line="suin-bundang"
              data-line-name="수인분당선"
-             data-line-color="#ECA300" />
+             data-line-color="#ECA300"  transform="translate(21.453,30.044)"/>
           <circle
              id="_상갈"
              data-name="상갈"
@@ -10069,7 +10069,7 @@
              data-node-role="ordinary"
              data-line="suin-bundang"
              data-line-name="수인분당선"
-             data-line-color="#ECA300"  transform="translate(136.3804,-72.0837)"/>
+             data-line-color="#ECA300"  transform="translate(128.049,-133.246)"/>
           <circle
              id="_청명"
              data-name="청명"
@@ -10085,7 +10085,7 @@
              data-node-role="ordinary"
              data-line="suin-bundang"
              data-line-name="수인분당선"
-             data-line-color="#ECA300"  transform="translate(100.5848,-72.0837)"/>
+             data-line-color="#ECA300"  transform="translate(95.528,-85.892)"/>
           <circle
              id="_영통"
              data-name="영통"
@@ -10101,7 +10101,7 @@
              data-node-role="ordinary"
              data-line="suin-bundang"
              data-line-name="수인분당선"
-             data-line-color="#ECA300"  transform="translate(65.0903,-72.0837)"/>
+             data-line-color="#ECA300"  transform="translate(60.868,-72.084)"/>
           <circle
              id="_망포"
              data-name="망포"
@@ -10117,7 +10117,7 @@
              data-node-role="ordinary"
              data-line="suin-bundang"
              data-line-name="수인분당선"
-             data-line-color="#ECA300"  transform="translate(28.7958,-72.2837)"/>
+             data-line-color="#ECA300"  transform="translate(21.994,-91.101)"/>
           <circle
              id="_매탄권선"
              data-name="매탄권선"
@@ -10133,7 +10133,7 @@
              data-node-role="ordinary"
              data-line="suin-bundang"
              data-line-name="수인분당선"
-             data-line-color="#ECA300"  transform="translate(0.0000,-70.9890)"/>
+             data-line-color="#ECA300"  transform="translate(-18.818,-95.921)"/>
           <circle
              id="_수원시청"
              data-name="수원시청"
@@ -10149,7 +10149,7 @@
              data-node-role="ordinary"
              data-line="suin-bundang"
              data-line-name="수인분당선"
-             data-line-color="#ECA300"  transform="translate(0.0000,-35.4945)"/>
+             data-line-color="#ECA300"  transform="translate(0,-61.119)"/>
           <circle
              id="_매교"
              data-name="매교"
@@ -10165,7 +10165,7 @@
              data-node-role="ordinary"
              data-line="suin-bundang"
              data-line-name="수인분당선"
-             data-line-color="#ECA300" />
+             data-line-color="#ECA300"  transform="translate(0,-25.613)"/>
           <circle
              id="_둔전"
              data-name="둔전"
@@ -10389,7 +10389,7 @@
              data-node-role="ordinary"
              data-line="airport-railroad"
              data-line-name="공항철도"
-             data-line-color="#0079AC"  transform="translate(0.0000,49.9890)"/>
+             data-line-color="#0079AC"  transform="translate(0,11.777)"/>
           <circle
              id="_운서"
              data-name="운서"
@@ -10403,7 +10403,7 @@
              data-station="운서"
              data-station-name="운서"
              data-node-role="ordinary"
-             data-line="airport-railroad"  transform="translate(0.0000,23.2945)"/>
+             data-line="airport-railroad"  transform="translate(0,-13.908)"/>
           <circle
              id="_영종"
              data-name="영종"
@@ -10417,7 +10417,7 @@
              data-station="영종"
              data-station-name="영종"
              data-node-role="ordinary"
-             data-line="airport-railroad" />
+             data-line="airport-railroad"  transform="translate(0,-39.217)"/>
           <circle
              id="_시우"
              data-name="시우"
@@ -10593,7 +10593,7 @@
              data-node-role="ordinary"
              data-line="9"
              data-line-name="9호선"
-             data-line-color="#A49D87"  transform="translate(-16.3958,18.3958)"/>
+             data-line-color="#A49D87"  transform="translate(-20.035,22.035)"/>
           <circle
              id="_송파나루"
              data-name="송파나루"
@@ -10657,7 +10657,7 @@
              data-node-role="ordinary"
              data-line="9"
              data-line-name="9호선"
-             data-line-color="#A49D87" />
+             data-line-color="#A49D87"  transform="translate(21.059,19.936)"/>
           <g
              id="station-symbol-고촌"
              data-name="고촌"
@@ -10858,7 +10858,7 @@
              data-node-role="ordinary"
              data-line="suin-bundang"
              data-line-name="수인분당선"
-             data-line-color="#ECA300" />
+             data-line-color="#ECA300"  transform="translate(8.114,0)"/>
           <circle
              id="_야목"
              data-name="야목"
@@ -10922,7 +10922,7 @@
              data-node-role="ordinary"
              data-line="suin-bundang"
              data-line-name="수인분당선"
-             data-line-color="#ECA300" />
+             data-line-color="#ECA300"  transform="translate(-2.635,2.635)"/>
           <circle
              id="_국제업무지구"
              data-name="국제업무지구"
@@ -10938,7 +10938,7 @@
              data-node-role="ordinary"
              data-line="incheon-1"
              data-line-name="인천1호선"
-             data-line-color="#B4C7E7"  transform="translate(-58.9892,253.3673)"/>
+             data-line-color="#B4C7E7"  transform="translate(-65.811,253.367)"/>
           <circle
              id="station-node-병점"
              class="station-node-ordinary-line-1"
@@ -11008,7 +11008,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="seohae">
+             data-line="seohae" transform="translate(-9.642,-53.741)">
             <title
                id="title-transfer-station-일산"
                data-station="일산"
@@ -11169,7 +11169,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="seohae">
+             data-line="seohae" transform="translate(-36.193,-39.237)">
             <title
                id="title-transfer-station-풍산"
                data-station="풍산"
@@ -11331,7 +11331,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="seohae">
+             data-line="seohae" transform="translate(0,9.963)">
             <title
                id="title-transfer-station-백마"
                data-station="백마"
@@ -11493,7 +11493,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="uijeongbu-lrt"
-             transform="translate(-7.924145,-0.3169658)">
+             transform="translate(-26.707,9.542)">
             <title
                id="title-transfer-station-회룡"
                data-station="회룡"
@@ -11656,7 +11656,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="1"
-             transform="translate(8.1260132)">
+             transform="translate(193.247,70.731)">
             <title
                id="title-transfer-station-도봉산"
                data-station="도봉산"
@@ -11818,7 +11818,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="seohae">
+             data-line="seohae" transform="translate(0,65.468)">
             <title
                id="title-transfer-station-곡산"
                data-station="곡산"
@@ -11979,7 +11979,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="7">
+             data-line="7" transform="translate(0,-114.475)">
             <title
                id="title-transfer-station-노원"
                data-station="노원"
@@ -12141,7 +12141,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="1">
+             data-line="1" transform="translate(91.31,-68.442)">
             <title
                id="title-transfer-station-창동"
                data-station="창동"
@@ -12303,7 +12303,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="6">
+             data-line="6" transform="translate(100.149,-10.697)">
             <title
                id="title-transfer-station-불광"
                data-station="불광"
@@ -12465,7 +12465,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="gtx-a">
+             data-line="gtx-a" transform="translate(-4.527,-3.327)">
             <title
                id="title-transfer-station-연신내"
                data-station="연신내"
@@ -12709,7 +12709,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="3"
-             transform="translate(-6.570033,-4.9275247)">
+             transform="translate(-44.781,58.49)">
             <title
                id="title-transfer-station-대곡"
                data-station="대곡"
@@ -13134,7 +13134,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="6">
+             data-line="6" transform="translate(0,35.503)">
             <title
                id="title-transfer-station-태릉입구"
                data-station="태릉입구"
@@ -13296,7 +13296,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="1">
+             data-line="1" transform="translate(0,72.923)">
             <title
                id="title-transfer-station-광운대"
                data-station="광운대"
@@ -13459,7 +13459,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="ui-sinseol"
-             transform="translate(-1.7207259,-2.0075135)">
+             transform="translate(14.378,-23.57)">
             <title
                id="title-transfer-station-성신여대입구"
                data-station="성신여대입구"
@@ -13623,7 +13623,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="6">
+             data-line="6" transform="translate(4.059,31.564)">
             <title
                id="title-transfer-station-석계"
                data-station="석계"
@@ -13784,7 +13784,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="6"
-             transform="translate(-1.6933586,1.4514502)">
+             transform="translate(1.039,-26.384)">
             <title
                id="title-transfer-station-보문"
                data-station="보문"
@@ -13948,7 +13948,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="6">
+             data-line="6" transform="translate(17.244,0)">
             <title
                id="title-transfer-station-신내"
                data-station="신내"
@@ -14111,7 +14111,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="8"
-             transform="translate(-66.743477,-0.3972826)">
+             transform="translate(25.252,-28.828)">
             <title
                id="title-transfer-station-별내"
                data-station="별내"
@@ -14273,7 +14273,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="gyeongchun">
+             data-line="gyeongchun" transform="translate(-11.596,0)">
             <title
                id="title-transfer-station-중랑"
                data-station="중랑"
@@ -14435,7 +14435,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="gyeongchun">
+             data-line="gyeongchun" transform="translate(-6.835,-20.653)">
             <title
                id="title-transfer-station-망우"
                data-station="망우"
@@ -14597,7 +14597,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="gyeongchun">
+             data-line="gyeongchun" transform="translate(22.242,54.826)">
             <title
                id="title-transfer-station-상봉"
                data-station="상봉"
@@ -14808,7 +14808,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="gyeongchun">
+             data-line="gyeongchun" transform="translate(-2.218,-2.745)">
             <title
                id="title-transfer-station-회기"
                data-station="회기"
@@ -15224,7 +15224,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="gimpo-goldline"
-             transform="translate(-0.49166123,6.391596)">
+             transform="translate(-33.568,20.15)">
             <title
                id="title-transfer-station-김포공항"
                data-station="김포공항"
@@ -15522,7 +15522,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="gyeongchun">
+             data-line="gyeongchun" transform="translate(-27.859,0)">
             <title
                id="title-transfer-station-청량리"
                data-station="청량리"
@@ -15775,7 +15775,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="4"
-             transform="translate(-0.78210325,7.0389293)">
+             transform="translate(9.756,7.039)">
             <title
                id="title-transfer-station-동대문"
                data-station="동대문"
@@ -15937,7 +15937,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="6">
+             data-line="6" transform="translate(0,31.727)">
             <title
                id="title-transfer-station-동묘앞"
                data-station="동묘앞"
@@ -16099,7 +16099,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="ui-sinseol"
-             transform="translate(8.9994147,-0.74995122)">
+             transform="translate(-11.515,-0.75)">
             <title
                id="title-transfer-station-신설동"
                data-station="신설동"
@@ -16305,7 +16305,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="airport-railroad">
+             data-line="airport-railroad" transform="translate(0,1.09)">
             <title
                id="title-transfer-station-계양"
                data-station="계양"
@@ -16478,7 +16478,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="airport-railroad">
+             data-line="airport-railroad" transform="translate(-12.602,-130.2)">
             <title
                id="title-transfer-station-검암"
                data-station="검암"
@@ -16651,7 +16651,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="6">
+             data-line="6" transform="translate(-5.545,-42.763)">
             <title
                id="title-transfer-station-디지털미디어시티"
                data-station="디지털미디어시티"
@@ -16860,7 +16860,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="9"
-             transform="rotate(180,1268.3843,1433.5031)">
+             transform="translate(86.862,-55.908) rotate(180,1268.3843,1433.5031)">
             <title
                id="title-transfer-station-마곡나루"
                data-station="마곡나루"
@@ -17021,7 +17021,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="gyeongui-jungang"
-             transform="translate(19.651982,5.52712)">
+             transform="translate(27.837,13.712)">
             <title
                id="title-transfer-station-가좌"
                data-station="가좌"
@@ -17136,7 +17136,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="8"
-             transform="rotate(-90,3845.949,1500.316)">
+             transform="translate(10.567,-10.567) translate(-43.319,61.532) rotate(-90,3845.949,1500.316)">
             <title
                id="title-transfer-station-구리"
                data-station="구리"
@@ -17298,7 +17298,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="5">
+             data-line="5" transform="translate(36.879,0)">
             <title
                id="title-transfer-station-충정로"
                data-station="충정로"
@@ -17461,7 +17461,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="1">
+             data-line="1" transform="translate(-17.09,11.429)">
             <title
                id="title-transfer-station-시청"
                data-station="시청"
@@ -17621,7 +17621,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="3">
+             data-line="3" transform="translate(35.877,0)">
             <title
                id="title-transfer-station-을지로3가"
                data-station="을지로3가"
@@ -17783,7 +17783,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="6">
+             data-line="6" transform="translate(-6.785,0)">
             <title
                id="title-transfer-station-신당"
                data-station="신당"
@@ -17945,7 +17945,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="5">
+             data-line="5" transform="translate(27.587,0)">
             <title
                id="title-transfer-station-을지로4가"
                data-station="을지로4가"
@@ -18108,7 +18108,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="4">
+             data-line="4" transform="translate(7.525,-8.78)">
             <title
                id="title-transfer-station-동대문역사문화공원"
                data-station="동대문역사문화공원"
@@ -18318,7 +18318,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="gyeongui-jungang"
-             transform="translate(-13.173368,-14.051592)">
+             transform="translate(-45.529,-39.465)">
             <title
                id="title-transfer-station-왕십리"
                data-station="왕십리"
@@ -18570,7 +18570,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="2">
+             data-line="2" transform="translate(-6.207,27.072)">
             <title
                id="title-transfer-station-홍대입구"
                data-station="홍대입구"
@@ -18777,7 +18777,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="3"
-             transform="translate(8.4252226,0.24780066)">
+             transform="translate(-1.245,9.028)">
             <title
                id="title-transfer-station-충무로"
                data-station="충무로"
@@ -18940,7 +18940,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="6"
-             transform="rotate(90,2753.8094,1640.4054)">
+             transform="translate(-37.484,0) rotate(90,2753.8094,1640.4054)">
             <title
                id="title-transfer-station-청구"
                data-station="청구"
@@ -19103,7 +19103,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="7"
-             transform="translate(0,-7.0197426)">
+             transform="translate(70.31,45.813)">
             <title
                id="title-transfer-station-군자"
                data-station="군자"
@@ -19263,7 +19263,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="2">
+             data-line="2" transform="translate(34.435,-23.182)">
             <title
                id="title-transfer-station-성수"
                data-station="성수"
@@ -19378,7 +19378,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="gyeongui-jungang"
-             transform="translate(16.941736)">
+             transform="translate(-19.773,-36.714)">
             <title
                id="title-transfer-station-서울역"
                data-station="서울역"
@@ -19687,7 +19687,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="6">
+             data-line="6" transform="translate(-12.712,-9.898)">
             <title
                id="title-transfer-station-합정"
                data-station="합정"
@@ -19848,7 +19848,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="5"
-             transform="translate(0.75805037,-4.5483022)">
+             transform="translate(-43.831,-49.137)">
             <title
                id="title-transfer-station-까치산"
                data-station="까치산"
@@ -20009,7 +20009,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="2">
+             data-line="2" transform="translate(0.484,-79.105)">
             <title
                id="title-transfer-station-건대입구"
                data-station="건대입구"
@@ -20172,7 +20172,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="6"
-             transform="translate(13.643895)">
+             transform="translate(121.2,-207.791)">
             <title
                id="title-transfer-station-약수"
                data-station="약수"
@@ -20335,7 +20335,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="4"
-             transform="rotate(-90,2218.2081,1847.3565)">
+             transform="translate(2.637,-4.969) translate(-7.629,14.881) rotate(-90,2218.2081,1847.3565)">
             <title
                id="title-transfer-station-삼각지"
                data-station="삼각지"
@@ -20498,7 +20498,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="5">
+             data-line="5" transform="translate(-16.508,-14.793)">
             <title
                id="title-transfer-station-공덕"
                data-station="공덕"
@@ -20750,7 +20750,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="6">
+             data-line="6" transform="translate(15.453,0)">
             <title
                id="title-transfer-station-효창공원앞"
                data-station="효창공원앞"
@@ -20912,7 +20912,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="2">
+             data-line="2" transform="translate(20.576,20.576)">
             <title
                id="title-transfer-station-당산"
                data-station="당산"
@@ -21075,7 +21075,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="7"
-             transform="translate(1.410882,-13.050659)">
+             transform="translate(-23.103,-9.73)">
             <title
                id="title-transfer-station-석남"
                data-station="석남"
@@ -21248,7 +21248,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="1">
+             data-line="1" transform="translate(0,22.143)">
             <title
                id="title-transfer-station-용산"
                data-station="용산"
@@ -21410,7 +21410,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="3">
+             data-line="3" transform="translate(0,18.147)">
             <title
                id="title-transfer-station-옥수"
                data-station="옥수"
@@ -21574,7 +21574,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="5"
-             transform="translate(-138.77887,6.7384686)">
+             transform="translate(-138.779,-14.336)">
             <title
                id="title-transfer-station-천호"
                data-station="천호"
@@ -21736,7 +21736,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="4"
-             transform="translate(10.405566,-0.44279004)">
+             transform="translate(26.472,15.623)">
             <title
                id="title-transfer-station-이촌"
                data-station="이촌"
@@ -21898,7 +21898,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="seohae">
+             data-line="seohae" transform="translate(0,-8.618)">
             <title
                id="title-transfer-station-부천종합운동장"
                data-station="부천종합운동장"
@@ -22061,7 +22061,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="2"
-             transform="translate(0,4.9508503)">
+             transform="translate(71.673,-12.524)">
             <title
                id="title-transfer-station-영등포구청"
                data-station="영등포구청"
@@ -22224,7 +22224,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="suin-bundang"
-             transform="translate(-0.19089821,5.1542517)">
+             transform="translate(-7.472,12.436)">
             <title
                id="title-transfer-station-강남구청"
                data-station="강남구청"
@@ -22386,7 +22386,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="7"
-             transform="translate(0,-14.10882)">
+             transform="translate(81.857,55.867)">
             <title
                id="title-transfer-station-부평구청"
                data-station="부평구청"
@@ -22559,7 +22559,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="5">
+             data-line="5" transform="translate(-11.18,-2.378)">
             <title
                id="title-transfer-station-여의도"
                data-station="여의도"
@@ -22721,7 +22721,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="5">
+             data-line="5" transform="translate(-34.985,-5.927)">
             <title
                id="title-transfer-station-강동"
                data-station="강동"
@@ -22836,7 +22836,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="9"
-             transform="translate(10.793046)">
+             transform="translate(105.411,-68.633)">
             <title
                id="title-transfer-station-동작"
                data-station="동작"
@@ -22999,7 +22999,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="1"
-             transform="translate(-6.7018824)">
+             transform="translate(-113.579,-0.624)">
             <title
                id="title-transfer-station-노량진"
                data-station="노량진"
@@ -23162,7 +23162,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="9"
-             transform="rotate(-90,2042.8584,2150.8998)">
+             transform="translate(1.651,-118.609) rotate(-90,2042.8584,2150.8998)">
             <title
                id="title-transfer-station-샛강"
                data-station="샛강"
@@ -23324,7 +23324,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="2">
+             data-line="2" transform="translate(0,22.059)">
             <title
                id="title-transfer-station-잠실"
                data-station="잠실"
@@ -23486,7 +23486,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="3">
+             data-line="3" transform="translate(-1.253,42.521)">
             <title
                id="title-transfer-station-신사"
                data-station="신사"
@@ -23652,7 +23652,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="shinbundang"
-             transform="translate(9.2579589,0.2436305)">
+             transform="translate(3.436,6.066)">
             <title
                id="title-transfer-station-논현"
                data-station="논현"
@@ -23815,7 +23815,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="5">
+             data-line="5" transform="translate(85.356,29.536)">
             <title
                id="title-transfer-station-신길"
                data-station="신길"
@@ -23977,7 +23977,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="2">
+             data-line="2" transform="translate(43.125,27.235)">
             <title
                id="title-transfer-station-신도림"
                data-station="신도림"
@@ -24140,7 +24140,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="incheon-1"
-             transform="translate(-14.707768,-0.17936302)">
+             transform="translate(-62.545,47.049)">
             <title
                id="title-transfer-station-부평"
                data-station="부평"
@@ -24313,7 +24313,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="1">
+             data-line="1" transform="translate(99.743,0)">
             <title
                id="title-transfer-station-구로"
                data-station="구로"
@@ -24427,7 +24427,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="1">
+             data-line="1" transform="translate(63.284,59.877)">
             <title
                id="title-transfer-station-대방"
                data-station="대방"
@@ -24589,7 +24589,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="1">
+             data-line="1" transform="translate(-66.886,0)">
             <title
                id="title-transfer-station-소사"
                data-station="소사"
@@ -24751,7 +24751,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="1">
+             data-line="1" transform="translate(21.864,18.455)">
             <title
                id="title-transfer-station-온수"
                data-station="온수"
@@ -24914,7 +24914,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="9"
-             transform="translate(0.53019007,-9.8085162)">
+             transform="translate(26.598,0.284)">
             <title
                id="title-transfer-station-올림픽공원"
                data-station="올림픽공원"
@@ -25076,7 +25076,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="suin-bundang">
+             data-line="suin-bundang" transform="translate(0.312,-3.745)">
             <title
                id="title-transfer-station-선정릉"
                data-station="선정릉"
@@ -25237,7 +25237,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="2">
+             data-line="2" transform="translate(77.6,68.27)">
             <title
                id="title-transfer-station-종합운동장"
                data-station="종합운동장"
@@ -25400,7 +25400,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="3"
-             transform="translate(-18.743653,7.3145964)">
+             transform="translate(-78.387,96.697)">
             <title
                id="title-transfer-station-고속터미널"
                data-station="고속터미널"
@@ -25608,7 +25608,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="9"
-             transform="translate(0,-9.0896008)">
+             transform="translate(-56.079,-7.837)">
             <title
                id="title-transfer-station-신논현"
                data-station="신논현"
@@ -25771,7 +25771,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="1">
+             data-line="1" transform="translate(-35.866,-13.835)">
             <title
                id="title-transfer-station-가산디지털단지"
                data-station="가산디지털단지"
@@ -25933,7 +25933,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="2">
+             data-line="2" transform="translate(18.198,11.767)">
             <title
                id="title-transfer-station-대림"
                data-station="대림"
@@ -26095,7 +26095,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="8">
+             data-line="8" transform="translate(25.98,-24.431)">
             <title
                id="title-transfer-station-석촌"
                data-station="석촌"
@@ -26255,7 +26255,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="7">
+             data-line="7" transform="translate(-29.729,73.376)">
             <title
                id="title-transfer-station-보라매"
                data-station="보라매"
@@ -26581,7 +26581,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="3"
-             transform="translate(-104.72351,132.25049)">
+             transform="translate(-134.381,132.25)">
             <title
                id="title-transfer-station-오금"
                data-station="오금"
@@ -26745,7 +26745,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="1">
+             data-line="1" transform="translate(-47.837,-5.697)">
             <title
                id="title-transfer-station-주안"
                data-station="주안"
@@ -26917,7 +26917,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="incheon-1"
-             transform="translate(-8.9889657)">
+             transform="translate(153.778,-98.299)">
             <title
                id="title-transfer-station-인천시청"
                data-station="인천시청"
@@ -27099,7 +27099,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="3">
+             data-line="3" transform="translate(46.855,-9.819)">
             <title
                id="title-transfer-station-교대"
                data-station="교대"
@@ -27261,7 +27261,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="suin-bundang">
+             data-line="suin-bundang" transform="translate(28.921,-61.727)">
             <title
                id="title-transfer-station-선릉"
                data-station="선릉"
@@ -27424,7 +27424,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="4"
-             transform="translate(-0.94744189)">
+             transform="translate(-22.167,0)">
             <title
                id="title-transfer-station-사당"
                data-station="사당"
@@ -27588,7 +27588,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="1">
+             data-line="1" transform="translate(9.36,3.508)">
             <title
                id="title-transfer-station-금천구청"
                data-station="금천구청"
@@ -27702,7 +27702,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="2">
+             data-line="2" transform="translate(-0.031,73.642)">
             <title
                id="title-transfer-station-신림"
                data-station="신림"
@@ -27864,7 +27864,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="2">
+             data-line="2" transform="translate(16.371,0)">
             <title
                id="title-transfer-station-강남"
                data-station="강남"
@@ -28028,7 +28028,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="3"
-             transform="translate(1.2824922,6.6689594)">
+             transform="translate(-24.146,-18.76)">
             <title
                id="title-transfer-station-가락시장"
                data-station="가락시장"
@@ -28191,7 +28191,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="suin-bundang"
-             transform="translate(-0.18017724,7.9277986)">
+             transform="translate(23.631,30.341)">
             <title
                id="title-transfer-station-도곡"
                data-station="도곡"
@@ -28354,7 +28354,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="3"
-             transform="translate(9.2731234)">
+             transform="translate(-188.973,30.916)">
             <title
                id="title-transfer-station-양재"
                data-station="양재"
@@ -28517,7 +28517,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="gtx-a">
+             data-line="gtx-a" transform="translate(0,22.477)">
             <title
                id="title-transfer-station-수서"
                data-station="수서"
@@ -28737,7 +28737,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="suin-bundang"
-             transform="translate(0.37225316,8.9340759)">
+             transform="translate(-51.606,30.64)">
             <title
                id="title-transfer-station-복정"
                data-station="복정"
@@ -28899,7 +28899,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="airport-railroad">
+             data-line="airport-railroad" transform="translate(0,8.892)">
             <title
                id="title-airport-airplane-인천공항1터미널">인천공항1터미널 공항 노드 — Bootstrap Icons airplane-fill</title>
             <g
@@ -28941,7 +28941,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="4">
+             data-line="4" transform="translate(7.8,45.264)">
             <title
                id="title-transfer-station-금정"
                data-station="금정"
@@ -29101,7 +29101,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="1">
+             data-line="1" transform="translate(0,48.916)">
             <title
                id="title-transfer-station-인천"
                data-station="인천"
@@ -29263,7 +29263,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="shinbundang">
+             data-line="shinbundang" transform="translate(25.29,-25.29)">
             <title
                id="title-transfer-station-판교"
                data-station="판교"
@@ -29599,7 +29599,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="gtx-a">
+             data-line="gtx-a" transform="translate(14.288,-14.998)">
             <title
                id="title-transfer-station-구성"
                data-station="구성"
@@ -29772,7 +29772,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="shinbundang"
-             transform="translate(1.1422158,8.376249)">
+             transform="translate(-46.867,-65.47)">
             <title
                id="title-transfer-station-미금"
                data-station="미금"
@@ -29936,7 +29936,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="shinbundang"
-             transform="translate(1.1422158,8.376249)">
+             transform="translate(-39.596,4.506)">
             <title
                id="title-transfer-station-정자"
                data-station="정자"
@@ -30099,7 +30099,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="gyeonggang">
+             data-line="gyeonggang" transform="translate(15.051,0)">
             <title
                id="title-transfer-station-이매"
                data-station="이매"
@@ -30263,7 +30263,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="suin-bundang">
+             data-line="suin-bundang" transform="translate(-36.095,16.341)">
             <title
                id="title-transfer-station-기흥"
                data-station="기흥"
@@ -30436,7 +30436,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="suin-bundang">
+             data-line="suin-bundang" transform="translate(47.585,15.488)">
             <title
                id="title-transfer-station-모란"
                data-station="모란"
@@ -30599,7 +30599,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="incheon-1"
-             transform="translate(-11.98811)">
+             transform="translate(-2.524,33.653)">
             <title
                id="title-transfer-station-원인재"
                data-station="원인재"
@@ -30772,7 +30772,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="suin-bundang">
+             data-line="suin-bundang" transform="translate(33.308,31.703)">
             <title
                id="title-transfer-station-한대앞"
                data-station="한대앞"
@@ -31276,7 +31276,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="suin-bundang">
+             data-line="suin-bundang" transform="translate(-39.53,-26.24)">
             <title
                id="title-transfer-station-수원"
                data-station="수원"
@@ -31437,7 +31437,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="seohae"
-             transform="translate(0,5.0488672)">
+             transform="translate(28.532,59.91)">
             <title
                id="title-transfer-station-초지"
                data-station="초지"

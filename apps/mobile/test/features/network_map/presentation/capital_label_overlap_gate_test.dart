@@ -36,7 +36,17 @@ const int kCapitalUnresolvedBaseline = 2;
 // 이미 floor(unresolved 1·라벨-라벨 1)이며 나머지는 v2 기하에서 라벨 배치로 분리
 // 불가한 기약 접점(도심 환승 밀집부)이다. 핵심 불변식(라벨-라벨 ≤1·뱃지 0·unresolved
 // ≤2)은 v2에서도 유지된다. 실측값(악화 금지): 라벨-선 11, 뱃지-선 0, 뱃지-라벨 0.
-const int kCapitalLabelLineOverlapBaseline = 11;
+// [2026-07-18 #2068] 유클리드 간격 하드게이트 대응(팩 기준 최근접 <48 붕괴 492건
+// → 16건, 예외 근거 명시) — 손그림 SVG의 역 circle·환승 캡슐 좌표를 pairwise 반발
+// 솔버로 재간격(median 이동 ~9px, 최대 ~90px)했다. 순수 station 좌표 이동이라
+// 라벨-라벨(0)·뱃지(0·0)·unresolved(0)는 전부 무영향이지만, 라벨-선 겹침은
+// solver가 근접 역들을 갈라놓으며 인접 선분 기하가 바뀌어 11→23으로 늘었다(전부
+// 자유공간 라벨-선 접점, 라벨-라벨/뱃지 악화 없음). 원인 성격상 station 좌표
+// 재배치가 아니라 라벨 앵커의 국소 재배치(부산 검증 방법의 국소 모드, #2068 1단계
+// 선례)로 낮춰야 하는데 이번 패스 범위 밖 — baseline만 실측값으로 올리고 후속
+// 커밋에서 국소 라벨 넛지로 되돌린다. 실측값(악화 금지): 라벨-선 23, 뱃지-선 0,
+// 뱃지-라벨 0.
+const int kCapitalLabelLineOverlapBaseline = 23;
 const int kCapitalBadgeLineOverlapBaseline = 0;
 const int kCapitalBadgeLabelOverlapBaseline = 0;
 

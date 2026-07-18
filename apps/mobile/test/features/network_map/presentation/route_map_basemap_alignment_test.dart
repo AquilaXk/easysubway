@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:easysubway_mobile/features/network_map/domain/map_camera.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/route_map_basemap_view.dart';
 import 'package:flutter/painting.dart';
@@ -11,11 +14,17 @@ import 'package:flutter_test/flutter_test.dart';
 //     .vec는 viewBox=source 좌표라 designScale 곱셈/나눗셈이 없다 — 이 항등이
 //     깨지면 바탕과 인터랙션(히트 rect·팝오버·핀)이 어긋난다.
 //
-// (B) 바탕↔인터랙션 역위치 실측 정합(느슨 40px): SVG 노드 좌표(바탕이 그리는
-//     위치)와 팩 좌표(route_map_positions, 인터랙션이 쓰는 위치)가 같은 viewBox
-//     좌표계를 공유함을 seoul 대표 역 9곳으로 고정한다. 두 좌표는 octolinear
-//     snap·respacing·track projection·parallel offset 후처리로 소량 편차가 있으나
-//     (#2068 이슈 "11~30px 이내"), 원점·스케일은 동일하다.
+// (B) 바탕↔인터랙션 역위치 실측 정합(전 역 하드 5px, #2068 P-65): SVG 노드
+//     좌표(바탕이 그리는 위치)와 팩 좌표(route_map_positions, 인터랙션이
+//     쓰는 위치)가 같은 viewBox 좌표계를 공유함을 **표본이 아니라 수도권
+//     전 역(799/800, 톤제외 1)**으로 고정한다. respace --pin-stations(P-65
+//     재설계)가 팩 좌표를 SVG canonical 배정에 고정하므로 실측 delta는
+//     전부 <1px(반올림 잔차)다 — 과거 "표본 9역·40px" 게이트는 나머지
+//     791역의 붕괴(#2068 실측 최대 638px)를 놓쳤다(원인 규명 완료, 이 게이트로
+//     재발 방지). fixture는
+//     tools/route-map/generate-basemap-alignment-fixture.mjs가
+//     buildAssignments(apply-sma-svg-positions.mjs의 canonical 정합 단일
+//     정본)를 그대로 재사용해 산출 — SVG 파이프라인 재실행 시 함께 재생성한다.
 //
 // 카메라 세트는 route_map_overlay_camera_sync_test.dart의 4개를 재사용한다.
 
@@ -119,88 +128,52 @@ void main() {
     });
   }
 
-  // (B) seoul 대표 역 9곳: SVG 노드 좌표 vs 팩(route_map_positions) 좌표.
-  // 출처: SVG 노드 = easy-subway-sma-v2-geometry.json stationNodes(viewBox 좌표),
-  //       팩 = capital.sqlite route_map_positions(x/y, 동일 viewBox 좌표계).
-  // measuredDelta는 #2068 실측치. 임계값 40px 근거: octolinear snap·respacing·
-  //   track projection·parallel offset 후처리로 발생하는 worst-case 편차(#2068
-  //   이슈 "11~30px 이내")에 헤드룸을 둔 값 — 두 좌표가 같은 원점·스케일의 viewBox
-  //   좌표계를 공유한다는 사실을 고정한다(권역 대표로 seoul만; 5권역 확장 안 함).
-  const seoulFixture =
-      <({String name, Offset svgNode, Offset pack, double measured})>[
-        (
-          name: '강남',
-          svgNode: Offset(1369.617, 1266.787),
-          pack: Offset(1369.8, 1266.9),
-          measured: 0.17,
-        ),
-        (
-          name: '잠실',
-          svgNode: Offset(1532.203, 1121.976),
-          pack: Offset(1529.4, 1120.3),
-          measured: 3.26,
-        ),
-        (
-          name: '사당',
-          svgNode: Offset(1184.615, 1262.218),
-          pack: Offset(1186.5, 1261.9),
-          measured: 1.91,
-        ),
-        (
-          name: '서울역',
-          svgNode: Offset(1055.9, 905.304),
-          pack: Offset(1053.5, 897.7),
-          measured: 7.97,
-        ),
-        (
-          name: '청량리',
-          svgNode: Offset(1553.242, 753.882),
-          pack: Offset(1551.8, 753.2),
-          measured: 1.57,
-        ),
-        (
-          name: '인천',
-          svgNode: Offset(391.867, 1419.985),
-          pack: Offset(391.0, 1417.9),
-          measured: 2.27,
-        ),
-        (
-          name: '수원',
-          svgNode: Offset(1148.164, 1631.347),
-          pack: Offset(1146.3, 1630.4),
-          measured: 2.08,
-        ),
-        (
-          name: '의정부',
-          svgNode: Offset(1456.977, 468.558),
-          pack: Offset(1457.1, 468.4),
-          measured: 0.26,
-        ),
-        (
-          name: '동두천',
-          svgNode: Offset(1129.377, 468.558),
-          pack: Offset(1125.4, 468.4),
-          measured: 3.99,
-        ),
-      ];
+  // (B) seoul 전 역: SVG canonical 배정 좌표 vs 팩(route_map_positions) 좌표.
+  // fixture 출처: tools/route-map/generate-basemap-alignment-fixture.mjs가
+  //   buildAssignments(apply-sma-svg-positions.mjs — SVG↔DB canonical 정합
+  //   단일 정본)를 재사용해 산출한
+  //   seoul-alignment-fixture.json(수도권 800행 중 799행, 1행은 canonical
+  //   미매칭으로 fixture 자체가 unmatchedCount로 보고 — 아래서 최소 커버리지로
+  //   고정). P-65(respace --pin-stations) 재설계로 팩 좌표가 SVG 배정에
+  //   고정되므로 실측 delta는 전부 <1px(반올림 잔차)다. 임계 5px는 그 실측에
+  //   충분한 헤드룸을 둔 하드 게이트 — 과거 "표본 9역·40px"는 나머지 791역의
+  //   붕괴(#2068 실측 최대 638px, 파이프라인 project-nodes/respace 원인 규명
+  //   완료)를 전혀 잡지 못했다.
+  const alignmentThresholdPx = 5.0;
+  const minStationCoverage = 700; // 수도권 800행 중 대다수 커버(하드 최소선).
 
-  const alignmentThresholdPx = 40.0;
+  test('(B) seoul 바탕(SVG 배정) ↔ 인터랙션(팩) 좌표가 같은 viewBox 좌표계 — 전 역 하드 <5px', () {
+    // apps/mobile 밖(tools/route-map/route-map-defs/)에 둔다 — pubspec.yaml의
+    // assets/datapacks/metro_map_pack/basemap/ 와일드카드 번들에 QA 전용
+    // fixture가 딸려 들어가지 않도록(dart:io File은 앱 asset bundle을 거치지
+    // 않고 소스 트리를 직접 읽으므로 위치 제약이 없다).
+    final file = File(
+      '../../tools/route-map/route-map-defs/seoul-alignment-fixture.json',
+    );
+    expect(
+      file.existsSync(),
+      isTrue,
+      reason:
+          'fixture 없음 — node tools/route-map/generate-basemap-alignment-fixture.mjs 로 생성 필요: ${file.path}',
+    );
+    final fixture = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+    final entries = (fixture['entries'] as List).cast<Map<String, dynamic>>();
 
-  test('(B) seoul 바탕(SVG 노드) ↔ 인터랙션(팩) 좌표가 같은 viewBox 좌표계(<40px)', () {
-    for (final f in seoulFixture) {
-      final delta = (f.svgNode - f.pack).distance;
-      // fixture 무결성: 계산 delta가 표기 measured와 대략 일치(좌표·measured가
-      // 각각 독립 반올림된 실측이라 0.5px 여유). 표 손상(자릿수 뒤바뀜 등) 조기 감지용.
-      expect(
-        (delta - f.measured).abs(),
-        lessThan(0.5),
-        reason: '${f.name}: 계산 delta=$delta, fixture measured=${f.measured}',
-      );
-      // 핵심 불변식: 바탕과 인터랙션이 같은 좌표계를 공유(원점·스케일 동일).
+    expect(
+      entries.length,
+      greaterThanOrEqualTo(minStationCoverage),
+      reason:
+          'fixture 커버리지 급감 — canonical 정합이 대량 깨졌을 가능성(entries=${entries.length})',
+    );
+
+    for (final e in entries) {
+      final delta = (e['deltaPx'] as num).toDouble();
       expect(
         delta,
         lessThan(alignmentThresholdPx),
-        reason: '${f.name}: svgNode=${f.svgNode} pack=${f.pack} delta=$delta',
+        reason:
+            '${e['name']}(${e['stationId']}/${e['lineId']}): svg=(${e['svgX']},${e['svgY']}) '
+            'pack=(${e['packX']},${e['packY']}) delta=$delta',
       );
     }
   });
