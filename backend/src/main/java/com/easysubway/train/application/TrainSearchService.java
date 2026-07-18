@@ -366,6 +366,7 @@ public class TrainSearchService {
 		}
 		Instant futureTtl = now.plus(FUTURE_TTL);
 		Instant serviceDayStart = TrainSearchScopePolicy.serviceDayStartsAt(query.departureDate());
+		if (!serviceDayStart.isAfter(now)) return now.plus(TODAY_TTL);
 		return futureTtl.isBefore(serviceDayStart) ? futureTtl : serviceDayStart;
 	}
 

@@ -54,6 +54,37 @@ class TrainSearchRateLimitFilterTest {
 	}
 
 	@Test
+	void appliesTheSearchLimiterToHeadRequestsHandledByGetMappings() throws Exception {
+		var filter = limiterWithOneToken();
+
+		assertThat(filteredRequest(filter, request("HEAD", "/api/v1/trains/search"), "KTX").getStatus())
+			.isEqualTo(200);
+		assertThat(filteredRequest(filter, request("HEAD", "/api/v1/trains/search"), "KTX").getStatus())
+			.isEqualTo(429);
+	}
+
+	@Test
+	void normalizesMatrixParametersBeforeSelectingEitherLimiter() throws Exception {
+		var searchFilter = limiterWithOneToken();
+		assertThat(filteredRequest(
+			searchFilter,
+			request("GET", "/api/v1/trains/search;x=1"),
+			"KTX"
+		).getStatus()).isEqualTo(200);
+		assertThat(filteredRequest(
+			searchFilter,
+			request("GET", "/api/v1/trains/search;x=2"),
+			"KTX"
+		).getStatus()).isEqualTo(429);
+
+		var stationFilter = limiterWithOneToken();
+		assertThat(filteredRequest(stationFilter, request("GET", "/api/v1/trains/stations;x=1"), null).getStatus())
+			.isEqualTo(200);
+		assertThat(filteredRequest(stationFilter, request("GET", "/api/v1/trains/stations;x=2"), null).getStatus())
+			.isEqualTo(429);
+	}
+
+	@Test
 	void trustsForwardedChainOnlyWhenTheDirectPeerIsConfigured() {
 		var resolver = new TrainSearchClientIdentityResolver("10.0.0.0/8,172.16.0.0/12,2001:db8::/32");
 		var trusted = request();
@@ -116,8 +147,31 @@ class TrainSearchRateLimitFilterTest {
 		return response;
 	}
 
+	private MockHttpServletResponse filteredRequest(
+		TrainSearchRateLimitFilter filter,
+		MockHttpServletRequest request,
+		String trainType
+	) throws Exception {
+		if (trainType != null) request.setParameter("trainType", trainType);
+		var response = new MockHttpServletResponse();
+		filter.doFilter(request, response, new MockFilterChain());
+		return response;
+	}
+
+	private TrainSearchRateLimitFilter limiterWithOneToken() {
+		return new TrainSearchRateLimitFilter(
+			new ObjectMapper(),
+			new TrainSearchRateLimiter(1, 10, fixedClock()),
+			new TrainSearchClientIdentityResolver("")
+		);
+	}
+
 	private MockHttpServletRequest request() {
-		var request = new MockHttpServletRequest("GET", "/api/v1/trains/search");
+		return request("GET", "/api/v1/trains/search");
+	}
+
+	private MockHttpServletRequest request(String method, String path) {
+		var request = new MockHttpServletRequest(method, path);
 		request.setRemoteAddr("203.0.113.1");
 		return request;
 	}

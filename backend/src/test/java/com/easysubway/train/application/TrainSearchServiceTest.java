@@ -135,6 +135,22 @@ class TrainSearchServiceTest {
 	}
 
 	@Test
+	void usesTodayTtlWhenAFutureServiceDayBecomesCurrentDuringProviderLoading() {
+		var clock = new TestClock(Instant.parse("2026-07-19T17:59:00Z"));
+		service = serviceWith(clock, duration -> {});
+		provider.beforeSearchReturn = () -> clock.advance(Duration.ofMinutes(2));
+
+		var snapshot = service.searchWithMetadata(criteriaFor(LocalDate.parse("2026-07-20"), null));
+
+		assertThat(cache.legs.values()).singleElement().satisfies(leg -> {
+			assertThat(leg.observedAt()).isEqualTo(Instant.parse("2026-07-19T18:01:00Z"));
+			assertThat(leg.expiresAt()).isEqualTo(Instant.parse("2026-07-19T18:06:00Z"));
+			assertThat(leg.expiresAt()).isAfter(leg.observedAt());
+		});
+		assertThat(snapshot.expiresAt()).isEqualTo(Instant.parse("2026-07-19T18:06:00Z"));
+	}
+
+	@Test
 	void previousCalendarDateRemainsSearchableUntilTheThreeAmServiceDayBoundary() {
 		service = serviceAt(Instant.parse("2026-07-19T17:30:00Z"));
 

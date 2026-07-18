@@ -19,10 +19,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.UrlPathHelper;
 
 @Component
 class TrainSearchRateLimitFilter extends OncePerRequestFilter {
@@ -68,12 +70,13 @@ class TrainSearchRateLimitFilter extends OncePerRequestFilter {
 		HttpServletResponse response,
 		FilterChain filterChain
 	) throws ServletException, IOException {
-		TrainSearchRateLimiter limiter = limiter(request);
+		String path = UrlPathHelper.defaultInstance.getPathWithinApplication(request);
+		TrainSearchRateLimiter limiter = limiter(request, path);
 		if (limiter == null) {
 			filterChain.doFilter(request, response);
 			return;
 		}
-		int cost = SEARCH_PATH.equals(request.getRequestURI()) ? searchCost(request) : 1;
+		int cost = SEARCH_PATH.equals(path) ? searchCost(request) : 1;
 		TrainSearchRateLimiter.AcquireResult result = limiter.acquire(identityResolver.resolve(request), cost);
 		if (result.allowed()) {
 			filterChain.doFilter(request, response);
@@ -90,9 +93,9 @@ class TrainSearchRateLimitFilter extends OncePerRequestFilter {
 		));
 	}
 
-	private TrainSearchRateLimiter limiter(HttpServletRequest request) {
-		if (!"GET".equals(request.getMethod())) return null;
-		return switch (request.getRequestURI()) {
+	private TrainSearchRateLimiter limiter(HttpServletRequest request, String path) {
+		if (!HttpMethod.GET.matches(request.getMethod()) && !HttpMethod.HEAD.matches(request.getMethod())) return null;
+		return switch (path) {
 			case STATIONS_PATH -> stationLimiter;
 			case SEARCH_PATH -> searchLimiter;
 			default -> null;
