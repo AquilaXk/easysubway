@@ -442,6 +442,25 @@ async function keyboardSmoke(page, baseUrl, report) {
   if (alertExpanded !== "true") {
     throw new Error("alert center did not expose aria-expanded=true");
   }
+
+  // #2277: workspace disclosure는 현재 위치를 담은 영역만 기본 펼침하고 나머지는 접는다.
+  // Alpine이 x-bind로 aria-expanded를 실제 상태로 덮어쓸 때까지(비현재 영역이 접힐 때까지) 기다린 뒤
+  // 현재(펼침) 1개 + 나머지(접힘)로 갈렸는지 판정한다. no-JS 정적 상태(모두 true)는 이 대기로 배제된다.
+  await page.waitForSelector('.admin-nav-workspace-toggle[aria-expanded="false"]', { timeout: 2000 }).catch(() => {});
+  const workspaceDisclosure = await page.evaluate(() => {
+    const toggles = Array.from(document.querySelectorAll(".admin-nav-workspace-toggle"));
+    return {
+      total: toggles.length,
+      expanded: toggles.filter((toggle) => toggle.getAttribute("aria-expanded") === "true").length,
+      collapsed: toggles.filter((toggle) => toggle.getAttribute("aria-expanded") === "false").length,
+    };
+  });
+  report.keyboard.push({ check: "nav-workspace-disclosure", ...workspaceDisclosure });
+  if (!(workspaceDisclosure.total >= 2
+    && workspaceDisclosure.expanded === 1
+    && workspaceDisclosure.collapsed === workspaceDisclosure.total - 1)) {
+    throw new Error(`workspace disclosure did not default to only the current workspace expanded: ${JSON.stringify(workspaceDisclosure)}`);
+  }
 }
 
 // #1988: admin-table-scroll wrapper의 키보드 접근성.

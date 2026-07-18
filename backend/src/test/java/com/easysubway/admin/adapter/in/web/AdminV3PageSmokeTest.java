@@ -200,6 +200,37 @@ class AdminV3PageSmokeTest {
 	}
 
 	@Test
+	@DisplayName("sidebar는 workspace disclosure로 렌더하고 현재 위치 workspace만 펼치며 빈 workspace는 제외한다")
+	void adminSidebarRendersWorkspaceDisclosure() throws Exception {
+		// admin.view만 가진 관리자는 program이 있는 workspace(개요·역·접근성 데이터·분석)만 보고
+		// program이 0개인 workspace(운영·커뮤니케이션·데이터팩·시스템·감사)는 렌더되지 않는다(#2277 §7·§8).
+		String html = mockMvc.perform(get("/admin/dashboard/page")
+				.with(user("viewer").authorities(new SimpleGrantedAuthority("admin.view"))))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("class=\"admin-nav-workspace-toggle\"")
+			.contains("aria-controls=\"admin-workspace-overview\"")
+			.contains("개요")
+			.contains("역·접근성 데이터")
+			.contains("분석")
+			.doesNotContain("커뮤니케이션")
+			.doesNotContain("데이터팩")
+			.doesNotContain("시스템·감사");
+
+		// 현재 위치(대시보드)를 담은 workspace만 data-current="true"로 렌더돼 JS가 이 영역만 펼친다.
+		// no-JS 폴백을 위해 서버는 toggle에 aria-expanded="true"를 정적으로 붙여 모든 program을 노출한다.
+		assertThat(html)
+			.contains("is-current")
+			.contains("data-current=\"true\"")
+			.contains("data-current=\"false\"")
+			.contains("aria-expanded=\"true\"");
+	}
+
+	@Test
 	@DisplayName("전체 permission 관리자는 모든 관리자 program을 볼 수 있다")
 	void fullPermissionAdminSeesAllPrograms() throws Exception {
 		String html = mockMvc.perform(get("/admin/dashboard/page")
