@@ -25,6 +25,7 @@ import '../core/database/catalog/catalog_database.dart';
 import '../core/database/catalog/catalog_database_opener.dart';
 import '../core/database/user/user_database.dart';
 import '../core/database/user/user_database_opener.dart';
+import '../features/routes/data/local_route_repository.dart';
 import 'app_endpoints.dart';
 import 'app_dependencies.dart';
 
@@ -44,6 +45,7 @@ class AppBootstrap {
     required this.resumeDataPackUpdate,
     required this.acceptMeteredDataPackUpdate,
     required this.bundledDataPackFreshness,
+    this.localRouteRepository,
   });
 
   final AppDependencies dependencies;
@@ -53,6 +55,7 @@ class AppBootstrap {
   final Future<void> Function() resumeDataPackUpdate;
   final Future<void> Function() acceptMeteredDataPackUpdate;
   final BundledDataPackFreshness? bundledDataPackFreshness;
+  final LocalRouteRepository? localRouteRepository;
 
   static Future<AppBootstrap> initialize({
     Directory? databaseDirectory,
@@ -95,17 +98,50 @@ class AppBootstrap {
           ? await BundledDataPackFreshness.read(supportDirectory)
           : await _installedDataPackFreshness(userDatabase);
       final runner = dataPackUpdateRunner ?? _defaultDataPackUpdateRunner;
-      dataPackUpdate = _runDataPackUpdateSafely(
-        supportDirectory: supportDirectory,
-        userDatabase: userDatabase,
-        runner: runner,
-        trigger: UpdateTrigger.appStart,
-      );
+      final localRouteRepository = routeRepository == null
+          ? LocalRouteRepository(
+              catalogDatabase: catalogDatabase,
+              artifactIdentity: catalogDatabaseOpener.openedArtifactIdentity,
+            )
+          : null;
+
+      Future<void> runAndActivate(UpdateTrigger trigger) async {
+        await _runDataPackUpdateSafely(
+          supportDirectory: supportDirectory,
+          userDatabase: userDatabase,
+          runner: runner,
+          trigger: trigger,
+        );
+        final local = localRouteRepository;
+        if (local == null) return;
+        try {
+          final opener = CatalogDatabaseOpener(
+            databaseDirectory: supportDirectory,
+            assetBundle: assetBundle ?? rootBundle,
+            emergencyOverrideRepository: emergencyOverrideRepository,
+          );
+          final activatedDatabase = await opener.open();
+          await local.activateDataPack(
+            catalogDatabase: activatedDatabase,
+            artifactIdentity: opener.openedArtifactIdentity,
+            ownsDatabase: true,
+          );
+        } catch (error, stackTrace) {
+          reportMobileError(
+            error,
+            stackTrace,
+            context: '이동 정보 업데이트 적용 중 예외가 발생했습니다.',
+          );
+        }
+      }
+
+      dataPackUpdate = runAndActivate(UpdateTrigger.appStart);
 
       final dependencies = AppDependencies.resolve(
         repository: repository,
         reportRepository: reportRepository,
         routeRepository: routeRepository,
+        localRouteRepository: localRouteRepository,
         routeFeedbackRepository: routeFeedbackRepository,
         favoriteRepository: favoriteRepository,
         favoriteFacilityRepository: favoriteFacilityRepository,
@@ -126,19 +162,12 @@ class AppBootstrap {
         catalogDatabase: catalogDatabase,
         userDatabase: userDatabase,
         dataPackUpdate: dataPackUpdate,
-        resumeDataPackUpdate: () => _runDataPackUpdateSafely(
-          supportDirectory: supportDirectory,
-          userDatabase: userDatabase,
-          runner: runner,
-          trigger: UpdateTrigger.foregroundResume,
-        ),
-        acceptMeteredDataPackUpdate: () => _runDataPackUpdateSafely(
-          supportDirectory: supportDirectory,
-          userDatabase: userDatabase,
-          runner: runner,
-          trigger: UpdateTrigger.userConsent,
-        ),
+        resumeDataPackUpdate: () =>
+            runAndActivate(UpdateTrigger.foregroundResume),
+        acceptMeteredDataPackUpdate: () =>
+            runAndActivate(UpdateTrigger.userConsent),
         bundledDataPackFreshness: bundledDataPackFreshness,
+        localRouteRepository: localRouteRepository,
       );
     } catch (error, stackTrace) {
       await dataPackUpdate;
@@ -149,6 +178,7 @@ class AppBootstrap {
 
   Future<void> close() async {
     await dataPackUpdate;
+    await localRouteRepository?.close();
     await catalogDatabase.close();
     await userDatabase.close();
   }

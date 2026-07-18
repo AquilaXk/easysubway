@@ -1210,7 +1210,9 @@ void main() {
                 'id': 'capital',
                 'version': '19',
                 'path': updatedPack.path,
-                'sha256': 'bootstrap-fixture',
+                'sha256': sha256
+                    .convert(await updatedPack.readAsBytes())
+                    .toString(),
               }),
             );
           },
@@ -1228,6 +1230,13 @@ void main() {
 
     expect(metadata.read<String>('value'), '1');
     finishUpdate.complete();
+    await bootstrap.dataPackUpdate;
+
+    final activeRouteDatabase = bootstrap.localRouteRepository!.catalogDatabase;
+    final activePack = await activeRouteDatabase.customSelect('''
+      SELECT value FROM catalog_metadata WHERE key = 'activePack'
+      ''').getSingle();
+    expect(activePack.read<String>('value'), 'capital-v19');
   });
 
   test('앱 부트스트랩은 설치된 current pack의 manifest expiry를 stale 상태로 전달한다', () async {
