@@ -11987,6 +11987,65 @@ void main() {
     expect(find.textContaining('private share failure'), findsNothing);
   });
 
+  testWidgets('도착 시간표만 있는 로컬 경로도 소요시간으로 출발을 보완해 공유한다', (tester) async {
+    tester.binding.platformDispatcher.localeTestValue = const Locale('ko');
+    addTearDown(tester.binding.platformDispatcher.clearLocaleTestValue);
+    String? sharedText;
+    final result = _sampleRouteSearchResult(
+      routeSearchId: 'local-planned-arrival-route',
+      etaSource: 'STATIC_LOCAL',
+      steps: const [
+        RouteSearchStep(
+          sequence: 1,
+          stepType: 'ride',
+          title: '상록수에서 사당까지 4호선 이동',
+          description: '4호선 열차로 이동합니다.',
+          lineId: 'seoul-4',
+          lineName: '수도권 4호선',
+          fromStationId: 'station-sangnoksu',
+          toStationId: 'station-sadang',
+          estimatedMinutes: 7,
+          distanceMeters: 0,
+          includesStairs: false,
+          requiresAccessibilityCheck: false,
+          plannedArrivalTimeIso: '2026-07-18T08:12:00+09:00',
+          timeSource: 'OFFICIAL_TIMETABLE',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(result: result),
+          stationRepository: FakeStationSearchRepository(),
+          routeShareInvoker: (text, origin) async => sharedText = text,
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 18),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _tapFirstRouteResultListItem(tester);
+    await tester.pumpAndSettle();
+    final shareButton = find.byKey(const Key('routeShareButton'));
+    await tester.ensureVisible(shareButton);
+    await tester.tap(shareButton);
+    await tester.pumpAndSettle();
+
+    expect(sharedText, contains('시간: 08:05 → 08:12'));
+    expect(find.text('경로 요약을 공유하지 못했어요.'), findsNothing);
+  });
+
   testWidgets('ITX 공식 운임이 없으면 공유 API를 호출하지 않는다', (tester) async {
     var shareCalls = 0;
     final result = _sampleRouteSearchResult(

@@ -4903,20 +4903,31 @@ RouteShareSnapshot _routeShareSnapshot(
             forbiddenIdentifiers.any(description.contains)) {
           throw StateError('Route leg display labels are unavailable');
         }
+        var departureTimeSource = step.realtimeDepartureTimeIso.isNotEmpty
+            ? step.realtimeDepartureTimeIso
+            : step.plannedDepartureTimeIso;
+        var arrivalTimeSource = step.realtimeArrivalTimeIso.isNotEmpty
+            ? step.realtimeArrivalTimeIso
+            : step.plannedArrivalTimeIso;
+        if (result.isLocalResult) {
+          final duration = Duration(minutes: step.estimatedMinutes);
+          if (departureTimeSource.isEmpty && arrivalTimeSource.isNotEmpty) {
+            departureTimeSource = _shiftRouteShareTime(
+              arrivalTimeSource,
+              -duration,
+            );
+          } else if (arrivalTimeSource.isEmpty &&
+              departureTimeSource.isNotEmpty) {
+            arrivalTimeSource = _shiftRouteShareTime(
+              departureTimeSource,
+              duration,
+            );
+          }
+        }
         return RouteShareLeg(
           description: description,
-          departureTime: _routeShareTime(
-            step.realtimeDepartureTimeIso.isNotEmpty
-                ? step.realtimeDepartureTimeIso
-                : step.plannedDepartureTimeIso,
-            allowEmpty: true,
-          ),
-          arrivalTime: _routeShareTime(
-            step.realtimeArrivalTimeIso.isNotEmpty
-                ? step.realtimeArrivalTimeIso
-                : step.plannedArrivalTimeIso,
-            allowEmpty: true,
-          ),
+          departureTime: _routeShareTime(departureTimeSource, allowEmpty: true),
+          arrivalTime: _routeShareTime(arrivalTimeSource, allowEmpty: true),
         );
       })
       .toList(growable: false);
@@ -4932,17 +4943,16 @@ RouteShareSnapshot _routeShareSnapshot(
       ? steps.last.realtimeArrivalTimeIso
       : steps.last.plannedArrivalTimeIso;
   final durationMinutes = (result.estimatedDurationSeconds / 60).ceil();
-  if (result.isLocalResult &&
-      departureSource.isEmpty &&
-      arrivalSource.isEmpty) {
-    final departure = DateTime.tryParse(result.createdAt);
-    if (departure == null) {
-      throw StateError('Local route time is unavailable');
+  if (result.isLocalResult) {
+    final duration = Duration(seconds: result.estimatedDurationSeconds);
+    if (departureSource.isEmpty && arrivalSource.isEmpty) {
+      departureSource = _routeShareTime(result.createdAt);
+      arrivalSource = _shiftRouteShareTime(departureSource, duration);
+    } else if (departureSource.isEmpty) {
+      departureSource = _shiftRouteShareTime(arrivalSource, -duration);
+    } else if (arrivalSource.isEmpty) {
+      arrivalSource = _shiftRouteShareTime(departureSource, duration);
     }
-    departureSource = departure.toIso8601String();
-    arrivalSource = departure
-        .add(Duration(seconds: result.estimatedDurationSeconds))
-        .toIso8601String();
   }
 
   RouteShareFare? fare;
@@ -4997,6 +5007,23 @@ String _routeShareTime(String value, {bool allowEmpty = false}) {
     throw StateError('Route time is unavailable');
   }
   return '${match.group(1)}:${match.group(2)}';
+}
+
+String _shiftRouteShareTime(String value, Duration offset) {
+  final match = RegExp(
+    r'(?:T|^)(\d{2}):(\d{2})(?::(\d{2}))?',
+  ).firstMatch(value.trim());
+  if (match == null) {
+    throw StateError('Route time is unavailable');
+  }
+  final hour = int.parse(match.group(1)!);
+  final minute = int.parse(match.group(2)!);
+  final second = int.parse(match.group(3) ?? '0');
+  if (hour > 23 || minute > 59 || second > 59) {
+    throw StateError('Route time is unavailable');
+  }
+  final shifted = DateTime.utc(2000, 1, 2, hour, minute, second).add(offset);
+  return '${shifted.hour.toString().padLeft(2, '0')}:${shifted.minute.toString().padLeft(2, '0')}';
 }
 
 class _OfficialOdFareSection extends StatelessWidget {
