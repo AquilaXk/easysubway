@@ -31,6 +31,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.ResolverStyle;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -46,6 +47,7 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 	private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(5);
 	private static final Duration RETRY_DELAY = Duration.ofMillis(250);
 	private static final int PAGE_SIZE = 100;
+	private static final int MAX_TOTAL_COUNT = 1_000;
 	private static final ZoneId PROVIDER_ZONE = ZoneId.of("Asia/Seoul");
 	private static final DateTimeFormatter PROVIDER_TIME = DateTimeFormatter.ofPattern("uuuuMMddHHmmss")
 		.withResolverStyle(ResolverStyle.STRICT);
@@ -201,7 +203,17 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 		}
 		Map<String, Journey> unique = new LinkedHashMap<>();
 		for (String providerCode : providerCodes) {
-			search(query, providerCode).forEach(journey -> unique.putIfAbsent(journeyKey(journey), journey));
+			var providerKeys = new HashSet<String>();
+			for (Journey journey : search(query, providerCode)) {
+				String key = journeyKey(journey);
+				if (!providerKeys.add(key)) {
+					throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
+				}
+				Journey existing = unique.putIfAbsent(key, journey);
+				if (existing != null && !existing.equals(journey)) {
+					throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
+				}
+			}
 		}
 		return unique.values().stream()
 			.sorted(Comparator.comparing(Journey::departureAt)
@@ -365,7 +377,7 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 			int responsePage = requiredInteger(body, "pageNo");
 			int responsePageSize = requiredInteger(body, "numOfRows");
 			int totalCount = requiredInteger(body, "totalCount");
-			if (responsePage != page || responsePageSize != PAGE_SIZE) {
+			if (responsePage != page || responsePageSize != PAGE_SIZE || totalCount > MAX_TOTAL_COUNT) {
 				throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
 			}
 			if (expectedTotalCount == null) {
@@ -480,7 +492,7 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 
 	private int requiredInteger(JsonNode row, String field) {
 		JsonNode value = row.path(field);
-		if (!value.canConvertToInt() || value.intValue() < 0) {
+		if (!value.isIntegralNumber() || !value.canConvertToInt() || value.intValue() < 0) {
 			throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
 		}
 		return value.intValue();

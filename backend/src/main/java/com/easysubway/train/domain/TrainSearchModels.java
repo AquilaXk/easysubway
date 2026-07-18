@@ -83,7 +83,12 @@ public final class TrainSearchModels {
 		OffsetDateTime observedAt,
 		List<Journey> outbound,
 		List<Journey> inbound
-	) {}
+	) {
+		public SearchResult {
+			outbound = List.copyOf(outbound);
+			inbound = List.copyOf(inbound);
+		}
+	}
 
 	public record Journey(
 		String trainNumber,

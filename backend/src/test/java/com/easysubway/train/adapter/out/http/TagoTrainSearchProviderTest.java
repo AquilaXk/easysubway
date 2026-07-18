@@ -196,6 +196,46 @@ class TagoTrainSearchProviderTest {
 	}
 
 	@Test
+	void rejectsDuplicateRowsWithinOneProviderCode() throws Exception {
+		String duplicate = journeyRow(101);
+		var server = server(exchange -> respond(exchange, paginatedResponse(
+			"[" + duplicate + "," + duplicate + "]",
+			2
+		)));
+		try {
+			assertThatThrownBy(() -> provider(server, "test-key")
+				.search(legQuery(LocalDate.parse("2026-07-20"), "KTX", "00")))
+				.isInstanceOf(ProviderFailure.class)
+				.hasMessage("TRAIN_SEARCH_PROVIDER_ERROR");
+		} finally {
+			server.stop(0);
+		}
+	}
+
+	@Test
+	void rejectsConflictingCopiesAcrossProviderCodes() throws Exception {
+		var server = server(exchange -> {
+			String providerCode = query(exchange.getRequestURI()).get("trainGradeCode");
+			String fare = "01".equals(providerCode) ? "23700" : "23800";
+			respond(exchange, paginatedResponse("""
+				{"trainno":"101","traingradename":"KTX-산천","depplandtime":"20260720090000","arrplandtime":"20260720100200","depplacename":"서울","arrplacename":"대전","adultcharge":"%s"}
+				""".formatted(fare), 1));
+		});
+		try {
+			var query = new LegQuery(
+				"NAT010000", "NAT011668", LocalDate.parse("2026-07-20"), "KTX_SANCHEON",
+				java.util.List.of("01", "10"), "서울", "대전"
+			);
+
+			assertThatThrownBy(() -> provider(server, "test-key").search(query))
+				.isInstanceOf(ProviderFailure.class)
+				.hasMessage("TRAIN_SEARCH_PROVIDER_ERROR");
+		} finally {
+			server.stop(0);
+		}
+	}
+
+	@Test
 	void mergesPagesAndAcceptsSingleItemShape() throws Exception {
 		var requestedPages = new java.util.concurrent.CopyOnWriteArrayList<String>();
 		var budgetCalls = new AtomicInteger();
@@ -322,6 +362,39 @@ class TagoTrainSearchProviderTest {
 				.hasMessage("TRAIN_SEARCH_PROVIDER_ERROR");
 		} finally {
 			drift.stop(0);
+		}
+	}
+
+	@Test
+	void rejectsExcessiveTotalCountBeforeRequestingAnotherPage() throws Exception {
+		var attempts = new AtomicInteger();
+		var server = server(exchange -> {
+			attempts.incrementAndGet();
+			respond(exchange, paginatedResponse(journeyRow(1), 1_001));
+		});
+		try {
+			assertThatThrownBy(() -> provider(server, "test-key")
+				.search(legQuery(LocalDate.parse("2026-07-20"), "KTX", "00")))
+				.isInstanceOf(ProviderFailure.class)
+				.hasMessage("TRAIN_SEARCH_PROVIDER_ERROR");
+			assertThat(attempts).hasValue(1);
+		} finally {
+			server.stop(0);
+		}
+	}
+
+	@Test
+	void rejectsFractionalPaginationMetadata() throws Exception {
+		var server = server(exchange -> respond(exchange, """
+			{"response":{"header":{"resultCode":"00"},"body":{"items":{"item":[]},"pageNo":1.9,"numOfRows":100,"totalCount":0}}}
+			"""));
+		try {
+			assertThatThrownBy(() -> provider(server, "test-key")
+				.search(legQuery(LocalDate.parse("2026-07-20"), "KTX", "00")))
+				.isInstanceOf(ProviderFailure.class)
+				.hasMessage("TRAIN_SEARCH_PROVIDER_ERROR");
+		} finally {
+			server.stop(0);
 		}
 	}
 

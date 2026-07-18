@@ -13,7 +13,12 @@ public interface TrainSearchProvider {
 
 	List<Journey> search(LegQuery query);
 
-	record Catalog(Instant observedAt, List<Station> stations, List<TrainType> trainTypes) {}
+	record Catalog(Instant observedAt, List<Station> stations, List<TrainType> trainTypes) {
+		public Catalog {
+			stations = List.copyOf(stations);
+			trainTypes = List.copyOf(trainTypes);
+		}
+	}
 
 	final class ProviderFailure extends RuntimeException {
 
