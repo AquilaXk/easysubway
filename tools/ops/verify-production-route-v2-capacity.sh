@@ -268,7 +268,8 @@ docker run -d --name "${clone_db}" --network "${network}" --network-alias postgr
 
 db_ready=false
 for _ in $(seq 1 90); do
-	if docker exec "${clone_db}" sh -lc 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null 2>&1; then
+	if [[ "$(docker exec "${clone_db}" cat /proc/1/comm 2>/dev/null || true)" == postgres ]] \
+		&& docker exec "${clone_db}" sh -lc 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null 2>&1; then
 		db_ready=true
 		break
 	fi
