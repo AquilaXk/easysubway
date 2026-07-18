@@ -10,6 +10,9 @@ import com.easysubway.route.domain.ConstraintMode;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -60,6 +63,38 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 
 		assertThat(second).isSameAs(first);
 		assertThat(compiled.activeServiceDayCacheSize()).isOne();
+	}
+
+	@Test
+	@DisplayName("일반 search는 next-service 전용 boarding index를 생성하지 않는다")
+	void regularSearchDoesNotAllocateBoardingIndex() {
+		var compiled = planner.compile(frequencyTimetable());
+
+		assertThat(planner.search(command(WEDNESDAY, 9, 5), compiled)).hasSize(1);
+
+		assertThat(compiled.activeServiceDay(WEDNESDAY).boardingIndexInitialized()).isFalse();
+	}
+
+	@Test
+	@DisplayName("동시 nextServiceTime은 service day boarding index를 안전하게 lazy publish한다")
+	void concurrentNextServiceTimeLazilyPublishesBoardingIndex() throws Exception {
+		var compiled = planner.compile(frequencyTimetable());
+		var activeDay = compiled.activeServiceDay(WEDNESDAY);
+		var start = new CountDownLatch(1);
+
+		assertThat(activeDay.boardingIndexInitialized()).isFalse();
+		try (var executor = Executors.newFixedThreadPool(8)) {
+			var attempts = java.util.stream.IntStream.range(0, 8).mapToObj(ignored -> executor.submit(() -> {
+				start.await();
+				return planner.nextServiceTime(command(WEDNESDAY, 8, 0), compiled);
+			})).toList();
+			start.countDown();
+			for (var attempt : attempts) {
+				assertThat(attempt.get(5, TimeUnit.SECONDS))
+					.contains(OffsetDateTime.parse("2026-07-01T09:00:00+09:00"));
+			}
+		}
+		assertThat(activeDay.boardingIndexInitialized()).isTrue();
 	}
 
 	@Test

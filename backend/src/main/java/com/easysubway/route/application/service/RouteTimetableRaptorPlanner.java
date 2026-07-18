@@ -787,7 +787,7 @@ class RouteTimetableRaptorPlanner {
 			List<ScheduledTrip> activeTrips = scheduledTrips.stream()
 				.filter(trip -> activeServiceIds.contains(trip.trip().serviceId()))
 				.toList();
-			ActiveServiceDay compiled = new ActiveServiceDay(activeTrips, boardingsByStation(activeTrips));
+			ActiveServiceDay compiled = new ActiveServiceDay(activeTrips);
 			activeServiceDays.put(serviceDate, compiled);
 			if (activeServiceDays.size() > ACTIVE_SERVICE_DAY_CACHE_SIZE) {
 				activeServiceDays.remove(activeServiceDays.sequencedKeySet().getFirst());
@@ -908,19 +908,33 @@ class RouteTimetableRaptorPlanner {
 	static final class ActiveServiceDay {
 
 		private final List<ScheduledTrip> trips;
-		private final Map<String, List<BoardingStop>> boardingsByStation;
+		private volatile Map<String, List<BoardingStop>> boardingsByStation;
 
-		private ActiveServiceDay(List<ScheduledTrip> trips, Map<String, List<BoardingStop>> boardingsByStation) {
+		private ActiveServiceDay(List<ScheduledTrip> trips) {
 			this.trips = List.copyOf(trips);
-			this.boardingsByStation = Map.copyOf(boardingsByStation);
 		}
 
 		private List<ScheduledTrip> trips() {
 			return trips;
 		}
 
+		boolean boardingIndexInitialized() {
+			return boardingsByStation != null;
+		}
+
 		private Map<String, List<BoardingStop>> boardingsByStation() {
-			return boardingsByStation;
+			Map<String, List<BoardingStop>> snapshot = boardingsByStation;
+			if (snapshot != null) {
+				return snapshot;
+			}
+			synchronized (this) {
+				snapshot = boardingsByStation;
+				if (snapshot == null) {
+					snapshot = RouteTimetableRaptorPlanner.boardingsByStation(trips);
+					boardingsByStation = snapshot;
+				}
+				return snapshot;
+			}
 		}
 	}
 
