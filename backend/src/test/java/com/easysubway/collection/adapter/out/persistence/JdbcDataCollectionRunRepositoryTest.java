@@ -13,6 +13,7 @@ import com.easysubway.collection.domain.DataCollectionSource;
 import com.easysubway.collection.domain.DataCollectionStepStatus;
 import com.easysubway.collection.domain.DataCollectionStatus;
 import com.easysubway.collection.domain.InvalidDataCollectionException;
+import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -26,8 +27,9 @@ import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -171,6 +173,17 @@ class JdbcDataCollectionRunRepositoryTest {
 		assertThatThrownBy(() -> repository.saveRun(runningRun("collection-next")))
 			.isInstanceOf(InvalidDataCollectionException.class)
 			.hasMessage("같은 수집 대상이 이미 실행 중입니다.");
+	}
+
+	@Test
+	@DisplayName("PostgreSQL RUNNING source partial index 충돌을 동시 실행 거부로 분류한다")
+	void recognizesPostgresRunningSourceIndexConflict() {
+		var exception = new DataIntegrityViolationException(
+			"save failed",
+			new SQLException("duplicate key violates ux_data_collection_runs_running_source")
+		);
+
+		assertThat(JdbcDataCollectionRunRepository.isActiveSourceConflict(exception)).isTrue();
 	}
 
 	@Test

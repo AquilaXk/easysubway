@@ -1,2 +1,3 @@
-CREATE UNIQUE INDEX CONCURRENTLY ux_data_collection_runs_active_source
-    ON data_collection_runs (active_source);
+CREATE UNIQUE INDEX CONCURRENTLY ux_data_collection_runs_running_source
+    ON data_collection_runs (source)
+    WHERE status = 'RUNNING';

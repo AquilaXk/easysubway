@@ -81,10 +81,14 @@ public class JdbcDataCollectionRunRepository implements
 		return run;
 	}
 
-	private boolean isActiveSourceConflict(DataIntegrityViolationException exception) {
+	static boolean isActiveSourceConflict(DataIntegrityViolationException exception) {
 		String message = exception.getMostSpecificCause().getMessage();
-		return message != null
-			&& message.toLowerCase(Locale.ROOT).contains("ux_data_collection_runs_active_source");
+		if (message == null) {
+			return false;
+		}
+		String normalized = message.toLowerCase(Locale.ROOT);
+		return normalized.contains("ux_data_collection_runs_active_source")
+			|| normalized.contains("ux_data_collection_runs_running_source");
 	}
 
 	private void saveRunRecord(DataCollectionRun run) {

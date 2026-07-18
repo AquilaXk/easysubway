@@ -14042,9 +14042,10 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   assert.doesNotMatch(batchRunPostgresSchema, /CREATE (?:UNIQUE )?INDEX/);
   assert.match(
     batchRunPostgresIndex,
-    /CREATE UNIQUE INDEX CONCURRENTLY ux_data_collection_runs_active_source/,
+    /CREATE UNIQUE INDEX CONCURRENTLY ux_data_collection_runs_running_source/,
   );
-  assert.match(batchRunPostgresIndex, /ON data_collection_runs \(active_source\)/);
+  assert.match(batchRunPostgresIndex, /ON data_collection_runs \(source\)/);
+  assert.match(batchRunPostgresIndex, /WHERE status = 'RUNNING'/);
   assert.match(batchRunH2Schema, /CREATE UNIQUE INDEX ux_data_collection_runs_active_source/);
   assert.match(batchRunPreflight, /WHERE status = 'RUNNING'/);
   assert.match(batchRunPreflight, /GROUP BY source/);
@@ -14132,6 +14133,7 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   assert.match(jdbcRepository, /@Transactional[\s\S]*saveRun\(DataCollectionRun run\)/);
   assert.match(jdbcRepository, /isActiveSourceConflict/);
   assert.match(jdbcRepository, /ux_data_collection_runs_active_source/);
+  assert.match(jdbcRepository, /ux_data_collection_runs_running_source/);
   assert.match(jdbcRepository, /throw exception/);
   assert.match(jdbcRepository, /INSERT INTO data_collection_runs/);
   assert.match(jdbcRepository, /INSERT INTO data_collection_run_steps/);
