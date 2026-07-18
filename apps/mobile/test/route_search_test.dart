@@ -254,6 +254,7 @@ void main() {
         originStationId: 'station-sangnoksu',
         destinationStationId: 'station-sadang',
         mobilityType: 'WHEELCHAIR',
+        objective: RouteObjective.fewestTransfers,
       ),
     );
 
@@ -265,6 +266,7 @@ void main() {
       'constraintMode': 'STRICT_STEP_FREE',
     });
     expect(result.routeSearchId, 'route-1');
+    expect(result.objective, RouteObjective.fastest);
     expect(result.constraintMode, 'STRICT_STEP_FREE');
     expect(result.summaryTitle, '상록수에서 사당까지');
     expect(result.lineName, '수도권 4호선');
@@ -373,6 +375,9 @@ void main() {
 
   test('경로 검색 컨트롤러는 현재 결과 ETA refresh 상태를 유지해서 표시한다', () async {
     final repository = FakeRouteSearchRepository();
+    repository.searchResult = _sampleRouteSearchResult(
+      objective: RouteObjective.fewestTransfers,
+    );
     final controller = RouteSearchController(repository: repository);
 
     await controller.search(
@@ -405,6 +410,7 @@ void main() {
     expect(repository.refreshRouteSearchIds, ['route-1']);
     expect(controller.state.status, RouteSearchViewStatus.success);
     expect(controller.state.isRefreshing, isFalse);
+    expect(controller.state.result!.objective, RouteObjective.fewestTransfers);
     expect(
       controller.state.refreshMessage,
       '실시간 정보가 늦어 계획 시간으로 안내해요. · 최근 확인 시간이 오래되어 계획 시간으로 안내 · 신뢰도 낮음',
@@ -1678,6 +1684,67 @@ void main() {
   });
 
   group('#2099 objective-tagged itinerary 보존·선택', () {
+    test('선택 objective와 공식 운임, exact leg 시각을 공유 입력까지 보존한다', () {
+      final itinerary = RouteSearchV2Itinerary.fromJson({
+        'itineraryId': 'route-itx-primary',
+        'status': 'FOUND',
+        'plannedArrivalTime': '2026-06-30T11:42:00+09:00',
+        'realtimeArrivalTime': null,
+        'etaSource': 'PLANNED',
+        'etaConfidence': 'MEDIUM',
+        'durationSeconds': 9120,
+        'transferCount': 1,
+        'walkingDistanceMeters': 180,
+        'accessibilityRisk': <String, Object?>{
+          'stairCount': 0,
+          'unknownAccessibilityCount': 0,
+          'generatedConnectorCount': 0,
+          'staleDataCount': 0,
+          'lowConfidenceCount': 0,
+          'unavailableFacilityCount': 0,
+          'riskLevel': 'LOW',
+          'reasonCodes': <String>[],
+          'level': 'LOW',
+          'reasons': <String>[],
+        },
+        'legs': [
+          _rideLegJson(
+            serviceClass: 'ITX_CHEONGCHUN',
+            servicePattern: 'EXPRESS',
+          ),
+        ],
+        'commercialEtaEligible': true,
+        'objectiveTags': ['FEWEST_TRANSFERS'],
+        'officialFare': <String, Object?>{
+          'adultFareWon': 9800,
+          'currency': 'KRW',
+          'policy': 'SUM_OF_OFFICIAL_RIDE_OD_FARES',
+          'sourceIds': ['tago-train-schedule-fares'],
+          'sourceSnapshotIds': ['itx-20260630'],
+        },
+      });
+      final result = _objectiveResult([itinerary]);
+
+      final display = RouteSearchResult.fromV2(
+        result,
+        objective: RouteObjective.fewestTransfers,
+      );
+
+      expect(display.objective, RouteObjective.fewestTransfers);
+      expect(display.departureTimeIso, '2026-06-30T09:15:00+09:00');
+      expect(display.arrivalTimeIso, '2026-06-30T11:42:00+09:00');
+      expect(display.officialFare?.adultFareWon, 9800);
+      expect(display.officialFare?.currency, 'KRW');
+      expect(
+        display.steps.single.plannedDepartureTimeIso,
+        '2026-06-30T09:17:00+09:00',
+      );
+      expect(
+        display.steps.single.plannedArrivalTimeIso,
+        '2026-06-30T09:42:00+09:00',
+      );
+    });
+
     test('dual-tag dedupe된 대표 itinerary는 두 objective에서 모두 선택된다', () {
       final result = _objectiveResult([
         _taggedItinerary(
@@ -2039,6 +2106,7 @@ RouteSearchResult _sampleRouteSearchResult({
   String accessibilityRiskLevel = '',
   int? transferSlackSeconds,
   bool hasOutOfStationTransfer = false,
+  RouteObjective objective = RouteObjective.fastest,
 }) {
   return RouteSearchResult(
     routeSearchId: routeSearchId,
@@ -2062,6 +2130,7 @@ RouteSearchResult _sampleRouteSearchResult({
     accessibilityRiskLevel: accessibilityRiskLevel,
     transferSlackSeconds: transferSlackSeconds,
     hasOutOfStationTransfer: hasOutOfStationTransfer,
+    objective: objective,
   );
 }
 

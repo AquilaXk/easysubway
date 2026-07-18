@@ -686,6 +686,8 @@ void main() {
 
     expect(result.status, 'FOUND');
     expect(result.originStationId, 'station-sangnoksu');
+    expect(result.createdAt, endsWith('Z'));
+    expect(DateTime.parse(result.createdAt).isUtc, isTrue);
   });
 
   test('로컬 경로는 exact official OD 요금을 함께 반환한다', () async {
@@ -5413,6 +5415,7 @@ void main() {
     expect(fastest.transferCount, 1);
     expect(fewestTransfers.status, 'FOUND');
     expect(fewestTransfers.transferCount, 0);
+    expect(fewestTransfers.objective, RouteObjective.fewestTransfers);
     expect(
       fewestTransfers.steps.expand((step) => step.evidenceSources),
       contains('edge:ride-a-c-direct-test'),
