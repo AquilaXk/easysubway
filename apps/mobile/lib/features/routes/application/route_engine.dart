@@ -531,7 +531,7 @@ class RouteAssembler {
         edge.isDataStale ||
         edge.accessibilityState == RouteAccessibilityState.unknown ||
         edge.stairAccessState == RouteStairAccessState.unknown) {
-      return '안내를 준비 중이에요';
+      return '';
     }
     if (edge.reliabilityScore >= 80) {
       return '확인된 정보예요';
@@ -539,12 +539,12 @@ class RouteAssembler {
     if (edge.reliabilityScore >= 60) {
       return '일부 확인된 정보예요';
     }
-    return '안내를 준비 중이에요';
+    return '';
   }
 
   String _warningMessage(String code) {
     return switch (code) {
-      'LOW_DATA_CONFIDENCE' => '일부 시설 안내를 준비 중이에요.',
+      'LOW_DATA_CONFIDENCE' => '일부 시설 안내는 아직 확인되지 않았어요.',
       'STALE_ACCESSIBILITY_DATA' => '시설 상태 안내가 오래됐을 수 있어요.',
       'STAIR_ONLY_ACCESS' => '계단 포함 구간이 있습니다.',
       // 불확실성 헤지는 앱 공통 사전 한 벌로 통일한다(#1577). 연결 미확인의
