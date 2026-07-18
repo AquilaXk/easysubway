@@ -63,7 +63,10 @@ class OperatorAccessibilityReportControllerTest {
 			.andExpect(jsonPath("$.data.stationQualityRows[2].description").value("쉬운 길 안내를 볼 수 있어요"))
 			.andExpect(jsonPath("$.data.stationQualityRows[3].description").value("고장·공사 소식이 반영됐어요"))
 			// #2095: region 목록이 이름순 정렬이라 강원권(ITX-청춘 pilot 3역)이 수도권보다
-			// 앞에 온다. operator/line은 손대지 않아 강원권 쪽은 0이다.
+			// 앞에 온다. ITX-청춘 노선을 LINES에 추가했지만 그 운영기관인 한국철도공사는
+			// 이미 수인분당선으로 "수도권" TransitOperator에 등록돼 있어(단일 region
+			// 스키마상 강원권 전용 운영기관을 지어내지 않았으므로) 강원권 operatorCount는
+			// 여전히 0이다.
 			.andExpect(jsonPath("$.data.regionQualityRows[0].name").value("강원권"))
 			.andExpect(jsonPath("$.data.regionQualityRows[0].operatorCount").value(0))
 			.andExpect(jsonPath("$.data.regionQualityRows[1].name").value("수도권"))
