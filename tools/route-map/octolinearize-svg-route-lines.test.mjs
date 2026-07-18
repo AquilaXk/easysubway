@@ -77,6 +77,30 @@ test("buildFilletedLocalPath: 짧은 leg는 필렛 반경을 축소(겹침 방�
   assert.ok(Math.abs(p0x - 2.2) < 0.01);
 });
 
+test("buildFilletedLocalPath: minClearancePx를 주면 leg가 짧을 때 필렛을 생략(sharp)한다", () => {
+  // #2068 4차: G-NODE-STRAIGHT(노드 직선 여유) 하드 게이트 — leg(4px)가
+  // minClearancePx(6px)보다 짧으면 필렛 자체를 생략해 leg 전체가 직선으로
+  // 남는다(노드 바로 앞에서 곡선이 시작되지 않는다).
+  const verts = [
+    { x: 0, y: 0, synthetic: false },
+    { x: 4, y: 0, synthetic: true },
+    { x: 4, y: 4, synthetic: false },
+  ];
+  const d = buildFilletedLocalPath(verts, IDENT, 6, 6);
+  assert.ok(!d.includes("C")); // 필렛 없음 — sharp corner.
+  assert.equal(d, "M 0 0 L 4 0 L 4 4");
+});
+
+test("buildFilletedLocalPath: minClearancePx 미지정(기본 0)이면 기존 동작 유지", () => {
+  const verts = [
+    { x: 0, y: 0, synthetic: false },
+    { x: 4, y: 0, synthetic: true },
+    { x: 4, y: 4, synthetic: false },
+  ];
+  const d = buildFilletedLocalPath(verts, IDENT, 6);
+  assert.ok(d.includes("C")); // 기본값은 기존처럼 필렛 적용.
+});
+
 test("buildFilletedLocalPath: local 변환(render→SVG local) 적용", () => {
   const verts = [
     { x: 70, y: 138, synthetic: false },

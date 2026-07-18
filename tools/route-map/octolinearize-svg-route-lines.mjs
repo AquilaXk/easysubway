@@ -94,8 +94,12 @@ function unit(v) {
 function addScaled(p, dir, s) {
   return { x: p.x + dir.x * s, y: p.y + dir.y * s };
 }
+// 오너 지시(2026-07-18, 3차 재확인): "직선은 정확히 8방향 스냅, 부동소수 잔차도
+// 최소화" — 좌표를 3자리에서 6자리로 반올림해 짧은(서브px) 세그먼트에서
+// 독립 반올림이 만드는 각도 잔차를 실질적으로 제거한다(0.001° tolerance 실측
+// 검증 — round-svg-route-lines.mjs 참고).
 function fmt(p) {
-  return `${Math.round(p.x * 1000) / 1000} ${Math.round(p.y * 1000) / 1000}`;
+  return `${Math.round(p.x * 1e6) / 1e6} ${Math.round(p.y * 1e6) / 1e6}`;
 }
 
 const BEZIER_CIRCLE_K = 0.5523;
@@ -105,7 +109,7 @@ const BEZIER_CIRCLE_K = 0.5523;
  * synthetic 정점에서만 짧은 원형근사 3차 베지어 필렛을 입힌다(실제 역 정점은
  * sharp — G-NODE 보존). 반환: d 문자열, 또는 정점<2면 null.
  */
-export function buildFilletedLocalPath(annotatedVerts, transform, radiusPx = 6) {
+export function buildFilletedLocalPath(annotatedVerts, transform, radiusPx = 6, minClearancePx = 0) {
   const n = annotatedVerts.length;
   if (n < 2) return null;
   const cmds = [`M ${fmt(toLocal(annotatedVerts[0], transform))}`];
@@ -119,7 +123,15 @@ export function buildFilletedLocalPath(annotatedVerts, transform, radiusPx = 6) 
       const dOut = unit(sub(next, cur));
       const legIn = dist(prev, cur);
       const legOut = dist(cur, next);
-      const rr = Math.max(0, Math.min(radiusPx, legIn * 0.45, legOut * 0.45));
+      // #2068 4차: minClearancePx(기본 0=미적용)를 주면 필렛이 역 바로 앞에서
+      // 곡선을 시작하지 않도록 반경을 추가로 축소한다 — G-NODE-STRAIGHT 하드
+      // 게이트(노드에서 최소 직선 리드 확보)를 만족시킨다. leg가
+      // minClearancePx보다 짧으면(직선 리드를 남길 여지 자체가 없으면) 필렛을
+      // 아예 생략(rr=0, sharp corner)해 leg 전체가 직선으로 남는다.
+      const rr = Math.max(
+        0,
+        Math.min(radiusPx, legIn * 0.45, legOut * 0.45, legIn - minClearancePx, legOut - minClearancePx),
+      );
       if (rr < 0.05) {
         cmds.push(`L ${fmt(toLocal(cur, transform))}`);
         pen = cur;
@@ -144,7 +156,7 @@ export function buildFilletedLocalPath(annotatedVerts, transform, radiusPx = 6) 
 
 // ── route-line 그룹 조작 ────────────────────────────────────────────────────
 
-function sliceGroup(svgText, idIdx) {
+export function sliceGroup(svgText, idIdx) {
   const gStart = svgText.lastIndexOf("<g", idIdx);
   const openEnd = svgText.indexOf(">", idIdx);
   let depth = 0;
@@ -165,7 +177,7 @@ function sliceGroup(svgText, idIdx) {
 /** 그룹 텍스트에서 첫 stroke(색 지정) path의 속성 템플릿(문자열)을 뽑는다.
  *  id/d/sodipodi:nodetypes는 제외 — id·d는 새로 만들고, sodipodi:nodetypes는
  *  path 재구성 후 정점 수가 달라져 stale해지므로 버린다. */
-function extractStrokeTemplate(groupText) {
+export function extractStrokeTemplate(groupText) {
   const pathRe = /<path\b[^>]*?\/>/gs;
   for (let m = pathRe.exec(groupText); m; m = pathRe.exec(groupText)) {
     const p = m[0];
@@ -185,7 +197,7 @@ function extractStrokeTemplate(groupText) {
 // seohae(서해선)처럼 stroke 없이 fill-ribbon으로 그려진 노선의 폴백 템플릿
 // (다른 23개 노선과 동일한 round-cap stroke 관례로 정규화 — #2068 실측: 서해선이
 // 유일한 fill-ribbon 표현이라 통일이 일관성을 높인다).
-function fallbackStrokeTemplate(slug, config) {
+export function fallbackStrokeTemplate(slug, config) {
   const color =
     Object.entries(config.colorToSlug).find(([, s]) => s === slug)?.[0] ?? "#666666";
   return (
