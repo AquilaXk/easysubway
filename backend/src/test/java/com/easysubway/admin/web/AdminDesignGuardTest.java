@@ -243,6 +243,10 @@ class AdminDesignGuardTest {
 		assertThat(rule(css, "\\.admin-main")).doesNotContain("overflow-x: auto;");
 		assertThat(rule(css, "\\.admin-v3 section,\\s*\\.admin-card"))
 			.doesNotContain("overflow-x: auto;");
+		assertThat(rule(css,
+			"\\.admin-v3 \\.admin-table-scroll table\\.static-table tbody tr:hover "
+				+ "td:first-child:not\\(\\[colspan\\]\\)"))
+			.contains("background: var(--admin-surface);");
 	}
 
 	private static int count(Pattern pattern, String source) {

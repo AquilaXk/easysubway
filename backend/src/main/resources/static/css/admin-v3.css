@@ -534,6 +534,10 @@ body.admin-v3 {
 	background: transparent;
 }
 
+.admin-v3 .admin-table-scroll table.static-table tbody tr:hover td:first-child:not([colspan]) {
+	background: var(--admin-surface);
+}
+
 .admin-v3 tbody tr:last-child td {
 	border-bottom: 0;
 }
