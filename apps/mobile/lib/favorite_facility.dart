@@ -300,7 +300,7 @@ class FavoriteFacility {
     if (floorFrom.trim().isNotEmpty && floorTo.trim().isNotEmpty) {
       return '$floorFrom-$floorTo';
     }
-    return '위치 안내를 준비 중이에요';
+    return '위치 미확인';
   }
 
   String get updatedLabel => '최근 확인 $lastUpdatedAt';
@@ -355,6 +355,6 @@ String _dataSourceLabel(String dataSourceType) {
     'USER_REPORT' => '이용자 제보',
     'ADMIN_VERIFIED' => '확인된 안내',
     'PARTNER_FEED' => '연계 안내',
-    _ => '안내를 준비 중이에요',
+    _ => '',
   };
 }

@@ -252,7 +252,7 @@ void main() {
     expect(result.statusLabel, '접수됨');
   });
 
-  test('시설 신고 결과는 공개 번호가 없으면 라벨 없는 준비 중 값을 보여준다', () {
+  test('시설 신고 결과는 공개 번호가 없으면 발급 전 사실형 값을 보여준다', () {
     const result = FacilityReportResult(
       id: 'report-1',
       stationId: 'station-sangnoksu',
@@ -263,7 +263,7 @@ void main() {
       createdAt: '2026-06-13T10:00:00',
     );
 
-    expect(result.displayReceiptCode, '준비 중');
+    expect(result.displayReceiptCode, '발급 전');
   });
 
   test('시설 신고 요청은 사진 Base64 대신 object metadata를 전송한다', () {

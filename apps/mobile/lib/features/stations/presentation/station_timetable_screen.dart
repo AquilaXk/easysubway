@@ -162,7 +162,7 @@ class _StationTimetableScreenState extends State<StationTimetableScreen> {
             if (_loading)
               const Center(child: CircularProgressIndicator())
             else if (timetable == null || !timetable.isAvailable)
-              const _StationTimetableEmptyMessage(message: '시간표를 준비 중이에요.')
+              const _StationTimetableEmptyMessage(message: '시간표 정보가 없어요')
             else ...[
               const _StationTimetableSectionTitle(title: '방향'),
               const SizedBox(height: 8),

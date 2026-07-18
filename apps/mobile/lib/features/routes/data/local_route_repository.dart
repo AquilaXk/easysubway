@@ -1210,7 +1210,7 @@ List<route_step.RouteStep> _collapseConsecutiveRideSteps(
           : 'UNKNOWN',
       confidenceLabel: previous.confidenceLabel == step.confidenceLabel
           ? previous.confidenceLabel
-          : '안내를 준비 중이에요',
+          : '',
     );
   }
   return collapsed;

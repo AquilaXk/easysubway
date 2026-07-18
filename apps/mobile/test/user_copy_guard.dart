@@ -85,6 +85,10 @@ const _forbiddenUserCopy = <String>[
   '개인정보 제거',
   '출구 정보가 아직 없습니다',
   '시설 정보가 아직 없습니다',
+  // #2078: 비-loading '준비 중'·'준비중' placeholder 회귀 차단. 실제 loading은
+  // 아래 allowlist(_isActualLoadingCopy)로만 예외 처리한다.
+  '준비 중',
+  '준비중',
   '위치 권한을 거부',
   '위치 권한을 확인',
   '위치 권한을 허용',
@@ -116,6 +120,19 @@ bool _isAllowedAttributionCopy(String copy) =>
     copy == '지도와 경로 판단 자료의 출처와 이용 조건을 확인해요' ||
     copy.startsWith('데이터 및 지도 출처, 지도와 경로 판단 자료의 출처와 이용 조건을 확인해요');
 
+// #2078: 실제 loading(진행 중) UI 라벨만 '준비 중'·'준비중' 차단에서 예외로
+// 허용하는 allowlist다. 앱의 loading voice는 '확인 중'·'불러오는 중'·'확인하고
+// 있어요' 진행형 어휘만 쓰고 '준비 중' 토큰을 포함하지 않으므로(status-voice
+// inventory producer의 VERIFIED_LOADING_TEXTS와 동일한 원칙), 렌더된 copy에
+// '준비 중'이 있으면 loading이 아니라 placeholder 회귀다. 따라서 이 allowlist는
+// 의도적으로 비어 있다 — 어떤 실제 loading 라벨도 '준비 중'을 포함하지 않는다.
+// 새 loading UI가 정말 이 토큰을 써야 한다면(권장하지 않음) 그 문구와 코드
+// 위치·상태 전이 근거를 명시해 여기 추가하고, 그때만 예외가 성립한다.
+const _actualLoadingReadyCopy = <String>[];
+
+bool _isActualLoadingCopy(String copy) =>
+    _actualLoadingReadyCopy.contains(copy);
+
 void expectNoForbiddenUserCopy(WidgetTester tester) {
   final visibleCopy = <String>{};
   for (final widget in tester.allWidgets) {
@@ -136,6 +153,10 @@ void expectNoForbiddenUserCopy(WidgetTester tester) {
   for (final copy in visibleCopy.where((copy) => copy.trim().isNotEmpty)) {
     for (final forbidden in _forbiddenUserCopy) {
       if (forbidden == '출처' && _isAllowedAttributionCopy(copy)) {
+        continue;
+      }
+      if ((forbidden == '준비 중' || forbidden == '준비중') &&
+          _isActualLoadingCopy(copy)) {
         continue;
       }
       expect(copy, isNot(contains(forbidden)));

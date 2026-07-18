@@ -221,13 +221,22 @@ class _NotificationInboxItem {
     final name = facility.name.trim().isEmpty
         ? facility.typeLabel
         : facility.name;
+    // 출처 라벨이 비어 있을 수 있어(무표시) 빈 값은 걸러 Semantics에 ", ," 유령
+    // 세그먼트를 남기지 않는다(#2078).
+    final semanticParts = <String>[
+      '${facility.stationLabel} $name',
+      '${facility.typeLabel} ${facility.statusLabel}',
+      facility.severityLabel,
+      facility.updatedLabel,
+      facility.dataSourceLabel,
+      facility.nextActionLabel,
+    ].where((part) => part.trim().isNotEmpty);
     return _NotificationInboxItem(
       icon: _facilityIcon(facility.type),
       title: '${facility.stationLabel} $name',
       subtitle:
           '${facility.severityLabel} · ${facility.typeLabel} ${facility.statusLabel}',
-      semanticLabel:
-          '${facility.stationLabel} $name, ${facility.typeLabel} ${facility.statusLabel}, ${facility.severityLabel}, ${facility.updatedLabel}, ${facility.dataSourceLabel}, ${facility.nextActionLabel}',
+      semanticLabel: semanticParts.join(', '),
       kind: '시설',
       severity: facility.statusPresentation.severity,
       actionLabel: facility.nextActionLabel,
