@@ -94,6 +94,7 @@ volume="${prefix}-db-data"
 clone_db="${prefix}-db"
 clone_backend="${prefix}-backend"
 clone_gateway="${prefix}-gateway"
+clone_curl="${prefix}-curl"
 work_dir="$(mktemp -d "${RUNNER_TEMP:-/tmp}/issue-2095-capacity.XXXXXX")"
 backup_file="${work_dir}/production.dump"
 postgres_env_file="${work_dir}/postgres.env"
@@ -126,7 +127,7 @@ cleanup() {
 	if ! stop_resource_sampler; then
 		cleanup_failed=1
 	fi
-	for container in "${clone_gateway}" "${clone_backend}" "${clone_db}"; do
+	for container in "${clone_gateway}" "${clone_backend}" "${clone_curl}" "${clone_db}"; do
 		if ! existing_object="$(docker container ls -a --filter "name=^/${container}$" --format '{{.Names}}')"; then
 			cleanup_failed=1
 		elif [[ "${existing_object}" == "${container}" ]] \
@@ -366,13 +367,33 @@ IFS='|' read -r origin_station_id destination_station_id departure_time <<< "${i
 docker run -d --name "${clone_backend}" --network "${network}" --network-alias backend \
 	--env-file "${backend_env_file}" \
 	--cpus 1 --memory 1g --memory-swap 1g --pids-limit 256 \
-	--publish 127.0.0.1::8080 "${expected_image_id}" >/dev/null
+	"${expected_image_id}" >/dev/null
 
-backend_binding="$(docker port "${clone_backend}" 8080/tcp)"
-[[ "${backend_binding}" =~ ^127\.0\.0\.1:[0-9]+$ ]] || { echo 'isolated backend binding is invalid' >&2; exit 1; }
+# The isolated network is --internal, so it has no route to/from the host: neither
+# --publish nor `docker port` work for containers on it (verified against Docker's
+# bridge driver; the host cannot even reach a container's bridge IP directly). All
+# HTTP access to the isolated backend/gateway must originate from a container that is
+# itself attached to the isolated network. clone_curl is a dedicated, unmeasured
+# helper for that purpose — built from the already-pulled backend image (which ships
+# curl), kept out of docker_stats/OOM/restart sampling so load-generation traffic
+# never taints the backend/gateway resource-peak evidence.
+docker run -d --name "${clone_curl}" --network "${network}" --user "$(id -u):$(id -g)" --entrypoint sh \
+	--cpus 1 --memory 128m --memory-swap 128m --pids-limit 64 \
+	-v "${work_dir}:${work_dir}" \
+	"${expected_image_id}" -c 'sleep infinity' >/dev/null
+curl_helper_ready=false
+for _ in $(seq 1 30); do
+	if docker exec "${clone_curl}" curl --version >/dev/null 2>&1; then
+		curl_helper_ready=true
+		break
+	fi
+	sleep 1
+done
+[[ "${curl_helper_ready}" == true ]] || { echo 'isolated curl helper is missing curl or failed to start' >&2; exit 1; }
+
 backend_ready=false
 for _ in $(seq 1 120); do
-	if [[ "$(curl -sS --noproxy '*' --connect-timeout 1 --max-time 2 -o /dev/null -w '%{http_code}' "http://${backend_binding}/actuator/health/readiness" 2>/dev/null || true)" == 200 ]]; then
+	if [[ "$(docker exec "${clone_curl}" curl -sS --noproxy '*' --connect-timeout 1 --max-time 2 -o /dev/null -w '%{http_code}' "http://backend:8080/actuator/health/readiness" 2>/dev/null || true)" == 200 ]]; then
 		backend_ready=true
 		break
 	fi
@@ -380,8 +401,8 @@ for _ in $(seq 1 120); do
 done
 [[ "${backend_ready}" == true ]] || { echo 'isolated backend readiness timed out' >&2; exit 1; }
 
-docker run -d --name "${clone_gateway}" --network "${network}" --user 10001:10001 --read-only \
-	--tmpfs /tmp:rw,nosuid,nodev --publish 127.0.0.1::8081 \
+docker run -d --name "${clone_gateway}" --network "${network}" --network-alias gateway --user 10001:10001 --read-only \
+	--tmpfs /tmp:rw,nosuid,nodev \
 	--env-file "${gateway_env_file}" \
 	--cpus 1 --memory 256m --memory-swap 256m --pids-limit 128 \
 	--entrypoint /etc/nginx/route-v2-entrypoint.sh \
@@ -390,12 +411,10 @@ docker run -d --name "${clone_gateway}" --network "${network}" --user 10001:1000
 	-v "${PWD}/infra/nginx/route-v2-gateway.conf.template:/etc/nginx/templates/default.conf.template:ro" \
 	-v "${PWD}/infra/nginx/route-v2-proxy-headers.conf.template:/etc/nginx/templates/route-v2-proxy-headers.inc.template:ro" \
 	"${gateway_image}" nginx -g 'daemon off;' >/dev/null
-gateway_binding="$(docker port "${clone_gateway}" 8081/tcp)"
-[[ "${gateway_binding}" =~ ^127\.0\.0\.1:[0-9]+$ ]] || { echo 'isolated gateway binding is invalid' >&2; exit 1; }
-gateway_base="http://${gateway_binding}"
+gateway_base="http://gateway:8081"
 gateway_ready=false
 for _ in $(seq 1 60); do
-	if [[ "$(curl -sS --noproxy '*' --connect-timeout 1 --max-time 2 -o /dev/null -w '%{http_code}' "${gateway_base}/" 2>/dev/null || true)" == 404 ]]; then
+	if [[ "$(docker exec "${clone_curl}" curl -sS --noproxy '*' --connect-timeout 1 --max-time 2 -o /dev/null -w '%{http_code}' "${gateway_base}/" 2>/dev/null || true)" == 404 ]]; then
 		gateway_ready=true
 		break
 	fi
@@ -454,7 +473,7 @@ const nonce = randomBytes(16).toString("base64url");
 const signature = createHmac("sha256", Buffer.from(process.argv[1], "hex")).update(nonce).digest("base64url");
 process.stdout.write(JSON.stringify({ integrityToken: `${nonce}.${signature}`, clientNonce: nonce }));
 ' "${synthetic_secret}")"
-	result="$(curl -sS --noproxy '*' --connect-timeout 2 --max-time 10 \
+	result="$(docker exec "${clone_curl}" curl -sS --noproxy '*' --connect-timeout 2 --max-time 10 \
 		-D "${last_headers}" -o "${last_body}" -w '%{http_code} %{time_total}' \
 		--request POST --header 'content-type: application/json' \
 		--header "CF-Connecting-IP: ${client_ip}" \
@@ -491,7 +510,7 @@ send_search() {
 	last_headers="${work_dir}/headers-${request_index}.txt"
 	last_body="${work_dir}/body-${request_index}.json"
 	local result time_seconds latency_ms
-	result="$(curl -sS --noproxy '*' --connect-timeout 2 --max-time 10 \
+	result="$(docker exec "${clone_curl}" curl -sS --noproxy '*' --connect-timeout 2 --max-time 10 \
 		-D "${last_headers}" -o "${last_body}" -w '%{http_code} %{time_total}' \
 		--request POST --header 'content-type: application/json' \
 		--header "CF-Connecting-IP: ${client_ip}" --header "Authorization: Bearer ${token}" \
@@ -621,7 +640,7 @@ for ((index = 0; index <= search_burst; index += 1)); do
 	burst_body="${work_dir}/body-${request_index}.json"
 	burst_result="${work_dir}/result-${request_index}.txt"
 	(
-		curl -sS --noproxy '*' --connect-timeout 2 --max-time 10 \
+		docker exec "${clone_curl}" curl -sS --noproxy '*' --connect-timeout 2 --max-time 10 \
 			-D "${burst_headers}" -o "${burst_body}" -w '%{http_code} %{time_total}' \
 			--request POST --header 'content-type: application/json' \
 			--header 'CF-Connecting-IP: 198.51.100.200' --header "Authorization: Bearer ${burst_token}" \
