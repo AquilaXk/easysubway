@@ -163,6 +163,15 @@ class AdminDesignGuardTest {
 		Matcher alertTrigger = Pattern.compile("<a class=\"admin-alert-bell\"[^>]*>").matcher(shell);
 		assertThat(alertTrigger.find()).as("alert bell trigger가 존재한다").isTrue();
 		assertThat(alertTrigger.group()).doesNotContain("aria-haspopup");
+		Matcher userTrigger = Pattern.compile("<button[^>]*class=\"admin-user-menu-trigger\"[^>]*>")
+			.matcher(shell);
+		assertThat(userTrigger.find()).as("user menu trigger가 존재한다").isTrue();
+		assertThat(userTrigger.group()).doesNotContain("aria-haspopup");
+		Matcher userPanel = Pattern.compile("<div[^>]*id=\"admin-user-menu-panel\"[^>]*>").matcher(shell);
+		assertThat(userPanel.find()).as("user menu panel이 존재한다").isTrue();
+		assertThat(userPanel.group())
+			.contains("role=\"region\"")
+			.doesNotContain("role=\"dialog\"");
 	}
 
 	@Test
