@@ -12724,10 +12724,18 @@ test("관리자 v3 공통 shell은 접근성 chrome과 inline style 제한을 �
   assert.match(adminCss, /\.admin-v3 a:focus-visible/);
   assert.match(adminCss, /outline: 3px solid #ffbf47/);
   assert.match(adminCss, /\.admin-topbar-row/);
-  assert.match(adminCss, /\.admin-main[\s\S]*min-width: 0[\s\S]*overflow-x: auto/);
+  // #2071 scroll 소유권 계약: 관리자 table의 horizontal scroll은 .admin-table-scroll wrapper가 단독 소유한다.
+  // .admin-main / .admin-v3 section / .admin-card 는 scroll을 소유하지 않는다(overflow-x: visible).
+  assert.match(adminCss, /\.admin-main[\s\S]*?min-width: 0[\s\S]*?overflow-x: visible/);
   assert.match(adminCss, /\.admin-sidebar[\s\S]*overflow-y: auto/);
   assert.match(adminCss, /\.admin-v3 table[\s\S]*min-width: 620px/);
-  assert.match(adminCss, /\.admin-v3 section,[\s\S]*\.admin-card[\s\S]*overflow-x: auto/);
+  assert.match(adminCss, /\.admin-v3 section,[\s\S]*?\.admin-card[\s\S]*?overflow-x: visible/);
+  // .admin-table-scroll 이 유일한 scroll 소유자: overflow: auto + bounded viewport(max-block-size) + inline overscroll 격리.
+  assert.match(adminCss, /\.admin-table-scroll \{[\s\S]*?max-block-size: min\(70vh, 640px\)[\s\S]*?overflow: auto[\s\S]*?overscroll-behavior-inline: contain/);
+  // vertical sticky 는 thead th 에만 적용한다(#2071 리뷰: row header td 는 vertical sticky 제외).
+  assert.match(adminCss, /\.admin-v3 thead th \{[\s\S]*?position: sticky[\s\S]*?top: 0/);
+  // 첫 열 horizontal sticky 는 scroll wrapper 안에서만: th:first-child / td:first-child:not([colspan]).
+  assert.match(adminCss, /\.admin-table-scroll th:first-child,[\s\S]*?\.admin-table-scroll td:first-child:not\(\[colspan\]\) \{[\s\S]*?position: sticky[\s\S]*?left: 0/);
   assert.match(navigationAdvice, /@ModelAttribute\("adminShell"\)/);
   assert.match(navigationAdvice, /return "PRODUCTION"/);
   assert.match(navigationAdvice, /return "STAGING"/);
