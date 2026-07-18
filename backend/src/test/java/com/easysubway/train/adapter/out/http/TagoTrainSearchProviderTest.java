@@ -142,7 +142,7 @@ class TagoTrainSearchProviderTest {
 		});
 		try {
 			var provider = provider(server, "never-print-service-key");
-			var query = new LegQuery("NAT010000", "NAT011668", LocalDate.parse("2026-07-20"), "KTX", "00");
+			var query = legQuery(LocalDate.parse("2026-07-20"), "KTX", "00");
 
 			assertThat(provider.search(query)).hasSize(1);
 			assertThat(requests.get("GetStrtpntAlocFndTrainInfo"))
@@ -181,7 +181,9 @@ class TagoTrainSearchProviderTest {
 				"NAT011668",
 				LocalDate.parse("2026-07-20"),
 				"KTX_SANCHEON",
-				java.util.List.of("01", "10")
+				java.util.List.of("01", "10"),
+				"서울",
+				"대전"
 			);
 
 			assertThat(provider(server, "test-key").search(query))
@@ -206,7 +208,7 @@ class TagoTrainSearchProviderTest {
 		});
 		try {
 			var provider = provider(server, "test-key", budgetCalls::incrementAndGet);
-			var query = new LegQuery("NAT010000", "NAT011668", LocalDate.parse("2026-07-20"), "KTX", "00");
+			var query = legQuery(LocalDate.parse("2026-07-20"), "KTX", "00");
 
 			assertThat(provider.search(query)).hasSize(101);
 			assertThat(requestedPages).containsExactly("1", "2");
@@ -229,7 +231,7 @@ class TagoTrainSearchProviderTest {
 				""", 1));
 		});
 		try {
-			var query = new LegQuery("NAT010000", "NAT011668", LocalDate.parse("2026-07-20"), "KTX", "00");
+			var query = legQuery(LocalDate.parse("2026-07-20"), "KTX", "00");
 
 			assertThat(provider(server, "test-key").search(query)).hasSize(1);
 			assertThat(attempts).hasValue(2);
@@ -239,11 +241,40 @@ class TagoTrainSearchProviderTest {
 	}
 
 	@Test
+	void retriesTransientHttpStatusesOnce() throws Exception {
+		for (int status : java.util.List.of(408, 429, 503)) {
+			var attempts = new AtomicInteger();
+			var budgetCalls = new AtomicInteger();
+			var server = server(exchange -> {
+				if (attempts.incrementAndGet() == 1) {
+					respond(exchange, status, "temporary");
+					return;
+				}
+				respond(exchange, paginatedResponse("""
+					{"trainno":"101","traingradename":"KTX","depplandtime":"20260720090000","arrplandtime":"20260720100200","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"}
+					""", 1));
+			});
+			try {
+				var query = new LegQuery(
+					"NAT010000", "NAT011668", LocalDate.parse("2026-07-20"), "KTX", java.util.List.of("00"),
+					"서울", "대전"
+				);
+
+				assertThat(provider(server, "test-key", budgetCalls::incrementAndGet).search(query)).hasSize(1);
+				assertThat(attempts).hasValue(2);
+				assertThat(budgetCalls).hasValue(2);
+			} finally {
+				server.stop(0);
+			}
+		}
+	}
+
+	@Test
 	void rejectsHttpFailureEvenWhenBodyLooksSuccessful() throws Exception {
 		var server = server(exchange -> respond(exchange, 500, paginatedResponse("[]", 0)));
 		try {
 			var provider = provider(server, "literal-secret-value");
-			var query = new LegQuery("NAT010000", "NAT011668", LocalDate.parse("2026-07-20"), "KTX", "00");
+			var query = legQuery(LocalDate.parse("2026-07-20"), "KTX", "00");
 
 			assertThatThrownBy(() -> provider.search(query))
 				.isInstanceOf(ProviderFailure.class)
@@ -258,7 +289,7 @@ class TagoTrainSearchProviderTest {
 	void rejectsAPageThatMakesNoProgress() throws Exception {
 		var server = server(exchange -> respond(exchange, paginatedResponse("[]", 1)));
 		try {
-			var query = new LegQuery("NAT010000", "NAT011668", LocalDate.parse("2026-07-20"), "KTX", "00");
+			var query = legQuery(LocalDate.parse("2026-07-20"), "KTX", "00");
 
 			assertThatThrownBy(() -> provider(server, "test-key").search(query))
 				.isInstanceOf(ProviderFailure.class)
@@ -272,7 +303,7 @@ class TagoTrainSearchProviderTest {
 	void rejectsPageMetadataMismatchAndTotalDrift() throws Exception {
 		var wrongPage = server(exchange -> respond(exchange, paginatedResponse(journeyRow(1), 1, 2)));
 		try {
-			var query = new LegQuery("NAT010000", "NAT011668", LocalDate.parse("2026-07-20"), "KTX", "00");
+			var query = legQuery(LocalDate.parse("2026-07-20"), "KTX", "00");
 			assertThatThrownBy(() -> provider(wrongPage, "test-key").search(query))
 				.isInstanceOf(ProviderFailure.class)
 				.hasMessage("TRAIN_SEARCH_PROVIDER_ERROR");
@@ -285,7 +316,7 @@ class TagoTrainSearchProviderTest {
 			respond(exchange, paginatedResponse(page == 1 ? journeyRows(1, 100) : journeyRow(101), page == 1 ? 101 : 102, page));
 		});
 		try {
-			var query = new LegQuery("NAT010000", "NAT011668", LocalDate.parse("2026-07-20"), "KTX", "00");
+			var query = legQuery(LocalDate.parse("2026-07-20"), "KTX", "00");
 			assertThatThrownBy(() -> provider(drift, "test-key").search(query))
 				.isInstanceOf(ProviderFailure.class)
 				.hasMessage("TRAIN_SEARCH_PROVIDER_ERROR");
@@ -300,7 +331,7 @@ class TagoTrainSearchProviderTest {
 			{"trainno":"101","traingradename":"KTX","depplandtime":"not-a-time","arrplandtime":"20260720100200","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"}
 			""", 1)));
 		try {
-			var query = new LegQuery("NAT010000", "NAT011668", LocalDate.parse("2026-07-20"), "KTX", "00");
+			var query = legQuery(LocalDate.parse("2026-07-20"), "KTX", "00");
 			assertThatThrownBy(() -> provider(server, "test-key").search(query))
 				.isInstanceOf(ProviderFailure.class)
 				.hasMessage("TRAIN_SEARCH_NO_VALID_ROWS");
@@ -315,7 +346,7 @@ class TagoTrainSearchProviderTest {
 			{"trainno":"101","traingradename":"KTX","depplandtime":"20260230090000","arrplandtime":"20260230100200","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"}
 			""", 1)));
 		try {
-			var query = new LegQuery("NAT010000", "NAT011668", LocalDate.parse("2026-02-28"), "KTX", "00");
+			var query = legQuery(LocalDate.parse("2026-02-28"), "KTX", "00");
 			assertThatThrownBy(() -> provider(server, "test-key").search(query))
 				.isInstanceOf(ProviderFailure.class)
 				.hasMessage("TRAIN_SEARCH_NO_VALID_ROWS");
@@ -330,7 +361,51 @@ class TagoTrainSearchProviderTest {
 			{"trainno":"101","traingradename":"KTX","depplandtime":"20260721090000","arrplandtime":"20260721100200","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"}
 			""", 1)));
 		try {
-			var query = new LegQuery("NAT010000", "NAT011668", LocalDate.parse("2026-07-20"), "KTX", "00");
+			var query = legQuery(LocalDate.parse("2026-07-20"), "KTX", "00");
+			assertThatThrownBy(() -> provider(server, "test-key").search(query))
+				.isInstanceOf(ProviderFailure.class)
+				.hasMessage("TRAIN_SEARCH_NO_VALID_ROWS");
+		} finally {
+			server.stop(0);
+		}
+	}
+
+	@Test
+	void appliesThreeAmServiceDayBoundary() throws Exception {
+		var provider = new TagoTrainSearchProvider(
+			"never-print-service-key",
+			JSON,
+			HttpClient.newHttpClient(),
+			Clock.fixed(Instant.parse("2026-07-19T00:00:00Z"), ZoneOffset.UTC),
+			URI.create("http://127.0.0.1/")
+		);
+		var query = new LegQuery(
+			"NAT010000", "NAT011668", LocalDate.parse("2026-07-20"), "KTX", java.util.List.of("00"),
+			"서울", "대전"
+		);
+
+		var journeys = provider.parseJourneys(JSON.readTree("""
+			{"response":{"header":{"resultCode":"00"},"body":{"items":{"item":[
+			  {"trainno":"100","traingradename":"KTX","depplandtime":"20260720025900","arrplandtime":"20260720040000","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"},
+			  {"trainno":"101","traingradename":"KTX","depplandtime":"20260720030000","arrplandtime":"20260720040200","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"},
+			  {"trainno":"102","traingradename":"KTX","depplandtime":"20260721025900","arrplandtime":"20260721040000","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"}
+			]}}}}
+			"""), query);
+
+		assertThat(journeys).extracting(Journey::trainNumber).containsExactly("101", "102");
+	}
+
+	@Test
+	void rejectsResponseStationNamesThatDoNotMatchTheRequestedLeg() throws Exception {
+		var server = server(exchange -> respond(exchange, paginatedResponse("""
+			{"trainno":"101","traingradename":"KTX","depplandtime":"20260720090000","arrplandtime":"20260720100200","depplacename":"부산","arrplacename":"대전","adultcharge":"23700"}
+			""", 1)));
+		try {
+			var query = new LegQuery(
+				"NAT010000", "NAT011668", LocalDate.parse("2026-07-20"), "KTX", java.util.List.of("00"),
+				"서울", "대전"
+			);
+
 			assertThatThrownBy(() -> provider(server, "test-key").search(query))
 				.isInstanceOf(ProviderFailure.class)
 				.hasMessage("TRAIN_SEARCH_NO_VALID_ROWS");
@@ -345,7 +420,7 @@ class TagoTrainSearchProviderTest {
 			{"trainno":"301","traingradename":"SRT","depplandtime":"20260720090000","arrplandtime":"20260720100200","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"}
 			""", 1)));
 		try {
-			var query = new LegQuery("NAT010000", "NAT011668", LocalDate.parse("2026-07-20"), "KTX", "00");
+			var query = legQuery(LocalDate.parse("2026-07-20"), "KTX", "00");
 			assertThatThrownBy(() -> provider(server, "test-key").search(query))
 				.isInstanceOf(ProviderFailure.class)
 				.hasMessage("TRAIN_SEARCH_NO_VALID_ROWS");
@@ -391,7 +466,20 @@ class TagoTrainSearchProviderTest {
 			HttpClient.newHttpClient(),
 			Clock.fixed(Instant.parse("2026-07-19T00:00:00Z"), ZoneOffset.UTC),
 			URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/"),
-			budget
+			budget,
+			java.time.Duration.ZERO
+		);
+	}
+
+	private LegQuery legQuery(LocalDate date, String trainType, String providerCode) {
+		return new LegQuery(
+			"NAT010000",
+			"NAT011668",
+			date,
+			trainType,
+			java.util.List.of(providerCode),
+			"서울",
+			"대전"
 		);
 	}
 

@@ -25,7 +25,9 @@ public final class TrainSearchModels {
 		String arrivalStationId,
 		LocalDate departureDate,
 		String trainType,
-		List<String> providerTrainGradeCodes
+		List<String> providerTrainGradeCodes,
+		String departureStationName,
+		String arrivalStationName
 	) {
 		public LegQuery {
 			providerTrainGradeCodes = List.copyOf(providerTrainGradeCodes);
@@ -37,7 +39,7 @@ public final class TrainSearchModels {
 			LocalDate departureDate,
 			String trainType
 		) {
-			this(departureStationId, arrivalStationId, departureDate, trainType, List.of());
+			this(departureStationId, arrivalStationId, departureDate, trainType, List.of(), null, null);
 		}
 
 		public LegQuery(
@@ -47,7 +49,25 @@ public final class TrainSearchModels {
 			String trainType,
 			String providerTrainGradeCode
 		) {
-			this(departureStationId, arrivalStationId, departureDate, trainType, List.of(providerTrainGradeCode));
+			this(
+				departureStationId,
+				arrivalStationId,
+				departureDate,
+				trainType,
+				List.of(providerTrainGradeCode),
+				null,
+				null
+			);
+		}
+
+		public LegQuery(
+			String departureStationId,
+			String arrivalStationId,
+			LocalDate departureDate,
+			String trainType,
+			List<String> providerTrainGradeCodes
+		) {
+			this(departureStationId, arrivalStationId, departureDate, trainType, providerTrainGradeCodes, null, null);
 		}
 	}
 

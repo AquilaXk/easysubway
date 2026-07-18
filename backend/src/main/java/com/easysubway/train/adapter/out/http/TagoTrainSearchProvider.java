@@ -23,7 +23,9 @@ import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.ResolverStyle;
@@ -42,6 +44,7 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 
 	private static final URI DEFAULT_BASE_URI = URI.create("https://apis.data.go.kr/1613000/TrainInfo/");
 	private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(5);
+	private static final Duration RETRY_DELAY = Duration.ofMillis(250);
 	private static final int PAGE_SIZE = 100;
 	private static final ZoneId PROVIDER_ZONE = ZoneId.of("Asia/Seoul");
 	private static final DateTimeFormatter PROVIDER_TIME = DateTimeFormatter.ofPattern("uuuuMMddHHmmss")
@@ -67,6 +70,7 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 	private final Clock clock;
 	private final URI baseUri;
 	private final TrainSearchProviderCallBudget callBudget;
+	private final Duration retryDelay;
 
 	@Autowired
 	TagoTrainSearchProvider(
@@ -80,12 +84,13 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 			HttpClient.newBuilder().connectTimeout(REQUEST_TIMEOUT).build(),
 			Clock.systemUTC(),
 			DEFAULT_BASE_URI,
-			callBudget
+			callBudget,
+			RETRY_DELAY
 		);
 	}
 
 	TagoTrainSearchProvider(String serviceKey, ObjectMapper objectMapper, HttpClient httpClient, Clock clock) {
-		this(serviceKey, objectMapper, httpClient, clock, DEFAULT_BASE_URI, () -> {});
+		this(serviceKey, objectMapper, httpClient, clock, DEFAULT_BASE_URI, () -> {}, RETRY_DELAY);
 	}
 
 	TagoTrainSearchProvider(
@@ -95,7 +100,7 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 		Clock clock,
 		URI baseUri
 	) {
-		this(serviceKey, objectMapper, httpClient, clock, baseUri, () -> {});
+		this(serviceKey, objectMapper, httpClient, clock, baseUri, () -> {}, RETRY_DELAY);
 	}
 
 	TagoTrainSearchProvider(
@@ -106,12 +111,25 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 		URI baseUri,
 		TrainSearchProviderCallBudget callBudget
 	) {
+		this(serviceKey, objectMapper, httpClient, clock, baseUri, callBudget, RETRY_DELAY);
+	}
+
+	TagoTrainSearchProvider(
+		String serviceKey,
+		ObjectMapper objectMapper,
+		HttpClient httpClient,
+		Clock clock,
+		URI baseUri,
+		TrainSearchProviderCallBudget callBudget,
+		Duration retryDelay
+	) {
 		this.serviceKey = decodedServiceKey(serviceKey);
 		this.objectMapper = objectMapper;
 		this.httpClient = httpClient;
 		this.clock = clock;
 		this.baseUri = baseUri;
 		this.callBudget = callBudget;
+		this.retryDelay = retryDelay;
 	}
 
 	@Override
@@ -169,6 +187,10 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 
 	@Override
 	public List<Journey> search(LegQuery query) {
+		if (normalizeStationName(query.departureStationName()).isBlank()
+			|| normalizeStationName(query.arrivalStationName()).isBlank()) {
+			throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
+		}
 		List<String> providerCodes = query.providerTrainGradeCodes().stream()
 			.map(String::trim)
 			.distinct()
@@ -238,6 +260,7 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 		}
 		List<Journey> journeys = rows.stream().map(row -> journey(row, query)).toList();
 		return TrainSearchScopePolicy.retainSupported(journeys, Journey::trainType).stream()
+			.flatMap(journey -> journeysForRequestedServiceDay(journey, query.departureDate()))
 			.sorted(java.util.Comparator.comparing(Journey::departureAt)
 				.thenComparing(Journey::arrivalAt)
 				.thenComparing(Journey::trainType)
@@ -253,8 +276,11 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 			.atZone(PROVIDER_ZONE).toOffsetDateTime();
 		long durationMinutes = Duration.between(departureAt, arrivalAt).toMinutes();
 		int fare = integer(row, "adultcharge");
-		if (!departureAt.toLocalDate().equals(query.departureDate())
-			|| (query.trainType() != null && !query.trainType().equals(trainType))
+		String departureStationName = requiredText(row, "depplacename");
+		String arrivalStationName = requiredText(row, "arrplacename");
+		if ((query.trainType() != null && !query.trainType().equals(trainType))
+			|| !stationNameMatches(query.departureStationName(), departureStationName)
+			|| !stationNameMatches(query.arrivalStationName(), arrivalStationName)
 			|| durationMinutes <= 0
 			|| durationMinutes > Integer.MAX_VALUE
 			|| fare < 0) {
@@ -264,14 +290,41 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 			requiredText(row, "trainno"),
 			trainType,
 			query.departureStationId(),
-			requiredText(row, "depplacename"),
+			departureStationName,
 			departureAt,
 			query.arrivalStationId(),
-			requiredText(row, "arrplacename"),
+			arrivalStationName,
 			arrivalAt,
 			(int) durationMinutes,
 			fare
 		);
+	}
+
+	private java.util.stream.Stream<Journey> journeysForRequestedServiceDay(
+		Journey journey,
+		LocalDate requestedServiceDay
+	) {
+		LocalDate calendarDay = journey.departureAt().toLocalDate();
+		LocalDate serviceDay = journey.departureAt().toLocalTime().isBefore(LocalTime.of(3, 0))
+			? calendarDay.minusDays(1)
+			: calendarDay;
+		if (serviceDay.equals(requestedServiceDay)) {
+			return java.util.stream.Stream.of(journey);
+		}
+		if (calendarDay.equals(requestedServiceDay)) {
+			return java.util.stream.Stream.empty();
+		}
+		throw new IllegalArgumentException("TRAIN_SEARCH_NO_VALID_ROWS");
+	}
+
+	private boolean stationNameMatches(String expected, String actual) {
+		return expected == null || normalizeStationName(expected).equals(normalizeStationName(actual));
+	}
+
+	private String normalizeStationName(String value) {
+		return value == null
+			? ""
+			: value.toLowerCase(Locale.KOREAN).replaceAll("[^\\p{L}\\p{N}]+", "");
 	}
 
 	private String trainType(String value) {
@@ -366,7 +419,15 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 		for (int attempt = 0; attempt < 2; attempt++) {
 			try {
 				callBudget.acquire();
-				return httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+				HttpResponse<String> response = httpClient.send(
+					request,
+					HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
+				);
+				if (attempt == 0 && retryable(response.statusCode())) {
+					waitBeforeRetry();
+					continue;
+				}
+				return response;
 			} catch (InterruptedException exception) {
 				Thread.currentThread().interrupt();
 				throw new ProviderFailure("TRAIN_SEARCH_UNAVAILABLE");
@@ -374,9 +435,23 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 				if (attempt == 1) {
 					throw exception;
 				}
+				waitBeforeRetry();
 			}
 		}
 		throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
+	}
+
+	private boolean retryable(int status) {
+		return status == 408 || status == 429 || status >= 500;
+	}
+
+	private void waitBeforeRetry() {
+		try {
+			Thread.sleep(retryDelay);
+		} catch (InterruptedException exception) {
+			Thread.currentThread().interrupt();
+			throw new ProviderFailure("TRAIN_SEARCH_UNAVAILABLE");
+		}
 	}
 
 	private URI uri(String operation, Map<String, String> parameters) {
