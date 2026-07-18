@@ -234,7 +234,8 @@ public class RouteSearchService implements RouteSearchUseCase {
 			candidateCount,
 			alternativeCount,
 			timetableResults,
-			selectCandidates
+			selectCandidates,
+			true
 		).itineraries();
 	}
 
@@ -244,23 +245,33 @@ public class RouteSearchService implements RouteSearchUseCase {
 		int candidateCount,
 		int alternativeCount,
 		List<RouteSearchResult> timetableResults,
-		UnaryOperator<List<RouteSearchResult>> selectCandidates
+		UnaryOperator<List<RouteSearchResult>> selectCandidates,
+		boolean legacyGraphCandidateAllowed
 	) {
-		try {
-			List<RouteSearchResult> accessibilityCheckedResults = buildRouteSearchAlternatives(
-				withoutRealtime(command),
-				candidateCount
-			);
-			List<RouteSearchResult> selectedAccessibilityCheckedResults = selectCandidates.apply(accessibilityCheckedResults);
-			if (selectedAccessibilityCheckedResults.stream().anyMatch(this::hasAccessibilitySignal)) {
-				return new TimetableCandidateSelection(
-					selectedAccessibilityCheckedResults,
-					TimetableCandidateSource.LEGACY_ACCESSIBILITY_CHECK
+		// #2095/#2286: ITX-청춘 인증 Route V2 검색(legacyGraphCandidateAllowed=false로 호출하는
+		// RouteV2Planner)은 prod 게이트(ProductionRouteV2Support.requireUsablePlan)가 항상
+		// TIMETABLE_RAPTOR 출처만 허용한다. #1400 레거시 그래프 우선 시도(접근성 신호가 있으면
+		// 레거시 결과를 채택)는 legacyGraphCandidateAllowed=true인 SUBWAY 경로 전용 과도기
+		// 로직으로 남긴다 — ITX pilot 역처럼 STATION_LINES로는 연결됐지만 접근성 시설 데이터가
+		// 없는 역은 레거시 그래프에서 거의 항상 hasAccessibilitySignal=true가 돼 레거시가
+		// 채택되고, 그 결과 timetableArtifactId가 null이 돼 prod 게이트에서 503으로 막힌다.
+		if (legacyGraphCandidateAllowed) {
+			try {
+				List<RouteSearchResult> accessibilityCheckedResults = buildRouteSearchAlternatives(
+					withoutRealtime(command),
+					candidateCount
 				);
+				List<RouteSearchResult> selectedAccessibilityCheckedResults = selectCandidates.apply(accessibilityCheckedResults);
+				if (selectedAccessibilityCheckedResults.stream().anyMatch(this::hasAccessibilitySignal)) {
+					return new TimetableCandidateSelection(
+						selectedAccessibilityCheckedResults,
+						TimetableCandidateSource.LEGACY_ACCESSIBILITY_CHECK
+					);
+				}
+			} catch (RouteNotFoundException | StationNotFoundException exception) {
+				// Timetable coverage can lead legacy graph coverage while #1400 closes the production graph gap.
+				log.debug("Legacy graph could not stabilize timetable route {} -> {}", command.originStationId(), command.destinationStationId(), exception);
 			}
-		} catch (RouteNotFoundException | StationNotFoundException exception) {
-			// Timetable coverage can lead legacy graph coverage while #1400 closes the production graph gap.
-			log.debug("Legacy graph could not stabilize timetable route {} -> {}", command.originStationId(), command.destinationStationId(), exception);
 		}
 		return new TimetableCandidateSelection(
 			selectCandidates.apply(timetableResults)

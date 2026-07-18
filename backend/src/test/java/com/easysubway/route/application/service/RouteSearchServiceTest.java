@@ -1551,20 +1551,44 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
-	@DisplayName("V2 planner는 stair-only 위험이 있으면 시간표 scan보다 접근성 warning을 보존한다")
-	void routeV2PlannerPreservesAccessibilityWarningsBeforeTimetableScan() {
+	@DisplayName("V2 planner는 stair-only 위험이 있어도 레거시 그래프로 새치기하지 않고 시간표 scan을 그대로 쓴다")
+	void routeV2PlannerAlwaysPrefersTimetableScanEvenWithLegacyAccessibilitySignal() {
+		// #2095/#2286: 인증 Route V2(prod 게이트가 TIMETABLE_RAPTOR 출처만 허용)는 접근성
+		// warning이 있어도 레거시 그래프를 먼저 시도하지 않는다 — 레거시가 채택되면
+		// timetableArtifactId가 null이 돼 그 게이트에서 막히기 때문이다(ITX pilot 역처럼
+		// STATION_LINES는 있지만 접근성 시설 데이터가 없는 역에서 실제로 발생했다). 이 테스트가
+		// 쓰는 StairOnlyTransitMasterPort는 레거시 그래프라면 STAIR_ONLY_ACCESS 경고를 냈을
+		// 것이지만(레거시 로직은 stabilizeTimetableRouteCandidatesWithSource의
+		// legacyGraphCandidateAllowed=true 경로에만 남아 있다), RAPTOR는 접근성 시설 데이터를
+		// 참조하지 않으므로 경고 없이 FOUND를 낸다.
+		var delegate = routeTimetablePort();
+		var port = new LoadRouteTimetablePort() {
+			@Override
+			public RouteTimetable loadRouteTimetable() {
+				return delegate.loadRouteTimetable();
+			}
+
+			@Override
+			public String timetableCacheKey() {
+				return "ITX_CHEONGCHUN:artifact-legacy-conflict:2999-01-01T00:00:00Z";
+			}
+
+			@Override
+			public Optional<String> activeItxTimetableArtifactId() {
+				return Optional.of("artifact-legacy-conflict");
+			}
+		};
 		var repository = new InMemoryRouteSearchRepository();
 		var routeSearchService = new RouteSearchService(repository, repository, new StairOnlyTransitMasterPort(), CLOCK);
-		var planner = new RouteV2Planner(routeSearchService, routeTimetablePort());
+		var planner = new RouteV2Planner(routeSearchService, port);
 
 		var plan = planner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3));
 
 		assertThat(plan.statuses()).containsExactly(RouteV2Status.FOUND);
-		assertThat(plan.source()).isEqualTo(RouteV2PlanSource.LEGACY_GRAPH);
-		assertThat(plan.itineraries().getFirst().etaSource()).isEqualTo(EtaSource.STATIC_BACKEND_ESTIMATE);
-		assertThat(plan.itineraries().getFirst().warnings())
-			.extracting("code")
-			.containsExactly(RouteWarningCode.STAIR_ONLY_ACCESS);
+		assertThat(plan.source()).isEqualTo(RouteV2PlanSource.TIMETABLE_RAPTOR);
+		assertThat(plan.timetableArtifactId()).isEqualTo("artifact-legacy-conflict");
+		assertThat(plan.itineraries().getFirst().etaSource()).isEqualTo(EtaSource.PLANNED);
+		assertThat(plan.itineraries().getFirst().warnings()).isEmpty();
 	}
 
 	@Test
