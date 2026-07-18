@@ -162,10 +162,27 @@ class AppBootstrap {
   }
 
   Future<void> close() async {
-    await dataPackUpdate;
-    await localRouteRepository?.close();
-    await catalogDatabase.close();
-    await userDatabase.close();
+    Object? firstError;
+    StackTrace? firstStackTrace;
+
+    Future<void> closeResource(Future<void> Function() close) async {
+      try {
+        await close();
+      } catch (error, stackTrace) {
+        firstError ??= error;
+        firstStackTrace ??= stackTrace;
+      }
+    }
+
+    await closeResource(() => dataPackUpdate);
+    await closeResource(
+      () => localRouteRepository?.close() ?? Future<void>.value(),
+    );
+    await closeResource(catalogDatabase.close);
+    await closeResource(userDatabase.close);
+    if (firstError != null) {
+      Error.throwWithStackTrace(firstError!, firstStackTrace!);
+    }
   }
 }
 

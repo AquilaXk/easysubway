@@ -372,6 +372,196 @@ void main() {
     await oldDatabase.close();
   });
 
+  test(
+    'cold bundle을 기다리던 activation은 close 뒤 candidate build를 시작하지 않는다',
+    () async {
+      final initialDatabase = CatalogDatabase.memory();
+      final candidateDatabase = CatalogDatabase.memory();
+      await initialDatabase.seedBaselineIfEmpty();
+      await candidateDatabase.seedBaselineIfEmpty();
+      final coldBuildStarted = Completer<void>();
+      final releaseColdBuild = Completer<void>();
+      var snapshotBuildCount = 0;
+      final repository = LocalRouteRepository(
+        catalogDatabase: initialDatabase,
+        artifactIdentity: 'artifact-initial',
+        routeCatalogBuildObserver: (event) async {
+          if (event != 'snapshot') return;
+          snapshotBuildCount += 1;
+          if (snapshotBuildCount == 1) {
+            coldBuildStarted.complete();
+            await releaseColdBuild.future;
+          }
+        },
+      );
+
+      final coldSearch = repository.canSearchRoute(
+        const RouteSearchRequest(
+          originStationId: 'station-sangnoksu',
+          destinationStationId: 'station-sadang',
+          mobilityType: 'STANDARD',
+        ),
+      );
+      await coldBuildStarted.future;
+      final activation = repository.activateDataPack(
+        catalogDatabase: candidateDatabase,
+        artifactIdentity: 'artifact-candidate',
+        ownsDatabase: true,
+      );
+      final closing = repository.close();
+      releaseColdBuild.complete();
+
+      expect(await coldSearch, isTrue);
+      await activation;
+      await closing;
+      expect(snapshotBuildCount, 1);
+      await initialDatabase.close();
+    },
+  );
+
+  test('동일 artifact의 동시 activation은 candidate build 하나를 공유한다', () async {
+    final initialDatabase = CatalogDatabase.memory();
+    final firstCandidateDatabase = CatalogDatabase.memory();
+    final secondCandidateDatabase = CatalogDatabase.memory();
+    await initialDatabase.seedBaselineIfEmpty();
+    await firstCandidateDatabase.seedBaselineIfEmpty();
+    await secondCandidateDatabase.seedBaselineIfEmpty();
+    final candidateGraphStarted = Completer<void>();
+    final releaseCandidateGraph = Completer<void>();
+    var countCandidateBuilds = false;
+    var candidateSnapshotBuildCount = 0;
+    final repository = LocalRouteRepository(
+      catalogDatabase: initialDatabase,
+      artifactIdentity: 'artifact-initial',
+      routeCatalogBuildObserver: (event) async {
+        if (!countCandidateBuilds) return;
+        if (event == 'snapshot') candidateSnapshotBuildCount += 1;
+        if (event == 'graph') {
+          if (!candidateGraphStarted.isCompleted) {
+            candidateGraphStarted.complete();
+          }
+          await releaseCandidateGraph.future;
+        }
+      },
+    );
+    await repository.canSearchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'STANDARD',
+      ),
+    );
+    countCandidateBuilds = true;
+
+    final first = repository.activateDataPack(
+      catalogDatabase: firstCandidateDatabase,
+      artifactIdentity: 'artifact-shared',
+      ownsDatabase: true,
+    );
+    await candidateGraphStarted.future;
+    final second = repository.activateDataPack(
+      catalogDatabase: secondCandidateDatabase,
+      artifactIdentity: 'artifact-shared',
+      ownsDatabase: true,
+    );
+    await Future<void>.delayed(Duration.zero);
+    releaseCandidateGraph.complete();
+
+    await Future.wait([first, second]);
+    expect(candidateSnapshotBuildCount, 1);
+    await repository.close();
+    await initialDatabase.close();
+  });
+
+  test('close는 진행 중인 runtime refresh를 기다린 뒤 owned DB를 닫는다', () async {
+    final initialDatabase = CatalogDatabase.memory();
+    final activeDatabase = CatalogDatabase.memory();
+    await initialDatabase.seedBaselineIfEmpty();
+    await activeDatabase.seedBaselineIfEmpty();
+    final refreshStarted = Completer<void>();
+    final releaseRefresh = Completer<void>();
+    final repository = LocalRouteRepository(
+      catalogDatabase: initialDatabase,
+      artifactIdentity: 'artifact-initial',
+      routeRuntimeRefreshObserver: (event) async {
+        if (event != 'load') return;
+        refreshStarted.complete();
+        await releaseRefresh.future;
+      },
+    );
+    await repository.activateDataPack(
+      catalogDatabase: activeDatabase,
+      artifactIdentity: 'artifact-active',
+      ownsDatabase: true,
+    );
+
+    Object? refreshError;
+    final refresh = repository.refreshRuntimeState().catchError((Object error) {
+      refreshError = error;
+    });
+    await refreshStarted.future;
+    var closeCompleted = false;
+    final closing = repository.close().then((_) => closeCompleted = true);
+    await Future<void>.delayed(Duration.zero);
+    final completedBeforeRelease = closeCompleted;
+    releaseRefresh.complete();
+
+    await refresh;
+    await closing;
+    expect(completedBeforeRelease, isFalse);
+    expect(refreshError, isNull);
+    await initialDatabase.close();
+  });
+
+  test('artifact activation은 이전 owned DB의 runtime refresh를 기다린다', () async {
+    final initialDatabase = CatalogDatabase.memory();
+    final activeDatabase = CatalogDatabase.memory();
+    final candidateDatabase = CatalogDatabase.memory();
+    await initialDatabase.seedBaselineIfEmpty();
+    await activeDatabase.seedBaselineIfEmpty();
+    await candidateDatabase.seedBaselineIfEmpty();
+    final refreshStarted = Completer<void>();
+    final releaseRefresh = Completer<void>();
+    final repository = LocalRouteRepository(
+      catalogDatabase: initialDatabase,
+      artifactIdentity: 'artifact-initial',
+      routeRuntimeRefreshObserver: (event) async {
+        if (event != 'load') return;
+        refreshStarted.complete();
+        await releaseRefresh.future;
+      },
+    );
+    await repository.activateDataPack(
+      catalogDatabase: activeDatabase,
+      artifactIdentity: 'artifact-active',
+      ownsDatabase: true,
+    );
+
+    Object? refreshError;
+    final refresh = repository.refreshRuntimeState().catchError((Object error) {
+      refreshError = error;
+    });
+    await refreshStarted.future;
+    var activationCompleted = false;
+    final activation = repository
+        .activateDataPack(
+          catalogDatabase: candidateDatabase,
+          artifactIdentity: 'artifact-candidate',
+          ownsDatabase: true,
+        )
+        .then((_) => activationCompleted = true);
+    await Future<void>.delayed(Duration.zero);
+    final completedBeforeRelease = activationCompleted;
+    releaseRefresh.complete();
+
+    await refresh;
+    await activation;
+    expect(completedBeforeRelease, isFalse);
+    expect(refreshError, isNull);
+    await repository.close();
+    await initialDatabase.close();
+  });
+
   test('실패한 cold graph build는 부분 publish 없이 다음 호출에서 재시도한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);

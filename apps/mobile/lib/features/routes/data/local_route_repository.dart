@@ -22,6 +22,7 @@ class LocalRouteRepository implements RouteSearchRepository {
     this.artifactIdentity = 'initial-artifact',
     DateTime Function()? now,
     this.routeCatalogBuildObserver,
+    this.routeRuntimeRefreshObserver,
   }) : now = now ?? DateTime.now,
        _initialCatalogDatabase = catalogDatabase,
        _initialOfficialOdFareRepository =
@@ -33,9 +34,12 @@ class LocalRouteRepository implements RouteSearchRepository {
   final DateTime Function() now;
   final OfficialOdFareRepository _initialOfficialOdFareRepository;
   final FutureOr<void> Function(String event)? routeCatalogBuildObserver;
+  final FutureOr<void> Function(String event)? routeRuntimeRefreshObserver;
   _RouteCatalogBundle? _activeBundle;
   Future<_RouteCatalogBundle>? _routeCatalogBundleFuture;
+  Future<void> _activationQueue = Future<void>.value();
   final Set<Future<void>> _inFlightActivations = {};
+  final Set<Future<void>> _inFlightRuntimeRefreshes = {};
   final Set<_RouteCatalogBundle> _retiredBundles = {};
   Future<void>? _closeFuture;
   bool _isClosed = false;
@@ -67,6 +71,9 @@ class LocalRouteRepository implements RouteSearchRepository {
             .then((bundle) {
               if (!_isClosed) {
                 _activeBundle ??= bundle;
+              }
+              if (identical(_routeCatalogBundleFuture, future)) {
+                _routeCatalogBundleFuture = null;
               }
               return _activeBundle ?? bundle;
             })
@@ -115,10 +122,16 @@ class LocalRouteRepository implements RouteSearchRepository {
       return _rejectClosedActivation(catalogDatabase, ownsDatabase);
     }
     late final Future<void> activation;
-    activation = _activateDataPack(
-      catalogDatabase: catalogDatabase,
-      artifactIdentity: artifactIdentity,
-      ownsDatabase: ownsDatabase,
+    activation = _activationQueue.then(
+      (_) => _activateDataPack(
+        catalogDatabase: catalogDatabase,
+        artifactIdentity: artifactIdentity,
+        ownsDatabase: ownsDatabase,
+      ),
+    );
+    _activationQueue = activation.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
     );
     _inFlightActivations.add(activation);
     return activation.whenComplete(() {
@@ -141,9 +154,17 @@ class LocalRouteRepository implements RouteSearchRepository {
     required String artifactIdentity,
     required bool ownsDatabase,
   }) async {
+    if (_isClosed) {
+      await _disposeIncomingDatabase(catalogDatabase, ownsDatabase);
+      return;
+    }
     final active = _activeBundle;
     final inFlight = _routeCatalogBundleFuture;
     final current = active ?? (inFlight == null ? null : await inFlight);
+    if (_isClosed) {
+      await _disposeIncomingDatabase(catalogDatabase, ownsDatabase);
+      return;
+    }
     if ((current?.artifactIdentity ?? this.artifactIdentity) ==
         artifactIdentity) {
       if (ownsDatabase &&
@@ -179,6 +200,11 @@ class LocalRouteRepository implements RouteSearchRepository {
       await candidate.dispose();
       return;
     }
+    await _waitForRuntimeRefreshes();
+    if (_isClosed || activation != _activationSequence) {
+      await candidate.dispose();
+      return;
+    }
     final previous = _activeBundle;
     _activeBundle = candidate;
     if (previous != null) {
@@ -195,9 +221,46 @@ class LocalRouteRepository implements RouteSearchRepository {
     }
   }
 
-  Future<void> refreshRuntimeState() async {
+  Future<void> _disposeIncomingDatabase(
+    CatalogDatabase catalogDatabase,
+    bool ownsDatabase,
+  ) async {
+    if (ownsDatabase) {
+      await catalogDatabase.close();
+    }
+  }
+
+  Future<void> refreshRuntimeState() {
+    if (_isClosed) {
+      return Future.error(StateError('LocalRouteRepository is closed.'));
+    }
+    late final Future<void> refresh;
+    refresh = _refreshRuntimeState();
+    _inFlightRuntimeRefreshes.add(refresh);
+    return refresh.whenComplete(() {
+      _inFlightRuntimeRefreshes.remove(refresh);
+    });
+  }
+
+  Future<void> _refreshRuntimeState() async {
     final bundle = await _routeCatalogBundle();
+    await routeRuntimeRefreshObserver?.call('load');
     bundle.runtimeState = await _RouteRuntimeState.load(bundle.catalogDatabase);
+  }
+
+  Future<void> _waitForRuntimeRefreshes() async {
+    while (_inFlightRuntimeRefreshes.isNotEmpty) {
+      final pending = _inFlightRuntimeRefreshes.toList(growable: false);
+      await Future.wait(
+        pending.map((refresh) async {
+          try {
+            await refresh;
+          } catch (_) {
+            // 호출자에게 전달되는 refresh 오류가 lifecycle 정리를 막지는 않는다.
+          }
+        }),
+      );
+    }
   }
 
   Future<void> close() {
@@ -233,6 +296,7 @@ class LocalRouteRepository implements RouteSearchRepository {
         firstStackTrace ??= stackTrace;
       }
     }
+    await _waitForRuntimeRefreshes();
     for (final retired in _retiredBundles.toList(growable: false)) {
       try {
         await retired.dispose();
