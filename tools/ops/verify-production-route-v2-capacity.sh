@@ -391,6 +391,18 @@ for _ in $(seq 1 30); do
 done
 [[ "${curl_helper_ready}" == true ]] || { echo 'isolated curl helper is missing curl or failed to start' >&2; exit 1; }
 
+# On a readiness timeout, tail the failing container's own log to surface the
+# actual boot failure (e.g. a Spring bean creation error) instead of only the
+# generic "timed out" message. Filter out anything shaped like a raw KEY=VALUE
+# env dump line or an obviously secret-labeled line, since these clones are
+# started from files containing synthetic credentials and a production DB URL.
+dump_readiness_diagnostics() {
+	local container="${1:?container name is required}"
+	echo "--- ${container} last log lines (tail 40, env-dump/secret lines filtered) ---" >&2
+	docker logs --tail 40 "${container}" 2>&1 \
+		| grep -Ev '^[A-Za-z_][A-Za-z0-9_]*=|PASSWORD|SECRET|_KEY|PEPPER|ATTESTATION' >&2 || true
+}
+
 backend_ready=false
 for _ in $(seq 1 120); do
 	if [[ "$(docker exec "${clone_curl}" curl -sS --noproxy '*' --connect-timeout 1 --max-time 2 -o /dev/null -w '%{http_code}' "http://backend:8080/actuator/health/readiness" 2>/dev/null || true)" == 200 ]]; then
@@ -399,7 +411,11 @@ for _ in $(seq 1 120); do
 	fi
 	sleep 1
 done
-[[ "${backend_ready}" == true ]] || { echo 'isolated backend readiness timed out' >&2; exit 1; }
+if [[ "${backend_ready}" != true ]]; then
+	echo 'isolated backend readiness timed out' >&2
+	dump_readiness_diagnostics "${clone_backend}"
+	exit 1
+fi
 
 docker run -d --name "${clone_gateway}" --network "${network}" --network-alias gateway --user 10001:10001 --read-only \
 	--tmpfs /tmp:rw,nosuid,nodev \
@@ -420,7 +436,11 @@ for _ in $(seq 1 60); do
 	fi
 	sleep 1
 done
-[[ "${gateway_ready}" == true ]] || { echo 'isolated gateway readiness timed out' >&2; exit 1; }
+if [[ "${gateway_ready}" != true ]]; then
+	echo 'isolated gateway readiness timed out' >&2
+	dump_readiness_diagnostics "${clone_gateway}"
+	exit 1
+fi
 
 node -e '
 const { createHash, randomBytes } = require("node:crypto");

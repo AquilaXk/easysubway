@@ -147,6 +147,17 @@ test("capacity runner는 동일 candidate·격리 load·privacy·closed ingress�
   assert.match(capacityDecoder, /@Profile\("capacity-evidence"\)/);
   assert.match(capacityDecoder, /MessageDigest\.isEqual/);
   assert.match(capacityDecoder, /MEETS_DEVICE_INTEGRITY/);
+  // Spring cannot implicitly resolve which of this class's two constructors to
+  // autowire (neither is a lone/no-arg constructor), so the @Value-based
+  // constructor must be explicitly marked. Without this, bean creation fails
+  // with "No default constructor found" and the isolated backend never
+  // becomes ready — see #2095 run 29625986367.
+  assert.match(capacityDecoder, /@Autowired\s+CapacityEvidencePlayIntegrityDecoder\(/);
+  assert.match(runner, /dump_readiness_diagnostics\(\) \{/);
+  assert.match(runner, /docker logs --tail 40 "\$\{container\}"/);
+  assert.match(runner, /grep -Ev '\^\[A-Za-z_\]\[A-Za-z0-9_\]\*=\|PASSWORD\|SECRET\|_KEY\|PEPPER\|ATTESTATION'/);
+  assert.match(runner, /dump_readiness_diagnostics "\$\{clone_backend\}"/);
+  assert.match(runner, /dump_readiness_diagnostics "\$\{clone_gateway\}"/);
   assert.match(runner, /timetable snapshot identity is invalid/);
   assert.match(runner, /normal_state_count_before/);
   assert.match(runner, /normal_state_count_after/);
