@@ -754,7 +754,10 @@
       "evidence": [
         "apps/mobile/lib/mobile_error_reporter.dart",
         "apps/mobile/release/release-security-gate.json",
-        "backend/src/main/java/com/easysubway/common/web/CommonExceptionHandler.java"
+        "backend/src/main/java/com/easysubway/common/web/CommonExceptionHandler.java",
+        "backend/src/main/java/com/easysubway/usage/adapter/in/web/UserActivityTrackingFilter.java",
+        "backend/src/main/java/com/easysubway/usage/adapter/out/persistence/JdbcUserActivityRepository.java",
+        "backend/src/main/java/com/easysubway/report/application/service/FacilityReportService.java"
       ],
       "lastVerifiedAt": "2026-06-19",
       "sharedWithThirdParties": false,
