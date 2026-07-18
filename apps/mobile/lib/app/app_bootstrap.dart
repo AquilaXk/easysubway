@@ -105,37 +105,14 @@ class AppBootstrap {
             )
           : null;
 
-      Future<void> runAndActivate(UpdateTrigger trigger) async {
-        await _runDataPackUpdateSafely(
-          supportDirectory: supportDirectory,
-          userDatabase: userDatabase,
-          runner: runner,
-          trigger: trigger,
-        );
-        final local = localRouteRepository;
-        if (local == null) return;
-        try {
-          final opener = CatalogDatabaseOpener(
-            databaseDirectory: supportDirectory,
-            assetBundle: assetBundle ?? rootBundle,
-            emergencyOverrideRepository: emergencyOverrideRepository,
-          );
-          final activatedDatabase = await opener.open();
-          await local.activateDataPack(
-            catalogDatabase: activatedDatabase,
-            artifactIdentity: opener.openedArtifactIdentity,
-            ownsDatabase: true,
-          );
-        } catch (error, stackTrace) {
-          reportMobileError(
-            error,
-            stackTrace,
-            context: '이동 정보 업데이트 적용 중 예외가 발생했습니다.',
-          );
-        }
-      }
-
-      dataPackUpdate = runAndActivate(UpdateTrigger.appStart);
+      // 설치 pointer는 갱신하되, 세션의 catalog 의존성은 다음 bootstrap까지
+      // 함께 열린 동일 DB를 유지해 기능별로 서로 다른 데이터팩을 노출하지 않는다.
+      dataPackUpdate = _runDataPackUpdateSafely(
+        supportDirectory: supportDirectory,
+        userDatabase: userDatabase,
+        runner: runner,
+        trigger: UpdateTrigger.appStart,
+      );
 
       final dependencies = AppDependencies.resolve(
         repository: repository,
@@ -162,10 +139,18 @@ class AppBootstrap {
         catalogDatabase: catalogDatabase,
         userDatabase: userDatabase,
         dataPackUpdate: dataPackUpdate,
-        resumeDataPackUpdate: () =>
-            runAndActivate(UpdateTrigger.foregroundResume),
-        acceptMeteredDataPackUpdate: () =>
-            runAndActivate(UpdateTrigger.userConsent),
+        resumeDataPackUpdate: () => _runDataPackUpdateSafely(
+          supportDirectory: supportDirectory,
+          userDatabase: userDatabase,
+          runner: runner,
+          trigger: UpdateTrigger.foregroundResume,
+        ),
+        acceptMeteredDataPackUpdate: () => _runDataPackUpdateSafely(
+          supportDirectory: supportDirectory,
+          userDatabase: userDatabase,
+          runner: runner,
+          trigger: UpdateTrigger.userConsent,
+        ),
         bundledDataPackFreshness: bundledDataPackFreshness,
         localRouteRepository: localRouteRepository,
       );

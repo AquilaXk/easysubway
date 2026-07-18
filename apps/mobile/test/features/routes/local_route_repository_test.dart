@@ -109,6 +109,42 @@ void main() {
     expect((await repository.searchRoute(request)).originStationName, '새 상록수');
   });
 
+  test('cold artifact 교체는 기존 artifact bundle을 먼저 만들지 않는다', () async {
+    final oldDatabase = CatalogDatabase.memory();
+    final newDatabase = CatalogDatabase.memory();
+    addTearDown(oldDatabase.close);
+    addTearDown(newDatabase.close);
+    await oldDatabase.seedBaselineIfEmpty();
+    await newDatabase.seedBaselineIfEmpty();
+    var snapshotBuildCount = 0;
+    var graphBuildCount = 0;
+    final repository = LocalRouteRepository(
+      catalogDatabase: oldDatabase,
+      artifactIdentity: 'artifact-old',
+      routeCatalogBuildObserver: (event) {
+        if (event == 'snapshot') snapshotBuildCount += 1;
+        if (event == 'graph') graphBuildCount += 1;
+      },
+    );
+
+    await repository.activateDataPack(
+      catalogDatabase: newDatabase,
+      artifactIdentity: 'artifact-new',
+    );
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'STANDARD',
+      ),
+    );
+
+    expect(result.status, 'FOUND');
+    expect(snapshotBuildCount, 1);
+    expect(graphBuildCount, 1);
+    expect(repository.catalogDatabase, same(newDatabase));
+  });
+
   test('동일 artifact identity의 route API는 snapshot과 graph를 한 번만 빌드한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);

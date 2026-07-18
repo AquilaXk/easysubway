@@ -1232,11 +1232,12 @@ void main() {
     finishUpdate.complete();
     await bootstrap.dataPackUpdate;
 
-    final activeRouteDatabase = bootstrap.localRouteRepository!.catalogDatabase;
-    final activePack = await activeRouteDatabase.customSelect('''
+    final sessionRouteDatabase =
+        bootstrap.localRouteRepository!.catalogDatabase;
+    final activePack = await sessionRouteDatabase.customSelect('''
       SELECT value FROM catalog_metadata WHERE key = 'activePack'
       ''').getSingle();
-    expect(activePack.read<String>('value'), 'capital-v19');
+    expect(activePack.read<String>('value'), 'capital');
   });
 
   test('앱 부트스트랩은 설치된 current pack의 manifest expiry를 stale 상태로 전달한다', () async {

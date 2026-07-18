@@ -95,15 +95,22 @@ class LocalRouteRepository implements RouteSearchRepository {
     );
   }
 
+  /// 세션의 다른 catalog 소비자와 교체가 조정된 뒤 완성된 route bundle을 게시한다.
   Future<void> activateDataPack({
     required CatalogDatabase catalogDatabase,
     required String artifactIdentity,
     bool ownsDatabase = false,
   }) async {
-    final current = await _routeCatalogBundle();
-    if (current.artifactIdentity == artifactIdentity) {
+    final active = _activeBundle;
+    final inFlight = _routeCatalogBundleFuture;
+    final current = active ?? (inFlight == null ? null : await inFlight);
+    if ((current?.artifactIdentity ?? this.artifactIdentity) ==
+        artifactIdentity) {
       if (ownsDatabase &&
-          !identical(catalogDatabase, current.catalogDatabase)) {
+          !identical(
+            catalogDatabase,
+            current?.catalogDatabase ?? _initialCatalogDatabase,
+          )) {
         await catalogDatabase.close();
       }
       return;
