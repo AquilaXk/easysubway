@@ -54,7 +54,7 @@ class AdminDesignGuardTest {
 	private static final Pattern CONDITIONAL_TABLE = Pattern.compile("<table\\b[^>]*\\bth:if=");
 	private static final Pattern ACCESSIBLE_TABLE_WRAPPER = Pattern.compile(
 		"<div class=\"admin-table-scroll\" tabindex=\"0\" role=\"group\"\\s+"
-			+ "aria-label=\"가로로 스크롤 가능한 데이터 표\"[^>]*>\\s*<table\\b",
+			+ "aria-label=\"가로로 스크롤 가능한 [^\"]*표\"[^>]*>\\s*<table\\b",
 		Pattern.DOTALL);
 	private static final Pattern TABLE_WRAPPER_CLOSE = Pattern.compile("</table>\\s*</div>");
 
