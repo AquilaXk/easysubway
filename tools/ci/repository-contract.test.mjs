@@ -14100,6 +14100,8 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   assert.match(sourceSnapshot, /checksum/);
   assert.match(service, /implements DataCollectionUseCase/);
   assert.match(service, /JobLauncher/);
+  assert.match(service, /ORPHANED_RUN_AFTER = Duration\.ofHours\(24\)/);
+  assert.match(service, /failOrphanedRunningRun/);
   assert.match(service, /transitMasterCollectionJob/);
   assert.match(service, /execution\.getStatus\(\) != BatchStatus\.COMPLETED/);
   assert.match(service, /execution\.getAllFailureExceptions\(\)/);
@@ -14136,6 +14138,9 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   assert.match(jdbcRepository, /JdbcTemplate/);
   assert.match(jdbcRepository, /@Transactional[\s\S]*saveRun\(DataCollectionRun run\)/);
   assert.match(jdbcRepository, /isActiveSourceConflict/);
+  assert.match(jdbcRepository, /BATCH_JOB_EXECUTION_PARAMS/);
+  assert.match(jdbcRepository, /STARTING', 'STARTED', 'STOPPING', 'UNKNOWN/);
+  assert.match(jdbcRepository, /COALESCE\(execution\.LAST_UPDATED, execution\.START_TIME, execution\.CREATE_TIME\)/);
   assert.match(jdbcRepository, /ux_data_collection_runs_active_source/);
   assert.match(jdbcRepository, /ux_data_collection_runs_running_source/);
   assert.match(jdbcRepository, /throw exception/);

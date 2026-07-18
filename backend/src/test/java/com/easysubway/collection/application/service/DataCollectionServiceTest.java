@@ -53,6 +53,62 @@ class DataCollectionServiceTest {
 	}
 
 	@Test
+	@DisplayName("24시간이 지난 고아 RUNNING claim은 실패로 재조정하고 새 실행을 허용한다")
+	void orphanedRunningClaimIsReconciledBeforeNewLaunch() {
+		var repository = new InMemoryDataCollectionRunRepository();
+		DataCollectionRun orphan = new DataCollectionRun(
+			"collection-orphaned",
+			DataCollectionSource.TRANSIT_MASTER,
+			DataCollectionStatus.RUNNING,
+			"stopped-instance",
+			LocalDateTime.now().minusHours(25),
+			null,
+			0,
+			null,
+			false,
+			"수집 실행 중입니다."
+		);
+		repository.saveRun(orphan);
+		JobLauncher launcher = (job, parameters) -> {
+			String runId = parameters.getString("runId");
+			repository.saveRun(new DataCollectionRun(
+				runId,
+				DataCollectionSource.TRANSIT_MASTER,
+				DataCollectionStatus.COMPLETED,
+				"admin-user",
+				LocalDateTime.now(),
+				LocalDateTime.now(),
+				1,
+				null,
+				false,
+				"수집 완료"
+			));
+			JobExecution execution = mock(JobExecution.class);
+			org.mockito.Mockito.when(execution.getStatus()).thenReturn(BatchStatus.COMPLETED);
+			return execution;
+		};
+		var service = new DataCollectionService(
+			repository,
+			repository,
+			() -> "collection-recovered",
+			launcher,
+			mock(Job.class)
+		);
+
+		DataCollectionRun recovered = service.runCollection(
+			new RunDataCollectionCommand(DataCollectionSource.TRANSIT_MASTER, "admin-user")
+		);
+
+		assertThat(recovered.status()).isEqualTo(DataCollectionStatus.COMPLETED);
+		assertThat(repository.loadRun(orphan.runId())).get()
+			.extracting(DataCollectionRun::status, DataCollectionRun::failureMessage)
+			.containsExactly(
+				DataCollectionStatus.FAILED,
+				"배치 실행 소유권이 만료되어 고아 실행으로 정리되었습니다."
+			);
+	}
+
+	@Test
 	@DisplayName("배치 launch 실패는 사전 저장한 같은 실행을 FAILED로 갱신한다")
 	void launchFailureMarksClaimedRunAsFailed() {
 		var repository = new InMemoryDataCollectionRunRepository();

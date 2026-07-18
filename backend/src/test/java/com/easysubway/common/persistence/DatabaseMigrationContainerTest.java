@@ -3,14 +3,17 @@ package com.easysubway.common.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.easysubway.route.adapter.out.persistence.JdbcRouteV2AccessStore;
+import com.easysubway.collection.adapter.out.persistence.JdbcDataCollectionRunRepository;
+import com.easysubway.collection.domain.DataCollectionSource;
 import com.easysubway.datapack.adapter.out.persistence.JdbcDatapackReleaseDeliveryRepository;
 import com.easysubway.datapack.domain.DatapackReleaseDelivery;
+import com.easysubway.route.adapter.out.persistence.JdbcRouteV2AccessStore;
 import com.easysubway.route.application.port.out.RouteV2AccessStore.RouteV2Session;
 import com.easysubway.route.application.port.out.RouteV2AccessStore.SessionStatus;
 import com.zaxxer.hikari.HikariDataSource;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -227,6 +230,48 @@ class DatabaseMigrationContainerTest {
 			schema,
 			"legacy-running-b"
 		)).isInstanceOf(DataAccessException.class);
+
+		try (var scopedDataSource = new HikariDataSource()) {
+			scopedDataSource.setJdbcUrl(POSTGRES.getJdbcUrl());
+			scopedDataSource.setUsername(POSTGRES.getUsername());
+			scopedDataSource.setPassword(POSTGRES.getPassword());
+			scopedDataSource.setSchema(schema);
+			var scopedJdbc = new JdbcTemplate(scopedDataSource);
+			var repository = new JdbcDataCollectionRunRepository(scopedDataSource);
+			LocalDateTime staleBefore = LocalDateTime.now().plusMinutes(1);
+			assertThat(repository.failOrphanedRunningRun(
+				DataCollectionSource.TRANSIT_MASTER,
+				staleBefore,
+				LocalDateTime.now(),
+				"배치 실행 소유권이 만료되어 고아 실행으로 정리되었습니다.",
+				"이전 실행이 비정상 종료되었습니다. 새 실행 결과를 확인하세요."
+			)).isTrue();
+
+			insertLegacyRunningRun(scopedJdbc, null, "legacy-running-live");
+			scopedJdbc.update("""
+				INSERT INTO BATCH_JOB_INSTANCE (JOB_INSTANCE_ID, VERSION, JOB_NAME, JOB_KEY)
+				VALUES (1, 0, 'transitMasterCollectionJob', 'live-job')
+				""");
+			scopedJdbc.update("""
+				INSERT INTO BATCH_JOB_EXECUTION (
+					JOB_EXECUTION_ID, VERSION, JOB_INSTANCE_ID, CREATE_TIME,
+					START_TIME, STATUS, LAST_UPDATED
+				) VALUES (1, 0, 1, ?, ?, 'STARTED', ?)
+				""", LocalDateTime.now(), LocalDateTime.now(), staleBefore.plusMinutes(1));
+			scopedJdbc.update("""
+				INSERT INTO BATCH_JOB_EXECUTION_PARAMS (
+					JOB_EXECUTION_ID, PARAMETER_NAME, PARAMETER_TYPE, PARAMETER_VALUE, IDENTIFYING
+				) VALUES (1, 'runId', 'java.lang.String', 'legacy-running-live', 'Y')
+				""");
+
+			assertThat(repository.failOrphanedRunningRun(
+				DataCollectionSource.TRANSIT_MASTER,
+				staleBefore,
+				LocalDateTime.now(),
+				"배치 실행 소유권이 만료되어 고아 실행으로 정리되었습니다.",
+				"이전 실행이 비정상 종료되었습니다. 새 실행 결과를 확인하세요."
+			)).isFalse();
+		}
 	}
 
 	@Test
@@ -650,14 +695,15 @@ class DatabaseMigrationContainerTest {
 	}
 
 	private void insertLegacyRunningRun(JdbcTemplate jdbcTemplate, String schema, String runId) {
+		String prefix = schema == null ? "" : schema + ".";
 		jdbcTemplate.update("""
-			INSERT INTO %s.data_collection_runs (
+			INSERT INTO %sdata_collection_runs (
 				run_id, source, status, requested_by, started_at, completed_at,
 				collected_count, failure_message, retryable, operator_action
 			)
 			VALUES (?, 'TRANSIT_MASTER', 'RUNNING', 'legacy-admin', CURRENT_TIMESTAMP,
 				NULL, 0, NULL, FALSE, '수집 실행 중입니다.')
-			""".formatted(schema), runId);
+			""".formatted(prefix), runId);
 	}
 
 	private org.flywaydb.core.api.configuration.FluentConfiguration flyway(

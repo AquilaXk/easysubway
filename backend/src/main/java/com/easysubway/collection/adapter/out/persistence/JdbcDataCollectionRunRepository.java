@@ -10,6 +10,7 @@ import com.easysubway.collection.domain.DataCollectionStatus;
 import com.easysubway.collection.domain.InvalidDataCollectionException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -79,6 +80,46 @@ public class JdbcDataCollectionRunRepository implements
 			);
 		}
 		return run;
+	}
+
+	@Override
+	@Transactional
+	public boolean failOrphanedRunningRun(
+		DataCollectionSource source,
+		LocalDateTime staleBefore,
+		LocalDateTime failedAt,
+		String failureMessage,
+		String operatorAction
+	) {
+		return jdbcTemplate.update("""
+			UPDATE data_collection_runs
+			SET status = 'FAILED',
+				active_source = NULL,
+				completed_at = ?,
+				failure_message = ?,
+				retryable = TRUE,
+				operator_action = ?
+			WHERE source = ?
+				AND status = 'RUNNING'
+				AND started_at <= ?
+				AND NOT EXISTS (
+					SELECT 1
+					FROM BATCH_JOB_EXECUTION execution
+					JOIN BATCH_JOB_EXECUTION_PARAMS parameter
+						ON parameter.JOB_EXECUTION_ID = execution.JOB_EXECUTION_ID
+					WHERE parameter.PARAMETER_NAME = 'runId'
+						AND parameter.PARAMETER_VALUE = data_collection_runs.run_id
+						AND execution.STATUS IN ('STARTING', 'STARTED', 'STOPPING', 'UNKNOWN')
+						AND COALESCE(execution.LAST_UPDATED, execution.START_TIME, execution.CREATE_TIME) > ?
+				)
+			""",
+			failedAt,
+			failureMessage,
+			operatorAction,
+			source.name(),
+			staleBefore,
+			staleBefore
+		) > 0;
 	}
 
 	static boolean isActiveSourceConflict(DataIntegrityViolationException exception) {

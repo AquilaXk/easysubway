@@ -218,7 +218,7 @@ class DataCollectionAdminPageControllerTest {
 	}
 
 	private DataCollectionRun runningRun(String runId) {
-		LocalDateTime now = LocalDateTime.of(2026, 6, 27, 0, 0);
+		LocalDateTime now = LocalDateTime.now();
 		return new DataCollectionRun(
 			runId,
 			DataCollectionSource.TRANSIT_MASTER,

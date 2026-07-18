@@ -46,6 +46,8 @@ class JdbcDataCollectionRunRepositoryTest {
 
 	@BeforeEach
 	void setUp() {
+		jdbcTemplate.execute("DROP TABLE IF EXISTS BATCH_JOB_EXECUTION_PARAMS");
+		jdbcTemplate.execute("DROP TABLE IF EXISTS BATCH_JOB_EXECUTION");
 		jdbcTemplate.execute("DROP TABLE IF EXISTS data_collection_runs");
 		jdbcTemplate.execute("DROP TABLE IF EXISTS data_collection_run_steps");
 		jdbcTemplate.execute("""
@@ -79,6 +81,22 @@ class JdbcDataCollectionRunRepositoryTest {
 				record_count INTEGER NOT NULL,
 				failure_message VARCHAR(1000),
 				PRIMARY KEY (run_id, step_order)
+			)
+			""");
+		jdbcTemplate.execute("""
+			CREATE TABLE BATCH_JOB_EXECUTION (
+				JOB_EXECUTION_ID BIGINT PRIMARY KEY,
+				CREATE_TIME TIMESTAMP NOT NULL,
+				START_TIME TIMESTAMP NULL,
+				STATUS VARCHAR(10),
+				LAST_UPDATED TIMESTAMP NULL
+			)
+			""");
+		jdbcTemplate.execute("""
+			CREATE TABLE BATCH_JOB_EXECUTION_PARAMS (
+				JOB_EXECUTION_ID BIGINT NOT NULL,
+				PARAMETER_NAME VARCHAR(100) NOT NULL,
+				PARAMETER_VALUE VARCHAR(2500)
 			)
 			""");
 	}
@@ -226,6 +244,56 @@ class JdbcDataCollectionRunRepositoryTest {
 		);
 
 		assertThat(repository.loadRunningRun(DataCollectionSource.TRANSIT_MASTER)).isEmpty();
+	}
+
+	@Test
+	@DisplayName("stale RUNNING claim은 batch execution이 없으면 원자적으로 FAILED로 재조정한다")
+	void reconcilesStaleRunningClaimWithoutBatchExecution() {
+		DataCollectionRun orphan = runningRun("collection-orphaned");
+		repository.saveRun(orphan);
+		LocalDateTime cutoff = orphan.startedAt().plusHours(1);
+
+		boolean reconciled = repository.failOrphanedRunningRun(
+			DataCollectionSource.TRANSIT_MASTER,
+			cutoff,
+			cutoff.plusMinutes(1),
+			"배치 실행 소유권이 만료되어 고아 실행으로 정리되었습니다.",
+			"이전 실행이 비정상 종료되었습니다. 새 실행 결과를 확인하세요."
+		);
+
+		assertThat(reconciled).isTrue();
+		assertThat(repository.loadRun(orphan.runId())).get()
+			.extracting(DataCollectionRun::status)
+			.isEqualTo(DataCollectionStatus.FAILED);
+	}
+
+	@Test
+	@DisplayName("최근 갱신된 STARTED batch execution의 RUNNING claim은 재조정하지 않는다")
+	void preservesRunningClaimWithFreshStartedBatchExecution() {
+		DataCollectionRun running = runningRun("collection-live");
+		repository.saveRun(running);
+		LocalDateTime cutoff = running.startedAt().plusHours(1);
+		jdbcTemplate.update("""
+			INSERT INTO BATCH_JOB_EXECUTION (
+				JOB_EXECUTION_ID, CREATE_TIME, START_TIME, STATUS, LAST_UPDATED
+			) VALUES (1, ?, ?, 'STARTED', ?)
+			""", running.startedAt(), running.startedAt(), cutoff.plusMinutes(1));
+		jdbcTemplate.update("""
+			INSERT INTO BATCH_JOB_EXECUTION_PARAMS (
+				JOB_EXECUTION_ID, PARAMETER_NAME, PARAMETER_VALUE
+			) VALUES (1, 'runId', ?)
+			""", running.runId());
+
+		boolean reconciled = repository.failOrphanedRunningRun(
+			DataCollectionSource.TRANSIT_MASTER,
+			cutoff,
+			cutoff.plusMinutes(2),
+			"배치 실행 소유권이 만료되어 고아 실행으로 정리되었습니다.",
+			"이전 실행이 비정상 종료되었습니다. 새 실행 결과를 확인하세요."
+		);
+
+		assertThat(reconciled).isFalse();
+		assertThat(repository.loadRunningRun(DataCollectionSource.TRANSIT_MASTER)).contains(running);
 	}
 
 	@Test

@@ -6,6 +6,7 @@ import com.easysubway.collection.domain.DataCollectionRun;
 import com.easysubway.collection.domain.DataCollectionSource;
 import com.easysubway.collection.domain.DataCollectionStatus;
 import com.easysubway.collection.domain.InvalidDataCollectionException;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -34,6 +35,39 @@ public class InMemoryDataCollectionRunRepository implements
 		runs.removeIf(savedRun -> savedRun.runId().equals(run.runId()));
 		runs.add(run);
 		return run;
+	}
+
+	@Override
+	public synchronized boolean failOrphanedRunningRun(
+		DataCollectionSource source,
+		LocalDateTime staleBefore,
+		LocalDateTime failedAt,
+		String failureMessage,
+		String operatorAction
+	) {
+		Optional<DataCollectionRun> orphaned = runs.stream()
+			.filter(run -> run.source() == source)
+			.filter(run -> run.status() == DataCollectionStatus.RUNNING)
+			.filter(run -> !run.startedAt().isAfter(staleBefore))
+			.findFirst();
+		if (orphaned.isEmpty()) {
+			return false;
+		}
+		DataCollectionRun run = orphaned.orElseThrow();
+		saveRun(new DataCollectionRun(
+			run.runId(),
+			run.source(),
+			DataCollectionStatus.FAILED,
+			run.requestedBy(),
+			run.startedAt(),
+			failedAt,
+			run.collectedCount(),
+			failureMessage,
+			true,
+			operatorAction,
+			run.steps()
+		));
+		return true;
 	}
 
 	@Override

@@ -9,6 +9,7 @@ import com.easysubway.collection.domain.DataCollectionRun;
 import com.easysubway.collection.domain.DataCollectionSource;
 import com.easysubway.collection.domain.DataCollectionStatus;
 import com.easysubway.collection.domain.InvalidDataCollectionException;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -23,6 +24,11 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class DataCollectionService implements DataCollectionUseCase {
+	private static final Duration ORPHANED_RUN_AFTER = Duration.ofHours(24);
+	private static final String ORPHANED_RUN_FAILURE =
+		"배치 실행 소유권이 만료되어 고아 실행으로 정리되었습니다.";
+	private static final String ORPHANED_RUN_ACTION =
+		"이전 실행이 비정상 종료되었습니다. 새 실행 결과를 확인하세요.";
 
 	private final LoadDataCollectionRunPort loadDataCollectionRunPort;
 	private final SaveDataCollectionRunPort saveDataCollectionRunPort;
@@ -67,13 +73,21 @@ public class DataCollectionService implements DataCollectionUseCase {
 	}
 
 	private DataCollectionRun launchTransitMasterCollection(String requestedBy) {
+		LocalDateTime now = LocalDateTime.now();
+		saveDataCollectionRunPort.failOrphanedRunningRun(
+			DataCollectionSource.TRANSIT_MASTER,
+			now.minus(ORPHANED_RUN_AFTER),
+			now,
+			ORPHANED_RUN_FAILURE,
+			ORPHANED_RUN_ACTION
+		);
 		String runId = generateCollectionRunIdPort.nextCollectionRunId();
 		DataCollectionRun claimedRun = saveDataCollectionRunPort.saveRun(new DataCollectionRun(
 			runId,
 			DataCollectionSource.TRANSIT_MASTER,
 			DataCollectionStatus.RUNNING,
 			requestedBy,
-			LocalDateTime.now(),
+			now,
 			null,
 			0,
 			null,
