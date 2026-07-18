@@ -606,6 +606,24 @@ if (identity?.timetableSnapshotSha256 !== expected.timetableSnapshotSha256
 	return 1
 }
 
+# On an unexpected status code, dump the actual response status/headers/body to
+# make the failure self-diagnosing instead of just "did not return exact NNN".
+# Request headers we send (Authorization, CF-Connecting-IP) never appear in the
+# -D output (that only captures response headers), but filter them anyway as a
+# defensive measure since this dumps to CI-visible stderr.
+dump_request_diagnostics() {
+	local headers_file="${1:?headers file is required}"
+	local body_file="${2:?body file is required}"
+	echo "--- request diagnostics: status=${last_status} ---" >&2
+	if [[ -f "${headers_file}" ]]; then
+		grep -iEv 'authorization:|cf-connecting-ip:' "${headers_file}" >&2 || true
+	fi
+	if [[ -f "${body_file}" ]]; then
+		head -c 2000 "${body_file}" >&2 || true
+		echo >&2
+	fi
+}
+
 sample_resources() {
 	local backend_resource gateway_resource sampled_at_ms
 	backend_resource="$(docker stats --no-stream --format '{{.MemPerc}} {{.CPUPerc}}' "${clone_backend}")"
@@ -636,16 +654,19 @@ sample_resources
 unexpected_error_count=0
 for ((index = 0; index < session_rate; index += 1)); do
 	send_session normal "198.51.100.$((index + 101))"
-	[[ "${last_status}" == 200 ]] || { echo 'normal session profile did not return exact 200' >&2; exit 1; }
+	[[ "${last_status}" == 200 ]] \
+		|| { dump_request_diagnostics "${last_headers}" "${last_body}"; echo 'normal session profile did not return exact 200' >&2; exit 1; }
 	capture_issued_session
 done
 for ((index = 0; index <= session_burst; index += 1)); do
 	send_session burst 198.51.100.180
-	[[ "${last_status}" == 200 ]] || { echo 'session limiter rejected before the configured burst was consumed' >&2; exit 1; }
+	[[ "${last_status}" == 200 ]] \
+		|| { dump_request_diagnostics "${last_headers}" "${last_body}"; echo 'session limiter rejected before the configured burst was consumed' >&2; exit 1; }
 	capture_issued_session
 done
 send_session burst 198.51.100.180
-[[ "${last_status}" == 429 ]] || { echo 'session burst profile did not return exact 429' >&2; exit 1; }
+[[ "${last_status}" == 429 ]] \
+	|| { dump_request_diagnostics "${last_headers}" "${last_body}"; echo 'session burst profile did not return exact 429' >&2; exit 1; }
 grep -Eqi '^Retry-After: [1-9][0-9]*' "${last_headers}" || { echo 'session 429 is missing integer Retry-After' >&2; exit 1; }
 
 mapfile -t tokens < <(cut -f 1 "${issued_tokens_file}")
@@ -660,7 +681,8 @@ WHERE origin_station_id = '${origin_station_id}'
 [[ "${normal_state_count_before}" =~ ^[0-9]+$ ]] || { echo 'normal state baseline is invalid' >&2; exit 1; }
 for ((index = 0; index < search_rate; index += 1)); do
 	send_search normal "${tokens[$((index % session_rate))]}" "198.51.100.$((index + 1))"
-	[[ "${last_status}" == 200 ]] || { echo 'normal search profile did not return exact 200' >&2; exit 1; }
+	[[ "${last_status}" == 200 ]] \
+		|| { dump_request_diagnostics "${last_headers}" "${last_body}"; echo 'normal search profile did not return exact 200' >&2; exit 1; }
 	validate_normal_search_body "${last_body}" || exit 1
 done
 normal_state_count_after="$(clone_psql "SELECT COUNT(*) FROM route_v2_states
@@ -676,6 +698,7 @@ WHERE origin_station_id = '${origin_station_id}'
 burst_token="${seeded_tokens[0]}"
 burst_pids=()
 burst_headers_files=()
+burst_body_files=()
 burst_result_files=()
 for ((index = 0; index <= search_burst; index += 1)); do
 	request_index=$((request_index + 1))
@@ -691,6 +714,7 @@ for ((index = 0; index <= search_burst; index += 1)); do
 	) &
 	burst_pids+=("$!")
 	burst_headers_files+=("${burst_headers}")
+	burst_body_files+=("${burst_body}")
 	burst_result_files+=("${burst_result}")
 done
 for index in "${!burst_pids[@]}"; do
@@ -707,10 +731,11 @@ for index in "${!burst_pids[@]}"; do
 	grep -Eqi '^Cache-Control:[[:space:]]*private,[[:space:]]*no-store[[:space:]]*\r?$' "${burst_headers_files[${index}]}" \
 		|| { echo 'concurrent Route V2 response is missing Cache-Control: private, no-store' >&2; exit 1; }
 	[[ "${last_status}" == 200 ]] \
-		|| { echo 'search burst profile did not return exact 200 before rate limiting' >&2; exit 1; }
+		|| { dump_request_diagnostics "${burst_headers_files[${index}]}" "${burst_body_files[${index}]}"; echo 'search burst profile did not return exact 200 before rate limiting' >&2; exit 1; }
 done
 send_search burst "${burst_token}" 198.51.100.200
-[[ "${last_status}" == 429 ]] || { echo 'burst profile did not return exact 429' >&2; exit 1; }
+[[ "${last_status}" == 429 ]] \
+	|| { dump_request_diagnostics "${last_headers}" "${last_body}"; echo 'burst profile did not return exact 429' >&2; exit 1; }
 grep -Eqi '^Retry-After: [1-9][0-9]*' "${last_headers}" || { echo '429 response is missing integer Retry-After' >&2; exit 1; }
 node -e '
 const value = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
@@ -719,7 +744,8 @@ if (value.code !== "ROUTE_RATE_LIMITED") process.exit(1);
 
 clone_psql "UPDATE timetable_snapshot_history SET fresh_until = TO_CHAR((CURRENT_TIMESTAMP - INTERVAL '1 second') AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') WHERE snapshot_sha256 = (SELECT snapshot_sha256 FROM timetable_snapshot_active WHERE singleton_id = 1);" >/dev/null
 send_search unavailable "${seeded_tokens[1]}" 198.51.100.210
-[[ "${last_status}" == 503 ]] || { echo 'unavailable profile did not return exact 503' >&2; exit 1; }
+[[ "${last_status}" == 503 ]] \
+	|| { dump_request_diagnostics "${last_headers}" "${last_body}"; echo 'unavailable profile did not return exact 503' >&2; exit 1; }
 node -e '
 const value = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
 if (value.code !== "ITX_TIMETABLE_UNAVAILABLE") process.exit(1);
