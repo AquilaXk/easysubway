@@ -153,6 +153,12 @@ void main() {
         sidecarJson,
         'seoul',
       );
+      // #2068 수도권 KTX·SRT 표장(오너 확정 11역, 2026-07-18): 라벨이 표장
+      // 위에 얹히지 않도록 regional 게이트와 같은 방식으로 solver에 넘긴다.
+      final serviceTagObstacles = parseRouteMapServiceTagObstaclesForRegion(
+        sidecarJson,
+        'seoul',
+      );
       final normalizedOwnerLabelNames = ownerLabels.keys
           .map(_normalizeNameForMatchRate)
           .toSet();
@@ -191,6 +197,7 @@ void main() {
         basemap: true,
         ownerLabelsByStationName: ownerLabels,
         stationNameByStationId: fixture.stationNameByStationId,
+        serviceTagObstacles: serviceTagObstacles,
       );
 
       // 전 역 표시(숨김 금지 계약) — 미매치도 폴백 경로로 라벨을 낸다.
@@ -232,7 +239,15 @@ void main() {
         design,
         basemap: true,
       );
-      var labelNode = 0, labelCapsule = 0, labelBand = 0;
+      final serviceTagRects = [
+        for (final tag in serviceTagObstacles)
+          Rect.fromCenter(
+            center: design.toDesign(tag.center),
+            width: tag.halfWidth * 2 * design.designScale,
+            height: tag.halfHeight * 2 * design.designScale,
+          ),
+      ];
+      var labelNode = 0, labelCapsule = 0, labelBand = 0, labelServiceTag = 0;
       for (final l in layout.labels) {
         if (nodeRects.any((n) => _rectOverlaps(l.rect, n))) labelNode += 1;
         if (capsules.any((c) => _rectOverlaps(l.rect, c))) labelCapsule += 1;
@@ -244,6 +259,9 @@ void main() {
         )) {
           labelBand += 1;
         }
+        if (serviceTagRects.any((s) => _rectOverlaps(l.rect, s))) {
+          labelServiceTag += 1;
+        }
       }
       final labelLine = routeMapLabelLineOverlapCount(
         layout,
@@ -254,7 +272,15 @@ void main() {
       print(
         '[참고] labelNode=$labelNode labelCapsule=$labelCapsule '
         'labelBand=$labelBand labelLine=$labelLine '
+        'labelServiceTag=$labelServiceTag '
         'unresolved(오너 겹침 감사)=${layout.unresolvedOverlapCount}',
+      );
+      // #2068 수도권 KTX·SRT 표장(오너 확정 11역) — regional 게이트와 같은
+      // 하드 0 게이트. 라벨이 표장 아이콘 위에 얹히면 회귀.
+      expect(
+        labelServiceTag,
+        0,
+        reason: '수도권 라벨-표장 겹침 $labelServiceTag — 0 악화 금지',
       );
     },
   );

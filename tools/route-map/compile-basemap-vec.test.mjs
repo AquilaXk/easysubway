@@ -7,6 +7,7 @@ import test from "node:test";
 import {
   extractOwnerLabels,
   extractRailTransferChipObstacles,
+  extractServiceTagObstacles,
   markLineTerminalBadgeEntries,
   normalizeSvgForCompile,
 } from "./compile-basemap-vec.mjs";
@@ -663,4 +664,70 @@ test("extractRailTransferChipObstacles: rail-transfer-layer가 없으면 빈 배
     extractRailTransferChipObstacles('<svg><g id="route-lines-layer"></g></svg>'),
     [],
   );
+});
+
+// #2068 수도권 표장 마감: obstacle 좌표계 정합. main-map-scaled-layer(seoul형
+// scale(k)+translate)가 있으면 service-tag·rail-transfer chip이 그 안에 로컬
+// (pre-scale) 좌표로 쓰이므로, extractOwnerLabels와 같은 공식(로컬×mapScale+
+// mapTranslate)으로 최종 좌표계로 변환돼야 라벨 sidecar·route_map_positions와
+// 정합한다(오버레이 게이트가 그 좌표계로 obstacle을 비교하기 때문).
+test("extractServiceTagObstacles: main-map-scaled-layer 안 chip은 mapScale·mapTranslate를 적용해 최종 좌표로 낸다", () => {
+  const svg = `<svg viewBox="0 0 2400 1800">
+    <g id="main-map-scaled-layer" transform="translate(70 138) scale(0.455)">
+      <g id="service-tags-layer" class="render-layer service-tag-layer">
+        <g id="service-tag-a" class="service-tag" data-station="서울역" data-services="KTX"
+           transform="translate(1000,600)">
+          <title>서울역 · KTX</title>
+          <g transform="matrix(1,0,0,1,0,0)" data-logo="KTX">
+            <path d="M 0 0 L 100 0 L 100 200 L 0 200 Z" />
+          </g>
+        </g>
+      </g>
+    </g>
+  </svg>`;
+  const [obstacle] = extractServiceTagObstacles(svg);
+  // 로컬 bbox center=(1050,700), halfW=50, halfH=100.
+  // 최종 = translate(70,138) + scale(0.455)*로컬.
+  assert.equal(obstacle.x, 70 + 1050 * 0.455);
+  assert.equal(obstacle.y, 138 + 700 * 0.455);
+  assert.equal(obstacle.halfWidth, 50 * 0.455);
+  assert.equal(obstacle.halfHeight, 100 * 0.455);
+});
+
+test("extractServiceTagObstacles·extractRailTransferChipObstacles: main-map-scaled-layer가 없는 권역(busan·daegu·daejeon·gwangju)은 mapScale=1로 obstacle 좌표가 항등 변환된다(회귀 가드)", () => {
+  const svgSourceDir = path.join(
+    import.meta.dirname,
+    "route-map-defs/svg-sources",
+  );
+  for (const [id, file] of [
+    ["busan", "easy-subway-busan-v1.svg"],
+    ["daegu", "easy-subway-daegu-v1.svg"],
+    ["daejeon", "easy-subway-daejeon-v1.svg"],
+    ["gwangju", "easy-subway-gwangju-v1.svg"],
+  ]) {
+    const svgText = readFileSync(path.join(svgSourceDir, file), "utf8");
+    assert.doesNotMatch(
+      svgText,
+      /<g\b[^>]*\bid="main-map-scaled-layer"[^>]*\btransform=/,
+      `${id}: main-map-scaled-layer 부재 가정이 깨졌습니다(mapScale=1 전제 무효화)`,
+    );
+    const obstacles = [
+      ...extractServiceTagObstacles(svgText),
+      ...extractRailTransferChipObstacles(svgText),
+    ];
+    const sidecar = JSON.parse(
+      readFileSync(
+        path.join(
+          import.meta.dirname,
+          "../../apps/mobile/assets/datapacks/metro_map_pack/basemap/labels.json",
+        ),
+        "utf8",
+      ),
+    );
+    assert.deepEqual(
+      obstacles,
+      sidecar.serviceTagObstacles[id],
+      `${id}: mapScale 리팩토링 전후 obstacle 좌표가 달라졌습니다`,
+    );
+  }
 });

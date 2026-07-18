@@ -425,6 +425,35 @@ function parseTransformChain(transformValue) {
   return M;
 }
 
+// obstacle 좌표계 정합(#2068 수도권 표장 마감) — service-tags-layer·
+// rail-transfer-layer는 seoul처럼 main-map-scaled-layer(scale(k)+translate) 안에
+// 중첩될 수 있다(예: seoul k=0.455). 그 안의 표장은 SVG 저자 좌표(로컬, pre-scale)
+// 로 쓰여 있으므로, extractOwnerLabels와 동일한 공식(로컬×mapScale+mapTranslate)
+// 으로 최종 라벨·vec 좌표계(라벨 sidecar·route_map_positions와 공유하는 좌표계)
+// 로 변환해야 게이트가 참조하는 라벨·노드 위치와 정합한다. main-map-scaled-layer가
+// 없는 권역(busan·daegu·daejeon·gwangju)은 mapScale=1·mapTranslate=(0,0)이라
+// 항등 변환 — 기존 obstacle 좌표는 완전히 불변이다(회귀 테스트로 실증).
+function mapScaleAndTranslateFrom(svgText) {
+  const mapTransform = svgText.match(
+    /<g\b(?=[^>]*\bid="main-map-scaled-layer")(?=[^>]*\btransform="([^"]+)")[^>]*>/,
+  )?.[1];
+  return {
+    mapScale: scaleFromMapTransform(mapTransform),
+    mapTranslate: parseTranslate(mapTransform),
+  };
+}
+
+function applyMapScaleToObstacles(obstacles, svgText) {
+  const { mapScale, mapTranslate } = mapScaleAndTranslateFrom(svgText);
+  return obstacles.map((o) => ({
+    ...o,
+    x: mapTranslate.dx + o.x * mapScale,
+    y: mapTranslate.dy + o.y * mapScale,
+    halfWidth: o.halfWidth * mapScale,
+    halfHeight: o.halfHeight * mapScale,
+  }));
+}
+
 // service-tag(KTX·SRT·AIR 표장) 장애물 목록(#2068 마감 라운드 item 3) — 라벨
 // solver가 이 표장 위에 라벨을 얹지 않도록 회피 대상으로 쓴다. 각
 // `<g class="service-tag">` 서브그룹의 transform 체인(중첩 `<g transform>`
@@ -434,7 +463,8 @@ function parseTransformChain(transformValue) {
 // 내용이 없는 빈 그룹(예: 부산 기장 KTX — title만 있고 실제 로고 도형이 없는
 // 소스 데이터 결측)은 회피할 것이 없으므로 건너뛴다. 같은 역에 서브그룹이
 // 여럿(예: 부전 KTX 아이콘+배경 pill)이면 각자 별도 obstacle로 낸다 — 합집합
-// 커버리지가 되어 더 안전하다.
+// 커버리지가 되어 더 안전하다. 반환 좌표는 mapScaleAndTranslateFrom으로 최종
+// 좌표계로 변환됨(위 주석 참고).
 export function extractServiceTagObstacles(svgText) {
   const layerStart = svgText.indexOf('id="service-tags-layer"');
   if (layerStart < 0) return [];
@@ -508,7 +538,7 @@ export function extractServiceTagObstacles(svgText) {
       halfHeight: (maxY - minY) / 2,
     });
   }
-  return obstacles;
+  return applyMapScaleToObstacles(obstacles, svgText);
 }
 
 // 대전·광주 rail chip 표장 장애물(#2068 대전·광주 마감) — 부산·대구는
@@ -589,7 +619,7 @@ export function extractRailTransferChipObstacles(svgText) {
       halfHeight: (maxY - minY) / 2,
     });
   }
-  return obstacles;
+  return applyMapScaleToObstacles(obstacles, svgText);
 }
 
 /**

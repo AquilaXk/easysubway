@@ -45853,6 +45853,271 @@
             <text x="3107.0" y="831.6" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">의정</text>
           </g>
         </g>
+        <g
+           id="service-tags-layer"
+           class="render-layer service-tag-layer"
+           data-asset-policy="inline-svg-paths-only">
+          <g id="service-tag-seoul-station"
+             class="service-tag"
+             data-station="서울역"
+             data-services="KTX"
+             data-logo-mode="inline-svg-paths"
+             transform="translate(2089.1793,1730.9887)">
+            <title
+               id="service-tag-seoul-station-title">서울역 · KTX</title>
+            <g
+               id="logo-ktx-inline-vector-seoul-station"
+               transform="matrix(0.0447145,0,0,0.0447145,0,0)"
+               aria-label="KTX"
+               data-logo-source="gwangju_metro_map_sma_v1_family_transfer_v5.svg">
+              <path
+                 id="logo-ktx-blue-path-seoul-station"
+                 d="m 660,175 -36,37 -28,32 32,71 h 93 z m -522,-40 1,-1 1,1 -1,1 z M 0,315 h 93 l 15,-50 v -3 l 3,-7 2,-10 3,-7 4,-17 2,-3 11,-7 2,1 21,58 18,45 h 92 l -2,-8 -2,-3 -1,-5 -2,-3 -1,-5 -2,-3 -1,-5 -10,-24 -1,-5 -2,-3 -1,-5 -2,-3 -30,-81 76,-49 h 73 l 1,1 -7,21 -4,17 -3,7 -6,24 -3,7 -4,17 -3,7 -6,24 -3,7 v 3 l -20,67 h 93 l 9,-29 v -3 l 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 v -3 l 2,-2 h 85 l 4,6 24,56 25,-23 23,-19 6,-9 9,-10 2,-5 -24,-55 H 255 l -115,81 -1,-2 11,-13 19,-66 H 76 Z"
+                 fill="#000055"
+                 fill-rule="evenodd" />
+              <path
+                 id="logo-ktx-red-path-seoul-station"
+                 d="m 958,0 h -9 l -1,1 -15,1 -1,1 -38,5 -25,5 -9,3 h -4 l -40,11 -43,15 -36,15 -39,19 -19,11 -30,20 -28,21 -50,43 -69,69 -46,51 -20,24 h 102 l 55,-69 46,-51 61,-59 46,-38 25,-18 28,-18 48,-25 42,-17 h 3 l 6,-3 22,-7 z"
+                 fill="#e00024"
+                 fill-rule="evenodd" />
+            </g>
+          </g>
+          <g id="service-tag-yongsan"
+             class="service-tag"
+             data-station="용산"
+             data-services="KTX"
+             data-logo-mode="inline-svg-paths"
+             transform="translate(2152.7178,2077.5382)">
+            <title
+               id="service-tag-yongsan-title">용산 · KTX</title>
+            <g
+               id="logo-ktx-inline-vector-yongsan"
+               transform="matrix(0.0447145,0,0,0.0447145,0,0)"
+               aria-label="KTX"
+               data-logo-source="gwangju_metro_map_sma_v1_family_transfer_v5.svg">
+              <path
+                 id="logo-ktx-blue-path-yongsan"
+                 d="m 660,175 -36,37 -28,32 32,71 h 93 z m -522,-40 1,-1 1,1 -1,1 z M 0,315 h 93 l 15,-50 v -3 l 3,-7 2,-10 3,-7 4,-17 2,-3 11,-7 2,1 21,58 18,45 h 92 l -2,-8 -2,-3 -1,-5 -2,-3 -1,-5 -2,-3 -1,-5 -10,-24 -1,-5 -2,-3 -1,-5 -2,-3 -30,-81 76,-49 h 73 l 1,1 -7,21 -4,17 -3,7 -6,24 -3,7 -4,17 -3,7 -6,24 -3,7 v 3 l -20,67 h 93 l 9,-29 v -3 l 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 v -3 l 2,-2 h 85 l 4,6 24,56 25,-23 23,-19 6,-9 9,-10 2,-5 -24,-55 H 255 l -115,81 -1,-2 11,-13 19,-66 H 76 Z"
+                 fill="#000055"
+                 fill-rule="evenodd" />
+              <path
+                 id="logo-ktx-red-path-yongsan"
+                 d="m 958,0 h -9 l -1,1 -15,1 -1,1 -38,5 -25,5 -9,3 h -4 l -40,11 -43,15 -36,15 -39,19 -19,11 -30,20 -28,21 -50,43 -69,69 -46,51 -20,24 h 102 l 55,-69 46,-51 61,-59 46,-38 25,-18 28,-18 48,-25 42,-17 h 3 l 6,-3 22,-7 z"
+                 fill="#e00024"
+                 fill-rule="evenodd" />
+            </g>
+          </g>
+          <g id="service-tag-gwangmyeong"
+             class="service-tag"
+             data-station="광명"
+             data-services="KTX"
+             data-logo-mode="inline-svg-paths"
+             transform="translate(1463.6409,2512.4591)">
+            <title
+               id="service-tag-gwangmyeong-title">광명 · KTX</title>
+            <g
+               id="logo-ktx-inline-vector-gwangmyeong"
+               transform="matrix(0.0447145,0,0,0.0447145,0,0)"
+               aria-label="KTX"
+               data-logo-source="gwangju_metro_map_sma_v1_family_transfer_v5.svg">
+              <path
+                 id="logo-ktx-blue-path-gwangmyeong"
+                 d="m 660,175 -36,37 -28,32 32,71 h 93 z m -522,-40 1,-1 1,1 -1,1 z M 0,315 h 93 l 15,-50 v -3 l 3,-7 2,-10 3,-7 4,-17 2,-3 11,-7 2,1 21,58 18,45 h 92 l -2,-8 -2,-3 -1,-5 -2,-3 -1,-5 -2,-3 -1,-5 -10,-24 -1,-5 -2,-3 -1,-5 -2,-3 -30,-81 76,-49 h 73 l 1,1 -7,21 -4,17 -3,7 -6,24 -3,7 -4,17 -3,7 -6,24 -3,7 v 3 l -20,67 h 93 l 9,-29 v -3 l 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 v -3 l 2,-2 h 85 l 4,6 24,56 25,-23 23,-19 6,-9 9,-10 2,-5 -24,-55 H 255 l -115,81 -1,-2 11,-13 19,-66 H 76 Z"
+                 fill="#000055"
+                 fill-rule="evenodd" />
+              <path
+                 id="logo-ktx-red-path-gwangmyeong"
+                 d="m 958,0 h -9 l -1,1 -15,1 -1,1 -38,5 -25,5 -9,3 h -4 l -40,11 -43,15 -36,15 -39,19 -19,11 -30,20 -28,21 -50,43 -69,69 -46,51 -20,24 h 102 l 55,-69 46,-51 61,-59 46,-38 25,-18 28,-18 48,-25 42,-17 h 3 l 6,-3 22,-7 z"
+                 fill="#e00024"
+                 fill-rule="evenodd" />
+            </g>
+          </g>
+          <g id="service-tag-haengsin"
+             class="service-tag"
+             data-station="행신"
+             data-services="KTX"
+             data-logo-mode="inline-svg-paths"
+             transform="translate(1169.9684,1153.3162)">
+            <title
+               id="service-tag-haengsin-title">행신 · KTX</title>
+            <g
+               id="logo-ktx-inline-vector-haengsin"
+               transform="matrix(0.0447145,0,0,0.0447145,0,0)"
+               aria-label="KTX"
+               data-logo-source="gwangju_metro_map_sma_v1_family_transfer_v5.svg">
+              <path
+                 id="logo-ktx-blue-path-haengsin"
+                 d="m 660,175 -36,37 -28,32 32,71 h 93 z m -522,-40 1,-1 1,1 -1,1 z M 0,315 h 93 l 15,-50 v -3 l 3,-7 2,-10 3,-7 4,-17 2,-3 11,-7 2,1 21,58 18,45 h 92 l -2,-8 -2,-3 -1,-5 -2,-3 -1,-5 -2,-3 -1,-5 -10,-24 -1,-5 -2,-3 -1,-5 -2,-3 -30,-81 76,-49 h 73 l 1,1 -7,21 -4,17 -3,7 -6,24 -3,7 -4,17 -3,7 -6,24 -3,7 v 3 l -20,67 h 93 l 9,-29 v -3 l 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 v -3 l 2,-2 h 85 l 4,6 24,56 25,-23 23,-19 6,-9 9,-10 2,-5 -24,-55 H 255 l -115,81 -1,-2 11,-13 19,-66 H 76 Z"
+                 fill="#000055"
+                 fill-rule="evenodd" />
+              <path
+                 id="logo-ktx-red-path-haengsin"
+                 d="m 958,0 h -9 l -1,1 -15,1 -1,1 -38,5 -25,5 -9,3 h -4 l -40,11 -43,15 -36,15 -39,19 -19,11 -30,20 -28,21 -50,43 -69,69 -46,51 -20,24 h 102 l 55,-69 46,-51 61,-59 46,-38 25,-18 28,-18 48,-25 42,-17 h 3 l 6,-3 22,-7 z"
+                 fill="#e00024"
+                 fill-rule="evenodd" />
+            </g>
+          </g>
+          <g id="service-tag-cheongnyangni"
+             class="service-tag"
+             data-station="청량리"
+             data-services="KTX"
+             data-logo-mode="inline-svg-paths"
+             transform="translate(3232.1244,1434.3294)">
+            <title
+               id="service-tag-cheongnyangni-title">청량리 · KTX</title>
+            <g
+               id="logo-ktx-inline-vector-cheongnyangni"
+               transform="matrix(0.0447145,0,0,0.0447145,0,0)"
+               aria-label="KTX"
+               data-logo-source="gwangju_metro_map_sma_v1_family_transfer_v5.svg">
+              <path
+                 id="logo-ktx-blue-path-cheongnyangni"
+                 d="m 660,175 -36,37 -28,32 32,71 h 93 z m -522,-40 1,-1 1,1 -1,1 z M 0,315 h 93 l 15,-50 v -3 l 3,-7 2,-10 3,-7 4,-17 2,-3 11,-7 2,1 21,58 18,45 h 92 l -2,-8 -2,-3 -1,-5 -2,-3 -1,-5 -2,-3 -1,-5 -10,-24 -1,-5 -2,-3 -1,-5 -2,-3 -30,-81 76,-49 h 73 l 1,1 -7,21 -4,17 -3,7 -6,24 -3,7 -4,17 -3,7 -6,24 -3,7 v 3 l -20,67 h 93 l 9,-29 v -3 l 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 v -3 l 2,-2 h 85 l 4,6 24,56 25,-23 23,-19 6,-9 9,-10 2,-5 -24,-55 H 255 l -115,81 -1,-2 11,-13 19,-66 H 76 Z"
+                 fill="#000055"
+                 fill-rule="evenodd" />
+              <path
+                 id="logo-ktx-red-path-cheongnyangni"
+                 d="m 958,0 h -9 l -1,1 -15,1 -1,1 -38,5 -25,5 -9,3 h -4 l -40,11 -43,15 -36,15 -39,19 -19,11 -30,20 -28,21 -50,43 -69,69 -46,51 -20,24 h 102 l 55,-69 46,-51 61,-59 46,-38 25,-18 28,-18 48,-25 42,-17 h 3 l 6,-3 22,-7 z"
+                 fill="#e00024"
+                 fill-rule="evenodd" />
+            </g>
+          </g>
+          <g id="service-tag-yeongdeungpo"
+             class="service-tag"
+             data-station="영등포"
+             data-services="KTX"
+             data-logo-mode="inline-svg-paths"
+             transform="translate(1836.6519,2199.3052)">
+            <title
+               id="service-tag-yeongdeungpo-title">영등포 · KTX</title>
+            <g
+               id="logo-ktx-inline-vector-yeongdeungpo"
+               transform="matrix(0.0447145,0,0,0.0447145,0,0)"
+               aria-label="KTX"
+               data-logo-source="gwangju_metro_map_sma_v1_family_transfer_v5.svg">
+              <path
+                 id="logo-ktx-blue-path-yeongdeungpo"
+                 d="m 660,175 -36,37 -28,32 32,71 h 93 z m -522,-40 1,-1 1,1 -1,1 z M 0,315 h 93 l 15,-50 v -3 l 3,-7 2,-10 3,-7 4,-17 2,-3 11,-7 2,1 21,58 18,45 h 92 l -2,-8 -2,-3 -1,-5 -2,-3 -1,-5 -2,-3 -1,-5 -10,-24 -1,-5 -2,-3 -1,-5 -2,-3 -30,-81 76,-49 h 73 l 1,1 -7,21 -4,17 -3,7 -6,24 -3,7 -4,17 -3,7 -6,24 -3,7 v 3 l -20,67 h 93 l 9,-29 v -3 l 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 v -3 l 2,-2 h 85 l 4,6 24,56 25,-23 23,-19 6,-9 9,-10 2,-5 -24,-55 H 255 l -115,81 -1,-2 11,-13 19,-66 H 76 Z"
+                 fill="#000055"
+                 fill-rule="evenodd" />
+              <path
+                 id="logo-ktx-red-path-yeongdeungpo"
+                 d="m 958,0 h -9 l -1,1 -15,1 -1,1 -38,5 -25,5 -9,3 h -4 l -40,11 -43,15 -36,15 -39,19 -19,11 -30,20 -28,21 -50,43 -69,69 -46,51 -20,24 h 102 l 55,-69 46,-51 61,-59 46,-38 25,-18 28,-18 48,-25 42,-17 h 3 l 6,-3 22,-7 z"
+                 fill="#e00024"
+                 fill-rule="evenodd" />
+            </g>
+          </g>
+          <g id="service-tag-suwon"
+             class="service-tag"
+             data-station="수원"
+             data-services="KTX"
+             data-logo-mode="inline-svg-paths"
+             transform="translate(2410.1244,3287.5821)">
+            <title
+               id="service-tag-suwon-title">수원 · KTX</title>
+            <g
+               id="logo-ktx-inline-vector-suwon"
+               transform="matrix(0.0447145,0,0,0.0447145,0,0)"
+               aria-label="KTX"
+               data-logo-source="gwangju_metro_map_sma_v1_family_transfer_v5.svg">
+              <path
+                 id="logo-ktx-blue-path-suwon"
+                 d="m 660,175 -36,37 -28,32 32,71 h 93 z m -522,-40 1,-1 1,1 -1,1 z M 0,315 h 93 l 15,-50 v -3 l 3,-7 2,-10 3,-7 4,-17 2,-3 11,-7 2,1 21,58 18,45 h 92 l -2,-8 -2,-3 -1,-5 -2,-3 -1,-5 -2,-3 -1,-5 -10,-24 -1,-5 -2,-3 -1,-5 -2,-3 -30,-81 76,-49 h 73 l 1,1 -7,21 -4,17 -3,7 -6,24 -3,7 -4,17 -3,7 -6,24 -3,7 v 3 l -20,67 h 93 l 9,-29 v -3 l 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 v -3 l 2,-2 h 85 l 4,6 24,56 25,-23 23,-19 6,-9 9,-10 2,-5 -24,-55 H 255 l -115,81 -1,-2 11,-13 19,-66 H 76 Z"
+                 fill="#000055"
+                 fill-rule="evenodd" />
+              <path
+                 id="logo-ktx-red-path-suwon"
+                 d="m 958,0 h -9 l -1,1 -15,1 -1,1 -38,5 -25,5 -9,3 h -4 l -40,11 -43,15 -36,15 -39,19 -19,11 -30,20 -28,21 -50,43 -69,69 -46,51 -20,24 h 102 l 55,-69 46,-51 61,-59 46,-38 25,-18 28,-18 48,-25 42,-17 h 3 l 6,-3 22,-7 z"
+                 fill="#e00024"
+                 fill-rule="evenodd" />
+            </g>
+          </g>
+          <g id="service-tag-sangbong"
+             class="service-tag"
+             data-station="상봉"
+             data-services="KTX"
+             data-logo-mode="inline-svg-paths"
+             transform="translate(3710.6079,1402.5052)">
+            <title
+               id="service-tag-sangbong-title">상봉 · KTX</title>
+            <g
+               id="logo-ktx-inline-vector-sangbong"
+               transform="matrix(0.0447145,0,0,0.0447145,0,0)"
+               aria-label="KTX"
+               data-logo-source="gwangju_metro_map_sma_v1_family_transfer_v5.svg">
+              <path
+                 id="logo-ktx-blue-path-sangbong"
+                 d="m 660,175 -36,37 -28,32 32,71 h 93 z m -522,-40 1,-1 1,1 -1,1 z M 0,315 h 93 l 15,-50 v -3 l 3,-7 2,-10 3,-7 4,-17 2,-3 11,-7 2,1 21,58 18,45 h 92 l -2,-8 -2,-3 -1,-5 -2,-3 -1,-5 -2,-3 -1,-5 -10,-24 -1,-5 -2,-3 -1,-5 -2,-3 -30,-81 76,-49 h 73 l 1,1 -7,21 -4,17 -3,7 -6,24 -3,7 -4,17 -3,7 -6,24 -3,7 v 3 l -20,67 h 93 l 9,-29 v -3 l 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 v -3 l 2,-2 h 85 l 4,6 24,56 25,-23 23,-19 6,-9 9,-10 2,-5 -24,-55 H 255 l -115,81 -1,-2 11,-13 19,-66 H 76 Z"
+                 fill="#000055"
+                 fill-rule="evenodd" />
+              <path
+                 id="logo-ktx-red-path-sangbong"
+                 d="m 958,0 h -9 l -1,1 -15,1 -1,1 -38,5 -25,5 -9,3 h -4 l -40,11 -43,15 -36,15 -39,19 -19,11 -30,20 -28,21 -50,43 -69,69 -46,51 -20,24 h 102 l 55,-69 46,-51 61,-59 46,-38 25,-18 28,-18 48,-25 42,-17 h 3 l 6,-3 22,-7 z"
+                 fill="#e00024"
+                 fill-rule="evenodd" />
+            </g>
+          </g>
+          <g id="service-tag-suseo"
+             class="service-tag"
+             data-station="수서"
+             data-services="SRT"
+             data-logo-mode="inline-svg-paths"
+             transform="translate(3431.5989,2724.0754)">
+            <title
+               id="service-tag-suseo-title">수서 · SRT</title>
+            <g
+               id="logo-srt-inline-vector-suseo"
+               transform="matrix(0.02057936,0,0,0.02057936,0,0)"
+               aria-label="SRT"
+               data-logo-source="gwangju_metro_map_sma_v1_family_transfer_v5.svg">
+              <path
+                 id="logo-srt-path-suseo"
+                 d="m 1136.258 106.6 h -129.2 l -115.9 221 h 127.3 z M 1.9 327.6 h 408.102 l 1.9 -1.3 h 17.1 l 1.9 -1.3 22.8 -1.3 32.3 -5.2 22.8 -5.2 34.2 -13 26.6 -18.2 11.4 -11.7 11.4 -16.9 5.7 -16.9 v -27.3 l -1.9 -1.3 -1.9 -13 -13.3 -24.7 -24.7 -33.8 -11.4 -26 V 91 l 9.5 -14.3 17.1 -10.4 24.7 -6.5 34.2 -1.3 1.9 -1.3 502.304 1.3 13.3 2.6 17.1 6.5 9.5 6.5 11.4 15.6 1.9 10.4 -1.9 1.3 -1.9 13 -15.2 19.5 -22.8 15.6 -28.5 13 -66.5 19.5 -39.9 9.1 h -7.6 l 9.5 16.9 74.1 104 11.4 7.8 13.3 5.2 13.3 2.6 h 438.654 l 7.6 1.3 1.9 -1.3 24.7 -1.3 17.1 -3.9 30.4 -11.7 22.8 -15.6 11.4 -11.7 15.2 -23.4 5.7 -14.3 3.8 -3.9 5.7 -14.3 3.8 -3.9 3.8 -10.4 3.8 -3.9 3.8 -10.4 3.8 -3.9 5.7 -14.3 3.8 -3.9 60.8 -117 1.9 -1.3 h 148.2 l 11.4 -2.6 13.3 -9.1 38 -46.8 H 1844.046 l -1.9 1.3 -38 2.6 -34.2 6.5 -28.5 9.1 -24.7 11.7 -20.9 14.3 -13.3 13 -15.2 24.7 h 70.3 l 20.9 -13 15.2 -5.2 26.6 -5.2 h 19 l 1.9 -1.3 h 74.1 l 1.9 1.3 -115.9 219.7 -9.5 6.5 -22.8 5.2 H 1370.49 l -13.3 -16.9 v -2.6 l -11.4 -14.3 v -2.6 l -11.4 -14.3 -24.7 -39 7.6 -3.9 19 -3.9 47.5 -15.6 45.6 -19.5 19 -10.4 20.9 -14.3 13.3 -11.7 11.4 -14.3 5.7 -11.7 1.9 -26 -9.5 -20.8 -17.1 -16.9 -11.4 -6.5 L 1464.692 16.9 1423.956 9.1 1393.404 5.2 1350.122 2.6 1347.576 1.3 H 1319.57 L 1317.024 0 H 647.426 l -1.9 1.3 -30.4 1.3 -34.2 5.2 -26.6 6.5 -22.8 7.8 -24.7 13 -15.2 13 -9.5 13 -5.7 15.6 v 28.6 l 7.6 23.4 15.2 27.3 20.9 28.6 9.5 23.4 v 22.1 l -3.8 7.8 -9.5 10.4 -17.1 10.4 -19 6.5 -19 3.9 -22.8 1.3 -1.9 1.3 H 62.7 l -15.2 3.9 -11.4 7.8 z"
+                 fill="#4c2f48"
+                 fill-rule="evenodd" />
+            </g>
+          </g>
+          <g id="service-tag-dongtan"
+             class="service-tag"
+             data-station="동탄"
+             data-services="SRT"
+             data-logo-mode="inline-svg-paths"
+             transform="translate(2646.9505,3031.1435)">
+            <title
+               id="service-tag-dongtan-title">동탄 · SRT</title>
+            <g
+               id="logo-srt-inline-vector-dongtan"
+               transform="matrix(0.02057936,0,0,0.02057936,0,0)"
+               aria-label="SRT"
+               data-logo-source="gwangju_metro_map_sma_v1_family_transfer_v5.svg">
+              <path
+                 id="logo-srt-path-dongtan"
+                 d="m 1136.258 106.6 h -129.2 l -115.9 221 h 127.3 z M 1.9 327.6 h 408.102 l 1.9 -1.3 h 17.1 l 1.9 -1.3 22.8 -1.3 32.3 -5.2 22.8 -5.2 34.2 -13 26.6 -18.2 11.4 -11.7 11.4 -16.9 5.7 -16.9 v -27.3 l -1.9 -1.3 -1.9 -13 -13.3 -24.7 -24.7 -33.8 -11.4 -26 V 91 l 9.5 -14.3 17.1 -10.4 24.7 -6.5 34.2 -1.3 1.9 -1.3 502.304 1.3 13.3 2.6 17.1 6.5 9.5 6.5 11.4 15.6 1.9 10.4 -1.9 1.3 -1.9 13 -15.2 19.5 -22.8 15.6 -28.5 13 -66.5 19.5 -39.9 9.1 h -7.6 l 9.5 16.9 74.1 104 11.4 7.8 13.3 5.2 13.3 2.6 h 438.654 l 7.6 1.3 1.9 -1.3 24.7 -1.3 17.1 -3.9 30.4 -11.7 22.8 -15.6 11.4 -11.7 15.2 -23.4 5.7 -14.3 3.8 -3.9 5.7 -14.3 3.8 -3.9 3.8 -10.4 3.8 -3.9 3.8 -10.4 3.8 -3.9 5.7 -14.3 3.8 -3.9 60.8 -117 1.9 -1.3 h 148.2 l 11.4 -2.6 13.3 -9.1 38 -46.8 H 1844.046 l -1.9 1.3 -38 2.6 -34.2 6.5 -28.5 9.1 -24.7 11.7 -20.9 14.3 -13.3 13 -15.2 24.7 h 70.3 l 20.9 -13 15.2 -5.2 26.6 -5.2 h 19 l 1.9 -1.3 h 74.1 l 1.9 1.3 -115.9 219.7 -9.5 6.5 -22.8 5.2 H 1370.49 l -13.3 -16.9 v -2.6 l -11.4 -14.3 v -2.6 l -11.4 -14.3 -24.7 -39 7.6 -3.9 19 -3.9 47.5 -15.6 45.6 -19.5 19 -10.4 20.9 -14.3 13.3 -11.7 11.4 -14.3 5.7 -11.7 1.9 -26 -9.5 -20.8 -17.1 -16.9 -11.4 -6.5 L 1464.692 16.9 1423.956 9.1 1393.404 5.2 1350.122 2.6 1347.576 1.3 H 1319.57 L 1317.024 0 H 647.426 l -1.9 1.3 -30.4 1.3 -34.2 5.2 -26.6 6.5 -22.8 7.8 -24.7 13 -15.2 13 -9.5 13 -5.7 15.6 v 28.6 l 7.6 23.4 15.2 27.3 20.9 28.6 9.5 23.4 v 22.1 l -3.8 7.8 -9.5 10.4 -17.1 10.4 -19 6.5 -19 3.9 -22.8 1.3 -1.9 1.3 H 62.7 l -15.2 3.9 -11.4 7.8 z"
+                 fill="#4c2f48"
+                 fill-rule="evenodd" />
+            </g>
+          </g>
+          <g id="service-tag-pyeongtaekjeje"
+             class="service-tag"
+             data-station="평택지제"
+             data-services="SRT"
+             data-logo-mode="inline-svg-paths"
+             transform="translate(3144.9879,3370.1919)">
+            <title
+               id="service-tag-pyeongtaekjeje-title">평택지제 · SRT</title>
+            <g
+               id="logo-srt-inline-vector-pyeongtaekjeje"
+               transform="matrix(0.02057936,0,0,0.02057936,0,0)"
+               aria-label="SRT"
+               data-logo-source="gwangju_metro_map_sma_v1_family_transfer_v5.svg">
+              <path
+                 id="logo-srt-path-pyeongtaekjeje"
+                 d="m 1136.258 106.6 h -129.2 l -115.9 221 h 127.3 z M 1.9 327.6 h 408.102 l 1.9 -1.3 h 17.1 l 1.9 -1.3 22.8 -1.3 32.3 -5.2 22.8 -5.2 34.2 -13 26.6 -18.2 11.4 -11.7 11.4 -16.9 5.7 -16.9 v -27.3 l -1.9 -1.3 -1.9 -13 -13.3 -24.7 -24.7 -33.8 -11.4 -26 V 91 l 9.5 -14.3 17.1 -10.4 24.7 -6.5 34.2 -1.3 1.9 -1.3 502.304 1.3 13.3 2.6 17.1 6.5 9.5 6.5 11.4 15.6 1.9 10.4 -1.9 1.3 -1.9 13 -15.2 19.5 -22.8 15.6 -28.5 13 -66.5 19.5 -39.9 9.1 h -7.6 l 9.5 16.9 74.1 104 11.4 7.8 13.3 5.2 13.3 2.6 h 438.654 l 7.6 1.3 1.9 -1.3 24.7 -1.3 17.1 -3.9 30.4 -11.7 22.8 -15.6 11.4 -11.7 15.2 -23.4 5.7 -14.3 3.8 -3.9 5.7 -14.3 3.8 -3.9 3.8 -10.4 3.8 -3.9 3.8 -10.4 3.8 -3.9 5.7 -14.3 3.8 -3.9 60.8 -117 1.9 -1.3 h 148.2 l 11.4 -2.6 13.3 -9.1 38 -46.8 H 1844.046 l -1.9 1.3 -38 2.6 -34.2 6.5 -28.5 9.1 -24.7 11.7 -20.9 14.3 -13.3 13 -15.2 24.7 h 70.3 l 20.9 -13 15.2 -5.2 26.6 -5.2 h 19 l 1.9 -1.3 h 74.1 l 1.9 1.3 -115.9 219.7 -9.5 6.5 -22.8 5.2 H 1370.49 l -13.3 -16.9 v -2.6 l -11.4 -14.3 v -2.6 l -11.4 -14.3 -24.7 -39 7.6 -3.9 19 -3.9 47.5 -15.6 45.6 -19.5 19 -10.4 20.9 -14.3 13.3 -11.7 11.4 -14.3 5.7 -11.7 1.9 -26 -9.5 -20.8 -17.1 -16.9 -11.4 -6.5 L 1464.692 16.9 1423.956 9.1 1393.404 5.2 1350.122 2.6 1347.576 1.3 H 1319.57 L 1317.024 0 H 647.426 l -1.9 1.3 -30.4 1.3 -34.2 5.2 -26.6 6.5 -22.8 7.8 -24.7 13 -15.2 13 -9.5 13 -5.7 15.6 v 28.6 l 7.6 23.4 15.2 27.3 20.9 28.6 9.5 23.4 v 22.1 l -3.8 7.8 -9.5 10.4 -17.1 10.4 -19 6.5 -19 3.9 -22.8 1.3 -1.9 1.3 H 62.7 l -15.2 3.9 -11.4 7.8 z"
+                 fill="#4c2f48"
+                 fill-rule="evenodd" />
+            </g>
+          </g>
+        </g>
       </g>
     </g>
   </g>
