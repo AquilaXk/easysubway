@@ -96,6 +96,27 @@ test("capacity runner는 동일 candidate·격리 load·privacy·closed ingress�
   assert.doesNotMatch(runner, /--user 0:0/);
   assert.match(runner, /docker exec "\$\{clone_curl\}" curl --version/);
   assert.match(runner, /docker exec "\$\{clone_curl\}" curl/);
+  // -v "${work_dir}:${work_dir}" (identical-path mount) is unsafe: intermediate
+  // path components resolve against the container's OWN filesystem, and the
+  // backend base image ships its own /home/ubuntu at a different, image-baked uid
+  // — this collided with RUNNER_TEMP paths nested under a real /home/<user> on the
+  // production runner and made curl's -D/-o writes fail with exit 23 even though
+  // the runner uid matched the leaf directory's actual host ownership (confirmed
+  // on the production runner: the runner uid could not even `stat` the mount
+  // point, while root could). Mounting at a synthetic top-level container path
+  // avoids the collision entirely.
+  assert.match(runner, /curl_mount="\/capacity-evidence-http"/);
+  assert.match(runner, /to_curl_mount_path\(\) \{/);
+  assert.match(runner, /-v "\$\{work_dir\}:\$\{curl_mount\}"/);
+  assert.equal(
+    (runner.match(/-D "\$\(to_curl_mount_path "\$\{last_headers\}"\)" -o "\$\(to_curl_mount_path "\$\{last_body\}"\)"/g) ?? [])
+      .length,
+    2,
+  );
+  assert.match(
+    runner,
+    /-D "\$\(to_curl_mount_path "\$\{burst_headers\}"\)" -o "\$\(to_curl_mount_path "\$\{burst_body\}"\)"/,
+  );
   assert.match(runner, /--network-alias gateway/);
   assert.match(runner, /gateway_base="http:\/\/gateway:8081"/);
   const gatewayRun = runner.match(/docker run -d --name "\$\{clone_gateway\}"[\s\S]*?nginx -g 'daemon off;' >\/dev\/null/)?.[0] ?? "";
