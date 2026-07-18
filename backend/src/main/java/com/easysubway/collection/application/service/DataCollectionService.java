@@ -86,22 +86,26 @@ public class DataCollectionService implements DataCollectionUseCase {
 			.addString("source", DataCollectionSource.TRANSIT_MASTER.name())
 			.addLong("run.id", System.nanoTime())
 			.toJobParameters();
+		JobExecution execution;
 		try {
-			JobExecution execution = jobLauncher.run(transitMasterCollectionJob, parameters);
-			if (execution.getStatus() != BatchStatus.COMPLETED) {
-				Throwable failure = execution.getAllFailureExceptions().stream()
-					.findFirst()
-					.orElse(null);
-				String failureMessage = DataCollectionFailureDetailSanitizer.operatorSafe(
-					failure,
-					execution.getStatus()
-				);
-				markFailed(claimedRun, failureMessage);
-				throw new InvalidDataCollectionException("데이터 수집 배치를 실행하지 못했습니다.");
-			}
+			execution = jobLauncher.run(transitMasterCollectionJob, parameters);
 		} catch (JobExecutionException exception) {
 			markFailed(claimedRun, DataCollectionFailureDetailSanitizer.operatorSafe(exception));
 			throw new InvalidDataCollectionException("데이터 수집 배치를 실행하지 못했습니다.", exception);
+		} catch (RuntimeException exception) {
+			markFailed(claimedRun, DataCollectionFailureDetailSanitizer.operatorSafe(exception));
+			throw new InvalidDataCollectionException("데이터 수집 배치를 실행하지 못했습니다.", exception);
+		}
+		if (execution.getStatus() != BatchStatus.COMPLETED) {
+			Throwable failure = execution.getAllFailureExceptions().stream()
+				.findFirst()
+				.orElse(null);
+			String failureMessage = DataCollectionFailureDetailSanitizer.operatorSafe(
+				failure,
+				execution.getStatus()
+			);
+			markFailed(claimedRun, failureMessage);
+			throw new InvalidDataCollectionException("데이터 수집 배치를 실행하지 못했습니다.");
 		}
 		return loadDataCollectionRunPort.loadRun(runId)
 			.orElseThrow(() -> new InvalidDataCollectionException("데이터 수집 실행 기록을 찾을 수 없습니다."));

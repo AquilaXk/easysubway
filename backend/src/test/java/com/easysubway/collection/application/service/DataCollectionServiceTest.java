@@ -81,6 +81,45 @@ class DataCollectionServiceTest {
 	}
 
 	@Test
+	@DisplayName("배치 launch의 unchecked 실패도 claim을 해제해 같은 source를 다시 실행할 수 있다")
+	void uncheckedLaunchFailureMarksClaimAsFailedAndAllowsRerun() {
+		var repository = new InMemoryDataCollectionRunRepository();
+		var idSequence = new AtomicInteger();
+		var launchCount = new AtomicInteger();
+		JobLauncher launcher = (job, parameters) -> {
+			launchCount.incrementAndGet();
+			throw new IllegalStateException("executor rejected secret-shaped payload");
+		};
+		var service = new DataCollectionService(
+			repository,
+			repository,
+			() -> "collection-runtime-failed-" + idSequence.incrementAndGet(),
+			launcher,
+			mock(Job.class)
+		);
+
+		for (int attempt = 0; attempt < 2; attempt++) {
+			assertThatThrownBy(() -> service.runCollection(
+				new RunDataCollectionCommand(DataCollectionSource.TRANSIT_MASTER, "admin-user")
+			))
+				.isInstanceOf(InvalidDataCollectionException.class)
+				.hasMessage("데이터 수집 배치를 실행하지 못했습니다.")
+				.hasCauseInstanceOf(IllegalStateException.class);
+			assertThat(repository.loadRunningRun(DataCollectionSource.TRANSIT_MASTER)).isEmpty();
+		}
+
+		assertThat(launchCount).hasValue(2);
+		assertThat(repository.loadRun("collection-runtime-failed-2")).get()
+			.extracting(DataCollectionRun::status, DataCollectionRun::failureMessage)
+			.satisfies(values -> {
+				assertThat(values.get(0)).isEqualTo(DataCollectionStatus.FAILED);
+				assertThat(values.get(1).toString())
+					.contains("IllegalStateException", "보호 정책")
+					.doesNotContain("executor rejected secret-shaped payload");
+			});
+	}
+
+	@Test
 	@DisplayName("배치가 FAILED로 반환되면 claim을 해제하고 같은 source를 다시 실행할 수 있다")
 	void failedJobExecutionMarksClaimAsFailedAndAllowsRerun() {
 		var repository = new InMemoryDataCollectionRunRepository();
