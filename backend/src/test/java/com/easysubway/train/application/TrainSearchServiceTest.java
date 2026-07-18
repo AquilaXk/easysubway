@@ -95,6 +95,17 @@ class TrainSearchServiceTest {
 	}
 
 	@Test
+	void refreshesAFutureEntryWhenItsDepartureDateBecomesTodayInKorea() {
+		service = serviceAt(Instant.parse("2026-07-19T14:59:00Z"));
+		service.search(criteriaFor(LocalDate.parse("2026-07-20"), null));
+
+		service = serviceAt(Instant.parse("2026-07-19T15:00:00Z"));
+		service.search(criteriaFor(LocalDate.parse("2026-07-20"), null));
+
+		assertThat(provider.searchCalls).hasValue(2);
+	}
+
+	@Test
 	void keepsTheLegLeaseBeyondTheBoundedProviderSearchWindow() {
 		service.search(criteria(null));
 
@@ -211,8 +222,23 @@ class TrainSearchServiceTest {
 	}
 
 	private SearchCriteria criteria(LocalDate returnDate) {
+		return criteriaFor(LocalDate.parse("2026-07-19"), returnDate);
+	}
+
+	private SearchCriteria criteriaFor(LocalDate departureDate, LocalDate returnDate) {
 		return new SearchCriteria(
-			"NAT010000", "NAT011668", LocalDate.parse("2026-07-19"), returnDate, "KTX"
+			"NAT010000", "NAT011668", departureDate, returnDate, "KTX"
+		);
+	}
+
+	private TrainSearchService serviceAt(Instant instant) {
+		return new TrainSearchService(
+			provider,
+			cache,
+			new ObjectMapper().registerModule(new JavaTimeModule()),
+			Clock.fixed(instant, ZoneOffset.UTC),
+			duration -> {},
+			() -> "owner"
 		);
 	}
 

@@ -317,16 +317,13 @@ public class TrainSearchService {
 			List<Journey> journeys = provider.search(query);
 			String normalizedQuery = write(canonical(query));
 			String payload = write(journeys);
-			Duration ttl = query.departureDate().equals(LocalDate.now(clock.withZone(PROVIDER_ZONE)))
-				? TODAY_TTL
-				: FUTURE_TTL;
 			var loaded = new CachedLeg(
 				key,
 				normalizedQuery,
 				payload,
 				sha256(payload),
 				now,
-				now.plus(ttl)
+				expiresAt(query, now)
 			);
 			if (!cache.storeLegAndRelease(key, owner, loaded)) throw failure("TRAIN_SEARCH_UNAVAILABLE");
 			released = true;
@@ -337,6 +334,15 @@ public class TrainSearchService {
 		} finally {
 			if (!released) cache.releaseLease(key, owner);
 		}
+	}
+
+	private Instant expiresAt(LegQuery query, Instant now) {
+		if (query.departureDate().equals(LocalDate.now(clock.withZone(PROVIDER_ZONE)))) {
+			return now.plus(TODAY_TTL);
+		}
+		Instant futureTtl = now.plus(FUTURE_TTL);
+		Instant departureDay = query.departureDate().atStartOfDay(PROVIDER_ZONE).toInstant();
+		return futureTtl.isBefore(departureDay) ? futureTtl : departureDay;
 	}
 
 	private CachedLeg pollForShared(String key) {
