@@ -263,8 +263,8 @@ class FavoriteFacility {
       'USER_REPORTED' => '제보됨',
       'ADMIN_VERIFIED' => '확인 완료',
       'NEEDS_REPORT' => '알려 주세요',
-      'NEEDS_CHECK' => '상태를 확인하고 있어요',
-      _ => '상태를 확인하고 있어요',
+      'NEEDS_CHECK' => '상태 미확인',
+      _ => '상태 미확인',
     };
   }
 
