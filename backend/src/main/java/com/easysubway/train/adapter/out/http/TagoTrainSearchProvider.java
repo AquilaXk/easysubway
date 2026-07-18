@@ -23,7 +23,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.ResolverStyle;
@@ -258,7 +257,7 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 		);
 		return paginated("GetStrtpntAlocFndTrainInfo", parameters).stream()
 			.map(row -> journeyForCalendarDate(row, query, calendarDate))
-			.filter(journey -> serviceDay(journey.departureAt()).equals(query.departureDate()))
+			.filter(journey -> TrainSearchScopePolicy.serviceDay(journey.departureAt()).equals(query.departureDate()))
 			.toList();
 	}
 
@@ -354,20 +353,13 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 		LocalDate requestedServiceDay
 	) {
 		LocalDate calendarDay = journey.departureAt().toLocalDate();
-		if (serviceDay(journey.departureAt()).equals(requestedServiceDay)) {
+		if (TrainSearchScopePolicy.serviceDay(journey.departureAt()).equals(requestedServiceDay)) {
 			return java.util.stream.Stream.of(journey);
 		}
 		if (calendarDay.equals(requestedServiceDay)) {
 			return java.util.stream.Stream.empty();
 		}
 		throw new IllegalArgumentException("TRAIN_SEARCH_NO_VALID_ROWS");
-	}
-
-	private LocalDate serviceDay(java.time.OffsetDateTime departureAt) {
-		LocalDate calendarDay = departureAt.toLocalDate();
-		return departureAt.toLocalTime().isBefore(LocalTime.of(3, 0))
-			? calendarDay.minusDays(1)
-			: calendarDay;
 	}
 
 	private boolean stationNameMatches(String expected, String actual) {

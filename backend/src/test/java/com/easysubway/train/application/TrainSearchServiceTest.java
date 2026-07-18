@@ -96,14 +96,30 @@ class TrainSearchServiceTest {
 	}
 
 	@Test
-	void refreshesAFutureEntryWhenItsDepartureDateBecomesTodayInKorea() {
-		service = serviceAt(Instant.parse("2026-07-19T14:59:00Z"));
+	void refreshesAFutureEntryWhenItsServiceDayStartsAtThreeAmInKorea() {
+		service = serviceAt(Instant.parse("2026-07-19T17:59:00Z"));
 		service.search(criteriaFor(LocalDate.parse("2026-07-20"), null));
 
-		service = serviceAt(Instant.parse("2026-07-19T15:00:00Z"));
+		service = serviceAt(Instant.parse("2026-07-19T18:00:00Z"));
 		service.search(criteriaFor(LocalDate.parse("2026-07-20"), null));
 
 		assertThat(provider.searchCalls).hasValue(2);
+	}
+
+	@Test
+	void previousCalendarDateRemainsSearchableUntilTheThreeAmServiceDayBoundary() {
+		service = serviceAt(Instant.parse("2026-07-19T17:30:00Z"));
+
+		service.search(criteriaFor(LocalDate.parse("2026-07-19"), null));
+
+		assertThat(provider.searchCalls).hasValue(1);
+
+		service = serviceAt(Instant.parse("2026-07-19T18:00:00Z"));
+		assertThatThrownBy(() -> service.search(criteriaFor(LocalDate.parse("2026-07-19"), null)))
+			.isInstanceOf(TrainSearchService.TrainSearchFailure.class)
+			.extracting("code")
+			.isEqualTo("TRAIN_SEARCH_INVALID_ARGUMENT");
+		assertThat(provider.searchCalls).hasValue(1);
 	}
 
 	@Test

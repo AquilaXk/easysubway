@@ -22,7 +22,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.HexFormat;
@@ -45,7 +44,6 @@ public class TrainSearchService {
 
 	private static final String CATALOG_KIND = "catalog";
 	private static final String CATALOG_LEASE_KEY = "catalog-refresh-v1";
-	private static final ZoneId PROVIDER_ZONE = ZoneId.of("Asia/Seoul");
 	private static final Duration CATALOG_TTL = Duration.ofHours(24);
 	private static final Duration TODAY_TTL = Duration.ofMinutes(5);
 	private static final Duration FUTURE_TTL = Duration.ofHours(6);
@@ -349,12 +347,12 @@ public class TrainSearchService {
 	}
 
 	private Instant expiresAt(LegQuery query, Instant now) {
-		if (query.departureDate().equals(LocalDate.now(clock.withZone(PROVIDER_ZONE)))) {
+		if (query.departureDate().equals(TrainSearchScopePolicy.currentServiceDay(clock))) {
 			return now.plus(TODAY_TTL);
 		}
 		Instant futureTtl = now.plus(FUTURE_TTL);
-		Instant departureDay = query.departureDate().atStartOfDay(PROVIDER_ZONE).toInstant();
-		return futureTtl.isBefore(departureDay) ? futureTtl : departureDay;
+		Instant serviceDayStart = TrainSearchScopePolicy.serviceDayStartsAt(query.departureDate());
+		return futureTtl.isBefore(serviceDayStart) ? futureTtl : serviceDayStart;
 	}
 
 	private CachedLeg pollForShared(String key) {
@@ -373,7 +371,7 @@ public class TrainSearchService {
 	private SearchCriteria validateStructure(SearchCriteria criteria) {
 		String departureStationId = criteria == null ? null : trimmed(criteria.departureStationId());
 		String arrivalStationId = criteria == null ? null : trimmed(criteria.arrivalStationId());
-		LocalDate today = LocalDate.now(clock.withZone(PROVIDER_ZONE));
+		LocalDate today = TrainSearchScopePolicy.currentServiceDay(clock);
 		if (criteria == null
 			|| blank(departureStationId)
 			|| blank(arrivalStationId)

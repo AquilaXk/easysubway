@@ -13,7 +13,6 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.HexFormat;
 import java.util.concurrent.TimeUnit;
@@ -29,7 +28,6 @@ import org.springframework.web.context.request.WebRequest;
 @RestController
 class TrainSearchContractController {
 
-	private static final ZoneId KOREA = ZoneId.of("Asia/Seoul");
 	private static final CachePolicy STATION_CACHE = new CachePolicy(300, 86_400);
 	private static final CachePolicy TODAY_CACHE = new CachePolicy(60, 300);
 	private static final CachePolicy FUTURE_CACHE = new CachePolicy(300, 21_600);
@@ -86,7 +84,7 @@ class TrainSearchContractController {
 				inboundDate,
 				trainType
 			);
-			CachePolicy cachePolicy = outboundDate.equals(clock.instant().atZone(KOREA).toLocalDate())
+			CachePolicy cachePolicy = outboundDate.equals(TrainSearchScopePolicy.currentServiceDay(clock))
 				? TODAY_CACHE
 				: FUTURE_CACHE;
 			var snapshot = service.searchWithMetadata(criteria);

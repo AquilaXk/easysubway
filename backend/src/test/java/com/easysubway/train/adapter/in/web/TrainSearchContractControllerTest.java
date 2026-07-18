@@ -169,6 +169,23 @@ class TrainSearchContractControllerTest {
 	}
 
 	@Test
+	void overnightSearchUsesTodayCacheUntilTheThreeAmServiceDayBoundary() throws Exception {
+		when(clock.instant()).thenReturn(Instant.parse("2026-07-19T17:30:00Z"));
+		when(service.searchWithMetadata(any())).thenReturn(new TrainSearchSnapshot(
+			result(),
+			Instant.parse("2026-07-19T17:35:00Z")
+		));
+
+		mockMvc.perform(get("/api/v1/trains/search")
+				.param("departureStationId", "NAT010000")
+				.param("arrivalStationId", "NAT011668")
+				.param("departureDate", "2026-07-19")
+				.param("trainType", "KTX"))
+			.andExpect(status().isOk())
+			.andExpect(header().string("Cache-Control", "max-age=60, public, s-maxage=300"));
+	}
+
+	@Test
 	void malformedDateAndServiceFailuresUseStableNoStoreCodes() throws Exception {
 		mockMvc.perform(get("/api/v1/trains/search"))
 			.andExpect(status().isBadRequest())
