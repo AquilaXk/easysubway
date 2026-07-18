@@ -11913,6 +11913,411 @@ void main() {
     }
   });
 
+  testWidgets('경로 상세의 공유 버튼은 표시명 요약과 실제 trigger 영역만 OS 공유에 넘긴다', (
+    tester,
+  ) async {
+    tester.binding.platformDispatcher.localeTestValue = const Locale('ko');
+    addTearDown(tester.binding.platformDispatcher.clearLocaleTestValue);
+    String? sharedText;
+    Rect? sharedOrigin;
+    var failShare = false;
+    final result = _sampleRouteSearchResult(
+      routeSearchId: 'local-private-route-id',
+      etaSource: 'STALE',
+      objective: RouteObjective.fewestTransfers,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(result: result),
+          stationRepository: FakeStationSearchRepository(),
+          routeShareInvoker: (text, origin) async {
+            sharedText = text;
+            sharedOrigin = origin;
+            if (failShare) {
+              throw StateError('private share failure');
+            }
+          },
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 18),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _tapFirstRouteResultListItem(tester);
+    await tester.pumpAndSettle();
+
+    final shareButton = find.byKey(const Key('routeShareButton'));
+    expect(shareButton, findsOneWidget);
+    final shareSemantics = find.bySemanticsLabel('경로 요약 공유');
+    expect(shareSemantics, findsOneWidget);
+    expect(
+      tester
+          .getSemantics(shareSemantics)
+          .getSemanticsData()
+          .hasAction(SemanticsAction.tap),
+      isTrue,
+    );
+    await tester.ensureVisible(shareButton);
+    await tester.tap(shareButton);
+    await tester.pumpAndSettle();
+
+    expect(sharedText, contains('상록수 → 사당'));
+    expect(sharedText, contains('기준: 최소환승'));
+    expect(sharedText, contains('시간: 04:20 → 04:27'));
+    expect(sharedText, contains('저장된 데이터 기준'));
+    expect(sharedText, isNot(contains('local-private-route-id')));
+    expect(sharedText, isNot(contains('station-sangnoksu')));
+    expect(sharedOrigin, tester.getRect(shareButton));
+
+    failShare = true;
+    await tester.tap(shareButton);
+    await tester.pumpAndSettle();
+    expect(find.text('경로 요약을 공유하지 못했어요.'), findsOneWidget);
+    expect(find.textContaining('private share failure'), findsNothing);
+  });
+
+  testWidgets('시각 없는 진입·출구 사이 공식 ride 시각을 전체 공유 시각으로 사용한다', (tester) async {
+    String? sharedText;
+    final result = _sampleRouteSearchResult(
+      routeSearchId: 'local-timed-middle-route',
+      etaSource: 'STATIC_LOCAL',
+      steps: const [
+        RouteSearchStep(
+          sequence: 1,
+          stepType: 'entry',
+          title: '상록수역 승강장으로 이동',
+          description: '승강장으로 이동합니다.',
+          lineId: 'seoul-4',
+          lineName: '수도권 4호선',
+          fromStationId: 'station-sangnoksu',
+          toStationId: 'station-sangnoksu',
+          estimatedMinutes: 2,
+          distanceMeters: 80,
+          includesStairs: false,
+          requiresAccessibilityCheck: false,
+        ),
+        RouteSearchStep(
+          sequence: 2,
+          stepType: 'ride',
+          title: '상록수에서 사당까지 4호선 이동',
+          description: '4호선 열차로 이동합니다.',
+          lineId: 'seoul-4',
+          lineName: '수도권 4호선',
+          fromStationId: 'station-sangnoksu',
+          toStationId: 'station-sadang',
+          estimatedMinutes: 7,
+          distanceMeters: 0,
+          includesStairs: false,
+          requiresAccessibilityCheck: false,
+          plannedDepartureTimeIso: '2026-07-18T08:05:00+09:00',
+          plannedArrivalTimeIso: '2026-07-18T08:12:00+09:00',
+          timeSource: 'OFFICIAL_TIMETABLE',
+        ),
+        RouteSearchStep(
+          sequence: 3,
+          stepType: 'exit',
+          title: '사당역 출구로 이동',
+          description: '출구로 이동합니다.',
+          lineId: 'seoul-4',
+          lineName: '수도권 4호선',
+          fromStationId: 'station-sadang',
+          toStationId: 'station-sadang',
+          estimatedMinutes: 2,
+          distanceMeters: 80,
+          includesStairs: false,
+          requiresAccessibilityCheck: false,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(result: result),
+          stationRepository: FakeStationSearchRepository(),
+          routeShareInvoker: (text, origin) async => sharedText = text,
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 18),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _tapFirstRouteResultListItem(tester);
+    await tester.pumpAndSettle();
+    final shareButton = find.byKey(const Key('routeShareButton'));
+    await tester.ensureVisible(shareButton);
+    await tester.tap(shareButton);
+    await tester.pumpAndSettle();
+
+    expect(sharedText, contains('시간: 08:05 → 08:12'));
+    expect(sharedText, isNot(contains('시간: 04:20')));
+    expect(find.text('경로 요약을 공유하지 못했어요.'), findsNothing);
+  });
+
+  testWidgets('시각 필드가 없는 V1 온라인 결과도 조회 시각 기반 요약을 공유한다', (tester) async {
+    String? sharedText;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(
+            result: _sampleRouteSearchResult(),
+          ),
+          stationRepository: FakeStationSearchRepository(),
+          routeShareInvoker: (text, origin) async => sharedText = text,
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 18),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _tapFirstRouteResultListItem(tester);
+    await tester.pumpAndSettle();
+    final shareButton = find.byKey(const Key('routeShareButton'));
+    await tester.ensureVisible(shareButton);
+    await tester.tap(shareButton);
+    await tester.pumpAndSettle();
+
+    expect(sharedText, contains('시간: 04:20 → 04:27'));
+    expect(sharedText, contains('계획 시간 기준'));
+    expect(find.text('경로 요약을 공유하지 못했어요.'), findsNothing);
+  });
+
+  testWidgets('서로 다른 offset의 V2 공유 시각을 한국 시간대로 통일한다', (tester) async {
+    String? sharedText;
+    final result = _sampleRouteSearchResult(
+      departureTimeIso: '2026-07-18T09:00:00Z',
+      arrivalTimeIso: '2026-07-18T18:30:00+09:00',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(result: result),
+          stationRepository: FakeStationSearchRepository(),
+          routeShareInvoker: (text, origin) async => sharedText = text,
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 18),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _tapFirstRouteResultListItem(tester);
+    await tester.pumpAndSettle();
+    final shareButton = find.byKey(const Key('routeShareButton'));
+    await tester.ensureVisible(shareButton);
+    await tester.tap(shareButton);
+    await tester.pumpAndSettle();
+
+    expect(sharedText, contains('시간: 18:00 → 18:30'));
+    expect(sharedText, isNot(contains('시간: 09:00')));
+    expect(find.text('경로 요약을 공유하지 못했어요.'), findsNothing);
+  });
+
+  testWidgets('영어 기기의 MIXED 로컬 경로도 한국어 사실 안내와 보완 시각으로 공유한다', (tester) async {
+    tester.binding.platformDispatcher.localeTestValue = const Locale('en');
+    addTearDown(tester.binding.platformDispatcher.clearLocaleTestValue);
+    String? sharedText;
+    final result = _sampleRouteSearchResult(
+      routeSearchId: 'local-planned-arrival-route',
+      etaSource: 'MIXED',
+      steps: const [
+        RouteSearchStep(
+          sequence: 1,
+          stepType: 'ride',
+          title: '상록수에서 사당까지 4호선 이동',
+          description: '4호선 열차로 이동합니다.',
+          lineId: 'seoul-4',
+          lineName: '수도권 4호선',
+          fromStationId: 'station-sangnoksu',
+          toStationId: 'station-sadang',
+          estimatedMinutes: 7,
+          distanceMeters: 0,
+          includesStairs: false,
+          requiresAccessibilityCheck: false,
+          plannedArrivalTimeIso: '2026-07-18T08:12:00+09:00',
+          timeSource: 'OFFICIAL_TIMETABLE',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(result: result),
+          stationRepository: FakeStationSearchRepository(),
+          routeShareInvoker: (text, origin) async => sharedText = text,
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 18),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _tapFirstRouteResultListItem(tester);
+    await tester.pumpAndSettle();
+    final shareButton = find.byKey(const Key('routeShareButton'));
+    await tester.ensureVisible(shareButton);
+    await tester.tap(shareButton);
+    await tester.pumpAndSettle();
+
+    expect(sharedText, contains('시간: 08:05 → 08:12'));
+    expect(sharedText, contains('일부 실시간 정보가 반영'));
+    expect(sharedText, isNot(contains('Objective:')));
+    expect(find.text('경로 요약을 공유하지 못했어요.'), findsNothing);
+  });
+
+  testWidgets('ITX 공식 운임이 없으면 공유 API를 호출하지 않는다', (tester) async {
+    var shareCalls = 0;
+    final result = _sampleRouteSearchResult(
+      etaSource: 'PLANNED',
+      departureTimeIso: '2026-07-18T09:00:00+09:00',
+      arrivalTimeIso: '2026-07-18T09:07:00+09:00',
+      transportScope: RouteTransportScope.subwayAndItxCheongchun,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(result: result),
+          stationRepository: FakeStationSearchRepository(),
+          routeShareInvoker: (text, origin) async => shareCalls++,
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 18),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _tapFirstRouteResultListItem(tester);
+    await tester.pumpAndSettle();
+    final shareButton = find.byKey(const Key('routeShareButton'));
+    await tester.ensureVisible(shareButton);
+    await tester.tap(shareButton);
+    await tester.pumpAndSettle();
+
+    expect(shareCalls, 0);
+    expect(find.text('경로 요약을 공유하지 못했어요.'), findsOneWidget);
+  });
+
+  testWidgets('공유 처리 중에는 버튼과 semantics 재진입을 막는다', (tester) async {
+    final shareCompleter = Completer<void>();
+    var shareCalls = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(
+            result: _sampleRouteSearchResult(),
+          ),
+          stationRepository: FakeStationSearchRepository(),
+          routeShareInvoker: (text, origin) {
+            shareCalls++;
+            return shareCompleter.future;
+          },
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 18),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _tapFirstRouteResultListItem(tester);
+    await tester.pumpAndSettle();
+
+    final shareButton = find.byKey(const Key('routeShareButton'));
+    final shareSemantics = find.bySemanticsLabel('경로 요약 공유');
+    await tester.ensureVisible(shareButton);
+    await tester.tap(shareButton);
+    await tester.pump();
+    await tester.tap(shareButton, warnIfMissed: false);
+    await tester.pump();
+
+    expect(shareCalls, 1);
+    expect(tester.widget<OutlinedButton>(shareButton).onPressed, isNull);
+    expect(
+      tester
+          .getSemantics(shareSemantics)
+          .getSemanticsData()
+          .hasAction(SemanticsAction.tap),
+      isFalse,
+    );
+
+    shareCompleter.complete();
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<OutlinedButton>(shareButton).onPressed, isNotNull);
+    expect(
+      tester
+          .getSemantics(shareSemantics)
+          .getSemanticsData()
+          .hasAction(SemanticsAction.tap),
+      isTrue,
+    );
+  });
+
   testWidgets('광고 repository는 경로 결과와 상세에만 같은 placement로 배선된다', (tester) async {
     final apiClient = _NoInventoryAdApiClient();
     final adRepository = AdRepository(apiClient);
@@ -18178,6 +18583,10 @@ RouteSearchResult _sampleRouteSearchResult({
   String etaSource = '',
   String sourceUpdatedAt = '',
   String destinationStationName = '사당',
+  String departureTimeIso = '',
+  String arrivalTimeIso = '',
+  RouteObjective objective = RouteObjective.fastest,
+  RouteTransportScope transportScope = RouteTransportScope.subway,
   OfficialOdFareQuote? officialOdFareQuote,
   List<RouteSearchStep>? steps,
   List<String> recommendationReasons = const [
@@ -18252,6 +18661,10 @@ RouteSearchResult _sampleRouteSearchResult({
     etaSource: etaSource,
     sourceUpdatedAt: sourceUpdatedAt,
     officialOdFareQuote: officialOdFareQuote,
+    departureTimeIso: departureTimeIso,
+    arrivalTimeIso: arrivalTimeIso,
+    objective: objective,
+    transportScope: transportScope,
   );
 }
 
