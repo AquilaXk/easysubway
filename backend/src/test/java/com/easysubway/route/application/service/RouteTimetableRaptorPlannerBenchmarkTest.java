@@ -1,6 +1,7 @@
 package com.easysubway.route.application.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.easysubway.profile.domain.MobilityType;
 import com.easysubway.route.application.port.in.RouteSearchUseCase;
@@ -109,13 +110,43 @@ class RouteTimetableRaptorPlannerBenchmarkTest {
 		assertThat(afterLastResult.lastPlan().nextServiceTime()).isNotNull();
 	}
 
+	@Test
+	@DisplayName("allocation benchmark는 com.sun.management ThreadMXBean이 아니면 명확히 실패한다")
+	void rejectsThreadMxBeanWithoutAllocationApi() {
+		var bean = java.lang.management.ThreadMXBean.class.cast(java.lang.reflect.Proxy.newProxyInstance(
+			getClass().getClassLoader(),
+			new Class<?>[] { java.lang.management.ThreadMXBean.class },
+			(proxy, method, arguments) -> {
+				throw new AssertionError("standard ThreadMXBean method must not be called");
+			}
+		));
+
+		assertThatThrownBy(() -> requireThreadAllocationBean(bean))
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessage("benchmark requires com.sun.management.ThreadMXBean");
+	}
+
+	@Test
+	@DisplayName("allocation benchmark는 thread allocation 측정 미지원 JVM에서 명확히 실패한다")
+	void rejectsThreadMxBeanWithoutAllocationSupport() {
+		var bean = com.sun.management.ThreadMXBean.class.cast(java.lang.reflect.Proxy.newProxyInstance(
+			getClass().getClassLoader(),
+			new Class<?>[] { com.sun.management.ThreadMXBean.class },
+			(proxy, method, arguments) -> false
+		));
+
+		assertThatThrownBy(() -> requireThreadAllocationBean(bean))
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessage("benchmark requires thread allocation measurement support");
+	}
+
 	private static Measurement measure(String scenario, Supplier<RouteV2Plan> query) {
 		for (int index = 0; index < WARMUPS; index += 1) {
 			query.get();
 		}
 		long[] nanos = new long[MEASUREMENTS];
 		long[] allocatedBytes = new long[MEASUREMENTS];
-		var bean = (com.sun.management.ThreadMXBean) ManagementFactory.getThreadMXBean();
+		var bean = requireThreadAllocationBean(ManagementFactory.getThreadMXBean());
 		if (!bean.isThreadAllocatedMemoryEnabled()) {
 			bean.setThreadAllocatedMemoryEnabled(true);
 		}
@@ -140,6 +171,18 @@ class RouteTimetableRaptorPlannerBenchmarkTest {
 			Arrays.toString(allocatedBytes)
 		);
 		return new Measurement(lastPlan);
+	}
+
+	private static com.sun.management.ThreadMXBean requireThreadAllocationBean(
+		java.lang.management.ThreadMXBean platformBean
+	) {
+		if (!(platformBean instanceof com.sun.management.ThreadMXBean allocationBean)) {
+			throw new IllegalStateException("benchmark requires com.sun.management.ThreadMXBean");
+		}
+		if (!allocationBean.isThreadAllocatedMemorySupported()) {
+			throw new IllegalStateException("benchmark requires thread allocation measurement support");
+		}
+		return allocationBean;
 	}
 
 	private static SearchRouteV2Command command(String departureTime) {

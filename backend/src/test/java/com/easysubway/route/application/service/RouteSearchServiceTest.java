@@ -11,6 +11,7 @@ import com.easysubway.route.application.port.in.RouteSearchUseCase;
 import com.easysubway.route.application.port.in.SearchInternalRouteCommand;
 import com.easysubway.route.application.port.in.SearchRouteCommand;
 import com.easysubway.route.application.port.in.RouteV2SearchUseCase;
+import com.easysubway.route.application.port.in.RouteV2SearchUseCase.RouteV2Plan;
 import com.easysubway.route.application.port.in.RouteV2SearchUseCase.RouteV2Status;
 import com.easysubway.route.application.port.in.RouteV2SearchUseCase.RouteV2PlanSource;
 import com.easysubway.route.application.port.in.SubmitRouteFeedbackCommand;
@@ -73,7 +74,6 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -1381,42 +1381,31 @@ class RouteSearchServiceTest {
 	void routeV2PlannerPublishesOnlyCompleteOldOrNewCompiledSnapshotDuringReplacement() throws Exception {
 		var port = new ConcurrentSwitchingRouteTimetablePort();
 		var planner = new RouteV2Planner(legacySearchMustNotBeCalled(), port);
-		var observed = new ConcurrentLinkedQueue<List<String>>();
-		var start = new CountDownLatch(1);
 
-		try (var executor = Executors.newFixedThreadPool(4)) {
-			var writer = executor.submit(() -> {
-				start.await();
-				for (int index = 0; index < 80; index += 1) {
-					port.use(index % 2 == 0 ? "b" : "a");
-				}
-				return null;
-			});
-			var readers = java.util.stream.IntStream.range(0, 3).mapToObj(ignored -> executor.submit(() -> {
-				start.await();
-				for (int index = 0; index < 100; index += 1) {
-					var plan = planner.search(routeV2Command(
-						ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3));
-					String tripId = plan.itineraries().getFirst().steps().stream()
-						.filter(step -> "ride".equals(step.stepType()))
-						.findFirst()
-						.orElseThrow()
-						.tripId();
-					observed.add(List.of(plan.timetableArtifactId(), tripId));
-				}
-				return null;
-			})).toList();
-			start.countDown();
-			writer.get(10, TimeUnit.SECONDS);
-			for (var reader : readers) {
-				reader.get(10, TimeUnit.SECONDS);
-			}
+		List<RouteV2Plan> plans;
+		try (var executor = Executors.newFixedThreadPool(2)) {
+			var oldPlan = executor.submit(() -> planner.search(routeV2Command(
+				ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3)));
+			assertThat(port.awaitOldLoadStarted()).isTrue();
+			port.use("b");
+			var newPlan = executor.submit(() -> planner.search(routeV2Command(
+				ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3)));
+			port.releaseOldLoad();
+			plans = List.of(oldPlan.get(10, TimeUnit.SECONDS), newPlan.get(10, TimeUnit.SECONDS));
 		}
 
-		assertThat(observed).hasSize(300).allSatisfy(pair -> assertThat(pair).isIn(
+		var observed = plans.stream().map(plan -> List.of(
+			plan.timetableArtifactId(),
+			plan.itineraries().getFirst().steps().stream()
+				.filter(step -> "ride".equals(step.stepType()))
+				.findFirst()
+				.orElseThrow()
+				.tripId()
+		)).toList();
+		assertThat(observed).containsExactlyInAnyOrder(
 			List.of("artifact-a", "trip-a"),
 			List.of("artifact-b", "trip-b")
-		));
+		);
 	}
 
 	@Test
@@ -3441,6 +3430,9 @@ class RouteSearchServiceTest {
 	private static class ConcurrentSwitchingRouteTimetablePort implements LoadRouteTimetablePort {
 
 		private volatile RouteTimetableSnapshot active = snapshot("a");
+		private final CountDownLatch oldLoadStarted = new CountDownLatch(1);
+		private final CountDownLatch releaseOldLoad = new CountDownLatch(1);
+		private final AtomicInteger oldLoadBlocksRemaining = new AtomicInteger(1);
 
 		@Override
 		public boolean hasRouteTimetable() {
@@ -3454,7 +3446,20 @@ class RouteSearchServiceTest {
 
 		@Override
 		public RouteTimetableSnapshot loadRouteTimetableSnapshot() {
-			return active;
+			RouteTimetableSnapshot loaded = active;
+			if ("artifact-a".equals(loaded.timetableArtifactId())
+				&& oldLoadBlocksRemaining.compareAndSet(1, 0)) {
+				oldLoadStarted.countDown();
+				try {
+					if (!releaseOldLoad.await(5, TimeUnit.SECONDS)) {
+						throw new AssertionError("old timetable load release timed out");
+					}
+				} catch (InterruptedException exception) {
+					Thread.currentThread().interrupt();
+					throw new AssertionError("old timetable load interrupted", exception);
+				}
+			}
+			return loaded;
 		}
 
 		@Override
@@ -3464,6 +3469,14 @@ class RouteSearchServiceTest {
 
 		void use(String version) {
 			active = snapshot(version);
+		}
+
+		boolean awaitOldLoadStarted() throws InterruptedException {
+			return oldLoadStarted.await(5, TimeUnit.SECONDS);
+		}
+
+		void releaseOldLoad() {
+			releaseOldLoad.countDown();
 		}
 
 		private static RouteTimetableSnapshot snapshot(String version) {

@@ -700,9 +700,9 @@ class RouteTimetableRaptorPlanner {
 		private final Map<String, Integer> stationIndex;
 		private final Map<String, Integer> routeIndex;
 		private final Map<String, Integer> tripIndex;
-		private final Map<Integer, int[]> stopsByRoute;
-		private final Map<Integer, int[]> routesByStop;
-		private final Map<Integer, List<ScheduledTrip>> tripsByRoute;
+		private final Map<Integer, int[]> stopsByPattern;
+		private final Map<Integer, int[]> patternsByStop;
+		private final Map<Integer, List<ScheduledTrip>> tripsByPattern;
 		private final Map<DayOfWeek, List<ServiceCalendar>> calendarsByDay;
 		private final Map<LocalDate, List<ServiceCalendarDate>> exceptionsByDate;
 		private final List<ScheduledTrip> scheduledTrips;
@@ -733,9 +733,10 @@ class RouteTimetableRaptorPlanner {
 			compiledTrips.sort(Comparator.comparing((ScheduledTrip scheduledTrip) -> scheduledTrip.trip().id())
 				.thenComparingInt(scheduledTrip -> scheduledTrip.departureSeconds(0)));
 			scheduledTrips = List.copyOf(compiledTrips);
-			stopsByRoute = compileStopsByRoute(source, stopTimesByTrip, routeIndex, stationIndex);
-			routesByStop = invertPatterns(stopsByRoute, stationIndex.size());
-			tripsByRoute = compileTripsByRoute(scheduledTrips, routeIndex);
+			CompiledRoutePatterns routePatterns = compileRoutePatterns(scheduledTrips, routeIndex, stationIndex);
+			stopsByPattern = routePatterns.stopsByPattern();
+			patternsByStop = invertPatterns(stopsByPattern, stationIndex.size());
+			tripsByPattern = routePatterns.tripsByPattern();
 			calendarsByDay = compileCalendarsByDay(source.serviceCalendars());
 			exceptionsByDate = Map.copyOf(source.serviceCalendarDates().stream().collect(
 				java.util.stream.Collectors.groupingBy(
@@ -766,7 +767,11 @@ class RouteTimetableRaptorPlanner {
 		}
 
 		int routePatternCount() {
-			return stopsByRoute.size();
+			return stopsByPattern.size();
+		}
+
+		int routePatternTripLinkCount() {
+			return tripsByPattern.values().stream().mapToInt(List::size).sum();
 		}
 
 		int scheduledTripCount() {
@@ -829,70 +834,59 @@ class RouteTimetableRaptorPlanner {
 			return Map.copyOf(index);
 		}
 
-		private static Map<Integer, int[]> compileStopsByRoute(
-			RouteTimetable source,
-			Map<String, List<TransitStopTime>> stopTimesByTrip,
+		private static CompiledRoutePatterns compileRoutePatterns(
+			List<ScheduledTrip> scheduledTrips,
 			Map<String, Integer> routeIndex,
 			Map<String, Integer> stationIndex
 		) {
-			Map<String, List<TransitStopTime>> longestByRoute = new HashMap<>();
-			for (TransitTrip trip : source.transitTrips()) {
-				List<TransitStopTime> candidate = stopTimesByTrip.getOrDefault(trip.id(), List.of());
-				List<TransitStopTime> current = longestByRoute.get(trip.routeId());
-				if (current == null || candidate.size() > current.size()) {
-					longestByRoute.put(trip.routeId(), candidate);
-				}
-			}
-			Map<Integer, int[]> patterns = new HashMap<>();
-			for (Map.Entry<String, List<TransitStopTime>> entry : longestByRoute.entrySet()) {
-				Integer denseRoute = routeIndex.get(entry.getKey());
-				if (denseRoute == null || entry.getValue().isEmpty()) {
+			Map<RoutePatternKey, Integer> patternIds = new LinkedHashMap<>();
+			Map<Integer, int[]> stopsByPattern = new HashMap<>();
+			Map<Integer, List<ScheduledTrip>> tripsByPattern = new HashMap<>();
+			for (ScheduledTrip trip : scheduledTrips) {
+				Integer denseRoute = routeIndex.get(trip.trip().routeId());
+				if (denseRoute == null || trip.stopTimes().isEmpty()) {
 					continue;
 				}
-				patterns.put(denseRoute, entry.getValue().stream()
-					.mapToInt(stopTime -> stationIndex.get(stopTime.stationId()))
-					.toArray());
+				List<Integer> stationSequence = trip.stopTimes().stream()
+					.map(stopTime -> stationIndex.get(stopTime.stationId()))
+					.toList();
+				RoutePatternKey key = new RoutePatternKey(denseRoute, stationSequence);
+				int patternId = patternIds.computeIfAbsent(key, ignored -> patternIds.size());
+				stopsByPattern.putIfAbsent(
+					patternId,
+					stationSequence.stream().mapToInt(Integer::intValue).toArray()
+				);
+				tripsByPattern.computeIfAbsent(patternId, ignored -> new ArrayList<>()).add(trip);
 			}
-			return Map.copyOf(patterns);
+			tripsByPattern.replaceAll((ignored, trips) -> trips.stream()
+				.sorted(Comparator.comparingInt(trip -> trip.departureSeconds(0)))
+				.toList());
+			return new CompiledRoutePatterns(Map.copyOf(stopsByPattern), Map.copyOf(tripsByPattern));
 		}
 
-		private static Map<Integer, int[]> invertPatterns(Map<Integer, int[]> stopsByRoute, int stationCount) {
-			List<List<Integer>> routeLists = new ArrayList<>(stationCount);
+		private static Map<Integer, int[]> invertPatterns(Map<Integer, int[]> stopsByPattern, int stationCount) {
+			List<List<Integer>> patternLists = new ArrayList<>(stationCount);
 			for (int index = 0; index < stationCount; index += 1) {
-				routeLists.add(new ArrayList<>());
+				patternLists.add(new ArrayList<>());
 			}
-			for (Map.Entry<Integer, int[]> entry : stopsByRoute.entrySet()) {
+			for (Map.Entry<Integer, int[]> entry : stopsByPattern.entrySet()) {
 				for (int station : entry.getValue()) {
-					List<Integer> routes = routeLists.get(station);
-					if (!routes.contains(entry.getKey())) {
-						routes.add(entry.getKey());
+					List<Integer> patterns = patternLists.get(station);
+					if (!patterns.contains(entry.getKey())) {
+						patterns.add(entry.getKey());
 					}
 				}
 			}
-			Map<Integer, int[]> routesByStop = new HashMap<>();
-			for (int index = 0; index < routeLists.size(); index += 1) {
-				if (!routeLists.get(index).isEmpty()) {
-					routesByStop.put(index, routeLists.get(index).stream().mapToInt(Integer::intValue).sorted().toArray());
+			Map<Integer, int[]> patternsByStop = new HashMap<>();
+			for (int index = 0; index < patternLists.size(); index += 1) {
+				if (!patternLists.get(index).isEmpty()) {
+					patternsByStop.put(
+						index,
+						patternLists.get(index).stream().mapToInt(Integer::intValue).sorted().toArray()
+					);
 				}
 			}
-			return Map.copyOf(routesByStop);
-		}
-
-		private static Map<Integer, List<ScheduledTrip>> compileTripsByRoute(
-			List<ScheduledTrip> scheduledTrips,
-			Map<String, Integer> routeIndex
-		) {
-			Map<Integer, List<ScheduledTrip>> byRoute = new HashMap<>();
-			for (ScheduledTrip trip : scheduledTrips) {
-				Integer denseRoute = routeIndex.get(trip.trip().routeId());
-				if (denseRoute != null) {
-					byRoute.computeIfAbsent(denseRoute, ignored -> new ArrayList<>()).add(trip);
-				}
-			}
-			byRoute.replaceAll((ignored, trips) -> trips.stream()
-				.sorted(Comparator.comparingInt(trip -> trip.departureSeconds(0)))
-				.toList());
-			return Map.copyOf(byRoute);
+			return Map.copyOf(patternsByStop);
 		}
 
 		private static Map<DayOfWeek, List<ServiceCalendar>> compileCalendarsByDay(List<ServiceCalendar> calendars) {
@@ -992,6 +986,15 @@ class RouteTimetableRaptorPlanner {
 	}
 
 	private record ScanResult(ServiceDay serviceDay, List<Label> labels) {
+	}
+
+	private record RoutePatternKey(int routeIndex, List<Integer> stationSequence) {
+	}
+
+	private record CompiledRoutePatterns(
+		Map<Integer, int[]> stopsByPattern,
+		Map<Integer, List<ScheduledTrip>> tripsByPattern
+	) {
 	}
 
 	private record Label(String stationId, int timeSeconds, int startSeconds, int boardings, List<RideLeg> path) {

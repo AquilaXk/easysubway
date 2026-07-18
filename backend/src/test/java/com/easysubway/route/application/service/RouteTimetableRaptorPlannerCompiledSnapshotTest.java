@@ -36,6 +36,16 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 	}
 
 	@Test
+	@DisplayName("같은 route의 branch·short-turn station sequence를 distinct pattern으로 compile한다")
+	void compilesBranchAndShortTurnTripsAsDistinctPatterns() {
+		var compiled = planner.compile(branchAndShortTurnTimetable());
+
+		assertThat(compiled.routePatternCount()).isEqualTo(3);
+		assertThat(compiled.scheduledTripCount()).isEqualTo(4);
+		assertThat(compiled.routePatternTripLinkCount()).isEqualTo(compiled.scheduledTripCount());
+	}
+
+	@Test
 	@DisplayName("compiled frequency 출발은 반복 검색에서도 기존 시각을 유지한다")
 	void preservesFrequencyDeparturesAcrossRepeatedSearches() {
 		var compiled = planner.compile(frequencyTimetable());
@@ -159,7 +169,8 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 		var compiled = planner.compile(calendarExceptionTimetable());
 
 		assertThat(compiled.activeTripCount(WEDNESDAY)).isOne();
-		assertThat(compiled.activeTripCount(WEDNESDAY.plusDays(3))).isZero();
+		assertThat(compiled.activeTripCount(WEDNESDAY.plusDays(1))).isZero();
+		assertThat(compiled.activeTripCount(WEDNESDAY.plusDays(2))).isOne();
 		assertThat(compiled.activeTripCount(WEDNESDAY.plusDays(4))).isOne();
 	}
 
@@ -175,6 +186,35 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 			),
 			List.of(new LoadRouteTimetablePort.TransitFrequency(
 				"trip-frequency", 32400, 34200, 600, false))
+		);
+	}
+
+	private static RouteTimetable branchAndShortTurnTimetable() {
+		return timetable(
+			List.of(weekday("weekday")),
+			List.of(),
+			List.of(
+				new LoadRouteTimetablePort.TransitTrip(
+					"trip-full", "route", "weekday", "도착", "0", "LOCAL", 0),
+				new LoadRouteTimetablePort.TransitTrip(
+					"trip-branch", "route", "weekday", "분기", "0", "LOCAL", 0),
+				new LoadRouteTimetablePort.TransitTrip(
+					"trip-short", "route", "weekday", "단축", "0", "LOCAL", 0)
+			),
+			List.of(
+				stop("trip-full", 1, "station-a", 32400),
+				stop("trip-full", 2, "station-b", 32500),
+				stop("trip-full", 3, "station-c", 32600),
+				stop("trip-full", 4, "station-d", 32700),
+				stop("trip-branch", 1, "station-a", 33000),
+				stop("trip-branch", 2, "station-b", 33100),
+				stop("trip-branch", 3, "station-e", 33200),
+				stop("trip-short", 1, "station-a", 33600),
+				stop("trip-short", 2, "station-b", 33700),
+				stop("trip-short", 3, "station-c", 33800)
+			),
+			List.of(new LoadRouteTimetablePort.TransitFrequency(
+				"trip-full", 32400, 33600, 600, false))
 		);
 	}
 
@@ -195,7 +235,7 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 		return timetable(
 			List.of(weekday("weekday")),
 			List.of(
-				new LoadRouteTimetablePort.ServiceCalendarDate("weekday", WEDNESDAY.plusDays(3), 2),
+				new LoadRouteTimetablePort.ServiceCalendarDate("weekday", WEDNESDAY.plusDays(1), 2),
 				new LoadRouteTimetablePort.ServiceCalendarDate("special", WEDNESDAY.plusDays(4), 1)
 			),
 			List.of(
