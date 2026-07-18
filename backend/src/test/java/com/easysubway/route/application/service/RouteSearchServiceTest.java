@@ -1621,6 +1621,45 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
+	@DisplayName("V2 planner는 출구 데이터가 없는 역을 지나는 RAPTOR itinerary에 LOW_DATA_CONFIDENCE만 부착하고 STAIR_ONLY_ACCESS는 지어내지 않는다")
+	void routeV2PlannerAttachesLowDataConfidenceNotStairOnlyForNoExitDataStationsOnTimetableScan() {
+		// #2292 2라운드 리뷰: 위 flip 테스트(StairOnlyTransitMasterPort)는 "출구는 있지만
+		// 계단뿐"인 실데이터만 검증한다. 이 PR을 유발한 실제 시나리오는 ITX pilot 역처럼
+		// 출구 데이터 자체가 없는 역이고, 이 경우 STAIR_ONLY_ACCESS를 지어내면 안 된다(근거
+		// 없는 과잉 경고) — LOW_DATA_CONFIDENCE만 붙어야 레거시(hasStairOnlyAccess/
+		// hasLowAccessibilityData)와 동일한 기준이다.
+		var delegate = routeTimetablePort();
+		var port = new LoadRouteTimetablePort() {
+			@Override
+			public RouteTimetable loadRouteTimetable() {
+				return delegate.loadRouteTimetable();
+			}
+
+			@Override
+			public String timetableCacheKey() {
+				return "ITX_CHEONGCHUN:artifact-no-exit-data:2999-01-01T00:00:00Z";
+			}
+
+			@Override
+			public Optional<String> activeItxTimetableArtifactId() {
+				return Optional.of("artifact-no-exit-data");
+			}
+		};
+		var repository = new InMemoryRouteSearchRepository();
+		var routeSearchService = new RouteSearchService(repository, repository, new NoExitDataTransitMasterPort(), CLOCK);
+		var planner = new RouteV2Planner(routeSearchService, port);
+
+		var plan = planner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3));
+
+		assertThat(plan.statuses()).containsExactly(RouteV2Status.FOUND);
+		assertThat(plan.source()).isEqualTo(RouteV2PlanSource.TIMETABLE_RAPTOR);
+		assertThat(plan.timetableArtifactId()).isEqualTo("artifact-no-exit-data");
+		assertThat(plan.itineraries().getFirst().warnings())
+			.extracting("code")
+			.containsExactly(RouteWarningCode.LOW_DATA_CONFIDENCE);
+	}
+
+	@Test
 	@DisplayName("V2 planner는 strict step-free 요청에서 시간표 scan으로 접근성 차단을 우회하지 않는다")
 	void routeV2PlannerKeepsAccessibilityBlockingForStrictStepFreeWithTimetable() {
 		var repository = new InMemoryRouteSearchRepository();
@@ -4020,6 +4059,18 @@ class RouteSearchServiceTest {
 
 		@Override
 		public List<RouteEdge> loadRouteEdges() {
+			return List.of();
+		}
+	}
+
+	// #2292 2라운드 리뷰: 이 PR을 유발한 실제 시나리오 — ITX pilot 역처럼 출구 데이터 자체가
+	// 없는 역(StairOnlyTransitMasterPort처럼 "출구는 있지만 계단뿐"이 아니라 출구 레코드가
+	// 아예 없음). hasStairOnlyAccess()는 exits.isEmpty()면 근거 없이 stairs-only로 단정하지
+	// 않고 false를 반환하며, hasLowAccessibilityData()는 exits.isEmpty()면 true를 반환한다.
+	private static class NoExitDataTransitMasterPort extends StairOnlyTransitMasterPort {
+
+		@Override
+		public List<StationExit> loadStationExits() {
 			return List.of();
 		}
 	}
