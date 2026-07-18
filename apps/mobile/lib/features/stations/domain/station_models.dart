@@ -228,7 +228,7 @@ class FavoriteStation {
 
   String get lineLabel {
     if (lines.isEmpty) {
-      return '노선을 확인하고 있어요';
+      return '노선 미확인';
     }
     return lines.map((line) => line.name).join(', ');
   }
@@ -298,7 +298,7 @@ class StationSearchResult {
 
   String get lineLabel {
     if (lines.isEmpty) {
-      return '노선을 확인하고 있어요';
+      return '노선 미확인';
     }
     return lines.map((line) => line.name).join(', ');
   }
@@ -386,7 +386,7 @@ class StationDetail {
 
   String get lineLabel {
     if (lines.isEmpty) {
-      return '노선을 확인하고 있어요';
+      return '노선 미확인';
     }
     return lines.map((line) => line.name).join(', ');
   }
@@ -450,7 +450,7 @@ class StationExitInfo {
   bool get hasCoordinate => latitude != null && longitude != null;
 
   String get elevatorConnectionLabel {
-    return hasElevatorConnection ? '엘리베이터 연결' : '엘리베이터 연결을 확인하고 있어요';
+    return hasElevatorConnection ? '엘리베이터 연결' : '엘리베이터 연결 미확인';
   }
 
   String get stairPathLabel {
@@ -562,8 +562,8 @@ class StationFacilityInfo {
       'USER_REPORTED' => '제보됨',
       'ADMIN_VERIFIED' => '확인 완료',
       'NEEDS_REPORT' => '알려 주세요',
-      'NEEDS_CHECK' => '상태를 확인하고 있어요',
-      _ => '상태를 확인하고 있어요',
+      'NEEDS_CHECK' => '상태 미확인',
+      _ => '상태 미확인',
     };
   }
 

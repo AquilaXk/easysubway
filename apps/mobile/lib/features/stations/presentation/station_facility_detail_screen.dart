@@ -216,7 +216,7 @@ String _facilityFloorLabel(StationFacilityInfo facility) {
   final from = facility.floorFrom.trim();
   final to = facility.floorTo.trim();
   if (from.isEmpty && to.isEmpty) {
-    return '연결 위치를 확인하고 있어요';
+    return '연결 위치 미확인';
   }
   if (from.isEmpty || to.isEmpty) {
     return '연결 위치 ${from.isEmpty ? to : from}';

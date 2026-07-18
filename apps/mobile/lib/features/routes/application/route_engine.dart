@@ -556,7 +556,7 @@ class RouteAssembler {
       'BLOCKED_PLACEHOLDER_EVIDENCE_HASH' => '임시 근거만 있는 경로는 안내하지 않아요.',
       'BLOCKED_UNSUPPORTED_SCOPE' => '지원 범위 밖 경로는 안내하지 않아요.',
       'STRICT_EVIDENCE_UNSUPPORTED' => '검증 근거가 부족해 계단 없는 경로로 안내하지 않아요.',
-      'DURATION_UNKNOWN' => '소요 시간을 확인하고 있어요.',
+      'DURATION_UNKNOWN' => routeDurationUnknown,
       'ACCESSIBILITY_STATE_UNKNOWN' => routeHedgeAccessibilityUnknown,
       'FACILITY_UNDER_MAINTENANCE' => routeFacilityUnderMaintenance,
       'FACILITY_UNAVAILABLE' => routeFacilityUnavailable,
