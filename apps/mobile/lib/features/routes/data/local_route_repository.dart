@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:isolate';
 
 import '../../../core/database/catalog/catalog_database.dart';
+import '../../../mobile_error_reporter.dart';
 import '../../../route_hedge_labels.dart';
 import '../../../route_search.dart';
 import '../../fare/official_od_fare_quote.dart';
@@ -34,12 +35,19 @@ class LocalRouteRepository implements RouteSearchRepository {
   final FutureOr<void> Function(String event)? routeCatalogBuildObserver;
   _RouteCatalogBundle? _activeBundle;
   Future<_RouteCatalogBundle>? _routeCatalogBundleFuture;
+  final Set<Future<void>> _inFlightActivations = {};
+  final Set<_RouteCatalogBundle> _retiredBundles = {};
+  Future<void>? _closeFuture;
+  bool _isClosed = false;
   int _activationSequence = 0;
 
   CatalogDatabase get catalogDatabase =>
       _activeBundle?.catalogDatabase ?? _initialCatalogDatabase;
 
   Future<_RouteCatalogBundle> _routeCatalogBundle() {
+    if (_isClosed) {
+      return Future.error(StateError('LocalRouteRepository is closed.'));
+    }
     final active = _activeBundle;
     if (active != null) {
       return Future.value(active);
@@ -57,8 +65,10 @@ class LocalRouteRepository implements RouteSearchRepository {
               ownsDatabase: false,
             )
             .then((bundle) {
-              _activeBundle ??= bundle;
-              return _activeBundle!;
+              if (!_isClosed) {
+                _activeBundle ??= bundle;
+              }
+              return _activeBundle ?? bundle;
             })
             .onError((Object error, StackTrace stackTrace) {
               if (identical(_routeCatalogBundleFuture, future)) {
@@ -100,6 +110,36 @@ class LocalRouteRepository implements RouteSearchRepository {
     required CatalogDatabase catalogDatabase,
     required String artifactIdentity,
     bool ownsDatabase = false,
+  }) {
+    if (_isClosed) {
+      return _rejectClosedActivation(catalogDatabase, ownsDatabase);
+    }
+    late final Future<void> activation;
+    activation = _activateDataPack(
+      catalogDatabase: catalogDatabase,
+      artifactIdentity: artifactIdentity,
+      ownsDatabase: ownsDatabase,
+    );
+    _inFlightActivations.add(activation);
+    return activation.whenComplete(() {
+      _inFlightActivations.remove(activation);
+    });
+  }
+
+  Future<void> _rejectClosedActivation(
+    CatalogDatabase catalogDatabase,
+    bool ownsDatabase,
+  ) async {
+    if (ownsDatabase) {
+      await catalogDatabase.close();
+    }
+    throw StateError('LocalRouteRepository is closed.');
+  }
+
+  Future<void> _activateDataPack({
+    required CatalogDatabase catalogDatabase,
+    required String artifactIdentity,
+    required bool ownsDatabase,
   }) async {
     final active = _activeBundle;
     final inFlight = _routeCatalogBundleFuture;
@@ -127,10 +167,13 @@ class LocalRouteRepository implements RouteSearchRepository {
         ownsDatabase: ownsDatabase,
       );
     } catch (error, stackTrace) {
-      if (ownsDatabase) {
-        await catalogDatabase.close();
+      try {
+        if (ownsDatabase) {
+          await catalogDatabase.close();
+        }
+      } finally {
+        Error.throwWithStackTrace(error, stackTrace);
       }
-      Error.throwWithStackTrace(error, stackTrace);
     }
     if (activation != _activationSequence) {
       await candidate.dispose();
@@ -138,7 +181,18 @@ class LocalRouteRepository implements RouteSearchRepository {
     }
     final previous = _activeBundle;
     _activeBundle = candidate;
-    await previous?.dispose();
+    if (previous != null) {
+      try {
+        await previous.dispose();
+      } catch (error, stackTrace) {
+        _retiredBundles.add(previous);
+        reportMobileError(
+          error,
+          stackTrace,
+          context: '이전 이동 정보 bundle 정리 중 예외가 발생했습니다.',
+        );
+      }
+    }
   }
 
   Future<void> refreshRuntimeState() async {
@@ -146,10 +200,64 @@ class LocalRouteRepository implements RouteSearchRepository {
     bundle.runtimeState = await _RouteRuntimeState.load(bundle.catalogDatabase);
   }
 
-  Future<void> close() async {
+  Future<void> close() {
+    final existing = _closeFuture;
+    if (existing != null) {
+      return existing;
+    }
+    _isClosed = true;
+    _activationSequence += 1;
+    final future = _closeResources();
+    _closeFuture = future;
+    return future;
+  }
+
+  Future<void> _closeResources() async {
+    Object? firstError;
+    StackTrace? firstStackTrace;
+    _RouteCatalogBundle? completedBuild;
+    final build = _routeCatalogBundleFuture;
+    if (build != null) {
+      try {
+        completedBuild = await build;
+      } catch (error, stackTrace) {
+        firstError = error;
+        firstStackTrace = stackTrace;
+      }
+    }
+    for (final activation in _inFlightActivations.toList(growable: false)) {
+      try {
+        await activation;
+      } catch (error, stackTrace) {
+        firstError ??= error;
+        firstStackTrace ??= stackTrace;
+      }
+    }
+    for (final retired in _retiredBundles.toList(growable: false)) {
+      try {
+        await retired.dispose();
+        _retiredBundles.remove(retired);
+      } catch (error, stackTrace) {
+        firstError ??= error;
+        firstStackTrace ??= stackTrace;
+      }
+    }
     final bundle = _activeBundle;
     _activeBundle = null;
-    await bundle?.dispose();
+    if (completedBuild != null && !identical(completedBuild, bundle)) {
+      await completedBuild.dispose();
+    }
+    if (bundle != null) {
+      try {
+        await bundle.dispose();
+      } catch (error, stackTrace) {
+        firstError ??= error;
+        firstStackTrace ??= stackTrace;
+      }
+    }
+    if (firstError != null) {
+      Error.throwWithStackTrace(firstError, firstStackTrace!);
+    }
   }
 
   Future<RouteSearchRequest> canonicalRequest(
@@ -1247,18 +1355,21 @@ class _RouteCatalogBundle {
     final nowSeconds = at.toUtc().millisecondsSinceEpoch ~/ 1000;
     return (storedEdge) {
       final sourceEdge = _networkEdgesById[storedEdge.sourceEdgeId];
-      if (sourceEdge == null || sourceEdge.facilityId.isEmpty) {
+      if (sourceEdge == null) {
         return storedEdge;
       }
-      final effective = sourceEdge.resolveFacility(
-        state.facilityAt(sourceEdge.facilityId, nowSeconds),
-      );
+      final effective = sourceEdge.facilityId.isEmpty
+          ? sourceEdge
+          : sourceEdge.resolveFacility(
+              state.facilityAt(sourceEdge.facilityId, nowSeconds),
+            );
       return _toGraphRouteEdge(
         effective,
         storedEdge.type,
         id: storedEdge.id,
         fromNodeId: storedEdge.fromNodeId,
         toNodeId: storedEdge.toNodeId,
+        at: at,
       );
     };
   }
@@ -2693,8 +2804,10 @@ graph.RouteEdge _toGraphRouteEdge(
   String? id,
   String? fromNodeId,
   String? toNodeId,
+  DateTime? at,
 }) {
   final effectiveFromNodeId = fromNodeId ?? networkEdge.fromNodeId;
+  final evaluatedAt = at ?? DateTime.now();
 
   // route contract: local metric fallback
   // Source durations of 0 keep `durationSeconds` at 0 so UI can say the time
@@ -2722,10 +2835,10 @@ graph.RouteEdge _toGraphRouteEdge(
         ? graph.RouteStairAccessState.stairOnly
         : networkEdge.routeStairAccessState,
     reliabilityScore: networkEdge.effectiveReliabilityScore,
-    isDataStale: networkEdge.isDataStale,
+    isDataStale: networkEdge.isDataStaleAt(evaluatedAt),
     accessibilityState: networkEdge.accessibilityState,
     isUnderMaintenance: networkEdge.isUnderMaintenance,
-    safetyEvidence: networkEdge.safetyEvidence,
+    safetyEvidence: networkEdge.safetyEvidenceAt(evaluatedAt),
   );
 }
 
@@ -3439,7 +3552,9 @@ class _NetworkEdgeSnapshot {
     return reliabilityScore;
   }
 
-  bool get isDataStale {
+  bool get isDataStale => isDataStaleAt(DateTime.now());
+
+  bool isDataStaleAt(DateTime at) {
     if (_accessibilityStatusUpper == 'UNKNOWN') {
       return true;
     }
@@ -3452,11 +3567,14 @@ class _NetworkEdgeSnapshot {
       isUtc: true,
     );
     return verifiedDate.isBefore(
-      DateTime.now().toUtc().subtract(const Duration(days: 365)),
+      at.toUtc().subtract(const Duration(days: 365)),
     );
   }
 
-  graph.RouteEdgeSafetyEvidence get safetyEvidence {
+  graph.RouteEdgeSafetyEvidence get safetyEvidence =>
+      safetyEvidenceAt(DateTime.now());
+
+  graph.RouteEdgeSafetyEvidence safetyEvidenceAt(DateTime at) {
     final verifiedAt = lastVerifiedAtSeconds == null
         ? null
         : DateTime.fromMillisecondsSinceEpoch(
@@ -3486,7 +3604,7 @@ class _NetworkEdgeSnapshot {
       evidenceHashValid: evidenceHashValid,
       isPlaceholderEvidence: isPlaceholderEvidence,
       lastVerifiedAt: verifiedAt,
-      isStale: isDataStale,
+      isStale: isDataStaleAt(at),
       isGeneratedConnector: false,
       strictRouteEligible: blockerReasons.isEmpty,
       blockerReasons: blockerReasons,

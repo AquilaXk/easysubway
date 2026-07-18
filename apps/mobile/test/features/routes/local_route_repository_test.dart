@@ -14,8 +14,10 @@ import 'package:easysubway_mobile/features/fare/official_od_fare_quote.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_route_mapping.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_scheduler.dart';
 import 'package:easysubway_mobile/features/mobility_profile/mobility_profile_policy.dart';
+import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:easysubway_mobile/route_search.dart';
 import 'package:easysubway_mobile/route_v2_ingress.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -107,6 +109,82 @@ void main() {
       throwsStateError,
     );
     expect((await repository.searchRoute(request)).originStationName, '새 상록수');
+  });
+
+  test('candidate build 오류는 owned DB close 오류보다 우선해 원본 stack을 보존한다', () async {
+    final oldDatabase = CatalogDatabase.memory();
+    final brokenDatabase = _CloseFailingCatalogDatabase();
+    addTearDown(oldDatabase.close);
+    await oldDatabase.seedBaselineIfEmpty();
+    await brokenDatabase.seedBaselineIfEmpty();
+    final repository = LocalRouteRepository(
+      catalogDatabase: oldDatabase,
+      routeCatalogBuildObserver: (event) {
+        if (event == 'graph') throw StateError('candidate graph failed');
+      },
+    );
+
+    await expectLater(
+      repository.activateDataPack(
+        catalogDatabase: brokenDatabase,
+        artifactIdentity: 'artifact-broken',
+        ownsDatabase: true,
+      ),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          'candidate graph failed',
+        ),
+      ),
+    );
+  });
+
+  test('이전 bundle 정리 실패는 게시된 candidate activation을 실패로 바꾸지 않는다', () async {
+    final initialDatabase = CatalogDatabase.memory();
+    final previousDatabase = _CloseFailingCatalogDatabase();
+    final candidateDatabase = CatalogDatabase.memory();
+    addTearDown(initialDatabase.close);
+    await initialDatabase.seedBaselineIfEmpty();
+    await previousDatabase.seedBaselineIfEmpty();
+    await candidateDatabase.seedBaselineIfEmpty();
+    await candidateDatabase.customStatement(
+      "UPDATE stations SET name_ko = '정리 실패 뒤 새 상록수' "
+      "WHERE id = 'station-sangnoksu'",
+    );
+    final repository = LocalRouteRepository(
+      catalogDatabase: initialDatabase,
+      artifactIdentity: 'artifact-initial',
+    );
+    await repository.activateDataPack(
+      catalogDatabase: previousDatabase,
+      artifactIdentity: 'artifact-previous',
+      ownsDatabase: true,
+    );
+    final reported = <FlutterErrorDetails>[];
+
+    await runWithMobileErrorReporter(
+      reported.add,
+      () => repository.activateDataPack(
+        catalogDatabase: candidateDatabase,
+        artifactIdentity: 'artifact-candidate',
+        ownsDatabase: true,
+      ),
+    );
+
+    expect(reported, hasLength(1));
+    expect(reported.single.exception, isA<StateError>());
+    expect(
+      (await repository.searchRoute(
+        const RouteSearchRequest(
+          originStationId: 'station-sangnoksu',
+          destinationStationId: 'station-sadang',
+          mobilityType: 'STANDARD',
+        ),
+      )).originStationName,
+      '정리 실패 뒤 새 상록수',
+    );
+    await repository.close();
   });
 
   test('cold artifact 교체는 기존 artifact bundle을 먼저 만들지 않는다', () async {
@@ -204,6 +282,94 @@ void main() {
 
     expect(await Future.wait(calls), [isTrue, isTrue, isTrue]);
     expect(snapshotBuildCount, 1);
+  });
+
+  test('close는 진행 중인 cold bundle 생성을 기다리고 종료 뒤 재게시하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    await database.seedBaselineIfEmpty();
+    final buildStarted = Completer<void>();
+    final releaseBuild = Completer<void>();
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      routeCatalogBuildObserver: (event) async {
+        if (event != 'snapshot') return;
+        buildStarted.complete();
+        await releaseBuild.future;
+      },
+    );
+    const request = RouteSearchRequest(
+      originStationId: 'station-sangnoksu',
+      destinationStationId: 'station-sadang',
+      mobilityType: 'STANDARD',
+    );
+
+    final search = repository.canSearchRoute(request);
+    await buildStarted.future;
+    var closeCompleted = false;
+    final closing = repository.close().then((_) => closeCompleted = true);
+    await Future<void>.delayed(Duration.zero);
+    final completedBeforeRelease = closeCompleted;
+    releaseBuild.complete();
+
+    expect(await search, isTrue);
+    await closing;
+    expect(completedBeforeRelease, isFalse);
+    await expectLater(repository.canSearchRoute(request), throwsStateError);
+    await database.close();
+  });
+
+  test('close는 진행 중인 artifact activation을 기다리고 후보 게시를 취소한다', () async {
+    final oldDatabase = CatalogDatabase.memory();
+    final newDatabase = CatalogDatabase.memory();
+    await oldDatabase.seedBaselineIfEmpty();
+    await newDatabase.seedBaselineIfEmpty();
+    var blockActivation = false;
+    final activationStarted = Completer<void>();
+    final releaseActivation = Completer<void>();
+    final repository = LocalRouteRepository(
+      catalogDatabase: oldDatabase,
+      artifactIdentity: 'artifact-old',
+      routeCatalogBuildObserver: (event) async {
+        if (event != 'graph' || !blockActivation) return;
+        activationStarted.complete();
+        await releaseActivation.future;
+      },
+    );
+    await repository.canSearchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'STANDARD',
+      ),
+    );
+    blockActivation = true;
+
+    final activation = repository.activateDataPack(
+      catalogDatabase: newDatabase,
+      artifactIdentity: 'artifact-new',
+      ownsDatabase: true,
+    );
+    await activationStarted.future;
+    var closeCompleted = false;
+    final closing = repository.close().then((_) => closeCompleted = true);
+    await Future<void>.delayed(Duration.zero);
+    final completedBeforeRelease = closeCompleted;
+    releaseActivation.complete();
+
+    await activation;
+    await closing;
+    expect(completedBeforeRelease, isFalse);
+    await expectLater(
+      repository.canSearchRoute(
+        const RouteSearchRequest(
+          originStationId: 'station-sangnoksu',
+          destinationStationId: 'station-sadang',
+          mobilityType: 'STANDARD',
+        ),
+      ),
+      throwsStateError,
+    );
+    await oldDatabase.close();
   });
 
   test('실패한 cold graph build는 부분 publish 없이 다음 호출에서 재시도한다', () async {
@@ -2485,6 +2651,67 @@ void main() {
     expect(result.steps, isEmpty);
     expect(result.blockedReasons, contains('오래된 안내라 계단 없는 경로로 안내하지 않아요.'));
     expect(result.warnings, isEmpty);
+  });
+
+  test('시설 없는 edge는 graph 재빌드 없이 365일 경계를 넘으면 stale이 된다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    var current = DateTime.utc(2026, 7, 18, 12);
+    final verifiedAt = current
+        .subtract(const Duration(days: 365))
+        .add(const Duration(seconds: 1));
+    for (final edge in [
+      (
+        id: 'entry-a-fresh-boundary',
+        from: 'station-a',
+        to: 'station-a:line-test',
+        type: 'ENTRY',
+      ),
+      (
+        id: 'ride-a-c-fresh-boundary',
+        from: 'station-a:line-test',
+        to: 'station-c:line-test',
+        type: 'RIDE',
+      ),
+      (
+        id: 'exit-c-fresh-boundary',
+        from: 'station-c:line-test',
+        to: 'station-c',
+        type: 'EXIT',
+      ),
+    ]) {
+      await _insertVerifiedNetworkEdge(
+        database,
+        id: edge.id,
+        fromNodeId: edge.from,
+        toNodeId: edge.to,
+        edgeType: edge.type,
+        durationSeconds: 60,
+        lastVerifiedAtSeconds: verifiedAt.millisecondsSinceEpoch ~/ 1000,
+      );
+    }
+    var graphBuildCount = 0;
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      now: () => current,
+      routeCatalogBuildObserver: (event) {
+        if (event == 'graph') graphBuildCount += 1;
+      },
+    );
+    const request = RouteSearchRequest(
+      originStationId: 'station-a',
+      destinationStationId: 'station-c',
+      mobilityType: 'WHEELCHAIR',
+    );
+
+    expect((await repository.searchRoute(request)).status, 'FOUND');
+    current = current.add(const Duration(seconds: 2));
+    final stale = await repository.searchRoute(request);
+
+    expect(stale.status, 'UNKNOWN');
+    expect(stale.blockedReasons, contains('오래된 안내라 계단 없는 경로로 안내하지 않아요.'));
+    expect(graphBuildCount, 1);
   });
 
   test('잘못된 provenance와 evidence hash는 strict 경로에서 FOUND 근거가 되지 않는다', () async {
@@ -5892,6 +6119,21 @@ Future<void> _addFacilityIdColumnIfMissing(CatalogDatabase database) async {
       'ALTER TABLE network_edges ADD COLUMN facility_id TEXT',
     );
     await database.refreshRouteSchemaCapabilities();
+  }
+}
+
+final class _CloseFailingCatalogDatabase extends CatalogDatabase {
+  _CloseFailingCatalogDatabase() : super(NativeDatabase.memory());
+
+  var _failNextClose = true;
+
+  @override
+  Future<void> close() async {
+    await super.close();
+    if (_failNextClose) {
+      _failNextClose = false;
+      throw StateError('catalog database close failed');
+    }
   }
 }
 
