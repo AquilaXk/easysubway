@@ -9,6 +9,8 @@ export const VIEWPORTS = [
   { name: "desktop-1280", width: 1280, height: 900 },
   { name: "tablet-1024", width: 1024, height: 900 },
   { name: "mobile-768", width: 768, height: 900 },
+  { name: "desktop-1440", width: 1440, height: 900 },
+  { name: "mobile-390", width: 390, height: 844 },
 ];
 
 export const ADMIN_PAGES = [
@@ -34,6 +36,26 @@ export const OPERATOR_PAGES = [
   ["/operator/route-feedback-report/page", "operator-route-feedback"],
   ["/operator/push-notification-report/page", "operator-push"],
 ];
+
+// #1988: text 200% reflow/clipping evidence는 대표 5화면에서만 수집한다.
+export const TEXT_SCALE_FACTOR = 2;
+export const TEXT_SCALE_VIEWPORTS = ["desktop-1440", "mobile-390"];
+export const ADMIN_TEXT_SCALE_PAGES = [
+  ["/admin/dashboard/page", "dashboard"],
+  ["/admin/stations/page", "stations"],
+  ["/admin/stations/station-sangnoksu/page", "station-hub"],
+  ["/admin/datapack/pipeline/page", "datapack-pipeline"],
+];
+export const OPERATOR_TEXT_SCALE_PAGES = [
+  ["/operator/accessibility-report/page", "operator-accessibility"],
+];
+
+// #1988: admin·operator 로그인 공개 상태 parity 캡처 대상.
+export const LOGIN_SURFACES = [
+  { key: "admin", loginPath: "/admin/login" },
+  { key: "operator", loginPath: "/operator/login" },
+];
+export const RETRY_WARNING_COPY = "아이디 또는 비밀번호를 확인하고 다시 시도해 주세요.";
 
 export const MANUAL_REQUIRED = [
   "VoiceOver reading flow for dashboard, reports, station hub, datapack pipeline, and audits",
@@ -66,11 +88,15 @@ async function main() {
     noJs: [],
     charts: [],
     axTree: [],
+    textScale: [],
+    loginStates: [],
+    loginParity: null,
   };
 
   try {
     await mkdir(outputDir, { recursive: true });
     await runJsPass(browser, baseUrl, outputDir, adminUser, adminPassword, operatorUser, operatorPassword, report);
+    await runLoginStatePass(browser, baseUrl, outputDir, report);
     await runNoJsPass(browser, baseUrl, outputDir, adminUser, adminPassword, operatorUser, operatorPassword, report);
   } finally {
     await browser.close();
@@ -95,6 +121,10 @@ async function main() {
     noJsPages: report.noJs.length,
     chartChecks: report.charts.length,
     keyboardChecks: report.keyboard.length,
+    textScaleChecks: report.textScale.length,
+    textScaleReflowFailures: report.textScale.filter((entry) => !entry.noHorizontalScroll).length,
+    loginStateCaptures: report.loginStates.length,
+    loginParityOk: report.loginParity ? report.loginParity.parity : null,
   };
   report.blockingViolations = blockingViolations;
   const reportPath = path.join(outputDir, "admin-accessibility-qa-report.json");
@@ -117,6 +147,8 @@ async function runJsPass(browser, baseUrl, outputDir, adminUser, adminPassword, 
   }
   await keyboardSmoke(page, baseUrl, report);
   await captureAxTree(page, outputDir, report);
+  await keyboardTableCheck(page, baseUrl, report);
+  await textScalePass(page, baseUrl, outputDir, report, ADMIN_TEXT_SCALE_PAGES);
   await context.close();
 
   const operatorContext = await browser.newContext({ viewport: VIEWPORTS[0] });
@@ -128,6 +160,7 @@ async function runJsPass(browser, baseUrl, outputDir, adminUser, adminPassword, 
       await auditPage(operatorPage, baseUrl, outputDir, url, `${name}-${viewport.name}`, report);
     }
   }
+  await textScalePass(operatorPage, baseUrl, outputDir, report, OPERATOR_TEXT_SCALE_PAGES);
   await operatorContext.close();
 }
 
@@ -185,6 +218,127 @@ async function auditPage(page, baseUrl, outputDir, url, name, report) {
   }
 }
 
+// #1988: text-only 200%.
+// admin-v3 CSS는 전부 px 기반 font-size라 CDP Page.setFontSizes(기본 폰트 크기 최소값)로는
+// 명시적 px 텍스트가 스케일되지 않는다. 동등한 text-only 방식으로 모든 요소의 computed
+// font-size를 factor배로 인라인 override해(레이아웃 box는 그대로 유지) reflow/clipping을 압박한다.
+async function textScalePass(page, baseUrl, outputDir, report, pages) {
+  const viewports = TEXT_SCALE_VIEWPORTS.map((name) => VIEWPORTS.find((viewport) => viewport.name === name));
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport);
+    for (const [url, name] of pages) {
+      const response = await page.goto(`${baseUrl}${url}`, { waitUntil: "networkidle" });
+      await assertOk(page, url, response);
+      const metrics = await page.evaluate((factor) => {
+        const elements = Array.from(document.querySelectorAll("*"));
+        const originals = elements.map((element) => parseFloat(getComputedStyle(element).fontSize) || 0);
+        elements.forEach((element, index) => {
+          if (originals[index] > 0) {
+            element.style.fontSize = `${originals[index] * factor}px`;
+          }
+        });
+        const doc = document.documentElement;
+        const clippedContainers = elements.filter((element) => {
+          const style = getComputedStyle(element);
+          const hiddenX = style.overflowX === "hidden" || style.overflowX === "clip";
+          const hiddenY = style.overflowY === "hidden" || style.overflowY === "clip";
+          const overflowsX = hiddenX && element.scrollWidth > element.clientWidth + 1;
+          const overflowsY = hiddenY && element.scrollHeight > element.clientHeight + 1;
+          return overflowsX || overflowsY;
+        }).length;
+        return {
+          scrollWidth: doc.scrollWidth,
+          clientWidth: doc.clientWidth,
+          noHorizontalScroll: doc.scrollWidth <= doc.clientWidth + 1,
+          clippedContainers,
+        };
+      }, TEXT_SCALE_FACTOR);
+      const screenshot = path.join(outputDir, `text-scale-200-${name}-${viewport.name}.png`);
+      await page.screenshot({ path: screenshot, fullPage: true });
+      report.textScale.push({
+        url,
+        name,
+        viewport: viewport.name,
+        factor: TEXT_SCALE_FACTOR,
+        method: "text-only font-size override (px-based admin CSS)",
+        screenshot,
+        ...metrics,
+      });
+    }
+  }
+}
+
+// #1988: 로그인 공개 상태(NONE·RETRY_WARNING)를 admin·operator 각각 캡처하고 parity를 검사한다.
+// 실제 계정 잠금을 유발하지 않도록 존재하지 않는 사용자명으로 실패를 만든다.
+async function runLoginStatePass(browser, baseUrl, outputDir, report) {
+  const captured = {};
+  for (const surface of LOGIN_SURFACES) {
+    const context = await browser.newContext({ viewport: VIEWPORTS[0] });
+    const page = await context.newPage();
+    try {
+      const noneResponse = await page.goto(`${baseUrl}${surface.loginPath}`, { waitUntil: "domcontentloaded" });
+      const noneStatus = noneResponse ? noneResponse.status() : 0;
+      const noneAlerts = await page.locator("[role=\"alert\"]").count();
+      const noneShot = path.join(outputDir, `login-${surface.key}-none.png`);
+      await page.screenshot({ path: noneShot, fullPage: true });
+
+      await page.fill("input[name=\"username\"]", `qa-nonexistent-${Date.now()}`);
+      await page.fill("input[name=\"password\"]", "qa-invalid-credential");
+      const [postResponse] = await Promise.all([
+        page.waitForResponse((response) =>
+          response.url().endsWith(surface.loginPath) && response.request().method() === "POST"),
+        page.click("button[type=\"submit\"]"),
+      ]);
+      const postStatus = postResponse.status();
+      await page.waitForLoadState("networkidle");
+      const warningAlerts = await page.locator("[role=\"alert\"]").count();
+      const warningCopy = warningAlerts > 0
+        ? (await page.locator("[role=\"alert\"]").first().innerText()).trim()
+        : null;
+      const warningShot = path.join(outputDir, `login-${surface.key}-retry-warning.png`);
+      await page.screenshot({ path: warningShot, fullPage: true });
+
+      const entry = {
+        surface: surface.key,
+        loginPath: surface.loginPath,
+        noneStatus,
+        noneAlerts,
+        noneScreenshot: noneShot,
+        postStatus,
+        warningAlerts,
+        warningCopy,
+        warningScreenshot: warningShot,
+      };
+      captured[surface.key] = entry;
+      report.loginStates.push(entry);
+      if (!warningCopy || !warningCopy.includes(RETRY_WARNING_COPY)) {
+        throw new Error(`${surface.loginPath} did not render RETRY_WARNING after failed login`);
+      }
+    } finally {
+      await context.close();
+    }
+  }
+
+  const admin = captured.admin;
+  const operator = captured.operator;
+  const statusParity = admin.postStatus === operator.postStatus;
+  const noneStatusParity = admin.noneStatus === operator.noneStatus;
+  const warningCopyParity = admin.warningCopy === operator.warningCopy;
+  const alertStructureParity = admin.warningAlerts === operator.warningAlerts
+    && admin.noneAlerts === operator.noneAlerts;
+  report.loginParity = {
+    parity: statusParity && noneStatusParity && warningCopyParity && alertStructureParity,
+    statusParity,
+    noneStatusParity,
+    warningCopyParity,
+    alertStructureParity,
+    adminPostStatus: admin.postStatus,
+    operatorPostStatus: operator.postStatus,
+    adminWarningCopy: admin.warningCopy,
+    operatorWarningCopy: operator.warningCopy,
+  };
+}
+
 async function keyboardSmoke(page, baseUrl, report) {
   const response = await page.goto(`${baseUrl}/admin/dashboard/page`, { waitUntil: "networkidle" });
   await assertOk(page, "/admin/dashboard/page", response);
@@ -203,6 +357,72 @@ async function keyboardSmoke(page, baseUrl, report) {
   if (alertExpanded !== "true") {
     throw new Error("alert center did not expose aria-expanded=true");
   }
+}
+
+// #1988: admin-table-scroll wrapper의 키보드 접근성.
+// 좁은 viewport로 표를 가로 overflow시킨 뒤 Tab focus·ArrowRight/ArrowLeft scrollLeft 변화·
+// focus-visible outline을 검사한다.
+async function keyboardTableCheck(page, baseUrl, report) {
+  await page.setViewportSize(VIEWPORTS.find((viewport) => viewport.name === "mobile-390"));
+  const response = await page.goto(`${baseUrl}/admin/stations/page`, { waitUntil: "networkidle" });
+  await assertOk(page, "/admin/stations/page", response);
+
+  let tabFocusable = false;
+  for (let index = 0; index < 60 && !tabFocusable; index += 1) {
+    await page.keyboard.press("Tab");
+    tabFocusable = await page.evaluate(() =>
+      Boolean(document.activeElement && document.activeElement.classList.contains("admin-table-scroll")));
+  }
+
+  const focusState = await page.evaluate(() => {
+    const element = document.querySelector(".admin-table-scroll");
+    if (!element) {
+      return null;
+    }
+    const style = getComputedStyle(element);
+    const focused = document.activeElement === element;
+    return {
+      maxScrollLeft: element.scrollWidth - element.clientWidth,
+      startScrollLeft: element.scrollLeft,
+      focused,
+      outlineStyle: focused ? style.outlineStyle : null,
+      outlineWidth: focused ? style.outlineWidth : null,
+    };
+  });
+
+  // Chromium 키보드 스크롤은 smooth 애니메이션이라 press 직후 scrollLeft가 아직 0일 수 있다. 정착 대기.
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await page.waitForTimeout(300);
+  const afterRight = await page.evaluate(() => {
+    const element = document.querySelector(".admin-table-scroll");
+    return element ? element.scrollLeft : null;
+  });
+  await page.keyboard.press("ArrowLeft");
+  await page.waitForTimeout(300);
+  const afterLeft = await page.evaluate(() => {
+    const element = document.querySelector(".admin-table-scroll");
+    return element ? element.scrollLeft : null;
+  });
+
+  const startScrollLeft = focusState ? focusState.startScrollLeft : null;
+  const outlineVisible = Boolean(
+    focusState
+    && focusState.outlineStyle
+    && focusState.outlineStyle !== "none"
+    && focusState.outlineWidth
+    && parseFloat(focusState.outlineWidth) > 0,
+  );
+  report.keyboard.push({
+    check: "admin-table-scroll-keyboard",
+    tabFocusable,
+    maxScrollLeft: focusState ? focusState.maxScrollLeft : null,
+    scrolledRight: afterRight != null && startScrollLeft != null && afterRight > startScrollLeft,
+    scrolledBackLeft: afterLeft != null && afterRight != null && afterLeft < afterRight,
+    outlineStyle: focusState ? focusState.outlineStyle : null,
+    outlineWidth: focusState ? focusState.outlineWidth : null,
+    outlineVisible,
+  });
 }
 
 async function captureAxTree(page, outputDir, report) {
