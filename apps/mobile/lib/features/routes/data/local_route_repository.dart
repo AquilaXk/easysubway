@@ -126,11 +126,11 @@ class LocalRouteRepository implements RouteSearchRepository {
         ),
         ownsDatabase: ownsDatabase,
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
       if (ownsDatabase) {
         await catalogDatabase.close();
       }
-      rethrow;
+      Error.throwWithStackTrace(error, stackTrace);
     }
     if (activation != _activationSequence) {
       await candidate.dispose();
