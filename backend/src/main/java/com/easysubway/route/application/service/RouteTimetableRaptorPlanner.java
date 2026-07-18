@@ -333,6 +333,7 @@ class RouteTimetableRaptorPlanner {
 		int[] stops = timetable.stopsByPattern(pattern);
 		ScheduledTrip boardedTrip = null;
 		int boardingPosition = -1;
+		int boardingReadySeconds = UNREACHED;
 		for (int position = firstMarkedPosition; position < stops.length; position += 1) {
 			trips = activeServiceDay.tripsByPattern(pattern, position);
 			int station = stops[position];
@@ -356,9 +357,11 @@ class RouteTimetableRaptorPlanner {
 				readySeconds + accessSeconds + slackSeconds
 			);
 			if (candidate != null && (boardedTrip == null
+				|| readySeconds < boardingReadySeconds
 				|| candidate.departureSeconds(position) < boardedTrip.departureSeconds(position))) {
 				boardedTrip = candidate;
 				boardingPosition = position;
+				boardingReadySeconds = readySeconds;
 				workspace.expandedTrips += 1;
 			}
 		}

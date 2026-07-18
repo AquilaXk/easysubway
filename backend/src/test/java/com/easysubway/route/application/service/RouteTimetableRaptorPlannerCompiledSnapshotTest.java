@@ -213,6 +213,29 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 	}
 
 	@Test
+	@DisplayName("같은 trip의 후속 stop에 더 일찍 도착한 predecessor로 환승 위치를 갱신한다")
+	void preservesEarlierPredecessorAtLaterBoardingStop() {
+		var command = new SearchRouteV2Command(
+			"station-a",
+			"station-d",
+			OffsetDateTime.parse("2026-07-01T08:50:00+09:00"),
+			MobilityType.SENIOR,
+			ConstraintMode.ALLOW_WITH_WARNINGS,
+			false,
+			1,
+			1
+		);
+
+		var results = planner.search(command, planner.compile(laterBoardingPredecessorTimetable()));
+
+		assertThat(results).hasSize(1);
+		assertThat(results.getFirst().steps())
+			.filteredOn(step -> "ride".equals(step.stepType()))
+			.extracting("tripId")
+			.containsExactly("feeder-e", "connector");
+	}
+
+	@Test
 	@DisplayName("같은 정차열에서 하차 정책이 다른 후속 trip을 잃지 않는다")
 	void preservesLaterTripWhenEarlierTripBlocksDropOff() {
 		var results = planner.search(
@@ -464,6 +487,46 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 				stop("a-late", 1, "station-a", 32700),
 				stop("a-late", 2, "station-b", 33000),
 				stop("a-late", 3, "station-c", 33600)
+			),
+			List.of()
+		);
+	}
+
+	private static RouteTimetable laterBoardingPredecessorTimetable() {
+		return new RouteTimetable(
+			List.of(weekday("weekday")),
+			List.of(),
+			List.of(
+				new LoadRouteTimetablePort.TransitRoute(
+					"route-b", "line-b", "B", "B 경유", "B 방면", "Asia/Seoul"),
+				new LoadRouteTimetablePort.TransitRoute(
+					"route-e", "line-e", "E", "E 경유", "E 방면", "Asia/Seoul"),
+				new LoadRouteTimetablePort.TransitRoute(
+					"route-connector", "line-c", "C", "연결", "D 방면", "Asia/Seoul")
+			),
+			List.of(
+				new LoadRouteTimetablePort.TransitTrip(
+					"connector", "route-connector", "weekday", "D", "0", "LOCAL", 0),
+				new LoadRouteTimetablePort.TransitTrip(
+					"feeder-b", "route-b", "weekday", "B", "0", "LOCAL", 0),
+				new LoadRouteTimetablePort.TransitTrip(
+					"feeder-e", "route-e", "weekday", "E", "0", "LOCAL", 0)
+			),
+			List.of(
+				new LoadRouteTimetablePort.TransitStopTime(
+					"connector", 1, "station-b", "line-c", 33600, 33600, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime(
+					"connector", 2, "station-e", "line-c", 33900, 33900, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime(
+					"connector", 3, "station-d", "line-c", 34200, 34200, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime(
+					"feeder-b", 1, "station-a", "line-b", 32400, 32400, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime(
+					"feeder-b", 2, "station-b", "line-b", 32700, 32700, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime(
+					"feeder-e", 1, "station-a", "line-e", 32520, 32520, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime(
+					"feeder-e", 2, "station-e", "line-e", 32640, 32640, 0, 0)
 			),
 			List.of()
 		);
