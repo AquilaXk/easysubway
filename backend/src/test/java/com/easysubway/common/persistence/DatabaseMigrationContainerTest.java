@@ -198,6 +198,38 @@ class DatabaseMigrationContainerTest {
 	}
 
 	@Test
+	@DisplayName("PostgreSQL V64는 재시도 index artifact를 교체하고 RUNNING source를 고유하게 만든다")
+	void postgresqlV64ReplacesRetryArtifactAndGuardsRunningSource() {
+		String schema = "batch_run_v64_retry_" + System.nanoTime();
+		var dataSource = new DriverManagerDataSource(
+			POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+		flyway(dataSource, "classpath:db/migration/postgresql", schema)
+			.target(MigrationVersion.fromVersion("63"))
+			.load()
+			.migrate();
+		var jdbcTemplate = new JdbcTemplate(dataSource);
+		jdbcTemplate.execute("CREATE INDEX ux_data_collection_runs_running_source ON "
+			+ schema + ".data_collection_runs (source)");
+
+		migrate(dataSource, "classpath:db/migration/postgresql", schema);
+
+		assertThat(jdbcTemplate.queryForObject("""
+			SELECT i.indisunique AND i.indisvalid AND i.indisready
+			FROM pg_index i
+			JOIN pg_class c ON c.oid = i.indexrelid
+			JOIN pg_namespace n ON n.oid = c.relnamespace
+			WHERE n.nspname = ?
+				AND c.relname = 'ux_data_collection_runs_running_source'
+			""", Boolean.class, schema)).isTrue();
+		insertLegacyRunningRun(jdbcTemplate, schema, "legacy-running-a");
+		assertThatThrownBy(() -> insertLegacyRunningRun(
+			jdbcTemplate,
+			schema,
+			"legacy-running-b"
+		)).isInstanceOf(DataAccessException.class);
+	}
+
+	@Test
 	@DisplayName("PostgreSQL도 100개 동시 요청에서 session 전체 50회만 원자적으로 소비한다")
 	void postgresqlConsumesRouteV2SessionAtMostFiftyTimesUnderConcurrency() throws Exception {
 		String schema = "route_v2_concurrency_" + System.nanoTime();
@@ -615,6 +647,17 @@ class DatabaseMigrationContainerTest {
 
 	private void migrate(javax.sql.DataSource dataSource, String location, String schema) {
 		flyway(dataSource, location, schema).load().migrate();
+	}
+
+	private void insertLegacyRunningRun(JdbcTemplate jdbcTemplate, String schema, String runId) {
+		jdbcTemplate.update("""
+			INSERT INTO %s.data_collection_runs (
+				run_id, source, status, requested_by, started_at, completed_at,
+				collected_count, failure_message, retryable, operator_action
+			)
+			VALUES (?, 'TRANSIT_MASTER', 'RUNNING', 'legacy-admin', CURRENT_TIMESTAMP,
+				NULL, 0, NULL, FALSE, '수집 실행 중입니다.')
+			""".formatted(schema), runId);
 	}
 
 	private org.flywaydb.core.api.configuration.FluentConfiguration flyway(

@@ -200,7 +200,8 @@ public class JdbcDataCollectionRunRepository implements
 					SELECT run_id, source, status, requested_by, started_at, completed_at, collected_count,
 						failure_message, retryable, operator_action
 					FROM data_collection_runs
-					WHERE active_source = ?
+					WHERE source = ?
+						AND status = 'RUNNING'
 					""",
 				this::mapRun,
 				source.name()

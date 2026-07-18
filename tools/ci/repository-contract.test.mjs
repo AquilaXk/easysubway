@@ -14040,10 +14040,14 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
     assert.match(batchRunSchema, /admin\.batch\.run/);
   }
   assert.doesNotMatch(batchRunPostgresSchema, /CREATE (?:UNIQUE )?INDEX/);
+  assert.match(batchRunPostgresIndex, /LOCK TABLE data_collection_runs IN SHARE ROW EXCLUSIVE MODE/);
+  assert.match(batchRunPostgresIndex, /DROP INDEX IF EXISTS ux_data_collection_runs_running_source/);
+  assert.match(batchRunPostgresIndex, /V64 migration blocked: duplicate RUNNING/);
   assert.match(
     batchRunPostgresIndex,
-    /CREATE UNIQUE INDEX CONCURRENTLY ux_data_collection_runs_running_source/,
+    /CREATE UNIQUE INDEX ux_data_collection_runs_running_source/,
   );
+  assert.doesNotMatch(batchRunPostgresIndex, /CONCURRENTLY/);
   assert.match(batchRunPostgresIndex, /ON data_collection_runs \(source\)/);
   assert.match(batchRunPostgresIndex, /WHERE status = 'RUNNING'/);
   assert.match(batchRunH2Schema, /CREATE UNIQUE INDEX ux_data_collection_runs_active_source/);

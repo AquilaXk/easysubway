@@ -213,6 +213,22 @@ class JdbcDataCollectionRunRepositoryTest {
 	}
 
 	@Test
+	@DisplayName("구버전이 남긴 terminal active_source는 RUNNING claim으로 조회하지 않는다")
+	void ignoresStaleLegacyActiveSourceOnTerminalRun() {
+		DataCollectionRun completed = completedRun(
+			"collection-legacy-completed",
+			LocalDateTime.of(2026, 7, 18, 11, 0)
+		);
+		repository.saveRun(completed);
+		jdbcTemplate.update(
+			"UPDATE data_collection_runs SET active_source = source WHERE run_id = ?",
+			completed.runId()
+		);
+
+		assertThat(repository.loadRunningRun(DataCollectionSource.TRANSIT_MASTER)).isEmpty();
+	}
+
+	@Test
 	@DisplayName("step 저장 실패 시 run row와 active claim과 기존 steps를 함께 rollback한다")
 	void saveRunRollsBackEntireAggregateWhenStepInsertFails() {
 		DataCollectionRun running = new DataCollectionRun(
