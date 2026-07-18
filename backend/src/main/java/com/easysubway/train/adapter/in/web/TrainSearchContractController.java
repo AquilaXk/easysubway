@@ -84,10 +84,10 @@ class TrainSearchContractController {
 				inboundDate,
 				trainType
 			);
+			var snapshot = service.searchWithMetadata(criteria);
 			CachePolicy cachePolicy = outboundDate.equals(TrainSearchScopePolicy.currentServiceDay(clock))
 				? TODAY_CACHE
 				: FUTURE_CACHE;
-			var snapshot = service.searchWithMetadata(criteria);
 			return success(snapshot.result(), snapshot.expiresAt(), cachePolicy, webRequest);
 		} catch (DateTimeParseException exception) {
 			return error(HttpStatus.BAD_REQUEST, "TRAIN_SEARCH_INVALID_ARGUMENT", "검색 조건을 확인해 주세요.");

@@ -49,6 +49,7 @@ test("OpenAPI는 역검색·왕복검색 성공 envelope와 안정 오류 계약
 
   assert.deepEqual(Object.keys(stationParameters), ["query", "trainType"]);
   assert.equal(stationParameters.query.required, true);
+  assert.equal(stationParameters.trainType.required, false);
   assert.equal(stationParameters.query.schema.minLength, 2);
   assert.deepEqual(Object.keys(searchParameters), [
     "departureStationId", "arrivalStationId", "departureDate", "returnDate", "trainType",
@@ -57,6 +58,7 @@ test("OpenAPI는 역검색·왕복검색 성공 envelope와 안정 오류 계약
     assert.equal(searchParameters[required].required, true);
   }
   assert.equal(searchParameters.returnDate.required, false);
+  assert.equal(searchParameters.trainType.required, false);
   assert.deepEqual(Object.keys(stations.responses), ["200", "304", "400", "422", "429", "502", "503"]);
   assert.deepEqual(Object.keys(search.responses), ["200", "304", "400", "422", "429", "502", "503"]);
   for (const operation of [stations, search]) {
