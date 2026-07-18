@@ -1,5 +1,5 @@
 /*
- * admin-foundation.css — V6-04 CSS 책임 분리(#2276): 전역 리셋·루트 레이아웃·포커스·skip-link.
+ * admin-foundation.css — V6-04 CSS 책임 분리(#2276): 전역 리셋·루트 요소 기본값·포커스·skip-link.
  * import 순서: tokens → foundation → shell → components → data. tokens는 admin-v3.css가 먼저 import한다.
  * 이 레이어는 요소 기본값과 전역 접근성 chrome만 소유한다.
  */
@@ -18,12 +18,6 @@ body.admin-v3 {
 	background: var(--admin-bg);
 	color: var(--admin-ink);
 	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-
-.admin-shell {
-	display: grid;
-	grid-template-columns: 240px minmax(0, 1fr);
-	min-height: 100vh;
 }
 
 .admin-v3 a:focus-visible,

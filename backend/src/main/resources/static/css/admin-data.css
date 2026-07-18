@@ -94,7 +94,10 @@
 	color: var(--admin-ink);
 }
 
-.dashboard-card.metric-cell {
+/* 셀 좌측 구분선 base(#1983): 명시도를 .admin-v3(0,3,0)로 올려 utility 구분선
+   (.admin-v3 .metric-cell + .metric-cell, 0,3,0)과 동률로 맞춘다. 첫 열(:nth-child)·반응형
+   1열(768px override) 규칙이 소스상 이 base보다 뒤에 와 동률 소스순서로 이겨 좌측 선을 벗긴다(#2298 리뷰). */
+.admin-v3 .dashboard-card.metric-cell {
 	border-left: 1px solid var(--admin-border);
 	padding-left: 18px;
 }
@@ -431,13 +434,13 @@
 		grid-template-columns: 1fr;
 	}
 
-	.dashboard-card.metric-cell {
+	.admin-v3 .dashboard-card.metric-cell {
 		border-left: 0;
 		border-top: 1px solid var(--admin-border);
 		padding-top: 12px;
 	}
 
-	.dashboard-card.metric-cell:first-child {
+	.admin-v3 .dashboard-card.metric-cell:first-child {
 		border-top: 0;
 		padding-top: 4px;
 	}
