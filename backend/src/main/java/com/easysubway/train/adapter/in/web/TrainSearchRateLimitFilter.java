@@ -125,7 +125,7 @@ final class TrainSearchRateLimiter {
 		this.clock = clock;
 	}
 
-	AcquireResult acquire(String identity, int cost) {
+	synchronized AcquireResult acquire(String identity, int cost) {
 		if (cost < 1) throw new IllegalArgumentException("train-search request cost must be positive");
 		long now = Instant.now(clock).getEpochSecond();
 		long window = now - Math.floorMod(now, WINDOW_SECONDS);
@@ -139,15 +139,11 @@ final class TrainSearchRateLimiter {
 	private WindowCounter counterFor(String identity, long window) {
 		WindowCounter existing = counters.get(identity);
 		if (existing != null) return existing;
-		synchronized (counters) {
-			existing = counters.get(identity);
-			if (existing != null) return existing;
-			counters.entrySet().removeIf(entry -> entry.getValue().isBefore(window));
-			if (counters.size() >= maxKeys) return null;
-			WindowCounter created = new WindowCounter(window);
-			counters.put(identity, created);
-			return created;
-		}
+		counters.entrySet().removeIf(entry -> entry.getValue().isBefore(window));
+		if (counters.size() >= maxKeys) return null;
+		WindowCounter created = new WindowCounter(window);
+		counters.put(identity, created);
+		return created;
 	}
 
 	record AcquireResult(boolean allowed, long retryAfterSeconds) {}

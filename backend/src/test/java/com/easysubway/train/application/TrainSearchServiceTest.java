@@ -79,7 +79,8 @@ class TrainSearchServiceTest {
 
 	@Test
 	void usesFiveMinutesForTodayAndSixHoursForFutureRoundTrip() {
-		var result = service.search(criteria(LocalDate.parse("2026-07-21")));
+		var snapshot = service.searchWithMetadata(criteria(LocalDate.parse("2026-07-21")));
+		var result = snapshot.result();
 
 		assertThat(result.outbound()).hasSize(1);
 		assertThat(result.inbound()).hasSize(1);
@@ -90,6 +91,7 @@ class TrainSearchServiceTest {
 			);
 		assertThat(cache.legs.values()).extracting(CachedLeg::expiresAt)
 			.containsExactlyInAnyOrder(NOW.plus(Duration.ofMinutes(5)), NOW.plus(Duration.ofHours(6)));
+		assertThat(snapshot.expiresAt()).isEqualTo(NOW.plus(Duration.ofMinutes(5)));
 	}
 
 	@Test

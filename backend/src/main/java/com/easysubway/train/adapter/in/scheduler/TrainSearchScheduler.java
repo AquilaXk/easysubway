@@ -20,7 +20,8 @@ class TrainSearchScheduler {
 
 	@Scheduled(
 		cron = "${easysubway.train-search.catalog-refresh-cron:0 30 3 * * *}",
-		zone = "Asia/Seoul"
+		zone = "Asia/Seoul",
+		scheduler = "trainSearchTaskScheduler"
 	)
 	void refreshCatalog() {
 		try {
@@ -32,7 +33,8 @@ class TrainSearchScheduler {
 
 	@Scheduled(
 		cron = "${easysubway.train-search.cache-purge-cron:0 10 4 * * *}",
-		zone = "Asia/Seoul"
+		zone = "Asia/Seoul",
+		scheduler = "trainSearchTaskScheduler"
 	)
 	void purgeExpiredCache() {
 		int purged = service.purgeExpired();

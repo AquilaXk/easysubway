@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
@@ -29,12 +30,9 @@ import org.springframework.web.context.request.WebRequest;
 class TrainSearchContractController {
 
 	private static final ZoneId KOREA = ZoneId.of("Asia/Seoul");
-	private static final CacheControl STATION_CACHE = CacheControl.maxAge(300, TimeUnit.SECONDS)
-		.cachePublic().sMaxAge(86_400, TimeUnit.SECONDS);
-	private static final CacheControl TODAY_CACHE = CacheControl.maxAge(60, TimeUnit.SECONDS)
-		.cachePublic().sMaxAge(300, TimeUnit.SECONDS);
-	private static final CacheControl FUTURE_CACHE = CacheControl.maxAge(300, TimeUnit.SECONDS)
-		.cachePublic().sMaxAge(21_600, TimeUnit.SECONDS);
+	private static final CachePolicy STATION_CACHE = new CachePolicy(300, 86_400);
+	private static final CachePolicy TODAY_CACHE = new CachePolicy(60, 300);
+	private static final CachePolicy FUTURE_CACHE = new CachePolicy(300, 21_600);
 	private static final CacheControl NO_STORE = CacheControl.noStore();
 
 	private final TrainSearchService service;
@@ -59,7 +57,8 @@ class TrainSearchContractController {
 	) {
 		try {
 			validateTrainType(trainType);
-			return success(service.stations(query, trainType), STATION_CACHE, webRequest);
+			var snapshot = service.stationsWithMetadata(query, trainType);
+			return success(snapshot.stations(), snapshot.expiresAt(), STATION_CACHE, webRequest);
 		} catch (IllegalArgumentException exception) {
 			return error(HttpStatus.BAD_REQUEST, "TRAIN_SEARCH_UNSUPPORTED_TRAIN_TYPE", "지원하지 않는 열차종입니다.");
 		} catch (TrainSearchFailure failure) {
@@ -87,10 +86,11 @@ class TrainSearchContractController {
 				inboundDate,
 				trainType
 			);
-			CacheControl cacheControl = outboundDate.equals(clock.instant().atZone(KOREA).toLocalDate())
+			CachePolicy cachePolicy = outboundDate.equals(clock.instant().atZone(KOREA).toLocalDate())
 				? TODAY_CACHE
 				: FUTURE_CACHE;
-			return success(service.search(criteria), cacheControl, webRequest);
+			var snapshot = service.searchWithMetadata(criteria);
+			return success(snapshot.result(), snapshot.expiresAt(), cachePolicy, webRequest);
 		} catch (DateTimeParseException | NullPointerException exception) {
 			return error(HttpStatus.BAD_REQUEST, "TRAIN_SEARCH_INVALID_ARGUMENT", "검색 조건을 확인해 주세요.");
 		} catch (IllegalArgumentException exception) {
@@ -100,9 +100,15 @@ class TrainSearchContractController {
 		}
 	}
 
-	private ResponseEntity<ApiResponse<?>> success(Object data, CacheControl cacheControl, WebRequest webRequest) {
+	private ResponseEntity<ApiResponse<?>> success(
+		Object data,
+		java.time.Instant expiresAt,
+		CachePolicy cachePolicy,
+		WebRequest webRequest
+	) {
 		ApiResponse<Object> envelope = ApiResponse.ok(data);
 		String etag = etag(envelope);
+		CacheControl cacheControl = cacheControl(expiresAt, cachePolicy);
 		if (etag.equals(webRequest.getHeader("If-None-Match"))) {
 			return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
 				.eTag(etag)
@@ -113,6 +119,14 @@ class TrainSearchContractController {
 			.eTag(etag)
 			.cacheControl(cacheControl)
 			.body(envelope);
+	}
+
+	private CacheControl cacheControl(java.time.Instant expiresAt, CachePolicy policy) {
+		long remaining = Math.max(0, Duration.between(clock.instant(), expiresAt).getSeconds());
+		CacheControl result = CacheControl.maxAge(Math.min(policy.clientSeconds(), remaining), TimeUnit.SECONDS)
+			.cachePublic()
+			.sMaxAge(Math.min(policy.sharedSeconds(), remaining), TimeUnit.SECONDS);
+		return remaining == 0 ? result.mustRevalidate() : result;
 	}
 
 	private ResponseEntity<ApiResponse<?>> error(HttpStatus status, String code, String message) {
@@ -157,4 +171,6 @@ class TrainSearchContractController {
 	}
 
 	record TrainSearchError(String code) {}
+
+	private record CachePolicy(long clientSeconds, long sharedSeconds) {}
 }

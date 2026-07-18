@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.lang.reflect.Modifier;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -75,6 +76,13 @@ class TrainSearchRateLimitFilterTest {
 		var limiter = new TrainSearchRateLimiter(24, 1, fixedClock());
 		assertThat(limiter.acquire("first", 1).allowed()).isTrue();
 		assertThat(limiter.acquire("second", 1).allowed()).isFalse();
+	}
+
+	@Test
+	void acquireSerializesLookupCleanupRolloverAndTokenConsumption() throws Exception {
+		var acquire = TrainSearchRateLimiter.class.getDeclaredMethod("acquire", String.class, int.class);
+
+		assertThat(Modifier.isSynchronized(acquire.getModifiers())).isTrue();
 	}
 
 	private void assertAllowed(TrainSearchRateLimitFilter filter, String trainType, String returnDate) throws Exception {

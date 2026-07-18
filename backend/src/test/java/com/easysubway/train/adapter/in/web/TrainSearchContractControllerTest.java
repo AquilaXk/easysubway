@@ -10,6 +10,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.easysubway.train.application.TrainSearchService;
 import com.easysubway.train.application.TrainSearchService.TrainSearchFailure;
+import com.easysubway.train.application.TrainSearchService.StationSearchSnapshot;
+import com.easysubway.train.application.TrainSearchService.TrainSearchSnapshot;
 import com.easysubway.train.domain.TrainSearchModels.Journey;
 import com.easysubway.train.domain.TrainSearchModels.SearchResult;
 import com.easysubway.train.domain.TrainSearchModels.Station;
@@ -67,7 +69,10 @@ class TrainSearchContractControllerTest {
 
 	@Test
 	void stationSuccessUsesPublicCacheAndExactEtagRevalidation() throws Exception {
-		when(service.stations("서울", "KTX")).thenReturn(List.of(new Station("NAT010000", "서울")));
+		when(service.stationsWithMetadata("서울", "KTX")).thenReturn(new StationSearchSnapshot(
+			List.of(new Station("NAT010000", "서울")),
+			Instant.parse("2026-07-20T00:00:00Z")
+		));
 
 		MvcResult first = mockMvc.perform(get("/api/v1/trains/stations")
 				.param("query", "서울")
@@ -90,7 +95,10 @@ class TrainSearchContractControllerTest {
 
 	@Test
 	void todaySearchUsesShortPublicCacheAndReturnsApprovedFields() throws Exception {
-		when(service.search(any())).thenReturn(result());
+		when(service.searchWithMetadata(any())).thenReturn(new TrainSearchSnapshot(
+			result(),
+			Instant.parse("2026-07-19T00:05:00Z")
+		));
 
 		mockMvc.perform(get("/api/v1/trains/search")
 				.param("departureStationId", "NAT010000")
@@ -102,6 +110,22 @@ class TrainSearchContractControllerTest {
 			.andExpect(jsonPath("$.data.outbound[0].trainNumber").value("101"))
 			.andExpect(jsonPath("$.data.outbound[0].adultFareWon").value(23700))
 			.andExpect(jsonPath("$.data.inbound").isEmpty());
+	}
+
+	@Test
+	void futureSearchCapsPublicCacheAtTheRemainingSourceTtl() throws Exception {
+		when(service.searchWithMetadata(any())).thenReturn(new TrainSearchSnapshot(
+			result(),
+			Instant.parse("2026-07-19T00:00:45Z")
+		));
+
+		mockMvc.perform(get("/api/v1/trains/search")
+				.param("departureStationId", "NAT010000")
+				.param("arrivalStationId", "NAT011668")
+				.param("departureDate", "2026-07-20")
+				.param("trainType", "KTX"))
+			.andExpect(status().isOk())
+			.andExpect(header().string("Cache-Control", "max-age=45, public, s-maxage=45"));
 	}
 
 	@Test
@@ -118,7 +142,7 @@ class TrainSearchContractControllerTest {
 			new ExpectedFailure("TRAIN_SEARCH_UNAVAILABLE", 503)
 		)) {
 			TrainSearchFailure failure = new TrainSearchFailure(expected.code());
-			doThrow(failure).when(service).search(any());
+			doThrow(failure).when(service).searchWithMetadata(any());
 			mockMvc.perform(get("/api/v1/trains/search")
 					.param("departureStationId", "NAT010000")
 					.param("arrivalStationId", "NAT011668")

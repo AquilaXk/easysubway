@@ -102,11 +102,15 @@ public class TrainSearchService {
 	}
 
 	public Catalog catalog() {
+		return catalogWithMetadata().catalog();
+	}
+
+	private CatalogEntry catalogWithMetadata() {
 		try {
 			Instant now = clock.instant();
 			return cache.freshCatalog(CATALOG_KIND, now)
-				.map(this::decodeCatalog)
-				.orElseGet(() -> refreshCatalog(now));
+				.map(cached -> new CatalogEntry(decodeCatalog(cached), cached.expiresAt()))
+				.orElseGet(() -> refreshCatalogEntry(now));
 		} catch (TrainSearchFailure failure) {
 			throw failure;
 		} catch (RuntimeException exception) {
@@ -115,22 +119,33 @@ public class TrainSearchService {
 	}
 
 	public List<Station> stations(String query, String trainType) {
+		return stationsWithMetadata(query, trainType).stations();
+	}
+
+	public StationSearchSnapshot stationsWithMetadata(String query, String trainType) {
 		String normalizedQuery = query == null ? "" : query.trim();
 		if (normalizedQuery.codePointCount(0, normalizedQuery.length()) < 2) {
 			throw failure("TRAIN_SEARCH_INVALID_ARGUMENT");
 		}
 		if (trainType != null) requireSupported(trainType);
 		String folded = normalizedQuery.toLowerCase(Locale.ROOT);
-		return catalog().stations().stream()
+		CatalogEntry catalog = catalogWithMetadata();
+		List<Station> stations = catalog.catalog().stations().stream()
 			.filter(station -> station.name().toLowerCase(Locale.ROOT).contains(folded))
 			.sorted(Comparator.comparing(Station::name).thenComparing(Station::id))
 			.toList();
+		return new StationSearchSnapshot(stations, catalog.expiresAt());
 	}
 
 	public SearchResult search(SearchCriteria criteria) {
+		return searchWithMetadata(criteria).result();
+	}
+
+	public TrainSearchSnapshot searchWithMetadata(SearchCriteria criteria) {
 		SearchCriteria normalized = validateStructure(criteria);
 		try {
-			Catalog catalog = catalog();
+			CatalogEntry catalogEntry = catalogWithMetadata();
+			Catalog catalog = catalogEntry.catalog();
 			validateStations(normalized, catalog);
 			LegResult outbound = direction(
 				catalog,
@@ -149,11 +164,16 @@ public class TrainSearchService {
 			Instant observedAt = inbound == null || outbound.observedAt().isAfter(inbound.observedAt())
 				? outbound.observedAt()
 				: inbound.observedAt();
-			return new SearchResult(
+			SearchResult result = new SearchResult(
 				OffsetDateTime.ofInstant(observedAt, ZoneOffset.UTC),
 				outbound.journeys(),
 				inbound == null ? List.of() : inbound.journeys()
 			);
+			Instant expiresAt = inbound == null || outbound.expiresAt().isBefore(inbound.expiresAt())
+				? outbound.expiresAt()
+				: inbound.expiresAt();
+			if (catalogEntry.expiresAt().isBefore(expiresAt)) expiresAt = catalogEntry.expiresAt();
+			return new TrainSearchSnapshot(result, expiresAt);
 		} catch (TrainSearchFailure failure) {
 			throw failure;
 		} catch (RuntimeException exception) {
@@ -163,7 +183,7 @@ public class TrainSearchService {
 
 	public Catalog refreshCatalog() {
 		try {
-			return refreshCatalog(clock.instant());
+			return refreshCatalogEntry(clock.instant()).catalog();
 		} catch (TrainSearchFailure failure) {
 			throw failure;
 		} catch (RuntimeException exception) {
@@ -175,10 +195,13 @@ public class TrainSearchService {
 		return cache.purgeExpiredBefore(clock.instant().minus(Duration.ofHours(48)));
 	}
 
-	private Catalog refreshCatalog(Instant now) {
+	private CatalogEntry refreshCatalogEntry(Instant now) {
 		synchronized (catalogLock) {
 			var existing = cache.freshCatalog(CATALOG_KIND, now);
-			if (existing.isPresent()) return decodeCatalog(existing.orElseThrow());
+			if (existing.isPresent()) {
+				CachedCatalog cached = existing.orElseThrow();
+				return new CatalogEntry(decodeCatalog(cached), cached.expiresAt());
+			}
 			String owner = ownerSupplier.get();
 			if (!cache.tryAcquireLease(CATALOG_LEASE_KEY, owner, now, CATALOG_LEASE_TTL)) {
 				return pollForCatalog();
@@ -198,7 +221,7 @@ public class TrainSearchService {
 					filtered.observedAt(),
 					now.plus(CATALOG_TTL)
 				)));
-				return filtered;
+				return new CatalogEntry(filtered, now.plus(CATALOG_TTL));
 			} catch (ProviderFailure exception) {
 				throw failure(providerFailureCode(exception));
 			} finally {
@@ -207,11 +230,14 @@ public class TrainSearchService {
 		}
 	}
 
-	private Catalog pollForCatalog() {
+	private CatalogEntry pollForCatalog() {
 		for (Duration delay : LEASE_POLLS) {
 			sleep(delay);
 			var cached = cache.freshCatalog(CATALOG_KIND, clock.instant());
-			if (cached.isPresent()) return decodeCatalog(cached.orElseThrow());
+			if (cached.isPresent()) {
+				CachedCatalog value = cached.orElseThrow();
+				return new CatalogEntry(decodeCatalog(value), value.expiresAt());
+			}
 		}
 		throw failure("TRAIN_SEARCH_UNAVAILABLE");
 	}
@@ -251,7 +277,8 @@ public class TrainSearchService {
 				.thenComparing(Journey::trainNumber))
 			.forEach(journey -> unique.putIfAbsent(journeyKey(journey), journey));
 		Instant observedAt = legs.stream().map(CachedLeg::observedAt).max(Comparator.naturalOrder()).orElseThrow();
-		return new LegResult(observedAt, List.copyOf(unique.values()));
+		Instant expiresAt = legs.stream().map(CachedLeg::expiresAt).min(Comparator.naturalOrder()).orElseThrow();
+		return new LegResult(observedAt, expiresAt, List.copyOf(unique.values()));
 	}
 
 	private CachedLeg leg(LegQuery query) {
@@ -476,7 +503,17 @@ public class TrainSearchService {
 		return new TrainSearchFailure(code);
 	}
 
-	private record LegResult(Instant observedAt, List<Journey> journeys) {}
+	private record CatalogEntry(Catalog catalog, Instant expiresAt) {}
+
+	private record LegResult(Instant observedAt, Instant expiresAt, List<Journey> journeys) {}
+
+	public record StationSearchSnapshot(List<Station> stations, Instant expiresAt) {
+		public StationSearchSnapshot {
+			stations = List.copyOf(stations);
+		}
+	}
+
+	public record TrainSearchSnapshot(SearchResult result, Instant expiresAt) {}
 
 	@FunctionalInterface
 	interface Sleeper {
