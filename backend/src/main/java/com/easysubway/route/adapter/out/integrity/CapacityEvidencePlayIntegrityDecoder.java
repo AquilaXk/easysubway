@@ -31,7 +31,7 @@ final class CapacityEvidencePlayIntegrityDecoder implements PlayIntegrityDecoder
 	// validateVerdict()'s `verdict.requestTimestamp().isAfter(now)` freshness check
 	// rejects every single session — 100% reproducible, unrelated to attestation
 	// crypto. Backdating by a small safety margin restores the natural ordering.
-	private static final Duration TIMESTAMP_SAFETY_MARGIN = Duration.ofMillis(100);
+	static final Duration TIMESTAMP_SAFETY_MARGIN = Duration.ofMillis(100);
 
 	private final byte[] attestationKey;
 	private final String certificateDigest;
