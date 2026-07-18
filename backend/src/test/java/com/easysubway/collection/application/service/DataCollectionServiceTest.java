@@ -7,10 +7,13 @@ import static org.mockito.Mockito.mock;
 import com.easysubway.collection.adapter.out.persistence.InMemoryDataCollectionRunRepository;
 import com.easysubway.collection.application.port.in.RunDataCollectionCommand;
 import com.easysubway.collection.domain.DataCollectionRun;
+import com.easysubway.collection.domain.DataCollectionRunStep;
 import com.easysubway.collection.domain.DataCollectionSource;
+import com.easysubway.collection.domain.DataCollectionStepStatus;
 import com.easysubway.collection.domain.DataCollectionStatus;
 import com.easysubway.collection.domain.InvalidDataCollectionException;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -161,6 +164,61 @@ class DataCollectionServiceTest {
 		))
 			.isInstanceOf(InvalidDataCollectionException.class);
 		assertThat(launchCount).hasValue(2);
+	}
+
+	@Test
+	@DisplayName("tasklet이 이미 저장한 terminal 실패 단계는 FAILED JobExecution fallback이 덮지 않는다")
+	void failedJobExecutionPreservesRecordedFailureSteps() {
+		var repository = new InMemoryDataCollectionRunRepository();
+		JobLauncher launcher = (job, parameters) -> {
+			String runId = parameters.getString("runId");
+			repository.saveRun(new DataCollectionRun(
+				runId,
+				DataCollectionSource.TRANSIT_MASTER,
+				DataCollectionStatus.FAILED,
+				"admin-user",
+				LocalDateTime.of(2026, 7, 18, 12, 0),
+				LocalDateTime.of(2026, 7, 18, 12, 1),
+				0,
+				"IllegalStateException: 상세 오류는 보호 정책에 따라 생략되었습니다.",
+				true,
+				"실패 단계를 확인하세요.",
+				List.of(new DataCollectionRunStep(
+					"FETCH",
+					DataCollectionStepStatus.FAILED,
+					null,
+					null,
+					null,
+					0,
+					"IllegalStateException: 상세 오류는 보호 정책에 따라 생략되었습니다."
+				))
+			));
+			JobExecution execution = mock(JobExecution.class);
+			org.mockito.Mockito.when(execution.getStatus()).thenReturn(BatchStatus.FAILED);
+			org.mockito.Mockito.when(execution.getAllFailureExceptions())
+				.thenReturn(List.of(new IllegalStateException("raw provider failure")));
+			return execution;
+		};
+		var service = new DataCollectionService(
+			repository,
+			repository,
+			() -> "collection-recorded-failed",
+			launcher,
+			mock(Job.class)
+		);
+
+		assertThatThrownBy(() -> service.runCollection(
+			new RunDataCollectionCommand(DataCollectionSource.TRANSIT_MASTER, "admin-user")
+		))
+			.isInstanceOf(InvalidDataCollectionException.class)
+			.hasMessage("데이터 수집 배치를 실행하지 못했습니다.");
+
+		assertThat(repository.loadRun("collection-recorded-failed")).get()
+			.extracting(DataCollectionRun::steps)
+			.satisfies(steps -> assertThat(steps)
+				.singleElement()
+				.extracting(DataCollectionRunStep::name, DataCollectionRunStep::status)
+				.containsExactly("FETCH", DataCollectionStepStatus.FAILED));
 	}
 
 	private static DataCollectionRun runningRun(String runId) {

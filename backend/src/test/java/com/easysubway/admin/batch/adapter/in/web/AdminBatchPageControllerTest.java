@@ -154,6 +154,24 @@ class AdminBatchPageControllerTest {
 	}
 
 	@Test
+	@DisplayName("BATCH_RUN만 가진 관리자는 신규 실행할 수 있고 BATCH_RETRY만 가진 관리자는 거부된다")
+	void runSecurityMatcherUsesBatchRunPermissionIndependently() throws Exception {
+		mockMvc.perform(post("/admin/batches/transit-master-collection/run")
+				.with(user("batch-runner").authorities(new SimpleGrantedAuthority("admin.batch.run")))
+				.with(csrf())
+				.with(commandToken("/admin/batches/page"))
+				.param("runRequested", "true"))
+			.andExpect(status().is3xxRedirection());
+
+		mockMvc.perform(post("/admin/batches/transit-master-collection/run")
+				.with(user("batch-retry-operator").authorities(new SimpleGrantedAuthority("admin.batch.retry")))
+				.with(csrf())
+				.with(commandToken("/admin/batches/page"))
+				.param("runRequested", "true"))
+			.andExpect(status().isForbidden());
+	}
+
+	@Test
 	@DisplayName("관리자는 허용 batch registry와 실패 step, 재처리 버튼을 확인한다")
 	void adminViewsBatchRegistryAndFailedSteps() throws Exception {
 		saveDataCollectionRunPort.saveRun(failedRun("failed-run"));
