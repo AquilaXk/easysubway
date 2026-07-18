@@ -291,7 +291,7 @@ void main() {
     expect(result.steps.first.title, '상록수역에서 4호선 승강장으로 이동');
     expect(result.steps.first.actionTitle, isEmpty);
     expect(result.steps.first.hasMetricSourceMetadata, isTrue);
-    expect(result.steps.first.metricSourceLabel, '시간 또는 거리를 확인하고 있어요');
+    expect(result.steps.first.metricSourceLabel, '시간·거리 정보 미확인');
     expect(result.steps.first.estimatedMinutes, 4);
     expect(result.steps.first.distanceMeters, 180);
     expect(result.steps.first.stepType, 'entry');
@@ -309,7 +309,7 @@ void main() {
       result.warnings.map((warning) => warning.userMessage),
       contains('시설 상태 안내가 오래됐을 수 있어요.'),
     );
-    expect(result.semanticLabel, contains('시간 또는 거리를 확인하고 있어요'));
+    expect(result.semanticLabel, contains('시간·거리 정보 미확인'));
   });
 
   test('경로 검색 컨트롤러는 빈 입력과 실패 상태를 쉬운 문구로 표시한다', () async {
@@ -653,7 +653,7 @@ void main() {
       'STALE',
     });
     expect(routeEtaSourceLabel('REALTIME'), '실시간 도착정보 준비 중');
-    expect(routeEtaSourceLabel('MIXED'), '일부 도착정보를 확인하고 있어요');
+    expect(routeEtaSourceLabel('MIXED'), '일부 실시간 도착정보');
     expect(routeEtaSourceLabel('STATIC_BACKEND_ESTIMATE'), '시간표 기준');
     expect(routeEtaSourceLabel('STATIC_ESTIMATE'), '정적 추정');
     expect(routeEtaSourceLabel('UNSUPPORTED'), '실시간 미지원');
@@ -1307,7 +1307,7 @@ void main() {
       requiresAccessibilityCheck: false,
     );
 
-    expect(step.burdenLabel, '약 30분 · 거리를 확인하고 있어요');
+    expect(step.burdenLabel, '약 30분 · 거리 미확인');
   });
 
   test('경로 단계 이동 부담은 측정 시간 없음 상태를 0분으로 표시하지 않는다', () {
@@ -1325,7 +1325,7 @@ void main() {
       requiresAccessibilityCheck: false,
     );
 
-    expect(step.burdenLabel, '시간을 확인하고 있어요 · 180m');
+    expect(step.burdenLabel, '시간 미확인 · 180m');
   });
 
   test('경로 계단 상태는 unknown을 계단 없음으로 올리지 않는다', () {

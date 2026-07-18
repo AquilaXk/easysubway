@@ -9545,8 +9545,8 @@ void main() {
     expect(find.byKey(const Key('routeStepNumber-3')), findsOneWidget);
 
     // #1948: 경유 스텝은 0값 placeholder burdenLabel을 렌더하지 않는다.
-    expect(find.text('시간을 확인하고 있어요 · 거리를 확인하고 있어요'), findsNothing);
-    expect(find.textContaining('시간을 확인하고 있어요'), findsNothing);
+    expect(find.text('시간 미확인 · 거리 미확인'), findsNothing);
+    expect(find.textContaining('시간 미확인'), findsNothing);
     // #1948: 경유 스텝은 보일러플레이트 기본 안내 문장 대신 간결 카피를 쓴다.
     expect(find.text('안내된 순서대로 이동합니다.'), findsNothing);
     expect(find.text('내리지 않고 이 역을 지나가요'), findsOneWidget);
@@ -10460,14 +10460,14 @@ void main() {
         find.byKey(const Key('stationDetailLargeScreenLayout')),
         findsNothing,
       );
-      // 정상 시설은 상태 필 없이 이름으로 조용히, 문제(고장·확인 중)만 상태 필로 렌더링.
+      // 정상 시설은 상태 필 없이 이름으로 조용히, 문제(고장·미확인)만 상태 필로 렌더링.
       var sawNormalQuiet = false;
       var sawBroken = false;
       var sawNeedsCheck = false;
       for (var index = 0; index < 8; index += 1) {
         sawNormalQuiet |= find.text('1번 출구 엘리베이터').evaluate().isNotEmpty;
         sawBroken |= find.text('이용할 수 없어요').evaluate().isNotEmpty;
-        sawNeedsCheck |= find.text('상태를 확인하고 있어요').evaluate().isNotEmpty;
+        sawNeedsCheck |= find.text('상태 미확인').evaluate().isNotEmpty;
         if (sawNormalQuiet && sawBroken && sawNeedsCheck) {
           break;
         }

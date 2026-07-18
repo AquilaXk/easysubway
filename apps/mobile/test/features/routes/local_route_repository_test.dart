@@ -2363,7 +2363,7 @@ void main() {
     );
 
     expect(result.status, 'UNKNOWN');
-    expect(result.destinationStationName, '역 이름을 확인하고 있어요');
+    expect(result.destinationStationName, '역 이름 미확인');
     expect(result.isLocalResult, isTrue);
   });
 
