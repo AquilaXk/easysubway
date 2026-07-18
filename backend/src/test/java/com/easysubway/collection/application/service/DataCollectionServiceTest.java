@@ -72,7 +72,12 @@ class DataCollectionServiceTest {
 
 		assertThat(repository.loadRun("collection-failed")).get()
 			.extracting(DataCollectionRun::status, DataCollectionRun::failureMessage)
-			.containsExactly(DataCollectionStatus.FAILED, "launch down");
+			.satisfies(values -> {
+				assertThat(values.get(0)).isEqualTo(DataCollectionStatus.FAILED);
+				assertThat(values.get(1).toString())
+					.contains("JobParametersInvalidException", "보호 정책")
+					.doesNotContain("launch down");
+			});
 	}
 
 	@Test
@@ -104,7 +109,12 @@ class DataCollectionServiceTest {
 			.hasMessage("데이터 수집 배치를 실행하지 못했습니다.");
 		assertThat(repository.loadRun("collection-failed-1")).get()
 			.extracting(DataCollectionRun::status, DataCollectionRun::failureMessage)
-			.containsExactly(DataCollectionStatus.FAILED, "loader down");
+			.satisfies(values -> {
+				assertThat(values.get(0)).isEqualTo(DataCollectionStatus.FAILED);
+				assertThat(values.get(1).toString())
+					.contains("IllegalStateException", "보호 정책")
+					.doesNotContain("loader down");
+			});
 		assertThat(repository.loadRunningRun(DataCollectionSource.TRANSIT_MASTER)).isEmpty();
 
 		assertThatThrownBy(() -> service.runCollection(

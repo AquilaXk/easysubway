@@ -14130,10 +14130,13 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   assert.match(jdbcRepository, /ORDER BY completed_at DESC, run_id DESC/);
   assert.match(jdbcRepository, /ORDER BY started_at DESC, run_id DESC/);
   assert.match(failureDetailSanitizer, /MAX_LENGTH = 500/);
-  assert.match(failureDetailSanitizer, /URL_QUERY/);
-  assert.match(failureDetailSanitizer, /CREDENTIAL/);
-  assert.match(failureDetailSanitizer, /AUTHORIZATION_VALUE/);
-  assert.match(failureDetailSanitizer, /RAW_BODY/);
+  assert.match(failureDetailSanitizer, /operatorSafe\(Throwable failure, BatchStatus status\)/);
+  assert.match(failureDetailSanitizer, /failure\.getClass\(\)\.getSimpleName\(\)/);
+  assert.match(failureDetailSanitizer, /BatchStatus\./);
+  assert.match(failureDetailSanitizer, /보호 정책에 따라 생략되었습니다/);
+  assert.doesNotMatch(failureDetailSanitizer, /failure\.getMessage\(\)/);
+  assert.doesNotMatch(failureDetailSanitizer, /Pattern|URL_QUERY|CREDENTIAL|AUTHORIZATION_VALUE|RAW_BODY/);
+  assert.doesNotMatch(failureDetailSanitizer, /normalize|truncate/);
   assert.match(controller, /@GetMapping\("\/admin\/data-sources"\)/);
   assert.match(controller, /@PostMapping\("\/admin\/data-sources\/\{dataSourceId\}\/sync"\)/);
   assert.match(controller, /dataCollectionSource\(String dataSourceId\)/);

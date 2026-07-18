@@ -94,7 +94,7 @@ public class DataCollectionService implements DataCollectionUseCase {
 					.orElse(null);
 				String failureMessage = DataCollectionFailureDetailSanitizer.operatorSafe(
 					failure,
-					"배치 실행 상태: " + execution.getStatus()
+					execution.getStatus()
 				);
 				markFailed(claimedRun, failureMessage);
 				throw new InvalidDataCollectionException("데이터 수집 배치를 실행하지 못했습니다.");

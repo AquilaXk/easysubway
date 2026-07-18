@@ -262,8 +262,9 @@ class JdbcDataCollectionRunRepositoryTest {
 	void sensitiveLongFailedJobExecutionStoresSafeDetailAndAllowsRerun() {
 		var idSequence = new AtomicInteger();
 		var launchCount = new AtomicInteger();
-		String rawFailure = "GET https://provider.example/v1/stations?apiKey=provider-secret "
-			+ "Authorization=Bearer access-token response body={\"token\":\"body-secret\"} "
+		String rawFailure = "api key: sk-live-example password value hunter2 client secret is example "
+			+ "jdbc:postgresql://admin:secret-value@db.example/prod "
+			+ "upstream returned {\"customer\":\"raw provider payload\"} "
 			+ "x".repeat(1_100);
 		assertThat(rawFailure.length()).isGreaterThan(1_000);
 		JobLauncher launcher = (job, parameters) -> {
@@ -298,13 +299,11 @@ class JdbcDataCollectionRunRepositoryTest {
 			.hasSizeLessThanOrEqualTo(500)
 			.contains("보호 정책")
 			.doesNotContain(
-				"provider-secret",
-				"access-token",
-				"body-secret",
-				"apiKey",
-				"Authorization",
-				"https://",
-				"response body"
+				"sk-live-example",
+				"hunter2",
+				"client secret is",
+				"admin:secret-value",
+				"raw provider payload"
 			);
 	}
 
