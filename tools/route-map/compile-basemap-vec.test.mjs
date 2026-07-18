@@ -6,6 +6,7 @@ import test from "node:test";
 
 import {
   extractOwnerLabels,
+  extractRailTransferChipObstacles,
   markLineTerminalBadgeEntries,
   normalizeSvgForCompile,
 } from "./compile-basemap-vec.mjs";
@@ -625,4 +626,41 @@ test("labels.json sidecar: 5권역 모두 terminal 엔트리에 hasLineTerminalB
       }
     }
   }
+});
+
+// #2068 대전·광주 마감: 재설계된 두 권역 SVG는 부산·대구형 service-tag 마크업
+// (class="service-tag"·data-station) 대신 rail-transfer-layer 안 rail chip
+// (data-services·data-station-name)으로 KTX·SRT 표장을 담는다. 전용 인식기가
+// chip <g>만(내부 로고 서브그룹 제외) 잡아 절대 좌표 bbox 장애물을 낸다.
+test("extractRailTransferChipObstacles: rail-transfer-layer chip을 transform 합성으로 잡는다", () => {
+  const svg = `<svg viewBox="0 0 2400 1800">
+    <g id="rail-transfer-layer">
+      <g id="chip-a" data-station-name="대전역(혁신도시)" data-services="KTX,SRT"
+         transform="translate(-10,-20)">
+        <title>207 대전역 KTX·SRT 환승</title>
+        <g transform="matrix(0.05,0,0,0.05,1000,600)" data-logo="KTX">
+          <path d="M 0 0 L 100 0 L 100 200 L 0 200 Z" />
+        </g>
+      </g>
+      <rect x="500" y="500" width="58" height="20" />
+      <text x="520" y="510">경전선</text>
+    </g>
+  </svg>`;
+  const obstacles = extractRailTransferChipObstacles(svg);
+  assert.equal(obstacles.length, 1); // rect·text 캡션과 로고 서브그룹은 chip 아님.
+  const [chip] = obstacles;
+  assert.equal(chip.station, "대전역(혁신도시)");
+  // 로컬 path [0,0]-[100,200]에 matrix(0.05) → [0,0]-[5,10], +translate(1000,600)
+  // → [1000,600]-[1005,610], chip translate(-10,-20) → [990,580]-[995,590].
+  assert.equal(chip.x, 992.5);
+  assert.equal(chip.y, 585);
+  assert.equal(chip.halfWidth, 2.5);
+  assert.equal(chip.halfHeight, 5);
+});
+
+test("extractRailTransferChipObstacles: rail-transfer-layer가 없으면 빈 배열", () => {
+  assert.deepEqual(
+    extractRailTransferChipObstacles('<svg><g id="route-lines-layer"></g></svg>'),
+    [],
+  );
 });

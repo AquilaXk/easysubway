@@ -220,6 +220,12 @@ function extractMapSvg(svgText) {
     // 포함한다. 마크가 라벨·심벌 위에 오도록 맨 위에 렌더한다. 텍스트 없는 벡터
     // path라 폰트 정규화·baseline 경로와 무관하다. 미보유 권역은 빈 문자열.
     "service-tags-layer",
+    // #2068 대전·광주 고속철 표장: 재설계된 두 권역 SVG는 service-tag 마크업
+    // (class="service-tag"·data-station) 대신 rail-transfer-layer 안 rail chip
+    // (data-services·data-station-name·<title> 역명) 형식으로 KTX·SRT 로고를
+    // 담는다. 부산·대구형 인식기가 못 잡던 이 표장을 바탕층 최상단에 반입한다.
+    // 다른 권역엔 이 레이어가 없어(extractGroup 빈 문자열) 영향이 없다.
+    "rail-transfer-layer",
   ];
   const mapGroup = layerIds
     .map((id) => {
@@ -494,6 +500,87 @@ export function extractServiceTagObstacles(svgText) {
     if (!Number.isFinite(minX)) {
       continue; // 시각 내용 없는 빈 표장(예: 기장 KTX) — 회피 대상 아님.
     }
+    obstacles.push({
+      station,
+      x: (minX + maxX) / 2,
+      y: (minY + maxY) / 2,
+      halfWidth: (maxX - minX) / 2,
+      halfHeight: (maxY - minY) / 2,
+    });
+  }
+  return obstacles;
+}
+
+// 대전·광주 rail chip 표장 장애물(#2068 대전·광주 마감) — 부산·대구는
+// service-tags-layer에 class="service-tag"·data-station 마크업을 쓰지만,
+// 재설계된 대전·광주 SVG는 rail-transfer-layer 안에 data-services를 가진
+// chip <g>(대전 대전역·서대전역, 광주 광주송정역)로 KTX·SRT 로고를 담는다.
+// extractServiceTagObstacles의 인식 조건(class="service-tag")에 걸리지 않으므로
+// 별도 인식기로 스캔한다. chip <g>는 data-services 속성으로 판별하고(내부 로고
+// 서브그룹은 data-logo만 가져 제외됨), 역 앵커는 data-station-name(없으면 <g>
+// id)으로 잡는다. bbox는 extractServiceTagObstacles와 같은 transform 체인 합성·
+// 재귀 도형 수집으로 절대 좌표화한다. 표장이 없는 권역은 빈 배열.
+export function extractRailTransferChipObstacles(svgText) {
+  const layerStart = svgText.indexOf('id="rail-transfer-layer"');
+  if (layerStart < 0) return [];
+  const groupStart = svgText.lastIndexOf("<g", layerStart);
+  let depth = 0;
+  let layerEnd = -1;
+  const tagRe = /<g\b|<\/g>/g;
+  tagRe.lastIndex = groupStart;
+  let m;
+  while ((m = tagRe.exec(svgText))) {
+    depth += m[0] === "</g>" ? -1 : 1;
+    if (depth === 0) {
+      layerEnd = tagRe.lastIndex;
+      break;
+    }
+  }
+  if (layerEnd < 0) return [];
+  const layer = svgText.slice(groupStart, layerEnd);
+
+  const obstacles = [];
+  const tagOpenRe = /<g\b[^>]*>/g;
+  for (const tm of layer.matchAll(tagOpenRe)) {
+    const openTag = tm[0];
+    if (!/\bdata-services="/.test(openTag)) continue; // chip <g>만(로고 서브그룹 제외).
+    const station =
+      (openTag.match(/\bdata-station-name="([^"]*)"/) || [])[1] ??
+      (openTag.match(/\bid="([^"]*)"/) || [])[1] ??
+      "";
+    const rootTransform =
+      (openTag.match(/\btransform="([^"]*)"/) || [])[1] ?? "";
+    const blockStart = tm.index;
+    let d = 0;
+    const innerRe = /<g\b|<\/g>/g;
+    innerRe.lastIndex = blockStart;
+    let im;
+    let blockEnd = -1;
+    while ((im = innerRe.exec(layer))) {
+      d += im[0] === "</g>" ? -1 : 1;
+      if (d === 0) {
+        blockEnd = innerRe.lastIndex;
+        break;
+      }
+    }
+    if (blockEnd < 0) continue;
+    const block = layer.slice(blockStart + openTag.length, blockEnd);
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    const visit = (x, y) => {
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    };
+    collectShapeBoundsRecursive(
+      block,
+      parseTransformChain(rootTransform),
+      visit,
+    );
+    if (!Number.isFinite(minX)) continue; // 시각 내용 없는 빈 chip — 회피 대상 아님.
     obstacles.push({
       station,
       x: (minX + maxX) / 2,
@@ -1083,8 +1170,12 @@ function main() {
         sourceText,
       );
       labelsByRegion[region.id] = ownerLabels;
-      serviceTagObstaclesByRegion[region.id] =
-        extractServiceTagObstacles(sourceText);
+      // 부산·대구형(service-tag) + 대전·광주형(rail chip) 표장 장애물을 합쳐
+      // 단일 회피 목록으로 낸다 — 앱·게이트는 origin 구분 없이 rect로 소비한다.
+      serviceTagObstaclesByRegion[region.id] = [
+        ...extractServiceTagObstacles(sourceText),
+        ...extractRailTransferChipObstacles(sourceText),
+      ];
       buildMaps.push({
         id: region.id,
         source: path.relative(root, inputSvg).replaceAll(path.sep, "/"),
