@@ -12,7 +12,9 @@ import com.easysubway.collection.domain.InvalidDataCollectionException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.Job;
+import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobExecutionException;
 import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.launch.JobLauncher;
@@ -85,25 +87,38 @@ public class DataCollectionService implements DataCollectionUseCase {
 			.addLong("run.id", System.nanoTime())
 			.toJobParameters();
 		try {
-			jobLauncher.run(transitMasterCollectionJob, parameters);
+			JobExecution execution = jobLauncher.run(transitMasterCollectionJob, parameters);
+			if (execution.getStatus() != BatchStatus.COMPLETED) {
+				String failureMessage = execution.getAllFailureExceptions().stream()
+					.map(Throwable::getMessage)
+					.filter(message -> message != null && !message.isBlank())
+					.findFirst()
+					.orElse("배치 실행 상태: " + execution.getStatus());
+				markFailed(claimedRun, failureMessage);
+				throw new InvalidDataCollectionException("데이터 수집 배치를 실행하지 못했습니다.");
+			}
 		} catch (JobExecutionException exception) {
-			saveDataCollectionRunPort.saveRun(new DataCollectionRun(
-				claimedRun.runId(),
-				claimedRun.source(),
-				DataCollectionStatus.FAILED,
-				claimedRun.requestedBy(),
-				claimedRun.startedAt(),
-				LocalDateTime.now(),
-				0,
-				exception.getMessage() == null || exception.getMessage().isBlank()
-					? exception.getClass().getSimpleName()
-					: exception.getMessage(),
-				true,
-				"일시 오류일 수 있습니다. 실패 사유를 확인한 뒤 같은 수집 대상을 다시 실행하세요."
-			));
+			markFailed(claimedRun, exception.getMessage() == null || exception.getMessage().isBlank()
+				? exception.getClass().getSimpleName()
+				: exception.getMessage());
 			throw new InvalidDataCollectionException("데이터 수집 배치를 실행하지 못했습니다.", exception);
 		}
 		return loadDataCollectionRunPort.loadRun(runId)
 			.orElseThrow(() -> new InvalidDataCollectionException("데이터 수집 실행 기록을 찾을 수 없습니다."));
+	}
+
+	private void markFailed(DataCollectionRun claimedRun, String failureMessage) {
+		saveDataCollectionRunPort.saveRun(new DataCollectionRun(
+			claimedRun.runId(),
+			claimedRun.source(),
+			DataCollectionStatus.FAILED,
+			claimedRun.requestedBy(),
+			claimedRun.startedAt(),
+			LocalDateTime.now(),
+			0,
+			failureMessage,
+			true,
+			"일시 오류일 수 있습니다. 실패 사유를 확인한 뒤 같은 수집 대상을 다시 실행하세요."
+		));
 	}
 }

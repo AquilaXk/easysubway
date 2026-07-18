@@ -19,6 +19,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 @Profile("prod | staging | release | prod-like")
@@ -38,6 +39,7 @@ public class JdbcDataCollectionRunRepository implements
 	}
 
 	@Override
+	@Transactional
 	public DataCollectionRun saveRun(DataCollectionRun run) {
 		try {
 			saveRunRecord(run);

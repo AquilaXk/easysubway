@@ -13969,6 +13969,7 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   const batchRunH2Schema = read(
     "backend/src/main/resources/db/migration/h2/V63__admin_batch_run_permission.sql",
   );
+  const batchRunPreflight = read("tools/ops/admin-batch-run-v63-preflight.sql");
   const run = read("backend/src/main/java/com/easysubway/collection/domain/DataCollectionRun.java");
   const runStep = read("backend/src/main/java/com/easysubway/collection/domain/DataCollectionRunStep.java");
   const stepStatus = read("backend/src/main/java/com/easysubway/collection/domain/DataCollectionStepStatus.java");
@@ -14033,6 +14034,12 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
     assert.match(batchRunSchema, /CREATE UNIQUE INDEX ux_data_collection_runs_active_source/);
     assert.match(batchRunSchema, /admin\.batch\.run/);
   }
+  assert.match(batchRunPreflight, /WHERE status = 'RUNNING'/);
+  assert.match(batchRunPreflight, /GROUP BY source/);
+  assert.match(batchRunPreflight, /HAVING COUNT\(\*\) > 1/);
+  assert.match(batchRunPreflight, /V63 preflight blocked: duplicate RUNNING/);
+  assert.match(batchRunPreflight, /performs no updates/);
+  assert.doesNotMatch(batchRunPreflight, /\b(?:UPDATE|DELETE|INSERT|ALTER)\b/i);
   assert.match(run, /record DataCollectionRun/);
   assert.match(run, /requestedBy/);
   assert.match(run, /collectedCount/);
@@ -14074,6 +14081,8 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   assert.match(service, /implements DataCollectionUseCase/);
   assert.match(service, /JobLauncher/);
   assert.match(service, /transitMasterCollectionJob/);
+  assert.match(service, /execution\.getStatus\(\) != BatchStatus\.COMPLETED/);
+  assert.match(service, /execution\.getAllFailureExceptions\(\)/);
   assert.match(service, /InvalidDataCollectionException\("데이터 수집 배치를 실행하지 못했습니다\.", exception\)/);
   assert.match(service, /loadRun\(runId\)/);
   assert.match(service, /loadLatestCompletedRun\(source\)/);
@@ -14103,6 +14112,7 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   assert.match(jdbcRepository, /@Profile\("prod \| staging \| release \| prod-like"\)/);
   assert.match(jdbcRepository, /implements[\s\S]*LoadDataCollectionRunPort[\s\S]*SaveDataCollectionRunPort/);
   assert.match(jdbcRepository, /JdbcTemplate/);
+  assert.match(jdbcRepository, /@Transactional[\s\S]*saveRun\(DataCollectionRun run\)/);
   assert.match(jdbcRepository, /INSERT INTO data_collection_runs/);
   assert.match(jdbcRepository, /INSERT INTO data_collection_run_steps/);
   assert.match(jdbcRepository, /DELETE FROM data_collection_run_steps WHERE run_id = \?/);

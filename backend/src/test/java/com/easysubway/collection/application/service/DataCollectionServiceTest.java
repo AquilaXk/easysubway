@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobParametersInvalidException;
@@ -72,6 +73,45 @@ class DataCollectionServiceTest {
 		assertThat(repository.loadRun("collection-failed")).get()
 			.extracting(DataCollectionRun::status, DataCollectionRun::failureMessage)
 			.containsExactly(DataCollectionStatus.FAILED, "launch down");
+	}
+
+	@Test
+	@DisplayName("배치가 FAILED로 반환되면 claim을 해제하고 같은 source를 다시 실행할 수 있다")
+	void failedJobExecutionMarksClaimAsFailedAndAllowsRerun() {
+		var repository = new InMemoryDataCollectionRunRepository();
+		var idSequence = new AtomicInteger();
+		var launchCount = new AtomicInteger();
+		JobLauncher launcher = (job, parameters) -> {
+			launchCount.incrementAndGet();
+			JobExecution execution = mock(JobExecution.class);
+			org.mockito.Mockito.when(execution.getStatus()).thenReturn(BatchStatus.FAILED);
+			org.mockito.Mockito.when(execution.getAllFailureExceptions())
+				.thenReturn(java.util.List.of(new IllegalStateException("loader down")));
+			return execution;
+		};
+		var service = new DataCollectionService(
+			repository,
+			repository,
+			() -> "collection-failed-" + idSequence.incrementAndGet(),
+			launcher,
+			mock(Job.class)
+		);
+
+		assertThatThrownBy(() -> service.runCollection(
+			new RunDataCollectionCommand(DataCollectionSource.TRANSIT_MASTER, "admin-user")
+		))
+			.isInstanceOf(InvalidDataCollectionException.class)
+			.hasMessage("데이터 수집 배치를 실행하지 못했습니다.");
+		assertThat(repository.loadRun("collection-failed-1")).get()
+			.extracting(DataCollectionRun::status, DataCollectionRun::failureMessage)
+			.containsExactly(DataCollectionStatus.FAILED, "loader down");
+		assertThat(repository.loadRunningRun(DataCollectionSource.TRANSIT_MASTER)).isEmpty();
+
+		assertThatThrownBy(() -> service.runCollection(
+			new RunDataCollectionCommand(DataCollectionSource.TRANSIT_MASTER, "admin-user")
+		))
+			.isInstanceOf(InvalidDataCollectionException.class);
+		assertThat(launchCount).hasValue(2);
 	}
 
 	private static DataCollectionRun runningRun(String runId) {

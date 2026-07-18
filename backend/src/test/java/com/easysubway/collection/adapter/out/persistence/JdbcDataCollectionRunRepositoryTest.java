@@ -2,7 +2,11 @@ package com.easysubway.collection.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import com.easysubway.collection.application.port.in.RunDataCollectionCommand;
+import com.easysubway.collection.application.service.DataCollectionService;
 import com.easysubway.collection.domain.DataCollectionRun;
 import com.easysubway.collection.domain.DataCollectionRunStep;
 import com.easysubway.collection.domain.DataCollectionSource;
@@ -11,25 +15,35 @@ import com.easysubway.collection.domain.DataCollectionStatus;
 import com.easysubway.collection.domain.InvalidDataCollectionException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.batch.core.BatchStatus;
+import org.springframework.batch.core.Job;
+import org.springframework.batch.core.JobExecution;
+import org.springframework.batch.core.launch.JobLauncher;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 @DisplayName("JDBC 데이터 수집 실행 기록 저장소")
+@SpringJUnitConfig(JdbcDataCollectionRunRepositoryTest.TransactionConfig.class)
 class JdbcDataCollectionRunRepositoryTest {
 
+	@Autowired
 	private JdbcDataCollectionRunRepository repository;
+	@Autowired
+	private JdbcTemplate jdbcTemplate;
 
 	@BeforeEach
 	void setUp() {
-		var dataSource = new DriverManagerDataSource(
-			"jdbc:h2:mem:collection-runs;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
-			"sa",
-			""
-		);
-		var jdbcTemplate = new JdbcTemplate(dataSource);
 		jdbcTemplate.execute("DROP TABLE IF EXISTS data_collection_runs");
 		jdbcTemplate.execute("DROP TABLE IF EXISTS data_collection_run_steps");
 		jdbcTemplate.execute("""
@@ -65,7 +79,6 @@ class JdbcDataCollectionRunRepositoryTest {
 				PRIMARY KEY (run_id, step_order)
 			)
 			""");
-		repository = new JdbcDataCollectionRunRepository(jdbcTemplate);
 	}
 
 	@Test
@@ -184,6 +197,129 @@ class JdbcDataCollectionRunRepositoryTest {
 			.get()
 			.extracting(DataCollectionRun::status)
 			.isEqualTo(DataCollectionStatus.RUNNING);
+	}
+
+	@Test
+	@DisplayName("step 저장 실패 시 run row와 active claim과 기존 steps를 함께 rollback한다")
+	void saveRunRollsBackEntireAggregateWhenStepInsertFails() {
+		DataCollectionRun running = new DataCollectionRun(
+			"collection-transaction",
+			DataCollectionSource.TRANSIT_MASTER,
+			DataCollectionStatus.RUNNING,
+			"admin-user",
+			LocalDateTime.of(2026, 7, 18, 12, 0),
+			null,
+			0,
+			null,
+			false,
+			"수집 실행 중입니다.",
+			List.of(new DataCollectionRunStep(
+				"CLAIM",
+				DataCollectionStepStatus.COMPLETED,
+				null,
+				null,
+				null,
+				0,
+				null
+			))
+		);
+		repository.saveRun(running);
+		DataCollectionRun invalidTerminal = new DataCollectionRun(
+			running.runId(),
+			running.source(),
+			DataCollectionStatus.FAILED,
+			running.requestedBy(),
+			running.startedAt(),
+			running.startedAt().plusMinutes(1),
+			0,
+			"loader down",
+			true,
+			"재실행하세요.",
+			List.of(new DataCollectionRunStep(
+				"x".repeat(41),
+				DataCollectionStepStatus.FAILED,
+				null,
+				null,
+				null,
+				0,
+				"loader down"
+			))
+		);
+
+		assertThatThrownBy(() -> repository.saveRun(invalidTerminal))
+			.isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+
+		assertThat(repository.loadRunningRun(DataCollectionSource.TRANSIT_MASTER))
+			.contains(running);
+		assertThat(repository.loadRun(running.runId()))
+			.get()
+			.extracting(DataCollectionRun::steps)
+			.isEqualTo(running.steps());
+	}
+
+	@Test
+	@DisplayName("FAILED JobExecution은 JDBC claim을 해제해 같은 source 재실행을 허용한다")
+	void failedJobExecutionReleasesJdbcClaimAndAllowsRerun() {
+		var idSequence = new AtomicInteger();
+		var launchCount = new AtomicInteger();
+		JobLauncher launcher = (job, parameters) -> {
+			launchCount.incrementAndGet();
+			JobExecution execution = mock(JobExecution.class);
+			when(execution.getStatus()).thenReturn(BatchStatus.FAILED);
+			when(execution.getAllFailureExceptions())
+				.thenReturn(List.of(new IllegalStateException("loader down")));
+			return execution;
+		};
+		var service = new DataCollectionService(
+			repository,
+			repository,
+			() -> "collection-jdbc-failed-" + idSequence.incrementAndGet(),
+			launcher,
+			mock(Job.class)
+		);
+
+		for (int attempt = 0; attempt < 2; attempt++) {
+			assertThatThrownBy(() -> service.runCollection(
+				new RunDataCollectionCommand(DataCollectionSource.TRANSIT_MASTER, "admin-user")
+			))
+				.isInstanceOf(InvalidDataCollectionException.class)
+				.hasMessage("데이터 수집 배치를 실행하지 못했습니다.");
+			assertThat(repository.loadRunningRun(DataCollectionSource.TRANSIT_MASTER)).isEmpty();
+		}
+
+		assertThat(launchCount).hasValue(2);
+		assertThat(repository.loadRun("collection-jdbc-failed-2")).get()
+			.extracting(DataCollectionRun::status, DataCollectionRun::failureMessage)
+			.containsExactly(DataCollectionStatus.FAILED, "loader down");
+	}
+
+	@Configuration
+	@EnableTransactionManagement(proxyTargetClass = true)
+	static class TransactionConfig {
+
+		@Bean
+		DriverManagerDataSource dataSource() {
+			return new DriverManagerDataSource(
+				"jdbc:h2:mem:collection-runs;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
+				"sa",
+				""
+			);
+		}
+
+		@Bean
+		JdbcTemplate jdbcTemplate(DriverManagerDataSource dataSource) {
+			return new JdbcTemplate(dataSource);
+		}
+
+		@Bean
+		JdbcDataCollectionRunRepository repository(DriverManagerDataSource dataSource) {
+			return new JdbcDataCollectionRunRepository(dataSource);
+		}
+
+		@Bean
+		PlatformTransactionManager transactionManager(DriverManagerDataSource dataSource) {
+			return new DataSourceTransactionManager(dataSource);
+		}
 	}
 
 	private DataCollectionRun completedRun(String runId, LocalDateTime startedAt) {
