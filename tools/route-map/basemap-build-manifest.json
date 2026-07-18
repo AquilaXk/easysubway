@@ -13,16 +13,16 @@
   },
   "ownerLabelsSidecar": {
     "path": "apps/mobile/assets/datapacks/metro_map_pack/basemap/labels.json",
-    "sha256": "0b63b55df8a305dfcaf6c0b5501ef29fcff66941db05b46254b2e6481a0d3a11"
+    "sha256": "fc4b0a39dc0e00350fb9c214c47bfdc08d2d0389f16920f207685efec46e4c3c"
   },
   "maps": [
     {
       "id": "seoul",
       "source": "tools/route-map/route-map-defs/svg-sources/easy-subway-sma-v2.svg",
       "compiledVector": "apps/mobile/assets/datapacks/metro_map_pack/basemap/seoul.vec",
-      "sourceSvgSha256": "150130604c471c09f0c50f103651dc0f71896e7a185948bb901e77d9d7d75e05",
-      "normalizedSvgSha256": "6e7b43af2593185c63cdb05eea9530f6b416866ab315518b761c8a501c6f6195",
-      "compiledVectorSha256": "28a79544aab3c58e627666d1bf30e1212f1f9fb5bd2e4697e5b876d1a805cc42",
+      "sourceSvgSha256": "b6f0cfea2499da74695135cec3c7462f13c87f6cebb385887830dc78bbcf71ba",
+      "normalizedSvgSha256": "764218c1f37b3d68c41644aa93be39cfc83d3490960558675b128572d0b90d29",
+      "compiledVectorSha256": "0b53ecf291647168d919d51504b93f8c3fe53d4e9d8665bf7eb5e74ed5f1164a",
       "viewBox": [
         0,
         0,
