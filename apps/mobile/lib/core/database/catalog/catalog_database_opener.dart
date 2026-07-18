@@ -25,11 +25,14 @@ class CatalogDatabaseOpener {
   final EmergencyOverrideRepository? emergencyOverrideRepository;
   final DateTime Function() _now;
   bool _openedBundledDataPack = false;
+  String _openedArtifactIdentity = '';
 
   bool get openedBundledDataPack => _openedBundledDataPack;
+  String get openedArtifactIdentity => _openedArtifactIdentity;
 
   Future<CatalogDatabase> open() async {
     _openedBundledDataPack = false;
+    _openedArtifactIdentity = '';
     final installedDatabase = await _openInstalledCurrentDataPack();
     if (installedDatabase != null) {
       return installedDatabase;
@@ -47,6 +50,9 @@ class CatalogDatabaseOpener {
     await database.seedBaselineIfEmpty();
     await _writeBundledFreshness(datapackDirectory, index);
     _openedBundledDataPack = true;
+    _openedArtifactIdentity = p.normalize(
+      File(p.join(datapackDirectory.path, 'capital.sqlite')).absolute.path,
+    );
     return database;
   }
 
@@ -253,6 +259,7 @@ class CatalogDatabaseOpener {
     try {
       if (await _isUsableCatalogDatabase(database)) {
         returned = true;
+        _openedArtifactIdentity = p.normalize(file.absolute.path);
         return database;
       }
       return null;

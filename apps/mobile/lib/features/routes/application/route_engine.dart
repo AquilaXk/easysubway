@@ -12,14 +12,17 @@ class LocalRouteEngine {
   LocalRouteEngine({
     required this.graph,
     this.costCalculator = const AccessibilityCostCalculator(),
+    this.edgeResolver,
   }) : accessGraphRouter = AccessGraphRouter(
          graph: graph,
          costCalculator: costCalculator,
+         edgeResolver: edgeResolver,
        ),
        routeAssembler = RouteAssembler(costCalculator: costCalculator);
 
   final NetworkGraph graph;
   final AccessibilityCostCalculator costCalculator;
+  final RouteEdge Function(RouteEdge edge)? edgeResolver;
   final AccessGraphRouter accessGraphRouter;
   final RouteAssembler routeAssembler;
 
@@ -121,10 +124,12 @@ class AccessGraphRouter {
   const AccessGraphRouter({
     required this.graph,
     this.costCalculator = const AccessibilityCostCalculator(),
+    this.edgeResolver,
   });
 
   final NetworkGraph graph;
   final AccessibilityCostCalculator costCalculator;
+  final RouteEdge Function(RouteEdge edge)? edgeResolver;
 
   AccessPathResult findPath({
     required String originNodeId,
@@ -241,7 +246,8 @@ class AccessGraphRouter {
         break;
       }
 
-      for (final edge in graph.edgesFrom(candidate.nodeId)) {
+      for (final storedEdge in graph.edgesFrom(candidate.nodeId)) {
+        final edge = edgeResolver?.call(storedEdge) ?? storedEdge;
         if (!traversalPolicy.canTraverse(
           edge,
           currentNodeId: candidate.nodeId,

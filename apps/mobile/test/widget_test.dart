@@ -12338,6 +12338,15 @@ void main() {
       },
       enablePushNotifications: false,
     );
+    await tester.runAsync(
+      () => dependencies.routeRepository.searchRoute(
+        const RouteSearchRequest(
+          originStationId: 'station-sangnoksu',
+          destinationStationId: 'station-sadang',
+          mobilityType: 'STANDARD',
+        ),
+      ),
+    );
     final semanticsHandle = tester.ensureSemantics();
     try {
       await tester.pumpWidget(

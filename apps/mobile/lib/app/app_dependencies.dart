@@ -67,6 +67,7 @@ class AppDependencies {
     StationSearchRepository? repository,
     FacilityReportRepository? reportRepository,
     RouteSearchRepository? routeRepository,
+    LocalRouteRepository? localRouteRepository,
     RouteFeedbackRepository? routeFeedbackRepository,
     FavoriteStationRepository? favoriteRepository,
     FavoriteFacilityRepository? favoriteFacilityRepository,
@@ -148,14 +149,16 @@ class AppDependencies {
     final resolvedRealtimeRepository =
         realtimeRepository ??
         _defaultRealtimeRepository(baseUri: optionalBaseUri);
-    final localRouteRepository = catalogDatabase == null
-        ? null
-        : LocalRouteRepository(
-            catalogDatabase: catalogDatabase,
-            officialOdFareRepository: OfficialOdFareRepository(
-              catalogDatabase: catalogDatabase,
-            ),
-          );
+    final resolvedLocalRouteRepository =
+        localRouteRepository ??
+        (catalogDatabase == null
+            ? null
+            : LocalRouteRepository(
+                catalogDatabase: catalogDatabase,
+                officialOdFareRepository: OfficialOdFareRepository(
+                  catalogDatabase: catalogDatabase,
+                ),
+              ));
 
     return AppDependencies(
       repository: resolvedStationRepository,
@@ -169,20 +172,20 @@ class AppDependencies {
           routeRepository ??
           (() {
             if (!enableRouteV2OnlineFirst) {
-              return localRouteRepository == null
+              return resolvedLocalRouteRepository == null
                   ? RouteSearchApiRepository(baseUri: requireBaseUri())
                   : LocalFirstRouteSearchRepository(
-                      localRepository: localRouteRepository,
+                      localRepository: resolvedLocalRouteRepository,
                     );
             }
-            if (localRouteRepository == null) {
+            if (resolvedLocalRouteRepository == null) {
               throw StateError(
                 'Route V2 online-first requires a local catalog database.',
               );
             }
             final routeV2BaseUri = requireBaseUri();
             final local = LocalFirstRouteSearchRepository(
-              localRepository: localRouteRepository,
+              localRepository: resolvedLocalRouteRepository,
             );
             final sessionProvider = PlayIntegrityRouteV2SessionProvider(
               apiClient: ApiClient(baseUri: routeV2BaseUri),
@@ -197,7 +200,7 @@ class AppDependencies {
                   bearerTokenProvider: sessionProvider.issueToken,
                   bearerTokenInvalidator: sessionProvider.invalidateSession,
                 ),
-                localRepository: localRouteRepository,
+                localRepository: resolvedLocalRouteRepository,
                 metrics: routeSearchOnlineFirstMetrics,
               ),
             );
