@@ -10640,7 +10640,7 @@ void main() {
     );
   });
 
-  testWidgets('역 상세는 시설 목록이 없으면 확인 필요 요약을 숨긴다', (tester) async {
+  testWidgets('역 상세는 시설 목록이 없으면 시설 섹션을 통째로 숨긴다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final repository = FakeStationSearchRepository(
       nextResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
@@ -10670,8 +10670,9 @@ void main() {
       await tester.drag(find.byType(ListView), const Offset(0, -520));
       await tester.pumpAndSettle();
 
-      expect(find.text('시설'), findsOneWidget);
-      expect(find.text('시설 안내를 준비 중이에요.'), findsOneWidget);
+      // #2078: 시설 데이터가 없으면 섹션 제목·빈 안내·잔여 간격을 모두 숨긴다.
+      expect(find.text('시설'), findsNothing);
+      expect(find.text('시설 안내를 준비 중이에요.'), findsNothing);
       expect(find.text('확인 필요 없음'), findsNothing);
       expect(find.bySemanticsLabel('다시 볼 시설 없음'), findsNothing);
     } finally {
@@ -10882,7 +10883,7 @@ void main() {
     }
   });
 
-  testWidgets('역 상세 시간표는 로컬 coverage가 없으면 준비 중으로 강등한다', (tester) async {
+  testWidgets('역 상세 시간표는 로컬 coverage가 없으면 사실형 빈 안내를 보여준다', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: StationDetailScreen(
@@ -10899,7 +10900,7 @@ void main() {
     await tester.tap(find.byKey(const Key('stationTimetableButton')));
     await tester.pumpAndSettle();
 
-    expect(find.text('시간표를 준비 중이에요.'), findsOneWidget);
+    expect(find.text('시간표 정보가 없어요'), findsOneWidget);
     expect(find.textContaining('임시'), findsNothing);
   });
 
@@ -11854,11 +11855,11 @@ void main() {
       expect(find.textContaining('STATIC_ESTIMATE'), findsNothing);
       expect(find.textContaining('MEASURED'), findsNothing);
       expect(find.text('계단 없는 승강장 접근 동선을 확인해 이동합니다.'), findsOneWidget);
-      expect(find.text('약 4분 · 180m · 엘리베이터 안내 준비 중'), findsOneWidget);
+      expect(find.text('약 4분 · 180m · 엘리베이터 안내 미확인'), findsOneWidget);
       // 여러 주의는 각주 한 줄로 합쳐 하나의 '주의 확인'만 노출한다(#1577).
       expect(find.text('주의 확인'), findsOneWidget);
       expect(
-        find.text('일부 시설 안내를 준비 중이에요. · 시설 상태 안내가 오래됐을 수 있어요.'),
+        find.text('일부 시설 안내는 아직 확인되지 않았어요. · 시설 상태 안내가 오래됐을 수 있어요.'),
         findsOneWidget,
       );
       expect(
@@ -18648,7 +18649,7 @@ RouteSearchResult _sampleRouteSearchResult({
     warnings: const [
       RouteSearchWarning(
         code: 'LOW_DATA_CONFIDENCE',
-        message: '일부 시설 안내를 준비 중이에요.',
+        message: '일부 시설 안내는 아직 확인되지 않았어요.',
       ),
       RouteSearchWarning(
         code: 'STALE_ACCESSIBILITY_DATA',

@@ -922,7 +922,7 @@ class FacilityReportResult {
   String get displayReceiptCode {
     final code = publicReceiptCode?.trim();
     if (code == null || code.isEmpty) {
-      return '준비 중';
+      return '발급 전';
     }
     return code;
   }
