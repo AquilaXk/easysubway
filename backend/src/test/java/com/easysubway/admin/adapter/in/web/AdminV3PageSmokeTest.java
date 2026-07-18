@@ -211,15 +211,17 @@ class AdminV3PageSmokeTest {
 			.getResponse()
 			.getContentAsString();
 
+		// 렌더되는 workspace는 고유 disclosure 토큰(aria-controls)으로, 빈 workspace는 그 토큰의 부재로
+		// 단언한다 — 다른 화면 텍스트에 우연히 섞일 수 있는 라벨 substring("분석" 등) 대신 고유 토큰을 쓴다.
 		assertThat(html)
 			.contains("class=\"admin-nav-workspace-toggle\"")
 			.contains("aria-controls=\"admin-workspace-overview\"")
-			.contains("개요")
-			.contains("역·접근성 데이터")
-			.contains("분석")
-			.doesNotContain("커뮤니케이션")
-			.doesNotContain("데이터팩")
-			.doesNotContain("시스템·감사");
+			.contains("aria-controls=\"admin-workspace-accessibility-data\"")
+			.contains("aria-controls=\"admin-workspace-analytics\"")
+			.doesNotContain("aria-controls=\"admin-workspace-operations\"")
+			.doesNotContain("aria-controls=\"admin-workspace-communications\"")
+			.doesNotContain("aria-controls=\"admin-workspace-datapack\"")
+			.doesNotContain("aria-controls=\"admin-workspace-system-audit\"");
 
 		// 현재 위치(대시보드)를 담은 workspace만 data-current="true"로 렌더돼 JS가 이 영역만 펼친다.
 		// no-JS 폴백을 위해 서버는 toggle에 aria-expanded="true"를 정적으로 붙여 모든 program을 노출한다.
@@ -227,7 +229,30 @@ class AdminV3PageSmokeTest {
 			.contains("is-current")
 			.contains("data-current=\"true\"")
 			.contains("data-current=\"false\"")
-			.contains("aria-expanded=\"true\"");
+			.contains("aria-expanded=\"true\"")
+			// 현재 위치가 있는 페이지는 no-current 폴백 표식을 붙이지 않는다(현재 영역만 펼침 유지).
+			.doesNotContain("class=\"admin-nav-scroll is-no-current\"");
+	}
+
+	@Test
+	@DisplayName("현재 위치 없는 페이지(검색)는 nav-scroll에 is-no-current를 붙여 JS 폴백으로 전 영역을 펼친다")
+	void adminSidebarFallsBackToAllExpandedWhenNoWorkspaceIsCurrent() throws Exception {
+		// 검색 페이지는 sidebar('')로 렌더돼 어떤 workspace도 현재 위치가 아니다. 서버가 이 상태를
+		// .admin-nav-scroll에 is-no-current로 표식하면, JS(navWorkspace init)가 전 영역 펼침으로 폴백해
+		// program 링크가 접혀 사라지는 회귀(#2277 리뷰)를 막는다. no-JS는 정적 펼침을 그대로 유지한다.
+		String html = mockMvc.perform(get("/admin/search")
+				.with(user("viewer").authorities(new SimpleGrantedAuthority("admin.view"))))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("class=\"admin-nav-scroll is-no-current\"")
+			.contains("aria-controls=\"admin-workspace-overview\"")
+			.contains("href=\"/admin/dashboard/page\"")
+			.contains("data-current=\"false\"")
+			.doesNotContain("data-current=\"true\"");
 	}
 
 	@Test

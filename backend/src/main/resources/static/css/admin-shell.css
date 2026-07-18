@@ -143,8 +143,10 @@
 
 /* 펼침 전 flash 방지(#2277): JS 초기화 창(has-js, has-js-ready 이전)에서만 현재 위치가 아닌 영역의
    program 목록을 숨긴다. has-js-ready 이후로는 navWorkspace의 x-show 인라인 display가 전담하고,
-   no-JS(has-js 미부착)는 이 규칙이 걸리지 않아 모든 영역이 펼쳐진 채 유지된다(폴백). */
-.admin-v3.has-js:not(.has-js-ready) .admin-nav-workspace:not(.is-current) .admin-nav-workspace-programs {
+   no-JS(has-js 미부착)는 이 규칙이 걸리지 않아 모든 영역이 펼쳐진 채 유지된다(폴백).
+   현재 위치가 없는 페이지(.admin-nav-scroll.is-no-current, #2277 리뷰)는 가드에서 제외해 전 영역을
+   펼친 채 유지한다 — is-current가 하나도 없어 모든 영역이 숨겨지는 회귀를 막는다. */
+.admin-v3.has-js:not(.has-js-ready) .admin-nav-scroll:not(.is-no-current) .admin-nav-workspace:not(.is-current) .admin-nav-workspace-programs {
 	display: none;
 }
 

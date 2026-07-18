@@ -58,7 +58,12 @@ document.addEventListener('alpine:init', function () {
 		return {
 			expanded: true,
 			init: function () {
-				this.expanded = this.$el.dataset.current === 'true';
+				// 현재 위치가 없는 페이지(sidebar('')로 렌더되는 검색·알림·오류 등)는 서버가
+				// .admin-nav-scroll에 is-no-current를 붙인다. 이때 어떤 영역도 data-current="true"가
+				// 아니어서 전 영역이 접히는 회귀를 막기 위해 전 영역 펼침으로 폴백한다(#2277 리뷰).
+				var scroll = this.$el.closest('.admin-nav-scroll');
+				var noCurrent = scroll ? scroll.classList.contains('is-no-current') : false;
+				this.expanded = noCurrent || this.$el.dataset.current === 'true';
 			},
 			get ariaExpanded() {
 				return this.expanded ? 'true' : 'false';

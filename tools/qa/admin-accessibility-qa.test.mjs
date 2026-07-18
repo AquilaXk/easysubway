@@ -94,6 +94,17 @@ test("admin accessibility QA script verifies workspace disclosure defaults to cu
   assert.match(source, /workspace disclosure did not default to only the current workspace expanded/);
 });
 
+// #2277 리뷰: 현재 위치가 없는 페이지가 전 영역 펼침으로 폴백하는지 QA 하네스가 실제로 검증하는 계약.
+test("admin accessibility QA script verifies no-current page falls back to all workspaces expanded", () => {
+  assert.match(source, /check: "nav-workspace-no-current-disclosure"/);
+  assert.match(source, /\/admin\/search/);
+  assert.match(source, /is-no-current/);
+  assert.match(source, /disclosure\.expanded === disclosure\.total/);
+  assert.match(source, /disclosure\.visiblePrograms === disclosure\.total/);
+  assert.match(source, /no-current page did not fall back to all workspaces expanded/);
+  assert.match(source, /await noCurrentWorkspaceDisclosure\(page, baseUrl, report\)/);
+});
+
 test("admin accessibility QA script verifies admin-table-scroll keyboard and focus outline", () => {
   assert.match(source, /keyboardTableCheck/);
   assert.match(source, /admin-table-scroll/);

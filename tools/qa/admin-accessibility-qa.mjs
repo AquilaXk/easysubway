@@ -194,6 +194,7 @@ async function runJsPass(browser, baseUrl, outputDir, adminUser, adminPassword, 
   }
   await keyboardSmoke(page, baseUrl, report);
   await captureAxTree(page, outputDir, report);
+  await noCurrentWorkspaceDisclosure(page, baseUrl, report);
   await keyboardTableCheck(page, baseUrl, report);
   await textScalePass(page, baseUrl, outputDir, report, ADMIN_TEXT_SCALE_PAGES);
   await context.close();
@@ -460,6 +461,36 @@ async function keyboardSmoke(page, baseUrl, report) {
     && workspaceDisclosure.expanded === 1
     && workspaceDisclosure.collapsed === workspaceDisclosure.total - 1)) {
     throw new Error(`workspace disclosure did not default to only the current workspace expanded: ${JSON.stringify(workspaceDisclosure)}`);
+  }
+}
+
+// #2277 리뷰: 현재 위치가 없는 페이지(sidebar('')로 렌더되는 검색·알림·오류)는 is-current 영역이
+// 하나도 없어 JS가 전 영역을 접어 program 링크가 사라지는 회귀가 있었다. 서버가 .admin-nav-scroll에
+// is-no-current를 붙이고 navWorkspace init이 전 영역 펼침으로 폴백하는지 실제 브라우저로 검증한다.
+// /admin/search를 대표로 방문해 모든 영역이 펼쳐지고(aria-expanded=true) program 목록이 실제로 보이는지 확인한다.
+async function noCurrentWorkspaceDisclosure(page, baseUrl, report) {
+  await page.setViewportSize(VIEWPORTS.find((viewport) => viewport.name === "desktop-1280"));
+  const response = await page.goto(`${baseUrl}/admin/search`, { waitUntil: "networkidle" });
+  await assertOk(page, "/admin/search", response);
+  // Alpine이 x-show를 최초 평가(has-js-ready)한 뒤 판정한다 — 폴백이 실제로 program 목록을 펼쳤는지 본다.
+  await page.waitForSelector("body.has-js-ready", { timeout: 2000 }).catch(() => {});
+  const disclosure = await page.evaluate(() => {
+    const scroll = document.querySelector(".admin-nav-scroll");
+    const toggles = Array.from(document.querySelectorAll(".admin-nav-workspace-toggle"));
+    const programs = Array.from(document.querySelectorAll(".admin-nav-workspace-programs"));
+    return {
+      isNoCurrent: Boolean(scroll && scroll.classList.contains("is-no-current")),
+      total: toggles.length,
+      expanded: toggles.filter((toggle) => toggle.getAttribute("aria-expanded") === "true").length,
+      visiblePrograms: programs.filter((element) => element.getClientRects().length > 0).length,
+    };
+  });
+  report.keyboard.push({ check: "nav-workspace-no-current-disclosure", ...disclosure });
+  if (!(disclosure.isNoCurrent
+    && disclosure.total >= 2
+    && disclosure.expanded === disclosure.total
+    && disclosure.visiblePrograms === disclosure.total)) {
+    throw new Error(`no-current page did not fall back to all workspaces expanded: ${JSON.stringify(disclosure)}`);
   }
 }
 
