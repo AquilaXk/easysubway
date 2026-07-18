@@ -3,6 +3,9 @@ package com.easysubway.train.adapter.out.http;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.easysubway.train.application.TrainSearchProvider.ProviderFailure;
 import com.easysubway.train.domain.TrainSearchModels.Journey;
@@ -16,6 +19,8 @@ import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -50,7 +55,7 @@ class TagoTrainSearchProviderTest {
 		var journeys = provider.parseJourneys(JSON.readTree("""
 			{"response":{"header":{"resultCode":"00","resultMsg":"NORMAL SERVICE."},"body":{
 			  "items":{"item":[
-			    {"trainno":"00101","traingradename":"KTX","depplandtime":"20260720090000","arrplandtime":"20260720100200","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"},
+			    {"trainno":"00101","traingradename":"KTX","depplandtime":"20260720090000","arrplandtime":"20260720100200","depplacename":"서울","arrplacename":"대전","adultcharge":23700},
 			    {"trainno":"2001","traingradename":"ITX-청춘","depplandtime":"20260720091000","arrplandtime":"20260720110000","depplacename":"서울","arrplacename":"대전","adultcharge":"10000"}
 			  ]},"pageNo":1,"numOfRows":100,"totalCount":2
 			}}}
@@ -121,6 +126,45 @@ class TagoTrainSearchProviderTest {
 				.containsEntry("pageNo", "1")
 				.containsEntry("numOfRows", "100")
 				.containsEntry("serviceKey", "encoded+service/key");
+		} finally {
+			server.stop(0);
+		}
+	}
+
+	@Test
+	void rejectsConflictingStationNamesForOneProviderId() throws Exception {
+		var server = server(exchange -> {
+			String operation = exchange.getRequestURI().getPath().substring(1);
+			switch (operation) {
+				case "GetCtyCodeList" -> respond(exchange, catalogResponse("""
+					[{"citycode":"11","cityname":"서울"},{"citycode":"12","cityname":"부산"}]
+					"""));
+				case "GetVhcleKndList" -> respond(exchange, catalogResponse("""
+					[
+					  {"vehiclekndid":"00","vehiclekndnm":"KTX"},
+					  {"vehiclekndid":"01","vehiclekndnm":"KTX-산천"},
+					  {"vehiclekndid":"02","vehiclekndnm":"SRT"},
+					  {"vehiclekndid":"03","vehiclekndnm":"ITX-마음"},
+					  {"vehiclekndid":"04","vehiclekndnm":"ITX-새마을"},
+					  {"vehiclekndid":"05","vehiclekndnm":"새마을호"},
+					  {"vehiclekndid":"06","vehiclekndnm":"무궁화호"},
+					  {"vehiclekndid":"08","vehiclekndnm":"누리로"}
+					]
+					"""));
+				case "GetCtyAcctoTrainSttnList" -> {
+					String cityCode = query(exchange.getRequestURI()).get("cityCode");
+					String name = "11".equals(cityCode) ? "서울" : "서울역";
+					respond(exchange, paginatedResponse("""
+						[{"nodeid":"NAT010000","nodename":"%s"}]
+						""".formatted(name), 1));
+				}
+				default -> respond(exchange, 404, "unexpected operation");
+			}
+		});
+		try {
+			assertThatThrownBy(() -> provider(server, "test-key").catalog())
+				.isInstanceOf(ProviderFailure.class)
+				.hasMessage("TRAIN_SEARCH_PROVIDER_ERROR");
 		} finally {
 			server.stop(0);
 		}
@@ -261,23 +305,35 @@ class TagoTrainSearchProviderTest {
 	@Test
 	void retriesOneTransportFailureBeforeResponse() throws Exception {
 		var attempts = new AtomicInteger();
-		var server = server(exchange -> {
+		var budgetCalls = new AtomicInteger();
+		var httpClient = mock(HttpClient.class);
+		@SuppressWarnings("unchecked")
+		var response = (HttpResponse<String>) mock(HttpResponse.class);
+		when(response.statusCode()).thenReturn(200);
+		when(response.body()).thenReturn(paginatedResponse("""
+			{"trainno":"101","traingradename":"KTX","depplandtime":"20260720090000","arrplandtime":"20260720100200","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"}
+			""", 1));
+		when(httpClient.<String>send(any(HttpRequest.class), any()))
+			.thenAnswer(invocation -> {
 			if (attempts.incrementAndGet() == 1) {
-				exchange.close();
-				return;
+				throw new IOException("transient transport failure");
 			}
-			respond(exchange, paginatedResponse("""
-				{"trainno":"101","traingradename":"KTX","depplandtime":"20260720090000","arrplandtime":"20260720100200","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"}
-				""", 1));
+			return response;
 		});
-		try {
-			var query = legQuery(LocalDate.parse("2026-07-20"), "KTX", "00");
+		var provider = new TagoTrainSearchProvider(
+			"test-key",
+			JSON,
+			httpClient,
+			Clock.fixed(Instant.parse("2026-07-19T00:00:00Z"), ZoneOffset.UTC),
+			URI.create("https://provider.example/"),
+			budgetCalls::incrementAndGet,
+			java.time.Duration.ZERO
+		);
+		var query = legQuery(LocalDate.parse("2026-07-20"), "KTX", "00");
 
-			assertThat(provider(server, "test-key").search(query)).hasSize(1);
-			assertThat(attempts).hasValue(2);
-		} finally {
-			server.stop(0);
-		}
+		assertThat(provider.search(query)).hasSize(1);
+		assertThat(attempts).hasValue(2);
+		assertThat(budgetCalls).hasValue(2);
 	}
 
 	@Test
@@ -332,6 +388,23 @@ class TagoTrainSearchProviderTest {
 			var query = legQuery(LocalDate.parse("2026-07-20"), "KTX", "00");
 
 			assertThatThrownBy(() -> provider(server, "test-key").search(query))
+				.isInstanceOf(ProviderFailure.class)
+				.hasMessage("TRAIN_SEARCH_PROVIDER_ERROR");
+		} finally {
+			server.stop(0);
+		}
+	}
+
+	@Test
+	void rejectsShiftedPaginationEvenWhenTheFinalTotalMatches() throws Exception {
+		var server = server(exchange -> {
+			int page = Integer.parseInt(query(exchange.getRequestURI()).get("pageNo"));
+			String rows = page == 1 ? journeyRows(1, 50) : journeyRows(51, 100);
+			respond(exchange, paginatedResponse(rows, 150, page));
+		});
+		try {
+			assertThatThrownBy(() -> provider(server, "test-key")
+				.search(legQuery(LocalDate.parse("2026-07-20"), "KTX", "00")))
 				.isInstanceOf(ProviderFailure.class)
 				.hasMessage("TRAIN_SEARCH_PROVIDER_ERROR");
 		} finally {
@@ -408,6 +481,51 @@ class TagoTrainSearchProviderTest {
 			assertThatThrownBy(() -> provider(server, "test-key").search(query))
 				.isInstanceOf(ProviderFailure.class)
 				.hasMessage("TRAIN_SEARCH_NO_VALID_ROWS");
+		} finally {
+			server.stop(0);
+		}
+	}
+
+	@Test
+	void rejectsNumericJsonForTextFields() throws Exception {
+		var server = server(exchange -> respond(exchange, paginatedResponse("""
+			{"trainno":101,"traingradename":"KTX","depplandtime":"20260720090000","arrplandtime":"20260720100200","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"}
+			""", 1)));
+		try {
+			assertThatThrownBy(() -> provider(server, "test-key")
+				.search(legQuery(LocalDate.parse("2026-07-20"), "KTX", "00")))
+				.isInstanceOf(ProviderFailure.class)
+				.hasMessage("TRAIN_SEARCH_NO_VALID_ROWS");
+		} finally {
+			server.stop(0);
+		}
+	}
+
+	@Test
+	void rejectsInvalidSearchContractBeforeCallingTheProvider() throws Exception {
+		var requests = new AtomicInteger();
+		var server = server(exchange -> {
+			requests.incrementAndGet();
+			respond(exchange, paginatedResponse("[]", 0));
+		});
+		try {
+			var provider = provider(server, "test-key");
+			assertThatThrownBy(() -> provider.search(null))
+				.isInstanceOf(ProviderFailure.class)
+				.hasMessage("TRAIN_SEARCH_PROVIDER_ERROR");
+
+			for (LegQuery query : java.util.List.of(
+				new LegQuery(null, "NAT011668", LocalDate.parse("2026-07-20"), "KTX", java.util.List.of("00"), "서울", "대전"),
+				new LegQuery("NAT010000", " ", LocalDate.parse("2026-07-20"), "KTX", java.util.List.of("00"), "서울", "대전"),
+				new LegQuery("NAT010000", "NAT011668", null, "KTX", java.util.List.of("00"), "서울", "대전"),
+				new LegQuery("NAT010000", "NAT011668", LocalDate.parse("2026-07-20"), null, java.util.List.of("00"), "서울", "대전"),
+				new LegQuery("NAT010000", "NAT011668", LocalDate.parse("2026-07-20"), "ITX_CHEONGCHUN", java.util.List.of("07"), "서울", "대전")
+			)) {
+				assertThatThrownBy(() -> provider.search(query))
+					.isInstanceOf(ProviderFailure.class)
+					.hasMessage("TRAIN_SEARCH_PROVIDER_ERROR");
+			}
+			assertThat(requests).hasValue(0);
 		} finally {
 			server.stop(0);
 		}

@@ -156,7 +156,11 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 			String cityCode = requiredText(city, "citycode");
 			for (JsonNode station : paginated("GetCtyAcctoTrainSttnList", Map.of("cityCode", cityCode))) {
 				String id = requiredText(station, "nodeid");
-				stations.putIfAbsent(id, new Station(id, requiredText(station, "nodename")));
+				Station candidate = new Station(id, requiredText(station, "nodename"));
+				Station existing = stations.putIfAbsent(id, candidate);
+				if (existing != null && !existing.equals(candidate)) {
+					throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
+				}
 			}
 		}
 
@@ -189,7 +193,15 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 
 	@Override
 	public List<Journey> search(LegQuery query) {
-		if (normalizeStationName(query.departureStationName()).isBlank()
+		if (query == null
+			|| query.departureStationId() == null
+			|| query.departureStationId().isBlank()
+			|| query.arrivalStationId() == null
+			|| query.arrivalStationId().isBlank()
+			|| query.departureDate() == null
+			|| query.trainType() == null
+			|| !TrainSearchScopePolicy.supportedTrainTypes().contains(query.trainType())
+			|| normalizeStationName(query.departureStationName()).isBlank()
 			|| normalizeStationName(query.arrivalStationName()).isBlank()) {
 			throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
 		}
@@ -358,15 +370,22 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 
 	private String requiredText(JsonNode row, String field) {
 		JsonNode value = row.path(field);
-		if ((!value.isTextual() && !value.isNumber()) || value.asText().isBlank()) {
+		if (!value.isTextual() || value.asText().isBlank()) {
 			throw new IllegalArgumentException("TRAIN_SEARCH_NO_VALID_ROWS");
 		}
 		return value.asText().trim();
 	}
 
 	private int integer(JsonNode row, String field) {
+		JsonNode value = row.path(field);
+		if (value.isIntegralNumber() && value.canConvertToInt()) {
+			return value.intValue();
+		}
 		try {
-			return Integer.parseInt(requiredText(row, field));
+			if (!value.isTextual() || value.asText().isBlank()) {
+				throw new NumberFormatException();
+			}
+			return Integer.parseInt(value.asText().trim());
 		} catch (NumberFormatException exception) {
 			throw new IllegalArgumentException("TRAIN_SEARCH_NO_VALID_ROWS");
 		}
@@ -399,7 +418,8 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 				throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
 			}
 			List<JsonNode> pageRows = itemRows(body);
-			if (pageRows.isEmpty() && rows.size() < totalCount) {
+			int expectedRowsOnPage = Math.min(PAGE_SIZE, totalCount - rows.size());
+			if (pageRows.size() != expectedRowsOnPage) {
 				throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
 			}
 			rows.addAll(pageRows);

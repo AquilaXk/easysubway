@@ -25,5 +25,9 @@ public interface TrainSearchProvider {
 		public ProviderFailure(String code) {
 			super(code);
 		}
+
+		public ProviderFailure(String code, Throwable cause) {
+			super(code, cause);
+		}
 	}
 }

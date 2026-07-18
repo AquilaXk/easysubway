@@ -36,7 +36,7 @@ final class SharedTrainSearchProviderCallBudget implements TrainSearchProviderCa
 				return;
 			}
 		} catch (DataAccessException | TransactionException exception) {
-			throw new ProviderFailure("TRAIN_SEARCH_UNAVAILABLE");
+			throw new ProviderFailure("TRAIN_SEARCH_UNAVAILABLE", exception);
 		}
 		throw new ProviderFailure("TRAIN_SEARCH_UNAVAILABLE");
 	}

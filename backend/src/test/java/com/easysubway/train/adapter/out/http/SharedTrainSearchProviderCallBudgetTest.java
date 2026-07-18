@@ -36,7 +36,8 @@ class SharedTrainSearchProviderCallBudgetTest {
 
 		assertThatThrownBy(budget::acquire)
 			.isInstanceOf(ProviderFailure.class)
-			.hasMessage("TRAIN_SEARCH_UNAVAILABLE");
+			.hasMessage("TRAIN_SEARCH_UNAVAILABLE")
+			.hasCauseInstanceOf(QueryTimeoutException.class);
 		verify(cache).tryAcquireProviderCall("tago-train", ZoneId.of("Asia/Seoul"), 10, 1000);
 	}
 
