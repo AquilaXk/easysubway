@@ -181,6 +181,22 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 	}
 
 	@Test
+	@DisplayName("동률 도착은 기존 exhaustive 전역 trip-id 순서를 유지한다")
+	void preservesLegacyTripOrderForEqualArrival() {
+		var results = planner.search(
+			command("station-a", "station-c", "2026-07-01T08:50:00+09:00"),
+			planner.compile(equalArrivalOvertakingTimetable())
+		);
+
+		assertThat(results).hasSize(1);
+		assertThat(results.getFirst().steps())
+			.filteredOn(step -> "ride".equals(step.stepType()))
+			.extracting("tripId", "plannedArrivalTime")
+			.containsExactly(org.assertj.core.groups.Tuple.tuple(
+				"a-fast", "2026-07-01T09:35:00+09:00"));
+	}
+
+	@Test
 	@DisplayName("같은 정차열에서 하차 정책이 다른 후속 trip을 잃지 않는다")
 	void preservesLaterTripWhenEarlierTripBlocksDropOff() {
 		var results = planner.search(
@@ -388,6 +404,28 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 					"trip-blocked", 2, "station-b", "line", 33000, 33000, 0, 1),
 				stop("trip-usable", 1, "station-a", 32700),
 				stop("trip-usable", 2, "station-b", 33300)
+			),
+			List.of()
+		);
+	}
+
+	private static RouteTimetable equalArrivalOvertakingTimetable() {
+		return timetable(
+			List.of(weekday("weekday")),
+			List.of(),
+			List.of(
+				new LoadRouteTimetablePort.TransitTrip(
+					"z-slow", "route", "weekday", "도착", "0", "LOCAL", 0),
+				new LoadRouteTimetablePort.TransitTrip(
+					"a-fast", "route", "weekday", "도착", "0", "EXPRESS", 0)
+			),
+			List.of(
+				stop("z-slow", 1, "station-a", 32400),
+				stop("z-slow", 2, "station-b", 33600),
+				stop("z-slow", 3, "station-c", 34500),
+				stop("a-fast", 1, "station-a", 33000),
+				stop("a-fast", 2, "station-b", 33300),
+				stop("a-fast", 3, "station-c", 34500)
 			),
 			List.of()
 		);

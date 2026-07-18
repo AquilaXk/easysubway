@@ -1198,7 +1198,13 @@ class RouteTimetableRaptorPlanner {
 			int alightStop
 		) {
 			int candidateSlot = slot(boardings, station);
-			if (arrivalSeconds[candidateSlot] <= candidateArrivalSeconds) {
+			int existingArrivalSeconds = arrivalSeconds[candidateSlot];
+			if (existingArrivalSeconds < candidateArrivalSeconds) {
+				return;
+			}
+			if (existingArrivalSeconds == candidateArrivalSeconds
+				&& (parentTrip[candidateSlot] < trip
+					|| (parentTrip[candidateSlot] == trip && parentBoardStop[candidateSlot] <= boardStop))) {
 				return;
 			}
 			for (int fewerBoardings = 0; fewerBoardings < boardings; fewerBoardings += 1) {
