@@ -377,19 +377,19 @@ docker run -d --name "${clone_backend}" --network "${network}" --network-alias b
 # helper for that purpose — built from the already-pulled backend image (which ships
 # curl), kept out of docker_stats/OOM/restart sampling so load-generation traffic
 # never taints the backend/gateway resource-peak evidence.
-docker run -d --name "${clone_curl}" --network "${network}" --user 0:0 --entrypoint sh \
+docker run -d --name "${clone_curl}" --network "${network}" --user "$(id -u):$(id -g)" --entrypoint sh \
 	--cpus 1 --memory 128m --memory-swap 128m --pids-limit 64 \
 	-v "${work_dir}:${work_dir}" \
 	"${expected_image_id}" -c 'sleep infinity' >/dev/null
 curl_helper_ready=false
 for _ in $(seq 1 30); do
-	if docker exec "${clone_curl}" true >/dev/null 2>&1; then
+	if docker exec "${clone_curl}" curl --version >/dev/null 2>&1; then
 		curl_helper_ready=true
 		break
 	fi
 	sleep 1
 done
-[[ "${curl_helper_ready}" == true ]] || { echo 'isolated curl helper readiness timed out' >&2; exit 1; }
+[[ "${curl_helper_ready}" == true ]] || { echo 'isolated curl helper is missing curl or failed to start' >&2; exit 1; }
 
 backend_ready=false
 for _ in $(seq 1 120); do

@@ -60,7 +60,9 @@ test("capacity runner는 동일 candidate·격리 load·privacy·closed ingress�
   assert.doesNotMatch(runner, /docker port "\$\{clone_backend\}"/);
   assert.doesNotMatch(runner, /docker port "\$\{clone_gateway\}"/);
   assert.match(runner, /clone_curl="\$\{prefix\}-curl"/);
-  assert.match(runner, /docker run -d --name "\$\{clone_curl\}" --network "\$\{network\}" --user 0:0 --entrypoint sh/);
+  assert.match(runner, /docker run -d --name "\$\{clone_curl\}" --network "\$\{network\}" --user "\$\(id -u\):\$\(id -g\)" --entrypoint sh/);
+  assert.doesNotMatch(runner, /--user 0:0/);
+  assert.match(runner, /docker exec "\$\{clone_curl\}" curl --version/);
   assert.match(runner, /docker exec "\$\{clone_curl\}" curl/);
   assert.match(runner, /--network-alias gateway/);
   assert.match(runner, /gateway_base="http:\/\/gateway:8081"/);
