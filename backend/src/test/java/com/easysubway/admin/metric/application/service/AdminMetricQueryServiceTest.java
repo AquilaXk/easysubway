@@ -3,6 +3,7 @@ package com.easysubway.admin.metric.application.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
+import com.easysubway.admin.metric.adapter.in.web.AnalyticsComparisonCard;
 import com.easysubway.admin.metric.adapter.out.persistence.InMemoryAdminMetricDailyRepository;
 import com.easysubway.admin.metric.application.service.AdminMetricQueryService.AdminMetricComparison;
 import com.easysubway.admin.metric.domain.AdminMetricDaily;
@@ -97,6 +98,40 @@ class AdminMetricQueryServiceTest {
 		assertThat(comparison.current()).isEqualTo(30.0);
 		assertThat(comparison.previous()).isEqualTo(0.0);
 		assertThat(comparison.deltaPercent()).isNull();
+	}
+
+	@Test
+	@DisplayName("직전 기간에 스냅샷이 없으면 부재로 보고 카드에 '직전 없음'으로 표기한다")
+	void previousAbsentRendersNoPreviousLabel() {
+		// 직전 7일 [06-23, 06-29]에 스냅샷이 하나도 없음 → previous는 0으로 채우지만 실측이 아니다.
+		save(AdminMetricKeys.USERS_ACTIVE, TODAY, 30);
+
+		AdminMetricComparison comparison = service.compare(List.of(AdminMetricKeys.USERS_ACTIVE), 7).getFirst();
+
+		assertThat(comparison.previous()).isEqualTo(0.0);
+		assertThat(comparison.previousPresent()).isFalse();
+		assertThat(comparison.deltaPercent()).isNull();
+
+		AnalyticsComparisonCard card = AnalyticsComparisonCard.from(comparison, true);
+		assertThat(card.deltaPercentLabel()).isEqualTo("직전 없음");
+	}
+
+	@Test
+	@DisplayName("직전 기간 실측값이 0이면 부재와 구분해 '기준 0 — 증가율 산정 불가'로 표기한다")
+	void previousMeasuredZeroRendersUndefinedGrowthLabel() {
+		// 직전 7일 [06-23, 06-29]에 실측 0 스냅샷 존재 → 부재가 아니라 실측된 0이다.
+		save(AdminMetricKeys.USERS_ACTIVE, TODAY.minusDays(8), 0);
+		save(AdminMetricKeys.USERS_ACTIVE, TODAY, 30);
+
+		AdminMetricComparison comparison = service.compare(List.of(AdminMetricKeys.USERS_ACTIVE), 7).getFirst();
+
+		assertThat(comparison.current()).isEqualTo(30.0);
+		assertThat(comparison.previous()).isEqualTo(0.0);
+		assertThat(comparison.previousPresent()).isTrue();
+		assertThat(comparison.deltaPercent()).isNull();
+
+		AnalyticsComparisonCard card = AnalyticsComparisonCard.from(comparison, true);
+		assertThat(card.deltaPercentLabel()).isEqualTo("기준 0 — 증가율 산정 불가");
 	}
 
 	@Test

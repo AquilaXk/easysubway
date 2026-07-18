@@ -96,9 +96,11 @@ public class AdminMetricQueryService {
 				AdminMetricKind kind = AdminMetricKeys.kind(key);
 				double current = aggregate(valuesByDate, currentFrom, today, kind);
 				double previous = aggregate(valuesByDate, previousFrom, previousTo, kind);
+				boolean previousPresent = hasSnapshot(valuesByDate, previousFrom, previousTo);
 				Double deltaPercent = previous == 0.0 ? null : (current - previous) * 100 / previous;
 				return new AdminMetricComparison(
-					key, AdminMetricKeys.label(key), days, current, previous, current - previous, deltaPercent);
+					key, AdminMetricKeys.label(key), days, current, previous, current - previous, deltaPercent,
+					previousPresent);
 			})
 			.toList();
 	}
@@ -126,6 +128,19 @@ public class AdminMetricQueryService {
 			}
 		}
 		return 0.0;
+	}
+
+	/**
+	 * 기간 {@code [from, to]} 안에 스냅샷이 하나라도 있는지 여부. 집계값이 0.0이어도 실측된 0인지
+	 * 스냅샷 자체가 없어 0으로 채운 것인지 구분한다(#2273: "실측 0"과 "직전 없음" 구분).
+	 */
+	private static boolean hasSnapshot(Map<LocalDate, Double> valuesByDate, LocalDate from, LocalDate to) {
+		for (LocalDate date = from; !date.isAfter(to); date = date.plusDays(1)) {
+			if (valuesByDate.containsKey(date)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private static List<String> normalizeKeys(Collection<String> requestedKeys) {
@@ -158,10 +173,12 @@ public class AdminMetricQueryService {
 	 * @param key          지표 키
 	 * @param label        한글 표시 라벨
 	 * @param days         비교 기간(일)
-	 * @param current      최근 기간 집계(일별 counter는 합계, 그 외는 기간 내 최신 스냅샷)
-	 * @param previous     직전 동일 기간 집계(집계 방식은 current와 동일)
-	 * @param delta        current - previous
-	 * @param deltaPercent 증감률(%), 직전 기간이 0이면 null(정의 불가)
+	 * @param current         최근 기간 집계(일별 counter는 합계, 그 외는 기간 내 최신 스냅샷)
+	 * @param previous        직전 동일 기간 집계(집계 방식은 current와 동일)
+	 * @param delta           current - previous
+	 * @param deltaPercent    증감률(%), 직전 기간이 0이면 null(정의 불가)
+	 * @param previousPresent 직전 기간에 스냅샷이 하나라도 있었는지. previous가 0.0일 때 실측된 0인지
+	 *                        (true) 스냅샷 부재로 0으로 채운 것인지(false)를 구분한다(#2273)
 	 */
 	public record AdminMetricComparison(
 		String key,
@@ -170,7 +187,8 @@ public class AdminMetricQueryService {
 		double current,
 		double previous,
 		double delta,
-		Double deltaPercent
+		Double deltaPercent,
+		boolean previousPresent
 	) {
 
 		public boolean improved(boolean higherIsBetter) {
