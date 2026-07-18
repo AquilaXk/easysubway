@@ -12684,7 +12684,15 @@ test("관리자 v3 공통 shell은 접근성 chrome과 inline style 제한을 �
   const formErrorsFragment = read("backend/src/main/resources/templates/admin/fragments/form-errors.html");
   const paginationFragment = read("backend/src/main/resources/templates/admin/fragments/pagination.html");
   const errorTemplate = read("backend/src/main/resources/templates/admin/error.html");
-  const adminCss = read("backend/src/main/resources/static/css/admin-v3.css");
+  // #2276 V6-04: admin-v3.css는 tokens → foundation → shell → components → data import manifest다.
+  // 관리자 CSS 선언은 4책임 파일이 소유하므로, scroll 소유권·focus 계약은 import 순서대로 이어붙인
+  // 실효 스타일시트를 검증한다(admin-v3.css @import cascade와 동일).
+  const adminCss = [
+    "backend/src/main/resources/static/css/admin-foundation.css",
+    "backend/src/main/resources/static/css/admin-shell.css",
+    "backend/src/main/resources/static/css/admin-components.css",
+    "backend/src/main/resources/static/css/admin-data.css",
+  ].map((cssFile) => read(cssFile)).join("\n");
   const navigationAdvice = read("backend/src/main/java/com/easysubway/admin/navigation/AdminNavigationAdvice.java");
   const envExample = read(".env.example");
   const backendEnvAllowlist = read("tools/deploy/backend-app-env.allowlist");
