@@ -50,7 +50,7 @@ class TagoTrainSearchProviderTest {
 		var journeys = provider.parseJourneys(JSON.readTree("""
 			{"response":{"header":{"resultCode":"00","resultMsg":"NORMAL SERVICE."},"body":{
 			  "items":{"item":[
-			    {"trainno":"101","traingradename":"KTX","depplandtime":"20260720090000","arrplandtime":"20260720100200","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"},
+			    {"trainno":"00101","traingradename":"KTX","depplandtime":"20260720090000","arrplandtime":"20260720100200","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"},
 			    {"trainno":"2001","traingradename":"ITX-청춘","depplandtime":"20260720091000","arrplandtime":"20260720110000","depplacename":"서울","arrplacename":"대전","adultcharge":"10000"}
 			  ]},"pageNo":1,"numOfRows":100,"totalCount":2
 			}}}
@@ -402,6 +402,21 @@ class TagoTrainSearchProviderTest {
 	void malformedJourneyIsTypedAsNoValidRows() throws Exception {
 		var server = server(exchange -> respond(exchange, paginatedResponse("""
 			{"trainno":"101","traingradename":"KTX","depplandtime":"not-a-time","arrplandtime":"20260720100200","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"}
+			""", 1)));
+		try {
+			var query = legQuery(LocalDate.parse("2026-07-20"), "KTX", "00");
+			assertThatThrownBy(() -> provider(server, "test-key").search(query))
+				.isInstanceOf(ProviderFailure.class)
+				.hasMessage("TRAIN_SEARCH_NO_VALID_ROWS");
+		} finally {
+			server.stop(0);
+		}
+	}
+
+	@Test
+	void rejectsNonNumericTrainNumber() throws Exception {
+		var server = server(exchange -> respond(exchange, paginatedResponse("""
+			{"trainno":"20O1","traingradename":"KTX","depplandtime":"20260720090000","arrplandtime":"20260720100200","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"}
 			""", 1)));
 		try {
 			var query = legQuery(LocalDate.parse("2026-07-20"), "KTX", "00");

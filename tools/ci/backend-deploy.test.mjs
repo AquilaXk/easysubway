@@ -306,6 +306,10 @@ test("TAGO 기차검색 key는 공용 GitHub secret에서 backend 전용 env로�
 
   assert.match(cd, /DATA_GO_KR_SERVICE_KEY_SECRET: \$\{\{ secrets\.DATA_GO_KR_SERVICE_KEY \}\}/);
   assert.match(cd, /EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY=%s/);
+  assert.match(cd, /drop\["EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_MINUTE"\] = 1/);
+  assert.match(cd, /drop\["EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_DAY"\] = 1/);
+  assert.match(cd, /printf 'EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_MINUTE=60\\n'/);
+  assert.match(cd, /printf 'EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_DAY=1000\\n'/);
   assert.match(allowlist, /^EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY$/m);
   assert.doesNotMatch(allowlist, /^DATA_GO_KR_SERVICE_KEY$/m);
   assert.deepEqual(scopeMap.keys.EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY, ["backend"]);

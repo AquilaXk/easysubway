@@ -299,7 +299,7 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 			throw new IllegalArgumentException("TRAIN_SEARCH_NO_VALID_ROWS");
 		}
 		return new Journey(
-			requiredText(row, "trainno"),
+			canonicalTrainNumber(row),
 			trainType,
 			query.departureStationId(),
 			departureStationName,
@@ -310,6 +310,18 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 			(int) durationMinutes,
 			fare
 		);
+	}
+
+	private String canonicalTrainNumber(JsonNode row) {
+		String raw = requiredText(row, "trainno");
+		if (!raw.matches("[0-9]+")) {
+			throw new IllegalArgumentException("TRAIN_SEARCH_NO_VALID_ROWS");
+		}
+		String canonical = raw.replaceFirst("^0+", "");
+		if (canonical.isEmpty()) {
+			throw new IllegalArgumentException("TRAIN_SEARCH_NO_VALID_ROWS");
+		}
+		return canonical;
 	}
 
 	private java.util.stream.Stream<Journey> journeysForRequestedServiceDay(
