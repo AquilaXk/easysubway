@@ -68,8 +68,11 @@ class OperatorAccessibilityReportControllerTest {
 			.andExpect(jsonPath("$.data.regionQualityRows[0].operatorCount").value(0))
 			.andExpect(jsonPath("$.data.regionQualityRows[1].name").value("수도권"))
 			.andExpect(jsonPath("$.data.regionQualityRows[1].operatorCount").value(2))
-			// station 접근성 점수 정렬(점수 오름차순, 동점은 이름순)도 ITX-청춘 pilot 역
-			// 14곳(모두 접근성 시설 미등록이라 점수 0)이 앞으로 와 상록수(15점)보다 먼저다.
+			// station 접근성 점수 정렬(DataQualityService: score → region → stationName →
+			// stationId)도 ITX-청춘 pilot 역 14곳(모두 접근성 시설 미등록이라 점수 0)이
+			// 상록수(15점)보다 앞으로 온다. 강촌이 [0]인 건 이름순이 아니라 동점(0점) 안에서
+			// region이 먼저 갈리기 때문 — 강원권(강촌·남춘천·춘천)이 가나다순으로 수도권보다
+			// 앞서 정렬되고, 강원권 내에서는 이름순으로 강촌이 가장 앞이다.
 			.andExpect(jsonPath("$.data.stationAccessibilityScoreRows[0].stationName").value("강촌"))
 			.andExpect(jsonPath("$.data.stationAccessibilityScoreRows[0].reasons[0]").value("일부 정보는 확인 중이에요"))
 			.andExpect(jsonPath("$.data.accessibilityImprovementPriorityRows[0].stationName").value("상록수"))
