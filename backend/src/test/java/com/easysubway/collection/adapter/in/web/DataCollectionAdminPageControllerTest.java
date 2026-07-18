@@ -27,6 +27,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
@@ -37,6 +38,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 	"easysubway.user.password=user-test-password"
 })
 @AutoConfigureMockMvc
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 @DisplayName("관리자 데이터 수집 배치 화면")
 class DataCollectionAdminPageControllerTest {
 
@@ -124,6 +126,20 @@ class DataCollectionAdminPageControllerTest {
 			.contains("도시철도 마스터")
 			.contains("완료")
 			.contains("admin-user");
+	}
+
+	@Test
+	@DisplayName("기존 데이터 수집 실행 endpoint도 같은 source RUNNING claim을 우회하지 못한다")
+	void pageRunRejectsRunningSource() throws Exception {
+		saveDataCollectionRunPort.saveRun(runningRun("running-run"));
+
+		mockMvc.perform(post("/admin/data-collections/page/run")
+				.with(httpBasic("admin-user", "admin-test-password"))
+				.with(csrf())
+				.with(commandToken("/admin/data-collections/page"))
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("source", "TRANSIT_MASTER"))
+			.andExpect(status().isBadRequest());
 	}
 
 	@Test

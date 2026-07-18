@@ -12240,6 +12240,7 @@ test("관리자 플랫폼 전환 계약은 shadow rollout과 legacy fallback 제
     "backend/src/main/resources/db/migration/postgresql/V12__admin_batch_operation_permission.sql",
     "backend/src/main/resources/db/migration/postgresql/V13__admin_common_code_incident.sql",
     "backend/src/main/resources/db/migration/postgresql/V15__admin_report_photo_read_permission.sql",
+    "backend/src/main/resources/db/migration/postgresql/V63__admin_batch_run_permission.sql",
   ].map(read).join("\n");
   const h2AdminMigrations = [
     "backend/src/main/resources/db/migration/h2/V10__admin_rbac_menu.sql",
@@ -12247,6 +12248,7 @@ test("관리자 플랫폼 전환 계약은 shadow rollout과 legacy fallback 제
     "backend/src/main/resources/db/migration/h2/V12__admin_batch_operation_permission.sql",
     "backend/src/main/resources/db/migration/h2/V13__admin_common_code_incident.sql",
     "backend/src/main/resources/db/migration/h2/V15__admin_report_photo_read_permission.sql",
+    "backend/src/main/resources/db/migration/h2/V63__admin_batch_run_permission.sql",
   ].map(read).join("\n");
 
   assert.match(applicationYml, /platform-transition:\s*\n\s*stage: \$\{EASYSUBWAY_ADMIN_PLATFORM_TRANSITION_STAGE:shadow\}/);
@@ -12302,6 +12304,7 @@ test("관리자 플랫폼 전환 계약은 shadow rollout과 legacy fallback 제
     "admin.security.admin",
     "admin.audit.read",
     "admin.privacy-log.read",
+    "admin.batch.run",
     "admin.batch.retry",
     "admin.operations.manage",
   ]) {
@@ -13960,6 +13963,12 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   const collectionRunStepsPostgresSchema = read(
     "backend/src/main/resources/db/migration/postgresql/V8__data_collection_run_steps.sql",
   );
+  const batchRunPostgresSchema = read(
+    "backend/src/main/resources/db/migration/postgresql/V63__admin_batch_run_permission.sql",
+  );
+  const batchRunH2Schema = read(
+    "backend/src/main/resources/db/migration/h2/V63__admin_batch_run_permission.sql",
+  );
   const run = read("backend/src/main/java/com/easysubway/collection/domain/DataCollectionRun.java");
   const runStep = read("backend/src/main/java/com/easysubway/collection/domain/DataCollectionRunStep.java");
   const stepStatus = read("backend/src/main/java/com/easysubway/collection/domain/DataCollectionStepStatus.java");
@@ -14019,6 +14028,11 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   assert.match(batchPostgresSchema, /ALTER TABLE data_collection_runs[\s\S]*ADD COLUMN IF NOT EXISTS retryable BOOLEAN NOT NULL DEFAULT FALSE/);
   assert.match(batchPostgresSchema, /ALTER TABLE data_collection_runs[\s\S]*ADD COLUMN IF NOT EXISTS operator_action VARCHAR\(500\) NOT NULL DEFAULT/);
   assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_data_collection_runs_started_at/);
+  for (const batchRunSchema of [batchRunPostgresSchema, batchRunH2Schema]) {
+    assert.match(batchRunSchema, /ADD COLUMN active_source VARCHAR\(40\)/);
+    assert.match(batchRunSchema, /CREATE UNIQUE INDEX ux_data_collection_runs_active_source/);
+    assert.match(batchRunSchema, /admin\.batch\.run/);
+  }
   assert.match(run, /record DataCollectionRun/);
   assert.match(run, /requestedBy/);
   assert.match(run, /collectedCount/);
@@ -16115,6 +16129,7 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
     read("backend/src/main/resources/db/migration/postgresql/V13__admin_common_code_incident.sql"),
     read("backend/src/main/resources/db/migration/postgresql/V15__admin_report_photo_read_permission.sql"),
     read("backend/src/main/resources/db/migration/postgresql/V22__datapack_admin_permissions.sql"),
+    read("backend/src/main/resources/db/migration/postgresql/V63__admin_batch_run_permission.sql"),
   ].join("\n");
   const adminRbacH2Schema = [
     read("backend/src/main/resources/db/migration/h2/V10__admin_rbac_menu.sql"),
@@ -16123,6 +16138,7 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
     read("backend/src/main/resources/db/migration/h2/V13__admin_common_code_incident.sql"),
     read("backend/src/main/resources/db/migration/h2/V15__admin_report_photo_read_permission.sql"),
     read("backend/src/main/resources/db/migration/h2/V22__datapack_admin_permissions.sql"),
+    read("backend/src/main/resources/db/migration/h2/V63__admin_batch_run_permission.sql"),
   ].join("\n");
   const adminProgramRegistry = read("backend/src/main/java/com/easysubway/admin/navigation/AdminProgram.java");
   const adminPermission = read("backend/src/main/java/com/easysubway/admin/authorization/AdminPermission.java");
@@ -16328,6 +16344,7 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
     "admin.security.admin",
     "admin.audit.read",
     "admin.privacy-log.read",
+    "admin.batch.run",
     "admin.batch.retry",
     "admin.operations.manage",
     "admin.datapack.read",

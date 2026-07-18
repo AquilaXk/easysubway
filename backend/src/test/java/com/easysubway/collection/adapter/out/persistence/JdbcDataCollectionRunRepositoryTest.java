@@ -1,12 +1,14 @@
 package com.easysubway.collection.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.easysubway.collection.domain.DataCollectionRun;
 import com.easysubway.collection.domain.DataCollectionRunStep;
 import com.easysubway.collection.domain.DataCollectionSource;
 import com.easysubway.collection.domain.DataCollectionStepStatus;
 import com.easysubway.collection.domain.DataCollectionStatus;
+import com.easysubway.collection.domain.InvalidDataCollectionException;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,8 +43,13 @@ class JdbcDataCollectionRunRepositoryTest {
 				collected_count INTEGER NOT NULL,
 				failure_message VARCHAR(1000) NULL,
 				retryable BOOLEAN NOT NULL,
-				operator_action VARCHAR(500) NOT NULL
+				operator_action VARCHAR(500) NOT NULL,
+				active_source VARCHAR(40) NULL
 			)
+			""");
+		jdbcTemplate.execute("""
+			CREATE UNIQUE INDEX ux_data_collection_runs_active_source
+				ON data_collection_runs (active_source)
 			""");
 		jdbcTemplate.execute("""
 			CREATE TABLE data_collection_run_steps (
@@ -143,6 +150,42 @@ class JdbcDataCollectionRunRepositoryTest {
 		assertThat(repository.loadRun("collection-failed")).contains(run);
 	}
 
+	@Test
+	@DisplayName("같은 source의 RUNNING claim은 하나만 저장한다")
+	void saveRunRejectsSecondRunningClaimForSameSource() {
+		repository.saveRun(runningRun("collection-running"));
+
+		assertThatThrownBy(() -> repository.saveRun(runningRun("collection-next")))
+			.isInstanceOf(InvalidDataCollectionException.class)
+			.hasMessage("같은 수집 대상이 이미 실행 중입니다.");
+	}
+
+	@Test
+	@DisplayName("RUNNING을 terminal 상태로 갱신하면 같은 source를 다시 claim할 수 있다")
+	void terminalUpdateReleasesRunningClaim() {
+		DataCollectionRun running = runningRun("collection-running");
+		repository.saveRun(running);
+		repository.saveRun(new DataCollectionRun(
+			running.runId(),
+			running.source(),
+			DataCollectionStatus.COMPLETED,
+			running.requestedBy(),
+			running.startedAt(),
+			running.startedAt().plusMinutes(1),
+			1,
+			null,
+			false,
+			"수집 완료"
+		));
+
+		repository.saveRun(runningRun("collection-next"));
+
+		assertThat(repository.loadRun("collection-next"))
+			.get()
+			.extracting(DataCollectionRun::status)
+			.isEqualTo(DataCollectionStatus.RUNNING);
+	}
+
 	private DataCollectionRun completedRun(String runId, LocalDateTime startedAt) {
 		return new DataCollectionRun(
 			runId,
@@ -170,6 +213,21 @@ class JdbcDataCollectionRunRepositoryTest {
 			"loader down",
 			true,
 			"일시 오류일 수 있습니다. 실패 사유를 확인한 뒤 같은 수집 대상을 다시 실행하세요."
+		);
+	}
+
+	private DataCollectionRun runningRun(String runId) {
+		return new DataCollectionRun(
+			runId,
+			DataCollectionSource.TRANSIT_MASTER,
+			DataCollectionStatus.RUNNING,
+			"admin-user",
+			LocalDateTime.of(2026, 7, 18, 12, 0),
+			null,
+			0,
+			null,
+			false,
+			"수집 실행 중입니다."
 		);
 	}
 }

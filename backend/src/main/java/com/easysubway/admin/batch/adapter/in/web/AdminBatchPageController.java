@@ -11,6 +11,7 @@ import com.easysubway.common.web.pagination.AdminPageRequest;
 import com.easysubway.common.web.pagination.EgovPaginationView;
 import com.easysubway.collection.domain.DataCollectionRun;
 import com.easysubway.collection.domain.DataCollectionRunStep;
+import com.easysubway.collection.domain.DataCollectionSource;
 import com.easysubway.collection.domain.DataCollectionStepStatus;
 import com.easysubway.collection.domain.DataCollectionStatus;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -27,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -64,9 +66,56 @@ class AdminBatchPageController {
 		@RequestParam(required = false) Integer size,
 		Model model
 	) {
-		model.addAttribute("jobs", batchOperationService.listJobs().stream().map(BatchJobRow::from).toList());
+		Set<DataCollectionSource> runningSources = batchOperationService.runningSources();
+		model.addAttribute("jobs", batchOperationService.listJobs().stream()
+			.map(job -> BatchJobRow.from(job, runningSources.contains(job.source())))
+			.toList());
 		populateBatchLive(model, page, size);
 		return "admin/batches/list";
+	}
+
+	@PostMapping("/admin/batches/{jobId}/run")
+	@PreAuthorize("hasAuthority('admin.batch.run')")
+	String run(
+		@PathVariable String jobId,
+		@Valid @ModelAttribute("runBatchJobForm") RunBatchJobForm form,
+		BindingResult bindingResult,
+		Principal principal,
+		Authentication authentication,
+		HttpServletRequest request,
+		Model model,
+		HttpServletResponse response
+	) {
+		if (bindingResult.hasErrors()) {
+			response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+			batchPage(null, null, model);
+			AdminFormErrorView.expose(model, bindingResult);
+			return "admin/batches/list";
+		}
+		try {
+			DataCollectionRun run = batchOperationService.run(jobId, principal.getName());
+			auditWriter.batchOperation(
+				authentication,
+				request,
+				"BATCH_JOB",
+				jobId,
+				"RUN_BATCH_JOB",
+				AdminAuditOutcome.SUCCESS,
+				"runId=%s".formatted(run.runId())
+			);
+		} catch (RuntimeException exception) {
+			auditWriter.batchOperation(
+				authentication,
+				request,
+				"BATCH_JOB",
+				jobId,
+				"RUN_BATCH_JOB",
+				AdminAuditOutcome.FAILURE,
+				"error=%s".formatted(exception.getMessage())
+			);
+			throw exception;
+		}
+		return "redirect:/admin/batches/page";
 	}
 
 	// 배치 운영 자동 갱신(#1742): 실행 중 배치가 있을 때만 10초 폴링이 live 영역(이력 차트·최근 실행)을 받아간다.
@@ -213,11 +262,17 @@ class AdminBatchPageController {
 		return "redirect:/admin/batches/page";
 	}
 
-	record BatchJobRow(String id, String jobName, String label, boolean retryEnabled) {
+	record BatchJobRow(String id, String jobName, String label, boolean retryEnabled, boolean running) {
 
-		static BatchJobRow from(AdminBatchJob job) {
-			return new BatchJobRow(job.id(), job.jobName(), job.label(), job.retryEnabled());
+		static BatchJobRow from(AdminBatchJob job, boolean running) {
+			return new BatchJobRow(job.id(), job.jobName(), job.label(), job.retryEnabled(), running);
 		}
+	}
+
+	record RunBatchJobForm(
+		@AssertTrue(message = "배치 신규 실행 요청을 확인해야 합니다.")
+		boolean runRequested
+	) {
 	}
 
 	record RetryBatchRunForm(
