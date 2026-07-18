@@ -18,9 +18,8 @@ public final class LoginNoticeFlash implements AuthenticationFailureHandler {
 		HttpServletResponse response,
 		AuthenticationException exception
 	) throws IOException, ServletException {
-		request.getSession().setAttribute(SESSION_ATTRIBUTE, LoginNotice.RETRY_WARNING);
-		String requestPath = request.getRequestURI().substring(request.getContextPath().length());
-		String loginPath = "/operator/login".equals(requestPath) ? "/operator/login" : "/admin/login";
+		String loginPath = loginPath(request);
+		request.getSession().setAttribute(sessionAttribute(loginPath), LoginNotice.RETRY_WARNING);
 		response.sendRedirect(request.getContextPath() + loginPath);
 	}
 
@@ -29,8 +28,18 @@ public final class LoginNoticeFlash implements AuthenticationFailureHandler {
 		if (session == null) {
 			return LoginNotice.NONE;
 		}
-		Object notice = session.getAttribute(SESSION_ATTRIBUTE);
-		session.removeAttribute(SESSION_ATTRIBUTE);
+		String sessionAttribute = sessionAttribute(loginPath(request));
+		Object notice = session.getAttribute(sessionAttribute);
+		session.removeAttribute(sessionAttribute);
 		return notice == LoginNotice.RETRY_WARNING ? LoginNotice.RETRY_WARNING : LoginNotice.NONE;
+	}
+
+	private static String loginPath(HttpServletRequest request) {
+		String requestPath = request.getRequestURI().substring(request.getContextPath().length());
+		return "/operator/login".equals(requestPath) ? "/operator/login" : "/admin/login";
+	}
+
+	private static String sessionAttribute(String loginPath) {
+		return SESSION_ATTRIBUTE + loginPath;
 	}
 }

@@ -123,6 +123,38 @@ class LoginNoticeSecurityTest {
 
 	@ParameterizedTest(name = "{0}")
 	@EnumSource(LoginSurface.class)
+	@DisplayName("실패 warning은 다른 로그인 surface가 먼저 열려도 교차 소비되지 않는다")
+	void warningIsScopedToLoginSurface(LoginSurface surface) throws Exception {
+		MockHttpSession session = new MockHttpSession();
+		MvcResult failureResult = mockMvc.perform(post(surface.loginPath)
+				.session(session)
+				.with(csrf())
+				.param("username", "unknown-user")
+				.param("password", "wrong-password"))
+			.andExpect(status().is3xxRedirection())
+			.andExpect(redirectedUrl(surface.loginPath))
+			.andReturn();
+		MockHttpSession failureSession = sessionFrom(failureResult);
+
+		String otherSurfaceHtml = mockMvc.perform(get(surface.other().loginPath).session(failureSession))
+			.andExpect(status().isOk())
+			.andExpect(model().attribute("loginNotice", LoginNotice.NONE))
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+		assertThat(otherSurfaceHtml).doesNotContain(RETRY_WARNING_COPY, "role=\"alert\"");
+
+		String originalSurfaceHtml = mockMvc.perform(get(surface.loginPath).session(failureSession))
+			.andExpect(status().isOk())
+			.andExpect(model().attribute("loginNotice", LoginNotice.RETRY_WARNING))
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+		assertThat(originalSurfaceHtml).contains(RETRY_WARNING_COPY, "role=\"alert\"");
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@EnumSource(LoginSurface.class)
 	@DisplayName("missing·invalid CSRF는 403이고 경고 flash를 만들지 않는다")
 	void csrfFailuresDoNotCreateNotice(LoginSurface surface) throws Exception {
 		assertCsrfFailureHasNoNotice(surface, false);
@@ -206,6 +238,10 @@ class LoginNoticeSecurityTest {
 		LoginSurface(String loginPath, AdminIdentityRole role) {
 			this.loginPath = loginPath;
 			this.role = role;
+		}
+
+		LoginSurface other() {
+			return this == ADMIN ? OPERATOR : ADMIN;
 		}
 	}
 
