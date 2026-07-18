@@ -10680,6 +10680,52 @@ void main() {
     }
   });
 
+  testWidgets('역 상세는 출구 목록이 없으면 시설이 있어도 출구 섹션만 숨긴다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    final repository = FakeStationSearchRepository(
+      nextResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+      stationExits: const [],
+      stationFacilities: const [
+        StationFacilityInfo(
+          id: 'facility-sangnoksu-elevator-1',
+          stationId: 'station-sangnoksu',
+          exitId: 'exit-sangnoksu-1',
+          type: 'ELEVATOR',
+          name: '1번 출구 엘리베이터',
+          floorFrom: 'B1',
+          floorTo: '1F',
+          description: '1번 출구 앞',
+          status: 'NORMAL',
+          dataConfidence: 'HIGH',
+          dataSourceType: 'OFFICIAL_FILE',
+          lastUpdatedAt: '2026-06-12',
+          fieldValidationStatus: 'VERIFIED',
+        ),
+      ],
+    );
+
+    try {
+      await _pumpStationDetailForTest(
+        tester,
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+      );
+
+      await tester.drag(find.byType(ListView), const Offset(0, -520));
+      await tester.pumpAndSettle();
+
+      // #2078: 출구는 비고 시설은 있는 비대칭 케이스 — 출구 섹션 제목·빈
+      // 안내·잔여 간격만 숨기고, 시설 섹션은 그대로 그린다.
+      expect(find.text('출구'), findsNothing);
+      expect(find.text('출구 안내를 준비 중이에요.'), findsNothing);
+      expect(find.text('시설'), findsOneWidget);
+      expect(find.text('1번 출구 엘리베이터'), findsOneWidget);
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
   testWidgets('역 상세 광고는 성공 content 최하단에 station placement로 배선된다', (
     tester,
   ) async {
