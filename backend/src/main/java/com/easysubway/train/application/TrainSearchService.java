@@ -135,7 +135,8 @@ public class TrainSearchService {
 	}
 
 	public TrainSearchSnapshot searchWithMetadata(SearchCriteria criteria) {
-		SearchCriteria normalized = validateStructure(criteria);
+		LocalDate admittedServiceDay = TrainSearchScopePolicy.currentServiceDay(clock);
+		SearchCriteria normalized = validateStructure(criteria, admittedServiceDay);
 		try {
 			CatalogEntry catalogEntry = catalogWithMetadata();
 			Catalog catalog = catalogEntry.catalog();
@@ -145,14 +146,16 @@ public class TrainSearchService {
 				normalized.departureStationId(),
 				normalized.arrivalStationId(),
 				normalized.departureDate(),
-				normalized.trainType()
+				normalized.trainType(),
+				admittedServiceDay
 			);
 			LegResult inbound = normalized.returnDate() == null ? null : direction(
 				catalog,
 				normalized.arrivalStationId(),
 				normalized.departureStationId(),
 				normalized.returnDate(),
-				normalized.trainType()
+				normalized.trainType(),
+				admittedServiceDay
 			);
 			Instant observedAt = inbound == null || outbound.observedAt().isAfter(inbound.observedAt())
 				? outbound.observedAt()
@@ -257,7 +260,8 @@ public class TrainSearchService {
 		String departureStationId,
 		String arrivalStationId,
 		LocalDate date,
-		String requestedTrainType
+		String requestedTrainType,
+		LocalDate admittedServiceDay
 	) {
 		Station departure = station(catalog, departureStationId);
 		Station arrival = station(catalog, arrivalStationId);
@@ -276,7 +280,7 @@ public class TrainSearchService {
 				type.providerCodes(),
 				departure.name(),
 				arrival.name()
-			)))
+			), admittedServiceDay))
 			.toList();
 		Map<String, Journey> unique = new LinkedHashMap<>();
 		legs.stream()
@@ -291,7 +295,7 @@ public class TrainSearchService {
 		return new LegResult(observedAt, expiresAt, List.copyOf(unique.values()));
 	}
 
-	private CachedLeg leg(LegQuery query) {
+	private CachedLeg leg(LegQuery query, LocalDate admittedServiceDay) {
 		String key = key(query);
 		Instant now = clock.instant();
 		CachedLeg local = l1.get(key);
@@ -306,7 +310,7 @@ public class TrainSearchService {
 		var existing = singleFlights.putIfAbsent(key, pending);
 		if (existing != null) return await(existing);
 		try {
-			CachedLeg loaded = loadLeg(key, query, now);
+			CachedLeg loaded = loadLeg(key, query, admittedServiceDay, now);
 			pending.complete(loaded);
 			return loaded;
 		} catch (RuntimeException exception) {
@@ -317,13 +321,15 @@ public class TrainSearchService {
 		}
 	}
 
-	private CachedLeg loadLeg(String key, LegQuery query, Instant now) {
+	private CachedLeg loadLeg(String key, LegQuery query, LocalDate admittedServiceDay, Instant now) {
 		String owner = ownerSupplier.get();
-		if (!cache.tryAcquireLease(key, owner, now, LEG_LEASE_TTL)) return pollForShared(key, query);
-		return loadOwnedLeg(key, query, owner);
+		if (!cache.tryAcquireLease(key, owner, now, LEG_LEASE_TTL)) {
+			return pollForShared(key, query, admittedServiceDay);
+		}
+		return loadOwnedLeg(key, query, admittedServiceDay, owner);
 	}
 
-	private CachedLeg loadOwnedLeg(String key, LegQuery query, String owner) {
+	private CachedLeg loadOwnedLeg(String key, LegQuery query, LocalDate admittedServiceDay, String owner) {
 		boolean released = false;
 		try {
 			List<Journey> journeys = provider.search(query);
@@ -336,7 +342,7 @@ public class TrainSearchService {
 				payload,
 				sha256(payload),
 				completedAt,
-				expiresAt(query, completedAt)
+				expiresAt(query, admittedServiceDay, completedAt)
 			);
 			validLeg(key, loaded);
 			if (!cache.storeLegAndRelease(key, owner, loaded)) throw failure("TRAIN_SEARCH_UNAVAILABLE");
@@ -350,18 +356,20 @@ public class TrainSearchService {
 		}
 	}
 
-	private Instant expiresAt(LegQuery query, Instant now) {
-		if (query.departureDate().equals(TrainSearchScopePolicy.currentServiceDay(clock))) {
+	private Instant expiresAt(LegQuery query, LocalDate admittedServiceDay, Instant now) {
+		if (query.departureDate().equals(admittedServiceDay)) {
 			Instant todayTtl = now.plus(TODAY_TTL);
 			Instant nextServiceDayStart = TrainSearchScopePolicy.serviceDayStartsAt(query.departureDate().plusDays(1));
-			return todayTtl.isBefore(nextServiceDayStart) ? todayTtl : nextServiceDayStart;
+			return nextServiceDayStart.isAfter(now) && nextServiceDayStart.isBefore(todayTtl)
+				? nextServiceDayStart
+				: todayTtl;
 		}
 		Instant futureTtl = now.plus(FUTURE_TTL);
 		Instant serviceDayStart = TrainSearchScopePolicy.serviceDayStartsAt(query.departureDate());
 		return futureTtl.isBefore(serviceDayStart) ? futureTtl : serviceDayStart;
 	}
 
-	private CachedLeg pollForShared(String key, LegQuery query) {
+	private CachedLeg pollForShared(String key, LegQuery query, LocalDate admittedServiceDay) {
 		for (Duration delay : LEG_LEASE_POLLS) {
 			sleep(delay);
 			Instant now = clock.instant();
@@ -373,22 +381,21 @@ public class TrainSearchService {
 			}
 			String owner = ownerSupplier.get();
 			if (cache.tryAcquireLease(key, owner, now, LEG_LEASE_TTL)) {
-				return loadOwnedLeg(key, query, owner);
+				return loadOwnedLeg(key, query, admittedServiceDay, owner);
 			}
 		}
 		throw failure("TRAIN_SEARCH_UNAVAILABLE");
 	}
 
-	private SearchCriteria validateStructure(SearchCriteria criteria) {
+	private SearchCriteria validateStructure(SearchCriteria criteria, LocalDate admittedServiceDay) {
 		String departureStationId = criteria == null ? null : trimmed(criteria.departureStationId());
 		String arrivalStationId = criteria == null ? null : trimmed(criteria.arrivalStationId());
-		LocalDate today = TrainSearchScopePolicy.currentServiceDay(clock);
 		if (criteria == null
 			|| blank(departureStationId)
 			|| blank(arrivalStationId)
 			|| Objects.equals(departureStationId, arrivalStationId)
 			|| criteria.departureDate() == null
-			|| criteria.departureDate().isBefore(today)
+			|| criteria.departureDate().isBefore(admittedServiceDay)
 			|| (criteria.returnDate() != null && criteria.returnDate().isBefore(criteria.departureDate()))) {
 			throw failure("TRAIN_SEARCH_INVALID_ARGUMENT");
 		}
