@@ -126,6 +126,45 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 	}
 
 	@Test
+	@DisplayName("search는 marked stop이 속한 route pattern만 스캔한다")
+	void scansOnlyMarkedRoutePatterns() {
+		var compiled = planner.compile(disconnectedRoutesTimetable());
+
+		assertThat(planner.search(command(WEDNESDAY, 8, 50), compiled)).hasSize(1);
+
+		var metrics = planner.lastScanMetrics();
+		assertThat(metrics.expandedRoutes()).isOne();
+		assertThat(metrics.expandedTrips()).isOne();
+
+		planner.search(command(WEDNESDAY, 8, 50), compiled);
+		assertThat(planner.lastScanMetrics().workspaceIdentity()).isEqualTo(metrics.workspaceIdentity());
+	}
+
+	@Test
+	@DisplayName("중간 stop에서 추월한 trip도 해당 stop 출발 시각 순서로 이진 탐색한다")
+	void binarySearchesTripsInDepartureOrderAtEachStop() {
+		var command = new SearchRouteV2Command(
+			"station-b",
+			"station-c",
+			OffsetDateTime.parse("2026-07-01T09:10:00+09:00"),
+			MobilityType.SENIOR,
+			ConstraintMode.ALLOW_WITH_WARNINGS,
+			false,
+			0,
+			1
+		);
+
+		var results = planner.search(command, planner.compile(overtakingTimetable()));
+
+		assertThat(results).hasSize(1);
+		assertThat(results.getFirst().steps())
+			.filteredOn(step -> "ride".equals(step.stepType()))
+			.extracting("tripId", "plannedDepartureTime")
+			.containsExactly(org.assertj.core.groups.Tuple.tuple(
+				"trip-fast", "2026-07-01T09:20:00+09:00"));
+	}
+
+	@Test
 	@DisplayName("동시 nextServiceTime은 service day boarding index를 안전하게 lazy publish한다")
 	void concurrentNextServiceTimeLazilyPublishesBoardingIndex() throws Exception {
 		var compiled = planner.compile(frequencyTimetable());
@@ -245,6 +284,58 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 			List.of(
 				stop("trip-weekday", 1, "station-a", 32400), stop("trip-weekday", 2, "station-b", 33000),
 				stop("trip-special", 1, "station-a", 32400), stop("trip-special", 2, "station-b", 33000)
+			),
+			List.of()
+		);
+	}
+
+	private static RouteTimetable disconnectedRoutesTimetable() {
+		return new RouteTimetable(
+			List.of(weekday("weekday")),
+			List.of(),
+			List.of(
+				new LoadRouteTimetablePort.TransitRoute(
+					"route-main", "line-main", "M", "주 경로", "B 방면", "Asia/Seoul"),
+				new LoadRouteTimetablePort.TransitRoute(
+					"route-other", "line-other", "O", "무관 경로", "Y 방면", "Asia/Seoul")
+			),
+			List.of(
+				new LoadRouteTimetablePort.TransitTrip(
+					"trip-main", "route-main", "weekday", "B", "0", "LOCAL", 0),
+				new LoadRouteTimetablePort.TransitTrip(
+					"trip-other", "route-other", "weekday", "Y", "0", "LOCAL", 0)
+			),
+			List.of(
+				new LoadRouteTimetablePort.TransitStopTime(
+					"trip-main", 1, "station-a", "line-main", 32400, 32400, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime(
+					"trip-main", 2, "station-b", "line-main", 33000, 33000, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime(
+					"trip-other", 1, "station-x", "line-other", 32400, 32400, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime(
+					"trip-other", 2, "station-y", "line-other", 33000, 33000, 0, 0)
+			),
+			List.of()
+		);
+	}
+
+	private static RouteTimetable overtakingTimetable() {
+		return timetable(
+			List.of(weekday("weekday")),
+			List.of(),
+			List.of(
+				new LoadRouteTimetablePort.TransitTrip(
+					"trip-slow", "route", "weekday", "도착", "0", "LOCAL", 0),
+				new LoadRouteTimetablePort.TransitTrip(
+					"trip-fast", "route", "weekday", "도착", "0", "EXPRESS", 0)
+			),
+			List.of(
+				stop("trip-slow", 1, "station-a", 32400),
+				stop("trip-slow", 2, "station-b", 34200),
+				stop("trip-slow", 3, "station-c", 34800),
+				stop("trip-fast", 1, "station-a", 33000),
+				stop("trip-fast", 2, "station-b", 33600),
+				stop("trip-fast", 3, "station-c", 34500)
 			),
 			List.of()
 		);

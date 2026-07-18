@@ -2607,6 +2607,19 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
+	@DisplayName("역 내부 Dijkstra 후보는 경로 리스트를 보관하지 않는다")
+	void internalRouteCandidateDoesNotCarryPathList() {
+		Class<?> candidateType = java.util.Arrays.stream(RouteSearchService.class.getDeclaredClasses())
+			.filter(type -> type.getSimpleName().equals("InternalRouteCandidate"))
+			.findFirst()
+			.orElseThrow();
+
+		assertThat(candidateType.getRecordComponents())
+			.extracting(java.lang.reflect.RecordComponent::getName)
+			.containsExactly("nodeId", "cost");
+	}
+
+	@Test
 	@DisplayName("역 내부 이동 경로는 활성 노드와 간선을 단계로 반환한다")
 	void searchInternalRouteReturnsActiveRouteEdgesAsSteps() {
 		var result = service.searchInternalRoute(new SearchInternalRouteCommand(
