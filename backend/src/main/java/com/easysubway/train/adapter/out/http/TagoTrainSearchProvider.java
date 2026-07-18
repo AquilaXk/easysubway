@@ -524,10 +524,17 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 
 	private int requiredInteger(JsonNode row, String field) {
 		JsonNode value = row.path(field);
-		if (!value.isIntegralNumber() || !value.canConvertToInt() || value.intValue() < 0) {
-			throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
+		if (value.isIntegralNumber() && value.canConvertToInt() && value.intValue() >= 0) {
+			return value.intValue();
 		}
-		return value.intValue();
+		if (value.isTextual() && value.textValue().matches("[0-9]+")) {
+			try {
+				return Integer.parseInt(value.textValue());
+			} catch (NumberFormatException ignored) {
+				// Fall through to the stable provider error for values outside the int range.
+			}
+		}
+		throw new ProviderFailure("TRAIN_SEARCH_PROVIDER_ERROR");
 	}
 
 	private static String decodedServiceKey(String value) {

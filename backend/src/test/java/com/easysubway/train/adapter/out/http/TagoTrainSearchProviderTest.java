@@ -472,6 +472,22 @@ class TagoTrainSearchProviderTest {
 	}
 
 	@Test
+	void acceptsDigitStringPaginationMetadataFromOfficialSchema() throws Exception {
+		var server = server(exchange -> respond(exchange, """
+			{"response":{"header":{"resultCode":"00"},"body":{"items":{"item":{"trainno":"101","traingradename":"KTX","depplandtime":"20260720090000","arrplandtime":"20260720100200","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"}},"pageNo":"1","numOfRows":"100","totalCount":"1"}}}
+			"""));
+		try {
+			assertThat(provider(server, "test-key")
+				.search(legQuery(LocalDate.parse("2026-07-20"), "KTX", "00")))
+				.singleElement()
+				.extracting(Journey::trainNumber)
+				.isEqualTo("101");
+		} finally {
+			server.stop(0);
+		}
+	}
+
+	@Test
 	void malformedJourneyIsTypedAsNoValidRows() throws Exception {
 		var server = server(exchange -> respond(exchange, paginatedResponse("""
 			{"trainno":"101","traingradename":"KTX","depplandtime":"not-a-time","arrplandtime":"20260720100200","depplacename":"서울","arrplacename":"대전","adultcharge":"23700"}
