@@ -4926,21 +4926,17 @@ RouteShareSnapshot _routeShareSnapshot(RouteSearchResult result) {
 
   var departureSource = result.departureTimeIso.isNotEmpty
       ? result.departureTimeIso
-      : steps.first.realtimeDepartureTimeIso.isNotEmpty
-      ? steps.first.realtimeDepartureTimeIso
-      : steps.first.plannedDepartureTimeIso;
+      : _firstRouteShareDeparture(steps);
   var arrivalSource = result.arrivalTimeIso.isNotEmpty
       ? result.arrivalTimeIso
-      : steps.last.realtimeArrivalTimeIso.isNotEmpty
-      ? steps.last.realtimeArrivalTimeIso
-      : steps.last.plannedArrivalTimeIso;
+      : _lastRouteShareArrival(steps);
   final durationMinutes = (result.estimatedDurationSeconds / 60).ceil();
-  if (result.isLocalResult) {
-    final duration = Duration(seconds: result.estimatedDurationSeconds);
-    if (departureSource.isEmpty && arrivalSource.isEmpty) {
-      departureSource = _routeShareTime(result.createdAt);
-      arrivalSource = _shiftRouteShareTime(departureSource, duration);
-    } else if (departureSource.isEmpty) {
+  final duration = Duration(seconds: result.estimatedDurationSeconds);
+  if (departureSource.isEmpty && arrivalSource.isEmpty) {
+    departureSource = _routeShareTime(result.createdAt);
+    arrivalSource = _shiftRouteShareTime(departureSource, duration);
+  } else if (result.isLocalResult) {
+    if (departureSource.isEmpty) {
       departureSource = _shiftRouteShareTime(arrivalSource, -duration);
     } else if (arrivalSource.isEmpty) {
       arrivalSource = _shiftRouteShareTime(departureSource, duration);
@@ -4989,6 +4985,30 @@ RouteShareSnapshot _routeShareSnapshot(RouteSearchResult result) {
     legs: legs,
     fare: fare,
   );
+}
+
+String _firstRouteShareDeparture(List<RouteSearchStep> steps) {
+  for (final step in steps) {
+    if (step.realtimeDepartureTimeIso.isNotEmpty) {
+      return step.realtimeDepartureTimeIso;
+    }
+    if (step.plannedDepartureTimeIso.isNotEmpty) {
+      return step.plannedDepartureTimeIso;
+    }
+  }
+  return '';
+}
+
+String _lastRouteShareArrival(List<RouteSearchStep> steps) {
+  for (final step in steps.reversed) {
+    if (step.realtimeArrivalTimeIso.isNotEmpty) {
+      return step.realtimeArrivalTimeIso;
+    }
+    if (step.plannedArrivalTimeIso.isNotEmpty) {
+      return step.plannedArrivalTimeIso;
+    }
+  }
+  return '';
 }
 
 String _routeShareTime(String value, {bool allowEmpty = false}) {
