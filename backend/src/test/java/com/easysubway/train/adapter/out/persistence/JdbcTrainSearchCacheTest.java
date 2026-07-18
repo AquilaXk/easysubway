@@ -74,6 +74,16 @@ class JdbcTrainSearchCacheTest {
 	}
 
 	@Test
+	void doesNotAcquireLeaseAfterAnotherNodeStoredFreshPayload() {
+		Instant databaseNow = jdbcTemplate.queryForObject("SELECT CURRENT_TIMESTAMP", java.sql.Timestamp.class).toInstant();
+		var fresh = leg("filled", databaseNow.minusSeconds(1), databaseNow.plus(Duration.ofHours(1)));
+		assertThat(repository.tryAcquireLease("filled", "owner-a", databaseNow, Duration.ofSeconds(15))).isTrue();
+		assertThat(repository.storeLegAndRelease("filled", "owner-a", fresh)).isTrue();
+
+		assertThat(repository.tryAcquireLease("filled", "owner-b", databaseNow, Duration.ofSeconds(15))).isFalse();
+	}
+
+	@Test
 	void concurrentLeaseAttemptsHaveExactlyOneOwner() throws InterruptedException {
 		int callers = 8;
 		var ready = new CountDownLatch(callers);
@@ -131,6 +141,27 @@ class JdbcTrainSearchCacheTest {
 		assertThat(repository.purgeExpiredBefore(observedAt.plusSeconds(61))).isEqualTo(1);
 		assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM train_search_cache", Integer.class))
 			.isEqualTo(1);
+	}
+
+	@Test
+	void purgeRemovesOldFailedAndOrphanPlaceholdersButKeepsActiveLease() {
+		Instant databaseNow = jdbcTemplate.queryForObject("SELECT CURRENT_TIMESTAMP", java.sql.Timestamp.class).toInstant();
+		Instant old = databaseNow.minus(Duration.ofHours(3));
+		Instant cutoff = databaseNow.minus(Duration.ofHours(2));
+
+		assertThat(repository.tryAcquireLease("failed", "owner", databaseNow, Duration.ofMinutes(1))).isTrue();
+		repository.releaseLease("failed", "owner");
+		assertThat(repository.tryAcquireLease("orphan", "owner", databaseNow, Duration.ofMinutes(1))).isTrue();
+		assertThat(repository.tryAcquireLease("active", "owner", databaseNow, Duration.ofHours(1))).isTrue();
+		jdbcTemplate.update("UPDATE train_search_cache SET last_access_at = ?", java.sql.Timestamp.from(old));
+		jdbcTemplate.update(
+			"UPDATE train_search_cache SET lease_expires_at = ? WHERE cache_key = 'orphan'",
+			java.sql.Timestamp.from(databaseNow.minusSeconds(1))
+		);
+
+		assertThat(repository.purgeExpiredBefore(cutoff)).isEqualTo(2);
+		assertThat(jdbcTemplate.queryForList("SELECT cache_key FROM train_search_cache", String.class))
+			.containsExactly("active");
 	}
 
 	@Test

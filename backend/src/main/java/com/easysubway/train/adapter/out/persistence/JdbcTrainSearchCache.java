@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import javax.sql.DataSource;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +19,7 @@ public class JdbcTrainSearchCache implements TrainSearchCache {
 
 	private final JdbcTemplate jdbcTemplate;
 
+	@Autowired
 	public JdbcTrainSearchCache(DataSource dataSource) {
 		this(new JdbcTemplate(dataSource));
 	}
@@ -121,11 +123,14 @@ public class JdbcTrainSearchCache implements TrainSearchCache {
 			"""
 				UPDATE train_search_cache
 				SET lease_owner = ?, lease_expires_at = ?
-				WHERE cache_key = ? AND (lease_owner IS NULL OR lease_expires_at <= ?)
+				WHERE cache_key = ?
+					AND (lease_owner IS NULL OR lease_expires_at <= ?)
+					AND (payload_json IS NULL OR expires_at <= ?)
 				""",
 			owner,
 			Timestamp.from(databaseNow.plus(ttl)),
 			key,
+			Timestamp.from(databaseNow),
 			Timestamp.from(databaseNow)
 		) == 1;
 	}
@@ -226,7 +231,13 @@ public class JdbcTrainSearchCache implements TrainSearchCache {
 	public int purgeExpiredBefore(Instant cutoff) {
 		Objects.requireNonNull(cutoff, "cutoff must not be null");
 		return jdbcTemplate.update(
-			"DELETE FROM train_search_cache WHERE expires_at IS NOT NULL AND expires_at < ? AND lease_owner IS NULL",
+			"""
+				DELETE FROM train_search_cache
+				WHERE ((expires_at IS NOT NULL AND expires_at < ?)
+						OR (expires_at IS NULL AND last_access_at < ?))
+					AND (lease_owner IS NULL OR lease_expires_at <= CURRENT_TIMESTAMP)
+				""",
+			Timestamp.from(cutoff),
 			Timestamp.from(cutoff)
 		);
 	}

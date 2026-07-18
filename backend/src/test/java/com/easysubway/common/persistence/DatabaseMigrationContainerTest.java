@@ -294,6 +294,7 @@ class DatabaseMigrationContainerTest {
 			assertThat(repository.storeLegAndRelease("owned", "owner-b", leg)).isFalse();
 			assertThat(repository.storeLegAndRelease("owned", "owner-a", leg)).isTrue();
 			assertThat(repository.freshLeg("owned", observedAt.plusSeconds(1))).contains(leg);
+			assertThat(repository.tryAcquireLease("owned", "owner-c", observedAt, Duration.ofSeconds(15))).isFalse();
 		}
 	}
 
