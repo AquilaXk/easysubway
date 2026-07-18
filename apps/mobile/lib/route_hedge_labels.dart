@@ -46,7 +46,7 @@ String routeUncertaintyHedgeLabel(String code) {
 /// 그대로 두고, 불확실성 계열은 위 헤지 사전으로 위임해 한 벌로 통일한다.
 String routeWarningLabel(String code) {
   return switch (code.trim()) {
-    'LOW_DATA_CONFIDENCE' => '일부 시설 안내를 준비 중이에요.',
+    'LOW_DATA_CONFIDENCE' => '일부 시설 안내는 아직 확인되지 않았어요.',
     'STALE_ACCESSIBILITY_DATA' => '시설 상태 안내가 오래됐을 수 있어요.',
     'STAIR_ONLY_ACCESS' => '계단 포함 구간이 있습니다.',
     'DURATION_UNKNOWN' => routeDurationUnknown,

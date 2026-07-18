@@ -225,7 +225,7 @@ void main() {
               'warnings': [
                 {
                   'code': 'LOW_DATA_CONFIDENCE',
-                  'message': '일부 시설 안내를 준비 중이에요.',
+                  'message': '일부 시설 안내는 아직 확인되지 않았어요.',
                 },
                 {
                   'code': 'STALE_ACCESSIBILITY_DATA',
@@ -297,7 +297,7 @@ void main() {
     expect(result.steps.first.stepType, 'entry');
     expect(result.steps.first.includesStairs, isFalse);
     expect(result.steps.first.requiresAccessibilityCheck, isTrue);
-    expect(result.steps.first.burdenLabel, '약 4분 · 180m · 엘리베이터 안내 준비 중');
+    expect(result.steps.first.burdenLabel, '약 4분 · 180m · 엘리베이터 안내 미확인');
     expect(result.steps[1].userTitle, '사당역에서 출구 엘리베이터와 통로 안내를 확인');
     expect(result.semanticLabel, isNot(contains('접근성 정보')));
     expect(result.arrivalGuidanceStep?.description, '2번 출구의 엘리베이터를 먼저 확인하세요.');
@@ -652,7 +652,7 @@ void main() {
       'UNSUPPORTED',
       'STALE',
     });
-    expect(routeEtaSourceLabel('REALTIME'), '실시간 도착정보 준비 중');
+    expect(routeEtaSourceLabel('REALTIME'), '실시간 도착정보');
     expect(routeEtaSourceLabel('MIXED'), '일부 실시간 도착정보');
     expect(routeEtaSourceLabel('STATIC_BACKEND_ESTIMATE'), '시간표 기준');
     expect(routeEtaSourceLabel('STATIC_ESTIMATE'), '정적 추정');
@@ -1248,9 +1248,8 @@ void main() {
   });
 
   test('경유 스텝 음성 안내는 신뢰도·측정 출처 문구를 읽지 않는다 (#1975)', () {
-    // 경유 마커가 route_step 기본값(confidenceLabel='안내를 준비 중이에요',
-    // timeSource/distanceSource 비어있지 않음)을 상속해도 경유 스텝에서는
-    // 신뢰도·측정 출처 문구가 음성 안내에 새어 나오지 않아야 한다.
+    // 경유 마커가 신뢰도 문구(confidenceLabel)와 측정 출처를 갖고 있어도 경유
+    // 스텝에서는 그 문구가 음성 안내에 새어 나오지 않아야 한다.
     const waypointStep = RouteSearchStep(
       sequence: 2,
       stepType: 'waypoint',
@@ -1266,11 +1265,11 @@ void main() {
       requiresAccessibilityCheck: false,
       timeSource: 'UNKNOWN',
       distanceSource: 'UNKNOWN',
-      confidenceLabel: '안내를 준비 중이에요',
+      confidenceLabel: '확인된 정보예요',
     );
 
     final label = waypointStep.semanticGuidanceLabel;
-    expect(label, isNot(contains('안내를 준비 중이에요')));
+    expect(label, isNot(contains('확인된 정보예요')));
     expect(label, isNot(contains('확인하고 있어요')));
   });
 
@@ -2097,7 +2096,7 @@ RouteSearchResult _sampleRouteSearchResult({
   List<RouteSearchWarning> warnings = const [
     RouteSearchWarning(
       code: 'LOW_DATA_CONFIDENCE',
-      message: '일부 시설 안내를 준비 중이에요.',
+      message: '일부 시설 안내는 아직 확인되지 않았어요.',
     ),
   ],
   List<String> blockedReasons = const [],

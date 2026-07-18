@@ -23,7 +23,7 @@ class StationRealtimeSummary extends StatelessWidget {
     final title = switch (snapshot.status) {
       RealtimeSnapshotStatus.fresh => '도착 정보',
       RealtimeSnapshotStatus.stale => '최근 도착 정보',
-      RealtimeSnapshotStatus.unsupported => '지원 준비 중',
+      RealtimeSnapshotStatus.unsupported => '실시간 정보 미지원',
       RealtimeSnapshotStatus.unavailable => '실시간 정보 확인 불가',
       RealtimeSnapshotStatus.loading => '실시간 정보 확인 중',
     };

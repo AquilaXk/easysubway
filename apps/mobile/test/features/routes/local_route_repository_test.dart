@@ -2301,7 +2301,8 @@ void main() {
       result.warnings.map((warning) => warning.code),
       contains('STAIR_ONLY_ACCESS_UNKNOWN'),
     );
-    expect(rideStep.confidenceLabel, '안내를 준비 중이에요');
+    // #2078: 낮은 신뢰도는 준비 중 placeholder 대신 빈 라벨(무표시)로 남긴다.
+    expect(rideStep.confidenceLabel, '');
   });
 
   test('로컬 경로 추천 이유와 음성 안내는 선택 경로에 없는 계단 차단 근거를 말하지 않는다', () async {
