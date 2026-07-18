@@ -137,10 +137,17 @@ Size _measureBadge(String text, {required double fontSize}) =>
 // 명시)했다. 조사 6과 달리 이번은 **라벨이 아니라 station 좌표**를 옮긴
 // 패스라, 재간격으로 벌어진 역들의 라벨 앵커가 이웃 라벨과 새로 겹치는 쌍이
 // 생겼다(미금×오리·신풍×영등포·신풍×보라매공원·명학×수리산·연수×동춘 5건 +
-// 기존 보라매×보라매공원 1건 = 6). 조사 6과 동일한 국소 재배치(SVG 라벨
-// 강체 평행이동)로 되돌릴 수 있으나 이번 패스 범위 밖 — baseline만 실측값
-// 6으로 올리고 후속 커밋에서 이 5건에 조사 6과 같은 국소 넛지를 적용한다.
-const int kCapitalBasemapLabelLabelPairBaseline = 6;
+// 기존 보라매×보라매공원 1건 = 6). baseline을 실측값 6으로 올렸었다.
+//
+// 조사 8(#2068 3단계 — apply-euclidean-svg-respacing.mjs 커밋 도구화, 별칭
+// 매핑·마커 없는 라벨 폴백 확장 후 census 예외 16→0, 2026-07-18): 조사 7의
+// 반발 솔버를 재현 가능한 도구로 승격해 재적용하면서(별칭 미매핑 13건 해소 +
+// 다체 클러스터 2건도 반복 적용으로 해소) 역 좌표가 조사 7 시점과는 다시
+// 달라졌다 — 그 결과로 이번 재측정에서 라벨-라벨 pairs가 **1**로 자연 복귀했다
+// (조사 7이 만든 5건의 신규 쌍은 이번 재간격 경로에서 재현되지 않음. 남은
+// 1쌍은 조사 6부터의 보라매×보라매공원 하드 케이스). baseline을 원래
+// 값(1)으로 되돌린다 — 조사 6·8 근거 유지.
+const int kCapitalBasemapLabelLabelPairBaseline = 1;
 
 bool _rectOverlaps(Rect a, Rect b) {
   final o = a.intersect(b);

@@ -10,6 +10,7 @@ import {
   extractServiceTagObstacles,
   markLineTerminalBadgeEntries,
   normalizeSvgForCompile,
+  parseSvgNumbers,
 } from "./compile-basemap-vec.mjs";
 
 test("컴파일 전에 단순 class 스타일을 SVG 속성으로 인라인한다", () => {
@@ -664,6 +665,43 @@ test("extractRailTransferChipObstacles: rail-transfer-layer가 없으면 빈 배
     extractRailTransferChipObstacles('<svg><g id="route-lines-layer"></g></svg>'),
     [],
   );
+});
+
+// #2068 ITX-청춘 chip 반입 대비 파서 강화(정본). 기존 `/-?\d+\.?\d*/g`(정수부
+// 우선)는 벡터 최적화 export가 흔히 내는 "선행 0 생략 + 연접 소수"(예:
+// ".191.132" = 0.191과 0.132 두 숫자)를 "191.132" 하나로 오병합했다 —
+// extract-svg-geometry.mjs의 pathEndpointVertices가 이미 쓰는 순서(부호 →
+// 선택 정수부 → 선택 소수부 → 필수 최소 1자리)로 교체해 정확히 분리한다.
+test("SVG_NUMBER_TOKEN_RE(parseSvgNumbers): 선행 0 생략·연접 소수를 개별 숫자로 정확히 나눈다", () => {
+  assert.deepEqual(parseSvgNumbers(".191.132"), [0.191, 0.132]);
+  assert.deepEqual(parseSvgNumbers("12.34.56"), [12.34, 0.56]);
+  assert.deepEqual(parseSvgNumbers("-.58.58"), [-0.58, 0.58]);
+  assert.deepEqual(parseSvgNumbers("123 -45.6 .78"), [123, -45.6, 0.78]);
+});
+
+// collectShapeBounds(내부)는 커맨드 인식 파서(visitPathCoordinates)로 절대좌표를
+// 정확히 추적한다 — A(호, rx ry x축회전 large-arc sweep x y 7개 인자 중 마지막
+// 2개만 좌표)의 비좌표 인자를 좌표로 오인하지 않고, 상대좌표(소문자) 명령의
+// 누적도 정확히 처리해야 한다(ITX-청춘 로고가 이 두 특성을 모두 씀 — 실측:
+// 나이브 파서로는 로고 자체 bbox가 viewBox 300 대비 590으로 부풀었다).
+test("extractServiceTagObstacles: A(호)·상대좌표 혼용 path도 정확한 bbox를 낸다(커맨드 인식 파서)", () => {
+  const svg = `<svg viewBox="0 0 2400 1800">
+    <g id="service-tags-layer" class="render-layer service-tag-layer">
+      <g id="service-tag-a" class="service-tag" data-station="테스트역" data-services="ITX">
+        <title>테스트역 · ITX</title>
+        <g transform="matrix(1,0,0,1,0,0)" data-logo="ITX">
+          <path d="M10 10 l 10 0 a 5 5 0 0 1 5 5 l 0 10 h -5 v -5 z" />
+        </g>
+      </g>
+    </g>
+  </svg>`;
+  const [obstacle] = extractServiceTagObstacles(svg);
+  // 수동 절대좌표 추적: M(10,10) L(20,10) A..→(25,15) L(25,25) H(20,25) V(20,20) Z.
+  // bbox: x[10,25] y[10,25] (제어점 없는 A/L/H/V만 있어 endpoint == bbox 극값).
+  assert.equal(obstacle.x, (10 + 25) / 2);
+  assert.equal(obstacle.y, (10 + 25) / 2);
+  assert.equal(obstacle.halfWidth, (25 - 10) / 2);
+  assert.equal(obstacle.halfHeight, (25 - 10) / 2);
 });
 
 // #2068 수도권 표장 마감: obstacle 좌표계 정합. main-map-scaled-layer(seoul형

@@ -374,6 +374,114 @@ function firstAttr(tag, name) {
   return match ? match[1] : null;
 }
 
+// SVG path `d` number 토큰 렉서(#2068 ITX-청춘 chip 반입 대비 파서 강화 —
+// 정본). SVG 좌표는 공백/콤마로 구분되지 않고 그냥 이어붙을 수 있다(선행
+// 0 생략 + 연접 소수, 예: 벡터 최적화 export가 흔히 내는 ".191.132" =
+// 0.191과 0.132 두 숫자). 기존 `/-?\d+\.?\d*/g`(정수부 우선)는 이 표기에서
+// "191.132" 하나로 오병합해(정수부를 억지로 채워 넣음) bbox가 크게 부풀거나
+// 좌표가 어긋난다 — extract-svg-geometry.mjs의 pathEndpointVertices가 이미
+// 쓰는 순서(선택 부호 → 선택 정수부 → 선택 소수부 → 필수 최소 1자리)를
+// 공유해 "정수부 없이 소수부만"과 "정수부만"을 모두 정확히 개별 숫자로
+// 나눈다: 정수부를 최대한 욕심껏 먼저 소비하고, 소수점 뒤에 최소 1자리가
+// 없으면 정규식 엔진이 역추적해 정수부를 한 자리씩 양보하며 재시도한다 —
+// 그 결과 "12.34.56"도 12.34·0.56 두 숫자로 올바르게 분리된다(수동 검증:
+// 이 파일의 compile-basemap-vec.test.mjs 참고). 지수 표기(e/E)도 지원.
+export const SVG_NUMBER_TOKEN_RE = /-?\d*\.?\d+(?:[eE][+-]?\d+)?/g;
+
+/** path `d`(또는 임의 좌표 나열 문자열)에서 숫자 토큰만 뽑는다(위 렉서). */
+export function parseSvgNumbers(d) {
+  return [...d.matchAll(SVG_NUMBER_TOKEN_RE)].map((m) => Number(m[0]));
+}
+
+// 커맨드별 인자 개수(#2068 ITX-청춘 chip 반입 대비 정본). collectShapeBounds의
+// 기존 "커맨드 무시, 숫자 2개씩 짝짓기" 간이 파서는 KTX/SRT/rail chip 로고가
+// 전부 M/L/C(2·2·6개 인자, 항상 2의 배수)만 쓰는 절대좌표 path라 우연히
+// 맞았다. ITX-청춘 로고는 A(호, 7개 인자 — rx ry x축회전 large-arc sweep x y,
+// 마지막 2개만 좌표)와 상대좌표 명령(소문자, 현재점 기준 델타)을 함께 쓴다 —
+// 숫자를 그냥 2개씩 짝지으면 A의 비좌표 인자(rx/ry/플래그)가 좌표로 오인되며
+// 그 뒤 전체 인자 정렬이 밀리고, 상대좌표 델타를 절대좌표인 양 그대로 쓰면
+// 도형이 원점 근처로 뭉친다 — 그 결과 bbox가 실제보다 훨씬 크게 부풀었다
+// (헤드리스 렌더·실측 대조로 발견: ITX 로고 자체 bbox가 viewBox 300 대비
+// 590 높이로 나옴). 아래 표는 각 커맨드의 인자 개수(좌표쌍 여부와 무관하게
+// 정확한 인자 소비량만 규정) — A는 좌표가 아닌 5개를 건너뛰고 마지막 (x,y)만
+// 좌표로 낸다.
+const PATH_COMMAND_ARITY = {
+  M: 2, L: 2, T: 2, // (x y)
+  H: 1, V: 1, // (x) / (y)
+  C: 6, S: 4, Q: 4, // (cp... x y) — 좌표쌍 전부 좌표로 취급(제어점 포함 보수적 bbox)
+  A: 7, // rx ry x-rot large-arc sweep x y — 좌표는 마지막 (x,y)뿐
+  Z: 0,
+};
+
+/**
+ * path `d`를 명령 인식 파서로 순회하며 실제 도형 좌표(절대화됨)만 [visit]에
+ * 넘긴다. curve 제어점(C/S/Q)은 여전히 좌표로 방문해 기존의 "보수적으로
+ * 넉넉한 bbox" 방향을 유지하되, A의 반지름·플래그 인자와 상대좌표 누적은
+ * 정확히 처리한다(extract-svg-geometry.mjs의 pathEndpointVertices와 동일한
+ * 커맨드·상대/절대 처리 원리 — 그쪽은 끝점만, 이쪽은 제어점도 포함).
+ */
+function visitPathCoordinates(d, visit) {
+  const tokens =
+    d.match(new RegExp(`[a-zA-Z]|${SVG_NUMBER_TOKEN_RE.source}`, "g")) || [];
+  let i = 0;
+  let cx = 0;
+  let cy = 0;
+  let startX = 0;
+  let startY = 0;
+  let cmd = "";
+  const num = () => Number(tokens[i++]);
+  while (i < tokens.length) {
+    if (/[a-zA-Z]/.test(tokens[i])) {
+      cmd = tokens[i++];
+    }
+    const c = cmd.toUpperCase();
+    const rel = cmd === cmd.toLowerCase();
+    if (c === "Z") {
+      cx = startX;
+      cy = startY;
+      continue;
+    }
+    if (c === "H") {
+      cx = (rel ? cx : 0) + num();
+      visit(cx, cy);
+      continue;
+    }
+    if (c === "V") {
+      cy = (rel ? cy : 0) + num();
+      visit(cx, cy);
+      continue;
+    }
+    if (c === "A") {
+      num();
+      num();
+      num();
+      num();
+      num(); // rx ry x-rot large-arc sweep — 좌표 아님, 건너뜀.
+      cx = (rel ? cx : 0) + num();
+      cy = (rel ? cy : 0) + num();
+      visit(cx, cy);
+      continue;
+    }
+    const pairCount = (PATH_COMMAND_ARITY[c] ?? 2) / 2;
+    if (!Number.isInteger(pairCount)) break; // 알 수 없는 커맨드 방어.
+    for (let p = 0; p < pairCount; p += 1) {
+      const isLast = p === pairCount - 1;
+      const x = (rel ? cx : 0) + num();
+      const y = (rel ? cy : 0) + num();
+      visit(x, y);
+      if (isLast) {
+        cx = x;
+        cy = y;
+        if (c === "M") {
+          startX = cx;
+          startY = cy;
+          cmd = rel ? "l" : "L"; // 후속 좌표쌍은 lineto(SVG 스펙).
+        }
+      }
+    }
+  }
+}
+
 // 2D 아핀 [a,b,c,d,e,f]: x'=a*x+c*y+e, y'=b*x+d*y+f. SVG transform 속성 합성 관례.
 const IDENTITY_MATRIX = [1, 0, 0, 1, 0, 0];
 
@@ -672,9 +780,10 @@ function collectShapeBoundsRecursive(text, matrix, visit) {
  * 자체에 스케일이 온다)도 [matrix]와 합성해 반영한다.
  */
 function collectShapeBounds(text, matrix, visit) {
-  // path는 좌표쌍만 뽑는 정식 파서 대신, 커맨드 문자를 무시하고 숫자 토큰만
-  // 순서대로 2개씩 x,y로 짝짓는 간이 방식을 쓴다 — curve 제어점까지 좌표로
-  // 잡혀 실제 외곽보다 넉넉한(장애물 회피에는 안전한 방향) bbox가 나온다.
+  // path는 커맨드 인식 파서(visitPathCoordinates)로 절대좌표를 정확히
+  // 추적하되, curve 제어점까지 좌표로 방문해 실제 외곽보다 넉넉한(장애물
+  // 회피에는 안전한 방향) bbox를 낸다 — A(호)의 비좌표 인자·상대좌표
+  // 누적은 정확히 처리한다(#2068 ITX-청춘 chip: 절대/상대 혼용 + arc 사용).
   for (const pm of text.matchAll(/<path\b[^>]*\/?>/g)) {
     const tag = pm[0];
     const d = firstAttr(tag, "d");
@@ -683,11 +792,10 @@ function collectShapeBounds(text, matrix, visit) {
     const pathMatrix = pathTransform
       ? composeMatrix(matrix, parseTransformChain(pathTransform))
       : matrix;
-    const nums = [...d.matchAll(/-?\d+\.?\d*/g)].map((x) => Number(x[0]));
-    for (let i = 0; i + 1 < nums.length; i += 2) {
-      const [x, y] = applyMatrix(pathMatrix, nums[i], nums[i + 1]);
+    visitPathCoordinates(d, (px, py) => {
+      const [x, y] = applyMatrix(pathMatrix, px, py);
       visit(x, y);
-    }
+    });
   }
   for (const cm of text.matchAll(/<circle\b[^>]*\/?>/g)) {
     const tag = cm[0];

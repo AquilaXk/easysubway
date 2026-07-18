@@ -2016,7 +2016,7 @@
             <path
                id="_경의중앙선-3"
                data-name="경의중앙선"
-               d="M 3820 650 L 3888.6863 581.3137 Q 3900 570 3916 570 L 4364 570 Q 4380 570 4391.2092 581.4173 L 4478.7908 670.6254 Q 4490 682.0427 4490 698.0427 L 4490 1304 Q 4490 1320 4476.3537 1328.3533 L 4297.0816 1463.6254 Q 4271.4947 1479.2879 4242.0736 1485.1529 L 4046.1574 1494.8311 Q 4016.7363 1500.6961 3986.7363 1500.6961 L 3846 1500.6961 L 3846 1369 C 3846 1365 3844.4 1361.2 3841.5 1358.3 L 3836.3 1353.2 C 3833.5 1350.4 3829.7 1348.9 3825.8 1348.9 L 3158.9 1348.9 C 3147 1348.9 3135.6 1353.6 3127.2 1362 L 3007.2 1479.2 C 2998.7 1487.6 2993.9 1499.1 2993.9 1511.1 L 2993.9 1769.9 C 2993.9 1786.4 2991.2 1797.1 2974.5 1813.8 L 2887.4 1900.5 2805.6 1982.2 C 2788.9 1998.9 2777.8 2002.8 2761.3 2002.8 L 2179.1 2002.8 C 2178.1 2002.8 2177.2 2002.8 2176.3 2002.5 2173.4 2001.9 2170.9619 2005.7387 2168.8619 2003.6387 L 2130.396 2003.5155 C 2121.3096 1999.4058 2120.9815 1996.5697 2120.9193 1988.6246 L 2120.1335 1888.2619 C 2120.0455 1877.0622 2120.6475 1870.0579 2109.0632 1870.6584 L 2090.6472 1871.6131 C 2081.4022 1872.0924 2072.0591 1871.8149 2062.4768 1871.9346 2057.8436 1871.9926 2053.1789 1871.759 2048.9049 1871.8806 2037.1968 1872.214 2022.9922 1870.3431 2012.0081 1872.7652 2007.7794 1872.9946 2005.8019 1875.0803 1993.8685 1862.7809 1962.9427 1830.9066 1861.1767 1713.6573 1849.0739 1698.5078 L 1839.6334 1688.0672 L 1763.8 1604.2 1625.0989 1453.1164 1569.4 1409.7 L 1474.4 1314.7 1398.4 1238.7 1323.1 1163.4 1241.8 1081.8 1163.278 997.997 1066.0212 900.2838 1026.086 857.3535 C 1015.486 846.7535 1011.705 834 1011.705 818 L 1209.672 603 C 1209.672 595 1216.112 588.559 1224.172 588.559 L 1786.267 588.559 C 1812.967 588.559 1833.367 568 1833.367 528.7 1833.367 489.4 1812.967 468.9 1786.267 468.9 L 1331.267 468.9"
+               d="M 3820 650 L 3888.6863 581.3137 Q 3900 570 3916 570 L 4246.695 596.695 L 4364 570 Q 4380 570 4391.2092 581.4173 L 4478.7908 670.6254 Q 4490 682.0427 4490 698.0427 L 4490 1304 Q 4490 1320 4476.3537 1328.3533 L 4297.0816 1463.6254 Q 4271.4947 1479.2879 4242.0736 1485.1529 L 4046.1574 1494.8311 Q 4016.7363 1500.6961 3986.7363 1500.6961 L 3846 1500.6961 L 3846 1369 C 3846 1365 3844.4 1361.2 3841.5 1358.3 L 3836.3 1353.2 C 3833.5 1350.4 3829.7 1348.9 3825.8 1348.9 L 3158.9 1348.9 C 3147 1348.9 3135.6 1353.6 3127.2 1362 L 3007.2 1479.2 C 2998.7 1487.6 2993.9 1499.1 2993.9 1511.1 L 2993.9 1769.9 C 2993.9 1786.4 2991.2 1797.1 2974.5 1813.8 L 2887.4 1900.5 2805.6 1982.2 C 2788.9 1998.9 2777.8 2002.8 2761.3 2002.8 L 2179.1 2002.8 C 2178.1 2002.8 2177.2 2002.8 2176.3 2002.5 2173.4 2001.9 2170.9619 2005.7387 2168.8619 2003.6387 L 2130.396 2003.5155 C 2121.3096 1999.4058 2120.9815 1996.5697 2120.9193 1988.6246 L 2120.1335 1888.2619 C 2120.0455 1877.0622 2120.6475 1870.0579 2109.0632 1870.6584 L 2090.6472 1871.6131 C 2081.4022 1872.0924 2072.0591 1871.8149 2062.4768 1871.9346 2057.8436 1871.9926 2053.1789 1871.759 2048.9049 1871.8806 2037.1968 1872.214 2022.9922 1870.3431 2012.0081 1872.7652 2007.7794 1872.9946 2005.8019 1875.0803 1993.8685 1862.7809 1962.9427 1830.9066 1861.1767 1713.6573 1849.0739 1698.5078 L 1839.6334 1688.0672 L 1763.8 1604.2 1625.0989 1453.1164 1569.4 1409.7 L 1474.4 1314.7 1398.4 1238.7 1323.1 1163.4 1241.8 1081.8 1163.278 997.997 1066.0212 900.2838 1026.086 857.3535 C 1015.486 846.7535 1011.705 834 1011.705 818 L 1209.672 603 C 1209.672 595 1216.112 588.559 1224.172 588.559 L 1786.267 588.559 C 1812.967 588.559 1833.367 568 1833.367 528.7 1833.367 489.4 1812.967 468.9 1786.267 468.9 L 1331.267 468.9"
                fill="none"
                stroke="#6ac2b3"
                stroke-linecap="round"
@@ -2643,7 +2643,7 @@
              data-node-role="terminal"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698"  transform="translate(0,-68.264)"/>
+             data-line-color="#794698"  transform="translate(0,-75.209)"/>
           <circle
              id="_개화"
              data-name="개화"
@@ -2659,7 +2659,7 @@
              data-node-role="terminal"
              data-line="9"
              data-line-name="9호선"
-             data-line-color="#A49D87"  transform="translate(-4.037,-4.037)"/>
+             data-line-color="#A49D87"  transform="translate(-10.543,-10.543)"/>
           <circle
              id="_마천"
              data-name="마천"
@@ -2787,7 +2787,7 @@
              data-node-role="terminal"
              data-line="gyeongchun"
              data-line-name="경춘선"
-             data-line-color="#007A62"  transform="translate(-14.1956,0.0000)"/>
+             data-line-color="#007A62"  transform="translate(-16.04,0)"/>
           <circle
              id="_광교"
              data-name="광교"
@@ -2859,7 +2859,7 @@
              data-node-role="terminal"
              data-line="airport-railroad"
              data-line-name="공항철도"
-             data-line-color="#0079AC">
+             data-line-color="#0079AC" transform="translate(0,6.864)">
             <title
                id="title-airport-airplane-인천공항2터미널">인천공항2터미널 공항 노드 — Bootstrap Icons airplane-fill</title>
             <g
@@ -3849,7 +3849,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-18.17,-18.17)"/>
+             data-line-color="#004A85"  transform="translate(-19.434,-19.434)"/>
           <circle
              id="_세류"
              data-name="세류"
@@ -4553,7 +4553,7 @@
              data-node-role="ordinary"
              data-line="2"
              data-line-name="2호선"
-             data-line-color="#00A23F"  transform="translate(-73.9890,-25.0000)"/>
+             data-line-color="#00A23F"  transform="translate(-89.343,-26.901)"/>
           <circle
              id="_이대"
              data-name="이대"
@@ -4569,7 +4569,7 @@
              data-node-role="ordinary"
              data-line="2"
              data-line-name="2호선"
-             data-line-color="#00A23F"  transform="translate(-45.813,0)"/>
+             data-line-color="#00A23F"  transform="translate(-42.477,0)"/>
           <circle
              id="_아현"
              data-name="아현"
@@ -4585,7 +4585,7 @@
              data-node-role="ordinary"
              data-line="2"
              data-line-name="2호선"
-             data-line-color="#00A23F"  transform="translate(-5.565,0)"/>
+             data-line-color="#00A23F"  transform="translate(-6.363,0)"/>
           <circle
              id="_을지로입구"
              data-name="을지로입구"
@@ -4601,7 +4601,7 @@
              data-node-role="ordinary"
              data-line="2"
              data-line-name="2호선"
-             data-line-color="#00A23F"  transform="translate(10.352,0)"/>
+             data-line-color="#00A23F"  transform="translate(10.695,0)"/>
           <circle
              id="_상왕십리"
              data-name="상왕십리"
@@ -5977,7 +5977,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698"  transform="translate(4.235,-21.4)"/>
+             data-line-color="#794698"  transform="translate(4.235,-27.723)"/>
           <circle
              id="_송정"
              data-name="송정"
@@ -5993,7 +5993,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698"  transform="translate(-153.01,-75.348)"/>
+             data-line-color="#794698"  transform="translate(-161.355,-75.348)"/>
           <circle
              id="_마곡"
              data-name="마곡"
@@ -6025,7 +6025,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698"  transform="translate(-76.126,-117.164)"/>
+             data-line-color="#794698"  transform="translate(-79.998,-121.036)"/>
           <circle
              id="_우장산"
              data-name="우장산"
@@ -6041,7 +6041,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698"  transform="translate(-81.594,-81.591)"/>
+             data-line-color="#794698"  transform="translate(-84.02,-84.017)"/>
           <circle
              id="_화곡"
              data-name="화곡"
@@ -6057,7 +6057,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698"  transform="translate(-60.865,-60.865)"/>
+             data-line-color="#794698"  transform="translate(-64.858,-64.858)"/>
           <circle
              id="_공항시장"
              data-name="공항시장"
@@ -6250,7 +6250,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698"  transform="translate(-36.062,-36.06)"/>
+             data-line-color="#794698"  transform="translate(-37.141,-37.139)"/>
           <circle
              id="_목동"
              data-name="목동"
@@ -6266,7 +6266,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698"  transform="translate(-16.913,-16.91)"/>
+             data-line-color="#794698"  transform="translate(-11.401,-11.398)"/>
           <circle
              id="_오목교"
              data-name="오목교"
@@ -6282,7 +6282,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698"  transform="translate(2.14,2.14)"/>
+             data-line-color="#794698"  transform="translate(7.921,7.921)"/>
           <circle
              id="_양평:5호선"
              data-name="양평:5호선"
@@ -6298,7 +6298,7 @@
              data-node-role="ordinary"
              data-line="5"
              data-line-name="5호선"
-             data-line-color="#794698" />
+             data-line-color="#794698"  transform="translate(26.695,26.695)"/>
           <circle
              id="_영등포시장"
              data-name="영등포시장"
@@ -7242,7 +7242,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31"  transform="translate(-20.415,0)"/>
+             data-line-color="#6E7E31"  transform="translate(-22.804,0)"/>
           <circle
              id="_숭실대입구"
              data-name="숭실대입구"
@@ -7258,7 +7258,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31"  transform="translate(-35.66,0)"/>
+             data-line-color="#6E7E31"  transform="translate(-38.548,0)"/>
           <circle
              id="_상도"
              data-name="상도"
@@ -7274,7 +7274,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31"  transform="translate(-67.238,0)"/>
+             data-line-color="#6E7E31"  transform="translate(-69.489,0)"/>
           <circle
              id="_장승배기"
              data-name="장승배기"
@@ -7290,7 +7290,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31"  transform="translate(-87.987,0)"/>
+             data-line-color="#6E7E31"  transform="translate(-90.473,0)"/>
           <circle
              id="_신대방삼거리"
              data-name="신대방삼거리"
@@ -7306,7 +7306,7 @@
              data-node-role="ordinary"
              data-line="7"
              data-line-name="7호선"
-             data-line-color="#6E7E31"  transform="translate(-92.017,-11.786)"/>
+             data-line-color="#6E7E31"  transform="translate(-95.573,-14.913)"/>
           <circle
              id="_신풍"
              data-name="신풍"
@@ -8823,7 +8823,7 @@
              data-node-role="ordinary"
              data-line="gyeongui-jungang"
              data-line-name="경의중앙선"
-             data-line-color="#6AC2B3" />
+             data-line-color="#6AC2B3"  transform="translate(-15.354,-1.901)"/>
           <circle
              id="_서강대"
              data-name="서강대"
@@ -9095,7 +9095,7 @@
              data-node-role="ordinary"
              data-line="gyeongui-jungang"
              data-line-name="경의중앙선"
-             data-line-color="#6AC2B3" />
+             data-line-color="#6AC2B3"  transform="translate(26.695,26.695)"/>
           <circle
              id="_원덕"
              data-name="원덕"
@@ -9335,7 +9335,7 @@
              data-node-role="ordinary"
              data-line="gyeongchun"
              data-line-name="경춘선"
-             data-line-color="#007A62" />
+             data-line-color="#007A62"  transform="translate(-0.281,0)"/>
           <circle
              id="_김유정"
              data-name="김유정"
@@ -9351,7 +9351,7 @@
              data-node-role="ordinary"
              data-line="gyeongchun"
              data-line-name="경춘선"
-             data-line-color="#007A62"  transform="translate(5.7934,0.0000)"/>
+             data-line-color="#007A62"  transform="translate(5.736,0)"/>
           <circle
              id="_강촌"
              data-name="강촌"
@@ -9383,7 +9383,7 @@
              data-node-role="ordinary"
              data-line="gyeongchun"
              data-line-name="경춘선"
-             data-line-color="#007A62"  transform="translate(18.7824,0.0000)"/>
+             data-line-color="#007A62"  transform="translate(20.978,0)"/>
           <circle
              id="_굴봉산"
              data-name="굴봉산"
@@ -10389,7 +10389,7 @@
              data-node-role="ordinary"
              data-line="airport-railroad"
              data-line-name="공항철도"
-             data-line-color="#0079AC"  transform="translate(0,11.777)"/>
+             data-line-color="#0079AC"  transform="translate(0,9.99)"/>
           <circle
              id="_운서"
              data-name="운서"
@@ -10403,7 +10403,7 @@
              data-station="운서"
              data-station-name="운서"
              data-node-role="ordinary"
-             data-line="airport-railroad"  transform="translate(0,-13.908)"/>
+             data-line="airport-railroad"  transform="translate(0,-16.424)"/>
           <circle
              id="_영종"
              data-name="영종"
@@ -10417,7 +10417,7 @@
              data-station="영종"
              data-station-name="영종"
              data-node-role="ordinary"
-             data-line="airport-railroad"  transform="translate(0,-39.217)"/>
+             data-line="airport-railroad"  transform="translate(0,-40.982)"/>
           <circle
              id="_시우"
              data-name="시우"
@@ -10956,7 +10956,7 @@
              data-node-role="ordinary"
              data-line="1"
              data-line-name="1호선"
-             data-line-color="#004A85"  transform="translate(-172.7516,0.0000)"/>
+             data-line-color="#004A85"  transform="translate(-171.418,1.334)"/>
           <circle
              id="station-node-서동탄"
              class="station-node-ordinary-line-1"
@@ -15224,7 +15224,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="gimpo-goldline"
-             transform="translate(-33.568,20.15)">
+             transform="translate(-43.741,14.899)">
             <title
                id="title-transfer-station-김포공항"
                data-station="김포공항"
@@ -17298,7 +17298,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="5" transform="translate(36.879,0)">
+             data-line="5" transform="translate(36.784,0)">
             <title
                id="title-transfer-station-충정로"
                data-station="충정로"
@@ -17461,7 +17461,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="1" transform="translate(-17.09,11.429)">
+             data-line="1" transform="translate(-17.242,11.429)">
             <title
                id="title-transfer-station-시청"
                data-station="시청"
@@ -17621,7 +17621,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="3" transform="translate(35.877,0)">
+             data-line="3" transform="translate(36.216,0)">
             <title
                id="title-transfer-station-을지로3가"
                data-station="을지로3가"
@@ -17945,7 +17945,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="5" transform="translate(27.587,0)">
+             data-line="5" transform="translate(29.156,0)">
             <title
                id="title-transfer-station-을지로4가"
                data-station="을지로4가"
@@ -18108,7 +18108,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="4" transform="translate(7.525,-8.78)">
+             data-line="4" transform="translate(18.327,-8.78)">
             <title
                id="title-transfer-station-동대문역사문화공원"
                data-station="동대문역사문화공원"
@@ -18570,7 +18570,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="2" transform="translate(-6.207,27.072)">
+             data-line="2" transform="translate(-6.207,28.973)">
             <title
                id="title-transfer-station-홍대입구"
                data-station="홍대입구"
@@ -19848,7 +19848,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="5"
-             transform="translate(-43.831,-49.137)">
+             transform="translate(-45.421,-50.727)">
             <title
                id="title-transfer-station-까치산"
                data-station="까치산"
@@ -26255,7 +26255,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="7" transform="translate(-29.729,73.376)">
+             data-line="7" transform="translate(-32.856,76.503)">
             <title
                id="title-transfer-station-보라매"
                data-station="보라매"
@@ -26418,7 +26418,7 @@
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
              data-line="4"
-             transform="rotate(-90,2454.6587,2333.3662)">
+             transform="translate(5.468,0) translate(11.231,0) rotate(-90,2454.6587,2333.3662)">
             <title
                id="title-transfer-station-이수"
                data-station="이수"
@@ -28899,7 +28899,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="airport-railroad" transform="translate(0,8.892)">
+             data-line="airport-railroad" transform="translate(0,8.099)">
             <title
                id="title-airport-airplane-인천공항1터미널">인천공항1터미널 공항 노드 — Bootstrap Icons airplane-fill</title>
             <g
@@ -31276,7 +31276,7 @@
              data-slot-size="3u"
              data-base-unit-u="8px"
              data-centerline-rule="route-stroke-center-must-pass-through-matching-badge-center"
-             data-line="suin-bundang" transform="translate(-39.53,-26.24)">
+             data-line="suin-bundang" transform="translate(-39.6,-26.31)">
             <title
                id="title-transfer-station-수원"
                data-station="수원"
@@ -37615,9 +37615,9 @@
              data-label-role="transfer"
              font-weight="600"
              x="1610.197"
-             y="3169.6438"><tspan
+             y="3152.061"><tspan
                x="1610.197"
-               y="3169.6438"
+               y="3152.061"
                font-family="Pretendard"
                id="tspan530">중앙</tspan></text>
           <text
@@ -37632,10 +37632,10 @@
              data-station="정왕"
              data-label-role="transfer"
              font-weight="600"
-             x="1338.3442"
-             y="3384.9351"><tspan
-               x="1338.3442"
-               y="3384.9351"
+             x="1341.606"
+             y="3324.731"><tspan
+               x="1341.606"
+               y="3324.731"
                font-family="Pretendard"
                id="tspan531">정왕</tspan></text>
           <text
@@ -37650,14 +37650,14 @@
              data-station="신길온천"
              data-label-role="transfer"
              font-weight="600"
-             x="1422.6278"
-             y="3385.3232"><tspan
-               x="1422.6278"
-               y="3385.3232"
+             x="1405.032"
+             y="3388.585"><tspan
+               x="1405.032"
+               y="3388.585"
                font-family="Pretendard"
                id="tspan532">신길</tspan><tspan
-               x="1422.6278"
-               y="3414.1233"
+               x="1405.032"
+               y="3417.385"
                font-family="Pretendard"
                id="tspan533">온천</tspan></text>
           <text
@@ -37672,10 +37672,10 @@
              data-station="안산"
              data-label-role="transfer"
              font-weight="600"
-             x="1501.451"
-             y="3384.5466"><tspan
-               x="1501.451"
-               y="3384.5466"
+             x="1515.787"
+             y="3441.489"><tspan
+               x="1515.787"
+               y="3441.489"
                font-family="Pretendard"
                id="tspan534">안산</tspan></text>
           <text
@@ -43953,10 +43953,10 @@
              data-station="고잔"
              data-label-role="transfer"
              font-weight="600"
-             x="1610.7532"
-             y="3240.2"><tspan
-               x="1610.7532"
-               y="3240.2"
+             x="1610.753"
+             y="3257.782"><tspan
+               x="1610.753"
+               y="3257.782"
                font-family="Pretendard"
                id="tspan917">고잔</tspan></text>
           <text
@@ -46062,7 +46062,7 @@
              data-station="수서"
              data-services="SRT"
              data-logo-mode="inline-svg-paths"
-             transform="translate(3431.5989,2724.0754)">
+             transform="translate(3431.5989,2741.6554)">
             <title
                id="service-tag-suseo-title">수서 · SRT</title>
             <g
@@ -46115,6 +46115,262 @@
                  d="m 1136.258 106.6 h -129.2 l -115.9 221 h 127.3 z M 1.9 327.6 h 408.102 l 1.9 -1.3 h 17.1 l 1.9 -1.3 22.8 -1.3 32.3 -5.2 22.8 -5.2 34.2 -13 26.6 -18.2 11.4 -11.7 11.4 -16.9 5.7 -16.9 v -27.3 l -1.9 -1.3 -1.9 -13 -13.3 -24.7 -24.7 -33.8 -11.4 -26 V 91 l 9.5 -14.3 17.1 -10.4 24.7 -6.5 34.2 -1.3 1.9 -1.3 502.304 1.3 13.3 2.6 17.1 6.5 9.5 6.5 11.4 15.6 1.9 10.4 -1.9 1.3 -1.9 13 -15.2 19.5 -22.8 15.6 -28.5 13 -66.5 19.5 -39.9 9.1 h -7.6 l 9.5 16.9 74.1 104 11.4 7.8 13.3 5.2 13.3 2.6 h 438.654 l 7.6 1.3 1.9 -1.3 24.7 -1.3 17.1 -3.9 30.4 -11.7 22.8 -15.6 11.4 -11.7 15.2 -23.4 5.7 -14.3 3.8 -3.9 5.7 -14.3 3.8 -3.9 3.8 -10.4 3.8 -3.9 3.8 -10.4 3.8 -3.9 5.7 -14.3 3.8 -3.9 60.8 -117 1.9 -1.3 h 148.2 l 11.4 -2.6 13.3 -9.1 38 -46.8 H 1844.046 l -1.9 1.3 -38 2.6 -34.2 6.5 -28.5 9.1 -24.7 11.7 -20.9 14.3 -13.3 13 -15.2 24.7 h 70.3 l 20.9 -13 15.2 -5.2 26.6 -5.2 h 19 l 1.9 -1.3 h 74.1 l 1.9 1.3 -115.9 219.7 -9.5 6.5 -22.8 5.2 H 1370.49 l -13.3 -16.9 v -2.6 l -11.4 -14.3 v -2.6 l -11.4 -14.3 -24.7 -39 7.6 -3.9 19 -3.9 47.5 -15.6 45.6 -19.5 19 -10.4 20.9 -14.3 13.3 -11.7 11.4 -14.3 5.7 -11.7 1.9 -26 -9.5 -20.8 -17.1 -16.9 -11.4 -6.5 L 1464.692 16.9 1423.956 9.1 1393.404 5.2 1350.122 2.6 1347.576 1.3 H 1319.57 L 1317.024 0 H 647.426 l -1.9 1.3 -30.4 1.3 -34.2 5.2 -26.6 6.5 -22.8 7.8 -24.7 13 -15.2 13 -9.5 13 -5.7 15.6 v 28.6 l 7.6 23.4 15.2 27.3 20.9 28.6 9.5 23.4 v 22.1 l -3.8 7.8 -9.5 10.4 -17.1 10.4 -19 6.5 -19 3.9 -22.8 1.3 -1.9 1.3 H 62.7 l -15.2 3.9 -11.4 7.8 z"
                  fill="#4c2f48"
                  fill-rule="evenodd" />
+            </g>
+          </g>
+                  <g id="service-tag-cheongnyangni-itx"
+             class="service-tag"
+             data-station="청량리"
+             data-services="ITX"
+             data-logo-mode="inline-svg-paths"
+             transform="translate(3284.851,1406.425)">
+            <title
+               id="service-tag-cheongnyangni-itx-title">청량리 · ITX</title>
+            <g
+               id="logo-itx-inline-vector-cheongnyangni-itx"
+               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
+               aria-label="ITX"
+               data-logo-source="itx-cheongchun-logo.svg">
+<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
+            </g>
+          </g>
+          <g id="service-tag-sangbong-itx"
+             class="service-tag"
+             data-station="상봉"
+             data-services="ITX"
+             data-logo-mode="inline-svg-paths"
+             transform="translate(3748.42,1434.272)">
+            <title
+               id="service-tag-sangbong-itx-title">상봉 · ITX</title>
+            <g
+               id="logo-itx-inline-vector-sangbong-itx"
+               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
+               aria-label="ITX"
+               data-logo-source="itx-cheongchun-logo.svg">
+<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
+            </g>
+          </g>
+          <g id="service-tag-yongsan-itx"
+             class="service-tag"
+             data-station="용산"
+             data-services="ITX"
+             data-logo-mode="inline-svg-paths"
+             transform="translate(2229.476,2068.645)">
+            <title
+               id="service-tag-yongsan-itx-title">용산 · ITX</title>
+            <g
+               id="logo-itx-inline-vector-yongsan-itx"
+               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
+               aria-label="ITX"
+               data-logo-source="itx-cheongchun-logo.svg">
+<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
+            </g>
+          </g>
+          <g id="service-tag-pyeongnaehopyeong"
+             class="service-tag"
+             data-station="평내호평"
+             data-services="ITX"
+             data-logo-mode="inline-svg-paths"
+             transform="translate(4434.912,1434.264)">
+            <title
+               id="service-tag-pyeongnaehopyeong-title">평내호평 · ITX</title>
+            <g
+               id="logo-itx-inline-vector-pyeongnaehopyeong"
+               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
+               aria-label="ITX"
+               data-logo-source="itx-cheongchun-logo.svg">
+<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
+            </g>
+          </g>
+          <g id="service-tag-maseok"
+             class="service-tag"
+             data-station="마석"
+             data-services="ITX"
+             data-logo-mode="inline-svg-paths"
+             transform="translate(4381.944,1202.584)">
+            <title
+               id="service-tag-maseok-title">마석 · ITX</title>
+            <g
+               id="logo-itx-inline-vector-maseok"
+               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
+               aria-label="ITX"
+               data-logo-source="itx-cheongchun-logo.svg">
+<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
+            </g>
+          </g>
+          <g id="service-tag-cheongpyeong"
+             class="service-tag"
+             data-station="청평"
+             data-services="ITX"
+             data-logo-mode="inline-svg-paths"
+             transform="translate(4381.944,1096.28)">
+            <title
+               id="service-tag-cheongpyeong-title">청평 · ITX</title>
+            <g
+               id="logo-itx-inline-vector-cheongpyeong"
+               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
+               aria-label="ITX"
+               data-logo-source="itx-cheongchun-logo.svg">
+<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
+            </g>
+          </g>
+          <g id="service-tag-gapyeong"
+             class="service-tag"
+             data-station="가평"
+             data-services="ITX"
+             data-logo-mode="inline-svg-paths"
+             transform="translate(4381.944,879.251)">
+            <title
+               id="service-tag-gapyeong-title">가평 · ITX</title>
+            <g
+               id="logo-itx-inline-vector-gapyeong"
+               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
+               aria-label="ITX"
+               data-logo-source="itx-cheongchun-logo.svg">
+<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
+            </g>
+          </g>
+          <g id="service-tag-namchuncheon"
+             class="service-tag"
+             data-station="남춘천"
+             data-services="ITX"
+             data-logo-mode="inline-svg-paths"
+             transform="translate(4037.319,700.143)">
+            <title
+               id="service-tag-namchuncheon-title">남춘천 · ITX</title>
+            <g
+               id="logo-itx-inline-vector-namchuncheon"
+               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
+               aria-label="ITX"
+               data-logo-source="itx-cheongchun-logo.svg">
+<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
+            </g>
+          </g>
+          <g id="service-tag-chuncheon-itx"
+             class="service-tag"
+             data-station="춘천"
+             data-services="ITX"
+             data-logo-mode="inline-svg-paths"
+             transform="translate(3930.259,700.143)">
+            <title
+               id="service-tag-chuncheon-itx-title">춘천 · ITX</title>
+            <g
+               id="logo-itx-inline-vector-chuncheon-itx"
+               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
+               aria-label="ITX"
+               data-logo-source="itx-cheongchun-logo.svg">
+<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
+            </g>
+          </g>
+          <g id="service-tag-oksu"
+             class="service-tag"
+             data-station="옥수"
+             data-services="ITX"
+             data-logo-mode="inline-svg-paths"
+             transform="translate(2774.924,2073.302)">
+            <title
+               id="service-tag-oksu-title">옥수 · ITX</title>
+            <g
+               id="logo-itx-inline-vector-oksu"
+               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
+               aria-label="ITX"
+               data-logo-source="itx-cheongchun-logo.svg">
+<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
+            </g>
+          </g>
+          <g id="service-tag-wangsimni"
+             class="service-tag"
+             data-station="왕십리"
+             data-services="ITX"
+             data-logo-mode="inline-svg-paths"
+             transform="translate(2976.556,1431.692)">
+            <title
+               id="service-tag-wangsimni-title">왕십리 · ITX</title>
+            <g
+               id="logo-itx-inline-vector-wangsimni"
+               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
+               aria-label="ITX"
+               data-logo-source="itx-cheongchun-logo.svg">
+<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
+            </g>
+          </g>
+          <g id="service-tag-toegyewon"
+             class="service-tag"
+             data-station="퇴계원"
+             data-services="ITX"
+             data-logo-mode="inline-svg-paths"
+             transform="translate(4105.499,1640.598)">
+            <title
+               id="service-tag-toegyewon-title">퇴계원 · ITX</title>
+            <g
+               id="logo-itx-inline-vector-toegyewon"
+               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
+               aria-label="ITX"
+               data-logo-source="itx-cheongchun-logo.svg">
+<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
+            </g>
+          </g>
+          <g id="service-tag-sareung"
+             class="service-tag"
+             data-station="사릉"
+             data-services="ITX"
+             data-logo-mode="inline-svg-paths"
+             transform="translate(4214.149,1532.119)">
+            <title
+               id="service-tag-sareung-title">사릉 · ITX</title>
+            <g
+               id="logo-itx-inline-vector-sareung"
+               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
+               aria-label="ITX"
+               data-logo-source="itx-cheongchun-logo.svg">
+<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
+            </g>
+          </g>
+          <g id="service-tag-galmae"
+             class="service-tag"
+             data-station="갈매"
+             data-services="ITX"
+             data-logo-mode="inline-svg-paths"
+             transform="translate(4061.11,1334)">
+            <title
+               id="service-tag-galmae-title">갈매 · ITX</title>
+            <g
+               id="logo-itx-inline-vector-galmae"
+               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
+               aria-label="ITX"
+               data-logo-source="itx-cheongchun-logo.svg">
+<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
+            </g>
+          </g>
+          <g id="service-tag-byeollae"
+             class="service-tag"
+             data-station="별내"
+             data-services="ITX"
+             data-logo-mode="inline-svg-paths"
+             transform="translate(4109.02,1362.22)">
+            <title
+               id="service-tag-byeollae-title">별내 · ITX</title>
+            <g
+               id="logo-itx-inline-vector-byeollae"
+               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
+               aria-label="ITX"
+               data-logo-source="itx-cheongchun-logo.svg">
+<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
+            </g>
+          </g>
+          <g id="service-tag-sinnae"
+             class="service-tag"
+             data-station="신내"
+             data-services="ITX"
+             data-logo-mode="inline-svg-paths"
+             transform="translate(3945.682,1272.278)">
+            <title
+               id="service-tag-sinnae-title">신내 · ITX</title>
+            <g
+               id="logo-itx-inline-vector-sinnae"
+               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
+               aria-label="ITX"
+               data-logo-source="itx-cheongchun-logo.svg">
+<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
             </g>
           </g>
         </g>
