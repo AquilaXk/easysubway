@@ -31,6 +31,48 @@ test("train-search canonical allowlist와 OpenAPI enum은 ITX-청춘을 제외�
   assert.doesNotMatch(trainTypeSchema, /ITX_CHEONGCHUN/);
 });
 
+test("OpenAPI는 역검색·왕복검색 성공 envelope와 안정 오류 계약을 공개한다", () => {
+  const openapi = read("contracts/api/train-api.openapi.yaml");
+
+  for (const parameter of [
+    "query",
+    "departureStationId",
+    "arrivalStationId",
+    "departureDate",
+    "returnDate",
+    "trainType",
+  ]) {
+    assert.match(openapi, new RegExp(`- name: ${parameter}(?:\\n|\\r\\n)`));
+  }
+  for (const schema of [
+    "StationSearchEnvelope",
+    "TrainSearchEnvelope",
+    "Station",
+    "Journey",
+    "TrainSearchResult",
+  ]) {
+    assert.match(openapi, new RegExp(`\\n    ${schema}:\\n`));
+  }
+  for (const status of ["200", "400", "422", "429", "502", "503"]) {
+    assert.match(openapi, new RegExp(`        "${status}":`));
+  }
+  for (const code of [
+    "TRAIN_SEARCH_INVALID_ARGUMENT",
+    "TRAIN_SEARCH_UNSUPPORTED_TRAIN_TYPE",
+    "TRAIN_SEARCH_RATE_LIMITED",
+    "TRAIN_SEARCH_PROVIDER_ERROR",
+    "TRAIN_SEARCH_NO_VALID_ROWS",
+    "TRAIN_SEARCH_UNAVAILABLE",
+  ]) {
+    assert.match(openapi, new RegExp(`(?:- |code: )${code}(?:\\n|,|\\])`));
+  }
+  assert.match(openapi, /name: query[\s\S]*?required: true[\s\S]*?minLength: 2/);
+  assert.match(openapi, /name: departureStationId[\s\S]*?required: true/);
+  assert.match(openapi, /name: arrivalStationId[\s\S]*?required: true/);
+  assert.match(openapi, /name: departureDate[\s\S]*?required: true/);
+  assert.match(openapi, /headers:[\s\S]*?ETag:[\s\S]*?Cache-Control:/);
+});
+
 test("backend·Mobile allowlist는 canonical 열차종과 drift하지 않는다", () => {
   const java = read("backend/src/main/java/com/easysubway/train/domain/TrainSearchScopePolicy.java");
   const dart = read("apps/mobile/lib/features/train_search/domain/train_search_scope_policy.dart");

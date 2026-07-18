@@ -1,15 +1,32 @@
 package com.easysubway.train.adapter.in.web;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.easysubway.train.application.TrainSearchService;
+import com.easysubway.train.application.TrainSearchService.TrainSearchFailure;
+import com.easysubway.train.domain.TrainSearchModels.Journey;
+import com.easysubway.train.domain.TrainSearchModels.SearchResult;
+import com.easysubway.train.domain.TrainSearchModels.Station;
+import java.time.OffsetDateTime;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 @SpringBootTest(properties = {
 	"spring.profiles.active=test",
@@ -18,18 +35,30 @@ import org.springframework.test.web.servlet.MockMvc;
 	"spring.datasource.driver-class-name=org.h2.Driver"
 })
 @AutoConfigureMockMvc
-@DisplayName("기차검색 ITX 제외 HTTP 계약")
+@DisplayName("전국 기차검색 HTTP 계약")
 class TrainSearchContractControllerTest {
 
 	@Autowired
 	private MockMvc mockMvc;
 
+	@MockitoBean
+	private TrainSearchService service;
+
+	@MockitoBean
+	private Clock clock;
+
+	@BeforeEach
+	void setUpClock() {
+		when(clock.instant()).thenReturn(Instant.parse("2026-07-19T00:00:00Z"));
+		when(clock.getZone()).thenReturn(ZoneOffset.UTC);
+	}
+
 	@Test
-	@DisplayName("station filter와 search query의 ITX-청춘 직접 입력은 같은 error envelope를 반환한다")
-	void directItxRequestsReturnTheSameErrorEnvelope() throws Exception {
+	void directItxRequestsReturnTheSameNoStoreErrorEnvelope() throws Exception {
 		for (String path : new String[] { "/api/v1/trains/stations", "/api/v1/trains/search" }) {
 			mockMvc.perform(get(path).param("trainType", "ITX_CHEONGCHUN"))
 				.andExpect(status().isBadRequest())
+				.andExpect(header().string("Cache-Control", "no-store"))
 				.andExpect(jsonPath("$.success").value(false))
 				.andExpect(jsonPath("$.data.code").value("TRAIN_SEARCH_UNSUPPORTED_TRAIN_TYPE"))
 				.andExpect(jsonPath("$.message").value("지원하지 않는 열차종입니다."));
@@ -37,11 +66,82 @@ class TrainSearchContractControllerTest {
 	}
 
 	@Test
-	@DisplayName("지원 열차종은 #2094 구현 전 빈 결과로 위장하지 않고 unavailable로 닫힌다")
-	void supportedTrainTypeFailsClosedUntilRoadmapImplementation() throws Exception {
-		mockMvc.perform(get("/api/v1/trains/search").param("trainType", "KTX"))
-			.andExpect(status().isServiceUnavailable())
-			.andExpect(jsonPath("$.success").value(false))
-			.andExpect(jsonPath("$.data.code").value("TRAIN_SEARCH_UNAVAILABLE"));
+	void stationSuccessUsesPublicCacheAndExactEtagRevalidation() throws Exception {
+		when(service.stations("서울", "KTX")).thenReturn(List.of(new Station("NAT010000", "서울")));
+
+		MvcResult first = mockMvc.perform(get("/api/v1/trains/stations")
+				.param("query", "서울")
+				.param("trainType", "KTX"))
+			.andExpect(status().isOk())
+			.andExpect(header().string("Cache-Control", "max-age=300, public, s-maxage=86400"))
+			.andExpect(header().exists("ETag"))
+			.andExpect(jsonPath("$.success").value(true))
+			.andExpect(jsonPath("$.data[0].id").value("NAT010000"))
+			.andReturn();
+
+		mockMvc.perform(get("/api/v1/trains/stations")
+				.param("query", "서울")
+				.param("trainType", "KTX")
+				.header("If-None-Match", first.getResponse().getHeader("ETag")))
+			.andExpect(status().isNotModified())
+			.andExpect(header().string("ETag", first.getResponse().getHeader("ETag")))
+			.andExpect(header().string("Cache-Control", "max-age=300, public, s-maxage=86400"));
 	}
+
+	@Test
+	void todaySearchUsesShortPublicCacheAndReturnsApprovedFields() throws Exception {
+		when(service.search(any())).thenReturn(result());
+
+		mockMvc.perform(get("/api/v1/trains/search")
+				.param("departureStationId", "NAT010000")
+				.param("arrivalStationId", "NAT011668")
+				.param("departureDate", "2026-07-19")
+				.param("trainType", "KTX"))
+			.andExpect(status().isOk())
+			.andExpect(header().string("Cache-Control", "max-age=60, public, s-maxage=300"))
+			.andExpect(jsonPath("$.data.outbound[0].trainNumber").value("101"))
+			.andExpect(jsonPath("$.data.outbound[0].adultFareWon").value(23700))
+			.andExpect(jsonPath("$.data.inbound").isEmpty());
+	}
+
+	@Test
+	void malformedDateAndServiceFailuresUseStableNoStoreCodes() throws Exception {
+		mockMvc.perform(get("/api/v1/trains/search").param("departureDate", "not-a-date"))
+			.andExpect(status().isBadRequest())
+			.andExpect(header().string("Cache-Control", "no-store"))
+			.andExpect(jsonPath("$.data.code").value("TRAIN_SEARCH_INVALID_ARGUMENT"));
+
+		for (var expected : List.of(
+			new ExpectedFailure("TRAIN_SEARCH_INVALID_ARGUMENT", 422),
+			new ExpectedFailure("TRAIN_SEARCH_NO_VALID_ROWS", 502),
+			new ExpectedFailure("TRAIN_SEARCH_PROVIDER_ERROR", 502),
+			new ExpectedFailure("TRAIN_SEARCH_UNAVAILABLE", 503)
+		)) {
+			TrainSearchFailure failure = new TrainSearchFailure(expected.code());
+			doThrow(failure).when(service).search(any());
+			mockMvc.perform(get("/api/v1/trains/search")
+					.param("departureStationId", "NAT010000")
+					.param("arrivalStationId", "NAT011668")
+					.param("departureDate", "2026-07-20")
+					.param("trainType", "KTX"))
+				.andExpect(status().is(expected.status()))
+				.andExpect(header().string("Cache-Control", "no-store"))
+				.andExpect(jsonPath("$.data.code").value(expected.code()));
+		}
+	}
+
+	private SearchResult result() {
+		return new SearchResult(
+			OffsetDateTime.parse("2026-07-19T09:00:00+09:00"),
+			List.of(new Journey(
+				"101", "KTX", "NAT010000", "서울",
+				OffsetDateTime.parse("2026-07-19T09:00:00+09:00"),
+				"NAT011668", "대전", OffsetDateTime.parse("2026-07-19T10:02:00+09:00"),
+				62, 23_700
+			)),
+			List.of()
+		);
+	}
+
+	private record ExpectedFailure(String code, int status) {}
 }
