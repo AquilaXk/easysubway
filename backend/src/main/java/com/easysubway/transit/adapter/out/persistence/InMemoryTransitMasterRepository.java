@@ -94,8 +94,60 @@ public class InMemoryTransitMasterRepository implements
 			DataSourceType.OFFICIAL_FILE,
 			LocalDate.of(2026, 6, 12),
 			true
-		)
+		),
+		// ITX-청춘(경춘선) pilot 정차역 14곳 — Route V2 capacity evidence(#2095)가 검증하는
+		// pilot scope. id·이름·정차 순서는 tools/datapack/sources/itx-cheongchun-source-timetable-20260715152903681.json
+		// (stationRosters, providerStationId·providerStationName·canonicalStationId·corridorSequence,
+		// 원출처 data.go.kr 열린데이터광장 KRIC API — 같은 소스의
+		// korail-itx-cheongchun-station-sequence-20260713.json officialSourceUrl 참고)에서
+		// 그대로 가져왔고, production 격리 클론의 실제 transit_stop_times/transit_trips
+		// (service_class='ITX_CHEONGCHUN') stop_sequence 순서와 대조해 일치를 확인했다
+		// (#2095). nameEn은 국립국어원 로마자 표기법(코레일 역명판 표기와 동일) 표준 변환이다.
+		// region은 행정구역 기준(가평까지 경기도=수도권, 강촌부터 강원도=강원권)이며 정밀
+		// 좌표가 아니므로 창작이 아니다.
+		//
+		// 위도·경도는 이 datapack 소스에 없고, capacity 스크립트가 검증하는 Route V2 search
+		// 경로(RouteV2Planner)는 LoadTransitMasterPort/Station 좌표를 전혀 참조하지 않는다
+		// (loadActiveStation()은 존재·active 여부만 확인) — 그래서 여기서는 확정 좌표를
+		// 만들어내는 대신 명백히 미확정임을 알 수 있는 자리표시자 0,0을 쓴다. null을 쓰면
+		// TransitMasterService의 "인근 역 검색"(distanceMeters())이 실제로 이 14역에 대해
+		// NullPointerException을 낸다 — 0,0은 한국에서 수백만 km 떨어져 있어 그 기능이
+		// 정상 동작하는 한 이 14역이 우연히 "인근"으로 뜰 일이 없다. 실좌표 반입은 #2098
+		// real data-pack adapter 범위다.
+		itxCheongchunPilotStation("station-8aa315864466", "용산", "Yongsan"),
+		itxCheongchunPilotStation("station-c0679b9a6cf8", "옥수", "Oksu"),
+		itxCheongchunPilotStation("station-e5cf592cf355", "왕십리", "Wangsimni"),
+		itxCheongchunPilotStation("station-b819702fa7d9", "청량리", "Cheongnyangni"),
+		itxCheongchunPilotStation("station-83bcb1eae340", "상봉", "Sangbong"),
+		itxCheongchunPilotStation("station-b52ac4dfe64e", "퇴계원", "Toegyewon"),
+		itxCheongchunPilotStation("station-2ccf5647f7f7", "사릉", "Sareung"),
+		itxCheongchunPilotStation("station-f3d9c93ba7d6", "평내호평", "Pyeongnae-Hopyeong"),
+		itxCheongchunPilotStation("station-661ff65ea040", "마석", "Maseok"),
+		itxCheongchunPilotStation("station-6c1f50a5aa3b", "청평", "Cheongpyeong"),
+		itxCheongchunPilotStation("station-4f6045ff9103", "가평", "Gapyeong"),
+		itxCheongchunPilotStation("station-30ba86472e55", "강촌", "Gangchon", "강원권"),
+		itxCheongchunPilotStation("station-d5e344125b52", "남춘천", "Namchuncheon", "강원권"),
+		itxCheongchunPilotStation("station-dd14cfb89cbc", "춘천", "Chuncheon", "강원권")
 	);
+
+	private static Station itxCheongchunPilotStation(String id, String nameKo, String nameEn) {
+		return itxCheongchunPilotStation(id, nameKo, nameEn, "수도권");
+	}
+
+	private static Station itxCheongchunPilotStation(String id, String nameKo, String nameEn, String region) {
+		return new Station(
+			id,
+			nameKo,
+			nameEn,
+			region,
+			BigDecimal.ZERO,
+			BigDecimal.ZERO,
+			DataQualityLevel.LEVEL_1,
+			DataSourceType.OFFICIAL_FILE,
+			LocalDate.of(2026, 7, 15),
+			true
+		);
+	}
 
 	private static final List<StationLine> STATION_LINES = List.of(
 		new StationLine("station-sangnoksu", "seoul-4", "448", 48, "당고개 방면 / 오이도 방면"),

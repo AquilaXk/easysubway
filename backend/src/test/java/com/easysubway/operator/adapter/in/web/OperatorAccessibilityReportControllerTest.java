@@ -53,16 +53,24 @@ class OperatorAccessibilityReportControllerTest {
 				.with(httpBasic("operator-user", "operator-test-password")))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.success").value(true))
-			.andExpect(jsonPath("$.data.totalStations").value(2))
+			// #2095: InMemoryTransitMasterRepository에 ITX-청춘 pilot 정차역 14곳이
+			// 추가돼 역 수 집계가 2에서 16으로 늘었다.
+			.andExpect(jsonPath("$.data.totalStations").value(16))
 			.andExpect(jsonPath("$.data.totalFacilities").value(3))
 			.andExpect(jsonPath("$.data.needsVerificationFacilityCount").value(1))
 			.andExpect(jsonPath("$.data.stationQualityRows[0].description").value("일부 정보는 확인 중이에요"))
 			.andExpect(jsonPath("$.data.stationQualityRows[1].description").value("시설 정보를 함께 볼 수 있어요"))
 			.andExpect(jsonPath("$.data.stationQualityRows[2].description").value("쉬운 길 안내를 볼 수 있어요"))
 			.andExpect(jsonPath("$.data.stationQualityRows[3].description").value("고장·공사 소식이 반영됐어요"))
-			.andExpect(jsonPath("$.data.regionQualityRows[0].name").value("수도권"))
-			.andExpect(jsonPath("$.data.regionQualityRows[0].operatorCount").value(2))
-			.andExpect(jsonPath("$.data.stationAccessibilityScoreRows[0].stationName").value("상록수"))
+			// #2095: region 목록이 이름순 정렬이라 강원권(ITX-청춘 pilot 3역)이 수도권보다
+			// 앞에 온다. operator/line은 손대지 않아 강원권 쪽은 0이다.
+			.andExpect(jsonPath("$.data.regionQualityRows[0].name").value("강원권"))
+			.andExpect(jsonPath("$.data.regionQualityRows[0].operatorCount").value(0))
+			.andExpect(jsonPath("$.data.regionQualityRows[1].name").value("수도권"))
+			.andExpect(jsonPath("$.data.regionQualityRows[1].operatorCount").value(2))
+			// station 접근성 점수 정렬(점수 오름차순, 동점은 이름순)도 ITX-청춘 pilot 역
+			// 14곳(모두 접근성 시설 미등록이라 점수 0)이 앞으로 와 상록수(15점)보다 먼저다.
+			.andExpect(jsonPath("$.data.stationAccessibilityScoreRows[0].stationName").value("강촌"))
 			.andExpect(jsonPath("$.data.stationAccessibilityScoreRows[0].reasons[0]").value("일부 정보는 확인 중이에요"))
 			.andExpect(jsonPath("$.data.accessibilityImprovementPriorityRows[0].stationName").value("상록수"))
 			.andExpect(jsonPath("$.data.accessibilityImprovementPriorityRows[0].facilityName").value("장애인 화장실"))
@@ -87,7 +95,8 @@ class OperatorAccessibilityReportControllerTest {
 				String csv = result.getResponse().getContentAsString();
 				org.assertj.core.api.Assertions.assertThat(csv)
 					.startsWith("﻿section,metric,value,detail\r\n")
-					.contains("summary,totalStations,2,")
+					// #2095: ITX-청춘 pilot 정차역 14곳 추가로 2 → 16.
+					.contains("summary,totalStations,16,")
 					.contains("summary,totalFacilities,3,")
 					.contains("summary,needsVerificationFacilityCount,1,")
 					.contains("stationScore,상록수,")
@@ -117,8 +126,9 @@ class OperatorAccessibilityReportControllerTest {
 				.isEqualTo("section");
 			org.assertj.core.api.Assertions.assertThat(sheet.getRow(1).getCell(1).getStringCellValue())
 				.isEqualTo("totalStations");
+			// #2095: ITX-청춘 pilot 정차역 14곳 추가로 2 → 16.
 			org.assertj.core.api.Assertions.assertThat(sheet.getRow(1).getCell(2).getStringCellValue())
-				.isEqualTo("2");
+				.isEqualTo("16");
 		}
 	}
 

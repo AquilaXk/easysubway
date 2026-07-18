@@ -97,7 +97,9 @@ class DataCollectionAdminPageControllerTest {
 			.contains("건너뜀")
 			.contains("수동 필요")
 			.contains("admin-user")
-			.contains(">14<")
+			// #2095: InMemoryTransitMasterRepository에 ITX-청춘 pilot 정차역 14곳이
+			// 추가돼 수집 건수(operators+lines+stations+...)가 14에서 28로 늘었다.
+			.contains(">28<")
 			.contains("name=\"source\"")
 			.contains("value=\"TRANSIT_MASTER\"")
 			.contains("name=\"_csrf\"");
