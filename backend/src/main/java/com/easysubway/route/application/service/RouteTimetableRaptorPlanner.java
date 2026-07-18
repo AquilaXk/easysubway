@@ -358,7 +358,9 @@ class RouteTimetableRaptorPlanner {
 			);
 			if (candidate != null && (boardedTrip == null
 				|| readySeconds < boardingReadySeconds
-				|| candidate.departureSeconds(position) < boardedTrip.departureSeconds(position))) {
+				|| candidate.departureSeconds(position) < boardedTrip.departureSeconds(position)
+				|| (candidate != boardedTrip
+					&& candidate.departureSeconds(position) == boardedTrip.departureSeconds(position)))) {
 				boardedTrip = candidate;
 				boardingPosition = position;
 				boardingReadySeconds = readySeconds;

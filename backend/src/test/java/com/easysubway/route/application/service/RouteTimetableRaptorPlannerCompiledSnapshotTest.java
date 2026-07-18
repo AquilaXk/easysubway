@@ -236,6 +236,36 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 	}
 
 	@Test
+	@DisplayName("후속 stop의 동일 출발 trip이 더 빨리 도착하면 해당 trip으로 전환한다")
+	void switchesToFasterTripWithSameDepartureAtLaterStop() {
+		var command = new SearchRouteV2Command(
+			"station-origin",
+			"station-d",
+			OffsetDateTime.parse("2026-07-01T08:40:00+09:00"),
+			MobilityType.SENIOR,
+			ConstraintMode.ALLOW_WITH_WARNINGS,
+			false,
+			1,
+			1
+		);
+
+		var results = planner.search(command, planner.compile(sameDepartureDownstreamTimetable()));
+
+		assertThat(results).hasSize(1);
+		assertThat(results.getFirst().steps())
+			.filteredOn(step -> "ride".equals(step.stepType()))
+			.extracting("tripId")
+			.containsExactly("feeder-b", "a-fast");
+		assertThat(results.getFirst().steps())
+			.filteredOn(step -> "ride".equals(step.stepType()))
+			.extracting("plannedArrivalTime")
+			.containsExactly(
+				"2026-07-01T09:05:00+09:00",
+				"2026-07-01T09:25:00+09:00"
+			);
+	}
+
+	@Test
 	@DisplayName("같은 정차열에서 하차 정책이 다른 후속 trip을 잃지 않는다")
 	void preservesLaterTripWhenEarlierTripBlocksDropOff() {
 		var results = planner.search(
@@ -527,6 +557,54 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 					"feeder-e", 1, "station-a", "line-e", 32520, 32520, 0, 0),
 				new LoadRouteTimetablePort.TransitStopTime(
 					"feeder-e", 2, "station-e", "line-e", 32640, 32640, 0, 0)
+			),
+			List.of()
+		);
+	}
+
+	private static RouteTimetable sameDepartureDownstreamTimetable() {
+		return new RouteTimetable(
+			List.of(weekday("weekday")),
+			List.of(),
+			List.of(
+				new LoadRouteTimetablePort.TransitRoute(
+					"route-feeder-a", "line-fa", "FA", "A 연결", "A 방면", "Asia/Seoul"),
+				new LoadRouteTimetablePort.TransitRoute(
+					"route-feeder-b", "line-fb", "FB", "B 연결", "B 방면", "Asia/Seoul"),
+				new LoadRouteTimetablePort.TransitRoute(
+					"route-main", "line-main", "M", "본선", "D 방면", "Asia/Seoul")
+			),
+			List.of(
+				new LoadRouteTimetablePort.TransitTrip(
+					"a-fast", "route-main", "weekday", "D", "0", "EXPRESS", 0),
+				new LoadRouteTimetablePort.TransitTrip(
+					"feeder-a", "route-feeder-a", "weekday", "A", "0", "LOCAL", 0),
+				new LoadRouteTimetablePort.TransitTrip(
+					"feeder-b", "route-feeder-b", "weekday", "B", "0", "LOCAL", 0),
+				new LoadRouteTimetablePort.TransitTrip(
+					"z-slow", "route-main", "weekday", "D", "0", "LOCAL", 0)
+			),
+			List.of(
+				new LoadRouteTimetablePort.TransitStopTime(
+					"a-fast", 1, "station-a", "line-main", 32100, 32100, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime(
+					"a-fast", 2, "station-b", "line-main", 33600, 33600, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime(
+					"a-fast", 3, "station-d", "line-main", 33900, 33900, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime(
+					"feeder-a", 1, "station-origin", "line-fa", 31620, 31620, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime(
+					"feeder-a", 2, "station-a", "line-fa", 32400, 32400, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime(
+					"feeder-b", 1, "station-origin", "line-fb", 31680, 31680, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime(
+					"feeder-b", 2, "station-b", "line-fb", 32700, 32700, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime(
+					"z-slow", 1, "station-a", "line-main", 33000, 33000, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime(
+					"z-slow", 2, "station-b", "line-main", 33600, 33600, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime(
+					"z-slow", 3, "station-d", "line-main", 34200, 34200, 0, 0)
 			),
 			List.of()
 		);
