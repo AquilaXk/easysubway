@@ -95,6 +95,23 @@ class TrainSearchServiceTest {
 	}
 
 	@Test
+	void keepsTheLegLeaseBeyondTheBoundedProviderSearchWindow() {
+		service.search(criteria(null));
+
+		assertThat(cache.leaseTtls.values())
+			.anySatisfy(ttl -> assertThat(ttl).isGreaterThanOrEqualTo(Duration.ofMinutes(15)));
+	}
+
+	@Test
+	void scheduledCatalogRefreshReplacesAStillFreshCatalog() {
+		service.catalog();
+
+		service.refreshCatalog();
+
+		assertThat(provider.catalogCalls).hasValue(2);
+	}
+
+	@Test
 	void rejectsInvalidInputsBeforeSearchingAndKeepsItxOutOfTheCatalog() {
 		assertThatThrownBy(() -> service.stations("서", null))
 			.isInstanceOf(TrainSearchService.TrainSearchFailure.class)
@@ -260,6 +277,7 @@ class TrainSearchServiceTest {
 		private final Map<String, CachedCatalog> catalogs = new ConcurrentHashMap<>();
 		private final Map<String, CachedLeg> legs = new ConcurrentHashMap<>();
 		private final Map<String, String> leases = new ConcurrentHashMap<>();
+		private final Map<String, Duration> leaseTtls = new ConcurrentHashMap<>();
 		private volatile boolean failCatalogRead;
 
 		@Override
@@ -281,6 +299,7 @@ class TrainSearchServiceTest {
 
 		@Override
 		public boolean tryAcquireLease(String key, String owner, Instant now, Duration ttl) {
+			leaseTtls.put(key, ttl);
 			return leases.putIfAbsent(key, owner) == null;
 		}
 

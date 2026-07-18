@@ -49,7 +49,8 @@ public class TrainSearchService {
 	private static final Duration CATALOG_TTL = Duration.ofHours(24);
 	private static final Duration TODAY_TTL = Duration.ofMinutes(5);
 	private static final Duration FUTURE_TTL = Duration.ofHours(6);
-	private static final Duration LEG_LEASE_TTL = Duration.ofSeconds(15);
+	// 한 구간도 영업일 2일, 페이지네이션, 복수 열차종 코드, 요청별 재시도를 순차 수행할 수 있다.
+	private static final Duration LEG_LEASE_TTL = Duration.ofMinutes(15);
 	private static final Duration CATALOG_LEASE_TTL = Duration.ofMinutes(5);
 	private static final List<Duration> LEASE_POLLS = List.of(
 		Duration.ofMillis(100),
@@ -110,7 +111,7 @@ public class TrainSearchService {
 			Instant now = clock.instant();
 			return cache.freshCatalog(CATALOG_KIND, now)
 				.map(cached -> new CatalogEntry(decodeCatalog(cached), cached.expiresAt()))
-				.orElseGet(() -> refreshCatalogEntry(now));
+				.orElseGet(() -> refreshCatalogEntry(now, false));
 		} catch (TrainSearchFailure failure) {
 			throw failure;
 		} catch (RuntimeException exception) {
@@ -183,7 +184,7 @@ public class TrainSearchService {
 
 	public Catalog refreshCatalog() {
 		try {
-			return refreshCatalogEntry(clock.instant()).catalog();
+			return refreshCatalogEntry(clock.instant(), true).catalog();
 		} catch (TrainSearchFailure failure) {
 			throw failure;
 		} catch (RuntimeException exception) {
@@ -195,12 +196,14 @@ public class TrainSearchService {
 		return cache.purgeExpiredBefore(clock.instant().minus(Duration.ofHours(48)));
 	}
 
-	private CatalogEntry refreshCatalogEntry(Instant now) {
+	private CatalogEntry refreshCatalogEntry(Instant now, boolean force) {
 		synchronized (catalogLock) {
-			var existing = cache.freshCatalog(CATALOG_KIND, now);
-			if (existing.isPresent()) {
-				CachedCatalog cached = existing.orElseThrow();
-				return new CatalogEntry(decodeCatalog(cached), cached.expiresAt());
+			if (!force) {
+				var existing = cache.freshCatalog(CATALOG_KIND, now);
+				if (existing.isPresent()) {
+					CachedCatalog cached = existing.orElseThrow();
+					return new CatalogEntry(decodeCatalog(cached), cached.expiresAt());
+				}
 			}
 			String owner = ownerSupplier.get();
 			if (!cache.tryAcquireLease(CATALOG_LEASE_KEY, owner, now, CATALOG_LEASE_TTL)) {
