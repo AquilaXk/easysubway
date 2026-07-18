@@ -579,7 +579,7 @@ class LocalRouteRepository implements RouteSearchRepository {
       blockedReasons: result.blockedReasonCodes
           .map(_blockedReasonMessage)
           .toList(growable: false),
-      createdAt: DateTime.now().toIso8601String(),
+      createdAt: DateTime.now().toUtc().toIso8601String(),
       etaSource: 'STATIC_LOCAL',
       etaConfidence: 'STATIC',
       sourceUpdatedAt: catalog.sourceUpdatedAt,
