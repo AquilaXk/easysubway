@@ -76,7 +76,7 @@ String _routeDateLabel(String value) {
 
 const routeEtaSourceLabels = <String, String>{
   'REALTIME': '실시간 도착정보 준비 중',
-  'MIXED': '일부 도착정보를 확인하고 있어요',
+  'MIXED': '일부 실시간 도착정보',
   'PLANNED': '시간표 기준',
   'STATIC_BACKEND_ESTIMATE': '시간표 기준',
   'STATIC_BACKEND_V1': '시간표 기준',
@@ -1622,7 +1622,7 @@ class RouteSearchResult {
 
   String get scoreLabel => burdenLevelLabel;
 
-  String get lineLabel => lineName.isEmpty ? '노선을 확인하고 있어요' : lineName;
+  String get lineLabel => lineName.isEmpty ? '노선 미확인' : lineName;
 
   bool get isBlocked => status == 'BLOCKED';
 
@@ -1859,10 +1859,10 @@ class RouteSearchResult {
 
   String get burdenLevelLabel {
     if (isBlocked) {
-      return '이동 부담을 확인하고 있어요';
+      return '이동 부담 미확인';
     }
     if (movementSteps.isEmpty) {
-      return '이동 부담을 확인하고 있어요';
+      return '이동 부담 미확인';
     }
     if (_hasHighBurdenFact) {
       return '이동 부담 높음';
@@ -2375,7 +2375,7 @@ class RouteSearchStep {
       return '예상 시간·거리예요';
     }
     if (timeSource == 'UNKNOWN' || distanceSource == 'UNKNOWN') {
-      return '시간 또는 거리를 확인하고 있어요';
+      return '시간·거리 정보 미확인';
     }
     if (timeSource == 'REALTIME') {
       return '실시간 도착 정보 기준이에요';
@@ -2389,14 +2389,14 @@ class RouteSearchStep {
 
 String _routeDurationLabel(int estimatedMinutes) {
   if (estimatedMinutes <= 0) {
-    return '시간을 확인하고 있어요';
+    return '시간 미확인';
   }
   return '약 $estimatedMinutes분';
 }
 
 String _routeDistanceLabel(int distanceMeters) {
   if (distanceMeters <= 0) {
-    return '거리를 확인하고 있어요';
+    return '거리 미확인';
   }
   if (distanceMeters < 1000) {
     return '${distanceMeters}m';

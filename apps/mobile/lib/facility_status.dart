@@ -40,8 +40,8 @@ const _cautionPresentation = FacilityStatusPresentation(
 
 const _needsInfoPresentation = FacilityStatusPresentation(
   severity: FacilityStatusSeverity.needsInfo,
-  severityLabel: '확인 중',
-  statusTitle: '상태를 확인하고 있어요',
+  severityLabel: '미확인',
+  statusTitle: '상태 미확인',
   nextActionLabel: '자세히 보기',
   nextActionDescription: '상태를 확인하고, 이동 전 현장 안내도 함께 봐 주세요.',
   priority: 30,
@@ -49,7 +49,7 @@ const _needsInfoPresentation = FacilityStatusPresentation(
 
 const _unknownPresentation = FacilityStatusPresentation(
   severity: FacilityStatusSeverity.needsInfo,
-  severityLabel: '확인 중',
+  severityLabel: '미확인',
   statusTitle: '설치 확인 · 운행상태 미확인',
   nextActionLabel: '자세히 보기',
   nextActionDescription: '설치 여부는 확인됐어요. 운행 상태는 현장 안내도 함께 봐 주세요.',
