@@ -111,7 +111,11 @@ void main() {
       legs: List.generate(
         12,
         (index) => RouteShareLeg(
-          description: '중간 이동 ${index + 1} ${'아주 긴 설명 ' * 4}',
+          description: switch (index) {
+            0 => '출발 구간',
+            11 => '도착 구간',
+            _ => '중간 이동 ${index + 1} ${'아주 긴 설명 ' * 4}',
+          },
           departureTime: '10:00',
           arrivalTime: '10:10',
         ),
@@ -127,7 +131,85 @@ void main() {
     expect(text, contains('09:10 → 11:42'));
     expect(text, contains('총 152분 · 환승 5회'));
     expect(text, contains('계획 시간 기준'));
+    expect(text, contains('- 출발 구간'));
+    expect(text, contains('- 도착 구간'));
     expect(text, contains('중간 경로'));
+  });
+
+  test('필수 마지막 leg가 budget에 안 들어가면 짧은 중간 leg로 대체하지 않는다', () {
+    const first = RouteShareLeg(
+      description: '출발 구간',
+      departureTime: '09:10',
+      arrivalTime: '09:20',
+    );
+    const middle = RouteShareLeg(
+      description: '짧은 중간 구간',
+      departureTime: '09:20',
+      arrivalTime: '09:30',
+    );
+    const last = RouteShareLeg(
+      description:
+          '목적지 마지막 구간은 길더라도 반드시 보존해야 하는 핵심 이동 정보입니다. '
+          '목적지 도착 노선과 하차 지점을 함께 설명합니다.',
+      departureTime: '09:30',
+      arrivalTime: '11:42',
+    );
+    const essentialOnly = RouteShareSnapshot(
+      languageCode: 'ko',
+      originName: '상록수',
+      destinationName: '춘천',
+      objective: RouteShareObjective.fastest,
+      transportScope: RouteShareTransportScope.subwayAndItxCheongchun,
+      departureTime: '09:10',
+      arrivalTime: '11:42',
+      durationMinutes: 152,
+      transferCount: 1,
+      freshness: RouteShareFreshness.planned,
+      legs: [first, last],
+      fare: fare,
+    );
+    const withMiddle = RouteShareSnapshot(
+      languageCode: 'ko',
+      originName: '상록수',
+      destinationName: '춘천',
+      objective: RouteShareObjective.fastest,
+      transportScope: RouteShareTransportScope.subwayAndItxCheongchun,
+      departureTime: '09:10',
+      arrivalTime: '11:42',
+      durationMinutes: 152,
+      transferCount: 1,
+      freshness: RouteShareFreshness.planned,
+      legs: [first, middle, last],
+      fare: fare,
+    );
+    final insufficientForLast =
+        buildRouteShareSummary(essentialOnly).length - 1;
+
+    expect(
+      () => buildRouteShareSummary(withMiddle, maxLength: insufficientForLast),
+      throwsStateError,
+    );
+  });
+
+  test('ITX 범위는 builder 경계에서도 공식 KRW 운임이 필수다', () {
+    expect(
+      () => buildRouteShareSummary(
+        const RouteShareSnapshot(
+          languageCode: 'ko',
+          originName: '상록수',
+          destinationName: '춘천',
+          objective: RouteShareObjective.fastest,
+          transportScope: RouteShareTransportScope.subwayAndItxCheongchun,
+          departureTime: '09:10',
+          arrivalTime: '11:42',
+          durationMinutes: 152,
+          transferCount: 1,
+          freshness: RouteShareFreshness.planned,
+          legs: legs,
+        ),
+      ),
+      throwsStateError,
+    );
   });
 
   test('정상 itinerary가 없으면 빈 공유 text를 만들지 않는다', () {

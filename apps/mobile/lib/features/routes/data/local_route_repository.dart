@@ -585,6 +585,7 @@ class LocalRouteRepository implements RouteSearchRepository {
       sourceUpdatedAt: catalog.sourceUpdatedAt,
       officialOdFareQuote: officialOdFareQuote,
       transportScope: request.transportScope,
+      objective: request.objective,
     );
   }
 

@@ -254,6 +254,7 @@ void main() {
         originStationId: 'station-sangnoksu',
         destinationStationId: 'station-sadang',
         mobilityType: 'WHEELCHAIR',
+        objective: RouteObjective.fewestTransfers,
       ),
     );
 
@@ -265,6 +266,7 @@ void main() {
       'constraintMode': 'STRICT_STEP_FREE',
     });
     expect(result.routeSearchId, 'route-1');
+    expect(result.objective, RouteObjective.fewestTransfers);
     expect(result.constraintMode, 'STRICT_STEP_FREE');
     expect(result.summaryTitle, '상록수에서 사당까지');
     expect(result.lineName, '수도권 4호선');
@@ -373,6 +375,9 @@ void main() {
 
   test('경로 검색 컨트롤러는 현재 결과 ETA refresh 상태를 유지해서 표시한다', () async {
     final repository = FakeRouteSearchRepository();
+    repository.searchResult = _sampleRouteSearchResult(
+      objective: RouteObjective.fewestTransfers,
+    );
     final controller = RouteSearchController(repository: repository);
 
     await controller.search(
@@ -405,6 +410,7 @@ void main() {
     expect(repository.refreshRouteSearchIds, ['route-1']);
     expect(controller.state.status, RouteSearchViewStatus.success);
     expect(controller.state.isRefreshing, isFalse);
+    expect(controller.state.result!.objective, RouteObjective.fewestTransfers);
     expect(
       controller.state.refreshMessage,
       '실시간 정보가 늦어 계획 시간으로 안내해요. · 최근 확인 시간이 오래되어 계획 시간으로 안내 · 신뢰도 낮음',
@@ -2100,6 +2106,7 @@ RouteSearchResult _sampleRouteSearchResult({
   String accessibilityRiskLevel = '',
   int? transferSlackSeconds,
   bool hasOutOfStationTransfer = false,
+  RouteObjective objective = RouteObjective.fastest,
 }) {
   return RouteSearchResult(
     routeSearchId: routeSearchId,
@@ -2123,6 +2130,7 @@ RouteSearchResult _sampleRouteSearchResult({
     accessibilityRiskLevel: accessibilityRiskLevel,
     transferSlackSeconds: transferSlackSeconds,
     hasOutOfStationTransfer: hasOutOfStationTransfer,
+    objective: objective,
   );
 }
 

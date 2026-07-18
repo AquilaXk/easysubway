@@ -66,13 +66,16 @@ String buildRouteShareSummary(
     return full;
   }
 
-  final selected = <int>[];
-  final priority = <int>[
+  final selected = <int>[
     0,
     if (snapshot.legs.length > 1) snapshot.legs.length - 1,
-    for (var i = 1; i < snapshot.legs.length - 1; i++) i,
   ];
-  for (final index in priority) {
+  if (_compose(snapshot, selected).length > maxLength) {
+    throw StateError(
+      'Route share length budget is too small for essential facts',
+    );
+  }
+  for (var index = 1; index < snapshot.legs.length - 1; index++) {
     final candidate = [...selected, index]..sort();
     if (_compose(snapshot, candidate).length <= maxLength) {
       selected
@@ -111,6 +114,11 @@ void _validate(RouteShareSnapshot snapshot, int maxLength) {
     throw StateError('Route share leg is incomplete');
   }
   final fare = snapshot.fare;
+  if (snapshot.transportScope ==
+          RouteShareTransportScope.subwayAndItxCheongchun &&
+      fare == null) {
+    throw StateError('Official ITX fare is unavailable');
+  }
   if (fare != null && (fare.adultFareWon <= 0 || fare.currency != 'KRW')) {
     throw StateError('Route share fare is invalid');
   }

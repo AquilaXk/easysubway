@@ -222,6 +222,7 @@ class RouteSearchApiRepository implements RouteSearchRepository {
       return RouteSearchResult.fromJson(
         data,
         constraintMode: routeRequest.effectiveConstraintMode,
+        objective: routeRequest.objective,
       );
     } on RouteSearchException {
       rethrow;
@@ -1294,6 +1295,7 @@ class RouteSearchResult {
   factory RouteSearchResult.fromJson(
     Map<String, Object?> json, {
     String? constraintMode,
+    RouteObjective objective = RouteObjective.fastest,
   }) {
     final rawSteps = json['steps'];
     final rawWarnings = json['warnings'];
@@ -1387,6 +1389,7 @@ class RouteSearchResult {
       sourceUpdatedAt: _optionalRouteString(json, 'sourceUpdatedAt'),
       nextServiceTime: _optionalRouteString(json, 'nextServiceTime'),
       transportScope: _routeTransportScopeFromValue(json['transportScope']),
+      objective: objective,
     );
   }
 
@@ -1687,6 +1690,7 @@ class RouteSearchResult {
     List<RouteSearchStep>? steps,
     String? etaSource,
     OfficialOdFareQuote? officialOdFareQuote,
+    RouteObjective? objective,
   }) {
     return RouteSearchResult(
       routeSearchId: routeSearchId,
@@ -1723,7 +1727,7 @@ class RouteSearchResult {
       supportsRefresh: supportsRefresh,
       nextServiceTime: nextServiceTime,
       transportScope: transportScope,
-      objective: objective,
+      objective: objective ?? this.objective,
       departureTimeIso: departureTimeIso,
       arrivalTimeIso: arrivalTimeIso,
       officialFare: officialFare,
@@ -4588,8 +4592,11 @@ RouteSearchResult _preserveGetOffAlarmArrivalTimes({
   required RouteSearchResult next,
   required RouteSearchResult previous,
 }) {
+  final objectivePreserved = next.withDisplayLabels(
+    objective: previous.objective,
+  );
   if (_rideLegArrivalsFromResult(previous).isEmpty) {
-    return next;
+    return objectivePreserved;
   }
   final previousRideSteps = previous.steps
       .where(
@@ -4598,7 +4605,7 @@ RouteSearchResult _preserveGetOffAlarmArrivalTimes({
       )
       .toList(growable: false);
   var changed = false;
-  final steps = next.steps
+  final steps = objectivePreserved.steps
       .map((step) {
         if (step.stepType != 'ride' || step.plannedArrivalTimeIso.isNotEmpty) {
           return step;
@@ -4621,9 +4628,9 @@ RouteSearchResult _preserveGetOffAlarmArrivalTimes({
       })
       .toList(growable: false);
   if (!changed) {
-    return next;
+    return objectivePreserved;
   }
-  return next.withDisplayLabels(steps: steps);
+  return objectivePreserved.withDisplayLabels(steps: steps);
 }
 
 RouteSearchStep? _matchingPreviousRideStep({
@@ -4970,7 +4977,9 @@ RouteShareSnapshot _routeShareSnapshot(
     transferCount: result.transferCount,
     freshness: switch (result.etaSource) {
       'REALTIME' => RouteShareFreshness.realtime,
-      'STATIC_LOCAL' || 'STATIC_ESTIMATE' => RouteShareFreshness.staticData,
+      'STATIC_LOCAL' ||
+      'STATIC_ESTIMATE' ||
+      'STALE' => RouteShareFreshness.staticData,
       _ => RouteShareFreshness.planned,
     },
     legs: legs,

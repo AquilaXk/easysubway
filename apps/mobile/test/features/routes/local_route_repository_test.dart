@@ -5413,6 +5413,7 @@ void main() {
     expect(fastest.transferCount, 1);
     expect(fewestTransfers.status, 'FOUND');
     expect(fewestTransfers.transferCount, 0);
+    expect(fewestTransfers.objective, RouteObjective.fewestTransfers);
     expect(
       fewestTransfers.steps.expand((step) => step.evidenceSources),
       contains('edge:ride-a-c-direct-test'),

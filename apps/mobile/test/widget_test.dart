@@ -11923,7 +11923,7 @@ void main() {
     var failShare = false;
     final result = _sampleRouteSearchResult(
       routeSearchId: 'local-private-route-id',
-      etaSource: 'STATIC_LOCAL',
+      etaSource: 'STALE',
       objective: RouteObjective.fewestTransfers,
     );
 
