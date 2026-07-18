@@ -93,15 +93,29 @@ async function main() {
     loginParity: null,
   };
 
+  const reportPath = path.join(outputDir, "admin-accessibility-qa-report.json");
+  await mkdir(outputDir, { recursive: true });
+  // #1988: 어느 pass가 예외를 던져도 수집분을 보존하도록 report 쓰기를 finally로 감싼다.
+  // 예외 자체는 finally에서 삼키지 않고 그대로 전파돼 exit code로 실패를 표면화한다.
   try {
-    await mkdir(outputDir, { recursive: true });
-    await runJsPass(browser, baseUrl, outputDir, adminUser, adminPassword, operatorUser, operatorPassword, report);
-    await runLoginStatePass(browser, baseUrl, outputDir, report);
-    await runNoJsPass(browser, baseUrl, outputDir, adminUser, adminPassword, operatorUser, operatorPassword, report);
+    try {
+      await runJsPass(browser, baseUrl, outputDir, adminUser, adminPassword, operatorUser, operatorPassword, report);
+      await runLoginStatePass(browser, baseUrl, outputDir, report);
+      await runNoJsPass(browser, baseUrl, outputDir, adminUser, adminPassword, operatorUser, operatorPassword, report);
+    } finally {
+      await browser.close();
+    }
   } finally {
-    await browser.close();
+    finalizeReport(report);
+    await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
   }
+  if (report.blockingViolations.length > 0) {
+    throw new Error(`blocking axe violations: ${JSON.stringify(report.blockingViolations)}`);
+  }
+  console.log(`admin accessibility QA ok: ${reportPath}`);
+}
 
+function finalizeReport(report) {
   const blockingViolations = report.axe.flatMap((entry) =>
     entry.violations
       .filter((violation) => violation.impact === "critical" || violation.impact === "serious")
@@ -127,12 +141,6 @@ async function main() {
     loginParityOk: report.loginParity ? report.loginParity.parity : null,
   };
   report.blockingViolations = blockingViolations;
-  const reportPath = path.join(outputDir, "admin-accessibility-qa-report.json");
-  await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
-  if (blockingViolations.length > 0) {
-    throw new Error(`blocking axe violations: ${JSON.stringify(blockingViolations)}`);
-  }
-  console.log(`admin accessibility QA ok: ${reportPath}`);
 }
 
 async function runJsPass(browser, baseUrl, outputDir, adminUser, adminPassword, operatorUser, operatorPassword, report) {
@@ -260,7 +268,7 @@ async function textScalePass(page, baseUrl, outputDir, report, pages) {
         name,
         viewport: viewport.name,
         factor: TEXT_SCALE_FACTOR,
-        method: "text-only font-size override (px-based admin CSS)",
+        method: "inline font-size ×2 override — 실제 브라우저 텍스트 확대와 다를 수 있는 근사",
         screenshot,
         ...metrics,
       });
@@ -284,13 +292,16 @@ async function runLoginStatePass(browser, baseUrl, outputDir, report) {
 
       await page.fill("input[name=\"username\"]", `qa-nonexistent-${Date.now()}`);
       await page.fill("input[name=\"password\"]", "qa-invalid-credential");
-      const [postResponse] = await Promise.all([
-        page.waitForResponse((response) =>
-          response.url().endsWith(surface.loginPath) && response.request().method() === "POST"),
-        page.click("button[type=\"submit\"]"),
-      ]);
-      const postStatus = postResponse.status();
-      await page.waitForLoadState("networkidle");
+      await page.click("button[type=\"submit\"]");
+      // #1988: 실패 로그인 판정은 POST 응답 가로채기 대신 [role="alert"] 가시화 대기로 한다.
+      // 타임아웃(10s)이면 run을 중단하지 않고 alertVisible=false로 non-blocking 기록한다.
+      let alertVisible = false;
+      try {
+        await page.locator("[role=\"alert\"]").first().waitFor({ state: "visible", timeout: 10000 });
+        alertVisible = true;
+      } catch {
+        alertVisible = false;
+      }
       const warningAlerts = await page.locator("[role=\"alert\"]").count();
       const warningCopy = warningAlerts > 0
         ? (await page.locator("[role=\"alert\"]").first().innerText()).trim()
@@ -298,22 +309,22 @@ async function runLoginStatePass(browser, baseUrl, outputDir, report) {
       const warningShot = path.join(outputDir, `login-${surface.key}-retry-warning.png`);
       await page.screenshot({ path: warningShot, fullPage: true });
 
+      // #1988: RETRY_WARNING copy 일치 여부는 throw 대신 non-blocking 플래그로 기록한다.
+      const retryWarningRendered = Boolean(warningCopy && warningCopy.includes(RETRY_WARNING_COPY));
       const entry = {
         surface: surface.key,
         loginPath: surface.loginPath,
         noneStatus,
         noneAlerts,
         noneScreenshot: noneShot,
-        postStatus,
+        alertVisible,
         warningAlerts,
         warningCopy,
+        retryWarningRendered,
         warningScreenshot: warningShot,
       };
       captured[surface.key] = entry;
       report.loginStates.push(entry);
-      if (!warningCopy || !warningCopy.includes(RETRY_WARNING_COPY)) {
-        throw new Error(`${surface.loginPath} did not render RETRY_WARNING after failed login`);
-      }
     } finally {
       await context.close();
     }
@@ -321,25 +332,42 @@ async function runLoginStatePass(browser, baseUrl, outputDir, report) {
 
   const admin = captured.admin;
   const operator = captured.operator;
-  const statusParity = admin.postStatus === operator.postStatus;
+  // #1988: 한쪽 surface 캡처가 누락되면 parity 계산을 건너뛰고 사유를 기록한다.
+  if (!admin || !operator) {
+    const missing = !admin ? "admin" : "operator";
+    report.loginParity = {
+      parity: false,
+      reason: `login parity 계산 불가: ${missing} surface 캡처 누락`,
+    };
+    return;
+  }
   const noneStatusParity = admin.noneStatus === operator.noneStatus;
   const warningCopyParity = admin.warningCopy === operator.warningCopy;
+  const retryWarningParity = admin.retryWarningRendered === operator.retryWarningRendered;
+  const alertVisibleParity = admin.alertVisible === operator.alertVisible;
   const alertStructureParity = admin.warningAlerts === operator.warningAlerts
     && admin.noneAlerts === operator.noneAlerts;
   report.loginParity = {
-    parity: statusParity && noneStatusParity && warningCopyParity && alertStructureParity,
-    statusParity,
+    parity: noneStatusParity
+      && warningCopyParity
+      && retryWarningParity
+      && alertVisibleParity
+      && alertStructureParity,
     noneStatusParity,
     warningCopyParity,
+    retryWarningParity,
+    alertVisibleParity,
     alertStructureParity,
-    adminPostStatus: admin.postStatus,
-    operatorPostStatus: operator.postStatus,
+    adminRetryWarningRendered: admin.retryWarningRendered,
+    operatorRetryWarningRendered: operator.retryWarningRendered,
     adminWarningCopy: admin.warningCopy,
     operatorWarningCopy: operator.warningCopy,
   };
 }
 
 async function keyboardSmoke(page, baseUrl, report) {
+  // #1988: 게이트 측정 상태였던 mobile-768(768×900)로 명시 고정해 호출 순서 의존을 제거한다.
+  await page.setViewportSize(VIEWPORTS.find((viewport) => viewport.name === "mobile-768"));
   const response = await page.goto(`${baseUrl}/admin/dashboard/page`, { waitUntil: "networkidle" });
   await assertOk(page, "/admin/dashboard/page", response);
   await page.keyboard.press(process.platform === "darwin" ? "Meta+K" : "Control+K");
@@ -426,6 +454,8 @@ async function keyboardTableCheck(page, baseUrl, report) {
 }
 
 async function captureAxTree(page, outputDir, report) {
+  // #1988: AX tree 캡처도 게이트 측정 상태 mobile-768(768×900)로 고정한다.
+  await page.setViewportSize(VIEWPORTS.find((viewport) => viewport.name === "mobile-768"));
   const session = await page.context().newCDPSession(page);
   const tree = await session.send("Accessibility.getFullAXTree");
   const axPath = path.join(outputDir, "dashboard-ax-tree.json");

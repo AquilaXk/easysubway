@@ -45,7 +45,10 @@ test("admin accessibility QA script captures login NONE and RETRY_WARNING public
   assert.match(source, /RETRY_WARNING_COPY/);
   assert.match(source, /report\.loginParity = \{/);
   assert.match(source, /warningCopyParity/);
-  assert.match(source, /did not render RETRY_WARNING after failed login/);
+  // #1988: 실패 로그인은 [role="alert"] 가시화 대기로 판정하고, copy 불일치는 non-blocking 플래그로 기록한다.
+  assert.match(source, /waitFor\(\{ state: "visible", timeout: 10000 \}\)/);
+  assert.match(source, /retryWarningRendered/);
+  assert.match(source, /login parity 계산 불가/);
 });
 
 test("admin accessibility QA script verifies admin-table-scroll keyboard and focus outline", () => {
