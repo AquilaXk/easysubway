@@ -113,9 +113,11 @@ void main() {
   // #2068 부산 마감 라운드: 생성기 라벨 solver를 앱 충실 모델(실 Pretendard
   // 실측·designScale·노드 반경/캡슐/선폭 실측 상수)로 교체해 부산 오너 라벨
   // 147건을 전부 재배치 — labelNode 33→0·labelCapsule 10→0·labelBand 49→0
-  // (2026-07-18 실측). 부산만 하드 0 게이트로 승격한다. 타 권역(대구·대전·광주)
-  // 은 아직 이 재배치를 거치지 않아 참고 지표로 남기되, 현재 실측 baseline을
-  // 명시해 악화만 방지한다(대구 12/5, 대전·광주 0/0 — 이미 0).
+  // (2026-07-18 실측). 부산만 하드 0 게이트로 승격했다.
+  // #2068 대구 6차: 같은 앱 충실 solver로 대구 오너 라벨을 재배치 —
+  // labelNode 12→0·labelCapsule 5→0·labelServiceTag 1→0(동대구 KTX·SRT 표장
+  // 반입 후)·labelBand 20→2(참고). 대구도 labelNode/labelCapsule 하드 0으로
+  // 승격한다. 남은 대전·광주는 재배치 전이나 이미 0/0이라 그대로 둔다.
   //
   // labelServiceTag(item 3: KTX·SRT·AIR 표장 회피)는 4권역 전부 0 하드 게이트
   // — 표장이 있는 곳은 부산뿐이고(부산역·부전·센텀·태화강·공항) 부산 라벨을
@@ -124,7 +126,7 @@ void main() {
   // 회귀를 잡는다.
   const cases = <(String, String, double, int, int, int, int)>[
     ('부산권', 'busan', 0.90, 0, 0, 0, 0),
-    ('대구권', 'daegu', 0.90, 0, 12, 5, 0),
+    ('대구권', 'daegu', 0.90, 0, 0, 0, 0),
     ('대전권', 'daejeon', 0.70, 0, 0, 0, 0),
     ('광주권', 'gwangju', 0.90, 0, 0, 0, 0),
   ];

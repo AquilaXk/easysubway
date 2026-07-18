@@ -449,10 +449,18 @@ export function extractServiceTagObstacles(svgText) {
   const layer = svgText.slice(groupStart, layerEnd);
 
   const obstacles = [];
-  const tagOpenRe =
-    /<g\s+id="service-tag-[^"]*"\s*\n?\s*class="service-tag"\s*\n?\s*data-station="([^"]*)"[^>]*\btransform="([^"]*)"[^>]*>/g;
+  // 속성 순서 무관용(#2068 마감): 소스마다 여는 <g> 태그의 속성 나열 순서가
+  // 다르다(부산: class→data-station→transform, 대구: class→transform→
+  // data-station). 예전 정규식은 data-station이 transform보다 앞에 오는 순서를
+  // 고정 가정해 대구 동대구 KTX·SRT 표장을 놓쳤다. 여는 태그 전체를 먼저 잡고
+  // class·data-station·transform을 각각 순서 독립으로 추출한다.
+  const tagOpenRe = /<g\s+id="service-tag-[^"]*"[^>]*>/g;
   for (const tm of layer.matchAll(tagOpenRe)) {
-    const [openTag, station, rootTransform] = tm;
+    const openTag = tm[0];
+    if (!/\bclass="service-tag"/.test(openTag)) continue;
+    const station = (openTag.match(/\bdata-station="([^"]*)"/) || [])[1] ?? "";
+    const rootTransform =
+      (openTag.match(/\btransform="([^"]*)"/) || [])[1] ?? "";
     const blockStart = tm.index;
     let d = 0;
     const innerRe = /<g\b|<\/g>/g;

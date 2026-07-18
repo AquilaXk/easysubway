@@ -619,7 +619,7 @@
          stroke-width="8"
          stroke-linecap="round"
          stroke-linejoin="round"
-         d="M 205 1352 H 1976 C 2052 1352 2052 1404 2052 1456 C 2052 1573 2242 1716 2394 1716 H 2508 C 2536.5 1716 2555.5 1742 2584 1742 H 2755 C 2793 1742 2821.5 1722.5 2848.879 1703 C 2983 1612 3173 1352 3361.879 1352 H 4413"
+         d="M 175 1352 H 1976 C 2052 1352 2052 1404 2052 1456 C 2052 1573 2242 1716 2394 1716 H 2508 C 2536.5 1716 2555.5 1760 2584 1760 H 2755 C 2793 1760 2821.5 1731.5 2848.879 1703 C 2983 1612 3173 1352 3361.879 1352 H 4442"
          data-geometry="soft-cubic-connected-daegyeong"
          data-curve-policy="soft-cubic-at-every-direction-change"
          data-straight-segments="preserved-between-curves" />
@@ -637,13 +637,13 @@
          stroke-linejoin="round"
          data-geometry="soft-u-terminal-and-soft-cubic-core"
          data-soft-turn="line3-northwest-tail"
-         d="M 1577 1885 H 323 c -190 0 -190 -286 0 -286 h 1197 c 38 0 91.0839 -33.9912 119.5839 -53.4912 C 1677.5839 1519.5088 1710 1501.5 1710 1469 V 1287 c 0 -78 209 -136.5 209 -208 0 -52 -114 -52 -114 -104 V 689 c 0 -7.8 11.4 -13 38 -13 h 2489"
+         d="M 1723.3 1885 H 323 c -190 0 -190 -286 0 -286 h 1197 c 38 0 91.0839 -33.9912 119.5839 -53.4912 C 1677.5839 1519.5088 1710 1501.5 1710 1469 V 1287 c 0 -78 209 -136.5 209 -208 0 -52 -114 -52 -114 -104 V 689 c 0 -7.8 11.4 -13 38 -13 h 2663.4"
          data-curve-policy="soft-cubic-at-every-direction-change"
          data-straight-segments="preserved-between-curves"
          sodipodi:nodetypes="cssssssssssc" />
       <polyline
          id="route-line-2"
-         points="209.0000,1066.0000 4332.0000,1066.0000"
+         points="115.9000,1066.0000 4442.5000,1066.0000"
          class="route-line line-line2"
          data-line="line2"
          data-line-name="2호선"
@@ -668,7 +668,7 @@
          stroke-width="8"
          stroke-linecap="round"
          stroke-linejoin="round"
-         d="M 209 676 H 1786 C 1871.5 676 1938 721.5 1938 780 V 910 C 1938 975 2014 988 2109 1053 L 2261 1157 L 2327.5 1202.5 C 2369.3 1231.1 2394 1261 2394 1313 V 1612 C 2394 1664 2432 1716 2481.4 1716 H 4332"
+         d="M 129.2 676 H 1786 C 1871.5 676 1938 721.5 1938 780 V 910 C 1938 975 2014 988 2109 1053 L 2261 1157 L 2327.5 1202.5 C 2369.3 1231.1 2394 1261 2394 1313 V 1612 C 2394 1664 2432 1716 2481.4 1716 H 4407.1"
          data-geometry="soft-cubic-connected-line1"
          data-curve-policy="soft-cubic-at-every-direction-change"
          data-straight-segments="preserved-between-curves" />
@@ -2776,37 +2776,37 @@
        id="line-terminal-badges-layer"
        data-name="종점 호선 마크"
        class="render-layer line-terminal-badge-layer">
-      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line1" id="line-terminal-badge-line1-209-676">
-        <circle cx="209.00" cy="676.00" r="30" fill="#EE265B" data-role="line-terminal-badge" />
-        <text x="209.00" y="676.00" fill="#FFFFFF" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">1</text>
+      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line1" id="line-terminal-badge-line1-129-676">
+        <circle cx="129.20" cy="676.00" r="30" fill="#EE265B" data-role="line-terminal-badge" />
+        <text x="129.20" y="676.00" fill="#FFFFFF" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">1</text>
       </g>
-      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line1" id="line-terminal-badge-line1-4332-1716">
-        <circle cx="4332.00" cy="1716.00" r="30" fill="#EE265B" data-role="line-terminal-badge" />
-        <text x="4332.00" y="1716.00" fill="#FFFFFF" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">1</text>
+      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line1" id="line-terminal-badge-line1-4407-1716">
+        <circle cx="4407.10" cy="1716.00" r="30" fill="#EE265B" data-role="line-terminal-badge" />
+        <text x="4407.10" y="1716.00" fill="#FFFFFF" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">1</text>
       </g>
-      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line2" id="line-terminal-badge-line2-209-1066">
-        <circle cx="209.00" cy="1066.00" r="30" fill="#00B794" data-role="line-terminal-badge" />
-        <text x="209.00" y="1066.00" fill="#FFFFFF" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">2</text>
+      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line2" id="line-terminal-badge-line2-116-1066">
+        <circle cx="115.90" cy="1066.00" r="30" fill="#00B794" data-role="line-terminal-badge" />
+        <text x="115.90" y="1066.00" fill="#FFFFFF" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">2</text>
       </g>
-      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line2" id="line-terminal-badge-line2-4332-1066">
-        <circle cx="4332.00" cy="1066.00" r="30" fill="#00B794" data-role="line-terminal-badge" />
-        <text x="4332.00" y="1066.00" fill="#FFFFFF" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">2</text>
+      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line2" id="line-terminal-badge-line2-4443-1066">
+        <circle cx="4442.50" cy="1066.00" r="30" fill="#00B794" data-role="line-terminal-badge" />
+        <text x="4442.50" y="1066.00" fill="#FFFFFF" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">2</text>
       </g>
-      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line3" id="line-terminal-badge-line3-1577-1885">
-        <circle cx="1577.00" cy="1885.00" r="30" fill="#FFC513" data-role="line-terminal-badge" />
-        <text x="1577.00" y="1885.00" fill="#344258" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">3</text>
+      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line3" id="line-terminal-badge-line3-1723-1885">
+        <circle cx="1723.30" cy="1885.00" r="30" fill="#FFC513" data-role="line-terminal-badge" />
+        <text x="1723.30" y="1885.00" fill="#344258" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">3</text>
       </g>
-      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line3" id="line-terminal-badge-line3-4332-676">
-        <circle cx="4332.00" cy="676.00" r="30" fill="#FFC513" data-role="line-terminal-badge" />
-        <text x="4332.00" y="676.00" fill="#344258" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">3</text>
+      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="line3" id="line-terminal-badge-line3-4506-676">
+        <circle cx="4506.40" cy="676.00" r="30" fill="#FFC513" data-role="line-terminal-badge" />
+        <text x="4506.40" y="676.00" fill="#344258" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">3</text>
       </g>
-      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="daegyeong" id="line-terminal-badge-daegyeong-205-1352">
-        <rect x="157.00" y="1324.00" width="96" height="56" rx="28" ry="28" fill="#0066B3" data-role="line-terminal-badge" />
-        <text x="205.00" y="1352.00" fill="#FFFFFF" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">대경</text>
+      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="daegyeong" id="line-terminal-badge-daegyeong-175-1352">
+        <rect x="127.00" y="1324.00" width="96" height="56" rx="28" ry="28" fill="#0066B3" data-role="line-terminal-badge" />
+        <text x="175.00" y="1352.00" fill="#FFFFFF" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">대경</text>
       </g>
-      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="daegyeong" id="line-terminal-badge-daegyeong-4413-1352">
-        <rect x="4365.00" y="1324.00" width="96" height="56" rx="28" ry="28" fill="#0066B3" data-role="line-terminal-badge" />
-        <text x="4413.00" y="1352.00" fill="#FFFFFF" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">대경</text>
+      <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="daegyeong" id="line-terminal-badge-daegyeong-4442-1352">
+        <rect x="4394.00" y="1324.00" width="96" height="56" rx="28" ry="28" fill="#0066B3" data-role="line-terminal-badge" />
+        <text x="4442.00" y="1352.00" fill="#FFFFFF" font-size="34" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">대경</text>
       </g>
     </g>
     <g
@@ -2918,7 +2918,7 @@
            id="tspan149">송현</tspan></text>
       <text
          x="1121.0000"
-         y="620.1000"
+         y="618.5800"
          text-anchor="middle"
          font-size="28"
          font-weight="700"
@@ -2930,7 +2930,7 @@
            dy="0.0000"
            id="tspan150">서부</tspan><tspan
            x="1121.0000"
-           dy="18.8500"
+           dy="34.1400"
            id="tspan151">정류장</tspan></text>
       <text
          x="1235.0000"
@@ -2999,7 +2999,7 @@
            id="tspan156">교대</tspan></text>
       <text
          x="1824.5140"
-         y="638.7568"
+         y="625.0368"
          text-anchor="end"
          font-size="31"
          font-weight="850"
@@ -3009,7 +3009,7 @@
          id="text157">명덕</text>
       <text
          x="2179.6916"
-         y="1032.0730"
+         y="1004.6430"
          text-anchor="end"
          font-size="31"
          font-weight="850"
@@ -3029,7 +3029,7 @@
          id="text159">중앙로</text>
       <text
          x="2615.2930"
-         y="1689.7198"
+         y="1651.6198"
          text-anchor="middle"
          font-size="28"
          font-weight="700"
@@ -3042,7 +3042,7 @@
            id="tspan159">칠성시장</tspan></text>
       <text
          x="2722.7965"
-         y="1690.0487"
+         y="1651.9487"
          text-anchor="middle"
          font-size="28"
          font-weight="700"
@@ -3068,7 +3068,7 @@
            id="tspan161">동구청</tspan></text>
       <text
          x="3044.4650"
-         y="1675.7000"
+         y="1651.3200"
          text-anchor="middle"
          font-size="28"
          font-weight="700"
@@ -3094,7 +3094,7 @@
            id="tspan163">동촌</tspan></text>
       <text
          x="3259.0510"
-         y="1675.7000"
+         y="1651.3200"
          text-anchor="middle"
          font-size="28"
          font-weight="700"
@@ -3120,7 +3120,7 @@
            id="tspan165">방촌</tspan></text>
       <text
          x="3473.6560"
-         y="1675.7000"
+         y="1651.3200"
          text-anchor="middle"
          font-size="28"
          font-weight="700"
@@ -3146,7 +3146,7 @@
            id="tspan167">율하</tspan></text>
       <text
          x="3688.2420"
-         y="1675.7000"
+         y="1651.3200"
          text-anchor="middle"
          font-size="28"
          font-weight="700"
@@ -3172,7 +3172,7 @@
            id="tspan169">반야월</tspan></text>
       <text
          x="3902.8280"
-         y="1675.7000"
+         y="1651.3200"
          text-anchor="middle"
          font-size="28"
          font-weight="700"
@@ -3198,7 +3198,7 @@
            id="tspan171">안심</tspan></text>
       <text
          x="4117.4140"
-         y="1657.5000"
+         y="1620.9300"
          text-anchor="middle"
          font-size="25"
          font-weight="700"
@@ -3210,7 +3210,7 @@
            dy="0.0000"
            id="tspan172">대구한의대</tspan><tspan
            x="4117.4140"
-           dy="17.9400"
+           dy="31.0400"
            id="tspan173">병원</tspan></text>
       <text
          x="4224.7070"
@@ -3226,11 +3226,11 @@
            dy="0.0000"
            id="tspan174">부호</tspan><tspan
            x="4224.7070"
-           dy="17.9400"
+           dy="31.0400"
            id="tspan175">(경일대·호산대)</tspan></text>
       <text
          x="4332.0000"
-         y="1657.5000"
+         y="1651.4000"
          text-anchor="middle"
          font-size="29"
          font-weight="700"
@@ -3242,11 +3242,11 @@
            dy="0.0000"
            id="tspan176">하양</tspan><tspan
            x="4332.0000"
-           dy="17.9400"
+           dy="34.1400"
            id="tspan177">(대구가톨릭대)</tspan></text>
       <text
          x="2533.8178"
-         y="1673.7709"
+         y="1614.3409"
          text-anchor="end"
          font-size="31"
          font-weight="850"
@@ -3255,8 +3255,8 @@
          data-label-role="transfer"
          id="text178">대구역</text>
       <text
-         x="2833.1510"
-         y="1666.7407"
+         x="2804.0510"
+         y="1637.6407"
          text-anchor="middle"
          font-size="31"
          font-weight="850"
@@ -3343,7 +3343,7 @@
            dy="0.0000"
            id="tspan184">성서산업</tspan><tspan
            x="874.0000"
-           dy="17.8100"
+           dy="34.1400"
            id="tspan185">단지</tspan></text>
       <text
          x="1007.0000"
@@ -3424,8 +3424,8 @@
            dy="0.0000"
            id="tspan191">내당</tspan></text>
       <text
-         x="1804.5074"
-         y="1107.2633"
+         x="1794.6474"
+         y="1103.1833"
          text-anchor="middle"
          font-size="28"
          font-weight="700"
@@ -3433,7 +3433,7 @@
          class="station-name is-ordinary"
          data-label-role="ordinary"
          id="text192"><tspan
-           x="1804.5074"
+           x="1794.6474"
            dy="0.0000"
            id="tspan192">반고개</tspan></text>
       <text
@@ -3541,7 +3541,7 @@
            dy="0.0000"
            id="tspan200">수성알파</tspan><tspan
            x="3384.9260"
-           dy="17.8100"
+           dy="34.1400"
            id="tspan201">시티</tspan></text>
       <text
          x="3542.7780"
@@ -3623,7 +3623,7 @@
            id="tspan207">영남대</tspan></text>
       <text
          x="1991.9438"
-         y="1032.1630"
+         y="1001.6830"
          text-anchor="end"
          font-size="31"
          font-weight="850"
@@ -3656,7 +3656,7 @@
            id="tspan209">건들바위</tspan></text>
       <text
          x="2339.1090"
-         y="716.3000"
+         y="730.0200"
          text-anchor="middle"
          font-size="28"
          font-weight="700"
@@ -3682,7 +3682,7 @@
            id="tspan211">수성시장</tspan></text>
       <text
          x="2837.3270"
-         y="716.3000"
+         y="726.9700"
          text-anchor="middle"
          font-size="25"
          font-weight="700"
@@ -3694,7 +3694,7 @@
            dy="0.0000"
            id="tspan212">수성구민</tspan><tspan
            x="2837.3270"
-           dy="18.2000"
+           dy="31.0400"
            id="tspan213">운동장</tspan></text>
       <text
          x="3086.4360"
@@ -3711,7 +3711,7 @@
            id="tspan214">어린이세상</tspan></text>
       <text
          x="3335.5640"
-         y="716.3000"
+         y="730.0200"
          text-anchor="middle"
          font-size="28"
          font-weight="700"
@@ -3737,7 +3737,7 @@
            id="tspan216">수성못</tspan></text>
       <text
          x="3833.7820"
-         y="716.3000"
+         y="730.0200"
          text-anchor="middle"
          font-size="28"
          font-weight="700"
@@ -3776,7 +3776,7 @@
            id="tspan219">용지</tspan></text>
       <text
          x="285.0000"
-         y="1407.9000"
+         y="1420.0900"
          text-anchor="middle"
          font-size="29"
          font-weight="780"
@@ -4263,8 +4263,8 @@
          data-label-orientation="horizontal"
          data-label-side="above">
         <text
-           x="1520.0000"
-           y="1566.5000"
+           x="1486.2100"
+           y="1552.5000"
            text-anchor="middle"
            font-size="28"
            font-weight="720"
@@ -4294,8 +4294,8 @@
          data-label-side="connector"
          transform="translate(51.1086,3.0985)">
         <text
-           x="1580.8000"
-           y="1517.1000"
+           x="1568.9500"
+           y="1505.2500"
            text-anchor="end"
            font-size="28"
            font-weight="720"
@@ -4324,8 +4324,8 @@
          data-label-orientation="horizontal"
          data-label-side="connector">
         <text
-           x="1675.8000"
-           y="1452.1000"
+           x="1648.8600"
+           y="1425.1600"
            text-anchor="end"
            font-size="28"
            font-weight="720"
@@ -4533,7 +4533,7 @@
          id="text277">133</text>
       <text
          x="2722.5860"
-         y="1757.6000"
+         y="1740.0000"
          text-anchor="middle"
          font-size="9.5"
          font-weight="650"
@@ -5615,7 +5615,7 @@
       <g
          id="service-tag-ktx-srt"
          class="service-tag"
-         transform="translate(4.3624,44.0262)"
+         transform="translate(1339.3624,573.0262)"
          data-station="동대구역"
          data-services="KTX,SRT"
          data-logo-mode="inline-svg-paths"

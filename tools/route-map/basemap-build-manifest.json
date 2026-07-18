@@ -13,7 +13,7 @@
   },
   "ownerLabelsSidecar": {
     "path": "apps/mobile/assets/datapacks/metro_map_pack/basemap/labels.json",
-    "sha256": "0545c555d23616c07db9f36d03dbd2cf7e9326ed23a56d66f78a1b57b9bafa70"
+    "sha256": "5455140ca3992af86ad2279ddcdbb83710b895b7e43ef9a836422b79aa2e24d4"
   },
   "maps": [
     {
@@ -50,9 +50,9 @@
       "id": "daegu",
       "source": "tools/route-map/route-map-defs/svg-sources/easy-subway-daegu-v1.svg",
       "compiledVector": "apps/mobile/assets/datapacks/metro_map_pack/basemap/daegu.vec",
-      "sourceSvgSha256": "1724375fbe6cce3aa1710872f5399fd65442ac5a8ec759c88a2a179f27ef0f30",
-      "normalizedSvgSha256": "8758876f2c0f16787997764075143fabd6ff144df85305c04f5ca229be144460",
-      "compiledVectorSha256": "28d9217117484682cb9b907178ae7028e346afd0fafdac114cb6f74da45f77e3",
+      "sourceSvgSha256": "e3d99548c8d34705a210955063ea3c396c6c0c2f665153d1ca791966fab7cef6",
+      "normalizedSvgSha256": "52a049425e019be175f8d0ec71d678bcd056849cfa6215a254451903c06d7b52",
+      "compiledVectorSha256": "1ea14756ac053cd0455af1b3f2357ee4d1b1564d0fcaf1f4568195440ca4572f",
       "viewBox": [
         0,
         0,
