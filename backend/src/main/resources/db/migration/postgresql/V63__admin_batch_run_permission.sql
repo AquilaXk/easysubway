@@ -5,9 +5,6 @@ UPDATE data_collection_runs
 SET active_source = source
 WHERE status = 'RUNNING';
 
-CREATE UNIQUE INDEX ux_data_collection_runs_active_source
-    ON data_collection_runs (active_source);
-
 ALTER TABLE admin_role_permissions DROP CONSTRAINT admin_role_permissions_permission_code_check;
 
 ALTER TABLE admin_role_permissions ADD CONSTRAINT admin_role_permissions_permission_code_check

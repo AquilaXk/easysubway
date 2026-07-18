@@ -109,6 +109,35 @@ class AdminBatchPageControllerTest {
 		assertThat(auditEventRepository.findRecent(AdminAuditEventType.BATCH_OPERATION, 2))
 			.singleElement()
 			.satisfies(event -> assertThat(event.action()).isEqualTo("RUN_BATCH_JOB"));
+		assertThat(auditEventRepository.findRecent(AdminAuditEventType.ADMIN_ACTION, 1))
+			.singleElement()
+			.satisfies(event -> {
+				assertThat(event.outcome()).isEqualTo(AdminAuditOutcome.FAILURE);
+				assertThat(event.action()).isEqualTo("POST /admin/batches/{jobId}/run");
+			});
+	}
+
+	@Test
+	@DisplayName("배치 신규 실행 실패 audit은 원본 예외 메시지와 입력값을 저장하지 않는다")
+	void runFailureAuditDoesNotExposeExceptionMessage() throws Exception {
+		String privateJobId = "private-sql-token";
+
+		mockMvc.perform(post("/admin/batches/{jobId}/run", privateJobId)
+				.with(httpBasic("admin-user", "admin-test-password"))
+				.with(csrf())
+				.with(commandToken("/admin/batches/page"))
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("runRequested", "true"))
+			.andExpect(status().isBadRequest());
+
+		assertThat(auditEventRepository.findRecent(AdminAuditEventType.BATCH_OPERATION, 1))
+			.singleElement()
+			.satisfies(event -> {
+				assertThat(event.outcome()).isEqualTo(AdminAuditOutcome.FAILURE);
+				assertThat(event.reason())
+					.contains("errorType=InvalidDataCollectionException", "detail=배치 실행 실패")
+					.doesNotContain(privateJobId);
+			});
 	}
 
 	@Test

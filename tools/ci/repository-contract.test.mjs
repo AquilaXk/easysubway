@@ -13966,6 +13966,9 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   const batchRunPostgresSchema = read(
     "backend/src/main/resources/db/migration/postgresql/V63__admin_batch_run_permission.sql",
   );
+  const batchRunPostgresIndex = read(
+    "backend/src/main/resources/db/migration/postgresql/V64__data_collection_active_source_index.sql",
+  );
   const batchRunH2Schema = read(
     "backend/src/main/resources/db/migration/h2/V63__admin_batch_run_permission.sql",
   );
@@ -14034,15 +14037,24 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_data_collection_runs_started_at/);
   for (const batchRunSchema of [batchRunPostgresSchema, batchRunH2Schema]) {
     assert.match(batchRunSchema, /ADD COLUMN active_source VARCHAR\(40\)/);
-    assert.match(batchRunSchema, /CREATE UNIQUE INDEX ux_data_collection_runs_active_source/);
     assert.match(batchRunSchema, /admin\.batch\.run/);
   }
+  assert.doesNotMatch(batchRunPostgresSchema, /CREATE (?:UNIQUE )?INDEX/);
+  assert.match(
+    batchRunPostgresIndex,
+    /CREATE UNIQUE INDEX CONCURRENTLY ux_data_collection_runs_active_source/,
+  );
+  assert.match(batchRunPostgresIndex, /ON data_collection_runs \(active_source\)/);
+  assert.match(batchRunH2Schema, /CREATE UNIQUE INDEX ux_data_collection_runs_active_source/);
   assert.match(batchRunPreflight, /WHERE status = 'RUNNING'/);
   assert.match(batchRunPreflight, /GROUP BY source/);
   assert.match(batchRunPreflight, /HAVING COUNT\(\*\) > 1/);
   assert.match(batchRunPreflight, /V63 preflight blocked: duplicate RUNNING/);
   assert.match(batchRunPreflight, /performs no updates/);
-  assert.doesNotMatch(batchRunPreflight, /\b(?:UPDATE|DELETE|INSERT|ALTER)\b/i);
+  assert.doesNotMatch(
+    batchRunPreflight,
+    /\b(?:UPDATE|DELETE|INSERT|ALTER|CREATE|DROP|TRUNCATE|MERGE)\b/i,
+  );
   assert.match(run, /record DataCollectionRun/);
   assert.match(run, /requestedBy/);
   assert.match(run, /collectedCount/);

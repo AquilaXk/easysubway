@@ -45,6 +45,7 @@ class AdminBatchPageController {
 
 	private static final int HISTORY_PER_JOB = 30;
 	private static final DateTimeFormatter HISTORY_LABEL = DateTimeFormatter.ofPattern("MM-dd HH:mm");
+	private static final String ALREADY_RUNNING_MESSAGE = "같은 수집 대상이 이미 실행 중입니다.";
 
 	private final AdminBatchOperationService batchOperationService;
 	private final AdminAuditWriter auditWriter;
@@ -111,11 +112,18 @@ class AdminBatchPageController {
 				jobId,
 				"RUN_BATCH_JOB",
 				AdminAuditOutcome.FAILURE,
-				"error=%s".formatted(exception.getMessage())
+				runFailureAuditReason(exception)
 			);
 			throw exception;
 		}
 		return "redirect:/admin/batches/page";
+	}
+
+	private static String runFailureAuditReason(RuntimeException exception) {
+		if (ALREADY_RUNNING_MESSAGE.equals(exception.getMessage())) {
+			return "reason=" + ALREADY_RUNNING_MESSAGE;
+		}
+		return "errorType=%s detail=배치 실행 실패".formatted(exception.getClass().getSimpleName());
 	}
 
 	// 배치 운영 자동 갱신(#1742): 실행 중 배치가 있을 때만 10초 폴링이 live 영역(이력 차트·최근 실행)을 받아간다.

@@ -107,8 +107,12 @@ public class DataCollectionService implements DataCollectionUseCase {
 			markFailedUnlessRecorded(claimedRun, failureMessage);
 			throw new InvalidDataCollectionException("데이터 수집 배치를 실행하지 못했습니다.");
 		}
-		return loadDataCollectionRunPort.loadRun(runId)
-			.orElseThrow(() -> new InvalidDataCollectionException("데이터 수집 실행 기록을 찾을 수 없습니다."));
+		DataCollectionRun recorded = loadDataCollectionRunPort.loadRun(runId).orElse(claimedRun);
+		if (recorded.status() != DataCollectionStatus.COMPLETED) {
+			markFailedUnlessRecorded(recorded, DataCollectionFailureDetailSanitizer.operatorSafe((Throwable) null));
+			throw new InvalidDataCollectionException("데이터 수집 실행 기록을 완료 상태로 확정하지 못했습니다.");
+		}
+		return recorded;
 	}
 
 	private void markFailedUnlessRecorded(DataCollectionRun claimedRun, String failureMessage) {

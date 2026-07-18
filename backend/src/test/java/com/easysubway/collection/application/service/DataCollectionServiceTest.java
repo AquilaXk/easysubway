@@ -217,8 +217,47 @@ class DataCollectionServiceTest {
 			.extracting(DataCollectionRun::steps)
 			.satisfies(steps -> assertThat(steps)
 				.singleElement()
-				.extracting(DataCollectionRunStep::name, DataCollectionRunStep::status)
-				.containsExactly("FETCH", DataCollectionStepStatus.FAILED));
+				.extracting(
+					DataCollectionRunStep::name,
+					DataCollectionRunStep::status,
+					DataCollectionRunStep::failureMessage
+				)
+				.containsExactly(
+					"FETCH",
+					DataCollectionStepStatus.FAILED,
+					"IllegalStateException: 상세 오류는 보호 정책에 따라 생략되었습니다."
+				));
+	}
+
+	@Test
+	@DisplayName("JobExecution 완료 뒤 recorder가 완료 상태를 저장하지 않으면 claim을 FAILED로 해제한다")
+	void completedJobExecutionRequiresRecordedCompletedRun() {
+		var repository = new InMemoryDataCollectionRunRepository();
+		JobLauncher launcher = (job, parameters) -> {
+			JobExecution execution = mock(JobExecution.class);
+			org.mockito.Mockito.when(execution.getStatus()).thenReturn(BatchStatus.COMPLETED);
+			return execution;
+		};
+		var service = new DataCollectionService(
+			repository,
+			repository,
+			() -> "collection-unrecorded-completed",
+			launcher,
+			mock(Job.class)
+		);
+
+		assertThatThrownBy(() -> service.runCollection(
+			new RunDataCollectionCommand(DataCollectionSource.TRANSIT_MASTER, "admin-user")
+		))
+			.isInstanceOf(InvalidDataCollectionException.class)
+			.hasMessage("데이터 수집 실행 기록을 완료 상태로 확정하지 못했습니다.");
+
+		assertThat(repository.loadRun("collection-unrecorded-completed")).get()
+			.satisfies(run -> {
+				assertThat(run.status()).isEqualTo(DataCollectionStatus.FAILED);
+				assertThat(run.failureMessage()).contains("보호 정책");
+			});
+		assertThat(repository.loadRunningRun(DataCollectionSource.TRANSIT_MASTER)).isEmpty();
 	}
 
 	@Test
