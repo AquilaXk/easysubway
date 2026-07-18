@@ -955,7 +955,7 @@ class RouteTimetableRaptorPlanner {
 			Map<String, Integer> routeIndex,
 			Map<String, Integer> stationIndex
 		) {
-			Map<RoutePatternKey, Integer> patternIds = new LinkedHashMap<>();
+			Map<RoutePatternKey, List<ScheduledTrip>> groupedTrips = new LinkedHashMap<>();
 			Map<Integer, int[]> stopsByPattern = new HashMap<>();
 			Map<Integer, List<ScheduledTrip>> tripsByPattern = new HashMap<>();
 			for (ScheduledTrip trip : scheduledTrips) {
@@ -966,18 +966,52 @@ class RouteTimetableRaptorPlanner {
 				List<Integer> stationSequence = trip.stopTimes().stream()
 					.map(stopTime -> stationIndex.get(stopTime.stationId()))
 					.toList();
-				RoutePatternKey key = new RoutePatternKey(denseRoute, stationSequence);
-				int patternId = patternIds.computeIfAbsent(key, ignored -> patternIds.size());
-				stopsByPattern.putIfAbsent(
-					patternId,
-					stationSequence.stream().mapToInt(Integer::intValue).toArray()
-				);
-				tripsByPattern.computeIfAbsent(patternId, ignored -> new ArrayList<>()).add(trip);
+				List<Integer> accessSignature = trip.stopTimes().stream()
+					.map(stopTime -> (stopTime.pickupType() << 16) | (stopTime.dropOffType() & 0xffff))
+					.toList();
+				RoutePatternKey key = new RoutePatternKey(denseRoute, stationSequence, accessSignature);
+				groupedTrips.computeIfAbsent(key, ignored -> new ArrayList<>()).add(trip);
 			}
-			tripsByPattern.replaceAll((ignored, trips) -> trips.stream()
-				.sorted(Comparator.comparingInt(trip -> trip.departureSeconds(0)))
-				.toList());
+			for (Map.Entry<RoutePatternKey, List<ScheduledTrip>> entry : groupedTrips.entrySet()) {
+				List<List<ScheduledTrip>> nonOvertakingGroups = new ArrayList<>();
+				List<ScheduledTrip> orderedTrips = entry.getValue().stream()
+					.sorted(Comparator.comparingInt((ScheduledTrip trip) -> trip.departureSeconds(0))
+						.thenComparingInt(ScheduledTrip::index))
+					.toList();
+				for (ScheduledTrip trip : orderedTrips) {
+					List<ScheduledTrip> selectedGroup = null;
+					for (List<ScheduledTrip> group : nonOvertakingGroups) {
+						if (doesNotOvertake(group.getLast(), trip)) {
+							selectedGroup = group;
+							break;
+						}
+					}
+					if (selectedGroup == null) {
+						selectedGroup = new ArrayList<>();
+						nonOvertakingGroups.add(selectedGroup);
+					}
+					selectedGroup.add(trip);
+				}
+				for (List<ScheduledTrip> group : nonOvertakingGroups) {
+					int patternId = stopsByPattern.size();
+					stopsByPattern.put(
+						patternId,
+						entry.getKey().stationSequence().stream().mapToInt(Integer::intValue).toArray()
+					);
+					tripsByPattern.put(patternId, List.copyOf(group));
+				}
+			}
 			return new CompiledRoutePatterns(Map.copyOf(stopsByPattern), Map.copyOf(tripsByPattern));
+		}
+
+		private static boolean doesNotOvertake(ScheduledTrip earlier, ScheduledTrip later) {
+			for (int stop = 0; stop < earlier.stopTimes().size(); stop += 1) {
+				if (earlier.arrivalSeconds(stop) > later.arrivalSeconds(stop)
+					|| earlier.departureSeconds(stop) > later.departureSeconds(stop)) {
+					return false;
+				}
+			}
+			return true;
 		}
 
 		private static Map<Integer, int[]> invertPatterns(Map<Integer, int[]> stopsByPattern, int stationCount) {
@@ -1223,7 +1257,11 @@ class RouteTimetableRaptorPlanner {
 	record ScanMetrics(int expandedRoutes, int expandedTrips, int workspaceIdentity) {
 	}
 
-	private record RoutePatternKey(int routeIndex, List<Integer> stationSequence) {
+	private record RoutePatternKey(
+		int routeIndex,
+		List<Integer> stationSequence,
+		List<Integer> accessSignature
+	) {
 	}
 
 	private record CompiledRoutePatterns(

@@ -41,7 +41,7 @@ class RouteTimetableRaptorPlannerDifferentialTest {
 			String origin = STATIONS.get(random.nextInt(STATIONS.size()));
 			String destination = STATIONS.get(random.nextInt(STATIONS.size()));
 			int minute = random.nextInt(41);
-			int maxTransfers = random.nextInt(3);
+			int maxTransfers = random.nextInt(4);
 			var command = command(origin, destination, minute, maxTransfers);
 
 			assertThat(signatures(planner.search(command, timetable)))

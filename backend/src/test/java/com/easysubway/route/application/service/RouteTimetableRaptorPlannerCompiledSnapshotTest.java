@@ -165,6 +165,37 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 	}
 
 	@Test
+	@DisplayName("출발 stop에서 함께 탑승 가능한 추월 trip의 더 빠른 downstream 도착을 보존한다")
+	void preservesFasterDownstreamArrivalFromOvertakingTrip() {
+		var results = planner.search(
+			command("station-a", "station-c", "2026-07-01T08:50:00+09:00"),
+			planner.compile(overtakingTimetable())
+		);
+
+		assertThat(results).hasSize(1);
+		assertThat(results.getFirst().steps())
+			.filteredOn(step -> "ride".equals(step.stepType()))
+			.extracting("tripId", "plannedArrivalTime")
+			.containsExactly(org.assertj.core.groups.Tuple.tuple(
+				"trip-fast", "2026-07-01T09:35:00+09:00"));
+	}
+
+	@Test
+	@DisplayName("같은 정차열에서 하차 정책이 다른 후속 trip을 잃지 않는다")
+	void preservesLaterTripWhenEarlierTripBlocksDropOff() {
+		var results = planner.search(
+			command("station-a", "station-b", "2026-07-01T08:50:00+09:00"),
+			planner.compile(dropOffVariantTimetable())
+		);
+
+		assertThat(results).hasSize(1);
+		assertThat(results.getFirst().steps())
+			.filteredOn(step -> "ride".equals(step.stepType()))
+			.extracting("tripId")
+			.containsExactly("trip-usable");
+	}
+
+	@Test
 	@DisplayName("동시 nextServiceTime은 service day boarding index를 안전하게 lazy publish한다")
 	void concurrentNextServiceTimeLazilyPublishesBoardingIndex() throws Exception {
 		var compiled = planner.compile(frequencyTimetable());
@@ -341,6 +372,27 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 		);
 	}
 
+	private static RouteTimetable dropOffVariantTimetable() {
+		return timetable(
+			List.of(weekday("weekday")),
+			List.of(),
+			List.of(
+				new LoadRouteTimetablePort.TransitTrip(
+					"trip-blocked", "route", "weekday", "도착", "0", "LOCAL", 0),
+				new LoadRouteTimetablePort.TransitTrip(
+					"trip-usable", "route", "weekday", "도착", "0", "LOCAL", 0)
+			),
+			List.of(
+				stop("trip-blocked", 1, "station-a", 32400),
+				new LoadRouteTimetablePort.TransitStopTime(
+					"trip-blocked", 2, "station-b", "line", 33000, 33000, 0, 1),
+				stop("trip-usable", 1, "station-a", 32700),
+				stop("trip-usable", 2, "station-b", 33300)
+			),
+			List.of()
+		);
+	}
+
 	private static LoadRouteTimetablePort.ServiceCalendar weekday(String serviceId) {
 		return new LoadRouteTimetablePort.ServiceCalendar(
 			serviceId, true, true, true, true, true, false, false,
@@ -385,6 +437,19 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 			false,
 			0,
 			3
+		);
+	}
+
+	private static SearchRouteV2Command command(String origin, String destination, String departureTime) {
+		return new SearchRouteV2Command(
+			origin,
+			destination,
+			OffsetDateTime.parse(departureTime),
+			MobilityType.SENIOR,
+			ConstraintMode.ALLOW_WITH_WARNINGS,
+			false,
+			0,
+			1
 		);
 	}
 
