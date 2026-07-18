@@ -16728,6 +16728,7 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     "route_v2_itx_request_state",
     "route_v2_gateway_abuse_rate_limit_state",
     "facility_report_abuse_rate_limit_state",
+    "train_search_abuse_rate_limit_state",
     "mobility_profile",
     "facility_report_content",
     "facility_report_photo",
@@ -16781,9 +16782,12 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
       "facility_report_photo",
       "facility_report_location",
     ]);
-    const auditedForPrivacyInventory = new Set(["facility_report_abuse_rate_limit_state"]);
+    const auditedForPrivacyInventory = new Set([
+      "facility_report_abuse_rate_limit_state",
+      "train_search_abuse_rate_limit_state",
+    ]);
     const expectedLastVerifiedAt = auditedForPrivacyInventory.has(id)
-      ? "2026-07-18"
+      ? id === "train_search_abuse_rate_limit_state" ? "2026-07-19" : "2026-07-18"
       : id.startsWith("route_v2_") || reviewedForLegalDisclosure.has(id)
         ? "2026-07-16"
         : "2026-06-19";
@@ -16846,6 +16850,7 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     const noUserDeletionBoundary = new Set([
       "route_v2_gateway_abuse_rate_limit_state",
       "facility_report_abuse_rate_limit_state",
+      "train_search_abuse_rate_limit_state",
     ]);
     assert.equal(
       item.googlePlayDataSafety.deletionSupported,
@@ -16919,6 +16924,35 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
   assert.match(
     reportAbuseControlSource,
     /report abuse control store mode must be local until distributed store is implemented/,
+  );
+
+  const trainSearchAbuseState = items.get("train_search_abuse_rate_limit_state");
+  assert.equal(trainSearchAbuseState.implementationStatus, "backend-collected");
+  assert.equal(trainSearchAbuseState.sharedWithThirdParties, false);
+  assert.equal(trainSearchAbuseState.storeMode, "local");
+  assert.equal(trainSearchAbuseState.persistedToDatabase, false);
+  assert.equal(trainSearchAbuseState.includedInAccessLog, false);
+  assert.deepEqual(trainSearchAbuseState.storageLocations, ["backend-jvm-memory"]);
+  assert.equal(trainSearchAbuseState.retention.fixedTtl, false);
+  assert.equal(trainSearchAbuseState.retention.windowSeconds, 60);
+  assert.equal(trainSearchAbuseState.retention.maxCounterKeysPerLimiter, 4096);
+  assert.equal(trainSearchAbuseState.googlePlayDataSafety.dataType, "Device or other IDs");
+  assert.equal(trainSearchAbuseState.googlePlayDataSafety.deletionSupported, false);
+  assert.equal(trainSearchAbuseState.googlePlayDataSafety.processedEphemerally, false);
+  assert.deepEqual(trainSearchAbuseState.rateLimitedEndpoints, [
+    "GET /api/v1/trains/stations",
+    "GET /api/v1/trains/search",
+  ]);
+  const trainSearchRateLimitSource = read(
+    "backend/src/main/java/com/easysubway/train/adapter/in/web/TrainSearchRateLimitFilter.java",
+  );
+  assert.match(trainSearchRateLimitSource, /Map<String, WindowCounter> counters = new ConcurrentHashMap<>/);
+  assert.match(trainSearchRateLimitSource, /return "ip:" \+ remote/);
+  assert.ok(
+    readJson("apps/mobile/release/play-store-submission-content.json")
+      .dataSafetyDeclarations.answerMatrix
+      .find((item) => item.dataType === "Device or other IDs")
+      .inventoryDataIds.includes("train_search_abuse_rate_limit_state"),
   );
 
   const appStoreTypes = [...new Set(

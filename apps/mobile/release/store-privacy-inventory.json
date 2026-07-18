@@ -176,6 +176,59 @@
       }
     },
     {
+      "id": "train_search_abuse_rate_limit_state",
+      "displayNameKo": "기차검색 악용 방지 상태",
+      "purposeKo": "공개 전국 기차검색 endpoint의 과도한 요청과 제공기관 quota 악용 방지",
+      "implementationStatus": "backend-collected",
+      "introducedInVersion": "1.0.4",
+      "codeOwner": "train",
+      "collectionTrigger": "사용자가 기차역 또는 여객열차 검색 요청을 보낼 때 filter가 요청 IP별 요청 제한 상태를 갱신",
+      "backendTableOrService": [
+        "TrainSearchRateLimitFilter OncePerRequestFilter",
+        "TrainSearchRateLimiter in-memory ConcurrentHashMap counters",
+        "TrainSearchClientIdentityResolver ip:remoteAddr key"
+      ],
+      "storageLocations": ["backend-jvm-memory"],
+      "retentionKo": "고정 TTL은 없다. 역 검색과 열차 검색 limiter가 각각 요청 IP별 카운터를 JVM heap에 보관하고 60초 window마다 재설정한다. 새 IP가 들어올 때 이전 window 항목을 제거하며 limiter별 최대 4096개를 넘으면 새 IP 요청을 거절한다. 최종적으로 JVM 프로세스 종료 시 모두 삭제된다.",
+      "deletionKo": "요청 IP는 사용자 계정 DB나 access log에 저장하지 않고 filter도 IP를 로그로 남기지 않는다. window 경과 뒤 새 IP 삽입 시 제거되거나 JVM 프로세스 종료 시 자동 삭제되며, 사용자가 직접 삭제할 영속 저장소는 없다.",
+      "deletionImplementation": "TrainSearchRateLimiter가 ip:clientIdentity별 WindowCounter를 역 검색과 열차 검색용 JVM heap ConcurrentHashMap에서 각각 관리한다. 새 키 생성 시 이전 window 카운터를 제거하고 maxKeys(기본 4096) 초과 시 저장 대신 요청을 거절한다.",
+      "evidence": [
+        "backend/src/main/java/com/easysubway/train/adapter/in/web/TrainSearchRateLimitFilter.java",
+        "backend/src/test/java/com/easysubway/train/adapter/in/web/TrainSearchRateLimitFilterTest.java"
+      ],
+      "lastVerifiedAt": "2026-07-19",
+      "sharedWithThirdParties": false,
+      "usedForTracking": false,
+      "rateLimitedEndpoints": [
+        "GET /api/v1/trains/stations",
+        "GET /api/v1/trains/search"
+      ],
+      "clientIdentityKey": "ip:remoteAddr (신뢰 프록시 요청은 X-Forwarded-For에서 해석한 클라이언트 IP)",
+      "storeMode": "local",
+      "persistedToDatabase": false,
+      "includedInAccessLog": false,
+      "retention": {
+        "fixedTtl": false,
+        "windowSeconds": 60,
+        "maxCounterKeysPerLimiter": 4096,
+        "evictionBoundary": "prior-window entries removed on next identity insertion; over-capacity identities rejected without storage",
+        "finalDeletionBoundary": "JVM process lifecycle end"
+      },
+      "operationReference": "https://docs.spring.io/spring-framework/reference/web/webmvc/filters.html",
+      "googlePlayDataSafety": {
+        "dataType": "Device or other IDs",
+        "collected": true,
+        "collectionType": "optional-user-triggered-train-search-abuse-control",
+        "purpose": "Fraud prevention, security, and compliance",
+        "linkedToUser": true,
+        "encryptedInTransit": true,
+        "optional": true,
+        "required": false,
+        "deletionSupported": false,
+        "processedEphemerally": false
+      }
+    },
+    {
       "id": "precise_location",
       "displayNameKo": "현재 위치",
       "purposeKo": "가까운 역 검색, 시설 신고 위치 확인, 외부 지도 도보 길안내",

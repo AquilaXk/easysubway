@@ -94,6 +94,30 @@ class TrainSearchContractControllerTest {
 	}
 
 	@Test
+	void stationRevalidationAcceptsWeakListedAndWildcardIfNoneMatchValidators() throws Exception {
+		when(service.stationsWithMetadata("서울", "KTX")).thenReturn(new StationSearchSnapshot(
+			List.of(new Station("NAT010000", "서울")),
+			Instant.parse("2026-07-20T00:00:00Z")
+		));
+
+		MvcResult first = mockMvc.perform(get("/api/v1/trains/stations")
+				.param("query", "서울")
+				.param("trainType", "KTX"))
+			.andExpect(status().isOk())
+			.andReturn();
+		String etag = first.getResponse().getHeader("ETag");
+
+		for (String validator : List.of("W/" + etag, "\"other\", " + etag, "*")) {
+			mockMvc.perform(get("/api/v1/trains/stations")
+					.param("query", "서울")
+					.param("trainType", "KTX")
+					.header("If-None-Match", validator))
+				.andExpect(status().isNotModified())
+				.andExpect(header().string("ETag", etag));
+		}
+	}
+
+	@Test
 	void todaySearchUsesShortPublicCacheAndReturnsApprovedFields() throws Exception {
 		when(service.searchWithMetadata(any())).thenReturn(new TrainSearchSnapshot(
 			result(),

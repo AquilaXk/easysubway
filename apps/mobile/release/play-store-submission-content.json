@@ -322,7 +322,7 @@
       },
       {
         "dataType": "Device or other IDs",
-        "inventoryDataIds": ["route_v2_itx_integrity", "route_v2_gateway_abuse_rate_limit_state", "facility_report_abuse_rate_limit_state"],
+        "inventoryDataIds": ["route_v2_itx_integrity", "route_v2_gateway_abuse_rate_limit_state", "facility_report_abuse_rate_limit_state", "train_search_abuse_rate_limit_state"],
         "containsCollectedData": true,
         "containsRequiredData": false,
         "containsOptionalData": true,
@@ -348,6 +348,7 @@
       "favorites",
       "ITX Route V2 integrity session",
       "ITX Route V2 gateway abuse prevention state",
+      "train search abuse prevention state",
       "ITX Route V2 mobility preferences",
       "ITX Route V2 route request and state"
     ],

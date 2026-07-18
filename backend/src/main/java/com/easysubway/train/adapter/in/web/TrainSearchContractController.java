@@ -109,7 +109,7 @@ class TrainSearchContractController {
 		ApiResponse<Object> envelope = ApiResponse.ok(data);
 		String etag = etag(envelope);
 		CacheControl cacheControl = cacheControl(expiresAt, cachePolicy);
-		if (etag.equals(webRequest.getHeader("If-None-Match"))) {
+		if (matchesIfNoneMatch(webRequest.getHeaderValues("If-None-Match"), etag)) {
 			return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
 				.eTag(etag)
 				.cacheControl(cacheControl)
@@ -119,6 +119,22 @@ class TrainSearchContractController {
 			.eTag(etag)
 			.cacheControl(cacheControl)
 			.body(envelope);
+	}
+
+	private boolean matchesIfNoneMatch(String[] headerValues, String etag) {
+		if (headerValues == null) return false;
+		String current = withoutWeakPrefix(etag);
+		for (String headerValue : headerValues) {
+			for (String validator : headerValue.split(",")) {
+				String candidate = validator.trim();
+				if ("*".equals(candidate) || current.equals(withoutWeakPrefix(candidate))) return true;
+			}
+		}
+		return false;
+	}
+
+	private String withoutWeakPrefix(String etag) {
+		return etag.startsWith("W/") ? etag.substring(2).trim() : etag;
 	}
 
 	private CacheControl cacheControl(java.time.Instant expiresAt, CachePolicy policy) {
