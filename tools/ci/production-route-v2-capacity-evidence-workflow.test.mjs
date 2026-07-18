@@ -54,7 +54,16 @@ test("capacity runner는 동일 candidate·격리 load·privacy·closed ingress�
   assert.match(runner, /synthetic_secret/);
   assert.match(runner, /synthetic_certificate_digest/);
   assert.doesNotMatch(runner, /range \.Config\.Env/);
-  assert.match(runner, /--publish 127\.0\.0\.1::8080 "\$\{expected_image_id\}"/);
+  assert.match(runner, /"\$\{expected_image_id\}" >\/dev\/null/);
+  assert.doesNotMatch(runner, /--publish 127\.0\.0\.1::8080/);
+  assert.doesNotMatch(runner, /--publish 127\.0\.0\.1::8081/);
+  assert.doesNotMatch(runner, /docker port "\$\{clone_backend\}"/);
+  assert.doesNotMatch(runner, /docker port "\$\{clone_gateway\}"/);
+  assert.match(runner, /clone_curl="\$\{prefix\}-curl"/);
+  assert.match(runner, /docker run -d --name "\$\{clone_curl\}" --network "\$\{network\}" --user 0:0 --entrypoint sh/);
+  assert.match(runner, /docker exec "\$\{clone_curl\}" curl/);
+  assert.match(runner, /--network-alias gateway/);
+  assert.match(runner, /gateway_base="http:\/\/gateway:8081"/);
   const gatewayRun = runner.match(/docker run -d --name "\$\{clone_gateway\}"[\s\S]*?nginx -g 'daemon off;' >\/dev\/null/)?.[0] ?? "";
   assert.match(gatewayRun, /--cpus 1 --memory 256m --memory-swap 256m --pids-limit 128/);
   assert.match(runner, /profile=normal/);
