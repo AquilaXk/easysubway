@@ -107,6 +107,18 @@ class TrainSearchServiceTest {
 	}
 
 	@Test
+	void capsCurrentServiceDayTtlAtTheNextThreeAmBoundary() {
+		service = serviceAt(Instant.parse("2026-07-19T17:59:00Z"));
+
+		var snapshot = service.searchWithMetadata(criteriaFor(LocalDate.parse("2026-07-19"), null));
+
+		assertThat(cache.legs.values()).singleElement().satisfies(leg ->
+			assertThat(leg.expiresAt()).isEqualTo(Instant.parse("2026-07-19T18:00:00Z"))
+		);
+		assertThat(snapshot.expiresAt()).isEqualTo(Instant.parse("2026-07-19T18:00:00Z"));
+	}
+
+	@Test
 	void previousCalendarDateRemainsSearchableUntilTheThreeAmServiceDayBoundary() {
 		service = serviceAt(Instant.parse("2026-07-19T17:30:00Z"));
 
@@ -142,6 +154,30 @@ class TrainSearchServiceTest {
 			.extracting("code")
 			.isEqualTo("TRAIN_SEARCH_UNAVAILABLE");
 		assertThat(slept[0]).isGreaterThanOrEqualTo(Duration.ofMinutes(15));
+	}
+
+	@Test
+	void reacquiresAnAbandonedLegLeaseAfterItExpires() {
+		service.search(criteria(null));
+		String key = cache.legs.keySet().iterator().next();
+		cache.legs.clear();
+		cache.leases.put(key, "failed-owner");
+		provider.searchCalls.set(0);
+		var clock = new TestClock(NOW);
+		Duration[] slept = { Duration.ZERO };
+		service = serviceWith(clock, duration -> {
+			slept[0] = slept[0].plus(duration);
+			clock.advance(duration);
+			if (slept[0].compareTo(Duration.ofMinutes(15)) >= 0) {
+				cache.leases.remove(key, "failed-owner");
+			}
+		});
+
+		service.search(criteria(null));
+
+		assertThat(slept[0]).isGreaterThanOrEqualTo(Duration.ofMinutes(15));
+		assertThat(provider.searchCalls).hasValue(1);
+		assertThat(cache.legs).containsKey(key);
 	}
 
 	@Test

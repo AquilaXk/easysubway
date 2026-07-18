@@ -319,7 +319,11 @@ public class TrainSearchService {
 
 	private CachedLeg loadLeg(String key, LegQuery query, Instant now) {
 		String owner = ownerSupplier.get();
-		if (!cache.tryAcquireLease(key, owner, now, LEG_LEASE_TTL)) return pollForShared(key);
+		if (!cache.tryAcquireLease(key, owner, now, LEG_LEASE_TTL)) return pollForShared(key, query);
+		return loadOwnedLeg(key, query, owner);
+	}
+
+	private CachedLeg loadOwnedLeg(String key, LegQuery query, String owner) {
 		boolean released = false;
 		try {
 			List<Journey> journeys = provider.search(query);
@@ -348,21 +352,28 @@ public class TrainSearchService {
 
 	private Instant expiresAt(LegQuery query, Instant now) {
 		if (query.departureDate().equals(TrainSearchScopePolicy.currentServiceDay(clock))) {
-			return now.plus(TODAY_TTL);
+			Instant todayTtl = now.plus(TODAY_TTL);
+			Instant nextServiceDayStart = TrainSearchScopePolicy.serviceDayStartsAt(query.departureDate().plusDays(1));
+			return todayTtl.isBefore(nextServiceDayStart) ? todayTtl : nextServiceDayStart;
 		}
 		Instant futureTtl = now.plus(FUTURE_TTL);
 		Instant serviceDayStart = TrainSearchScopePolicy.serviceDayStartsAt(query.departureDate());
 		return futureTtl.isBefore(serviceDayStart) ? futureTtl : serviceDayStart;
 	}
 
-	private CachedLeg pollForShared(String key) {
+	private CachedLeg pollForShared(String key, LegQuery query) {
 		for (Duration delay : LEG_LEASE_POLLS) {
 			sleep(delay);
-			var cached = cache.freshLeg(key, clock.instant());
+			Instant now = clock.instant();
+			var cached = cache.freshLeg(key, now);
 			if (cached.isPresent()) {
 				CachedLeg value = validLeg(key, cached.orElseThrow());
 				remember(key, value);
 				return value;
+			}
+			String owner = ownerSupplier.get();
+			if (cache.tryAcquireLease(key, owner, now, LEG_LEASE_TTL)) {
+				return loadOwnedLeg(key, query, owner);
 			}
 		}
 		throw failure("TRAIN_SEARCH_UNAVAILABLE");
