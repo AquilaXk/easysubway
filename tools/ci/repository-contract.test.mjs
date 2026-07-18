@@ -13987,6 +13987,9 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
     "backend/src/main/java/com/easysubway/collection/application/port/out/TransitMasterCollectionSnapshot.java",
   );
   const service = read("backend/src/main/java/com/easysubway/collection/application/service/DataCollectionService.java");
+  const failureDetailSanitizer = read(
+    "backend/src/main/java/com/easysubway/collection/application/service/DataCollectionFailureDetailSanitizer.java",
+  );
   const recorder = read("backend/src/main/java/com/easysubway/collection/application/service/DataCollectionRunRecorder.java");
   const sourceAdapter = read(
     "backend/src/main/java/com/easysubway/collection/adapter/out/source/LoadedTransitMasterCollectionSourceAdapter.java",
@@ -14083,6 +14086,7 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   assert.match(service, /transitMasterCollectionJob/);
   assert.match(service, /execution\.getStatus\(\) != BatchStatus\.COMPLETED/);
   assert.match(service, /execution\.getAllFailureExceptions\(\)/);
+  assert.match(service, /DataCollectionFailureDetailSanitizer\.operatorSafe/);
   assert.match(service, /InvalidDataCollectionException\("데이터 수집 배치를 실행하지 못했습니다\.", exception\)/);
   assert.match(service, /loadRun\(runId\)/);
   assert.match(service, /loadLatestCompletedRun\(source\)/);
@@ -14096,6 +14100,7 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   assert.match(recorder, /"STAGE"/);
   assert.match(recorder, /MANUAL_REQUIRED/);
   assert.match(recorder, /catch \(RuntimeException exception\)/);
+  assert.match(recorder, /DataCollectionFailureDetailSanitizer\.operatorSafe/);
   assert.match(recorder, /DataCollectionStatus\.FAILED/);
   assert.match(recorder, /COMPLETED_OPERATOR_ACTION/);
   assert.match(recorder, /FAILED_OPERATOR_ACTION/);
@@ -14113,6 +14118,9 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   assert.match(jdbcRepository, /implements[\s\S]*LoadDataCollectionRunPort[\s\S]*SaveDataCollectionRunPort/);
   assert.match(jdbcRepository, /JdbcTemplate/);
   assert.match(jdbcRepository, /@Transactional[\s\S]*saveRun\(DataCollectionRun run\)/);
+  assert.match(jdbcRepository, /isActiveSourceConflict/);
+  assert.match(jdbcRepository, /ux_data_collection_runs_active_source/);
+  assert.match(jdbcRepository, /throw exception/);
   assert.match(jdbcRepository, /INSERT INTO data_collection_runs/);
   assert.match(jdbcRepository, /INSERT INTO data_collection_run_steps/);
   assert.match(jdbcRepository, /DELETE FROM data_collection_run_steps WHERE run_id = \?/);
@@ -14121,6 +14129,11 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   assert.match(jdbcRepository, /WHERE source = \?/);
   assert.match(jdbcRepository, /ORDER BY completed_at DESC, run_id DESC/);
   assert.match(jdbcRepository, /ORDER BY started_at DESC, run_id DESC/);
+  assert.match(failureDetailSanitizer, /MAX_LENGTH = 500/);
+  assert.match(failureDetailSanitizer, /URL_QUERY/);
+  assert.match(failureDetailSanitizer, /CREDENTIAL/);
+  assert.match(failureDetailSanitizer, /AUTHORIZATION_VALUE/);
+  assert.match(failureDetailSanitizer, /RAW_BODY/);
   assert.match(controller, /@GetMapping\("\/admin\/data-sources"\)/);
   assert.match(controller, /@PostMapping\("\/admin\/data-sources\/\{dataSourceId\}\/sync"\)/);
   assert.match(controller, /dataCollectionSource\(String dataSourceId\)/);

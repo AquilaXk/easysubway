@@ -258,16 +258,20 @@ class JdbcDataCollectionRunRepositoryTest {
 	}
 
 	@Test
-	@DisplayName("FAILED JobExecution은 JDBC claim을 해제해 같은 source 재실행을 허용한다")
-	void failedJobExecutionReleasesJdbcClaimAndAllowsRerun() {
+	@DisplayName("길고 민감한 FAILED JobExecution은 안전한 사유로 JDBC claim을 해제해 재실행을 허용한다")
+	void sensitiveLongFailedJobExecutionStoresSafeDetailAndAllowsRerun() {
 		var idSequence = new AtomicInteger();
 		var launchCount = new AtomicInteger();
+		String rawFailure = "GET https://provider.example/v1/stations?apiKey=provider-secret "
+			+ "Authorization=Bearer access-token response body={\"token\":\"body-secret\"} "
+			+ "x".repeat(1_100);
+		assertThat(rawFailure.length()).isGreaterThan(1_000);
 		JobLauncher launcher = (job, parameters) -> {
 			launchCount.incrementAndGet();
 			JobExecution execution = mock(JobExecution.class);
 			when(execution.getStatus()).thenReturn(BatchStatus.FAILED);
 			when(execution.getAllFailureExceptions())
-				.thenReturn(List.of(new IllegalStateException("loader down")));
+				.thenReturn(List.of(new IllegalStateException(rawFailure)));
 			return execution;
 		};
 		var service = new DataCollectionService(
@@ -288,9 +292,44 @@ class JdbcDataCollectionRunRepositoryTest {
 		}
 
 		assertThat(launchCount).hasValue(2);
-		assertThat(repository.loadRun("collection-jdbc-failed-2")).get()
-			.extracting(DataCollectionRun::status, DataCollectionRun::failureMessage)
-			.containsExactly(DataCollectionStatus.FAILED, "loader down");
+		DataCollectionRun failedRun = repository.loadRun("collection-jdbc-failed-2").orElseThrow();
+		assertThat(failedRun.status()).isEqualTo(DataCollectionStatus.FAILED);
+		assertThat(failedRun.failureMessage())
+			.hasSizeLessThanOrEqualTo(500)
+			.contains("보호 정책")
+			.doesNotContain(
+				"provider-secret",
+				"access-token",
+				"body-secret",
+				"apiKey",
+				"Authorization",
+				"https://",
+				"response body"
+			);
+	}
+
+	@Test
+	@DisplayName("active source 충돌이 아닌 run row integrity 오류는 원래 예외를 보존한다")
+	void saveRunPreservesNonClaimIntegrityViolation() {
+		DataCollectionRun running = runningRun("collection-integrity");
+		repository.saveRun(running);
+		DataCollectionRun invalidTerminal = new DataCollectionRun(
+			running.runId(),
+			running.source(),
+			DataCollectionStatus.FAILED,
+			running.requestedBy(),
+			running.startedAt(),
+			running.startedAt().plusMinutes(1),
+			0,
+			"x".repeat(1_001),
+			true,
+			"재실행하세요."
+		);
+
+		assertThatThrownBy(() -> repository.saveRun(invalidTerminal))
+			.isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class)
+			.isNotInstanceOf(InvalidDataCollectionException.class);
+		assertThat(repository.loadRunningRun(DataCollectionSource.TRANSIT_MASTER)).contains(running);
 	}
 
 	@Configuration

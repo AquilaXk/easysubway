@@ -11,6 +11,7 @@ import com.easysubway.collection.domain.InvalidDataCollectionException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import javax.sql.DataSource;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,7 +45,10 @@ public class JdbcDataCollectionRunRepository implements
 		try {
 			saveRunRecord(run);
 		} catch (DataIntegrityViolationException exception) {
-			throw new InvalidDataCollectionException("같은 수집 대상이 이미 실행 중입니다.", exception);
+			if (isActiveSourceConflict(exception)) {
+				throw new InvalidDataCollectionException("같은 수집 대상이 이미 실행 중입니다.", exception);
+			}
+			throw exception;
 		}
 		jdbcTemplate.update("DELETE FROM data_collection_run_steps WHERE run_id = ?", run.runId());
 		for (int index = 0; index < run.steps().size(); index++) {
@@ -75,6 +79,12 @@ public class JdbcDataCollectionRunRepository implements
 			);
 		}
 		return run;
+	}
+
+	private boolean isActiveSourceConflict(DataIntegrityViolationException exception) {
+		String message = exception.getMostSpecificCause().getMessage();
+		return message != null
+			&& message.toLowerCase(Locale.ROOT).contains("ux_data_collection_runs_active_source");
 	}
 
 	private void saveRunRecord(DataCollectionRun run) {

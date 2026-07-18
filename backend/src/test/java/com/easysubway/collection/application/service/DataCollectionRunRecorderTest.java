@@ -153,6 +153,35 @@ class DataCollectionRunRecorderTest {
 	}
 
 	@Test
+	@DisplayName("수집 실패의 URL query와 credential과 body 원문은 run과 step에 저장하지 않는다")
+	void recordTransitMasterRunSanitizesSensitiveFailureDetail() {
+		var failingRepository = new InMemoryDataCollectionRunRepository();
+		String rawFailure = "GET https://provider.example/v1/stations?apiKey=provider-secret "
+			+ "Authorization=Bearer access-token response body={\"token\":\"body-secret\"} "
+			+ "x".repeat(1_100);
+		var failingRecorder = new DataCollectionRunRecorder(
+			() -> {
+				throw new IllegalStateException(rawFailure);
+			},
+			failingRepository,
+			CLOCK
+		);
+
+		assertThatThrownBy(() -> failingRecorder.recordTransitMasterRun("collection-sensitive", "admin-user"))
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessage(rawFailure);
+
+		DataCollectionRun run = failingRepository.loadRun("collection-sensitive").orElseThrow();
+		assertThat(run.failureMessage())
+			.hasSizeLessThanOrEqualTo(500)
+			.contains("보호 정책")
+			.doesNotContain("provider-secret", "access-token", "body-secret", "https://", "response body");
+		assertThat(run.steps()).singleElement()
+			.extracting("failureMessage")
+			.isEqualTo(run.failureMessage());
+	}
+
+	@Test
 	@DisplayName("검증 실패도 실패 단계와 원인을 실행 기록에 남긴다")
 	void recordTransitMasterRunStoresFailedValidationStep() {
 		var failingRepository = new InMemoryDataCollectionRunRepository();

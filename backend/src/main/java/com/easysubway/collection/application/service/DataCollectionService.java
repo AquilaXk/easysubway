@@ -89,18 +89,18 @@ public class DataCollectionService implements DataCollectionUseCase {
 		try {
 			JobExecution execution = jobLauncher.run(transitMasterCollectionJob, parameters);
 			if (execution.getStatus() != BatchStatus.COMPLETED) {
-				String failureMessage = execution.getAllFailureExceptions().stream()
-					.map(Throwable::getMessage)
-					.filter(message -> message != null && !message.isBlank())
+				Throwable failure = execution.getAllFailureExceptions().stream()
 					.findFirst()
-					.orElse("배치 실행 상태: " + execution.getStatus());
+					.orElse(null);
+				String failureMessage = DataCollectionFailureDetailSanitizer.operatorSafe(
+					failure,
+					"배치 실행 상태: " + execution.getStatus()
+				);
 				markFailed(claimedRun, failureMessage);
 				throw new InvalidDataCollectionException("데이터 수집 배치를 실행하지 못했습니다.");
 			}
 		} catch (JobExecutionException exception) {
-			markFailed(claimedRun, exception.getMessage() == null || exception.getMessage().isBlank()
-				? exception.getClass().getSimpleName()
-				: exception.getMessage());
+			markFailed(claimedRun, DataCollectionFailureDetailSanitizer.operatorSafe(exception));
 			throw new InvalidDataCollectionException("데이터 수집 배치를 실행하지 못했습니다.", exception);
 		}
 		return loadDataCollectionRunPort.loadRun(runId)
