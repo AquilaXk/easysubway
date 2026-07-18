@@ -16538,6 +16538,53 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   assert.ok(securityPrivacyEvidence.userDataDeletionE2E.targets.includes("report photo object 삭제"));
 });
 
+test("#2272 V6-00 관리자·operator QA surface는 API catalog GET page route에 대응하고 owner를 고정한다", () => {
+  const qaSource = read("tools/qa/admin-accessibility-qa.mjs");
+
+  // API catalog의 GET page route가 정본이다. 템플릿 세그먼트({id})는 한 세그먼트 매칭으로 취급한다.
+  const catalogList = execFileSync(
+    process.execPath,
+    ["tools/ci/api-catalog.mjs", "list"],
+    { cwd: root, encoding: "utf8" },
+  );
+  const getRoutes = catalogList
+    .split("\n")
+    .filter((line) => line.startsWith("internal:GET:"))
+    .map((line) => line.split("\t")[3])
+    .filter(Boolean);
+  const routeMatchers = getRoutes.map((route) => {
+    const escaped = route
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      .replace(/\\\{[^/]+\\\}/g, "[^/]+");
+    return new RegExp(`^${escaped}$`);
+  });
+  const matchesCatalog = (url) => routeMatchers.some((matcher) => matcher.test(url));
+
+  // QA surface inventory 항목을 source에서 파싱한다(조사 수치 하드코딩 금지, source assertion).
+  const entryRegex =
+    /\{\s*url:\s*"([^"]+)",\s*name:\s*"([^"]+)",\s*archetype:\s*"([^"]+)",\s*ownerSubIssue:\s*"(V6-\d\d)",\s*permission:\s*"([^"]+)",\s*noJsPath:\s*"([^"]+)"\s*\}/g;
+  const entries = [...qaSource.matchAll(entryRegex)];
+  assert.equal(entries.length, 18, "QA surface inventory는 admin 13 + operator 5 = 18개여야 한다");
+
+  const OWNER_SUB_ISSUES = new Set(["V6-07", "V6-08", "V6-09", "V6-10"]);
+  const mismatches = [];
+  for (const [, url, , archetype, owner, permission, noJsPath] of entries) {
+    if (!matchesCatalog(url)) {
+      mismatches.push(`${url}: catalog GET page route 없음`);
+    }
+    if (!OWNER_SUB_ISSUES.has(owner)) {
+      mismatches.push(`${url}: owner=${owner} (V6-07~V6-10 아님)`);
+    }
+    if (archetype.length === 0 || permission.length === 0) {
+      mismatches.push(`${url}: archetype/permission 누락`);
+    }
+    if (noJsPath !== url) {
+      mismatches.push(`${url}: noJsPath!=url`);
+    }
+  }
+  assert.deepEqual(mismatches, [], `QA surface ↔ catalog GET page route 계약 불일치: ${mismatches.join(", ")}`);
+});
+
 test("관리자 사용자 활동 화면은 API 오류율 운영 지표를 표시한다", () => {
   const userActivityFilter = read("backend/src/main/java/com/easysubway/usage/adapter/in/web/UserActivityTrackingFilter.java");
   const summary = read("backend/src/main/java/com/easysubway/usage/domain/UserActivityDashboardSummary.java");
