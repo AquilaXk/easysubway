@@ -21,13 +21,45 @@ test("Route V2 capacity evidence는 main-only production approval을 강제한�
   assert.match(workflow, /timeout-minutes: 30/);
   assert.match(workflow, /cancel-in-progress: false/);
   assert.match(workflow, /group: production-route-v2-capacity-evidence/);
-  assert.match(workflow, /EXPECTED_DEPLOYED_SHA: \$\{\{ github\.sha \}\}/);
+  // main이 계속 전진해도 이미 배포된 candidate에 대해 capacity evidence를 돌릴 수
+  // 있도록, EXPECTED_DEPLOYED_SHA는 workflow_dispatch.inputs.deploy_sha가 지정되면
+  // 그 값을, 비어 있으면 현재 main head(github.sha)를 사용한다 — CD workflow의
+  // deploy_sha 처리(.github/workflows/cd.yml)와 동형이다.
+  assert.match(
+    workflow,
+    /deploy_sha:\n\s+description: "capacity evidence를 실행할, 이미 배포된 main 커밋 SHA\. 비우면 현재 main head\."\n\s+required: false\n\s+type: string/,
+  );
+  assert.match(
+    workflow,
+    /EXPECTED_DEPLOYED_SHA: \$\{\{ inputs\.deploy_sha != '' && inputs\.deploy_sha \|\| github\.sha \}\}/,
+  );
   assert.match(workflow, /actions\/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e/);
   assert.match(workflow, /node-version: "24"/);
   assert.match(workflow, /bash tools\/ops\/verify-production-route-v2-capacity\.sh/);
   assert.match(
     workflow,
     /if \[\[ "\$\{GITHUB_REF\}" != "refs\/heads\/main" \]\]; then\s+echo "production Route V2 capacity evidence must run from main" >&2\s+exit 1\s+fi/,
+  );
+  // 임의 SHA나 미병합 커밋으로 capacity evidence를 돌리지 못하도록, 체크아웃
+  // 직후 지정된 SHA가 origin/main의 ancestor인지 검증하고 나서야 그 SHA로
+  // working tree를 옮긴다. fetch-depth: 0이 없으면 merge-base가 얕은 클론에서
+  // 실패하므로 함께 고정한다.
+  assert.match(workflow, /fetch-depth: 0/);
+  assert.match(workflow, /name: Verify deploy SHA is an ancestor of main/);
+  assert.match(
+    workflow,
+    /if \[\[ ! "\$\{EXPECTED_DEPLOYED_SHA\}" =~ \^\[0-9a-f\]\{40\}\$ \]\]; then\s+echo "invalid deploy sha: \$\{EXPECTED_DEPLOYED_SHA\}" >&2\s+exit 1\s+fi/,
+  );
+  assert.match(workflow, /git fetch origin main/);
+  assert.match(
+    workflow,
+    /if ! git merge-base --is-ancestor "\$\{EXPECTED_DEPLOYED_SHA\}" origin\/main; then\s+echo "deploy target is not on origin\/main: \$\{EXPECTED_DEPLOYED_SHA\}" >&2\s+exit 1\s+fi/,
+  );
+  assert.match(workflow, /git checkout --detach "\$\{EXPECTED_DEPLOYED_SHA\}"/);
+  // ancestor 검증 스텝은 checkout 다음, Node.js 설정 이전에 실행돼야 이후
+  // 스텝이 올바른 candidate SHA의 트리 내용을 사용한다.
+  assert.ok(
+    workflow.indexOf("Verify deploy SHA is an ancestor of main") < workflow.indexOf("Set up Node.js"),
   );
 });
 

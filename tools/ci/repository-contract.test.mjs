@@ -12240,6 +12240,7 @@ test("관리자 플랫폼 전환 계약은 shadow rollout과 legacy fallback 제
     "backend/src/main/resources/db/migration/postgresql/V12__admin_batch_operation_permission.sql",
     "backend/src/main/resources/db/migration/postgresql/V13__admin_common_code_incident.sql",
     "backend/src/main/resources/db/migration/postgresql/V15__admin_report_photo_read_permission.sql",
+    "backend/src/main/resources/db/migration/postgresql/V63__admin_batch_run_permission.sql",
   ].map(read).join("\n");
   const h2AdminMigrations = [
     "backend/src/main/resources/db/migration/h2/V10__admin_rbac_menu.sql",
@@ -12247,6 +12248,7 @@ test("관리자 플랫폼 전환 계약은 shadow rollout과 legacy fallback 제
     "backend/src/main/resources/db/migration/h2/V12__admin_batch_operation_permission.sql",
     "backend/src/main/resources/db/migration/h2/V13__admin_common_code_incident.sql",
     "backend/src/main/resources/db/migration/h2/V15__admin_report_photo_read_permission.sql",
+    "backend/src/main/resources/db/migration/h2/V63__admin_batch_run_permission.sql",
   ].map(read).join("\n");
 
   assert.match(applicationYml, /platform-transition:\s*\n\s*stage: \$\{EASYSUBWAY_ADMIN_PLATFORM_TRANSITION_STAGE:shadow\}/);
@@ -12302,6 +12304,7 @@ test("관리자 플랫폼 전환 계약은 shadow rollout과 legacy fallback 제
     "admin.security.admin",
     "admin.audit.read",
     "admin.privacy-log.read",
+    "admin.batch.run",
     "admin.batch.retry",
     "admin.operations.manage",
   ]) {
@@ -13960,6 +13963,16 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   const collectionRunStepsPostgresSchema = read(
     "backend/src/main/resources/db/migration/postgresql/V8__data_collection_run_steps.sql",
   );
+  const batchRunPostgresSchema = read(
+    "backend/src/main/resources/db/migration/postgresql/V63__admin_batch_run_permission.sql",
+  );
+  const batchRunPostgresIndex = read(
+    "backend/src/main/resources/db/migration/postgresql/V64__data_collection_active_source_index.sql",
+  );
+  const batchRunH2Schema = read(
+    "backend/src/main/resources/db/migration/h2/V63__admin_batch_run_permission.sql",
+  );
+  const batchRunPreflight = read("tools/ops/admin-batch-run-v63-preflight.sql");
   const run = read("backend/src/main/java/com/easysubway/collection/domain/DataCollectionRun.java");
   const runStep = read("backend/src/main/java/com/easysubway/collection/domain/DataCollectionRunStep.java");
   const stepStatus = read("backend/src/main/java/com/easysubway/collection/domain/DataCollectionStepStatus.java");
@@ -13977,6 +13990,9 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
     "backend/src/main/java/com/easysubway/collection/application/port/out/TransitMasterCollectionSnapshot.java",
   );
   const service = read("backend/src/main/java/com/easysubway/collection/application/service/DataCollectionService.java");
+  const failureDetailSanitizer = read(
+    "backend/src/main/java/com/easysubway/collection/application/service/DataCollectionFailureDetailSanitizer.java",
+  );
   const recorder = read("backend/src/main/java/com/easysubway/collection/application/service/DataCollectionRunRecorder.java");
   const sourceAdapter = read(
     "backend/src/main/java/com/easysubway/collection/adapter/out/source/LoadedTransitMasterCollectionSourceAdapter.java",
@@ -14019,6 +14035,31 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   assert.match(batchPostgresSchema, /ALTER TABLE data_collection_runs[\s\S]*ADD COLUMN IF NOT EXISTS retryable BOOLEAN NOT NULL DEFAULT FALSE/);
   assert.match(batchPostgresSchema, /ALTER TABLE data_collection_runs[\s\S]*ADD COLUMN IF NOT EXISTS operator_action VARCHAR\(500\) NOT NULL DEFAULT/);
   assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_data_collection_runs_started_at/);
+  for (const batchRunSchema of [batchRunPostgresSchema, batchRunH2Schema]) {
+    assert.match(batchRunSchema, /ADD COLUMN active_source VARCHAR\(40\)/);
+    assert.match(batchRunSchema, /admin\.batch\.run/);
+  }
+  assert.doesNotMatch(batchRunPostgresSchema, /CREATE (?:UNIQUE )?INDEX/);
+  assert.match(batchRunPostgresIndex, /LOCK TABLE data_collection_runs IN SHARE ROW EXCLUSIVE MODE/);
+  assert.match(batchRunPostgresIndex, /DROP INDEX IF EXISTS ux_data_collection_runs_running_source/);
+  assert.match(batchRunPostgresIndex, /V64 migration blocked: duplicate RUNNING/);
+  assert.match(
+    batchRunPostgresIndex,
+    /CREATE UNIQUE INDEX ux_data_collection_runs_running_source/,
+  );
+  assert.doesNotMatch(batchRunPostgresIndex, /CONCURRENTLY/);
+  assert.match(batchRunPostgresIndex, /ON data_collection_runs \(source\)/);
+  assert.match(batchRunPostgresIndex, /WHERE status = 'RUNNING'/);
+  assert.match(batchRunH2Schema, /CREATE UNIQUE INDEX ux_data_collection_runs_active_source/);
+  assert.match(batchRunPreflight, /WHERE status = 'RUNNING'/);
+  assert.match(batchRunPreflight, /GROUP BY source/);
+  assert.match(batchRunPreflight, /HAVING COUNT\(\*\) > 1/);
+  assert.match(batchRunPreflight, /V63 preflight blocked: duplicate RUNNING/);
+  assert.match(batchRunPreflight, /performs no updates/);
+  assert.doesNotMatch(
+    batchRunPreflight,
+    /\b(?:UPDATE|DELETE|INSERT|ALTER|CREATE|DROP|TRUNCATE|MERGE)\b/i,
+  );
   assert.match(run, /record DataCollectionRun/);
   assert.match(run, /requestedBy/);
   assert.match(run, /collectedCount/);
@@ -14059,7 +14100,12 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   assert.match(sourceSnapshot, /checksum/);
   assert.match(service, /implements DataCollectionUseCase/);
   assert.match(service, /JobLauncher/);
+  assert.match(service, /ORPHANED_RUN_AFTER = Duration\.ofHours\(24\)/);
+  assert.match(service, /failOrphanedRunningRun/);
   assert.match(service, /transitMasterCollectionJob/);
+  assert.match(service, /execution\.getStatus\(\) != BatchStatus\.COMPLETED/);
+  assert.match(service, /execution\.getAllFailureExceptions\(\)/);
+  assert.match(service, /DataCollectionFailureDetailSanitizer\.operatorSafe/);
   assert.match(service, /InvalidDataCollectionException\("데이터 수집 배치를 실행하지 못했습니다\.", exception\)/);
   assert.match(service, /loadRun\(runId\)/);
   assert.match(service, /loadLatestCompletedRun\(source\)/);
@@ -14073,6 +14119,7 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   assert.match(recorder, /"STAGE"/);
   assert.match(recorder, /MANUAL_REQUIRED/);
   assert.match(recorder, /catch \(RuntimeException exception\)/);
+  assert.match(recorder, /DataCollectionFailureDetailSanitizer\.operatorSafe/);
   assert.match(recorder, /DataCollectionStatus\.FAILED/);
   assert.match(recorder, /COMPLETED_OPERATOR_ACTION/);
   assert.match(recorder, /FAILED_OPERATOR_ACTION/);
@@ -14089,6 +14136,14 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   assert.match(jdbcRepository, /@Profile\("prod \| staging \| release \| prod-like"\)/);
   assert.match(jdbcRepository, /implements[\s\S]*LoadDataCollectionRunPort[\s\S]*SaveDataCollectionRunPort/);
   assert.match(jdbcRepository, /JdbcTemplate/);
+  assert.match(jdbcRepository, /@Transactional[\s\S]*saveRun\(DataCollectionRun run\)/);
+  assert.match(jdbcRepository, /isActiveSourceConflict/);
+  assert.match(jdbcRepository, /BATCH_JOB_EXECUTION_PARAMS/);
+  assert.match(jdbcRepository, /STARTING', 'STARTED', 'STOPPING', 'UNKNOWN/);
+  assert.match(jdbcRepository, /COALESCE\(execution\.LAST_UPDATED, execution\.START_TIME, execution\.CREATE_TIME\)/);
+  assert.match(jdbcRepository, /ux_data_collection_runs_active_source/);
+  assert.match(jdbcRepository, /ux_data_collection_runs_running_source/);
+  assert.match(jdbcRepository, /throw exception/);
   assert.match(jdbcRepository, /INSERT INTO data_collection_runs/);
   assert.match(jdbcRepository, /INSERT INTO data_collection_run_steps/);
   assert.match(jdbcRepository, /DELETE FROM data_collection_run_steps WHERE run_id = \?/);
@@ -14097,6 +14152,14 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   assert.match(jdbcRepository, /WHERE source = \?/);
   assert.match(jdbcRepository, /ORDER BY completed_at DESC, run_id DESC/);
   assert.match(jdbcRepository, /ORDER BY started_at DESC, run_id DESC/);
+  assert.match(failureDetailSanitizer, /MAX_LENGTH = 500/);
+  assert.match(failureDetailSanitizer, /operatorSafe\(Throwable failure, BatchStatus status\)/);
+  assert.match(failureDetailSanitizer, /failure\.getClass\(\)\.getSimpleName\(\)/);
+  assert.match(failureDetailSanitizer, /BatchStatus\./);
+  assert.match(failureDetailSanitizer, /보호 정책에 따라 생략되었습니다/);
+  assert.doesNotMatch(failureDetailSanitizer, /failure\.getMessage\(\)/);
+  assert.doesNotMatch(failureDetailSanitizer, /Pattern|URL_QUERY|CREDENTIAL|AUTHORIZATION_VALUE|RAW_BODY/);
+  assert.doesNotMatch(failureDetailSanitizer, /normalize|truncate/);
   assert.match(controller, /@GetMapping\("\/admin\/data-sources"\)/);
   assert.match(controller, /@PostMapping\("\/admin\/data-sources\/\{dataSourceId\}\/sync"\)/);
   assert.match(controller, /dataCollectionSource\(String dataSourceId\)/);
@@ -16115,6 +16178,7 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
     read("backend/src/main/resources/db/migration/postgresql/V13__admin_common_code_incident.sql"),
     read("backend/src/main/resources/db/migration/postgresql/V15__admin_report_photo_read_permission.sql"),
     read("backend/src/main/resources/db/migration/postgresql/V22__datapack_admin_permissions.sql"),
+    read("backend/src/main/resources/db/migration/postgresql/V63__admin_batch_run_permission.sql"),
   ].join("\n");
   const adminRbacH2Schema = [
     read("backend/src/main/resources/db/migration/h2/V10__admin_rbac_menu.sql"),
@@ -16123,6 +16187,7 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
     read("backend/src/main/resources/db/migration/h2/V13__admin_common_code_incident.sql"),
     read("backend/src/main/resources/db/migration/h2/V15__admin_report_photo_read_permission.sql"),
     read("backend/src/main/resources/db/migration/h2/V22__datapack_admin_permissions.sql"),
+    read("backend/src/main/resources/db/migration/h2/V63__admin_batch_run_permission.sql"),
   ].join("\n");
   const adminProgramRegistry = read("backend/src/main/java/com/easysubway/admin/navigation/AdminProgram.java");
   const adminPermission = read("backend/src/main/java/com/easysubway/admin/authorization/AdminPermission.java");
@@ -16328,6 +16393,7 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
     "admin.security.admin",
     "admin.audit.read",
     "admin.privacy-log.read",
+    "admin.batch.run",
     "admin.batch.retry",
     "admin.operations.manage",
     "admin.datapack.read",

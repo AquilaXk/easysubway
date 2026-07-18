@@ -17,9 +17,8 @@
 	<header class="admin-page-head">
 		<div>
 			<h1>통합 대시보드</h1>
-			<p>지금 급한 것 → 추세 → 상세 순으로 신고·시설·경로·알림·시스템을 모읍니다.</p>
 		</div>
-		<div class="admin-actions">
+		<div class="admin-actions admin-dashboard-snapshot-actions">
 			<span th:if="${snapshotStatus == null}" class="admin-status warn">지표 집계 대기</span>
 			<span th:if="${snapshotStatus != null and snapshotStatus.success}" class="admin-status good">지표 집계 정상</span>
 			<span th:if="${snapshotStatus != null and !snapshotStatus.success}" class="admin-status bad">지표 집계 실패</span>
