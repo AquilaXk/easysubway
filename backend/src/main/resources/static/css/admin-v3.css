@@ -432,7 +432,8 @@ body.admin-v3 {
 
 .admin-table-scroll {
 	max-width: 100%;
-	overflow-x: auto;
+	max-block-size: min(70vh, 640px);
+	overflow: auto;
 	overscroll-behavior-inline: contain;
 	scrollbar-gutter: stable;
 	isolation: isolate;
@@ -1719,7 +1720,7 @@ body.admin-v3 {
 	}
 }
 
-/* ≤768px: 표준 테이블 밀도를 좁힌다(가로 스크롤은 table min-width + section overflow-x가 담당). */
+/* ≤768px: 표준 테이블 밀도를 좁힌다(table min-width + admin-table-scroll이 scroll을 담당). */
 @media (max-width: 768px) {
 	.admin-v3 th,
 	.admin-v3 td {

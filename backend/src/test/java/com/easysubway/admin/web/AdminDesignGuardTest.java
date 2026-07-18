@@ -232,7 +232,8 @@ class AdminDesignGuardTest {
 
 		assertThat(css)
 			.contains(".admin-table-scroll {")
-			.contains("overflow-x: auto;")
+			.contains("max-block-size: min(70vh, 640px);")
+			.contains("overflow: auto;")
 			.contains(".admin-v3 .admin-table-scroll:focus-visible {")
 			.contains(".admin-table-scroll th:first-child,")
 			.contains(".admin-table-scroll td:first-child:not([colspan]) {")
