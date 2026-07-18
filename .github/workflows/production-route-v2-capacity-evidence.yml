@@ -2,6 +2,11 @@ name: Production Route V2 capacity evidence
 
 on:
   workflow_dispatch:
+    inputs:
+      deploy_sha:
+        description: "capacity evidence를 실행할, 이미 배포된 main 커밋 SHA. 비우면 현재 main head."
+        required: false
+        type: string
 
 jobs:
   verify:
@@ -18,7 +23,7 @@ jobs:
       cancel-in-progress: false
     env:
       DEPLOY_ROOT: ${{ vars.DEPLOY_ROOT }}
-      EXPECTED_DEPLOYED_SHA: ${{ github.sha }}
+      EXPECTED_DEPLOYED_SHA: ${{ inputs.deploy_sha != '' && inputs.deploy_sha || github.sha }}
 
     steps:
       - name: Reject non-main manual execution
@@ -32,7 +37,23 @@ jobs:
       - name: Checkout reviewed main
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
+          fetch-depth: 0
           persist-credentials: false
+
+      - name: Verify deploy SHA is an ancestor of main
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "${EXPECTED_DEPLOYED_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "invalid deploy sha: ${EXPECTED_DEPLOYED_SHA}" >&2
+            exit 1
+          fi
+          git fetch origin main
+          if ! git merge-base --is-ancestor "${EXPECTED_DEPLOYED_SHA}" origin/main; then
+            echo "deploy target is not on origin/main: ${EXPECTED_DEPLOYED_SHA}" >&2
+            exit 1
+          fi
+          git checkout --detach "${EXPECTED_DEPLOYED_SHA}"
 
       - name: Set up Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
