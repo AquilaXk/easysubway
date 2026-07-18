@@ -757,7 +757,6 @@
         "backend/src/main/java/com/easysubway/common/web/CommonExceptionHandler.java",
         "backend/src/main/java/com/easysubway/usage/adapter/in/web/UserActivityTrackingFilter.java",
         "backend/src/main/java/com/easysubway/usage/adapter/out/persistence/JdbcUserActivityRepository.java",
-        "backend/src/main/java/com/easysubway/notification/adapter/in/scheduler/PushNotificationDeliveryScheduler.java",
         "backend/src/main/java/com/easysubway/report/application/service/FacilityReportService.java"
       ],
       "lastVerifiedAt": "2026-06-19",
