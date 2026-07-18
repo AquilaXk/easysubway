@@ -221,6 +221,66 @@ class DataCollectionServiceTest {
 				.containsExactly("FETCH", DataCollectionStepStatus.FAILED));
 	}
 
+	@Test
+	@DisplayName("recorder 완료 뒤 JobExecution 실패는 단계 이력을 보존한 FAILED로 정합화한다")
+	void failedJobExecutionReconcilesRecordedCompletedRun() {
+		var repository = new InMemoryDataCollectionRunRepository();
+		JobLauncher launcher = (job, parameters) -> {
+			String runId = parameters.getString("runId");
+			repository.saveRun(new DataCollectionRun(
+				runId,
+				DataCollectionSource.TRANSIT_MASTER,
+				DataCollectionStatus.COMPLETED,
+				"admin-user",
+				LocalDateTime.of(2026, 7, 18, 12, 0),
+				LocalDateTime.of(2026, 7, 18, 12, 1),
+				7,
+				null,
+				false,
+				"수집이 완료되었습니다.",
+				List.of(new DataCollectionRunStep(
+					"FETCH",
+					DataCollectionStepStatus.COMPLETED,
+					null,
+					null,
+					null,
+					7,
+					null
+				))
+			));
+			JobExecution execution = mock(JobExecution.class);
+			org.mockito.Mockito.when(execution.getStatus()).thenReturn(BatchStatus.FAILED);
+			org.mockito.Mockito.when(execution.getAllFailureExceptions())
+				.thenReturn(List.of(new IllegalStateException("raw listener failure")));
+			return execution;
+		};
+		var service = new DataCollectionService(
+			repository,
+			repository,
+			() -> "collection-recorded-completed",
+			launcher,
+			mock(Job.class)
+		);
+
+		assertThatThrownBy(() -> service.runCollection(
+			new RunDataCollectionCommand(DataCollectionSource.TRANSIT_MASTER, "admin-user")
+		))
+			.isInstanceOf(InvalidDataCollectionException.class)
+			.hasMessage("데이터 수집 배치를 실행하지 못했습니다.");
+
+		assertThat(repository.loadRun("collection-recorded-completed")).get()
+			.satisfies(run -> {
+				assertThat(run.status()).isEqualTo(DataCollectionStatus.FAILED);
+				assertThat(run.collectedCount()).isEqualTo(7);
+				assertThat(run.failureMessage())
+					.contains("IllegalStateException", "보호 정책")
+					.doesNotContain("raw listener failure");
+				assertThat(run.steps()).singleElement()
+					.extracting(DataCollectionRunStep::name, DataCollectionRunStep::status)
+					.containsExactly("FETCH", DataCollectionStepStatus.COMPLETED);
+			});
+	}
+
 	private static DataCollectionRun runningRun(String runId) {
 		return new DataCollectionRun(
 			runId,

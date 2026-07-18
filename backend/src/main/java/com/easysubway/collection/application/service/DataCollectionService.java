@@ -112,11 +112,11 @@ public class DataCollectionService implements DataCollectionUseCase {
 	}
 
 	private void markFailedUnlessRecorded(DataCollectionRun claimedRun, String failureMessage) {
-		Optional<DataCollectionRun> recorded = loadDataCollectionRunPort.loadRun(claimedRun.runId());
-		if (recorded.isPresent() && recorded.get().status() != DataCollectionStatus.RUNNING) {
+		DataCollectionRun recorded = loadDataCollectionRunPort.loadRun(claimedRun.runId()).orElse(claimedRun);
+		if (recorded.status() == DataCollectionStatus.FAILED) {
 			return;
 		}
-		markFailed(claimedRun, failureMessage);
+		markFailed(recorded, failureMessage);
 	}
 
 	private void markFailed(DataCollectionRun claimedRun, String failureMessage) {
@@ -127,10 +127,11 @@ public class DataCollectionService implements DataCollectionUseCase {
 			claimedRun.requestedBy(),
 			claimedRun.startedAt(),
 			LocalDateTime.now(),
-			0,
+			claimedRun.collectedCount(),
 			failureMessage,
 			true,
-			"일시 오류일 수 있습니다. 실패 사유를 확인한 뒤 같은 수집 대상을 다시 실행하세요."
+			"일시 오류일 수 있습니다. 실패 사유를 확인한 뒤 같은 수집 대상을 다시 실행하세요.",
+			claimedRun.steps()
 		));
 	}
 }
