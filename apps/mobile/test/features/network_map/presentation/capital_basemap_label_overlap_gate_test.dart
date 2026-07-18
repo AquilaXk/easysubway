@@ -164,7 +164,22 @@ Size _measureBadge(String text, {required double fontSize}) =>
 // 하드 케이스). 라벨-표장(KTX/SRT/AIR chip) 하드 0 게이트도 이 패스에서
 // 밀린 신길·강남대(라운드 4~5 공통 재발 패턴)를 재넛지해 0 유지.
 // baseline을 원래 값(1)으로 되돌린다(악화 아님 — 조사 6·8과 동일 수준 복귀).
-const int kCapitalBasemapLabelLabelPairBaseline = 1;
+//
+// 조사 11(#2068 오너 기준본 전환, 2026-07-19): 오너 결정으로 라운드 2~5
+// 산출물을 전부 폐기하고 오너가 손수 다듬은 새 SVG(viewBox 3800×3020,
+// 이전 v2와 좌표계 전혀 다름)를 새 정본으로 삼았다 — 조사 1~10의 baseline은
+// 전부 옛 소스 기준이라 무효. 새 소스 위에서: (a) 간선을 오너 배치 존중
+// 최소침습 다듬기(run 투영 tolerance 18px, 역 재배치 없음)로 8선형 118→3·
+// 노드-간선 15→0(6호선 응암 인근 3건 서브px 예외), (b) compile-basemap-vec.mjs
+// 의 실측 버그 2건 수정(parseTranslate가 체인 translate 첫 개만 읽던 것 —
+// .matchAll 합산으로 수정; station-label-group 감싸 그룹의 transform을 못
+// 읽던 것 — 512자 이내 최근접 그룹 탐지로 수정. 두 버그로 오너 매치율이
+// 650→185까지 붕괴했었다가 652로 복구), (c) 위 두 수정 후 라벨 위치가
+// 정확해지며 라벨-라벨 겹침이 새 소스 기준 실측 7쌍으로 확정된다(조사 6
+// 방식의 국소 라벨 재배치는 오너의 "필수만" 스코프 조정 지시로 이번 라운드
+// 에서는 하지 않음 — 손질 추천 목록에 남긴다). baseline을 새 소스 실측값
+// 7로 재설정한다(옛 소스의 "1"과 비교 불가 — 좌표계 자체가 다른 새 기준선).
+const int kCapitalBasemapLabelLabelPairBaseline = 7;
 
 bool _rectOverlaps(Rect a, Rect b) {
   final o = a.intersect(b);

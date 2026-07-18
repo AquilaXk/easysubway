@@ -1,9 +1,43 @@
+import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vector_graphics/vector_graphics.dart';
 
 import '../../../support/pretendard_test_font.dart';
+
+// #2068 오너 기준본 전환(2026-07-19) 근본 원인 수정: 이 게이트는 seoul.vec
+// 좌표를 "로컬 → 렌더" 재계산할 때 scale 레이어(id="main-map-scaled-layer")의
+// translate를 써야 하는데, 예전에는 소스 SVG(구 v2)가 항상
+// translate(70,138)이라 하드코딩해 왔다. 오너 새 SVG(viewBox 3800×3020)는
+// translate(757.0146 664.5656)로 바뀌었는데 하드코딩은 그대로 남아, 연천·
+// 신창 종점 배지 샘플링 창이 실제 배지 위치에서 render 공간으로 약
+// (687,527)px나 벗어나 잉크가 전혀 안 잡혔다(cnt=0) — compile-basemap-vec.mjs
+// 는 소스 SVG의 실제 transform을 그대로 컴파일 산출물에 굽기 때문에, 배지
+// 자체는 항상 정상 위치에 그려지고 있었다(기능 결함 아님, 테스트만 어긋남).
+// 매번 하드코딩을 갱신하는 대신, 컴파일러와 동일한 정규식으로 소스 SVG에서
+// 직접 파싱해 앞으로 소스가 또 바뀌어도 이 게이트가 저절로 따라가게 한다.
+({double tx, double ty}) _seoulScaleLayerTranslate() {
+  final svg = File(
+    '../../tools/route-map/route-map-defs/svg-sources/easy-subway-sma-v2.svg',
+  ).readAsStringSync();
+  final groupMatch = RegExp(
+    r'<g\b(?=[^>]*\bid="main-map-scaled-layer")(?=[^>]*\btransform="([^"]+)")[^>]*>',
+  ).firstMatch(svg);
+  if (groupMatch == null) {
+    throw StateError('main-map-scaled-layer transform을 소스 SVG에서 못 찾음');
+  }
+  final transformValue = groupMatch.group(1)!;
+  final translateMatches = RegExp(
+    r'translate\(\s*(-?[\d.]+)[,\s]+(-?[\d.]+)\s*\)',
+  ).allMatches(transformValue);
+  double dx = 0, dy = 0;
+  for (final m in translateMatches) {
+    dx += double.parse(m.group(1)!);
+    dy += double.parse(m.group(2)!);
+  }
+  return (tx: dx, ty: dy);
+}
 
 // #2068 배지 텍스트 세로 중심 게이트 (전 권역, 컴파일 .vec 픽셀 실측).
 //
@@ -58,17 +92,23 @@ class _Badge {
 //
 // 정상(비반전) 종점 숫자 배지: 오차 ≤ fontSize의 5%(task 기준). 실측 ~2~3%.
 // 마곡 반전 배지(수정본): 원 반경 마스크로 캡슐 흰 링을 배제한 잉크 centroid.
-// 실측 9=+0.047, 공항=-0.017. 상한 0.12(글리프 잉크 비대칭 여유)로 두어 오너가
-// 반려한 '원 하단/밖 이탈'(반전 버그 재발 시 ratio ≳ 0.5)을 확실히 잡는다.
-// seoul 좌표는 scale(0.455)+translate(70,138) 적용 전 로컬, 마곡 좌표는
-// rotate(180,1268.3843,1433.5031) 적용 후 렌더 로컬.
+// 상한 0.12(글리프 잉크 비대칭 여유)로 두어 오너가 반려한 '원 하단/밖 이탈'
+// (반전 버그 재발 시 ratio ≳ 0.5)을 확실히 잡는다.
+// seoul 좌표는 scale(0.455)+translate(757.0146,664.5656) 적용 전 로컬(오너
+// 기준본 viewBox 3800×3020 — 구 v2의 2400×1860과 좌표계 전혀 다름).
+//
+// #2068 오너 기준본 전환(2026-07-19): 라운드 2~5 산출물(구 v2 좌표계) 전부
+// 폐기, 새 SVG의 실제 badge 좌표로 재실측(line-terminal-badge-1-연천·
+// line-terminal-badge-9-개화 — 새로 이식한 종점 마크; transfer-station-badge
+// -마곡나루-9호선-1/공항철도-2 — 오너 원본에 이미 있던 scale(-1) 반전 패턴,
+// 구 마곡나루 버그와 동일 위험군이라 그대로 회귀 가드 대상으로 유지).
 const _badges = <_Badge>[
-  // 수도권 레퍼런스 종점 숫자(비반전).
+  // 수도권 레퍼런스 종점 숫자(비반전) — 이식한 종점 마크(line-terminal-badge).
   _Badge(
-    'seoul 종점1(흰)',
+    'seoul 종점1(흰, 신창)',
     'seoul',
-    1535.7,
-    2563.0,
+    6090.013,
+    4404.871,
     22.5,
     19.5,
     true,
@@ -76,30 +116,22 @@ const _badges = <_Badge>[
     0.05,
   ),
   _Badge(
-    'seoul 종점9(어두움)',
+    'seoul 종점9(어두움, 개화)',
     'seoul',
-    1024.5,
-    1282.8,
+    -181.282,
+    696.156,
     22.5,
     19.5,
     false,
     0.455,
     0.05,
   ),
-  // 수도권 마곡 환승 배지(반전, 수정 대상).
-  // #2068 유클리드 재간격(간격 패스 3라운드)으로 마곡나루 캡슐이
-  // translate(86.862,-55.908)만큼 이동(간격 정합 패스, 신방화/가양/증미
-  // 인접 붕괴 해소) — rotate 적용 후 로컬 좌표에 동일 델타를 가산.
-  //
-  // #2068 라운드 4(8선형 run 재작도)로 마곡나루가 렌더 공간에서 추가로
-  // (0,-16)px 이동(실측: route_map_positions HEAD (694,768)→라운드4
-  // (694,752)). local delta = 16/0.455 ≈ 35.1648(scale 0.455 역산) — 회전
-  // 180° 후 로컬 좌표에서 cy만 감소(cx는 dx=0이라 불변).
+  // 수도권 마곡 환승 배지(반전, 오너 원본 구조 — transform="scale(-1)").
   _Badge(
     'seoul 마곡9(반전)',
     'seoul',
-    1371.6535,
-    1363.6164,
+    366.0363,
+    1013.626,
     18,
     12,
     true,
@@ -109,8 +141,8 @@ const _badges = <_Badge>[
   _Badge(
     'seoul 마곡공항(반전)',
     'seoul',
-    1371.6535,
-    1337.0665,
+    339.4864,
+    1013.6261,
     10.3,
     12,
     true,
@@ -137,11 +169,12 @@ void main() {
       }
 
       const double s = 24.0;
+      final seoulTranslate = _seoulScaleLayerTranslate();
       final failures = <String>[];
       for (final b in _badges) {
         final picture = pictures[b.region]!;
-        final tx = b.region == 'seoul' ? 70.0 : 0.0;
-        final ty = b.region == 'seoul' ? 138.0 : 0.0;
+        final tx = b.region == 'seoul' ? seoulTranslate.tx : 0.0;
+        final ty = b.region == 'seoul' ? seoulTranslate.ty : 0.0;
         final cx = tx + b.k * b.cx;
         final cy = ty + b.k * b.cy;
         final discRpx = b.discR * b.k * s;

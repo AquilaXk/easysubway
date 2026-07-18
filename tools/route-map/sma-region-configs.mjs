@@ -82,7 +82,12 @@ const SEOUL = {
     if (svgName === "이수") return { name: "총신대입구" };
     return { name: svgName };
   },
-  contentBand: { minY: 340, maxY: 1720 },
+  // #2068 오너 기준본 전환(2026-07-19): 오너 v2.1은 viewBox 3800×3020(구 v2는
+  // 2400×1860)으로 캔버스 자체가 커져, 구 하드코딩(340~1720)이 실제 콘텐츠
+  // 대부분(역 y 실측 범위 334~2852)을 "범례 밖"으로 오판해 5개 노선의 stroke를
+  // 통째로 누락시켰다(build-sma-tracks.mjs 실측 — "SVG stroke 없음" 경고).
+  // 새 캔버스의 실제 역 y 범위(334~2852)에 여유를 두고 재설정한다.
+  contentBand: { minY: 300, maxY: 2900 },
 };
 
 // ── 부산(busan): #2011 2단계. 오너 자작 easy-subway-busan-v1. ─────────────────

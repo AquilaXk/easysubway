@@ -359,14 +359,26 @@ function roundCoord(value) {
 // 에서만 온다 — 클래스 규칙을 role별로 미리 읽어 인라인 속성이 없을 때 쓴다.
 const ownerLabelRoles = ["ordinary", "transfer", "terminal"];
 
+// #2068 오너 기준본 전환(2026-07-19) 실측 버그 수정: transform 속성에 여러
+// translate(...)가 공백으로 이어 붙은 체인(예: 반복 패치가 누적된
+// "translate(a,b) translate(c,d) translate(e,f)")이면 SVG 의미상 전부
+// 합산돼야 하는데, .match()는 첫 translate 하나만 읽고 나머지를 버렸다 —
+// 라벨 위치가 실제와 크게 어긋나(원종 등 다수가 같은 좌표 근처로 뭉침)
+// 오너 라벨 매치율이 650→185로 붕괴하는 회귀를 실측으로 잡았다. .matchAll()
+// 로 전부 찾아 합산한다(단순 translate만 조합되는 한 순서 무관하게 합이
+// 곧 최종 오프셋 — rotate/scale이 섞이면 이 근사가 깨지지만, 라벨 transform은
+// 실측상 translate만 쌓인다).
 function parseTranslate(transformValue) {
   if (!transformValue) return { dx: 0, dy: 0 };
-  const match = transformValue.match(
-    /translate\(\s*(-?[\d.]+)[,\s]+(-?[\d.]+)\s*\)/,
-  );
-  return match
-    ? { dx: Number(match[1]), dy: Number(match[2]) }
-    : { dx: 0, dy: 0 };
+  const matches = [...transformValue.matchAll(/translate\(\s*(-?[\d.]+)[,\s]+(-?[\d.]+)\s*\)/g)];
+  if (matches.length === 0) return { dx: 0, dy: 0 };
+  let dx = 0;
+  let dy = 0;
+  for (const m of matches) {
+    dx += Number(m[1]);
+    dy += Number(m[2]);
+  }
+  return { dx, dy };
 }
 
 function firstAttr(tag, name) {
@@ -1094,8 +1106,18 @@ export function extractOwnerLabels(svgText, regionId) {
     "g",
   );
   for (const match of svgText.matchAll(textRe)) {
+    // #2068 오너 기준본 전환(2026-07-19) 실측 버그 수정: 오너 v2.1 일부 라벨은
+    // data-label-role이 <text> 자신에 있지만(이 정규식 경로), 그 <text>가
+    // <g id="station-label-group-<name>" transform="...">로 한 겹 더 감싸여
+    // 있다(수도권 기존 관례에 없던 패턴 — 인천1·2호선 다수). 이 그룹 변환을
+    // 못 읽으면 라벨이 station-label-group의 transform만큼(관측 최대
+    // 500px대) 엉뚱한 곳에 앉아 오너 매치율이 붕괴한다(실측: 601/656 중
+    // 다수가 이 패턴). 매치 직전 512자 이내에서 가장 가까운
+    // station-label-group 열림 태그를 찾아 감싸는지 확인한다.
+    const before = svgText.slice(Math.max(0, match.index - 512), match.index);
+    const wrapMatch = before.match(/<g\b[^>]*\bid="station-label-group-[^"]*"[^>]*>\s*$/);
     const entry = ownerLabelEntryFrom(
-      null,
+      wrapMatch ? wrapMatch[0] : null,
       match[0],
       match[1],
       mapScale,

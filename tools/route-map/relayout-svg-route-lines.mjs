@@ -1007,6 +1007,8 @@ function parseArgs(argv) {
     filletRadius: 6,
     runTolerance: DEFAULT_RUN_TOLERANCE_PX,
     minNodeClearance: DEFAULT_MIN_NODE_CLEARANCE_PX,
+    censusHardGate: true,
+    applyStationFixups: true,
   };
   for (let i = 0; i < argv.length; i += 1) {
     switch (argv[i]) {
@@ -1019,6 +1021,17 @@ function parseArgs(argv) {
       case "--fillet-radius": o.filletRadius = Number(argv[++i]); break;
       case "--run-tolerance": o.runTolerance = Number(argv[++i]); break;
       case "--min-node-clearance": o.minNodeClearance = Number(argv[++i]); break;
+      // #2068 오너 결정(2026-07-19): 오너 손수 다듬기 기준본 위에서는 census가
+      // 하드 게이트가 아니라 보고 항목이다("위반이 나와도 역을 옮기지 말고
+      // 수치만 보고") — 이 플래그로 안전망(reactive revert)을 끄면 run
+      // 투영·미세정렬 결과가 그대로 유지되고, census는 별도로 측정만 한다.
+      case "--no-census-hard-gate": o.censusHardGate = false; break;
+      // #2068 오너 결정(2026-07-19): "오너 손수 기준본 다듬기" 모드 — run
+      // 투영·필렛(자연스러운 8방향 스냅)만 적용하고, 겹침/직선여유를 위해
+      // 역을 추가로 밀어내는 능동적 재배치(resolveOverlapsByMovingStations·
+      // resolveNodeClearanceByMicroAlign)는 건드리지 않는다(오너 원본 형상
+      // 최대 보존 — "다듬기"지 "재설계" 아님).
+      case "--no-station-fixups": o.applyStationFixups = false; break;
     }
   }
   return o;
@@ -1034,7 +1047,13 @@ function branchesFor(branchesJson, region, lineNameKo) {
  * 마커 이동·SVG 패치는 별도). 반환: { locked, perLine: Map(slug→{seq(원본),
  * projectedSeq, runs, bundles}), bundles }.
  */
-export function computeGlobalRelayout(db, region, branchesJson, runTolerancePx = DEFAULT_RUN_TOLERANCE_PX) {
+export function computeGlobalRelayout(
+  db,
+  region,
+  branchesJson,
+  runTolerancePx = DEFAULT_RUN_TOLERANCE_PX,
+  censusHardGate = true,
+) {
   const slugToId = resolveLineMap(db, SEOUL);
   const allRuns = [];
   // slug → [piece...] — piece = 한 노선의 그리는 조각 하나(본선 outlier-split
@@ -1098,7 +1117,11 @@ export function computeGlobalRelayout(db, region, branchesJson, runTolerancePx =
   // 했다(#2068 1·2차 공통 실측 — 뚝섬↔성수 47.85px 재발). 안전망 자체는 여유를
   // 두고(50px), 실제 게이트 임계(48)는 audit-station-euclidean-spacing.mjs가
   // 그대로 지킨다.
-  enforceEuclideanSafetyNet(locked, byLineAll, origAll, 50);
+  //
+  // #2068 오너 결정(2026-07-19): 오너 손수 기준본 위에서는 census가 하드
+  // 게이트가 아니다("위반이 나와도 역을 옮기지 말고 수치만 보고") —
+  // censusHardGate=false면 안전망(reactive revert)을 아예 돌리지 않는다.
+  if (censusHardGate) enforceEuclideanSafetyNet(locked, byLineAll, origAll, 50);
   return { locked, projectedRuns, perLinePieces, slugToId };
 }
 
@@ -1189,6 +1212,7 @@ async function main() {
       o.region,
       branchesJson,
       o.runTolerance,
+      o.censusHardGate,
     );
 
     // 원 좌표(팩) — delta 계산용(조각 전부 순회 — 지선 포함). key→slugs도 함께
@@ -1229,49 +1253,55 @@ async function main() {
     // 아니라 edge 공유 여부(perLinePieces의 key 순서)로만 정해지므로 재배치
     // 전에 한 번 계산해도 무효화되지 않는다.
     const overlapDetectionBundles = detectCorridorBundles(perLinePieces);
-    const overlapResolution = resolveOverlapsByMovingStations(buildFinalPieces(), locked, {
-      offsetPx: o.corridorSpacing >= 8 ? o.corridorSpacing : 8,
-      bundles: overlapDetectionBundles,
-      bundleSpacingPx: o.corridorSpacing,
-    });
+    let overlapResolution = { clusters: [], movedKeys: new Set() };
+    let safetyNet2 = { revertedCount: 0 };
+    let clearanceResolution = { fixes: [], movedKeys: new Set(), skipped: [] };
+    let safetyNet3 = { revertedCount: 0 };
+    if (o.applyStationFixups) {
+      overlapResolution = resolveOverlapsByMovingStations(buildFinalPieces(), locked, {
+        offsetPx: o.corridorSpacing >= 8 ? o.corridorSpacing : 8,
+        bundles: overlapDetectionBundles,
+        bundleSpacingPx: o.corridorSpacing,
+      });
 
-    // 역 이동(위 겹침 해소 + 원래 재배치)로 새 유클리드 위반이 생겼을 수 있어
-    // 안전망을 다시 돌린다(하드 게이트 census 0 보장 — computeGlobalRelayout
-    // 내부와 동일 스코프의 region 전체 쿼리 재사용).
-    const allLineRows2 = db
-      .prepare(`SELECT station_id AS key, line_id AS lineId, x, y FROM route_map_positions WHERE region = ?`)
-      .all(o.region);
-    const byLineAll2 = new Map();
-    for (const r of allLineRows2) {
-      if (!byLineAll2.has(r.lineId)) byLineAll2.set(r.lineId, [[]]);
-      byLineAll2.get(r.lineId)[0].push({ key: r.key, x: r.x, y: r.y });
-    }
-    const origAll2 = new Map();
-    for (const r of allLineRows2) if (!origAll2.has(r.key)) origAll2.set(r.key, { x: r.x, y: r.y });
-    const safetyNet2 = enforceEuclideanSafetyNet(locked, byLineAll2, origAll2, 50);
+      // 역 이동(위 겹침 해소 + 원래 재배치)로 새 유클리드 위반이 생겼을 수 있어
+      // 안전망을 다시 돌린다(하드 게이트 census 0 보장 — computeGlobalRelayout
+      // 내부와 동일 스코프의 region 전체 쿼리 재사용).
+      const allLineRows2 = db
+        .prepare(`SELECT station_id AS key, line_id AS lineId, x, y FROM route_map_positions WHERE region = ?`)
+        .all(o.region);
+      const byLineAll2 = new Map();
+      for (const r of allLineRows2) {
+        if (!byLineAll2.has(r.lineId)) byLineAll2.set(r.lineId, [[]]);
+        byLineAll2.get(r.lineId)[0].push({ key: r.key, x: r.x, y: r.y });
+      }
+      const origAll2 = new Map();
+      for (const r of allLineRows2) if (!origAll2.has(r.key)) origAll2.set(r.key, { x: r.x, y: r.y });
+      if (o.censusHardGate) safetyNet2 = enforceEuclideanSafetyNet(locked, byLineAll2, origAll2, 50);
 
-    // #2068 5차(코디네이터 승인 — 코너 방향 재설계): G-NODE-STRAIGHT(노드
-    // 직선여유) 위반을 만드는 edge(diag*√2 < 임계)를 미세정렬해 코너 자체를
-    // 없앤다. resolveNodeClearanceByMicroAlign 주석 참고 — 코너 방향
-    // (bend-early/late) 선택만으로는 {legA,legB} 값 자체가 안 바뀌어(어느
-    // 역이 짧은 다리를 받는지만 바뀜) 위반을 없앨 수 없다는 분석적 결론에
-    // 따른 것이다.
-    const clearanceResolution = resolveNodeClearanceByMicroAlign(buildFinalPieces(), locked, {
-      thresholdPx: o.minNodeClearance,
-      bundles: overlapDetectionBundles,
-      bundleSpacingPx: o.corridorSpacing,
-    });
-    const allLineRows3 = db
-      .prepare(`SELECT station_id AS key, line_id AS lineId, x, y FROM route_map_positions WHERE region = ?`)
-      .all(o.region);
-    const byLineAll3 = new Map();
-    for (const r of allLineRows3) {
-      if (!byLineAll3.has(r.lineId)) byLineAll3.set(r.lineId, [[]]);
-      byLineAll3.get(r.lineId)[0].push({ key: r.key, x: r.x, y: r.y });
+      // #2068 5차(코디네이터 승인 — 코너 방향 재설계): G-NODE-STRAIGHT(노드
+      // 직선여유) 위반을 만드는 edge(diag*√2 < 임계)를 미세정렬해 코너 자체를
+      // 없앤다. resolveNodeClearanceByMicroAlign 주석 참고 — 코너 방향
+      // (bend-early/late) 선택만으로는 {legA,legB} 값 자체가 안 바뀌어(어느
+      // 역이 짧은 다리를 받는지만 바뀜) 위반을 없앨 수 없다는 분석적 결론에
+      // 따른 것이다.
+      clearanceResolution = resolveNodeClearanceByMicroAlign(buildFinalPieces(), locked, {
+        thresholdPx: o.minNodeClearance,
+        bundles: overlapDetectionBundles,
+        bundleSpacingPx: o.corridorSpacing,
+      });
+      const allLineRows3 = db
+        .prepare(`SELECT station_id AS key, line_id AS lineId, x, y FROM route_map_positions WHERE region = ?`)
+        .all(o.region);
+      const byLineAll3 = new Map();
+      for (const r of allLineRows3) {
+        if (!byLineAll3.has(r.lineId)) byLineAll3.set(r.lineId, [[]]);
+        byLineAll3.get(r.lineId)[0].push({ key: r.key, x: r.x, y: r.y });
+      }
+      const origAll3 = new Map();
+      for (const r of allLineRows3) if (!origAll3.has(r.key)) origAll3.set(r.key, { x: r.x, y: r.y });
+      if (o.censusHardGate) safetyNet3 = enforceEuclideanSafetyNet(locked, byLineAll3, origAll3, 50);
     }
-    const origAll3 = new Map();
-    for (const r of allLineRows3) if (!origAll3.has(r.key)) origAll3.set(r.key, { x: r.x, y: r.y });
-    const safetyNet3 = enforceEuclideanSafetyNet(locked, byLineAll3, origAll3, 50);
 
     // 1) 마커·라벨·chip·종점마크 이동(local delta = render delta / scale) — 겹침
     //    해소로 옮긴 역까지 반영한 최종 locked 기준.
