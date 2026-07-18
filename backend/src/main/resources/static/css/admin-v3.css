@@ -4,6 +4,11 @@
 	box-sizing: border-box;
 }
 
+html,
+body.admin-v3 {
+	overflow-x: hidden;
+}
+
 body.admin-v3 {
 	margin: 0;
 	background: var(--admin-bg);
@@ -164,7 +169,7 @@ body.admin-v3 {
 	max-width: none;
 	margin: 0;
 	padding: 28px 30px 48px;
-	overflow-x: auto;
+	overflow-x: visible;
 }
 
 .admin-topbar {
@@ -415,7 +420,6 @@ body.admin-v3 {
 }
 
 .admin-v3 table {
-	overflow: hidden;
 	width: 100%;
 	min-width: 620px;
 	border-collapse: collapse;
@@ -423,7 +427,20 @@ body.admin-v3 {
 
 .admin-v3 section,
 .admin-card {
+	overflow-x: visible;
+}
+
+.admin-table-scroll {
+	max-width: 100%;
 	overflow-x: auto;
+	overscroll-behavior-inline: contain;
+	scrollbar-gutter: stable;
+	isolation: isolate;
+}
+
+.admin-v3 .admin-table-scroll:focus-visible {
+	outline: 3px solid #ffbf47;
+	outline-offset: 3px;
 }
 
 /* 플랫 섹션(#2047, 오너 확정 2026-07-13): 1px 보더 패널은 핵심 지표 묶음·데이터 표·폼에만 두고,
@@ -463,6 +480,19 @@ body.admin-v3 {
 	font-weight: var(--admin-w-body);
 }
 
+.admin-table-scroll th:first-child,
+.admin-table-scroll td:first-child:not([colspan]) {
+	position: sticky;
+	left: 0;
+	z-index: 2;
+	background: var(--admin-surface);
+}
+
+.admin-table-scroll thead th:first-child {
+	z-index: 3;
+	background: var(--admin-header-bg);
+}
+
 .admin-v3 tbody tr {
 	height: 44px;
 }
@@ -472,8 +502,17 @@ body.admin-v3 {
 	background: var(--admin-header-bg);
 }
 
+.admin-v3 .admin-table-scroll tbody tr:hover td:first-child:not([colspan]) {
+	background: var(--admin-header-bg);
+}
+
 .admin-v3 tbody tr[aria-selected="true"],
 .admin-v3 tbody tr.is-selected {
+	background: var(--admin-accent-soft);
+}
+
+.admin-v3 .admin-table-scroll tbody tr[aria-selected="true"] td:first-child:not([colspan]),
+.admin-v3 .admin-table-scroll tbody tr.is-selected td:first-child:not([colspan]) {
 	background: var(--admin-accent-soft);
 }
 
