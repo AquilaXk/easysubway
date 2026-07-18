@@ -4842,12 +4842,7 @@ class _RouteShareButton extends StatelessWidget {
         throw StateError('Route share trigger is unavailable');
       }
       final origin = renderBox.localToGlobal(Offset.zero) & renderBox.size;
-      final text = buildRouteShareSummary(
-        _routeShareSnapshot(
-          result,
-          View.of(context).platformDispatcher.locale.languageCode,
-        ),
-      );
+      final text = buildRouteShareSummary(_routeShareSnapshot(result));
       final invoke = invoker;
       if (invoke != null) {
         await invoke(text, origin);
@@ -4866,10 +4861,7 @@ class _RouteShareButton extends StatelessWidget {
   }
 }
 
-RouteShareSnapshot _routeShareSnapshot(
-  RouteSearchResult result,
-  String languageCode,
-) {
+RouteShareSnapshot _routeShareSnapshot(RouteSearchResult result) {
   if (result.isBlocked || result.status != 'FOUND') {
     throw StateError('Route is unavailable');
   }
@@ -4969,7 +4961,8 @@ RouteShareSnapshot _routeShareSnapshot(
   }
 
   return RouteShareSnapshot(
-    languageCode: languageCode == 'en' ? 'en' : 'ko',
+    // 실제 역명과 leg 표시명은 아직 한국어 canonical만 제공한다.
+    languageCode: 'ko',
     originName: originName,
     destinationName: destinationName,
     objective: switch (result.objective) {
@@ -4987,6 +4980,7 @@ RouteShareSnapshot _routeShareSnapshot(
     transferCount: result.transferCount,
     freshness: switch (result.etaSource) {
       'REALTIME' => RouteShareFreshness.realtime,
+      'MIXED' => RouteShareFreshness.mixed,
       'STATIC_LOCAL' ||
       'STATIC_ESTIMATE' ||
       'STALE' => RouteShareFreshness.staticData,

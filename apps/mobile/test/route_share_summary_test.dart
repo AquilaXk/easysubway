@@ -74,6 +74,54 @@ void main() {
     expect(text, contains('Planned schedule'));
   });
 
+  test('MIXED ETA는 한국어와 영어에서 일부 실시간 정보 반영으로 안내한다', () {
+    const base = RouteShareSnapshot(
+      languageCode: 'ko',
+      originName: '상록수',
+      destinationName: '사당',
+      objective: RouteShareObjective.fastest,
+      transportScope: RouteShareTransportScope.subway,
+      departureTime: '08:05',
+      arrivalTime: '08:12',
+      durationMinutes: 7,
+      transferCount: 0,
+      freshness: RouteShareFreshness.mixed,
+      legs: [
+        RouteShareLeg(
+          description: '상록수에서 사당까지 이동',
+          departureTime: '08:05',
+          arrivalTime: '08:12',
+        ),
+      ],
+    );
+
+    expect(buildRouteShareSummary(base), contains('일부 실시간 정보가 반영'));
+    expect(
+      buildRouteShareSummary(
+        const RouteShareSnapshot(
+          languageCode: 'en',
+          originName: 'Sangnoksu',
+          destinationName: 'Sadang',
+          objective: RouteShareObjective.fastest,
+          transportScope: RouteShareTransportScope.subway,
+          departureTime: '08:05',
+          arrivalTime: '08:12',
+          durationMinutes: 7,
+          transferCount: 0,
+          freshness: RouteShareFreshness.mixed,
+          legs: [
+            RouteShareLeg(
+              description: 'Ride from Sangnoksu to Sadang',
+              departureTime: '08:05',
+              arrivalTime: '08:12',
+            ),
+          ],
+        ),
+      ),
+      contains('Some realtime information is included'),
+    );
+  });
+
   test('같은 snapshot과 budget은 byte-for-byte 같은 text를 만든다', () {
     const snapshot = RouteShareSnapshot(
       languageCode: 'ko',

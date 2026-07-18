@@ -2,7 +2,7 @@ enum RouteShareObjective { fastest, fewestTransfers }
 
 enum RouteShareTransportScope { subway, subwayAndItxCheongchun }
 
-enum RouteShareFreshness { realtime, planned, staticData }
+enum RouteShareFreshness { realtime, mixed, planned, staticData }
 
 class RouteShareFare {
   const RouteShareFare({required this.adultFareWon, required this.currency});
@@ -182,19 +182,25 @@ String _scope(RouteShareTransportScope scope, bool ko) => switch (scope) {
     ko ? '지하철 + ITX-청춘' : 'Subway + ITX-Cheongchun',
 };
 
-String _freshness(RouteShareFreshness freshness, bool ko) =>
-    switch (freshness) {
-      RouteShareFreshness.realtime =>
-        ko ? '실시간 정보 기준입니다.' : 'Based on realtime information.',
-      RouteShareFreshness.planned =>
-        ko
-            ? '계획 시간 기준이며 실제 운행과 다를 수 있습니다.'
-            : 'Planned schedule; actual service may differ.',
-      RouteShareFreshness.staticData =>
-        ko
-            ? '저장된 데이터 기준이며 실제 운행과 다를 수 있습니다.'
-            : 'Saved data; actual service may differ.',
-    };
+String _freshness(
+  RouteShareFreshness freshness,
+  bool ko,
+) => switch (freshness) {
+  RouteShareFreshness.realtime =>
+    ko ? '실시간 정보 기준입니다.' : 'Based on realtime information.',
+  RouteShareFreshness.mixed =>
+    ko
+        ? '일부 실시간 정보가 반영됐으며 실제 운행과 다를 수 있습니다.'
+        : 'Some realtime information is included; actual service may differ.',
+  RouteShareFreshness.planned =>
+    ko
+        ? '계획 시간 기준이며 실제 운행과 다를 수 있습니다.'
+        : 'Planned schedule; actual service may differ.',
+  RouteShareFreshness.staticData =>
+    ko
+        ? '저장된 데이터 기준이며 실제 운행과 다를 수 있습니다.'
+        : 'Saved data; actual service may differ.',
+};
 
 String _number(int value) {
   final digits = value.toString();

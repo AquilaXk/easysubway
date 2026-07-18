@@ -11987,13 +11987,13 @@ void main() {
     expect(find.textContaining('private share failure'), findsNothing);
   });
 
-  testWidgets('도착 시간표만 있는 로컬 경로도 소요시간으로 출발을 보완해 공유한다', (tester) async {
-    tester.binding.platformDispatcher.localeTestValue = const Locale('ko');
+  testWidgets('영어 기기의 MIXED 로컬 경로도 한국어 사실 안내와 보완 시각으로 공유한다', (tester) async {
+    tester.binding.platformDispatcher.localeTestValue = const Locale('en');
     addTearDown(tester.binding.platformDispatcher.clearLocaleTestValue);
     String? sharedText;
     final result = _sampleRouteSearchResult(
       routeSearchId: 'local-planned-arrival-route',
-      etaSource: 'STATIC_LOCAL',
+      etaSource: 'MIXED',
       steps: const [
         RouteSearchStep(
           sequence: 1,
@@ -12043,6 +12043,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(sharedText, contains('시간: 08:05 → 08:12'));
+    expect(sharedText, contains('일부 실시간 정보가 반영'));
+    expect(sharedText, isNot(contains('Objective:')));
     expect(find.text('경로 요약을 공유하지 못했어요.'), findsNothing);
   });
 
