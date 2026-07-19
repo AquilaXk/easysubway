@@ -237,6 +237,27 @@ test("접근성 edge의 계단 여부가 boolean이 아니면 strict materializa
   );
 });
 
+test("접근성 source snapshot의 정책 값이 boolean이 아니면 materialization을 거부한다", async () => {
+  const value = await inputs();
+
+  for (const field of ["redistributionAllowed", "credentialRedacted"]) {
+    const snapshots = JSON.parse(value.sourceSnapshotsBytes);
+    const snapshot = snapshots.find(
+      ({ snapshotId }) => snapshotId === "seoul-metro-accessibility-capital-admission-20260712",
+    );
+    snapshot[field] = "false";
+
+    assert.throws(
+      () => buildServerTimetableSnapshot({
+        ...value,
+        sourceSnapshotsBytes: Buffer.from(JSON.stringify(snapshots)),
+        buildNow,
+      }),
+      /canonical accessibility source snapshot policy boolean is invalid/,
+    );
+  }
+});
+
 test("complete snapshot은 source·completeness identity와 freshness를 fail closed한다", async () => {
   const value = await inputs();
   const source = JSON.parse(value.sourceBytes);

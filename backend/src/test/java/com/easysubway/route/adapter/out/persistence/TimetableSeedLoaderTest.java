@@ -215,19 +215,7 @@ class TimetableSeedLoaderTest {
 
 	@Test
 	void trackedCompleteSnapshotLoadsWithExactEvidenceCounts() {
-		Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-		TimetableSeedLoader loader = new TimetableSeedLoader(
-			repository(),
-			dataSource,
-			new DataSourceTransactionManager(dataSource),
-			new ClassPathResource("timetable/line4-timetable-seed.sql.gz"),
-			new ClassPathResource("timetable/server-timetable-snapshot-evidence.json"),
-			true,
-			objectMapper,
-			clock
-		);
-
-		loader.run(null);
+		trackedLoader().run(null);
 
 		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM transit_trips", Integer.class)).isEqualTo(1035);
 		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM transit_stop_times", Integer.class)).isEqualTo(34070);
@@ -240,6 +228,34 @@ class TimetableSeedLoaderTest {
 		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM station_pathway_edges", Integer.class)).isEqualTo(4);
 		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM transfer_rules", Integer.class)).isZero();
 		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM route_edge_evidence", Integer.class)).isEqualTo(4);
+	}
+
+	@Test
+	void trackedCompleteSnapshotRejectsMismatchedExistingSourceSnapshot() {
+		jdbc.update("""
+			INSERT INTO data_source_snapshots (
+				snapshot_id, source_id, provider, retrieved_at, source_updated_at, row_count, coverage_count,
+				raw_sha256, raw_object_uri, redacted_request_fingerprint, schema_fingerprint,
+				snapshot_status, schema_status, license_status, fetch_status,
+				redistribution_allowed, credential_redacted, previous_snapshot_id, diff_summary,
+				freshness_expires_at, raw_retention_expires_at
+			) VALUES (
+				'seoul-metro-accessibility-capital-admission-20260712', 'seoul-metro-accessibility',
+				'서울교통공사', '2026-07-12 00:00:00', '2026-07-12 00:00:00', 1, 1,
+				?, 's3://easysubway-datapack-sources/seoul-metro-accessibility/20260712.json', ?, ?,
+				'LOCKED', 'PASS', 'PASS', 'SUCCESS', TRUE, TRUE, NULL, NULL,
+				'2099-08-01 00:00:00', '2099-10-01 00:00:00'
+			)
+			""", "0".repeat(64), "1".repeat(64), "2".repeat(64));
+
+		assertThatThrownBy(() -> trackedLoader().run(null))
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessageContaining("transit timetable snapshot activation failed");
+
+		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM timetable_snapshot_history", Integer.class)).isZero();
+		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM transit_trips", Integer.class)).isZero();
+		assertThat(jdbc.queryForObject("SELECT raw_sha256 FROM data_source_snapshots", String.class))
+			.isEqualTo("0".repeat(64));
 	}
 
 	@Test
@@ -286,6 +302,20 @@ class TimetableSeedLoaderTest {
 
 	private JdbcRouteTimetableRepository repository() {
 		return new JdbcRouteTimetableRepository(jdbc, Clock.fixed(NOW, ZoneOffset.UTC));
+	}
+
+	private TimetableSeedLoader trackedLoader() {
+		Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
+		return new TimetableSeedLoader(
+			repository(),
+			dataSource,
+			new DataSourceTransactionManager(dataSource),
+			new ClassPathResource("timetable/line4-timetable-seed.sql.gz"),
+			new ClassPathResource("timetable/server-timetable-snapshot-evidence.json"),
+			true,
+			objectMapper,
+			clock
+		);
 	}
 
 	private SnapshotResource snapshot(String suffix, boolean invalidForeignKey) throws Exception {

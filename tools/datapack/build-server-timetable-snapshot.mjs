@@ -279,6 +279,9 @@ function addAccessNode(nodes, stationId, lineId, id) {
 }
 
 function sourceSnapshotInsert(row) {
+  if (typeof row.redistributionAllowed !== "boolean" || typeof row.credentialRedacted !== "boolean") {
+    throw new Error(`canonical accessibility source snapshot policy boolean is invalid: ${row.snapshotId}`);
+  }
   const coverageCount = sourceSnapshotCoverageCount(row);
   const diffSummary = row.diffSummary == null
     ? null
@@ -304,8 +307,19 @@ function sourceSnapshotInsert(row) {
     sqlNullableText(row.governancePolicyVersion, "snapshot governance policy version"),
     sqlNullableText(row.governancePolicySha256, "snapshot governance policy hash"),
   ];
-  return "INSERT INTO data_source_snapshots (snapshot_id, source_id, provider, retrieved_at, source_updated_at, freshness_basis_at, provider_valid_until, row_count, coverage_count, raw_sha256, raw_object_uri, redacted_request_fingerprint, schema_fingerprint, snapshot_status, schema_status, license_status, fetch_status, redistribution_allowed, credential_redacted, previous_snapshot_id, diff_summary, diff_summary_json, freshness_expires_at, raw_retention_expires_at, governance_policy_version, governance_policy_sha256) "
-    + `SELECT ${values.join(", ")} WHERE NOT EXISTS (SELECT 1 FROM data_source_snapshots WHERE snapshot_id = ${values[0]});`;
+  const columns = [
+    "snapshot_id", "source_id", "provider", "retrieved_at", "source_updated_at", "freshness_basis_at",
+    "provider_valid_until", "row_count", "coverage_count", "raw_sha256", "raw_object_uri",
+    "redacted_request_fingerprint", "schema_fingerprint", "snapshot_status", "schema_status",
+    "license_status", "fetch_status", "redistribution_allowed", "credential_redacted", "previous_snapshot_id",
+    "diff_summary", "diff_summary_json", "freshness_expires_at", "raw_retention_expires_at",
+    "governance_policy_version", "governance_policy_sha256",
+  ];
+  const exactIdentity = columns
+    .map((column, index) => `${column} IS NOT DISTINCT FROM ${values[index]}`)
+    .join(" AND ");
+  return `INSERT INTO data_source_snapshots (${columns.join(", ")}) `
+    + `SELECT ${values.join(", ")} WHERE NOT EXISTS (SELECT 1 FROM data_source_snapshots WHERE ${exactIdentity});`;
 }
 
 function sourceSnapshotCoverageCount(row) {
