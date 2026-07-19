@@ -11,6 +11,7 @@ const DATAPACK_INDEX_PATH = "apps/mobile/assets/datapacks/index.json";
 const RELEASE_GATE_INDEX_PATH = "contracts/release/gate-index.json";
 const RELEASE_GATE_DIRECTORY = "apps/mobile/release";
 const SOURCE_INVENTORY_PATH = "apps/mobile/assets/datapacks/source-inventory.json";
+const SOURCE_INVENTORY_SCHEMA_PATH = "contracts/datapack/source-inventory.schema.json";
 const SOURCE_GOVERNANCE_POLICY_PATH = "tools/datapack/source-governance-policy.json";
 const FRESHNESS_POLICY_PATH = "apps/mobile/release/datapack-freshness-sla.json";
 
@@ -73,6 +74,22 @@ export function validateJson(schemaPath, valuePath, errors) {
   errors.push(...result.errors.map((error) => `${valuePath}: ${error}`));
   if (schemaPath === DATAPACK_MANIFEST_SCHEMA_PATH) validateDatapackManifest(loadJson(valuePath), valuePath, errors);
   if (schemaPath === DATAPACK_INDEX_SCHEMA_PATH) validateDatapackIndex(loadJson(valuePath), valuePath, errors);
+  if (schemaPath === SOURCE_INVENTORY_SCHEMA_PATH) validateSourceInventory(loadJson(valuePath), valuePath, errors);
+}
+
+export function validateSourceInventory(inventory, valuePath, errors) {
+  if (inventory == null || typeof inventory !== "object" || Array.isArray(inventory)
+    || !Array.isArray(inventory.sources)) return;
+  for (const [index, source] of inventory.sources.entries()) {
+    if (source == null || typeof source !== "object" || Array.isArray(source)) continue;
+    const path = `${valuePath}: $.sources.${index}`;
+    if (source.productionUseAllowed === true && source.topologyAdmissionEvidence == null) {
+      errors.push(`${path}.productionUseAllowed: true는 topologyAdmissionEvidence가 필요하다`);
+    }
+    if (source.topologyAdmissionEvidence != null && source.productionUseAllowed !== true) {
+      errors.push(`${path}.topologyAdmissionEvidence: productionUseAllowed true가 필요하다`);
+    }
+  }
 }
 
 export function validateDatapackIndex(index, valuePath, errors) {
