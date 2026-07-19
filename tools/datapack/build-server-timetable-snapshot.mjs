@@ -210,6 +210,9 @@ function canonicalAccessibilitySql(reviewedPackBytes, sourceSnapshotsBytes, cano
   const nodes = new Map();
   const usedSnapshots = new Map();
   for (const edge of edges) {
+    if (typeof edge.includesStairs !== "boolean") {
+      throw new Error(`canonical accessibility edge includesStairs is invalid: ${edge.id}`);
+    }
     const endpoint = accessEdgeEndpoint(edge);
     addAccessNode(nodes, endpoint.stationId, null, edge.edgeType === "ENTRY" ? edge.fromNodeId : edge.toNodeId);
     addAccessNode(nodes, endpoint.stationId, endpoint.lineId, edge.edgeType === "ENTRY" ? edge.toNodeId : edge.fromNodeId);
@@ -226,11 +229,11 @@ function canonicalAccessibilitySql(reviewedPackBytes, sourceSnapshotsBytes, cano
     .map(accessNodeInsert);
   const edgeStatements = edges.map(accessEdgeInsert);
   const evidenceStatements = edges.map((edge) => routeEdgeEvidenceInsert(edge, accessEdgeEndpoint(edge)));
+  const sql = `${[...snapshotStatements, ...nodeStatements, ...edgeStatements, ...evidenceStatements].join("\n")}\n`;
   return {
-    sql: `${[...snapshotStatements, ...nodeStatements, ...edgeStatements, ...evidenceStatements].join("\n")}\n`,
+    sql,
     source: {
-      reviewedPackSha256: sha256(reviewedPackBytes),
-      sourceSnapshotsSha256: sha256(sourceSnapshotsBytes),
+      materializedSqlSha256: sha256(Buffer.from(sql)),
     },
     nodeCount: nodes.size,
     edgeCount: edges.length,
@@ -335,7 +338,7 @@ function routeEdgeEvidenceInsert(edge, endpoint) {
   const strictEligible = edge.accessibilityStatus === "AVAILABLE"
     && edge.verificationStatus === "VERIFIED"
     && ["OFFICIAL_SOURCE", "OPERATOR_CONFIRMED", "FIELD_VERIFIED"].includes(edge.provenanceKind)
-    && edge.includesStairs !== true;
+    && edge.includesStairs === false;
   return "INSERT INTO route_edge_evidence (id, station_id, line_id, edge_id, edge_type, source_id, source_snapshot_id, provenance_kind, verification_status, last_verified_at, evidence_hash, strict_route_eligible, blocker_reason, created_at) VALUES ("
     + `${sqlText(`route-evidence-${edge.id}`, "route evidence id")}, ${sqlText(endpoint.stationId, "route evidence station")}, `
     + `${sqlText(endpoint.lineId, "route evidence line")}, ${sqlText(edge.id, "route evidence edge")}, `

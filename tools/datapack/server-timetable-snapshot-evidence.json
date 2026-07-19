@@ -31,8 +31,7 @@
     "admittedInputSqliteSha256": "72b85f941a8cb3a905218287a3e2ff4ce38561397ed5c22d77816576529ffe03"
   },
   "accessibilitySource": {
-    "reviewedPackSha256": "6b64e5e9f16306e7602a52fd47247c770b2b192c058f1f07a718aaf2dab2ff4a",
-    "sourceSnapshotsSha256": "8c6d2f4e1cc40b6ee784947f3e87ce8f2e16f1c6a99bc1430bf82e29e5a6dab0"
+    "materializedSqlSha256": "1adb5c48ffa30a8ab586f2ddb1b10fda32afb27f1f006b76a0837c4b81aa0dcf"
   },
   "canonicalStationSet": {
     "version": "sha256:1d44e5838691cb5103a864713f50d1d867d1337477544347b31e0f3ee94dd273",
@@ -124,5 +123,5 @@
     "transferRules": 0,
     "routeEdgeEvidence": 4
   },
-  "evidenceHash": "15189d493f05ebe6ce01c7c6193e09c23a36b14acce6afa39abb6ff7ca34f50c"
+  "evidenceHash": "585740b998aaaf1e7568bfd43d46b4a6c12c7913fd712b2bd5c6df5797f004f9"
 }

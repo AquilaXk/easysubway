@@ -198,6 +198,45 @@ test("접근성 source snapshot의 lineage와 governance 값을 그대로 materi
   assert.match(childStatement, /, '2026-07-15', 'a{64}' WHERE/);
 });
 
+test("접근성 evidence identity는 실제 materialization 입력에만 결합한다", async () => {
+  const value = await inputs();
+  const baseline = buildServerTimetableSnapshot({ ...value, buildNow });
+  const reviewedPack = JSON.parse(value.reviewedPackBytes);
+  reviewedPack.unrelatedMetadata = "changed";
+  const snapshots = JSON.parse(value.sourceSnapshotsBytes);
+  snapshots.push({ snapshotId: "unrelated-snapshot" });
+
+  const unrelatedChange = buildServerTimetableSnapshot({
+    ...value,
+    reviewedPackBytes: Buffer.from(JSON.stringify(reviewedPack)),
+    sourceSnapshotsBytes: Buffer.from(JSON.stringify(snapshots)),
+    buildNow,
+  });
+
+  assert.equal(unrelatedChange.sql, baseline.sql);
+  assert.deepEqual(unrelatedChange.evidence, baseline.evidence);
+  const accessSql = baseline.sql.slice(baseline.sql.indexOf("INSERT INTO data_source_snapshots"));
+  assert.equal(
+    baseline.evidence.accessibilitySource.materializedSqlSha256,
+    sha256(Buffer.from(accessSql)),
+  );
+});
+
+test("접근성 edge의 계단 여부가 boolean이 아니면 strict materialization을 거부한다", async () => {
+  const value = await inputs();
+  const reviewedPack = JSON.parse(value.reviewedPackBytes);
+  reviewedPack.packs[0].networkEdges[0].includesStairs = "true";
+
+  assert.throws(
+    () => buildServerTimetableSnapshot({
+      ...value,
+      reviewedPackBytes: Buffer.from(JSON.stringify(reviewedPack)),
+      buildNow,
+    }),
+    /canonical accessibility edge includesStairs is invalid/,
+  );
+});
+
 test("complete snapshot은 source·completeness identity와 freshness를 fail closed한다", async () => {
   const value = await inputs();
   const source = JSON.parse(value.sourceBytes);
