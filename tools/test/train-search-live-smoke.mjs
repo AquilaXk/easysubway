@@ -101,6 +101,14 @@ export function validateBackendSearchEnvelope(payload, {
   };
 }
 
+export function addProviderStation(stations, id, name) {
+  const existing = stations.get(id);
+  if (existing !== undefined && existing !== name) {
+    throw new Error(`TAGO station ID conflict: ${id}`);
+  }
+  if (existing === undefined) stations.set(id, name);
+}
+
 export async function collectProviderEvidence({
   serviceKey,
   departureDate,
@@ -131,7 +139,6 @@ export async function collectProviderEvidence({
   }
 
   const stations = new Map();
-  let stationConflictCount = 0;
   for (const [index, city] of citiesResult.rows.entries()) {
     const cityCode = requiredString(city?.citycode, `city[${index}].citycode`);
     requiredString(city?.cityname, `city[${index}].cityname`);
@@ -140,9 +147,7 @@ export async function collectProviderEvidence({
     for (const [stationIndex, row] of result.rows.entries()) {
       const id = requiredString(row?.nodeid, `station[${stationIndex}].nodeid`);
       const name = requiredString(row?.nodename, `station[${stationIndex}].nodename`);
-      const existing = stations.get(id);
-      if (existing !== undefined && existing !== name) stationConflictCount += 1;
-      if (existing === undefined) stations.set(id, name);
+      addProviderStation(stations, id, name);
     }
   }
   const departureName = stations.get(requiredString(departureStationId, "departureStationId"));
@@ -185,7 +190,7 @@ export async function collectProviderEvidence({
     supportedTrainTypes: SUPPORTED_TRAIN_TYPES,
     gradeNames: grades.map(({ name }) => name).sort((left, right) => left.localeCompare(right, "ko")),
     stationCount: stations.size,
-    stationConflictCount,
+    stationConflictCount: 0,
     departureStation: { id: departureStationId, name: departureName },
     arrivalStation: { id: arrivalStationId, name: arrivalName },
     scheduleRowCount: journeys.length,

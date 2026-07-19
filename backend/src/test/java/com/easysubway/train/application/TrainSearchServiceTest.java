@@ -70,14 +70,15 @@ class TrainSearchServiceTest {
 	@Test
 	void threeNodesShareOneProviderCallThroughTheDatabaseLease() throws Exception {
 		var mapper = new ObjectMapper().registerModule(new JavaTimeModule());
+		var clock = Clock.fixed(NOW, ZoneOffset.UTC);
 		var firstNode = new TrainSearchService(
-			provider, cache, mapper, Clock.systemUTC(), Thread::sleep, () -> "node-a"
+			provider, cache, mapper, clock, Thread::sleep, () -> "node-a"
 		);
 		var secondNode = new TrainSearchService(
-			provider, cache, mapper, Clock.systemUTC(), Thread::sleep, () -> "node-b"
+			provider, cache, mapper, clock, Thread::sleep, () -> "node-b"
 		);
 		var thirdNode = new TrainSearchService(
-			provider, cache, mapper, Clock.systemUTC(), Thread::sleep, () -> "node-c"
+			provider, cache, mapper, clock, Thread::sleep, () -> "node-c"
 		);
 		provider.blockSearch = true;
 		var first = CompletableFuture.supplyAsync(() -> firstNode.search(criteria(null)));

@@ -1,5 +1,6 @@
 import http from "k6/http";
 import { check } from "k6";
+import exec from "k6/execution";
 import { Counter, Rate } from "k6/metrics";
 
 const fiveXx = new Counter("train_search_5xx");
@@ -48,8 +49,12 @@ export default function () {
     arrivalStationId: __ENV.TRAIN_SEARCH_ARRIVAL_ID,
   };
   if (workload === "unique") {
-    parameters.departureDate = shiftedDate(__ENV.TRAIN_SEARCH_DATE, __ITER % 7);
-    parameters.trainType = trainTypes[__ITER % trainTypes.length];
+    const iteration = exec.scenario.iterationInTest;
+    parameters.departureDate = shiftedDate(
+      __ENV.TRAIN_SEARCH_DATE,
+      Math.floor(iteration / trainTypes.length),
+    );
+    parameters.trainType = trainTypes[iteration % trainTypes.length];
   } else {
     parameters.departureDate = __ENV.TRAIN_SEARCH_DATE;
     parameters.trainType = "KTX";

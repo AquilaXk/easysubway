@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
+  addProviderStation,
   normalizeProviderTrainType,
   validateBackendSearchEnvelope,
   validateProviderEnvelope,
@@ -85,6 +86,15 @@ test("backend 서울→대전 KTX 응답은 운임·시간·ITX 0건을 증명�
   assert.equal(evidence.itxCheongchunRowCount, 0);
 });
 
+test("TAGO station catalog는 동일 ID의 상이한 이름을 거부한다", () => {
+  const stations = new Map();
+  addProviderStation(stations, "NAT010000", "서울");
+  assert.throws(
+    () => addProviderStation(stations, "NAT010000", "서울역"),
+    /station ID conflict/,
+  );
+});
+
 test("capacity runner는 repeated·unique·3-node·quota 경계를 고정한다", () => {
   const k6 = read("tools/test/train-search-capacity.k6.js");
   const runner = read("tools/test/run-train-search-capacity.sh");
@@ -92,6 +102,8 @@ test("capacity runner는 repeated·unique·3-node·quota 경계를 고정한다"
   assert.match(k6, /TRAIN_SEARCH_WORKLOAD/);
   assert.match(k6, /repeated/);
   assert.match(k6, /unique/);
+  assert.match(k6, /iterationInTest/);
+  assert.doesNotMatch(k6, /__ITER/);
   assert.match(k6, /http_req_duration/);
   assert.match(k6, /http_req_failed/);
   assert.match(k6, /new Counter\("train_search_5xx"\)/);
@@ -118,6 +130,7 @@ test("#2094 release artifact는 동일 candidate와 모든 완료 증거를 요�
   assert.equal(runtime.provider.httpSuccess, true);
   assert.equal(runtime.provider.resultCode, "00");
   assert.equal(runtime.provider.schemaStatus, "EXPECTED");
+  assert.equal(runtime.provider.stationConflictCount, 0);
   assert.deepEqual(runtime.provider.operations, [
     "GetCtyCodeList",
     "GetCtyAcctoTrainSttnList",
