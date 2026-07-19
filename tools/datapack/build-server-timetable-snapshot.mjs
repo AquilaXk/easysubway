@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { gunzipSync, gzipSync } from "node:zlib";
 
 import { buildBackendTimetableSeed } from "./build-backend-timetable-seed.mjs";
+import { approvedLegacyGovernanceBinding } from "./legacy-source-governance.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const ARTIFACT_KIND = "server-timetable-snapshot-evidence";
@@ -216,10 +217,9 @@ function canonicalAccessibilitySql(reviewedPackBytes, sourceSnapshotsBytes, cano
     if (!snapshot || snapshot.sourceId !== edge.sourceId) {
       throw new Error(`canonical accessibility source snapshot is missing: ${edge.id}`);
     }
-    usedSnapshots.set(snapshot.snapshotId, snapshot);
+    addSourceSnapshotLineage(snapshot, snapshotsById, usedSnapshots, new Set());
   }
   const snapshotStatements = [...usedSnapshots.values()]
-    .sort((left, right) => left.snapshotId.localeCompare(right.snapshotId))
     .map(sourceSnapshotInsert);
   const nodeStatements = [...nodes.values()]
     .sort((left, right) => left.id.localeCompare(right.id))
@@ -237,6 +237,21 @@ function canonicalAccessibilitySql(reviewedPackBytes, sourceSnapshotsBytes, cano
     transferRuleCount: 0,
     evidenceCount: evidenceStatements.length,
   };
+}
+
+function addSourceSnapshotLineage(snapshot, snapshotsById, usedSnapshots, visiting) {
+  if (usedSnapshots.has(snapshot.snapshotId)) return;
+  if (visiting.has(snapshot.snapshotId)) throw new Error("canonical accessibility source snapshot lineage cycles");
+  visiting.add(snapshot.snapshotId);
+  if (snapshot.previousSnapshotId != null) {
+    const previous = snapshotsById.get(snapshot.previousSnapshotId);
+    if (!previous || previous.sourceId !== snapshot.sourceId) {
+      throw new Error(`canonical accessibility source snapshot ancestor is missing: ${snapshot.snapshotId}`);
+    }
+    addSourceSnapshotLineage(previous, snapshotsById, usedSnapshots, visiting);
+  }
+  visiting.delete(snapshot.snapshotId);
+  usedSnapshots.set(snapshot.snapshotId, snapshot);
 }
 
 function accessEdgeEndpoint(edge) {
@@ -261,21 +276,40 @@ function addAccessNode(nodes, stationId, lineId, id) {
 }
 
 function sourceSnapshotInsert(row) {
+  const coverageCount = sourceSnapshotCoverageCount(row);
+  const diffSummary = row.diffSummary == null
+    ? null
+    : (typeof row.diffSummary === "string" ? row.diffSummary : row.diffSummary.status);
   const values = [
     sqlText(row.snapshotId, "snapshot id"), sqlText(row.sourceId, "snapshot source id"),
     sqlText(row.provider, "snapshot provider"), sqlTimestamp(row.retrievedAt, "snapshot retrievedAt"),
-    sqlTimestamp(row.sourceUpdatedAt, "snapshot sourceUpdatedAt"), Number(row.rowCount),
+    sqlNullableTimestamp(row.sourceUpdatedAt, "snapshot sourceUpdatedAt"),
+    sqlNullableTimestamp(row.freshnessBasisAt, "snapshot freshnessBasisAt"),
+    sqlNullableTimestamp(row.providerValidUntil, "snapshot providerValidUntil"),
+    Number(row.rowCount), coverageCount,
     sqlText(row.rawSha256, "snapshot rawSha256"), sqlText(row.rawObjectUri, "snapshot rawObjectUri"),
     sqlText(row.redactedRequestFingerprint, "snapshot request fingerprint"),
     sqlText(row.schemaFingerprint, "snapshot schema fingerprint"), sqlText(row.snapshotStatus, "snapshot status"),
     sqlText(row.schemaStatus, "snapshot schema status"), sqlText(row.licenseStatus, "snapshot license status"),
     sqlText(row.fetchStatus, "snapshot fetch status"), row.redistributionAllowed ? "TRUE" : "FALSE",
-    row.credentialRedacted ? "TRUE" : "FALSE", "NULL", "NULL",
+    row.credentialRedacted ? "TRUE" : "FALSE",
+    sqlNullableText(row.previousSnapshotId, "snapshot previous id"),
+    sqlNullableText(diffSummary, "snapshot diff summary"),
+    row.diffSummary == null ? "NULL" : sqlText(JSON.stringify(row.diffSummary), "snapshot diff summary JSON"),
     sqlTimestamp(row.freshnessExpiresAt, "snapshot freshnessExpiresAt"),
-    sqlTimestamp(row.rawRetentionExpiresAt, "snapshot rawRetentionExpiresAt"), Number(row.rowCount),
+    sqlTimestamp(row.rawRetentionExpiresAt, "snapshot rawRetentionExpiresAt"),
+    sqlNullableText(row.governancePolicyVersion, "snapshot governance policy version"),
+    sqlNullableText(row.governancePolicySha256, "snapshot governance policy hash"),
   ];
-  return "INSERT INTO data_source_snapshots (snapshot_id, source_id, provider, retrieved_at, source_updated_at, row_count, raw_sha256, raw_object_uri, redacted_request_fingerprint, schema_fingerprint, snapshot_status, schema_status, license_status, fetch_status, redistribution_allowed, credential_redacted, previous_snapshot_id, diff_summary, freshness_expires_at, raw_retention_expires_at, coverage_count) "
+  return "INSERT INTO data_source_snapshots (snapshot_id, source_id, provider, retrieved_at, source_updated_at, freshness_basis_at, provider_valid_until, row_count, coverage_count, raw_sha256, raw_object_uri, redacted_request_fingerprint, schema_fingerprint, snapshot_status, schema_status, license_status, fetch_status, redistribution_allowed, credential_redacted, previous_snapshot_id, diff_summary, diff_summary_json, freshness_expires_at, raw_retention_expires_at, governance_policy_version, governance_policy_sha256) "
     + `SELECT ${values.join(", ")} WHERE NOT EXISTS (SELECT 1 FROM data_source_snapshots WHERE snapshot_id = ${values[0]});`;
+}
+
+function sourceSnapshotCoverageCount(row) {
+  if (Number.isInteger(row.coverageCount) && row.coverageCount >= 0) return row.coverageCount;
+  if (row.previousSnapshotId == null && row.diffSummary == null
+    && approvedLegacyGovernanceBinding(row) != null) return Number(row.rowCount);
+  throw new Error(`canonical accessibility source snapshot coverage is missing: ${row.snapshotId}`);
 }
 
 function accessNodeInsert(node) {
@@ -317,6 +351,14 @@ function sqlTimestamp(value, label) {
   const date = new Date(requiredText(value, label));
   if (Number.isNaN(date.getTime())) throw new Error(`${label} is invalid`);
   return `'${date.toISOString().slice(0, 19).replace("T", " ")}'`;
+}
+
+function sqlNullableTimestamp(value, label) {
+  return value == null ? "NULL" : sqlTimestamp(value, label);
+}
+
+function sqlNullableText(value, label) {
+  return value == null ? "NULL" : sqlText(value, label);
 }
 
 function plannerIdentitySql(source, completeness) {

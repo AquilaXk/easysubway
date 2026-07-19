@@ -215,6 +215,7 @@ class TimetableSeedLoaderTest {
 
 	@Test
 	void trackedCompleteSnapshotLoadsWithExactEvidenceCounts() {
+		Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
 		TimetableSeedLoader loader = new TimetableSeedLoader(
 			repository(),
 			dataSource,
@@ -223,7 +224,7 @@ class TimetableSeedLoaderTest {
 			new ClassPathResource("timetable/server-timetable-snapshot-evidence.json"),
 			true,
 			objectMapper,
-			Clock.fixed(NOW, ZoneOffset.UTC)
+			clock
 		);
 
 		loader.run(null);
@@ -270,6 +271,7 @@ class TimetableSeedLoaderTest {
 	}
 
 	private TimetableSeedLoader loader(SnapshotResource snapshot) {
+		Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
 		return new TimetableSeedLoader(
 			repository(),
 			dataSource,
@@ -278,7 +280,7 @@ class TimetableSeedLoaderTest {
 			snapshot.evidence(),
 			true,
 			objectMapper,
-			Clock.fixed(NOW, ZoneOffset.UTC)
+			clock
 		);
 	}
 

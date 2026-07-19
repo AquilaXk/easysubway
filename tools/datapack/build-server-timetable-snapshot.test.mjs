@@ -152,6 +152,52 @@ test("#2135 ADMITTED source와 subway seed를 deterministic complete server snap
   assert.ok(first.evidence.servicePatternEvidence.expressTripCount > 0);
 });
 
+test("접근성 source snapshot의 lineage와 governance 값을 그대로 materialize한다", async () => {
+  const value = await inputs();
+  const reviewedPack = JSON.parse(value.reviewedPackBytes);
+  const snapshots = JSON.parse(value.sourceSnapshotsBytes);
+  const parent = snapshots.find(
+    ({ snapshotId }) => snapshotId === "seoul-metro-accessibility-capital-admission-20260712",
+  );
+  const child = {
+    ...parent,
+    snapshotId: "seoul-metro-accessibility-capital-admission-20260713",
+    retrievedAt: "2026-07-13T00:00:00Z",
+    sourceUpdatedAt: null,
+    rowCount: 9,
+    coverageCount: 2,
+    previousSnapshotId: parent.snapshotId,
+    diffSummary: { status: "CHANGED", rowDelta: 8, coverageDelta: 1 },
+    governancePolicyVersion: "2026-07-15",
+    governancePolicySha256: "a".repeat(64),
+  };
+  for (const pack of reviewedPack.packs) {
+    for (const edge of pack.networkEdges ?? []) {
+      if (["ENTRY", "EXIT"].includes(edge.edgeType) && edge.sourceSnapshotId === parent.snapshotId) {
+        edge.sourceSnapshotId = child.snapshotId;
+      }
+    }
+  }
+
+  const result = buildServerTimetableSnapshot({
+    ...value,
+    reviewedPackBytes: Buffer.from(JSON.stringify(reviewedPack)),
+    sourceSnapshotsBytes: Buffer.from(JSON.stringify([...snapshots, child])),
+    buildNow,
+  });
+  const parentOffset = result.sql.indexOf(`SELECT '${parent.snapshotId}'`);
+  const childStatement = result.sql.split("\n")
+    .find((line) => line.includes(`SELECT '${child.snapshotId}'`));
+
+  assert.ok(parentOffset >= 0);
+  assert.ok(childStatement);
+  assert.ok(parentOffset < result.sql.indexOf(childStatement));
+  assert.match(childStatement, /, NULL, NULL, NULL, 9, 2, /);
+  assert.match(childStatement, new RegExp(`, '${parent.snapshotId}', 'CHANGED', `));
+  assert.match(childStatement, /'\{"status":"CHANGED","rowDelta":8,"coverageDelta":1\}'/);
+  assert.match(childStatement, /, '2026-07-15', 'a{64}' WHERE/);
+});
+
 test("complete snapshot은 source·completeness identity와 freshness를 fail closed한다", async () => {
   const value = await inputs();
   const source = JSON.parse(value.sourceBytes);
