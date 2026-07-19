@@ -214,6 +214,23 @@ function finalizeReport(report) {
       nodes: 0,
     });
   }
+  // #2281 V6-09: 대시보드 KPI 상태 계층 계약을 위반으로 편입한다. headline 카드가 3개를 넘거나,
+  // 기간 표기 caption이 없거나, 총 카드가 3개 초과인데 나머지를 담는 native details가 없거나 DETAILS가
+  // 아니면(keyboard·no-JS 접근 불가) 실패를 표면화한다.
+  const kpiHierarchy = report.keyboard.find((entry) => entry.check === "dashboard-kpi-hierarchy");
+  if (kpiHierarchy
+    && (kpiHierarchy.panelPresent === false
+      || kpiHierarchy.headlineCards > 3
+      || kpiHierarchy.captionPresent === false
+      || (kpiHierarchy.totalCards > 3
+        && (kpiHierarchy.disclosureCards === 0 || kpiHierarchy.disclosureIsDetails !== true)))) {
+    blockingViolations.push({
+      page: "/admin/dashboard/page",
+      id: "dashboard-kpi-hierarchy",
+      impact: "serious",
+      nodes: 0,
+    });
+  }
   const criticalViolations = blockingViolations.filter((violation) => violation.impact === "critical");
   const seriousViolations = blockingViolations.filter((violation) => violation.impact === "serious");
   report.summary = {
@@ -245,6 +262,7 @@ async function runJsPass(browser, baseUrl, outputDir, adminUser, adminPassword, 
     }
   }
   await keyboardSmoke(page, baseUrl, report);
+  await dashboardKpiHierarchyCheck(page, baseUrl, report);
   await captureAxTree(page, outputDir, report);
   await noCurrentWorkspaceDisclosure(page, baseUrl, report);
   await keyboardTableCheck(page, baseUrl, report);
@@ -757,6 +775,41 @@ async function listToolbarSheetCheck(page, baseUrl, report) {
     sheetClosed,
     focusRestored,
   });
+}
+
+// #2281 V6-09: 통합 대시보드 KPI 상태 계층 계약. 대표 KPI 3개만 headline으로 노출하고 나머지는
+// disclosure로 격하해 urgent state를 먼저 식별하게 한다. headline 카드가 3개를 넘거나(우선순위 붕괴),
+// 기간 표기 caption(값=현재·스파크라인=최근 7일·델타=전일)이 없거나, 총 카드가 3개 초과인데 나머지를
+// 담는 native details(.dashboard-more)가 없거나 DETAILS 요소가 아니면(keyboard·no-JS 접근 불가)
+// finalizeReport가 위반으로 편입해 exit code로 실패를 표면화한다(§7 대표 KPI·§9 urgent state 식별).
+async function dashboardKpiHierarchyCheck(page, baseUrl, report) {
+  await page.setViewportSize(VIEWPORTS.find((viewport) => viewport.name === "mobile-390"));
+  const response = await page.goto(`${baseUrl}/admin/dashboard/page`, { waitUntil: "networkidle" });
+  await assertOk(page, "/admin/dashboard/page", response);
+
+  const signal = await page.evaluate(() => {
+    const panel = document.querySelector(".dashboard-metric-panel");
+    const headlineGrid = panel ? panel.querySelector(":scope > .dashboard-cards") : null;
+    const headlineCards = headlineGrid ? headlineGrid.querySelectorAll(".dashboard-card").length : 0;
+    const more = panel ? panel.querySelector(".dashboard-more") : null;
+    const disclosureCards = more ? more.querySelectorAll(".dashboard-card").length : 0;
+    const totalCards = panel ? panel.querySelectorAll(".dashboard-card").length : 0;
+    const captionPresent = Boolean(
+      panel
+        && panel.querySelector(".section-hint")
+        && /현재 값/.test(panel.querySelector(".section-hint").textContent || ""),
+    );
+    return {
+      panelPresent: Boolean(panel),
+      headlineCards,
+      disclosureCards,
+      totalCards,
+      captionPresent,
+      disclosureIsDetails: more ? more.tagName === "DETAILS" : null,
+    };
+  });
+
+  report.keyboard.push({ check: "dashboard-kpi-hierarchy", ...signal });
 }
 
 async function captureAxTree(page, outputDir, report) {

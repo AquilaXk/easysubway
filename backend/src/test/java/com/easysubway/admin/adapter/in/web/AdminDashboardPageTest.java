@@ -61,6 +61,27 @@ class AdminDashboardPageTest {
 	}
 
 	@Test
+	@DisplayName("핵심 지표는 대표 KPI 3개를 headline으로 노출하고 나머지는 disclosure로 격하한다")
+	void foregroundsThreeRepresentativeKpisWithRestInDisclosure() throws Exception {
+		String html = mockMvc.perform(get("/admin/dashboard/page")
+				.with(httpBasic("admin-test", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		// 기간 표기 명확화(headline 의미 희석 해소): 값=현재, 스파크라인=최근 7일, 델타=전일 대비.
+		assertThat(html)
+			.contains("현재 값 · 최근 7일 스파크라인 · 전일 대비")
+			// 대표 KPI 3개(시점·비율)는 headline, 4번째(누계 총량인 푸시 실패)는 disclosure로 격하.
+			.contains("class=\"dashboard-details dashboard-more\"")
+			.contains("나머지 지표")
+			.contains("확인 필요 시설")
+			.contains("경로 차단률")
+			.contains("푸시 실패");
+	}
+
+	@Test
 	@DisplayName("지표 스냅샷 수동 재실행은 command token으로 집계 후 대시보드로 리다이렉트한다")
 	void manualSnapshotRerunRedirects() throws Exception {
 		MockHttpSession session = new MockHttpSession();
