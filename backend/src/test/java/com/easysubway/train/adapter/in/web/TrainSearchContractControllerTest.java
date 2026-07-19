@@ -6,6 +6,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -96,6 +97,21 @@ class TrainSearchContractControllerTest {
 			.andExpect(status().isNotModified())
 			.andExpect(header().string("ETag", first.getResponse().getHeader("ETag")))
 			.andExpect(header().string("Cache-Control", "max-age=300, must-revalidate, public, s-maxage=86400"));
+	}
+
+	@Test
+	void publicSecurityChainAllowsHeadWithoutAResponseBody() throws Exception {
+		when(service.stationsWithMetadata("서울", "KTX")).thenReturn(new StationSearchSnapshot(
+			List.of(new Station("NAT010000", "서울")),
+			Instant.parse("2026-07-20T00:00:00Z")
+		));
+
+		mockMvc.perform(head("/api/v1/trains/stations")
+				.param("query", "서울")
+				.param("trainType", "KTX"))
+			.andExpect(status().isOk())
+			.andExpect(header().exists("ETag"))
+			.andExpect(result -> assertThat(result.getResponse().getContentAsByteArray()).isEmpty());
 	}
 
 	@Test

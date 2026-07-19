@@ -7212,9 +7212,17 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   );
   assert.ok(reportApiMatcherScope, "report API security matcher scope must be readable");
   assert.ok(publicApiMatcherScope, "public API security matcher scope must be readable");
-  const publicApiMatchers = [reportApiMatcherScope[0], publicApiMatcherScope[0]]
-    .flatMap((scope) => Array.from(scope.matchAll(/"([^"]+)"/g), (match) => match[1]))
-    .filter((matcher) => matcher.startsWith("/api/") || matcher.startsWith("/actuator/"));
+  const publicApiMatchers = [...new Set(
+    [reportApiMatcherScope[0], publicApiMatcherScope[0]]
+      .flatMap((scope) => Array.from(scope.matchAll(/"([^"]+)"/g), (match) => match[1]))
+      .filter((matcher) => matcher.startsWith("/api/") || matcher.startsWith("/actuator/")),
+  )];
+  for (const method of ["GET", "HEAD"]) {
+    assert.match(
+      publicApiMatcherScope[0],
+      new RegExp(`HttpMethod\\.${method},[\\s\\S]*?"/api/v1/trains/stations",[\\s\\S]*?"/api/v1/trains/search"`),
+    );
+  }
   assert.deepEqual(
     publicApiMatchers,
     operationsEvidence.backendControlPlane.publicApiSurface.allowedPublicSecurityMatchers,
@@ -16722,6 +16730,7 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
   const requiredIds = [
     "precise_location",
     "search_queries",
+    "train_search_queries",
     "favorite_stations_routes_facilities",
     "route_eta_feedback",
     "route_v2_itx_integrity",
@@ -16785,10 +16794,11 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     ]);
     const auditedForPrivacyInventory = new Set([
       "facility_report_abuse_rate_limit_state",
+      "train_search_queries",
       "train_search_abuse_rate_limit_state",
     ]);
     const expectedLastVerifiedAt = auditedForPrivacyInventory.has(id)
-      ? id === "train_search_abuse_rate_limit_state" ? "2026-07-19" : "2026-07-18"
+      ? id === "facility_report_abuse_rate_limit_state" ? "2026-07-18" : "2026-07-19"
       : id.startsWith("route_v2_") || reviewedForLegalDisclosure.has(id)
         ? "2026-07-16"
         : "2026-06-19";
@@ -16826,9 +16836,10 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
         "route_v2_itx_integrity",
         "route_v2_gateway_abuse_rate_limit_state",
       ].includes(id);
+      const anonymousSearchHistory = id === "train_search_queries";
       assert.equal(
         item.googlePlayDataSafety.linkedToUser,
-        id.startsWith("route_v2_itx_") ? routeV2ExpectedLinkage : true,
+        anonymousSearchHistory ? false : id.startsWith("route_v2_itx_") ? routeV2ExpectedLinkage : true,
         `${id} Play user linkage must match the release data model`,
       );
     }
@@ -16851,6 +16862,7 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     const noUserDeletionBoundary = new Set([
       "route_v2_gateway_abuse_rate_limit_state",
       "facility_report_abuse_rate_limit_state",
+      "train_search_queries",
       "train_search_abuse_rate_limit_state",
     ]);
     assert.equal(
@@ -16958,6 +16970,31 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
       .find((item) => item.dataType === "Device or other IDs")
       .inventoryDataIds.includes("train_search_abuse_rate_limit_state"),
   );
+
+  const trainSearchQueries = items.get("train_search_queries");
+  assert.equal(trainSearchQueries.implementationStatus, "backend-collected");
+  assert.equal(trainSearchQueries.sharedWithThirdParties, false);
+  assert.deepEqual(trainSearchQueries.storageLocations, ["backend-database"]);
+  assert.deepEqual(trainSearchQueries.persistedFields, [
+    "departureStationId",
+    "arrivalStationId",
+    "departureDate",
+    "trainType",
+  ]);
+  assert.equal(trainSearchQueries.accountLinked, false);
+  assert.equal(trainSearchQueries.retention.todayFreshSeconds, 300);
+  assert.equal(trainSearchQueries.retention.futureFreshSeconds, 21600);
+  assert.equal(trainSearchQueries.retention.purgeEligibilityAfterExpirySeconds, 172800);
+  assert.equal(trainSearchQueries.retention.purgeCron, "0 10 4 * * * Asia/Seoul");
+  assert.equal(trainSearchQueries.retention.maximumPurgeLagSeconds, 86400);
+  assert.equal(trainSearchQueries.googlePlayDataSafety.linkedToUser, false);
+  assert.equal(trainSearchQueries.googlePlayDataSafety.deletionSupported, false);
+  assert.equal(trainSearchQueries.appStorePrivacy.linkedToUser, false);
+  const appActivityDeclaration = readJson("apps/mobile/release/play-store-submission-content.json")
+    .dataSafetyDeclarations.answerMatrix
+    .find((item) => item.dataType === "App activity");
+  assert.ok(appActivityDeclaration.inventoryDataIds.includes("train_search_queries"));
+  assert.equal(appActivityDeclaration.containsDeletionUnsupportedData, true);
 
   const appStoreTypes = [...new Set(
     inventory.dataTypes

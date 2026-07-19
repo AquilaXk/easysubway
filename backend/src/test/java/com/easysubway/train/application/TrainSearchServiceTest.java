@@ -267,6 +267,49 @@ class TrainSearchServiceTest {
 	}
 
 	@Test
+	void catalogAvailabilityRechecksFreshCacheAfterAcquiringTheLease() {
+		service.catalog();
+		CachedCatalog concurrentlyStored = cache.catalogs.get("catalog");
+		cache.catalogs.clear();
+		provider.catalogCalls.set(0);
+		cache.beforeLeaseAcquire = () -> cache.catalogs.put("catalog", concurrentlyStored);
+
+		Catalog result = service.ensureCatalogAvailable();
+
+		assertThat(result.stations()).extracting(Station::name).containsExactly("서울", "대전");
+		assertThat(provider.catalogCalls).hasValue(0);
+		assertThat(cache.leases).doesNotContainKey("catalog-refresh-v1");
+	}
+
+	@Test
+	void forcedCatalogRefreshRechecksAChangedCacheAfterPollReacquiresTheLease() {
+		service.catalog();
+		CachedCatalog baseline = cache.catalogs.get("catalog");
+		CachedCatalog concurrentlyRefreshed = new CachedCatalog(
+			baseline.kind(),
+			baseline.payloadJson(),
+			baseline.payloadSha256(),
+			baseline.observedAt(),
+			baseline.expiresAt().plus(Duration.ofHours(1))
+		);
+		cache.leases.put("catalog-refresh-v1", "other-owner");
+		AtomicInteger attempts = new AtomicInteger();
+		cache.beforeLeaseAcquire = () -> {
+			if (attempts.incrementAndGet() == 2) {
+				cache.catalogs.put("catalog", concurrentlyRefreshed);
+				cache.leases.remove("catalog-refresh-v1", "other-owner");
+			}
+		};
+
+		Catalog result = service.refreshCatalog();
+
+		assertThat(result.stations()).extracting(Station::name).containsExactly("서울", "대전");
+		assertThat(provider.catalogCalls).hasValue(1);
+		assertThat(cache.catalogs.get("catalog").expiresAt()).isEqualTo(concurrentlyRefreshed.expiresAt());
+		assertThat(cache.leases).doesNotContainKey("catalog-refresh-v1");
+	}
+
+	@Test
 	void catalogAvailabilityPreparationRecoversAnEmptyCatalogOutsideTheHttpBudget() {
 		cache.leases.put("catalog-refresh-v1", "other-owner");
 		var clock = new TestClock(NOW);
@@ -601,6 +644,7 @@ class TrainSearchServiceTest {
 		private volatile boolean failCatalogRead;
 		private volatile boolean denyLeases;
 		private volatile Runnable beforeCatalogReturn = () -> {};
+		private volatile Runnable beforeLeaseAcquire = () -> {};
 
 		@Override
 		public Optional<CachedCatalog> freshCatalog(String kind, Instant now) {
@@ -624,6 +668,7 @@ class TrainSearchServiceTest {
 		@Override
 		public boolean tryAcquireLease(String key, String owner, Instant now, Duration ttl) {
 			leaseTtls.put(key, ttl);
+			beforeLeaseAcquire.run();
 			if (denyLeases) return false;
 			return leases.putIfAbsent(key, owner) == null;
 		}

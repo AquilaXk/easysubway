@@ -237,7 +237,7 @@ public class TrainSearchService {
 		if (!cache.tryAcquireLease(CATALOG_LEASE_KEY, owner, now, CATALOG_LEASE_TTL)) {
 			return pollForCatalog(force ? existing.orElse(null) : null, deadline, recoverOrphanLease);
 		}
-		return loadCatalog(owner, catalogLoadDeadline(now, deadline));
+		return loadCatalogAfterLease(owner, existing.orElse(null), force, clock.instant(), deadline);
 	}
 
 	private CatalogEntry pollForCatalog(CachedCatalog baseline, Instant deadline, boolean recoverOrphanLease) {
@@ -253,10 +253,32 @@ public class TrainSearchService {
 			}
 			String owner = ownerSupplier.get();
 			if (cache.tryAcquireLease(CATALOG_LEASE_KEY, owner, now, CATALOG_LEASE_TTL)) {
-				return loadCatalog(owner, catalogLoadDeadline(now, deadline));
+				return loadCatalogAfterLease(owner, baseline, true, clock.instant(), deadline);
 			}
 		}
 		throw failure("TRAIN_SEARCH_UNAVAILABLE");
+	}
+
+	private CatalogEntry loadCatalogAfterLease(
+		String owner,
+		CachedCatalog baseline,
+		boolean force,
+		Instant acquiredAt,
+		Instant deadline
+	) {
+		boolean delegatedToLoad = false;
+		try {
+			var current = cache.freshCatalog(CATALOG_KIND, clock.instant());
+			requireBefore(deadline);
+			if (current.isPresent() && (!force || catalogChanged(baseline, current.orElseThrow()))) {
+				CachedCatalog value = current.orElseThrow();
+				return new CatalogEntry(decodeCatalog(value), value.expiresAt());
+			}
+			delegatedToLoad = true;
+			return loadCatalog(owner, catalogLoadDeadline(acquiredAt, deadline));
+		} finally {
+			if (!delegatedToLoad) cache.releaseLease(CATALOG_LEASE_KEY, owner);
+		}
 	}
 
 	private Instant catalogLoadDeadline(Instant acquiredAt, Instant overallDeadline) {

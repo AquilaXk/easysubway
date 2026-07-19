@@ -231,10 +231,11 @@
       },
       {
         "dataType": "App activity",
-        "inventoryDataIds": ["search_queries", "favorite_stations_routes_facilities", "route_eta_feedback", "route_v2_itx_request_state"],
+        "inventoryDataIds": ["search_queries", "train_search_queries", "favorite_stations_routes_facilities", "route_eta_feedback", "route_v2_itx_request_state"],
         "containsCollectedData": true,
         "containsRequiredData": true,
         "containsOptionalData": true,
+        "containsDeletionUnsupportedData": true,
         "requiredConsoleFields": [
           "collected",
           "collectionType",

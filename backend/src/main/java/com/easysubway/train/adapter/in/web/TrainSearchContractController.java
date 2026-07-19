@@ -16,8 +16,10 @@ import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.HexFormat;
 import java.util.concurrent.TimeUnit;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.CacheControl;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -48,30 +50,32 @@ class TrainSearchContractController {
 	}
 
 	@GetMapping("/api/v1/trains/stations")
-	ResponseEntity<ApiResponse<?>> stations(
+	ResponseEntity<?> stations(
 		@RequestParam(required = false) String query,
 		@RequestParam(required = false) String trainType,
-		WebRequest webRequest
+		WebRequest webRequest,
+		HttpServletRequest request
 	) {
 		try {
 			validateTrainType(trainType);
 			var snapshot = service.stationsWithMetadata(query, trainType);
-			return success(snapshot.stations(), snapshot.expiresAt(), STATION_CACHE, webRequest);
+			return withoutHeadBody(request, success(snapshot.stations(), snapshot.expiresAt(), STATION_CACHE, webRequest));
 		} catch (IllegalArgumentException exception) {
-			return error(HttpStatus.BAD_REQUEST, "TRAIN_SEARCH_UNSUPPORTED_TRAIN_TYPE", "지원하지 않는 열차종입니다.");
+			return withoutHeadBody(request, error(HttpStatus.BAD_REQUEST, "TRAIN_SEARCH_UNSUPPORTED_TRAIN_TYPE", "지원하지 않는 열차종입니다."));
 		} catch (TrainSearchFailure failure) {
-			return error(failureStatus(failure), failure.getCode(), failureMessage(failure));
+			return withoutHeadBody(request, error(failureStatus(failure), failure.getCode(), failureMessage(failure)));
 		}
 	}
 
 	@GetMapping("/api/v1/trains/search")
-	ResponseEntity<ApiResponse<?>> search(
+	ResponseEntity<?> search(
 		@RequestParam(required = false) String departureStationId,
 		@RequestParam(required = false) String arrivalStationId,
 		@RequestParam(required = false) String departureDate,
 		@RequestParam(required = false) String returnDate,
 		@RequestParam(required = false) String trainType,
-		WebRequest webRequest
+		WebRequest webRequest,
+		HttpServletRequest request
 	) {
 		try {
 			validateTrainType(trainType);
@@ -87,19 +91,24 @@ class TrainSearchContractController {
 			var snapshot = service.searchWithMetadata(criteria);
 			LocalDate completedServiceDay = TrainSearchScopePolicy.currentServiceDay(clock);
 			if (outboundDate.isBefore(completedServiceDay)) {
-				return uncacheableSuccess(snapshot.result());
+				return withoutHeadBody(request, uncacheableSuccess(snapshot.result()));
 			}
 			CachePolicy cachePolicy = outboundDate.equals(completedServiceDay)
 				? TODAY_CACHE
 				: FUTURE_CACHE;
-			return success(snapshot.result(), snapshot.expiresAt(), cachePolicy, webRequest);
+			return withoutHeadBody(request, success(snapshot.result(), snapshot.expiresAt(), cachePolicy, webRequest));
 		} catch (DateTimeParseException exception) {
-			return error(HttpStatus.BAD_REQUEST, "TRAIN_SEARCH_INVALID_ARGUMENT", "검색 조건을 확인해 주세요.");
+			return withoutHeadBody(request, error(HttpStatus.BAD_REQUEST, "TRAIN_SEARCH_INVALID_ARGUMENT", "검색 조건을 확인해 주세요."));
 		} catch (IllegalArgumentException exception) {
-			return error(HttpStatus.BAD_REQUEST, "TRAIN_SEARCH_UNSUPPORTED_TRAIN_TYPE", "지원하지 않는 열차종입니다.");
+			return withoutHeadBody(request, error(HttpStatus.BAD_REQUEST, "TRAIN_SEARCH_UNSUPPORTED_TRAIN_TYPE", "지원하지 않는 열차종입니다."));
 		} catch (TrainSearchFailure failure) {
-			return error(failureStatus(failure), failure.getCode(), failureMessage(failure));
+			return withoutHeadBody(request, error(failureStatus(failure), failure.getCode(), failureMessage(failure)));
 		}
+	}
+
+	private ResponseEntity<?> withoutHeadBody(HttpServletRequest request, ResponseEntity<?> response) {
+		if (!HttpMethod.HEAD.matches(request.getMethod())) return response;
+		return ResponseEntity.status(response.getStatusCode()).headers(response.getHeaders()).build();
 	}
 
 	private ResponseEntity<ApiResponse<?>> success(
