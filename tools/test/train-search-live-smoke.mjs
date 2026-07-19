@@ -88,6 +88,10 @@ export function validateBackendSearchEnvelope(payload, {
     throw new Error("backend train search result schema was invalid");
   }
   const rows = [...outbound, ...inbound];
+  const itxCheongchunRowCount = rows.filter((row) => row?.trainType === "ITX_CHEONGCHUN").length;
+  if (itxCheongchunRowCount !== 0) {
+    throw new Error("backend train search returned ITX_CHEONGCHUN rows");
+  }
   for (const [index, row] of rows.entries()) validateJourney(row, `journey[${index}]`);
   requireDate(departureDate);
   if (outbound.some((row) => (
@@ -102,7 +106,7 @@ export function validateBackendSearchEnvelope(payload, {
     observedAt,
     rowCount: outbound.length,
     fareRowCount: outbound.filter((row) => Number.isInteger(row.adultFareWon) && row.adultFareWon >= 0).length,
-    itxCheongchunRowCount: rows.filter((row) => row.trainType === "ITX_CHEONGCHUN").length,
+    itxCheongchunRowCount,
   };
 }
 
@@ -522,9 +526,9 @@ function decodedServiceKey(value) {
 
 function publicHttpsOrigin(value) {
   const url = new URL(requiredString(value, "--base-url"));
-  if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash
-    || url.pathname !== "/" || ["localhost", "127.0.0.1", "::1"].includes(url.hostname)) {
-    throw new Error("--base-url must be a credential-free public HTTPS origin");
+  if (url.origin !== "https://easysubway-api.aquilaxk.site"
+    || url.username || url.password || url.search || url.hash || url.pathname !== "/") {
+    throw new Error("--base-url must be the EasySubway production HTTPS origin");
   }
   return url;
 }

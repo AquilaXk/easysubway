@@ -50,6 +50,7 @@ done
 ./backend/gradlew -p backend test --rerun-tasks \
 	--tests 'com.easysubway.train.application.TrainSearchServiceTest.threeNodesShareOneProviderCallThroughTheDatabaseLease' \
 	--tests 'com.easysubway.train.adapter.out.persistence.JdbcTrainSearchCacheTest.enforcesSharedMinuteAndDayQuotaPerProvider' \
+	--tests 'com.easysubway.train.adapter.out.persistence.JdbcTrainSearchCacheTest.concurrentLeaseAttemptsHaveExactlyOneOwner' \
 	--tests 'com.easysubway.train.adapter.out.http.SharedTrainSearchProviderCallBudgetTest'
 
 node tools/test/collect-train-search-backend-observation.mjs \

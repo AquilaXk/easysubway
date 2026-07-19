@@ -14,6 +14,10 @@ const REQUIRED_TESTS = Object.freeze([
     "enforcesSharedMinuteAndDayQuotaPerProvider",
   ],
   [
+    "com.easysubway.train.adapter.out.persistence.JdbcTrainSearchCacheTest",
+    "concurrentLeaseAttemptsHaveExactlyOneOwner",
+  ],
+  [
     "com.easysubway.train.adapter.out.http.SharedTrainSearchProviderCallBudgetTest",
     "quotaRejectionFailsClosedAsUnavailable",
   ],

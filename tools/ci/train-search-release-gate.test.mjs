@@ -5,6 +5,7 @@ import test from "node:test";
 
 import {
   addProviderStation,
+  collectBackendEvidence,
   normalizeProviderTrainType,
   providerJourney,
   validateBackendSearchEnvelope,
@@ -92,6 +93,33 @@ test("backend 서울→대전 KTX 응답은 운임·시간·ITX 0건을 증명�
   assert.equal(evidence.rowCount, 1);
   assert.equal(evidence.fareRowCount, 1);
   assert.equal(evidence.itxCheongchunRowCount, 0);
+  assert.throws(
+    () => validateBackendSearchEnvelope({
+      success: true,
+      data: {
+        observedAt: "2026-07-19T06:00:00Z",
+        outbound: [{
+          trainNumber: "ITX-1",
+          trainType: "ITX_CHEONGCHUN",
+          departureStationId: "NAT010000",
+          departureStationName: "서울",
+          departureAt: "2026-07-20T09:00:00+09:00",
+          arrivalStationId: "NAT011668",
+          arrivalStationName: "대전",
+          arrivalAt: "2026-07-20T10:02:00+09:00",
+          durationMinutes: 62,
+          adultFareWon: 23700,
+        }],
+        inbound: [],
+      },
+    }, {
+      departureStationId: "NAT010000",
+      arrivalStationId: "NAT011668",
+      trainType: "KTX",
+      departureDate: "2026-07-20",
+    }),
+    /backend train search returned ITX_CHEONGCHUN rows/,
+  );
   assert.throws(
     () => validateBackendSearchEnvelope({
       success: true,
@@ -255,6 +283,7 @@ test("backend test XML에서 3-node provider 1회와 quota fail-closed를 계산
       path: "TEST-com.easysubway.train.adapter.out.persistence.JdbcTrainSearchCacheTest.xml",
       content: suite("com.easysubway.train.adapter.out.persistence.JdbcTrainSearchCacheTest", [
         "enforcesSharedMinuteAndDayQuotaPerProvider",
+        "concurrentLeaseAttemptsHaveExactlyOneOwner",
       ]),
     },
     {
@@ -270,12 +299,30 @@ test("backend test XML에서 3-node provider 1회와 quota fail-closed를 계산
   assert.equal(observation.nodeCount, 3);
   assert.equal(observation.providerCallCount, 1);
   assert.equal(observation.quotaVerdict, "PASS");
+  assert.ok(observation.requiredTests.includes(
+    "com.easysubway.train.adapter.out.persistence.JdbcTrainSearchCacheTest#concurrentLeaseAttemptsHaveExactlyOneOwner",
+  ));
   assert.throws(
     () => buildBackendObservation([{
       path: "TEST-broken.xml",
       content: '<testsuite name="broken" tests="1" skipped="0" failures="1" errors="0"/>',
     }]),
     /backend observation test suite failed/,
+  );
+});
+
+test("live evidence는 EasySubway production API origin만 허용한다", async () => {
+  const android = read("apps/mobile/integration_test/train_search_release_evidence_test.dart");
+  assert.match(android, /expect\(baseUri\.origin, 'https:\/\/easysubway-api\.aquilaxk\.site'\)/);
+  await assert.rejects(
+    collectBackendEvidence({
+      baseUrl: "https://api.example.com/",
+      candidateGitSha: "a".repeat(40),
+      deploymentRunUrl: "https://github.com/AquilaXk/easysubway/actions/runs/1",
+      departureDate: "2026-07-20",
+      fetchImpl: async () => { throw new Error("fetch must not run"); },
+    }),
+    /EasySubway production HTTPS origin/,
   );
 });
 
@@ -325,6 +372,7 @@ test("#2094 release artifact는 동일 candidate와 모든 완료 증거를 요�
   assert.equal(gate.issue2094RoadmapRequiredForThisGate, true);
   assert.match(runtime.candidateGitSha, /^[0-9a-f]{40}$/);
   assert.equal(runtime.backend.deployedGitSha, runtime.candidateGitSha);
+  assert.equal(runtime.backend.apiOrigin, "https://easysubway-api.aquilaxk.site");
   assert.equal(runtime.backend.deployment.deployedGitSha, runtime.candidateGitSha);
   assert.equal(runtime.backend.deployment.conclusion, "success");
   assert.deepEqual(runtime.backend.deployment.requiredJobs, [
@@ -333,6 +381,7 @@ test("#2094 release artifact는 동일 candidate와 모든 완료 증거를 요�
     "CD Record deployment",
   ]);
   assert.equal(runtime.android.artifactGitSha, runtime.candidateGitSha);
+  assert.equal(runtime.android.apiOrigin, "https://easysubway-api.aquilaxk.site");
   assert.equal(runtime.provider.httpSuccess, true);
   assert.equal(runtime.provider.resultCode, "00");
   assert.equal(runtime.provider.schemaStatus, "EXPECTED");

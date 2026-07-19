@@ -66,6 +66,7 @@
     },
     "backend": {
       "deployedGitSha": "d36bc00467ab69732f49e1f56a343bb2da1e73ce",
+      "apiOrigin": "https://easysubway-api.aquilaxk.site",
       "deployment": {
         "runId": 29677130333,
         "runUrl": "https://github.com/AquilaXk/easysubway/actions/runs/29677130333",
@@ -124,6 +125,7 @@
         "requiredTests": [
           "com.easysubway.train.application.TrainSearchServiceTest#threeNodesShareOneProviderCallThroughTheDatabaseLease",
           "com.easysubway.train.adapter.out.persistence.JdbcTrainSearchCacheTest#enforcesSharedMinuteAndDayQuotaPerProvider",
+          "com.easysubway.train.adapter.out.persistence.JdbcTrainSearchCacheTest#concurrentLeaseAttemptsHaveExactlyOneOwner",
           "com.easysubway.train.adapter.out.http.SharedTrainSearchProviderCallBudgetTest#quotaRejectionFailsClosedAsUnavailable",
           "com.easysubway.train.adapter.out.http.SharedTrainSearchProviderCallBudgetTest#quotaPersistenceFailureFailsClosedAsUnavailable",
           "com.easysubway.train.adapter.out.http.SharedTrainSearchProviderCallBudgetTest#quotaTransactionBoundaryFailureFailsClosedAsUnavailable"
@@ -131,30 +133,31 @@
         "testResults": [
           {
             "file": "TEST-com.easysubway.train.adapter.out.http.SharedTrainSearchProviderCallBudgetTest.xml",
-            "sha256": "7c217205d3a8a0a54e22bba040979369a402cfd41cff50f168438659e197b484",
+            "sha256": "e9c03377ef88ca575b9c8ac9a553db631226bac8a2b296d535d5ddfc2ed291e8",
             "testCount": 3
           },
           {
             "file": "TEST-com.easysubway.train.adapter.out.persistence.JdbcTrainSearchCacheTest.xml",
-            "sha256": "c2b72efe08c31e582aecb65e9368609d0d3d4da58ac6a3bdc0d42fe51868b014",
-            "testCount": 1
+            "sha256": "c8bb45d6c22935d2d6b94da6802c798f1e963f2041cdd9ed86d89fbe482b33d5",
+            "testCount": 2
           },
           {
             "file": "TEST-com.easysubway.train.application.TrainSearchServiceTest.xml",
-            "sha256": "48a0287ed3a814b71e33cd140f57fcff005d734d67df9b0642c5c210634ef183",
+            "sha256": "af1926fbc233ee7e2ed7de9cf81d9ff0391d20a6886a8a7deab863dcec2a3bb7",
             "testCount": 1
           }
         ],
-        "evidenceSha256": "4eba0be1621dd7f2d6cd746df097fa1a76fc016c16529ee398cd9a23d1d492ae"
+        "evidenceSha256": "9777a51105f724f7fe8112f54f26f1a8d9a1453cd78a7513c8fd2643c4ea0a32"
       }
     },
     "android": {
       "artifactGitSha": "d36bc00467ab69732f49e1f56a343bb2da1e73ce",
+      "apiOrigin": "https://easysubway-api.aquilaxk.site",
       "deviceModel": "SM-A175N",
       "androidVersion": "16",
       "networkBoundary": "OCI_STAGING_CONNECT_PROXY",
       "candidateApkSha256": "6141d54f5fb8ab003640bac236130babe4db105989baf2b69de07fa4da271772",
-      "integrationTestSourceSha256": "1000171442e65c8b88f3528eb23222b2b85876c87e0736952862f9ba79a1680d",
+      "integrationTestSourceSha256": "24d9a17de584da3c3bdffdd9dcbde533e5907c9ecbcc4e0881ab60d72ae1190f",
       "menuToResultPassed": true,
       "roundTripPassed": true,
       "stateMatrixPassed": true,

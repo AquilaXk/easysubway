@@ -22,6 +22,7 @@ void main() {
     final baseUri = Uri.parse(_baseUrl);
     expect(baseUri.scheme, 'https');
     expect(baseUri.host, isNotEmpty);
+    expect(baseUri.origin, 'https://easysubway-api.aquilaxk.site');
     await tester.pumpWidget(
       MaterialApp(
         home: TrainSearchScreen(
