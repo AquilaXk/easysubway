@@ -95,7 +95,7 @@ async function withServer(routes, fn) {
   }
 }
 
-async function runSmoke(baseUrl, extraArgs = []) {
+async function runSmoke(baseUrl, extraArgs = [], timeoutSeconds = "4") {
   const dir = path.join(tmpdir(), `smoke-${Date.now()}-${Math.random().toString(16).slice(2)}`);
   await rm(dir, { recursive: true, force: true });
   await mkdir(dir, { recursive: true });
@@ -110,7 +110,7 @@ async function runSmoke(baseUrl, extraArgs = []) {
     "--datapack-base-url",
     baseUrl,
     "--timeout-seconds",
-    "4",
+    timeoutSeconds,
     ...ingressArgs,
     "--report",
     reportPath,
@@ -179,6 +179,24 @@ test("post-deploy smoke does not retry a permanent train catalog 400", async () 
     assert.equal(code, 1);
     assert.equal(axis(report, "train-search").attempts, 1);
     assert.equal(stationCalls, 1);
+  });
+});
+
+test("post-deploy smoke keeps every sequential axis inside one global timeout", async () => {
+  const routes = defaultRoutes();
+  routes.liveness = () => new Promise((resolve) => {
+    setTimeout(() => resolve({ status: 200, body: { status: "UP" } }), 3000);
+  });
+  await withServer(routes, async (baseUrl) => {
+    const startedAt = Date.now();
+    const { code, report } = await runSmoke(baseUrl, [], "1");
+    const elapsedMs = Date.now() - startedAt;
+
+    assert.equal(code, 1);
+    assert.ok(elapsedMs < 1800, `global timeout took ${elapsedMs}ms`);
+    assert.equal(report.axes.length, 6);
+    assert.match(axis(report, "train-search").detail, /global timeout budget exhausted/);
+    assert.equal(axis(report, "train-search").attempts, 0);
   });
 });
 

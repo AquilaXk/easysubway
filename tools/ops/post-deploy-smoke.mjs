@@ -207,13 +207,27 @@ async function checkDatapack(datapackBaseUrl, axis, timeoutMs) {
   }
 }
 
-async function runAxis(axis, check, options) {
-  const { maxMs } = options;
+function timeoutAxis(axis, startedAt) {
+  return {
+    id: axis.id,
+    titleKo: axis.titleKo,
+    deploymentAttributed: axis.deploymentAttributed,
+    result: "FAIL",
+    latencyMs: Date.now() - startedAt,
+    attempts: 0,
+    detail: "global timeout budget exhausted",
+  };
+}
+
+async function runAxis(axis, check, options, globalDeadline) {
   const startedAt = Date.now();
+  const globalRemainingMs = globalDeadline - startedAt;
+  if (globalRemainingMs <= 0) return timeoutAxis(axis, startedAt);
+  const maxMs = Math.min(options.maxMs, globalRemainingMs);
   const perRequestTimeout = Math.min(10000, Math.max(2000, maxMs));
   const outcome = await retry(
     (remainingMs) => check(Math.min(perRequestTimeout, remainingMs)),
-    options,
+    { ...options, maxMs },
   );
   return {
     id: axis.id,
@@ -226,10 +240,12 @@ async function runAxis(axis, check, options) {
   };
 }
 
-async function runAxisOnce(axis, check, timeoutMs) {
+async function runAxisOnce(axis, check, timeoutMs, globalDeadline) {
   const startedAt = Date.now();
+  const globalRemainingMs = globalDeadline - startedAt;
+  if (globalRemainingMs <= 0) return timeoutAxis(axis, startedAt);
   try {
-    await check(timeoutMs);
+    await check(Math.min(timeoutMs, globalRemainingMs));
     return {
       id: axis.id,
       titleKo: axis.titleKo,
@@ -282,20 +298,22 @@ async function main() {
 
   const datapackBaseUrl = argValue(args, "--datapack-base-url", datapack.baseUrl);
   const budgetMs = Number(argValue(args, "--timeout-seconds", "90")) * 1000;
+  const globalDeadline = Date.now() + budgetMs;
 
   const axes = [];
   axes.push(await runAxis(liveness, (t) => checkHealth(baseUrl, liveness, t), {
     maxMs: Math.max(2000, budgetMs * 0.1),
     delayMs: 2000,
-  }));
+  }, globalDeadline));
   axes.push(await runAxis(readiness, (t) => checkHealth(baseUrl, readiness, t), {
     maxMs: Math.max(6000, budgetMs * 0.45),
     delayMs: 3000,
-  }));
+  }, globalDeadline));
   axes.push(await runAxisOnce(
     routeApiClosure,
     (t) => checkRouteApiClosure(baseUrl, routeApiClosure, t, routeV2IngressEnabled),
     Math.min(10000, Math.max(2000, budgetMs * 0.2)),
+    globalDeadline,
   ));
   axes.push(await runAxis(
     trainSearch,
@@ -305,16 +323,17 @@ async function main() {
       delayMs: 2000,
       shouldRetry: (error) => error instanceof RetryableTrainSmokeError,
     },
+    globalDeadline,
   ));
   axes.push(await runAxis(adminLogin, (t) => checkAdminLogin(baseUrl, adminLogin, t), {
     maxMs: Math.max(2000, budgetMs * 0.1),
     delayMs: 2000,
-  }));
+  }, globalDeadline));
   if (datapackBaseUrl) {
     axes.push(await runAxis(datapack, (t) => checkDatapack(datapackBaseUrl, datapack, t), {
       maxMs: Math.max(2000, budgetMs * 0.15),
       delayMs: 2000,
-    }));
+    }, globalDeadline));
   } else {
     axes.push({
       id: datapack.id,
