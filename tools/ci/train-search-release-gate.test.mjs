@@ -745,6 +745,15 @@ test("capacity validator는 OD·날짜와 required CI를 fail-closed로 검증�
     assert.match(wrongOd.stderr, /repeated summary failed its evidence contract/);
 
     write("repeated.json", runtime.capacity.repeated);
+    const wrongBindingOd = structuredClone(runtime.capacity.candidateBinding);
+    wrongBindingOd.backend.departureStationId = "NAT999999";
+    delete wrongBindingOd.evidenceSha256;
+    wrongBindingOd.evidenceSha256 = sha256(JSON.stringify(wrongBindingOd));
+    write("candidate-binding.json", wrongBindingOd);
+    const mixedOd = spawnSync(process.execPath, args, { encoding: "utf8" });
+    assert.notEqual(mixedOd.status, 0);
+    assert.match(mixedOd.stderr, /candidate deployment binding failed its evidence contract/);
+
     const binding = structuredClone(runtime.capacity.candidateBinding);
     delete binding.backend.requiredCi;
     delete binding.evidenceSha256;
@@ -835,6 +844,9 @@ test("#2094 release artifact는 동일 candidate와 모든 완료 증거를 요�
   assert.deepEqual(runtime.capacity.candidateBinding.backend.requiredCi, runtime.requiredCi);
   assert.equal(runtime.capacity.candidateBinding.backend.currentDeployment.sha, runtime.candidateGitSha);
   assert.equal(runtime.capacity.candidateBinding.backend.origin, runtime.backend.apiOrigin);
+  assert.equal(runtime.capacity.candidateBinding.backend.departureStationId, "NAT010000");
+  assert.equal(runtime.capacity.candidateBinding.backend.arrivalStationId, "NAT011668");
+  assert.equal(runtime.capacity.candidateBinding.backend.departureDate, "2026-07-20");
   const { evidenceSha256: bindingSha256, ...unsignedBinding } = runtime.capacity.candidateBinding;
   assert.equal(bindingSha256, sha256(JSON.stringify(unsignedBinding)));
   assert.equal(runtime.backend.sourceObjectSha256, bindingSha256);

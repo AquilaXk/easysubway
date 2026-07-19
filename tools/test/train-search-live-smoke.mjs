@@ -322,6 +322,7 @@ export async function collectBackendEvidence({
     stationQueries: [departureQuery, arrivalQuery],
     departureStationId: departure.id,
     arrivalStationId: arrival.id,
+    departureDate,
     seoulDaejeonKtxFareRows: search.fareRowCount,
     itxCheongchunRows: search.itxCheongchunRowCount,
     conditionalEtagStatus: 304,

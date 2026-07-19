@@ -112,7 +112,7 @@
       "conditionalEtagStatus": 304,
       "errorCacheControl": "no-store",
       "schemaStatus": "EXPECTED",
-      "sourceObjectSha256": "500f137dd09f3775ea270d4e5704c5775a5e605914c99a4d92374bbc9c6442ff"
+      "sourceObjectSha256": "3d6750f5e40f6d53fda4be0aa3f3785b7433681d3d6671d98a8e97cfc28559eb"
     },
     "capacity": {
       "executor": {
@@ -243,6 +243,7 @@
           "stationQueries": ["서울", "대전"],
           "departureStationId": "NAT010000",
           "arrivalStationId": "NAT011668",
+          "departureDate": "2026-07-20",
           "seoulDaejeonKtxFareRows": 64,
           "itxCheongchunRows": 0,
           "conditionalEtagStatus": 304,
@@ -250,7 +251,7 @@
           "schemaStatus": "EXPECTED"
         },
         "credentialRedacted": true,
-        "evidenceSha256": "500f137dd09f3775ea270d4e5704c5775a5e605914c99a4d92374bbc9c6442ff"
+        "evidenceSha256": "3d6750f5e40f6d53fda4be0aa3f3785b7433681d3d6671d98a8e97cfc28559eb"
       }
     },
     "android": {
@@ -293,7 +294,7 @@
         "Admin QA Gates"
       ]
     },
-    "liveEvidenceSha256": "be032978fdf2ab96d77a8040e40445c77c8efb7491c6d29fee22856d07c0554e"
+    "liveEvidenceSha256": "191d5990cc1e2a22a15ddc7abf788ffac83453b51a587c613dbfc22d1b67363d"
   },
   "verification": {
     "backend": "./backend/gradlew -p backend test --tests '*TrainSearch*'",

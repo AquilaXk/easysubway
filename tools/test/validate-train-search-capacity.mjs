@@ -79,6 +79,9 @@ try {
     JSON.parse(await readFile(evidenceFiles[3], "utf8")),
     candidateGitSha,
     apiOrigin,
+    departureStationId,
+    arrivalStationId,
+    departureDate,
   );
 } catch {
   fail("candidate deployment binding failed its evidence contract");
@@ -175,7 +178,14 @@ async function validatedEvidenceFiles(arguments_) {
   return files;
 }
 
-function validateCandidateBindingArtifact(artifact, candidateGitSha, apiOrigin) {
+function validateCandidateBindingArtifact(
+  artifact,
+  candidateGitSha,
+  apiOrigin,
+  departureStationId,
+  arrivalStationId,
+  departureDate,
+) {
   if (!artifact || typeof artifact !== "object") throw new Error("candidate binding was invalid");
   const { evidenceSha256, ...unsigned } = artifact;
   if (artifact.schemaVersion !== 1
@@ -185,6 +195,9 @@ function validateCandidateBindingArtifact(artifact, candidateGitSha, apiOrigin) 
     || artifact.credentialRedacted !== true
     || artifact.backend?.deployedGitSha !== candidateGitSha
     || artifact.backend?.origin !== apiOrigin
+    || artifact.backend?.departureStationId !== departureStationId
+    || artifact.backend?.arrivalStationId !== arrivalStationId
+    || artifact.backend?.departureDate !== departureDate
     || artifact.backend?.deployment?.deployedGitSha !== candidateGitSha
     || artifact.backend?.deployment?.conclusion !== "success"
     || artifact.backend?.requiredCi?.candidateGitSha !== candidateGitSha
