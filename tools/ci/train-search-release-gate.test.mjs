@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
@@ -118,6 +119,39 @@ test("backend 서울→대전 KTX 응답은 운임·시간·ITX 0건을 증명�
     }),
     /backend outbound row did not match the requested leg/,
   );
+  for (const data of [
+    {
+      observedAt: "2026-07-19",
+      outbound: [],
+      inbound: [],
+    },
+    {
+      observedAt: "2026-07-19T06:00:00Z",
+      outbound: [],
+      inbound: [{
+        trainNumber: "102",
+        trainType: "KTX",
+        departureStationId: "NAT011668",
+        departureStationName: "대전",
+        departureAt: "2026-07-20T11:00:00+09:00",
+        arrivalStationId: "NAT010000",
+        arrivalStationName: "서울",
+        arrivalAt: "2026-07-20T12:02:00+09:00",
+        durationMinutes: 62,
+        adultFareWon: 23700,
+      }],
+    },
+  ]) {
+    assert.throws(
+      () => validateBackendSearchEnvelope({ success: true, data }, {
+        departureStationId: "NAT010000",
+        arrivalStationId: "NAT011668",
+        trainType: "KTX",
+        departureDate: "2026-07-20",
+      }),
+      /backend train search result schema was invalid/,
+    );
+  }
 });
 
 test("TAGO station catalog는 동일 ID의 상이한 이름을 거부한다", () => {
@@ -272,6 +306,15 @@ test("capacity runner는 repeated·unique·3-node·quota 경계를 고정한다"
   assert.doesNotMatch(k6, /TRAIN_SEARCH_PROVIDER_CALL_COUNT|TRAIN_SEARCH_QUOTA_VERDICT/);
   assert.match(runner, /validate-train-search-capacity\.mjs/);
   assert.doesNotMatch(runner, /source .*\.env|curl|jq|sed|awk|grep/);
+  for (const baseUrl of ["https://localhost", "https://127.0.0.1", "https://10.0.0.1"]) {
+    const result = spawnSync("bash", [
+      "tools/test/run-train-search-capacity.sh",
+      "--base-url",
+      baseUrl,
+    ], { encoding: "utf8" });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /public EasySubway production HTTPS origin/);
+  }
 });
 
 test("#2094 release artifact는 동일 candidate와 모든 완료 증거를 요구한다", () => {

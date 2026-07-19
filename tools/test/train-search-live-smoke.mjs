@@ -84,7 +84,7 @@ export function validateBackendSearchEnvelope(payload, {
     throw new Error("backend train search envelope was invalid");
   }
   const { observedAt, outbound, inbound } = payload.data;
-  if (!validDateTime(observedAt) || !Array.isArray(outbound) || !Array.isArray(inbound)) {
+  if (!validDateTime(observedAt) || !Array.isArray(outbound) || !Array.isArray(inbound) || inbound.length !== 0) {
     throw new Error("backend train search result schema was invalid");
   }
   const rows = [...outbound, ...inbound];
@@ -554,7 +554,22 @@ function integer(value, label) {
 }
 
 function validDateTime(value) {
-  return typeof value === "string" && value !== "" && !Number.isNaN(Date.parse(value));
+  if (typeof value !== "string") return false;
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-]\d{2}:\d{2})$/u.exec(value);
+  if (!match) return false;
+  const [year, month, day, hour, minute, second] = match.slice(1, 7).map(Number);
+  const maxDay = [31, leapYear(year) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
+  if (month < 1 || month > 12 || day < 1 || day > maxDay
+    || hour > 23 || minute > 59 || second > 59) return false;
+  if (match[7] !== "Z") {
+    const [offsetHour, offsetMinute] = match[7].slice(1).split(":").map(Number);
+    if (offsetHour > 23 || offsetMinute > 59) return false;
+  }
+  return true;
+}
+
+function leapYear(year) {
+  return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
 }
 
 function sha256(value) {

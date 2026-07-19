@@ -22,7 +22,8 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
-[[ "${base_url}" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?/?$ ]] || { echo "--base-url must be a public HTTPS origin" >&2; exit 2; }
+[[ "${base_url}" == "https://easysubway-api.aquilaxk.site" || "${base_url}" == "https://easysubway-api.aquilaxk.site/" ]] \
+	|| { echo "--base-url must be the public EasySubway production HTTPS origin" >&2; exit 2; }
 [[ "${departure_id}" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "--departure-id is invalid" >&2; exit 2; }
 [[ "${arrival_id}" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "--arrival-id is invalid" >&2; exit 2; }
 [[ "${departure_date}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { echo "--date is invalid" >&2; exit 2; }
