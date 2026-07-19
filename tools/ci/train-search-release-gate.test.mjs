@@ -1094,13 +1094,43 @@ test("#2094 release artifact는 동일 candidate와 모든 완료 증거를 요�
   assert.match(runtime.android.screenshotSha256, /^[0-9a-f]{64}$/);
   assert.match(runtime.android.semanticsSha256, /^[0-9a-f]{64}$/);
   assert.equal(runtime.review.actionableFindingsOpen, 0);
-  assert.equal(runtime.review.candidatePullRequest, 2291);
-  assert.equal(runtime.review.candidateMergeGitSha, runtime.candidateGitSha);
-  assert.match(runtime.review.reviewedHeadGitSha, /^[0-9a-f]{40}$/);
+  assert.equal(runtime.review.evidenceClass, "FULL_SHIPPED_TRAIN_SEARCH_CHANGE_SET");
+  assert.equal(runtime.review.reviewedHeadGitSha, "d6c98f4fd373762bd4f6cc9e2a459ba9eb1de052");
   assert.equal(
     runtime.review.reviewUrl,
-    "https://github.com/AquilaXk/easysubway/pull/2291#pullrequestreview-4730310729",
+    "https://github.com/AquilaXk/easysubway/pull/2311#pullrequestreview-4730748072",
   );
+  assert.deepEqual(runtime.review.reviewedRanges, [
+    {
+      pullRequest: 2294,
+      baseGitSha: "c1f498c1e9800bcc45ca4dda3fd8f4309e00e6ea",
+      mergeGitSha: "3a974f37f5a7c49480c951843a631964aa73b721",
+    },
+    {
+      pullRequest: 2295,
+      baseGitSha: "b50172dda489fb21bcd345610aa003fc9633154b",
+      mergeGitSha: "05833195a92fcbc1eb062c4a69990f59614b5284",
+    },
+    {
+      pullRequest: 2299,
+      baseGitSha: "d6971399b75912634b34423ea3c45791acd6fcf3",
+      mergeGitSha: "9fd69f5de10f45d727a34c57dd295ca22a5d0d22",
+    },
+    {
+      pullRequest: 2307,
+      baseGitSha: "ea4086a37828febc73922b172426702bbd827dc5",
+      mergeGitSha: "083625bec6e0818c80e250bb3f7490a209abe15c",
+    },
+    {
+      pullRequest: 2310,
+      baseGitSha: "083625bec6e0818c80e250bb3f7490a209abe15c",
+      mergeGitSha: "d36bc00467ab69732f49e1f56a343bb2da1e73ce",
+    },
+  ]);
+  assert.deepEqual(runtime.review.resolutionCommits, [
+    "f3b800d19fab5337f6f898f708284866307c09fe",
+    "d6c98f4fd373762bd4f6cc9e2a459ba9eb1de052",
+  ]);
   assert.equal(runtime.requiredCi.candidateGitSha, runtime.candidateGitSha);
   assert.deepEqual(runtime.backend.requiredCi, runtime.requiredCi);
   assert.equal(runtime.requiredCi.workflowName, "CI");

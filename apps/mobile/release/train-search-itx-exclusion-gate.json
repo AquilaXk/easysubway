@@ -273,10 +273,40 @@
       "semanticsSha256": "d91ba0f790af500aef6cbc5f1c5820aff8384a0f64278c45235d99b0f5b2799e"
     },
     "review": {
-      "candidatePullRequest": 2291,
-      "candidateMergeGitSha": "86be8d0294f9e2badab61f25e5c6a6ed9b7eea2c",
-      "reviewedHeadGitSha": "8beff4c9d5d188ae1631abdf2b5c4e8620f9737d",
-      "reviewUrl": "https://github.com/AquilaXk/easysubway/pull/2291#pullrequestreview-4730310729",
+      "evidenceClass": "FULL_SHIPPED_TRAIN_SEARCH_CHANGE_SET",
+      "reviewedHeadGitSha": "d6c98f4fd373762bd4f6cc9e2a459ba9eb1de052",
+      "reviewUrl": "https://github.com/AquilaXk/easysubway/pull/2311#pullrequestreview-4730748072",
+      "reviewedRanges": [
+        {
+          "pullRequest": 2294,
+          "baseGitSha": "c1f498c1e9800bcc45ca4dda3fd8f4309e00e6ea",
+          "mergeGitSha": "3a974f37f5a7c49480c951843a631964aa73b721"
+        },
+        {
+          "pullRequest": 2295,
+          "baseGitSha": "b50172dda489fb21bcd345610aa003fc9633154b",
+          "mergeGitSha": "05833195a92fcbc1eb062c4a69990f59614b5284"
+        },
+        {
+          "pullRequest": 2299,
+          "baseGitSha": "d6971399b75912634b34423ea3c45791acd6fcf3",
+          "mergeGitSha": "9fd69f5de10f45d727a34c57dd295ca22a5d0d22"
+        },
+        {
+          "pullRequest": 2307,
+          "baseGitSha": "ea4086a37828febc73922b172426702bbd827dc5",
+          "mergeGitSha": "083625bec6e0818c80e250bb3f7490a209abe15c"
+        },
+        {
+          "pullRequest": 2310,
+          "baseGitSha": "083625bec6e0818c80e250bb3f7490a209abe15c",
+          "mergeGitSha": "d36bc00467ab69732f49e1f56a343bb2da1e73ce"
+        }
+      ],
+      "resolutionCommits": [
+        "f3b800d19fab5337f6f898f708284866307c09fe",
+        "d6c98f4fd373762bd4f6cc9e2a459ba9eb1de052"
+      ],
       "actionableFindingsOpen": 0
     },
     "requiredCi": {
@@ -294,7 +324,7 @@
         "Admin QA Gates"
       ]
     },
-    "liveEvidenceSha256": "191d5990cc1e2a22a15ddc7abf788ffac83453b51a587c613dbfc22d1b67363d"
+    "liveEvidenceSha256": "8079d24d2b8cf10730a78450531efbdc3d186ecb1321d0bf0a4ea76c4b63ec5a"
   },
   "verification": {
     "backend": "./backend/gradlew -p backend test --tests '*TrainSearch*'",
