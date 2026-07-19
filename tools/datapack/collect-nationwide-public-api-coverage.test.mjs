@@ -82,6 +82,16 @@ test("전국 target과 fixture에서 line AND domain 실제 검색 계획을 만
   assert.equal(searchPlan.entries[0].queries[0].query.size, 10_000);
   assert.equal(searchPlan.entries[0].queries[0].query.keyword, "1호선");
   assert.deepEqual(searchPlan.entries[0].queries[0].matchTermGroups[1], ["1호선"]);
+  const operatorWideQuery = searchPlan.entries[0].queries.find(({ query }) => query.keyword === "실시간도착");
+  assert.ok(operatorWideQuery);
+  assert.deepEqual(operatorWideQuery.query.organizations, ["부산교통공사"]);
+  assert.deepEqual(operatorWideQuery.matchTermGroups, [[
+    "실시간도착",
+    "실시간열차",
+    "열차위치",
+    "도착정보",
+    "실제일시",
+  ]]);
 });
 
 test("전국 공통 provider 후보가 있으면 운영기관 catalog 0건을 공식 미지원으로 확정하지 않는다", async () => {
@@ -226,7 +236,14 @@ test("공공데이터 검색이 거부하는 GTX-A 문장부호는 안전한 ali
     },
   });
 
-  assert.deepEqual(searchPlan.entries[0].queries.map(({ query }) => query.keyword), ["GTXA"]);
+  assert.deepEqual(searchPlan.entries[0].queries.map(({ query }) => query.keyword), [
+    "GTXA",
+    "실시간도착",
+    "실시간열차",
+    "열차위치",
+    "도착정보",
+    "실제일시",
+  ]);
   assert.deepEqual(searchPlan.entries[0].queries[0].matchTermGroups[1], ["GTXA"]);
 });
 

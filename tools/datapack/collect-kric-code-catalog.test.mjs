@@ -1,0 +1,94 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { downloadKricCodeCatalog } from "./collect-kric-code-catalog.mjs";
+
+const XLSX_PREFIX = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00]);
+
+test("KRIC 최신 코드 정본은 XLSX 경계와 sanitized metadata를 검증한다", async () => {
+  const catalog = await downloadKricCodeCatalog({
+    now: new Date("2026-07-19T00:00:00.000Z"),
+    fetchImpl: async (url) => {
+      assert.equal(
+        String(url),
+        "https://data.kric.go.kr/rips/download.file?answerId=395&fileId=1&id=395&type=N",
+      );
+      return new Response(XLSX_PREFIX, {
+        status: 200,
+        headers: { "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
+      });
+    },
+  });
+
+  assert.equal(catalog.metadata.artifactKind, "kric-provider-code-catalog-download");
+  assert.equal(catalog.metadata.capturedAt, "2026-07-19T00:00:00.000Z");
+  assert.equal(catalog.metadata.byteCount, XLSX_PREFIX.length);
+  assert.match(catalog.metadata.sha256, /^[a-f0-9]{64}$/);
+  assert.deepEqual(catalog.bytes, XLSX_PREFIX);
+});
+
+test("KRIC 코드 정본은 HTTP·schema·크기 오류를 fail closed 한다", async (context) => {
+  await context.test("HTTP", async () => {
+    await assert.rejects(downloadKricCodeCatalog({
+      fetchImpl: async () => new Response("unavailable", { status: 503 }),
+    }), /HTTP 503/);
+  });
+  await context.test("schema", async () => {
+    await assert.rejects(downloadKricCodeCatalog({
+      fetchImpl: async () => new Response("<html/>", { status: 200, headers: { "content-type": "text/html" } }),
+    }), /schema mismatch/);
+  });
+  await context.test("size", async () => {
+    await assert.rejects(downloadKricCodeCatalog({
+      maximumBytes: 5,
+      fetchImpl: async () => new Response(XLSX_PREFIX, {
+        status: 200,
+        headers: { "content-type": "application/octet-stream" },
+      }),
+    }), /size limit/);
+  });
+});
+
+test("KRIC 코드 정본은 동일 host HTTPS redirect만 한 번 따른다", async () => {
+  const requests = [];
+  const catalog = await downloadKricCodeCatalog({
+    fetchImpl: async (url) => {
+      requests.push(String(url));
+      if (requests.length === 1) {
+        return new Response(null, {
+          status: 302,
+          headers: { location: "/rips/files/catalog.xlsx" },
+        });
+      }
+      return new Response(XLSX_PREFIX, {
+        status: 200,
+        headers: { "content-type": "application/octet-stream" },
+      });
+    },
+  });
+  assert.equal(catalog.metadata.byteCount, XLSX_PREFIX.length);
+  assert.deepEqual(requests, [
+    "https://data.kric.go.kr/rips/download.file?answerId=395&fileId=1&id=395&type=N",
+    "https://data.kric.go.kr/rips/files/catalog.xlsx",
+  ]);
+
+  await assert.rejects(downloadKricCodeCatalog({
+    fetchImpl: async () => new Response(null, {
+      status: 302,
+      headers: { location: "https://example.com/catalog.xlsx" },
+    }),
+  }), /redirect origin/);
+});
+
+test("KRIC transport 실패는 비밀 없는 원인 코드만 노출한다", async () => {
+  const secret = "never-print-provider-value";
+  await assert.rejects(downloadKricCodeCatalog({
+    fetchImpl: async () => {
+      throw new Error(`fetch failed ${secret}`, { cause: { code: "ECONNRESET" } });
+    },
+  }), (error) => {
+    assert.match(error.message, /transport failure \(ECONNRESET\)/);
+    assert.doesNotMatch(error.message, new RegExp(secret));
+    return true;
+  });
+});

@@ -79,18 +79,18 @@ export function buildNationwidePublicApiSearchPlan({ targets, fixture, sourceCan
       knownProviderCandidateIds: (knownProviderCandidatesByDomain.get(sourceDomain) ?? [])
         .filter((candidate) => candidateAppliesToScope(candidate.coverageScope, scope))
         .map(({ id }) => id),
-      queries: lineTerms.map((keyword) => ({
-        providerId: "data-go-search",
-        endpoint: "https://api.odcloud.kr/api/GetSearchDataList/v1/searchData",
-        operation: "searchData",
-        credentialEnv: "DATA_GO_KR_SERVICE_KEY",
-        credentialParam: "serviceKey",
-        credentialPlacement: "header",
-        method: "POST",
-        format: "json",
-        matchTermGroups: [domain.terms, lineTerms],
-        query: { page: 0, size: 10_000, dataType: ["API"], organizations: [operatorName], keyword },
-      })),
+      queries: [
+        ...lineTerms.map((keyword) => publicApiSearchQuery({
+          operatorName,
+          keyword,
+          matchTermGroups: [domain.terms, lineTerms],
+        })),
+        ...domain.terms.map((keyword) => publicApiSearchQuery({
+          operatorName,
+          keyword,
+          matchTermGroups: [domain.terms],
+        })),
+      ],
     };
   }));
   return {
@@ -98,6 +98,21 @@ export function buildNationwidePublicApiSearchPlan({ targets, fixture, sourceCan
     artifactKind: "nationwide-public-api-coverage-search-plan",
     targetVersion: requiredString(targets.targetVersion, "targets.targetVersion"),
     entries,
+  };
+}
+
+function publicApiSearchQuery({ operatorName, keyword, matchTermGroups }) {
+  return {
+    providerId: "data-go-search",
+    endpoint: "https://api.odcloud.kr/api/GetSearchDataList/v1/searchData",
+    operation: "searchData",
+    credentialEnv: "DATA_GO_KR_SERVICE_KEY",
+    credentialParam: "serviceKey",
+    credentialPlacement: "header",
+    method: "POST",
+    format: "json",
+    matchTermGroups,
+    query: { page: 0, size: 10_000, dataType: ["API"], organizations: [operatorName], keyword },
   };
 }
 

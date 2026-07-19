@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { promisify } from "node:util";
 
@@ -289,6 +290,40 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
   validateCatalog(catalog);
   assert.ok(catalog.some((entry) => entry.kind === "internal"));
   assert.ok(catalog.some((entry) => entry.id === "provider:seoul-topis-realtime-station-arrival"));
+  const kricCodeCatalog = findCatalogEntry(catalog, "provider:kric-provider-code-catalog");
+  const providerDocument = JSON.parse(await readFile(
+    new URL("../datapack/source-candidates.json", import.meta.url),
+    "utf8",
+  ));
+  const kricCodeCatalogCandidate = providerDocument.candidates.find(
+    ({ id }) => id === "kric-provider-code-catalog",
+  );
+  const kricCodeCatalogSnapshot = JSON.parse(await readFile(
+    new URL("../datapack/sources/kric-provider-code-catalog-20260228.json", import.meta.url),
+    "utf8",
+  ));
+  assert.equal(kricCodeCatalog.operation.auth.placement, "none");
+  assert.equal(kricCodeCatalog.operation.runner.command, "node tools/datapack/collect-kric-code-catalog.mjs");
+  assert.deepEqual(kricCodeCatalog.responseFields, [
+    "RAIL_OPR_ISTT_CD",
+    "RAIL_OPR_ISTT_NM",
+    "LN_CD",
+    "LN_NM",
+    "STIN_CD",
+    "STIN_NM",
+  ]);
+  assert.equal(
+    kricCodeCatalogCandidate.evidence.liveSampleRetrievedAt,
+    kricCodeCatalogSnapshot.capturedAt,
+  );
+  assert.equal(
+    kricCodeCatalogCandidate.evidence.liveSampleRowCount,
+    kricCodeCatalogSnapshot.stationRecordCount,
+  );
+  assert.equal(
+    kricCodeCatalogCandidate.evidence.liveSampleRawSha256,
+    kricCodeCatalogSnapshot.sourceSha256,
+  );
   const publicDataSearch = findCatalogEntry(catalog, "provider:public-data-portal-search");
   assert.equal(publicDataSearch.operation.method, "POST");
   assert.equal(publicDataSearch.operation.auth.env, "DATA_GO_KR_SERVICE_KEY");
@@ -384,7 +419,7 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
 test("프로젝트 provider catalog는 비API source를 제외하고 모든 호출 계약을 제공한다", async () => {
   const providers = (await loadProjectCatalog()).filter((entry) => entry.kind === "provider");
 
-  assert.equal(providers.length, 40);
+  assert.equal(providers.length, 41);
   assert.equal(providers.some((entry) => entry.documentationStatus === "metadata-only"), false);
   assert.equal(providers.some((entry) => entry.id === "provider:molit-urban-rail-full-route"), false);
   assert.equal(providers.some((entry) => entry.id === "provider:seoulmetro-cyberstation-route-map"), false);
