@@ -1573,6 +1573,7 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY=prod-tago-train-service-key",
     "EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_MINUTE=60",
     "EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_DAY=1000",
+    "EASYSUBWAY_TRAIN_SEARCH_RATE_LIMIT_PER_DAY=64",
     "EASYSUBWAY_REPORT_RECEIPT_TOKEN_PEPPER=legacy-pepper-with-enough-entropy",
     "EASYSUBWAY_REPORT_UPLOAD_BUCKET=easysubway-report-uploads",
     "EASYSUBWAY_REPORT_UPLOAD_MAX_BYTES=921600",
@@ -16935,6 +16936,8 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
   assert.deepEqual(trainSearchAbuseState.storageLocations, ["backend-jvm-memory"]);
   assert.equal(trainSearchAbuseState.retention.fixedTtl, false);
   assert.equal(trainSearchAbuseState.retention.windowSeconds, 60);
+  assert.equal(trainSearchAbuseState.retention.dailyCostLimit, 64);
+  assert.equal(trainSearchAbuseState.retention.dailyWindowZone, "Asia/Seoul");
   assert.equal(trainSearchAbuseState.retention.maxCounterKeysPerLimiter, 4096);
   assert.equal(trainSearchAbuseState.googlePlayDataSafety.dataType, "Device or other IDs");
   assert.equal(trainSearchAbuseState.googlePlayDataSafety.deletionSupported, false);

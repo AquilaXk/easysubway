@@ -10,6 +10,8 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -42,6 +44,7 @@ class TrainSearchRateLimitFilter extends OncePerRequestFilter {
 		ObjectMapper objectMapper,
 		@Value("${EASYSUBWAY_TRAIN_STATION_RATE_LIMIT_PER_MINUTE:60}") int stationLimit,
 		@Value("${EASYSUBWAY_TRAIN_SEARCH_RATE_LIMIT_PER_MINUTE:24}") int searchLimit,
+		@Value("${EASYSUBWAY_TRAIN_SEARCH_RATE_LIMIT_PER_DAY:64}") int searchDailyLimit,
 		@Value("${EASYSUBWAY_TRAIN_SEARCH_RATE_LIMIT_MAX_KEYS:4096}") int maxKeys,
 		@Value("${easysubway.auth.client-ip.trusted-proxies:}") String trustedProxies,
 		ObjectProvider<Clock> clockProvider
@@ -49,7 +52,13 @@ class TrainSearchRateLimitFilter extends OncePerRequestFilter {
 		this.objectMapper = objectMapper;
 		Clock clock = clockProvider.getIfAvailable(Clock::systemUTC);
 		this.stationLimiter = new TrainSearchRateLimiter(stationLimit, maxKeys, clock);
-		this.searchLimiter = new TrainSearchRateLimiter(searchLimit, maxKeys, clock);
+		this.searchLimiter = new TrainSearchRateLimiter(
+			searchLimit,
+			searchDailyLimit,
+			maxKeys,
+			clock,
+			ZoneId.of("Asia/Seoul")
+		);
 		this.identityResolver = new TrainSearchClientIdentityResolver(trustedProxies);
 	}
 
@@ -117,38 +126,64 @@ final class TrainSearchRateLimiter {
 	private static final long WINDOW_SECONDS = 60;
 
 	private final int limit;
+	private final Integer dailyLimit;
 	private final int maxKeys;
 	private final Clock clock;
+	private final ZoneId dayZone;
 	private final Map<String, WindowCounter> counters = new ConcurrentHashMap<>();
 	private long countersWindow = Long.MIN_VALUE;
 
 	TrainSearchRateLimiter(int limit, int maxKeys, Clock clock) {
-		if (limit < 1 || maxKeys < 1) throw new IllegalArgumentException("train-search rate limit must be positive");
+		this(limit, null, maxKeys, clock, ZoneId.of("UTC"));
+	}
+
+	TrainSearchRateLimiter(int limit, int dailyLimit, int maxKeys, Clock clock, ZoneId dayZone) {
+		this(limit, Integer.valueOf(dailyLimit), maxKeys, clock, dayZone);
+	}
+
+	private TrainSearchRateLimiter(int limit, Integer dailyLimit, int maxKeys, Clock clock, ZoneId dayZone) {
+		if (limit < 1 || (dailyLimit != null && dailyLimit < 1) || maxKeys < 1) {
+			throw new IllegalArgumentException("train-search rate limit must be positive");
+		}
 		this.limit = limit;
+		this.dailyLimit = dailyLimit;
 		this.maxKeys = maxKeys;
 		this.clock = clock;
+		this.dayZone = dayZone;
 	}
 
 	synchronized AcquireResult acquire(String identity, int cost) {
 		if (cost < 1) throw new IllegalArgumentException("train-search request cost must be positive");
-		long now = Instant.now(clock).getEpochSecond();
+		Instant currentInstant = Instant.now(clock);
+		long now = currentInstant.getEpochSecond();
 		long window = now - Math.floorMod(now, WINDOW_SECONDS);
-		if (countersWindow != window) {
+		LocalDate currentDate = currentInstant.atZone(dayZone).toLocalDate();
+		long day = currentDate.toEpochDay();
+		long retentionWindow = dailyLimit == null ? window : day;
+		if (countersWindow != retentionWindow) {
 			counters.clear();
-			countersWindow = window;
+			countersWindow = retentionWindow;
 		}
-		WindowCounter counter = counterFor(identity, window);
-		long retryAfter = WINDOW_SECONDS - Math.floorMod(now, WINDOW_SECONDS);
-		return counter != null && counter.acquire(window, cost, limit)
+		WindowCounter counter = counterFor(identity, window, day);
+		long minuteRetryAfter = WINDOW_SECONDS - Math.floorMod(now, WINDOW_SECONDS);
+		long dailyRetryAfter = java.time.Duration.between(
+			currentInstant,
+			currentDate.plusDays(1).atStartOfDay(dayZone).toInstant()
+		).getSeconds();
+		WindowCounter.Decision decision = counter == null
+			? WindowCounter.Decision.CARDINALITY_DENIED
+			: counter.acquire(window, day, cost, limit, dailyLimit);
+		long retryAfter = decision == WindowCounter.Decision.DAILY_DENIED ? dailyRetryAfter : minuteRetryAfter;
+		return decision == WindowCounter.Decision.ALLOWED
 			? new AcquireResult(true, 0)
 			: new AcquireResult(false, retryAfter);
 	}
 
-	private WindowCounter counterFor(String identity, long window) {
+	private WindowCounter counterFor(String identity, long window, long day) {
 		WindowCounter existing = counters.get(identity);
 		if (existing != null) return existing;
 		if (counters.size() >= maxKeys) return null;
-		WindowCounter created = new WindowCounter(window);
+		WindowCounter created = new WindowCounter(window, day);
 		counters.put(identity, created);
 		return created;
 	}
@@ -157,22 +192,38 @@ final class TrainSearchRateLimiter {
 
 	private static final class WindowCounter {
 		private long window;
+		private long day;
 		private int used;
+		private int dailyUsed;
 
-		private WindowCounter(long window) {
+		private WindowCounter(long window, long day) {
 			this.window = window;
+			this.day = day;
 		}
 
-		private synchronized boolean acquire(long currentWindow, int cost, int limit) {
+		private synchronized Decision acquire(
+			long currentWindow,
+			long currentDay,
+			int cost,
+			int limit,
+			Integer dailyLimit
+		) {
 			if (window != currentWindow) {
 				window = currentWindow;
 				used = 0;
 			}
-			if (cost > limit - used) return false;
+			if (day != currentDay) {
+				day = currentDay;
+				dailyUsed = 0;
+			}
+			if (dailyLimit != null && cost > dailyLimit - dailyUsed) return Decision.DAILY_DENIED;
+			if (cost > limit - used) return Decision.MINUTE_DENIED;
 			used += cost;
-			return true;
+			if (dailyLimit != null) dailyUsed += cost;
+			return Decision.ALLOWED;
 		}
 
+		private enum Decision { ALLOWED, MINUTE_DENIED, DAILY_DENIED, CARDINALITY_DENIED }
 	}
 }
 

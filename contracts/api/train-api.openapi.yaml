@@ -133,7 +133,7 @@ components:
         type: string
         enum: [no-store]
     RetryAfter:
-      description: Seconds until the next one-minute rate-limit window
+      description: Seconds until the exhausted per-client minute or KST daily rate-limit window resets
       schema:
         type: integer
         minimum: 1
@@ -167,7 +167,7 @@ components:
               code: TRAIN_SEARCH_INVALID_ARGUMENT
             message: 검색 조건을 확인해 주세요.
     RateLimited:
-      description: Per-client request budget exhausted
+      description: Per-client minute or KST daily request-cost budget exhausted
       headers:
         Cache-Control:
           $ref: "#/components/headers/NoStore"

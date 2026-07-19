@@ -189,9 +189,9 @@
         "TrainSearchClientIdentityResolver ip:remoteAddr key"
       ],
       "storageLocations": ["backend-jvm-memory"],
-      "retentionKo": "고정 TTL은 없다. 역 검색과 열차 검색 limiter가 각각 요청 IP별 카운터를 JVM heap에 보관한다. 각 limiter는 다음 60초 고정 window의 첫 요청에서 이전 window의 전체 map을 한 번 비우며, limiter별 최대 4096개를 넘으면 새 IP 요청을 거절한다. 최종적으로 JVM 프로세스 종료 시 모두 삭제된다.",
-      "deletionKo": "요청 IP는 사용자 계정 DB나 access log에 저장하지 않고 filter도 IP를 로그로 남기지 않는다. 각 limiter의 다음 60초 window 첫 요청 또는 JVM 프로세스 종료 시 자동 삭제되며, 사용자가 직접 삭제할 영속 저장소는 없다.",
-      "deletionImplementation": "TrainSearchRateLimiter가 ip:clientIdentity별 WindowCounter를 역 검색과 열차 검색용 JVM heap ConcurrentHashMap에서 각각 관리한다. 고정 window 변경을 감지한 첫 요청이 해당 limiter의 map을 한 번 clear하고, maxKeys(기본 4096) 초과 시 저장 대신 요청을 거절한다.",
+      "retentionKo": "고정 TTL은 없다. 역 검색 limiter는 요청 IP별 카운터를 다음 60초 window까지, 열차 검색 limiter는 분당·일일 비용 카운터를 다음 Asia/Seoul 날짜까지 JVM heap에 보관한다. limiter별 최대 4096개를 넘으면 새 IP 요청을 거절하며, 최종적으로 JVM 프로세스 종료 시 모두 삭제된다.",
+      "deletionKo": "요청 IP는 사용자 계정 DB나 access log에 저장하지 않고 filter도 IP를 로그로 남기지 않는다. 역 검색 상태는 다음 60초 window, 열차 검색 상태는 다음 Asia/Seoul 날짜의 첫 요청 또는 JVM 프로세스 종료 시 자동 삭제되며, 사용자가 직접 삭제할 영속 저장소는 없다.",
+      "deletionImplementation": "TrainSearchRateLimiter가 ip:clientIdentity별 WindowCounter를 역 검색과 열차 검색용 JVM heap ConcurrentHashMap에서 각각 관리한다. 역 검색 limiter는 60초 window, 열차 검색 limiter는 Asia/Seoul 일일 window 변경을 감지한 첫 요청이 map을 한 번 clear하고, maxKeys(기본 4096) 초과 시 저장 대신 요청을 거절한다.",
       "evidence": [
         "backend/src/main/java/com/easysubway/train/adapter/in/web/TrainSearchRateLimitFilter.java",
         "backend/src/test/java/com/easysubway/train/adapter/in/web/TrainSearchRateLimitFilterTest.java"
@@ -210,8 +210,10 @@
       "retention": {
         "fixedTtl": false,
         "windowSeconds": 60,
+        "dailyCostLimit": 64,
+        "dailyWindowZone": "Asia/Seoul",
         "maxCounterKeysPerLimiter": 4096,
-        "evictionBoundary": "each limiter clears all prior-window entries on the first request in the next fixed window; over-capacity identities rejected without storage",
+        "evictionBoundary": "station limiter clears prior entries in the next minute; search limiter clears prior entries on the next KST day; over-capacity identities rejected without storage",
         "finalDeletionBoundary": "JVM process lifecycle end"
       },
       "operationReference": "https://docs.spring.io/spring-framework/reference/web/webmvc/filters.html",

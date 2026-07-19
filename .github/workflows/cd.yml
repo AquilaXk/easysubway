@@ -523,6 +523,7 @@ jobs:
                 drop["EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_DAY"] = 1
                 drop["EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_MINUTE"] = 1
                 drop["EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_DAY"] = 1
+                drop["EASYSUBWAY_TRAIN_SEARCH_RATE_LIMIT_PER_DAY"] = 1
                 if (drop_topis_key == "true") {
                   drop["EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY"] = 1
                 }
@@ -552,6 +553,7 @@ jobs:
             fi
             printf 'EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_MINUTE=60\n' >> "${env_file}"
             printf 'EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_DAY=1000\n' >> "${env_file}"
+            printf 'EASYSUBWAY_TRAIN_SEARCH_RATE_LIMIT_PER_DAY=64\n' >> "${env_file}"
             echo "source=secret" >> "${GITHUB_OUTPUT}"
           else
             cp .env.example "${env_file}"

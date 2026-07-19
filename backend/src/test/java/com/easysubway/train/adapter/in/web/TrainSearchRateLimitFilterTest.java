@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Instant;
-import java.time.ZoneOffset;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.lang.reflect.Modifier;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockFilterChain;
@@ -128,6 +128,27 @@ class TrainSearchRateLimitFilterTest {
 		var acquire = TrainSearchRateLimiter.class.getDeclaredMethod("acquire", String.class, int.class);
 
 		assertThat(Modifier.isSynchronized(acquire.getModifiers())).isTrue();
+	}
+
+	@Test
+	void dailySearchCostBudgetFailsClosedAndResetsAtTheNextKstDay() {
+		var clock = new TestClock(Instant.parse("2026-07-19T14:59:30Z"));
+		var limiter = new TrainSearchRateLimiter(24, 2, 10, clock, ZoneId.of("Asia/Seoul"));
+
+		assertThat(limiter.acquire("client", 2)).isEqualTo(new TrainSearchRateLimiter.AcquireResult(true, 0));
+		assertThat(limiter.acquire("client", 1)).isEqualTo(new TrainSearchRateLimiter.AcquireResult(false, 30));
+
+		clock.advanceSeconds(30);
+
+		assertThat(limiter.acquire("client", 1)).isEqualTo(new TrainSearchRateLimiter.AcquireResult(true, 0));
+	}
+
+	@Test
+	void dailyBudgetRejectsAnOverBudgetCostWithoutPartiallyChargingTheMinuteWindow() {
+		var limiter = new TrainSearchRateLimiter(2, 1, 10, fixedClock(), ZoneId.of("Asia/Seoul"));
+
+		assertThat(limiter.acquire("client", 2).allowed()).isFalse();
+		assertThat(limiter.acquire("client", 1).allowed()).isTrue();
 	}
 
 	private void assertAllowed(TrainSearchRateLimitFilter filter, String trainType, String returnDate) throws Exception {

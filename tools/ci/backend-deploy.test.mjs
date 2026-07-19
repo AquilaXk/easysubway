@@ -277,6 +277,7 @@ test("배포 env 준비는 Compose 서버 env와 backend 앱 env를 분리한다
   assert.match(backendEnv, /^EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY=prod-tago-train-service-key$/m);
   assert.match(backendEnv, /^EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_MINUTE=60$/m);
   assert.match(backendEnv, /^EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_DAY=1000$/m);
+  assert.match(backendEnv, /^EASYSUBWAY_TRAIN_SEARCH_RATE_LIMIT_PER_DAY=64$/m);
   assert.match(backendEnv, /^EASYSUBWAY_REPORT_OBJECT_STORAGE_INTERNAL_ENDPOINT=http:\/\/object-storage:9000$/m);
   assert.match(backendEnv, /^EASYSUBWAY_REPORT_UPLOAD_PUBLIC_BASE_URL=https:\/\/uploads.easysubway.example$/m);
   assert.match(backendEnv, /^EASYSUBWAY_REPORT_ABUSE_WINDOW_SECONDS=45$/m);
@@ -308,8 +309,10 @@ test("TAGO 기차검색 key는 공용 GitHub secret에서 backend 전용 env로�
   assert.match(cd, /EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY=%s/);
   assert.match(cd, /drop\["EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_MINUTE"\] = 1/);
   assert.match(cd, /drop\["EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_DAY"\] = 1/);
+  assert.match(cd, /drop\["EASYSUBWAY_TRAIN_SEARCH_RATE_LIMIT_PER_DAY"\] = 1/);
   assert.match(cd, /printf 'EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_MINUTE=60\\n'/);
   assert.match(cd, /printf 'EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_DAY=1000\\n'/);
+  assert.match(cd, /printf 'EASYSUBWAY_TRAIN_SEARCH_RATE_LIMIT_PER_DAY=64\\n'/);
   assert.match(allowlist, /^EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY$/m);
   assert.doesNotMatch(allowlist, /^DATA_GO_KR_SERVICE_KEY$/m);
   assert.deepEqual(scopeMap.keys.EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY, ["backend"]);
@@ -317,6 +320,7 @@ test("TAGO 기차검색 key는 공용 GitHub secret에서 backend 전용 env로�
   for (const [key, value] of [
     ["EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_MINUTE", "60"],
     ["EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_DAY", "1000"],
+    ["EASYSUBWAY_TRAIN_SEARCH_RATE_LIMIT_PER_DAY", "64"],
   ]) {
     assert.match(example, new RegExp(`^${key}=${value}$`, "m"));
     assert.match(allowlist, new RegExp(`^${key}$`, "m"));
