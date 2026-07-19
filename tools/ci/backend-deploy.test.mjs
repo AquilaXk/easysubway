@@ -334,6 +334,10 @@ test("TAGO 기차검색 key는 공용 GitHub secret에서 backend 전용 env로�
   assert.match(cd, /printf 'EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_MINUTE=60\\n'/);
   assert.match(cd, /printf 'EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_DAY=1000\\n'/);
   assert.match(cd, /printf 'EASYSUBWAY_TRAIN_SEARCH_RATE_LIMIT_PER_DAY=64\\n'/);
+  assert.match(
+    cd,
+    /node --env-file="\$\{PREPARED_ENV_DIR\}\/backend\.env" tools\/ops\/probe-tago-train-provider\.mjs/,
+  );
   assert.match(allowlist, /^EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY$/m);
   assert.doesNotMatch(allowlist, /^DATA_GO_KR_SERVICE_KEY$/m);
   assert.deepEqual(scopeMap.keys.EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY, ["backend"]);
@@ -347,6 +351,13 @@ test("TAGO 기차검색 key는 공용 GitHub secret에서 backend 전용 env로�
     assert.match(allowlist, new RegExp(`^${key}$`, "m"));
     assert.deepEqual(scopeMap.keys[key], ["backend"]);
   }
+});
+
+test("production 배포 env는 TAGO 기차검색 key 누락을 거부한다", async () => {
+  await assert.rejects(
+    prepare(fixtureEnv().replace(/^EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY=.*\n/m, "")),
+    /required deployment env is empty: EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY/,
+  );
 });
 
 test("배포 env 준비는 중복, interpolation, 내부 공개 URL을 차단한다", async () => {

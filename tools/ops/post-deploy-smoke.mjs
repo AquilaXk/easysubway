@@ -112,6 +112,65 @@ async function checkRouteApiClosure(baseUrl, axis, timeoutMs, routeV2IngressEnab
   }
 }
 
+function koreaServiceDay() {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date()).filter(({ type }) => type !== "literal").map(({ type, value }) => [type, value]));
+  const calendarDate = `${parts.year}-${parts.month}-${parts.day}`;
+  if (Number(parts.hour) >= 3) return calendarDate;
+  const prior = new Date(`${calendarDate}T00:00:00Z`);
+  prior.setUTCDate(prior.getUTCDate() - 1);
+  return prior.toISOString().slice(0, 10);
+}
+
+async function trainStations(baseUrl, axis, query, timeoutMs) {
+  const url = new URL(joinUrl(baseUrl, axis.stationPath));
+  url.searchParams.set("query", query);
+  url.searchParams.set("trainType", axis.trainType);
+  const { status, text } = await httpRequest(url, { timeoutMs });
+  if (status !== 200) throw new Error(`${query} station catalog returned HTTP ${status}`);
+  const body = parseJson(text, `${query} station catalog`);
+  if (body.success !== true || !Array.isArray(body.data)) {
+    throw new Error(`${query} station catalog schema was invalid`);
+  }
+  const station = body.data.find((entry) => entry?.name === query && typeof entry.id === "string" && entry.id !== "");
+  if (!station) throw new Error(`${query} station catalog did not contain the exact station`);
+  return station;
+}
+
+async function checkTrainSearch(baseUrl, axis, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  const remaining = () => {
+    const value = deadline - Date.now();
+    if (value <= 0) throw new Error("train search smoke timeout budget exhausted");
+    return value;
+  };
+  const departure = await trainStations(baseUrl, axis, axis.stationQueries[0], remaining());
+  const arrival = await trainStations(baseUrl, axis, axis.stationQueries[1], remaining());
+  const url = new URL(joinUrl(baseUrl, axis.searchPath));
+  url.searchParams.set("departureStationId", departure.id);
+  url.searchParams.set("arrivalStationId", arrival.id);
+  url.searchParams.set("departureDate", koreaServiceDay());
+  url.searchParams.set("trainType", axis.trainType);
+  const { status, text } = await httpRequest(url, { timeoutMs: remaining() });
+  if (status !== 200) throw new Error(`train search returned HTTP ${status}`);
+  const body = parseJson(text, "train search");
+  const journeys = body?.success === true && Array.isArray(body?.data?.outbound) ? body.data.outbound : [];
+  const approved = journeys.some((journey) => (
+    journey?.trainType === axis.trainType
+      && journey?.departureStationId === departure.id
+      && journey?.arrivalStationId === arrival.id
+      && Number.isInteger(journey?.adultFareWon)
+      && journey.adultFareWon >= 0
+  ));
+  if (!approved) throw new Error("train search did not return an approved Seoul-Daejeon KTX fare row");
+}
+
 async function checkAdminLogin(baseUrl, axis, timeoutMs) {
   const url = joinUrl(baseUrl, axis.path);
   const { status, text } = await httpRequest(url, { timeoutMs });
@@ -199,7 +258,7 @@ async function main() {
 
   const contractPath = argValue(args, "--contract", DEFAULT_CONTRACT);
   const contract = JSON.parse(await readFile(contractPath, "utf8"));
-  const { liveness, readiness, routeApiClosure, adminLogin, datapack } = contract.axes;
+  const { liveness, readiness, routeApiClosure, trainSearch, adminLogin, datapack } = contract.axes;
 
   const datapackBaseUrl = argValue(args, "--datapack-base-url", datapack.baseUrl);
   const budgetMs = Number(argValue(args, "--timeout-seconds", "90")) * 1000;
@@ -217,6 +276,11 @@ async function main() {
     routeApiClosure,
     (t) => checkRouteApiClosure(baseUrl, routeApiClosure, t, routeV2IngressEnabled),
     Math.min(10000, Math.max(2000, budgetMs * 0.2)),
+  ));
+  axes.push(await runAxisOnce(
+    trainSearch,
+    (t) => checkTrainSearch(baseUrl, trainSearch, t),
+    Math.max(65_000, budgetMs * 0.75),
   ));
   axes.push(await runAxis(adminLogin, (t) => checkAdminLogin(baseUrl, adminLogin, t), {
     maxMs: Math.max(2000, budgetMs * 0.1),

@@ -622,6 +622,13 @@ jobs:
           EASYSUBWAY_BACKEND_ENV_FILE="${PREPARED_ENV_DIR}/backend.env" \
             docker compose --env-file "${PREPARED_ENV_DIR}/compose.env" -f infra/docker-compose.yml config --quiet
 
+      - name: CD Deploy / Validate TAGO train provider credential
+        if: ${{ steps.dotenv.outputs.source == 'secret' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --env-file="${PREPARED_ENV_DIR}/backend.env" tools/ops/probe-tago-train-provider.mjs
+
       - name: CD Deploy / Log in to GHCR
         uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567
         with:
