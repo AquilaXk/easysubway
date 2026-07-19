@@ -46,13 +46,13 @@
 
 		<!-- V6-06 공통 툴바: 검색은 항상 direct, 유형·상태·역 필터는 필터 시트, 정렬은 보기 설정 시트로 접힌다.
 		     각 영역 form은 나머지 파라미터를 hidden으로 보존한다. -->
-		<!-- NOTE(#2279): 검색 form의 필터 보존용 hidden(search.hidden)은 보류. list-toolbar.html의
-		     th:each="param" 이 Thymeleaf 예약어 param을 loop 변수로 써 non-empty hidden 전달 시 500이 난다.
-		     해당 fragment는 §5 수정 파일 밖이라 수정하지 않고 보고한다. 필터→필터·정렬·페이지네이션 보존은
-		     아래 자체 form(hidden th:value)이 담당하므로 정상 동작하고, 키워드 검색 시 필터 유지만 보류된다. -->
+		<!-- 검색 form의 필터·정렬 보존용 hidden(search.hidden, #2279 리뷰 반영): list-toolbar.html이
+		     ${search.get('hidden')} 메서드 호출로 null-safe하게 읽고 hiddenParam으로 반복하므로, 여기서 유형·
+		     상태·역·정렬을 그대로 전달해 키워드 검색이 활성 필터를 덮어쓰지 않게 한다(§7 filter binding 불변). -->
 		<div th:replace="~{admin/fragments/list-toolbar :: toolbar(
 		         '/admin/facilities/page', 'facility-results',
-		         ${ {'name':'query','value':searchKeyword,'placeholder':'시설·역 이름 검색','label':'시설·역 이름 검색','hidden':{}} },
+		         ${ {'name':'query','value':searchKeyword,'placeholder':'시설·역 이름 검색','label':'시설·역 이름 검색',
+		            'hidden': {'type':selectedType,'status':selectedStatus,'stationId':selectedStationFilter,'sort':selectedSort}} },
 		         ~{}, ~{::facilityFilters}, ~{::facilityView})}">
 			<form th:fragment="facilityFilters" class="admin-toolbar-form" method="get"
 			      th:action="@{/admin/facilities/page}" role="group" aria-label="유형·상태·역 필터"
