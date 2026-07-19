@@ -32,9 +32,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -50,8 +52,9 @@ public class TrainSearchService {
 	// 한 구간도 영업일 2일, 페이지네이션, 복수 열차종 코드, 요청별 재시도를 순차 수행할 수 있다.
 	private static final Duration LEG_LEASE_TTL = Duration.ofMinutes(15);
 	private static final Duration CATALOG_LEASE_TTL = Duration.ofMinutes(5);
-	private static final List<Duration> CATALOG_LEASE_POLLS = leasePolls(CATALOG_LEASE_TTL);
-	private static final List<Duration> LEG_LEASE_POLLS = leasePolls(LEG_LEASE_TTL);
+	private static final Duration HTTP_REQUEST_BUDGET = Duration.ofSeconds(30);
+	private static final Duration LEASE_WAIT_BUDGET = Duration.ofSeconds(5);
+	private static final List<Duration> LEASE_POLLS = leasePolls(LEASE_WAIT_BUDGET);
 	private static final int L1_LIMIT = 20_000;
 	private static final TypeReference<List<Journey>> JOURNEYS = new TypeReference<>() {};
 
@@ -95,15 +98,16 @@ public class TrainSearchService {
 	}
 
 	public Catalog catalog() {
-		return catalogWithMetadata().catalog();
+		return catalogWithMetadata(requestDeadline()).catalog();
 	}
 
-	private CatalogEntry catalogWithMetadata() {
+	private CatalogEntry catalogWithMetadata(Instant deadline) {
 		try {
+			requireBefore(deadline);
 			Instant now = clock.instant();
 			return cache.freshCatalog(CATALOG_KIND, now)
 				.map(cached -> new CatalogEntry(decodeCatalog(cached), cached.expiresAt()))
-				.orElseGet(() -> refreshCatalogEntry(now, false));
+				.orElseGet(() -> refreshCatalogEntry(now, false, deadline));
 		} catch (TrainSearchFailure failure) {
 			throw failure;
 		} catch (RuntimeException exception) {
@@ -122,7 +126,7 @@ public class TrainSearchService {
 		}
 		if (trainType != null) requireSupported(trainType);
 		String folded = normalizedQuery.toLowerCase(Locale.ROOT);
-		CatalogEntry catalog = catalogWithMetadata();
+		CatalogEntry catalog = catalogWithMetadata(requestDeadline());
 		List<Station> stations = catalog.catalog().stations().stream()
 			.filter(station -> station.name().toLowerCase(Locale.ROOT).contains(folded))
 			.sorted(Comparator.comparing(Station::name).thenComparing(Station::id))
@@ -135,10 +139,11 @@ public class TrainSearchService {
 	}
 
 	public TrainSearchSnapshot searchWithMetadata(SearchCriteria criteria) {
+		Instant deadline = requestDeadline();
 		LocalDate admittedServiceDay = TrainSearchScopePolicy.currentServiceDay(clock);
 		SearchCriteria normalized = validateStructure(criteria, admittedServiceDay);
 		try {
-			CatalogEntry catalogEntry = catalogWithMetadata();
+			CatalogEntry catalogEntry = catalogWithMetadata(deadline);
 			Catalog catalog = catalogEntry.catalog();
 			validateStations(normalized, catalog);
 			LegResult outbound = direction(
@@ -147,7 +152,8 @@ public class TrainSearchService {
 				normalized.arrivalStationId(),
 				normalized.departureDate(),
 				normalized.trainType(),
-				admittedServiceDay
+				admittedServiceDay,
+				deadline
 			);
 			LegResult inbound = normalized.returnDate() == null ? null : direction(
 				catalog,
@@ -155,7 +161,8 @@ public class TrainSearchService {
 				normalized.departureStationId(),
 				normalized.returnDate(),
 				normalized.trainType(),
-				admittedServiceDay
+				admittedServiceDay,
+				deadline
 			);
 			Instant observedAt = inbound == null || outbound.observedAt().isAfter(inbound.observedAt())
 				? outbound.observedAt()
@@ -179,7 +186,8 @@ public class TrainSearchService {
 
 	public Catalog refreshCatalog() {
 		try {
-			return refreshCatalogEntry(clock.instant(), true).catalog();
+			Instant now = clock.instant();
+			return refreshCatalogEntry(now, true, now.plus(CATALOG_LEASE_TTL)).catalog();
 		} catch (TrainSearchFailure failure) {
 			throw failure;
 		} catch (RuntimeException exception) {
@@ -191,7 +199,7 @@ public class TrainSearchService {
 		return cache.purgeExpiredBefore(clock.instant().minus(Duration.ofHours(48)));
 	}
 
-	private CatalogEntry refreshCatalogEntry(Instant now, boolean force) {
+	private CatalogEntry refreshCatalogEntry(Instant now, boolean force, Instant deadline) {
 		synchronized (catalogLock) {
 			var existing = cache.freshCatalog(CATALOG_KIND, now);
 			if (!force && existing.isPresent()) {
@@ -200,15 +208,15 @@ public class TrainSearchService {
 			}
 			String owner = ownerSupplier.get();
 			if (!cache.tryAcquireLease(CATALOG_LEASE_KEY, owner, now, CATALOG_LEASE_TTL)) {
-				return pollForCatalog(force ? existing.orElse(null) : null);
+				return pollForCatalog(force ? existing.orElse(null) : null, deadline);
 			}
-			return loadCatalog(owner);
+			return loadCatalog(owner, deadline);
 		}
 	}
 
-	private CatalogEntry pollForCatalog(CachedCatalog baseline) {
-		for (Duration delay : CATALOG_LEASE_POLLS) {
-			sleep(delay);
+	private CatalogEntry pollForCatalog(CachedCatalog baseline, Instant deadline) {
+		for (Duration delay : LEASE_POLLS) {
+			sleep(delay, deadline);
 			Instant now = clock.instant();
 			var cached = cache.freshCatalog(CATALOG_KIND, now);
 			if (cached.isPresent() && catalogChanged(baseline, cached.orElseThrow())) {
@@ -217,7 +225,7 @@ public class TrainSearchService {
 			}
 			String owner = ownerSupplier.get();
 			if (cache.tryAcquireLease(CATALOG_LEASE_KEY, owner, now, CATALOG_LEASE_TTL)) {
-				return loadCatalog(owner);
+				return loadCatalog(owner, deadline);
 			}
 		}
 		throw failure("TRAIN_SEARCH_UNAVAILABLE");
@@ -229,9 +237,11 @@ public class TrainSearchService {
 			|| !Objects.equals(baseline.expiresAt(), current.expiresAt());
 	}
 
-	private CatalogEntry loadCatalog(String owner) {
+	private CatalogEntry loadCatalog(String owner, Instant deadline) {
 		try {
-			Catalog loaded = provider.catalog();
+			requireBefore(deadline);
+			Catalog loaded = provider.catalog(deadline);
+			requireBefore(deadline);
 			Instant completedAt = clock.instant();
 			Catalog filtered = new Catalog(
 				loaded.observedAt(),
@@ -261,7 +271,8 @@ public class TrainSearchService {
 		String arrivalStationId,
 		LocalDate date,
 		String requestedTrainType,
-		LocalDate admittedServiceDay
+		LocalDate admittedServiceDay,
+		Instant deadline
 	) {
 		Station departure = station(catalog, departureStationId);
 		Station arrival = station(catalog, arrivalStationId);
@@ -271,8 +282,10 @@ public class TrainSearchService {
 		if (types.isEmpty() || types.stream().anyMatch(type -> type.providerCodes().isEmpty())) {
 			throw failure("TRAIN_SEARCH_UNAVAILABLE");
 		}
-		List<CachedLeg> legs = types.stream()
-			.map(type -> leg(new LegQuery(
+		var legs = new java.util.ArrayList<CachedLeg>();
+		for (TrainType type : types) {
+			requireBefore(deadline);
+			legs.add(leg(new LegQuery(
 				departure.id(),
 				arrival.id(),
 				date,
@@ -280,8 +293,8 @@ public class TrainSearchService {
 				type.providerCodes(),
 				departure.name(),
 				arrival.name()
-			), admittedServiceDay))
-			.toList();
+			), admittedServiceDay, deadline));
+		}
 		Map<String, Journey> unique = new LinkedHashMap<>();
 		legs.stream()
 			.flatMap(value -> decodeJourneys(value).stream())
@@ -295,7 +308,8 @@ public class TrainSearchService {
 		return new LegResult(observedAt, expiresAt, List.copyOf(unique.values()));
 	}
 
-	private CachedLeg leg(LegQuery query, LocalDate admittedServiceDay) {
+	private CachedLeg leg(LegQuery query, LocalDate admittedServiceDay, Instant deadline) {
+		requireBefore(deadline);
 		String key = key(query);
 		Instant now = clock.instant();
 		CachedLeg local = l1.get(key);
@@ -308,9 +322,9 @@ public class TrainSearchService {
 		}
 		var pending = new CompletableFuture<CachedLeg>();
 		var existing = singleFlights.putIfAbsent(key, pending);
-		if (existing != null) return await(existing);
+		if (existing != null) return await(existing, deadline);
 		try {
-			CachedLeg loaded = loadLeg(key, query, admittedServiceDay, now);
+			CachedLeg loaded = loadLeg(key, query, admittedServiceDay, now, deadline);
 			pending.complete(loaded);
 			return loaded;
 		} catch (RuntimeException exception) {
@@ -321,18 +335,26 @@ public class TrainSearchService {
 		}
 	}
 
-	private CachedLeg loadLeg(String key, LegQuery query, LocalDate admittedServiceDay, Instant now) {
+	private CachedLeg loadLeg(String key, LegQuery query, LocalDate admittedServiceDay, Instant now, Instant deadline) {
 		String owner = ownerSupplier.get();
 		if (!cache.tryAcquireLease(key, owner, now, LEG_LEASE_TTL)) {
-			return pollForShared(key, query, admittedServiceDay);
+			return pollForShared(key, query, admittedServiceDay, deadline);
 		}
-		return loadOwnedLeg(key, query, admittedServiceDay, owner);
+		return loadOwnedLeg(key, query, admittedServiceDay, owner, deadline);
 	}
 
-	private CachedLeg loadOwnedLeg(String key, LegQuery query, LocalDate admittedServiceDay, String owner) {
+	private CachedLeg loadOwnedLeg(
+		String key,
+		LegQuery query,
+		LocalDate admittedServiceDay,
+		String owner,
+		Instant deadline
+	) {
 		boolean released = false;
 		try {
-			List<Journey> journeys = provider.search(query);
+			requireBefore(deadline);
+			List<Journey> journeys = provider.search(query, deadline);
+			requireBefore(deadline);
 			Instant completedAt = clock.instant();
 			String normalizedQuery = write(canonical(query));
 			String payload = write(journeys);
@@ -370,9 +392,9 @@ public class TrainSearchService {
 		return futureTtl.isBefore(serviceDayStart) ? futureTtl : serviceDayStart;
 	}
 
-	private CachedLeg pollForShared(String key, LegQuery query, LocalDate admittedServiceDay) {
-		for (Duration delay : LEG_LEASE_POLLS) {
-			sleep(delay);
+	private CachedLeg pollForShared(String key, LegQuery query, LocalDate admittedServiceDay, Instant deadline) {
+		for (Duration delay : LEASE_POLLS) {
+			sleep(delay, deadline);
 			Instant now = clock.instant();
 			var cached = cache.freshLeg(key, now);
 			if (cached.isPresent()) {
@@ -382,7 +404,7 @@ public class TrainSearchService {
 			}
 			String owner = ownerSupplier.get();
 			if (cache.tryAcquireLease(key, owner, now, LEG_LEASE_TTL)) {
-				return loadOwnedLeg(key, query, admittedServiceDay, owner);
+				return loadOwnedLeg(key, query, admittedServiceDay, owner, deadline);
 			}
 		}
 		throw failure("TRAIN_SEARCH_UNAVAILABLE");
@@ -513,22 +535,43 @@ public class TrainSearchService {
 		}
 	}
 
-	private CachedLeg await(CompletableFuture<CachedLeg> future) {
+	private CachedLeg await(CompletableFuture<CachedLeg> future, Instant deadline) {
 		try {
-			return future.join();
-		} catch (CompletionException exception) {
+			Duration remaining = remaining(deadline);
+			return future.get(Math.max(1L, remaining.toMillis()), TimeUnit.MILLISECONDS);
+		} catch (ExecutionException exception) {
 			if (exception.getCause() instanceof RuntimeException runtime) throw runtime;
+			throw failure("TRAIN_SEARCH_UNAVAILABLE", exception);
+		} catch (InterruptedException exception) {
+			Thread.currentThread().interrupt();
+			throw failure("TRAIN_SEARCH_UNAVAILABLE", exception);
+		} catch (TimeoutException exception) {
 			throw failure("TRAIN_SEARCH_UNAVAILABLE", exception);
 		}
 	}
 
-	private void sleep(Duration duration) {
+	private void sleep(Duration duration, Instant deadline) {
 		try {
-			sleeper.sleep(duration);
+			Duration remaining = remaining(deadline);
+			sleeper.sleep(duration.compareTo(remaining) < 0 ? duration : remaining);
 		} catch (InterruptedException exception) {
 			Thread.currentThread().interrupt();
 			throw failure("TRAIN_SEARCH_UNAVAILABLE", exception);
 		}
+	}
+
+	private Instant requestDeadline() {
+		return clock.instant().plus(HTTP_REQUEST_BUDGET);
+	}
+
+	private Duration remaining(Instant deadline) {
+		Instant now = clock.instant();
+		if (!now.isBefore(deadline)) throw failure("TRAIN_SEARCH_UNAVAILABLE");
+		return Duration.between(now, deadline);
+	}
+
+	private void requireBefore(Instant deadline) {
+		remaining(deadline);
 	}
 
 	private String providerFailureCode(ProviderFailure failure) {

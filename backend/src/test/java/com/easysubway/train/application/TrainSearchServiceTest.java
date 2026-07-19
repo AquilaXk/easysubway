@@ -120,34 +120,34 @@ class TrainSearchServiceTest {
 
 	@Test
 	void keepsAnAdmittedServiceDayResultFreshWhenProviderCompletionCrossesThreeAm() {
-		var clock = new TestClock(Instant.parse("2026-07-19T17:59:00Z"));
+		var clock = new TestClock(Instant.parse("2026-07-19T17:59:59Z"));
 		service = serviceWith(clock, duration -> {});
-		provider.beforeSearchReturn = () -> clock.advance(Duration.ofMinutes(2));
+		provider.beforeSearchReturn = () -> clock.advance(Duration.ofSeconds(2));
 
 		var snapshot = service.searchWithMetadata(criteriaFor(LocalDate.parse("2026-07-19"), null));
 
 		assertThat(cache.legs.values()).singleElement().satisfies(leg -> {
-			assertThat(leg.observedAt()).isEqualTo(Instant.parse("2026-07-19T18:01:00Z"));
-			assertThat(leg.expiresAt()).isEqualTo(Instant.parse("2026-07-19T18:06:00Z"));
+			assertThat(leg.observedAt()).isEqualTo(Instant.parse("2026-07-19T18:00:01Z"));
+			assertThat(leg.expiresAt()).isEqualTo(Instant.parse("2026-07-19T18:05:01Z"));
 			assertThat(leg.expiresAt()).isAfter(leg.observedAt());
 		});
-		assertThat(snapshot.expiresAt()).isEqualTo(Instant.parse("2026-07-19T18:06:00Z"));
+		assertThat(snapshot.expiresAt()).isEqualTo(Instant.parse("2026-07-19T18:05:01Z"));
 	}
 
 	@Test
 	void usesTodayTtlWhenAFutureServiceDayBecomesCurrentDuringProviderLoading() {
-		var clock = new TestClock(Instant.parse("2026-07-19T17:59:00Z"));
+		var clock = new TestClock(Instant.parse("2026-07-19T17:59:59Z"));
 		service = serviceWith(clock, duration -> {});
-		provider.beforeSearchReturn = () -> clock.advance(Duration.ofMinutes(2));
+		provider.beforeSearchReturn = () -> clock.advance(Duration.ofSeconds(2));
 
 		var snapshot = service.searchWithMetadata(criteriaFor(LocalDate.parse("2026-07-20"), null));
 
 		assertThat(cache.legs.values()).singleElement().satisfies(leg -> {
-			assertThat(leg.observedAt()).isEqualTo(Instant.parse("2026-07-19T18:01:00Z"));
-			assertThat(leg.expiresAt()).isEqualTo(Instant.parse("2026-07-19T18:06:00Z"));
+			assertThat(leg.observedAt()).isEqualTo(Instant.parse("2026-07-19T18:00:01Z"));
+			assertThat(leg.expiresAt()).isEqualTo(Instant.parse("2026-07-19T18:05:01Z"));
 			assertThat(leg.expiresAt()).isAfter(leg.observedAt());
 		});
-		assertThat(snapshot.expiresAt()).isEqualTo(Instant.parse("2026-07-19T18:06:00Z"));
+		assertThat(snapshot.expiresAt()).isEqualTo(Instant.parse("2026-07-19T18:05:01Z"));
 	}
 
 	@Test
@@ -175,7 +175,7 @@ class TrainSearchServiceTest {
 	}
 
 	@Test
-	void waitsForTheLegLeaseUntilItsExecutionBoundaryBeforeReturningUnavailable() {
+	void capsHttpWaitingForAnOccupiedLegLease() {
 		service.catalog();
 		cache.denyLeases = true;
 		Duration[] slept = { Duration.ZERO };
@@ -185,11 +185,11 @@ class TrainSearchServiceTest {
 			.isInstanceOf(TrainSearchService.TrainSearchFailure.class)
 			.extracting("code")
 			.isEqualTo("TRAIN_SEARCH_UNAVAILABLE");
-		assertThat(slept[0]).isGreaterThanOrEqualTo(Duration.ofMinutes(15));
+		assertThat(slept[0]).isPositive().isLessThanOrEqualTo(Duration.ofSeconds(5));
 	}
 
 	@Test
-	void reacquiresAnAbandonedLegLeaseAfterItExpires() {
+	void returnsUnavailableBeforeAnAbandonedLegLeaseExpires() {
 		service.search(criteria(null));
 		String key = cache.legs.keySet().iterator().next();
 		cache.legs.clear();
@@ -205,11 +205,32 @@ class TrainSearchServiceTest {
 			}
 		});
 
-		service.search(criteria(null));
+		assertThatThrownBy(() -> service.search(criteria(null)))
+			.isInstanceOf(TrainSearchService.TrainSearchFailure.class)
+			.extracting("code")
+			.isEqualTo("TRAIN_SEARCH_UNAVAILABLE");
 
-		assertThat(slept[0]).isGreaterThanOrEqualTo(Duration.ofMinutes(15));
-		assertThat(provider.searchCalls).hasValue(1);
-		assertThat(cache.legs).containsKey(key);
+		assertThat(slept[0]).isPositive().isLessThanOrEqualTo(Duration.ofSeconds(5));
+		assertThat(provider.searchCalls).hasValue(0);
+		assertThat(cache.legs).doesNotContainKey(key);
+	}
+
+	@Test
+	void stopsStartingColdCacheTrainTypeSearchesAtTheRequestDeadline() {
+		var clock = new TestClock(NOW);
+		provider.catalogTrainTypes = allSupportedTrainTypes();
+		provider.beforeSearchReturn = () -> clock.advance(Duration.ofSeconds(10));
+		service = serviceWith(clock, duration -> clock.advance(duration));
+
+		assertThatThrownBy(() -> service.search(new SearchCriteria(
+			"NAT010000", "NAT011668", LocalDate.parse("2026-07-19"), null, null
+		)))
+			.isInstanceOf(TrainSearchService.TrainSearchFailure.class)
+			.extracting("code")
+			.isEqualTo("TRAIN_SEARCH_UNAVAILABLE");
+
+		assertThat(provider.searchCalls).hasValue(3);
+		assertThat(provider.queries).hasSize(3);
 	}
 
 	@Test
@@ -324,13 +345,13 @@ class TrainSearchServiceTest {
 	void startsTodayTtlWhenTheProviderCallCompletes() {
 		var clock = new TestClock(NOW);
 		service = serviceWith(clock, duration -> {});
-		provider.beforeSearchReturn = () -> clock.advance(Duration.ofMinutes(10));
+		provider.beforeSearchReturn = () -> clock.advance(Duration.ofSeconds(10));
 
 		service.search(criteria(null));
 
 		assertThat(cache.legs.values()).singleElement().satisfies(leg -> {
-			assertThat(leg.observedAt()).isEqualTo(NOW.plus(Duration.ofMinutes(10)));
-			assertThat(leg.expiresAt()).isEqualTo(NOW.plus(Duration.ofMinutes(15)));
+			assertThat(leg.observedAt()).isEqualTo(NOW.plus(Duration.ofSeconds(10)));
+			assertThat(leg.expiresAt()).isEqualTo(NOW.plus(Duration.ofMinutes(5)).plusSeconds(10));
 		});
 	}
 
@@ -403,6 +424,19 @@ class TrainSearchServiceTest {
 		);
 	}
 
+	private List<TrainType> allSupportedTrainTypes() {
+		return List.of(
+			new TrainType("KTX", "KTX", List.of("00")),
+			new TrainType("KTX_SANCHEON", "KTX-산천", List.of("01", "10")),
+			new TrainType("SRT", "SRT", List.of("02")),
+			new TrainType("ITX_MAUM", "ITX-마음", List.of("03")),
+			new TrainType("ITX_SAEMAEUL", "ITX-새마을", List.of("04")),
+			new TrainType("SAEMAEUL", "새마을호", List.of("05")),
+			new TrainType("MUGUNGHWA", "무궁화호", List.of("06")),
+			new TrainType("NURIRO", "누리로", List.of("08"))
+		);
+	}
+
 	private static final class FakeProvider implements TrainSearchProvider {
 		private final AtomicInteger catalogCalls = new AtomicInteger();
 		private final AtomicInteger searchCalls = new AtomicInteger();
@@ -412,6 +446,10 @@ class TrainSearchServiceTest {
 		private volatile boolean blockSearch;
 		private volatile String failureCode;
 		private volatile Runnable beforeSearchReturn = () -> {};
+		private volatile List<TrainType> catalogTrainTypes = List.of(
+			new TrainType("KTX", "KTX", List.of("00", "10")),
+			new TrainType("ITX_CHEONGCHUN", "ITX-청춘", List.of("09"))
+		);
 
 		@Override
 		public Catalog catalog() {
@@ -419,10 +457,7 @@ class TrainSearchServiceTest {
 			return new Catalog(
 				NOW,
 				List.of(new Station("NAT010000", "서울"), new Station("NAT011668", "대전")),
-				List.of(
-					new TrainType("KTX", "KTX", List.of("00", "10")),
-					new TrainType("ITX_CHEONGCHUN", "ITX-청춘", List.of("09"))
-				)
+				catalogTrainTypes
 			);
 		}
 
