@@ -2,6 +2,8 @@ package com.easysubway.route.application.service;
 
 import com.easysubway.route.application.port.in.RouteV2SearchUseCase.SearchRouteV2Command;
 import com.easysubway.route.application.port.out.LoadRouteTimetablePort;
+import com.easysubway.route.application.port.out.LoadRouteTimetablePort.PathwayEdge;
+import com.easysubway.route.application.port.out.LoadRouteTimetablePort.RouteEdgeEvidence;
 import com.easysubway.route.application.port.out.LoadRouteTimetablePort.RouteTimetable;
 import com.easysubway.route.application.port.out.LoadRouteTimetablePort.ServiceCalendar;
 import com.easysubway.route.application.port.out.LoadRouteTimetablePort.ServiceCalendarDate;
@@ -9,7 +11,9 @@ import com.easysubway.route.application.port.out.LoadRouteTimetablePort.TransitF
 import com.easysubway.route.application.port.out.LoadRouteTimetablePort.TransitRoute;
 import com.easysubway.route.application.port.out.LoadRouteTimetablePort.TransitStopTime;
 import com.easysubway.route.application.port.out.LoadRouteTimetablePort.TransitTrip;
+import com.easysubway.route.application.port.out.LoadRouteTimetablePort.TransferRule;
 import com.easysubway.route.domain.BoardingSlackPolicy;
+import com.easysubway.route.domain.ConstraintMode;
 import com.easysubway.route.domain.EtaSource;
 import com.easysubway.route.domain.ProfileWalkTimeCalculator;
 import com.easysubway.route.domain.ProfileWalkTimeCalculator.WalkTimeSource;
@@ -53,6 +57,13 @@ class RouteTimetableRaptorPlanner {
 	private static final int LABEL_SLOT_COUNT = PARETO_LIMIT + 1;
 	private static final int UNREACHED = Integer.MAX_VALUE;
 	private static final int[] NO_PATTERNS = new int[0];
+	private static final int[] NO_TRANSITIONS = new int[0];
+	private static final byte WARNING_LOW_CONFIDENCE = 1;
+	private static final byte WARNING_STAIRS = 1 << 1;
+	private static final byte WARNING_STALE = 1 << 2;
+	private static final int STRICT_PROFILE_MASK = profileMask(ConstraintMode.STRICT_STEP_FREE);
+	private static final int NON_STRICT_PROFILE_MASK = profileMask(
+		ConstraintMode.PREFER_STEP_FREE, ConstraintMode.ALLOW_WITH_WARNINGS);
 	private final ThreadLocal<ScanWorkspace> scanWorkspaces = ThreadLocal.withInitial(ScanWorkspace::new);
 
 	List<RouteSearchResult> search(SearchRouteV2Command command, RouteTimetable timetable) {
@@ -594,6 +605,33 @@ class RouteTimetableRaptorPlanner {
 		).seconds();
 	}
 
+	static int profileBit(com.easysubway.profile.domain.MobilityType mobilityType, ConstraintMode constraintMode) {
+		int mobility = switch (mobilityType) {
+			case SENIOR -> 0;
+			case STROLLER -> 1;
+			case WHEELCHAIR -> 2;
+			case PREGNANT -> 3;
+			case TEMPORARY_INJURY -> 4;
+			case LUGGAGE -> 5;
+		};
+		int constraint = switch (constraintMode) {
+			case STRICT_STEP_FREE -> 0;
+			case PREFER_STEP_FREE -> 1;
+			case ALLOW_WITH_WARNINGS -> 2;
+		};
+		return 1 << (mobility * ConstraintMode.values().length + constraint);
+	}
+
+	private static int profileMask(ConstraintMode... constraintModes) {
+		int mask = 0;
+		for (var mobilityType : com.easysubway.profile.domain.MobilityType.values()) {
+			for (ConstraintMode constraintMode : constraintModes) {
+				mask |= profileBit(mobilityType, constraintMode);
+			}
+		}
+		return mask;
+	}
+
 	private static RouteStep timetableAccessStep(
 		int sequence,
 		String stepType,
@@ -792,12 +830,14 @@ class RouteTimetableRaptorPlanner {
 		private final Map<String, Integer> stationIndex;
 		private final Map<String, Integer> routeIndex;
 		private final Map<String, Integer> tripIndex;
+		private final Map<String, Integer> lineIndex;
 		private final Map<Integer, int[]> stopsByPattern;
 		private final Map<Integer, int[]> patternsByStop;
 		private final Map<Integer, List<ScheduledTrip>> tripsByPattern;
 		private final Map<DayOfWeek, List<ServiceCalendar>> calendarsByDay;
 		private final Map<LocalDate, List<ServiceCalendarDate>> exceptionsByDate;
 		private final List<ScheduledTrip> scheduledTrips;
+		private final AccessTransitions accessTransitions;
 		private final LinkedHashMap<LocalDate, ActiveServiceDay> activeServiceDays = new LinkedHashMap<>(16, 0.75f, true);
 
 		private CompiledTimetable(RouteTimetable source) {
@@ -805,6 +845,7 @@ class RouteTimetableRaptorPlanner {
 			stationIndex = denseIndex(source.transitStopTimes().stream().map(TransitStopTime::stationId).toList());
 			routeIndex = denseIndex(source.transitRoutes().stream().map(TransitRoute::id).toList());
 			tripIndex = denseIndex(source.transitTrips().stream().map(TransitTrip::id).toList());
+			lineIndex = denseIndex(source.transitStopTimes().stream().map(TransitStopTime::lineId).toList());
 
 			Map<String, TransitRoute> routesById = routesById(source);
 			Map<String, List<TransitStopTime>> stopTimesByTrip = stopTimesByTrip(source);
@@ -839,6 +880,7 @@ class RouteTimetableRaptorPlanner {
 					java.util.stream.Collectors.collectingAndThen(java.util.stream.Collectors.toList(), List::copyOf)
 				)
 			));
+			accessTransitions = AccessTransitions.compile(source, stationIndex, lineIndex);
 		}
 
 		RouteTimetable source() {
@@ -851,6 +893,38 @@ class RouteTimetableRaptorPlanner {
 
 		int stationIndex(String stationId) {
 			return stationIndex.getOrDefault(stationId, -1);
+		}
+
+		int lineIndex(String lineId) {
+			return lineIndex.getOrDefault(lineId, -1);
+		}
+
+		int entryTransition(int station, int line, int profileBit, boolean ignoreBlocked) {
+			return accessTransitions.entry(station, line, profileBit, ignoreBlocked);
+		}
+
+		int exitTransition(int station, int line, int profileBit, boolean ignoreBlocked) {
+			return accessTransitions.exit(station, line, profileBit, ignoreBlocked);
+		}
+
+		int transferTransition(int station, int fromLine, int toLine, int profileBit, boolean ignoreBlocked) {
+			return accessTransitions.transfer(station, fromLine, toLine, profileBit, ignoreBlocked);
+		}
+
+		int transitionDurationSeconds(int transition) {
+			return accessTransitions.durationSeconds(transition);
+		}
+
+		int transitionDistanceMeters(int transition) {
+			return accessTransitions.distanceMeters(transition);
+		}
+
+		String transitionVerificationStatus(int transition) {
+			return accessTransitions.verificationStatus(transition);
+		}
+
+		int unsupportedTransferCount() {
+			return accessTransitions.unsupportedTransferCount();
 		}
 
 		Set<String> coveredStationIds() {
@@ -1050,6 +1124,316 @@ class RouteTimetableRaptorPlanner {
 				byDay.put(day, calendars.stream().filter(calendar -> runsOn(calendar, day)).toList());
 			}
 			return Map.copyOf(byDay);
+		}
+	}
+
+	private static final class AccessTransitions {
+
+		private static final Comparator<Candidate> CANDIDATE_ORDER = Comparator
+			.comparingInt((Candidate candidate) -> Integer.bitCount(candidate.warningCodes()))
+			.thenComparingInt(Candidate::durationSeconds)
+			.thenComparingInt(Candidate::distanceMeters)
+			.thenComparing(candidate -> candidate.edgeId() == null ? "" : candidate.edgeId());
+
+		private final int lineCount;
+		private final int[][] entryTransitions;
+		private final int[][] exitTransitions;
+		private final int[][] transferTransitions;
+		private final int[] durationSeconds;
+		private final int[] distanceMeters;
+		private final int[] blockedProfiles;
+		private final int[] warningProfiles;
+		private final byte[] warningCodes;
+		private final boolean[] includesStairs;
+		private final String[] edgeIds;
+		private final String[] verificationStatuses;
+		private final int unsupportedTransferCount;
+
+		private AccessTransitions(
+			int lineCount,
+			int[][] entryTransitions,
+			int[][] exitTransitions,
+			int[][] transferTransitions,
+			List<Candidate> candidates,
+			int unsupportedTransferCount
+		) {
+			this.lineCount = lineCount;
+			this.entryTransitions = entryTransitions;
+			this.exitTransitions = exitTransitions;
+			this.transferTransitions = transferTransitions;
+			this.unsupportedTransferCount = unsupportedTransferCount;
+			durationSeconds = new int[candidates.size()];
+			distanceMeters = new int[candidates.size()];
+			blockedProfiles = new int[candidates.size()];
+			warningProfiles = new int[candidates.size()];
+			warningCodes = new byte[candidates.size()];
+			includesStairs = new boolean[candidates.size()];
+			edgeIds = new String[candidates.size()];
+			verificationStatuses = new String[candidates.size()];
+			for (int index = 0; index < candidates.size(); index += 1) {
+				Candidate candidate = candidates.get(index);
+				durationSeconds[index] = candidate.durationSeconds();
+				distanceMeters[index] = candidate.distanceMeters();
+				blockedProfiles[index] = candidate.blockedProfiles();
+				warningProfiles[index] = candidate.warningProfiles();
+				warningCodes[index] = candidate.warningCodes();
+				includesStairs[index] = candidate.includesStairs();
+				edgeIds[index] = candidate.edgeId();
+				verificationStatuses[index] = candidate.verificationStatus();
+			}
+		}
+
+		private static AccessTransitions compile(
+			RouteTimetable timetable,
+			Map<String, Integer> stationIndex,
+			Map<String, Integer> lineIndex
+		) {
+			int stationCount = stationIndex.size();
+			int lineCount = lineIndex.size();
+			List<List<Candidate>> entries = candidateLists(stationCount * lineCount);
+			List<List<Candidate>> exits = candidateLists(stationCount * lineCount);
+			List<List<Candidate>> transfers = candidateLists(stationCount * lineCount * lineCount);
+			Map<String, PathwayEdge> edges = new HashMap<>();
+			for (PathwayEdge edge : timetable.routeAccessData().pathwayEdges()) {
+				edges.put(edge.id(), edge);
+			}
+			Map<String, RouteEdgeEvidence> evidenceByEdge = new HashMap<>();
+			timetable.routeAccessData().routeEdgeEvidence().stream()
+				.sorted(Comparator.comparing(RouteEdgeEvidence::id))
+				.forEach(evidence -> evidenceByEdge.putIfAbsent(evidence.edgeId(), evidence));
+
+			for (RouteEdgeEvidence evidence : timetable.routeAccessData().routeEdgeEvidence()) {
+				Integer station = stationIndex.get(evidence.stationId());
+				Integer line = lineIndex.get(evidence.lineId());
+				PathwayEdge edge = edges.get(evidence.edgeId());
+				if (station == null || line == null || edge == null) {
+					continue;
+				}
+				Candidate candidate = candidate(edge, evidence, null, edge.durationSeconds(), true);
+				if ("ENTRY".equals(evidence.edgeType())) {
+					entries.get(stationLineKey(station, line, lineCount)).add(candidate);
+				} else if ("EXIT".equals(evidence.edgeType())) {
+					exits.get(stationLineKey(station, line, lineCount)).add(candidate);
+				}
+			}
+
+			int unsupported = 0;
+			for (TransferRule rule : timetable.routeAccessData().transferRules()) {
+				if (!rule.fromStationId().equals(rule.toStationId()) || !"IN_STATION".equals(rule.transferType())) {
+					unsupported += 1;
+					continue;
+				}
+				Integer station = stationIndex.get(rule.fromStationId());
+				Integer fromLine = lineIndex.get(rule.fromLineId());
+				Integer toLine = lineIndex.get(rule.toLineId());
+				if (station == null || fromLine == null || toLine == null) {
+					continue;
+				}
+				List<Candidate> candidates = transfers.get(transferKey(station, fromLine, toLine, lineCount));
+				PathwayEdge normalEdge = edges.get(rule.pathwayEdgeId());
+				if (normalEdge != null) {
+					boolean strictCandidate = normalEdge.id().equals(rule.strictStepFreePathwayEdgeId());
+					candidates.add(candidate(
+						normalEdge,
+						evidenceByEdge.get(normalEdge.id()),
+						rule,
+						Math.max(rule.minTransferSeconds(), normalEdge.durationSeconds()),
+						strictCandidate
+					));
+				}
+				PathwayEdge strictEdge = edges.get(rule.strictStepFreePathwayEdgeId());
+				if (strictEdge != null && (normalEdge == null || !strictEdge.id().equals(normalEdge.id()))) {
+					candidates.add(candidate(
+						strictEdge,
+						evidenceByEdge.get(strictEdge.id()),
+						rule,
+						Math.max(rule.minTransferSeconds(), strictEdge.durationSeconds()),
+						true
+					));
+				}
+			}
+
+			boolean[][] served = new boolean[stationCount][lineCount];
+			for (TransitStopTime stopTime : timetable.transitStopTimes()) {
+				Integer station = stationIndex.get(stopTime.stationId());
+				Integer line = lineIndex.get(stopTime.lineId());
+				if (station != null && line != null) {
+					served[station][line] = true;
+				}
+			}
+			for (int station = 0; station < stationCount; station += 1) {
+				for (int line = 0; line < lineCount; line += 1) {
+					if (!served[station][line]) {
+						continue;
+					}
+					addDefaultIfEmpty(entries.get(stationLineKey(station, line, lineCount)), ENTRY_DURATION_SECONDS, ENTRY_DISTANCE_METERS);
+					addDefaultIfEmpty(exits.get(stationLineKey(station, line, lineCount)), EXIT_DURATION_SECONDS, EXIT_DISTANCE_METERS);
+					for (int toLine = 0; toLine < lineCount; toLine += 1) {
+						if (served[station][toLine]) {
+							addDefaultIfEmpty(
+								transfers.get(transferKey(station, line, toLine, lineCount)),
+								TRANSFER_DURATION_SECONDS,
+								TRANSFER_DISTANCE_METERS
+							);
+						}
+					}
+				}
+			}
+
+			List<Candidate> flattened = new ArrayList<>();
+			int[][] entryIds = flatten(entries, flattened);
+			int[][] exitIds = flatten(exits, flattened);
+			int[][] transferIds = flatten(transfers, flattened);
+			return new AccessTransitions(lineCount, entryIds, exitIds, transferIds, flattened, unsupported);
+		}
+
+		private static Candidate candidate(
+			PathwayEdge edge,
+			RouteEdgeEvidence evidence,
+			TransferRule rule,
+			int durationSeconds,
+			boolean strictCandidate
+		) {
+			boolean verified = evidence != null
+				&& "VERIFIED".equals(evidence.verificationStatus())
+				&& "VERIFIED".equals(edge.verificationStatus())
+				&& (rule == null || "VERIFIED".equals(rule.verificationStatus()));
+			boolean trusted = evidence != null
+				&& trustedProvenance(evidence.provenanceKind())
+				&& trustedProvenance(edge.provenanceKind());
+			boolean strictAllowed = strictCandidate
+				&& verified
+				&& trusted
+				&& evidence.strictRouteEligible()
+				&& !edge.includesStairs();
+			byte warnings = 0;
+			if (!verified || !trusted || edge.reliabilityScore() < 80) {
+				warnings |= WARNING_LOW_CONFIDENCE;
+			}
+			if (edge.includesStairs()) {
+				warnings |= WARNING_STAIRS;
+			}
+			if ("STALE".equals(edge.verificationStatus())
+				|| evidence != null && "STALE".equals(evidence.verificationStatus())
+				|| rule != null && "STALE".equals(rule.verificationStatus())) {
+				warnings |= WARNING_STALE;
+			}
+			String verificationStatus = evidence == null ? "MISSING" : evidence.verificationStatus();
+			return new Candidate(
+				durationSeconds,
+				edge.distanceMeters(),
+				strictAllowed ? 0 : STRICT_PROFILE_MASK,
+				warnings == 0 ? 0 : NON_STRICT_PROFILE_MASK,
+				warnings,
+				edge.includesStairs(),
+				edge.id(),
+				verificationStatus
+			);
+		}
+
+		private static boolean trustedProvenance(String provenance) {
+			return "OFFICIAL_SOURCE".equals(provenance)
+				|| "OPERATOR_CONFIRMED".equals(provenance)
+				|| "FIELD_VERIFIED".equals(provenance);
+		}
+
+		private static void addDefaultIfEmpty(List<Candidate> candidates, int durationSeconds, int distanceMeters) {
+			if (candidates.isEmpty()) {
+				candidates.add(new Candidate(
+					durationSeconds,
+					distanceMeters,
+					STRICT_PROFILE_MASK,
+					NON_STRICT_PROFILE_MASK,
+					WARNING_LOW_CONFIDENCE,
+					false,
+					null,
+					"MISSING"
+				));
+			}
+		}
+
+		private static List<List<Candidate>> candidateLists(int size) {
+			List<List<Candidate>> candidates = new ArrayList<>(size);
+			for (int index = 0; index < size; index += 1) {
+				candidates.add(new ArrayList<>());
+			}
+			return candidates;
+		}
+
+		private static int[][] flatten(List<List<Candidate>> source, List<Candidate> flattened) {
+			int[][] indexes = new int[source.size()][];
+			for (int key = 0; key < source.size(); key += 1) {
+				List<Candidate> candidates = source.get(key);
+				if (candidates.isEmpty()) {
+					indexes[key] = NO_TRANSITIONS;
+					continue;
+				}
+				candidates.sort(CANDIDATE_ORDER);
+				int[] ids = new int[candidates.size()];
+				for (int index = 0; index < candidates.size(); index += 1) {
+					ids[index] = flattened.size();
+					flattened.add(candidates.get(index));
+				}
+				indexes[key] = ids;
+			}
+			return indexes;
+		}
+
+		private static int stationLineKey(int station, int line, int lineCount) {
+			return station * lineCount + line;
+		}
+
+		private static int transferKey(int station, int fromLine, int toLine, int lineCount) {
+			return (station * lineCount + fromLine) * lineCount + toLine;
+		}
+
+		private int entry(int station, int line, int profileBit, boolean ignoreBlocked) {
+			return select(entryTransitions[stationLineKey(station, line, lineCount)], profileBit, ignoreBlocked);
+		}
+
+		private int exit(int station, int line, int profileBit, boolean ignoreBlocked) {
+			return select(exitTransitions[stationLineKey(station, line, lineCount)], profileBit, ignoreBlocked);
+		}
+
+		private int transfer(int station, int fromLine, int toLine, int profileBit, boolean ignoreBlocked) {
+			return select(transferTransitions[transferKey(station, fromLine, toLine, lineCount)], profileBit, ignoreBlocked);
+		}
+
+		private int select(int[] candidates, int profileBit, boolean ignoreBlocked) {
+			for (int transition : candidates) {
+				if (ignoreBlocked || (blockedProfiles[transition] & profileBit) == 0) {
+					return transition;
+				}
+			}
+			return -1;
+		}
+
+		private int durationSeconds(int transition) {
+			return durationSeconds[transition];
+		}
+
+		private int distanceMeters(int transition) {
+			return distanceMeters[transition];
+		}
+
+		private String verificationStatus(int transition) {
+			return verificationStatuses[transition];
+		}
+
+		private int unsupportedTransferCount() {
+			return unsupportedTransferCount;
+		}
+
+		private record Candidate(
+			int durationSeconds,
+			int distanceMeters,
+			int blockedProfiles,
+			int warningProfiles,
+			byte warningCodes,
+			boolean includesStairs,
+			String edgeId,
+			String verificationStatus
+		) {
 		}
 	}
 

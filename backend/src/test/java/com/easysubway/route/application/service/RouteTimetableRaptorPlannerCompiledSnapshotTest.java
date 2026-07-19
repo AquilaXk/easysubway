@@ -9,6 +9,7 @@ import com.easysubway.route.application.port.out.LoadRouteTimetablePort.RouteTim
 import com.easysubway.route.domain.ConstraintMode;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -33,6 +34,93 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 		assertThat(compiled.routePatternCount()).isOne();
 		assertThat(compiled.scheduledTripCount()).isEqualTo(3);
 		assertThat(compiled.primitiveTimeArrayCount()).isEqualTo(3);
+	}
+
+	@Test
+	@DisplayName("mobility×constraint 18개 조합을 서로 다른 profile bit로 compile한다")
+	void compilesUniqueAccessProfileBits() {
+		var bits = new HashSet<Integer>();
+
+		for (MobilityType mobilityType : MobilityType.values()) {
+			for (ConstraintMode constraintMode : ConstraintMode.values()) {
+				bits.add(RouteTimetableRaptorPlanner.profileBit(mobilityType, constraintMode));
+			}
+		}
+
+		assertThat(bits).hasSize(18).allMatch(bit -> Integer.bitCount(bit) == 1);
+	}
+
+	@Test
+	@DisplayName("verified transition과 non-strict 기본값을 primitive access table로 compile한다")
+	void compilesVerifiedTransitionsAndNonStrictDefaults() {
+		var accessData = new LoadRouteTimetablePort.RouteAccessData(
+			List.of(
+				new LoadRouteTimetablePort.PathwayNode("entry", "station-a", "line", "ENTRANCE"),
+				new LoadRouteTimetablePort.PathwayNode("platform", "station-a", "line", "PLATFORM")
+			),
+			List.of(new LoadRouteTimetablePort.PathwayEdge(
+				"verified-entry", "entry", "platform", 90, 60, false, false, 100,
+				"AVAILABLE", "OFFICIAL_SOURCE", "VERIFIED"
+			)),
+			List.of(new LoadRouteTimetablePort.TransferRule(
+				"outside", "station-a", "line", "station-b", "line", "OUT_OF_STATION",
+				120, "verified-entry", null, "VERIFIED"
+			)),
+			List.of(new LoadRouteTimetablePort.RouteEdgeEvidence(
+				"entry-evidence", "station-a", "line", "verified-entry", "ENTRY",
+				"OFFICIAL_SOURCE", "VERIFIED", true, null
+			))
+		);
+		var compiled = planner.compile(withAccess(everyDayTimetable(), accessData));
+		int stationA = compiled.stationIndex("station-a");
+		int stationB = compiled.stationIndex("station-b");
+		int line = compiled.lineIndex("line");
+		int strict = RouteTimetableRaptorPlanner.profileBit(
+			MobilityType.WHEELCHAIR, ConstraintMode.STRICT_STEP_FREE);
+		int allow = RouteTimetableRaptorPlanner.profileBit(
+			MobilityType.SENIOR, ConstraintMode.ALLOW_WITH_WARNINGS);
+
+		int verifiedEntry = compiled.entryTransition(stationA, line, strict, false);
+		int defaultExit = compiled.exitTransition(stationB, line, allow, false);
+
+		assertThat(compiled.transitionDurationSeconds(verifiedEntry)).isEqualTo(90);
+		assertThat(compiled.transitionDistanceMeters(verifiedEntry)).isEqualTo(60);
+		assertThat(defaultExit).isNotNegative();
+		assertThat(compiled.transitionDurationSeconds(defaultExit)).isEqualTo(180);
+		assertThat(compiled.transitionDistanceMeters(defaultExit)).isEqualTo(120);
+		assertThat(compiled.exitTransition(stationB, line, strict, false)).isEqualTo(-1);
+		assertThat(compiled.unsupportedTransferCount()).isOne();
+	}
+
+	@Test
+	@DisplayName("strict는 stairs·generated·unknown·stale·missing transition을 모두 차단한다")
+	void strictBlocksUnsafeAndUnverifiedTransitions() {
+		int strict = RouteTimetableRaptorPlanner.profileBit(
+			MobilityType.WHEELCHAIR, ConstraintMode.STRICT_STEP_FREE);
+		int allow = RouteTimetableRaptorPlanner.profileBit(
+			MobilityType.SENIOR, ConstraintMode.ALLOW_WITH_WARNINGS);
+		List<LoadRouteTimetablePort.RouteAccessData> unsafe = List.of(
+			entryAccess("VERIFIED", "OFFICIAL_SOURCE", true, true),
+			entryAccess("GENERATED", "GENERATED", false, false),
+			entryAccess("UNKNOWN", "UNKNOWN", false, false),
+			entryAccess("STALE", "OFFICIAL_SOURCE", false, false),
+			entryAccess(null, null, false, false)
+		);
+
+		for (var accessData : unsafe) {
+			var compiled = planner.compile(withAccess(everyDayTimetable(), accessData));
+			int station = compiled.stationIndex("station-a");
+			int line = compiled.lineIndex("line");
+
+			assertThat(compiled.entryTransition(station, line, strict, false)).isEqualTo(-1);
+			assertThat(compiled.entryTransition(station, line, allow, false)).isNotNegative();
+		}
+
+		var stale = planner.compile(withAccess(
+			everyDayTimetable(), entryAccess("STALE", "OFFICIAL_SOURCE", false, false)));
+		int staleTransition = stale.entryTransition(
+			stale.stationIndex("station-a"), stale.lineIndex("line"), allow, false);
+		assertThat(stale.transitionVerificationStatus(staleTransition)).isEqualTo("STALE");
 	}
 
 	@Test
@@ -455,6 +543,47 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 			List.of(stop("trip-daily", 1, "station-a", 32400), stop("trip-daily", 2, "station-b", 33000)),
 			List.of()
 		);
+	}
+
+	private static RouteTimetable withAccess(
+		RouteTimetable timetable,
+		LoadRouteTimetablePort.RouteAccessData accessData
+	) {
+		return new RouteTimetable(
+			timetable.serviceCalendars(),
+			timetable.serviceCalendarDates(),
+			timetable.transitRoutes(),
+			timetable.transitTrips(),
+			timetable.transitStopTimes(),
+			timetable.transitFrequencies(),
+			timetable.officialFares(),
+			timetable.feedEndDate(),
+			accessData
+		);
+	}
+
+	private static LoadRouteTimetablePort.RouteAccessData entryAccess(
+		String verificationStatus,
+		String provenanceKind,
+		boolean strictEligible,
+		boolean includesStairs
+	) {
+		var nodes = List.of(
+			new LoadRouteTimetablePort.PathwayNode("entry", "station-a", "line", "ENTRANCE"),
+			new LoadRouteTimetablePort.PathwayNode("platform", "station-a", "line", "PLATFORM")
+		);
+		var edges = List.of(new LoadRouteTimetablePort.PathwayEdge(
+			"entry-edge", "entry", "platform", 90, 60, false, includesStairs, 100,
+			"AVAILABLE", provenanceKind == null ? "UNKNOWN" : provenanceKind,
+			verificationStatus == null ? "UNKNOWN" : verificationStatus
+		));
+		var evidence = verificationStatus == null ? List.<LoadRouteTimetablePort.RouteEdgeEvidence>of() : List.of(
+			new LoadRouteTimetablePort.RouteEdgeEvidence(
+				"entry-evidence", "station-a", "line", "entry-edge", "ENTRY",
+				provenanceKind, verificationStatus, strictEligible, strictEligible ? null : "UNVERIFIED"
+			)
+		);
+		return new LoadRouteTimetablePort.RouteAccessData(nodes, edges, List.of(), evidence);
 	}
 
 	private static RouteTimetable calendarExceptionTimetable() {
