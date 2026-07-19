@@ -106,6 +106,37 @@ test("대전 topology snapshot을 실제 production pack 입력으로 materializ
   }), /future/);
 });
 
+test("대전 topology admission은 snapshot schema와 endpoint identity 변조를 거부한다", async () => {
+  const [baseFixture, snapshot, inventory, canonicalStationMappings] = await inputs();
+  for (const mutation of [
+    { schemaVersion: 999 },
+    { endpoint: "https://example.invalid/wrong" },
+  ]) {
+    assert.throws(() => materializeDaejeonRouteTopology({
+      baseFixture,
+      snapshot: { ...snapshot, ...mutation },
+      inventory,
+      canonicalStationMappings,
+      now: evidenceNow,
+    }), /invalid Daejeon route topology snapshot/);
+  }
+});
+
+test("대전 topology admission은 capturedAt에서 24시간을 넘겨 연장한 freshness를 거부한다", async () => {
+  const [baseFixture, snapshot, inventory, canonicalStationMappings] = await inputs();
+  const extendedInventory = structuredClone(inventory);
+  extendedInventory.sources.find(({ id }) => id === snapshot.sourceId)
+    .topologyAdmissionEvidence.freshUntil = "2030-01-01T00:00:00.000Z";
+
+  assert.throws(() => materializeDaejeonRouteTopology({
+    baseFixture,
+    snapshot,
+    inventory: extendedInventory,
+    canonicalStationMappings,
+    now: new Date("2027-01-01T00:00:00.000Z"),
+  }), /freshness contract is invalid/);
+});
+
 test("materialized production SQLite와 provenance만 대전 1호선 topology requirement를 SUPPORTED로 만든다", async (context) => {
   const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-daejeon-topology-pack-"));
   context.after(() => rm(outputDir, { recursive: true, force: true }));

@@ -7,7 +7,7 @@ import { pathToFileURL } from "node:url";
 import { probeDaejeonCoverageApi } from "./probe-daejeon-coverage-api.mjs";
 
 const SOURCE_ID = "daejeon-station-distance-fare";
-const ENDPOINT = "https://apis.data.go.kr/B554695/TimeDistSVC/getTimeDist01";
+export const DAEJEON_TOPOLOGY_ENDPOINT = "https://apis.data.go.kr/B554695/TimeDistSVC/getTimeDist01";
 export const DAEJEON_LINE1_STATION_NUMBERS = Object.freeze(
   Array.from({ length: 22 }, (_, index) => String(101 + index)),
 );
@@ -51,7 +51,7 @@ export async function collectDaejeonRouteTopology({
     artifactKind: "daejeon-route-topology-collection",
     sourceId: SOURCE_ID,
     observedAt: now.toISOString(),
-    endpoint: ENDPOINT,
+    endpoint: DAEJEON_TOPOLOGY_ENDPOINT,
     providerResultCode: "00",
     schemaStatus: "EXPECTED",
     stationNumbers: [...DAEJEON_LINE1_STATION_NUMBERS],

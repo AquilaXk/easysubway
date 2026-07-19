@@ -5,11 +5,13 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { parseMolitDaejeonStationMappings } from "./build-molit-nationwide-fixture.mjs";
+import { DAEJEON_TOPOLOGY_ENDPOINT } from "./collect-daejeon-route-topology.mjs";
 
 const SOURCE_ID = "daejeon-station-distance-fare";
 const OPERATOR_ID = "daejeon-transportation";
 const LINE_ID = "line-7051a9c2525c";
 const PACK_ID = "nationwide-daejeon-topology";
+const FRESHNESS_MILLIS = 24 * 60 * 60 * 1_000;
 const STATION_NUMBERS = Object.freeze(Array.from({ length: 22 }, (_, index) => String(101 + index)));
 
 export function materializeDaejeonRouteTopology({
@@ -114,7 +116,8 @@ export function materializeDaejeonRouteTopology({
 }
 
 function validateSnapshot(snapshot) {
-  if (snapshot?.artifactKind !== "daejeon-route-topology-collection" || snapshot.sourceId !== SOURCE_ID
+  if (snapshot?.schemaVersion !== 1 || snapshot.artifactKind !== "daejeon-route-topology-collection"
+    || snapshot.sourceId !== SOURCE_ID || snapshot.endpoint !== DAEJEON_TOPOLOGY_ENDPOINT
     || snapshot.providerResultCode !== "00" || snapshot.schemaStatus !== "EXPECTED"
     || snapshot.credentialRedacted !== true || snapshot.rowCount !== 42 || snapshot.rows?.length !== 42
     || JSON.stringify(snapshot.stationNumbers) !== JSON.stringify(STATION_NUMBERS)
@@ -159,6 +162,9 @@ function requiredSource(inventory, snapshot, now) {
   if (!Number.isFinite(freshUntil)) throw new Error(`${SOURCE_ID} topology evidence freshUntil is invalid`);
   const capturedAt = Date.parse(evidence.capturedAt);
   if (!Number.isFinite(capturedAt)) throw new Error(`${SOURCE_ID} topology evidence capturedAt is invalid`);
+  if (freshUntil !== capturedAt + FRESHNESS_MILLIS) {
+    throw new Error(`${SOURCE_ID} topology evidence freshness contract is invalid`);
+  }
   const observedNow = now instanceof Date ? now.getTime() : Number.NaN;
   if (!Number.isFinite(observedNow)) throw new Error("materialization time is invalid");
   if (observedNow < capturedAt) throw new Error(`${SOURCE_ID} topology evidence is future-dated`);
