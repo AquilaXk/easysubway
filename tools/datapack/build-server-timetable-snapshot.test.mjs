@@ -116,6 +116,7 @@ test("#2135 ADMITTED source와 subway seed를 deterministic complete server snap
   assert.equal(first.evidence.rowCounts.routeEdgeEvidence, 4);
   assert.equal((first.sql.match(/INSERT INTO station_pathway_nodes/g) ?? []).length, 4);
   assert.equal((first.sql.match(/INSERT INTO station_pathway_edges/g) ?? []).length, 4);
+  assert.equal((first.sql.match(/INSERT INTO transfer_rules/g) ?? []).length, 0);
   assert.equal((first.sql.match(/INSERT INTO route_edge_evidence/g) ?? []).length, 4);
   assert.match(first.sql, /'ITX_CHEONGCHUN'/);
   assert.match(first.sql, /, 2135\);/);
@@ -278,7 +279,7 @@ test("접근성 source와 edge의 숫자 값이 유효한 정수가 아니면 ma
   );
 
   for (const [field, invalidValue, message] of [
-    ["durationSeconds", Number.NaN, "pathway duration"],
+    ["durationSeconds", 1.5, "pathway duration"],
     ["distanceMeters", -1, "pathway distance"],
     ["reliabilityScore", 101, "pathway reliability"],
   ]) {
@@ -293,6 +294,21 @@ test("접근성 source와 edge의 숫자 값이 유효한 정수가 아니면 ma
       new RegExp(`${message} is invalid`),
     );
   }
+});
+
+test("접근성 edge endpoint 형식이 잘못되면 명시적인 build error로 거부한다", async () => {
+  const value = await inputs();
+  const reviewedPack = JSON.parse(value.reviewedPackBytes);
+  reviewedPack.packs[0].networkEdges[0].toNodeId = null;
+
+  assert.throws(
+    () => buildServerTimetableSnapshot({
+      ...value,
+      reviewedPackBytes: Buffer.from(JSON.stringify(reviewedPack)),
+      buildNow,
+    }),
+    /canonical accessibility edge endpoints are invalid/,
+  );
 });
 
 test("complete snapshot은 source·completeness identity와 freshness를 fail closed한다", async () => {

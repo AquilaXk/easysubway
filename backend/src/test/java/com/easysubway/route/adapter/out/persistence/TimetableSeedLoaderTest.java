@@ -339,11 +339,6 @@ class TimetableSeedLoaderTest {
 		String sourceHash = sha256("source-" + suffix);
 		String sql = """
 			INSERT INTO transit_feed_info (id, feed_end_date) VALUES (1, '20261231');
-			INSERT INTO data_source_snapshots (snapshot_id, source_id, provider, retrieved_at, source_updated_at, row_count, raw_sha256, raw_object_uri, redacted_request_fingerprint, schema_fingerprint, snapshot_status, schema_status, license_status, fetch_status, redistribution_allowed, credential_redacted, previous_snapshot_id, diff_summary, freshness_expires_at, raw_retention_expires_at, coverage_count) SELECT 'access-snapshot-%1$s','access-source-%1$s','operator','2026-07-01 00:00:00','2026-07-01 00:00:00',1,'%3$s','s3://fixture/access','%3$s','%3$s','LOCKED','PASS','PASS','SUCCESS',TRUE,TRUE,NULL,NULL,'2026-12-31 00:00:00','2027-01-31 00:00:00',1 WHERE NOT EXISTS (SELECT 1 FROM data_source_snapshots WHERE snapshot_id = 'access-snapshot-%1$s');
-			INSERT INTO station_pathway_nodes (id, station_id, line_id, node_type, label) VALUES ('access-concourse-%1$s','station-subway-%1$s',NULL,'CONCOURSE','concourse');
-			INSERT INTO station_pathway_nodes (id, station_id, line_id, node_type, label) VALUES ('access-platform-%1$s','station-subway-%1$s','seoul-4','PLATFORM','platform');
-			INSERT INTO station_pathway_edges (id, from_node_id, to_node_id, edge_type, duration_seconds, distance_meters, bidirectional, includes_stairs, reliability_score, accessibility_status, source_id, source_snapshot_id, provider_record_hash, provenance_kind, verification_status, last_verified_at, evidence_hash, legacy_internal_route_edge_id) VALUES ('access-edge-%1$s','access-concourse-%1$s','access-platform-%1$s','ENTRY',90,100,FALSE,FALSE,100,'AVAILABLE','access-source-%1$s','access-snapshot-%1$s','%3$s','OFFICIAL_SOURCE','VERIFIED','2026-07-01 00:00:00','%3$s','access-edge-%1$s');
-			INSERT INTO route_edge_evidence (id, station_id, line_id, edge_id, edge_type, source_id, source_snapshot_id, provenance_kind, verification_status, last_verified_at, evidence_hash, strict_route_eligible, blocker_reason, created_at) VALUES ('route-evidence-%1$s','station-subway-%1$s','seoul-4','access-edge-%1$s','ENTRY','access-source-%1$s','access-snapshot-%1$s','OFFICIAL_SOURCE','VERIFIED','2026-07-01 00:00:00','%3$s',TRUE,NULL,'2026-07-01 00:00:00');
 			INSERT INTO service_calendars (service_id, start_date, end_date, timezone, monday, tuesday, wednesday, thursday, friday, saturday, sunday) VALUES ('service-%1$s','20260101','20261231','Asia/Seoul',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE);
 			INSERT INTO transit_routes (id, timezone, line_id, route_short_name, route_long_name, direction_name) VALUES ('subway-route-%1$s','Asia/Seoul','seoul-4','','','up');
 			INSERT INTO transit_routes (id, timezone, line_id, route_short_name, route_long_name, direction_name) VALUES ('itx-route-%1$s','Asia/Seoul','line-54a7b980b7c3','ITX-청춘','','down');
@@ -355,6 +350,11 @@ class TimetableSeedLoaderTest {
 			INSERT INTO transit_stop_times (trip_id, stop_sequence, station_id, line_id, pickup_type, drop_off_type, arrival_seconds, departure_seconds) VALUES ('itx-trip-%1$s',2,'station-itx-pass-%1$s','line-54a7b980b7c3',1,1,250,250);
 			INSERT INTO transit_stop_times (trip_id, stop_sequence, station_id, line_id, pickup_type, drop_off_type, arrival_seconds, departure_seconds) VALUES ('%6$s',3,'station-itx-terminal-%1$s','line-54a7b980b7c3',0,0,300,300);
 			INSERT INTO transit_trip_official_fares (trip_id, origin_station_id, destination_station_id, adult_fare_won, currency, source_id, source_snapshot_id) VALUES ('itx-trip-%1$s','station-itx-origin-%1$s','station-itx-terminal-%1$s',9800,'KRW','official','snapshot-%1$s');
+			INSERT INTO data_source_snapshots (snapshot_id, source_id, provider, retrieved_at, source_updated_at, row_count, raw_sha256, raw_object_uri, redacted_request_fingerprint, schema_fingerprint, snapshot_status, schema_status, license_status, fetch_status, redistribution_allowed, credential_redacted, previous_snapshot_id, diff_summary, freshness_expires_at, raw_retention_expires_at, coverage_count) SELECT 'access-snapshot-%1$s','access-source-%1$s','operator','2026-07-01 00:00:00','2026-07-01 00:00:00',1,'%3$s','s3://fixture/access','%3$s','%3$s','LOCKED','PASS','PASS','SUCCESS',TRUE,TRUE,NULL,NULL,'2026-12-31 00:00:00','2027-01-31 00:00:00',1 WHERE NOT EXISTS (SELECT 1 FROM data_source_snapshots WHERE snapshot_id = 'access-snapshot-%1$s');
+			INSERT INTO station_pathway_nodes (id, station_id, line_id, node_type, label) VALUES ('access-concourse-%1$s','station-subway-%1$s',NULL,'CONCOURSE','concourse');
+			INSERT INTO station_pathway_nodes (id, station_id, line_id, node_type, label) VALUES ('access-platform-%1$s','station-subway-%1$s','seoul-4','PLATFORM','platform');
+			INSERT INTO station_pathway_edges (id, from_node_id, to_node_id, edge_type, duration_seconds, distance_meters, bidirectional, includes_stairs, reliability_score, accessibility_status, source_id, source_snapshot_id, provider_record_hash, provenance_kind, verification_status, last_verified_at, evidence_hash, legacy_internal_route_edge_id) VALUES ('access-edge-%1$s','access-concourse-%1$s','access-platform-%1$s','ENTRY',90,100,FALSE,FALSE,100,'AVAILABLE','access-source-%1$s','access-snapshot-%1$s','%3$s','OFFICIAL_SOURCE','VERIFIED','2026-07-01 00:00:00','%3$s','access-edge-%1$s');
+			INSERT INTO route_edge_evidence (id, station_id, line_id, edge_id, edge_type, source_id, source_snapshot_id, provenance_kind, verification_status, last_verified_at, evidence_hash, strict_route_eligible, blocker_reason, created_at) VALUES ('route-evidence-%1$s','station-subway-%1$s','seoul-4','access-edge-%1$s','ENTRY','access-source-%1$s','access-snapshot-%1$s','OFFICIAL_SOURCE','VERIFIED','2026-07-01 00:00:00','%3$s',TRUE,NULL,'2026-07-01 00:00:00');
 			""".formatted(
 			suffix,
 			sourceHash,
@@ -522,6 +522,8 @@ class TimetableSeedLoaderTest {
 		assertThat(jdbc.queryForList(
 			"SELECT source_snapshot_id FROM transit_trip_official_fares", String.class))
 			.containsExactly("snapshot-" + suffix);
+		assertThat(jdbc.queryForList("SELECT id FROM station_pathway_nodes ORDER BY id", String.class))
+			.containsExactly("access-concourse-" + suffix, "access-platform-" + suffix);
 		assertThat(jdbc.queryForList("SELECT id FROM station_pathway_edges", String.class))
 			.containsExactly("access-edge-" + suffix);
 		assertThat(jdbc.queryForList("SELECT id FROM route_edge_evidence", String.class))

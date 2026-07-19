@@ -260,7 +260,10 @@ function addSourceSnapshotLineage(snapshot, snapshotsById, usedSnapshots, visiti
 function accessEdgeEndpoint(edge) {
   const platformNodeId = edge.edgeType === "ENTRY" ? edge.toNodeId : edge.fromNodeId;
   const stationNodeId = edge.edgeType === "ENTRY" ? edge.fromNodeId : edge.toNodeId;
-  const separator = String(platformNodeId).lastIndexOf(":");
+  if (typeof platformNodeId !== "string" || typeof stationNodeId !== "string") {
+    throw new Error(`canonical accessibility edge endpoints are invalid: ${edge.id}`);
+  }
+  const separator = platformNodeId.lastIndexOf(":");
   const stationId = platformNodeId.slice(0, separator);
   const lineId = platformNodeId.slice(separator + 1);
   if (separator < 1 || stationNodeId !== stationId || !lineId) {
