@@ -18,6 +18,7 @@ import {
   validateBackendSearchEnvelope,
   validateBackendObservationTime,
   validateCurrentProductionDeployment,
+  validateConditionalCacheResponse,
   validateDeploymentRun,
   validateKtxProviderJourneys,
   validateProviderEnvelope,
@@ -248,6 +249,26 @@ test("backend freshness 시각은 search 응답을 수집한 뒤 결정한다", 
       > source.indexOf("validateBackendSearchEnvelope(await responseJson(first"),
   );
   assert.match(source, /validateBackendObservationTime\([\s\S]*?collectedAt,/);
+});
+
+test("backend 304 응답은 동일 ETag와 Cache-Control을 요구한다", () => {
+  const etag = `"${"a".repeat(64)}"`;
+  const response = (headers) => ({
+    status: 304,
+    headers: new Headers(headers),
+  });
+  assert.doesNotThrow(() => validateConditionalCacheResponse(response({
+    etag,
+    "cache-control": "private, max-age=300",
+  }), etag));
+  assert.throws(
+    () => validateConditionalCacheResponse(response({ "cache-control": "private, max-age=300" }), etag),
+    /conditional response ETag did not match/,
+  );
+  assert.throws(
+    () => validateConditionalCacheResponse(response({ etag, "cache-control": "no-store" }), etag),
+    /conditional response Cache-Control was invalid/,
+  );
 });
 
 test("TAGO station catalog는 동일 ID의 상이한 이름을 거부한다", () => {

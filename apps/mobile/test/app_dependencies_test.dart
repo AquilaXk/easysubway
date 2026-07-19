@@ -11,6 +11,7 @@ import 'package:easysubway_mobile/features/ads/ad_repository.dart';
 import 'package:easysubway_mobile/features/realtime/realtime_repository.dart';
 import 'package:easysubway_mobile/features/service_notice/data/notice_repository.dart';
 import 'package:easysubway_mobile/features/stations/data/drift_station_repository.dart';
+import 'package:easysubway_mobile/features/train_search/data/train_search_repository.dart';
 import 'package:easysubway_mobile/features/train_search/domain/train_search_models.dart';
 import 'package:easysubway_mobile/main.dart' as app;
 import 'package:easysubway_mobile/route_search.dart';
@@ -352,6 +353,55 @@ void main() {
       ),
     );
     expect(apiBaseReads, 1);
+  });
+
+  test('기본 전체 열차 cold-cache 검색은 30초 전용 timeout의 실제 API 경로를 사용한다', () async {
+    final catalogDatabase = CatalogDatabase.memory();
+    final userDatabase = user_db.UserDatabase.memory();
+    late Uri requestedUri;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(catalogDatabase.close);
+    addTearDown(userDatabase.close);
+    addTearDown(server.close);
+
+    server.listen((request) {
+      requestedUri = request.uri;
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode({
+            'success': true,
+            'data': {
+              'observedAt': '2026-07-19T12:00:00Z',
+              'outbound': <Object?>[],
+              'inbound': <Object?>[],
+            },
+          }),
+        )
+        ..close();
+    });
+
+    final dependencies = AppDependencies.resolve(
+      catalogDatabase: catalogDatabase,
+      userDatabase: userDatabase,
+      apiBaseUri: () =>
+          Uri.parse('http://${server.address.host}:${server.port}'),
+      enablePushNotifications: false,
+    );
+
+    final result = await dependencies.trainSearchRepository.search(
+      TrainSearchCriteria(
+        departure: const TrainStation(id: 'NAT010000', name: '서울'),
+        arrival: const TrainStation(id: 'NAT011668', name: '대전'),
+        departureDate: DateTime(2026, 7, 20),
+      ),
+    );
+
+    expect(trainSearchApiTimeout, const Duration(seconds: 35));
+    expect(result.outbound, isEmpty);
+    expect(requestedUri.path, '/api/v1/trains/search');
+    expect(requestedUri.queryParameters['trainType'], isNull);
   });
 
   test('로컬 데이터베이스가 없으면 API 주소 없는 원격 fallback을 만들지 않는다', () {

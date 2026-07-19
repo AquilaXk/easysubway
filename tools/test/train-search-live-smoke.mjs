@@ -297,7 +297,7 @@ export async function collectBackendEvidence({
   );
   const etag = first.headers.get("etag");
   const conditional = await fetchWithTimeout(searchUrl, { headers: { "if-none-match": etag } }, fetchImpl);
-  if (conditional.status !== 304) throw new Error(`train search conditional request returned HTTP ${conditional.status}`);
+  validateConditionalCacheResponse(conditional, etag);
 
   const unsupportedStations = new URL("/api/v1/trains/stations", origin);
   unsupportedStations.searchParams.set("query", departureQuery);
@@ -334,6 +334,18 @@ export async function collectBackendEvidence({
 export function validateKtxProviderJourneys(journeys) {
   if (!Array.isArray(journeys) || journeys.some((journey) => journey?.trainType !== "KTX")) {
     throw new Error("TAGO KTX query returned a non-KTX row");
+  }
+}
+
+export function validateConditionalCacheResponse(response, etag) {
+  if (response?.status !== 304) {
+    throw new Error(`train search conditional request returned HTTP ${response?.status}`);
+  }
+  if (response.headers?.get("etag") !== etag) {
+    throw new Error("conditional response ETag did not match");
+  }
+  if (!(response.headers?.get("cache-control") ?? "").includes("max-age=")) {
+    throw new Error("conditional response Cache-Control was invalid");
   }
 }
 

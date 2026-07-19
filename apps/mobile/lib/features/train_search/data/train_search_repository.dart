@@ -3,6 +3,9 @@ import '../../../mobile_error_reporter.dart';
 import '../domain/train_search_models.dart';
 import '../domain/train_search_scope_policy.dart';
 
+// Backend가 cold-cache provider fan-out에 쓰는 30초 예산 뒤 응답할 여유를 둔다.
+const trainSearchApiTimeout = Duration(seconds: 35);
+
 class ApiTrainSearchRepository implements TrainSearchRepository {
   const ApiTrainSearchRepository(this._apiClient);
 
