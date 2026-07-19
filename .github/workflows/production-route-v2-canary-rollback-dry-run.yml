@@ -2,6 +2,13 @@ name: Production Route V2 canary rollback dry-run
 
 # 실행은 오너의 명시적 승인과 #1016(signed-RC canary attestation provisioning)
 # 완료 후에만 수동으로 트리거한다. push/schedule 자동 트리거는 두지 않는다.
+#
+# canary attestation key는 GitHub Actions secret으로 이 workflow에 별도 결속하지
+# 않는다. capacity evidence workflow의 EASYSUBWAY_ROUTE_V2_ORIGIN_SECRET과 동일하게,
+# #1016이 provision하면 EASYSUBWAY_ENV → prepare-deployment-env.sh를 거쳐 production
+# 호스트의 배포된 compose.env(${DEPLOY_ROOT}/shared/current-env/compose.env)에만
+# 존재한다. self-hosted 러너가 그 파일을 직접 읽으므로(tools/ops/verify-production-route-v2-canary-rollback.sh)
+# 이 workflow는 secrets.EASYSUBWAY_ENV 외의 개별 scoped secret을 참조하지 않는다.
 on:
   workflow_dispatch:
     inputs:
@@ -31,7 +38,6 @@ jobs:
       DEPLOY_ROOT: ${{ vars.DEPLOY_ROOT }}
       EXPECTED_DEPLOYED_SHA: ${{ inputs.deploy_sha != '' && inputs.deploy_sha || github.sha }}
       PRODUCTION_CANARY_APPROVAL: ${{ inputs.production_approval }}
-      EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY: ${{ secrets.EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY }}
 
     steps:
       - name: Reject non-main manual execution

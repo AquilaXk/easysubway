@@ -26,8 +26,39 @@ EVIDENCE_LIB="${REPO_ROOT}/tools/ops/route-v2-canary-rollback-evidence.mjs"
 OPERATIONS_EVIDENCE="${REPO_ROOT}/apps/mobile/release/operations-release-evidence.json"
 TIMETABLE_EVIDENCE="${REPO_ROOT}/backend/src/main/resources/timetable/server-timetable-snapshot-evidence.json"
 
+# Dotenv parser copied verbatim from tools/ops/verify-production-route-v2-capacity.sh
+# (and tools/deploy/deploy-backend.sh) so the canary attestation key is read with the
+# SAME fail-closed duplicate-key rejection and quote-stripping as every other
+# production-scoped secret this repo reads off the deployed compose.env — never as a
+# GitHub Actions secrets.* reference (see workflow header comment).
+read_env_value() {
+	local file="${1:?file is required}"
+	local name="${2:?name is required}"
+	local line value="" match_count=0
+	while IFS= read -r line || [[ -n "${line}" ]]; do
+		[[ "${line}" == "${name}="* ]] || continue
+		match_count=$((match_count + 1))
+		value="${line#*=}"
+		if [[ "${value}" == \"*\" && "${value}" == *\" ]] || [[ "${value}" == \'*\' && "${value}" == *\' ]]; then
+			value="${value:1:${#value}-2}"
+		fi
+	done < "${file}"
+	if (( match_count > 1 )); then
+		echo "${name} is defined ${match_count} times in the deployment environment" >&2
+		return 1
+	fi
+	(( match_count == 1 )) || return 1
+	printf '%s\n' "${value}"
+	return 0
+}
+
 # Test-only hooks: exercise the fail-closed gates and pure helpers without a
 # production runner. They never touch the deploy lock, filesystem state, or edge.
+if [[ "${1:-}" == --test-read-env-value ]]; then
+	[[ $# -eq 3 && -f "${2}" && "${3}" =~ ^[A-Z0-9_]+$ ]] || exit 2
+	read_env_value "${2}" "${3}"
+	exit
+fi
 if [[ "${1:-}" == --test-validate-approval ]]; then
 	[[ $# -eq 2 ]] || exit 2
 	node "${EVIDENCE_LIB}" validate-approval "${2}"
@@ -43,7 +74,6 @@ DEPLOY_ROOT="${DEPLOY_ROOT:-/opt/easysubway}"
 EXPECTED_DEPLOYED_SHA="${EXPECTED_DEPLOYED_SHA:-}"
 PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://easysubway-api.aquilaxk.site}"
 PRODUCTION_CANARY_APPROVAL="${PRODUCTION_CANARY_APPROVAL:-}"
-CANARY_ATTESTATION_KEY="${EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY:-}"
 
 # --- Gate 1: pure input validation (fail-closed before any production access) ---
 [[ "${EXPECTED_DEPLOYED_SHA}" =~ ^[0-9a-f]{40}$ ]] || { echo 'expected deployed SHA is invalid' >&2; exit 2; }
@@ -65,6 +95,8 @@ flock -w 300 9 || { echo 'timed out waiting for deployment lock' >&2; exit 1; }
 current_sha="$(<"${DEPLOY_ROOT}/shared/current-sha")"
 current_digest="$(<"${DEPLOY_ROOT}/shared/current-image-digest")"
 ingress_state_file="${DEPLOY_ROOT}/shared/current-route-v2-ingress-enabled"
+compose_env="${DEPLOY_ROOT}/shared/current-env/compose.env"
+[[ -f "${compose_env}" ]] || { echo 'current compose environment is missing' >&2; exit 1; }
 [[ "${current_sha}" == "${EXPECTED_DEPLOYED_SHA}" ]] \
 	|| { echo 'deployed SHA does not match the approved canary candidate' >&2; exit 1; }
 [[ "${current_digest}" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo 'deployed image digest marker is invalid' >&2; exit 1; }
@@ -104,7 +136,11 @@ node "${EVIDENCE_LIB}" assert-candidate "${expected_candidate}" "${provided_cand
 candidate_verified_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 # --- Gate 3a: signed-RC canary attestation must be provisioned (blocked on #1016) ---
-[[ -n "${CANARY_ATTESTATION_KEY}" ]] \
+# Sourced from the deployed compose.env, never from a GitHub Actions secret — same
+# provider-key-overlay pattern as EASYSUBWAY_ROUTE_V2_ORIGIN_SECRET in the capacity
+# runner. Until #1016 provisions this key on the production host, the lookup fails
+# and the run is rejected before it sends a single canary request.
+CANARY_ATTESTATION_KEY="$(read_env_value "${compose_env}" EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY)" \
 	|| { echo 'signed-RC canary attestation credential is not provisioned (blocked on #1016); refusing to run' >&2; exit 1; }
 
 # Record the prior approved state BEFORE the canary so the rollback dry-run has an

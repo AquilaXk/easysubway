@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { promisify } from "node:util";
 import test from "node:test";
 
@@ -46,10 +48,18 @@ test("canary rollback workflow는 승인 input과 main-only production 게이트
     /EXPECTED_DEPLOYED_SHA: \$\{\{ inputs\.deploy_sha != '' && inputs\.deploy_sha \|\| github\.sha \}\}/,
   );
   assert.match(workflow, /PRODUCTION_CANARY_APPROVAL: \$\{\{ inputs\.production_approval \}\}/);
-  assert.match(
-    workflow,
-    /EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY: \$\{\{ secrets\.EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY \}\}/,
-  );
+  // canary attestation key는 GitHub Actions secret으로 결속하지 않는다 — 기존
+  // capacity workflow가 EASYSUBWAY_ROUTE_V2_ORIGIN_SECRET을 다루는 것과 동일하게,
+  // #1016 provisioning 이후 배포된 compose.env에서만 읽는다(러너가 직접 읽음).
+  assert.doesNotMatch(workflow, /secrets\.[A-Z0-9_]*CANARY[A-Z0-9_]*/);
+  assert.doesNotMatch(workflow, /EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY:\s*\$\{\{\s*secrets\./);
+  for (const match of workflow.matchAll(/secrets(?:\.([A-Z0-9_]+)|\[['"]([A-Z0-9_]+)['"]\])/g)) {
+    const secretName = match[1] ?? match[2];
+    assert.ok(
+      secretName === "EASYSUBWAY_ENV" || secretName === "GITHUB_TOKEN",
+      `unexpected scoped secret reference: ${secretName}`,
+    );
+  }
   assert.match(workflow, /actions\/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e/);
   assert.match(workflow, /node-version: "24"/);
   assert.match(workflow, /bash tools\/ops\/verify-production-route-v2-canary-rollback\.sh/);
@@ -87,6 +97,16 @@ test("canary rollback runner는 fail-closed 게이트와 rollback 경로를 갖�
   assert.match(runner, /PUBLIC_BASE_URL.*==.*https:\/\/easysubway-api\.aquilaxk\.site/);
   // pure-input gate runs before the deploy lock so fail-closed never touches state.
   assert.ok(runner.indexOf("validate-approval") < runner.indexOf('exec 9>"${DEPLOY_ROOT}/deploy.lock"'));
+  // canary attestation key is read from the deployed compose.env with the SAME
+  // dotenv parser as the capacity runner — never from a GitHub Actions secret.
+  assert.match(runner, /compose_env="\$\{DEPLOY_ROOT\}\/shared\/current-env\/compose\.env"/);
+  assert.match(runner, /current compose environment is missing/);
+  assert.match(
+    runner,
+    /CANARY_ATTESTATION_KEY="\$\(read_env_value "\$\{compose_env\}" EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY\)"/,
+  );
+  assert.doesNotMatch(runner, /EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY:-/);
+  assert.match(runner, /is defined \$\{match_count\} times in the deployment environment/);
   // Ingress-close rollback + timeline evidence.
   assert.match(runner, /printf 'false\\n' > "\$\{ingress_state_file\}"/);
   assert.match(runner, /nginx -s reload/);
@@ -105,6 +125,66 @@ test("canary runner --test-validate-approval는 승인 형식을 강제한다", 
     execFileAsync("bash", [runnerPath, "--test-validate-approval", "approved-by-owner"]),
   );
   await assert.rejects(execFileAsync("bash", [runnerPath, "--test-validate-approval", ""]));
+});
+
+test("canary runner dotenv parser는 배포 parser와 동일하게 외부 따옴표를 제거한다", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "route-canary-env-"));
+  const envPath = path.join(tempDir, "compose.env");
+  try {
+    await writeFile(envPath, [
+      'EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY="deadbeef"',
+      "",
+    ].join("\n"));
+    const key = await execFileAsync("bash", [
+      runnerPath,
+      "--test-read-env-value",
+      envPath,
+      "EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY",
+    ]);
+    assert.equal(key.stdout, "deadbeef\n");
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("canary runner dotenv parser는 중복 정의된 키를 fail-closed로 거부한다", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "route-canary-env-dup-"));
+  const envPath = path.join(tempDir, "compose.env");
+  try {
+    await writeFile(envPath, [
+      "EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY=a",
+      "EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY=b",
+      "",
+    ].join("\n"));
+    await assert.rejects(
+      execFileAsync("bash", [
+        runnerPath,
+        "--test-read-env-value",
+        envPath,
+        "EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY",
+      ]),
+    );
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("canary runner dotenv parser는 키가 없으면 fail-closed로 거부한다", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "route-canary-env-missing-"));
+  const envPath = path.join(tempDir, "compose.env");
+  try {
+    await writeFile(envPath, "EASYSUBWAY_ROUTE_V2_ORIGIN_SECRET=unrelated\n");
+    await assert.rejects(
+      execFileAsync("bash", [
+        runnerPath,
+        "--test-read-env-value",
+        envPath,
+        "EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY",
+      ]),
+    );
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
 });
 
 test("canary runner --test-expected-candidate는 체크인된 RC candidate를 산출한다", async () => {
