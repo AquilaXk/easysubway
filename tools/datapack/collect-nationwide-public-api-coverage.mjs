@@ -83,11 +83,13 @@ export function buildNationwidePublicApiSearchPlan({ targets, fixture, sourceCan
         ...lineTerms.map((keyword) => publicApiSearchQuery({
           operatorName,
           keyword,
+          coverageScope: "LINE_EVIDENCE",
           matchTermGroups: [domain.terms, lineTerms],
         })),
         ...domain.terms.map((keyword) => publicApiSearchQuery({
           operatorName,
           keyword,
+          coverageScope: "OPERATOR_DISCOVERY",
           matchTermGroups: [domain.terms],
         })),
       ],
@@ -101,7 +103,7 @@ export function buildNationwidePublicApiSearchPlan({ targets, fixture, sourceCan
   };
 }
 
-function publicApiSearchQuery({ operatorName, keyword, matchTermGroups }) {
+function publicApiSearchQuery({ operatorName, keyword, coverageScope, matchTermGroups }) {
   return {
     providerId: "data-go-search",
     endpoint: "https://api.odcloud.kr/api/GetSearchDataList/v1/searchData",
@@ -111,6 +113,7 @@ function publicApiSearchQuery({ operatorName, keyword, matchTermGroups }) {
     credentialPlacement: "header",
     method: "POST",
     format: "json",
+    coverageScope,
     matchTermGroups,
     query: { page: 0, size: 10_000, dataType: ["API"], organizations: [operatorName], keyword },
   };
@@ -148,7 +151,9 @@ export async function collectNationwidePublicApiCoverage({
       results.push(result.evidence);
       if (result.evidence.matchCount > 0) {
         unresolvedResult = {
-          reasonCode: "PUBLIC_API_DATA_AVAILABLE",
+          reasonCode: query.coverageScope === "OPERATOR_DISCOVERY"
+            ? "PUBLIC_API_CANDIDATE_REQUIRES_LINE_VALIDATION"
+            : "PUBLIC_API_DATA_AVAILABLE",
           matchCount: result.evidence.matchCount,
           ...(result.evidence.capturedRows ? { matches: result.evidence.capturedRows } : {}),
         };
@@ -570,6 +575,10 @@ function validateQuery(query, label) {
   }
   if (query.credentialPlacement === "header" && query.credentialParam !== "Authorization") {
     throw new Error(`${label}.credentialParam must be Authorization for header authentication`);
+  }
+  if (query.coverageScope !== undefined
+    && !new Set(["LINE_EVIDENCE", "OPERATOR_DISCOVERY"]).has(query.coverageScope)) {
+    throw new Error(`${label}.coverageScope is invalid`);
   }
   if (!new Set(["json", "xml"]).has(query.format)) throw new Error(`${label}.format is invalid`);
   if (query.format === "json" && query.method !== "POST") throw new Error(`${label}.json search must use POST`);

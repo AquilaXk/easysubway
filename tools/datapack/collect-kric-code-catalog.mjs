@@ -65,7 +65,9 @@ export async function downloadKricCodeCatalog({
 async function fetchWithRetry(fetchImpl) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      return await fetchWithBoundedRedirect(ENDPOINT, fetchImpl);
+      const response = await fetchWithBoundedRedirect(ENDPOINT, fetchImpl);
+      if (response.status < 500 || response.status > 599 || attempt === 1) return response;
+      await response.body?.cancel().catch(() => {});
     } catch (error) {
       if (error instanceof Error && error.message.startsWith("KRIC code catalog redirect")) throw error;
       if (attempt === 1) {

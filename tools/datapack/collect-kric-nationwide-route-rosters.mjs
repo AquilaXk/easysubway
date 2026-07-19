@@ -48,14 +48,22 @@ export async function collectKricNationwideRouteRosters({
   ));
   const rosters = new Array(requests.length);
   let nextRequest = 0;
+  let aborted = false;
+  let firstFailure;
   const worker = async () => {
-    while (nextRequest < requests.length) {
+    while (!aborted && nextRequest < requests.length) {
       const requestIndex = nextRequest;
       nextRequest += 1;
-      rosters[requestIndex] = await collectImpl({ ...requests[requestIndex], serviceKey, now });
+      try {
+        rosters[requestIndex] = await collectImpl({ ...requests[requestIndex], serviceKey, now });
+      } catch (error) {
+        aborted = true;
+        firstFailure ??= error;
+      }
     }
   };
   await Promise.all(Array.from({ length: Math.min(concurrency, requests.length) }, () => worker()));
+  if (firstFailure !== undefined) throw firstFailure;
 
   const rosterByRequest = new Map(rosters.map((roster) => [`${roster.mreaWideCd}:${roster.lnCd}`, roster]));
   for (const scope of providerScopes) {

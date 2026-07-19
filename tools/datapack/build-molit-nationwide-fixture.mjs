@@ -12,6 +12,7 @@ import {
 } from "./lib/molit-svg-provider-identity.mjs";
 
 const sourceId = "molit-urban-rail-full-route";
+const kricProviderCodeCatalogSourceId = "kric-provider-code-catalog-20260228";
 const seoulMetroSourceId = "seoulmetro-cyberstation";
 const humetroSourceId = "humetro-cyberstation";
 const grtcSourceId = "grtc-cyberstation";
@@ -123,6 +124,7 @@ async function main() {
   const rows = parseCsv(csv).map(rowFromCsv).filter(Boolean);
   const svgRows = parseCsv(svgCsv).map(svgRowFromCsv).filter(Boolean);
   const kricCodeCatalog = JSON.parse(kricCodeCatalogBytes.toString("utf8"));
+  validateKricProviderCodeCatalogIdentity(kricCodeCatalog);
   sourceShaById.set(kricCodeCatalog.sourceId, kricCodeCatalog.sourceSha256);
   const fixture = buildFixture(rows, svgRows, kricCodeCatalog, officialSources, sourceShaById);
   await writeFile(outputPath, `${JSON.stringify(fixture, null, 2)}\n`);
@@ -957,6 +959,7 @@ function svgRowFromCsv(row) {
 }
 
 function providerLineScopesFor(catalog, coverageScopes, lines) {
+  validateKricProviderCodeCatalogIdentity(catalog);
   if (catalog?.artifactKind !== "kric-provider-line-catalog" || !Array.isArray(catalog.providerLines)
     || !Number.isInteger(catalog.stationRecordCount) || catalog.stationRecordCount < 1) {
     throw new Error("KRIC provider code catalog is invalid");
@@ -993,6 +996,15 @@ function providerLineScopesFor(catalog, coverageScopes, lines) {
       `${right.regionId}:${right.operatorId}:${right.lineId}`,
     ),
   );
+}
+
+export function validateKricProviderCodeCatalogIdentity(catalog) {
+  if (catalog?.sourceId !== kricProviderCodeCatalogSourceId) {
+    throw new Error("KRIC provider code catalog sourceId is invalid");
+  }
+  if (typeof catalog.sourceSha256 !== "string" || !/^[a-f0-9]{64}$/i.test(catalog.sourceSha256)) {
+    throw new Error("KRIC provider code catalog sourceSha256 is invalid");
+  }
 }
 
 export function validateMolitProviderIdentities(svgRows, providerLineScopes) {

@@ -85,6 +85,7 @@ test("전국 target과 fixture에서 line AND domain 실제 검색 계획을 만
   assert.deepEqual(searchPlan.entries[0].queries[0].matchTermGroups[1], ["1호선"]);
   const operatorWideQuery = searchPlan.entries[0].queries.find(({ query }) => query.keyword === "실시간도착");
   assert.ok(operatorWideQuery);
+  assert.equal(operatorWideQuery.coverageScope, "OPERATOR_DISCOVERY");
   assert.deepEqual(operatorWideQuery.query.organizations, ["부산교통공사"]);
   assert.deepEqual(operatorWideQuery.matchTermGroups, [[
     "실시간도착",
@@ -93,6 +94,36 @@ test("전국 target과 fixture에서 line AND domain 실제 검색 계획을 만
     "도착정보",
     "실제일시",
   ]]);
+});
+
+test("운영기관 공통 검색 결과는 현재 line 지원 증거가 아니라 검증 대기 후보로 남긴다", async () => {
+  const searchTarget = {
+    ...target,
+    queries: [{
+      providerId: "data-go-search",
+      endpoint: "https://api.odcloud.kr/api/GetSearchDataList/v1/searchData",
+      operation: "searchData",
+      credentialEnv: "DATA_GO_KR_SERVICE_KEY",
+      credentialParam: "Authorization",
+      credentialPlacement: "header",
+      method: "POST",
+      format: "json",
+      coverageScope: "OPERATOR_DISCOVERY",
+      matchTermGroups: [["실시간도착", "도착정보"]],
+      query: { page: 0, size: 10_000, dataType: ["API"], organizations: ["부산교통공사"], keyword: "실시간도착" },
+    }],
+  };
+  const resolutions = await collectNationwidePublicApiCoverage({
+    searchPlan: plan([searchTarget]),
+    credentials: { DATA_GO_KR_SERVICE_KEY: "key" },
+    fetchImpl: async () => new Response(JSON.stringify({
+      statusCode: 200,
+      result: { sum: 1, dataCount: 1, data: [{ dataName: "부산교통공사 실시간도착정보" }] },
+    }), { status: 200, headers: { "content-type": "application/json" } }),
+  });
+
+  assert.equal(resolutions.entries.length, 0);
+  assert.equal(resolutions.unresolved[0].reasonCode, "PUBLIC_API_CANDIDATE_REQUIRES_LINE_VALIDATION");
 });
 
 test("전국 공통 provider 후보가 있으면 운영기관 catalog 0건을 공식 미지원으로 확정하지 않는다", async () => {

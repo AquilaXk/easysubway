@@ -302,6 +302,17 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
     new URL("../datapack/sources/kric-provider-code-catalog-20260228.json", import.meta.url),
     "utf8",
   ));
+  assert.ok(kricCodeCatalogCandidate);
+  assert.equal(kricCodeCatalogCandidate.operation.method, kricCodeCatalog.operation.method);
+  assert.equal(kricCodeCatalogCandidate.operation.endpoint, kricCodeCatalog.operation.endpoint);
+  assert.deepEqual(
+    kricCodeCatalogCandidate.operation.requiredParameters,
+    kricCodeCatalog.operation.requiredParameters,
+  );
+  assert.equal(
+    kricCodeCatalogCandidate.operation.responseEnvelope,
+    kricCodeCatalog.operation.responseEnvelope,
+  );
   assert.equal(kricCodeCatalog.operation.auth.placement, "none");
   assert.equal(kricCodeCatalog.operation.runner.command, "node tools/datapack/collect-kric-code-catalog.mjs");
   assert.deepEqual(kricCodeCatalog.responseFields, [

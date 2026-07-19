@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { validateMolitProviderIdentities } from "./build-molit-nationwide-fixture.mjs";
+import {
+  validateKricProviderCodeCatalogIdentity,
+  validateMolitProviderIdentities,
+} from "./build-molit-nationwide-fixture.mjs";
 
 test("MOLIT provider identity가 coverage scope와 매칭되지 않으면 거부한다", () => {
   assert.throws(() => validateMolitProviderIdentities([{
@@ -13,4 +16,19 @@ test("MOLIT provider identity가 coverage scope와 매칭되지 않으면 거부
     },
     lineName: "4호선",
   }], []), /MOLIT provider scope is unmatched/);
+});
+
+test("KRIC provider code catalog identity는 고정 source ID와 SHA-256만 허용한다", () => {
+  assert.doesNotThrow(() => validateKricProviderCodeCatalogIdentity({
+    sourceId: "kric-provider-code-catalog-20260228",
+    sourceSha256: "a".repeat(64),
+  }));
+  assert.throws(() => validateKricProviderCodeCatalogIdentity({
+    sourceId: "unexpected",
+    sourceSha256: "a".repeat(64),
+  }), /sourceId is invalid/);
+  assert.throws(() => validateKricProviderCodeCatalogIdentity({
+    sourceId: "kric-provider-code-catalog-20260228",
+    sourceSha256: "not-a-sha",
+  }), /sourceSha256 is invalid/);
 });

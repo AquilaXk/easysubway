@@ -101,6 +101,48 @@ test("전국 KRIC roster 수집은 targetVersion을 provider 호출 전에 검�
   }), /targets.targetVersion is required/);
 });
 
+test("전국 KRIC roster worker는 첫 실패 뒤 신규 provider 호출을 시작하지 않고 모두 settle한다", async () => {
+  const extendedTargets = {
+    ...targets,
+    activeLineScopes: [
+      ...targets.activeLineScopes,
+      { regionId: "daegu", operatorId: "daegu-transportation", lineId: "daegu-1" },
+      { regionId: "gwangju", operatorId: "gwangju-transit", lineId: "gwangju-1" },
+    ],
+  };
+  const extendedFixture = {
+    providerLineScopes: [
+      ...fixture.providerLineScopes,
+      { regionId: "daegu", operatorId: "daegu-transportation", lineId: "daegu-1", mreaWideCd: "03", lnCd: "1", railOprIsttCd: "DG" },
+      { regionId: "gwangju", operatorId: "gwangju-transit", lineId: "gwangju-1", mreaWideCd: "04", lnCd: "1", railOprIsttCd: "GJ" },
+    ],
+  };
+  let calls = 0;
+  let inFlightSettled = false;
+  const failure = new Error("provider failed");
+  await assert.rejects(collectKricNationwideRouteRosters({
+    targets: extendedTargets,
+    fixture: extendedFixture,
+    serviceKey: "secret",
+    concurrency: 2,
+    collectImpl: async ({ mreaWideCd, lnCd }) => {
+      calls += 1;
+      if (calls === 1) throw failure;
+      await new Promise((resolve) => setImmediate(resolve));
+      inFlightSettled = true;
+      return {
+        artifactKind: "kric-route-roster",
+        mreaWideCd,
+        lnCd,
+        resultCode: "00",
+        stations: [{ railOprIsttCd: "BS", mreaWideCd, lnCd }],
+      };
+    },
+  }), (error) => error === failure);
+  assert.equal(inFlightSettled, true);
+  assert.equal(calls, 2);
+});
+
 test("전국 KRIC roster 수집은 각 provider roster schema 오류를 거부한다", async (context) => {
   const validRoster = ({ mreaWideCd, lnCd }) => ({
     schemaVersion: 1,

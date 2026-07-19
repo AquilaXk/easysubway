@@ -65,6 +65,19 @@ test("KRIC provider code catalog는 header-only Sheet1을 거부한다", () => {
   }), /contains no station rows/);
 });
 
+test("KRIC provider-line key가 다른 운영기관·노선명으로 충돌하면 거부한다", () => {
+  assert.throws(() => buildProviderLineCatalog({
+    sourceId: "kric-provider-code-catalog-20260228",
+    sourceSha256: "a".repeat(64),
+    capturedAt: "2026-07-19T00:00:00.000Z",
+    sheets: [{ name: "Sheet1", rows: [
+      ["RAIL_OPR_ISTT_CD", "RAIL_OPR_ISTT_NM", "LN_CD", "LN_NM", "STIN_CD", "STIN_NM"],
+      ["S1", "서울교통공사", "4", "4호선", "433", "사당"],
+      ["S1", "다른운영기관", "4", "다른노선", "434", "총신대입구"],
+    ] }],
+  }), /KRIC provider line conflict/);
+});
+
 test("KRIC XLSX parser는 외부 relation과 과도한 cell을 거부한다", () => {
   assert.throws(() => parseWorkbookSheetRefs(
     `<workbook xmlns:r="rels"><sheets><sheet name="x" r:id="r1"/></sheets></workbook>`,

@@ -29,9 +29,37 @@ test("KRIC 최신 코드 정본은 XLSX 경계와 sanitized metadata를 검증�
 
 test("KRIC 코드 정본은 HTTP·schema·크기 오류를 fail closed 한다", async (context) => {
   await context.test("HTTP", async () => {
+    let attempts = 0;
     await assert.rejects(downloadKricCodeCatalog({
-      fetchImpl: async () => new Response("unavailable", { status: 503 }),
+      fetchImpl: async () => {
+        attempts += 1;
+        return new Response("unavailable", { status: 503 });
+      },
     }), /HTTP 503/);
+    assert.equal(attempts, 2);
+  });
+  await context.test("HTTP 5xx recovery", async () => {
+    let attempts = 0;
+    const catalog = await downloadKricCodeCatalog({
+      fetchImpl: async () => {
+        attempts += 1;
+        return attempts === 1
+          ? new Response("unavailable", { status: 503 })
+          : new Response(XLSX_PREFIX, { status: 200, headers: { "content-type": "application/octet-stream" } });
+      },
+    });
+    assert.equal(attempts, 2);
+    assert.deepEqual(catalog.bytes, XLSX_PREFIX);
+  });
+  await context.test("HTTP 4xx", async () => {
+    let attempts = 0;
+    await assert.rejects(downloadKricCodeCatalog({
+      fetchImpl: async () => {
+        attempts += 1;
+        return new Response("not found", { status: 404 });
+      },
+    }), /HTTP 404/);
+    assert.equal(attempts, 1);
   });
   await context.test("schema", async () => {
     await assert.rejects(downloadKricCodeCatalog({
