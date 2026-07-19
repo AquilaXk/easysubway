@@ -3293,13 +3293,14 @@
         "outputFields": ["dayType", "drctType", "stNum", "tmList", "tmZone"],
         "officialSwaggerOperationId": "getAllTimeTable",
         "liveValidation": {
-          "observedAt": "2026-07-14T07:02:58.606Z",
+          "observedAt": "2026-07-19T22:08:27.043Z",
           "httpStatus": 200,
           "providerResultCode": "00",
           "schemaStatus": "EXPECTED",
           "rowCount": 1628,
           "rawSha256": "af47a698e7770e8fc709bb3dfa05b525f836b57b37cb9b716d6ca768e6723dbd",
-          "evidenceArtifact": "tools/datapack/sources/daejeon-train-timetable-20260714.json",
+          "rowsSha256": "5888ab731dbe76b9b4791c30224664a12c37a25da50c5423d4266bc3c02c44a9",
+          "evidenceArtifact": "tools/datapack/sources/daejeon-train-timetable-20260720.json",
           "admitted": true
         },
         "coverageAssessment": {
