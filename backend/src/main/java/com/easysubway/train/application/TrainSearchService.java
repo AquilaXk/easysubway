@@ -182,6 +182,7 @@ public class TrainSearchService {
 				? outbound.expiresAt()
 				: inbound.expiresAt();
 			if (catalogEntry.expiresAt().isBefore(expiresAt)) expiresAt = catalogEntry.expiresAt();
+			if (!clock.instant().isBefore(expiresAt)) throw failure("TRAIN_SEARCH_UNAVAILABLE");
 			return new TrainSearchSnapshot(result, expiresAt);
 		} catch (TrainSearchFailure failure) {
 			throw failure;

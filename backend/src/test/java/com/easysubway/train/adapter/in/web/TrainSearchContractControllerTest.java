@@ -83,7 +83,7 @@ class TrainSearchContractControllerTest {
 				.param("query", "서울")
 				.param("trainType", "KTX"))
 			.andExpect(status().isOk())
-			.andExpect(header().string("Cache-Control", "max-age=300, public, s-maxage=86400"))
+			.andExpect(header().string("Cache-Control", "max-age=300, must-revalidate, public, s-maxage=86400"))
 			.andExpect(header().exists("ETag"))
 			.andExpect(jsonPath("$.success").value(true))
 			.andExpect(jsonPath("$.data[0].id").value("NAT010000"))
@@ -95,7 +95,7 @@ class TrainSearchContractControllerTest {
 				.header("If-None-Match", first.getResponse().getHeader("ETag")))
 			.andExpect(status().isNotModified())
 			.andExpect(header().string("ETag", first.getResponse().getHeader("ETag")))
-			.andExpect(header().string("Cache-Control", "max-age=300, public, s-maxage=86400"));
+			.andExpect(header().string("Cache-Control", "max-age=300, must-revalidate, public, s-maxage=86400"));
 	}
 
 	@Test
@@ -136,7 +136,7 @@ class TrainSearchContractControllerTest {
 				.param("returnDate", "2026-07-20")
 				.param("trainType", "KTX"))
 			.andExpect(status().isOk())
-			.andExpect(header().string("Cache-Control", "max-age=60, public, s-maxage=300"))
+			.andExpect(header().string("Cache-Control", "max-age=60, must-revalidate, public, s-maxage=300"))
 			.andExpect(jsonPath("$.data.outbound[0].trainNumber").value("101"))
 			.andExpect(jsonPath("$.data.outbound[0].adultFareWon").value(23700))
 			.andExpect(jsonPath("$.data.inbound").isEmpty());
@@ -165,7 +165,7 @@ class TrainSearchContractControllerTest {
 				.param("departureDate", "2026-07-20")
 				.param("trainType", "KTX"))
 			.andExpect(status().isOk())
-			.andExpect(header().string("Cache-Control", "max-age=45, public, s-maxage=45"));
+			.andExpect(header().string("Cache-Control", "max-age=45, must-revalidate, public, s-maxage=45"));
 	}
 
 	@Test
@@ -182,7 +182,7 @@ class TrainSearchContractControllerTest {
 				.param("departureDate", "2026-07-19")
 				.param("trainType", "KTX"))
 			.andExpect(status().isOk())
-			.andExpect(header().string("Cache-Control", "max-age=60, public, s-maxage=300"));
+			.andExpect(header().string("Cache-Control", "max-age=60, must-revalidate, public, s-maxage=300"));
 	}
 
 	@Test
@@ -199,7 +199,7 @@ class TrainSearchContractControllerTest {
 				.param("departureDate", "2026-07-20")
 				.param("trainType", "KTX"))
 			.andExpect(status().isOk())
-			.andExpect(header().string("Cache-Control", "max-age=60, public, s-maxage=300"));
+			.andExpect(header().string("Cache-Control", "max-age=60, must-revalidate, public, s-maxage=300"));
 	}
 
 	@Test

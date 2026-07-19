@@ -97,6 +97,29 @@ class TrainSearchServiceTest {
 	}
 
 	@Test
+	void rejectsARoundTripSnapshotWhenTheFirstLegExpiresDuringAssembly() {
+		var clock = new TestClock(NOW);
+		service = serviceWith(clock, duration -> {});
+		service.search(criteria(null));
+		CachedLeg outbound = cache.legs.values().iterator().next();
+		cache.legs.put(outbound.key(), new CachedLeg(
+			outbound.key(),
+			outbound.normalizedQueryJson(),
+			outbound.payloadJson(),
+			outbound.payloadSha256(),
+			outbound.observedAt(),
+			NOW.plusSeconds(1)
+		));
+		service = serviceWith(clock, duration -> {});
+		provider.beforeSearchReturn = () -> clock.advance(Duration.ofSeconds(2));
+
+		assertThatThrownBy(() -> service.searchWithMetadata(criteria(LocalDate.parse("2026-07-21"))))
+			.isInstanceOf(TrainSearchService.TrainSearchFailure.class)
+			.extracting("code")
+			.isEqualTo("TRAIN_SEARCH_UNAVAILABLE");
+	}
+
+	@Test
 	void refreshesAFutureEntryWhenItsServiceDayStartsAtThreeAmInKorea() {
 		service = serviceAt(Instant.parse("2026-07-19T17:59:00Z"));
 		service.search(criteriaFor(LocalDate.parse("2026-07-20"), null));

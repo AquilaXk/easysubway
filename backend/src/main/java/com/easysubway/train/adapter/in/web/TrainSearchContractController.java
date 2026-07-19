@@ -149,10 +149,10 @@ class TrainSearchContractController {
 
 	private CacheControl cacheControl(java.time.Instant expiresAt, CachePolicy policy) {
 		long remaining = Math.max(0, Duration.between(clock.instant(), expiresAt).getSeconds());
-		CacheControl result = CacheControl.maxAge(Math.min(policy.clientSeconds(), remaining), TimeUnit.SECONDS)
+		return CacheControl.maxAge(Math.min(policy.clientSeconds(), remaining), TimeUnit.SECONDS)
 			.cachePublic()
+			.mustRevalidate()
 			.sMaxAge(Math.min(policy.sharedSeconds(), remaining), TimeUnit.SECONDS);
-		return remaining == 0 ? result.mustRevalidate() : result;
 	}
 
 	private ResponseEntity<ApiResponse<?>> error(HttpStatus status, String code, String message) {
