@@ -495,11 +495,12 @@ test("extractOwnerLabels: daejeon 환승 복합 표기는 data-full-official-nam
 test("extractOwnerLabels: 5권역 실 SVG에서 ordinary/transfer/terminal 개수가 실측과 일치한다", () => {
   const sources = path.join(import.meta.dirname, "route-map-defs/svg-sources");
   const expected = {
-    // #2068 오너 기준본 전환(2026-07-19): 오너가 손수 다듬은 새 SVG(viewBox
-    // 3800×3020)로 easy-subway-sma-v2.svg 자체가 교체됐다 — 이 수는 실측치라
-    // 새 소스의 실제 라벨 구성을 그대로 반영한다(ordinary 501→502, transfer·
-    // terminal은 이식한 종점 마크 30개와 정확히 일치해 불변).
-    "easy-subway-sma-v2.svg": { ordinary: 502, transfer: 124, terminal: 30 },
+    // #2068 오너 v3(최종 디자인) 통합(2026-07-20): 오너가 처음부터 새로 그린
+    // 확정본으로 easy-subway-sma-v2.svg 자체가 교체됐다 — 이 수는 실측치라
+    // 새 소스의 실제 라벨 구성을 그대로 반영한다(ordinary 502→501, v3 자체
+    // 라벨 구성 차이. transfer는 불변. terminal 30은 이식한 종점 마크 30개와
+    // 정확히 일치 — 형상 비침습 기계 이식, 위치는 v3 역 좌표 기준 재계산).
+    "easy-subway-sma-v2.svg": { ordinary: 501, transfer: 124, terminal: 30 },
     // #2068 벡스코 병합: 2호선·동해선을 단일 환승 station_id로 합치면서, 동해선
     // 노드용 중복 ordinary 라벨(벡스코_DH)을 제거했다(단일 환승 캡슐이 전사 라벨을
     // 이미 가지므로 중복 표기 불필요) → ordinary 129→128.
