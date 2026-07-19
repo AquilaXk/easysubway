@@ -67,8 +67,9 @@ function worksheetCellValue(attributes, body, sharedStrings) {
   }
   const raw = /<v\b[^>]*>([\s\S]*?)<\/v>/i.exec(body)?.[1] ?? "";
   if (attributes.t !== "s") return decodeXml(raw);
-  const index = Number(raw);
-  if (!Number.isInteger(index) || index < 0 || index >= sharedStrings.length) {
+  const normalizedIndex = raw.trim();
+  const index = Number(normalizedIndex);
+  if (!/^\d+$/.test(normalizedIndex) || !Number.isInteger(index) || index < 0 || index >= sharedStrings.length) {
     throw new Error("KRIC XLSX shared string index is invalid");
   }
   return sharedStrings[index];

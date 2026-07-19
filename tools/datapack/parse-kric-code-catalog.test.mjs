@@ -88,3 +88,12 @@ test("KRIC XLSX parser는 외부 relation과 과도한 cell을 거부한다", ()
     [],
   ), /column limit/);
 });
+
+test("KRIC XLSX shared string index는 비어 있거나 10진수가 아니면 거부한다", () => {
+  for (const body of ["", "<v></v>", "<v> </v>", "<v>0x1</v>", "<v>1.0</v>"]) {
+    assert.throws(() => parseWorksheetRows(
+      `<worksheet><sheetData><row><c r="A1" t="s">${body}</c></row></sheetData></worksheet>`,
+      ["zero", "one"],
+    ), /shared string index is invalid/);
+  }
+});
