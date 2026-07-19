@@ -2,6 +2,9 @@
 import { pathToFileURL } from "node:url";
 
 const DEFAULT_BASE_URL = "https://apis.data.go.kr/1613000/TrainInfo/";
+const RETRYABLE_HTTP_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
+
+class RetryableProbeError extends Error {}
 
 function requiredServiceKey(value) {
   const trimmed = String(value ?? "").trim();
@@ -26,6 +29,35 @@ function rows(payload) {
   return values;
 }
 
+async function probeAttempt(url, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) {
+      const message = `provider HTTP status was ${response.status}`;
+      if (RETRYABLE_HTTP_STATUSES.has(response.status)) throw new RetryableProbeError(message);
+      throw new Error(message);
+    }
+    let payload;
+    try {
+      payload = await response.json();
+    } catch {
+      throw new Error("provider response was not valid JSON");
+    }
+    if (payload?.response?.header?.resultCode !== "00") {
+      throw new Error("provider resultCode was not 00");
+    }
+    return { result: "PASS", operation: "GetCtyCodeList", validRows: rows(payload).length };
+  } catch (error) {
+    if (error?.name === "AbortError") throw new Error("provider credential probe timed out");
+    if (error instanceof TypeError) throw new RetryableProbeError(error.message);
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function probeTagoTrainProvider({
   serviceKey,
   baseUrl = DEFAULT_BASE_URL,
@@ -40,33 +72,13 @@ export async function probeTagoTrainProvider({
 
   const deadline = Date.now() + timeoutMs;
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    const controller = new AbortController();
     const remaining = deadline - Date.now();
     if (remaining <= 0) throw new Error("provider credential probe timed out");
-    const timer = setTimeout(() => controller.abort(), remaining);
     try {
-      const response = await fetch(url, { signal: controller.signal });
-      if (!response.ok) {
-        if (attempt === 0 && [408, 429, 500, 502, 503, 504].includes(response.status)) continue;
-        throw new Error(`provider HTTP status was ${response.status}`);
-      }
-      let payload;
-      try {
-        payload = await response.json();
-      } catch {
-        throw new Error("provider response was not valid JSON");
-      }
-      if (payload?.response?.header?.resultCode !== "00") {
-        throw new Error("provider resultCode was not 00");
-      }
-      const validRows = rows(payload).length;
-      return { result: "PASS", operation: "GetCtyCodeList", validRows };
+      return await probeAttempt(url, remaining);
     } catch (error) {
-      if (error?.name === "AbortError") throw new Error("provider credential probe timed out");
-      if (attempt === 0 && error instanceof TypeError) continue;
+      if (attempt === 0 && error instanceof RetryableProbeError) continue;
       throw error;
-    } finally {
-      clearTimeout(timer);
     }
   }
   throw new Error("provider credential probe failed");
