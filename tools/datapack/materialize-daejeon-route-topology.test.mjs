@@ -101,6 +101,9 @@ test("대전 topology snapshot을 실제 production pack 입력으로 materializ
   assert.throws(() => materializeDaejeonRouteTopology({
     baseFixture, snapshot, inventory, canonicalStationMappings, now: new Date("not-a-date"),
   }), /materialization time is invalid/);
+  assert.throws(() => materializeDaejeonRouteTopology({
+    baseFixture, snapshot, inventory, canonicalStationMappings, now: new Date("2026-07-19T22:00:00.000Z"),
+  }), /future/);
 });
 
 test("materialized production SQLite와 provenance만 대전 1호선 topology requirement를 SUPPORTED로 만든다", async (context) => {
@@ -315,6 +318,46 @@ test("명시된 접근성 coverage scope의 station-line evidence 누락을 거�
     cwd: root,
     env: { ...process.env, EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: publicKey },
   }), /verified ENTRY coverage gap/);
+});
+
+test("접근성 source가 있는 production pack은 접근성 coverage metadata 삭제를 거부한다", async (context) => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-accessibility-metadata-gap-"));
+  context.after(() => rm(outputDir, { recursive: true, force: true }));
+  const [baseFixture, snapshot, inventory, canonicalStationMappings] = await inputs();
+  const pack = baseFixture.packs[0];
+  pack.metadata.productionCoverageEvidence = JSON.stringify(
+    JSON.parse(pack.metadata.productionCoverageEvidence)
+      .filter(({ sourceDomain }) => sourceDomain !== "accessibility_facilities"),
+  );
+  pack.networkEdges = pack.networkEdges.filter(({ id }) => id !== "edge-entry-sangnoksu-seoul-4");
+  pack.minimumTableRows.network_edges = pack.networkEdges.length;
+  const fixture = materializeDaejeonRouteTopology({
+    baseFixture, snapshot, inventory, canonicalStationMappings, now: evidenceNow,
+  });
+  const fixturePath = path.join(outputDir, "fixture.json");
+  const packOutput = path.join(outputDir, "pack");
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+  await mkdir(packOutput, { recursive: true });
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    privateKeyEncoding: { type: "pkcs8", format: "pem" },
+    publicKeyEncoding: { type: "spki", format: "pem" },
+  });
+  await execFileAsync(process.execPath, [
+    "tools/datapack/build-datapack.mjs", "--fixture", fixturePath, "--output", packOutput,
+  ], {
+    cwd: root,
+    env: { ...process.env, EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM: privateKey },
+  });
+  await assert.rejects(execFileAsync(process.execPath, [
+    "tools/datapack/validate-datapack.mjs",
+    "--manifest", path.join(packOutput, "current.json"),
+    "--root", packOutput,
+    "--require-production",
+  ], {
+    cwd: root,
+    env: { ...process.env, EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: publicKey },
+  }), /productionCoverageEvidence accessibility scope is missing/);
 });
 
 async function readJson(relativePath) {

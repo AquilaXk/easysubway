@@ -157,8 +157,11 @@ function requiredSource(inventory, snapshot, now) {
   }
   const freshUntil = Date.parse(evidence.freshUntil);
   if (!Number.isFinite(freshUntil)) throw new Error(`${SOURCE_ID} topology evidence freshUntil is invalid`);
+  const capturedAt = Date.parse(evidence.capturedAt);
+  if (!Number.isFinite(capturedAt)) throw new Error(`${SOURCE_ID} topology evidence capturedAt is invalid`);
   const observedNow = now instanceof Date ? now.getTime() : Number.NaN;
   if (!Number.isFinite(observedNow)) throw new Error("materialization time is invalid");
+  if (observedNow < capturedAt) throw new Error(`${SOURCE_ID} topology evidence is future-dated`);
   if (observedNow >= freshUntil) throw new Error(`${SOURCE_ID} topology evidence is stale`);
   return source;
 }

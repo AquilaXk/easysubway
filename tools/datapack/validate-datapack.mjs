@@ -1853,15 +1853,22 @@ function accessibilityCoverageScopes(database, sourceById) {
   }
   if (!Array.isArray(entries)) throw new Error("productionCoverageEvidence metadata must be an array");
   const scopes = new Set();
+  const hasAccessibilitySource = [...sourceById.values()]
+    .some((source) => sourceSupportsDomain(source, "accessibility_facilities"));
   for (const entry of entries) {
     if (entry?.sourceDomain !== "accessibility_facilities") continue;
     if (typeof entry.regionId !== "string" || !entry.regionId
       || typeof entry.operatorId !== "string" || !entry.operatorId
       || !Array.isArray(entry.sourceIds) || entry.sourceIds.length === 0
-      || entry.sourceIds.some((sourceId) => !sourceSupportsDomain(sourceById.get(sourceId), "accessibility_facilities"))) {
+      || entry.sourceIds.some((sourceId) => !sourceSupportsCoverageScope(
+        sourceById.get(sourceId), entry.regionId, entry.operatorId, "accessibility_facilities",
+      ))) {
       throw new Error("productionCoverageEvidence accessibility scope is invalid");
     }
     scopes.add(accessibilityCoverageScopeKey(entry.regionId, entry.operatorId));
+  }
+  if (hasAccessibilitySource && scopes.size === 0) {
+    throw new Error("productionCoverageEvidence accessibility scope is missing");
   }
   return scopes;
 }
@@ -2234,6 +2241,12 @@ function stationLineEvidenceKey(stationId, lineId) {
 
 function sourceSupportsDomain(source, domain) {
   return source?.coverageScope?.sourceDomains?.includes(domain) === true;
+}
+
+function sourceSupportsCoverageScope(source, regionId, operatorId, domain) {
+  return sourceSupportsDomain(source, domain)
+    && source.coverageScope.regionIds?.includes(regionId) === true
+    && source.coverageScope.operatorIds?.includes(operatorId) === true;
 }
 
 function edgePairKey(fromNodeId, toNodeId) {
