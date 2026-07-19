@@ -10,10 +10,10 @@ import {
 
 test("KRIC XLSX workbook relation과 shared string을 bounded row로 복원한다", () => {
   const workbookXml = `<?xml version="1.0"?><workbook xmlns:r="rels"><sheets>
-    <sheet name="코드정보" sheetId="1" r:id="rId1"/>
+    <sheet name = "코드정보" sheetId="1" r:id = "rId1"/>
   </sheets></workbook>`;
   const relationshipsXml = `<?xml version="1.0"?><Relationships>
-    <Relationship Id="rId1" Target="worksheets/sheet1.xml"/>
+    <Relationship Id = "rId1" Target = "worksheets/sheet1.xml"/>
   </Relationships>`;
   assert.deepEqual(parseWorkbookSheetRefs(workbookXml, relationshipsXml), [{
     name: "코드정보",

@@ -14,12 +14,12 @@ const MAXIMUM_CELL_LENGTH = 2_048;
 
 export function parseWorkbookSheetRefs(workbookXml, relationshipsXml) {
   const relationships = new Map();
-  for (const match of relationshipsXml.matchAll(/<Relationship\b([^>]*)\/?\s*>/gi)) {
+  for (const match of relationshipsXml.matchAll(/<Relationship\b([^>]*)>/gi)) {
     const attributes = xmlAttributes(match[1]);
     if (attributes.Id && attributes.Target) relationships.set(attributes.Id, attributes.Target);
   }
   const sheets = [];
-  for (const match of workbookXml.matchAll(/<sheet\b([^>]*)\/?\s*>/gi)) {
+  for (const match of workbookXml.matchAll(/<sheet\b([^>]*)>/gi)) {
     const attributes = xmlAttributes(match[1]);
     const relationshipId = attributes["r:id"];
     const target = relationships.get(relationshipId);
@@ -51,28 +51,27 @@ export function parseWorksheetRows(xml, sharedStrings) {
       const attributes = xmlAttributes(cellMatch[1]);
       const column = columnIndex(attributes.r);
       if (column >= MAXIMUM_COLUMNS) throw new Error("KRIC XLSX column limit exceeded");
-      const body = cellMatch[2];
-      let value = "";
-      if (attributes.t === "inlineStr") {
-        value = [...body.matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/gi)].map(([, text]) => decodeXml(text)).join("");
-      } else {
-        const raw = /<v\b[^>]*>([\s\S]*?)<\/v>/i.exec(body)?.[1] ?? "";
-        if (attributes.t === "s") {
-          const index = Number(raw);
-          if (!Number.isInteger(index) || index < 0 || index >= sharedStrings.length) {
-            throw new Error("KRIC XLSX shared string index is invalid");
-          }
-          value = sharedStrings[index];
-        } else {
-          value = decodeXml(raw);
-        }
-      }
-      row[column] = boundedText(value, "cell");
+      row[column] = boundedText(worksheetCellValue(attributes, cellMatch[2], sharedStrings), "cell");
     }
     while (row.length > 0 && row.at(-1) === undefined) row.pop();
     rows.push(Array.from({ length: row.length }, (_, index) => row[index] ?? ""));
   }
   return rows;
+}
+
+function worksheetCellValue(attributes, body, sharedStrings) {
+  if (attributes.t === "inlineStr") {
+    return [...body.matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/gi)]
+      .map(([, text]) => decodeXml(text))
+      .join("");
+  }
+  const raw = /<v\b[^>]*>([\s\S]*?)<\/v>/i.exec(body)?.[1] ?? "";
+  if (attributes.t !== "s") return decodeXml(raw);
+  const index = Number(raw);
+  if (!Number.isInteger(index) || index < 0 || index >= sharedStrings.length) {
+    throw new Error("KRIC XLSX shared string index is invalid");
+  }
+  return sharedStrings[index];
 }
 
 export function buildProviderLineCatalog({ sourceId, sourceSha256, capturedAt, sheets }) {
@@ -111,7 +110,7 @@ export function buildProviderLineCatalog({ sourceId, sourceSha256, capturedAt, s
 }
 
 function xmlAttributes(raw) {
-  return Object.fromEntries([...raw.matchAll(/([:\w-]+)\s*=\s*"([^"]*)"/g)]
+  return Object.fromEntries([...raw.matchAll(/(?:^|[ \t\r\n])([:\w-]+)[ \t\r\n]*=[ \t\r\n]*"([^"]*)"/g)]
     .map(([, name, value]) => [name, decodeXml(value)]));
 }
 
@@ -119,7 +118,7 @@ function columnIndex(reference) {
   const letters = /^([A-Z]{1,3})\d+$/i.exec(reference ?? "")?.[1]?.toUpperCase();
   if (!letters) throw new Error("KRIC XLSX cell reference is invalid");
   let value = 0;
-  for (const letter of letters) value = value * 26 + letter.charCodeAt(0) - 64;
+  for (const letter of letters) value = value * 26 + letter.codePointAt(0) - 64;
   return value - 1;
 }
 
@@ -187,8 +186,10 @@ async function main(argv) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  main(process.argv.slice(2)).catch((error) => {
+  try {
+    await main(process.argv.slice(2));
+  } catch (error) {
     console.error(error instanceof Error ? error.message : "KRIC code catalog parse failed");
     process.exitCode = 1;
-  });
+  }
 }

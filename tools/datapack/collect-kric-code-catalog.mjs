@@ -123,8 +123,10 @@ async function main(argv) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  main(process.argv.slice(2)).catch((error) => {
+  try {
+    await main(process.argv.slice(2));
+  } catch (error) {
     console.error(error instanceof Error ? error.message : "KRIC code catalog collection failed");
     process.exitCode = 1;
-  });
+  }
 }
