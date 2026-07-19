@@ -16934,6 +16934,7 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
   assert.equal(trainSearchAbuseState.persistedToDatabase, false);
   assert.equal(trainSearchAbuseState.includedInAccessLog, false);
   assert.deepEqual(trainSearchAbuseState.storageLocations, ["backend-jvm-memory"]);
+  assert.ok(trainSearchAbuseState.evidence.includes("infra/nginx/host-easysubway.conf.template"));
   assert.equal(trainSearchAbuseState.retention.fixedTtl, false);
   assert.equal(trainSearchAbuseState.retention.windowSeconds, 60);
   assert.equal(trainSearchAbuseState.retention.dailyCostLimit, 64);

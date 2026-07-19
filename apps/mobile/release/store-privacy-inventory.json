@@ -194,7 +194,8 @@
       "deletionImplementation": "TrainSearchRateLimiter가 ip:clientIdentity별 WindowCounter를 역 검색과 열차 검색용 JVM heap ConcurrentHashMap에서 각각 관리한다. 역 검색 limiter는 60초 window, 열차 검색 limiter는 Asia/Seoul 일일 window 변경을 감지한 첫 요청이 map을 한 번 clear하고, maxKeys(기본 4096) 초과 시 저장 대신 요청을 거절한다.",
       "evidence": [
         "backend/src/main/java/com/easysubway/train/adapter/in/web/TrainSearchRateLimitFilter.java",
-        "backend/src/test/java/com/easysubway/train/adapter/in/web/TrainSearchRateLimitFilterTest.java"
+        "backend/src/test/java/com/easysubway/train/adapter/in/web/TrainSearchRateLimitFilterTest.java",
+        "infra/nginx/host-easysubway.conf.template"
       ],
       "lastVerifiedAt": "2026-07-19",
       "sharedWithThirdParties": false,

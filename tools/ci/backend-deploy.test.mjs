@@ -251,9 +251,11 @@ test("production train-search rate limit은 sanitized Nginx peer 경계를 필�
   }
 
   const proxy = read("infra/nginx/host-default-proxy.conf");
+  const host = read("infra/nginx/host-easysubway.conf.template");
   assert.match(proxy, /real_ip_header CF-Connecting-IP;/);
   assert.match(proxy, /proxy_set_header X-Forwarded-For \$remote_addr;/);
   assert.doesNotMatch(proxy, /proxy_add_x_forwarded_for/);
+  assert.equal((host.match(/access_log off;/g) ?? []).length, 3);
 });
 
 test("Route V2 배포 secret과 certificate digest는 config injection을 차단한다", async () => {

@@ -85,7 +85,11 @@ class TrainSearchContractController {
 				trainType
 			);
 			var snapshot = service.searchWithMetadata(criteria);
-			CachePolicy cachePolicy = outboundDate.equals(TrainSearchScopePolicy.currentServiceDay(clock))
+			LocalDate completedServiceDay = TrainSearchScopePolicy.currentServiceDay(clock);
+			if (outboundDate.isBefore(completedServiceDay)) {
+				return uncacheableSuccess(snapshot.result());
+			}
+			CachePolicy cachePolicy = outboundDate.equals(completedServiceDay)
 				? TODAY_CACHE
 				: FUTURE_CACHE;
 			return success(snapshot.result(), snapshot.expiresAt(), cachePolicy, webRequest);
@@ -116,6 +120,14 @@ class TrainSearchContractController {
 		return ResponseEntity.ok()
 			.eTag(etag)
 			.cacheControl(cacheControl)
+			.body(envelope);
+	}
+
+	private ResponseEntity<ApiResponse<?>> uncacheableSuccess(Object data) {
+		ApiResponse<Object> envelope = ApiResponse.ok(data);
+		return ResponseEntity.ok()
+			.eTag(etag(envelope))
+			.cacheControl(NO_STORE)
 			.body(envelope);
 	}
 
