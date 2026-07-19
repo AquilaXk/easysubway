@@ -79,13 +79,14 @@
           "CD Record deployment"
         ]
       },
-      "observedAt": "2026-07-19T07:42:37.114Z",
+      "observedAt": "2026-07-19T06:59:01.734195Z",
+      "collectedAt": "2026-07-19T09:26:30.650Z",
       "seoulDaejeonKtxFareRows": 54,
       "itxCheongchunRows": 0,
       "conditionalEtagStatus": 304,
       "errorCacheControl": "no-store",
       "schemaStatus": "EXPECTED",
-      "sourceObjectSha256": "67c9bfd1a4ffcb21f92a6a38198229c7bc9887bfc9dd4d59e90d58d39db1e376"
+      "sourceObjectSha256": "c6609caaf0800fd00b7beaf6f847b2ad3fbeaa20a1d11508af0f29977fbe091b"
     },
     "capacity": {
       "executor": {
@@ -119,9 +120,8 @@
         "schemaVersion": 1,
         "artifactKind": "train-search-backend-observation",
         "status": "PASS",
-        "nodeCount": 3,
-        "providerCallCount": 1,
-        "quotaVerdict": "PASS",
+        "threeNodeSingleProviderCallVerifiedByTest": true,
+        "quotaFailClosedVerifiedByTests": true,
         "requiredTests": [
           "com.easysubway.train.application.TrainSearchServiceTest#threeNodesShareOneProviderCallThroughTheDatabaseLease",
           "com.easysubway.train.adapter.out.persistence.JdbcTrainSearchCacheTest#enforcesSharedMinuteAndDayQuotaPerProvider",
@@ -133,21 +133,21 @@
         "testResults": [
           {
             "file": "TEST-com.easysubway.train.adapter.out.http.SharedTrainSearchProviderCallBudgetTest.xml",
-            "sha256": "e9c03377ef88ca575b9c8ac9a553db631226bac8a2b296d535d5ddfc2ed291e8",
+            "sha256": "1e9c04a18a382f48681e77ec28949b069440ff918f1c89a7902451f008aad2ba",
             "testCount": 3
           },
           {
             "file": "TEST-com.easysubway.train.adapter.out.persistence.JdbcTrainSearchCacheTest.xml",
-            "sha256": "c8bb45d6c22935d2d6b94da6802c798f1e963f2041cdd9ed86d89fbe482b33d5",
+            "sha256": "c179c95ce5b6cfae810a76281f7115ff6b9bcb0d1459d66e24596af8a66a2978",
             "testCount": 2
           },
           {
             "file": "TEST-com.easysubway.train.application.TrainSearchServiceTest.xml",
-            "sha256": "af1926fbc233ee7e2ed7de9cf81d9ff0391d20a6886a8a7deab863dcec2a3bb7",
+            "sha256": "849ace30e529ccbc75c2438ccb333cd1acba43d185b33dfc22e71bc015c541cd",
             "testCount": 1
           }
         ],
-        "evidenceSha256": "9777a51105f724f7fe8112f54f26f1a8d9a1453cd78a7513c8fd2643c4ea0a32"
+        "evidenceSha256": "227fc31235fab3391a76a93819f4d0212e02c3d91274bb202c17c9be75b57b77"
       }
     },
     "android": {
@@ -157,7 +157,7 @@
       "androidVersion": "16",
       "networkBoundary": "OCI_STAGING_CONNECT_PROXY",
       "candidateApkSha256": "6141d54f5fb8ab003640bac236130babe4db105989baf2b69de07fa4da271772",
-      "integrationTestSourceSha256": "24d9a17de584da3c3bdffdd9dcbde533e5907c9ecbcc4e0881ab60d72ae1190f",
+      "integrationTestSourceSha256": "deaf0bd25c0e60da40cf9812ee77c3f39de8a1f0413246da43df491ce54c20c5",
       "menuToResultPassed": true,
       "roundTripPassed": true,
       "stateMatrixPassed": true,
@@ -177,7 +177,7 @@
       "status": "PASS",
       "runUrl": "https://github.com/AquilaXk/easysubway/actions/runs/29676605960"
     },
-    "liveEvidenceSha256": "d7ef42412036df46af4d05f869e3b4ee945b1fceae9586e4fe99a897d7803e27"
+    "liveEvidenceSha256": "9bb7c0ee349e6b224f1b64ff9d2477afe8635f192f0feffdb9db21880ef56859"
   },
   "verification": {
     "backend": "./backend/gradlew -p backend test --tests '*TrainSearch*'",

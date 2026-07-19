@@ -69,11 +69,12 @@ void main() {
     }
   });
 
-  testWidgets('실제 Android에서 unavailable은 이전 결과 없이 종료한다', (tester) async {
+  testWidgets('실제 Android에서 offline network 오류는 이전 결과 없이 종료한다', (tester) async {
+    final baseUri = Uri.parse(_baseUrl);
     await tester.pumpWidget(
-      const MaterialApp(
+      MaterialApp(
         home: TrainSearchScreen(
-          repository: _UnavailableAfterSelectionRepository(),
+          repository: _OfflineAfterSelectionRepository(baseUri),
         ),
       ),
     );
@@ -88,7 +89,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('trainSearchError')), findsOneWidget);
-    expect(find.text('기차 검색을 일시적으로 사용할 수 없습니다.'), findsOneWidget);
+    expect(find.text('인터넷 연결을 확인한 뒤 다시 시도해 주세요.'), findsOneWidget);
     expect(find.byKey(const Key('trainSearchResults')), findsNothing);
   });
 }
@@ -157,8 +158,13 @@ Future<void> _waitFor(
   expect(finder, findsOneWidget);
 }
 
-class _UnavailableAfterSelectionRepository implements TrainSearchRepository {
-  const _UnavailableAfterSelectionRepository();
+class _OfflineAfterSelectionRepository implements TrainSearchRepository {
+  _OfflineAfterSelectionRepository(Uri baseUri)
+    : _api = ApiTrainSearchRepository(
+        ApiClient(baseUri: baseUri, httpClient: _OfflineHttpClient()),
+      );
+
+  final ApiTrainSearchRepository _api;
 
   @override
   Future<List<TrainStation>> stations(
@@ -169,10 +175,16 @@ class _UnavailableAfterSelectionRepository implements TrainSearchRepository {
       : const [TrainStation(id: 'NAT011668', name: '대전')];
 
   @override
-  Future<TrainSearchResult> search(TrainSearchCriteria criteria) async {
-    throw const TrainSearchException(
-      TrainSearchFailureKind.unavailable,
-      '기차 검색을 일시적으로 사용할 수 없습니다.',
-    );
+  Future<TrainSearchResult> search(TrainSearchCriteria criteria) =>
+      _api.search(criteria);
+}
+
+class _OfflineHttpClient implements HttpClient {
+  @override
+  Future<HttpClientRequest> getUrl(Uri url) async {
+    throw const SocketException('offline evidence');
   }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

@@ -16,11 +16,15 @@ if (!new Set(["repeated", "unique"]).has(workload)) {
 const rate = Number(__ENV.TRAIN_SEARCH_RATE || 1);
 const duration = __ENV.TRAIN_SEARCH_DURATION || "12s";
 if (!Number.isInteger(rate) || rate < 1 || rate > 4) throw new Error("TRAIN_SEARCH_RATE must be 1 through 4");
-const durationMatch = /^([1-9][0-9]*)s$/.exec(duration);
+const durationMatch = /^([1-9]\d*)s$/.exec(duration);
 if (!durationMatch) throw new Error("TRAIN_SEARCH_DURATION must be whole seconds");
 const durationSeconds = Number(durationMatch[1]);
 const expectedRequestCount = Math.floor((rate * durationSeconds) / 2);
 if (expectedRequestCount < 1) throw new Error("TRAIN_SEARCH_DURATION scheduled no requests");
+const summaryPath = __ENV.TRAIN_SEARCH_SUMMARY_PATH;
+if (typeof summaryPath !== "string" || !summaryPath.startsWith("/")) {
+  throw new Error("TRAIN_SEARCH_SUMMARY_PATH is required and must be absolute");
+}
 
 export const options = {
   scenarios: {
@@ -53,7 +57,7 @@ function shiftedDate(value, days) {
   return date.toISOString().slice(0, 10);
 }
 
-export default function () {
+export default function trainSearchCapacity() {
   const parameters = {
     departureStationId: __ENV.TRAIN_SEARCH_DEPARTURE_ID,
     arrivalStationId: __ENV.TRAIN_SEARCH_ARRIVAL_ID,
@@ -84,7 +88,9 @@ export default function () {
         const payload = value.json();
         return payload?.success === true
           && Array.isArray(payload?.data?.outbound)
-          && payload.data.outbound.every((row) => row.trainType !== "ITX_CHEONGCHUN");
+          && Array.isArray(payload.data.inbound)
+          && [...payload.data.outbound, ...payload.data.inbound]
+            .every((row) => row.trainType !== "ITX_CHEONGCHUN");
       } catch {
         return false;
       }
@@ -121,6 +127,6 @@ export function handleSummary(data) {
   };
   return {
     stdout: `train-search ${workload}: ${summary.status} requests=${summary.requestCount} p95Ms=${summary.p95Ms}\n`,
-    [__ENV.TRAIN_SEARCH_SUMMARY_PATH]: `${JSON.stringify(summary, null, 2)}\n`,
+    [summaryPath]: `${JSON.stringify(summary, null, 2)}\n`,
   };
 }

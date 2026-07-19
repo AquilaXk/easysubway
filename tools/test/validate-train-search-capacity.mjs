@@ -1,11 +1,13 @@
 #!/usr/bin/env node
-import { readFile } from "node:fs/promises";
+import { lstat, readFile, realpath } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { validateBackendObservationArtifact } from "./collect-train-search-backend-observation.mjs";
 
 const expectedWorkloads = ["repeated", "unique"];
-if (process.argv.length !== 5) fail("expected repeated, unique, and backend observation paths");
+const evidenceFiles = await validatedEvidenceFiles(process.argv.slice(2));
 
-for (const [index, file] of process.argv.slice(2, 4).entries()) {
+for (const [index, file] of evidenceFiles.slice(0, 2).entries()) {
   let summary;
   try {
     summary = JSON.parse(await readFile(file, "utf8"));
@@ -34,12 +36,45 @@ for (const [index, file] of process.argv.slice(2, 4).entries()) {
 }
 
 try {
-  validateBackendObservationArtifact(JSON.parse(await readFile(process.argv[4], "utf8")));
+  validateBackendObservationArtifact(JSON.parse(await readFile(evidenceFiles[2], "utf8")));
 } catch {
   fail("backend observation failed its evidence contract");
 }
 
 console.log("train-search capacity summaries and backend observation PASS");
+
+async function validatedEvidenceFiles(arguments_) {
+  const expectedNames = ["repeated.json", "unique.json", "backend-observation.json"];
+  if (arguments_.length !== expectedNames.length
+    || arguments_.some((value) => !path.isAbsolute(value))) {
+    fail("expected three absolute evidence paths");
+  }
+  const directory = path.dirname(arguments_[0]);
+  if (arguments_.some((value, index) => (
+    path.dirname(value) !== directory || path.basename(value) !== expectedNames[index]
+  ))) {
+    fail("evidence paths must use the canonical names in one directory");
+  }
+  const allowedRoots = [await realpath(process.cwd()), await realpath(tmpdir())];
+  if (!allowedRoots.some((root) => pathInside(root, directory))) {
+    fail("evidence directory is outside the allowed roots");
+  }
+  const realDirectory = await realpath(directory);
+  if (!allowedRoots.some((root) => pathInside(root, realDirectory))) {
+    fail("evidence directory resolves outside the allowed roots");
+  }
+  const files = expectedNames.map((name) => path.join(realDirectory, name));
+  const metadata = await Promise.all(files.map((file) => lstat(file)));
+  if (metadata.some((value) => !value.isFile() || value.isSymbolicLink())) {
+    fail("evidence inputs must be regular files");
+  }
+  return files;
+}
+
+function pathInside(root, candidate) {
+  const relative = path.relative(root, candidate);
+  return relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative));
+}
 
 function fail(message) {
   console.error(message);

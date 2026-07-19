@@ -8,6 +8,9 @@ const PROVIDER_BASE = "https://apis.data.go.kr/1613000/TrainInfo/";
 const PAGE_SIZE = 100;
 const MAX_PAGES = 100;
 const TIMEOUT_MS = 10_000;
+const TODAY_BACKEND_OBSERVATION_AGE_MS = 6 * 60 * 1_000;
+const FUTURE_BACKEND_OBSERVATION_AGE_MS = (6 * 60 + 1) * 60 * 1_000;
+const MAX_BACKEND_CLOCK_SKEW_MS = 60 * 1_000;
 const PROVIDER_OPERATIONS = Object.freeze([
   "GetCtyCodeList",
   "GetCtyAcctoTrainSttnList",
@@ -141,8 +144,9 @@ export async function collectProviderEvidence({
   }));
   const supportedTrainTypes = [...new Set(grades
     .map(({ trainType }) => trainType)
-    .filter((trainType) => SUPPORTED_TRAIN_TYPES.includes(trainType)))].sort();
-  const expectedTypes = [...SUPPORTED_TRAIN_TYPES].sort();
+    .filter((trainType) => SUPPORTED_TRAIN_TYPES.includes(trainType)))]
+    .sort((left, right) => left.localeCompare(right));
+  const expectedTypes = [...SUPPORTED_TRAIN_TYPES].sort((left, right) => left.localeCompare(right));
   if (JSON.stringify(supportedTrainTypes) !== JSON.stringify(expectedTypes)) {
     throw new Error(`TAGO supported train types were incomplete: ${supportedTrainTypes.join(",")}`);
   }
@@ -163,7 +167,10 @@ export async function collectProviderEvidence({
   const arrivalName = stations.get(requiredString(arrivalStationId, "arrivalStationId"));
   if (!departureName || !arrivalName) throw new Error("TAGO station catalog did not contain both requested stations");
 
-  const ktxCodes = grades.filter(({ trainType }) => trainType === "KTX").map(({ code }) => code).sort();
+  const ktxCodes = grades
+    .filter(({ trainType }) => trainType === "KTX")
+    .map(({ code }) => code)
+    .sort((left, right) => left.localeCompare(right));
   if (ktxCodes.length === 0) throw new Error("TAGO KTX provider grade was missing");
   const scheduleRows = [];
   for (const trainGradeCode of ktxCodes) {
@@ -244,6 +251,7 @@ export async function collectBackendEvidence({
   if (search.fareRowCount === 0 || search.itxCheongchunRowCount !== 0) {
     throw new Error("backend KTX fare or ITX exclusion evidence failed");
   }
+  const observationTime = validateBackendObservationTime(search.observedAt, departureDate, now);
   const etag = first.headers.get("etag");
   const conditional = await fetchWithTimeout(searchUrl, { headers: { "if-none-match": etag } }, fetchImpl);
   if (conditional.status !== 304) throw new Error(`train search conditional request returned HTTP ${conditional.status}`);
@@ -257,7 +265,7 @@ export async function collectBackendEvidence({
   await requireUnsupported(unsupportedSearch, fetchImpl);
 
   return {
-    observedAt: now.toISOString(),
+    ...observationTime,
     deployedGitSha: deployment.deployedGitSha,
     deployment,
     origin: origin.origin,
@@ -270,6 +278,26 @@ export async function collectBackendEvidence({
     errorCacheControl: "no-store",
     schemaStatus: "EXPECTED",
   };
+}
+
+export function validateBackendObservationTime(observedAt, departureDate, now = new Date()) {
+  const collectedAt = now instanceof Date ? now : new Date(now);
+  const observedTime = Date.parse(observedAt);
+  requireDate(departureDate);
+  if (!validDateTime(observedAt) || Number.isNaN(collectedAt.getTime())) {
+    throw new Error("backend observation time was invalid");
+  }
+  const ageMs = collectedAt.getTime() - observedTime;
+  if (ageMs < -MAX_BACKEND_CLOCK_SKEW_MS) {
+    throw new Error("backend observation was in the future");
+  }
+  const maxAgeMs = departureDate === koreaServiceDate(collectedAt.toISOString())
+    ? TODAY_BACKEND_OBSERVATION_AGE_MS
+    : FUTURE_BACKEND_OBSERVATION_AGE_MS;
+  if (ageMs > maxAgeMs) {
+    throw new Error("backend observation was stale");
+  }
+  return { observedAt, collectedAt: collectedAt.toISOString() };
 }
 
 async function backendStation(origin, query, fetchImpl) {
@@ -316,31 +344,20 @@ async function providerRows(operation, parameters, key, fetchImpl, paginated) {
   let totalCount;
   let requestCount = 0;
   for (;;) {
-    const query = paginated ? { pageNo: String(pageNo), numOfRows: String(PAGE_SIZE), ...parameters } : parameters;
-    const url = new URL(operation, PROVIDER_BASE);
-    for (const [name, value] of Object.entries({ serviceKey: key, _type: "json", ...query })) {
-      url.searchParams.set(name, value);
-    }
-    const response = await fetchWithRetry(url, fetchImpl);
-    requestCount += response.attempts;
-    if (!response.value.ok) throw new Error(`${operation} returned HTTP ${response.value.status}`);
-    const text = await response.value.text();
-    rawHashes.push(sha256(text));
-    let payload;
-    try { payload = JSON.parse(text); } catch { throw new Error(`${operation} returned invalid JSON`); }
-    const body = validateProviderEnvelope(payload, { operation, paginated, pageNo, pageSize: PAGE_SIZE });
-    const pageRows = itemRows(body, operation);
+    const page = await providerPage(operation, parameters, key, fetchImpl, paginated, pageNo);
+    requestCount += page.attempts;
+    rawHashes.push(page.rawHash);
     if (!paginated) {
-      rows.push(...pageRows);
-      totalCount = pageRows.length;
+      rows.push(...page.rows);
+      totalCount = page.rows.length;
       break;
     }
-    const reportedTotal = integer(body.totalCount, `${operation}.totalCount`);
+    const reportedTotal = page.totalCount;
     if (totalCount === undefined) totalCount = reportedTotal;
     if (reportedTotal !== totalCount) throw new Error(`${operation} totalCount changed during pagination`);
     const expectedRows = Math.min(PAGE_SIZE, Math.max(0, totalCount - rows.length));
-    if (pageRows.length !== expectedRows) throw new Error(`${operation} page row count was invalid`);
-    rows.push(...pageRows);
+    if (page.rows.length !== expectedRows) throw new Error(`${operation} page row count was invalid`);
+    rows.push(...page.rows);
     if (rows.length === totalCount) break;
     pageNo += 1;
     if (pageNo > MAX_PAGES) throw new Error(`${operation} exceeded the pagination limit`);
@@ -358,6 +375,30 @@ async function providerRows(operation, parameters, key, fetchImpl, paginated) {
       totalCount,
       rawResponseSha256: sha256(rawHashes.join("|")),
     },
+  };
+}
+
+async function providerPage(operation, parameters, key, fetchImpl, paginated, pageNo) {
+  const query = paginated ? { pageNo: String(pageNo), numOfRows: String(PAGE_SIZE), ...parameters } : parameters;
+  const url = new URL(operation, PROVIDER_BASE);
+  for (const [name, value] of Object.entries({ serviceKey: key, _type: "json", ...query })) {
+    url.searchParams.set(name, value);
+  }
+  const response = await fetchWithRetry(url, fetchImpl);
+  if (!response.value.ok) throw new Error(`${operation} returned HTTP ${response.value.status}`);
+  const text = await response.value.text();
+  let payload;
+  try {
+    payload = JSON.parse(text);
+  } catch {
+    throw new Error(`${operation} returned invalid JSON`);
+  }
+  const body = validateProviderEnvelope(payload, { operation, paginated, pageNo, pageSize: PAGE_SIZE });
+  return {
+    attempts: response.attempts,
+    rawHash: sha256(text),
+    rows: itemRows(body, operation),
+    totalCount: paginated ? integer(body.totalCount, `${operation}.totalCount`) : null,
   };
 }
 
@@ -395,7 +436,7 @@ export function providerJourney(row, index, {
 }) {
   const departureAt = requiredString(row?.depplandtime, `journey[${index}].depplandtime`);
   const arrivalAt = requiredString(row?.arrplandtime, `journey[${index}].arrplandtime`);
-  if (!/^\d{14}$/.test(departureAt) || !/^\d{14}$/.test(arrivalAt) || arrivalAt <= departureAt) {
+  if (!validProviderDateTime(departureAt) || !validProviderDateTime(arrivalAt) || arrivalAt <= departureAt) {
     throw new Error(`journey[${index}] time was invalid`);
   }
   const fare = integer(row?.adultcharge, `journey[${index}].adultcharge`);
@@ -418,6 +459,19 @@ export function providerJourney(row, index, {
     arrivalAt,
     adultFareWon: fare,
   };
+}
+
+function validProviderDateTime(value) {
+  const match = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/u.exec(value);
+  if (!match) return false;
+  const [year, month, day, hour, minute, second] = match.slice(1).map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  return parsed.getUTCFullYear() === year
+    && parsed.getUTCMonth() === month - 1
+    && parsed.getUTCDate() === day
+    && parsed.getUTCHours() === hour
+    && parsed.getUTCMinutes() === minute
+    && parsed.getUTCSeconds() === second;
 }
 
 export function validateDeploymentRun(run, jobsPayload, { candidateGitSha, deploymentRunUrl }) {
@@ -472,7 +526,7 @@ function deploymentUrl(value) {
   const url = new URL(requiredString(value, "--deployment-run-url"));
   if (url.protocol !== "https:"
     || url.hostname !== "github.com"
-    || !/^\/AquilaXk\/easysubway\/actions\/runs\/[1-9][0-9]*$/u.test(url.pathname)
+    || !/^\/AquilaXk\/easysubway\/actions\/runs\/[1-9]\d*$/u.test(url.pathname)
     || url.search
     || url.hash
     || url.username
@@ -624,8 +678,10 @@ async function main() {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     console.error(error instanceof Error ? error.message : "train-search live smoke failed");
     process.exitCode = 1;
-  });
+  }
 }

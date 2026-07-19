@@ -28,6 +28,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
@@ -81,19 +82,26 @@ class TrainSearchServiceTest {
 			provider, cache, mapper, clock, Thread::sleep, () -> "node-c"
 		);
 		provider.blockSearch = true;
-		var first = CompletableFuture.supplyAsync(() -> firstNode.search(criteria(null)));
-		assertThat(provider.searchStarted.await(5, TimeUnit.SECONDS)).isTrue();
-		var second = CompletableFuture.supplyAsync(() -> secondNode.search(criteria(null)));
-		var third = CompletableFuture.supplyAsync(() -> thirdNode.search(criteria(null)));
-		assertThat(cache.followerLeaseAttempts.await(5, TimeUnit.SECONDS)).isTrue();
-		provider.continueSearch.countDown();
+		var pool = Executors.newFixedThreadPool(3);
+		try {
+			var first = CompletableFuture.supplyAsync(() -> firstNode.search(criteria(null)), pool);
+			assertThat(provider.searchStarted.await(5, TimeUnit.SECONDS)).isTrue();
+			var second = CompletableFuture.supplyAsync(() -> secondNode.search(criteria(null)), pool);
+			var third = CompletableFuture.supplyAsync(() -> thirdNode.search(criteria(null)), pool);
+			assertThat(cache.followerLeaseAttempts.await(5, TimeUnit.SECONDS)).isTrue();
+			provider.continueSearch.countDown();
 
-		assertThat(List.of(
-			first.get(5, TimeUnit.SECONDS),
-			second.get(5, TimeUnit.SECONDS),
-			third.get(5, TimeUnit.SECONDS)
-		)).allMatch(first.join()::equals);
-		assertThat(provider.searchCalls).hasValue(1);
+			assertThat(List.of(
+				first.get(5, TimeUnit.SECONDS),
+				second.get(5, TimeUnit.SECONDS),
+				third.get(5, TimeUnit.SECONDS)
+			)).allMatch(first.join()::equals);
+			assertThat(provider.searchCalls).hasValue(1);
+		} finally {
+			provider.continueSearch.countDown();
+			pool.shutdownNow();
+			assertThat(pool.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+		}
 	}
 
 	@Test

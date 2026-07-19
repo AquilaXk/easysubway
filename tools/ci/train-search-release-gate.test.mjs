@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
@@ -9,6 +10,7 @@ import {
   normalizeProviderTrainType,
   providerJourney,
   validateBackendSearchEnvelope,
+  validateBackendObservationTime,
   validateDeploymentRun,
   validateProviderEnvelope,
 } from "../test/train-search-live-smoke.mjs";
@@ -19,6 +21,7 @@ import {
 
 const read = (file) => readFileSync(file, "utf8");
 const readJson = (file) => JSON.parse(read(file));
+const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 
 const supportedTrainTypes = [
   "KTX",
@@ -182,6 +185,28 @@ test("backend 서울→대전 KTX 응답은 운임·시간·ITX 0건을 증명�
   }
 });
 
+test("backend live evidence는 API observedAt을 보존하고 stale 응답을 거부한다", () => {
+  assert.deepEqual(
+    validateBackendObservationTime(
+      "2026-07-19T06:00:00Z",
+      "2026-07-19",
+      new Date("2026-07-19T06:04:00Z"),
+    ),
+    {
+      observedAt: "2026-07-19T06:00:00Z",
+      collectedAt: "2026-07-19T06:04:00.000Z",
+    },
+  );
+  assert.throws(
+    () => validateBackendObservationTime(
+      "2026-07-19T06:00:00Z",
+      "2026-07-19",
+      new Date("2026-07-19T06:11:00Z"),
+    ),
+    /backend observation was stale/,
+  );
+});
+
 test("TAGO station catalog는 동일 ID의 상이한 이름을 거부한다", () => {
   const stations = new Map();
   addProviderStation(stations, "NAT010000", "서울");
@@ -218,6 +243,26 @@ test("TAGO 운임 행은 요청한 서울→대전 OD와 날짜가 정확히 일
     }),
     /provider journey OD or date mismatch/,
   );
+  for (const invalidTime of ["20260720250000", "20260230090000"]) {
+    assert.throws(
+      () => providerJourney({
+        trainno: "101",
+        traingradename: "KTX",
+        depplandtime: invalidTime,
+        arrplandtime: "20260721100000",
+        depplacename: "서울",
+        arrplacename: "대전",
+        adultcharge: 23700,
+      }, 0, {
+        departureStationId: "NAT010000",
+        departureStationName: "서울",
+        arrivalStationId: "NAT011668",
+        arrivalStationName: "대전",
+        departureDate: "2026-07-20",
+      }),
+      /time was invalid/,
+    );
+  }
   assert.throws(
     () => providerJourney({ ...row, depplandtime: "20260721090000", arrplandtime: "20260721100200" }, 0, {
       departureStationId: "NAT010000",
@@ -296,9 +341,11 @@ test("backend test XML에서 3-node provider 1회와 quota fail-closed를 계산
     },
   ]);
   assert.equal(observation.status, "PASS");
-  assert.equal(observation.nodeCount, 3);
-  assert.equal(observation.providerCallCount, 1);
-  assert.equal(observation.quotaVerdict, "PASS");
+  assert.equal(observation.threeNodeSingleProviderCallVerifiedByTest, true);
+  assert.equal(observation.quotaFailClosedVerifiedByTests, true);
+  assert.equal("nodeCount" in observation, false);
+  assert.equal("providerCallCount" in observation, false);
+  assert.equal("quotaVerdict" in observation, false);
   assert.ok(observation.requiredTests.includes(
     "com.easysubway.train.adapter.out.persistence.JdbcTrainSearchCacheTest#concurrentLeaseAttemptsHaveExactlyOneOwner",
   ));
@@ -346,13 +393,26 @@ test("capacity runner는 repeated·unique·3-node·quota 경계를 고정한다"
   assert.match(k6, /timeUnit: "2s"/);
   assert.doesNotMatch(k6, /http_req_failed\?\.values\?\.passes/);
   assert.match(k6, /requestCount >= expectedRequestCount/);
+  assert.match(k6, /Array\.isArray\(payload\.data\.inbound\)/);
+  assert.match(k6, /TRAIN_SEARCH_SUMMARY_PATH is required/);
   assert.match(runner, /--nodes 3/);
   assert.match(runner, /--max-duration-seconds/);
   assert.match(runner, /collect-train-search-backend-observation\.mjs/);
   assert.doesNotMatch(runner, /--provider-call-count|--quota-verdict/);
   assert.doesNotMatch(k6, /TRAIN_SEARCH_PROVIDER_CALL_COUNT|TRAIN_SEARCH_QUOTA_VERDICT/);
+  const serviceTest = read("backend/src/test/java/com/easysubway/train/application/TrainSearchServiceTest.java");
+  assert.match(serviceTest, /Executors\.newFixedThreadPool\(3\)/);
+  assert.match(serviceTest, /pool\.shutdownNow\(\)/);
   assert.match(runner, /validate-train-search-capacity\.mjs/);
   assert.doesNotMatch(runner, /source .*\.env|curl|jq|sed|awk|grep/);
+  const unsafeEvidence = spawnSync(process.execPath, [
+    "tools/test/validate-train-search-capacity.mjs",
+    "/etc/repeated.json",
+    "/etc/unique.json",
+    "/etc/backend-observation.json",
+  ], { encoding: "utf8" });
+  assert.notEqual(unsafeEvidence.status, 0);
+  assert.match(unsafeEvidence.stderr, /outside the allowed roots/);
   for (const baseUrl of ["https://localhost", "https://127.0.0.1", "https://10.0.0.1"]) {
     const result = spawnSync("bash", [
       "tools/test/run-train-search-capacity.sh",
@@ -367,8 +427,10 @@ test("capacity runner는 repeated·unique·3-node·quota 경계를 고정한다"
 test("#2094 release artifact는 동일 candidate와 모든 완료 증거를 요구한다", () => {
   const gate = readJson("apps/mobile/release/train-search-itx-exclusion-gate.json");
   const runtime = gate.issue2094RuntimeEvidence;
+  const { liveEvidenceSha256, ...unsignedRuntime } = runtime;
 
   assert.equal(gate.runtimeImplementationStatus, "SATISFIED_BY_2094");
+  assert.equal(liveEvidenceSha256, sha256(JSON.stringify(unsignedRuntime)));
   assert.equal(gate.issue2094RoadmapRequiredForThisGate, true);
   assert.match(runtime.candidateGitSha, /^[0-9a-f]{40}$/);
   assert.equal(runtime.backend.deployedGitSha, runtime.candidateGitSha);
@@ -416,6 +478,10 @@ test("#2094 release artifact는 동일 candidate와 모든 완료 증거를 요�
   assert.equal(runtime.android.networkBoundary, "OCI_STAGING_CONNECT_PROXY");
   assert.match(runtime.android.candidateApkSha256, /^[0-9a-f]{64}$/);
   assert.match(runtime.android.integrationTestSourceSha256, /^[0-9a-f]{64}$/);
+  assert.equal(
+    runtime.android.integrationTestSourceSha256,
+    sha256(read("apps/mobile/integration_test/train_search_release_evidence_test.dart")),
+  );
   assert.match(runtime.android.screenshotSha256, /^[0-9a-f]{64}$/);
   assert.match(runtime.android.semanticsSha256, /^[0-9a-f]{64}$/);
   assert.equal(runtime.review.actionableFindingsOpen, 0);

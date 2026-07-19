@@ -36,7 +36,7 @@ export function buildBackendObservation(files) {
   const passingTests = new Set();
   const testResults = files.map(({ path: filePath, content }) => {
     if (typeof content !== "string") throw new Error("backend observation test result was unreadable");
-    const suite = content.match(/<testsuite\b([^>]*)>/u);
+    const suite = /<testsuite\b([^>]*)>/u.exec(content);
     if (!suite) throw new Error("backend observation test suite was invalid");
     const attributes = xmlAttributes(suite[1]);
     if (!positiveInteger(attributes.tests)
@@ -67,9 +67,8 @@ export function buildBackendObservation(files) {
     schemaVersion: 1,
     artifactKind: "train-search-backend-observation",
     status: "PASS",
-    nodeCount: 3,
-    providerCallCount: 1,
-    quotaVerdict: "PASS",
+    threeNodeSingleProviderCallVerifiedByTest: true,
+    quotaFailClosedVerifiedByTests: true,
     requiredTests,
     testResults,
   };
@@ -83,17 +82,18 @@ export function validateBackendObservationArtifact(artifact) {
   if (artifact.schemaVersion !== 1
     || artifact.artifactKind !== "train-search-backend-observation"
     || artifact.status !== "PASS"
-    || artifact.nodeCount !== 3
-    || artifact.providerCallCount !== 1
-    || artifact.quotaVerdict !== "PASS"
+    || artifact.threeNodeSingleProviderCallVerifiedByTest !== true
+    || artifact.quotaFailClosedVerifiedByTests !== true
+    || "nodeCount" in artifact
+    || "providerCallCount" in artifact
+    || "quotaVerdict" in artifact
     || !Array.isArray(artifact.requiredTests)
     || artifact.requiredTests.length !== REQUIRED_TESTS.length
     || REQUIRED_TESTS.some(([className, method]) => !artifact.requiredTests.includes(`${className}#${method}`))
     || !Array.isArray(artifact.testResults)
     || artifact.testResults.length < 3
     || artifact.testResults.some((result) => (
-      typeof result?.file !== "string"
-        || !/^[^/]+[.]xml$/u.test(result.file)
+      !validXmlFileName(result?.file)
         || !/^[0-9a-f]{64}$/u.test(result.sha256 ?? "")
         || !positiveInteger(String(result.testCount))
     ))
@@ -109,8 +109,16 @@ function xmlAttributes(value) {
     .map((match) => [match[1], match[2]]));
 }
 
+function validXmlFileName(value) {
+  return typeof value === "string"
+    && value.length > ".xml".length
+    && value.endsWith(".xml")
+    && path.basename(value) === value
+    && !value.includes("\\");
+}
+
 function positiveInteger(value) {
-  return /^[1-9][0-9]*$/u.test(value ?? "");
+  return /^[1-9]\d*$/u.test(value ?? "");
 }
 
 function sha256(value) {
@@ -136,19 +144,21 @@ async function main() {
   const testResultsDir = path.resolve(args["test-results-dir"]);
   const names = (await readdir(testResultsDir))
     .filter((name) => name.startsWith("TEST-") && name.endsWith(".xml"))
-    .sort();
+    .sort((left, right) => left.localeCompare(right));
   const files = await Promise.all(names.map(async (name) => ({
     path: name,
     content: await readFile(path.join(testResultsDir, name), "utf8"),
   })));
   const artifact = buildBackendObservation(files);
   await writeFile(args.output, `${JSON.stringify(artifact, null, 2)}\n`, { mode: 0o600 });
-  console.log("train-search backend observation PASS: nodes=3 providerCallCount=1 quotaVerdict=PASS");
+  console.log("train-search backend observation PASS: 3-node single-flight and quota fail-closed verified by tests");
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     console.error(error instanceof Error ? error.message : "backend observation failed");
     process.exitCode = 1;
-  });
+  }
 }
