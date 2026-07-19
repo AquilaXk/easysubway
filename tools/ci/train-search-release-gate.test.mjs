@@ -237,18 +237,128 @@ test("backend live evidence는 API observedAt을 보존하고 stale 응답을 �
   );
 });
 
-test("backend freshness 시각은 search 응답을 수집한 뒤 결정한다", () => {
-  const source = read("tools/test/train-search-live-smoke.mjs");
-  const backendSource = source.slice(
-    source.indexOf("export async function collectBackendEvidence"),
-    source.indexOf("export function validateKtxProviderJourneys"),
+test("backend freshness 시각은 search 응답을 수집한 뒤 결정한다", async () => {
+  const candidateGitSha = "a".repeat(40);
+  const etag = `"${"b".repeat(64)}"`;
+  let searchParsed = false;
+  let clockCalls = 0;
+  const json = (payload, { status = 200, headers = {} } = {}) => new Response(
+    JSON.stringify(payload),
+    { status, headers: { "content-type": "application/json", ...headers } },
   );
-  assert.doesNotMatch(backendSource, /now = new Date\(\)/);
-  assert.ok(
-    source.indexOf("const collectedAt = now === undefined ? new Date() : now;")
-      > source.indexOf("validateBackendSearchEnvelope(await responseJson(first"),
-  );
-  assert.match(source, /validateBackendObservationTime\([\s\S]*?collectedAt,/);
+  const successHeaders = { etag, "cache-control": "public, max-age=300" };
+  const run = (id, name) => ({
+    id,
+    name,
+    head_sha: candidateGitSha,
+    status: "completed",
+    conclusion: "success",
+    event: "push",
+    html_url: `https://github.com/AquilaXk/easysubway/actions/runs/${id}`,
+    repository: { full_name: "AquilaXk/easysubway" },
+  });
+  const deployments = [{
+    id: 3,
+    sha: candidateGitSha,
+    ref: "main",
+    environment: "production",
+    created_at: "2026-07-19T05:59:00Z",
+  }];
+  const statuses = [{
+    id: 4,
+    state: "success",
+    environment_url: "https://easysubway-api.aquilaxk.site",
+    created_at: "2026-07-19T06:00:00Z",
+  }];
+  const fetchImpl = async (input, options = {}) => {
+    const url = new URL(input);
+    if (url.pathname.endsWith("/actions/runs/1")) return json(run(1, "CD"));
+    if (url.pathname.endsWith("/actions/runs/1/jobs")) {
+      return json({ jobs: [
+        { name: "CD Deploy", conclusion: "success" },
+        { name: "Post-deploy smoke", conclusion: "success" },
+        { name: "CD Record deployment", conclusion: "success" },
+      ] });
+    }
+    if (url.pathname.endsWith("/actions/runs/2")) return json(run(2, "CI"));
+    if (url.pathname.endsWith("/actions/runs/2/jobs")) {
+      return json({ jobs: [
+        "Repository CI", "Android CI", "Release Gate Consistency",
+        "Mobile App CI", "Backend CI", "Admin QA Gates",
+      ].map((name) => ({ name, conclusion: "success" })) });
+    }
+    if (url.pathname.endsWith("/deployments")) return json(deployments);
+    if (url.pathname.endsWith("/deployments/3/statuses")) return json(statuses);
+    if (url.pathname === "/api/v1/trains/stations"
+      && url.searchParams.get("trainType") === "ITX_CHEONGCHUN") {
+      return json({
+        success: false,
+        data: { code: "TRAIN_SEARCH_UNSUPPORTED_TRAIN_TYPE" },
+      }, { status: 400, headers: { "cache-control": "no-store" } });
+    }
+    if (url.pathname === "/api/v1/trains/stations") {
+      const name = url.searchParams.get("query");
+      return json({
+        success: true,
+        data: [{ id: name === "서울" ? "NAT010000" : "NAT011668", name }],
+      }, { headers: successHeaders });
+    }
+    if (url.pathname === "/api/v1/trains/search"
+      && url.searchParams.get("trainType") === "ITX_CHEONGCHUN") {
+      return json({
+        success: false,
+        data: { code: "TRAIN_SEARCH_UNSUPPORTED_TRAIN_TYPE" },
+      }, { status: 400, headers: { "cache-control": "no-store" } });
+    }
+    if (url.pathname === "/api/v1/trains/search" && options.headers?.["if-none-match"]) {
+      return new Response(null, { status: 304, headers: successHeaders });
+    }
+    if (url.pathname === "/api/v1/trains/search") {
+      const response = json({
+        success: true,
+        data: {
+          observedAt: "2026-07-19T06:01:00Z",
+          outbound: [{
+            trainNumber: "101",
+            trainType: "KTX",
+            departureStationId: "NAT010000",
+            departureStationName: "서울",
+            departureAt: "2026-07-20T09:00:00+09:00",
+            arrivalStationId: "NAT011668",
+            arrivalStationName: "대전",
+            arrivalAt: "2026-07-20T10:02:00+09:00",
+            durationMinutes: 62,
+            adultFareWon: 23_700,
+          }],
+          inbound: [],
+        },
+      }, { headers: successHeaders });
+      const parse = response.json.bind(response);
+      response.json = async () => {
+        searchParsed = true;
+        return parse();
+      };
+      return response;
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  };
+
+  const evidence = await collectBackendEvidence({
+    baseUrl: "https://easysubway-api.aquilaxk.site/",
+    candidateGitSha,
+    deploymentRunUrl: "https://github.com/AquilaXk/easysubway/actions/runs/1",
+    ciRunUrl: "https://github.com/AquilaXk/easysubway/actions/runs/2",
+    departureDate: "2026-07-20",
+    fetchImpl,
+    now: () => {
+      clockCalls += 1;
+      assert.equal(searchParsed, true);
+      return new Date("2026-07-19T06:02:00Z");
+    },
+  });
+
+  assert.equal(clockCalls, 1);
+  assert.equal(evidence.collectedAt, "2026-07-19T06:02:00.000Z");
 });
 
 test("backend 304 응답은 동일 ETag와 Cache-Control을 요구한다", () => {
@@ -855,6 +965,16 @@ test("capacity validator는 OD·날짜와 required CI를 fail-closed로 검증�
     const missingCi = spawnSync(process.execPath, args, { encoding: "utf8" });
     assert.notEqual(missingCi.status, 0);
     assert.match(missingCi.stderr, /candidate deployment binding failed its evidence contract/);
+
+    const mismatchedCiUrl = structuredClone(runtime.capacity.candidateBinding);
+    mismatchedCiUrl.backend.requiredCi.runUrl =
+      "https://github.com/AquilaXk/easysubway/actions/runs/1";
+    delete mismatchedCiUrl.evidenceSha256;
+    mismatchedCiUrl.evidenceSha256 = sha256(JSON.stringify(mismatchedCiUrl));
+    write("candidate-binding.json", mismatchedCiUrl);
+    const wrongCiUrl = spawnSync(process.execPath, args, { encoding: "utf8" });
+    assert.notEqual(wrongCiUrl.status, 0);
+    assert.match(wrongCiUrl.stderr, /candidate deployment binding failed its evidence contract/);
 
     const missingDeploymentMetadata = structuredClone(runtime.capacity.candidateBinding);
     delete missingDeploymentMetadata.backend.deployment.runId;

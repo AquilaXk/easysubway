@@ -288,7 +288,9 @@ export async function collectBackendEvidence({
   if (search.fareRowCount === 0 || search.itxCheongchunRowCount !== 0) {
     throw new Error("backend KTX fare or ITX exclusion evidence failed");
   }
-  const collectedAt = now === undefined ? new Date() : now;
+  const collectedAt = now === undefined
+    ? new Date()
+    : typeof now === "function" ? now() : now;
   const observationTime = validateBackendObservationTime(
     search.observedAt,
     departureDate,

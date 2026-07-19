@@ -213,8 +213,9 @@ function validateCandidateBindingArtifact(
     || artifact.backend?.requiredCi?.workflowName !== "CI"
     || artifact.backend?.requiredCi?.conclusion !== "success"
     || !Number.isInteger(artifact.backend?.requiredCi?.runId)
-    || !/^https:\/\/github\.com\/AquilaXk\/easysubway\/actions\/runs\/[1-9][0-9]*$/u
-      .test(artifact.backend?.requiredCi?.runUrl ?? "")
+    || artifact.backend.requiredCi.runId < 1
+    || artifact.backend?.requiredCi?.runUrl
+      !== `https://github.com/AquilaXk/easysubway/actions/runs/${artifact.backend.requiredCi.runId}`
     || !Array.isArray(artifact.backend?.requiredCi?.requiredJobs)
     || artifact.backend.requiredCi.requiredJobs.length !== requiredCiJobs.length
     || requiredCiJobs.some((job, index) => artifact.backend.requiredCi.requiredJobs[index] !== job)
