@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -35,23 +35,27 @@ test("전국 공공데이터 audit은 76건만 공식 미지원으로 닫고 194
 
   const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-2138-coverage-"));
   const outputPath = path.join(outputDir, "report.json");
-  await execFileAsync(process.execPath, [
-    "tools/datapack/report-coverage-gaps.mjs",
-    "--targets", "tools/datapack/nationwide-coverage-targets.json",
-    "--inventory", "tools/datapack/source-inventory.json",
-    "--resolution-plan", planPath,
-    "--resolutions", resolutionsPath,
-    "--output", outputPath,
-    "--allow-gaps",
-  ], { cwd: root });
+  try {
+    await execFileAsync(process.execPath, [
+      "tools/datapack/report-coverage-gaps.mjs",
+      "--targets", "tools/datapack/nationwide-coverage-targets.json",
+      "--inventory", "tools/datapack/source-inventory.json",
+      "--resolution-plan", planPath,
+      "--resolutions", resolutionsPath,
+      "--output", outputPath,
+      "--allow-gaps",
+    ], { cwd: root });
 
-  const report = JSON.parse(await readFile(outputPath, "utf8"));
-  assert.equal(report.summary.launchRequired.totalCount, 270);
-  assert.equal(report.summary.launchRequired.explicitlyUnsupportedCount, 76);
-  assert.equal(report.summary.launchRequired.missingCount, 194);
-  assert.equal(report.summary.launchRequired.terminalResolutionRatio, 0.2815);
+    const report = JSON.parse(await readFile(outputPath, "utf8"));
+    assert.equal(report.summary.launchRequired.totalCount, 270);
+    assert.equal(report.summary.launchRequired.explicitlyUnsupportedCount, 76);
+    assert.equal(report.summary.launchRequired.missingCount, 194);
+    assert.equal(report.summary.launchRequired.terminalResolutionRatio, 0.2815);
 
-  const workflow = await readFile(path.join(root, ".github/workflows/datapack-release.yml"), "utf8");
-  assert.match(workflow, /--resolution-plan tools\/datapack\/release\/nationwide-public-api-coverage-search-plan-20260720\.json/);
-  assert.match(workflow, /--resolutions tools\/datapack\/release\/nationwide-public-api-coverage-resolutions-20260720\.json/);
+    const workflow = await readFile(path.join(root, ".github/workflows/datapack-release.yml"), "utf8");
+    assert.match(workflow, /--resolution-plan tools\/datapack\/release\/nationwide-public-api-coverage-search-plan-20260720\.json/);
+    assert.match(workflow, /--resolutions tools\/datapack\/release\/nationwide-public-api-coverage-resolutions-20260720\.json/);
+  } finally {
+    await rm(outputDir, { recursive: true, force: true });
+  }
 });
