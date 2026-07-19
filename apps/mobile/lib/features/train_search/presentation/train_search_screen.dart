@@ -36,12 +36,13 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
   bool _roundTrip = false;
   bool _loading = false;
   TrainSearchResult? _result;
+  bool _resultIsRoundTrip = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _departureDate = _dateOnly(widget.now());
+    _departureDate = _currentServiceDay();
   }
 
   @override
@@ -307,7 +308,7 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _journeySection('가는 열차', result.outbound),
-        if (result.inbound.isNotEmpty) ...[
+        if (_resultIsRoundTrip) ...[
           const SizedBox(height: 20),
           _journeySection('오는 열차', result.inbound),
         ],
@@ -336,10 +337,14 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
 
   Widget _journeyCard(TrainJourney journey) {
     final fare = '${_formatNumber(journey.adultFareWon)}원';
+    final departureTime = _formatTime(journey.departureAt);
+    final arrivalTime = _formatArrivalTime(journey);
     final semanticsLabel =
         '${journey.departureStationName} 출발, '
         '${journey.arrivalStationName} 도착, '
-        '${journey.trainType.labelKo} ${journey.trainNumber}, 성인 1인 $fare';
+        '${journey.trainType.labelKo} ${journey.trainNumber}, '
+        '$departureTime 출발, $arrivalTime 도착, '
+        '${journey.durationMinutes}분 소요, 성인 1인 $fare';
     return Semantics(
       label: semanticsLabel,
       child: ExcludeSemantics(
@@ -367,8 +372,7 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${_formatTime(journey.departureAt)} → '
-                  '${_formatTime(journey.arrivalAt)} · ${journey.durationMinutes}분',
+                  '$departureTime → $arrivalTime · ${journey.durationMinutes}분',
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -435,6 +439,7 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
   }
 
   void _swapStations() {
+    _stationRequestToken++;
     setState(() {
       final station = _departure;
       _departure = _arrival;
@@ -449,17 +454,17 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
   }
 
   Future<void> _pickDate({required bool returnDate}) async {
-    final today = _dateOnly(widget.now());
+    final serviceDay = _currentServiceDay();
     final initialDate = returnDate
         ? (_returnDate ?? _departureDate)
         : _departureDate;
     final selected = await showDatePicker(
       context: context,
-      initialDate: initialDate.isBefore(today) ? today : initialDate,
-      firstDate: returnDate && _departureDate.isAfter(today)
+      initialDate: initialDate.isBefore(serviceDay) ? serviceDay : initialDate,
+      firstDate: returnDate && _departureDate.isAfter(serviceDay)
           ? _departureDate
-          : today,
-      lastDate: DateTime(today.year + 1, today.month, today.day),
+          : serviceDay,
+      lastDate: DateTime(serviceDay.year + 1, serviceDay.month, serviceDay.day),
     );
     if (selected == null || !mounted) return;
     setState(() {
@@ -488,9 +493,11 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
       return;
     }
     final requestToken = ++_searchRequestToken;
+    final isRoundTrip = _roundTrip;
     setState(() {
       _loading = true;
       _result = null;
+      _resultIsRoundTrip = false;
       _error = null;
     });
     try {
@@ -507,12 +514,14 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
       setState(() {
         _loading = false;
         _result = result;
+        _resultIsRoundTrip = isRoundTrip;
       });
     } on TrainSearchException catch (error) {
       if (!mounted || requestToken != _searchRequestToken) return;
       setState(() {
         _loading = false;
         _result = null;
+        _resultIsRoundTrip = false;
         _error = error.message;
       });
     }
@@ -521,7 +530,16 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
   void _clearResult() {
     _searchRequestToken++;
     _result = null;
+    _resultIsRoundTrip = false;
     _error = null;
+  }
+
+  DateTime _currentServiceDay() {
+    final koreaNow = widget.now().toUtc().add(const Duration(hours: 9));
+    final calendarDay = _dateOnly(koreaNow);
+    return koreaNow.hour < 3
+        ? calendarDay.subtract(const Duration(days: 1))
+        : calendarDay;
   }
 
   DateTime _dateOnly(DateTime value) =>
@@ -532,10 +550,31 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
       '${value.day.toString().padLeft(2, '0')}';
 
   String _formatTime(DateTime value) {
-    final koreaTime = value.toUtc().add(const Duration(hours: 9));
+    final koreaTime = _koreaTime(value);
     return '${koreaTime.hour.toString().padLeft(2, '0')}:'
         '${koreaTime.minute.toString().padLeft(2, '0')}';
   }
+
+  String _formatArrivalTime(TrainJourney journey) {
+    final departure = _koreaTime(journey.departureAt);
+    final arrival = _koreaTime(journey.arrivalAt);
+    final departureDay = DateTime.utc(
+      departure.year,
+      departure.month,
+      departure.day,
+    );
+    final arrivalDay = DateTime.utc(arrival.year, arrival.month, arrival.day);
+    final dayOffset = arrivalDay.difference(departureDay).inDays;
+    final prefix = switch (dayOffset) {
+      0 => '',
+      1 => '다음 날 ',
+      _ => '$dayOffset일 후 ',
+    };
+    return '$prefix${_formatTime(journey.arrivalAt)}';
+  }
+
+  DateTime _koreaTime(DateTime value) =>
+      value.toUtc().add(const Duration(hours: 9));
 
   String _formatNumber(int value) {
     final digits = value.toString();

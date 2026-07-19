@@ -10,11 +10,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 class _FakeTrainSearchRepository implements TrainSearchRepository {
   _FakeTrainSearchRepository({
+    this.stationsCompleter,
     this.searchCompleter,
     this.error,
     TrainSearchResult? result,
   }) : result = result ?? _result();
 
+  final Completer<List<TrainStation>>? stationsCompleter;
   final Completer<TrainSearchResult>? searchCompleter;
   final TrainSearchException? error;
   final TrainSearchResult result;
@@ -26,6 +28,9 @@ class _FakeTrainSearchRepository implements TrainSearchRepository {
     String query, {
     TrainSearchTrainType? type,
   }) async {
+    if (stationsCompleter case final Completer<List<TrainStation>> completer) {
+      return completer.future;
+    }
     if (query.contains('서울')) {
       return const [TrainStation(id: 'NAT010000', name: '서울')];
     }
@@ -98,9 +103,7 @@ Future<void> _tapSubmit(WidgetTester tester) async {
     240,
     scrollable: scrollable,
   );
-  await tester.ensureVisible(
-    find.byKey(const Key('trainSearchSubmitButton')),
-  );
+  await tester.ensureVisible(find.byKey(const Key('trainSearchSubmitButton')));
   await tester.pump();
   await tester.tap(find.byKey(const Key('trainSearchSubmitButton')));
 }
@@ -112,7 +115,7 @@ void main() {
       MaterialApp(
         home: TrainSearchScreen(
           repository: repository,
-          now: () => DateTime(2026, 7, 19),
+          now: () => DateTime.utc(2026, 7, 19, 3),
         ),
       ),
     );
@@ -140,10 +143,25 @@ void main() {
       find.byWidgetPredicate(
         (widget) =>
             widget is Semantics &&
-            widget.properties.label == '서울 출발, 대전 도착, KTX 101, 성인 1인 23,700원',
+            widget.properties.label ==
+                '서울 출발, 대전 도착, KTX 101, '
+                    '09:00 출발, 10:02 도착, 62분 소요, 성인 1인 23,700원',
       ),
       findsOneWidget,
     );
+  });
+
+  testWidgets('한국시간 03시 이후에는 새 service day를 기본 검색일로 사용한다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TrainSearchScreen(
+          repository: _FakeTrainSearchRepository(),
+          now: () => DateTime.utc(2026, 7, 19, 18, 30),
+        ),
+      ),
+    );
+
+    expect(find.text('가는 날  2026.07.20'), findsOneWidget);
   });
 
   testWidgets('출발·도착을 바꾸고 왕복 날짜를 검색 조건에 반영한다', (tester) async {
@@ -152,7 +170,7 @@ void main() {
       MaterialApp(
         home: TrainSearchScreen(
           repository: repository,
-          now: () => DateTime(2026, 7, 19),
+          now: () => DateTime.utc(2026, 7, 19, 3),
         ),
       ),
     );
@@ -174,6 +192,97 @@ void main() {
     expect(repository.lastCriteria!.returnDate, DateTime(2026, 7, 19));
   });
 
+  testWidgets('왕복 결과는 오는 열차가 없어도 빈 오는 편을 표시한다', (tester) async {
+    final repository = _FakeTrainSearchRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TrainSearchScreen(
+          repository: repository,
+          now: () => DateTime.utc(2026, 7, 19, 3),
+        ),
+      ),
+    );
+    await _selectStations(tester);
+    await tester.tap(find.text('왕복'));
+    await tester.pump();
+    await _tapSubmit(tester);
+    await tester.pumpAndSettle();
+
+    expect(find.text('오는 열차'), findsOneWidget);
+    expect(find.text('운행 열차가 없습니다.'), findsOneWidget);
+  });
+
+  testWidgets('자정을 넘는 열차는 다음 날 도착을 화면과 semantics에 표시한다', (tester) async {
+    final overnight = TrainSearchResult(
+      observedAt: DateTime.parse('2026-07-19T12:00:00Z'),
+      outbound: [
+        TrainJourney(
+          trainNumber: '999',
+          trainType: TrainSearchTrainType.ktx,
+          departureStationId: 'NAT010000',
+          departureStationName: '서울',
+          departureAt: DateTime.parse('2026-07-20T23:30:00+09:00'),
+          arrivalStationId: 'NAT011668',
+          arrivalStationName: '대전',
+          arrivalAt: DateTime.parse('2026-07-21T00:30:00+09:00'),
+          durationMinutes: 60,
+          adultFareWon: 23700,
+        ),
+      ],
+      inbound: const [],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TrainSearchScreen(
+          repository: _FakeTrainSearchRepository(result: overnight),
+          now: () => DateTime.utc(2026, 7, 19, 3),
+        ),
+      ),
+    );
+    await _selectStations(tester);
+    await _tapSubmit(tester);
+    await tester.pumpAndSettle();
+
+    expect(find.text('23:30 → 다음 날 00:30 · 60분'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Semantics &&
+            widget.properties.label?.contains(
+                  '23:30 출발, 다음 날 00:30 도착, 60분 소요',
+                ) ==
+                true,
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('역 교환은 진행 중인 자동완성 응답을 무효화한다', (tester) async {
+    final completer = Completer<List<TrainStation>>();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TrainSearchScreen(
+          repository: _FakeTrainSearchRepository(stationsCompleter: completer),
+          now: () => DateTime.utc(2026, 7, 19, 3),
+        ),
+      ),
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('trainSearchDepartureField')),
+      '서울',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('trainSearchSwapButton')));
+    completer.complete(const [TrainStation(id: 'NAT010000', name: '서울')]);
+    await tester.pump();
+
+    expect(
+      find.byKey(const Key('trainSearchStationSuggestion-departure-NAT010000')),
+      findsNothing,
+    );
+  });
+
   testWidgets('검색 중 중복 제출을 막고 loading 상태를 알린다', (tester) async {
     final completer = Completer<TrainSearchResult>();
     final repository = _FakeTrainSearchRepository(searchCompleter: completer);
@@ -181,7 +290,7 @@ void main() {
       MaterialApp(
         home: TrainSearchScreen(
           repository: repository,
-          now: () => DateTime(2026, 7, 19),
+          now: () => DateTime.utc(2026, 7, 19, 3),
         ),
       ),
     );
@@ -209,7 +318,7 @@ void main() {
       MaterialApp(
         home: TrainSearchScreen(
           repository: repository,
-          now: () => DateTime(2026, 7, 19),
+          now: () => DateTime.utc(2026, 7, 19, 3),
         ),
       ),
     );
@@ -234,7 +343,7 @@ void main() {
       MaterialApp(
         home: TrainSearchScreen(
           repository: repository,
-          now: () => DateTime(2026, 7, 19),
+          now: () => DateTime.utc(2026, 7, 19, 3),
         ),
       ),
     );
@@ -252,7 +361,7 @@ void main() {
         child: MaterialApp(
           home: TrainSearchScreen(
             repository: _FakeTrainSearchRepository(),
-            now: () => DateTime(2026, 7, 19),
+            now: () => DateTime.utc(2026, 7, 19, 3),
           ),
         ),
       ),
