@@ -388,6 +388,36 @@ class TagoTrainSearchProviderTest {
 	}
 
 	@Test
+	void recomputesTheHttpTimeoutAfterQuotaWaiting() throws Exception {
+		var attempts = new AtomicInteger();
+		var now = new java.util.concurrent.atomic.AtomicReference<>(Instant.parse("2026-07-19T00:00:00Z"));
+		var httpClient = mock(HttpClient.class);
+		var clock = mock(Clock.class);
+		when(clock.instant()).thenAnswer(ignored -> now.get());
+		when(httpClient.<String>send(any(HttpRequest.class), any())).thenAnswer(invocation -> {
+			attempts.incrementAndGet();
+			throw new AssertionError("HTTP send must not start after the deadline");
+		});
+		var provider = new TagoTrainSearchProvider(
+			"test-key",
+			JSON,
+			httpClient,
+			clock,
+			URI.create("https://provider.example/"),
+			() -> now.set(Instant.parse("2026-07-19T00:00:05Z")),
+			java.time.Duration.ZERO
+		);
+
+		assertThatThrownBy(() -> provider.search(
+			legQuery(LocalDate.parse("2026-07-20"), "KTX", "00"),
+			Instant.parse("2026-07-19T00:00:05Z")
+		))
+			.isInstanceOf(ProviderFailure.class)
+			.hasMessage("TRAIN_SEARCH_UNAVAILABLE");
+		assertThat(attempts).hasValue(0);
+	}
+
+	@Test
 	void retriesTransientHttpStatusesOnce() throws Exception {
 		for (int status : java.util.List.of(408, 429, 503)) {
 			var attempts = new AtomicInteger();

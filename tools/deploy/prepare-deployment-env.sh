@@ -289,14 +289,9 @@ case "${public_upload_url_normalized}" in
 esac
 
 trusted_proxy_cidrs="$(value EASYSUBWAY_TRUSTED_PROXY_CIDRS)"
-if [[ -n "${trusted_proxy_cidrs}" ]]; then
-	IFS=',' read -r -a cidrs <<< "${trusted_proxy_cidrs}"
-	for cidr in "${cidrs[@]}"; do
-		if [[ ! "${cidr}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}/([0-9]|[1-2][0-9]|3[0-2])$ ]]; then
-			printf 'invalid trusted proxy CIDR\n' >&2
-			exit 1
-		fi
-	done
+if [[ "${trusted_proxy_cidrs}" != "172.16.0.0/12" ]]; then
+	printf 'trusted proxy CIDRs must equal the Docker ingress boundary\n' >&2
+	exit 1
 fi
 
 require_port EASYSUBWAY_POSTGRES_PORT

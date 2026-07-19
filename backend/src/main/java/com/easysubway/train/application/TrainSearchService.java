@@ -105,8 +105,10 @@ public class TrainSearchService {
 		try {
 			requireBefore(deadline);
 			Instant now = clock.instant();
-			return cache.freshCatalog(CATALOG_KIND, now)
-				.map(cached -> new CatalogEntry(decodeCatalog(cached), cached.expiresAt()))
+			var cached = cache.freshCatalog(CATALOG_KIND, now);
+			requireBefore(deadline);
+			return cached
+				.map(value -> new CatalogEntry(decodeCatalog(value), value.expiresAt()))
 				.orElseGet(() -> refreshCatalogEntry(now, false, deadline));
 		} catch (TrainSearchFailure failure) {
 			throw failure;
@@ -202,6 +204,7 @@ public class TrainSearchService {
 	private CatalogEntry refreshCatalogEntry(Instant now, boolean force, Instant deadline) {
 		synchronized (catalogLock) {
 			var existing = cache.freshCatalog(CATALOG_KIND, now);
+			requireBefore(deadline);
 			if (!force && existing.isPresent()) {
 				CachedCatalog cached = existing.orElseThrow();
 				return new CatalogEntry(decodeCatalog(cached), cached.expiresAt());
@@ -219,6 +222,7 @@ public class TrainSearchService {
 			sleep(delay, deadline);
 			Instant now = clock.instant();
 			var cached = cache.freshCatalog(CATALOG_KIND, now);
+			requireBefore(deadline);
 			if (cached.isPresent() && catalogChanged(baseline, cached.orElseThrow())) {
 				CachedCatalog value = cached.orElseThrow();
 				return new CatalogEntry(decodeCatalog(value), value.expiresAt());
@@ -315,6 +319,7 @@ public class TrainSearchService {
 		CachedLeg local = l1.get(key);
 		if (local != null && local.expiresAt().isAfter(now)) return validLeg(key, local);
 		var shared = cache.freshLeg(key, now);
+		requireBefore(deadline);
 		if (shared.isPresent()) {
 			CachedLeg value = validLeg(key, shared.orElseThrow());
 			remember(key, value);
@@ -397,6 +402,7 @@ public class TrainSearchService {
 			sleep(delay, deadline);
 			Instant now = clock.instant();
 			var cached = cache.freshLeg(key, now);
+			requireBefore(deadline);
 			if (cached.isPresent()) {
 				CachedLeg value = validLeg(key, cached.orElseThrow());
 				remember(key, value);

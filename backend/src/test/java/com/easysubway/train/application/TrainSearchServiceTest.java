@@ -342,6 +342,20 @@ class TrainSearchServiceTest {
 	}
 
 	@Test
+	void checksTheRequestDeadlineAfterCatalogCacheRead() {
+		var clock = new TestClock(NOW);
+		service = serviceWith(clock, duration -> clock.advance(duration));
+		service.catalog();
+		cache.beforeCatalogReturn = () -> clock.advance(Duration.ofSeconds(30));
+
+		assertThatThrownBy(() -> service.stations("서울", null))
+			.isInstanceOf(TrainSearchService.TrainSearchFailure.class)
+			.extracting("code")
+			.isEqualTo("TRAIN_SEARCH_UNAVAILABLE");
+		assertThat(provider.catalogCalls).hasValue(1);
+	}
+
+	@Test
 	void startsTodayTtlWhenTheProviderCallCompletes() {
 		var clock = new TestClock(NOW);
 		service = serviceWith(clock, duration -> {});
@@ -495,10 +509,12 @@ class TrainSearchServiceTest {
 		private final CountDownLatch secondLegRead = new CountDownLatch(1);
 		private volatile boolean failCatalogRead;
 		private volatile boolean denyLeases;
+		private volatile Runnable beforeCatalogReturn = () -> {};
 
 		@Override
 		public Optional<CachedCatalog> freshCatalog(String kind, Instant now) {
 			if (failCatalogRead) throw new IllegalStateException("database unavailable");
+			beforeCatalogReturn.run();
 			return Optional.ofNullable(catalogs.get(kind)).filter(value -> value.expiresAt().isAfter(now));
 		}
 

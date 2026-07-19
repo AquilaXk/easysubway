@@ -485,11 +485,11 @@ public final class TagoTrainSearchProvider implements TrainSearchProvider {
 	private HttpResponse<String> sendWithOneRetry(URI uri, Instant deadline) throws IOException {
 		for (int attempt = 0; attempt < 2; attempt++) {
 			try {
+				callBudget.acquire();
 				HttpRequest request = HttpRequest.newBuilder(uri)
 					.timeout(requestTimeout(deadline))
 					.GET()
 					.build();
-				callBudget.acquire();
 				HttpResponse<String> response = httpClient.send(
 					request,
 					HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
