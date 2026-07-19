@@ -359,7 +359,7 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
   for (const [id, method, authEnv, command] of [
     ["provider:busan-transportation-route-topology", "GET", "DATA_GO_KR_SERVICE_KEY", "node tools/datapack/collect-busan-route-topology.mjs"],
     ["provider:daejeon-train-timetable", "GET", "DATA_GO_KR_SERVICE_KEY", "node tools/datapack/probe-daejeon-coverage-api.mjs"],
-    ["provider:daejeon-station-distance-fare", "GET", "DATA_GO_KR_SERVICE_KEY", "node tools/datapack/probe-daejeon-coverage-api.mjs"],
+    ["provider:daejeon-station-distance-fare", "GET", "DATA_GO_KR_SERVICE_KEY", "node tools/datapack/collect-daejeon-route-topology.mjs"],
   ]) {
     const entry = findCatalogEntry(catalog, id);
     assert.equal(entry.operation.method, method);
@@ -405,6 +405,10 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
     "endstnno",
   ]);
   assert.deepEqual(daejeonDistanceFare.responseFields, ["distfloat", "fee", "min", "sec"]);
+  assert.deepEqual(daejeonDistanceFare.operation.runner.requiredEnv, [
+    "DATA_GO_KR_SERVICE_KEY",
+    "DAEJEON_TOPOLOGY_OUTPUT",
+  ]);
   const daejeonSearchIds = new Set(listCatalog(catalog, { kind: "provider", query: "대전" }).map(({ id }) => id));
   for (const id of [
     "provider:daejeon-station-distance-fare",
