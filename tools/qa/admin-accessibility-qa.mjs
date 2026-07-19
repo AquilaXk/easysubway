@@ -217,13 +217,24 @@ function finalizeReport(report) {
   // #2281 V6-09: 대시보드 KPI 상태 계층 계약을 위반으로 편입한다. headline 카드가 3개를 넘거나,
   // 기간 표기 caption이 없거나, 총 카드가 3개 초과인데 나머지를 담는 native details가 없거나 DETAILS가
   // 아니면(keyboard·no-JS 접근 불가) 실패를 표면화한다.
+  // #2306 리뷰: (1) check entry 자체가 없으면(pass가 돌지 않았거나 신호 미기록) false-green이므로
+  // 위반으로 편입한다. (2) 누계 총량 카드가 headline에 있거나(index 기반 격하 회귀), headline 카드가
+  // 지표 정체성(data-metric-key)을 노출하지 않으면(정체성 검증 불가) 위반으로 편입한다.
   const kpiHierarchy = report.keyboard.find((entry) => entry.check === "dashboard-kpi-hierarchy");
-  if (kpiHierarchy
-    && (kpiHierarchy.panelPresent === false
+  if (!kpiHierarchy) {
+    blockingViolations.push({
+      page: "/admin/dashboard/page",
+      id: "dashboard-kpi-hierarchy-missing",
+      impact: "serious",
+      nodes: 0,
+    });
+  } else if (kpiHierarchy.panelPresent === false
       || kpiHierarchy.headlineCards > 3
       || kpiHierarchy.captionPresent === false
+      || kpiHierarchy.headlineMetricKeysPresent === false
+      || kpiHierarchy.cumulativeInHeadline === true
       || (kpiHierarchy.totalCards > 3
-        && (kpiHierarchy.disclosureCards === 0 || kpiHierarchy.disclosureIsDetails !== true)))) {
+        && (kpiHierarchy.disclosureCards === 0 || kpiHierarchy.disclosureIsDetails !== true))) {
     blockingViolations.push({
       page: "/admin/dashboard/page",
       id: "dashboard-kpi-hierarchy",
@@ -788,12 +799,25 @@ async function dashboardKpiHierarchyCheck(page, baseUrl, report) {
   await assertOk(page, "/admin/dashboard/page", response);
 
   const signal = await page.evaluate(() => {
+    // #2306 리뷰: 누계 총량 지표(AdminMetricKeys.PUSH_FAILED)는 index가 아니라 지표 의미로 격하한다.
+    // Java 상수값을 그대로 미러링한다(계약 값).
+    const CUMULATIVE_METRIC_KEY = "push.failed";
+    const metricKeysOf = (root) =>
+      root ? Array.from(root.querySelectorAll(".dashboard-card")).map((card) => card.getAttribute("data-metric-key")) : [];
     const panel = document.querySelector(".dashboard-metric-panel");
     const headlineGrid = panel ? panel.querySelector(":scope > .dashboard-cards") : null;
     const headlineCards = headlineGrid ? headlineGrid.querySelectorAll(".dashboard-card").length : 0;
     const more = panel ? panel.querySelector(".dashboard-more") : null;
     const disclosureCards = more ? more.querySelectorAll(".dashboard-card").length : 0;
     const totalCards = panel ? panel.querySelectorAll(".dashboard-card").length : 0;
+    const headlineMetricKeys = metricKeysOf(headlineGrid);
+    const disclosureMetricKeys = metricKeysOf(more);
+    // headline 카드 정체성: 모든 headline 카드가 실제 metric key를 노출해야 한다(속성 부재 시 false-green 방지).
+    const headlineMetricKeysPresent = headlineCards > 0
+      && headlineMetricKeys.every((key) => typeof key === "string" && key.length > 0);
+    // 누계 카드는 headline에 없어야 하고, 존재한다면 disclosure에 있어야 한다.
+    const cumulativeInHeadline = headlineMetricKeys.includes(CUMULATIVE_METRIC_KEY);
+    const cumulativeDemoted = disclosureMetricKeys.includes(CUMULATIVE_METRIC_KEY);
     const captionPresent = Boolean(
       panel
         && panel.querySelector(".section-hint")
@@ -804,6 +828,11 @@ async function dashboardKpiHierarchyCheck(page, baseUrl, report) {
       headlineCards,
       disclosureCards,
       totalCards,
+      headlineMetricKeys,
+      disclosureMetricKeys,
+      headlineMetricKeysPresent,
+      cumulativeInHeadline,
+      cumulativeDemoted,
       captionPresent,
       disclosureIsDetails: more ? more.tagName === "DETAILS" : null,
     };

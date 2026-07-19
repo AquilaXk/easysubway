@@ -199,11 +199,22 @@ test("admin accessibility QA script verifies dashboard KPI hierarchy and disclos
   assert.match(source, /disclosureIsDetails/);
   // 기간 표기 caption(값=현재·스파크라인=최근 7일·델타=전일)이 headline 의미 희석을 없애는지 검사한다.
   assert.match(source, /captionPresent/);
+  // #2306 리뷰: headline 카드 정체성(metric key)을 data-metric-key로 읽어 누계 카드가 headline에
+  // 없는지(cumulativeInHeadline) 판정하고, 카드가 정체성을 노출하는지(headlineMetricKeysPresent) 검사한다.
+  assert.match(source, /data-metric-key/);
+  assert.match(source, /const CUMULATIVE_METRIC_KEY = "push\.failed";/);
+  assert.match(source, /cumulativeInHeadline/);
+  assert.match(source, /headlineMetricKeysPresent/);
   // 계약 실패가 blocking 위반으로 표면화되는지 고정한다.
   assert.match(source, /id: "dashboard-kpi-hierarchy"/);
   assert.match(source, /kpiHierarchy\.headlineCards > 3/);
   assert.match(source, /kpiHierarchy\.captionPresent === false/);
   assert.match(source, /kpiHierarchy\.disclosureIsDetails !== true/);
+  assert.match(source, /kpiHierarchy\.cumulativeInHeadline === true/);
+  assert.match(source, /kpiHierarchy\.headlineMetricKeysPresent === false/);
+  // #2306 리뷰: check entry 부재(pass 미실행/신호 미기록)를 false-green으로 통과시키지 않는다.
+  assert.match(source, /if \(!kpiHierarchy\)/);
+  assert.match(source, /id: "dashboard-kpi-hierarchy-missing"/);
 });
 
 test("admin accessibility QA script records manual-only screen reader and contrast work", () => {
