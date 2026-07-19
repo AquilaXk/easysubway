@@ -7321,11 +7321,15 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   assert.match(routeV2ProxyHeaders, /proxy_set_header X-EasySubway-Origin-Verify/);
   assert.match(
     jdbcRouteTimetableRepository,
-    /artifact\.snapshotSha256\(\) \+ artifact\.freshUntil\(\)/,
+    /artifact\.snapshotSha256\(\)[\s\S]*artifact\.plannerIdentity\(\)\.canonicalPackSha256\(\)[\s\S]*artifact\.freshUntil\(\)/,
   );
   assert.match(
     jdbcRouteTimetableRepositoryTest,
     /동일 freshness에서도 active snapshot SHA가 바뀌면 cache key가 바뀐다/,
+  );
+  assert.match(
+    jdbcRouteTimetableRepositoryTest,
+    /canonical pack SHA가 바뀌면 cache key가 바뀐다/,
   );
   assert.match(routeV2GatewayProbe, /session success response must remain private, no-store/);
   assert.match(routeV2GatewayProbe, /search success response must remain private, no-store/);
@@ -15009,7 +15013,7 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(planner, /ObjectProvider<LoadRouteTimetablePort>/);
   assert.match(planner, /getIfAvailable\(\)/);
   assert.match(planner, /timetableRequired && routeTimetablePort != null/);
-  assert.match(planner, /timetableRequired[\s\S]*canUseTimetableRaptor\(command\)[\s\S]*routeTimetablePort\.hasRouteTimetable\(\)/);
+  assert.match(planner, /timetableRequired[\s\S]*routeTimetablePort\.hasRouteTimetable\(\)/);
   assert.match(planner, /timetableCovers\(command, snapshot\)/);
   assert.match(planner, /snapshot\.timetableArtifactId\(\)/);
   assert.match(planner, /coveredStationIds\(\)/);
@@ -15021,7 +15025,7 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(h2StateMigration, /timetable_artifact_id VARCHAR\(160\) NOT NULL/);
   assert.match(postgresArtifactIdMigration, /ALTER COLUMN timetable_artifact_id TYPE VARCHAR\(200\)/);
   assert.match(h2ArtifactIdMigration, /ALTER COLUMN timetable_artifact_id VARCHAR\(200\)/);
-  assert.match(planner, /canUseTimetableRaptor/);
+  assert.doesNotMatch(planner, /canUseTimetableRaptor/);
   assert.match(planner, /loadRouteTimetableSnapshot\(\)/);
   assert.match(planner, /RouteTimetableRaptorPlanner/);
   assert.match(planner, /noTimetableServicePlan/);
