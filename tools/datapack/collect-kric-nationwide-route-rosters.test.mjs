@@ -92,6 +92,15 @@ test("전국 KRIC roster 수집은 target과 fixture의 중복 provider scope를
   }), /duplicate fixture provider scope/);
 });
 
+test("전국 KRIC roster 수집은 targetVersion을 provider 호출 전에 검증한다", async () => {
+  await assert.rejects(collectKricNationwideRouteRosters({
+    targets: { ...targets, targetVersion: "" },
+    fixture,
+    serviceKey: "secret",
+    collectImpl: async () => assert.fail("must not collect"),
+  }), /targets.targetVersion is required/);
+});
+
 test("전국 KRIC roster 수집은 각 provider roster schema 오류를 거부한다", async (context) => {
   const validRoster = ({ mreaWideCd, lnCd }) => ({
     schemaVersion: 1,

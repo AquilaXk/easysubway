@@ -81,6 +81,9 @@ export function buildProviderLineCatalog({ sourceId, sourceSha256, capturedAt, s
   if (!sheet || JSON.stringify(sheet.rows?.[0]) !== JSON.stringify(expectedHeader)) {
     throw new Error("KRIC provider code catalog header is invalid");
   }
+  if (sheet.rows.length < 2) {
+    throw new Error("KRIC provider code catalog contains no station rows");
+  }
   const providerLines = new Map();
   for (const [index, row] of sheet.rows.slice(1).entries()) {
     if (!Array.isArray(row) || row.length !== expectedHeader.length || row.some((value) => typeof value !== "string" || !value.trim())) {

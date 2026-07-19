@@ -14,6 +14,7 @@ export async function collectKricNationwideRouteRosters({
   concurrency = 3,
 } = {}) {
   requiredString(serviceKey, "KRIC_SERVICE_KEY");
+  const targetVersion = requiredString(targets?.targetVersion, "targets.targetVersion");
   if (!Array.isArray(targets?.activeLineScopes) || targets.activeLineScopes.length === 0) {
     throw new Error("targets.activeLineScopes is required");
   }
@@ -71,7 +72,7 @@ export async function collectKricNationwideRouteRosters({
     schemaVersion: 1,
     artifactKind: "kric-nationwide-route-rosters",
     sourceId: "kric-subway-route-info",
-    targetVersion: requiredString(targets.targetVersion, "targets.targetVersion"),
+    targetVersion,
     capturedAt: now.toISOString(),
     credentialRedacted: true,
     providerScopeCount: providerScopes.length,

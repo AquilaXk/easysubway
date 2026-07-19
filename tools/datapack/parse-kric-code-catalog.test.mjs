@@ -54,6 +54,17 @@ test("KRIC station code rows는 중복 없는 provider-line catalog로 축약한
   ]);
 });
 
+test("KRIC provider code catalog는 header-only Sheet1을 거부한다", () => {
+  assert.throws(() => buildProviderLineCatalog({
+    sourceId: "kric-provider-code-catalog-20260228",
+    sourceSha256: "a".repeat(64),
+    capturedAt: "2026-07-19T00:00:00.000Z",
+    sheets: [{ name: "Sheet1", rows: [[
+      "RAIL_OPR_ISTT_CD", "RAIL_OPR_ISTT_NM", "LN_CD", "LN_NM", "STIN_CD", "STIN_NM",
+    ]] }],
+  }), /contains no station rows/);
+});
+
 test("KRIC XLSX parser는 외부 relation과 과도한 cell을 거부한다", () => {
   assert.throws(() => parseWorkbookSheetRefs(
     `<workbook xmlns:r="rels"><sheets><sheet name="x" r:id="r1"/></sheets></workbook>`,

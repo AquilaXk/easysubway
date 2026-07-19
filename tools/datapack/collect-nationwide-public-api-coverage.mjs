@@ -107,7 +107,7 @@ function publicApiSearchQuery({ operatorName, keyword, matchTermGroups }) {
     endpoint: "https://api.odcloud.kr/api/GetSearchDataList/v1/searchData",
     operation: "searchData",
     credentialEnv: "DATA_GO_KR_SERVICE_KEY",
-    credentialParam: "serviceKey",
+    credentialParam: "Authorization",
     credentialPlacement: "header",
     method: "POST",
     format: "json",
@@ -274,7 +274,9 @@ async function runQuery(query, credentials, fetchImpl, requestCache) {
     url.searchParams.set("format", query.format);
   }
   if (query.credentialPlacement !== "header") url.searchParams.set(query.credentialParam, credential);
-  const authorization = query.credentialPlacement === "header" ? { authorization: `Infuser ${credential}` } : {};
+  const authorization = query.credentialPlacement === "header"
+    ? { [query.credentialParam]: `Infuser ${credential}` }
+    : {};
   const requestKey = JSON.stringify({
     endpoint: query.endpoint,
     method: query.method ?? "GET",
@@ -565,6 +567,9 @@ function validateQuery(query, label) {
   requiredString(query.credentialParam, `${label}.credentialParam`);
   if (query.credentialPlacement !== undefined && !new Set(["header", "query"]).has(query.credentialPlacement)) {
     throw new Error(`${label}.credentialPlacement is invalid`);
+  }
+  if (query.credentialPlacement === "header" && query.credentialParam !== "Authorization") {
+    throw new Error(`${label}.credentialParam must be Authorization for header authentication`);
   }
   if (!new Set(["json", "xml"]).has(query.format)) throw new Error(`${label}.format is invalid`);
   if (query.format === "json" && query.method !== "POST") throw new Error(`${label}.json search must use POST`);
