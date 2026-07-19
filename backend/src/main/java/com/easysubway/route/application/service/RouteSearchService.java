@@ -382,6 +382,9 @@ public class RouteSearchService implements RouteSearchUseCase {
 			.filter(step -> "ride".equals(step.stepType()))
 			.map(RouteStep::toStationId)
 			.forEach(stationIds::add);
+		if (!stationIds.contains(routeSearchResult.destinationStationId())) {
+			stationIds.add(routeSearchResult.destinationStationId());
+		}
 		return List.copyOf(stationIds);
 	}
 
