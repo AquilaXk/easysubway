@@ -971,6 +971,140 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
   assert.doesNotMatch(releaseGateJob, /iOS CI \/ Build Flutter iOS simulator app/);
 });
 
+// #2283 V6-11: Admin QA Gates가 실제 브라우저 하네스를 blocking으로 통합하되(shadow 구간에서 seed
+// 포함 blocking 0을 실측한 뒤 continue-on-error 한 줄을 제거해 승격, PR #2309 run 29677088560),
+// required check 이름과 기존 정적 게이트(vendor integrity·unit test)를 그대로 보존하고, admin 무관
+// 변경은 명시적 성공 skip을 반환하며, boot·seed는 shadow 여부와 무관하게 항상 강제 성공이도록 고정한다.
+test("Admin QA Gates는 실제 브라우저 QA를 blocking으로 통합하고 required check·skip 계약을 유지한다", () => {
+  const workflow = read(".github/workflows/ci.yml");
+  const adminQaJob = jobBlock(workflow, "admin-qa-gates", "repository-contracts");
+
+  // required check 이름과 job 수준 docs_only skip은 그대로 유지된다.
+  assert.match(adminQaJob, /name: Admin QA Gates/);
+  assert.match(adminQaJob, /needs\.changes\.outputs\.docs_only != 'true'/);
+  assert.ok(REQUIRED_STATUS_CHECK_CONTEXTS.includes("Admin QA Gates"));
+
+  // 기존 정적 게이트(vendor integrity + unit test)는 삭제/개명하지 않는다.
+  assert.match(adminQaJob, /Admin QA Gates \/ Install pinned QA tools/);
+  assert.match(adminQaJob, /npm ci --prefix tools\/qa/);
+  assert.match(adminQaJob, /Admin QA Gates \/ Run static QA gates/);
+  assert.match(adminQaJob, /node tools\/ci\/check-admin-vendor-integrity\.mjs/);
+  assert.match(adminQaJob, /npm test --prefix tools\/qa/);
+
+  // admin 관련 경로(backend surface) 변경에서만 heavy browser step(boot·seed·harness)을 실행한다.
+  assert.match(adminQaJob, /Admin QA Gates \/ Set up Java for actual browser QA/);
+  assert.match(adminQaJob, /Admin QA Gates \/ Set up Chrome for actual browser QA/);
+  assert.match(adminQaJob, /Admin QA Gates \/ Build backend for actual browser QA/);
+  assert.match(adminQaJob, /\.\/gradlew bootJar --no-daemon/);
+  assert.match(adminQaJob, /Admin QA Gates \/ Boot backend for actual browser QA/);
+  assert.match(adminQaJob, /Admin QA Gates \/ Seed CI facility report photo for actual browser QA/);
+  assert.match(adminQaJob, /Admin QA Gates \/ Actual browser accessibility QA \(shadow\)/);
+  assert.match(adminQaJob, /Admin QA Gates \/ Stop backend for actual browser QA/);
+  assert.match(adminQaJob, /node tools\/qa\/admin-accessibility-qa\.mjs --output/);
+  // Java·Chrome·build·boot·seed·harness step은 모두 backend == 'true' gate로만 실행한다.
+  for (const step of [
+    "Set up Java for actual browser QA",
+    "Set up Chrome for actual browser QA",
+    "Build backend for actual browser QA",
+    "Boot backend for actual browser QA",
+    "Seed CI facility report photo for actual browser QA",
+    "Actual browser accessibility QA \\(shadow\\)",
+  ]) {
+    const stepBlock = adminQaJob.match(new RegExp(`- name: Admin QA Gates / ${step}[\\s\\S]*?\\n      - `))?.[0] ?? "";
+    assert.match(stepBlock, /needs\.changes\.outputs\.backend == 'true'/, `${step} must gate on backend == 'true'`);
+  }
+
+  // 무관 변경(backend != 'true')은 explicit successful skip(exit 0)을 반환한다.
+  assert.match(adminQaJob, /Admin QA Gates \/ Skip actual browser QA \(unrelated change\)/);
+  assert.match(adminQaJob, /needs\.changes\.outputs\.backend != 'true'/);
+  assert.match(adminQaJob, /skipping the actual browser accessibility QA step\./);
+
+  // #2283 V6-11: browser step 직전 seed 단계는 dev/H2의 빈 신고 대기열(V6-08 report-queue-action
+  // -signal이 항상 blocking되는 seed-data gap)을 해소한다. 공개 API로 사진 첨부 신고 1건을 시드하고,
+  // 임의 재시도 없이 실패 시 job을 실패시킨다(shadow 여부와 무관하게 seed 단계는 continue-on-error가 아니다).
+  const seedStep = adminQaJob.match(
+    /- name: Admin QA Gates \/ Seed CI facility report photo for actual browser QA[\s\S]*?\n      (?:#|- name:)/,
+  )?.[0] ?? "";
+  assert.doesNotMatch(seedStep, /continue-on-error/);
+  assert.doesNotMatch(seedStep, /\bretry\b/i);
+  assert.match(seedStep, /station-sangnoksu/);
+  assert.match(seedStep, /facility-sangnoksu-elevator-1/);
+  assert.match(seedStep, /photoDataBase64/);
+  assert.match(seedStep, /POST http:\/\/localhost:8080\/api\/v1\/reports/);
+  assert.match(seedStep, /if \[\[ "\$\{http_code\}" != "201" \]\]; then/);
+  assert.match(seedStep, /exit 1/);
+  assert.doesNotMatch(seedStep, /secrets\./);
+
+  // boot 단계는 backend 실행 실패를 shadow와 무관하게 job 실패로 표면화한다(continue-on-error 아님).
+  const bootStep = adminQaJob.match(
+    /- name: Admin QA Gates \/ Boot backend for actual browser QA[\s\S]*?\n      (?:#|- name:)/,
+  )?.[0] ?? "";
+  assert.doesNotMatch(bootStep, /continue-on-error/);
+  assert.doesNotMatch(bootStep, /\bretry\b/i);
+  assert.match(bootStep, /openssl rand -hex 24/);
+  assert.match(bootStep, /::add-mask::\$\{admin_pw\}/);
+  assert.match(bootStep, /::add-mask::\$\{operator_pw\}/);
+  assert.match(bootStep, />> "\$\{GITHUB_ENV\}"/);
+  assert.match(bootStep, /if \[\[ "\$\{ready\}" != "1" \]\]; then/);
+  assert.doesNotMatch(bootStep, /secrets\./);
+  // #2283 리뷰: jar 해석은 pipefail-안전한 nullglob 배열이어야 한다(`ls | grep | head` 파이프라인 금지).
+  assert.doesNotMatch(bootStep, /ls backend\/build\/libs/);
+  assert.match(bootStep, /shopt -s nullglob/);
+  assert.match(bootStep, /candidate_jars=\(backend\/build\/libs\/\*\.jar\)/);
+  assert.match(bootStep, /"\$\{candidate\}" != \*-plain\.jar/);
+  // #2283 리뷰: 부팅 대기는 readiness probe로 좁힌다(permitAll 확인됨, liveness보다 정확한 신호).
+  assert.match(bootStep, /actuator\/health\/readiness/);
+  assert.doesNotMatch(bootStep, /curl -fsS http:\/\/localhost:8080\/actuator\/health >/);
+
+  // #2283 V6-11: shadow→blocking 승격 완료. harness 호출 step에 continue-on-error가 없다 —
+  // shadow 재개가 필요하면 이 한 줄(`continue-on-error: true`)을 다시 추가하는 것이 유일한 스위치다.
+  // boot·seed는 애초에 shadow 대상이 아니었으므로(항상 강제 성공) 승격 전후로 변화가 없다.
+  const browserStep = adminQaJob.match(
+    /- name: Admin QA Gates \/ Actual browser accessibility QA \(shadow\)[\s\S]*?\n      - name:/,
+  )?.[0] ?? "";
+  assert.match(browserStep, /id: browser-qa/);
+  assert.doesNotMatch(browserStep, /continue-on-error/);
+  // arbitrary retry로 flaky를 숨기지 않는다.
+  assert.doesNotMatch(browserStep, /\bretry\b/i);
+  // harness step 자체는 backend boot·seed 로직을 갖지 않는다(Boot·Seed 단계로 이관).
+  assert.doesNotMatch(browserStep, /openssl rand/);
+  assert.doesNotMatch(browserStep, /photoDataBase64/);
+  assert.match(browserStep, /"mode": "blocking"/);
+
+  // shadow artifact(report JSON·스크린샷)와 job summary를 항상 남기고, backend는 항상 정리한다.
+  assert.match(adminQaJob, /Admin QA Gates \/ Upload actual browser QA artifacts \(shadow\)/);
+  assert.match(adminQaJob, /actions\/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02/);
+  assert.match(adminQaJob, /Admin QA Gates \/ Summarize actual browser QA \(shadow\)/);
+  assert.match(adminQaJob, /GITHUB_STEP_SUMMARY/);
+  // #2283 리뷰(CodeRabbit Major): report JSON이 손상·절단돼도 Summarize step은 try/catch로
+  // fallback summary(파싱 실패 사실 + 파일 크기·head)를 남기고 항상 성공 종료해야 한다. 게이트
+  // 판정은 harness step(browser-qa)의 exit code가 이미 내렸으므로 이 step은 이를 약화하지 않는다.
+  const summarizeStep = adminQaJob.match(
+    /- name: Admin QA Gates \/ Summarize actual browser QA \(shadow\)[\s\S]*/,
+  )?.[0] ?? "";
+  assert.match(summarizeStep, /try \{/);
+  assert.match(summarizeStep, /\} catch \(error\) \{/);
+  assert.match(summarizeStep, /Report JSON parse failed \(fallback summary\)/);
+  assert.match(summarizeStep, /fs\.statSync\(reportPath\)\.size/);
+  assert.match(summarizeStep, /Head \(first 500 chars\)/);
+  assert.doesNotMatch(summarizeStep, /\bretry\b/i);
+  const stopStep = adminQaJob.match(
+    /- name: Admin QA Gates \/ Stop backend for actual browser QA[\s\S]*?\n      - name:/,
+  )?.[0] ?? "";
+  assert.match(stopStep, /always\(\) && needs\.changes\.outputs\.backend == 'true'/);
+  assert.match(stopStep, /BACKEND_QA_PID/);
+  // #2283 리뷰: backend-qa.log는 artifact로 업로드되므로(파일 내용은 ::add-mask:: 대상이 아니다)
+  // 업로드 전 생성 비밀 문자열을 scrub한다(로그 전체를 아티팩트에서 제외하는 대신 진단 가치를 보존).
+  assert.match(stopStep, /sed -i "s\/\$\{ADMIN_QA_ADMIN_PASSWORD\}\/\[REDACTED\]\/g"/);
+  assert.match(stopStep, /sed -i "s\/\$\{ADMIN_QA_OPERATOR_PASSWORD\}\/\[REDACTED\]\/g"/);
+  // tested revision·seed·profile을 artifact/summary에 기록한다.
+  assert.match(adminQaJob, /testedRevision/);
+  assert.match(adminQaJob, /"database": "h2-in-memory"/);
+
+  // CI 러너 sandbox 완화(harness step).
+  assert.match(browserStep, /ADMIN_QA_CHROME_NO_SANDBOX: "1"/);
+});
+
 test("main ruleset 필수 체크는 ci.yml 잡 이름·automerge 코디네이터와 1:1로 고정된다", () => {
   // These context names correspond 1:1 to main ruleset 17584352's
   // required_status_checks. Renaming a ci.yml job without updating the ruleset
