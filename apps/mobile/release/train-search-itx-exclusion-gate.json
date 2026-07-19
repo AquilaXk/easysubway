@@ -35,7 +35,7 @@
   "issue2094RoadmapRequiredForThisGate": true,
   "runtimeImplementationStatus": "SATISFIED_BY_2094",
   "issue2094RuntimeEvidence": {
-    "candidateGitSha": "d36bc00467ab69732f49e1f56a343bb2da1e73ce",
+    "candidateGitSha": "86be8d0294f9e2badab61f25e5c6a6ed9b7eea2c",
     "provider": {
       "observedAt": "2026-07-19T07:42:33.730Z",
       "httpSuccess": true,
@@ -65,13 +65,13 @@
       "sourceObjectSha256": "79a94b66a2d299d5293247e4547c9ce55939082bdc37542b2658f12fbda72913"
     },
     "backend": {
-      "deployedGitSha": "d36bc00467ab69732f49e1f56a343bb2da1e73ce",
+      "deployedGitSha": "86be8d0294f9e2badab61f25e5c6a6ed9b7eea2c",
       "apiOrigin": "https://easysubway-api.aquilaxk.site",
       "deployment": {
-        "runId": 29677130333,
-        "runUrl": "https://github.com/AquilaXk/easysubway/actions/runs/29677130333",
+        "runId": 29678175251,
+        "runUrl": "https://github.com/AquilaXk/easysubway/actions/runs/29678175251",
         "workflowName": "CD",
-        "deployedGitSha": "d36bc00467ab69732f49e1f56a343bb2da1e73ce",
+        "deployedGitSha": "86be8d0294f9e2badab61f25e5c6a6ed9b7eea2c",
         "conclusion": "success",
         "requiredJobs": [
           "CD Deploy",
@@ -79,14 +79,21 @@
           "CD Record deployment"
         ]
       },
+      "currentDeployment": {
+        "deploymentId": 5508806761,
+        "statusId": 15664924308,
+        "sha": "86be8d0294f9e2badab61f25e5c6a6ed9b7eea2c",
+        "createdAt": "2026-07-19T07:30:26Z",
+        "succeededAt": "2026-07-19T08:43:32Z"
+      },
       "observedAt": "2026-07-19T06:59:01.734195Z",
-      "collectedAt": "2026-07-19T09:26:30.650Z",
+      "collectedAt": "2026-07-19T09:59:04.457Z",
       "seoulDaejeonKtxFareRows": 54,
       "itxCheongchunRows": 0,
       "conditionalEtagStatus": 304,
       "errorCacheControl": "no-store",
       "schemaStatus": "EXPECTED",
-      "sourceObjectSha256": "c6609caaf0800fd00b7beaf6f847b2ad3fbeaa20a1d11508af0f29977fbe091b"
+      "sourceObjectSha256": "0b247de4e27cc545611f591ed559621f666b2f6dd142aae605bc39ee6e4ae46c"
     },
     "capacity": {
       "executor": {
@@ -151,21 +158,21 @@
       }
     },
     "android": {
-      "artifactGitSha": "d36bc00467ab69732f49e1f56a343bb2da1e73ce",
+      "artifactGitSha": "86be8d0294f9e2badab61f25e5c6a6ed9b7eea2c",
       "apiOrigin": "https://easysubway-api.aquilaxk.site",
       "deviceModel": "SM-A175N",
       "androidVersion": "16",
       "networkBoundary": "OCI_STAGING_CONNECT_PROXY",
-      "candidateApkSha256": "6141d54f5fb8ab003640bac236130babe4db105989baf2b69de07fa4da271772",
+      "candidateApkSha256": "f0eae8b2dd9053fa98669de2452eb73bcf0e6d77ca2e2283bef56f828e23608f",
       "integrationTestSourceSha256": "deaf0bd25c0e60da40cf9812ee77c3f39de8a1f0413246da43df491ce54c20c5",
       "menuToResultPassed": true,
       "roundTripPassed": true,
       "stateMatrixPassed": true,
       "offlineUnavailablePassed": true,
       "subwayRegressionPassed": true,
-      "screenshotPath": ".codex/evidence/issue-2094-android-d36bc004/result.png",
-      "semanticsPath": ".codex/evidence/issue-2094-android-d36bc004/result.xml",
-      "screenshotSha256": "8307df1082d7cccaa019fb3712a0f2f5d1048eb32243a221be25a85c87271deb",
+      "screenshotPath": ".codex/evidence/issue-2094-android-86be8d02/result.png",
+      "semanticsPath": ".codex/evidence/issue-2094-android-86be8d02/result.xml",
+      "screenshotSha256": "51cb92740643cd0671d55aa74c19d582ea92617dabe54d2e2057aca1beed11c7",
       "semanticsSha256": "d91ba0f790af500aef6cbc5f1c5820aff8384a0f64278c45235d99b0f5b2799e"
     },
     "review": {
@@ -175,9 +182,9 @@
     },
     "requiredCi": {
       "status": "PASS",
-      "runUrl": "https://github.com/AquilaXk/easysubway/actions/runs/29676605960"
+      "runUrl": "https://github.com/AquilaXk/easysubway/actions/runs/29677947876"
     },
-    "liveEvidenceSha256": "9bb7c0ee349e6b224f1b64ff9d2477afe8635f192f0feffdb9db21880ef56859"
+    "liveEvidenceSha256": "0be13e231c0a82de118679d84e26450b0970b8f2fade257b1a7fe4903cc3d419"
   },
   "verification": {
     "backend": "./backend/gradlew -p backend test --tests '*TrainSearch*'",

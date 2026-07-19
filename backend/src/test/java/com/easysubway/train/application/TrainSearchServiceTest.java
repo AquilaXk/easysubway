@@ -693,6 +693,7 @@ class TrainSearchServiceTest {
 		private final AtomicInteger freshLegCalls = new AtomicInteger();
 		private final CountDownLatch secondLegRead = new CountDownLatch(1);
 		private final CountDownLatch followerLeaseAttempts = new CountDownLatch(2);
+		private final java.util.Set<String> followerLeaseOwners = ConcurrentHashMap.newKeySet();
 		private volatile boolean failCatalogRead;
 		private volatile boolean denyLeases;
 		private volatile Runnable beforeCatalogReturn = () -> {};
@@ -723,7 +724,7 @@ class TrainSearchServiceTest {
 			beforeLeaseAcquire.run();
 			if (denyLeases) return false;
 			boolean acquired = leases.putIfAbsent(key, owner) == null;
-			if (!acquired) followerLeaseAttempts.countDown();
+			if (!acquired && followerLeaseOwners.add(owner)) followerLeaseAttempts.countDown();
 			return acquired;
 		}
 

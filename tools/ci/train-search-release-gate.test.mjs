@@ -11,7 +11,9 @@ import {
   providerJourney,
   validateBackendSearchEnvelope,
   validateBackendObservationTime,
+  validateCurrentProductionDeployment,
   validateDeploymentRun,
+  validateKtxProviderJourneys,
   validateProviderEnvelope,
 } from "../test/train-search-live-smoke.mjs";
 import {
@@ -275,6 +277,14 @@ test("TAGO 운임 행은 요청한 서울→대전 OD와 날짜가 정확히 일
   );
 });
 
+test("TAGO KTX grade 응답은 모든 행이 KTX여야 한다", () => {
+  assert.doesNotThrow(() => validateKtxProviderJourneys([{ trainType: "KTX" }]));
+  assert.throws(
+    () => validateKtxProviderJourneys([{ trainType: "KTX" }, { trainType: "SRT" }]),
+    /non-KTX row/,
+  );
+});
+
 test("배포 workflow run은 성공한 CD SHA와 필수 job을 독립 검증한다", () => {
   const deploymentRunUrl = "https://github.com/AquilaXk/easysubway/actions/runs/29677130333";
   const candidateGitSha = "d36bc00467ab69732f49e1f56a343bb2da1e73ce";
@@ -307,6 +317,34 @@ test("배포 workflow run은 성공한 CD SHA와 필수 job을 독립 검증한�
       deploymentRunUrl,
     }),
     /deployment workflow jobs were incomplete/,
+  );
+});
+
+test("backend live evidence는 최신 production environment deployment를 candidate에 바인딩한다", () => {
+  const candidateGitSha = "d36bc00467ab69732f49e1f56a343bb2da1e73ce";
+  const deployments = [{
+    id: 123,
+    sha: candidateGitSha,
+    ref: "main",
+    environment: "production",
+    created_at: "2026-07-19T06:53:34Z",
+  }];
+  const statuses = [{
+    id: 456,
+    state: "success",
+    environment_url: "https://easysubway-api.aquilaxk.site",
+    created_at: "2026-07-19T07:00:00Z",
+  }];
+  assert.deepEqual(validateCurrentProductionDeployment(deployments, statuses, candidateGitSha), {
+    deploymentId: 123,
+    statusId: 456,
+    sha: candidateGitSha,
+    createdAt: "2026-07-19T06:53:34Z",
+    succeededAt: "2026-07-19T07:00:00Z",
+  });
+  assert.throws(
+    () => validateCurrentProductionDeployment(deployments, statuses, "b".repeat(40)),
+    /current production deployment did not match/,
   );
 });
 
@@ -437,6 +475,11 @@ test("#2094 release artifact는 동일 candidate와 모든 완료 증거를 요�
   assert.equal(runtime.backend.apiOrigin, "https://easysubway-api.aquilaxk.site");
   assert.equal(runtime.backend.deployment.deployedGitSha, runtime.candidateGitSha);
   assert.equal(runtime.backend.deployment.conclusion, "success");
+  assert.equal(runtime.backend.currentDeployment.sha, runtime.candidateGitSha);
+  assert.equal(Number.isSafeInteger(runtime.backend.currentDeployment.deploymentId), true);
+  assert.equal(Number.isSafeInteger(runtime.backend.currentDeployment.statusId), true);
+  assert.match(runtime.backend.currentDeployment.createdAt, /^\d{4}-\d{2}-\d{2}T/);
+  assert.match(runtime.backend.currentDeployment.succeededAt, /^\d{4}-\d{2}-\d{2}T/);
   assert.deepEqual(runtime.backend.deployment.requiredJobs, [
     "CD Deploy",
     "Post-deploy smoke",

@@ -190,6 +190,7 @@ export async function collectProviderEvidence({
     arrivalStationName: arrivalName,
     departureDate,
   }));
+  validateKtxProviderJourneys(journeys);
   const fareRows = journeys.filter((row) => row.trainType === "KTX" && row.adultFareWon >= 0);
   if (fareRows.length === 0) throw new Error("TAGO Seoul-Daejeon KTX fare row was missing");
   const itxCheongchunRowCount = journeys.filter((row) => row.trainType === "ITX_CHEONGCHUN").length;
@@ -232,6 +233,7 @@ export async function collectBackendEvidence({
   const origin = publicHttpsOrigin(baseUrl);
   const candidateSha = requireSha(candidateGitSha);
   const deployment = await deploymentEvidence(deploymentRunUrl, candidateSha, fetchImpl);
+  const currentDeployment = await currentDeploymentEvidence(candidateSha, fetchImpl);
   requireDate(departureDate);
   const departure = await backendStation(origin, departureQuery, fetchImpl);
   const arrival = await backendStation(origin, arrivalQuery, fetchImpl);
@@ -263,11 +265,17 @@ export async function collectBackendEvidence({
   const unsupportedSearch = new URL(searchUrl);
   unsupportedSearch.searchParams.set("trainType", "ITX_CHEONGCHUN");
   await requireUnsupported(unsupportedSearch, fetchImpl);
+  const confirmedDeployment = await currentDeploymentEvidence(candidateSha, fetchImpl);
+  if (confirmedDeployment.deploymentId !== currentDeployment.deploymentId
+    || confirmedDeployment.statusId !== currentDeployment.statusId) {
+    throw new Error("production deployment changed during backend observation");
+  }
 
   return {
     ...observationTime,
     deployedGitSha: deployment.deployedGitSha,
     deployment,
+    currentDeployment,
     origin: origin.origin,
     stationQueries: [departureQuery, arrivalQuery],
     departureStationId: departure.id,
@@ -278,6 +286,12 @@ export async function collectBackendEvidence({
     errorCacheControl: "no-store",
     schemaStatus: "EXPECTED",
   };
+}
+
+export function validateKtxProviderJourneys(journeys) {
+  if (!Array.isArray(journeys) || journeys.some((journey) => journey?.trainType !== "KTX")) {
+    throw new Error("TAGO KTX query returned a non-KTX row");
+  }
 }
 
 export function validateBackendObservationTime(observedAt, departureDate, now = new Date()) {
@@ -520,6 +534,71 @@ async function deploymentEvidence(value, candidateGitSha, fetchImpl) {
     await responseJson(jobsResponse, "deployment workflow jobs"),
     { candidateGitSha, deploymentRunUrl: runUrl.toString() },
   );
+}
+
+async function currentDeploymentEvidence(candidateGitSha, fetchImpl) {
+  const deploymentsResponse = await fetchWithTimeout(
+    "https://api.github.com/repos/AquilaXk/easysubway/deployments?environment=production&per_page=1",
+    {
+      headers: {
+        accept: "application/vnd.github+json",
+        "user-agent": "easysubway-train-search-evidence",
+      },
+    },
+    fetchImpl,
+  );
+  if (!deploymentsResponse.ok) {
+    throw new Error(`current production deployment returned HTTP ${deploymentsResponse.status}`);
+  }
+  const deployments = await responseJson(deploymentsResponse, "current production deployment");
+  const deploymentId = deployments?.[0]?.id;
+  if (!Number.isSafeInteger(deploymentId) || deploymentId < 1) {
+    throw new Error("current production deployment was missing");
+  }
+  const statusesResponse = await fetchWithTimeout(
+    `https://api.github.com/repos/AquilaXk/easysubway/deployments/${deploymentId}/statuses?per_page=1`,
+    {
+      headers: {
+        accept: "application/vnd.github+json",
+        "user-agent": "easysubway-train-search-evidence",
+      },
+    },
+    fetchImpl,
+  );
+  if (!statusesResponse.ok) {
+    throw new Error(`current production deployment status returned HTTP ${statusesResponse.status}`);
+  }
+  return validateCurrentProductionDeployment(
+    deployments,
+    await responseJson(statusesResponse, "current production deployment status"),
+    candidateGitSha,
+  );
+}
+
+export function validateCurrentProductionDeployment(payload, statuses, candidateGitSha) {
+  const candidateSha = requireSha(candidateGitSha);
+  const deployment = Array.isArray(payload) ? payload[0] : null;
+  const status = Array.isArray(statuses) ? statuses[0] : null;
+  if (!Number.isSafeInteger(deployment?.id)
+    || deployment.id < 1
+    || deployment.sha !== candidateSha
+    || deployment.ref !== "main"
+    || deployment.environment !== "production"
+    || !validDateTime(deployment.created_at)
+    || !Number.isSafeInteger(status?.id)
+    || status.id < 1
+    || status.state !== "success"
+    || status.environment_url !== "https://easysubway-api.aquilaxk.site"
+    || !validDateTime(status.created_at)) {
+    throw new Error("current production deployment did not match the candidate");
+  }
+  return {
+    deploymentId: deployment.id,
+    statusId: status.id,
+    sha: deployment.sha,
+    createdAt: deployment.created_at,
+    succeededAt: status.created_at,
+  };
 }
 
 function deploymentUrl(value) {
