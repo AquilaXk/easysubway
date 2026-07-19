@@ -75,3 +75,55 @@ test("전국 KRIC roster 수집은 target mapping이나 provider operator row �
     }),
   }), /provider operator row is missing/);
 });
+
+test("전국 KRIC roster 수집은 target과 fixture의 중복 provider scope를 거부한다", async () => {
+  await assert.rejects(collectKricNationwideRouteRosters({
+    targets: { ...targets, activeLineScopes: [...targets.activeLineScopes, targets.activeLineScopes[0]] },
+    fixture,
+    serviceKey: "secret",
+    collectImpl: async () => assert.fail("must not collect"),
+  }), /duplicate target active line scope/);
+
+  await assert.rejects(collectKricNationwideRouteRosters({
+    targets,
+    fixture: { providerLineScopes: [...fixture.providerLineScopes, fixture.providerLineScopes[0]] },
+    serviceKey: "secret",
+    collectImpl: async () => assert.fail("must not collect"),
+  }), /duplicate fixture provider scope/);
+});
+
+test("전국 KRIC roster 수집은 각 provider roster schema 오류를 거부한다", async (context) => {
+  const validRoster = ({ mreaWideCd, lnCd }) => ({
+    schemaVersion: 1,
+    artifactKind: "kric-route-roster",
+    mreaWideCd,
+    lnCd,
+    resultCode: "00",
+    stations: ["S1", "KR", "BS"].map((railOprIsttCd, index) => ({
+      railOprIsttCd,
+      lnCd,
+      mreaWideCd,
+      stinCd: `${index + 1}`,
+      stinNm: `역${index + 1}`,
+      stinConsOrdr: index + 1,
+    })),
+  });
+  for (const [label, mutate] of [
+    ["artifactKind", (roster) => { roster.artifactKind = "wrong"; }],
+    ["resultCode", (roster) => { roster.resultCode = "30"; }],
+    ["stations", (roster) => { roster.stations = null; }],
+  ]) {
+    await context.test(label, async () => {
+      await assert.rejects(collectKricNationwideRouteRosters({
+        targets,
+        fixture,
+        serviceKey: "secret",
+        collectImpl: async (request) => {
+          const roster = validRoster(request);
+          mutate(roster);
+          return roster;
+        },
+      }), /nationwide roster schema is invalid/);
+    });
+  }
+});

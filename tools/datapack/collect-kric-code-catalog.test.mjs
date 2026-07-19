@@ -39,13 +39,28 @@ test("KRIC 코드 정본은 HTTP·schema·크기 오류를 fail closed 한다", 
     }), /schema mismatch/);
   });
   await context.test("size", async () => {
+    let cancelled = false;
     await assert.rejects(downloadKricCodeCatalog({
       maximumBytes: 5,
-      fetchImpl: async () => new Response(XLSX_PREFIX, {
+      fetchImpl: async () => ({
+        ok: true,
         status: 200,
-        headers: { "content-type": "application/octet-stream" },
+        headers: new Headers({ "content-type": "application/octet-stream" }),
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(XLSX_PREFIX.subarray(0, 4));
+            controller.enqueue(XLSX_PREFIX.subarray(4));
+          },
+          cancel() {
+            cancelled = true;
+          },
+        }),
+        async arrayBuffer() {
+          assert.fail("response body must be consumed as a bounded stream");
+        },
       }),
     }), /size limit/);
+    assert.equal(cancelled, true);
   });
 });
 

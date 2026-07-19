@@ -1,10 +1,15 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { TextDecoder } from "node:util";
 import vm from "node:vm";
 
-import { parseMolitSvgProviderIdentity } from "./lib/molit-svg-provider-identity.mjs";
+import {
+  normalizeMolitProviderLineName,
+  parseMolitSvgProviderIdentity,
+} from "./lib/molit-svg-provider-identity.mjs";
 
 const sourceId = "molit-urban-rail-full-route";
 const seoulMetroSourceId = "seoulmetro-cyberstation";
@@ -962,7 +967,7 @@ function providerLineScopesFor(catalog, coverageScopes, lines) {
     if ([railOprIsttCd, operatorName, lnCd, lineName].some((value) => typeof value !== "string" || !value.trim())) {
       throw new Error(`KRIC provider line catalog row ${index} is invalid`);
     }
-    const key = `${operatorIdFor(operatorName)}:${providerLineNameKey(lineName)}`;
+    const key = `${operatorIdFor(operatorName)}:${normalizeMolitProviderLineName(lineName)}`;
     const provider = { railOprIsttCd, lnCd };
     const existing = providerByOperatorLine.get(key);
     if (existing && JSON.stringify(existing) !== JSON.stringify(provider)) {
@@ -974,7 +979,7 @@ function providerLineScopesFor(catalog, coverageScopes, lines) {
   for (const scope of coverageScopes.values()) {
     const line = lines.get(scope.lineId);
     if (!line) throw new Error(`coverage line is missing: ${scope.lineId}`);
-    const provider = providerByOperatorLine.get(`${scope.operatorId}:${providerLineNameKey(line.nameKo)}`);
+    const provider = providerByOperatorLine.get(`${scope.operatorId}:${normalizeMolitProviderLineName(line.nameKo)}`);
     if (!provider) throw new Error(`KRIC provider code is missing: ${scope.regionId}:${scope.operatorId}:${scope.lineId}`);
     providerScopes.push({
       ...scope,
@@ -990,7 +995,7 @@ function providerLineScopesFor(catalog, coverageScopes, lines) {
   );
 }
 
-function validateMolitProviderIdentities(svgRows, providerLineScopes) {
+export function validateMolitProviderIdentities(svgRows, providerLineScopes) {
   const expected = new Map(providerLineScopes.map((scope) => [
     `${scope.regionId}:${scope.operatorId}:${scope.lineId}`,
     scope,
@@ -998,26 +1003,14 @@ function validateMolitProviderIdentities(svgRows, providerLineScopes) {
   for (const row of svgRows) {
     if (!row.providerIdentity) continue;
     const regionName = regionNameForProviderCode(row.providerIdentity.mreaWideCd);
-    const key = `${coverageRegionId(regionName)}:${operatorIdFor(row.providerIdentity.operatorName)}:${lineIdFor(regionName, fixtureLineNameForProvider(row.lineName))}`;
+    const key = `${coverageRegionId(regionName)}:${operatorIdFor(row.providerIdentity.operatorName)}:${lineIdFor(regionName, normalizeMolitProviderLineName(row.lineName))}`;
     const scope = expected.get(key);
-    if (!scope) continue;
+    if (!scope) throw new Error(`MOLIT provider scope is unmatched: ${key}`);
     if (scope.mreaWideCd !== row.providerIdentity.mreaWideCd || scope.lnCd !== row.providerIdentity.lnCd
       || scope.railOprIsttCd !== row.providerIdentity.railOprIsttCd) {
       throw new Error(`MOLIT/KRIC provider code mismatch: ${key}`);
     }
   }
-}
-
-function providerLineNameKey(value) {
-  return String(value)
-    .replace(/^(수도권|부산|대구|광주|대전)\s+/, "")
-    .replaceAll("·", "")
-    .replace(/^(경의중앙|경춘|수인분당)선$/, "$1")
-    .replace(/^공항철도$/, "공항")
-    .replace(/^용인(?:경전철|에버라인)$/, "에버라인")
-    .replace(/^우이신설경전철$/, "우이신설")
-    .replace(/^의정부경전철$/, "의정부")
-    .trim();
 }
 
 function providerRegionCode(regionId) {
@@ -1036,21 +1029,6 @@ function regionNameForProviderCode(mreaWideCd) {
   }[mreaWideCd];
   if (!regionName) throw new Error(`unknown MOLIT provider region: ${mreaWideCd}`);
   return regionName;
-}
-
-function fixtureLineNameForProvider(lineName) {
-  return {
-    "경의·중앙선": "경의중앙",
-    경의중앙선: "경의중앙",
-    경춘선: "경춘",
-    공항철도: "공항",
-    수인분당선: "수인분당",
-    신분당선: "신분당",
-    용인경전철: "에버라인",
-    용인에버라인: "에버라인",
-    우이신설경전철: "우이신설",
-    의정부경전철: "의정부",
-  }[lineName] ?? lineName;
 }
 
 function svgRowsByKey(rows) {
@@ -1317,4 +1295,6 @@ function requireArg(args, name) {
   return value;
 }
 
-await main();
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  await main();
+}

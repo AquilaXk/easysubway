@@ -29,9 +29,13 @@ export async function collectKricNationwideRouteRosters({
     for (const field of ["mreaWideCd", "lnCd", "railOprIsttCd"]) requiredString(scope[field], `provider scope ${key}.${field}`);
     providerScopeByKey.set(key, scope);
   }
+  const seenTargetScopeKeys = new Set();
   const providerScopes = targets.activeLineScopes.map((scope) => {
-    const providerScope = providerScopeByKey.get(scopeKey(scope));
-    if (!providerScope) throw new Error(`target/provider scope set does not match: ${scopeKey(scope)}`);
+    const key = scopeKey(scope);
+    if (seenTargetScopeKeys.has(key)) throw new Error(`duplicate target active line scope: ${key}`);
+    seenTargetScopeKeys.add(key);
+    const providerScope = providerScopeByKey.get(key);
+    if (!providerScope) throw new Error(`target/provider scope set does not match: ${key}`);
     return providerScope;
   });
 

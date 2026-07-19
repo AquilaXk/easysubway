@@ -28,8 +28,21 @@ export async function downloadKricCodeCatalog({
   if (Number.isFinite(contentLength) && contentLength > maximumBytes) {
     throw new Error("KRIC code catalog size limit exceeded");
   }
-  const bytes = Buffer.from(await response.arrayBuffer());
-  if (bytes.length > maximumBytes) throw new Error("KRIC code catalog size limit exceeded");
+  if (!response.body) throw new Error("KRIC code catalog schema mismatch: response body missing");
+  const reader = response.body.getReader();
+  const chunks = [];
+  let byteCount = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    byteCount += value.byteLength;
+    if (byteCount > maximumBytes) {
+      await reader.cancel().catch(() => {});
+      throw new Error("KRIC code catalog size limit exceeded");
+    }
+    chunks.push(Buffer.from(value));
+  }
+  const bytes = Buffer.concat(chunks, byteCount);
   if (bytes.length < 4 || !bytes.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04]))) {
     throw new Error("KRIC code catalog schema mismatch: XLSX ZIP signature missing");
   }
