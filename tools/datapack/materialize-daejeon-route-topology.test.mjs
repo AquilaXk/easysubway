@@ -178,12 +178,78 @@ test("부산과 대전 topology를 하나의 nationwide production pack으로 �
     canonicalStationMappings: parseCanonicalBusanStationMappings(busanStationMapCsv),
     now: new Date("2026-07-19T18:14:03.004Z"),
   });
+  const capitalOnlyFixture = materializeDaejeonRouteTopology({
+    baseFixture,
+    snapshot: daejeonSnapshot,
+    inventory,
+    canonicalStationMappings,
+    now: evidenceNow,
+  });
   const fixture = materializeDaejeonRouteTopology({
     baseFixture: busanFixture,
     snapshot: daejeonSnapshot,
     inventory,
     canonicalStationMappings,
     now: evidenceNow,
+  });
+  assert.notEqual(fixture.packs[0].id, capitalOnlyFixture.packs[0].id);
+  assert.notEqual(fixture.packs[0].url, capitalOnlyFixture.packs[0].url);
+  assert.match(fixture.packs[0].id, /^nationwide-daejeon-topology-[a-f0-9]{64}$/);
+  const fixturePath = path.join(outputDir, "fixture.json");
+  const packOutput = path.join(outputDir, "pack");
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+  await mkdir(packOutput, { recursive: true });
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    privateKeyEncoding: { type: "pkcs8", format: "pem" },
+    publicKeyEncoding: { type: "spki", format: "pem" },
+  });
+  await execFileAsync(process.execPath, [
+    "tools/datapack/build-datapack.mjs", "--fixture", fixturePath, "--output", packOutput,
+  ], {
+    cwd: root,
+    env: { ...process.env, EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM: privateKey },
+  });
+  await execFileAsync(process.execPath, [
+    "tools/datapack/validate-datapack.mjs",
+    "--manifest", path.join(packOutput, "current.json"),
+    "--root", packOutput,
+    "--require-production",
+  ], {
+    cwd: root,
+    env: { ...process.env, EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: publicKey },
+  });
+});
+
+test("접근성 coverage는 같은 운영기관의 scope 밖 지역 station-line을 분모에서 제외한다", async (context) => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-accessibility-region-scope-"));
+  context.after(() => rm(outputDir, { recursive: true, force: true }));
+  const [baseFixture, snapshot, inventory, canonicalStationMappings] = await inputs();
+  const pack = baseFixture.packs[0];
+  pack.lines.push({
+    ...pack.lines[0],
+    id: "busan-test-line",
+    nameKo: "부산 범위 밖 테스트 노선",
+  });
+  pack.stations.push({
+    ...pack.stations[0],
+    id: "station-busan-out-of-scope",
+    nameKo: "부산 범위 밖 테스트역",
+    normalizedName: "부산 범위 밖 테스트역",
+    region: "부산권",
+  });
+  pack.stationLines.push({
+    ...pack.stationLines[0],
+    stationId: "station-busan-out-of-scope",
+    lineId: "busan-test-line",
+    stationCode: "B001",
+    lineSequence: 1,
+  });
+  pack.minimumTableRows.lines = pack.lines.length;
+  pack.minimumTableRows.stations = pack.stations.length;
+  pack.minimumTableRows.station_lines = pack.stationLines.length;
+  const fixture = materializeDaejeonRouteTopology({
+    baseFixture, snapshot, inventory, canonicalStationMappings, now: evidenceNow,
   });
   const fixturePath = path.join(outputDir, "fixture.json");
   const packOutput = path.join(outputDir, "pack");

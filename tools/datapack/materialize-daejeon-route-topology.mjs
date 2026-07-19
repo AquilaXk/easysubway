@@ -22,6 +22,7 @@ export function materializeDaejeonRouteTopology({
   validateSnapshot(snapshot);
   const source = requiredSource(inventory, snapshot, now);
   const mappings = requiredMappings(canonicalStationMappings);
+  const compositionSha256 = sha256(JSON.stringify({ baseFixture, snapshot, source, mappings }));
   const fixture = structuredClone(baseFixture);
   if (!Array.isArray(fixture.packs) || fixture.packs.length !== 1 || fixture.packs[0].artifactKind !== "production") {
     throw new Error("base fixture must contain exactly one production pack");
@@ -30,9 +31,9 @@ export function materializeDaejeonRouteTopology({
   const pack = fixture.packs[0];
   const version = /-(\d{8})$/.exec(source.topologyAdmissionEvidence.snapshotId)?.[1];
   if (!version) throw new Error(`${SOURCE_ID} snapshotId must end with YYYYMMDD`);
-  pack.id = PACK_ID;
+  pack.id = `${PACK_ID}-${compositionSha256}`;
   pack.version = version;
-  pack.url = `https://objectstorage.ap-seoul-1.oraclecloud.com/n/axvym6vk8g7i/b/easysubway-datapacks/o/catalog/${PACK_ID}-v${version}.sqlite.gz`;
+  pack.url = `https://objectstorage.ap-seoul-1.oraclecloud.com/n/axvym6vk8g7i/b/easysubway-datapacks/o/catalog/${pack.id}-v${version}.sqlite.gz`;
   fixture.manifest.activePack = { id: pack.id, version: pack.version };
 
   if (pack.sourceInventory.some(({ id }) => id === SOURCE_ID)) {

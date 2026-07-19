@@ -39,6 +39,13 @@ const positiveFacilityStatuses = new Set(["NORMAL", "AVAILABLE", "IN_SERVICE", "
 // 단 strict route guarantee(#1394 휠체어 이용 보장)는 AVAILABLE 전용으로 불변이며, UNDER_MAINTENANCE/
 // NO_OFFICIAL_FEED edge는 strict_route_eligible=0 이어야 한다.
 const verifiedAccessibilityStatuses = new Set(["AVAILABLE", "UNDER_MAINTENANCE", "NO_OFFICIAL_FEED"]);
+const coverageRegionIdByStationRegion = new Map([
+  ["수도권", "capital"],
+  ["부산권", "busan"],
+  ["대구권", "daegu"],
+  ["광주권", "gwangju"],
+  ["대전권", "daejeon"],
+]);
 const maintenanceOperationalStatuses = new Set([
   "UNDER_MAINTENANCE",
   "MAINTENANCE",
@@ -1808,18 +1815,21 @@ function validatePositiveEdgeProvenance(edge, sourceUpdatedAtById, pack, accessi
 }
 
 function productionVerifiedCoverage(database, edgeRows, accessibilityEvidence) {
-  const accessibilityOperatorIds = accessibilityCoverageOperatorIds(database, accessibilityEvidence.sourceById);
+  const accessibilityScopes = accessibilityCoverageScopes(database, accessibilityEvidence.sourceById);
   const stationLineRows = database
     .prepare(`
-      SELECT sl.station_id, sl.line_id, l.operator_id
+      SELECT sl.station_id, sl.line_id, l.operator_id, s.region
       FROM station_lines sl
       JOIN lines l ON l.id = sl.line_id
+      JOIN stations s ON s.id = sl.station_id
       ORDER BY sl.station_id, sl.line_id
     `)
     .all();
-  const claimedStationLineRows = accessibilityOperatorIds === null
+  const claimedStationLineRows = accessibilityScopes === null
     ? stationLineRows
-    : stationLineRows.filter((row) => accessibilityOperatorIds.has(row.operator_id));
+    : stationLineRows.filter((row) => accessibilityScopes.has(
+      accessibilityCoverageScopeKey(stationRegionId(row.region), row.operator_id),
+    ));
   const requiredPairs = requiredAccessibilityCoveragePairs(claimedStationLineRows);
   const verifiedPairs = verifiedAccessibilityCoveragePairs(edgeRows, accessibilityEvidence);
 
@@ -1830,7 +1840,7 @@ function productionVerifiedCoverage(database, edgeRows, accessibilityEvidence) {
   };
 }
 
-function accessibilityCoverageOperatorIds(database, sourceById) {
+function accessibilityCoverageScopes(database, sourceById) {
   const row = database.prepare(
     "SELECT value FROM catalog_metadata WHERE key = 'productionCoverageEvidence'",
   ).get();
@@ -1842,17 +1852,28 @@ function accessibilityCoverageOperatorIds(database, sourceById) {
     throw new Error("productionCoverageEvidence metadata must be valid JSON");
   }
   if (!Array.isArray(entries)) throw new Error("productionCoverageEvidence metadata must be an array");
-  const operatorIds = new Set();
+  const scopes = new Set();
   for (const entry of entries) {
     if (entry?.sourceDomain !== "accessibility_facilities") continue;
-    if (typeof entry.operatorId !== "string" || !entry.operatorId
+    if (typeof entry.regionId !== "string" || !entry.regionId
+      || typeof entry.operatorId !== "string" || !entry.operatorId
       || !Array.isArray(entry.sourceIds) || entry.sourceIds.length === 0
       || entry.sourceIds.some((sourceId) => !sourceSupportsDomain(sourceById.get(sourceId), "accessibility_facilities"))) {
       throw new Error("productionCoverageEvidence accessibility scope is invalid");
     }
-    operatorIds.add(entry.operatorId);
+    scopes.add(accessibilityCoverageScopeKey(entry.regionId, entry.operatorId));
   }
-  return operatorIds;
+  return scopes;
+}
+
+function stationRegionId(region) {
+  const regionId = coverageRegionIdByStationRegion.get(String(region ?? "").normalize("NFKC"));
+  if (!regionId) throw new Error(`station region is not mapped to a coverage region: ${region}`);
+  return regionId;
+}
+
+function accessibilityCoverageScopeKey(regionId, operatorId) {
+  return `${regionId}\0${operatorId}`;
 }
 
 function requiredAccessibilityCoveragePairs(stationLineRows) {
