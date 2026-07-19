@@ -25,6 +25,9 @@ import '../features/stations/data/drift_station_repository.dart';
 import '../features/stations/data/current_location_provider.dart';
 import '../features/stations/data/station_api_repository.dart';
 import '../features/stations/domain/station_repositories.dart';
+import '../features/train_search/data/train_search_repository.dart';
+import '../features/train_search/domain/train_search_models.dart';
+import '../features/train_search/domain/train_search_scope_policy.dart';
 import '../internal_route.dart';
 import '../network_map.dart';
 import '../notification_settings.dart';
@@ -57,6 +60,7 @@ class AppDependencies {
     required this.notificationRepository,
     required this.notificationPermissionProvider,
     required this.locationProvider,
+    required this.trainSearchRepository,
     required this.userDataDeletionRepository,
     this.getOffAlarmController,
     required this.noticeRepository,
@@ -80,6 +84,7 @@ class AppDependencies {
     NotificationSettingsRepository? notificationRepository,
     NotificationPermissionProvider? notificationPermissionProvider,
     CurrentLocationProvider? locationProvider,
+    TrainSearchRepository? trainSearchRepository,
     UserDataDeletionRepository? userDataDeletionRepository,
     NoticeRepository? noticeRepository,
     AdRepository? adRepository,
@@ -269,6 +274,9 @@ class AppDependencies {
       notificationPermissionProvider: resolvedNotificationPermissionProvider,
       locationProvider:
           locationProvider ?? MethodChannelCurrentLocationProvider(),
+      trainSearchRepository:
+          trainSearchRepository ??
+          _LazyDefaultTrainSearchRepository(optionalBaseUri),
       userDataDeletionRepository:
           userDataDeletionRepository ??
           _defaultUserDataDeletionRepository(
@@ -304,10 +312,37 @@ class AppDependencies {
   final NotificationSettingsRepository? notificationRepository;
   final NotificationPermissionProvider? notificationPermissionProvider;
   final CurrentLocationProvider locationProvider;
+  final TrainSearchRepository trainSearchRepository;
   final UserDataDeletionRepository? userDataDeletionRepository;
   final GetOffAlarmController? getOffAlarmController;
   final NoticeRepository? noticeRepository;
   final AdRepository? adRepository;
+}
+
+class _LazyDefaultTrainSearchRepository implements TrainSearchRepository {
+  _LazyDefaultTrainSearchRepository(this._baseUri);
+
+  final Uri? Function() _baseUri;
+  TrainSearchRepository? _delegate;
+
+  TrainSearchRepository _resolveDelegate() {
+    final cachedDelegate = _delegate;
+    if (cachedDelegate != null) return cachedDelegate;
+    final resolvedBaseUri = _baseUri();
+    return _delegate = resolvedBaseUri == null
+        ? const UnavailableTrainSearchRepository()
+        : ApiTrainSearchRepository(ApiClient(baseUri: resolvedBaseUri));
+  }
+
+  @override
+  Future<TrainSearchResult> search(TrainSearchCriteria criteria) =>
+      _resolveDelegate().search(criteria);
+
+  @override
+  Future<List<TrainStation>> stations(
+    String query, {
+    TrainSearchTrainType? type,
+  }) => _resolveDelegate().stations(query, type: type);
 }
 
 /// 공개 공지 API는 선택 기능이라 앱 시작 중 base URL을 강제 평가하지 않는다.

@@ -390,6 +390,7 @@ class NetworkMapScreen extends StatefulWidget {
     this.realtimeRepository,
     this.onOpenSavedItems,
     this.onOpenNearbyStations,
+    this.onOpenTrainSearch,
     this.onOpenSettings,
     this.onOpenServiceNotices,
     this.notificationAction,
@@ -441,6 +442,7 @@ class NetworkMapScreen extends StatefulWidget {
 
   /// 현재 선택 지역 표시명을 함께 전달한다(#2090 검색 화면 지역 표시 배선).
   final ValueChanged<String>? onOpenNearbyStations;
+  final VoidCallback? onOpenTrainSearch;
   final VoidCallback? onOpenSettings;
 
   /// 좌측 메뉴 "운행 공지" 목록 화면 열기.
@@ -1312,6 +1314,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               widget.onOpenStationSearch(_currentRegionDisplayName),
           onOpenSavedItems: widget.onOpenSavedItems,
           onOpenNearbyStations: _openNearbyStationsWithRegion,
+          onOpenTrainSearch: widget.onOpenTrainSearch,
           onOpenServiceNotices: widget.onOpenServiceNotices,
           onOpenSettings: widget.onOpenSettings,
         );
@@ -3100,6 +3103,7 @@ class _NetworkMapMenuPanel extends StatelessWidget {
     required this.onOpenStationSearch,
     required this.onOpenSavedItems,
     required this.onOpenNearbyStations,
+    required this.onOpenTrainSearch,
     required this.onOpenServiceNotices,
     required this.onOpenSettings,
   });
@@ -3107,6 +3111,7 @@ class _NetworkMapMenuPanel extends StatelessWidget {
   final VoidCallback onOpenStationSearch;
   final VoidCallback? onOpenSavedItems;
   final VoidCallback? onOpenNearbyStations;
+  final VoidCallback? onOpenTrainSearch;
   final VoidCallback? onOpenServiceNotices;
   final VoidCallback? onOpenSettings;
 
@@ -3153,6 +3158,13 @@ class _NetworkMapMenuPanel extends StatelessWidget {
                           label: '가까운 역',
                           onTap: () =>
                               _runAction(context, onOpenNearbyStations!),
+                        ),
+                      if (onOpenTrainSearch != null)
+                        _NetworkMapMenuTile(
+                          key: const Key('networkMapMenuTrainSearchButton'),
+                          icon: Icons.train_outlined,
+                          label: '기차 검색',
+                          onTap: () => _runAction(context, onOpenTrainSearch!),
                         ),
                       if (onOpenSavedItems != null ||
                           onOpenSettings != null) ...[

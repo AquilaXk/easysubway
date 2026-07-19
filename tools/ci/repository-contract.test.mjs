@@ -15040,7 +15040,9 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(raptorPlanner, /transitFrequencies\(\)/);
   assert.match(raptorPlanner, /pickupType\(\)/);
   assert.match(raptorPlanner, /dropOffType\(\)/);
-  assert.match(raptorPlanner, /dominates/);
+  assert.match(raptorPlanner, /PARETO_LIMIT/);
+  assert.match(raptorPlanner, /collectMarkedPatterns/);
+  assert.match(raptorPlanner, /private int\[] parentTrip/);
   assert.match(useCase, /record SearchRouteV2Command/);
   assert.match(useCase, /OffsetDateTime departureTime/);
   assert.match(useCase, /boolean useRealtime/);
