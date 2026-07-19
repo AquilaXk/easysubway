@@ -51,7 +51,18 @@ test("부산 topology snapshot을 실제 production pack 입력으로 materializ
     ({ sourceSnapshotId }) => sourceSnapshotId === "busan-transportation-route-topology-20260720",
   ));
   assert.equal(busanEdges[0].distanceMeters, snapshot.edges[0].distanceMeters);
-  assert.equal(busanEdges[0].durationSeconds, snapshot.edges[0].durationSeconds);
+  assert.equal(
+    busanEdges[0].durationSeconds,
+    snapshot.edges[0].durationSeconds + snapshot.edges[0].stoppingSeconds,
+  );
+  const line1ForwardIds = new Set(snapshot.edges
+    .filter(({ lineId, fromStationCode, toStationCode }) =>
+      lineId === "line-ab1a041f6266" && Number(toStationCode) > Number(fromStationCode))
+    .map(({ edgeId }) => `edge-${edgeId.replaceAll(":", "-")}`));
+  assert.equal(
+    busanEdges.filter(({ id }) => line1ForwardIds.has(id)).reduce((sum, edge) => sum + edge.durationSeconds, 0),
+    4_745,
+  );
   assert.deepEqual(
     busanStationLines
       .filter(({ stationCode }) => new Set(["102", "103", "119", "201"]).has(stationCode))

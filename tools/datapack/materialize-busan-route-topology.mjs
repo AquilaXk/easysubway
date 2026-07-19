@@ -97,7 +97,7 @@ export function materializeBusanRouteTopology({
       id: `edge-${edge.edgeId.replaceAll(":", "-")}`,
       fromNodeId: `${from.stationId}:${edge.lineId}`,
       toNodeId: `${to.stationId}:${edge.lineId}`,
-      durationSeconds: edge.durationSeconds,
+      durationSeconds: edge.durationSeconds + edge.stoppingSeconds,
       distanceMeters: edge.distanceMeters,
       edgeType: "RIDE",
       servicePattern: "LOCAL",
