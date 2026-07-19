@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -68,6 +69,8 @@ export function buildBackendObservation(files, metadata) {
     schemaVersion: 1,
     artifactKind: "train-search-backend-observation",
     candidateGitSha: metadata.candidateGitSha,
+    runtimeSourceGitSha: metadata.runtimeSourceGitSha,
+    runtimeSourceMatchesCandidate: metadata.runtimeSourceMatchesCandidate,
     apiOrigin: metadata.apiOrigin,
     collectedAt: metadata.collectedAt,
     status: "PASS",
@@ -86,6 +89,8 @@ export function validateBackendObservationArtifact(artifact) {
   if (artifact.schemaVersion !== 1
     || artifact.artifactKind !== "train-search-backend-observation"
     || !validCandidateSha(artifact.candidateGitSha)
+    || artifact.runtimeSourceGitSha !== artifact.candidateGitSha
+    || artifact.runtimeSourceMatchesCandidate !== true
     || artifact.apiOrigin !== "https://easysubway-api.aquilaxk.site"
     || !validCollectedAt(artifact.collectedAt)
     || artifact.status !== "PASS"
@@ -113,10 +118,27 @@ export function validateBackendObservationArtifact(artifact) {
 
 function validateMetadata(metadata) {
   if (!metadata || !validCandidateSha(metadata.candidateGitSha)
+    || metadata.runtimeSourceGitSha !== metadata.candidateGitSha
+    || metadata.runtimeSourceMatchesCandidate !== true
     || metadata.apiOrigin !== "https://easysubway-api.aquilaxk.site"
     || !validCollectedAt(metadata.collectedAt)) {
     throw new Error("backend observation metadata was invalid");
   }
+}
+
+function verifyRuntimeSource(candidateGitSha) {
+  const paths = [
+    "backend/src/main",
+    "backend/build.gradle",
+    "backend/settings.gradle",
+    "backend/gradle.lockfile",
+  ];
+  const commit = spawnSync("git", ["cat-file", "-e", `${candidateGitSha}^{commit}`], { encoding: "utf8" });
+  const diff = spawnSync("git", ["diff", "--quiet", candidateGitSha, "--", ...paths], { encoding: "utf8" });
+  if (commit.status !== 0 || diff.status !== 0) {
+    throw new Error("backend runtime source did not match the candidate SHA");
+  }
+  return candidateGitSha;
 }
 
 function validCandidateSha(value) {
@@ -217,8 +239,11 @@ async function main() {
     path: name,
     content: await readFile(path.join(testResultsDir, name), "utf8"),
   })));
+  const runtimeSourceGitSha = verifyRuntimeSource(args["candidate-sha"]);
   const artifact = buildBackendObservation(files, {
     candidateGitSha: args["candidate-sha"],
+    runtimeSourceGitSha,
+    runtimeSourceMatchesCandidate: true,
     apiOrigin: args["api-origin"],
     collectedAt: new Date().toISOString(),
   });

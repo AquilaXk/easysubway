@@ -67,6 +67,17 @@ test("TAGO resultCode·body schema와 공식 열차종을 strict하게 검증한
     }),
     /provider resultCode was not 00/,
   );
+  for (const invalidCount of [null, "", false]) {
+    assert.throws(
+      () => validateProviderEnvelope({
+        response: {
+          header: { resultCode: "00" },
+          body: { items: { item: [] }, pageNo: 1, numOfRows: 100, totalCount: invalidCount },
+        },
+      }, { operation: "GetVhcleKndList", paginated: true, pageNo: 1, pageSize: 100 }),
+      /was not an integer/,
+    );
+  }
 });
 
 test("backend 서울→대전 KTX 응답은 운임·시간·ITX 0건을 증명한다", () => {
@@ -207,6 +218,15 @@ test("backend live evidence는 API observedAt을 보존하고 stale 응답을 �
     ),
     /backend observation was stale/,
   );
+  assert.throws(
+    () => validateBackendObservationTime(
+      "2026-07-19T06:00:00Z",
+      "2026-07-20",
+      new Date("2026-07-19T06:04:00Z"),
+      "2026-07-19T06:01:00Z",
+    ),
+    /predated the candidate deployment/,
+  );
 });
 
 test("TAGO station catalog는 동일 ID의 상이한 이름을 거부한다", () => {
@@ -245,6 +265,18 @@ test("TAGO 운임 행은 요청한 서울→대전 OD와 날짜가 정확히 일
     }),
     /provider journey OD or date mismatch/,
   );
+  for (const invalidFare of [null, "", false, true]) {
+    assert.throws(
+      () => providerJourney({ ...row, adultcharge: invalidFare }, 0, {
+        departureStationId: "NAT010000",
+        departureStationName: "서울",
+        arrivalStationId: "NAT011668",
+        arrivalStationName: "대전",
+        departureDate: "2026-07-20",
+      }),
+      /was not an integer/,
+    );
+  }
   for (const invalidTime of ["20260720250000", "20260230090000"]) {
     assert.throws(
       () => providerJourney({
@@ -357,6 +389,8 @@ test("backend test XML에서 3-node provider 1회와 quota fail-closed를 계산
   ].join("\n");
   const metadata = {
     candidateGitSha: "a".repeat(40),
+    runtimeSourceGitSha: "a".repeat(40),
+    runtimeSourceMatchesCandidate: true,
     apiOrigin: "https://easysubway-api.aquilaxk.site",
     collectedAt: "2026-07-19T12:00:00.000Z",
   };
@@ -459,6 +493,11 @@ test("capacity runner는 repeated·unique·3-node·quota 경계를 고정한다"
   assert.match(runner, /validate-train-search-capacity\.mjs/);
   assert.match(runner, /--preflight-output-dir/);
   assert.match(runner, /--candidate-sha/);
+  assert.match(runner, /--deployment-run-url/);
+  assert.match(runner, /train-search-live-smoke\.mjs/);
+  assert.match(runner, /candidate-binding\.json/);
+  const collector = read("tools/test/collect-train-search-backend-observation.mjs");
+  assert.match(collector, /git", \["diff", "--quiet", candidateGitSha/);
   assert.doesNotMatch(runner, /source .*\.env|curl|jq|sed|awk|grep/);
   const unsafeEvidence = spawnSync(process.execPath, [
     "tools/test/validate-train-search-capacity.mjs",
@@ -469,6 +508,7 @@ test("capacity runner는 repeated·unique·3-node·quota 경계를 고정한다"
     "/etc/repeated.json",
     "/etc/unique.json",
     "/etc/backend-observation.json",
+    "/etc/candidate-binding.json",
   ], { encoding: "utf8" });
   assert.notEqual(unsafeEvidence.status, 0);
   assert.match(unsafeEvidence.stderr, /outside the allowed roots/);
@@ -481,6 +521,7 @@ test("capacity runner는 repeated·unique·3-node·quota 경계를 고정한다"
     "--output-dir", "/etc/easysubway-capacity",
     "--nodes", "3",
     "--candidate-sha", "a".repeat(40),
+    "--deployment-run-url", "https://github.com/AquilaXk/easysubway/actions/runs/1",
   ], { encoding: "utf8" });
   assert.notEqual(unsafeOutput.status, 0);
   assert.match(unsafeOutput.stderr, /outside the allowed roots/);
@@ -513,6 +554,10 @@ test("#2094 release artifact는 동일 candidate와 모든 완료 증거를 요�
   assert.equal(Number.isSafeInteger(runtime.backend.currentDeployment.statusId), true);
   assert.match(runtime.backend.currentDeployment.createdAt, /^\d{4}-\d{2}-\d{2}T/);
   assert.match(runtime.backend.currentDeployment.succeededAt, /^\d{4}-\d{2}-\d{2}T/);
+  assert.equal(
+    Date.parse(runtime.backend.observedAt) >= Date.parse(runtime.backend.currentDeployment.succeededAt),
+    true,
+  );
   assert.deepEqual(runtime.backend.deployment.requiredJobs, [
     "CD Deploy",
     "Post-deploy smoke",
@@ -551,8 +596,22 @@ test("#2094 release artifact는 동일 candidate와 모든 완료 증거를 요�
   assert.match(runtime.capacity.executor.binarySha256, /^[0-9a-f]{64}$/);
   validateBackendObservationArtifact(runtime.capacity.backendObservation);
   assert.equal(runtime.capacity.backendObservation.candidateGitSha, runtime.candidateGitSha);
+  assert.equal(runtime.capacity.backendObservation.runtimeSourceGitSha, runtime.candidateGitSha);
+  assert.equal(runtime.capacity.backendObservation.runtimeSourceMatchesCandidate, true);
   assert.equal(runtime.capacity.backendObservation.apiOrigin, runtime.backend.apiOrigin);
   assert.match(runtime.capacity.backendObservation.collectedAt, /^\d{4}-\d{2}-\d{2}T/);
+  assert.equal(runtime.capacity.candidateBinding.candidateGitSha, runtime.candidateGitSha);
+  assert.equal(runtime.capacity.candidateBinding.backend.deployedGitSha, runtime.candidateGitSha);
+  assert.equal(runtime.capacity.candidateBinding.backend.currentDeployment.sha, runtime.candidateGitSha);
+  assert.equal(runtime.capacity.candidateBinding.backend.origin, runtime.backend.apiOrigin);
+  const { evidenceSha256: bindingSha256, ...unsignedBinding } = runtime.capacity.candidateBinding;
+  assert.equal(bindingSha256, sha256(JSON.stringify(unsignedBinding)));
+  assert.equal(runtime.backend.sourceObjectSha256, bindingSha256);
+  assert.equal(
+    Date.parse(runtime.capacity.candidateBinding.backend.observedAt)
+      >= Date.parse(runtime.capacity.candidateBinding.backend.currentDeployment.succeededAt),
+    true,
+  );
   assert.equal(runtime.android.menuToResultPassed, true);
   assert.equal(runtime.android.roundTripPassed, true);
   assert.equal(runtime.android.stateMatrixPassed, true);

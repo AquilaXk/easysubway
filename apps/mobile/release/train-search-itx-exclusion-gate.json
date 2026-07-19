@@ -86,14 +86,14 @@
         "createdAt": "2026-07-19T07:30:26Z",
         "succeededAt": "2026-07-19T08:43:32Z"
       },
-      "observedAt": "2026-07-19T06:59:01.734195Z",
-      "collectedAt": "2026-07-19T09:59:04.457Z",
-      "seoulDaejeonKtxFareRows": 54,
+      "observedAt": "2026-07-19T10:37:18.778105767Z",
+      "collectedAt": "2026-07-19T10:37:16.783Z",
+      "seoulDaejeonKtxFareRows": 64,
       "itxCheongchunRows": 0,
       "conditionalEtagStatus": 304,
       "errorCacheControl": "no-store",
       "schemaStatus": "EXPECTED",
-      "sourceObjectSha256": "0b247de4e27cc545611f591ed559621f666b2f6dd142aae605bc39ee6e4ae46c"
+      "sourceObjectSha256": "036eed75a47f53dab0fdba441a5219945973ceba8f74d2e8655468e8c0989f1c"
     },
     "capacity": {
       "executor": {
@@ -105,12 +105,12 @@
         "schemaVersion": 1,
         "candidateGitSha": "86be8d0294f9e2badab61f25e5c6a6ed9b7eea2c",
         "apiOrigin": "https://easysubway-api.aquilaxk.site",
-        "collectedAt": "2026-07-19T10:19:22.085Z",
+        "collectedAt": "2026-07-19T10:37:30.913Z",
         "workload": "repeated",
         "status": "PASS",
         "requestCount": 6,
         "expectedRequestCount": 5,
-        "p95Ms": 710.0255,
+        "p95Ms": 707.0772499999999,
         "failureRate": 0,
         "fiveXxCount": 0,
         "fourXxCount": 0,
@@ -121,12 +121,12 @@
         "schemaVersion": 1,
         "candidateGitSha": "86be8d0294f9e2badab61f25e5c6a6ed9b7eea2c",
         "apiOrigin": "https://easysubway-api.aquilaxk.site",
-        "collectedAt": "2026-07-19T10:19:32.597Z",
+        "collectedAt": "2026-07-19T10:37:44.803Z",
         "workload": "unique",
         "status": "PASS",
         "requestCount": 6,
         "expectedRequestCount": 5,
-        "p95Ms": 424.3165,
+        "p95Ms": 3455.4825,
         "failureRate": 0,
         "fiveXxCount": 0,
         "fourXxCount": 0,
@@ -137,8 +137,10 @@
         "schemaVersion": 1,
         "artifactKind": "train-search-backend-observation",
         "candidateGitSha": "86be8d0294f9e2badab61f25e5c6a6ed9b7eea2c",
+        "runtimeSourceGitSha": "86be8d0294f9e2badab61f25e5c6a6ed9b7eea2c",
+        "runtimeSourceMatchesCandidate": true,
         "apiOrigin": "https://easysubway-api.aquilaxk.site",
-        "collectedAt": "2026-07-19T10:19:43.683Z",
+        "collectedAt": "2026-07-19T10:37:56.275Z",
         "status": "PASS",
         "threeNodeSingleProviderCallVerifiedByTest": true,
         "quotaFailClosedVerifiedByTests": true,
@@ -153,21 +155,62 @@
         "testResults": [
           {
             "file": "TEST-com.easysubway.train.adapter.out.http.SharedTrainSearchProviderCallBudgetTest.xml",
-            "sha256": "1bf63c3fefdcd3666609c1d32e15cdfc502cedbec096e3cfdcd368bc8c525824",
+            "sha256": "30f5dfb3bf0b8fa499ebc104ee10e03e835d701b2fbf984b49b19914a89bcaf9",
             "testCount": 3
           },
           {
             "file": "TEST-com.easysubway.train.adapter.out.persistence.JdbcTrainSearchCacheTest.xml",
-            "sha256": "3b47ea20f62ed42fac44f7a3670593060192a89fbe9786070aff72fe7e857638",
+            "sha256": "b3c32a7f2af1ef861e3542b94afb5b72d4734c0fb5c1d3c9936ab3a1f7c2a2e5",
             "testCount": 2
           },
           {
             "file": "TEST-com.easysubway.train.application.TrainSearchServiceTest.xml",
-            "sha256": "98b9883ffe342df5c17ae0cb695bdae1daf576ae497c7ebe37f7fde3c90b4a17",
+            "sha256": "b8491b39fe6198cdef8a44d2f867f47326e22062227918d9ab8f6015763d6051",
             "testCount": 1
           }
         ],
-        "evidenceSha256": "ed37a7d2f2335420b661c696d9ebb2168b9227f9494c23fce83a19cd42795e4a"
+        "evidenceSha256": "7c4fe4ca6459e26b972c31199bcc812573b5df5386efe66b37bbd5b04e3c4472"
+      },
+      "candidateBinding": {
+        "schemaVersion": 1,
+        "artifactKind": "train-search-live-smoke",
+        "candidateGitSha": "86be8d0294f9e2badab61f25e5c6a6ed9b7eea2c",
+        "provider": null,
+        "backend": {
+          "observedAt": "2026-07-19T10:37:18.778105767Z",
+          "collectedAt": "2026-07-19T10:37:16.783Z",
+          "deployedGitSha": "86be8d0294f9e2badab61f25e5c6a6ed9b7eea2c",
+          "deployment": {
+            "runId": 29678175251,
+            "runUrl": "https://github.com/AquilaXk/easysubway/actions/runs/29678175251",
+            "workflowName": "CD",
+            "deployedGitSha": "86be8d0294f9e2badab61f25e5c6a6ed9b7eea2c",
+            "conclusion": "success",
+            "requiredJobs": [
+              "CD Deploy",
+              "Post-deploy smoke",
+              "CD Record deployment"
+            ]
+          },
+          "currentDeployment": {
+            "deploymentId": 5508806761,
+            "statusId": 15664924308,
+            "sha": "86be8d0294f9e2badab61f25e5c6a6ed9b7eea2c",
+            "createdAt": "2026-07-19T07:30:26Z",
+            "succeededAt": "2026-07-19T08:43:32Z"
+          },
+          "origin": "https://easysubway-api.aquilaxk.site",
+          "stationQueries": ["서울", "대전"],
+          "departureStationId": "NAT010000",
+          "arrivalStationId": "NAT011668",
+          "seoulDaejeonKtxFareRows": 64,
+          "itxCheongchunRows": 0,
+          "conditionalEtagStatus": 304,
+          "errorCacheControl": "no-store",
+          "schemaStatus": "EXPECTED"
+        },
+        "credentialRedacted": true,
+        "evidenceSha256": "036eed75a47f53dab0fdba441a5219945973ceba8f74d2e8655468e8c0989f1c"
       }
     },
     "android": {
@@ -199,7 +242,7 @@
       "status": "PASS",
       "runUrl": "https://github.com/AquilaXk/easysubway/actions/runs/29677947876"
     },
-    "liveEvidenceSha256": "bc7b3325fe21db029cc7f552a52cdaef5116b4a8c433537230e3e442cefd5448"
+    "liveEvidenceSha256": "631a820a983940dcc95e9845981e03d9ca59d90115efa5617b658af6cd1b82cf"
   },
   "verification": {
     "backend": "./backend/gradlew -p backend test --tests '*TrainSearch*'",

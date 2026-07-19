@@ -253,7 +253,12 @@ export async function collectBackendEvidence({
   if (search.fareRowCount === 0 || search.itxCheongchunRowCount !== 0) {
     throw new Error("backend KTX fare or ITX exclusion evidence failed");
   }
-  const observationTime = validateBackendObservationTime(search.observedAt, departureDate, now);
+  const observationTime = validateBackendObservationTime(
+    search.observedAt,
+    departureDate,
+    now,
+    currentDeployment.succeededAt,
+  );
   const etag = first.headers.get("etag");
   const conditional = await fetchWithTimeout(searchUrl, { headers: { "if-none-match": etag } }, fetchImpl);
   if (conditional.status !== 304) throw new Error(`train search conditional request returned HTTP ${conditional.status}`);
@@ -294,12 +299,16 @@ export function validateKtxProviderJourneys(journeys) {
   }
 }
 
-export function validateBackendObservationTime(observedAt, departureDate, now = new Date()) {
+export function validateBackendObservationTime(observedAt, departureDate, now = new Date(), notBefore) {
   const collectedAt = now instanceof Date ? now : new Date(now);
   const observedTime = Date.parse(observedAt);
   requireDate(departureDate);
   if (!validDateTime(observedAt) || Number.isNaN(collectedAt.getTime())) {
     throw new Error("backend observation time was invalid");
+  }
+  if (notBefore !== undefined
+    && (!validDateTime(notBefore) || observedTime < Date.parse(notBefore))) {
+    throw new Error("backend observation predated the candidate deployment");
   }
   const ageMs = collectedAt.getTime() - observedTime;
   if (ageMs < -MAX_BACKEND_CLOCK_SKEW_MS) {
@@ -685,8 +694,11 @@ function requiredString(value, label) {
 }
 
 function integer(value, label) {
+  if (typeof value !== "number" && (typeof value !== "string" || !/^-?\d+$/u.test(value))) {
+    throw new Error(`${label} was not an integer`);
+  }
   const parsed = typeof value === "number" ? value : Number(value);
-  if (!Number.isInteger(parsed)) throw new Error(`${label} was not an integer`);
+  if (!Number.isSafeInteger(parsed)) throw new Error(`${label} was not an integer`);
   return parsed;
 }
 

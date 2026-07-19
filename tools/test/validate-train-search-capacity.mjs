@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createHash } from "node:crypto";
 import { lstat, readFile, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -55,11 +56,21 @@ try {
   fail("backend observation failed its evidence contract");
 }
 
+try {
+  validateCandidateBindingArtifact(
+    JSON.parse(await readFile(evidenceFiles[3], "utf8")),
+    candidateGitSha,
+    apiOrigin,
+  );
+} catch {
+  fail("candidate deployment binding failed its evidence contract");
+}
+
 console.log("train-search capacity summaries and backend observation PASS");
 
 function parseEvidenceArguments(values) {
-  if (values.length !== 7 || values[0] !== "--candidate-sha" || values[2] !== "--api-origin") {
-    fail("expected --candidate-sha, --api-origin, and three absolute evidence paths");
+  if (values.length !== 8 || values[0] !== "--candidate-sha" || values[2] !== "--api-origin") {
+    fail("expected --candidate-sha, --api-origin, and four absolute evidence paths");
   }
   if (!/^[0-9a-f]{40}$/u.test(values[1])) fail("candidate SHA must be a full lowercase Git SHA");
   if (values[3] !== "https://easysubway-api.aquilaxk.site") fail("API origin must be production");
@@ -92,7 +103,7 @@ export async function validateOutputDirectory(value) {
       fail("output directory path must contain only real directories");
     }
   }
-  for (const name of ["repeated.json", "unique.json", "backend-observation.json"]) {
+  for (const name of ["repeated.json", "unique.json", "backend-observation.json", "candidate-binding.json"]) {
     try {
       const metadata = await lstat(path.join(target, name));
       if (!metadata.isFile() || metadata.isSymbolicLink()) {
@@ -105,10 +116,10 @@ export async function validateOutputDirectory(value) {
 }
 
 async function validatedEvidenceFiles(arguments_) {
-  const expectedNames = ["repeated.json", "unique.json", "backend-observation.json"];
+  const expectedNames = ["repeated.json", "unique.json", "backend-observation.json", "candidate-binding.json"];
   if (arguments_.length !== expectedNames.length
     || arguments_.some((value) => !path.isAbsolute(value))) {
-    fail("expected three absolute evidence paths");
+    fail("expected four absolute evidence paths");
   }
   const directory = path.dirname(arguments_[0]);
   if (arguments_.some((value, index) => (
@@ -130,6 +141,35 @@ async function validatedEvidenceFiles(arguments_) {
   return files;
 }
 
+function validateCandidateBindingArtifact(artifact, candidateGitSha, apiOrigin) {
+  if (!artifact || typeof artifact !== "object") throw new Error("candidate binding was invalid");
+  const { evidenceSha256, ...unsigned } = artifact;
+  if (artifact.schemaVersion !== 1
+    || artifact.artifactKind !== "train-search-live-smoke"
+    || artifact.candidateGitSha !== candidateGitSha
+    || artifact.provider !== null
+    || artifact.credentialRedacted !== true
+    || artifact.backend?.deployedGitSha !== candidateGitSha
+    || artifact.backend?.origin !== apiOrigin
+    || artifact.backend?.deployment?.deployedGitSha !== candidateGitSha
+    || artifact.backend?.deployment?.conclusion !== "success"
+    || artifact.backend?.currentDeployment?.sha !== candidateGitSha
+    || !validUtcTimestamp(artifact.backend?.observedAt)
+    || !validUtcTimestamp(artifact.backend?.currentDeployment?.succeededAt)
+    || Date.parse(artifact.backend?.observedAt) < Date.parse(artifact.backend?.currentDeployment?.succeededAt)
+    || !validCollectedAt(artifact.backend?.collectedAt)
+    || !/^[0-9a-f]{64}$/u.test(evidenceSha256 ?? "")
+    || sha256(JSON.stringify(unsigned)) !== evidenceSha256) {
+    throw new Error("candidate binding failed validation");
+  }
+}
+
+function validUtcTimestamp(value) {
+  return typeof value === "string"
+    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/u.test(value)
+    && Number.isFinite(Date.parse(value));
+}
+
 function pathInside(root, candidate) {
   const relative = path.relative(root, candidate);
   return relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative));
@@ -139,6 +179,10 @@ function validCollectedAt(value) {
   return typeof value === "string"
     && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u.test(value)
     && Number.isFinite(Date.parse(value));
+}
+
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
 }
 
 function fail(message) {
