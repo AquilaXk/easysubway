@@ -7321,11 +7321,15 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   assert.match(routeV2ProxyHeaders, /proxy_set_header X-EasySubway-Origin-Verify/);
   assert.match(
     jdbcRouteTimetableRepository,
-    /artifact\.snapshotSha256\(\) \+ artifact\.freshUntil\(\)/,
+    /artifact\.snapshotSha256\(\)[\s\S]*artifact\.plannerIdentity\(\)\.canonicalPackSha256\(\)[\s\S]*artifact\.freshUntil\(\)/,
   );
   assert.match(
     jdbcRouteTimetableRepositoryTest,
     /동일 freshness에서도 active snapshot SHA가 바뀌면 cache key가 바뀐다/,
+  );
+  assert.match(
+    jdbcRouteTimetableRepositoryTest,
+    /canonical pack SHA가 바뀌면 cache key가 바뀐다/,
   );
   assert.match(routeV2GatewayProbe, /session success response must remain private, no-store/);
   assert.match(routeV2GatewayProbe, /search success response must remain private, no-store/);
@@ -8728,6 +8732,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   const sourceIds = inventory.sources.map((source) => source.id).sort();
   assert.deepEqual(sourceIds, [
     "busan-transportation-official-od-fares",
+    "busan-transportation-route-topology",
     "busan-transportation-urban-rail-station-info",
     "kric-disabled-toilet",
     "kric-elevator-car-number",
@@ -9890,6 +9895,8 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
   const inventory = readJson("tools/datapack/source-inventory.json");
   const candidates = readJson("tools/datapack/source-candidates.json");
   const productionSourceIds = new Set(inventory.sources.map((source) => source.id));
+  // kric-provider-code-catalog는 credential-free 공식 파일을 code mapping으로 승인한 source라
+  // "샘플 URL만 문서화된" KRIC API 후보 계약과 다르다.
   // kric-subway-timetable은 라이브 재구성 실증을 가진 schedule_timetable 후보라 "샘플 URL만 문서화된"
   // 페이퍼 KRIC 후보 계약과 다르다 — 아래 전용 테스트에서 별도로 고정하고 이 루프에서는 제외한다.
   // production inventory로 승격된 KRIC 시설 source(엘리베이터·에스컬레이터·휠체어리프트 위치/이동동선 등,
@@ -9898,6 +9905,7 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
     (candidate) =>
       candidate.id.startsWith("kric-") &&
       !new Set([
+        "kric-provider-code-catalog",
         "kric-station-timetable",
         "kric-subway-timetable",
         "kric-subway-timetable-exp",
@@ -9908,7 +9916,7 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
   assert.equal(candidates.schemaVersion, 1);
   assert.equal(candidates.artifactKind, "production-source-candidates");
   assert.equal(candidates.source, "tools/datapack/source-candidates.json");
-  assert.equal(candidates.updatedAt, "2026-07-14");
+  assert.equal(candidates.updatedAt, "2026-07-20");
   assert.deepEqual(
     kricCandidates.map((candidate) => candidate.id).sort(),
     [
@@ -15006,7 +15014,7 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(planner, /ObjectProvider<LoadRouteTimetablePort>/);
   assert.match(planner, /getIfAvailable\(\)/);
   assert.match(planner, /timetableRequired && routeTimetablePort != null/);
-  assert.match(planner, /timetableRequired[\s\S]*canUseTimetableRaptor\(command\)[\s\S]*routeTimetablePort\.hasRouteTimetable\(\)/);
+  assert.match(planner, /timetableRequired[\s\S]*routeTimetablePort\.hasRouteTimetable\(\)/);
   assert.match(planner, /timetableCovers\(command, snapshot\)/);
   assert.match(planner, /snapshot\.timetableArtifactId\(\)/);
   assert.match(planner, /coveredStationIds\(\)/);
@@ -15018,11 +15026,14 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(h2StateMigration, /timetable_artifact_id VARCHAR\(160\) NOT NULL/);
   assert.match(postgresArtifactIdMigration, /ALTER COLUMN timetable_artifact_id TYPE VARCHAR\(200\)/);
   assert.match(h2ArtifactIdMigration, /ALTER COLUMN timetable_artifact_id VARCHAR\(200\)/);
-  assert.match(planner, /canUseTimetableRaptor/);
+  assert.doesNotMatch(planner, /canUseTimetableRaptor/);
   assert.match(planner, /loadRouteTimetableSnapshot\(\)/);
   assert.match(planner, /RouteTimetableRaptorPlanner/);
   assert.match(planner, /noTimetableServicePlan/);
-  assert.match(planner, /nextServiceTime\(\s*command,\s*snapshot\.compiledTimetable\(\)\s*\)/);
+  assert.match(
+    planner,
+    /nextServiceTime\(\s*command,\s*snapshot\.compiledTimetable\(\),\s*realtimeOverlay\s*\)/,
+  );
   assert.match(planner, /searchRouteAlternatives/);
   assert.match(planner, /statusesOf/);
   assert.match(raptorPlanner, /class RouteTimetableRaptorPlanner/);

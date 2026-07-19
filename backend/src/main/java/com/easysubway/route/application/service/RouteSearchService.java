@@ -4,6 +4,10 @@ import com.easysubway.profile.domain.MobilityType;
 import com.easysubway.route.application.port.in.RouteSearchUseCase;
 import com.easysubway.route.application.port.in.RouteSearchUseCase.TimetableCandidateSelection;
 import com.easysubway.route.application.port.in.RouteSearchUseCase.TimetableCandidateSource;
+import com.easysubway.route.application.port.in.RouteSearchUseCase.TimetableRealtimeQuery;
+import com.easysubway.route.application.port.in.RouteSearchUseCase.TimetableRealtimeUpdate;
+import com.easysubway.route.application.port.in.RouteSearchUseCase.TimetableRealtimeUpdates;
+import com.easysubway.route.application.port.in.RouteSearchUseCase.TimetableTripDeparture;
 import com.easysubway.route.application.port.in.SearchInternalRouteCommand;
 import com.easysubway.route.application.port.in.SearchRouteCommand;
 import com.easysubway.route.application.port.in.SubmitRouteFeedbackCommand;
@@ -11,6 +15,8 @@ import com.easysubway.route.application.port.out.LoadRouteSearchPort;
 import com.easysubway.route.application.port.out.RealtimeArrivalResolver;
 import com.easysubway.route.application.port.out.SaveRouteFeedbackPort;
 import com.easysubway.route.application.port.out.SaveRouteSearchPort;
+import com.easysubway.route.domain.ArrivalCandidate;
+import com.easysubway.route.domain.ArrivalFreshness;
 import com.easysubway.route.domain.BoardingSlackPolicy;
 import com.easysubway.route.domain.EtaConfidence;
 import com.easysubway.route.domain.EtaSource;
@@ -44,6 +50,7 @@ import com.easysubway.transit.domain.StationLine;
 import com.easysubway.transit.domain.StationNotFoundException;
 import com.easysubway.transit.domain.SubwayLine;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -83,6 +90,7 @@ public class RouteSearchService implements RouteSearchUseCase {
 	private static final int METERS_PER_STATION = 900;
 	private static final int ACCESSIBILITY_DATA_FRESH_DAYS = 30;
 	private static final String MATCHED_REALTIME_REASON = "MATCHED_REALTIME";
+	private static final String POST_SCAN_REALTIME_FALLBACK_REASON = "REALTIME_POST_SCAN_FALLBACK";
 
 	private final LoadRouteSearchPort loadRouteSearchPort;
 	private final SaveRouteSearchPort saveRouteSearchPort;
@@ -312,6 +320,127 @@ public class RouteSearchService implements RouteSearchUseCase {
 			.toList();
 	}
 
+	@Override
+	public TimetableRealtimeUpdates resolveTimetableRealtime(List<TimetableRealtimeQuery> queries) {
+		if (realtimeArrivalResolver == null || queries == null || queries.isEmpty()) {
+			return TimetableRealtimeUpdates.unavailable("REALTIME_OVERLAY_UNAVAILABLE");
+		}
+		Map<String, TimetableRealtimeUpdate> updatesByTripId = new HashMap<>();
+		Set<String> versions = new java.util.TreeSet<>();
+		for (TimetableRealtimeQuery query : queries) {
+			RealtimeArrivalResolver.Resolution resolution;
+			try {
+				resolution = realtimeArrivalResolver.resolve(preScanRealtimeQuery(query));
+			} catch (RuntimeException exception) {
+				log.debug("Pre-scan realtime overlay query failed for {} / {}", query.stationId(), query.lineId(), exception);
+				return TimetableRealtimeUpdates.unavailable("REALTIME_PROVIDER_ERROR");
+			}
+			if (resolution.status() != ArrivalFreshness.FRESH_REALTIME
+				|| resolution.providerSnapshotId() == null || resolution.providerSnapshotId().isBlank()
+				|| resolution.providerReceivedAt() == null) {
+				return TimetableRealtimeUpdates.unavailable(realtimeFallbackCode(resolution));
+			}
+			versions.add(resolution.providerSnapshotId());
+			Map<String, TimetableTripDeparture> plannedByTrainNo = exactPlannedDepartures(query.departures());
+			if (plannedByTrainNo == null) {
+				return TimetableRealtimeUpdates.unavailable("AMBIGUOUS_TIMETABLE_TRAIN_NO");
+			}
+			boolean queryMatchedRealtime = false;
+			Set<String> cancelled = Set.copyOf(resolution.cancelledTrainNos());
+			for (String trainNo : cancelled) {
+				TimetableTripDeparture planned = plannedByTrainNo.get(trainNo);
+				if (planned != null) {
+					queryMatchedRealtime = true;
+					if (!mergeRealtimeUpdate(updatesByTripId, new TimetableRealtimeUpdate(
+						planned.tripId(), 0, 0, true,
+						resolution.providerSnapshotId(), resolution.providerReceivedAt()))) {
+						return TimetableRealtimeUpdates.unavailable("CONFLICTING_REALTIME_TRIP_UPDATE");
+					}
+				}
+			}
+			Map<String, ArrivalCandidate> candidateByTrainNo = new HashMap<>();
+			for (var candidate : resolution.candidates()) {
+				if (candidate == null || candidate.freshness() != ArrivalFreshness.FRESH_REALTIME
+					|| candidate.trainNo() == null || candidate.trainNo().isBlank()
+					|| candidate.providerReceivedAt() == null
+					|| candidate.expectedArrivalAt().isBefore(query.readyAt())
+					|| cancelled.contains(candidate.trainNo())
+					|| !plannedByTrainNo.containsKey(candidate.trainNo())) {
+					continue;
+				}
+				candidateByTrainNo.merge(
+					candidate.trainNo(), candidate,
+					(left, right) -> left.expectedArrivalAt().isAfter(right.expectedArrivalAt()) ? right : left);
+			}
+			for (var entry : candidateByTrainNo.entrySet()) {
+				TimetableTripDeparture planned = plannedByTrainNo.get(entry.getKey());
+				queryMatchedRealtime = true;
+				long arrivalDelta = Duration.between(
+					planned.scheduledArrivalAt(), entry.getValue().expectedArrivalAt()).toSeconds();
+				Instant expectedDepartureAt = entry.getValue().expectedArrivalAt().plus(
+					Duration.between(planned.scheduledArrivalAt(), planned.scheduledDepartureAt()));
+				long departureDelta = Duration.between(
+					planned.scheduledDepartureAt(), expectedDepartureAt).toSeconds();
+				if (arrivalDelta < Integer.MIN_VALUE || arrivalDelta > Integer.MAX_VALUE
+					|| departureDelta < Integer.MIN_VALUE || departureDelta > Integer.MAX_VALUE) {
+					return TimetableRealtimeUpdates.unavailable("INVALID_REALTIME_DELTA");
+				}
+				if (!mergeRealtimeUpdate(updatesByTripId, new TimetableRealtimeUpdate(
+					planned.tripId(), (int) arrivalDelta, (int) departureDelta, false,
+					resolution.providerSnapshotId(), entry.getValue().providerReceivedAt()))) {
+					return TimetableRealtimeUpdates.unavailable("CONFLICTING_REALTIME_TRIP_UPDATE");
+				}
+			}
+			if (!queryMatchedRealtime) {
+				return TimetableRealtimeUpdates.unavailable("NO_USABLE_REALTIME_CANDIDATE");
+			}
+		}
+		List<TimetableRealtimeUpdate> updates = new ArrayList<>(updatesByTripId.values());
+		updates.sort(Comparator.comparing(TimetableRealtimeUpdate::tripId));
+		return new TimetableRealtimeUpdates(String.join("+", versions), true, updates, null);
+	}
+
+	private static boolean mergeRealtimeUpdate(
+		Map<String, TimetableRealtimeUpdate> updatesByTripId,
+		TimetableRealtimeUpdate update
+	) {
+		TimetableRealtimeUpdate previous = updatesByTripId.get(update.tripId());
+		if (previous != null && (previous.cancelled() != update.cancelled()
+			|| previous.arrivalDeltaSeconds() != update.arrivalDeltaSeconds()
+			|| previous.departureDeltaSeconds() != update.departureDeltaSeconds())) {
+			return false;
+		}
+		if (previous == null || previous.providerObservedAt().isBefore(update.providerObservedAt())) {
+			updatesByTripId.put(update.tripId(), update);
+		}
+		return true;
+	}
+
+	private RealtimeArrivalResolver.Query preScanRealtimeQuery(TimetableRealtimeQuery query) {
+		Station station = loadActiveStation(query.stationId());
+		SubwayLine line = loadActiveLine(query.lineId());
+		return new RealtimeArrivalResolver.Query(
+			station.id(), line.id(), providerLineId(line), station.nameKo(), line.name(), "", query.readyAt());
+	}
+
+	private Map<String, TimetableTripDeparture> exactPlannedDepartures(List<TimetableTripDeparture> departures) {
+		Map<String, TimetableTripDeparture> byTrainNo = new HashMap<>();
+		for (TimetableTripDeparture departure : departures) {
+			if (departure.trainNo() == null || departure.trainNo().isBlank()
+				|| departure.scheduledArrivalAt() == null || departure.scheduledDepartureAt() == null
+				|| byTrainNo.putIfAbsent(departure.trainNo(), departure) != null) {
+				return null;
+			}
+		}
+		return byTrainNo;
+	}
+
+	private String realtimeFallbackCode(RealtimeArrivalResolver.Resolution resolution) {
+		return resolution.fallbackCode() == null || resolution.fallbackCode().isBlank()
+			? resolution.status().name()
+			: resolution.fallbackCode();
+	}
+
 	private RouteSearchResult withSteps(RouteSearchResult result, List<RouteStep> steps) {
 		return new RouteSearchResult(
 			result.routeSearchId(),
@@ -356,20 +485,9 @@ public class RouteSearchService implements RouteSearchUseCase {
 		);
 	}
 
-	// #2095/#2292: RouteV2Planner가 항상 RAPTOR(TIMETABLE_SCAN)를 쓰도록 바뀌면서(레거시 그래프
-	// 우선 시도 생략, stabilizeTimetableRouteCandidatesWithSource의
-	// legacyGraphCandidateAllowed=false) 레거시 buildRouteSearchAlternatives()가 부착하던
-	// 접근성 경고(LOW_DATA_CONFIDENCE/STAIR_ONLY_ACCESS/STALE_ACCESSIBILITY_DATA)가 RAPTOR
-	// 결과에는 전혀 붙지 않게 됐다 — RAPTOR는 시간표 데이터만 참조하고
-	// LoadTransitMasterPort의 출구·시설 데이터를 보지 않기 때문이다. WHEELCHAIR·
-	// STRICT_STEP_FREE는 canUseTimetableRaptor()가 false라 애초에 이 경로를 타지 않고
-	// 레거시로 차단·경고까지 그대로 받으므로 무영향이지만(blocksStairOnlyAccess는 이 두
-	// 프로필에서만 true — RouteProfileWeight 참고), PREFER_STEP_FREE 등 "선호"만 하는
-	// 프로필은 경고 없이 통과해버려 접근성 정보가 유실됐다. 레거시와 동일한 기준
-	// (hasStairOnlyAccess/routeWarnings, 같은 LoadTransitMasterPort 출구·시설 데이터)을
-	// RAPTOR itinerary의 승차·환승·하차 역(진입역 + 각 ride 하차역 — 레거시의
-	// accessibilityStationIds와 동일한 의미)에 그대로 적용해 재부착한다. 완화도 과잉 경고도
-	// 아니고, RAPTOR가 이미 채운 warnings가 있으면 보존한 채 합친다.
+	// RAPTOR transition warning과 station-level 출구·시설 warning은 근거 범위가 다르다.
+	// 시간표 경로가 지나가는 역에 기존 facility warning을 적용한 뒤, RAPTOR가 선택한
+	// transition warning과 합쳐 pathway row가 아직 표현하지 못하는 station evidence도 보존한다.
 	private List<RouteWarning> timetableAccessibilityWarnings(RouteSearchResult routeSearchResult) {
 		List<String> accessibilityStationIds = timetableAccessibilityStationIds(routeSearchResult);
 		boolean stairOnlyAccess = hasStairOnlyAccess(accessibilityStationIds);
@@ -393,6 +511,9 @@ public class RouteSearchService implements RouteSearchUseCase {
 			.filter(step -> "ride".equals(step.stepType()))
 			.map(RouteStep::toStationId)
 			.forEach(stationIds::add);
+		if (!stationIds.contains(routeSearchResult.destinationStationId())) {
+			stationIds.add(routeSearchResult.destinationStationId());
+		}
 		return List.copyOf(stationIds);
 	}
 
@@ -1389,9 +1510,25 @@ public class RouteSearchService implements RouteSearchUseCase {
 				elapsedSeconds += durationSeconds(step);
 				continue;
 			}
+			if (EtaSource.REALTIME.name().equals(step.timeSource())) {
+				elapsedSeconds += durationSeconds(step);
+				continue;
+			}
 			int boardingSlackSeconds = boardingSlackSeconds(command.mobilityType());
 			Instant readyAt = command.departureTime().toInstant().plusSeconds(elapsedSeconds + boardingSlackSeconds);
-			RealtimeArrivalResolver.Resolution resolution = realtimeArrivalResolver.resolve(realtimeQuery(step, readyAt));
+			RealtimeArrivalResolver.Resolution resolution;
+			try {
+				resolution = realtimeArrivalResolver.resolve(realtimeQuery(step, readyAt));
+			} catch (RuntimeException exception) {
+				log.debug("Post-scan realtime fallback query failed for {} / {}", step.fromStationId(), step.lineId(), exception);
+				resolution = new RealtimeArrivalResolver.Resolution(
+					ArrivalFreshness.UNAVAILABLE,
+					"REALTIME_PROVIDER_ERROR",
+					null,
+					null,
+					List.of()
+				);
+			}
 			RealtimeEtaOverlay.Result overlay = realtimeEtaOverlay.overlay(
 				readyAt,
 				durationSeconds(step),
@@ -1401,13 +1538,22 @@ public class RouteSearchService implements RouteSearchUseCase {
 				resolution.providerSnapshotId(),
 				resolution.providerReceivedAt(),
 				resolution.candidates().size(),
-				resolution.candidates()
+				realtimeCandidatesFor(step, resolution.candidates())
 			);
 			RouteStep realtimeStep = withEtaOverlay(step, overlay);
 			realtimeSteps.set(index, realtimeStep);
 			elapsedSeconds += boardingSlackSeconds + realtimeWaitSeconds(overlay) + durationSeconds(step);
 		}
 		return List.copyOf(realtimeSteps);
+	}
+
+	private List<ArrivalCandidate> realtimeCandidatesFor(RouteStep step, List<ArrivalCandidate> candidates) {
+		if (step.trainNo() == null || step.trainNo().isBlank()) {
+			return candidates;
+		}
+		return candidates.stream()
+			.filter(candidate -> candidate != null && step.trainNo().equals(candidate.trainNo()))
+			.toList();
 	}
 
 	private RealtimeArrivalResolver.Query realtimeQuery(RouteStep step, Instant readyAt) {
@@ -1463,6 +1609,7 @@ public class RouteSearchService implements RouteSearchUseCase {
 		}
 		List<String> reasonCodes = new ArrayList<>();
 		reasonCodes.add(MATCHED_REALTIME_REASON);
+		reasonCodes.add(POST_SCAN_REALTIME_FALLBACK_REASON);
 		reasonCodes.addAll(overlay.warningCodes());
 		return List.copyOf(reasonCodes);
 	}

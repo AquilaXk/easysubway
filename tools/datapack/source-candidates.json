@@ -3,8 +3,53 @@
   "artifactKind": "production-source-candidates",
   "source": "tools/datapack/source-candidates.json",
   "retrievedAt": "2026-06-22",
-  "updatedAt": "2026-07-14",
+  "updatedAt": "2026-07-20",
   "candidates": [
+    {
+      "id": "kric-provider-code-catalog",
+      "priority": "P0",
+      "domain": "station_line_membership",
+      "displayName": "국가철도공단 운영기관·노선·역 API 코드정보",
+      "detailUrl": "https://data.kric.go.kr/rips/M_04_01/detail.do?id=395",
+      "requestUrl": "https://data.kric.go.kr/rips/download.file?answerId=395&fileId=1&id=395&type=N",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://data.kric.go.kr/rips/download.file?answerId=395&fileId=1&id=395&type=N",
+        "auth": { "placement": "none" },
+        "requiredParameters": ["answerId", "fileId", "id", "type"],
+        "responseEnvelope": "XLSX ZIP workbook Sheet1",
+        "responseFields": ["RAIL_OPR_ISTT_CD", "RAIL_OPR_ISTT_NM", "LN_CD", "LN_NM", "STIN_CD", "STIN_NM"],
+        "runner": {
+          "command": "node tools/datapack/collect-kric-code-catalog.mjs",
+          "arguments": [
+            "--output",
+            "/tmp/easysubway-kric-provider-code-catalog.xlsx",
+            "--metadata-output",
+            "/tmp/easysubway-kric-provider-code-catalog.metadata.json"
+          ],
+          "requiredEnv": []
+        },
+        "secretPolicy": "credential-free-output"
+      },
+      "licenseEvidenceStatus": "review_required",
+      "sampleEvidenceStatus": "validated_live_sample",
+      "admissionStatus": "admitted_as_code_mapping",
+      "automaticRouteGraphEdgeAllowed": false,
+      "mobileEmbeddingAllowed": false,
+      "evidence": {
+        "detailPageUrl": "https://data.kric.go.kr/rips/M_04_01/detail.do?id=395",
+        "termsUrl": "https://data.kric.go.kr/rips/serviceInfo/clause.do",
+        "retrievedAt": "2026-07-19",
+        "searchTerms": ["운영기관", "노선", "역 코드", "GTX-A", "대경선", "인천1호선"],
+        "outputFields": ["RAIL_OPR_ISTT_CD", "RAIL_OPR_ISTT_NM", "LN_CD", "LN_NM", "STIN_CD", "STIN_NM"],
+        "liveSampleRetrievedAt": "2026-07-19T13:38:26.639Z",
+        "liveSampleFormat": "xlsx",
+        "liveSampleRowCount": 1108,
+        "liveSampleRawSha256": "ef1f8b094e32e81c7390e8566984293dcefcc85e7fadacfe4433e77ddcc61272",
+        "liveSampleNote": "공식 2026-02-28 XLSX를 credential-free tracked collector로 수집하고 ZIP·workbook·6개 column·1,108 station row를 검증한 뒤 provider-line 정본으로 축약했습니다. 공개 다운로드는 확인했지만 포털 약관만으로 재배포 허용을 확정할 수 없어 code mapping 외 production admission과 mobile embedding은 금지합니다."
+      },
+      "nextAction": "재배포 범위의 명시적 승인을 확보한 뒤 license evidence를 재검토하고, 공식 코드 변경 공지 시 동일 collector로 재수집해 provider-line diff를 검토한다"
+    },
     {
       "id": "kric-subway-route-info",
       "priority": "P0",
@@ -3267,6 +3312,86 @@
         ]
       },
       "nextAction": "검증된 1628행을 대전도시철도 1호선 schedule_timetable transformer로 materialize하고 production pack 검증을 수행한다"
+    },
+    {
+      "id": "busan-transportation-route-topology",
+      "priority": "P0",
+      "domain": "route_graph_topology",
+      "coverageScope": {
+        "regionIds": ["busan"],
+        "operatorIds": ["busan-transportation"],
+        "lineIds": [
+          "line-ab1a041f6266",
+          "line-d74614a04530",
+          "line-d812a5bc1e5f",
+          "line-eb7b47920390"
+        ]
+      },
+      "displayName": "부산교통공사_도시철도 역간 거리·소요시간",
+      "detailUrl": "https://www.data.go.kr/data/15001019/openapi.do",
+      "requestUrl": "http://data.humetro.busan.kr/voc/api/open_api_distance.tnn",
+      "operation": {
+        "method": "GET",
+        "endpoint": "http://data.humetro.busan.kr/voc/api/open_api_distance.tnn",
+        "auth": {
+          "env": "DATA_GO_KR_SERVICE_KEY",
+          "placement": "query",
+          "parameter": "serviceKey",
+          "valueEncoding": "url-search-params-once",
+          "loadPolicy": "process-env-no-shell-parsing"
+        },
+        "requiredParameters": ["serviceKey"],
+        "fixedParameters": {
+          "act": "xml"
+        },
+        "optionalParameters": ["scode"],
+        "responseEnvelope": "response.header + response.body.item[]",
+        "responseFields": ["startSn", "startSc", "endSn", "endSc", "dist", "time", "stoppingTime", "exchange"],
+        "runner": {
+          "command": "node tools/datapack/collect-busan-route-topology.mjs",
+          "arguments": [
+            "--output",
+            "/tmp/easysubway-busan-route-topology.json",
+            "--scope-html",
+            "tools/datapack/sources/humetro-cyberstation-map-20260623.html"
+          ],
+          "requiredEnv": ["DATA_GO_KR_SERVICE_KEY"]
+        },
+        "secretPolicy": "env-only-redacted-output"
+      },
+      "licenseEvidenceStatus": "confirmed_attribution",
+      "sampleEvidenceStatus": "validated_live_full_snapshot",
+      "admissionStatus": "validated_live_topology_materialized_to_production_candidate",
+      "productionInventoryReferenceId": "busan-transportation-route-topology",
+      "serviceKeyHandling": "offline_collector_secret_only",
+      "mobileEmbeddingAllowed": false,
+      "evidence": {
+        "retrievedAt": "2026-07-20",
+        "endpoint": "http://data.humetro.busan.kr/voc/api/open_api_distance.tnn",
+        "usePermissionRange": "공공누리 제1유형(출처표시), 제3자 권리 포함 저작권 표시",
+        "formats": ["XML"],
+        "outputFields": ["startSn", "startSc", "endSn", "endSc", "dist", "time", "stoppingTime", "exchange"],
+        "liveSampleRetrievedAt": "2026-07-19T18:13:31.841Z",
+        "liveSampleRowCount": 220,
+        "liveSampleStationCount": 114,
+        "liveSampleExcludedTransferCount": 18,
+        "liveSampleRawSha256": "1314c1ca4bad29ca7b25e8887519ae89a503e649b67b15d53e9232940898eebd",
+        "liveSampleEvidenceHash": "9ec95ebb6d789457060e243f079ad371465d0e5e1a309504b18b9a78e00a24cc",
+        "evidenceArtifact": "tools/datapack/sources/busan-transportation-route-topology-20260720.json",
+        "coverageAssessment": {
+          "state": "SUPPORTED",
+          "requirementCount": 4,
+          "sourceDomain": "route_graph_topology",
+          "artifactKind": "production",
+          "materializer": "tools/datapack/materialize-busan-route-topology.mjs",
+          "verificationTest": "tools/datapack/materialize-busan-route-topology.test.mjs"
+        },
+        "coverageLimitations": [
+          "부산교통공사 1~4호선 내부 인접 edge만 포함하고 exchange=Y인 타 노선 환승 edge는 별도 집계한다",
+          "provider operation은 HTTP-only이므로 backend collector에서만 호출하고 credential·raw XML은 배포 artifact에 포함하지 않는다"
+        ]
+      },
+      "nextAction": "#2138의 나머지 provider/domain batch를 같은 production SQLite·field provenance 계약으로 합치고 최종 nationwide candidate를 rehearsal한다"
     },
     {
       "id": "daejeon-station-distance-fare",

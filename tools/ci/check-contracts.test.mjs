@@ -10,6 +10,7 @@ import {
   validateDatapackIndex,
   validateDatapackManifest,
   validateJson,
+  validateSourceInventory,
   validateSourceGovernanceContracts,
 } from "./check-contracts.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
@@ -96,7 +97,7 @@ test("source admission evidence envelope는 승인 필드 외 값을 거부하�
   assert.deepEqual(validateSchema(schema, inventory).errors, []);
 });
 
-test("inventory provenance 전용 source는 production 사용 금지만 선언할 수 있다", () => {
+test("inventory production 사용 승인은 topology admission evidence를 요구한다", () => {
   const schema = loadJson("contracts/datapack/source-inventory.schema.json");
   const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
   const provenanceOnlySource = inventory.sources.find((source) => source.productionUseAllowed === false);
@@ -105,10 +106,24 @@ test("inventory provenance 전용 source는 production 사용 금지만 선언�
   assert.deepEqual(validateSchema(schema, inventory).errors, []);
 
   provenanceOnlySource.productionUseAllowed = true;
-  assert.deepEqual(
-    validateSchema(schema, inventory).errors,
-    [`$.sources.${inventory.sources.indexOf(provenanceOnlySource)}.productionUseAllowed: const false 불일치`],
-  );
+  const errors = [];
+  validateSourceInventory(inventory, "source-inventory.json", errors);
+  assert.deepEqual(errors, [
+    `source-inventory.json: $.sources.${inventory.sources.indexOf(provenanceOnlySource)}.productionUseAllowed: true는 topologyAdmissionEvidence가 필요하다`,
+  ]);
+  assert.doesNotThrow(() => validateSourceInventory({ sources: {} }, "source-inventory.json", []));
+});
+
+test("topology admission evidence는 승인 필드 외 값을 거부한다", () => {
+  const schema = loadJson("contracts/datapack/source-inventory.schema.json");
+  const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const topologySource = inventory.sources.find((source) => source.topologyAdmissionEvidence != null);
+
+  topologySource.topologyAdmissionEvidence.serviceKey = "must-never-enter-contract";
+
+  assert.ok(validateSchema(schema, inventory).errors.some((error) => (
+    error.includes("topologyAdmissionEvidence.serviceKey")
+  )));
 });
 
 test("boundaries.json이 스스로 정합하다", () => {
