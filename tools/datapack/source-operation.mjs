@@ -432,12 +432,15 @@ export function operationHumanSummary(summary) {
   }
   if (summary.operation && !summary.operationValidationError) {
     const runner = [summary.operation.runner.command, ...(summary.operation.runner.arguments ?? [])].join(" ");
+    const fixedParameters = Object.entries(summary.operation.fixedParameters ?? {})
+      .map(([key, value]) => `${key}=${value}`)
+      .join(", ") || "none";
     lines.push(
       `auth env: ${summary.operation.auth.env ?? "not required"}`,
       `auth value encoding: ${summary.operation.auth.valueEncoding ?? "provider default"}`,
       `auth load policy: ${summary.operation.auth.loadPolicy ?? "runtime default"}`,
       `required params: ${summary.operation.requiredParameters.join(", ")}`,
-      `fixed params: ${Object.entries(summary.operation.fixedParameters ?? {}).map(([key, value]) => `${key}=${value}`).join(", ") || "none"}`,
+      `fixed params: ${fixedParameters}`,
       `optional params: ${(summary.operation.optionalParameters ?? []).join(", ") || "none"}`,
       `response envelope: ${summary.operation.responseEnvelope}`,
       `runner: ${runner}`,

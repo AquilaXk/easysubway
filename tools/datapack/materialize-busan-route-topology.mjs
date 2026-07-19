@@ -37,8 +37,6 @@ export function materializeBusanRouteTopology({
   pack.version = version;
   pack.url = `https://objectstorage.ap-seoul-1.oraclecloud.com/n/axvym6vk8g7i/b/easysubway-datapacks/o/catalog/${PACK_ID}-v${version}.sqlite.gz`;
   fixture.manifest.activePack = { id: pack.id, version: pack.version };
-  fixture.manifest.publishedAt = snapshot.capturedAt;
-  fixture.manifest.expiresAt = snapshot.freshUntil;
 
   if (pack.sourceInventory.some(({ id }) => id === SOURCE_ID)) {
     throw new Error(`${SOURCE_ID} already exists in base fixture`);

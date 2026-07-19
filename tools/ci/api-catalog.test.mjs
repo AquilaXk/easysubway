@@ -356,20 +356,15 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
     "dataType",
     "detailPageUrl",
   ]);
-  for (const [id, method, authEnv] of [
-    ["provider:busan-transportation-route-topology", "GET", "DATA_GO_KR_SERVICE_KEY"],
-    ["provider:daejeon-train-timetable", "GET", "DATA_GO_KR_SERVICE_KEY"],
-    ["provider:daejeon-station-distance-fare", "GET", "DATA_GO_KR_SERVICE_KEY"],
+  for (const [id, method, authEnv, command] of [
+    ["provider:busan-transportation-route-topology", "GET", "DATA_GO_KR_SERVICE_KEY", "node tools/datapack/collect-busan-route-topology.mjs"],
+    ["provider:daejeon-train-timetable", "GET", "DATA_GO_KR_SERVICE_KEY", "node tools/datapack/probe-daejeon-coverage-api.mjs"],
+    ["provider:daejeon-station-distance-fare", "GET", "DATA_GO_KR_SERVICE_KEY", "node tools/datapack/probe-daejeon-coverage-api.mjs"],
   ]) {
     const entry = findCatalogEntry(catalog, id);
     assert.equal(entry.operation.method, method);
     assert.equal(entry.operation.auth.env, authEnv);
-    assert.equal(
-      entry.operation.runner.command,
-      id.includes("busan-transportation-route-topology")
-        ? "node tools/datapack/collect-busan-route-topology.mjs"
-        : "node tools/datapack/probe-daejeon-coverage-api.mjs",
-    );
+    assert.equal(entry.operation.runner.command, command);
   }
   const busanTopology = findCatalogEntry(catalog, "provider:busan-transportation-route-topology");
   const busanTopologyCandidate = providerDocument.candidates.find(
@@ -398,7 +393,7 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
   assert.equal(busanTopologyCandidate.evidence.liveSampleRawSha256, busanTopologySnapshot.rawSha256);
   assert.equal(busanTopologyCandidate.evidence.liveSampleEvidenceHash, busanTopologySnapshot.contentSha256);
   assert.equal(busanTopologySnapshot.credentialRedacted, true);
-  assert.doesNotMatch(JSON.stringify(busanTopologySnapshot), /"serviceKey"/);
+  assert.doesNotMatch(JSON.stringify(busanTopologySnapshot), /serviceKey/i);
   const removedDaejeonId = ["provider:daejeon", "braille-guide-map"].join("-");
   assert.equal(catalog.some(({ id }) => id === removedDaejeonId), false);
   const daejeonDistanceFare = findCatalogEntry(catalog, "provider:daejeon-station-distance-fare");

@@ -39,6 +39,8 @@ test("부산 topology snapshot을 실제 production pack 입력으로 materializ
 
   assert.deepEqual(fixture.manifest.activePack, { id: pack.id, version: pack.version });
   assert.equal(fixture.manifest.releaseSequence, baseFixture.manifest.releaseSequence);
+  assert.equal(fixture.manifest.publishedAt, baseFixture.manifest.publishedAt);
+  assert.equal(fixture.manifest.expiresAt, baseFixture.manifest.expiresAt);
   assert.equal(pack.artifactKind, "production");
   assert.equal(busanEdges.length, 220);
   assert.equal(busanStationLines.length, 114);
