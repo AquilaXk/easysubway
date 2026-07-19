@@ -1481,7 +1481,7 @@ class RouteTimetableRaptorPlanner {
 
 			for (RouteEdgeEvidence evidence : timetable.routeAccessData().routeEdgeEvidence()) {
 				Integer station = stationIndex.get(evidence.stationId());
-				Integer line = lineIndex.get(evidence.lineId());
+				Integer line = evidence.lineId() == null ? null : lineIndex.get(evidence.lineId());
 				PathwayEdge edge = edges.get(evidence.edgeId());
 				if (station == null || line == null || edge == null) {
 					continue;
@@ -1752,7 +1752,8 @@ class RouteTimetableRaptorPlanner {
 		}
 
 		private boolean verified(int transition) {
-			return "VERIFIED".equals(verificationStatuses[transition]);
+			return "VERIFIED".equals(verificationStatuses[transition])
+				&& (warningCodes[transition] & (WARNING_LOW_CONFIDENCE | WARNING_STALE)) == 0;
 		}
 
 		private int unsupportedTransferCount() {

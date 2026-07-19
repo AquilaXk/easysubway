@@ -74,16 +74,14 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 				"entry-evidence", "station-a", "line", "verified-entry", "ENTRY",
 				"OFFICIAL_SOURCE", "VERIFIED", true, null), new LoadRouteTimetablePort.RouteEdgeEvidence(
 				"stairs-evidence", "station-a", "line", "fast-stairs", "ENTRY",
-				"OFFICIAL_SOURCE", "VERIFIED", false, "STAIRS"))
+				"OFFICIAL_SOURCE", "VERIFIED", false, "STAIRS"), new LoadRouteTimetablePort.RouteEdgeEvidence(
+				"station-wide", "station-a", null, "fast-stairs", "GENERATED_CONNECTOR",
+				"GENERATED", "GENERATED", false, "NO_LINE"))
 		);
 		var compiled = planner.compile(withAccess(everyDayTimetable(), accessData));
-		int stationA = compiled.stationIndex("station-a");
-		int stationB = compiled.stationIndex("station-b");
-		int line = compiled.lineIndex("line");
-		int strict = RouteTimetableRaptorPlanner.profileBit(
-			MobilityType.WHEELCHAIR, ConstraintMode.STRICT_STEP_FREE);
-		int allow = RouteTimetableRaptorPlanner.profileBit(
-			MobilityType.SENIOR, ConstraintMode.ALLOW_WITH_WARNINGS);
+		int stationA = compiled.stationIndex("station-a"), stationB = compiled.stationIndex("station-b"), line = compiled.lineIndex("line");
+		int strict = RouteTimetableRaptorPlanner.profileBit(MobilityType.WHEELCHAIR, ConstraintMode.STRICT_STEP_FREE);
+		int allow = RouteTimetableRaptorPlanner.profileBit(MobilityType.SENIOR, ConstraintMode.ALLOW_WITH_WARNINGS);
 
 		int verifiedEntry = compiled.entryTransition(stationA, line, strict, false);
 		int defaultExit = compiled.exitTransition(stationB, line, allow, false);
@@ -103,8 +101,7 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 	@Test
 	@DisplayName("stairs·generated·unknown·stale·missing은 strict에서, 운영 불가는 모든 profile에서 차단한다")
 	void strictBlocksUnsafeAndUnverifiedTransitions() {
-		int strict = RouteTimetableRaptorPlanner.profileBit(
-			MobilityType.WHEELCHAIR, ConstraintMode.STRICT_STEP_FREE);
+		int strict = RouteTimetableRaptorPlanner.profileBit(MobilityType.WHEELCHAIR, ConstraintMode.STRICT_STEP_FREE);
 		int allow = RouteTimetableRaptorPlanner.profileBit(
 			MobilityType.SENIOR, ConstraintMode.ALLOW_WITH_WARNINGS);
 		int prefer = RouteTimetableRaptorPlanner.profileBit(MobilityType.SENIOR, ConstraintMode.PREFER_STEP_FREE);
@@ -112,6 +109,7 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 			entryAccess("VERIFIED", "OFFICIAL_SOURCE", true, true),
 			entryAccess("GENERATED", "GENERATED", false, false),
 			entryAccess("UNKNOWN", "UNKNOWN", false, false, "NO_OFFICIAL_FEED"),
+			entryAccess("VERIFIED", "OFFICIAL_SOURCE", false, false, "NO_OFFICIAL_FEED"),
 			entryAccess("STALE", "OFFICIAL_SOURCE", false, false),
 			entryAccess(null, null, false, false),
 			entryAccess("VERIFIED", "OFFICIAL_SOURCE", true, false, "UNDER_MAINTENANCE")
@@ -124,19 +122,20 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 			assertThat(compiled.entryTransition(station, line, strict, false)).isEqualTo(-1);
 			assertThat(List.of(prefer, allow).stream().allMatch(profile -> compiled.entryTransition(station, line, profile, false) < 0))
 				.isEqualTo(index == unsafe.size() - 1);
+			if (index == 3) {
+				assertThat(compiled.transitionVerified(compiled.entryTransition(station, line, allow, false))).isFalse();
+			}
 		}
 
 		var stale = planner.compile(withAccess(
 			everyDayTimetable(), entryAccess("STALE", "OFFICIAL_SOURCE", false, false)));
-		int staleTransition = stale.entryTransition(
-			stale.stationIndex("station-a"), stale.lineIndex("line"), allow, false);
-		assertThat(stale.transitionVerificationStatus(staleTransition)).isEqualTo("STALE");
+		assertThat(stale.transitionVerificationStatus(stale.entryTransition(
+			stale.stationIndex("station-a"), stale.lineIndex("line"), allow, false))).isEqualTo("STALE");
 
 		var staleEdge = planner.compile(withAccess(
 			everyDayTimetable(), entryAccessWithStatuses("STALE", "VERIFIED")));
-		int staleEdgeTransition = staleEdge.entryTransition(
-			staleEdge.stationIndex("station-a"), staleEdge.lineIndex("line"), allow, false);
-		assertThat(staleEdge.transitionVerificationStatus(staleEdgeTransition)).isEqualTo("STALE");
+		assertThat(staleEdge.transitionVerificationStatus(staleEdge.entryTransition(
+			staleEdge.stationIndex("station-a"), staleEdge.lineIndex("line"), allow, false))).isEqualTo("STALE");
 	}
 
 	@Test
