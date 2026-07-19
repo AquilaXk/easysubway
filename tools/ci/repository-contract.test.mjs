@@ -1573,6 +1573,7 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY=prod-tago-train-service-key",
     "EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_MINUTE=60",
     "EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_DAY=1000",
+    "EASYSUBWAY_TRAIN_SEARCH_RATE_LIMIT_PER_DAY=64",
     "EASYSUBWAY_REPORT_RECEIPT_TOKEN_PEPPER=legacy-pepper-with-enough-entropy",
     "EASYSUBWAY_REPORT_UPLOAD_BUCKET=easysubway-report-uploads",
     "EASYSUBWAY_REPORT_UPLOAD_MAX_BYTES=921600",
@@ -7211,9 +7212,17 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   );
   assert.ok(reportApiMatcherScope, "report API security matcher scope must be readable");
   assert.ok(publicApiMatcherScope, "public API security matcher scope must be readable");
-  const publicApiMatchers = [reportApiMatcherScope[0], publicApiMatcherScope[0]]
-    .flatMap((scope) => Array.from(scope.matchAll(/"([^"]+)"/g), (match) => match[1]))
-    .filter((matcher) => matcher.startsWith("/api/") || matcher.startsWith("/actuator/"));
+  const publicApiMatchers = [...new Set(
+    [reportApiMatcherScope[0], publicApiMatcherScope[0]]
+      .flatMap((scope) => Array.from(scope.matchAll(/"([^"]+)"/g), (match) => match[1]))
+      .filter((matcher) => matcher.startsWith("/api/") || matcher.startsWith("/actuator/")),
+  )];
+  for (const method of ["GET", "HEAD"]) {
+    assert.match(
+      publicApiMatcherScope[0],
+      new RegExp(`HttpMethod\\.${method},[\\s\\S]*?"/api/v1/trains/stations",[\\s\\S]*?"/api/v1/trains/search"`),
+    );
+  }
   assert.deepEqual(
     publicApiMatchers,
     operationsEvidence.backendControlPlane.publicApiSurface.allowedPublicSecurityMatchers,
@@ -16721,6 +16730,7 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
   const requiredIds = [
     "precise_location",
     "search_queries",
+    "train_search_queries",
     "favorite_stations_routes_facilities",
     "route_eta_feedback",
     "route_v2_itx_integrity",
@@ -16728,6 +16738,7 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     "route_v2_itx_request_state",
     "route_v2_gateway_abuse_rate_limit_state",
     "facility_report_abuse_rate_limit_state",
+    "train_search_abuse_rate_limit_state",
     "mobility_profile",
     "facility_report_content",
     "facility_report_photo",
@@ -16781,9 +16792,13 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
       "facility_report_photo",
       "facility_report_location",
     ]);
-    const auditedForPrivacyInventory = new Set(["facility_report_abuse_rate_limit_state"]);
+    const auditedForPrivacyInventory = new Set([
+      "facility_report_abuse_rate_limit_state",
+      "train_search_queries",
+      "train_search_abuse_rate_limit_state",
+    ]);
     const expectedLastVerifiedAt = auditedForPrivacyInventory.has(id)
-      ? "2026-07-18"
+      ? id === "facility_report_abuse_rate_limit_state" ? "2026-07-18" : "2026-07-19"
       : id.startsWith("route_v2_") || reviewedForLegalDisclosure.has(id)
         ? "2026-07-16"
         : "2026-06-19";
@@ -16821,9 +16836,10 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
         "route_v2_itx_integrity",
         "route_v2_gateway_abuse_rate_limit_state",
       ].includes(id);
+      const anonymousSearchHistory = id === "train_search_queries";
       assert.equal(
         item.googlePlayDataSafety.linkedToUser,
-        id.startsWith("route_v2_itx_") ? routeV2ExpectedLinkage : true,
+        anonymousSearchHistory ? false : id.startsWith("route_v2_itx_") ? routeV2ExpectedLinkage : true,
         `${id} Play user linkage must match the release data model`,
       );
     }
@@ -16846,6 +16862,8 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     const noUserDeletionBoundary = new Set([
       "route_v2_gateway_abuse_rate_limit_state",
       "facility_report_abuse_rate_limit_state",
+      "train_search_queries",
+      "train_search_abuse_rate_limit_state",
     ]);
     assert.equal(
       item.googlePlayDataSafety.deletionSupported,
@@ -16920,6 +16938,63 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     reportAbuseControlSource,
     /report abuse control store mode must be local until distributed store is implemented/,
   );
+
+  const trainSearchAbuseState = items.get("train_search_abuse_rate_limit_state");
+  assert.equal(trainSearchAbuseState.implementationStatus, "backend-collected");
+  assert.equal(trainSearchAbuseState.sharedWithThirdParties, false);
+  assert.equal(trainSearchAbuseState.storeMode, "local");
+  assert.equal(trainSearchAbuseState.persistedToDatabase, false);
+  assert.equal(trainSearchAbuseState.includedInAccessLog, false);
+  assert.deepEqual(trainSearchAbuseState.storageLocations, ["backend-jvm-memory"]);
+  assert.ok(trainSearchAbuseState.evidence.includes("infra/nginx/host-easysubway.conf.template"));
+  assert.equal(trainSearchAbuseState.retention.fixedTtl, false);
+  assert.equal(trainSearchAbuseState.retention.windowSeconds, 60);
+  assert.equal(trainSearchAbuseState.retention.dailyCostLimit, 64);
+  assert.equal(trainSearchAbuseState.retention.dailyWindowZone, "Asia/Seoul");
+  assert.equal(trainSearchAbuseState.retention.maxCounterKeysPerLimiter, 4096);
+  assert.equal(trainSearchAbuseState.googlePlayDataSafety.dataType, "Device or other IDs");
+  assert.equal(trainSearchAbuseState.googlePlayDataSafety.deletionSupported, false);
+  assert.equal(trainSearchAbuseState.googlePlayDataSafety.processedEphemerally, false);
+  assert.deepEqual(trainSearchAbuseState.rateLimitedEndpoints, [
+    "GET /api/v1/trains/stations",
+    "GET /api/v1/trains/search",
+  ]);
+  const trainSearchRateLimitSource = read(
+    "backend/src/main/java/com/easysubway/train/adapter/in/web/TrainSearchRateLimitFilter.java",
+  );
+  assert.match(trainSearchRateLimitSource, /Map<String, WindowCounter> counters = new ConcurrentHashMap<>/);
+  assert.match(trainSearchRateLimitSource, /return "ip:" \+ remote/);
+  assert.ok(
+    readJson("apps/mobile/release/play-store-submission-content.json")
+      .dataSafetyDeclarations.answerMatrix
+      .find((item) => item.dataType === "Device or other IDs")
+      .inventoryDataIds.includes("train_search_abuse_rate_limit_state"),
+  );
+
+  const trainSearchQueries = items.get("train_search_queries");
+  assert.equal(trainSearchQueries.implementationStatus, "backend-collected");
+  assert.equal(trainSearchQueries.sharedWithThirdParties, false);
+  assert.deepEqual(trainSearchQueries.storageLocations, ["backend-database"]);
+  assert.deepEqual(trainSearchQueries.persistedFields, [
+    "departureStationId",
+    "arrivalStationId",
+    "departureDate",
+    "trainType",
+  ]);
+  assert.equal(trainSearchQueries.accountLinked, false);
+  assert.equal(trainSearchQueries.retention.todayFreshSeconds, 300);
+  assert.equal(trainSearchQueries.retention.futureFreshSeconds, 21600);
+  assert.equal(trainSearchQueries.retention.purgeEligibilityAfterExpirySeconds, 172800);
+  assert.equal(trainSearchQueries.retention.purgeCron, "0 10 4 * * * Asia/Seoul");
+  assert.equal(trainSearchQueries.retention.maximumPurgeLagSeconds, 86400);
+  assert.equal(trainSearchQueries.googlePlayDataSafety.linkedToUser, false);
+  assert.equal(trainSearchQueries.googlePlayDataSafety.deletionSupported, false);
+  assert.equal(trainSearchQueries.appStorePrivacy.linkedToUser, false);
+  const appActivityDeclaration = readJson("apps/mobile/release/play-store-submission-content.json")
+    .dataSafetyDeclarations.answerMatrix
+    .find((item) => item.dataType === "App activity");
+  assert.ok(appActivityDeclaration.inventoryDataIds.includes("train_search_queries"));
+  assert.equal(appActivityDeclaration.containsDeletionUnsupportedData, true);
 
   const appStoreTypes = [...new Set(
     inventory.dataTypes

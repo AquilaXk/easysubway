@@ -13,6 +13,7 @@ const ASSET_ORIGIN = "https://ads-assets.fixture.test-only.dev";
 const ASSET_ORIGIN_LINE = `EASYSUBWAY_ADS_ASSET_ORIGIN=${ASSET_ORIGIN}`;
 const EVENT_DAILY_CAP_LINE = "EASYSUBWAY_ADS_EVENT_DAILY_CAP=1000000";
 const BACKEND_BIND_LINE = "EASYSUBWAY_BACKEND_BIND=127.0.0.1";
+const TRUSTED_PROXY_LINE = "EASYSUBWAY_TRUSTED_PROXY_CIDRS=172.16.0.0/12";
 const ROUTE_V2_ORIGIN_SECRET_LINE = `EASYSUBWAY_ROUTE_V2_ORIGIN_SECRET=${"O".repeat(43)}`;
 const ROUTE_V2_CERTIFICATE_LINE = `EASYSUBWAY_ROUTE_V2_PLAY_INTEGRITY_CERTIFICATE_SHA256=${"A".repeat(43)}`;
 const deploymentTempDirs = new Set();
@@ -238,6 +239,25 @@ test("production backend bind는 loopback만 허용한다", async () => {
   }
 });
 
+test("production train-search rate limit은 sanitized Nginx peer 경계를 필수로 신뢰한다", async () => {
+  for (const value of ["", "10.0.0.0/8,192.168.0.0/16", "172.16.0.0/16", "0.0.0.0/0"]) {
+    await assert.rejects(
+      prepare(fixtureEnv().replace(
+        TRUSTED_PROXY_LINE,
+        `EASYSUBWAY_TRUSTED_PROXY_CIDRS=${value}`,
+      )),
+      /trusted proxy CIDRs must equal the Docker ingress boundary/,
+    );
+  }
+
+  const proxy = read("infra/nginx/host-default-proxy.conf");
+  const host = read("infra/nginx/host-easysubway.conf.template");
+  assert.match(proxy, /real_ip_header CF-Connecting-IP;/);
+  assert.match(proxy, /proxy_set_header X-Forwarded-For \$remote_addr;/);
+  assert.doesNotMatch(proxy, /proxy_add_x_forwarded_for/);
+  assert.equal((host.match(/access_log off;/g) ?? []).length, 3);
+});
+
 test("Route V2 배포 secret과 certificate digest는 config injection을 차단한다", async () => {
   await assert.rejects(
     prepare(fixtureEnv().replace(ROUTE_V2_ORIGIN_SECRET_LINE, "EASYSUBWAY_ROUTE_V2_ORIGIN_SECRET=short;include")),
@@ -277,6 +297,8 @@ test("배포 env 준비는 Compose 서버 env와 backend 앱 env를 분리한다
   assert.match(backendEnv, /^EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY=prod-tago-train-service-key$/m);
   assert.match(backendEnv, /^EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_MINUTE=60$/m);
   assert.match(backendEnv, /^EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_DAY=1000$/m);
+  assert.match(backendEnv, /^EASYSUBWAY_TRAIN_SEARCH_RATE_LIMIT_PER_DAY=64$/m);
+  assert.match(backendEnv, /^EASYSUBWAY_TRUSTED_PROXY_CIDRS=172\.16\.0\.0\/12$/m);
   assert.match(backendEnv, /^EASYSUBWAY_REPORT_OBJECT_STORAGE_INTERNAL_ENDPOINT=http:\/\/object-storage:9000$/m);
   assert.match(backendEnv, /^EASYSUBWAY_REPORT_UPLOAD_PUBLIC_BASE_URL=https:\/\/uploads.easysubway.example$/m);
   assert.match(backendEnv, /^EASYSUBWAY_REPORT_ABUSE_WINDOW_SECONDS=45$/m);
@@ -308,8 +330,14 @@ test("TAGO 기차검색 key는 공용 GitHub secret에서 backend 전용 env로�
   assert.match(cd, /EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY=%s/);
   assert.match(cd, /drop\["EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_MINUTE"\] = 1/);
   assert.match(cd, /drop\["EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_DAY"\] = 1/);
+  assert.match(cd, /drop\["EASYSUBWAY_TRAIN_SEARCH_RATE_LIMIT_PER_DAY"\] = 1/);
   assert.match(cd, /printf 'EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_MINUTE=60\\n'/);
   assert.match(cd, /printf 'EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_DAY=1000\\n'/);
+  assert.match(cd, /printf 'EASYSUBWAY_TRAIN_SEARCH_RATE_LIMIT_PER_DAY=64\\n'/);
+  assert.match(
+    cd,
+    /node --env-file="\$\{PREPARED_ENV_DIR\}\/backend\.env" tools\/ops\/probe-tago-train-provider\.mjs/,
+  );
   assert.match(allowlist, /^EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY$/m);
   assert.doesNotMatch(allowlist, /^DATA_GO_KR_SERVICE_KEY$/m);
   assert.deepEqual(scopeMap.keys.EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY, ["backend"]);
@@ -317,11 +345,19 @@ test("TAGO 기차검색 key는 공용 GitHub secret에서 backend 전용 env로�
   for (const [key, value] of [
     ["EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_MINUTE", "60"],
     ["EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_DAY", "1000"],
+    ["EASYSUBWAY_TRAIN_SEARCH_RATE_LIMIT_PER_DAY", "64"],
   ]) {
     assert.match(example, new RegExp(`^${key}=${value}$`, "m"));
     assert.match(allowlist, new RegExp(`^${key}$`, "m"));
     assert.deepEqual(scopeMap.keys[key], ["backend"]);
   }
+});
+
+test("production 배포 env는 TAGO 기차검색 key 누락을 거부한다", async () => {
+  await assert.rejects(
+    prepare(fixtureEnv().replace(/^EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY=.*\n/m, "")),
+    /required deployment env is empty: EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY/,
+  );
 });
 
 test("배포 env 준비는 중복, interpolation, 내부 공개 URL을 차단한다", async () => {
