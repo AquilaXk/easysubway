@@ -7,6 +7,7 @@ arrival_id=""
 departure_date=""
 output_dir=""
 nodes=""
+candidate_sha=""
 max_duration_seconds="120"
 
 while [[ $# -gt 0 ]]; do
@@ -17,6 +18,7 @@ while [[ $# -gt 0 ]]; do
 		--date) departure_date="${2:-}"; shift 2 ;;
 		--output-dir) output_dir="${2:-}"; shift 2 ;;
 		--nodes) nodes="${2:-}"; shift 2 ;;
+		--candidate-sha) candidate_sha="${2:-}"; shift 2 ;;
 		--max-duration-seconds) max_duration_seconds="${2:-}"; shift 2 ;;
 		*) echo "unknown argument" >&2; exit 2 ;;
 	esac
@@ -29,15 +31,19 @@ done
 [[ "${departure_date}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { echo "--date is invalid" >&2; exit 2; }
 [[ "${output_dir}" == /* ]] || { echo "--output-dir must be absolute" >&2; exit 2; }
 [[ "${nodes}" == "3" ]] || { echo "--nodes 3 is required" >&2; exit 2; }
+[[ "${candidate_sha}" =~ ^[0-9a-f]{40}$ ]] || { echo "--candidate-sha must be a full lowercase Git SHA" >&2; exit 2; }
 [[ "${max_duration_seconds}" =~ ^[0-9]+$ ]] && (( max_duration_seconds >= 20 && max_duration_seconds <= 600 )) \
 	|| { echo "--max-duration-seconds must be 20 through 600" >&2; exit 2; }
+node tools/test/validate-train-search-capacity.mjs --preflight-output-dir "${output_dir}"
 mkdir -p "${output_dir}"
+node tools/test/validate-train-search-capacity.mjs --preflight-output-dir "${output_dir}"
 duration_seconds=$((max_duration_seconds / 2))
 (( duration_seconds > 30 )) && duration_seconds=30
 
 for workload in repeated unique; do
 	TRAIN_SEARCH_WORKLOAD="${workload}" \
 	TRAIN_SEARCH_BASE_URL="${base_url}" \
+	TRAIN_SEARCH_CANDIDATE_SHA="${candidate_sha}" \
 	TRAIN_SEARCH_DEPARTURE_ID="${departure_id}" \
 	TRAIN_SEARCH_ARRIVAL_ID="${arrival_id}" \
 	TRAIN_SEARCH_DATE="${departure_date}" \
@@ -55,9 +61,13 @@ done
 
 node tools/test/collect-train-search-backend-observation.mjs \
 	--test-results-dir backend/build/test-results/test \
+	--candidate-sha "${candidate_sha}" \
+	--api-origin "${base_url%/}" \
 	--output "${output_dir}/backend-observation.json"
 
 node tools/test/validate-train-search-capacity.mjs \
+	--candidate-sha "${candidate_sha}" \
+	--api-origin "${base_url%/}" \
 	"${output_dir}/repeated.json" \
 	"${output_dir}/unique.json" \
 	"${output_dir}/backend-observation.json"

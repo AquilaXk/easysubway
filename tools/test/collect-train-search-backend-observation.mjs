@@ -31,8 +31,9 @@ const REQUIRED_TESTS = Object.freeze([
   ],
 ]);
 
-export function buildBackendObservation(files) {
+export function buildBackendObservation(files, metadata) {
   if (!Array.isArray(files) || files.length === 0) throw new Error("backend observation test results were missing");
+  validateMetadata(metadata);
   const passingTests = new Set();
   const testResults = files.map(({ path: filePath, content }) => {
     if (typeof content !== "string") throw new Error("backend observation test result was unreadable");
@@ -66,6 +67,9 @@ export function buildBackendObservation(files) {
   const artifact = {
     schemaVersion: 1,
     artifactKind: "train-search-backend-observation",
+    candidateGitSha: metadata.candidateGitSha,
+    apiOrigin: metadata.apiOrigin,
+    collectedAt: metadata.collectedAt,
     status: "PASS",
     threeNodeSingleProviderCallVerifiedByTest: true,
     quotaFailClosedVerifiedByTests: true,
@@ -81,6 +85,9 @@ export function validateBackendObservationArtifact(artifact) {
   const { evidenceSha256, ...unsigned } = artifact;
   if (artifact.schemaVersion !== 1
     || artifact.artifactKind !== "train-search-backend-observation"
+    || !validCandidateSha(artifact.candidateGitSha)
+    || artifact.apiOrigin !== "https://easysubway-api.aquilaxk.site"
+    || !validCollectedAt(artifact.collectedAt)
     || artifact.status !== "PASS"
     || artifact.threeNodeSingleProviderCallVerifiedByTest !== true
     || artifact.quotaFailClosedVerifiedByTests !== true
@@ -102,6 +109,24 @@ export function validateBackendObservationArtifact(artifact) {
     throw new Error("backend observation artifact failed validation");
   }
   return artifact;
+}
+
+function validateMetadata(metadata) {
+  if (!metadata || !validCandidateSha(metadata.candidateGitSha)
+    || metadata.apiOrigin !== "https://easysubway-api.aquilaxk.site"
+    || !validCollectedAt(metadata.collectedAt)) {
+    throw new Error("backend observation metadata was invalid");
+  }
+}
+
+function validCandidateSha(value) {
+  return /^[0-9a-f]{40}$/u.test(value ?? "");
+}
+
+function validCollectedAt(value) {
+  return typeof value === "string"
+    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u.test(value)
+    && Number.isFinite(Date.parse(value));
 }
 
 function xmlAttributes(value) {
@@ -179,8 +204,10 @@ function parseArgs(argv) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  if (!args["test-results-dir"] || !path.isAbsolute(args.output ?? "")) {
-    throw new Error("--test-results-dir is required and --output must be absolute");
+  if (!args["test-results-dir"] || !path.isAbsolute(args.output ?? "")
+    || !validCandidateSha(args["candidate-sha"])
+    || args["api-origin"] !== "https://easysubway-api.aquilaxk.site") {
+    throw new Error("--test-results-dir, absolute --output, --candidate-sha, and production --api-origin are required");
   }
   const testResultsDir = path.resolve(args["test-results-dir"]);
   const names = (await readdir(testResultsDir))
@@ -190,7 +217,11 @@ async function main() {
     path: name,
     content: await readFile(path.join(testResultsDir, name), "utf8"),
   })));
-  const artifact = buildBackendObservation(files);
+  const artifact = buildBackendObservation(files, {
+    candidateGitSha: args["candidate-sha"],
+    apiOrigin: args["api-origin"],
+    collectedAt: new Date().toISOString(),
+  });
   await writeFile(args.output, `${JSON.stringify(artifact, null, 2)}\n`, { mode: 0o600 });
   console.log("train-search backend observation PASS: 3-node single-flight and quota fail-closed verified by tests");
 }

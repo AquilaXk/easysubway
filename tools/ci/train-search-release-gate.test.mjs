@@ -355,6 +355,11 @@ test("backend test XML에서 3-node provider 1회와 quota fail-closed를 계산
     ...tests.map((testName) => `<testcase name="${testName}()" classname="${name}" time="0.1"/>`),
     "</testsuite>",
   ].join("\n");
+  const metadata = {
+    candidateGitSha: "a".repeat(40),
+    apiOrigin: "https://easysubway-api.aquilaxk.site",
+    collectedAt: "2026-07-19T12:00:00.000Z",
+  };
   const observation = buildBackendObservation([
     {
       path: "TEST-com.easysubway.train.application.TrainSearchServiceTest.xml",
@@ -377,7 +382,7 @@ test("backend test XML에서 3-node provider 1회와 quota fail-closed를 계산
         "quotaTransactionBoundaryFailureFailsClosedAsUnavailable",
       ]),
     },
-  ]);
+  ], metadata);
   assert.equal(observation.status, "PASS");
   assert.equal(observation.threeNodeSingleProviderCallVerifiedByTest, true);
   assert.equal(observation.quotaFailClosedVerifiedByTests, true);
@@ -391,7 +396,7 @@ test("backend test XML에서 3-node provider 1회와 quota fail-closed를 계산
     () => buildBackendObservation([{
       path: "TEST-broken.xml",
       content: '<testsuite name="broken" tests="1" skipped="0" failures="1" errors="0"/>',
-    }]),
+    }], metadata),
     /backend observation test suite failed/,
   );
 });
@@ -438,6 +443,10 @@ test("capacity runner는 repeated·unique·3-node·quota 경계를 고정한다"
   assert.match(k6, /requestCount >= expectedRequestCount/);
   assert.match(k6, /Array\.isArray\(payload\.data\.inbound\)/);
   assert.match(k6, /TRAIN_SEARCH_SUMMARY_PATH is required/);
+  assert.match(k6, /TRAIN_SEARCH_CANDIDATE_SHA must be a full lowercase Git SHA/);
+  assert.match(k6, /candidateGitSha,/);
+  assert.match(k6, /apiOrigin,/);
+  assert.match(k6, /collectedAt: new Date\(\)\.toISOString\(\)/);
   assert.match(runner, /--nodes 3/);
   assert.match(runner, /--max-duration-seconds/);
   assert.match(runner, /collect-train-search-backend-observation\.mjs/);
@@ -448,15 +457,33 @@ test("capacity runner는 repeated·unique·3-node·quota 경계를 고정한다"
   assert.match(serviceTest, /Executors\.newFixedThreadPool\(3\)/);
   assert.match(serviceTest, /pool\.shutdownNow\(\)/);
   assert.match(runner, /validate-train-search-capacity\.mjs/);
+  assert.match(runner, /--preflight-output-dir/);
+  assert.match(runner, /--candidate-sha/);
   assert.doesNotMatch(runner, /source .*\.env|curl|jq|sed|awk|grep/);
   const unsafeEvidence = spawnSync(process.execPath, [
     "tools/test/validate-train-search-capacity.mjs",
+    "--candidate-sha",
+    "a".repeat(40),
+    "--api-origin",
+    "https://easysubway-api.aquilaxk.site",
     "/etc/repeated.json",
     "/etc/unique.json",
     "/etc/backend-observation.json",
   ], { encoding: "utf8" });
   assert.notEqual(unsafeEvidence.status, 0);
   assert.match(unsafeEvidence.stderr, /outside the allowed roots/);
+  const unsafeOutput = spawnSync("bash", [
+    "tools/test/run-train-search-capacity.sh",
+    "--base-url", "https://easysubway-api.aquilaxk.site",
+    "--departure-id", "NAT010000",
+    "--arrival-id", "NAT011668",
+    "--date", "2026-08-10",
+    "--output-dir", "/etc/easysubway-capacity",
+    "--nodes", "3",
+    "--candidate-sha", "a".repeat(40),
+  ], { encoding: "utf8" });
+  assert.notEqual(unsafeOutput.status, 0);
+  assert.match(unsafeOutput.stderr, /outside the allowed roots/);
   for (const baseUrl of ["https://localhost", "https://127.0.0.1", "https://10.0.0.1"]) {
     const result = spawnSync("bash", [
       "tools/test/run-train-search-capacity.sh",
@@ -509,6 +536,9 @@ test("#2094 release artifact는 동일 candidate와 모든 완료 증거를 요�
   assert.equal(runtime.capacity.repeated.status, "PASS");
   assert.equal(runtime.capacity.unique.status, "PASS");
   for (const workload of [runtime.capacity.repeated, runtime.capacity.unique]) {
+    assert.equal(workload.candidateGitSha, runtime.candidateGitSha);
+    assert.equal(workload.apiOrigin, runtime.backend.apiOrigin);
+    assert.match(workload.collectedAt, /^\d{4}-\d{2}-\d{2}T/);
     assert.equal(workload.failureRate, 0);
     assert.equal(workload.fiveXxCount, 0);
     assert.equal(workload.fourXxCount, 0);
@@ -516,9 +546,13 @@ test("#2094 release artifact는 동일 candidate와 모든 완료 증거를 요�
     assert.equal(workload.droppedIterationCount, 0);
     assert.equal(workload.requestCount >= workload.expectedRequestCount, true);
   }
+  assert.equal(runtime.capacity.executor.hostClass, "LOCAL_MACOS_ARM64");
   assert.equal(runtime.capacity.executor.k6Version, "1.5.0");
-  assert.match(runtime.capacity.executor.imageDigest, /^sha256:[0-9a-f]{64}$/);
+  assert.match(runtime.capacity.executor.binarySha256, /^[0-9a-f]{64}$/);
   validateBackendObservationArtifact(runtime.capacity.backendObservation);
+  assert.equal(runtime.capacity.backendObservation.candidateGitSha, runtime.candidateGitSha);
+  assert.equal(runtime.capacity.backendObservation.apiOrigin, runtime.backend.apiOrigin);
+  assert.match(runtime.capacity.backendObservation.collectedAt, /^\d{4}-\d{2}-\d{2}T/);
   assert.equal(runtime.android.menuToResultPassed, true);
   assert.equal(runtime.android.roundTripPassed, true);
   assert.equal(runtime.android.stateMatrixPassed, true);
@@ -534,5 +568,12 @@ test("#2094 release artifact는 동일 candidate와 모든 완료 증거를 요�
   assert.match(runtime.android.screenshotSha256, /^[0-9a-f]{64}$/);
   assert.match(runtime.android.semanticsSha256, /^[0-9a-f]{64}$/);
   assert.equal(runtime.review.actionableFindingsOpen, 0);
+  assert.equal(runtime.review.candidatePullRequest, 2291);
+  assert.equal(runtime.review.candidateMergeGitSha, runtime.candidateGitSha);
+  assert.match(runtime.review.reviewedHeadGitSha, /^[0-9a-f]{40}$/);
+  assert.equal(
+    runtime.review.reviewUrl,
+    "https://github.com/AquilaXk/easysubway/pull/2291#pullrequestreview-4730310729",
+  );
   assert.equal(runtime.requiredCi.status, "PASS");
 });

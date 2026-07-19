@@ -97,15 +97,20 @@
     },
     "capacity": {
       "executor": {
-        "hostClass": "OCI_STAGING",
+        "hostClass": "LOCAL_MACOS_ARM64",
         "k6Version": "1.5.0",
-        "imageDigest": "sha256:2072ea9eafa596532d9aee0cc0e0a50cfb0e7fb703981a46179af5f4f22c5ea4"
+        "binarySha256": "73a1a95d645151efa3ec65a0288d6d25d2343eecacbe38fd2ac33f46da121c85"
       },
       "repeated": {
+        "schemaVersion": 1,
+        "candidateGitSha": "86be8d0294f9e2badab61f25e5c6a6ed9b7eea2c",
+        "apiOrigin": "https://easysubway-api.aquilaxk.site",
+        "collectedAt": "2026-07-19T10:19:22.085Z",
+        "workload": "repeated",
         "status": "PASS",
         "requestCount": 6,
         "expectedRequestCount": 5,
-        "p95Ms": 245.32919274999992,
+        "p95Ms": 710.0255,
         "failureRate": 0,
         "fiveXxCount": 0,
         "fourXxCount": 0,
@@ -113,10 +118,15 @@
         "droppedIterationCount": 0
       },
       "unique": {
+        "schemaVersion": 1,
+        "candidateGitSha": "86be8d0294f9e2badab61f25e5c6a6ed9b7eea2c",
+        "apiOrigin": "https://easysubway-api.aquilaxk.site",
+        "collectedAt": "2026-07-19T10:19:32.597Z",
+        "workload": "unique",
         "status": "PASS",
         "requestCount": 6,
         "expectedRequestCount": 5,
-        "p95Ms": 2089.7910944999994,
+        "p95Ms": 424.3165,
         "failureRate": 0,
         "fiveXxCount": 0,
         "fourXxCount": 0,
@@ -126,6 +136,9 @@
       "backendObservation": {
         "schemaVersion": 1,
         "artifactKind": "train-search-backend-observation",
+        "candidateGitSha": "86be8d0294f9e2badab61f25e5c6a6ed9b7eea2c",
+        "apiOrigin": "https://easysubway-api.aquilaxk.site",
+        "collectedAt": "2026-07-19T10:19:43.683Z",
         "status": "PASS",
         "threeNodeSingleProviderCallVerifiedByTest": true,
         "quotaFailClosedVerifiedByTests": true,
@@ -140,21 +153,21 @@
         "testResults": [
           {
             "file": "TEST-com.easysubway.train.adapter.out.http.SharedTrainSearchProviderCallBudgetTest.xml",
-            "sha256": "1e9c04a18a382f48681e77ec28949b069440ff918f1c89a7902451f008aad2ba",
+            "sha256": "1bf63c3fefdcd3666609c1d32e15cdfc502cedbec096e3cfdcd368bc8c525824",
             "testCount": 3
           },
           {
             "file": "TEST-com.easysubway.train.adapter.out.persistence.JdbcTrainSearchCacheTest.xml",
-            "sha256": "c179c95ce5b6cfae810a76281f7115ff6b9bcb0d1459d66e24596af8a66a2978",
+            "sha256": "3b47ea20f62ed42fac44f7a3670593060192a89fbe9786070aff72fe7e857638",
             "testCount": 2
           },
           {
             "file": "TEST-com.easysubway.train.application.TrainSearchServiceTest.xml",
-            "sha256": "849ace30e529ccbc75c2438ccb333cd1acba43d185b33dfc22e71bc015c541cd",
+            "sha256": "98b9883ffe342df5c17ae0cb695bdae1daf576ae497c7ebe37f7fde3c90b4a17",
             "testCount": 1
           }
         ],
-        "evidenceSha256": "227fc31235fab3391a76a93819f4d0212e02c3d91274bb202c17c9be75b57b77"
+        "evidenceSha256": "ed37a7d2f2335420b661c696d9ebb2168b9227f9494c23fce83a19cd42795e4a"
       }
     },
     "android": {
@@ -176,15 +189,17 @@
       "semanticsSha256": "d91ba0f790af500aef6cbc5f1c5820aff8384a0f64278c45235d99b0f5b2799e"
     },
     "review": {
-      "candidatePullRequest": 2310,
-      "reviewUrl": "https://github.com/AquilaXk/easysubway/pull/2310#pullrequestreview-4730263044",
+      "candidatePullRequest": 2291,
+      "candidateMergeGitSha": "86be8d0294f9e2badab61f25e5c6a6ed9b7eea2c",
+      "reviewedHeadGitSha": "8beff4c9d5d188ae1631abdf2b5c4e8620f9737d",
+      "reviewUrl": "https://github.com/AquilaXk/easysubway/pull/2291#pullrequestreview-4730310729",
       "actionableFindingsOpen": 0
     },
     "requiredCi": {
       "status": "PASS",
       "runUrl": "https://github.com/AquilaXk/easysubway/actions/runs/29677947876"
     },
-    "liveEvidenceSha256": "0be13e231c0a82de118679d84e26450b0970b8f2fade257b1a7fe4903cc3d419"
+    "liveEvidenceSha256": "bc7b3325fe21db029cc7f552a52cdaef5116b4a8c433537230e3e442cefd5448"
   },
   "verification": {
     "backend": "./backend/gradlew -p backend test --tests '*TrainSearch*'",

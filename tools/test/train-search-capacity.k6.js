@@ -26,6 +26,14 @@ const summaryPath = __ENV.TRAIN_SEARCH_SUMMARY_PATH;
 if (typeof summaryPath !== "string" || !summaryPath.startsWith("/")) {
   throw new Error("TRAIN_SEARCH_SUMMARY_PATH is required and must be absolute");
 }
+const candidateGitSha = __ENV.TRAIN_SEARCH_CANDIDATE_SHA;
+if (!/^[0-9a-f]{40}$/.test(candidateGitSha)) {
+  throw new Error("TRAIN_SEARCH_CANDIDATE_SHA must be a full lowercase Git SHA");
+}
+const apiOrigin = __ENV.TRAIN_SEARCH_BASE_URL?.replace(/\/$/, "");
+if (apiOrigin !== "https://easysubway-api.aquilaxk.site") {
+  throw new Error("TRAIN_SEARCH_BASE_URL must be the EasySubway production API origin");
+}
 
 export const options = {
   scenarios: {
@@ -77,8 +85,7 @@ export default function trainSearchCapacity() {
   const query = Object.entries(parameters)
     .map(([name, value]) => `${encodeURIComponent(name)}=${encodeURIComponent(value)}`)
     .join("&");
-  const origin = __ENV.TRAIN_SEARCH_BASE_URL.replace(/\/$/, "");
-  const response = http.get(`${origin}/api/v1/trains/search?${query}`, { tags: { workload } });
+  const response = http.get(`${apiOrigin}/api/v1/trains/search?${query}`, { tags: { workload } });
   fiveXx.add(response.status >= 500 && response.status <= 599);
   fourXx.add(response.status >= 400 && response.status <= 499);
   rateLimited.add(response.status === 429);
@@ -111,6 +118,9 @@ export function handleSummary(data) {
   const failureRate = data.metrics.http_req_failed?.values?.rate ?? null;
   const summary = {
     schemaVersion: 1,
+    candidateGitSha,
+    apiOrigin,
+    collectedAt: new Date().toISOString(),
     workload,
     status: requestCount >= expectedRequestCount && p95Ms !== null && failureRate === 0
       && failedChecks === 0 && fiveXxCount === 0 && fourXxCount === 0 && rateLimitedCount === 0

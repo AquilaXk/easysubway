@@ -5,7 +5,15 @@ import path from "node:path";
 import { validateBackendObservationArtifact } from "./collect-train-search-backend-observation.mjs";
 
 const expectedWorkloads = ["repeated", "unique"];
-const evidenceFiles = await validatedEvidenceFiles(process.argv.slice(2));
+const arguments_ = process.argv.slice(2);
+if (arguments_[0] === "--preflight-output-dir") {
+  if (arguments_.length !== 2) fail("expected one output directory");
+  await validateOutputDirectory(arguments_[1]);
+  console.log("train-search capacity output directory PASS");
+  process.exit(0);
+}
+const { candidateGitSha, apiOrigin, evidencePaths } = parseEvidenceArguments(arguments_);
+const evidenceFiles = await validatedEvidenceFiles(evidencePaths);
 
 for (const [index, file] of evidenceFiles.slice(0, 2).entries()) {
   let summary;
@@ -15,6 +23,9 @@ for (const [index, file] of evidenceFiles.slice(0, 2).entries()) {
     fail(`${expectedWorkloads[index]} summary was unreadable`);
   }
   if (summary?.workload !== expectedWorkloads[index]
+    || summary?.candidateGitSha !== candidateGitSha
+    || summary?.apiOrigin !== apiOrigin
+    || !validCollectedAt(summary?.collectedAt)
     || summary?.status !== "PASS"
     || !Number.isInteger(summary?.requestCount)
     || summary.requestCount < 1
@@ -36,12 +47,62 @@ for (const [index, file] of evidenceFiles.slice(0, 2).entries()) {
 }
 
 try {
-  validateBackendObservationArtifact(JSON.parse(await readFile(evidenceFiles[2], "utf8")));
+  const observation = validateBackendObservationArtifact(JSON.parse(await readFile(evidenceFiles[2], "utf8")));
+  if (observation.candidateGitSha !== candidateGitSha || observation.apiOrigin !== apiOrigin) {
+    fail("backend observation did not match the requested candidate and origin");
+  }
 } catch {
   fail("backend observation failed its evidence contract");
 }
 
 console.log("train-search capacity summaries and backend observation PASS");
+
+function parseEvidenceArguments(values) {
+  if (values.length !== 7 || values[0] !== "--candidate-sha" || values[2] !== "--api-origin") {
+    fail("expected --candidate-sha, --api-origin, and three absolute evidence paths");
+  }
+  if (!/^[0-9a-f]{40}$/u.test(values[1])) fail("candidate SHA must be a full lowercase Git SHA");
+  if (values[3] !== "https://easysubway-api.aquilaxk.site") fail("API origin must be production");
+  return { candidateGitSha: values[1], apiOrigin: values[3], evidencePaths: values.slice(4) };
+}
+
+export async function validateOutputDirectory(value) {
+  if (!path.isAbsolute(value ?? "")) fail("output directory must be absolute");
+  const requestedTarget = path.resolve(value);
+  const rootMappings = await Promise.all([process.cwd(), tmpdir(), "/tmp"].map(async (input) => ({
+    input: path.resolve(input),
+    real: await realpath(input),
+  })));
+  const mapping = rootMappings.find(({ input }) => pathInside(input, requestedTarget));
+  if (!mapping) fail("output directory is outside the allowed roots");
+  const root = mapping.real;
+  const target = path.join(root, path.relative(mapping.input, requestedTarget));
+  const relative = path.relative(root, target);
+  let current = root;
+  for (const segment of relative.split(path.sep).filter(Boolean)) {
+    current = path.join(current, segment);
+    let metadata;
+    try {
+      metadata = await lstat(current);
+    } catch (error) {
+      if (error?.code === "ENOENT") break;
+      throw error;
+    }
+    if (!metadata.isDirectory() || metadata.isSymbolicLink()) {
+      fail("output directory path must contain only real directories");
+    }
+  }
+  for (const name of ["repeated.json", "unique.json", "backend-observation.json"]) {
+    try {
+      const metadata = await lstat(path.join(target, name));
+      if (!metadata.isFile() || metadata.isSymbolicLink()) {
+        fail("existing evidence outputs must be regular files");
+      }
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+    }
+  }
+}
 
 async function validatedEvidenceFiles(arguments_) {
   const expectedNames = ["repeated.json", "unique.json", "backend-observation.json"];
@@ -55,10 +116,8 @@ async function validatedEvidenceFiles(arguments_) {
   ))) {
     fail("evidence paths must use the canonical names in one directory");
   }
-  const allowedRoots = [await realpath(process.cwd()), await realpath(tmpdir())];
-  if (!allowedRoots.some((root) => pathInside(root, directory))) {
-    fail("evidence directory is outside the allowed roots");
-  }
+  await validateOutputDirectory(directory);
+  const allowedRoots = [await realpath(process.cwd()), await realpath(tmpdir()), await realpath("/tmp")];
   const realDirectory = await realpath(directory);
   if (!allowedRoots.some((root) => pathInside(root, realDirectory))) {
     fail("evidence directory resolves outside the allowed roots");
@@ -74,6 +133,12 @@ async function validatedEvidenceFiles(arguments_) {
 function pathInside(root, candidate) {
   const relative = path.relative(root, candidate);
   return relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative));
+}
+
+function validCollectedAt(value) {
+  return typeof value === "string"
+    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u.test(value)
+    && Number.isFinite(Date.parse(value));
 }
 
 function fail(message) {
