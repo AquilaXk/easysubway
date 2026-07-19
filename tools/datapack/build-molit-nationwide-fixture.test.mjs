@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
@@ -43,21 +44,28 @@ test("MOLIT provider identity는 canonical alias scope를 검증하고 코드 �
   }], [scope]), /MOLIT\/KRIC provider code mismatch/);
 });
 
-test("KRIC provider code catalog identity는 고정 source ID와 SHA-256만 허용한다", () => {
-  assert.doesNotThrow(() => validateKricProviderCodeCatalogIdentity({
-    sourceId: "kric-provider-code-catalog-20260228",
-    sourceSha256: "ef1f8b094e32e81c7390e8566984293dcefcc85e7fadacfe4433e77ddcc61272",
-  }));
+test("KRIC provider code catalog identity는 source와 canonical content hash를 고정한다", async () => {
+  const catalog = JSON.parse(await readFile(
+    new URL("./sources/kric-provider-code-catalog-20260228.json", import.meta.url),
+    "utf8",
+  ));
+  assert.doesNotThrow(() => validateKricProviderCodeCatalogIdentity(catalog));
   assert.throws(() => validateKricProviderCodeCatalogIdentity({
+    ...catalog,
     sourceId: "unexpected",
-    sourceSha256: "a".repeat(64),
   }), /sourceId is invalid/);
   assert.throws(() => validateKricProviderCodeCatalogIdentity({
-    sourceId: "kric-provider-code-catalog-20260228",
+    ...catalog,
     sourceSha256: "a".repeat(64),
   }), /sourceSha256 does not match/);
   assert.throws(() => validateKricProviderCodeCatalogIdentity({
-    sourceId: "kric-provider-code-catalog-20260228",
+    ...catalog,
     sourceSha256: "not-a-sha",
   }), /sourceSha256 is invalid/);
+  assert.throws(() => validateKricProviderCodeCatalogIdentity({
+    ...catalog,
+    providerLines: catalog.providerLines.map((line, index) => (
+      index === 0 ? { ...line, lnCd: "WRONG" } : line
+    )),
+  }), /canonical content hash does not match/);
 });

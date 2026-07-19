@@ -33,7 +33,7 @@
       },
       "licenseEvidenceStatus": "official_public_download",
       "sampleEvidenceStatus": "validated_live_sample",
-      "admissionStatus": "admitted_to_production_inventory",
+      "admissionStatus": "admitted_as_code_mapping",
       "automaticRouteGraphEdgeAllowed": false,
       "mobileEmbeddingAllowed": false,
       "evidence": {

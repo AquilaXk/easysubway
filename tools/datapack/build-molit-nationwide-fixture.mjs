@@ -14,6 +14,7 @@ import {
 const sourceId = "molit-urban-rail-full-route";
 const kricProviderCodeCatalogSourceId = "kric-provider-code-catalog-20260228";
 const kricProviderCodeCatalogSha256 = "ef1f8b094e32e81c7390e8566984293dcefcc85e7fadacfe4433e77ddcc61272";
+const kricProviderCodeCatalogContentSha256 = "012e7dca252e148d148af8146e87d0bb5484de4638379a39204eb492e0413c26";
 const seoulMetroSourceId = "seoulmetro-cyberstation";
 const humetroSourceId = "humetro-cyberstation";
 const grtcSourceId = "grtc-cyberstation";
@@ -1008,6 +1009,13 @@ export function validateKricProviderCodeCatalogIdentity(catalog) {
   }
   if (catalog.sourceSha256.toLowerCase() !== kricProviderCodeCatalogSha256) {
     throw new Error("KRIC provider code catalog sourceSha256 does not match trusted snapshot");
+  }
+  const contentSha256 = sha256(JSON.stringify({
+    stationRecordCount: catalog.stationRecordCount,
+    providerLines: catalog.providerLines,
+  }));
+  if (contentSha256 !== kricProviderCodeCatalogContentSha256) {
+    throw new Error("KRIC provider code catalog canonical content hash does not match trusted snapshot");
   }
 }
 
