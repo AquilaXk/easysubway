@@ -74,7 +74,8 @@
 					<polyline th:attr="points=${card.sparkPoints}" fill="none"
 					          stroke="currentColor" stroke-width="1.5"></polyline>
 				</svg>
-				<span class="dashboard-card-delta" th:classappend="${' is-' + card.deltaTone}"
+				<span th:if="${card.deltaLabel != null}" class="dashboard-card-delta"
+				      th:classappend="${' is-' + card.deltaTone}"
 				      th:text="${card.deltaLabel}">전일 대비</span>
 			</a>
 		</div>

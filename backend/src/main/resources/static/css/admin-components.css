@@ -548,6 +548,25 @@
 	margin: 6px 0 0;
 }
 
+/* 빈 상태 3단 뷰포트 대응(#2327): 데스크톱은 message+hint(안내+액션 경로) 그대로, 태블릿은 동일
+   구조에서 padding만 좁히고, 모바일은 추이 섹션 빈 상태의 hint를 접어 첫 화면에 핵심 과업(재집계
+   액션은 페이지 상단 버튼으로 항상 노출)이 오게 한다. */
+@media (max-width: 1024px) {
+	.admin-v3 .empty-state {
+		padding: 16px 8px;
+	}
+}
+
+@media (max-width: 480px) {
+	.admin-v3 .empty-state {
+		padding: 12px 8px;
+	}
+
+	.admin-v3 .dashboard-trends-section .empty-state-hint {
+		display: none;
+	}
+}
+
 /* 일괄 선택·액션 바(#1737) */
 .admin-v3 .select-col {
 	width: 36px;
