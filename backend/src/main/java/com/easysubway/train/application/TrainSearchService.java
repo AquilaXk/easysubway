@@ -214,7 +214,8 @@ public class TrainSearchService {
 	}
 
 	public int purgeExpired() {
-		return cache.purgeExpiredBefore(clock.instant().minus(Duration.ofHours(48)));
+		Instant now = clock.instant();
+		return purgeExpiredL1(now) + cache.purgeExpiredBefore(now.minus(Duration.ofHours(48)));
 	}
 
 	private Instant catalogRecoveryDeadline(Instant now) {
@@ -370,6 +371,7 @@ public class TrainSearchService {
 		Instant now = clock.instant();
 		CachedLeg local = l1.get(key);
 		if (local != null && local.expiresAt().isAfter(now)) return validLeg(key, local);
+		if (local != null) forget(key, local);
 		var shared = cache.freshLeg(key, now);
 		requireBefore(deadline);
 		if (shared.isPresent()) {
@@ -583,7 +585,7 @@ public class TrainSearchService {
 		}
 	}
 
-	private void remember(String key, CachedLeg value) {
+	private synchronized void remember(String key, CachedLeg value) {
 		CachedLeg previous = l1.put(key, value);
 		if (previous == null) l1Order.add(key);
 		while (l1.size() > L1_LIMIT) {
@@ -591,6 +593,21 @@ public class TrainSearchService {
 			if (oldest == null) break;
 			l1.remove(oldest);
 		}
+	}
+
+	private synchronized void forget(String key, CachedLeg value) {
+		if (l1.remove(key, value)) l1Order.remove(key);
+	}
+
+	private synchronized int purgeExpiredL1(Instant now) {
+		int purged = 0;
+		for (Map.Entry<String, CachedLeg> entry : l1.entrySet()) {
+			if (!entry.getValue().expiresAt().isAfter(now) && l1.remove(entry.getKey(), entry.getValue())) {
+				purged += 1;
+			}
+		}
+		l1Order.removeIf(key -> !l1.containsKey(key));
+		return purged;
 	}
 
 	private CachedLeg await(CompletableFuture<CachedLeg> future, Instant deadline) {

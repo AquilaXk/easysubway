@@ -97,6 +97,20 @@ class TrainSearchServiceTest {
 	}
 
 	@Test
+	void purgeExpiredRemovesExpiredEntriesFromTheProcessLocalCache() {
+		var clock = new TestClock(NOW);
+		service = serviceWith(clock, duration -> {});
+		service.search(criteria(null));
+		clock.advance(Duration.ofMinutes(6));
+
+		assertThat(service.purgeExpired()).isEqualTo(1);
+
+		cache.legs.clear();
+		service.search(criteria(null));
+		assertThat(provider.searchCalls).hasValue(2);
+	}
+
+	@Test
 	void rejectsARoundTripSnapshotWhenTheFirstLegExpiresDuringAssembly() {
 		var clock = new TestClock(NOW);
 		service = serviceWith(clock, duration -> {});

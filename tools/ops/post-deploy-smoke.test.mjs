@@ -149,6 +149,39 @@ test("post-deploy smoke passes when all six axes respond correctly", async () =>
   });
 });
 
+test("post-deploy smoke retries a temporary train catalog 503 during cold start", async () => {
+  const routes = defaultRoutes();
+  let stationCalls = 0;
+  routes.trainSeoulStations = () => {
+    stationCalls += 1;
+    return stationCalls === 1
+      ? { status: 503, body: { success: false, data: { code: "TRAIN_SEARCH_UNAVAILABLE" } } }
+      : { status: 200, body: { success: true, data: [{ id: "NAT010000", name: "서울" }] } };
+  };
+  await withServer(routes, async (baseUrl) => {
+    const { code, report } = await runSmoke(baseUrl);
+    assert.equal(code, 0);
+    assert.equal(axis(report, "train-search").result, "PASS");
+    assert.equal(axis(report, "train-search").attempts, 2);
+    assert.equal(stationCalls, 2);
+  });
+});
+
+test("post-deploy smoke does not retry a permanent train catalog 400", async () => {
+  const routes = defaultRoutes();
+  let stationCalls = 0;
+  routes.trainSeoulStations = () => {
+    stationCalls += 1;
+    return { status: 400, body: { success: false, data: { code: "TRAIN_SEARCH_INVALID_ARGUMENT" } } };
+  };
+  await withServer(routes, async (baseUrl) => {
+    const { code, report } = await runSmoke(baseUrl);
+    assert.equal(code, 1);
+    assert.equal(axis(report, "train-search").attempts, 1);
+    assert.equal(stationCalls, 1);
+  });
+});
+
 test("post-deploy smoke fails when nationwide train search cannot return a Seoul-Daejeon KTX fare", async () => {
   const routes = defaultRoutes();
   routes.trainSearch = () => ({

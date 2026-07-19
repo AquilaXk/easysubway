@@ -16,6 +16,8 @@ import { argValue } from "../release/summary-validation-utils.mjs";
 
 const DEFAULT_CONTRACT = path.join(import.meta.dirname, "post-deploy-smoke-contract.json");
 
+class RetryableTrainSmokeError extends Error {}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -43,18 +45,18 @@ function parseJson(text, label) {
   }
 }
 
-async function retry(check, { maxMs, delayMs }) {
+async function retry(check, { maxMs, delayMs, shouldRetry = () => true }) {
   const deadline = Date.now() + maxMs;
   let attempts = 0;
   let lastError;
   for (;;) {
     attempts += 1;
     try {
-      await check();
+      await check(Math.max(1, deadline - Date.now()));
       return { ok: true, attempts, error: null };
     } catch (error) {
       lastError = error;
-      if (Date.now() + delayMs >= deadline) {
+      if (!shouldRetry(error) || Date.now() + delayMs >= deadline) {
         return { ok: false, attempts, error: lastError };
       }
       await sleep(delayMs);
@@ -132,7 +134,14 @@ async function trainStations(baseUrl, axis, query, timeoutMs) {
   const url = new URL(joinUrl(baseUrl, axis.stationPath));
   url.searchParams.set("query", query);
   url.searchParams.set("trainType", axis.trainType);
-  const { status, text } = await httpRequest(url, { timeoutMs });
+  let status;
+  let text;
+  try {
+    ({ status, text } = await httpRequest(url, { timeoutMs }));
+  } catch (error) {
+    throw new RetryableTrainSmokeError(`${query} station catalog request failed: ${error.message}`);
+  }
+  if (status === 503) throw new RetryableTrainSmokeError(`${query} station catalog returned HTTP 503`);
   if (status !== 200) throw new Error(`${query} station catalog returned HTTP ${status}`);
   const body = parseJson(text, `${query} station catalog`);
   if (body.success !== true || !Array.isArray(body.data)) {
@@ -157,7 +166,14 @@ async function checkTrainSearch(baseUrl, axis, timeoutMs) {
   url.searchParams.set("arrivalStationId", arrival.id);
   url.searchParams.set("departureDate", koreaServiceDay());
   url.searchParams.set("trainType", axis.trainType);
-  const { status, text } = await httpRequest(url, { timeoutMs: remaining() });
+  let status;
+  let text;
+  try {
+    ({ status, text } = await httpRequest(url, { timeoutMs: remaining() }));
+  } catch (error) {
+    throw new RetryableTrainSmokeError(`train search request failed: ${error.message}`);
+  }
+  if (status === 503) throw new RetryableTrainSmokeError("train search returned HTTP 503");
   if (status !== 200) throw new Error(`train search returned HTTP ${status}`);
   const body = parseJson(text, "train search");
   const journeys = body?.success === true && Array.isArray(body?.data?.outbound) ? body.data.outbound : [];
@@ -191,10 +207,14 @@ async function checkDatapack(datapackBaseUrl, axis, timeoutMs) {
   }
 }
 
-async function runAxis(axis, check, { maxMs, delayMs }) {
+async function runAxis(axis, check, options) {
+  const { maxMs } = options;
   const startedAt = Date.now();
   const perRequestTimeout = Math.min(10000, Math.max(2000, maxMs));
-  const outcome = await retry(() => check(perRequestTimeout), { maxMs, delayMs });
+  const outcome = await retry(
+    (remainingMs) => check(Math.min(perRequestTimeout, remainingMs)),
+    options,
+  );
   return {
     id: axis.id,
     titleKo: axis.titleKo,
@@ -277,10 +297,14 @@ async function main() {
     (t) => checkRouteApiClosure(baseUrl, routeApiClosure, t, routeV2IngressEnabled),
     Math.min(10000, Math.max(2000, budgetMs * 0.2)),
   ));
-  axes.push(await runAxisOnce(
+  axes.push(await runAxis(
     trainSearch,
     (t) => checkTrainSearch(baseUrl, trainSearch, t),
-    Math.max(65_000, budgetMs * 0.75),
+    {
+      maxMs: Math.max(2000, budgetMs * 0.75),
+      delayMs: 2000,
+      shouldRetry: (error) => error instanceof RetryableTrainSmokeError,
+    },
   ));
   axes.push(await runAxis(adminLogin, (t) => checkAdminLogin(baseUrl, adminLogin, t), {
     maxMs: Math.max(2000, budgetMs * 0.1),
