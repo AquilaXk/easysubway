@@ -176,6 +176,62 @@
       }
     },
     {
+      "id": "train_search_abuse_rate_limit_state",
+      "displayNameKo": "기차검색 악용 방지 상태",
+      "purposeKo": "공개 전국 기차검색 endpoint의 과도한 요청과 제공기관 quota 악용 방지",
+      "implementationStatus": "backend-collected",
+      "introducedInVersion": "1.0.5",
+      "codeOwner": "train",
+      "collectionTrigger": "사용자가 기차역 또는 여객열차 검색 요청을 보낼 때 filter가 요청 IP별 요청 제한 상태를 갱신",
+      "backendTableOrService": [
+        "TrainSearchRateLimitFilter OncePerRequestFilter",
+        "TrainSearchRateLimiter in-memory ConcurrentHashMap counters",
+        "TrainSearchClientIdentityResolver ip:remoteAddr key"
+      ],
+      "storageLocations": ["backend-jvm-memory"],
+      "retentionKo": "고정 TTL은 없다. 역 검색 limiter는 요청 IP별 카운터를 다음 60초 window까지, 열차 검색 limiter는 분당·일일 비용 카운터를 다음 Asia/Seoul 날짜까지 JVM heap에 보관한다. limiter별 최대 4096개를 넘으면 새 IP 요청을 거절하며, 최종적으로 JVM 프로세스 종료 시 모두 삭제된다.",
+      "deletionKo": "요청 IP는 사용자 계정 DB나 access log에 저장하지 않고 filter도 IP를 로그로 남기지 않는다. 역 검색 상태는 다음 60초 window, 열차 검색 상태는 다음 Asia/Seoul 날짜의 첫 요청 또는 JVM 프로세스 종료 시 자동 삭제되며, 사용자가 직접 삭제할 영속 저장소는 없다.",
+      "deletionImplementation": "TrainSearchRateLimiter가 ip:clientIdentity별 WindowCounter를 역 검색과 열차 검색용 JVM heap ConcurrentHashMap에서 각각 관리한다. 역 검색 limiter는 60초 window, 열차 검색 limiter는 Asia/Seoul 일일 window 변경을 감지한 첫 요청이 map을 한 번 clear하고, maxKeys(기본 4096) 초과 시 저장 대신 요청을 거절한다.",
+      "evidence": [
+        "backend/src/main/java/com/easysubway/train/adapter/in/web/TrainSearchRateLimitFilter.java",
+        "backend/src/test/java/com/easysubway/train/adapter/in/web/TrainSearchRateLimitFilterTest.java",
+        "infra/nginx/host-easysubway.conf.template"
+      ],
+      "lastVerifiedAt": "2026-07-19",
+      "sharedWithThirdParties": false,
+      "usedForTracking": false,
+      "rateLimitedEndpoints": [
+        "GET /api/v1/trains/stations",
+        "GET /api/v1/trains/search"
+      ],
+      "clientIdentityKey": "ip:remoteAddr (신뢰 프록시 요청은 X-Forwarded-For에서 해석한 클라이언트 IP)",
+      "storeMode": "local",
+      "persistedToDatabase": false,
+      "includedInAccessLog": false,
+      "retention": {
+        "fixedTtl": false,
+        "windowSeconds": 60,
+        "dailyCostLimit": 64,
+        "dailyWindowZone": "Asia/Seoul",
+        "maxCounterKeysPerLimiter": 4096,
+        "evictionBoundary": "station limiter clears prior entries in the next minute; search limiter clears prior entries on the next KST day; over-capacity identities rejected without storage",
+        "finalDeletionBoundary": "JVM process lifecycle end"
+      },
+      "operationReference": "https://docs.spring.io/spring-framework/reference/web/webmvc/filters.html",
+      "googlePlayDataSafety": {
+        "dataType": "Device or other IDs",
+        "collected": true,
+        "collectionType": "optional-user-triggered-train-search-abuse-control",
+        "purpose": "Fraud prevention, security, and compliance",
+        "linkedToUser": true,
+        "encryptedInTransit": true,
+        "optional": true,
+        "required": false,
+        "deletionSupported": false,
+        "processedEphemerally": false
+      }
+    },
+    {
       "id": "precise_location",
       "displayNameKo": "현재 위치",
       "purposeKo": "가까운 역 검색, 시설 신고 위치 확인, 외부 지도 도보 길안내",
@@ -264,6 +320,62 @@
       "appStorePrivacy": {
         "dataType": "NSPrivacyCollectedDataTypeSearchHistory",
         "linkedToUser": true,
+        "purpose": "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+      }
+    },
+    {
+      "id": "train_search_queries",
+      "displayNameKo": "기차 검색 조건",
+      "purposeKo": "전국 여객열차 시간표와 성인 1인 운임 검색 결과 제공",
+      "implementationStatus": "backend-collected",
+      "introducedInVersion": "1.0.5",
+      "codeOwner": "train",
+      "collectionTrigger": "사용자가 출발역, 도착역, 날짜와 선택 열차종으로 기차 검색을 실행할 때 cache miss 조건을 저장",
+      "backendTableOrService": [
+        "train_search_cache.normalized_query_json",
+        "TrainSearchService",
+        "TrainSearchScheduler"
+      ],
+      "storageLocations": ["backend-database"],
+      "persistedFields": [
+        "departureStationId",
+        "arrivalStationId",
+        "departureDate",
+        "trainType"
+      ],
+      "accountLinked": false,
+      "retentionKo": "검색 조건은 결과와 함께 오늘 영업일 5분 또는 미래 영업일 6시간 동안 fresh 상태로 보관한다. 만료 후 48시간이 지나면 삭제 대상이 되고 매일 04:10 KST purge에서 삭제하므로, 삭제 대상이 된 뒤 실제 삭제까지 최대 24시간이 더 걸릴 수 있다.",
+      "deletionKo": "계정이나 요청 IP와 연결하지 않는 공유 cache라 사용자별 삭제 키는 없다. expires_at 기준 자동 purge로 삭제한다.",
+      "deletionImplementation": "TrainSearchService.purgeExpired가 expires_at보다 48시간 지난 train_search_cache 행을 TrainSearchScheduler의 매일 04:10 KST 작업에서 삭제한다.",
+      "retention": {
+        "todayFreshSeconds": 300,
+        "futureFreshSeconds": 21600,
+        "purgeEligibilityAfterExpirySeconds": 172800,
+        "purgeCron": "0 10 4 * * * Asia/Seoul",
+        "maximumPurgeLagSeconds": 86400
+      },
+      "evidence": [
+        "backend/src/main/java/com/easysubway/train/application/TrainSearchService.java",
+        "backend/src/main/java/com/easysubway/train/adapter/in/scheduler/TrainSearchScheduler.java",
+        "backend/src/main/resources/db/migration/postgresql/V65__train_search_cache.sql"
+      ],
+      "lastVerifiedAt": "2026-07-19",
+      "sharedWithThirdParties": false,
+      "usedForTracking": false,
+      "googlePlayDataSafety": {
+        "dataType": "App activity",
+        "collected": true,
+        "collectionType": "optional-user-triggered-search",
+        "purpose": "App functionality",
+        "linkedToUser": false,
+        "encryptedInTransit": true,
+        "optional": true,
+        "required": false,
+        "deletionSupported": false
+      },
+      "appStorePrivacy": {
+        "dataType": "NSPrivacyCollectedDataTypeSearchHistory",
+        "linkedToUser": false,
         "purpose": "NSPrivacyCollectedDataTypePurposeAppFunctionality"
       }
     },
