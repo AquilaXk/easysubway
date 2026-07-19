@@ -533,8 +533,10 @@ class RouteTimetableRaptorPlanner {
 				+ slackSeconds;
 			byte warningBits = (byte) (workspace.warningBits[readySlot]
 				| timetable.transitionWarningCodes(accessTransition, accessProfileBit, ignoreAccessBlocks));
-			if (best == null || earliestDepartureSeconds < best.earliestDepartureSeconds()
-				|| earliestDepartureSeconds == best.earliestDepartureSeconds() && readySlot < best.readySlot()) {
+			if (best == null || compareReadyBoardingKeys(
+				earliestDepartureSeconds, warningBits, readySlot,
+				best.earliestDepartureSeconds(), best.warningBits(), best.readySlot()
+			) < 0) {
 				best = new ReadyBoarding(readySlot, accessTransition, earliestDepartureSeconds, warningBits);
 			}
 		}
@@ -632,10 +634,37 @@ class RouteTimetableRaptorPlanner {
 	}
 
 	private static int compareDestinationLabels(Label left, Label right) {
-		return Comparator.comparingInt(Label::timeSeconds)
-			.thenComparingInt(label -> label.path().getLast().scheduledTrip().index())
-			.thenComparingInt(label -> label.path().getLast().fromIndex())
-			.compare(left, right);
+		RideLeg leftLast = left.path().getLast();
+		RideLeg rightLast = right.path().getLast();
+		return compareDestinationLabelKeys(
+			left.timeSeconds(), left.warningBits(), leftLast.scheduledTrip().index(), leftLast.fromIndex(),
+			right.timeSeconds(), right.warningBits(), rightLast.scheduledTrip().index(), rightLast.fromIndex()
+		);
+	}
+
+	static int compareReadyBoardingKeys(
+		int leftTime, byte leftWarnings, int leftSlot,
+		int rightTime, byte rightWarnings, int rightSlot
+	) {
+		int comparison = Integer.compare(leftTime, rightTime);
+		if (comparison == 0) {
+			comparison = Integer.compare(warningCount(leftWarnings), warningCount(rightWarnings));
+		}
+		return comparison != 0 ? comparison : Integer.compare(leftSlot, rightSlot);
+	}
+
+	static int compareDestinationLabelKeys(
+		int leftTime, byte leftWarnings, int leftTrip, int leftStop,
+		int rightTime, byte rightWarnings, int rightTrip, int rightStop
+	) {
+		int comparison = compareReadyBoardingKeys(
+			leftTime, leftWarnings, leftTrip,
+			rightTime, rightWarnings, rightTrip);
+		return comparison != 0 ? comparison : Integer.compare(leftStop, rightStop);
+	}
+
+	private static int warningCount(byte warningBits) {
+		return Integer.bitCount(Byte.toUnsignedInt(warningBits));
 	}
 
 	private static int candidateLimit(SearchRouteV2Command command) {
@@ -1906,8 +1935,8 @@ class RouteTimetableRaptorPlanner {
 				return;
 			}
 			if (existingArrivalSeconds == candidateArrivalSeconds) {
-				int existingWarnings = Integer.bitCount(Byte.toUnsignedInt(warningBits[candidateSlot]));
-				int candidateWarnings = Integer.bitCount(Byte.toUnsignedInt(accumulatedWarnings));
+				int existingWarnings = warningCount(warningBits[candidateSlot]);
+				int candidateWarnings = warningCount(accumulatedWarnings);
 				if (existingWarnings < candidateWarnings
 					|| existingWarnings == candidateWarnings && (parentTrip[candidateSlot] < trip
 						|| parentTrip[candidateSlot] == trip && parentBoardStop[candidateSlot] <= boardStop)) {

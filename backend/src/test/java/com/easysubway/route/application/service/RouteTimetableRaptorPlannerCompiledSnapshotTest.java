@@ -464,6 +464,24 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 	}
 
 	@Test
+	@DisplayName("동일 boarding 준비 시각은 slot 순서보다 누적 접근성 warning이 적은 상태를 선택한다")
+	void equalBoardingReadinessPrefersFewerAccessibilityWarnings() {
+		assertThat(RouteTimetableRaptorPlanner.compareReadyBoardingKeys(
+			100, (byte) 0, 2,
+			100, (byte) 1, 1
+		)).isNegative();
+	}
+
+	@Test
+	@DisplayName("동일 destination 도착 시각은 trip 순서보다 누적 접근성 warning이 적은 후보를 선택한다")
+	void equalDestinationArrivalPrefersFewerAccessibilityWarnings() {
+		assertThat(RouteTimetableRaptorPlanner.compareDestinationLabelKeys(
+			100, (byte) 0, 1, 0,
+			100, (byte) 1, 0, 0
+		)).isNegative();
+	}
+
+	@Test
 	@DisplayName("후행 trip이 downstream에서 합류해도 기존 trip-id 동률 순서를 유지한다")
 	void preservesLegacyTripOrderWhenLaterTripMergesDownstream() {
 		var results = planner.search(
