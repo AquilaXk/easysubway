@@ -35,6 +35,24 @@ test("타입·enum·pattern·배열 items·additionalProperties를 검증한다"
   );
 });
 
+test("uniqueItems는 scalar와 객체의 중복을 거부한다", () => {
+  const schema = { type: "array", uniqueItems: true };
+
+  assert.equal(validateSchema(schema, ["a", "b"]).ok, true);
+  assert.equal(validateSchema(schema, ["a", "a"]).ok, false);
+  assert.equal(validateSchema(schema, [{ id: 1 }, { id: 1 }]).ok, false);
+});
+
+test("minLength는 Unicode code point 기준으로 문자열 길이를 검증한다", () => {
+  const schema = { type: "string", minLength: 1 };
+
+  assert.equal(validateSchema(schema, "a").ok, true);
+  assert.equal(validateSchema(schema, "😀").ok, true);
+  assert.equal(validateSchema(schema, "").ok, false);
+  assert.throws(() => validateSchema({ type: "string", minLength: -1 }, "a"), /0 이상의 정수/);
+  assert.throws(() => validateSchema({ type: "array", minLength: 1 }, []), /type: string/);
+});
+
 test("중첩 객체 오류 경로를 점 표기로 보고한다", () => {
   const schema = {
     type: "object",
