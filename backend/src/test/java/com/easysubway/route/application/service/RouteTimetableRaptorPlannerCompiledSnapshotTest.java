@@ -122,6 +122,12 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 		int staleTransition = stale.entryTransition(
 			stale.stationIndex("station-a"), stale.lineIndex("line"), allow, false);
 		assertThat(stale.transitionVerificationStatus(staleTransition)).isEqualTo("STALE");
+
+		var staleEdge = planner.compile(withAccess(
+			everyDayTimetable(), entryAccessWithStatuses("STALE", "VERIFIED")));
+		int staleEdgeTransition = staleEdge.entryTransition(
+			staleEdge.stationIndex("station-a"), staleEdge.lineIndex("line"), allow, false);
+		assertThat(staleEdge.transitionVerificationStatus(staleEdgeTransition)).isEqualTo("STALE");
 	}
 
 	@Test
@@ -300,6 +306,23 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 	}
 
 	@Test
+	@DisplayName("strict nextServiceTime은 차단된 entry·exit transition의 운행을 안내하지 않는다")
+	void strictNextServiceTimeSkipsAccessBlockedService() {
+		var command = new SearchRouteV2Command(
+			"station-a",
+			"station-b",
+			OffsetDateTime.parse("2026-07-01T08:50:00+09:00"),
+			MobilityType.WHEELCHAIR,
+			ConstraintMode.STRICT_STEP_FREE,
+			false,
+			0,
+			1
+		);
+
+		assertThat(planner.nextServiceTime(command, planner.compile(everyDayTimetable()))).isEmpty();
+	}
+
+	@Test
 	@DisplayName("같은 service day의 immutable active snapshot을 재사용한다")
 	void reusesSameActiveServiceDay() {
 		var compiled = planner.compile(frequencyTimetable());
@@ -415,6 +438,29 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 			.extracting("tripId", "plannedArrivalTime")
 			.containsExactly(org.assertj.core.groups.Tuple.tuple(
 				"a-fast", "2026-07-01T09:35:00+09:00"));
+	}
+
+	@Test
+	@DisplayName("동시 도착 label은 trip 순서보다 누적 접근성 warning이 적은 후보를 보존한다")
+	void equalArrivalPrefersFewerAccessibilityWarnings() throws Exception {
+		Class<?> workspaceType = Class.forName(
+			"com.easysubway.route.application.service.RouteTimetableRaptorPlanner$ScanWorkspace");
+		var constructor = workspaceType.getDeclaredConstructor();
+		constructor.setAccessible(true);
+		Object workspace = constructor.newInstance();
+		var prepare = workspaceType.getDeclaredMethod("prepare", int.class, int.class, int.class);
+		prepare.setAccessible(true);
+		prepare.invoke(workspace, 1, 1, 0);
+		var relax = workspaceType.getDeclaredMethod(
+			"relax", int.class, int.class, int.class, int.class, int.class,
+			int.class, int.class, int.class, int.class, byte.class);
+		relax.setAccessible(true);
+		relax.invoke(workspace, 0, 1, 0, 100, 0, 0, 1, 0, 0, (byte) 1);
+		relax.invoke(workspace, 0, 1, 0, 100, 1, 0, 1, 0, 0, (byte) 0);
+		var warnings = workspaceType.getDeclaredField("warningBits");
+		warnings.setAccessible(true);
+
+		assertThat(((byte[]) warnings.get(workspace))[2]).isZero();
 	}
 
 	@Test
@@ -702,6 +748,20 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 			)
 		);
 		return new LoadRouteTimetablePort.RouteAccessData(nodes, edges, List.of(), evidence);
+	}
+
+	private static LoadRouteTimetablePort.RouteAccessData entryAccessWithStatuses(
+		String edgeVerificationStatus,
+		String evidenceVerificationStatus
+	) {
+		var edge = new LoadRouteTimetablePort.PathwayEdge(
+			"entry-edge", "entry", "platform", 90, 60, false, false, 100,
+			"AVAILABLE", "OFFICIAL_SOURCE", edgeVerificationStatus);
+		var evidence = new LoadRouteTimetablePort.RouteEdgeEvidence(
+			"entry-evidence", "station-a", "line", "entry-edge", "ENTRY",
+			"OFFICIAL_SOURCE", evidenceVerificationStatus, false, "UNVERIFIED");
+		return new LoadRouteTimetablePort.RouteAccessData(
+			List.of(), List.of(edge), List.of(), List.of(evidence));
 	}
 
 	private static LoadRouteTimetablePort.RouteAccessData verifiedDirectAccess() {

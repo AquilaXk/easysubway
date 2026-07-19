@@ -197,11 +197,20 @@ class RouteTimetableRaptorPlanner {
 		Map<String, List<BoardingStop>> boardingsByStation = timetable.activeServiceDay(serviceDate).boardingsByStation();
 		Map<ReachabilityState, Boolean> reachabilityCache = new HashMap<>();
 		Integer firstDepartureSeconds = null;
-		int entrySeconds = profiledWalkSeconds(command, ENTRY_DURATION_SECONDS);
+		int origin = timetable.stationIndex(command.originStationId());
+		int accessProfileBit = profileBit(command.mobilityType(), command.constraintMode());
 		int slackSeconds = BoardingSlackPolicy.secondsFor(command.mobilityType());
 		for (BoardingStop boardingStop : boardingsByStation.getOrDefault(command.originStationId(), List.of())) {
 			ScheduledTrip trip = boardingStop.trip();
 			int stopIndex = boardingStop.stopIndex();
+			int boardingLine = timetable.lineIndex(trip.lineId());
+			int entryTransition = origin < 0 || boardingLine < 0 ? -1 : timetable.entryTransition(
+				origin, boardingLine, accessProfileBit, false);
+			if (entryTransition < 0) {
+				continue;
+			}
+			int entrySeconds = profiledWalkSeconds(
+				command, timetable.transitionDurationSeconds(entryTransition));
 			int departureSeconds = trip.departureSeconds(stopIndex);
 			if (!trip.allowsPickup(stopIndex)
 				|| departureSeconds < startSeconds + entrySeconds + slackSeconds) {
@@ -209,10 +218,12 @@ class RouteTimetableRaptorPlanner {
 			}
 			if (canReachDestinationAfterBoarding(
 				command,
+				timetable,
 				boardingsByStation,
 				trip,
 				stopIndex,
 				0,
+				accessProfileBit,
 				new HashSet<>(),
 				reachabilityCache
 			)) {
@@ -226,10 +237,12 @@ class RouteTimetableRaptorPlanner {
 
 	private boolean canReachDestinationAfterBoarding(
 		SearchRouteV2Command command,
+		CompiledTimetable timetable,
 		Map<String, List<BoardingStop>> boardingsByStation,
 		ScheduledTrip trip,
 		int boardingStopIndex,
 		int transfersUsed,
+		int accessProfileBit,
 		Set<ReachabilityState> visiting,
 		Map<ReachabilityState, Boolean> reachabilityCache
 	) {
@@ -240,14 +253,22 @@ class RouteTimetableRaptorPlanner {
 				continue;
 			}
 			if (command.destinationStationId().equals(stopTime.stationId())) {
-				return true;
+				int destination = timetable.stationIndex(stopTime.stationId());
+				int incomingLine = timetable.lineIndex(trip.lineId());
+				if (destination >= 0 && incomingLine >= 0
+					&& timetable.exitTransition(destination, incomingLine, accessProfileBit, false) >= 0) {
+					return true;
+				}
 			}
 			if (canReachDestinationAfterAlighting(
 				command,
+				timetable,
 				boardingsByStation,
 				stopTime.stationId(),
 				trip.arrivalSeconds(stopIndex),
+				timetable.lineIndex(trip.lineId()),
 				transfersUsed,
+				accessProfileBit,
 				visiting,
 				reachabilityCache
 			)) {
@@ -259,17 +280,20 @@ class RouteTimetableRaptorPlanner {
 
 	private boolean canReachDestinationAfterAlighting(
 		SearchRouteV2Command command,
+		CompiledTimetable timetable,
 		Map<String, List<BoardingStop>> boardingsByStation,
 		String stationId,
 		int readySeconds,
+		int incomingLine,
 		int transfersUsed,
+		int accessProfileBit,
 		Set<ReachabilityState> visiting,
 		Map<ReachabilityState, Boolean> reachabilityCache
 	) {
 		if (transfersUsed >= command.maxTransfers()) {
 			return false;
 		}
-		ReachabilityState state = new ReachabilityState(stationId, readySeconds, transfersUsed);
+		ReachabilityState state = new ReachabilityState(stationId, readySeconds, incomingLine, transfersUsed);
 		Boolean cached = reachabilityCache.get(state);
 		if (cached != null) {
 			return cached;
@@ -277,22 +301,32 @@ class RouteTimetableRaptorPlanner {
 		if (!visiting.add(state)) {
 			return false;
 		}
-		int transferSeconds = profiledWalkSeconds(command, TRANSFER_DURATION_SECONDS);
+		int station = timetable.stationIndex(stationId);
 		int slackSeconds = BoardingSlackPolicy.secondsFor(command.mobilityType());
 		try {
 			for (BoardingStop boardingStop : boardingsByStation.getOrDefault(stationId, List.of())) {
 				ScheduledTrip trip = boardingStop.trip();
 				int stopIndex = boardingStop.stopIndex();
+				int boardingLine = timetable.lineIndex(trip.lineId());
+				int transferTransition = station < 0 || incomingLine < 0 || boardingLine < 0 ? -1
+					: timetable.transferTransition(station, incomingLine, boardingLine, accessProfileBit, false);
+				if (transferTransition < 0) {
+					continue;
+				}
+				int transferSeconds = profiledWalkSeconds(
+					command, timetable.transitionDurationSeconds(transferTransition));
 				if (!trip.allowsPickup(stopIndex)
 					|| trip.departureSeconds(stopIndex) < readySeconds + transferSeconds + slackSeconds) {
 					continue;
 				}
 				if (canReachDestinationAfterBoarding(
 					command,
+					timetable,
 					boardingsByStation,
 					trip,
 					stopIndex,
 					transfersUsed + 1,
+					accessProfileBit,
 					visiting,
 					reachabilityCache
 				)) {
@@ -1519,7 +1553,7 @@ class RouteTimetableRaptorPlanner {
 				|| rule != null && "STALE".equals(rule.verificationStatus())) {
 				warnings |= WARNING_STALE;
 			}
-			String verificationStatus = evidence == null ? "MISSING" : evidence.verificationStatus();
+			String verificationStatus = combinedVerificationStatus(edge, evidence, rule);
 			return new Candidate(
 				durationSeconds,
 				edge.distanceMeters(),
@@ -1536,6 +1570,29 @@ class RouteTimetableRaptorPlanner {
 			return "OFFICIAL_SOURCE".equals(provenance)
 				|| "OPERATOR_CONFIRMED".equals(provenance)
 				|| "FIELD_VERIFIED".equals(provenance);
+		}
+
+		private static String combinedVerificationStatus(
+			PathwayEdge edge,
+			RouteEdgeEvidence evidence,
+			TransferRule rule
+		) {
+			if (evidence == null) {
+				return "MISSING";
+			}
+			List<String> statuses = rule == null
+				? List.of(edge.verificationStatus(), evidence.verificationStatus())
+				: List.of(edge.verificationStatus(), evidence.verificationStatus(), rule.verificationStatus());
+			if (statuses.contains("STALE")) {
+				return "STALE";
+			}
+			if (statuses.contains("GENERATED")) {
+				return "GENERATED";
+			}
+			if (statuses.contains("MISSING")) {
+				return "MISSING";
+			}
+			return statuses.stream().allMatch("VERIFIED"::equals) ? "VERIFIED" : "UNKNOWN";
 		}
 
 		private static RouteEdgeEvidence uniqueTransferEvidence(
@@ -1848,10 +1905,14 @@ class RouteTimetableRaptorPlanner {
 			if (existingArrivalSeconds < candidateArrivalSeconds) {
 				return;
 			}
-			if (existingArrivalSeconds == candidateArrivalSeconds
-				&& (parentTrip[candidateSlot] < trip
-					|| (parentTrip[candidateSlot] == trip && parentBoardStop[candidateSlot] <= boardStop))) {
-				return;
+			if (existingArrivalSeconds == candidateArrivalSeconds) {
+				int existingWarnings = Integer.bitCount(Byte.toUnsignedInt(warningBits[candidateSlot]));
+				int candidateWarnings = Integer.bitCount(Byte.toUnsignedInt(accumulatedWarnings));
+				if (existingWarnings < candidateWarnings
+					|| existingWarnings == candidateWarnings && (parentTrip[candidateSlot] < trip
+						|| parentTrip[candidateSlot] == trip && parentBoardStop[candidateSlot] <= boardStop)) {
+					return;
+				}
 			}
 			for (int fewerBoardings = 0; fewerBoardings < boardings; fewerBoardings += 1) {
 				if (arrivalSeconds[slot(fewerBoardings, station, incomingLine)] <= candidateArrivalSeconds) {
@@ -1986,7 +2047,7 @@ class RouteTimetableRaptorPlanner {
 	private record BoardingStop(ScheduledTrip trip, int stopIndex, TransitStopTime stopTime) {
 	}
 
-	private record ReachabilityState(String stationId, int readySeconds, int transfersUsed) {
+	private record ReachabilityState(String stationId, int readySeconds, int incomingLine, int transfersUsed) {
 	}
 
 	private record RideLeg(ScheduledTrip scheduledTrip, int fromIndex, int toIndex) {
