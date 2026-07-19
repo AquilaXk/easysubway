@@ -130,7 +130,7 @@ export function evaluateCanaryBudgets(samples, budgets) {
   if (!Array.isArray(samples) || samples.length === 0) {
     throw new Error("canary produced no samples");
   }
-  const normalized = samples.map(normalizeSample);
+  const normalized = samples.map((sample, index) => normalizeSample(sample, index));
   const p95MaxMs = budgets?.p95MaxMs;
   const p99MaxMs = budgets?.p99MaxMs;
   const maxUnexpectedErrors = budgets?.maxUnexpectedErrors ?? 0;
