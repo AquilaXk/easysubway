@@ -79,7 +79,6 @@ public interface LoadRouteTimetablePort {
 			this(serviceCalendars, serviceCalendarDates, transitRoutes, transitTrips, transitStopTimes,
 				transitFrequencies, officialFares, feedEndDate, RouteAccessData.empty());
 		}
-
 		public RouteTimetable(
 			List<ServiceCalendar> serviceCalendars,
 			List<ServiceCalendarDate> serviceCalendarDates,
@@ -134,30 +133,35 @@ public interface LoadRouteTimetablePort {
 			transferRules = List.copyOf(transferRules);
 			routeEdgeEvidence = List.copyOf(routeEdgeEvidence);
 		}
-
 		public static RouteAccessData empty() {
 			return new RouteAccessData(List.of(), List.of(), List.of(), List.of());
 		}
 	}
-
 	record PathwayNode(String id, String stationId, String lineId, String nodeType) {
 	}
-
-	record PathwayEdge(
-		String id,
-		String fromNodeId,
-		String toNodeId,
+		record PathwayEdge(
+			String id,
+			String fromNodeId,
+			String toNodeId,
 		int durationSeconds,
 		int distanceMeters,
 		boolean bidirectional,
 		boolean includesStairs,
 		int reliabilityScore,
-		String accessibilityStatus,
-		String provenanceKind,
-		String verificationStatus
-	) {
-	}
-
+			String accessibilityStatus,
+			String provenanceKind,
+			String verificationStatus,
+			String legacyInternalRouteEdgeId
+		) {
+			public PathwayEdge(
+				String id, String fromNodeId, String toNodeId, int durationSeconds, int distanceMeters,
+				boolean bidirectional, boolean includesStairs, int reliabilityScore,
+				String accessibilityStatus, String provenanceKind, String verificationStatus
+			) {
+				this(id, fromNodeId, toNodeId, durationSeconds, distanceMeters, bidirectional, includesStairs,
+					reliabilityScore, accessibilityStatus, provenanceKind, verificationStatus, id);
+			}
+		}
 	record TransferRule(
 		String id,
 		String fromStationId,
@@ -171,7 +175,6 @@ public interface LoadRouteTimetablePort {
 		String verificationStatus
 	) {
 	}
-
 	record RouteEdgeEvidence(
 		String id,
 		String stationId,
@@ -184,7 +187,6 @@ public interface LoadRouteTimetablePort {
 		String blockerReason
 	) {
 	}
-
 	record ServiceCalendar(
 		String serviceId,
 		boolean monday,

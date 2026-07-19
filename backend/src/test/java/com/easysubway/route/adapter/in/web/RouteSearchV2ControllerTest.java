@@ -191,7 +191,6 @@ class RouteSearchV2ControllerTest {
 				"f".repeat(64)
 			);
 		}
-
 		private static LoadRouteTimetablePort.RouteAccessData verifiedAccessData() {
 			var entry = new LoadRouteTimetablePort.PathwayEdge(
 				"entry", "entrance", "platform-a", 120, 80, false, false, 100,
@@ -200,7 +199,11 @@ class RouteSearchV2ControllerTest {
 				"exit", "platform-b", "gate", 90, 60, false, false, 100,
 				"AVAILABLE", "OFFICIAL_SOURCE", "VERIFIED");
 			return new LoadRouteTimetablePort.RouteAccessData(
-				List.of(),
+				List.of(
+					new LoadRouteTimetablePort.PathwayNode("entrance", "station-sangnoksu", null, "ENTRANCE"),
+					new LoadRouteTimetablePort.PathwayNode("platform-a", "station-sangnoksu", "seoul-4", "PLATFORM"),
+					new LoadRouteTimetablePort.PathwayNode("platform-b", "station-sadang", "seoul-4", "PLATFORM"),
+					new LoadRouteTimetablePort.PathwayNode("gate", "station-sadang", null, "EXIT")),
 				List.of(entry, exit),
 				List.of(),
 				List.of(

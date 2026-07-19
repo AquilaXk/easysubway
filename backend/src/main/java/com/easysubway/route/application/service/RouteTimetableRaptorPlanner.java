@@ -3,6 +3,7 @@ package com.easysubway.route.application.service;
 import com.easysubway.route.application.port.in.RouteV2SearchUseCase.SearchRouteV2Command;
 import com.easysubway.route.application.port.out.LoadRouteTimetablePort;
 import com.easysubway.route.application.port.out.LoadRouteTimetablePort.PathwayEdge;
+import com.easysubway.route.application.port.out.LoadRouteTimetablePort.PathwayNode;
 import com.easysubway.route.application.port.out.LoadRouteTimetablePort.RouteEdgeEvidence;
 import com.easysubway.route.application.port.out.LoadRouteTimetablePort.RouteTimetable;
 import com.easysubway.route.application.port.out.LoadRouteTimetablePort.ServiceCalendar;
@@ -77,7 +78,6 @@ class RouteTimetableRaptorPlanner {
 		return results(command, timetable, serviceDay,
 			scanDestinationLabels(command, timetable, serviceDay, serviceDay.departureSeconds(), false));
 	}
-
 	SearchOutcome searchWithDiagnostics(SearchRouteV2Command command, CompiledTimetable timetable) {
 		ServiceDay serviceDay = serviceDay(command);
 		ScanResult found = scanDestinationLabels(
@@ -93,7 +93,6 @@ class RouteTimetableRaptorPlanner {
 		}
 		return new SearchOutcome(List.of(), blockedAccessibilityResult(command, serviceDay, diagnostic.labels().getFirst()));
 	}
-
 	private static List<RouteSearchResult> results(
 		SearchRouteV2Command command,
 		CompiledTimetable timetable,
@@ -134,7 +133,6 @@ class RouteTimetableRaptorPlanner {
 			LocalDateTime.of(serviceDay.date(), java.time.LocalTime.MIDNIGHT).plusSeconds(diagnostic.startSeconds())
 		);
 	}
-
 	ScanMetrics lastScanMetrics() {
 		ScanWorkspace workspace = scanWorkspaces.get();
 		return new ScanMetrics(
@@ -553,7 +551,6 @@ class RouteTimetableRaptorPlanner {
 		}
 		return best;
 	}
-
 	private static ScheduledTrip earliestBoardableTrip(
 		List<ScheduledTrip> trips,
 		int stopPosition,
@@ -641,7 +638,6 @@ class RouteTimetableRaptorPlanner {
 				&& other.timeSeconds() <= candidate.timeSeconds()))
 			.toList();
 	}
-
 	private static int compareDestinationLabels(Label left, Label right) {
 		RideLeg leftLast = left.path().getLast();
 		RideLeg rightLast = right.path().getLast();
@@ -650,7 +646,6 @@ class RouteTimetableRaptorPlanner {
 			right.timeSeconds(), right.warningBits(), rightLast.scheduledTrip().index(), rightLast.fromIndex()
 		);
 	}
-
 	static int compareReadyBoardingKeys(
 		int leftTime, byte leftWarnings, int leftSlot,
 		int rightTime, byte rightWarnings, int rightSlot,
@@ -666,7 +661,6 @@ class RouteTimetableRaptorPlanner {
 		}
 		return comparison != 0 ? comparison : Integer.compare(leftSlot, rightSlot);
 	}
-
 	static int compareDestinationLabelKeys(
 		int leftTime, byte leftWarnings, int leftTrip, int leftStop,
 		int rightTime, byte rightWarnings, int rightTrip, int rightStop
@@ -676,7 +670,6 @@ class RouteTimetableRaptorPlanner {
 			rightTime, rightWarnings, rightTrip, false);
 		return comparison != 0 ? comparison : Integer.compare(leftStop, rightStop);
 	}
-
 	private static int warningCount(byte warningBits) {
 		return Integer.bitCount(Byte.toUnsignedInt(warningBits));
 	}
@@ -862,7 +855,6 @@ class RouteTimetableRaptorPlanner {
 		};
 		return 1 << (mobility * ConstraintMode.values().length + constraint);
 	}
-
 	private static int profileMask(ConstraintMode... constraintModes) {
 		int mask = 0;
 		for (var mobilityType : com.easysubway.profile.domain.MobilityType.values()) {
@@ -872,7 +864,6 @@ class RouteTimetableRaptorPlanner {
 		}
 		return mask;
 	}
-
 	private static RouteStep timetableAccessStep(
 		int sequence,
 		String stepType,
@@ -934,7 +925,6 @@ class RouteTimetableRaptorPlanner {
 		}
 		return List.copyOf(warnings);
 	}
-
 	private static String serviceTime(ServiceDay serviceDay, int seconds) {
 		return serviceDay.date().atStartOfDay(SERVICE_ZONE)
 			.plusSeconds(seconds)
@@ -1152,7 +1142,6 @@ class RouteTimetableRaptorPlanner {
 		int lineCount() {
 			return lineIndex.size();
 		}
-
 		int stationIndex(String stationId) {
 			return stationIndex.getOrDefault(stationId, -1);
 		}
@@ -1160,47 +1149,36 @@ class RouteTimetableRaptorPlanner {
 		int lineIndex(String lineId) {
 			return lineIndex.getOrDefault(lineId, -1);
 		}
-
 		int entryTransition(int station, int line, int profileBit, boolean ignoreBlocked) {
 			return accessTransitions.entry(station, line, profileBit, ignoreBlocked);
 		}
-
 		int exitTransition(int station, int line, int profileBit, boolean ignoreBlocked) {
 			return accessTransitions.exit(station, line, profileBit, ignoreBlocked);
 		}
-
 		int transferTransition(int station, int fromLine, int toLine, int profileBit, boolean ignoreBlocked) {
 			return accessTransitions.transfer(station, fromLine, toLine, profileBit, ignoreBlocked);
 		}
-
 		int transitionDurationSeconds(int transition) {
 			return accessTransitions.durationSeconds(transition);
 		}
-
 		int transitionDistanceMeters(int transition) {
 			return accessTransitions.distanceMeters(transition);
 		}
-
 		String transitionVerificationStatus(int transition) {
 			return accessTransitions.verificationStatus(transition);
 		}
-
 		byte transitionWarningCodes(int transition, int profileBit, boolean ignoreBlocked) {
 			return accessTransitions.warningCodes(transition, profileBit, ignoreBlocked);
 		}
-
 		boolean transitionIncludesStairs(int transition) {
 			return accessTransitions.includesStairs(transition);
 		}
-
 		boolean transitionVerified(int transition) {
 			return accessTransitions.verified(transition);
 		}
-
 		int unsupportedTransferCount() {
 			return accessTransitions.unsupportedTransferCount();
 		}
-
 		Set<String> coveredStationIds() {
 			return stationIndex.keySet();
 		}
@@ -1404,13 +1382,11 @@ class RouteTimetableRaptorPlanner {
 	}
 
 	private static final class AccessTransitions {
-
 		private static final Comparator<Candidate> CANDIDATE_ORDER = Comparator
 			.comparingInt(Candidate::durationSeconds)
 			.thenComparingInt(candidate -> Integer.bitCount(candidate.warningCodes()))
 			.thenComparingInt(Candidate::distanceMeters)
 			.thenComparing(candidate -> candidate.edgeId() == null ? "" : candidate.edgeId());
-
 		private final int lineCount;
 		private final int[][] entryTransitions;
 		private final int[][] exitTransitions;
@@ -1424,7 +1400,6 @@ class RouteTimetableRaptorPlanner {
 		private final String[] edgeIds;
 		private final String[] verificationStatuses;
 		private final int unsupportedTransferCount;
-
 		private AccessTransitions(
 			int lineCount,
 			int[][] entryTransitions,
@@ -1470,21 +1445,29 @@ class RouteTimetableRaptorPlanner {
 			List<List<Candidate>> exits = candidateLists(stationCount * lineCount);
 			List<List<Candidate>> transfers = candidateLists(stationCount * lineCount * lineCount);
 			Map<String, PathwayEdge> edges = new HashMap<>();
+			Set<String> ambiguousEdgeIds = new HashSet<>();
 			for (PathwayEdge edge : timetable.routeAccessData().pathwayEdges()) {
-				edges.put(edge.id(), edge);
+				indexEdge(edges, ambiguousEdgeIds, edge.id(), edge);
+				indexEdge(edges, ambiguousEdgeIds, edge.legacyInternalRouteEdgeId(), edge);
+			}
+			Map<String, PathwayNode> nodes = new HashMap<>();
+			for (PathwayNode node : timetable.routeAccessData().pathwayNodes()) {
+				nodes.put(node.id(), node);
 			}
 			Map<EvidenceKey, List<RouteEdgeEvidence>> evidenceByIdentity = new HashMap<>();
 			for (RouteEdgeEvidence evidence : timetable.routeAccessData().routeEdgeEvidence()) {
-				evidenceByIdentity.computeIfAbsent(EvidenceKey.from(evidence), ignored -> new ArrayList<>())
+				PathwayEdge edge = edges.get(evidence.edgeId());
+				evidenceByIdentity.computeIfAbsent(EvidenceKey.from(evidence, edge == null ? evidence.edgeId() : edge.id()),
+					ignored -> new ArrayList<>())
 					.add(evidence);
 			}
-
 			for (RouteEdgeEvidence evidence : timetable.routeAccessData().routeEdgeEvidence()) {
 				Integer station = stationIndex.get(evidence.stationId());
 				Integer line = evidence.lineId() == null ? null : lineIndex.get(evidence.lineId());
 				PathwayEdge edge = edges.get(evidence.edgeId());
 				if (station == null || line == null || edge == null
-					|| evidenceByIdentity.get(EvidenceKey.from(evidence)).size() != 1) {
+					|| !ownedByEvidence(edge, evidence, nodes)
+					|| evidenceByIdentity.get(EvidenceKey.from(evidence, edge.id())).size() != 1) {
 					continue;
 				}
 				Candidate candidate = candidate(edge, evidence, null, edge.durationSeconds(), true);
@@ -1494,7 +1477,6 @@ class RouteTimetableRaptorPlanner {
 					exits.get(stationLineKey(station, line, lineCount)).add(candidate);
 				}
 			}
-
 			int unsupported = 0;
 			for (TransferRule rule : timetable.routeAccessData().transferRules()) {
 				if (!rule.fromStationId().equals(rule.toStationId()) || !"IN_STATION".equals(rule.transferType())) {
@@ -1508,8 +1490,8 @@ class RouteTimetableRaptorPlanner {
 					continue;
 				}
 				List<Candidate> candidates = transfers.get(transferKey(station, fromLine, toLine, lineCount));
-				PathwayEdge normalEdge = edges.get(rule.pathwayEdgeId());
-				PathwayEdge strictEdge = edges.get(rule.strictStepFreePathwayEdgeId());
+				PathwayEdge normalEdge = ownedByRule(edges.get(rule.pathwayEdgeId()), rule, nodes);
+				PathwayEdge strictEdge = ownedByRule(edges.get(rule.strictStepFreePathwayEdgeId()), rule, nodes);
 				if (normalEdge == null && strictEdge == null && rule.minTransferSeconds() > 0) {
 					candidates.add(new Candidate(rule.minTransferSeconds(), TRANSFER_DISTANCE_METERS,
 						STRICT_PROFILE_MASK, NON_STRICT_PROFILE_MASK, WARNING_LOW_CONFIDENCE,
@@ -1535,7 +1517,6 @@ class RouteTimetableRaptorPlanner {
 					));
 				}
 			}
-
 			boolean[][] served = new boolean[stationCount][lineCount];
 			for (TransitStopTime stopTime : timetable.transitStopTimes()) {
 				Integer station = stationIndex.get(stopTime.stationId());
@@ -1562,12 +1543,59 @@ class RouteTimetableRaptorPlanner {
 					}
 				}
 			}
-
 			List<Candidate> flattened = new ArrayList<>();
 			int[][] entryIds = flatten(entries, flattened);
 			int[][] exitIds = flatten(exits, flattened);
 			int[][] transferIds = flatten(transfers, flattened);
 			return new AccessTransitions(lineCount, entryIds, exitIds, transferIds, flattened, unsupported);
+		}
+
+		private static void indexEdge(Map<String, PathwayEdge> edges, Set<String> ambiguous, String id, PathwayEdge edge) {
+			if (id == null || id.isBlank() || ambiguous.contains(id)) {
+				return;
+			}
+			PathwayEdge existing = edges.putIfAbsent(id, edge);
+			if (existing != null && existing != edge) {
+				edges.remove(id);
+				ambiguous.add(id);
+			}
+		}
+
+		private static boolean ownedByEvidence(
+			PathwayEdge edge, RouteEdgeEvidence evidence, Map<String, PathwayNode> nodes
+		) {
+			PathwayNode from = nodes.get(edge.fromNodeId()), to = nodes.get(edge.toNodeId());
+			if (from == null || to == null || !evidence.stationId().equals(from.stationId())
+				|| !evidence.stationId().equals(to.stationId())) {
+				return false;
+			}
+			boolean forward = "ENTRY".equals(evidence.edgeType())
+				? lineCompatible(from, evidence.lineId()) && evidence.lineId().equals(to.lineId())
+				: "EXIT".equals(evidence.edgeType())
+					&& evidence.lineId().equals(from.lineId()) && lineCompatible(to, evidence.lineId());
+			boolean reverse = "ENTRY".equals(evidence.edgeType())
+				? lineCompatible(to, evidence.lineId()) && evidence.lineId().equals(from.lineId())
+				: "EXIT".equals(evidence.edgeType())
+					&& evidence.lineId().equals(to.lineId()) && lineCompatible(from, evidence.lineId());
+			return forward || edge.bidirectional() && reverse;
+		}
+
+		private static boolean lineCompatible(PathwayNode node, String lineId) {
+			return node.lineId() == null || lineId.equals(node.lineId());
+		}
+
+		private static PathwayEdge ownedByRule(PathwayEdge edge, TransferRule rule, Map<String, PathwayNode> nodes) {
+			if (edge == null) {
+				return null;
+			}
+			PathwayNode from = nodes.get(edge.fromNodeId()), to = nodes.get(edge.toNodeId());
+			boolean forward = from != null && to != null && rule.fromStationId().equals(from.stationId())
+				&& rule.toStationId().equals(to.stationId()) && rule.fromLineId().equals(from.lineId())
+				&& rule.toLineId().equals(to.lineId());
+			boolean reverse = edge.bidirectional() && from != null && to != null
+				&& rule.fromStationId().equals(to.stationId()) && rule.toStationId().equals(from.stationId())
+				&& rule.fromLineId().equals(to.lineId()) && rule.toLineId().equals(from.lineId());
+			return forward || reverse ? edge : null;
 		}
 
 		private static Candidate candidate(
@@ -1676,7 +1704,6 @@ class RouteTimetableRaptorPlanner {
 				));
 			}
 		}
-
 		private static List<List<Candidate>> candidateLists(int size) {
 			List<List<Candidate>> candidates = new ArrayList<>(size);
 			for (int index = 0; index < size; index += 1) {
@@ -1684,7 +1711,6 @@ class RouteTimetableRaptorPlanner {
 			}
 			return candidates;
 		}
-
 		private static int[][] flatten(List<List<Candidate>> source, List<Candidate> flattened) {
 			int[][] indexes = new int[source.size()][];
 			for (int key = 0; key < source.size(); key += 1) {
@@ -1703,27 +1729,21 @@ class RouteTimetableRaptorPlanner {
 			}
 			return indexes;
 		}
-
 		private static int stationLineKey(int station, int line, int lineCount) {
 			return station * lineCount + line;
 		}
-
 		private static int transferKey(int station, int fromLine, int toLine, int lineCount) {
 			return (station * lineCount + fromLine) * lineCount + toLine;
 		}
-
 		private int entry(int station, int line, int profileBit, boolean ignoreBlocked) {
 			return select(entryTransitions[stationLineKey(station, line, lineCount)], profileBit, ignoreBlocked);
 		}
-
 		private int exit(int station, int line, int profileBit, boolean ignoreBlocked) {
 			return select(exitTransitions[stationLineKey(station, line, lineCount)], profileBit, ignoreBlocked);
 		}
-
 		private int transfer(int station, int fromLine, int toLine, int profileBit, boolean ignoreBlocked) {
 			return select(transferTransitions[transferKey(station, fromLine, toLine, lineCount)], profileBit, ignoreBlocked);
 		}
-
 		private int select(int[] candidates, int profileBit, boolean ignoreBlocked) {
 			for (int transition : candidates) {
 				if (ignoreBlocked || (blockedProfiles[transition] & profileBit) == 0) {
@@ -1732,36 +1752,28 @@ class RouteTimetableRaptorPlanner {
 			}
 			return -1;
 		}
-
 		private int durationSeconds(int transition) {
 			return durationSeconds[transition];
 		}
-
 		private int distanceMeters(int transition) {
 			return distanceMeters[transition];
 		}
-
 		private String verificationStatus(int transition) {
 			return verificationStatuses[transition];
 		}
-
 		private byte warningCodes(int transition, int profileBit, boolean ignoreBlocked) {
 			return ignoreBlocked || (warningProfiles[transition] & profileBit) != 0 ? warningCodes[transition] : 0;
 		}
-
 		private boolean includesStairs(int transition) {
 			return includesStairs[transition];
 		}
-
 		private boolean verified(int transition) {
 			return "VERIFIED".equals(verificationStatuses[transition])
 				&& (warningCodes[transition] & (WARNING_LOW_CONFIDENCE | WARNING_STALE)) == 0;
 		}
-
 		private int unsupportedTransferCount() {
 			return unsupportedTransferCount;
 		}
-
 		private record Candidate(
 			int durationSeconds,
 			int distanceMeters,
@@ -1773,15 +1785,13 @@ class RouteTimetableRaptorPlanner {
 			String verificationStatus
 		) {
 		}
-
 		private record EvidenceKey(String stationId, String lineId, String edgeId, String edgeType) {
-			private static EvidenceKey from(RouteEdgeEvidence evidence) {
+			private static EvidenceKey from(RouteEdgeEvidence evidence, String edgeId) {
 				return new EvidenceKey(
-					evidence.stationId(), evidence.lineId(), evidence.edgeId(), evidence.edgeType());
+					evidence.stationId(), evidence.lineId(), edgeId, evidence.edgeType());
 			}
 		}
 	}
-
 	static final class ActiveServiceDay {
 
 		private final List<ScheduledTrip> trips;
@@ -1932,7 +1942,6 @@ class RouteTimetableRaptorPlanner {
 		private int slot(int boardings, int station, int incomingLine) {
 			return (boardings * stationCount + station) * lineStateCount + incomingLine;
 		}
-
 		private int noIncomingLine() {
 			return lineStateCount - 1;
 		}
@@ -2033,13 +2042,11 @@ class RouteTimetableRaptorPlanner {
 		byte warningBits
 	) {
 	}
-
 	record SearchOutcome(List<RouteSearchResult> itineraries, RouteSearchResult blockedAccessibility) {
 		SearchOutcome {
 			itineraries = List.copyOf(itineraries);
 		}
 	}
-
 	record ScanMetrics(int expandedRoutes, int expandedTrips, int workspaceIdentity) {
 	}
 
@@ -2095,7 +2102,6 @@ class RouteTimetableRaptorPlanner {
 		private boolean allowsDropOff(int stopIndex) {
 			return times.allowsDropOff(stopIndex);
 		}
-
 		private String lineId(int stopIndex) {
 			return stopTimes.get(stopIndex).lineId();
 		}

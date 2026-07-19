@@ -59,7 +59,6 @@ class LoadRouteTimetablePortTest {
 			false
 		)).isInstanceOf(IllegalArgumentException.class);
 	}
-
 	@Test
 	@DisplayName("접근성 snapshot row는 immutable copy로 보관한다")
 	void routeAccessDataCopiesRows() {
@@ -67,9 +66,7 @@ class LoadRouteTimetablePortTest {
 			new LoadRouteTimetablePort.PathwayNode("node-1", "station-a", "line-a", "PLATFORM")
 		));
 		var accessData = new LoadRouteTimetablePort.RouteAccessData(nodes, List.of(), List.of(), List.of());
-
 		nodes.clear();
-
 		assertThat(accessData.pathwayNodes()).hasSize(1);
 		assertThatThrownBy(() -> accessData.pathwayNodes().clear())
 			.isInstanceOf(UnsupportedOperationException.class);

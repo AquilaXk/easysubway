@@ -115,13 +115,11 @@ class JdbcRouteTimetableRepositoryTest {
 			.isEqualTo("f".repeat(64) + "b".repeat(64) + "2999-01-01T00:00:00Z")
 			.isNotEqualTo(firstKey);
 	}
-
 	@Test
 	@DisplayName("canonical pack SHA가 바뀌면 cache key가 바뀐다")
 	void changesCacheKeyWhenCanonicalPackShaChanges() {
 		insertItxRows("2999-01-01T00:00:00Z");
 		String firstKey = repository.timetableCacheKey();
-
 		jdbcTemplate.update(
 			"UPDATE timetable_snapshot_history SET canonical_pack_sha256 = ? WHERE snapshot_sha256 = ?",
 			"9".repeat(64),
@@ -131,7 +129,6 @@ class JdbcRouteTimetableRepositoryTest {
 			"UPDATE route_service_artifact_evidence SET canonical_pack_sha256 = ? WHERE service_class = 'ITX_CHEONGCHUN'",
 			"9".repeat(64)
 		);
-
 		assertThat(repository.timetableCacheKey())
 			.isEqualTo("a".repeat(64) + "9".repeat(64) + "2999-01-01T00:00:00Z")
 			.isNotEqualTo(firstKey);
@@ -196,24 +193,22 @@ class JdbcRouteTimetableRepositoryTest {
 		insertTimetableRows();
 		insertItxRows("2999-01-01T00:00:00Z");
 		insertRouteAccessRows();
-
 		var access = repository.loadRouteTimetableSnapshot().timetable().routeAccessData();
-
 		assertThat(access.pathwayNodes()).extracting("id")
 			.containsExactly("node-entry", "node-platform");
 		assertThat(access.pathwayEdges()).singleElement().satisfies(edge -> {
 			assertThat(edge.id()).isEqualTo("edge-entry");
+			assertThat(edge.legacyInternalRouteEdgeId()).isEqualTo("legacy-entry");
 			assertThat(edge.durationSeconds()).isEqualTo(120);
 			assertThat(edge.includesStairs()).isFalse();
 		});
 		assertThat(access.transferRules()).singleElement().satisfies(rule ->
 			assertThat(rule.strictStepFreePathwayEdgeId()).isEqualTo("edge-entry"));
 		assertThat(access.routeEdgeEvidence()).singleElement().satisfies(evidence -> {
-			assertThat(evidence.edgeId()).isEqualTo("edge-entry");
+			assertThat(evidence.edgeId()).isEqualTo("legacy-entry");
 			assertThat(evidence.strictRouteEligible()).isTrue();
 		});
 	}
-
 	@Test
 	@DisplayName("missing·schema-invalid·lineage mismatch active snapshot은 모두 fail closed한다")
 	void rejectsMissingInvalidSchemaAndLineageMismatch() {
@@ -372,7 +367,6 @@ class JdbcRouteTimetableRepositoryTest {
 			jdbcTemplate.queryForObject("SELECT COUNT(*) FROM transit_stop_times", Integer.class)
 		);
 	}
-
 	private void insertRouteAccessRows() {
 		jdbcTemplate.update("""
 			INSERT INTO data_source_snapshots (
@@ -395,10 +389,10 @@ class JdbcRouteTimetableRepositoryTest {
 		jdbcTemplate.update("""
 			INSERT INTO station_pathway_edges (
 				id, from_node_id, to_node_id, duration_seconds, distance_meters,
-				includes_stairs, provenance_kind, verification_status
+				includes_stairs, provenance_kind, verification_status, legacy_internal_route_edge_id
 			) VALUES (
 				'edge-entry', 'node-entry', 'node-platform', 120, 80,
-				FALSE, 'OFFICIAL_SOURCE', 'VERIFIED'
+				FALSE, 'OFFICIAL_SOURCE', 'VERIFIED', 'legacy-entry'
 			)
 			""");
 		jdbcTemplate.update("""
@@ -417,7 +411,7 @@ class JdbcRouteTimetableRepositoryTest {
 				provenance_kind, verification_status, last_verified_at, evidence_hash,
 				strict_route_eligible, created_at
 			) VALUES (
-				'evidence-entry', 'station-sangnoksu', 'seoul-4', 'edge-entry', 'ENTRY',
+				'evidence-entry', 'station-sangnoksu', 'seoul-4', 'legacy-entry', 'ENTRY',
 				'operator-source', 'access-snapshot', 'OFFICIAL_SOURCE', 'VERIFIED',
 				CURRENT_TIMESTAMP, ?, TRUE, CURRENT_TIMESTAMP
 			)

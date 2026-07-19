@@ -67,7 +67,6 @@ class RouteTimetableRaptorPlannerDifferentialTest {
 		List<LocalDate> serviceDates = List.of(SERVICE_DATE, SERVICE_DATE.plusDays(5));
 		int[] departureBands = {19800, 30600, 82800, 90000};
 		int samples = 0;
-
 		for (OdCase odCase : odCases) {
 			for (MobilityType mobilityType : MobilityType.values()) {
 				for (ConstraintMode constraintMode : ConstraintMode.values()) {
@@ -79,7 +78,6 @@ class RouteTimetableRaptorPlannerDifferentialTest {
 							var current = planner.searchWithDiagnostics(command, compiled);
 							String sample = "%s/%s/%s/%s/%s".formatted(
 								odCase.name(), mobilityType, constraintMode, serviceDate, departureSeconds);
-
 							if (odCase.accessBlocked() && constraintMode == ConstraintMode.STRICT_STEP_FREE) {
 								assertThat(legacy).as("의도 차이[%s]: 고정 access 구 엔진은 통과", sample).isNotEmpty();
 								assertThat(current.itineraries()).as(sample).isEmpty();
@@ -113,10 +111,8 @@ class RouteTimetableRaptorPlannerDifferentialTest {
 				}
 			}
 		}
-
 		assertThat(samples).isEqualTo(720);
 	}
-
 	private static List<Signature> exhaustiveSignatures(SearchRouteV2Command command, RouteTimetable timetable) {
 		Map<String, LoadRouteTimetablePort.TransitRoute> routes = new HashMap<>();
 		for (var route : timetable.transitRoutes()) {
@@ -283,7 +279,6 @@ class RouteTimetableRaptorPlannerDifferentialTest {
 			3
 		);
 	}
-
 	private static RouteTimetable accessibilityMatrixTimetable() {
 		var daily = new LoadRouteTimetablePort.ServiceCalendar(
 			"daily", true, true, true, true, true, true, true,
@@ -313,7 +308,6 @@ class RouteTimetableRaptorPlannerDifferentialTest {
 		return new RouteTimetable(
 			List.of(daily), List.of(), routes, trips, stops, List.of(), List.of(), null, matrixAccessData());
 	}
-
 	private static void addTrip(
 		List<LoadRouteTimetablePort.TransitTrip> trips,
 		List<LoadRouteTimetablePort.TransitStopTime> stops,
@@ -327,34 +321,35 @@ class RouteTimetableRaptorPlannerDifferentialTest {
 			stops.add(stop(tripId, index + 1, spec.stationId(), spec.lineId(), spec.seconds()));
 		}
 	}
-
 	private static StopSpec stopSpec(String stationId, String lineId, int seconds) {
 		return new StopSpec(stationId, lineId, seconds);
 	}
-
 	private static LoadRouteTimetablePort.RouteAccessData matrixAccessData() {
+		List<LoadRouteTimetablePort.PathwayNode> nodes = new ArrayList<>();
 		List<LoadRouteTimetablePort.PathwayEdge> edges = new ArrayList<>();
 		List<LoadRouteTimetablePort.RouteEdgeEvidence> evidence = new ArrayList<>();
 		for (String stationLine : List.of(
 			"a:l1", "b:l1", "c:l1", "b:l2", "d:l2", "e:l2", "e:l3", "f:l3",
 			"x:lx", "y:lx", "z:lz", "w:lz", "blocked-b:lb")) {
 			String[] parts = stationLine.split(":");
-			addVerifiedAccess(edges, evidence, parts[0], parts[1]);
+			addVerifiedAccess(nodes, edges, evidence, parts[0], parts[1]);
 		}
 		var generatedEntry = new LoadRouteTimetablePort.PathwayEdge(
 			"blocked-entry", "blocked-entrance", "blocked-platform", 240, 180, false, false, 40,
 			"UNKNOWN", "GENERATED", "GENERATED");
 		edges.add(generatedEntry);
+		nodes.add(new LoadRouteTimetablePort.PathwayNode("blocked-entrance", "blocked-a", null, "ENTRANCE"));
+		nodes.add(new LoadRouteTimetablePort.PathwayNode("blocked-platform", "blocked-a", "lb", "PLATFORM"));
 		evidence.add(new LoadRouteTimetablePort.RouteEdgeEvidence(
 			"blocked-entry-evidence", "blocked-a", "lb", generatedEntry.id(), "ENTRY",
 			"GENERATED", "GENERATED", false, "GENERATED"));
 		List<LoadRouteTimetablePort.TransferRule> transfers = new ArrayList<>();
-		addVerifiedTransfer(edges, evidence, transfers, "b", "l1", "l2");
-		addVerifiedTransfer(edges, evidence, transfers, "e", "l2", "l3");
-		return new LoadRouteTimetablePort.RouteAccessData(List.of(), edges, transfers, evidence);
+		addVerifiedTransfer(nodes, edges, evidence, transfers, "b", "l1", "l2");
+		addVerifiedTransfer(nodes, edges, evidence, transfers, "e", "l2", "l3");
+		return new LoadRouteTimetablePort.RouteAccessData(nodes, edges, transfers, evidence);
 	}
-
 	private static void addVerifiedAccess(
+		List<LoadRouteTimetablePort.PathwayNode> nodes,
 		List<LoadRouteTimetablePort.PathwayEdge> edges,
 		List<LoadRouteTimetablePort.RouteEdgeEvidence> evidence,
 		String station,
@@ -365,11 +360,15 @@ class RouteTimetableRaptorPlannerDifferentialTest {
 		var exit = verifiedEdge(key + "-exit", 180, 120);
 		edges.add(entry);
 		edges.add(exit);
+		nodes.add(new LoadRouteTimetablePort.PathwayNode(entry.fromNodeId(), station, null, "ENTRANCE"));
+		nodes.add(new LoadRouteTimetablePort.PathwayNode(entry.toNodeId(), station, line, "PLATFORM"));
+		nodes.add(new LoadRouteTimetablePort.PathwayNode(exit.fromNodeId(), station, line, "PLATFORM"));
+		nodes.add(new LoadRouteTimetablePort.PathwayNode(exit.toNodeId(), station, null, "EXIT"));
 		evidence.add(verifiedEvidence(key + "-entry-evidence", station, line, entry.id(), "ENTRY"));
 		evidence.add(verifiedEvidence(key + "-exit-evidence", station, line, exit.id(), "EXIT"));
 	}
-
 	private static void addVerifiedTransfer(
+		List<LoadRouteTimetablePort.PathwayNode> nodes,
 		List<LoadRouteTimetablePort.PathwayEdge> edges,
 		List<LoadRouteTimetablePort.RouteEdgeEvidence> evidence,
 		List<LoadRouteTimetablePort.TransferRule> transfers,
@@ -384,26 +383,27 @@ class RouteTimetableRaptorPlannerDifferentialTest {
 		var stepFreeEdge = verifiedEdge(key + "-step-free", 360, 260);
 		edges.add(stairEdge);
 		edges.add(stepFreeEdge);
+		for (var edge : List.of(stairEdge, stepFreeEdge)) {
+			nodes.add(new LoadRouteTimetablePort.PathwayNode(edge.fromNodeId(), station, fromLine, "PLATFORM"));
+			nodes.add(new LoadRouteTimetablePort.PathwayNode(edge.toNodeId(), station, toLine, "PLATFORM"));
+		}
 		evidence.add(verifiedEvidence(key + "-stairs-evidence", station, toLine, stairEdge.id(), "TRANSFER"));
 		evidence.add(verifiedEvidence(key + "-step-free-evidence", station, toLine, stepFreeEdge.id(), "TRANSFER"));
 		transfers.add(new LoadRouteTimetablePort.TransferRule(
 			key + "-rule", station, fromLine, station, toLine, "IN_STATION", 360,
 			stairEdge.id(), stepFreeEdge.id(), "VERIFIED"));
 	}
-
 	private static LoadRouteTimetablePort.PathwayEdge verifiedEdge(String id, int duration, int distance) {
 		return new LoadRouteTimetablePort.PathwayEdge(
 			id, id + "-from", id + "-to", duration, distance, false, false, 100,
 			"AVAILABLE", "OFFICIAL_SOURCE", "VERIFIED");
 	}
-
 	private static LoadRouteTimetablePort.RouteEdgeEvidence verifiedEvidence(
 		String id, String station, String line, String edgeId, String edgeType
 	) {
 		return new LoadRouteTimetablePort.RouteEdgeEvidence(
 			id, station, line, edgeId, edgeType, "OFFICIAL_SOURCE", "VERIFIED", true, null);
 	}
-
 	private static LoadRouteTimetablePort.TransitRoute route(String id, String lineId) {
 		return new LoadRouteTimetablePort.TransitRoute(id, lineId, id, id, id, "Asia/Seoul");
 	}
@@ -424,10 +424,8 @@ class RouteTimetableRaptorPlannerDifferentialTest {
 
 	private record OdCase(String name, String origin, String destination, int maxTransfers, boolean accessBlocked) {
 	}
-
 	private record StopSpec(String stationId, String lineId, int seconds) {
 	}
-
 	private record ReferenceTrip(
 		LoadRouteTimetablePort.TransitTrip trip,
 		LoadRouteTimetablePort.TransitRoute route,

@@ -251,7 +251,6 @@ public class JdbcRouteTimetableRepository implements LoadRouteTimetablePort {
 			loadRouteAccessData()
 		);
 	}
-
 	private RouteAccessData loadRouteAccessData() {
 		return new RouteAccessData(
 			jdbcTemplate.query(
@@ -271,7 +270,7 @@ public class JdbcRouteTimetableRepository implements LoadRouteTimetablePort {
 				"""
 					SELECT id, from_node_id, to_node_id, duration_seconds, distance_meters,
 						bidirectional, includes_stairs, reliability_score, accessibility_status,
-						provenance_kind, verification_status
+						provenance_kind, verification_status, legacy_internal_route_edge_id
 					FROM station_pathway_edges
 					ORDER BY id
 					""",
@@ -286,7 +285,8 @@ public class JdbcRouteTimetableRepository implements LoadRouteTimetablePort {
 					resultSet.getInt("reliability_score"),
 					resultSet.getString("accessibility_status"),
 					resultSet.getString("provenance_kind"),
-					resultSet.getString("verification_status")
+					resultSet.getString("verification_status"),
+					resultSet.getString("legacy_internal_route_edge_id")
 				)
 			),
 			jdbcTemplate.query(
@@ -357,7 +357,6 @@ public class JdbcRouteTimetableRepository implements LoadRouteTimetablePort {
 			+ artifact.plannerIdentity().canonicalPackSha256()
 			+ artifact.freshUntil();
 	}
-
 	private LocalDate loadFeedEndDate() {
 		List<LocalDate> rows = jdbcTemplate.query(
 			"SELECT feed_end_date FROM transit_feed_info LIMIT 1",
