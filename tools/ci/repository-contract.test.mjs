@@ -990,18 +990,23 @@ test("Admin QA Gates는 실제 브라우저 QA를 shadow로 통합하고 require
   assert.match(adminQaJob, /node tools\/ci\/check-admin-vendor-integrity\.mjs/);
   assert.match(adminQaJob, /npm test --prefix tools\/qa/);
 
-  // admin 관련 경로(backend surface) 변경에서만 heavy browser step을 실행한다.
+  // admin 관련 경로(backend surface) 변경에서만 heavy browser step(boot·seed·harness)을 실행한다.
   assert.match(adminQaJob, /Admin QA Gates \/ Set up Java for actual browser QA/);
   assert.match(adminQaJob, /Admin QA Gates \/ Set up Chrome for actual browser QA/);
   assert.match(adminQaJob, /Admin QA Gates \/ Build backend for actual browser QA/);
   assert.match(adminQaJob, /\.\/gradlew bootJar --no-daemon/);
+  assert.match(adminQaJob, /Admin QA Gates \/ Boot backend for actual browser QA/);
+  assert.match(adminQaJob, /Admin QA Gates \/ Seed CI facility report photo for actual browser QA/);
   assert.match(adminQaJob, /Admin QA Gates \/ Actual browser accessibility QA \(shadow\)/);
+  assert.match(adminQaJob, /Admin QA Gates \/ Stop backend for actual browser QA/);
   assert.match(adminQaJob, /node tools\/qa\/admin-accessibility-qa\.mjs --output/);
-  // Java·Chrome·build·browser step은 모두 backend == 'true' gate로만 실행한다.
+  // Java·Chrome·build·boot·seed·harness step은 모두 backend == 'true' gate로만 실행한다.
   for (const step of [
     "Set up Java for actual browser QA",
     "Set up Chrome for actual browser QA",
     "Build backend for actual browser QA",
+    "Boot backend for actual browser QA",
+    "Seed CI facility report photo for actual browser QA",
     "Actual browser accessibility QA \\(shadow\\)",
   ]) {
     const stepBlock = adminQaJob.match(new RegExp(`- name: Admin QA Gates / ${step}[\\s\\S]*?\\n      - `))?.[0] ?? "";
@@ -1013,7 +1018,37 @@ test("Admin QA Gates는 실제 브라우저 QA를 shadow로 통합하고 require
   assert.match(adminQaJob, /needs\.changes\.outputs\.backend != 'true'/);
   assert.match(adminQaJob, /skipping the actual browser accessibility QA step\./);
 
-  // shadow↔blocking 승격 스위치: browser step은 continue-on-error(shadow)로 둔다.
+  // #2283 V6-11: browser step 직전 seed 단계는 dev/H2의 빈 신고 대기열(V6-08 report-queue-action
+  // -signal이 항상 blocking되는 seed-data gap)을 해소한다. 공개 API로 사진 첨부 신고 1건을 시드하고,
+  // 임의 재시도 없이 실패 시 job을 실패시킨다(shadow 여부와 무관하게 seed 단계는 continue-on-error가 아니다).
+  const seedStep = adminQaJob.match(
+    /- name: Admin QA Gates \/ Seed CI facility report photo for actual browser QA[\s\S]*?\n      (?:#|- name:)/,
+  )?.[0] ?? "";
+  assert.doesNotMatch(seedStep, /continue-on-error/);
+  assert.doesNotMatch(seedStep, /\bretry\b/i);
+  assert.match(seedStep, /station-sangnoksu/);
+  assert.match(seedStep, /facility-sangnoksu-elevator-1/);
+  assert.match(seedStep, /photoDataBase64/);
+  assert.match(seedStep, /POST http:\/\/localhost:8080\/api\/v1\/reports/);
+  assert.match(seedStep, /if \[\[ "\$\{http_code\}" != "201" \]\]; then/);
+  assert.match(seedStep, /exit 1/);
+  assert.doesNotMatch(seedStep, /secrets\./);
+
+  // boot 단계는 backend 실행 실패를 shadow와 무관하게 job 실패로 표면화한다(continue-on-error 아님).
+  const bootStep = adminQaJob.match(
+    /- name: Admin QA Gates \/ Boot backend for actual browser QA[\s\S]*?\n      (?:#|- name:)/,
+  )?.[0] ?? "";
+  assert.doesNotMatch(bootStep, /continue-on-error/);
+  assert.doesNotMatch(bootStep, /\bretry\b/i);
+  assert.match(bootStep, /openssl rand -hex 24/);
+  assert.match(bootStep, /::add-mask::\$\{admin_pw\}/);
+  assert.match(bootStep, /::add-mask::\$\{operator_pw\}/);
+  assert.match(bootStep, />> "\$\{GITHUB_ENV\}"/);
+  assert.match(bootStep, /if \[\[ "\$\{ready\}" != "1" \]\]; then/);
+  assert.doesNotMatch(bootStep, /secrets\./);
+
+  // shadow↔blocking 승격 스위치: harness 호출만 continue-on-error(shadow)로 둔다. boot·seed는
+  // 항상 강제 성공이어야 하므로 승격 스위치 대상에서 제외한다.
   const browserStep = adminQaJob.match(
     /- name: Admin QA Gates \/ Actual browser accessibility QA \(shadow\)[\s\S]*?\n      - name:/,
   )?.[0] ?? "";
@@ -1021,23 +1056,26 @@ test("Admin QA Gates는 실제 브라우저 QA를 shadow로 통합하고 require
   assert.match(browserStep, /continue-on-error: true/);
   // arbitrary retry로 flaky를 숨기지 않는다.
   assert.doesNotMatch(browserStep, /\bretry\b/i);
+  // harness step 자체는 backend boot·seed 로직을 갖지 않는다(Boot·Seed 단계로 이관).
+  assert.doesNotMatch(browserStep, /openssl rand/);
+  assert.doesNotMatch(browserStep, /photoDataBase64/);
 
-  // shadow artifact(report JSON·스크린샷)와 job summary를 항상 남긴다.
+  // shadow artifact(report JSON·스크린샷)와 job summary를 항상 남기고, backend는 항상 정리한다.
   assert.match(adminQaJob, /Admin QA Gates \/ Upload actual browser QA artifacts \(shadow\)/);
   assert.match(adminQaJob, /actions\/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02/);
   assert.match(adminQaJob, /Admin QA Gates \/ Summarize actual browser QA \(shadow\)/);
   assert.match(adminQaJob, /GITHUB_STEP_SUMMARY/);
+  const stopStep = adminQaJob.match(
+    /- name: Admin QA Gates \/ Stop backend for actual browser QA[\s\S]*?\n      - name:/,
+  )?.[0] ?? "";
+  assert.match(stopStep, /always\(\) && needs\.changes\.outputs\.backend == 'true'/);
+  assert.match(stopStep, /BACKEND_QA_PID/);
   // tested revision·seed·profile을 artifact/summary에 기록한다.
   assert.match(adminQaJob, /testedRevision/);
   assert.match(adminQaJob, /"database": "h2-in-memory"/);
 
-  // CI 러너 sandbox 완화·임시 계정 비밀번호 마스킹(로그에 비밀 미출력).
-  assert.match(adminQaJob, /ADMIN_QA_CHROME_NO_SANDBOX: "1"/);
-  assert.match(adminQaJob, /openssl rand -hex 24/);
-  assert.match(adminQaJob, /::add-mask::\$\{admin_pw\}/);
-  assert.match(adminQaJob, /::add-mask::\$\{operator_pw\}/);
-  // 실제 브라우저 QA 경로는 repository secret을 쓰지 않는다(비밀은 실행 시 생성).
-  assert.doesNotMatch(browserStep, /secrets\./);
+  // CI 러너 sandbox 완화(harness step).
+  assert.match(browserStep, /ADMIN_QA_CHROME_NO_SANDBOX: "1"/);
 });
 
 test("main ruleset 필수 체크는 ci.yml 잡 이름·automerge 코디네이터와 1:1로 고정된다", () => {

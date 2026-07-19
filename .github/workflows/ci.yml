@@ -194,51 +194,43 @@ jobs:
           chmod +x gradlew
           ./gradlew bootJar --no-daemon
 
-      # #2283 V6-11: SHADOW 단계. backend를 dev/H2로 부팅하고 실제 브라우저 하네스를 완주시킨다.
-      # continue-on-error: true 한 줄이 shadow↔blocking 승격 스위치다(이 줄을 지우면 required
-      # check `Admin QA Gates`가 그대로 blocking이 된다 — 잡 이름·기존 단계는 변경하지 않는다).
-      # 임시 admin·operator 계정 비밀번호는 실행 시 생성해 마스킹하고 로그에 출력하지 않는다.
-      - name: Admin QA Gates / Actual browser accessibility QA (shadow)
+      # #2283 V6-11: backend를 dev/H2로 부팅해 이후 seed·harness 단계가 같은 러너에서 공유한다
+      # (백그라운드 프로세스는 스텝 경계를 넘어 같은 러너 VM에서 유지된다). 임시 admin·operator
+      # 계정 비밀번호는 이 스텝에서 생성·마스킹해 GITHUB_ENV로 다음 스텝에 전달한다(로그에 비밀
+      # 미출력, repository secret 미사용). backend 부팅 실패는 shadow와 무관하게 job을 실패시킨다.
+      - name: Admin QA Gates / Boot backend for actual browser QA
         if: ${{ needs.changes.outputs.backend == 'true' }}
-        id: browser-qa
-        continue-on-error: true
         env:
-          CHROME_PATH: ${{ steps.setup-chrome-a11y.outputs.chrome-path }}
-          ADMIN_QA_CHROME_NO_SANDBOX: "1"
+          SPRING_PROFILES_ACTIVE: dev
+          EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED: "false"
           ADMIN_QA_OUTPUT_DIR: artifacts/admin-qa
-          NODE_OPTIONS: --disable-warning=ExperimentalWarning
         run: |
           set -euo pipefail
           mkdir -p "${ADMIN_QA_OUTPUT_DIR}"
-          cat > "${ADMIN_QA_OUTPUT_DIR}/run-manifest.json" <<EOF
-          {
-            "testedRevision": "${GITHUB_SHA}",
-            "profile": "dev",
-            "database": "h2-in-memory",
-            "seed": "ephemeral env admin/operator bootstrap accounts (never printed)",
-            "viewports": ["desktop-1440", "desktop-1280", "tablet-1024", "mobile-390", "mobile-320"],
-            "textScale": "200%",
-            "reflow": "400% (320px target width)",
-            "command": "node tools/qa/admin-accessibility-qa.mjs --output ${ADMIN_QA_OUTPUT_DIR}",
-            "mode": "shadow"
-          }
-          EOF
 
-          export SPRING_PROFILES_ACTIVE=dev
-          export EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED=false
-          export EASYSUBWAY_ADMIN_USERNAME=admin-qa
-          export EASYSUBWAY_OPERATOR_USERNAME=operator-qa
+          admin_user="admin-qa"
+          operator_user="operator-qa"
           admin_pw="$(openssl rand -hex 24)"
           operator_pw="$(openssl rand -hex 24)"
           echo "::add-mask::${admin_pw}"
           echo "::add-mask::${operator_pw}"
-          export EASYSUBWAY_ADMIN_PASSWORD="${admin_pw}"
-          export EASYSUBWAY_OPERATOR_PASSWORD="${operator_pw}"
+          {
+            echo "ADMIN_QA_ADMIN_USER=${admin_user}"
+            echo "ADMIN_QA_ADMIN_PASSWORD=${admin_pw}"
+            echo "ADMIN_QA_OPERATOR_USER=${operator_user}"
+            echo "ADMIN_QA_OPERATOR_PASSWORD=${operator_pw}"
+          } >> "${GITHUB_ENV}"
 
           jar="$(ls backend/build/libs/*.jar | grep -v -- '-plain\.jar' | head -n1)"
           echo "Booting backend (profile=dev, H2 in-memory): ${jar}"
-          java -jar "${jar}" > backend-qa.log 2>&1 &
+          EASYSUBWAY_ADMIN_USERNAME="${admin_user}" \
+          EASYSUBWAY_ADMIN_PASSWORD="${admin_pw}" \
+          EASYSUBWAY_OPERATOR_USERNAME="${operator_user}" \
+          EASYSUBWAY_OPERATOR_PASSWORD="${operator_pw}" \
+          nohup java -jar "${jar}" > "${ADMIN_QA_OUTPUT_DIR}/backend-qa.log" 2>&1 &
           backend_pid=$!
+          disown
+          echo "BACKEND_QA_PID=${backend_pid}" >> "${GITHUB_ENV}"
 
           ready=0
           for _ in $(seq 1 60); do
@@ -252,26 +244,86 @@ jobs:
             fi
             sleep 3
           done
-
-          harness_status=1
-          if [[ "${ready}" == "1" ]]; then
-            set +e
-            ADMIN_QA_BASE_URL=http://localhost:8080 \
-            ADMIN_QA_ADMIN_USER="${EASYSUBWAY_ADMIN_USERNAME}" \
-            ADMIN_QA_ADMIN_PASSWORD="${admin_pw}" \
-            ADMIN_QA_OPERATOR_USER="${EASYSUBWAY_OPERATOR_USERNAME}" \
-            ADMIN_QA_OPERATOR_PASSWORD="${operator_pw}" \
-            node tools/qa/admin-accessibility-qa.mjs --output "${ADMIN_QA_OUTPUT_DIR}"
-            harness_status=$?
-            set -e
-          else
-            echo "backend did not become ready; harness not run (see backend-qa.log artifact)"
+          if [[ "${ready}" != "1" ]]; then
+            echo "backend did not become ready (see backend-qa.log artifact)"
+            exit 1
           fi
 
-          kill "${backend_pid}" 2>/dev/null || true
-          wait "${backend_pid}" 2>/dev/null || true
-          cp backend-qa.log "${ADMIN_QA_OUTPUT_DIR}/backend-qa.log" 2>/dev/null || true
-          exit "${harness_status}"
+      # #2283 V6-11: browser step 직전 seed 단계. 신고 사진 fail-closed 검사(#2280 V6-08 report-queue
+      # -action-signal)는 dev/H2의 빈 신고 대기열에서 썸네일 0개로 항상 blocking되므로, 공개 API
+      # (POST /api/v1/reports, photoDataBase64 인라인 경로)로 사진 첨부 신고 1건을 시드해 전제를
+      # 확보한다. station-sangnoksu·facility-sangnoksu-elevator-1은 InMemoryTransitMasterRepository가
+      # dev 프로파일에서 항상 시드하는 고정 식별자다(§#2277 AdminAccessibilitySmokeTest와 동일 fixture).
+      # 임의 재시도 없이 단발 요청 실패는 그대로 job을 실패시킨다.
+      - name: Admin QA Gates / Seed CI facility report photo for actual browser QA
+        if: ${{ needs.changes.outputs.backend == 'true' }}
+        run: |
+          set -euo pipefail
+          # FacilityReportControllerTest의 VALID_PNG_BASE64와 동일한 1x1 PNG golden fixture(비밀 아님).
+          photo_base64="iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+          payload="$(node -e '
+            const [stationId, facilityId, photoBase64] = process.argv.slice(1);
+            process.stdout.write(JSON.stringify({
+              stationId,
+              facilityId,
+              reportType: "BROKEN",
+              description: "CI seed: #2283 browser QA blocking 전제 확보(신고 사진 fail-closed 검사용)",
+              photoFileName: "ci-seed.png",
+              photoContentType: "image/png",
+              photoDataBase64: photoBase64,
+            }));
+          ' "station-sangnoksu" "facility-sangnoksu-elevator-1" "${photo_base64}")"
+          response_file="$(mktemp)"
+          http_code="$(curl -sS -o "${response_file}" -w '%{http_code}' \
+            -u "${ADMIN_QA_ADMIN_USER}:${ADMIN_QA_ADMIN_PASSWORD}" \
+            -H 'Content-Type: application/json' \
+            -X POST http://localhost:8080/api/v1/reports \
+            -d "${payload}")"
+          if [[ "${http_code}" != "201" ]]; then
+            echo "seed report creation failed (HTTP ${http_code})"
+            cat "${response_file}"
+            exit 1
+          fi
+          echo "seeded facility report with photo (HTTP 201)"
+
+      # #2283 V6-11: SHADOW 단계. continue-on-error: true 한 줄이 shadow↔blocking 승격 스위치다
+      # (이 줄을 지우면 required check `Admin QA Gates`가 그대로 blocking이 된다 — 잡 이름·기존
+      # 단계는 변경하지 않는다). backend는 앞선 Boot 단계가 이미 부팅·Seed 단계가 이미 시드했다.
+      - name: Admin QA Gates / Actual browser accessibility QA (shadow)
+        if: ${{ needs.changes.outputs.backend == 'true' }}
+        id: browser-qa
+        continue-on-error: true
+        env:
+          CHROME_PATH: ${{ steps.setup-chrome-a11y.outputs.chrome-path }}
+          ADMIN_QA_CHROME_NO_SANDBOX: "1"
+          ADMIN_QA_BASE_URL: http://localhost:8080
+          ADMIN_QA_OUTPUT_DIR: artifacts/admin-qa
+          NODE_OPTIONS: --disable-warning=ExperimentalWarning
+        run: |
+          set -euo pipefail
+          mkdir -p "${ADMIN_QA_OUTPUT_DIR}"
+          cat > "${ADMIN_QA_OUTPUT_DIR}/run-manifest.json" <<EOF
+          {
+            "testedRevision": "${GITHUB_SHA}",
+            "profile": "dev",
+            "database": "h2-in-memory",
+            "seed": "ephemeral env admin/operator bootstrap accounts + 1 seeded facility report photo (never printed)",
+            "viewports": ["desktop-1440", "desktop-1280", "tablet-1024", "mobile-390", "mobile-320"],
+            "textScale": "200%",
+            "reflow": "400% (320px target width)",
+            "command": "node tools/qa/admin-accessibility-qa.mjs --output ${ADMIN_QA_OUTPUT_DIR}",
+            "mode": "shadow"
+          }
+          EOF
+          node tools/qa/admin-accessibility-qa.mjs --output "${ADMIN_QA_OUTPUT_DIR}"
+
+      - name: Admin QA Gates / Stop backend for actual browser QA
+        if: ${{ always() && needs.changes.outputs.backend == 'true' }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${BACKEND_QA_PID:-}" ]]; then
+            kill "${BACKEND_QA_PID}" 2>/dev/null || true
+          fi
 
       - name: Admin QA Gates / Upload actual browser QA artifacts (shadow)
         if: ${{ always() && needs.changes.outputs.backend == 'true' }}
