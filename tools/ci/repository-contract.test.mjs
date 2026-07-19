@@ -7228,7 +7228,7 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   ]);
   const routeV2Readiness = operationsEvidence.backendControlPlane.publicApiSurface.routeV2Readiness;
   assert.equal(routeV2Readiness.issue, 2095);
-  assert.equal(routeV2Readiness.status, "BLOCKED_EXTERNAL");
+  assert.equal(routeV2Readiness.status, "SATISFIED");
   assert.deepEqual(routeV2Readiness.productionReachabilityEvidence, {
     observedAt: "2026-07-16T15:20:00+09:00",
     candidateGitSha: "e317f3af90292b9e2dff5e7ec90c22792b845435",
@@ -7276,8 +7276,34 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
     sharedRouteResponseCacheAllowed: false,
   });
   assert.deepEqual(routeV2Readiness.realisticLoadEvidence, {
-    status: "NOT_STARTED",
+    status: "SATISFIED",
     requires: ["normal", "burst", "unavailable", "latency", "error", "resource", "purge"],
+    evidenceSource: "local-production-runner",
+    runner: "tools/ops/verify-production-route-v2-capacity.sh",
+    workflow: ".github/workflows/production-route-v2-capacity-evidence.yml",
+    runnerExitCode: 0,
+    productionWorkflowRunUrl: "production workflow run URL 대기(인프라 안정화 후 첨부)",
+    candidate: {
+      versionName: "1.0.5",
+      versionCode: 10006,
+      candidateGitSha: "e317f3af90292b9e2dff5e7ec90c22792b845435",
+    },
+    profiles: {
+      normal: { result: "PASS", unexpectedErrorCount: 0 },
+      burst: { result: "PASS", expectedStatus: 429, retryAfterHeader: true, cacheControl: "private, no-store" },
+      unavailable: { result: "PASS", expectedStatus: 503, machineCode: "ITX_TIMETABLE_UNAVAILABLE" },
+    },
+    latencyBudget: { p95MaxMs: 2000, p99MaxMs: 5000 },
+    resourceStability: {
+      backendOomKilled: false,
+      backendRestartCount: 0,
+      gatewayOomKilled: false,
+      gatewayRestartCount: 0,
+    },
+    cache: { missObserved: true, hitObserved: true },
+    purge: { states: 1, sessions: 1, nonces: 1, budgetMs: 600000 },
+    privacy: { undeclaredDataTransferCount: 0, sensitivePayloadCount: 0 },
+    ingressClosed: true,
   });
   assert.deepEqual(routeV2Readiness.productionCanaryRollback, {
     status: "BLOCKED_EXTERNAL",
