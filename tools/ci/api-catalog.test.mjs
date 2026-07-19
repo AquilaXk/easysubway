@@ -357,14 +357,46 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
     "detailPageUrl",
   ]);
   for (const [id, method, authEnv] of [
+    ["provider:busan-transportation-route-topology", "GET", "DATA_GO_KR_SERVICE_KEY"],
     ["provider:daejeon-train-timetable", "GET", "DATA_GO_KR_SERVICE_KEY"],
     ["provider:daejeon-station-distance-fare", "GET", "DATA_GO_KR_SERVICE_KEY"],
   ]) {
     const entry = findCatalogEntry(catalog, id);
     assert.equal(entry.operation.method, method);
     assert.equal(entry.operation.auth.env, authEnv);
-    assert.equal(entry.operation.runner.command, "node tools/datapack/probe-daejeon-coverage-api.mjs");
+    assert.equal(
+      entry.operation.runner.command,
+      id.includes("busan-transportation-route-topology")
+        ? "node tools/datapack/collect-busan-route-topology.mjs"
+        : "node tools/datapack/probe-daejeon-coverage-api.mjs",
+    );
   }
+  const busanTopology = findCatalogEntry(catalog, "provider:busan-transportation-route-topology");
+  const busanTopologyCandidate = providerDocument.candidates.find(
+    ({ id }) => id === "busan-transportation-route-topology",
+  );
+  const busanTopologySnapshot = JSON.parse(await readFile(
+    new URL("../datapack/sources/busan-transportation-route-topology-20260720.json", import.meta.url),
+    "utf8",
+  ));
+  assert.equal(busanTopology.endpoint, "http://data.humetro.busan.kr/voc/api/open_api_distance.tnn");
+  assert.deepEqual(busanTopology.operation.requiredParameters, ["serviceKey", "act", "scode"]);
+  assert.deepEqual(busanTopology.responseFields, [
+    "startSn", "startSc", "endSn", "endSc", "dist", "time", "stoppingTime", "exchange",
+  ]);
+  assert.deepEqual(busanTopology.operation.runner.arguments, [
+    "--output",
+    "/tmp/easysubway-busan-route-topology.json",
+    "--scope-html",
+    "tools/datapack/sources/humetro-cyberstation-map-20260623.html",
+  ]);
+  assert.equal(busanTopologyCandidate.evidence.liveSampleRetrievedAt, busanTopologySnapshot.capturedAt);
+  assert.equal(busanTopologyCandidate.evidence.liveSampleRowCount, busanTopologySnapshot.edgeCount);
+  assert.equal(busanTopologyCandidate.evidence.liveSampleStationCount, busanTopologySnapshot.stationCount);
+  assert.equal(busanTopologyCandidate.evidence.liveSampleRawSha256, busanTopologySnapshot.rawSha256);
+  assert.equal(busanTopologyCandidate.evidence.liveSampleEvidenceHash, busanTopologySnapshot.contentSha256);
+  assert.equal(busanTopologySnapshot.credentialRedacted, true);
+  assert.doesNotMatch(JSON.stringify(busanTopologySnapshot), /"serviceKey"/);
   const removedDaejeonId = ["provider:daejeon", "braille-guide-map"].join("-");
   assert.equal(catalog.some(({ id }) => id === removedDaejeonId), false);
   const daejeonDistanceFare = findCatalogEntry(catalog, "provider:daejeon-station-distance-fare");
@@ -438,7 +470,7 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
 test("프로젝트 provider catalog는 비API source를 제외하고 모든 호출 계약을 제공한다", async () => {
   const providers = (await loadProjectCatalog()).filter((entry) => entry.kind === "provider");
 
-  assert.equal(providers.length, 41);
+  assert.equal(providers.length, 42);
   assert.equal(providers.some((entry) => entry.documentationStatus === "metadata-only"), false);
   assert.equal(providers.some((entry) => entry.id === "provider:molit-urban-rail-full-route"), false);
   assert.equal(providers.some((entry) => entry.id === "provider:seoulmetro-cyberstation-route-map"), false);
