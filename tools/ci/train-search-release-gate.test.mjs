@@ -85,11 +85,39 @@ test("backend 서울→대전 KTX 응답은 운임·시간·ITX 0건을 증명�
     departureStationId: "NAT010000",
     arrivalStationId: "NAT011668",
     trainType: "KTX",
+    departureDate: "2026-07-20",
   });
 
   assert.equal(evidence.rowCount, 1);
   assert.equal(evidence.fareRowCount, 1);
   assert.equal(evidence.itxCheongchunRowCount, 0);
+  assert.throws(
+    () => validateBackendSearchEnvelope({
+      success: true,
+      data: {
+        observedAt: "2026-07-19T06:00:00Z",
+        outbound: [{
+          trainNumber: "101",
+          trainType: "KTX",
+          departureStationId: "NAT010000",
+          departureStationName: "서울",
+          departureAt: "2026-07-22T09:00:00+09:00",
+          arrivalStationId: "NAT011668",
+          arrivalStationName: "대전",
+          arrivalAt: "2026-07-22T10:02:00+09:00",
+          durationMinutes: 62,
+          adultFareWon: 23700,
+        }],
+        inbound: [],
+      },
+    }, {
+      departureStationId: "NAT010000",
+      arrivalStationId: "NAT011668",
+      trainType: "KTX",
+      departureDate: "2026-07-20",
+    }),
+    /backend outbound row did not match the requested leg/,
+  );
 });
 
 test("TAGO station catalog는 동일 ID의 상이한 이름을 거부한다", () => {
@@ -231,10 +259,12 @@ test("capacity runner는 repeated·unique·3-node·quota 경계를 고정한다"
   assert.match(k6, /new Counter\("train_search_5xx"\)/);
   assert.match(k6, /new Counter\("train_search_4xx"\)/);
   assert.match(k6, /new Counter\("train_search_429"\)/);
+  assert.match(k6, /dropped_iterations/);
+  assert.match(k6, /expectedRequestCount/);
   assert.match(k6, /fiveXxCount = data\.metrics\.train_search_5xx/);
   assert.match(k6, /timeUnit: "2s"/);
   assert.doesNotMatch(k6, /http_req_failed\?\.values\?\.passes/);
-  assert.match(k6, /requestCount > 0/);
+  assert.match(k6, /requestCount >= expectedRequestCount/);
   assert.match(runner, /--nodes 3/);
   assert.match(runner, /--max-duration-seconds/);
   assert.match(runner, /collect-train-search-backend-observation\.mjs/);
@@ -280,6 +310,8 @@ test("#2094 release artifact는 동일 candidate와 모든 완료 증거를 요�
     assert.equal(workload.fiveXxCount, 0);
     assert.equal(workload.fourXxCount, 0);
     assert.equal(workload.rateLimitedCount, 0);
+    assert.equal(workload.droppedIterationCount, 0);
+    assert.equal(workload.requestCount >= workload.expectedRequestCount, true);
   }
   assert.equal(runtime.capacity.executor.k6Version, "1.5.0");
   assert.match(runtime.capacity.executor.imageDigest, /^sha256:[0-9a-f]{64}$/);

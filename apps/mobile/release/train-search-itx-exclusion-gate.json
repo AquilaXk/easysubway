@@ -94,21 +94,25 @@
       },
       "repeated": {
         "status": "PASS",
-        "requestCount": 5,
-        "p95Ms": 397.6983985999999,
+        "requestCount": 6,
+        "expectedRequestCount": 5,
+        "p95Ms": 245.32919274999992,
         "failureRate": 0,
         "fiveXxCount": 0,
         "fourXxCount": 0,
-        "rateLimitedCount": 0
+        "rateLimitedCount": 0,
+        "droppedIterationCount": 0
       },
       "unique": {
         "status": "PASS",
         "requestCount": 6,
-        "p95Ms": 961.6243737499999,
+        "expectedRequestCount": 5,
+        "p95Ms": 2089.7910944999994,
         "failureRate": 0,
         "fiveXxCount": 0,
         "fourXxCount": 0,
-        "rateLimitedCount": 0
+        "rateLimitedCount": 0,
+        "droppedIterationCount": 0
       },
       "backendObservation": {
         "schemaVersion": 1,

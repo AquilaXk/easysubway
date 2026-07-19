@@ -16,6 +16,9 @@ for (const [index, file] of process.argv.slice(2, 4).entries()) {
     || summary?.status !== "PASS"
     || !Number.isInteger(summary?.requestCount)
     || summary.requestCount < 1
+    || !Number.isInteger(summary?.expectedRequestCount)
+    || summary.expectedRequestCount < 1
+    || summary.requestCount < summary.expectedRequestCount
     || typeof summary?.p95Ms !== "number"
     || summary.p95Ms < 0
     || summary.p95Ms >= 8_000
@@ -23,6 +26,7 @@ for (const [index, file] of process.argv.slice(2, 4).entries()) {
     || summary?.fiveXxCount !== 0
     || summary?.fourXxCount !== 0
     || summary?.rateLimitedCount !== 0
+    || summary?.droppedIterationCount !== 0
     || "providerCallCount" in summary
     || "quotaVerdict" in summary) {
     fail(`${expectedWorkloads[index]} summary failed its evidence contract`);

@@ -78,6 +78,7 @@ export function validateBackendSearchEnvelope(payload, {
   departureStationId,
   arrivalStationId,
   trainType,
+  departureDate,
 } = {}) {
   if (payload?.success !== true || !payload.data || typeof payload.data !== "object") {
     throw new Error("backend train search envelope was invalid");
@@ -88,15 +89,19 @@ export function validateBackendSearchEnvelope(payload, {
   }
   const rows = [...outbound, ...inbound];
   for (const [index, row] of rows.entries()) validateJourney(row, `journey[${index}]`);
-  const matchingRows = outbound.filter((row) => (
-    row.departureStationId === departureStationId
-      && row.arrivalStationId === arrivalStationId
-      && row.trainType === trainType
-  ));
+  requireDate(departureDate);
+  if (outbound.some((row) => (
+    row.departureStationId !== departureStationId
+      || row.arrivalStationId !== arrivalStationId
+      || row.trainType !== trainType
+      || koreaServiceDate(row.departureAt) !== departureDate
+  ))) {
+    throw new Error("backend outbound row did not match the requested leg");
+  }
   return {
     observedAt,
     rowCount: outbound.length,
-    fareRowCount: matchingRows.filter((row) => Number.isInteger(row.adultFareWon) && row.adultFareWon >= 0).length,
+    fareRowCount: outbound.filter((row) => Number.isInteger(row.adultFareWon) && row.adultFareWon >= 0).length,
     itxCheongchunRowCount: rows.filter((row) => row.trainType === "ITX_CHEONGCHUN").length,
   };
 }
@@ -230,6 +235,7 @@ export async function collectBackendEvidence({
     departureStationId: departure.id,
     arrivalStationId: arrival.id,
     trainType: "KTX",
+    departureDate,
   });
   if (search.fareRowCount === 0 || search.itxCheongchunRowCount !== 0) {
     throw new Error("backend KTX fare or ITX exclusion evidence failed");
@@ -474,6 +480,12 @@ function deploymentUrl(value) {
 
 function normalizeStationName(value) {
   return requiredString(value, "station name").replace(/[^0-9A-Za-z가-힣]/gu, "").toUpperCase();
+}
+
+function koreaServiceDate(value) {
+  const korea = new Date(Date.parse(value) + (9 * 60 * 60 * 1_000));
+  if (korea.getUTCHours() < 3) korea.setUTCDate(korea.getUTCDate() - 1);
+  return korea.toISOString().slice(0, 10);
 }
 
 function validateJourney(row, label) {

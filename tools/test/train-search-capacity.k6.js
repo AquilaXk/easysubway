@@ -16,6 +16,11 @@ if (!new Set(["repeated", "unique"]).has(workload)) {
 const rate = Number(__ENV.TRAIN_SEARCH_RATE || 1);
 const duration = __ENV.TRAIN_SEARCH_DURATION || "12s";
 if (!Number.isInteger(rate) || rate < 1 || rate > 4) throw new Error("TRAIN_SEARCH_RATE must be 1 through 4");
+const durationMatch = /^([1-9][0-9]*)s$/.exec(duration);
+if (!durationMatch) throw new Error("TRAIN_SEARCH_DURATION must be whole seconds");
+const durationSeconds = Number(durationMatch[1]);
+const expectedRequestCount = Math.floor((rate * durationSeconds) / 2);
+if (expectedRequestCount < 1) throw new Error("TRAIN_SEARCH_DURATION scheduled no requests");
 
 export const options = {
   scenarios: {
@@ -36,6 +41,7 @@ export const options = {
     train_search_4xx: ["count==0"],
     train_search_429: ["count==0"],
     train_search_success: ["rate>0.99"],
+    dropped_iterations: ["count==0"],
   },
 };
 
@@ -92,22 +98,26 @@ export function handleSummary(data) {
   const fiveXxCount = data.metrics.train_search_5xx?.values?.count ?? 0;
   const fourXxCount = data.metrics.train_search_4xx?.values?.count ?? 0;
   const rateLimitedCount = data.metrics.train_search_429?.values?.count ?? 0;
+  const droppedIterationCount = data.metrics.dropped_iterations?.values?.count ?? 0;
   const requestCount = data.metrics.http_reqs?.values?.count ?? 0;
   const p95Ms = data.metrics.http_req_duration?.values?.["p(95)"] ?? null;
   const failureRate = data.metrics.http_req_failed?.values?.rate ?? null;
   const summary = {
     schemaVersion: 1,
     workload,
-    status: requestCount > 0 && p95Ms !== null && failureRate === 0
+    status: requestCount >= expectedRequestCount && p95Ms !== null && failureRate === 0
       && failedChecks === 0 && fiveXxCount === 0 && fourXxCount === 0 && rateLimitedCount === 0
+      && droppedIterationCount === 0
       ? "PASS"
       : "FAIL",
     requestCount,
+    expectedRequestCount,
     p95Ms,
     failureRate,
     fiveXxCount,
     fourXxCount,
     rateLimitedCount,
+    droppedIterationCount,
   };
   return {
     stdout: `train-search ${workload}: ${summary.status} requests=${summary.requestCount} p95Ms=${summary.p95Ms}\n`,
