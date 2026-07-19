@@ -135,7 +135,11 @@ test("negative report는 request·provider·cache·catalog·Mobile에서 ITX 0�
   assert.equal(report.daejeonSupportedTrainTypePreserved, true);
   assert.equal(report.routeV2ItxConsumerUnchanged, true);
   assert.equal(report.issue2135ArtifactConsumedByTrainSearch, false);
-  assert.equal(report.issue2094RoadmapRequiredForThisGate, false);
+  assert.equal(report.issue2094RoadmapRequiredForThisGate, true);
+  assert.equal(report.runtimeImplementationStatus, "SATISFIED_BY_2094");
+  assert.equal(report.providerLiveCallPerformed, true);
+  assert.equal(report.issue2094RuntimeEvidence.provider.itxCheongchunRows, 0);
+  assert.equal(report.issue2094RuntimeEvidence.backend.itxCheongchunRows, 0);
   assert.equal(report.verification.backend, "./backend/gradlew -p backend test --tests '*TrainSearch*'");
   assert.equal(report.verification.mobile, "cd apps/mobile && flutter test test/features/train_search");
 });
