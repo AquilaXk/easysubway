@@ -68,6 +68,34 @@ class TrainSearchServiceTest {
 	}
 
 	@Test
+	void threeNodesShareOneProviderCallThroughTheDatabaseLease() throws Exception {
+		var mapper = new ObjectMapper().registerModule(new JavaTimeModule());
+		var firstNode = new TrainSearchService(
+			provider, cache, mapper, Clock.systemUTC(), Thread::sleep, () -> "node-a"
+		);
+		var secondNode = new TrainSearchService(
+			provider, cache, mapper, Clock.systemUTC(), Thread::sleep, () -> "node-b"
+		);
+		var thirdNode = new TrainSearchService(
+			provider, cache, mapper, Clock.systemUTC(), Thread::sleep, () -> "node-c"
+		);
+		provider.blockSearch = true;
+		var first = CompletableFuture.supplyAsync(() -> firstNode.search(criteria(null)));
+		assertThat(provider.searchStarted.await(5, TimeUnit.SECONDS)).isTrue();
+		var second = CompletableFuture.supplyAsync(() -> secondNode.search(criteria(null)));
+		var third = CompletableFuture.supplyAsync(() -> thirdNode.search(criteria(null)));
+		Thread.sleep(150);
+		provider.continueSearch.countDown();
+
+		assertThat(List.of(
+			first.get(5, TimeUnit.SECONDS),
+			second.get(5, TimeUnit.SECONDS),
+			third.get(5, TimeUnit.SECONDS)
+		)).allMatch(first.join()::equals);
+		assertThat(provider.searchCalls).hasValue(1);
+	}
+
+	@Test
 	void passesEveryProviderCodeAndStationNameInOneCanonicalLegQuery() {
 		service.search(criteria(null));
 

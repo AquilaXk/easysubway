@@ -3,8 +3,8 @@
   "artifactKind": "train-search-itx-exclusion-gate",
   "sourceIssue": 2136,
   "status": "SATISFIED",
-  "evidenceClass": "DETERMINISTIC_CONTRACT",
-  "providerLiveCallPerformed": false,
+  "evidenceClass": "LIVE_AND_DETERMINISTIC",
+  "providerLiveCallPerformed": true,
   "supportedTrainTypes": [
     "KTX",
     "KTX_SANCHEON",
@@ -32,8 +32,99 @@
   "daejeonSupportedTrainTypePreserved": true,
   "routeV2ItxConsumerUnchanged": true,
   "issue2135ArtifactConsumedByTrainSearch": false,
-  "issue2094RoadmapRequiredForThisGate": false,
-  "runtimeImplementationStatus": "DEFERRED_TO_2094",
+  "issue2094RoadmapRequiredForThisGate": true,
+  "runtimeImplementationStatus": "SATISFIED_BY_2094",
+  "issue2094RuntimeEvidence": {
+    "candidateGitSha": "d36bc00467ab69732f49e1f56a343bb2da1e73ce",
+    "provider": {
+      "observedAt": "2026-07-19T06:59:18.230Z",
+      "httpSuccess": true,
+      "resultCode": "00",
+      "schemaStatus": "EXPECTED",
+      "operations": [
+        "GetCtyCodeList",
+        "GetCtyAcctoTrainSttnList",
+        "GetVhcleKndList",
+        "GetStrtpntAlocFndTrainInfo"
+      ],
+      "supportedTrainTypes": [
+        "KTX",
+        "KTX_SANCHEON",
+        "SRT",
+        "ITX_MAUM",
+        "ITX_SAEMAEUL",
+        "SAEMAEUL",
+        "MUGUNGHWA",
+        "NURIRO"
+      ],
+      "stationCount": 343,
+      "stationConflictCount": 0,
+      "seoulDaejeonKtxFareRows": 54,
+      "itxCheongchunRows": 0,
+      "credentialRedacted": true,
+      "evidenceSha256": "2a7b6dea15de490f94d2bf47a21c91cd6cac854b3058a266282e472c6ea4941c"
+    },
+    "backend": {
+      "deployedGitSha": "d36bc00467ab69732f49e1f56a343bb2da1e73ce",
+      "deployRunUrl": "https://github.com/AquilaXk/easysubway/actions/runs/29677130333",
+      "postDeploySmokeStatus": "PASS",
+      "observedAt": "2026-07-19T06:58:58.720Z",
+      "seoulDaejeonKtxFareRows": 54,
+      "itxCheongchunRows": 0,
+      "conditionalEtagStatus": 304,
+      "errorCacheControl": "no-store",
+      "schemaStatus": "EXPECTED",
+      "evidenceSha256": "69667f568104930e4a50c3c7f2c5f7c8088d378233853acb42a34ef2cae7a886"
+    },
+    "capacity": {
+      "repeated": {
+        "status": "PASS",
+        "requestCount": 11,
+        "p95Ms": 731.0905,
+        "failureRate": 0,
+        "fiveXxCount": 0
+      },
+      "unique": {
+        "status": "PASS",
+        "requestCount": 11,
+        "p95Ms": 1558.0025,
+        "failureRate": 0,
+        "fiveXxCount": 0
+      },
+      "threeNodeSingleFlight": {
+        "status": "PASS",
+        "nodeCount": 3,
+        "providerCallCount": 1,
+        "verification": "TrainSearchServiceTest.threeNodesShareOneProviderCallThroughTheDatabaseLease"
+      },
+      "quotaVerdict": "PASS"
+    },
+    "android": {
+      "artifactGitSha": "d36bc00467ab69732f49e1f56a343bb2da1e73ce",
+      "deviceModel": "SM-A175N",
+      "androidVersion": "16",
+      "candidateApkSha256": "699c4c2b3d88c2c30887a17eafa26fe833eb0a3ce26576101e12a9391fab6d4e",
+      "integrationHarnessApkSha256": "c9e7b4f30d756afea39d598154a18ea63051534672e172306e45626bb9589480",
+      "menuToResultPassed": true,
+      "roundTripPassed": true,
+      "stateMatrixPassed": true,
+      "offlineUnavailablePassed": true,
+      "subwayRegressionPassed": true,
+      "screenshotPath": ".codex/evidence/issue-2094-android-d36bc004/result.png",
+      "semanticsPath": ".codex/evidence/issue-2094-android-d36bc004/result.xml",
+      "screenshotSha256": "8307df1082d7cccaa019fb3712a0f2f5d1048eb32243a221be25a85c87271deb",
+      "semanticsSha256": "d91ba0f790af500aef6cbc5f1c5820aff8384a0f64278c45235d99b0f5b2799e"
+    },
+    "review": {
+      "candidatePullRequest": 2310,
+      "reviewUrl": "https://github.com/AquilaXk/easysubway/pull/2310#pullrequestreview-4730263044",
+      "actionableFindingsOpen": 0
+    },
+    "requiredCi": {
+      "status": "PASS",
+      "runUrl": "https://github.com/AquilaXk/easysubway/actions/runs/29676605960"
+    }
+  },
   "verification": {
     "backend": "./backend/gradlew -p backend test --tests '*TrainSearch*'",
     "mobile": "cd apps/mobile && flutter test test/features/train_search",
