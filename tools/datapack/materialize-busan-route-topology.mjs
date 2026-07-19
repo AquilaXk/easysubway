@@ -16,7 +16,13 @@ const LINE_METADATA = new Map([
   ["line-eb7b47920390", { nameKo: "부산 2호선", color: "#81bf48" }],
 ]);
 
-export function materializeBusanRouteTopology({ baseFixture, snapshot, inventory, now = new Date() }) {
+export function materializeBusanRouteTopology({
+  baseFixture,
+  snapshot,
+  inventory,
+  canonicalStationMappings,
+  now = new Date(),
+}) {
   admitBusanRouteTopology(snapshot, { now });
   const source = requiredSource(inventory, snapshot);
   const fixture = structuredClone(baseFixture);
@@ -31,7 +37,6 @@ export function materializeBusanRouteTopology({ baseFixture, snapshot, inventory
   pack.version = version;
   pack.url = `https://objectstorage.ap-seoul-1.oraclecloud.com/n/axvym6vk8g7i/b/easysubway-datapacks/o/catalog/${PACK_ID}-v${version}.sqlite.gz`;
   fixture.manifest.activePack = { id: pack.id, version: pack.version };
-  fixture.manifest.releaseSequence = Number(version);
   fixture.manifest.publishedAt = snapshot.capturedAt;
   fixture.manifest.expiresAt = snapshot.freshUntil;
 
@@ -56,7 +61,7 @@ export function materializeBusanRouteTopology({ baseFixture, snapshot, inventory
     lineScope.forEach((station, index) => {
       const key = `${lineId}:${station.stationCode}`;
       if (scopeByKey.has(key)) throw new Error(`duplicate Busan station scope: ${key}`);
-      const stationId = stationIdFor(station.stationName);
+      const stationId = canonicalStationIdFor(canonicalStationMappings, station);
       scopeByKey.set(key, { ...station, stationId });
       stationById.set(stationId, {
         id: stationId,
@@ -156,8 +161,39 @@ function packSource(source, snapshot) {
   };
 }
 
-function stationIdFor(stationName) {
-  return `station-${createHash("sha1").update(`부산권:${stationName.normalize("NFKC")}`).digest("hex").slice(0, 12)}`;
+export function parseCanonicalBusanStationMappings(csv) {
+  if (typeof csv !== "string" || csv.length === 0) {
+    throw new Error("canonical Busan station mapping CSV is required");
+  }
+  const mappings = new Map();
+  for (const line of csv.split(/\r?\n/)) {
+    const match = /^"부산권",(station-[a-f0-9]{12}),(line-[a-f0-9]{12}),"([^"]+)"/.exec(line);
+    if (!match || !LINE_METADATA.has(match[2])) continue;
+    const [, stationId, lineId, canonicalName] = match;
+    const providerName = normalizedStationName(canonicalName);
+    const key = `${lineId}:${providerName}`;
+    const existing = mappings.get(key);
+    if (existing && existing !== stationId) {
+      throw new Error(`ambiguous canonical Busan station mapping: ${key}`);
+    }
+    mappings.set(key, stationId);
+  }
+  if (mappings.size === 0) throw new Error("canonical Busan station mappings are empty");
+  return mappings;
+}
+
+function canonicalStationIdFor(mappings, station) {
+  if (!(mappings instanceof Map)) throw new Error("canonical Busan station mappings are required");
+  const key = `${station.lineId}:${normalizedStationName(station.stationName)}`;
+  const stationId = mappings.get(key);
+  if (!/^station-[a-f0-9]{12}$/.test(stationId ?? "")) {
+    throw new Error(`canonical station mapping missing: ${key}`);
+  }
+  return stationId;
+}
+
+function normalizedStationName(value) {
+  return value.normalize("NFKC").replace(/\([^()]*\)$/, "").replace(/[^\p{L}\p{N}]/gu, "").replace(/역$/, "").toLowerCase();
 }
 
 function sha256(value) {
@@ -165,21 +201,28 @@ function sha256(value) {
 }
 
 function parseArgs(argv) {
-  if (argv.length !== 8 || argv[0] !== "--base-fixture" || argv[2] !== "--snapshot"
-    || argv[4] !== "--inventory" || argv[6] !== "--output" || !path.isAbsolute(argv[7])) {
-    throw new Error("usage: materialize-busan-route-topology.mjs --base-fixture <json> --snapshot <json> --inventory <json> --output <absolute.json>");
+  if (argv.length !== 10 || argv[0] !== "--base-fixture" || argv[2] !== "--snapshot"
+    || argv[4] !== "--inventory" || argv[6] !== "--station-map" || argv[8] !== "--output"
+    || !path.isAbsolute(argv[9])) {
+    throw new Error("usage: materialize-busan-route-topology.mjs --base-fixture <json> --snapshot <json> --inventory <json> --station-map <csv> --output <absolute.json>");
   }
-  return { baseFixture: argv[1], snapshot: argv[3], inventory: argv[5], output: argv[7] };
+  return {
+    baseFixture: argv[1], snapshot: argv[3], inventory: argv[5], stationMap: argv[7], output: argv[9],
+  };
 }
 
 async function main(argv) {
   const args = parseArgs(argv);
-  const [baseFixture, snapshot, inventory] = await Promise.all([
+  const [baseFixture, snapshot, inventory, stationMapCsv] = await Promise.all([
     readFile(args.baseFixture, "utf8").then(JSON.parse),
     readFile(args.snapshot, "utf8").then(JSON.parse),
     readFile(args.inventory, "utf8").then(JSON.parse),
+    readFile(args.stationMap, "utf8"),
   ]);
-  const fixture = materializeBusanRouteTopology({ baseFixture, snapshot, inventory });
+  const canonicalStationMappings = parseCanonicalBusanStationMappings(stationMapCsv);
+  const fixture = materializeBusanRouteTopology({
+    baseFixture, snapshot, inventory, canonicalStationMappings,
+  });
   await writeFile(args.output, `${JSON.stringify(fixture, null, 2)}\n`);
   console.log(`Busan route topology materialized: stations=${snapshot.stationCount} edges=${snapshot.edgeCount}`);
 }

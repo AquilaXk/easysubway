@@ -8,29 +8,37 @@ import { DatabaseSync } from "node:sqlite";
 import { promisify } from "node:util";
 import test from "node:test";
 
-import { materializeBusanRouteTopology } from "./materialize-busan-route-topology.mjs";
+import {
+  materializeBusanRouteTopology,
+  parseCanonicalBusanStationMappings,
+} from "./materialize-busan-route-topology.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
 const evidenceNow = new Date("2026-07-19T18:14:03.004Z");
 
 async function inputs() {
-  return Promise.all([
+  const [baseFixture, snapshot, inventory, stationMapCsv] = await Promise.all([
     readJson("tools/datapack/release/capital-production-reviewed-pack.json"),
     readJson("tools/datapack/sources/busan-transportation-route-topology-20260720.json"),
     readJson("tools/datapack/source-inventory.json"),
+    readFile(path.join(root, "tools/datapack/sources/regional-official-svg-route-map-coordinates-20260624.csv"), "utf8"),
   ]);
+  return [baseFixture, snapshot, inventory, parseCanonicalBusanStationMappings(stationMapCsv)];
 }
 
 test("부산 topology snapshot을 실제 production pack 입력으로 materialize한다", async () => {
-  const [baseFixture, snapshot, inventory] = await inputs();
-  const fixture = materializeBusanRouteTopology({ baseFixture, snapshot, inventory, now: evidenceNow });
+  const [baseFixture, snapshot, inventory, canonicalStationMappings] = await inputs();
+  const fixture = materializeBusanRouteTopology({
+    baseFixture, snapshot, inventory, canonicalStationMappings, now: evidenceNow,
+  });
   const pack = fixture.packs[0];
   const source = pack.sourceInventory.find(({ id }) => id === snapshot.sourceId);
   const busanEdges = pack.networkEdges.filter(({ sourceId }) => sourceId === snapshot.sourceId);
   const busanStationLines = pack.stationLines.filter(({ sourceId }) => sourceId === snapshot.sourceId);
 
   assert.deepEqual(fixture.manifest.activePack, { id: pack.id, version: pack.version });
+  assert.equal(fixture.manifest.releaseSequence, baseFixture.manifest.releaseSequence);
   assert.equal(pack.artifactKind, "production");
   assert.equal(busanEdges.length, 220);
   assert.equal(busanStationLines.length, 114);
@@ -42,12 +50,24 @@ test("부산 topology snapshot을 실제 production pack 입력으로 materializ
   ));
   assert.equal(busanEdges[0].distanceMeters, snapshot.edges[0].distanceMeters);
   assert.equal(busanEdges[0].durationSeconds, snapshot.edges[0].durationSeconds);
+  assert.deepEqual(
+    busanStationLines
+      .filter(({ stationCode }) => new Set(["102", "103", "119", "201"]).has(stationCode))
+      .map(({ stationId, stationCode }) => ({ stationId, stationCode })),
+    [
+      { stationId: "station-fcb7a21e5606", stationCode: "102" },
+      { stationId: "station-dd45c69d3e40", stationCode: "103" },
+      { stationId: "station-1fc7a7c971c8", stationCode: "119" },
+      { stationId: "station-6b611916f76a", stationCode: "201" },
+    ],
+  );
 
   assert.throws(
     () => materializeBusanRouteTopology({
       baseFixture,
       snapshot,
       inventory,
+      canonicalStationMappings,
       now: new Date(snapshot.freshUntil),
     }),
     /stale/,
@@ -60,9 +80,22 @@ test("부산 topology snapshot을 실제 production pack 입력으로 materializ
       baseFixture,
       snapshot,
       inventory: mismatchedInventory,
+      canonicalStationMappings,
       now: evidenceNow,
     }),
     /inventory evidence/,
+  );
+  const incompleteMappings = new Map(canonicalStationMappings);
+  incompleteMappings.delete("line-ab1a041f6266:하단");
+  assert.throws(
+    () => materializeBusanRouteTopology({
+      baseFixture,
+      snapshot,
+      inventory,
+      canonicalStationMappings: incompleteMappings,
+      now: evidenceNow,
+    }),
+    /canonical station mapping missing/,
   );
 });
 
@@ -72,8 +105,10 @@ test("materialized production SQLite와 provenance만 부산 4개 topology requi
   const fixturePath = path.join(outputDir, "fixture.json");
   const packOutput = path.join(outputDir, "pack");
   const reportPath = path.join(outputDir, "coverage.json");
-  const [baseFixture, snapshot, inventory] = await inputs();
-  const fixture = materializeBusanRouteTopology({ baseFixture, snapshot, inventory, now: evidenceNow });
+  const [baseFixture, snapshot, inventory, canonicalStationMappings] = await inputs();
+  const fixture = materializeBusanRouteTopology({
+    baseFixture, snapshot, inventory, canonicalStationMappings, now: evidenceNow,
+  });
   await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
   await mkdir(packOutput, { recursive: true });
 
