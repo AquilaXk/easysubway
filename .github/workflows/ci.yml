@@ -286,13 +286,13 @@ jobs:
           fi
           echo "seeded facility report with photo (HTTP 201)"
 
-      # #2283 V6-11: SHADOW 단계. continue-on-error: true 한 줄이 shadow↔blocking 승격 스위치다
-      # (이 줄을 지우면 required check `Admin QA Gates`가 그대로 blocking이 된다 — 잡 이름·기존
-      # 단계는 변경하지 않는다). backend는 앞선 Boot 단계가 이미 부팅·Seed 단계가 이미 시드했다.
+      # #2283 V6-11: BLOCKING 승격. shadow 구간(PR #2309 run 29677088560, tested revision
+      # 1fc89cda8ca81b801bb1fe18b21e945b54193df9)에서 seed 단계 포함 blocking 0으로 완주한 것을
+      # 실측한 뒤 continue-on-error 한 줄을 제거해 승격했다(잡 이름·기존 단계는 변경하지 않는다).
+      # backend는 앞선 Boot 단계가 이미 부팅·Seed 단계가 이미 시드했다.
       - name: Admin QA Gates / Actual browser accessibility QA (shadow)
         if: ${{ needs.changes.outputs.backend == 'true' }}
         id: browser-qa
-        continue-on-error: true
         env:
           CHROME_PATH: ${{ steps.setup-chrome-a11y.outputs.chrome-path }}
           ADMIN_QA_CHROME_NO_SANDBOX: "1"
@@ -312,7 +312,7 @@ jobs:
             "textScale": "200%",
             "reflow": "400% (320px target width)",
             "command": "node tools/qa/admin-accessibility-qa.mjs --output ${ADMIN_QA_OUTPUT_DIR}",
-            "mode": "shadow"
+            "mode": "blocking"
           }
           EOF
           node tools/qa/admin-accessibility-qa.mjs --output "${ADMIN_QA_OUTPUT_DIR}"
@@ -344,9 +344,9 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo "### Admin QA Gates / Actual browser QA (shadow)"
+            echo "### Admin QA Gates / Actual browser QA"
             echo ""
-            echo "- Mode: **shadow** (continue-on-error; blocking 승격은 browser-qa step의 continue-on-error 한 줄 제거)"
+            echo "- Mode: **blocking** (PR #2309 run 29677088560에서 seed 포함 blocking 0 shadow 실측 후 승격)"
             echo "- Step outcome: \`${BROWSER_QA_OUTCOME}\`"
             echo "- Tested revision: \`${TESTED_REVISION}\`"
             echo "- Seed/profile: dev · H2 in-memory · ephemeral env admin/operator 계정"

@@ -971,10 +971,11 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
   assert.doesNotMatch(releaseGateJob, /iOS CI \/ Build Flutter iOS simulator app/);
 });
 
-// #2283 V6-11: Admin QA Gates가 실제 브라우저 하네스를 shadow로 통합하되, required check 이름과
-// 기존 정적 게이트(vendor integrity·unit test)를 그대로 보존하고, admin 무관 변경은 명시적 성공 skip을
-// 반환하며, shadow→blocking 승격이 단일 continue-on-error 스위치가 되도록 구조를 고정한다.
-test("Admin QA Gates는 실제 브라우저 QA를 shadow로 통합하고 required check·skip 계약을 유지한다", () => {
+// #2283 V6-11: Admin QA Gates가 실제 브라우저 하네스를 blocking으로 통합하되(shadow 구간에서 seed
+// 포함 blocking 0을 실측한 뒤 continue-on-error 한 줄을 제거해 승격, PR #2309 run 29677088560),
+// required check 이름과 기존 정적 게이트(vendor integrity·unit test)를 그대로 보존하고, admin 무관
+// 변경은 명시적 성공 skip을 반환하며, boot·seed는 shadow 여부와 무관하게 항상 강제 성공이도록 고정한다.
+test("Admin QA Gates는 실제 브라우저 QA를 blocking으로 통합하고 required check·skip 계약을 유지한다", () => {
   const workflow = read(".github/workflows/ci.yml");
   const adminQaJob = jobBlock(workflow, "admin-qa-gates", "repository-contracts");
 
@@ -1047,18 +1048,20 @@ test("Admin QA Gates는 실제 브라우저 QA를 shadow로 통합하고 require
   assert.match(bootStep, /if \[\[ "\$\{ready\}" != "1" \]\]; then/);
   assert.doesNotMatch(bootStep, /secrets\./);
 
-  // shadow↔blocking 승격 스위치: harness 호출만 continue-on-error(shadow)로 둔다. boot·seed는
-  // 항상 강제 성공이어야 하므로 승격 스위치 대상에서 제외한다.
+  // #2283 V6-11: shadow→blocking 승격 완료. harness 호출 step에 continue-on-error가 없다 —
+  // shadow 재개가 필요하면 이 한 줄(`continue-on-error: true`)을 다시 추가하는 것이 유일한 스위치다.
+  // boot·seed는 애초에 shadow 대상이 아니었으므로(항상 강제 성공) 승격 전후로 변화가 없다.
   const browserStep = adminQaJob.match(
     /- name: Admin QA Gates \/ Actual browser accessibility QA \(shadow\)[\s\S]*?\n      - name:/,
   )?.[0] ?? "";
   assert.match(browserStep, /id: browser-qa/);
-  assert.match(browserStep, /continue-on-error: true/);
+  assert.doesNotMatch(browserStep, /continue-on-error/);
   // arbitrary retry로 flaky를 숨기지 않는다.
   assert.doesNotMatch(browserStep, /\bretry\b/i);
   // harness step 자체는 backend boot·seed 로직을 갖지 않는다(Boot·Seed 단계로 이관).
   assert.doesNotMatch(browserStep, /openssl rand/);
   assert.doesNotMatch(browserStep, /photoDataBase64/);
+  assert.match(browserStep, /"mode": "blocking"/);
 
   // shadow artifact(report JSON·스크린샷)와 job summary를 항상 남기고, backend는 항상 정리한다.
   assert.match(adminQaJob, /Admin QA Gates \/ Upload actual browser QA artifacts \(shadow\)/);
