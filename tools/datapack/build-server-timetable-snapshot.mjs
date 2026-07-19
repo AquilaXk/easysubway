@@ -272,8 +272,9 @@ function sourceSnapshotInsert(row) {
     sqlText(row.fetchStatus, "snapshot fetch status"), row.redistributionAllowed ? "TRUE" : "FALSE",
     row.credentialRedacted ? "TRUE" : "FALSE", "NULL", "NULL",
     sqlTimestamp(row.freshnessExpiresAt, "snapshot freshnessExpiresAt"),
+    sqlTimestamp(row.rawRetentionExpiresAt, "snapshot rawRetentionExpiresAt"), Number(row.rowCount),
   ];
-  return "INSERT INTO data_source_snapshots (snapshot_id, source_id, provider, retrieved_at, source_updated_at, row_count, raw_sha256, raw_object_uri, redacted_request_fingerprint, schema_fingerprint, snapshot_status, schema_status, license_status, fetch_status, redistribution_allowed, credential_redacted, previous_snapshot_id, diff_summary, freshness_expires_at) "
+  return "INSERT INTO data_source_snapshots (snapshot_id, source_id, provider, retrieved_at, source_updated_at, row_count, raw_sha256, raw_object_uri, redacted_request_fingerprint, schema_fingerprint, snapshot_status, schema_status, license_status, fetch_status, redistribution_allowed, credential_redacted, previous_snapshot_id, diff_summary, freshness_expires_at, raw_retention_expires_at, coverage_count) "
     + `SELECT ${values.join(", ")} WHERE NOT EXISTS (SELECT 1 FROM data_source_snapshots WHERE snapshot_id = ${values[0]});`;
 }
 
