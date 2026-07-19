@@ -436,8 +436,8 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 	}
 
 	@Test
-	@DisplayName("동시 도착 label은 trip 순서보다 누적 접근성 warning이 적은 후보를 보존한다")
-	void equalArrivalPrefersFewerAccessibilityWarnings() throws Exception {
+	@DisplayName("후행 warning-free 비지배 label을 보존한다")
+	void preservesLaterWarningFreeLabel() throws Exception {
 		Class<?> workspaceType = Class.forName(
 			"com.easysubway.route.application.service.RouteTimetableRaptorPlanner$ScanWorkspace");
 		var constructor = workspaceType.getDeclaredConstructor();
@@ -451,10 +451,10 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 			int.class, int.class, int.class, int.class, byte.class);
 		relax.setAccessible(true);
 		relax.invoke(workspace, 0, 1, 0, 100, 0, 0, 1, 0, 0, (byte) 1);
-		relax.invoke(workspace, 0, 1, 0, 100, 1, 0, 1, 0, 0, (byte) 0);
-		var warnings = workspaceType.getDeclaredField("warningBits");
-		warnings.setAccessible(true);
-		assertThat(((byte[]) warnings.get(workspace))[2]).isZero();
+		relax.invoke(workspace, 0, 1, 0, 110, 1, 0, 1, 0, 0, (byte) 0);
+		var arrivals = workspaceType.getDeclaredField("arrivalSeconds");
+		arrivals.setAccessible(true);
+		assertThat((int[]) arrivals.get(workspace)).contains(100, 110);
 	}
 	@Test
 	@DisplayName("후행 trip이 downstream에서 합류해도 기존 trip-id 동률 순서를 유지한다")
