@@ -1120,6 +1120,91 @@ class RouteTimetableRaptorPlanner {
 			.toList();
 	}
 
+	List<TimetableRealtimeQuery> realtimeQueries(
+		SearchRouteV2Command command,
+		CompiledTimetable timetable,
+		List<RouteSearchResult> itineraries,
+		List<TimetableRealtimeQuery> queried
+	) {
+		Set<BoardingPoint> queriedPoints = new HashSet<>();
+		for (TimetableRealtimeQuery query : queried) {
+			queriedPoints.add(new BoardingPoint(query.stationId(), query.lineId()));
+		}
+		Map<BoardingPoint, Instant> readyAtByPoint = new LinkedHashMap<>();
+		for (RouteSearchResult itinerary : itineraries) {
+			for (int stepIndex = 0; stepIndex < itinerary.steps().size(); stepIndex += 1) {
+				RouteStep step = itinerary.steps().get(stepIndex);
+				if (!"ride".equals(step.stepType()) || step.fromStationId() == null || step.lineId() == null) {
+					continue;
+				}
+				BoardingPoint point = new BoardingPoint(step.fromStationId(), step.lineId());
+				if (queriedPoints.contains(point)) {
+					continue;
+				}
+				Instant readyAt = realtimeReadyAt(command, itinerary.steps(), stepIndex);
+				readyAtByPoint.merge(point, readyAt, (left, right) -> left.isBefore(right) ? left : right);
+			}
+		}
+		if (readyAtByPoint.isEmpty()) {
+			return List.of();
+		}
+
+		ServiceDay serviceDay = serviceDay(command);
+		Map<BoardingPoint, List<TimetableTripDeparture>> departuresByPoint = new LinkedHashMap<>();
+		readyAtByPoint.keySet().forEach(point -> departuresByPoint.put(point, new ArrayList<>()));
+		for (ScheduledTrip trip : timetable.activeServiceDay(serviceDay.date()).trips()) {
+			if (trip.trip().trainNo() == null) {
+				continue;
+			}
+			for (int stopIndex = 0; stopIndex < trip.stopTimes().size(); stopIndex += 1) {
+				TransitStopTime stop = trip.stopTimes().get(stopIndex);
+				BoardingPoint point = new BoardingPoint(stop.stationId(), stop.lineId());
+				List<TimetableTripDeparture> departures = departuresByPoint.get(point);
+				if (departures == null || !trip.allowsPickup(stopIndex)) {
+					continue;
+				}
+				departures.add(new TimetableTripDeparture(
+					trip.trip().id(),
+					trip.trip().trainNo(),
+					trip.trip().servicePattern(),
+					serviceDay.date().atStartOfDay(SERVICE_ZONE)
+						.plusSeconds(trip.arrivalSeconds(stopIndex)).toInstant(),
+					serviceDay.date().atStartOfDay(SERVICE_ZONE)
+						.plusSeconds(trip.departureSeconds(stopIndex)).toInstant()
+				));
+			}
+		}
+		return departuresByPoint.entrySet().stream()
+			.filter(entry -> !entry.getValue().isEmpty())
+			.map(entry -> new TimetableRealtimeQuery(
+				entry.getKey().stationId(),
+				entry.getKey().lineId(),
+				readyAtByPoint.get(entry.getKey()),
+				entry.getValue()
+			))
+			.toList();
+	}
+
+	private static Instant realtimeReadyAt(
+		SearchRouteV2Command command,
+		List<RouteStep> steps,
+		int rideStepIndex
+	) {
+		if (rideStepIndex > 0) {
+			RouteStep access = steps.get(rideStepIndex - 1);
+			if (("entry".equals(access.stepType()) || "transfer".equals(access.stepType()))
+				&& access.plannedDepartureTime() != null && access.walkSeconds() != null) {
+				return OffsetDateTime.parse(access.plannedDepartureTime())
+					.plusSeconds(access.walkSeconds() + BoardingSlackPolicy.secondsFor(command.mobilityType()))
+					.toInstant();
+			}
+		}
+		RouteStep ride = steps.get(rideStepIndex);
+		return ride.plannedDepartureTime() == null
+			? command.departureTime().toInstant()
+			: OffsetDateTime.parse(ride.plannedDepartureTime()).toInstant();
+	}
+
 	RealtimeOverlay compileRealtimeOverlay(
 		CompiledTimetable timetable,
 		TimetableRealtimeUpdates realtimeUpdates
@@ -2291,6 +2376,8 @@ class RouteTimetableRaptorPlanner {
 		SearchOutcome {
 			itineraries = List.copyOf(itineraries);
 		}
+	}
+	private record BoardingPoint(String stationId, String lineId) {
 	}
 	record ScanMetrics(int expandedRoutes, int expandedTrips, int workspaceIdentity) {
 	}

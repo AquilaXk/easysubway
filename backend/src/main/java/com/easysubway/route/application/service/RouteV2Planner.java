@@ -3,6 +3,9 @@ package com.easysubway.route.application.service;
 import com.easysubway.common.error.InvalidRequestException;
 import com.easysubway.route.application.port.in.RouteSearchUseCase;
 import com.easysubway.route.application.port.in.RouteSearchUseCase.TimetableCandidateSource;
+import com.easysubway.route.application.port.in.RouteSearchUseCase.TimetableRealtimeQuery;
+import com.easysubway.route.application.port.in.RouteSearchUseCase.TimetableRealtimeUpdate;
+import com.easysubway.route.application.port.in.RouteSearchUseCase.TimetableRealtimeUpdates;
 import com.easysubway.route.application.port.in.SearchRouteCommand;
 import com.easysubway.route.application.port.in.RouteV2SearchUseCase;
 import com.easysubway.route.application.port.in.RouteV2SearchUseCase.SearchRouteV2Command;
@@ -27,7 +30,9 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
@@ -119,12 +124,9 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 				}
 				SearchRouteCommand searchRouteCommand = toSearchRouteCommand(command);
 				routeSearchUseCase.validateRouteSearch(searchRouteCommand);
-				RealtimeSnapshot realtimeSnapshot = realtimeSnapshot(command, snapshot);
-				RouteTimetableRaptorPlanner.SearchOutcome searchOutcome = timetableRaptorPlanner.searchWithDiagnostics(
-					rankingCommand(command),
-					snapshot.compiledTimetable(),
-					realtimeSnapshot.overlay()
-				);
+				RealtimeSearch realtimeSearch = realtimeSearch(command, snapshot);
+				RealtimeSnapshot realtimeSnapshot = realtimeSearch.snapshot();
+				RouteTimetableRaptorPlanner.SearchOutcome searchOutcome = realtimeSearch.outcome();
 				boolean blockedAccessibility = searchOutcome.blockedAccessibility() != null;
 				List<RouteSearchResult> timetableItineraries = blockedAccessibility
 					? List.of(searchOutcome.blockedAccessibility()) : searchOutcome.itineraries();
@@ -271,22 +273,104 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 		}
 	}
 
-	private RealtimeSnapshot realtimeSnapshot(SearchRouteV2Command command, TimetableSnapshot timetableSnapshot) {
+	private RealtimeSearch realtimeSearch(SearchRouteV2Command command, TimetableSnapshot timetableSnapshot) {
+		var rankingCommand = rankingCommand(command);
 		if (command.useRealtime()) {
-			var queries = timetableRaptorPlanner.realtimeQueries(command, timetableSnapshot.compiledTimetable());
-			var updates = routeSearchUseCase.resolveTimetableRealtime(queries);
-			if (updates == null) {
-				updates = RouteSearchUseCase.TimetableRealtimeUpdates.unavailable("REALTIME_OVERLAY_UNAVAILABLE");
-			}
-			RealtimeOverlay overlay = timetableRaptorPlanner.compileRealtimeOverlay(
-				timetableSnapshot.compiledTimetable(), updates);
-			RealtimeSnapshot replacement = new RealtimeSnapshot(
-				timetableSnapshot.cacheKey(), overlay.version(), overlay, updates.fallbackCode());
-			// 단일 volatile 참조 교체로 스캔은 구/신 overlay 중 하나만 캡처한다.
-			cachedRealtimeSnapshot = replacement;
-			return replacement;
+			return realtimeSearch(command, rankingCommand, timetableSnapshot);
 		}
-		return RealtimeSnapshot.empty();
+		RealtimeSnapshot empty = RealtimeSnapshot.empty();
+		return new RealtimeSearch(
+			empty,
+			timetableRaptorPlanner.searchWithDiagnostics(
+				rankingCommand, timetableSnapshot.compiledTimetable(), empty.overlay())
+		);
+	}
+
+	private RealtimeSearch realtimeSearch(
+		SearchRouteV2Command command,
+		SearchRouteV2Command rankingCommand,
+		TimetableSnapshot timetableSnapshot
+	) {
+		List<TimetableRealtimeQuery> queried = new ArrayList<>(
+			timetableRaptorPlanner.realtimeQueries(command, timetableSnapshot.compiledTimetable()));
+		TimetableRealtimeUpdates updates = resolveRealtimeUpdates(queried);
+		RealtimeSnapshot realtimeSnapshot = realtimeSnapshot(timetableSnapshot, updates);
+		RouteTimetableRaptorPlanner.SearchOutcome searchOutcome = timetableRaptorPlanner.searchWithDiagnostics(
+			rankingCommand, timetableSnapshot.compiledTimetable(), realtimeSnapshot.overlay());
+
+		int refinementLimit = RANKING_CANDIDATE_LIMIT * (command.maxTransfers() + 1);
+		for (int pass = 0; pass < refinementLimit && updates.available(); pass += 1) {
+			List<TimetableRealtimeQuery> additions = timetableRaptorPlanner.realtimeQueries(
+				command, timetableSnapshot.compiledTimetable(), searchOutcome.itineraries(), queried);
+			if (additions.isEmpty()) {
+				return new RealtimeSearch(realtimeSnapshot, searchOutcome);
+			}
+			queried.addAll(additions);
+			updates = mergeRealtimeUpdates(updates, resolveRealtimeUpdates(additions));
+			realtimeSnapshot = realtimeSnapshot(timetableSnapshot, updates);
+			searchOutcome = timetableRaptorPlanner.searchWithDiagnostics(
+				rankingCommand, timetableSnapshot.compiledTimetable(), realtimeSnapshot.overlay());
+		}
+		if (updates.available() && !timetableRaptorPlanner.realtimeQueries(
+			command, timetableSnapshot.compiledTimetable(), searchOutcome.itineraries(), queried).isEmpty()) {
+			updates = TimetableRealtimeUpdates.unavailable("REALTIME_REFINEMENT_LIMIT_EXCEEDED");
+			realtimeSnapshot = realtimeSnapshot(timetableSnapshot, updates);
+			searchOutcome = timetableRaptorPlanner.searchWithDiagnostics(
+				rankingCommand, timetableSnapshot.compiledTimetable(), realtimeSnapshot.overlay());
+		}
+		return new RealtimeSearch(realtimeSnapshot, searchOutcome);
+	}
+
+	private TimetableRealtimeUpdates resolveRealtimeUpdates(List<TimetableRealtimeQuery> queries) {
+		TimetableRealtimeUpdates updates = routeSearchUseCase.resolveTimetableRealtime(queries);
+		return updates == null
+			? TimetableRealtimeUpdates.unavailable("REALTIME_OVERLAY_UNAVAILABLE")
+			: updates;
+	}
+
+	private RealtimeSnapshot realtimeSnapshot(
+		TimetableSnapshot timetableSnapshot,
+		TimetableRealtimeUpdates updates
+	) {
+		RealtimeOverlay overlay = timetableRaptorPlanner.compileRealtimeOverlay(
+			timetableSnapshot.compiledTimetable(), updates);
+		RealtimeSnapshot replacement = new RealtimeSnapshot(
+			timetableSnapshot.cacheKey(), overlay.version(), overlay, updates.fallbackCode());
+		// 단일 volatile 참조 교체로 스캔은 구/신 overlay 중 하나만 캡처한다.
+		cachedRealtimeSnapshot = replacement;
+		return replacement;
+	}
+
+	private static TimetableRealtimeUpdates mergeRealtimeUpdates(
+		TimetableRealtimeUpdates current,
+		TimetableRealtimeUpdates addition
+	) {
+		if (!current.available()) {
+			return current;
+		}
+		if (!addition.available()) {
+			return addition;
+		}
+		Map<String, TimetableRealtimeUpdate> updatesByTripId = new LinkedHashMap<>();
+		for (TimetableRealtimeUpdate update : current.updates()) {
+			updatesByTripId.put(update.tripId(), update);
+		}
+		for (TimetableRealtimeUpdate update : addition.updates()) {
+			TimetableRealtimeUpdate previous = updatesByTripId.get(update.tripId());
+			if (previous != null && (previous.cancelled() != update.cancelled()
+				|| previous.arrivalDeltaSeconds() != update.arrivalDeltaSeconds()
+				|| previous.departureDeltaSeconds() != update.departureDeltaSeconds())) {
+				return TimetableRealtimeUpdates.unavailable("CONFLICTING_REALTIME_TRIP_UPDATE");
+			}
+			if (previous == null || previous.providerObservedAt().isBefore(update.providerObservedAt())) {
+				updatesByTripId.put(update.tripId(), update);
+			}
+		}
+		List<TimetableRealtimeUpdate> merged = updatesByTripId.values().stream()
+			.sorted(Comparator.comparing(TimetableRealtimeUpdate::tripId))
+			.toList();
+		return new TimetableRealtimeUpdates(
+			current.version() + "+" + addition.version(), true, merged, null);
 	}
 
 	private static Counter cacheCounter(MeterRegistry registry, String result) {
@@ -325,6 +409,12 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 		private static RealtimeSnapshot empty() {
 			return new RealtimeSnapshot(null, null, RealtimeOverlay.empty(), null);
 		}
+	}
+
+	private record RealtimeSearch(
+		RealtimeSnapshot snapshot,
+		RouteTimetableRaptorPlanner.SearchOutcome outcome
+	) {
 	}
 
 	private SearchRouteV2Command rankingCommand(SearchRouteV2Command command) {

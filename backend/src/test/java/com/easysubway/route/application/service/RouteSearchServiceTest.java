@@ -2196,6 +2196,25 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
+	@DisplayName("여러 탑승점에서 같은 trip을 확인해도 동일한 pre-scan update는 한 번만 유지한다")
+	void deduplicatesConsistentRealtimeTripAcrossQueries() {
+		var repository = new InMemoryRouteSearchRepository();
+		var resolver = new CountingRealtimeArrivalResolver();
+		var routeSearchService = new RouteSearchService(
+			repository, repository, new TimetableAlignedRampAccessibleTransitMasterPort(), CLOCK, resolver);
+		var query = new TimetableRealtimeQuery(
+			"station-a", "seoul-4", CLOCK.instant(), List.of(new TimetableTripDeparture(
+				"trip-live", "train-test", "LOCAL",
+				CLOCK.instant().plusSeconds(60), CLOCK.instant().plusSeconds(90))));
+
+		var updates = routeSearchService.resolveTimetableRealtime(List.of(query, query));
+
+		assertThat(updates.available()).isTrue();
+		assertThat(updates.updates()).singleElement()
+			.satisfies(update -> assertThat(update.tripId()).isEqualTo("trip-live"));
+	}
+
+	@Test
 	@DisplayName("pre-scan realtime 묶음 중 하나라도 stale이면 전체 overlay를 적용하지 않는다")
 	void rejectsPartialRealtimeOverlayWhenAnyQueryIsStale() {
 		var repository = new InMemoryRouteSearchRepository();
@@ -2317,8 +2336,8 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
-	@DisplayName("pre-scan overlay 이후 환승 ride만 post-scan fallback으로 보정한다")
-	void routeV2PlannerFallsBackOnlyForUnresolvedTransferRide() {
+	@DisplayName("pre-scan overlay는 후보 경로의 환승 ride까지 최종 스캔 전에 보정한다")
+	void routeV2PlannerAppliesRealtimeToTransferBeforeFinalScan() {
 		var repository = new InMemoryRouteSearchRepository();
 		List<RealtimeArrivalResolver.Query> queries = Collections.synchronizedList(new ArrayList<>());
 		RealtimeArrivalResolver resolver = query -> {
@@ -2352,8 +2371,53 @@ class RouteSearchServiceTest {
 		assertThat(plan.itineraries().getFirst().steps())
 			.filteredOn(step -> "ride".equals(step.stepType()))
 			.extracting(step -> step.reasonCodes().getLast())
-			.containsExactly("REALTIME_PRE_SCAN_OVERLAY", "REALTIME_POST_SCAN_FALLBACK");
+			.containsExactly("REALTIME_PRE_SCAN_OVERLAY", "REALTIME_PRE_SCAN_OVERLAY");
 		assertThat(plan.statuses()).containsExactly(RouteV2Status.FOUND);
+	}
+
+	@Test
+	@DisplayName("pre-scan overlay는 후보 경로의 취소된 환승 열차를 최종 스캔 전에 제외한다")
+	void routeV2PlannerExcludesCancelledTransferBeforeFinalScan() {
+		var repository = new InMemoryRouteSearchRepository();
+		List<RealtimeArrivalResolver.Query> queries = Collections.synchronizedList(new ArrayList<>());
+		RealtimeArrivalResolver resolver = query -> {
+			queries.add(query);
+			Instant observedAt = query.readyAt().minusSeconds(30);
+			if ("station-transfer".equals(query.stationId())) {
+				return new RealtimeArrivalResolver.Resolution(
+					ArrivalFreshness.FRESH_REALTIME,
+					null,
+					"snapshot-transfer",
+					observedAt,
+					List.of(),
+					List.of("train-b")
+				);
+			}
+			return new RealtimeArrivalResolver.Resolution(
+				ArrivalFreshness.FRESH_REALTIME,
+				null,
+				"snapshot-origin",
+				observedAt,
+				List.of(new ArrivalCandidate(
+					"train-a", query.lineId(), query.direction(), "환승역",
+					600, query.readyAt().plusSeconds(600), observedAt, "LOCAL",
+					ArrivalFreshness.FRESH_REALTIME, EtaConfidence.HIGH
+				))
+			);
+		};
+		var routeSearchService = new RouteSearchService(
+			repository, repository, new OneTransferTransitMasterPort(), CLOCK, resolver);
+		var planner = new RouteV2Planner(routeSearchService, preScanTransferRouteTimetablePort());
+
+		var plan = planner.search(new RouteV2Planner.SearchRouteV2Command(
+			"station-a", "station-b", OffsetDateTime.parse("2026-07-01T09:00:00+09:00"),
+			MobilityType.SENIOR, ConstraintMode.PREFER_STEP_FREE, true, 1, 1));
+
+		assertThat(queries).extracting(RealtimeArrivalResolver.Query::stationId)
+			.contains("station-transfer");
+		assertThat(plan.itineraries()).isEmpty();
+		assertThat(plan.statuses()).containsExactly(RouteV2Status.NO_TIMETABLE_SERVICE);
+		assertThat(plan.nextServiceTime()).isEqualTo(OffsetDateTime.parse("2026-07-02T09:09:00+09:00"));
 	}
 
 	@Test

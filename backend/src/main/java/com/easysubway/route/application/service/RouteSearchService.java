@@ -325,9 +325,8 @@ public class RouteSearchService implements RouteSearchUseCase {
 		if (realtimeArrivalResolver == null || queries == null || queries.isEmpty()) {
 			return TimetableRealtimeUpdates.unavailable("REALTIME_OVERLAY_UNAVAILABLE");
 		}
-		List<TimetableRealtimeUpdate> updates = new ArrayList<>();
+		Map<String, TimetableRealtimeUpdate> updatesByTripId = new HashMap<>();
 		Set<String> versions = new java.util.TreeSet<>();
-		Set<String> updatedTripIds = new HashSet<>();
 		for (TimetableRealtimeQuery query : queries) {
 			RealtimeArrivalResolver.Resolution resolution;
 			try {
@@ -346,14 +345,17 @@ public class RouteSearchService implements RouteSearchUseCase {
 			if (plannedByTrainNo == null) {
 				return TimetableRealtimeUpdates.unavailable("AMBIGUOUS_TIMETABLE_TRAIN_NO");
 			}
-			int queryUpdateStart = updates.size();
+			boolean queryMatchedRealtime = false;
 			Set<String> cancelled = Set.copyOf(resolution.cancelledTrainNos());
 			for (String trainNo : cancelled) {
 				TimetableTripDeparture planned = plannedByTrainNo.get(trainNo);
-				if (planned != null && updatedTripIds.add(planned.tripId())) {
-					updates.add(new TimetableRealtimeUpdate(
+				if (planned != null) {
+					queryMatchedRealtime = true;
+					if (!mergeRealtimeUpdate(updatesByTripId, new TimetableRealtimeUpdate(
 						planned.tripId(), 0, 0, true,
-						resolution.providerSnapshotId(), resolution.providerReceivedAt()));
+						resolution.providerSnapshotId(), resolution.providerReceivedAt()))) {
+						return TimetableRealtimeUpdates.unavailable("CONFLICTING_REALTIME_TRIP_UPDATE");
+					}
 				}
 			}
 			Map<String, ArrivalCandidate> candidateByTrainNo = new HashMap<>();
@@ -372,9 +374,7 @@ public class RouteSearchService implements RouteSearchUseCase {
 			}
 			for (var entry : candidateByTrainNo.entrySet()) {
 				TimetableTripDeparture planned = plannedByTrainNo.get(entry.getKey());
-				if (!updatedTripIds.add(planned.tripId())) {
-					continue;
-				}
+				queryMatchedRealtime = true;
 				long arrivalDelta = Duration.between(
 					planned.scheduledArrivalAt(), entry.getValue().expectedArrivalAt()).toSeconds();
 				Instant expectedDepartureAt = entry.getValue().expectedArrivalAt().plus(
@@ -385,16 +385,35 @@ public class RouteSearchService implements RouteSearchUseCase {
 					|| departureDelta < Integer.MIN_VALUE || departureDelta > Integer.MAX_VALUE) {
 					return TimetableRealtimeUpdates.unavailable("INVALID_REALTIME_DELTA");
 				}
-				updates.add(new TimetableRealtimeUpdate(
+				if (!mergeRealtimeUpdate(updatesByTripId, new TimetableRealtimeUpdate(
 					planned.tripId(), (int) arrivalDelta, (int) departureDelta, false,
-					resolution.providerSnapshotId(), entry.getValue().providerReceivedAt()));
+					resolution.providerSnapshotId(), entry.getValue().providerReceivedAt()))) {
+					return TimetableRealtimeUpdates.unavailable("CONFLICTING_REALTIME_TRIP_UPDATE");
+				}
 			}
-			if (updates.size() == queryUpdateStart) {
+			if (!queryMatchedRealtime) {
 				return TimetableRealtimeUpdates.unavailable("NO_USABLE_REALTIME_CANDIDATE");
 			}
 		}
+		List<TimetableRealtimeUpdate> updates = new ArrayList<>(updatesByTripId.values());
 		updates.sort(Comparator.comparing(TimetableRealtimeUpdate::tripId));
 		return new TimetableRealtimeUpdates(String.join("+", versions), true, updates, null);
+	}
+
+	private static boolean mergeRealtimeUpdate(
+		Map<String, TimetableRealtimeUpdate> updatesByTripId,
+		TimetableRealtimeUpdate update
+	) {
+		TimetableRealtimeUpdate previous = updatesByTripId.get(update.tripId());
+		if (previous != null && (previous.cancelled() != update.cancelled()
+			|| previous.arrivalDeltaSeconds() != update.arrivalDeltaSeconds()
+			|| previous.departureDeltaSeconds() != update.departureDeltaSeconds())) {
+			return false;
+		}
+		if (previous == null || previous.providerObservedAt().isBefore(update.providerObservedAt())) {
+			updatesByTripId.put(update.tripId(), update);
+		}
+		return true;
 	}
 
 	private RealtimeArrivalResolver.Query preScanRealtimeQuery(TimetableRealtimeQuery query) {
