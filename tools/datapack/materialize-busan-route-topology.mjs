@@ -16,8 +16,8 @@ const LINE_METADATA = new Map([
   ["line-eb7b47920390", { nameKo: "부산 2호선", color: "#81bf48" }],
 ]);
 
-export function materializeBusanRouteTopology({ baseFixture, snapshot, inventory }) {
-  admitBusanRouteTopology(snapshot);
+export function materializeBusanRouteTopology({ baseFixture, snapshot, inventory, now = new Date() }) {
+  admitBusanRouteTopology(snapshot, { now });
   const source = requiredSource(inventory, snapshot);
   const fixture = structuredClone(baseFixture);
   if (!Array.isArray(fixture.packs) || fixture.packs.length !== 1 || fixture.packs[0].artifactKind !== "production") {
@@ -134,7 +134,8 @@ function requiredSource(inventory, snapshot) {
   const evidence = source.topologyAdmissionEvidence;
   if (!evidence || evidence.contentSha256 !== snapshot.contentSha256 || evidence.rawSha256 !== snapshot.rawSha256
     || evidence.capturedAt !== snapshot.capturedAt || evidence.freshUntil !== snapshot.freshUntil
-    || evidence.stationCount !== snapshot.stationCount || evidence.edgeCount !== snapshot.edgeCount) {
+    || evidence.stationCount !== snapshot.stationCount || evidence.edgeCount !== snapshot.edgeCount
+    || evidence.excludedTransferCount !== snapshot.excludedTransferCount) {
     throw new Error(`${SOURCE_ID} inventory evidence does not match snapshot`);
   }
   return source;

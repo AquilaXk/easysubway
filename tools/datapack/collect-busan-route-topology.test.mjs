@@ -335,6 +335,7 @@ test("부산 topology admission은 4개 노선 full snapshot만 허용하고 sta
   assert.throws(() => admit({ ...snapshot, endpoint: "https://example.invalid" }), /identity/);
   assert.throws(() => admit({ ...snapshot, fieldsProvided: ["network_edges"] }), /fields/);
   assert.throws(() => admit({ ...snapshot, responseEncodings: ["unknown"] }), /encoding/);
+  assert.throws(() => admit({ ...snapshot, excludedTransferCount: -1 }), /excluded transfer/);
   assert.throws(() => admit({ ...snapshot, freshUntil: snapshot.capturedAt }), /freshness/);
   const edges = structuredClone(snapshot.edges);
   edges[0].distanceMeters = -1;

@@ -277,6 +277,9 @@ export function admitBusanRouteTopology(snapshot, { now = new Date() } = {}) {
     || snapshot.edges.some(({ lineId }) => !EXPECTED_LINE_IDS.includes(lineId))) {
     throw new Error("Busan route topology admission partial snapshot is invalid");
   }
+  if (!Number.isSafeInteger(snapshot.excludedTransferCount) || snapshot.excludedTransferCount < 0) {
+    throw new Error("Busan route topology admission excluded transfer count is invalid");
+  }
   validateNormalizedEdges(snapshot.edges);
   validateEdgesAgainstScope(snapshot.edges, scope);
   if (snapshot.contentSha256 !== contentHash(snapshot.edges, scope)) {

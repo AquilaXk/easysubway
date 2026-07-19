@@ -12,6 +12,7 @@ import { materializeBusanRouteTopology } from "./materialize-busan-route-topolog
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
+const evidenceNow = new Date("2026-07-19T18:14:03.004Z");
 
 async function inputs() {
   return Promise.all([
@@ -23,7 +24,7 @@ async function inputs() {
 
 test("부산 topology snapshot을 실제 production pack 입력으로 materialize한다", async () => {
   const [baseFixture, snapshot, inventory] = await inputs();
-  const fixture = materializeBusanRouteTopology({ baseFixture, snapshot, inventory });
+  const fixture = materializeBusanRouteTopology({ baseFixture, snapshot, inventory, now: evidenceNow });
   const pack = fixture.packs[0];
   const source = pack.sourceInventory.find(({ id }) => id === snapshot.sourceId);
   const busanEdges = pack.networkEdges.filter(({ sourceId }) => sourceId === snapshot.sourceId);
@@ -42,11 +43,26 @@ test("부산 topology snapshot을 실제 production pack 입력으로 materializ
   assert.equal(busanEdges[0].distanceMeters, snapshot.edges[0].distanceMeters);
   assert.equal(busanEdges[0].durationSeconds, snapshot.edges[0].durationSeconds);
 
-  const stale = structuredClone(snapshot);
-  stale.freshUntil = "2026-07-19T18:13:31.841Z";
   assert.throws(
-    () => materializeBusanRouteTopology({ baseFixture, snapshot: stale, inventory }),
-    /freshness|freshUntil|stale/,
+    () => materializeBusanRouteTopology({
+      baseFixture,
+      snapshot,
+      inventory,
+      now: new Date(snapshot.freshUntil),
+    }),
+    /stale/,
+  );
+  const mismatchedInventory = structuredClone(inventory);
+  mismatchedInventory.sources.find(({ id }) => id === snapshot.sourceId)
+    .topologyAdmissionEvidence.excludedTransferCount += 1;
+  assert.throws(
+    () => materializeBusanRouteTopology({
+      baseFixture,
+      snapshot,
+      inventory: mismatchedInventory,
+      now: evidenceNow,
+    }),
+    /inventory evidence/,
   );
 });
 
@@ -57,7 +73,7 @@ test("materialized production SQLite와 provenance만 부산 4개 topology requi
   const packOutput = path.join(outputDir, "pack");
   const reportPath = path.join(outputDir, "coverage.json");
   const [baseFixture, snapshot, inventory] = await inputs();
-  const fixture = materializeBusanRouteTopology({ baseFixture, snapshot, inventory });
+  const fixture = materializeBusanRouteTopology({ baseFixture, snapshot, inventory, now: evidenceNow });
   await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
   await mkdir(packOutput, { recursive: true });
 
