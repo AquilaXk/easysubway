@@ -154,6 +154,10 @@ public class TimetableSeedLoader implements ApplicationRunner {
 
 	private void deleteCurrentSnapshot() {
 		for (String table : List.of(
+			"route_edge_evidence",
+			"transfer_rules",
+			"station_pathway_edges",
+			"station_pathway_nodes",
 			"transit_frequencies",
 			"transit_trip_official_fares",
 			"transit_stop_times",
@@ -183,6 +187,10 @@ public class TimetableSeedLoader implements ApplicationRunner {
 		assertCount("transit_stop_times", evidence.stopTimeCount());
 		assertCount("transit_trip_official_fares", evidence.officialFareCount());
 		assertCount("route_service_artifact_evidence", 1);
+		assertCount("station_pathway_nodes", evidence.stationPathwayNodeCount());
+		assertCount("station_pathway_edges", evidence.stationPathwayEdgeCount());
+		assertCount("transfer_rules", evidence.transferRuleCount());
+		assertCount("route_edge_evidence", evidence.routeEdgeEvidenceCount());
 		assertQueryCount(
 			"SELECT COUNT(*) FROM transit_trips WHERE service_class = 'SUBWAY'",
 			evidence.subwayTripCount(),
@@ -439,7 +447,11 @@ public class TimetableSeedLoader implements ApplicationRunner {
 		int subwayStopTimeCount,
 		int itxTripCount,
 		int itxStopTimeCount,
-		int officialFareCount
+		int officialFareCount,
+		int stationPathwayNodeCount,
+		int stationPathwayEdgeCount,
+		int transferRuleCount,
+		int routeEdgeEvidenceCount
 	) {
 
 		static SnapshotEvidence from(ObjectNode node, ObjectMapper mapper, Clock clock) {
@@ -497,7 +509,11 @@ public class TimetableSeedLoader implements ApplicationRunner {
 				positiveInteger(counts, "subwayStopTimes"),
 				positiveInteger(counts, "itxTrips"),
 				positiveInteger(counts, "itxStopTimes"),
-				positiveInteger(counts, "officialFares")
+				positiveInteger(counts, "officialFares"),
+				nonNegativeInteger(counts, "stationPathwayNodes"),
+				nonNegativeInteger(counts, "stationPathwayEdges"),
+				nonNegativeInteger(counts, "transferRules"),
+				nonNegativeInteger(counts, "routeEdgeEvidence")
 			);
 			if (!"ITX_CHEONGCHUN".equals(text(service, "serviceId"))
 				|| !"line-54a7b980b7c3".equals(text(service, "canonicalLineId"))
@@ -538,6 +554,14 @@ public class TimetableSeedLoader implements ApplicationRunner {
 			int value = integer(node, field);
 			if (value <= 0) {
 				throw new IllegalStateException("timetable snapshot evidence count is invalid: " + field);
+			}
+			return value;
+		}
+
+		private static int nonNegativeInteger(JsonNode node, String field) {
+			int value = integer(node, field);
+			if (value < 0) {
+				throw new IllegalStateException("timetable snapshot evidence field is invalid: " + field);
 			}
 			return value;
 		}

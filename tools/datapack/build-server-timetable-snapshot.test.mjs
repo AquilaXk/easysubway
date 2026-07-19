@@ -20,6 +20,8 @@ const contractPath = path.join(root, "tools/datapack/itx-cheongchun-coverage-con
 const canonicalPackPath = path.join(root, "apps/mobile/assets/datapacks/capital.sqlite.gz");
 const topologyEvidencePath = path.join(root, "tools/datapack/itx-cheongchun-topology-evidence.json");
 const subwayRosterPath = path.join(root, "tools/datapack/sources/kric-line4-route-roster-20260706.json");
+const reviewedPackPath = path.join(root, "tools/datapack/release/capital-production-reviewed-pack.json");
+const sourceSnapshotsPath = path.join(root, "tools/datapack/release/source-snapshots.json");
 const buildNow = new Date("2026-07-16T00:00:00.000Z");
 
 function sha256(value) {
@@ -38,6 +40,8 @@ async function inputs() {
   const canonicalPackGzipBytes = await readFile(canonicalPackPath);
   const topologyEvidenceBytes = await readFile(topologyEvidencePath);
   const subwayRosterBytes = await readFile(subwayRosterPath);
+  const reviewedPackBytes = await readFile(reviewedPackPath);
+  const sourceSnapshotsBytes = await readFile(sourceSnapshotsPath);
   return {
     baselineGzipBytes,
     contractBytes,
@@ -46,6 +50,8 @@ async function inputs() {
     canonicalPackGzipBytes,
     topologyEvidenceBytes,
     subwayRosterBytes,
+    reviewedPackBytes,
+    sourceSnapshotsBytes,
   };
 }
 
@@ -104,6 +110,13 @@ test("#2135 ADMITTED source와 subway seed를 deterministic complete server snap
   );
   assert.ok(first.evidence.rowCounts.subwayTrips > 0);
   assert.ok(first.evidence.rowCounts.subwayStopTimes > first.evidence.rowCounts.subwayTrips);
+  assert.equal(first.evidence.rowCounts.stationPathwayNodes, 4);
+  assert.equal(first.evidence.rowCounts.stationPathwayEdges, 4);
+  assert.equal(first.evidence.rowCounts.transferRules, 0);
+  assert.equal(first.evidence.rowCounts.routeEdgeEvidence, 4);
+  assert.equal((first.sql.match(/INSERT INTO station_pathway_nodes/g) ?? []).length, 4);
+  assert.equal((first.sql.match(/INSERT INTO station_pathway_edges/g) ?? []).length, 4);
+  assert.equal((first.sql.match(/INSERT INTO route_edge_evidence/g) ?? []).length, 4);
   assert.match(first.sql, /'ITX_CHEONGCHUN'/);
   assert.match(first.sql, /, 2135\);/);
   assert.equal((first.sql.match(/INSERT INTO transit_feed_info/g) ?? []).length, 1);

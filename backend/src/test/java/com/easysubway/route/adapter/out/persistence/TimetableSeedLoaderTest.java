@@ -44,6 +44,10 @@ class TimetableSeedLoaderTest {
 		jdbc = new JdbcTemplate(dataSource);
 		jdbc.execute("DROP ALL OBJECTS");
 		jdbc.execute("RUNSCRIPT FROM 'src/main/resources/db/migration/h2/V29__canonical_transit_schedule.sql'");
+		jdbc.execute("RUNSCRIPT FROM 'src/main/resources/db/migration/h2/V16__datapack_source_snapshots.sql'");
+		jdbc.execute("RUNSCRIPT FROM 'src/main/resources/db/migration/h2/V17__datapack_alias_quarantine_ledgers.sql'");
+		jdbc.execute("RUNSCRIPT FROM 'src/main/resources/db/migration/h2/V19__datapack_route_edge_evidence.sql'");
+		jdbc.execute("RUNSCRIPT FROM 'src/main/resources/db/migration/h2/V30__canonical_station_pathways.sql'");
 		jdbc.execute("RUNSCRIPT FROM 'src/main/resources/db/migration/h2/V37__transit_feed_info.sql'");
 		jdbc.execute("RUNSCRIPT FROM 'src/main/resources/db/migration/h2/V50__route_service_identity.sql'");
 		jdbc.execute("RUNSCRIPT FROM 'src/main/resources/db/migration/h2/V61__timetable_snapshot_state.sql'");
@@ -229,6 +233,10 @@ class TimetableSeedLoaderTest {
 			.isEqualTo(140);
 		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM transit_trip_official_fares", Integer.class))
 			.isEqualTo(3686);
+		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM station_pathway_nodes", Integer.class)).isEqualTo(4);
+		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM station_pathway_edges", Integer.class)).isEqualTo(4);
+		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM transfer_rules", Integer.class)).isZero();
+		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM route_edge_evidence", Integer.class)).isEqualTo(4);
 	}
 
 	@Test
@@ -280,6 +288,11 @@ class TimetableSeedLoaderTest {
 		String sourceHash = sha256("source-" + suffix);
 		String sql = """
 			INSERT INTO transit_feed_info (id, feed_end_date) VALUES (1, '20261231');
+			INSERT INTO data_source_snapshots (snapshot_id, source_id, provider, retrieved_at, source_updated_at, row_count, raw_sha256, raw_object_uri, redacted_request_fingerprint, schema_fingerprint, snapshot_status, schema_status, license_status, fetch_status, redistribution_allowed, credential_redacted, previous_snapshot_id, diff_summary, freshness_expires_at) SELECT 'access-snapshot-%1$s','access-source','operator','2026-07-01 00:00:00','2026-07-01 00:00:00',1,'%3$s','s3://fixture/access','%3$s','%3$s','LOCKED','PASS','PASS','SUCCESS',TRUE,TRUE,NULL,NULL,'2026-12-31 00:00:00' WHERE NOT EXISTS (SELECT 1 FROM data_source_snapshots WHERE snapshot_id = 'access-snapshot-%1$s');
+			INSERT INTO station_pathway_nodes (id, station_id, line_id, node_type, label) VALUES ('access-concourse-%1$s','station-subway-%1$s',NULL,'CONCOURSE','concourse');
+			INSERT INTO station_pathway_nodes (id, station_id, line_id, node_type, label) VALUES ('access-platform-%1$s','station-subway-%1$s','seoul-4','PLATFORM','platform');
+			INSERT INTO station_pathway_edges (id, from_node_id, to_node_id, edge_type, duration_seconds, distance_meters, bidirectional, includes_stairs, reliability_score, accessibility_status, source_id, source_snapshot_id, provider_record_hash, provenance_kind, verification_status, last_verified_at, evidence_hash, legacy_internal_route_edge_id) VALUES ('access-edge-%1$s','access-concourse-%1$s','access-platform-%1$s','ENTRY',90,100,FALSE,FALSE,100,'AVAILABLE','access-source','access-snapshot-%1$s','%3$s','OFFICIAL_SOURCE','VERIFIED','2026-07-01 00:00:00','%3$s','access-edge-%1$s');
+			INSERT INTO route_edge_evidence (id, station_id, line_id, edge_id, edge_type, source_id, source_snapshot_id, provenance_kind, verification_status, last_verified_at, evidence_hash, strict_route_eligible, blocker_reason, created_at) VALUES ('route-evidence-%1$s','station-subway-%1$s','seoul-4','access-edge-%1$s','ENTRY','access-source','access-snapshot-%1$s','OFFICIAL_SOURCE','VERIFIED','2026-07-01 00:00:00','%3$s',TRUE,NULL,'2026-07-01 00:00:00');
 			INSERT INTO service_calendars (service_id, start_date, end_date, timezone, monday, tuesday, wednesday, thursday, friday, saturday, sunday) VALUES ('service-%1$s','20260101','20261231','Asia/Seoul',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE);
 			INSERT INTO transit_routes (id, timezone, line_id, route_short_name, route_long_name, direction_name) VALUES ('subway-route-%1$s','Asia/Seoul','seoul-4','','','up');
 			INSERT INTO transit_routes (id, timezone, line_id, route_short_name, route_long_name, direction_name) VALUES ('itx-route-%1$s','Asia/Seoul','line-54a7b980b7c3','ITX-청춘','','down');
@@ -340,6 +353,10 @@ class TimetableSeedLoaderTest {
 		counts.put("itxStopTimes", 3);
 		counts.put("officialFares", 1);
 		counts.put("routeServiceEvidence", 1);
+		counts.put("stationPathwayNodes", 2);
+		counts.put("stationPathwayEdges", 1);
+		counts.put("transferRules", 0);
+		counts.put("routeEdgeEvidence", 1);
 		evidence.put("evidenceHash", sha256(objectMapper.writeValueAsBytes(evidence)));
 		return new SnapshotResource(namedResource(gzipBytes, "snapshot.sql.gz"), jsonResource(evidence, "evidence.json"));
 	}
@@ -442,6 +459,10 @@ class TimetableSeedLoaderTest {
 		assertThat(jdbc.queryForList(
 			"SELECT source_snapshot_id FROM transit_trip_official_fares", String.class))
 			.containsExactly("snapshot-" + suffix);
+		assertThat(jdbc.queryForList("SELECT id FROM station_pathway_edges", String.class))
+			.containsExactly("access-edge-" + suffix);
+		assertThat(jdbc.queryForList("SELECT id FROM route_edge_evidence", String.class))
+			.containsExactly("route-evidence-" + suffix);
 		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM timetable_snapshot_active", Integer.class)).isOne();
 	}
 
