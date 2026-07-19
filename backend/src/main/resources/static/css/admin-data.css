@@ -524,40 +524,6 @@
 	margin: 0;
 }
 
-/* 목록 상태 셀(V6-07 #2279): 상태를 텍스트 + 아이콘 + 색으로 함께 전한다(색 단독 표현 금지).
-   아이콘은 프로젝트 sprite(check·warning·error·info)를 currentColor로 그리므로 tone class의 색을
-   그대로 물려받는다. 시각 언어는 기존 상태색 토큰 범위 안에서만 쓴다. */
-.admin-v3 .data-status {
-	display: inline-flex;
-	align-items: center;
-	gap: 6px;
-	font-size: 13px;
-	color: var(--admin-ink);
-	white-space: nowrap;
-}
-
-.admin-v3 .data-status .admin-icon {
-	width: 16px;
-	height: 16px;
-	flex: none;
-}
-
-.admin-v3 .data-status.tone-good {
-	color: var(--admin-good);
-}
-
-.admin-v3 .data-status.tone-warn {
-	color: var(--admin-warn);
-}
-
-.admin-v3 .data-status.tone-bad {
-	color: var(--admin-danger);
-}
-
-.admin-v3 .data-status.tone-info {
-	color: var(--admin-ink-2);
-}
-
 /* 마지막 확인/갱신일 셀(V6-07 #2279): 상대 시간을 위, 정확한 날짜를 아래(meta)로 병기한다.
    상대 시간에는 정확한 날짜를 title로도 달아 hover·스크린리더에서 절대 시각을 확인할 수 있다. */
 .admin-v3 .data-verified {
@@ -569,6 +535,14 @@
 .admin-v3 .data-verified-relative {
 	color: var(--admin-ink);
 	font-variant-numeric: tabular-nums;
+}
+
+/* 필터/정렬 적용 버튼 JS 시 숨김(#2313): 이 버튼이 속한 필터 form은 htmx `hx-trigger="change, submit"`으로
+   이미 값이 바뀌는 즉시 자동 제출된다. JS 활성 환경에서 명시 제출 버튼은 잉여이므로 숨긴다. no-JS(has-js
+   미부착)에서는 자동 제출이 동작하지 않으므로 이 규칙이 걸리지 않아 버튼이 계속 노출되고, 그대로 수동
+   GET 제출로 필터가 적용된다(폴백 유지, hidden 필터 바인딩·GET 계약은 그대로). */
+.admin-v3.has-js .admin-filter-apply {
+	display: none;
 }
 
 /* compact: 필터·보기 설정을 시트로 접는다. JS가 있을 때만(has-js) 트리거를 노출하고 시트를 접어

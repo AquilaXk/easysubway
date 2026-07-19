@@ -36,7 +36,7 @@
 					<input type="search" name="q" x-ref="input" placeholder="메뉴·역 검색"
 					       aria-label="검색어" autocomplete="off"
 					       x-on:keydown.arrow-down.prevent="focusResults">
-					<button type="submit">검색</button>
+					<button type="submit" class="outline">검색</button>
 				</form>
 				<div id="palette-results" class="command-palette-results"
 				     x-on:keydown.arrow-down.prevent="moveDown"
@@ -247,7 +247,7 @@
 	        crossorigin="anonymous" defer></script>
 </th:block>
 <span th:fragment="status(text, tone)" class="admin-status"
-      th:classappend="${tone == 'good'} ? ' good' : (${tone == 'bad'} ? ' bad' : (${tone == 'warn'} ? ' warn' : ''))"
+      th:classappend="${tone == 'good'} ? ' good' : (${tone == 'bad'} ? ' bad' : (${tone == 'warn'} ? ' warn' : (${tone == 'info'} ? ' info' : '')))"
       th:text="${text}">상태</span>
 <span th:fragment="statusAuto(label)" class="admin-status"
       th:classappend="${label == null ? '' :

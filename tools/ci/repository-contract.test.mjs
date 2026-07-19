@@ -9894,6 +9894,8 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
   const inventory = readJson("tools/datapack/source-inventory.json");
   const candidates = readJson("tools/datapack/source-candidates.json");
   const productionSourceIds = new Set(inventory.sources.map((source) => source.id));
+  // kric-provider-code-catalog는 credential-free 공식 파일을 code mapping으로 승인한 source라
+  // "샘플 URL만 문서화된" KRIC API 후보 계약과 다르다.
   // kric-subway-timetable은 라이브 재구성 실증을 가진 schedule_timetable 후보라 "샘플 URL만 문서화된"
   // 페이퍼 KRIC 후보 계약과 다르다 — 아래 전용 테스트에서 별도로 고정하고 이 루프에서는 제외한다.
   // production inventory로 승격된 KRIC 시설 source(엘리베이터·에스컬레이터·휠체어리프트 위치/이동동선 등,
@@ -9902,6 +9904,7 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
     (candidate) =>
       candidate.id.startsWith("kric-") &&
       !new Set([
+        "kric-provider-code-catalog",
         "kric-station-timetable",
         "kric-subway-timetable",
         "kric-subway-timetable-exp",
@@ -9912,7 +9915,7 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
   assert.equal(candidates.schemaVersion, 1);
   assert.equal(candidates.artifactKind, "production-source-candidates");
   assert.equal(candidates.source, "tools/datapack/source-candidates.json");
-  assert.equal(candidates.updatedAt, "2026-07-14");
+  assert.equal(candidates.updatedAt, "2026-07-19");
   assert.deepEqual(
     kricCandidates.map((candidate) => candidate.id).sort(),
     [
