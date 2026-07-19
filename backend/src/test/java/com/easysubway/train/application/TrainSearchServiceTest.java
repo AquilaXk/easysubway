@@ -244,7 +244,7 @@ class TrainSearchServiceTest {
 	}
 
 	@Test
-	void forcedCatalogRefreshWaitsForAnOrphanLeaseAndKeepsLoadBudget() {
+	void forcedCatalogRefreshWaitsForAnOrphanLeaseAndKeepsLoadInsideTheNewLease() {
 		service.catalog();
 		cache.leases.put("catalog-refresh-v1", "other-owner");
 		var clock = new TestClock(NOW);
@@ -252,15 +252,19 @@ class TrainSearchServiceTest {
 		service = serviceWith(clock, duration -> {
 			slept[0] = slept[0].plus(duration);
 			clock.advance(duration);
-			if (slept[0].compareTo(Duration.ofMinutes(5)) >= 0) {
+			if (slept[0].compareTo(Duration.ofMinutes(6)) >= 0) {
 				cache.leases.remove("catalog-refresh-v1", "other-owner");
 			}
 		});
 
 		service.refreshCatalog();
 
-		assertThat(slept[0]).isGreaterThanOrEqualTo(Duration.ofMinutes(5));
+		assertThat(slept[0]).isGreaterThanOrEqualTo(Duration.ofMinutes(6));
 		assertThat(provider.catalogCalls).hasValue(2);
+		assertThat(cache.leaseTtls.get("catalog-refresh-v1")).isEqualTo(Duration.ofMinutes(6));
+		Instant acquiredAt = NOW.plus(slept[0]);
+		assertThat(provider.catalogDeadlines).last().isEqualTo(acquiredAt.plus(Duration.ofMinutes(5)));
+		assertThat(provider.catalogDeadlines.getLast()).isBefore(acquiredAt.plus(Duration.ofMinutes(6)));
 	}
 
 	@Test
@@ -479,6 +483,7 @@ class TrainSearchServiceTest {
 		private final AtomicInteger catalogCalls = new AtomicInteger();
 		private final AtomicInteger searchCalls = new AtomicInteger();
 		private final List<LegQuery> queries = new java.util.concurrent.CopyOnWriteArrayList<>();
+		private final List<Instant> catalogDeadlines = new java.util.concurrent.CopyOnWriteArrayList<>();
 		private final CountDownLatch searchStarted = new CountDownLatch(1);
 		private final CountDownLatch continueSearch = new CountDownLatch(1);
 		private final CountDownLatch catalogStarted = new CountDownLatch(1);
@@ -508,6 +513,12 @@ class TrainSearchServiceTest {
 				List.of(new Station("NAT010000", "서울"), new Station("NAT011668", "대전")),
 				catalogTrainTypes
 			);
+		}
+
+		@Override
+		public Catalog catalog(Instant deadline) {
+			catalogDeadlines.add(deadline);
+			return catalog();
 		}
 
 		@Override

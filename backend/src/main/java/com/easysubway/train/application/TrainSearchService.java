@@ -51,7 +51,7 @@ public class TrainSearchService {
 	private static final Duration FUTURE_TTL = Duration.ofHours(6);
 	// 한 구간도 영업일 2일, 페이지네이션, 복수 열차종 코드, 요청별 재시도를 순차 수행할 수 있다.
 	private static final Duration LEG_LEASE_TTL = Duration.ofMinutes(15);
-	private static final Duration CATALOG_LEASE_TTL = Duration.ofMinutes(5);
+	private static final Duration CATALOG_LEASE_TTL = Duration.ofMinutes(6);
 	private static final Duration CATALOG_LOAD_BUDGET = Duration.ofMinutes(5);
 	private static final Duration CATALOG_RECOVERY_GRACE = Duration.ofSeconds(1);
 	private static final Duration HTTP_REQUEST_BUDGET = Duration.ofSeconds(30);
@@ -220,7 +220,7 @@ public class TrainSearchService {
 		if (!cache.tryAcquireLease(CATALOG_LEASE_KEY, owner, now, CATALOG_LEASE_TTL)) {
 			return pollForCatalog(force ? existing.orElse(null) : null, deadline, force);
 		}
-		return loadCatalog(owner, deadline);
+		return loadCatalog(owner, catalogLoadDeadline(now, deadline));
 	}
 
 	private CatalogEntry pollForCatalog(CachedCatalog baseline, Instant deadline, boolean recoverOrphanLease) {
@@ -236,10 +236,15 @@ public class TrainSearchService {
 			}
 			String owner = ownerSupplier.get();
 			if (cache.tryAcquireLease(CATALOG_LEASE_KEY, owner, now, CATALOG_LEASE_TTL)) {
-				return loadCatalog(owner, deadline);
+				return loadCatalog(owner, catalogLoadDeadline(now, deadline));
 			}
 		}
 		throw failure("TRAIN_SEARCH_UNAVAILABLE");
+	}
+
+	private Instant catalogLoadDeadline(Instant acquiredAt, Instant overallDeadline) {
+		Instant ownedLoadDeadline = acquiredAt.plus(CATALOG_LOAD_BUDGET);
+		return ownedLoadDeadline.isBefore(overallDeadline) ? ownedLoadDeadline : overallDeadline;
 	}
 
 	private boolean catalogChanged(CachedCatalog baseline, CachedCatalog current) {
@@ -261,6 +266,7 @@ public class TrainSearchService {
 			);
 			String payload = write(filtered);
 			Instant expiresAt = completedAt.plus(CATALOG_TTL);
+			requireBefore(deadline);
 			cache.replaceCatalog(List.of(new CachedCatalog(
 				CATALOG_KIND,
 				payload,
