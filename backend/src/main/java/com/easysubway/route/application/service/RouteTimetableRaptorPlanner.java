@@ -74,11 +74,65 @@ class RouteTimetableRaptorPlanner {
 
 	List<RouteSearchResult> search(SearchRouteV2Command command, CompiledTimetable timetable) {
 		ServiceDay serviceDay = serviceDay(command);
-		return scanDestinationLabels(command, timetable, serviceDay, serviceDay.departureSeconds(), false).labels().stream()
+		return results(command, timetable, serviceDay,
+			scanDestinationLabels(command, timetable, serviceDay, serviceDay.departureSeconds(), false));
+	}
+
+	SearchOutcome searchWithDiagnostics(SearchRouteV2Command command, CompiledTimetable timetable) {
+		ServiceDay serviceDay = serviceDay(command);
+		ScanResult found = scanDestinationLabels(
+			command, timetable, serviceDay, serviceDay.departureSeconds(), false);
+		List<RouteSearchResult> itineraries = results(command, timetable, serviceDay, found);
+		if (!itineraries.isEmpty()) {
+			return new SearchOutcome(itineraries, null);
+		}
+		ScanResult diagnostic = scanDestinationLabels(
+			command, timetable, serviceDay, serviceDay.departureSeconds(), true);
+		if (diagnostic.labels().isEmpty()) {
+			return new SearchOutcome(List.of(), null);
+		}
+		return new SearchOutcome(List.of(), blockedAccessibilityResult(command, serviceDay, diagnostic.labels().getFirst()));
+	}
+
+	private static List<RouteSearchResult> results(
+		SearchRouteV2Command command,
+		CompiledTimetable timetable,
+		ServiceDay serviceDay,
+		ScanResult scanResult
+	) {
+		return scanResult.labels().stream()
 			.sorted(RouteTimetableRaptorPlanner::compareLabels)
 			.limit(candidateLimit(command))
 			.map(label -> toRouteSearchResult(command, label, serviceDay, timetable))
 			.toList();
+	}
+
+	private static RouteSearchResult blockedAccessibilityResult(
+		SearchRouteV2Command command,
+		ServiceDay serviceDay,
+		Label diagnostic
+	) {
+		List<RouteWarning> warnings = warnings(diagnostic.warningBits());
+		if (warnings.isEmpty()) {
+			warnings = List.of(new RouteWarning(RouteWarningCode.LOW_DATA_CONFIDENCE));
+		}
+		return new RouteSearchResult(
+			"route-v2-raptor-blocked-" + serviceDay.date() + "-" + command.originStationId()
+				+ "-" + command.destinationStationId(),
+			command.originStationId(),
+			command.originStationId(),
+			command.destinationStationId(),
+			command.destinationStationId(),
+			command.mobilityType(),
+			RouteSearchStatus.BLOCKED,
+			"",
+			"",
+			0,
+			List.of(),
+			warnings,
+			List.of("검증된 계단 없는 접근 경로를 확인할 수 없습니다."),
+			LocalDateTime.of(serviceDay.date(), java.time.LocalTime.MIDNIGHT).plusSeconds(diagnostic.startSeconds())
+		);
 	}
 
 	ScanMetrics lastScanMetrics() {
@@ -396,7 +450,7 @@ class RouteTimetableRaptorPlanner {
 			int accessSeconds = profiledWalkSeconds(command, timetable.transitionDurationSeconds(accessTransition));
 			int earliestDepartureSeconds = readySeconds + accessSeconds + slackSeconds;
 			byte warningBits = (byte) (workspace.warningBits[readySlot]
-				| timetable.transitionWarningCodes(accessTransition, accessProfileBit));
+				| timetable.transitionWarningCodes(accessTransition, accessProfileBit, ignoreAccessBlocks));
 			if (boardedTrip != null
 				&& earliestDepartureSeconds < boardingEarliestDepartureSeconds
 				&& boardedTrip.allowsPickup(position)
@@ -498,7 +552,7 @@ class RouteTimetableRaptorPlanner {
 				accessTransitions,
 				exitTransition,
 				(byte) (workspace.warningBits[slot]
-					| timetable.transitionWarningCodes(exitTransition, accessProfileBit))
+					| timetable.transitionWarningCodes(exitTransition, accessProfileBit, ignoreAccessBlocks))
 			));
 		}
 		return labels;
@@ -1004,8 +1058,8 @@ class RouteTimetableRaptorPlanner {
 			return accessTransitions.verificationStatus(transition);
 		}
 
-		byte transitionWarningCodes(int transition, int profileBit) {
-			return accessTransitions.warningCodes(transition, profileBit);
+		byte transitionWarningCodes(int transition, int profileBit, boolean ignoreBlocked) {
+			return accessTransitions.warningCodes(transition, profileBit, ignoreBlocked);
 		}
 
 		boolean transitionIncludesStairs(int transition) {
@@ -1400,7 +1454,8 @@ class RouteTimetableRaptorPlanner {
 				&& evidence.strictRouteEligible()
 				&& !edge.includesStairs();
 			byte warnings = 0;
-			if (!verified || !trusted || edge.reliabilityScore() < 80) {
+			if (!verified || !trusted || edge.reliabilityScore() < 80
+				|| evidence != null && !evidence.strictRouteEligible()) {
 				warnings |= WARNING_LOW_CONFIDENCE;
 			}
 			if (edge.includesStairs()) {
@@ -1513,8 +1568,8 @@ class RouteTimetableRaptorPlanner {
 			return verificationStatuses[transition];
 		}
 
-		private byte warningCodes(int transition, int profileBit) {
-			return (warningProfiles[transition] & profileBit) == 0 ? 0 : warningCodes[transition];
+		private byte warningCodes(int transition, int profileBit, boolean ignoreBlocked) {
+			return ignoreBlocked || (warningProfiles[transition] & profileBit) != 0 ? warningCodes[transition] : 0;
 		}
 
 		private boolean includesStairs(int transition) {
@@ -1767,6 +1822,12 @@ class RouteTimetableRaptorPlanner {
 	}
 
 	private record ScanResult(ServiceDay serviceDay, List<Label> labels) {
+	}
+
+	record SearchOutcome(List<RouteSearchResult> itineraries, RouteSearchResult blockedAccessibility) {
+		SearchOutcome {
+			itineraries = List.copyOf(itineraries);
+		}
 	}
 
 	record ScanMetrics(int expandedRoutes, int expandedTrips, int workspaceIdentity) {
