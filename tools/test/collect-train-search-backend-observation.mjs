@@ -126,16 +126,32 @@ function validateMetadata(metadata) {
   }
 }
 
-function verifyRuntimeSource(candidateGitSha) {
+export function verifyRuntimeSource(candidateGitSha, cwd = process.cwd()) {
   const paths = [
     "backend/src/main",
     "backend/build.gradle",
     "backend/settings.gradle",
     "backend/gradle.lockfile",
   ];
-  const commit = spawnSync("/usr/bin/git", ["cat-file", "-e", `${candidateGitSha}^{commit}`], { encoding: "utf8" });
-  const diff = spawnSync("/usr/bin/git", ["diff", "--quiet", candidateGitSha, "--", ...paths], { encoding: "utf8" });
-  if (commit.status !== 0 || diff.status !== 0) {
+  const options = { cwd, encoding: "utf8" };
+  const commit = spawnSync("/usr/bin/git", ["cat-file", "-e", `${candidateGitSha}^{commit}`], options);
+  const diff = spawnSync("/usr/bin/git", ["diff", "--quiet", candidateGitSha, "--", ...paths], options);
+  const untracked = spawnSync(
+    "/usr/bin/git",
+    ["ls-files", "--others", "--exclude-standard", "--", ...paths],
+    options,
+  );
+  const ignored = spawnSync(
+    "/usr/bin/git",
+    ["ls-files", "--others", "--ignored", "--exclude-standard", "--", ...paths],
+    options,
+  );
+  if (commit.status !== 0
+    || diff.status !== 0
+    || untracked.status !== 0
+    || ignored.status !== 0
+    || untracked.stdout.trim() !== ""
+    || ignored.stdout.trim() !== "") {
     throw new Error("backend runtime source did not match the candidate SHA");
   }
   return candidateGitSha;

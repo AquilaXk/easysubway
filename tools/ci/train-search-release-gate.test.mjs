@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
 import * as trainSearchLiveSmoke from "../test/train-search-live-smoke.mjs";
+import { validateSearchPayload } from "../test/train-search-capacity-contract.mjs";
 
 import {
   addProviderStation,
@@ -24,6 +25,7 @@ import {
 import {
   buildBackendObservation,
   validateBackendObservationArtifact,
+  verifyRuntimeSource,
 } from "../test/collect-train-search-backend-observation.mjs";
 
 const read = (file) => readFileSync(file, "utf8");
@@ -571,6 +573,42 @@ test("backend test XML에서 3-node provider 1회와 quota fail-closed를 계산
   );
 });
 
+test("backend runtime source 검증은 보호 경로의 untracked 파일을 거부한다", () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "train-runtime-source-"));
+  const git = (...args) => spawnSync("/usr/bin/git", args, { cwd: directory, encoding: "utf8" });
+  try {
+    assert.equal(git("init").status, 0);
+    assert.equal(git("config", "user.email", "test@example.com").status, 0);
+    assert.equal(git("config", "user.name", "EasySubway Test").status, 0);
+    const sourceDirectory = path.join(directory, "backend", "src", "main", "java");
+    mkdirSync(sourceDirectory, { recursive: true });
+    const tracked = path.join(sourceDirectory, "Tracked.java");
+    writeFileSync(tracked, "final class Tracked {}\n");
+    assert.equal(git("add", "backend/src/main/java/Tracked.java").status, 0);
+    assert.equal(git("commit", "-m", "fixture").status, 0);
+    const candidateGitSha = git("rev-parse", "HEAD").stdout.trim();
+    assert.equal(verifyRuntimeSource(candidateGitSha, directory), candidateGitSha);
+
+    writeFileSync(path.join(directory, "backend", "src", "main", "java", "Injected.java"),
+      "final class Injected {}\n");
+    assert.throws(
+      () => verifyRuntimeSource(candidateGitSha, directory),
+      /backend runtime source did not match the candidate SHA/,
+    );
+
+    rmSync(path.join(sourceDirectory, "Injected.java"));
+    writeFileSync(path.join(directory, ".git", "info", "exclude"),
+      "backend/src/main/java/Ignored.java\n");
+    writeFileSync(path.join(sourceDirectory, "Ignored.java"), "final class Ignored {}\n");
+    assert.throws(
+      () => verifyRuntimeSource(candidateGitSha, directory),
+      /backend runtime source did not match the candidate SHA/,
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("live evidence는 EasySubway production API origin만 허용한다", async () => {
   const android = read("apps/mobile/integration_test/train_search_release_evidence_test.dart");
   assert.match(android, /Uri _requireProductionBaseUri\(\)/);
@@ -637,7 +675,8 @@ test("capacity runner는 repeated·unique·3-node·quota 경계를 고정한다"
   assert.match(k6, /timeUnit: `\$\{ARRIVAL_INTERVAL_SECONDS\}s`/);
   assert.doesNotMatch(k6, /http_req_failed\?\.values\?\.passes/);
   assert.match(k6, /requestCount >= expectedRequestCount/);
-  assert.match(k6, /Array\.isArray\(payload\.data\.inbound\)/);
+  assert.match(k6, /validateSearchPayload\(payload, parameters, workload\)/);
+  assert.match(k6, /train-search-capacity-contract\.mjs/);
   assert.match(k6, /TRAIN_SEARCH_SUMMARY_PATH is required/);
   assert.match(k6, /TRAIN_SEARCH_CANDIDATE_SHA must be a full lowercase Git SHA/);
   assert.match(k6, /candidateGitSha,/);
@@ -715,6 +754,38 @@ test("capacity runner는 repeated·unique·3-node·quota 경계를 고정한다"
   }
 });
 
+test("capacity 응답 계약은 실제 OD·날짜·열차종·운임을 검증한다", () => {
+  const parameters = {
+    departureStationId: "NAT010000",
+    arrivalStationId: "NAT011668",
+    departureDate: "2026-07-20",
+    trainType: "KTX",
+  };
+  const row = {
+    departureStationId: "NAT010000",
+    arrivalStationId: "NAT011668",
+    departureAt: "2026-07-20T09:00:00+09:00",
+    trainType: "KTX",
+    adultFareWon: 23_700,
+  };
+  const payload = { success: true, data: { outbound: [row], inbound: [] } };
+  assert.equal(validateSearchPayload(payload, parameters, "repeated"), true);
+  assert.equal(validateSearchPayload({ success: true, data: { outbound: [], inbound: [] } },
+    parameters, "repeated"), false);
+  for (const invalid of [
+    { ...row, departureStationId: "NAT999999" },
+    { ...row, arrivalStationId: "NAT999999" },
+    { ...row, departureAt: "2026-07-21T09:00:00+09:00" },
+    { ...row, trainType: "SRT" },
+    { ...row, adultFareWon: null },
+  ]) {
+    assert.equal(validateSearchPayload({ success: true, data: { outbound: [invalid], inbound: [] } },
+      parameters, "repeated"), false);
+  }
+  assert.equal(validateSearchPayload({ success: true, data: { outbound: [], inbound: [] } },
+    { ...parameters, trainType: "SRT" }, "unique"), true);
+});
+
 test("capacity validator는 OD·날짜와 required CI를 fail-closed로 검증한다", () => {
   const runtime = readJson("apps/mobile/release/train-search-itx-exclusion-gate.json").issue2094RuntimeEvidence;
   const directory = mkdtempSync(path.join(tmpdir(), "train-capacity-validator-"));
@@ -763,6 +834,18 @@ test("capacity validator는 OD·날짜와 required CI를 fail-closed로 검증�
     const missingCi = spawnSync(process.execPath, args, { encoding: "utf8" });
     assert.notEqual(missingCi.status, 0);
     assert.match(missingCi.stderr, /candidate deployment binding failed its evidence contract/);
+
+    const missingDeploymentMetadata = structuredClone(runtime.capacity.candidateBinding);
+    delete missingDeploymentMetadata.backend.deployment.runId;
+    delete missingDeploymentMetadata.backend.deployment.runUrl;
+    delete missingDeploymentMetadata.backend.deployment.workflowName;
+    delete missingDeploymentMetadata.backend.deployment.requiredJobs;
+    delete missingDeploymentMetadata.evidenceSha256;
+    missingDeploymentMetadata.evidenceSha256 = sha256(JSON.stringify(missingDeploymentMetadata));
+    write("candidate-binding.json", missingDeploymentMetadata);
+    const missingCd = spawnSync(process.execPath, args, { encoding: "utf8" });
+    assert.notEqual(missingCd.status, 0);
+    assert.match(missingCd.stderr, /candidate deployment binding failed its evidence contract/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

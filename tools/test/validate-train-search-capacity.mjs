@@ -14,6 +14,7 @@ const requiredCiJobs = [
   "Backend CI",
   "Admin QA Gates",
 ];
+const requiredDeploymentJobs = ["CD Deploy", "Post-deploy smoke", "CD Record deployment"];
 const arguments_ = process.argv.slice(2);
 if (arguments_[0] === "--preflight-output-dir") {
   if (arguments_.length !== 2) fail("expected one output directory");
@@ -199,7 +200,15 @@ function validateCandidateBindingArtifact(
     || artifact.backend?.arrivalStationId !== arrivalStationId
     || artifact.backend?.departureDate !== departureDate
     || artifact.backend?.deployment?.deployedGitSha !== candidateGitSha
+    || artifact.backend?.deployment?.workflowName !== "CD"
     || artifact.backend?.deployment?.conclusion !== "success"
+    || !Number.isInteger(artifact.backend?.deployment?.runId)
+    || artifact.backend.deployment.runId < 1
+    || artifact.backend?.deployment?.runUrl
+      !== `https://github.com/AquilaXk/easysubway/actions/runs/${artifact.backend.deployment.runId}`
+    || !Array.isArray(artifact.backend?.deployment?.requiredJobs)
+    || artifact.backend.deployment.requiredJobs.length !== requiredDeploymentJobs.length
+    || requiredDeploymentJobs.some((job, index) => artifact.backend.deployment.requiredJobs[index] !== job)
     || artifact.backend?.requiredCi?.candidateGitSha !== candidateGitSha
     || artifact.backend?.requiredCi?.workflowName !== "CI"
     || artifact.backend?.requiredCi?.conclusion !== "success"

@@ -2,6 +2,7 @@ import http from "k6/http";
 import { check } from "k6";
 import exec from "k6/execution";
 import { Counter, Rate } from "k6/metrics";
+import { validateSearchPayload } from "./train-search-capacity-contract.mjs";
 
 const fiveXx = new Counter("train_search_5xx");
 const fourXx = new Counter("train_search_4xx");
@@ -102,11 +103,7 @@ export default function trainSearchCapacity() {
     "success envelope": (value) => {
       try {
         const payload = value.json();
-        return payload?.success === true
-          && Array.isArray(payload?.data?.outbound)
-          && Array.isArray(payload.data.inbound)
-          && [...payload.data.outbound, ...payload.data.inbound]
-            .every((row) => row.trainType !== "ITX_CHEONGCHUN");
+        return validateSearchPayload(payload, parameters, workload);
       } catch {
         return false;
       }
