@@ -121,11 +121,9 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 					rankingCommand(command),
 					snapshot.compiledTimetable()
 				);
-				if (searchOutcome.blockedAccessibility() != null) {
-					RouteSearchResult blocked = searchOutcome.blockedAccessibility();
-					return timetablePlan(List.of(blocked), statusesOf(List.of(blocked), command.useRealtime()), snapshot);
-				}
-				List<RouteSearchResult> timetableItineraries = searchOutcome.itineraries();
+				boolean blockedAccessibility = searchOutcome.blockedAccessibility() != null;
+				List<RouteSearchResult> timetableItineraries = blockedAccessibility
+					? List.of(searchOutcome.blockedAccessibility()) : searchOutcome.itineraries();
 				if (timetableItineraries.isEmpty()) {
 					return noTimetableServicePlan(command, snapshot);
 				}
@@ -143,6 +141,9 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 					false
 				);
 				timetableItineraries = stabilizedCandidates.itineraries();
+				if (blockedAccessibility) {
+					return timetablePlan(timetableItineraries, statusesOf(timetableItineraries, false), snapshot);
+				}
 				if (stabilizedCandidates.source() == TimetableCandidateSource.TIMETABLE_SCAN) {
 					timetableItineraries = routeSearchUseCase.applyRealtimeToTimetableCandidates(
 						searchRouteCommand,

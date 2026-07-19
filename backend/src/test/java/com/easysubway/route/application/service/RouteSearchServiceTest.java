@@ -1660,7 +1660,9 @@ class RouteSearchServiceTest {
 	@Test
 	@DisplayName("V2 planner는 strict wheelchair 요청을 RAPTOR에서 BLOCKED_ACCESSIBILITY로 진단한다")
 	void routeV2PlannerDiagnosesStrictWheelchairAccessibilityBlockInRaptor() {
-		var planner = new RouteV2Planner(legacySearchMustNotBeCalled(), routeTimetablePort());
+		var repository = new InMemoryRouteSearchRepository();
+		var routeSearchService = new RouteSearchService(repository, repository, new StairOnlyTransitMasterPort(), CLOCK);
+		var planner = new RouteV2Planner(routeSearchService, routeTimetablePort());
 
 		var plan = planner.search(new RouteV2SearchUseCase.SearchRouteV2Command(
 			"station-a",
@@ -1680,7 +1682,7 @@ class RouteSearchServiceTest {
 			assertThat(itinerary.status()).isEqualTo(RouteSearchStatus.BLOCKED);
 			assertThat(itinerary.steps()).isEmpty();
 			assertThat(itinerary.warnings()).extracting("code")
-				.contains(RouteWarningCode.LOW_DATA_CONFIDENCE);
+				.containsExactly(RouteWarningCode.LOW_DATA_CONFIDENCE, RouteWarningCode.STAIR_ONLY_ACCESS);
 			assertThat(itinerary.blockedReasons())
 				.containsExactly("검증된 계단 없는 접근 경로를 확인할 수 없습니다.");
 		});
