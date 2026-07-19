@@ -326,7 +326,7 @@ class RouteTimetableRaptorPlanner {
 		int slackSeconds
 	) {
 		workspace.expandedRoutes += 1;
-		List<ScheduledTrip> trips = activeServiceDay.tripsByPattern(pattern, firstMarkedPosition);
+		List<ScheduledTrip> trips = activeServiceDay.tripsByPattern(pattern);
 		if (trips.isEmpty()) {
 			return;
 		}
@@ -335,7 +335,6 @@ class RouteTimetableRaptorPlanner {
 		int boardingPosition = -1;
 		int boardingReadySeconds = UNREACHED;
 		for (int position = firstMarkedPosition; position < stops.length; position += 1) {
-			trips = activeServiceDay.tripsByPattern(pattern, position);
 			int station = stops[position];
 			if (boardedTrip != null && position > boardingPosition && boardedTrip.allowsDropOff(position)) {
 				workspace.relax(
@@ -903,21 +902,13 @@ class RouteTimetableRaptorPlanner {
 			List<ScheduledTrip> activeTrips = scheduledTrips.stream()
 				.filter(trip -> activeServiceIds.contains(trip.trip().serviceId()))
 				.toList();
-			Map<Integer, List<List<ScheduledTrip>>> activeTripsByPattern = new HashMap<>();
+			Map<Integer, List<ScheduledTrip>> activeTripsByPattern = new HashMap<>();
 			for (Map.Entry<Integer, List<ScheduledTrip>> entry : tripsByPattern.entrySet()) {
 				List<ScheduledTrip> patternTrips = entry.getValue().stream()
 					.filter(trip -> activeServiceIds.contains(trip.trip().serviceId()))
 					.toList();
 				if (!patternTrips.isEmpty()) {
-					List<List<ScheduledTrip>> tripsByStop = new ArrayList<>();
-					for (int stop = 0; stop < stopsByPattern.get(entry.getKey()).length; stop += 1) {
-						int stopIndex = stop;
-						// Stable sorting keeps the non-overtaking pattern order when departures tie.
-						tripsByStop.add(patternTrips.stream()
-							.sorted(Comparator.comparingInt((ScheduledTrip trip) -> trip.departureSeconds(stopIndex)))
-							.toList());
-					}
-					activeTripsByPattern.put(entry.getKey(), List.copyOf(tripsByStop));
+					activeTripsByPattern.put(entry.getKey(), patternTrips);
 				}
 			}
 			ActiveServiceDay compiled = new ActiveServiceDay(activeTrips, Map.copyOf(activeTripsByPattern));
@@ -1065,10 +1056,10 @@ class RouteTimetableRaptorPlanner {
 	static final class ActiveServiceDay {
 
 		private final List<ScheduledTrip> trips;
-		private final Map<Integer, List<List<ScheduledTrip>>> tripsByPattern;
+		private final Map<Integer, List<ScheduledTrip>> tripsByPattern;
 		private volatile Map<String, List<BoardingStop>> boardingsByStation;
 
-		private ActiveServiceDay(List<ScheduledTrip> trips, Map<Integer, List<List<ScheduledTrip>>> tripsByPattern) {
+		private ActiveServiceDay(List<ScheduledTrip> trips, Map<Integer, List<ScheduledTrip>> tripsByPattern) {
 			this.trips = List.copyOf(trips);
 			this.tripsByPattern = tripsByPattern;
 		}
@@ -1077,9 +1068,14 @@ class RouteTimetableRaptorPlanner {
 			return trips;
 		}
 
-		private List<ScheduledTrip> tripsByPattern(int pattern, int stopPosition) {
-			List<List<ScheduledTrip>> tripsByStop = tripsByPattern.get(pattern);
-			return tripsByStop == null ? List.of() : tripsByStop.get(stopPosition);
+		private List<ScheduledTrip> tripsByPattern(int pattern) {
+			return tripsByPattern.getOrDefault(pattern, List.of());
+		}
+
+		int routePatternTripLinkCount() {
+			return tripsByPattern.values().stream()
+				.mapToInt(List::size)
+				.sum();
 		}
 
 		boolean boardingIndexInitialized() {

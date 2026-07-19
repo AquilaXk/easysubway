@@ -116,6 +116,16 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 	}
 
 	@Test
+	@DisplayName("active service day는 pattern trip을 stop마다 복제하지 않는다")
+	void storesEachActivePatternTripOnce() {
+		var compiled = planner.compile(frequencyTimetable());
+
+		var activeDay = compiled.activeServiceDay(WEDNESDAY);
+
+		assertThat(activeDay.routePatternTripLinkCount()).isEqualTo(compiled.scheduledTripCount());
+	}
+
+	@Test
 	@DisplayName("일반 search는 next-service 전용 boarding index를 생성하지 않는다")
 	void regularSearchDoesNotAllocateBoardingIndex() {
 		var compiled = planner.compile(frequencyTimetable());
