@@ -1076,6 +1076,18 @@ test("Admin QA Gates는 실제 브라우저 QA를 blocking으로 통합하고 re
   assert.match(adminQaJob, /actions\/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02/);
   assert.match(adminQaJob, /Admin QA Gates \/ Summarize actual browser QA \(shadow\)/);
   assert.match(adminQaJob, /GITHUB_STEP_SUMMARY/);
+  // #2283 리뷰(CodeRabbit Major): report JSON이 손상·절단돼도 Summarize step은 try/catch로
+  // fallback summary(파싱 실패 사실 + 파일 크기·head)를 남기고 항상 성공 종료해야 한다. 게이트
+  // 판정은 harness step(browser-qa)의 exit code가 이미 내렸으므로 이 step은 이를 약화하지 않는다.
+  const summarizeStep = adminQaJob.match(
+    /- name: Admin QA Gates \/ Summarize actual browser QA \(shadow\)[\s\S]*/,
+  )?.[0] ?? "";
+  assert.match(summarizeStep, /try \{/);
+  assert.match(summarizeStep, /\} catch \(error\) \{/);
+  assert.match(summarizeStep, /Report JSON parse failed \(fallback summary\)/);
+  assert.match(summarizeStep, /fs\.statSync\(reportPath\)\.size/);
+  assert.match(summarizeStep, /Head \(first 500 chars\)/);
+  assert.doesNotMatch(summarizeStep, /\bretry\b/i);
   const stopStep = adminQaJob.match(
     /- name: Admin QA Gates \/ Stop backend for actual browser QA[\s\S]*?\n      - name:/,
   )?.[0] ?? "";

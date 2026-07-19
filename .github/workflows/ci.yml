@@ -389,18 +389,40 @@ jobs:
           } >> "${GITHUB_STEP_SUMMARY}"
           report="${ADMIN_QA_OUTPUT_DIR}/admin-accessibility-qa-report.json"
           if [[ -f "${report}" ]]; then
+            # #2283 리뷰(CodeRabbit Major): report JSON이 손상·절단돼 있어도 이 단계는 정보성
+            # summary만 남기므로 항상 성공 종료해야 한다. 게이트 판정(blocking exit)은 이미
+            # 앞선 harness 단계(id: browser-qa, continue-on-error 없음 — blocking 승격 완료)가
+            # 자체 exit code로 내렸다. 이 step의 성공/실패는 그 판정을 강화하거나 약화하지 않는다.
             node -e '
               const fs = require("fs");
-              const report = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-              const summary = report.summary || {};
-              const blocking = (report.blockingViolations || []).length;
-              const lines = [
-                "- Blocking violations: **" + blocking + "**",
-                "- axe critical: " + (summary.criticalAxeViolations ?? "n/a") + " · axe serious: " + (summary.seriousAxeViolations ?? "n/a"),
-                "- reflow(400%) horizontal-scroll failures: " + (summary.reflowHorizontalScrollFailures ?? "n/a"),
-                "- screenshots: " + (summary.screenshots ?? "n/a") + " · no-JS pages: " + (summary.noJsPages ?? "n/a"),
-              ];
-              fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
+              const reportPath = process.argv[1];
+              try {
+                const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+                const summary = report.summary || {};
+                const blocking = (report.blockingViolations || []).length;
+                const lines = [
+                  "- Blocking violations: **" + blocking + "**",
+                  "- axe critical: " + (summary.criticalAxeViolations ?? "n/a") + " · axe serious: " + (summary.seriousAxeViolations ?? "n/a"),
+                  "- reflow(400%) horizontal-scroll failures: " + (summary.reflowHorizontalScrollFailures ?? "n/a"),
+                  "- screenshots: " + (summary.screenshots ?? "n/a") + " · no-JS pages: " + (summary.noJsPages ?? "n/a"),
+                ];
+                fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
+              } catch (error) {
+                let size = "unknown";
+                let head = "";
+                try {
+                  size = String(fs.statSync(reportPath).size);
+                  head = fs.readFileSync(reportPath, "utf8").slice(0, 500);
+                } catch {
+                  // stat/read 자체가 실패해도 fallback summary는 계속 남긴다.
+                }
+                const lines = [
+                  "- Report JSON parse failed (fallback summary): **" + error.message + "**",
+                  "- File size: " + size + " bytes",
+                  "- Head (first 500 chars): " + JSON.stringify(head),
+                ];
+                fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
+              }
             ' "${report}"
           else
             echo "- Report JSON not produced (backend boot or harness failed before report write; see artifact backend-qa.log)." >> "${GITHUB_STEP_SUMMARY}"
