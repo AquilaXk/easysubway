@@ -141,6 +141,21 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 	}
 
 	@Test
+	@DisplayName("route 메타데이터가 없어도 stop line fallback으로 경로를 검색한다")
+	void searchesTripWithoutRouteMetadata() {
+		var results = planner.search(
+			command(WEDNESDAY, 8, 50),
+			planner.compile(missingRouteMetadataTimetable())
+		);
+
+		assertThat(results).hasSize(1);
+		assertThat(results.getFirst().steps())
+			.filteredOn(step -> "ride".equals(step.stepType()))
+			.extracting("lineId", "lineName")
+			.containsExactly(org.assertj.core.groups.Tuple.tuple("line-fallback", "line-fallback"));
+	}
+
+	@Test
 	@DisplayName("중간 stop에서 추월한 trip도 해당 stop 출발 시각 순서로 이진 탐색한다")
 	void binarySearchesTripsInDepartureOrderAtEachStop() {
 		var command = new SearchRouteV2Command(
@@ -476,6 +491,23 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 					"trip-other", 1, "station-x", "line-other", 32400, 32400, 0, 0),
 				new LoadRouteTimetablePort.TransitStopTime(
 					"trip-other", 2, "station-y", "line-other", 33000, 33000, 0, 0)
+			),
+			List.of()
+		);
+	}
+
+	private static RouteTimetable missingRouteMetadataTimetable() {
+		return new RouteTimetable(
+			List.of(weekday("weekday")),
+			List.of(),
+			List.of(),
+			List.of(new LoadRouteTimetablePort.TransitTrip(
+				"trip-missing-route", "route-missing", "weekday", "B", "0", "LOCAL", 0)),
+			List.of(
+				new LoadRouteTimetablePort.TransitStopTime(
+					"trip-missing-route", 1, "station-a", "line-fallback", 32400, 32400, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime(
+					"trip-missing-route", 2, "station-b", "line-fallback", 33000, 33000, 0, 0)
 			),
 			List.of()
 		);

@@ -829,7 +829,7 @@ class RouteTimetableRaptorPlanner {
 				compiledTrips.set(index, compiledTrips.get(index).withIndex(index));
 			}
 			scheduledTrips = List.copyOf(compiledTrips);
-			CompiledRoutePatterns routePatterns = compileRoutePatterns(scheduledTrips, routeIndex, stationIndex);
+			CompiledRoutePatterns routePatterns = compileRoutePatterns(scheduledTrips, stationIndex);
 			stopsByPattern = routePatterns.stopsByPattern();
 			patternsByStop = invertPatterns(stopsByPattern, stationIndex.size());
 			tripsByPattern = routePatterns.tripsByPattern();
@@ -965,15 +965,13 @@ class RouteTimetableRaptorPlanner {
 
 		private static CompiledRoutePatterns compileRoutePatterns(
 			List<ScheduledTrip> scheduledTrips,
-			Map<String, Integer> routeIndex,
 			Map<String, Integer> stationIndex
 		) {
 			Map<RoutePatternKey, List<ScheduledTrip>> groupedTrips = new LinkedHashMap<>();
 			Map<Integer, int[]> stopsByPattern = new HashMap<>();
 			Map<Integer, List<ScheduledTrip>> tripsByPattern = new HashMap<>();
 			for (ScheduledTrip trip : scheduledTrips) {
-				Integer denseRoute = routeIndex.get(trip.trip().routeId());
-				if (denseRoute == null || trip.stopTimes().isEmpty()) {
+				if (trip.stopTimes().isEmpty()) {
 					continue;
 				}
 				List<Integer> stationSequence = trip.stopTimes().stream()
@@ -982,7 +980,7 @@ class RouteTimetableRaptorPlanner {
 				List<Integer> accessSignature = trip.stopTimes().stream()
 					.map(stopTime -> (stopTime.pickupType() << 16) | (stopTime.dropOffType() & 0xffff))
 					.toList();
-				RoutePatternKey key = new RoutePatternKey(denseRoute, stationSequence, accessSignature);
+				RoutePatternKey key = new RoutePatternKey(trip.trip().routeId(), stationSequence, accessSignature);
 				groupedTrips.computeIfAbsent(key, ignored -> new ArrayList<>()).add(trip);
 			}
 			for (Map.Entry<RoutePatternKey, List<ScheduledTrip>> entry : groupedTrips.entrySet()) {
@@ -1280,7 +1278,7 @@ class RouteTimetableRaptorPlanner {
 	}
 
 	private record RoutePatternKey(
-		int routeIndex,
+		String routeId,
 		List<Integer> stationSequence,
 		List<Integer> accessSignature
 	) {
