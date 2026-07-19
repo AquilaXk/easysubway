@@ -971,6 +971,75 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
   assert.doesNotMatch(releaseGateJob, /iOS CI \/ Build Flutter iOS simulator app/);
 });
 
+// #2283 V6-11: Admin QA Gates가 실제 브라우저 하네스를 shadow로 통합하되, required check 이름과
+// 기존 정적 게이트(vendor integrity·unit test)를 그대로 보존하고, admin 무관 변경은 명시적 성공 skip을
+// 반환하며, shadow→blocking 승격이 단일 continue-on-error 스위치가 되도록 구조를 고정한다.
+test("Admin QA Gates는 실제 브라우저 QA를 shadow로 통합하고 required check·skip 계약을 유지한다", () => {
+  const workflow = read(".github/workflows/ci.yml");
+  const adminQaJob = jobBlock(workflow, "admin-qa-gates", "repository-contracts");
+
+  // required check 이름과 job 수준 docs_only skip은 그대로 유지된다.
+  assert.match(adminQaJob, /name: Admin QA Gates/);
+  assert.match(adminQaJob, /needs\.changes\.outputs\.docs_only != 'true'/);
+  assert.ok(REQUIRED_STATUS_CHECK_CONTEXTS.includes("Admin QA Gates"));
+
+  // 기존 정적 게이트(vendor integrity + unit test)는 삭제/개명하지 않는다.
+  assert.match(adminQaJob, /Admin QA Gates \/ Install pinned QA tools/);
+  assert.match(adminQaJob, /npm ci --prefix tools\/qa/);
+  assert.match(adminQaJob, /Admin QA Gates \/ Run static QA gates/);
+  assert.match(adminQaJob, /node tools\/ci\/check-admin-vendor-integrity\.mjs/);
+  assert.match(adminQaJob, /npm test --prefix tools\/qa/);
+
+  // admin 관련 경로(backend surface) 변경에서만 heavy browser step을 실행한다.
+  assert.match(adminQaJob, /Admin QA Gates \/ Set up Java for actual browser QA/);
+  assert.match(adminQaJob, /Admin QA Gates \/ Set up Chrome for actual browser QA/);
+  assert.match(adminQaJob, /Admin QA Gates \/ Build backend for actual browser QA/);
+  assert.match(adminQaJob, /\.\/gradlew bootJar --no-daemon/);
+  assert.match(adminQaJob, /Admin QA Gates \/ Actual browser accessibility QA \(shadow\)/);
+  assert.match(adminQaJob, /node tools\/qa\/admin-accessibility-qa\.mjs --output/);
+  // Java·Chrome·build·browser step은 모두 backend == 'true' gate로만 실행한다.
+  for (const step of [
+    "Set up Java for actual browser QA",
+    "Set up Chrome for actual browser QA",
+    "Build backend for actual browser QA",
+    "Actual browser accessibility QA \\(shadow\\)",
+  ]) {
+    const stepBlock = adminQaJob.match(new RegExp(`- name: Admin QA Gates / ${step}[\\s\\S]*?\\n      - `))?.[0] ?? "";
+    assert.match(stepBlock, /needs\.changes\.outputs\.backend == 'true'/, `${step} must gate on backend == 'true'`);
+  }
+
+  // 무관 변경(backend != 'true')은 explicit successful skip(exit 0)을 반환한다.
+  assert.match(adminQaJob, /Admin QA Gates \/ Skip actual browser QA \(unrelated change\)/);
+  assert.match(adminQaJob, /needs\.changes\.outputs\.backend != 'true'/);
+  assert.match(adminQaJob, /skipping the actual browser accessibility QA step\./);
+
+  // shadow↔blocking 승격 스위치: browser step은 continue-on-error(shadow)로 둔다.
+  const browserStep = adminQaJob.match(
+    /- name: Admin QA Gates \/ Actual browser accessibility QA \(shadow\)[\s\S]*?\n      - name:/,
+  )?.[0] ?? "";
+  assert.match(browserStep, /id: browser-qa/);
+  assert.match(browserStep, /continue-on-error: true/);
+  // arbitrary retry로 flaky를 숨기지 않는다.
+  assert.doesNotMatch(browserStep, /\bretry\b/i);
+
+  // shadow artifact(report JSON·스크린샷)와 job summary를 항상 남긴다.
+  assert.match(adminQaJob, /Admin QA Gates \/ Upload actual browser QA artifacts \(shadow\)/);
+  assert.match(adminQaJob, /actions\/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02/);
+  assert.match(adminQaJob, /Admin QA Gates \/ Summarize actual browser QA \(shadow\)/);
+  assert.match(adminQaJob, /GITHUB_STEP_SUMMARY/);
+  // tested revision·seed·profile을 artifact/summary에 기록한다.
+  assert.match(adminQaJob, /testedRevision/);
+  assert.match(adminQaJob, /"database": "h2-in-memory"/);
+
+  // CI 러너 sandbox 완화·임시 계정 비밀번호 마스킹(로그에 비밀 미출력).
+  assert.match(adminQaJob, /ADMIN_QA_CHROME_NO_SANDBOX: "1"/);
+  assert.match(adminQaJob, /openssl rand -hex 24/);
+  assert.match(adminQaJob, /::add-mask::\$\{admin_pw\}/);
+  assert.match(adminQaJob, /::add-mask::\$\{operator_pw\}/);
+  // 실제 브라우저 QA 경로는 repository secret을 쓰지 않는다(비밀은 실행 시 생성).
+  assert.doesNotMatch(browserStep, /secrets\./);
+});
+
 test("main ruleset 필수 체크는 ci.yml 잡 이름·automerge 코디네이터와 1:1로 고정된다", () => {
   // These context names correspond 1:1 to main ruleset 17584352's
   // required_status_checks. Renaming a ci.yml job without updating the ruleset
