@@ -64,7 +64,7 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
               '전국 여객열차',
               style: Theme.of(
                 context,
-              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 4),
             Text(
@@ -208,8 +208,13 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
     if (_suggestionSlot != slot || _suggestions.isEmpty) {
       return const SizedBox.shrink();
     }
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(top: 4),
+      decoration: BoxDecoration(
+        border: Border.symmetric(
+          horizontal: BorderSide(color: Theme.of(context).dividerColor),
+        ),
+      ),
       child: Column(
         children: [
           for (final station in _suggestions)
@@ -258,8 +263,13 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
     if (_error case final String error) {
       return Semantics(
         liveRegion: true,
-        child: Card(
+        child: Container(
           key: const Key('trainSearchError'),
+          decoration: BoxDecoration(
+            border: Border.symmetric(
+              horizontal: BorderSide(color: Theme.of(context).dividerColor),
+            ),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -313,7 +323,7 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
           title,
           style: Theme.of(
             context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 8),
         if (journeys.isEmpty)
@@ -333,8 +343,13 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
     return Semantics(
       label: semanticsLabel,
       child: ExcludeSemantics(
-        child: Card(
+        child: Container(
           margin: const EdgeInsets.only(bottom: 10),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: Theme.of(context).dividerColor),
+            ),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -343,7 +358,7 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
                 Text(
                   '${journey.trainType.labelKo} ${journey.trainNumber}',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -359,7 +374,7 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
                 Text(
                   fare,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const Text('성인 1인'),
