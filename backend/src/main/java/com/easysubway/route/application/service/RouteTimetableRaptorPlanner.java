@@ -20,6 +20,8 @@ import com.easysubway.route.domain.ProfileWalkTimeCalculator.WalkTimeSource;
 import com.easysubway.route.domain.RouteSearchResult;
 import com.easysubway.route.domain.RouteSearchStatus;
 import com.easysubway.route.domain.RouteStep;
+import com.easysubway.route.domain.RouteWarning;
+import com.easysubway.route.domain.RouteWarningCode;
 import com.easysubway.route.domain.RouteSearchResult.OfficialFare;
 import java.time.Duration;
 import java.time.DayOfWeek;
@@ -72,10 +74,10 @@ class RouteTimetableRaptorPlanner {
 
 	List<RouteSearchResult> search(SearchRouteV2Command command, CompiledTimetable timetable) {
 		ServiceDay serviceDay = serviceDay(command);
-		return scanDestinationLabels(command, timetable, serviceDay, serviceDay.departureSeconds()).labels().stream()
+		return scanDestinationLabels(command, timetable, serviceDay, serviceDay.departureSeconds(), false).labels().stream()
 			.sorted(RouteTimetableRaptorPlanner::compareLabels)
 			.limit(candidateLimit(command))
-			.map(label -> toRouteSearchResult(command, label, serviceDay, timetable.source()))
+			.map(label -> toRouteSearchResult(command, label, serviceDay, timetable))
 			.toList();
 	}
 
@@ -255,7 +257,8 @@ class RouteTimetableRaptorPlanner {
 		SearchRouteV2Command command,
 		CompiledTimetable timetable,
 		ServiceDay serviceDay,
-		int startSeconds
+		int startSeconds,
+		boolean ignoreAccessBlocks
 	) {
 		ActiveServiceDay activeServiceDay = timetable.activeServiceDay(serviceDay.date());
 		ScanWorkspace workspace = scanWorkspaces.get();
@@ -272,8 +275,7 @@ class RouteTimetableRaptorPlanner {
 		workspace.mark(origin);
 
 		int slackSeconds = BoardingSlackPolicy.secondsFor(command.mobilityType());
-		int entrySeconds = profiledWalkSeconds(command, ENTRY_DURATION_SECONDS);
-		int transferSeconds = profiledWalkSeconds(command, TRANSFER_DURATION_SECONDS);
+		int accessProfileBit = profileBit(command.mobilityType(), command.constraintMode());
 		for (int round = 0; round <= command.maxTransfers() && workspace.markedStopCount > 0; round += 1) {
 			collectMarkedPatterns(timetable, workspace);
 			Arrays.sort(workspace.markedPatterns, 0, workspace.markedPatternCount);
@@ -286,15 +288,18 @@ class RouteTimetableRaptorPlanner {
 					pattern,
 					workspace.firstMarkedPosition[pattern],
 					round,
-					round == 0 ? entrySeconds : transferSeconds,
-					slackSeconds
+					slackSeconds,
+					accessProfileBit,
+					command,
+					ignoreAccessBlocks
 				);
 			}
 			workspace.finishRound();
 		}
 
 		List<Label> destinationLabels = destinationLabels(
-			command.destinationStationId(), timetable, workspace, destination, startSeconds)
+			command.destinationStationId(), timetable, workspace, destination, startSeconds,
+			accessProfileBit, command, ignoreAccessBlocks)
 			.stream()
 			.sorted(RouteTimetableRaptorPlanner::compareLabels)
 			.limit(candidateLimit(command))
@@ -333,8 +338,10 @@ class RouteTimetableRaptorPlanner {
 		int pattern,
 		int firstMarkedPosition,
 		int round,
-		int accessSeconds,
-		int slackSeconds
+		int slackSeconds,
+		int accessProfileBit,
+		SearchRouteV2Command command,
+		boolean ignoreAccessBlocks
 	) {
 		workspace.expandedRoutes += 1;
 		List<ScheduledTrip> trips = activeServiceDay.tripsByPattern(pattern);
@@ -342,9 +349,15 @@ class RouteTimetableRaptorPlanner {
 			return;
 		}
 		int[] stops = timetable.stopsByPattern(pattern);
+		int boardingLine = timetable.lineIndex(trips.getFirst().lineId());
+		if (boardingLine < 0) {
+			return;
+		}
 		ScheduledTrip boardedTrip = null;
 		int boardingPosition = -1;
-		int boardingReadySeconds = UNREACHED;
+		int boardingEarliestDepartureSeconds = UNREACHED;
+		int boardingAccessTransition = -1;
+		byte boardingWarningBits = 0;
 		for (int position = firstMarkedPosition; position < stops.length; position += 1) {
 			int station = stops[position];
 			if (boardedTrip != null && position > boardingPosition && boardedTrip.allowsDropOff(position)) {
@@ -354,20 +367,44 @@ class RouteTimetableRaptorPlanner {
 					boardedTrip.arrivalSeconds(position),
 					boardedTrip.index(),
 					boardingPosition,
-					position
+					position,
+					boardingAccessTransition,
+					boardingWarningBits
 				);
 			}
-			int readySeconds = workspace.arrivalSeconds[workspace.slot(round, station)];
+			int readySlot = workspace.slot(round, station);
+			int readySeconds = workspace.arrivalSeconds[readySlot];
 			if (readySeconds == UNREACHED) {
 				continue;
 			}
+			int accessTransition;
+			if (round == 0) {
+				accessTransition = timetable.entryTransition(
+					station, boardingLine, accessProfileBit, ignoreAccessBlocks);
+			} else {
+				int previousTrip = workspace.parentTrip[readySlot];
+				if (previousTrip < 0) {
+					continue;
+				}
+				int previousLine = timetable.lineIndex(timetable.scheduledTrip(previousTrip).lineId());
+				accessTransition = previousLine < 0 ? -1 : timetable.transferTransition(
+					station, previousLine, boardingLine, accessProfileBit, ignoreAccessBlocks);
+			}
+			if (accessTransition < 0) {
+				continue;
+			}
+			int accessSeconds = profiledWalkSeconds(command, timetable.transitionDurationSeconds(accessTransition));
 			int earliestDepartureSeconds = readySeconds + accessSeconds + slackSeconds;
+			byte warningBits = (byte) (workspace.warningBits[readySlot]
+				| timetable.transitionWarningCodes(accessTransition, accessProfileBit));
 			if (boardedTrip != null
-				&& readySeconds < boardingReadySeconds
+				&& earliestDepartureSeconds < boardingEarliestDepartureSeconds
 				&& boardedTrip.allowsPickup(position)
 				&& boardedTrip.departureSeconds(position) >= earliestDepartureSeconds) {
 				boardingPosition = position;
-				boardingReadySeconds = readySeconds;
+				boardingEarliestDepartureSeconds = earliestDepartureSeconds;
+				boardingAccessTransition = accessTransition;
+				boardingWarningBits = warningBits;
 			}
 			ScheduledTrip candidate = earliestBoardableTrip(
 				trips,
@@ -381,7 +418,9 @@ class RouteTimetableRaptorPlanner {
 					&& candidate.arrivalSeconds(position) <= boardedTrip.arrivalSeconds(position)))) {
 				boardedTrip = candidate;
 				boardingPosition = position;
-				boardingReadySeconds = readySeconds;
+				boardingEarliestDepartureSeconds = earliestDepartureSeconds;
+				boardingAccessTransition = accessTransition;
+				boardingWarningBits = warningBits;
 				workspace.expandedTrips += 1;
 			}
 		}
@@ -416,7 +455,10 @@ class RouteTimetableRaptorPlanner {
 		CompiledTimetable timetable,
 		ScanWorkspace workspace,
 		int destination,
-		int startSeconds
+		int startSeconds,
+		int accessProfileBit,
+		SearchRouteV2Command command,
+		boolean ignoreAccessBlocks
 	) {
 		List<Label> labels = new ArrayList<>(PARETO_LIMIT);
 		for (int boardings = 1; boardings <= PARETO_LIMIT; boardings += 1) {
@@ -424,7 +466,15 @@ class RouteTimetableRaptorPlanner {
 			if (workspace.arrivalSeconds[slot] == UNREACHED) {
 				continue;
 			}
+			ScheduledTrip finalTrip = timetable.scheduledTrip(workspace.parentTrip[slot]);
+			int finalLine = timetable.lineIndex(finalTrip.lineId());
+			int exitTransition = finalLine < 0 ? -1 : timetable.exitTransition(
+				destination, finalLine, accessProfileBit, ignoreAccessBlocks);
+			if (exitTransition < 0) {
+				continue;
+			}
 			List<RideLeg> path = new ArrayList<>(boardings);
+			int[] accessTransitions = new int[boardings];
 			int station = destination;
 			int currentBoardings = boardings;
 			while (currentBoardings > 0) {
@@ -433,16 +483,22 @@ class RouteTimetableRaptorPlanner {
 				int boardingPosition = workspace.parentBoardStop[currentSlot];
 				int alightingPosition = workspace.parentAlightStop[currentSlot];
 				path.add(new RideLeg(trip, boardingPosition, alightingPosition));
+				accessTransitions[currentBoardings - 1] = workspace.parentAccessTransition[currentSlot];
 				station = timetable.stationIndex(trip.stopTimes().get(boardingPosition).stationId());
 				currentBoardings -= 1;
 			}
 			java.util.Collections.reverse(path);
 			labels.add(new Label(
 				destinationStationId,
-				workspace.arrivalSeconds[slot],
+				workspace.arrivalSeconds[slot]
+					+ profiledWalkSeconds(command, timetable.transitionDurationSeconds(exitTransition)),
 				startSeconds,
 				boardings,
-				List.copyOf(path)
+				List.copyOf(path),
+				accessTransitions,
+				exitTransition,
+				(byte) (workspace.warningBits[slot]
+					| timetable.transitionWarningCodes(exitTransition, accessProfileBit))
 			));
 		}
 		return labels;
@@ -463,17 +519,17 @@ class RouteTimetableRaptorPlanner {
 		SearchRouteV2Command command,
 		Label label,
 		ServiceDay serviceDay,
-		RouteTimetable timetable
+		CompiledTimetable timetable
 	) {
 		List<RouteStep> steps = new ArrayList<>();
 		int sequence = 1;
 		int boardingSlackSeconds = BoardingSlackPolicy.secondsFor(command.mobilityType());
-		int entryDurationSeconds = profiledWalkSeconds(command, ENTRY_DURATION_SECONDS);
-		int transferDurationSeconds = profiledWalkSeconds(command, TRANSFER_DURATION_SECONDS);
-		int exitDurationSeconds = profiledWalkSeconds(command, EXIT_DURATION_SECONDS);
 		List<RideLeg> path = label.path();
 		RideLeg firstLeg = path.getFirst();
 		RideLeg lastLeg = path.getLast();
+		int entryTransition = label.accessTransitions()[0];
+		int entryDurationSeconds = profiledWalkSeconds(
+			command, timetable.transitionDurationSeconds(entryTransition));
 		steps.add(timetableAccessStep(
 			sequence,
 			"entry",
@@ -482,16 +538,20 @@ class RouteTimetableRaptorPlanner {
 			firstLeg.lineId(),
 			firstLeg.lineName(),
 			waitMinutesBeforeBoarding(label.startSeconds(), firstLeg.departureSeconds(), entryDurationSeconds, boardingSlackSeconds),
-			ENTRY_DISTANCE_METERS,
 			entryDurationSeconds,
 			serviceTime(serviceDay, label.startSeconds()),
-			serviceTime(serviceDay, firstLeg.departureSeconds())
+			serviceTime(serviceDay, firstLeg.departureSeconds()),
+			timetable,
+			entryTransition
 		));
 		sequence += 1;
 		for (int index = 0; index < path.size(); index += 1) {
 			RideLeg leg = path.get(index);
 			if (index > 0) {
 				RideLeg previousLeg = path.get(index - 1);
+				int transferTransition = label.accessTransitions()[index];
+				int transferDurationSeconds = profiledWalkSeconds(
+					command, timetable.transitionDurationSeconds(transferTransition));
 				steps.add(timetableAccessStep(
 					sequence,
 					"transfer",
@@ -500,10 +560,11 @@ class RouteTimetableRaptorPlanner {
 					leg.lineId(),
 					leg.lineName(),
 					waitMinutesBeforeBoarding(previousLeg.arrivalSeconds(), leg.departureSeconds(), transferDurationSeconds, boardingSlackSeconds),
-					TRANSFER_DISTANCE_METERS,
 					transferDurationSeconds,
 					serviceTime(serviceDay, previousLeg.arrivalSeconds()),
-					serviceTime(serviceDay, leg.departureSeconds())
+					serviceTime(serviceDay, leg.departureSeconds()),
+					timetable,
+					transferTransition
 				));
 				sequence += 1;
 			}
@@ -540,6 +601,8 @@ class RouteTimetableRaptorPlanner {
 			));
 			sequence += 1;
 		}
+		int exitDurationSeconds = profiledWalkSeconds(
+			command, timetable.transitionDurationSeconds(label.exitTransition()));
 		steps.add(timetableAccessStep(
 			sequence,
 			"exit",
@@ -548,10 +611,11 @@ class RouteTimetableRaptorPlanner {
 			lastLeg.lineId(),
 			lastLeg.lineName(),
 			(int) Math.ceil(exitDurationSeconds / 60.0),
-			EXIT_DISTANCE_METERS,
 			exitDurationSeconds,
 			serviceTime(serviceDay, lastLeg.arrivalSeconds()),
-			serviceTime(serviceDay, lastLeg.arrivalSeconds() + exitDurationSeconds)
+			serviceTime(serviceDay, lastLeg.arrivalSeconds() + exitDurationSeconds),
+			timetable,
+			label.exitTransition()
 		));
 		return new RouteSearchResult(
 			"route-v2-raptor-" + serviceDay.date() + "-" + command.originStationId() + "-" + command.destinationStationId()
@@ -566,11 +630,11 @@ class RouteTimetableRaptorPlanner {
 			label.path().getFirst().lineName(),
 			Math.max(1, (label.timeSeconds() - label.startSeconds()) / 60),
 			List.copyOf(steps),
-			List.of(),
+			warnings(label.warningBits()),
 			List.of(),
 			LocalDateTime.of(serviceDay.date(), java.time.LocalTime.MIDNIGHT).plusSeconds(label.startSeconds()),
 			List.of(),
-			officialFare(timetable, path)
+			officialFare(timetable.source(), path)
 		);
 	}
 
@@ -640,11 +704,14 @@ class RouteTimetableRaptorPlanner {
 		String lineId,
 		String lineName,
 		int estimatedMinutes,
-		int distanceMeters,
 		int walkSeconds,
 		String plannedDepartureTime,
-		String plannedArrivalTime
+		String plannedArrivalTime,
+		CompiledTimetable timetable,
+		int transition
 	) {
+		boolean includesStairs = timetable.transitionIncludesStairs(transition);
+		boolean verified = timetable.transitionVerified(transition);
 		return new RouteStep(
 			sequence,
 			stepType,
@@ -655,13 +722,13 @@ class RouteTimetableRaptorPlanner {
 			fromStationId,
 			toStationId,
 			estimatedMinutes,
-			distanceMeters,
-			false,
-			"UNKNOWN",
-			true,
+			timetable.transitionDistanceMeters(transition),
+			includesStairs,
+			includesStairs ? "STAIR_ONLY" : verified ? "STEP_FREE" : "UNKNOWN",
+			!verified,
 			EtaSource.PLANNED.name(),
 			"TIMETABLE",
-			"시간표",
+			verified ? "검증됨" : "확인 필요",
 			List.of(),
 			null,
 			null,
@@ -675,6 +742,20 @@ class RouteTimetableRaptorPlanner {
 			plannedDepartureTime,
 			plannedArrivalTime
 		);
+	}
+
+	private static List<RouteWarning> warnings(byte warningBits) {
+		List<RouteWarning> warnings = new ArrayList<>(3);
+		if ((warningBits & WARNING_LOW_CONFIDENCE) != 0) {
+			warnings.add(new RouteWarning(RouteWarningCode.LOW_DATA_CONFIDENCE));
+		}
+		if ((warningBits & WARNING_STAIRS) != 0) {
+			warnings.add(new RouteWarning(RouteWarningCode.STAIR_ONLY_ACCESS));
+		}
+		if ((warningBits & WARNING_STALE) != 0) {
+			warnings.add(new RouteWarning(RouteWarningCode.STALE_ACCESSIBILITY_DATA));
+		}
+		return List.copyOf(warnings);
 	}
 
 	private static String serviceTime(ServiceDay serviceDay, int seconds) {
@@ -921,6 +1002,18 @@ class RouteTimetableRaptorPlanner {
 
 		String transitionVerificationStatus(int transition) {
 			return accessTransitions.verificationStatus(transition);
+		}
+
+		byte transitionWarningCodes(int transition, int profileBit) {
+			return accessTransitions.warningCodes(transition, profileBit);
+		}
+
+		boolean transitionIncludesStairs(int transition) {
+			return accessTransitions.includesStairs(transition);
+		}
+
+		boolean transitionVerified(int transition) {
+			return accessTransitions.verified(transition);
 		}
 
 		int unsupportedTransferCount() {
@@ -1420,6 +1513,18 @@ class RouteTimetableRaptorPlanner {
 			return verificationStatuses[transition];
 		}
 
+		private byte warningCodes(int transition, int profileBit) {
+			return (warningProfiles[transition] & profileBit) == 0 ? 0 : warningCodes[transition];
+		}
+
+		private boolean includesStairs(int transition) {
+			return includesStairs[transition];
+		}
+
+		private boolean verified(int transition) {
+			return "VERIFIED".equals(verificationStatuses[transition]);
+		}
+
 		private int unsupportedTransferCount() {
 			return unsupportedTransferCount;
 		}
@@ -1527,6 +1632,8 @@ class RouteTimetableRaptorPlanner {
 		private int[] parentTrip = new int[0];
 		private int[] parentBoardStop = new int[0];
 		private int[] parentAlightStop = new int[0];
+		private int[] parentAccessTransition = new int[0];
+		private byte[] warningBits = new byte[0];
 		private int[] markedStops = new int[0];
 		private int[] nextMarkedStops = new int[0];
 		private boolean[] marked = new boolean[0];
@@ -1547,6 +1654,8 @@ class RouteTimetableRaptorPlanner {
 				parentTrip = new int[labelSlots];
 				parentBoardStop = new int[labelSlots];
 				parentAlightStop = new int[labelSlots];
+				parentAccessTransition = new int[labelSlots];
+				warningBits = new byte[labelSlots];
 			}
 			if (markedStops.length < requiredStationCount) {
 				markedStops = new int[requiredStationCount];
@@ -1562,6 +1671,8 @@ class RouteTimetableRaptorPlanner {
 			Arrays.fill(parentTrip, 0, labelSlots, -1);
 			Arrays.fill(parentBoardStop, 0, labelSlots, -1);
 			Arrays.fill(parentAlightStop, 0, labelSlots, -1);
+			Arrays.fill(parentAccessTransition, 0, labelSlots, -1);
+			Arrays.fill(warningBits, 0, labelSlots, (byte) 0);
 			Arrays.fill(marked, 0, requiredStationCount, false);
 			Arrays.fill(nextMarked, 0, requiredStationCount, false);
 			Arrays.fill(firstMarkedPosition, 0, patternCount, -1);
@@ -1589,7 +1700,9 @@ class RouteTimetableRaptorPlanner {
 			int candidateArrivalSeconds,
 			int trip,
 			int boardStop,
-			int alightStop
+			int alightStop,
+			int accessTransition,
+			byte accumulatedWarnings
 		) {
 			int candidateSlot = slot(boardings, station);
 			int existingArrivalSeconds = arrivalSeconds[candidateSlot];
@@ -1610,6 +1723,8 @@ class RouteTimetableRaptorPlanner {
 			parentTrip[candidateSlot] = trip;
 			parentBoardStop[candidateSlot] = boardStop;
 			parentAlightStop[candidateSlot] = alightStop;
+			parentAccessTransition[candidateSlot] = accessTransition;
+			warningBits[candidateSlot] = accumulatedWarnings;
 			if (!nextMarked[station]) {
 				nextMarked[station] = true;
 				nextMarkedStops[nextMarkedStopCount++] = station;
@@ -1670,7 +1785,16 @@ class RouteTimetableRaptorPlanner {
 	) {
 	}
 
-	private record Label(String stationId, int timeSeconds, int startSeconds, int boardings, List<RideLeg> path) {
+	private record Label(
+		String stationId,
+		int timeSeconds,
+		int startSeconds,
+		int boardings,
+		List<RideLeg> path,
+		int[] accessTransitions,
+		int exitTransition,
+		byte warningBits
+	) {
 	}
 
 	private record ScheduledTrip(
@@ -1698,6 +1822,10 @@ class RouteTimetableRaptorPlanner {
 
 		private boolean allowsDropOff(int stopIndex) {
 			return times.allowsDropOff(stopIndex);
+		}
+
+		private String lineId() {
+			return route == null ? stopTimes.getFirst().lineId() : route.lineId();
 		}
 	}
 

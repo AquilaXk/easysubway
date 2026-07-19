@@ -124,6 +124,73 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 	}
 
 	@Test
+	@DisplayName("scan은 선택한 verified entry·exit의 시간과 거리만 경로에 반영한다")
+	void scanUsesSelectedVerifiedEntryAndExitTransitions() {
+		var command = new SearchRouteV2Command(
+			"station-a",
+			"station-b",
+			OffsetDateTime.parse("2026-07-01T08:50:00+09:00"),
+			MobilityType.WHEELCHAIR,
+			ConstraintMode.STRICT_STEP_FREE,
+			false,
+			0,
+			1
+		);
+
+		var results = planner.search(command, planner.compile(withAccess(everyDayTimetable(), verifiedDirectAccess())));
+
+		assertThat(results).singleElement().satisfies(result -> {
+			assertThat(result.warnings()).isEmpty();
+			assertThat(result.steps())
+				.filteredOn(step -> "entry".equals(step.stepType()) || "exit".equals(step.stepType()))
+				.extracting("walkSeconds", "distanceMeters", "includesStairs", "requiresAccessibilityCheck")
+				.containsExactly(
+					org.assertj.core.groups.Tuple.tuple(180, 70, false, false),
+					org.assertj.core.groups.Tuple.tuple(135, 40, false, false)
+				);
+		});
+	}
+
+	@Test
+	@DisplayName("strict scan은 검증되지 않은 access transition만 있으면 경로를 반환하지 않는다")
+	void strictScanRejectsUnverifiedAccessTransitions() {
+		var command = new SearchRouteV2Command(
+			"station-a",
+			"station-b",
+			OffsetDateTime.parse("2026-07-01T08:50:00+09:00"),
+			MobilityType.WHEELCHAIR,
+			ConstraintMode.STRICT_STEP_FREE,
+			false,
+			0,
+			1
+		);
+
+		assertThat(planner.search(command, planner.compile(everyDayTimetable()))).isEmpty();
+	}
+
+	@Test
+	@DisplayName("scan은 이전 ride line에서 다음 ride line으로 가는 transfer transition을 사용한다")
+	void scanUsesLineToLineTransferTransition() {
+		var command = new SearchRouteV2Command(
+			"station-a",
+			"station-b",
+			OffsetDateTime.parse("2026-07-01T08:40:00+09:00"),
+			MobilityType.SENIOR,
+			ConstraintMode.ALLOW_WITH_WARNINGS,
+			false,
+			1,
+			1
+		);
+
+		var results = planner.search(command, planner.compile(withAccess(oneTransferTimetable(), verifiedTransferAccess())));
+
+		assertThat(results).singleElement().satisfies(result ->
+			assertThat(result.steps()).filteredOn(step -> "transfer".equals(step.stepType()))
+				.extracting("walkSeconds", "distanceMeters")
+				.containsExactly(org.assertj.core.groups.Tuple.tuple(81, 25)));
+	}
+
+	@Test
 	@DisplayName("같은 route의 branch·short-turn station sequence를 distinct pattern으로 compile한다")
 	void compilesBranchAndShortTurnTripsAsDistinctPatterns() {
 		var compiled = planner.compile(branchAndShortTurnTimetable());
@@ -584,6 +651,76 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 			)
 		);
 		return new LoadRouteTimetablePort.RouteAccessData(nodes, edges, List.of(), evidence);
+	}
+
+	private static LoadRouteTimetablePort.RouteAccessData verifiedDirectAccess() {
+		var edges = List.of(
+			new LoadRouteTimetablePort.PathwayEdge(
+				"entry-generated", "entrance", "platform-a", 30, 20, false, false, 50,
+				"UNKNOWN", "GENERATED", "GENERATED"),
+			new LoadRouteTimetablePort.PathwayEdge(
+				"entry-verified", "entrance", "platform-a", 120, 70, false, false, 100,
+				"AVAILABLE", "OFFICIAL_SOURCE", "VERIFIED"),
+			new LoadRouteTimetablePort.PathwayEdge(
+				"exit-verified", "platform-b", "exit", 75, 40, false, false, 100,
+				"AVAILABLE", "OFFICIAL_SOURCE", "VERIFIED")
+		);
+		var evidence = List.of(
+			new LoadRouteTimetablePort.RouteEdgeEvidence(
+				"entry-generated-evidence", "station-a", "line", "entry-generated", "ENTRY",
+				"GENERATED", "GENERATED", false, "GENERATED"),
+			new LoadRouteTimetablePort.RouteEdgeEvidence(
+				"entry-verified-evidence", "station-a", "line", "entry-verified", "ENTRY",
+				"OFFICIAL_SOURCE", "VERIFIED", true, null),
+			new LoadRouteTimetablePort.RouteEdgeEvidence(
+				"exit-verified-evidence", "station-b", "line", "exit-verified", "EXIT",
+				"OFFICIAL_SOURCE", "VERIFIED", true, null)
+		);
+		return new LoadRouteTimetablePort.RouteAccessData(List.of(), edges, List.of(), evidence);
+	}
+
+	private static LoadRouteTimetablePort.RouteAccessData verifiedTransferAccess() {
+		var edge = new LoadRouteTimetablePort.PathwayEdge(
+			"transfer-edge", "platform-1", "platform-2", 60, 25, false, false, 100,
+			"AVAILABLE", "OFFICIAL_SOURCE", "VERIFIED");
+		var rule = new LoadRouteTimetablePort.TransferRule(
+			"transfer-rule", "station-x", "line-1", "station-x", "line-2", "IN_STATION",
+			60, "transfer-edge", "transfer-edge", "VERIFIED");
+		var evidence = new LoadRouteTimetablePort.RouteEdgeEvidence(
+			"transfer-evidence", "station-x", "line-2", "transfer-edge", "TRANSFER",
+			"OFFICIAL_SOURCE", "VERIFIED", true, null);
+		return new LoadRouteTimetablePort.RouteAccessData(
+			List.of(), List.of(edge), List.of(rule), List.of(evidence));
+	}
+
+	private static RouteTimetable oneTransferTimetable() {
+		return new RouteTimetable(
+			List.of(weekday("weekday")),
+			List.of(),
+			List.of(
+				new LoadRouteTimetablePort.TransitRoute(
+					"route-1", "line-1", "1", "1호선", "X 방면", "Asia/Seoul"),
+				new LoadRouteTimetablePort.TransitRoute(
+					"route-2", "line-2", "2", "2호선", "B 방면", "Asia/Seoul")
+			),
+			List.of(
+				new LoadRouteTimetablePort.TransitTrip(
+					"trip-1", "route-1", "weekday", "X", "0", "LOCAL", 0),
+				new LoadRouteTimetablePort.TransitTrip(
+					"trip-2", "route-2", "weekday", "B", "0", "LOCAL", 0)
+			),
+			List.of(
+				new LoadRouteTimetablePort.TransitStopTime(
+					"trip-1", 1, "station-a", "line-1", 31800, 31800, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime(
+					"trip-1", 2, "station-x", "line-1", 32400, 32400, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime(
+					"trip-2", 1, "station-x", "line-2", 33000, 33000, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime(
+					"trip-2", 2, "station-b", "line-2", 33600, 33600, 0, 0)
+			),
+			List.of()
+		);
 	}
 
 	private static RouteTimetable calendarExceptionTimetable() {
