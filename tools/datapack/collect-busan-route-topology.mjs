@@ -9,6 +9,10 @@ import { scanXmlStructure } from "./lib/source-candidate-evidence-collector.mjs"
 const ENDPOINT = "http://data.humetro.busan.kr/voc/api/open_api_distance.tnn"; // NOSONAR -- provider contract is HTTP-only
 const DETAIL_URL = "https://www.data.go.kr/data/15001019/openapi.do";
 const FIELDS = ["startSn", "startSc", "endSn", "endSc", "dist", "time", "stoppingTime", "exchange"];
+const NORMALIZED_EDGE_FIELDS = [
+  "edgeId", "lineId", "fromStationCode", "fromStationName", "toStationCode", "toStationName",
+  "distanceMeters", "durationSeconds", "stoppingSeconds", "exchange",
+].sort();
 const LINE_IDS = Object.freeze({
   1: "line-ab1a041f6266",
   2: "line-eb7b47920390",
@@ -52,8 +56,7 @@ export async function collectBusanRouteTopology({
   if (failures.length > 0) throw failures[0];
   const edges = responses.flatMap((response) => response.edges)
     .sort((left, right) => left.edgeId.localeCompare(right.edgeId, "en"));
-  const duplicate = edges.find((edge, index) => index > 0 && edges[index - 1].edgeId === edge.edgeId);
-  if (duplicate) throw new Error(`Busan route topology schema mismatch: duplicate edge ${duplicate.edgeId}`);
+  validateNormalizedEdges(edges);
   if (scope) validateEdgesAgainstScope(edges, scope);
   const lineIds = [...new Set(edges.map(({ lineId }) => lineId))].sort((left, right) => left.localeCompare(right, "en"));
   const rawSha256 = sha256(JSON.stringify(responses.map((response, index) => ({
@@ -75,6 +78,7 @@ export async function collectBusanRouteTopology({
     official: true,
     fixture: false,
     credentialRedacted: true,
+    responseEncodings: [...new Set(responses.map(({ responseEncoding }) => responseEncoding))].sort(),
     requestCount: responses.length,
     excludedTransferCount: responses.reduce((sum, response) => sum + response.excludedTransferCount, 0),
     stationCount: scope?.length ?? new Set(edges.flatMap(({ fromStationCode, toStationCode }) => [fromStationCode, toStationCode])).size,
@@ -105,22 +109,35 @@ async function collectResponse({ key, stationCode, fetchImpl }) {
     url.searchParams.set("scode", stationCode);
   }
   const response = await fetchWithRetry(url, fetchImpl);
-  const raw = await response.text();
-  const rawEvidence = `rawBytes=${Buffer.byteLength(raw)}; rawSha256=${sha256(raw)}`;
+  const rawBytes = Buffer.from(await response.arrayBuffer());
+  const rawEvidence = `rawBytes=${rawBytes.length}; rawSha256=${sha256(rawBytes)}`;
   if (!response.ok) throw new Error(`Busan route topology HTTP ${response.status}; ${rawEvidence}`);
   const contentType = response.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase() ?? "";
   if (!XML_CONTENT_TYPES.has(contentType)) {
     throw new Error(`Busan route topology schema mismatch: content-type ${safeToken(contentType || "missing")}; ${rawEvidence}`);
   }
-  const providerResultCode = scalar(raw, "resultCode");
+  let raw;
+  let envelope;
+  try {
+    const decoded = decodeXmlBytes(rawBytes);
+    raw = decoded.raw;
+    envelope = parseXmlEnvelope(raw);
+    envelope.responseEncoding = decoded.responseEncoding;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Busan route topology schema mismatch";
+    throw new Error(`${message}; requestScope=${stationCode ?? "all"}; structure=${xmlTagStructure(raw ?? "")}; `
+      + `tags=${scanXmlStructure(raw ?? "").tagSummary}; ${rawEvidence}`);
+  }
+  const providerResultCode = envelope.resultCode;
   if (providerResultCode && !new Set(["0", "00", "SUCCESS"]).has(providerResultCode.toUpperCase())) {
-    const resultMessage = scalar(raw, "resultMsg") ?? "";
+    const resultMessage = envelope.resultMessage;
     throw new Error(`Busan route topology provider resultCode ${safeToken(providerResultCode)}; `
       + `classification=${classifyProviderFailure(resultMessage)}; ${rawEvidence}`);
   }
   let parsed;
   try {
-    parsed = parseEdges(raw);
+    if (envelope.body == null) throw new Error("Busan route topology schema mismatch: response body");
+    parsed = parseEdges(envelope.body);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Busan route topology schema mismatch";
     throw new Error(`${message}; requestScope=${stationCode ?? "all"}; stationPairs=${stationPairs(raw)}; `
@@ -129,7 +146,7 @@ async function collectResponse({ key, stationCode, fetchImpl }) {
   if (stationCode != null && parsed.edges.some(({ fromStationCode }) => fromStationCode !== stationCode)) {
     throw new Error(`Busan route topology schema mismatch: request scope ${stationCode}; ${rawEvidence}`);
   }
-  return { ...parsed, rawSha256: sha256(raw) };
+  return { ...parsed, rawSha256: sha256(rawBytes), responseEncoding: envelope.responseEncoding };
 }
 
 export function parseBusanRouteTopologyScope(html) {
@@ -205,10 +222,17 @@ function validateStationScopes(scopes) {
 }
 
 function validateEdgesAgainstScope(edges, scope) {
+  const scopeByCode = new Map(scope.map((station) => [station.stationCode, station]));
   const actual = new Map(scope.map(({ stationCode }) => [stationCode, []]));
   for (const edge of edges) {
     if (!actual.has(edge.fromStationCode) || !actual.has(edge.toStationCode)) {
       throw new Error(`Busan route topology adjacency scope has unmatched edge: ${edge.edgeId}`);
+    }
+    if (canonicalStationName(edge.fromStationName) !== canonicalStationName(scopeByCode.get(edge.fromStationCode).stationName)
+      || canonicalStationName(edge.toStationName) !== canonicalStationName(scopeByCode.get(edge.toStationCode).stationName)) {
+      throw new Error(`Busan route topology adjacency scope station name mismatch: ${edge.edgeId}; `
+        + `actual=${edge.fromStationName}:${edge.toStationName}; `
+        + `expected=${scopeByCode.get(edge.fromStationCode).stationName}:${scopeByCode.get(edge.toStationCode).stationName}`);
     }
     actual.get(edge.fromStationCode).push(edge.toStationCode);
   }
@@ -223,15 +247,25 @@ function validateEdgesAgainstScope(edges, scope) {
 export function admitBusanRouteTopology(snapshot, { now = new Date() } = {}) {
   const current = validDate(now, "now");
   if (snapshot?.schemaVersion !== 1 || snapshot.artifactKind !== "busan-route-topology-snapshot"
-    || snapshot.sourceId !== "busan-transportation-route-topology" || snapshot.official !== true) {
+    || snapshot.sourceId !== "busan-transportation-route-topology" || snapshot.official !== true
+    || snapshot.detailUrl !== DETAIL_URL || snapshot.endpoint !== ENDPOINT || snapshot.credentialRedacted !== true) {
     throw new Error("Busan route topology admission identity is invalid");
   }
   if (snapshot.fixture !== false) throw new Error("Busan route topology admission rejects fixture evidence");
+  const responseEncodings = snapshot.responseEncodings;
+  if (!Array.isArray(responseEncodings) || responseEncodings.length === 0
+    || new Set(responseEncodings).size !== responseEncodings.length
+    || responseEncodings.some((encoding) => !new Set(["utf-8", "euc-kr", "euc-kr-after-invalid-utf8"]).has(encoding))) {
+    throw new Error("Busan route topology admission response encoding is invalid");
+  }
   if (snapshot.license?.type !== "KOGL-1" || snapshot.license.redistributionAllowed !== true) {
     throw new Error("Busan route topology admission license is invalid");
   }
   if (JSON.stringify(snapshot.lineIds) !== JSON.stringify(EXPECTED_LINE_IDS)) {
     throw new Error("Busan route topology admission line scope is incomplete");
+  }
+  if (JSON.stringify(snapshot.fieldsProvided) !== JSON.stringify(["network_edges", "duration_seconds", "distance_meters"])) {
+    throw new Error("Busan route topology admission fields are invalid");
   }
   const scope = validateStationScopes(snapshot.scope);
   if (snapshot.stationCount !== scope.length || snapshot.requestCount !== scope.length
@@ -243,6 +277,7 @@ export function admitBusanRouteTopology(snapshot, { now = new Date() } = {}) {
     || snapshot.edges.some(({ lineId }) => !EXPECTED_LINE_IDS.includes(lineId))) {
     throw new Error("Busan route topology admission partial snapshot is invalid");
   }
+  validateNormalizedEdges(snapshot.edges);
   validateEdgesAgainstScope(snapshot.edges, scope);
   if (snapshot.contentSha256 !== contentHash(snapshot.edges, scope)) {
     throw new Error("Busan route topology admission content hash mismatch");
@@ -251,7 +286,11 @@ export function admitBusanRouteTopology(snapshot, { now = new Date() } = {}) {
     throw new Error("Busan route topology admission raw hash is invalid");
   }
   const capturedAt = validDate(new Date(snapshot.capturedAt), "snapshot.capturedAt");
-  if (current.getTime() < capturedAt.getTime() || current.getTime() - capturedAt.getTime() >= FRESHNESS_MILLIS) {
+  const freshUntil = validDate(new Date(snapshot.freshUntil), "snapshot.freshUntil");
+  if (freshUntil.getTime() !== capturedAt.getTime() + FRESHNESS_MILLIS) {
+    throw new Error("Busan route topology admission freshness contract is invalid");
+  }
+  if (current.getTime() < capturedAt.getTime() || current.getTime() >= freshUntil.getTime()) {
     throw new Error("Busan route topology admission stale snapshot is rejected");
   }
   return {
@@ -265,37 +304,20 @@ export function admitBusanRouteTopology(snapshot, { now = new Date() } = {}) {
   };
 }
 
-export function busanRouteTopologyCoverageRecords(snapshot) {
-  admitBusanRouteTopology(snapshot, { now: new Date(snapshot.capturedAt) });
-  return snapshot.lineIds.flatMap((lineId) => snapshot.fieldsProvided.map((field) => ({
-    entityType: "source-snapshot",
-    entityId: `${snapshot.sourceId}:${snapshot.contentSha256}:${lineId}:${field}`,
-    field,
-    sourceId: snapshot.sourceId,
-    coverageScope: {
-      regionIds: ["busan"],
-      operatorIds: ["busan-transportation"],
-      lineIds: [lineId],
-      sourceDomains: ["route_graph_topology"],
-    },
-    derivationKind: "OFFICIAL",
-    verifiedAt: snapshot.capturedAt,
-  })));
-}
-
-function parseEdges(raw) {
-  if (typeof raw !== "string" || !/^\s*<\?xml\b/i.test(raw) || /<!DOCTYPE|<!ENTITY/i.test(raw)) {
-    throw new Error("Busan route topology schema mismatch: XML document");
-  }
-  const items = [...raw.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)];
+function parseEdges(body) {
+  const items = [...body.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)];
   if (items.length === 0) throw new Error("Busan route topology schema mismatch: XML items");
+  const bodyRemainder = body.replace(/<item\b[^>]*>[\s\S]*?<\/item>/gi, "").trim();
+  if (bodyRemainder !== "") throw new Error("Busan route topology schema mismatch: response body envelope");
   const seen = new Set();
   let excludedTransferCount = 0;
   const edges = items.map(([, item], index) => {
-    const values = Object.fromEntries(FIELDS.map((field) => [field, scalar(item, field)]));
-    if (FIELDS.some((field) => values[field] == null)) {
-      throw new Error(`Busan route topology schema mismatch: item[${index}] fields`);
-    }
+    const values = Object.fromEntries(FIELDS.map((field) => [field, singleScalar(item, field, `item[${index}]`)]));
+    const itemRemainder = FIELDS.reduce(
+      (remainder, field) => remainder.replace(new RegExp(`<${field}\\b[^>]*>[^<]{0,512}<\\/${field}>`, "i"), ""),
+      item,
+    ).trim();
+    if (itemRemainder !== "") throw new Error(`Busan route topology schema mismatch: item[${index}] envelope`);
     const { startSc, endSc } = values;
     const lineId = lineIdForStationCode(startSc);
     if (!new Set(["", "Y", "N"]).has(values.exchange)) {
@@ -339,6 +361,86 @@ function parseEdges(raw) {
   };
 }
 
+function decodeXmlBytes(bytes) {
+  const prefix = bytes.subarray(0, 256).toString("latin1");
+  const declared = /<\?xml\b[^>]*\bencoding=["']([^"']+)["']/i.exec(prefix)?.[1]?.toLowerCase() ?? "utf-8";
+  const encoding = new Map([
+    ["utf-8", "utf-8"], ["utf8", "utf-8"], ["euc-kr", "euc-kr"],
+    ["ks_c_5601-1987", "euc-kr"], ["ks-c-5601-1987", "euc-kr"],
+  ]).get(declared);
+  if (!encoding) throw new Error(`Busan route topology schema mismatch: XML encoding ${safeToken(declared)}`);
+  let raw;
+  let responseEncoding = encoding;
+  try {
+    raw = new TextDecoder(encoding, { fatal: true }).decode(bytes);
+  } catch {
+    if (encoding !== "utf-8") throw new Error(`Busan route topology schema mismatch: XML ${encoding} decoding`);
+    try {
+      raw = new TextDecoder("euc-kr", { fatal: true }).decode(bytes);
+      responseEncoding = "euc-kr-after-invalid-utf8";
+    } catch {
+      throw new Error("Busan route topology schema mismatch: XML utf-8/euc-kr decoding");
+    }
+  }
+  if (raw.includes("\uFFFD")) throw new Error("Busan route topology schema mismatch: XML replacement character");
+  return { raw, responseEncoding };
+}
+
+function parseXmlEnvelope(raw) {
+  if (typeof raw !== "string" || /<!DOCTYPE|<!ENTITY/i.test(raw)) {
+    throw new Error("Busan route topology schema mismatch: XML document");
+  }
+  const document = /^\s*<\?xml\b[^>]*\?>\s*<response\b[^>]*>([\s\S]*?)<\/response>\s*$/i.exec(raw);
+  if (!document) throw new Error("Busan route topology schema mismatch: response envelope");
+  const response = /^\s*<header\b[^>]*>([\s\S]*?)<\/header>([\s\S]*)$/i.exec(document[1]);
+  if (!response) throw new Error("Busan route topology schema mismatch: response/header/body envelope");
+  const header = response[1];
+  const resultCode = singleScalar(header, "resultCode", "response.header");
+  const resultMessage = singleScalar(header, "resultMsg", "response.header");
+  const headerRemainder = header
+    .replace(/<resultCode\b[^>]*>[^<]{0,512}<\/resultCode>/i, "")
+    .replace(/<resultMsg\b[^>]*>[^<]{0,512}<\/resultMsg>/i, "").trim();
+  if (headerRemainder !== "") throw new Error("Busan route topology schema mismatch: response header envelope");
+  const tail = response[2].trim();
+  if (tail === "") return { resultCode, resultMessage, body: null };
+  const success = /^<body\b[^>]*>([\s\S]*?)<\/body>\s*<numOfRows\b[^>]*>(\d+)<\/numOfRows>\s*<pageNo\b[^>]*>(\d+)<\/pageNo>\s*<totalCount\b[^>]*>(\d+)<\/totalCount>$/i.exec(tail);
+  if (!success || Number(success[2]) < 1 || Number(success[3]) < 1 || Number(success[4]) < 1) {
+    throw new Error("Busan route topology schema mismatch: response/header/body envelope");
+  }
+  return { resultCode, resultMessage, body: success[1] };
+}
+
+function validateNormalizedEdges(edges) {
+  if (!Array.isArray(edges) || edges.length === 0) throw new Error("Busan route topology admission edge set is invalid");
+  const seen = new Set();
+  let previousId = null;
+  for (const [index, edge] of edges.entries()) {
+    if (!edge || typeof edge !== "object" || Array.isArray(edge)
+      || JSON.stringify(Object.keys(edge).sort()) !== JSON.stringify(NORMALIZED_EDGE_FIELDS)) {
+      throw new Error(`Busan route topology admission edge[${index}] schema is invalid`);
+    }
+    const lineId = lineIdForStationCode(edge.fromStationCode);
+    const endLineId = lineIdForStationCode(edge.toStationCode);
+    const lineCode = Object.keys(LINE_IDS).find((code) => LINE_IDS[code] === lineId);
+    const expectedId = `busan:${lineCode}:${edge.fromStationCode}:${edge.toStationCode}`;
+    if (!lineId || endLineId !== lineId || edge.lineId !== lineId || edge.edgeId !== expectedId
+      || !Number.isInteger(edge.distanceMeters) || edge.distanceMeters < 100 || edge.distanceMeters > 10_000_000
+      || !Number.isInteger(edge.durationSeconds) || edge.durationSeconds < 1 || edge.durationSeconds > 86_400
+      || !Number.isInteger(edge.stoppingSeconds) || edge.stoppingSeconds < 0 || edge.stoppingSeconds > 3_600
+      || !new Set([null, "N"]).has(edge.exchange)) {
+      throw new Error(`Busan route topology admission edge[${index}] values are invalid`);
+    }
+    requiredText(edge.fromStationName, `edge[${index}].fromStationName`);
+    requiredText(edge.toStationName, `edge[${index}].toStationName`);
+    if (seen.has(edge.edgeId) || (previousId != null && previousId.localeCompare(edge.edgeId, "en") >= 0)) {
+      throw new Error(`Busan route topology admission edge ordering is invalid: ${edge.edgeId}`);
+    }
+    seen.add(edge.edgeId);
+    previousId = edge.edgeId;
+  }
+  return edges;
+}
+
 async function fetchWithRetry(url, fetchImpl) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
@@ -362,6 +464,14 @@ function scalar(raw, field) {
   return match ? decodeXml(match[1].trim()) : null;
 }
 
+function singleScalar(raw, field, label) {
+  const matches = [...raw.matchAll(new RegExp(`<${field}\\b[^>]*>([^<]{0,512})<\\/${field}>`, "gi"))];
+  if (matches.length !== 1) {
+    throw new Error(`Busan route topology schema mismatch: ${label}.${field} ${matches.length > 1 ? "duplicate field" : "missing field"}`);
+  }
+  return decodeXml(matches[0][1].trim());
+}
+
 function stationPairs(raw) {
   const pairs = [...raw.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)].map(([, item]) => {
     const start = scalar(item, "startSc");
@@ -371,6 +481,11 @@ function stationPairs(raw) {
       ? `${start}:${end}:${exchange || "-"}` : "invalid";
   });
   return pairs.slice(0, 8).join(",") || "none";
+}
+
+function xmlTagStructure(raw) {
+  return [...raw.matchAll(/<\s*(\/?)\s*([A-Za-z][A-Za-z0-9_-]*)\b[^>]*>/g)]
+    .slice(0, 80).map(([, closing, name]) => `${closing ? "/" : ""}${name}`).join(",") || "none";
 }
 
 function decodeXml(value) {
@@ -388,8 +503,15 @@ function unsignedInteger(value, minimum, maximum, label) {
 }
 
 function requiredText(value, label) {
-  if (typeof value !== "string" || value.trim() === "") throw new Error(`Busan route topology schema mismatch: ${label}`);
+  if (typeof value !== "string" || value.trim() === "" || value.includes("\uFFFD")) {
+    throw new Error(`Busan route topology schema mismatch: ${label}`);
+  }
   return value.trim();
+}
+
+function canonicalStationName(value) {
+  return requiredText(value, "station name").normalize("NFKC")
+    .replace(/\([^)]*\)$/, "").replace(/역$/, "").replace(/[^\p{L}\p{N}]/gu, "");
 }
 
 function requiredValue(value, label) {

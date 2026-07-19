@@ -137,15 +137,17 @@
       },
       "topologyAdmissionEvidence": {
         "issue": 2319,
+        "materializer": "tools/datapack/materialize-busan-route-topology.mjs",
+        "verificationTest": "tools/datapack/materialize-busan-route-topology.test.mjs",
         "snapshotId": "busan-transportation-route-topology-20260720",
         "snapshotPath": "tools/datapack/sources/busan-transportation-route-topology-20260720.json",
-        "capturedAt": "2026-07-19T17:45:14.898Z",
-        "freshUntil": "2026-07-20T17:45:14.898Z",
+        "capturedAt": "2026-07-19T18:13:31.841Z",
+        "freshUntil": "2026-07-20T18:13:31.841Z",
         "stationCount": 114,
         "edgeCount": 220,
         "excludedTransferCount": 18,
-        "rawSha256": "e056228b30737f1e8ccfd4e464901a9c83ab22848f7fcef2f9aebf2956cd6ef3",
-        "contentSha256": "aefb5ffdd51bf8fbea2868ed5682c29b9f62a4966e2ce236dcc82e826d3f331d"
+        "rawSha256": "1314c1ca4bad29ca7b25e8887519ae89a503e649b67b15d53e9232940898eebd",
+        "contentSha256": "9ec95ebb6d789457060e243f079ad371465d0e5e1a309504b18b9a78e00a24cc"
       }
     },
     {

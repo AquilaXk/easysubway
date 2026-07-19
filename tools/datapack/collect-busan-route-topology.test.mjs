@@ -1,33 +1,25 @@
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import path from "node:path";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { promisify } from "node:util";
 
 import {
   admitBusanRouteTopology,
-  busanRouteTopologyCoverageRecords,
   collectBusanRouteTopology,
   parseBusanRouteTopologyScope,
 } from "./collect-busan-route-topology.mjs";
 
-const execFileAsync = promisify(execFile);
-
-const XML = `<?xml version="1.0" encoding="UTF-8"?>
-<response>
+const XML_ITEMS = `
   <item><startSn>신평</startSn><startSc>101</startSc><endSn>하단</endSn><endSc>102</endSc><dist>16</dist><time>140</time><stoppingTime>0</stoppingTime><exchange></exchange></item>
   <item><startSn>장산</startSn><startSc>201</startSc><endSn>중동</endSn><endSc>202</endSc><dist>9</dist><time>90</time><stoppingTime>20</stoppingTime><exchange>N</exchange></item>
   <item><startSn>수영</startSn><startSc>301</startSc><endSn>망미</endSn><endSc>302</endSc><dist>7</dist><time>80</time><stoppingTime>20</stoppingTime><exchange>N</exchange></item>
-  <item><startSn>미남</startSn><startSc>401</startSc><endSn>동래</endSn><endSc>402</endSc><dist>8</dist><time>85</time><stoppingTime>20</stoppingTime><exchange></exchange></item>
-</response>`;
+  <item><startSn>미남</startSn><startSc>401</startSc><endSn>동래</endSn><endSc>402</endSc><dist>8</dist><time>85</time><stoppingTime>20</stoppingTime><exchange></exchange></item>`;
+const XML = successXml(XML_ITEMS);
 
 const SCOPE_HTML = `
 <div class="s101 s-1"><a onclick="one_point('101', '1', '신평', event )"></a></div>
 <div class="l101-102 l102-101 w-1"></div>
-<div class="s102 s-1"><a onclick="one_point('102', '1', '하단', event )"></a></div>
+<div class="s102 s-1"><a onclick="one_point('102', '1', '하단역', event )"></a></div>
 <div class="s201 s-2"><a onclick="one_point('201', '2', '장산', event )"></a></div>
 <div class="l201-202 l202-201 w-2"></div>
 <div class="s202 s-2"><a onclick="one_point('202', '2', '중동', event )"></a></div>
@@ -40,6 +32,15 @@ const SCOPE_HTML = `
 
 function response(body = XML, { status = 200, contentType = "application/xml" } = {}) {
   return new Response(body, { status, headers: { "content-type": contentType } });
+}
+
+function successXml(items) {
+  const count = [...items.matchAll(/<item\b/g)].length;
+  return `<?xml version="1.0" encoding="UTF-8"?><response><header><resultCode>00</resultCode><resultMsg>정상</resultMsg></header><body>${items}</body><numOfRows>${Math.max(1, count)}</numOfRows><pageNo>1</pageNo><totalCount>${Math.max(1, count)}</totalCount></response>`;
+}
+
+function contentHash(edges, scope) {
+  return createHash("sha256").update(JSON.stringify({ scope, edges })).digest("hex");
 }
 
 function collect(options = {}) {
@@ -66,6 +67,7 @@ test("부산 topology collector는 공식 XML operation을 4개 노선 edge로 �
   assert.equal(snapshot.sourceId, "busan-transportation-route-topology");
   assert.equal(snapshot.capturedAt, "2026-07-20T00:00:00.000Z");
   assert.equal(snapshot.rowCount, 4);
+  assert.deepEqual(snapshot.responseEncodings, ["utf-8"]);
   assert.equal(snapshot.edgeCount, 4);
   assert.deepEqual(snapshot.lineIds, [
     "line-ab1a041f6266",
@@ -104,7 +106,7 @@ test("부산 topology collector는 공식 XML operation을 4개 노선 edge로 �
 
 test("부산 topology collector는 공식 scode 필터만 추가로 허용한다", async () => {
   let requestUrl;
-  const firstItemOnly = `<?xml version="1.0"?><response>${XML.match(/<item>[\s\S]*?<\/item>/)[0]}</response>`;
+  const firstItemOnly = successXml(XML.match(/<item>[\s\S]*?<\/item>/)[0]);
   await assert.rejects(collect({
     stationCode: "101",
     fetchImpl: async (url) => {
@@ -129,14 +131,35 @@ test("부산 topology collector는 1호선 95~99 두 자리 역 코드를 보존
   assert.equal(snapshot.edges[0].lineId, "line-ab1a041f6266");
 });
 
+test("부산 topology collector는 UTF-8로 잘못 선언된 EUC-KR 역명을 손실 없이 디코딩한다", async () => {
+  const template = `<?xml version="1.0" encoding="UTF-8"?><response>
+    <header><resultCode>00</resultCode><resultMsg>OK</resultMsg></header><body>
+    <item><startSn>{START}</startSn><startSc>101</startSc><endSn>{END}</endSn><endSc>102</endSc><dist>16</dist><time>140</time><stoppingTime>0</stoppingTime><exchange>N</exchange></item>
+    <item><startSn>L2A</startSn><startSc>201</startSc><endSn>L2B</endSn><endSc>202</endSc><dist>9</dist><time>90</time><stoppingTime>20</stoppingTime><exchange>N</exchange></item>
+    <item><startSn>L3A</startSn><startSc>301</startSc><endSn>L3B</endSn><endSc>302</endSc><dist>7</dist><time>80</time><stoppingTime>20</stoppingTime><exchange>N</exchange></item>
+    <item><startSn>L4A</startSn><startSc>401</startSc><endSn>L4B</endSn><endSc>402</endSc><dist>8</dist><time>85</time><stoppingTime>20</stoppingTime><exchange>N</exchange></item>
+    </body><numOfRows>4</numOfRows><pageNo>1</pageNo><totalCount>4</totalCount></response>`;
+  const [beforeStart, afterStart] = template.split("{START}");
+  const [beforeEnd, afterEnd] = afterStart.split("{END}");
+  const bytes = Buffer.concat([
+    Buffer.from(beforeStart, "ascii"), Buffer.from("bdc5c6f2", "hex"),
+    Buffer.from(beforeEnd, "ascii"), Buffer.from("c7cfb4dc", "hex"), Buffer.from(afterEnd, "ascii"),
+  ]);
+  const snapshot = await collect({ fetchImpl: async () => response(bytes) });
+  assert.equal(snapshot.edges[0].fromStationName, "신평");
+  assert.equal(snapshot.edges[0].toStationName, "하단");
+  assert.deepEqual(snapshot.responseEncodings, ["euc-kr-after-invalid-utf8"]);
+  assert.doesNotMatch(JSON.stringify(snapshot), /�/);
+});
+
 test("부산 topology collector는 exchange=Y인 범위 밖 환승 edge만 분리한다", async () => {
   const transfer = "<item><startSn>부전</startSn><startSc>120</startSc><endSn>부전</endSn><endSc>801</endSc>"
     + "<dist></dist><time></time><stoppingTime></stoppingTime><exchange>Y</exchange></item>";
-  const snapshot = await collect({ fetchImpl: async () => response(XML.replace("</response>", `${transfer}</response>`)) });
+  const snapshot = await collect({ fetchImpl: async () => response(XML.replace("</body>", `${transfer}</body>`)) });
   assert.equal(snapshot.edgeCount, 4);
   assert.equal(snapshot.excludedTransferCount, 1);
   await assert.rejects(collect({
-    fetchImpl: async () => response(XML.replace("</response>", `${transfer.replace("<exchange>Y", "<exchange>N")}</response>`)),
+    fetchImpl: async () => response(XML.replace("</body>", `${transfer.replace("<exchange>Y", "<exchange>N")}</body>`)),
   }), /station scope/);
 });
 
@@ -158,10 +181,10 @@ test("부산 topology collector는 공식 station/adjacency scope 전체를 boun
       const station = byCode.get(stationCode);
       const items = station.neighborCodes.map((neighborCode) => `<item>
         <startSn>${station.stationName}</startSn><startSc>${stationCode}</startSc>
-        <endSn>${names.get(neighborCode)}</endSn><endSc>${neighborCode}</endSc>
+        <endSn>${names.get(neighborCode).replace(/역$/, "")}</endSn><endSc>${neighborCode}</endSc>
         <dist>10</dist><time>60</time><stoppingTime>20</stoppingTime><exchange></exchange>
       </item>`).join("");
-      return response(`<?xml version="1.0"?><response>${items}</response>`);
+      return response(successXml(items));
     },
   });
   assert.deepEqual(requested.sort(), scope.map(({ stationCode }) => stationCode));
@@ -177,19 +200,43 @@ test("부산 topology collector는 공식 station/adjacency scope 전체를 boun
       const stationCode = new URL(url).searchParams.get("scode");
       const station = byCode.get(stationCode);
       const neighborCode = stationCode === "101" ? "103" : station.neighborCodes[0];
-      return response(`<?xml version="1.0"?><response><item>
+      return response(successXml(`<item>
         <startSn>${station.stationName}</startSn><startSc>${stationCode}</startSc>
         <endSn>역</endSn><endSc>${neighborCode}</endSc><dist>10</dist><time>60</time>
         <stoppingTime>20</stoppingTime><exchange></exchange>
-      </item></response>`);
+      </item>`));
     },
   }), /adjacency scope/);
+
+  await assert.rejects(collect({
+    stationScopes: scope,
+    fetchImpl: async (url) => {
+      const stationCode = new URL(url).searchParams.get("scode");
+      const station = byCode.get(stationCode);
+      const neighborCode = station.neighborCodes[0];
+      return response(successXml(`<item><startSn>${station.stationName}</startSn><startSc>${stationCode}</startSc>
+        <endSn>${stationCode === "101" ? "완전다름" : names.get(neighborCode)}</endSn><endSc>${neighborCode}</endSc>
+        <dist>10</dist><time>60</time><stoppingTime>20</stoppingTime><exchange>N</exchange></item>`));
+    },
+  }), /station name mismatch/);
 });
 
 test("부산 topology scope parser는 duplicate·cross-line·고립 station을 거부한다", () => {
   assert.throws(() => parseBusanRouteTopologyScope(`${SCOPE_HTML}${SCOPE_HTML}`), /duplicate station/);
   assert.throws(() => parseBusanRouteTopologyScope(SCOPE_HTML.replace("l101-102 l102-101", "l101-202 l202-101")), /cross-line/);
   assert.throws(() => parseBusanRouteTopologyScope(SCOPE_HTML.replace('<div class="l401-402 l402-401 w-4"></div>', "")), /isolated station/);
+});
+
+test("부산 topology collector는 실제 response/header/body envelope와 단일 field를 강제한다", async () => {
+  const item = XML.match(/<item>[\s\S]*?<\/item>/)[0];
+  await assert.rejects(
+    collect({ fetchImpl: async () => response(`<?xml version="1.0"?><response>${item}</response>`) }),
+    /envelope/,
+  );
+  await assert.rejects(
+    collect({ fetchImpl: async () => response(XML.replace("<dist>16</dist>", "<dist>16</dist><dist>17</dist>")) }),
+    /duplicate field/,
+  );
 });
 
 test("부산 topology scope parser는 보존된 공식 노선도에서 4개 노선 114개 역을 고정한다", async () => {
@@ -212,7 +259,7 @@ test("부산 topology collector는 XML schema·숫자·노선 scope를 fail clos
     ["cross line", XML.replace("<endSc>102</endSc>", "<endSc>202</endSc>")],
     ["invalid distance", XML.replace("<dist>16</dist>", "<dist>1.6</dist>")],
     ["invalid duration", XML.replace("<time>140</time>", "<time>-1</time>")],
-    ["duplicate edge", XML.replace("</response>", `${XML.match(/<item>[\s\S]*?<\/item>/)[0]}</response>`) ],
+    ["duplicate edge", XML.replace("</body>", `${XML.match(/<item>[\s\S]*?<\/item>/)[0]}</body>`) ],
     ["unmatched node", "<response><message>none</message></response>"],
   ];
   for (const [name, body] of invalidCases) {
@@ -275,65 +322,35 @@ test("부산 topology admission은 4개 노선 full snapshot만 허용하고 sta
         <endSn>${names.get(neighborCode)}</endSn><endSc>${neighborCode}</endSc>
         <dist>10</dist><time>60</time><stoppingTime>20</stoppingTime><exchange></exchange>
       </item>`).join("");
-      return response(`<?xml version="1.0"?><response>${items}</response>`);
+      return response(successXml(items));
     },
   });
-  assert.equal(admitBusanRouteTopology(snapshot, { now: new Date("2026-07-20T23:59:59.999Z") }).status, "ADMITTED");
-  assert.throws(() => admitBusanRouteTopology({ ...snapshot, fixture: true }), /fixture/);
-  assert.throws(() => admitBusanRouteTopology({ ...snapshot, lineIds: snapshot.lineIds.slice(1) }), /line scope/);
-  assert.throws(() => admitBusanRouteTopology({ ...snapshot, contentSha256: "0".repeat(64) }), /content hash/);
-  assert.throws(() => admitBusanRouteTopology({ ...snapshot, scope: snapshot.scope.slice(1) }), /scope/);
+  const admit = (candidate) => admitBusanRouteTopology(candidate, { now: new Date("2026-07-20T23:59:59.999Z") });
+  assert.equal(admit(snapshot).status, "ADMITTED");
+  assert.throws(() => admit({ ...snapshot, fixture: true }), /fixture/);
+  assert.throws(() => admit({ ...snapshot, lineIds: snapshot.lineIds.slice(1) }), /line scope/);
+  assert.throws(() => admit({ ...snapshot, contentSha256: "0".repeat(64) }), /content hash/);
+  assert.throws(() => admit({ ...snapshot, scope: snapshot.scope.slice(1) }), /scope/);
+  assert.throws(() => admit({ ...snapshot, credentialRedacted: false }), /identity/);
+  assert.throws(() => admit({ ...snapshot, endpoint: "https://example.invalid" }), /identity/);
+  assert.throws(() => admit({ ...snapshot, fieldsProvided: ["network_edges"] }), /fields/);
+  assert.throws(() => admit({ ...snapshot, responseEncodings: ["unknown"] }), /encoding/);
+  assert.throws(() => admit({ ...snapshot, freshUntil: snapshot.capturedAt }), /freshness/);
+  const edges = structuredClone(snapshot.edges);
+  edges[0].distanceMeters = -1;
+  assert.throws(() => admit({
+    ...snapshot,
+    edges,
+    contentSha256: contentHash(edges, snapshot.scope),
+  }), /edge/);
+  const reversed = [...snapshot.edges].reverse();
+  assert.throws(() => admit({
+    ...snapshot,
+    edges: reversed,
+    contentSha256: contentHash(reversed, snapshot.scope),
+  }), /edge/);
   assert.throws(
     () => admitBusanRouteTopology(snapshot, { now: new Date("2026-07-21T00:00:00.001Z") }),
     /stale/,
   );
-});
-
-test("#2138 coverage report는 부산 topology 4 requirements만 SUPPORTED로 전환한다", async () => {
-  const root = path.resolve(new URL("../..", import.meta.url).pathname);
-  const snapshot = JSON.parse(await readFile(
-    new URL("./sources/busan-transportation-route-topology-20260720.json", import.meta.url),
-    "utf8",
-  ));
-  const records = busanRouteTopologyCoverageRecords(snapshot);
-  assert.equal(records.length, 12);
-  const pack = {
-    id: "busan-topology-admission",
-    version: "20260720",
-    artifactKind: "production",
-    sqliteSha256: snapshot.contentSha256,
-  };
-  const manifestBytes = Buffer.from(`${JSON.stringify({ activePack: { id: pack.id, version: pack.version }, packs: [pack] }, null, 2)}\n`);
-  const provenance = {
-    schemaVersion: 1,
-    artifactKind: "datapack-field-provenance",
-    manifestSha256: createHash("sha256").update(manifestBytes).digest("hex"),
-    packs: [{ ...pack, records }],
-  };
-  const outputDir = path.join(tmpdir(), `easysubway-busan-topology-coverage-${process.pid}`);
-  await rm(outputDir, { recursive: true, force: true });
-  await mkdir(outputDir, { recursive: true });
-  const manifestPath = path.join(outputDir, "current.json");
-  const provenancePath = path.join(outputDir, "current.provenance.json");
-  const reportPath = path.join(outputDir, "coverage.json");
-  await writeFile(manifestPath, manifestBytes);
-  await writeFile(provenancePath, `${JSON.stringify(provenance, null, 2)}\n`);
-  await execFileAsync(process.execPath, [
-    "tools/datapack/report-coverage-gaps.mjs",
-    "--targets", "tools/datapack/nationwide-coverage-targets.json",
-    "--inventory", "tools/datapack/source-inventory.json",
-    "--manifest", manifestPath,
-    "--provenance", provenancePath,
-    "--output", reportPath,
-    "--allow-gaps",
-  ], { cwd: root });
-  const report = JSON.parse(await readFile(reportPath, "utf8"));
-  assert.equal(report.summary.launchRequired.totalCount, 270);
-  assert.equal(report.summary.launchRequired.supportedCount, 4);
-  assert.equal(report.summary.launchRequired.missingCount, 266);
-  const supported = report.requirements.filter(({ status }) => status === "SUPPORTED");
-  assert.deepEqual(supported.map(({ lineId, sourceDomain }) => [lineId, sourceDomain]), snapshot.lineIds.map(
-    (lineId) => [lineId, "route_graph_topology"],
-  ));
-  assert.ok(supported.every(({ sourceIds }) => sourceIds.length === 1 && sourceIds[0] === snapshot.sourceId));
 });

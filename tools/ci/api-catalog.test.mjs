@@ -380,7 +380,9 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
     "utf8",
   ));
   assert.equal(busanTopology.endpoint, "http://data.humetro.busan.kr/voc/api/open_api_distance.tnn");
-  assert.deepEqual(busanTopology.operation.requiredParameters, ["serviceKey", "act", "scode"]);
+  assert.deepEqual(busanTopology.operation.requiredParameters, ["serviceKey"]);
+  assert.deepEqual(busanTopology.operation.fixedParameters, { act: "xml" });
+  assert.deepEqual(busanTopology.operation.optionalParameters, ["scode"]);
   assert.deepEqual(busanTopology.responseFields, [
     "startSn", "startSc", "endSn", "endSc", "dist", "time", "stoppingTime", "exchange",
   ]);
