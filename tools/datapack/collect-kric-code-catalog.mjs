@@ -104,7 +104,7 @@ async function fetchWithBoundedRedirect(initialUrl, fetchImpl) {
   throw new Error("KRIC code catalog redirect limit exceeded");
 }
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   if (argv.length !== 4 || argv[0] !== "--output" || argv[2] !== "--metadata-output") {
     throw new Error("usage: collect-kric-code-catalog.mjs --output <absolute.xlsx> --metadata-output <absolute.json>");
   }

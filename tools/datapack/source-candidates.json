@@ -21,6 +21,12 @@
         "responseFields": ["RAIL_OPR_ISTT_CD", "RAIL_OPR_ISTT_NM", "LN_CD", "LN_NM", "STIN_CD", "STIN_NM"],
         "runner": {
           "command": "node tools/datapack/collect-kric-code-catalog.mjs",
+          "arguments": [
+            "--output",
+            "/tmp/easysubway-kric-provider-code-catalog.xlsx",
+            "--metadata-output",
+            "/tmp/easysubway-kric-provider-code-catalog.metadata.json"
+          ],
           "requiredEnv": []
         },
         "secretPolicy": "credential-free-output"

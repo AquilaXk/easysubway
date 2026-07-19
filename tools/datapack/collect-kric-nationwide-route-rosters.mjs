@@ -99,7 +99,7 @@ function requiredString(value, label) {
   return value;
 }
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   if (argv.length !== 6 || argv[0] !== "--targets" || argv[2] !== "--fixture" || argv[4] !== "--output") {
     throw new Error("usage: collect-kric-nationwide-route-rosters.mjs --targets <targets.json> --fixture <fixture.json> --output <absolute.json>");
   }
@@ -107,17 +107,23 @@ function parseArgs(argv) {
   return { targets: argv[1], fixture: argv[3], output: argv[5] };
 }
 
-async function main(argv) {
+export async function main(argv, {
+  serviceKey = process.env.KRIC_SERVICE_KEY,
+  readFileImpl = readFile,
+  writeFileImpl = writeFile,
+  collectRostersImpl = collectKricNationwideRouteRosters,
+  log = console.log,
+} = {}) {
   const args = parseArgs(argv);
-  const targets = JSON.parse(await readFile(args.targets, "utf8"));
-  const fixture = JSON.parse(await readFile(args.fixture, "utf8"));
-  const result = await collectKricNationwideRouteRosters({
+  const targets = JSON.parse(await readFileImpl(args.targets, "utf8"));
+  const fixture = JSON.parse(await readFileImpl(args.fixture, "utf8"));
+  const result = await collectRostersImpl({
     targets,
     fixture,
-    serviceKey: process.env.KRIC_SERVICE_KEY,
+    serviceKey,
   });
-  await writeFile(args.output, `${JSON.stringify(result, null, 2)}\n`, { mode: 0o600 });
-  console.log(`sanitized KRIC nationwide rosters ready: scopes=${result.providerScopeCount} requests=${result.requestCount}`);
+  await writeFileImpl(args.output, `${JSON.stringify(result, null, 2)}\n`, { mode: 0o600 });
+  log(`sanitized KRIC nationwide rosters ready: scopes=${result.providerScopeCount} requests=${result.requestCount}`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {

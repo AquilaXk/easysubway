@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { collectKricNationwideRouteRosters } from "./collect-kric-nationwide-route-rosters.mjs";
+import {
+  collectKricNationwideRouteRosters,
+  main,
+  parseArgs,
+} from "./collect-kric-nationwide-route-rosters.mjs";
 
 const targets = {
   targetVersion: "2026-07-13",
@@ -18,6 +22,50 @@ const fixture = {
     { regionId: "busan", operatorId: "busan-transportation", lineId: "busan-1", mreaWideCd: "02", lnCd: "1", railOprIsttCd: "BS" },
   ],
 };
+
+test("전국 KRIC roster CLI 인자와 파일 orchestration을 검증한다", async () => {
+  assert.deepEqual(parseArgs([
+    "--targets", "targets.json",
+    "--fixture", "fixture.json",
+    "--output", "/tmp/rosters.json",
+  ]), { targets: "targets.json", fixture: "fixture.json", output: "/tmp/rosters.json" });
+  assert.throws(() => parseArgs(["--targets", "targets.json"]), /usage/);
+  assert.throws(() => parseArgs([
+    "--fixture", "fixture.json",
+    "--targets", "targets.json",
+    "--output", "/tmp/rosters.json",
+  ]), /usage/);
+  assert.throws(() => parseArgs([
+    "--targets", "targets.json",
+    "--fixture", "fixture.json",
+    "--output", "rosters.json",
+  ]), /absolute/);
+
+  const writes = [];
+  const logs = [];
+  let collected;
+  await main([
+    "--targets", "targets.json",
+    "--fixture", "fixture.json",
+    "--output", "/tmp/rosters.json",
+  ], {
+    serviceKey: "secret",
+    readFileImpl: async (file) => JSON.stringify(file === "targets.json" ? targets : fixture),
+    collectRostersImpl: async (input) => {
+      collected = input;
+      return { providerScopeCount: 3, requestCount: 2 };
+    },
+    writeFileImpl: async (...args) => writes.push(args),
+    log: (message) => logs.push(message),
+  });
+  assert.deepEqual(collected, { targets, fixture, serviceKey: "secret" });
+  assert.deepEqual(writes, [[
+    "/tmp/rosters.json",
+    `${JSON.stringify({ providerScopeCount: 3, requestCount: 2 }, null, 2)}\n`,
+    { mode: 0o600 },
+  ]]);
+  assert.deepEqual(logs, ["sanitized KRIC nationwide rosters ready: scopes=3 requests=2"]);
+});
 
 test("전국 KRIC roster 수집은 shared line 요청을 합치고 모든 operator row를 검증한다", async () => {
   const requests = [];

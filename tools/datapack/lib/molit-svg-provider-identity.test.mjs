@@ -34,6 +34,15 @@ test("MOLIT SVG 식별자에서 KRIC 권역·노선·운영기관 코드를 정�
       operatorName: "우이신설경전철주식회사",
     },
   );
+  assert.deepEqual(
+    parseMolitSvgProviderIdentity("subway_a01_lG1", "GM(김포골드라인에스알에스(주))"),
+    {
+      mreaWideCd: "01",
+      lnCd: "G1",
+      railOprIsttCd: "GM",
+      operatorName: "김포골드라인에스알에스(주)",
+    },
+  );
 });
 
 test("KRIC provider 형식이 아닌 노선도 행은 provider identity로 승격하지 않는다", () => {

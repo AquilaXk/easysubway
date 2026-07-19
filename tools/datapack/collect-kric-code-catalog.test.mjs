@@ -1,9 +1,25 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { downloadKricCodeCatalog } from "./collect-kric-code-catalog.mjs";
+import { downloadKricCodeCatalog, parseArgs } from "./collect-kric-code-catalog.mjs";
 
 const XLSX_PREFIX = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00]);
+
+test("KRIC 코드 정본 CLI는 두 absolute output 인자를 요구한다", () => {
+  assert.deepEqual(parseArgs([
+    "--output", "/tmp/catalog.xlsx",
+    "--metadata-output", "/tmp/catalog.json",
+  ]), { output: "/tmp/catalog.xlsx", metadataOutput: "/tmp/catalog.json" });
+  assert.throws(() => parseArgs(["--output", "/tmp/catalog.xlsx"]), /usage/);
+  assert.throws(() => parseArgs([
+    "--metadata-output", "/tmp/catalog.json",
+    "--output", "/tmp/catalog.xlsx",
+  ]), /usage/);
+  assert.throws(() => parseArgs([
+    "--output", "catalog.xlsx",
+    "--metadata-output", "/tmp/catalog.json",
+  ]), /absolute/);
+});
 
 test("KRIC 최신 코드 정본은 XLSX 경계와 sanitized metadata를 검증한다", async () => {
   const catalog = await downloadKricCodeCatalog({

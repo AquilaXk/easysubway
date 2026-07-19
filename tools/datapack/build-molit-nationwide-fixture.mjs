@@ -13,6 +13,7 @@ import {
 
 const sourceId = "molit-urban-rail-full-route";
 const kricProviderCodeCatalogSourceId = "kric-provider-code-catalog-20260228";
+const kricProviderCodeCatalogSha256 = "ef1f8b094e32e81c7390e8566984293dcefcc85e7fadacfe4433e77ddcc61272";
 const seoulMetroSourceId = "seoulmetro-cyberstation";
 const humetroSourceId = "humetro-cyberstation";
 const grtcSourceId = "grtc-cyberstation";
@@ -1004,6 +1005,9 @@ export function validateKricProviderCodeCatalogIdentity(catalog) {
   }
   if (typeof catalog.sourceSha256 !== "string" || !/^[a-f0-9]{64}$/i.test(catalog.sourceSha256)) {
     throw new Error("KRIC provider code catalog sourceSha256 is invalid");
+  }
+  if (catalog.sourceSha256.toLowerCase() !== kricProviderCodeCatalogSha256) {
+    throw new Error("KRIC provider code catalog sourceSha256 does not match trusted snapshot");
   }
 }
 

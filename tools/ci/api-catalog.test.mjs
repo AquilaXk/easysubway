@@ -315,6 +315,12 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
   );
   assert.equal(kricCodeCatalog.operation.auth.placement, "none");
   assert.equal(kricCodeCatalog.operation.runner.command, "node tools/datapack/collect-kric-code-catalog.mjs");
+  assert.deepEqual(kricCodeCatalog.operation.runner.arguments, [
+    "--output",
+    "/tmp/easysubway-kric-provider-code-catalog.xlsx",
+    "--metadata-output",
+    "/tmp/easysubway-kric-provider-code-catalog.metadata.json",
+  ]);
   assert.deepEqual(kricCodeCatalog.responseFields, [
     "RAIL_OPR_ISTT_CD",
     "RAIL_OPR_ISTT_NM",
