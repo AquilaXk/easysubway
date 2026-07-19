@@ -131,7 +131,7 @@ export function materializeBusanRouteTopology({
 
 function requiredSource(inventory, snapshot) {
   const source = inventory?.sources?.find(({ id }) => id === SOURCE_ID);
-  if (!source || source.productionUseAllowed !== true || source.license?.redistributionAllowed !== true) {
+  if (source?.productionUseAllowed !== true || source.license?.redistributionAllowed !== true) {
     throw new Error(`${SOURCE_ID} is not admitted for production use`);
   }
   const evidence = source.topologyAdmissionEvidence;
@@ -226,8 +226,10 @@ async function main(argv) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  main(process.argv.slice(2)).catch((error) => {
+  try {
+    await main(process.argv.slice(2));
+  } catch (error) {
     console.error(error instanceof Error ? error.message : "Busan route topology materialization failed");
     process.exitCode = 1;
-  });
+  }
 }

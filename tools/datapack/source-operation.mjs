@@ -301,7 +301,7 @@ export function validateOperation(candidate, { allowMissing = false } = {}) {
   }
   const fixedParameters = operation.fixedParameters ?? {};
   if (typeof fixedParameters !== "object" || Array.isArray(fixedParameters)) {
-    throw new Error(`${candidate.id}.operation.fixedParameters must be an object`);
+    throw new TypeError(`${candidate.id}.operation.fixedParameters must be an object`);
   }
   for (const [name, value] of Object.entries(fixedParameters)) {
     requiredText(name, `${candidate.id}.operation.fixedParameters name`);

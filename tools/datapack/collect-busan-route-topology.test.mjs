@@ -30,8 +30,8 @@ const SCOPE_HTML = `
 <div class="l401-402 l402-401 w-4"></div>
 <div class="s402 s-4"><a onclick="one_point('402', '4', '동래', event )"></a></div>`;
 
-function response(body = XML, { status = 200, contentType = "application/xml" } = {}) {
-  return new Response(body, { status, headers: { "content-type": contentType } });
+function response(body = XML, { status = 200, contentType = "application/xml", headers = {} } = {}) {
+  return new Response(body, { status, headers: { "content-type": contentType, ...headers } });
 }
 
 function successXml(items) {
@@ -277,6 +277,7 @@ test("부산 topology collector는 HTTP/content-type/transport failure를 bounde
   await context.test("transport retry", async () => {
     let calls = 0;
     const snapshot = await collect({
+      sleepImpl: async () => {},
       fetchImpl: async () => {
         calls += 1;
         if (calls === 1) throw new Error("temporary");
@@ -284,6 +285,25 @@ test("부산 topology collector는 HTTP/content-type/transport failure를 bounde
       },
     });
     assert.equal(calls, 2);
+    assert.equal(snapshot.edgeCount, 4);
+  });
+  await context.test("rate-limit retry delay", async () => {
+    let calls = 0;
+    const delays = [];
+    const snapshot = await collect({
+      sleepImpl: async (delay) => delays.push(delay),
+      fetchImpl: async () => {
+        calls += 1;
+        if (calls === 1) return response("rate limited", {
+          status: 429,
+          contentType: "text/plain",
+          headers: { "retry-after": "10" },
+        });
+        return response();
+      },
+    });
+    assert.equal(calls, 2);
+    assert.deepEqual(delays, [2_000]);
     assert.equal(snapshot.edgeCount, 4);
   });
   await context.test("HTTP", async () => {
@@ -304,6 +324,15 @@ test("부산 topology collector는 HTTP/content-type/transport failure를 bounde
       collect({ fetchImpl: async () => response(body) }),
       /provider resultCode 30; classification=authorization.*rawSha256=[a-f0-9]{64}/,
     );
+  });
+  await context.test("provider success code", async () => {
+    for (const resultCode of ["0", "SUCCESS", ""]) {
+      const body = XML.replace("<resultCode>00</resultCode>", `<resultCode>${resultCode}</resultCode>`);
+      await assert.rejects(
+        collect({ fetchImpl: async () => response(body) }),
+        /provider resultCode/,
+      );
+    }
   });
 });
 

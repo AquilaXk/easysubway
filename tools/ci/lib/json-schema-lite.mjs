@@ -40,14 +40,7 @@ function assertSupported(schema, path) {
 }
 
 function validateScalar(schema, value, path, errors) {
-  if (schema.minLength !== undefined) {
-    if (schema.type !== "string") {
-      throw new Error(`json-schema-lite: minLength 사용 시 type: string 명시 필요 (${path})`);
-    }
-    if (!Number.isInteger(schema.minLength) || schema.minLength < 0) {
-      throw new Error(`json-schema-lite: minLength는 0 이상의 정수여야 합니다 (${path})`);
-    }
-  }
+  validateMinLengthKeyword(schema, path);
   if (schema.const !== undefined && value !== schema.const) {
     errors.push(`${path}: const ${JSON.stringify(schema.const)} 불일치`);
     return true;
@@ -60,19 +53,34 @@ function validateScalar(schema, value, path, errors) {
     errors.push(`${path}: type ${schema.type} 불일치`);
     return true;
   }
-  if (schema.type === "string" && schema.pattern && !new RegExp(schema.pattern).test(value)) {
-    errors.push(`${path}: pattern ${schema.pattern} 불일치`);
-  }
-  if (schema.type === "string" && schema.minLength !== undefined && [...value].length < schema.minLength) {
-    errors.push(`${path}: minLength ${schema.minLength} 미만`);
-  }
-  if (schema.type === "string" && schema.format && !matchesFormat(schema.format, value)) {
-    errors.push(`${path}: format ${schema.format} 불일치`);
-  }
+  validateString(schema, value, path, errors);
   if (typeof value === "number" && schema.minimum !== undefined && value < schema.minimum) {
     errors.push(`${path}: minimum ${schema.minimum} 미만`);
   }
   return false;
+}
+
+function validateMinLengthKeyword(schema, path) {
+  if (schema.minLength === undefined) return;
+  if (schema.type !== "string") {
+    throw new Error(`json-schema-lite: minLength 사용 시 type: string 명시 필요 (${path})`);
+  }
+  if (!Number.isInteger(schema.minLength) || schema.minLength < 0) {
+    throw new Error(`json-schema-lite: minLength는 0 이상의 정수여야 합니다 (${path})`);
+  }
+}
+
+function validateString(schema, value, path, errors) {
+  if (schema.type !== "string") return;
+  if (schema.pattern && !new RegExp(schema.pattern).test(value)) {
+    errors.push(`${path}: pattern ${schema.pattern} 불일치`);
+  }
+  if (schema.minLength !== undefined && [...value].length < schema.minLength) {
+    errors.push(`${path}: minLength ${schema.minLength} 미만`);
+  }
+  if (schema.format && !matchesFormat(schema.format, value)) {
+    errors.push(`${path}: format ${schema.format} 불일치`);
+  }
 }
 
 function matchesFormat(format, value) {
