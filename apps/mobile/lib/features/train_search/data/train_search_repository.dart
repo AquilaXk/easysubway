@@ -1,4 +1,5 @@
 import '../../../core/network/api_client.dart';
+import '../../../mobile_error_reporter.dart';
 import '../domain/train_search_models.dart';
 import '../domain/train_search_scope_policy.dart';
 
@@ -39,7 +40,12 @@ class ApiTrainSearchRepository implements TrainSearchRepository {
       );
     } on TrainSearchException {
       rethrow;
-    } on Object {
+    } on Exception catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '기차역 검색 응답 처리 중 예외가 발생했습니다.',
+      );
       throw const TrainSearchException(
         TrainSearchFailureKind.invalidResponse,
         '기차역 정보를 확인하지 못했습니다.',
@@ -78,7 +84,12 @@ class ApiTrainSearchRepository implements TrainSearchRepository {
       );
     } on TrainSearchException {
       rethrow;
-    } on Object {
+    } on Exception catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '기차 시간표 응답 처리 중 예외가 발생했습니다.',
+      );
       throw const TrainSearchException(
         TrainSearchFailureKind.invalidResponse,
         '기차 시간표 응답을 확인하지 못했습니다.',

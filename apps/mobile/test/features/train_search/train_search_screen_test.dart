@@ -11,16 +11,19 @@ import 'package:flutter_test/flutter_test.dart';
 class _FakeTrainSearchRepository implements TrainSearchRepository {
   _FakeTrainSearchRepository({
     this.stationsCompleter,
+    this.stationError,
     this.searchCompleter,
     this.error,
     TrainSearchResult? result,
   }) : result = result ?? _result();
 
   final Completer<List<TrainStation>>? stationsCompleter;
+  final TrainSearchException? stationError;
   final Completer<TrainSearchResult>? searchCompleter;
   final TrainSearchException? error;
   final TrainSearchResult result;
   var searchCalls = 0;
+  var stationCalls = 0;
   TrainSearchCriteria? lastCriteria;
 
   @override
@@ -28,6 +31,8 @@ class _FakeTrainSearchRepository implements TrainSearchRepository {
     String query, {
     TrainSearchTrainType? type,
   }) async {
+    stationCalls++;
+    if (stationError case final TrainSearchException error) throw error;
     if (stationsCompleter case final Completer<List<TrainStation>> completer) {
       return completer.future;
     }
@@ -76,7 +81,7 @@ Future<void> _selectStations(WidgetTester tester) async {
     find.byKey(const Key('trainSearchDepartureField')),
     '서울',
   );
-  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 300));
   await tester.tap(
     find.byKey(const Key('trainSearchStationSuggestion-departure-NAT010000')),
   );
@@ -84,7 +89,7 @@ Future<void> _selectStations(WidgetTester tester) async {
     find.byKey(const Key('trainSearchArrivalField')),
     '대전',
   );
-  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 300));
   await tester.tap(
     find.byKey(const Key('trainSearchStationSuggestion-arrival-NAT011668')),
   );
@@ -272,7 +277,7 @@ void main() {
       find.byKey(const Key('trainSearchDepartureField')),
       '서울',
     );
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.byKey(const Key('trainSearchSwapButton')));
     completer.complete(const [TrainStation(id: 'NAT010000', name: '서울')]);
     await tester.pump();
@@ -281,6 +286,57 @@ void main() {
       find.byKey(const Key('trainSearchStationSuggestion-departure-NAT010000')),
       findsNothing,
     );
+  });
+
+  testWidgets('역 자동완성은 마지막 입력만 300ms 뒤 조회한다', (tester) async {
+    final repository = _FakeTrainSearchRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TrainSearchScreen(
+          repository: repository,
+          now: () => DateTime.utc(2026, 7, 19, 3),
+        ),
+      ),
+    );
+
+    final field = find.byKey(const Key('trainSearchDepartureField'));
+    await tester.enterText(field, '서울');
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.enterText(field, '서울역');
+    await tester.pump(const Duration(milliseconds: 299));
+
+    expect(repository.stationCalls, 0);
+
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(repository.stationCalls, 1);
+  });
+
+  testWidgets('역 자동완성 오류는 검색 결과 오류 화면을 열지 않는다', (tester) async {
+    final repository = _FakeTrainSearchRepository(
+      stationError: const TrainSearchException(
+        TrainSearchFailureKind.network,
+        '인터넷 연결을 확인한 뒤 다시 시도해 주세요.',
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TrainSearchScreen(
+          repository: repository,
+          now: () => DateTime.utc(2026, 7, 19, 3),
+        ),
+      ),
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('trainSearchDepartureField')),
+      '서울',
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump();
+
+    expect(repository.stationCalls, 1);
+    expect(find.byKey(const Key('trainSearchError')), findsNothing);
+    expect(find.byKey(const Key('trainSearchRetryButton')), findsNothing);
   });
 
   testWidgets('검색 중 중복 제출을 막고 loading 상태를 알린다', (tester) async {

@@ -2,6 +2,8 @@ import 'package:easysubway_mobile/core/network/api_client.dart';
 import 'package:easysubway_mobile/features/train_search/data/train_search_repository.dart';
 import 'package:easysubway_mobile/features/train_search/domain/train_search_models.dart';
 import 'package:easysubway_mobile/features/train_search/domain/train_search_scope_policy.dart';
+import 'package:easysubway_mobile/mobile_error_reporter.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _FakeApiClient extends ApiClient {
@@ -156,18 +158,40 @@ void main() {
         ),
       ]);
 
-      await expectLater(
-        ApiTrainSearchRepository(api).search(_criteria()),
-        throwsA(
-          isA<TrainSearchException>().having(
-            (error) => error.kind,
-            'kind',
-            TrainSearchFailureKind.invalidResponse,
-          ),
-        ),
+      FlutterErrorDetails? reported;
+      await runWithMobileErrorReporter(
+        (details) => reported = details,
+        () async {
+          await expectLater(
+            ApiTrainSearchRepository(api).search(_criteria()),
+            throwsA(
+              isA<TrainSearchException>().having(
+                (error) => error.kind,
+                'kind',
+                TrainSearchFailureKind.invalidResponse,
+              ),
+            ),
+          );
+        },
       );
+      expect(reported?.exception, isA<FormatException>());
     });
   }
+
+  test('프로그래밍 Error는 도메인 실패로 숨기지 않는다', () async {
+    final api = _FakeApiClient(const [], error: StateError('programming bug'));
+
+    await expectLater(
+      ApiTrainSearchRepository(api).search(_criteria()),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          'programming bug',
+        ),
+      ),
+    );
+  });
 
   for (final entry in <(int, String, TrainSearchFailureKind)>[
     (

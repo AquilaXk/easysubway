@@ -22,12 +22,15 @@ class TrainSearchScreen extends StatefulWidget {
 }
 
 class _TrainSearchScreenState extends State<TrainSearchScreen> {
+  static const _stationDebounceDuration = Duration(milliseconds: 300);
+
   final _departureController = TextEditingController();
   final _arrivalController = TextEditingController();
   TrainStation? _departure;
   TrainStation? _arrival;
   _StationSlot? _suggestionSlot;
   List<TrainStation> _suggestions = const [];
+  Timer? _stationDebounce;
   int _stationRequestToken = 0;
   int _searchRequestToken = 0;
   late DateTime _departureDate;
@@ -47,6 +50,7 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
 
   @override
   void dispose() {
+    _stationDebounce?.cancel();
     _departureController.dispose();
     _arrivalController.dispose();
     super.dispose();
@@ -192,15 +196,23 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
         prefixIcon: const Icon(Icons.train_outlined),
       ),
       onChanged: (value) {
+        _stationDebounce?.cancel();
+        final requestToken = ++_stationRequestToken;
         setState(() {
           if (slot == _StationSlot.departure) {
             _departure = null;
           } else {
             _arrival = null;
           }
+          _suggestionSlot = null;
+          _suggestions = const [];
           _clearResult();
         });
-        unawaited(_loadStations(slot, value));
+        if (value.trim().runes.length < 2) return;
+        _stationDebounce = Timer(
+          _stationDebounceDuration,
+          () => unawaited(_loadStations(slot, value, requestToken)),
+        );
       },
     );
   }
@@ -390,18 +402,12 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
     );
   }
 
-  Future<void> _loadStations(_StationSlot slot, String query) async {
+  Future<void> _loadStations(
+    _StationSlot slot,
+    String query,
+    int requestToken,
+  ) async {
     final normalized = query.trim();
-    final requestToken = ++_stationRequestToken;
-    if (normalized.runes.length < 2) {
-      if (mounted) {
-        setState(() {
-          _suggestionSlot = null;
-          _suggestions = const [];
-        });
-      }
-      return;
-    }
     try {
       final stations = await widget.repository.stations(
         normalized,
@@ -412,17 +418,17 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
         _suggestionSlot = slot;
         _suggestions = stations;
       });
-    } on TrainSearchException catch (error) {
+    } on TrainSearchException {
       if (!mounted || requestToken != _stationRequestToken) return;
       setState(() {
         _suggestionSlot = null;
         _suggestions = const [];
-        _error = error.message;
       });
     }
   }
 
   void _selectStation(_StationSlot slot, TrainStation station) {
+    _stationDebounce?.cancel();
     _stationRequestToken++;
     setState(() {
       if (slot == _StationSlot.departure) {
@@ -439,6 +445,7 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
   }
 
   void _swapStations() {
+    _stationDebounce?.cancel();
     _stationRequestToken++;
     setState(() {
       final station = _departure;
