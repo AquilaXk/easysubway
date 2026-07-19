@@ -86,6 +86,9 @@ node tools/test/collect-train-search-backend-observation.mjs \
 node tools/test/validate-train-search-capacity.mjs \
 	--candidate-sha "${candidate_sha}" \
 	--api-origin "${base_url%/}" \
+	--departure-id "${departure_id}" \
+	--arrival-id "${arrival_id}" \
+	--date "${departure_date}" \
 	"${output_dir}/repeated.json" \
 	"${output_dir}/unique.json" \
 	"${output_dir}/backend-observation.json" \

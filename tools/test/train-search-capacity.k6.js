@@ -34,6 +34,14 @@ const apiOrigin = __ENV.TRAIN_SEARCH_BASE_URL?.replace(/\/$/, "");
 if (apiOrigin !== "https://easysubway-api.aquilaxk.site") {
   throw new Error("TRAIN_SEARCH_BASE_URL must be the EasySubway production API origin");
 }
+const departureStationId = __ENV.TRAIN_SEARCH_DEPARTURE_ID;
+const arrivalStationId = __ENV.TRAIN_SEARCH_ARRIVAL_ID;
+const departureDate = __ENV.TRAIN_SEARCH_DATE;
+if (!/^[A-Za-z0-9_-]+$/.test(departureStationId ?? "")
+  || !/^[A-Za-z0-9_-]+$/.test(arrivalStationId ?? "")
+  || !/^\d{4}-\d{2}-\d{2}$/.test(departureDate ?? "")) {
+  throw new Error("train-search OD and date inputs are invalid");
+}
 
 export const options = {
   scenarios: {
@@ -68,18 +76,18 @@ function shiftedDate(value, days) {
 
 export default function trainSearchCapacity() {
   const parameters = {
-    departureStationId: __ENV.TRAIN_SEARCH_DEPARTURE_ID,
-    arrivalStationId: __ENV.TRAIN_SEARCH_ARRIVAL_ID,
+    departureStationId,
+    arrivalStationId,
   };
   if (workload === "unique") {
     const iteration = exec.scenario.iterationInTest;
     parameters.departureDate = shiftedDate(
-      __ENV.TRAIN_SEARCH_DATE,
+      departureDate,
       Math.floor(iteration / trainTypes.length),
     );
     parameters.trainType = trainTypes[iteration % trainTypes.length];
   } else {
-    parameters.departureDate = __ENV.TRAIN_SEARCH_DATE;
+    parameters.departureDate = departureDate;
     parameters.trainType = "KTX";
   }
   const query = Object.entries(parameters)
@@ -120,6 +128,9 @@ export function handleSummary(data) {
     schemaVersion: 1,
     candidateGitSha,
     apiOrigin,
+    departureStationId,
+    arrivalStationId,
+    departureDate,
     collectedAt: new Date().toISOString(),
     workload,
     status: requestCount >= expectedRequestCount && p95Ms !== null && failureRate === 0

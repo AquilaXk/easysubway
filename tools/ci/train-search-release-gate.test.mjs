@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
 
 import * as trainSearchLiveSmoke from "../test/train-search-live-smoke.mjs";
@@ -230,6 +232,20 @@ test("backend live evidence는 API observedAt을 보존하고 stale 응답을 �
     ),
     /predated the candidate deployment/,
   );
+});
+
+test("backend freshness 시각은 search 응답을 수집한 뒤 결정한다", () => {
+  const source = read("tools/test/train-search-live-smoke.mjs");
+  const backendSource = source.slice(
+    source.indexOf("export async function collectBackendEvidence"),
+    source.indexOf("export function validateKtxProviderJourneys"),
+  );
+  assert.doesNotMatch(backendSource, /now = new Date\(\)/);
+  assert.ok(
+    source.indexOf("const collectedAt = now === undefined ? new Date() : now;")
+      > source.indexOf("validateBackendSearchEnvelope(await responseJson(first"),
+  );
+  assert.match(source, /validateBackendObservationTime\([\s\S]*?collectedAt,/);
 });
 
 test("TAGO station catalog는 동일 ID의 상이한 이름을 거부한다", () => {
@@ -626,6 +642,9 @@ test("capacity runner는 repeated·unique·3-node·quota 경계를 고정한다"
   assert.match(k6, /TRAIN_SEARCH_CANDIDATE_SHA must be a full lowercase Git SHA/);
   assert.match(k6, /candidateGitSha,/);
   assert.match(k6, /apiOrigin,/);
+  assert.match(k6, /departureStationId,/);
+  assert.match(k6, /arrivalStationId,/);
+  assert.match(k6, /departureDate,/);
   assert.match(k6, /collectedAt: new Date\(\)\.toISOString\(\)/);
   assert.match(runner, /--nodes 3/);
   assert.match(runner, /--max-duration-seconds/);
@@ -641,6 +660,9 @@ test("capacity runner는 repeated·unique·3-node·quota 경계를 고정한다"
   assert.match(runner, /--candidate-sha/);
   assert.match(runner, /--deployment-run-url/);
   assert.match(runner, /--ci-run-url/);
+  assert.match(runner, /--departure-id "\$\{departure_id\}"/);
+  assert.match(runner, /--arrival-id "\$\{arrival_id\}"/);
+  assert.match(runner, /--date "\$\{departure_date\}"/);
   assert.ok(runner.indexOf("--validate-date") < runner.indexOf("--mode backend"));
   assert.match(runner, /train-search-live-smoke\.mjs/);
   assert.match(runner, /candidate-binding\.json/);
@@ -653,6 +675,12 @@ test("capacity runner는 repeated·unique·3-node·quota 경계를 고정한다"
     "a".repeat(40),
     "--api-origin",
     "https://easysubway-api.aquilaxk.site",
+    "--departure-id",
+    "NAT010000",
+    "--arrival-id",
+    "NAT011668",
+    "--date",
+    "2026-07-20",
     "/etc/repeated.json",
     "/etc/unique.json",
     "/etc/backend-observation.json",
@@ -682,6 +710,50 @@ test("capacity runner는 repeated·unique·3-node·quota 경계를 고정한다"
     ], { encoding: "utf8" });
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /public EasySubway production HTTPS origin/);
+  }
+});
+
+test("capacity validator는 OD·날짜와 required CI를 fail-closed로 검증한다", () => {
+  const runtime = readJson("apps/mobile/release/train-search-itx-exclusion-gate.json").issue2094RuntimeEvidence;
+  const directory = mkdtempSync(path.join(tmpdir(), "train-capacity-validator-"));
+  const candidateGitSha = runtime.candidateGitSha;
+  const args = [
+    "tools/test/validate-train-search-capacity.mjs",
+    "--candidate-sha", candidateGitSha,
+    "--api-origin", "https://easysubway-api.aquilaxk.site",
+    "--departure-id", "NAT010000",
+    "--arrival-id", "NAT011668",
+    "--date", "2026-07-20",
+    path.join(directory, "repeated.json"),
+    path.join(directory, "unique.json"),
+    path.join(directory, "backend-observation.json"),
+    path.join(directory, "candidate-binding.json"),
+  ];
+  const write = (name, value) => writeFileSync(path.join(directory, name), `${JSON.stringify(value)}\n`);
+  try {
+    write("repeated.json", runtime.capacity.repeated);
+    write("unique.json", runtime.capacity.unique);
+    write("backend-observation.json", runtime.capacity.backendObservation);
+    write("candidate-binding.json", runtime.capacity.candidateBinding);
+    assert.equal(spawnSync(process.execPath, args, { encoding: "utf8" }).status, 0);
+
+    write("repeated.json", { ...runtime.capacity.repeated, departureStationId: "NAT999999" });
+    const wrongOd = spawnSync(process.execPath, args, { encoding: "utf8" });
+    assert.notEqual(wrongOd.status, 0);
+    assert.match(wrongOd.stderr, /repeated summary failed its evidence contract/);
+
+    write("repeated.json", runtime.capacity.repeated);
+    const binding = structuredClone(runtime.capacity.candidateBinding);
+    delete binding.backend.requiredCi;
+    delete binding.evidenceSha256;
+    const unsigned = binding;
+    binding.evidenceSha256 = sha256(JSON.stringify(unsigned));
+    write("candidate-binding.json", binding);
+    const missingCi = spawnSync(process.execPath, args, { encoding: "utf8" });
+    assert.notEqual(missingCi.status, 0);
+    assert.match(missingCi.stderr, /candidate deployment binding failed its evidence contract/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
   }
 });
 
@@ -736,6 +808,9 @@ test("#2094 release artifact는 동일 candidate와 모든 완료 증거를 요�
   for (const workload of [runtime.capacity.repeated, runtime.capacity.unique]) {
     assert.equal(workload.candidateGitSha, runtime.candidateGitSha);
     assert.equal(workload.apiOrigin, runtime.backend.apiOrigin);
+    assert.equal(workload.departureStationId, "NAT010000");
+    assert.equal(workload.arrivalStationId, "NAT011668");
+    assert.equal(workload.departureDate, "2026-07-20");
     assert.match(workload.collectedAt, /^\d{4}-\d{2}-\d{2}T/);
     assert.equal(workload.failureRate, 0);
     assert.equal(workload.fiveXxCount, 0);

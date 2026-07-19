@@ -262,7 +262,7 @@ export async function collectBackendEvidence({
   departureQuery = "서울",
   arrivalQuery = "대전",
   fetchImpl = fetch,
-  now = new Date(),
+  now,
 } = {}) {
   const origin = publicHttpsOrigin(baseUrl);
   const candidateSha = requireSha(candidateGitSha);
@@ -288,10 +288,11 @@ export async function collectBackendEvidence({
   if (search.fareRowCount === 0 || search.itxCheongchunRowCount !== 0) {
     throw new Error("backend KTX fare or ITX exclusion evidence failed");
   }
+  const collectedAt = now === undefined ? new Date() : now;
   const observationTime = validateBackendObservationTime(
     search.observedAt,
     departureDate,
-    now,
+    collectedAt,
     currentDeployment.succeededAt,
   );
   const etag = first.headers.get("etag");

@@ -6,6 +6,14 @@ import path from "node:path";
 import { validateBackendObservationArtifact } from "./collect-train-search-backend-observation.mjs";
 
 const expectedWorkloads = ["repeated", "unique"];
+const requiredCiJobs = [
+  "Repository CI",
+  "Android CI",
+  "Release Gate Consistency",
+  "Mobile App CI",
+  "Backend CI",
+  "Admin QA Gates",
+];
 const arguments_ = process.argv.slice(2);
 if (arguments_[0] === "--preflight-output-dir") {
   if (arguments_.length !== 2) fail("expected one output directory");
@@ -13,7 +21,14 @@ if (arguments_[0] === "--preflight-output-dir") {
   console.log("train-search capacity output directory PASS");
   process.exit(0);
 }
-const { candidateGitSha, apiOrigin, evidencePaths } = parseEvidenceArguments(arguments_);
+const {
+  candidateGitSha,
+  apiOrigin,
+  departureStationId,
+  arrivalStationId,
+  departureDate,
+  evidencePaths,
+} = parseEvidenceArguments(arguments_);
 const evidenceFiles = await validatedEvidenceFiles(evidencePaths);
 
 for (const [index, file] of evidenceFiles.slice(0, 2).entries()) {
@@ -26,6 +41,9 @@ for (const [index, file] of evidenceFiles.slice(0, 2).entries()) {
   if (summary?.workload !== expectedWorkloads[index]
     || summary?.candidateGitSha !== candidateGitSha
     || summary?.apiOrigin !== apiOrigin
+    || summary?.departureStationId !== departureStationId
+    || summary?.arrivalStationId !== arrivalStationId
+    || summary?.departureDate !== departureDate
     || !validCollectedAt(summary?.collectedAt)
     || summary?.status !== "PASS"
     || !Number.isInteger(summary?.requestCount)
@@ -69,12 +87,28 @@ try {
 console.log("train-search capacity summaries and backend observation PASS");
 
 function parseEvidenceArguments(values) {
-  if (values.length !== 8 || values[0] !== "--candidate-sha" || values[2] !== "--api-origin") {
-    fail("expected --candidate-sha, --api-origin, and four absolute evidence paths");
+  if (values.length !== 14
+    || values[0] !== "--candidate-sha"
+    || values[2] !== "--api-origin"
+    || values[4] !== "--departure-id"
+    || values[6] !== "--arrival-id"
+    || values[8] !== "--date") {
+    fail("expected candidate, origin, OD, date, and four absolute evidence paths");
   }
   if (!/^[0-9a-f]{40}$/u.test(values[1])) fail("candidate SHA must be a full lowercase Git SHA");
   if (values[3] !== "https://easysubway-api.aquilaxk.site") fail("API origin must be production");
-  return { candidateGitSha: values[1], apiOrigin: values[3], evidencePaths: values.slice(4) };
+  if (!/^[A-Za-z0-9_-]+$/u.test(values[5]) || !/^[A-Za-z0-9_-]+$/u.test(values[7])) {
+    fail("station IDs are invalid");
+  }
+  if (!validDate(values[9])) fail("date is invalid");
+  return {
+    candidateGitSha: values[1],
+    apiOrigin: values[3],
+    departureStationId: values[5],
+    arrivalStationId: values[7],
+    departureDate: values[9],
+    evidencePaths: values.slice(10),
+  };
 }
 
 export async function validateOutputDirectory(value) {
@@ -153,6 +187,15 @@ function validateCandidateBindingArtifact(artifact, candidateGitSha, apiOrigin) 
     || artifact.backend?.origin !== apiOrigin
     || artifact.backend?.deployment?.deployedGitSha !== candidateGitSha
     || artifact.backend?.deployment?.conclusion !== "success"
+    || artifact.backend?.requiredCi?.candidateGitSha !== candidateGitSha
+    || artifact.backend?.requiredCi?.workflowName !== "CI"
+    || artifact.backend?.requiredCi?.conclusion !== "success"
+    || !Number.isInteger(artifact.backend?.requiredCi?.runId)
+    || !/^https:\/\/github\.com\/AquilaXk\/easysubway\/actions\/runs\/[1-9][0-9]*$/u
+      .test(artifact.backend?.requiredCi?.runUrl ?? "")
+    || !Array.isArray(artifact.backend?.requiredCi?.requiredJobs)
+    || artifact.backend.requiredCi.requiredJobs.length !== requiredCiJobs.length
+    || requiredCiJobs.some((job, index) => artifact.backend.requiredCi.requiredJobs[index] !== job)
     || artifact.backend?.currentDeployment?.sha !== candidateGitSha
     || !validUtcTimestamp(artifact.backend?.observedAt)
     || !validUtcTimestamp(artifact.backend?.currentDeployment?.succeededAt)
@@ -162,6 +205,12 @@ function validateCandidateBindingArtifact(artifact, candidateGitSha, apiOrigin) 
     || sha256(JSON.stringify(unsigned)) !== evidenceSha256) {
     throw new Error("candidate binding failed validation");
   }
+}
+
+function validDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(value ?? "")) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
 function validUtcTimestamp(value) {

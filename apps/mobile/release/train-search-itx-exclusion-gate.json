@@ -124,6 +124,9 @@
         "schemaVersion": 1,
         "candidateGitSha": "86be8d0294f9e2badab61f25e5c6a6ed9b7eea2c",
         "apiOrigin": "https://easysubway-api.aquilaxk.site",
+        "departureStationId": "NAT010000",
+        "arrivalStationId": "NAT011668",
+        "departureDate": "2026-07-20",
         "collectedAt": "2026-07-19T10:37:30.913Z",
         "workload": "repeated",
         "status": "PASS",
@@ -140,6 +143,9 @@
         "schemaVersion": 1,
         "candidateGitSha": "86be8d0294f9e2badab61f25e5c6a6ed9b7eea2c",
         "apiOrigin": "https://easysubway-api.aquilaxk.site",
+        "departureStationId": "NAT010000",
+        "arrivalStationId": "NAT011668",
+        "departureDate": "2026-07-20",
         "collectedAt": "2026-07-19T10:37:44.803Z",
         "workload": "unique",
         "status": "PASS",
@@ -287,7 +293,7 @@
         "Admin QA Gates"
       ]
     },
-    "liveEvidenceSha256": "7db7fb6ba641cc7fbfd1ca60532a5248855d9a3acfc0da518b052bcbb9cf73d7"
+    "liveEvidenceSha256": "be032978fdf2ab96d77a8040e40445c77c8efb7491c6d29fee22856d07c0554e"
   },
   "verification": {
     "backend": "./backend/gradlew -p backend test --tests '*TrainSearch*'",
