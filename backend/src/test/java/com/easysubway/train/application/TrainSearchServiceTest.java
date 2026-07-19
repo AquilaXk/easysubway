@@ -85,7 +85,7 @@ class TrainSearchServiceTest {
 		assertThat(provider.searchStarted.await(5, TimeUnit.SECONDS)).isTrue();
 		var second = CompletableFuture.supplyAsync(() -> secondNode.search(criteria(null)));
 		var third = CompletableFuture.supplyAsync(() -> thirdNode.search(criteria(null)));
-		Thread.sleep(150);
+		assertThat(cache.followerLeaseAttempts.await(5, TimeUnit.SECONDS)).isTrue();
 		provider.continueSearch.countDown();
 
 		assertThat(List.of(
@@ -684,6 +684,7 @@ class TrainSearchServiceTest {
 		private final Map<String, Duration> leaseTtls = new ConcurrentHashMap<>();
 		private final AtomicInteger freshLegCalls = new AtomicInteger();
 		private final CountDownLatch secondLegRead = new CountDownLatch(1);
+		private final CountDownLatch followerLeaseAttempts = new CountDownLatch(2);
 		private volatile boolean failCatalogRead;
 		private volatile boolean denyLeases;
 		private volatile Runnable beforeCatalogReturn = () -> {};
@@ -713,7 +714,9 @@ class TrainSearchServiceTest {
 			leaseTtls.put(key, ttl);
 			beforeLeaseAcquire.run();
 			if (denyLeases) return false;
-			return leases.putIfAbsent(key, owner) == null;
+			boolean acquired = leases.putIfAbsent(key, owner) == null;
+			if (!acquired) followerLeaseAttempts.countDown();
+			return acquired;
 		}
 
 		@Override

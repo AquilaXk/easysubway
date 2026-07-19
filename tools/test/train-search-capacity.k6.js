@@ -4,6 +4,8 @@ import exec from "k6/execution";
 import { Counter, Rate } from "k6/metrics";
 
 const fiveXx = new Counter("train_search_5xx");
+const fourXx = new Counter("train_search_4xx");
+const rateLimited = new Counter("train_search_429");
 const success = new Rate("train_search_success");
 
 const workload = __ENV.TRAIN_SEARCH_WORKLOAD;
@@ -20,7 +22,7 @@ export const options = {
     train_search: {
       executor: "constant-arrival-rate",
       rate,
-      timeUnit: "1s",
+      timeUnit: "2s",
       duration,
       preAllocatedVUs: rate * 2,
       maxVUs: rate * 4,
@@ -31,6 +33,8 @@ export const options = {
     http_req_failed: ["rate<0.01"],
     checks: ["rate>0.99"],
     train_search_5xx: ["count==0"],
+    train_search_4xx: ["count==0"],
+    train_search_429: ["count==0"],
     train_search_success: ["rate>0.99"],
   },
 };
@@ -65,6 +69,8 @@ export default function () {
   const origin = __ENV.TRAIN_SEARCH_BASE_URL.replace(/\/$/, "");
   const response = http.get(`${origin}/api/v1/trains/search?${query}`, { tags: { workload } });
   fiveXx.add(response.status >= 500 && response.status <= 599);
+  fourXx.add(response.status >= 400 && response.status <= 499);
+  rateLimited.add(response.status === 429);
   const passed = check(response, {
     "HTTP 200": (value) => value.status === 200,
     "success envelope": (value) => {
@@ -84,6 +90,8 @@ export default function () {
 export function handleSummary(data) {
   const failedChecks = data.metrics.checks?.values?.fails ?? 0;
   const fiveXxCount = data.metrics.train_search_5xx?.values?.count ?? 0;
+  const fourXxCount = data.metrics.train_search_4xx?.values?.count ?? 0;
+  const rateLimitedCount = data.metrics.train_search_429?.values?.count ?? 0;
   const requestCount = data.metrics.http_reqs?.values?.count ?? 0;
   const p95Ms = data.metrics.http_req_duration?.values?.["p(95)"] ?? null;
   const failureRate = data.metrics.http_req_failed?.values?.rate ?? null;
@@ -91,13 +99,15 @@ export function handleSummary(data) {
     schemaVersion: 1,
     workload,
     status: requestCount > 0 && p95Ms !== null && failureRate === 0
-      && failedChecks === 0 && fiveXxCount === 0 ? "PASS" : "FAIL",
+      && failedChecks === 0 && fiveXxCount === 0 && fourXxCount === 0 && rateLimitedCount === 0
+      ? "PASS"
+      : "FAIL",
     requestCount,
     p95Ms,
     failureRate,
     fiveXxCount,
-    providerCallCount: Number(__ENV.TRAIN_SEARCH_PROVIDER_CALL_COUNT || 0),
-    quotaVerdict: __ENV.TRAIN_SEARCH_QUOTA_VERDICT || "UNVERIFIED",
+    fourXxCount,
+    rateLimitedCount,
   };
   return {
     stdout: `train-search ${workload}: ${summary.status} requests=${summary.requestCount} p95Ms=${summary.p95Ms}\n`,

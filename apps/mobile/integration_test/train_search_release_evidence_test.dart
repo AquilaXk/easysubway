@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:easysubway_mobile/core/network/api_client.dart';
 import 'package:easysubway_mobile/features/train_search/data/train_search_repository.dart';
 import 'package:easysubway_mobile/features/train_search/domain/train_search_models.dart';
@@ -11,6 +13,7 @@ const _baseUrl = String.fromEnvironment('EASYSUBWAY_API_BASE_URL');
 const _captureDelaySeconds = int.fromEnvironment(
   'EASYSUBWAY_EVIDENCE_CAPTURE_DELAY_SECONDS',
 );
+const _proxyPort = int.fromEnvironment('EASYSUBWAY_EVIDENCE_PROXY_PORT');
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -22,7 +25,9 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: TrainSearchScreen(
-          repository: ApiTrainSearchRepository(ApiClient(baseUri: baseUri)),
+          repository: ApiTrainSearchRepository(
+            ApiClient(baseUri: baseUri, httpClient: _evidenceHttpClient()),
+          ),
         ),
       ),
     );
@@ -47,7 +52,14 @@ void main() {
     await _tapSubmit(tester);
     await _waitFor(tester, find.byKey(const Key('trainSearchResults')));
 
-    expect(find.textContaining('원'), findsWidgets);
+    expect(
+      find.bySemanticsLabel(RegExp(r'서울 출발, 대전 도착, .+성인 1인 [0-9,]+원')),
+      findsWidgets,
+    );
+    expect(
+      find.bySemanticsLabel(RegExp(r'대전 출발, 서울 도착, .+성인 1인 [0-9,]+원')),
+      findsWidgets,
+    );
     expect(find.text('가는 열차'), findsOneWidget);
     expect(find.text('오는 열차'), findsOneWidget);
     if (_captureDelaySeconds > 0) {
@@ -78,6 +90,16 @@ void main() {
     expect(find.text('기차 검색을 일시적으로 사용할 수 없습니다.'), findsOneWidget);
     expect(find.byKey(const Key('trainSearchResults')), findsNothing);
   });
+}
+
+HttpClient? _evidenceHttpClient() {
+  if (_proxyPort == 0) return null;
+  if (_proxyPort < 1 || _proxyPort > 65535) {
+    throw StateError('EASYSUBWAY_EVIDENCE_PROXY_PORT is invalid');
+  }
+  final client = HttpClient();
+  client.findProxy = (_) => 'PROXY 127.0.0.1:$_proxyPort';
+  return client;
 }
 
 Future<void> _selectStation(
@@ -124,6 +146,13 @@ Future<void> _waitFor(
     await tester.pump(const Duration(milliseconds: 200));
     if (finder.evaluate().isNotEmpty) return;
   }
+  final visibleText = tester
+      .widgetList<Text>(find.byType(Text))
+      .map((widget) => widget.data)
+      .whereType<String>()
+      .where((value) => value.isNotEmpty)
+      .join(' | ');
+  debugPrint('WAIT_FOR_TIMEOUT_VISIBLE_TEXT: $visibleText');
   expect(finder, findsOneWidget);
 }
 

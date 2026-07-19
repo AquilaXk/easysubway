@@ -169,7 +169,10 @@ export async function collectProviderEvidence({
   }
   const journeys = scheduleRows.map((row, index) => providerJourney(row, index, {
     departureStationId,
+    departureStationName: departureName,
     arrivalStationId,
+    arrivalStationName: arrivalName,
+    departureDate,
   }));
   const fareRows = journeys.filter((row) => row.trainType === "KTX" && row.adultFareWon >= 0);
   if (fareRows.length === 0) throw new Error("TAGO Seoul-Daejeon KTX fare row was missing");
@@ -203,6 +206,7 @@ export async function collectProviderEvidence({
 export async function collectBackendEvidence({
   baseUrl,
   candidateGitSha,
+  deploymentRunUrl,
   departureDate,
   departureQuery = "서울",
   arrivalQuery = "대전",
@@ -211,6 +215,7 @@ export async function collectBackendEvidence({
 } = {}) {
   const origin = publicHttpsOrigin(baseUrl);
   const candidateSha = requireSha(candidateGitSha);
+  const deployment = await deploymentEvidence(deploymentRunUrl, candidateSha, fetchImpl);
   requireDate(departureDate);
   const departure = await backendStation(origin, departureQuery, fetchImpl);
   const arrival = await backendStation(origin, arrivalQuery, fetchImpl);
@@ -243,7 +248,8 @@ export async function collectBackendEvidence({
 
   return {
     observedAt: now.toISOString(),
-    deployedGitSha: candidateSha,
+    deployedGitSha: deployment.deployedGitSha,
+    deployment,
     origin: origin.origin,
     stationQueries: [departureQuery, arrivalQuery],
     departureStationId: departure.id,
@@ -370,7 +376,13 @@ async function fetchWithTimeout(url, options, fetchImpl) {
   }
 }
 
-function providerJourney(row, index, { departureStationId, arrivalStationId }) {
+export function providerJourney(row, index, {
+  departureStationId,
+  departureStationName,
+  arrivalStationId,
+  arrivalStationName,
+  departureDate,
+}) {
   const departureAt = requiredString(row?.depplandtime, `journey[${index}].depplandtime`);
   const arrivalAt = requiredString(row?.arrplandtime, `journey[${index}].arrplandtime`);
   if (!/^\d{14}$/.test(departureAt) || !/^\d{14}$/.test(arrivalAt) || arrivalAt <= departureAt) {
@@ -378,17 +390,90 @@ function providerJourney(row, index, { departureStationId, arrivalStationId }) {
   }
   const fare = integer(row?.adultcharge, `journey[${index}].adultcharge`);
   if (fare < 0) throw new Error(`journey[${index}] fare was invalid`);
+  const actualDepartureName = requiredString(row?.depplacename, `journey[${index}].depplacename`);
+  const actualArrivalName = requiredString(row?.arrplacename, `journey[${index}].arrplacename`);
+  if (normalizeStationName(actualDepartureName) !== normalizeStationName(departureStationName)
+    || normalizeStationName(actualArrivalName) !== normalizeStationName(arrivalStationName)
+    || departureAt.slice(0, 8) !== departureDate.replaceAll("-", "")) {
+    throw new Error(`journey[${index}] provider journey OD or date mismatch`);
+  }
   return {
     trainNumber: requiredString(row?.trainno, `journey[${index}].trainno`),
     trainType: normalizeProviderTrainType(row?.traingradename),
     departureStationId,
-    departureStationName: requiredString(row?.depplacename, `journey[${index}].depplacename`),
+    departureStationName: actualDepartureName,
     departureAt,
     arrivalStationId,
-    arrivalStationName: requiredString(row?.arrplacename, `journey[${index}].arrplacename`),
+    arrivalStationName: actualArrivalName,
     arrivalAt,
     adultFareWon: fare,
   };
+}
+
+export function validateDeploymentRun(run, jobsPayload, { candidateGitSha, deploymentRunUrl }) {
+  const url = deploymentUrl(deploymentRunUrl);
+  const runId = Number(url.pathname.split("/").at(-1));
+  if (run?.id !== runId
+    || run?.name !== "CD"
+    || run?.head_sha !== candidateGitSha
+    || run?.status !== "completed"
+    || run?.conclusion !== "success"
+    || run?.html_url !== url.toString()
+    || run?.repository?.full_name !== "AquilaXk/easysubway") {
+    throw new Error("deployment workflow run did not match the candidate");
+  }
+  const requiredJobs = ["CD Deploy", "Post-deploy smoke", "CD Record deployment"];
+  if (!Array.isArray(jobsPayload?.jobs)
+    || requiredJobs.some((name) => !jobsPayload.jobs.some((job) => (
+      job?.name === name && job?.conclusion === "success"
+    )))) {
+    throw new Error("deployment workflow jobs were incomplete");
+  }
+  return {
+    runId,
+    runUrl: url.toString(),
+    workflowName: run.name,
+    deployedGitSha: run.head_sha,
+    conclusion: run.conclusion,
+    requiredJobs,
+  };
+}
+
+async function deploymentEvidence(value, candidateGitSha, fetchImpl) {
+  const runUrl = deploymentUrl(value);
+  const runId = runUrl.pathname.split("/").at(-1);
+  const apiBase = `https://api.github.com/repos/AquilaXk/easysubway/actions/runs/${runId}`;
+  const headers = {
+    accept: "application/vnd.github+json",
+    "user-agent": "easysubway-train-search-evidence",
+  };
+  const runResponse = await fetchWithTimeout(apiBase, { headers }, fetchImpl);
+  if (!runResponse.ok) throw new Error(`deployment workflow run returned HTTP ${runResponse.status}`);
+  const jobsResponse = await fetchWithTimeout(`${apiBase}/jobs?per_page=100`, { headers }, fetchImpl);
+  if (!jobsResponse.ok) throw new Error(`deployment workflow jobs returned HTTP ${jobsResponse.status}`);
+  return validateDeploymentRun(
+    await responseJson(runResponse, "deployment workflow run"),
+    await responseJson(jobsResponse, "deployment workflow jobs"),
+    { candidateGitSha, deploymentRunUrl: runUrl.toString() },
+  );
+}
+
+function deploymentUrl(value) {
+  const url = new URL(requiredString(value, "--deployment-run-url"));
+  if (url.protocol !== "https:"
+    || url.hostname !== "github.com"
+    || !/^\/AquilaXk\/easysubway\/actions\/runs\/[1-9][0-9]*$/u.test(url.pathname)
+    || url.search
+    || url.hash
+    || url.username
+    || url.password) {
+    throw new Error("--deployment-run-url must identify the EasySubway GitHub Actions run");
+  }
+  return url;
+}
+
+function normalizeStationName(value) {
+  return requiredString(value, "station name").replace(/[^0-9A-Za-z가-힣]/gu, "").toUpperCase();
 }
 
 function validateJourney(row, label) {
@@ -491,6 +576,7 @@ async function main() {
   const backend = mode === "provider" ? null : await collectBackendEvidence({
     baseUrl: args["base-url"],
     candidateGitSha: args["candidate-sha"],
+    deploymentRunUrl: args["deployment-run-url"],
     departureDate: args.date,
   });
   const artifact = {

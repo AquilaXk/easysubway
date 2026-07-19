@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
+import { validateBackendObservationArtifact } from "./collect-train-search-backend-observation.mjs";
 
 const expectedWorkloads = ["repeated", "unique"];
-if (process.argv.length !== 4) fail("expected repeated and unique summary paths");
+if (process.argv.length !== 5) fail("expected repeated, unique, and backend observation paths");
 
-for (const [index, file] of process.argv.slice(2).entries()) {
+for (const [index, file] of process.argv.slice(2, 4).entries()) {
   let summary;
   try {
     summary = JSON.parse(await readFile(file, "utf8"));
@@ -20,13 +21,21 @@ for (const [index, file] of process.argv.slice(2).entries()) {
     || summary.p95Ms >= 8_000
     || summary?.failureRate !== 0
     || summary?.fiveXxCount !== 0
-    || summary?.providerCallCount !== 1
-    || summary?.quotaVerdict !== "PASS") {
+    || summary?.fourXxCount !== 0
+    || summary?.rateLimitedCount !== 0
+    || "providerCallCount" in summary
+    || "quotaVerdict" in summary) {
     fail(`${expectedWorkloads[index]} summary failed its evidence contract`);
   }
 }
 
-console.log("train-search capacity summaries PASS");
+try {
+  validateBackendObservationArtifact(JSON.parse(await readFile(process.argv[4], "utf8")));
+} catch {
+  fail("backend observation failed its evidence contract");
+}
+
+console.log("train-search capacity summaries and backend observation PASS");
 
 function fail(message) {
   console.error(message);
