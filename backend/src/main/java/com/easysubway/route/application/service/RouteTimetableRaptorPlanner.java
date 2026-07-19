@@ -1483,7 +1483,8 @@ class RouteTimetableRaptorPlanner {
 				Integer station = stationIndex.get(evidence.stationId());
 				Integer line = evidence.lineId() == null ? null : lineIndex.get(evidence.lineId());
 				PathwayEdge edge = edges.get(evidence.edgeId());
-				if (station == null || line == null || edge == null) {
+				if (station == null || line == null || edge == null
+					|| evidenceByIdentity.get(EvidenceKey.from(evidence)).size() != 1) {
 					continue;
 				}
 				Candidate candidate = candidate(edge, evidence, null, edge.durationSeconds(), true);

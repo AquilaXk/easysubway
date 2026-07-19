@@ -99,11 +99,10 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 	}
 
 	@Test
-	@DisplayName("stairs·generated·unknown·stale·missing은 strict에서, 운영 불가는 모든 profile에서 차단한다")
+	@DisplayName("unsafe·unverified·중복 evidence는 strict에서, 운영 불가는 모든 profile에서 차단한다")
 	void strictBlocksUnsafeAndUnverifiedTransitions() {
 		int strict = RouteTimetableRaptorPlanner.profileBit(MobilityType.WHEELCHAIR, ConstraintMode.STRICT_STEP_FREE);
-		int allow = RouteTimetableRaptorPlanner.profileBit(
-			MobilityType.SENIOR, ConstraintMode.ALLOW_WITH_WARNINGS);
+		int allow = RouteTimetableRaptorPlanner.profileBit(MobilityType.SENIOR, ConstraintMode.ALLOW_WITH_WARNINGS);
 		int prefer = RouteTimetableRaptorPlanner.profileBit(MobilityType.SENIOR, ConstraintMode.PREFER_STEP_FREE);
 		List<LoadRouteTimetablePort.RouteAccessData> unsafe = List.of(
 			entryAccess("VERIFIED", "OFFICIAL_SOURCE", true, true),
@@ -127,31 +126,31 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 			}
 		}
 
-		var stale = planner.compile(withAccess(
-			everyDayTimetable(), entryAccess("STALE", "OFFICIAL_SOURCE", false, false)));
-		assertThat(stale.transitionVerificationStatus(stale.entryTransition(
-			stale.stationIndex("station-a"), stale.lineIndex("line"), allow, false))).isEqualTo("STALE");
+		var stale = planner.compile(withAccess(everyDayTimetable(), entryAccess("STALE", "OFFICIAL_SOURCE", false, false)));
+		assertThat(stale.transitionVerificationStatus(stale.entryTransition(stale.stationIndex("station-a"),
+			stale.lineIndex("line"), allow, false))).isEqualTo("STALE");
+		var staleEdge = planner.compile(withAccess(everyDayTimetable(), entryAccessWithStatuses("STALE", "VERIFIED")));
+		assertThat(staleEdge.transitionVerificationStatus(staleEdge.entryTransition(staleEdge.stationIndex("station-a"),
+			staleEdge.lineIndex("line"), allow, false))).isEqualTo("STALE");
 
-		var staleEdge = planner.compile(withAccess(
-			everyDayTimetable(), entryAccessWithStatuses("STALE", "VERIFIED")));
-		assertThat(staleEdge.transitionVerificationStatus(staleEdge.entryTransition(
-			staleEdge.stationIndex("station-a"), staleEdge.lineIndex("line"), allow, false))).isEqualTo("STALE");
+		var access = entryAccess("VERIFIED", "OFFICIAL_SOURCE", true, false);
+		var compiled = planner.compile(withAccess(everyDayTimetable(), new LoadRouteTimetablePort.RouteAccessData(
+			access.pathwayNodes(), access.pathwayEdges(),
+			access.transferRules(), List.of(access.routeEdgeEvidence().get(0), new LoadRouteTimetablePort.RouteEdgeEvidence(
+				"newer-stale", "station-a", "line", "entry-edge", "ENTRY", "OFFICIAL_SOURCE", "STALE", false, "STALE")))));
+		assertThat(compiled.entryTransition(compiled.stationIndex("station-a"), compiled.lineIndex("line"),
+			RouteTimetableRaptorPlanner.profileBit(MobilityType.WHEELCHAIR, ConstraintMode.STRICT_STEP_FREE), false))
+			.isEqualTo(-1);
 	}
 
 	@Test
 	@DisplayName("transfer evidence는 같은 edge의 ENTRY가 아니라 station·line·TRANSFER 식별자로 선택한다")
 	void selectsTransferEvidenceByFullIdentity() {
 		var compiled = planner.compile(withAccess(oneTransferTimetable(), ambiguousTransferEvidenceAccess()));
-		int strict = RouteTimetableRaptorPlanner.profileBit(
-			MobilityType.WHEELCHAIR, ConstraintMode.STRICT_STEP_FREE);
+		int strict = RouteTimetableRaptorPlanner.profileBit(MobilityType.WHEELCHAIR, ConstraintMode.STRICT_STEP_FREE);
 
-		assertThat(compiled.transferTransition(
-			compiled.stationIndex("station-x"),
-			compiled.lineIndex("line-1"),
-			compiled.lineIndex("line-2"),
-			strict,
-			false
-		)).isEqualTo(-1);
+		assertThat(compiled.transferTransition(compiled.stationIndex("station-x"), compiled.lineIndex("line-1"),
+			compiled.lineIndex("line-2"), strict, false)).isEqualTo(-1);
 	}
 
 	@Test
