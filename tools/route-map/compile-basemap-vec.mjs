@@ -264,6 +264,29 @@ function extractMapSvg(svgText) {
   if (!mapGroup.includes('id="route-lines-layer"')) {
     throw new Error("route-lines-layer를 SVG에서 찾지 못했습니다.");
   }
+  // #2068 오너 v3 KTX·SRT 마크(정정): 오너가 직접 배치한 표장은 우리 관례
+  // (service-tags-layer/rail-transfer-layer, main-map-scaled-layer 안 로컬
+  // 좌표)를 따르지 않고, main-map-scaled-layer 밖 최상위 형제 요소로 이미
+  // 최종 root viewBox 좌표에 배치돼 있다(각 <g>의 matrix(...) e,f가 그 자체로
+  // 렌더 좌표). 오너 마크를 옮기지 않고(요청 조건) 렌더 대상에만 포함하려면
+  // 그 좌표계를 그대로 보존해야 하므로, 다른 layerIds와 달리 mapTransform(k
+  // 스케일) 밖 형제로 이어붙인다 — 안에 넣으면 좌표가 이중 스케일된다.
+  // id 패턴은 오너 SVG 실측(도구용 legend/chip 사본과 실제 역 마크를 구분):
+  // legend 사본은 "-footer-0-6-9"·"-footer-2-6-2"에서 끝나고(추가 숫자 접미
+  // 없음), 실제 역 마크만 그 뒤에 "-<숫자>"가 더 붙는다.
+  const ownerRailMarks = [
+    ...svgText.matchAll(
+      /<g\s+id="logo-ktx-inline-vector-footer-0-6-9-\d+"[^>]*>[\s\S]*?<\/g>/g,
+    ),
+    ...svgText.matchAll(
+      /<g\s+id="logo-srt-inline-vector-footer-2-6-2-\d+"[^>]*>[\s\S]*?<\/g>/g,
+    ),
+  ]
+    .map((m) => m[0])
+    .join("\n");
+  if (ownerRailMarks) {
+    renderedMap = `${renderedMap}\n<g id="owner-rail-service-marks-layer" data-name="오너 KTX·SRT 마크(원본 root 좌표 보존)">\n${ownerRailMarks}\n</g>`;
+  }
   return `${svgStart}\n${defs || styles}\n${renderedMap}\n</svg>`;
 }
 

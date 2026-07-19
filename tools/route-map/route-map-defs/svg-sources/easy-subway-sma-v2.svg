@@ -1638,7 +1638,8 @@
                data-staircase-policy="macro-anchor-direct-or-single-dogleg"
                data-max-doglegs-per-structural-interval="1"
                sodipodi:nodetypes="csccssssssc" />
-          </g>
+          <path id="terminal-route-extension-gimpo-goldline-양촌" data-role="terminal-route-extension" fill="none" stroke="#957326" stroke-linecap="round" stroke-width="13" data-line="gimpo-goldline" d="M -1219.8123 253.7020 L -1231.8123 253.7020" />
+</g>
           <g
              id="route-line-incheon-2"
              data-name="인천2호선"
@@ -1671,7 +1672,9 @@
                data-staircase-policy="macro-anchor-direct-or-single-dogleg"
                data-max-doglegs-per-structural-interval="1"
                sodipodi:nodetypes="csscsscsscccscccssssc" />
-          </g>
+          <path id="terminal-route-extension-incheon-2-검단오류" data-role="terminal-route-extension" fill="none" stroke="#F4A462" stroke-linecap="round" stroke-width="13" data-line="incheon-2" d="M -1226.4057 565.7899 L -1238.4057 565.7899" />
+<path id="terminal-route-extension-incheon-2-운연" data-role="terminal-route-extension" fill="none" stroke="#F4A462" stroke-linecap="round" stroke-width="13" data-line="incheon-2" d="M 441.7262 3600.9547 L 441.7262 3588.9547" />
+</g>
           <g
              id="route-line-everline"
              data-name="에버라인"
@@ -1703,7 +1706,8 @@
                data-geometry-system="octilinear-8dir-rounded-v1"
                data-staircase-policy="macro-anchor-direct-or-single-dogleg"
                data-max-doglegs-per-structural-interval="1" />
-          </g>
+          <path id="terminal-route-extension-everline-전대.에버랜드" data-role="terminal-route-extension" fill="none" stroke="#44A436" stroke-linecap="round" stroke-width="13" data-line="everline" d="M 5852.7152 4192.1635 L 5840.7152 4192.2061" />
+</g>
           <g
              id="route-line-uijeongbu-lrt"
              data-name="의정부 경전철"
@@ -1736,7 +1740,9 @@
                data-staircase-policy="macro-anchor-direct-or-single-dogleg"
                data-max-doglegs-per-structural-interval="1"
                sodipodi:nodetypes="cssccc" />
-          </g>
+          <path id="terminal-route-extension-uijeongbu-lrt-발곡" data-role="terminal-route-extension" fill="none" stroke="#F0831E" stroke-linecap="round" stroke-width="13" data-line="uijeongbu-lrt" d="M 3685.6822 -130.9134 L 3685.6822 -142.9134" />
+<path id="terminal-route-extension-uijeongbu-lrt-탑석" data-role="terminal-route-extension" fill="none" stroke="#F0831E" stroke-linecap="round" stroke-width="13" data-line="uijeongbu-lrt" d="M 1718.6492 -418.8255 L 1730.6490 -418.7499" />
+</g>
           <g
              id="route-line-sillim"
              data-name="신림선"
@@ -1769,7 +1775,8 @@
                data-staircase-policy="macro-anchor-direct-or-single-dogleg"
                data-max-doglegs-per-structural-interval="1"
                sodipodi:nodetypes="cssssccscssc" />
-          </g>
+          <path id="terminal-route-extension-sillim-관악산" data-role="terminal-route-extension" fill="none" stroke="#5E7DBB" stroke-linecap="round" stroke-width="13" data-line="sillim" d="M 2393.3745 3156.9987 L 2405.3745 3156.9987" />
+</g>
           <g
              id="route-line-ui-sinseol"
              data-name="우이신설"
@@ -1802,7 +1809,8 @@
                data-staircase-policy="macro-anchor-direct-or-single-dogleg"
                data-max-doglegs-per-structural-interval="1"
                sodipodi:nodetypes="cssssscc" />
-          </g>
+          <path id="terminal-route-extension-ui-sinseol-북한산우이" data-role="terminal-route-extension" fill="none" stroke="#BACC50" stroke-linecap="round" stroke-width="13" data-line="ui-sinseol" d="M 3731.8360 51.5042 L 3743.8360 51.5042" />
+</g>
           <g
              id="route-line-gtx-a"
              data-name="GTXA"
@@ -1855,7 +1863,9 @@
                data-geometry-system="octilinear-8dir-rounded-v1"
                data-staircase-policy="macro-anchor-direct-or-single-dogleg"
                data-max-doglegs-per-structural-interval="1" />
-          </g>
+          <path id="terminal-route-extension-gtx-a-동탄" data-role="terminal-route-extension" fill="none" stroke="#9A6292" stroke-linecap="round" stroke-width="13" data-line="gtx-a" d="M 3228.5393 3954.8009 L 3216.5395 3954.7365" />
+<path id="terminal-route-extension-gtx-a-운정중앙" data-role="terminal-route-extension" fill="none" stroke="#9A6292" stroke-linecap="round" stroke-width="13" data-line="gtx-a" d="M -1043.9881 62.4932 L -1031.9900 62.2815" />
+</g>
           <g
              id="route-line-seohae"
              data-name="서해선"
@@ -1890,7 +1900,8 @@
                data-staircase-policy="macro-anchor-direct-or-single-dogleg"
                data-max-doglegs-per-structural-interval="1"
                data-line-weight-reference="everline" />
-          </g>
+          <path id="terminal-route-extension-seohae-원시" data-role="terminal-route-extension" fill="none" stroke="#5EAC41" stroke-linecap="round" stroke-width="13" data-line="seohae" d="M 1512.0558 4387.7679 L 1520.5414 4379.2830" />
+</g>
           <g
              id="route-line-gyeonggang"
              data-name="경강선"
@@ -1923,7 +1934,8 @@
                data-staircase-policy="macro-anchor-direct-or-single-dogleg"
                data-max-doglegs-per-structural-interval="1"
                sodipodi:nodetypes="csccssssssssscc" />
-          </g>
+          <path id="terminal-route-extension-gyeonggang-여주" data-role="terminal-route-extension" fill="none" stroke="#0B318F" stroke-linecap="round" stroke-width="13" data-line="gyeonggang" d="M 5861.5064 3994.3613 L 5861.5064 4006.3613" />
+</g>
           <g
              id="route-line-gyeongchun"
              data-name="경춘선"
@@ -1975,7 +1987,8 @@
                data-staircase-policy="macro-anchor-direct-or-single-dogleg"
                data-max-doglegs-per-structural-interval="1"
                sodipodi:nodetypes="csssccscsscssc" />
-          </g>
+          <path id="terminal-route-extension-gyeongchun-춘천" data-role="terminal-route-extension" fill="none" stroke="#007A62" stroke-linecap="round" stroke-width="13" data-line="gyeongchun" d="M 5191.1767 -445.1991 L 5182.6914 -436.7138" />
+</g>
           <g
              id="route-line-airport-railroad"
              data-name="공항철도"
@@ -2011,7 +2024,8 @@
                data-geometry-system="octilinear-8dir-rounded-v1"
                data-staircase-policy="macro-anchor-direct-or-single-dogleg"
                data-max-doglegs-per-structural-interval="1" />
-          </g>
+          <path id="terminal-route-extension-airport-railroad-인천공항2터미널" data-role="terminal-route-extension" fill="none" stroke="#0079AC" stroke-linecap="round" stroke-width="13" data-line="airport-railroad" d="M -923.1090 3453.7020 L -914.6237 3462.1873" />
+</g>
           <g
              id="route-line-incheon-1"
              data-name="인천1호선"
@@ -2045,7 +2059,9 @@
                data-geometry-system="octilinear-8dir-rounded-v1"
                data-staircase-policy="macro-anchor-direct-or-single-dogleg"
                data-max-doglegs-per-structural-interval="1" />
-          </g>
+          <path id="terminal-route-extension-incheon-1-검단호수공원" data-role="terminal-route-extension" fill="none" stroke="#B4C7E7" stroke-linecap="round" stroke-width="13" data-line="incheon-1" d="M -643.9881 438.3174 L -655.9881 438.3174" />
+<path id="terminal-route-extension-incheon-1-송도달빛축제공원" data-role="terminal-route-extension" fill="none" stroke="#B4C7E7" stroke-linecap="round" stroke-width="13" data-line="incheon-1" d="M -602.2299 4800.9547 L -590.2299 4800.9847" />
+</g>
           <g
              id="route-line-shinbundang"
              data-name="신분당선"
@@ -2079,7 +2095,8 @@
                data-staircase-policy="macro-anchor-direct-or-single-dogleg"
                data-max-doglegs-per-structural-interval="1"
                sodipodi:nodetypes="csssssccssssscscssc" />
-          </g>
+          <path id="terminal-route-extension-shinbundang-광교" data-role="terminal-route-extension" fill="none" stroke="#B81B30" stroke-linecap="round" stroke-width="13" data-line="shinbundang" d="M 2575.7921 3466.8888 L 2563.7921 3466.8888" />
+</g>
           <g
              id="route-line-suin-bundang"
              data-name="수인분당"
@@ -2190,7 +2207,9 @@
                data-geometry-system="octilinear-8dir-rounded-v1"
                data-staircase-policy="macro-anchor-direct-or-single-dogleg"
                data-max-doglegs-per-structural-interval="1" />
-          </g>
+          <path id="terminal-route-extension-gyeongui-jungang-임진강" data-role="terminal-route-extension" fill="none" stroke="#6AC2B3" stroke-linecap="round" stroke-width="13" data-line="gyeongui-jungang" d="M 173.5943 -730.9134 L 185.5943 -730.9156" />
+<path id="terminal-route-extension-gyeongui-jungang-지평" data-role="terminal-route-extension" fill="none" stroke="#6AC2B3" stroke-linecap="round" stroke-width="13" data-line="gyeongui-jungang" d="M 4956.0119 -388.0563 L 4947.5265 -379.5711" />
+</g>
           <g
              id="route-line-9"
              data-name="9호선"
@@ -2243,7 +2262,9 @@
                data-staircase-policy="macro-anchor-direct-or-single-dogleg"
                data-max-doglegs-per-structural-interval="1"
                sodipodi:nodetypes="ccsscssssccssssssc" />
-          </g>
+          <path id="terminal-route-extension-9-개화" data-role="terminal-route-extension" fill="none" stroke="#A49D87" stroke-linecap="round" stroke-width="13" data-line="9" d="M -138.4936 726.2295 L -138.4936 738.2295" />
+<path id="terminal-route-extension-9-중앙보훈병원" data-role="terminal-route-extension" fill="none" stroke="#A49D87" stroke-linecap="round" stroke-width="13" data-line="9" d="M 5305.4624 2099.8558 L 5313.9477 2091.3705" />
+</g>
           <g
              id="route-line-8"
              data-name="8호선"
@@ -2329,7 +2350,8 @@
                data-staircase-policy="macro-anchor-direct-or-single-dogleg"
                data-max-doglegs-per-structural-interval="1"
                sodipodi:nodetypes="cssssccsssscscsscccscscssscssssssc" />
-          </g>
+          <path id="terminal-route-extension-7-장암" data-role="terminal-route-extension" fill="none" stroke="#6E7E31" stroke-linecap="round" stroke-width="13" data-line="7" d="M 4030.7371 -89.1552 L 4030.7371 -77.1552" />
+</g>
           <g
              id="route-line-6"
              data-name="6호선"
@@ -2446,7 +2468,10 @@
                data-geometry-system="octilinear-8dir-rounded-v1"
                data-staircase-policy="macro-anchor-direct-or-single-dogleg"
                data-max-doglegs-per-structural-interval="1" />
-          </g>
+          <path id="terminal-route-extension-5-마천" data-role="terminal-route-extension" fill="none" stroke="#794698" stroke-linecap="round" stroke-width="13" data-line="5" d="M 5479.0888 2915.2404 L 5491.0888 2915.2404" />
+<path id="terminal-route-extension-5-방화" data-role="terminal-route-extension" fill="none" stroke="#794698" stroke-linecap="round" stroke-width="13" data-line="5" d="M -22.0101 567.9877 L -22.0101 555.9877" />
+<path id="terminal-route-extension-5-하남검단산역" data-role="terminal-route-extension" fill="none" stroke="#794698" stroke-linecap="round" stroke-width="13" data-line="5" d="M 5793.3745 1187.7679 L 5810.3451 1170.7973" />
+</g>
           <g
              id="route-line-4"
              data-name="4호선"
@@ -2480,7 +2505,8 @@
                data-staircase-policy="macro-anchor-direct-or-single-dogleg"
                data-max-doglegs-per-structural-interval="1"
                sodipodi:nodetypes="csscsscssssccssssscsssscsscccccsssssccsscscccsscssscsssssssc" />
-          </g>
+          <path id="terminal-route-extension-4-진접" data-role="terminal-route-extension" fill="none" stroke="#009BCE" stroke-linecap="round" stroke-width="13" data-line="4" d="M 5707.6602 -192.4519 L 5695.6602 -192.4519" />
+</g>
           <g
              id="route-line-3"
              data-name="3호선"
@@ -2513,7 +2539,8 @@
                data-geometry-system="octilinear-8dir-rounded-v1"
                data-staircase-policy="macro-anchor-direct-or-single-dogleg"
                data-max-doglegs-per-structural-interval="1" />
-          </g>
+          <path id="terminal-route-extension-3-대화" data-role="terminal-route-extension" fill="none" stroke="#ED6C00" stroke-linecap="round" stroke-width="13" data-line="3" d="M -835.1969 -23.2211 L -847.1969 -23.2211" />
+</g>
           <g
              id="route-line-2"
              data-name="2호선"
@@ -2674,7 +2701,10 @@
                data-staircase-policy="macro-anchor-direct-or-single-dogleg"
                data-max-doglegs-per-structural-interval="1"
                sodipodi:nodetypes="csssssssccssc" />
-          </g>
+          <path id="terminal-route-extension-1-광명" data-role="terminal-route-extension" fill="none" stroke="#004A85" stroke-linecap="round" stroke-width="13" data-line="1" d="M 843.9240 3073.4822 L 852.4092 3064.9969" />
+<path id="terminal-route-extension-1-신창" data-role="terminal-route-extension" fill="none" stroke="#004A85" stroke-linecap="round" stroke-width="13" data-line="1" d="M 6035.1327 4416.3393 L 6047.1327 4416.3393" />
+<path id="terminal-route-extension-1-연천" data-role="terminal-route-extension" fill="none" stroke="#004A85" stroke-linecap="round" stroke-width="13" data-line="1" d="M 1525.2426 -280.3640 L 1537.2426 -280.3640" />
+</g>
           <g
              id="route-alignment-adjustments-gyeongui-seohae"
              data-name="경의중앙선-서해선 환승노드 중심 정렬 및 탄현-임진강 U형 조정" />
@@ -13509,7 +13539,7 @@
                    data-line-color="#9A6292" />
                 <text
                    xml:space="preserve"
-                   style="font-weight:bold;font-size:8.79121px;line-height:0.9;font-family:NanumSquareRound, NanumSquareRound, 'Pretendard Variable', Pretendard, 'Noto Sans CJK KR', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Segoe UI', Arial, sans-serif;-inkscape-font-specification:'NanumSquareRound, NanumSquareRound, Pretendard Variable, Pretendard, Noto Sans CJK KR, Noto Sans KR, Apple SD Gothic Neo, Malgun Gothic, Segoe UI, Arial, sans-serif Bold';text-align:center;writing-mode:lr-tb;direction:ltr;text-anchor:middle;fill:#ffffff;stroke-width:2.1978"
+                   style="font-weight:bold;font-size:8.79121px;line-height:0.9;font-family:Pretendard;text-align:center;writing-mode:lr-tb;direction:ltr;text-anchor:middle;fill:#ffffff;stroke-width:2.1978"
                    x="1586.7012"
                    y="865.93457"
                    id="text1"><tspan
@@ -17886,7 +17916,7 @@
                    fill="#ffffff"
                    class="ourclass-transfer-badge-label"
                    font-family="Pretendard"
-                   font-size="18px"
+                   font-size="24px"
                    font-weight="900"
                    text-anchor="middle"
                    paint-order="stroke"
@@ -17932,7 +17962,7 @@
                    fill="#ffffff"
                    class="ourclass-transfer-badge-label"
                    font-family="Pretendard"
-                   font-size="10.3px"
+                   font-size="13.73px"
                    font-weight="900"
                    text-anchor="middle"
                    paint-order="stroke"
@@ -27324,7 +27354,7 @@
                    fill="#ffffff"
                    class="ourclass-transfer-badge-label"
                    font-family="Pretendard"
-                   font-size="18px"
+                   font-size="24px"
                    font-weight="900"
                    text-anchor="middle"
                    dominant-baseline="central"
@@ -29432,7 +29462,7 @@
                    fill="#ffffff"
                    class="ourclass-transfer-badge-label"
                    font-family="Pretendard"
-                   font-size="18px"
+                   font-size="24px"
                    font-weight="900"
                    text-anchor="middle"
                    dominant-baseline="central"
@@ -37047,7 +37077,7 @@
           <text
              id="station-label-구로"
              data-name="구로"
-             transform="translate(-541.790005 195.919667) translate(1514.2 2177.4)"
+             transform="translate(-541.790005 195.919667) translate(1463.7 2130.7)"
              fill="#111"
              font-family="Pretendard"
              font-size="28.571"
@@ -48765,619 +48795,130 @@
       </g>
     </g>
   </g>
-  <g id="line-terminal-badges-layer" data-name="종점 호선 마크" class="render-layer line-terminal-badge-layer">
+    <g id="line-terminal-badges-layer" data-name="종점 호선 마크" class="render-layer line-terminal-badge-layer">
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="9" id="line-terminal-badge-9-개화">
-  <circle cx="-138.494" cy="726.229" r="19.5" fill="#A49D87" data-role="line-terminal-badge" />
-  <text x="-138.494" y="726.229" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">9</text>
+  <circle cx="-138.4936" cy="738.2295" r="19.5" fill="#A49D87" data-role="line-terminal-badge" />
+  <text x="-138.4936" y="738.2295" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">9</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="incheon-2" id="line-terminal-badge-incheon-2-검단오류">
-  <rect x="-1258.856" y="546.290" width="64.9" height="39" rx="19.5" ry="19.5" fill="#F4A462" data-role="line-terminal-badge" />
-  <text x="-1226.406" y="565.790" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">인2</text>
+  <rect x="-1270.8557" y="546.2899" width="64.9" height="39" rx="19.5" ry="19.5" fill="#F4A462" data-role="line-terminal-badge" />
+  <text x="-1238.4057" y="565.7899" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">인2</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="incheon-1" id="line-terminal-badge-incheon-1-검단호수공원">
-  <rect x="-676.438" y="418.817" width="64.9" height="39" rx="19.5" ry="19.5" fill="#B4C7E7" data-role="line-terminal-badge" />
-  <text x="-643.988" y="438.317" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">인1</text>
+  <rect x="-688.4381" y="418.8174" width="64.9" height="39" rx="19.5" ry="19.5" fill="#B4C7E7" data-role="line-terminal-badge" />
+  <text x="-655.9881" y="438.3174" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">인1</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="sillim" id="line-terminal-badge-sillim-관악산">
-  <rect x="2360.925" y="3137.499" width="64.9" height="39" rx="19.5" ry="19.5" fill="#5E7DBB" data-role="line-terminal-badge" />
-  <text x="2393.375" y="3156.999" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">신림</text>
+  <rect x="2372.9245" y="3137.4987" width="64.9" height="39" rx="19.5" ry="19.5" fill="#5E7DBB" data-role="line-terminal-badge" />
+  <text x="2405.3745" y="3156.9987" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">신림</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="shinbundang" id="line-terminal-badge-shinbundang-광교">
-  <rect x="2543.342" y="3447.389" width="64.9" height="39" rx="19.5" ry="19.5" fill="#B81B30" data-role="line-terminal-badge" />
-  <text x="2575.792" y="3466.889" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">신분</text>
+  <rect x="2531.3421" y="3447.3888" width="64.9" height="39" rx="19.5" ry="19.5" fill="#B81B30" data-role="line-terminal-badge" />
+  <text x="2563.7921" y="3466.8888" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">신분</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="1" id="line-terminal-badge-1-광명">
-  <circle cx="843.924" cy="3073.482" r="19.5" fill="#004A85" data-role="line-terminal-badge" />
-  <text x="843.924" y="3073.482" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">1</text>
+  <circle cx="852.4092" cy="3064.9969" r="19.5" fill="#004A85" data-role="line-terminal-badge" />
+  <text x="852.4092" y="3064.9969" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">1</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="3" id="line-terminal-badge-3-대화">
-  <circle cx="-835.197" cy="-23.221" r="19.5" fill="#ED6C00" data-role="line-terminal-badge" />
-  <text x="-835.197" y="-23.221" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">3</text>
+  <circle cx="-847.1969" cy="-23.2211" r="19.5" fill="#ED6C00" data-role="line-terminal-badge" />
+  <text x="-847.1969" y="-23.2211" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">3</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="gtx-a" id="line-terminal-badge-gtx-a-동탄">
-  <circle cx="3228.539" cy="3954.801" r="19.5" fill="#9A6292" data-role="line-terminal-badge" />
-  <text x="3228.539" y="3954.801" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">A</text>
+  <circle cx="3216.5395" cy="3954.7365" r="19.5" fill="#9A6292" data-role="line-terminal-badge" />
+  <text x="3216.5395" y="3954.7365" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">A</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="5" id="line-terminal-badge-5-마천">
-  <circle cx="5479.089" cy="2915.240" r="19.5" fill="#794698" data-role="line-terminal-badge" />
-  <text x="5479.089" y="2915.240" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">5</text>
+  <circle cx="5491.0888" cy="2915.2404" r="19.5" fill="#794698" data-role="line-terminal-badge" />
+  <text x="5491.0888" y="2915.2404" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">5</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="uijeongbu-lrt" id="line-terminal-badge-uijeongbu-lrt-발곡">
-  <rect x="3653.232" y="-150.413" width="64.9" height="39" rx="19.5" ry="19.5" fill="#F0831E" data-role="line-terminal-badge" />
-  <text x="3685.682" y="-130.913" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">의정</text>
+  <rect x="3653.2322" y="-162.4134" width="64.9" height="39" rx="19.5" ry="19.5" fill="#F0831E" data-role="line-terminal-badge" />
+  <text x="3685.6822" y="-142.9134" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">의정</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="5" id="line-terminal-badge-5-방화">
-  <circle cx="-22.010" cy="567.988" r="19.5" fill="#794698" data-role="line-terminal-badge" />
-  <text x="-22.010" y="567.988" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">5</text>
+  <circle cx="-22.0101" cy="555.9877" r="19.5" fill="#794698" data-role="line-terminal-badge" />
+  <text x="-22.0101" y="555.9877" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">5</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="ui-sinseol" id="line-terminal-badge-ui-sinseol-북한산우이">
-  <rect x="3699.386" y="32.004" width="64.9" height="39" rx="19.5" ry="19.5" fill="#BACC50" data-role="line-terminal-badge" />
-  <text x="3731.836" y="51.504" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">우이</text>
+  <rect x="3711.3860" y="32.0042" width="64.9" height="39" rx="19.5" ry="19.5" fill="#BACC50" data-role="line-terminal-badge" />
+  <text x="3743.8360" y="51.5042" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">우이</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="incheon-1" id="line-terminal-badge-incheon-1-송도달빛축제공원">
-  <rect x="-634.680" y="4781.455" width="64.9" height="39" rx="19.5" ry="19.5" fill="#B4C7E7" data-role="line-terminal-badge" />
-  <text x="-602.230" y="4800.955" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">인1</text>
+  <rect x="-622.6799" y="4781.4847" width="64.9" height="39" rx="19.5" ry="19.5" fill="#B4C7E7" data-role="line-terminal-badge" />
+  <text x="-590.2299" y="4800.9847" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">인1</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="1" id="line-terminal-badge-1-신창">
-  <circle cx="6035.133" cy="4416.339" r="19.5" fill="#004A85" data-role="line-terminal-badge" />
-  <text x="6035.133" y="4416.339" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">1</text>
+  <circle cx="6047.1327" cy="4416.3393" r="19.5" fill="#004A85" data-role="line-terminal-badge" />
+  <text x="6047.1327" y="4416.3393" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">1</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="gimpo-goldline" id="line-terminal-badge-gimpo-goldline-양촌">
-  <rect x="-1252.262" y="234.202" width="64.9" height="39" rx="19.5" ry="19.5" fill="#957326" data-role="line-terminal-badge" />
-  <text x="-1219.812" y="253.702" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">김포</text>
+  <rect x="-1264.2623" y="234.2020" width="64.9" height="39" rx="19.5" ry="19.5" fill="#957326" data-role="line-terminal-badge" />
+  <text x="-1231.8123" y="253.7020" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">김포</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="gyeonggang" id="line-terminal-badge-gyeonggang-여주">
-  <rect x="5829.056" y="3974.861" width="64.9" height="39" rx="19.5" ry="19.5" fill="#0B318F" data-role="line-terminal-badge" />
-  <text x="5861.506" y="3994.361" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">경강</text>
+  <rect x="5829.0564" y="3986.8613" width="64.9" height="39" rx="19.5" ry="19.5" fill="#0B318F" data-role="line-terminal-badge" />
+  <text x="5861.5064" y="4006.3613" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">경강</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="1" id="line-terminal-badge-1-연천">
-  <circle cx="1525.243" cy="-280.364" r="19.5" fill="#004A85" data-role="line-terminal-badge" />
-  <text x="1525.243" y="-280.364" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">1</text>
+  <circle cx="1537.2426" cy="-280.3640" r="19.5" fill="#004A85" data-role="line-terminal-badge" />
+  <text x="1537.2426" y="-280.3640" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">1</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="incheon-2" id="line-terminal-badge-incheon-2-운연">
-  <rect x="409.276" y="3581.455" width="64.9" height="39" rx="19.5" ry="19.5" fill="#F4A462" data-role="line-terminal-badge" />
-  <text x="441.726" y="3600.955" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">인2</text>
+  <rect x="409.2762" y="3569.4547" width="64.9" height="39" rx="19.5" ry="19.5" fill="#F4A462" data-role="line-terminal-badge" />
+  <text x="441.7262" y="3588.9547" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">인2</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="gtx-a" id="line-terminal-badge-gtx-a-운정중앙">
-  <circle cx="-1043.988" cy="62.493" r="19.5" fill="#9A6292" data-role="line-terminal-badge" />
-  <text x="-1043.988" y="62.493" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">A</text>
+  <circle cx="-1031.9900" cy="62.2815" r="19.5" fill="#9A6292" data-role="line-terminal-badge" />
+  <text x="-1031.9900" y="62.2815" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">A</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="seohae" id="line-terminal-badge-seohae-원시">
-  <rect x="1479.606" y="4368.268" width="64.9" height="39" rx="19.5" ry="19.5" fill="#5EAC41" data-role="line-terminal-badge" />
-  <text x="1512.056" y="4387.768" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">서해</text>
+  <rect x="1488.0914" y="4359.7830" width="64.9" height="39" rx="19.5" ry="19.5" fill="#5EAC41" data-role="line-terminal-badge" />
+  <text x="1520.5414" y="4379.2830" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">서해</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="airport-railroad" id="line-terminal-badge-airport-railroad-인천공항2터미널">
-  <rect x="-955.559" y="3434.202" width="64.9" height="39" rx="19.5" ry="19.5" fill="#0079AC" data-role="line-terminal-badge" />
-  <text x="-923.109" y="3453.702" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">공항</text>
+  <rect x="-947.0737" y="3442.6873" width="64.9" height="39" rx="19.5" ry="19.5" fill="#0079AC" data-role="line-terminal-badge" />
+  <text x="-914.6237" y="3462.1873" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">공항</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="gyeongui-jungang" id="line-terminal-badge-gyeongui-jungang-임진강">
-  <rect x="141.144" y="-750.413" width="64.9" height="39" rx="19.5" ry="19.5" fill="#6AC2B3" data-role="line-terminal-badge" />
-  <text x="173.594" y="-730.913" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">경의</text>
+  <rect x="153.1443" y="-750.4156" width="64.9" height="39" rx="19.5" ry="19.5" fill="#6AC2B3" data-role="line-terminal-badge" />
+  <text x="185.5943" y="-730.9156" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">경의</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="7" id="line-terminal-badge-7-장암">
-  <circle cx="4030.737" cy="-89.155" r="19.5" fill="#6E7E31" data-role="line-terminal-badge" />
-  <text x="4030.737" y="-89.155" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">7</text>
+  <circle cx="4030.7371" cy="-77.1552" r="19.5" fill="#6E7E31" data-role="line-terminal-badge" />
+  <text x="4030.7371" y="-77.1552" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">7</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="everline" id="line-terminal-badge-everline-전대.에버랜드">
-  <rect x="5820.265" y="4172.664" width="64.9" height="39" rx="19.5" ry="19.5" fill="#44A436" data-role="line-terminal-badge" />
-  <text x="5852.715" y="4192.164" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">에버</text>
+  <rect x="5808.2652" y="4172.7061" width="64.9" height="39" rx="19.5" ry="19.5" fill="#44A436" data-role="line-terminal-badge" />
+  <text x="5840.7152" y="4192.2061" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">에버</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="9" id="line-terminal-badge-9-중앙보훈병원">
-  <circle cx="5305.462" cy="2099.856" r="19.5" fill="#A49D87" data-role="line-terminal-badge" />
-  <text x="5305.462" y="2099.856" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">9</text>
+  <circle cx="5313.9477" cy="2091.3705" r="19.5" fill="#A49D87" data-role="line-terminal-badge" />
+  <text x="5313.9477" y="2091.3705" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">9</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="gyeongui-jungang" id="line-terminal-badge-gyeongui-jungang-지평">
-  <rect x="4923.562" y="-407.556" width="64.9" height="39" rx="19.5" ry="19.5" fill="#6AC2B3" data-role="line-terminal-badge" />
-  <text x="4956.012" y="-388.056" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">경의</text>
+  <rect x="4915.0765" y="-399.0711" width="64.9" height="39" rx="19.5" ry="19.5" fill="#6AC2B3" data-role="line-terminal-badge" />
+  <text x="4947.5265" y="-379.5711" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">경의</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="4" id="line-terminal-badge-4-진접">
-  <circle cx="5707.660" cy="-192.452" r="19.5" fill="#009BCE" data-role="line-terminal-badge" />
-  <text x="5707.660" y="-192.452" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">4</text>
+  <circle cx="5695.6602" cy="-192.4519" r="19.5" fill="#009BCE" data-role="line-terminal-badge" />
+  <text x="5695.6602" y="-192.4519" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">4</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="gyeongchun" id="line-terminal-badge-gyeongchun-춘천">
-  <rect x="5158.727" y="-464.699" width="64.9" height="39" rx="19.5" ry="19.5" fill="#007A62" data-role="line-terminal-badge" />
-  <text x="5191.177" y="-445.199" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">경춘</text>
+  <rect x="5150.2414" y="-456.2138" width="64.9" height="39" rx="19.5" ry="19.5" fill="#007A62" data-role="line-terminal-badge" />
+  <text x="5182.6914" y="-436.7138" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">경춘</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="uijeongbu-lrt" id="line-terminal-badge-uijeongbu-lrt-탑석">
-  <rect x="1686.199" y="-438.325" width="64.9" height="39" rx="19.5" ry="19.5" fill="#F0831E" data-role="line-terminal-badge" />
-  <text x="1718.649" y="-418.825" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">의정</text>
+  <rect x="1698.1990" y="-438.2499" width="64.9" height="39" rx="19.5" ry="19.5" fill="#F0831E" data-role="line-terminal-badge" />
+  <text x="1730.6490" y="-418.7499" fill="#333D4B" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">의정</text>
 </g>
 <g class="line-terminal-badge" data-role="line-terminal-badge" data-line="5" id="line-terminal-badge-5-하남검단산역">
-  <circle cx="5793.375" cy="1187.768" r="19.5" fill="#794698" data-role="line-terminal-badge" />
-  <text x="5793.375" y="1187.768" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">5</text>
+  <circle cx="5810.3451" cy="1170.7973" r="19.5" fill="#794698" data-role="line-terminal-badge" />
+  <text x="5810.3451" y="1170.7973" fill="#FFFFFF" font-size="22.5" font-weight="900" text-anchor="middle" dominant-baseline="central" data-role="line-terminal-badge">5</text>
 </g>
   </g>
-  <g id="service-tags-layer" class="render-layer service-tag-layer" data-asset-policy="inline-svg-paths-only">
-<g id="service-tag-서울역-ktx"
-             class="service-tag"
-             data-station="서울역"
-             data-services="KTX"
-             data-logo-mode="inline-svg-paths"
-             transform="translate(1988.9789,1535.0207)">
-            <title id="service-tag-서울역-ktx-title">서울역 · KTX</title>
-            <g
-               id="logo-ktx-inline-vector-서울역-ktx"
-               transform="matrix(0.0447145,0,0,0.0447145,0,0)"
-               aria-label="KTX"
-               data-logo-source="gwangju_metro_map_sma_v1_family_transfer_v5.svg">
-              <path
-                 id="logo-ktx-blue-path-서울역-ktx"
-                 d="m 660,175 -36,37 -28,32 32,71 h 93 z m -522,-40 1,-1 1,1 -1,1 z M 0,315 h 93 l 15,-50 v -3 l 3,-7 2,-10 3,-7 4,-17 2,-3 11,-7 2,1 21,58 18,45 h 92 l -2,-8 -2,-3 -1,-5 -2,-3 -1,-5 -2,-3 -1,-5 -10,-24 -1,-5 -2,-3 -1,-5 -2,-3 -30,-81 76,-49 h 73 l 1,1 -7,21 -4,17 -3,7 -6,24 -3,7 -4,17 -3,7 -6,24 -3,7 v 3 l -20,67 h 93 l 9,-29 v -3 l 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 v -3 l 2,-2 h 85 l 4,6 24,56 25,-23 23,-19 6,-9 9,-10 2,-5 -24,-55 H 255 l -115,81 -1,-2 11,-13 19,-66 H 76 Z"
-                 fill="#000055"
-                 fill-rule="evenodd" />
-              <path
-                 id="logo-ktx-red-path-서울역-ktx"
-                 d="m 958,0 h -9 l -1,1 -15,1 -1,1 -38,5 -25,5 -9,3 h -4 l -40,11 -43,15 -36,15 -39,19 -19,11 -30,20 -28,21 -50,43 -69,69 -46,51 -20,24 h 102 l 55,-69 46,-51 61,-59 46,-38 25,-18 28,-18 48,-25 42,-17 h 3 l 6,-3 22,-7 z"
-                 fill="#e00024"
-                 fill-rule="evenodd" />
-            </g>
-          </g>
-<g id="service-tag-용산-ktx"
-             class="service-tag"
-             data-station="용산"
-             data-services="KTX"
-             data-logo-mode="inline-svg-paths"
-             transform="translate(2064.1728,2007.0796)">
-            <title id="service-tag-용산-ktx-title">용산 · KTX</title>
-            <g
-               id="logo-ktx-inline-vector-용산-ktx"
-               transform="matrix(0.0447145,0,0,0.0447145,0,0)"
-               aria-label="KTX"
-               data-logo-source="gwangju_metro_map_sma_v1_family_transfer_v5.svg">
-              <path
-                 id="logo-ktx-blue-path-용산-ktx"
-                 d="m 660,175 -36,37 -28,32 32,71 h 93 z m -522,-40 1,-1 1,1 -1,1 z M 0,315 h 93 l 15,-50 v -3 l 3,-7 2,-10 3,-7 4,-17 2,-3 11,-7 2,1 21,58 18,45 h 92 l -2,-8 -2,-3 -1,-5 -2,-3 -1,-5 -2,-3 -1,-5 -10,-24 -1,-5 -2,-3 -1,-5 -2,-3 -30,-81 76,-49 h 73 l 1,1 -7,21 -4,17 -3,7 -6,24 -3,7 -4,17 -3,7 -6,24 -3,7 v 3 l -20,67 h 93 l 9,-29 v -3 l 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 v -3 l 2,-2 h 85 l 4,6 24,56 25,-23 23,-19 6,-9 9,-10 2,-5 -24,-55 H 255 l -115,81 -1,-2 11,-13 19,-66 H 76 Z"
-                 fill="#000055"
-                 fill-rule="evenodd" />
-              <path
-                 id="logo-ktx-red-path-용산-ktx"
-                 d="m 958,0 h -9 l -1,1 -15,1 -1,1 -38,5 -25,5 -9,3 h -4 l -40,11 -43,15 -36,15 -39,19 -19,11 -30,20 -28,21 -50,43 -69,69 -46,51 -20,24 h 102 l 55,-69 46,-51 61,-59 46,-38 25,-18 28,-18 48,-25 42,-17 h 3 l 6,-3 22,-7 z"
-                 fill="#e00024"
-                 fill-rule="evenodd" />
-            </g>
-          </g>
-<g id="service-tag-광명-ktx"
-             class="service-tag"
-             data-station="광명"
-             data-services="KTX"
-             data-logo-mode="inline-svg-paths"
-             transform="translate(797.3015,3026.8598)">
-            <title id="service-tag-광명-ktx-title">광명 · KTX</title>
-            <g
-               id="logo-ktx-inline-vector-광명-ktx"
-               transform="matrix(0.0447145,0,0,0.0447145,0,0)"
-               aria-label="KTX"
-               data-logo-source="gwangju_metro_map_sma_v1_family_transfer_v5.svg">
-              <path
-                 id="logo-ktx-blue-path-광명-ktx"
-                 d="m 660,175 -36,37 -28,32 32,71 h 93 z m -522,-40 1,-1 1,1 -1,1 z M 0,315 h 93 l 15,-50 v -3 l 3,-7 2,-10 3,-7 4,-17 2,-3 11,-7 2,1 21,58 18,45 h 92 l -2,-8 -2,-3 -1,-5 -2,-3 -1,-5 -2,-3 -1,-5 -10,-24 -1,-5 -2,-3 -1,-5 -2,-3 -30,-81 76,-49 h 73 l 1,1 -7,21 -4,17 -3,7 -6,24 -3,7 -4,17 -3,7 -6,24 -3,7 v 3 l -20,67 h 93 l 9,-29 v -3 l 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 v -3 l 2,-2 h 85 l 4,6 24,56 25,-23 23,-19 6,-9 9,-10 2,-5 -24,-55 H 255 l -115,81 -1,-2 11,-13 19,-66 H 76 Z"
-                 fill="#000055"
-                 fill-rule="evenodd" />
-              <path
-                 id="logo-ktx-red-path-광명-ktx"
-                 d="m 958,0 h -9 l -1,1 -15,1 -1,1 -38,5 -25,5 -9,3 h -4 l -40,11 -43,15 -36,15 -39,19 -19,11 -30,20 -28,21 -50,43 -69,69 -46,51 -20,24 h 102 l 55,-69 46,-51 61,-59 46,-38 25,-18 28,-18 48,-25 42,-17 h 3 l 6,-3 22,-7 z"
-                 fill="#e00024"
-                 fill-rule="evenodd" />
-            </g>
-          </g>
-<g id="service-tag-행신-ktx"
-             class="service-tag"
-             data-station="행신"
-             data-services="KTX"
-             data-logo-mode="inline-svg-paths"
-             transform="translate(334.5024,336.7499)">
-            <title id="service-tag-행신-ktx-title">행신 · KTX</title>
-            <g
-               id="logo-ktx-inline-vector-행신-ktx"
-               transform="matrix(0.0447145,0,0,0.0447145,0,0)"
-               aria-label="KTX"
-               data-logo-source="gwangju_metro_map_sma_v1_family_transfer_v5.svg">
-              <path
-                 id="logo-ktx-blue-path-행신-ktx"
-                 d="m 660,175 -36,37 -28,32 32,71 h 93 z m -522,-40 1,-1 1,1 -1,1 z M 0,315 h 93 l 15,-50 v -3 l 3,-7 2,-10 3,-7 4,-17 2,-3 11,-7 2,1 21,58 18,45 h 92 l -2,-8 -2,-3 -1,-5 -2,-3 -1,-5 -2,-3 -1,-5 -10,-24 -1,-5 -2,-3 -1,-5 -2,-3 -30,-81 76,-49 h 73 l 1,1 -7,21 -4,17 -3,7 -6,24 -3,7 -4,17 -3,7 -6,24 -3,7 v 3 l -20,67 h 93 l 9,-29 v -3 l 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 v -3 l 2,-2 h 85 l 4,6 24,56 25,-23 23,-19 6,-9 9,-10 2,-5 -24,-55 H 255 l -115,81 -1,-2 11,-13 19,-66 H 76 Z"
-                 fill="#000055"
-                 fill-rule="evenodd" />
-              <path
-                 id="logo-ktx-red-path-행신-ktx"
-                 d="m 958,0 h -9 l -1,1 -15,1 -1,1 -38,5 -25,5 -9,3 h -4 l -40,11 -43,15 -36,15 -39,19 -19,11 -30,20 -28,21 -50,43 -69,69 -46,51 -20,24 h 102 l 55,-69 46,-51 61,-59 46,-38 25,-18 28,-18 48,-25 42,-17 h 3 l 6,-3 22,-7 z"
-                 fill="#e00024"
-                 fill-rule="evenodd" />
-            </g>
-          </g>
-<g id="service-tag-청량리-ktx"
-             class="service-tag"
-             data-station="청량리"
-             data-services="KTX"
-             data-logo-mode="inline-svg-paths"
-             transform="translate(3993.8431,931.0936)">
-            <title id="service-tag-청량리-ktx-title">청량리 · KTX</title>
-            <g
-               id="logo-ktx-inline-vector-청량리-ktx"
-               transform="matrix(0.0447145,0,0,0.0447145,0,0)"
-               aria-label="KTX"
-               data-logo-source="gwangju_metro_map_sma_v1_family_transfer_v5.svg">
-              <path
-                 id="logo-ktx-blue-path-청량리-ktx"
-                 d="m 660,175 -36,37 -28,32 32,71 h 93 z m -522,-40 1,-1 1,1 -1,1 z M 0,315 h 93 l 15,-50 v -3 l 3,-7 2,-10 3,-7 4,-17 2,-3 11,-7 2,1 21,58 18,45 h 92 l -2,-8 -2,-3 -1,-5 -2,-3 -1,-5 -2,-3 -1,-5 -10,-24 -1,-5 -2,-3 -1,-5 -2,-3 -30,-81 76,-49 h 73 l 1,1 -7,21 -4,17 -3,7 -6,24 -3,7 -4,17 -3,7 -6,24 -3,7 v 3 l -20,67 h 93 l 9,-29 v -3 l 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 v -3 l 2,-2 h 85 l 4,6 24,56 25,-23 23,-19 6,-9 9,-10 2,-5 -24,-55 H 255 l -115,81 -1,-2 11,-13 19,-66 H 76 Z"
-                 fill="#000055"
-                 fill-rule="evenodd" />
-              <path
-                 id="logo-ktx-red-path-청량리-ktx"
-                 d="m 958,0 h -9 l -1,1 -15,1 -1,1 -38,5 -25,5 -9,3 h -4 l -40,11 -43,15 -36,15 -39,19 -19,11 -30,20 -28,21 -50,43 -69,69 -46,51 -20,24 h 102 l 55,-69 46,-51 61,-59 46,-38 25,-18 28,-18 48,-25 42,-17 h 3 l 6,-3 22,-7 z"
-                 fill="#e00024"
-                 fill-rule="evenodd" />
-            </g>
-          </g>
-<g id="service-tag-영등포-ktx"
-             class="service-tag"
-             data-station="영등포"
-             data-services="KTX"
-             data-logo-mode="inline-svg-paths"
-             transform="translate(1340.6273,2337.2185)">
-            <title id="service-tag-영등포-ktx-title">영등포 · KTX</title>
-            <g
-               id="logo-ktx-inline-vector-영등포-ktx"
-               transform="matrix(0.0447145,0,0,0.0447145,0,0)"
-               aria-label="KTX"
-               data-logo-source="gwangju_metro_map_sma_v1_family_transfer_v5.svg">
-              <path
-                 id="logo-ktx-blue-path-영등포-ktx"
-                 d="m 660,175 -36,37 -28,32 32,71 h 93 z m -522,-40 1,-1 1,1 -1,1 z M 0,315 h 93 l 15,-50 v -3 l 3,-7 2,-10 3,-7 4,-17 2,-3 11,-7 2,1 21,58 18,45 h 92 l -2,-8 -2,-3 -1,-5 -2,-3 -1,-5 -2,-3 -1,-5 -10,-24 -1,-5 -2,-3 -1,-5 -2,-3 -30,-81 76,-49 h 73 l 1,1 -7,21 -4,17 -3,7 -6,24 -3,7 -4,17 -3,7 -6,24 -3,7 v 3 l -20,67 h 93 l 9,-29 v -3 l 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 v -3 l 2,-2 h 85 l 4,6 24,56 25,-23 23,-19 6,-9 9,-10 2,-5 -24,-55 H 255 l -115,81 -1,-2 11,-13 19,-66 H 76 Z"
-                 fill="#000055"
-                 fill-rule="evenodd" />
-              <path
-                 id="logo-ktx-red-path-영등포-ktx"
-                 d="m 958,0 h -9 l -1,1 -15,1 -1,1 -38,5 -25,5 -9,3 h -4 l -40,11 -43,15 -36,15 -39,19 -19,11 -30,20 -28,21 -50,43 -69,69 -46,51 -20,24 h 102 l 55,-69 46,-51 61,-59 46,-38 25,-18 28,-18 48,-25 42,-17 h 3 l 6,-3 22,-7 z"
-                 fill="#e00024"
-                 fill-rule="evenodd" />
-            </g>
-          </g>
-<g id="service-tag-수원-ktx"
-             class="service-tag"
-             data-station="수원"
-             data-services="KTX"
-             data-logo-mode="inline-svg-paths"
-             transform="translate(2223.6752,4288.3982)">
-            <title id="service-tag-수원-ktx-title">수원 · KTX</title>
-            <g
-               id="logo-ktx-inline-vector-수원-ktx"
-               transform="matrix(0.0447145,0,0,0.0447145,0,0)"
-               aria-label="KTX"
-               data-logo-source="gwangju_metro_map_sma_v1_family_transfer_v5.svg">
-              <path
-                 id="logo-ktx-blue-path-수원-ktx"
-                 d="m 660,175 -36,37 -28,32 32,71 h 93 z m -522,-40 1,-1 1,1 -1,1 z M 0,315 h 93 l 15,-50 v -3 l 3,-7 2,-10 3,-7 4,-17 2,-3 11,-7 2,1 21,58 18,45 h 92 l -2,-8 -2,-3 -1,-5 -2,-3 -1,-5 -2,-3 -1,-5 -10,-24 -1,-5 -2,-3 -1,-5 -2,-3 -30,-81 76,-49 h 73 l 1,1 -7,21 -4,17 -3,7 -6,24 -3,7 -4,17 -3,7 -6,24 -3,7 v 3 l -20,67 h 93 l 9,-29 v -3 l 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 v -3 l 2,-2 h 85 l 4,6 24,56 25,-23 23,-19 6,-9 9,-10 2,-5 -24,-55 H 255 l -115,81 -1,-2 11,-13 19,-66 H 76 Z"
-                 fill="#000055"
-                 fill-rule="evenodd" />
-              <path
-                 id="logo-ktx-red-path-수원-ktx"
-                 d="m 958,0 h -9 l -1,1 -15,1 -1,1 -38,5 -25,5 -9,3 h -4 l -40,11 -43,15 -36,15 -39,19 -19,11 -30,20 -28,21 -50,43 -69,69 -46,51 -20,24 h 102 l 55,-69 46,-51 61,-59 46,-38 25,-18 28,-18 48,-25 42,-17 h 3 l 6,-3 22,-7 z"
-                 fill="#e00024"
-                 fill-rule="evenodd" />
-            </g>
-          </g>
-<g id="service-tag-상봉-ktx"
-             class="service-tag"
-             data-station="상봉"
-             data-services="KTX"
-             data-logo-mode="inline-svg-paths"
-             transform="translate(4754.2826,902.5222)">
-            <title id="service-tag-상봉-ktx-title">상봉 · KTX</title>
-            <g
-               id="logo-ktx-inline-vector-상봉-ktx"
-               transform="matrix(0.0447145,0,0,0.0447145,0,0)"
-               aria-label="KTX"
-               data-logo-source="gwangju_metro_map_sma_v1_family_transfer_v5.svg">
-              <path
-                 id="logo-ktx-blue-path-상봉-ktx"
-                 d="m 660,175 -36,37 -28,32 32,71 h 93 z m -522,-40 1,-1 1,1 -1,1 z M 0,315 h 93 l 15,-50 v -3 l 3,-7 2,-10 3,-7 4,-17 2,-3 11,-7 2,1 21,58 18,45 h 92 l -2,-8 -2,-3 -1,-5 -2,-3 -1,-5 -2,-3 -1,-5 -10,-24 -1,-5 -2,-3 -1,-5 -2,-3 -30,-81 76,-49 h 73 l 1,1 -7,21 -4,17 -3,7 -6,24 -3,7 -4,17 -3,7 -6,24 -3,7 v 3 l -20,67 h 93 l 9,-29 v -3 l 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 4,-17 3,-7 4,-17 3,-7 6,-24 3,-7 v -3 l 2,-2 h 85 l 4,6 24,56 25,-23 23,-19 6,-9 9,-10 2,-5 -24,-55 H 255 l -115,81 -1,-2 11,-13 19,-66 H 76 Z"
-                 fill="#000055"
-                 fill-rule="evenodd" />
-              <path
-                 id="logo-ktx-red-path-상봉-ktx"
-                 d="m 958,0 h -9 l -1,1 -15,1 -1,1 -38,5 -25,5 -9,3 h -4 l -40,11 -43,15 -36,15 -39,19 -19,11 -30,20 -28,21 -50,43 -69,69 -46,51 -20,24 h 102 l 55,-69 46,-51 61,-59 46,-38 25,-18 28,-18 48,-25 42,-17 h 3 l 6,-3 22,-7 z"
-                 fill="#e00024"
-                 fill-rule="evenodd" />
-            </g>
-          </g>
-<g id="service-tag-수서-srt"
-             class="service-tag"
-             data-station="수서"
-             data-services="SRT"
-             data-logo-mode="inline-svg-paths"
-             transform="translate(4263.2356,3209.2774)">
-            <title id="service-tag-수서-srt-title">수서 · SRT</title>
-            <g
-               id="logo-srt-inline-vector-수서-srt"
-               transform="matrix(0.02057936,0,0,0.02057936,0,0)"
-               aria-label="SRT"
-               data-logo-source="gwangju_metro_map_sma_v1_family_transfer_v5.svg">
-              <path
-                 id="logo-srt-path-수서-srt"
-                 d="m 1136.258 106.6 h -129.2 l -115.9 221 h 127.3 z M 1.9 327.6 h 408.102 l 1.9 -1.3 h 17.1 l 1.9 -1.3 22.8 -1.3 32.3 -5.2 22.8 -5.2 34.2 -13 26.6 -18.2 11.4 -11.7 11.4 -16.9 5.7 -16.9 v -27.3 l -1.9 -1.3 -1.9 -13 -13.3 -24.7 -24.7 -33.8 -11.4 -26 V 91 l 9.5 -14.3 17.1 -10.4 24.7 -6.5 34.2 -1.3 1.9 -1.3 502.304 1.3 13.3 2.6 17.1 6.5 9.5 6.5 11.4 15.6 1.9 10.4 -1.9 1.3 -1.9 13 -15.2 19.5 -22.8 15.6 -28.5 13 -66.5 19.5 -39.9 9.1 h -7.6 l 9.5 16.9 74.1 104 11.4 7.8 13.3 5.2 13.3 2.6 h 438.654 l 7.6 1.3 1.9 -1.3 24.7 -1.3 17.1 -3.9 30.4 -11.7 22.8 -15.6 11.4 -11.7 15.2 -23.4 5.7 -14.3 3.8 -3.9 5.7 -14.3 3.8 -3.9 3.8 -10.4 3.8 -3.9 3.8 -10.4 3.8 -3.9 5.7 -14.3 3.8 -3.9 60.8 -117 1.9 -1.3 h 148.2 l 11.4 -2.6 13.3 -9.1 38 -46.8 H 1844.046 l -1.9 1.3 -38 2.6 -34.2 6.5 -28.5 9.1 -24.7 11.7 -20.9 14.3 -13.3 13 -15.2 24.7 h 70.3 l 20.9 -13 15.2 -5.2 26.6 -5.2 h 19 l 1.9 -1.3 h 74.1 l 1.9 1.3 -115.9 219.7 -9.5 6.5 -22.8 5.2 H 1370.49 l -13.3 -16.9 v -2.6 l -11.4 -14.3 v -2.6 l -11.4 -14.3 -24.7 -39 7.6 -3.9 19 -3.9 47.5 -15.6 45.6 -19.5 19 -10.4 20.9 -14.3 13.3 -11.7 11.4 -14.3 5.7 -11.7 1.9 -26 -9.5 -20.8 -17.1 -16.9 -11.4 -6.5 L 1464.692 16.9 1423.956 9.1 1393.404 5.2 1350.122 2.6 1347.576 1.3 H 1319.57 L 1317.024 0 H 647.426 l -1.9 1.3 -30.4 1.3 -34.2 5.2 -26.6 6.5 -22.8 7.8 -24.7 13 -15.2 13 -9.5 13 -5.7 15.6 v 28.6 l 7.6 23.4 15.2 27.3 20.9 28.6 9.5 23.4 v 22.1 l -3.8 7.8 -9.5 10.4 -17.1 10.4 -19 6.5 -19 3.9 -22.8 1.3 -1.9 1.3 H 62.7 l -15.2 3.9 -11.4 7.8 z"
-                 fill="#4c2f48"
-                 fill-rule="evenodd" />
-            </g>
-          </g>
-<g id="service-tag-동탄-srt"
-             class="service-tag"
-             data-station="동탄"
-             data-services="SRT"
-             data-logo-mode="inline-svg-paths"
-             transform="translate(3228.5393,3888.8668)">
-            <title id="service-tag-동탄-srt-title">동탄 · SRT</title>
-            <g
-               id="logo-srt-inline-vector-동탄-srt"
-               transform="matrix(0.02057936,0,0,0.02057936,0,0)"
-               aria-label="SRT"
-               data-logo-source="gwangju_metro_map_sma_v1_family_transfer_v5.svg">
-              <path
-                 id="logo-srt-path-동탄-srt"
-                 d="m 1136.258 106.6 h -129.2 l -115.9 221 h 127.3 z M 1.9 327.6 h 408.102 l 1.9 -1.3 h 17.1 l 1.9 -1.3 22.8 -1.3 32.3 -5.2 22.8 -5.2 34.2 -13 26.6 -18.2 11.4 -11.7 11.4 -16.9 5.7 -16.9 v -27.3 l -1.9 -1.3 -1.9 -13 -13.3 -24.7 -24.7 -33.8 -11.4 -26 V 91 l 9.5 -14.3 17.1 -10.4 24.7 -6.5 34.2 -1.3 1.9 -1.3 502.304 1.3 13.3 2.6 17.1 6.5 9.5 6.5 11.4 15.6 1.9 10.4 -1.9 1.3 -1.9 13 -15.2 19.5 -22.8 15.6 -28.5 13 -66.5 19.5 -39.9 9.1 h -7.6 l 9.5 16.9 74.1 104 11.4 7.8 13.3 5.2 13.3 2.6 h 438.654 l 7.6 1.3 1.9 -1.3 24.7 -1.3 17.1 -3.9 30.4 -11.7 22.8 -15.6 11.4 -11.7 15.2 -23.4 5.7 -14.3 3.8 -3.9 5.7 -14.3 3.8 -3.9 3.8 -10.4 3.8 -3.9 3.8 -10.4 3.8 -3.9 5.7 -14.3 3.8 -3.9 60.8 -117 1.9 -1.3 h 148.2 l 11.4 -2.6 13.3 -9.1 38 -46.8 H 1844.046 l -1.9 1.3 -38 2.6 -34.2 6.5 -28.5 9.1 -24.7 11.7 -20.9 14.3 -13.3 13 -15.2 24.7 h 70.3 l 20.9 -13 15.2 -5.2 26.6 -5.2 h 19 l 1.9 -1.3 h 74.1 l 1.9 1.3 -115.9 219.7 -9.5 6.5 -22.8 5.2 H 1370.49 l -13.3 -16.9 v -2.6 l -11.4 -14.3 v -2.6 l -11.4 -14.3 -24.7 -39 7.6 -3.9 19 -3.9 47.5 -15.6 45.6 -19.5 19 -10.4 20.9 -14.3 13.3 -11.7 11.4 -14.3 5.7 -11.7 1.9 -26 -9.5 -20.8 -17.1 -16.9 -11.4 -6.5 L 1464.692 16.9 1423.956 9.1 1393.404 5.2 1350.122 2.6 1347.576 1.3 H 1319.57 L 1317.024 0 H 647.426 l -1.9 1.3 -30.4 1.3 -34.2 5.2 -26.6 6.5 -22.8 7.8 -24.7 13 -15.2 13 -9.5 13 -5.7 15.6 v 28.6 l 7.6 23.4 15.2 27.3 20.9 28.6 9.5 23.4 v 22.1 l -3.8 7.8 -9.5 10.4 -17.1 10.4 -19 6.5 -19 3.9 -22.8 1.3 -1.9 1.3 H 62.7 l -15.2 3.9 -11.4 7.8 z"
-                 fill="#4c2f48"
-                 fill-rule="evenodd" />
-            </g>
-          </g>
-<g id="service-tag-평택지제-srt"
-             class="service-tag"
-             data-station="평택지제"
-             data-services="SRT"
-             data-logo-mode="inline-svg-paths"
-             transform="translate(3942.8251,4350.4053)">
-            <title id="service-tag-평택지제-srt-title">평택지제 · SRT</title>
-            <g
-               id="logo-srt-inline-vector-평택지제-srt"
-               transform="matrix(0.02057936,0,0,0.02057936,0,0)"
-               aria-label="SRT"
-               data-logo-source="gwangju_metro_map_sma_v1_family_transfer_v5.svg">
-              <path
-                 id="logo-srt-path-평택지제-srt"
-                 d="m 1136.258 106.6 h -129.2 l -115.9 221 h 127.3 z M 1.9 327.6 h 408.102 l 1.9 -1.3 h 17.1 l 1.9 -1.3 22.8 -1.3 32.3 -5.2 22.8 -5.2 34.2 -13 26.6 -18.2 11.4 -11.7 11.4 -16.9 5.7 -16.9 v -27.3 l -1.9 -1.3 -1.9 -13 -13.3 -24.7 -24.7 -33.8 -11.4 -26 V 91 l 9.5 -14.3 17.1 -10.4 24.7 -6.5 34.2 -1.3 1.9 -1.3 502.304 1.3 13.3 2.6 17.1 6.5 9.5 6.5 11.4 15.6 1.9 10.4 -1.9 1.3 -1.9 13 -15.2 19.5 -22.8 15.6 -28.5 13 -66.5 19.5 -39.9 9.1 h -7.6 l 9.5 16.9 74.1 104 11.4 7.8 13.3 5.2 13.3 2.6 h 438.654 l 7.6 1.3 1.9 -1.3 24.7 -1.3 17.1 -3.9 30.4 -11.7 22.8 -15.6 11.4 -11.7 15.2 -23.4 5.7 -14.3 3.8 -3.9 5.7 -14.3 3.8 -3.9 3.8 -10.4 3.8 -3.9 3.8 -10.4 3.8 -3.9 5.7 -14.3 3.8 -3.9 60.8 -117 1.9 -1.3 h 148.2 l 11.4 -2.6 13.3 -9.1 38 -46.8 H 1844.046 l -1.9 1.3 -38 2.6 -34.2 6.5 -28.5 9.1 -24.7 11.7 -20.9 14.3 -13.3 13 -15.2 24.7 h 70.3 l 20.9 -13 15.2 -5.2 26.6 -5.2 h 19 l 1.9 -1.3 h 74.1 l 1.9 1.3 -115.9 219.7 -9.5 6.5 -22.8 5.2 H 1370.49 l -13.3 -16.9 v -2.6 l -11.4 -14.3 v -2.6 l -11.4 -14.3 -24.7 -39 7.6 -3.9 19 -3.9 47.5 -15.6 45.6 -19.5 19 -10.4 20.9 -14.3 13.3 -11.7 11.4 -14.3 5.7 -11.7 1.9 -26 -9.5 -20.8 -17.1 -16.9 -11.4 -6.5 L 1464.692 16.9 1423.956 9.1 1393.404 5.2 1350.122 2.6 1347.576 1.3 H 1319.57 L 1317.024 0 H 647.426 l -1.9 1.3 -30.4 1.3 -34.2 5.2 -26.6 6.5 -22.8 7.8 -24.7 13 -15.2 13 -9.5 13 -5.7 15.6 v 28.6 l 7.6 23.4 15.2 27.3 20.9 28.6 9.5 23.4 v 22.1 l -3.8 7.8 -9.5 10.4 -17.1 10.4 -19 6.5 -19 3.9 -22.8 1.3 -1.9 1.3 H 62.7 l -15.2 3.9 -11.4 7.8 z"
-                 fill="#4c2f48"
-                 fill-rule="evenodd" />
-            </g>
-          </g>
-<g id="service-tag-청량리-itx"
-             class="service-tag"
-             data-station="청량리"
-             data-services="ITX"
-             data-logo-mode="inline-svg-paths"
-             transform="translate(3900.5982,931.0936)">
-            <title id="service-tag-청량리-itx-title">청량리 · ITX</title>
-            <g
-               id="logo-itx-inline-vector-청량리-itx"
-               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
-               aria-label="ITX"
-               data-logo-source="itx-cheongchun-logo.svg">
-<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
-            </g>
-          </g>
-<g id="service-tag-상봉-itx"
-             class="service-tag"
-             data-station="상봉"
-             data-services="ITX"
-             data-logo-mode="inline-svg-paths"
-             transform="translate(4661.0378,902.5222)">
-            <title id="service-tag-상봉-itx-title">상봉 · ITX</title>
-            <g
-               id="logo-itx-inline-vector-상봉-itx"
-               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
-               aria-label="ITX"
-               data-logo-source="itx-cheongchun-logo.svg">
-<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
-            </g>
-          </g>
-<g id="service-tag-용산-itx"
-             class="service-tag"
-             data-station="용산"
-             data-services="ITX"
-             data-logo-mode="inline-svg-paths"
-             transform="translate(1970.9279,2100.3244)">
-            <title id="service-tag-용산-itx-title">용산 · ITX</title>
-            <g
-               id="logo-itx-inline-vector-용산-itx"
-               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
-               aria-label="ITX"
-               data-logo-source="itx-cheongchun-logo.svg">
-<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
-            </g>
-          </g>
-<g id="service-tag-평내호평-itx"
-             class="service-tag"
-             data-station="평내호평"
-             data-services="ITX"
-             data-logo-mode="inline-svg-paths"
-             transform="translate(5931.3675,593.8927)">
-            <title id="service-tag-평내호평-itx-title">평내호평 · ITX</title>
-            <g
-               id="logo-itx-inline-vector-평내호평-itx"
-               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
-               aria-label="ITX"
-               data-logo-source="itx-cheongchun-logo.svg">
-<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
-            </g>
-          </g>
-<g id="service-tag-마석-itx"
-             class="service-tag"
-             data-station="마석"
-             data-services="ITX"
-             data-logo-mode="inline-svg-paths"
-             transform="translate(6108.1288,425.5991)">
-            <title id="service-tag-마석-itx-title">마석 · ITX</title>
-            <g
-               id="logo-itx-inline-vector-마석-itx"
-               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
-               aria-label="ITX"
-               data-logo-source="itx-cheongchun-logo.svg">
-<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
-            </g>
-          </g>
-<g id="service-tag-청평-itx"
-             class="service-tag"
-             data-station="청평"
-             data-services="ITX"
-             data-logo-mode="inline-svg-paths"
-             transform="translate(6108.1288,137.6870)">
-            <title id="service-tag-청평-itx-title">청평 · ITX</title>
-            <g
-               id="logo-itx-inline-vector-청평-itx"
-               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
-               aria-label="ITX"
-               data-logo-source="itx-cheongchun-logo.svg">
-<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
-            </g>
-          </g>
-<g id="service-tag-가평-itx"
-             class="service-tag"
-             data-station="가평"
-             data-services="ITX"
-             data-logo-mode="inline-svg-paths"
-             transform="translate(6108.1288,-148.0272)">
-            <title id="service-tag-가평-itx-title">가평 · ITX</title>
-            <g
-               id="logo-itx-inline-vector-가평-itx"
-               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
-               aria-label="ITX"
-               data-logo-source="itx-cheongchun-logo.svg">
-<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
-            </g>
-          </g>
-<g id="service-tag-남춘천-itx"
-             class="service-tag"
-             data-station="남춘천"
-             data-services="ITX"
-             data-logo-mode="inline-svg-paths"
-             transform="translate(5298.4004,-515.9974)">
-            <title id="service-tag-남춘천-itx-title">남춘천 · ITX</title>
-            <g
-               id="logo-itx-inline-vector-남춘천-itx"
-               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
-               aria-label="ITX"
-               data-logo-source="itx-cheongchun-logo.svg">
-<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
-            </g>
-          </g>
-<g id="service-tag-춘천-itx"
-             class="service-tag"
-             data-station="춘천"
-             data-services="ITX"
-             data-logo-mode="inline-svg-paths"
-             transform="translate(5237.7991,-398.5767)">
-            <title id="service-tag-춘천-itx-title">춘천 · ITX</title>
-            <g
-               id="logo-itx-inline-vector-춘천-itx"
-               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
-               aria-label="ITX"
-               data-logo-source="itx-cheongchun-logo.svg">
-<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
-            </g>
-          </g>
-<g id="service-tag-옥수-itx"
-             class="service-tag"
-             data-station="옥수"
-             data-services="ITX"
-             data-logo-mode="inline-svg-paths"
-             transform="translate(3022.4145,1998.2883)">
-            <title id="service-tag-옥수-itx-title">옥수 · ITX</title>
-            <g
-               id="logo-itx-inline-vector-옥수-itx"
-               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
-               aria-label="ITX"
-               data-logo-source="itx-cheongchun-logo.svg">
-<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
-            </g>
-          </g>
-<g id="service-tag-왕십리-itx"
-             class="service-tag"
-             data-station="왕십리"
-             data-services="ITX"
-             data-logo-mode="inline-svg-paths"
-             transform="translate(3525.7112,1236.5881)">
-            <title id="service-tag-왕십리-itx-title">왕십리 · ITX</title>
-            <g
-               id="logo-itx-inline-vector-왕십리-itx"
-               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
-               aria-label="ITX"
-               data-logo-source="itx-cheongchun-logo.svg">
-<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
-            </g>
-          </g>
-<g id="service-tag-퇴계원-itx"
-             class="service-tag"
-             data-station="퇴계원"
-             data-services="ITX"
-             data-logo-mode="inline-svg-paths"
-             transform="translate(5608.7591,917.4382)">
-            <title id="service-tag-퇴계원-itx-title">퇴계원 · ITX</title>
-            <g
-               id="logo-itx-inline-vector-퇴계원-itx"
-               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
-               aria-label="ITX"
-               data-logo-source="itx-cheongchun-logo.svg">
-<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
-            </g>
-          </g>
-<g id="service-tag-사릉-itx"
-             class="service-tag"
-             data-station="사릉"
-             data-services="ITX"
-             data-logo-mode="inline-svg-paths"
-             transform="translate(5767.0009,774.5811)">
-            <title id="service-tag-사릉-itx-title">사릉 · ITX</title>
-            <g
-               id="logo-itx-inline-vector-사릉-itx"
-               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
-               aria-label="ITX"
-               data-logo-source="itx-cheongchun-logo.svg">
-<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
-            </g>
-          </g>
-<g id="service-tag-갈매-itx"
-             class="service-tag"
-             data-station="갈매"
-             data-services="ITX"
-             data-logo-mode="inline-svg-paths"
-             transform="translate(5193.3745,785.5701)">
-            <title id="service-tag-갈매-itx-title">갈매 · ITX</title>
-            <g
-               id="logo-itx-inline-vector-갈매-itx"
-               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
-               aria-label="ITX"
-               data-logo-source="itx-cheongchun-logo.svg">
-<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
-            </g>
-          </g>
-<g id="service-tag-별내-itx"
-             class="service-tag"
-             data-station="별내"
-             data-services="ITX"
-             data-logo-mode="inline-svg-paths"
-             transform="translate(5374.0629,898.1266)">
-            <title id="service-tag-별내-itx-title">별내 · ITX</title>
-            <g
-               id="logo-itx-inline-vector-별내-itx"
-               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
-               aria-label="ITX"
-               data-logo-source="itx-cheongchun-logo.svg">
-<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
-            </g>
-          </g>
-<g id="service-tag-신내-itx"
-             class="service-tag"
-             data-station="신내"
-             data-services="ITX"
-             data-logo-mode="inline-svg-paths"
-             transform="translate(5003.8949,789.4971)">
-            <title id="service-tag-신내-itx-title">신내 · ITX</title>
-            <g
-               id="logo-itx-inline-vector-신내-itx"
-               transform="matrix(0.0447145,0,0,0.0447145,-21.402,-6.707)"
-               aria-label="ITX"
-               data-logo-source="itx-cheongchun-logo.svg">
-<g style="fill:#30b141;fill-opacity:1"><path d="m0 0 .191.132A.58.58 0 0 1 .36.555c0 .337-.26.608-.585.608-15.601 1.01-85.436 5.29-113.065 5.29-35.043 0-41.439-21.01-41.439-21.01h18.169C-132.193.238-112.361-.152-105.733-.02-78.594-.02-15-.046-.225-.046c.079 0 .156.013.225.046" style="fill:#30b141;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 754.989 29.059)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.61l2.659 9.002H2.655Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 851.358 254.275)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0-1.354-4.562h28.468L28.462 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 792.435 272.061)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h4.617l3.408 11.563H3.419Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 786.322 292.607)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.341 4.564-29.73.007L-29.736 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 936.544 227.714)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 1.945 6.598h5.228L1.542-12.517h-5.228l2.302 7.814H-6.81L-5.423 0Z" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 774.233 168.256)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-7.682l.925 3.125h-5.251L-12.926 0h-7.676l-1.393-4.709h7.685S-15-6.4-15.724-7.318c-.729-.918-1.463-1.804-2.371-2.425-.915-.647-1.654-1.036-2.717-1.386a15.272 15.272 0 0 0-3.257-.681l-1.325-4.504c1.368.02 2.665.171 3.915.442 1.248.271 2.899.925 3.917 1.414 1.013.495 1.697.937 2.539 1.479.416.277.795.555 1.142.833.176-.278.4-.556.651-.833.529-.542 1.089-1.149 1.671-1.479.575-.324 1.995-1.143 3.084-1.414 1.083-.271 2.299-.422 3.647-.442l1.334 4.504a10.498 10.498 0 0 0-2.854.681c-.858.35-1.35.753-1.888 1.393-.542.621-.767 1.5-.958 2.418-.185.918.129 2.609.129 2.609h7.678L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 757.4 142.827)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0h-10.772l1.353 4.604H1.883l.918 3.124h5.241l-.928-3.124h11.294L17.055 0H6.232s2.441-3.474 9.798-3.474l-1.32-4.472S5-8.408 1.909-4.082c-5.634-4.32-15.072-3.864-15.072-3.864l1.32 4.472C-4.481-3.474 0 0 0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 874.468 163.557)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-3.062 0-4.782 2.603-3.838 5.806s4.194 5.806 7.252 5.806c3.065 0 4.789-2.603 3.841-5.813C6.314 2.603 3.064 0 0 0m4.781 16.235c-6 0-12.245-4.67-13.943-10.429C-10.859.046-7.365-4.632-1.367-4.632c5.997 0 12.249 4.678 13.943 10.431 1.697 5.766-1.794 10.436-7.795 10.436" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 708.62 279.141)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="M0 0c-2.073 0-2.605-1.678-2.605-1.678l-8.861-30.046-.852-2.913-1.285-4.344c-.023-.08.027-.145.11-.145H.853c1.3.088 3.876.67 4.801 3.809L16.063 0H0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 61.281 116.415)"/></g><g style="fill:#6a6a6f;fill-opacity:1"><path d="m0 0 27.84 18.6H14.57c-1.417-.073-1.978-.218-3.246-.991L-6.047 6.961l-9.997 11.513a.357.357 0 0 1-.255.126h-17.969c-.082 0-.101-.053-.045-.126L-18.016-.35l-17.533-10.707-.013-.02v.014c-3.973-2.543-6.407-3.944-11.496-3.944h-4.983c-1.447 0-2.649.033-4.307.852-1.493.74-2.384 1.81-2.43 3.435-.027.931.201 2.166.686 3.758l5.8 19.696h10.515c1.089.066 3.058.588 3.755 2.959l.852 2.907h-13.498l.945 2.219c1.38 2.873 3.531 4.987 6.037 6.196h-11.913c-5.227 0-8.814-1.929-10.636-5.687l-.985-2.728h-10.436l-1.737-5.866h10.588s-6.096-20.792-6.093-20.792c-.67-2.312-.988-4.115-.955-5.363.053-1.903 1.087-3.878 3.693-5.306 2.827-1.552 7.06-1.8 13.243-1.8h23.019c5.072 0 8.408 2.272 8.408 2.272l15.885 10.501 9.306-10.64s1.674-2.133 5.192-2.133h14.765c.082 0 .103.053.043.129L0 0" style="fill:#6a6a6f;fill-opacity:1;fill-rule:nonzero;stroke:none" transform="matrix(4.50314 0 0 -4.50314 498.662 200.172)"/></g>
-            </g>
-          </g>
-  </g>
+
+  
 
 
   <g
