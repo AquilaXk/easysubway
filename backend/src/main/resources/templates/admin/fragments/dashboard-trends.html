@@ -31,7 +31,7 @@
 				<h2 th:text="${trend.title}">추이</h2>
 			</div>
 			<div th:if="${trend.empty}">
-				<div th:replace="~{admin/fragments/empty-state :: panel('아직 집계된 추이가 없습니다.', '지표 지금 다시 집계를 실행하면 오늘부터 데이터가 누적됩니다.')}"></div>
+				<div th:replace="~{admin/fragments/empty-state :: panel('아직 집계된 추이가 없습니다.', '지표 집계가 실행되면 오늘부터 데이터가 누적됩니다.')}"></div>
 			</div>
 			<th:block th:unless="${trend.empty}">
 			<div class="trend-canvas-wrap">

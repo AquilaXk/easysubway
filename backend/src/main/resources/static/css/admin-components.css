@@ -548,9 +548,10 @@
 	margin: 6px 0 0;
 }
 
-/* 빈 상태 3단 뷰포트 대응(#2327): 데스크톱은 message+hint(안내+액션 경로) 그대로, 태블릿은 동일
-   구조에서 padding만 좁히고, 모바일은 추이 섹션 빈 상태의 hint를 접어 첫 화면에 핵심 과업(재집계
-   액션은 페이지 상단 버튼으로 항상 노출)이 오게 한다. */
+/* 빈 상태 3단 뷰포트 대응(#2327): 데스크톱은 message+hint(안내) 그대로, 태블릿은 동일
+   구조에서 padding만 좁히고, 모바일은 추이 섹션 빈 상태의 hint를 시각적으로만 숨겨(.sr-only와
+   동일한 clip 패턴) 첫 화면 공간을 아끼되 스크린리더에는 계속 노출한다. 재집계 버튼은 a-batches
+   권한 계정에만 노출되는 액션이라 hint 문구는 이를 전제하지 않는다(권한 무관 문구). */
 @media (max-width: 1024px) {
 	.admin-v3 .empty-state {
 		padding: 16px 8px;
@@ -563,7 +564,15 @@
 	}
 
 	.admin-v3 .dashboard-trends-section .empty-state-hint {
-		display: none;
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 }
 

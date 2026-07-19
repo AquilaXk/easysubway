@@ -286,7 +286,7 @@ class AdminV3PageSmokeTest {
 		assertThat(html)
 			.as("스냅샷이 없는 기본 상태는 두 추이 패널 모두 empty-state로 대체된다")
 			.contains("아직 집계된 추이가 없습니다.")
-			.contains("지표 지금 다시 집계를 실행하면 오늘부터 데이터가 누적됩니다.")
+			.contains("지표 집계가 실행되면 오늘부터 데이터가 누적됩니다.")
 			.doesNotContain("class=\"trend-canvas\"");
 
 		String fragment = mockMvc.perform(get("/admin/dashboard/trends")
