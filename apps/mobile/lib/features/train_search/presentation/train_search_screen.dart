@@ -30,6 +30,7 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
   TrainStation? _arrival;
   _StationSlot? _suggestionSlot;
   List<TrainStation> _suggestions = const [];
+  String? _suggestionError;
   Timer? _stationDebounce;
   int _stationRequestToken = 0;
   int _searchRequestToken = 0;
@@ -206,6 +207,7 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
           }
           _suggestionSlot = null;
           _suggestions = const [];
+          _suggestionError = null;
           _clearResult();
         });
         if (value.trim().runes.length < 2) return;
@@ -218,9 +220,30 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
   }
 
   Widget _suggestionList(_StationSlot slot) {
-    if (_suggestionSlot != slot || _suggestions.isEmpty) {
+    if (_suggestionSlot != slot) {
       return const SizedBox.shrink();
     }
+    if (_suggestionError case final String error) {
+      return Semantics(
+        liveRegion: true,
+        child: Container(
+          key: Key('trainSearchStationError-${slot.name}'),
+          padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+          child: Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(error),
+              TextButton(
+                key: Key('trainSearchStationRetry-${slot.name}'),
+                onPressed: () => _retryStationSearch(slot),
+                child: const Text('역 다시 조회'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    if (_suggestions.isEmpty) return const SizedBox.shrink();
     return Container(
       margin: const EdgeInsets.only(top: 4),
       decoration: BoxDecoration(
@@ -417,14 +440,30 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
       setState(() {
         _suggestionSlot = slot;
         _suggestions = stations;
+        _suggestionError = null;
       });
-    } on TrainSearchException {
+    } on TrainSearchException catch (error) {
       if (!mounted || requestToken != _stationRequestToken) return;
       setState(() {
-        _suggestionSlot = null;
+        _suggestionSlot = slot;
         _suggestions = const [];
+        _suggestionError = error.message;
       });
     }
+  }
+
+  void _retryStationSearch(_StationSlot slot) {
+    _stationDebounce?.cancel();
+    final query = slot == _StationSlot.departure
+        ? _departureController.text
+        : _arrivalController.text;
+    final requestToken = ++_stationRequestToken;
+    setState(() {
+      _suggestionSlot = slot;
+      _suggestions = const [];
+      _suggestionError = null;
+    });
+    unawaited(_loadStations(slot, query, requestToken));
   }
 
   void _selectStation(_StationSlot slot, TrainStation station) {
@@ -440,6 +479,7 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
       }
       _suggestionSlot = null;
       _suggestions = const [];
+      _suggestionError = null;
       _clearResult();
     });
   }
@@ -456,6 +496,7 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
       _arrivalController.text = text;
       _suggestionSlot = null;
       _suggestions = const [];
+      _suggestionError = null;
       _clearResult();
     });
   }
@@ -497,6 +538,19 @@ class _TrainSearchScreenState extends State<TrainSearchScreen> {
     }
     if (departure.id == arrival.id) {
       setState(() => _error = '서로 다른 출발역과 도착역을 선택해 주세요.');
+      return;
+    }
+    final serviceDay = _currentServiceDay();
+    if (_departureDate.isBefore(serviceDay)) {
+      setState(() {
+        _departureDate = serviceDay;
+        if (_roundTrip &&
+            (_returnDate == null || _returnDate!.isBefore(serviceDay))) {
+          _returnDate = serviceDay;
+        }
+        _clearResult();
+        _error = '가는 날이 지나 오늘로 변경했습니다. 날짜를 확인해 주세요.';
+      });
       return;
     }
     final requestToken = ++_searchRequestToken;

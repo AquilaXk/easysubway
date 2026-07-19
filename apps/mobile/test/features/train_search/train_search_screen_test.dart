@@ -18,7 +18,7 @@ class _FakeTrainSearchRepository implements TrainSearchRepository {
   }) : result = result ?? _result();
 
   final Completer<List<TrainStation>>? stationsCompleter;
-  final TrainSearchException? stationError;
+  TrainSearchException? stationError;
   final Completer<TrainSearchResult>? searchCompleter;
   final TrainSearchException? error;
   final TrainSearchResult result;
@@ -311,7 +311,7 @@ void main() {
     expect(repository.stationCalls, 1);
   });
 
-  testWidgets('역 자동완성 오류는 검색 결과 오류 화면을 열지 않는다', (tester) async {
+  testWidgets('역 자동완성 오류는 입력란에서 안내하고 다시 조회한다', (tester) async {
     final repository = _FakeTrainSearchRepository(
       stationError: const TrainSearchException(
         TrainSearchFailureKind.network,
@@ -337,6 +337,42 @@ void main() {
     expect(repository.stationCalls, 1);
     expect(find.byKey(const Key('trainSearchError')), findsNothing);
     expect(find.byKey(const Key('trainSearchRetryButton')), findsNothing);
+    expect(
+      find.byKey(const Key('trainSearchStationError-departure')),
+      findsOneWidget,
+    );
+    expect(find.text('인터넷 연결을 확인한 뒤 다시 시도해 주세요.'), findsOneWidget);
+
+    repository.stationError = null;
+    await tester.tap(
+      find.byKey(const Key('trainSearchStationRetry-departure')),
+    );
+    await tester.pump();
+
+    expect(repository.stationCalls, 2);
+    expect(
+      find.byKey(const Key('trainSearchStationSuggestion-departure-NAT010000')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('제출 직전 지난 service day를 오늘로 갱신하고 재확인을 요구한다', (tester) async {
+    var now = DateTime.utc(2026, 7, 19, 3);
+    final repository = _FakeTrainSearchRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TrainSearchScreen(repository: repository, now: () => now),
+      ),
+    );
+    await _selectStations(tester);
+
+    now = DateTime.utc(2026, 7, 20, 3);
+    await _tapSubmit(tester);
+    await tester.pump();
+
+    expect(repository.searchCalls, 0);
+    expect(find.text('가는 날이 지나 오늘로 변경했습니다. 날짜를 확인해 주세요.'), findsOneWidget);
+    expect(find.text('가는 날  2026.07.20'), findsOneWidget);
   });
 
   testWidgets('검색 중 중복 제출을 막고 loading 상태를 알린다', (tester) async {
