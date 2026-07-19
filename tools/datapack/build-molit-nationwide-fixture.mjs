@@ -1025,6 +1025,9 @@ export function validateMolitProviderIdentities(svgRows, providerLineScopes) {
     scope,
   ]));
   for (const row of svgRows) {
+    if (row.svgFileName?.startsWith("subway_") && !row.providerIdentity) {
+      throw new Error(`MOLIT subway provider identity is invalid: ${row.svgFileName}`);
+    }
     if (!row.providerIdentity) continue;
     const regionName = regionNameForProviderCode(row.providerIdentity.mreaWideCd);
     const key = `${coverageRegionId(regionName)}:${operatorIdFor(row.providerIdentity.operatorName)}:${lineIdFor(regionName, normalizeMolitProviderLineName(row.lineName))}`;

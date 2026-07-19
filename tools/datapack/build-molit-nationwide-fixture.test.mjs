@@ -19,6 +19,14 @@ test("MOLIT provider identity가 coverage scope와 매칭되지 않으면 거부
   }], []), /MOLIT provider scope is unmatched/);
 });
 
+test("MOLIT subway 행의 provider identity 파싱 실패를 거부한다", () => {
+  assert.throws(() => validateMolitProviderIdentities([{
+    svgFileName: "subway_a01_l4",
+    providerIdentity: null,
+    lineName: "4호선",
+  }], []), /MOLIT subway provider identity is invalid/);
+});
+
 test("MOLIT provider identity는 canonical alias scope를 검증하고 코드 불일치를 거부한다", () => {
   const row = {
     providerIdentity: {
