@@ -197,14 +197,16 @@ function finalizeReport(report) {
   }
   // V6-08 #2280: 신고 대기열 action·photo 경계 계약을 위반으로 편입한다. 일괄 승인이 primary가 아니거나,
   // 반려가 danger가 아니거나, 사진 셀이 raw object key를 노출하거나 썸네일이 permission-gated endpoint를
-  // 벗어나면 실패를 표면화한다(§7 action 체계, §9 photo matrix).
+  // 벗어나거나, 사진 셀 검증 자체가 수행되지 않았으면(썸네일 0개, 무검증 PASS 위장 방지) 실패를 표면화한다
+  // (§7 action 체계, §9 photo matrix).
   const actionSignal = report.keyboard.find((entry) => entry.check === "report-queue-action-signal");
   if (actionSignal
     && (actionSignal.bulkbarPresent === false
       || actionSignal.approvePrimary === false
       || actionSignal.rejectDanger === false
       || actionSignal.noRawPhotoKey === false
-      || actionSignal.photoScoped === false)) {
+      || actionSignal.photoScoped === false
+      || actionSignal.photoScopedVerified === false)) {
     blockingViolations.push({
       page: "/admin/reports/page",
       id: "report-queue-action-signal",
@@ -652,16 +654,22 @@ async function reportQueueActionSignalCheck(page, baseUrl, report) {
     const reject = document.querySelector(".bulk-actionbar button[name=\"decision\"][value=\"REJECT\"]");
     const approvePrimary = approve ? approve.classList.contains("primary") : false;
     const rejectDanger = reject ? reject.classList.contains("danger") : false;
-    // 사진 fail closed: 어떤 셀도 raw object key를 노출하지 않고, 썸네일은 permission-gated 원본 endpoint만 가리킨다.
-    const noRawPhotoKey = !(document.body.textContent || "").includes("facility-reports/");
+    // 사진 fail closed: 어떤 셀도 raw object key를 노출하지 않고(속성값 leak 포함 innerHTML 스캔),
+    // 썸네일은 permission-gated 원본 endpoint만 가리킨다.
+    const noRawPhotoKey = !(document.body.innerHTML || "").includes("facility-reports/");
     const thumbs = Array.from(document.querySelectorAll(".report-thumb"));
-    const photoScoped = thumbs.every((anchor) => (anchor.getAttribute("href") || "").includes("/photo/original"));
+    // 썸네일이 0개면 every()가 무검증인데도 true를 반환해 PASS로 위장한다 — photoScopedVerified로 실제
+    // 검증 여부를 분리하고, photoScoped 자체도 미검증 시 fail closed로 false를 반환한다.
+    const photoScopedVerified = thumbs.length > 0;
+    const photoScoped = photoScopedVerified
+      && thumbs.every((anchor) => (anchor.getAttribute("href") || "").includes("/photo/original"));
     return {
       bulkbarPresent: Boolean(bulkbar),
       approvePrimary,
       rejectDanger,
       noRawPhotoKey,
       photoScoped,
+      photoScopedVerified,
       thumbs: thumbs.length,
     };
   });

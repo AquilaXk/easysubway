@@ -170,13 +170,20 @@ test("admin accessibility QA script verifies report queue action hierarchy and p
   assert.match(source, /button\[name=\\"decision\\"\]\[value=\\"REJECT\\"\]/);
   assert.match(source, /classList\.contains\("primary"\)/);
   assert.match(source, /classList\.contains\("danger"\)/);
-  // 사진 fail closed: raw object key 미노출 + 썸네일은 permission-gated 원본 endpoint만 참조한다.
+  // 사진 fail closed: raw object key 미노출(속성값 leak 포함 innerHTML 스캔) + 썸네일은 permission-gated
+  // 원본 endpoint만 참조한다.
+  assert.match(source, /document\.body\.innerHTML \|\| ""\)\.includes\("facility-reports\/"\)/);
   assert.match(source, /noRawPhotoKey/);
   assert.match(source, /photoScoped/);
+  // 썸네일 0개 무검증 PASS 위장을 방지하는 photoScopedVerified 신호를 고정한다.
+  assert.match(source, /const photoScopedVerified = thumbs\.length > 0;/);
+  assert.match(source, /photoScopedVerified\s*\n\s*&&\s*thumbs\.every/);
   // 계약 실패가 blocking 위반으로 표면화되는지 고정한다.
   assert.match(source, /id: "report-queue-action-signal"/);
   assert.match(source, /actionSignal\.approvePrimary === false/);
   assert.match(source, /actionSignal\.rejectDanger === false/);
+  assert.match(source, /actionSignal\.photoScoped === false/);
+  assert.match(source, /actionSignal\.photoScopedVerified === false/);
 });
 
 test("admin accessibility QA script records manual-only screen reader and contrast work", () => {
