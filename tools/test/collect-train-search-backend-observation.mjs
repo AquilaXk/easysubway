@@ -105,8 +105,49 @@ export function validateBackendObservationArtifact(artifact) {
 }
 
 function xmlAttributes(value) {
-  return Object.fromEntries([...value.matchAll(/([A-Za-z_:][A-Za-z0-9_.:-]*)="([^"]*)"/gu)]
-    .map((match) => [match[1], match[2]]));
+  const attributes = {};
+  let cursor = 0;
+  while (cursor < value.length) {
+    while (cursor < value.length && whitespace(value[cursor])) cursor += 1;
+    if (cursor === value.length || (value[cursor] === "/" && cursor === value.length - 1)) break;
+    const nameStart = cursor;
+    if (!xmlNameStart(value[cursor])) throw new Error("backend observation XML attribute was invalid");
+    cursor += 1;
+    while (cursor < value.length && xmlNameCharacter(value[cursor])) cursor += 1;
+    const name = value.slice(nameStart, cursor);
+    while (cursor < value.length && whitespace(value[cursor])) cursor += 1;
+    if (value[cursor] !== "=") throw new Error("backend observation XML attribute was invalid");
+    cursor += 1;
+    while (cursor < value.length && whitespace(value[cursor])) cursor += 1;
+    if (value[cursor] !== "\"") throw new Error("backend observation XML attribute was invalid");
+    const contentStart = cursor + 1;
+    const contentEnd = value.indexOf("\"", contentStart);
+    if (contentEnd < 0 || Object.hasOwn(attributes, name)) {
+      throw new Error("backend observation XML attribute was invalid");
+    }
+    attributes[name] = value.slice(contentStart, contentEnd);
+    cursor = contentEnd + 1;
+  }
+  return attributes;
+}
+
+function whitespace(character) {
+  return character === " " || character === "\t" || character === "\r" || character === "\n";
+}
+
+function xmlNameStart(character) {
+  return character === ":" || character === "_" || asciiLetter(character);
+}
+
+function xmlNameCharacter(character) {
+  return xmlNameStart(character)
+    || character === "."
+    || character === "-"
+    || (character >= "0" && character <= "9");
+}
+
+function asciiLetter(character) {
+  return (character >= "A" && character <= "Z") || (character >= "a" && character <= "z");
 }
 
 function validXmlFileName(value) {
