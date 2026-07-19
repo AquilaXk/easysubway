@@ -10,8 +10,8 @@ import test from "node:test";
 
 import {
   materializeDaejeonRouteTopology,
-  parseCanonicalDaejeonStationMappings,
 } from "./materialize-daejeon-route-topology.mjs";
+import { parseMolitDaejeonStationMappings } from "./build-molit-nationwide-fixture.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
@@ -22,9 +22,9 @@ async function inputs() {
     readJson("tools/datapack/release/capital-production-reviewed-pack.json"),
     readJson("tools/datapack/sources/daejeon-route-topology-20260720.json"),
     readJson("tools/datapack/source-inventory.json"),
-    readFile(path.join(root, "tools/datapack/sources/regional-official-svg-route-map-coordinates-20260624.csv"), "utf8"),
+    readFile(path.join(root, "tools/datapack/sources/molit-urban-rail-full-route-20251211.csv")),
   ]);
-  return [baseFixture, snapshot, inventory, parseCanonicalDaejeonStationMappings(stationMapCsv)];
+  return [baseFixture, snapshot, inventory, parseMolitDaejeonStationMappings(stationMapCsv)];
 }
 
 test("대전 topology snapshot을 실제 production pack 입력으로 materialize한다", async () => {
@@ -86,6 +86,17 @@ test("대전 topology snapshot을 실제 production pack 입력으로 materializ
   assert.throws(() => materializeDaejeonRouteTopology({
     baseFixture, snapshot, inventory, canonicalStationMappings, now: new Date("2026-07-20T22:12:49.895Z"),
   }), /stale/);
+  for (const malformedFreshUntil of [undefined, "not-a-date"]) {
+    const malformedInventory = structuredClone(inventory);
+    malformedInventory.sources.find(({ id }) => id === snapshot.sourceId)
+      .topologyAdmissionEvidence.freshUntil = malformedFreshUntil;
+    assert.throws(() => materializeDaejeonRouteTopology({
+      baseFixture, snapshot, inventory: malformedInventory, canonicalStationMappings, now: evidenceNow,
+    }), /freshUntil is invalid/);
+  }
+  assert.throws(() => materializeDaejeonRouteTopology({
+    baseFixture, snapshot, inventory, canonicalStationMappings, now: new Date("not-a-date"),
+  }), /materialization time is invalid/);
 });
 
 test("materialized production SQLite와 provenance만 대전 1호선 topology requirement를 SUPPORTED로 만든다", async (context) => {

@@ -4,6 +4,8 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { parseMolitDaejeonStationMappings } from "./build-molit-nationwide-fixture.mjs";
+
 const SOURCE_ID = "daejeon-station-distance-fare";
 const OPERATOR_ID = "daejeon-transportation";
 const LINE_ID = "line-7051a9c2525c";
@@ -152,7 +154,11 @@ function requiredSource(inventory, snapshot, now) {
     || evidence.rawSha256 !== snapshot.rawSha256 || evidence.contentSha256 !== snapshot.contentSha256) {
     throw new Error(`${SOURCE_ID} inventory evidence does not match snapshot`);
   }
-  if (now >= new Date(evidence.freshUntil)) throw new Error(`${SOURCE_ID} topology evidence is stale`);
+  const freshUntil = Date.parse(evidence.freshUntil);
+  if (!Number.isFinite(freshUntil)) throw new Error(`${SOURCE_ID} topology evidence freshUntil is invalid`);
+  const observedNow = now instanceof Date ? now.getTime() : Number.NaN;
+  if (!Number.isFinite(observedNow)) throw new Error("materialization time is invalid");
+  if (observedNow >= freshUntil) throw new Error(`${SOURCE_ID} topology evidence is stale`);
   return source;
 }
 
@@ -179,24 +185,6 @@ function packSource(source, snapshot) {
   };
 }
 
-export function parseCanonicalDaejeonStationMappings(csv) {
-  if (typeof csv !== "string" || csv.length === 0) throw new Error("canonical Daejeon station mapping CSV is required");
-  const mappings = [];
-  for (const line of csv.split(/\r?\n/)) {
-    const match = /^"대전권",(station-[a-f0-9]{12}),line-7051a9c2525c,"([^"]+)"/.exec(line);
-    if (!match) continue;
-    mappings.push({
-      stationId: match[1],
-      stationName: match[2],
-      stationNumber: String(100 + mappings.length + 1),
-    });
-  }
-  if (mappings.length !== 22 || new Set(mappings.map(({ stationId }) => stationId)).size !== 22) {
-    throw new Error("canonical Daejeon station mapping must contain exactly 22 unique stations");
-  }
-  return mappings;
-}
-
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -216,13 +204,13 @@ async function main(argv) {
     readFile(args.baseFixture, "utf8").then(JSON.parse),
     readFile(args.snapshot, "utf8").then(JSON.parse),
     readFile(args.inventory, "utf8").then(JSON.parse),
-    readFile(args.stationMap, "utf8"),
+    readFile(args.stationMap),
   ]);
   const fixture = materializeDaejeonRouteTopology({
     baseFixture,
     snapshot,
     inventory,
-    canonicalStationMappings: parseCanonicalDaejeonStationMappings(stationMapCsv),
+    canonicalStationMappings: parseMolitDaejeonStationMappings(stationMapCsv),
   });
   await writeFile(args.output, `${JSON.stringify(fixture, null, 2)}\n`);
   console.log(`Daejeon route topology materialized: stations=${snapshot.stationNumbers.length} edges=${snapshot.rowCount}`);
