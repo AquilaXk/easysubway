@@ -1591,6 +1591,7 @@ class RouteTimetableRaptorPlanner {
 				&& verified
 				&& trusted
 				&& available
+				&& edge.reliabilityScore() >= 80
 				&& evidence.strictRouteEligible()
 				&& !edge.includesStairs();
 			byte warnings = 0;

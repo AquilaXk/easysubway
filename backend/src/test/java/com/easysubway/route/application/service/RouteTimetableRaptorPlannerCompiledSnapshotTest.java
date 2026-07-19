@@ -107,11 +107,12 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 		List<LoadRouteTimetablePort.RouteAccessData> unsafe = List.of(
 			entryAccess("VERIFIED", "OFFICIAL_SOURCE", true, true),
 			entryAccess("GENERATED", "GENERATED", false, false),
-			entryAccess("UNKNOWN", "UNKNOWN", false, false, "NO_OFFICIAL_FEED"),
-			entryAccess("VERIFIED", "OFFICIAL_SOURCE", false, false, "NO_OFFICIAL_FEED"),
+			entryAccess("UNKNOWN", "UNKNOWN", false, false, "NO_OFFICIAL_FEED", 100),
+			entryAccess("VERIFIED", "OFFICIAL_SOURCE", false, false, "NO_OFFICIAL_FEED", 100),
 			entryAccess("STALE", "OFFICIAL_SOURCE", false, false),
 			entryAccess(null, null, false, false),
-			entryAccess("VERIFIED", "OFFICIAL_SOURCE", true, false, "UNDER_MAINTENANCE")
+			entryAccess("VERIFIED", "OFFICIAL_SOURCE", true, false, "AVAILABLE", 79),
+			entryAccess("VERIFIED", "OFFICIAL_SOURCE", true, false, "UNDER_MAINTENANCE", 100)
 		);
 
 		for (int index = 0; index < unsafe.size(); index += 1) {
@@ -132,7 +133,6 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 		var staleEdge = planner.compile(withAccess(everyDayTimetable(), entryAccessWithStatuses("STALE", "VERIFIED")));
 		assertThat(staleEdge.transitionVerificationStatus(staleEdge.entryTransition(staleEdge.stationIndex("station-a"),
 			staleEdge.lineIndex("line"), allow, false))).isEqualTo("STALE");
-
 		var access = entryAccess("VERIFIED", "OFFICIAL_SOURCE", true, false);
 		var compiled = planner.compile(withAccess(everyDayTimetable(), new LoadRouteTimetablePort.RouteAccessData(
 			access.pathwayNodes(), access.pathwayEdges(),
@@ -732,22 +732,19 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 		boolean strictEligible,
 		boolean includesStairs
 	) {
-		return entryAccess(verificationStatus, provenanceKind, strictEligible, includesStairs, "AVAILABLE");
+		return entryAccess(verificationStatus, provenanceKind, strictEligible, includesStairs, "AVAILABLE", 100);
 	}
 
 	private static LoadRouteTimetablePort.RouteAccessData entryAccess(
-		String verificationStatus,
-		String provenanceKind,
-		boolean strictEligible,
-		boolean includesStairs,
-		String accessibilityStatus
+		String verificationStatus, String provenanceKind, boolean strictEligible, boolean includesStairs,
+		String accessibilityStatus, int reliabilityScore
 	) {
 		var nodes = List.of(
 			new LoadRouteTimetablePort.PathwayNode("entry", "station-a", "line", "ENTRANCE"),
 			new LoadRouteTimetablePort.PathwayNode("platform", "station-a", "line", "PLATFORM")
 		);
 		var edges = List.of(new LoadRouteTimetablePort.PathwayEdge(
-			"entry-edge", "entry", "platform", 90, 60, false, includesStairs, 100,
+			"entry-edge", "entry", "platform", 90, 60, false, includesStairs, reliabilityScore,
 			accessibilityStatus, provenanceKind == null ? "UNKNOWN" : provenanceKind,
 			verificationStatus == null ? "UNKNOWN" : verificationStatus
 		));
