@@ -8760,6 +8760,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "busan-transportation-official-od-fares",
     "busan-transportation-route-topology",
     "busan-transportation-urban-rail-station-info",
+    "daejeon-station-distance-fare",
     "kric-disabled-toilet",
     "kric-elevator-car-number",
     "kric-metropolitan-rail-station-info",
