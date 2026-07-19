@@ -1042,27 +1042,11 @@ function validateNetworkEdgeStationLineEndpoints(database, pack) {
   if (stationLineNodes.size === 0) {
     return;
   }
-  const routeGraphRequiredNodes = connectedLineNodes(stationLineRows);
-
-  const connectedNodes = new Set();
-  const directedAdjacency = new Map(
-    [...routeGraphRequiredNodes].map((nodeId) => [nodeId, new Set()]),
-  );
-  const undirectedAdjacency = new Map(
-    [...routeGraphRequiredNodes].map((nodeId) => [nodeId, new Set()]),
-  );
   const edges = database
     .prepare("SELECT id, from_node_id, to_node_id, edge_type FROM network_edges ORDER BY id")
     .all();
-  let hasExplicitRouteGraphEdge = false;
-  addGeneratedStationTransferEdges(
-    stationLineRows,
-    routeGraphRequiredNodes,
-    connectedNodes,
-    directedAdjacency,
-    undirectedAdjacency,
-  );
-  for (const edge of edges) {
+  const explicitRouteGraphLineIds = new Set();
+  const resolvedEdges = edges.map((edge) => {
     const edgeType = normalizedEdgeType(edge.edge_type);
     const endpoints = [
       routeEndpoint(edge.from_node_id, stationIds, stationLineNodes),
@@ -1081,15 +1065,44 @@ function validateNetworkEdgeStationLineEndpoints(database, pack) {
       }
     }
     validateAccessEdgeEndpointShape(edge, edgeType, endpoints, pack);
+    const routeGraphEdgeType = routeGraphConnectivityEdgeType(edgeType);
+    if (routeGraphEdgeType !== null) {
+      for (const { stationLineNode } of endpoints) {
+        if (stationLineNode !== null) explicitRouteGraphLineIds.add(stationLineNode.split(":")[1]);
+      }
+    }
+    return { edge, endpoints, routeGraphEdgeType };
+  });
+
+  const hasRegressionContract = Boolean(pack.routeRegressionScope)
+    || (Array.isArray(pack.representativeRouteRegressions) && pack.representativeRouteRegressions.length > 0);
+  if (explicitRouteGraphLineIds.size === 0 && !hasRegressionContract) return;
+  const requiredLineIds = hasRegressionContract
+    ? new Set(stationLineRows.map(({ line_id }) => line_id))
+    : explicitRouteGraphLineIds;
+  const routeGraphRequiredNodes = connectedLineNodes(stationLineRows, requiredLineIds);
+  const connectedNodes = new Set();
+  const directedAdjacency = new Map(
+    [...routeGraphRequiredNodes].map((nodeId) => [nodeId, new Set()]),
+  );
+  const undirectedAdjacency = new Map(
+    [...routeGraphRequiredNodes].map((nodeId) => [nodeId, new Set()]),
+  );
+  addGeneratedStationTransferEdges(
+    stationLineRows,
+    routeGraphRequiredNodes,
+    connectedNodes,
+    directedAdjacency,
+    undirectedAdjacency,
+  );
+  for (const { endpoints, routeGraphEdgeType } of resolvedEdges) {
     const fromNode = endpoints[0].stationLineNode;
     const toNode = endpoints[1].stationLineNode;
-    const routeGraphEdgeType = routeGraphConnectivityEdgeType(edgeType);
     if (
       routeGraphEdgeType !== null &&
       routeGraphRequiredNodes.has(fromNode) &&
       routeGraphRequiredNodes.has(toNode)
     ) {
-      hasExplicitRouteGraphEdge = true;
       addRouteGraphEdge(
         fromNode,
         toNode,
@@ -1107,14 +1120,6 @@ function validateNetworkEdgeStationLineEndpoints(database, pack) {
         );
       }
     }
-  }
-
-  if (
-    !hasExplicitRouteGraphEdge &&
-    !pack.routeRegressionScope &&
-    (!Array.isArray(pack.representativeRouteRegressions) || pack.representativeRouteRegressions.length === 0)
-  ) {
-    return;
   }
   for (const nodeId of routeGraphRequiredNodes) {
     if (!connectedNodes.has(nodeId)) {
@@ -1207,14 +1212,14 @@ function isNetworkTransferEdgeType(edgeType) {
     edgeType === "LEGACY_TRANSFER";
 }
 
-function connectedLineNodes(stationLineRows) {
+function connectedLineNodes(stationLineRows, requiredLineIds) {
   const lineCounts = new Map();
   for (const row of stationLineRows) {
     lineCounts.set(row.line_id, (lineCounts.get(row.line_id) ?? 0) + 1);
   }
   return new Set(
     stationLineRows
-      .filter((row) => (lineCounts.get(row.line_id) ?? 0) > 1)
+      .filter((row) => requiredLineIds.has(row.line_id) && (lineCounts.get(row.line_id) ?? 0) > 1)
       .map((row) => stationLineNodeId(row.station_id, row.line_id)),
   );
 }
@@ -1739,7 +1744,9 @@ function productionVerifiedCoverage(database, edgeRows, accessibilityEvidence) {
   const stationLineRows = database
     .prepare("SELECT station_id, line_id FROM station_lines ORDER BY station_id, line_id")
     .all();
-  const requiredPairs = requiredAccessibilityCoveragePairs(stationLineRows);
+  const claimedStationLineRows = stationLineRows.filter((row) =>
+    accessibilityEvidence.claimedAccessibilityStationLines.has(stationLineEvidenceKey(row.station_id, row.line_id)));
+  const requiredPairs = requiredAccessibilityCoveragePairs(claimedStationLineRows);
   const verifiedPairs = verifiedAccessibilityCoveragePairs(edgeRows, accessibilityEvidence);
 
   return {
@@ -1858,6 +1865,7 @@ function isVerifiedAccessibilityCoverageEdge(edge, accessibilityEvidence) {
 
 function productionAccessibilityEvidence(database, pack) {
   const sourceById = new Map(pack.sourceInventory.map((source) => [source.id, source]));
+  const claimedAccessibilityStationLines = new Set();
   const strictFacilityStationLines = new Set();
   const maintenanceFacilityStationLines = new Set();
   const noOfficialFeedStationLines = new Set();
@@ -1874,6 +1882,9 @@ function productionAccessibilityEvidence(database, pack) {
       const operationalStatus = String(row.operational_status ?? "").toUpperCase();
       const statusMeaning = String(row.status_meaning ?? "").toUpperCase();
       const accessibilitySource = sourceSupportsDomain(sourceById.get(row.source_id), "accessibility_facilities");
+      if (accessibilitySource) {
+        claimedAccessibilityStationLines.add(stationLineEvidenceKey(row.station_id, row.line_id));
+      }
       if (
         row.strict_route_eligible === 1 &&
         row.evidence_kind === "EXISTS" &&
@@ -1910,6 +1921,7 @@ function productionAccessibilityEvidence(database, pack) {
   const approvedMovementPathways = approvedMovementPathwayStationLines(database, sourceById);
   return {
     sourceById,
+    claimedAccessibilityStationLines,
     strictFacilityStationLines,
     maintenanceFacilityStationLines,
     noOfficialFeedStationLines,

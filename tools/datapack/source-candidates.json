@@ -3413,8 +3413,8 @@
         "responseEnvelope": "response.header + response.body.items.item",
         "responseFields": ["distfloat", "fee", "min", "sec"],
         "runner": {
-          "command": "node tools/datapack/probe-daejeon-coverage-api.mjs",
-          "requiredEnv": ["DATA_GO_KR_SERVICE_KEY", "DAEJEON_API_PROBE_SOURCE_ID", "DAEJEON_API_PROBE_OUTPUT"]
+          "command": "node tools/datapack/collect-daejeon-route-topology.mjs",
+          "requiredEnv": ["DATA_GO_KR_SERVICE_KEY", "DAEJEON_TOPOLOGY_OUTPUT"]
         },
         "secretPolicy": "env-only-redacted-output"
       },

@@ -131,6 +131,10 @@ test("대전 역간 candidate는 official XML과 full adjacent OD로 topology를
   assert.equal(candidate.evidence.topologyValidation.edgeCount, 42);
   assert.equal(candidate.evidence.topologyValidation.contentSha256,
     "111ef488fc9d1f960445844b907e7f7b6f804e4adff0867f2f8c1e43433c747f");
+  assert.deepEqual(candidate.operation.runner, {
+    command: "node tools/datapack/collect-daejeon-route-topology.mjs",
+    requiredEnv: ["DATA_GO_KR_SERVICE_KEY", "DAEJEON_TOPOLOGY_OUTPUT"],
+  });
   assert.deepEqual(candidate.evidence.coverageLimitations, [
     "대전도시철도 1호선 22개 역의 인접 21구간 양방향 edge만 포함한다",
     "provider credential과 raw XML은 배포 artifact에 포함하지 않는다",

@@ -41,6 +41,10 @@ export function materializeDaejeonRouteTopology({
   pack.lines.push({ id: LINE_ID, operatorId: OPERATOR_ID, nameKo: "대전 1호선", nameEn: "", color: "#007448" });
 
   const byStationNumber = new Map(mappings.map((mapping) => [mapping.stationNumber, mapping]));
+  const canonicalSource = pack.sourceInventory.find(({ id }) => id === "molit-urban-rail-full-route");
+  if (!canonicalSource?.fields?.includes("station_name") || !canonicalSource.fields.includes("station_sequence")) {
+    throw new Error("MOLIT canonical station mapping source is missing from base fixture");
+  }
   for (const mapping of mappings) {
     pack.stations.push({
       id: mapping.stationId,
@@ -51,10 +55,10 @@ export function materializeDaejeonRouteTopology({
       latitude: null,
       longitude: null,
       dataQualityLevel: "LEVEL_2",
-      dataSourceType: "OFFICIAL_API",
-      sourceId: SOURCE_ID,
+      dataSourceType: "OFFICIAL_FILE",
+      sourceId: canonicalSource.id,
       derivationKind: "OFFICIAL",
-      lastVerifiedAt: snapshot.observedAt,
+      lastVerifiedAt: canonicalSource.updatedAt,
     });
     pack.stationLines.push({
       stationId: mapping.stationId,
@@ -62,9 +66,9 @@ export function materializeDaejeonRouteTopology({
       stationCode: mapping.stationNumber,
       lineSequence: Number(mapping.stationNumber) - 100,
       platformInfo: "",
-      sourceId: SOURCE_ID,
+      sourceId: canonicalSource.id,
       derivationKind: "OFFICIAL",
-      lastVerifiedAt: snapshot.observedAt,
+      lastVerifiedAt: canonicalSource.updatedAt,
     });
   }
 

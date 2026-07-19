@@ -34,13 +34,18 @@ test("대전 topology snapshot을 실제 production pack 입력으로 materializ
   });
   const pack = fixture.packs[0];
   const edges = pack.networkEdges.filter(({ sourceId }) => sourceId === snapshot.sourceId);
-  const stationLines = pack.stationLines.filter(({ sourceId }) => sourceId === snapshot.sourceId);
+  const stationLines = pack.stationLines.filter(({ lineId }) => lineId === "line-7051a9c2525c");
 
   assert.deepEqual(fixture.manifest.activePack, { id: pack.id, version: pack.version });
   assert.equal(fixture.manifest.releaseSequence, baseFixture.manifest.releaseSequence);
   assert.equal(pack.artifactKind, "production");
   assert.equal(edges.length, 42);
   assert.equal(stationLines.length, 22);
+  assert.ok(stationLines.every(({ sourceId }) => sourceId === "molit-urban-rail-full-route"));
+  assert.ok(pack.stations
+    .filter(({ id }) => stationLines.some(({ stationId }) => stationId === id))
+    .every(({ sourceId, dataSourceType }) =>
+      sourceId === "molit-urban-rail-full-route" && dataSourceType === "OFFICIAL_FILE"));
   assert.equal(edges.filter(({ fromNodeId, toNodeId }) => fromNodeId < toNodeId)
     .reduce((sum, edge) => sum + edge.durationSeconds, 0), 2_400);
   assert.equal(edges.filter(({ fromNodeId, toNodeId }) => fromNodeId < toNodeId)
@@ -96,7 +101,7 @@ test("materialized production SQLite와 provenance만 대전 1호선 topology re
   await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
   await mkdir(packOutput, { recursive: true });
 
-  const { privateKey } = generateKeyPairSync("rsa", {
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", {
     modulusLength: 2048,
     privateKeyEncoding: { type: "pkcs8", format: "pem" },
     publicKeyEncoding: { type: "spki", format: "pem" },
@@ -110,6 +115,15 @@ test("materialized production SQLite와 provenance만 대전 1호선 topology re
 
   const manifestPath = path.join(packOutput, "current.json");
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  await execFileAsync(process.execPath, [
+    "tools/datapack/validate-datapack.mjs",
+    "--manifest", manifestPath,
+    "--root", packOutput,
+    "--require-production",
+  ], {
+    cwd: root,
+    env: { ...process.env, EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: publicKey },
+  });
   const sqlitePath = path.join(packOutput, new URL(manifest.packs[0].url).pathname.split("/").slice(-2).join("/")).replace(/\.gz$/, "");
   const database = new DatabaseSync(sqlitePath, { readOnly: true });
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM network_edges WHERE source_id = ?")
