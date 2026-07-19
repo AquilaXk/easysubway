@@ -668,6 +668,8 @@ test("capacity runner는 repeated·unique·3-node·quota 경계를 고정한다"
   assert.match(runner, /candidate-binding\.json/);
   const collector = read("tools/test/collect-train-search-backend-observation.mjs");
   assert.match(collector, /git", \["diff", "--quiet", candidateGitSha/);
+  assert.doesNotMatch(collector, /spawnSync\("git"/);
+  assert.match(collector, /spawnSync\("\/usr\/bin\/git"/);
   assert.doesNotMatch(runner, /source .*\.env|curl|jq|sed|awk|grep/);
   const unsafeEvidence = spawnSync(process.execPath, [
     "tools/test/validate-train-search-capacity.mjs",

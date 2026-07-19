@@ -133,8 +133,8 @@ function verifyRuntimeSource(candidateGitSha) {
     "backend/settings.gradle",
     "backend/gradle.lockfile",
   ];
-  const commit = spawnSync("git", ["cat-file", "-e", `${candidateGitSha}^{commit}`], { encoding: "utf8" });
-  const diff = spawnSync("git", ["diff", "--quiet", candidateGitSha, "--", ...paths], { encoding: "utf8" });
+  const commit = spawnSync("/usr/bin/git", ["cat-file", "-e", `${candidateGitSha}^{commit}`], { encoding: "utf8" });
+  const diff = spawnSync("/usr/bin/git", ["diff", "--quiet", candidateGitSha, "--", ...paths], { encoding: "utf8" });
   if (commit.status !== 0 || diff.status !== 0) {
     throw new Error("backend runtime source did not match the candidate SHA");
   }
