@@ -1047,6 +1047,14 @@ test("Admin QA Gates는 실제 브라우저 QA를 blocking으로 통합하고 re
   assert.match(bootStep, />> "\$\{GITHUB_ENV\}"/);
   assert.match(bootStep, /if \[\[ "\$\{ready\}" != "1" \]\]; then/);
   assert.doesNotMatch(bootStep, /secrets\./);
+  // #2283 리뷰: jar 해석은 pipefail-안전한 nullglob 배열이어야 한다(`ls | grep | head` 파이프라인 금지).
+  assert.doesNotMatch(bootStep, /ls backend\/build\/libs/);
+  assert.match(bootStep, /shopt -s nullglob/);
+  assert.match(bootStep, /candidate_jars=\(backend\/build\/libs\/\*\.jar\)/);
+  assert.match(bootStep, /"\$\{candidate\}" != \*-plain\.jar/);
+  // #2283 리뷰: 부팅 대기는 readiness probe로 좁힌다(permitAll 확인됨, liveness보다 정확한 신호).
+  assert.match(bootStep, /actuator\/health\/readiness/);
+  assert.doesNotMatch(bootStep, /curl -fsS http:\/\/localhost:8080\/actuator\/health >/);
 
   // #2283 V6-11: shadow→blocking 승격 완료. harness 호출 step에 continue-on-error가 없다 —
   // shadow 재개가 필요하면 이 한 줄(`continue-on-error: true`)을 다시 추가하는 것이 유일한 스위치다.
@@ -1073,6 +1081,10 @@ test("Admin QA Gates는 실제 브라우저 QA를 blocking으로 통합하고 re
   )?.[0] ?? "";
   assert.match(stopStep, /always\(\) && needs\.changes\.outputs\.backend == 'true'/);
   assert.match(stopStep, /BACKEND_QA_PID/);
+  // #2283 리뷰: backend-qa.log는 artifact로 업로드되므로(파일 내용은 ::add-mask:: 대상이 아니다)
+  // 업로드 전 생성 비밀 문자열을 scrub한다(로그 전체를 아티팩트에서 제외하는 대신 진단 가치를 보존).
+  assert.match(stopStep, /sed -i "s\/\$\{ADMIN_QA_ADMIN_PASSWORD\}\/\[REDACTED\]\/g"/);
+  assert.match(stopStep, /sed -i "s\/\$\{ADMIN_QA_OPERATOR_PASSWORD\}\/\[REDACTED\]\/g"/);
   // tested revision·seed·profile을 artifact/summary에 기록한다.
   assert.match(adminQaJob, /testedRevision/);
   assert.match(adminQaJob, /"database": "h2-in-memory"/);
