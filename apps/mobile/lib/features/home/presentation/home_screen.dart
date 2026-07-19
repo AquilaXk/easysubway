@@ -33,6 +33,8 @@ import '../../settings/presentation/app_settings_screen.dart';
 import '../../settings/presentation/service_info_screen.dart';
 import '../../stations/presentation/station_search_screen.dart';
 import '../../support/presentation/support_access_screen.dart';
+import '../../train_search/domain/train_search_models.dart';
+import '../../train_search/presentation/train_search_screen.dart';
 
 const _mainIconControlRadius = BorderRadius.all(Radius.circular(12));
 
@@ -55,6 +57,7 @@ class HomeScreen extends StatefulWidget {
     required this.notificationRepository,
     required this.notificationPermissionProvider,
     required this.locationProvider,
+    required this.trainSearchRepository,
     required this.supportAccessInfo,
     required this.supportAccessLauncher,
     required this.userDataDeletionRepository,
@@ -90,6 +93,7 @@ class HomeScreen extends StatefulWidget {
   final NotificationSettingsRepository? notificationRepository;
   final NotificationPermissionProvider? notificationPermissionProvider;
   final CurrentLocationProvider locationProvider;
+  final TrainSearchRepository trainSearchRepository;
   final SupportAccessInfo supportAccessInfo;
   final SupportAccessLauncher supportAccessLauncher;
   final UserDataDeletionRepository? userDataDeletionRepository;
@@ -460,6 +464,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       );
     }
 
+    void openTrainSearch() {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) =>
+              TrainSearchScreen(repository: widget.trainSearchRepository),
+        ),
+      );
+    }
+
     Widget rootTab(Widget child) {
       final staleLabel = widget.bundledDataPackStaleLabel;
       return PopScope(
@@ -541,6 +554,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           onOpenNearbyStations: (regionLabel) => unawaited(
             openStationSearch(regionLabel, StationSearchEntryMode.nearby),
           ),
+          onOpenTrainSearch: openTrainSearch,
           onOpenSettings: openMoreTab,
           onOpenServiceNotices: noticeController == null
               ? null

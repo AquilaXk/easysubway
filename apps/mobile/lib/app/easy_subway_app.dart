@@ -18,6 +18,7 @@ import '../features/mobility_profile/mobility_profile_policy.dart';
 import '../features/realtime/realtime_repository.dart';
 import '../features/service_notice/data/notice_repository.dart';
 import '../features/support/presentation/support_access_screen.dart';
+import '../features/train_search/domain/train_search_models.dart';
 import '../internal_route.dart';
 import '../legacy_credential_cleanup.dart';
 import '../mobile_error_reporter.dart';
@@ -114,6 +115,7 @@ class EasySubwayApp extends StatelessWidget {
        notificationPermissionProvider =
            dependencies.notificationPermissionProvider,
        locationProvider = dependencies.locationProvider,
+       trainSearchRepository = dependencies.trainSearchRepository,
        userDataDeletionRepository = dependencies.userDataDeletionRepository,
        getOffAlarmController = dependencies.getOffAlarmController,
        noticeRepository = dependencies.noticeRepository;
@@ -134,6 +136,7 @@ class EasySubwayApp extends StatelessWidget {
   final NotificationSettingsRepository? notificationRepository;
   final NotificationPermissionProvider? notificationPermissionProvider;
   final CurrentLocationProvider locationProvider;
+  final TrainSearchRepository trainSearchRepository;
   final UserDataDeletionRepository? userDataDeletionRepository;
   final GetOffAlarmController? getOffAlarmController;
   final NoticeRepository? noticeRepository;
@@ -245,6 +248,7 @@ class EasySubwayApp extends StatelessWidget {
           notificationRepository: notificationRepository,
           notificationPermissionProvider: notificationPermissionProvider,
           locationProvider: locationProvider,
+          trainSearchRepository: trainSearchRepository,
           initialOnboardingState: initialOnboardingState,
           onboardingStore: onboardingStore,
           facilityReportDraftTargetStore: facilityReportDraftTargetStore,
@@ -371,6 +375,7 @@ class _EasySubwayHome extends StatefulWidget {
     required this.notificationRepository,
     required this.notificationPermissionProvider,
     required this.locationProvider,
+    required this.trainSearchRepository,
     required this.initialOnboardingState,
     required this.onboardingStore,
     required this.facilityReportDraftTargetStore,
@@ -401,6 +406,7 @@ class _EasySubwayHome extends StatefulWidget {
   final NotificationSettingsRepository? notificationRepository;
   final NotificationPermissionProvider? notificationPermissionProvider;
   final CurrentLocationProvider locationProvider;
+  final TrainSearchRepository trainSearchRepository;
   final OnboardingState initialOnboardingState;
   final OnboardingResultStore? onboardingStore;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
@@ -511,6 +517,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome>
         notificationRepository: widget.notificationRepository,
         notificationPermissionProvider: widget.notificationPermissionProvider,
         locationProvider: widget.locationProvider,
+        trainSearchRepository: widget.trainSearchRepository,
         initialMobilityType: onboardingResult?.mobilityType,
         viewPreferences: preferences,
         simpleViewEnabled: preferences.simpleViewEnabled,

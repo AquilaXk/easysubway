@@ -11,6 +11,7 @@ import 'package:easysubway_mobile/features/ads/ad_repository.dart';
 import 'package:easysubway_mobile/features/realtime/realtime_repository.dart';
 import 'package:easysubway_mobile/features/service_notice/data/notice_repository.dart';
 import 'package:easysubway_mobile/features/stations/data/drift_station_repository.dart';
+import 'package:easysubway_mobile/features/train_search/domain/train_search_models.dart';
 import 'package:easysubway_mobile/main.dart' as app;
 import 'package:easysubway_mobile/route_search.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -320,6 +321,37 @@ void main() {
 
     expect(result.notices, isEmpty);
     expect(result.stale, isFalse);
+  });
+
+  test('기차 검색은 첫 호출까지 API 주소를 읽지 않고 주소가 없으면 unavailable이다', () async {
+    final catalogDatabase = CatalogDatabase.memory();
+    final userDatabase = user_db.UserDatabase.memory();
+    var apiBaseReads = 0;
+    addTearDown(catalogDatabase.close);
+    addTearDown(userDatabase.close);
+
+    final dependencies = AppDependencies.resolve(
+      catalogDatabase: catalogDatabase,
+      userDatabase: userDatabase,
+      apiBaseUri: () {
+        apiBaseReads++;
+        return null;
+      },
+      enablePushNotifications: false,
+    );
+
+    expect(apiBaseReads, 0);
+    await expectLater(
+      dependencies.trainSearchRepository.stations('서울'),
+      throwsA(
+        isA<TrainSearchException>().having(
+          (error) => error.kind,
+          'kind',
+          TrainSearchFailureKind.unavailable,
+        ),
+      ),
+    );
+    expect(apiBaseReads, 1);
   });
 
   test('로컬 데이터베이스가 없으면 API 주소 없는 원격 fallback을 만들지 않는다', () {
