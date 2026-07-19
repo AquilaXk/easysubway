@@ -303,6 +303,8 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
     "utf8",
   ));
   assert.ok(kricCodeCatalogCandidate);
+  assert.equal(kricCodeCatalogCandidate.licenseEvidenceStatus, "review_required");
+  assert.equal(kricCodeCatalogCandidate.mobileEmbeddingAllowed, false);
   assert.equal(kricCodeCatalogCandidate.operation.method, kricCodeCatalog.operation.method);
   assert.equal(kricCodeCatalogCandidate.operation.endpoint, kricCodeCatalog.operation.endpoint);
   assert.deepEqual(

@@ -8617,6 +8617,14 @@ test("전국 coverage target은 공식 snapshot의 현재 catalog 노선과 정�
 
   const targets = JSON.parse(await readFile(path.join(root, "tools/datapack/nationwide-coverage-targets.json"), "utf8"));
   const fixture = JSON.parse(await readFile(fixturePath, "utf8"));
+  for (const pack of fixture.packs) {
+    const kricCodeCatalog = pack.sourceInventory.find(
+      ({ id }) => id === "kric-provider-code-catalog-20260228",
+    );
+    assert.ok(kricCodeCatalog, `${pack.packId} KRIC provider code catalog source missing`);
+    assert.equal(kricCodeCatalog.licenseStatus, "review-required");
+    assert.equal(kricCodeCatalog.redistributionAllowed, false);
+  }
   const compareCoverageLineScopes = (left, right) =>
     `${left.regionId}:${left.operatorId}:${left.lineId}`.localeCompare(
       `${right.regionId}:${right.operatorId}:${right.lineId}`,
