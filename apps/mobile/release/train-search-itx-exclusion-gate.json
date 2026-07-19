@@ -37,7 +37,7 @@
   "issue2094RuntimeEvidence": {
     "candidateGitSha": "86be8d0294f9e2badab61f25e5c6a6ed9b7eea2c",
     "provider": {
-      "observedAt": "2026-07-19T07:42:33.730Z",
+      "observedAt": "2026-07-19T10:59:28.620Z",
       "httpSuccess": true,
       "resultCode": "00",
       "schemaStatus": "EXPECTED",
@@ -57,12 +57,16 @@
         "MUGUNGHWA",
         "NURIRO"
       ],
+      "queriedTrainGradeCodes": {
+        "KTX": ["00"],
+        "ITX_CHEONGCHUN": ["09"]
+      },
       "stationCount": 343,
       "stationConflictCount": 0,
-      "seoulDaejeonKtxFareRows": 54,
+      "seoulDaejeonKtxFareRows": 64,
       "itxCheongchunRows": 0,
       "credentialRedacted": true,
-      "sourceObjectSha256": "79a94b66a2d299d5293247e4547c9ce55939082bdc37542b2658f12fbda72913"
+      "sourceObjectSha256": "2622e3ebd731cf0427e2fc777dc77d9e3ab5326462537a167bf24fab8beb2ddd"
     },
     "backend": {
       "deployedGitSha": "86be8d0294f9e2badab61f25e5c6a6ed9b7eea2c",
@@ -79,6 +83,21 @@
           "CD Record deployment"
         ]
       },
+      "requiredCi": {
+        "runId": 29677947876,
+        "runUrl": "https://github.com/AquilaXk/easysubway/actions/runs/29677947876",
+        "workflowName": "CI",
+        "candidateGitSha": "86be8d0294f9e2badab61f25e5c6a6ed9b7eea2c",
+        "conclusion": "success",
+        "requiredJobs": [
+          "Repository CI",
+          "Android CI",
+          "Release Gate Consistency",
+          "Mobile App CI",
+          "Backend CI",
+          "Admin QA Gates"
+        ]
+      },
       "currentDeployment": {
         "deploymentId": 5508806761,
         "statusId": 15664924308,
@@ -87,13 +106,13 @@
         "succeededAt": "2026-07-19T08:43:32Z"
       },
       "observedAt": "2026-07-19T10:37:18.778105767Z",
-      "collectedAt": "2026-07-19T10:37:16.783Z",
+      "collectedAt": "2026-07-19T10:58:24.774Z",
       "seoulDaejeonKtxFareRows": 64,
       "itxCheongchunRows": 0,
       "conditionalEtagStatus": 304,
       "errorCacheControl": "no-store",
       "schemaStatus": "EXPECTED",
-      "sourceObjectSha256": "036eed75a47f53dab0fdba441a5219945973ceba8f74d2e8655468e8c0989f1c"
+      "sourceObjectSha256": "500f137dd09f3775ea270d4e5704c5775a5e605914c99a4d92374bbc9c6442ff"
     },
     "capacity": {
       "executor": {
@@ -178,7 +197,7 @@
         "provider": null,
         "backend": {
           "observedAt": "2026-07-19T10:37:18.778105767Z",
-          "collectedAt": "2026-07-19T10:37:16.783Z",
+          "collectedAt": "2026-07-19T10:58:24.774Z",
           "deployedGitSha": "86be8d0294f9e2badab61f25e5c6a6ed9b7eea2c",
           "deployment": {
             "runId": 29678175251,
@@ -190,6 +209,21 @@
               "CD Deploy",
               "Post-deploy smoke",
               "CD Record deployment"
+            ]
+          },
+          "requiredCi": {
+            "runId": 29677947876,
+            "runUrl": "https://github.com/AquilaXk/easysubway/actions/runs/29677947876",
+            "workflowName": "CI",
+            "candidateGitSha": "86be8d0294f9e2badab61f25e5c6a6ed9b7eea2c",
+            "conclusion": "success",
+            "requiredJobs": [
+              "Repository CI",
+              "Android CI",
+              "Release Gate Consistency",
+              "Mobile App CI",
+              "Backend CI",
+              "Admin QA Gates"
             ]
           },
           "currentDeployment": {
@@ -210,7 +244,7 @@
           "schemaStatus": "EXPECTED"
         },
         "credentialRedacted": true,
-        "evidenceSha256": "036eed75a47f53dab0fdba441a5219945973ceba8f74d2e8655468e8c0989f1c"
+        "evidenceSha256": "500f137dd09f3775ea270d4e5704c5775a5e605914c99a4d92374bbc9c6442ff"
       }
     },
     "android": {
@@ -220,7 +254,7 @@
       "androidVersion": "16",
       "networkBoundary": "OCI_STAGING_CONNECT_PROXY",
       "candidateApkSha256": "f0eae8b2dd9053fa98669de2452eb73bcf0e6d77ca2e2283bef56f828e23608f",
-      "integrationTestSourceSha256": "deaf0bd25c0e60da40cf9812ee77c3f39de8a1f0413246da43df491ce54c20c5",
+      "integrationTestSourceSha256": "bb7d4ad80d22e4ccd59526638b1787c7c6fe25ff6a9913547e2ec1d1dedf603c",
       "menuToResultPassed": true,
       "roundTripPassed": true,
       "stateMatrixPassed": true,
@@ -239,10 +273,21 @@
       "actionableFindingsOpen": 0
     },
     "requiredCi": {
-      "status": "PASS",
-      "runUrl": "https://github.com/AquilaXk/easysubway/actions/runs/29677947876"
+      "runId": 29677947876,
+      "runUrl": "https://github.com/AquilaXk/easysubway/actions/runs/29677947876",
+      "workflowName": "CI",
+      "candidateGitSha": "86be8d0294f9e2badab61f25e5c6a6ed9b7eea2c",
+      "conclusion": "success",
+      "requiredJobs": [
+        "Repository CI",
+        "Android CI",
+        "Release Gate Consistency",
+        "Mobile App CI",
+        "Backend CI",
+        "Admin QA Gates"
+      ]
     },
-    "liveEvidenceSha256": "631a820a983940dcc95e9845981e03d9ca59d90115efa5617b658af6cd1b82cf"
+    "liveEvidenceSha256": "7db7fb6ba641cc7fbfd1ca60532a5248855d9a3acfc0da518b052bcbb9cf73d7"
   },
   "verification": {
     "backend": "./backend/gradlew -p backend test --tests '*TrainSearch*'",

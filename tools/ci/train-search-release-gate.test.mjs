@@ -4,9 +4,12 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
+import * as trainSearchLiveSmoke from "../test/train-search-live-smoke.mjs";
+
 import {
   addProviderStation,
   collectBackendEvidence,
+  collectProviderEvidence,
   normalizeProviderTrainType,
   providerJourney,
   validateBackendSearchEnvelope,
@@ -317,6 +320,80 @@ test("TAGO KTX grade 응답은 모든 행이 KTX여야 한다", () => {
   );
 });
 
+test("TAGO exclusion 증거는 ITX_CHEONGCHUN grade를 직접 조회한다", async () => {
+  const scheduleGradeCodes = [];
+  const grades = [
+    ["00", "KTX"],
+    ["10", "KTX-산천"],
+    ["17", "SRT"],
+    ["18", "ITX-마음"],
+    ["01", "ITX-새마을"],
+    ["05", "새마을호"],
+    ["06", "무궁화호"],
+    ["08", "누리로"],
+    ["09", "ITX-청춘"],
+  ].map(([vehiclekndid, vehiclekndnm]) => ({ vehiclekndid, vehiclekndnm }));
+  const fetchImpl = async (input) => {
+    const url = new URL(input);
+    const operation = url.pathname.split("/").at(-1);
+    let rows;
+    if (operation === "GetVhcleKndList") rows = grades;
+    else if (operation === "GetCtyCodeList") rows = [{ citycode: "11", cityname: "전국" }];
+    else if (operation === "GetCtyAcctoTrainSttnList") {
+      rows = [
+        { nodeid: "NAT010000", nodename: "서울" },
+        { nodeid: "NAT011668", nodename: "대전" },
+      ];
+    } else if (operation === "GetStrtpntAlocFndTrainInfo") {
+      const gradeCode = url.searchParams.get("trainGradeCode");
+      scheduleGradeCodes.push(gradeCode);
+      rows = gradeCode === "00" ? [{
+        trainno: "101",
+        traingradename: "KTX",
+        depplandtime: "20260815090000",
+        arrplandtime: "20260815100200",
+        depplacename: "서울",
+        arrplacename: "대전",
+        adultcharge: "23700",
+      }] : [];
+    } else {
+      throw new Error(`unexpected operation: ${operation}`);
+    }
+    const paginated = operation === "GetCtyAcctoTrainSttnList"
+      || operation === "GetStrtpntAlocFndTrainInfo";
+    return new Response(JSON.stringify({
+      response: {
+        header: { resultCode: "00" },
+        body: {
+          items: { item: rows },
+          ...(paginated ? {
+            pageNo: Number(url.searchParams.get("pageNo")),
+            numOfRows: Number(url.searchParams.get("numOfRows")),
+            totalCount: rows.length,
+          } : {}),
+        },
+      },
+    }), { status: 200 });
+  };
+
+  const evidence = await collectProviderEvidence({
+    serviceKey: "test-key",
+    departureDate: "2026-08-15",
+    departureStationId: "NAT010000",
+    arrivalStationId: "NAT011668",
+    fetchImpl,
+    now: new Date("2026-07-19T12:00:00Z"),
+  });
+
+  assert.deepEqual(scheduleGradeCodes.sort(), ["00", "09"]);
+  assert.deepEqual(evidence.queriedTrainGradeCodes, {
+    KTX: ["00"],
+    ITX_CHEONGCHUN: ["09"],
+  });
+  assert.equal(evidence.itxCheongchunRowCount, 0);
+  assert.equal(evidence.fareRowCount, 1);
+});
+
 test("배포 workflow run은 성공한 CD SHA와 필수 job을 독립 검증한다", () => {
   const deploymentRunUrl = "https://github.com/AquilaXk/easysubway/actions/runs/29677130333";
   const candidateGitSha = "d36bc00467ab69732f49e1f56a343bb2da1e73ce";
@@ -349,6 +426,49 @@ test("배포 workflow run은 성공한 CD SHA와 필수 job을 독립 검증한�
       deploymentRunUrl,
     }),
     /deployment workflow jobs were incomplete/,
+  );
+});
+
+test("필수 CI workflow run은 candidate SHA와 required job 성공에 결속된다", () => {
+  const validateRequiredCiRun = trainSearchLiveSmoke.validateRequiredCiRun;
+  assert.equal(typeof validateRequiredCiRun, "function");
+  const candidateGitSha = "d36bc00467ab69732f49e1f56a343bb2da1e73ce";
+  const ciRunUrl = "https://github.com/AquilaXk/easysubway/actions/runs/29677947876";
+  const run = {
+    id: 29677947876,
+    name: "CI",
+    head_sha: candidateGitSha,
+    status: "completed",
+    conclusion: "success",
+    event: "push",
+    html_url: ciRunUrl,
+    repository: { full_name: "AquilaXk/easysubway" },
+  };
+  const requiredJobs = [
+    "Repository CI",
+    "Android CI",
+    "Release Gate Consistency",
+    "Mobile App CI",
+    "Backend CI",
+    "Admin QA Gates",
+  ];
+  const jobs = { jobs: requiredJobs.map((name) => ({ name, conclusion: "success" })) };
+
+  assert.deepEqual(validateRequiredCiRun(run, jobs, { candidateGitSha, ciRunUrl }), {
+    runId: 29677947876,
+    runUrl: ciRunUrl,
+    workflowName: "CI",
+    candidateGitSha,
+    conclusion: "success",
+    requiredJobs,
+  });
+  assert.throws(
+    () => validateRequiredCiRun({ ...run, head_sha: "a".repeat(40) }, jobs, { candidateGitSha, ciRunUrl }),
+    /CI workflow run did not match the candidate/,
+  );
+  assert.throws(
+    () => validateRequiredCiRun(run, { jobs: jobs.jobs.slice(1) }, { candidateGitSha, ciRunUrl }),
+    /CI workflow jobs were incomplete/,
   );
 });
 
@@ -437,7 +557,8 @@ test("backend test XML에서 3-node provider 1회와 quota fail-closed를 계산
 
 test("live evidence는 EasySubway production API origin만 허용한다", async () => {
   const android = read("apps/mobile/integration_test/train_search_release_evidence_test.dart");
-  assert.match(android, /expect\(baseUri\.origin, 'https:\/\/easysubway-api\.aquilaxk\.site'\)/);
+  assert.match(android, /Uri _requireProductionBaseUri\(\)/);
+  assert.equal((android.match(/_requireProductionBaseUri\(\)/g) ?? []).length, 3);
   await assert.rejects(
     collectBackendEvidence({
       baseUrl: "https://api.example.com/",
@@ -448,6 +569,31 @@ test("live evidence는 EasySubway production API origin만 허용한다", async 
     }),
     /EasySubway production HTTPS origin/,
   );
+});
+
+test("존재하지 않는 달력 날짜는 external fetch 전에 거부한다", async () => {
+  let fetchCalls = 0;
+  await assert.rejects(
+    collectBackendEvidence({
+      baseUrl: "https://easysubway-api.aquilaxk.site/",
+      candidateGitSha: "a".repeat(40),
+      deploymentRunUrl: "https://github.com/AquilaXk/easysubway/actions/runs/1",
+      departureDate: "2026-02-30",
+      fetchImpl: async () => {
+        fetchCalls += 1;
+        throw new Error("fetch must not run");
+      },
+    }),
+    /--date must be YYYY-MM-DD/,
+  );
+  assert.equal(fetchCalls, 0);
+
+  const cli = spawnSync(process.execPath, [
+    "tools/test/train-search-live-smoke.mjs",
+    "--validate-date", "2026-02-30",
+  ], { encoding: "utf8" });
+  assert.notEqual(cli.status, 0);
+  assert.match(cli.stderr, /--date must be YYYY-MM-DD/);
 });
 
 test("capacity runner는 repeated·unique·3-node·quota 경계를 고정한다", () => {
@@ -494,6 +640,8 @@ test("capacity runner는 repeated·unique·3-node·quota 경계를 고정한다"
   assert.match(runner, /--preflight-output-dir/);
   assert.match(runner, /--candidate-sha/);
   assert.match(runner, /--deployment-run-url/);
+  assert.match(runner, /--ci-run-url/);
+  assert.ok(runner.indexOf("--validate-date") < runner.indexOf("--mode backend"));
   assert.match(runner, /train-search-live-smoke\.mjs/);
   assert.match(runner, /candidate-binding\.json/);
   const collector = read("tools/test/collect-train-search-backend-observation.mjs");
@@ -522,6 +670,7 @@ test("capacity runner는 repeated·unique·3-node·quota 경계를 고정한다"
     "--nodes", "3",
     "--candidate-sha", "a".repeat(40),
     "--deployment-run-url", "https://github.com/AquilaXk/easysubway/actions/runs/1",
+    "--ci-run-url", "https://github.com/AquilaXk/easysubway/actions/runs/2",
   ], { encoding: "utf8" });
   assert.notEqual(unsafeOutput.status, 0);
   assert.match(unsafeOutput.stderr, /outside the allowed roots/);
@@ -576,6 +725,10 @@ test("#2094 release artifact는 동일 candidate와 모든 완료 증거를 요�
     "GetStrtpntAlocFndTrainInfo",
   ]);
   assert.deepEqual(runtime.provider.supportedTrainTypes, supportedTrainTypes);
+  assert.deepEqual(runtime.provider.queriedTrainGradeCodes, {
+    KTX: ["00"],
+    ITX_CHEONGCHUN: ["09"],
+  });
   assert.equal(runtime.backend.seoulDaejeonKtxFareRows > 0, true);
   assert.equal(runtime.backend.itxCheongchunRows, 0);
   assert.equal(runtime.capacity.repeated.status, "PASS");
@@ -602,6 +755,7 @@ test("#2094 release artifact는 동일 candidate와 모든 완료 증거를 요�
   assert.match(runtime.capacity.backendObservation.collectedAt, /^\d{4}-\d{2}-\d{2}T/);
   assert.equal(runtime.capacity.candidateBinding.candidateGitSha, runtime.candidateGitSha);
   assert.equal(runtime.capacity.candidateBinding.backend.deployedGitSha, runtime.candidateGitSha);
+  assert.deepEqual(runtime.capacity.candidateBinding.backend.requiredCi, runtime.requiredCi);
   assert.equal(runtime.capacity.candidateBinding.backend.currentDeployment.sha, runtime.candidateGitSha);
   assert.equal(runtime.capacity.candidateBinding.backend.origin, runtime.backend.apiOrigin);
   const { evidenceSha256: bindingSha256, ...unsignedBinding } = runtime.capacity.candidateBinding;
@@ -634,5 +788,16 @@ test("#2094 release artifact는 동일 candidate와 모든 완료 증거를 요�
     runtime.review.reviewUrl,
     "https://github.com/AquilaXk/easysubway/pull/2291#pullrequestreview-4730310729",
   );
-  assert.equal(runtime.requiredCi.status, "PASS");
+  assert.equal(runtime.requiredCi.candidateGitSha, runtime.candidateGitSha);
+  assert.deepEqual(runtime.backend.requiredCi, runtime.requiredCi);
+  assert.equal(runtime.requiredCi.workflowName, "CI");
+  assert.equal(runtime.requiredCi.conclusion, "success");
+  assert.deepEqual(runtime.requiredCi.requiredJobs, [
+    "Repository CI",
+    "Android CI",
+    "Release Gate Consistency",
+    "Mobile App CI",
+    "Backend CI",
+    "Admin QA Gates",
+  ]);
 });

@@ -9,6 +9,7 @@ output_dir=""
 nodes=""
 candidate_sha=""
 deployment_run_url=""
+ci_run_url=""
 max_duration_seconds="120"
 
 while [[ $# -gt 0 ]]; do
@@ -21,6 +22,7 @@ while [[ $# -gt 0 ]]; do
 		--nodes) nodes="${2:-}"; shift 2 ;;
 		--candidate-sha) candidate_sha="${2:-}"; shift 2 ;;
 		--deployment-run-url) deployment_run_url="${2:-}"; shift 2 ;;
+		--ci-run-url) ci_run_url="${2:-}"; shift 2 ;;
 		--max-duration-seconds) max_duration_seconds="${2:-}"; shift 2 ;;
 		*) echo "unknown argument" >&2; exit 2 ;;
 	esac
@@ -36,8 +38,11 @@ done
 [[ "${candidate_sha}" =~ ^[0-9a-f]{40}$ ]] || { echo "--candidate-sha must be a full lowercase Git SHA" >&2; exit 2; }
 [[ "${deployment_run_url}" =~ ^https://github\.com/AquilaXk/easysubway/actions/runs/[1-9][0-9]*$ ]] \
 	|| { echo "--deployment-run-url must identify the candidate CD run" >&2; exit 2; }
+[[ "${ci_run_url}" =~ ^https://github\.com/AquilaXk/easysubway/actions/runs/[1-9][0-9]*$ ]] \
+	|| { echo "--ci-run-url must identify the candidate CI run" >&2; exit 2; }
 [[ "${max_duration_seconds}" =~ ^[0-9]+$ ]] && (( max_duration_seconds >= 20 && max_duration_seconds <= 600 )) \
 	|| { echo "--max-duration-seconds must be 20 through 600" >&2; exit 2; }
+node tools/test/train-search-live-smoke.mjs --validate-date "${departure_date}"
 node tools/test/validate-train-search-capacity.mjs --preflight-output-dir "${output_dir}"
 mkdir -p "${output_dir}"
 node tools/test/validate-train-search-capacity.mjs --preflight-output-dir "${output_dir}"
@@ -49,6 +54,7 @@ node tools/test/train-search-live-smoke.mjs \
 	--base-url "${base_url}" \
 	--candidate-sha "${candidate_sha}" \
 	--deployment-run-url "${deployment_run_url}" \
+	--ci-run-url "${ci_run_url}" \
 	--date "${departure_date}" \
 	--output "${output_dir}/candidate-binding.json"
 

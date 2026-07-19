@@ -19,10 +19,7 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('실제 Android에서 서울-대전 KTX 왕복 시간표와 운임을 표시한다', (tester) async {
-    final baseUri = Uri.parse(_baseUrl);
-    expect(baseUri.scheme, 'https');
-    expect(baseUri.host, isNotEmpty);
-    expect(baseUri.origin, 'https://easysubway-api.aquilaxk.site');
+    final baseUri = _requireProductionBaseUri();
     await tester.pumpWidget(
       MaterialApp(
         home: TrainSearchScreen(
@@ -70,7 +67,7 @@ void main() {
   });
 
   testWidgets('실제 Android에서 offline network 오류는 이전 결과 없이 종료한다', (tester) async {
-    final baseUri = Uri.parse(_baseUrl);
+    final baseUri = _requireProductionBaseUri();
     await tester.pumpWidget(
       MaterialApp(
         home: TrainSearchScreen(
@@ -92,6 +89,14 @@ void main() {
     expect(find.text('인터넷 연결을 확인한 뒤 다시 시도해 주세요.'), findsOneWidget);
     expect(find.byKey(const Key('trainSearchResults')), findsNothing);
   });
+}
+
+Uri _requireProductionBaseUri() {
+  final baseUri = Uri.parse(_baseUrl);
+  expect(baseUri.scheme, 'https');
+  expect(baseUri.host, isNotEmpty);
+  expect(baseUri.origin, 'https://easysubway-api.aquilaxk.site');
+  return baseUri;
 }
 
 HttpClient? _evidenceHttpClient() {

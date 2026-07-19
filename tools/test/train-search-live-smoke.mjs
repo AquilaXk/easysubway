@@ -27,6 +27,14 @@ const SUPPORTED_TRAIN_TYPES = Object.freeze([
   "MUGUNGHWA",
   "NURIRO",
 ]);
+const REQUIRED_CI_JOBS = Object.freeze([
+  "Repository CI",
+  "Android CI",
+  "Release Gate Consistency",
+  "Mobile App CI",
+  "Backend CI",
+  "Admin QA Gates",
+]);
 
 const TRAIN_TYPE_BY_NORMALIZED_NAME = new Map([
   ["KTX", "KTX"],
@@ -172,16 +180,27 @@ export async function collectProviderEvidence({
     .map(({ code }) => code)
     .sort((left, right) => left.localeCompare(right));
   if (ktxCodes.length === 0) throw new Error("TAGO KTX provider grade was missing");
+  const itxCheongchunCodes = grades
+    .filter(({ trainType }) => trainType === "ITX_CHEONGCHUN")
+    .map(({ code }) => code)
+    .sort((left, right) => left.localeCompare(right));
+  if (itxCheongchunCodes.length === 0) throw new Error("TAGO ITX_CHEONGCHUN provider grade was missing");
   const scheduleRows = [];
-  for (const trainGradeCode of ktxCodes) {
-    const result = await providerRows("GetStrtpntAlocFndTrainInfo", {
-      depPlaceId: departureStationId,
-      arrPlaceId: arrivalStationId,
-      depPlandTime: departureDate.replaceAll("-", ""),
-      trainGradeCode,
-    }, key, fetchImpl, true);
-    operations.push(result.evidence);
-    scheduleRows.push(...result.rows);
+  const itxCheongchunRows = [];
+  for (const [trainGradeCodes, target] of [
+    [ktxCodes, scheduleRows],
+    [itxCheongchunCodes, itxCheongchunRows],
+  ]) {
+    for (const trainGradeCode of trainGradeCodes) {
+      const result = await providerRows("GetStrtpntAlocFndTrainInfo", {
+        depPlaceId: departureStationId,
+        arrPlaceId: arrivalStationId,
+        depPlandTime: departureDate.replaceAll("-", ""),
+        trainGradeCode,
+      }, key, fetchImpl, true);
+      operations.push(result.evidence);
+      target.push(...result.rows);
+    }
   }
   const journeys = scheduleRows.map((row, index) => providerJourney(row, index, {
     departureStationId,
@@ -193,8 +212,18 @@ export async function collectProviderEvidence({
   validateKtxProviderJourneys(journeys);
   const fareRows = journeys.filter((row) => row.trainType === "KTX" && row.adultFareWon >= 0);
   if (fareRows.length === 0) throw new Error("TAGO Seoul-Daejeon KTX fare row was missing");
-  const itxCheongchunRowCount = journeys.filter((row) => row.trainType === "ITX_CHEONGCHUN").length;
-  if (itxCheongchunRowCount !== 0) throw new Error("TAGO KTX query returned ITX_CHEONGCHUN rows");
+  const itxJourneys = itxCheongchunRows.map((row, index) => providerJourney(row, index, {
+    departureStationId,
+    departureStationName: departureName,
+    arrivalStationId,
+    arrivalStationName: arrivalName,
+    departureDate,
+  }));
+  if (itxJourneys.some((journey) => journey.trainType !== "ITX_CHEONGCHUN")) {
+    throw new Error("TAGO ITX_CHEONGCHUN query returned a different train type");
+  }
+  const itxCheongchunRowCount = itxJourneys.length;
+  if (itxCheongchunRowCount !== 0) throw new Error("TAGO ITX_CHEONGCHUN query returned rows");
   const observedOperations = new Set(operations.map(({ operation }) => operation));
   if (!PROVIDER_OPERATIONS.every((operation) => observedOperations.has(operation))) {
     throw new Error("TAGO operation evidence was incomplete");
@@ -208,12 +237,16 @@ export async function collectProviderEvidence({
     operations: PROVIDER_OPERATIONS,
     operationEvidence: operations,
     supportedTrainTypes: SUPPORTED_TRAIN_TYPES,
+    queriedTrainGradeCodes: {
+      KTX: ktxCodes,
+      ITX_CHEONGCHUN: itxCheongchunCodes,
+    },
     gradeNames: grades.map(({ name }) => name).sort((left, right) => left.localeCompare(right, "ko")),
     stationCount: stations.size,
     stationConflictCount: 0,
     departureStation: { id: departureStationId, name: departureName },
     arrivalStation: { id: arrivalStationId, name: arrivalName },
-    scheduleRowCount: journeys.length,
+    scheduleRowCount: journeys.length + itxJourneys.length,
     fareRowCount: fareRows.length,
     itxCheongchunRowCount,
     credentialRedacted: true,
@@ -224,6 +257,7 @@ export async function collectBackendEvidence({
   baseUrl,
   candidateGitSha,
   deploymentRunUrl,
+  ciRunUrl,
   departureDate,
   departureQuery = "서울",
   arrivalQuery = "대전",
@@ -232,9 +266,10 @@ export async function collectBackendEvidence({
 } = {}) {
   const origin = publicHttpsOrigin(baseUrl);
   const candidateSha = requireSha(candidateGitSha);
-  const deployment = await deploymentEvidence(deploymentRunUrl, candidateSha, fetchImpl);
-  const currentDeployment = await currentDeploymentEvidence(candidateSha, fetchImpl);
   requireDate(departureDate);
+  const deployment = await deploymentEvidence(deploymentRunUrl, candidateSha, fetchImpl);
+  const requiredCi = await requiredCiEvidence(ciRunUrl, candidateSha, fetchImpl);
+  const currentDeployment = await currentDeploymentEvidence(candidateSha, fetchImpl);
   const departure = await backendStation(origin, departureQuery, fetchImpl);
   const arrival = await backendStation(origin, arrivalQuery, fetchImpl);
   const searchUrl = new URL("/api/v1/trains/search", origin);
@@ -280,6 +315,7 @@ export async function collectBackendEvidence({
     ...observationTime,
     deployedGitSha: deployment.deployedGitSha,
     deployment,
+    requiredCi,
     currentDeployment,
     origin: origin.origin,
     stationQueries: [departureQuery, arrivalQuery],
@@ -526,6 +562,35 @@ export function validateDeploymentRun(run, jobsPayload, { candidateGitSha, deplo
   };
 }
 
+export function validateRequiredCiRun(run, jobsPayload, { candidateGitSha, ciRunUrl }) {
+  const url = ciUrl(ciRunUrl);
+  const runId = Number(url.pathname.split("/").at(-1));
+  if (run?.id !== runId
+    || run?.name !== "CI"
+    || run?.head_sha !== candidateGitSha
+    || run?.status !== "completed"
+    || run?.conclusion !== "success"
+    || run?.event !== "push"
+    || run?.html_url !== url.toString()
+    || run?.repository?.full_name !== "AquilaXk/easysubway") {
+    throw new Error("CI workflow run did not match the candidate");
+  }
+  if (!Array.isArray(jobsPayload?.jobs)
+    || REQUIRED_CI_JOBS.some((name) => !jobsPayload.jobs.some((job) => (
+      job?.name === name && job?.conclusion === "success"
+    )))) {
+    throw new Error("CI workflow jobs were incomplete");
+  }
+  return {
+    runId,
+    runUrl: url.toString(),
+    workflowName: run.name,
+    candidateGitSha: run.head_sha,
+    conclusion: run.conclusion,
+    requiredJobs: REQUIRED_CI_JOBS,
+  };
+}
+
 async function deploymentEvidence(value, candidateGitSha, fetchImpl) {
   const runUrl = deploymentUrl(value);
   const runId = runUrl.pathname.split("/").at(-1);
@@ -542,6 +607,25 @@ async function deploymentEvidence(value, candidateGitSha, fetchImpl) {
     await responseJson(runResponse, "deployment workflow run"),
     await responseJson(jobsResponse, "deployment workflow jobs"),
     { candidateGitSha, deploymentRunUrl: runUrl.toString() },
+  );
+}
+
+async function requiredCiEvidence(value, candidateGitSha, fetchImpl) {
+  const runUrl = ciUrl(value);
+  const runId = runUrl.pathname.split("/").at(-1);
+  const apiBase = `https://api.github.com/repos/AquilaXk/easysubway/actions/runs/${runId}`;
+  const headers = {
+    accept: "application/vnd.github+json",
+    "user-agent": "easysubway-train-search-evidence",
+  };
+  const runResponse = await fetchWithTimeout(apiBase, { headers }, fetchImpl);
+  if (!runResponse.ok) throw new Error(`CI workflow run returned HTTP ${runResponse.status}`);
+  const jobsResponse = await fetchWithTimeout(`${apiBase}/jobs?per_page=100`, { headers }, fetchImpl);
+  if (!jobsResponse.ok) throw new Error(`CI workflow jobs returned HTTP ${jobsResponse.status}`);
+  return validateRequiredCiRun(
+    await responseJson(runResponse, "CI workflow run"),
+    await responseJson(jobsResponse, "CI workflow jobs"),
+    { candidateGitSha, ciRunUrl: runUrl.toString() },
   );
 }
 
@@ -624,6 +708,20 @@ function deploymentUrl(value) {
   return url;
 }
 
+function ciUrl(value) {
+  const url = new URL(requiredString(value, "--ci-run-url"));
+  if (url.protocol !== "https:"
+    || url.hostname !== "github.com"
+    || !/^\/AquilaXk\/easysubway\/actions\/runs\/[1-9]\d*$/u.test(url.pathname)
+    || url.search
+    || url.hash
+    || url.username
+    || url.password) {
+    throw new Error("--ci-run-url must identify the EasySubway CI run");
+  }
+  return url;
+}
+
 function normalizeStationName(value) {
   return requiredString(value, "station name").replace(/[^0-9A-Za-z가-힣]/gu, "").toUpperCase();
 }
@@ -682,7 +780,7 @@ function requireSha(value) {
 }
 
 function requireDate(value) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value ?? "") || Number.isNaN(Date.parse(`${value}T00:00:00Z`))) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value ?? "") || !validDateTime(`${value}T00:00:00Z`)) {
     throw new Error("--date must be YYYY-MM-DD");
   }
   return value;
@@ -737,6 +835,11 @@ function parseArgs(argv) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  if (Object.hasOwn(args, "validate-date")) {
+    requireDate(args["validate-date"]);
+    console.log("train-search date PASS");
+    return;
+  }
   const output = requiredString(args.output, "--output");
   if (!path.isAbsolute(output)) throw new Error("--output must be absolute");
   const mode = args.mode ?? "both";
@@ -753,6 +856,7 @@ async function main() {
     baseUrl: args["base-url"],
     candidateGitSha: args["candidate-sha"],
     deploymentRunUrl: args["deployment-run-url"],
+    ciRunUrl: args["ci-run-url"],
     departureDate: args.date,
   });
   const artifact = {
