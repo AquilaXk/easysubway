@@ -167,10 +167,11 @@ final class TrainSearchRateLimiter {
 		}
 		WindowCounter counter = counterFor(identity, window, day);
 		long minuteRetryAfter = WINDOW_SECONDS - Math.floorMod(now, WINDOW_SECONDS);
-		long dailyRetryAfter = java.time.Duration.between(
+		var untilNextDay = java.time.Duration.between(
 			currentInstant,
 			currentDate.plusDays(1).atStartOfDay(dayZone).toInstant()
-		).getSeconds();
+		);
+		long dailyRetryAfter = untilNextDay.getSeconds() + (untilNextDay.getNano() == 0 ? 0 : 1);
 		WindowCounter.Decision decision = counter == null
 			? WindowCounter.Decision.CARDINALITY_DENIED
 			: counter.acquire(window, day, cost, limit, dailyLimit);

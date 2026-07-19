@@ -164,6 +164,16 @@ class TrainSearchRateLimitFilterTest {
 			.isEqualTo(new TrainSearchRateLimiter.AcquireResult(false, 90));
 	}
 
+	@Test
+	void roundsASubsecondDailyRetryAfterUpToOneSecond() {
+		var clock = Clock.fixed(Instant.parse("2026-07-19T14:59:59.500Z"), ZoneOffset.UTC);
+		var limiter = new TrainSearchRateLimiter(24, 1, 10, clock, ZoneId.of("Asia/Seoul"));
+		assertThat(limiter.acquire("client", 1).allowed()).isTrue();
+
+		assertThat(limiter.acquire("client", 1))
+			.isEqualTo(new TrainSearchRateLimiter.AcquireResult(false, 1));
+	}
+
 	private void assertAllowed(TrainSearchRateLimitFilter filter, String trainType, String returnDate) throws Exception {
 		assertThat(filtered(filter, trainType, returnDate).getStatus()).isEqualTo(200);
 	}

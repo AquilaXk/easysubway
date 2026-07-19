@@ -52,9 +52,14 @@ public class TrainSearchService {
 	// 한 구간도 영업일 2일, 페이지네이션, 복수 열차종 코드, 요청별 재시도를 순차 수행할 수 있다.
 	private static final Duration LEG_LEASE_TTL = Duration.ofMinutes(15);
 	private static final Duration CATALOG_LEASE_TTL = Duration.ofMinutes(5);
+	private static final Duration CATALOG_LOAD_BUDGET = Duration.ofMinutes(5);
+	private static final Duration CATALOG_RECOVERY_GRACE = Duration.ofSeconds(1);
 	private static final Duration HTTP_REQUEST_BUDGET = Duration.ofSeconds(30);
 	private static final Duration LEASE_WAIT_BUDGET = Duration.ofSeconds(5);
 	private static final List<Duration> LEASE_POLLS = leasePolls(LEASE_WAIT_BUDGET);
+	private static final List<Duration> CATALOG_RECOVERY_POLLS = leasePolls(
+		CATALOG_LEASE_TTL.plus(CATALOG_RECOVERY_GRACE)
+	);
 	private static final int L1_LIMIT = 20_000;
 	private static final TypeReference<List<Journey>> JOURNEYS = new TypeReference<>() {};
 
@@ -67,7 +72,6 @@ public class TrainSearchService {
 	private final ConcurrentHashMap<String, CachedLeg> l1 = new ConcurrentHashMap<>();
 	private final ConcurrentLinkedQueue<String> l1Order = new ConcurrentLinkedQueue<>();
 	private final ConcurrentHashMap<String, CompletableFuture<CachedLeg>> singleFlights = new ConcurrentHashMap<>();
-	private final Object catalogLock = new Object();
 
 	@Autowired
 	public TrainSearchService(TrainSearchProvider provider, TrainSearchCache cache, ObjectMapper objectMapper) {
@@ -189,7 +193,11 @@ public class TrainSearchService {
 	public Catalog refreshCatalog() {
 		try {
 			Instant now = clock.instant();
-			return refreshCatalogEntry(now, true, now.plus(CATALOG_LEASE_TTL)).catalog();
+			Instant deadline = now
+				.plus(CATALOG_LEASE_TTL)
+				.plus(CATALOG_RECOVERY_GRACE)
+				.plus(CATALOG_LOAD_BUDGET);
+			return refreshCatalogEntry(now, true, deadline).catalog();
 		} catch (TrainSearchFailure failure) {
 			throw failure;
 		} catch (RuntimeException exception) {
@@ -202,23 +210,22 @@ public class TrainSearchService {
 	}
 
 	private CatalogEntry refreshCatalogEntry(Instant now, boolean force, Instant deadline) {
-		synchronized (catalogLock) {
-			var existing = cache.freshCatalog(CATALOG_KIND, now);
-			requireBefore(deadline);
-			if (!force && existing.isPresent()) {
-				CachedCatalog cached = existing.orElseThrow();
-				return new CatalogEntry(decodeCatalog(cached), cached.expiresAt());
-			}
-			String owner = ownerSupplier.get();
-			if (!cache.tryAcquireLease(CATALOG_LEASE_KEY, owner, now, CATALOG_LEASE_TTL)) {
-				return pollForCatalog(force ? existing.orElse(null) : null, deadline);
-			}
-			return loadCatalog(owner, deadline);
+		var existing = cache.freshCatalog(CATALOG_KIND, now);
+		requireBefore(deadline);
+		if (!force && existing.isPresent()) {
+			CachedCatalog cached = existing.orElseThrow();
+			return new CatalogEntry(decodeCatalog(cached), cached.expiresAt());
 		}
+		String owner = ownerSupplier.get();
+		if (!cache.tryAcquireLease(CATALOG_LEASE_KEY, owner, now, CATALOG_LEASE_TTL)) {
+			return pollForCatalog(force ? existing.orElse(null) : null, deadline, force);
+		}
+		return loadCatalog(owner, deadline);
 	}
 
-	private CatalogEntry pollForCatalog(CachedCatalog baseline, Instant deadline) {
-		for (Duration delay : LEASE_POLLS) {
+	private CatalogEntry pollForCatalog(CachedCatalog baseline, Instant deadline, boolean recoverOrphanLease) {
+		List<Duration> polls = recoverOrphanLease ? CATALOG_RECOVERY_POLLS : LEASE_POLLS;
+		for (Duration delay : polls) {
 			sleep(delay, deadline);
 			Instant now = clock.instant();
 			var cached = cache.freshCatalog(CATALOG_KIND, now);

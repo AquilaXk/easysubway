@@ -27,6 +27,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
@@ -243,17 +244,40 @@ class TrainSearchServiceTest {
 	}
 
 	@Test
-	void forcedCatalogRefreshReacquiresTheLeaseAfterTheOtherOwnerFails() {
+	void forcedCatalogRefreshWaitsForAnOrphanLeaseAndKeepsLoadBudget() {
 		service.catalog();
 		cache.leases.put("catalog-refresh-v1", "other-owner");
-		service = serviceWith(
-			Clock.fixed(NOW, ZoneOffset.UTC),
-			duration -> cache.leases.remove("catalog-refresh-v1", "other-owner")
-		);
+		var clock = new TestClock(NOW);
+		Duration[] slept = { Duration.ZERO };
+		service = serviceWith(clock, duration -> {
+			slept[0] = slept[0].plus(duration);
+			clock.advance(duration);
+			if (slept[0].compareTo(Duration.ofMinutes(5)) >= 0) {
+				cache.leases.remove("catalog-refresh-v1", "other-owner");
+			}
+		});
 
 		service.refreshCatalog();
 
+		assertThat(slept[0]).isGreaterThanOrEqualTo(Duration.ofMinutes(5));
 		assertThat(provider.catalogCalls).hasValue(2);
+	}
+
+	@Test
+	void catalogMissDoesNotWaitOnAnotherProviderCallMonitor() throws Exception {
+		provider.blockCatalog = true;
+		var first = CompletableFuture.supplyAsync(service::catalog);
+		assertThat(provider.catalogStarted.await(5, TimeUnit.SECONDS)).isTrue();
+		var second = CompletableFuture.supplyAsync(service::catalog);
+
+		try {
+			assertThatThrownBy(() -> second.get(1, TimeUnit.SECONDS))
+				.isInstanceOf(ExecutionException.class)
+				.hasCauseInstanceOf(TrainSearchService.TrainSearchFailure.class);
+		} finally {
+			provider.continueCatalog.countDown();
+			first.get(5, TimeUnit.SECONDS);
+		}
 	}
 
 	@Test
@@ -457,7 +481,10 @@ class TrainSearchServiceTest {
 		private final List<LegQuery> queries = new java.util.concurrent.CopyOnWriteArrayList<>();
 		private final CountDownLatch searchStarted = new CountDownLatch(1);
 		private final CountDownLatch continueSearch = new CountDownLatch(1);
+		private final CountDownLatch catalogStarted = new CountDownLatch(1);
+		private final CountDownLatch continueCatalog = new CountDownLatch(1);
 		private volatile boolean blockSearch;
+		private volatile boolean blockCatalog;
 		private volatile String failureCode;
 		private volatile Runnable beforeSearchReturn = () -> {};
 		private volatile List<TrainType> catalogTrainTypes = List.of(
@@ -468,6 +495,14 @@ class TrainSearchServiceTest {
 		@Override
 		public Catalog catalog() {
 			catalogCalls.incrementAndGet();
+			catalogStarted.countDown();
+			if (blockCatalog) {
+				try {
+					continueCatalog.await(5, TimeUnit.SECONDS);
+				} catch (InterruptedException exception) {
+					Thread.currentThread().interrupt();
+				}
+			}
 			return new Catalog(
 				NOW,
 				List.of(new Station("NAT010000", "서울"), new Station("NAT011668", "대전")),
