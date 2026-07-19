@@ -20,9 +20,11 @@ class TrainSearchSchedulerTest {
 		TrainSearchService service = mock(TrainSearchService.class);
 		TrainSearchScheduler scheduler = new TrainSearchScheduler(service);
 
+		scheduler.ensureCatalogAvailable();
 		scheduler.refreshCatalog();
 		scheduler.purgeExpiredCache();
 
+		verify(service).ensureCatalogAvailable();
 		verify(service).refreshCatalog();
 		verify(service).purgeExpired();
 	}
@@ -38,8 +40,21 @@ class TrainSearchSchedulerTest {
 
 	@Test
 	void catalogRefreshUsesDedicatedTaskScheduler() throws Exception {
+		Method availability = TrainSearchScheduler.class.getDeclaredMethod("ensureCatalogAvailable");
 		Method refresh = TrainSearchScheduler.class.getDeclaredMethod("refreshCatalog");
 		assertThatCode(() -> {
+			Scheduled availabilitySchedule = availability.getAnnotation(Scheduled.class);
+			if (!"trainSearchTaskScheduler".equals(availabilitySchedule.scheduler())) {
+				throw new AssertionError("unexpected availability scheduler: " + availabilitySchedule.scheduler());
+			}
+			if (!"${easysubway.train-search.catalog-availability-delay-ms:300000}"
+				.equals(availabilitySchedule.fixedDelayString())) {
+				throw new AssertionError("unexpected availability delay: " + availabilitySchedule.fixedDelayString());
+			}
+			if (!"${easysubway.train-search.catalog-availability-initial-delay-ms:0}"
+				.equals(availabilitySchedule.initialDelayString())) {
+				throw new AssertionError("unexpected initial delay: " + availabilitySchedule.initialDelayString());
+			}
 			String scheduler = refresh.getAnnotation(Scheduled.class).scheduler();
 			if (!"trainSearchTaskScheduler".equals(scheduler)) {
 				throw new AssertionError("unexpected scheduler: " + scheduler);

@@ -113,7 +113,7 @@ public class TrainSearchService {
 			requireBefore(deadline);
 			return cached
 				.map(value -> new CatalogEntry(decodeCatalog(value), value.expiresAt()))
-				.orElseGet(() -> refreshCatalogEntry(now, false, deadline));
+				.orElseGet(() -> refreshCatalogEntry(now, false, false, deadline));
 		} catch (TrainSearchFailure failure) {
 			throw failure;
 		} catch (RuntimeException exception) {
@@ -193,11 +193,18 @@ public class TrainSearchService {
 	public Catalog refreshCatalog() {
 		try {
 			Instant now = clock.instant();
-			Instant deadline = now
-				.plus(CATALOG_LEASE_TTL)
-				.plus(CATALOG_RECOVERY_GRACE)
-				.plus(CATALOG_LOAD_BUDGET);
-			return refreshCatalogEntry(now, true, deadline).catalog();
+			return refreshCatalogEntry(now, true, true, catalogRecoveryDeadline(now)).catalog();
+		} catch (TrainSearchFailure failure) {
+			throw failure;
+		} catch (RuntimeException exception) {
+			throw failure("TRAIN_SEARCH_UNAVAILABLE", exception);
+		}
+	}
+
+	public Catalog ensureCatalogAvailable() {
+		try {
+			Instant now = clock.instant();
+			return refreshCatalogEntry(now, false, true, catalogRecoveryDeadline(now)).catalog();
 		} catch (TrainSearchFailure failure) {
 			throw failure;
 		} catch (RuntimeException exception) {
@@ -209,7 +216,16 @@ public class TrainSearchService {
 		return cache.purgeExpiredBefore(clock.instant().minus(Duration.ofHours(48)));
 	}
 
-	private CatalogEntry refreshCatalogEntry(Instant now, boolean force, Instant deadline) {
+	private Instant catalogRecoveryDeadline(Instant now) {
+		return now.plus(CATALOG_LEASE_TTL).plus(CATALOG_RECOVERY_GRACE).plus(CATALOG_LOAD_BUDGET);
+	}
+
+	private CatalogEntry refreshCatalogEntry(
+		Instant now,
+		boolean force,
+		boolean recoverOrphanLease,
+		Instant deadline
+	) {
 		var existing = cache.freshCatalog(CATALOG_KIND, now);
 		requireBefore(deadline);
 		if (!force && existing.isPresent()) {
@@ -218,7 +234,7 @@ public class TrainSearchService {
 		}
 		String owner = ownerSupplier.get();
 		if (!cache.tryAcquireLease(CATALOG_LEASE_KEY, owner, now, CATALOG_LEASE_TTL)) {
-			return pollForCatalog(force ? existing.orElse(null) : null, deadline, force);
+			return pollForCatalog(force ? existing.orElse(null) : null, deadline, recoverOrphanLease);
 		}
 		return loadCatalog(owner, catalogLoadDeadline(now, deadline));
 	}

@@ -19,6 +19,19 @@ class TrainSearchScheduler {
 	}
 
 	@Scheduled(
+		initialDelayString = "${easysubway.train-search.catalog-availability-initial-delay-ms:0}",
+		fixedDelayString = "${easysubway.train-search.catalog-availability-delay-ms:300000}",
+		scheduler = "trainSearchTaskScheduler"
+	)
+	void ensureCatalogAvailable() {
+		try {
+			service.ensureCatalogAvailable();
+		} catch (TrainSearchFailure failure) {
+			log.warn("train-search catalog availability check failed: code={}", failure.getCode());
+		}
+	}
+
+	@Scheduled(
 		cron = "${easysubway.train-search.catalog-refresh-cron:0 30 3 * * *}",
 		zone = "Asia/Seoul",
 		scheduler = "trainSearchTaskScheduler"

@@ -244,6 +244,28 @@ class TrainSearchServiceTest {
 	}
 
 	@Test
+	void catalogAvailabilityPreparationRecoversAnEmptyCatalogOutsideTheHttpBudget() {
+		cache.leases.put("catalog-refresh-v1", "other-owner");
+		var clock = new TestClock(NOW);
+		Duration[] slept = { Duration.ZERO };
+		service = serviceWith(clock, duration -> {
+			slept[0] = slept[0].plus(duration);
+			clock.advance(duration);
+			if (slept[0].compareTo(Duration.ofMinutes(6)) >= 0) {
+				cache.leases.remove("catalog-refresh-v1", "other-owner");
+			}
+		});
+
+		service.ensureCatalogAvailable();
+
+		assertThat(slept[0]).isGreaterThanOrEqualTo(Duration.ofMinutes(6));
+		assertThat(provider.catalogCalls).hasValue(1);
+		Instant acquiredAt = NOW.plus(slept[0]);
+		assertThat(provider.catalogDeadlines).containsExactly(acquiredAt.plus(Duration.ofMinutes(5)));
+		assertThat(cache.catalogs).containsKey("catalog");
+	}
+
+	@Test
 	void forcedCatalogRefreshWaitsForAnOrphanLeaseAndKeepsLoadInsideTheNewLease() {
 		service.catalog();
 		cache.leases.put("catalog-refresh-v1", "other-owner");
