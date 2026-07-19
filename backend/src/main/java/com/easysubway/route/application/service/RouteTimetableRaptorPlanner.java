@@ -203,7 +203,7 @@ class RouteTimetableRaptorPlanner {
 		for (BoardingStop boardingStop : boardingsByStation.getOrDefault(command.originStationId(), List.of())) {
 			ScheduledTrip trip = boardingStop.trip();
 			int stopIndex = boardingStop.stopIndex();
-			int boardingLine = timetable.lineIndex(trip.lineId());
+			int boardingLine = timetable.lineIndex(trip.lineId(stopIndex));
 			int entryTransition = origin < 0 || boardingLine < 0 ? -1 : timetable.entryTransition(
 				origin, boardingLine, accessProfileBit, false);
 			if (entryTransition < 0) {
@@ -254,7 +254,7 @@ class RouteTimetableRaptorPlanner {
 			}
 			if (command.destinationStationId().equals(stopTime.stationId())) {
 				int destination = timetable.stationIndex(stopTime.stationId());
-				int incomingLine = timetable.lineIndex(trip.lineId());
+				int incomingLine = timetable.lineIndex(trip.lineId(stopIndex));
 				if (destination >= 0 && incomingLine >= 0
 					&& timetable.exitTransition(destination, incomingLine, accessProfileBit, false) >= 0) {
 					return true;
@@ -266,7 +266,7 @@ class RouteTimetableRaptorPlanner {
 				boardingsByStation,
 				stopTime.stationId(),
 				trip.arrivalSeconds(stopIndex),
-				timetable.lineIndex(trip.lineId()),
+				timetable.lineIndex(trip.lineId(stopIndex)),
 				transfersUsed,
 				accessProfileBit,
 				visiting,
@@ -307,7 +307,7 @@ class RouteTimetableRaptorPlanner {
 			for (BoardingStop boardingStop : boardingsByStation.getOrDefault(stationId, List.of())) {
 				ScheduledTrip trip = boardingStop.trip();
 				int stopIndex = boardingStop.stopIndex();
-				int boardingLine = timetable.lineIndex(trip.lineId());
+				int boardingLine = timetable.lineIndex(trip.lineId(stopIndex));
 				int transferTransition = station < 0 || incomingLine < 0 || boardingLine < 0 ? -1
 					: timetable.transferTransition(station, incomingLine, boardingLine, accessProfileBit, false);
 				if (transferTransition < 0) {
@@ -437,10 +437,6 @@ class RouteTimetableRaptorPlanner {
 			return;
 		}
 		int[] stops = timetable.stopsByPattern(pattern);
-		int boardingLine = timetable.lineIndex(trips.getFirst().lineId());
-		if (boardingLine < 0) {
-			return;
-		}
 		ScheduledTrip boardedTrip = null;
 		int boardingPosition = -1;
 		int boardingEarliestDepartureSeconds = UNREACHED;
@@ -449,6 +445,10 @@ class RouteTimetableRaptorPlanner {
 		byte boardingWarningBits = 0;
 		for (int position = firstMarkedPosition; position < stops.length; position += 1) {
 			int station = stops[position];
+			int boardingLine = timetable.lineIndex(trips.getFirst().lineId(position));
+			if (boardingLine < 0) {
+				continue;
+			}
 			if (boardedTrip != null && position > boardingPosition && boardedTrip.allowsDropOff(position)) {
 				workspace.relax(
 					station,
@@ -465,26 +465,32 @@ class RouteTimetableRaptorPlanner {
 			}
 			ReadyBoarding ready = bestReadyBoarding(
 				timetable, workspace, station, boardingLine, round, slackSeconds,
-				accessProfileBit, command, ignoreAccessBlocks);
+				accessProfileBit, command, ignoreAccessBlocks, UNREACHED);
 			if (ready == null) {
 				continue;
 			}
 			int earliestDepartureSeconds = ready.earliestDepartureSeconds();
-			if (boardedTrip != null
-				&& earliestDepartureSeconds < boardingEarliestDepartureSeconds
-				&& boardedTrip.allowsPickup(position)
-				&& boardedTrip.departureSeconds(position) >= earliestDepartureSeconds) {
+			ScheduledTrip candidate = earliestBoardableTrip(
+				trips,
+				position,
+				earliestDepartureSeconds
+			);
+			if (candidate != null) {
+				ready = bestReadyBoarding(timetable, workspace, station, boardingLine, round, slackSeconds,
+					accessProfileBit, command, ignoreAccessBlocks, candidate.departureSeconds(position));
+					earliestDepartureSeconds = ready.earliestDepartureSeconds();
+			}
+			if (boardedTrip != null && boardedTrip.allowsPickup(position)
+				&& boardedTrip.departureSeconds(position) >= earliestDepartureSeconds
+				&& compareReadyBoardingKeys(
+					earliestDepartureSeconds, ready.warningBits(), ready.readySlot(),
+					boardingEarliestDepartureSeconds, boardingWarningBits, boardingReadySlot, true) < 0) {
 				boardingPosition = position;
 				boardingEarliestDepartureSeconds = earliestDepartureSeconds;
 				boardingAccessTransition = ready.accessTransition();
 				boardingReadySlot = ready.readySlot();
 				boardingWarningBits = ready.warningBits();
 			}
-			ScheduledTrip candidate = earliestBoardableTrip(
-				trips,
-				position,
-				earliestDepartureSeconds
-			);
 			if (candidate != null && (boardedTrip == null
 				|| candidate.departureSeconds(position) < boardedTrip.departureSeconds(position)
 				|| (candidate != boardedTrip
@@ -510,7 +516,8 @@ class RouteTimetableRaptorPlanner {
 		int slackSeconds,
 		int accessProfileBit,
 		SearchRouteV2Command command,
-		boolean ignoreAccessBlocks
+		boolean ignoreAccessBlocks,
+		int boardingDeadlineSeconds
 	) {
 		ReadyBoarding best = null;
 		int firstIncomingLine = round == 0 ? workspace.noIncomingLine() : 0;
@@ -531,11 +538,15 @@ class RouteTimetableRaptorPlanner {
 			int earliestDepartureSeconds = readySeconds
 				+ profiledWalkSeconds(command, timetable.transitionDurationSeconds(accessTransition))
 				+ slackSeconds;
+			if (earliestDepartureSeconds > boardingDeadlineSeconds) {
+				continue;
+			}
 			byte warningBits = (byte) (workspace.warningBits[readySlot]
 				| timetable.transitionWarningCodes(accessTransition, accessProfileBit, ignoreAccessBlocks));
 			if (best == null || compareReadyBoardingKeys(
 				earliestDepartureSeconds, warningBits, readySlot,
-				best.earliestDepartureSeconds(), best.warningBits(), best.readySlot()
+				best.earliestDepartureSeconds(), best.warningBits(), best.readySlot(),
+				boardingDeadlineSeconds != UNREACHED
 			) < 0) {
 				best = new ReadyBoarding(readySlot, accessTransition, earliestDepartureSeconds, warningBits);
 			}
@@ -585,10 +596,8 @@ class RouteTimetableRaptorPlanner {
 				if (workspace.arrivalSeconds[slot] == UNREACHED) {
 					continue;
 				}
-				ScheduledTrip finalTrip = timetable.scheduledTrip(workspace.parentTrip[slot]);
-				int finalLine = timetable.lineIndex(finalTrip.lineId());
-				int exitTransition = finalLine < 0 ? -1 : timetable.exitTransition(
-					destination, finalLine, accessProfileBit, ignoreAccessBlocks);
+				int exitTransition = timetable.exitTransition(
+					destination, incomingLine, accessProfileBit, ignoreAccessBlocks);
 				if (exitTransition < 0) {
 					continue;
 				}
@@ -644,11 +653,16 @@ class RouteTimetableRaptorPlanner {
 
 	static int compareReadyBoardingKeys(
 		int leftTime, byte leftWarnings, int leftSlot,
-		int rightTime, byte rightWarnings, int rightSlot
+		int rightTime, byte rightWarnings, int rightSlot,
+		boolean preferWarnings
 	) {
-		int comparison = Integer.compare(leftTime, rightTime);
+		int comparison = preferWarnings
+			? Integer.compare(warningCount(leftWarnings), warningCount(rightWarnings))
+			: Integer.compare(leftTime, rightTime);
 		if (comparison == 0) {
-			comparison = Integer.compare(warningCount(leftWarnings), warningCount(rightWarnings));
+			comparison = preferWarnings
+				? Integer.compare(leftTime, rightTime)
+				: Integer.compare(warningCount(leftWarnings), warningCount(rightWarnings));
 		}
 		return comparison != 0 ? comparison : Integer.compare(leftSlot, rightSlot);
 	}
@@ -659,7 +673,7 @@ class RouteTimetableRaptorPlanner {
 	) {
 		int comparison = compareReadyBoardingKeys(
 			leftTime, leftWarnings, leftTrip,
-			rightTime, rightWarnings, rightTrip);
+			rightTime, rightWarnings, rightTrip, false);
 		return comparison != 0 ? comparison : Integer.compare(leftStop, rightStop);
 	}
 
@@ -698,7 +712,7 @@ class RouteTimetableRaptorPlanner {
 			"entry",
 			command.originStationId(),
 			firstLeg.from().stationId(),
-			firstLeg.lineId(),
+			firstLeg.from().lineId(),
 			firstLeg.lineName(),
 			waitMinutesBeforeBoarding(label.startSeconds(), firstLeg.departureSeconds(), entryDurationSeconds, boardingSlackSeconds),
 			entryDurationSeconds,
@@ -720,7 +734,7 @@ class RouteTimetableRaptorPlanner {
 					"transfer",
 					previousLeg.to().stationId(),
 					leg.from().stationId(),
-					leg.lineId(),
+					leg.from().lineId(),
 					leg.lineName(),
 					waitMinutesBeforeBoarding(previousLeg.arrivalSeconds(), leg.departureSeconds(), transferDurationSeconds, boardingSlackSeconds),
 					transferDurationSeconds,
@@ -771,7 +785,7 @@ class RouteTimetableRaptorPlanner {
 			"exit",
 			lastLeg.to().stationId(),
 			command.destinationStationId(),
-			lastLeg.lineId(),
+			lastLeg.to().lineId(),
 			lastLeg.lineName(),
 			(int) Math.ceil(exitDurationSeconds / 60.0),
 			exitDurationSeconds,
@@ -1305,7 +1319,9 @@ class RouteTimetableRaptorPlanner {
 				List<Integer> accessSignature = trip.stopTimes().stream()
 					.map(stopTime -> (stopTime.pickupType() << 16) | (stopTime.dropOffType() & 0xffff))
 					.toList();
-				RoutePatternKey key = new RoutePatternKey(trip.trip().routeId(), stationSequence, accessSignature);
+				List<String> lineSequence = trip.stopTimes().stream().map(TransitStopTime::lineId).toList();
+				RoutePatternKey key = new RoutePatternKey(
+					trip.trip().routeId(), stationSequence, lineSequence, accessSignature);
 				groupedTrips.computeIfAbsent(key, ignored -> new ArrayList<>()).add(trip);
 			}
 			for (Map.Entry<RoutePatternKey, List<ScheduledTrip>> entry : groupedTrips.entrySet()) {
@@ -1492,6 +1508,12 @@ class RouteTimetableRaptorPlanner {
 				}
 				List<Candidate> candidates = transfers.get(transferKey(station, fromLine, toLine, lineCount));
 				PathwayEdge normalEdge = edges.get(rule.pathwayEdgeId());
+				PathwayEdge strictEdge = edges.get(rule.strictStepFreePathwayEdgeId());
+				if (normalEdge == null && strictEdge == null && rule.minTransferSeconds() > 0) {
+					candidates.add(new Candidate(rule.minTransferSeconds(), TRANSFER_DISTANCE_METERS,
+						STRICT_PROFILE_MASK, NON_STRICT_PROFILE_MASK, WARNING_LOW_CONFIDENCE,
+						false, null, "MISSING"));
+				}
 				if (normalEdge != null) {
 					boolean strictCandidate = normalEdge.id().equals(rule.strictStepFreePathwayEdgeId());
 					candidates.add(candidate(
@@ -1502,7 +1524,6 @@ class RouteTimetableRaptorPlanner {
 						strictCandidate
 					));
 				}
-				PathwayEdge strictEdge = edges.get(rule.strictStepFreePathwayEdgeId());
 				if (strictEdge != null && (normalEdge == null || !strictEdge.id().equals(normalEdge.id()))) {
 					candidates.add(candidate(
 						strictEdge,
@@ -2019,6 +2040,7 @@ class RouteTimetableRaptorPlanner {
 	private record RoutePatternKey(
 		String routeId,
 		List<Integer> stationSequence,
+		List<String> lineSequence,
 		List<Integer> accessSignature
 	) {
 	}
@@ -2068,8 +2090,8 @@ class RouteTimetableRaptorPlanner {
 			return times.allowsDropOff(stopIndex);
 		}
 
-		private String lineId() {
-			return route == null ? stopTimes.getFirst().lineId() : route.lineId();
+		private String lineId(int stopIndex) {
+			return stopTimes.get(stopIndex).lineId();
 		}
 	}
 

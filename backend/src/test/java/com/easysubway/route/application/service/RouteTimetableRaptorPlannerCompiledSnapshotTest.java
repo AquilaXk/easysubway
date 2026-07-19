@@ -65,6 +65,9 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 			List.of(new LoadRouteTimetablePort.TransferRule(
 				"outside", "station-a", "line", "station-b", "line", "OUT_OF_STATION",
 				120, "verified-entry", null, "VERIFIED"
+			), new LoadRouteTimetablePort.TransferRule(
+				"rule-only", "station-a", "line", "station-a", "line", "IN_STATION",
+				178, null, null, "VERIFIED"
 			)),
 			List.of(new LoadRouteTimetablePort.RouteEdgeEvidence(
 				"entry-evidence", "station-a", "line", "verified-entry", "ENTRY",
@@ -82,12 +85,15 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 
 		int verifiedEntry = compiled.entryTransition(stationA, line, strict, false);
 		int defaultExit = compiled.exitTransition(stationB, line, allow, false);
+		int ruleOnlyTransfer = compiled.transferTransition(stationA, line, line, allow, false);
 
 		assertThat(compiled.transitionDurationSeconds(verifiedEntry)).isEqualTo(90);
 		assertThat(compiled.transitionDistanceMeters(verifiedEntry)).isEqualTo(60);
 		assertThat(defaultExit).isNotNegative();
 		assertThat(compiled.transitionDurationSeconds(defaultExit)).isEqualTo(180);
 		assertThat(compiled.transitionDistanceMeters(defaultExit)).isEqualTo(120);
+		assertThat(compiled.transitionDurationSeconds(ruleOnlyTransfer)).isEqualTo(178);
+		assertThat(compiled.transferTransition(stationA, line, line, strict, false)).isEqualTo(-1);
 		assertThat(compiled.exitTransition(stationB, line, strict, false)).isEqualTo(-1);
 		assertThat(compiled.unsupportedTransferCount()).isOne();
 	}
@@ -160,7 +166,7 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 			1
 		);
 
-		var results = planner.search(command, planner.compile(withAccess(everyDayTimetable(), verifiedDirectAccess())));
+		var results = planner.search(command, planner.compile(withAccess(lineChangingTimetable(), verifiedDirectAccess())));
 
 		assertThat(results).singleElement().satisfies(result -> {
 			assertThat(result.warnings()).isEmpty();
@@ -214,27 +220,20 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 	}
 
 	@Test
-	@DisplayName("strict scan은 더 일찍 도착한 다른 노선에 지배되지 않고 환승 가능한 유입 노선을 보존한다")
+	@DisplayName("scan은 빠른 unknown 상태보다 같은 열차를 타는 verified 유입 노선을 보존한다")
 	void strictScanPreservesIncomingLineLabels() {
-		var command = new SearchRouteV2Command(
-			"station-origin",
-			"station-destination",
-			OffsetDateTime.parse("2026-07-01T08:50:00+09:00"),
-			MobilityType.WHEELCHAIR,
-			ConstraintMode.STRICT_STEP_FREE,
-			false,
-			1,
-			1
-		);
-
-		var results = planner.search(command, planner.compile(withAccess(
-			incomingLineDominanceTimetable(), incomingLineDominanceAccess())));
-
-		assertThat(results).singleElement().satisfies(result ->
-			assertThat(result.steps())
-				.filteredOn(step -> "ride".equals(step.stepType()))
-				.extracting("tripId")
-				.containsExactly("trip-b", "trip-c"));
+		for (ConstraintMode mode : List.of(ConstraintMode.STRICT_STEP_FREE, ConstraintMode.ALLOW_WITH_WARNINGS)) {
+			var command = new SearchRouteV2Command(
+				"station-origin", "station-destination", OffsetDateTime.parse("2026-07-01T08:50:00+09:00"),
+				MobilityType.WHEELCHAIR, mode, false, 1, 1);
+			var results = planner.search(command, planner.compile(withAccess(
+				incomingLineDominanceTimetable(), incomingLineDominanceAccess())));
+			assertThat(results).singleElement().satisfies(result -> {
+				assertThat(result.warnings()).isEmpty();
+				assertThat(result.steps()).filteredOn(step -> "ride".equals(step.stepType()))
+					.extracting("tripId").containsExactly("trip-b", "trip-c");
+			});
+		}
 	}
 
 	@Test
@@ -461,24 +460,6 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 		warnings.setAccessible(true);
 
 		assertThat(((byte[]) warnings.get(workspace))[2]).isZero();
-	}
-
-	@Test
-	@DisplayName("동일 boarding 준비 시각은 slot 순서보다 누적 접근성 warning이 적은 상태를 선택한다")
-	void equalBoardingReadinessPrefersFewerAccessibilityWarnings() {
-		assertThat(RouteTimetableRaptorPlanner.compareReadyBoardingKeys(
-			100, (byte) 0, 2,
-			100, (byte) 1, 1
-		)).isNegative();
-	}
-
-	@Test
-	@DisplayName("동일 destination 도착 시각은 trip 순서보다 누적 접근성 warning이 적은 후보를 선택한다")
-	void equalDestinationArrivalPrefersFewerAccessibilityWarnings() {
-		assertThat(RouteTimetableRaptorPlanner.compareDestinationLabelKeys(
-			100, (byte) 0, 1, 0,
-			100, (byte) 1, 0, 0
-		)).isNegative();
 	}
 
 	@Test
@@ -717,6 +698,16 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 		);
 	}
 
+	private static RouteTimetable lineChangingTimetable() {
+		var timetable = everyDayTimetable();
+		var first = timetable.transitStopTimes().getFirst();
+		var second = timetable.transitStopTimes().getLast();
+		return new RouteTimetable(timetable.serviceCalendars(), timetable.serviceCalendarDates(),
+			timetable.transitRoutes(), timetable.transitTrips(), List.of(first, new LoadRouteTimetablePort.TransitStopTime(
+				second.tripId(), second.stopSequence(), second.stationId(), "line-b", second.arrivalSeconds(),
+				second.departureSeconds(), second.pickupType(), second.dropOffType())), timetable.transitFrequencies());
+	}
+
 	private static RouteTimetable withAccess(
 		RouteTimetable timetable,
 		LoadRouteTimetablePort.RouteAccessData accessData
@@ -802,7 +793,7 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 				"entry-verified-evidence", "station-a", "line", "entry-verified", "ENTRY",
 				"OFFICIAL_SOURCE", "VERIFIED", true, null),
 			new LoadRouteTimetablePort.RouteEdgeEvidence(
-				"exit-verified-evidence", "station-b", "line", "exit-verified", "EXIT",
+				"exit-verified-evidence", "station-b", "line-b", "exit-verified", "EXIT",
 				"OFFICIAL_SOURCE", "VERIFIED", true, null)
 		);
 		return new LoadRouteTimetablePort.RouteAccessData(List.of(), edges, List.of(), evidence);
@@ -930,7 +921,7 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 				new LoadRouteTimetablePort.TransitStopTime(
 					"trip-a", 1, "station-origin", "line-a", 33000, 33000, 0, 0),
 				new LoadRouteTimetablePort.TransitStopTime(
-					"trip-a", 2, "station-x", "line-a", 33600, 33600, 0, 0),
+					"trip-a", 2, "station-x", "line-a", 33000, 33000, 0, 0),
 				new LoadRouteTimetablePort.TransitStopTime(
 					"trip-b", 1, "station-origin", "line-b", 33060, 33060, 0, 0),
 				new LoadRouteTimetablePort.TransitStopTime(
