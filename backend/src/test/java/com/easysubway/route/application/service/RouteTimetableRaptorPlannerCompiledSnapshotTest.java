@@ -59,9 +59,10 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 				new LoadRouteTimetablePort.PathwayNode("platform", "station-a", "line", "PLATFORM")
 			),
 			List.of(new LoadRouteTimetablePort.PathwayEdge(
-				"verified-entry", "entry", "platform", 90, 60, false, false, 100,
-				"AVAILABLE", "OFFICIAL_SOURCE", "VERIFIED"
-			)),
+				"verified-entry", "entry", "platform", 360, 60, false, false, 100,
+				"AVAILABLE", "OFFICIAL_SOURCE", "VERIFIED"), new LoadRouteTimetablePort.PathwayEdge(
+				"fast-stairs", "entry", "platform", 62, 20, false, true, 100,
+				"AVAILABLE", "OFFICIAL_SOURCE", "VERIFIED")),
 			List.of(new LoadRouteTimetablePort.TransferRule(
 				"outside", "station-a", "line", "station-b", "line", "OUT_OF_STATION",
 				120, "verified-entry", null, "VERIFIED"
@@ -71,8 +72,9 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 			)),
 			List.of(new LoadRouteTimetablePort.RouteEdgeEvidence(
 				"entry-evidence", "station-a", "line", "verified-entry", "ENTRY",
-				"OFFICIAL_SOURCE", "VERIFIED", true, null
-			))
+				"OFFICIAL_SOURCE", "VERIFIED", true, null), new LoadRouteTimetablePort.RouteEdgeEvidence(
+				"stairs-evidence", "station-a", "line", "fast-stairs", "ENTRY",
+				"OFFICIAL_SOURCE", "VERIFIED", false, "STAIRS"))
 		);
 		var compiled = planner.compile(withAccess(everyDayTimetable(), accessData));
 		int stationA = compiled.stationIndex("station-a");
@@ -87,9 +89,9 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 		int defaultExit = compiled.exitTransition(stationB, line, allow, false);
 		int ruleOnlyTransfer = compiled.transferTransition(stationA, line, line, allow, false);
 
-		assertThat(compiled.transitionDurationSeconds(verifiedEntry)).isEqualTo(90);
+		assertThat(compiled.transitionDurationSeconds(verifiedEntry)).isEqualTo(360);
 		assertThat(compiled.transitionDistanceMeters(verifiedEntry)).isEqualTo(60);
-		assertThat(defaultExit).isNotNegative();
+		assertThat(compiled.transitionDurationSeconds(compiled.entryTransition(stationA, line, allow, false))).isEqualTo(62);
 		assertThat(compiled.transitionDurationSeconds(defaultExit)).isEqualTo(180);
 		assertThat(compiled.transitionDistanceMeters(defaultExit)).isEqualTo(120);
 		assertThat(compiled.transitionDurationSeconds(ruleOnlyTransfer)).isEqualTo(178);
@@ -99,28 +101,29 @@ class RouteTimetableRaptorPlannerCompiledSnapshotTest {
 	}
 
 	@Test
-	@DisplayName("strict는 stairs·generated·unknown·stale·missing·운영 불가 transition을 모두 차단한다")
+	@DisplayName("stairs·generated·unknown·stale·missing은 strict에서, 운영 불가는 모든 profile에서 차단한다")
 	void strictBlocksUnsafeAndUnverifiedTransitions() {
 		int strict = RouteTimetableRaptorPlanner.profileBit(
 			MobilityType.WHEELCHAIR, ConstraintMode.STRICT_STEP_FREE);
 		int allow = RouteTimetableRaptorPlanner.profileBit(
 			MobilityType.SENIOR, ConstraintMode.ALLOW_WITH_WARNINGS);
+		int prefer = RouteTimetableRaptorPlanner.profileBit(MobilityType.SENIOR, ConstraintMode.PREFER_STEP_FREE);
 		List<LoadRouteTimetablePort.RouteAccessData> unsafe = List.of(
 			entryAccess("VERIFIED", "OFFICIAL_SOURCE", true, true),
 			entryAccess("GENERATED", "GENERATED", false, false),
-			entryAccess("UNKNOWN", "UNKNOWN", false, false),
+			entryAccess("UNKNOWN", "UNKNOWN", false, false, "NO_OFFICIAL_FEED"),
 			entryAccess("STALE", "OFFICIAL_SOURCE", false, false),
 			entryAccess(null, null, false, false),
 			entryAccess("VERIFIED", "OFFICIAL_SOURCE", true, false, "UNDER_MAINTENANCE")
 		);
 
-		for (var accessData : unsafe) {
-			var compiled = planner.compile(withAccess(everyDayTimetable(), accessData));
-			int station = compiled.stationIndex("station-a");
-			int line = compiled.lineIndex("line");
+		for (int index = 0; index < unsafe.size(); index += 1) {
+			var compiled = planner.compile(withAccess(everyDayTimetable(), unsafe.get(index)));
+			int station = compiled.stationIndex("station-a"), line = compiled.lineIndex("line");
 
 			assertThat(compiled.entryTransition(station, line, strict, false)).isEqualTo(-1);
-			assertThat(compiled.entryTransition(station, line, allow, false)).isNotNegative();
+			assertThat(List.of(prefer, allow).stream().allMatch(profile -> compiled.entryTransition(station, line, profile, false) < 0))
+				.isEqualTo(index == unsafe.size() - 1);
 		}
 
 		var stale = planner.compile(withAccess(

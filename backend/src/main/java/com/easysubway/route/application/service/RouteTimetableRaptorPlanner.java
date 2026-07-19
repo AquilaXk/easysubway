@@ -1406,8 +1406,8 @@ class RouteTimetableRaptorPlanner {
 	private static final class AccessTransitions {
 
 		private static final Comparator<Candidate> CANDIDATE_ORDER = Comparator
-			.comparingInt((Candidate candidate) -> Integer.bitCount(candidate.warningCodes()))
-			.thenComparingInt(Candidate::durationSeconds)
+			.comparingInt(Candidate::durationSeconds)
+			.thenComparingInt(candidate -> Integer.bitCount(candidate.warningCodes()))
 			.thenComparingInt(Candidate::distanceMeters)
 			.thenComparing(candidate -> candidate.edgeId() == null ? "" : candidate.edgeId());
 
@@ -1584,6 +1584,8 @@ class RouteTimetableRaptorPlanner {
 				&& trustedProvenance(evidence.provenanceKind())
 				&& trustedProvenance(edge.provenanceKind());
 			boolean available = "AVAILABLE".equals(edge.accessibilityStatus());
+			boolean unavailable = "UNAVAILABLE".equals(edge.accessibilityStatus())
+				|| "UNDER_MAINTENANCE".equals(edge.accessibilityStatus());
 			boolean strictAllowed = strictCandidate
 				&& verified
 				&& trusted
@@ -1607,7 +1609,8 @@ class RouteTimetableRaptorPlanner {
 			return new Candidate(
 				durationSeconds,
 				edge.distanceMeters(),
-				strictAllowed ? 0 : STRICT_PROFILE_MASK,
+				unavailable ? STRICT_PROFILE_MASK | NON_STRICT_PROFILE_MASK
+					: (strictAllowed ? 0 : STRICT_PROFILE_MASK),
 				warnings == 0 ? 0 : NON_STRICT_PROFILE_MASK,
 				warnings,
 				edge.includesStairs(),
