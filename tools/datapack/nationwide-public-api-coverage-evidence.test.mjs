@@ -18,6 +18,11 @@ test("전국 공공데이터 audit은 76건만 공식 미지원으로 닫고 194
   const resolutions = JSON.parse(resolutionsText);
 
   assert.equal(plan.entries.length, 270);
+  const korailEntries = plan.entries.filter(({ operatorId }) => operatorId === "korail");
+  assert.equal(korailEntries.length, 60);
+  assert.ok(korailEntries.every(({ queries }) => queries.every(
+    ({ query }) => query.organizations[0] === "한국철도공사",
+  )));
   assert.equal(resolutions.entries.length, 76);
   assert.equal(resolutions.unresolved.length, 194);
   assert.deepEqual(
