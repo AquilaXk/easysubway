@@ -59,8 +59,11 @@ class TrainSearchRateLimitFilterTest {
 
 		assertThat(filteredRequest(filter, request("HEAD", "/api/v1/trains/search"), "KTX").getStatus())
 			.isEqualTo(200);
-		assertThat(filteredRequest(filter, request("HEAD", "/api/v1/trains/search"), "KTX").getStatus())
-			.isEqualTo(429);
+		var limited = filteredRequest(filter, request("HEAD", "/api/v1/trains/search"), "KTX");
+		assertThat(limited.getStatus()).isEqualTo(429);
+		assertThat(limited.getHeader("Cache-Control")).isEqualTo("no-store");
+		assertThat(limited.getHeader("Retry-After")).isEqualTo("30");
+		assertThat(limited.getContentAsByteArray()).isEmpty();
 	}
 
 	@Test
@@ -149,6 +152,16 @@ class TrainSearchRateLimitFilterTest {
 
 		assertThat(limiter.acquire("client", 2).allowed()).isFalse();
 		assertThat(limiter.acquire("client", 1).allowed()).isTrue();
+	}
+
+	@Test
+	void dailyLimiterCardinalityDenialRetriesAtTheNextKstDay() {
+		var clock = Clock.fixed(Instant.parse("2026-07-19T14:58:30Z"), ZoneOffset.UTC);
+		var limiter = new TrainSearchRateLimiter(24, 64, 1, clock, ZoneId.of("Asia/Seoul"));
+		assertThat(limiter.acquire("first", 1).allowed()).isTrue();
+
+		assertThat(limiter.acquire("second", 1))
+			.isEqualTo(new TrainSearchRateLimiter.AcquireResult(false, 90));
 	}
 
 	private void assertAllowed(TrainSearchRateLimitFilter filter, String trainType, String returnDate) throws Exception {

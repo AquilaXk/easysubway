@@ -95,6 +95,7 @@ class TrainSearchRateLimitFilter extends OncePerRequestFilter {
 		response.setHeader("Cache-Control", "no-store");
 		response.setHeader("Retry-After", Long.toString(result.retryAfterSeconds()));
 		response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+		if (HttpMethod.HEAD.matches(request.getMethod())) return;
 		objectMapper.writeValue(response.getOutputStream(), Map.of(
 			"success", false,
 			"data", Map.of("code", "TRAIN_SEARCH_RATE_LIMITED"),
@@ -173,7 +174,9 @@ final class TrainSearchRateLimiter {
 		WindowCounter.Decision decision = counter == null
 			? WindowCounter.Decision.CARDINALITY_DENIED
 			: counter.acquire(window, day, cost, limit, dailyLimit);
-		long retryAfter = decision == WindowCounter.Decision.DAILY_DENIED ? dailyRetryAfter : minuteRetryAfter;
+		boolean retriesNextDay = decision == WindowCounter.Decision.DAILY_DENIED
+			|| (decision == WindowCounter.Decision.CARDINALITY_DENIED && dailyLimit != null);
+		long retryAfter = retriesNextDay ? dailyRetryAfter : minuteRetryAfter;
 		return decision == WindowCounter.Decision.ALLOWED
 			? new AcquireResult(true, 0)
 			: new AcquireResult(false, retryAfter);
