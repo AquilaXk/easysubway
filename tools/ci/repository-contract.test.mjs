@@ -12879,11 +12879,11 @@ test("관리자 v3 공통 shell은 접근성 chrome과 inline style 제한을 �
   assert.match(adminCss, /outline: 3px solid #ffbf47/);
   assert.match(adminCss, /\.admin-topbar-row/);
   // #2071 scroll 소유권 계약: 관리자 table의 horizontal scroll은 .admin-table-scroll wrapper가 단독 소유한다.
-  // .admin-main / .admin-v3 section / .admin-card 는 scroll을 소유하지 않는다(overflow-x: visible).
+  // .admin-main / .admin-panel / .admin-card 는 scroll을 소유하지 않는다(overflow-x: visible).
   assert.match(adminCss, /\.admin-main[\s\S]*?min-width: 0[\s\S]*?overflow-x: visible/);
   assert.match(adminCss, /\.admin-sidebar[\s\S]*overflow-y: auto/);
   assert.match(adminCss, /\.admin-v3 table[\s\S]*min-width: 620px/);
-  assert.match(adminCss, /\.admin-v3 section,[\s\S]*?\.admin-card[\s\S]*?overflow-x: visible/);
+  assert.match(adminCss, /\.admin-panel,[\s\S]*?\.admin-card[\s\S]*?overflow-x: visible/);
   // .admin-table-scroll 이 유일한 scroll 소유자: overflow: auto + bounded viewport(max-block-size) + inline overscroll 격리.
   assert.match(adminCss, /\.admin-table-scroll \{[\s\S]*?max-block-size: min\(70vh, 640px\)[\s\S]*?overflow: auto[\s\S]*?overscroll-behavior-inline: contain/);
   // vertical sticky 는 thead th 에만 적용한다(#2071 리뷰: row header td 는 vertical sticky 제외).
