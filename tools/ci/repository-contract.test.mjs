@@ -8732,6 +8732,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   const sourceIds = inventory.sources.map((source) => source.id).sort();
   assert.deepEqual(sourceIds, [
     "busan-transportation-official-od-fares",
+    "busan-transportation-route-topology",
     "busan-transportation-urban-rail-station-info",
     "kric-disabled-toilet",
     "kric-elevator-car-number",
@@ -9915,7 +9916,7 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
   assert.equal(candidates.schemaVersion, 1);
   assert.equal(candidates.artifactKind, "production-source-candidates");
   assert.equal(candidates.source, "tools/datapack/source-candidates.json");
-  assert.equal(candidates.updatedAt, "2026-07-19");
+  assert.equal(candidates.updatedAt, "2026-07-20");
   assert.deepEqual(
     kricCandidates.map((candidate) => candidate.id).sort(),
     [
