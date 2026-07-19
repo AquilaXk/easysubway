@@ -12,6 +12,10 @@ import {
   materializeDaejeonRouteTopology,
 } from "./materialize-daejeon-route-topology.mjs";
 import { parseMolitDaejeonStationMappings } from "./build-molit-nationwide-fixture.mjs";
+import {
+  materializeBusanRouteTopology,
+  parseCanonicalBusanStationMappings,
+} from "./materialize-busan-route-topology.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
@@ -157,6 +161,94 @@ test("materialized production SQLite와 provenance만 대전 1호선 topology re
     daejeon.filter(({ status }) => status === "SUPPORTED").map(({ lineId, sourceDomain }) => ({ lineId, sourceDomain })),
     [{ lineId: "line-7051a9c2525c", sourceDomain: "route_graph_topology" }],
   );
+});
+
+test("부산과 대전 topology를 하나의 nationwide production pack으로 합성한다", async (context) => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-busan-daejeon-topology-pack-"));
+  context.after(() => rm(outputDir, { recursive: true, force: true }));
+  const [baseFixture, daejeonSnapshot, inventory, canonicalStationMappings] = await inputs();
+  const [busanSnapshot, busanStationMapCsv] = await Promise.all([
+    readJson("tools/datapack/sources/busan-transportation-route-topology-20260720.json"),
+    readFile(path.join(root, "tools/datapack/sources/regional-official-svg-route-map-coordinates-20260624.csv"), "utf8"),
+  ]);
+  const busanFixture = materializeBusanRouteTopology({
+    baseFixture,
+    snapshot: busanSnapshot,
+    inventory,
+    canonicalStationMappings: parseCanonicalBusanStationMappings(busanStationMapCsv),
+    now: new Date("2026-07-19T18:14:03.004Z"),
+  });
+  const fixture = materializeDaejeonRouteTopology({
+    baseFixture: busanFixture,
+    snapshot: daejeonSnapshot,
+    inventory,
+    canonicalStationMappings,
+    now: evidenceNow,
+  });
+  const fixturePath = path.join(outputDir, "fixture.json");
+  const packOutput = path.join(outputDir, "pack");
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+  await mkdir(packOutput, { recursive: true });
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    privateKeyEncoding: { type: "pkcs8", format: "pem" },
+    publicKeyEncoding: { type: "spki", format: "pem" },
+  });
+  await execFileAsync(process.execPath, [
+    "tools/datapack/build-datapack.mjs", "--fixture", fixturePath, "--output", packOutput,
+  ], {
+    cwd: root,
+    env: { ...process.env, EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM: privateKey },
+  });
+  await execFileAsync(process.execPath, [
+    "tools/datapack/validate-datapack.mjs",
+    "--manifest", path.join(packOutput, "current.json"),
+    "--root", packOutput,
+    "--require-production",
+  ], {
+    cwd: root,
+    env: { ...process.env, EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: publicKey },
+  });
+});
+
+test("명시된 접근성 coverage scope의 station-line evidence 누락을 거부한다", async (context) => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-accessibility-scope-gap-"));
+  context.after(() => rm(outputDir, { recursive: true, force: true }));
+  const [baseFixture, snapshot, inventory, canonicalStationMappings] = await inputs();
+  const pack = baseFixture.packs[0];
+  pack.stationFacilityEvidence = pack.stationFacilityEvidence
+    .filter(({ stationId }) => stationId !== "station-sangnoksu");
+  pack.networkEdges = pack.networkEdges.filter(({ fromNodeId, toNodeId }) =>
+    !fromNodeId.startsWith("station-sangnoksu") && !toNodeId.startsWith("station-sangnoksu"));
+  pack.minimumTableRows.station_facility_evidence = pack.stationFacilityEvidence.length;
+  pack.minimumTableRows.network_edges = pack.networkEdges.length;
+  const fixture = materializeDaejeonRouteTopology({
+    baseFixture, snapshot, inventory, canonicalStationMappings, now: evidenceNow,
+  });
+  const fixturePath = path.join(outputDir, "fixture.json");
+  const packOutput = path.join(outputDir, "pack");
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+  await mkdir(packOutput, { recursive: true });
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    privateKeyEncoding: { type: "pkcs8", format: "pem" },
+    publicKeyEncoding: { type: "spki", format: "pem" },
+  });
+  await execFileAsync(process.execPath, [
+    "tools/datapack/build-datapack.mjs", "--fixture", fixturePath, "--output", packOutput,
+  ], {
+    cwd: root,
+    env: { ...process.env, EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM: privateKey },
+  });
+  await assert.rejects(execFileAsync(process.execPath, [
+    "tools/datapack/validate-datapack.mjs",
+    "--manifest", path.join(packOutput, "current.json"),
+    "--root", packOutput,
+    "--require-production",
+  ], {
+    cwd: root,
+    env: { ...process.env, EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: publicKey },
+  }), /verified ENTRY coverage gap/);
 });
 
 async function readJson(relativePath) {
