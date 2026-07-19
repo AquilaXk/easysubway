@@ -428,7 +428,12 @@ test("capacity runner는 repeated·unique·3-node·quota 경계를 고정한다"
   assert.match(k6, /dropped_iterations/);
   assert.match(k6, /expectedRequestCount/);
   assert.match(k6, /fiveXxCount = data\.metrics\.train_search_5xx/);
-  assert.match(k6, /timeUnit: "2s"/);
+  assert.match(k6, /const ARRIVAL_INTERVAL_SECONDS = 2;/);
+  assert.match(
+    k6,
+    /expectedRequestCount = Math\.floor\(\(rate \* durationSeconds\) \/ ARRIVAL_INTERVAL_SECONDS\)/,
+  );
+  assert.match(k6, /timeUnit: `\$\{ARRIVAL_INTERVAL_SECONDS\}s`/);
   assert.doesNotMatch(k6, /http_req_failed\?\.values\?\.passes/);
   assert.match(k6, /requestCount >= expectedRequestCount/);
   assert.match(k6, /Array\.isArray\(payload\.data\.inbound\)/);
@@ -439,6 +444,7 @@ test("capacity runner는 repeated·unique·3-node·quota 경계를 고정한다"
   assert.doesNotMatch(runner, /--provider-call-count|--quota-verdict/);
   assert.doesNotMatch(k6, /TRAIN_SEARCH_PROVIDER_CALL_COUNT|TRAIN_SEARCH_QUOTA_VERDICT/);
   const serviceTest = read("backend/src/test/java/com/easysubway/train/application/TrainSearchServiceTest.java");
+  assert.match(serviceTest, /Executors\.newFixedThreadPool\(2\)/);
   assert.match(serviceTest, /Executors\.newFixedThreadPool\(3\)/);
   assert.match(serviceTest, /pool\.shutdownNow\(\)/);
   assert.match(runner, /validate-train-search-capacity\.mjs/);

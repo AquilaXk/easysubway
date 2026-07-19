@@ -15,11 +15,12 @@ if (!new Set(["repeated", "unique"]).has(workload)) {
 
 const rate = Number(__ENV.TRAIN_SEARCH_RATE || 1);
 const duration = __ENV.TRAIN_SEARCH_DURATION || "12s";
+const ARRIVAL_INTERVAL_SECONDS = 2;
 if (!Number.isInteger(rate) || rate < 1 || rate > 4) throw new Error("TRAIN_SEARCH_RATE must be 1 through 4");
 const durationMatch = /^([1-9]\d*)s$/.exec(duration);
 if (!durationMatch) throw new Error("TRAIN_SEARCH_DURATION must be whole seconds");
 const durationSeconds = Number(durationMatch[1]);
-const expectedRequestCount = Math.floor((rate * durationSeconds) / 2);
+const expectedRequestCount = Math.floor((rate * durationSeconds) / ARRIVAL_INTERVAL_SECONDS);
 if (expectedRequestCount < 1) throw new Error("TRAIN_SEARCH_DURATION scheduled no requests");
 const summaryPath = __ENV.TRAIN_SEARCH_SUMMARY_PATH;
 if (typeof summaryPath !== "string" || !summaryPath.startsWith("/")) {
@@ -31,7 +32,7 @@ export const options = {
     train_search: {
       executor: "constant-arrival-rate",
       rate,
-      timeUnit: "2s",
+      timeUnit: `${ARRIVAL_INTERVAL_SECONDS}s`,
       duration,
       preAllocatedVUs: rate * 2,
       maxVUs: rate * 4,

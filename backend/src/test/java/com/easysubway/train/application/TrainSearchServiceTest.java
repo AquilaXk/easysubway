@@ -58,14 +58,21 @@ class TrainSearchServiceTest {
 	@Test
 	void joinsConcurrentMissesIntoOneProviderSearch() throws Exception {
 		provider.blockSearch = true;
-		var first = CompletableFuture.supplyAsync(() -> service.search(criteria(null)));
-		assertThat(provider.searchStarted.await(5, TimeUnit.SECONDS)).isTrue();
-		var second = CompletableFuture.supplyAsync(() -> service.search(criteria(null)));
-		assertThat(cache.secondLegRead.await(5, TimeUnit.SECONDS)).isTrue();
-		provider.continueSearch.countDown();
+		var pool = Executors.newFixedThreadPool(2);
+		try {
+			var first = CompletableFuture.supplyAsync(() -> service.search(criteria(null)), pool);
+			assertThat(provider.searchStarted.await(5, TimeUnit.SECONDS)).isTrue();
+			var second = CompletableFuture.supplyAsync(() -> service.search(criteria(null)), pool);
+			assertThat(cache.secondLegRead.await(5, TimeUnit.SECONDS)).isTrue();
+			provider.continueSearch.countDown();
 
-		assertThat(first.get(5, TimeUnit.SECONDS)).isEqualTo(second.get(5, TimeUnit.SECONDS));
-		assertThat(provider.searchCalls).hasValue(1);
+			assertThat(first.get(5, TimeUnit.SECONDS)).isEqualTo(second.get(5, TimeUnit.SECONDS));
+			assertThat(provider.searchCalls).hasValue(1);
+		} finally {
+			provider.continueSearch.countDown();
+			pool.shutdownNow();
+			assertThat(pool.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+		}
 	}
 
 	@Test
@@ -409,17 +416,20 @@ class TrainSearchServiceTest {
 	@Test
 	void catalogMissDoesNotWaitOnAnotherProviderCallMonitor() throws Exception {
 		provider.blockCatalog = true;
-		var first = CompletableFuture.supplyAsync(service::catalog);
-		assertThat(provider.catalogStarted.await(5, TimeUnit.SECONDS)).isTrue();
-		var second = CompletableFuture.supplyAsync(service::catalog);
-
+		var pool = Executors.newFixedThreadPool(2);
 		try {
+			var first = CompletableFuture.supplyAsync(service::catalog, pool);
+			assertThat(provider.catalogStarted.await(5, TimeUnit.SECONDS)).isTrue();
+			var second = CompletableFuture.supplyAsync(service::catalog, pool);
 			assertThatThrownBy(() -> second.get(1, TimeUnit.SECONDS))
 				.isInstanceOf(ExecutionException.class)
 				.hasCauseInstanceOf(TrainSearchService.TrainSearchFailure.class);
-		} finally {
 			provider.continueCatalog.countDown();
 			first.get(5, TimeUnit.SECONDS);
+		} finally {
+			provider.continueCatalog.countDown();
+			pool.shutdownNow();
+			assertThat(pool.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
 		}
 	}
 
