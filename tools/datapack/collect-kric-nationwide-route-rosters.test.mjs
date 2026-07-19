@@ -166,8 +166,7 @@ test("전국 KRIC roster worker는 첫 실패 뒤 신규 provider 호출을 시�
     ],
   };
   let calls = 0;
-  let inFlightSettled = false;
-  const failure = new Error("provider failed");
+  const failures = [new Error("provider failed 1"), new Error("provider failed 2")];
   await assert.rejects(collectKricNationwideRouteRosters({
     targets: extendedTargets,
     fixture: extendedFixture,
@@ -175,19 +174,16 @@ test("전국 KRIC roster worker는 첫 실패 뒤 신규 provider 호출을 시�
     concurrency: 2,
     collectImpl: async ({ mreaWideCd, lnCd }) => {
       calls += 1;
-      if (calls === 1) throw failure;
+      const callIndex = calls - 1;
       await new Promise((resolve) => setImmediate(resolve));
-      inFlightSettled = true;
-      return {
-        artifactKind: "kric-route-roster",
-        mreaWideCd,
-        lnCd,
-        resultCode: "00",
-        stations: [{ railOprIsttCd: "BS", mreaWideCd, lnCd }],
-      };
+      throw failures[callIndex];
     },
-  }), (error) => error === failure);
-  assert.equal(inFlightSettled, true);
+  }), (error) => {
+    assert.ok(error instanceof AggregateError);
+    assert.equal(error.message, "KRIC nationwide roster collection failed");
+    assert.deepEqual(error.errors, failures);
+    return true;
+  });
   assert.equal(calls, 2);
 });
 

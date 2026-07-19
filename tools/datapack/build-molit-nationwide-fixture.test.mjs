@@ -18,6 +18,31 @@ test("MOLIT provider identity가 coverage scope와 매칭되지 않으면 거부
   }], []), /MOLIT provider scope is unmatched/);
 });
 
+test("MOLIT provider identity는 canonical alias scope를 검증하고 코드 불일치를 거부한다", () => {
+  const row = {
+    providerIdentity: {
+      mreaWideCd: "01",
+      lnCd: "K4",
+      railOprIsttCd: "KR",
+      operatorName: "한국철도공사",
+    },
+    lineName: "경의·중앙선",
+  };
+  const scope = {
+    regionId: "capital",
+    operatorId: "korail",
+    lineId: "line-6e39be0cb6e2",
+    mreaWideCd: "01",
+    lnCd: "K4",
+    railOprIsttCd: "KR",
+  };
+  assert.doesNotThrow(() => validateMolitProviderIdentities([row], [scope]));
+  assert.throws(() => validateMolitProviderIdentities([{
+    ...row,
+    providerIdentity: { ...row.providerIdentity, lnCd: "K1" },
+  }], [scope]), /MOLIT\/KRIC provider code mismatch/);
+});
+
 test("KRIC provider code catalog identity는 고정 source ID와 SHA-256만 허용한다", () => {
   assert.doesNotThrow(() => validateKricProviderCodeCatalogIdentity({
     sourceId: "kric-provider-code-catalog-20260228",
