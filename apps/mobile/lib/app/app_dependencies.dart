@@ -331,9 +331,7 @@ class _LazyDefaultTrainSearchRepository implements TrainSearchRepository {
     final resolvedBaseUri = _baseUri();
     return _delegate = resolvedBaseUri == null
         ? const UnavailableTrainSearchRepository()
-        : ApiTrainSearchRepository(
-            ApiClient(baseUri: resolvedBaseUri, timeout: trainSearchApiTimeout),
-          );
+        : ApiTrainSearchRepository(ApiClient(baseUri: resolvedBaseUri));
   }
 
   @override
