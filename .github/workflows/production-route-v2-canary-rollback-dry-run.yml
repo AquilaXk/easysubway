@@ -1,0 +1,73 @@
+name: Production Route V2 canary rollback dry-run
+
+# 실행은 오너의 명시적 승인과 #1016(signed-RC canary attestation provisioning)
+# 완료 후에만 수동으로 트리거한다. push/schedule 자동 트리거는 두지 않는다.
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_sha:
+        description: "canary/rollback dry-run을 실행할, 이미 배포된 main 커밋 SHA(승인된 RC candidate). 비우면 현재 main head."
+        required: false
+        type: string
+      production_approval:
+        description: "오너 승인 근거 URL(AquilaXk/easysubway issue/pull/actions-runs). 없으면 fail-closed."
+        required: true
+        type: string
+
+jobs:
+  canary-rollback:
+    name: Verify Route V2 canary and ingress-close rollback dry-run
+    permissions:
+      contents: read
+    runs-on:
+      - self-hosted
+      - easysubway-production
+    timeout-minutes: 30
+    environment: production
+    concurrency:
+      group: production-route-v2-canary-rollback-dry-run
+      cancel-in-progress: false
+    env:
+      DEPLOY_ROOT: ${{ vars.DEPLOY_ROOT }}
+      EXPECTED_DEPLOYED_SHA: ${{ inputs.deploy_sha != '' && inputs.deploy_sha || github.sha }}
+      PRODUCTION_CANARY_APPROVAL: ${{ inputs.production_approval }}
+      EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY: ${{ secrets.EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY }}
+
+    steps:
+      - name: Reject non-main manual execution
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "production Route V2 canary rollback dry-run must run from main" >&2
+            exit 1
+          fi
+
+      - name: Checkout reviewed main
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify deploy SHA is an ancestor of main
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "${EXPECTED_DEPLOYED_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "invalid deploy sha: ${EXPECTED_DEPLOYED_SHA}" >&2
+            exit 1
+          fi
+          git fetch origin main
+          if ! git merge-base --is-ancestor "${EXPECTED_DEPLOYED_SHA}" origin/main; then
+            echo "deploy target is not on origin/main: ${EXPECTED_DEPLOYED_SHA}" >&2
+            exit 1
+          fi
+          git checkout --detach "${EXPECTED_DEPLOYED_SHA}"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+
+      - name: Verify signed-RC canary and ingress-close rollback dry-run
+        shell: bash
+        run: bash tools/ops/verify-production-route-v2-canary-rollback.sh
