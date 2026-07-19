@@ -258,6 +258,40 @@ test("접근성 source snapshot의 정책 값이 boolean이 아니면 materializ
   }
 });
 
+test("접근성 source와 edge의 숫자 값이 유효한 정수가 아니면 materialization을 거부한다", async () => {
+  const value = await inputs();
+  const snapshots = JSON.parse(value.sourceSnapshotsBytes);
+  const snapshot = snapshots.find(
+    ({ snapshotId }) => snapshotId === "seoul-metro-accessibility-capital-admission-20260712",
+  );
+  snapshot.rowCount = "1";
+  assert.throws(
+    () => buildServerTimetableSnapshot({
+      ...value,
+      sourceSnapshotsBytes: Buffer.from(JSON.stringify(snapshots)),
+      buildNow,
+    }),
+    /snapshot rowCount is invalid/,
+  );
+
+  for (const [field, invalidValue, message] of [
+    ["durationSeconds", Number.NaN, "pathway duration"],
+    ["distanceMeters", -1, "pathway distance"],
+    ["reliabilityScore", 101, "pathway reliability"],
+  ]) {
+    const reviewedPack = JSON.parse(value.reviewedPackBytes);
+    reviewedPack.packs[0].networkEdges[0][field] = invalidValue;
+    assert.throws(
+      () => buildServerTimetableSnapshot({
+        ...value,
+        reviewedPackBytes: Buffer.from(JSON.stringify(reviewedPack)),
+        buildNow,
+      }),
+      new RegExp(`${message} is invalid`),
+    );
+  }
+});
+
 test("complete snapshot은 source·completeness identity와 freshness를 fail closed한다", async () => {
   const value = await inputs();
   const source = JSON.parse(value.sourceBytes);

@@ -282,7 +282,8 @@ function sourceSnapshotInsert(row) {
   if (typeof row.redistributionAllowed !== "boolean" || typeof row.credentialRedacted !== "boolean") {
     throw new Error(`canonical accessibility source snapshot policy boolean is invalid: ${row.snapshotId}`);
   }
-  const coverageCount = sourceSnapshotCoverageCount(row);
+  const rowCount = sqlInteger(row.rowCount, "snapshot rowCount");
+  const coverageCount = sourceSnapshotCoverageCount(row, rowCount);
   const diffSummary = row.diffSummary == null
     ? null
     : (typeof row.diffSummary === "string" ? row.diffSummary : row.diffSummary.status);
@@ -292,7 +293,7 @@ function sourceSnapshotInsert(row) {
     sqlNullableTimestamp(row.sourceUpdatedAt, "snapshot sourceUpdatedAt"),
     sqlNullableTimestamp(row.freshnessBasisAt, "snapshot freshnessBasisAt"),
     sqlNullableTimestamp(row.providerValidUntil, "snapshot providerValidUntil"),
-    Number(row.rowCount), coverageCount,
+    rowCount, coverageCount,
     sqlText(row.rawSha256, "snapshot rawSha256"), sqlText(row.rawObjectUri, "snapshot rawObjectUri"),
     sqlText(row.redactedRequestFingerprint, "snapshot request fingerprint"),
     sqlText(row.schemaFingerprint, "snapshot schema fingerprint"), sqlText(row.snapshotStatus, "snapshot status"),
@@ -322,10 +323,10 @@ function sourceSnapshotInsert(row) {
     + `SELECT ${values.join(", ")} WHERE NOT EXISTS (SELECT 1 FROM data_source_snapshots WHERE ${exactIdentity});`;
 }
 
-function sourceSnapshotCoverageCount(row) {
+function sourceSnapshotCoverageCount(row, rowCount) {
   if (Number.isInteger(row.coverageCount) && row.coverageCount >= 0) return row.coverageCount;
   if (row.previousSnapshotId == null && row.diffSummary == null
-    && approvedLegacyGovernanceBinding(row) != null) return Number(row.rowCount);
+    && approvedLegacyGovernanceBinding(row) != null) return rowCount;
   throw new Error(`canonical accessibility source snapshot coverage is missing: ${row.snapshotId}`);
 }
 
@@ -340,8 +341,10 @@ function accessEdgeInsert(edge) {
   return "INSERT INTO station_pathway_edges (id, from_node_id, to_node_id, edge_type, duration_seconds, distance_meters, bidirectional, includes_stairs, reliability_score, accessibility_status, source_id, source_snapshot_id, provider_record_hash, provenance_kind, verification_status, last_verified_at, evidence_hash, instruction, legacy_internal_route_edge_id) VALUES ("
     + `${sqlText(edge.id, "pathway edge id")}, ${sqlText(edge.fromNodeId, "pathway from node")}, `
     + `${sqlText(edge.toNodeId, "pathway to node")}, ${sqlText(edge.edgeType, "pathway edge type")}, `
-    + `${Number(edge.durationSeconds)}, ${Number(edge.distanceMeters)}, FALSE, ${edge.includesStairs ? "TRUE" : "FALSE"}, `
-    + `${Number(edge.reliabilityScore)}, ${sqlText(edge.accessibilityStatus, "pathway accessibility status")}, `
+    + `${sqlInteger(edge.durationSeconds, "pathway duration")}, `
+    + `${sqlInteger(edge.distanceMeters, "pathway distance")}, FALSE, ${edge.includesStairs ? "TRUE" : "FALSE"}, `
+    + `${sqlInteger(edge.reliabilityScore, "pathway reliability", 100)}, `
+    + `${sqlText(edge.accessibilityStatus, "pathway accessibility status")}, `
     + `${sqlText(edge.sourceId, "pathway source id")}, ${sqlText(edge.sourceSnapshotId, "pathway source snapshot id")}, `
     + `${sqlText(edge.providerRecordHash, "pathway provider hash")}, ${sqlText(edge.provenanceKind, "pathway provenance")}, `
     + `${sqlText(edge.verificationStatus, "pathway verification")}, ${sqlTimestamp(edge.lastVerifiedAt, "pathway verifiedAt")}, `
@@ -368,6 +371,13 @@ function sqlTimestamp(value, label) {
   const date = new Date(requiredText(value, label));
   if (Number.isNaN(date.getTime())) throw new Error(`${label} is invalid`);
   return `'${date.toISOString().slice(0, 19).replace("T", " ")}'`;
+}
+
+function sqlInteger(value, label, maximum = Number.MAX_SAFE_INTEGER) {
+  if (!Number.isSafeInteger(value) || value < 0 || value > maximum) {
+    throw new Error(`${label} is invalid`);
+  }
+  return value;
 }
 
 function sqlNullableTimestamp(value, label) {
