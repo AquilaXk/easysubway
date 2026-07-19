@@ -70,7 +70,7 @@
    목록으로 돌아가기 등, 그 화면의 데이터를 바꾸지 않고 다른 화면으로 이동만 하는 액션에 부여한다. */
 .admin-btn.plain,
 .admin-v3 button.plain {
-	min-height: auto;
+	min-height: 24px;
 	padding: 0;
 	background: transparent;
 	color: var(--admin-accent);
