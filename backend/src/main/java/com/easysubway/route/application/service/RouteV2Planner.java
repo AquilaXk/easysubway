@@ -14,6 +14,7 @@ import com.easysubway.route.application.port.in.RouteV2SearchUseCase.RouteTransp
 import com.easysubway.route.application.port.out.LoadRouteTimetablePort;
 import com.easysubway.route.application.port.out.LoadRouteTimetablePort.RouteTimetable;
 import com.easysubway.route.application.service.RouteTimetableRaptorPlanner.CompiledTimetable;
+import com.easysubway.route.application.service.RouteTimetableRaptorPlanner.RealtimeOverlay;
 import com.easysubway.route.domain.EtaSource;
 import com.easysubway.route.domain.ProfileWalkTimeCalculator;
 import com.easysubway.route.domain.RouteNotFoundException;
@@ -53,6 +54,7 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 	private final AtomicBoolean timetableCacheHitLogged = new AtomicBoolean();
 	private final AtomicBoolean timetableCacheMissLogged = new AtomicBoolean();
 	private volatile TimetableSnapshot cachedTimetableSnapshot;
+	private volatile RealtimeSnapshot cachedRealtimeSnapshot = RealtimeSnapshot.empty();
 
 	public RouteV2Planner(RouteSearchUseCase routeSearchUseCase) {
 		this(routeSearchUseCase, RouteTimetable::empty, false, true, new SimpleMeterRegistry());
@@ -117,15 +119,17 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 				}
 				SearchRouteCommand searchRouteCommand = toSearchRouteCommand(command);
 				routeSearchUseCase.validateRouteSearch(searchRouteCommand);
+				RealtimeSnapshot realtimeSnapshot = realtimeSnapshot(command, snapshot);
 				RouteTimetableRaptorPlanner.SearchOutcome searchOutcome = timetableRaptorPlanner.searchWithDiagnostics(
 					rankingCommand(command),
-					snapshot.compiledTimetable()
+					snapshot.compiledTimetable(),
+					realtimeSnapshot.overlay()
 				);
 				boolean blockedAccessibility = searchOutcome.blockedAccessibility() != null;
 				List<RouteSearchResult> timetableItineraries = blockedAccessibility
 					? List.of(searchOutcome.blockedAccessibility()) : searchOutcome.itineraries();
 				if (timetableItineraries.isEmpty()) {
-					return noTimetableServicePlan(command, snapshot);
+					return noTimetableServicePlan(command, snapshot, realtimeSnapshot.overlay());
 				}
 				// #2095/#2286: 인증 Route V2는 SUBWAY_AND_ITX_CHEONGCHUN scope만 받고(위에서 강제)
 				// prod 게이트가 TIMETABLE_RAPTOR 출처만 허용하므로, 레거시 그래프 우선 시도를
@@ -188,10 +192,15 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 		}
 	}
 
-	private RouteV2Plan noTimetableServicePlan(SearchRouteV2Command command, TimetableSnapshot snapshot) {
+	private RouteV2Plan noTimetableServicePlan(
+		SearchRouteV2Command command,
+		TimetableSnapshot snapshot,
+		RealtimeOverlay realtimeOverlay
+	) {
 		OffsetDateTime nextServiceTime = timetableRaptorPlanner.nextServiceTime(
 			command,
-			snapshot.compiledTimetable()
+			snapshot.compiledTimetable(),
+			realtimeOverlay
 		).orElse(null);
 		return new RouteV2Plan(
 			List.of(),
@@ -262,6 +271,24 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 		}
 	}
 
+	private RealtimeSnapshot realtimeSnapshot(SearchRouteV2Command command, TimetableSnapshot timetableSnapshot) {
+		if (command.useRealtime()) {
+			var queries = timetableRaptorPlanner.realtimeQueries(command, timetableSnapshot.compiledTimetable());
+			var updates = routeSearchUseCase.resolveTimetableRealtime(queries);
+			if (updates == null) {
+				updates = RouteSearchUseCase.TimetableRealtimeUpdates.unavailable("REALTIME_OVERLAY_UNAVAILABLE");
+			}
+			RealtimeOverlay overlay = timetableRaptorPlanner.compileRealtimeOverlay(
+				timetableSnapshot.compiledTimetable(), updates);
+			RealtimeSnapshot replacement = new RealtimeSnapshot(
+				timetableSnapshot.cacheKey(), overlay.version(), overlay, updates.fallbackCode());
+			// 단일 volatile 참조 교체로 스캔은 구/신 overlay 중 하나만 캡처한다.
+			cachedRealtimeSnapshot = replacement;
+			return replacement;
+		}
+		return RealtimeSnapshot.empty();
+	}
+
 	private static Counter cacheCounter(MeterRegistry registry, String result) {
 		return Counter.builder("easysubway.route.v2.timetable.cache")
 			.tag("result", result)
@@ -287,6 +314,17 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 		String timetableArtifactId,
 		LoadRouteTimetablePort.PlannerIdentity plannerIdentity
 	) {
+	}
+
+	private record RealtimeSnapshot(
+		String timetableCacheKey,
+		String overlayVersion,
+		RealtimeOverlay overlay,
+		String fallbackCode
+	) {
+		private static RealtimeSnapshot empty() {
+			return new RealtimeSnapshot(null, null, RealtimeOverlay.empty(), null);
+		}
 	}
 
 	private SearchRouteV2Command rankingCommand(SearchRouteV2Command command) {
@@ -401,9 +439,20 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 		if (!useRealtime || itinerary.status() != RouteSearchStatus.FOUND) {
 			return false;
 		}
-		return itinerary.etaSource() == EtaSource.STATIC_BACKEND_ESTIMATE
-			|| itinerary.etaSource() == EtaSource.PLANNED
-			|| itinerary.etaSource() == EtaSource.FALLBACK;
+		List<RouteStep> rideSteps = itinerary.steps().stream()
+			.filter(step -> "ride".equals(step.stepType()))
+			.toList();
+		if (rideSteps.isEmpty()) {
+			return itinerary.etaSource() == EtaSource.STATIC_BACKEND_ESTIMATE
+				|| itinerary.etaSource() == EtaSource.PLANNED
+				|| itinerary.etaSource() == EtaSource.FALLBACK;
+		}
+		return rideSteps.stream()
+			.anyMatch(step -> EtaSource.PLANNED.name().equals(step.timeSource())
+				|| EtaSource.FALLBACK.name().equals(step.timeSource())
+				|| EtaSource.STATIC_BACKEND_ESTIMATE.name().equals(step.timeSource())
+				|| "ESTIMATED_CONSTANT".equals(step.timeSource())
+				|| "STATIC_BACKEND_V1".equals(step.timeSource()));
 	}
 
 	private RouteV2Status statusOf(RouteSearchResult itinerary) {
