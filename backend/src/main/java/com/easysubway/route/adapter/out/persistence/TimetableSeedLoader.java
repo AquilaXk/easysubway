@@ -373,7 +373,8 @@ public class TimetableSeedLoader implements ApplicationRunner {
 			if (!evidence.snapshotSha256().equals(sha256(sqlBytes))
 				|| evidence.snapshotSqlByteSize() != sqlBytes.length
 				|| !evidence.snapshotGzipSha256().equals(sha256(rawSeedBytes))
-				|| evidence.snapshotGzipByteSize() != rawSeedBytes.length) {
+				|| evidence.snapshotGzipByteSize() != rawSeedBytes.length
+				|| !evidence.accessibilityMaterializedSqlSha256().equals(accessibilitySqlSha256(sqlBytes))) {
 				throw new IllegalStateException("timetable snapshot evidence does not match seed bytes");
 			}
 			List<String> lines = new String(sqlBytes, StandardCharsets.UTF_8).lines()
@@ -413,6 +414,15 @@ public class TimetableSeedLoader implements ApplicationRunner {
 		}
 	}
 
+	private static String accessibilitySqlSha256(byte[] sqlBytes) {
+		String sql = new String(sqlBytes, StandardCharsets.UTF_8);
+		int offset = sql.indexOf("INSERT INTO data_source_snapshots ");
+		if (offset < 0) {
+			throw new IllegalStateException("timetable snapshot accessibility SQL is missing");
+		}
+		return sha256(sql.substring(offset).getBytes(StandardCharsets.UTF_8));
+	}
+
 	enum ActivationResult {
 		ACTIVATED,
 		NO_CHANGE
@@ -438,6 +448,7 @@ public class TimetableSeedLoader implements ApplicationRunner {
 		String canonicalStationSetSha256,
 		int canonicalStationMemberCount,
 		String sourceLineageSha256,
+		String accessibilityMaterializedSqlSha256,
 		String evidenceHash,
 		int calendarCount,
 		int routeCount,
@@ -473,6 +484,7 @@ public class TimetableSeedLoader implements ApplicationRunner {
 			JsonNode source = object(node, "sourceArtifact");
 			JsonNode service = object(node, "serviceIdentity");
 			JsonNode canonical = object(node, "canonicalPackIdentity");
+			JsonNode accessibility = object(node, "accessibilitySource");
 			JsonNode stations = object(node, "canonicalStationSet");
 			JsonNode counts = object(node, "rowCounts");
 			String freshUntil = text(node, "freshUntil");
@@ -500,6 +512,7 @@ public class TimetableSeedLoader implements ApplicationRunner {
 				hash(stations, "sha256"),
 				positiveInteger(stations, "memberCount"),
 				hash(node, "sourceLineageSha256"),
+				hash(accessibility, "materializedSqlSha256"),
 				evidenceHash,
 				positiveInteger(counts, "calendars"),
 				positiveInteger(counts, "routes"),

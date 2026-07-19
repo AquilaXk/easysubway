@@ -284,6 +284,7 @@ function sourceSnapshotInsert(row) {
   }
   const rowCount = sqlInteger(row.rowCount, "snapshot rowCount");
   const coverageCount = sourceSnapshotCoverageCount(row, rowCount);
+  const legacyGovernance = approvedLegacyGovernanceBinding(row);
   const diffSummary = row.diffSummary == null
     ? null
     : (typeof row.diffSummary === "string" ? row.diffSummary : row.diffSummary.status);
@@ -305,8 +306,10 @@ function sourceSnapshotInsert(row) {
     row.diffSummary == null ? "NULL" : sqlText(JSON.stringify(row.diffSummary), "snapshot diff summary JSON"),
     sqlTimestamp(row.freshnessExpiresAt, "snapshot freshnessExpiresAt"),
     sqlTimestamp(row.rawRetentionExpiresAt, "snapshot rawRetentionExpiresAt"),
-    sqlNullableText(row.governancePolicyVersion, "snapshot governance policy version"),
-    sqlNullableText(row.governancePolicySha256, "snapshot governance policy hash"),
+    sqlNullableText(row.governancePolicyVersion ?? legacyGovernance?.governancePolicyVersion,
+      "snapshot governance policy version"),
+    sqlNullableText(row.governancePolicySha256 ?? legacyGovernance?.governancePolicySha256,
+      "snapshot governance policy hash"),
   ];
   const columns = [
     "snapshot_id", "source_id", "provider", "retrieved_at", "source_updated_at", "freshness_basis_at",

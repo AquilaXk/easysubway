@@ -284,6 +284,23 @@ class TimetableSeedLoaderTest {
 			.isInstanceOf(IllegalStateException.class)
 			.hasMessageContaining("evidence");
 		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM timetable_snapshot_history", Integer.class)).isZero();
+
+		ObjectNode mismatchedAccessibility;
+		try (var input = snapshot.evidence().getInputStream()) {
+			mismatchedAccessibility = (ObjectNode) objectMapper.readTree(input);
+		}
+		mismatchedAccessibility.withObject("/accessibilitySource")
+			.put("materializedSqlSha256", "0".repeat(64));
+		mismatchedAccessibility.remove("evidenceHash");
+		mismatchedAccessibility.put("evidenceHash", sha256(objectMapper.writeValueAsBytes(mismatchedAccessibility)));
+		SnapshotResource mismatchedSnapshot = new SnapshotResource(
+			snapshot.seed(),
+			jsonResource(mismatchedAccessibility, "mismatched-accessibility.json")
+		);
+		assertThatThrownBy(() -> loader(mismatchedSnapshot).run(null))
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessageContaining("does not match seed bytes");
+		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM timetable_snapshot_history", Integer.class)).isZero();
 	}
 
 	private TimetableSeedLoader loader(SnapshotResource snapshot) {
@@ -371,6 +388,10 @@ class TimetableSeedLoaderTest {
 		canonical.put("id", "capital");
 		canonical.put("sha256", "b".repeat(64));
 		canonical.put("sqliteSha256", "c".repeat(64));
+		ObjectNode accessibility = evidence.putObject("accessibilitySource");
+		int accessibilityOffset = sql.indexOf("INSERT INTO data_source_snapshots ");
+		accessibility.put("materializedSqlSha256", sha256(
+			sql.substring(accessibilityOffset).getBytes(StandardCharsets.UTF_8)));
 		ObjectNode stationSet = evidence.putObject("canonicalStationSet");
 		stationSet.put("version", "sha256:" + "e".repeat(64));
 		stationSet.put("sha256", "e".repeat(64));
@@ -429,6 +450,10 @@ class TimetableSeedLoaderTest {
 		evidence.put("snapshotSqlByteSize", itxOnlySqlBytes.length);
 		evidence.put("snapshotGzipSha256", sha256(itxOnlyGzipBytes));
 		evidence.put("snapshotGzipByteSize", itxOnlyGzipBytes.length);
+		evidence.withObject("/accessibilitySource").put(
+			"materializedSqlSha256",
+			sha256(sql.substring(sql.indexOf("INSERT INTO data_source_snapshots ")).getBytes(StandardCharsets.UTF_8))
+		);
 		evidence.withObject("/rowCounts").put("trips", 1).put("stopTimes", 3);
 		evidence.remove("evidenceHash");
 		evidence.put("evidenceHash", sha256(objectMapper.writeValueAsBytes(evidence)));
@@ -459,6 +484,10 @@ class TimetableSeedLoaderTest {
 		evidence.put("snapshotSqlByteSize", invalidSqlBytes.length);
 		evidence.put("snapshotGzipSha256", sha256(invalidGzipBytes));
 		evidence.put("snapshotGzipByteSize", invalidGzipBytes.length);
+		evidence.withObject("/accessibilitySource").put(
+			"materializedSqlSha256",
+			sha256(sql.substring(sql.indexOf("INSERT INTO data_source_snapshots ")).getBytes(StandardCharsets.UTF_8))
+		);
 		evidence.remove("evidenceHash");
 		evidence.put("evidenceHash", sha256(objectMapper.writeValueAsBytes(evidence)));
 		return new SnapshotResource(
