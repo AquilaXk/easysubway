@@ -36,6 +36,7 @@
   "runtimeImplementationStatus": "SATISFIED_BY_2094",
   "issue2094RuntimeEvidence": {
     "candidateGitSha": "86be8d0294f9e2badab61f25e5c6a6ed9b7eea2c",
+    "mobileClientTimeoutMs": 8000,
     "provider": {
       "observedAt": "2026-07-19T10:59:28.620Z",
       "httpSuccess": true,
@@ -303,10 +304,6 @@
           "mergeGitSha": "d36bc00467ab69732f49e1f56a343bb2da1e73ce"
         }
       ],
-      "resolutionCommits": [
-        "f3b800d19fab5337f6f898f708284866307c09fe",
-        "d6c98f4fd373762bd4f6cc9e2a459ba9eb1de052"
-      ],
       "actionableFindingsOpen": 0
     },
     "requiredCi": {
@@ -324,11 +321,11 @@
         "Admin QA Gates"
       ]
     },
-    "liveEvidenceSha256": "8079d24d2b8cf10730a78450531efbdc3d186ecb1321d0bf0a4ea76c4b63ec5a"
+    "liveEvidenceSha256": "eb9cae9089264d6f80fc6592e8cf856ee6fd30958bcd2be3f5d630dcef7ccb0c"
   },
   "verification": {
     "backend": "./backend/gradlew -p backend test --tests '*TrainSearch*'",
     "mobile": "cd apps/mobile && flutter test test/features/train_search",
-    "crossLayer": "node --test tools/ci/train-search-itx-exclusion-contract.test.mjs"
+    "crossLayer": "node --test tools/ci/train-search-itx-exclusion-contract.test.mjs tools/ci/train-search-release-gate.test.mjs"
   }
 }

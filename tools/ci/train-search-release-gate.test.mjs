@@ -1040,6 +1040,8 @@ test("#2094 release artifact는 동일 candidate와 모든 완료 증거를 요�
   assert.equal(runtime.backend.itxCheongchunRows, 0);
   assert.equal(runtime.capacity.repeated.status, "PASS");
   assert.equal(runtime.capacity.unique.status, "PASS");
+  assert.equal(runtime.mobileClientTimeoutMs, 8_000);
+  assert.equal(runtime.capacity.unique.p95Ms < runtime.mobileClientTimeoutMs, true);
   for (const workload of [runtime.capacity.repeated, runtime.capacity.unique]) {
     assert.equal(workload.candidateGitSha, runtime.candidateGitSha);
     assert.equal(workload.apiOrigin, runtime.backend.apiOrigin);
@@ -1127,10 +1129,7 @@ test("#2094 release artifact는 동일 candidate와 모든 완료 증거를 요�
       mergeGitSha: "d36bc00467ab69732f49e1f56a343bb2da1e73ce",
     },
   ]);
-  assert.deepEqual(runtime.review.resolutionCommits, [
-    "f3b800d19fab5337f6f898f708284866307c09fe",
-    "d6c98f4fd373762bd4f6cc9e2a459ba9eb1de052",
-  ]);
+  assert.equal(Object.hasOwn(runtime.review, "resolutionCommits"), false);
   assert.equal(runtime.requiredCi.candidateGitSha, runtime.candidateGitSha);
   assert.deepEqual(runtime.backend.requiredCi, runtime.requiredCi);
   assert.equal(runtime.requiredCi.workflowName, "CI");
@@ -1143,4 +1142,8 @@ test("#2094 release artifact는 동일 candidate와 모든 완료 증거를 요�
     "Backend CI",
     "Admin QA Gates",
   ]);
+  assert.equal(
+    gate.verification.crossLayer,
+    "node --test tools/ci/train-search-itx-exclusion-contract.test.mjs tools/ci/train-search-release-gate.test.mjs",
+  );
 });
