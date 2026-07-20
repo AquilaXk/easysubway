@@ -262,10 +262,12 @@ class AdminOverviewPageController {
 		return "%.1f%%".formatted((double) summary.blockedCount() * 100 / summary.totalCount());
 	}
 
-	// 데이터팩 출시 준비 상세 표(#2349): 후보 게이트·별칭·격리·수동 오버라이드·시설 근거·경로 게이트·
-	// 매니페스트 서명 7개 차단 요인 카테고리 중 0건은 숨기고 비-0만 노출한다(뷰 모델 한정 가공,
-	// DatapackReleaseBlockerSummaryUseCase 집계 로직은 변경하지 않는다).
-	private static final int DATAPACK_BLOCKER_ROW_TOTAL = 7;
+	// 데이터팩 출시 준비 상세 표(#2349, #2352 리뷰로 10개로 확장): 후보 게이트·별칭·격리·소스 최신성·
+	// 수동 오버라이드·시설 근거·경로 게이트·콜백 정합성 확인·증거 번들 검증·매니페스트 서명 10개 차단 요인
+	// 카테고리 중 0건은 숨기고 비-0만 노출한다(뷰 모델 한정 가공, DatapackReleaseBlockerSummaryUseCase
+	// 집계 로직은 변경하지 않는다). 10개 행의 합은 항상 datapackReleaseSummary.totalBlockers()와
+	// 일치해야 한다(트리아지 카드·blocker-total 표기와의 정합, #2352 리뷰 지적).
+	private static final int DATAPACK_BLOCKER_ROW_TOTAL = 10;
 
 	private static List<DatapackBlockerRow> datapackBlockerRows(
 		DatapackReleaseBlockerSummaryUseCase.DatapackReleaseBlockerSummary summary
@@ -277,9 +279,14 @@ class AdminOverviewPageController {
 		addBlockerRow(rows, "후보 게이트", summary.candidateGateBlockers());
 		addBlockerRow(rows, "별칭", summary.aliasBlockers());
 		addBlockerRow(rows, "격리", summary.quarantineBlockers());
+		addBlockerRow(rows, "소스 최신성", summary.sourceFreshnessBlockers());
 		addBlockerRow(rows, "수동 오버라이드", summary.manualOverrideBlockers());
 		addBlockerRow(rows, "시설 근거", summary.facilityBlockers());
 		addBlockerRow(rows, "경로 게이트", summary.routeGateBlockers());
+		addBlockerRow(rows, "콜백 정합성 확인", summary.callbackReconciliationBlockers());
+		// "증거 번들" 단독 라벨은 위 sha·워크플로 상세 표의 evidenceBundleSha256 행(같은 details 안,
+		// 같은 <th scope="row">증거 번들</th> 마크업)과 충돌해 "증거 번들 검증"으로 구분한다(#2352 리뷰).
+		addBlockerRow(rows, "증거 번들 검증", summary.evidenceBundleBlockers());
 		addBlockerRow(rows, "매니페스트 서명", summary.manifestBlockers());
 		return rows;
 	}

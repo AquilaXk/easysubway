@@ -149,8 +149,10 @@
 					</tbody>
 				</table>
 				</div>
-				<!-- 차단 요인 상세(#2349 노이즈 제거): 7개 차단 요인 카테고리(datapackBlockerRows) 중
-				     0건은 숨기고 비-0만 노출한다. 숨긴 건수는 아래 요약 줄, 전부 숨었으면 빈 상태로 대체한다. -->
+				<!-- 차단 요인 상세(#2349 노이즈 제거, #2352 리뷰로 10개로 확장): 10개 차단 요인 카테고리
+				     (datapackBlockerRows) 중 0건은 숨기고 비-0만 노출한다. 숨긴 건수는 아래 요약 줄, 전부
+				     숨었으면 빈 상태로 대체한다. 10개 행의 합은 항상 datapackReleaseSummary.totalBlockers()
+				     (위 트리아지 카드·blocker-total)와 일치한다. -->
 				<th:block th:if="${!datapackBlockerRows.isEmpty()}">
 				<div class="admin-table-scroll" tabindex="0" role="group"
 				     aria-label="가로로 스크롤 가능한 데이터 표">
