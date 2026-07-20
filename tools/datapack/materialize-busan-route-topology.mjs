@@ -25,6 +25,12 @@ export function materializeBusanRouteTopology({
 }) {
   admitBusanRouteTopology(snapshot, { now });
   const source = requiredSource(inventory, snapshot, canonicalStationMappings);
+  const compositionSha256 = sha256(JSON.stringify({
+    baseFixture,
+    snapshot,
+    source,
+    canonicalStationMappings: canonicalStationMappingEntries(canonicalStationMappings, snapshot.scope),
+  }));
   const fixture = structuredClone(baseFixture);
   if (!Array.isArray(fixture.packs) || fixture.packs.length !== 1 || fixture.packs[0].artifactKind !== "production") {
     throw new Error("base fixture must contain exactly one production pack");
@@ -33,9 +39,9 @@ export function materializeBusanRouteTopology({
   const pack = fixture.packs[0];
   const version = /-(\d{8})$/.exec(source.topologyAdmissionEvidence.snapshotId)?.[1];
   if (!version) throw new Error(`${SOURCE_ID} snapshotId must end with YYYYMMDD`);
-  pack.id = PACK_ID;
+  pack.id = `${PACK_ID}-${compositionSha256}`;
   pack.version = version;
-  pack.url = `https://objectstorage.ap-seoul-1.oraclecloud.com/n/axvym6vk8g7i/b/easysubway-datapacks/o/catalog/${PACK_ID}-v${version}.sqlite.gz`;
+  pack.url = `https://objectstorage.ap-seoul-1.oraclecloud.com/n/axvym6vk8g7i/b/easysubway-datapacks/o/catalog/${pack.id}-v${version}.sqlite.gz`;
   fixture.manifest.activePack = { id: pack.id, version: pack.version };
 
   if (pack.sourceInventory.some(({ id }) => id === SOURCE_ID)) {
@@ -141,6 +147,14 @@ function requiredSource(inventory, snapshot, canonicalStationMappings) {
     || evidence.excludedTransferCount !== snapshot.excludedTransferCount) {
     throw new Error(`${SOURCE_ID} inventory evidence does not match snapshot`);
   }
+  if (JSON.stringify(source.coverageScope?.regionIds) !== JSON.stringify(["busan"])
+    || JSON.stringify(source.coverageScope?.operatorIds) !== JSON.stringify([OPERATOR_ID])
+    || JSON.stringify(source.coverageScope?.lineIds) !== JSON.stringify(snapshot.lineIds)
+    || JSON.stringify(source.coverageScope?.sourceDomains)
+      !== JSON.stringify(["route_graph_topology", "station_line_membership"])
+    || JSON.stringify(source.fieldsProvided) !== JSON.stringify(snapshot.fieldsProvided)) {
+    throw new Error(`${SOURCE_ID} membership source metadata does not match snapshot`);
+  }
   const membership = source.membershipAdmissionEvidence;
   const mappingSha256 = canonicalStationMappingHash(canonicalStationMappings, snapshot.scope);
   const stationCodesSha256 = sha256(JSON.stringify(snapshot.scope.map(({ stationCode }) => stationCode)));
@@ -207,11 +221,14 @@ function canonicalStationIdFor(mappings, station) {
 }
 
 function canonicalStationMappingHash(mappings, scope) {
-  const entries = scope.map((station) => {
+  return sha256(JSON.stringify(canonicalStationMappingEntries(mappings, scope)));
+}
+
+function canonicalStationMappingEntries(mappings, scope) {
+  return scope.map((station) => {
     const key = `${station.lineId}:${normalizedStationName(station.stationName)}`;
     return [key, canonicalStationIdFor(mappings, station)];
   }).sort(([left], [right]) => left.localeCompare(right, "en"));
-  return sha256(JSON.stringify(entries));
 }
 
 function normalizedStationName(value) {

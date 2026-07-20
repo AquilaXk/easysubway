@@ -38,6 +38,8 @@ test("부산 topology snapshot을 실제 production pack 입력으로 materializ
   const busanStationLines = pack.stationLines.filter(({ sourceId }) => sourceId === snapshot.sourceId);
 
   assert.deepEqual(fixture.manifest.activePack, { id: pack.id, version: pack.version });
+  assert.match(pack.id, /^nationwide-busan-topology-[a-f0-9]{64}$/);
+  assert.match(pack.url, new RegExp(`/catalog/${pack.id}-v${pack.version}\\.sqlite\\.gz$`));
   assert.equal(fixture.manifest.releaseSequence, baseFixture.manifest.releaseSequence);
   assert.equal(fixture.manifest.publishedAt, baseFixture.manifest.publishedAt);
   assert.equal(fixture.manifest.expiresAt, baseFixture.manifest.expiresAt);
@@ -156,6 +158,40 @@ test("부산 topology snapshot을 실제 production pack 입력으로 materializ
     }),
     /canonical station mapping missing/,
   );
+  const sourceMetadataMutations = [
+    ["regionIds", (source) => { source.coverageScope.regionIds = []; }],
+    ["operatorIds", (source) => { source.coverageScope.operatorIds = []; }],
+    ["lineIds", (source) => { source.coverageScope.lineIds = source.coverageScope.lineIds.slice(1); }],
+    ["sourceDomains", (source) => { source.coverageScope.sourceDomains = ["route_graph_topology"]; }],
+    ["line", (source) => { source.fieldsProvided = source.fieldsProvided.filter((field) => field !== "line"); }],
+    ["station_name", (source) => { source.fieldsProvided = source.fieldsProvided.filter((field) => field !== "station_name"); }],
+    ["station_code", (source) => { source.fieldsProvided = source.fieldsProvided.filter((field) => field !== "station_code"); }],
+  ];
+  for (const [field, mutate] of sourceMetadataMutations) {
+    const mismatchedMetadata = structuredClone(inventory);
+    mutate(mismatchedMetadata.sources.find(({ id }) => id === snapshot.sourceId));
+    assert.throws(
+      () => materializeBusanRouteTopology({
+        baseFixture,
+        snapshot,
+        inventory: mismatchedMetadata,
+        canonicalStationMappings,
+        now: evidenceNow,
+      }),
+      /membership source metadata/,
+      field,
+    );
+  }
+  const changedSourceMetadata = structuredClone(inventory);
+  changedSourceMetadata.sources.find(({ id }) => id === snapshot.sourceId).updateFrequency = "daily";
+  const changedFixture = materializeBusanRouteTopology({
+    baseFixture,
+    snapshot,
+    inventory: changedSourceMetadata,
+    canonicalStationMappings,
+    now: evidenceNow,
+  });
+  assert.notEqual(changedFixture.packs[0].id, pack.id);
 });
 
 test("materialized production SQLite와 provenance만 부산 4개 topology·membership requirement를 SUPPORTED로 만든다", async (context) => {
