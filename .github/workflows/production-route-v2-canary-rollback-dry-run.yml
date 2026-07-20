@@ -45,7 +45,6 @@ jobs:
     env:
       DEPLOY_ROOT: ${{ vars.DEPLOY_ROOT }}
       PRODUCTION_CANARY_APPROVAL: ${{ inputs.production_approval }}
-      CANARY_ROLLBACK_REPORT: ${{ runner.temp }}/route-v2-canary-rollback-evidence.json
 
     steps:
       - name: Reject non-main manual execution
@@ -101,6 +100,12 @@ jobs:
 
       - name: Verify signed-RC canary and ingress-close rollback dry-run
         shell: bash
+        env:
+          # `runner` context is only valid at step level, never job level
+          # (a job-level use invalidates the whole file — GitHub then surfaces a
+          # job-less failed run on every push). The evidence path stays identical
+          # to the artifact upload step's `path:` below.
+          CANARY_ROLLBACK_REPORT: ${{ runner.temp }}/route-v2-canary-rollback-evidence.json
         run: bash tools/ops/verify-production-route-v2-canary-rollback.sh
 
       - name: Upload canary rollback evidence
