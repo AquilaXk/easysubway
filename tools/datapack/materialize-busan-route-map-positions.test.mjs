@@ -13,6 +13,7 @@ import { materializeBusanRouteTopology, parseCanonicalBusanStationMappings } fro
 import { materializeBusanTimetable } from "./materialize-busan-timetable.mjs";
 import { materializeDaejeonTimetable } from "./materialize-daejeon-timetable.mjs";
 import {
+  connectorTrackPath,
   materializeBusanRouteMapPositions,
   materializedBusanRouteMapPackContentHash,
 } from "./materialize-busan-route-map-positions.mjs";
@@ -20,7 +21,15 @@ import {
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
 const topologyNow = new Date("2026-07-19T18:14:03.004Z");
-const routeMapNow = new Date("2026-07-20T10:20:00.000Z");
+const routeMapNow = new Date("2026-07-20T11:13:18.000Z");
+
+test("공식 connector 경로를 역 순서대로 연결해 노선 track을 만든다", async () => {
+  const snapshot = await readJson("tools/datapack/sources/busan-transportation-route-map-positions-20260720.json");
+  const path = connectorTrackPath(snapshot, "line-d74614a04530");
+  assert.match(path, /^M 1132 539 L 1126 539/);
+  assert.ok((path.match(/(?:M|L) /g) ?? []).length > 17);
+  assert.match(path, /L 1080 486/);
+});
 
 async function inputs() {
   const [
@@ -89,12 +98,17 @@ test("공식 부산 좌표 snapshot을 누적 production candidate pack에 mater
   assert.deepEqual(
     Object.fromEntries(tracks.map(({ lineId, path }) => [lineId, (path.match(/(?:M|L) /g) ?? []).length])),
     {
-      "line-ab1a041f6266": 40,
-      "line-d74614a04530": 17,
-      "line-d812a5bc1e5f": 14,
-      "line-eb7b47920390": 43,
+      "line-ab1a041f6266": 258,
+      "line-d74614a04530": 249,
+      "line-d812a5bc1e5f": 196,
+      "line-eb7b47920390": 736,
     },
   );
+  const station301 = rows.find(({ lineId, sourceLabel }) => (
+    lineId === "line-d74614a04530" && sourceLabel === "수영"
+  ));
+  assert.match(station301.upPath, /^M 1080 486 L 1080 482/);
+  assert.equal(station301.downPath, "");
   assert.ok(rows.every(({ labelPolygon }) => labelPolygon.length === 4));
   assert.equal(new Set(rows.map(({ lineId }) => lineId)).size, 4);
   assert.deepEqual(source.coverageScope.lineIds, routeMapSnapshot.lineIds);
@@ -115,6 +129,18 @@ test("공식 부산 좌표 snapshot을 누적 production candidate pack에 mater
       now: routeMapNow,
     }),
     /inventory evidence/,
+  );
+  const tamperedSnapshot = structuredClone(routeMapSnapshot);
+  tamperedSnapshot.connectors[0].path = "M 0 0 L 1 1";
+  assert.throws(
+    () => materializeBusanRouteMapPositions({
+      baseFixture: timetableFixture,
+      snapshot: tamperedSnapshot,
+      topologySnapshot,
+      inventory,
+      now: routeMapNow,
+    }),
+    /invalid Busan route map positions snapshot/,
   );
   const incompleteFixture = structuredClone(timetableFixture);
   incompleteFixture.packs[0].stationLines = incompleteFixture.packs[0].stationLines.filter(

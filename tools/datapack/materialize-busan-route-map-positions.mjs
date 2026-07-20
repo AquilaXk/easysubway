@@ -24,6 +24,10 @@ export function materializeBusanRouteMapPositions({ baseFixture, snapshot, topol
   const stations = canonicalStations(pack, topologySnapshot);
   validateTopologyLineage(pack, snapshot, topologySnapshot, stations);
   const byLine = Map.groupBy(snapshot.positions, ({ lineId }) => lineId);
+  const connectors = new Map(snapshot.connectors.map((connector) => [
+    `${connector.lineId}:${connector.fromStationCode}:${connector.toStationCode}`,
+    connector,
+  ]));
   const rows = [];
   const tracks = [];
   for (const lineId of snapshot.lineIds) {
@@ -36,7 +40,7 @@ export function materializeBusanRouteMapPositions({ baseFixture, snapshot, topol
       region: "부산권",
       lineId,
       trackIndex: 0,
-      path: linePositions.map(({ x, y }, index) => `${index === 0 ? "M" : "L"} ${x} ${y}`).join(" "),
+      path: connectorTrackPath(snapshot, lineId),
       svgColor: line.color,
       sourceId: SOURCE_ID,
       sourceName: "부산교통공사 사이버스테이션 노선도",
@@ -53,6 +57,15 @@ export function materializeBusanRouteMapPositions({ baseFixture, snapshot, topol
       if (!stationId) throw new Error(`Busan route map canonical station scope missing: ${lineId}:${position.stationCode}`);
       const previous = linePositions[index - 1];
       const next = linePositions[index + 1];
+      const previousConnector = previous
+        ? connectors.get(`${lineId}:${previous.stationCode}:${position.stationCode}`)
+        : undefined;
+      const nextConnector = next
+        ? connectors.get(`${lineId}:${position.stationCode}:${next.stationCode}`)
+        : undefined;
+      if ((previous && !previousConnector) || (next && !nextConnector)) {
+        throw new Error(`Busan route map connector missing: ${lineId}:${position.stationCode}`);
+      }
       rows.push({
         stationId,
         lineId,
@@ -62,8 +75,8 @@ export function materializeBusanRouteMapPositions({ baseFixture, snapshot, topol
         labelDx: position.labelDx,
         labelDy: position.labelDy,
         labelPolygon: structuredClone(position.labelPolygon),
-        upPath: next ? segmentPath(next, position) : "",
-        downPath: previous ? segmentPath(previous, position) : "",
+        upPath: nextConnector ? reversePath(nextConnector.path) : "",
+        downPath: previousConnector?.path ?? "",
         sourceId: SOURCE_ID,
         sourceName: "부산교통공사 사이버스테이션 노선도",
         sourceUrl: snapshot.sourceUrl,
@@ -124,7 +137,13 @@ function requiredSource(inventory, snapshot, topologySnapshot, now) {
     || evidence.snapshotPath !== "tools/datapack/sources/busan-transportation-route-map-positions-20260720.json"
     || evidence.capturedAt !== snapshot.capturedAt || evidence.stationCount !== snapshot.stationCount
     || evidence.htmlSha256 !== snapshot.htmlSha256 || evidence.cssSha256 !== snapshot.cssSha256
+    || evidence.connectorEvidencePath !== "tools/datapack/sources/busan-transportation-route-map-connectors-20260720.json"
+    || evidence.connectorEvidenceSha256 !== snapshot.connectorEvidenceSha256
+    || evidence.connectorAssetSetSha256 !== snapshot.connectorAssetSetSha256
     || evidence.rawSha256 !== snapshot.rawSha256 || evidence.positionsSha256 !== snapshot.positionsSha256
+    || evidence.connectorsSha256 !== snapshot.connectorsSha256
+    || evidence.connectorCount !== snapshot.connectorCount
+    || evidence.connectorAssetCount !== snapshot.connectorAssetCount
     || evidence.topologySourceId !== snapshot.topologySourceId
     || evidence.topologySnapshotId !== snapshot.topologySnapshotId
     || evidence.topologyContentSha256 !== snapshot.topologyContentSha256
@@ -216,8 +235,44 @@ function packSource(source, snapshot) {
   };
 }
 
-function segmentPath(from, to) {
-  return `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
+export function connectorTrackPath(snapshot, lineId) {
+  const positions = snapshot.positions.filter((position) => position.lineId === lineId)
+    .sort((left, right) => Number(left.stationCode) - Number(right.stationCode));
+  const connectors = snapshot.connectors.filter((connector) => connector.lineId === lineId)
+    .sort((left, right) => Number(left.fromStationCode) - Number(right.fromStationCode));
+  if (positions.length < 2 || connectors.length !== positions.length - 1) {
+    throw new Error(`Busan route map connector count mismatch: ${lineId}`);
+  }
+  const points = [];
+  for (let index = 0; index < connectors.length; index += 1) {
+    const connector = connectors[index];
+    const from = positions[index];
+    const to = positions[index + 1];
+    const connectorPoints = pathPoints(connector.path);
+    if (connector.fromStationCode !== from.stationCode || connector.toStationCode !== to.stationCode
+      || connectorPoints[0].x !== from.x || connectorPoints[0].y !== from.y
+      || connectorPoints.at(-1).x !== to.x || connectorPoints.at(-1).y !== to.y) {
+      throw new Error(`Busan route map connector lineage mismatch: ${lineId}:${connector.fromStationCode}`);
+    }
+    points.push(...connectorPoints.slice(index === 0 ? 0 : 1));
+  }
+  return serializePath(points);
+}
+
+function reversePath(pathValue) {
+  return serializePath(pathPoints(pathValue).reverse());
+}
+
+function pathPoints(pathValue) {
+  const matches = [...pathValue.matchAll(/(?:M|L) (\d+) (\d+)/g)];
+  if (matches.length < 2 || matches.map((match) => match[0]).join(" ") !== pathValue) {
+    throw new Error("invalid Busan route map connector path");
+  }
+  return matches.map((match) => ({ x: Number(match[1]), y: Number(match[2]) }));
+}
+
+function serializePath(points) {
+  return points.map(({ x, y }, index) => `${index === 0 ? "M" : "L"} ${x} ${y}`).join(" ");
 }
 
 function sha256(value) {
