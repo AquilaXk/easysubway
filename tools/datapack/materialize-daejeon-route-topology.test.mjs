@@ -45,11 +45,26 @@ test("대전 topology snapshot을 실제 production pack 입력으로 materializ
   assert.equal(pack.artifactKind, "production");
   assert.equal(edges.length, 42);
   assert.equal(stationLines.length, 22);
-  assert.ok(stationLines.every(({ sourceId }) => sourceId === "molit-urban-rail-full-route"));
+  const membershipSource = pack.sourceInventory.find(({ id }) =>
+    id === "molit-urban-rail-full-route-daejeon-membership");
+  const stationCodeSource = pack.sourceInventory.find(({ id }) => id === snapshot.sourceId);
+  assert.ok(stationLines.every(({ sourceId }) =>
+    sourceId === "molit-urban-rail-full-route-daejeon-membership"));
+  assert.ok(stationLines.every(({ fieldProvenance }) =>
+    fieldProvenance?.station_code?.sourceId === snapshot.sourceId
+    && fieldProvenance.station_code.sourceSnapshotId === "daejeon-station-distance-fare-topology-20260720"
+    && fieldProvenance.station_code.evidenceHash === snapshot.contentSha256
+    && fieldProvenance.station_code.derivationKind === "OFFICIAL"));
+  assert.ok(membershipSource.coverageScope.lineIds.includes("line-7051a9c2525c"));
+  assert.deepEqual(stationCodeSource.coverageScope.sourceDomains, [
+    "route_graph_topology",
+    "station_line_membership",
+  ]);
   assert.ok(pack.stations
     .filter(({ id }) => stationLines.some(({ stationId }) => stationId === id))
     .every(({ sourceId, dataSourceType }) =>
-      sourceId === "molit-urban-rail-full-route" && dataSourceType === "OFFICIAL_FILE"));
+      sourceId === "molit-urban-rail-full-route-daejeon-membership"
+      && dataSourceType === "OFFICIAL_FILE"));
   assert.equal(edges.filter(({ fromNodeId, toNodeId }) => fromNodeId < toNodeId)
     .reduce((sum, edge) => sum + edge.durationSeconds, 0), 2_400);
   assert.equal(edges.filter(({ fromNodeId, toNodeId }) => fromNodeId < toNodeId)
@@ -137,10 +152,37 @@ test("대전 topology admission은 capturedAt에서 24시간을 넘겨 연장한
   }), /freshness contract is invalid/);
 });
 
-test("materialized production SQLite와 provenance만 대전 1호선 topology requirement를 SUPPORTED로 만든다", async (context) => {
+test("대전 membership admission은 source scope와 두 공식 evidence의 결속 변조를 거부한다", async () => {
+  const [baseFixture, snapshot, inventory, canonicalStationMappings] = await inputs();
+  const mutations = [
+    (sources) => { sources.membership.coverageScope.lineIds = []; },
+    (sources) => { sources.membership.fieldsProvided = sources.membership.fieldsProvided.filter((field) => field !== "line"); },
+    (sources) => { sources.stationCode.membershipAdmissionEvidence.mappingSha256 = "0".repeat(64); },
+    (sources) => { sources.stationCode.membershipAdmissionEvidence.stationCodesSha256 = "0".repeat(64); },
+    (sources) => { sources.stationCode.membershipAdmissionEvidence.stationCodeContentSha256 = "0".repeat(64); },
+  ];
+  for (const mutate of mutations) {
+    const invalidInventory = structuredClone(inventory);
+    mutate({
+      membership: invalidInventory.sources.find(({ id }) =>
+        id === "molit-urban-rail-full-route-daejeon-membership"),
+      stationCode: invalidInventory.sources.find(({ id }) => id === snapshot.sourceId),
+    });
+    assert.throws(() => materializeDaejeonRouteTopology({
+      baseFixture,
+      snapshot,
+      inventory: invalidInventory,
+      canonicalStationMappings,
+      now: evidenceNow,
+    }), /Daejeon membership evidence is invalid/);
+  }
+});
+
+test("materialized production SQLite와 field provenance만 대전 1호선 membership·topology를 SUPPORTED로 만든다", async (context) => {
   const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-daejeon-topology-pack-"));
   context.after(() => rm(outputDir, { recursive: true, force: true }));
   const fixturePath = path.join(outputDir, "fixture.json");
+  const invalidFixturePath = path.join(outputDir, "invalid-fixture.json");
   const packOutput = path.join(outputDir, "pack");
   const reportPath = path.join(outputDir, "coverage.json");
   const [baseFixture, snapshot, inventory, canonicalStationMappings] = await inputs();
@@ -155,6 +197,17 @@ test("materialized production SQLite와 provenance만 대전 1호선 topology re
     privateKeyEncoding: { type: "pkcs8", format: "pem" },
     publicKeyEncoding: { type: "spki", format: "pem" },
   });
+  const invalidFixture = structuredClone(fixture);
+  invalidFixture.packs[0].stationLines.find(({ lineId }) => lineId === "line-7051a9c2525c")
+    .fieldProvenance.station_code.sourceId = "missing-membership-source";
+  await writeFile(invalidFixturePath, `${JSON.stringify(invalidFixture, null, 2)}\n`);
+  await assert.rejects(execFileAsync(process.execPath, [
+    "tools/datapack/build-datapack.mjs", "--fixture", invalidFixturePath, "--output", packOutput,
+  ], {
+    cwd: root,
+    env: { ...process.env, EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM: privateKey },
+  }), /fieldProvenance source is missing from sourceInventory/);
+
   await execFileAsync(process.execPath, [
     "tools/datapack/build-datapack.mjs", "--fixture", fixturePath, "--output", packOutput,
   ], {
@@ -179,6 +232,23 @@ test("materialized production SQLite와 provenance만 대전 1호선 topology re
     .get(snapshot.sourceId).count, 42);
   database.close();
 
+  const provenance = JSON.parse(await readFile(path.join(packOutput, "current.provenance.json"), "utf8"));
+  const membershipRecords = provenance.packs[0].records.filter(({ coverageScope }) =>
+    coverageScope?.lineIds?.includes("line-7051a9c2525c")
+    && coverageScope.sourceDomains?.includes("station_line_membership"));
+  assert.deepEqual(
+    [...new Set(membershipRecords.filter(({ field }) => field === "station_name").map(({ sourceId }) => sourceId))],
+    ["molit-urban-rail-full-route-daejeon-membership"],
+  );
+  assert.deepEqual(
+    [...new Set(membershipRecords.filter(({ field }) => field === "line").map(({ sourceId }) => sourceId))],
+    ["molit-urban-rail-full-route-daejeon-membership"],
+  );
+  assert.deepEqual(
+    [...new Set(membershipRecords.filter(({ field }) => field === "station_code").map(({ sourceId }) => sourceId))],
+    [snapshot.sourceId],
+  );
+
   await execFileAsync(process.execPath, [
     "tools/datapack/report-coverage-gaps.mjs",
     "--targets", "tools/datapack/nationwide-coverage-targets.json",
@@ -193,7 +263,10 @@ test("materialized production SQLite와 provenance만 대전 1호선 topology re
   const daejeon = report.requirements.filter(({ operatorId }) => operatorId === "daejeon-transportation");
   assert.deepEqual(
     daejeon.filter(({ status }) => status === "SUPPORTED").map(({ lineId, sourceDomain }) => ({ lineId, sourceDomain })),
-    [{ lineId: "line-7051a9c2525c", sourceDomain: "route_graph_topology" }],
+    [
+      { lineId: "line-7051a9c2525c", sourceDomain: "station_line_membership" },
+      { lineId: "line-7051a9c2525c", sourceDomain: "route_graph_topology" },
+    ],
   );
 });
 

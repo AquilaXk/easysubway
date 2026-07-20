@@ -8814,6 +8814,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "kric-wheelchair-lift-movement",
     "molit-tago-subway-info",
     "molit-urban-rail-full-route",
+    "molit-urban-rail-full-route-daejeon-membership",
     "seoul-metro-accessibility",
     "seoul-metro-fast-exit-car-door",
     "seoul-metro-official-od-fare-canary",

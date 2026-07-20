@@ -224,6 +224,7 @@ test("production SQLite·field provenance가 대전 schedule requirement와 런�
   assert.deepEqual(report.requirements
     .filter(({ operatorId, status }) => operatorId === "daejeon-transportation" && status === "SUPPORTED")
     .map(({ lineId, sourceDomain }) => ({ lineId, sourceDomain })), [
+    { lineId: "line-7051a9c2525c", sourceDomain: "station_line_membership" },
     { lineId: "line-7051a9c2525c", sourceDomain: "route_graph_topology" },
     { lineId: "line-7051a9c2525c", sourceDomain: "schedule_timetable" },
   ]);
