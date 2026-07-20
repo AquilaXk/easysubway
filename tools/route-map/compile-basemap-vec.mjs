@@ -1138,7 +1138,20 @@ export function extractOwnerLabels(svgText, regionId) {
     // 다수가 이 패턴). 매치 직전 512자 이내에서 가장 가까운
     // station-label-group 열림 태그를 찾아 감싸는지 확인한다.
     const before = svgText.slice(Math.max(0, match.index - 512), match.index);
-    const wrapMatch = before.match(/<g\b[^>]*\bid="station-label-group-[^"]*"[^>]*>\s*$/);
+    // #2068 대구 오너 직접 제작본 전환(2026-07-20) 실측 버그 수정: 대구 오너는
+    // 밀집 회랑(line3 매천~북구청 등)의 라벨 17건을 per-라벨 그룹
+    // <g class="horizontal-station-label-group" id="lineN-N-horizontal-label"
+    // transform="translate(...)">로 감싸 nudge한다 — seoul/gwangju의
+    // id="station-label-group-…" 래퍼와 문법만 다를 뿐 같은 "라벨 감싸는 그룹
+    // transform"이다. 이 래퍼를 못 읽으면 라벨이 translate만큼(관측 최대 ~215px)
+    // 엉뚱한 곳(예: 팔달 라벨이 매천시장 노드 위)에 앉아 라벨-노드 겹침 게이트
+    // 오탐·실기기 오배치를 낸다. 두 래퍼 문법을 모두 인식한다(다른 권역 SVG엔
+    // horizontal-station-label-group 클래스가 없어 산출물 불변).
+    const wrapMatch =
+      before.match(/<g\b[^>]*\bid="station-label-group-[^"]*"[^>]*>\s*$/) ??
+      before.match(
+        /<g\b[^>]*\bclass="[^"]*horizontal-station-label-group[^"]*"[^>]*>\s*$/,
+      );
     const entry = ownerLabelEntryFrom(
       wrapMatch ? wrapMatch[0] : null,
       match[0],

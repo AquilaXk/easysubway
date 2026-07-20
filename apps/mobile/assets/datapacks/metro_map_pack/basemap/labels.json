@@ -8090,8 +8090,8 @@
       {
         "station": "각산",
         "role": "ordinary",
-        "x": 3902.828,
-        "y": 1651.32,
+        "x": 3836.5776,
+        "y": 757.1605,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8099,8 +8099,8 @@
       {
         "station": "감삼",
         "role": "ordinary",
-        "x": 1406,
-        "y": 1107.6,
+        "x": 1258.1272,
+        "y": 1467.0861,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8108,8 +8108,8 @@
       {
         "station": "강창",
         "role": "ordinary",
-        "x": 608,
-        "y": 1107.6,
+        "x": 541.8728,
+        "y": 1466.1497,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8117,8 +8117,8 @@
       {
         "station": "건들바위",
         "role": "ordinary",
-        "x": 2090,
-        "y": 637,
+        "x": 2363.7329,
+        "y": 1663.5748,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8126,8 +8126,8 @@
       {
         "station": "경대병원",
         "role": "ordinary",
-        "x": 2280,
-        "y": 1025.7,
+        "x": 2320.7385,
+        "y": 1476.3612,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8135,9 +8135,9 @@
       {
         "station": "경산",
         "role": "terminal",
-        "x": 4332,
-        "y": 1407.9,
-        "anchor": "middle",
+        "x": 3961.3462,
+        "y": 1241.8811,
+        "anchor": "end",
         "fontSizePx": 29,
         "lines": [],
         "hasLineTerminalBadge": true
@@ -8145,8 +8145,8 @@
       {
         "station": "계명대",
         "role": "ordinary",
-        "x": 741,
-        "y": 1025.7,
+        "x": 660.9364,
+        "y": 1465.9015,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8154,8 +8154,8 @@
       {
         "station": "고산",
         "role": "ordinary",
-        "x": 3542.778,
-        "y": 1107.6,
+        "x": 3520,
+        "y": 1476.3612,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8163,27 +8163,27 @@
       {
         "station": "공단",
         "role": "ordinary",
-        "x": 836,
-        "y": 1566.5,
-        "anchor": "middle",
+        "x": 1502.6344,
+        "y": 848.8137,
+        "anchor": "start",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "교대",
         "role": "ordinary",
-        "x": 1691,
-        "y": 715,
-        "anchor": "middle",
+        "x": 2125.1921,
+        "y": 1750,
+        "anchor": "start",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "구미",
         "role": "terminal",
-        "x": 285,
-        "y": 1420.09,
-        "anchor": "middle",
+        "x": 418.2901,
+        "y": 598.9549,
+        "anchor": "end",
         "fontSizePx": 29,
         "lines": [],
         "hasLineTerminalBadge": true
@@ -8191,26 +8191,26 @@
       {
         "station": "구암",
         "role": "ordinary",
-        "x": 532,
-        "y": 1926.6,
-        "anchor": "middle",
+        "x": 1074.2085,
+        "y": 549.088,
+        "anchor": "start",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "남산",
         "role": "ordinary",
-        "x": 1775.8667,
-        "y": 964.311,
-        "anchor": "end",
+        "x": 1950,
+        "y": 1660.1072,
+        "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "내당",
         "role": "ordinary",
-        "x": 1672,
-        "y": 1107.6,
+        "x": 1501.7194,
+        "y": 1468.5482,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8218,8 +8218,8 @@
       {
         "station": "다사",
         "role": "ordinary",
-        "x": 342,
-        "y": 1107.6,
+        "x": 301.4493,
+        "y": 1469.8566,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8227,8 +8227,8 @@
       {
         "station": "달성공원",
         "role": "ordinary",
-        "x": 1568.95,
-        "y": 1505.25,
+        "x": 1912.3131,
+        "y": 1322.9033,
         "anchor": "end",
         "fontSizePx": 28,
         "lines": []
@@ -8236,8 +8236,8 @@
       {
         "station": "담티",
         "role": "ordinary",
-        "x": 3069.222,
-        "y": 1025.7,
+        "x": 3070.7385,
+        "y": 1474.5399,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8245,8 +8245,8 @@
       {
         "station": "대곡",
         "role": "ordinary",
-        "x": 437,
-        "y": 638.3,
+        "x": 457.7456,
+        "y": 2148.2126,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8254,8 +8254,8 @@
       {
         "station": "대구역",
         "role": "transfer",
-        "x": 2533.8178,
-        "y": 1614.3409,
+        "x": 2109.7695,
+        "y": 1229.057,
         "anchor": "end",
         "fontSizePx": 31,
         "lines": []
@@ -8263,8 +8263,8 @@
       {
         "station": "대구은행",
         "role": "ordinary",
-        "x": 2437.852,
-        "y": 1025.7,
+        "x": 2470,
+        "y": 1474.5399,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8272,28 +8272,28 @@
       {
         "station": "대구한의대병원",
         "role": "ordinary",
-        "x": 4117.414,
-        "y": 1620.93,
+        "x": 3930.8428,
+        "y": 573.8559,
         "anchor": "middle",
         "fontSizePx": 25,
         "lines": [
           {
             "text": "대구한의대",
-            "x": 4117.414,
-            "y": 1620.93
+            "x": 3930.8428,
+            "y": 573.8559
           },
           {
             "text": "병원",
-            "x": 4117.414,
-            "y": 1651.97
+            "x": 3930.8428,
+            "y": 604.8959
           }
         ]
       },
       {
         "station": "대명",
         "role": "ordinary",
-        "x": 1235,
-        "y": 715,
+        "x": 1687.2544,
+        "y": 2144.7102,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8301,8 +8301,8 @@
       {
         "station": "대봉교",
         "role": "ordinary",
-        "x": 2339.109,
-        "y": 730.02,
+        "x": 2582.9863,
+        "y": 1662.2841,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8310,8 +8310,8 @@
       {
         "station": "대실",
         "role": "ordinary",
-        "x": 475,
-        "y": 1025.7,
+        "x": 420,
+        "y": 1469.6471,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8319,8 +8319,8 @@
       {
         "station": "동구청",
         "role": "ordinary",
-        "x": 2937.172,
-        "y": 1757.6,
+        "x": 2575.437,
+        "y": 757.6455,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8328,26 +8328,26 @@
       {
         "station": "동대구역",
         "role": "transfer",
-        "x": 2804.051,
-        "y": 1637.6407,
-        "anchor": "middle",
+        "x": 2472.9429,
+        "y": 869.0461,
+        "anchor": "end",
         "fontSizePx": 31,
         "lines": []
       },
       {
         "station": "동천",
         "role": "ordinary",
-        "x": 950,
-        "y": 1926.6,
-        "anchor": "middle",
+        "x": 1074.6298,
+        "y": 388.091,
+        "anchor": "start",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "동촌",
         "role": "ordinary",
-        "x": 3151.758,
-        "y": 1757.6,
+        "x": 2855.437,
+        "y": 757.6455,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8355,8 +8355,8 @@
       {
         "station": "두류",
         "role": "ordinary",
-        "x": 1539,
-        "y": 1025.7,
+        "x": 1378.1272,
+        "y": 1466.8379,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8364,8 +8364,8 @@
       {
         "station": "만촌",
         "role": "ordinary",
-        "x": 2911.389,
-        "y": 1107.6,
+        "x": 2918.5227,
+        "y": 1474.884,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8373,44 +8373,44 @@
       {
         "station": "만평",
         "role": "ordinary",
-        "x": 1007,
-        "y": 1566.5,
-        "anchor": "middle",
+        "x": 1667.5306,
+        "y": 846.4849,
+        "anchor": "start",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "매천",
         "role": "ordinary",
-        "x": 323,
-        "y": 1566.5,
-        "anchor": "middle",
+        "x": 1072.3248,
+        "y": 721.3325,
+        "anchor": "start",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "매천시장",
         "role": "ordinary",
-        "x": 494,
-        "y": 1566.5,
-        "anchor": "middle",
+        "x": 1143.0547,
+        "y": 847.6616,
+        "anchor": "start",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "명덕",
         "role": "transfer",
-        "x": 1824.514,
-        "y": 625.0368,
-        "anchor": "end",
+        "x": 2034.686,
+        "y": 1589.5231,
+        "anchor": "start",
         "fontSizePx": 31,
         "lines": []
       },
       {
         "station": "문양",
         "role": "terminal",
-        "x": 209,
-        "y": 1025.7,
+        "x": 181.4493,
+        "y": 1469.7832,
         "anchor": "middle",
         "fontSizePx": 29,
         "lines": [],
@@ -8419,8 +8419,8 @@
       {
         "station": "반고개",
         "role": "ordinary",
-        "x": 1794.6474,
-        "y": 1103.1833,
+        "x": 1617.4209,
+        "y": 1469.3877,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8428,8 +8428,8 @@
       {
         "station": "반야월",
         "role": "ordinary",
-        "x": 3795.535,
-        "y": 1757.6,
+        "x": 3695.437,
+        "y": 757.6455,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8437,17 +8437,17 @@
       {
         "station": "반월당",
         "role": "transfer",
-        "x": 2179.6916,
-        "y": 1004.643,
-        "anchor": "end",
+        "x": 2007.8186,
+        "y": 1467.8866,
+        "anchor": "start",
         "fontSizePx": 31,
         "lines": []
       },
       {
         "station": "방촌",
         "role": "ordinary",
-        "x": 3366.344,
-        "y": 1757.6,
+        "x": 3135.437,
+        "y": 757.6455,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8455,17 +8455,17 @@
       {
         "station": "범물",
         "role": "ordinary",
-        "x": 4082.891,
-        "y": 637,
-        "anchor": "middle",
+        "x": 3272.1475,
+        "y": 2023.515,
+        "anchor": "start",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "범어",
         "role": "ordinary",
-        "x": 2595.685,
-        "y": 1107.6,
+        "x": 2618.5227,
+        "y": 1474.1454,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8473,55 +8473,55 @@
       {
         "station": "부호",
         "role": "ordinary",
-        "x": 4224.707,
-        "y": 1757.6,
+        "x": 3931.7871,
+        "y": 460.3242,
         "anchor": "middle",
         "fontSizePx": 25,
         "lines": [
           {
             "text": "부호",
-            "x": 4224.707,
-            "y": 1757.6
+            "x": 3931.7871,
+            "y": 460.3242
           },
           {
             "text": "(경일대·호산대)",
-            "x": 4224.707,
-            "y": 1788.64
+            "x": 3931.7871,
+            "y": 491.3642
           }
         ]
       },
       {
         "station": "북구청",
         "role": "ordinary",
-        "x": 1486.21,
-        "y": 1552.5,
-        "anchor": "middle",
+        "x": 1821.6771,
+        "y": 1182.4412,
+        "anchor": "start",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "북삼",
         "role": "ordinary",
-        "x": 1122.2354,
-        "y": 1309.8502,
-        "anchor": "middle",
+        "x": 646.6173,
+        "y": 834.3638,
+        "anchor": "end",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "사곡",
         "role": "ordinary",
-        "x": 722,
-        "y": 1310.4,
-        "anchor": "middle",
+        "x": 532.4537,
+        "y": 716.6594,
+        "anchor": "end",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "사월",
         "role": "ordinary",
-        "x": 3858.463,
-        "y": 1107.6,
+        "x": 3819.2615,
+        "y": 1478.577,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8529,8 +8529,8 @@
       {
         "station": "상인",
         "role": "ordinary",
-        "x": 779,
-        "y": 715,
+        "x": 985,
+        "y": 2146.9646,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8538,17 +8538,17 @@
       {
         "station": "서대구역",
         "role": "ordinary",
-        "x": 1979.4046,
-        "y": 1313.5577,
-        "anchor": "middle",
+        "x": 939.1207,
+        "y": 1125.3158,
+        "anchor": "end",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "서문시장",
         "role": "ordinary",
-        "x": 1648.86,
-        "y": 1425.16,
+        "x": 1913.0009,
+        "y": 1422.3251,
         "anchor": "end",
         "fontSizePx": 28,
         "lines": []
@@ -8556,28 +8556,28 @@
       {
         "station": "서부정류장",
         "role": "ordinary",
-        "x": 1121,
-        "y": 618.58,
+        "x": 1512.2544,
+        "y": 2147.0291,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": [
           {
             "text": "서부",
-            "x": 1121,
-            "y": 618.58
+            "x": 1512.2544,
+            "y": 2147.0291
           },
           {
             "text": "정류장",
-            "x": 1121,
-            "y": 652.72
+            "x": 1512.2544,
+            "y": 2181.1691
           }
         ]
       },
       {
         "station": "설화명곡",
         "role": "terminal",
-        "x": 209,
-        "y": 638.3,
+        "x": 167.4557,
+        "y": 2152.1899,
         "anchor": "middle",
         "fontSizePx": 29,
         "lines": [],
@@ -8586,28 +8586,28 @@
       {
         "station": "성서산업단지",
         "role": "ordinary",
-        "x": 874,
-        "y": 1107.6,
+        "x": 780.9364,
+        "y": 1435.8491,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": [
           {
             "text": "성서산업",
-            "x": 874,
-            "y": 1107.6
+            "x": 780.9364,
+            "y": 1435.8491
           },
           {
             "text": "단지",
-            "x": 874,
-            "y": 1141.74
+            "x": 780.9364,
+            "y": 1469.9891
           }
         ]
       },
       {
         "station": "송현",
         "role": "ordinary",
-        "x": 1007,
-        "y": 715,
+        "x": 1335,
+        "y": 2144.7102,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8615,28 +8615,28 @@
       {
         "station": "수성구민운동장",
         "role": "ordinary",
-        "x": 2837.327,
-        "y": 726.97,
-        "anchor": "middle",
+        "x": 3017.3313,
+        "y": 1703.7738,
+        "anchor": "start",
         "fontSizePx": 25,
         "lines": [
           {
             "text": "수성구민",
-            "x": 2837.327,
-            "y": 726.97
+            "x": 3017.3313,
+            "y": 1703.7738
           },
           {
             "text": "운동장",
-            "x": 2837.327,
-            "y": 758.01
+            "x": 3017.3313,
+            "y": 1734.8138
           }
         ]
       },
       {
         "station": "수성구청",
         "role": "ordinary",
-        "x": 2753.537,
-        "y": 1025.7,
+        "x": 2768.5227,
+        "y": 1474.5399,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8644,17 +8644,17 @@
       {
         "station": "수성못",
         "role": "ordinary",
-        "x": 3584.673,
-        "y": 637,
-        "anchor": "middle",
+        "x": 3030.8555,
+        "y": 2023.9202,
+        "anchor": "start",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "수성시장",
         "role": "ordinary",
-        "x": 2588.218,
-        "y": 637,
+        "x": 2802.9863,
+        "y": 1661.3351,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8662,28 +8662,28 @@
       {
         "station": "수성알파시티",
         "role": "ordinary",
-        "x": 3384.926,
-        "y": 1007.5,
+        "x": 3368.5227,
+        "y": 1441.2452,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": [
           {
             "text": "수성알파",
-            "x": 3384.926,
-            "y": 1007.5
+            "x": 3368.5227,
+            "y": 1441.2452
           },
           {
             "text": "시티",
-            "x": 3384.926,
-            "y": 1041.64
+            "x": 3368.5227,
+            "y": 1475.3852
           }
         ]
       },
       {
         "station": "신기",
         "role": "ordinary",
-        "x": 3688.242,
-        "y": 1651.32,
+        "x": 3556.5776,
+        "y": 757.1605,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8691,8 +8691,8 @@
       {
         "station": "신매",
         "role": "ordinary",
-        "x": 3700.611,
-        "y": 1025.7,
+        "x": 3669.2615,
+        "y": 1476.7556,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8700,17 +8700,17 @@
       {
         "station": "신천",
         "role": "ordinary",
-        "x": 2722.7965,
-        "y": 1651.9487,
-        "anchor": "middle",
+        "x": 2336.7358,
+        "y": 1002.5633,
+        "anchor": "end",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "아양교",
         "role": "ordinary",
-        "x": 3044.465,
-        "y": 1651.32,
+        "x": 2716.5776,
+        "y": 757.1605,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8718,8 +8718,8 @@
       {
         "station": "안심",
         "role": "ordinary",
-        "x": 4010.121,
-        "y": 1757.6,
+        "x": 3955.4939,
+        "y": 703.9178,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8727,8 +8727,8 @@
       {
         "station": "안지랑",
         "role": "ordinary",
-        "x": 1349,
-        "y": 638.3,
+        "x": 1863.3816,
+        "y": 2145.9583,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8736,17 +8736,17 @@
       {
         "station": "어린이세상",
         "role": "ordinary",
-        "x": 3086.436,
-        "y": 637,
-        "anchor": "middle",
+        "x": 3020.3362,
+        "y": 1811.8029,
+        "anchor": "start",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "연호",
         "role": "ordinary",
-        "x": 3227.074,
-        "y": 1107.6,
+        "x": 3217.0457,
+        "y": 1475.6226,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8754,8 +8754,8 @@
       {
         "station": "영남대",
         "role": "terminal",
-        "x": 4332,
-        "y": 1025.7,
+        "x": 4270,
+        "y": 1474.5399,
         "anchor": "middle",
         "fontSizePx": 29,
         "lines": [],
@@ -8764,26 +8764,26 @@
       {
         "station": "영대병원",
         "role": "ordinary",
-        "x": 1577,
-        "y": 638.3,
-        "anchor": "middle",
+        "x": 2122.2915,
+        "y": 1870,
+        "anchor": "start",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "왜관",
         "role": "ordinary",
-        "x": 1520,
-        "y": 1310.4,
-        "anchor": "middle",
+        "x": 796.1898,
+        "y": 983.9363,
+        "anchor": "end",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "용계",
         "role": "ordinary",
-        "x": 3473.656,
-        "y": 1651.32,
+        "x": 3276.5776,
+        "y": 757.1605,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8791,8 +8791,8 @@
       {
         "station": "용산",
         "role": "ordinary",
-        "x": 1140,
-        "y": 1107.6,
+        "x": 1018.1272,
+        "y": 1468.9589,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8800,9 +8800,9 @@
       {
         "station": "용지",
         "role": "terminal",
-        "x": 4332,
-        "y": 746,
-        "anchor": "middle",
+        "x": 3364.179,
+        "y": 2024.1195,
+        "anchor": "start",
         "fontSizePx": 29,
         "lines": [],
         "hasLineTerminalBadge": true
@@ -8810,17 +8810,17 @@
       {
         "station": "원대",
         "role": "ordinary",
-        "x": 1349,
-        "y": 1566.5,
-        "anchor": "middle",
+        "x": 1818.9128,
+        "y": 1052.5439,
+        "anchor": "start",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "월배",
         "role": "ordinary",
-        "x": 665,
-        "y": 638.3,
+        "x": 811.1273,
+        "y": 2148.2126,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8828,8 +8828,8 @@
       {
         "station": "월촌",
         "role": "ordinary",
-        "x": 893,
-        "y": 638.3,
+        "x": 1160,
+        "y": 2145.9583,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8837,8 +8837,8 @@
       {
         "station": "율하",
         "role": "ordinary",
-        "x": 3580.949,
-        "y": 1757.6,
+        "x": 3415.437,
+        "y": 757.6455,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8846,8 +8846,8 @@
       {
         "station": "이곡",
         "role": "ordinary",
-        "x": 1007,
-        "y": 1025.7,
+        "x": 897.1908,
+        "y": 1469.6471,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8855,8 +8855,8 @@
       {
         "station": "임당",
         "role": "ordinary",
-        "x": 4174.148,
-        "y": 1107.6,
+        "x": 4119.2612,
+        "y": 1474.884,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8864,8 +8864,8 @@
       {
         "station": "정평",
         "role": "ordinary",
-        "x": 4016.315,
-        "y": 1025.7,
+        "x": 3969.2615,
+        "y": 1476.0171,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8873,8 +8873,8 @@
       {
         "station": "죽전",
         "role": "ordinary",
-        "x": 1273,
-        "y": 1025.7,
+        "x": 1140,
+        "y": 1465.9015,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8882,8 +8882,8 @@
       {
         "station": "중앙로",
         "role": "ordinary",
-        "x": 2274.6213,
-        "y": 1134.5502,
+        "x": 2119.3093,
+        "y": 1388.6874,
         "anchor": "start",
         "fontSizePx": 28,
         "lines": []
@@ -8891,17 +8891,17 @@
       {
         "station": "지산",
         "role": "ordinary",
-        "x": 3833.782,
-        "y": 730.02,
-        "anchor": "middle",
+        "x": 3155.1799,
+        "y": 2024.1985,
+        "anchor": "start",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "진천",
         "role": "ordinary",
-        "x": 551,
-        "y": 715,
+        "x": 635,
+        "y": 2149.219,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -8909,8 +8909,8 @@
       {
         "station": "청라언덕",
         "role": "transfer",
-        "x": 1991.9438,
-        "y": 1001.683,
+        "x": 1790.4613,
+        "y": 1468.7999,
         "anchor": "end",
         "fontSizePx": 31,
         "lines": []
@@ -8918,9 +8918,9 @@
       {
         "station": "칠곡경대병원",
         "role": "terminal",
-        "x": 1577,
-        "y": 1954,
-        "anchor": "middle",
+        "x": 1073.7229,
+        "y": 148.9979,
+        "anchor": "start",
         "fontSizePx": 29,
         "lines": [],
         "hasLineTerminalBadge": true
@@ -8928,74 +8928,74 @@
       {
         "station": "칠곡운암",
         "role": "ordinary",
-        "x": 741,
-        "y": 1926.6,
-        "anchor": "middle",
+        "x": 1071.8538,
+        "y": 469.088,
+        "anchor": "start",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "칠성시장",
         "role": "ordinary",
-        "x": 2615.293,
-        "y": 1651.6198,
-        "anchor": "middle",
+        "x": 2218.897,
+        "y": 1122.5632,
+        "anchor": "end",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "태전",
         "role": "ordinary",
-        "x": 323,
-        "y": 1926.6,
-        "anchor": "middle",
+        "x": 1074.6795,
+        "y": 629.559,
+        "anchor": "start",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "팔거",
         "role": "ordinary",
-        "x": 1159,
-        "y": 1926.6,
-        "anchor": "middle",
+        "x": 1073.7229,
+        "y": 313.5325,
+        "anchor": "start",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "팔달",
         "role": "ordinary",
-        "x": 665,
-        "y": 1566.5,
-        "anchor": "middle",
+        "x": 1334.4972,
+        "y": 847.6914,
+        "anchor": "start",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "팔달시장",
         "role": "ordinary",
-        "x": 1178,
-        "y": 1566.5,
-        "anchor": "middle",
+        "x": 1825.1044,
+        "y": 911.1319,
+        "anchor": "start",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "하양",
         "role": "terminal",
-        "x": 4332,
-        "y": 1651.4,
+        "x": 3933.1687,
+        "y": 357.437,
         "anchor": "middle",
         "fontSizePx": 29,
         "lines": [
           {
             "text": "하양",
-            "x": 4332,
-            "y": 1651.4
+            "x": 3933.1687,
+            "y": 357.437
           },
           {
             "text": "(대구가톨릭대)",
-            "x": 4332,
-            "y": 1685.54
+            "x": 3933.1687,
+            "y": 391.577
           }
         ],
         "hasLineTerminalBadge": true
@@ -9003,17 +9003,17 @@
       {
         "station": "학정",
         "role": "ordinary",
-        "x": 1368,
-        "y": 1926.6,
-        "anchor": "middle",
+        "x": 1075.5368,
+        "y": 237.1602,
+        "anchor": "start",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "해안",
         "role": "ordinary",
-        "x": 3259.051,
-        "y": 1651.32,
+        "x": 2996.5776,
+        "y": 757.1605,
         "anchor": "middle",
         "fontSizePx": 28,
         "lines": []
@@ -9021,27 +9021,27 @@
       {
         "station": "현충로",
         "role": "ordinary",
-        "x": 1463,
-        "y": 715,
-        "anchor": "middle",
+        "x": 2122.2915,
+        "y": 1989.0331,
+        "anchor": "start",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "화원",
         "role": "ordinary",
-        "x": 323,
-        "y": 715,
-        "anchor": "middle",
+        "x": 283.1481,
+        "y": 2149.2751,
+        "anchor": "start",
         "fontSizePx": 28,
         "lines": []
       },
       {
         "station": "황금",
         "role": "ordinary",
-        "x": 3335.564,
-        "y": 730.02,
-        "anchor": "middle",
+        "x": 3021.5381,
+        "y": 1901.8029,
+        "anchor": "start",
         "fontSizePx": 28,
         "lines": []
       }
@@ -9855,10 +9855,10 @@
     "daegu": [
       {
         "station": "동대구역",
-        "x": 2836.4324759359997,
-        "y": 1799.4336064275,
-        "halfWidth": 21.431872127999895,
-        "halfHeight": 8.461706427500076
+        "x": 2334.646266186466,
+        "y": 856.1661726656077,
+        "halfWidth": 25.05958297067741,
+        "halfHeight": 11.234918168417778
       }
     ],
     "daejeon": [
