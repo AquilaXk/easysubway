@@ -746,7 +746,7 @@ test("snapshot freshness precheck는 timezone offset을 가진 freshUntil을 파
 
 test("snapshot freshness precheck는 잘못된 입력을 거부한다", () => {
   assert.throws(
-    () => evaluateSnapshotFreshnessPrecheck({ freshUntil: "not-a-date", now: new Date(), marginSeconds: 0 }),
+    () => evaluateSnapshotFreshnessPrecheck({ freshUntil: "not-a-dateZ", now: new Date(), marginSeconds: 0 }),
     /invalid freshUntil timestamp/,
   );
   assert.throws(
@@ -754,6 +754,29 @@ test("snapshot freshness precheck는 잘못된 입력을 거부한다", () => {
     /marginSeconds must be a non-negative integer/,
   );
   assert.equal(DEFAULT_MARGIN_SECONDS, 2 * 60 * 60);
+});
+
+test("snapshot freshness precheck는 timezone offset 없는 freshUntil을 backend 게이트와 동일하게 거부한다", () => {
+  // backend TimetableSeedLoader의 활성 경로는 OffsetDateTime.parse로 offset 없는
+  // timestamp를 예외로 거부한다. 이 안전망이 Date.parse의 관대한 로컬-타임존 파싱으로
+  // offset 없는 값을 통과시키면, precheck는 fresh로 오판하고 force-recreate된 새
+  // 컨테이너가 부팅 fail-closed로 죽는다 — 정확히 이 사전 검사가 막으려는 장애다.
+  for (const naive of [
+    "2026-07-20T00:00:00", // naive datetime, offset 없음
+    "2026-07-20", // date-only
+    "2026-07-20 00:00:00", // space-separated naive datetime
+  ]) {
+    assert.throws(
+      () => evaluateSnapshotFreshnessPrecheck({ freshUntil: naive, now: new Date(), marginSeconds: 0 }),
+      /freshUntil must carry a timezone offset/,
+      `expected rejection for offset-less freshUntil: ${naive}`,
+    );
+  }
+  // Z, +09:00, -0500 표기는 모두 허용된다.
+  for (const withOffset of ["2026-07-20T00:00:00Z", "2026-07-20T00:00:00+09:00", "2026-07-20T00:00:00-0500"]) {
+    assert.doesNotThrow(() =>
+      evaluateSnapshotFreshnessPrecheck({ freshUntil: withOffset, now: new Date("2000-01-01T00:00:00Z"), marginSeconds: 0 }));
+  }
 });
 
 test("snapshot freshness precheck CLI는 유효 snapshot을 통과시킨다", async () => {
@@ -781,6 +804,15 @@ test("snapshot freshness precheck CLI는 마진 내 만료 snapshot을 차단한
   );
   assert.equal(exitCode, 1);
   assert.match(stdout, /verdict=expiring_within_margin/);
+});
+
+test("snapshot freshness precheck CLI는 값 없는 --margin-seconds를 무음 기본값 폴백 대신 명시적으로 거부한다", async () => {
+  const { exitCode, stderr } = await runFreshnessPrecheck(
+    { freshUntil: "2099-01-01T00:00:00+09:00" },
+    ["--margin-seconds"],
+  );
+  assert.equal(exitCode, 1);
+  assert.match(stderr, /--margin-seconds requires a value/);
 });
 
 test("snapshot freshness precheck CLI는 evidence 누락·손상 시 fail closed 한다", async () => {

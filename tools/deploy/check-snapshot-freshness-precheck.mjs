@@ -25,6 +25,12 @@ export function evaluateSnapshotFreshnessPrecheck({
   now,
   marginSeconds = DEFAULT_MARGIN_SECONDS,
 }) {
+  // 안전망은 보호 대상 게이트(backend TimetableSeedLoader의 OffsetDateTime.parse,
+  // 즉 offset 없는 timestamp를 거부)보다 관대해지면 안 된다: offset 없는 값을 Date.parse가
+  // 러너 로컬 타임존으로 조용히 파싱해 통과시키는 것을 막는다.
+  if (!/(?:[Zz]|[+-]\d{2}:?\d{2})$/.test(String(freshUntil))) {
+    throw new Error(`freshUntil must carry a timezone offset: ${String(freshUntil)}`);
+  }
   const freshUntilMs = Date.parse(freshUntil);
   if (!Number.isFinite(freshUntilMs)) {
     throw new Error(`invalid freshUntil timestamp: ${String(freshUntil)}`);
@@ -59,6 +65,9 @@ function parseArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (token === "--margin-seconds") {
+      if (index + 1 >= argv.length) {
+        throw new Error("--margin-seconds requires a value");
+      }
       options.marginSeconds = argv[index += 1];
     } else if (token.startsWith("--margin-seconds=")) {
       options.marginSeconds = token.slice("--margin-seconds=".length);
