@@ -352,6 +352,10 @@ input:focus-visible {
 	vertical-align: top;
 	font-size: 13px;
 	line-height: 1.45;
+	/* 한글 어절 단위 줄바꿈(#2349 PR⑩a, admin-components.css와 동일 원칙) — 좁은 컬럼에서 지역·역명이
+	   낱글자 단위로 세로 줄바꿈("강원/권", "남춘/천")되는 것을 막는다. keep-all로 줄바꿈 불가능한 공백 없는 긴 값은 overflow-wrap: anywhere가 끊는다. */
+	word-break: keep-all;
+	overflow-wrap: anywhere;
 }
 
 .data-table th {
@@ -605,6 +609,19 @@ input:focus-visible {
 	background: var(--admin-accent);
 	color: #fff;
 	font-weight: var(--admin-w-strong);
+}
+
+/* 결측값 스크린리더 텍스트(#2349 PR⑩b): admin-components.css .sr-only와 동일 정의. */
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
 }
 
 /* retry warning(#2349 PR⑨): admin 로그인과 동일한 warn 톤 정합(NONE/RETRY_WARNING parity 계약). */
