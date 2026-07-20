@@ -5,6 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { validateBusanRouteMapPositionsSnapshot } from "./collect-busan-route-map-positions.mjs";
+import { busanRouteTopologyContentHash } from "./collect-busan-route-topology.mjs";
 
 const SOURCE_ID = "busan-transportation-route-map-positions";
 const TOPOLOGY_SOURCE_ID = "busan-transportation-route-topology";
@@ -20,8 +21,8 @@ export function materializeBusanRouteMapPositions({ baseFixture, snapshot, topol
     throw new Error("Busan route map positions require one cumulative production pack");
   }
   if (pack.sourceInventory.some(({ id }) => id === SOURCE_ID)) throw new Error(`${SOURCE_ID} already exists`);
-  validateTopologyLineage(pack, snapshot, topologySnapshot);
   const stations = canonicalStations(pack, topologySnapshot);
+  validateTopologyLineage(pack, snapshot, topologySnapshot, stations);
   const byLine = Map.groupBy(snapshot.positions, ({ lineId }) => lineId);
   const rows = [];
   const tracks = [];
@@ -144,21 +145,55 @@ function requiredSource(inventory, snapshot, topologySnapshot, now) {
   return source;
 }
 
-function validateTopologyLineage(pack, snapshot, topologySnapshot) {
+function validateTopologyLineage(pack, snapshot, topologySnapshot, stations) {
+  const actual = pack.networkEdges.filter(({ sourceId }) => sourceId === TOPOLOGY_SOURCE_ID)
+    .sort((left, right) => left.id.localeCompare(right.id, "en"));
+  const expected = topologySnapshot.edges.map((edge) => ({
+    id: `edge-${edge.edgeId.replaceAll(":", "-")}`,
+    fromNodeId: `${stations.get(`${edge.lineId}:${edge.fromStationCode}`)}:${edge.lineId}`,
+    toNodeId: `${stations.get(`${edge.lineId}:${edge.toStationCode}`)}:${edge.lineId}`,
+    durationSeconds: edge.durationSeconds + edge.stoppingSeconds,
+    distanceMeters: edge.distanceMeters,
+    sourceSnapshotId: snapshot.topologySnapshotId,
+    providerRecordHash: sha256(JSON.stringify(edge)),
+    evidenceHash: topologySnapshot.contentSha256,
+  })).sort((left, right) => left.id.localeCompare(right.id, "en"));
+  const comparable = actual.map((edge) => Object.fromEntries(
+    Object.keys(expected[0]).map((key) => [key, edge[key]]),
+  ));
   if (!pack.sourceInventory.some(({ id }) => id === TOPOLOGY_SOURCE_ID)
-    || pack.networkEdges.filter(({ sourceId }) => sourceId === TOPOLOGY_SOURCE_ID).length !== 220
-    || topologySnapshot.contentSha256 !== snapshot.topologyContentSha256) {
+    || topologySnapshot.contentSha256 !== snapshot.topologyContentSha256
+    || topologySnapshot.contentSha256 !== busanRouteTopologyContentHash(
+      topologySnapshot.edges,
+      topologySnapshot.scope,
+    )
+    || actual.length !== expected.length || JSON.stringify(comparable) !== JSON.stringify(expected)) {
     throw new Error("Busan route map topology lineage mismatch");
   }
 }
 
 function canonicalStations(pack, topologySnapshot) {
-  const expected = new Set(topologySnapshot.scope.map(({ lineId, stationCode }) => `${lineId}:${stationCode}`));
+  const expected = new Map();
+  for (const lineId of topologySnapshot.lineIds) {
+    topologySnapshot.scope.filter((station) => station.lineId === lineId)
+      .sort((left, right) => Number(left.stationCode) - Number(right.stationCode))
+      .forEach((station, index) => expected.set(`${lineId}:${station.stationCode}`, {
+        stationName: station.stationName,
+        lineSequence: index + 1,
+      }));
+  }
+  const stationNames = new Map(pack.stations.map(({ id, nameKo }) => [id, nameKo]));
   const stations = new Map();
   for (const stationLine of pack.stationLines) {
     const key = `${stationLine.lineId}:${stationLine.stationCode}`;
-    if (!expected.has(key)) continue;
+    const expectedStation = expected.get(key);
+    if (!expectedStation) continue;
     if (stations.has(key)) throw new Error(`Busan route map duplicate canonical station: ${key}`);
+    if (stationLine.sourceId !== TOPOLOGY_SOURCE_ID
+      || stationLine.lineSequence !== expectedStation.lineSequence
+      || stationNames.get(stationLine.stationId)?.normalize("NFKC") !== expectedStation.stationName.normalize("NFKC")) {
+      throw new Error(`Busan route map topology lineage mismatch: ${key}`);
+    }
     stations.set(key, stationLine.stationId);
   }
   if (stations.size !== 114) throw new Error(`Busan route map canonical station scope mismatch: ${stations.size}`);

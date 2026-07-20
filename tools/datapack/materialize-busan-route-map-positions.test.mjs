@@ -130,6 +130,24 @@ test("공식 부산 좌표 snapshot을 누적 production candidate pack에 mater
     }),
     /canonical station scope/,
   );
+  const swappedFixture = structuredClone(timetableFixture);
+  const station95 = swappedFixture.packs[0].stationLines.find(
+    ({ lineId, stationCode }) => lineId === "line-ab1a041f6266" && stationCode === "95",
+  );
+  const station96 = swappedFixture.packs[0].stationLines.find(
+    ({ lineId, stationCode }) => lineId === "line-ab1a041f6266" && stationCode === "96",
+  );
+  [station95.stationId, station96.stationId] = [station96.stationId, station95.stationId];
+  assert.throws(
+    () => materializeBusanRouteMapPositions({
+      baseFixture: swappedFixture,
+      snapshot: routeMapSnapshot,
+      topologySnapshot,
+      inventory,
+      now: routeMapNow,
+    }),
+    /topology lineage mismatch/,
+  );
 });
 
 test("materialized SQLite와 provenance가 부산 route_map_positions 4건을 SUPPORTED로 만든다", async (context) => {
