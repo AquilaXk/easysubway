@@ -1,5 +1,10 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
+import { readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+
+import { busanRouteTopologyContentHash } from "./collect-busan-route-topology.mjs";
 
 const SOURCE_ID = "busan-transportation-timetable";
 const TOPOLOGY_SOURCE_ID = "busan-transportation-route-topology";
@@ -7,6 +12,7 @@ const PACK_ID = "nationwide-busan-schedule";
 const EXPECTED_ROW_COUNT = 109_140;
 const EXPECTED_TRIP_COUNT = 3_833;
 const FRESHNESS_MILLIS = 24 * 60 * 60 * 1_000;
+const SUPPORTED_SERVICE_CALENDAR_YEAR = "2026";
 const LINE_IDS = Object.freeze({
   "1": "line-ab1a041f6266",
   "2": "line-eb7b47920390",
@@ -20,18 +26,25 @@ const SERVICES = Object.freeze({
 });
 const HOLIDAYS_2026 = Object.freeze([
   "20260101", "20260216", "20260217", "20260218", "20260302", "20260505", "20260525",
-  "20260603", "20260817", "20260924", "20260925", "20261005", "20261009", "20261225",
+  "20260603", "20260606", "20260815", "20260817", "20260924", "20260925", "20260926",
+  "20261003", "20261005", "20261009", "20261225",
 ]);
 
-export function materializeBusanTimetable({ baseFixture, timetableSnapshot, inventory, now = new Date() }) {
+export function materializeBusanTimetable({
+  baseFixture,
+  timetableSnapshot,
+  topologySnapshot,
+  inventory,
+  now = new Date(),
+}) {
   const rows = validateSnapshot(timetableSnapshot);
-  const source = requiredSource(inventory, timetableSnapshot, now);
+  const source = requiredSource(inventory, timetableSnapshot, topologySnapshot, now);
   const fixture = structuredClone(baseFixture);
   const pack = fixture.packs?.[0];
   if (!pack || fixture.packs.length !== 1) throw new Error("Busan timetable requires one cumulative pack");
   if (pack.sourceInventory.some(({ id }) => id === SOURCE_ID)) throw new Error(`${SOURCE_ID} already exists`);
-  validateTopologyLineage(pack, source.scheduleAdmissionEvidence);
   const stations = canonicalStations(pack);
+  const topologyPairs = validateTopologyLineage(pack, source.scheduleAdmissionEvidence, topologySnapshot, stations);
   const provenance = scheduleProvenance(source, timetableSnapshot);
   const groups = Map.groupBy(rows, (row) => [row.line, row.day, row.trainno, row.updown, row.endcode].join(":"));
   if (groups.size !== EXPECTED_TRIP_COUNT) throw new Error(`Busan timetable trip count mismatch: ${groups.size}`);
@@ -50,6 +63,7 @@ export function materializeBusanTimetable({ baseFixture, timetableSnapshot, inve
     if (new Set(ordered.map(({ row }) => row.scode)).size !== ordered.length) {
       throw new Error(`Busan timetable duplicate trip stop: ${key}`);
     }
+    validateTripAdjacency(ordered, stations, lineId, topologyPairs, key);
     const id = `trip-busan-${line}-${day}-${trainno}-${updown}-${endcode}`;
     if (tripIds.has(id)) throw new Error(`duplicate Busan timetable trip id: ${id}`);
     tripIds.add(id);
@@ -137,20 +151,36 @@ function validateSnapshot(snapshot) {
   return snapshot.rows;
 }
 
-function requiredSource(inventory, snapshot, now) {
+function requiredSource(inventory, snapshot, topologySnapshot, now) {
   const source = inventory?.sources?.find(({ id }) => id === SOURCE_ID);
   const evidence = source?.scheduleAdmissionEvidence;
+  const topologyEvidence = inventory?.sources?.find(({ id }) => id === TOPOLOGY_SOURCE_ID)
+    ?.topologyAdmissionEvidence;
   if (source?.productionUseAllowed !== true || source.license?.redistributionAllowed !== true
     || source.capabilities?.schedule?.productionUseAllowed !== true || evidence?.issue !== 2368
     || evidence.materializer !== "tools/datapack/materialize-busan-timetable.mjs"
     || evidence.verificationTest !== "tools/datapack/materialize-busan-timetable.test.mjs"
-    || evidence.snapshotId !== "busan-transportation-timetable-20260720"
+    || !/^busan-transportation-timetable-\d{8}$/.test(evidence.snapshotId ?? "")
     || evidence.capturedAt !== snapshot.capturedAt || evidence.freshUntil !== snapshot.freshUntil
     || evidence.rowCount !== EXPECTED_ROW_COUNT || evidence.departureCount !== EXPECTED_ROW_COUNT
     || evidence.tripCount !== EXPECTED_TRIP_COUNT || evidence.stopTimeCount !== EXPECTED_ROW_COUNT
     || evidence.rawSha256 !== snapshot.rawSha256 || evidence.rowsSha256 !== snapshot.rowsSha256
     || evidence.topologySourceId !== TOPOLOGY_SOURCE_ID) {
     throw new Error(`${SOURCE_ID} inventory evidence does not match snapshot`);
+  }
+  if (topologySnapshot?.sourceId !== TOPOLOGY_SOURCE_ID
+    || evidence.topologySnapshotId !== topologyEvidence?.snapshotId
+    || evidence.topologyContentSha256 !== topologyEvidence?.contentSha256
+    || evidence.topologyContentSha256 !== topologySnapshot.contentSha256
+    || topologySnapshot.contentSha256 !== busanRouteTopologyContentHash(topologySnapshot.edges, topologySnapshot.scope)) {
+    throw new Error("Busan timetable topology lineage mismatch");
+  }
+  const version = evidence.snapshotId.slice(-8);
+  if (version !== compactSeoulDate(evidence.capturedAt)) {
+    throw new Error(`${SOURCE_ID} snapshotId must match capturedAt Asia/Seoul date`);
+  }
+  if (!version.startsWith(SUPPORTED_SERVICE_CALENDAR_YEAR)) {
+    throw new Error(`${SOURCE_ID} snapshotId must use supported service calendar year ${SUPPORTED_SERVICE_CALENDAR_YEAR}`);
   }
   const capturedAt = Date.parse(evidence.capturedAt);
   const freshUntil = Date.parse(evidence.freshUntil);
@@ -162,12 +192,38 @@ function requiredSource(inventory, snapshot, now) {
   return source;
 }
 
-function validateTopologyLineage(pack, evidence) {
+function validateTopologyLineage(pack, evidence, snapshot, stations) {
   const topology = pack.sourceInventory.find(({ id }) => id === TOPOLOGY_SOURCE_ID);
-  const edges = pack.networkEdges.filter(({ sourceId }) => sourceId === TOPOLOGY_SOURCE_ID);
-  if (!topology || edges.length !== 220 || edges.some(({ sourceSnapshotId, evidenceHash }) =>
-    sourceSnapshotId !== evidence.topologySnapshotId || evidenceHash !== evidence.topologyContentSha256)) {
+  const actual = pack.networkEdges.filter(({ sourceId }) => sourceId === TOPOLOGY_SOURCE_ID)
+    .sort((left, right) => left.id.localeCompare(right.id, "en"));
+  const expected = snapshot.edges.map((edge) => {
+    const from = stations.get(`${edge.lineId}:${edge.fromStationCode}`);
+    const to = stations.get(`${edge.lineId}:${edge.toStationCode}`);
+    return {
+      id: `edge-${edge.edgeId.replaceAll(":", "-")}`,
+      fromNodeId: `${from?.stationId}:${edge.lineId}`,
+      toNodeId: `${to?.stationId}:${edge.lineId}`,
+      durationSeconds: edge.durationSeconds + edge.stoppingSeconds,
+      distanceMeters: edge.distanceMeters,
+      sourceSnapshotId: evidence.topologySnapshotId,
+      providerRecordHash: sha256(JSON.stringify(edge)),
+      evidenceHash: evidence.topologyContentSha256,
+    };
+  }).sort((left, right) => left.id.localeCompare(right.id, "en"));
+  const comparable = actual.map((edge) => Object.fromEntries(Object.keys(expected[0]).map((key) => [key, edge[key]])));
+  if (!topology || actual.length !== 220 || JSON.stringify(comparable) !== JSON.stringify(expected)) {
     throw new Error("Busan timetable topology lineage mismatch");
+  }
+  return new Set(actual.map((edge) => `${edge.fromNodeId}:${edge.toNodeId}`));
+}
+
+function validateTripAdjacency(ordered, stations, lineId, topologyPairs, tripKey) {
+  for (let index = 1; index < ordered.length; index += 1) {
+    const from = stations.get(`${lineId}:${ordered[index - 1].row.scode}`)?.stationId;
+    const to = stations.get(`${lineId}:${ordered[index].row.scode}`)?.stationId;
+    if (!topologyPairs.has(`${from}:${lineId}:${to}:${lineId}`)) {
+      throw new Error(`Busan timetable topology adjacency mismatch: ${tripKey}`);
+    }
   }
 }
 
@@ -200,7 +256,7 @@ function addCalendars(pack, provenance) {
     }, provenance),
   );
   pack.serviceCalendarDates.push(...HOLIDAYS_2026.flatMap((date) => {
-    const day = new Date(`${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6)}T00:00:00+09:00`).getDay();
+    const day = new Date(`${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6)}T00:00:00Z`).getUTCDay();
     return [
       withProvenance({ serviceId: SERVICES["3"], date, exceptionType: 1 }, provenance, "GENERATED"),
       withProvenance({ serviceId: day === 6 ? SERVICES["2"] : SERVICES["1"], date, exceptionType: 2 }, provenance, "GENERATED"),
@@ -272,3 +328,34 @@ function compactSeoulDate(value) {
 }
 
 function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
+
+function parseArgs(argv) {
+  const expected = ["--base-fixture", "--timetable-snapshot", "--topology-snapshot", "--inventory", "--output"];
+  if (argv.length !== expected.length * 2 || expected.some((flag, index) => argv[index * 2] !== flag)
+    || !path.isAbsolute(argv.at(-1))) {
+    throw new Error("usage: materialize-busan-timetable.mjs --base-fixture <json> --timetable-snapshot <json> --topology-snapshot <json> --inventory <json> --output <absolute.json>");
+  }
+  return Object.fromEntries(expected.map((flag, index) => [flag.slice(2), argv[index * 2 + 1]]));
+}
+
+async function main(argv) {
+  const args = parseArgs(argv);
+  const [baseFixture, timetableSnapshot, topologySnapshot, inventory] = await Promise.all([
+    readFile(args["base-fixture"], "utf8").then(JSON.parse),
+    readFile(args["timetable-snapshot"], "utf8").then(JSON.parse),
+    readFile(args["topology-snapshot"], "utf8").then(JSON.parse),
+    readFile(args.inventory, "utf8").then(JSON.parse),
+  ]);
+  const fixture = materializeBusanTimetable({ baseFixture, timetableSnapshot, topologySnapshot, inventory });
+  await writeFile(args.output, `${JSON.stringify(fixture, null, 2)}\n`);
+  console.log(`Busan timetable materialized: trips=${EXPECTED_TRIP_COUNT} stopTimes=${EXPECTED_ROW_COUNT}`);
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  try {
+    await main(process.argv.slice(2));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : "Busan timetable materialization failed");
+    process.exitCode = 1;
+  }
+}

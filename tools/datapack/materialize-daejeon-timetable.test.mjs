@@ -263,6 +263,7 @@ test("병합된 부산·대전 admission과 공식 미지원 evidence를 91/270 
   const fixture = materializeBusanTimetable({
     baseFixture: daejeonFixture,
     timetableSnapshot: busanTimetableSnapshot,
+    topologySnapshot: busanSnapshot,
     inventory: values.inventory,
     now: new Date("2026-07-20T09:00:00.000Z"),
   });

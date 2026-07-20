@@ -150,17 +150,18 @@ function validateRow(values, { station, day, byCode, index }) {
 }
 
 function validateCompleteRows(rows, scope) {
-  const expected = new Set(scope.flatMap(({ stationCode }) => DAYS.map((day) => `${stationCode}:${day}`)));
+  const expected = new Set(scope.flatMap(({ stationCode }) =>
+    DAYS.flatMap((day) => ["0", "1"].map((updown) => `${stationCode}:${day}:${updown}`))));
   const seen = new Set();
   const keys = new Set();
   for (const row of rows) {
-    seen.add(`${row.scode}:${row.day}`);
+    seen.add(`${row.scode}:${row.day}:${row.updown}`);
     const key = RESPONSE_FIELDS.map((field) => row[field]).join(":");
     if (keys.has(key)) throw new Error("Busan timetable schema mismatch: duplicate row");
     keys.add(key);
   }
   if (seen.size !== expected.size || [...expected].some((key) => !seen.has(key))) {
-    throw new Error("Busan timetable schema mismatch: station/day scope incomplete");
+    throw new Error("Busan timetable schema mismatch: station/day/direction scope incomplete");
   }
 }
 
