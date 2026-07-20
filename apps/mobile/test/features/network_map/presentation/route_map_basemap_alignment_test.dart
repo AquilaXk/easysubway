@@ -177,4 +177,66 @@ void main() {
       );
     }
   });
+
+  // (C) 부산 전 역: seoul과 동일 하드 게이트를 부산에 미러(#2068 완주 라운드,
+  // 오너 v2 재배치 승인 반영). fixture 출처는 (B)와 동일 생성기(부산 재실행,
+  // --region 부산권 --geometry easy-subway-busan-v1-geometry.json)이며, 파이프라인이
+  // seoul과 동일하게 respace --pin-stations로 팩 좌표를 SVG 배정에 고정한다.
+  //
+  // 예외 1건: 국제금융센터·부산은행(station-080c154ce646/line-eb7b47920390)은
+  // route-map-busan-label-nudges.json의 결정적 라벨-선 겹침 회피 nudge(#2068 10차)로
+  // SVG 원좌표에서 의도적으로 이동됨(실측 501px) — 정합 오류가 아니라 별도 결정적
+  // 도구가 낸 알려진 편차이므로, 그 nudge 파일에 등재된 (stationId,lineId)만 하드
+  // 임계에서 제외한다(새 예외 임의 추가 금지 — nudge 파일이 커지면 이 목록도 함께
+  // 커진다).
+  const busanNudgeExceptionsFile =
+      '../../tools/route-map/route-map-busan-label-nudges.json';
+  const minBusanStationCoverage = 150; // 부산 158행 중 대다수 커버(하드 최소선).
+
+  test('(C) busan 바탕(SVG 배정) ↔ 인터랙션(팩) 좌표가 같은 viewBox 좌표계 — 전 역 하드 <5px'
+      '(label-nudge 등재 예외 제외)', () {
+    final file = File(
+      '../../tools/route-map/route-map-defs/busan-alignment-fixture.json',
+    );
+    expect(
+      file.existsSync(),
+      isTrue,
+      reason:
+          'fixture 없음 — node tools/route-map/generate-basemap-alignment-fixture.mjs '
+          '--region 부산권 --geometry tools/route-map/route-map-defs/easy-subway-busan-v1-geometry.json '
+          '--out tools/route-map/route-map-defs/busan-alignment-fixture.json 로 생성 필요: ${file.path}',
+    );
+    final fixture = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+    final entries = (fixture['entries'] as List).cast<Map<String, dynamic>>();
+
+    final nudgeFile = File(busanNudgeExceptionsFile);
+    final nudgeExceptions = <String>{};
+    if (nudgeFile.existsSync()) {
+      final nudges =
+          jsonDecode(nudgeFile.readAsStringSync()) as Map<String, dynamic>;
+      for (final n in (nudges['nudges'] as List).cast<Map<String, dynamic>>()) {
+        nudgeExceptions.add('${n['stationId']}/${n['lineId']}');
+      }
+    }
+
+    expect(
+      entries.length,
+      greaterThanOrEqualTo(minBusanStationCoverage),
+      reason:
+          'fixture 커버리지 급감 — canonical 정합이 대량 깨졌을 가능성(entries=${entries.length})',
+    );
+
+    for (final e in entries) {
+      final key = '${e['stationId']}/${e['lineId']}';
+      if (nudgeExceptions.contains(key)) continue;
+      final delta = (e['deltaPx'] as num).toDouble();
+      expect(
+        delta,
+        lessThan(alignmentThresholdPx),
+        reason:
+            '${e['name']}(${e['stationId']}/${e['lineId']}): svg=(${e['svgX']},${e['svgY']}) '
+            'pack=(${e['packX']},${e['packY']}) delta=$delta',
+      );
+    }
+  });
 }

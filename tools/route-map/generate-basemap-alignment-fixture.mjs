@@ -23,6 +23,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { buildAssignments } from "./apply-sma-svg-positions.mjs";
 import { cleanupPackDir, openPack, repoRoot } from "./pack-io.mjs";
+import { getRegionConfig } from "./sma-region-configs.mjs";
 
 function parseArgs(argv) {
   const o = {
@@ -55,9 +56,10 @@ function main() {
   const extraction = JSON.parse(
     readFileSync(path.join(repoRoot, o.geometry), "utf8"),
   );
+  const config = getRegionConfig(o.region);
   const { db, dir } = openPack(o.pack, "align-fixture-");
   try {
-    const { assignments } = buildAssignments(db, extraction);
+    const { assignments } = buildAssignments(db, extraction, config);
     const svgByStation = new Map(assignments.map((a) => [a.stationId, a]));
 
     const names = new Map();
@@ -71,7 +73,7 @@ function main() {
       .prepare(
         "SELECT station_id, line_id, x, y FROM route_map_positions WHERE region = ?",
       )
-      .all(o.region);
+      .all(config.regionKey);
 
     const entries = [];
     let unmatched = 0;

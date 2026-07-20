@@ -20,29 +20,58 @@
 // 수술이며, 병합 후 apply-sma-svg-positions 미매핑 0 게이트도 통과함을 실측했다.
 // 하드 게이트는 자유 교차 0을 못 박고, 재배치·재간격·스냅 회귀가 새 자유 교차를
 // 만들면 즉시 실패시킨다.
+//
+// #2068 완주 라운드(오너 v2 재배치, 2026-07-20): 오너가 부전에 1호선·동해선
+// 심벌을 각각 그려 넣으면서 그 교차가 새로 드러났다. 벡스코와 겉보기엔 같은
+// "자유 교차" 형태지만 원인이 다르다 — 오너 확정: "별개 역인데? 내가 환승역으로
+// 그렸다고?" — 1호선 부전과 동해선 부전은 서로 다른 물리역이고(병합 대상 아님,
+// merge-busan-transfers.mjs 절대 적용 금지), 두 노선이 그 지점에서 그냥
+// 지나가며 교차하는 실제 무환승 교차다(오너가 그린 실제 지리, 데이터 결함
+// 아님). 그래서 knot 등록(벡스코식 병합)이 아니라 좌표·노선쌍으로 정밀
+// 특정한 allowlist로 처리한다 — free 카운트 자체의 임계 완화가 아니라, 이
+// 특정 교차 1건만 "알려진 무환승 교차"로 분리해 여전히 0을 하드 고정한다.
+// 좌표는 파이프라인 실측(부전 위치, line1×동해선 트랙 교차 검출분을 모두
+// 포괄하는 중심점·반경)에서 가져왔다 — 새로운 자유 교차가 다른 곳에 생기면
+// 이 allowlist에 안 걸려 즉시 실패한다(포괄 완화 아님).
+const BUSAN_FREE_CROSSING_ALLOWLIST = [
+  {
+    lineIds: ["line-ab1a041f6266", "line-f52eb59d8497"], // 부산 1호선 × 부산 동해선
+    point: { x: 5817, y: 3985 },
+    toleranceRadius: 80,
+    note:
+      "오너 확정 2026-07-20 — 부전 1호선·동해선 별개 역, 무환승 교차(병합 금지). " +
+      "부전 좌표(1호선 station-9acc028dded4, 동해선 station-ee8407a487c2 모두 " +
+      "(5817,3938) 인근)에서 두 노선이 실제로 교차만 하고 환승은 없다.",
+  },
+];
+
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { classifyCrossings, clusterCentroids } from "./audit-station-spacing.mjs";
 import { loadRegionRespaceGraph, medianStationChainLength } from "./respace-route-map.mjs";
 import { cleanupPackDir, openPack } from "./pack-io.mjs";
 
-const KNOWN_FREE_CROSSING_BASELINE = 0; // 벡스코 병합 완료 — 자유 교차 0(위 note 참고).
+const KNOWN_FREE_CROSSING_BASELINE = 0; // 벡스코 병합 + 부전 allowlist — 자유 교차 0(위 note 참고).
 
-test("부산권 실팩: 자유 교차 0(벡스코 병합 완료, #2068 마감)", () => {
+test("부산권 실팩: 자유 교차 0(벡스코 병합 + 부전 allowlist, #2068 완주)", () => {
   const { db, dir } = openPack("apps/mobile/assets/datapacks/capital.sqlite.gz", "busan-free-crossing-gate-");
   try {
     const graph = loadRegionRespaceGraph(db, "부산권");
-    const tracksPoints = graph.tracks
-      .filter((t) => t.nodeIds.length)
-      .map((t) => t.nodeIds.map((id) => graph.nodes[id]));
+    const activeTracks = graph.tracks.filter((t) => t.nodeIds.length);
+    const tracksPoints = activeTracks.map((t) => t.nodeIds.map((id) => graph.nodes[id]));
+    const trackLineIds = activeTracks.map((t) => t.lineId);
     const unit = medianStationChainLength(graph);
     const byClass = classifyCrossings(tracksPoints, clusterCentroids(graph, graph.nodes), {
       knotRadius: unit * 0.75,
+      trackLineIds,
+      freeAllowlist: BUSAN_FREE_CROSSING_ALLOWLIST,
     });
     assert.ok(
       byClass.free <= KNOWN_FREE_CROSSING_BASELINE,
-      `부산권 자유 교차 ${byClass.free}건 — baseline ${KNOWN_FREE_CROSSING_BASELINE}(벡스코 병합 완료) 악화 금지. ` +
-        `새 자유 교차가 생겼으면 재배치로 제거를 먼저 시도하라(#2068 오너 지적: 비환승 교차 최소화).`,
+      `부산권 자유 교차 ${byClass.free}건(allowlist 제외분 ${byClass.freeAllowlisted}건) — ` +
+        `baseline ${KNOWN_FREE_CROSSING_BASELINE} 악화 금지. 새 자유 교차가 생겼으면 재배치로 ` +
+        `제거를 먼저 시도하라(#2068 오너 지적: 비환승 교차 최소화). allowlist에 없는 좌표/노선쌍이면 ` +
+        `임의로 allowlist를 넓히지 말고 오너 확인부터 받아라.`,
     );
   } finally {
     try {
