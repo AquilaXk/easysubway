@@ -515,6 +515,39 @@ test("pack 미입력 경로는 admit된 identity와 번들 pack이 불일치하�
   );
 });
 
+test("pack 미입력 경로는 sqliteSha256만 어긋나도 fail closed 한다", async () => {
+  const value = await inputs();
+  const { contractBytes, sourceBytes } = consistentFreshnessInputs(value);
+  // gzip sha256은 실측 pack과 일치시키되 sqliteSha256만 다른 값으로 어긋나게 한다.
+  const contract = JSON.parse(contractBytes);
+  contract.officialEvidence.korailCompletenessAdmission.canonicalPackIdentity.sqliteSha256 = "9".repeat(64);
+  const tamperedContractBytes = Buffer.from(`${JSON.stringify(contract, null, 2)}\n`);
+
+  assert.throws(
+    () => buildServerTimetableSnapshot({
+      ...value, contractBytes: tamperedContractBytes, sourceBytes, topologyEvidenceBytes: null, buildNow,
+    }),
+    /canonical topology pack identity mismatch/,
+  );
+});
+
+test("pack 미입력 경로는 gzip이 파손되면 fail closed 한다", async () => {
+  const value = await inputs();
+  const { contractBytes, sourceBytes } = consistentFreshnessInputs(value);
+
+  assert.throws(
+    () => buildServerTimetableSnapshot({
+      ...value,
+      contractBytes,
+      sourceBytes,
+      canonicalPackGzipBytes: Buffer.from("corrupt-not-a-gzip"),
+      topologyEvidenceBytes: null,
+      buildNow,
+    }),
+    /canonical topology pack identity mismatch/,
+  );
+});
+
 test("pack 미입력 경로와 topology evidence 경로는 동일 입력에서 byte-identical snapshot을 낸다", async () => {
   const value = await inputs();
   const { contractBytes, sourceBytes, topologyEvidenceBytes } = consistentFreshnessInputs(value);
