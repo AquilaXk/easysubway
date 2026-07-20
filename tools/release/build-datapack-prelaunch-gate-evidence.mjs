@@ -13,6 +13,7 @@ import { buildReleaseCallback } from "../datapack/build-release-callback.mjs";
 import { evaluateReleaseDecision } from "../datapack/decide-datapack-release.mjs";
 import { canonicalJson, withoutSignature } from "../datapack/lib/manifest-validation.mjs";
 import { sendReleaseCallback } from "../datapack/send-release-callback.mjs";
+import { codepointCompare } from "../lib/codepoint-compare.mjs";
 const GATE_LIFETIME_MS = 14 * 86_400_000;
 const REQUIRED_SUITES = ["source", "freshness", "rollback", "android", "callback", "backend"];
 const execFileAsync = promisify(execFile);
@@ -170,7 +171,7 @@ function buildSourceInventory(snapshots, evaluatedAt, expiresAt) {
     expiresAt: new Date(Math.min(
       Date.parse(expiresAt), Date.parse(snapshot.freshnessExpiresAt), Date.parse(snapshot.rawRetentionExpiresAt),
     )).toISOString(),
-  })).sort((left, right) => left.sourceId.localeCompare(right.sourceId));
+  })).sort((left, right) => codepointCompare(left.sourceId, right.sourceId));
   return {
     inventoryAsOf: new Date(evaluatedAt).toISOString(),
     entries,
@@ -284,7 +285,7 @@ function validateSourceInputs(buildSpec, report, identity, evaluatedMillis) {
   }
   const schemaFingerprintSetHash = sha256(JSON.stringify(buildSpec.sourceSnapshots
     .map(({ snapshotId, schemaFingerprint }) => ({ snapshotId, schemaFingerprint }))
-    .sort((left, right) => left.snapshotId.localeCompare(right.snapshotId))));
+    .sort((left, right) => codepointCompare(left.snapshotId, right.snapshotId))));
   if (report.schemaFingerprintSetHash !== schemaFingerprintSetHash) {
     throw new Error("source admission schema fingerprint evidence mismatch");
   }
@@ -334,7 +335,7 @@ function requiredSha(value, label) {
   if (!/^[a-f0-9]{64}$/.test(value ?? "")) throw new Error(`${label} is invalid`);
 }
 function passing(names) {
-  return Object.fromEntries([...names].sort((left, right) => left.localeCompare(right)).map((name) => [name, true]));
+  return Object.fromEntries([...names].sort((left, right) => codepointCompare(left, right)).map((name) => [name, true]));
 }
 function same(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
@@ -946,7 +947,7 @@ async function junitFiles(root, required = true) {
     else if (entry.name.endsWith(".xml")) files.push(child);
   }
   if (required && files.length === 0) throw new Error("backend JUnit reports are missing");
-  return files.sort((left, right) => left.localeCompare(right));
+  return files.sort((left, right) => codepointCompare(left, right));
 }
 async function validateJunit(files, identity) {
   const requiredClasses = [

@@ -18,6 +18,7 @@ import {
   ROUTE_SEARCH_CATALOG_ID,
   buildRouteIntegrationVerdict,
 } from "../release/generate-route-integration-verdict.mjs";
+import { codepointCompare } from "../lib/codepoint-compare.mjs";
 
 const root = process.cwd();
 const execFileAsync = promisify(execFile);
@@ -4481,7 +4482,7 @@ test("A RED repository locks summary v2 contract and catalog", async () => {
       { matrixId, caseId, targetAlias: `target.${matrixId}`, expectedStatuses: matrix.expectedStatusByCase[caseId] },
     ]));
   assert.deepEqual(catalog.procedureIds, expectedProcedures.map(([procedureId]) => procedureId).sort());
-  assert.deepEqual(Object.entries(catalog.procedureById).sort(([left], [right]) => left.localeCompare(right)), expectedProcedures.sort(([left], [right]) => left.localeCompare(right)));
+  assert.deepEqual(Object.entries(catalog.procedureById).sort(([left], [right]) => codepointCompare(left, right)), expectedProcedures.sort(([left], [right]) => codepointCompare(left, right)));
   assert.equal(new Set(catalog.procedureIds).size, catalog.procedureIds.length);
   assert.equal(new Set(catalog.targetAliases).size, catalog.targetAliases.length);
   assert.equal(new Set(catalog.ownerAliases).size, catalog.ownerAliases.length);
@@ -5796,7 +5797,7 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   assert.deepEqual(manifest.sourceInventory, {
     inventoryAsOf: now, generatedAt: now, producerVersion: 2,
     statusCounts: { APPROVED: requiredSourceIds.length, REVIEW_REQUIRED: 0, BLOCKED: 0, EXPIRED: 0 },
-    entries: [...sourceInventoryEntries].sort((left, right) => left.sourceId.localeCompare(right.sourceId)),
+    entries: [...sourceInventoryEntries].sort((left, right) => codepointCompare(left.sourceId, right.sourceId)),
     snapshotSetIdentity,
   });
   assert.equal(manifest.identityLinkage.status, "SATISFIED");
@@ -8873,7 +8874,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     assert.ok(Array.isArray(source.coverageScope.sourceDomains));
     assert.ok(source.capabilities && typeof source.capabilities === "object", `${source.id} must declare source capabilities`);
     assert.deepEqual(
-      Object.keys(source.capabilities).sort((left, right) => left.localeCompare(right)),
+      Object.keys(source.capabilities).sort((left, right) => codepointCompare(left, right)),
       ["facility", "realtime", "schedule"],
       `${source.id} must declare schedule, realtime, and facility capabilities`,
     );
@@ -9702,7 +9703,7 @@ test("strict route coverage는 UNKNOWN edge와 unpromoted movement candidate를 
         operationalStatus: row.operationalStatus,
         strictRouteEligible: row.strictRouteEligible,
       }))
-      .sort((left, right) => left.stationId.localeCompare(right.stationId)),
+      .sort((left, right) => codepointCompare(left.stationId, right.stationId)),
     [
       { stationId: "station-sadang", evidenceKind: "EXISTS", operationalStatus: "UNDER_MAINTENANCE", strictRouteEligible: false },
       { stationId: "station-sangnoksu", evidenceKind: "NOT_EXISTS", operationalStatus: "NOT_COVERED", strictRouteEligible: false },
@@ -10064,7 +10065,7 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
       assert.match(candidate.evidence.sampleUrl, /[?&]serviceKey=\[서비스키값\](?:&|$)/);
     }
     assert.ok(candidate.capabilities && typeof candidate.capabilities === "object");
-    assert.deepEqual(Object.keys(candidate.capabilities).sort((left, right) => left.localeCompare(right)), [
+    assert.deepEqual(Object.keys(candidate.capabilities).sort((left, right) => codepointCompare(left, right)), [
       "facility",
       "realtime",
       "schedule",
@@ -10128,7 +10129,7 @@ test("서울 TOPIS 실시간 source는 backend-only key 경계와 guarded produc
     assert.equal(candidate.mobileEmbeddingAllowed, false);
     assert.equal(candidate.dataRetentionPolicy, "provider_does_not_offer_past_realtime_data");
     assert.ok(candidate.capabilities && typeof candidate.capabilities === "object");
-    assert.deepEqual(Object.keys(candidate.capabilities).sort((left, right) => left.localeCompare(right)), [
+    assert.deepEqual(Object.keys(candidate.capabilities).sort((left, right) => codepointCompare(left, right)), [
       "facility",
       "realtime",
       "schedule",
@@ -10360,7 +10361,7 @@ test("KRIC subwayTimetable 후보는 pilot schedule production source로 승인�
   assert.equal(productionSourceIds.has(candidate.id), true, "승인된 후보는 production inventory에 있어야 한다");
 
   // capabilities.schedule은 pilot 범위에서만 production 사용을 허용한다.
-  assert.deepEqual(Object.keys(candidate.capabilities).sort((left, right) => left.localeCompare(right)), [
+  assert.deepEqual(Object.keys(candidate.capabilities).sort((left, right) => codepointCompare(left, right)), [
     "facility",
     "realtime",
     "schedule",
@@ -11682,7 +11683,7 @@ test("source raw archive 도구는 공용 CSV parser와 명시적 문자열 정�
   assert.match(restoreCheckScript, /import \{ parseCsv \} from "\.\/data-source-raw-archive-csv\.mjs"/);
   assert.doesNotMatch(materializeScript, /function parseCsv\(/);
   assert.doesNotMatch(restoreCheckScript, /function parseCsv\(/);
-  assert.match(restoreCheckScript, /localeCompare/);
+  assert.match(restoreCheckScript, /codepointCompare/);
 
   const { parseCsv } = await import(pathToFileURL(path.join(root, csvParserPath)));
   assert.deepEqual(
@@ -18741,4 +18742,169 @@ test("서비스·위치정보 이용약관은 공개 경로와 사실 계약을 
   assert.match(locationTerms, /제 16 조 \(사업자 및 위치정보관리책임자\)/);
   assert.match(locationTerms, /약관을 단순히 게시하거나 이용자가 열람했다는 사실만으로 별도 동의를 받은 것으로 보지 않습니다/);
   assert.doesNotMatch(`${terms}\n${locationTerms}`, /TBD|TODO|준비 중/);
+});
+
+test("tools/**/*.mjs는 로케일 미지정 localeCompare 호출을 두지 않는다 (#2390)", () => {
+  // 로케일 인자 없는 localeCompare는 실행 환경 ICU 기본 로케일에 콜레이션을 의존해
+  // canonicalScopeHash와 datapack/evidence 산출물이 빌드 머신마다 갈릴 수 있다(#2390).
+  // 정렬 비교는 tools/lib/codepoint-compare.mjs의 codepointCompare(로케일 무관)로 통일하고,
+  // 사용자 표시용 콜레이션이 필요한 곳만 명시 로케일(두 번째 인자)을 붙인다.
+  const IDENT = /[A-Za-z0-9_$]/;
+  const REGEX_PREV = new Set([
+    "return", "typeof", "instanceof", "in", "of", "new", "delete", "void",
+    "do", "else", "yield", "await", "case",
+  ]);
+
+  // 주석·문자열·정규식 리터럴을 공백으로 마스킹한다. 템플릿 `${...}` 표현식은
+  // 코드로 남겨(내부 호출도 검출), 백틱/문자열 텍스트·`${`/`}` 구분자만 지운다.
+  const maskLiterals = (source) => {
+    const out = source.split("");
+    const n = source.length;
+    let lastSig = "";
+    let lastWord = "";
+    const blank = (k) => { if (out[k] !== "\n") out[k] = " "; };
+    const maskQuote = (start, quote) => {
+      let k = start; blank(k); k += 1;
+      while (k < n) {
+        const c = source[k];
+        if (c === "\\") { blank(k); blank(k + 1); k += 2; continue; }
+        blank(k); k += 1;
+        if (c === quote || c === "\n") break;
+      }
+      return k;
+    };
+    const maskCode = (start, stopBrace) => {
+      let i = start;
+      let braceDepth = 0;
+      while (i < n) {
+        const c = source[i];
+        if (stopBrace && c === "{") braceDepth += 1;
+        if (stopBrace && c === "}") { if (braceDepth === 0) return i; braceDepth -= 1; }
+        if (c === "/" && source[i + 1] === "/") {
+          let k = i; while (k < n && source[k] !== "\n") { blank(k); k += 1; } i = k; continue;
+        }
+        if (c === "/" && source[i + 1] === "*") {
+          let k = i + 2; while (k < n && !(source[k] === "*" && source[k + 1] === "/")) k += 1;
+          k = Math.min(n, k + 2); for (let b = i; b < k; b += 1) blank(b); i = k; continue;
+        }
+        if (c === "/") {
+          const prevValue = lastSig !== "" && (IDENT.test(lastSig) || lastSig === ")" || lastSig === "]");
+          const startsRegex = !prevValue || (IDENT.test(lastSig) && REGEX_PREV.has(lastWord));
+          if (startsRegex) {
+            let k = i + 1; let inClass = false; let ok = false;
+            while (k < n) {
+              const d = source[k];
+              if (d === "\\") { k += 2; continue; }
+              if (d === "\n") break;
+              if (d === "[") inClass = true; else if (d === "]") inClass = false;
+              else if (d === "/" && !inClass) { k += 1; ok = true; break; }
+              k += 1;
+            }
+            if (ok) {
+              while (k < n && /[a-z]/i.test(source[k])) k += 1;
+              for (let b = i; b < k; b += 1) blank(b);
+              lastSig = "/"; lastWord = ""; i = k; continue;
+            }
+          }
+          lastSig = "/"; lastWord = ""; i += 1; continue;
+        }
+        if (c === "'" || c === '"') { i = maskQuote(i, c); lastSig = c; lastWord = ""; continue; }
+        if (c === "`") {
+          blank(i); let k = i + 1;
+          while (k < n) {
+            const d = source[k];
+            if (d === "\\") { blank(k); blank(k + 1); k += 2; continue; }
+            if (d === "`") { blank(k); k += 1; break; }
+            if (d === "$" && source[k + 1] === "{") {
+              blank(k); blank(k + 1); k += 2; k = maskCode(k, "}");
+              if (source[k] === "}") { blank(k); k += 1; } continue;
+            }
+            blank(k); k += 1;
+          }
+          lastSig = "`"; lastWord = ""; i = k; continue;
+        }
+        if (!/\s/.test(c)) {
+          lastSig = c;
+          lastWord = IDENT.test(c) ? (IDENT.test(source[i - 1] || "") ? lastWord : "") + c : "";
+        }
+        i += 1;
+      }
+      return i;
+    };
+    maskCode(0, null);
+    return out.join("");
+  };
+
+  // 로케일 인자 없는 .localeCompare( 호출의 라인 번호 목록을 돌려준다.
+  const findLocaleUnspecified = (source) => {
+    const masked = maskLiterals(source);
+    const needle = ".localeCompare(";
+    const hits = [];
+    let from = 0;
+    for (;;) {
+      const idx = masked.indexOf(needle, from);
+      if (idx === -1) break;
+      from = idx + needle.length;
+      const openParen = idx + needle.length - 1;
+      let depth = 0; let close = -1; const commas = [];
+      for (let i = openParen; i < masked.length; i += 1) {
+        const ch = masked[i];
+        if (ch === "(" || ch === "[" || ch === "{") depth += 1;
+        else if (ch === ")" || ch === "]" || ch === "}") { depth -= 1; if (depth === 0) { close = i; break; } }
+        else if (ch === "," && depth === 1) commas.push(i);
+      }
+      if (close === -1) continue;
+      // 비어 있지 않은 인자 수는 원본 소스로 센다(문자열 로케일은 마스킹돼도 실인자,
+      // trailing comma는 빈 세그먼트라 인자가 아니다).
+      const bounds = [openParen, ...commas, close];
+      let argCount = 0;
+      for (let s = 0; s < bounds.length - 1; s += 1) {
+        if (source.slice(bounds[s] + 1, bounds[s + 1]).trim() !== "") argCount += 1;
+      }
+      if (argCount < 2) hits.push(source.slice(0, idx).split("\n").length);
+    }
+    return hits;
+  };
+
+  // 자기검증: 위반 예시는 검출되고 허용 예시는 통과한다(과탐·미탐 없음).
+  assert.equal(findLocaleUnspecified("x.sort((a, b) => a.localeCompare(b));").length, 1);
+  assert.equal(findLocaleUnspecified("`${a.foo.localeCompare(b.foo)}`;").length, 1);
+  assert.equal(findLocaleUnspecified("x.localeCompare(\n  y,\n);").length, 1);
+  assert.equal(findLocaleUnspecified('a.localeCompare(b, "en");').length, 0);
+  assert.equal(findLocaleUnspecified('a.localeCompare(b, "ko", { numeric: true });').length, 0);
+  assert.equal(findLocaleUnspecified('const s = "a.localeCompare(b)";').length, 0);
+  assert.equal(findLocaleUnspecified("// a.localeCompare(b)\n").length, 0);
+  assert.equal(findLocaleUnspecified("assert.match(src, /a.localeCompare(b)/);").length, 0);
+
+  // 아래 파일들은 operations 리뷰 게이트의 소스 sha 핀(apps/mobile/release/post-launch-operations-review-gate.json,
+  // refreshOn "operations-contract-change")에 묶여 있다. 코드포인트 치환은 핀을 stale로 만들고,
+  // 운영 릴리스 요약 validator가 런타임에 그 핀을 강제하므로 핀 갱신에는 operations 재리뷰가 필요하다.
+  // 따라서 이 파일들의 치환+핀 갱신은 A급 후속 PR에서 operations 재리뷰와 함께 처리한다(#2390).
+  const PENDING_SEPARATE_A_GRADE = [
+    "tools/datapack/run-emergency-datapack-drill.mjs",
+    "tools/ops/validate-operations-release-summary.mjs",
+    "tools/release/generate-rc-evidence-manifest.mjs",
+    "tools/release/summary-validation-utils.mjs",
+  ];
+  // 자기청소: 후속 PR이 아래 파일을 치환하면 이 단언이 실패해 stale 예외를 강제로 제거하게 한다.
+  for (const rel of PENDING_SEPARATE_A_GRADE) {
+    assert.ok(
+      findLocaleUnspecified(read(rel)).length > 0,
+      `${rel} 는 이미 치환됐다 — PENDING_SEPARATE_A_GRADE 예외 항목을 제거하라.`,
+    );
+  }
+
+  const excluded = new Set(["tools/lib/codepoint-compare.mjs", ...PENDING_SEPARATE_A_GRADE]);
+  const files = execFileSync("git", ["ls-files", "tools"], { cwd: root, encoding: "utf8" })
+    .split("\n")
+    .filter((rel) => rel.endsWith(".mjs") && !excluded.has(rel));
+  const violations = [];
+  for (const rel of files) {
+    for (const line of findLocaleUnspecified(read(rel))) violations.push(`${rel}:${line}`);
+  }
+  assert.deepEqual(
+    violations,
+    [],
+    `로케일 미지정 localeCompare는 금지된다(#2390). codepointCompare(tools/lib/codepoint-compare.mjs) 사용 또는 명시 로케일로 바꿔라:\n${violations.join("\n")}`,
+  );
 });
