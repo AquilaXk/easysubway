@@ -215,7 +215,7 @@ function decodeXml(bytes) {
 }
 
 function scalar(raw, field) {
-  const value = new RegExp(`<${field}\\b[^>]*>([^<]{0,200})<\\/${field}>`, "i").exec(raw)?.[1];
+  const value = new RegExp(String.raw`<${field}\b[^>]*>([^<]{0,200})<\/${field}>`, "i").exec(raw)?.[1];
   return value == null ? null : decodeEntities(value.trim());
 }
 
@@ -231,7 +231,7 @@ function decodedServiceKey(value) {
 }
 
 function validDate(value, label) {
-  const date = value instanceof Date ? new Date(value) : new Date(value);
+  const date = new Date(value);
   if (Number.isNaN(date.getTime())) throw new Error(`${label} is invalid`);
   return date;
 }
@@ -271,8 +271,10 @@ async function main(args = process.argv.slice(2)) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     console.error(error instanceof Error ? error.message : "Busan timetable collection failed");
     process.exitCode = 1;
-  });
+  }
 }

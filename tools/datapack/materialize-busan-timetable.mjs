@@ -122,7 +122,10 @@ export function materializeBusanTimetable({
 }
 
 export function materializedPackContentHash(pack, version) {
-  const { id: _id, version: _version, url: _url, ...content } = pack;
+  const content = { ...pack };
+  delete content.id;
+  delete content.version;
+  delete content.url;
   return sha256(JSON.stringify({ version, content }));
 }
 
@@ -134,7 +137,8 @@ function validateSnapshot(snapshot) {
     || snapshot.rowsSha256 !== sha256(JSON.stringify(snapshot.rows))
     || !/^[a-f0-9]{64}$/.test(snapshot.rawSha256 ?? "")
     || JSON.stringify(snapshot.dayTypes) !== JSON.stringify(["1", "2", "3"])
-    || JSON.stringify(snapshot.lineIds) !== JSON.stringify(Object.values(LINE_IDS).sort())) {
+    || JSON.stringify(snapshot.lineIds) !== JSON.stringify(Object.values(LINE_IDS)
+      .sort((left, right) => left.localeCompare(right, "en")))) {
     throw new Error("invalid Busan timetable snapshot");
   }
   const keys = new Set();
@@ -193,7 +197,7 @@ function requiredSource(inventory, snapshot, topologySnapshot, now) {
 }
 
 function validateTopologyLineage(pack, evidence, snapshot, stations) {
-  const topology = pack.sourceInventory.find(({ id }) => id === TOPOLOGY_SOURCE_ID);
+  const hasTopology = pack.sourceInventory.some(({ id }) => id === TOPOLOGY_SOURCE_ID);
   const actual = pack.networkEdges.filter(({ sourceId }) => sourceId === TOPOLOGY_SOURCE_ID)
     .sort((left, right) => left.id.localeCompare(right.id, "en"));
   const expected = snapshot.edges.map((edge) => {
@@ -211,7 +215,7 @@ function validateTopologyLineage(pack, evidence, snapshot, stations) {
     };
   }).sort((left, right) => left.id.localeCompare(right.id, "en"));
   const comparable = actual.map((edge) => Object.fromEntries(Object.keys(expected[0]).map((key) => [key, edge[key]])));
-  if (!topology || actual.length !== 220 || JSON.stringify(comparable) !== JSON.stringify(expected)) {
+  if (!hasTopology || actual.length !== 220 || JSON.stringify(comparable) !== JSON.stringify(expected)) {
     throw new Error("Busan timetable topology lineage mismatch");
   }
   return new Set(actual.map((edge) => `${edge.fromNodeId}:${edge.toNodeId}`));
