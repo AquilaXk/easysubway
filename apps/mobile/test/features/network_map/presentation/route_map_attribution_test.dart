@@ -6,14 +6,18 @@
 // 전환했다 — 제거가 아니라 계약 전환이다(manifest license.attributionRequired=false).
 // 이제 광주는 수도권·부산·대구·대전과 동일하게 화면 attribution을 표시하지 않는다.
 //
-// StructuredRouteMapPainter는 화면 좌하단에 attributionText를 직접
-// Canvas.drawPicture로 그리므로 find.text()로는 찾을 수 없다(#283-347행,
-// structured_route_map_painter.dart 참고). 대신 CustomPaint의 painter를
-// StructuredRouteMapPainter로 캐스팅해 attributionText 필드를 직접
-// assert한다 — 이 방식이 렌더 방식과 가장 정합적이고 신뢰성 있는 검증이다.
+// [#2068] 프로덕션 바탕 렌더러가 StructuredRouteMapView → RouteMapBasemapView로
+// 전환됐다(하이브리드 .vec 바탕층). attribution 불변식(선택 region의 attributionText
+// 값)은 그대로이며, 검증 대상 위젯·painter만 새 바탕 위젯 기준으로 정합 갱신한다
+// (무력화 아님 — 동일 attribution 불변식을 새 위젯에서 검증).
+//
+// RouteMapBasemapPainter는 화면 좌하단에 attributionText를 직접 Canvas로 그리므로
+// find.text()로는 찾을 수 없다(route_map_basemap_view.dart _paintAttribution 참고).
+// 대신 CustomPaint의 painter를 RouteMapBasemapPainter로 캐스팅해 attributionText
+// 필드를 직접 assert한다 — 이 방식이 렌더 방식과 가장 정합적이고 신뢰성 있다.
 import 'dart:convert';
 
-import 'package:easysubway_mobile/features/network_map/presentation/structured_route_map_painter.dart';
+import 'package:easysubway_mobile/features/network_map/presentation/route_map_basemap_view.dart';
 import 'package:easysubway_mobile/features/route_draft/application/route_draft_controller.dart';
 import 'package:easysubway_mobile/network_map.dart';
 import 'package:flutter/material.dart';
@@ -102,16 +106,16 @@ class _FakeNetworkMapRepository implements NetworkMapRepository {
   }
 }
 
-StructuredRouteMapPainter _findRouteMapPainter(WidgetTester tester) {
+RouteMapBasemapPainter _findRouteMapPainter(WidgetTester tester) {
   final customPaintFinder = find.descendant(
-    of: find.byType(StructuredRouteMapView),
+    of: find.byType(RouteMapBasemapView),
     matching: find.byWidgetPredicate(
       (widget) =>
-          widget is CustomPaint && widget.painter is StructuredRouteMapPainter,
+          widget is CustomPaint && widget.painter is RouteMapBasemapPainter,
     ),
   );
   final painter = tester.widget<CustomPaint>(customPaintFinder).painter;
-  return painter as StructuredRouteMapPainter;
+  return painter as RouteMapBasemapPainter;
 }
 
 void main() {
@@ -133,7 +137,7 @@ void main() {
 
     // 오너 자작 도식으로 전환돼 CC-BY-SA(kiwitree) attribution 체인이 배포
     // 렌더링에 부착되지 않는다 — 수도권 등과 동일하게 미표시.
-    expect(find.byType(StructuredRouteMapView), findsOneWidget);
+    expect(find.byType(RouteMapBasemapView), findsOneWidget);
     final painter = _findRouteMapPainter(tester);
     expect(painter.attributionText, isNull);
   });
@@ -169,7 +173,7 @@ void main() {
     await tester.pump(Duration.zero);
     await tester.pumpAndSettle();
 
-    expect(find.byType(StructuredRouteMapView), findsOneWidget);
+    expect(find.byType(RouteMapBasemapView), findsOneWidget);
     final painter = _findRouteMapPainter(tester);
     expect(painter.attributionText, isNull);
   });
@@ -189,6 +193,13 @@ void main() {
       // catch 블록(`_sharedAttributionTextByRegionFuture = null`)이 담당하므로, 그
       // 무효화가 사라지면(=재시도 안 됨) manifestLoadAttempts가 2에 도달하지 못한다.
       final manifestBytes = await rootBundle.load(_mapManifestAssetPath);
+      // 광주 바탕 .vec를 실제 번들 바이트로 미리 로드해 mock 핸들러가 서빙한다
+      // (#2068). 이 테스트가 가로채는 대상은 manifest 로드 재시도이며, 바탕 .vec
+      // 로드 실패는 이 불변식과 무관한 노이즈다 — 실제 바이트로 서빙해 basemap이
+      // 조용히 로드되게 하고 takeException이 manifest 실패만 관측하게 유지한다.
+      const basemapAssetPath =
+          'assets/datapacks/metro_map_pack/basemap/gwangju.vec';
+      final basemapBytes = await rootBundle.load(basemapAssetPath);
       // rootBundle은 loadString(cache:true)을 프로세스 생애주기 동안 캐시한다. 앞선
       // 테스트가 이미 이 키를 성공 로드해 rootBundle 자체의 _stringCache에 남아
       // 있으므로, induced failure를 실제로 겪으려면 그 캐시를 먼저 비운다.
@@ -202,6 +213,9 @@ void main() {
         ByteData? message,
       ) async {
         final key = utf8.decode(message!.buffer.asUint8List());
+        if (key == basemapAssetPath) {
+          return basemapBytes; // 바탕 .vec는 항상 실제 바이트로 성공 로드.
+        }
         if (key != _mapManifestAssetPath) {
           return null;
         }
@@ -235,7 +249,7 @@ void main() {
       // FlutterError.reportError로 전파되므로 takeException으로 소비해 의도된
       // 예외임을 확인한다. 자작 전환 후 attribution은 성공/실패 무관하게 null이므로
       // 표시 여부가 아니라 시도 횟수와 예외로 실패를 관측한다.
-      expect(find.byType(StructuredRouteMapView), findsOneWidget);
+      expect(find.byType(RouteMapBasemapView), findsOneWidget);
       expect(_findRouteMapPainter(tester).attributionText, isNull);
       expect(manifestLoadAttempts, 1);
       expect(tester.takeException(), isNotNull);
@@ -263,7 +277,7 @@ void main() {
       // 재시도가 실제로 일어나 2차 로드가 성공했다: 시도 횟수가 2에 도달하고,
       // 2차에는 예외가 남지 않는다(성공 파싱). 캐시 무효화가 없었다면 실패 Future가
       // 붙들려 재시도가 일어나지 않고 attempts는 1에 머문다.
-      expect(find.byType(StructuredRouteMapView), findsOneWidget);
+      expect(find.byType(RouteMapBasemapView), findsOneWidget);
       expect(_findRouteMapPainter(tester).attributionText, isNull);
       expect(manifestLoadAttempts, 2);
       expect(tester.takeException(), isNull);

@@ -46,6 +46,7 @@ import 'package:easysubway_mobile/legacy_credential_cleanup.dart';
 import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:easysubway_mobile/network_map.dart';
 import 'package:easysubway_mobile/search_field.dart';
+import 'package:easysubway_mobile/features/network_map/presentation/route_map_basemap_view.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/nearby_direction_title.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/structured_route_map_painter.dart';
 import 'package:easysubway_mobile/notification_settings.dart';
@@ -832,6 +833,7 @@ void main() {
     expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
     expect(find.byKey(const Key('nearbyStationButton')), findsOneWidget);
     expect(find.byKey(const Key('networkMapBottomAdBanner')), findsOneWidget);
+    // #2068: 노선도는 일반/급행 선택 없는 단일 통합 지도라 운행종별 토글이 없다.
     // #2099 DoD: 노선도에 일반/급행 선택 control과 별도 상태는 0건이다. 일반/급행은
     // 선택 UI가 아니라 실제 운행 정보이므로 노선도 뷰 토글을 두지 않는다.
     expect(
@@ -1609,10 +1611,10 @@ void main() {
     expect(find.bySemanticsLabel('노선: 전체 노선'), findsNothing);
     expect(find.text('전체 노선'), findsNothing);
     expect(find.byKey(const Key('networkMapInteractiveViewer')), findsNothing);
-    expect(find.byType(StructuredRouteMapView), findsOneWidget);
+    expect(find.byType(RouteMapBasemapView), findsOneWidget);
 
     expect(find.byKey(const Key('networkMapSurface')), findsOneWidget);
-    expect(find.byType(StructuredRouteMapView), findsOneWidget);
+    expect(find.byType(RouteMapBasemapView), findsOneWidget);
   });
 
   testWidgets('홈 shell 경로 상세 뒤로가기는 결과 목록으로 돌아간다', (tester) async {
@@ -1779,7 +1781,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
-    expect(find.byType(StructuredRouteMapView), findsOneWidget);
+    expect(find.byType(RouteMapBasemapView), findsOneWidget);
     expect(find.byKey(const Key('networkMapLineFilter')), findsNothing);
 
     await tester.tap(find.text('테스트권'));
@@ -3082,13 +3084,16 @@ void main() {
       final path = offline['path'] as String;
       expect(map['source_url'], isA<String>());
       expect(validSourceScheme(map['source_url'] as String), isTrue);
-      // #1641: SVG 이미지는 더 이상 번들하지 않는다(canvas 렌더). 소스 경로와
-      // 라이선스 속성표기만 유지된다(광주 CC-BY-SA 등).
-      expect(offline['included'], isFalse);
-      expect(path, startsWith('assets/datapacks/maps/'));
+      // [#2068] 하이브리드 바탕층 전환: 오너 자작 SVG를 build-time 컴파일한
+      // vector_graphics 바이너리(.vec)를 basemap/으로 번들한다. offline 블록은
+      // 이제 실제 번들 .vec를 가리키고 included=true다.
+      expect(offline['included'], isTrue);
+      expect(path, startsWith('assets/datapacks/metro_map_pack/basemap/'));
       final extension = path.split('.').last.toLowerCase();
-      expect(extension, anyOf('pdf', 'svg'));
-      expect(offline['type'], extension);
+      expect(extension, 'vec');
+      expect(offline['type'], 'vector-graphics-vec');
+      // 가리키는 .vec가 실제로 번들에 존재해야 한다(offline included 계약 강화).
+      expect(File(path).existsSync(), isTrue, reason: '$path가 번들에 없다');
       final license = map['license'] as Map<String, Object?>;
       expect(license['name'], isA<String>());
       expect(license['spdx'], isA<String>());
@@ -3139,7 +3144,7 @@ void main() {
     expect(decoration.color, Colors.white);
     expect(decoration.border, isNull);
     expect(decoration.borderRadius, isNull);
-    expect(find.byType(StructuredRouteMapView), findsOneWidget);
+    expect(find.byType(RouteMapBasemapView), findsOneWidget);
     expect(find.byKey(const Key('networkMapPainter')), findsNothing);
   });
 
@@ -3166,15 +3171,15 @@ void main() {
         find.byKey(const Key('networkMapInteractiveViewer')),
         findsNothing,
       );
-      final renderer = tester.getSize(find.byType(StructuredRouteMapView));
+      final renderer = tester.getSize(find.byType(RouteMapBasemapView));
       final surface = tester.getSize(
         find.byKey(const Key('networkMapSurface')),
       );
       expect(renderer.width, surface.width);
       expect(renderer.height, surface.height);
       expect(
-        tester.widget(find.byType(StructuredRouteMapView)),
-        isA<StructuredRouteMapView>(),
+        tester.widget(find.byType(RouteMapBasemapView)),
+        isA<RouteMapBasemapView>(),
       );
     } finally {
       debugDefaultTargetPlatformOverride = null;
@@ -3243,6 +3248,81 @@ void main() {
   // #2099 WP2: 노선도의 일반/급행 뷰 토글과 급행 전용 필터 데이터 경로는
   // 제거됐다(일반/급행은 선택 UI가 아니라 실제 운행 정보). 노선도에 선택 control이
   // 0건임은 '노선도 첫 화면은 하단 광고 위에 지도 조작을 유지한다' 테스트가 지킨다.
+  testWidgets('노선도는 일반 급행 선택 없이 모든 노선을 함께 표시한다', (tester) async {
+    // #2068: 노선도는 단일 통합 지도다. LOCAL/EXPRESS가 섞인 fixture에서도
+    // 운행종별 필터 없이 모든 노선·역·edge를 함께 렌더하고, 일반/급행 선택
+    // control(토글·selected semantics)은 어느 상태에서도 만들지 않는다.
+    final semanticsHandle = tester.ensureSemantics();
+    final fixture = _unifiedRouteMapData();
+
+    await tester.pumpWidget(
+      buildEasySubwayTestApp(
+        repository: FakeStationSearchRepository(networkMapData: fixture),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // (a) 단일 통합 basemap 위에 라벨-온리 오버레이만 얹는다. express-only 분기
+    // (basemap 없는 경로)는 사라졌다.
+    expect(find.byType(RouteMapBasemapView), findsOneWidget);
+    final overlay = tester.widget<StructuredRouteMapView>(
+      find.byType(StructuredRouteMapView),
+    );
+    expect(overlay.drawLines, isFalse);
+    expect(overlay.drawStationSymbols, isFalse);
+
+    // (a) 입력 NetworkMapData의 노선·역이 필터로 줄지 않는다(개수 불감소).
+    expect(
+      overlay.map.lines.map((line) => line.lineId).toSet(),
+      fixture.lines.map((line) => line.id).toSet(),
+    );
+    expect(
+      overlay.map.stations.length,
+      greaterThanOrEqualTo(fixture.stations.length),
+    );
+    expect(
+      overlay.map.stations.map((station) => station.lineId).toSet(),
+      fixture.lines.map((line) => line.id).toSet(),
+    );
+
+    // (a) edge 양끝 역(일반·급행 각 노선)이 모두 상호작용 대상으로 남는다.
+    for (final key in const [
+      'networkMapStation-local-a-line-local',
+      'networkMapStation-local-b-line-local',
+      'networkMapStation-express-a-line-express',
+      'networkMapStation-express-b-line-express',
+    ]) {
+      expect(find.byKey(Key(key)), findsOneWidget);
+    }
+
+    // (b)+(c) 어느 상태에서도 운행종별 토글(일반/급행 선택 control)이 트리에
+    // 만들어지지 않는다. 토글은 '일반'/'급행' 세그먼트로 렌더됐으므로 그 부재로
+    // 토글 미생성을 확인한다(역 라벨 '일반A' 등은 정확 일치가 아니라 무관).
+    expect(find.text('일반'), findsNothing);
+    expect(find.text('급행'), findsNothing);
+    final servicePatternControlLabels = <String>[];
+    void collectServicePatternControls(SemanticsNode node) {
+      final label = node.getSemanticsData().label;
+      if (label == '일반' || label == '급행') {
+        servicePatternControlLabels.add(label);
+      }
+      node.visitChildren((child) {
+        collectServicePatternControls(child);
+        return true;
+      });
+    }
+
+    collectServicePatternControls(
+      tester.getSemantics(find.byKey(const Key('networkMapScreen'))),
+    );
+    expect(servicePatternControlLabels, isEmpty);
+
+    semanticsHandle.dispose();
+  });
 
   testWidgets('노선도 viewport 밖 station semantics는 생성하지 않는다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
@@ -17149,6 +17229,127 @@ FavoriteRoute _favoriteRoute({
     routeCreatedAt: '2026-06-13T04:20:00',
     addedAt: '2026-06-14T10:00:00',
     transportScope: transportScope,
+  );
+}
+
+NetworkMapData _unifiedRouteMapData() {
+  return const NetworkMapData(
+    regions: [NetworkMapRegion(name: '테스트권')],
+    selectedRegion: '테스트권',
+    lines: [
+      NetworkMapLine(
+        id: 'line-local',
+        name: '일반 노선',
+        color: '#444444',
+        region: '테스트권',
+      ),
+      NetworkMapLine(
+        id: 'line-express',
+        name: '급행 노선',
+        color: '#D71920',
+        region: '테스트권',
+      ),
+    ],
+    stations: [
+      NetworkMapStation(
+        id: 'station-local-a',
+        nameKo: '일반A',
+        nameEn: 'Local A',
+        region: '테스트권',
+        lineId: 'line-local',
+        stationCode: 'L01',
+        sequence: 1,
+        position: NetworkMapPosition(
+          x: 100,
+          y: 100,
+          labelDx: 0,
+          labelDy: 0,
+          upPath: '',
+          downPath: '',
+          sourceId: 'fixture-unified-route-map',
+        ),
+      ),
+      NetworkMapStation(
+        id: 'station-local-b',
+        nameKo: '일반B',
+        nameEn: 'Local B',
+        region: '테스트권',
+        lineId: 'line-local',
+        stationCode: 'L02',
+        sequence: 2,
+        position: NetworkMapPosition(
+          x: 180,
+          y: 100,
+          labelDx: 0,
+          labelDy: 0,
+          upPath: '',
+          downPath: '',
+          sourceId: 'fixture-unified-route-map',
+        ),
+      ),
+      NetworkMapStation(
+        id: 'station-express-a',
+        nameKo: '급행A',
+        nameEn: 'Express A',
+        region: '테스트권',
+        lineId: 'line-express',
+        stationCode: 'E01',
+        sequence: 1,
+        position: NetworkMapPosition(
+          x: 100,
+          y: 180,
+          labelDx: 0,
+          labelDy: 0,
+          upPath: '',
+          downPath: '',
+          sourceId: 'fixture-unified-route-map',
+        ),
+      ),
+      NetworkMapStation(
+        id: 'station-express-b',
+        nameKo: '급행B',
+        nameEn: 'Express B',
+        region: '테스트권',
+        lineId: 'line-express',
+        stationCode: 'E02',
+        sequence: 2,
+        position: NetworkMapPosition(
+          x: 180,
+          y: 180,
+          labelDx: 0,
+          labelDy: 0,
+          upPath: '',
+          downPath: '',
+          sourceId: 'fixture-unified-route-map',
+        ),
+      ),
+    ],
+    edges: [
+      NetworkMapEdge(
+        id: 'edge-local',
+        lineId: 'line-local',
+        fromStationId: 'station-local-a:line-local',
+        toStationId: 'station-local-b:line-local',
+        accessibilityStatus: 'AVAILABLE',
+        reliabilityScore: 100,
+      ),
+      NetworkMapEdge(
+        id: 'edge-express',
+        lineId: 'line-express',
+        fromStationId: 'station-express-a:line-express',
+        toStationId: 'station-express-b:line-express',
+        accessibilityStatus: 'AVAILABLE',
+        reliabilityScore: 100,
+      ),
+    ],
+    positionSources: [
+      NetworkMapPositionSource(
+        id: 'fixture-unified-route-map',
+        name: '통합 노선도 fixture',
+        licenseStatus: 'fixture-only',
+      ),
+    ],
+    stationLineMemberships: [],
   );
 }
 

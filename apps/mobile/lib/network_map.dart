@@ -16,6 +16,7 @@ import 'features/ads/ad_repository.dart';
 import 'features/network_map/domain/map_camera.dart';
 import 'features/network_map/domain/route_map_design_space.dart';
 import 'features/network_map/domain/route_map_major_stations.dart';
+import 'features/network_map/domain/route_map_owner_labels.dart';
 import 'features/network_map/domain/structured_route_map.dart';
 import 'features/network_map/presentation/nearby_data_source_toggle.dart';
 import 'features/network_map/presentation/nearby_direction_columns.dart';
@@ -25,6 +26,9 @@ import 'features/network_map/presentation/route_map_transfer_marker.dart';
 import 'features/network_map/presentation/station_fan_menu.dart';
 import 'features/network_map/presentation/station_fan_menu_geometry.dart'
     show kFanMenuDesignSize, kFanMenuTailTip;
+import 'features/network_map/presentation/route_map_basemap_view.dart';
+import 'features/network_map/presentation/route_map_label_layout.dart'
+    show routeMapOwnerLabelMaxAnchorDistancePxFor;
 import 'features/network_map/presentation/structured_route_map_painter.dart';
 import 'features/realtime/realtime_repository.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
@@ -844,6 +848,9 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
             }
             final loadResult = snapshot.data!;
             final data = loadResult.data;
+            // #2068: 노선도는 일반/급행 선택 없는 단일 통합 지도다. LOCAL/EXPRESS는
+            // 시간표·길찾기 trip 속성으로만 유지되고, 지도는 항상 원본 data 전체를
+            // 렌더한다(운행종별 필터 없음).
             _startInitialNearbyFocus();
             return _NetworkMapChrome(
               regions: data.regions,
@@ -3413,6 +3420,40 @@ void resetNetworkMapAttributionCacheForTest() {
   _sharedAttributionTextByRegionFuture = null;
 }
 
+// basemap 6차(#2068) 오너 라벨 sidecar — 5권역 결합 단일 JSON이라 attribution과
+// 같은 모듈 캐시 관례로 1회만 로드해 공유한다(region 전환마다 다시 읽지 않음).
+// 로드 실패 시 캐시를 비워 다음 마운트에서 재시도하고, 그때까지 basemap 라벨은
+// 4차 자동 솔버로 전부 폴백한다(fail-safe, 크래시 금지).
+Future<Map<String, Map<String, List<RouteMapOwnerLabelEntry>>>>?
+_sharedOwnerLabelsByRegionFuture;
+
+Future<Map<String, Map<String, List<RouteMapOwnerLabelEntry>>>>
+_loadNetworkMapOwnerLabelsByRegion() {
+  return _sharedOwnerLabelsByRegionFuture ??= rootBundle
+      .loadString(kRouteMapOwnerLabelsAssetPath)
+      .then(routeMapOwnerLabelsByRegionFrom);
+}
+
+@visibleForTesting
+void resetNetworkMapOwnerLabelsCacheForTest() {
+  _sharedOwnerLabelsByRegionFuture = null;
+}
+
+/// 위젯 테스트가 실제 sidecar 로드 경로(rootBundle.loadString)를 거치지 않고
+/// 오너 라벨 캐시를 즉시 채운다(#2068 실기기 회귀 재현 테스트 전용). 이미
+/// 파싱한 결과(예: rootBundle.load로 바이트를 받아 테스트가 직접 디코드한 것)를
+/// 넘기면 다음 `_loadOwnerLabels()` 호출이 이 값을 즉시 받는다 — 대형 sidecar
+/// JSON(현재 170KB대, Flutter loadString의 동기 임계값을 넘어 compute() 격리
+/// isolate로 디코드된다)의 loadString 완료를 기다릴 필요가 없어, 그 경로가 느리게
+/// 동작하는 테스트 환경에서도 region 키 정규화 등 나머지 로직을 실데이터로
+/// 검증할 수 있다.
+@visibleForTesting
+void primeNetworkMapOwnerLabelsCacheForTest(
+  Map<String, Map<String, List<RouteMapOwnerLabelEntry>>> byRegion,
+) {
+  _sharedOwnerLabelsByRegionFuture = Future.value(byRegion);
+}
+
 class _NetworkMapCanvas extends StatefulWidget {
   const _NetworkMapCanvas({
     required this.data,
@@ -3535,6 +3576,8 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   Map<String, Color>? _structuredLineColorsCache;
   Map<String, String>? _structuredLabelTextCache;
   Map<String, String>? _structuredLineBadgeLabelCache;
+  // basemap 6차(#2068): stationId → 축약 전 원본 nameKo(오너 라벨 sidecar 매칭 키).
+  Map<String, String>? _structuredStationNameByStationIdCache;
   // 팬 메뉴 환승 앵커(#2192): 렌더 캡슐 중심 유도에 쓰는 파생값. structured 캐시와
   // 같은 키로 무효화한다. designScale은 렌더러 모드 판정과 동일 값이어야 한다.
   double? _structuredDesignScaleCache;
@@ -3543,6 +3586,9 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   // region → attribution 표시 문자열(#1951). manifest 로드 전에는 null로 두고
   // attribution을 표시하지 않는다(로드 실패 시에도 동일하게 조용히 미표기).
   Map<String, String>? _attributionTextByRegion;
+  // basemap 6차(#2068): asset id(seoul/busan/...) → station명 → 오너 라벨 앵커.
+  // 로드 전·실패 시 null → basemap 라벨은 4차 자동 솔버로 전부 폴백(fail-safe).
+  Map<String, Map<String, List<RouteMapOwnerLabelEntry>>>? _ownerLabelsByRegion;
   // onTapUp 경로에서만 쓰는 stationLinesById를 매 build(팬 프레임)마다 재계산하지 않도록
   // region·stations identity로 캐시한다(#1973). 800역/24노선 재계산이 build 스파이크 원인.
   Map<String, List<NetworkMapLine>>? _stationLinesByIdCache;
@@ -3559,6 +3605,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
       SchedulerBinding.instance.addTimingsCallback(_logRouteMapFrameTimings);
     }
     _loadAttributionText();
+    _loadOwnerLabels();
   }
 
   Future<void> _loadAttributionText() async {
@@ -3578,6 +3625,25 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
         error,
         stackTrace,
         context: '지도 datapack manifest에서 attribution 정보를 불러오는 중 예외가 발생했습니다.',
+      );
+    }
+  }
+
+  Future<void> _loadOwnerLabels() async {
+    try {
+      final byRegion = await _loadNetworkMapOwnerLabelsByRegion();
+      if (!mounted) {
+        return;
+      }
+      setState(() => _ownerLabelsByRegion = byRegion);
+    } catch (error, stackTrace) {
+      // #2068 6차: 로드/파싱 실패는 basemap 라벨의 4차 자동 솔버 폴백으로
+      // 안전 처리한다(크래시 금지). 재시도를 위해 캐시를 비운다.
+      _sharedOwnerLabelsByRegionFuture = null;
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '노선도 오너 라벨 sidecar를 불러오는 중 예외가 발생했습니다.',
       );
     }
   }
@@ -3882,13 +3948,39 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   }
 
   _MapGeometry _geometryFor(NetworkMapData data) {
+    // basemap 오너 라벨 sidecar(로드는 async)를 geometry bounds에 반영한다(#2068).
+    // 로드 전엔 null → 라벨 rect 없이 계산되지만, 로드가 끝나면 setState로 rebuild
+    // 되며 ownerKey가 바뀌어 캐시가 무효화되고 라벨 extents를 포함해 재계산된다
+    // (stale bounds 방지 — sidecar 로드 전/후 캐시 키 구분).
+    //
+    // data.selectedRegion은 drift_station_repository._storedNetworkMapRegion이
+    // 만든 저장형('광주권' 등 접미 포함)이라 kRouteMapBasemapRegionToId의 짧은
+    // 키('광주')와 직접 안 맞는다 — _displayRegionName으로 정규화해야 조회가
+    // 성공한다(실기기 회귀: 정규화 누락으로 basemapAssetId가 항상 null이 돼
+    // 라벨이 bounds에 전혀 반영되지 않았다, #2068).
+    final basemapAssetId =
+        kRouteMapBasemapRegionToId[_displayRegionName(data.selectedRegion)];
+    final ownerEntries = basemapAssetId == null
+        ? null
+        : _ownerLabelsByRegion?[basemapAssetId];
+    final ownerKey = ownerEntries == null
+        ? 'none'
+        : 'owner:${ownerEntries.length}';
     final cacheKey =
-        'generated:${data.selectedRegion}:${identityHashCode(data.stations)}:${data.stations.length}';
+        'generated:${data.selectedRegion}:${identityHashCode(data.stations)}:${data.stations.length}:$ownerKey';
     final cached = _geometryCache;
     if (_geometryCacheKey == cacheKey && cached != null) {
       return cached;
     }
-    final geometry = _MapGeometry.fromStations(data.stations);
+    final ownerLabelSourceRects = ownerEntries == null || ownerEntries.isEmpty
+        ? const <Rect>[]
+        : networkMapOwnerLabelSourceRects(
+            ownerLabels: ownerEntries.values.expand((entries) => entries),
+          );
+    final geometry = _MapGeometry.fromStations(
+      data.stations,
+      ownerLabelSourceRects: ownerLabelSourceRects,
+    );
     _geometryCacheKey = cacheKey;
     _geometryCache = geometry;
     return geometry;
@@ -4137,21 +4229,64 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     );
   }
 
-  // 구조화 canvas 렌더러(#1641)를 visual camera로 마운트한다. WebView와 달리
-  // 명령형 controller 없이 camera prop 변경(setState)으로 갱신된다.
+  // 하이브리드 바탕층(#2068)을 visual camera로 마운트한다. 바탕은 region에 매핑된
+  // 컴파일 .vec를 런타임 디코드해 그리며(RouteMapBasemapView), 인터랙션 좌표계와
+  // 1:1 정렬된다. WebView와 달리 명령형 controller 없이 camera prop 변경(setState)
+  // 으로 갱신된다. sourceOrigin은 오버레이·카메라의 origin-뺀 공간과 맞춘다.
   Widget _buildStructuredRouteMapCanvas(
     MapCameraState camera,
     Offset sourceOrigin,
   ) {
+    final attribution = _attributionTextByRegion?[widget.data.selectedRegion];
     _ensureStructuredRouteMap();
-    return StructuredRouteMapView(
-      map: _structuredRouteMapCache!,
-      camera: camera,
-      lineColors: _structuredLineColorsCache!,
-      labelTextByStationId: _structuredLabelTextCache!,
-      lineBadgeLabelByLineId: _structuredLineBadgeLabelCache!,
-      sourceOrigin: sourceOrigin,
-      attributionText: _attributionTextByRegion?[widget.data.selectedRegion],
+    final map = _structuredRouteMapCache!;
+    final lineColors = _structuredLineColorsCache!;
+    final labelTextByStationId = _structuredLabelTextCache!;
+    final lineBadgeLabelByLineId = _structuredLineBadgeLabelCache!;
+    // basemap 6차(#2068): asset id(예: '수도권'→'seoul')로 오너 라벨 sidecar를
+    // 조회한다. 매핑에 없는 region·로드 전이면 빈 맵 → 4차 자동 솔버 폴백.
+    // widget.data.selectedRegion은 저장형('광주권' 등)이라 _geometryFor와 같이
+    // _displayRegionName으로 정규화해야 kRouteMapBasemapRegionToId 조회가
+    // 성공한다(정규화 누락 시 basemapAssetId가 항상 null 회귀, #2068).
+    final basemapAssetId =
+        kRouteMapBasemapRegionToId[_displayRegionName(
+          widget.data.selectedRegion,
+        )];
+    final ownerLabelsByStationName = basemapAssetId == null
+        ? const <String, List<RouteMapOwnerLabelEntry>>{}
+        : _ownerLabelsByRegion?[basemapAssetId] ??
+              const <String, List<RouteMapOwnerLabelEntry>>{};
+    // #2068 부산 라벨 지오메트리 튜닝 라운드(2026-07-20): 부산은 designScale이
+    // 작고(0.237) 밀집·折 회랑에서 라벨을 자기 노드에서 상대적으로 멀리 그리는
+    // 화풍이라 seoul 캘리브레이션(185px)로는 정상 매치(예: 토성 421.7px)가
+    // 오매치로 분류된다. 실측 근거: 정상 매치 최댓값 421.7px, 좌천 교차-노선
+    // 오배정 후보는 1113px+ (안전마진 충분) — route_map_label_layout.dart의
+    // kRouteMapOwnerLabelMaxAnchorDistancePx 문서 참고.
+    final ownerLabelMaxAnchorDistancePx =
+        routeMapOwnerLabelMaxAnchorDistancePxFor(basemapAssetId);
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        RouteMapBasemapView(
+          region: _displayRegionName(widget.data.selectedRegion),
+          camera: camera,
+          sourceOrigin: sourceOrigin,
+          attributionText: attribution,
+        ),
+        StructuredRouteMapView(
+          map: map,
+          camera: camera,
+          lineColors: lineColors,
+          labelTextByStationId: labelTextByStationId,
+          lineBadgeLabelByLineId: lineBadgeLabelByLineId,
+          drawLines: false,
+          drawStationSymbols: false,
+          sourceOrigin: sourceOrigin,
+          ownerLabelsByStationName: ownerLabelsByStationName,
+          ownerLabelMaxAnchorDistancePx: ownerLabelMaxAnchorDistancePx,
+          stationNameByStationId: _structuredStationNameByStationIdCache!,
+        ),
+      ],
     );
   }
 
@@ -4179,6 +4314,11 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     _structuredLabelTextCache = {
       for (final station in data.stations)
         station.id: routeMapStationLabel(station.nameKo),
+    };
+    // basemap 6차(#2068): 오너 라벨 sidecar 매칭은 축약 전 원본 nameKo
+    // 기준이라 위 축약 맵과 별도로 둔다.
+    _structuredStationNameByStationIdCache = {
+      for (final station in data.stations) station.id: station.nameKo,
     };
     _structuredLineBadgeLabelCache = {
       for (final line in data.lines) line.id: routeMapLineBadgeLabel(line.name),
@@ -4673,7 +4813,15 @@ class _MapGeometry {
   final double overlayStyleScale;
   final _StationSpatialIndex stationIndex;
 
-  factory _MapGeometry.fromStations(List<NetworkMapStation> stations) {
+  factory _MapGeometry.fromStations(
+    List<NetworkMapStation> stations, {
+    // basemap 오너 라벨(sidecar)의 실제 렌더 extents(source 단위). 오너 라벨은
+    // route_map_positions의 합성 label_polygon보다 훨씬 넓게 그려지므로(예: 광주
+    // '학동·증심사입구'가 anchor에서 오른쪽으로 수백 source px 확장), 이 rect들을
+    // bounds에 union하지 않으면 초기 fit·팬 한계가 라벨을 잘라낸다(#2068 실기기
+    // 반려). 미매치/무sidecar 지역은 빈 리스트라 기존 동작(label_polygon) 그대로.
+    List<Rect> ownerLabelSourceRects = const [],
+  }) {
     var minX = double.infinity;
     var minY = double.infinity;
     var maxX = 0.0;
@@ -4714,6 +4862,12 @@ class _MapGeometry {
         maxX = math.max(maxX, labelPolygonBounds.right);
         maxY = math.max(maxY, labelPolygonBounds.bottom);
       }
+    }
+    for (final rect in ownerLabelSourceRects) {
+      minX = math.min(minX, rect.left);
+      minY = math.min(minY, rect.top);
+      maxX = math.max(maxX, rect.right);
+      maxY = math.max(maxY, rect.bottom);
     }
     if (!minX.isFinite || !minY.isFinite) {
       return _MapGeometry(
@@ -5117,6 +5271,99 @@ Rect? _labelPolygonBoundsFor(NetworkMapStation station) {
   return polygon == null ? null : _boundsForPolygon(polygon);
 }
 
+/// [text]/[position]/[anchor]/[fontSizeSource] 한 줄의 근사 렌더 rect(source
+/// 좌표). [_ownerLabelSourceRect]·다줄 union이 공유하는 단일 줄 계산 —
+/// painter [_ownerLabelRect]와 같은 baseline 규칙(top = anchorY − 0.8×fontSize)
+/// ·anchor 배치를 쓴다. 폭은 TextPainter 실측 대신 "글자수 × fontSize"로
+/// 보수적 근사한다(한글 자폭 ≈ 1em이라 근사 방향은 과대 → bounds가 살짝
+/// 넓어질 뿐 라벨을 자르는 방향이 아니어서 안전).
+Rect _ownerLabelLineSourceRect(
+  String text,
+  Offset position,
+  RouteMapOwnerLabelAnchor anchor,
+  double fontSizeSource,
+) {
+  final width = text.runes.length * fontSizeSource;
+  // painter의 TextPainter 높이는 대략 fontSize × 1.3(줄 높이)이라 그만큼 잡는다
+  // (수직 여유 — 과대 방향이라 안전).
+  final height = fontSizeSource * 1.3;
+  final top = position.dy - 0.8 * fontSizeSource;
+  final double left;
+  switch (anchor) {
+    case RouteMapOwnerLabelAnchor.middle:
+      left = position.dx - width / 2;
+    case RouteMapOwnerLabelAnchor.end:
+      left = position.dx - width;
+    case RouteMapOwnerLabelAnchor.start:
+      left = position.dx;
+  }
+  return Rect.fromLTWH(left, top, width, height);
+}
+
+/// basemap 오너 라벨 1건의 실제 렌더 rect를 source 좌표로 산출한다(#2068,
+/// 다줄 라벨 렌더 갱신). painter(route_map_label_layout.dart의 [_ownerFixedLabel])
+/// 와 같은 규칙을 source 단위로 옮긴 것 — entry.fontSizePx는 이미 source(viewBox)
+/// 단위 로컬 font-size라 design 변환·클램프 없이 그대로 쓴다(Pretendard 번들로
+/// 앱 자폭이 SVG와 동일해져 10차의 13px 상한 클램프를 제거했다 — 클램프가
+/// 여전히 있다면 이 함수의 bounds가 실제(더 큰) 렌더보다 좁게 잡혀 라벨이
+/// 잘릴 수 있었다).
+///
+/// [entry.lines]가 2줄 이상이면(오너 SVG가 줄바꿈한 라벨) 실제 렌더은 painter가
+/// 카탈로그 표시 텍스트 일치 여부로 다줄/단일 줄을 고르지만, 이 함수는 그
+/// 텍스트에 접근할 수 없다 — 단일 줄 근사(entry.station 전체 폭)와 줄별 근사의
+/// **합집합**을 잡아 항상 안전한 상위집합이 되게 한다(과대 방향, 절대 과소
+/// 방향 아님).
+Rect _ownerLabelSourceRect(RouteMapOwnerLabelEntry entry) {
+  var rect = _ownerLabelLineSourceRect(
+    entry.station,
+    entry.position,
+    entry.anchor,
+    entry.fontSizePx,
+  );
+  for (final line in entry.lines) {
+    rect = rect.expandToInclude(
+      _ownerLabelLineSourceRect(
+        line.text,
+        line.position,
+        entry.anchor,
+        entry.fontSizePx,
+      ),
+    );
+  }
+  return rect;
+}
+
+/// basemap 지역 오너 라벨들의 실제 렌더 rect(source 좌표) 목록. geometry bounds가
+/// 라벨 extents까지 담도록 [_MapGeometry.fromStations]에 넘긴다(#2068). 매칭
+/// 여부와 무관하게 전 엔트리를 포함한다 — 매치 라벨은 정확히 이 앵커에 그려지고,
+/// 미매치 라벨은 솔버가 그 역 근처(이미 station±18 bounds 안)에 배치하므로,
+/// 전 엔트리 union은 실렌더 extents의 안전한 상위집합이다.
+@visibleForTesting
+List<Rect> networkMapOwnerLabelSourceRects({
+  required Iterable<RouteMapOwnerLabelEntry> ownerLabels,
+}) {
+  return [for (final entry in ownerLabels) _ownerLabelSourceRect(entry)];
+}
+
+/// 테스트용: 주어진 역·오너 라벨 rect로 산출한 지도 geometry의 전체 source
+/// bounds(팬 한계·초기 fit의 근거). #2068 오너 라벨 extents 포함 회귀 가드.
+@visibleForTesting
+Rect networkMapGeometrySourceBoundsFor(
+  List<NetworkMapStation> stations, {
+  List<Rect> ownerLabelSourceRects = const [],
+}) {
+  final geometry = _MapGeometry.fromStations(
+    stations,
+    ownerLabelSourceRects: ownerLabelSourceRects,
+  );
+  return Rect.fromLTWH(
+    geometry.origin.dx,
+    geometry.origin.dy,
+    geometry.width,
+    geometry.height,
+  );
+}
+
 List<Offset>? _labelPolygonFor(
   NetworkMapStation station,
   _MapGeometry geometry,
@@ -5287,16 +5534,19 @@ class _StationHitTarget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 팬 성능: 축소 상태에서 화면에 잡히는 canonical 역이 수백 개(예: 수도권
+    // 축소 시 300~450개)라, 제스처 종료 프레임에서 이 오버레이가 한 번에 재구축
+    // 되며 큰 build 스파이크를 만든다. 여기서 GestureDetector를 개별 역마다 두면
+    // 그 비용이 배가되는데, 시각(포인터) 탭은 이미 배경 GestureDetector의
+    // onTapUp → `_openNearestStation`(`_stationAtViewportPosition` 공간 히트
+    // 테스트)이 노드·라벨 폴리곤까지 고려해 전담하므로 개별 GestureDetector는
+    // 중복이다. 접근성(스크린리더) 탭만 Semantics onTap 액션으로 남겨 역별
+    // 버튼 시맨틱을 유지한다.
     return Semantics(
       button: true,
       label: station.displayName,
       onTap: onTap,
-      child: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        excludeFromSemantics: true,
-        onTap: onTap,
-        child: const SizedBox.expand(),
-      ),
+      child: const SizedBox.expand(),
     );
   }
 }

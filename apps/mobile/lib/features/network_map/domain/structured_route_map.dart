@@ -10,6 +10,7 @@
 // - transfer_groups: 같은 station_id에 여러 line_id → 중심 좌표
 // - station_labels priority: 환승 > 주요 > 일반 (별도 검수값 없으면 일반)
 // - LOD: zoom0 lines only, zoom1 환승/주요 라벨, zoom2 전체 역 라벨
+import 'dart:math' as math;
 import 'dart:ui' show Offset;
 
 /// 라벨 우선순위·볼드 class (#1636 station_labels.priority).
@@ -118,6 +119,47 @@ class RouteMapLineTrackInput {
   final List<String> paths;
 }
 
+/// 순환선의 폐합 엣지 판정 임계값. 시작-끝 간격이 폴리라인 자체 bbox 대각선의
+/// 이 비율 미만이면 "거의 닫힌 고리"로 보고 [_closeNearLoopPolyline]이 닫는다.
+/// [_routeMapTerminalStationIds]의 순환 판정(loopSpanRatio)과 같은 크기.
+const double _kLoopClosureSpanRatio = 0.25;
+
+/// route_map_line_tracks의 path 조립 과정에서 순환(loop) track의 마지막 폐합
+/// 세그먼트가 드롭된 경우를 보정한다(#2068 실기기 반려 3차: 시청 라벨이 2호선
+/// 순환 폐합 구간 "빈 공간"에 배치돼 화면에선 선 위로 보임). 데이터팩 전 권역
+/// 실측(2026-07-16): 50개 track 중 시작-끝 간격/자기 bbox 대각선 비율이 0.25
+/// 미만인 경우는 2건뿐 — 수도권 2호선 track0(간격 38.2/대각 813.8=0.047, 시청↔
+/// 을지로입구 사이 약 1역 간격 누락)과 수도권 공항 track1(간격 0.35/대각 26.7=
+/// 0.013, 사실상 부동소수 오차). 그 외 노선(6호선 등, 응암루프처럼 부분 순환을
+/// 포함해도 전체 track은 선형이라 비율이 0.7~1.0)은 영향 없다 — 진짜 열린
+/// 노선은 시작-끝 간격이 자기 규모에 비례해 크다.
+List<Offset> _closeNearLoopPolyline(List<Offset> points) {
+  if (points.length < 3) {
+    return points;
+  }
+  final first = points.first;
+  final last = points.last;
+  if (first == last) {
+    return points;
+  }
+  var minX = first.dx, maxX = first.dx, minY = first.dy, maxY = first.dy;
+  for (final p in points) {
+    minX = math.min(minX, p.dx);
+    maxX = math.max(maxX, p.dx);
+    minY = math.min(minY, p.dy);
+    maxY = math.max(maxY, p.dy);
+  }
+  final span = (Offset(maxX, maxY) - Offset(minX, minY)).distance;
+  if (span <= 0) {
+    return points;
+  }
+  final gap = (last - first).distance;
+  if (gap > 0 && gap < span * _kLoopClosureSpanRatio) {
+    return [...points, first];
+  }
+  return points;
+}
+
 /// "M x y L x y ..." 형태의 절대 좌표 path를 정점 목록으로 파싱한다.
 /// 데이터팩(enrich-capital-route-map-layer.mjs)은 절대 M/L 세그먼트만 방출하므로
 /// 명령 문자는 무시하고 숫자 쌍만 읽는다. (H/V/상대 명령은 대상 아님.)
@@ -181,7 +223,7 @@ StructuredRouteMap buildStructuredRouteMap(
         lineId: lineId,
         polylines: [
           for (final path in pathsByLine[lineId] ?? const <String>[])
-            parseRouteMapPolyline(path),
+            _closeNearLoopPolyline(parseRouteMapPolyline(path)),
         ].where((points) => points.length >= 2).toList(growable: false),
       ),
   ];

@@ -52,8 +52,9 @@ ui.Picture _picture(StructuredRouteMap map, RouteMapDesignSpace design) {
     design: design,
     labelTextByStationId: const {},
     badgeLabelByLineId: const {},
-    measureLabel: (text, {required bool bold}) => const Size(10, 13),
-    measureBadge: (text) => const Size(10, 18),
+    measureLabel: (text, {required bool bold, required double fontSize}) =>
+        const Size(10, 13),
+    measureBadge: (text, {required double fontSize}) => const Size(10, 18),
   );
   return recordRouteMapPicture(
     map: map,

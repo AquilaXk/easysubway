@@ -17,14 +17,13 @@ import '../../../support/capital_route_map_fixture.dart';
 // 라벨-선, 뱃지-선, 뱃지-라벨, unresolved 모두 0. 저사양 권역이라 도심 밀집이
 // 수도권보다 낮아 겹침이 원천 발생하지 않는다. baseline은 하드 0 — 후속 버전
 // 교체에서 겹침이 생기면 즉시 실패해 회귀를 잡는다.
-Size _measureLabel(String text, {required bool bold}) => Size(
-  text.length * kRouteMapDesignLabelFontPx,
-  kRouteMapDesignLabelFontPx + 4,
-);
-Size _measureBadge(String text) => Size(
-  text.length * kRouteMapDesignBadgeFontPx + 12,
-  kRouteMapDesignBadgeFontPx + 7,
-);
+Size _measureLabel(
+  String text, {
+  required bool bold,
+  required double fontSize,
+}) => Size(text.length * fontSize, fontSize + 4);
+Size _measureBadge(String text, {required double fontSize}) =>
+    Size(text.length * fontSize + 12, fontSize + 7);
 
 void main() {
   // 저장 region 명은 route_map_positions.region 값(권역 접미사 포함)과 일치해야
