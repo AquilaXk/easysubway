@@ -4,6 +4,9 @@ import com.easysubway.admin.authorization.AdminRbacRole;
 import com.easysubway.admin.authorization.application.port.out.AdminRbacAuthorityRepository;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -17,6 +20,10 @@ import org.springframework.stereotype.Repository;
 @Repository
 @Profile("prod | staging | release | prod-like")
 public class JdbcAdminRbacAuthorityRepository implements AdminRbacAuthorityRepository {
+
+	// bootstrap seed가 만든 role 할당임을 표시하는 provenance 값. 회수(revoke) 시 이 값의
+	// 행만 대상으로 삼고, 수동 부여(granted_by NULL 등)는 건드리지 않는다.
+	private static final String BOOTSTRAP_PROVENANCE = "bootstrap";
 
 	private final JdbcTemplate jdbcTemplate;
 
@@ -48,17 +55,42 @@ public class JdbcAdminRbacAuthorityRepository implements AdminRbacAuthorityRepos
 			FROM admin_user_roles
 			WHERE login_id = ? AND role_code = ?
 			""", Integer.class, canonicalLoginId, role.name());
+		// 이미 동일 (login_id, role_code) 행이 있으면 provenance와 무관하게 덮지 않는다.
+		// 운영자가 수동 부여(granted_by NULL)한 role을 bootstrap seed가 침범하지 않도록 존중한다.
 		if (existing != null && existing > 0) {
 			return;
 		}
 		try {
 			jdbcTemplate.update("""
-				INSERT INTO admin_user_roles (created_at, role_code, login_id)
-				VALUES (?, ?, ?)
-				""", LocalDateTime.now(Clock.systemUTC()), role.name(), canonicalLoginId);
+				INSERT INTO admin_user_roles (created_at, role_code, login_id, granted_by)
+				VALUES (?, ?, ?, ?)
+				""", LocalDateTime.now(Clock.systemUTC()), role.name(), canonicalLoginId, BOOTSTRAP_PROVENANCE);
 		} catch (DuplicateKeyException exception) {
 			// 동시 부팅이 이미 동일 role 할당을 seed한 경우이므로 멱등하게 무시한다.
 		}
+	}
+
+	@Override
+	public void revokeStaleBootstrapRoles(Set<String> activeBootstrapLoginIds) {
+		List<String> active = activeBootstrapLoginIds.stream()
+			.map(JdbcAdminRbacAuthorityRepository::normalize)
+			.toList();
+		if (active.isEmpty()) {
+			jdbcTemplate.update("""
+				DELETE FROM admin_user_roles
+				WHERE granted_by = ?
+				""", BOOTSTRAP_PROVENANCE);
+			return;
+		}
+		String placeholders = String.join(", ", Collections.nCopies(active.size(), "?"));
+		List<Object> arguments = new ArrayList<>();
+		arguments.add(BOOTSTRAP_PROVENANCE);
+		arguments.addAll(active);
+		jdbcTemplate.update("""
+			DELETE FROM admin_user_roles
+			WHERE granted_by = ?
+				AND login_id NOT IN (%s)
+			""".formatted(placeholders), arguments.toArray());
 	}
 
 	private static String normalize(String loginId) {

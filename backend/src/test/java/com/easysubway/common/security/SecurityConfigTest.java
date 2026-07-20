@@ -368,6 +368,56 @@ class SecurityConfigTest {
 	}
 
 	@Test
+	@DisplayName("env에서 관리자 계정이 제거되면 부팅 시 bootstrap-seeded SUPER_ADMIN role을 회수한다")
+	void envAdminBootstrapRoleIsRevokedWhenCredentialRemoved() {
+		var securityConfig = new SecurityConfig();
+		var adminRepository = new InMemoryAdminIdentityRepository();
+		var rbacRepository = new InMemoryAdminRbacAuthorityRepository();
+		var passwordEncoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
+		var environment = new MockEnvironment();
+
+		securityConfig.userDetailsService(
+			"env-admin", "admin-password", "", "", "", "", "", "", "", true, "", "",
+			adminRepository, rbacRepository, passwordEncoder, environment
+		);
+		assertThat(rbacRepository.findPermissionAuthorities("env-admin")).contains("admin.security.admin");
+
+		// env에서 관리자 계정 설정이 사라진 채 부팅한다.
+		securityConfig.userDetailsService(
+			"", "", "", "", "", "", "", "", "", true, "", "",
+			adminRepository, rbacRepository, passwordEncoder, environment
+		);
+
+		assertThat(rbacRepository.findPermissionAuthorities("env-admin")).isEmpty();
+	}
+
+	@Test
+	@DisplayName("bootstrap 회수는 운영자가 수동 부여한 RBAC 권한을 보존한다")
+	void bootstrapRevokePreservesManuallyGrantedAuthorities() {
+		var securityConfig = new SecurityConfig();
+		var adminRepository = new InMemoryAdminIdentityRepository();
+		var rbacRepository = new InMemoryAdminRbacAuthorityRepository();
+		var passwordEncoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
+		var environment = new MockEnvironment();
+		// 운영자가 별도 계정에 수동 부여한 권한.
+		rbacRepository.replacePermissionAuthorities("manual-admin", Set.of("admin.view", "admin.report.review"));
+
+		securityConfig.userDetailsService(
+			"env-admin", "admin-password", "", "", "", "", "", "", "", true, "", "",
+			adminRepository, rbacRepository, passwordEncoder, environment
+		);
+		// env 계정 제거 후 재부팅해도 수동 부여 권한은 회수되지 않는다.
+		securityConfig.userDetailsService(
+			"", "", "", "", "", "", "", "", "", true, "", "",
+			adminRepository, rbacRepository, passwordEncoder, environment
+		);
+
+		assertThat(rbacRepository.findPermissionAuthorities("manual-admin"))
+			.containsExactlyInAnyOrder("admin.view", "admin.report.review");
+		assertThat(rbacRepository.findPermissionAuthorities("env-admin")).isEmpty();
+	}
+
+	@Test
 	@DisplayName("관리자 계정 설정이 있으면 영속 identity 저장소에 bootstrap한다")
 	void adminCredentialsBootstrapPersistentIdentity() {
 		contextRunner

@@ -60,6 +60,24 @@ import org.springframework.security.web.util.matcher.IpAddressMatcher;
 @EnableMethodSecurity
 public class SecurityConfig {
 
+	// RBAC 권한이 배선되지 않은 편의 오버로드(테스트 지원 경로)를 위한 명시적 no-op 구현.
+	// port가 조회뿐 아니라 seed/revoke 쓰기까지 포함하므로 단일 함수 람다로 대체할 수 없다.
+	private static final AdminRbacAuthorityRepository NO_ADMIN_RBAC_AUTHORITIES =
+		new AdminRbacAuthorityRepository() {
+			@Override
+			public Set<String> findPermissionAuthorities(String loginId) {
+				return Set.of();
+			}
+
+			@Override
+			public void seedRole(String loginId, AdminRbacRole role) {
+			}
+
+			@Override
+			public void revokeStaleBootstrapRoles(Set<String> activeBootstrapLoginIds) {
+			}
+		};
+
 	// 관리자·operator 콘솔 CSP: 모든 스크립트·스타일은 self-host(static/vendor·static/css)만 허용한다.
 	// Alpine는 CSP 빌드라 'unsafe-eval' 불필요, 인라인 스크립트·핸들러는 전면 금지(진화형 향상 원칙).
 	// img data:는 Chart.js가 canvas를 toDataURL로 내보낼 때만 쓰이며 신고 사진은 same-origin 엔드포인트('self')로 제공된다.
@@ -501,6 +519,9 @@ public class SecurityConfig {
 			), now);
 		}
 		adminIdentityRepository.disableStaleBootstrapIdentities(activeBootstrapLoginIds, now);
+		// disableStale와 대칭으로, active bootstrap 계정 목록에 없는 bootstrap-seeded RBAC role을
+		// 회수한다. 수동 부여 role은 보존한다(provenance로 구분).
+		adminRbacAuthorityRepository.revokeStaleBootstrapRoles(activeBootstrapLoginIds);
 		var users = new ConcurrentUserDetailsManager();
 		if (!userUsername.isBlank() && !userPassword.isBlank()) {
 			users.createUser(User.withUsername(userUsername)
@@ -547,7 +568,7 @@ public class SecurityConfig {
 			basicAuthExceptionOwner,
 			basicAuthExceptionExpiresAt,
 			adminIdentityRepository,
-			loginId -> Set.of(),
+			NO_ADMIN_RBAC_AUTHORITIES,
 			passwordEncoder,
 			environment
 		);
