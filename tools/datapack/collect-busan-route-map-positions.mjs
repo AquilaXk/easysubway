@@ -30,6 +30,9 @@ export function createBusanRouteMapPositionsSnapshot({ html, css, topology, conn
   }
   const capturedAtValue = new Date(capturedAt).toISOString();
   if (capturedAtValue !== capturedAt) throw new Error("capturedAt must be an ISO instant");
+  if (connectorEvidence.capturedAt !== capturedAt) {
+    throw new Error("connector evidence capturedAt mismatch");
+  }
 
   const htmlStations = parseHtmlStations(html.toString("utf8"));
   const cssText = css.toString("utf8");

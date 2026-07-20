@@ -130,6 +130,23 @@ test("공식 connector evidence가 없으면 route map snapshot 생성을 거부
   );
 });
 
+test("snapshot 시점과 다른 connector evidence는 결합하지 않는다", async () => {
+  const { html, css, topology, connectorEvidence } = await inputs();
+  const staleConnectorEvidence = structuredClone(connectorEvidence);
+  staleConnectorEvidence.capturedAt = "2026-07-20T11:13:17.000Z";
+
+  assert.throws(
+    () => createBusanRouteMapPositionsSnapshot({
+      html,
+      css,
+      topology,
+      connectorEvidence: staleConnectorEvidence,
+      capturedAt,
+    }),
+    /connector evidence capturedAt mismatch/,
+  );
+});
+
 test("#2379 inventory·candidate는 snapshot byte identity와 자유 이용 근거를 고정한다", async () => {
   const [snapshotBytes, connectorEvidenceBytes, inventory, candidates] = await Promise.all([
     readFile(new URL("./sources/busan-transportation-route-map-positions-20260720.json", import.meta.url)),

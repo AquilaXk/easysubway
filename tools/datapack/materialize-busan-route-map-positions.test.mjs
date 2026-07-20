@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { generateKeyPairSync } from "node:crypto";
+import { createHash, generateKeyPairSync } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -36,7 +36,7 @@ async function inputs() {
     baseFixture,
     topologySnapshot,
     timetableSnapshot,
-    routeMapSnapshot,
+    routeMapSnapshotBytes,
     daejeonTopologySnapshot,
     daejeonTimetableSnapshot,
     inventory,
@@ -46,7 +46,7 @@ async function inputs() {
     readJson("tools/datapack/release/capital-production-reviewed-pack.json"),
     readJson("tools/datapack/sources/busan-transportation-route-topology-20260720.json"),
     readJson("tools/datapack/sources/busan-transportation-timetable-20260720.json"),
-    readJson("tools/datapack/sources/busan-transportation-route-map-positions-20260720.json"),
+    readFile(path.join(root, "tools/datapack/sources/busan-transportation-route-map-positions-20260720.json")),
     readJson("tools/datapack/sources/daejeon-route-topology-20260720.json"),
     readJson("tools/datapack/sources/daejeon-train-timetable-20260720.json"),
     readJson("tools/datapack/source-inventory.json"),
@@ -75,14 +75,23 @@ async function inputs() {
     inventory,
     now: routeMapNow,
   });
-  return { timetableFixture, topologySnapshot, routeMapSnapshot, inventory };
+  return {
+    timetableFixture,
+    topologySnapshot,
+    routeMapSnapshot: JSON.parse(routeMapSnapshotBytes),
+    routeMapSnapshotSha256: createHash("sha256").update(routeMapSnapshotBytes).digest("hex"),
+    inventory,
+  };
 }
 
 test("공식 부산 좌표 snapshot을 누적 production candidate pack에 materialize한다", async () => {
-  const { timetableFixture, topologySnapshot, routeMapSnapshot, inventory } = await inputs();
+  const {
+    timetableFixture, topologySnapshot, routeMapSnapshot, routeMapSnapshotSha256, inventory,
+  } = await inputs();
   const fixture = materializeBusanRouteMapPositions({
     baseFixture: timetableFixture,
     snapshot: routeMapSnapshot,
+    snapshotSha256: routeMapSnapshotSha256,
     topologySnapshot,
     inventory,
     now: routeMapNow,
@@ -124,6 +133,7 @@ test("공식 부산 좌표 snapshot을 누적 production candidate pack에 mater
     () => materializeBusanRouteMapPositions({
       baseFixture: timetableFixture,
       snapshot: routeMapSnapshot,
+      snapshotSha256: routeMapSnapshotSha256,
       topologySnapshot,
       inventory: mismatchedInventory,
       now: routeMapNow,
@@ -136,6 +146,7 @@ test("공식 부산 좌표 snapshot을 누적 production candidate pack에 mater
     () => materializeBusanRouteMapPositions({
       baseFixture: timetableFixture,
       snapshot: tamperedSnapshot,
+      snapshotSha256: routeMapSnapshotSha256,
       topologySnapshot,
       inventory,
       now: routeMapNow,
@@ -150,6 +161,7 @@ test("공식 부산 좌표 snapshot을 누적 production candidate pack에 mater
     () => materializeBusanRouteMapPositions({
       baseFixture: incompleteFixture,
       snapshot: routeMapSnapshot,
+      snapshotSha256: routeMapSnapshotSha256,
       topologySnapshot,
       inventory,
       now: routeMapNow,
@@ -168,11 +180,28 @@ test("공식 부산 좌표 snapshot을 누적 production candidate pack에 mater
     () => materializeBusanRouteMapPositions({
       baseFixture: swappedFixture,
       snapshot: routeMapSnapshot,
+      snapshotSha256: routeMapSnapshotSha256,
       topologySnapshot,
       inventory,
       now: routeMapNow,
     }),
     /topology lineage mismatch/,
+  );
+
+  const byteDifferentSnapshotSha256 = createHash("sha256")
+    .update(`${JSON.stringify(routeMapSnapshot, null, 2)}\n`)
+    .digest("hex");
+  assert.notEqual(byteDifferentSnapshotSha256, routeMapSnapshotSha256);
+  assert.throws(
+    () => materializeBusanRouteMapPositions({
+      baseFixture: timetableFixture,
+      snapshot: routeMapSnapshot,
+      snapshotSha256: byteDifferentSnapshotSha256,
+      topologySnapshot,
+      inventory,
+      now: routeMapNow,
+    }),
+    /snapshot byte identity/,
   );
 });
 
@@ -182,10 +211,13 @@ test("materialized SQLite와 provenance가 부산 route_map_positions 4건을 SU
   const fixturePath = path.join(outputDir, "fixture.json");
   const packOutput = path.join(outputDir, "pack");
   const reportPath = path.join(outputDir, "coverage.json");
-  const { timetableFixture, topologySnapshot, routeMapSnapshot, inventory } = await inputs();
+  const {
+    timetableFixture, topologySnapshot, routeMapSnapshot, routeMapSnapshotSha256, inventory,
+  } = await inputs();
   const fixture = materializeBusanRouteMapPositions({
     baseFixture: timetableFixture,
     snapshot: routeMapSnapshot,
+    snapshotSha256: routeMapSnapshotSha256,
     topologySnapshot,
     inventory,
     now: routeMapNow,

@@ -12,9 +12,16 @@ const TOPOLOGY_SOURCE_ID = "busan-transportation-route-topology";
 const PACK_ID = "nationwide-busan-route-map";
 const OPERATOR_ID = "busan-transportation";
 
-export function materializeBusanRouteMapPositions({ baseFixture, snapshot, topologySnapshot, inventory, now = new Date() }) {
+export function materializeBusanRouteMapPositions({
+  baseFixture,
+  snapshot,
+  snapshotSha256,
+  topologySnapshot,
+  inventory,
+  now = new Date(),
+}) {
   validateBusanRouteMapPositionsSnapshot(snapshot);
-  const source = requiredSource(inventory, snapshot, topologySnapshot, now);
+  const source = requiredSource(inventory, snapshot, snapshotSha256, topologySnapshot, now);
   const fixture = structuredClone(baseFixture);
   const pack = fixture.packs?.[0];
   if (!pack || fixture.packs.length !== 1 || pack.artifactKind !== "production") {
@@ -131,9 +138,12 @@ export function materializedBusanRouteMapPackContentHash(pack, version) {
   return sha256(JSON.stringify({ version, content }));
 }
 
-function requiredSource(inventory, snapshot, topologySnapshot, now) {
+function requiredSource(inventory, snapshot, snapshotSha256, topologySnapshot, now) {
   const source = inventory?.sources?.find(({ id }) => id === SOURCE_ID);
   const evidence = source?.routeMapAdmissionEvidence;
+  if (!/^[a-f0-9]{64}$/.test(snapshotSha256 ?? "") || evidence?.snapshotSha256 !== snapshotSha256) {
+    throw new Error("Busan route map snapshot byte identity mismatch");
+  }
   const observedNow = now instanceof Date ? now.getTime() : Number.NaN;
   if (source?.productionUseAllowed !== true || source.license?.redistributionAllowed !== true
     || source.license.commercialUseAllowed !== true || source.license.derivativeWorkAllowed !== true
@@ -297,13 +307,20 @@ function parseArgs(argv) {
 
 async function main(argv) {
   const args = parseArgs(argv);
-  const [baseFixture, snapshot, topologySnapshot, inventory] = await Promise.all([
+  const [baseFixture, snapshotBytes, topologySnapshot, inventory] = await Promise.all([
     readFile(args["base-fixture"], "utf8").then(JSON.parse),
-    readFile(args.snapshot, "utf8").then(JSON.parse),
+    readFile(args.snapshot),
     readFile(args["topology-snapshot"], "utf8").then(JSON.parse),
     readFile(args.inventory, "utf8").then(JSON.parse),
   ]);
-  const fixture = materializeBusanRouteMapPositions({ baseFixture, snapshot, topologySnapshot, inventory });
+  const snapshot = JSON.parse(snapshotBytes);
+  const fixture = materializeBusanRouteMapPositions({
+    baseFixture,
+    snapshot,
+    snapshotSha256: sha256(snapshotBytes),
+    topologySnapshot,
+    inventory,
+  });
   await writeFile(args.output, `${JSON.stringify(fixture, null, 2)}\n`);
   console.log(`Busan route map positions materialized: stations=${snapshot.stationCount}`);
 }
