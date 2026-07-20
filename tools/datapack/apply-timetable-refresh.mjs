@@ -30,8 +30,21 @@ const GUARDED_PATHS = [
 ];
 const CONTRACT_PATH = "tools/datapack/itx-cheongchun-coverage-contract.json";
 const EVIDENCE_PATH = "tools/datapack/server-timetable-snapshot-evidence.json";
+const RUNTIME_EVIDENCE_PATH = "backend/src/main/resources/timetable/server-timetable-snapshot-evidence.json";
 const SNAPSHOT_BUILD_SCRIPT = "tools/datapack/build-server-timetable-snapshot.mjs";
 const RECOVERY_HINT = "복구: `git checkout -- <가드 경로>` 또는 `git stash` 로 작업 트리를 되돌린 뒤 재시도하세요.";
+// 재산출 빌드가 스테일 admission pin 위에 쌓는 것을 막으려 fail closed 할 때 내는 마커.
+const IDENTITY_MISMATCH_MARKER = /canonical (?:topology )?pack identity mismatch/i;
+const ADMISSION_RECOVERY_HINT =
+  "이 실패는 canonical pack identity mismatch입니다: 수동 admission 교정(coverage contract의 admitted "
+  + "canonical pack identity를 실제 pack과 일치하도록 갱신)을 선행한 뒤 재실행하세요. "
+  + "단순 revert 후 재시도는 동일하게 실패합니다.";
+
+// changedFiles가 전부 GUARDED_PATHS 접두사 안에 있는지 검사한다. 디렉토리 접두사("a/b")와
+// 정확한 파일 경로 둘 다를 다루되, "a/b"가 "a/bc"를 잘못 포섭하지 않도록 경계(/)를 요구한다.
+function isGuardedPath(file) {
+  return GUARDED_PATHS.some((prefix) => file === prefix || file.startsWith(`${prefix}/`));
+}
 
 function createGitRunner(repoRoot) {
   return async (args) => {
@@ -103,6 +116,17 @@ export async function applyTimetableRefresh({
   } catch (error) {
     throw new Error(`promotion.patch를 파싱할 수 없습니다: ${error.message}`);
   }
+
+  // guard-scope 게이트: patch가 건드리는 경로가 전부 가드 경로 안에 있어야 한다. 적용 전에
+  // 검사해, freshness 리프레시 범위를 벗어난 파일을 조용히 적용하는 것을 fail closed 로 막는다.
+  const outOfScope = changedFiles.filter((file) => !isGuardedPath(file));
+  if (outOfScope.length > 0) {
+    throw new Error(
+      "guard-scope 게이트 실패: promotion.patch가 가드 경로 밖의 파일을 건드려 적용하지 않습니다.\n"
+      + `가드 경로 밖 파일:\n${outOfScope.map((file) => `  - ${file}`).join("\n")}`,
+    );
+  }
+
   try {
     await runGit(["apply", "--check", resolvedPatch]);
   } catch (error) {
@@ -121,13 +145,30 @@ export async function applyTimetableRefresh({
   try {
     await runSnapshotBuild({ repoRoot });
   } catch (error) {
+    // 빌드 stderr/메시지에 admission identity mismatch 마커가 있으면, 단순 revert 후 재시도가
+    // 통하지 않는다는 admission 교정 선행 안내를 조건부로 덧붙인다.
+    const detail = `${error.stderr ?? ""}\n${error.message ?? ""}`;
+    const admissionBranch = IDENTITY_MISMATCH_MARKER.test(detail) ? `\n${ADMISSION_RECOVERY_HINT}` : "";
     throw new Error(
       `재산출(build-server-timetable-snapshot --without-topology-evidence) 실패: ${error.message}\n`
-      + `상태: promotion.patch는 이미 적용됐고 snapshot 산출물은 갱신되지 않았습니다. ${RECOVERY_HINT}`,
+      + `상태: promotion.patch는 이미 적용됐고 snapshot 산출물은 갱신되지 않았습니다. ${RECOVERY_HINT}`
+      + admissionBranch,
     );
   }
 
-  // (3) 검증: freshUntil 연장 + sourceArtifact가 patch의 신규 source와 일치.
+  // (3) 검증: evidence 사본 동기 + freshUntil 연장 + sourceArtifact가 patch의 신규 source와 일치.
+  // 재산출은 tools/datapack evidence와 backend runtime evidence를 함께 써야 한다. 두 사본이
+  // 바이트 동일하지 않으면 런타임이 스테일 freshness를 읽을 수 있으므로 fail closed 한다.
+  const [toolEvidenceBytes, runtimeEvidenceBytes] = await Promise.all([
+    readFile(path.join(repoRoot, EVIDENCE_PATH)),
+    readFile(path.join(repoRoot, RUNTIME_EVIDENCE_PATH)),
+  ]);
+  if (!toolEvidenceBytes.equals(runtimeEvidenceBytes)) {
+    throw new Error(
+      `검증 실패: snapshot evidence 사본이 바이트 동일하지 않습니다 `
+      + `(${EVIDENCE_PATH} ↔ ${RUNTIME_EVIDENCE_PATH}). 재산출이 두 사본을 함께 갱신하지 못했습니다. ${RECOVERY_HINT}`,
+    );
+  }
   const after = await readEvidence(repoRoot);
   const beforeMs = Date.parse(before.freshUntil);
   const afterMs = Date.parse(after.freshUntil);

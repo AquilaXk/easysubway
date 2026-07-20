@@ -203,6 +203,64 @@ test("검증 실패: evidence sourceArtifact가 patch의 신규 source와 불일
   );
 });
 
+test("guard-scope: patch가 가드 경로 밖 파일을 건드리면 적용 전에 fail closed", async (t) => {
+  const dir = await makeFixture(t);
+  const build = makeBuildStub(dir);
+  // 가드 경로 밖(tools/out-of-scope.txt)을 추가하는 patch를 만든다.
+  await writeFile(path.join(dir, "tools/out-of-scope.txt"), "not-guarded\n");
+  await git(dir, ["add", "-N", "tools/out-of-scope.txt"]);
+  const { stdout } = await git(dir, ["diff", "--", "tools/out-of-scope.txt"]);
+  await git(dir, ["reset", "-q"]);
+  await rm(path.join(dir, "tools/out-of-scope.txt"));
+  const patchPath = path.join(dir, "out-of-scope.patch");
+  await writeFile(patchPath, stdout);
+
+  await assert.rejects(
+    applyTimetableRefresh({ patchPath, repoRoot: dir, runSnapshotBuild: build.run }),
+    (error) => {
+      assert.match(error.message, /guard-scope|가드 경로/);
+      assert.match(error.message, /out-of-scope\.txt/);
+      return true;
+    },
+  );
+  assert.equal(build.calls.count, 0, "재산출은 호출되지 않아야 한다");
+});
+
+test("evidence 사본 불일치: 재산출 후 runtime 사본이 tools 사본과 다르면 fail closed", async (t) => {
+  const dir = await makeFixture(t);
+  const patchPath = await buildPromotionPatch(dir);
+  // freshUntil·source는 정상 갱신하되 runtime 사본만 일부러 다르게 쓴다(사본 동기 깨짐).
+  const desyncBuild = async () => {
+    const contract = JSON.parse(await readFile(path.join(dir, CONTRACT_PATH), "utf8"));
+    const freshUntil = contract.sourceTimetableArtifact.freshUntil;
+    const sourceId = contract.sourceTimetableArtifact.artifactId;
+    await writeFile(path.join(dir, EVIDENCE_PATH), evidenceFor(sourceId, freshUntil));
+    await writeFile(path.join(dir, RUNTIME_EVIDENCE_PATH), `${evidenceFor(sourceId, freshUntil)}\n`);
+    await writeFile(path.join(dir, SEED_PATH), `seed-gz-placeholder-${sourceId}\n`);
+  };
+
+  await assert.rejects(
+    applyTimetableRefresh({ patchPath, repoRoot: dir, runSnapshotBuild: desyncBuild }),
+    /사본|바이트 동일|불일치/,
+  );
+});
+
+test("멱등성: 성공 후 재실행하면 더티 트리 가드가 재적용을 차단한다", async (t) => {
+  const dir = await makeFixture(t);
+  const patchPath = await buildPromotionPatch(dir);
+  const build = makeBuildStub(dir);
+
+  await applyTimetableRefresh({ patchPath, repoRoot: dir, runSnapshotBuild: build.run });
+  assert.equal(build.calls.count, 1);
+
+  // 재실행: 첫 실행이 남긴 uncommitted 변경(가드 경로)으로 클린 트리 게이트가 막아야 한다.
+  await assert.rejects(
+    applyTimetableRefresh({ patchPath, repoRoot: dir, runSnapshotBuild: build.run }),
+    /클린 트리|uncommitted|더티/,
+  );
+  assert.equal(build.calls.count, 1, "재실행에서 재산출은 호출되지 않아야 한다");
+});
+
 test("--patch 경로 미지정 시 명시적으로 실패한다", async (t) => {
   const dir = await makeFixture(t);
   await assert.rejects(
