@@ -26,15 +26,18 @@ export const CANARY_TIMELINE_STAGES = [
   "budget_evaluated",
   "rollback_dry_run_started",
   "ingress_closed",
+  "ingress_restored",
   "rollback_verified",
   "evidence_emitted",
 ];
 
-// The rollback dry-run only runs the ingress-close step when the canary breaches
-// its budget; on a clean canary the close is rehearsed against the recorded prior
-// approved state rather than the live edge. Both paths must still emit every other
-// stage so the timeline proves the rollback path was exercised for the candidate.
-export const OPTIONAL_TIMELINE_STAGES = new Set(["ingress_closed"]);
+// The rollback dry-run ALWAYS physically closes the host Route V2 ingress — on a
+// clean canary this is a real close/verify/restore rehearsal (not a no-op), and on
+// a budget breach it is the permanent rollback. Only the restore step is
+// conditional: a clean canary restores ingress to the state it started in
+// (ingress_restored), while a breach leaves it closed (the prior approved posture)
+// and never restores.
+export const OPTIONAL_TIMELINE_STAGES = new Set(["ingress_restored"]);
 
 const APPROVAL_REFERENCE_PATTERN =
   /^https:\/\/github\.com\/AquilaXk\/easysubway\/(?:issues|pull|actions\/runs)\/[0-9]+(?:#[A-Za-z0-9_-]+)?$/;
@@ -114,7 +117,10 @@ function normalizeSample(sample, index) {
     throw new Error(`sample[${index}] latencyMs is invalid`);
   }
   const cacheControl = typeof sample?.cacheControl === "string" ? sample.cacheControl : "";
-  return { profile, status, latencyMs, cacheControl };
+  // Only route-search samples carry this field; every other sample defaults to
+  // "matched" (not applicable) so it never contributes a false breach.
+  const plannerIdentityMatch = sample?.plannerIdentityMatch !== false;
+  return { profile, status, latencyMs, cacheControl, plannerIdentityMatch };
 }
 
 function percentile(sortedLatencies, ratio) {
@@ -124,8 +130,13 @@ function percentile(sortedLatencies, ratio) {
 }
 
 // Score the synthetic canary against the pre-launch budget. A breach in ANY
-// dimension (latency, error, missing rate-limit engagement, or a cache-safety
-// violation) flags the run so the caller executes the ingress-close rollback.
+// dimension (a normal-profile request that did not succeed, latency, error,
+// missing rate-limit engagement, or a cache-safety violation) flags the run so the
+// caller executes the ingress-close rollback. Requiring every "normal" sample to be
+// an exact HTTP 200 (burst's 429 is scored separately via limitEngaged) closes a
+// vacuous-pass gap: without it, a canary whose normal requests are ALL rejected
+// (e.g. every attestation is denied) could still read as "within budget" as long as
+// one burst request got rate-limited.
 export function evaluateCanaryBudgets(samples, budgets) {
   if (!Array.isArray(samples) || samples.length === 0) {
     throw new Error("canary produced no samples");
@@ -140,6 +151,12 @@ export function evaluateCanaryBudgets(samples, budgets) {
     throw new Error("canary latency budget is invalid");
   }
 
+  const normalSamples = normalized.filter((sample) => sample.profile === "normal");
+  if (normalSamples.length === 0) {
+    throw new Error("canary requires at least one normal-profile sample");
+  }
+  const failedNormalSamples = normalSamples.filter((sample) => sample.status !== 200).length;
+
   const latencies = normalized.map((sample) => sample.latencyMs).sort((a, b) => a - b);
   const p95 = percentile(latencies, 0.95);
   const p99 = percentile(latencies, 0.99);
@@ -152,8 +169,18 @@ export function evaluateCanaryBudgets(samples, budgets) {
         (sample) => !/^private,\s*no-store$/i.test(sample.cacheControl.trim()),
       ).length
     : 0;
+  // A 200 response with the WRONG timetable identity is a distinct failure mode
+  // from a bad status code (e.g. a route search hitting a stale/drifted active
+  // snapshot behind an otherwise-healthy session endpoint) — scored separately so
+  // it cannot be masked by an unrelated status-code-only budget check.
+  const plannerIdentityMismatches = normalized.filter(
+    (sample) => sample.plannerIdentityMatch === false,
+  ).length;
 
   const breaches = [];
+  if (failedNormalSamples > 0) {
+    breaches.push(`${failedNormalSamples} normal-profile sample(s) did not return exact HTTP 200`);
+  }
   if (p95 > p95MaxMs) breaches.push(`p95 latency ${p95}ms exceeds ${p95MaxMs}ms`);
   if (p99 > p99MaxMs) breaches.push(`p99 latency ${p99}ms exceeds ${p99MaxMs}ms`);
   if (unexpectedErrors > maxUnexpectedErrors) {
@@ -165,17 +192,23 @@ export function evaluateCanaryBudgets(samples, budgets) {
   if (cacheSafetyViolations > 0) {
     breaches.push(`${cacheSafetyViolations} response(s) missing Cache-Control: private, no-store`);
   }
+  if (plannerIdentityMismatches > 0) {
+    breaches.push(`${plannerIdentityMismatches} response(s) had a route search planner identity mismatch`);
+  }
 
   return {
     withinBudget: breaches.length === 0,
     breaches,
     summary: {
       sampleCount: normalized.length,
+      normalSampleCount: normalSamples.length,
+      failedNormalSampleCount: failedNormalSamples,
       p95LatencyMs: p95,
       p99LatencyMs: p99,
       unexpectedErrorCount: unexpectedErrors,
       limitEngaged,
       cacheSafetyViolationCount: cacheSafetyViolations,
+      plannerIdentityMismatchCount: plannerIdentityMismatches,
     },
   };
 }
@@ -195,8 +228,11 @@ function assertMonotonic(timeline) {
 }
 
 // Assemble the canary/rollback dry-run evidence. `stages` maps each timeline stage
-// name to an ISO-8601 timestamp; the ingress_closed stage is only present when the
-// rollback actually closed ingress in response to a budget breach.
+// name to an ISO-8601 timestamp. `ingress_closed` is ALWAYS required — the
+// rollback dry-run always physically closes the host Route V2 ingress, whether the
+// canary was healthy (rehearsal) or breached its budget (permanent rollback).
+// `ingress_restored` is present only on the healthy/rehearsal path, where ingress
+// is reopened after the close is verified; a budget breach never restores it.
 export function buildCanaryRollbackEvidence({
   candidate,
   publicBaseUrl,
@@ -204,7 +240,7 @@ export function buildCanaryRollbackEvidence({
   ingressWasOpen,
   budget,
   budgetResult,
-  rollbackExecuted,
+  restoredAfterRehearsal,
   priorApprovedState,
   stages,
 }) {
@@ -213,6 +249,13 @@ export function buildCanaryRollbackEvidence({
   if (!budgetResult) throw new Error("evidence requires the budget evaluation result");
   requireString(publicBaseUrl, "publicBaseUrl");
   if (!priorApprovedState) throw new Error("evidence requires the prior approved state");
+
+  const restored = restoredAfterRehearsal === true;
+  if (budgetResult.withinBudget !== restored) {
+    throw new Error(
+      "a healthy canary must restore ingress after the rehearsal, and a budget breach must not restore it",
+    );
+  }
 
   const timeline = [];
   for (const stage of CANARY_TIMELINE_STAGES) {
@@ -223,11 +266,15 @@ export function buildCanaryRollbackEvidence({
     }
     timeline.push({ stage, at });
   }
-  if (rollbackExecuted && stages?.ingress_closed === undefined) {
-    throw new Error("rollback executed but the ingress_closed stage timestamp is missing");
+  // ingress_closed is a REQUIRED stage (not in OPTIONAL_TIMELINE_STAGES), so the
+  // loop above already rejects a missing timestamp with "timeline is missing
+  // required stage: ingress_closed". Only ingress_restored's presence needs to be
+  // tied to `restored` here, since it is the one truly conditional stage.
+  if (restored && stages?.ingress_restored === undefined) {
+    throw new Error("rehearsal restored ingress but the ingress_restored stage timestamp is missing");
   }
-  if (!rollbackExecuted && stages?.ingress_closed !== undefined) {
-    throw new Error("ingress_closed recorded but the rollback was not executed");
+  if (!restored && stages?.ingress_restored !== undefined) {
+    throw new Error("ingress_restored recorded but the rehearsal did not restore ingress");
   }
   assertMonotonic(timeline);
 
@@ -249,8 +296,8 @@ export function buildCanaryRollbackEvidence({
     },
     rollbackDryRun: {
       trigger: budgetResult.withinBudget ? "rehearsal" : "budget-breach",
-      ingressClosed: rollbackExecuted === true,
-      restoredState: priorApprovedState,
+      ingressClosed: true,
+      restoredAfterRehearsal: restored,
     },
     timeline,
   };
