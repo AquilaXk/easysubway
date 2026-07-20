@@ -332,7 +332,18 @@
         "productionCanaryRollback": {
           "status": "BLOCKED_EXTERNAL",
           "explicitProductionApprovalRequired": true,
-          "sameCandidateIdentityRequired": true
+          "sameCandidateIdentityRequired": true,
+          "preparedTooling": {
+            "runner": "tools/ops/verify-production-route-v2-canary-rollback.sh",
+            "evidenceLibrary": "tools/ops/route-v2-canary-rollback-evidence.mjs",
+            "workflow": ".github/workflows/production-route-v2-canary-rollback-dry-run.yml",
+            "requiresBeforeExecution": [
+              "explicit-owner-approval-reference",
+              "same-candidate-identity",
+              "signed-rc-canary-attestation-provisioned",
+              "route-v2-ingress-open"
+            ]
+          }
         }
       },
       "requiredEvidence": [

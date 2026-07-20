@@ -7310,7 +7310,36 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
     status: "BLOCKED_EXTERNAL",
     explicitProductionApprovalRequired: true,
     sameCandidateIdentityRequired: true,
+    preparedTooling: {
+      runner: "tools/ops/verify-production-route-v2-canary-rollback.sh",
+      evidenceLibrary: "tools/ops/route-v2-canary-rollback-evidence.mjs",
+      workflow: ".github/workflows/production-route-v2-canary-rollback-dry-run.yml",
+      requiresBeforeExecution: [
+        "explicit-owner-approval-reference",
+        "same-candidate-identity",
+        "signed-rc-canary-attestation-provisioned",
+        "route-v2-ingress-open",
+      ],
+    },
   });
+  // 실행은 오너 명시 승인 + #1016 완료 후에만 가능하지만, canary/rollback dry-run
+  // 도구는 미리 결속해 두어 승인 즉시 실행 가능하도록 한다(status는 BLOCKED_EXTERNAL 유지).
+  const canaryRollbackWorkflow = read(".github/workflows/production-route-v2-canary-rollback-dry-run.yml");
+  const canaryRollbackRunner = read("tools/ops/verify-production-route-v2-canary-rollback.sh");
+  assert.match(canaryRollbackWorkflow, /workflow_dispatch:/);
+  assert.match(canaryRollbackWorkflow, /environment: production/);
+  assert.match(canaryRollbackWorkflow, /production_approval:\n\s+description:[^\n]+\n\s+required: true/);
+  assert.match(
+    canaryRollbackWorkflow,
+    /if \[\[ "\$\{GITHUB_REF\}" != "refs\/heads\/main" \]\]; then\s+echo "production Route V2 canary rollback dry-run must run from main" >&2\s+exit 1\s+fi/,
+  );
+  assert.match(canaryRollbackWorkflow, /tools\/ops\/verify-production-route-v2-canary-rollback\.sh/);
+  assert.match(canaryRollbackRunner, /^set -euo pipefail$/m);
+  assert.match(canaryRollbackRunner, /validate-approval/);
+  assert.match(canaryRollbackRunner, /assert-candidate/);
+  assert.match(canaryRollbackRunner, /blocked on #1016/);
+  assert.match(canaryRollbackRunner, /Route V2 ingress must be open for the signed-RC canary/);
+  assert.doesNotMatch(canaryRollbackRunner, /gh secret set|set -x/);
   const routeCapacityWorkflow = read(".github/workflows/production-route-v2-capacity-evidence.yml");
   const routeCapacityRunner = read("tools/ops/verify-production-route-v2-capacity.sh");
   assert.match(routeCapacityWorkflow, /workflow_dispatch:/);
