@@ -253,6 +253,85 @@
       }
     },
     {
+      "id": "busan-transportation-route-map-positions",
+      "displayName": "부산교통공사_도시철도 노선도·사이버스테이션",
+      "owner": "부산교통공사",
+      "provider": "부산교통공사",
+      "providerDepartment": "IT지원단",
+      "sourceSystem": "부산교통공사·공공데이터포털",
+      "datasetUrl": "https://www.data.go.kr/data/15054957/fileData.do",
+      "datasetKind": "official-web-offline-snapshot",
+      "coverage": "부산교통공사 1~4호선 114개 역 노선도 좌표와 label polygon",
+      "coverageScope": {
+        "regionIds": ["busan"],
+        "operatorIds": ["busan-transportation"],
+        "lineIds": [
+          "line-ab1a041f6266",
+          "line-d74614a04530",
+          "line-d812a5bc1e5f",
+          "line-eb7b47920390"
+        ],
+        "sourceDomains": ["route_map_positions"]
+      },
+      "requiredForProductionPack": false,
+      "productionUseAllowed": true,
+      "updateFrequency": "on-change",
+      "observedDataUpdatedAt": "2025-11-04",
+      "retrievedAt": "2026-07-20",
+      "license": {
+        "type": "PUBLIC_DATA_FREE_USE",
+        "name": "공공데이터포털 이용허락범위 제한 없음",
+        "attribution": "부산교통공사 · 공공데이터포털 이용허락범위 제한 없음",
+        "commercialUseAllowed": true,
+        "derivativeWorkAllowed": true,
+        "redistributionAllowed": true,
+        "evidenceUrl": "https://www.data.go.kr/data/15054957/fileData.do"
+      },
+      "fieldsProvided": ["route_map_position", "route_map_label_polygon"],
+      "capabilities": {
+        "schedule": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "on-change",
+          "unsupportedNotes": "source does not provide scheduled timetable data"
+        },
+        "realtime": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "liveEtaEligible": false,
+          "rateLimitStatus": "NOT_APPLICABLE",
+          "coverageStatus": "OFFLINE_ROUTE_MAP_SNAPSHOT_ONLY",
+          "updateFrequency": "on-change",
+          "unsupportedNotes": "source does not provide realtime arrivals"
+        },
+        "facility": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "on-change",
+          "unsupportedNotes": "source does not provide accessibility facility records"
+        }
+      },
+      "routeMapAdmissionEvidence": {
+        "issue": 2379,
+        "materializer": "tools/datapack/materialize-busan-route-map-positions.mjs",
+        "verificationTest": "tools/datapack/materialize-busan-route-map-positions.test.mjs",
+        "snapshotId": "busan-transportation-route-map-positions-20260720",
+        "snapshotPath": "tools/datapack/sources/busan-transportation-route-map-positions-20260720.json",
+        "snapshotSha256": "404bc31c9c55618d9911a5023c6a8b10030f3df0fddedbff40d616801c6955b6",
+        "capturedAt": "2026-07-20T10:20:00.000Z",
+        "stationCount": 114,
+        "htmlSha256": "491568c86676bd2ed26594af3be1da54e36f407fe4deff4b8b019e003e28f7f3",
+        "cssSha256": "2247ab29d55938677e544dd5cc264a0524dc68d01d6baf133be236df2bea4569",
+        "rawSha256": "a43f1de46dcac105365b7097d575f6412bd634b3559de24d0eb944b52e829f68",
+        "positionsSha256": "89088b3a3a5c269f7030dd4d8b641a20dca0276340f134e16140c3562e3862cf",
+        "topologySourceId": "busan-transportation-route-topology",
+        "topologySnapshotId": "busan-transportation-route-topology-20260720",
+        "topologyContentSha256": "9ec95ebb6d789457060e243f079ad371465d0e5e1a309504b18b9a78e00a24cc"
+      }
+    },
+    {
       "id": "daejeon-station-distance-fare",
       "displayName": "대전교통공사_역간 소요시간/거리/요금 조회 서비스",
       "owner": "대전교통공사",
