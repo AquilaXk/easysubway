@@ -118,7 +118,7 @@ class RouteGateMatrixAdminPageController {
 
 	private static String blockerReason(RouteGateRow row, boolean generated) {
 		if (row.strictRouteEligible()) {
-			return "-";
+			return "—";
 		}
 		if (row.blockerReason() != null && !row.blockerReason().isBlank()) {
 			return row.blockerReason();
@@ -136,7 +136,7 @@ class RouteGateMatrixAdminPageController {
 
 	private static String valueOrDash(String value) {
 		if (value == null || value.isBlank()) {
-			return "-";
+			return "—";
 		}
 		return value;
 	}

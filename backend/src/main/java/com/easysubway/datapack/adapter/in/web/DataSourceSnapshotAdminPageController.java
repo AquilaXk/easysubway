@@ -190,7 +190,7 @@ class DataSourceSnapshotAdminPageController {
 
 		private static String valueOrDash(String value) {
 			if (value == null || value.isBlank()) {
-				return "-";
+				return "—";
 			}
 			return value;
 		}
