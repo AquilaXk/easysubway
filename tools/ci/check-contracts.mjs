@@ -83,7 +83,8 @@ export function validateSourceInventory(inventory, valuePath, errors) {
   for (const [index, source] of inventory.sources.entries()) {
     if (source == null || typeof source !== "object" || Array.isArray(source)) continue;
     const path = `${valuePath}: $.sources.${index}`;
-    const sourceDomains = new Set(source.coverageScope?.sourceDomains ?? []);
+    const sourceDomains = new Set(Array.isArray(source.coverageScope?.sourceDomains)
+      ? source.coverageScope.sourceDomains : []);
     const requiresTopology = sourceDomains.has("route_graph_topology");
     const requiresSchedule = sourceDomains.has("schedule_timetable");
     if (source.productionUseAllowed === true && requiresTopology && source.topologyAdmissionEvidence == null) {

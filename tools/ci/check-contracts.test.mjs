@@ -137,6 +137,12 @@ test("production admission evidence는 coverage source domain과 일치해야 �
   assert.ok(errors.some((error) => error.includes("scheduleAdmissionEvidence: schedule_timetable source domain이 필요하다")));
 });
 
+test("source inventory semantic 검증은 schema-invalid sourceDomains에서 오류 수집을 중단하지 않는다", () => {
+  assert.doesNotThrow(() => validateSourceInventory({
+    sources: [{ coverageScope: { sourceDomains: 1 } }],
+  }, "source-inventory.json", []));
+});
+
 test("topology admission evidence는 승인 필드 외 값을 거부한다", () => {
   const schema = loadJson("contracts/datapack/source-inventory.schema.json");
   const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
