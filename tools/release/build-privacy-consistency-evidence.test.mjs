@@ -66,72 +66,76 @@ test("현재 tracked 원본에 대해 실행하면 SATISFIED와 모순 0을 산�
   assert.match(evidence.inputs.privacyPolicy.sha256, /^[0-9a-f]{64}$/);
 });
 
-test("폼 answerMatrix 집계가 inventory 값과 모순되면 fail-closed BLOCKED한다", async () => {
-  const repoRoot = await fixtureRepoRoot({
+// 네 BLOCKED 회귀는 "fixtureRepoRoot로 특정 원본만 오염 → 실행 → status가
+// BLOCKED_PRIVACY_CONSISTENCY" 구조가 모두 같다. 그 반복되는 실행·공통 assert 골격을
+// 한 곳(아래 for 루프)에만 두고, 케이스마다 다른 mutate 콜백과 세부 assert만 테이블로 둔다.
+const BLOCKED_CONSISTENCY_CASES = [
+  {
+    name: "폼 answerMatrix 집계가 inventory 값과 모순되면 fail-closed BLOCKED한다",
     mutatePlayForm(playForm) {
       const location = playForm.dataSafetyDeclarations.answerMatrix.find((item) => item.dataType === "Location");
       location.containsRequiredData = true; // inventory Location은 required 항목이 없다.
     },
-  });
-  const evidence = buildPrivacyConsistencyEvidence({ candidate: candidate(), repoRoot });
-
-  assert.equal(evidence.status, "BLOCKED_PRIVACY_CONSISTENCY");
-  assert.equal(evidence.checks.inventoryFormConsistent, "FAILED");
-  assert.ok(
-    evidence.answerMatrixConsistency.contradictions.some(
-      (item) => item.dataType === "Location" && item.code === "required_flag_mismatch",
-    ),
-  );
-});
-
-test("inventory의 collected 항목이 폼 matrix에서 누락되면 coverage 모순으로 BLOCKED한다", async () => {
-  const repoRoot = await fixtureRepoRoot({
+    assertEvidence(evidence) {
+      assert.equal(evidence.checks.inventoryFormConsistent, "FAILED");
+      assert.ok(
+        evidence.answerMatrixConsistency.contradictions.some(
+          (item) => item.dataType === "Location" && item.code === "required_flag_mismatch",
+        ),
+      );
+    },
+  },
+  {
+    name: "inventory의 collected 항목이 폼 matrix에서 누락되면 coverage 모순으로 BLOCKED한다",
     mutatePlayForm(playForm) {
       const appActivity = playForm.dataSafetyDeclarations.answerMatrix.find((item) => item.dataType === "App activity");
       appActivity.inventoryDataIds = appActivity.inventoryDataIds.filter((id) => id !== "search_queries");
     },
-  });
-  const evidence = buildPrivacyConsistencyEvidence({ candidate: candidate(), repoRoot });
-
-  assert.equal(evidence.status, "BLOCKED_PRIVACY_CONSISTENCY");
-  assert.ok(evidence.answerMatrixConsistency.uncoveredCollected.includes("search_queries"));
-});
-
-test("정책 원본에서 경계 문구 anchor가 사라지면 fail-closed BLOCKED한다", async () => {
-  const repoRoot = await fixtureRepoRoot({
+    assertEvidence(evidence) {
+      assert.ok(evidence.answerMatrixConsistency.uncoveredCollected.includes("search_queries"));
+    },
+  },
+  {
+    name: "정책 원본에서 경계 문구 anchor가 사라지면 fail-closed BLOCKED한다",
     mutatePolicy(policy) {
       return policy.replace("DB나 access log에는 저장하지 않습니다", "생략");
     },
-  });
-  const evidence = buildPrivacyConsistencyEvidence({ candidate: candidate(), repoRoot });
-
-  assert.equal(evidence.status, "BLOCKED_PRIVACY_CONSISTENCY");
-  assert.equal(evidence.checks.inventoryPolicyConsistent, "FAILED");
-  const gateway = evidence.policyBoundaryConsistency.boundaries.find(
-    (item) => item.id === "gateway_shared_memory_non_persistence",
-  );
-  assert.equal(gateway.consistent, false);
-  assert.ok(gateway.missingAnchors.includes("DB나 access log에는 저장하지 않습니다"));
-});
-
-test("inventory가 경계를 더 이상 선언하지 않으면 정책 anchor가 있어도 BLOCKED한다", async () => {
-  const repoRoot = await fixtureRepoRoot({
+    assertEvidence(evidence) {
+      assert.equal(evidence.checks.inventoryPolicyConsistent, "FAILED");
+      const gateway = evidence.policyBoundaryConsistency.boundaries.find(
+        (item) => item.id === "gateway_shared_memory_non_persistence",
+      );
+      assert.equal(gateway.consistent, false);
+      assert.ok(gateway.missingAnchors.includes("DB나 access log에는 저장하지 않습니다"));
+    },
+  },
+  {
+    name: "inventory가 경계를 더 이상 선언하지 않으면 정책 anchor가 있어도 BLOCKED한다",
     mutateInventory(inventory) {
       const integrity = inventory.dataTypes.find((item) => item.id === "route_v2_itx_integrity");
       integrity.backendNeverPersistedOrLogged = integrity.backendNeverPersistedOrLogged.filter(
         (field) => field !== "rawIntegrityToken",
       );
     },
-  });
-  const evidence = buildPrivacyConsistencyEvidence({ candidate: candidate(), repoRoot });
+    assertEvidence(evidence) {
+      const boundary = evidence.policyBoundaryConsistency.boundaries.find(
+        (item) => item.id === "route_v2_raw_hash_boundary",
+      );
+      assert.equal(boundary.inventoryFactHolds, false);
+      assert.equal(boundary.consistent, false);
+    },
+  },
+];
 
-  assert.equal(evidence.status, "BLOCKED_PRIVACY_CONSISTENCY");
-  const boundary = evidence.policyBoundaryConsistency.boundaries.find(
-    (item) => item.id === "route_v2_raw_hash_boundary",
-  );
-  assert.equal(boundary.inventoryFactHolds, false);
-  assert.equal(boundary.consistent, false);
-});
+for (const testCase of BLOCKED_CONSISTENCY_CASES) {
+  test(testCase.name, async () => {
+    const repoRoot = await fixtureRepoRoot(testCase);
+    const evidence = buildPrivacyConsistencyEvidence({ candidate: candidate(), repoRoot });
+
+    assert.equal(evidence.status, "BLOCKED_PRIVACY_CONSISTENCY");
+    testCase.assertEvidence(evidence);
+  });
+}
 
 test("입력 원본이 없으면 fail-closed BLOCKED_PRIVACY_CONSISTENCY_INPUTS를 산출한다", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "easysubway-privacy-evidence-empty-"));
