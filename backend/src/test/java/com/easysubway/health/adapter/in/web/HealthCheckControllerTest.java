@@ -150,4 +150,24 @@ class HealthCheckControllerTest {
 		mockMvc.perform(get("/api/v1/internal-unlisted-resource"))
 			.andExpect(status().isForbidden());
 	}
+
+	@Test
+	@DisplayName("파비콘 자산이 없어도 /favicon.ico는 금지(403)가 아니라 정상 404로 응답한다(#2349)")
+	void faviconRequestIsNotForbiddenWhenAssetIsAbsent() throws Exception {
+		// 파비콘 정적 자산이 없어 404가 나면 컨테이너가 /error로 ERROR dispatch를 forward하는데,
+		// 공개 체인의 anyRequest().denyAll()이 이 dispatch까지 잡아 원래 404가 403으로 뒤바뀌던
+		// 회귀를 고정한다. permitAll 파비콘 경로는 403이 아니어야 한다.
+		mockMvc.perform(get("/favicon.ico"))
+			.andExpect(status().isNotFound())
+			.andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(403));
+	}
+
+	@Test
+	@DisplayName("ERROR dispatch 경로(/error)는 공개 체인 기본 차단에서 제외된다(#2349)")
+	void errorDispatchPathIsNotBlockedByPublicChain() throws Exception {
+		// #2349 회귀의 실제 원인: 공개 체인 denyAll이 /error까지 차단해 404 error 렌더가 403으로 바뀌었다.
+		// /error 직접 요청이 금지(403)가 아니어야 한다(허용 후 컨테이너가 원래 상태코드로 렌더).
+		mockMvc.perform(get("/error"))
+			.andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(403));
+	}
 }

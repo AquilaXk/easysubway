@@ -356,6 +356,19 @@ public class SecurityConfig {
 		return http
 			.csrf(AbstractHttpConfigurer::disable)
 			.authorizeHttpRequests(authorize -> authorize
+				// /error는 서블릿 컨테이너의 ERROR dispatch 전용 경로다. permitAll인 정적/공개 경로가
+				// 리소스 부재로 404를 내면(예: 파비콘 자산 미제공 /favicon.ico) 컨테이너가 /error로
+				// ERROR dispatch를 forward하는데, Spring Security 6는 이 dispatch도 필터링하므로 /error가
+				// 이 체인의 anyRequest().denyAll()에 걸려 원래 404 대신 403이 응답됐다(#2349). /error를
+				// 허용해 원래 상태코드(404 등)가 그대로 렌더되게 한다. 보호 경로는 여전히 각 요청이
+				// AuthorizationFilter의 denyAll에서 먼저 차단돼 handler·/error에 닿지 못하므로 경계는 그대로다.
+				// /error는 서블릿 컨테이너의 ERROR dispatch 전용 경로다. permitAll인 정적/공개 경로가
+				// 리소스 부재로 404를 내면(예: 파비콘 자산 미제공 /favicon.ico) 컨테이너가 /error로
+				// ERROR dispatch를 forward하는데, Spring Security 6는 이 dispatch도 필터링하므로 /error가
+				// 이 체인의 anyRequest().denyAll()에 걸려 원래 404 대신 403이 응답됐다(#2349). /error를
+				// 허용해 원래 상태코드(404 등)가 그대로 렌더되게 한다. 보호 경로는 여전히 각 요청이
+				// AuthorizationFilter의 denyAll에서 먼저 차단돼 handler·/error에 닿지 못하므로 경계는 그대로다.
+				.requestMatchers("/error").permitAll()
 				.requestMatchers(
 					HttpMethod.POST,
 					"/api/ads/events"
