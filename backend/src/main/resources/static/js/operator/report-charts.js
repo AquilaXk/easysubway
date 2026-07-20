@@ -8,11 +8,14 @@
 		return value || fallback;
 	}
 
+	// 팔레트(#2349 PR⑩e): admin 대시보드 추이 차트(dashboard-charts.js PALETTE)와 동일한 순서 —
+	// 파랑(주 계열) → 잉크 톤(보조) → 잉크 톤(보조2) → 경고색. 상태 의미 없는 카테고리 막대에
+	// 상태색(good=초록/청록 계열)을 대표색으로 쓰지 않는다.
 	var COLORS = [
-		tokenColor('--admin-good', '#0a705a'),
-		tokenColor('--admin-danger', '#b42318'),
-		tokenColor('--admin-chart-series', '#2f6f9f'),
-		tokenColor('--admin-warn', '#9a5600')
+		tokenColor('--admin-accent', '#006fd6'),
+		tokenColor('--admin-ink-2', '#29484b'),
+		tokenColor('--admin-ink-3', '#466467'),
+		tokenColor('--admin-danger', '#b42318')
 	];
 
 	function tableData(canvas) {

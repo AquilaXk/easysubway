@@ -224,9 +224,11 @@ input:focus-visible {
 	color: #fff;
 }
 
+/* auto-fit(#2349 PR⑩e): 4개 카드 화면은 기존과 동일하게 4열을 채우고, 5개 카드 화면(접근성 현황)은
+   4+1로 어색하게 랩되는 대신 5열로 정렬된다(빈 트랙은 collapse되어 4개 카드 화면 폭에 영향 없음). */
 .metric-grid {
 	display: grid;
-	grid-template-columns: repeat(4, minmax(0, 1fr));
+	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 	gap: 12px;
 	margin-bottom: 12px;
 }
@@ -375,6 +377,33 @@ input:focus-visible {
 .numeric {
 	text-align: right;
 	font-weight: var(--admin-w-strong);
+}
+
+/* 빈 상태 표준화(#2349 PR⑩e, admin td.empty와 동일 원칙): colspan 메시지 셀이 last-child 우측 정렬을
+   상속해 붕괴하는 것을 막고 admin/fragments 빈 상태 문법(.empty-state)과 정렬을 맞춘다. */
+.data-table td.empty {
+	padding: 28px 16px;
+	border-top: 1px solid var(--admin-border);
+	text-align: center;
+	font-weight: var(--admin-w-body);
+}
+
+/* 표준 빈 상태(#2349 PR⑩e, admin/fragments/empty-state.html 문법 이관). message는 상황 설명,
+   hint는 다음 행동 안내(선택). */
+.empty-state {
+	padding: 24px 8px;
+	text-align: center;
+}
+
+.empty-state-message {
+	color: var(--admin-ink);
+	margin: 0;
+}
+
+.empty-state-hint {
+	color: var(--admin-ink-2);
+	font-size: 13px;
+	margin: 6px 0 0;
 }
 
 /* 표 scroll wrapper(#2282 V6-10, admin #2071과 동일 원칙): wrapper만 가로 overflow를 소유하고
@@ -606,7 +635,7 @@ input:focus-visible {
 	height: 44px;
 	border: 0;
 	border-radius: var(--admin-radius-control);
-	background: var(--admin-accent);
+	background: var(--admin-primary);
 	color: #fff;
 	font-weight: var(--admin-w-strong);
 }
