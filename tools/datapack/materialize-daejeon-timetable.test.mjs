@@ -10,7 +10,10 @@ import test from "node:test";
 
 import { parseMolitDaejeonStationMappings } from "./build-molit-nationwide-fixture.mjs";
 import { checkTimetableRideConsistency } from "./validate-timetable-ride-consistency.mjs";
-import { materializeDaejeonTimetable } from "./materialize-daejeon-timetable.mjs";
+import {
+  materializeDaejeonTimetable,
+  materializedPackContentHash,
+} from "./materialize-daejeon-timetable.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
@@ -124,6 +127,14 @@ test("동일 시간표 행의 다음날 refresh도 새 immutable pack identity�
 
   assert.notDeepEqual(next.manifest.activePack, initial.manifest.activePack);
   assert.equal(next.manifest.activePack.version, "20260721");
+});
+
+test("materialized pack 내용 전체가 immutable pack identity에 반영된다", () => {
+  const pack = { id: "base-pack", version: "1", url: "https://example.test/base", serviceCalendars: [{ serviceId: "weekday" }] };
+  const changed = structuredClone(pack);
+  changed.serviceCalendars[0].endDate = "20261231";
+
+  assert.notEqual(materializedPackContentHash(pack, "20260720"), materializedPackContentHash(changed, "20260720"));
 });
 
 test("공식 휴일 근거가 없는 연도의 timetable refresh는 fail closed한다", async () => {

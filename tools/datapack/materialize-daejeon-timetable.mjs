@@ -114,21 +114,6 @@ export function materializeDaejeonTimetable({
     pickupType: stopTime.pickupType,
     dropOffType: stopTime.dropOffType,
   }, { ...provenance, providerRecordHash: stopTime.providerRecordHash })));
-  const compositionSha256 = sha256(JSON.stringify({
-    previousPackId: pack.id,
-    timetableSnapshotIdentity: {
-      snapshotId: source.scheduleAdmissionEvidence.snapshotId,
-      observedAt: timetableSnapshot.observedAt,
-      rawSha256: timetableSnapshot.rawSha256,
-      rowsSha256: timetableSnapshot.rowsSha256,
-    },
-    source,
-    tripIds: trips.map(({ id }) => id),
-  }));
-  pack.id = `${PACK_ID}-${compositionSha256}`;
-  pack.version = version;
-  pack.url = `https://objectstorage.ap-seoul-1.oraclecloud.com/n/axvym6vk8g7i/b/easysubway-datapacks/o/catalog/${pack.id}-v${pack.version}.sqlite.gz`;
-  fixture.manifest.activePack = { id: pack.id, version: pack.version };
   pack.minimumTableRows = {
     ...pack.minimumTableRows,
     service_calendars: pack.serviceCalendars.length,
@@ -138,7 +123,26 @@ export function materializeDaejeonTimetable({
     transit_stop_times: pack.transitStopTimes.length,
     transit_feed_info: pack.transitFeedInfo.length,
   };
+  const compositionSha256 = sha256(JSON.stringify({
+    timetableSnapshotIdentity: {
+      snapshotId: source.scheduleAdmissionEvidence.snapshotId,
+      observedAt: timetableSnapshot.observedAt,
+      rawSha256: timetableSnapshot.rawSha256,
+      rowsSha256: timetableSnapshot.rowsSha256,
+    },
+    source,
+    materializedPackContentSha256: materializedPackContentHash(pack, version),
+  }));
+  pack.id = `${PACK_ID}-${compositionSha256}`;
+  pack.version = version;
+  pack.url = `https://objectstorage.ap-seoul-1.oraclecloud.com/n/axvym6vk8g7i/b/easysubway-datapacks/o/catalog/${pack.id}-v${pack.version}.sqlite.gz`;
+  fixture.manifest.activePack = { id: pack.id, version: pack.version };
   return fixture;
+}
+
+export function materializedPackContentHash(pack, version) {
+  const { id: previousPackId, version: _previousVersion, url: _previousUrl, ...content } = pack;
+  return sha256(JSON.stringify({ previousPackId, version, content }));
 }
 
 function validateSnapshot(snapshot) {
