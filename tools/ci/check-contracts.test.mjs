@@ -97,7 +97,7 @@ test("source admission evidence envelope는 승인 필드 외 값을 거부하�
   assert.deepEqual(validateSchema(schema, inventory).errors, []);
 });
 
-test("inventory production 사용 승인은 topology admission evidence를 요구한다", () => {
+test("inventory production 사용 승인은 topology 또는 schedule admission evidence를 요구한다", () => {
   const schema = loadJson("contracts/datapack/source-inventory.schema.json");
   const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
   const provenanceOnlySource = inventory.sources.find((source) => source.productionUseAllowed === false);
@@ -109,9 +109,38 @@ test("inventory production 사용 승인은 topology admission evidence를 요�
   const errors = [];
   validateSourceInventory(inventory, "source-inventory.json", errors);
   assert.deepEqual(errors, [
-    `source-inventory.json: $.sources.${inventory.sources.indexOf(provenanceOnlySource)}.productionUseAllowed: true는 topologyAdmissionEvidence가 필요하다`,
+    `source-inventory.json: $.sources.${inventory.sources.indexOf(provenanceOnlySource)}.productionUseAllowed: true는 production admission evidence가 필요하다`,
   ]);
+
+  provenanceOnlySource.productionUseAllowed = false;
+  errors.length = 0;
+  const scheduleSource = inventory.sources.find((source) => source.scheduleAdmissionEvidence != null);
+  scheduleSource.productionUseAllowed = false;
+  validateSourceInventory(inventory, "source-inventory.json", errors);
+  assert.equal(errors.at(-1),
+    `source-inventory.json: $.sources.${inventory.sources.indexOf(scheduleSource)}.scheduleAdmissionEvidence: productionUseAllowed true가 필요하다`);
   assert.doesNotThrow(() => validateSourceInventory({ sources: {} }, "source-inventory.json", []));
+});
+
+test("production admission evidence는 coverage source domain과 일치해야 한다", () => {
+  const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const topologySource = inventory.sources.find((source) => source.topologyAdmissionEvidence != null);
+  const scheduleSource = inventory.sources.find((source) => source.scheduleAdmissionEvidence != null);
+  const scheduleEvidence = structuredClone(scheduleSource.scheduleAdmissionEvidence);
+  delete topologySource.topologyAdmissionEvidence;
+  topologySource.scheduleAdmissionEvidence = scheduleEvidence;
+
+  const errors = [];
+  validateSourceInventory(inventory, "source-inventory.json", errors);
+
+  assert.ok(errors.some((error) => error.includes("route_graph_topology production 승인은 topologyAdmissionEvidence가 필요하다")));
+  assert.ok(errors.some((error) => error.includes("scheduleAdmissionEvidence: schedule_timetable source domain이 필요하다")));
+});
+
+test("source inventory semantic 검증은 schema-invalid sourceDomains에서 오류 수집을 중단하지 않는다", () => {
+  assert.doesNotThrow(() => validateSourceInventory({
+    sources: [{ coverageScope: { sourceDomains: 1 } }],
+  }, "source-inventory.json", []));
 });
 
 test("topology admission evidence는 승인 필드 외 값을 거부한다", () => {
@@ -123,6 +152,18 @@ test("topology admission evidence는 승인 필드 외 값을 거부한다", () 
 
   assert.ok(validateSchema(schema, inventory).errors.some((error) => (
     error.includes("topologyAdmissionEvidence.serviceKey")
+  )));
+});
+
+test("schedule admission evidence는 승인 필드 외 값을 거부한다", () => {
+  const schema = loadJson("contracts/datapack/source-inventory.schema.json");
+  const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const scheduleSource = inventory.sources.find((source) => source.scheduleAdmissionEvidence != null);
+
+  scheduleSource.scheduleAdmissionEvidence.serviceKey = "must-never-enter-contract";
+
+  assert.ok(validateSchema(schema, inventory).errors.some((error) => (
+    error.includes("scheduleAdmissionEvidence.serviceKey")
   )));
 });
 
