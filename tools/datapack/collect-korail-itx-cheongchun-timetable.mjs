@@ -2076,16 +2076,9 @@ async function fetchWithRetry(url, fetchImpl) {
   throw new Error("Korail train operation API transport failure");
 }
 
-function normalizeProviderTimestamp(value) {
-  const text = String(value ?? "");
-  if (/^\d{14}$/.test(text)) return text;
-  const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(?:\.\d+)?$/.exec(text);
-  return match === null ? null : `${match[1]}${match[2]}${match[3]}${match[4]}${match[5]}${match[6]}`;
-}
-
 function timestampSeconds(value, runDate, label) {
-  const text = normalizeProviderTimestamp(value);
-  if (text === null) throw new Error(`${label} must use YYYYMMDDHHMISS`);
+  const text = requiredString(String(value), label);
+  if (!/^\d{14}$/.test(text)) throw new Error(`${label} must use YYYYMMDDHHMISS`);
   const hours = Number(text.slice(8, 10));
   const minutes = Number(text.slice(10, 12));
   const seconds = Number(text.slice(12, 14));
@@ -2125,14 +2118,15 @@ function isoRunDate(runDate) {
 
 function providerTimestamp(primary, fallback, label) {
   for (const value of [primary, fallback]) {
-    const text = normalizeProviderTimestamp(value);
-    if (text !== null) return text;
+    const text = String(value ?? "");
+    if (/^\d{14}$/.test(text)) return text;
   }
   throw new Error(`${label} and fallback timestamp are missing`);
 }
 
 function validProviderTimestamp(value) {
-  return normalizeProviderTimestamp(value);
+  const text = String(value ?? "");
+  return /^\d{14}$/.test(text) ? text : null;
 }
 
 function operationEvidence(operation, value) {
