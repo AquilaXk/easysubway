@@ -41,6 +41,12 @@ BACKUP_DIR="${DEPLOY_ROOT}/backups/postgres"
 DIAGNOSTICS_DIR="${SHARED_DIR}/diagnostics"
 STATE_FILE="${SHARED_DIR}/deployment-state.env"
 RESULT_FILE="${SHARED_DIR}/last-result.env"
+# Separate, informational-only key: which port (if any) a blue/green standby
+# container is currently occupying, and whether it is the box actually
+# serving public traffic (issue #2331). deployment-state.env's `phase` field
+# stays the sole re-entrancy gate (see the `phase=completed` check below); this
+# file never gates anything, it only makes the standby's state observable.
+STANDBY_STATE_FILE="${SHARED_DIR}/deployment-standby-state.env"
 LOCK_FILE="${DEPLOY_ROOT}/deploy.lock"
 
 COMPOSE_ENV="${INCOMING_DIR}/compose.env"
@@ -52,9 +58,6 @@ OBSERVABILITY_CONFIG_SERVICES=(alertmanager prometheus loki grafana)
 # The image content sha (digest hex) replaces the former jar sha256 as the
 # deployed-artifact identity; it flows into the compose metadata label.
 image_digest_hex="${DEPLOY_IMAGE_DIGEST#sha256:}"
-# GHCR repository the CD build-image job pushes to; used as the rollback source
-# of truth when a previous image is no longer in the server-local cache.
-GHCR_IMAGE="${DEPLOY_GHCR_IMAGE:-ghcr.io/aquilaxk/easysubway-backend}"
 # Safety margin (seconds) for the timetable snapshot freshness precheck. If the
 # candidate image's bundled snapshot expires within "now + margin", the new
 # container would fail closed at boot or shortly after the deploy completes, so
@@ -227,6 +230,13 @@ ensure_backend_env_value EASYSUBWAY_ADMIN_MASTER_DATA_VERSION "${DEPLOY_SHA}"
 
 backend_port="$(read_env_value "${COMPOSE_ENV}" EASYSUBWAY_BACKEND_PORT)"
 backend_port="${backend_port:-8080}"
+# Internal-only alternate port for the transient standby container used to
+# validate a candidate image before it is promoted onto the canonical
+# "backend" container name/port (issue #2331). Not operator-configurable via
+# the deployment env allowlists — it never appears in nginx's steady-state
+# config, only briefly during a deploy's promotion window.
+backend_standby_port="$(read_env_value "${COMPOSE_ENV}" EASYSUBWAY_BACKEND_STANDBY_PORT)"
+backend_standby_port="${backend_standby_port:-8082}"
 route_v2_gateway_port="$(read_env_value "${COMPOSE_ENV}" EASYSUBWAY_ROUTE_V2_GATEWAY_PORT)"
 route_v2_gateway_port="${route_v2_gateway_port:-8081}"
 route_v2_ingress_enabled="$(read_env_value "${COMPOSE_ENV}" EASYSUBWAY_ROUTE_V2_INGRESS_ENABLED | tr '[:upper:]' '[:lower:]')"
@@ -339,7 +349,7 @@ verify_runtime_hardening() {
 
 runtime_services_hardened() {
 	local service
-	for service in "${RUNTIME_SERVICES[@]}"; do
+	for service in "$@"; do
 		verify_runtime_hardening "${service}" || return 1
 	done
 }
@@ -512,7 +522,7 @@ fi
 if [[ "${current_sha}" == "${DEPLOY_SHA}" && "${current_env_hash}" == "${target_env_hash}" ]]; then
 	if curl -fsS --connect-timeout 2 --max-time 5 "http://127.0.0.1:${backend_port}/actuator/health/readiness" >/dev/null 2>&1 \
 		&& compose_services_running "${BACKEND_ENV}" "${COMPOSE_ENV}" "${DEPLOY_SHA}" "${RUNTIME_SERVICES[@]}" "${OBSERVABILITY_SERVICES[@]}" \
-		&& runtime_services_hardened; then
+		&& runtime_services_hardened "${RUNTIME_SERVICES[@]}"; then
 		write_phase "completed"
 		write_result "noop" "same_sha_same_env_services_ready"
 		exit 0
@@ -592,110 +602,88 @@ chmod 600 "${tmp_env_set}/compose.env" "${tmp_env_set}/backend.env" "${tmp_env_s
 # Alertmanager runs as nobody in the official image; the private env-set directory keeps this config scoped.
 chmod 644 "${tmp_env_set}/alertmanager.yml"
 mv "${tmp_env_set}" "${env_set}"
-if [[ -L "${SHARED_DIR}/current-env" ]]; then
-	previous_target="$(readlink "${SHARED_DIR}/current-env")"
-	ln -sfn "${previous_target}" "${SHARED_DIR}/previous-env"
-fi
 ln -sfn "${env_set}" "${SHARED_DIR}/current-env.next"
 mv -Tf "${SHARED_DIR}/current-env.next" "${SHARED_DIR}/current-env"
 
-ensure_rollback_image() {
-	local sha="$1"
-	if docker image inspect "easysubway-backend:${sha}" >/dev/null 2>&1; then
-		return 0
-	fi
-	# Local image was pruned; restore it from GHCR using the digest recorded when
-	# that SHA was deployed (issue #1686 — removes server-local cache dependence).
-	local prev_digest=""
-	if [[ -f "${SHARED_DIR}/previous-env/metadata.env" ]]; then
-		prev_digest="$(sed -n 's/^image_digest=//p' "${SHARED_DIR}/previous-env/metadata.env")"
-	fi
-	if [[ ! "${prev_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-		return 1
-	fi
-	if ! timeout 300 docker pull "${GHCR_IMAGE}@${prev_digest}" >/dev/null 2>&1; then
-		return 1
-	fi
-	docker tag "${GHCR_IMAGE}@${prev_digest}" "easysubway-backend:${sha}"
+write_standby_state() {
+	local phase="$1"
+	local port="${2:-none}"
+	local tmp
+	tmp="$(mktemp "${SHARED_DIR}/deployment-standby-state.XXXXXX")"
+	chmod 600 "${tmp}"
+	{
+		printf 'phase=%s\n' "${phase}"
+		printf 'sha=%s\n' "${DEPLOY_SHA}"
+		printf 'port=%s\n' "${port}"
+	} > "${tmp}"
+	mv "${tmp}" "${STANDBY_STATE_FILE}"
 }
 
-fail_backend_deployment() {
-	local detail="$1"
-	if [[ -n "${current_sha}" && -L "${SHARED_DIR}/previous-env" ]]; then
-		ln -sfn "$(readlink "${SHARED_DIR}/previous-env")" "${SHARED_DIR}/current-env.next"
-		mv -Tf "${SHARED_DIR}/current-env.next" "${SHARED_DIR}/current-env"
-		ensure_rollback_image "${current_sha}" || true
-		compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${current_sha}" up -d --no-deps --no-build --force-recreate "${RUNTIME_SERVICES[@]}" || true
-		start_observability_services "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${current_sha}" "${recreate_alertmanager}" "${recreate_observability_config}" || true
-		write_result "failed" "${detail}_rollback_attempted"
-	else
-		compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" rm -f -s "${RUNTIME_SERVICES[@]}" || true
-		if [[ "${legacy_backend_was_active}" -eq 1 || "${legacy_backend_was_enabled}" -eq 1 ]]; then
-			if restore_legacy_backend_service; then
-				write_result "failed" "${detail}_legacy_restore_attempted"
-			else
-				write_result "failed" "${detail}_legacy_restore_failed"
-			fi
-		else
-			write_result "failed" "${detail}_rollback_unavailable"
+wait_backend_http_ready() {
+	local port="$1"
+	local _attempt
+	for _attempt in $(seq 1 60); do
+		if curl -fsS --connect-timeout 2 --max-time 5 "http://127.0.0.1:${port}/actuator/health/readiness" >/dev/null 2>&1; then
+			return 0
 		fi
-	fi
-	write_phase "completed"
-	printf '%s\n' "${DEPLOY_SHA}" > "${SHARED_DIR}/failed-sha"
+		sleep 5
+	done
+	return 1
 }
 
-write_phase "restarting"
-if ! compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" up -d --no-deps --no-build --force-recreate "${RUNTIME_SERVICES[@]}"; then
-	fail_backend_deployment "backend_start_failed"
-	exit 1
-fi
-if ! start_observability_services "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" "${recreate_alertmanager}" "${recreate_observability_config}"; then
-	fail_backend_deployment "observability_start_failed"
-	exit 1
-fi
-if ! runtime_services_hardened; then
-	fail_backend_deployment "runtime_hardening_failed"
-	exit 1
-fi
-
-observability_ready=0
-for _ in $(seq 1 12); do
-	if compose_services_running "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" "${RUNTIME_SERVICES[@]}" "${OBSERVABILITY_SERVICES[@]}"; then
-		observability_ready=1
-		break
+dump_diagnostics() {
+	local tag="$1"
+	local profile="$2"
+	shift 2
+	local diagnostic
+	diagnostic="$(mktemp "${DIAGNOSTICS_DIR}/${DEPLOY_SHA}-${tag}-$(date -u +%Y%m%dT%H%M%SZ).XXXXXX.log")"
+	chmod 600 "${diagnostic}"
+	if [[ -n "${profile}" ]]; then
+		compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" --profile "${profile}" ps > "${diagnostic}" 2>&1 || true
+		compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" --profile "${profile}" logs --no-color --tail=200 "$@" >> "${diagnostic}" 2>&1 || true
+	else
+		compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" ps > "${diagnostic}" 2>&1 || true
+		compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" logs --no-color --tail=200 "$@" >> "${diagnostic}" 2>&1 || true
 	fi
-	sleep 5
-done
-
-if [[ "${observability_ready}" -ne 1 ]]; then
-	diagnostic="$(mktemp "${DIAGNOSTICS_DIR}/${DEPLOY_SHA}-observability-$(date -u +%Y%m%dT%H%M%SZ).XXXXXX.log")"
 	chmod 600 "${diagnostic}"
-	compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" --profile observability ps > "${diagnostic}" 2>&1 || true
-	compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" --profile observability logs --no-color --tail=200 "${RUNTIME_SERVICES[@]}" "${OBSERVABILITY_SERVICES[@]}" >> "${diagnostic}" 2>&1 || true
-	chmod 600 "${diagnostic}"
-	fail_backend_deployment "observability_readiness_failed"
-	exit 1
-fi
+}
 
-ready=0
-for _ in $(seq 1 60); do
-	if curl -fsS --connect-timeout 2 --max-time 5 "http://127.0.0.1:${backend_port}/actuator/health/readiness" >/dev/null 2>&1; then
-		ready=1
-		break
+cleanup_standby() {
+	compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" rm -f -s backend-standby || true
+}
+
+abort_deploy() {
+	local detail="$1"
+	write_result "failed" "${detail}"
+	printf '%s\n' "${DEPLOY_SHA}" > "${SHARED_DIR}/failed-sha"
+	write_phase "completed"
+}
+
+# Only reachable from the pre-promotion standby stages below, where the
+# canonical "backend" container has not been touched at all. If this is the
+# very first managed deploy (current_sha empty) and stop_legacy_backend_service
+# above stopped/disabled the pre-Docker systemd unit, that unit is the only
+# thing that could still serve traffic — restore it, mirroring the safety net
+# the old rollback path used to provide for that same narrow case. Once
+# promotion has started, canonical "backend" is Docker-managed territory
+# regardless of current_sha history, so later failure branches do not call
+# this (see the "leave nginx pointed at the proven-healthy standby" comment
+# below instead).
+abort_standby_stage() {
+	local detail="$1"
+	if [[ -z "${current_sha}" && ( "${legacy_backend_was_active}" -eq 1 || "${legacy_backend_was_enabled}" -eq 1 ) ]]; then
+		if restore_legacy_backend_service; then
+			abort_deploy "${detail}_legacy_restore_attempted"
+		else
+			abort_deploy "${detail}_legacy_restore_failed"
+		fi
+	else
+		abort_deploy "${detail}"
 	fi
-	sleep 5
-done
-
-if [[ "${ready}" -ne 1 ]]; then
-	diagnostic="$(mktemp "${DIAGNOSTICS_DIR}/${DEPLOY_SHA}-$(date -u +%Y%m%dT%H%M%SZ).XXXXXX.log")"
-	chmod 600 "${diagnostic}"
-	compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" logs --no-color --tail=200 "${RUNTIME_SERVICES[@]}" > "${diagnostic}" 2>&1 || true
-	chmod 600 "${diagnostic}"
-	fail_backend_deployment "readiness_failed"
-	exit 1
-fi
+}
 
 install_route_v2_host_ingress() {
+	local target_backend_port="$1"
 	local site_target="/etc/nginx/sites-available/easysubway"
 	local route_snippet_target="/etc/nginx/snippets/easysubway-route-v2-proxy.conf"
 	local default_snippet_target="/etc/nginx/snippets/easysubway-default-proxy.conf"
@@ -718,7 +706,7 @@ install_route_v2_host_ingress() {
 		return 1
 	fi
 	if ! sed \
-		-e "s/__BACKEND_PORT__/${backend_port}/g" \
+		-e "s/__BACKEND_PORT__/${target_backend_port}/g" \
 		-e "s|__ROUTE_V2_ACTION__|${route_v2_host_action}|g" \
 		infra/nginx/host-easysubway.conf.template > "${candidate}"; then
 		rm -f "${candidate}" "${site_backup}" "${route_snippet_backup}" "${default_snippet_backup}"
@@ -791,13 +779,149 @@ install_route_v2_host_ingress() {
 	rm -f "${candidate}" "${site_backup}" "${route_snippet_backup}" "${default_snippet_backup}"
 }
 
-if ! install_route_v2_host_ingress; then
-	fail_backend_deployment "route_v2_host_ingress_failed"
+# --- Stage 1: bring up a standby container on an alternate port running the
+# candidate image and validate it end-to-end, entirely without touching the
+# running canonical "backend" container (issue #2331). If anything in this
+# stage fails, the canonical container and Nginx are left completely alone —
+# the deploy fails with the old backend still fully serving. There is
+# deliberately no "restart the previous image" fallback here: that path is
+# exactly what this issue removes, because the standby step already proves
+# whether the candidate image can serve before anything live is touched.
+write_phase "standby_starting"
+write_standby_state "starting" "${backend_standby_port}"
+if ! compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" up -d --no-deps --no-build --force-recreate backend-standby; then
+	cleanup_standby
+	write_standby_state "idle"
+	abort_standby_stage "standby_start_failed"
+	exit 1
+fi
+if ! runtime_services_hardened backend-standby; then
+	dump_diagnostics "standby" "" backend-standby
+	cleanup_standby
+	write_standby_state "idle"
+	abort_standby_stage "standby_hardening_failed"
+	exit 1
+fi
+if ! wait_backend_http_ready "${backend_standby_port}"; then
+	dump_diagnostics "standby" "" backend-standby
+	cleanup_standby
+	write_standby_state "idle"
+	abort_standby_stage "standby_readiness_failed"
+	exit 1
+fi
+write_phase "standby_ready"
+write_standby_state "ready" "${backend_standby_port}"
+
+# --- Stage 2: the standby is proven healthy on the candidate image. Point
+# host Nginx's default location at the standby port so public traffic keeps
+# flowing while the canonical "backend" container is torn down and recreated
+# below — the window that used to be a hard outage (force-recreate before any
+# validation).
+if ! install_route_v2_host_ingress "${backend_standby_port}"; then
+	cleanup_standby
+	write_standby_state "idle"
+	abort_standby_stage "nginx_alt_switch_failed"
+	exit 1
+fi
+write_phase "nginx_alt"
+write_standby_state "nginx_alt" "${backend_standby_port}"
+
+# --- Stage 3: promote — recreate the canonical "backend" container with the
+# candidate image while the standby keeps serving public traffic. A failure
+# here is the one case where the standby is deliberately left serving as the
+# terminal state instead of being cleaned up: the candidate image already
+# proved itself on the standby, so a promotion failure here points at
+# infra/resource trouble (e.g. two backend containers briefly competing for
+# host resources), not at the image — and there is no previous-image restart
+# to fall back to. The safest available state is "leave the proven-healthy
+# standby serving and stop", recorded with a distinct "_standby_serving"
+# detail so an operator can find it.
+write_phase "promoting"
+if ! compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" up -d --no-deps --no-build --force-recreate backend; then
+	write_standby_state "serving_standby_degraded" "${backend_standby_port}"
+	abort_deploy "canonical_promotion_failed_standby_serving"
+	exit 1
+fi
+if ! runtime_services_hardened backend; then
+	dump_diagnostics "canonical" "" backend
+	write_standby_state "serving_standby_degraded" "${backend_standby_port}"
+	abort_deploy "canonical_hardening_failed_standby_serving"
+	exit 1
+fi
+if ! wait_backend_http_ready "${backend_port}"; then
+	dump_diagnostics "canonical" "" backend
+	write_standby_state "serving_standby_degraded" "${backend_standby_port}"
+	abort_deploy "canonical_readiness_failed_standby_serving"
+	exit 1
+fi
+write_phase "promoted"
+
+# --- Stage 4: the canonical container is proven healthy on the candidate
+# image. Switch host Nginx back to the canonical port. If this switch itself
+# fails, both the canonical and the standby are healthy — install_route_v2_host_ingress
+# already attempted to restore whatever Nginx had immediately before this
+# call (i.e. pointed at the standby), so public traffic keeps flowing either
+# way; the standby is deliberately left running (not cleaned up) so this
+# stays true, again recorded with a "_standby_serving" detail.
+if ! install_route_v2_host_ingress "${backend_port}"; then
+	write_standby_state "serving_standby_degraded" "${backend_standby_port}"
+	abort_deploy "nginx_canonical_switchback_failed_standby_serving"
 	exit 1
 fi
 
 printf '%s\n' "${route_v2_ingress_enabled_normalized}" > "${SHARED_DIR}/current-route-v2-ingress-enabled"
 chmod 600 "${SHARED_DIR}/current-route-v2-ingress-enabled"
+
+# --- Stage 5: Nginx is back on the canonical port and the standby is no
+# longer needed. Retire it promptly — it is pure standby-window memory
+# overhead on the host (issue #2331 background).
+write_phase "standby_cleanup"
+if ! compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" rm -f -s backend-standby; then
+	write_standby_state "orphaned" "${backend_standby_port}"
+	abort_deploy "standby_cleanup_failed"
+	exit 1
+fi
+write_standby_state "idle"
+
+# --- Stage 6: recreate the remaining runtime services. Neither sits behind
+# host Nginx's default location (already switched back to canonical above),
+# so their recreation is not on the zero-downtime path: back-worker has no
+# external HTTP exposure at all, and route-v2-gateway's brief restart only
+# affects the two Route V2 endpoints, which already have their own
+# canary/rollback safety net (issue #2095/#2337). The canonical backend is
+# already promoted and serving at this point, so a failure here is reported
+# without touching it further.
+write_phase "finalizing"
+if ! compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" up -d --no-deps --no-build --force-recreate back-worker route-v2-gateway; then
+	dump_diagnostics "back-worker-gateway" "" back-worker route-v2-gateway
+	abort_deploy "back_worker_gateway_recreate_failed"
+	exit 1
+fi
+if ! runtime_services_hardened back-worker route-v2-gateway; then
+	dump_diagnostics "back-worker-gateway" "" back-worker route-v2-gateway
+	abort_deploy "back_worker_gateway_hardening_failed"
+	exit 1
+fi
+
+if ! start_observability_services "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" "${recreate_alertmanager}" "${recreate_observability_config}"; then
+	abort_deploy "observability_start_failed"
+	exit 1
+fi
+
+observability_ready=0
+for _ in $(seq 1 12); do
+	if compose_services_running "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" "${RUNTIME_SERVICES[@]}" "${OBSERVABILITY_SERVICES[@]}"; then
+		observability_ready=1
+		break
+	fi
+	sleep 5
+done
+
+if [[ "${observability_ready}" -ne 1 ]]; then
+	dump_diagnostics "observability" "observability" "${RUNTIME_SERVICES[@]}" "${OBSERVABILITY_SERVICES[@]}"
+	abort_deploy "observability_readiness_failed"
+	exit 1
+fi
 
 legacy_restore_on_error=0
 trap - ERR INT TERM HUP

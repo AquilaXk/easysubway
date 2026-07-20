@@ -1307,10 +1307,12 @@ test("백엔드 배포는 GHCR digest를 pull하고 서버 위 build 경로를 �
   assert.match(deploy, /image_revision_mismatch/);
   assert.match(deploy, /org\.opencontainers\.image\.revision/);
 
-  // Rollback no longer depends on the server-local image cache: a pruned image
-  // is restored from GHCR by digest.
-  assert.match(deploy, /ensure_rollback_image/);
-  assert.match(deploy, /docker pull "\$\{GHCR_IMAGE\}@\$\{prev_digest\}"/);
+  // The old "restart the previous image from GHCR" rollback path is removed
+  // entirely (issue #2331): a candidate is proven on a standby container
+  // before the canonical container is ever touched, so there is no server-
+  // local image cache to fall back to and nothing to pull by a prior digest.
+  assert.doesNotMatch(deploy, /ensure_rollback_image/);
+  assert.doesNotMatch(deploy, /GHCR_IMAGE/);
   assert.match(deploy, /current-image-digest/);
 });
 
