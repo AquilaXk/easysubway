@@ -70,39 +70,81 @@ function requireString(value, label) {
 // OUT OF SCOPE and rejected on security grounds — it would be a permanent
 // authentication bypass shipped in the production artifact.
 //
-// Instead, the runner's input contract is: #1016's provisioning pipeline
-// delivers a POOL of already-minted, currently-valid, single-use signed-RC Play
-// Integrity token/nonce pairs — genuine tokens obtained from Google's Play
-// Integrity API against the approved RC candidate's signing identity — via
-// EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY in the deployed compose.env. Each
-// pair is consumed by exactly one session-issuance request (Play Integrity
-// tokens are nonce-bound and single-use against route_v2_nonce_replays, so they
-// cannot be reused across requests). The payload is a JSON array:
+// The runner's input contract is: #1016's provisioning pipeline mints a POOL of
+// already-minted, currently-valid, single-use signed-RC Play Integrity
+// token/nonce pairs IMMEDIATELY BEFORE each approved workflow run, and delivers
+// them ONCE to that run via a host-local file
+// (${DEPLOY_ROOT}/shared/route-v2-canary-integrity-tokens.json) that the runner
+// moves into its own work directory and deletes from that shared location —
+// NEVER via the deployed compose.env, which is a durable, deploy-time artifact:
+// RouteV2SessionService rejects a Play Integrity verdict whose request
+// timestamp is more than 2 minutes old and rejects a replayed nonce, so a pool
+// sitting in compose.env since the last deploy (which could be hours or days
+// old, and could be reused across multiple runs) would always fail decode on a
+// perfectly healthy candidate. The payload also carries the Mobile candidate
+// identity that #1016 actually built and signed to mint these tokens — binding
+// the attestation to a REAL provisioning event instead of trusting whatever
+// pubspec.yaml happens to say in the reviewed-main checkout, which could
+// disagree with a different Play-recognized build using the same package and
+// certificate:
 //
-//   [{ "integrityToken": "<opaque Play Integrity token>", "clientNonce": "<nonce>" }, ...]
+//   {
+//     "mintedAt": "<ISO-8601 instant, must be within CANARY_POOL_MAX_AGE_MS of use>",
+//     "mobileVersionName": "<Mobile candidate versionName #1016 signed>",
+//     "mobileVersionCode": <Mobile candidate versionCode #1016 signed>,
+//     "pairs": [{ "integrityToken": "<opaque Play Integrity token>", "clientNonce": "<nonce>" }, ...]
+//   }
 //
-// If this value is absent, malformed, or short of the pairs a run needs, the
-// runner fails closed with "blocked on #1016" before sending a single request —
-// exactly like the (now-superseded) raw-key gate it replaces.
-export function parseCanaryIntegrityTokens(rawJson, requiredCount) {
+// If this payload is absent, stale, malformed, or short of the pairs a run
+// needs, the runner fails closed with "blocked on #1016" before sending a
+// single request — exactly like the (now-superseded) compose.env-key gate it
+// replaces.
+const CANARY_POOL_MAX_AGE_MS = 5 * 60 * 1000;
+
+export function parseCanaryIntegrityTokens(rawJson, requiredCount, options = {}) {
   if (!Number.isInteger(requiredCount) || requiredCount <= 0) {
     throw new Error("requiredCount must be a positive integer");
   }
+  const now = options.now ?? Date.now();
   let parsed;
   try {
     parsed = JSON.parse(rawJson);
   } catch {
     throw new Error("signed-RC canary integrity token payload is not valid JSON");
   }
-  if (!Array.isArray(parsed) || parsed.length < requiredCount) {
+
+  const mintedAtMs = Date.parse(parsed?.mintedAt);
+  if (!Number.isFinite(mintedAtMs)) {
+    throw new Error("signed-RC canary integrity token payload is missing a valid mintedAt timestamp");
+  }
+  const ageMs = now - mintedAtMs;
+  if (ageMs < 0 || ageMs > CANARY_POOL_MAX_AGE_MS) {
+    throw new Error(
+      `signed-RC canary integrity token payload must be minted within ${CANARY_POOL_MAX_AGE_MS / 60000} minute(s) of use`,
+    );
+  }
+
+  const mobileVersionName = requireString(parsed?.mobileVersionName, "token payload mobileVersionName");
+  const mobileVersionCode = parsed?.mobileVersionCode;
+  if (!Number.isInteger(mobileVersionCode) || mobileVersionCode <= 0) {
+    throw new Error("token payload mobileVersionCode is invalid");
+  }
+
+  const pairs = parsed?.pairs;
+  if (!Array.isArray(pairs) || pairs.length < requiredCount) {
     throw new Error(
       `signed-RC canary integrity token payload must supply at least ${requiredCount} pair(s)`,
     );
   }
-  return parsed.slice(0, requiredCount).map((pair, index) => ({
-    integrityToken: requireString(pair?.integrityToken, `integrity token pair[${index}].integrityToken`),
-    clientNonce: requireString(pair?.clientNonce, `integrity token pair[${index}].clientNonce`),
-  }));
+  return {
+    mintedAt: parsed.mintedAt,
+    mobileVersionName,
+    mobileVersionCode,
+    pairs: pairs.slice(0, requiredCount).map((pair, index) => ({
+      integrityToken: requireString(pair?.integrityToken, `integrity token pair[${index}].integrityToken`),
+      clientNonce: requireString(pair?.clientNonce, `integrity token pair[${index}].clientNonce`),
+    })),
+  };
 }
 
 // Resolve the single RC candidate identity from the checked-in release evidence
@@ -171,7 +213,11 @@ export function assertCandidateMatch(provided, expected) {
 function normalizeSample(sample, index) {
   const profile = requireString(sample?.profile, `sample[${index}] profile`);
   const status = sample?.status;
-  if (!Number.isInteger(status) || status < 100 || status > 599) {
+  // 0 is the bash runner's transport-failure sentinel (curl's own "000" for a
+  // DNS/TLS/connect/timeout that never reached the server) — accepted here so a
+  // network blip becomes a scored breach sample instead of an unhandled
+  // exception that would abort budget evaluation entirely.
+  if (!Number.isInteger(status) || status < 0 || (status > 0 && status < 100) || status > 599) {
     throw new Error(`sample[${index}] status is invalid`);
   }
   const latencyMs = sample?.latencyMs;
@@ -238,10 +284,22 @@ export function evaluateCanaryBudgets(samples, budgets) {
   const plannerIdentityMismatches = normalized.filter(
     (sample) => sample.plannerIdentityMatch === false,
   ).length;
+  // A burst-profile sample may only legitimately be 200 (accepted before the
+  // limiter engaged) or 429 (rejected by the limiter) — anything else (403 from
+  // a rejected attestation, another 4xx, a 5xx, or the "0" transport-failure
+  // sentinel) is a breach on its own. Without this, repeated invalid-attestation
+  // responses in the burst batch could pass unnoticed as long as ONE burst
+  // request happened to also return 429 and every normal sample was fine.
+  const invalidBurstSamples = normalized.filter(
+    (sample) => sample.profile === "burst" && sample.status !== 200 && sample.status !== 429,
+  ).length;
 
   const breaches = [];
   if (failedNormalSamples > 0) {
     breaches.push(`${failedNormalSamples} normal-profile sample(s) did not return exact HTTP 200`);
+  }
+  if (invalidBurstSamples > 0) {
+    breaches.push(`${invalidBurstSamples} burst-profile sample(s) returned neither 200 nor 429`);
   }
   if (p95 > p95MaxMs) breaches.push(`p95 latency ${p95}ms exceeds ${p95MaxMs}ms`);
   if (p99 > p99MaxMs) breaches.push(`p99 latency ${p99}ms exceeds ${p99MaxMs}ms`);
@@ -265,6 +323,7 @@ export function evaluateCanaryBudgets(samples, budgets) {
       sampleCount: normalized.length,
       normalSampleCount: normalSamples.length,
       failedNormalSampleCount: failedNormalSamples,
+      invalidBurstSampleCount: invalidBurstSamples,
       p95LatencyMs: p95,
       p99LatencyMs: p99,
       unexpectedErrorCount: unexpectedErrors,
@@ -369,6 +428,16 @@ async function readJson(path) {
   return JSON.parse(await readFile(path, "utf8"));
 }
 
+// Reads the raw token pool from STDIN rather than an argv string — the CLI's
+// own argv is visible to any same-UID process on the self-hosted runner host
+// via /proc/<pid>/cmdline for the lifetime of this short-lived process, which
+// would otherwise expose not-yet-consumed signed-RC tokens.
+async function readStdin() {
+  const chunks = [];
+  for await (const chunk of process.stdin) chunks.push(chunk);
+  return Buffer.concat(chunks).toString("utf8");
+}
+
 async function main(argv) {
   const [subcommand, ...rest] = argv;
   switch (subcommand) {
@@ -391,7 +460,8 @@ async function main(argv) {
       return;
     }
     case "parse-integrity-tokens": {
-      const [rawJson, requiredCountArg] = rest;
+      const [requiredCountArg] = rest;
+      const rawJson = await readStdin();
       const tokens = parseCanaryIntegrityTokens(rawJson, Number(requiredCountArg));
       process.stdout.write(`${JSON.stringify(tokens)}\n`);
       return;

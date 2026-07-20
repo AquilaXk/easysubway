@@ -645,6 +645,27 @@ test("Route V2 host ingress는 두 exact 경로만 gateway로 보내고 실패 �
   );
   assert.match(deploy, /route_v2_host_action="return 404;"/);
   assert.match(deploy, /route_v2_host_action="proxy_pass http:\/\/127\.0\.0\.1:\$\{route_v2_gateway_port\};"/);
+
+  // A prior signed-RC canary budget breach (issue #2095) closes Route V2
+  // ingress and leaves a durable lock file; a routine, unrelated deploy must
+  // not silently re-open ingress by re-rendering the (stale)
+  // EASYSUBWAY_ROUTE_V2_INGRESS_ENABLED=true desired state from compose.env.
+  assert.match(
+    deploy,
+    /route_v2_canary_rollback_lock="\$\{SHARED_DIR\}\/route-v2-canary-rollback-lock\.json"/,
+  );
+  assert.match(deploy, /if \[\[ -f "\$\{route_v2_canary_rollback_lock\}" \]\]; then/);
+  const rollbackLockOverrideBlock = deploy.match(
+    /if \[\[ -f "\$\{route_v2_canary_rollback_lock\}" \]\]; then([\s\S]*?)\nfi\n/,
+  )?.[1] ?? "";
+  assert.match(rollbackLockOverrideBlock, /route_v2_ingress_enabled_normalized=false/);
+  assert.match(rollbackLockOverrideBlock, /route_v2_host_action="return 404;"/);
+  // The lock check must run AFTER the configured-value case statement (so it
+  // overrides whatever compose.env says) and BEFORE the host ingress render.
+  assert.ok(
+    deploy.indexOf("invalid Route V2 ingress enabled value") < deploy.indexOf('route_v2_canary_rollback_lock=')
+      && deploy.indexOf('route_v2_canary_rollback_lock=') < deploy.indexOf('install_route_v2_host_ingress()'),
+  );
 });
 
 test("Compose backend 서비스는 bootJar 기반 이미지와 제한된 바인딩을 사용한다", () => {

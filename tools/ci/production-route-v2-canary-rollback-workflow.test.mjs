@@ -18,14 +18,26 @@ import {
 
 const workflowPath = ".github/workflows/production-route-v2-canary-rollback-dry-run.yml";
 const runnerPath = "tools/ops/verify-production-route-v2-canary-rollback.sh";
+const deployBackendPath = "tools/deploy/deploy-backend.sh";
 const operationsEvidencePath = "apps/mobile/release/operations-release-evidence.json";
 const timetableEvidencePath = "backend/src/main/resources/timetable/server-timetable-snapshot-evidence.json";
-const pubspecPath = "apps/mobile/pubspec.yaml";
 const composeAllowlistPath = "tools/deploy/compose-server-env.allowlist";
 const prepareDeploymentEnvPath = "tools/deploy/prepare-deployment-env.sh";
 const execFileAsync = promisify(execFile);
 
 const validApproval = "https://github.com/AquilaXk/easysubway/issues/2095";
+
+function validPoolPayload({ mintedAt = new Date().toISOString(), pairCount = 4 } = {}) {
+  return JSON.stringify({
+    mintedAt,
+    mobileVersionName: "1.0.5",
+    mobileVersionCode: 10006,
+    pairs: Array.from({ length: pairCount }, (_, index) => ({
+      integrityToken: `token-${index}`,
+      clientNonce: `nonce-${index}`,
+    })),
+  });
+}
 
 test("canary rollback workflow는 승인 input과 main-only production 게이트를 강제한다", async () => {
   const workflow = await readFile(workflowPath, "utf8");
@@ -52,11 +64,9 @@ test("canary rollback workflow는 승인 input과 main-only production 게이트
     workflow,
     /CANARY_ROLLBACK_REPORT: \$\{\{ runner\.temp \}\}\/route-v2-canary-rollback-evidence\.json/,
   );
-  // canary attestation key는 GitHub Actions secret으로 결속하지 않는다 — 기존
-  // capacity workflow가 EASYSUBWAY_ROUTE_V2_ORIGIN_SECRET을 다루는 것과 동일하게,
-  // #1016 provisioning 이후 배포된 compose.env에서만 읽는다(러너가 직접 읽음).
-  assert.doesNotMatch(workflow, /secrets\.[A-Z0-9_]*CANARY[A-Z0-9_]*/);
-  assert.doesNotMatch(workflow, /EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY:\s*\$\{\{\s*secrets\./);
+  // The token pool is delivered as a host-local file (see the runner's Gate 3
+  // comment), never via a GitHub Actions secret or workflow_dispatch input — a
+  // plain-string dispatch input would be publicly visible on this public repo.
   for (const match of workflow.matchAll(/secrets(?:\.([A-Z0-9_]+)|\[['"]([A-Z0-9_]+)['"]\])/g)) {
     const secretName = match[1] ?? match[2];
     assert.ok(
@@ -64,6 +74,7 @@ test("canary rollback workflow는 승인 input과 main-only production 게이트
       `unexpected scoped secret reference: ${secretName}`,
     );
   }
+  assert.doesNotMatch(workflow, /canary_integrity_tokens/i);
   assert.match(workflow, /actions\/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e/);
   assert.match(workflow, /node-version: "24"/);
   assert.match(workflow, /bash tools\/ops\/verify-production-route-v2-canary-rollback\.sh/);
@@ -125,7 +136,7 @@ test("canary rollback runner는 fail-closed 게이트와 rollback 경로를 갖�
   assert.match(runner, /assert-candidate/);
   assert.match(
     runner,
-    /deployed candidate identity does not match the checked-in RC candidate \(independent Mobile pubspec\.yaml \+ live production timetable identity\)/,
+    /deployed candidate identity does not match the checked-in RC candidate \(signed-RC token pool provisioning evidence \+ live production timetable identity\)/,
   );
   // #1016 attestation + ingress-open preconditions are fail-closed.
   assert.match(runner, /blocked on #1016/);
@@ -134,48 +145,48 @@ test("canary rollback runner는 fail-closed 게이트와 rollback 경로를 갖�
   assert.match(runner, /PUBLIC_BASE_URL.*==.*https:\/\/easysubway-api\.aquilaxk\.site/);
   // pure-input gate runs before the deploy lock so fail-closed never touches state.
   assert.ok(runner.indexOf("validate-approval") < runner.indexOf('exec 9>"${DEPLOY_ROOT}/deploy.lock"'));
-  // canary attestation payload is read from the deployed compose.env with the
-  // SAME dotenv parser as the capacity runner — never from a GitHub Actions
-  // secret — and is a pool of real, pre-minted Play Integrity token pairs
-  // (never a raw key this runner signs with locally; see the Gate 3a comment).
-  assert.match(runner, /compose_env="\$\{DEPLOY_ROOT\}\/shared\/current-env\/compose\.env"/);
-  assert.match(runner, /current compose environment is missing/);
-  assert.match(
-    runner,
-    /CANARY_INTEGRITY_TOKENS_RAW="\$\(read_env_value "\$\{compose_env\}" EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY\)"/,
-  );
-  assert.doesNotMatch(runner, /EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY:-/);
+  // No more compose.env-based key: the token pool is never sourced from a
+  // GitHub Actions secret NOR the durable deploy-time compose.env.
+  assert.doesNotMatch(runner, /EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY/);
+  assert.doesNotMatch(runner, /CANARY_ATTESTATION_KEY/);
   assert.match(runner, /is defined \$\{match_count\} times in the deployment environment/);
 
   // Production runs the real GooglePlayIntegrityDecoder (prod profile) — this
-  // runner must never locally synthesize an attestation (that only the isolated
-  // capacity-evidence profile's synthetic decoder would accept), so it consumes
-  // an externally-supplied token pool sized to what the canary loop needs, and
-  // fails closed if the pool is too small or malformed.
-  assert.match(runner, /parse-integrity-tokens/);
-  assert.match(runner, /required_canary_requests=\$\(\(session_burst \+ 2\)\)/);
-  assert.match(runner, /blocked on #1016/);
+  // runner must never locally synthesize an attestation, so it consumes a
+  // freshly-minted, host-local, single-use token pool file instead.
   assert.doesNotMatch(runner, /createHmac/);
   assert.doesNotMatch(runner, /randomBytes\(16\)\.toString\("base64url"\)/);
 
-  // The public edge overwrites any caller-supplied CF-Connecting-IP with the
-  // runner's real source IP, so every request shares one limiter key — the
-  // runner no longer sends this header, and sizes its own request volume
-  // (1 normal + configured-burst+1 burst) to that single shared budget instead
-  // of pretending distinct simulated IPs would isolate them.
-  assert.doesNotMatch(runner, /--header "CF-Connecting-IP/);
-  assert.match(runner, /session_burst="\$\(read_env_value "\$\{compose_env\}" EASYSUBWAY_ROUTE_V2_SESSION_BURST\)"/);
-  assert.match(runner, /canary_sample normal \/api\/v2\/routes\/session 1 0/);
+  // Gate 3: the token pool is a HOST-LOCAL file (never compose.env, never a GH
+  // secret/input) that is MOVED (not copied) out of the well-known shared
+  // location and deleted, so a second run can never replay it.
   assert.match(
     runner,
-    /for \(\(burst_attempt = 0; burst_attempt <= session_burst; burst_attempt \+= 1\)\)/,
+    /canary_pool_source="\$\{DEPLOY_ROOT\}\/shared\/route-v2-canary-integrity-tokens\.json"/,
+  );
+  assert.match(runner, /signed-RC canary attestation token pool is not provisioned \(blocked on #1016\)/);
+  assert.match(runner, /mv "\$\{canary_pool_source\}" "\$\{canary_pool_raw_file\}"/);
+  assert.match(runner, /rm -f "\$\{canary_pool_raw_file\}"/);
+  assert.match(runner, /node "\$\{EVIDENCE_LIB\}" parse-integrity-tokens "\$\{required_canary_requests\}" \\\n\s*< "\$\{canary_pool_raw_file\}"/);
+  assert.match(runner, /signed-RC canary attestation token pool is invalid, stale, or has too few pairs \(blocked on #1016\)/);
+  assert.match(runner, /required_canary_requests=\$\(\(session_burst \+ 2\)\)/);
+  // Gate 2 (ingress-open) runs BEFORE Gate 3 (pool consumption) so a
+  // not-yet-approved run never burns a freshly-minted single-use pool.
+  assert.ok(
+    runner.indexOf("Route V2 ingress must be open for the signed-RC canary")
+      < runner.indexOf('canary_pool_source="${DEPLOY_ROOT}/shared/route-v2-canary-integrity-tokens.json"'),
   );
 
-  // Independent candidate identity sources (finding: no more copying `expected`).
-  assert.match(runner, /parse_pubspec_version/);
-  assert.match(runner, /PUBSPEC_PATH="\$\{REPO_ROOT\}\/apps\/mobile\/pubspec\.yaml"/);
-  assert.doesNotMatch(runner, /mobileVersionName: expected\.mobileVersionName/);
-  assert.doesNotMatch(runner, /mobileVersionCode: expected\.mobileVersionCode/);
+  // Gate 4: Mobile candidate identity comes from the token pool's OWN declared
+  // provisioning evidence (mobileVersionName/mobileVersionCode — what #1016
+  // actually signed to mint the tokens), never from the reviewed-main
+  // checkout's pubspec.yaml.
+  assert.doesNotMatch(runner, /PUBSPEC_PATH/);
+  assert.doesNotMatch(runner, /parse_pubspec_version/);
+  assert.match(
+    runner,
+    /const p = JSON\.parse\(require\("node:fs"\)\.readFileSync\(process\.argv\[1\], "utf8"\)\);\nprocess\.stdout\.write\(JSON\.stringify\(\{ versionName: p\.mobileVersionName, versionCode: p\.mobileVersionCode \}\)\);/,
+  );
   assert.match(runner, /production_psql\(\) \{/);
   assert.match(runner, /docker exec easysubway-postgres/);
   assert.match(runner, /timetable_snapshot_active/);
@@ -194,22 +205,45 @@ test("canary rollback runner는 fail-closed 게이트와 rollback 경로를 갖�
     /\[\[ "\$\(docker inspect --format '\{\{\.Image\}\}' easysubway-backend\)" == "\$\{expected_image_id\}" \]\] \\\n\s*\|\| \{ echo 'running backend image mismatch' >&2; exit 1; \}/,
   );
 
-  // Route search canary + planner identity cross-check (finding: session-only
-  // canary never exercised route search or the active timetable it serves).
+  // The public edge overwrites any caller-supplied CF-Connecting-IP with the
+  // runner's real source IP, so every request shares one limiter key.
+  assert.doesNotMatch(runner, /--header "CF-Connecting-IP/);
+  assert.match(runner, /session_burst="\$\(read_env_value "\$\{compose_env\}" EASYSUBWAY_ROUTE_V2_SESSION_BURST\)"/);
+  assert.match(runner, /canary_sample normal \/api\/v2\/routes\/session 1 0/);
+  assert.match(
+    runner,
+    /for \(\(burst_attempt = 0; burst_attempt <= session_burst; burst_attempt \+= 1\)\)/,
+  );
+
+  // Route search canary + planner identity cross-check.
   assert.match(runner, /canary_search_sample\(\) \{/);
   assert.match(runner, /\/api\/v2\/routes\/search/);
   assert.match(runner, /plannerIdentityMatch/);
   assert.match(runner, /capture_issued_session/);
   assert.match(runner, /route:v2:itx/);
 
-  // The pre-minted token pair is written to a file and sent via curl's
-  // `--data-binary @file`, never inlined as a `node -e` argv value or a curl
-  // argv string — avoiding any credential exposure via this process's own
-  // argv/cmdline, consistent with the no-argv-secret principle from the first
-  // fallback review round (now applied to the token pool instead of a raw key).
+  // Token pool pair lookups pass only the FILE PATH and a numeric index as
+  // node -e argv, never the pool content itself — a same-UID process reading
+  // /proc/<pid>/cmdline sees no token material.
   assert.match(runner, /attestation_file="\$\{work_dir\}\/attestation-\$\{index\}\.json"/);
+  assert.match(
+    runner,
+    /"\$\{canary_pool_parsed_file\}" "\$\{token_index\}" "\$\{attestation_file\}"/,
+  );
   assert.match(runner, /--data-binary "@\$\{attestation_file\}"/);
   assert.doesNotMatch(runner, /process\.argv\[1\], "hex"/);
+
+  // Transport failures (curl non-zero: DNS/TLS/timeout) must not trip `set -e`
+  // mid-canary and skip the rollback section — captured as curl's own "000"
+  // sentinel via a `|| true` guard instead.
+  assert.match(runner, /send_canary_request\(\) \{/);
+  assert.match(runner, /\|\| true$/m);
+  assert.match(runner, /if \[\[ "\$\{last_status\}" == 000 \|\| -z "\$\{last_status\}" \]\]; then/);
+  assert.match(runner, /canary request transport failure \(DNS\/TLS\/connect\/timeout\)/);
+  assert.match(
+    runner,
+    /curl -sS --connect-timeout 3 --max-time 10 --output \/dev\/null --write-out '%\{http_code\}' \\\n\s*--request POST --header 'content-type: application\/json' --data-binary '\{\}' "\$\{PUBLIC_BASE_URL\}\$\{path\}" \|\| true/,
+  );
 
   // Ingress-close rollback ALWAYS applies the real host Nginx configuration (not
   // just the state marker or a gateway-container-only reload).
@@ -235,6 +269,18 @@ test("canary rollback runner는 fail-closed 게이트와 rollback 경로를 갖�
     runner.indexOf("session_closed=") < runner.indexOf('if [[ "${budget_within}" == true ]]; then'),
   );
 
+  // Budget-breach path persists a durable rollback lock so a later, unrelated
+  // deploy cannot silently re-open ingress from compose.env's stale desired
+  // state (matches deploy-backend.sh's lock check).
+  assert.match(
+    runner,
+    /route_v2_rollback_lock="\$\{DEPLOY_ROOT\}\/shared\/route-v2-canary-rollback-lock\.json"/,
+  );
+  assert.match(runner, /reason: "signed-RC canary budget breach"/);
+  assert.ok(
+    runner.indexOf('if [[ "${budget_within}" == true ]]; then') < runner.indexOf('route_v2_rollback_lock='),
+  );
+
   assert.match(runner, /build-evidence/);
   assert.match(runner, /signed-RC canary breached its budget; ingress-close rollback executed/);
 
@@ -249,32 +295,36 @@ test("canary rollback runner는 fail-closed 게이트와 rollback 경로를 갖�
   // No secret leakage or trace expansion.
   assert.doesNotMatch(runner, /set -x/);
   assert.doesNotMatch(runner, /gh secret set/);
-  assert.doesNotMatch(runner, /echo.*CANARY_ATTESTATION_KEY/);
 });
 
-test("canary attestation key는 표준 CD 배포 allowlist와 값 검증 계약을 갖는다", async () => {
+test("canary attestation key는 표준 CD 배포 allowlist에 더 이상 없다(실행-시점 파일 공급으로 일원화)", async () => {
+  // Round 2 stored the token pool in compose.env (a durable deploy-time
+  // artifact); this was superseded because RouteV2SessionService rejects a
+  // Play Integrity verdict older than 2 minutes and rejects a replayed nonce —
+  // a pool sitting in compose.env since the last deploy would always be stale.
+  // The design is now unified on execution-time delivery (a host-local file
+  // consumed by the runner's Gate 3), so the compose.env allowlist entry and
+  // its conditional value-validation contract are both reverted.
   const allowlist = await readFile(composeAllowlistPath, "utf8");
-  assert.match(
-    allowlist,
-    /^EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY$/m,
-    "EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY must be in the compose-server-env allowlist so prepare-deployment-env.sh can deliver it to compose.env",
-  );
+  assert.doesNotMatch(allowlist, /^EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY$/m);
 
   const prepareScript = await readFile(prepareDeploymentEnvPath, "utf8");
-  // The key stays OPTIONAL in a normal deploy (its absence is what makes the
-  // canary runner fail closed with "blocked on #1016") but, when present, must
-  // be validated as a non-empty JSON array of {integrityToken, clientNonce}
-  // pairs — never required unconditionally, and never accepted as an arbitrary
-  // raw string.
-  assert.doesNotMatch(prepareScript, /require_nonempty EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY/);
+  assert.doesNotMatch(prepareScript, /EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY/);
+  assert.doesNotMatch(prepareScript, /canary_attestation_key_value/);
+});
+
+test("deploy-backend.sh는 canary rollback lock이 있으면 Route V2 ingress를 강제로 닫는다", async () => {
+  const deploy = await readFile(deployBackendPath, "utf8");
   assert.match(
-    prepareScript,
-    /canary_attestation_key_value="\$\(value EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY\)"/,
+    deploy,
+    /route_v2_canary_rollback_lock="\$\{SHARED_DIR\}\/route-v2-canary-rollback-lock\.json"/,
   );
-  assert.match(prepareScript, /if \[\[ -n "\$\{canary_attestation_key_value\}" \]\]; then/);
-  assert.match(prepareScript, /invalid Route V2 canary attestation key payload/);
-  assert.match(prepareScript, /pair\?\.integrityToken/);
-  assert.match(prepareScript, /pair\?\.clientNonce/);
+  assert.match(deploy, /if \[\[ -f "\$\{route_v2_canary_rollback_lock\}" \]\]; then/);
+  const overrideBlock = deploy.match(
+    /if \[\[ -f "\$\{route_v2_canary_rollback_lock\}" \]\]; then([\s\S]*?)\nfi\n/,
+  )?.[1] ?? "";
+  assert.match(overrideBlock, /route_v2_ingress_enabled_normalized=false/);
+  assert.match(overrideBlock, /route_v2_host_action="return 404;"/);
 });
 
 test("canary runner --test-validate-approval는 승인 형식을 강제한다", async () => {
@@ -285,39 +335,21 @@ test("canary runner --test-validate-approval는 승인 형식을 강제한다", 
   await assert.rejects(execFileAsync("bash", [runnerPath, "--test-validate-approval", ""]));
 });
 
-test("canary runner --test-parse-pubspec-version는 Mobile RC 버전을 독립적으로 파싱한다", async () => {
-  const { stdout } = await execFileAsync("bash", [runnerPath, "--test-parse-pubspec-version", pubspecPath]);
-  const parsed = JSON.parse(stdout);
-  assert.match(parsed.versionName, /^\d+\.\d+\.\d+$/);
-  assert.ok(Number.isInteger(parsed.versionCode) && parsed.versionCode > 0);
-
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), "route-canary-pubspec-"));
-  try {
-    const malformedPath = path.join(tempDir, "pubspec.yaml");
-    await writeFile(malformedPath, "name: easysubway\nversion: not-a-version\n");
-    await assert.rejects(
-      execFileAsync("bash", [runnerPath, "--test-parse-pubspec-version", malformedPath]),
-    );
-  } finally {
-    await rm(tempDir, { recursive: true, force: true });
-  }
-});
-
 test("canary runner dotenv parser는 배포 parser와 동일하게 외부 따옴표를 제거한다", async () => {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), "route-canary-env-"));
   const envPath = path.join(tempDir, "compose.env");
   try {
     await writeFile(envPath, [
-      'EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY="deadbeef"',
+      'EASYSUBWAY_ROUTE_V2_SESSION_BURST="2"',
       "",
     ].join("\n"));
     const key = await execFileAsync("bash", [
       runnerPath,
       "--test-read-env-value",
       envPath,
-      "EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY",
+      "EASYSUBWAY_ROUTE_V2_SESSION_BURST",
     ]);
-    assert.equal(key.stdout, "deadbeef\n");
+    assert.equal(key.stdout, "2\n");
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }
@@ -328,8 +360,8 @@ test("canary runner dotenv parser는 중복 정의된 키를 fail-closed로 거�
   const envPath = path.join(tempDir, "compose.env");
   try {
     await writeFile(envPath, [
-      "EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY=a",
-      "EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY=b",
+      "EASYSUBWAY_ROUTE_V2_SESSION_BURST=1",
+      "EASYSUBWAY_ROUTE_V2_SESSION_BURST=2",
       "",
     ].join("\n"));
     await assert.rejects(
@@ -337,7 +369,7 @@ test("canary runner dotenv parser는 중복 정의된 키를 fail-closed로 거�
         runnerPath,
         "--test-read-env-value",
         envPath,
-        "EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY",
+        "EASYSUBWAY_ROUTE_V2_SESSION_BURST",
       ]),
     );
   } finally {
@@ -355,7 +387,7 @@ test("canary runner dotenv parser는 키가 없으면 fail-closed로 거부한�
         runnerPath,
         "--test-read-env-value",
         envPath,
-        "EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY",
+        "EASYSUBWAY_ROUTE_V2_SESSION_BURST",
       ]),
     );
   } finally {
@@ -363,7 +395,7 @@ test("canary runner dotenv parser는 키가 없으면 fail-closed로 거부한�
   }
 });
 
-test("canary runner --test-expected-candidate는 체크인된 RC candidate를 산출하고 pubspec.yaml과 정합한다", async () => {
+test("canary runner --test-expected-candidate는 체크인된 RC candidate를 산출한다", async () => {
   const [operations, timetable] = await Promise.all([
     readFile(operationsEvidencePath, "utf8").then(JSON.parse),
     readFile(timetableEvidencePath, "utf8").then(JSON.parse),
@@ -371,18 +403,6 @@ test("canary runner --test-expected-candidate는 체크인된 RC candidate를 �
   const expected = resolveExpectedCandidate(operations, timetable);
   const { stdout } = await execFileAsync("bash", [runnerPath, "--test-expected-candidate"]);
   assert.deepEqual(JSON.parse(stdout), expected);
-
-  // Gate 2 sources the Mobile identity independently from pubspec.yaml — assert
-  // it is currently in sync with the checked-in RC candidate (an out-of-sync
-  // repo state would legitimately fail-closed at runtime, which is intended).
-  const { stdout: pubspecStdout } = await execFileAsync("bash", [
-    runnerPath,
-    "--test-parse-pubspec-version",
-    pubspecPath,
-  ]);
-  const mobileVersion = JSON.parse(pubspecStdout);
-  assert.equal(mobileVersion.versionName, expected.mobileVersionName);
-  assert.equal(mobileVersion.versionCode, expected.mobileVersionCode);
 });
 
 test("canary runner는 잘못된 SHA·승인·candidate에서 production 접근 전에 fail-closed한다", async () => {
@@ -488,6 +508,66 @@ test("evaluateCanaryBudgets는 normal profile의 200 성공을 강제하고 예�
   );
 });
 
+test("evaluateCanaryBudgets는 burst의 200/429 외 응답과 curl 전송 실패 sentinel을 breach로 집계한다", () => {
+  const budget = { p95MaxMs: 2000, p99MaxMs: 5000, maxUnexpectedErrors: 0, requireNoStore: true, requireLimitEngaged: true };
+  const cacheControl = "private, no-store";
+
+  // session normal 200, burst 403·403·429, search normal 200: repeated
+  // invalid-attestation burst responses must fail the budget even though one
+  // burst request did get rate-limited and both normal-profile requests were
+  // exact 200.
+  const invalidBurst = evaluateCanaryBudgets(
+    [
+      { profile: "normal", status: 200, latencyMs: 100, cacheControl },
+      { profile: "burst", status: 403, latencyMs: 90, cacheControl },
+      { profile: "burst", status: 403, latencyMs: 95, cacheControl },
+      { profile: "burst", status: 429, latencyMs: 80, cacheControl },
+      { profile: "normal", status: 200, latencyMs: 110, cacheControl },
+    ],
+    budget,
+  );
+  assert.equal(invalidBurst.withinBudget, false);
+  assert.equal(invalidBurst.summary.invalidBurstSampleCount, 2);
+  assert.ok(invalidBurst.breaches.some((b) => /returned neither 200 nor 429/.test(b)));
+
+  // A clean burst batch (only 200s and one 429) must not trip this check.
+  const cleanBurst = evaluateCanaryBudgets(
+    [
+      { profile: "normal", status: 200, latencyMs: 100, cacheControl },
+      { profile: "burst", status: 200, latencyMs: 90, cacheControl },
+      { profile: "burst", status: 429, latencyMs: 80, cacheControl },
+    ],
+    budget,
+  );
+  assert.equal(cleanBurst.withinBudget, true);
+  assert.equal(cleanBurst.summary.invalidBurstSampleCount, 0);
+
+  // status 0 is the bash runner's curl transport-failure sentinel (curl's own
+  // "000" for a DNS/TLS/connect/timeout that never reached the server) — it
+  // must be accepted by normalizeSample (not throw) and scored as a breach,
+  // not silently ignored, for both normal and burst profiles.
+  const transportFailureNormal = evaluateCanaryBudgets(
+    [
+      { profile: "normal", status: 0, latencyMs: 0, cacheControl: "" },
+      { profile: "burst", status: 429, latencyMs: 80, cacheControl },
+    ],
+    budget,
+  );
+  assert.equal(transportFailureNormal.withinBudget, false);
+  assert.equal(transportFailureNormal.summary.failedNormalSampleCount, 1);
+
+  const transportFailureBurst = evaluateCanaryBudgets(
+    [
+      { profile: "normal", status: 200, latencyMs: 100, cacheControl },
+      { profile: "burst", status: 0, latencyMs: 0, cacheControl: "" },
+      { profile: "burst", status: 429, latencyMs: 80, cacheControl },
+    ],
+    budget,
+  );
+  assert.equal(transportFailureBurst.withinBudget, false);
+  assert.equal(transportFailureBurst.summary.invalidBurstSampleCount, 1);
+});
+
 test("evaluateCanaryBudgets는 normal·burst가 동일 limiter key를 공유하는 실측 설계에서 오탐 breach되지 않는다", () => {
   const budget = { p95MaxMs: 2000, p99MaxMs: 5000, maxUnexpectedErrors: 0, requireNoStore: true, requireLimitEngaged: true };
   const cacheControl = "private, no-store";
@@ -561,30 +641,80 @@ test("assertCandidateMatch와 validateApprovalReference는 fail-closed다", () =
   );
 });
 
-test("parseCanaryIntegrityTokens는 #1016의 production 검증 가능 attestation 입력 계약을 강제한다", () => {
-  const validPool = JSON.stringify([
-    { integrityToken: "token-0", clientNonce: "nonce-0" },
-    { integrityToken: "token-1", clientNonce: "nonce-1" },
-    { integrityToken: "token-2", clientNonce: "nonce-2" },
-  ]);
-  const tokens = parseCanaryIntegrityTokens(validPool, 2);
-  assert.deepEqual(tokens, [
-    { integrityToken: "token-0", clientNonce: "nonce-0" },
-    { integrityToken: "token-1", clientNonce: "nonce-1" },
-  ]);
+test("parseCanaryIntegrityTokens는 #1016의 실행-시점 attestation 입력 계약(freshness·provisioning evidence)을 강제한다", () => {
+  const now = Date.parse("2026-07-20T02:00:00.000Z");
+  const mintedAt = "2026-07-20T01:58:00.000Z"; // 2 minutes before `now`, within the 5-minute window
+  const payload = JSON.stringify({
+    mintedAt,
+    mobileVersionName: "1.0.5",
+    mobileVersionCode: 10006,
+    pairs: [
+      { integrityToken: "token-0", clientNonce: "nonce-0" },
+      { integrityToken: "token-1", clientNonce: "nonce-1" },
+      { integrityToken: "token-2", clientNonce: "nonce-2" },
+    ],
+  });
+  const result = parseCanaryIntegrityTokens(payload, 2, { now });
+  assert.deepEqual(result, {
+    mintedAt,
+    mobileVersionName: "1.0.5",
+    mobileVersionCode: 10006,
+    pairs: [
+      { integrityToken: "token-0", clientNonce: "nonce-0" },
+      { integrityToken: "token-1", clientNonce: "nonce-1" },
+    ],
+  });
 
-  assert.throws(() => parseCanaryIntegrityTokens("not-json", 1), /not valid JSON/);
-  assert.throws(() => parseCanaryIntegrityTokens("[]", 1), /at least 1 pair/);
-  assert.throws(() => parseCanaryIntegrityTokens(validPool, 5), /at least 5 pair/);
+  assert.throws(() => parseCanaryIntegrityTokens("not-json", 1, { now }), /not valid JSON/);
   assert.throws(
-    () => parseCanaryIntegrityTokens(JSON.stringify([{ clientNonce: "nonce-0" }]), 1),
+    () => parseCanaryIntegrityTokens(JSON.stringify({ mobileVersionName: "1.0.5", mobileVersionCode: 10006, pairs: [] }), 1, { now }),
+    /mintedAt/,
+  );
+  // Stale pool (minted 10 minutes before now, past the 5-minute window) —
+  // exactly the "reused compose.env pool" failure mode this contract exists
+  // to prevent.
+  const stalePayload = JSON.stringify({
+    mintedAt: "2026-07-20T01:50:00.000Z",
+    mobileVersionName: "1.0.5",
+    mobileVersionCode: 10006,
+    pairs: [{ integrityToken: "token-0", clientNonce: "nonce-0" }],
+  });
+  assert.throws(() => parseCanaryIntegrityTokens(stalePayload, 1, { now }), /within 5 minute/);
+  // A pool "minted" in the future (clock skew or bad input) must also fail closed.
+  const futurePayload = JSON.stringify({
+    mintedAt: "2026-07-20T02:05:00.000Z",
+    mobileVersionName: "1.0.5",
+    mobileVersionCode: 10006,
+    pairs: [{ integrityToken: "token-0", clientNonce: "nonce-0" }],
+  });
+  assert.throws(() => parseCanaryIntegrityTokens(futurePayload, 1, { now }), /within 5 minute/);
+
+  assert.throws(
+    () => parseCanaryIntegrityTokens(JSON.stringify({ mintedAt, mobileVersionCode: 10006, pairs: [] }), 1, { now }),
+    /mobileVersionName/,
+  );
+  assert.throws(
+    () => parseCanaryIntegrityTokens(JSON.stringify({ mintedAt, mobileVersionName: "1.0.5", mobileVersionCode: 0, pairs: [] }), 1, { now }),
+    /mobileVersionCode/,
+  );
+  assert.throws(
+    () => parseCanaryIntegrityTokens(JSON.stringify({ mintedAt, mobileVersionName: "1.0.5", mobileVersionCode: 10006, pairs: [] }), 1, { now }),
+    /at least 1 pair/,
+  );
+  assert.throws(
+    () => parseCanaryIntegrityTokens(JSON.stringify({ mintedAt, mobileVersionName: "1.0.5", mobileVersionCode: 10006, pairs: [{ clientNonce: "nonce-0" }] }), 1, { now }),
     /integrityToken/,
   );
   assert.throws(
-    () => parseCanaryIntegrityTokens(JSON.stringify([{ integrityToken: "token-0" }]), 1),
+    () => parseCanaryIntegrityTokens(JSON.stringify({ mintedAt, mobileVersionName: "1.0.5", mobileVersionCode: 10006, pairs: [{ integrityToken: "token-0" }] }), 1, { now }),
     /clientNonce/,
   );
-  assert.throws(() => parseCanaryIntegrityTokens(validPool, 0), /requiredCount/);
+  assert.throws(() => parseCanaryIntegrityTokens(validPoolPayload(), 0), /requiredCount/);
+
+  // Defaults to Date.now() when `now` is not supplied (real runner path) — a
+  // freshly-minted payload must pass without needing to inject a clock.
+  const liveResult = parseCanaryIntegrityTokens(validPoolPayload({ pairCount: 1 }), 1);
+  assert.equal(liveResult.pairs.length, 1);
 });
 
 test("buildCanaryRollbackEvidence는 시간순 timeline과 rollback 일관성을 강제한다", () => {
