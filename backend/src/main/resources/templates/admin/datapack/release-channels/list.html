@@ -85,7 +85,7 @@
 					<span th:title="${channel.manifestSha256}" th:text="${#strings.abbreviate(channel.manifestSha256, 11)}">sha</span>
 				</td>
 				<td>
-					<span th:text="${channel.previousStableCandidateId}">previous candidate</span>
+					<span th:insert="~{admin/fragments/missing-value :: value(${channel.previousStableCandidateId}, '미상')}">previous candidate</span>
 					<span th:text="${channel.previousStableCandidateVersion}">previous version</span>
 					<span th:title="${channel.previousManifestSha256}" th:text="${#strings.abbreviate(channel.previousManifestSha256, 11)}">previous sha</span>
 				</td>
