@@ -306,6 +306,7 @@ function parseArgs(argv) {
       case "--line": o.lines.push(argv[++i]); break;
       case "--all": o.all = true; break;
       case "--dry-run": o.dryRun = true; break;
+      case "--check": o.dryRun = true; break;
     }
   }
   return o;

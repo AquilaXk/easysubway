@@ -218,7 +218,7 @@ function diffTable(previousDb, newDb, table) {
 function buildRowDiffEvidence(previousDb, newDb) {
   const tables = new Set([...listTables(previousDb), ...listTables(newDb)]);
   const diffs = [];
-  for (const table of [...tables].sort()) {
+  for (const table of [...tables].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))) {
     const diff = diffTable(previousDb, newDb, table);
     if (diff.rowsRemoved > 0 || diff.rowsAdded > 0 || diff.rowsChanged > 0) {
       diffs.push(diff);

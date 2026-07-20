@@ -260,8 +260,16 @@ void main() {
           ownerLabelMaxAnchorDistancePx: ownerLabelMaxAnchorDistancePx,
         );
 
-        // 숨김 금지: 전 역이 라벨을 가진다(미매치는 폴백 솔버 경로).
-        expect(layout.labels.length, greaterThan(0));
+        // 숨김 금지: 전 역이 라벨을 가진다(미매치는 폴백 솔버 경로). 후보 역
+        // 이름 수를 하한으로 둬 "대부분 라벨 누락" 회귀를 잡는다(현행 실측:
+        // 부산 146/144·대구 97/97·대전 22/22·광주 20/20 — labels ≥ candidates).
+        expect(
+          layout.labels.length,
+          greaterThanOrEqualTo(candidateNames.length),
+          reason:
+              '$dbRegion 라벨 ${layout.labels.length}개 < 후보 역명 '
+              '${candidateNames.length}개 — 전 역 라벨 표시 계약 회귀',
+        );
 
         var pairs = 0;
         for (var i = 0; i < layout.labels.length; i += 1) {

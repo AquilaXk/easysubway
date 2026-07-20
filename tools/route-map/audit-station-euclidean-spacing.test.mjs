@@ -1,8 +1,5 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 import {
@@ -11,19 +8,17 @@ import {
 } from "./audit-station-euclidean-spacing.mjs";
 
 function makeDb() {
-  const dir = mkdtempSync(path.join(tmpdir(), "euclid-audit-"));
-  const dbPath = path.join(dir, "t.sqlite");
-  const db = new DatabaseSync(dbPath);
+  const db = new DatabaseSync(":memory:");
   db.exec(`
     CREATE TABLE route_map_positions (
       station_id TEXT, line_id TEXT, region TEXT, x INTEGER, y INTEGER
     );
   `);
-  return { db, dir };
+  return { db };
 }
 
 test("같은 노선 내 유클리드 <threshold 쌍을 잡는다(환승 동일역 제외)", () => {
-  const { db, dir } = makeDb();
+  const { db } = makeDb();
   try {
     const ins = db.prepare(
       "INSERT INTO route_map_positions (station_id, line_id, region, x, y) VALUES (?,?,?,?,?)",
@@ -42,12 +37,11 @@ test("같은 노선 내 유클리드 <threshold 쌍을 잡는다(환승 동일�
     assert.ok(violations.every((v) => v.a !== v.b));
   } finally {
     db.close();
-    rmSync(dir, { recursive: true, force: true });
   }
 });
 
 test("동일 station_id(환승 캡슐 멤버)는 같은 line 내에서 자기 자신과 비교되지 않는다", () => {
-  const { db, dir } = makeDb();
+  const { db } = makeDb();
   try {
     const ins = db.prepare(
       "INSERT INTO route_map_positions (station_id, line_id, region, x, y) VALUES (?,?,?,?,?)",
@@ -58,7 +52,6 @@ test("동일 station_id(환승 캡슐 멤버)는 같은 line 내에서 자기 �
     assert.equal(violations.length, 0);
   } finally {
     db.close();
-    rmSync(dir, { recursive: true, force: true });
   }
 });
 

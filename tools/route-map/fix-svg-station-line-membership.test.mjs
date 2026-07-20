@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { planNodeFix } from "./fix-svg-station-line-membership.mjs";
+import { planNodeFix, resolvePrimarySlug } from "./fix-svg-station-line-membership.mjs";
 
 // #2068 Phase C: data-line 오표기 감지 순수 함수 계약. 고촌(gtx-a로 오기, 진짜는
 // 김포골드라인) 실측 사례를 고정한다.
@@ -49,4 +49,14 @@ test("transferLines 다중 slug도 declared 집합에 합산", () => {
   // true가 다르면 감지.
   const plan = planNodeFix(node, new Set(["1", "gyeongchun", "suin-bundang"]), config);
   assert.deepEqual(plan.trueSlugs, ["1", "gyeongchun", "suin-bundang"]);
+});
+
+test("resolvePrimarySlug: 기존 data-line이 진본 목록에 있으면 정렬 첫 slug가 아니어도 유지", () => {
+  // 진본 소속 노선 {4, suin-bundang}(정렬됨), 기존 data-line "suin-bundang"이
+  // 유효 → 정렬 첫 slug "4"로 교체하지 않고 유지한다.
+  assert.equal(resolvePrimarySlug("suin-bundang", ["4", "suin-bundang"]), "suin-bundang");
+});
+
+test("resolvePrimarySlug: 기존 data-line이 진본 목록에 없으면 정렬 첫 slug로 교체", () => {
+  assert.equal(resolvePrimarySlug("9", ["4", "suin-bundang"]), "4");
 });

@@ -120,7 +120,15 @@ Map<String, List<RouteMapOwnerLabelEntry>> parseRouteMapOwnerLabelsForRegion(
   if (decoded is! Map || decoded['regions'] is! Map) {
     return const {};
   }
-  final regionEntries = (decoded['regions'] as Map)[regionId];
+  return _buildOwnerLabelMap((decoded['regions'] as Map)[regionId]);
+}
+
+/// 이미 디코드된 region 엔트리 리스트(Object?)를 station명 키 맵으로 만든다.
+/// 형식이 어긋나면 빈 맵. [parseRouteMapOwnerLabelsForRegion]과
+/// [routeMapOwnerLabelsByRegionFrom]이 공유해 sidecar를 1회만 decode하도록 한다.
+Map<String, List<RouteMapOwnerLabelEntry>> _buildOwnerLabelMap(
+  Object? regionEntries,
+) {
   if (regionEntries is! List) {
     return const {};
   }
@@ -154,6 +162,7 @@ Map<String, List<RouteMapOwnerLabelEntry>> parseRouteMapOwnerLabelsForRegion(
 }
 
 /// sidecar 전체 JSON을 region별로 한 번에 파싱한다(로더가 1회 호출해 캐시).
+/// sidecar는 여기서 1회만 decode하고 그 결과를 모든 region이 공유한다.
 Map<String, Map<String, List<RouteMapOwnerLabelEntry>>>
 routeMapOwnerLabelsByRegionFrom(String sidecarJson) {
   final Object? decoded;
@@ -168,8 +177,7 @@ routeMapOwnerLabelsByRegionFrom(String sidecarJson) {
   final regions = decoded['regions'] as Map;
   return {
     for (final key in regions.keys)
-      if (key is String)
-        key: parseRouteMapOwnerLabelsForRegion(sidecarJson, key),
+      if (key is String) key: _buildOwnerLabelMap(regions[key]),
   };
 }
 

@@ -107,6 +107,15 @@ export function planNodeFix(node, trueSlugs, config) {
   };
 }
 
+/**
+ * 환승 마커의 주 data-line slug를 고른다. 기존 data-line이 진본 소속 노선
+ * 집합(sortedTrueSlugs)에 있으면 그대로 유지하고, 아니면 정렬된 첫 slug로
+ * 교체한다. 순수 함수.
+ */
+export function resolvePrimarySlug(dataLine, sortedTrueSlugs) {
+  return sortedTrueSlugs.includes(dataLine) ? dataLine : sortedTrueSlugs[0];
+}
+
 export function main() {
   const argv = process.argv.slice(2);
   const o = {
@@ -166,9 +175,7 @@ export function main() {
         tagText = setAttr(tagText, "data-transfer-lines", sorted.join(" "));
         tagText = setAttr(tagText, "data-transfer-line-count", String(sorted.length));
         // 주 data-line은 정렬된 첫 slug로(기존이 진짜 목록에 있으면 유지).
-        const primary = plan.declared.includes(sorted[0]) && plan.trueSlugs.includes(node.dataLine)
-          ? node.dataLine
-          : sorted[0];
+        const primary = resolvePrimarySlug(node.dataLine, sorted);
         tagText = setAttr(tagText, "data-line", primary);
         tagText = setAttr(tagText, "data-line-name", `${SEOUL.slugToSuffix[primary] ?? primary}`);
         if (colorBySlug.has(primary)) tagText = setAttr(tagText, "data-line-color", colorBySlug.get(primary));

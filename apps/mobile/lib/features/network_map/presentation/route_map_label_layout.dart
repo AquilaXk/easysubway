@@ -523,12 +523,12 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
       : const <String, RouteMapOwnerLabelEntry>{};
   // #2068 9차: 폴백 라벨·뱃지 pill의 공통 font-size. basemap은 권역 오너 라벨
   // 중앙값(시각 일관성), 기본 모드는 각자 고정값(완전 불변).
-  final fallbackLabelFontSizePx = basemap
+  final basemapMedianFontSizePx = basemap
       ? _medianOwnerLabelFontSizeDesign(ownerLabelsByStationName, design)
-      : kRouteMapDesignLabelFontPx;
-  final badgeFontSizePx = basemap
-      ? _medianOwnerLabelFontSizeDesign(ownerLabelsByStationName, design)
-      : kRouteMapDesignBadgeFontPx;
+      : null;
+  final fallbackLabelFontSizePx =
+      basemapMedianFontSizePx ?? kRouteMapDesignLabelFontPx;
+  final badgeFontSizePx = basemapMedianFontSizePx ?? kRouteMapDesignBadgeFontPx;
 
   // #2068 부산 5차: 동명 폴백 억제 준비. 같은 물리역명이 별개 station_id 2개로
   // 모델링되고(평행 코리더 동명역 — 부전 1호선/동해선, 벡스코 2호선/동해선 등)

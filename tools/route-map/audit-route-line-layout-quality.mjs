@@ -125,9 +125,7 @@ export function collinearOverlap(segA, segB, angleTolDeg = 0.5) {
   if (diff > 90) diff = 180 - diff;
   if (diff > angleTolDeg) return null; // 방향이 다르면 평행/공선 아님(교차는 별도 게이트).
   // A의 직선 방정식 기준 B 양끝의 수직거리(공선이면 거의 0).
-  const dPerp1 = pointToSegmentDistance(segB.a, segA.a, segA.b);
-  const dPerp2 = pointToSegmentDistance(segB.b, segA.a, segA.b);
-  // pointToSegmentDistance는 clamp된 최단거리라 무한직선 판정엔 부적합할 수 있으니
+  // pointToSegmentDistance는 clamp된 최단거리라 무한직선 판정엔 부적합하므로
   // 직접 무한직선까지 수직거리를 계산한다.
   const ang = (degA * Math.PI) / 180;
   const ux = Math.cos(ang);
@@ -136,8 +134,6 @@ export function collinearOverlap(segA, segB, angleTolDeg = 0.5) {
   const vy = ux;
   const perpOf = (p) => Math.abs((p.x - segA.a.x) * vx + (p.y - segA.a.y) * vy);
   const perpDist = Math.max(perpOf(segB.a), perpOf(segB.b));
-  void dPerp1;
-  void dPerp2;
   if (perpDist > 3) return null; // 같은 직선 위가 아님(다른 corridor).
   // along 축 투영으로 구간 겹침 판정.
   const alongOf = (p) => (p.x - segA.a.x) * ux + (p.y - segA.a.y) * uy;
