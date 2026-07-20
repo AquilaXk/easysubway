@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "artifactKind": "server-timetable-snapshot-evidence",
   "schemaIdentity": "backend-timetable-snapshot-v1",
-  "snapshotId": "server-timetable-snapshot-8dba0bb1b1de67e4",
-  "snapshotSha256": "8dba0bb1b1de67e4208224d02159a722a538b8b3b2add15951ef50b227c83668",
-  "snapshotSqlByteSize": 9714229,
-  "snapshotGzipSha256": "a76f26a14cf159eb2fb15a6ac9c171e4d79c6c45f6ada3eaaf85d710767eba81",
-  "snapshotGzipByteSize": 347833,
-  "freshUntil": "2026-07-20T00:00:00+09:00",
+  "snapshotId": "server-timetable-snapshot-650061722835c375",
+  "snapshotSha256": "650061722835c375d655c9d0d9808de319f03680e74fdc30687c840a1401d2bc",
+  "snapshotSqlByteSize": 9714509,
+  "snapshotGzipSha256": "aa5bbc585dabdb5986ed2f91136c9d15a426f8ecea49ecc6a7150e7ced1f2885",
+  "snapshotGzipByteSize": 348008,
+  "freshUntil": "2026-07-27T00:00:00+09:00",
   "serviceIdentity": {
     "serviceId": "ITX_CHEONGCHUN",
     "canonicalLineId": "line-54a7b980b7c3",
@@ -15,9 +15,9 @@
     "timezone": "Asia/Seoul"
   },
   "sourceArtifact": {
-    "id": "itx-cheongchun-source-timetable-20260715152903681",
-    "sha256": "e3c4f942a02712904d44d642627eb909523d55189efce96296a0d2b96e3ea4ad",
-    "completenessEvidenceSha256": "f47650a9e0bfe9cc02683540bfbf4b214bcf869e4c659e04464226478fc2f257"
+    "id": "itx-cheongchun-source-timetable-20260719235343823",
+    "sha256": "f3c6f6cd1f74caea5a5d19d37e3e764dac2b59d740867d4d193fbc68e4893d2e",
+    "completenessEvidenceSha256": "657b789a00f5f77363e51847161518bda0785a6e77793030d8ae3f3085cf64f3"
   },
   "canonicalPackIdentity": {
     "id": "capital",
@@ -38,7 +38,7 @@
     "sha256": "1d44e5838691cb5103a864713f50d1d867d1337477544347b31e0f3ee94dd273",
     "memberCount": 18
   },
-  "sourceLineageSha256": "a0cfbc1c07121f444ff57cd4aaa03b277b20f7828c9407ba991c69c66a524db2",
+  "sourceLineageSha256": "6f9e5f817bf041089d684f7a618fdaa1d99e1187096f4261bdcb5b70a179427e",
   "servicePatternEvidence": {
     "localTripCount": 888,
     "expressTripCount": 147,
@@ -123,5 +123,5 @@
     "transferRules": 0,
     "routeEdgeEvidence": 4
   },
-  "evidenceHash": "22fb760e2ef917a8a83047e62940525d91305b601d37aa631cf0a2ca45c89b11"
+  "evidenceHash": "6a806cb19b728ea30ce9be381cb06afdf7f53c274aa7767eb80cb69087151945"
 }

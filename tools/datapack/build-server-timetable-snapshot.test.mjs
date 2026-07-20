@@ -131,9 +131,18 @@ test("#2135 ADMITTED source와 subway seed를 deterministic complete server snap
   assert.equal((first.sql.match(/INSERT INTO transit_feed_info/g) ?? []).length, 1);
   assert.equal((first.sql.match(/VALUES \('weekday-kric'/g) ?? []).length, 1);
   assert.equal((first.sql.match(/VALUES \('holiday-kric'/g) ?? []).length, 1);
-  assert.match(first.sql, /VALUES \('itx-cheongchun-weekday-kric', '20260716', '20260719', 'Asia\/Seoul', TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE\)/);
-  assert.match(first.sql, /VALUES \('itx-cheongchun-saturday-kric', '20260716', '20260719', 'Asia\/Seoul', FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE\)/);
-  assert.match(first.sql, /VALUES \('itx-cheongchun-holiday-kric', '20260716', '20260719', 'Asia\/Seoul', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE\)/);
+  const itxServiceDates = Object.values(source.selectedServiceDates).sort((left, right) => left.localeCompare(right));
+  const itxStartDate = itxServiceDates[0];
+  const itxEndDate = itxServiceDates.at(-1);
+  assert.match(first.sql, new RegExp(
+    `VALUES \\('itx-cheongchun-weekday-kric', '${itxStartDate}', '${itxEndDate}', 'Asia/Seoul', TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE\\)`,
+  ));
+  assert.match(first.sql, new RegExp(
+    `VALUES \\('itx-cheongchun-saturday-kric', '${itxStartDate}', '${itxEndDate}', 'Asia/Seoul', FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE\\)`,
+  ));
+  assert.match(first.sql, new RegExp(
+    `VALUES \\('itx-cheongchun-holiday-kric', '${itxStartDate}', '${itxEndDate}', 'Asia/Seoul', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE\\)`,
+  ));
   for (const [sourceServiceId, namespacedServiceId] of [
     ["weekday-kric", "itx-cheongchun-weekday-kric"],
     ["saturday-kric", "itx-cheongchun-saturday-kric"],
@@ -329,10 +338,11 @@ test("complete snapshot은 source·completeness identity와 freshness를 fail cl
     () => buildServerTimetableSnapshot({ ...value, sourceBytes: tamperedSourceBytes, buildNow }),
     /source artifact SHA-256 mismatch/,
   );
+  const source2 = JSON.parse(value.sourceBytes);
   assert.throws(
     () => buildServerTimetableSnapshot({
       ...value,
-      buildNow: new Date("2026-07-19T15:00:00.000Z"),
+      buildNow: new Date(Date.parse(source2.freshUntil)),
     }),
     /source artifact is stale/,
   );
@@ -342,7 +352,7 @@ test("complete snapshot은 source·completeness identity와 freshness를 fail cl
       canonicalPackGzipBytes: Buffer.concat([value.canonicalPackGzipBytes, Buffer.from("tampered")]),
       buildNow,
     }),
-    /canonical topology pack identity mismatch/,
+    /canonical pack identity mismatch/,
   );
   const topologyEvidence = JSON.parse(value.topologyEvidenceBytes);
   topologyEvidence.pack.outputSha256 = "0".repeat(64);
@@ -354,6 +364,70 @@ test("complete snapshot은 source·completeness identity와 freshness를 fail cl
     }),
     /canonical topology pack identity mismatch/,
   );
+});
+
+function withTamperedSourcePackIdentity(value, mutate) {
+  const source = JSON.parse(value.sourceBytes);
+  mutate(source);
+  const { evidenceHash: _drop, ...sourceWithoutEvidenceHash } = source;
+  source.evidenceHash = sha256(Buffer.from(JSON.stringify(sourceWithoutEvidenceHash)));
+  const sourceBytes = Buffer.from(`${JSON.stringify(source, null, 2)}\n`);
+  const contract = JSON.parse(value.contractBytes);
+  contract.sourceTimetableArtifact.sha256 = sha256(sourceBytes);
+  const contractBytes = Buffer.from(`${JSON.stringify(contract, null, 2)}\n`);
+  return { sourceBytes, contractBytes };
+}
+
+test("source pack identity가 역사적 admission pin과 달라도 현재 번들 pack과 일치하면 admission을 통과한다", async () => {
+  const value = await inputs();
+  const source = JSON.parse(value.sourceBytes);
+  const contract = JSON.parse(value.contractBytes);
+  const admissionPin = contract.officialEvidence.korailCompletenessAdmission.canonicalPackIdentity;
+
+  // 전제: 번들 pack은 admission pin(과거 pre-topology pack) 이후로 전진했다 — 두 값이 다름을 실측으로 고정한다.
+  assert.notEqual(source.canonicalPackIdentity.sha256, admissionPin.sha256);
+  assert.equal(source.canonicalPackIdentity.sha256, sha256(value.canonicalPackGzipBytes));
+
+  const result = buildServerTimetableSnapshot({ ...value, buildNow });
+  assert.deepEqual(result.evidence.canonicalPackIdentity, {
+    id: "capital",
+    sha256: sha256(value.canonicalPackGzipBytes),
+    sqliteSha256: sha256(gunzipSync(value.canonicalPackGzipBytes)),
+  });
+});
+
+test("source pack identity가 현재 번들 pack과 다르면 canonical pack identity mismatch로 거부한다", async () => {
+  const value = await inputs();
+  const { sourceBytes, contractBytes } = withTamperedSourcePackIdentity(value, (source) => {
+    source.canonicalPackIdentity.sha256 = "1".repeat(64);
+  });
+
+  assert.throws(
+    () => buildServerTimetableSnapshot({ ...value, sourceBytes, contractBytes, buildNow }),
+    /canonical pack identity mismatch/,
+  );
+});
+
+test("korailCompletenessAdmission pack pin이 없거나 형식이 잘못되면 canonical pack identity mismatch로 거부한다", async () => {
+  const value = await inputs();
+  const mutations = [
+    (contract) => { delete contract.officialEvidence.korailCompletenessAdmission.canonicalPackIdentity; },
+    (contract) => { contract.officialEvidence.korailCompletenessAdmission.canonicalPackIdentity.id = "busan"; },
+    (contract) => { contract.officialEvidence.korailCompletenessAdmission.canonicalPackIdentity.sha256 = "not-a-hash"; },
+    (contract) => { contract.officialEvidence.korailCompletenessAdmission.canonicalPackIdentity.sqliteSha256 = "0".repeat(63); },
+  ];
+  for (const mutate of mutations) {
+    const contract = JSON.parse(value.contractBytes);
+    mutate(contract);
+    assert.throws(
+      () => buildServerTimetableSnapshot({
+        ...value,
+        contractBytes: Buffer.from(JSON.stringify(contract)),
+        buildNow,
+      }),
+      /canonical pack identity mismatch/,
+    );
+  }
 });
 
 test("현재 8컬럼 subway trip INSERT에서도 direction과 terminal evidence를 보존한다", async () => {

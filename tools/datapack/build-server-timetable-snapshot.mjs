@@ -56,6 +56,7 @@ export function buildServerTimetableSnapshot({
     sourceBytes,
     completeness,
     completenessBytes,
+    canonicalPackGzipBytes,
     buildNow,
   });
   const { canonicalPackIdentity, canonicalPackLineage } = validateCanonicalTopologyPack({
@@ -522,6 +523,121 @@ function namespacedItxServiceId(sourceServiceId) {
   return serviceId;
 }
 
+// Mirrors deriveTopology() in apply-itx-topology-to-bundled-pack.mjs (the one-time #2135/#2187
+// topology-baking script). Duplicated on purpose rather than imported: that script runs its CLI
+// main() unconditionally at module load (no entrypoint guard) and rewrites the shipped mobile
+// pack — importing it here would risk executing that side effect. This copy is read-only: it
+// recomputes the station/edge topology structure implied by the CURRENT admitted source, so it
+// can be compared against the frozen itx-cheongchun-topology-evidence.json without ever touching
+// the bundled pack file.
+const ITX_TOPOLOGY_EXPECTED_EDGE_COUNT = 48;
+
+function deriveItxTopologyFromSource(source) {
+  if (!Array.isArray(source?.stationSequences) || source.stationSequences.length === 0) {
+    throw new Error("ITX topology stationSequences must be non-empty");
+  }
+  const rosterStations = (source.stationRosters ?? []).flatMap(({ stations }) => stations ?? []);
+  const stations = new Map(rosterStations.map(({ canonicalStationId, lineId }) => [
+    `${canonicalStationId}:${lineId}`,
+    { stationId: canonicalStationId, lineId },
+  ]));
+  const corridorSequences = new Map(rosterStations.map((station) => [
+    `${station.canonicalStationId}:${station.lineId}`,
+    station.corridorSequence,
+  ]));
+  if (stations.size === 0) throw new Error("ITX topology canonical station roster is empty");
+  const servedStations = new Map();
+  const edges = new Map();
+  const adjacency = new Map();
+  const directions = new Set();
+  for (const sequence of source.stationSequences) {
+    if (!Array.isArray(sequence.stops) || sequence.stops.length < 2) {
+      throw new Error(`ITX topology sequence needs at least two stops: ${sequence.trainNumber ?? "unknown"}`);
+    }
+    directions.add(sequence.directionId);
+    for (const stop of sequence.stops) {
+      if (typeof stop.stationId !== "string" || typeof stop.lineId !== "string") {
+        throw new Error("ITX topology stop identity is invalid");
+      }
+      servedStations.set(`${stop.stationId}:${stop.lineId}`, { stationId: stop.stationId, lineId: stop.lineId });
+    }
+    for (let index = 1; index < sequence.stops.length; index += 1) {
+      const from = sequence.stops[index - 1];
+      const to = sequence.stops[index];
+      const fromNodeId = `${from.stationId}:${from.lineId}:EXPRESS`;
+      const toNodeId = `${to.stationId}:${to.lineId}:EXPRESS`;
+      const fromKey = `${from.stationId}:${from.lineId}`;
+      const toKey = `${to.stationId}:${to.lineId}`;
+      const fromSequence = corridorSequences.get(fromKey);
+      const toSequence = corridorSequences.get(toKey);
+      const increasing = sequence.directionId === "up" && fromSequence < toSequence;
+      const decreasing = sequence.directionId === "down" && fromSequence > toSequence;
+      if (!Number.isInteger(fromSequence) || !Number.isInteger(toSequence)
+        || from.corridorSequence !== fromSequence || to.corridorSequence !== toSequence
+        || (!increasing && !decreasing)) {
+        throw new Error(`ITX topology direction is invalid: ${sequence.trainNumber ?? "unknown"}`);
+      }
+      if (!adjacency.has(fromKey)) adjacency.set(fromKey, new Set());
+      if (!adjacency.has(toKey)) adjacency.set(toKey, new Set());
+      adjacency.get(fromKey).add(toKey);
+      adjacency.get(toKey).add(fromKey);
+      const key = `${fromNodeId}->${toNodeId}`;
+      edges.set(key, {
+        id: `itx-cheongchun:${sha256(key).slice(0, 20)}`,
+        fromNodeId,
+        toNodeId,
+        durationSeconds: 0,
+        distanceMeters: 0,
+        edgeType: "RIDE",
+        servicePattern: "EXPRESS",
+        serviceClass: "ITX_CHEONGCHUN",
+      });
+    }
+  }
+  if (directions.size !== 2 || !directions.has("up") || !directions.has("down")) {
+    throw new Error("ITX topology requires U/D station sequences");
+  }
+  const expectedServedStationKeys = new Set((source.transitStopTimes ?? [])
+    .map(({ stationId, lineId }) => `${stationId}:${lineId}`));
+  if (expectedServedStationKeys.size === 0
+    || expectedServedStationKeys.size !== servedStations.size
+    || [...expectedServedStationKeys].some((key) => !servedStations.has(key))
+    || [...servedStations.keys()].some((key) => !stations.has(key))) {
+    throw new Error("ITX topology must cover the admitted service stop set");
+  }
+  const [firstServedStation] = expectedServedStationKeys;
+  const visited = new Set([firstServedStation]);
+  const pending = [firstServedStation];
+  while (pending.length > 0) {
+    for (const neighbor of adjacency.get(pending.pop()) ?? []) {
+      if (!visited.has(neighbor)) {
+        visited.add(neighbor);
+        pending.push(neighbor);
+      }
+    }
+  }
+  if (visited.size !== expectedServedStationKeys.size) {
+    throw new Error("ITX topology service stop graph must be connected");
+  }
+  const edgeKeys = new Set(edges.keys());
+  if (edgeKeys.size !== ITX_TOPOLOGY_EXPECTED_EDGE_COUNT
+    || [...edgeKeys].some((key) => {
+      const [from, to] = key.split("->");
+      return !edgeKeys.has(`${to}->${from}`);
+    })) {
+    throw new Error(`ITX topology requires ${ITX_TOPOLOGY_EXPECTED_EDGE_COUNT} paired directed edges`);
+  }
+  const topology = {
+    stations: [...stations.values()].sort((left, right) => left.stationId.localeCompare(right.stationId)
+      || left.lineId.localeCompare(right.lineId)),
+    servedStations: [...servedStations.values()].sort((left, right) => left.stationId.localeCompare(right.stationId)
+      || left.lineId.localeCompare(right.lineId)),
+    edges: [...edges.values()].sort((left, right) => left.id.localeCompare(right.id)),
+  };
+  const normalizedBytes = Buffer.from(`${JSON.stringify(topology)}\n`);
+  return { ...topology, sha256: sha256(normalizedBytes) };
+}
+
 function validateCanonicalTopologyPack({
   contract,
   source,
@@ -539,16 +655,21 @@ function validateCanonicalTopologyPack({
   }
   const outputSha256 = sha256(canonicalPackGzipBytes);
   const outputSqliteSha256 = sha256(canonicalPackSqliteBytes);
+  // topologyEvidence.sourceArtifact is the #2135/#2187 topology-baking event's frozen lineage
+  // record (which admitted source was active when the pack was last baked) — validated here only
+  // for existence/format, never rewritten, never compared for equality against the CURRENT
+  // admitted source. The bundled pack's station/edge topology may legitimately continue to be
+  // served by a LATER admitted source (freshness-only recollection with an unchanged roster), so
+  // structural equivalence is checked instead, below.
   if (source.canonicalPackIdentity?.path !== "apps/mobile/assets/datapacks/capital.sqlite.gz"
     || topologyEvidence?.schemaVersion !== 1
     || topologyEvidence.artifactKind !== "itx-cheongchun-mobile-topology-evidence"
     || topologyEvidence.serviceId !== "ITX_CHEONGCHUN"
     || topologyEvidence.sourceIssue !== 2135
-    || topologyEvidence.sourceArtifact?.id !== source.artifactId
-    || topologyEvidence.sourceArtifact?.sha256 !== sha256(sourceBytes)
-    || topologyEvidence.sourceArtifact?.completenessEvidenceSha256
-      !== source.completenessEvidenceSha256
-    || topologyEvidence.sourceArtifact?.freshUntil !== source.freshUntil
+    || typeof topologyEvidence.sourceArtifact?.id !== "string" || topologyEvidence.sourceArtifact.id === ""
+    || !lowercaseSha(topologyEvidence.sourceArtifact?.sha256)
+    || !lowercaseSha(topologyEvidence.sourceArtifact?.completenessEvidenceSha256)
+    || !Number.isFinite(Date.parse(topologyEvidence.sourceArtifact?.freshUntil ?? ""))
     || topologyEvidence.pack?.id !== "capital"
     || topologyEvidence.pack.inputSha256 !== admittedCanonicalPackIdentity.sha256
     || topologyEvidence.pack.inputSqliteSha256 !== admittedCanonicalPackIdentity.sqliteSha256
@@ -560,6 +681,25 @@ function validateCanonicalTopologyPack({
     || topologyEvidence.topology?.isolatedServedStationCount !== 0
     || !lowercaseSha(topologyEvidence.topology?.sha256)
     || !contract.allowedConsumerIssues?.includes("#1400")) {
+    throw new Error("canonical topology pack identity mismatch");
+  }
+  // Structural equivalence gate: the CURRENT admitted source must derive the exact same station
+  // membership/served-station/edge topology as the one baked into the bundled pack. This is what
+  // actually protects the pack — if a future recollection ever changes the topology (new station,
+  // dropped stop, reordered corridor), this recompute diverges from the frozen evidence and the
+  // build fails closed, requiring a real re-bake (apply-itx-topology-to-bundled-pack.mjs) with
+  // owner approval. Unlike the identity-pin checks above, this does not accept mere trust in a
+  // historical hash — it recomputes from the live source every time.
+  let derivedTopology;
+  try {
+    derivedTopology = deriveItxTopologyFromSource(source);
+  } catch (error) {
+    throw new Error("canonical topology pack identity mismatch", { cause: error });
+  }
+  if (derivedTopology.stations.length !== topologyEvidence.topology.stationMembershipCount
+    || derivedTopology.servedStations.length !== topologyEvidence.topology.servedStationCount
+    || derivedTopology.edges.length !== topologyEvidence.topology.edgeCount
+    || derivedTopology.sha256 !== topologyEvidence.topology.sha256) {
     throw new Error("canonical topology pack identity mismatch");
   }
   return {
@@ -748,6 +888,7 @@ function validateAdmission({
   sourceBytes,
   completeness,
   completenessBytes,
+  canonicalPackGzipBytes,
   buildNow,
 }) {
   const reference = contract?.sourceTimetableArtifact;
@@ -796,11 +937,20 @@ function validateAdmission({
     || !Array.isArray(source.sourceLineage) || source.sourceLineage.length !== 3) {
     throw new Error("source artifact must contain complete timetable and lineage rows");
   }
+  // The historical korailCompletenessAdmission record is a frozen lineage fact (observed at
+  // admission time, deep-equal pinned by itx-cheongchun-coverage-contract.test.mjs) — it is
+  // validated here only for existence/format, never rewritten. The bundled canonical pack may
+  // legitimately advance after admission (e.g. ITX topology baked into capital.sqlite.gz), so
+  // the source pack identity is checked against the CURRENT bundled pack bytes instead of the
+  // historical pin. See collect-korail-itx-cheongchun-timetable.mjs's promotion replay comment
+  // for the same "pack may advance" invariant applied to source admission.
   const canonical = contract?.officialEvidence?.korailCompletenessAdmission?.canonicalPackIdentity;
   if (canonical?.id !== "capital"
     || !lowercaseSha(canonical.sha256)
-    || !lowercaseSha(canonical.sqliteSha256)
-    || source.canonicalPackIdentity?.sha256 !== canonical.sha256) {
+    || !lowercaseSha(canonical.sqliteSha256)) {
+    throw new Error("canonical pack identity mismatch");
+  }
+  if (source.canonicalPackIdentity?.sha256 !== sha256(canonicalPackGzipBytes)) {
     throw new Error("canonical pack identity mismatch");
   }
   return { id: canonical.id, sha256: canonical.sha256, sqliteSha256: canonical.sqliteSha256 };

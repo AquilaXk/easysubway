@@ -2816,6 +2816,33 @@ test("KORAIL plan selection은 missing warning과 duplicate·date·endpoint·tim
   ])), /KORAIL_PLAN_MISMATCH/);
 });
 
+test("KORAIL plan 시각은 YYYYMMDDHHMISS와 YYYY-MM-DD HH:MM:SS 포맷을 모두 수용하고 그 외는 fail한다", () => {
+  const materialized = tagoMaterializedFixture();
+  const input = (plans) => ({ plans, materialized, runDate: "20260713" });
+
+  const dashed = validateKorailItxPlans(input([
+    planRow("02001", "용산", "춘천", "2026-07-13 06:00:00", "2026-07-13 08:00:00"),
+  ]));
+  assert.deepEqual(dashed.trainNumbers, ["2001"]);
+
+  const fractional = validateKorailItxPlans(input([
+    planRow("02001", "용산", "춘천", "2026-07-13 06:00:00.0", "2026-07-13 08:00:00.000"),
+  ]));
+  assert.deepEqual(fractional.trainNumbers, ["2001"]);
+
+  const compact = validateKorailItxPlans(input([
+    planRow("02001", "용산", "춘천", "20260713060000", "20260713080000"),
+  ]));
+  assert.deepEqual(compact.trainNumbers, ["2001"]);
+
+  assert.throws(() => validateKorailItxPlans(input([
+    planRow("02001", "용산", "춘천", "2026/07/13 06:00:00", "20260713080000"),
+  ])), /KORAIL_PLAN_MISMATCH/);
+  assert.throws(() => validateKorailItxPlans(input([
+    planRow("02001", "용산", "춘천", "2026-07-13T06:00:00", "20260713080000"),
+  ])), /KORAIL_PLAN_MISMATCH/);
+});
+
 function tagoMaterializedFixture() {
   return {
     trainNumbers: ["2001", "2002"],
