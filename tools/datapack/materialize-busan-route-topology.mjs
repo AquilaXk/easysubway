@@ -142,10 +142,15 @@ function requiredSource(inventory, snapshot) {
     throw new Error(`${SOURCE_ID} inventory evidence does not match snapshot`);
   }
   const membership = source.membershipAdmissionEvidence;
-  if (!membership || membership.issue !== 2363 || membership.contentSha256 !== snapshot.contentSha256
-    || membership.scopeSha256 !== snapshot.scopeSha256 || membership.capturedAt !== snapshot.capturedAt
-    || membership.freshUntil !== snapshot.freshUntil || membership.stationCount !== snapshot.stationCount
-    || JSON.stringify(membership.lineIds) !== JSON.stringify(snapshot.lineIds)) {
+  const stationCodesSha256 = sha256(JSON.stringify(snapshot.scope.map(({ stationCode }) => stationCode)));
+  if (!membership || membership.issue !== 2363 || membership.snapshotId !== evidence.snapshotId
+    || membership.verifiedAt !== snapshot.capturedAt || membership.stationCount !== snapshot.stationCount
+    || JSON.stringify(membership.lineIds) !== JSON.stringify(snapshot.lineIds)
+    || membership.membershipSourceId !== SOURCE_ID || membership.membershipSourceRawSha256 !== snapshot.rawSha256
+    || membership.membershipSourceSnapshotSha256 !== snapshot.scopeSha256
+    || membership.mappingSha256 !== snapshot.scopeSha256 || membership.stationCodesSha256 !== stationCodesSha256
+    || membership.stationCodeSourceId !== SOURCE_ID || membership.stationCodeSnapshotId !== evidence.snapshotId
+    || membership.stationCodeContentSha256 !== snapshot.contentSha256) {
     throw new Error(`${SOURCE_ID} membership evidence does not match snapshot`);
   }
   return source;
