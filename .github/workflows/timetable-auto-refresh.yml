@@ -1,0 +1,264 @@
+name: Timetable Snapshot Auto Refresh
+
+on:
+  schedule:
+    # 매일 05:00 KST(20:00 UTC). freshUntil 만료(T-24h/T-6h) 이전에 잔여 유효기간을
+    # 관측하고, refresh lead(T-72h) 창에 들어오면 자동 재수집을 트리거한다.
+    - cron: "0 20 * * *"
+  workflow_dispatch:
+    inputs:
+      force_refresh:
+        description: "shouldRefresh 판정과 무관하게 재수집·승격을 실행한다"
+        type: boolean
+        default: false
+      dry_run:
+        description: "비밀키·provider 네트워크 호출 없이 계획만 출력한다"
+        type: boolean
+        default: false
+
+concurrency:
+  group: timetable-auto-refresh-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot-freshness-alert:
+    name: Snapshot Freshness Alert
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      NODE_OPTIONS: --disable-warning=ExperimentalWarning
+      SLACK_RELEASE_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_WEBHOOK_URL }}
+    outputs:
+      status: ${{ steps.check.outputs.status }}
+      severity: ${{ steps.check.outputs.severity }}
+      should_refresh: ${{ steps.check.outputs.should_refresh }}
+      expired: ${{ steps.check.outputs.expired }}
+      remaining_seconds: ${{ steps.check.outputs.remaining_seconds }}
+      fresh_until: ${{ steps.check.outputs.fresh_until }}
+      day8_date: ${{ steps.check.outputs.day8_date }}
+      day7_date: ${{ steps.check.outputs.day7_date }}
+      day9_date: ${{ steps.check.outputs.day9_date }}
+    steps:
+      - name: Snapshot Freshness Alert / Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Snapshot Freshness Alert / Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+
+      - name: Snapshot Freshness Alert / Configure temp paths
+        run: |
+          set -euo pipefail
+          {
+            echo "EASYSUBWAY_TIMETABLE_FRESHNESS_EVIDENCE=${{ runner.temp }}/easysubway-timetable-freshness/freshness-alert-evidence.json"
+            echo "EASYSUBWAY_TIMETABLE_FRESHNESS_METRICS=${{ runner.temp }}/easysubway-timetable-freshness/timetable-snapshot-freshness.prom"
+          } >> "${GITHUB_ENV}"
+
+      - name: Snapshot Freshness Alert / Check remaining validity
+        id: check
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "${EASYSUBWAY_TIMETABLE_FRESHNESS_EVIDENCE}")"
+          node tools/datapack/check-timetable-snapshot-freshness.mjs \
+            --evidence tools/datapack/server-timetable-snapshot-evidence.json \
+            --output "${EASYSUBWAY_TIMETABLE_FRESHNESS_EVIDENCE}" \
+            --metrics-output "${EASYSUBWAY_TIMETABLE_FRESHNESS_METRICS}" \
+            --github-output "${GITHUB_OUTPUT}"
+
+      - name: Snapshot Freshness Alert / Upload evidence artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: easysubway-timetable-freshness-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/easysubway-timetable-freshness/freshness-alert-evidence.json
+            ${{ runner.temp }}/easysubway-timetable-freshness/timetable-snapshot-freshness.prom
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Snapshot Freshness Alert / Skip missing Slack webhook
+        if: ${{ steps.check.outputs.status == 'FIRING' && env.SLACK_RELEASE_WEBHOOK_URL == '' }}
+        run: echo "::notice title=Timetable snapshot freshness::SLACK_RELEASE_WEBHOOK_URL is not configured."
+
+      - name: Snapshot Freshness Alert / Notify Slack on firing alert
+        if: ${{ steps.check.outputs.status == 'FIRING' && env.SLACK_RELEASE_WEBHOOK_URL != '' }}
+        uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c
+        with:
+          webhook: ${{ env.SLACK_RELEASE_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            text: "EasySubway timetable snapshot freshness ${{ steps.check.outputs.severity }}"
+            blocks:
+              - type: section
+                text:
+                  type: mrkdwn
+                  text: |
+                    *EasySubway Timetable Snapshot Freshness Alert*
+                    • severity: `${{ steps.check.outputs.severity }}`
+                    • remaining seconds: `${{ steps.check.outputs.remaining_seconds }}`
+                    • fresh until: `${{ steps.check.outputs.fresh_until }}`
+                    • should refresh: `${{ steps.check.outputs.should_refresh }}`
+                    • repo: `${{ github.repository }}`
+                    • run: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|GitHub Actions 열기>
+
+      - name: Snapshot Freshness Alert / Fail run on critical severity
+        if: ${{ steps.check.outputs.severity == 'critical' }}
+        run: |
+          echo "Timetable snapshot freshUntil is within the T-6h critical window or already expired." >&2
+          exit 1
+
+      - name: Snapshot Freshness Alert / Skip missing Slack webhook for watchdog failure
+        if: ${{ failure() && steps.check.outcome == 'failure' && env.SLACK_RELEASE_WEBHOOK_URL == '' }}
+        run: echo "::notice title=Timetable snapshot freshness::SLACK_RELEASE_WEBHOOK_URL is not configured; watchdog failure was not reported to Slack."
+
+      - name: Snapshot Freshness Alert / Notify Slack on watchdog failure
+        if: ${{ failure() && steps.check.outcome == 'failure' && env.SLACK_RELEASE_WEBHOOK_URL != '' }}
+        uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c
+        with:
+          webhook: ${{ env.SLACK_RELEASE_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            text: "EasySubway timetable snapshot freshness watchdog failed"
+            blocks:
+              - type: section
+                text:
+                  type: mrkdwn
+                  text: |
+                    *EasySubway Timetable Snapshot Freshness Watchdog Failure*
+                    • the freshness check step itself failed (evidence missing/corrupt or script error), not a FIRING alert
+                    • repo: `${{ github.repository }}`
+                    • run: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|GitHub Actions 열기>
+
+  auto-refresh:
+    name: Auto Refresh Collect and Promote
+    needs: snapshot-freshness-alert
+    if: ${{ always() && (needs.snapshot-freshness-alert.outputs.should_refresh == 'true' || (github.event_name == 'workflow_dispatch' && inputs.force_refresh)) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      NODE_OPTIONS: --disable-warning=ExperimentalWarning
+      SLACK_RELEASE_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_WEBHOOK_URL }}
+      DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
+      DAY8_DATE: ${{ needs.snapshot-freshness-alert.outputs.day8_date }}
+      DAY7_DATE: ${{ needs.snapshot-freshness-alert.outputs.day7_date }}
+      DAY9_DATE: ${{ needs.snapshot-freshness-alert.outputs.day9_date }}
+    steps:
+      - name: Auto Refresh / Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Auto Refresh / Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+
+      - name: Auto Refresh / Configure temp paths
+        run: |
+          set -euo pipefail
+          {
+            echo "EASYSUBWAY_ITX_CANDIDATE=${{ runner.temp }}/easysubway-timetable-refresh/itx-source-candidate.json"
+            echo "EASYSUBWAY_ITX_COMPLETENESS=${{ runner.temp }}/easysubway-timetable-refresh/itx-source-completeness.json"
+            echo "EASYSUBWAY_ITX_REFRESH_PATCH=${{ runner.temp }}/easysubway-timetable-refresh/promotion.patch"
+          } >> "${GITHUB_ENV}"
+          mkdir -p "${{ runner.temp }}/easysubway-timetable-refresh"
+
+      - name: Auto Refresh / Print plan on dry run
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          echo "::notice title=Auto refresh dry run::비밀키·provider 호출 없이 계획만 출력합니다."
+          echo "planned admission service dates: day8=${DAY8_DATE} day7=${DAY7_DATE} day9=${DAY9_DATE}"
+          echo "would run: collect-korail-itx-cheongchun-timetable.mjs (admission) -> --promote-candidate on UNCHANGED_AUTO -> fail-closed on CHANGE_REVIEW_REQUIRED"
+
+      - name: Auto Refresh / Guard missing service key
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${DATA_GO_KR_SERVICE_KEY}" ]]; then
+            echo "::error title=Auto refresh::DATA_GO_KR_SERVICE_KEY secret is not configured; cannot re-collect. Fail closed without touching production." >&2
+            exit 1
+          fi
+          if [[ "${DATA_GO_KR_SERVICE_KEY}" == *$'\n'* || "${DATA_GO_KR_SERVICE_KEY}" == *$'\r'* ]]; then
+            echo "::error title=Auto refresh::DATA_GO_KR_SERVICE_KEY secret must be a single line." >&2
+            exit 1
+          fi
+
+      - name: Auto Refresh / Re-collect timetable source
+        id: collect
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
+        run: |
+          set -euo pipefail
+          set +e
+          node tools/datapack/collect-korail-itx-cheongchun-timetable.mjs \
+            --canonical-pack apps/mobile/assets/datapacks/capital.sqlite.gz \
+            --output "${EASYSUBWAY_ITX_CANDIDATE}" \
+            --completeness-output "${EASYSUBWAY_ITX_COMPLETENESS}" \
+            --day8-date "${DAY8_DATE}" \
+            --day7-date "${DAY7_DATE}" \
+            --day9-date "${DAY9_DATE}"
+          collect_exit=$?
+          set -e
+          echo "collect_exit=${collect_exit}" >> "${GITHUB_OUTPUT}"
+          promotion_status="NONE"
+          if [[ -f "${EASYSUBWAY_ITX_CANDIDATE}" ]]; then
+            promotion_status="$(node -e 'const fs=require("fs");const c=JSON.parse(fs.readFileSync(process.env.EASYSUBWAY_ITX_CANDIDATE,"utf8"));process.stdout.write(String(c.promotionStatus ?? c.validationStatus ?? "UNKNOWN"))')"
+          fi
+          echo "promotion_status=${promotion_status}" >> "${GITHUB_OUTPUT}"
+          echo "re-collect finished: collect_exit=${collect_exit} promotion_status=${promotion_status}"
+
+      - name: Auto Refresh / Promote unchanged source (UNCHANGED_AUTO)
+        id: promote
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) && steps.collect.outputs.collect_exit == '0' && steps.collect.outputs.promotion_status == 'SUPPORTED' }}
+        run: |
+          set -euo pipefail
+          node tools/datapack/collect-korail-itx-cheongchun-timetable.mjs \
+            --promote-candidate "${EASYSUBWAY_ITX_CANDIDATE}" \
+            --completeness-evidence "${EASYSUBWAY_ITX_COMPLETENESS}" \
+            --source-output-dir "${GITHUB_WORKSPACE}" \
+            --coverage-contract tools/datapack/itx-cheongchun-coverage-contract.json
+          git add -N tools/datapack/sources tools/datapack/itx-cheongchun-coverage-contract.json
+          git diff -- tools/datapack/sources tools/datapack/itx-cheongchun-coverage-contract.json > "${EASYSUBWAY_ITX_REFRESH_PATCH}"
+          echo "::notice title=Auto refresh::source UNCHANGED and promoted (UNCHANGED_AUTO). 재산출(apply-itx-topology allowlist + build-server-timetable-snapshot)과 배포는 수동 단계입니다 — 첨부한 promotion.patch를 적용하세요."
+
+      - name: Auto Refresh / Fail closed on review-required change
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) && !(steps.collect.outputs.collect_exit == '0' && steps.collect.outputs.promotion_status == 'SUPPORTED') }}
+        env:
+          COLLECT_EXIT: ${{ steps.collect.outputs.collect_exit }}
+          PROMOTION_STATUS: ${{ steps.collect.outputs.promotion_status }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${SLACK_RELEASE_WEBHOOK_URL}" ]]; then
+            payload="$(node -e '
+              const status = process.env.PROMOTION_STATUS || "UNKNOWN";
+              const exitCode = process.env.COLLECT_EXIT || "unknown";
+              const text = status === "CHANGE_REVIEW_REQUIRED"
+                ? "timetable source changed — owner approval required before promotion."
+                : "timetable re-collection failed or produced no admissible candidate.";
+              process.stdout.write(JSON.stringify({ text: `EasySubway timetable auto-refresh blocked: ${text} (promotionStatus=${status}, collectExit=${exitCode}, run=${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID})` }));
+            ')"
+            curl -fsS -X POST -H "Content-Type: application/json" --data "${payload}" "${SLACK_RELEASE_WEBHOOK_URL}" || echo "::warning title=Auto refresh::Slack notification failed."
+          else
+            echo "::notice title=Auto refresh::SLACK_RELEASE_WEBHOOK_URL is not configured."
+          fi
+          echo "::error title=Auto refresh::자동 승격 조건(collect_exit=0 AND promotionStatus=SUPPORTED)을 만족하지 못했습니다. 승인 게이트를 우회하지 않고 fail closed 합니다." >&2
+          exit 1
+
+      - name: Auto Refresh / Upload refresh artifacts
+        if: ${{ always() && !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: easysubway-timetable-refresh-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/easysubway-timetable-refresh/itx-source-candidate.json
+            ${{ runner.temp }}/easysubway-timetable-refresh/itx-source-completeness.json
+            ${{ runner.temp }}/easysubway-timetable-refresh/promotion.patch
+          if-no-files-found: warn
+          retention-days: 14
