@@ -31,6 +31,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { codepointCompare } from "../lib/codepoint-compare.mjs";
 import { DAEJEON, DAEGU, BUSAN } from "./sma-region-configs.mjs";
 
 const root = path.resolve(import.meta.dirname, "../..");
@@ -1183,7 +1184,7 @@ export function extractOwnerLabels(svgText, regionId) {
   }
   entries.sort((a, b) =>
     a.station === b.station
-      ? a.role.localeCompare(b.role)
+      ? codepointCompare(a.role, b.role)
       : a.station.localeCompare(b.station, "ko"),
   );
   return entries;

@@ -10,6 +10,7 @@ import { gunzipSync, gzipSync } from "node:zlib";
 
 import { buildBackendTimetableSeed } from "./build-backend-timetable-seed.mjs";
 import { approvedLegacyGovernanceBinding } from "./legacy-source-governance.mjs";
+import { codepointCompare } from "../lib/codepoint-compare.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const ARTIFACT_KIND = "server-timetable-snapshot-evidence";
@@ -48,7 +49,9 @@ export function buildServerTimetableSnapshot({
   const contract = parseJson(contractBytes, "coverage contract");
   const source = parseJson(sourceBytes, "source artifact");
   const completeness = parseJson(completenessBytes, "completeness evidence");
-  const topologyEvidence = parseJson(topologyEvidenceBytes, "topology evidence");
+  const topologyEvidence = topologyEvidenceBytes == null
+    ? null
+    : parseJson(topologyEvidenceBytes, "topology evidence");
   const subwayRoster = parseJson(subwayRosterBytes, "subway roster");
   const admittedCanonicalPackIdentity = validateAdmission({
     contract,
@@ -58,15 +61,19 @@ export function buildServerTimetableSnapshot({
     completenessBytes,
     buildNow,
   });
-  const { canonicalPackIdentity, canonicalPackLineage } = validateCanonicalTopologyPack({
-    contract,
-    source,
-    sourceBytes,
-    topologyEvidence,
-    topologyEvidenceBytes,
-    canonicalPackGzipBytes,
-    admittedCanonicalPackIdentity,
-  });
+  // 순수 freshness 리프레시(topology 불변)는 apply-itx가 산출하는 topology evidence 없이
+  // 이미 admit된 pack identity를 재사용한다. topology가 실제로 바뀌는 리프레시는 기존 경로.
+  const { canonicalPackIdentity, canonicalPackLineage } = topologyEvidenceBytes == null
+    ? admittedCanonicalPack({ canonicalPackGzipBytes, admittedCanonicalPackIdentity })
+    : validateCanonicalTopologyPack({
+      contract,
+      source,
+      sourceBytes,
+      topologyEvidence,
+      topologyEvidenceBytes,
+      canonicalPackGzipBytes,
+      admittedCanonicalPackIdentity,
+    });
   const baselineSql = normalizeSubwayStationIds(
     rawBaselineSql,
     canonicalPackGzipBytes,
@@ -79,9 +86,9 @@ export function buildServerTimetableSnapshot({
       serviceId: namespacedItxServiceId(trip.serviceId),
       serviceClass: "ITX_CHEONGCHUN",
     }))
-    .sort((left, right) => left.id.localeCompare(right.id));
+    .sort((left, right) => codepointCompare(left.id, right.id));
   const sortedStopTimes = [...source.transitStopTimes]
-    .sort((left, right) => left.tripId.localeCompare(right.tripId)
+    .sort((left, right) => codepointCompare(left.tripId, right.tripId)
       || left.stopSequence - right.stopSequence);
   const routeServiceArtifactEvidence = [{
     serviceClass: "ITX_CHEONGCHUN",
@@ -164,7 +171,7 @@ export function buildServerTimetableSnapshot({
       memberCount: canonicalStationIds.length,
     },
     sourceLineageSha256: sha256(Buffer.from(JSON.stringify(
-      [...source.sourceLineage].sort((left, right) => left.dayCd.localeCompare(right.dayCd)),
+      [...source.sourceLineage].sort((left, right) => codepointCompare(left.dayCd, right.dayCd)),
     ))),
     servicePatternEvidence,
     rowCounts: {
@@ -205,7 +212,7 @@ function canonicalAccessibilitySql(reviewedPackBytes, sourceSnapshotsBytes, cano
   }
   const edges = pack.networkEdges
     .filter(({ edgeType }) => edgeType === "ENTRY" || edgeType === "EXIT")
-    .sort((left, right) => left.id.localeCompare(right.id));
+    .sort((left, right) => codepointCompare(left.id, right.id));
   if (edges.length === 0) throw new Error("canonical accessibility source has no entry or exit edges");
   const snapshotsById = new Map(sourceSnapshots.map((row) => [row.snapshotId, row]));
   const nodes = new Map();
@@ -226,7 +233,7 @@ function canonicalAccessibilitySql(reviewedPackBytes, sourceSnapshotsBytes, cano
   const snapshotStatements = [...usedSnapshots.values()]
     .map(sourceSnapshotInsert);
   const nodeStatements = [...nodes.values()]
-    .sort((left, right) => left.id.localeCompare(right.id))
+    .sort((left, right) => codepointCompare(left.id, right.id))
     .map(accessNodeInsert);
   const edgeStatements = edges.map(accessEdgeInsert);
   const evidenceStatements = edges.map((edge) => routeEdgeEvidenceInsert(edge, accessEdgeEndpoint(edge)));
@@ -407,7 +414,7 @@ function plannerIdentitySql(source, completeness) {
     }
     tripByServiceDayAndTrain.set(key, trip.id);
     return `UPDATE transit_trips SET train_no = ${sqlText(trainNumber, "train number")} WHERE id = ${sqlText(trip.id, "trip id")};`;
-  }).sort((left, right) => left.localeCompare(right));
+  }).sort((left, right) => codepointCompare(left, right));
 
   const fares = new Map();
   for (const serviceDay of completeness.serviceDays ?? []) {
@@ -431,9 +438,9 @@ function plannerIdentitySql(source, completeness) {
       fares.set(key, row);
     }
   }
-  const fareRows = [...fares.values()].sort((left, right) => left.tripId.localeCompare(right.tripId)
-    || left.originStationId.localeCompare(right.originStationId)
-    || left.destinationStationId.localeCompare(right.destinationStationId));
+  const fareRows = [...fares.values()].sort((left, right) => codepointCompare(left.tripId, right.tripId)
+    || codepointCompare(left.originStationId, right.originStationId)
+    || codepointCompare(left.destinationStationId, right.destinationStationId));
   if (fareRows.length === 0) throw new Error("complete timetable official fares are required");
   const fareStatements = fareRows.map((fare) => (
     "INSERT INTO transit_trip_official_fares "
@@ -455,7 +462,7 @@ function subwayTrainIdentitySql(baselineSql) {
       const providerTrainNo = match[1].replace(/^[A-Z](?=\d+$)/, "");
       return `UPDATE transit_trips SET train_no = ${sqlText(providerTrainNo, "subway train number")} WHERE id = ${sqlText(tripId, "subway trip id")};`;
     })
-    .sort((left, right) => left.localeCompare(right));
+    .sort((left, right) => codepointCompare(left, right));
   if (statements.length === 0) throw new Error("subway trip train identity is missing");
   return `${statements.join("\n")}\n`;
 }
@@ -481,7 +488,7 @@ function officialSubwayFareSql(canonicalPackGzipBytes, baselineSql) {
       stopsByTrip.set(tripId, stops);
     }
     const rows = [];
-    for (const [tripId, stops] of [...stopsByTrip].sort(([left], [right]) => left.localeCompare(right))) {
+    for (const [tripId, stops] of [...stopsByTrip].sort(([left], [right]) => codepointCompare(left, right))) {
       const stationIds = orderedStationIds(stops);
       for (const quote of quotes) {
         const originIndex = stationIds.indexOf(quote.origin_station_id);
@@ -520,6 +527,35 @@ function namespacedItxServiceId(sourceServiceId) {
   const serviceId = ITX_SERVICE_ID_BY_SOURCE[sourceServiceId];
   if (!serviceId) throw new Error(`unsupported ITX service calendar: ${sourceServiceId}`);
   return serviceId;
+}
+
+function admittedCanonicalPack({ canonicalPackGzipBytes, admittedCanonicalPackIdentity }) {
+  let canonicalPackSqliteBytes;
+  try {
+    canonicalPackSqliteBytes = gunzipSync(canonicalPackGzipBytes);
+  } catch {
+    throw new Error("canonical topology pack identity mismatch");
+  }
+  const outputSha256 = sha256(canonicalPackGzipBytes);
+  const outputSqliteSha256 = sha256(canonicalPackSqliteBytes);
+  // coverage contract가 이미 admit한 identity를 evidence에 그대로 기록하되, 실제 번들 pack
+  // 파일의 실측 해시와 어긋나면 스테일 pin 위에 조용히 쌓지 않도록 fail closed 한다.
+  if (admittedCanonicalPackIdentity.sha256 !== outputSha256
+    || admittedCanonicalPackIdentity.sqliteSha256 !== outputSqliteSha256) {
+    throw new Error("canonical topology pack identity mismatch");
+  }
+  return {
+    canonicalPackIdentity: {
+      id: admittedCanonicalPackIdentity.id,
+      sha256: outputSha256,
+      sqliteSha256: outputSqliteSha256,
+    },
+    canonicalPackLineage: {
+      provenance: "coverage-contract-admission",
+      admittedInputSha256: admittedCanonicalPackIdentity.sha256,
+      admittedInputSqliteSha256: admittedCanonicalPackIdentity.sqliteSha256,
+    },
+  };
 }
 
 function validateCanonicalTopologyPack({
@@ -673,7 +709,7 @@ function representativeServicePatternEvidence(sql, source) {
   }
   const localTrips = trips.filter(({ servicePattern }) => servicePattern === "LOCAL");
   const expressTrips = trips.filter(({ servicePattern }) => servicePattern === "EXPRESS");
-  const local = localTrips.sort((left, right) => left.id.localeCompare(right.id))
+  const local = localTrips.sort((left, right) => codepointCompare(left.id, right.id))
     .find((candidate) => orderedStationIds(stopsByTrip.get(candidate.id)).length > 1);
   const express = representativeItxExpressPattern(source);
   if (!local || !express) {
@@ -694,7 +730,7 @@ function representativeItxExpressPattern(source) {
     stops.push({ sequence: stop.stopSequence, stationId: stop.stationId });
     stopTimesByTrip.set(stop.tripId, stops);
   }
-  for (const trip of [...source.transitTrips].sort((left, right) => left.id.localeCompare(right.id))) {
+  for (const trip of [...source.transitTrips].sort((left, right) => codepointCompare(left.id, right.id))) {
     const stopStationIds = orderedStationIds(stopTimesByTrip.get(trip.id));
     const dayCd = trip.id.split("-").at(-1);
     const roster = source.stationRosters.find((candidate) => candidate.dayCd === dayCd);
@@ -910,15 +946,15 @@ function requiredSqlColumn(row, column) {
 function canonicalStationSet(source) {
   return [...new Set(source.stationRosters.flatMap(({ stations }) => stations)
     .map(({ canonicalStationId, lineId }) => `${canonicalStationId}:${lineId}`))]
-    .sort((left, right) => left.localeCompare(right));
+    .sort((left, right) => codepointCompare(left, right));
 }
 
 function earliestServiceDate(selectedServiceDates) {
-  return Object.values(selectedServiceDates).sort((left, right) => left.localeCompare(right))[0];
+  return Object.values(selectedServiceDates).sort((left, right) => codepointCompare(left, right))[0];
 }
 
 function latestServiceDate(selectedServiceDates) {
-  return Object.values(selectedServiceDates).sort((left, right) => left.localeCompare(right)).at(-1);
+  return Object.values(selectedServiceDates).sort((left, right) => codepointCompare(left, right)).at(-1);
 }
 
 function parseJson(bytes, label) {
@@ -953,6 +989,9 @@ async function main() {
     ?? "apps/mobile/assets/datapacks/capital.sqlite.gz");
   const topologyEvidencePath = path.resolve(root, args["topology-evidence"]
     ?? "tools/datapack/itx-cheongchun-topology-evidence.json");
+  // --without-topology-evidence: topology 불변 순수 freshness 리프레시. apply-itx 산출물
+  // (topology evidence) 없이 admit된 pack identity를 재사용한다.
+  const withoutTopologyEvidence = args["without-topology-evidence"] === true;
   const subwayRosterPath = path.resolve(root, args["subway-roster"]
     ?? "tools/datapack/sources/kric-line4-route-roster-20260706.json");
   const reviewedPackPath = path.resolve(root, args["reviewed-pack"]
@@ -971,7 +1010,7 @@ async function main() {
       contract.sourceTimetableArtifact.completenessEvidencePath,
     )),
     canonicalPackGzipBytes: await readFile(canonicalPackPath),
-    topologyEvidenceBytes: await readFile(topologyEvidencePath),
+    topologyEvidenceBytes: withoutTopologyEvidence ? null : await readFile(topologyEvidencePath),
     subwayRosterBytes: await readFile(subwayRosterPath),
     reviewedPackBytes: await readFile(reviewedPackPath),
     sourceSnapshotsBytes: await readFile(sourceSnapshotsPath),
@@ -1018,6 +1057,10 @@ function parseArgs(argv) {
     const flag = argv[index];
     if (flag === "--check") {
       args.check = true;
+      continue;
+    }
+    if (flag === "--without-topology-evidence") {
+      args["without-topology-evidence"] = true;
       continue;
     }
     if (!flag.startsWith("--") || argv[index + 1] == null || argv[index + 1].startsWith("--")) {

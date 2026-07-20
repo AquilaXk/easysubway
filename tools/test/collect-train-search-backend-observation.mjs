@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { codepointCompare } from "../lib/codepoint-compare.mjs";
 
 const REQUIRED_TESTS = Object.freeze([
   [
@@ -59,7 +60,7 @@ export function buildBackendObservation(files, metadata) {
       sha256: sha256(content),
       testCount: Number(attributes.tests),
     };
-  }).sort((left, right) => left.file.localeCompare(right.file));
+  }).sort((left, right) => codepointCompare(left.file, right.file));
 
   const requiredTests = REQUIRED_TESTS.map(([className, method]) => `${className}#${method}`);
   if (requiredTests.some((test) => !passingTests.has(test))) {
@@ -250,7 +251,7 @@ async function main() {
   const testResultsDir = path.resolve(args["test-results-dir"]);
   const names = (await readdir(testResultsDir))
     .filter((name) => name.startsWith("TEST-") && name.endsWith(".xml"))
-    .sort((left, right) => left.localeCompare(right));
+    .sort((left, right) => codepointCompare(left, right));
   const files = await Promise.all(names.map(async (name) => ({
     path: name,
     content: await readFile(path.join(testResultsDir, name), "utf8"),

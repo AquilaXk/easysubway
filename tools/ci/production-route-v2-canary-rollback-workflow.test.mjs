@@ -73,6 +73,25 @@ test("canary rollback workflow는 승인 input과 main-only production 게이트
     workflow,
     /CANARY_ROLLBACK_REPORT: \$\{\{ runner\.temp \}\}\/route-v2-canary-rollback-evidence\.json/,
   );
+  // #2387 regression guard: CANARY_ROLLBACK_REPORT interpolates the `runner`
+  // context, which is valid ONLY at step level. A job-level placement
+  // invalidates the whole workflow file, which GitHub surfaces as a job-less
+  // failed run on EVERY push (#2387's original defect). The plain substring
+  // assertion above matches regardless of nesting, so these two guards pin the
+  // env down to the canary step and keep `runner.` out of the job-level env:
+  // (a) the CANARY_ROLLBACK_REPORT env line must live inside the
+  //     "Verify signed-RC canary..." step's OWN 8-space-indented env: block.
+  const verifyCanaryStep = workflow.match(
+    /\n {6}- name: Verify signed-RC canary and ingress-close rollback dry-run\n([\s\S]*?)(?=\n {6}- name: )/,
+  )?.[1] ?? "";
+  assert.match(
+    verifyCanaryStep,
+    /^ {8}env:\n(?: {10}#.*\n)* {10}CANARY_ROLLBACK_REPORT: \$\{\{ runner\.temp \}\}\/route-v2-canary-rollback-evidence\.json$/m,
+  );
+  // (b) the job-level env: block (4-space `env:` before `steps:`) must never
+  //     reference a `runner.` context — the exact regression #2387 fixed.
+  const jobLevelEnv = workflow.match(/\n {4}env:\n((?: {6}\S[^\n]*\n)+)/)?.[1] ?? "";
+  assert.doesNotMatch(jobLevelEnv, /runner\./);
   // The token pool is delivered as a host-local file (see the runner's Gate 3
   // comment), never via a GitHub Actions secret or workflow_dispatch input — a
   // plain-string dispatch input would be publicly visible on this public repo.

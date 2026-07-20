@@ -60,7 +60,7 @@ while IFS= read -r file; do
       repository=true
       deploy=true
       ;;
-    .github/workflows/*.yml|tools/ci/**|tools/repo/**|tools/qa/**)
+    .github/workflows/*.yml|.github/actionlint.yaml|tools/ci/**|tools/repo/**|tools/qa/**)
       ci=true
       repository=true
       ;;
@@ -109,6 +109,8 @@ while IFS= read -r file; do
       release=true
       ;;
     apps/mobile/release/**)
+      # repository=true여야 contract test(claim 스캔)가 실행된다(#2390). 이 게이트가 지키는 자산이 여기 있다.
+      repository=true
       mobile=true
       android=true
       ios=true

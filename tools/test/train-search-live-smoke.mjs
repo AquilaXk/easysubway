@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { codepointCompare } from "../lib/codepoint-compare.mjs";
 
 const PROVIDER_BASE = "https://apis.data.go.kr/1613000/TrainInfo/";
 const PAGE_SIZE = 100;
@@ -153,8 +154,8 @@ export async function collectProviderEvidence({
   const supportedTrainTypes = [...new Set(grades
     .map(({ trainType }) => trainType)
     .filter((trainType) => SUPPORTED_TRAIN_TYPES.includes(trainType)))]
-    .sort((left, right) => left.localeCompare(right));
-  const expectedTypes = [...SUPPORTED_TRAIN_TYPES].sort((left, right) => left.localeCompare(right));
+    .sort((left, right) => codepointCompare(left, right));
+  const expectedTypes = [...SUPPORTED_TRAIN_TYPES].sort((left, right) => codepointCompare(left, right));
   if (JSON.stringify(supportedTrainTypes) !== JSON.stringify(expectedTypes)) {
     throw new Error(`TAGO supported train types were incomplete: ${supportedTrainTypes.join(",")}`);
   }
@@ -178,12 +179,12 @@ export async function collectProviderEvidence({
   const ktxCodes = grades
     .filter(({ trainType }) => trainType === "KTX")
     .map(({ code }) => code)
-    .sort((left, right) => left.localeCompare(right));
+    .sort((left, right) => codepointCompare(left, right));
   if (ktxCodes.length === 0) throw new Error("TAGO KTX provider grade was missing");
   const itxCheongchunCodes = grades
     .filter(({ trainType }) => trainType === "ITX_CHEONGCHUN")
     .map(({ code }) => code)
-    .sort((left, right) => left.localeCompare(right));
+    .sort((left, right) => codepointCompare(left, right));
   if (itxCheongchunCodes.length === 0) throw new Error("TAGO ITX_CHEONGCHUN provider grade was missing");
   const scheduleRows = [];
   const itxCheongchunRows = [];
