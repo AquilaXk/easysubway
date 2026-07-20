@@ -3279,7 +3279,7 @@
           "loadPolicy": "process-env-no-shell-parsing"
         },
         "requiredParameters": ["serviceKey"],
-        "fixedParameters": { "pageNo": "1", "numOfRows": "9999" },
+        "fixedParameters": { "pageNo": "1..N", "numOfRows": "500" },
         "optionalParameters": ["SUBWAY_NAME"],
         "responseEnvelope": "response.header + response.body.items.item[]",
         "responseFields": ["day", "endCord", "direction", "time", "subwayCord", "updateDt", "subwayLine", "endName", "subwayName"],
@@ -3291,8 +3291,8 @@
         "secretPolicy": "env-only-redacted-output"
       },
       "licenseEvidenceStatus": "confirmed_unrestricted",
-      "sampleEvidenceStatus": "official_schema_documented_live_pending",
-      "admissionStatus": "collector_implemented_live_pending",
+      "sampleEvidenceStatus": "validated_live_full_snapshot_stale",
+      "admissionStatus": "rejected_stale_provider_rows",
       "serviceKeyHandling": "offline_collector_secret_only",
       "mobileEmbeddingAllowed": false,
       "evidence": {
@@ -3300,9 +3300,20 @@
         "officialDetailPage": "https://www.data.go.kr/data/15111298/openapi.do",
         "approval": "development_and_production_auto_approved",
         "license": "unrestricted",
-        "outputFields": ["day", "endCord", "direction", "time", "subwayCord", "updateDt", "subwayLine", "endName", "subwayName"]
+        "outputFields": ["day", "endCord", "direction", "time", "subwayCord", "updateDt", "subwayLine", "endName", "subwayName"],
+        "liveSampleRetrievedAt": "2026-07-20T12:39:27.563Z",
+        "liveSampleRowCount": 11779,
+        "liveSamplePageCount": 24,
+        "liveSampleRawSha256": "bdb1cb0291351b01a8e52495ea64977f87f58301706b58c91f6ffba7075c3a6a",
+        "liveSampleRowsSha256": "83b124e6fed803e224714677252f693fd407d71af08f95c95a1e4eaf2b23b99e",
+        "providerUpdateDate": "20220917",
+        "freshnessAssessment": "STALE_NOT_ADMISSIBLE"
       },
-      "nextAction": "tracked collector로 credential-safe live snapshot을 고정하고 #2383 production timetable admission을 완료한다"
+      "coverageLimitations": [
+        "HTTP 200, provider resultCode 00, 11779/11779 rows와 schema는 정상이나 모든 행의 updateDt가 20220917",
+        "stale source는 production timetable 또는 SUPPORTED coverage 근거로 사용하지 않음"
+      ],
+      "nextAction": "광주교통공사 공식 cyberstation의 현재 timetable을 별도 tracked collector로 검증한다"
     },
     {
       "id": "daejeon-train-timetable",

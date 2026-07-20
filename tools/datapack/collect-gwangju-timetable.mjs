@@ -18,13 +18,88 @@ export async function collectGwangjuTimetable({
   fetchImpl = fetch,
   now = new Date(),
   sleepImpl = sleep,
+  concurrency = 4,
 } = {}) {
   const capturedAt = validDate(now, "now");
   const key = decodedServiceKey(requiredText(serviceKey, "DATA_GO_KR_SERVICE_KEY"));
+  if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 4) throw new Error("concurrency is invalid");
+  const first = await collectPage({ pageNo: 1, key, fetchImpl, sleepImpl });
+  const pageCount = Math.ceil(first.totalCount / first.numOfRows);
+  if (!Number.isSafeInteger(pageCount) || pageCount < 1 || pageCount > 100) {
+    throw new Error(`Gwangju timetable schema mismatch: pageCount=${safeToken(String(pageCount))}`);
+  }
+  const pages = new Array(pageCount);
+  pages[0] = first;
+  let nextPageNo = 2;
+  let failure;
+  const worker = async () => {
+    while (!failure && nextPageNo <= pageCount) {
+      const pageNo = nextPageNo;
+      nextPageNo += 1;
+      try {
+        pages[pageNo - 1] = await collectPage({ pageNo, key, fetchImpl, sleepImpl });
+      } catch (error) {
+        failure = error;
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, pageCount - 1) }, () => worker()));
+  if (failure) throw failure;
+  for (const page of pages) {
+    if (page.totalCount !== first.totalCount || page.numOfRows !== first.numOfRows) {
+      throw new Error("Gwangju timetable schema mismatch: pagination metadata drift");
+    }
+  }
+  const rows = pages.flatMap((page) => page.rows).sort(compareRows);
+  if (rows.length !== first.totalCount) {
+    throw new Error(`Gwangju timetable schema mismatch: truncated items; items=${rows.length}; `
+      + `totalCount=${first.totalCount}`);
+  }
+  validateRows(rows);
+  const rawSha256 = sha256(JSON.stringify(pages.map(({ pageNo, rawSha256: pageSha256 }) => ({
+    pageNo,
+    rawSha256: pageSha256,
+  }))));
+  const responseEncodings = [...new Set(pages.map(({ responseEncoding }) => responseEncoding))].sort(compareText);
+  return {
+    schemaVersion: 1,
+    artifactKind: "gwangju-timetable-snapshot",
+    sourceId: SOURCE_ID,
+    detailUrl: DETAIL_URL,
+    endpoint: ENDPOINT,
+    capturedAt: capturedAt.toISOString(),
+    freshUntil: new Date(capturedAt.getTime() + FRESHNESS_MILLIS).toISOString(),
+    httpStatus: 200,
+    providerResultCode: "00",
+    schemaStatus: "EXPECTED",
+    official: true,
+    fixture: false,
+    credentialRedacted: true,
+    requestCount: pages.length,
+    rowCount: rows.length,
+    dayTypes: [...new Set(rows.map(({ day }) => day))].sort(compareText),
+    directions: [...new Set(rows.map(({ direction }) => direction))].sort(compareText),
+    stationCodes: [...new Set(rows.map(({ subwayCord }) => subwayCord))].sort(compareText),
+    outputFields: [...OUTPUT_FIELDS],
+    fieldsProvided: ["service_calendar", "trip", "stop_time"],
+    responseEncodings,
+    license: {
+      type: "UNRESTRICTED",
+      attribution: "광주교통공사, 공공데이터포털",
+      redistributionAllowed: true,
+      evidenceUrl: DETAIL_URL,
+    },
+    rawSha256,
+    rowsSha256: sha256(JSON.stringify(rows)),
+    rows,
+  };
+}
+
+async function collectPage({ pageNo, key, fetchImpl, sleepImpl }) {
   const url = new URL(ENDPOINT);
   url.searchParams.set("serviceKey", key);
-  url.searchParams.set("pageNo", "1");
-  url.searchParams.set("numOfRows", "9999");
+  url.searchParams.set("pageNo", String(pageNo));
+  url.searchParams.set("numOfRows", "500");
   const response = await fetchWithRetry(url, fetchImpl, sleepImpl);
   const bytes = Buffer.from(await response.arrayBuffer());
   const rawSha256 = sha256(bytes);
@@ -45,45 +120,25 @@ export async function collectGwangjuTimetable({
   const items = [...body.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)].map((match) => match[1]);
   if (items.length === 0) throw new Error(`Gwangju timetable schema mismatch: empty items; rawSha256=${rawSha256}`);
   const totalCount = scalar(body, "totalCount");
-  if (totalCount == null || !/^\d+$/.test(totalCount) || Number(totalCount) !== items.length) {
-    throw new Error(`Gwangju timetable schema mismatch: truncated items; items=${items.length}; `
-      + `totalCount=${safeToken(totalCount ?? "missing")}; rawSha256=${rawSha256}`);
+  const responsePageNo = scalar(body, "pageNo");
+  const numOfRows = scalar(body, "numOfRows");
+  if (totalCount == null || !/^\d+$/.test(totalCount) || Number(totalCount) < items.length
+    || responsePageNo == null || Number(responsePageNo) !== pageNo
+    || numOfRows == null || !/^\d+$/.test(numOfRows) || Number(numOfRows) < items.length
+    || Number(numOfRows) < 1 || Number(numOfRows) > 500) {
+    throw new Error(`Gwangju timetable schema mismatch: pagination metadata; page=${pageNo}; `
+      + `items=${items.length}; totalCount=${safeToken(totalCount ?? "missing")}; rawSha256=${rawSha256}`);
   }
   const rows = items.map((item, index) => validateRow(
     Object.fromEntries(OUTPUT_FIELDS.map((field) => [field, scalar(item, field)])),
     index,
   )).sort(compareRows);
-  validateRows(rows);
   return {
-    schemaVersion: 1,
-    artifactKind: "gwangju-timetable-snapshot",
-    sourceId: SOURCE_ID,
-    detailUrl: DETAIL_URL,
-    endpoint: ENDPOINT,
-    capturedAt: capturedAt.toISOString(),
-    freshUntil: new Date(capturedAt.getTime() + FRESHNESS_MILLIS).toISOString(),
-    httpStatus: response.status,
-    providerResultCode: resultCode,
-    schemaStatus: "EXPECTED",
-    official: true,
-    fixture: false,
-    credentialRedacted: true,
-    requestCount: 1,
-    rowCount: rows.length,
-    dayTypes: [...new Set(rows.map(({ day }) => day))].sort(compareText),
-    directions: [...new Set(rows.map(({ direction }) => direction))].sort(compareText),
-    stationCodes: [...new Set(rows.map(({ subwayCord }) => subwayCord))].sort(compareText),
-    outputFields: [...OUTPUT_FIELDS],
-    fieldsProvided: ["service_calendar", "trip", "stop_time"],
+    pageNo,
+    totalCount: Number(totalCount),
+    numOfRows: Number(numOfRows),
     responseEncoding,
-    license: {
-      type: "UNRESTRICTED",
-      attribution: "광주교통공사, 공공데이터포털",
-      redistributionAllowed: true,
-      evidenceUrl: DETAIL_URL,
-    },
     rawSha256,
-    rowsSha256: sha256(JSON.stringify(rows)),
     rows,
   };
 }
@@ -95,11 +150,13 @@ function validateRow(values, index) {
   }
   if (!/^[A-Za-z0-9-]{1,20}$/.test(values.endCord ?? "")) invalid.push("endCord");
   if (!/^[A-Za-z0-9-]{1,20}$/.test(values.subwayCord ?? "")) invalid.push("subwayCord");
-  if (!/^(?:[01]\d|2\d):[0-5]\d(?::[0-5]\d)?$/.test(values.time ?? "")) invalid.push("time");
-  if (!/^\d{4}[-./]\d{2}[-./]\d{2}/.test(values.updateDt ?? "")) invalid.push("updateDt");
+  if (!/^(?:(?:[01]\d|2\d):?[0-5]\d(?::?[0-5]\d)?)$/.test(values.time ?? "")) invalid.push("time");
+  if (!/^(?:\d{8}|\d{4}[-./]\d{2}[-./]\d{2})$/.test(values.updateDt ?? "")) invalid.push("updateDt");
   if (!/^1(?:호선)?$/.test(values.subwayLine ?? "")) invalid.push("subwayLine");
   if (invalid.length > 0) {
-    throw new Error(`Gwangju timetable schema mismatch: item[${index}] values=${[...new Set(invalid)].join(",")}`);
+    const fields = [...new Set(invalid)];
+    throw new Error(`Gwangju timetable schema mismatch: item[${index}] values=${fields.join(",")}; `
+      + `shapes=${fields.map((field) => `${field}:${valueShape(values[field])}`).join(",")}`);
   }
   return Object.fromEntries(OUTPUT_FIELDS.map((field) => [field, values[field].trim()]));
 }
@@ -172,6 +229,14 @@ function validDate(value, label) {
 function requiredText(value, label) {
   if (typeof value !== "string" || value.trim() === "") throw new Error(`${label} is required`);
   return value.trim();
+}
+
+function valueShape(value) {
+  if (value == null) return "MISSING";
+  if (value === "") return "EMPTY";
+  if (/^\d+$/.test(value)) return `DIGITS_${value.length}`;
+  if (/^[\d:./ -]+$/.test(value)) return `DATE_TIME_CHARS_LENGTH_${value.length}`;
+  return `TEXT_LENGTH_${value.length}`;
 }
 
 function safeToken(value) { return /^[A-Za-z0-9._-]{1,32}$/.test(value) ? value : "UNKNOWN"; }

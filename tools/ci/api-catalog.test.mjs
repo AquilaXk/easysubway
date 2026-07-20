@@ -408,7 +408,7 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
   assert.equal(gwangjuTimetable.detailUrl, "https://www.data.go.kr/data/15111298/openapi.do");
   assert.equal(gwangjuTimetable.endpoint, "https://apis.data.go.kr/B551232/grtcTimetable/timetable");
   assert.deepEqual(gwangjuTimetable.operation.requiredParameters, ["serviceKey"]);
-  assert.deepEqual(gwangjuTimetable.operation.fixedParameters, { pageNo: "1", numOfRows: "9999" });
+  assert.deepEqual(gwangjuTimetable.operation.fixedParameters, { pageNo: "1..N", numOfRows: "500" });
   assert.deepEqual(gwangjuTimetable.operation.optionalParameters, ["SUBWAY_NAME"]);
   assert.deepEqual(gwangjuTimetable.responseFields, [
     "day", "endCord", "direction", "time", "subwayCord", "updateDt", "subwayLine", "endName", "subwayName",
@@ -416,6 +416,13 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
   assert.deepEqual(gwangjuTimetable.operation.runner.arguments, [
     "--output", "/tmp/easysubway-gwangju-timetable.json",
   ]);
+  assert.equal(gwangjuTimetable.status, "rejected_stale_provider_rows");
+  const gwangjuTimetableCandidate = providerDocument.candidates.find(
+    ({ id }) => id === "gwangju-transportation-timetable",
+  );
+  assert.equal(gwangjuTimetableCandidate.evidence.liveSampleRowCount, 11779);
+  assert.equal(gwangjuTimetableCandidate.evidence.providerUpdateDate, "20220917");
+  assert.equal(gwangjuTimetableCandidate.evidence.freshnessAssessment, "STALE_NOT_ADMISSIBLE");
   const removedDaejeonId = ["provider:daejeon", "braille-guide-map"].join("-");
   assert.equal(catalog.some(({ id }) => id === removedDaejeonId), false);
   const daejeonDistanceFare = findCatalogEntry(catalog, "provider:daejeon-station-distance-fare");
