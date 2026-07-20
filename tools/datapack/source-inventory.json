@@ -165,7 +165,7 @@
         "membershipSourceId": "busan-transportation-route-topology",
         "membershipSourceRawSha256": "1314c1ca4bad29ca7b25e8887519ae89a503e649b67b15d53e9232940898eebd",
         "membershipSourceSnapshotSha256": "bf0b275ec0c2c06f809a858eacbf60cfcb169025f08379be43ef8254fd0e7816",
-        "mappingSha256": "bf0b275ec0c2c06f809a858eacbf60cfcb169025f08379be43ef8254fd0e7816",
+        "mappingSha256": "494648057aa006842743d4729b5118b33325283e45380b1703e25f543ed59d26",
         "stationCodesSha256": "63545c48047eca5563c6c6f4f0e4c7eb19aa80e1ebf4766edfc82a357c2a2ebf",
         "stationCodeSourceId": "busan-transportation-route-topology",
         "stationCodeSnapshotId": "busan-transportation-route-topology-20260720",

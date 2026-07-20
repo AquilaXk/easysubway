@@ -132,6 +132,18 @@ test("부산 topology snapshot을 실제 production pack 입력으로 materializ
       field,
     );
   }
+  const tamperedMappings = new Map(canonicalStationMappings);
+  tamperedMappings.set("line-ab1a041f6266:하단", "station-deadbeefdead");
+  assert.throws(
+    () => materializeBusanRouteTopology({
+      baseFixture,
+      snapshot,
+      inventory,
+      canonicalStationMappings: tamperedMappings,
+      now: evidenceNow,
+    }),
+    /membership evidence/,
+  );
   const incompleteMappings = new Map(canonicalStationMappings);
   incompleteMappings.delete("line-ab1a041f6266:하단");
   assert.throws(

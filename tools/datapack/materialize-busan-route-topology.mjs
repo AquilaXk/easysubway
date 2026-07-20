@@ -24,7 +24,7 @@ export function materializeBusanRouteTopology({
   now = new Date(),
 }) {
   admitBusanRouteTopology(snapshot, { now });
-  const source = requiredSource(inventory, snapshot);
+  const source = requiredSource(inventory, snapshot, canonicalStationMappings);
   const fixture = structuredClone(baseFixture);
   if (!Array.isArray(fixture.packs) || fixture.packs.length !== 1 || fixture.packs[0].artifactKind !== "production") {
     throw new Error("base fixture must contain exactly one production pack");
@@ -129,7 +129,7 @@ export function materializeBusanRouteTopology({
   return fixture;
 }
 
-function requiredSource(inventory, snapshot) {
+function requiredSource(inventory, snapshot, canonicalStationMappings) {
   const source = inventory?.sources?.find(({ id }) => id === SOURCE_ID);
   if (source?.productionUseAllowed !== true || source.license?.redistributionAllowed !== true) {
     throw new Error(`${SOURCE_ID} is not admitted for production use`);
@@ -142,6 +142,7 @@ function requiredSource(inventory, snapshot) {
     throw new Error(`${SOURCE_ID} inventory evidence does not match snapshot`);
   }
   const membership = source.membershipAdmissionEvidence;
+  const mappingSha256 = canonicalStationMappingHash(canonicalStationMappings, snapshot.scope);
   const stationCodesSha256 = sha256(JSON.stringify(snapshot.scope.map(({ stationCode }) => stationCode)));
   if (!membership || membership.issue !== 2363
     || membership.materializer !== "tools/datapack/materialize-busan-route-topology.mjs"
@@ -151,7 +152,7 @@ function requiredSource(inventory, snapshot) {
     || JSON.stringify(membership.lineIds) !== JSON.stringify(snapshot.lineIds)
     || membership.membershipSourceId !== SOURCE_ID || membership.membershipSourceRawSha256 !== snapshot.rawSha256
     || membership.membershipSourceSnapshotSha256 !== snapshot.scopeSha256
-    || membership.mappingSha256 !== snapshot.scopeSha256 || membership.stationCodesSha256 !== stationCodesSha256
+    || membership.mappingSha256 !== mappingSha256 || membership.stationCodesSha256 !== stationCodesSha256
     || membership.stationCodeSourceId !== SOURCE_ID || membership.stationCodeSnapshotId !== evidence.snapshotId
     || membership.stationCodeContentSha256 !== snapshot.contentSha256) {
     throw new Error(`${SOURCE_ID} membership evidence does not match snapshot`);
@@ -203,6 +204,14 @@ function canonicalStationIdFor(mappings, station) {
     throw new Error(`canonical station mapping missing: ${key}`);
   }
   return stationId;
+}
+
+function canonicalStationMappingHash(mappings, scope) {
+  const entries = scope.map((station) => {
+    const key = `${station.lineId}:${normalizedStationName(station.stationName)}`;
+    return [key, canonicalStationIdFor(mappings, station)];
+  }).sort(([left], [right]) => left.localeCompare(right, "en"));
+  return sha256(JSON.stringify(entries));
 }
 
 function normalizedStationName(value) {
