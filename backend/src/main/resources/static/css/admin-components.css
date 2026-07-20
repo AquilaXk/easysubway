@@ -197,8 +197,9 @@
 	font-size: 14px;
 	line-height: 1.45;
 	/* 한글 어절 단위 줄바꿈(#2349 PR⑩a) — 좁은 컬럼에서 낱글자 단위 세로 줄바꿈("접/수/됨")을 막는다.
-	   overflow-wrap은 그대로 둬 실제로 어절보다 좁은 칸에서는 여전히 줄바꿈이 가능하다. */
+	   공백 없는 긴 값이 keep-all로 줄바꿈 불가능해질 때만 overflow-wrap: anywhere가 칸 안에서 끊는다. */
 	word-break: keep-all;
+	overflow-wrap: anywhere;
 }
 
 .admin-v3 th {
