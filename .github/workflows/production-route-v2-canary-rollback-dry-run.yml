@@ -1,0 +1,119 @@
+name: Production Route V2 canary rollback dry-run
+
+# 실행은 오너의 명시적 승인과 #1016(signed-RC canary attestation provisioning)
+# 완료 후에만 수동으로 트리거한다. push/schedule 자동 트리거는 두지 않는다.
+#
+# canary attestation key는 GitHub Actions secret으로 이 workflow에 별도 결속하지
+# 않는다. capacity evidence workflow의 EASYSUBWAY_ROUTE_V2_ORIGIN_SECRET과 동일하게,
+# #1016이 provision하면 EASYSUBWAY_ENV → prepare-deployment-env.sh를 거쳐 production
+# 호스트의 배포된 compose.env(${DEPLOY_ROOT}/shared/current-env/compose.env)에만
+# 존재한다. self-hosted 러너가 그 파일을 직접 읽으므로(tools/ops/verify-production-route-v2-canary-rollback.sh)
+# 이 workflow는 secrets.EASYSUBWAY_ENV 외의 개별 scoped secret을 참조하지 않는다.
+#
+# tooling(이 workflow가 실행하는 스크립트/evidence-lib)은 항상 reviewed main
+# checkout에서 실행한다 — canary/rollback 도구는 이 PR에서 신규 도입돼 과거에 이미
+# 승인된 RC candidate SHA(예: operations-release-evidence.json에 결속된 candidate)의
+# 커밋에는 아직 존재하지 않기 때문이다. "production에 지금 배포돼 있어야 하는 candidate
+# SHA가 무엇인가"는 별도 입력(deploy_sha)으로 받아 origin/main ancestor 여부만
+# 검증하고, checkout 대상 트리는 바꾸지 않는다 — 실제 그 SHA가 production에 배포돼
+# 있는지는 러너가 스스로 ${DEPLOY_ROOT}/shared/current-sha를 읽어 독립적으로 확인한다.
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_sha:
+        description: "canary/rollback dry-run 대상 production candidate SHA. 비우면 체크인된 RC candidate(operations-release-evidence.json)를 사용."
+        required: false
+        type: string
+      production_approval:
+        description: "오너 승인 근거 URL(AquilaXk/easysubway issue/pull/actions-runs). 없으면 fail-closed."
+        required: true
+        type: string
+
+jobs:
+  canary-rollback:
+    name: Verify Route V2 canary and ingress-close rollback dry-run
+    permissions:
+      contents: read
+    runs-on:
+      - self-hosted
+      - easysubway-production
+    timeout-minutes: 30
+    environment: production
+    concurrency:
+      group: production-route-v2-canary-rollback-dry-run
+      cancel-in-progress: false
+    env:
+      DEPLOY_ROOT: ${{ vars.DEPLOY_ROOT }}
+      PRODUCTION_CANARY_APPROVAL: ${{ inputs.production_approval }}
+      CANARY_ROLLBACK_REPORT: ${{ runner.temp }}/route-v2-canary-rollback-evidence.json
+
+    steps:
+      - name: Reject non-main manual execution
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "production Route V2 canary rollback dry-run must run from main" >&2
+            exit 1
+          fi
+
+      - name: Checkout reviewed main
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve and verify canary candidate SHA
+        shell: bash
+        env:
+          # Passed via env (never interpolated directly into the shell script)
+          # so a workflow_dispatch input cannot inject shell syntax — the same
+          # pattern this repo already uses for every other dispatch input
+          # (e.g. cd.yml's DISPATCH_SHA).
+          DEPLOY_SHA_INPUT: ${{ inputs.deploy_sha }}
+        run: |
+          set -euo pipefail
+          candidate_sha="${DEPLOY_SHA_INPUT}"
+          if [[ -z "${candidate_sha}" ]]; then
+            candidate_sha="$(node -e "
+              const d = require('./apps/mobile/release/operations-release-evidence.json');
+              process.stdout.write(d.backendControlPlane.publicApiSurface.routeV2Readiness.realisticLoadEvidence.candidate.candidateGitSha);
+            ")"
+          fi
+          if [[ ! "${candidate_sha}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "invalid deploy sha: ${candidate_sha}" >&2
+            exit 1
+          fi
+          git fetch origin main
+          if ! git merge-base --is-ancestor "${candidate_sha}" origin/main; then
+            echo "deploy target is not on origin/main: ${candidate_sha}" >&2
+            exit 1
+          fi
+          echo "EXPECTED_DEPLOYED_SHA=${candidate_sha}" >> "${GITHUB_ENV}"
+          # No checkout here: tooling stays on the reviewed main checkout above,
+          # since the canary/rollback scripts may not exist at ${candidate_sha}'s
+          # historical tree. The runner independently verifies that
+          # ${candidate_sha} is what production currently has deployed.
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+
+      - name: Verify signed-RC canary and ingress-close rollback dry-run
+        shell: bash
+        run: bash tools/ops/verify-production-route-v2-canary-rollback.sh
+
+      - name: Upload canary rollback evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: route-v2-canary-rollback-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/route-v2-canary-rollback-evidence.json
+          # A run that is rejected by an early fail-closed gate (malformed
+          # approval, candidate mismatch, missing attestation credential) never
+          # reaches evidence assembly, so no file exists yet — that is an expected
+          # outcome, not an upload failure, hence `warn` rather than this repo's
+          # usual `error` (see datapack-callback-reconciliation-evidence.yml).
+          if-no-files-found: warn
+          include-hidden-files: false
+          retention-days: 14
