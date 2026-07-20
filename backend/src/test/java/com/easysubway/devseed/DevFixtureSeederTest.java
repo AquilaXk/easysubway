@@ -85,7 +85,20 @@ class DevFixtureSeederTest {
 			FacilityReportStatus.UNDER_REVIEW,
 			FacilityReportStatus.ACCEPTED,
 			FacilityReportStatus.REJECTED,
-			FacilityReportStatus.RESOLVED);
+			FacilityReportStatus.RESOLVED,
+			FacilityReportStatus.DUPLICATE);
+
+		// DUPLICATE 상태는 실제 도메인에서 실존 기준 신고 참조를 강제하므로(FacilityReportService
+		// #resolveDuplicateOfReportId), seed도 duplicateOfReportId가 채워진 채 실존 신고를 참조해야 한다.
+		Set<String> reportIds = reports.stream().map(FacilityReport::id).collect(Collectors.toSet());
+		List<FacilityReport> duplicateReports = reports.stream()
+			.filter(report -> report.status() == FacilityReportStatus.DUPLICATE)
+			.toList();
+		assertThat(duplicateReports).isNotEmpty();
+		assertThat(duplicateReports).allSatisfy(report -> {
+			assertThat(report.duplicateOfReportId()).isNotBlank();
+			assertThat(reportIds).contains(report.duplicateOfReportId());
+		});
 
 		List<FacilityReport> reportsWithPhoto = reports.stream().filter(FacilityReport::hasPhoto).toList();
 		assertThat(reportsWithPhoto).isNotEmpty();

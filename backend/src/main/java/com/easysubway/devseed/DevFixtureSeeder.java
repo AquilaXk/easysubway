@@ -169,28 +169,38 @@ public class DevFixtureSeeder implements ApplicationRunner {
 		SeedPhoto resolvedPhoto = storeSeedPhoto("dev-seed-report-6");
 
 		List<SeedReportSpec> specs = List.of(
-			new SeedReportSpec("dev-seed-report-1", facilityAt(facilities, 0), FacilityReportType.BROKEN,
+			new SeedReportSpec("dev-seed-report-1", facilityById(facilities, "facility-sangnoksu-elevator-1"),
+				FacilityReportType.BROKEN,
 				"엘리베이터가 작동하지 않습니다.", FacilityReportStatus.SUBMITTED,
-				now.minusHours(2), null, seedPhoto),
-			new SeedReportSpec("dev-seed-report-2", facilityAt(facilities, 1), FacilityReportType.STAIRS_PRESENT,
+				now.minusHours(2), null, seedPhoto, null),
+			new SeedReportSpec("dev-seed-report-2", facilityById(facilities, "facility-sangnoksu-escalator-1"),
+				FacilityReportType.STAIRS_PRESENT,
 				"에스컬레이터 앞에 안내 없이 계단만 있습니다.", FacilityReportStatus.UNDER_REVIEW,
-				now.minusHours(30), null, null),
-			new SeedReportSpec("dev-seed-report-3", facilityAt(facilities, 2), FacilityReportType.INFORMATION_WRONG,
+				now.minusHours(30), null, null, null),
+			new SeedReportSpec("dev-seed-report-3", facilityById(facilities, "facility-sangnoksu-accessible-toilet"),
+				FacilityReportType.INFORMATION_WRONG,
 				"화장실 위치 안내가 실제 위치와 다릅니다.", FacilityReportStatus.SUBMITTED,
-				now.minusHours(80), null, null),
-			new SeedReportSpec("dev-seed-report-4", facilityAt(facilities, 0), FacilityReportType.ROUTE_BLOCKED,
+				now.minusHours(80), null, null, null),
+			new SeedReportSpec("dev-seed-report-4", facilityById(facilities, "facility-sangnoksu-elevator-1"),
+				FacilityReportType.ROUTE_BLOCKED,
 				"휠체어 이동 경로에 적재물이 쌓여 있습니다.", FacilityReportStatus.ACCEPTED,
-				now.minusDays(5), now.minusDays(4), null),
-			new SeedReportSpec("dev-seed-report-5", facilityAt(facilities, 3), FacilityReportType.CLOSED,
+				now.minusDays(5), now.minusDays(4), null, null),
+			new SeedReportSpec("dev-seed-report-5", facilityById(facilities, "facility-sadang-elevator-1"),
+				FacilityReportType.CLOSED,
 				"공사로 폐쇄됐다는 제보였으나 확인 결과 정상 운영 중이었습니다.", FacilityReportStatus.REJECTED,
-				now.minusDays(6), now.minusDays(5), null),
-			new SeedReportSpec("dev-seed-report-6", facilityAt(facilities, 4),
+				now.minusDays(6), now.minusDays(5), null, null),
+			new SeedReportSpec("dev-seed-report-6", facilityById(facilities, "facility-sadang-accessible-toilet"),
 				FacilityReportType.RECOVERED,
 				"신고 후 시설 점검이 완료되어 정상화됐습니다.", FacilityReportStatus.RESOLVED,
-				now.minusDays(10), now.minusDays(9), resolvedPhoto),
-			new SeedReportSpec("dev-seed-report-7", facilityAt(facilities, 1), FacilityReportType.ELEVATOR_UNAVAILABLE,
-				"동일 시설에 대한 중복 제보입니다.", FacilityReportStatus.DUPLICATE,
-				now.minusHours(20), now.minusHours(19), null)
+				now.minusDays(10), now.minusDays(9), resolvedPhoto, null),
+			// dev-seed-report-2와 동일 시설·동일 사안의 중복 제보. DUPLICATE 상태는 실제 도메인에서
+			// FacilityReportService#resolveDuplicateOfReportId가 실존 기준 신고 참조를 강제하므로
+			// seed도 같은 불변식을 지켜 기준 신고 id를 채운다.
+			new SeedReportSpec("dev-seed-report-7", facilityById(facilities, "facility-sangnoksu-escalator-1"),
+				FacilityReportType.STAIRS_PRESENT,
+				"에스컬레이터 앞 계단 안내 부족 제보가 중복 접수되었습니다. 기존 신고와 동일 사안입니다.",
+				FacilityReportStatus.DUPLICATE,
+				now.minusHours(20), now.minusHours(19), null, "dev-seed-report-2")
 		);
 
 		int saved = 0;
@@ -213,8 +223,17 @@ public class DevFixtureSeeder implements ApplicationRunner {
 		return new SeedPhoto(stored, sha256, (long) photoBytes.length);
 	}
 
-	private static AccessibilityFacility facilityAt(List<AccessibilityFacility> facilities, int index) {
-		return index < facilities.size() ? facilities.get(index) : null;
+	// 위치 인덱스 대신 fixture id로 조회한다. InMemoryTransitMasterRepository의 fixture가 추가·재정렬돼도
+	// 신고 유형-설명 정합이 조용히 어긋나지 않고, 참조 id가 존재하지 않으면 명시적으로 로그를 남기고
+	// 해당 신고만 건너뛴다(#2327 리뷰 지적).
+	private static AccessibilityFacility facilityById(List<AccessibilityFacility> facilities, String facilityId) {
+		return facilities.stream()
+			.filter(candidate -> facilityId.equals(candidate.id()))
+			.findFirst()
+			.orElseGet(() -> {
+				log.warn("dev seed skipped report referencing missing facility id={}", facilityId);
+				return null;
+			});
 	}
 
 	private static String sha256Hex(byte[] bytes) {
@@ -288,7 +307,8 @@ public class DevFixtureSeeder implements ApplicationRunner {
 		FacilityReportStatus status,
 		LocalDateTime createdAt,
 		LocalDateTime reviewedAt,
-		SeedPhoto photo
+		SeedPhoto photo,
+		String duplicateOfReportId
 	) {
 
 		FacilityReport toFacilityReport() {
@@ -308,7 +328,7 @@ public class DevFixtureSeeder implements ApplicationRunner {
 				hasPhoto ? photo.sizeBytes() : null,
 				facility.latitude(),
 				facility.longitude(),
-				null,
+				duplicateOfReportId,
 				status,
 				createdAt,
 				reviewedAt,
