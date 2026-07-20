@@ -83,11 +83,16 @@ export function validateSourceInventory(inventory, valuePath, errors) {
   for (const [index, source] of inventory.sources.entries()) {
     if (source == null || typeof source !== "object" || Array.isArray(source)) continue;
     const path = `${valuePath}: $.sources.${index}`;
-    if (source.productionUseAllowed === true && source.topologyAdmissionEvidence == null) {
-      errors.push(`${path}.productionUseAllowed: true는 topologyAdmissionEvidence가 필요하다`);
+    if (source.productionUseAllowed === true
+      && source.topologyAdmissionEvidence == null
+      && source.scheduleAdmissionEvidence == null) {
+      errors.push(`${path}.productionUseAllowed: true는 production admission evidence가 필요하다`);
     }
     if (source.topologyAdmissionEvidence != null && source.productionUseAllowed !== true) {
       errors.push(`${path}.topologyAdmissionEvidence: productionUseAllowed true가 필요하다`);
+    }
+    if (source.scheduleAdmissionEvidence != null && source.productionUseAllowed !== true) {
+      errors.push(`${path}.scheduleAdmissionEvidence: productionUseAllowed true가 필요하다`);
     }
   }
 }
