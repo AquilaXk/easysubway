@@ -226,7 +226,7 @@ jobs:
             --coverage-contract tools/datapack/itx-cheongchun-coverage-contract.json
           git add -N tools/datapack/sources tools/datapack/itx-cheongchun-coverage-contract.json
           git diff -- tools/datapack/sources tools/datapack/itx-cheongchun-coverage-contract.json > "${EASYSUBWAY_ITX_REFRESH_PATCH}"
-          echo "::notice title=Auto refresh::source UNCHANGED and promoted (UNCHANGED_AUTO). 재산출(apply-itx-topology allowlist + build-server-timetable-snapshot)과 배포는 수동 단계입니다 — 첨부한 promotion.patch를 적용하세요."
+          echo "::notice title=Auto refresh::source UNCHANGED and promoted (UNCHANGED_AUTO). 재수집이 현행 출하 pack을 대상으로 이뤄졌고 그 pack의 topology가 apply-itx에서 이미 검증됐다면(topology evidence OUTPUT identity 일치) promote가 admission pin을 출하 pack 실체로 자동 교정합니다 — 이 경우 apply-itx-topology(allowlist 편집·datapack 재기록) 없이 build-server-timetable-snapshot --without-topology-evidence 재산출과 배포만 수동 단계입니다. 조건 미충족(예: 출하 pack이 apply-itx OUTPUT과 불일치)이면 pin은 자동 교정되지 않으므로 기존 수동 admission 교정 절차가 선행되어야 --without-topology-evidence 재산출이 통과합니다 — 첨부한 promotion.patch를 적용하세요."
 
       - name: Auto Refresh / Fail closed on review-required change
         if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) && !(steps.collect.outputs.collect_exit == '0' && steps.collect.outputs.promotion_status == 'SUPPORTED') }}
