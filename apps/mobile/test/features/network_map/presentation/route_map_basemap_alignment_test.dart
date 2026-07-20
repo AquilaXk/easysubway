@@ -239,4 +239,46 @@ void main() {
       );
     }
   });
+
+  // (D) 대구 전 역: seoul(B)·busan(C)과 동일 하드 게이트를 대구에 미러(#2068
+  // 완주 라운드, 오너 직접 제작본 전환 반영). fixture 출처는 동일 생성기(대구
+  // 재실행, --region 대구권 --geometry easy-subway-daegu-v1-geometry.json)이며,
+  // 파이프라인이 seoul·busan과 동일하게 respace --pin-stations로 팩 좌표를 SVG
+  // 배정에 고정한다 — 실측 delta는 전부 0px(정수 반올림 일치). 대구는 라벨
+  // nudge 파일이 없어 예외 없이 전 역 하드다(seoul(B) 패턴).
+  const minDaeguStationCoverage = 95; // 대구 102행 중 대다수 커버(하드 최소선).
+
+  test('(D) daegu 바탕(SVG 배정) ↔ 인터랙션(팩) 좌표가 같은 viewBox 좌표계 — 전 역 하드 <5px', () {
+    final file = File(
+      '../../tools/route-map/route-map-defs/daegu-alignment-fixture.json',
+    );
+    expect(
+      file.existsSync(),
+      isTrue,
+      reason:
+          'fixture 없음 — node tools/route-map/generate-basemap-alignment-fixture.mjs '
+          '--region 대구권 --geometry tools/route-map/route-map-defs/easy-subway-daegu-v1-geometry.json '
+          '--out tools/route-map/route-map-defs/daegu-alignment-fixture.json 로 생성 필요: ${file.path}',
+    );
+    final fixture = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+    final entries = (fixture['entries'] as List).cast<Map<String, dynamic>>();
+
+    expect(
+      entries.length,
+      greaterThanOrEqualTo(minDaeguStationCoverage),
+      reason:
+          'fixture 커버리지 급감 — canonical 정합이 대량 깨졌을 가능성(entries=${entries.length})',
+    );
+
+    for (final e in entries) {
+      final delta = (e['deltaPx'] as num).toDouble();
+      expect(
+        delta,
+        lessThan(alignmentThresholdPx),
+        reason:
+            '${e['name']}(${e['stationId']}/${e['lineId']}): svg=(${e['svgX']},${e['svgY']}) '
+            'pack=(${e['packX']},${e['packY']}) delta=$delta',
+      );
+    }
+  });
 }
