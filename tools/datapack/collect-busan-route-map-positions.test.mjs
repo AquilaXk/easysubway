@@ -36,10 +36,10 @@ test("부산 공식 사이버스테이션 HTML/CSS에서 1~4호선 114개 좌표
     stationName: "다대포 해수욕장",
     x: 311,
     y: 705,
-    labelDx: -110,
-    labelDy: 0,
+    labelDx: -61,
+    labelDy: 2,
     labelPolygon: [
-      { x: 150, y: 694 }, { x: 253, y: 694 }, { x: 253, y: 716 }, { x: 150, y: 716 },
+      { x: 200, y: 700 }, { x: 300, y: 700 }, { x: 300, y: 714 }, { x: 200, y: 714 },
     ],
   });
   assert.deepEqual(snapshot.positions.find(({ stationCode }) => stationCode === "119"), {
@@ -49,10 +49,10 @@ test("부산 공식 사이버스테이션 HTML/CSS에서 1~4호선 114개 좌표
     stationName: "서면",
     x: 860,
     y: 652,
-    labelDx: -15,
-    labelDy: -7,
+    labelDx: 2,
+    labelDy: -13,
     labelPolygon: [
-      { x: 826, y: 634 }, { x: 864, y: 634 }, { x: 864, y: 656 }, { x: 826, y: 656 },
+      { x: 837, y: 632 }, { x: 887, y: 632 }, { x: 887, y: 646 }, { x: 837, y: 646 },
     ],
   });
   assert.ok(snapshot.positions.every(({ labelPolygon }) => labelPolygon.length === 4));

@@ -23,8 +23,10 @@ export function createBusanRouteMapPositionsSnapshot({ html, css, topology, capt
   if (capturedAtValue !== capturedAt) throw new Error("capturedAt must be an ISO instant");
 
   const htmlStations = parseHtmlStations(html.toString("utf8"));
-  const coordinates = parseCssPositions(css.toString("utf8"), /^\.s(\d+)$/);
-  const labels = parseCssPositions(css.toString("utf8"), /^\.s(\d+) \.sta-title$/);
+  const cssText = css.toString("utf8");
+  const coordinates = parseCssPositions(cssText, /^\.s(\d+)$/);
+  const labels = parseCssPositions(cssText, /^\.s(\d+) \.sta-title$/);
+  const lineLabelDefaults = parseCssPositions(cssText, /^\.line-(\d+) \.sta-title$/);
   const positions = topology.scope.map((station) => {
     const htmlStation = htmlStations.get(station.stationCode);
     const coordinate = coordinates.get(station.stationCode);
@@ -35,19 +37,28 @@ export function createBusanRouteMapPositionsSnapshot({ html, css, topology, capt
     if (!coordinate || coordinate.top == null || coordinate.left == null) {
       throw new Error(`Busan route map coordinate missing: ${station.stationCode}`);
     }
-    const label = labels.get(station.stationCode) ?? {};
+    const label = { ...(lineLabelDefaults.get(htmlStation.line) ?? {}), ...(labels.get(station.stationCode) ?? {}) };
+    if (label.top == null || label.left == null || label.width == null) {
+      throw new Error(`Busan route map label geometry missing: ${station.stationCode}`);
+    }
     const transfer = htmlStation.classNames.includes("trans");
-    const position = {
+    const stationPosition = {
       lineId: station.lineId,
       line: htmlStation.line,
       stationCode: station.stationCode,
       stationName: station.stationName,
       x: Math.round(coordinate.left + (transfer ? 12.5 : 5.5)),
       y: Math.round(coordinate.top + (transfer ? 13 : 5)),
-      labelDx: Math.round((label.left ?? 13) - 5),
-      labelDy: Math.round(label.top ?? 0),
     };
-    return { ...position, labelPolygon: labelPolygonFor(position) };
+    const labelPolygon = labelPolygonFor({ station: stationPosition, coordinate, label });
+    const labelCenterX = (labelPolygon[0].x + labelPolygon[1].x) / 2;
+    const labelCenterY = (labelPolygon[0].y + labelPolygon[3].y) / 2;
+    return {
+      ...stationPosition,
+      labelDx: Math.round(labelCenterX - stationPosition.x),
+      labelDy: Math.round(labelCenterY - stationPosition.y),
+      labelPolygon,
+    };
   }).sort(comparePositions);
 
   const htmlSha256 = sha256(html);
@@ -151,10 +162,14 @@ function parseCssPositions(css, selectorPattern) {
     if (!selectorMatch) continue;
     const top = cssNumber(match[2], "top");
     const left = cssNumber(match[2], "left");
-    if (top == null && left == null) continue;
+    const width = cssNumber(match[2], "width");
+    const lineHeight = cssNumber(match[2], "line-height");
+    if (top == null && left == null && width == null && lineHeight == null) continue;
     const stationCode = selectorMatch[1];
     if (positions.has(stationCode)) throw new Error(`Busan route map duplicate coordinate: ${stationCode}`);
-    positions.set(stationCode, { top, left });
+    positions.set(stationCode, Object.fromEntries(
+      Object.entries({ top, left, width, lineHeight }).filter(([, value]) => value != null),
+    ));
   }
   return positions;
 }
@@ -177,15 +192,15 @@ function normalizeStationName(value) {
   return String(value).normalize("NFKC").replace(/\s+/g, "").replace(/\([^()]*\)$/, "");
 }
 
-function labelPolygonFor(position) {
-  const width = Math.max(32, [...normalizeStationName(position.stationName)].length * 13 + 12);
-  const height = 22;
-  const centerX = position.x + position.labelDx;
-  const centerY = position.y + position.labelDy;
-  const left = Math.max(0, Math.round(centerX - width / 2));
-  const top = Math.max(0, Math.round(centerY - height / 2));
-  const right = Math.max(0, Math.round(centerX + width / 2));
-  const bottom = Math.max(0, Math.round(centerY + height / 2));
+function labelPolygonFor({ station, coordinate, label }) {
+  const width = label.width;
+  const lineHeight = label.lineHeight ?? 14;
+  const estimatedTextWidth = [...normalizeStationName(station.stationName)].length * 12;
+  const height = Math.max(14, Math.ceil(estimatedTextWidth / width) * lineHeight);
+  const left = Math.max(0, Math.round(coordinate.left + label.left));
+  const top = Math.max(0, Math.round(coordinate.top + label.top));
+  const right = Math.max(0, Math.round(left + width));
+  const bottom = Math.max(0, Math.round(top + height));
   return [
     { x: left, y: top },
     { x: right, y: top },

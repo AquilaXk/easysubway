@@ -1667,6 +1667,41 @@ function buildSqlitePack(sqlitePath, schema, pack, officialOdFareAdmissions) {
       );
       insertRows(
         database,
+        "route_map_line_tracks",
+        [
+          "region",
+          "line_id",
+          "track_index",
+          "path",
+          "svg_color",
+          "source_id",
+          "source_name",
+          "source_url",
+          "license",
+          "license_status",
+          "commercial_use_allowed",
+          "attribution_required",
+          "updated_at",
+        ],
+        pack.routeMapLineTracks ?? [],
+        (row) => [
+          requiredString(row.region, "routeMapLineTracks.region"),
+          requiredString(row.lineId, "routeMapLineTracks.lineId"),
+          requiredNonNegativeInteger(row.trackIndex, "routeMapLineTracks.trackIndex"),
+          requiredString(row.path, "routeMapLineTracks.path"),
+          row.svgColor ?? "",
+          requiredString(row.sourceId, "routeMapLineTracks.sourceId"),
+          requiredString(row.sourceName, "routeMapLineTracks.sourceName"),
+          requiredString(row.sourceUrl, "routeMapLineTracks.sourceUrl"),
+          requiredString(row.license, "routeMapLineTracks.license"),
+          requiredString(row.licenseStatus, "routeMapLineTracks.licenseStatus"),
+          boolFlag(row.commercialUseAllowed, "routeMapLineTracks.commercialUseAllowed"),
+          boolFlag(row.attributionRequired, "routeMapLineTracks.attributionRequired"),
+          timestamp(row.updatedAt),
+        ],
+      );
+      insertRows(
+        database,
         "station_exits",
         [
           "id",

@@ -80,13 +80,26 @@ test("공식 부산 좌표 snapshot을 누적 production candidate pack에 mater
   });
   const pack = fixture.packs[0];
   const rows = pack.routeMapPositions.filter(({ sourceId }) => sourceId === routeMapSnapshot.sourceId);
+  const tracks = pack.routeMapLineTracks.filter(({ sourceId }) => sourceId === routeMapSnapshot.sourceId);
   const source = pack.sourceInventory.find(({ id }) => id === routeMapSnapshot.sourceId);
 
   assert.equal(rows.length, 114);
+  assert.equal(tracks.length, 4);
+  assert.ok(tracks.every(({ trackIndex, path }) => trackIndex === 0 && /^M \d+ \d+(?: L \d+ \d+)+$/.test(path)));
+  assert.deepEqual(
+    Object.fromEntries(tracks.map(({ lineId, path }) => [lineId, (path.match(/(?:M|L) /g) ?? []).length])),
+    {
+      "line-ab1a041f6266": 40,
+      "line-d74614a04530": 17,
+      "line-d812a5bc1e5f": 14,
+      "line-eb7b47920390": 43,
+    },
+  );
   assert.ok(rows.every(({ labelPolygon }) => labelPolygon.length === 4));
   assert.equal(new Set(rows.map(({ lineId }) => lineId)).size, 4);
   assert.deepEqual(source.coverageScope.lineIds, routeMapSnapshot.lineIds);
   assert.equal(pack.minimumTableRows.route_map_positions, pack.routeMapPositions.length);
+  assert.equal(pack.minimumTableRows.route_map_line_tracks, pack.routeMapLineTracks.length);
   assert.match(pack.id, /^nationwide-busan-route-map-[a-f0-9]{64}$/);
   assert.equal(pack.id, `nationwide-busan-route-map-${materializedBusanRouteMapPackContentHash(pack, pack.version)}`);
 
@@ -156,6 +169,10 @@ test("materialized SQLite와 provenance가 부산 route_map_positions 4건을 SU
     .get(routeMapSnapshot.sourceId).count, 114);
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM route_map_positions WHERE source_id = ? AND label_polygon <> ''")
     .get(routeMapSnapshot.sourceId).count, 114);
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM route_map_line_tracks WHERE source_id = ?")
+    .get(routeMapSnapshot.sourceId).count, 4);
+  assert.equal(database.prepare("SELECT COUNT(DISTINCT line_id) AS count FROM route_map_line_tracks WHERE region = ?")
+    .get("부산권").count, 4);
   database.close();
 
   await execFileAsync(process.execPath, [

@@ -24,10 +24,28 @@ export function materializeBusanRouteMapPositions({ baseFixture, snapshot, topol
   const stations = canonicalStations(pack, topologySnapshot);
   const byLine = Map.groupBy(snapshot.positions, ({ lineId }) => lineId);
   const rows = [];
+  const tracks = [];
   for (const lineId of snapshot.lineIds) {
     const linePositions = [...(byLine.get(lineId) ?? [])].sort(
       (left, right) => Number(left.stationCode) - Number(right.stationCode),
     );
+    const line = pack.lines.find(({ id }) => id === lineId);
+    if (!line || linePositions.length < 2) throw new Error(`Busan route map line geometry missing: ${lineId}`);
+    tracks.push({
+      region: "부산권",
+      lineId,
+      trackIndex: 0,
+      path: linePositions.map(({ x, y }, index) => `${index === 0 ? "M" : "L"} ${x} ${y}`).join(" "),
+      svgColor: line.color,
+      sourceId: SOURCE_ID,
+      sourceName: "부산교통공사 사이버스테이션 노선도",
+      sourceUrl: snapshot.sourceUrl,
+      license: source.license.name,
+      licenseStatus: "redistributable",
+      commercialUseAllowed: true,
+      attributionRequired: false,
+      updatedAt: snapshot.capturedAt,
+    });
     for (let index = 0; index < linePositions.length; index += 1) {
       const position = linePositions[index];
       const stationId = stations.get(`${lineId}:${position.stationCode}`);
@@ -70,7 +88,12 @@ export function materializeBusanRouteMapPositions({ baseFixture, snapshot, topol
 
   pack.sourceInventory.push(packSource(source, snapshot));
   pack.routeMapPositions.push(...rows);
-  pack.minimumTableRows = { ...pack.minimumTableRows, route_map_positions: pack.routeMapPositions.length };
+  pack.routeMapLineTracks = [...(pack.routeMapLineTracks ?? []), ...tracks];
+  pack.minimumTableRows = {
+    ...pack.minimumTableRows,
+    route_map_positions: pack.routeMapPositions.length,
+    route_map_line_tracks: pack.routeMapLineTracks.length,
+  };
   const version = source.routeMapAdmissionEvidence.snapshotId.slice(-8);
   pack.id = `${PACK_ID}-${materializedBusanRouteMapPackContentHash(pack, version)}`;
   pack.version = version;
