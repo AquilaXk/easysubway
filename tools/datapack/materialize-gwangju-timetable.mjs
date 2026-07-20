@@ -70,7 +70,7 @@ export function materializeGwangjuTimetable({
   const durations = new Map(topologySnapshot.edges.map((edge) => [
     `${edge.fromStationCode}:${edge.toStationCode}`, edge.durationSeconds,
   ]));
-  const { trips, stopTimes, quarantinedRows, repairedStopCount } = reconstructTrips(
+  const { trips, quarantinedRows, repairedStopCount } = reconstructTrips(
     timetableSnapshot.rows,
     stations,
     durations,
@@ -453,7 +453,7 @@ function reconstructTrips(rows, stations, durations) {
         .map(({ stationId, seconds, repairReason }) => ({ stationId, seconds, repairReason })),
     }));
   }
-  return { trips: completed, stopTimes: completed.flatMap(({ stops }) => stops), quarantinedRows, repairedStopCount };
+  return { trips: completed, quarantinedRows, repairedStopCount };
 }
 
 function uniqueMatch(events, used, trip, expectedDuration) {
