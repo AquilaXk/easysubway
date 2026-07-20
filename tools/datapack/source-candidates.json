@@ -3327,6 +3327,71 @@
       "nextAction": "#2138의 나머지 전국 requirement를 같은 production SQLite·field provenance 계약으로 계속 admission한다"
     },
     {
+      "id": "busan-transportation-timetable",
+      "priority": "P0",
+      "domain": "schedule_timetable",
+      "coverageScope": {
+        "regionIds": ["busan"],
+        "operatorIds": ["busan-transportation"],
+        "lineIds": [
+          "line-ab1a041f6266",
+          "line-d74614a04530",
+          "line-d812a5bc1e5f",
+          "line-eb7b47920390"
+        ]
+      },
+      "displayName": "부산교통공사_부산 도시철도 열차시각표 조회 서비스",
+      "detailUrl": "https://www.data.go.kr/data/15000522/openapi.do",
+      "requestUrl": "http://data.humetro.busan.kr/voc/api/open_api_process.tnn",
+      "operation": {
+        "method": "GET",
+        "endpoint": "http://data.humetro.busan.kr/voc/api/open_api_process.tnn",
+        "auth": {
+          "env": "DATA_GO_KR_SERVICE_KEY",
+          "placement": "query",
+          "parameter": "serviceKey",
+          "valueEncoding": "url-search-params-once",
+          "loadPolicy": "process-env-no-shell-parsing"
+        },
+        "requiredParameters": ["serviceKey", "scode"],
+        "fixedParameters": { "act": "xml", "enum": "999" },
+        "optionalParameters": ["day", "updown", "stime", "etime"],
+        "responseEnvelope": "response.header + response.body.item[]",
+        "responseFields": ["sname", "engname", "trainno", "hour", "time", "day", "updown", "endcode", "scode", "line"],
+        "runner": {
+          "command": "node tools/datapack/collect-busan-timetable.mjs",
+          "arguments": [
+            "--scope-snapshot",
+            "tools/datapack/sources/busan-transportation-route-topology-20260720.json",
+            "--output",
+            "/tmp/easysubway-busan-timetable.json"
+          ],
+          "requiredEnv": ["DATA_GO_KR_SERVICE_KEY"]
+        },
+        "secretPolicy": "env-only-redacted-output"
+      },
+      "licenseEvidenceStatus": "confirmed_attribution",
+      "sampleEvidenceStatus": "live_capture_pending",
+      "admissionStatus": "operation_contract_registered",
+      "serviceKeyHandling": "offline_collector_secret_only",
+      "mobileEmbeddingAllowed": false,
+      "evidence": {
+        "retrievedAt": "2026-07-20",
+        "endpoint": "http://data.humetro.busan.kr/voc/api/open_api_process.tnn",
+        "usePermissionRange": "공공누리 제1유형(출처표시), 제3자 권리 포함 저작권 표시",
+        "formats": ["XML"],
+        "outputFields": ["sname", "engname", "trainno", "hour", "time", "day", "updown", "endcode", "scode", "line"],
+        "applicationStatus": "owner_approved",
+        "developmentQuota": 1000,
+        "coverageAssessment": {
+          "state": "MISSING",
+          "requirementCount": 4,
+          "sourceDomain": "schedule_timetable"
+        }
+      },
+      "nextAction": "tracked collector live snapshot과 production materialization을 #2368에서 완료한다"
+    },
+    {
       "id": "busan-transportation-route-topology",
       "priority": "P0",
       "domain": "route_graph_topology",

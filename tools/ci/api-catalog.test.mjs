@@ -357,6 +357,7 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
     "detailPageUrl",
   ]);
   for (const [id, method, authEnv, command] of [
+    ["provider:busan-transportation-timetable", "GET", "DATA_GO_KR_SERVICE_KEY", "node tools/datapack/collect-busan-timetable.mjs"],
     ["provider:busan-transportation-route-topology", "GET", "DATA_GO_KR_SERVICE_KEY", "node tools/datapack/collect-busan-route-topology.mjs"],
     ["provider:daejeon-train-timetable", "GET", "DATA_GO_KR_SERVICE_KEY", "node tools/datapack/probe-daejeon-coverage-api.mjs"],
     ["provider:daejeon-station-distance-fare", "GET", "DATA_GO_KR_SERVICE_KEY", "node tools/datapack/collect-daejeon-route-topology.mjs"],
@@ -394,6 +395,14 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
   assert.equal(busanTopologyCandidate.evidence.liveSampleEvidenceHash, busanTopologySnapshot.contentSha256);
   assert.equal(busanTopologySnapshot.credentialRedacted, true);
   assert.doesNotMatch(JSON.stringify(busanTopologySnapshot), /serviceKey/i);
+  const busanTimetable = findCatalogEntry(catalog, "provider:busan-transportation-timetable");
+  assert.equal(busanTimetable.endpoint, "http://data.humetro.busan.kr/voc/api/open_api_process.tnn");
+  assert.deepEqual(busanTimetable.operation.requiredParameters, ["serviceKey", "scode"]);
+  assert.deepEqual(busanTimetable.operation.fixedParameters, { act: "xml", enum: "999" });
+  assert.deepEqual(busanTimetable.operation.optionalParameters, ["day", "updown", "stime", "etime"]);
+  assert.deepEqual(busanTimetable.responseFields, [
+    "sname", "engname", "trainno", "hour", "time", "day", "updown", "endcode", "scode", "line",
+  ]);
   const removedDaejeonId = ["provider:daejeon", "braille-guide-map"].join("-");
   assert.equal(catalog.some(({ id }) => id === removedDaejeonId), false);
   const daejeonDistanceFare = findCatalogEntry(catalog, "provider:daejeon-station-distance-fare");
@@ -471,7 +480,7 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
 test("프로젝트 provider catalog는 비API source를 제외하고 모든 호출 계약을 제공한다", async () => {
   const providers = (await loadProjectCatalog()).filter((entry) => entry.kind === "provider");
 
-  assert.equal(providers.length, 42);
+  assert.equal(providers.length, 43);
   assert.equal(providers.some((entry) => entry.documentationStatus === "metadata-only"), false);
   assert.equal(providers.some((entry) => entry.id === "provider:molit-urban-rail-full-route"), false);
   assert.equal(providers.some((entry) => entry.id === "provider:seoulmetro-cyberstation-route-map"), false);
