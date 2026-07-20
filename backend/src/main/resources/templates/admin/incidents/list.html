@@ -23,8 +23,9 @@
 
 	<section class="admin-panel">
 		<h2>서비스 상태 연동</h2>
-		<p>
-			<span th:replace="~{admin/fragments/shell :: status(${healthStatus == 'UP'} ? '서비스 상태 정상' : '서비스 상태 이상', ${healthStatus == 'UP'} ? 'good' : 'bad')}">서비스 상태 정상</span>
+		<p th:with="healthLabel=${healthStatus == 'UP'} ? '서비스 상태 정상' : (${healthStatus == 'DEGRADED'} ? '서비스 상태 저하' : (${healthStatus == 'STALE'} ? '서비스 상태 지연' : '서비스 상태 이상')),
+		             healthTone=${healthStatus == 'UP'} ? 'good' : (${healthStatus == 'DEGRADED' or healthStatus == 'STALE'} ? 'warn' : 'bad')">
+			<span th:replace="~{admin/fragments/shell :: status(${healthLabel}, ${healthTone})}">서비스 상태 정상</span>
 		</p>
 		<form th:if="${healthStatus != 'UP'}" method="post" th:action="@{/admin/incidents/health}">
 			<input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
