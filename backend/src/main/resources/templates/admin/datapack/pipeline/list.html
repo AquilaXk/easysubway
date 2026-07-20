@@ -43,18 +43,14 @@
 			</div>
 			<div class="metric metric-cell">
 				<span>후보 입력 스냅샷</span>
-				<strong><span th:if="${pipeline.firstSourceSnapshotId != '-'}" th:title="${pipeline.sourceSnapshotIds}" th:text="${pipeline.firstSourceSnapshotId}">-</span><th:block
-					th:unless="${pipeline.firstSourceSnapshotId != '-'}"><span aria-hidden="true">—</span><span class="sr-only">미상</span></th:block></strong>
-				<em><span th:if="${pipeline.sourceSnapshotIds != '-'}" th:text="${pipeline.sourceSnapshotIds}">snapshot ids</span><th:block
-					th:unless="${pipeline.sourceSnapshotIds != '-'}"><span aria-hidden="true">—</span><span class="sr-only">미상</span></th:block></em>
+				<strong><span th:title="${pipeline.sourceSnapshotIds}" th:insert="~{admin/fragments/missing-value :: value(${pipeline.firstSourceSnapshotId != '-' ? pipeline.firstSourceSnapshotId : null}, '미상')}">-</span></strong>
+				<em><span th:insert="~{admin/fragments/missing-value :: value(${pipeline.sourceSnapshotIds != '-' ? pipeline.sourceSnapshotIds : null}, '미상')}">snapshot ids</span></em>
 			</div>
 			<div class="metric metric-cell">
 				<span>프로덕션 / 롤백</span>
-				<strong><span th:if="${pipeline.productionCandidateId != '-'}" th:text="${pipeline.productionCandidateId}">-</span><th:block
-					th:unless="${pipeline.productionCandidateId != '-'}"><span aria-hidden="true">—</span><span class="sr-only">미상</span></th:block></strong>
+				<strong><span th:insert="~{admin/fragments/missing-value :: value(${pipeline.productionCandidateId != '-' ? pipeline.productionCandidateId : null}, '미상')}">-</span></strong>
 				<em>롤백
-					<span th:if="${pipeline.rollbackCandidateId != '-'}" th:text="${pipeline.rollbackCandidateId}">rollback</span><th:block
-						th:unless="${pipeline.rollbackCandidateId != '-'}"><span aria-hidden="true">—</span><span class="sr-only">미상</span></th:block>
+					<span th:insert="~{admin/fragments/missing-value :: value(${pipeline.rollbackCandidateId != '-' ? pipeline.rollbackCandidateId : null}, '미상')}">rollback</span>
 				</em>
 			</div>
 		</div>
