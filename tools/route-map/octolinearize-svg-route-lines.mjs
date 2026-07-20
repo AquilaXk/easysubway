@@ -158,7 +158,6 @@ export function buildFilletedLocalPath(annotatedVerts, transform, radiusPx = 6, 
 
 export function sliceGroup(svgText, idIdx) {
   const gStart = svgText.lastIndexOf("<g", idIdx);
-  const openEnd = svgText.indexOf(">", idIdx);
   let depth = 0;
   let i = gStart;
   const re = /<g\b|<\/g>/g;
@@ -171,7 +170,6 @@ export function sliceGroup(svgText, idIdx) {
     }
   }
   throw new Error("route-line 그룹의 닫는 </g>를 찾지 못했습니다.");
-  void openEnd;
 }
 
 /** 그룹 텍스트에서 첫 stroke(색 지정) path의 속성 템플릿(문자열)을 뽑는다.

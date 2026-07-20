@@ -306,7 +306,8 @@ export function buildMinimalBendVertices(finalPoints, variantForEdge = null) {
  */
 export function detectCorridorBundles(lineStationSeqs) {
   const edgeLines = new Map(); // edgeKey → Set(lineId)
-  const edgeKeyOf = (k1, k2) => [k1, k2].sort().join("|");
+  const edgeKeyOf = (k1, k2) =>
+    [k1, k2].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).join("|");
   for (const [lineId, seqOrPieces] of lineStationSeqs) {
     // 값이 [{key,x,y}...](단일 조각) 또는 [[{...}],[{...}]](다중 조각/지선)
     // 둘 다 허용 — 조각 "사이"는 edge를 만들지 않는다(지선 경계에서 가짜 edge
@@ -324,7 +325,7 @@ export function detectCorridorBundles(lineStationSeqs) {
   const assignment = new Map(); // "lineId#edgeKey" → { index, size }
   for (const [ek, lineSet] of edgeLines) {
     if (lineSet.size < 2) continue;
-    const sortedLines = [...lineSet].sort();
+    const sortedLines = [...lineSet].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
     sortedLines.forEach((lineId, index) => {
       assignment.set(`${lineId}#${ek}`, { index, size: sortedLines.length });
     });
@@ -379,7 +380,7 @@ export function detectGeometricCorridorBundles(finalPiecesBySlug, bundles, colli
   for (const [key, entry] of coBundle) {
     if (assignment.has(key)) continue; // 위상 번들 우선(이미 배정됨).
     if (entry.partners.size < 2) continue;
-    const sorted = [...entry.partners].sort();
+    const sorted = [...entry.partners].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
     assignment.set(key, { index: sorted.indexOf(entry.slug), size: sorted.length });
   }
   return bundles;
@@ -668,7 +669,9 @@ export function resolveOverlapsByMovingStations(finalPiecesBySlug, locked, opts 
   }
 
   for (let iter = 0; iter < maxIters; iter += 1) {
-    const slugs = [...finalPiecesBySlug.keys()].sort();
+    const slugs = [...finalPiecesBySlug.keys()].sort((a, b) =>
+      a < b ? -1 : a > b ? 1 : 0,
+    );
     let anyMoved = false;
 
     for (let i = 0; i < slugs.length; i += 1) {
@@ -749,7 +752,9 @@ export function resolveOverlapsByMovingStations(finalPiecesBySlug, locked, opts 
                   locked.set(key, { x: cur.x + push.x, y: cur.y + push.y });
                   movedKeys.add(key);
                 }
-                const ck = [slugA, slugB].sort().join("|");
+                const ck = [slugA, slugB]
+                  .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+                  .join("|");
                 clusterCounts.set(ck, (clusterCounts.get(ck) ?? 0) + 1);
                 anyMoved = true;
                 fixedThisGuard = true;

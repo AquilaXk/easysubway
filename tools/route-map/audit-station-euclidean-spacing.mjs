@@ -76,7 +76,9 @@ export function findEuclideanSpacingViolations(db, region, threshold) {
         if (sts[i].station_id === sts[j].station_id) continue; // 환승 캡슐 내부 제외
         const d = Math.hypot(sts[i].x - sts[j].x, sts[i].y - sts[j].y);
         if (d < threshold) {
-          const [a, b] = [sts[i].station_id, sts[j].station_id].sort();
+          const [a, b] = [sts[i].station_id, sts[j].station_id].sort((p, q) =>
+            p < q ? -1 : p > q ? 1 : 0,
+          );
           violations.push({ lineId, a, b, dist: Math.round(d * 100) / 100 });
         }
       }
@@ -89,10 +91,16 @@ export function findEuclideanSpacingViolations(db, region, threshold) {
 /** 예외 목록과 대조해 허용되지 않은 위반만 남긴다. */
 export function filterUnlistedViolations(violations, exceptions) {
   const allowed = new Set(
-    (exceptions ?? []).map((e) => `${e.lineId}|${[e.a, e.b].sort().join("|")}`),
+    (exceptions ?? []).map(
+      (e) =>
+        `${e.lineId}|${[e.a, e.b].sort((p, q) => (p < q ? -1 : p > q ? 1 : 0)).join("|")}`,
+    ),
   );
   return violations.filter(
-    (v) => !allowed.has(`${v.lineId}|${[v.a, v.b].sort().join("|")}`),
+    (v) =>
+      !allowed.has(
+        `${v.lineId}|${[v.a, v.b].sort((p, q) => (p < q ? -1 : p > q ? 1 : 0)).join("|")}`,
+      ),
   );
 }
 

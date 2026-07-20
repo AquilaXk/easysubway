@@ -33,7 +33,10 @@ function resolveRepo(p) {
 
 /** slug 집합 문자열 정렬 비교용 키. */
 function slugSetKey(slugs) {
-  return [...new Set(slugs)].filter(Boolean).sort().join(" ");
+  return [...new Set(slugs)]
+    .filter(Boolean)
+    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+    .join(" ");
 }
 
 /**
@@ -97,7 +100,11 @@ export function planNodeFix(node, trueSlugs, config) {
   for (const t of String(node.transferLines || "").split(/[\s,]+/)) if (t) declared.add(t);
   if (slugSetKey([...declared]) === slugSetKey([...trueSlugs])) return null;
   if (trueSlugs.size === 0) return null; // 팩에 없는 역(위상 예외 등) — 자동수정 대상 아님.
-  return { canonName: canon.name, declared: [...declared], trueSlugs: [...trueSlugs].sort() };
+  return {
+    canonName: canon.name,
+    declared: [...declared],
+    trueSlugs: [...trueSlugs].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
+  };
 }
 
 export function main() {
@@ -153,7 +160,9 @@ export function main() {
       let tagText = svgText.slice(range.start, range.end);
       const hasTransferAttr = /\bdata-transfer-lines="/.test(tagText);
       if (hasTransferAttr) {
-        const sorted = [...plan.trueSlugs].sort();
+        const sorted = [...plan.trueSlugs].sort((a, b) =>
+          a < b ? -1 : a > b ? 1 : 0,
+        );
         tagText = setAttr(tagText, "data-transfer-lines", sorted.join(" "));
         tagText = setAttr(tagText, "data-transfer-line-count", String(sorted.length));
         // 주 data-line은 정렬된 첫 slug로(기존이 진짜 목록에 있으면 유지).
