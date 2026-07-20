@@ -142,8 +142,7 @@
 			<tr th:each="delivery : ${deliveries}">
 				<td th:text="${delivery.releaseRequestId + ' / ' + delivery.releaseSequence}">request</td>
 				<td th:text="${delivery.channel + ' / ' + delivery.state}">state</td>
-				<td><span th:text="${delivery.attempts}">0</span> / <th:block
-				    th:insert="~{admin/fragments/missing-value :: value(${delivery.httpClass}, '미상')}">—</th:block></td>
+				<td><span th:text="${delivery.attempts}">0</span> / <th:block th:insert="~{admin/fragments/missing-value :: value(${delivery.httpClass}, '미상')}">—</th:block></td>
 				<td><time th:text="${delivery.nextAttemptAt}">next attempt</time> / <time th:text="${delivery.reconcileDeadline}">reconcile</time> / <time th:text="${delivery.deadLetterDeadline}">dead letter</time></td>
 				<td><code th:text="${delivery.payloadSha256}">payload hash</code><br><code th:text="${delivery.signatureSha256}">signature hash</code></td>
 				<td th:insert="~{admin/fragments/missing-value :: value(${delivery.detail}, '미상')}">차단 요인</td>
