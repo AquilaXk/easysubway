@@ -37,20 +37,31 @@ const BOUND_EVIDENCE_REFERENCES = {
     verificationCommentUrl:
       "https://github.com/AquilaXk/easysubway/issues/1018#issuecomment-5018496643",
   },
-  // reviewedFormSha256/reviewedFormCommit은 2026-07-18 Play Console 재제출·검토 당시
-  // play-store-submission-content.json 원문에 결속된 고정값이다(git show
-  // 7ca868068717132c984d673718f350c3400e4ac5:apps/mobile/release/play-store-submission-content.json
-  // | shasum -a 256). 이후(2026-07-19, train_search_queries 추가 등) 파일이 바뀌면 현재
-  // tracked 파일의 sha256이 이 값과 달라지고, evaluatePlayConsoleProvenanceConsistency가
-  // 그 차이를 STALE로 fail-closed 판정한다 — Console이 실제로 검토한 적 없는 최신 내용을
-  // 검토된 것처럼 위조하지 않는다.
+  // reviewedFormSha256/reviewedFormCommit은 Play Console Data Safety 폼과 현행 tracked
+  // play-store-submission-content.json을 전수 대조 재검증한 시점의 파일 원문에 결속된
+  // 고정값이다(git show fa82ce6e:apps/mobile/release/play-store-submission-content.json
+  // | shasum -a 256). 2026-07-20 재검증(오너 위임 하에 Console 5단계 전체를 현행 tracked
+  // 폼과 대조): Console에 노출되는 답변과 현행 tracked 내용이 완전 일치, Console 답변 변경
+  // 0건·미저장 변경 0건이라 '저장' 비활성 — Console 재제출 이벤트는 불가·불필요였다.
+  // 2026-07-18 검토(7ca86806) 이후의 tracked 변경(2026-07-19 train_search 참조 추가,
+  // 2026-07-20 PR #2366 집계 플래그 5건 명시)은 전부 Console 폼에 노출되지 않는 tracked
+  // 전용 변경(집계 플래그·inventory 참조 id·dataRetention 목록)이라, 노출 답변 무변경이
+  // 확인된 이상 sha만 현행 revision(fa82ce6e)으로 재고정한다. 재검증 상세 로그는 local-only
+  // evidence(.codex/evidence/release/privacy-consistency/1018-console-reverify-20260720/).
+  // 이후 파일이 다시 바뀌면 현재 tracked sha256이 이 값과 달라지고
+  // evaluatePlayConsoleProvenanceConsistency가 그 차이를 STALE로 fail-closed 판정한다 —
+  // Console이 실제로 검토한 적 없는 내용을 검토된 것처럼 위조하지 않는다.
   playConsoleDataSafetyForm: {
     inventorySource: INVENTORY_FILE,
     formSource: PLAY_FORM_FILE,
-    reviewedFormCommit: "7ca86806",
-    reviewedFormSha256: "67cc31f63c90e1a28fd5d1a0e372ffaa1d1dfe6f41f3a55d439ce3b376af1803",
-    resubmittedAt: "2026-07-18",
-    recordedResult: "RESUBMITTED_AND_REVIEWED_FROM_TRACKED_INVENTORY",
+    reviewedFormCommit: "fa82ce6e",
+    reviewedFormSha256: "9ac24f19d8ab31389e75767050cf596f07142b541a53bb98ce8c1cf8ae9ad837",
+    reverifiedAt: "2026-07-20",
+    recordedResult: "REVERIFIED_CONSOLE_MATCHES_TRACKED_NO_RESUBMISSION_REQUIRED",
+    // 이력: 최초 재제출·검토는 2026-07-18(7ca86806). 이후 tracked 전용 변경만 있었고
+    // Console 노출 답변은 그대로여서 2026-07-20 재검증으로 sha만 현행 revision에 재고정했다.
+    priorResubmittedAt: "2026-07-18",
+    priorReviewedFormCommit: "7ca86806",
   },
 };
 
@@ -341,9 +352,9 @@ export function buildPrivacyConsistencyEvidence({
   repoRoot = process.cwd(),
   generatedAt = new Date().toISOString(),
   provenance = "final-candidate",
-  // 프로덕션/CLI 경로는 항상 기본값(2026-07-18 실제 검토 시점의 고정 historical hash)을
-  // 쓴다. 이 파라미터는 evaluatePlayConsoleProvenanceConsistency 로직을 git 이력에
-  // 결합하지 않고 독립적으로 단위 테스트하기 위한 테스트 전용 override다.
+  // 프로덕션/CLI 경로는 항상 기본값(2026-07-20 재검증 시점의 현행 revision fa82ce6e에
+  // 고정된 hash)을 쓴다. 이 파라미터는 evaluatePlayConsoleProvenanceConsistency 로직을
+  // git 이력에 결합하지 않고 독립적으로 단위 테스트하기 위한 테스트 전용 override다.
   reviewedPlayFormSha256 = BOUND_EVIDENCE_REFERENCES.playConsoleDataSafetyForm.reviewedFormSha256,
 }) {
   const identity = candidate?.releaseCandidateIdentity;
