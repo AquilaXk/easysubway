@@ -12,6 +12,7 @@ const SOURCE_ID = "daejeon-train-timetable";
 const TOPOLOGY_SOURCE_ID = "daejeon-station-distance-fare";
 const LINE_ID = "line-7051a9c2525c";
 const PACK_ID = "nationwide-daejeon-schedule";
+const SUPPORTED_SERVICE_CALENDAR_YEAR = "2026";
 const FRESHNESS_MILLIS = 24 * 60 * 60 * 1_000;
 const EXPECTED_ROW_COUNT = 1_628;
 const EXPECTED_DEPARTURE_COUNT = 9_574;
@@ -37,6 +38,11 @@ export function materializeDaejeonTimetable({
 }) {
   const events = validateSnapshot(timetableSnapshot);
   const source = requiredSource(inventory, timetableSnapshot, topologySnapshot, now);
+  const version = /-(\d{8})$/.exec(source.scheduleAdmissionEvidence.snapshotId)?.[1];
+  if (!version) throw new Error(`${SOURCE_ID} snapshotId must end with YYYYMMDD`);
+  if (!version.startsWith(SUPPORTED_SERVICE_CALENDAR_YEAR)) {
+    throw new Error(`${SOURCE_ID} snapshotId must use supported service calendar year ${SUPPORTED_SERVICE_CALENDAR_YEAR}`);
+  }
   const fixture = materializeDaejeonRouteTopology({
     baseFixture,
     snapshot: topologySnapshot,
@@ -108,8 +114,6 @@ export function materializeDaejeonTimetable({
     pickupType: stopTime.pickupType,
     dropOffType: stopTime.dropOffType,
   }, { ...provenance, providerRecordHash: stopTime.providerRecordHash })));
-  const version = /-(\d{8})$/.exec(source.scheduleAdmissionEvidence.snapshotId)?.[1];
-  if (!version) throw new Error(`${SOURCE_ID} snapshotId must end with YYYYMMDD`);
   const compositionSha256 = sha256(JSON.stringify({
     previousPackId: pack.id,
     timetableSnapshotIdentity: {

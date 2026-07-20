@@ -126,6 +126,21 @@ test("동일 시간표 행의 다음날 refresh도 새 immutable pack identity�
   assert.equal(next.manifest.activePack.version, "20260721");
 });
 
+test("공식 휴일 근거가 없는 연도의 timetable refresh는 fail closed한다", async () => {
+  const refreshed = structuredClone(await inputs());
+  refreshed.timetableSnapshot.observedAt = "2027-01-01T00:00:00.000Z";
+  const evidence = refreshed.inventory.sources.find(({ id }) => id === "daejeon-train-timetable")
+    .scheduleAdmissionEvidence;
+  evidence.snapshotId = "daejeon-train-timetable-20270101";
+  evidence.capturedAt = refreshed.timetableSnapshot.observedAt;
+  evidence.freshUntil = "2027-01-02T00:00:00.000Z";
+
+  assert.throws(() => materializeDaejeonTimetable({
+    ...refreshed,
+    now: new Date("2027-01-01T00:01:00.000Z"),
+  }), /supported service calendar year/);
+});
+
 test("production SQLite·field provenance가 대전 schedule requirement와 런타임 artifact identity를 함께 고정한다", async (context) => {
   const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-daejeon-schedule-pack-"));
   context.after(() => rm(outputDir, { recursive: true, force: true }));
