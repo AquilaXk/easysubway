@@ -115,7 +115,7 @@
 						</label>
 						<label>
 							<span class="sr-only">strict 제외 사유</span>
-							<input name="strictRouteEligibleReason" th:value="${row.strictRouteReason == '—' ? '' : row.strictRouteReason}" placeholder="strict 제외 사유">
+							<input name="strictRouteEligibleReason" th:value="${row.strictRouteReasonRaw ?: ''}" placeholder="strict 제외 사유">
 						</label>
 						<label>
 							<span class="sr-only">conflict status</span>

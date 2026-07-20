@@ -296,14 +296,14 @@ class DatapackCandidateAdminPageController {
 	}
 
 	private static String valueOrDash(String value) {
-		if (value == null || value.isBlank()) {
+		if (value == null || value.isBlank() || "-".equals(value)) {
 			return "—";
 		}
 		return value;
 	}
 
 	private static String shortHash(String value) {
-		if (value == null || value.isBlank() || "—".equals(value)) {
+		if (value == null || value.isBlank() || "-".equals(value) || "—".equals(value)) {
 			return "—";
 		}
 		return value.length() <= 8 ? value : value.substring(0, 8) + "…";

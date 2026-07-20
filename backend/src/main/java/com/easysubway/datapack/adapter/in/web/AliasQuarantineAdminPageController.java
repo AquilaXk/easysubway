@@ -250,7 +250,7 @@ class AliasQuarantineAdminPageController {
 		if (value == null) {
 			return "—";
 		}
-		if (value instanceof String text && text.isBlank()) {
+		if (value instanceof String text && (text.isBlank() || "-".equals(text))) {
 			return "—";
 		}
 		return value.toString();
