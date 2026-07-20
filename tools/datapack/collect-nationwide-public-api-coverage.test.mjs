@@ -663,10 +663,18 @@ test("bounded retry는 attempt마다 새 timeout signal을 사용한다", async 
 test("sanitized 진단은 reason과 transport code별 건수만 고정한다", () => {
   assert.deepEqual(summarizeUnresolvedDiagnostics([
     { reasonCode: "PUBLIC_API_FETCH_FAILED", transportReason: "ENOTFOUND" },
-    { reasonCode: "PUBLIC_API_FETCH_FAILED", transportReason: "ENOTFOUND", secret: "never-print-this-key" },
+    { reasonCode: "PUBLIC_API_FETCH_FAILED", transportReason: "ENOTFOUND" },
     { reasonCode: "PUBLIC_API_HTTP_FAILURE", httpStatus: 403 },
+    { reasonCode: "PUBLIC_API_FETCH_FAILED\nnever-print-this-key", transportReason: "ENOTFOUND\nnever-print-this-key" },
+    { reasonCode: "PUBLIC_API_PROVIDER_FAILURE", providerResultCode: "03\nnever-print-this-key" },
   ]), [
     "PUBLIC_API_FETCH_FAILED/ENOTFOUND=2",
     "PUBLIC_API_HTTP_FAILURE/HTTP_403=1",
+    "PUBLIC_API_PROVIDER_FAILURE/PROVIDER_UNKNOWN=1",
+    "PUBLIC_API_UNKNOWN/TRANSPORT_UNKNOWN=1",
   ]);
+  assert.doesNotMatch(summarizeUnresolvedDiagnostics([{
+    reasonCode: "PUBLIC_API_FETCH_FAILED\nnever-print-this-key",
+    transportReason: "ENOTFOUND\nnever-print-this-key",
+  }]).join(","), /never-print-this-key|\n/);
 });

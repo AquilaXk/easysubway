@@ -220,13 +220,24 @@ export async function collectNationwidePublicApiCoverage({
 export function summarizeUnresolvedDiagnostics(unresolved) {
   const counts = new Map();
   for (const entry of unresolved) {
-    const detail = entry.transportReason
-      ?? (Number.isInteger(entry.httpStatus) ? `HTTP_${entry.httpStatus}` : null)
-      ?? (typeof entry.providerResultCode === "string" ? `PROVIDER_${entry.providerResultCode}` : "UNSPECIFIED");
-    const key = `${entry.reasonCode}/${detail}`;
+    const reason = diagnosticToken(entry?.reasonCode, /^PUBLIC_API_[A-Z0-9_]{1,63}$/, "PUBLIC_API_UNKNOWN");
+    let detail = "UNSPECIFIED";
+    if (entry?.transportReason !== undefined) {
+      detail = diagnosticToken(entry.transportReason, /^[A-Z][A-Z0-9_]{1,63}$/, "TRANSPORT_UNKNOWN");
+    } else if (entry?.httpStatus !== undefined) {
+      detail = Number.isInteger(entry.httpStatus) && entry.httpStatus >= 100 && entry.httpStatus <= 599
+        ? `HTTP_${entry.httpStatus}` : "HTTP_UNKNOWN";
+    } else if (entry?.providerResultCode !== undefined) {
+      detail = `PROVIDER_${diagnosticToken(entry.providerResultCode, /^[A-Za-z0-9._-]{1,32}$/, "UNKNOWN")}`;
+    }
+    const key = `${reason}/${detail}`;
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   return [...counts.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([key, count]) => `${key}=${count}`);
+}
+
+function diagnosticToken(value, pattern, fallback) {
+  return typeof value === "string" && pattern.test(value) ? value : fallback;
 }
 
 function indexKnownProviderCandidates(sourceCandidates) {
