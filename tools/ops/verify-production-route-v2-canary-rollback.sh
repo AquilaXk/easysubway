@@ -242,6 +242,16 @@ route_v2_gateway_port="${route_v2_gateway_port:-8081}"
 route_v2_open_action="proxy_pass http://127.0.0.1:${route_v2_gateway_port};"
 route_v2_closed_action="return 404;"
 
+# The configured session burst allowance sizes the canary's own request volume
+# (see the canary loop below): on the real public edge the caller-supplied
+# CF-Connecting-IP is not trusted and is overwritten with the runner's actual
+# source IP, so every request this runner sends shares ONE limiter key. Reading
+# the configured value lets the canary size itself to that reality instead of
+# guessing.
+session_burst="$(read_env_value "${compose_env}" EASYSUBWAY_ROUTE_V2_SESSION_BURST)"
+[[ "${session_burst}" =~ ^[0-9]+$ && "${session_burst}" -le 20 ]] \
+	|| { echo 'configured Route V2 session burst is invalid or unexpectedly large' >&2; exit 1; }
+
 # --- Gate 2: same candidate identity, sourced from INDEPENDENT deployed state ---
 # Mobile version comes from the Mobile app's own pubspec.yaml (not copied from the
 # same operations-release-evidence.json record used to build `expected`), and the
@@ -261,6 +271,11 @@ production_psql() {
 	docker exec easysubway-postgres sh -lc \
 		'psql -X -v ON_ERROR_STOP=1 -A -t -U "$POSTGRES_USER" "$POSTGRES_DB" -c "$1"' sh "${sql}"
 }
+# fresh_until is rendered in UTC ("...Z") here, while the checked-in RC evidence
+# keeps its original zone offset (e.g. "+09:00") for the SAME instant.
+# assertCandidateMatch() (route-v2-canary-rollback-evidence.mjs) compares this
+# field as parsed epoch milliseconds rather than by literal string equality, so
+# this UTC rendering does not need to match the evidence file's offset text.
 live_timetable_identity="$(production_psql "
 SELECT history.snapshot_id || '|' || history.snapshot_sha256 || '|' || TO_CHAR(history.fresh_until::timestamptz AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')
 FROM timetable_snapshot_active active
@@ -290,10 +305,21 @@ candidate_verified_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 # --- Gate 3a: signed-RC canary attestation must be provisioned (blocked on #1016) ---
 # Sourced from the deployed compose.env, never from a GitHub Actions secret — same
 # provider-key-overlay pattern as EASYSUBWAY_ROUTE_V2_ORIGIN_SECRET in the capacity
-# runner. Until #1016 provisions this key on the production host, the lookup fails
-# and the run is rejected before it sends a single canary request.
-CANARY_ATTESTATION_KEY="$(read_env_value "${compose_env}" EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY)" \
+# runner. The value is a JSON array of already-minted, genuine signed-RC Play
+# Integrity token/nonce pairs (see the "Signed-RC canary integrity token pool"
+# header comment in route-v2-canary-rollback-evidence.mjs for the full input
+# contract) — never a raw key this runner signs locally, since production's real
+# GooglePlayIntegrityDecoder (the `prod` profile) would reject any local
+# synthesis. Until #1016 provisions enough pairs on the production host, the
+# lookup/parse fails and the run is rejected before it sends a single request.
+CANARY_INTEGRITY_TOKENS_RAW="$(read_env_value "${compose_env}" EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY)" \
 	|| { echo 'signed-RC canary attestation credential is not provisioned (blocked on #1016); refusing to run' >&2; exit 1; }
+# 1 normal-profile session request, plus enough burst-profile requests to exceed
+# the CONFIGURED burst allowance by one — see the canary loop below for why
+# normal and burst share a single request budget on the real public edge.
+required_canary_requests=$((session_burst + 2))
+canary_integrity_tokens="$(node "${EVIDENCE_LIB}" parse-integrity-tokens "${CANARY_INTEGRITY_TOKENS_RAW}" "${required_canary_requests}")" \
+	|| { echo 'signed-RC canary attestation credential payload is invalid or has too few pairs (blocked on #1016); refusing to run' >&2; exit 1; }
 
 # Record the prior approved state BEFORE the canary so the rollback dry-run has an
 # authoritative target to restore. The last approved production posture keeps Route
@@ -348,34 +374,38 @@ process.stdout.write(JSON.stringify({
 }));
 ' "${departure_time}")"
 
-# Send a small signed-RC synthetic canary to the live public edge and record each
-# response's status, latency, and Cache-Control for budget scoring. The signed
-# attestation is derived from the provisioned canary attestation key; production's
-# real Play Integrity path is unaffected.
+# Send a small signed-RC canary to the live public edge using a REAL pre-minted
+# token/nonce pair from the integrity token pool (never a locally-synthesized
+# attestation — see the Gate 3a comment) and record each response's status,
+# latency, and Cache-Control for budget scoring.
+#
+# The public edge does not trust a caller-supplied CF-Connecting-IP (it is
+# overwritten with the runner's real source IP before it reaches the limiter),
+# so this function no longer accepts or sends one: every request this runner
+# sends shares exactly one limiter key, by construction, not by header choice.
 canary_sample() {
 	local profile="${1:?profile is required}" path="${2:?path is required}"
-	local client_ip="${3:?client IP is required}" index="${4:?index is required}"
-	local result time_seconds
+	local index="${3:?index is required}" token_index="${4:?token index is required}"
+	local result time_seconds attestation_file
 	last_headers="${work_dir}/headers-${index}.txt"
 	last_body="${work_dir}/body-${index}.json"
-	local signed_attestation
-	# The attestation key is passed via STDIN, never as a `node -e` argv value:
-	# argv is visible to any other process on this shared self-hosted runner host
-	# via `ps`/`/proc/<pid>/cmdline` for the lifetime of the child process, which
-	# would otherwise expose a credential capable of minting further signed-RC
-	# attestations. Reading it from fd 0 avoids that exposure entirely.
-	signed_attestation="$(printf '%s' "${CANARY_ATTESTATION_KEY}" | node -e '
-const { createHmac, randomBytes } = require("node:crypto");
-const key = require("node:fs").readFileSync(0, "utf8");
-const nonce = randomBytes(16).toString("base64url");
-const signature = createHmac("sha256", Buffer.from(key, "hex")).update(nonce).digest("base64url");
-process.stdout.write(JSON.stringify({ integrityToken: `${nonce}.${signature}`, clientNonce: nonce }));
-')"
+	attestation_file="${work_dir}/attestation-${index}.json"
+	# Extracted to a file and sent via curl's `--data-binary @file` (not an
+	# inline argv string) so the token value never appears in this process's own
+	# argv either, on general principle — though these are already single-use,
+	# short-lived, pool-issued tokens rather than a reusable signing credential.
+	node -e '
+const { writeFileSync } = require("node:fs");
+const tokens = JSON.parse(process.argv[1]);
+const pair = tokens[Number(process.argv[2])];
+if (!pair) process.exit(1);
+writeFileSync(process.argv[3], JSON.stringify({ integrityToken: pair.integrityToken, clientNonce: pair.clientNonce }));
+' "${canary_integrity_tokens}" "${token_index}" "${attestation_file}" \
+		|| { echo 'insufficient signed-RC canary integrity tokens for this request (blocked on #1016)' >&2; exit 1; }
 	result="$(curl -sS --connect-timeout 3 --max-time 10 \
 		-D "${last_headers}" -o "${last_body}" -w '%{http_code} %{time_total}' \
 		--request POST --header 'content-type: application/json' \
-		--header "CF-Connecting-IP: ${client_ip}" \
-		--data-binary "${signed_attestation}" "${PUBLIC_BASE_URL}${path}")"
+		--data-binary "@${attestation_file}" "${PUBLIC_BASE_URL}${path}")"
 	last_status="${result%% *}"
 	time_seconds="${result#* }"
 	last_latency_ms="$(node -e 'const v = Number(process.argv[1]); if (!Number.isFinite(v)) process.exit(1); process.stdout.write(String(Math.round(v * 1000)));' "${time_seconds}")"
@@ -395,14 +425,14 @@ appendFileSync(process.argv[1], JSON.stringify({
 # the active timetable it actually serves, so planner outages or timetable drift
 # behind a healthy session endpoint would previously go undetected.
 canary_search_sample() {
-	local token="${1:?token is required}" client_ip="${2:?client IP is required}" index="${3:?index is required}"
+	local token="${1:?token is required}" index="${2:?index is required}"
 	local headers_file="${work_dir}/headers-${index}.txt"
 	local body_file="${work_dir}/body-${index}.json"
 	local result status time_seconds latency_ms cache_control planner_identity_match
 	result="$(curl -sS --connect-timeout 3 --max-time 10 \
 		-D "${headers_file}" -o "${body_file}" -w '%{http_code} %{time_total}' \
 		--request POST --header 'content-type: application/json' \
-		--header "CF-Connecting-IP: ${client_ip}" --header "Authorization: Bearer ${token}" \
+		--header "Authorization: Bearer ${token}" \
 		--data-binary "${search_request_body}" "${PUBLIC_BASE_URL}/api/v2/routes/search")"
 	status="${result%% *}"
 	time_seconds="${result#* }"
@@ -428,26 +458,31 @@ appendFileSync(process.argv[1], JSON.stringify({
 ' "${samples_file}.ndjson" normal "${status}" "${latency_ms}" "${cache_control}" "${planner_identity_match}"
 }
 
+# Exactly ONE normal-profile request, then enough burst-profile requests to
+# exceed the configured burst allowance by one. All of it goes through the SAME
+# real limiter key (the runner's own source IP — see canary_sample), so sending
+# more than a couple of "normal" requests before the burst phase would risk the
+# limiter itself rejecting a later "normal" request and producing a false
+# breach; sending too few burst requests would never observe the 429 the limit
+# check requires. `session_burst + 2` matches the exact count the isolated
+# capacity runner uses to reliably cross its own burst allowance.
 : > "${samples_file}.ndjson"
-canary_index=0
 issued_token=""
-for canary_index in 1 2 3 4 5; do
-	canary_sample normal /api/v2/routes/session "198.51.100.$((canary_index + 20))" "${canary_index}"
+canary_sample normal /api/v2/routes/session 1 0
+issued_token="$(capture_issued_session "${last_body}" || true)"
+for ((burst_attempt = 0; burst_attempt <= session_burst; burst_attempt += 1)); do
+	canary_index=$((burst_attempt + 2))
+	canary_sample burst /api/v2/routes/session "${canary_index}" "$((canary_index - 1))"
 	if [[ -z "${issued_token}" ]]; then
 		issued_token="$(capture_issued_session "${last_body}" || true)"
 	fi
 done
-# Drive the session limiter past its burst so the canary confirms rate limiting
-# still engages on the live edge (a limit-safety budget dimension).
-canary_index=$((canary_index + 1))
-canary_sample burst /api/v2/routes/session 198.51.100.90 "${canary_index}"
 # Only attempt the route search canary if session issuance produced a usable
-# token — if it did not, every normal-profile sample already recorded a non-200
-# status, which evaluateCanaryBudgets treats as a budget breach on its own, and
-# the rollback dry-run below still runs unconditionally.
+# token — if none did, the normal/burst samples above already recorded enough
+# non-200 statuses for evaluateCanaryBudgets to treat this as a budget breach on
+# its own, and the rollback dry-run below still runs unconditionally.
 if [[ -n "${issued_token}" ]]; then
-	canary_index=$((canary_index + 1))
-	canary_search_sample "${issued_token}" 198.51.100.111 "${canary_index}"
+	canary_search_sample "${issued_token}" "$((required_canary_requests + 1))"
 fi
 node -e '
 const { readFileSync, writeFileSync } = require("node:fs");

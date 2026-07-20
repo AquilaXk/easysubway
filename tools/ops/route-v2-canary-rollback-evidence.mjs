@@ -58,6 +58,53 @@ function requireString(value, label) {
   return value;
 }
 
+// --- Signed-RC canary integrity token pool (input contract for #1016) ---
+//
+// A real production backend container always runs the `prod` Spring profile,
+// which wires GooglePlayIntegrityDecoder — NOT the synthetic
+// CapacityEvidencePlayIntegrityDecoder the isolated capacity-evidence clone uses.
+// This runner therefore MUST NOT locally synthesize an attestation (e.g. an
+// HMAC-signed nonce): production's real decoder would reject it and every
+// session request would fail, always reading as a budget breach. Adding a
+// synthetic decoder to the `prod` profile to make this canary pass is explicitly
+// OUT OF SCOPE and rejected on security grounds — it would be a permanent
+// authentication bypass shipped in the production artifact.
+//
+// Instead, the runner's input contract is: #1016's provisioning pipeline
+// delivers a POOL of already-minted, currently-valid, single-use signed-RC Play
+// Integrity token/nonce pairs — genuine tokens obtained from Google's Play
+// Integrity API against the approved RC candidate's signing identity — via
+// EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY in the deployed compose.env. Each
+// pair is consumed by exactly one session-issuance request (Play Integrity
+// tokens are nonce-bound and single-use against route_v2_nonce_replays, so they
+// cannot be reused across requests). The payload is a JSON array:
+//
+//   [{ "integrityToken": "<opaque Play Integrity token>", "clientNonce": "<nonce>" }, ...]
+//
+// If this value is absent, malformed, or short of the pairs a run needs, the
+// runner fails closed with "blocked on #1016" before sending a single request —
+// exactly like the (now-superseded) raw-key gate it replaces.
+export function parseCanaryIntegrityTokens(rawJson, requiredCount) {
+  if (!Number.isInteger(requiredCount) || requiredCount <= 0) {
+    throw new Error("requiredCount must be a positive integer");
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(rawJson);
+  } catch {
+    throw new Error("signed-RC canary integrity token payload is not valid JSON");
+  }
+  if (!Array.isArray(parsed) || parsed.length < requiredCount) {
+    throw new Error(
+      `signed-RC canary integrity token payload must supply at least ${requiredCount} pair(s)`,
+    );
+  }
+  return parsed.slice(0, requiredCount).map((pair, index) => ({
+    integrityToken: requireString(pair?.integrityToken, `integrity token pair[${index}].integrityToken`),
+    clientNonce: requireString(pair?.clientNonce, `integrity token pair[${index}].clientNonce`),
+  }));
+}
+
 // Resolve the single RC candidate identity from the checked-in release evidence
 // and timetable snapshot evidence. Reading these at runtime (rather than pinning
 // constants) keeps the canary tied to whatever candidate the RC bump last recorded.
@@ -89,15 +136,30 @@ export function resolveExpectedCandidate(operationsEvidence, timetableEvidence) 
 // (from the deployed runner state + workflow inputs) must equal the checked-in RC
 // candidate on every field, or the run is rejected before any traffic is sent.
 export function assertCandidateMatch(provided, expected) {
-  const fields = [
+  const strictFields = [
     "backendDeploySha",
     "mobileVersionName",
     "mobileVersionCode",
     "timetableSnapshotId",
     "timetableSnapshotSha256",
-    "timetableFreshUntil",
   ];
-  const mismatches = fields.filter((field) => provided?.[field] !== expected?.[field]);
+  const mismatches = strictFields.filter((field) => provided?.[field] !== expected?.[field]);
+
+  // timetableFreshUntil represents a single INSTANT, not a display string: the
+  // live production DB query renders it in UTC ("...Z"), while the checked-in RC
+  // evidence keeps its original zone offset (e.g. "+09:00"). A byte-for-byte
+  // string compare would reject the SAME instant on every run, so this field is
+  // compared as parsed epoch milliseconds instead of literal text.
+  const providedFreshUntilMs = Date.parse(provided?.timetableFreshUntil);
+  const expectedFreshUntilMs = Date.parse(expected?.timetableFreshUntil);
+  const freshUntilMatches =
+    Number.isFinite(providedFreshUntilMs) &&
+    Number.isFinite(expectedFreshUntilMs) &&
+    providedFreshUntilMs === expectedFreshUntilMs;
+  if (!freshUntilMatches) {
+    mismatches.push("timetableFreshUntil");
+  }
+
   if (mismatches.length > 0) {
     throw new Error(
       `canary and rollback must use the same candidate identity; mismatched fields: ${mismatches.join(", ")}`,
@@ -326,6 +388,12 @@ async function main(argv) {
     case "assert-candidate": {
       const [expectedJson, providedJson] = rest;
       assertCandidateMatch(JSON.parse(providedJson), JSON.parse(expectedJson));
+      return;
+    }
+    case "parse-integrity-tokens": {
+      const [rawJson, requiredCountArg] = rest;
+      const tokens = parseCanaryIntegrityTokens(rawJson, Number(requiredCountArg));
+      process.stdout.write(`${JSON.stringify(tokens)}\n`);
       return;
     }
     case "evaluate-budgets": {

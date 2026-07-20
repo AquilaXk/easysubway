@@ -197,6 +197,35 @@ if [[ ! "$(value EASYSUBWAY_ROUTE_V2_PLAY_INTEGRITY_CERTIFICATE_SHA256)" =~ ^[A-
 	exit 1
 fi
 
+# EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY (issue #2095, blocked on #1016) is
+# OPTIONAL — its absence is exactly what makes the canary/rollback dry-run runner
+# (tools/ops/verify-production-route-v2-canary-rollback.sh) fail closed until
+# #1016 provisions it, so a normal deploy must not require it. When present it
+# must be a non-empty JSON array of {"integrityToken","clientNonce"} string
+# pairs (real, pre-minted signed-RC Play Integrity tokens — see the
+# route-v2-canary-rollback-evidence.mjs header comment for the full contract),
+# never a raw synthesis key.
+canary_attestation_key_value="$(value EASYSUBWAY_ROUTE_V2_CANARY_ATTESTATION_KEY)"
+if [[ -n "${canary_attestation_key_value}" ]]; then
+	if ! printf '%s' "${canary_attestation_key_value}" | node -e '
+const raw = require("node:fs").readFileSync(0, "utf8");
+let parsed;
+try {
+  parsed = JSON.parse(raw);
+} catch {
+  process.exit(1);
+}
+if (!Array.isArray(parsed) || parsed.length === 0) process.exit(1);
+for (const pair of parsed) {
+  if (typeof pair?.integrityToken !== "string" || pair.integrityToken.length === 0) process.exit(1);
+  if (typeof pair?.clientNonce !== "string" || pair.clientNonce.length === 0) process.exit(1);
+}
+'; then
+		printf 'invalid Route V2 canary attestation key payload\n' >&2
+		exit 1
+	fi
+fi
+
 if [[ "$(value EASYSUBWAY_BACKEND_BIND)" != "127.0.0.1" ]]; then
 	printf 'backend bind must be 127.0.0.1\n' >&2
 	exit 1
