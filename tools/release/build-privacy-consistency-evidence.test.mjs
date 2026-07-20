@@ -42,10 +42,11 @@ async function fixtureRepoRoot({ mutateInventory, mutatePlayForm, mutatePolicy }
 }
 
 // PR #2357 폴백 리뷰(review id 4732563185)의 aggregate flag 지적(모든 dataType이 4개
-// boolean을 명시)을 만족하는 fixture. 실제 tracked play-store-submission-content.json은
-// 5개 dataType이 containsDeletionUnsupportedData를 생략해 이 요구를 충족하지 못한다(아래
-// "현재 tracked 원본" 테스트가 그 사실 자체를 검증한다) — 이 fixture는 "데이터가 완전할
-// 때 SATISFIED가 나온다"는 happy path를 별도로 증명하기 위한 것이다.
+// boolean을 명시)을 만족하는 fixture. tracked play-store-submission-content.json은 이제
+// 5개 dataType의 containsDeletionUnsupportedData를 명시적 boolean으로 보정해 이 요구를
+// 충족하므로 이 helper는 tracked 원본에는 no-op이지만, 명시 flag가 빠진 폼에서도 happy
+// path("데이터가 완전할 때 SATISFIED가 나온다")를 안정적으로 재현하기 위한 조건부
+// 안전망으로 남긴다.
 function fillExplicitAggregateFlags(playForm) {
   for (const entry of playForm.dataSafetyDeclarations.answerMatrix) {
     if (typeof entry.containsDeletionUnsupportedData !== "boolean") {
@@ -93,12 +94,14 @@ test("aggregate flag가 모두 명시적 boolean이고 provenance가 검토 revi
 
 // [Major, PR #2357 review 4732563185] 2026-07-18 커밋(7ca86806)이 Play Console 재제출·검토
 // 당시의 play-store-submission-content.json이고, 그 sha256을 BOUND_EVIDENCE_REFERENCES에
-// 고정했다. 2026-07-19 커밋(9fd69f5, train_search_queries 추가)이 그 뒤로 파일을 바꿨으므로
-// 현재 tracked 파일은 검토된 revision과 다르다 — provenance는 STALE이어야 하고(위조 금지),
-// 같은 변경으로 5개 dataType이 containsDeletionUnsupportedData를 명시하지 않아
-// answerMatrix도 FAILED다. 정책 anchor·inventory boundary fact는 이 변경과 무관하게
-// 여전히 일치한다.
-test("현재 tracked 원본에 대해 실행하면 실제 결함(폼 provenance stale·집계 flag 누락)을 fail-closed로 드러낸다", () => {
+// 고정했다. 이후 커밋(train_search_queries 추가 등)이 그 뒤로 파일을 바꿨으므로 현재
+// tracked 파일은 검토된 revision과 다르다 — provenance는 여전히 STALE이어야 한다(위조 금지).
+// 반면 그 review가 지적한 5개 dataType의 containsDeletionUnsupportedData 누락은 이제
+// 폼에 명시적 boolean으로 보정돼 answerMatrix 집계 flag 모순은 0이다. 정책 anchor·inventory
+// boundary fact도 무관하게 여전히 일치한다. 따라서 남은 결함은 provenance STALE 하나뿐이며
+// 전체 status는 그 하나 때문에 여전히 BLOCKED다(reviewedFormSha256은 오너가 Play Console에서
+// 보정본을 재제출·재검토한 뒤에만 후속 PR로 재고정한다).
+test("현재 tracked 원본에 대해 실행하면 집계 flag 누락은 보정됐지만 폼 provenance stale은 fail-closed로 남는다", () => {
   const evidence = buildPrivacyConsistencyEvidence({
     candidate: candidate(),
     repoRoot: REPO_ROOT,
@@ -117,22 +120,19 @@ test("현재 tracked 원본에 대해 실행하면 실제 결함(폼 provenance 
   );
   assert.equal(evidence.checks.playConsoleProvenanceCurrent, "STALE");
 
-  assert.equal(evidence.checks.inventoryFormConsistent, "FAILED");
+  // 5개 dataType 집계 flag 보정 후 answerMatrix 집계 flag 모순은 0이고 판정은 SATISFIED다.
+  assert.equal(evidence.checks.inventoryFormConsistent, "SATISFIED");
   const missingFlagTypes = evidence.answerMatrixConsistency.contradictions
     .filter((item) => item.code === "aggregate_flag_missing_or_not_boolean")
     .map((item) => item.dataType)
     .sort();
-  assert.deepEqual(missingFlagTypes, [
-    "Diagnostics",
-    "Location",
-    "Personal info",
-    "Photos and videos",
-    "User-generated content",
-  ]);
+  assert.deepEqual(missingFlagTypes, []);
+  assert.equal(evidence.answerMatrixConsistency.consistent, true);
 
   assert.equal(evidence.checks.inventoryPolicyConsistent, "SATISFIED");
   assert.equal(evidence.policyBoundaryConsistency.consistent, true);
 
+  // provenance STALE 하나만 남아 전체 status는 여전히 BLOCKED다.
   assert.equal(evidence.status, "BLOCKED_PRIVACY_CONSISTENCY");
 });
 
