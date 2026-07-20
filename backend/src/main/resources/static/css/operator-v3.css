@@ -352,6 +352,9 @@ input:focus-visible {
 	vertical-align: top;
 	font-size: 13px;
 	line-height: 1.45;
+	/* 한글 어절 단위 줄바꿈(#2349 PR⑩a, admin-components.css와 동일 원칙) — 좁은 컬럼에서 지역·역명이
+	   낱글자 단위로 세로 줄바꿈("강원/권", "남춘/천")되는 것을 막는다. */
+	word-break: keep-all;
 }
 
 .data-table th {
