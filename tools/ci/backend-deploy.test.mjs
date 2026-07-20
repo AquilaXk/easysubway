@@ -6,6 +6,10 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test, { afterEach } from "node:test";
 import { promisify } from "node:util";
+import {
+  DEFAULT_MARGIN_SECONDS,
+  evaluateSnapshotFreshnessPrecheck,
+} from "../deploy/check-snapshot-freshness-precheck.mjs";
 
 const root = process.cwd();
 const execFileAsync = promisify(execFile);
@@ -672,4 +676,186 @@ test("Compose backend 서비스는 bootJar 기반 이미지와 제한된 바인�
     assert.match(block, /^    cap_drop:\s*\n      - ALL$/m, `${service} capabilities`);
     assert.match(block, /^    security_opt:\s*\n      - no-new-privileges:true$/m, `${service} no-new-privileges`);
   }
+});
+
+const FRESHNESS_PRECHECK = "tools/deploy/check-snapshot-freshness-precheck.mjs";
+
+async function runFreshnessPrecheck(evidence, extraArgs = []) {
+  const dir = await mkdtemp(path.join(tmpdir(), "easysubway-snapshot-precheck-"));
+  deploymentTempDirs.add(dir);
+  const evidencePath = path.join(dir, "server-timetable-snapshot-evidence.json");
+  await writeFile(evidencePath, typeof evidence === "string" ? evidence : JSON.stringify(evidence));
+  try {
+    const { stdout } = await execFileAsync("node", [FRESHNESS_PRECHECK, evidencePath, ...extraArgs], { cwd: root });
+    return { exitCode: 0, stdout };
+  } catch (error) {
+    return { exitCode: error.code ?? 1, stdout: String(error.stdout ?? ""), stderr: String(error.stderr ?? "") };
+  }
+}
+
+test("snapshot freshness precheck는 만료·마진 내 만료·유효를 판정한다", () => {
+  const now = new Date("2026-07-20T00:00:00Z");
+  const margin = 2 * 60 * 60;
+
+  const expired = evaluateSnapshotFreshnessPrecheck({
+    freshUntil: "2026-07-19T23:00:00Z",
+    now,
+    marginSeconds: margin,
+  });
+  assert.equal(expired.expired, true);
+  assert.equal(expired.stale, true);
+  assert.equal(expired.ok, false);
+
+  const withinMargin = evaluateSnapshotFreshnessPrecheck({
+    freshUntil: "2026-07-20T01:00:00Z",
+    now,
+    marginSeconds: margin,
+  });
+  assert.equal(withinMargin.expired, false);
+  assert.equal(withinMargin.stale, true);
+  assert.equal(withinMargin.ok, false);
+
+  const boundary = evaluateSnapshotFreshnessPrecheck({
+    freshUntil: "2026-07-20T02:00:00Z",
+    now,
+    marginSeconds: margin,
+  });
+  assert.equal(boundary.stale, true, "freshUntil == now + margin is treated as stale");
+
+  const fresh = evaluateSnapshotFreshnessPrecheck({
+    freshUntil: "2026-07-20T02:00:01Z",
+    now,
+    marginSeconds: margin,
+  });
+  assert.equal(fresh.expired, false);
+  assert.equal(fresh.stale, false);
+  assert.equal(fresh.ok, true);
+});
+
+test("snapshot freshness precheck는 timezone offset을 가진 freshUntil을 파싱한다", () => {
+  const now = new Date("2026-07-19T14:59:59Z");
+  const result = evaluateSnapshotFreshnessPrecheck({
+    freshUntil: "2026-07-20T00:00:00+09:00",
+    now,
+    marginSeconds: 0,
+  });
+  // 2026-07-20T00:00:00+09:00 == 2026-07-19T15:00:00Z, still 1s ahead of now.
+  assert.equal(result.expired, false);
+  assert.equal(result.ok, true);
+});
+
+test("snapshot freshness precheck는 잘못된 입력을 거부한다", () => {
+  assert.throws(
+    () => evaluateSnapshotFreshnessPrecheck({ freshUntil: "not-a-dateZ", now: new Date(), marginSeconds: 0 }),
+    /invalid freshUntil timestamp/,
+  );
+  assert.throws(
+    () => evaluateSnapshotFreshnessPrecheck({ freshUntil: "2026-07-20T00:00:00Z", now: new Date(), marginSeconds: -1 }),
+    /marginSeconds must be a non-negative integer/,
+  );
+  assert.equal(DEFAULT_MARGIN_SECONDS, 2 * 60 * 60);
+});
+
+test("snapshot freshness precheck는 timezone offset 없는 freshUntil을 backend 게이트와 동일하게 거부한다", () => {
+  // backend TimetableSeedLoader의 활성 경로는 OffsetDateTime.parse로 offset 없는
+  // timestamp를 예외로 거부한다. 이 안전망이 Date.parse의 관대한 로컬-타임존 파싱으로
+  // offset 없는 값을 통과시키면, precheck는 fresh로 오판하고 force-recreate된 새
+  // 컨테이너가 부팅 fail-closed로 죽는다 — 정확히 이 사전 검사가 막으려는 장애다.
+  for (const naive of [
+    "2026-07-20T00:00:00", // naive datetime, offset 없음
+    "2026-07-20", // date-only
+    "2026-07-20 00:00:00", // space-separated naive datetime
+  ]) {
+    assert.throws(
+      () => evaluateSnapshotFreshnessPrecheck({ freshUntil: naive, now: new Date(), marginSeconds: 0 }),
+      /freshUntil must carry a timezone offset/,
+      `expected rejection for offset-less freshUntil: ${naive}`,
+    );
+  }
+  // Z, +09:00, -0500 표기는 모두 허용된다.
+  for (const withOffset of ["2026-07-20T00:00:00Z", "2026-07-20T00:00:00+09:00", "2026-07-20T00:00:00-0500"]) {
+    assert.doesNotThrow(() =>
+      evaluateSnapshotFreshnessPrecheck({ freshUntil: withOffset, now: new Date("2000-01-01T00:00:00Z"), marginSeconds: 0 }));
+  }
+});
+
+test("snapshot freshness precheck CLI는 유효 snapshot을 통과시킨다", async () => {
+  const { exitCode } = await runFreshnessPrecheck(
+    { freshUntil: "2099-01-01T00:00:00+09:00" },
+    ["--margin-seconds", "0"],
+  );
+  assert.equal(exitCode, 0);
+});
+
+test("snapshot freshness precheck CLI는 만료 snapshot에서 non-zero로 종료한다", async () => {
+  const { exitCode, stdout } = await runFreshnessPrecheck(
+    { freshUntil: "2000-01-01T00:00:00+09:00" },
+    ["--margin-seconds", "0"],
+  );
+  assert.equal(exitCode, 1);
+  assert.match(stdout, /verdict=expired/);
+});
+
+test("snapshot freshness precheck CLI는 마진 내 만료 snapshot을 차단한다", async () => {
+  const soon = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+  const { exitCode, stdout } = await runFreshnessPrecheck(
+    { freshUntil: soon },
+    ["--margin-seconds", "7200"],
+  );
+  assert.equal(exitCode, 1);
+  assert.match(stdout, /verdict=expiring_within_margin/);
+});
+
+test("snapshot freshness precheck CLI는 값 없는 --margin-seconds를 무음 기본값 폴백 대신 명시적으로 거부한다", async () => {
+  const { exitCode, stderr } = await runFreshnessPrecheck(
+    { freshUntil: "2099-01-01T00:00:00+09:00" },
+    ["--margin-seconds"],
+  );
+  assert.equal(exitCode, 1);
+  assert.match(stderr, /--margin-seconds requires a value/);
+});
+
+test("snapshot freshness precheck CLI는 evidence 누락·손상 시 fail closed 한다", async () => {
+  const missingFreshUntil = await runFreshnessPrecheck({ schemaVersion: 1 }, ["--margin-seconds", "0"]);
+  assert.equal(missingFreshUntil.exitCode, 1);
+
+  const corrupt = await runFreshnessPrecheck("{ not json", ["--margin-seconds", "0"]);
+  assert.equal(corrupt.exitCode, 1);
+});
+
+test("CD 배포는 컨테이너 교체 전에 timetable snapshot freshness를 사전 검사한다", () => {
+  const deploy = read("tools/deploy/deploy-backend.sh");
+
+  assert.match(
+    deploy,
+    /SNAPSHOT_FRESHNESS_PRECHECK_MARGIN_SECONDS="\$\{SNAPSHOT_FRESHNESS_PRECHECK_MARGIN_SECONDS:-7200\}"/,
+  );
+  assert.match(
+    deploy,
+    /SNAPSHOT_EVIDENCE_PATH="backend\/src\/main\/resources\/timetable\/server-timetable-snapshot-evidence\.json"/,
+  );
+  assert.match(
+    deploy,
+    /node tools\/deploy\/check-snapshot-freshness-precheck\.mjs \\\n\t"\$\{SNAPSHOT_EVIDENCE_PATH\}" \\\n\t--margin-seconds "\$\{SNAPSHOT_FRESHNESS_PRECHECK_MARGIN_SECONDS\}"/,
+  );
+  assert.match(deploy, /write_result "blocked" "stale_snapshot_precheck_failed"/);
+
+  const precheckIndex = deploy.indexOf("check-snapshot-freshness-precheck.mjs");
+  const noopExitIndex = deploy.indexOf('write_result "noop" "same_sha_same_env_services_ready"');
+  const forceRecreateIndex = deploy.indexOf('write_phase "restarting"');
+  const backupIndex = deploy.indexOf("needs_backup=0");
+  const legacyStopIndex = deploy.lastIndexOf("\nstop_legacy_backend_service\n");
+  assert.notEqual(precheckIndex, -1);
+  assert.ok(noopExitIndex < precheckIndex, "precheck must not disturb the same-SHA no-op success path");
+  assert.ok(precheckIndex < backupIndex, "precheck must run before postgres backup");
+  assert.ok(precheckIndex < legacyStopIndex, "precheck must run before stopping the legacy backend");
+  assert.ok(precheckIndex < forceRecreateIndex, "precheck must run before the container force-recreate");
+
+  // The stale abort must not go through fail_backend_deployment (which rolls the
+  // running containers via force-recreate); it must leave the running backend
+  // untouched. Assert the stale-abort block writes a blocked result and exits
+  // without a fail_backend_deployment call between the precheck and the abort.
+  const staleBlock = deploy.slice(precheckIndex, deploy.indexOf("needs_backup=0", precheckIndex));
+  assert.doesNotMatch(staleBlock, /fail_backend_deployment/);
+  assert.match(staleBlock, /write_result "blocked" "stale_snapshot_precheck_failed"\n\texit 1/);
 });
