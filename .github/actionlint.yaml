@@ -1,0 +1,5 @@
+self-hosted-runner:
+  # self-hosted 운영 러너의 커스텀 라벨. 등록하지 않으면 runs-on의 이 라벨을
+  # actionlint가 미지의 라벨로 오탐 처리한다(#2396).
+  labels:
+    - easysubway-production
