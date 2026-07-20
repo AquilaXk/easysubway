@@ -5,9 +5,9 @@
 // 근거를 tracked source·test 참조로 결합한다. UI 렌더링/길찾기 로직을 재구현하지 않고, 이미
 // tracked된 위젯 test 이름과 request 직렬화 소스의 존재·내용만 정적으로 검증한다.
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { runCandidateContextEvidenceCli } from "./lib/candidate-context-evidence-cli.mjs";
 
 const API_CATALOG_ID = "internal:POST:/api/v2/routes/search:com.easysubway.route.adapter.in.web.RouteSearchController#searchRouteV2";
 
@@ -263,25 +263,4 @@ export function buildMobileConsumptionEvidence({
   };
 }
 
-function argument(name) {
-  const index = process.argv.indexOf(`--${name}`);
-  return index < 0 ? null : process.argv[index + 1];
-}
-
-const entry = process.argv[1] ? path.resolve(process.argv[1]) : null;
-if (entry === fileURLToPath(import.meta.url)) {
-  const candidatePath = argument("candidate-context");
-  const outputPath = argument("output");
-  if (!candidatePath || !outputPath) {
-    throw new Error("--candidate-context and --output are required");
-  }
-  const repoRoot = argument("repo-root") ? path.resolve(argument("repo-root")) : process.cwd();
-  const provenance = argument("provenance") ?? "final-candidate";
-  const evidence = buildMobileConsumptionEvidence({
-    candidate: JSON.parse(readFileSync(candidatePath, "utf8")),
-    repoRoot,
-    provenance,
-  });
-  mkdirSync(path.dirname(outputPath), { recursive: true });
-  writeFileSync(outputPath, `${JSON.stringify(evidence, null, 2)}\n`);
-}
+runCandidateContextEvidenceCli(import.meta.url, buildMobileConsumptionEvidence);
