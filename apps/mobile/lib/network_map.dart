@@ -22,7 +22,7 @@ import 'features/network_map/presentation/station_fan_menu_geometry.dart'
     show kFanMenuDesignSize;
 import 'features/network_map/presentation/route_map_basemap_view.dart';
 import 'features/network_map/presentation/route_map_label_layout.dart'
-    show kRouteMapOwnerLabelMaxAnchorDistancePx;
+    show routeMapOwnerLabelMaxAnchorDistancePxFor;
 import 'features/network_map/presentation/structured_route_map_painter.dart';
 import 'features/realtime/realtime_repository.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
@@ -4287,9 +4287,8 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     // 오매치로 분류된다. 실측 근거: 정상 매치 최댓값 421.7px, 좌천 교차-노선
     // 오배정 후보는 1113px+ (안전마진 충분) — route_map_label_layout.dart의
     // kRouteMapOwnerLabelMaxAnchorDistancePx 문서 참고.
-    final ownerLabelMaxAnchorDistancePx = basemapAssetId == 'busan'
-        ? 450.0
-        : kRouteMapOwnerLabelMaxAnchorDistancePx;
+    final ownerLabelMaxAnchorDistancePx =
+        routeMapOwnerLabelMaxAnchorDistancePxFor(basemapAssetId);
     return Stack(
       fit: StackFit.expand,
       children: [

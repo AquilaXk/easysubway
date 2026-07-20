@@ -419,6 +419,92 @@ void main() {
     );
   });
 
+  test('#2068 부산 리뷰: 동명 폴백 억제는 하드코딩 185가 아니라 위치 게이트 파라미터를 쓴다', () {
+    // 위 "부산 5차" 테스트는 쌍둥이 간격이 50px(185·450 둘 다 이내)라 억제
+    // 함수가 상수(185)를 쓰든 파라미터를 쓰든 결과가 같아 배선 회귀를 못 잡는다.
+    // 부산은 정상 매치 거리가 232~421px라 위치 게이트가 450인데, 억제 판정이
+    // 185를 쓰면 185 초과·450 이내 구간의 동명 폴백이 억제되지 않아 화면에 같은
+    // 이름이 2번 그려진다. 쌍둥이 간격을 300px(185<300<=450)로 두어, 파라미터를
+    // 실제로 참조해야만 통과하도록 못 박는다.
+    final map = StructuredRouteMap(
+      lines: const [],
+      stations: [
+        RouteMapStructuredStation(
+          stationId: 'a',
+          lineId: 'L1',
+          sequence: 0,
+          position: const Offset(0, 0),
+          labelPolygon: const [],
+          labelClass: RouteMapLabelClass.regular,
+        ),
+        RouteMapStructuredStation(
+          stationId: 'b',
+          lineId: 'L2',
+          sequence: 0,
+          position: const Offset(300, 0),
+          labelPolygon: const [],
+          labelClass: RouteMapLabelClass.regular,
+        ),
+      ],
+      transferGroups: const [],
+    );
+    const design = RouteMapDesignSpace(designScale: 1);
+    // 오너 라벨 1개(a 근접). b는 1:1 최근접 규칙상 미매치 → 폴백.
+    const ownerLabels = <String, List<RouteMapOwnerLabelEntry>>{
+      '동명역': [
+        RouteMapOwnerLabelEntry(
+          station: '동명역',
+          role: 'ordinary',
+          position: Offset(0, 0),
+          anchor: RouteMapOwnerLabelAnchor.middle,
+          fontSizePx: 13.0,
+        ),
+      ],
+    };
+    const names = <String, String>{'a': '동명역', 'b': '동명역'};
+    int labelCountAt(double gatePx) => solveRouteMapLabelLayout(
+      map: map,
+      design: design,
+      labelTextByStationId: const {'a': '동명', 'b': '동명'},
+      badgeLabelByLineId: const {},
+      measureLabel: _measureLabel,
+      measureBadge: _measureBadge,
+      basemap: true,
+      ownerLabelsByStationName: ownerLabels,
+      stationNameByStationId: names,
+      ownerLabelMaxAnchorDistancePx: gatePx,
+    ).labels.where((l) => l.text == '동명').length;
+
+    // 부산 배선(450): a 매치 앵커(0,0)와 b 폴백(300,0) 거리 300 <= 450 →
+    // b 억제 → "동명" 1개. (버그: 억제가 185를 쓰면 300>185라 억제 실패 → 2개.)
+    expect(
+      labelCountAt(450.0),
+      1,
+      reason: '위치 게이트 450에서 300px 떨어진 동명 폴백은 억제돼야 한다(파라미터 참조)',
+    );
+    // 대조군(185): 300 > 185 → 억제 조건 밖 → 두 폴백 모두 표시(억제가
+    // 게이트 값에 조건적임을 확인 — 무조건 1개가 아님).
+    expect(
+      labelCountAt(185.0),
+      2,
+      reason: '위치 게이트 185에서 300px는 억제 범위 밖이라 두 라벨 모두 표시된다',
+    );
+  });
+
+  test('#2068 부산 배선 가드: busan region이면 위치 게이트 450, 그 외는 기본값(185)', () {
+    // network_map.dart 위젯 build 경로가 basemapAsset…='busan'일 때 450을,
+    // 나머지 권역은 기본값을 솔버에 넘기는 분기를 이 순수 함수로 공유한다.
+    // 인라인 삼항을 이 함수로 배선했으므로(회귀 시 red) 여기서 값을 고정한다.
+    expect(routeMapOwnerLabelMaxAnchorDistancePxFor('busan'), 450.0);
+    for (final id in const ['seoul', 'daegu', 'daejeon', 'gwangju', null]) {
+      expect(
+        routeMapOwnerLabelMaxAnchorDistancePxFor(id),
+        kRouteMapOwnerLabelMaxAnchorDistancePx,
+        reason: '$id 권역은 seoul 캘리브레이션 기본 게이트를 유지해야 한다',
+      );
+    }
+  });
+
   test('기본 모드는 일반 역 노드 장애물을 시드하지 않는다 (basemap 전용 — baseline 불변)', () {
     // 겹치는 좌표 두 역: basemap이면 노드 rect가 서로를 밀어내지만, 기본 모드는
     // 노드 장애물이 없어 라벨이 상대 노드 좌표 근처에 놓일 수 있다. 두 모드의

@@ -260,6 +260,18 @@ RouteMapStaticLabel _ownerFixedLabel({
 /// 별도로 해소한다(거리 게이트와 최근접 우선은 서로 다른 안전장치).
 const double kRouteMapOwnerLabelMaxAnchorDistancePx = 185.0;
 
+/// basemap 권역별 오너 라벨↔후보 위치 게이트(px)를 결정한다.
+///
+/// #2068 부산 라벨 지오메트리 튜닝 라운드(2026-07-20): 부산은 designScale이
+/// 작고(0.237) 밀집·折 회랑에서 라벨을 자기 노드에서 상대적으로 멀리 그리는
+/// 화풍이라 seoul 캘리브레이션(185px)로는 정상 매치(예: 토성 421.7px)가
+/// 오매치로 분류된다(정상 매치 최댓값 421.7px, 오배정 후보는 1113px+ 안전마진
+/// 충분). 부산만 450으로 완화하고 나머지 권역은 기본값을 유지한다. 위젯
+/// build 경로(network_map.dart)와 게이트 테스트가 이 단일 함수를 공유해
+/// 배선 회귀를 함께 감시한다.
+double routeMapOwnerLabelMaxAnchorDistancePxFor(String? basemapAssetId) =>
+    basemapAssetId == 'busan' ? 450.0 : kRouteMapOwnerLabelMaxAnchorDistancePx;
+
 /// SVG·DB 표기 차 정규화(#2068 7차 지시 2) — 중점(·)을 마침표(.)로 통일해
 /// "4·19민주묘지"/DB "4.19민주묘지", "전대·에버랜드"/DB "전대.에버랜드" 2건을
 /// 회수한다. **다른 정규화는 과매칭 위험이 있어 추가하지 않는다**(공백·괄호·
@@ -545,8 +557,12 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
     final anchors = ownerMatchedAnchorsByName[name];
     if (anchors == null) return false;
     for (final anchor in anchors) {
-      if ((anchor - anchorDesign).distance <=
-          kRouteMapOwnerLabelMaxAnchorDistancePx) {
+      // #2068 부산 리뷰: 근접 판정은 하드코딩 상수(185, seoul 캘리브레이션)가
+      // 아니라 이 호출의 위치 게이트 파라미터를 써야 한다. 부산은 정상 매치
+      // 거리가 232~421px라 게이트가 450인데, 여기서만 185를 쓰면 동명 쌍둥이역
+      // (부전 1호선·동해선 등 별개 station_id)의 폴백 억제가 185 초과에서 실패해
+      // 같은 이름이 화면에 2번 그려진다.
+      if ((anchor - anchorDesign).distance <= ownerLabelMaxAnchorDistancePx) {
         return true;
       }
     }

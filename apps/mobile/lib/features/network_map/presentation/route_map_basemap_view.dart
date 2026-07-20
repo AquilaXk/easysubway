@@ -257,7 +257,10 @@ class _RouteMapBasemapViewState extends State<RouteMapBasemapView> {
   Widget build(BuildContext context) {
     _ensureAttributionPainter();
     // RepaintBoundary로 바탕 레이어를 형제 오버레이 rebuild와 분리한다.
-    // isComplex/willChange 힌트로 정적 Picture 재생 레이어의 raster 캐싱을 돕는다.
+    // isComplex=true는 이 레이어가 값비싼 그리기임을(래스터 캐시 가치 있음),
+    // willChange=true는 다음 프레임에 다시 바뀔 것임을(래스터 캐시를 유지하지
+    // 말라는 힌트 — isComplex 캐싱을 억제) 엔진에 알린다. 이 바탕은 카메라
+    // 팬/줌마다 매 프레임 repaint되는 레이어라 willChange가 적절하다.
     return RepaintBoundary(
       child: CustomPaint(
         size: widget.camera.viewportSize,
