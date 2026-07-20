@@ -3,6 +3,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { validateSourceGovernancePolicy } from "../datapack/source-governance-policy.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
+import { codepointCompare } from "../lib/codepoint-compare.mjs";
 
 const DATAPACK_MANIFEST_SCHEMA_PATH = "contracts/datapack/datapack-manifest.schema.json";
 const DATAPACK_INDEX_SCHEMA_PATH = "contracts/datapack/datapack-index.schema.json";
@@ -249,7 +250,7 @@ function validateEnvScopeMap(errors) {
 }
 
 function compareText(left, right) {
-  return left.localeCompare(right);
+  return codepointCompare(left, right);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

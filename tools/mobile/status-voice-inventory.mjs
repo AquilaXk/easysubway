@@ -34,6 +34,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { codepointCompare } from "../lib/codepoint-compare.mjs";
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const DEFAULT_ROOT = join(HERE, '..', '..');
@@ -303,12 +304,12 @@ function extractSingleQuoted(line) {
 // 우선순위를 판정한다.
 function compareEntries(a, b) {
   if (a.file !== b.file) {
-    return a.file.localeCompare(b.file);
+    return codepointCompare(a.file, b.file);
   }
   if (a.line !== b.line) {
     return a.line - b.line;
   }
-  return a.text.localeCompare(b.text);
+  return codepointCompare(a.text, b.text);
 }
 
 function classify(text, relFile, rawLine) {
