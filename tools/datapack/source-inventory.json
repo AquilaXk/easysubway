@@ -514,7 +514,7 @@
         "regionIds": ["gwangju"],
         "operatorIds": ["gwangju-metropolitan-rapid-transit"],
         "lineIds": ["line-e57a361e8892"],
-        "sourceDomains": ["route_graph_topology", "station_line_membership"]
+        "sourceDomains": ["route_graph_topology"]
       },
       "requiredForProductionPack": false,
       "productionUseAllowed": true,
@@ -565,11 +565,9 @@
         "capturedAt": "2026-07-20T13:08:47.161Z",
         "freshUntil": "2026-07-21T13:08:47.161Z",
         "stationCount": 20,
-        "odRowCount": 380,
         "edgeCount": 38,
+        "excludedTransferCount": 0,
         "rawSha256": "15e4a6835dff21997d29707b0554580560fd770388156b2ac169508cdfd6636a",
-        "scopeSha256": "42d1a6e82b0c4dd0b199f90fe620c38ddb2a9826df334c39a2d0692449324de4",
-        "edgesSha256": "8b0f77bb79db55e6f035e3e713bf9c2ade0b1a7619d495db44cefa1420257d0d",
         "contentSha256": "d8197488bc6dda94e595f7e350cc65c547117da804fb59b7dff85d18b3192e43"
       }
     },
@@ -638,16 +636,11 @@
         "capturedAt": "2026-07-20T12:55:50.079Z",
         "freshUntil": "2026-07-21T12:55:50.079Z",
         "rowCount": 13362,
-        "admittedOfficialRowCount": 13360,
+        "departureCount": 13360,
         "tripCount": 810,
         "stopTimeCount": 14171,
-        "generatedStopTimeCount": 811,
-        "quarantinedRows": [
-          { "dayCode": "DAYOFF", "direction": "st", "stationCode": "119", "time": "0756" },
-          { "dayCode": "DAYOFF", "direction": "st", "stationCode": "118", "time": "0759" }
-        ],
+        "rawSha256": "852b75f79ca7cccf8dfefc65ee4fe226f833e6cd2e52f5e721efdfac2efdc31a",
         "rowsSha256": "2eec08dc30a97c50fd349dc607e77677829881790b5ca896856caa4b9bbd3ccd",
-        "contentSha256": "b050ed92cbdd555e22e987e4854a7d60b5293951992d6c14ae26c110f9b4fb5a",
         "topologySourceId": "gwangju-transportation-route-topology",
         "topologySnapshotId": "gwangju-transportation-route-topology-20260720",
         "topologyContentSha256": "d8197488bc6dda94e595f7e350cc65c547117da804fb59b7dff85d18b3192e43"
@@ -683,7 +676,7 @@
         "redistributionAllowed": true,
         "evidenceUrl": "https://www.data.go.kr/data/15122916/fileData.do"
       },
-      "fieldsProvided": ["line", "station_name"],
+      "fieldsProvided": ["line", "station_name", "station_code"],
       "capabilities": {
         "schedule": {
           "status": "UNSUPPORTED",

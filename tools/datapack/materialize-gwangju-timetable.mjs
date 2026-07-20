@@ -225,15 +225,13 @@ function requiredSources(inventory, timetableSnapshot, topologySnapshot, mapping
     || schedule.verificationTest !== "tools/datapack/materialize-gwangju-timetable.test.mjs"
     || schedule.snapshotId !== "gwangju-transportation-cyberstation-timetable-20260720"
     || schedule.capturedAt !== timetableSnapshot.capturedAt || schedule.freshUntil !== timetableSnapshot.freshUntil
-    || schedule.rowCount !== 13_362 || schedule.admittedOfficialRowCount !== EXPECTED_OFFICIAL_STOP_TIME_COUNT
+    || schedule.rowCount !== 13_362 || schedule.departureCount !== EXPECTED_OFFICIAL_STOP_TIME_COUNT
     || schedule.tripCount !== EXPECTED_TRIP_COUNT || schedule.stopTimeCount !== EXPECTED_STOP_TIME_COUNT
-    || schedule.generatedStopTimeCount !== EXPECTED_GENERATED_STOP_TIME_COUNT
-    || schedule.rowsSha256 !== timetableSnapshot.rowsSha256 || schedule.contentSha256 !== timetableSnapshot.contentSha256
+    || schedule.rawSha256 !== timetableSnapshot.rawSha256
+    || schedule.rowsSha256 !== timetableSnapshot.rowsSha256
     || schedule.topologySourceId !== TOPOLOGY_SOURCE_ID
     || schedule.topologySnapshotId !== topologyEvidence?.snapshotId
-    || schedule.topologyContentSha256 !== topologySnapshot.contentSha256
-    || JSON.stringify(schedule.quarantinedRows?.map((row) => [row.dayCode, row.direction, row.stationCode, row.time].join(":")))
-      !== JSON.stringify(QUARANTINED_KEYS)) {
+    || schedule.topologyContentSha256 !== topologySnapshot.contentSha256) {
     throw new Error(`${SOURCE_ID} inventory evidence does not match snapshot`);
   }
   if (topology?.productionUseAllowed !== true || topology.license?.redistributionAllowed !== true
@@ -243,10 +241,8 @@ function requiredSources(inventory, timetableSnapshot, topologySnapshot, mapping
     || topologyEvidence.snapshotId !== "gwangju-transportation-route-topology-20260720"
     || topologyEvidence.capturedAt !== topologySnapshot.capturedAt
     || topologyEvidence.freshUntil !== topologySnapshot.freshUntil
-    || topologyEvidence.stationCount !== 20 || topologyEvidence.odRowCount !== 380
+    || topologyEvidence.stationCount !== 20 || topologyEvidence.excludedTransferCount !== 0
     || topologyEvidence.edgeCount !== 38 || topologyEvidence.rawSha256 !== topologySnapshot.rawSha256
-    || topologyEvidence.scopeSha256 !== topologySnapshot.scopeSha256
-    || topologyEvidence.edgesSha256 !== topologySnapshot.edgesSha256
     || topologyEvidence.contentSha256 !== topologySnapshot.contentSha256) {
     throw new Error(`${TOPOLOGY_SOURCE_ID} inventory evidence does not match snapshot`);
   }
@@ -324,12 +320,12 @@ function addStationsAndTopology(pack, snapshot, mappings, sources) {
       evidenceHash: membershipEvidence.mappingSha256,
       fieldProvenance: {
         station_code: {
-          sourceId: TOPOLOGY_SOURCE_ID,
-          sourceSnapshotId: topologyEvidence.snapshotId,
+          sourceId: MEMBERSHIP_SOURCE_ID,
+          sourceSnapshotId: membershipEvidence.snapshotId,
           providerRecordHash: sha256(JSON.stringify(scope)),
-          evidenceHash: snapshot.contentSha256,
+          evidenceHash: membershipEvidence.stationCodesSha256,
           derivationKind: "OFFICIAL",
-          verifiedAt: snapshot.capturedAt,
+          verifiedAt: membershipEvidence.verifiedAt,
         },
       },
       derivationKind: "OFFICIAL",

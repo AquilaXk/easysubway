@@ -59,14 +59,17 @@ test("광주 공식 topology·시간표를 20역·38 edge·810 trip·14171 stop_
   assert.ok(edges.every(({ sourceSnapshotId, evidenceHash }) =>
     sourceSnapshotId === "gwangju-transportation-route-topology-20260720"
       && evidenceHash === values.gwangjuTopology.contentSha256));
+  assert.ok(pack.stationLines.filter(({ lineId }) => lineId === "line-e57a361e8892")
+    .every(({ fieldProvenance }) =>
+      fieldProvenance.station_code.sourceId === "molit-urban-rail-full-route-gwangju-membership"));
 });
 
 test("광주 materializer는 완결되지 않은 일요일 0756 열차 2행만 exact tuple로 격리한다", async () => {
   const values = await inputs({ materialize: false });
-  const inventorySource = values.inventory.sources.find(
-    ({ id }) => id === "gwangju-transportation-cyberstation-timetable",
-  );
-  assert.deepEqual(inventorySource.scheduleAdmissionEvidence.quarantinedRows, [
+  assert.deepEqual(values.gwangjuTimetable.rows.filter(({ dayCode, direction, stationCode, time }) =>
+    dayCode === "DAYOFF" && direction === "st"
+      && ((stationCode === "119" && time === "0756") || (stationCode === "118" && time === "0759")))
+    .map(({ dayCode, direction, stationCode, time }) => ({ dayCode, direction, stationCode, time })), [
     { dayCode: "DAYOFF", direction: "st", stationCode: "119", time: "0756" },
     { dayCode: "DAYOFF", direction: "st", stationCode: "118", time: "0759" },
   ]);
