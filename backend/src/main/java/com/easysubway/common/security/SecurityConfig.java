@@ -13,6 +13,7 @@ import com.easysubway.admin.web.AdminHtmlAccessDeniedHandler;
 import com.easysubway.route.adapter.in.web.RouteV2IngressSecurity;
 import com.easysubway.route.adapter.in.web.RouteV2Metrics;
 import com.easysubway.route.application.port.out.RouteV2AccessStore;
+import jakarta.servlet.DispatcherType;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -20,6 +21,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
@@ -33,6 +35,8 @@ import org.springframework.core.env.Environment;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.authorization.AuthorizationDecision;
+import org.springframework.security.authorization.AuthorizationManager;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -44,9 +48,11 @@ import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.util.matcher.IpAddressMatcher;
 
 @Configuration
 @EnableWebSecurity
@@ -67,6 +73,25 @@ public class SecurityConfig {
 			+ "base-uri 'self'; "
 			+ "form-action 'self'; "
 			+ "frame-ancestors 'none'";
+
+	// /actuator/prometheus는 공개하지 않는다. docker compose 내부 DNS로 접근하는 Prometheus scrape(#2376의
+	// backend_app_metrics job)만 통과시키기 위해 사설망(RFC1918) 출처 remoteAddr에 한해 허용하고, 그 밖의
+	// 출처(공개·미상)는 계속 거부한다. nginx 공개 경로에서 /actuator/* 를 이미 차단하므로 외부 트래픽은 이
+	// 체인에 닿기 전에 걸러지고, 이 IP 게이트는 내부 네트워크 우회 접근까지 막는 심층 방어로 둔다.
+	private static final List<IpAddressMatcher> INTERNAL_NETWORK_MATCHERS = List.of(
+		new IpAddressMatcher("10.0.0.0/8"),
+		new IpAddressMatcher("172.16.0.0/12"),
+		new IpAddressMatcher("192.168.0.0/16")
+	);
+
+	private static AuthorizationManager<RequestAuthorizationContext> internalNetworkOnly() {
+		return (authentication, context) -> {
+			String remoteAddr = context.getRequest().getRemoteAddr();
+			boolean internal = remoteAddr != null
+				&& INTERNAL_NETWORK_MATCHERS.stream().anyMatch(matcher -> matcher.matches(remoteAddr));
+			return new AuthorizationDecision(internal);
+		};
+	}
 
 	@Bean
 	AdminHtmlAccessDeniedHandler adminHtmlAccessDeniedHandler() {
@@ -356,6 +381,15 @@ public class SecurityConfig {
 		return http
 			.csrf(AbstractHttpConfigurer::disable)
 			.authorizeHttpRequests(authorize -> authorize
+				// 컨테이너의 ERROR dispatch만 허용한다(경로 /error를 REQUEST로 여는 것이 아니다).
+				// permitAll인 정적/공개 경로가 리소스 부재로 404를 내면(예: 파비콘 자산 미제공
+				// /favicon.ico) 컨테이너가 /error로 ERROR dispatch를 forward하는데, Spring Security 6는
+				// 이 dispatch도 필터링하므로 원래 404가 이 체인의 anyRequest().denyAll()에 걸려 403으로
+				// 뒤바뀌었다(#2349). DispatcherType.ERROR를 허용해 원래 상태코드(404 등)가 그대로 렌더되게
+				// 한다. 직접 외부 GET /error(REQUEST dispatch)는 이 matcher에 걸리지 않아 여전히
+				// denyAll(403)에 남으므로 /error가 공개 조회 표면이 되지 않는다. 보호 경로도 여전히 각
+				// 요청이 AuthorizationFilter의 denyAll에서 먼저 차단돼 handler·/error에 닿지 못한다.
+				.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
 				.requestMatchers(
 					HttpMethod.POST,
 					"/api/ads/events"
@@ -392,6 +426,8 @@ public class SecurityConfig {
 					"/icons/**",
 					"/webjars/**"
 				).permitAll()
+				.requestMatchers(HttpMethod.GET, "/actuator/prometheus")
+				.access(internalNetworkOnly())
 				.anyRequest().denyAll()
 			)
 			.build();
