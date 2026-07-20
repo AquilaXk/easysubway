@@ -152,20 +152,35 @@ test("대전 역간 XML은 빈 row와 잘못된 수치를 거부한다", async (
   }
 });
 
-test("대전 열차시각표 candidate는 live XML schema만 admission하고 coverage는 계속 fail closed한다", () => {
+test("대전 열차시각표 candidate는 official XML과 topology lineage로 schedule을 production admission한다", () => {
   const candidate = sourceCandidates.candidates.find(({ id }) => id === "daejeon-train-timetable");
-  assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
-  assert.equal(candidate.admissionStatus, "validated_live_schema_admitted");
+  assert.equal(candidate.sampleEvidenceStatus, "validated_live_full_snapshot");
+  assert.equal(candidate.admissionStatus, "production_schedule_materialized");
+  assert.equal(candidate.productionInventoryReferenceId, "daejeon-train-timetable");
   assert.equal(candidate.evidence.liveValidation.providerResultCode, "00");
   assert.equal(candidate.evidence.liveValidation.rowCount, 1628);
   assert.equal(candidate.evidence.liveValidation.observedAt, timetableRowsEvidence.observedAt);
-  assert.equal(candidate.evidence.coverageAssessment.state, "MISSING");
+  assert.deepEqual(candidate.evidence.coverageAssessment, {
+    state: "SUPPORTED",
+    requirementCount: 1,
+    sourceDomain: "schedule_timetable",
+    artifactKind: "production",
+    materializer: "tools/datapack/materialize-daejeon-timetable.mjs",
+    verificationTest: "tools/datapack/materialize-daejeon-timetable.test.mjs",
+  });
   assert.equal(candidate.evidence.liveValidation.evidenceArtifact,
     "tools/datapack/sources/daejeon-train-timetable-20260720.json");
   assert.equal(candidate.evidence.liveValidation.rowsSha256, timetableRowsEvidence.rowsSha256);
   assert.equal(timetableEvidence.sourceId, candidate.id);
   assert.equal(timetableEvidence.rawSha256, candidate.evidence.liveValidation.rawSha256);
   assert.deepEqual(timetableEvidence.outputFields, candidate.evidence.outputFields);
+  assert.deepEqual(candidate.evidence.materializationValidation, {
+    departureCount: 9574,
+    tripCount: 460,
+    stopTimeCount: 10034,
+    topologySourceId: "daejeon-station-distance-fare",
+    topologyContentSha256: "111ef488fc9d1f960445844b907e7f7b6f804e4adff0867f2f8c1e43433c747f",
+  });
 });
 
 test("대전 열차시각표 sanitized snapshot은 1628개 공개 row와 semantic hash를 고정한다", () => {
