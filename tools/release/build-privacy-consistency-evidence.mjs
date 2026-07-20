@@ -37,9 +37,18 @@ const BOUND_EVIDENCE_REFERENCES = {
     verificationCommentUrl:
       "https://github.com/AquilaXk/easysubway/issues/1018#issuecomment-5018496643",
   },
+  // reviewedFormSha256/reviewedFormCommit은 2026-07-18 Play Console 재제출·검토 당시
+  // play-store-submission-content.json 원문에 결속된 고정값이다(git show
+  // 7ca868068717132c984d673718f350c3400e4ac5:apps/mobile/release/play-store-submission-content.json
+  // | shasum -a 256). 이후(2026-07-19, train_search_queries 추가 등) 파일이 바뀌면 현재
+  // tracked 파일의 sha256이 이 값과 달라지고, evaluatePlayConsoleProvenanceConsistency가
+  // 그 차이를 STALE로 fail-closed 판정한다 — Console이 실제로 검토한 적 없는 최신 내용을
+  // 검토된 것처럼 위조하지 않는다.
   playConsoleDataSafetyForm: {
     inventorySource: INVENTORY_FILE,
     formSource: PLAY_FORM_FILE,
+    reviewedFormCommit: "7ca86806",
+    reviewedFormSha256: "67cc31f63c90e1a28fd5d1a0e372ffaa1d1dfe6f41f3a55d439ce3b376af1803",
     resubmittedAt: "2026-07-18",
     recordedResult: "RESUBMITTED_AND_REVIEWED_FROM_TRACKED_INVENTORY",
   },
@@ -82,6 +91,11 @@ const POLICY_BOUNDARIES = [
         routeV2Integrity
           && stored.includes("tokenSha256")
           && stored.includes("nonceSha256")
+          // raw 필드가 backendStoredFields에 있으면 backendNeverPersistedOrLogged가 같은
+          // 필드를 "저장 안 함"으로 선언해도 실제 저장 목록과 모순이다 — hash 필드 존재만
+          // 보고 통과시키지 않는다.
+          && !stored.includes("rawIntegrityToken")
+          && !stored.includes("rawClientNonce")
           && neverPersisted.includes("rawIntegrityToken")
           && neverPersisted.includes("rawClientNonce"),
       );
@@ -113,9 +127,13 @@ const POLICY_BOUNDARIES = [
     descriptionKo:
       "Google Play Integrity 처리 정보는 Google 고정 정책을 따르고 backend가 raw token·verdict를 저장·로그하지 않는 경계",
     inventoryFact({ routeV2Integrity }) {
+      const neverPersisted = routeV2Integrity?.backendNeverPersistedOrLogged ?? [];
       return Boolean(
         routeV2Integrity?.googlePlayProcessing?.sharedOnward === false
-          && routeV2Integrity?.googleProcessingMayBeLinkedToSignedInAccountOrDevice === true,
+          && routeV2Integrity?.googleProcessingMayBeLinkedToSignedInAccountOrDevice === true
+          // Google Integrity payload·verdict 자체를 backend가 저장·로그하지 않는다는
+          // 선언이 없으면, sharedOnward=false만으로는 이 boundary가 실제로 성립하지 않는다.
+          && neverPersisted.includes("integrityPayloadOrVerdict"),
       );
     },
     anchors: [
@@ -160,7 +178,9 @@ function resolveMatrixEntryReferences(entry, items) {
 }
 
 // entry의 boolean 집계 플래그(collected/required/optional/deletion-unsupported)가 참조된
-// inventory 항목들의 실제 googlePlayDataSafety 값과 일치하는지 각각 검증한다.
+// inventory 항목들의 실제 googlePlayDataSafety 값과 일치하는지 각각 검증한다. 필드가
+// 아예 없거나 boolean이 아니면(예: 문자열 "true") malformed/불완전한 Console 선언으로
+// fail-closed 처리한다 — Boolean(...) truthy 변환이나 undefined 기본값에 기대지 않는다.
 function checkMatrixEntryAggregateFlags(entry, referenced) {
   const some = (predicate) => referenced.some((item) => predicate(item.googlePlayDataSafety ?? {}));
   const flagChecks = [
@@ -175,7 +195,16 @@ function checkMatrixEntryAggregateFlags(entry, referenced) {
   ];
   const contradictions = [];
   for (const [field, code, expected] of flagChecks) {
-    if (Boolean(entry[field]) !== expected) contradictions.push({ dataType: entry.dataType, code });
+    const value = entry[field];
+    if (typeof value !== "boolean") {
+      contradictions.push({
+        dataType: entry.dataType,
+        code: "aggregate_flag_missing_or_not_boolean",
+        detail: `${field}=${JSON.stringify(value ?? null)}`,
+      });
+      continue;
+    }
+    if (value !== expected) contradictions.push({ dataType: entry.dataType, code });
   }
   return contradictions;
 }
@@ -260,14 +289,22 @@ function buildPolicyBoundaryContext(inventory, items) {
   };
 }
 
+// HTML 주석(<!-- ... -->) 안에만 남은 문구는 실제 사용자에게 렌더링되지 않으므로 anchor
+// 검사 대상에서 제외한다. 완전한 HTML 파서는 만들지 않고 주석 블록만 제거하는 최소
+// 정규식을 쓴다(각 anchor는 순수 텍스트 리터럴이라 이 정도로 충분하다).
+function stripHtmlComments(html) {
+  return html.replace(/<!--[\s\S]*?-->/g, "");
+}
+
 // runtime inventory가 선언하는 핵심 경계가 실제로 성립하고, 그 경계를 알리는 정책 문구
-// anchor가 공개 정책 원본에 모두 존재하는지 검증한다.
+// anchor가 공개 정책 원본(주석 제외 렌더링 텍스트)에 모두 존재하는지 검증한다.
 function evaluatePolicyBoundaryConsistency(inventory, privacyPolicyHtml) {
   const items = new Map((inventory.dataTypes ?? []).map((item) => [item.id, item]));
   const context = buildPolicyBoundaryContext(inventory, items);
+  const renderedPolicyText = stripHtmlComments(privacyPolicyHtml);
   const boundaries = POLICY_BOUNDARIES.map((boundary) => {
     const inventoryFactHolds = boundary.inventoryFact(context);
-    const missingAnchors = boundary.anchors.filter((anchor) => !privacyPolicyHtml.includes(anchor));
+    const missingAnchors = boundary.anchors.filter((anchor) => !renderedPolicyText.includes(anchor));
     return {
       id: boundary.id,
       descriptionKo: boundary.descriptionKo,
@@ -283,11 +320,31 @@ function evaluatePolicyBoundaryConsistency(inventory, privacyPolicyHtml) {
   };
 }
 
+// Console이 실제로 검토·재제출한 폼 원문 sha256(reviewedFormSha256)과 현재 tracked
+// play-store-submission-content.json의 sha256이 같은지 검증한다. 다르면(예: 검토 이후
+// commit이 폼을 바꿨는데 재제출·재검토가 없었으면) 그 provenance는 최신 상태를 대변하지
+// 않으므로 STALE로 fail-closed 처리한다 — 검토된 적 없는 내용을 검토된 것처럼 위조하지
+// 않는다.
+function evaluatePlayConsoleProvenanceConsistency(currentFormSha256, reviewedFormSha256) {
+  const matchesReviewedRevision = /^[0-9a-f]{64}$/.test(reviewedFormSha256 ?? "")
+    && currentFormSha256 === reviewedFormSha256;
+  return {
+    reviewedFormSha256: reviewedFormSha256 ?? null,
+    currentFormSha256,
+    matchesReviewedRevision,
+    consistent: matchesReviewedRevision,
+  };
+}
+
 export function buildPrivacyConsistencyEvidence({
   candidate,
   repoRoot = process.cwd(),
   generatedAt = new Date().toISOString(),
   provenance = "final-candidate",
+  // 프로덕션/CLI 경로는 항상 기본값(2026-07-18 실제 검토 시점의 고정 historical hash)을
+  // 쓴다. 이 파라미터는 evaluatePlayConsoleProvenanceConsistency 로직을 git 이력에
+  // 결합하지 않고 독립적으로 단위 테스트하기 위한 테스트 전용 override다.
+  reviewedPlayFormSha256 = BOUND_EVIDENCE_REFERENCES.playConsoleDataSafetyForm.reviewedFormSha256,
 }) {
   const identity = candidate?.releaseCandidateIdentity;
   if (candidate?.phase !== "CANDIDATE" || candidate?.issue !== 2056 || !identity) {
@@ -322,6 +379,7 @@ export function buildPrivacyConsistencyEvidence({
       checks: {
         inventoryFormConsistent: "BLOCKED",
         inventoryPolicyConsistent: "BLOCKED",
+        playConsoleProvenanceCurrent: "BLOCKED",
       },
     };
   }
@@ -330,7 +388,13 @@ export function buildPrivacyConsistencyEvidence({
   const playForm = JSON.parse(playFormInput.text);
   const answerMatrixConsistency = evaluateAnswerMatrixConsistency(inventory, playForm);
   const policyBoundaryConsistency = evaluatePolicyBoundaryConsistency(inventory, policyInput.text);
-  const consistent = answerMatrixConsistency.consistent && policyBoundaryConsistency.consistent;
+  const playConsoleProvenanceConsistency = evaluatePlayConsoleProvenanceConsistency(
+    playFormInput.sha256,
+    reviewedPlayFormSha256,
+  );
+  const consistent = answerMatrixConsistency.consistent
+    && policyBoundaryConsistency.consistent
+    && playConsoleProvenanceConsistency.consistent;
 
   return {
     schemaVersion: 1,
@@ -345,9 +409,11 @@ export function buildPrivacyConsistencyEvidence({
     boundEvidenceReferences: BOUND_EVIDENCE_REFERENCES,
     answerMatrixConsistency,
     policyBoundaryConsistency,
+    playConsoleProvenanceConsistency,
     checks: {
       inventoryFormConsistent: answerMatrixConsistency.consistent ? "SATISFIED" : "FAILED",
       inventoryPolicyConsistent: policyBoundaryConsistency.consistent ? "SATISFIED" : "FAILED",
+      playConsoleProvenanceCurrent: playConsoleProvenanceConsistency.consistent ? "SATISFIED" : "STALE",
     },
   };
 }
