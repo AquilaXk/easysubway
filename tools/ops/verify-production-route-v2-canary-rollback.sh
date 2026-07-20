@@ -460,11 +460,21 @@ canary_search_sample() {
 		--header "Authorization: Bearer ${token}" \
 		--data-binary "${search_request_body}" "${PUBLIC_BASE_URL}/api/v2/routes/search"
 	if [[ "${last_status}" == 200 ]]; then
+		# A malformed/truncated/non-JSON 200 body must NOT let JSON.parse throw
+		# here: an uncaught exception would exit this `node -e` non-zero, which
+		# `set -e` would treat as a fatal script error mid-canary — BEFORE the
+		# rollback section below. Wrapped in try/catch so any parse or shape
+		# failure is scored as a breach sample (plannerIdentityMatch=false)
+		# instead of skipping rollback entirely.
 		planner_identity_match="$(node -e '
-const body = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
-const candidate = JSON.parse(process.argv[2]);
-const identity = body?.success === true ? body?.data?.plannerIdentity : null;
-process.stdout.write(String(identity?.timetableSnapshotSha256 === candidate.timetableSnapshotSha256));
+try {
+  const body = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
+  const candidate = JSON.parse(process.argv[2]);
+  const identity = body?.success === true ? body?.data?.plannerIdentity : null;
+  process.stdout.write(String(identity?.timetableSnapshotSha256 === candidate.timetableSnapshotSha256));
+} catch {
+  process.stdout.write("false");
+}
 ' "${body_file}" "${expected_candidate}")"
 	else
 		planner_identity_match="false"
@@ -527,6 +537,32 @@ printf 'false\n' > "${ingress_state_file}"
 chmod 600 "${ingress_state_file}"
 ingress_closed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
+route_v2_rollback_lock="${DEPLOY_ROOT}/shared/route-v2-canary-rollback-lock.json"
+if [[ "${budget_within}" != true ]]; then
+	# Permanent rollback: persist the durable lock IMMEDIATELY after the host
+	# close above succeeds — BEFORE the public verification probes below, which
+	# themselves depend on the network and could return curl's "000" transport
+	# sentinel and abort the script (see public_status). The close having been
+	# APPLIED is what must be locked in durably; whether we can also verify it
+	# publicly right now is a separate, best-effort check that must not gate
+	# whether the lock exists. Without this ordering a transient network blip
+	# during verification would leave marker=false with NO lock, and a later,
+	# UNRELATED deploy-backend.sh run could silently re-open ingress by
+	# re-rendering EASYSUBWAY_ROUTE_V2_INGRESS_ENABLED=true from compose.env's
+	# stale desired state — deploy-backend.sh checks for this lock and forces
+	# the host action closed until an operator removes it after investigating.
+	node -e '
+const { writeFileSync } = require("node:fs");
+writeFileSync(process.argv[1], JSON.stringify({
+  reason: "signed-RC canary budget breach",
+  candidateGitSha: process.argv[2],
+  closedAt: process.argv[3],
+  approvalReference: process.argv[4],
+}, null, 2) + "\n");
+' "${route_v2_rollback_lock}" "${current_sha}" "${ingress_closed_at}" "${PRODUCTION_CANARY_APPROVAL}"
+	chmod 600 "${route_v2_rollback_lock}"
+fi
+
 session_closed="$(public_status /api/v2/routes/session)"
 search_closed="$(public_status /api/v2/routes/search)"
 [[ "${session_closed}" == 404 && "${search_closed}" == 404 ]] \
@@ -546,26 +582,15 @@ if [[ "${budget_within}" == true ]]; then
 	ingress_restored_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 	session_restored="$(public_status /api/v2/routes/session)"
 	search_restored="$(public_status /api/v2/routes/search)"
-	[[ "${session_restored}" != 404 && "${search_restored}" != 404 ]] \
+	# `!= 404` alone is not a valid "restored" signal: public_status returns
+	# curl's own "000" http_code sentinel on a transport failure (DNS/TLS/
+	# connect/timeout), and "000" != "404" too — a network outage during THIS
+	# verification would otherwise be misrecorded as a successful restore. Both
+	# probes must return a real 3-digit status that is neither 404 nor 000.
+	[[ "${session_restored}" =~ ^[0-9]{3}$ && "${session_restored}" != 404 && "${session_restored}" != 000 \
+		&& "${search_restored}" =~ ^[0-9]{3}$ && "${search_restored}" != 404 && "${search_restored}" != 000 ]] \
 		|| { echo 'rollback rehearsal did not restore the public Route V2 edge' >&2; exit 1; }
 	restored_after_rehearsal=true
-else
-	# Permanent rollback: persist a durable lock so a later, UNRELATED
-	# deploy-backend.sh run cannot silently re-open ingress by re-rendering
-	# EASYSUBWAY_ROUTE_V2_INGRESS_ENABLED=true from compose.env's stale desired
-	# state — deploy-backend.sh checks for this lock and forces the host action
-	# closed until an operator removes it after investigating.
-	route_v2_rollback_lock="${DEPLOY_ROOT}/shared/route-v2-canary-rollback-lock.json"
-	node -e '
-const { writeFileSync } = require("node:fs");
-writeFileSync(process.argv[1], JSON.stringify({
-  reason: "signed-RC canary budget breach",
-  candidateGitSha: process.argv[2],
-  closedAt: process.argv[3],
-  approvalReference: process.argv[4],
-}, null, 2) + "\n");
-' "${route_v2_rollback_lock}" "${current_sha}" "${ingress_closed_at}" "${PRODUCTION_CANARY_APPROVAL}"
-	chmod 600 "${route_v2_rollback_lock}"
 fi
 rollback_verified_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 evidence_emitted_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"

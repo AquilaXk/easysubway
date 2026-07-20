@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -27,6 +28,14 @@ const execFileAsync = promisify(execFile);
 
 const validApproval = "https://github.com/AquilaXk/easysubway/issues/2095";
 
+// A real signed-RC Play Integrity clientNonce is exactly 22 base64url
+// characters decoding to 16 bytes (matches RouteV2SessionService's own
+// validation) — this generates genuine ones so pool-fixture tests exercise
+// the SAME format/uniqueness rules the parser now enforces.
+function makeNonce() {
+  return randomBytes(16).toString("base64url");
+}
+
 function validPoolPayload({ mintedAt = new Date().toISOString(), pairCount = 4 } = {}) {
   return JSON.stringify({
     mintedAt,
@@ -34,7 +43,7 @@ function validPoolPayload({ mintedAt = new Date().toISOString(), pairCount = 4 }
     mobileVersionCode: 10006,
     pairs: Array.from({ length: pairCount }, (_, index) => ({
       integrityToken: `token-${index}`,
-      clientNonce: `nonce-${index}`,
+      clientNonce: makeNonce(),
     })),
   });
 }
@@ -221,6 +230,14 @@ test("canary rollback runner는 fail-closed 게이트와 rollback 경로를 갖�
   assert.match(runner, /plannerIdentityMatch/);
   assert.match(runner, /capture_issued_session/);
   assert.match(runner, /route:v2:itx/);
+  // A malformed/truncated/non-JSON 200 search body must not let JSON.parse
+  // throw inside the node -e call: an uncaught exception would exit non-zero
+  // under `set -e`, aborting the script BEFORE the rollback section. Wrapped
+  // in try/catch so any parse failure is scored as plannerIdentityMatch=false
+  // (a breach sample) instead of skipping rollback entirely.
+  const searchSampleBlock = runner.match(/canary_search_sample\(\) \{[\s\S]*?\n\}\n/)?.[0] ?? "";
+  assert.match(searchSampleBlock, /try \{/);
+  assert.match(searchSampleBlock, /\} catch \{\n\s*process\.stdout\.write\("false"\);\n\s*\}/);
 
   // Token pool pair lookups pass only the FILE PATH and a numeric index as
   // node -e argv, never the pool content itself — a same-UID process reading
@@ -259,6 +276,23 @@ test("canary rollback runner는 fail-closed 게이트와 rollback 경로를 갖�
   assert.match(runner, /printf 'false\\n' > "\$\{ingress_state_file\}"/);
   assert.match(runner, /ingress-close rollback did not close the public Route V2 edge/);
 
+  // Budget-breach path persists a durable rollback lock IMMEDIATELY after the
+  // host close is applied — BEFORE the public verification probes, which
+  // depend on the network and could themselves return curl's "000" transport
+  // sentinel and abort the script. A later, unrelated deploy must not be able
+  // to silently re-open ingress from compose.env's stale desired state just
+  // because verification happened to fail on a blip (matches deploy-backend.sh's
+  // lock check).
+  assert.match(
+    runner,
+    /route_v2_rollback_lock="\$\{DEPLOY_ROOT\}\/shared\/route-v2-canary-rollback-lock\.json"/,
+  );
+  assert.match(runner, /reason: "signed-RC canary budget breach"/);
+  assert.ok(
+    runner.indexOf("ingress_closed_at=") < runner.indexOf('route_v2_rollback_lock="${DEPLOY_ROOT}')
+      && runner.indexOf('route_v2_rollback_lock="${DEPLOY_ROOT}') < runner.indexOf("session_closed="),
+  );
+
   // Healthy-path REAL close/verify/restore rehearsal — restore only happens when
   // the canary is within budget, and only after the close was verified.
   assert.match(runner, /if \[\[ "\$\{budget_within\}" == true \]\]; then/);
@@ -269,17 +303,14 @@ test("canary rollback runner는 fail-closed 게이트와 rollback 경로를 갖�
     runner.indexOf("session_closed=") < runner.indexOf('if [[ "${budget_within}" == true ]]; then'),
   );
 
-  // Budget-breach path persists a durable rollback lock so a later, unrelated
-  // deploy cannot silently re-open ingress from compose.env's stale desired
-  // state (matches deploy-backend.sh's lock check).
+  // Restore verification rejects the "000" transport sentinel explicitly — a
+  // network outage during THIS probe must not be misread as "not 404, so
+  // restored". Both probes must be a real 3-digit status, neither 404 nor 000.
   assert.match(
     runner,
-    /route_v2_rollback_lock="\$\{DEPLOY_ROOT\}\/shared\/route-v2-canary-rollback-lock\.json"/,
+    /\[\[ "\$\{session_restored\}" =~ \^\[0-9\]\{3\}\$ && "\$\{session_restored\}" != 404 && "\$\{session_restored\}" != 000 \\\n\s*&& "\$\{search_restored\}" =~ \^\[0-9\]\{3\}\$ && "\$\{search_restored\}" != 404 && "\$\{search_restored\}" != 000 \]\]/,
   );
-  assert.match(runner, /reason: "signed-RC canary budget breach"/);
-  assert.ok(
-    runner.indexOf('if [[ "${budget_within}" == true ]]; then') < runner.indexOf('route_v2_rollback_lock='),
-  );
+  assert.doesNotMatch(runner, /"\$\{session_restored\}" != 404 && "\$\{search_restored\}" != 404 \]\]/);
 
   assert.match(runner, /build-evidence/);
   assert.match(runner, /signed-RC canary breached its budget; ingress-close rollback executed/);
@@ -395,14 +426,72 @@ test("canary runner dotenv parser는 키가 없으면 fail-closed로 거부한�
   }
 });
 
-test("canary runner --test-expected-candidate는 체크인된 RC candidate를 산출한다", async () => {
+test("canary runner --test-expected-candidate는 operations-release-evidence.json과 timetable evidence의 현재 drift를 거부한다", async () => {
+  // apps/mobile/release/operations-release-evidence.json's
+  // routeV2Readiness.timetableSnapshotCache.currentImplementation is a KNOWN,
+  // pre-existing drift from the checked-in timetable evidence file this runner
+  // actually reads (backend/src/main/resources/timetable/server-timetable-snapshot-evidence.json)
+  // — a separate follow-up binding PR owns reconciling which value is
+  // authoritative. Until that lands, resolveExpectedCandidate() must correctly
+  // REFUSE to resolve a candidate instead of silently trusting one of the two
+  // mismatched evidences (this is the fail-closed behavior the cross-check
+  // exists to produce, not a bug in the cross-check itself).
   const [operations, timetable] = await Promise.all([
     readFile(operationsEvidencePath, "utf8").then(JSON.parse),
     readFile(timetableEvidencePath, "utf8").then(JSON.parse),
   ]);
-  const expected = resolveExpectedCandidate(operations, timetable);
-  const { stdout } = await execFileAsync("bash", [runnerPath, "--test-expected-candidate"]);
-  assert.deepEqual(JSON.parse(stdout), expected);
+  assert.throws(
+    () => resolveExpectedCandidate(operations, timetable),
+    /timetableSnapshotCache does not match the timetable evidence file/,
+  );
+  await assert.rejects(
+    execFileAsync("bash", [runnerPath, "--test-expected-candidate"]),
+    (error) => error.code === 2,
+  );
+});
+
+test("resolveExpectedCandidate는 operations-release-evidence.json과 timetable evidence의 snapshot 일치 여부를 검증한다", () => {
+  const buildOperations = (timetableSnapshotCache) => ({
+    backendControlPlane: {
+      publicApiSurface: {
+        routeV2Readiness: {
+          realisticLoadEvidence: {
+            candidate: { candidateGitSha: "a".repeat(40), versionName: "1.0.5", versionCode: 10006 },
+          },
+          timetableSnapshotCache,
+        },
+      },
+    },
+  });
+  const boundSnapshot = { snapshotSha256: "b".repeat(64), freshUntil: "2026-07-20T00:00:00+09:00" };
+  const operations = buildOperations({ currentImplementation: boundSnapshot });
+  const matchingTimetable = {
+    snapshotId: "server-timetable-snapshot-x",
+    snapshotSha256: "b".repeat(64),
+    // Same instant as boundSnapshot.freshUntil (2026-07-20T00:00:00+09:00),
+    // represented in UTC — proves the cross-check compares instants, not text.
+    freshUntil: "2026-07-19T15:00:00Z",
+  };
+  const resolved = resolveExpectedCandidate(operations, matchingTimetable);
+  assert.equal(resolved.timetableSnapshotSha256, "b".repeat(64));
+
+  const mismatchedSha = { ...matchingTimetable, snapshotSha256: "c".repeat(64) };
+  assert.throws(
+    () => resolveExpectedCandidate(operations, mismatchedSha),
+    /timetableSnapshotCache does not match the timetable evidence file/,
+  );
+
+  const mismatchedFreshUntil = { ...matchingTimetable, freshUntil: "2026-07-19T15:00:01Z" };
+  assert.throws(
+    () => resolveExpectedCandidate(operations, mismatchedFreshUntil),
+    /timetableSnapshotCache does not match the timetable evidence file/,
+  );
+
+  const missingBoundSnapshot = buildOperations(undefined);
+  assert.throws(
+    () => resolveExpectedCandidate(missingBoundSnapshot, matchingTimetable),
+    /timetableSnapshotCache does not match the timetable evidence file/,
+  );
 });
 
 test("canary runner는 잘못된 SHA·승인·candidate에서 production 접근 전에 fail-closed한다", async () => {
@@ -643,15 +732,16 @@ test("assertCandidateMatch와 validateApprovalReference는 fail-closed다", () =
 
 test("parseCanaryIntegrityTokens는 #1016의 실행-시점 attestation 입력 계약(freshness·provisioning evidence)을 강제한다", () => {
   const now = Date.parse("2026-07-20T02:00:00.000Z");
-  const mintedAt = "2026-07-20T01:58:00.000Z"; // 2 minutes before `now`, within the 5-minute window
+  const mintedAt = "2026-07-20T01:59:30.000Z"; // 30 seconds before `now`, within the 60-second window
+  const [nonce0, nonce1, nonce2] = [makeNonce(), makeNonce(), makeNonce()];
   const payload = JSON.stringify({
     mintedAt,
     mobileVersionName: "1.0.5",
     mobileVersionCode: 10006,
     pairs: [
-      { integrityToken: "token-0", clientNonce: "nonce-0" },
-      { integrityToken: "token-1", clientNonce: "nonce-1" },
-      { integrityToken: "token-2", clientNonce: "nonce-2" },
+      { integrityToken: "token-0", clientNonce: nonce0 },
+      { integrityToken: "token-1", clientNonce: nonce1 },
+      { integrityToken: "token-2", clientNonce: nonce2 },
     ],
   });
   const result = parseCanaryIntegrityTokens(payload, 2, { now });
@@ -660,8 +750,8 @@ test("parseCanaryIntegrityTokens는 #1016의 실행-시점 attestation 입력 �
     mobileVersionName: "1.0.5",
     mobileVersionCode: 10006,
     pairs: [
-      { integrityToken: "token-0", clientNonce: "nonce-0" },
-      { integrityToken: "token-1", clientNonce: "nonce-1" },
+      { integrityToken: "token-0", clientNonce: nonce0 },
+      { integrityToken: "token-1", clientNonce: nonce1 },
     ],
   });
 
@@ -670,24 +760,26 @@ test("parseCanaryIntegrityTokens는 #1016의 실행-시점 attestation 입력 �
     () => parseCanaryIntegrityTokens(JSON.stringify({ mobileVersionName: "1.0.5", mobileVersionCode: 10006, pairs: [] }), 1, { now }),
     /mintedAt/,
   );
-  // Stale pool (minted 10 minutes before now, past the 5-minute window) —
-  // exactly the "reused compose.env pool" failure mode this contract exists
-  // to prevent.
-  const stalePayload = JSON.stringify({
-    mintedAt: "2026-07-20T01:50:00.000Z",
+  // A pool minted 90 seconds before now (past the 60-second window, but still
+  // WELL within the backend's 2-minute verdict acceptance window) must be
+  // rejected here — that is the entire point of finding #3: this gate must be
+  // strictly tighter than the backend's own limit, accounting for the gate-to
+  // -last-request latency of the canary loop, not merely "not yet expired".
+  const barelyStalePayload = JSON.stringify({
+    mintedAt: "2026-07-20T01:58:30.000Z",
     mobileVersionName: "1.0.5",
     mobileVersionCode: 10006,
-    pairs: [{ integrityToken: "token-0", clientNonce: "nonce-0" }],
+    pairs: [{ integrityToken: "token-0", clientNonce: makeNonce() }],
   });
-  assert.throws(() => parseCanaryIntegrityTokens(stalePayload, 1, { now }), /within 5 minute/);
+  assert.throws(() => parseCanaryIntegrityTokens(barelyStalePayload, 1, { now }), /within 60 second/);
   // A pool "minted" in the future (clock skew or bad input) must also fail closed.
   const futurePayload = JSON.stringify({
     mintedAt: "2026-07-20T02:05:00.000Z",
     mobileVersionName: "1.0.5",
     mobileVersionCode: 10006,
-    pairs: [{ integrityToken: "token-0", clientNonce: "nonce-0" }],
+    pairs: [{ integrityToken: "token-0", clientNonce: makeNonce() }],
   });
-  assert.throws(() => parseCanaryIntegrityTokens(futurePayload, 1, { now }), /within 5 minute/);
+  assert.throws(() => parseCanaryIntegrityTokens(futurePayload, 1, { now }), /within 60 second/);
 
   assert.throws(
     () => parseCanaryIntegrityTokens(JSON.stringify({ mintedAt, mobileVersionCode: 10006, pairs: [] }), 1, { now }),
@@ -702,7 +794,7 @@ test("parseCanaryIntegrityTokens는 #1016의 실행-시점 attestation 입력 �
     /at least 1 pair/,
   );
   assert.throws(
-    () => parseCanaryIntegrityTokens(JSON.stringify({ mintedAt, mobileVersionName: "1.0.5", mobileVersionCode: 10006, pairs: [{ clientNonce: "nonce-0" }] }), 1, { now }),
+    () => parseCanaryIntegrityTokens(JSON.stringify({ mintedAt, mobileVersionName: "1.0.5", mobileVersionCode: 10006, pairs: [{ clientNonce: makeNonce() }] }), 1, { now }),
     /integrityToken/,
   );
   assert.throws(
@@ -715,6 +807,61 @@ test("parseCanaryIntegrityTokens는 #1016의 실행-시점 attestation 입력 �
   // freshly-minted payload must pass without needing to inject a clock.
   const liveResult = parseCanaryIntegrityTokens(validPoolPayload({ pairCount: 1 }), 1);
   assert.equal(liveResult.pairs.length, 1);
+});
+
+test("parseCanaryIntegrityTokens는 backend와 동일한 clientNonce 형식·pool 내 유일성을 강제한다", () => {
+  const mintedAt = new Date().toISOString();
+  const buildPayload = (pairs) => JSON.stringify({ mintedAt, mobileVersionName: "1.0.5", mobileVersionCode: 10006, pairs });
+
+  // Too short / wrong alphabet / wrong length are all rejected — backend
+  // requires exactly 22 base64url characters decoding to 16 bytes.
+  assert.throws(
+    () => parseCanaryIntegrityTokens(buildPayload([{ integrityToken: "token-0", clientNonce: "too-short" }]), 1),
+    /pair\[0\]\.clientNonce must be a 22-character base64url value/,
+  );
+  assert.throws(
+    () => parseCanaryIntegrityTokens(buildPayload([{ integrityToken: "token-0", clientNonce: `${"a".repeat(21)}!` }]), 1),
+    /pair\[0\]\.clientNonce must be a 22-character base64url value/,
+  );
+  assert.throws(
+    () => parseCanaryIntegrityTokens(buildPayload([{ integrityToken: "token-0", clientNonce: makeNonce() + "AB" }]), 1),
+    /pair\[0\]\.clientNonce must be a 22-character base64url value/,
+  );
+
+  // A genuinely valid 22-character base64url nonce passes.
+  const validNonce = makeNonce();
+  const passed = parseCanaryIntegrityTokens(buildPayload([{ integrityToken: "token-0", clientNonce: validNonce }]), 1);
+  assert.equal(passed.pairs[0].clientNonce, validNonce);
+
+  // A duplicated nonce anywhere in the pool (not just within the consumed
+  // subset) is rejected — matches the backend's own nonce-replay rejection,
+  // and this repo's runner would otherwise burn a "budget breach" verdict on
+  // an otherwise-healthy candidate purely from a provisioning bug.
+  const duplicateNonce = makeNonce();
+  assert.throws(
+    () => parseCanaryIntegrityTokens(
+      buildPayload([
+        { integrityToken: "token-0", clientNonce: duplicateNonce },
+        { integrityToken: "token-1", clientNonce: makeNonce() },
+        { integrityToken: "token-2", clientNonce: duplicateNonce },
+      ]),
+      2,
+    ),
+    /pair\[2\]\.clientNonce is duplicated within the pool/,
+  );
+  // The duplicate is rejected even when only the FIRST (not the duplicated)
+  // pair would actually be consumed — the whole pool is validated up front.
+  assert.throws(
+    () => parseCanaryIntegrityTokens(
+      buildPayload([
+        { integrityToken: "token-0", clientNonce: duplicateNonce },
+        { integrityToken: "token-1", clientNonce: duplicateNonce },
+        { integrityToken: "token-2", clientNonce: makeNonce() },
+      ]),
+      1,
+    ),
+    /pair\[1\]\.clientNonce is duplicated within the pool/,
+  );
 });
 
 test("buildCanaryRollbackEvidence는 시간순 timeline과 rollback 일관성을 강제한다", () => {

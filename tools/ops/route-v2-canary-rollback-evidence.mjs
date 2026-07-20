@@ -99,7 +99,19 @@ function requireString(value, label) {
 // needs, the runner fails closed with "blocked on #1016" before sending a
 // single request — exactly like the (now-superseded) compose.env-key gate it
 // replaces.
-const CANARY_POOL_MAX_AGE_MS = 5 * 60 * 1000;
+//
+// The age bound is STRICTLY LESS than RouteV2SessionService's 2-minute Play
+// Integrity verdict acceptance window, not equal to or looser than it: a pool
+// that passes this gate still has to survive Gate 4's live Postgres query and
+// candidate assertion, then the canary loop's own multiple sequential
+// requests, before its LAST pair is actually sent. A 5-minute (or even a
+// 2-minute) bound would let a 2-5 minute old pool through the gate only to be
+// rejected by the backend on every request — misread as a genuine budget
+// breach and closing a perfectly healthy candidate's ingress. 60 seconds
+// leaves a full minute of margin for that gate-to-last-request latency plus
+// clock skew between the host that minted the pool and this runner.
+const CANARY_POOL_MAX_AGE_MS = 60 * 1000;
+const CLIENT_NONCE_PATTERN = /^[A-Za-z0-9_-]{22}$/;
 
 export function parseCanaryIntegrityTokens(rawJson, requiredCount, options = {}) {
   if (!Number.isInteger(requiredCount) || requiredCount <= 0) {
@@ -120,7 +132,7 @@ export function parseCanaryIntegrityTokens(rawJson, requiredCount, options = {})
   const ageMs = now - mintedAtMs;
   if (ageMs < 0 || ageMs > CANARY_POOL_MAX_AGE_MS) {
     throw new Error(
-      `signed-RC canary integrity token payload must be minted within ${CANARY_POOL_MAX_AGE_MS / 60000} minute(s) of use`,
+      `signed-RC canary integrity token payload must be minted within ${CANARY_POOL_MAX_AGE_MS / 1000} second(s) of use`,
     );
   }
 
@@ -136,14 +148,40 @@ export function parseCanaryIntegrityTokens(rawJson, requiredCount, options = {})
       `signed-RC canary integrity token payload must supply at least ${requiredCount} pair(s)`,
     );
   }
+  // clientNonce format and pool-wide uniqueness are validated against the SAME
+  // rules the backend itself enforces (RouteV2SessionService requires exactly
+  // 22 base64url characters decoding to 16 bytes, and rejects a replayed
+  // nonce) — over the FULL pool, not just the pairs this run will consume, so
+  // a provisioning bug is caught here instead of surfacing as a false budget
+  // breach after live canary traffic against an otherwise-healthy candidate.
+  const seenNonces = new Set();
+  const validatedPairs = pairs.map((pair, index) => {
+    const integrityToken = requireString(pair?.integrityToken, `integrity token pair[${index}].integrityToken`);
+    const clientNonce = pair?.clientNonce;
+    if (typeof clientNonce !== "string" || !CLIENT_NONCE_PATTERN.test(clientNonce)) {
+      throw new Error(`integrity token pair[${index}].clientNonce must be a 22-character base64url value`);
+    }
+    let decodedLength;
+    try {
+      decodedLength = Buffer.from(clientNonce, "base64url").length;
+    } catch {
+      decodedLength = -1;
+    }
+    if (decodedLength !== 16) {
+      throw new Error(`integrity token pair[${index}].clientNonce must decode to exactly 16 bytes`);
+    }
+    if (seenNonces.has(clientNonce)) {
+      throw new Error(`integrity token pair[${index}].clientNonce is duplicated within the pool`);
+    }
+    seenNonces.add(clientNonce);
+    return { integrityToken, clientNonce };
+  });
+
   return {
     mintedAt: parsed.mintedAt,
     mobileVersionName,
     mobileVersionCode,
-    pairs: pairs.slice(0, requiredCount).map((pair, index) => ({
-      integrityToken: requireString(pair?.integrityToken, `integrity token pair[${index}].integrityToken`),
-      clientNonce: requireString(pair?.clientNonce, `integrity token pair[${index}].clientNonce`),
-    })),
+    pairs: validatedPairs.slice(0, requiredCount),
   };
 }
 
@@ -161,16 +199,44 @@ export function resolveExpectedCandidate(operationsEvidence, timetableEvidence) 
   if (!Number.isInteger(versionCode) || versionCode <= 0) {
     throw new Error("RC candidate versionCode is invalid");
   }
+
+  const timetableSnapshotId = requireString(timetableEvidence?.snapshotId, "timetable snapshotId");
+  const timetableSnapshotSha256 = requireString(
+    timetableEvidence?.snapshotSha256,
+    "timetable snapshotSha256",
+  );
+  const timetableFreshUntil = requireString(timetableEvidence?.freshUntil, "timetable freshUntil");
+
+  // The timetable evidence FILE this helper was handed must be the SAME
+  // snapshot operations-release-evidence.json's own timetableSnapshotCache
+  // record declares as current — otherwise this helper could silently mix two
+  // different release evidences into one candidate identity (e.g. certify a
+  // production timetable the RC manifest never actually approved, or reject a
+  // production timetable that matches the manifest just because a stale file
+  // was passed in). Note: this only rejects a MISMATCH between the two
+  // evidences; it does not correct either one — reconciling which value is
+  // authoritative is a separate, follow-up binding change.
+  const boundSnapshot = readiness?.timetableSnapshotCache?.currentImplementation;
+  const boundFreshUntilMs = Date.parse(boundSnapshot?.freshUntil);
+  const timetableFreshUntilMs = Date.parse(timetableFreshUntil);
+  const timetableEvidenceMatchesBoundSnapshot =
+    boundSnapshot?.snapshotSha256 === timetableSnapshotSha256 &&
+    Number.isFinite(boundFreshUntilMs) &&
+    Number.isFinite(timetableFreshUntilMs) &&
+    boundFreshUntilMs === timetableFreshUntilMs;
+  if (!timetableEvidenceMatchesBoundSnapshot) {
+    throw new Error(
+      "operations-release-evidence.json timetableSnapshotCache does not match the timetable evidence file; refusing to resolve a candidate from mismatched release evidence",
+    );
+  }
+
   return {
     backendDeploySha: requireString(candidate.candidateGitSha, "candidate backend SHA"),
     mobileVersionName: requireString(candidate.versionName, "candidate versionName"),
     mobileVersionCode: versionCode,
-    timetableSnapshotId: requireString(timetableEvidence?.snapshotId, "timetable snapshotId"),
-    timetableSnapshotSha256: requireString(
-      timetableEvidence?.snapshotSha256,
-      "timetable snapshotSha256",
-    ),
-    timetableFreshUntil: requireString(timetableEvidence?.freshUntil, "timetable freshUntil"),
+    timetableSnapshotId,
+    timetableSnapshotSha256,
+    timetableFreshUntil,
   };
 }
 
