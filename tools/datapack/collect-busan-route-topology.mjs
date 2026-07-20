@@ -89,7 +89,7 @@ export async function collectBusanRouteTopology({
     rowCount: edges.length,
     edgeCount: edges.length,
     lineIds,
-    fieldsProvided: ["network_edges", "duration_seconds", "distance_meters"],
+    fieldsProvided: ["network_edges", "duration_seconds", "distance_meters", "line", "station_name", "station_code"],
     license: {
       type: "KOGL-1",
       attribution: "부산교통공사, 공공누리 제1유형(출처표시); 제3자 권리 포함 저작권 표시",
@@ -265,7 +265,9 @@ export function admitBusanRouteTopology(snapshot, { now = new Date() } = {}) {
   if (JSON.stringify(snapshot.lineIds) !== JSON.stringify(EXPECTED_LINE_IDS)) {
     throw new Error("Busan route topology admission line scope is incomplete");
   }
-  if (JSON.stringify(snapshot.fieldsProvided) !== JSON.stringify(["network_edges", "duration_seconds", "distance_meters"])) {
+  if (JSON.stringify(snapshot.fieldsProvided) !== JSON.stringify([
+    "network_edges", "duration_seconds", "distance_meters", "line", "station_name", "station_code",
+  ])) {
     throw new Error("Busan route topology admission fields are invalid");
   }
   const scope = validateStationScopes(snapshot.scope);

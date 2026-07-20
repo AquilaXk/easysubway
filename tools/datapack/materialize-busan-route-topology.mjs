@@ -141,6 +141,13 @@ function requiredSource(inventory, snapshot) {
     || evidence.excludedTransferCount !== snapshot.excludedTransferCount) {
     throw new Error(`${SOURCE_ID} inventory evidence does not match snapshot`);
   }
+  const membership = source.membershipAdmissionEvidence;
+  if (!membership || membership.issue !== 2363 || membership.contentSha256 !== snapshot.contentSha256
+    || membership.scopeSha256 !== snapshot.scopeSha256 || membership.capturedAt !== snapshot.capturedAt
+    || membership.freshUntil !== snapshot.freshUntil || membership.stationCount !== snapshot.stationCount
+    || JSON.stringify(membership.lineIds) !== JSON.stringify(snapshot.lineIds)) {
+    throw new Error(`${SOURCE_ID} membership evidence does not match snapshot`);
+  }
   return source;
 }
 

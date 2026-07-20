@@ -98,6 +98,19 @@ test("부산 topology snapshot을 실제 production pack 입력으로 materializ
     }),
     /inventory evidence/,
   );
+  const mismatchedMembership = structuredClone(inventory);
+  mismatchedMembership.sources.find(({ id }) => id === snapshot.sourceId)
+    .membershipAdmissionEvidence.stationCount -= 1;
+  assert.throws(
+    () => materializeBusanRouteTopology({
+      baseFixture,
+      snapshot,
+      inventory: mismatchedMembership,
+      canonicalStationMappings,
+      now: evidenceNow,
+    }),
+    /membership evidence/,
+  );
   const incompleteMappings = new Map(canonicalStationMappings);
   incompleteMappings.delete("line-ab1a041f6266:하단");
   assert.throws(
@@ -112,7 +125,7 @@ test("부산 topology snapshot을 실제 production pack 입력으로 materializ
   );
 });
 
-test("materialized production SQLite와 provenance만 부산 4개 topology requirement를 SUPPORTED로 만든다", async (context) => {
+test("materialized production SQLite와 provenance만 부산 4개 topology·membership requirement를 SUPPORTED로 만든다", async (context) => {
   const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-busan-topology-pack-"));
   context.after(() => rm(outputDir, { recursive: true, force: true }));
   const fixturePath = path.join(outputDir, "fixture.json");
@@ -144,6 +157,9 @@ test("materialized production SQLite와 provenance만 부산 4개 topology requi
   assert.equal(database.prepare(
     "SELECT COUNT(*) AS count FROM network_edges WHERE source_id = ?",
   ).get(snapshot.sourceId).count, 220);
+  assert.equal(database.prepare(
+    "SELECT COUNT(*) AS count FROM station_lines WHERE line_id IN (?, ?, ?, ?)",
+  ).get(...snapshot.lineIds).count, 114);
   database.close();
 
   await execFileAsync(process.execPath, [
@@ -160,7 +176,10 @@ test("materialized production SQLite와 provenance만 부산 4개 topology requi
   const busan = report.requirements.filter(({ operatorId }) => operatorId === "busan-transportation");
   assert.deepEqual(
     busan.filter(({ status }) => status === "SUPPORTED").map(({ lineId, sourceDomain }) => ({ lineId, sourceDomain })),
-    snapshot.lineIds.map((lineId) => ({ lineId, sourceDomain: "route_graph_topology" })),
+    snapshot.lineIds.flatMap((lineId) => [
+      { lineId, sourceDomain: "station_line_membership" },
+      { lineId, sourceDomain: "route_graph_topology" },
+    ]),
   );
 });
 
