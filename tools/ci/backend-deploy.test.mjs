@@ -1137,8 +1137,11 @@ test("배포 성공 종단은 로컬 backend 이미지를 최신 10개+실행 �
   assert.notEqual(fnEnd, -1);
   const fnBody = deploy.slice(fnStart, fnEnd);
 
-  // 실패 무전파 구조: errexit-off 서브셸에서 실행되고 항상 0을 반환한다.
+  // 실패 무전파 구조: errexit-off 서브셸에서 실행되고, 서브셸 종료코드는
+  // `|| true`로 흡수한 뒤 항상 0을 반환한다(마지막 명령 실패가 errexit를
+  // 발화시켜 성공 기록 후 exit code를 뒤집지 못하게 한다).
   assert.match(fnBody, /\(\n\t\tset \+e/);
+  assert.match(fnBody, /\n\t\) \|\| true\n/);
   assert.match(fnBody, /\n\treturn 0$/);
 
   // 보존: 실행 중 컨테이너의 이미지 ID 전부.
@@ -1154,7 +1157,8 @@ test("배포 성공 종단은 로컬 backend 이미지를 최신 10개+실행 �
   assert.match(fnBody, /grep -qxF "\$\{id\}" <<<"\$\{keep_ids\}" && continue/);
 
   // 삭제: 그 외 이미지 → dangling prune → build cache prune (이 순서로).
-  assert.match(fnBody, /docker rmi "\$\{id\}"/);
+  // -f: 다중 repository/tag·GHCR RepoDigest 참조를 가진 이미지도 강제 삭제한다.
+  assert.match(fnBody, /docker rmi -f "\$\{id\}"/);
   assert.match(fnBody, /docker image prune -f/);
   assert.match(fnBody, /docker builder prune -af/);
   const rmiIdx = fnBody.indexOf("docker rmi");

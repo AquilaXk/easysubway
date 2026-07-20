@@ -736,7 +736,10 @@ prune_stale_backend_images() {
 			[[ -z "${id}" ]] && continue
 			grep -qxF "${id}" <<<"${running_ids}" && continue
 			grep -qxF "${id}" <<<"${keep_ids}" && continue
-			if docker rmi "${id}" >/dev/null 2>&1; then
+			# -f: a stale image ID can carry multiple repository/tag and GHCR
+			# RepoDigest references; plain rmi refuses to delete those, so force
+			# removal (safe — running + newest 10 are already excluded above).
+			if docker rmi -f "${id}" >/dev/null 2>&1; then
 				removed=$((removed + 1))
 			fi
 		done <<<"${all_ids}"
@@ -747,7 +750,7 @@ prune_stale_backend_images() {
 
 		printf 'image-cleanup(#2397): removed %s stale easysubway-backend image(s), kept %s newest + running; dangling reclaimed %s, build-cache reclaimed %s\n' \
 			"${removed}" "${kept:-0}" "${images_reclaimed:-0B}" "${builder_reclaimed:-0B}"
-	)
+	) || true
 	return 0
 }
 
