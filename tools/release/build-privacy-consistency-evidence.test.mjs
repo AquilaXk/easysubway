@@ -92,33 +92,32 @@ test("aggregate flag가 모두 명시적 boolean이고 provenance가 검토 revi
   assert.match(evidence.inputs.privacyPolicy.sha256, /^[0-9a-f]{64}$/);
 });
 
-// [Major, PR #2357 review 4732563185] 2026-07-18 커밋(7ca86806)이 Play Console 재제출·검토
-// 당시의 play-store-submission-content.json이고, 그 sha256을 BOUND_EVIDENCE_REFERENCES에
-// 고정했다. 이후 커밋(train_search_queries 추가 등)이 그 뒤로 파일을 바꿨으므로 현재
-// tracked 파일은 검토된 revision과 다르다 — provenance는 여전히 STALE이어야 한다(위조 금지).
-// 반면 그 review가 지적한 5개 dataType의 containsDeletionUnsupportedData 누락은 이제
-// 폼에 명시적 boolean으로 보정돼 answerMatrix 집계 flag 모순은 0이다. 정책 anchor·inventory
-// boundary fact도 무관하게 여전히 일치한다. 따라서 남은 결함은 provenance STALE 하나뿐이며
-// 전체 status는 그 하나 때문에 여전히 BLOCKED다(reviewedFormSha256은 오너가 Play Console에서
-// 보정본을 재제출·재검토한 뒤에만 후속 PR로 재고정한다).
-test("현재 tracked 원본에 대해 실행하면 집계 flag 누락은 보정됐지만 폼 provenance stale은 fail-closed로 남는다", () => {
+// 2026-07-20 재검증(오너 위임 하에 Play Console 5단계 전체를 현행 tracked 폼과 대조):
+// Console 노출 답변과 현행 tracked 내용이 완전 일치, Console 답변 변경 0건이라 재제출
+// 이벤트가 불필요했다. 2026-07-18 검토(7ca86806) 이후의 tracked 변경(train_search 참조
+// 추가·PR #2366 집계 flag 5건 명시)은 전부 Console에 노출되지 않는 tracked 전용 변경이라,
+// sha만 현행 revision(fa82ce6e)으로 재고정했다. 그 결과 현재 tracked 파일 sha256이
+// reviewedFormSha256과 같아져 provenance는 consistent이고, 과거 review가 지적한 5개
+// dataType 집계 flag도 이미 보정돼 answerMatrix 모순 0·정책 anchor·boundary fact 모두
+// 일치한다 — 즉 현재 tracked 원본은 세 판정 전부 결함 0으로 전체 status가 SATISFIED다.
+test("현재 tracked 원본에 대해 실행하면 provenance 재고정으로 세 판정 전부 결함 0인 SATISFIED를 산출한다", () => {
   const evidence = buildPrivacyConsistencyEvidence({
     candidate: candidate(),
     repoRoot: REPO_ROOT,
     generatedAt: "2026-07-20T00:00:00.000Z",
   });
 
-  assert.equal(evidence.playConsoleProvenanceConsistency.consistent, false);
-  assert.equal(evidence.playConsoleProvenanceConsistency.matchesReviewedRevision, false);
+  assert.equal(evidence.playConsoleProvenanceConsistency.consistent, true);
+  assert.equal(evidence.playConsoleProvenanceConsistency.matchesReviewedRevision, true);
   assert.equal(
     evidence.playConsoleProvenanceConsistency.reviewedFormSha256,
-    "67cc31f63c90e1a28fd5d1a0e372ffaa1d1dfe6f41f3a55d439ce3b376af1803",
+    "9ac24f19d8ab31389e75767050cf596f07142b541a53bb98ce8c1cf8ae9ad837",
   );
-  assert.notEqual(
+  assert.equal(
     evidence.playConsoleProvenanceConsistency.currentFormSha256,
     evidence.playConsoleProvenanceConsistency.reviewedFormSha256,
   );
-  assert.equal(evidence.checks.playConsoleProvenanceCurrent, "STALE");
+  assert.equal(evidence.checks.playConsoleProvenanceCurrent, "SATISFIED");
 
   // 5개 dataType 집계 flag 보정 후 answerMatrix 집계 flag 모순은 0이고 판정은 SATISFIED다.
   assert.equal(evidence.checks.inventoryFormConsistent, "SATISFIED");
@@ -132,8 +131,8 @@ test("현재 tracked 원본에 대해 실행하면 집계 flag 누락은 보정�
   assert.equal(evidence.checks.inventoryPolicyConsistent, "SATISFIED");
   assert.equal(evidence.policyBoundaryConsistency.consistent, true);
 
-  // provenance STALE 하나만 남아 전체 status는 여전히 BLOCKED다.
-  assert.equal(evidence.status, "BLOCKED_PRIVACY_CONSISTENCY");
+  // 세 판정 전부 결함 0이라 전체 status는 SATISFIED다.
+  assert.equal(evidence.status, "SATISFIED");
 });
 
 // reviewedPlayFormSha256 override로 provenance 판정 로직 자체를 git 이력과 분리해
