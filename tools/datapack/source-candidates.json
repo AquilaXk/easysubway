@@ -3257,6 +3257,58 @@
       "nextAction": "provider가 station time 값을 제공하면 같은 collector로 #1400·#2098·#2099 completeness를 재검증한다"
     },
     {
+      "id": "gwangju-transportation-route-topology",
+      "priority": "P0",
+      "domain": "route_graph_topology",
+      "coverageScope": {
+        "regionIds": ["gwangju"],
+        "operatorIds": ["gwangju-metropolitan-rapid-transit"],
+        "lineIds": ["line-e57a361e8892"]
+      },
+      "displayName": "광주교통공사 도시철도 운행정보",
+      "detailUrl": "https://www.grtc.co.kr/subway/contents/apiRunInfo",
+      "requestUrl": "https://www.grtc.co.kr/subway/openapi/json/stationTimeInfomation",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://www.grtc.co.kr/subway/openapi/json/stationTimeInfomation",
+        "auth": { "placement": "none" },
+        "requiredParameters": ["station_id"],
+        "fixedParameters": {},
+        "responseEnvelope": "JSON array of OD rows per station",
+        "responseFields": ["start_station_id", "start_station_name", "end_station_id", "end_station_name", "station_distance", "station_time"],
+        "runner": {
+          "command": "node tools/datapack/collect-gwangju-route-topology.mjs",
+          "arguments": ["--output", "/tmp/easysubway-gwangju-route-topology.json"],
+          "requiredEnv": []
+        },
+        "secretPolicy": "credential-free-output"
+      },
+      "licenseEvidenceStatus": "official_open_api_publication",
+      "sampleEvidenceStatus": "validated_live_full_snapshot",
+      "admissionStatus": "official_live_snapshot_captured",
+      "mobileEmbeddingAllowed": false,
+      "evidence": {
+        "retrievedAt": "2026-07-20",
+        "officialDocumentationUrl": "https://www.grtc.co.kr/subway/contents/apiRunInfo",
+        "licenseEvidenceUrl": "https://www.data.go.kr/data/15046044/fileData.do",
+        "license": "unrestricted",
+        "expectedStationCount": 20,
+        "expectedAdjacentEdgeCount": 38,
+        "liveSampleRetrievedAt": "2026-07-20T13:08:47.161Z",
+        "liveSampleFreshUntil": "2026-07-21T13:08:47.161Z",
+        "liveSampleRequestCount": 20,
+        "liveSampleOdRowCount": 380,
+        "liveSampleStationCount": 20,
+        "liveSampleAdjacentEdgeCount": 38,
+        "liveSampleRawSha256": "15e4a6835dff21997d29707b0554580560fd770388156b2ac169508cdfd6636a",
+        "liveSampleScopeSha256": "42d1a6e82b0c4dd0b199f90fe620c38ddb2a9826df334c39a2d0692449324de4",
+        "liveSampleEdgesSha256": "8b0f77bb79db55e6f035e3e713bf9c2ade0b1a7619d495db44cefa1420257d0d",
+        "liveSampleContentSha256": "d8197488bc6dda94e595f7e350cc65c547117da804fb59b7dff85d18b3192e43",
+        "evidenceArtifact": "tools/datapack/sources/gwangju-transportation-route-topology-20260720.json"
+      },
+      "nextAction": "38개 공식 topology edge를 광주 schedule materializer에 결합한다"
+    },
+    {
       "id": "gwangju-transportation-cyberstation-timetable",
       "priority": "P0",
       "domain": "schedule_timetable",
