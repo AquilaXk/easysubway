@@ -419,7 +419,7 @@ test("배포 env 준비는 중복, interpolation, 내부 공개 URL을 차단한
   assert.doesNotMatch(backendEnv, /^EASYSUBWAY_ALERT_SMTP_PASSWORD=/m);
 });
 
-test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤백 계약을 포함한다", async () => {
+test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, standby 승격 계약을 포함한다", async () => {
   await execFileAsync("bash", ["-n", "tools/deploy/prepare-deployment-env.sh"], { cwd: root });
   await execFileAsync("bash", ["-n", "tools/deploy/deploy-backend.sh"], { cwd: root });
   await execFileAsync("bash", ["-n", "tools/ops/postgres-backup.sh"], { cwd: root });
@@ -494,7 +494,7 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤�
   assert.ok(legacyStopCallIndex < deploy.indexOf("trap restore_legacy_on_unhandled_error ERR"));
   assert.ok(legacyStopCallIndex < deploy.indexOf("trap 'restore_legacy_on_interruption TERM' TERM"));
   const legacyRestoreDisableIndex = deploy.lastIndexOf("legacy_restore_on_error=0");
-  assert.ok(deploy.indexOf('fail_backend_deployment "readiness_failed"') < legacyRestoreDisableIndex);
+  assert.ok(deploy.indexOf('abort_deploy "observability_readiness_failed"') < legacyRestoreDisableIndex);
   assert.ok(legacyRestoreDisableIndex < deploy.indexOf('printf \'%s\\n\' "${DEPLOY_SHA}" > "${SHARED_DIR}/current-sha"'));
   assert.ok(deploy.indexOf("trap - ERR INT TERM HUP") < deploy.indexOf('printf \'%s\\n\' "${DEPLOY_SHA}" > "${SHARED_DIR}/current-sha"'));
   assert.match(deploy, /managed_image_drift/);
@@ -515,16 +515,15 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤�
   assert.match(deploy, /compose_services_running "\$\{BACKEND_ENV\}" "\$\{COMPOSE_ENV\}" "\$\{DEPLOY_SHA\}" "\$\{RUNTIME_SERVICES\[@\]\}" "\$\{OBSERVABILITY_SERVICES\[@\]\}"/);
   assert.match(deploy, /same_sha_same_env_services_ready/);
   assert.doesNotMatch(deploy, /same_sha_same_env_ready/);
-  assert.match(deploy, /up -d --no-deps --no-build --force-recreate "\$\{RUNTIME_SERVICES\[@\]\}"/);
+  // The 3-service RUNTIME_SERVICES force-recreate is gone: canonical "backend"
+  // is recreated alone during promotion (asserted in the blue/green contract
+  // block below).
   assert.match(deploy, /--profile observability up -d --no-build "\$\{OBSERVABILITY_SERVICES\[@\]\}" \|\| return 1/);
   assert.match(deploy, /--profile observability up -d --no-build --force-recreate "\$\{OBSERVABILITY_CONFIG_SERVICES\[@\]\}" \|\| return 1/);
   assert.match(deploy, /--profile observability up -d --no-build --force-recreate alertmanager \|\| return 1/);
   assert.match(deploy, /if \[\[ "\$\{current_env_hash\}" != "\$\{target_env_hash\}" \]\]; then/);
   assert.match(deploy, /git diff --quiet "\$\{current_sha\}" "\$\{DEPLOY_SHA\}" -- infra\/prometheus infra\/alertmanager\/templates infra\/loki infra\/grafana\/provisioning/);
   assert.doesNotMatch(deploy, /--force-recreate "\$\{OBSERVABILITY_SERVICES\[@\]\}"/);
-  assert.match(deploy, /fail_backend_deployment\(\)/);
-  assert.match(deploy, /fail_backend_deployment "backend_start_failed"/);
-  assert.match(deploy, /fail_backend_deployment "observability_start_failed"/);
   assert.match(deploy, /verify_runtime_hardening\(\)/);
   assert.match(deploy, /runtime_services_hardened\(\)/);
   assert.match(deploy, /docker inspect --format '\{\{\.Config\.User\}\}\|\{\{\.HostConfig\.ReadonlyRootfs\}\}\|\{\{json \.HostConfig\.Tmpfs\}\}\|\{\{json \.HostConfig\.CapDrop\}\}\|\{\{json \.HostConfig\.SecurityOpt\}\}'/);
@@ -539,28 +538,192 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤�
     deploy.indexOf("runtime_services_hardened()") < deploy.indexOf('if [[ "${current_sha}" == "${DEPLOY_SHA}"'),
     "runtime hardening helper must be available to the same-SHA no-op path",
   );
-  assert.match(deploy, /compose_services_running[\s\S]*&& runtime_services_hardened; then/);
-  assert.match(deploy, /if ! runtime_services_hardened; then/);
-  assert.match(deploy, /fail_backend_deployment "runtime_hardening_failed"/);
-  assert.ok(
-    deploy.indexOf('verify_runtime_hardening "${service}"') < deploy.indexOf('ready=0'),
-    "runtime hardening must pass before readiness completes the deployment",
-  );
+  assert.match(deploy, /compose_services_running[\s\S]*&& runtime_services_hardened "\$\{RUNTIME_SERVICES\[@\]\}"; then/);
+  assert.match(deploy, /if ! runtime_services_hardened backend-standby; then/);
+  assert.match(deploy, /if ! runtime_services_hardened backend; then/);
+  assert.match(deploy, /if ! runtime_services_hardened back-worker route-v2-gateway; then/);
   assert.match(deploy, /observability_ready=0/);
   assert.match(deploy, /compose_services_running "\$\{SHARED_DIR\}\/current-env\/backend\.env" "\$\{SHARED_DIR\}\/current-env\/compose\.env" "\$\{DEPLOY_SHA\}" "\$\{RUNTIME_SERVICES\[@\]\}" "\$\{OBSERVABILITY_SERVICES\[@\]\}"/);
-  assert.match(deploy, /mktemp "\$\{DIAGNOSTICS_DIR\}\/\$\{DEPLOY_SHA\}-observability-\$\(date -u \+%Y%m%dT%H%M%SZ\)\.XXXXXX\.log"/);
-  assert.match(deploy, /chmod 600 "\$\{diagnostic\}"/);
-  assert.match(deploy, /--profile observability logs --no-color --tail=200 "\$\{RUNTIME_SERVICES\[@\]\}" "\$\{OBSERVABILITY_SERVICES\[@\]\}"/);
-  assert.match(deploy, /fail_backend_deployment "observability_readiness_failed"/);
-  assert.match(deploy, /"\$\{detail\}_rollback_attempted"/);
-  assert.match(deploy, /"\$\{detail\}_rollback_unavailable"/);
-  assert.match(deploy, /start_observability_services "\$\{SHARED_DIR\}\/current-env\/backend\.env" "\$\{SHARED_DIR\}\/current-env\/compose\.env" "\$\{current_sha\}" "\$\{recreate_alertmanager\}" "\$\{recreate_observability_config\}" \|\| true/);
-  assert.match(deploy, /rm -f -s "\$\{RUNTIME_SERVICES\[@\]\}"/);
-  assert.match(deploy, /logs --no-color --tail=200 "\$\{RUNTIME_SERVICES\[@\]\}"/);
-  assert.match(deploy, /if ! compose "\$\{SHARED_DIR\}\/current-env\/backend\.env" "\$\{SHARED_DIR\}\/current-env\/compose\.env" "\$\{DEPLOY_SHA\}" up -d --no-deps --no-build --force-recreate "\$\{RUNTIME_SERVICES\[@\]\}"; then/);
   assert.match(deploy, /actuator\/health\/readiness/);
-  assert.match(deploy, /fail_backend_deployment "readiness_failed"/);
   assert.match(deploy, /diagnostics/);
+
+  // --- Blue/green standby+promotion contract (issue #2331). The old
+  // reboot-the-previous-image rollback path is fully removed: no image
+  // restart, no `previous-env` symlink, no per-detail "_rollback_attempted"/
+  // "_rollback_unavailable" suffixes. Instead a candidate is proven on a
+  // standby container before the canonical "backend" container is ever
+  // touched, and a single "leave the proven-healthy server as-is" fallback
+  // covers every post-promotion failure.
+  assert.doesNotMatch(deploy, /fail_backend_deployment/);
+  assert.doesNotMatch(deploy, /ensure_rollback_image/);
+  assert.doesNotMatch(deploy, /GHCR_IMAGE/);
+  assert.doesNotMatch(deploy, /previous-env/);
+  assert.doesNotMatch(deploy, /_rollback_attempted/);
+  assert.doesNotMatch(deploy, /_rollback_unavailable/);
+  assert.match(deploy, /backend_standby_port="\$\(read_env_value "\$\{COMPOSE_ENV\}" EASYSUBWAY_BACKEND_STANDBY_PORT\)"/);
+  assert.match(deploy, /backend_standby_port="\$\{backend_standby_port:-8082\}"/);
+  assert.match(deploy, /STANDBY_STATE_FILE="\$\{SHARED_DIR\}\/deployment-standby-state\.env"/);
+  assert.match(deploy, /write_standby_state\(\)/);
+  assert.match(deploy, /wait_backend_http_ready\(\)/);
+  assert.match(deploy, /dump_diagnostics\(\)/);
+  assert.match(deploy, /cleanup_standby\(\)/);
+  assert.match(deploy, /abort_deploy\(\)/);
+  assert.match(deploy, /abort_standby_stage\(\)/);
+  assert.match(deploy, /install_route_v2_host_ingress\(\) \{\n\tlocal target_backend_port="\$1"/);
+
+  // Stage order: no-op < freshness precheck < standby up < standby hardening
+  // + readiness < Nginx -> alt < promotion recreate < promotion hardening +
+  // readiness < Nginx -> canonical < standby cleanup < back-worker/gateway
+  // recreate < current-sha recorded.
+  const noopExitIndex = deploy.indexOf('write_result "noop" "same_sha_same_env_services_ready"');
+  const precheckIndex = deploy.indexOf("check-snapshot-freshness-precheck.mjs");
+  const standbyUpIndex = deploy.indexOf('write_phase "standby_starting"');
+  const standbyForceRecreateIndex = deploy.indexOf("up -d --no-deps --no-build --force-recreate backend-standby");
+  const standbyHardenedIndex = deploy.indexOf("if ! runtime_services_hardened backend-standby; then");
+  const standbyReadyWaitIndex = deploy.indexOf('if ! wait_backend_http_ready "${backend_standby_port}"; then');
+  const standbyReadyPhaseIndex = deploy.indexOf('write_phase "standby_ready"');
+  const nginxAltIndex = deploy.indexOf('if ! install_route_v2_host_ingress "${backend_standby_port}"; then');
+  const nginxAltPhaseIndex = deploy.indexOf('write_phase "nginx_alt"');
+  const promotingPhaseIndex = deploy.indexOf('write_phase "promoting"');
+  const canonicalForceRecreateIndex = deploy.indexOf("up -d --no-deps --no-build --force-recreate backend; then");
+  const canonicalHardenedIndex = deploy.indexOf("if ! runtime_services_hardened backend; then");
+  const canonicalReadyWaitIndex = deploy.indexOf('if ! wait_backend_http_ready "${backend_port}"; then');
+  const promotedPhaseIndex = deploy.indexOf('write_phase "promoted"');
+  const nginxCanonicalIndex = deploy.indexOf('if ! install_route_v2_host_ingress "${backend_port}"; then');
+  const standbyCleanupPhaseIndex = deploy.indexOf('write_phase "standby_cleanup"');
+  const standbyRmIndex = deploy.indexOf("rm -f -s backend-standby; then");
+  const finalizingPhaseIndex = deploy.indexOf('write_phase "finalizing"');
+  const backWorkerGatewayForceRecreateIndex = deploy.indexOf(
+    "up -d --no-deps --no-build --force-recreate back-worker route-v2-gateway",
+  );
+  const currentShaWriteIndex = deploy.indexOf('printf \'%s\\n\' "${DEPLOY_SHA}" > "${SHARED_DIR}/current-sha"');
+
+  for (const index of [
+    noopExitIndex, precheckIndex, standbyUpIndex, standbyForceRecreateIndex, standbyHardenedIndex,
+    standbyReadyWaitIndex, standbyReadyPhaseIndex, nginxAltIndex, nginxAltPhaseIndex, promotingPhaseIndex,
+    canonicalForceRecreateIndex, canonicalHardenedIndex, canonicalReadyWaitIndex, promotedPhaseIndex,
+    nginxCanonicalIndex, standbyCleanupPhaseIndex, standbyRmIndex, finalizingPhaseIndex,
+    backWorkerGatewayForceRecreateIndex, currentShaWriteIndex,
+  ]) {
+    assert.notEqual(index, -1);
+  }
+
+  assert.ok(noopExitIndex < precheckIndex, "no-op success must exit before the freshness precheck runs");
+  assert.ok(precheckIndex < standbyUpIndex, "freshness precheck must run before the standby container starts");
+  assert.ok(standbyUpIndex < standbyForceRecreateIndex);
+  assert.ok(standbyForceRecreateIndex < standbyHardenedIndex, "standby must exist before it is hardening-checked");
+  assert.ok(standbyHardenedIndex < standbyReadyWaitIndex, "standby hardening must pass before its readiness is polled");
+  assert.ok(standbyReadyWaitIndex < standbyReadyPhaseIndex);
+  assert.ok(standbyReadyPhaseIndex < nginxAltIndex, "standby must be proven ready before Nginx switches to it");
+  assert.ok(nginxAltIndex < nginxAltPhaseIndex);
+  assert.ok(nginxAltPhaseIndex < promotingPhaseIndex, "Nginx must be on the standby before the canonical container is recreated");
+  assert.ok(promotingPhaseIndex < canonicalForceRecreateIndex);
+  assert.ok(canonicalForceRecreateIndex < canonicalHardenedIndex);
+  assert.ok(canonicalHardenedIndex < canonicalReadyWaitIndex, "canonical hardening must pass before its readiness is polled");
+  assert.ok(canonicalReadyWaitIndex < promotedPhaseIndex);
+  assert.ok(promotedPhaseIndex < nginxCanonicalIndex, "canonical must be proven ready before Nginx switches back to it");
+  assert.ok(nginxCanonicalIndex < standbyCleanupPhaseIndex, "Nginx must be back on canonical before the standby is retired");
+  assert.ok(standbyCleanupPhaseIndex < standbyRmIndex);
+  assert.ok(standbyRmIndex < finalizingPhaseIndex, "standby must be retired before back-worker/route-v2-gateway are recreated");
+  assert.ok(finalizingPhaseIndex < backWorkerGatewayForceRecreateIndex);
+  assert.ok(
+    backWorkerGatewayForceRecreateIndex < currentShaWriteIndex,
+    "current-sha is only recorded once every stage above has succeeded",
+  );
+
+  // --- Review follow-up (PR #2356): legacy-restore trap must be disarmed
+  // before promotion recreates the canonical container, so a trap firing
+  // mid-promotion cannot start the legacy systemd jar on the same port the
+  // Docker canonical container may already hold.
+  const promotionLegacyDisarmIndex = deploy.indexOf("legacy_restore_on_error=0", promotingPhaseIndex);
+  assert.notEqual(promotionLegacyDisarmIndex, -1);
+  assert.ok(
+    promotingPhaseIndex < promotionLegacyDisarmIndex,
+    "legacy_restore_on_error must be disarmed at or after the promoting phase begins",
+  );
+  assert.ok(
+    promotionLegacyDisarmIndex < canonicalForceRecreateIndex,
+    "legacy_restore_on_error must be disarmed before the canonical container is force-recreated",
+  );
+
+  // --- Review follow-up: current-env is captured and restored on a
+  // pre-promotion standby-stage abort, so external tools that read
+  // current-env/compose.env as ground truth for "what canonical is actually
+  // running" (capacity/canary rollback scripts) never see an uncommitted
+  // candidate env after an abort that never touched canonical.
+  assert.match(deploy, /previous_env_set=""/);
+  assert.match(deploy, /if \[\[ -L "\$\{SHARED_DIR\}\/current-env" \]\]; then/);
+  assert.match(deploy, /previous_env_set="\$\(readlink "\$\{SHARED_DIR\}\/current-env"\)"/);
+  const abortStandbyStageBody = deploy.slice(
+    deploy.indexOf("abort_standby_stage() {"),
+    deploy.indexOf("abort_standby_stage() {") + deploy.slice(deploy.indexOf("abort_standby_stage() {")).indexOf("\n}\n"),
+  );
+  assert.match(abortStandbyStageBody, /if \[\[ -n "\$\{previous_env_set\}" \]\]; then/);
+  assert.match(abortStandbyStageBody, /ln -sfn "\$\{previous_env_set\}" "\$\{SHARED_DIR\}\/current-env\.next"/);
+  assert.match(abortStandbyStageBody, /rm -f "\$\{SHARED_DIR\}\/current-env"/);
+  const previousEnvSetCaptureIndex = deploy.indexOf('previous_env_set=""');
+  const currentEnvSwapIndex = deploy.indexOf('ln -sfn "${env_set}" "${SHARED_DIR}/current-env.next"');
+  assert.ok(
+    previousEnvSetCaptureIndex < currentEnvSwapIndex,
+    "the previous current-env target must be captured before it is overwritten",
+  );
+
+  // --- Review follow-up: the standby state file is reset to idle right
+  // after the deploy lock is acquired, so a stale "*_standby_serving" from a
+  // prior run does not linger across unrelated, later-blocked attempts.
+  const flockIndex = deploy.indexOf("flock 9");
+  const sessionStartResetIndex = deploy.indexOf('write_standby_state "idle"');
+  const interruptedStateCheckIndex = deploy.indexOf('write_result "blocked" "interrupted_state"');
+  const writeStandbyStateDefIndex = deploy.indexOf("write_standby_state() {");
+  assert.notEqual(flockIndex, -1);
+  assert.notEqual(sessionStartResetIndex, -1);
+  assert.ok(
+    writeStandbyStateDefIndex < flockIndex,
+    "write_standby_state must be defined before flock so it can reset state right after lock acquisition",
+  );
+  assert.ok(flockIndex < sessionStartResetIndex, "the standby state reset must run after the deploy lock is acquired");
+  assert.ok(
+    sessionStartResetIndex < interruptedStateCheckIndex,
+    "the standby state reset must run before any early-blocked exit",
+  );
+
+  // --- Review follow-up: manual recovery runbook for "*_standby_serving"
+  // degraded exits, and the expand/contract migration contract header.
+  assert.match(deploy, /Manual recovery runbook for a "\*_standby_serving" degraded exit/);
+  assert.match(deploy, /managed_image_drift — it is not a/);
+  assert.match(deploy, /expand\/contract \(purely additive\)/);
+  assert.match(deploy, /Automated destructive-DDL\s*\n# detection is tracked as a follow-up candidate under epic #2329/);
+
+  // Pre-promotion standby failures never touch the canonical container or
+  // Nginx (fall back to the pre-Docker legacy unit only for the narrow
+  // very-first-deploy case, exactly like the old rollback path did).
+  const standbyFailureBlock = deploy.slice(standbyUpIndex, nginxAltPhaseIndex);
+  assert.match(standbyFailureBlock, /abort_standby_stage "standby_start_failed"/);
+  assert.match(standbyFailureBlock, /abort_standby_stage "standby_hardening_failed"/);
+  assert.match(standbyFailureBlock, /abort_standby_stage "standby_readiness_failed"/);
+  assert.match(standbyFailureBlock, /abort_standby_stage "nginx_alt_switch_failed"/);
+  assert.doesNotMatch(standbyFailureBlock, /up -d --no-deps --no-build --force-recreate backend;/);
+
+  // Post-promotion failures leave the proven-healthy standby serving and are
+  // tagged with a "_standby_serving" detail so an operator can find them —
+  // the one place the standby is deliberately NOT cleaned up.
+  const postPromotionBlock = deploy.slice(promotingPhaseIndex, standbyCleanupPhaseIndex);
+  assert.match(postPromotionBlock, /abort_deploy "canonical_promotion_failed_standby_serving"/);
+  assert.match(postPromotionBlock, /abort_deploy "canonical_hardening_failed_standby_serving"/);
+  assert.match(postPromotionBlock, /abort_deploy "canonical_readiness_failed_standby_serving"/);
+  assert.match(postPromotionBlock, /abort_deploy "nginx_canonical_switchback_failed_standby_serving"/);
+  assert.doesNotMatch(postPromotionBlock, /cleanup_standby/);
+  assert.match(deploy, /write_standby_state "serving_standby_degraded" "\$\{backend_standby_port\}"/);
+
+  // The trailing back-worker/route-v2-gateway recreate and observability
+  // start no longer roll the already-promoted, already-serving canonical
+  // backend back to an old image on failure.
+  const tailBlock = deploy.slice(finalizingPhaseIndex);
+  assert.match(tailBlock, /abort_deploy "back_worker_gateway_recreate_failed"/);
+  assert.match(tailBlock, /abort_deploy "back_worker_gateway_hardening_failed"/);
+  assert.match(tailBlock, /abort_deploy "observability_start_failed"/);
+  assert.match(tailBlock, /abort_deploy "observability_readiness_failed"/);
+
   assert.match(backup, /pg_restore --list/);
   assert.doesNotMatch(backup, /pg_restore --list -/);
   assert.match(backup, /\.sha256/);
@@ -637,16 +800,21 @@ test("Route V2 host ingress는 두 exact 경로만 gateway로 보내고 실패 �
   assert.match(deploy, /restore_failed=1/);
   assert.match(deploy, /failed to restore Route V2 host ingress/);
   assert.doesNotMatch(deploy, /sudo nginx -t[^\n]+&& sudo systemctl reload nginx \|\| true/);
-  assert.match(deploy, /fail_backend_deployment "route_v2_host_ingress_failed"/);
   assert.match(deploy, /current-route-v2-ingress-enabled/);
-  assert.match(
-    deploy,
-    /compose "\$\{SHARED_DIR\}\/current-env\/backend\.env" "\$\{SHARED_DIR\}\/current-env\/compose\.env" "\$\{DEPLOY_SHA\}" up -d --no-deps --no-build --force-recreate "\$\{RUNTIME_SERVICES\[@\]\}"/,
-  );
-  assert.match(
-    deploy,
-    /compose "\$\{SHARED_DIR\}\/current-env\/backend\.env" "\$\{SHARED_DIR\}\/current-env\/compose\.env" "\$\{current_sha\}" up -d --no-deps --no-build --force-recreate "\$\{RUNTIME_SERVICES\[@\]\}"/,
-  );
+  // install_route_v2_host_ingress now takes the backend port to render as a
+  // parameter (issue #2331) — it is invoked once to point Nginx at the
+  // standby port and once to switch it back to the canonical port, instead
+  // of the old single call against a closed-over `backend_port` global.
+  assert.match(deploy, /install_route_v2_host_ingress\(\) \{\n\tlocal target_backend_port="\$1"/);
+  assert.match(deploy, /-e "s\/__BACKEND_PORT__\/\$\{target_backend_port\}\/g"/);
+  assert.match(deploy, /if ! install_route_v2_host_ingress "\$\{backend_standby_port\}"; then/);
+  assert.match(deploy, /if ! install_route_v2_host_ingress "\$\{backend_port\}"; then/);
+  // The old single-shot 3-service RUNTIME_SERVICES force-recreate (and its
+  // current_sha-based rollback twin) is gone: the canonical "backend"
+  // container is recreated alone during promotion, after a standby on an
+  // alternate port has already proven the candidate image.
+  assert.doesNotMatch(deploy, /up -d --no-deps --no-build --force-recreate "\$\{RUNTIME_SERVICES\[@\]\}"/);
+  assert.doesNotMatch(deploy, /"\$\{current_sha\}" up -d --no-deps --no-build --force-recreate/);
   assert.match(deploy, /route_v2_host_action="return 404;"/);
   assert.match(deploy, /route_v2_host_action="proxy_pass http:\/\/127\.0\.0\.1:\$\{route_v2_gateway_port\};"/);
 
@@ -717,7 +885,7 @@ test("Compose backend 서비스는 bootJar 기반 이미지와 제한된 바인�
   assert.match(compose, /postgres:\s*\n\s*condition: service_healthy/);
   assert.match(compose, /object-storage:\s*\n\s*condition: service_healthy/);
 
-  for (const service of ["backend", "back-worker"]) {
+  for (const service of ["backend", "backend-standby", "back-worker"]) {
     const block = compose.match(new RegExp(`\\n  ${service}:\\n[\\s\\S]*?(?=\\n  [a-z0-9-]+:\\n|\\nvolumes:)`))?.[0] ?? "";
     assert.match(block, /^    user: "10001:10001"$/m, `${service} numeric user`);
     assert.match(block, /^    read_only: true$/m, `${service} read-only rootfs`);
@@ -725,6 +893,24 @@ test("Compose backend 서비스는 bootJar 기반 이미지와 제한된 바인�
     assert.match(block, /^    cap_drop:\s*\n      - ALL$/m, `${service} capabilities`);
     assert.match(block, /^    security_opt:\s*\n      - no-new-privileges:true$/m, `${service} no-new-privileges`);
   }
+
+  // Blue/green standby (issue #2331): a transient container on an alternate,
+  // internal-only port, never auto-restarted by Docker.
+  const standbyBlock = compose.match(/\n  backend-standby:\n[\s\S]*?(?=\n  [a-z0-9-]+:\n|\nvolumes:)/)?.[0] ?? "";
+  assert.match(standbyBlock, /^    container_name: easysubway-backend-standby$/m);
+  assert.match(standbyBlock, /^    restart: "no"$/m, "standby must not be auto-restarted by Docker");
+  assert.match(
+    standbyBlock,
+    /"\$\{EASYSUBWAY_BACKEND_BIND:-127\.0\.0\.1\}:\$\{EASYSUBWAY_BACKEND_STANDBY_PORT:-8082\}:8080"/,
+  );
+  assert.doesNotMatch(standbyBlock, /EASYSUBWAY_BACKEND_PORT/, "standby must bind its own alternate port, not the canonical one");
+
+  // Review follow-up (PR #2356): the standby shares canonical's live
+  // datasource, so migrations/snapshot swap commit against production data
+  // before canonical is touched — "old backend untouched" must not be
+  // overclaimed as a data-layer guarantee.
+  assert.match(compose, /same Postgres datasource as canonical "backend"/i);
+  assert.match(compose, /process\/Nginx-level guarantee, not\s*\n\s*# a data-layer one/);
 });
 
 const FRESHNESS_PRECHECK = "tools/deploy/check-snapshot-freshness-precheck.mjs";
@@ -891,20 +1077,21 @@ test("CD 배포는 컨테이너 교체 전에 timetable snapshot freshness를 �
 
   const precheckIndex = deploy.indexOf("check-snapshot-freshness-precheck.mjs");
   const noopExitIndex = deploy.indexOf('write_result "noop" "same_sha_same_env_services_ready"');
-  const forceRecreateIndex = deploy.indexOf('write_phase "restarting"');
+  const standbyStartIndex = deploy.indexOf('write_phase "standby_starting"');
   const backupIndex = deploy.indexOf("needs_backup=0");
   const legacyStopIndex = deploy.lastIndexOf("\nstop_legacy_backend_service\n");
   assert.notEqual(precheckIndex, -1);
   assert.ok(noopExitIndex < precheckIndex, "precheck must not disturb the same-SHA no-op success path");
   assert.ok(precheckIndex < backupIndex, "precheck must run before postgres backup");
   assert.ok(precheckIndex < legacyStopIndex, "precheck must run before stopping the legacy backend");
-  assert.ok(precheckIndex < forceRecreateIndex, "precheck must run before the container force-recreate");
+  assert.ok(precheckIndex < standbyStartIndex, "precheck must run before the standby container is started");
 
-  // The stale abort must not go through fail_backend_deployment (which rolls the
-  // running containers via force-recreate); it must leave the running backend
-  // untouched. Assert the stale-abort block writes a blocked result and exits
-  // without a fail_backend_deployment call between the precheck and the abort.
+  // The stale abort must not go through abort_deploy/abort_standby_stage (the
+  // failure helpers used once containers are actually touched); it must leave
+  // the running backend untouched. Assert the stale-abort block writes a
+  // blocked result and exits directly, without going through either helper
+  // between the precheck and the abort.
   const staleBlock = deploy.slice(precheckIndex, deploy.indexOf("needs_backup=0", precheckIndex));
-  assert.doesNotMatch(staleBlock, /fail_backend_deployment/);
+  assert.doesNotMatch(staleBlock, /abort_deploy|abort_standby_stage/);
   assert.match(staleBlock, /write_result "blocked" "stale_snapshot_precheck_failed"\n\texit 1/);
 });
