@@ -531,28 +531,27 @@ test("canary runner dotenv parser는 키가 없으면 fail-closed로 거부한�
   }
 });
 
-test("canary runner --test-expected-candidate는 operations-release-evidence.json과 timetable evidence의 현재 drift를 거부한다", async () => {
+test("canary runner --test-expected-candidate는 정합된 operations-release-evidence.json과 timetable evidence에서 checked-in RC candidate를 resolve한다", async () => {
   // apps/mobile/release/operations-release-evidence.json's
-  // routeV2Readiness.timetableSnapshotCache.currentImplementation is a KNOWN,
-  // pre-existing drift from the checked-in timetable evidence file this runner
-  // actually reads (backend/src/main/resources/timetable/server-timetable-snapshot-evidence.json)
-  // — a separate follow-up binding PR owns reconciling which value is
-  // authoritative. Until that lands, resolveExpectedCandidate() must correctly
-  // REFUSE to resolve a candidate instead of silently trusting one of the two
-  // mismatched evidences (this is the fail-closed behavior the cross-check
-  // exists to produce, not a bug in the cross-check itself).
+  // routeV2Readiness.timetableSnapshotCache.currentImplementation is now
+  // reconciled with the checked-in timetable evidence file this runner actually
+  // reads (backend/src/main/resources/timetable/server-timetable-snapshot-evidence.json)
+  // — the earlier known drift was reconciled in #2095. resolveExpectedCandidate()
+  // therefore resolves the SAME checked-in RC candidate from the two matching
+  // evidences instead of fail-closing on a snapshot mismatch.
   const [operations, timetable] = await Promise.all([
     readFile(operationsEvidencePath, "utf8").then(JSON.parse),
     readFile(timetableEvidencePath, "utf8").then(JSON.parse),
   ]);
-  assert.throws(
-    () => resolveExpectedCandidate(operations, timetable),
-    /timetableSnapshotCache does not match the timetable evidence file/,
+  const resolved = resolveExpectedCandidate(operations, timetable);
+  assert.equal(resolved.timetableSnapshotId, timetable.snapshotId);
+  assert.equal(resolved.timetableSnapshotSha256, timetable.snapshotSha256);
+  assert.equal(
+    resolved.backendDeploySha,
+    operations.backendControlPlane.publicApiSurface.routeV2Readiness.realisticLoadEvidence.candidate
+      .candidateGitSha,
   );
-  await assert.rejects(
-    execFileAsync("bash", [runnerPath, "--test-expected-candidate"]),
-    (error) => error.code === 2,
-  );
+  await execFileAsync("bash", [runnerPath, "--test-expected-candidate"]);
 });
 
 test("resolveExpectedCandidate는 operations-release-evidence.json과 timetable evidence의 snapshot 일치 여부를 검증한다", () => {

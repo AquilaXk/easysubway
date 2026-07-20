@@ -7269,9 +7269,9 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
     currentImplementation: {
       status: "SATISFIED",
       fields: ["snapshotSha256", "freshUntil"],
-      snapshotId: "server-timetable-snapshot-c8ae07b67e133c8e",
-      snapshotSha256: "c8ae07b67e133c8ee019069b1c11590aac1449398caf87eb68bca540615b9623",
-      freshUntil: "2026-07-20T00:00:00+09:00",
+      snapshotId: "server-timetable-snapshot-9f9be14b6cdd6e4d",
+      snapshotSha256: "9f9be14b6cdd6e4d9a2eda1391b0bd7a48e6330485c9e1ec81d399958eae45d8",
+      freshUntil: "2026-07-27T00:00:00+09:00",
       evidencePath: "tools/datapack/server-timetable-snapshot-evidence.json",
     },
     sharedRouteResponseCacheAllowed: false,
@@ -7283,7 +7283,13 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
     runner: "tools/ops/verify-production-route-v2-capacity.sh",
     workflow: ".github/workflows/production-route-v2-capacity-evidence.yml",
     runnerExitCode: 0,
-    productionWorkflowRunUrl: "production workflow run URL 대기(인프라 안정화 후 첨부)",
+    productionWorkflowRunUrl: "https://github.com/AquilaXk/easysubway/actions/runs/29712689840",
+    productionWorkflowRun: {
+      runUrl: "https://github.com/AquilaXk/easysubway/actions/runs/29712689840",
+      deployedSha: "3cad74667dc4c519aac0d1a9f9bcab2bcf5e5142",
+      conclusion: "success",
+      note: "production capacity workflow 최초 완주. run은 candidate SHA(e317f3af90292b9e2dff5e7ec90c22792b845435)가 아닌 이후 배포·검증된 SHA(3cad7466)에서 수행됨 — candidate 블록은 candidate identity로 불변 유지.",
+    },
     candidate: {
       versionName: "1.0.5",
       versionCode: 10006,
