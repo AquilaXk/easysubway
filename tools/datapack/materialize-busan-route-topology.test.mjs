@@ -98,19 +98,40 @@ test("부산 topology snapshot을 실제 production pack 입력으로 materializ
     }),
     /inventory evidence/,
   );
-  const mismatchedMembership = structuredClone(inventory);
-  mismatchedMembership.sources.find(({ id }) => id === snapshot.sourceId)
-    .membershipAdmissionEvidence.stationCount -= 1;
-  assert.throws(
-    () => materializeBusanRouteTopology({
-      baseFixture,
-      snapshot,
-      inventory: mismatchedMembership,
-      canonicalStationMappings,
-      now: evidenceNow,
-    }),
-    /membership evidence/,
-  );
+  const membershipMutations = [
+    ["issue", (evidence) => { evidence.issue += 1; }],
+    ["materializer", (evidence) => { evidence.materializer += ".tampered"; }],
+    ["verificationTest", (evidence) => { evidence.verificationTest += ".tampered"; }],
+    ["snapshotId", (evidence) => { evidence.snapshotId += "-tampered"; }],
+    ["lineIds", (evidence) => { evidence.lineIds = [...evidence.lineIds].reverse(); }],
+    ["verifiedAt", (evidence) => { evidence.verifiedAt = "2026-07-19T18:13:30.841Z"; }],
+    ["stationCount", (evidence) => { evidence.stationCount -= 1; }],
+    ["membershipSourceId", (evidence) => { evidence.membershipSourceId += "-tampered"; }],
+    ["membershipSourceRawSha256", (evidence) => { evidence.membershipSourceRawSha256 = "0".repeat(64); }],
+    ["membershipSourceSnapshotSha256", (evidence) => { evidence.membershipSourceSnapshotSha256 = "0".repeat(64); }],
+    ["mappingSha256", (evidence) => { evidence.mappingSha256 = "0".repeat(64); }],
+    ["stationCodesSha256", (evidence) => { evidence.stationCodesSha256 = "0".repeat(64); }],
+    ["stationCodeSourceId", (evidence) => { evidence.stationCodeSourceId += "-tampered"; }],
+    ["stationCodeSnapshotId", (evidence) => { evidence.stationCodeSnapshotId += "-tampered"; }],
+    ["stationCodeContentSha256", (evidence) => { evidence.stationCodeContentSha256 = "0".repeat(64); }],
+  ];
+  for (const [field, mutate] of membershipMutations) {
+    const mismatchedMembership = structuredClone(inventory);
+    const membershipEvidence = mismatchedMembership.sources.find(({ id }) => id === snapshot.sourceId)
+      .membershipAdmissionEvidence;
+    mutate(membershipEvidence);
+    assert.throws(
+      () => materializeBusanRouteTopology({
+        baseFixture,
+        snapshot,
+        inventory: mismatchedMembership,
+        canonicalStationMappings,
+        now: evidenceNow,
+      }),
+      /membership evidence/,
+      field,
+    );
+  }
   const incompleteMappings = new Map(canonicalStationMappings);
   incompleteMappings.delete("line-ab1a041f6266:하단");
   assert.throws(

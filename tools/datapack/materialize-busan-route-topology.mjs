@@ -143,7 +143,10 @@ function requiredSource(inventory, snapshot) {
   }
   const membership = source.membershipAdmissionEvidence;
   const stationCodesSha256 = sha256(JSON.stringify(snapshot.scope.map(({ stationCode }) => stationCode)));
-  if (!membership || membership.issue !== 2363 || membership.snapshotId !== evidence.snapshotId
+  if (!membership || membership.issue !== 2363
+    || membership.materializer !== "tools/datapack/materialize-busan-route-topology.mjs"
+    || membership.verificationTest !== "tools/datapack/materialize-busan-route-topology.test.mjs"
+    || membership.snapshotId !== evidence.snapshotId
     || membership.verifiedAt !== snapshot.capturedAt || membership.stationCount !== snapshot.stationCount
     || JSON.stringify(membership.lineIds) !== JSON.stringify(snapshot.lineIds)
     || membership.membershipSourceId !== SOURCE_ID || membership.membershipSourceRawSha256 !== snapshot.rawSha256
