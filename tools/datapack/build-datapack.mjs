@@ -585,6 +585,14 @@ function packFieldProvenance(pack, { artifactKind, sqliteSha256 }) {
       && (!fieldProvenance || typeof fieldProvenance !== "object" || Array.isArray(fieldProvenance))) {
       throw new Error(`${entityType}.${field} fieldProvenance must be an object`);
     }
+    const rowSourceId = row.sourceId ?? defaultSourceId;
+    if (fieldProvenance?.sourceId !== undefined && fieldProvenance.sourceId !== rowSourceId) {
+      for (const linkageField of ["sourceSnapshotId", "providerRecordHash", "evidenceHash", "verifiedAt"]) {
+        if (typeof fieldProvenance[linkageField] !== "string" || fieldProvenance[linkageField].trim() === "") {
+          throw new Error(`${entityType}.${field} fieldProvenance source change requires explicit ${linkageField}`);
+        }
+      }
+    }
     const provenanceRow = fieldProvenance ? { ...row, ...fieldProvenance } : row;
     const sourceId = provenanceRow.sourceId ?? defaultSourceId;
     if (!sourceId) {

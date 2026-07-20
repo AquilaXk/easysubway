@@ -220,6 +220,20 @@ test("materialized production SQLite와 field provenance만 대전 1호선 membe
     }), expectedError);
   }
 
+  for (const linkageField of ["sourceSnapshotId", "providerRecordHash", "evidenceHash", "verifiedAt"]) {
+    const inheritedEvidenceFixture = structuredClone(fixture);
+    delete inheritedEvidenceFixture.packs[0].stationLines
+      .find(({ lineId }) => lineId === "line-7051a9c2525c")
+      .fieldProvenance.station_code[linkageField];
+    await writeFile(invalidFixturePath, `${JSON.stringify(inheritedEvidenceFixture, null, 2)}\n`);
+    await assert.rejects(execFileAsync(process.execPath, [
+      "tools/datapack/build-datapack.mjs", "--fixture", invalidFixturePath, "--output", packOutput,
+    ], {
+      cwd: root,
+      env: { ...process.env, EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM: privateKey },
+    }), new RegExp(`fieldProvenance source change requires explicit ${linkageField}`));
+  }
+
   await execFileAsync(process.execPath, [
     "tools/datapack/build-datapack.mjs", "--fixture", fixturePath, "--output", packOutput,
   ], {
