@@ -83,11 +83,31 @@ export function validateSourceInventory(inventory, valuePath, errors) {
   for (const [index, source] of inventory.sources.entries()) {
     if (source == null || typeof source !== "object" || Array.isArray(source)) continue;
     const path = `${valuePath}: $.sources.${index}`;
-    if (source.productionUseAllowed === true && source.topologyAdmissionEvidence == null) {
-      errors.push(`${path}.productionUseAllowed: true는 topologyAdmissionEvidence가 필요하다`);
+    const sourceDomains = new Set(Array.isArray(source.coverageScope?.sourceDomains)
+      ? source.coverageScope.sourceDomains : []);
+    const requiresTopology = sourceDomains.has("route_graph_topology");
+    const requiresSchedule = sourceDomains.has("schedule_timetable");
+    if (source.productionUseAllowed === true && requiresTopology && source.topologyAdmissionEvidence == null) {
+      errors.push(`${path}.topologyAdmissionEvidence: route_graph_topology production 승인은 topologyAdmissionEvidence가 필요하다`);
+    }
+    if (source.productionUseAllowed === true && requiresSchedule && source.scheduleAdmissionEvidence == null) {
+      errors.push(`${path}.scheduleAdmissionEvidence: schedule_timetable production 승인은 scheduleAdmissionEvidence가 필요하다`);
+    }
+    if (source.productionUseAllowed === true && !requiresTopology && !requiresSchedule
+      && source.topologyAdmissionEvidence == null && source.scheduleAdmissionEvidence == null) {
+      errors.push(`${path}.productionUseAllowed: true는 production admission evidence가 필요하다`);
+    }
+    if (source.topologyAdmissionEvidence != null && !requiresTopology) {
+      errors.push(`${path}.topologyAdmissionEvidence: route_graph_topology source domain이 필요하다`);
+    }
+    if (source.scheduleAdmissionEvidence != null && !requiresSchedule) {
+      errors.push(`${path}.scheduleAdmissionEvidence: schedule_timetable source domain이 필요하다`);
     }
     if (source.topologyAdmissionEvidence != null && source.productionUseAllowed !== true) {
       errors.push(`${path}.topologyAdmissionEvidence: productionUseAllowed true가 필요하다`);
+    }
+    if (source.scheduleAdmissionEvidence != null && source.productionUseAllowed !== true) {
+      errors.push(`${path}.scheduleAdmissionEvidence: productionUseAllowed true가 필요하다`);
     }
   }
 }
