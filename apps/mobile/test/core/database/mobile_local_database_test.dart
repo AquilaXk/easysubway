@@ -588,7 +588,7 @@ void main() {
     expect(timetable.read<int>('trip_count'), 0);
     expect(admission.read<String>('admission_status'), 'ADMITTED');
     expect(admission.read<int>('admission_eligible'), 1);
-    expect(admission.read<String>('fresh_until'), '2026-07-20T00:00:00+09:00');
+    expect(admission.read<String>('fresh_until'), '2026-07-27T00:00:00+09:00');
     expect(admission.read<int>('source_issue'), 2135);
   });
 

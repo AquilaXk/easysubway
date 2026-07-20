@@ -93,7 +93,7 @@
 					   th:href="${request.workflowRunUrl}"
 					   th:text="${request.workflowRunUrl}"
 					   target="_blank" rel="noopener noreferrer">workflow run</a>
-					<span th:unless="${request.workflowRunUrl != null}">-</span>
+					<span th:unless="${request.workflowRunUrl != null}">—</span>
 				</td>
 				<td th:text="${request.createdAt}">2026-07-06T00:00</td>
 				<td>
@@ -117,7 +117,7 @@
 					<span th:if="${request.status != 'REQUESTED'
 						and request.status != 'DISPATCH_FAILED'
 						and request.status != 'APPROVED'
-						and not (request.status == 'PUBLISHED' and request.promoteOutcome == 'REJECTED')}">-</span>
+						and not (request.status == 'PUBLISHED' and request.promoteOutcome == 'REJECTED')}">—</span>
 				</td>
 			</tr>
 			</tbody>
@@ -136,14 +136,14 @@
 				<th scope="col">증거 해시</th><th scope="col">차단 요인</th><th scope="col">복구</th>
 			</tr></thead>
 			<tbody>
-			<tr th:if="${deliveries.isEmpty()}"><td colspan="7">콜백 전송 내역이 없습니다.</td></tr>
+			<tr th:if="${deliveries.isEmpty()}"><td colspan="7"><div th:replace="~{admin/fragments/empty-state :: panel('콜백 전송 내역이 없습니다.', 'release request가 승인되면 콜백 전송이 여기에 표시됩니다.')}"></div></td></tr>
 			<tr th:each="delivery : ${deliveries}">
 				<td th:text="${delivery.releaseRequestId + ' / ' + delivery.releaseSequence}">request</td>
 				<td th:text="${delivery.channel + ' / ' + delivery.state}">state</td>
-				<td th:text="${delivery.attempts + ' / ' + (delivery.httpClass ?: '-')}">attempt</td>
+				<td th:text="${delivery.attempts + ' / ' + (delivery.httpClass ?: '—')}">attempt</td>
 				<td><time th:text="${delivery.nextAttemptAt}">next attempt</time> / <time th:text="${delivery.reconcileDeadline}">reconcile</time> / <time th:text="${delivery.deadLetterDeadline}">dead letter</time></td>
 				<td><code th:text="${delivery.payloadSha256}">payload hash</code><br><code th:text="${delivery.signatureSha256}">signature hash</code></td>
-				<td th:text="${delivery.detail ?: '-'}">차단 요인</td>
+				<td th:text="${delivery.detail ?: '—'}">차단 요인</td>
 				<td>
 					<form th:if="${delivery.repairable}" method="post"
 						  th:action="@{/admin/datapack/release-deliveries/{idempotencyKey}/repair(idempotencyKey=${delivery.idempotencyKey})}">
@@ -152,7 +152,7 @@
 						<label>복구 사유 <input name="reason" required maxlength="200"></label>
 						<button type="submit" class="outline">수동 복구</button>
 					</form>
-					<span th:unless="${delivery.repairable}">-</span>
+					<span th:unless="${delivery.repairable}">—</span>
 				</td>
 			</tr>
 			</tbody>
