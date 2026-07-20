@@ -14,7 +14,7 @@ import { materializeDaejeonTimetable } from "./materialize-daejeon-timetable.mjs
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
-const evidenceNow = new Date("2026-07-20T00:01:00.000Z");
+const evidenceNow = new Date("2026-07-20T01:16:47.000Z");
 
 async function inputs() {
   const [baseFixture, timetableSnapshot, topologySnapshot, inventory, stationMapCsv] = await Promise.all([
@@ -92,7 +92,7 @@ test("대전 시간표 admission은 snapshot·inventory·freshness·topology lin
   const cases = [
     [{ ...values, timetableSnapshot: { ...values.timetableSnapshot, endpoint: "https://example.invalid" } }, /snapshot/],
     [{ ...values, timetableSnapshot: { ...values.timetableSnapshot, rowsSha256: "0".repeat(64) } }, /snapshot/],
-    [{ ...values, now: new Date("2026-07-21T00:00:59.759Z") }, /stale/],
+    [{ ...values, now: new Date("2026-07-21T01:16:46.435Z") }, /stale/],
   ];
   for (const [input, expected] of cases) {
     assert.throws(() => materializeDaejeonTimetable({ ...input, now: input.now ?? evidenceNow }), expected);

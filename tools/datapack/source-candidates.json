@@ -3294,7 +3294,7 @@
         "outputFields": ["dayType", "drctType", "stNum", "tmList", "tmZone"],
         "officialSwaggerOperationId": "getAllTimeTable",
         "liveValidation": {
-          "observedAt": "2026-07-20T00:00:59.759Z",
+          "observedAt": "2026-07-20T01:16:46.435Z",
           "httpStatus": 200,
           "providerResultCode": "00",
           "schemaStatus": "EXPECTED",
