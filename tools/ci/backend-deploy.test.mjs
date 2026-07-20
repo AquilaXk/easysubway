@@ -1124,3 +1124,58 @@ test("CD 배포는 컨테이너 교체 전에 timetable snapshot freshness를 �
   assert.doesNotMatch(staleBlock, /abort_deploy|abort_standby_stage/);
   assert.match(staleBlock, /write_result "blocked" "stale_snapshot_precheck_failed"\n\texit 1/);
 });
+
+test("배포 성공 종단은 로컬 backend 이미지를 최신 10개+실행 중으로 정리하되 실패를 전파하지 않는다", async () => {
+  await execFileAsync("bash", ["-n", "tools/deploy/deploy-backend.sh"], { cwd: root });
+  const deploy = read("tools/deploy/deploy-backend.sh");
+
+  // 정리 함수가 존재한다.
+  assert.match(deploy, /prune_stale_backend_images\(\) \{/);
+  const fnStart = deploy.indexOf("prune_stale_backend_images() {");
+  const fnEnd = deploy.indexOf("\n}\n", fnStart);
+  assert.notEqual(fnStart, -1);
+  assert.notEqual(fnEnd, -1);
+  const fnBody = deploy.slice(fnStart, fnEnd);
+
+  // 실패 무전파 구조: errexit-off 서브셸에서 실행되고 항상 0을 반환한다.
+  assert.match(fnBody, /\(\n\t\tset \+e/);
+  assert.match(fnBody, /\n\treturn 0$/);
+
+  // 보존: 실행 중 컨테이너의 이미지 ID 전부.
+  assert.match(
+    fnBody,
+    /running_ids="\$\(docker ps -q \| xargs -r docker inspect --format '\{\{\.Image\}\}'/,
+  );
+  // 보존: easysubway-backend 이미지 중 생성일 최신 10개.
+  assert.match(fnBody, /docker images easysubway-backend --no-trunc --format '\{\{\.ID\}\}'/);
+  assert.match(fnBody, /head -n 10/);
+  // 보존 대상(실행 중·최신 10개)은 삭제 루프에서 continue로 건너뛴다.
+  assert.match(fnBody, /grep -qxF "\$\{id\}" <<<"\$\{running_ids\}" && continue/);
+  assert.match(fnBody, /grep -qxF "\$\{id\}" <<<"\$\{keep_ids\}" && continue/);
+
+  // 삭제: 그 외 이미지 → dangling prune → build cache prune (이 순서로).
+  assert.match(fnBody, /docker rmi "\$\{id\}"/);
+  assert.match(fnBody, /docker image prune -f/);
+  assert.match(fnBody, /docker builder prune -af/);
+  const rmiIdx = fnBody.indexOf("docker rmi");
+  const imagePruneIdx = fnBody.indexOf("docker image prune -f");
+  const builderPruneIdx = fnBody.indexOf("docker builder prune -af");
+  assert.ok(rmiIdx < imagePruneIdx, "삭제는 dangling prune보다 먼저 수행된다");
+  assert.ok(imagePruneIdx < builderPruneIdx, "dangling prune은 build cache prune보다 먼저 수행된다");
+
+  // 로그: 삭제 개수·회수 공간을 남긴다.
+  assert.match(fnBody, /image-cleanup\(#2397\): removed %s stale easysubway-backend image\(s\)/);
+  assert.match(fnBody, /dangling reclaimed %s, build-cache reclaimed %s/);
+
+  // 성공 종단 이후에만 호출된다: 모든 trap 해제 → 성공 결과 기록 → 정리 호출.
+  const trapDisarmIdx = deploy.lastIndexOf("trap - ERR INT TERM HUP");
+  const successIdx = deploy.indexOf('write_result "success" "backend_ready"');
+  const callMatches = deploy.match(/\nprune_stale_backend_images\n/g);
+  const callIdx = deploy.indexOf("\nprune_stale_backend_images\n");
+  assert.notEqual(successIdx, -1);
+  assert.notEqual(callIdx, -1);
+  assert.equal(callMatches?.length, 1, "정리는 최종 성공 경로에서 한 번만 호출된다");
+  assert.ok(trapDisarmIdx !== -1 && trapDisarmIdx < successIdx, "정리 호출 전에 모든 trap이 해제되어 있어야 한다");
+  assert.ok(successIdx < callIdx, "정리는 성공 결과(last-result.env)가 기록된 이후에만 호출된다");
+  assert.ok(fnEnd < callIdx, "정리 호출은 함수 정의 이후에 온다");
+});
