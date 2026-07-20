@@ -362,6 +362,7 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
     ["provider:daejeon-train-timetable", "GET", "DATA_GO_KR_SERVICE_KEY", "node tools/datapack/probe-daejeon-coverage-api.mjs"],
     ["provider:daejeon-station-distance-fare", "GET", "DATA_GO_KR_SERVICE_KEY", "node tools/datapack/collect-daejeon-route-topology.mjs"],
     ["provider:gwangju-transportation-timetable", "GET", "DATA_GO_KR_SERVICE_KEY", "node tools/datapack/collect-gwangju-timetable.mjs"],
+    ["provider:gwangju-transportation-cyberstation-timetable", "POST", undefined, "node tools/datapack/collect-gwangju-cyberstation-timetable.mjs"],
   ]) {
     const entry = findCatalogEntry(catalog, id);
     assert.equal(entry.operation.method, method);
@@ -423,6 +424,31 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
   assert.equal(gwangjuTimetableCandidate.evidence.liveSampleRowCount, 11779);
   assert.equal(gwangjuTimetableCandidate.evidence.providerUpdateDate, "20220917");
   assert.equal(gwangjuTimetableCandidate.evidence.freshnessAssessment, "STALE_NOT_ADMISSIBLE");
+  const gwangjuCyberstationTimetable = findCatalogEntry(
+    catalog,
+    "provider:gwangju-transportation-cyberstation-timetable",
+  );
+  assert.equal(
+    gwangjuCyberstationTimetable.endpoint,
+    "https://www.grtc.co.kr/cyber/portlet/subwayTimetable",
+  );
+  assert.deepEqual(gwangjuCyberstationTimetable.operation.auth, { placement: "none" });
+  assert.deepEqual(gwangjuCyberstationTimetable.operation.requiredParameters, ["subwayid"]);
+  assert.deepEqual(gwangjuCyberstationTimetable.operation.fixedParameters, { lineNo: "1" });
+  assert.deepEqual(gwangjuCyberstationTimetable.responseFields, ["dayCode", "direction", "hour", "minute"]);
+  const gwangjuCyberstationCandidate = providerDocument.candidates.find(
+    ({ id }) => id === "gwangju-transportation-cyberstation-timetable",
+  );
+  const gwangjuCyberstationSnapshot = JSON.parse(await readFile(
+    new URL("../datapack/sources/gwangju-transportation-cyberstation-timetable-20260720.json", import.meta.url),
+    "utf8",
+  ));
+  assert.equal(gwangjuCyberstationCandidate.evidence.liveSampleRowCount, gwangjuCyberstationSnapshot.rowCount);
+  assert.equal(
+    gwangjuCyberstationCandidate.evidence.liveSampleContentSha256,
+    gwangjuCyberstationSnapshot.contentSha256,
+  );
+  assert.equal(gwangjuCyberstationCandidate.evidence.liveSampleRowsSha256, gwangjuCyberstationSnapshot.rowsSha256);
   const removedDaejeonId = ["provider:daejeon", "braille-guide-map"].join("-");
   assert.equal(catalog.some(({ id }) => id === removedDaejeonId), false);
   const daejeonDistanceFare = findCatalogEntry(catalog, "provider:daejeon-station-distance-fare");
@@ -500,7 +526,7 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
 test("프로젝트 provider catalog는 비API source를 제외하고 모든 호출 계약을 제공한다", async () => {
   const providers = (await loadProjectCatalog()).filter((entry) => entry.kind === "provider");
 
-  assert.equal(providers.length, 44);
+  assert.equal(providers.length, 45);
   assert.equal(providers.some((entry) => entry.documentationStatus === "metadata-only"), false);
   assert.equal(providers.some((entry) => entry.id === "provider:molit-urban-rail-full-route"), false);
   assert.equal(providers.some((entry) => entry.id === "provider:seoulmetro-cyberstation-route-map"), false);

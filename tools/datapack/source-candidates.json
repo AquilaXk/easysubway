@@ -3257,6 +3257,54 @@
       "nextAction": "provider가 station time 값을 제공하면 같은 collector로 #1400·#2098·#2099 completeness를 재검증한다"
     },
     {
+      "id": "gwangju-transportation-cyberstation-timetable",
+      "priority": "P0",
+      "domain": "schedule_timetable",
+      "coverageScope": {
+        "regionIds": ["gwangju"],
+        "operatorIds": ["gwangju-metropolitan-rapid-transit"],
+        "lineIds": ["line-e57a361e8892"]
+      },
+      "displayName": "광주교통공사 사이버스테이션 열차시각표",
+      "detailUrl": "https://www.grtc.co.kr/subway/menu/trainTimetableSubMenu",
+      "requestUrl": "https://www.grtc.co.kr/cyber/portlet/subwayTimetable",
+      "operation": {
+        "method": "POST",
+        "endpoint": "https://www.grtc.co.kr/cyber/portlet/subwayTimetable",
+        "auth": { "placement": "none" },
+        "requiredParameters": ["subwayid"],
+        "fixedParameters": { "lineNo": "1" },
+        "responseEnvelope": "official HTML fragment per station",
+        "responseFields": ["dayCode", "direction", "hour", "minute"],
+        "runner": {
+          "command": "node tools/datapack/collect-gwangju-cyberstation-timetable.mjs",
+          "arguments": ["--output", "/tmp/easysubway-gwangju-cyberstation-timetable.json"],
+          "requiredEnv": []
+        },
+        "secretPolicy": "credential-free-output"
+      },
+      "licenseEvidenceStatus": "covered_by_unrestricted_data_go_timetable_dataset_15111298",
+      "sampleEvidenceStatus": "validated_live_full_snapshot",
+      "admissionStatus": "official_live_snapshot_captured",
+      "mobileEmbeddingAllowed": false,
+      "evidence": {
+        "retrievedAt": "2026-07-20",
+        "officialTimetablePage": "https://www.grtc.co.kr/subway/menu/trainTimetableSubMenu",
+        "officialRequestContractSource": "https://www.grtc.co.kr/cyber?timetable=19",
+        "licenseEvidenceUrl": "https://www.data.go.kr/data/15111298/openapi.do",
+        "license": "unrestricted",
+        "liveSampleRetrievedAt": "2026-07-20T12:55:50.079Z",
+        "liveSampleStationCount": 20,
+        "liveSampleRowCount": 13362,
+        "excludedPlaceholderCount": 1,
+        "normalizedBoundaryMinuteCount": 1,
+        "liveSampleContentSha256": "b050ed92cbdd555e22e987e4854a7d60b5293951992d6c14ae26c110f9b4fb5a",
+        "liveSampleRowsSha256": "2eec08dc30a97c50fd349dc607e77677829881790b5ca896856caa4b9bbd3ccd",
+        "evidenceArtifact": "tools/datapack/sources/gwangju-transportation-cyberstation-timetable-20260720.json"
+      },
+      "nextAction": "13,362개 현재 공식 schedule row를 deterministic timetable artifact로 materialize한다"
+    },
+    {
       "id": "gwangju-transportation-timetable",
       "priority": "P0",
       "domain": "schedule_timetable",
