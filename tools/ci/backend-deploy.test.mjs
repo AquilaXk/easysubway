@@ -846,6 +846,29 @@ test("Route V2 host ingress는 두 exact 경로만 gateway로 보내고 실패 �
   );
 });
 
+test("호스트 ingress는 actuator 공개를 차단하되 readiness/liveness probe만 예외로 둔다", () => {
+  // #2376: actuator Prometheus 메트릭은 docker network 내부에서만 scrape하고 공개 경로로는 노출하지 않는다.
+  const host = read("infra/nginx/host-easysubway.conf.template");
+  const httpsServer = host.slice(host.indexOf("server {", 1));
+
+  // 공개 probe 계약(공개 edge readiness probe·배포 검증)은 무회귀 — readiness/liveness는 계속 proxy된다.
+  assert.match(
+    httpsServer,
+    /location = \/actuator\/health\/readiness \{\s*proxy_pass http:\/\/127\.0\.0\.1:__BACKEND_PORT__;/,
+  );
+  assert.match(
+    httpsServer,
+    /location = \/actuator\/health\/liveness \{\s*proxy_pass http:\/\/127\.0\.0\.1:__BACKEND_PORT__;/,
+  );
+  // 나머지 /actuator/* (특히 /actuator/prometheus)와 bare /actuator는 공개 경로에서 404로 차단한다.
+  assert.match(httpsServer, /location = \/actuator \{\s*return 404;\s*\}/);
+  assert.match(httpsServer, /location \^~ \/actuator\/ \{\s*return 404;\s*\}/);
+  // /actuator/prometheus 를 프록시하는 location은 존재하지 않아야 한다.
+  assert.doesNotMatch(httpsServer, /location[^\n]*\/actuator\/prometheus[\s\S]*?proxy_pass/);
+  // 기존 catch-all proxy는 그대로 유지된다.
+  assert.match(httpsServer, /location \/ \{[\s\S]*proxy_pass http:\/\/127\.0\.0\.1:__BACKEND_PORT__;/);
+});
+
 test("CD Deploy는 canary rollback lock이 있으면 lock을 모르는 구버전 deploy-backend.sh를 거부한다", () => {
   // Redeploying a HISTORICAL main SHA copies and runs THAT SHA's own
   // tools/deploy/deploy-backend.sh (see "CD Deploy / Run local deployment"),
