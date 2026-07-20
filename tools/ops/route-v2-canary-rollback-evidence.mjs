@@ -154,7 +154,14 @@ export function parseCanaryIntegrityTokens(rawJson, requiredCount, options = {})
   // nonce) — over the FULL pool, not just the pairs this run will consume, so
   // a provisioning bug is caught here instead of surfacing as a false budget
   // breach after live canary traffic against an otherwise-healthy candidate.
+  // integrityToken uniqueness is checked for the same reason: if a
+  // provisioning bug pairs the SAME token with two different (each otherwise
+  // valid) nonces, the token's underlying request hash can only match ONE of
+  // those nonces server-side, so at least one canary request would get a 403
+  // from a perfectly healthy backend — which the runner would misread as a
+  // budget breach and close production ingress over a provisioning defect.
   const seenNonces = new Set();
+  const seenTokens = new Set();
   const validatedPairs = pairs.map((pair, index) => {
     const integrityToken = requireString(pair?.integrityToken, `integrity token pair[${index}].integrityToken`);
     const clientNonce = pair?.clientNonce;
@@ -174,6 +181,10 @@ export function parseCanaryIntegrityTokens(rawJson, requiredCount, options = {})
       throw new Error(`integrity token pair[${index}].clientNonce is duplicated within the pool`);
     }
     seenNonces.add(clientNonce);
+    if (seenTokens.has(integrityToken)) {
+      throw new Error(`integrity token pair[${index}].integrityToken is duplicated within the pool`);
+    }
+    seenTokens.add(integrityToken);
     return { integrityToken, clientNonce };
   });
 

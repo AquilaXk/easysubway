@@ -668,6 +668,34 @@ test("Route V2 host ingress는 두 exact 경로만 gateway로 보내고 실패 �
   );
 });
 
+test("CD Deploy는 canary rollback lock이 있으면 lock을 모르는 구버전 deploy-backend.sh를 거부한다", () => {
+  // Redeploying a HISTORICAL main SHA copies and runs THAT SHA's own
+  // tools/deploy/deploy-backend.sh (see "CD Deploy / Run local deployment"),
+  // which may predate the canary rollback lock check entirely (issue #2095) —
+  // deploy-backend.sh's own internal lock check (tested above) cannot help in
+  // that case, since it is version-skewed with the checked-out SHA. This gate
+  // must live in cd.yml's own step script instead, which is loaded from the
+  // ref that dispatched/triggered the CD run, not from the historical
+  // deploy_sha checkout, so it stays authoritative regardless of which
+  // deploy-backend.sh copy is about to run.
+  const cd = read(".github/workflows/cd.yml");
+  const runLocalDeploymentStep = cd.match(
+    /name: CD Deploy \/ Run local deployment\n([\s\S]*?)\n {6}- name:/,
+  )?.[1] ?? "";
+  assert.match(
+    runLocalDeploymentStep,
+    /if \[\[ -f "\$\{DEPLOY_ROOT\}\/shared\/route-v2-canary-rollback-lock\.json" \]\] \\\n\s*&& ! grep -Fq 'route-v2-canary-rollback-lock\.json' "\$\{incoming\}\/deploy-backend\.sh"; then/,
+  );
+  assert.match(runLocalDeploymentStep, /refusing to deploy until an operator resolves the lock/);
+  // The lock check must run AFTER deploy-backend.sh is copied into `incoming`
+  // (it inspects that copy) and BEFORE the copied script is actually invoked.
+  assert.ok(
+    runLocalDeploymentStep.indexOf('tools/deploy/deploy-backend.sh') < runLocalDeploymentStep.indexOf('route-v2-canary-rollback-lock.json') &&
+      runLocalDeploymentStep.indexOf("&& ! grep -Fq 'route-v2-canary-rollback-lock.json'") <
+        runLocalDeploymentStep.indexOf('bash "${incoming}/deploy-backend.sh"'),
+  );
+});
+
 test("Compose backend 서비스는 bootJar 기반 이미지와 제한된 바인딩을 사용한다", () => {
   const compose = read("infra/docker-compose.yml");
   const localBuildCompose = read("infra/docker-compose.local-build.yml");

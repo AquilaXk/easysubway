@@ -97,38 +97,33 @@ EXPECTED_DEPLOYED_SHA="${EXPECTED_DEPLOYED_SHA:-}"
 PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://easysubway-api.aquilaxk.site}"
 PRODUCTION_CANARY_APPROVAL="${PRODUCTION_CANARY_APPROVAL:-}"
 
-# Renders and atomically applies the SAME host Nginx Route V2 ingress action that
-# deploy-backend.sh performs (infra/nginx/host-easysubway.conf.template,
-# __ROUTE_V2_ACTION__), so a canary rollback closes the REAL public routing
-# decision point — host Nginx decides open/closed BEFORE a request ever reaches the
-# route-v2-gateway container, so reloading the gateway container alone (the
-# previous implementation) never actually closed public ingress. Route/default
-# proxy snippets are not re-installed here: deploy-backend.sh always installs them
-# on every deploy, and the candidate identity gate below already guarantees this
-# exact candidate SHA's last deploy-backend.sh run is what is currently live, so
-# they are guaranteed already in sync.
-apply_route_v2_host_ingress() {
-	local action="${1:?ingress action is required}"
+# Atomically installs (or removes) the host Nginx Route V2 site config, backing
+# up whatever is currently live and restoring that exact backup if the install
+# fails (nginx -t or reload rejects the new config). `candidate_file` is the
+# file to install; pass an empty string to mean "no site file should exist"
+# (removes the target instead of installing). This is the shared atomic
+# install/backup/restore primitive behind both apply_route_v2_host_ingress
+# (renders a fresh action into the reviewed-main template) and
+# restore_route_v2_host_ingress_original (reinstalls the exact bytes that were
+# live before this rehearsal started) below.
+install_route_v2_site_config() {
+	local candidate_file="${1-}"
 	local site_target="/etc/nginx/sites-available/easysubway"
-	local candidate site_backup
+	local site_backup
 	local site_existed=0 install_failed=0 restore_failed=0
-	candidate="$(mktemp)" || return 1
-	site_backup="$(mktemp)" || { rm -f "${candidate}"; return 1; }
-	if ! sed \
-		-e "s/__BACKEND_PORT__/${backend_port}/g" \
-		-e "s|__ROUTE_V2_ACTION__|${action}|g" \
-		"${HOST_NGINX_TEMPLATE}" > "${candidate}"; then
-		rm -f "${candidate}" "${site_backup}"
-		return 1
-	fi
+	site_backup="$(mktemp)" || return 1
 	if sudo test -f "${site_target}"; then
 		if ! sudo cp "${site_target}" "${site_backup}"; then
-			rm -f "${candidate}" "${site_backup}"
+			rm -f "${site_backup}"
 			return 1
 		fi
 		site_existed=1
 	fi
-	sudo install -m 0644 "${candidate}" "${site_target}" || install_failed=1
+	if [[ -n "${candidate_file}" ]]; then
+		sudo install -m 0644 "${candidate_file}" "${site_target}" || install_failed=1
+	else
+		sudo rm -f "${site_target}" || install_failed=1
+	fi
 	if [[ "${install_failed}" -eq 0 ]] && ! sudo nginx -t >/dev/null 2>&1; then install_failed=1; fi
 	if [[ "${install_failed}" -eq 0 ]] && ! sudo systemctl reload nginx; then install_failed=1; fi
 	if [[ "${install_failed}" -ne 0 ]]; then
@@ -143,12 +138,74 @@ apply_route_v2_host_ingress() {
 		if [[ "${restore_failed}" -eq 0 ]]; then
 			sudo systemctl reload nginx || restore_failed=1
 		fi
-		rm -f "${candidate}" "${site_backup}"
+		rm -f "${site_backup}"
 		[[ "${restore_failed}" -eq 0 ]] || echo 'failed to restore Route V2 host ingress after a failed apply' >&2
 		return 1
 	fi
-	rm -f "${candidate}" "${site_backup}"
+	rm -f "${site_backup}"
 	return 0
+}
+
+# Renders and atomically applies the SAME host Nginx Route V2 ingress action that
+# deploy-backend.sh performs (infra/nginx/host-easysubway.conf.template,
+# __ROUTE_V2_ACTION__), so a canary rollback closes the REAL public routing
+# decision point — host Nginx decides open/closed BEFORE a request ever reaches the
+# route-v2-gateway container, so reloading the gateway container alone (the
+# previous implementation) never actually closed public ingress. Route/default
+# proxy snippets are not re-installed here: deploy-backend.sh always installs them
+# on every deploy, and the candidate identity gate below already guarantees this
+# exact candidate SHA's last deploy-backend.sh run is what is currently live, so
+# they are guaranteed already in sync.
+apply_route_v2_host_ingress() {
+	local action="${1:?ingress action is required}"
+	local candidate
+	candidate="$(mktemp)" || return 1
+	if ! sed \
+		-e "s/__BACKEND_PORT__/${backend_port}/g" \
+		-e "s|__ROUTE_V2_ACTION__|${action}|g" \
+		"${HOST_NGINX_TEMPLATE}" > "${candidate}"; then
+		rm -f "${candidate}"
+		return 1
+	fi
+	local result=0
+	install_route_v2_site_config "${candidate}" || result=1
+	rm -f "${candidate}"
+	return "${result}"
+}
+
+# Reinstalls the EXACT host Nginx site config that was live before this
+# rehearsal touched anything (captured into the `original_site_config` global
+# right before the first close in the rollback dry-run section below) instead
+# of re-rendering host-easysubway.conf.template. Against a HISTORICAL
+# candidate SHA, reviewed-main's template can already differ from what that
+# candidate's own deploy-backend.sh run actually installed (e.g. a directive
+# added since), so restoring via a fresh template render would permanently
+# drift the historical candidate's live config as a side effect of a
+# rehearsal that is supposed to have zero net effect.
+restore_route_v2_host_ingress_original() {
+	install_route_v2_site_config "${original_site_config}"
+}
+
+# Writes the durable Route V2 canary rollback lock — deploy-backend.sh checks
+# for this lock and forces the host action closed until an operator
+# investigates and removes it, so a later UNRELATED deploy cannot silently
+# re-open ingress from compose.env's stale desired state. Called once the host
+# ingress is actually closed and staying closed (a budget breach) OR once an
+# attempt to restore it after a healthy rehearsal has itself failed (`reason`
+# documents which).
+write_route_v2_rollback_lock() {
+	local reason="${1:?reason is required}"
+	local lock_file="${DEPLOY_ROOT}/shared/route-v2-canary-rollback-lock.json"
+	node -e '
+const { writeFileSync } = require("node:fs");
+writeFileSync(process.argv[1], JSON.stringify({
+  reason: process.argv[2],
+  candidateGitSha: process.argv[3],
+  closedAt: process.argv[4],
+  approvalReference: process.argv[5],
+}, null, 2) + "\n");
+' "${lock_file}" "${reason}" "${current_sha}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${PRODUCTION_CANARY_APPROVAL}"
+	chmod 600 "${lock_file}"
 }
 
 # Sends a POST request, capturing curl's own transport failures (DNS/TLS/connect/
@@ -509,11 +566,22 @@ for ((burst_attempt = 0; burst_attempt <= session_burst; burst_attempt += 1)); d
 	fi
 done
 # Only attempt the route search canary if session issuance produced a usable
-# token — if none did, the normal/burst samples above already recorded enough
-# non-200 statuses for evaluateCanaryBudgets to treat this as a budget breach on
-# its own, and the rollback dry-run below still runs unconditionally.
+# token. If none did, the normal/burst samples above may ALL still read as
+# HTTP 200 (an invalid/missing body is still a 200 status — see
+# capture_issued_session), so evaluateCanaryBudgets could otherwise score this
+# as "within budget" having never exercised route search at all. Recording an
+# explicit breach sample here closes that gap; the rollback dry-run below
+# still runs unconditionally either way.
 if [[ -n "${issued_token}" ]]; then
 	canary_search_sample "${issued_token}" "$((required_canary_requests + 1))"
+else
+	echo 'no usable Route V2 session token was captured from any canary sample; recording a route-search budget breach' >&2
+	node -e '
+const { appendFileSync } = require("node:fs");
+appendFileSync(process.argv[1], JSON.stringify({
+  profile: "normal", status: 0, latencyMs: 0, cacheControl: "", plannerIdentityMatch: false,
+}) + "\n");
+' "${samples_file}.ndjson"
 fi
 node -e '
 const { readFileSync, writeFileSync } = require("node:fs");
@@ -530,6 +598,19 @@ budget_evaluated_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 # --- Rollback dry-run: ALWAYS physically close host ingress, then either restore
 # (healthy canary rehearsal) or leave it closed (budget breach, permanent) ---
 rollback_started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+# Preserve the EXACT host Nginx site config that is live before this rehearsal
+# touches anything, for restore_route_v2_host_ingress_original to reinstall on
+# the healthy path below — see that function's header comment for why a fresh
+# host-easysubway.conf.template render is not an equivalent restore against a
+# historical candidate SHA. An empty value means no site file existed yet.
+original_site_config="${work_dir}/original-route-v2-site-config"
+if sudo test -f /etc/nginx/sites-available/easysubway; then
+	sudo cp /etc/nginx/sites-available/easysubway "${original_site_config}" \
+		|| { echo 'failed to preserve the original Route V2 host Nginx configuration before the rehearsal' >&2; exit 1; }
+else
+	original_site_config=""
+fi
 
 apply_route_v2_host_ingress "${route_v2_closed_action}" \
 	|| { echo 'ingress-close rollback failed to apply the host Nginx configuration' >&2; exit 1; }
@@ -552,36 +633,33 @@ if [[ "${budget_within}" != true ]]; then
 	# EASYSUBWAY_ROUTE_V2_INGRESS_ENABLED=true from compose.env's stale desired
 	# state — deploy-backend.sh checks for this lock and forces the host
 	# action closed until an operator removes it after investigating.
-	route_v2_rollback_lock="${DEPLOY_ROOT}/shared/route-v2-canary-rollback-lock.json"
-	node -e '
-const { writeFileSync } = require("node:fs");
-writeFileSync(process.argv[1], JSON.stringify({
-  reason: "signed-RC canary budget breach",
-  candidateGitSha: process.argv[2],
-  closedAt: process.argv[3],
-  approvalReference: process.argv[4],
-}, null, 2) + "\n");
-' "${route_v2_rollback_lock}" "${current_sha}" "${ingress_closed_at}" "${PRODUCTION_CANARY_APPROVAL}"
-	chmod 600 "${route_v2_rollback_lock}"
+	write_route_v2_rollback_lock 'signed-RC canary budget breach'
 
 	# Permanent close is the terminal, intended state here — there is nothing
-	# further to restore, so a verification failure (including curl's "000"
-	# transport sentinel) is reported as a hard failure once the durable lock
-	# above already exists.
+	# further to restore. A failed verification (including curl's "000"
+	# transport sentinel) is logged but must NOT exit before the evidence
+	# assembly/persistence below runs: an early exit here would discard the
+	# candidate, samples, budget result, and timeline entirely (the workflow's
+	# `if: always()` artifact upload would only see a missing-file warning).
+	# The run still fails via the budget-breach check at the very end of this
+	# script regardless of this probe's own outcome, since budget_within is
+	# already false in this branch.
 	session_closed="$(public_status /api/v2/routes/session)"
 	search_closed="$(public_status /api/v2/routes/search)"
-	[[ "${session_closed}" == 404 && "${search_closed}" == 404 ]] \
-		|| { echo 'ingress-close rollback did not close the public Route V2 edge' >&2; exit 1; }
+	if [[ "${session_closed}" != 404 || "${search_closed}" != 404 ]]; then
+		echo 'ingress-close rollback did not close the public Route V2 edge (continuing to persist evidence before failing the run)' >&2
+	fi
 else
 	# Healthy canary: this is a REAL, non-mutating-net-effect close/verify/restore
 	# rehearsal. Both verification probes below are OBSERVED and reported, but
 	# neither is allowed to skip the restore step that follows it — a transient
 	# network blip (curl's "000" sentinel) on either probe must never leave
 	# ingress closed with the rehearsal's promised zero net effect broken. The
-	# restore APPLICATION itself (an `apply_route_v2_host_ingress` failure, not
-	# a probe result) is the only thing that still exits immediately, since at
-	# that point there is nothing further this runner can do locally to un-break
-	# the host Nginx config.
+	# restore APPLICATION itself (a restore_route_v2_host_ingress_original
+	# failure, not a probe result) is the only thing that still exits
+	# immediately — and even then only after durably locking ingress closed, so
+	# a later unrelated deploy cannot silently reopen it from compose.env's
+	# stale desired state.
 	rehearsal_verification_failed=0
 
 	session_closed="$(public_status /api/v2/routes/session)"
@@ -591,8 +669,11 @@ else
 		rehearsal_verification_failed=1
 	fi
 
-	apply_route_v2_host_ingress "${route_v2_open_action}" \
-		|| { echo 'rollback rehearsal failed to restore the host Nginx configuration' >&2; exit 1; }
+	if ! restore_route_v2_host_ingress_original; then
+		write_route_v2_rollback_lock 'rollback rehearsal failed to restore ingress after a successful close'
+		echo 'rollback rehearsal failed to restore the host Nginx configuration; ingress locked closed pending operator investigation' >&2
+		exit 1
+	fi
 	printf 'true\n' > "${ingress_state_file}"
 	chmod 600 "${ingress_state_file}"
 	ingress_restored_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"

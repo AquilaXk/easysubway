@@ -239,6 +239,26 @@ test("canary rollback runner는 fail-closed 게이트와 rollback 경로를 갖�
   assert.match(searchSampleBlock, /try \{/);
   assert.match(searchSampleBlock, /\} catch \{\n\s*process\.stdout\.write\("false"\);\n\s*\}/);
 
+  // If NO normal/burst response ever yielded a usable session token (every
+  // 200 body was invalid/missing — capture_issued_session only recognizes a
+  // well-formed token/scope/timestamp), the route search canary can never run
+  // at all. Skipping it silently would let the run pass on 200s + a 429 alone
+  // without ever exercising search — so this must itself be recorded as an
+  // explicit breach sample (a normal-profile sample that is not exact 200),
+  // not silently skipped.
+  assert.match(
+    runner,
+    /if \[\[ -n "\$\{issued_token\}" \]\]; then\n\s*canary_search_sample "\$\{issued_token\}" "\$\(\(required_canary_requests \+ 1\)\)"\nelse/,
+  );
+  const noTokenBranch = runner.match(
+    /if \[\[ -n "\$\{issued_token\}" \]\]; then\n[\s\S]*?\nelse\n([\s\S]*?)\nfi\n/,
+  )?.[1] ?? "";
+  assert.match(noTokenBranch, /no usable Route V2 session token was captured/);
+  assert.match(
+    noTokenBranch,
+    /profile: "normal", status: 0, latencyMs: 0, cacheControl: "", plannerIdentityMatch: false,/,
+  );
+
   // Token pool pair lookups pass only the FILE PATH and a numeric index as
   // node -e argv, never the pool content itself — a same-UID process reading
   // /proc/<pid>/cmdline sees no token material.
@@ -263,11 +283,17 @@ test("canary rollback runner는 fail-closed 게이트와 rollback 경로를 갖�
   );
 
   // Ingress-close rollback ALWAYS applies the real host Nginx configuration (not
-  // just the state marker or a gateway-container-only reload).
+  // just the state marker or a gateway-container-only reload). The atomic
+  // install/backup/restore primitive is factored into install_route_v2_site_config,
+  // shared by apply_route_v2_host_ingress (fresh template render) and
+  // restore_route_v2_host_ingress_original (reinstalls the exact pre-rehearsal
+  // bytes — see below).
+  assert.match(runner, /install_route_v2_site_config\(\) \{/);
   assert.match(runner, /apply_route_v2_host_ingress\(\) \{/);
+  assert.match(runner, /restore_route_v2_host_ingress_original\(\) \{/);
   assert.match(runner, /__ROUTE_V2_ACTION__/);
   assert.match(runner, /__BACKEND_PORT__/);
-  assert.match(runner, /sudo install -m 0644 "\$\{candidate\}" "\$\{site_target\}"/);
+  assert.match(runner, /sudo install -m 0644 "\$\{candidate_file\}" "\$\{site_target\}"/);
   assert.match(runner, /sudo nginx -t/);
   assert.match(runner, /sudo systemctl reload nginx/);
   assert.doesNotMatch(runner, /docker exec easysubway-route-v2-gateway nginx -s reload/);
@@ -275,6 +301,27 @@ test("canary rollback runner는 fail-closed 게이트와 rollback 경로를 갖�
   assert.match(runner, /route_v2_open_action="proxy_pass http:\/\/127\.0\.0\.1:\$\{route_v2_gateway_port\};"/);
   assert.match(runner, /printf 'false\\n' > "\$\{ingress_state_file\}"/);
   assert.match(runner, /ingress-close rollback did not close the public Route V2 edge/);
+
+  // The exact pre-rehearsal Nginx site config is preserved BEFORE the first
+  // close, and restore_route_v2_host_ingress_original reinstalls those exact
+  // bytes on the healthy path — NOT a fresh host-easysubway.conf.template
+  // render, which could already differ from what a HISTORICAL candidate SHA's
+  // own deploy-backend.sh run actually installed and would otherwise
+  // permanently drift its config as a side effect of a supposedly
+  // zero-net-effect rehearsal.
+  assert.match(runner, /original_site_config="\$\{work_dir\}\/original-route-v2-site-config"/);
+  assert.match(
+    runner,
+    /sudo test -f \/etc\/nginx\/sites-available\/easysubway/,
+  );
+  assert.match(
+    runner,
+    /sudo cp \/etc\/nginx\/sites-available\/easysubway "\$\{original_site_config\}"/,
+  );
+  assert.ok(
+    runner.indexOf('original_site_config="${work_dir}/original-route-v2-site-config"')
+      < runner.indexOf('apply_route_v2_host_ingress "${route_v2_closed_action}"'),
+  );
 
   // The breach/healthy split happens IMMEDIATELY after the close is applied,
   // BEFORE any public verification probe — the healthy branch must reach its
@@ -287,25 +334,41 @@ test("canary rollback runner는 fail-closed 게이트와 rollback 경로를 갖�
     runner.indexOf("ingress_closed_at=") < runner.indexOf('if [[ "${budget_within}" != true ]]; then'),
   );
 
-  // Budget-breach path persists a durable rollback lock IMMEDIATELY after the
-  // host close is applied — BEFORE its own public verification probe, which
-  // depends on the network and could itself return curl's "000" transport
-  // sentinel and abort the script. A later, unrelated deploy must not be able
-  // to silently re-open ingress from compose.env's stale desired state just
-  // because verification happened to fail on a blip (matches deploy-backend.sh's
-  // lock check). A verification failure on the PERMANENT-close path is still a
-  // hard exit — there is nothing further to restore for a breach.
+  // write_route_v2_rollback_lock persists a durable lock — used by BOTH the
+  // budget-breach path (immediately after the host close is applied, BEFORE
+  // its own public verification probe, which depends on the network and
+  // could itself return curl's "000" transport sentinel) and the healthy
+  // rehearsal path's restore-failure branch (finding: a restore that fails
+  // after a successful close must not leave production silently closed with
+  // NO lock, letting a later unrelated deploy reopen it from compose.env's
+  // stale desired state).
+  assert.match(runner, /write_route_v2_rollback_lock\(\) \{/);
   assert.match(
     runner,
-    /route_v2_rollback_lock="\$\{DEPLOY_ROOT\}\/shared\/route-v2-canary-rollback-lock\.json"/,
+    /lock_file="\$\{DEPLOY_ROOT\}\/shared\/route-v2-canary-rollback-lock\.json"/,
   );
-  assert.match(runner, /reason: "signed-RC canary budget breach"/);
+  assert.match(runner, /reason: process\.argv\[2\]/);
   const breachBranch = runner.match(
     /if \[\[ "\$\{budget_within\}" != true \]\]; then([\s\S]*?)\nelse\n/,
   )?.[1] ?? "";
-  assert.match(breachBranch, /route_v2_rollback_lock=/);
-  assert.ok(breachBranch.indexOf("route_v2_rollback_lock=") < breachBranch.indexOf("session_closed="));
-  assert.match(breachBranch, /\[\[ "\$\{session_closed\}" == 404 && "\$\{search_closed\}" == 404 \]\] \\\n\s*\|\| \{ echo 'ingress-close rollback did not close the public Route V2 edge' >&2; exit 1; \}/);
+  assert.match(breachBranch, /write_route_v2_rollback_lock 'signed-RC canary budget breach'/);
+  assert.ok(
+    breachBranch.indexOf("write_route_v2_rollback_lock 'signed-RC canary budget breach'")
+      < breachBranch.indexOf("session_closed="),
+  );
+  // A verification failure on the PERMANENT-close path does NOT exit — the
+  // evidence assembly/persistence below (candidate, samples, budget result,
+  // timeline) must still run, so a transient "000"/non-404 probe never
+  // discards that evidence. The run still fails via the budget-breach check
+  // at the very end of the script regardless of this probe's own outcome.
+  assert.match(
+    breachBranch,
+    /if \[\[ "\$\{session_closed\}" != 404 \|\| "\$\{search_closed\}" != 404 \]\]; then\n\s*echo 'ingress-close rollback did not close the public Route V2 edge \(continuing to persist evidence before failing the run\)' >&2\n\s*fi/,
+  );
+  assert.doesNotMatch(
+    breachBranch,
+    /\[\[ "\$\{session_closed\}" == 404 && "\$\{search_closed\}" == 404 \]\] \\\n\s*\|\| \{ echo 'ingress-close rollback did not close the public Route V2 edge' >&2; exit 1; \}/,
+  );
 
   // Healthy-path REAL close/verify/restore rehearsal: the close-verification
   // probe's failure (including curl's "000" transport sentinel) must NOT skip
@@ -320,20 +383,26 @@ test("canary rollback runner는 fail-closed 게이트와 rollback 경로를 갖�
     /if \[\[ "\$\{session_closed\}" != 404 \|\| "\$\{search_closed\}" != 404 \]\]; then/,
   );
   assert.match(healthyBranch, /rehearsal_verification_failed=1/);
-  assert.match(healthyBranch, /apply_route_v2_host_ingress "\$\{route_v2_open_action\}"/);
+  assert.match(healthyBranch, /restore_route_v2_host_ingress_original/);
   assert.match(healthyBranch, /rollback rehearsal did not restore the public Route V2 edge/);
   assert.match(healthyBranch, /restored_after_rehearsal=true/);
   // The restore APPLICATION call must be UNCONDITIONAL — it appears after the
   // close-verification probe's failure is merely recorded, never inside an
-  // `exit`-guarded branch that the probe's own failure could skip.
+  // `exit`-guarded branch that the probe's own failure could skip. And if the
+  // restore APPLICATION itself fails, ingress must be durably LOCKED closed
+  // (not just abandoned) before the script exits.
   assert.ok(
     healthyBranch.indexOf('rehearsal_verification_failed=1')
-      < healthyBranch.indexOf('apply_route_v2_host_ingress "${route_v2_open_action}"'),
+      < healthyBranch.indexOf('if ! restore_route_v2_host_ingress_original; then'),
+  );
+  assert.match(
+    healthyBranch,
+    /if ! restore_route_v2_host_ingress_original; then\n\s*write_route_v2_rollback_lock 'rollback rehearsal failed to restore ingress after a successful close'\n\s*echo '[^']+' >&2\n\s*exit 1\n\s*fi/,
   );
   // The overall pass/fail decision (exit on any recorded verification failure)
   // comes AFTER the restore application, not before it.
   assert.ok(
-    healthyBranch.indexOf('apply_route_v2_host_ingress "${route_v2_open_action}"')
+    healthyBranch.indexOf('if ! restore_route_v2_host_ingress_original; then')
       < healthyBranch.lastIndexOf('rehearsal_verification_failed=1')
       && healthyBranch.lastIndexOf('rehearsal_verification_failed=1')
       < healthyBranch.indexOf('[[ "${rehearsal_verification_failed}" -eq 0 ]]'),
@@ -897,6 +966,22 @@ test("parseCanaryIntegrityTokens는 backend와 동일한 clientNonce 형식·poo
       1,
     ),
     /pair\[1\]\.clientNonce is duplicated within the pool/,
+  );
+
+  // The SAME integrityToken paired with two DIFFERENT (each individually
+  // valid) nonces is also rejected: the token's underlying request hash can
+  // only match ONE of those nonces server-side, so at least one canary
+  // request would get a 403 from an otherwise-healthy backend — misread as a
+  // budget breach that closes production ingress over a provisioning bug.
+  assert.throws(
+    () => parseCanaryIntegrityTokens(
+      buildPayload([
+        { integrityToken: "shared-token", clientNonce: makeNonce() },
+        { integrityToken: "shared-token", clientNonce: makeNonce() },
+      ]),
+      2,
+    ),
+    /pair\[1\]\.integrityToken is duplicated within the pool/,
   );
 });
 
