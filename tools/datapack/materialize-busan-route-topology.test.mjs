@@ -9,6 +9,7 @@ import { promisify } from "node:util";
 import test from "node:test";
 
 import {
+  materializedBusanPackContentHash,
   materializeBusanRouteTopology,
   parseCanonicalBusanStationMappings,
 } from "./materialize-busan-route-topology.mjs";
@@ -40,6 +41,7 @@ test("부산 topology snapshot을 실제 production pack 입력으로 materializ
   assert.deepEqual(fixture.manifest.activePack, { id: pack.id, version: pack.version });
   assert.match(pack.id, /^nationwide-busan-topology-[a-f0-9]{64}$/);
   assert.match(pack.url, new RegExp(`/catalog/${pack.id}-v${pack.version}\\.sqlite\\.gz$`));
+  assert.equal(pack.id, `nationwide-busan-topology-${materializedBusanPackContentHash(pack, pack.version)}`);
   assert.equal(fixture.manifest.releaseSequence, baseFixture.manifest.releaseSequence);
   assert.equal(fixture.manifest.publishedAt, baseFixture.manifest.publishedAt);
   assert.equal(fixture.manifest.expiresAt, baseFixture.manifest.expiresAt);
@@ -192,6 +194,12 @@ test("부산 topology snapshot을 실제 production pack 입력으로 materializ
     now: evidenceNow,
   });
   assert.notEqual(changedFixture.packs[0].id, pack.id);
+  const changedMaterializedContent = structuredClone(pack);
+  changedMaterializedContent.stations.find(({ sourceId }) => sourceId === snapshot.sourceId).nameEn = "Changed";
+  assert.notEqual(
+    materializedBusanPackContentHash(changedMaterializedContent, pack.version),
+    materializedBusanPackContentHash(pack, pack.version),
+  );
 });
 
 test("materialized production SQLite와 provenance만 부산 4개 topology·membership requirement를 SUPPORTED로 만든다", async (context) => {
