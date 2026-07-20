@@ -18854,14 +18854,18 @@ test("tools/**/*.mjs는 로케일 미지정 localeCompare 호출을 두지 않�
         else if (ch === "," && depth === 1) commas.push(i);
       }
       if (close === -1) continue;
-      // 비어 있지 않은 인자 수는 원본 소스로 센다(문자열 로케일은 마스킹돼도 실인자,
+      // 인자는 원본 소스로 자른다(문자열 로케일은 마스킹돼도 실인자,
       // trailing comma는 빈 세그먼트라 인자가 아니다).
       const bounds = [openParen, ...commas, close];
-      let argCount = 0;
+      const args = [];
       for (let s = 0; s < bounds.length - 1; s += 1) {
-        if (source.slice(bounds[s] + 1, bounds[s + 1]).trim() !== "") argCount += 1;
+        const seg = source.slice(bounds[s] + 1, bounds[s + 1]).trim();
+        if (seg !== "") args.push(seg);
       }
-      if (argCount < 2) hits.push(source.slice(0, idx).split("\n").length);
+      // 두 번째 인자가 따옴표로 시작하는 문자열 리터럴일 때만 명시 로케일로 인정한다.
+      // undefined·식별자·기타 표현식은 런타임에 환경 기본 로케일로 폴백하므로 위반이다.
+      const localeOk = args.length >= 2 && (args[1].startsWith('"') || args[1].startsWith("'"));
+      if (!localeOk) hits.push(source.slice(0, idx).split("\n").length);
     }
     return hits;
   };
@@ -18872,6 +18876,8 @@ test("tools/**/*.mjs는 로케일 미지정 localeCompare 호출을 두지 않�
   assert.equal(findLocaleUnspecified("x.localeCompare(\n  y,\n);").length, 1);
   assert.equal(findLocaleUnspecified('a.localeCompare(b, "en");').length, 0);
   assert.equal(findLocaleUnspecified('a.localeCompare(b, "ko", { numeric: true });').length, 0);
+  assert.equal(findLocaleUnspecified("a.localeCompare(b, undefined);").length, 1);
+  assert.equal(findLocaleUnspecified("a.localeCompare(b, someVar);").length, 1);
   assert.equal(findLocaleUnspecified('const s = "a.localeCompare(b)";').length, 0);
   assert.equal(findLocaleUnspecified("// a.localeCompare(b)\n").length, 0);
   assert.equal(findLocaleUnspecified("assert.match(src, /a.localeCompare(b)/);").length, 0);
