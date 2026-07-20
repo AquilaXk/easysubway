@@ -29958,9 +29958,6 @@
           <g
              id="transfer-station-symbol-인천공항1터미널-0"
              class="ourclass-transfer-symbol ourclass-transfer-node-style ourclass-transfer-symbol-straight-v14"
-             data-name="인천공항1터미널"
-             data-station="인천공항1터미널"
-             data-station-name="인천공항1터미널"
              data-node-role="transfer"
              data-transfer-line-count="1"
              data-transfer-lines="airport-railroad"
@@ -29974,7 +29971,7 @@
              transform="translate(-651.27717,-1744.3961)"
              style="font-family:Pretendard;isolation:isolate">
             <title
-               id="title-airport-airplane-인천공항1터미널-7">인천공항1터미널 공항 노드 — Bootstrap Icons airplane-fill</title>
+               id="title-airport-airplane-인천공항1터미널-7">장식 비행기 아이콘 — Bootstrap Icons airplane-fill</title>
             <g
                id="airport-airplane-icon-인천공항1터미널-2"
                transform="matrix(1.5547664,0,0,1.5547664,554.18844,2668.0165)"
