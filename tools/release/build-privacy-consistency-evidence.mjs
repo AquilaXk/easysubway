@@ -7,9 +7,9 @@
 // 존재만 정적으로 검증한다. 불일치가 하나라도 있으면 fail-closed로 BLOCKED를 산출한다.
 
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { runCandidateContextEvidenceCli } from "./lib/candidate-context-evidence-cli.mjs";
 
 const INVENTORY_FILE = "apps/mobile/release/store-privacy-inventory.json";
 const PLAY_FORM_FILE = "apps/mobile/release/play-store-submission-content.json";
@@ -224,19 +224,22 @@ function evaluateAnswerMatrixConsistency(inventory, playForm) {
   const matrix = playForm.dataSafetyDeclarations?.answerMatrix ?? [];
   const requiredConsoleFields = inventory.googlePlayDataSafetyRequiredFields ?? [];
   const referencedIds = new Set();
-  const contradictions = [];
 
-  for (const entry of matrix) {
+  // entry별 세 판정(참조 조회·집계 플래그·보조 필드)의 모순을 한 번에 모은다. push()를
+  // 연쇄 호출하는 대신 flatMap으로 배열을 구성해 같은 entry 순서·같은 판정 순서를 유지한다.
+  const entryContradictions = matrix.flatMap((entry) => {
     for (const id of entry.inventoryDataIds ?? []) referencedIds.add(id);
-    const { referenced, contradictions: referenceContradictions } = resolveMatrixEntryReferences(entry, items);
-    contradictions.push(...referenceContradictions);
-    contradictions.push(...checkMatrixEntryAggregateFlags(entry, referenced));
-    contradictions.push(...checkMatrixEntrySupplementalFields(entry, referenced, requiredConsoleFields));
-  }
+    const { referenced, contradictions } = resolveMatrixEntryReferences(entry, items);
+    return [
+      ...contradictions,
+      ...checkMatrixEntryAggregateFlags(entry, referenced),
+      ...checkMatrixEntrySupplementalFields(entry, referenced, requiredConsoleFields),
+    ];
+  });
 
   const { uncovered: uncoveredCollected, contradictions: coverageContradictions } =
     findUncoveredCollectedData(inventory, referencedIds);
-  contradictions.push(...coverageContradictions);
+  const contradictions = [...entryContradictions, ...coverageContradictions];
 
   return {
     checkedDataTypes: matrix.length,
@@ -349,25 +352,4 @@ export function buildPrivacyConsistencyEvidence({
   };
 }
 
-function argument(name) {
-  const index = process.argv.indexOf(`--${name}`);
-  return index < 0 ? null : process.argv[index + 1];
-}
-
-const entry = process.argv[1] ? path.resolve(process.argv[1]) : null;
-if (entry === fileURLToPath(import.meta.url)) {
-  const candidatePath = argument("candidate-context");
-  const outputPath = argument("output");
-  if (!candidatePath || !outputPath) {
-    throw new Error("--candidate-context and --output are required");
-  }
-  const repoRoot = argument("repo-root") ? path.resolve(argument("repo-root")) : process.cwd();
-  const provenance = argument("provenance") ?? "final-candidate";
-  const evidence = buildPrivacyConsistencyEvidence({
-    candidate: JSON.parse(readFileSync(candidatePath, "utf8")),
-    repoRoot,
-    provenance,
-  });
-  mkdirSync(path.dirname(outputPath), { recursive: true });
-  writeFileSync(outputPath, `${JSON.stringify(evidence, null, 2)}\n`);
-}
+runCandidateContextEvidenceCli(import.meta.url, buildPrivacyConsistencyEvidence);
