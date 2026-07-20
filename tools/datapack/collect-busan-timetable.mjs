@@ -265,7 +265,7 @@ async function main(args = process.argv.slice(2)) {
     serviceKey: process.env.DATA_GO_KR_SERVICE_KEY,
     stationScopes: topology.scope,
   });
-  await writeFile(output, `${JSON.stringify(snapshot, null, 2)}\n`, { mode: 0o600 });
+  await writeFile(output, `${JSON.stringify(snapshot)}\n`, { mode: 0o600 });
   console.log(`sanitized Busan timetable snapshot ready: rows=${snapshot.rowCount}`);
 }
 
