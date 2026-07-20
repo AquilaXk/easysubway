@@ -11790,8 +11790,9 @@ test("로컬 관측성 스택은 Prometheus와 Grafana 기준선을 제공한다
   const grafanaDatasource = read("infra/grafana/provisioning/datasources/prometheus.yml");
 
   assert.match(build, /implementation 'io\.micrometer:micrometer-registry-prometheus'/);
-  assert.match(applicationYml, /management:\s*\n\s*endpoints:\s*\n\s*web:\s*\n\s*exposure:\s*\n\s*include:\s*["']?health\s*,\s*info["']?/);
-  assert.doesNotMatch(applicationYml, /include:\s*["']?health\s*,\s*info\s*,\s*prometheus["']?/);
+  // #2376: actuator Prometheus 메트릭을 docker network 내부에서 직접 scrape하기 위해 prometheus를 노출한다
+  // (공개 경로 차단은 nginx host 템플릿에서 보장 — backend-deploy.test.mjs 참조).
+  assert.match(applicationYml, /management:\s*\n\s*endpoints:\s*\n\s*web:\s*\n\s*exposure:\s*\n\s*include:\s*["']?health\s*,\s*info\s*,\s*prometheus["']?/);
   assert.match(applicationDevYml, /management:\s*\n\s*endpoints:\s*\n\s*web:\s*\n\s*exposure:\s*\n\s*include:\s*["']?health\s*,\s*info\s*,\s*prometheus["']?/);
 
   assert.match(compose, /prometheus:\n/);
@@ -11834,7 +11835,11 @@ test("로컬 관측성 스택은 Prometheus와 Grafana 기준선을 제공한다
   assert.match(prometheusConfig, /module: \[http_2xx\]/);
   assert.match(prometheusConfig, /https:\/\/easysubway-api\.aquilaxk\.site\/actuator\/health\/readiness/);
   assert.match(prometheusConfig, /replacement: public-edge-probe:9115/);
-  assert.doesNotMatch(prometheusConfig, /\/actuator\/prometheus/);
+  // #2376: backend actuator 메트릭 직접 scrape job. docker network 내부 backend:8080/actuator/prometheus.
+  assert.match(prometheusConfig, /job_name: "backend_app_metrics"/);
+  assert.match(prometheusConfig, /job_name: "backend_app_metrics"\s*\n\s*metrics_path: "\/actuator\/prometheus"\s*\n\s*static_configs:\s*\n\s*-\s*targets:\s*\n\s*-\s*"backend:8080"/);
+  // 임시 blue/green standby는 상시 대상이 아니라 scrape 대상에서 제외한다(down 노이즈 방지).
+  assert.doesNotMatch(prometheusConfig, /backend-standby:8080/);
   assert.doesNotMatch(prometheusConfig, /host\.docker\.internal:8080/);
   assert.match(prometheusConfig, /alertmanagers:\s*\n\s*-\s*static_configs:\s*\n\s*-\s*targets: \["alertmanager:9093"\]/);
   assert.match(prometheusConfig, /rule_files:\s*\n\s*-\s*\/etc\/prometheus\/alerts\.yml/);

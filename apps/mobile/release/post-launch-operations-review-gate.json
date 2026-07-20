@@ -84,8 +84,8 @@
         {
           "refreshOn": "observability-infrastructure-change",
           "files": [
-            {"path": "infra/prometheus/prometheus.yml", "sha256": "258441d7b2881a629145a9bfae65574769ccf2d218d94f70c29148bebad33ae0"},
-            {"path": "infra/prometheus/alerts.yml", "sha256": "e7792023715795e9f1611135594d13c3609e5fb31e3361b3f04661066413d982"},
+            {"path": "infra/prometheus/prometheus.yml", "sha256": "9bcde0205620224c01d86ec99fd2ef68314a9a96f40bd70c58fe67f8123e366f"},
+            {"path": "infra/prometheus/alerts.yml", "sha256": "5989a79122b2351b94397b75c2be48d2c6d30eba6d49901a990ac5a91447e210"},
             {"path": "infra/grafana/provisioning/datasources/prometheus.yml", "sha256": "857e2caebec8b70f3aa50c0b968c1ceed46b668a8f08a08532b47be22af3ed97"},
             {"path": "infra/grafana/provisioning/datasources/loki.yml", "sha256": "9156897987a95d3fe59f98651ade7802ad2fc9b65acd2845da90b36dd6f5949c"},
             {"path": "infra/loki/loki.yml", "sha256": "101b9286a15cc0c4f2a66879d801995efabd2c4d98cac904c4c3bd0816bf0e20"}
