@@ -217,6 +217,18 @@ export async function collectNationwidePublicApiCoverage({
   };
 }
 
+export function summarizeUnresolvedDiagnostics(unresolved) {
+  const counts = new Map();
+  for (const entry of unresolved) {
+    const detail = entry.transportReason
+      ?? (Number.isInteger(entry.httpStatus) ? `HTTP_${entry.httpStatus}` : null)
+      ?? (typeof entry.providerResultCode === "string" ? `PROVIDER_${entry.providerResultCode}` : "UNSPECIFIED");
+    const key = `${entry.reasonCode}/${detail}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return [...counts.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([key, count]) => `${key}=${count}`);
+}
+
 function indexKnownProviderCandidates(sourceCandidates) {
   const indexed = new Map();
   for (const [index, candidate] of (sourceCandidates?.candidates ?? []).entries()) {
@@ -402,8 +414,10 @@ async function fetchPublicApiPage({ url, request, expectedContentTypes, fetchImp
     try {
       response = await fetchImpl(url, { ...request, signal: AbortSignal.timeout(15_000) });
       break;
-    } catch {
-      if (attempt === 1) return { reasonCode: "PUBLIC_API_FETCH_FAILED", attempts: 2 };
+    } catch (error) {
+      if (attempt === 1) {
+        return { reasonCode: "PUBLIC_API_FETCH_FAILED", attempts: 2, transportReason: transportReason(error) };
+      }
     }
   }
   if (!response.ok) return { reasonCode: "PUBLIC_API_HTTP_FAILURE", httpStatus: response.status };
@@ -412,6 +426,13 @@ async function fetchPublicApiPage({ url, request, expectedContentTypes, fetchImp
     return { reasonCode: "PUBLIC_API_SCHEMA_MISMATCH", httpStatus: response.status, contentType: contentType ?? null };
   }
   return { raw: await response.text(), httpStatus: response.status, contentType };
+}
+
+function transportReason(error) {
+  const reason = error?.cause?.code ?? error?.code ?? error?.name;
+  return typeof reason === "string" && /^[A-Z][A-Z0-9_]{1,63}$/.test(reason.toUpperCase())
+    ? reason.toUpperCase()
+    : "UNKNOWN";
 }
 
 function captureXmlRows(raw, fields) {
@@ -667,6 +688,7 @@ async function main(argv) {
   const resolutions = await collectNationwidePublicApiCoverage({ searchPlan });
   await writeFile(args.output, `${JSON.stringify(resolutions, null, 2)}\n`);
   console.log(`public API coverage search complete: unsupported=${resolutions.entries.length} unresolved=${resolutions.unresolved.length}`);
+  console.log(`sanitized diagnostics: ${summarizeUnresolvedDiagnostics(resolutions.unresolved).join(", ")}`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
