@@ -26,7 +26,7 @@ export function materializeDaejeonRouteTopology({
   validateSnapshot(snapshot);
   const source = requiredSource(inventory, snapshot, now);
   const mappings = requiredMappings(canonicalStationMappings);
-  const membershipSource = requiredMembershipSource(inventory, snapshot, mappings);
+  const membershipSource = requiredMembershipSource(inventory, snapshot, mappings, now);
   const compositionSha256 = sha256(JSON.stringify({ baseFixture, snapshot, source, membershipSource, mappings }));
   const fixture = structuredClone(baseFixture);
   if (!Array.isArray(fixture.packs) || fixture.packs.length !== 1 || fixture.packs[0].artifactKind !== "production") {
@@ -214,7 +214,7 @@ function requiredMappings(mappings) {
   return mappings;
 }
 
-function requiredMembershipSource(inventory, snapshot, mappings) {
+function requiredMembershipSource(inventory, snapshot, mappings, now) {
   const source = inventory?.sources?.find(({ id }) => id === MEMBERSHIP_SOURCE_ID);
   const rawSource = inventory?.sources?.find(({ id }) => id === MEMBERSHIP_RAW_SOURCE_ID);
   const stationCodeSource = inventory?.sources?.find(({ id }) => id === SOURCE_ID);
@@ -222,6 +222,7 @@ function requiredMembershipSource(inventory, snapshot, mappings) {
   const scope = source?.coverageScope;
   const mappingSha256 = sha256(JSON.stringify(mappings));
   const stationCodesSha256 = sha256(JSON.stringify(mappings.map(({ stationNumber }) => stationNumber)));
+  const verifiedAt = Date.parse(evidence?.verifiedAt ?? "");
   if (source?.productionUseAllowed !== true || source.license?.redistributionAllowed !== true
     || rawSource?.admissionEvidence?.decision !== "APPROVED"
     || !source.fieldsProvided?.includes("line") || !source.fieldsProvided.includes("station_name")
@@ -236,8 +237,11 @@ function requiredMembershipSource(inventory, snapshot, mappings) {
     || evidence.stationCodeSnapshotId !== stationCodeSource?.topologyAdmissionEvidence?.snapshotId
     || evidence.stationCodeContentSha256 !== snapshot.contentSha256
     || evidence.membershipSourceRawSha256 !== rawSource.admissionEvidence.rawSha256
-    || !Number.isFinite(Date.parse(evidence.verifiedAt))) {
+    || !Number.isFinite(verifiedAt) || new Date(verifiedAt).toISOString() !== evidence.verifiedAt) {
     throw new Error(`${MEMBERSHIP_SOURCE_ID} Daejeon membership evidence is invalid`);
+  }
+  if (now.getTime() < verifiedAt) {
+    throw new Error(`${MEMBERSHIP_SOURCE_ID} membership evidence is future-dated`);
   }
   return source;
 }

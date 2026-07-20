@@ -593,6 +593,9 @@ function packFieldProvenance(pack, { artifactKind, sqliteSha256 }) {
     if (fieldProvenance && !sourceScopes.has(sourceId)) {
       throw new Error(`${entityType}.${field} fieldProvenance source is missing from sourceInventory: ${sourceId}`);
     }
+    if (fieldProvenance && !sourceFields.get(sourceId)?.has(field)) {
+      throw new Error(`${entityType}.${field} fieldProvenance source does not provide ${field}: ${sourceId}`);
+    }
     const coverageScopes = recordCoverageScopes(
       sourceScopes.get(sourceId),
       operatorIds,

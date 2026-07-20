@@ -17,7 +17,7 @@ import {
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
-const evidenceNow = new Date("2026-07-20T01:16:47.000Z");
+const evidenceNow = new Date("2026-07-20T04:00:00.000Z");
 
 async function inputs() {
   const [baseFixture, timetableSnapshot, topologySnapshot, inventory, stationMapCsv] = await Promise.all([

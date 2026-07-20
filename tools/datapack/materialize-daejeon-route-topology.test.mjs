@@ -19,7 +19,7 @@ import {
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
-const evidenceNow = new Date("2026-07-19T22:30:00.000Z");
+const evidenceNow = new Date("2026-07-20T04:00:00.000Z");
 
 async function inputs() {
   const [baseFixture, snapshot, inventory, stationMapCsv] = await Promise.all([
@@ -176,6 +176,13 @@ test("대전 membership admission은 source scope와 두 공식 evidence의 결�
       now: evidenceNow,
     }), /Daejeon membership evidence is invalid/);
   }
+  assert.throws(() => materializeDaejeonRouteTopology({
+    baseFixture,
+    snapshot,
+    inventory,
+    canonicalStationMappings,
+    now: new Date("2026-07-20T03:29:59.999Z"),
+  }), /membership evidence is future-dated/);
 });
 
 test("materialized production SQLite와 field provenance만 대전 1호선 membership·topology를 SUPPORTED로 만든다", async (context) => {
@@ -197,16 +204,21 @@ test("materialized production SQLite와 field provenance만 대전 1호선 membe
     privateKeyEncoding: { type: "pkcs8", format: "pem" },
     publicKeyEncoding: { type: "spki", format: "pem" },
   });
-  const invalidFixture = structuredClone(fixture);
-  invalidFixture.packs[0].stationLines.find(({ lineId }) => lineId === "line-7051a9c2525c")
-    .fieldProvenance.station_code.sourceId = "missing-membership-source";
-  await writeFile(invalidFixturePath, `${JSON.stringify(invalidFixture, null, 2)}\n`);
-  await assert.rejects(execFileAsync(process.execPath, [
-    "tools/datapack/build-datapack.mjs", "--fixture", invalidFixturePath, "--output", packOutput,
-  ], {
-    cwd: root,
-    env: { ...process.env, EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM: privateKey },
-  }), /fieldProvenance source is missing from sourceInventory/);
+  for (const [sourceId, expectedError] of [
+    ["missing-membership-source", /fieldProvenance source is missing from sourceInventory/],
+    ["molit-urban-rail-full-route-daejeon-membership", /fieldProvenance source does not provide station_code/],
+  ]) {
+    const invalidFixture = structuredClone(fixture);
+    invalidFixture.packs[0].stationLines.find(({ lineId }) => lineId === "line-7051a9c2525c")
+      .fieldProvenance.station_code.sourceId = sourceId;
+    await writeFile(invalidFixturePath, `${JSON.stringify(invalidFixture, null, 2)}\n`);
+    await assert.rejects(execFileAsync(process.execPath, [
+      "tools/datapack/build-datapack.mjs", "--fixture", invalidFixturePath, "--output", packOutput,
+    ], {
+      cwd: root,
+      env: { ...process.env, EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM: privateKey },
+    }), expectedError);
+  }
 
   await execFileAsync(process.execPath, [
     "tools/datapack/build-datapack.mjs", "--fixture", fixturePath, "--output", packOutput,
