@@ -62,6 +62,7 @@ test("광주 cyberstation collector는 공식 20개 역 timetable fragment를 bo
     direction: "pd", endCode: "119", endName: "평동역", time: "0525",
   });
   assert.match(snapshot.contentSha256, /^[a-f0-9]{64}$/);
+  assert.match(snapshot.rawSha256, /^[a-f0-9]{64}$/);
   assert.match(snapshot.rowsSha256, /^[a-f0-9]{64}$/);
   assert.equal(snapshot.credentialRedacted, true);
   assert.doesNotMatch(JSON.stringify(snapshot), /test-csrf-token|test-session/);
@@ -104,6 +105,7 @@ test("광주 cyberstation 공식 20260720 snapshot identity와 전체 scope를 �
   assert.equal(snapshot.normalizedBoundaryMinuteCount, 1);
   assert.equal(snapshot.scopeSha256, "5f6767ee8345a9caccaf2d367019d224bf7a60bbceda846b9f84cdf8114a8de1");
   assert.equal(snapshot.contentSha256, "b050ed92cbdd555e22e987e4854a7d60b5293951992d6c14ae26c110f9b4fb5a");
+  assert.equal(snapshot.rawSha256, "852b75f79ca7cccf8dfefc65ee4fe226f833e6cd2e52f5e721efdfac2efdc31a");
   assert.equal(snapshot.rowsSha256, hash(JSON.stringify(snapshot.rows)));
   assert.equal(snapshot.rowsSha256, "2eec08dc30a97c50fd349dc607e77677829881790b5ca896856caa4b9bbd3ccd");
   assert.equal(snapshot.fragments.some((fragment) => "html" in fragment), false);

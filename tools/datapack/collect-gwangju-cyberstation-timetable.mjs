@@ -62,6 +62,13 @@ export async function collectGwangjuCyberstationTimetable({
     throw new Error(`Gwangju cyberstation timetable schema mismatch: directions=${directions.join(",") || "missing"}`);
   }
   const rowsSha256 = sha256(JSON.stringify(rows));
+  const rawSha256 = sha256(JSON.stringify({
+    bootstrapSha256: session.rawSha256,
+    fragments: fragments.map(({ stationId, rawSha256: fragmentSha256 }) => ({
+      stationId,
+      rawSha256: fragmentSha256,
+    })),
+  }));
   const contentSha256 = sha256(JSON.stringify({
     fragments: fragments.map(({ stationId, rawSha256 }) => ({ stationId, rawSha256 })),
     rowsSha256,
@@ -95,6 +102,7 @@ export async function collectGwangjuCyberstationTimetable({
     scope: STATIONS,
     scopeSha256: sha256(JSON.stringify(STATIONS)),
     bootstrapSha256: session.rawSha256,
+    rawSha256,
     contentSha256,
     rowsSha256,
     fragments: fragments.map(({ rows: _rows, ...fragment }) => fragment),
