@@ -12,7 +12,10 @@ import {
   materializeBusanRouteTopology,
   parseCanonicalBusanStationMappings,
 } from "./materialize-busan-route-topology.mjs";
-import { materializeBusanTimetable } from "./materialize-busan-timetable.mjs";
+import {
+  materializeBusanTimetable,
+  runBusanTimetableMaterializer,
+} from "./materialize-busan-timetable.mjs";
 import { materializeDaejeonTimetable } from "./materialize-daejeon-timetable.mjs";
 
 const root = path.resolve(import.meta.dirname, "../..");
@@ -148,18 +151,22 @@ test("부산 timetable materializer CLI가 cumulative fixture를 출력한다", 
       writeFile(baseFixture, JSON.stringify(values.cumulativeFixture)),
       writeFile(inventory, JSON.stringify(values.inventory)),
     ]);
-    const result = await execFileAsync(process.execPath, [
-      path.join(root, "tools/datapack/materialize-busan-timetable.mjs"),
+    await runBusanTimetableMaterializer([
       "--base-fixture", baseFixture,
       "--timetable-snapshot", path.join(root, "tools/datapack/sources/busan-transportation-timetable-20260720.json"),
       "--topology-snapshot", path.join(root, "tools/datapack/sources/busan-transportation-route-topology-20260720.json"),
       "--inventory", inventory,
       "--output", output,
-    ]);
+    ], { now });
     const fixture = JSON.parse(await readFile(output, "utf8"));
     assert.equal(fixture.packs[0].transitTrips.filter(({ sourceId }) =>
       sourceId === "busan-transportation-timetable").length, 3_833);
-    assert.match(result.stdout, /trips=3833 stopTimes=109140/);
+    await assert.rejects(execFileAsync(process.execPath, [
+      path.join(root, "tools/datapack/materialize-busan-timetable.mjs"),
+    ]), (error) => {
+      assert.match(error.stderr, /usage: materialize-busan-timetable/);
+      return true;
+    });
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

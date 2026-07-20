@@ -338,7 +338,7 @@ function parseArgs(argv) {
   return Object.fromEntries(expected.map((flag, index) => [flag.slice(2), argv[index * 2 + 1]]));
 }
 
-async function main(argv) {
+export async function runBusanTimetableMaterializer(argv, { now = new Date() } = {}) {
   const args = parseArgs(argv);
   const [baseFixture, timetableSnapshot, topologySnapshot, inventory] = await Promise.all([
     readFile(args["base-fixture"], "utf8").then(JSON.parse),
@@ -346,14 +346,14 @@ async function main(argv) {
     readFile(args["topology-snapshot"], "utf8").then(JSON.parse),
     readFile(args.inventory, "utf8").then(JSON.parse),
   ]);
-  const fixture = materializeBusanTimetable({ baseFixture, timetableSnapshot, topologySnapshot, inventory });
+  const fixture = materializeBusanTimetable({ baseFixture, timetableSnapshot, topologySnapshot, inventory, now });
   await writeFile(args.output, `${JSON.stringify(fixture, null, 2)}\n`);
   console.log(`Busan timetable materialized: trips=${EXPECTED_TRIP_COUNT} stopTimes=${EXPECTED_ROW_COUNT}`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   try {
-    await main(process.argv.slice(2));
+    await runBusanTimetableMaterializer(process.argv.slice(2));
   } catch (error) {
     console.error(error instanceof Error ? error.message : "Busan timetable materialization failed");
     process.exitCode = 1;
