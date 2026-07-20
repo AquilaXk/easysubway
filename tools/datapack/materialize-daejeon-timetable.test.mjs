@@ -142,10 +142,15 @@ test("공식 휴일 근거가 없는 연도의 timetable refresh는 fail closed�
   refreshed.timetableSnapshot.observedAt = "2027-01-01T00:00:00.000Z";
   const evidence = refreshed.inventory.sources.find(({ id }) => id === "daejeon-train-timetable")
     .scheduleAdmissionEvidence;
-  evidence.snapshotId = "daejeon-train-timetable-20270101";
   evidence.capturedAt = refreshed.timetableSnapshot.observedAt;
   evidence.freshUntil = "2027-01-02T00:00:00.000Z";
 
+  assert.throws(() => materializeDaejeonTimetable({
+    ...refreshed,
+    now: new Date("2027-01-01T00:01:00.000Z"),
+  }), /capturedAt Asia\/Seoul date/);
+
+  evidence.snapshotId = "daejeon-train-timetable-20270101";
   assert.throws(() => materializeDaejeonTimetable({
     ...refreshed,
     now: new Date("2027-01-01T00:01:00.000Z"),

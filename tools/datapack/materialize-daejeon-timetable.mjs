@@ -13,6 +13,9 @@ const TOPOLOGY_SOURCE_ID = "daejeon-station-distance-fare";
 const LINE_ID = "line-7051a9c2525c";
 const PACK_ID = "nationwide-daejeon-schedule";
 const SUPPORTED_SERVICE_CALENDAR_YEAR = "2026";
+const SEOUL_DATE_FORMATTER = new Intl.DateTimeFormat("en", {
+  timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit",
+});
 const FRESHNESS_MILLIS = 24 * 60 * 60 * 1_000;
 const EXPECTED_ROW_COUNT = 1_628;
 const EXPECTED_DEPARTURE_COUNT = 9_574;
@@ -40,7 +43,11 @@ export function materializeDaejeonTimetable({
   const source = requiredSource(inventory, timetableSnapshot, topologySnapshot, now);
   const version = /-(\d{8})$/.exec(source.scheduleAdmissionEvidence.snapshotId)?.[1];
   if (!version) throw new Error(`${SOURCE_ID} snapshotId must end with YYYYMMDD`);
-  if (!version.startsWith(SUPPORTED_SERVICE_CALENDAR_YEAR)) {
+  const capturedDate = compactSeoulDate(source.scheduleAdmissionEvidence.capturedAt);
+  if (version !== capturedDate) {
+    throw new Error(`${SOURCE_ID} snapshotId must match capturedAt Asia/Seoul date`);
+  }
+  if (!capturedDate.startsWith(SUPPORTED_SERVICE_CALENDAR_YEAR)) {
     throw new Error(`${SOURCE_ID} snapshotId must use supported service calendar year ${SUPPORTED_SERVICE_CALENDAR_YEAR}`);
   }
   const fixture = materializeDaejeonRouteTopology({
@@ -143,6 +150,12 @@ export function materializeDaejeonTimetable({
 export function materializedPackContentHash(pack, version) {
   const { id: previousPackId, version: _previousVersion, url: _previousUrl, ...content } = pack;
   return sha256(JSON.stringify({ previousPackId, version, content }));
+}
+
+function compactSeoulDate(value) {
+  const parts = Object.fromEntries(SEOUL_DATE_FORMATTER.formatToParts(new Date(value))
+    .map(({ type, value: part }) => [type, part]));
+  return `${parts.year}${parts.month}${parts.day}`;
 }
 
 function validateSnapshot(snapshot) {
