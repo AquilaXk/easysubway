@@ -83,6 +83,8 @@ import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
 
+import { codepointCompare } from "../lib/codepoint-compare.mjs";
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const ITX_SERVICE_CLASS = "ITX_CHEONGCHUN";
 const EXPECTED_ITX_EDGE_COUNT = 48;
@@ -218,7 +220,7 @@ function diffTable(previousDb, newDb, table) {
 function buildRowDiffEvidence(previousDb, newDb) {
   const tables = new Set([...listTables(previousDb), ...listTables(newDb)]);
   const diffs = [];
-  for (const table of [...tables].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))) {
+  for (const table of [...tables].sort(codepointCompare)) {
     const diff = diffTable(previousDb, newDb, table);
     if (diff.rowsRemoved > 0 || diff.rowsAdded > 0 || diff.rowsChanged > 0) {
       diffs.push(diff);
