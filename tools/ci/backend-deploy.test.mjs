@@ -736,6 +736,9 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, standby 승격
   // 파괴적 DDL 게이트는 배포 대상 checkout에서도 재검사한다(#2365).
   assert.match(cd, /CD Deploy \/ Check migration DDL compatibility/);
   assert.match(cd, /node tools\/ci\/check-migration-ddl-compat\.mjs/);
+  // pre-#2365 SHA 롤백 재배포 시 검사기 파일 부재를 skip하는 가드가 있어야 한다.
+  assert.match(cd, /if \[\[ ! -f tools\/ci\/check-migration-ddl-compat\.mjs \]\]; then/);
+  assert.match(cd, /migration DDL gate absent at deploy target \(pre-#2365 SHA\); skipping/);
 });
 
 test("CD 배포 후 검증은 readiness 단일 프로브가 아니라 핵심 API 스모크로 게이트한다", () => {

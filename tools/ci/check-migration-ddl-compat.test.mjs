@@ -129,6 +129,22 @@ test("evaluateMigrationSet은 사유·승인이 명기된 allowlist 항목만 �
   assert.match(incomplete[0].why, /allowlist/);
 });
 
+test("evaluateMigrationSet은 공백만 있는 사유·승인 allowlist 항목을 거부한다", () => {
+  const files = [{ file: "V67__contract.sql", version: 67, sql: "DROP TABLE t;" }];
+  for (const bogus of [
+    { reason: "   ", approval: "#2365" },
+    { reason: "의도적 contract 단계", approval: "\t\n " },
+    { reason: "", approval: "" },
+  ]) {
+    const violations = evaluateMigrationSet(files, {
+      baselineVersion: 66,
+      allowlist: [{ file: "V67__contract.sql", ...bogus }],
+    });
+    assert.equal(violations.length, 1, `공백 통과: ${JSON.stringify(bogus)}`);
+    assert.match(violations[0].why, /allowlist/);
+  }
+});
+
 test("현재 트리의 실제 마이그레이션은 baseline(V66)에서 위반이 없다(회귀 없음)", () => {
   const files = loadMigrationFiles(realMigrationDir);
   const violations = evaluateMigrationSet(files, { baselineVersion: 66, allowlist: [] });

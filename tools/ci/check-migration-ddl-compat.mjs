@@ -108,6 +108,12 @@ function normalizeId(id) {
   return id.replace(/"/g, "").toLowerCase();
 }
 
+// 문자열이 아니거나(누락·잘못된 타입) 공백만 있으면 비어있는 것으로 본다.
+// non-string에 .trim()을 호출하지 않아 타입 안전하다.
+function isBlank(value) {
+  return typeof value !== "string" || value.trim() === "";
+}
+
 function collectCreatedTables(cleaned) {
   const set = new Set();
   const re =
@@ -224,7 +230,7 @@ export function evaluateMigrationSet(files, { baselineVersion = 0, allowlist = [
     if (findings.length === 0) continue;
     const entry = allow.get(f.file);
     if (entry) {
-      if (!entry.reason || !entry.approval) {
+      if (isBlank(entry.reason) || isBlank(entry.approval)) {
         violations.push({ file: f.file, findings, why: "allowlist reason/approval 누락" });
       }
       continue;
