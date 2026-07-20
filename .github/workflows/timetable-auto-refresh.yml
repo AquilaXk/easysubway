@@ -226,7 +226,7 @@ jobs:
             --coverage-contract tools/datapack/itx-cheongchun-coverage-contract.json
           git add -N tools/datapack/sources tools/datapack/itx-cheongchun-coverage-contract.json
           git diff -- tools/datapack/sources tools/datapack/itx-cheongchun-coverage-contract.json > "${EASYSUBWAY_ITX_REFRESH_PATCH}"
-          echo "::notice title=Auto refresh::source UNCHANGED and promoted (UNCHANGED_AUTO). 재산출(apply-itx-topology allowlist + build-server-timetable-snapshot)과 배포는 수동 단계입니다 — 첨부한 promotion.patch를 적용하세요."
+          echo "::notice title=Auto refresh::source UNCHANGED and promoted (UNCHANGED_AUTO). topology 불변 순수 freshness 리프레시이므로 apply-itx-topology(allowlist 편집·datapack 재기록) 없이 build-server-timetable-snapshot --without-topology-evidence 재산출과 배포만 수동 단계입니다 — 첨부한 promotion.patch를 적용하세요."
 
       - name: Auto Refresh / Fail closed on review-required change
         if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) && !(steps.collect.outputs.collect_exit == '0' && steps.collect.outputs.promotion_status == 'SUPPORTED') }}
