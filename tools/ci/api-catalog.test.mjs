@@ -361,6 +361,7 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
     ["provider:busan-transportation-route-topology", "GET", "DATA_GO_KR_SERVICE_KEY", "node tools/datapack/collect-busan-route-topology.mjs"],
     ["provider:daejeon-train-timetable", "GET", "DATA_GO_KR_SERVICE_KEY", "node tools/datapack/probe-daejeon-coverage-api.mjs"],
     ["provider:daejeon-station-distance-fare", "GET", "DATA_GO_KR_SERVICE_KEY", "node tools/datapack/collect-daejeon-route-topology.mjs"],
+    ["provider:gwangju-transportation-timetable", "GET", "DATA_GO_KR_SERVICE_KEY", "node tools/datapack/collect-gwangju-timetable.mjs"],
   ]) {
     const entry = findCatalogEntry(catalog, id);
     assert.equal(entry.operation.method, method);
@@ -402,6 +403,18 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
   assert.deepEqual(busanTimetable.operation.optionalParameters, ["day", "updown", "stime", "etime", "enum"]);
   assert.deepEqual(busanTimetable.responseFields, [
     "sname", "engname", "trainno", "hour", "time", "day", "updown", "endcode", "scode", "line",
+  ]);
+  const gwangjuTimetable = findCatalogEntry(catalog, "provider:gwangju-transportation-timetable");
+  assert.equal(gwangjuTimetable.detailUrl, "https://www.data.go.kr/data/15111298/openapi.do");
+  assert.equal(gwangjuTimetable.endpoint, "https://apis.data.go.kr/B551232/grtcTimetable/timetable");
+  assert.deepEqual(gwangjuTimetable.operation.requiredParameters, ["serviceKey"]);
+  assert.deepEqual(gwangjuTimetable.operation.fixedParameters, { pageNo: "1", numOfRows: "9999" });
+  assert.deepEqual(gwangjuTimetable.operation.optionalParameters, ["SUBWAY_NAME"]);
+  assert.deepEqual(gwangjuTimetable.responseFields, [
+    "day", "endCord", "direction", "time", "subwayCord", "updateDt", "subwayLine", "endName", "subwayName",
+  ]);
+  assert.deepEqual(gwangjuTimetable.operation.runner.arguments, [
+    "--output", "/tmp/easysubway-gwangju-timetable.json",
   ]);
   const removedDaejeonId = ["provider:daejeon", "braille-guide-map"].join("-");
   assert.equal(catalog.some(({ id }) => id === removedDaejeonId), false);
@@ -480,7 +493,7 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
 test("프로젝트 provider catalog는 비API source를 제외하고 모든 호출 계약을 제공한다", async () => {
   const providers = (await loadProjectCatalog()).filter((entry) => entry.kind === "provider");
 
-  assert.equal(providers.length, 43);
+  assert.equal(providers.length, 44);
   assert.equal(providers.some((entry) => entry.documentationStatus === "metadata-only"), false);
   assert.equal(providers.some((entry) => entry.id === "provider:molit-urban-rail-full-route"), false);
   assert.equal(providers.some((entry) => entry.id === "provider:seoulmetro-cyberstation-route-map"), false);
