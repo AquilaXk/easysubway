@@ -296,7 +296,6 @@
 
 .admin-v3 table.admin-kv-table td {
 	width: 60%;
-	word-break: break-word;
 	overflow-wrap: anywhere;
 }
 
