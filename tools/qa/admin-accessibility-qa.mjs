@@ -720,31 +720,40 @@ async function keyboardTableCheck(page, baseUrl, report) {
           startScrollLeft ?? 0,
           { timeout: SCROLL_SETTLE_TIMEOUT_MS, polling: 50 },
         );
-      } catch {
+      } catch (error) {
+        if (error.name !== "TimeoutError") {
+          throw error;
+        }
         // 정착 타임아웃: 다음 attempt에서 ArrowRight를 한 번 더 눌러 재시도한다.
       }
       afterRight = await readScrollLeft();
     }
 
     afterLeft = afterRight;
-    for (let attempt = 0;
-      attempt < SCROLL_MAX_ATTEMPTS
-        && !(afterLeft != null && afterRight != null && afterLeft < afterRight);
-      attempt += 1) {
-      await page.keyboard.press("ArrowLeft");
-      try {
-        await page.waitForFunction(
-          (ceiling) => {
-            const element = document.querySelector(".admin-table-scroll");
-            return Boolean(element) && element.scrollLeft < ceiling;
-          },
-          afterRight ?? 0,
-          { timeout: SCROLL_SETTLE_TIMEOUT_MS, polling: 50 },
-        );
-      } catch {
-        // 정착 타임아웃: 다음 attempt에서 ArrowLeft를 한 번 더 눌러 재시도한다.
+    // ArrowRight 실패(스크롤 불가) 시 ArrowLeft 루프 스킵, 판정 결과 불변 유지
+    if (afterRight != null && startScrollLeft != null && afterRight > startScrollLeft) {
+      for (let attempt = 0;
+        attempt < SCROLL_MAX_ATTEMPTS
+          && !(afterLeft != null && afterRight != null && afterLeft < afterRight);
+        attempt += 1) {
+        await page.keyboard.press("ArrowLeft");
+        try {
+          await page.waitForFunction(
+            (ceiling) => {
+              const element = document.querySelector(".admin-table-scroll");
+              return Boolean(element) && element.scrollLeft < ceiling;
+            },
+            afterRight ?? 0,
+            { timeout: SCROLL_SETTLE_TIMEOUT_MS, polling: 50 },
+          );
+        } catch (error) {
+          if (error.name !== "TimeoutError") {
+            throw error;
+          }
+          // 정착 타임아웃: 다음 attempt에서 ArrowLeft를 한 번 더 눌러 재시도한다.
+        }
+        afterLeft = await readScrollLeft();
       }
-      afterLeft = await readScrollLeft();
     }
   }
 
