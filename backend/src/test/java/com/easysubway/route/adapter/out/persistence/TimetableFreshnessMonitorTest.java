@@ -342,13 +342,17 @@ class TimetableFreshnessMonitorTest {
 
 	@Test
 	void remainingSecondsGaugeIsNaNWhenNoActiveSnapshot() {
-		MeterRegistry meterRegistry = new SimpleMeterRegistry();
+		PrometheusMeterRegistry meterRegistry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
 		TimetableFreshnessMonitor monitor = monitor(BEFORE, meterRegistry);
 
 		monitor.evaluate();
 
 		// fresh_until을 알 수 없으면 잘못된 만료 경보를 막기 위해 NaN을 내보낸다.
 		assertThat(meterRegistry.get(REMAINING_SECONDS_GAUGE).gauge().value()).isNaN();
+		// scrape 렌더링 계약 고정: NaN 게이지도 <메터명> NaN 라인으로 노출된다(실측 고정). Prometheus는 NaN
+		// 표본을 비교에서 걸러내므로(alerts.test.yml의 NaN 케이스 참조) 이 라인이 있어도 만료 경보는 발화하지 않는다.
+		assertThat(meterRegistry.scrape())
+			.contains("easysubway_timetable_snapshot_remaining_seconds NaN");
 	}
 
 	@Test

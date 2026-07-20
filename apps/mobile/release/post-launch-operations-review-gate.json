@@ -53,7 +53,7 @@
         {
           "refreshOn": "operations-contract-change",
           "files": [
-            {"path": "apps/mobile/release/operations-release-evidence.json", "sha256": "2a6fb09122f51a68cc962b08f0705b91191722aaab76b62edc5a4a6508434d28"},
+            {"path": "apps/mobile/release/operations-release-evidence.json", "sha256": "8cb0c151ca9f57a1716bf76f5d8564051252960ac74f94a698526deb8403169a"},
             {"path": "apps/mobile/release/operations-observability-gate.json", "sha256": "6955ac139fbc57be0721bb955e834164015050f397f2562e4402298578027afe"},
             {"path": "tools/ops/generate-operations-phase-a-summary.mjs", "sha256": "e89a520d6b229c5fd042ef8bcaf74873476c7253cd03b48fac1de21cf55e0c4d"},
             {"path": "tools/ops/validate-operations-release-summary.mjs", "sha256": "71a2a51da2b9c3a20d14512b608bccfbfee9022ca5718b77d44ff9254cc67979"},
@@ -85,7 +85,7 @@
           "refreshOn": "observability-infrastructure-change",
           "files": [
             {"path": "infra/prometheus/prometheus.yml", "sha256": "9bcde0205620224c01d86ec99fd2ef68314a9a96f40bd70c58fe67f8123e366f"},
-            {"path": "infra/prometheus/alerts.yml", "sha256": "5989a79122b2351b94397b75c2be48d2c6d30eba6d49901a990ac5a91447e210"},
+            {"path": "infra/prometheus/alerts.yml", "sha256": "41c18d783219a073e84abed81127a4217bd70306c48d5a3b3c0411e291bc6b39"},
             {"path": "infra/grafana/provisioning/datasources/prometheus.yml", "sha256": "857e2caebec8b70f3aa50c0b968c1ceed46b668a8f08a08532b47be22af3ed97"},
             {"path": "infra/grafana/provisioning/datasources/loki.yml", "sha256": "9156897987a95d3fe59f98651ade7802ad2fc9b65acd2845da90b36dd6f5949c"},
             {"path": "infra/loki/loki.yml", "sha256": "101b9286a15cc0c4f2a66879d801995efabd2c4d98cac904c4c3bd0816bf0e20"}

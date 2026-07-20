@@ -232,7 +232,8 @@
         "/actuator/health/readiness",
         "/api/v1/realtime/**",
         "/api/notices/active",
-        "/api/ads/active"
+        "/api/ads/active",
+        "/actuator/prometheus"
       ],
       "allowedAuthenticatedEndpoints": [
         "/api/v2/routes/session",

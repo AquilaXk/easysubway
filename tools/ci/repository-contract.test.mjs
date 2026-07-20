@@ -7199,6 +7199,9 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
       "/api/v1/realtime/**",
       "/api/notices/active",
       "/api/ads/active",
+      // #2376: /actuator/prometheus는 permitAll이 아니라 사설망(RFC1918) IP 게이트로만 열리지만,
+      // public 체인 스코프 안에 있어 security-matcher 인벤토리에는 포함된다.
+      "/actuator/prometheus",
     ],
   );
   assert.deepEqual(
@@ -11850,6 +11853,9 @@ test("로컬 관측성 스택은 Prometheus와 Grafana 기준선을 제공한다
   assert.match(prometheusAlerts, /alert: AquilaPublicEdgeProbeScrapeDown[\s\S]*severity: warning[\s\S]*title_ko: "공개 접속 점검 실패"[\s\S]*impact_ko: "외부에서 API readiness를 확인하는 관측 신호가 멈췄습니다\."[\s\S]*action_ko: "public-edge-probe 컨테이너 상태와 외부 HTTPS readiness 응답을 확인하세요\."/);
   assert.match(prometheusAlerts, /alert: AquilaDockerRuntimeProbeScrapeDown[\s\S]*severity: warning[\s\S]*title_ko: "Docker 런타임 점검 실패"[\s\S]*impact_ko: "컨테이너 상태 관측 신호가 멈춰 Docker 기반 장애 탐지가 늦어질 수 있습니다\."[\s\S]*action_ko: "docker-runtime-probe 컨테이너 상태와 Docker socket 접근 권한을 확인하세요\."/);
   assert.match(prometheusAlerts, /alert: AquilaBackWorkerScrapeDown[\s\S]*severity: critical[\s\S]*title_ko: "백그라운드 작업자 상태 점검 실패"[\s\S]*impact_ko: "작업 큐와 DLQ 관련 알림 평가가 늦거나 멈출 수 있습니다\."[\s\S]*action_ko: "back-worker 컨테이너 상태와 \/actuator\/health\/readiness 응답을 확인하세요\."/);
+  // #2376 dead-man's switch: backend_app_metrics scrape가 멈추면 freshness 경보가 조용히 멈추므로 그 무음을 감시한다.
+  assert.match(prometheusAlerts, /alert: AquilaBackendAppMetricsScrapeDown/);
+  assert.match(prometheusAlerts, /alert: AquilaBackendAppMetricsScrapeDown\s*\n\s*expr: min\(up\{job="backend_app_metrics"\}\) < 1[\s\S]*severity: critical[\s\S]*service: aquila-backend-app-metrics[\s\S]*title_ko: "백엔드 앱 메트릭 수집 실패"[\s\S]*impact_ko: "운행표 snapshot 잔여시간 게이지가 사라져 만료 24\/6시간 전 경보가 조용히 멈춥니다\."[\s\S]*action_ko: "backend 컨테이너 상태와 \/actuator\/prometheus 응답, docker network 내부 backend:8080 접근을 확인하세요\."/);
   assert.match(alertmanagerConfig, /receiver: operations-null/);
   assert.match(alertmanagerConfig, /templates:\s*\n\s*-\s*\/etc\/alertmanager\/templates\/\*\.tmpl/);
   assert.match(alertmanagerTemplate, /define "easysubway\.email\.subject"/);
@@ -13404,7 +13410,17 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
     security,
     /requestMatchers\([\s\S]*"\/api\/health"[\s\S]*"\/actuator\/health"[\s\S]*"\/actuator\/health\/liveness"[\s\S]*"\/actuator\/health\/readiness"[\s\S]*\)\.permitAll\(\)/,
   );
-  assert.doesNotMatch(security, /"\/actuator\/prometheus"/);
+  // #2376: /actuator/prometheus는 permitAll이 아니라, 사설망(RFC1918) 출처 remoteAddr에만 여는 IP 게이트로
+  // 노출한다(공개/미상 출처는 계속 denyAll로 거부). Prometheus의 backend_app_metrics scrape만 통과한다.
+  assert.match(
+    security,
+    /requestMatchers\(HttpMethod\.GET, "\/actuator\/prometheus"\)\s*\n\s*\.access\(internalNetworkOnly\(\)\)/,
+  );
+  assert.match(security, /new IpAddressMatcher\("10\.0\.0\.0\/8"\)/);
+  assert.match(security, /new IpAddressMatcher\("172\.16\.0\.0\/12"\)/);
+  assert.match(security, /new IpAddressMatcher\("192\.168\.0\.0\/16"\)/);
+  // prometheus 경로가 health permitAll 블록으로 새어 들어가지 않도록 permitAll 직전에 오지 않음을 확인한다.
+  assert.doesNotMatch(security, /"\/actuator\/prometheus"[\s\S]{0,200}?\)\.permitAll\(\)/);
   assert.match(security, /@Order\(4\)[\s\S]*?anyRequest\(\)\.denyAll\(\)/);
   assert.match(security, /easysubway\.operator\.username/);
   assert.match(security, /easysubway\.operator\.password/);
