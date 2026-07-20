@@ -14990,7 +14990,7 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.doesNotMatch(searchDashboardView, /routeSearchId|stationId/);
   assert.match(searchDashboardTemplate, /경로 검색 현황/);
   assert.match(searchDashboardTemplate, /전체 검색/);
-  assert.match(searchDashboardTemplate, /경로 차단율/);
+  assert.match(searchDashboardTemplate, /경로 차단률/);
   assert.match(searchDashboardTemplate, /운영 상태/);
   assert.match(searchDashboardTemplate, /summary\.blockedRateLabel/);
   assert.match(searchDashboardTemplate, /summary\.blockedAlertLabel/);
