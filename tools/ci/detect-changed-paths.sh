@@ -60,7 +60,7 @@ while IFS= read -r file; do
       repository=true
       deploy=true
       ;;
-    .github/workflows/*.yml|tools/ci/**|tools/repo/**|tools/qa/**)
+    .github/workflows/*.yml|.github/actionlint.yaml|tools/ci/**|tools/repo/**|tools/qa/**)
       ci=true
       repository=true
       ;;

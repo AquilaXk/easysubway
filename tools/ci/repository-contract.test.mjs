@@ -966,6 +966,8 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
   assert.match(repositoryJob, /ACTIONLINT_VERSION: "1\.7\.12"/);
   assert.match(repositoryJob, /ACTIONLINT_SHA256: "[0-9a-f]{64}"/);
   assert.match(repositoryJob, /sha256sum --check --status/);
+  // #2396(S6506): actionlint 다운로드 curl은 HTTPS·TLS 1.2 이상을 강제한다.
+  assert.match(repositoryJob, /curl --proto '=https' --tlsv1\.2 -fsSL/);
   assert.match(releaseGateJob, /Release Gate Consistency \/ Run release gate contract tests/);
   assert.match(releaseGateJob, /node --test tools\/ci\/repository-contract\.test\.mjs/);
   assert.match(releaseGateJob, /node tools\/ci\/check-map-attribution\.mjs/);
@@ -17825,6 +17827,11 @@ test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경�
   const ci = await classifyChangedFiles([".github/workflows/ci.yml"]);
   assert.equal(ci.repository, "true");
   assert.equal(ci.ci, "true");
+
+  // #2396: actionlint 설정(self-hosted 러너 라벨 등록)만 바뀌어도 actionlint 게이트가 돌아야 한다.
+  const actionlintConfig = await classifyChangedFiles([".github/actionlint.yaml"]);
+  assert.equal(actionlintConfig.repository, "true");
+  assert.equal(actionlintConfig.ci, "true");
 
   const cd = await classifyChangedFiles([".github/workflows/cd.yml"]);
   assert.equal(cd.repository, "true");
