@@ -537,20 +537,22 @@ printf 'false\n' > "${ingress_state_file}"
 chmod 600 "${ingress_state_file}"
 ingress_closed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-route_v2_rollback_lock="${DEPLOY_ROOT}/shared/route-v2-canary-rollback-lock.json"
+restored_after_rehearsal=false
+ingress_restored_at=""
 if [[ "${budget_within}" != true ]]; then
 	# Permanent rollback: persist the durable lock IMMEDIATELY after the host
-	# close above succeeds — BEFORE the public verification probes below, which
-	# themselves depend on the network and could return curl's "000" transport
-	# sentinel and abort the script (see public_status). The close having been
-	# APPLIED is what must be locked in durably; whether we can also verify it
-	# publicly right now is a separate, best-effort check that must not gate
-	# whether the lock exists. Without this ordering a transient network blip
-	# during verification would leave marker=false with NO lock, and a later,
-	# UNRELATED deploy-backend.sh run could silently re-open ingress by
-	# re-rendering EASYSUBWAY_ROUTE_V2_INGRESS_ENABLED=true from compose.env's
-	# stale desired state — deploy-backend.sh checks for this lock and forces
-	# the host action closed until an operator removes it after investigating.
+	# close above succeeds — BEFORE the public verification probe below, which
+	# itself depends on the network and could return curl's "000" transport
+	# sentinel. The close having been APPLIED is what must be locked in
+	# durably; whether we can also verify it publicly right now is a separate,
+	# best-effort check that must not gate whether the lock exists. Without
+	# this ordering a transient network blip during verification would leave
+	# marker=false with NO lock, and a later, UNRELATED deploy-backend.sh run
+	# could silently re-open ingress by re-rendering
+	# EASYSUBWAY_ROUTE_V2_INGRESS_ENABLED=true from compose.env's stale desired
+	# state — deploy-backend.sh checks for this lock and forces the host
+	# action closed until an operator removes it after investigating.
+	route_v2_rollback_lock="${DEPLOY_ROOT}/shared/route-v2-canary-rollback-lock.json"
 	node -e '
 const { writeFileSync } = require("node:fs");
 writeFileSync(process.argv[1], JSON.stringify({
@@ -561,20 +563,34 @@ writeFileSync(process.argv[1], JSON.stringify({
 }, null, 2) + "\n");
 ' "${route_v2_rollback_lock}" "${current_sha}" "${ingress_closed_at}" "${PRODUCTION_CANARY_APPROVAL}"
 	chmod 600 "${route_v2_rollback_lock}"
-fi
 
-session_closed="$(public_status /api/v2/routes/session)"
-search_closed="$(public_status /api/v2/routes/search)"
-[[ "${session_closed}" == 404 && "${search_closed}" == 404 ]] \
-	|| { echo 'ingress-close rollback did not close the public Route V2 edge' >&2; exit 1; }
-
-restored_after_rehearsal=false
-ingress_restored_at=""
-if [[ "${budget_within}" == true ]]; then
+	# Permanent close is the terminal, intended state here — there is nothing
+	# further to restore, so a verification failure (including curl's "000"
+	# transport sentinel) is reported as a hard failure once the durable lock
+	# above already exists.
+	session_closed="$(public_status /api/v2/routes/session)"
+	search_closed="$(public_status /api/v2/routes/search)"
+	[[ "${session_closed}" == 404 && "${search_closed}" == 404 ]] \
+		|| { echo 'ingress-close rollback did not close the public Route V2 edge' >&2; exit 1; }
+else
 	# Healthy canary: this is a REAL, non-mutating-net-effect close/verify/restore
-	# rehearsal — the close is proven for real against the live edge, then ingress
-	# is restored to the state the canary started in (open), so the rollback
-	# mechanism is exercised end-to-end without a lasting production change.
+	# rehearsal. Both verification probes below are OBSERVED and reported, but
+	# neither is allowed to skip the restore step that follows it — a transient
+	# network blip (curl's "000" sentinel) on either probe must never leave
+	# ingress closed with the rehearsal's promised zero net effect broken. The
+	# restore APPLICATION itself (an `apply_route_v2_host_ingress` failure, not
+	# a probe result) is the only thing that still exits immediately, since at
+	# that point there is nothing further this runner can do locally to un-break
+	# the host Nginx config.
+	rehearsal_verification_failed=0
+
+	session_closed="$(public_status /api/v2/routes/session)"
+	search_closed="$(public_status /api/v2/routes/search)"
+	if [[ "${session_closed}" != 404 || "${search_closed}" != 404 ]]; then
+		echo 'ingress-close rollback did not close the public Route V2 edge (continuing to restore before reporting failure)' >&2
+		rehearsal_verification_failed=1
+	fi
+
 	apply_route_v2_host_ingress "${route_v2_open_action}" \
 		|| { echo 'rollback rehearsal failed to restore the host Nginx configuration' >&2; exit 1; }
 	printf 'true\n' > "${ingress_state_file}"
@@ -587,9 +603,17 @@ if [[ "${budget_within}" == true ]]; then
 	# connect/timeout), and "000" != "404" too — a network outage during THIS
 	# verification would otherwise be misrecorded as a successful restore. Both
 	# probes must return a real 3-digit status that is neither 404 nor 000.
-	[[ "${session_restored}" =~ ^[0-9]{3}$ && "${session_restored}" != 404 && "${session_restored}" != 000 \
-		&& "${search_restored}" =~ ^[0-9]{3}$ && "${search_restored}" != 404 && "${search_restored}" != 000 ]] \
-		|| { echo 'rollback rehearsal did not restore the public Route V2 edge' >&2; exit 1; }
+	if ! [[ "${session_restored}" =~ ^[0-9]{3}$ && "${session_restored}" != 404 && "${session_restored}" != 000 \
+		&& "${search_restored}" =~ ^[0-9]{3}$ && "${search_restored}" != 404 && "${search_restored}" != 000 ]]; then
+		echo 'rollback rehearsal did not restore the public Route V2 edge' >&2
+		rehearsal_verification_failed=1
+	fi
+
+	# The restore APPLICATION already succeeded above regardless of what the
+	# probes report — only now, after that restore attempt, do we report any
+	# verification failure observed along the way.
+	[[ "${rehearsal_verification_failed}" -eq 0 ]] \
+		|| exit 1
 	restored_after_rehearsal=true
 fi
 rollback_verified_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"

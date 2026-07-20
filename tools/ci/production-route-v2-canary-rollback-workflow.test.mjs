@@ -276,38 +276,74 @@ test("canary rollback runner는 fail-closed 게이트와 rollback 경로를 갖�
   assert.match(runner, /printf 'false\\n' > "\$\{ingress_state_file\}"/);
   assert.match(runner, /ingress-close rollback did not close the public Route V2 edge/);
 
+  // The breach/healthy split happens IMMEDIATELY after the close is applied,
+  // BEFORE any public verification probe — the healthy branch must reach its
+  // OWN restore step regardless of what the close-verification probe reports
+  // (see below), and the breach branch must write its durable lock before its
+  // own close-verification probe can abort the script.
+  assert.match(runner, /if \[\[ "\$\{budget_within\}" != true \]\]; then/);
+  assert.doesNotMatch(runner, /if \[\[ "\$\{budget_within\}" == true \]\]; then/);
+  assert.ok(
+    runner.indexOf("ingress_closed_at=") < runner.indexOf('if [[ "${budget_within}" != true ]]; then'),
+  );
+
   // Budget-breach path persists a durable rollback lock IMMEDIATELY after the
-  // host close is applied — BEFORE the public verification probes, which
-  // depend on the network and could themselves return curl's "000" transport
+  // host close is applied — BEFORE its own public verification probe, which
+  // depends on the network and could itself return curl's "000" transport
   // sentinel and abort the script. A later, unrelated deploy must not be able
   // to silently re-open ingress from compose.env's stale desired state just
   // because verification happened to fail on a blip (matches deploy-backend.sh's
-  // lock check).
+  // lock check). A verification failure on the PERMANENT-close path is still a
+  // hard exit — there is nothing further to restore for a breach.
   assert.match(
     runner,
     /route_v2_rollback_lock="\$\{DEPLOY_ROOT\}\/shared\/route-v2-canary-rollback-lock\.json"/,
   );
   assert.match(runner, /reason: "signed-RC canary budget breach"/);
-  assert.ok(
-    runner.indexOf("ingress_closed_at=") < runner.indexOf('route_v2_rollback_lock="${DEPLOY_ROOT}')
-      && runner.indexOf('route_v2_rollback_lock="${DEPLOY_ROOT}') < runner.indexOf("session_closed="),
-  );
+  const breachBranch = runner.match(
+    /if \[\[ "\$\{budget_within\}" != true \]\]; then([\s\S]*?)\nelse\n/,
+  )?.[1] ?? "";
+  assert.match(breachBranch, /route_v2_rollback_lock=/);
+  assert.ok(breachBranch.indexOf("route_v2_rollback_lock=") < breachBranch.indexOf("session_closed="));
+  assert.match(breachBranch, /\[\[ "\$\{session_closed\}" == 404 && "\$\{search_closed\}" == 404 \]\] \\\n\s*\|\| \{ echo 'ingress-close rollback did not close the public Route V2 edge' >&2; exit 1; \}/);
 
-  // Healthy-path REAL close/verify/restore rehearsal — restore only happens when
-  // the canary is within budget, and only after the close was verified.
-  assert.match(runner, /if \[\[ "\$\{budget_within\}" == true \]\]; then/);
-  assert.match(runner, /apply_route_v2_host_ingress "\$\{route_v2_open_action\}"/);
-  assert.match(runner, /rollback rehearsal did not restore the public Route V2 edge/);
-  assert.match(runner, /restored_after_rehearsal=true/);
+  // Healthy-path REAL close/verify/restore rehearsal: the close-verification
+  // probe's failure (including curl's "000" transport sentinel) must NOT skip
+  // the restore step — it is only RECORDED (rehearsal_verification_failed=1)
+  // and the restore is attempted unconditionally right after, so a network
+  // blip on this specific probe can never leave the rehearsal's promised zero
+  // net effect broken (production ingress stuck closed).
+  const healthyBranch = runner.match(/\nelse\n([\s\S]*?)\nfi\nrollback_verified_at=/)?.[1] ?? "";
+  assert.match(healthyBranch, /rehearsal_verification_failed=0/);
+  assert.match(
+    healthyBranch,
+    /if \[\[ "\$\{session_closed\}" != 404 \|\| "\$\{search_closed\}" != 404 \]\]; then/,
+  );
+  assert.match(healthyBranch, /rehearsal_verification_failed=1/);
+  assert.match(healthyBranch, /apply_route_v2_host_ingress "\$\{route_v2_open_action\}"/);
+  assert.match(healthyBranch, /rollback rehearsal did not restore the public Route V2 edge/);
+  assert.match(healthyBranch, /restored_after_rehearsal=true/);
+  // The restore APPLICATION call must be UNCONDITIONAL — it appears after the
+  // close-verification probe's failure is merely recorded, never inside an
+  // `exit`-guarded branch that the probe's own failure could skip.
   assert.ok(
-    runner.indexOf("session_closed=") < runner.indexOf('if [[ "${budget_within}" == true ]]; then'),
+    healthyBranch.indexOf('rehearsal_verification_failed=1')
+      < healthyBranch.indexOf('apply_route_v2_host_ingress "${route_v2_open_action}"'),
+  );
+  // The overall pass/fail decision (exit on any recorded verification failure)
+  // comes AFTER the restore application, not before it.
+  assert.ok(
+    healthyBranch.indexOf('apply_route_v2_host_ingress "${route_v2_open_action}"')
+      < healthyBranch.lastIndexOf('rehearsal_verification_failed=1')
+      && healthyBranch.lastIndexOf('rehearsal_verification_failed=1')
+      < healthyBranch.indexOf('[[ "${rehearsal_verification_failed}" -eq 0 ]]'),
   );
 
   // Restore verification rejects the "000" transport sentinel explicitly — a
   // network outage during THIS probe must not be misread as "not 404, so
   // restored". Both probes must be a real 3-digit status, neither 404 nor 000.
   assert.match(
-    runner,
+    healthyBranch,
     /\[\[ "\$\{session_restored\}" =~ \^\[0-9\]\{3\}\$ && "\$\{session_restored\}" != 404 && "\$\{session_restored\}" != 000 \\\n\s*&& "\$\{search_restored\}" =~ \^\[0-9\]\{3\}\$ && "\$\{search_restored\}" != 404 && "\$\{search_restored\}" != 000 \]\]/,
   );
   assert.doesNotMatch(runner, /"\$\{session_restored\}" != 404 && "\$\{search_restored\}" != 404 \]\]/);
