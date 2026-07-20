@@ -1314,13 +1314,14 @@ test("백엔드 배포는 GHCR digest를 pull하고 서버 위 build 경로를 �
   assert.match(deploy, /current-image-digest/);
 });
 
-test("CD 배포는 production environment를 선언하고 배포 태그는 record-deploy 잡만 기록한다", () => {
+test("CD 배포는 production-cd environment를 선언하고 배포 태그는 record-deploy 잡만 기록한다", () => {
   const cd = read(".github/workflows/cd.yml");
   const cleanup = read(".github/workflows/actions-storage-cleanup.yml");
 
-  // production environment gives the deploy GitHub deployment history and lets a
-  // branch protection rule (deployment branches = main) apply (issue #1687).
-  assert.match(cd, /environment:\n\s*name: production\n\s*url: \$\{\{ vars\.DEPLOY_PUBLIC_API_BASE_URL \}\}/);
+  // production-cd environment gives the deploy GitHub deployment history without
+  // requiring manual review; the production environment stays reserved as the
+  // required-reviewer gate for sensitive workflows (issue #1687, #2350).
+  assert.match(cd, /environment:\n\s*name: production-cd\n\s*url: \$\{\{ vars\.DEPLOY_PUBLIC_API_BASE_URL \}\}/);
   assert.match(cd, /outputs:\n\s*sha: \$\{\{ steps\.target\.outputs\.sha \}\}/);
 
   // A lightweight deploy/backend/* tag records the deployed sha on GitHub.
@@ -7268,9 +7269,9 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
     currentImplementation: {
       status: "SATISFIED",
       fields: ["snapshotSha256", "freshUntil"],
-      snapshotId: "server-timetable-snapshot-c8ae07b67e133c8e",
-      snapshotSha256: "c8ae07b67e133c8ee019069b1c11590aac1449398caf87eb68bca540615b9623",
-      freshUntil: "2026-07-20T00:00:00+09:00",
+      snapshotId: "server-timetable-snapshot-9f9be14b6cdd6e4d",
+      snapshotSha256: "9f9be14b6cdd6e4d9a2eda1391b0bd7a48e6330485c9e1ec81d399958eae45d8",
+      freshUntil: "2026-07-27T00:00:00+09:00",
       evidencePath: "tools/datapack/server-timetable-snapshot-evidence.json",
     },
     sharedRouteResponseCacheAllowed: false,
@@ -7282,7 +7283,13 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
     runner: "tools/ops/verify-production-route-v2-capacity.sh",
     workflow: ".github/workflows/production-route-v2-capacity-evidence.yml",
     runnerExitCode: 0,
-    productionWorkflowRunUrl: "production workflow run URL 대기(인프라 안정화 후 첨부)",
+    productionWorkflowRunUrl: "https://github.com/AquilaXk/easysubway/actions/runs/29712689840",
+    productionWorkflowRun: {
+      runUrl: "https://github.com/AquilaXk/easysubway/actions/runs/29712689840",
+      deployedSha: "3cad74667dc4c519aac0d1a9f9bcab2bcf5e5142",
+      conclusion: "success",
+      note: "production capacity workflow 최초 완주. run은 candidate SHA(e317f3af90292b9e2dff5e7ec90c22792b845435)가 아닌 이후 배포·검증된 SHA(3cad7466)에서 수행됨 — candidate 블록은 candidate identity로 불변 유지.",
+    },
     candidate: {
       versionName: "1.0.5",
       versionCode: 10006,
@@ -8813,6 +8820,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "kric-wheelchair-lift-movement",
     "molit-tago-subway-info",
     "molit-urban-rail-full-route",
+    "molit-urban-rail-full-route-daejeon-membership",
     "seoul-metro-accessibility",
     "seoul-metro-fast-exit-car-door",
     "seoul-metro-official-od-fare-canary",
