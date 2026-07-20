@@ -959,6 +959,13 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
   assert.match(workflow, /node --test tools\/security\/\*\.test\.mjs/);
   assert.match(workflow, /Repository CI \/ Run ops tool tests/);
   assert.match(workflow, /node --test tools\/ops\/\*\.test\.mjs/);
+  // #2396: 워크플로 변경 시 actionlint 정적 검증 게이트가 pinned·checksum 검증으로 실행된다.
+  const repositoryJob = jobBlock(workflow, "repository-contracts", "backend");
+  assert.match(repositoryJob, /Repository CI \/ Lint GitHub Actions workflows/);
+  assert.match(repositoryJob, /needs\.changes\.outputs\.ci == 'true'/);
+  assert.match(repositoryJob, /ACTIONLINT_VERSION: "1\.7\.12"/);
+  assert.match(repositoryJob, /ACTIONLINT_SHA256: "[0-9a-f]{64}"/);
+  assert.match(repositoryJob, /sha256sum --check --status/);
   assert.match(releaseGateJob, /Release Gate Consistency \/ Run release gate contract tests/);
   assert.match(releaseGateJob, /node --test tools\/ci\/repository-contract\.test\.mjs/);
   assert.match(releaseGateJob, /node tools\/ci\/check-map-attribution\.mjs/);
