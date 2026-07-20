@@ -337,6 +337,14 @@ jobs:
           echo "required=${required}" >> "${GITHUB_OUTPUT}"
           echo "current_sha=${current_sha}" >> "${GITHUB_OUTPUT}"
 
+      - name: CD Deploy / Check migration DDL compatibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          # blue/green standby는 구 canonical과 같은 live Postgres에 대해 부팅하며 배포 대상
+          # 마이그레이션을 커밋하므로, 배포 대상 checkout에서 파괴적 DDL을 다시 확인한다(#2365).
+          node tools/ci/check-migration-ddl-compat.mjs
+
       - name: CD Deploy / Require route purge snapshot evidence
         if: ${{ steps.route-purge.outputs.required == 'true' }}
         shell: bash

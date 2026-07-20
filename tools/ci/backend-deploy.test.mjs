@@ -692,7 +692,7 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, standby 승격
   assert.match(deploy, /Manual recovery runbook for a "\*_standby_serving" degraded exit/);
   assert.match(deploy, /managed_image_drift — it is not a/);
   assert.match(deploy, /expand\/contract \(purely additive\)/);
-  assert.match(deploy, /Automated destructive-DDL\s*\n# detection is tracked as a follow-up candidate under epic #2329/);
+  assert.match(deploy, /mechanically enforced by tools\/ci\/check-migration-ddl-compat\.mjs/);
 
   // Pre-promotion standby failures never touch the canonical container or
   // Nginx (fall back to the pre-Docker legacy unit only for the narrow
@@ -733,6 +733,9 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, standby 승격
   assert.doesNotMatch(cd, /uses: actions\/setup-java@be66141d4002b0e783cc31e5449d3f9f3267ffd9/);
   assert.match(cd, /if \[\[ -n "\$\{EASYSUBWAY_ENV_FILE:-\}" \]\]; then/);
   assert.doesNotMatch(cd, /EASYSUBWAY_ENV_FILE:-\/dev\/null/);
+  // 파괴적 DDL 게이트는 배포 대상 checkout에서도 재검사한다(#2365).
+  assert.match(cd, /CD Deploy \/ Check migration DDL compatibility/);
+  assert.match(cd, /node tools\/ci\/check-migration-ddl-compat\.mjs/);
 });
 
 test("CD 배포 후 검증은 readiness 단일 프로브가 아니라 핵심 API 스모크로 게이트한다", () => {
