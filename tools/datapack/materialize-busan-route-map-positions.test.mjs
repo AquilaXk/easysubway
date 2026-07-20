@@ -219,6 +219,19 @@ test("materialized SQLite와 provenance가 부산 route_map_positions 4건을 SU
     .get("부산권").count, 4);
   database.close();
 
+  const provenance = JSON.parse(await readFile(path.join(packOutput, "current.provenance.json"), "utf8"));
+  const trackRecords = provenance.packs.flatMap(({ records }) => records).filter(
+    ({ sourceId, field }) => sourceId === routeMapSnapshot.sourceId && field === "route_map_line_track",
+  );
+  assert.equal(trackRecords.length, 4);
+  assert.ok(trackRecords.every((record) => (
+    record.entityType === "route_map_line_track"
+      && record.sourceSnapshotId === "busan-transportation-route-map-positions-20260720"
+      && record.evidenceHash === routeMapSnapshot.connectorsSha256
+      && /^[a-f0-9]{64}$/.test(record.providerRecordHash)
+      && record.derivationKind === "OFFICIAL"
+  )));
+
   await execFileAsync(process.execPath, [
     "tools/datapack/report-coverage-gaps.mjs",
     "--targets", "tools/datapack/nationwide-coverage-targets.json",

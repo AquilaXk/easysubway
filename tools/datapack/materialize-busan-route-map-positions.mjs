@@ -49,6 +49,13 @@ export function materializeBusanRouteMapPositions({ baseFixture, snapshot, topol
       licenseStatus: "redistributable",
       commercialUseAllowed: true,
       attributionRequired: false,
+      sourceSnapshotId: source.routeMapAdmissionEvidence.snapshotId,
+      providerRecordHash: sha256(JSON.stringify(
+        snapshot.connectors.filter((connector) => connector.lineId === lineId),
+      )),
+      evidenceHash: snapshot.connectorsSha256,
+      provenanceKind: "OFFICIAL_SOURCE",
+      derivationKind: "OFFICIAL",
       updatedAt: snapshot.capturedAt,
     });
     for (let index = 0; index < linePositions.length; index += 1) {

@@ -665,6 +665,11 @@ function packFieldProvenance(pack, { artifactKind, sqliteSha256 }) {
       addRecord(position, "route_map_position", entityId, "route_map_label_polygon", operatorIds, [position.lineId]);
     }
   }
+  for (const track of pack.routeMapLineTracks ?? []) {
+    const entityId = `${track.lineId}:${track.trackIndex}:${track.region ?? ""}`;
+    const operatorIds = [lineOperatorIds.get(track.lineId)].filter(Boolean);
+    addRecord(track, "route_map_line_track", entityId, "route_map_line_track", operatorIds, [track.lineId]);
+  }
   const transitRouteLineIds = new Map((pack.transitRoutes ?? []).map((route) => [route.id, route.lineId]));
   const transitRouteOperatorIds = new Map();
   for (const route of pack.transitRoutes ?? []) {
