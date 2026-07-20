@@ -97,10 +97,12 @@ test("source admission evidence envelope는 승인 필드 외 값을 거부하�
   assert.deepEqual(validateSchema(schema, inventory).errors, []);
 });
 
-test("inventory production 사용 승인은 topology 또는 schedule admission evidence를 요구한다", () => {
+test("inventory production 사용 승인은 domain별 admission evidence를 요구한다", () => {
   const schema = loadJson("contracts/datapack/source-inventory.schema.json");
   const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
-  const provenanceOnlySource = inventory.sources.find((source) => source.productionUseAllowed === false);
+  const admissionDomains = new Set(["route_graph_topology", "schedule_timetable", "station_line_membership"]);
+  const provenanceOnlySource = inventory.sources.find((source) => source.productionUseAllowed === false
+    && !source.coverageScope.sourceDomains.some((domain) => admissionDomains.has(domain)));
 
   assert.ok(provenanceOnlySource, "production 사용 금지 source fixture가 필요하다");
   assert.deepEqual(validateSchema(schema, inventory).errors, []);
@@ -137,6 +139,28 @@ test("production admission evidence는 coverage source domain과 일치해야 �
   assert.ok(errors.some((error) => error.includes("scheduleAdmissionEvidence: schedule_timetable source domain이 필요하다")));
 });
 
+test("membership production admission evidence는 domain과 production 승인을 함께 요구한다", () => {
+  const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const membershipSource = inventory.sources.find((source) => source.membershipAdmissionEvidence != null);
+  delete membershipSource.membershipAdmissionEvidence;
+
+  const missingErrors = [];
+  validateSourceInventory(inventory, "source-inventory.json", missingErrors);
+  assert.ok(missingErrors.some((error) => error.includes(
+    "station_line_membership production 승인은 membershipAdmissionEvidence가 필요하다",
+  )));
+
+  const freshInventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const mismatchedSource = freshInventory.sources.find((source) => source.membershipAdmissionEvidence != null);
+  mismatchedSource.coverageScope.sourceDomains = mismatchedSource.coverageScope.sourceDomains
+    .filter((domain) => domain !== "station_line_membership");
+  const mismatchedErrors = [];
+  validateSourceInventory(freshInventory, "source-inventory.json", mismatchedErrors);
+  assert.ok(mismatchedErrors.some((error) => error.includes(
+    "membershipAdmissionEvidence: station_line_membership source domain이 필요하다",
+  )));
+});
+
 test("source inventory semantic 검증은 schema-invalid sourceDomains에서 오류 수집을 중단하지 않는다", () => {
   assert.doesNotThrow(() => validateSourceInventory({
     sources: [{ coverageScope: { sourceDomains: 1 } }],
@@ -164,6 +188,18 @@ test("schedule admission evidence는 승인 필드 외 값을 거부한다", () 
 
   assert.ok(validateSchema(schema, inventory).errors.some((error) => (
     error.includes("scheduleAdmissionEvidence.serviceKey")
+  )));
+});
+
+test("membership admission evidence는 승인 필드 외 값을 거부한다", () => {
+  const schema = loadJson("contracts/datapack/source-inventory.schema.json");
+  const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const membershipSource = inventory.sources.find((source) => source.membershipAdmissionEvidence != null);
+
+  membershipSource.membershipAdmissionEvidence.serviceKey = "must-never-enter-contract";
+
+  assert.ok(validateSchema(schema, inventory).errors.some((error) => (
+    error.includes("membershipAdmissionEvidence.serviceKey")
   )));
 });
 
