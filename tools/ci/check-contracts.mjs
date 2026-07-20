@@ -87,14 +87,19 @@ export function validateSourceInventory(inventory, valuePath, errors) {
       ? source.coverageScope.sourceDomains : []);
     const requiresTopology = sourceDomains.has("route_graph_topology");
     const requiresSchedule = sourceDomains.has("schedule_timetable");
+    const requiresMembership = sourceDomains.has("station_line_membership");
     if (source.productionUseAllowed === true && requiresTopology && source.topologyAdmissionEvidence == null) {
       errors.push(`${path}.topologyAdmissionEvidence: route_graph_topology production 승인은 topologyAdmissionEvidence가 필요하다`);
     }
     if (source.productionUseAllowed === true && requiresSchedule && source.scheduleAdmissionEvidence == null) {
       errors.push(`${path}.scheduleAdmissionEvidence: schedule_timetable production 승인은 scheduleAdmissionEvidence가 필요하다`);
     }
-    if (source.productionUseAllowed === true && !requiresTopology && !requiresSchedule
-      && source.topologyAdmissionEvidence == null && source.scheduleAdmissionEvidence == null) {
+    if (source.productionUseAllowed === true && requiresMembership && source.membershipAdmissionEvidence == null) {
+      errors.push(`${path}.membershipAdmissionEvidence: station_line_membership production 승인은 membershipAdmissionEvidence가 필요하다`);
+    }
+    if (source.productionUseAllowed === true && !requiresTopology && !requiresSchedule && !requiresMembership
+      && source.topologyAdmissionEvidence == null && source.scheduleAdmissionEvidence == null
+      && source.membershipAdmissionEvidence == null) {
       errors.push(`${path}.productionUseAllowed: true는 production admission evidence가 필요하다`);
     }
     if (source.topologyAdmissionEvidence != null && !requiresTopology) {
@@ -103,11 +108,17 @@ export function validateSourceInventory(inventory, valuePath, errors) {
     if (source.scheduleAdmissionEvidence != null && !requiresSchedule) {
       errors.push(`${path}.scheduleAdmissionEvidence: schedule_timetable source domain이 필요하다`);
     }
+    if (source.membershipAdmissionEvidence != null && !requiresMembership) {
+      errors.push(`${path}.membershipAdmissionEvidence: station_line_membership source domain이 필요하다`);
+    }
     if (source.topologyAdmissionEvidence != null && source.productionUseAllowed !== true) {
       errors.push(`${path}.topologyAdmissionEvidence: productionUseAllowed true가 필요하다`);
     }
     if (source.scheduleAdmissionEvidence != null && source.productionUseAllowed !== true) {
       errors.push(`${path}.scheduleAdmissionEvidence: productionUseAllowed true가 필요하다`);
+    }
+    if (source.membershipAdmissionEvidence != null && source.productionUseAllowed !== true) {
+      errors.push(`${path}.membershipAdmissionEvidence: productionUseAllowed true가 필요하다`);
     }
   }
 }
