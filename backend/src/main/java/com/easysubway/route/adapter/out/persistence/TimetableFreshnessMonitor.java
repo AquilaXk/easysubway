@@ -33,6 +33,17 @@ import org.springframework.stereotype.Component;
  * 확인했다(2026-07-20 실측: infra prometheus/probe는 `/actuator/health/readiness`만 HTTP status로 확인하고,
  * admin의 {@code HealthCheckService}는 이 actuator 레지스트리와 무관한 별도 hand-rolled 상태다). 저장소 밖
  * alerting·대시보드에서 root status 문자열 동등 비교를 하는지는 별도 확인이 필요하다.
+ *
+ * <p><b>break-glass override({@code easysubway.timetable.freshness.break-glass})</b>는 {@code fresh_until}
+ * 축(시간 기반 만료)만 우회한다. {@code RouteV2Planner.search}의 {@code isFeedStale} 게이트({@code feed_end_date}가
+ * 검색일보다 과거면 {@code STALE_TIMETABLE} → 503)는 override와 무관하게 그대로 적용된다 — feed_end_date 이후
+ * 날짜에는 애초에 실제 trip이 없어 우회할 대상이 없으므로 의도된 동작이다. 즉 override를 켜도 만료된 snapshot의
+ * {@code feed_end_date}가 지난 날짜의 검색은 여전히 503이다.
+ *
+ * <p>이 override의 실효 감사 표면은 <b>WARN 로그와 {@code easysubway.timetable.snapshot.break-glass} gauge</b>다.
+ * {@code health()}가 반환하는 {@code breakGlass}/{@code breakGlassReason} detail은 참고용이며,
+ * {@code management.endpoint.health.show-details} 기본값({@code never})에서는 {@code /actuator/health} 응답에
+ * 노출되지 않는다. 노출을 원하면 별도로 {@code show-details: when-authorized}를 검토해야 한다(이 변경 범위 밖).
  */
 @Component
 @Profile("prod | staging | release | prod-like")
@@ -75,7 +86,9 @@ class TimetableFreshnessMonitor implements HealthIndicator {
 		this.breakGlass = breakGlass;
 		this.breakGlassReason = breakGlassReason == null || breakGlassReason.isBlank()
 			? UNSPECIFIED_REASON
-			: breakGlassReason.strip();
+			// 감사 문자열이 WARN 로그·health detail에 그대로 들어가므로, 앞뒤 공백 제거뿐 아니라 내부 제어문자
+			// (CR/LF 포함)도 공백으로 치환해 가짜 로그 라인 삽입을 차단한다.
+			: breakGlassReason.strip().replaceAll("\\p{Cntrl}+", " ");
 		Gauge.builder("easysubway.timetable.snapshot.fresh", state, current -> current.get().fresh() ? 1.0 : 0.0)
 			.description("Active timetable snapshot freshness: 1 when fresh, 0 when stale, absent, or unknown")
 			.register(meterRegistry);

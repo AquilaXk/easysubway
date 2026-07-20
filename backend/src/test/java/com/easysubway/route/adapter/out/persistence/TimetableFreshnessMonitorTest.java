@@ -280,6 +280,28 @@ class TimetableFreshnessMonitorTest {
 	}
 
 	@Test
+	void breakGlassReasonControlCharactersAreNormalizedToPreventLogForging() {
+		insertActiveSnapshot(FRESH_UNTIL);
+		MeterRegistry meterRegistry = new SimpleMeterRegistry();
+		// 내부 개행·제어문자가 있는 사유값(가짜 로그 라인 삽입 시도)이 공백으로 치환되는지 확인한다.
+		TimetableFreshnessMonitor monitor = breakGlassMonitor(
+			AFTER, meterRegistry, "ops-jdoe\r\nWARN forged line\tinjected");
+
+		monitor.evaluate();
+
+		assertThat(monitor.health().getDetails())
+			.extracting("breakGlassReason")
+			.isEqualTo("ops-jdoe WARN forged line injected");
+		assertThat(logAppender.events()).anySatisfy(event -> {
+			assertThat(event.getLevel()).isEqualTo(Level.WARN);
+			assertThat(event.getMessage().getFormattedMessage())
+				.doesNotContain("\r")
+				.doesNotContain("\n")
+				.contains("ops-jdoe WARN forged line injected");
+		});
+	}
+
+	@Test
 	void breakGlassBlankReasonIsNormalizedInAudit() {
 		insertActiveSnapshot(FRESH_UNTIL);
 		MeterRegistry meterRegistry = new SimpleMeterRegistry();
