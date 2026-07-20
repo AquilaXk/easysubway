@@ -1,8 +1,10 @@
 package com.easysubway.admin.authorization.adapter.out.persistence;
 
 import com.easysubway.admin.authorization.AdminPermission;
+import com.easysubway.admin.authorization.AdminRbacRole;
 import com.easysubway.admin.authorization.application.port.out.AdminRbacAuthorityRepository;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,6 +34,21 @@ public class InMemoryAdminRbacAuthorityRepository implements AdminRbacAuthorityR
 			throw new IllegalArgumentException("선언되지 않은 관리자 permission authority가 포함되어 있습니다.");
 		}
 		authoritiesByLoginId.put(normalize(loginId), assignedAuthorities);
+	}
+
+	@Override
+	public void seedRole(String loginId, AdminRbacRole role) {
+		if (role == null) {
+			return;
+		}
+		Set<String> roleAuthorities = role.permissions().stream()
+			.map(AdminPermission::authority)
+			.collect(Collectors.toUnmodifiableSet());
+		authoritiesByLoginId.merge(normalize(loginId), roleAuthorities, (existing, added) -> {
+			var union = new HashSet<>(existing);
+			union.addAll(added);
+			return Set.copyOf(union);
+		});
 	}
 
 	private static String normalize(String loginId) {

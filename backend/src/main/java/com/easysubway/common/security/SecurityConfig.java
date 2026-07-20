@@ -1,6 +1,7 @@
 package com.easysubway.common.security;
 
 import com.easysubway.admin.authorization.AdminPermission;
+import com.easysubway.admin.authorization.AdminRbacRole;
 import com.easysubway.admin.audit.application.port.out.AdminAuditEventRepository;
 import com.easysubway.admin.authorization.application.port.out.AdminRbacAuthorityRepository;
 import com.easysubway.admin.identity.application.port.out.AdminIdentityRepository;
@@ -467,7 +468,8 @@ public class SecurityConfig {
 		LocalDateTime now = LocalDateTime.now(Clock.systemUTC());
 		Set<String> activeBootstrapLoginIds = new LinkedHashSet<>();
 		if (!adminUsername.isBlank() && !adminPassword.isBlank()) {
-			activeBootstrapLoginIds.add(normalizeLoginId(adminUsername));
+			String adminLoginId = normalizeLoginId(adminUsername);
+			activeBootstrapLoginIds.add(adminLoginId);
 			bootstrapIdentity(adminIdentityRepository, passwordEncoder, adminPassword, localIdentity(
 				adminUsername,
 				"관리자",
@@ -475,6 +477,9 @@ public class SecurityConfig {
 				AdminIdentityRole.ADMIN,
 				now
 			), now);
+			// env로 지정된 관리자 계정은 이미 영속돼 있어도(비밀번호 동일 no-op 경로 포함)
+			// RBAC SUPER_ADMIN role 할당을 보증해 미배정 403을 해소한다. 멱등 seed다.
+			adminRbacAuthorityRepository.seedRole(adminLoginId, AdminRbacRole.SUPER_ADMIN);
 		}
 		if (!operatorUsername.isBlank() && !operatorPassword.isBlank()) {
 			activeBootstrapLoginIds.add(normalizeLoginId(operatorUsername));
