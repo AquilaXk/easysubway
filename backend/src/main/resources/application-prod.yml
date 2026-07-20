@@ -88,6 +88,14 @@ easysubway:
     seed:
       enabled: ${EASYSUBWAY_TIMETABLE_SEED_ENABLED:false}
       includes-itx: ${EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX:false}
+    freshness:
+      # break-glass override: 만료된 timetable snapshot을 명시적 운영 결정으로 한시 서빙한다(기본 false).
+      # 활성화 시 기동·주기 WARN 로그, actuator health detail, break-glass 메트릭으로 우회가 관측되며,
+      # 무결성(해시·스키마·출처) 검증은 우회되지 않는다 — 시간 기반 만료만 우회한다.
+      # 사용 후에는 fresh snapshot이 admit되는 즉시 반드시 비활성으로 되돌린다.
+      break-glass: ${EASYSUBWAY_TIMETABLE_FRESHNESS_BREAK_GLASS:false}
+      # 활성 사유·활성화 주체 감사 문맥(로그·health detail에 그대로 노출된다). 활성 시 채우기를 권장한다.
+      break-glass-reason: ${EASYSUBWAY_TIMETABLE_FRESHNESS_BREAK_GLASS_REASON:}
   route-v2:
     origin-secret: ${EASYSUBWAY_ROUTE_V2_ORIGIN_SECRET:}
     session-max-requests: ${EASYSUBWAY_ROUTE_V2_SESSION_MAX_REQUESTS:50}

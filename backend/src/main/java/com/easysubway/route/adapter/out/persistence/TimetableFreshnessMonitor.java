@@ -11,6 +11,7 @@ import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.boot.actuate.health.Status;
@@ -39,21 +40,50 @@ class TimetableFreshnessMonitor implements HealthIndicator {
 
 	static final Status STALE = new Status("STALE");
 	private static final Logger log = LoggerFactory.getLogger(TimetableFreshnessMonitor.class);
+	private static final String UNSPECIFIED_REASON = "(unspecified)";
 
 	private final JdbcTemplate jdbcTemplate;
 	private final Clock clock;
+	// break-glass override 활성 여부와 감사 문맥(활성 사유·주체). freshness 판정 자체는 바꾸지 않고 관측만 얹는다.
+	private final boolean breakGlass;
+	private final String breakGlassReason;
 	private final AtomicReference<Freshness> state = new AtomicReference<>(Freshness.unknown());
 
 	@Autowired
-	TimetableFreshnessMonitor(DataSource dataSource, MeterRegistry meterRegistry) {
-		this(new JdbcTemplate(dataSource), Clock.systemUTC(), meterRegistry);
+	TimetableFreshnessMonitor(
+		DataSource dataSource,
+		MeterRegistry meterRegistry,
+		@Value("${easysubway.timetable.freshness.break-glass:false}") boolean breakGlass,
+		@Value("${easysubway.timetable.freshness.break-glass-reason:}") String breakGlassReason
+	) {
+		this(new JdbcTemplate(dataSource), Clock.systemUTC(), meterRegistry, breakGlass, breakGlassReason);
 	}
 
 	TimetableFreshnessMonitor(JdbcTemplate jdbcTemplate, Clock clock, MeterRegistry meterRegistry) {
+		this(jdbcTemplate, clock, meterRegistry, false, "");
+	}
+
+	TimetableFreshnessMonitor(
+		JdbcTemplate jdbcTemplate,
+		Clock clock,
+		MeterRegistry meterRegistry,
+		boolean breakGlass,
+		String breakGlassReason
+	) {
 		this.jdbcTemplate = jdbcTemplate;
 		this.clock = clock;
+		this.breakGlass = breakGlass;
+		this.breakGlassReason = breakGlassReason == null || breakGlassReason.isBlank()
+			? UNSPECIFIED_REASON
+			: breakGlassReason.strip();
 		Gauge.builder("easysubway.timetable.snapshot.fresh", state, current -> current.get().fresh() ? 1.0 : 0.0)
 			.description("Active timetable snapshot freshness: 1 when fresh, 0 when stale, absent, or unknown")
+			.register(meterRegistry);
+		boolean overrideEnabled = breakGlass;
+		Gauge.builder("easysubway.timetable.snapshot.break-glass", state, current -> overrideEnabled ? 1.0 : 0.0)
+			.description(
+				"Timetable freshness break-glass override: 1 when enabled (expired snapshots served without "
+					+ "freshness gating; integrity still enforced), 0 otherwise")
 			.register(meterRegistry);
 	}
 
@@ -61,6 +91,14 @@ class TimetableFreshnessMonitor implements HealthIndicator {
 	// ApplicationReadyEvent는 ApplicationRunner(TimetableSeedLoader 포함)까지 끝난 뒤 발생해 활성화 순서가 보장된다.
 	@EventListener(ApplicationReadyEvent.class)
 	void evaluateOnStartup() {
+		if (breakGlass) {
+			log.warn(
+				"TIMETABLE FRESHNESS BREAK-GLASS OVERRIDE ENABLED (reason={}): expired timetable snapshots will be "
+					+ "served without freshness gating. Integrity verification (hash/schema/lineage) is NOT bypassed. "
+					+ "Disable easysubway.timetable.freshness.break-glass once a fresh snapshot is admitted.",
+				breakGlassReason
+			);
+		}
 		evaluate();
 	}
 
@@ -80,12 +118,20 @@ class TimetableFreshnessMonitor implements HealthIndicator {
 		}
 		state.set(observed);
 		logTransition(previous, observed);
+		if (breakGlass && observed.state() == State.STALE) {
+			// 우회가 은폐되지 않도록 만료 snapshot을 실제로 서빙하는 동안 주기마다 강한 WARN을 남긴다.
+			log.warn(
+				"break-glass override active: serving EXPIRED timetable snapshot {} (fresh_until={}, reason={}); "
+					+ "route search bypasses freshness gating while integrity checks remain enforced",
+				observed.snapshotId(), observed.freshUntil(), breakGlassReason
+			);
+		}
 	}
 
 	@Override
 	public Health health() {
 		Freshness current = state.get();
-		return switch (current.state()) {
+		Health base = switch (current.state()) {
 			case FRESH -> Health.up()
 				.withDetail("state", "FRESH")
 				.withDetail("snapshotId", current.snapshotId())
@@ -105,6 +151,19 @@ class TimetableFreshnessMonitor implements HealthIndicator {
 				.withDetail("reason", "freshness query failed; see application logs")
 				.build();
 		};
+		if (!breakGlass) {
+			return base;
+		}
+		// override 활성 시 "우회 중"이 health detail에도 드러나도록 감사 정보를 얹는다. STALE일 때는 만료 데이터를
+		// 실제로 서빙 중이므로 reason을 override 문맥으로 덮어쓴다.
+		Health.Builder builder = Health.status(base.getStatus());
+		base.getDetails().forEach(builder::withDetail);
+		builder.withDetail("breakGlass", true).withDetail("breakGlassReason", breakGlassReason);
+		if (current.state() == State.STALE) {
+			builder.withDetail("reason",
+				"break-glass override active: expired snapshot is being served (integrity still verified)");
+		}
+		return builder.build();
 	}
 
 	/** 쿼리 성공 시 관측 결과를, 실패 시 {@code null}을 반환한다(호출부가 이전 상태 유지 여부를 결정한다). */
