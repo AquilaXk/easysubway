@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import '../../stations/domain/station_line.dart' show stationLineColor;
 import '../domain/map_camera.dart';
 import '../domain/route_map_design_space.dart';
+import '../domain/route_map_owner_labels.dart';
 import '../domain/route_map_parallel_offsets.dart';
 import '../domain/structured_route_map.dart';
 import 'route_map_label_layout.dart';
@@ -77,6 +78,99 @@ const TextStyle _badgeStyle = TextStyle(
   fontSize: kRouteMapDesignBadgeFontPx,
   fontWeight: FontWeight.w700,
 );
+
+/// #2068: basemap 라벨 전용 폰트 family. 오너 SVG(Pretendard)와 동일 자폭으로
+/// 렌더해야 오너가 손배치한 라벨이 겹침 없이 그대로 성립한다(pubspec.yaml에
+/// weight 400/600/700 번들). 기본 모드(구조화 노선도)는 시스템 폰트를 유지한다.
+const String _basemapLabelFontFamily = 'Pretendard';
+
+/// #2068 9차: 라벨별 font-size(오너 매치는 오너 SVG 크기, 폴백은 권역 중앙값
+/// 또는 기본 13px)로 스타일을 만든다. 색·굵기는 [_labelStyle]/[_boldLabelStyle]
+/// 과 동일 — fontSize만 다르게 오버라이드한다.
+///
+/// [basemap]이 true면 오너 SVG와 동일한 Pretendard로 렌더한다(#2068). SVG
+/// font-weight 매핑: ordinary=400(Regular), transfer=600(SemiBold). 오너 SVG의
+/// terminal은 700이지만 [bold] 불리언은 transfer(600)와 terminal(700)을 구분하지
+/// 못하므로, 대다수인 transfer(600)에 맞춰 bold를 600으로 그린다 — 소수 terminal
+/// 라벨은 600<700이라 SVG(700) 배치가 비워둔 영역의 부분집합이 되어 겹침을
+/// 만들지 않는다(수학적으로 안전한 방향). 기본 모드는 기존 굵기(500/700)·시스템
+/// 폰트를 그대로 유지한다.
+TextStyle _labelStyleFor({
+  required bool bold,
+  required double fontSizePx,
+  required bool basemap,
+}) {
+  final base = (bold ? _boldLabelStyle : _labelStyle).copyWith(
+    fontSize: fontSizePx,
+  );
+  if (!basemap) {
+    return base;
+  }
+  return base.copyWith(
+    fontFamily: _basemapLabelFontFamily,
+    fontWeight: bold ? FontWeight.w600 : FontWeight.w400,
+  );
+}
+
+/// #2068 9차: 뱃지 font-size(basemap은 권역 오너 라벨 중앙값, 기본 모드는
+/// [kRouteMapDesignBadgeFontPx] 불변)로 스타일을 만든다. [basemap]이 true면
+/// 라벨과 같은 Pretendard로 그린다(굵기는 기존 700 유지).
+TextStyle _badgeStyleFor({required double fontSizePx, required bool basemap}) {
+  final base = _badgeStyle.copyWith(fontSize: fontSizePx);
+  if (!basemap) {
+    return base;
+  }
+  return base.copyWith(fontFamily: _basemapLabelFontFamily);
+}
+
+/// #2068: 솔버 시드 rect와 렌더가 정확히 같은 폰트 메트릭을 쓰도록, 라벨 실측을
+/// [_labelStyleFor]를 통해 단일화한다. [StructuredRouteMapView]와 게이트 테스트가
+/// 공유한다 — 테스트가 이 함수로 실측하면 앱과 100% 동일한(Pretendard 포함) 폭을
+/// 얻는다(테스트는 FontLoader로 Pretendard를 미리 로드해야 실메트릭이 나온다).
+@visibleForTesting
+Size measureRouteMapLabel(
+  String text, {
+  required bool bold,
+  required double fontSize,
+  required bool basemap,
+}) {
+  final painter = TextPainter(
+    text: TextSpan(
+      text: text,
+      style: _labelStyleFor(bold: bold, fontSizePx: fontSize, basemap: basemap),
+    ),
+    textDirection: TextDirection.ltr,
+    maxLines: 1,
+  )..layout();
+  final size = painter.size;
+  painter.dispose();
+  return size;
+}
+
+/// #2068: 뱃지 pill 실측(폭 = max(최소지름, 텍스트폭+좌우패딩), 높이 = 최소지름).
+/// pill 기하는 fontSize와 무관하게 불변 — 텍스트 크기만 통일한다(#2068 9차).
+@visibleForTesting
+Size measureRouteMapBadge(
+  String text, {
+  required double fontSize,
+  required bool basemap,
+}) {
+  final painter = TextPainter(
+    text: TextSpan(
+      text: text,
+      style: _badgeStyleFor(fontSizePx: fontSize, basemap: basemap),
+    ),
+    textDirection: TextDirection.ltr,
+    maxLines: 1,
+  )..layout();
+  final size = Size(
+    math.max(kRouteMapDesignBadgeRadiusPx * 2, painter.size.width + 10),
+    kRouteMapDesignBadgeRadiusPx * 2,
+  );
+  painter.dispose();
+  return size;
+}
+
 const TextStyle _attributionStyle = TextStyle(
   color: Color(0xFF466467),
   fontSize: 10,
@@ -154,96 +248,131 @@ ui.Picture recordRouteMapPicture({
   required RouteMapStaticLabelLayout layout,
   required Map<String, Color> lineColors,
   required Map<String, List<List<Offset>>> lineOffsets,
+  bool drawLines = true,
+  bool drawStationSymbols = true,
 }) {
   final recorder = ui.PictureRecorder();
   final canvas = Canvas(recorder);
-  final linePaint = Paint()
-    ..style = PaintingStyle.stroke
-    ..strokeWidth = kRouteMapDesignLineWidthPx
-    ..strokeJoin = StrokeJoin.round
-    ..strokeCap = StrokeCap.round
-    ..isAntiAlias = true;
+  if (drawLines) {
+    final linePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = kRouteMapDesignLineWidthPx
+      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.round
+      ..isAntiAlias = true;
 
-  // 1) 선: 정점을 design으로 투영 + G4 평행 오프셋(design px 그대로 적용).
-  for (final line in map.lines) {
-    linePaint.color = lineColors[line.lineId] ?? _fallbackLineColor;
-    final offsetsByPolyline = lineOffsets[line.lineId];
-    for (var p = 0; p < line.polylines.length; p += 1) {
-      final polyline = line.polylines[p];
-      if (polyline.isEmpty) continue;
-      final vertexOffsets =
-          offsetsByPolyline != null && p < offsetsByPolyline.length
-          ? offsetsByPolyline[p]
-          : null;
-      final path = Path();
-      for (var v = 0; v < polyline.length; v += 1) {
-        var point = design.toDesign(polyline[v]);
-        if (vertexOffsets != null && v < vertexOffsets.length) {
-          point += vertexOffsets[v] * kRouteMapDesignLineWidthPx;
+    // 1) 선: 정점을 design으로 투영 + G4 평행 오프셋(design px 그대로 적용).
+    for (final line in map.lines) {
+      linePaint.color = lineColors[line.lineId] ?? _fallbackLineColor;
+      final offsetsByPolyline = lineOffsets[line.lineId];
+      for (var p = 0; p < line.polylines.length; p += 1) {
+        final polyline = line.polylines[p];
+        if (polyline.isEmpty) continue;
+        final vertexOffsets =
+            offsetsByPolyline != null && p < offsetsByPolyline.length
+            ? offsetsByPolyline[p]
+            : null;
+        final path = Path();
+        for (var v = 0; v < polyline.length; v += 1) {
+          var point = design.toDesign(polyline[v]);
+          if (vertexOffsets != null && v < vertexOffsets.length) {
+            point += vertexOffsets[v] * kRouteMapDesignLineWidthPx;
+          }
+          v == 0
+              ? path.moveTo(point.dx, point.dy)
+              : path.lineTo(point.dx, point.dy);
         }
-        v == 0
-            ? path.moveTo(point.dx, point.dy)
-            : path.lineTo(point.dx, point.dy);
+        canvas.drawPath(path, linePaint);
       }
-      canvas.drawPath(path, linePaint);
     }
   }
 
-  // 2) 일반역 노드(흰 채움 + 노선색 테두리) — 상시 표시(스펙 S5).
-  for (final station in map.stations) {
-    if (station.labelClass == RouteMapLabelClass.transfer) continue;
-    final center = design.toDesign(station.position);
-    canvas.drawCircle(
-      center,
-      kRouteMapDesignStationRadiusPx,
-      _regularStationFillPaint,
-    );
-    _regularStationBorderPaint.color =
-        lineColors[station.lineId] ?? _fallbackLineColor;
-    canvas.drawCircle(
-      center,
-      kRouteMapDesignStationRadiusPx,
-      _regularStationBorderPaint,
-    );
-  }
+  if (drawStationSymbols) {
+    // 2) 일반역 노드(흰 채움 + 노선색 테두리) — 상시 표시(스펙 S5).
+    for (final station in map.stations) {
+      if (station.labelClass == RouteMapLabelClass.transfer) continue;
+      final center = design.toDesign(station.position);
+      canvas.drawCircle(
+        center,
+        kRouteMapDesignStationRadiusPx,
+        _regularStationFillPaint,
+      );
+      _regularStationBorderPaint.color =
+          lineColors[station.lineId] ?? _fallbackLineColor;
+      canvas.drawCircle(
+        center,
+        kRouteMapDesignStationRadiusPx,
+        _regularStationBorderPaint,
+      );
+    }
 
-  // 3) 환승 캡슐 — 기존 routeMapTransferMarkers를 design 좌표로 호출.
-  for (final group in map.transferGroups) {
-    final markers = routeMapTransferMarkers(
-      memberCenters: [
-        for (final p in group.memberPositions) design.toDesign(p),
-      ],
-      colors: [
-        for (final id in group.lineIds) lineColors[id] ?? _fallbackLineColor,
-      ],
-      designSpread:
-          offsetsMaxPairwiseDistance(group.memberPositions) *
-          design.designScale,
-      dotRadius: kRouteMapTransferDotRadiusPx,
-      dotGap: kRouteMapTransferDotGapPx,
-      padding: kRouteMapTransferDotPaddingPx,
-      horizontalDots: _transferDotsHorizontal(map, group, design),
-    );
-    for (final marker in markers) {
-      canvas.drawRRect(marker.capsule, _transferFillPaint);
-      canvas.drawRRect(marker.capsule, _transferBorderPaint);
-      for (final dot in marker.dots) {
-        _transferDotPaint.color = dot.color;
-        canvas.drawCircle(
-          dot.center,
-          kRouteMapTransferDotRadiusPx,
-          _transferDotPaint,
-        );
+    // 3) 환승 캡슐 — 기존 routeMapTransferMarkers를 design 좌표로 호출.
+    for (final group in map.transferGroups) {
+      final markers = routeMapTransferMarkers(
+        memberCenters: [
+          for (final p in group.memberPositions) design.toDesign(p),
+        ],
+        colors: [
+          for (final id in group.lineIds) lineColors[id] ?? _fallbackLineColor,
+        ],
+        designSpread:
+            offsetsMaxPairwiseDistance(group.memberPositions) *
+            design.designScale,
+        dotRadius: kRouteMapTransferDotRadiusPx,
+        dotGap: kRouteMapTransferDotGapPx,
+        padding: kRouteMapTransferDotPaddingPx,
+        horizontalDots: _transferDotsHorizontal(map, group, design),
+      );
+      for (final marker in markers) {
+        canvas.drawRRect(marker.capsule, _transferFillPaint);
+        canvas.drawRRect(marker.capsule, _transferBorderPaint);
+        for (final dot in marker.dots) {
+          _transferDotPaint.color = dot.color;
+          canvas.drawCircle(
+            dot.center,
+            kRouteMapTransferDotRadiusPx,
+            _transferDotPaint,
+          );
+        }
       }
     }
   }
 
   // 4) 역명 라벨(볼드=환승·종착) — 녹화 시에만 TextPainter 생성·즉시 dispose.
+  // #2068 9차: label.fontSizePx로 그린다(오너 매치는 오너 SVG 크기 그대로).
+  // basemap 모드(역 심벌 미렌더)는 오너 SVG와 동일한 Pretendard로 그린다(#2068).
+  // #2068 다줄 라벨 렌더: label.lines가 있으면(오너 SVG가 2줄 이상으로 나눈
+  // 라벨) 줄마다 자기 rect에 독립적으로 그린다 — 없으면(대다수) 기존처럼
+  // label.text 하나를 label.rect에 그린다.
+  final basemap = !drawStationSymbols;
   for (final label in layout.labels) {
+    if (label.lines.isNotEmpty) {
+      for (final line in label.lines) {
+        final linePainter = TextPainter(
+          text: TextSpan(
+            text: line.text,
+            style: _labelStyleFor(
+              bold: label.bold,
+              fontSizePx: label.fontSizePx,
+              basemap: basemap,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+          maxLines: 1,
+        )..layout();
+        linePainter.paint(canvas, line.rect.topLeft);
+        linePainter.dispose();
+      }
+      continue;
+    }
     final painter = TextPainter(
       text: TextSpan(
         text: label.text,
-        style: label.bold ? _boldLabelStyle : _labelStyle,
+        style: _labelStyleFor(
+          bold: label.bold,
+          fontSizePx: label.fontSizePx,
+          basemap: basemap,
+        ),
       ),
       textDirection: TextDirection.ltr,
       maxLines: 1,
@@ -252,7 +381,7 @@ ui.Picture recordRouteMapPicture({
     painter.dispose();
   }
 
-  // 5) 노선 뱃지 pill.
+  // 5) 노선 뱃지 pill. #2068 9차: badge.fontSizePx로 그린다.
   final badgeFill = Paint()
     ..style = PaintingStyle.fill
     ..isAntiAlias = true;
@@ -266,7 +395,10 @@ ui.Picture recordRouteMapPicture({
       badgeFill,
     );
     final painter = TextPainter(
-      text: TextSpan(text: badge.label, style: _badgeStyle),
+      text: TextSpan(
+        text: badge.label,
+        style: _badgeStyleFor(fontSizePx: badge.fontSizePx, basemap: basemap),
+      ),
       textDirection: TextDirection.ltr,
       maxLines: 1,
     )..layout();
@@ -375,8 +507,13 @@ class StructuredRouteMapView extends StatefulWidget {
     required this.lineColors,
     this.labelTextByStationId = const {},
     this.lineBadgeLabelByLineId = const {},
+    this.drawLines = true,
+    this.drawStationSymbols = true,
     this.sourceOrigin = Offset.zero,
     this.attributionText,
+    this.ownerLabelsByStationName = const {},
+    this.stationNameByStationId = const {},
+    this.ownerLabelMaxAnchorDistancePx = kRouteMapOwnerLabelMaxAnchorDistancePx,
     super.key,
   });
 
@@ -385,6 +522,8 @@ class StructuredRouteMapView extends StatefulWidget {
   final Map<String, Color> lineColors;
   final Map<String, String> labelTextByStationId;
   final Map<String, String> lineBadgeLabelByLineId;
+  final bool drawLines;
+  final bool drawStationSymbols;
 
   /// 오버레이·카메라의 geometry origin. Picture 재생을 origin-뺀 공간으로 맞춰
   /// 캔버스와 오버레이 좌표계를 일치시킨다(#1970).
@@ -392,12 +531,28 @@ class StructuredRouteMapView extends StatefulWidget {
 
   final String? attributionText;
 
+  /// basemap 6차(#2068): 오너 SVG 라벨 sidecar(현재 region분). 빈 맵이면
+  /// 미보유·로드전으로 취급해 4차 자동 솔버로 전부 폴백한다(fail-safe).
+  final Map<String, List<RouteMapOwnerLabelEntry>> ownerLabelsByStationName;
+
+  /// stationId → 원본 nameKo(축약 전). ownerLabelsByStationName 매칭 키.
+  final Map<String, String> stationNameByStationId;
+
+  /// #2068 부산 라벨 지오메트리 튜닝 라운드: 오너 라벨↔후보 위치 게이트(design
+  /// px). 기본값은 seoul 캘리브레이션(185.0) 그대로 — 넘기지 않는 기존
+  /// 호출부는 동작 불변. 부산은 designScale이 작고 밀집 회랑에서 라벨을
+  /// 자기 노드로부터 상대적으로 멀리 그리는 화풍이라 region별 값이 필요하다.
+  final double ownerLabelMaxAnchorDistancePx;
+
   @override
   State<StructuredRouteMapView> createState() => _StructuredRouteMapViewState();
 }
 
 class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
   StructuredRouteMap? _sourceMap;
+  bool? _drawLines;
+  bool? _drawStationSymbols;
+  Map<String, List<RouteMapOwnerLabelEntry>>? _ownerLabelsByStationName;
   RouteMapDesignSpace? _design;
   ui.Picture? _picture;
   // attribution TextPainter는 region(텍스트) 변경 시에만 재생성한다. 매 pan 프레임의
@@ -406,38 +561,39 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
   String? _attributionPainterText;
 
   void _ensurePicture() {
-    if (identical(_sourceMap, widget.map) && _picture != null) {
+    if (identical(_sourceMap, widget.map) &&
+        _drawLines == widget.drawLines &&
+        _drawStationSymbols == widget.drawStationSymbols &&
+        identical(_ownerLabelsByStationName, widget.ownerLabelsByStationName) &&
+        _picture != null) {
       return;
     }
     _picture?.dispose();
     _sourceMap = widget.map;
+    _drawLines = widget.drawLines;
+    _drawStationSymbols = widget.drawStationSymbols;
+    _ownerLabelsByStationName = widget.ownerLabelsByStationName;
     final design = routeMapDesignSpaceFor(widget.map);
     _design = design;
-    Size measureLabel(String text, {required bool bold}) {
-      final painter = TextPainter(
-        text: TextSpan(text: text, style: bold ? _boldLabelStyle : _labelStyle),
-        textDirection: TextDirection.ltr,
-        maxLines: 1,
-      )..layout();
-      final size = painter.size;
-      painter.dispose();
-      return size;
-    }
+    // #2068 9차: fontSize를 인자로 받아 라벨별(오너 매치=오너 크기, 폴백=권역
+    // 중앙값/기본 13px) 다른 크기로 실측한다 — 솔버 시드 rect와 렌더가 같은
+    // 크기를 쓰도록 반드시 이 인자로 측정해야 한다. basemap 모드는 오너 SVG와
+    // 동일한 Pretendard로 실측·렌더한다(#2068) — 실측·렌더가 [measureRouteMapLabel]
+    // /[_labelStyleFor]로 단일화돼 게이트 테스트와도 동일 메트릭을 공유한다.
+    final basemap = !widget.drawStationSymbols;
+    Size measureLabel(
+      String text, {
+      required bool bold,
+      required double fontSize,
+    }) => measureRouteMapLabel(
+      text,
+      bold: bold,
+      fontSize: fontSize,
+      basemap: basemap,
+    );
 
-    Size measureBadge(String text) {
-      final painter = TextPainter(
-        text: TextSpan(text: text, style: _badgeStyle),
-        textDirection: TextDirection.ltr,
-        maxLines: 1,
-      )..layout();
-      // pill 좌우 패딩 5px + 최소 지름 유지(기존 뱃지 규칙).
-      final size = Size(
-        math.max(kRouteMapDesignBadgeRadiusPx * 2, painter.size.width + 10),
-        kRouteMapDesignBadgeRadiusPx * 2,
-      );
-      painter.dispose();
-      return size;
-    }
+    Size measureBadge(String text, {required double fontSize}) =>
+        measureRouteMapBadge(text, fontSize: fontSize, basemap: basemap);
 
     final layout = solveRouteMapLabelLayout(
       map: widget.map,
@@ -446,6 +602,21 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
       badgeLabelByLineId: widget.lineBadgeLabelByLineId,
       measureLabel: measureLabel,
       measureBadge: measureBadge,
+      // 바탕층 모드(역 심벌 미렌더)에서는 화면 캡슐이 오너 SVG 것이라 실측
+      // 반폭이 크다 — 라벨 장애물·anchorPadding을 그 크기로 부풀린다(#2068).
+      basemap: !widget.drawStationSymbols,
+      // basemap 6차: 오너 SVG 라벨 앵커 sidecar(로드 전·express 모드는 빈 맵 →
+      // 4차 자동 솔버로 전부 폴백, fail-safe).
+      ownerLabelsByStationName: widget.ownerLabelsByStationName,
+      stationNameByStationId: widget.stationNameByStationId,
+      // #2068 광주 2차: sidecar 엔트리 중 하나라도 종점 호선 마크 플래그를
+      // 가지면(=이 region의 오너 SVG가 자체 종점 배지를 그림) 앱 솔버의
+      // 노선 뱃지 pill 후보를 억제한다(network_map.dart 변경 없이, 이미
+      // 통과하는 ownerLabelsByStationName만으로 도출).
+      suppressLineBadges: widget.ownerLabelsByStationName.values
+          .expand((entries) => entries)
+          .any((entry) => entry.hasLineTerminalBadge),
+      ownerLabelMaxAnchorDistancePx: widget.ownerLabelMaxAnchorDistancePx,
     );
     _picture = recordRouteMapPicture(
       map: widget.map,
@@ -453,6 +624,8 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
       layout: layout,
       lineColors: widget.lineColors,
       lineOffsets: routeMapParallelLineOffsets(widget.map.lines),
+      drawLines: widget.drawLines,
+      drawStationSymbols: widget.drawStationSymbols,
     );
   }
 

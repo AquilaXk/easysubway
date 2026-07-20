@@ -84,6 +84,54 @@ void main() {
       expect(map.lines.single.polylines, hasLength(1));
     });
 
+    test('거의 닫힌 순환 track은 시작점을 이어붙여 폐합한다 (#2068)', () {
+      // 시작-끝 간격(38.2)이 자기 bbox 대각선(813.8)의 0.25 미만 → 폐합 대상
+      // (수도권 2호선 track0 실측 비율 0.047 재현).
+      final map = buildStructuredRouteMap(
+        const [],
+        lineTracks: const [
+          RouteMapLineTrackInput(
+            lineId: 'loop-line',
+            paths: [
+              'M 1061.05 830.001 L 700 500 L 700 1100 L 1099.267 830.003',
+            ],
+          ),
+        ],
+      );
+      final poly = map.lines.single.polylines.single;
+      expect(poly.length, 5); // 원 4정점 + 폐합점.
+      expect(poly.last, poly.first);
+      expect(poly.first, const Offset(1061.05, 830.001));
+    });
+
+    test('시작-끝이 이미 같은 폐곡선은 그대로 둔다 (중복 폐합 방지)', () {
+      final map = buildStructuredRouteMap(
+        const [],
+        lineTracks: const [
+          RouteMapLineTrackInput(
+            lineId: 'closed-line',
+            paths: ['M 0 0 L 10 0 L 10 10 L 0 0'],
+          ),
+        ],
+      );
+      expect(map.lines.single.polylines.single, hasLength(4));
+    });
+
+    test('열린 선형(비순환) track은 폐합하지 않는다 — 시작-끝 간격이 규모에 비례', () {
+      // 수도권 6호선 실측 비율(0.918)류: 시작-끝 간격이 bbox 대각선의 상당
+      // 비율 — 순환 폐합 후보가 아니다.
+      final map = buildStructuredRouteMap(
+        const [],
+        lineTracks: const [
+          RouteMapLineTrackInput(
+            lineId: 'linear-line',
+            paths: ['M 0 0 L 50 50 L 100 0'],
+          ),
+        ],
+      );
+      expect(map.lines.single.polylines.single, hasLength(3));
+    });
+
     test('역이 있어도 track이 없는 노선은 빈 polylines', () {
       final map = buildStructuredRouteMap([
         input(stationId: 's1', lineId: 'line-a', sequence: 1),

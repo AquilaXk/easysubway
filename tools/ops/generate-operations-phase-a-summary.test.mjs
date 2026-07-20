@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -49,6 +51,19 @@ function markFixedReleaseRevalidated(gate) {
     gate.latestQaEvidenceSummary.remainingExternalBlockers.filter(
       (item) => item !== "fixed-release-rehearsal-after-node24-runtime-change",
     );
+  // #2068: 실 게이트의 pubspec.yaml 핀은 중단(superseded)된 RC에 의도적으로
+  // 고정돼 있어 live 해시와 불일치한다(repository-contract 계약). fixed-release
+  // 절차를 재검증한 상태를 시뮬레이션하려면 바뀐 파일(pubspec.yaml)을 현재
+  // 해시로 재바인딩해 refreshBindings를 정합시켜야 한다.
+  for (const binding of gate.preLaunchReadiness.finalRcBinding.refreshBindings) {
+    for (const file of binding.files) {
+      if (file.path === "apps/mobile/pubspec.yaml") {
+        file.sha256 = createHash("sha256")
+          .update(readFileSync(path.join(root, file.path)))
+          .digest("hex");
+      }
+    }
+  }
   return gate;
 }
 
