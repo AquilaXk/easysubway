@@ -8805,6 +8805,8 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "busan-transportation-urban-rail-station-info",
     "daejeon-station-distance-fare",
     "daejeon-train-timetable",
+    "gwangju-transportation-cyberstation-timetable",
+    "gwangju-transportation-route-topology",
     "kric-disabled-toilet",
     "kric-elevator-car-number",
     "kric-metropolitan-rail-station-info",
@@ -8828,6 +8830,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "molit-tago-subway-info",
     "molit-urban-rail-full-route",
     "molit-urban-rail-full-route-daejeon-membership",
+    "molit-urban-rail-full-route-gwangju-membership",
     "seoul-metro-accessibility",
     "seoul-metro-fast-exit-car-door",
     "seoul-metro-official-od-fare-canary",
@@ -8857,7 +8860,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     assert.match(source.license.attribution, /공공누리 제1유형|공공데이터포털 이용허락범위 제한 없음/);
     assert.match(
       source.datasetUrl,
-      /^https:\/\/(?:data\.seoul\.go\.kr\/dataList\/OA-[0-9]+\/[AFS]\/1\/datasetView\.do|www\.data\.go\.kr\/data\/[0-9]+\/(?:openapi|fileData)\.do|www\.seoulmetro\.co\.kr\/kr\/cyberStation\.do|data\.kric\.go\.kr\/rips\/M_01_02\/detail\.do\?id=[0-9]+&service=[A-Za-z0-9]+&operation=[A-Za-z0-9]+&page=[0-9]+)$/,
+      /^https:\/\/(?:data\.seoul\.go\.kr\/dataList\/OA-[0-9]+\/[AFS]\/1\/datasetView\.do|www\.data\.go\.kr\/data\/[0-9]+\/(?:openapi|fileData)\.do|www\.seoulmetro\.co\.kr\/kr\/cyberStation\.do|www\.grtc\.co\.kr\/subway\/(?:contents\/apiRunInfo|menu\/trainTimetableSubMenu)|data\.kric\.go\.kr\/rips\/M_01_02\/detail\.do\?id=[0-9]+&service=[A-Za-z0-9]+&operation=[A-Za-z0-9]+&page=[0-9]+)$/,
     );
     assert.match(source.observedDataUpdatedAt, /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/);
     assert.match(source.retrievedAt, /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/);
