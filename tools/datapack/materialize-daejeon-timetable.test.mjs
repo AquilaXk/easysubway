@@ -106,6 +106,26 @@ test("대전 시간표 admission은 snapshot·inventory·freshness·topology lin
   }), /inventory evidence/);
 });
 
+test("동일 시간표 행의 다음날 refresh도 새 immutable pack identity를 만든다", async () => {
+  const values = await inputs();
+  const initial = materializeDaejeonTimetable({ ...values, now: evidenceNow });
+  const refreshed = structuredClone(values);
+  refreshed.timetableSnapshot.observedAt = "2026-07-20T22:00:00.000Z";
+  const evidence = refreshed.inventory.sources.find(({ id }) => id === "daejeon-train-timetable")
+    .scheduleAdmissionEvidence;
+  evidence.snapshotId = "daejeon-train-timetable-20260721";
+  evidence.capturedAt = refreshed.timetableSnapshot.observedAt;
+  evidence.freshUntil = "2026-07-21T22:00:00.000Z";
+
+  const next = materializeDaejeonTimetable({
+    ...refreshed,
+    now: new Date("2026-07-20T22:01:00.000Z"),
+  });
+
+  assert.notDeepEqual(next.manifest.activePack, initial.manifest.activePack);
+  assert.equal(next.manifest.activePack.version, "20260721");
+});
+
 test("production SQLite·field provenance가 대전 schedule requirement와 런타임 artifact identity를 함께 고정한다", async (context) => {
   const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-daejeon-schedule-pack-"));
   context.after(() => rm(outputDir, { recursive: true, force: true }));

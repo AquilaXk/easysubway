@@ -108,14 +108,21 @@ export function materializeDaejeonTimetable({
     pickupType: stopTime.pickupType,
     dropOffType: stopTime.dropOffType,
   }, { ...provenance, providerRecordHash: stopTime.providerRecordHash })));
+  const version = /-(\d{8})$/.exec(source.scheduleAdmissionEvidence.snapshotId)?.[1];
+  if (!version) throw new Error(`${SOURCE_ID} snapshotId must end with YYYYMMDD`);
   const compositionSha256 = sha256(JSON.stringify({
     previousPackId: pack.id,
-    timetableRowsSha256: timetableSnapshot.rowsSha256,
-    topologyContentSha256: topologySnapshot.contentSha256,
+    timetableSnapshotIdentity: {
+      snapshotId: source.scheduleAdmissionEvidence.snapshotId,
+      observedAt: timetableSnapshot.observedAt,
+      rawSha256: timetableSnapshot.rawSha256,
+      rowsSha256: timetableSnapshot.rowsSha256,
+    },
+    source,
     tripIds: trips.map(({ id }) => id),
   }));
   pack.id = `${PACK_ID}-${compositionSha256}`;
-  pack.version = "20260720";
+  pack.version = version;
   pack.url = `https://objectstorage.ap-seoul-1.oraclecloud.com/n/axvym6vk8g7i/b/easysubway-datapacks/o/catalog/${pack.id}-v${pack.version}.sqlite.gz`;
   fixture.manifest.activePack = { id: pack.id, version: pack.version };
   pack.minimumTableRows = {
@@ -184,7 +191,8 @@ function requiredSource(inventory, snapshot, topologySnapshot, now) {
     throw new Error(`${SOURCE_ID} is not admitted for production use`);
   }
   const evidence = source.scheduleAdmissionEvidence;
-  if (!evidence || evidence.capturedAt !== snapshot.observedAt || evidence.rowCount !== snapshot.rowCount
+  if (!evidence || !/^daejeon-train-timetable-\d{8}$/.test(evidence.snapshotId ?? "")
+    || evidence.capturedAt !== snapshot.observedAt || evidence.rowCount !== snapshot.rowCount
     || evidence.departureCount !== EXPECTED_DEPARTURE_COUNT || evidence.tripCount !== EXPECTED_TRIP_COUNT
     || evidence.stopTimeCount !== EXPECTED_STOP_TIME_COUNT || evidence.rawSha256 !== snapshot.rawSha256
     || evidence.rowsSha256 !== snapshot.rowsSha256 || evidence.topologySourceId !== topologySnapshot.sourceId
