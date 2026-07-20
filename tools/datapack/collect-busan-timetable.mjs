@@ -95,7 +95,8 @@ async function collectResponse({ station, day, key, fetchImpl, sleepImpl, scope 
   url.searchParams.set("act", "xml");
   url.searchParams.set("scode", station.stationCode);
   url.searchParams.set("day", day);
-  url.searchParams.set("enum", "999");
+  url.searchParams.set("pageNo", "1");
+  url.searchParams.set("numOfRows", "999");
   const response = await fetchWithRetry(url, fetchImpl, sleepImpl);
   const bytes = Buffer.from(await response.arrayBuffer());
   const rawSha256 = sha256(bytes);
@@ -113,11 +114,13 @@ async function collectResponse({ station, day, key, fetchImpl, sleepImpl, scope 
   if (items.length === 0) throw new Error(`Busan timetable schema mismatch: empty items; rawSha256=${rawSha256}`);
   const totalCount = scalar(raw, "totalCount");
   if (totalCount != null && (!/^\d+$/.test(totalCount) || Number(totalCount) !== items.length)) {
-    throw new Error(`Busan timetable schema mismatch: truncated items; rawSha256=${rawSha256}`);
+    throw new Error(`Busan timetable schema mismatch: truncated items; items=${items.length}; `
+      + `totalCount=${safeToken(totalCount)}; rawSha256=${rawSha256}`);
   }
   const byCode = new Map(scope.map((entry) => [entry.stationCode, entry]));
+  const common = Object.fromEntries(["sname", "engname", "scode", "line"].map((field) => [field, scalar(body, field)]));
   const rows = items.map((item, index) => validateRow(
-    Object.fromEntries(RESPONSE_FIELDS.map((field) => [field, scalar(item, field)])),
+    Object.fromEntries(RESPONSE_FIELDS.map((field) => [field, common[field] ?? scalar(item, field)])),
     { station, day, byCode, index },
   ));
   return { rows, rawSha256, responseEncoding };
@@ -131,17 +134,18 @@ function validateRow(values, { station, day, byCode, index }) {
   const minute = Number(values.time);
   const expectedLine = LINE_CODES[station.lineId];
   const end = byCode.get(values.endcode);
-  if (requiredText(values.sname, "sname").replace(/역$/, "") !== station.stationName.replace(/역$/, "")
-    || requiredText(values.engname, "engname").length > 100
-    || !/^\d{1,8}$/.test(values.trainno)
-    || !/^\d{1,2}$/.test(values.hour) || hour < 0 || hour > 29
-    || !/^\d{1,2}$/.test(values.time) || minute < 0 || minute > 59
-    || values.day !== day || !DAYS.includes(values.day)
-    || !new Set(["0", "1"]).has(values.updown)
-    || values.scode !== station.stationCode || values.line !== expectedLine
-    || !end || LINE_CODES[end.lineId] !== expectedLine) {
-    throw new Error(`Busan timetable schema mismatch: item[${index}] values`);
-  }
+  const invalid = [];
+  if (values.sname.trim() === "" || values.sname.trim().length > 100) invalid.push("sname");
+  if (values.engname.trim() === "" || values.engname.trim().length > 100) invalid.push("engname");
+  if (!/^\d{1,8}$/.test(values.trainno)) invalid.push("trainno");
+  if (!/^\d{1,2}$/.test(values.hour) || hour < 0 || hour > 29) invalid.push("hour");
+  if (!/^\d{1,2}$/.test(values.time) || minute < 0 || minute > 59) invalid.push("time");
+  if (values.day !== day || !DAYS.includes(values.day)) invalid.push("day");
+  if (!new Set(["0", "1"]).has(values.updown)) invalid.push("updown");
+  if (values.scode !== station.stationCode) invalid.push("scode");
+  if (values.line !== expectedLine) invalid.push("line");
+  if (!end || LINE_CODES[end.lineId] !== expectedLine) invalid.push("endcode");
+  if (invalid.length > 0) throw new Error(`Busan timetable schema mismatch: item[${index}] values=${invalid.join(",")}`);
   return { ...values, hour: String(hour).padStart(2, "0"), time: String(minute).padStart(2, "0") };
 }
 
@@ -192,7 +196,10 @@ async function fetchWithRetry(url, fetchImpl, sleepImpl) {
       }
       return response;
     } catch (error) {
-      if (attempt === 1) throw new Error("Busan timetable transport failure", { cause: error });
+      if (attempt === 1) {
+        const code = error?.code ?? error?.cause?.code ?? "UNKNOWN";
+        throw new Error(`Busan timetable transport failure; code=${safeToken(String(code))}`);
+      }
     }
   }
   throw new Error("Busan timetable transport failure");

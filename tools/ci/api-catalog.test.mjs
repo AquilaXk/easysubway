@@ -398,8 +398,8 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
   const busanTimetable = findCatalogEntry(catalog, "provider:busan-transportation-timetable");
   assert.equal(busanTimetable.endpoint, "http://data.humetro.busan.kr/voc/api/open_api_process.tnn");
   assert.deepEqual(busanTimetable.operation.requiredParameters, ["serviceKey", "scode"]);
-  assert.deepEqual(busanTimetable.operation.fixedParameters, { act: "xml", enum: "999" });
-  assert.deepEqual(busanTimetable.operation.optionalParameters, ["day", "updown", "stime", "etime"]);
+  assert.deepEqual(busanTimetable.operation.fixedParameters, { act: "xml", pageNo: "1", numOfRows: "999" });
+  assert.deepEqual(busanTimetable.operation.optionalParameters, ["day", "updown", "stime", "etime", "enum"]);
   assert.deepEqual(busanTimetable.responseFields, [
     "sname", "engname", "trainno", "hour", "time", "day", "updown", "endcode", "scode", "line",
   ]);

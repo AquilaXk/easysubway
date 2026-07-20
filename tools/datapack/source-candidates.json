@@ -3354,8 +3354,8 @@
           "loadPolicy": "process-env-no-shell-parsing"
         },
         "requiredParameters": ["serviceKey", "scode"],
-        "fixedParameters": { "act": "xml", "enum": "999" },
-        "optionalParameters": ["day", "updown", "stime", "etime"],
+        "fixedParameters": { "act": "xml", "pageNo": "1", "numOfRows": "999" },
+        "optionalParameters": ["day", "updown", "stime", "etime", "enum"],
         "responseEnvelope": "response.header + response.body.item[]",
         "responseFields": ["sname", "engname", "trainno", "hour", "time", "day", "updown", "endcode", "scode", "line"],
         "runner": {
@@ -3371,8 +3371,8 @@
         "secretPolicy": "env-only-redacted-output"
       },
       "licenseEvidenceStatus": "confirmed_attribution",
-      "sampleEvidenceStatus": "live_capture_pending",
-      "admissionStatus": "operation_contract_registered",
+    "sampleEvidenceStatus": "live_capture_confirmed",
+    "admissionStatus": "production_materialized",
       "serviceKeyHandling": "offline_collector_secret_only",
       "mobileEmbeddingAllowed": false,
       "evidence": {
@@ -3381,15 +3381,30 @@
         "usePermissionRange": "공공누리 제1유형(출처표시), 제3자 권리 포함 저작권 표시",
         "formats": ["XML"],
         "outputFields": ["sname", "engname", "trainno", "hour", "time", "day", "updown", "endcode", "scode", "line"],
-        "applicationStatus": "owner_approved",
-        "developmentQuota": 1000,
-        "coverageAssessment": {
-          "state": "MISSING",
-          "requirementCount": 4,
-          "sourceDomain": "schedule_timetable"
-        }
+      "applicationStatus": "owner_approved",
+      "developmentQuota": 1000,
+      "liveValidation": {
+        "snapshotId": "busan-transportation-timetable-20260720",
+        "snapshotPath": "tools/datapack/sources/busan-transportation-timetable-20260720.json",
+        "capturedAt": "2026-07-20T08:37:16.931Z",
+        "freshUntil": "2026-07-21T08:37:16.931Z",
+        "requestCount": 342,
+        "stationCount": 114,
+        "rowCount": 109140,
+        "tripCount": 3833,
+        "rawSha256": "8269d5ba02ea03824220da02b5d807d8bce5eeba9bbc8e520d4a4e5938e03a95",
+        "rowsSha256": "9e5474410ba38fe1cc1f36611b82c5c05af1d2a33d7c2bef7bcf740cfadc1a7a",
+        "credentialRedacted": true,
+        "materializer": "tools/datapack/materialize-busan-timetable.mjs",
+        "verificationTest": "tools/datapack/materialize-busan-timetable.test.mjs"
       },
-      "nextAction": "tracked collector live snapshot과 production materialization을 #2368에서 완료한다"
+      "coverageAssessment": {
+        "state": "SUPPORTED",
+        "requirementCount": 4,
+        "sourceDomain": "schedule_timetable"
+      }
+    },
+    "nextAction": "24시간 admission snapshot을 갱신해 immutable production pack을 재생성한다"
     },
     {
       "id": "busan-transportation-route-topology",

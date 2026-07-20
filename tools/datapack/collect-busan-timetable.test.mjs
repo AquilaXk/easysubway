@@ -9,10 +9,12 @@ const topology = JSON.parse(await readFile(
   "utf8",
 ));
 
-function response(item) {
+function response({ stationName, stationCode, line, item }) {
   return new Response(`<?xml version="1.0" encoding="UTF-8"?><response>
     <header><resultCode>00</resultCode><resultMsg>정상</resultMsg></header>
-    <body><item>${item}</item></body></response>`, {
+    <body><scode>${stationCode}</scode><line>${line}</line><sname>${stationName}</sname>
+    <engname>Station ${stationCode}</engname><item>${item}</item></body>
+    <numOfRows>1</numOfRows><pageNo>1</pageNo><totalCount>1</totalCount></response>`, {
     headers: { "content-type": "application/xml" },
   });
 }
@@ -35,14 +37,13 @@ test("부산 timetable collector는 114개 역과 3개 요일을 bounded fan-out
         "line-d812a5bc1e5f": "4",
       })[station.lineId];
       const day = request.searchParams.get("day");
-      return response([
-        `<sname>${station.stationName}</sname>`,
-        `<engname>Station ${station.stationCode}</engname>`,
+      const stationName = station.stationCode === "205" ? "벡스코 공식별칭" : station.stationName;
+      return response({ stationName, stationCode: station.stationCode, line, item: [
         `<trainno>${line}${day}01</trainno>`,
         "<hour>05</hour><time>01</time>",
         `<day>${day}</day><updown>${Number(station.stationCode) % 2}</updown>`,
-        `<endcode>${station.stationCode}</endcode><scode>${station.stationCode}</scode><line>${line}</line>`,
-      ].join(""));
+        `<endcode>${station.stationCode}</endcode>`,
+      ].join("") });
     },
   });
 
@@ -53,10 +54,60 @@ test("부산 timetable collector는 114개 역과 3개 요일을 bounded fan-out
   assert.deepEqual(snapshot.dayTypes, ["1", "2", "3"]);
   assert.deepEqual(snapshot.lineIds, topology.lineIds);
   assert.deepEqual([...requested[0].searchParams], [
-    ["serviceKey", secret], ["act", "xml"], ["scode", topology.scope[0].stationCode], ["day", "1"], ["enum", "999"],
+    ["serviceKey", secret], ["act", "xml"], ["scode", topology.scope[0].stationCode], ["day", "1"],
+    ["pageNo", "1"], ["numOfRows", "999"],
   ]);
   assert.equal(snapshot.credentialRedacted, true);
   assert.match(snapshot.rowsSha256, /^[a-f0-9]{64}$/);
   assert.match(snapshot.rawSha256, /^[a-f0-9]{64}$/);
+  assert.equal(snapshot.rows.find(({ scode }) => scode === "205").sname, "벡스코 공식별칭");
   assert.doesNotMatch(JSON.stringify(snapshot), new RegExp(secret));
+});
+
+test("부산 timetable collector는 credential 없는 transport code만 진단한다", async () => {
+  const transport = Object.assign(new Error("secret-bearing transport detail"), { code: "ENOTFOUND" });
+  await assert.rejects(collectBusanTimetable({
+    serviceKey: "never-print-service-key",
+    stationScopes: topology.scope,
+    sleepImpl: async () => {},
+    fetchImpl: async () => { throw transport; },
+  }), (error) => {
+    assert.match(error.message, /transport failure; code=ENOTFOUND/);
+    assert.doesNotMatch(error.message, /never-print|secret-bearing/);
+    return true;
+  });
+});
+
+test("부산 timetable collector는 pagination mismatch count만 진단한다", async () => {
+  await assert.rejects(collectBusanTimetable({
+    serviceKey: "key",
+    stationScopes: topology.scope,
+    fetchImpl: async () => new Response(`<?xml version="1.0"?><response>
+      <header><resultCode>00</resultCode></header><body><item>
+      <sname>역</sname><engname>Station</engname><trainno>101</trainno><hour>05</hour><time>01</time>
+      <day>1</day><updown>0</updown><endcode>100</endcode><scode>100</scode><line>1</line>
+      </item></body><totalCount>2</totalCount></response>`, {
+      headers: { "content-type": "application/xml" },
+    }),
+  }), /truncated items; items=1; totalCount=2; rawSha256=[a-f0-9]{64}/);
+});
+
+test("부산 timetable collector는 값 대신 실패 field만 진단한다", async () => {
+  await assert.rejects(collectBusanTimetable({
+    serviceKey: "key",
+    stationScopes: topology.scope,
+    fetchImpl: async (url) => {
+      const request = new URL(url);
+      const station = topology.scope.find(({ stationCode }) => stationCode === request.searchParams.get("scode"));
+      const line = ({
+        "line-ab1a041f6266": "1", "line-eb7b47920390": "2",
+        "line-d74614a04530": "3", "line-d812a5bc1e5f": "4",
+      })[station.lineId];
+      const day = request.searchParams.get("day");
+      return response({ stationName: station.stationName, stationCode: station.stationCode, line, item: [
+        "<trainno>INVALID</trainno><hour>05</hour><time>01</time>",
+        `<day>${day}</day><updown>0</updown><endcode>${station.stationCode}</endcode>`,
+      ].join("") });
+    },
+  }), /item\[0\] values=trainno/);
 });
