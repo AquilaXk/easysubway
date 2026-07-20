@@ -631,6 +631,69 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, standby 승격
     "current-sha is only recorded once every stage above has succeeded",
   );
 
+  // --- Review follow-up (PR #2356): legacy-restore trap must be disarmed
+  // before promotion recreates the canonical container, so a trap firing
+  // mid-promotion cannot start the legacy systemd jar on the same port the
+  // Docker canonical container may already hold.
+  const promotionLegacyDisarmIndex = deploy.indexOf("legacy_restore_on_error=0", promotingPhaseIndex);
+  assert.notEqual(promotionLegacyDisarmIndex, -1);
+  assert.ok(
+    promotingPhaseIndex < promotionLegacyDisarmIndex,
+    "legacy_restore_on_error must be disarmed at or after the promoting phase begins",
+  );
+  assert.ok(
+    promotionLegacyDisarmIndex < canonicalForceRecreateIndex,
+    "legacy_restore_on_error must be disarmed before the canonical container is force-recreated",
+  );
+
+  // --- Review follow-up: current-env is captured and restored on a
+  // pre-promotion standby-stage abort, so external tools that read
+  // current-env/compose.env as ground truth for "what canonical is actually
+  // running" (capacity/canary rollback scripts) never see an uncommitted
+  // candidate env after an abort that never touched canonical.
+  assert.match(deploy, /previous_env_set=""/);
+  assert.match(deploy, /if \[\[ -L "\$\{SHARED_DIR\}\/current-env" \]\]; then/);
+  assert.match(deploy, /previous_env_set="\$\(readlink "\$\{SHARED_DIR\}\/current-env"\)"/);
+  const abortStandbyStageBody = deploy.slice(
+    deploy.indexOf("abort_standby_stage() {"),
+    deploy.indexOf("abort_standby_stage() {") + deploy.slice(deploy.indexOf("abort_standby_stage() {")).indexOf("\n}\n"),
+  );
+  assert.match(abortStandbyStageBody, /if \[\[ -n "\$\{previous_env_set\}" \]\]; then/);
+  assert.match(abortStandbyStageBody, /ln -sfn "\$\{previous_env_set\}" "\$\{SHARED_DIR\}\/current-env\.next"/);
+  assert.match(abortStandbyStageBody, /rm -f "\$\{SHARED_DIR\}\/current-env"/);
+  const previousEnvSetCaptureIndex = deploy.indexOf('previous_env_set=""');
+  const currentEnvSwapIndex = deploy.indexOf('ln -sfn "${env_set}" "${SHARED_DIR}/current-env.next"');
+  assert.ok(
+    previousEnvSetCaptureIndex < currentEnvSwapIndex,
+    "the previous current-env target must be captured before it is overwritten",
+  );
+
+  // --- Review follow-up: the standby state file is reset to idle right
+  // after the deploy lock is acquired, so a stale "*_standby_serving" from a
+  // prior run does not linger across unrelated, later-blocked attempts.
+  const flockIndex = deploy.indexOf("flock 9");
+  const sessionStartResetIndex = deploy.indexOf('write_standby_state "idle"');
+  const interruptedStateCheckIndex = deploy.indexOf('write_result "blocked" "interrupted_state"');
+  const writeStandbyStateDefIndex = deploy.indexOf("write_standby_state() {");
+  assert.notEqual(flockIndex, -1);
+  assert.notEqual(sessionStartResetIndex, -1);
+  assert.ok(
+    writeStandbyStateDefIndex < flockIndex,
+    "write_standby_state must be defined before flock so it can reset state right after lock acquisition",
+  );
+  assert.ok(flockIndex < sessionStartResetIndex, "the standby state reset must run after the deploy lock is acquired");
+  assert.ok(
+    sessionStartResetIndex < interruptedStateCheckIndex,
+    "the standby state reset must run before any early-blocked exit",
+  );
+
+  // --- Review follow-up: manual recovery runbook for "*_standby_serving"
+  // degraded exits, and the expand/contract migration contract header.
+  assert.match(deploy, /Manual recovery runbook for a "\*_standby_serving" degraded exit/);
+  assert.match(deploy, /managed_image_drift — it is not a/);
+  assert.match(deploy, /expand\/contract \(purely additive\)/);
+  assert.match(deploy, /Automated destructive-DDL\s*\n# detection is tracked as a follow-up candidate under epic #2329/);
+
   // Pre-promotion standby failures never touch the canonical container or
   // Nginx (fall back to the pre-Docker legacy unit only for the narrow
   // very-first-deploy case, exactly like the old rollback path did).
@@ -841,6 +904,13 @@ test("Compose backend 서비스는 bootJar 기반 이미지와 제한된 바인�
     /"\$\{EASYSUBWAY_BACKEND_BIND:-127\.0\.0\.1\}:\$\{EASYSUBWAY_BACKEND_STANDBY_PORT:-8082\}:8080"/,
   );
   assert.doesNotMatch(standbyBlock, /EASYSUBWAY_BACKEND_PORT/, "standby must bind its own alternate port, not the canonical one");
+
+  // Review follow-up (PR #2356): the standby shares canonical's live
+  // datasource, so migrations/snapshot swap commit against production data
+  // before canonical is touched — "old backend untouched" must not be
+  // overclaimed as a data-layer guarantee.
+  assert.match(compose, /same Postgres datasource as canonical "backend"/i);
+  assert.match(compose, /process\/Nginx-level guarantee, not\s*\n\s*# a data-layer one/);
 });
 
 const FRESHNESS_PRECHECK = "tools/deploy/check-snapshot-freshness-precheck.mjs";

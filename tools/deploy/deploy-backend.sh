@@ -1,6 +1,26 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+# --- Blue/green standby+promotion migration contract (issue #2331) ---------
+# The standby container (Stage 1 below) boots the candidate image against the
+# SAME live Postgres datasource the canonical "backend" container is still
+# serving traffic against. Standby boot commits Flyway migrations and
+# TimetableSeedLoader's snapshot swap (DELETE+reinsert, made atomic by its own
+# lock + immutable history — that part is safe) BEFORE the canonical
+# container is touched and BEFORE any go/no-go decision is made. This design
+# therefore only removes the "force-recreate before validation" outage
+# window; it does NOT make process-level standby validation a substitute for
+# a schema compatibility check. It is only safe because every backend
+# migration is required to follow an expand/contract (purely additive)
+# contract: a migration must never DROP/RENAME a column or table, add a NOT
+# NULL constraint without a default, or otherwise change shape in a way the
+# OLD, still-serving canonical code cannot tolerate. A destructive migration
+# landing here would corrupt/break the schema out from under the live
+# canonical backend during the standby boot window, independent of whether
+# Stage 1's readiness check subsequently passes or fails — standby-stage
+# abort does not roll back a committed migration. Automated destructive-DDL
+# detection is tracked as a follow-up candidate under epic #2329, not part of
+# this script.
 DEPLOY_ROOT="${DEPLOY_ROOT:-/opt/easysubway}"
 DEPLOY_REPO_URL="${DEPLOY_REPO_URL:-https://github.com/AquilaXk/easysubway.git}"
 DEPLOY_COMPOSE_PROJECT="${DEPLOY_COMPOSE_PROJECT:?DEPLOY_COMPOSE_PROJECT is required}"
@@ -100,8 +120,36 @@ write_phase() {
 	mv "${tmp}" "${STATE_FILE}"
 }
 
+write_standby_state() {
+	local phase="$1"
+	local port="${2:-none}"
+	local tmp
+	tmp="$(mktemp "${SHARED_DIR}/deployment-standby-state.XXXXXX")"
+	chmod 600 "${tmp}"
+	{
+		printf 'phase=%s\n' "${phase}"
+		printf 'sha=%s\n' "${DEPLOY_SHA}"
+		printf 'port=%s\n' "${port}"
+	} > "${tmp}"
+	mv "${tmp}" "${STANDBY_STATE_FILE}"
+}
+
 exec 9>"${LOCK_FILE}"
 flock 9
+
+# Reset the standby observability file at the start of every locked session
+# (issue #2331 review). This is a "this attempt has started fresh" marker,
+# not a live guarantee that no standby container exists: if a PRIOR run
+# exited in a "*_standby_serving" degraded state (see the promotion recovery
+# runbook below) and an operator has not yet followed it, a standby may still
+# genuinely be serving production traffic even though this file now reads
+# "idle" for the few seconds before this run either reaches Stage 1 itself or
+# is blocked by an earlier gate (e.g. managed_image_drift, which a degraded
+# exit's current-sha/canonical mismatch reliably triggers). Ground truth is
+# always `docker ps`/`current-route-v2-ingress-enabled`, not this file — it
+# only prevents a genuinely stale reading from lingering indefinitely across
+# unrelated, already-blocked deploy attempts.
+write_standby_state "idle"
 
 if [[ -f "${STATE_FILE}" ]] && ! grep -qx 'phase=completed' "${STATE_FILE}"; then
 	write_result "blocked" "interrupted_state"
@@ -601,23 +649,29 @@ write_alertmanager_config "${tmp_env_set}/alertmanager.yml"
 chmod 600 "${tmp_env_set}/compose.env" "${tmp_env_set}/backend.env" "${tmp_env_set}/metadata.env"
 # Alertmanager runs as nobody in the official image; the private env-set directory keeps this config scoped.
 chmod 644 "${tmp_env_set}/alertmanager.yml"
+# Capture whatever current-env pointed at (if anything) BEFORE swapping it to
+# this run's candidate env-set, so a pre-promotion standby-stage abort can put
+# it back (see abort_standby_stage below, issue #2331 review). This matters
+# because Stage 1-2 (standby boot + Nginx switch) must already read the NEW
+# env-set through current-env to build the standby with the candidate SHA's
+# config — the swap can't simply be deferred until promotion succeeds without
+# threading a second env-file path through every compose() call in those
+# stages. Restoring on abort is the smaller, scoped fix: it corrects the
+# externally-visible "current-env = what canonical is actually running"
+# invariant (tools/ops/verify-production-route-v2-capacity.sh and
+# verify-production-route-v2-canary-rollback.sh both read
+# current-env/compose.env as ground truth) for exactly the window where that
+# invariant would otherwise be wrong — before canonical is ever touched.
+# Post-promotion "*_standby_serving" degraded exits deliberately do NOT
+# restore this: by then the standby (already running the new SHA) is what is
+# actually serving, so current-env pointing at the new env-set is correct.
+previous_env_set=""
+if [[ -L "${SHARED_DIR}/current-env" ]]; then
+	previous_env_set="$(readlink "${SHARED_DIR}/current-env")"
+fi
 mv "${tmp_env_set}" "${env_set}"
 ln -sfn "${env_set}" "${SHARED_DIR}/current-env.next"
 mv -Tf "${SHARED_DIR}/current-env.next" "${SHARED_DIR}/current-env"
-
-write_standby_state() {
-	local phase="$1"
-	local port="${2:-none}"
-	local tmp
-	tmp="$(mktemp "${SHARED_DIR}/deployment-standby-state.XXXXXX")"
-	chmod 600 "${tmp}"
-	{
-		printf 'phase=%s\n' "${phase}"
-		printf 'sha=%s\n' "${DEPLOY_SHA}"
-		printf 'port=%s\n' "${port}"
-	} > "${tmp}"
-	mv "${tmp}" "${STANDBY_STATE_FILE}"
-}
 
 wait_backend_http_ready() {
 	local port="$1"
@@ -669,8 +723,23 @@ abort_deploy() {
 # regardless of current_sha history, so later failure branches do not call
 # this (see the "leave nginx pointed at the proven-healthy standby" comment
 # below instead).
+#
+# Also restores current-env to whatever it pointed at before this run staged
+# its candidate env-set (issue #2331 review): the canonical container was
+# never touched in this path, so current-env must keep describing that
+# untouched, actually-running config — otherwise the next deploy's same-SHA
+# no-op/alertmanager-recreate decisions, and external tools that read
+# current-env/compose.env as ground truth (verify-production-route-v2-capacity.sh,
+# verify-production-route-v2-canary-rollback.sh), would compute against an
+# uncommitted candidate env instead of what canonical is actually running.
 abort_standby_stage() {
 	local detail="$1"
+	if [[ -n "${previous_env_set}" ]]; then
+		ln -sfn "${previous_env_set}" "${SHARED_DIR}/current-env.next"
+		mv -Tf "${SHARED_DIR}/current-env.next" "${SHARED_DIR}/current-env"
+	else
+		rm -f "${SHARED_DIR}/current-env"
+	fi
 	if [[ -z "${current_sha}" && ( "${legacy_backend_was_active}" -eq 1 || "${legacy_backend_was_enabled}" -eq 1 ) ]]; then
 		if restore_legacy_backend_service; then
 			abort_deploy "${detail}_legacy_restore_attempted"
@@ -836,7 +905,45 @@ write_standby_state "nginx_alt" "${backend_standby_port}"
 # to fall back to. The safest available state is "leave the proven-healthy
 # standby serving and stop", recorded with a distinct "_standby_serving"
 # detail so an operator can find it.
+#
+# Manual recovery runbook for a "*_standby_serving" degraded exit
+# (canonical_promotion_failed_standby_serving / canonical_hardening_failed_standby_serving /
+# canonical_readiness_failed_standby_serving / nginx_canonical_switchback_failed_standby_serving,
+# issue #2331 review):
+#   1. Symptom: last-result.env's detail ends in "_standby_serving". Public
+#      traffic is fine — Nginx is on the standby (candidate SHA), which is
+#      already proven healthy. Canonical "backend" is broken, stopped, or
+#      still on the old SHA.
+#   2. ${SHARED_DIR}/current-sha still names the OLD SHA (never advanced,
+#      because promotion did not complete) while canonical/standby may
+#      actually be on the new one. This is why the NEXT automatic deploy
+#      attempt is expected to be blocked by managed_image_drift — it is not a
+#      bug, it is this design's fail-closed guard against retrying blindly
+#      over an inconsistent ledger.
+#   3. Investigate why canonical promotion/hardening/readiness failed (check
+#      the diagnostics log dump_diagnostics wrote under
+#      ${DIAGNOSTICS_DIR}/${DEPLOY_SHA}-canonical-*.log — usually host
+#      resource pressure from the standby+canonical overlap, not the image).
+#   4. Once resolved, re-promote canonical manually with the same compose
+#      invocation this stage uses (`... up -d --no-deps --no-build
+#      --force-recreate backend`) against ${SHARED_DIR}/current-env, or simply
+#      redeploy the same DEPLOY_SHA through the normal CD pipeline once the
+#      drift block is cleared.
+#   5. Confirm canonical is healthy, then switch Nginx back to the canonical
+#      port (this script's install_route_v2_host_ingress logic, or the
+#      equivalent manual sed+install+reload) and stop/remove backend-standby.
+#   6. Only after canonical is confirmed to match what is actually deployed
+#      should ${SHARED_DIR}/current-sha be corrected to match, unblocking
+#      normal automated deploys again.
 write_phase "promoting"
+# Promotion recreates the canonical Docker container on the same port the
+# pre-Docker legacy systemd unit used to own. From here on, a legacy-restore
+# trap firing (e.g. on an unrelated crash mid-promotion) would try to start
+# that legacy jar on a port the Docker canonical container may already hold —
+# disarm it now; abort_standby_stage (the only caller of
+# restore_legacy_backend_service) is unreachable past this point (issue #2331
+# review).
+legacy_restore_on_error=0
 if ! compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" up -d --no-deps --no-build --force-recreate backend; then
 	write_standby_state "serving_standby_degraded" "${backend_standby_port}"
 	abort_deploy "canonical_promotion_failed_standby_serving"

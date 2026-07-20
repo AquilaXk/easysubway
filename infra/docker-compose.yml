@@ -76,6 +76,14 @@ services:
   # `restart: "no"` keeps it from lingering if the host reboots mid-deploy —
   # every deploy run either promotes and removes it, or removes it on
   # failure, well within the same run.
+  #
+  # This container shares the SAME Postgres datasource as canonical "backend"
+  # below (same EASYSUBWAY_DATASOURCE_URL), which is still serving live
+  # traffic while this boots. Flyway migrations and TimetableSeedLoader's
+  # snapshot swap commit here, against the live database, before canonical is
+  # touched — "old backend untouched" is a process/Nginx-level guarantee, not
+  # a data-layer one. See the migration contract comment at the top of
+  # tools/deploy/deploy-backend.sh (issue #2331 review).
   backend-standby:
     image: easysubway-backend:${EASYSUBWAY_BACKEND_IMAGE_TAG:-local}
     container_name: easysubway-backend-standby
