@@ -237,6 +237,7 @@ function requiredMembershipSource(inventory, snapshot, mappings, now) {
     || evidence.stationCodeSnapshotId !== stationCodeSource?.topologyAdmissionEvidence?.snapshotId
     || evidence.stationCodeContentSha256 !== snapshot.contentSha256
     || evidence.membershipSourceRawSha256 !== rawSource.admissionEvidence.rawSha256
+    || evidence.membershipSourceSnapshotSha256 !== mappings.sourceRawSha256
     || !Number.isFinite(verifiedAt) || new Date(verifiedAt).toISOString() !== evidence.verifiedAt) {
     throw new Error(`${MEMBERSHIP_SOURCE_ID} Daejeon membership evidence is invalid`);
   }

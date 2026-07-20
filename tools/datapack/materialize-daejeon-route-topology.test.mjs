@@ -176,6 +176,19 @@ test("대전 membership admission은 source scope와 두 공식 evidence의 결�
       now: evidenceNow,
     }), /Daejeon membership evidence is invalid/);
   }
+  const stationMapCsv = await readFile(
+    path.join(root, "tools/datapack/sources/molit-urban-rail-full-route-20251211.csv"),
+  );
+  assert.throws(() => materializeDaejeonRouteTopology({
+    baseFixture,
+    snapshot,
+    inventory,
+    canonicalStationMappings: parseMolitDaejeonStationMappings(Buffer.concat([
+      stationMapCsv,
+      Buffer.from("\n"),
+    ])),
+    now: evidenceNow,
+  }), /Daejeon membership evidence is invalid/);
   assert.throws(() => materializeDaejeonRouteTopology({
     baseFixture,
     snapshot,
