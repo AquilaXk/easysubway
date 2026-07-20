@@ -225,7 +225,7 @@ void main() {
               'warnings': [
                 {
                   'code': 'LOW_DATA_CONFIDENCE',
-                  'message': '일부 시설 안내를 준비 중이에요.',
+                  'message': '일부 시설 안내는 아직 확인되지 않았어요.',
                 },
                 {
                   'code': 'STALE_ACCESSIBILITY_DATA',
@@ -254,6 +254,7 @@ void main() {
         originStationId: 'station-sangnoksu',
         destinationStationId: 'station-sadang',
         mobilityType: 'WHEELCHAIR',
+        objective: RouteObjective.fewestTransfers,
       ),
     );
 
@@ -265,6 +266,7 @@ void main() {
       'constraintMode': 'STRICT_STEP_FREE',
     });
     expect(result.routeSearchId, 'route-1');
+    expect(result.objective, RouteObjective.fastest);
     expect(result.constraintMode, 'STRICT_STEP_FREE');
     expect(result.summaryTitle, '상록수에서 사당까지');
     expect(result.lineName, '수도권 4호선');
@@ -289,13 +291,13 @@ void main() {
     expect(result.steps.first.title, '상록수역에서 4호선 승강장으로 이동');
     expect(result.steps.first.actionTitle, isEmpty);
     expect(result.steps.first.hasMetricSourceMetadata, isTrue);
-    expect(result.steps.first.metricSourceLabel, '시간 또는 거리를 확인하고 있어요');
+    expect(result.steps.first.metricSourceLabel, '시간·거리 정보 미확인');
     expect(result.steps.first.estimatedMinutes, 4);
     expect(result.steps.first.distanceMeters, 180);
     expect(result.steps.first.stepType, 'entry');
     expect(result.steps.first.includesStairs, isFalse);
     expect(result.steps.first.requiresAccessibilityCheck, isTrue);
-    expect(result.steps.first.burdenLabel, '약 4분 · 180m · 엘리베이터 안내 준비 중');
+    expect(result.steps.first.burdenLabel, '약 4분 · 180m · 엘리베이터 안내 미확인');
     expect(result.steps[1].userTitle, '사당역에서 출구 엘리베이터와 통로 안내를 확인');
     expect(result.semanticLabel, isNot(contains('접근성 정보')));
     expect(result.arrivalGuidanceStep?.description, '2번 출구의 엘리베이터를 먼저 확인하세요.');
@@ -307,7 +309,7 @@ void main() {
       result.warnings.map((warning) => warning.userMessage),
       contains('시설 상태 안내가 오래됐을 수 있어요.'),
     );
-    expect(result.semanticLabel, contains('시간 또는 거리를 확인하고 있어요'));
+    expect(result.semanticLabel, contains('시간·거리 정보 미확인'));
   });
 
   test('경로 검색 컨트롤러는 빈 입력과 실패 상태를 쉬운 문구로 표시한다', () async {
@@ -373,6 +375,9 @@ void main() {
 
   test('경로 검색 컨트롤러는 현재 결과 ETA refresh 상태를 유지해서 표시한다', () async {
     final repository = FakeRouteSearchRepository();
+    repository.searchResult = _sampleRouteSearchResult(
+      objective: RouteObjective.fewestTransfers,
+    );
     final controller = RouteSearchController(repository: repository);
 
     await controller.search(
@@ -405,6 +410,7 @@ void main() {
     expect(repository.refreshRouteSearchIds, ['route-1']);
     expect(controller.state.status, RouteSearchViewStatus.success);
     expect(controller.state.isRefreshing, isFalse);
+    expect(controller.state.result!.objective, RouteObjective.fewestTransfers);
     expect(
       controller.state.refreshMessage,
       '실시간 정보가 늦어 계획 시간으로 안내해요. · 최근 확인 시간이 오래되어 계획 시간으로 안내 · 신뢰도 낮음',
@@ -646,8 +652,8 @@ void main() {
       'UNSUPPORTED',
       'STALE',
     });
-    expect(routeEtaSourceLabel('REALTIME'), '실시간 도착정보 준비 중');
-    expect(routeEtaSourceLabel('MIXED'), '일부 도착정보를 확인하고 있어요');
+    expect(routeEtaSourceLabel('REALTIME'), '실시간 도착정보');
+    expect(routeEtaSourceLabel('MIXED'), '일부 실시간 도착정보');
     expect(routeEtaSourceLabel('STATIC_BACKEND_ESTIMATE'), '시간표 기준');
     expect(routeEtaSourceLabel('STATIC_ESTIMATE'), '정적 추정');
     expect(routeEtaSourceLabel('UNSUPPORTED'), '실시간 미지원');
@@ -1242,9 +1248,8 @@ void main() {
   });
 
   test('경유 스텝 음성 안내는 신뢰도·측정 출처 문구를 읽지 않는다 (#1975)', () {
-    // 경유 마커가 route_step 기본값(confidenceLabel='안내를 준비 중이에요',
-    // timeSource/distanceSource 비어있지 않음)을 상속해도 경유 스텝에서는
-    // 신뢰도·측정 출처 문구가 음성 안내에 새어 나오지 않아야 한다.
+    // 경유 마커가 신뢰도 문구(confidenceLabel)와 측정 출처를 갖고 있어도 경유
+    // 스텝에서는 그 문구가 음성 안내에 새어 나오지 않아야 한다.
     const waypointStep = RouteSearchStep(
       sequence: 2,
       stepType: 'waypoint',
@@ -1260,11 +1265,11 @@ void main() {
       requiresAccessibilityCheck: false,
       timeSource: 'UNKNOWN',
       distanceSource: 'UNKNOWN',
-      confidenceLabel: '안내를 준비 중이에요',
+      confidenceLabel: '확인된 정보예요',
     );
 
     final label = waypointStep.semanticGuidanceLabel;
-    expect(label, isNot(contains('안내를 준비 중이에요')));
+    expect(label, isNot(contains('확인된 정보예요')));
     expect(label, isNot(contains('확인하고 있어요')));
   });
 
@@ -1301,7 +1306,7 @@ void main() {
       requiresAccessibilityCheck: false,
     );
 
-    expect(step.burdenLabel, '약 30분 · 거리를 확인하고 있어요');
+    expect(step.burdenLabel, '약 30분 · 거리 미확인');
   });
 
   test('경로 단계 이동 부담은 측정 시간 없음 상태를 0분으로 표시하지 않는다', () {
@@ -1319,7 +1324,7 @@ void main() {
       requiresAccessibilityCheck: false,
     );
 
-    expect(step.burdenLabel, '시간을 확인하고 있어요 · 180m');
+    expect(step.burdenLabel, '시간 미확인 · 180m');
   });
 
   test('경로 계단 상태는 unknown을 계단 없음으로 올리지 않는다', () {
@@ -1562,6 +1567,451 @@ void main() {
       'etaFeedbackOptedIn': true,
     });
   });
+
+  group('#2099 V2 leg 운행 정보 파싱·급행 배지 파생', () {
+    test('RIDE SUBWAY/EXPRESS leg은 급행으로 파생된다', () {
+      final leg = RouteSearchV2Leg.fromJson(
+        _rideLegJson(serviceClass: 'SUBWAY', servicePattern: 'EXPRESS'),
+      );
+      expect(leg.serviceClass, 'SUBWAY');
+      expect(leg.servicePattern, 'EXPRESS');
+      expect(leg.isSubwayExpress, isTrue);
+      final step = RouteSearchStep.fromV2(1, leg);
+      expect(step.isSubwayExpress, isTrue);
+    });
+
+    test('RIDE SUBWAY/LOCAL leg은 급행이 아니다', () {
+      final leg = RouteSearchV2Leg.fromJson(
+        _rideLegJson(serviceClass: 'SUBWAY', servicePattern: 'LOCAL'),
+      );
+      expect(leg.isSubwayExpress, isFalse);
+      expect(RouteSearchStep.fromV2(1, leg).isSubwayExpress, isFalse);
+    });
+
+    test('RIDE ITX_CHEONGCHUN/EXPRESS leg은 generic 급행 배지를 만들지 않는다', () {
+      final leg = RouteSearchV2Leg.fromJson(
+        _rideLegJson(serviceClass: 'ITX_CHEONGCHUN', servicePattern: 'EXPRESS'),
+      );
+      expect(leg.serviceClass, 'ITX_CHEONGCHUN');
+      expect(leg.isSubwayExpress, isFalse);
+      expect(RouteSearchStep.fromV2(1, leg).isSubwayExpress, isFalse);
+    });
+
+    test('RIDE ITX_CHEONGCHUN leg은 ITX-청춘 서비스 식별로 파생된다', () {
+      final leg = RouteSearchV2Leg.fromJson(
+        _rideLegJson(serviceClass: 'ITX_CHEONGCHUN', servicePattern: 'EXPRESS'),
+      );
+      final step = RouteSearchStep.fromV2(1, leg);
+      expect(step.isItxCheongchun, isTrue);
+      // ITX-청춘은 급행 배지와 상호 배타다.
+      expect(step.isSubwayExpress, isFalse);
+    });
+
+    test('RIDE ITX_CHEONGCHUN/LOCAL leg도 ITX-청춘 서비스 식별을 유지한다', () {
+      // isItxCheongchun은 servicePattern과 무관하게 serviceClass만 본다(의도 동작).
+      // EXPRESS 케이스만 고정되어 있으면 LOCAL 회귀를 못 잡으므로 별도로 고정한다.
+      final leg = RouteSearchV2Leg.fromJson(
+        _rideLegJson(serviceClass: 'ITX_CHEONGCHUN', servicePattern: 'LOCAL'),
+      );
+      final step = RouteSearchStep.fromV2(1, leg);
+      expect(step.isItxCheongchun, isTrue);
+      expect(step.isSubwayExpress, isFalse);
+    });
+
+    test('RIDE SUBWAY leg은 ITX-청춘이 아니다', () {
+      final local = RouteSearchStep.fromV2(
+        1,
+        RouteSearchV2Leg.fromJson(
+          _rideLegJson(serviceClass: 'SUBWAY', servicePattern: 'LOCAL'),
+        ),
+      );
+      final express = RouteSearchStep.fromV2(
+        1,
+        RouteSearchV2Leg.fromJson(
+          _rideLegJson(serviceClass: 'SUBWAY', servicePattern: 'EXPRESS'),
+        ),
+      );
+      expect(local.isItxCheongchun, isFalse);
+      expect(express.isItxCheongchun, isFalse);
+    });
+
+    test('non-ride leg의 service 필드는 null만 허용한다', () {
+      final walk = _rideLegJson(legType: 'WALK')
+        ..remove('serviceClass')
+        ..remove('servicePattern');
+      final leg = RouteSearchV2Leg.fromJson(walk);
+      expect(leg.serviceClass, isNull);
+      expect(leg.servicePattern, isNull);
+      expect(leg.isSubwayExpress, isFalse);
+    });
+
+    test('non-ride leg이 service 필드를 실으면 payload error다', () {
+      final walk = _rideLegJson(legType: 'WALK');
+      walk['serviceClass'] = 'SUBWAY';
+      walk['servicePattern'] = 'EXPRESS';
+      expect(
+        () => RouteSearchV2Leg.fromJson(walk),
+        throwsA(isA<FormatException>()),
+      );
+    });
+
+    test('RIDE unknown pattern은 LOCAL 추정 없이 payload error다', () {
+      final leg = _rideLegJson(serviceClass: 'SUBWAY', servicePattern: 'RAPID');
+      expect(
+        () => RouteSearchV2Leg.fromJson(leg),
+        throwsA(isA<FormatException>()),
+      );
+    });
+
+    test('RIDE blank service 필드는 LOCAL 추정 없이 payload error다', () {
+      final leg = _rideLegJson(serviceClass: '', servicePattern: '');
+      expect(
+        () => RouteSearchV2Leg.fromJson(leg),
+        throwsA(isA<FormatException>()),
+      );
+    });
+
+    test('RIDE에 service 필드가 없으면 payload error다', () {
+      final leg = _rideLegJson()
+        ..remove('serviceClass')
+        ..remove('servicePattern');
+      expect(
+        () => RouteSearchV2Leg.fromJson(leg),
+        throwsA(isA<FormatException>()),
+      );
+    });
+  });
+
+  group('#2099 objective-tagged itinerary 보존·선택', () {
+    test('선택 objective와 공식 운임, exact leg 시각을 공유 입력까지 보존한다', () {
+      final itinerary = RouteSearchV2Itinerary.fromJson({
+        'itineraryId': 'route-itx-primary',
+        'status': 'FOUND',
+        'plannedArrivalTime': '2026-06-30T11:42:00+09:00',
+        'realtimeArrivalTime': null,
+        'etaSource': 'PLANNED',
+        'etaConfidence': 'MEDIUM',
+        'durationSeconds': 9120,
+        'transferCount': 1,
+        'walkingDistanceMeters': 180,
+        'accessibilityRisk': <String, Object?>{
+          'stairCount': 0,
+          'unknownAccessibilityCount': 0,
+          'generatedConnectorCount': 0,
+          'staleDataCount': 0,
+          'lowConfidenceCount': 0,
+          'unavailableFacilityCount': 0,
+          'riskLevel': 'LOW',
+          'reasonCodes': <String>[],
+          'level': 'LOW',
+          'reasons': <String>[],
+        },
+        'legs': [
+          _rideLegJson(
+            serviceClass: 'ITX_CHEONGCHUN',
+            servicePattern: 'EXPRESS',
+          ),
+        ],
+        'commercialEtaEligible': true,
+        'objectiveTags': ['FEWEST_TRANSFERS'],
+        'officialFare': <String, Object?>{
+          'adultFareWon': 9800,
+          'currency': 'KRW',
+          'policy': 'SUM_OF_OFFICIAL_RIDE_OD_FARES',
+          'sourceIds': ['tago-train-schedule-fares'],
+          'sourceSnapshotIds': ['itx-20260630'],
+        },
+      });
+      final result = _objectiveResult([itinerary]);
+
+      final display = RouteSearchResult.fromV2(
+        result,
+        objective: RouteObjective.fewestTransfers,
+      );
+
+      expect(display.objective, RouteObjective.fewestTransfers);
+      expect(display.departureTimeIso, '2026-06-30T09:15:00+09:00');
+      expect(display.arrivalTimeIso, '2026-06-30T11:42:00+09:00');
+      expect(display.officialFare?.adultFareWon, 9800);
+      expect(display.officialFare?.currency, 'KRW');
+      expect(
+        display.steps.single.plannedDepartureTimeIso,
+        '2026-06-30T09:17:00+09:00',
+      );
+      expect(
+        display.steps.single.plannedArrivalTimeIso,
+        '2026-06-30T09:42:00+09:00',
+      );
+    });
+
+    test('dual-tag dedupe된 대표 itinerary는 두 objective에서 모두 선택된다', () {
+      final result = _objectiveResult([
+        _taggedItinerary(
+          lineId: 'line-shared',
+          objectiveTags: const ['FASTEST', 'FEWEST_TRANSFERS'],
+        ),
+      ]);
+      expect(
+        RouteSearchResult.fromV2(
+          result,
+          objective: RouteObjective.fastest,
+        ).lineId,
+        'line-shared',
+      );
+      expect(
+        RouteSearchResult.fromV2(
+          result,
+          objective: RouteObjective.fewestTransfers,
+        ).lineId,
+        'line-shared',
+      );
+    });
+
+    test('objective별 대표가 다르면 각 objective의 태그된 itinerary를 고른다', () {
+      final result = _objectiveResult([
+        _taggedItinerary(lineId: 'line-fast', objectiveTags: const ['FASTEST']),
+        _taggedItinerary(
+          lineId: 'line-few',
+          objectiveTags: const ['FEWEST_TRANSFERS'],
+        ),
+      ]);
+      expect(
+        RouteSearchResult.fromV2(
+          result,
+          objective: RouteObjective.fastest,
+        ).lineId,
+        'line-fast',
+      );
+      expect(
+        RouteSearchResult.fromV2(
+          result,
+          objective: RouteObjective.fewestTransfers,
+        ).lineId,
+        'line-few',
+      );
+    });
+
+    test('태그 없는 응답은 첫 FOUND로 폴백해 기존 동작을 보존한다', () {
+      final result = _objectiveResult([
+        _taggedItinerary(lineId: 'line-a', objectiveTags: const []),
+      ]);
+      expect(
+        RouteSearchResult.fromV2(
+          result,
+          objective: RouteObjective.fewestTransfers,
+        ).lineId,
+        'line-a',
+      );
+    });
+
+    test('태그가 있는데 요청 objective와 매칭되는 FOUND가 없으면 fail closed', () {
+      // FASTEST 전용 경로만 있는데 최소환승을 요청하면 silent fallback(계약 위반)을
+      // 피해 payload 오류로 실패시킨다. RouteSearchV2ApiRepository.searchRoute의 generic
+      // catch가 이 FormatException을 unavailable로 흘려보낸다.
+      final result = _objectiveResult([
+        _taggedItinerary(lineId: 'line-fast', objectiveTags: const ['FASTEST']),
+      ]);
+      expect(
+        () => RouteSearchResult.fromV2(
+          result,
+          objective: RouteObjective.fewestTransfers,
+        ),
+        throwsFormatException,
+      );
+    });
+
+    test('이전 objective 검색의 늦은 응답은 현재 화면을 덮지 않는다', () async {
+      final repository = _ManualRouteSearchRepository();
+      final controller = RouteSearchController(repository: repository);
+      addTearDown(controller.dispose);
+
+      const fastRequest = RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'STANDARD',
+      );
+      const fewRequest = RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'STANDARD',
+        objective: RouteObjective.fewestTransfers,
+      );
+
+      unawaited(controller.search(fastRequest));
+      unawaited(controller.search(fewRequest));
+      await pumpEventQueue();
+
+      // 이전(FASTEST) 검색이 늦게 도착해도 최신(FEWEST_TRANSFERS) 상태를 덮지 못한다.
+      repository.completers[RouteObjective.fastest]!.complete(
+        _routeResult('route-fast'),
+      );
+      await pumpEventQueue();
+      expect(controller.state.result, isNull);
+      expect(controller.state.status, RouteSearchViewStatus.loading);
+
+      repository.completers[RouteObjective.fewestTransfers]!.complete(
+        _routeResult('route-few'),
+      );
+      await pumpEventQueue();
+      expect(controller.state.status, RouteSearchViewStatus.success);
+      expect(controller.state.result?.routeSearchId, 'route-few');
+    });
+  });
+}
+
+class _ManualRouteSearchRepository implements RouteSearchRepository {
+  final requests = <RouteSearchRequest>[];
+  final completers = <RouteObjective, Completer<RouteSearchResult>>{};
+
+  @override
+  Future<RouteSearchResult> searchRoute(RouteSearchRequest request) {
+    requests.add(request);
+    final completer = Completer<RouteSearchResult>();
+    completers[request.objective] = completer;
+    return completer.future;
+  }
+
+  @override
+  Future<RouteRefreshResult> refreshRoute(String routeSearchId) {
+    throw UnimplementedError();
+  }
+}
+
+RouteSearchResult _routeResult(String routeSearchId) {
+  return RouteSearchResult(
+    routeSearchId: routeSearchId,
+    originStationId: 'station-a',
+    originStationName: '상록수',
+    destinationStationId: 'station-b',
+    destinationStationName: '사당',
+    mobilityType: 'STANDARD',
+    constraintMode: 'PREFER_STEP_FREE',
+    status: 'FOUND',
+    lineId: 'seoul-4',
+    lineName: '수도권 4호선',
+    score: 90,
+    burdenCost: 90,
+    steps: const [],
+    warnings: const [],
+    recommendationReasons: const [],
+    blockedReasons: const [],
+    createdAt: '2026-06-30T09:15:00+09:00',
+  );
+}
+
+Map<String, Object?> _rideLegJson({
+  String legType = 'RIDE',
+  Object? serviceClass = 'SUBWAY',
+  Object? servicePattern = 'LOCAL',
+}) {
+  return <String, Object?>{
+    'legType': legType,
+    'fromStationId': 'station-a',
+    'toStationId': 'station-b',
+    'fromNodeId': '',
+    'toNodeId': '',
+    'lineId': 'line-4',
+    'tripId': 'trip-1',
+    'trainNo': '4001',
+    'plannedDepartureTime': '2026-06-30T09:17:00+09:00',
+    'realtimeDepartureTime': null,
+    'plannedArrivalTime': '2026-06-30T09:42:00+09:00',
+    'realtimeArrivalTime': null,
+    'waitTimeSeconds': 0,
+    'slackSeconds': 0,
+    'durationSeconds': 1500,
+    'distanceMeters': 12000,
+    'etaSource': 'PLANNED',
+    'confidence': 'MEDIUM',
+    'accessibilityRisk': <String, Object?>{
+      'stairCount': 0,
+      'unknownAccessibilityCount': 0,
+      'generatedConnectorCount': 0,
+      'staleDataCount': 0,
+      'lowConfidenceCount': 0,
+      'unavailableFacilityCount': 0,
+      'riskLevel': 'LOW',
+      'reasonCodes': <String>[],
+      'level': 'LOW',
+      'reasons': <String>[],
+    },
+    'serviceClass': serviceClass,
+    'servicePattern': servicePattern,
+  };
+}
+
+const _objectiveTestRisk = RouteSearchV2AccessibilityRisk(
+  stairCount: 0,
+  unknownAccessibilityCount: 0,
+  generatedConnectorCount: 0,
+  staleDataCount: 0,
+  lowConfidenceCount: 0,
+  unavailableFacilityCount: 0,
+  riskLevel: 'LOW',
+  reasonCodes: [],
+  level: 'LOW',
+  reasons: [],
+);
+
+RouteSearchV2Itinerary _taggedItinerary({
+  required String lineId,
+  required List<String> objectiveTags,
+}) {
+  return RouteSearchV2Itinerary(
+    itineraryId: 'route-$lineId-primary',
+    status: 'FOUND',
+    plannedArrivalTime: '2026-06-30T09:42:00+09:00',
+    realtimeArrivalTime: null,
+    etaSource: 'PLANNED',
+    etaConfidence: 'MEDIUM',
+    durationSeconds: 1620,
+    transferCount: 0,
+    walkingDistanceMeters: 80,
+    accessibilityRisk: _objectiveTestRisk,
+    commercialEtaEligible: false,
+    objectiveTags: objectiveTags,
+    legs: [
+      RouteSearchV2Leg(
+        legType: 'RIDE',
+        fromStationId: 'station-a',
+        toStationId: 'station-b',
+        fromNodeId: '',
+        toNodeId: '',
+        lineId: lineId,
+        tripId: 'trip-1',
+        trainNo: '4001',
+        plannedDepartureTime: '2026-06-30T09:17:00+09:00',
+        realtimeDepartureTime: null,
+        plannedArrivalTime: '2026-06-30T09:42:00+09:00',
+        realtimeArrivalTime: null,
+        waitTimeSeconds: 60,
+        slackSeconds: 0,
+        durationSeconds: 1500,
+        distanceMeters: 12000,
+        etaSource: 'PLANNED',
+        confidence: 'MEDIUM',
+        accessibilityRisk: _objectiveTestRisk,
+        serviceClass: 'SUBWAY',
+        servicePattern: 'LOCAL',
+      ),
+    ],
+  );
+}
+
+RouteSearchV2Result _objectiveResult(List<RouteSearchV2Itinerary> itineraries) {
+  return RouteSearchV2Result(
+    contractVersion: 'ROUTE_SEARCH_V2',
+    originStationId: 'station-a',
+    destinationStationId: 'station-b',
+    departureTime: '2026-06-30T09:15:00+09:00',
+    mobilityType: 'STANDARD',
+    constraintMode: 'PREFER_STEP_FREE',
+    useRealtime: true,
+    maxTransfers: 3,
+    alternativeCount: 3,
+    statuses: const ['FOUND'],
+    itineraries: itineraries,
+  );
 }
 
 class FakeRouteSearchRepository implements RouteSearchRepository {
@@ -1646,7 +2096,7 @@ RouteSearchResult _sampleRouteSearchResult({
   List<RouteSearchWarning> warnings = const [
     RouteSearchWarning(
       code: 'LOW_DATA_CONFIDENCE',
-      message: '일부 시설 안내를 준비 중이에요.',
+      message: '일부 시설 안내는 아직 확인되지 않았어요.',
     ),
   ],
   List<String> blockedReasons = const [],
@@ -1655,6 +2105,7 @@ RouteSearchResult _sampleRouteSearchResult({
   String accessibilityRiskLevel = '',
   int? transferSlackSeconds,
   bool hasOutOfStationTransfer = false,
+  RouteObjective objective = RouteObjective.fastest,
 }) {
   return RouteSearchResult(
     routeSearchId: routeSearchId,
@@ -1678,6 +2129,7 @@ RouteSearchResult _sampleRouteSearchResult({
     accessibilityRiskLevel: accessibilityRiskLevel,
     transferSlackSeconds: transferSlackSeconds,
     hasOutOfStationTransfer: hasOutOfStationTransfer,
+    objective: objective,
   );
 }
 

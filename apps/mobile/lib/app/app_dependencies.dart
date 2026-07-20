@@ -9,24 +9,31 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../features/favorites/data/drift_favorite_repositories.dart';
 import '../features/fare/official_od_fare_repository.dart';
 import '../features/ads/ad_repository.dart';
+import '../features/get_off_alarm/data/get_off_alarm_recovery_notice_store.dart';
 import '../features/get_off_alarm/data/get_off_alarm_state_repository.dart';
 import '../features/get_off_alarm/exact_alarm_permission.dart';
 import '../features/get_off_alarm/get_off_alarm_controller.dart';
 import '../features/get_off_alarm/get_off_alarm_notifier.dart';
+import '../features/get_off_alarm/get_off_alarm_reconcile_worker.dart';
 import '../features/network_map/data/drift_network_map_viewport_repository.dart';
 import '../features/preferences/data/drift_notification_settings_repository.dart';
 import '../features/realtime/realtime_repository.dart';
 import '../features/search_history/data/drift_search_history_repository.dart';
 import '../features/service_notice/data/drift_notice_cache_store.dart';
 import '../features/service_notice/data/notice_repository.dart';
-import '../features/stations/data/station_api_repository.dart';
 import '../features/stations/data/drift_station_repository.dart';
+import '../features/stations/data/current_location_provider.dart';
+import '../features/stations/data/station_api_repository.dart';
+import '../features/stations/domain/station_repositories.dart';
+import '../features/train_search/data/train_search_repository.dart';
+import '../features/train_search/domain/train_search_models.dart';
+import '../features/train_search/domain/train_search_scope_policy.dart';
 import '../internal_route.dart';
 import '../network_map.dart';
 import '../notification_settings.dart';
 import '../route_search.dart';
 import '../route_v2_ingress.dart';
-import '../station_search.dart';
+import '../station_search.dart' show defaultOptionalStationApiBaseUri;
 import '../user_data_deletion.dart';
 import '../features/internal_route/data/local_internal_route_repository.dart';
 import '../features/routes/data/local_route_repository.dart'
@@ -53,6 +60,7 @@ class AppDependencies {
     required this.notificationRepository,
     required this.notificationPermissionProvider,
     required this.locationProvider,
+    required this.trainSearchRepository,
     required this.userDataDeletionRepository,
     this.getOffAlarmController,
     required this.noticeRepository,
@@ -63,6 +71,7 @@ class AppDependencies {
     StationSearchRepository? repository,
     FacilityReportRepository? reportRepository,
     RouteSearchRepository? routeRepository,
+    LocalRouteRepository? localRouteRepository,
     RouteFeedbackRepository? routeFeedbackRepository,
     FavoriteStationRepository? favoriteRepository,
     FavoriteFacilityRepository? favoriteFacilityRepository,
@@ -75,6 +84,7 @@ class AppDependencies {
     NotificationSettingsRepository? notificationRepository,
     NotificationPermissionProvider? notificationPermissionProvider,
     CurrentLocationProvider? locationProvider,
+    TrainSearchRepository? trainSearchRepository,
     UserDataDeletionRepository? userDataDeletionRepository,
     NoticeRepository? noticeRepository,
     AdRepository? adRepository,
@@ -144,14 +154,16 @@ class AppDependencies {
     final resolvedRealtimeRepository =
         realtimeRepository ??
         _defaultRealtimeRepository(baseUri: optionalBaseUri);
-    final localRouteRepository = catalogDatabase == null
-        ? null
-        : LocalRouteRepository(
-            catalogDatabase: catalogDatabase,
-            officialOdFareRepository: OfficialOdFareRepository(
-              catalogDatabase: catalogDatabase,
-            ),
-          );
+    final resolvedLocalRouteRepository =
+        localRouteRepository ??
+        (catalogDatabase == null
+            ? null
+            : LocalRouteRepository(
+                catalogDatabase: catalogDatabase,
+                officialOdFareRepository: OfficialOdFareRepository(
+                  catalogDatabase: catalogDatabase,
+                ),
+              ));
 
     return AppDependencies(
       repository: resolvedStationRepository,
@@ -165,20 +177,20 @@ class AppDependencies {
           routeRepository ??
           (() {
             if (!enableRouteV2OnlineFirst) {
-              return localRouteRepository == null
+              return resolvedLocalRouteRepository == null
                   ? RouteSearchApiRepository(baseUri: requireBaseUri())
                   : LocalFirstRouteSearchRepository(
-                      localRepository: localRouteRepository,
+                      localRepository: resolvedLocalRouteRepository,
                     );
             }
-            if (localRouteRepository == null) {
+            if (resolvedLocalRouteRepository == null) {
               throw StateError(
                 'Route V2 online-first requires a local catalog database.',
               );
             }
             final routeV2BaseUri = requireBaseUri();
             final local = LocalFirstRouteSearchRepository(
-              localRepository: localRouteRepository,
+              localRepository: resolvedLocalRouteRepository,
             );
             final sessionProvider = PlayIntegrityRouteV2SessionProvider(
               apiClient: ApiClient(baseUri: routeV2BaseUri),
@@ -193,7 +205,7 @@ class AppDependencies {
                   bearerTokenProvider: sessionProvider.issueToken,
                   bearerTokenInvalidator: sessionProvider.invalidateSession,
                 ),
-                localRepository: localRouteRepository,
+                localRepository: resolvedLocalRouteRepository,
                 metrics: routeSearchOnlineFirstMetrics,
               ),
             );
@@ -262,6 +274,9 @@ class AppDependencies {
       notificationPermissionProvider: resolvedNotificationPermissionProvider,
       locationProvider:
           locationProvider ?? MethodChannelCurrentLocationProvider(),
+      trainSearchRepository:
+          trainSearchRepository ??
+          _LazyDefaultTrainSearchRepository(optionalBaseUri),
       userDataDeletionRepository:
           userDataDeletionRepository ??
           _defaultUserDataDeletionRepository(
@@ -297,10 +312,37 @@ class AppDependencies {
   final NotificationSettingsRepository? notificationRepository;
   final NotificationPermissionProvider? notificationPermissionProvider;
   final CurrentLocationProvider locationProvider;
+  final TrainSearchRepository trainSearchRepository;
   final UserDataDeletionRepository? userDataDeletionRepository;
   final GetOffAlarmController? getOffAlarmController;
   final NoticeRepository? noticeRepository;
   final AdRepository? adRepository;
+}
+
+class _LazyDefaultTrainSearchRepository implements TrainSearchRepository {
+  _LazyDefaultTrainSearchRepository(this._baseUri);
+
+  final Uri? Function() _baseUri;
+  TrainSearchRepository? _delegate;
+
+  TrainSearchRepository _resolveDelegate() {
+    final cachedDelegate = _delegate;
+    if (cachedDelegate != null) return cachedDelegate;
+    final resolvedBaseUri = _baseUri();
+    return _delegate = resolvedBaseUri == null
+        ? const UnavailableTrainSearchRepository()
+        : ApiTrainSearchRepository(ApiClient(baseUri: resolvedBaseUri));
+  }
+
+  @override
+  Future<TrainSearchResult> search(TrainSearchCriteria criteria) =>
+      _resolveDelegate().search(criteria);
+
+  @override
+  Future<List<TrainStation>> stations(
+    String query, {
+    TrainSearchTrainType? type,
+  }) => _resolveDelegate().stations(query, type: type);
 }
 
 /// 공개 공지 API는 선택 기능이라 앱 시작 중 base URL을 강제 평가하지 않는다.
@@ -412,6 +454,11 @@ GetOffAlarmController? _resolveGetOffAlarmController(
         notificationPermissionProvider ??
         MethodChannelNotificationPermissionProvider(),
     repository: DriftGetOffAlarmStateRepository(userDatabase: userDatabase),
+    recoveryNoticeStore: DriftGetOffAlarmRecoveryNoticeStore(
+      userDatabase: userDatabase,
+    ),
+    onActivateReconcileWork: registerGetOffAlarmReconcile,
+    onDeactivateReconcileWork: cancelGetOffAlarmReconcile,
   );
 }
 

@@ -53,12 +53,14 @@
 				만료 시각
 				<input name="expiresAt" type="datetime-local">
 			</label>
-			<button type="submit">공지 발행</button>
+			<button type="submit" class="primary">공지 발행</button>
 		</form>
 	</section>
 
 	<section class="admin-panel">
 		<h2>최근 공지</h2>
+		<div class="admin-table-scroll" tabindex="0" role="group"
+		     aria-label="가로로 스크롤 가능한 데이터 표">
 		<table>
 			<thead>
 			<tr>
@@ -74,7 +76,7 @@
 			</thead>
 			<tbody>
 			<tr th:if="${notices.isEmpty()}">
-				<td colspan="8">공지 없음</td>
+				<td colspan="8"><div th:replace="~{admin/fragments/empty-state :: panel('등록된 공지가 없습니다.', '아래 등록 폼에서 공지를 추가하세요.')}"></div></td>
 			</tr>
 			<tr th:each="notice : ${notices}">
 				<td th:text="${notice.title}">제목</td>
@@ -82,19 +84,20 @@
 				<td th:text="${notice.severity}">INFO</td>
 				<td th:text="${notice.body}">본문</td>
 				<td th:text="${notice.publishedAt}">2026-07-09T10:00</td>
-				<td th:text="${notice.expiresAt != null ? notice.expiresAt : '-'}">-</td>
+				<td th:insert="~{admin/fragments/missing-value :: value(${notice.expiresAt}, '없음')}">—</td>
 				<td th:text="${notice.publishedBy}">operator</td>
 				<td>
 					<form method="post"
 					      th:action="@{/admin/notices/{id}/unpublish/page(id=${notice.id})}">
 						<input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
 						<input type="hidden" name="commandToken" th:value="${commandTokens.next()}">
-						<button type="submit">즉시 내리기</button>
+						<button type="submit" class="danger">즉시 내리기</button>
 					</form>
 				</td>
 			</tr>
 			</tbody>
 		</table>
+		</div>
 	</section>
 </main>
 </div>

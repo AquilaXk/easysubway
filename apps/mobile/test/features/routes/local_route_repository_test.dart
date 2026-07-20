@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:drift/drift.dart' hide isNotNull, isNull;
+import 'package:drift/native.dart';
 import 'package:easysubway_mobile/app/app_dependencies.dart';
 import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart';
 import 'package:easysubway_mobile/facility_report.dart';
@@ -11,11 +14,658 @@ import 'package:easysubway_mobile/features/fare/official_od_fare_quote.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_route_mapping.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_scheduler.dart';
 import 'package:easysubway_mobile/features/mobility_profile/mobility_profile_policy.dart';
+import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:easysubway_mobile/route_search.dart';
 import 'package:easysubway_mobile/route_v2_ingress.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('warm searchRoute는 catalog SQL과 graph build를 실행하지 않는다', () async {
+    final queries = _QueryCounter();
+    final database = CatalogDatabase(
+      NativeDatabase.memory().interceptWith(queries),
+    );
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    var graphBuildCount = 0;
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      routeCatalogBuildObserver: (event) {
+        if (event == 'graph') graphBuildCount += 1;
+      },
+    );
+    const request = RouteSearchRequest(
+      originStationId: 'station-sangnoksu',
+      destinationStationId: 'station-sadang',
+      mobilityType: 'STANDARD',
+    );
+
+    await repository.searchRoute(request);
+    queries.reset();
+
+    final result = await repository.searchRoute(request);
+
+    expect(result.status, 'FOUND');
+    expect(queries.count, 0);
+    expect(graphBuildCount, 1);
+  });
+
+  test('artifact 교체는 완성된 새 bundle만 게시하고 실패하면 기존 bundle을 유지한다', () async {
+    final oldDatabase = CatalogDatabase.memory();
+    final newDatabase = CatalogDatabase.memory();
+    final brokenDatabase = CatalogDatabase.memory();
+    addTearDown(oldDatabase.close);
+    addTearDown(newDatabase.close);
+    addTearDown(brokenDatabase.close);
+    await oldDatabase.seedBaselineIfEmpty();
+    await newDatabase.seedBaselineIfEmpty();
+    await brokenDatabase.seedBaselineIfEmpty();
+    await newDatabase.customStatement(
+      "UPDATE stations SET name_ko = '새 상록수' WHERE id = 'station-sangnoksu'",
+    );
+    var failBrokenGraph = false;
+    var blockNewGraph = false;
+    final newGraphStarted = Completer<void>();
+    final releaseNewGraph = Completer<void>();
+    final repository = LocalRouteRepository(
+      catalogDatabase: oldDatabase,
+      artifactIdentity: 'artifact-old',
+      routeCatalogBuildObserver: (event) async {
+        if (event == 'graph' && failBrokenGraph) {
+          throw StateError('candidate graph failed');
+        }
+        if (event == 'graph' && blockNewGraph) {
+          newGraphStarted.complete();
+          await releaseNewGraph.future;
+        }
+      },
+    );
+    const request = RouteSearchRequest(
+      originStationId: 'station-sangnoksu',
+      destinationStationId: 'station-sadang',
+      mobilityType: 'STANDARD',
+    );
+
+    expect((await repository.searchRoute(request)).originStationName, '상록수');
+    blockNewGraph = true;
+    final activation = repository.activateDataPack(
+      catalogDatabase: newDatabase,
+      artifactIdentity: 'artifact-new',
+    );
+    await newGraphStarted.future;
+    expect((await repository.searchRoute(request)).originStationName, '상록수');
+    releaseNewGraph.complete();
+    await activation;
+    blockNewGraph = false;
+    expect((await repository.searchRoute(request)).originStationName, '새 상록수');
+
+    failBrokenGraph = true;
+    await expectLater(
+      repository.activateDataPack(
+        catalogDatabase: brokenDatabase,
+        artifactIdentity: 'artifact-broken',
+      ),
+      throwsStateError,
+    );
+    expect((await repository.searchRoute(request)).originStationName, '새 상록수');
+  });
+
+  test('candidate build 오류는 owned DB close 오류보다 우선해 원본 stack을 보존한다', () async {
+    final oldDatabase = CatalogDatabase.memory();
+    final brokenDatabase = _CloseFailingCatalogDatabase();
+    addTearDown(oldDatabase.close);
+    await oldDatabase.seedBaselineIfEmpty();
+    await brokenDatabase.seedBaselineIfEmpty();
+    final repository = LocalRouteRepository(
+      catalogDatabase: oldDatabase,
+      routeCatalogBuildObserver: (event) {
+        if (event == 'graph') throw StateError('candidate graph failed');
+      },
+    );
+
+    await expectLater(
+      repository.activateDataPack(
+        catalogDatabase: brokenDatabase,
+        artifactIdentity: 'artifact-broken',
+        ownsDatabase: true,
+      ),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          'candidate graph failed',
+        ),
+      ),
+    );
+  });
+
+  test('이전 bundle 정리 실패는 게시된 candidate activation을 실패로 바꾸지 않는다', () async {
+    final initialDatabase = CatalogDatabase.memory();
+    final previousDatabase = _CloseFailingCatalogDatabase();
+    final candidateDatabase = CatalogDatabase.memory();
+    addTearDown(initialDatabase.close);
+    await initialDatabase.seedBaselineIfEmpty();
+    await previousDatabase.seedBaselineIfEmpty();
+    await candidateDatabase.seedBaselineIfEmpty();
+    await candidateDatabase.customStatement(
+      "UPDATE stations SET name_ko = '정리 실패 뒤 새 상록수' "
+      "WHERE id = 'station-sangnoksu'",
+    );
+    final repository = LocalRouteRepository(
+      catalogDatabase: initialDatabase,
+      artifactIdentity: 'artifact-initial',
+    );
+    await repository.activateDataPack(
+      catalogDatabase: previousDatabase,
+      artifactIdentity: 'artifact-previous',
+      ownsDatabase: true,
+    );
+    final reported = <FlutterErrorDetails>[];
+
+    await runWithMobileErrorReporter(
+      reported.add,
+      () => repository.activateDataPack(
+        catalogDatabase: candidateDatabase,
+        artifactIdentity: 'artifact-candidate',
+        ownsDatabase: true,
+      ),
+    );
+
+    expect(reported, hasLength(1));
+    expect(reported.single.exception, isA<StateError>());
+    expect(
+      (await repository.searchRoute(
+        const RouteSearchRequest(
+          originStationId: 'station-sangnoksu',
+          destinationStationId: 'station-sadang',
+          mobilityType: 'STANDARD',
+        ),
+      )).originStationName,
+      '정리 실패 뒤 새 상록수',
+    );
+    await repository.close();
+  });
+
+  test('cold artifact 교체는 기존 artifact bundle을 먼저 만들지 않는다', () async {
+    final oldDatabase = CatalogDatabase.memory();
+    final newDatabase = CatalogDatabase.memory();
+    addTearDown(oldDatabase.close);
+    addTearDown(newDatabase.close);
+    await oldDatabase.seedBaselineIfEmpty();
+    await newDatabase.seedBaselineIfEmpty();
+    var snapshotBuildCount = 0;
+    var graphBuildCount = 0;
+    final repository = LocalRouteRepository(
+      catalogDatabase: oldDatabase,
+      artifactIdentity: 'artifact-old',
+      routeCatalogBuildObserver: (event) {
+        if (event == 'snapshot') snapshotBuildCount += 1;
+        if (event == 'graph') graphBuildCount += 1;
+      },
+    );
+
+    await repository.activateDataPack(
+      catalogDatabase: newDatabase,
+      artifactIdentity: 'artifact-new',
+    );
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'STANDARD',
+      ),
+    );
+
+    expect(result.status, 'FOUND');
+    expect(snapshotBuildCount, 1);
+    expect(graphBuildCount, 1);
+    expect(repository.catalogDatabase, same(newDatabase));
+  });
+
+  test('동일 artifact identity의 route API는 snapshot과 graph를 한 번만 빌드한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    var snapshotBuildCount = 0;
+    var graphBuildCount = 0;
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      routeCatalogBuildObserver: (event) {
+        if (event == 'snapshot') snapshotBuildCount += 1;
+        if (event == 'graph') graphBuildCount += 1;
+      },
+    );
+    const request = RouteSearchRequest(
+      originStationId: 'station-sangnoksu',
+      destinationStationId: 'station-sadang',
+      mobilityType: 'STANDARD',
+    );
+
+    await repository.routeCapability(request);
+    await repository.canSearchRoute(request);
+    await repository.searchRoute(request);
+
+    expect(snapshotBuildCount, 1);
+    expect(graphBuildCount, 1);
+  });
+
+  test('동시 cold route 호출은 하나의 snapshot build를 공유한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    final buildStarted = Completer<void>();
+    final releaseBuild = Completer<void>();
+    var snapshotBuildCount = 0;
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      routeCatalogBuildObserver: (event) async {
+        if (event != 'snapshot') return;
+        snapshotBuildCount += 1;
+        if (!buildStarted.isCompleted) buildStarted.complete();
+        await releaseBuild.future;
+      },
+    );
+    const request = RouteSearchRequest(
+      originStationId: 'station-sangnoksu',
+      destinationStationId: 'station-sadang',
+      mobilityType: 'STANDARD',
+    );
+
+    final calls = [
+      repository.canSearchRoute(request),
+      repository.canSearchRoute(request),
+      repository.canSearchRoute(request),
+    ];
+    await buildStarted.future;
+    releaseBuild.complete();
+
+    expect(await Future.wait(calls), [isTrue, isTrue, isTrue]);
+    expect(snapshotBuildCount, 1);
+  });
+
+  test('close는 진행 중인 cold bundle 생성을 기다리고 종료 뒤 재게시하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    await database.seedBaselineIfEmpty();
+    final buildStarted = Completer<void>();
+    final releaseBuild = Completer<void>();
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      routeCatalogBuildObserver: (event) async {
+        if (event != 'snapshot') return;
+        buildStarted.complete();
+        await releaseBuild.future;
+      },
+    );
+    const request = RouteSearchRequest(
+      originStationId: 'station-sangnoksu',
+      destinationStationId: 'station-sadang',
+      mobilityType: 'STANDARD',
+    );
+
+    final search = repository.canSearchRoute(request);
+    await buildStarted.future;
+    var closeCompleted = false;
+    final closing = repository.close().then((_) => closeCompleted = true);
+    await Future<void>.delayed(Duration.zero);
+    final completedBeforeRelease = closeCompleted;
+    releaseBuild.complete();
+
+    expect(await search, isTrue);
+    await closing;
+    expect(completedBeforeRelease, isFalse);
+    await expectLater(repository.canSearchRoute(request), throwsStateError);
+    await database.close();
+  });
+
+  test('close는 진행 중인 artifact activation을 기다리고 후보 게시를 취소한다', () async {
+    final oldDatabase = CatalogDatabase.memory();
+    final newDatabase = CatalogDatabase.memory();
+    await oldDatabase.seedBaselineIfEmpty();
+    await newDatabase.seedBaselineIfEmpty();
+    var blockActivation = false;
+    final activationStarted = Completer<void>();
+    final releaseActivation = Completer<void>();
+    final repository = LocalRouteRepository(
+      catalogDatabase: oldDatabase,
+      artifactIdentity: 'artifact-old',
+      routeCatalogBuildObserver: (event) async {
+        if (event != 'graph' || !blockActivation) return;
+        activationStarted.complete();
+        await releaseActivation.future;
+      },
+    );
+    await repository.canSearchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'STANDARD',
+      ),
+    );
+    blockActivation = true;
+
+    final activation = repository.activateDataPack(
+      catalogDatabase: newDatabase,
+      artifactIdentity: 'artifact-new',
+      ownsDatabase: true,
+    );
+    await activationStarted.future;
+    var closeCompleted = false;
+    final closing = repository.close().then((_) => closeCompleted = true);
+    await Future<void>.delayed(Duration.zero);
+    final completedBeforeRelease = closeCompleted;
+    releaseActivation.complete();
+
+    await activation;
+    await closing;
+    expect(completedBeforeRelease, isFalse);
+    await expectLater(
+      repository.canSearchRoute(
+        const RouteSearchRequest(
+          originStationId: 'station-sangnoksu',
+          destinationStationId: 'station-sadang',
+          mobilityType: 'STANDARD',
+        ),
+      ),
+      throwsStateError,
+    );
+    await oldDatabase.close();
+  });
+
+  test(
+    'cold bundle을 기다리던 activation은 close 뒤 candidate build를 시작하지 않는다',
+    () async {
+      final initialDatabase = CatalogDatabase.memory();
+      final candidateDatabase = CatalogDatabase.memory();
+      await initialDatabase.seedBaselineIfEmpty();
+      await candidateDatabase.seedBaselineIfEmpty();
+      final coldBuildStarted = Completer<void>();
+      final releaseColdBuild = Completer<void>();
+      var snapshotBuildCount = 0;
+      final repository = LocalRouteRepository(
+        catalogDatabase: initialDatabase,
+        artifactIdentity: 'artifact-initial',
+        routeCatalogBuildObserver: (event) async {
+          if (event != 'snapshot') return;
+          snapshotBuildCount += 1;
+          if (snapshotBuildCount == 1) {
+            coldBuildStarted.complete();
+            await releaseColdBuild.future;
+          }
+        },
+      );
+
+      final coldSearch = repository.canSearchRoute(
+        const RouteSearchRequest(
+          originStationId: 'station-sangnoksu',
+          destinationStationId: 'station-sadang',
+          mobilityType: 'STANDARD',
+        ),
+      );
+      await coldBuildStarted.future;
+      final activation = repository.activateDataPack(
+        catalogDatabase: candidateDatabase,
+        artifactIdentity: 'artifact-candidate',
+        ownsDatabase: true,
+      );
+      final closing = repository.close();
+      releaseColdBuild.complete();
+
+      expect(await coldSearch, isTrue);
+      await activation;
+      await closing;
+      expect(snapshotBuildCount, 1);
+      await initialDatabase.close();
+    },
+  );
+
+  test('동일 artifact의 동시 activation은 candidate build 하나를 공유한다', () async {
+    final initialDatabase = CatalogDatabase.memory();
+    final firstCandidateDatabase = CatalogDatabase.memory();
+    final secondCandidateDatabase = CatalogDatabase.memory();
+    await initialDatabase.seedBaselineIfEmpty();
+    await firstCandidateDatabase.seedBaselineIfEmpty();
+    await secondCandidateDatabase.seedBaselineIfEmpty();
+    final candidateGraphStarted = Completer<void>();
+    final releaseCandidateGraph = Completer<void>();
+    var countCandidateBuilds = false;
+    var candidateSnapshotBuildCount = 0;
+    final repository = LocalRouteRepository(
+      catalogDatabase: initialDatabase,
+      artifactIdentity: 'artifact-initial',
+      routeCatalogBuildObserver: (event) async {
+        if (!countCandidateBuilds) return;
+        if (event == 'snapshot') candidateSnapshotBuildCount += 1;
+        if (event == 'graph') {
+          if (!candidateGraphStarted.isCompleted) {
+            candidateGraphStarted.complete();
+          }
+          await releaseCandidateGraph.future;
+        }
+      },
+    );
+    await repository.canSearchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'STANDARD',
+      ),
+    );
+    countCandidateBuilds = true;
+
+    final first = repository.activateDataPack(
+      catalogDatabase: firstCandidateDatabase,
+      artifactIdentity: 'artifact-shared',
+      ownsDatabase: true,
+    );
+    await candidateGraphStarted.future;
+    final second = repository.activateDataPack(
+      catalogDatabase: secondCandidateDatabase,
+      artifactIdentity: 'artifact-shared',
+      ownsDatabase: true,
+    );
+    await Future<void>.delayed(Duration.zero);
+    releaseCandidateGraph.complete();
+
+    await Future.wait([first, second]);
+    expect(candidateSnapshotBuildCount, 1);
+    await repository.close();
+    await initialDatabase.close();
+  });
+
+  test('close는 진행 중인 runtime refresh를 기다린 뒤 owned DB를 닫는다', () async {
+    final initialDatabase = CatalogDatabase.memory();
+    final activeDatabase = CatalogDatabase.memory();
+    await initialDatabase.seedBaselineIfEmpty();
+    await activeDatabase.seedBaselineIfEmpty();
+    final refreshStarted = Completer<void>();
+    final releaseRefresh = Completer<void>();
+    final repository = LocalRouteRepository(
+      catalogDatabase: initialDatabase,
+      artifactIdentity: 'artifact-initial',
+      routeRuntimeRefreshObserver: (event) async {
+        if (event != 'load') return;
+        refreshStarted.complete();
+        await releaseRefresh.future;
+      },
+    );
+    await repository.activateDataPack(
+      catalogDatabase: activeDatabase,
+      artifactIdentity: 'artifact-active',
+      ownsDatabase: true,
+    );
+
+    Object? refreshError;
+    final refresh = repository.refreshRuntimeState().catchError((Object error) {
+      refreshError = error;
+    });
+    await refreshStarted.future;
+    var closeCompleted = false;
+    final closing = repository.close().then((_) => closeCompleted = true);
+    await Future<void>.delayed(Duration.zero);
+    final completedBeforeRelease = closeCompleted;
+    releaseRefresh.complete();
+
+    await refresh;
+    await closing;
+    expect(completedBeforeRelease, isFalse);
+    expect(refreshError, isNull);
+    await initialDatabase.close();
+  });
+
+  test('artifact activation은 이전 owned DB의 runtime refresh를 기다린다', () async {
+    final initialDatabase = CatalogDatabase.memory();
+    final activeDatabase = CatalogDatabase.memory();
+    final candidateDatabase = CatalogDatabase.memory();
+    await initialDatabase.seedBaselineIfEmpty();
+    await activeDatabase.seedBaselineIfEmpty();
+    await candidateDatabase.seedBaselineIfEmpty();
+    final refreshStarted = Completer<void>();
+    final releaseRefresh = Completer<void>();
+    final repository = LocalRouteRepository(
+      catalogDatabase: initialDatabase,
+      artifactIdentity: 'artifact-initial',
+      routeRuntimeRefreshObserver: (event) async {
+        if (event != 'load') return;
+        refreshStarted.complete();
+        await releaseRefresh.future;
+      },
+    );
+    await repository.activateDataPack(
+      catalogDatabase: activeDatabase,
+      artifactIdentity: 'artifact-active',
+      ownsDatabase: true,
+    );
+
+    Object? refreshError;
+    final refresh = repository.refreshRuntimeState().catchError((Object error) {
+      refreshError = error;
+    });
+    await refreshStarted.future;
+    var activationCompleted = false;
+    final activation = repository
+        .activateDataPack(
+          catalogDatabase: candidateDatabase,
+          artifactIdentity: 'artifact-candidate',
+          ownsDatabase: true,
+        )
+        .then((_) => activationCompleted = true);
+    await Future<void>.delayed(Duration.zero);
+    final completedBeforeRelease = activationCompleted;
+    releaseRefresh.complete();
+
+    await refresh;
+    await activation;
+    expect(completedBeforeRelease, isFalse);
+    expect(refreshError, isNull);
+    await repository.close();
+    await initialDatabase.close();
+  });
+
+  test('activation 중 새 runtime refresh는 candidate 게시 뒤 실행한다', () async {
+    final initialDatabase = CatalogDatabase.memory();
+    final activeDatabase = CatalogDatabase.memory();
+    final candidateDatabase = CatalogDatabase.memory();
+    await initialDatabase.seedBaselineIfEmpty();
+    await activeDatabase.seedBaselineIfEmpty();
+    await candidateDatabase.seedBaselineIfEmpty();
+    final candidateGraphStarted = Completer<void>();
+    final releaseCandidateGraph = Completer<void>();
+    final refreshStarted = Completer<void>();
+    var blockCandidate = false;
+    final repository = LocalRouteRepository(
+      catalogDatabase: initialDatabase,
+      artifactIdentity: 'artifact-initial',
+      routeCatalogBuildObserver: (event) async {
+        if (blockCandidate && event == 'graph') {
+          candidateGraphStarted.complete();
+          await releaseCandidateGraph.future;
+        }
+      },
+      routeRuntimeRefreshObserver: (event) {
+        if (event == 'load') refreshStarted.complete();
+      },
+    );
+    await repository.activateDataPack(
+      catalogDatabase: activeDatabase,
+      artifactIdentity: 'artifact-active',
+      ownsDatabase: true,
+    );
+    blockCandidate = true;
+
+    final activation = repository.activateDataPack(
+      catalogDatabase: candidateDatabase,
+      artifactIdentity: 'artifact-candidate',
+      ownsDatabase: true,
+    );
+    await candidateGraphStarted.future;
+    final refresh = repository.refreshRuntimeState();
+    await Future<void>.delayed(Duration.zero);
+    final startedBeforeCandidatePublish = refreshStarted.isCompleted;
+    releaseCandidateGraph.complete();
+
+    await activation;
+    await refresh;
+    expect(startedBeforeCandidatePublish, isFalse);
+    expect(refreshStarted.isCompleted, isTrue);
+    await repository.close();
+    await initialDatabase.close();
+  });
+
+  test('실패한 cold graph build는 부분 publish 없이 다음 호출에서 재시도한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    var snapshotBuildCount = 0;
+    var graphBuildCount = 0;
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      routeCatalogBuildObserver: (event) {
+        if (event == 'snapshot') snapshotBuildCount += 1;
+        if (event != 'graph') return;
+        graphBuildCount += 1;
+        if (graphBuildCount != 2) throw StateError('graph build failed');
+      },
+    );
+    const request = RouteSearchRequest(
+      originStationId: 'station-sangnoksu',
+      destinationStationId: 'station-sadang',
+      mobilityType: 'STANDARD',
+    );
+
+    await expectLater(repository.canSearchRoute(request), throwsStateError);
+    expect(await repository.canSearchRoute(request), isTrue);
+    expect(await repository.canSearchRoute(request), isTrue);
+
+    expect(snapshotBuildCount, 2);
+    expect(graphBuildCount, 2);
+  });
+
+  test('route schema PRAGMA는 DB open에서 끝나고 route build에서 실행하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    var schemaDiscoveryCount = 0;
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      routeCatalogBuildObserver: (event) {
+        if (event == 'schema') schemaDiscoveryCount += 1;
+      },
+    );
+    const request = RouteSearchRequest(
+      originStationId: 'station-sangnoksu',
+      destinationStationId: 'station-sadang',
+      mobilityType: 'STANDARD',
+    );
+
+    await repository.canSearchRoute(request);
+    expect(schemaDiscoveryCount, 0);
+
+    await repository.routeCapability(request);
+    await repository.searchRoute(request);
+    expect(schemaDiscoveryCount, 0);
+  });
+
   test('흡수된 station ID는 대표 station ID로 정규화해 경로를 검색한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
@@ -36,6 +686,8 @@ void main() {
 
     expect(result.status, 'FOUND');
     expect(result.originStationId, 'station-sangnoksu');
+    expect(result.createdAt, endsWith('Z'));
+    expect(DateTime.parse(result.createdAt).isUtc, isTrue);
   });
 
   test('로컬 경로는 exact official OD 요금을 함께 반환한다', () async {
@@ -624,6 +1276,126 @@ void main() {
       ) VALUES
         ('itx-trip', 1, 'station-a', 'line-test', 28770, 28800),
         ('itx-trip', 2, 'station-b', 'line-test', 29400, 29430)
+    ''');
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      now: () => DateTime.parse('2026-07-10T07:58:00+09:00'),
+    );
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    final ride = result.steps.singleWhere((step) => step.stepType == 'ride');
+    expect(result.status, 'FOUND');
+    expect(ride.plannedArrivalTimeIso, isEmpty);
+  });
+
+  test('로컬 경로는 소문자·공백 servicePattern을 정규화해 급행 시간표와 매칭한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    // edge에 소문자·공백 'express '가 와도 대문자 'EXPRESS' 시간표를 찾도록
+    // 조회 전 정규화한다(UI 투영과 같은 값).
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'express-edge-a-b',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-b:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 600,
+      servicePattern: 'express ',
+    );
+    await database.customStatement('''
+      INSERT INTO service_calendars (
+        service_id, monday, tuesday, wednesday, thursday, friday,
+        saturday, sunday, start_date, end_date
+      ) VALUES (
+        'express-weekday', 1, 1, 1, 1, 1, 0, 0, '20260101', '20261231'
+      )
+    ''');
+    await database.customStatement('''
+      INSERT INTO transit_routes (id, line_id, route_short_name)
+      VALUES ('express-route', 'line-test', '4')
+    ''');
+    await database.customStatement('''
+      INSERT INTO transit_trips (
+        id, route_id, service_id, service_pattern, service_class
+      ) VALUES (
+        'express-trip', 'express-route', 'express-weekday', 'EXPRESS', 'SUBWAY'
+      )
+    ''');
+    await database.customStatement('''
+      INSERT INTO transit_stop_times (
+        trip_id, stop_sequence, station_id, line_id,
+        arrival_seconds, departure_seconds
+      ) VALUES
+        ('express-trip', 1, 'station-a', 'line-test', 28770, 28800),
+        ('express-trip', 2, 'station-b', 'line-test', 29400, 29430)
+    ''');
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      now: () => DateTime.parse('2026-07-10T07:58:00+09:00'),
+    );
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    final ride = result.steps.singleWhere((step) => step.stepType == 'ride');
+    expect(result.status, 'FOUND');
+    expect(ride.plannedArrivalTimeIso, '2026-07-10T08:10:00+09:00');
+  });
+
+  test('로컬 경로는 미상 servicePattern이면 도착 시각 조회를 포기한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    // 화이트리스트 밖 값은 어떤 시간표와도 신뢰성 있게 매칭할 수 없으므로 도착
+    // 시각을 비운다(fail-safe). 급행 시간표가 있어도 조회하지 않는다.
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'mystery-edge-a-b',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-b:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 600,
+      servicePattern: 'MYSTERY',
+    );
+    await database.customStatement('''
+      INSERT INTO service_calendars (
+        service_id, monday, tuesday, wednesday, thursday, friday,
+        saturday, sunday, start_date, end_date
+      ) VALUES (
+        'mystery-weekday', 1, 1, 1, 1, 1, 0, 0, '20260101', '20261231'
+      )
+    ''');
+    await database.customStatement('''
+      INSERT INTO transit_routes (id, line_id, route_short_name)
+      VALUES ('mystery-route', 'line-test', '4')
+    ''');
+    await database.customStatement('''
+      INSERT INTO transit_trips (
+        id, route_id, service_id, service_pattern, service_class
+      ) VALUES (
+        'mystery-trip', 'mystery-route', 'mystery-weekday', 'MYSTERY', 'SUBWAY'
+      )
+    ''');
+    await database.customStatement('''
+      INSERT INTO transit_stop_times (
+        trip_id, stop_sequence, station_id, line_id,
+        arrival_seconds, departure_seconds
+      ) VALUES
+        ('mystery-trip', 1, 'station-a', 'line-test', 28770, 28800),
+        ('mystery-trip', 2, 'station-b', 'line-test', 29400, 29430)
     ''');
     final repository = LocalRouteRepository(
       catalogDatabase: database,
@@ -1529,7 +2301,8 @@ void main() {
       result.warnings.map((warning) => warning.code),
       contains('STAIR_ONLY_ACCESS_UNKNOWN'),
     );
-    expect(rideStep.confidenceLabel, '안내를 준비 중이에요');
+    // #2078: 낮은 신뢰도는 준비 중 placeholder 대신 빈 라벨(무표시)로 남긴다.
+    expect(rideStep.confidenceLabel, '');
   });
 
   test('로컬 경로 추천 이유와 음성 안내는 선택 경로에 없는 계단 차단 근거를 말하지 않는다', () async {
@@ -1591,7 +2364,7 @@ void main() {
     );
 
     expect(result.status, 'UNKNOWN');
-    expect(result.destinationStationName, '역 이름을 확인하고 있어요');
+    expect(result.destinationStationName, '역 이름 미확인');
     expect(result.isLocalResult, isTrue);
   });
 
@@ -1802,6 +2575,7 @@ void main() {
       ),
     );
     await _setOutOfStationTransferRuntimeEnabled(database, false);
+    await repository.refreshRuntimeState();
     final disabledResult = await repository.searchRoute(
       const RouteSearchRequest(
         originStationId: 'station-b',
@@ -1813,6 +2587,55 @@ void main() {
     expect(enabledResult.status, 'FOUND');
     expect(disabledResult.status, isNot('FOUND'));
   });
+
+  test(
+    '역외 환승 runtime kill switch false에서 true로 복구하면 graph 재빌드 없이 후보가 된다',
+    () async {
+      final database = CatalogDatabase.memory();
+      addTearDown(database.close);
+      await _seedLineWithoutNetworkEdges(database);
+      await _addSecondLineForTransferFixture(database);
+      await _allowOutOfStationTransfer(
+        database,
+        'station-a:line-test->station-c:line-alt',
+      );
+      await _setOutOfStationTransferRuntimeEnabled(database, false);
+      await _insertVerifiedNetworkEdge(
+        database,
+        id: 'edge-b-a-line-test',
+        fromNodeId: 'station-b:line-test',
+        toNodeId: 'station-a:line-test',
+        edgeType: 'RIDE',
+        durationSeconds: 90,
+      );
+      await _insertVerifiedNetworkEdge(
+        database,
+        id: 'out-transfer-a-c',
+        fromNodeId: 'station-a:line-test',
+        toNodeId: 'station-c:line-alt',
+        edgeType: 'OUT_OF_STATION_TRANSFER',
+        durationSeconds: 300,
+      );
+      var graphBuildCount = 0;
+      final repository = LocalRouteRepository(
+        catalogDatabase: database,
+        routeCatalogBuildObserver: (event) {
+          if (event == 'graph') graphBuildCount += 1;
+        },
+      );
+      const request = RouteSearchRequest(
+        originStationId: 'station-b',
+        destinationStationId: 'station-c',
+        mobilityType: 'WHEELCHAIR',
+      );
+
+      expect((await repository.searchRoute(request)).status, isNot('FOUND'));
+      await _setOutOfStationTransferRuntimeEnabled(database, true);
+      await repository.refreshRuntimeState();
+      expect((await repository.searchRoute(request)).status, 'FOUND');
+      expect(graphBuildCount, 1);
+    },
+  );
 
   test('역외 환승 edge는 역방향을 자동으로 열지 않는다', () async {
     final database = CatalogDatabase.memory();
@@ -2073,6 +2896,67 @@ void main() {
     expect(result.warnings, isEmpty);
   });
 
+  test('시설 없는 edge는 graph 재빌드 없이 365일 경계를 넘으면 stale이 된다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    var current = DateTime.utc(2026, 7, 18, 12);
+    final verifiedAt = current
+        .subtract(const Duration(days: 365))
+        .add(const Duration(seconds: 1));
+    for (final edge in [
+      (
+        id: 'entry-a-fresh-boundary',
+        from: 'station-a',
+        to: 'station-a:line-test',
+        type: 'ENTRY',
+      ),
+      (
+        id: 'ride-a-c-fresh-boundary',
+        from: 'station-a:line-test',
+        to: 'station-c:line-test',
+        type: 'RIDE',
+      ),
+      (
+        id: 'exit-c-fresh-boundary',
+        from: 'station-c:line-test',
+        to: 'station-c',
+        type: 'EXIT',
+      ),
+    ]) {
+      await _insertVerifiedNetworkEdge(
+        database,
+        id: edge.id,
+        fromNodeId: edge.from,
+        toNodeId: edge.to,
+        edgeType: edge.type,
+        durationSeconds: 60,
+        lastVerifiedAtSeconds: verifiedAt.millisecondsSinceEpoch ~/ 1000,
+      );
+    }
+    var graphBuildCount = 0;
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      now: () => current,
+      routeCatalogBuildObserver: (event) {
+        if (event == 'graph') graphBuildCount += 1;
+      },
+    );
+    const request = RouteSearchRequest(
+      originStationId: 'station-a',
+      destinationStationId: 'station-c',
+      mobilityType: 'WHEELCHAIR',
+    );
+
+    expect((await repository.searchRoute(request)).status, 'FOUND');
+    current = current.add(const Duration(seconds: 2));
+    final stale = await repository.searchRoute(request);
+
+    expect(stale.status, 'UNKNOWN');
+    expect(stale.blockedReasons, contains('오래된 안내라 계단 없는 경로로 안내하지 않아요.'));
+    expect(graphBuildCount, 1);
+  });
+
   test('잘못된 provenance와 evidence hash는 strict 경로에서 FOUND 근거가 되지 않는다', () async {
     for (final fixture in const [
       (
@@ -2307,6 +3191,7 @@ void main() {
         'RIDE'
       )
     ''');
+    await database.refreshRouteSchemaCapabilities();
     final repository = LocalRouteRepository(catalogDatabase: database);
 
     final result = await repository.searchRoute(
@@ -2354,6 +3239,7 @@ void main() {
         'AVAILABLE'
       )
     ''');
+    await database.refreshRouteSchemaCapabilities();
     final repository = LocalRouteRepository(catalogDatabase: database);
 
     final result = await repository.searchRoute(
@@ -2944,6 +3830,89 @@ void main() {
     expect(result.status, 'BLOCKED');
     expect(result.steps, isEmpty);
     expect(result.blockedReasons, contains('꼭 필요한 시설을 지금 이용하기 어려워요.'));
+  });
+
+  test('active 시설 상태가 시간 경과로 만료되면 graph 재빌드 없이 strict 경로가 복구된다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedAvailableFacilityRoute(database);
+    var current = DateTime.utc(2026, 7, 18, 5);
+    final nowSeconds = current.millisecondsSinceEpoch ~/ 1000;
+    await _addFacilityStatusSnapshot(
+      database,
+      id: 'snapshot-facility-a-expiring-unavailable',
+      providerId: 'live-provider',
+      sourceId: 'facility-live-source',
+      sourceSnapshotId: 'facility-live-source-20260718',
+      status: 'BROKEN',
+      operationalStatus: 'OUT_OF_SERVICE',
+      observedAtSeconds: nowSeconds,
+      expiresAtSeconds: nowSeconds + 30,
+    );
+    var graphBuildCount = 0;
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      now: () => current,
+      routeCatalogBuildObserver: (event) {
+        if (event == 'graph') graphBuildCount += 1;
+      },
+    );
+    const request = RouteSearchRequest(
+      originStationId: 'station-a',
+      destinationStationId: 'station-b',
+      mobilityType: 'WHEELCHAIR',
+    );
+
+    expect((await repository.searchRoute(request)).status, 'BLOCKED');
+    current = current.add(const Duration(seconds: 31));
+    expect((await repository.searchRoute(request)).status, 'FOUND');
+    expect(graphBuildCount, 1);
+  });
+
+  test('facility status DB 갱신은 graph 재빌드 없이 다음 검색의 strict 경로에 반영된다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedAvailableFacilityRoute(database);
+    var graphBuildCount = 0;
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      routeCatalogBuildObserver: (event) {
+        if (event == 'graph') graphBuildCount += 1;
+      },
+    );
+    const request = RouteSearchRequest(
+      originStationId: 'station-a',
+      destinationStationId: 'station-b',
+      mobilityType: 'WHEELCHAIR',
+    );
+    expect((await repository.searchRoute(request)).status, 'FOUND');
+    final nowSeconds = DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
+
+    await database.customInsert(
+      '''
+      INSERT INTO facility_status_snapshots (
+        id, facility_id, provider_id, source_id, source_snapshot_id,
+        provider_record_hash, evidence_hash, provenance_kind,
+        verification_status, status, operational_status, confidence,
+        observed_at, expires_at
+      ) VALUES (
+        'snapshot-facility-a-runtime-unavailable', 'facility-a-elevator',
+        'live-provider', 'facility-live-source', 'facility-live-source-20260718',
+        'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+        'OFFICIAL_SOURCE', 'VERIFIED', 'BROKEN', 'OUT_OF_SERVICE', 100, ?, ?
+      )
+      ''',
+      variables: [
+        Variable.withInt(nowSeconds),
+        Variable.withInt(nowSeconds + 3600),
+      ],
+      updates: {database.facilityStatusSnapshots},
+    );
+    await repository.refreshRuntimeState();
+
+    expect((await repository.searchRoute(request)).status, 'BLOCKED');
+    expect(graphBuildCount, 1);
   });
 
   test('operator override snapshot은 live snapshot보다 우선한다', () async {
@@ -4411,6 +5380,102 @@ void main() {
     expect(ride.carDoorCarNumber, 3);
     expect(ride.carDoorDoorNumber, 4);
   });
+
+  test('fewestTransfers 요청은 환승이 더 적은 대안을, fastest는 기존 경로를 반환한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedTwoLegRoute(database);
+    // 환승 없는 직통 대안(비쌈): fastest는 피하고 fewestTransfers만 고른다.
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'ride-a-c-direct-test',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-c:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 900,
+    );
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final fastest = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-c',
+        mobilityType: 'STANDARD',
+      ),
+    );
+    final fewestTransfers = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-c',
+        mobilityType: 'STANDARD',
+        objective: RouteObjective.fewestTransfers,
+      ),
+    );
+
+    expect(fastest.status, 'FOUND');
+    expect(fastest.transferCount, 1);
+    expect(fewestTransfers.status, 'FOUND');
+    expect(fewestTransfers.transferCount, 0);
+    expect(fewestTransfers.objective, RouteObjective.fewestTransfers);
+    expect(
+      fewestTransfers.steps.expand((step) => step.evidenceSources),
+      contains('edge:ride-a-c-direct-test'),
+    );
+  });
+
+  test('로컬 ride servicePattern은 대문자 enum으로 정규화한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'ride-a-b-line-test',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-b:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 90,
+      servicePattern: 'express',
+    );
+
+    final result = await LocalRouteRepository(catalogDatabase: database)
+        .searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-a',
+            destinationStationId: 'station-b',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        );
+
+    final ride = result.steps.firstWhere((s) => s.stepType == 'ride');
+    expect(ride.servicePattern, 'EXPRESS');
+  });
+
+  test('로컬 ride servicePattern이 LOCAL·EXPRESS가 아니면 배지 없이 null로 둔다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'ride-a-b-line-test',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-b:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 90,
+      servicePattern: 'RAPID',
+    );
+
+    final result = await LocalRouteRepository(catalogDatabase: database)
+        .searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-a',
+            destinationStationId: 'station-b',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        );
+
+    final ride = result.steps.firstWhere((s) => s.stepType == 'ride');
+    expect(ride.servicePattern, isNull);
+  });
 }
 
 Map<String, Object?> _routeV2Payload({
@@ -4503,6 +5568,8 @@ Map<String, Object?> _routeV2Payload({
             'distanceMeters': 180,
             'etaSource': 'REALTIME',
             'confidence': 'HIGH',
+            'serviceClass': 'SUBWAY',
+            'servicePattern': 'LOCAL',
             'accessibilityRisk': {
               'stairCount': 0,
               'unknownAccessibilityCount': 0,
@@ -5295,6 +6362,78 @@ Future<void> _addFacilityIdColumnIfMissing(CatalogDatabase database) async {
     await database.customStatement(
       'ALTER TABLE network_edges ADD COLUMN facility_id TEXT',
     );
+    await database.refreshRouteSchemaCapabilities();
+  }
+}
+
+final class _CloseFailingCatalogDatabase extends CatalogDatabase {
+  _CloseFailingCatalogDatabase() : super(NativeDatabase.memory());
+
+  var _failNextClose = true;
+
+  @override
+  Future<void> close() async {
+    await super.close();
+    if (_failNextClose) {
+      _failNextClose = false;
+      throw StateError('catalog database close failed');
+    }
+  }
+}
+
+final class _QueryCounter extends QueryInterceptor {
+  int count = 0;
+
+  void reset() => count = 0;
+
+  @override
+  Future<List<Map<String, Object?>>> runSelect(
+    QueryExecutor executor,
+    String statement,
+    List<Object?> args,
+  ) {
+    count += 1;
+    return executor.runSelect(statement, args);
+  }
+
+  @override
+  Future<void> runCustom(
+    QueryExecutor executor,
+    String statement,
+    List<Object?> args,
+  ) {
+    count += 1;
+    return executor.runCustom(statement, args);
+  }
+
+  @override
+  Future<int> runInsert(
+    QueryExecutor executor,
+    String statement,
+    List<Object?> args,
+  ) {
+    count += 1;
+    return executor.runInsert(statement, args);
+  }
+
+  @override
+  Future<int> runUpdate(
+    QueryExecutor executor,
+    String statement,
+    List<Object?> args,
+  ) {
+    count += 1;
+    return executor.runUpdate(statement, args);
+  }
+
+  @override
+  Future<int> runDelete(
+    QueryExecutor executor,
+    String statement,
+    List<Object?> args,
+  ) {
+    count += 1;
+    return executor.runDelete(statement, args);
   }
 }
 
@@ -5309,6 +6448,7 @@ Future<void> _addDistanceMetersColumnIfMissing(CatalogDatabase database) async {
     await database.customStatement(
       'ALTER TABLE network_edges ADD COLUMN distance_meters INTEGER NOT NULL DEFAULT 0',
     );
+    await database.refreshRouteSchemaCapabilities();
   }
 }
 

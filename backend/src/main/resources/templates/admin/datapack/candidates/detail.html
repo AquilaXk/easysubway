@@ -21,13 +21,15 @@
 			<p th:text="${'scope ' + candidate.scopeId + ' · ' + candidate.artifactKind + ' · ' + candidate.version}">scope</p>
 		</div>
 		<div class="admin-actions">
-			<a class="admin-btn" th:href="@{/admin/datapack/pipeline/page}">파이프라인 개요</a>
+			<a class="admin-btn plain" th:href="@{/admin/datapack/pipeline/page}">파이프라인 개요</a>
 		</div>
 	</header>
 
 	<section class="admin-panel">
 		<h2>게이트 체크리스트</h2>
 		<p class="summary" th:text="${evidenceBundle.productionPromoteReason()}">production promote 상태</p>
+		<div class="admin-table-scroll" tabindex="0" role="group"
+		     aria-label="가로로 스크롤 가능한 데이터 표">
 		<table class="static-table">
 			<thead>
 			<tr>
@@ -62,44 +64,47 @@
 			</tr>
 			</tbody>
 		</table>
+		</div>
 	</section>
 
 	<section class="admin-panel">
 		<h2>증거·산출물</h2>
 		<dl class="admin-meta-list">
 			<dt>증거 워크플로</dt>
-			<dd th:text="${evidenceBundle.workflowRunUrl}">workflow</dd>
+			<dd th:insert="~{admin/fragments/missing-value :: value(${evidenceBundle.workflowRunUrl}, '미상')}">workflow</dd>
 			<dt>증거 번들 sha256</dt>
 			<dd>
 				<span class="sha-inline" th:title="${evidenceBundle.evidenceBundleSha256}"
 				      th:text="${evidenceBundle.evidenceBundleSha256Short()}">sha</span>
-				<button type="button" class="tiny-btn" x-data="copyField" x-on:click="copy"
+				<button type="button" class="tiny-btn outline" x-data="copyField" x-on:click="copy"
 				        th:attr="data-copy-value=${evidenceBundle.evidenceBundleSha256}">복사</button>
 			</dd>
 			<dt>매니페스트 sha256</dt>
 			<dd>
 				<span class="sha-inline" th:title="${candidate.manifestSha256}"
 				      th:text="${candidate.manifestSha256Short()}">sha</span>
-				<button type="button" class="tiny-btn" x-data="copyField" x-on:click="copy"
+				<button type="button" class="tiny-btn outline" x-data="copyField" x-on:click="copy"
 				        th:attr="data-copy-value=${candidate.manifestSha256}">복사</button>
 			</dd>
 			<dt>원천 스냅샷 세트 hash</dt>
 			<dd>
 				<span class="sha-inline" th:title="${candidate.sourceSnapshotSetHash}"
 				      th:text="${candidate.sourceSnapshotSetHashShort()}">sha</span>
-				<button type="button" class="tiny-btn" x-data="copyField" x-on:click="copy"
+				<button type="button" class="tiny-btn outline" x-data="copyField" x-on:click="copy"
 				        th:attr="data-copy-value=${candidate.sourceSnapshotSetHash}">복사</button>
 			</dd>
 			<dt>오버라이드 세트 hash</dt>
 			<dd>
 				<span class="sha-inline" th:title="${candidate.overrideSetHash}"
 				      th:text="${candidate.overrideSetHashShort()}">sha</span>
-				<button type="button" class="tiny-btn" x-data="copyField" x-on:click="copy"
+				<button type="button" class="tiny-btn outline" x-data="copyField" x-on:click="copy"
 				        th:attr="data-copy-value=${candidate.overrideSetHash}">복사</button>
 			</dd>
 		</dl>
 		<details>
 			<summary>sha 원문 보기</summary>
+			<div class="admin-table-scroll" tabindex="0" role="group"
+			     aria-label="가로로 스크롤 가능한 데이터 표">
 			<table class="static-table">
 				<tbody>
 				<tr><th scope="row">buildSpec</th><td th:text="${candidate.buildSpecSha256}">sha</td></tr>
@@ -110,11 +115,14 @@
 				<tr><th scope="row">evidenceBundle</th><td th:text="${evidenceBundle.evidenceBundleSha256}">sha</td></tr>
 				</tbody>
 			</table>
+			</div>
 		</details>
 	</section>
 
 	<section class="admin-panel">
 		<h2>입력 원장</h2>
+		<div class="admin-table-scroll" tabindex="0" role="group"
+		     aria-label="가로로 스크롤 가능한 데이터 표">
 		<table class="static-table">
 			<tbody>
 			<tr><th scope="row">원천 스냅샷 ids</th><td th:text="${candidateInput.sourceSnapshotIds}">snapshot ids</td></tr>
@@ -124,6 +132,7 @@
 			<tr><th scope="row">승인 오버라이드 세트 hash</th><td><span th:title="${candidateInput.approvedOverrideSetHash}" th:text="${candidateInput.approvedOverrideSetHashShort()}">sha</span></td></tr>
 			</tbody>
 		</table>
+		</div>
 	</section>
 
 	<section class="admin-panel">
@@ -135,7 +144,7 @@
 			<label>사유
 				<input name="reason" value="candidate gates rerun requested" required>
 			</label>
-			<button type="submit">게이트 재실행</button>
+			<button type="submit" class="primary">게이트 재실행</button>
 		</form>
 	</section>
 </main>

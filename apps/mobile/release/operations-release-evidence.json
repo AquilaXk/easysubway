@@ -69,9 +69,9 @@
       },
       "phaseACurrentRcArtifact": {
         "result": "PASS_TWO_CLEAN_REPRODUCIBLE_BOOTJAR_BUILDS",
-        "sourceCommit": "dd49d5e7df7382df85e600c28344c35b5b7f9147",
+        "sourceCommit": "78e82c982046dc5c3192667599253511b803a85c",
         "artifact": "backend-boot.jar",
-        "backendArtifactSha256": "8bc8f71f92fa82b38739a02424c6758f317b6dd4d3f07398cdf29a886c4b5f98",
+        "backendArtifactSha256": "74a3e35762d1973c0b05a0c0bd6f0fc6aa2a4657ef23cde359cf100e0830f631",
         "productionMutationPerformed": false
       },
       "datapackArtifact": {
@@ -232,7 +232,8 @@
         "/actuator/health/readiness",
         "/api/v1/realtime/**",
         "/api/notices/active",
-        "/api/ads/active"
+        "/api/ads/active",
+        "/actuator/prometheus"
       ],
       "allowedAuthenticatedEndpoints": [
         "/api/v2/routes/session",
@@ -246,6 +247,111 @@
         "strategy": "NON_PRODUCTION_ONLY",
         "issue": 1913,
         "androidRouteMode": "LOCAL_FIRST"
+      },
+      "routeV2Readiness": {
+        "issue": 2095,
+        "status": "SATISFIED",
+        "productionReachabilityEvidence": {
+          "observedAt": "2026-07-16T15:20:00+09:00",
+          "candidateGitSha": "e317f3af90292b9e2dff5e7ec90c22792b845435",
+          "rollbackRun": "https://github.com/AquilaXk/easysubway/actions/runs/29470369402",
+          "ingressOpen": false,
+          "activeProductionEndpoints": []
+        },
+        "intendedAndroidConsumers": [
+          {
+            "method": "POST",
+            "path": "/api/v2/routes/session",
+            "consumer": "PlayIntegrityRouteV2SessionProvider",
+            "auth": "Play Integrity attestation and gateway origin proof",
+            "cacheControl": "private, no-store"
+          },
+          {
+            "method": "POST",
+            "path": "/api/v2/routes/search",
+            "consumer": "RouteSearchV2ApiRepository",
+            "auth": "Bearer route:v2:itx session and gateway origin proof",
+            "cacheControl": "private, no-store"
+          }
+        ],
+        "closedRouteEndpoints": [
+          "/api/v1/routes/search",
+          "/api/v2/routes/{routeSearchId}/refresh"
+        ],
+        "subwayLocalFirst": {
+          "consumer": "TransportScopedRouteSearchRepository",
+          "networkCalls": 0
+        },
+        "timetableSnapshotCache": {
+          "status": "SATISFIED",
+          "implementedByIssue": 2145,
+          "requiredKey": {
+            "format": "snapshotSha256 + freshUntil",
+            "fields": ["snapshotSha256", "freshUntil"],
+            "sameFreshnessDifferentHashReloadRequired": true
+          },
+          "currentImplementation": {
+            "status": "SATISFIED",
+            "fields": ["snapshotSha256", "freshUntil"],
+            "snapshotId": "server-timetable-snapshot-9f9be14b6cdd6e4d",
+            "snapshotSha256": "9f9be14b6cdd6e4d9a2eda1391b0bd7a48e6330485c9e1ec81d399958eae45d8",
+            "freshUntil": "2026-07-27T00:00:00+09:00",
+            "evidencePath": "tools/datapack/server-timetable-snapshot-evidence.json"
+          },
+          "sharedRouteResponseCacheAllowed": false
+        },
+        "realisticLoadEvidence": {
+          "status": "SATISFIED",
+          "requires": ["normal", "burst", "unavailable", "latency", "error", "resource", "purge"],
+          "evidenceSource": "local-production-runner",
+          "runner": "tools/ops/verify-production-route-v2-capacity.sh",
+          "workflow": ".github/workflows/production-route-v2-capacity-evidence.yml",
+          "runnerExitCode": 0,
+          "productionWorkflowRunUrl": "https://github.com/AquilaXk/easysubway/actions/runs/29712689840",
+          "productionWorkflowRun": {
+            "runUrl": "https://github.com/AquilaXk/easysubway/actions/runs/29712689840",
+            "deployedSha": "3cad74667dc4c519aac0d1a9f9bcab2bcf5e5142",
+            "conclusion": "success",
+            "note": "production capacity workflow 최초 완주. run은 candidate SHA(e317f3af90292b9e2dff5e7ec90c22792b845435)가 아닌 이후 배포·검증된 SHA(3cad7466)에서 수행됨 — candidate 블록은 candidate identity로 불변 유지."
+          },
+          "candidate": {
+            "versionName": "1.0.5",
+            "versionCode": 10006,
+            "candidateGitSha": "e317f3af90292b9e2dff5e7ec90c22792b845435"
+          },
+          "profiles": {
+            "normal": { "result": "PASS", "unexpectedErrorCount": 0 },
+            "burst": { "result": "PASS", "expectedStatus": 429, "retryAfterHeader": true, "cacheControl": "private, no-store" },
+            "unavailable": { "result": "PASS", "expectedStatus": 503, "machineCode": "ITX_TIMETABLE_UNAVAILABLE" }
+          },
+          "latencyBudget": { "p95MaxMs": 2000, "p99MaxMs": 5000 },
+          "resourceStability": {
+            "backendOomKilled": false,
+            "backendRestartCount": 0,
+            "gatewayOomKilled": false,
+            "gatewayRestartCount": 0
+          },
+          "cache": { "missObserved": true, "hitObserved": true },
+          "purge": { "states": 1, "sessions": 1, "nonces": 1, "budgetMs": 600000 },
+          "privacy": { "undeclaredDataTransferCount": 0, "sensitivePayloadCount": 0 },
+          "ingressClosed": true
+        },
+        "productionCanaryRollback": {
+          "status": "BLOCKED_EXTERNAL",
+          "explicitProductionApprovalRequired": true,
+          "sameCandidateIdentityRequired": true,
+          "preparedTooling": {
+            "runner": "tools/ops/verify-production-route-v2-canary-rollback.sh",
+            "evidenceLibrary": "tools/ops/route-v2-canary-rollback-evidence.mjs",
+            "workflow": ".github/workflows/production-route-v2-canary-rollback-dry-run.yml",
+            "requiresBeforeExecution": [
+              "explicit-owner-approval-reference",
+              "same-candidate-identity",
+              "signed-rc-canary-attestation-provisioned",
+              "route-v2-ingress-open"
+            ]
+          }
+        }
       },
       "requiredEvidence": [
         "backend-public-api-surface-inventory",

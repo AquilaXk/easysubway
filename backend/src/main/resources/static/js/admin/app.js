@@ -49,6 +49,31 @@ document.addEventListener('alpine:init', function () {
 	// 드롭다운이 열린다. sidebarToggle/alertCenter와 동일한 명명 컴포넌트 패턴 — CSP 빌드라
 	// 메서드·게터 이름만 디렉티브에 넣는다. 진화형 향상: JS가 없으면 트리거는 계정 페이지 링크로
 	// 동작하고 로그아웃 폼은 드롭다운 안에 그대로 렌더되어 접근 가능하다.
+	// 업무 영역(workspace) disclosure(#2277): 사이드바를 7개 업무 영역 아코디언으로 접는다.
+	// 서버는 모든 영역을 펼친 채(no-JS 폴백) 렌더하고, JS가 있으면 data-current="true"(현재 위치를
+	// 담은 영역)만 펼치고 나머지는 접는다. 각 영역은 독립 x-data라 하나를 열어도 다른 영역은 그대로다.
+	// 진화형 향상 — JS가 없으면 모든 영역이 펼쳐진 채 남아 허용 program 전부에 접근할 수 있다.
+	// CSP 빌드 규약: x-on/x-bind에는 메서드·게터 이름만 쓴다.
+	Alpine.data('navWorkspace', function () {
+		return {
+			expanded: true,
+			init: function () {
+				// 현재 위치가 없는 페이지(sidebar('')로 렌더되는 검색·알림·오류 등)는 서버가
+				// .admin-nav-scroll에 is-no-current를 붙인다. 이때 어떤 영역도 data-current="true"가
+				// 아니어서 전 영역이 접히는 회귀를 막기 위해 전 영역 펼침으로 폴백한다(#2277 리뷰).
+				var scroll = this.$el.closest('.admin-nav-scroll');
+				var noCurrent = scroll ? scroll.classList.contains('is-no-current') : false;
+				this.expanded = noCurrent || this.$el.dataset.current === 'true';
+			},
+			get ariaExpanded() {
+				return this.expanded ? 'true' : 'false';
+			},
+			toggle: function () {
+				this.expanded = !this.expanded;
+			},
+		};
+	});
+
 	Alpine.data('userMenu', function () {
 		return {
 			open: false,
@@ -518,6 +543,58 @@ document.addEventListener('alpine:init', function () {
 			},
 			recount: function () {
 				this.count = this.$root.querySelectorAll('input[name="notificationIds"]:checked').length;
+			},
+		};
+	});
+
+	// 목록 툴바 시트(#2278 V6-06): compact에서 필터·보기 설정을 시트로 여닫는다. 진화형 향상 —
+	// JS가 없으면 시트 트리거(x-cloak)는 숨고 시트 내용은 인라인으로 남아 form/link가 그대로 동작한다.
+	// userMenu와 동일한 포커스 정책: close()는 상태만 닫아 외부 클릭(x-on:click.outside) 시 포커스를
+	// 트리거로 빼앗지 않고(입력 미유실), Esc(closeFromKeyboard)로 닫을 때만 트리거로 포커스를 복원한다.
+	// 리스너는 Alpine 디렉티브(x-on)로만 선언해 컴포넌트가 교체될 때 자동 정리된다 — 수동 addEventListener나
+	// 폴링이 없어 htmx 부분 갱신으로 툴바가 다시 렌더돼도 리스너가 중복 등록되지 않는다.
+	// CSP 빌드 규약: x-on/x-bind에는 메서드·게터 이름만 쓴다.
+	Alpine.data('listToolbar', function () {
+		return {
+			filterOpen: false,
+			viewOpen: false,
+			get filterExpanded() {
+				return this.filterOpen ? 'true' : 'false';
+			},
+			get viewExpanded() {
+				return this.viewOpen ? 'true' : 'false';
+			},
+			get filterSheetClass() {
+				return this.filterOpen ? 'is-open' : '';
+			},
+			get viewSheetClass() {
+				return this.viewOpen ? 'is-open' : '';
+			},
+			toggleFilter: function () {
+				this.filterOpen = !this.filterOpen;
+			},
+			toggleView: function () {
+				this.viewOpen = !this.viewOpen;
+			},
+			closeFilter: function () {
+				this.filterOpen = false;
+			},
+			closeView: function () {
+				this.viewOpen = false;
+			},
+			closeFilterFromKeyboard: function () {
+				if (!this.filterOpen) {
+					return;
+				}
+				this.filterOpen = false;
+				this.$refs.filterTrigger?.focus();
+			},
+			closeViewFromKeyboard: function () {
+				if (!this.viewOpen) {
+					return;
+				}
+				this.viewOpen = false;
+				this.$refs.viewTrigger?.focus();
 			},
 		};
 	});

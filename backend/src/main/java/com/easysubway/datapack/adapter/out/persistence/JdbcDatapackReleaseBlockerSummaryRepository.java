@@ -50,6 +50,22 @@ public class JdbcDatapackReleaseBlockerSummaryRepository implements DatapackRele
 		long manualOverrideBlockers = countManualOverrideBlockers();
 		long facilityBlockers = countFacilityBlockers(null, evaluationAt);
 		long routeGateBlockers = countRouteGateBlockers(null);
+		long callbackReconciliationBlockers = count("""
+			SELECT COUNT(*) FROM datapack_release_deliveries
+			WHERE channel = 'production' AND state <> 'DELIVERED'
+			  AND NOT (state = 'DEAD_LETTER'
+				AND http_class = 'STALE'
+				AND sanitized_detail = 'CURRENT_RELEASE_ADVANCED')
+			""") + count("""
+			SELECT COUNT(*) FROM datapack_release_request request
+			WHERE request.target_channel = 'production'
+			  AND request.status IN ('APPROVED', 'DISPATCHED')
+			  AND request.updated_at <= ?
+			  AND NOT EXISTS (
+				SELECT 1 FROM datapack_release_deliveries delivery
+				WHERE delivery.release_request_id = request.approval_id
+			  )
+			""", evaluationAt.minusMinutes(10));
 		EvidenceBundleSummary evidenceBundle = evidenceBundle(candidate);
 		ManifestSignatureSummary manifestSignature = evidenceBundle.manifestSignature();
 		ReleaseChannelSummary productionChannel = productionChannel();
@@ -60,6 +76,7 @@ public class JdbcDatapackReleaseBlockerSummaryRepository implements DatapackRele
 			+ manualOverrideBlockers
 			+ facilityBlockers
 			+ routeGateBlockers
+			+ callbackReconciliationBlockers
 			+ evidenceBundle.blockerCount();
 		return new DatapackReleaseBlockerSummary(
 			candidate.map(CandidateGateSummary::candidateId).orElse("-"),
@@ -79,6 +96,8 @@ public class JdbcDatapackReleaseBlockerSummaryRepository implements DatapackRele
 			manualOverrideBlockers,
 			facilityBlockers,
 			routeGateBlockers,
+			callbackReconciliationBlockers,
+			evidenceBundle.otherBlockerCount(),
 			manifestSignature.blockerCount(),
 			readinessRows(
 				candidate,
@@ -88,6 +107,7 @@ public class JdbcDatapackReleaseBlockerSummaryRepository implements DatapackRele
 				manualOverrideBlockers,
 				facilityBlockers,
 				routeGateBlockers,
+				callbackReconciliationBlockers,
 				evidenceBundle,
 				manifestSignature
 			),
@@ -108,8 +128,8 @@ public class JdbcDatapackReleaseBlockerSummaryRepository implements DatapackRele
 			hasAnyEvidence && totalBlockers == 0 ? "PASS" : "확인 필요",
 			totalBlockers,
 			List.of(
-				new StationReleaseBlockerRow("Facility evidence", facilityBlockers, stationRowStatus(facilityBlockers, facilityEvidenceRows)),
-				new StationReleaseBlockerRow("Route gate", routeGateBlockers, stationRowStatus(routeGateBlockers, routeEvidenceRows))
+				new StationReleaseBlockerRow("시설 근거", facilityBlockers, stationRowStatus(facilityBlockers, facilityEvidenceRows)),
+				new StationReleaseBlockerRow("경로 게이트", routeGateBlockers, stationRowStatus(routeGateBlockers, routeEvidenceRows))
 			)
 		);
 	}
@@ -147,6 +167,7 @@ public class JdbcDatapackReleaseBlockerSummaryRepository implements DatapackRele
 		long manualOverrideBlockers,
 		long facilityBlockers,
 		long routeGateBlockers,
+		long callbackReconciliationBlockers,
 		EvidenceBundleSummary evidenceBundle,
 		ManifestSignatureSummary manifestSignature
 	) {
@@ -161,21 +182,28 @@ public class JdbcDatapackReleaseBlockerSummaryRepository implements DatapackRele
 		long androidBlockers = candidate.map(row -> "PASS".equals(row.androidEvidenceStatus()) ? 0L : 1L).orElse(1L)
 			+ evidenceBundle.androidBlocker();
 		return List.of(
-			new ReleaseReadinessRow("Source coverage", statusFor(sourceBlockers), sourceBlockers, sourceNote(aliasBlockers, quarantineBlockers)),
+			new ReleaseReadinessRow("소스 커버리지", statusFor(sourceBlockers), sourceBlockers, sourceNote(aliasBlockers, quarantineBlockers)),
 			new ReleaseReadinessRow(
-				"Source freshness",
+				"소스 최신성",
 				candidate.isEmpty() ? "확인 필요" : statusFor(sourceFreshnessBlockers),
 				sourceFreshnessBlockers,
 				candidate.isEmpty()
 					? "source snapshot 없음"
-					: sourceFreshnessBlockers > 0 ? "SOURCE_SNAPSHOT_EXPIRED" : "latest source snapshots"
+					: sourceFreshnessBlockers > 0 ? "SOURCE_SNAPSHOT_EXPIRED" : "최신 원천 스냅샷"
 			),
-			new ReleaseReadinessRow("Validator", statusFor(validatorBlockers), validatorBlockers, "SQLite integrity / validator gates"),
-			new ReleaseReadinessRow("Facility evidence", statusFor(facilityBlockers), facilityBlockers, "strict route eligible facility evidence"),
-			new ReleaseReadinessRow("Route gate", statusFor(routeBlockers), routeBlockers, "ENTRY/EXIT/TRANSFER and generated connector gates"),
-			new ReleaseReadinessRow("Android evidence", statusFor(androidBlockers), androidBlockers, "Android datapack adoption evidence"),
-			new ReleaseReadinessRow("Manifest signature", manifestSignature.status(), manifestSignature.blockerCount(), "release evidence bundle / signature"),
-			new ReleaseReadinessRow("Manual override", statusFor(manualOverrideBlockers), manualOverrideBlockers, "approval / expiry / conflict gates")
+			new ReleaseReadinessRow("검증기", statusFor(validatorBlockers), validatorBlockers, "SQLite 무결성 / 검증기 게이트"),
+			new ReleaseReadinessRow("시설 근거", statusFor(facilityBlockers), facilityBlockers, "엄격 경로 대상 시설 근거"),
+			new ReleaseReadinessRow("경로 게이트", statusFor(routeBlockers), routeBlockers, "ENTRY/EXIT/TRANSFER 및 생성된 커넥터 게이트"),
+			new ReleaseReadinessRow("Android 증거", statusFor(androidBlockers), androidBlockers, "Android 데이터팩 도입 증거"),
+			new ReleaseReadinessRow("매니페스트 서명", manifestSignature.status(), manifestSignature.blockerCount(), "릴리스 증거 번들 / 서명"),
+			new ReleaseReadinessRow(
+				"콜백 정합성 확인",
+				candidate.isEmpty() && callbackReconciliationBlockers == 0
+					? "확인 필요" : statusFor(callbackReconciliationBlockers),
+				callbackReconciliationBlockers,
+				callbackReconciliationBlockers > 0
+					? "CALLBACK_RECONCILIATION_REQUIRED" : "발송 확인됨"),
+			new ReleaseReadinessRow("수동 오버라이드", statusFor(manualOverrideBlockers), manualOverrideBlockers, "승인 / 만료 / 충돌 게이트")
 		);
 	}
 
@@ -332,6 +360,11 @@ public class JdbcDatapackReleaseBlockerSummaryRepository implements DatapackRele
 		return result == null ? 0L : result;
 	}
 
+	private long count(String sql, Object parameter) {
+		Long result = jdbcTemplate.queryForObject(sql, Long.class, parameter);
+		return result == null ? 0L : result;
+	}
+
 	private static String releaseStatus(Optional<CandidateGateSummary> candidate, long totalBlockers) {
 		if (candidate.isEmpty()) {
 			return "확인 필요";
@@ -423,6 +456,12 @@ public class JdbcDatapackReleaseBlockerSummaryRepository implements DatapackRele
 
 		long androidBlocker() {
 			return statusBlocker(androidEvidenceStatus);
+		}
+
+		// blockerCount() 중 매니페스트 서명(manifestSignature)을 제외한 나머지 증거 번들 차단 요인.
+		// 대시보드 상세 표의 "매니페스트 서명" 행과 중복 집계하지 않기 위해 분리한다(#2352 리뷰).
+		long otherBlockerCount() {
+			return validatorBlocker() + routeRegressionBlocker() + androidBlocker();
 		}
 
 		ManifestSignatureSummary manifestSignature() {

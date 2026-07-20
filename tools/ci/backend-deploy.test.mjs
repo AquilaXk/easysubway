@@ -6,6 +6,10 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test, { afterEach } from "node:test";
 import { promisify } from "node:util";
+import {
+  DEFAULT_MARGIN_SECONDS,
+  evaluateSnapshotFreshnessPrecheck,
+} from "../deploy/check-snapshot-freshness-precheck.mjs";
 
 const root = process.cwd();
 const execFileAsync = promisify(execFile);
@@ -13,6 +17,7 @@ const ASSET_ORIGIN = "https://ads-assets.fixture.test-only.dev";
 const ASSET_ORIGIN_LINE = `EASYSUBWAY_ADS_ASSET_ORIGIN=${ASSET_ORIGIN}`;
 const EVENT_DAILY_CAP_LINE = "EASYSUBWAY_ADS_EVENT_DAILY_CAP=1000000";
 const BACKEND_BIND_LINE = "EASYSUBWAY_BACKEND_BIND=127.0.0.1";
+const TRUSTED_PROXY_LINE = "EASYSUBWAY_TRUSTED_PROXY_CIDRS=172.16.0.0/12";
 const ROUTE_V2_ORIGIN_SECRET_LINE = `EASYSUBWAY_ROUTE_V2_ORIGIN_SECRET=${"O".repeat(43)}`;
 const ROUTE_V2_CERTIFICATE_LINE = `EASYSUBWAY_ROUTE_V2_PLAY_INTEGRITY_CERTIFICATE_SHA256=${"A".repeat(43)}`;
 const deploymentTempDirs = new Set();
@@ -23,6 +28,13 @@ function read(relativePath) {
 
 function fixtureEnv() {
   return read("tools/ci/fixtures/deployment-prod-valid.env");
+}
+
+function dotenvValues(source) {
+  return Object.fromEntries(source.split("\n").filter(Boolean).map((line) => {
+    const separator = line.indexOf("=");
+    return [line.slice(0, separator), line.slice(separator + 1)];
+  }));
 }
 
 afterEach(async () => {
@@ -111,6 +123,26 @@ test("광고 asset origin은 backend env에만 변형 없이 전달한다", asyn
     0,
     "compose.env must not contain an asset origin key",
   );
+});
+
+test("callback reconciliation catalog trust 설정은 backend env에 전달한다", async () => {
+  const source = `${fixtureEnv()}\nEASYSUBWAY_DATAPACK_CATALOG_BASE_URL=https://datapacks.example.test\nEASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1\n`;
+  const outputDir = await prepare(source);
+  const backendEnv = await readFile(path.join(outputDir, "backend.env"), "utf8");
+  const composeEnv = await readFile(path.join(outputDir, "compose.env"), "utf8");
+  const sourceValues = dotenvValues(source);
+  const backendValues = dotenvValues(backendEnv);
+
+  for (const name of [
+    "EASYSUBWAY_DATAPACK_CATALOG_BASE_URL",
+    "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM",
+    "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID",
+  ]) {
+    assert.ok(Object.hasOwn(sourceValues, name), `${name} is required in source`);
+    assert.ok(Object.hasOwn(backendValues, name), `${name} is required in backend.env`);
+    assert.equal(backendValues[name], sourceValues[name]);
+    assert.doesNotMatch(composeEnv, new RegExp(`^${name}=`, "m"));
+  }
 });
 
 test("광고 asset origin production preflight는 unsafe 값을 차단한다", async () => {
@@ -211,6 +243,25 @@ test("production backend bind는 loopback만 허용한다", async () => {
   }
 });
 
+test("production train-search rate limit은 sanitized Nginx peer 경계를 필수로 신뢰한다", async () => {
+  for (const value of ["", "10.0.0.0/8,192.168.0.0/16", "172.16.0.0/16", "0.0.0.0/0"]) {
+    await assert.rejects(
+      prepare(fixtureEnv().replace(
+        TRUSTED_PROXY_LINE,
+        `EASYSUBWAY_TRUSTED_PROXY_CIDRS=${value}`,
+      )),
+      /trusted proxy CIDRs must equal the Docker ingress boundary/,
+    );
+  }
+
+  const proxy = read("infra/nginx/host-default-proxy.conf");
+  const host = read("infra/nginx/host-easysubway.conf.template");
+  assert.match(proxy, /real_ip_header CF-Connecting-IP;/);
+  assert.match(proxy, /proxy_set_header X-Forwarded-For \$remote_addr;/);
+  assert.doesNotMatch(proxy, /proxy_add_x_forwarded_for/);
+  assert.equal((host.match(/access_log off;/g) ?? []).length, 3);
+});
+
 test("Route V2 배포 secret과 certificate digest는 config injection을 차단한다", async () => {
   await assert.rejects(
     prepare(fixtureEnv().replace(ROUTE_V2_ORIGIN_SECRET_LINE, "EASYSUBWAY_ROUTE_V2_ORIGIN_SECRET=short;include")),
@@ -247,6 +298,11 @@ test("배포 env 준비는 Compose 서버 env와 backend 앱 env를 분리한다
   assert.doesNotMatch(composeEnv, /^EASYSUBWAY_REPORT_UPLOAD_INTENT_SIGNING_KEY=/m);
   assert.match(backendEnv, /^EASYSUBWAY_DATASOURCE_URL=jdbc:postgresql:\/\/postgres:5432\/easysubway$/m);
   assert.match(backendEnv, /^EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY=prod-topis-service-key$/m);
+  assert.match(backendEnv, /^EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY=prod-tago-train-service-key$/m);
+  assert.match(backendEnv, /^EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_MINUTE=60$/m);
+  assert.match(backendEnv, /^EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_DAY=1000$/m);
+  assert.match(backendEnv, /^EASYSUBWAY_TRAIN_SEARCH_RATE_LIMIT_PER_DAY=64$/m);
+  assert.match(backendEnv, /^EASYSUBWAY_TRUSTED_PROXY_CIDRS=172\.16\.0\.0\/12$/m);
   assert.match(backendEnv, /^EASYSUBWAY_REPORT_OBJECT_STORAGE_INTERNAL_ENDPOINT=http:\/\/object-storage:9000$/m);
   assert.match(backendEnv, /^EASYSUBWAY_REPORT_UPLOAD_PUBLIC_BASE_URL=https:\/\/uploads.easysubway.example$/m);
   assert.match(backendEnv, /^EASYSUBWAY_REPORT_ABUSE_WINDOW_SECONDS=45$/m);
@@ -263,8 +319,49 @@ test("배포 env 준비는 Compose 서버 env와 backend 앱 env를 분리한다
   assert.doesNotMatch(backendEnv, /^EASYSUBWAY_OBJECT_STORAGE_ENDPOINT=/m);
   assert.doesNotMatch(backendEnv, /^EASYSUBWAY_POSTGRES_PASSWORD=/m);
   assert.doesNotMatch(backendEnv, /^EASYSUBWAY_ALERT_SMTP_PASSWORD=/m);
+  assert.doesNotMatch(backendEnv, /^DATA_GO_KR_SERVICE_KEY=/m);
   assert.equal(composeMode, 0o600);
   assert.equal(backendMode, 0o600);
+});
+
+test("TAGO 기차검색 key는 공용 GitHub secret에서 backend 전용 env로만 주입한다", () => {
+  const cd = read(".github/workflows/cd.yml");
+  const example = read(".env.example");
+  const allowlist = read("tools/deploy/backend-app-env.allowlist");
+  const scopeMap = JSON.parse(read("contracts/env/env-scope-map.json"));
+
+  assert.match(cd, /DATA_GO_KR_SERVICE_KEY_SECRET: \$\{\{ secrets\.DATA_GO_KR_SERVICE_KEY \}\}/);
+  assert.match(cd, /EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY=%s/);
+  assert.match(cd, /drop\["EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_MINUTE"\] = 1/);
+  assert.match(cd, /drop\["EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_DAY"\] = 1/);
+  assert.match(cd, /drop\["EASYSUBWAY_TRAIN_SEARCH_RATE_LIMIT_PER_DAY"\] = 1/);
+  assert.match(cd, /printf 'EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_MINUTE=60\\n'/);
+  assert.match(cd, /printf 'EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_DAY=1000\\n'/);
+  assert.match(cd, /printf 'EASYSUBWAY_TRAIN_SEARCH_RATE_LIMIT_PER_DAY=64\\n'/);
+  assert.match(
+    cd,
+    /node --env-file="\$\{PREPARED_ENV_DIR\}\/backend\.env" tools\/ops\/probe-tago-train-provider\.mjs/,
+  );
+  assert.match(allowlist, /^EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY$/m);
+  assert.doesNotMatch(allowlist, /^DATA_GO_KR_SERVICE_KEY$/m);
+  assert.deepEqual(scopeMap.keys.EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY, ["backend"]);
+  assert.equal(scopeMap.keys.DATA_GO_KR_SERVICE_KEY, undefined);
+  for (const [key, value] of [
+    ["EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_MINUTE", "60"],
+    ["EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_DAY", "1000"],
+    ["EASYSUBWAY_TRAIN_SEARCH_RATE_LIMIT_PER_DAY", "64"],
+  ]) {
+    assert.match(example, new RegExp(`^${key}=${value}$`, "m"));
+    assert.match(allowlist, new RegExp(`^${key}$`, "m"));
+    assert.deepEqual(scopeMap.keys[key], ["backend"]);
+  }
+});
+
+test("production 배포 env는 TAGO 기차검색 key 누락을 거부한다", async () => {
+  await assert.rejects(
+    prepare(fixtureEnv().replace(/^EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY=.*\n/m, "")),
+    /required deployment env is empty: EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY/,
+  );
 });
 
 test("배포 env 준비는 중복, interpolation, 내부 공개 URL을 차단한다", async () => {
@@ -322,7 +419,7 @@ test("배포 env 준비는 중복, interpolation, 내부 공개 URL을 차단한
   assert.doesNotMatch(backendEnv, /^EASYSUBWAY_ALERT_SMTP_PASSWORD=/m);
 });
 
-test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤백 계약을 포함한다", async () => {
+test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, standby 승격 계약을 포함한다", async () => {
   await execFileAsync("bash", ["-n", "tools/deploy/prepare-deployment-env.sh"], { cwd: root });
   await execFileAsync("bash", ["-n", "tools/deploy/deploy-backend.sh"], { cwd: root });
   await execFileAsync("bash", ["-n", "tools/ops/postgres-backup.sh"], { cwd: root });
@@ -397,7 +494,7 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤�
   assert.ok(legacyStopCallIndex < deploy.indexOf("trap restore_legacy_on_unhandled_error ERR"));
   assert.ok(legacyStopCallIndex < deploy.indexOf("trap 'restore_legacy_on_interruption TERM' TERM"));
   const legacyRestoreDisableIndex = deploy.lastIndexOf("legacy_restore_on_error=0");
-  assert.ok(deploy.indexOf('fail_backend_deployment "readiness_failed"') < legacyRestoreDisableIndex);
+  assert.ok(deploy.indexOf('abort_deploy "observability_readiness_failed"') < legacyRestoreDisableIndex);
   assert.ok(legacyRestoreDisableIndex < deploy.indexOf('printf \'%s\\n\' "${DEPLOY_SHA}" > "${SHARED_DIR}/current-sha"'));
   assert.ok(deploy.indexOf("trap - ERR INT TERM HUP") < deploy.indexOf('printf \'%s\\n\' "${DEPLOY_SHA}" > "${SHARED_DIR}/current-sha"'));
   assert.match(deploy, /managed_image_drift/);
@@ -418,16 +515,15 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤�
   assert.match(deploy, /compose_services_running "\$\{BACKEND_ENV\}" "\$\{COMPOSE_ENV\}" "\$\{DEPLOY_SHA\}" "\$\{RUNTIME_SERVICES\[@\]\}" "\$\{OBSERVABILITY_SERVICES\[@\]\}"/);
   assert.match(deploy, /same_sha_same_env_services_ready/);
   assert.doesNotMatch(deploy, /same_sha_same_env_ready/);
-  assert.match(deploy, /up -d --no-deps --no-build --force-recreate "\$\{RUNTIME_SERVICES\[@\]\}"/);
+  // The 3-service RUNTIME_SERVICES force-recreate is gone: canonical "backend"
+  // is recreated alone during promotion (asserted in the blue/green contract
+  // block below).
   assert.match(deploy, /--profile observability up -d --no-build "\$\{OBSERVABILITY_SERVICES\[@\]\}" \|\| return 1/);
   assert.match(deploy, /--profile observability up -d --no-build --force-recreate "\$\{OBSERVABILITY_CONFIG_SERVICES\[@\]\}" \|\| return 1/);
   assert.match(deploy, /--profile observability up -d --no-build --force-recreate alertmanager \|\| return 1/);
   assert.match(deploy, /if \[\[ "\$\{current_env_hash\}" != "\$\{target_env_hash\}" \]\]; then/);
   assert.match(deploy, /git diff --quiet "\$\{current_sha\}" "\$\{DEPLOY_SHA\}" -- infra\/prometheus infra\/alertmanager\/templates infra\/loki infra\/grafana\/provisioning/);
   assert.doesNotMatch(deploy, /--force-recreate "\$\{OBSERVABILITY_SERVICES\[@\]\}"/);
-  assert.match(deploy, /fail_backend_deployment\(\)/);
-  assert.match(deploy, /fail_backend_deployment "backend_start_failed"/);
-  assert.match(deploy, /fail_backend_deployment "observability_start_failed"/);
   assert.match(deploy, /verify_runtime_hardening\(\)/);
   assert.match(deploy, /runtime_services_hardened\(\)/);
   assert.match(deploy, /docker inspect --format '\{\{\.Config\.User\}\}\|\{\{\.HostConfig\.ReadonlyRootfs\}\}\|\{\{json \.HostConfig\.Tmpfs\}\}\|\{\{json \.HostConfig\.CapDrop\}\}\|\{\{json \.HostConfig\.SecurityOpt\}\}'/);
@@ -442,28 +538,192 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤�
     deploy.indexOf("runtime_services_hardened()") < deploy.indexOf('if [[ "${current_sha}" == "${DEPLOY_SHA}"'),
     "runtime hardening helper must be available to the same-SHA no-op path",
   );
-  assert.match(deploy, /compose_services_running[\s\S]*&& runtime_services_hardened; then/);
-  assert.match(deploy, /if ! runtime_services_hardened; then/);
-  assert.match(deploy, /fail_backend_deployment "runtime_hardening_failed"/);
-  assert.ok(
-    deploy.indexOf('verify_runtime_hardening "${service}"') < deploy.indexOf('ready=0'),
-    "runtime hardening must pass before readiness completes the deployment",
-  );
+  assert.match(deploy, /compose_services_running[\s\S]*&& runtime_services_hardened "\$\{RUNTIME_SERVICES\[@\]\}"; then/);
+  assert.match(deploy, /if ! runtime_services_hardened backend-standby; then/);
+  assert.match(deploy, /if ! runtime_services_hardened backend; then/);
+  assert.match(deploy, /if ! runtime_services_hardened back-worker route-v2-gateway; then/);
   assert.match(deploy, /observability_ready=0/);
   assert.match(deploy, /compose_services_running "\$\{SHARED_DIR\}\/current-env\/backend\.env" "\$\{SHARED_DIR\}\/current-env\/compose\.env" "\$\{DEPLOY_SHA\}" "\$\{RUNTIME_SERVICES\[@\]\}" "\$\{OBSERVABILITY_SERVICES\[@\]\}"/);
-  assert.match(deploy, /mktemp "\$\{DIAGNOSTICS_DIR\}\/\$\{DEPLOY_SHA\}-observability-\$\(date -u \+%Y%m%dT%H%M%SZ\)\.XXXXXX\.log"/);
-  assert.match(deploy, /chmod 600 "\$\{diagnostic\}"/);
-  assert.match(deploy, /--profile observability logs --no-color --tail=200 "\$\{RUNTIME_SERVICES\[@\]\}" "\$\{OBSERVABILITY_SERVICES\[@\]\}"/);
-  assert.match(deploy, /fail_backend_deployment "observability_readiness_failed"/);
-  assert.match(deploy, /"\$\{detail\}_rollback_attempted"/);
-  assert.match(deploy, /"\$\{detail\}_rollback_unavailable"/);
-  assert.match(deploy, /start_observability_services "\$\{SHARED_DIR\}\/current-env\/backend\.env" "\$\{SHARED_DIR\}\/current-env\/compose\.env" "\$\{current_sha\}" "\$\{recreate_alertmanager\}" "\$\{recreate_observability_config\}" \|\| true/);
-  assert.match(deploy, /rm -f -s "\$\{RUNTIME_SERVICES\[@\]\}"/);
-  assert.match(deploy, /logs --no-color --tail=200 "\$\{RUNTIME_SERVICES\[@\]\}"/);
-  assert.match(deploy, /if ! compose "\$\{SHARED_DIR\}\/current-env\/backend\.env" "\$\{SHARED_DIR\}\/current-env\/compose\.env" "\$\{DEPLOY_SHA\}" up -d --no-deps --no-build --force-recreate "\$\{RUNTIME_SERVICES\[@\]\}"; then/);
   assert.match(deploy, /actuator\/health\/readiness/);
-  assert.match(deploy, /fail_backend_deployment "readiness_failed"/);
   assert.match(deploy, /diagnostics/);
+
+  // --- Blue/green standby+promotion contract (issue #2331). The old
+  // reboot-the-previous-image rollback path is fully removed: no image
+  // restart, no `previous-env` symlink, no per-detail "_rollback_attempted"/
+  // "_rollback_unavailable" suffixes. Instead a candidate is proven on a
+  // standby container before the canonical "backend" container is ever
+  // touched, and a single "leave the proven-healthy server as-is" fallback
+  // covers every post-promotion failure.
+  assert.doesNotMatch(deploy, /fail_backend_deployment/);
+  assert.doesNotMatch(deploy, /ensure_rollback_image/);
+  assert.doesNotMatch(deploy, /GHCR_IMAGE/);
+  assert.doesNotMatch(deploy, /previous-env/);
+  assert.doesNotMatch(deploy, /_rollback_attempted/);
+  assert.doesNotMatch(deploy, /_rollback_unavailable/);
+  assert.match(deploy, /backend_standby_port="\$\(read_env_value "\$\{COMPOSE_ENV\}" EASYSUBWAY_BACKEND_STANDBY_PORT\)"/);
+  assert.match(deploy, /backend_standby_port="\$\{backend_standby_port:-8082\}"/);
+  assert.match(deploy, /STANDBY_STATE_FILE="\$\{SHARED_DIR\}\/deployment-standby-state\.env"/);
+  assert.match(deploy, /write_standby_state\(\)/);
+  assert.match(deploy, /wait_backend_http_ready\(\)/);
+  assert.match(deploy, /dump_diagnostics\(\)/);
+  assert.match(deploy, /cleanup_standby\(\)/);
+  assert.match(deploy, /abort_deploy\(\)/);
+  assert.match(deploy, /abort_standby_stage\(\)/);
+  assert.match(deploy, /install_route_v2_host_ingress\(\) \{\n\tlocal target_backend_port="\$1"/);
+
+  // Stage order: no-op < freshness precheck < standby up < standby hardening
+  // + readiness < Nginx -> alt < promotion recreate < promotion hardening +
+  // readiness < Nginx -> canonical < standby cleanup < back-worker/gateway
+  // recreate < current-sha recorded.
+  const noopExitIndex = deploy.indexOf('write_result "noop" "same_sha_same_env_services_ready"');
+  const precheckIndex = deploy.indexOf("check-snapshot-freshness-precheck.mjs");
+  const standbyUpIndex = deploy.indexOf('write_phase "standby_starting"');
+  const standbyForceRecreateIndex = deploy.indexOf("up -d --no-deps --no-build --force-recreate backend-standby");
+  const standbyHardenedIndex = deploy.indexOf("if ! runtime_services_hardened backend-standby; then");
+  const standbyReadyWaitIndex = deploy.indexOf('if ! wait_backend_http_ready "${backend_standby_port}"; then');
+  const standbyReadyPhaseIndex = deploy.indexOf('write_phase "standby_ready"');
+  const nginxAltIndex = deploy.indexOf('if ! install_route_v2_host_ingress "${backend_standby_port}"; then');
+  const nginxAltPhaseIndex = deploy.indexOf('write_phase "nginx_alt"');
+  const promotingPhaseIndex = deploy.indexOf('write_phase "promoting"');
+  const canonicalForceRecreateIndex = deploy.indexOf("up -d --no-deps --no-build --force-recreate backend; then");
+  const canonicalHardenedIndex = deploy.indexOf("if ! runtime_services_hardened backend; then");
+  const canonicalReadyWaitIndex = deploy.indexOf('if ! wait_backend_http_ready "${backend_port}"; then');
+  const promotedPhaseIndex = deploy.indexOf('write_phase "promoted"');
+  const nginxCanonicalIndex = deploy.indexOf('if ! install_route_v2_host_ingress "${backend_port}"; then');
+  const standbyCleanupPhaseIndex = deploy.indexOf('write_phase "standby_cleanup"');
+  const standbyRmIndex = deploy.indexOf("rm -f -s backend-standby; then");
+  const finalizingPhaseIndex = deploy.indexOf('write_phase "finalizing"');
+  const backWorkerGatewayForceRecreateIndex = deploy.indexOf(
+    "up -d --no-deps --no-build --force-recreate back-worker route-v2-gateway",
+  );
+  const currentShaWriteIndex = deploy.indexOf('printf \'%s\\n\' "${DEPLOY_SHA}" > "${SHARED_DIR}/current-sha"');
+
+  for (const index of [
+    noopExitIndex, precheckIndex, standbyUpIndex, standbyForceRecreateIndex, standbyHardenedIndex,
+    standbyReadyWaitIndex, standbyReadyPhaseIndex, nginxAltIndex, nginxAltPhaseIndex, promotingPhaseIndex,
+    canonicalForceRecreateIndex, canonicalHardenedIndex, canonicalReadyWaitIndex, promotedPhaseIndex,
+    nginxCanonicalIndex, standbyCleanupPhaseIndex, standbyRmIndex, finalizingPhaseIndex,
+    backWorkerGatewayForceRecreateIndex, currentShaWriteIndex,
+  ]) {
+    assert.notEqual(index, -1);
+  }
+
+  assert.ok(noopExitIndex < precheckIndex, "no-op success must exit before the freshness precheck runs");
+  assert.ok(precheckIndex < standbyUpIndex, "freshness precheck must run before the standby container starts");
+  assert.ok(standbyUpIndex < standbyForceRecreateIndex);
+  assert.ok(standbyForceRecreateIndex < standbyHardenedIndex, "standby must exist before it is hardening-checked");
+  assert.ok(standbyHardenedIndex < standbyReadyWaitIndex, "standby hardening must pass before its readiness is polled");
+  assert.ok(standbyReadyWaitIndex < standbyReadyPhaseIndex);
+  assert.ok(standbyReadyPhaseIndex < nginxAltIndex, "standby must be proven ready before Nginx switches to it");
+  assert.ok(nginxAltIndex < nginxAltPhaseIndex);
+  assert.ok(nginxAltPhaseIndex < promotingPhaseIndex, "Nginx must be on the standby before the canonical container is recreated");
+  assert.ok(promotingPhaseIndex < canonicalForceRecreateIndex);
+  assert.ok(canonicalForceRecreateIndex < canonicalHardenedIndex);
+  assert.ok(canonicalHardenedIndex < canonicalReadyWaitIndex, "canonical hardening must pass before its readiness is polled");
+  assert.ok(canonicalReadyWaitIndex < promotedPhaseIndex);
+  assert.ok(promotedPhaseIndex < nginxCanonicalIndex, "canonical must be proven ready before Nginx switches back to it");
+  assert.ok(nginxCanonicalIndex < standbyCleanupPhaseIndex, "Nginx must be back on canonical before the standby is retired");
+  assert.ok(standbyCleanupPhaseIndex < standbyRmIndex);
+  assert.ok(standbyRmIndex < finalizingPhaseIndex, "standby must be retired before back-worker/route-v2-gateway are recreated");
+  assert.ok(finalizingPhaseIndex < backWorkerGatewayForceRecreateIndex);
+  assert.ok(
+    backWorkerGatewayForceRecreateIndex < currentShaWriteIndex,
+    "current-sha is only recorded once every stage above has succeeded",
+  );
+
+  // --- Review follow-up (PR #2356): legacy-restore trap must be disarmed
+  // before promotion recreates the canonical container, so a trap firing
+  // mid-promotion cannot start the legacy systemd jar on the same port the
+  // Docker canonical container may already hold.
+  const promotionLegacyDisarmIndex = deploy.indexOf("legacy_restore_on_error=0", promotingPhaseIndex);
+  assert.notEqual(promotionLegacyDisarmIndex, -1);
+  assert.ok(
+    promotingPhaseIndex < promotionLegacyDisarmIndex,
+    "legacy_restore_on_error must be disarmed at or after the promoting phase begins",
+  );
+  assert.ok(
+    promotionLegacyDisarmIndex < canonicalForceRecreateIndex,
+    "legacy_restore_on_error must be disarmed before the canonical container is force-recreated",
+  );
+
+  // --- Review follow-up: current-env is captured and restored on a
+  // pre-promotion standby-stage abort, so external tools that read
+  // current-env/compose.env as ground truth for "what canonical is actually
+  // running" (capacity/canary rollback scripts) never see an uncommitted
+  // candidate env after an abort that never touched canonical.
+  assert.match(deploy, /previous_env_set=""/);
+  assert.match(deploy, /if \[\[ -L "\$\{SHARED_DIR\}\/current-env" \]\]; then/);
+  assert.match(deploy, /previous_env_set="\$\(readlink "\$\{SHARED_DIR\}\/current-env"\)"/);
+  const abortStandbyStageBody = deploy.slice(
+    deploy.indexOf("abort_standby_stage() {"),
+    deploy.indexOf("abort_standby_stage() {") + deploy.slice(deploy.indexOf("abort_standby_stage() {")).indexOf("\n}\n"),
+  );
+  assert.match(abortStandbyStageBody, /if \[\[ -n "\$\{previous_env_set\}" \]\]; then/);
+  assert.match(abortStandbyStageBody, /ln -sfn "\$\{previous_env_set\}" "\$\{SHARED_DIR\}\/current-env\.next"/);
+  assert.match(abortStandbyStageBody, /rm -f "\$\{SHARED_DIR\}\/current-env"/);
+  const previousEnvSetCaptureIndex = deploy.indexOf('previous_env_set=""');
+  const currentEnvSwapIndex = deploy.indexOf('ln -sfn "${env_set}" "${SHARED_DIR}/current-env.next"');
+  assert.ok(
+    previousEnvSetCaptureIndex < currentEnvSwapIndex,
+    "the previous current-env target must be captured before it is overwritten",
+  );
+
+  // --- Review follow-up: the standby state file is reset to idle right
+  // after the deploy lock is acquired, so a stale "*_standby_serving" from a
+  // prior run does not linger across unrelated, later-blocked attempts.
+  const flockIndex = deploy.indexOf("flock 9");
+  const sessionStartResetIndex = deploy.indexOf('write_standby_state "idle"');
+  const interruptedStateCheckIndex = deploy.indexOf('write_result "blocked" "interrupted_state"');
+  const writeStandbyStateDefIndex = deploy.indexOf("write_standby_state() {");
+  assert.notEqual(flockIndex, -1);
+  assert.notEqual(sessionStartResetIndex, -1);
+  assert.ok(
+    writeStandbyStateDefIndex < flockIndex,
+    "write_standby_state must be defined before flock so it can reset state right after lock acquisition",
+  );
+  assert.ok(flockIndex < sessionStartResetIndex, "the standby state reset must run after the deploy lock is acquired");
+  assert.ok(
+    sessionStartResetIndex < interruptedStateCheckIndex,
+    "the standby state reset must run before any early-blocked exit",
+  );
+
+  // --- Review follow-up: manual recovery runbook for "*_standby_serving"
+  // degraded exits, and the expand/contract migration contract header.
+  assert.match(deploy, /Manual recovery runbook for a "\*_standby_serving" degraded exit/);
+  assert.match(deploy, /managed_image_drift — it is not a/);
+  assert.match(deploy, /expand\/contract \(purely additive\)/);
+  assert.match(deploy, /mechanically enforced by tools\/ci\/check-migration-ddl-compat\.mjs/);
+
+  // Pre-promotion standby failures never touch the canonical container or
+  // Nginx (fall back to the pre-Docker legacy unit only for the narrow
+  // very-first-deploy case, exactly like the old rollback path did).
+  const standbyFailureBlock = deploy.slice(standbyUpIndex, nginxAltPhaseIndex);
+  assert.match(standbyFailureBlock, /abort_standby_stage "standby_start_failed"/);
+  assert.match(standbyFailureBlock, /abort_standby_stage "standby_hardening_failed"/);
+  assert.match(standbyFailureBlock, /abort_standby_stage "standby_readiness_failed"/);
+  assert.match(standbyFailureBlock, /abort_standby_stage "nginx_alt_switch_failed"/);
+  assert.doesNotMatch(standbyFailureBlock, /up -d --no-deps --no-build --force-recreate backend;/);
+
+  // Post-promotion failures leave the proven-healthy standby serving and are
+  // tagged with a "_standby_serving" detail so an operator can find them —
+  // the one place the standby is deliberately NOT cleaned up.
+  const postPromotionBlock = deploy.slice(promotingPhaseIndex, standbyCleanupPhaseIndex);
+  assert.match(postPromotionBlock, /abort_deploy "canonical_promotion_failed_standby_serving"/);
+  assert.match(postPromotionBlock, /abort_deploy "canonical_hardening_failed_standby_serving"/);
+  assert.match(postPromotionBlock, /abort_deploy "canonical_readiness_failed_standby_serving"/);
+  assert.match(postPromotionBlock, /abort_deploy "nginx_canonical_switchback_failed_standby_serving"/);
+  assert.doesNotMatch(postPromotionBlock, /cleanup_standby/);
+  assert.match(deploy, /write_standby_state "serving_standby_degraded" "\$\{backend_standby_port\}"/);
+
+  // The trailing back-worker/route-v2-gateway recreate and observability
+  // start no longer roll the already-promoted, already-serving canonical
+  // backend back to an old image on failure.
+  const tailBlock = deploy.slice(finalizingPhaseIndex);
+  assert.match(tailBlock, /abort_deploy "back_worker_gateway_recreate_failed"/);
+  assert.match(tailBlock, /abort_deploy "back_worker_gateway_hardening_failed"/);
+  assert.match(tailBlock, /abort_deploy "observability_start_failed"/);
+  assert.match(tailBlock, /abort_deploy "observability_readiness_failed"/);
+
   assert.match(backup, /pg_restore --list/);
   assert.doesNotMatch(backup, /pg_restore --list -/);
   assert.match(backup, /\.sha256/);
@@ -473,6 +733,12 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤�
   assert.doesNotMatch(cd, /uses: actions\/setup-java@be66141d4002b0e783cc31e5449d3f9f3267ffd9/);
   assert.match(cd, /if \[\[ -n "\$\{EASYSUBWAY_ENV_FILE:-\}" \]\]; then/);
   assert.doesNotMatch(cd, /EASYSUBWAY_ENV_FILE:-\/dev\/null/);
+  // 파괴적 DDL 게이트는 배포 대상 checkout에서도 재검사한다(#2365).
+  assert.match(cd, /CD Deploy \/ Check migration DDL compatibility/);
+  assert.match(cd, /node tools\/ci\/check-migration-ddl-compat\.mjs/);
+  // pre-#2365 SHA 롤백 재배포 시 검사기 파일 부재를 skip하는 가드가 있어야 한다.
+  assert.match(cd, /if \[\[ ! -f tools\/ci\/check-migration-ddl-compat\.mjs \]\]; then/);
+  assert.match(cd, /migration DDL gate absent at deploy target \(pre-#2365 SHA\); skipping/);
 });
 
 test("CD 배포 후 검증은 readiness 단일 프로브가 아니라 핵심 API 스모크로 게이트한다", () => {
@@ -540,18 +806,95 @@ test("Route V2 host ingress는 두 exact 경로만 gateway로 보내고 실패 �
   assert.match(deploy, /restore_failed=1/);
   assert.match(deploy, /failed to restore Route V2 host ingress/);
   assert.doesNotMatch(deploy, /sudo nginx -t[^\n]+&& sudo systemctl reload nginx \|\| true/);
-  assert.match(deploy, /fail_backend_deployment "route_v2_host_ingress_failed"/);
   assert.match(deploy, /current-route-v2-ingress-enabled/);
-  assert.match(
-    deploy,
-    /compose "\$\{SHARED_DIR\}\/current-env\/backend\.env" "\$\{SHARED_DIR\}\/current-env\/compose\.env" "\$\{DEPLOY_SHA\}" up -d --no-deps --no-build --force-recreate "\$\{RUNTIME_SERVICES\[@\]\}"/,
-  );
-  assert.match(
-    deploy,
-    /compose "\$\{SHARED_DIR\}\/current-env\/backend\.env" "\$\{SHARED_DIR\}\/current-env\/compose\.env" "\$\{current_sha\}" up -d --no-deps --no-build --force-recreate "\$\{RUNTIME_SERVICES\[@\]\}"/,
-  );
+  // install_route_v2_host_ingress now takes the backend port to render as a
+  // parameter (issue #2331) — it is invoked once to point Nginx at the
+  // standby port and once to switch it back to the canonical port, instead
+  // of the old single call against a closed-over `backend_port` global.
+  assert.match(deploy, /install_route_v2_host_ingress\(\) \{\n\tlocal target_backend_port="\$1"/);
+  assert.match(deploy, /-e "s\/__BACKEND_PORT__\/\$\{target_backend_port\}\/g"/);
+  assert.match(deploy, /if ! install_route_v2_host_ingress "\$\{backend_standby_port\}"; then/);
+  assert.match(deploy, /if ! install_route_v2_host_ingress "\$\{backend_port\}"; then/);
+  // The old single-shot 3-service RUNTIME_SERVICES force-recreate (and its
+  // current_sha-based rollback twin) is gone: the canonical "backend"
+  // container is recreated alone during promotion, after a standby on an
+  // alternate port has already proven the candidate image.
+  assert.doesNotMatch(deploy, /up -d --no-deps --no-build --force-recreate "\$\{RUNTIME_SERVICES\[@\]\}"/);
+  assert.doesNotMatch(deploy, /"\$\{current_sha\}" up -d --no-deps --no-build --force-recreate/);
   assert.match(deploy, /route_v2_host_action="return 404;"/);
   assert.match(deploy, /route_v2_host_action="proxy_pass http:\/\/127\.0\.0\.1:\$\{route_v2_gateway_port\};"/);
+
+  // A prior signed-RC canary budget breach (issue #2095) closes Route V2
+  // ingress and leaves a durable lock file; a routine, unrelated deploy must
+  // not silently re-open ingress by re-rendering the (stale)
+  // EASYSUBWAY_ROUTE_V2_INGRESS_ENABLED=true desired state from compose.env.
+  assert.match(
+    deploy,
+    /route_v2_canary_rollback_lock="\$\{SHARED_DIR\}\/route-v2-canary-rollback-lock\.json"/,
+  );
+  assert.match(deploy, /if \[\[ -f "\$\{route_v2_canary_rollback_lock\}" \]\]; then/);
+  const rollbackLockOverrideBlock = deploy.match(
+    /if \[\[ -f "\$\{route_v2_canary_rollback_lock\}" \]\]; then([\s\S]*?)\nfi\n/,
+  )?.[1] ?? "";
+  assert.match(rollbackLockOverrideBlock, /route_v2_ingress_enabled_normalized=false/);
+  assert.match(rollbackLockOverrideBlock, /route_v2_host_action="return 404;"/);
+  // The lock check must run AFTER the configured-value case statement (so it
+  // overrides whatever compose.env says) and BEFORE the host ingress render.
+  assert.ok(
+    deploy.indexOf("invalid Route V2 ingress enabled value") < deploy.indexOf('route_v2_canary_rollback_lock=')
+      && deploy.indexOf('route_v2_canary_rollback_lock=') < deploy.indexOf('install_route_v2_host_ingress()'),
+  );
+});
+
+test("호스트 ingress는 actuator 공개를 차단하되 readiness/liveness probe만 예외로 둔다", () => {
+  // #2376: actuator Prometheus 메트릭은 docker network 내부에서만 scrape하고 공개 경로로는 노출하지 않는다.
+  const host = read("infra/nginx/host-easysubway.conf.template");
+  const httpsServer = host.slice(host.indexOf("server {", 1));
+
+  // 공개 probe 계약(공개 edge readiness probe·배포 검증)은 무회귀 — readiness/liveness는 계속 proxy된다.
+  assert.match(
+    httpsServer,
+    /location = \/actuator\/health\/readiness \{\s*proxy_pass http:\/\/127\.0\.0\.1:__BACKEND_PORT__;/,
+  );
+  assert.match(
+    httpsServer,
+    /location = \/actuator\/health\/liveness \{\s*proxy_pass http:\/\/127\.0\.0\.1:__BACKEND_PORT__;/,
+  );
+  // 나머지 /actuator/* (특히 /actuator/prometheus)와 bare /actuator는 공개 경로에서 404로 차단한다.
+  assert.match(httpsServer, /location = \/actuator \{\s*return 404;\s*\}/);
+  assert.match(httpsServer, /location \^~ \/actuator\/ \{\s*return 404;\s*\}/);
+  // /actuator/prometheus 를 프록시하는 location은 존재하지 않아야 한다.
+  assert.doesNotMatch(httpsServer, /location[^\n]*\/actuator\/prometheus[\s\S]*?proxy_pass/);
+  // 기존 catch-all proxy는 그대로 유지된다.
+  assert.match(httpsServer, /location \/ \{[\s\S]*proxy_pass http:\/\/127\.0\.0\.1:__BACKEND_PORT__;/);
+});
+
+test("CD Deploy는 canary rollback lock이 있으면 lock을 모르는 구버전 deploy-backend.sh를 거부한다", () => {
+  // Redeploying a HISTORICAL main SHA copies and runs THAT SHA's own
+  // tools/deploy/deploy-backend.sh (see "CD Deploy / Run local deployment"),
+  // which may predate the canary rollback lock check entirely (issue #2095) —
+  // deploy-backend.sh's own internal lock check (tested above) cannot help in
+  // that case, since it is version-skewed with the checked-out SHA. This gate
+  // must live in cd.yml's own step script instead, which is loaded from the
+  // ref that dispatched/triggered the CD run, not from the historical
+  // deploy_sha checkout, so it stays authoritative regardless of which
+  // deploy-backend.sh copy is about to run.
+  const cd = read(".github/workflows/cd.yml");
+  const runLocalDeploymentStep = cd.match(
+    /name: CD Deploy \/ Run local deployment\n([\s\S]*?)\n {6}- name:/,
+  )?.[1] ?? "";
+  assert.match(
+    runLocalDeploymentStep,
+    /if \[\[ -f "\$\{DEPLOY_ROOT\}\/shared\/route-v2-canary-rollback-lock\.json" \]\] \\\n\s*&& ! grep -Fq 'route-v2-canary-rollback-lock\.json' "\$\{incoming\}\/deploy-backend\.sh"; then/,
+  );
+  assert.match(runLocalDeploymentStep, /refusing to deploy until an operator resolves the lock/);
+  // The lock check must run AFTER deploy-backend.sh is copied into `incoming`
+  // (it inspects that copy) and BEFORE the copied script is actually invoked.
+  assert.ok(
+    runLocalDeploymentStep.indexOf('tools/deploy/deploy-backend.sh') < runLocalDeploymentStep.indexOf('route-v2-canary-rollback-lock.json') &&
+      runLocalDeploymentStep.indexOf("&& ! grep -Fq 'route-v2-canary-rollback-lock.json'") <
+        runLocalDeploymentStep.indexOf('bash "${incoming}/deploy-backend.sh"'),
+  );
 });
 
 test("Compose backend 서비스는 bootJar 기반 이미지와 제한된 바인딩을 사용한다", () => {
@@ -571,7 +914,7 @@ test("Compose backend 서비스는 bootJar 기반 이미지와 제한된 바인�
   assert.match(compose, /postgres:\s*\n\s*condition: service_healthy/);
   assert.match(compose, /object-storage:\s*\n\s*condition: service_healthy/);
 
-  for (const service of ["backend", "back-worker"]) {
+  for (const service of ["backend", "backend-standby", "back-worker"]) {
     const block = compose.match(new RegExp(`\\n  ${service}:\\n[\\s\\S]*?(?=\\n  [a-z0-9-]+:\\n|\\nvolumes:)`))?.[0] ?? "";
     assert.match(block, /^    user: "10001:10001"$/m, `${service} numeric user`);
     assert.match(block, /^    read_only: true$/m, `${service} read-only rootfs`);
@@ -579,4 +922,205 @@ test("Compose backend 서비스는 bootJar 기반 이미지와 제한된 바인�
     assert.match(block, /^    cap_drop:\s*\n      - ALL$/m, `${service} capabilities`);
     assert.match(block, /^    security_opt:\s*\n      - no-new-privileges:true$/m, `${service} no-new-privileges`);
   }
+
+  // Blue/green standby (issue #2331): a transient container on an alternate,
+  // internal-only port, never auto-restarted by Docker.
+  const standbyBlock = compose.match(/\n  backend-standby:\n[\s\S]*?(?=\n  [a-z0-9-]+:\n|\nvolumes:)/)?.[0] ?? "";
+  assert.match(standbyBlock, /^    container_name: easysubway-backend-standby$/m);
+  assert.match(standbyBlock, /^    restart: "no"$/m, "standby must not be auto-restarted by Docker");
+  assert.match(
+    standbyBlock,
+    /"\$\{EASYSUBWAY_BACKEND_BIND:-127\.0\.0\.1\}:\$\{EASYSUBWAY_BACKEND_STANDBY_PORT:-8082\}:8080"/,
+  );
+  assert.doesNotMatch(standbyBlock, /EASYSUBWAY_BACKEND_PORT/, "standby must bind its own alternate port, not the canonical one");
+
+  // Review follow-up (PR #2356): the standby shares canonical's live
+  // datasource, so migrations/snapshot swap commit against production data
+  // before canonical is touched — "old backend untouched" must not be
+  // overclaimed as a data-layer guarantee.
+  assert.match(compose, /same Postgres datasource as canonical "backend"/i);
+  assert.match(compose, /process\/Nginx-level guarantee, not\s*\n\s*# a data-layer one/);
+});
+
+const FRESHNESS_PRECHECK = "tools/deploy/check-snapshot-freshness-precheck.mjs";
+
+async function runFreshnessPrecheck(evidence, extraArgs = []) {
+  const dir = await mkdtemp(path.join(tmpdir(), "easysubway-snapshot-precheck-"));
+  deploymentTempDirs.add(dir);
+  const evidencePath = path.join(dir, "server-timetable-snapshot-evidence.json");
+  await writeFile(evidencePath, typeof evidence === "string" ? evidence : JSON.stringify(evidence));
+  try {
+    const { stdout } = await execFileAsync("node", [FRESHNESS_PRECHECK, evidencePath, ...extraArgs], { cwd: root });
+    return { exitCode: 0, stdout };
+  } catch (error) {
+    return { exitCode: error.code ?? 1, stdout: String(error.stdout ?? ""), stderr: String(error.stderr ?? "") };
+  }
+}
+
+test("snapshot freshness precheck는 만료·마진 내 만료·유효를 판정한다", () => {
+  const now = new Date("2026-07-20T00:00:00Z");
+  const margin = 2 * 60 * 60;
+
+  const expired = evaluateSnapshotFreshnessPrecheck({
+    freshUntil: "2026-07-19T23:00:00Z",
+    now,
+    marginSeconds: margin,
+  });
+  assert.equal(expired.expired, true);
+  assert.equal(expired.stale, true);
+  assert.equal(expired.ok, false);
+
+  const withinMargin = evaluateSnapshotFreshnessPrecheck({
+    freshUntil: "2026-07-20T01:00:00Z",
+    now,
+    marginSeconds: margin,
+  });
+  assert.equal(withinMargin.expired, false);
+  assert.equal(withinMargin.stale, true);
+  assert.equal(withinMargin.ok, false);
+
+  const boundary = evaluateSnapshotFreshnessPrecheck({
+    freshUntil: "2026-07-20T02:00:00Z",
+    now,
+    marginSeconds: margin,
+  });
+  assert.equal(boundary.stale, true, "freshUntil == now + margin is treated as stale");
+
+  const fresh = evaluateSnapshotFreshnessPrecheck({
+    freshUntil: "2026-07-20T02:00:01Z",
+    now,
+    marginSeconds: margin,
+  });
+  assert.equal(fresh.expired, false);
+  assert.equal(fresh.stale, false);
+  assert.equal(fresh.ok, true);
+});
+
+test("snapshot freshness precheck는 timezone offset을 가진 freshUntil을 파싱한다", () => {
+  const now = new Date("2026-07-19T14:59:59Z");
+  const result = evaluateSnapshotFreshnessPrecheck({
+    freshUntil: "2026-07-20T00:00:00+09:00",
+    now,
+    marginSeconds: 0,
+  });
+  // 2026-07-20T00:00:00+09:00 == 2026-07-19T15:00:00Z, still 1s ahead of now.
+  assert.equal(result.expired, false);
+  assert.equal(result.ok, true);
+});
+
+test("snapshot freshness precheck는 잘못된 입력을 거부한다", () => {
+  assert.throws(
+    () => evaluateSnapshotFreshnessPrecheck({ freshUntil: "not-a-dateZ", now: new Date(), marginSeconds: 0 }),
+    /invalid freshUntil timestamp/,
+  );
+  assert.throws(
+    () => evaluateSnapshotFreshnessPrecheck({ freshUntil: "2026-07-20T00:00:00Z", now: new Date(), marginSeconds: -1 }),
+    /marginSeconds must be a non-negative integer/,
+  );
+  assert.equal(DEFAULT_MARGIN_SECONDS, 2 * 60 * 60);
+});
+
+test("snapshot freshness precheck는 timezone offset 없는 freshUntil을 backend 게이트와 동일하게 거부한다", () => {
+  // backend TimetableSeedLoader의 활성 경로는 OffsetDateTime.parse로 offset 없는
+  // timestamp를 예외로 거부한다. 이 안전망이 Date.parse의 관대한 로컬-타임존 파싱으로
+  // offset 없는 값을 통과시키면, precheck는 fresh로 오판하고 force-recreate된 새
+  // 컨테이너가 부팅 fail-closed로 죽는다 — 정확히 이 사전 검사가 막으려는 장애다.
+  for (const naive of [
+    "2026-07-20T00:00:00", // naive datetime, offset 없음
+    "2026-07-20", // date-only
+    "2026-07-20 00:00:00", // space-separated naive datetime
+  ]) {
+    assert.throws(
+      () => evaluateSnapshotFreshnessPrecheck({ freshUntil: naive, now: new Date(), marginSeconds: 0 }),
+      /freshUntil must carry a timezone offset/,
+      `expected rejection for offset-less freshUntil: ${naive}`,
+    );
+  }
+  // Z, +09:00, -0500 표기는 모두 허용된다.
+  for (const withOffset of ["2026-07-20T00:00:00Z", "2026-07-20T00:00:00+09:00", "2026-07-20T00:00:00-0500"]) {
+    assert.doesNotThrow(() =>
+      evaluateSnapshotFreshnessPrecheck({ freshUntil: withOffset, now: new Date("2000-01-01T00:00:00Z"), marginSeconds: 0 }));
+  }
+});
+
+test("snapshot freshness precheck CLI는 유효 snapshot을 통과시킨다", async () => {
+  const { exitCode } = await runFreshnessPrecheck(
+    { freshUntil: "2099-01-01T00:00:00+09:00" },
+    ["--margin-seconds", "0"],
+  );
+  assert.equal(exitCode, 0);
+});
+
+test("snapshot freshness precheck CLI는 만료 snapshot에서 non-zero로 종료한다", async () => {
+  const { exitCode, stdout } = await runFreshnessPrecheck(
+    { freshUntil: "2000-01-01T00:00:00+09:00" },
+    ["--margin-seconds", "0"],
+  );
+  assert.equal(exitCode, 1);
+  assert.match(stdout, /verdict=expired/);
+});
+
+test("snapshot freshness precheck CLI는 마진 내 만료 snapshot을 차단한다", async () => {
+  const soon = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+  const { exitCode, stdout } = await runFreshnessPrecheck(
+    { freshUntil: soon },
+    ["--margin-seconds", "7200"],
+  );
+  assert.equal(exitCode, 1);
+  assert.match(stdout, /verdict=expiring_within_margin/);
+});
+
+test("snapshot freshness precheck CLI는 값 없는 --margin-seconds를 무음 기본값 폴백 대신 명시적으로 거부한다", async () => {
+  const { exitCode, stderr } = await runFreshnessPrecheck(
+    { freshUntil: "2099-01-01T00:00:00+09:00" },
+    ["--margin-seconds"],
+  );
+  assert.equal(exitCode, 1);
+  assert.match(stderr, /--margin-seconds requires a value/);
+});
+
+test("snapshot freshness precheck CLI는 evidence 누락·손상 시 fail closed 한다", async () => {
+  const missingFreshUntil = await runFreshnessPrecheck({ schemaVersion: 1 }, ["--margin-seconds", "0"]);
+  assert.equal(missingFreshUntil.exitCode, 1);
+
+  const corrupt = await runFreshnessPrecheck("{ not json", ["--margin-seconds", "0"]);
+  assert.equal(corrupt.exitCode, 1);
+});
+
+test("CD 배포는 컨테이너 교체 전에 timetable snapshot freshness를 사전 검사한다", () => {
+  const deploy = read("tools/deploy/deploy-backend.sh");
+
+  assert.match(
+    deploy,
+    /SNAPSHOT_FRESHNESS_PRECHECK_MARGIN_SECONDS="\$\{SNAPSHOT_FRESHNESS_PRECHECK_MARGIN_SECONDS:-7200\}"/,
+  );
+  assert.match(
+    deploy,
+    /SNAPSHOT_EVIDENCE_PATH="backend\/src\/main\/resources\/timetable\/server-timetable-snapshot-evidence\.json"/,
+  );
+  assert.match(
+    deploy,
+    /node tools\/deploy\/check-snapshot-freshness-precheck\.mjs \\\n\t"\$\{SNAPSHOT_EVIDENCE_PATH\}" \\\n\t--margin-seconds "\$\{SNAPSHOT_FRESHNESS_PRECHECK_MARGIN_SECONDS\}"/,
+  );
+  assert.match(deploy, /write_result "blocked" "stale_snapshot_precheck_failed"/);
+
+  const precheckIndex = deploy.indexOf("check-snapshot-freshness-precheck.mjs");
+  const noopExitIndex = deploy.indexOf('write_result "noop" "same_sha_same_env_services_ready"');
+  const standbyStartIndex = deploy.indexOf('write_phase "standby_starting"');
+  const backupIndex = deploy.indexOf("needs_backup=0");
+  const legacyStopIndex = deploy.lastIndexOf("\nstop_legacy_backend_service\n");
+  assert.notEqual(precheckIndex, -1);
+  assert.ok(noopExitIndex < precheckIndex, "precheck must not disturb the same-SHA no-op success path");
+  assert.ok(precheckIndex < backupIndex, "precheck must run before postgres backup");
+  assert.ok(precheckIndex < legacyStopIndex, "precheck must run before stopping the legacy backend");
+  assert.ok(precheckIndex < standbyStartIndex, "precheck must run before the standby container is started");
+
+  // The stale abort must not go through abort_deploy/abort_standby_stage (the
+  // failure helpers used once containers are actually touched); it must leave
+  // the running backend untouched. Assert the stale-abort block writes a
+  // blocked result and exits directly, without going through either helper
+  // between the precheck and the abort.
+  const staleBlock = deploy.slice(precheckIndex, deploy.indexOf("needs_backup=0", precheckIndex));
+  assert.doesNotMatch(staleBlock, /abort_deploy|abort_standby_stage/);
+  assert.match(staleBlock, /write_result "blocked" "stale_snapshot_precheck_failed"\n\texit 1/);
 });

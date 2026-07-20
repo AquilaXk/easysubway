@@ -4,11 +4,17 @@ import 'dart:io';
 
 import 'package:drift/drift.dart' show Value;
 import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart';
+import 'package:easysubway_mobile/features/stations/application/station_detail_controller.dart';
+import 'package:easysubway_mobile/features/stations/application/station_search_controller.dart';
 import 'package:easysubway_mobile/features/stations/data/drift_station_repository.dart';
 import 'package:easysubway_mobile/features/stations/data/station_api_repository.dart';
+import 'package:easysubway_mobile/features/stations/domain/station_line.dart';
+import 'package:easysubway_mobile/features/stations/domain/station_models.dart';
+import 'package:easysubway_mobile/features/stations/domain/station_repositories.dart';
 import 'package:easysubway_mobile/features/realtime/realtime_repository.dart';
 import 'package:easysubway_mobile/mobile_error_reporter.dart';
-import 'package:easysubway_mobile/station_search.dart';
+import 'package:easysubway_mobile/station_search.dart'
+    show stationApiBaseUriForEnvironment;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -16,6 +22,67 @@ void main() {
   // 상대 확인 시점 기준 시각을 고정한 테스트는 항상 원래대로 되돌린다.
   tearDown(() {
     debugStationVerifiedClock = DateTime.now;
+  });
+
+  test('시간표 출발 모델은 일반·급행 운행종별을 시각순으로 유지한다', () {
+    const local = StationTimetableDeparture(
+      directionName: '사당 방면',
+      seconds: 28800, // 08:00
+    );
+    const express = StationTimetableDeparture(
+      directionName: '사당 방면',
+      seconds: 28980, // 08:03
+      servicePattern: 'EXPRESS',
+      serviceClass: 'SUBWAY',
+    );
+    const direction = StationTimetableDirection(
+      name: '사당 방면',
+      departures: [local, express],
+    );
+
+    expect(direction.departures.map((departure) => departure.seconds), [
+      28800,
+      28980,
+    ]);
+    expect(local.timeLabel, '08:00');
+    expect(express.timeLabel, '08:03');
+    expect(local.isExpress, isFalse);
+    expect(express.isExpress, isTrue);
+    expect(direction.firstDeparture.timeLabel, '08:00');
+    expect(direction.lastDeparture.timeLabel, '08:03');
+    expect(express.semanticLabel, contains('급행'));
+    expect(local.semanticLabel, isNot(contains('급행')));
+  });
+
+  test('시간표 방향은 일반·급행 출발을 시각순으로 묶고 첫차·막차를 유지한다', () {
+    // LOCAL 08:00과 EXPRESS 08:03이 한 방향 목록에 시각순으로 함께 놓이고,
+    // 급행 판정은 08:03에만 참이며, 첫차/막차는 목록 양끝을 그대로 가리킨다.
+    // (화면 렌더링 회귀는 widget_test.dart의 역 시간표 화면 테스트가 담당한다.)
+    const direction = StationTimetableDirection(
+      name: '사당 방면',
+      departures: [
+        StationTimetableDeparture(directionName: '사당 방면', seconds: 28800),
+        StationTimetableDeparture(
+          directionName: '사당 방면',
+          seconds: 28980,
+          servicePattern: 'EXPRESS',
+          serviceClass: 'SUBWAY',
+        ),
+      ],
+    );
+
+    expect(
+      direction.departures.map((departure) => departure.timeLabel).toList(),
+      ['08:00', '08:03'],
+    );
+    expect(
+      direction.departures.map((departure) => departure.isExpress).toList(),
+      [false, true],
+    );
+    expect(direction.firstDeparture.timeLabel, '08:00');
+    expect(direction.firstDeparture.isExpress, isFalse);
+    expect(direction.lastDeparture.timeLabel, '08:03');
+    expect(direction.lastDeparture.isExpress, isTrue);
   });
 
   test('릴리즈 빌드는 API 기본 주소를 반드시 설정해야 한다', () {
@@ -1300,10 +1367,10 @@ void main() {
       '비상벨',
       '1번 출구 엘리베이터',
     ]);
-    expect(state.facilityAttentionSummary, '고장·폐쇄 1개 · 가기 전 살펴보기 1개 · 확인 중 1개');
+    expect(state.facilityAttentionSummary, '고장·폐쇄 1개 · 가기 전 살펴보기 1개 · 미확인 1개');
     expect(
       state.facilityAttentionSemanticLabel,
-      '살펴볼 시설, 고장·폐쇄 1개, 가기 전 살펴보기 1개, 확인 중 1개',
+      '살펴볼 시설, 고장·폐쇄 1개, 가기 전 살펴보기 1개, 미확인 1개',
     );
   });
 

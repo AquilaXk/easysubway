@@ -232,7 +232,7 @@ CREATE TABLE route_service_artifact_evidence (
     (admission_status = 'ADMITTED' AND admission_eligible = 1 AND fresh_until IS NOT NULL)
     OR (admission_status = 'MISSING' AND admission_eligible = 0)
   ),
-  CHECK (source_issue = 2116)
+  CHECK (source_issue IN (2116, 2135))
 );
 
 CREATE TABLE realtime_provider_line_mappings (
@@ -577,8 +577,27 @@ CREATE TABLE route_map_positions (
   FOREIGN KEY (station_id, line_id) REFERENCES station_lines(station_id, line_id)
 );
 
+CREATE TABLE route_map_line_tracks (
+  region TEXT NOT NULL,
+  line_id TEXT NOT NULL,
+  track_index INTEGER NOT NULL,
+  path TEXT NOT NULL,
+  svg_color TEXT NOT NULL DEFAULT '',
+  source_id TEXT NOT NULL,
+  source_name TEXT NOT NULL,
+  source_url TEXT NOT NULL,
+  license TEXT NOT NULL,
+  license_status TEXT NOT NULL,
+  commercial_use_allowed INTEGER NOT NULL DEFAULT 0 CHECK (commercial_use_allowed IN (0, 1)),
+  attribution_required INTEGER NOT NULL DEFAULT 1 CHECK (attribution_required IN (0, 1)),
+  updated_at INTEGER,
+  PRIMARY KEY (region, line_id, track_index),
+  FOREIGN KEY (line_id) REFERENCES lines(id)
+);
+
 CREATE INDEX idx_facilities_station ON facilities(station_id);
 CREATE INDEX idx_route_map_positions_region_line ON route_map_positions(region, line_id);
+CREATE INDEX idx_route_map_line_tracks_region_line ON route_map_line_tracks(region, line_id);
 CREATE INDEX idx_internal_route_edges_from ON internal_route_edges(from_node_id);
 CREATE INDEX idx_station_pathway_nodes_station ON station_pathway_nodes(station_id, line_id, node_type);
 CREATE INDEX idx_station_pathway_edges_from ON station_pathway_edges(from_node_id);

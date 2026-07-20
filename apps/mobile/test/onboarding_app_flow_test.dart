@@ -1,8 +1,9 @@
 import 'package:easysubway_mobile/accessible_design.dart';
+import 'package:easysubway_mobile/app/easy_subway_app.dart';
 import 'package:easysubway_mobile/facility_report.dart';
+import 'package:easysubway_mobile/features/home/presentation/home_screen.dart';
 import 'package:easysubway_mobile/features/mobility_profile/mobility_profile_policy.dart';
 import 'package:easysubway_mobile/legacy_credential_cleanup.dart';
-import 'package:easysubway_mobile/main.dart';
 import 'package:easysubway_mobile/notification_settings.dart';
 import 'package:easysubway_mobile/onboarding.dart';
 import 'package:easysubway_mobile/route_search.dart';

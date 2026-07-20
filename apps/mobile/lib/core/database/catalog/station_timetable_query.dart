@@ -10,10 +10,18 @@ class CatalogStationDeparture {
   const CatalogStationDeparture({
     required this.directionName,
     required this.seconds,
+    required this.servicePattern,
+    required this.serviceClass,
   });
 
   final String directionName;
   final int seconds;
+
+  /// 운행종별(예: `LOCAL`·`EXPRESS`). final catalog 값을 손실 없이 전달한다.
+  final String servicePattern;
+
+  /// 운행 클래스(예: `SUBWAY`). 지하철 여부 판정에 쓴다.
+  final String serviceClass;
 }
 
 class CatalogStationDayTimetable {
@@ -152,7 +160,8 @@ class CatalogStationTimetableQuery {
     final rows = await database
         .customSelect(
           '''
-          SELECT DISTINCT r.direction_name, st.departure_seconds
+          SELECT DISTINCT r.direction_name, st.departure_seconds,
+                 t.service_pattern, t.service_class
           FROM transit_stop_times st
           JOIN transit_trips t ON t.id = st.trip_id
           JOIN transit_routes r ON r.id = t.route_id
@@ -160,7 +169,7 @@ class CatalogStationTimetableQuery {
           WHERE st.station_id = ?
             AND st.line_id = ?
             AND st.pickup_type = 0
-            AND t.service_class = 'SUBWAY'
+            AND UPPER(TRIM(t.service_class)) = 'SUBWAY'
             AND r.line_id = st.line_id
             AND TRIM(r.direction_name) <> ''
             $dayFilter
@@ -185,6 +194,8 @@ class CatalogStationTimetableQuery {
           (row) => CatalogStationDeparture(
             directionName: row.read<String>('direction_name'),
             seconds: row.read<int>('departure_seconds'),
+            servicePattern: row.read<String?>('service_pattern') ?? '',
+            serviceClass: row.read<String?>('service_class') ?? '',
           ),
         )
         .toList(growable: false);

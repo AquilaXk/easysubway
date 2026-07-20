@@ -106,6 +106,7 @@ class RouteEdge {
     required this.toNodeId,
     required this.type,
     required this.baseCost,
+    this.sourceEdgeId = '',
     int? durationSeconds,
     this.distanceMeters = 0,
     this.lineId = '',
@@ -149,6 +150,7 @@ class RouteEdge {
   /// `durationSeconds` may stay 0 when source data has no reliable duration,
   /// but route ordering still needs a positive fallback weight.
   final int baseCost;
+  final String sourceEdgeId;
   final int durationSeconds;
   final int distanceMeters;
   final String lineId;

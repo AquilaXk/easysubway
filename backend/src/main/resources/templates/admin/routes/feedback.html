@@ -80,30 +80,15 @@
 					<canvas id="route-feedback-trend-canvas" class="trend-canvas" role="img"
 					        th:attr="aria-label=|유형별 피드백 최근 ${trendDays}일 추이|,data-chart=${trendJson}"></canvas>
 				</div>
-				<details class="dashboard-details">
-					<summary>데이터 표로 보기</summary>
-					<table class="static-table">
-						<thead>
-						<tr>
-							<th scope="col">날짜</th>
-							<th th:each="s : ${trendChart.series}" scope="col" th:text="${s.label}">지표</th>
-						</tr>
-						</thead>
-						<tbody>
-						<tr th:each="label, iter : ${trendChart.labels}">
-							<th scope="row" th:text="${label}">날짜</th>
-							<td th:each="s : ${trendChart.series}"
-							    th:text="${s.values[iter.index] != null ? s.values[iter.index] : '—'}">0</td>
-						</tr>
-						</tbody>
-					</table>
-				</details>
+				<div th:replace="~{admin/fragments/trend-chart-table :: table(${trendChart})}"></div>
 			</section>
 		</div>
 	</div>
 
-	<section>
+	<section class="admin-panel">
 		<h2>평점별 피드백</h2>
+		<div class="admin-table-scroll" tabindex="0" role="group"
+		     aria-label="가로로 스크롤 가능한 데이터 표">
 		<table class="static-table">
 			<thead>
 			<tr>
@@ -120,10 +105,13 @@
 			</tr>
 			</tbody>
 		</table>
+		</div>
 	</section>
 
-	<section>
+	<section class="admin-panel">
 		<h2>최근 현장 차단 신고</h2>
+		<div class="admin-table-scroll" tabindex="0" role="group"
+		     aria-label="가로로 스크롤 가능한 데이터 표">
 		<table class="static-table">
 			<thead>
 			<tr>
@@ -141,21 +129,24 @@
 				<td th:text="${row.mobilityTypeLabel}">고령자</td>
 			</tr>
 			<tr th:if="${#lists.isEmpty(summary.recentBlockedFeedbacks)}">
-				<td colspan="4">최근 현장 차단 신고가 없습니다.</td>
+				<td colspan="4"><div th:replace="~{admin/fragments/empty-state :: panel('최근 현장 차단 신고가 없습니다.', '현장 차단 신고가 접수되면 자동으로 집계됩니다.')}"></div></td>
 			</tr>
 			</tbody>
 		</table>
+		</div>
 	</section>
 
-	<section>
-		<h2>ETA 보정 bucket</h2>
+	<section class="admin-panel">
+		<h2>도착 예정 보정 구간</h2>
+		<div class="admin-table-scroll" tabindex="0" role="group"
+		     aria-label="가로로 스크롤 가능한 데이터 표">
 		<table class="static-table">
 			<thead>
 			<tr>
 				<th scope="col">이동 프로필</th>
 				<th scope="col">제약</th>
 				<th scope="col">ETA 출처</th>
-				<th scope="col">Offset bucket</th>
+				<th scope="col">보정 구간</th>
 				<th scope="col">검토 작업</th>
 				<th scope="col">건수</th>
 			</tr>
@@ -170,10 +161,11 @@
 				<td th:text="${row.count}">0</td>
 			</tr>
 			<tr th:if="${#lists.isEmpty(summary.etaCalibrationBuckets)}">
-				<td colspan="6">opt-in ETA 보정 피드백이 없습니다.</td>
+				<td colspan="6"><div th:replace="~{admin/fragments/empty-state :: panel('수집 동의(opt-in) ETA 보정 피드백이 없습니다.', '수집 동의(opt-in) 피드백이 접수되면 자동으로 집계됩니다.')}"></div></td>
 			</tr>
 			</tbody>
 		</table>
+		</div>
 	</section>
 </main>
 </div>

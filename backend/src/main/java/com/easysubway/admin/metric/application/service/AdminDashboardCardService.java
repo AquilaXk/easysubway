@@ -30,10 +30,11 @@ public class AdminDashboardCardService {
 		String sparkPoints = AdminMetricSparkline.points(values, SPARK_WIDTH, SPARK_HEIGHT);
 		Delta delta = delta(values, currentValue);
 		return new DashboardCard(
-			title, valueLabel, href, sparkPoints, delta.label(), delta.tone(), SPARK_WIDTH, SPARK_HEIGHT);
+			title, metricKey, valueLabel, href, sparkPoints, delta.label(), delta.tone(), SPARK_WIDTH, SPARK_HEIGHT);
 	}
 
-	// 전일(마지막 인덱스 직전의 가장 최근 비결측 스냅샷) 대비 증감. 이력이 없으면 증감을 비운다.
+	// 전일(마지막 인덱스 직전의 가장 최근 비결측 스냅샷) 대비 증감. 이력이 없으면 델타 영역 자체를
+	// 비운다(null) — "전일 데이터 없음"을 카드마다 반복 노출하는 대신 화면이 영역을 렌더하지 않는다(#2327).
 	private static Delta delta(List<Double> values, double currentValue) {
 		Double previous = null;
 		for (int index = values.size() - 2; index >= 0; index--) {
@@ -43,7 +44,7 @@ public class AdminDashboardCardService {
 			}
 		}
 		if (previous == null) {
-			return new Delta("전일 데이터 없음", "flat");
+			return new Delta(null, null);
 		}
 		double diff = currentValue - previous;
 		if (Math.abs(diff) < 0.05) {
@@ -64,16 +65,20 @@ public class AdminDashboardCardService {
 
 	/**
 	 * @param title      카드 제목
+	 * @param metricKey  지표 키({@link com.easysubway.admin.metric.domain.AdminMetricKeys}). 카드의
+	 *                   의미 정체성이라 headline/disclosure 격하를 index가 아닌 지표 의미로 판정하는
+	 *                   근거로 쓴다(#2306 리뷰). 표시용 {@code data-metric-key}로도 노출된다.
 	 * @param value      현재 값 표시 문자열
 	 * @param href       카드 전체 클릭 시 이동할 화면
 	 * @param sparkPoints SVG polyline points(비면 스파크라인 생략)
-	 * @param deltaLabel 전일 대비 설명
-	 * @param deltaTone  up·down·flat
+	 * @param deltaLabel 전일 대비 설명. 비교 가능한 전일 스냅샷이 없으면 null(화면이 델타 영역을 생략한다, #2327)
+	 * @param deltaTone  up·down·flat. deltaLabel이 null이면 함께 null
 	 * @param sparkWidth SVG viewBox 너비
 	 * @param sparkHeight SVG viewBox 높이
 	 */
 	public record DashboardCard(
 		String title,
+		String metricKey,
 		String value,
 		String href,
 		String sparkPoints,

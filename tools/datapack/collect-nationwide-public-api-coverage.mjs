@@ -18,6 +18,9 @@ const KNOWN_HTTP_PROVIDER_HOSTS = new Set([
   "openapi.seoul.go.kr:8088",
 ]);
 const CREDENTIAL_ENVS = new Set(["DATA_GO_KR_SERVICE_KEY", "KRIC_SERVICE_KEY", "SEOUL_OPENAPI_KEY"]);
+const DATA_GO_ORGANIZATION_NAMES = new Map([
+  ["korail", "한국철도공사"],
+]);
 const SOURCE_DOMAIN_SEARCH = Object.freeze({
   station_line_membership: {
     terms: ["역정보", "역명", "역코드", "노선정보", "역사정보"],
@@ -68,7 +71,8 @@ export function buildNationwidePublicApiSearchPlan({ targets, fixture, sourceCan
   const entries = targets.activeLineScopes.flatMap((scope) => domains.map((sourceDomain) => {
     const domain = SOURCE_DOMAIN_SEARCH[sourceDomain];
     if (!domain) throw new Error(`unsupported launch source domain: ${sourceDomain}`);
-    const operatorName = requiredString(operators.get(scope.operatorId), `operator ${scope.operatorId}`);
+    const fixtureOperatorName = requiredString(operators.get(scope.operatorId), `operator ${scope.operatorId}`);
+    const operatorName = DATA_GO_ORGANIZATION_NAMES.get(scope.operatorId) ?? fixtureOperatorName;
     const lineName = requiredString(lines.get(scope.lineId), `line ${scope.lineId}`);
     const lineTerms = lineSearchTerms(lineName);
     return {
@@ -79,18 +83,20 @@ export function buildNationwidePublicApiSearchPlan({ targets, fixture, sourceCan
       knownProviderCandidateIds: (knownProviderCandidatesByDomain.get(sourceDomain) ?? [])
         .filter((candidate) => candidateAppliesToScope(candidate.coverageScope, scope))
         .map(({ id }) => id),
-      queries: lineTerms.map((keyword) => ({
-        providerId: "data-go-search",
-        endpoint: "https://api.odcloud.kr/api/GetSearchDataList/v1/searchData",
-        operation: "searchData",
-        credentialEnv: "DATA_GO_KR_SERVICE_KEY",
-        credentialParam: "serviceKey",
-        credentialPlacement: "header",
-        method: "POST",
-        format: "json",
-        matchTermGroups: [domain.terms, lineTerms],
-        query: { page: 0, size: 10_000, dataType: ["API"], organizations: [operatorName], keyword },
-      })),
+      queries: [
+        ...lineTerms.map((keyword) => publicApiSearchQuery({
+          operatorName,
+          keyword,
+          coverageScope: "LINE_EVIDENCE",
+          matchTermGroups: [domain.terms, lineTerms],
+        })),
+        ...domain.terms.map((keyword) => publicApiSearchQuery({
+          operatorName,
+          keyword,
+          coverageScope: "OPERATOR_DISCOVERY",
+          matchTermGroups: [domain.terms],
+        })),
+      ],
     };
   }));
   return {
@@ -98,6 +104,22 @@ export function buildNationwidePublicApiSearchPlan({ targets, fixture, sourceCan
     artifactKind: "nationwide-public-api-coverage-search-plan",
     targetVersion: requiredString(targets.targetVersion, "targets.targetVersion"),
     entries,
+  };
+}
+
+function publicApiSearchQuery({ operatorName, keyword, coverageScope, matchTermGroups }) {
+  return {
+    providerId: "data-go-search",
+    endpoint: "https://api.odcloud.kr/api/GetSearchDataList/v1/searchData",
+    operation: "searchData",
+    credentialEnv: "DATA_GO_KR_SERVICE_KEY",
+    credentialParam: "Authorization",
+    credentialPlacement: "header",
+    method: "POST",
+    format: "json",
+    coverageScope,
+    matchTermGroups,
+    query: { page: 0, size: 10_000, dataType: ["API"], organizations: [operatorName], keyword },
   };
 }
 
@@ -133,7 +155,9 @@ export async function collectNationwidePublicApiCoverage({
       results.push(result.evidence);
       if (result.evidence.matchCount > 0) {
         unresolvedResult = {
-          reasonCode: "PUBLIC_API_DATA_AVAILABLE",
+          reasonCode: query.coverageScope === "OPERATOR_DISCOVERY"
+            ? "PUBLIC_API_CANDIDATE_REQUIRES_LINE_VALIDATION"
+            : "PUBLIC_API_DATA_AVAILABLE",
           matchCount: result.evidence.matchCount,
           ...(result.evidence.capturedRows ? { matches: result.evidence.capturedRows } : {}),
         };
@@ -191,6 +215,29 @@ export async function collectNationwidePublicApiCoverage({
     entries,
     unresolved,
   };
+}
+
+export function summarizeUnresolvedDiagnostics(unresolved) {
+  const counts = new Map();
+  for (const entry of unresolved) {
+    const reason = diagnosticToken(entry?.reasonCode, /^PUBLIC_API_[A-Z0-9_]{1,63}$/, "PUBLIC_API_UNKNOWN");
+    let detail = "UNSPECIFIED";
+    if (entry?.transportReason !== undefined) {
+      detail = diagnosticToken(entry.transportReason, /^[A-Z][A-Z0-9_]{1,63}$/, "TRANSPORT_UNKNOWN");
+    } else if (entry?.httpStatus !== undefined) {
+      detail = Number.isInteger(entry.httpStatus) && entry.httpStatus >= 100 && entry.httpStatus <= 599
+        ? `HTTP_${entry.httpStatus}` : "HTTP_UNKNOWN";
+    } else if (entry?.providerResultCode !== undefined) {
+      detail = `PROVIDER_${diagnosticToken(entry.providerResultCode, /^[A-Za-z0-9._-]{1,32}$/, "UNKNOWN")}`;
+    }
+    const key = `${reason}/${detail}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return [...counts.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([key, count]) => `${key}=${count}`);
+}
+
+function diagnosticToken(value, pattern, fallback) {
+  return typeof value === "string" && pattern.test(value) ? value : fallback;
 }
 
 function indexKnownProviderCandidates(sourceCandidates) {
@@ -259,7 +306,9 @@ async function runQuery(query, credentials, fetchImpl, requestCache) {
     url.searchParams.set("format", query.format);
   }
   if (query.credentialPlacement !== "header") url.searchParams.set(query.credentialParam, credential);
-  const authorization = query.credentialPlacement === "header" ? { authorization: `Infuser ${credential}` } : {};
+  const authorization = query.credentialPlacement === "header"
+    ? { [query.credentialParam]: `Infuser ${credential}` }
+    : {};
   const requestKey = JSON.stringify({
     endpoint: query.endpoint,
     method: query.method ?? "GET",
@@ -376,8 +425,10 @@ async function fetchPublicApiPage({ url, request, expectedContentTypes, fetchImp
     try {
       response = await fetchImpl(url, { ...request, signal: AbortSignal.timeout(15_000) });
       break;
-    } catch {
-      if (attempt === 1) return { reasonCode: "PUBLIC_API_FETCH_FAILED", attempts: 2 };
+    } catch (error) {
+      if (attempt === 1) {
+        return { reasonCode: "PUBLIC_API_FETCH_FAILED", attempts: 2, transportReason: transportReason(error) };
+      }
     }
   }
   if (!response.ok) return { reasonCode: "PUBLIC_API_HTTP_FAILURE", httpStatus: response.status };
@@ -386,6 +437,13 @@ async function fetchPublicApiPage({ url, request, expectedContentTypes, fetchImp
     return { reasonCode: "PUBLIC_API_SCHEMA_MISMATCH", httpStatus: response.status, contentType: contentType ?? null };
   }
   return { raw: await response.text(), httpStatus: response.status, contentType };
+}
+
+function transportReason(error) {
+  const reason = error?.cause?.code ?? error?.code ?? error?.name;
+  return typeof reason === "string" && /^[A-Z][A-Z0-9_]{1,63}$/.test(reason.toUpperCase())
+    ? reason.toUpperCase()
+    : "UNKNOWN";
 }
 
 function captureXmlRows(raw, fields) {
@@ -551,6 +609,13 @@ function validateQuery(query, label) {
   if (query.credentialPlacement !== undefined && !new Set(["header", "query"]).has(query.credentialPlacement)) {
     throw new Error(`${label}.credentialPlacement is invalid`);
   }
+  if (query.credentialPlacement === "header" && query.credentialParam !== "Authorization") {
+    throw new Error(`${label}.credentialParam must be Authorization for header authentication`);
+  }
+  if (query.coverageScope !== undefined
+    && !new Set(["LINE_EVIDENCE", "OPERATOR_DISCOVERY"]).has(query.coverageScope)) {
+    throw new Error(`${label}.coverageScope is invalid`);
+  }
   if (!new Set(["json", "xml"]).has(query.format)) throw new Error(`${label}.format is invalid`);
   if (query.format === "json" && query.method !== "POST") throw new Error(`${label}.json search must use POST`);
   if (query.format === "xml" && query.method !== undefined && query.method !== "GET") {
@@ -634,6 +699,7 @@ async function main(argv) {
   const resolutions = await collectNationwidePublicApiCoverage({ searchPlan });
   await writeFile(args.output, `${JSON.stringify(resolutions, null, 2)}\n`);
   console.log(`public API coverage search complete: unsupported=${resolutions.entries.length} unresolved=${resolutions.unresolved.length}`);
+  console.log(`sanitized diagnostics: ${summarizeUnresolvedDiagnostics(resolutions.unresolved).join(", ")}`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {

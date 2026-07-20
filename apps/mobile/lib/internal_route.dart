@@ -286,7 +286,7 @@ class InternalRouteResult {
     return switch (status) {
       'FOUND' => '역 안 이동 경로를 찾았어요',
       'BLOCKED' => '계단 없는 역 안 이동 경로를 찾지 못했어요',
-      _ => '역 안 이동 안내를 준비 중이에요',
+      _ => '역 안 이동 안내 미확인',
     };
   }
 
@@ -395,7 +395,7 @@ class InternalRouteStep {
       _internalRouteDistanceLabel(distanceMeters),
       if (includesStairs) '계단 포함',
       if (requiresElevator) '엘리베이터를 이용해요',
-      if (requiresEscalator) '에스컬레이터 안내를 확인하고 있어요',
+      if (requiresEscalator) '에스컬레이터를 이용해요',
     ];
     return labels.join(' · ');
   }

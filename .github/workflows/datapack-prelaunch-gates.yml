@@ -1,0 +1,177 @@
+name: Data Pack Prelaunch Gates
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: datapack-prelaunch-gates-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rehearsal:
+    name: Governance, freshness, rollback, callback
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      REQUIRED_GATE_IDS: source_admission,source_governance,freshness_conditional_publish,rollback_rescue,callback_reconciliation
+
+    steps:
+      - name: Configure rehearsal paths
+        shell: bash
+        run: echo "EVIDENCE_DIR=${RUNNER_TEMP}/datapack-prelaunch-gates" >> "${GITHUB_ENV}"
+
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+
+      - name: Set up Java
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          channel: stable
+          flutter-version: "3.44.0"
+          cache: true
+
+      - name: Capture one rehearsal clock
+        shell: bash
+        run: echo "EVALUATED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" >> "${GITHUB_ENV}"
+
+      - name: Prepare isolated monotonic rescue RC
+        id: prepare
+        run: |
+          node tools/release/build-datapack-prelaunch-gate-evidence.mjs --mode prepare \
+            --repo-root . \
+            --output-dir "${EVIDENCE_DIR}" \
+            --build-spec tools/datapack/release/candidate-build-spec.json \
+            --reviewed-pack tools/datapack/release/capital-production-reviewed-pack.json \
+            --evaluated-at "${EVALUATED_AT}" \
+            --github-output "${GITHUB_OUTPUT}"
+
+      - name: Stage actual RC bytes for Android verification
+        shell: bash
+        run: cp "${EVIDENCE_DIR}/android-rc-bundle.json" apps/mobile/assets/datapacks/prelaunch/android-rc-bundle.json
+
+      - name: Enable KVM group permissions
+        shell: bash
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Rehearse monotonic rescue on Android emulator
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          ram-size: 2048M
+          working-directory: apps/mobile
+          script: >-
+            flutter test -d emulator-5554
+            --reporter=expanded
+            --file-reporter=json:"${EVIDENCE_DIR}/android-device.jsonl"
+            --dart-define=EASYSUBWAY_RC_MANIFEST_SHA256=${{ steps.prepare.outputs.manifestSha256 }}
+            --dart-define=EASYSUBWAY_RC_RELEASE_SEQUENCE=${{ steps.prepare.outputs.releaseSequence }}
+            integration_test/datapack_monotonic_rescue_test.dart
+
+      - name: Validate launch source snapshot set at the fixed clock
+        run: |
+          node tools/datapack/validate-source-snapshot-freshness.mjs \
+            --build-spec tools/datapack/release/candidate-build-spec.json \
+            --inventory tools/datapack/source-inventory.json \
+            --policy apps/mobile/release/datapack-freshness-sla.json \
+            --governance-policy tools/datapack/source-governance-policy.json \
+            --evaluation-at "${EVALUATED_AT}" \
+            > "${EVIDENCE_DIR}/source-validation.json"
+
+      - name: Rehearse source governance and purge boundaries
+        run: |
+          node --test --test-reporter=tap --test-reporter-destination="${EVIDENCE_DIR}/source.tap" \
+            tools/datapack/source-governance.test.mjs \
+            tools/datapack/purge-expired-source-raw.test.mjs \
+            tools/datapack/validate-source-snapshot-freshness.test.mjs
+
+      - name: Rehearse freshness and conditional publish boundaries
+        run: |
+          node --test --test-reporter=tap --test-reporter-destination="${EVIDENCE_DIR}/freshness.tap" \
+            tools/datapack/freshness-policy.test.mjs
+
+      - name: Rehearse monotonic rescue and immutable pointer ordering
+        run: |
+          node --test --test-reporter=tap --test-reporter-destination="${EVIDENCE_DIR}/rollback.tap" \
+            tools/datapack/rollback-manifest.test.mjs
+
+      - name: Rehearse callback retry and reconciliation handoff
+        run: |
+          node --test --test-reporter=tap --test-reporter-destination="${EVIDENCE_DIR}/callback.tap" \
+            tools/datapack/send-release-callback.test.mjs
+
+      - name: Rehearse PostgreSQL governance migration and backend reconciliation
+        env:
+          EASYSUBWAY_PRELAUNCH_MANIFEST_SHA256: ${{ steps.prepare.outputs.manifestSha256 }}
+          EASYSUBWAY_PRELAUNCH_RELEASE_SEQUENCE: ${{ steps.prepare.outputs.releaseSequence }}
+        run: |
+          backend/gradlew -p backend test --no-daemon \
+            --tests '*JdbcDataSourceSnapshotRepositoryContainerTest' \
+            --tests '*DatapackReleaseCallbackServiceTest' \
+            --tests '*DatapackReleaseReconciliationServiceTest' \
+            --tests '*DatapackReleaseReconciliationSchedulerTest' \
+            --tests '*DatapackReleaseRequestAdminPageControllerTest' \
+            --tests '*JdbcDatapackReleaseRequestRepositoryTest'
+
+      - name: Rehearse Android failed-release preservation and rescue replay
+        working-directory: apps/mobile
+        shell: bash
+        run: |
+          set -o pipefail
+          flutter test --reporter expanded \
+            test/core/datapack/data_pack_updater_test.dart \
+            test/core/datapack/data_pack_update_state_test.dart \
+            | tee "${EVIDENCE_DIR}/android.txt"
+
+      - name: Bind five gate fragments to one final RC identity
+        run: |
+          node tools/release/build-datapack-prelaunch-gate-evidence.mjs --mode collect \
+            --repo-root . \
+            --output-dir "${EVIDENCE_DIR}" \
+            --evaluated-at "${EVALUATED_AT}" \
+            --candidate "${EVIDENCE_DIR}/candidate-context.json" \
+            --build-spec tools/datapack/release/candidate-build-spec.json \
+            --source-validation-report "${EVIDENCE_DIR}/source-validation.json" \
+            --rollback-report "${EVIDENCE_DIR}/rollback-report.json" \
+            --callback-execution-report "${EVIDENCE_DIR}/callback-execution-report.json" \
+            --conditional-publish-report "${EVIDENCE_DIR}/conditional-publish-report.json" \
+            --android-device-report "${EVIDENCE_DIR}/android-device.jsonl" \
+            --source-suite-report "${EVIDENCE_DIR}/source.tap" \
+            --freshness-suite-report "${EVIDENCE_DIR}/freshness.tap" \
+            --rollback-suite-report "${EVIDENCE_DIR}/rollback.tap" \
+            --callback-suite-report "${EVIDENCE_DIR}/callback.tap" \
+            --android-suite-report "${EVIDENCE_DIR}/android.txt" \
+            --backend-junit-dir backend/build/test-results/test \
+            --public-key "${EVIDENCE_DIR}/public-key.pem" \
+            --data-pack-manifest "${EVIDENCE_DIR}/rescue-manifest.json" \
+            --data-pack-rehearsal-binding "${EVIDENCE_DIR}/rehearsal-binding.json" \
+            --data-pack-artifact "${EVIDENCE_DIR}/built-datapack/catalog/capital-v1.sqlite.gz"
+
+      - name: Upload prelaunch gate evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: easysubway-datapack-prelaunch-gates-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/datapack-prelaunch-gates
+            backend/build/test-results/test
+          if-no-files-found: error
+          retention-days: 30

@@ -1,7 +1,8 @@
-import 'package:drift/drift.dart' show Variable;
+import 'dart:async';
+import 'dart:isolate';
 
-import '../../../core/database/catalog/canonical_station_id.dart';
 import '../../../core/database/catalog/catalog_database.dart';
+import '../../../mobile_error_reporter.dart';
 import '../../../route_hedge_labels.dart';
 import '../../../route_search.dart';
 import '../../fare/official_od_fare_quote.dart';
@@ -16,43 +17,334 @@ import '../domain/route_step.dart' as route_step;
 
 class LocalRouteRepository implements RouteSearchRepository {
   LocalRouteRepository({
-    required this.catalogDatabase,
+    required CatalogDatabase catalogDatabase,
     OfficialOdFareRepository? officialOdFareRepository,
+    this.artifactIdentity = 'initial-artifact',
     DateTime Function()? now,
+    this.routeCatalogBuildObserver,
+    this.routeRuntimeRefreshObserver,
   }) : now = now ?? DateTime.now,
-       officialOdFareRepository =
+       _initialCatalogDatabase = catalogDatabase,
+       _initialOfficialOdFareRepository =
            officialOdFareRepository ??
            OfficialOdFareRepository(catalogDatabase: catalogDatabase);
 
-  final CatalogDatabase catalogDatabase;
+  final CatalogDatabase _initialCatalogDatabase;
+  final String artifactIdentity;
   final DateTime Function() now;
-  final OfficialOdFareRepository officialOdFareRepository;
+  final OfficialOdFareRepository _initialOfficialOdFareRepository;
+  final FutureOr<void> Function(String event)? routeCatalogBuildObserver;
+  final FutureOr<void> Function(String event)? routeRuntimeRefreshObserver;
+  _RouteCatalogBundle? _activeBundle;
+  Future<_RouteCatalogBundle>? _routeCatalogBundleFuture;
+  Future<void> _lifecycleQueue = Future<void>.value();
+  final Set<Future<void>> _inFlightActivations = {};
+  final Set<Future<void>> _inFlightRuntimeRefreshes = {};
+  final Set<_RouteCatalogBundle> _retiredBundles = {};
+  Future<void>? _closeFuture;
+  bool _isClosed = false;
+  int _activationSequence = 0;
+
+  CatalogDatabase get catalogDatabase =>
+      _activeBundle?.catalogDatabase ?? _initialCatalogDatabase;
+
+  Future<_RouteCatalogBundle> _routeCatalogBundle() {
+    if (_isClosed) {
+      return Future.error(StateError('LocalRouteRepository is closed.'));
+    }
+    final active = _activeBundle;
+    if (active != null) {
+      return Future.value(active);
+    }
+    final existing = _routeCatalogBundleFuture;
+    if (existing != null) {
+      return existing;
+    }
+    late final Future<_RouteCatalogBundle> future;
+    future =
+        _buildRouteCatalogBundle(
+              catalogDatabase: _initialCatalogDatabase,
+              artifactIdentity: artifactIdentity,
+              officialOdFareRepository: _initialOfficialOdFareRepository,
+              ownsDatabase: false,
+            )
+            .then((bundle) {
+              if (!_isClosed) {
+                _activeBundle ??= bundle;
+              }
+              if (identical(_routeCatalogBundleFuture, future)) {
+                _routeCatalogBundleFuture = null;
+              }
+              return _activeBundle ?? bundle;
+            })
+            .onError((Object error, StackTrace stackTrace) {
+              if (identical(_routeCatalogBundleFuture, future)) {
+                _routeCatalogBundleFuture = null;
+              }
+              Error.throwWithStackTrace(error, stackTrace);
+            });
+    _routeCatalogBundleFuture = future;
+    return future;
+  }
+
+  Future<_RouteCatalogBundle> _buildRouteCatalogBundle({
+    required CatalogDatabase catalogDatabase,
+    required String artifactIdentity,
+    required OfficialOdFareRepository officialOdFareRepository,
+    required bool ownsDatabase,
+  }) async {
+    await routeCatalogBuildObserver?.call('snapshot');
+    final catalog = await _RouteCatalogSnapshot.load(catalogDatabase);
+    final timetable = await _TimetableSnapshot.load(catalogDatabase);
+    final officialOdFares = await officialOdFareRepository.loadAllApproved();
+    final runtimeState = await _RouteRuntimeState.load(catalogDatabase);
+    await routeCatalogBuildObserver?.call('graph');
+    final routeGraph = await Isolate.run(catalog.toGraph);
+    return _RouteCatalogBundle(
+      artifactIdentity: artifactIdentity,
+      catalogDatabase: catalogDatabase,
+      catalog: catalog,
+      routeGraph: routeGraph,
+      timetable: timetable,
+      officialOdFares: officialOdFares,
+      runtimeState: runtimeState,
+      ownsDatabase: ownsDatabase,
+    );
+  }
+
+  /// 세션의 다른 catalog 소비자와 교체가 조정된 뒤 완성된 route bundle을 게시한다.
+  Future<void> activateDataPack({
+    required CatalogDatabase catalogDatabase,
+    required String artifactIdentity,
+    bool ownsDatabase = false,
+  }) {
+    if (_isClosed) {
+      return _rejectClosedActivation(catalogDatabase, ownsDatabase);
+    }
+    late final Future<void> activation;
+    activation = _enqueueLifecycleOperation(
+      () => _activateDataPack(
+        catalogDatabase: catalogDatabase,
+        artifactIdentity: artifactIdentity,
+        ownsDatabase: ownsDatabase,
+      ),
+    );
+    _inFlightActivations.add(activation);
+    return activation.whenComplete(() {
+      _inFlightActivations.remove(activation);
+    });
+  }
+
+  Future<void> _rejectClosedActivation(
+    CatalogDatabase catalogDatabase,
+    bool ownsDatabase,
+  ) async {
+    if (ownsDatabase) {
+      await catalogDatabase.close();
+    }
+    throw StateError('LocalRouteRepository is closed.');
+  }
+
+  Future<void> _activateDataPack({
+    required CatalogDatabase catalogDatabase,
+    required String artifactIdentity,
+    required bool ownsDatabase,
+  }) async {
+    if (_isClosed) {
+      await _disposeIncomingDatabase(catalogDatabase, ownsDatabase);
+      return;
+    }
+    final active = _activeBundle;
+    final inFlight = _routeCatalogBundleFuture;
+    final current = active ?? (inFlight == null ? null : await inFlight);
+    if (_isClosed) {
+      await _disposeIncomingDatabase(catalogDatabase, ownsDatabase);
+      return;
+    }
+    if ((current?.artifactIdentity ?? this.artifactIdentity) ==
+        artifactIdentity) {
+      if (ownsDatabase &&
+          !identical(
+            catalogDatabase,
+            current?.catalogDatabase ?? _initialCatalogDatabase,
+          )) {
+        await catalogDatabase.close();
+      }
+      return;
+    }
+    final activation = ++_activationSequence;
+    _RouteCatalogBundle candidate;
+    try {
+      candidate = await _buildRouteCatalogBundle(
+        catalogDatabase: catalogDatabase,
+        artifactIdentity: artifactIdentity,
+        officialOdFareRepository: OfficialOdFareRepository(
+          catalogDatabase: catalogDatabase,
+        ),
+        ownsDatabase: ownsDatabase,
+      );
+    } catch (error, stackTrace) {
+      try {
+        if (ownsDatabase) {
+          await catalogDatabase.close();
+        }
+      } finally {
+        Error.throwWithStackTrace(error, stackTrace);
+      }
+    }
+    if (activation != _activationSequence) {
+      await candidate.dispose();
+      return;
+    }
+    if (_isClosed || activation != _activationSequence) {
+      await candidate.dispose();
+      return;
+    }
+    final previous = _activeBundle;
+    _activeBundle = candidate;
+    if (previous != null) {
+      try {
+        await previous.dispose();
+      } catch (error, stackTrace) {
+        _retiredBundles.add(previous);
+        reportMobileError(
+          error,
+          stackTrace,
+          context: '이전 이동 정보 bundle 정리 중 예외가 발생했습니다.',
+        );
+      }
+    }
+  }
+
+  Future<void> _disposeIncomingDatabase(
+    CatalogDatabase catalogDatabase,
+    bool ownsDatabase,
+  ) async {
+    if (ownsDatabase) {
+      await catalogDatabase.close();
+    }
+  }
+
+  Future<void> refreshRuntimeState() {
+    if (_isClosed) {
+      return Future.error(StateError('LocalRouteRepository is closed.'));
+    }
+    late final Future<void> refresh;
+    refresh = _enqueueLifecycleOperation(() {
+      if (_isClosed) return Future<void>.value();
+      return _refreshRuntimeState();
+    });
+    _inFlightRuntimeRefreshes.add(refresh);
+    return refresh.whenComplete(() {
+      _inFlightRuntimeRefreshes.remove(refresh);
+    });
+  }
+
+  Future<void> _refreshRuntimeState() async {
+    final bundle = await _routeCatalogBundle();
+    await routeRuntimeRefreshObserver?.call('load');
+    bundle.runtimeState = await _RouteRuntimeState.load(bundle.catalogDatabase);
+  }
+
+  Future<void> _enqueueLifecycleOperation(Future<void> Function() operation) {
+    final queued = _lifecycleQueue.then((_) => operation());
+    _lifecycleQueue = queued.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    return queued;
+  }
+
+  Future<void> _waitForRuntimeRefreshes() async {
+    while (_inFlightRuntimeRefreshes.isNotEmpty) {
+      final pending = _inFlightRuntimeRefreshes.toList(growable: false);
+      await Future.wait(
+        pending.map(
+          (refresh) => refresh.then<void>(
+            (_) {},
+            onError: (Object error, StackTrace stackTrace) {
+              // 호출자에게 전달되는 refresh 오류가 lifecycle 정리를 막지는 않는다.
+            },
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> close() {
+    final existing = _closeFuture;
+    if (existing != null) {
+      return existing;
+    }
+    _isClosed = true;
+    _activationSequence += 1;
+    final future = _closeResources();
+    _closeFuture = future;
+    return future;
+  }
+
+  Future<void> _closeResources() async {
+    Object? firstError;
+    StackTrace? firstStackTrace;
+    _RouteCatalogBundle? completedBuild;
+    final build = _routeCatalogBundleFuture;
+    if (build != null) {
+      try {
+        completedBuild = await build;
+      } catch (error, stackTrace) {
+        firstError = error;
+        firstStackTrace = stackTrace;
+      }
+    }
+    for (final activation in _inFlightActivations.toList(growable: false)) {
+      try {
+        await activation;
+      } catch (error, stackTrace) {
+        firstError ??= error;
+        firstStackTrace ??= stackTrace;
+      }
+    }
+    await _waitForRuntimeRefreshes();
+    for (final retired in _retiredBundles.toList(growable: false)) {
+      try {
+        await retired.dispose();
+        _retiredBundles.remove(retired);
+      } catch (error, stackTrace) {
+        firstError ??= error;
+        firstStackTrace ??= stackTrace;
+      }
+    }
+    final bundle = _activeBundle;
+    _activeBundle = null;
+    if (completedBuild != null && !identical(completedBuild, bundle)) {
+      await completedBuild.dispose();
+    }
+    if (bundle != null) {
+      try {
+        await bundle.dispose();
+      } catch (error, stackTrace) {
+        firstError ??= error;
+        firstStackTrace ??= stackTrace;
+      }
+    }
+    if (firstError != null) {
+      Error.throwWithStackTrace(firstError, firstStackTrace!);
+    }
+  }
 
   Future<RouteSearchRequest> canonicalRequest(
     RouteSearchRequest request,
   ) async {
-    final waypoint = request.waypointStationId?.trim();
-    return RouteSearchRequest(
-      originStationId: await catalogDatabase.resolveCanonicalStationId(
-        request.originStationId.trim(),
-      ),
-      destinationStationId: await catalogDatabase.resolveCanonicalStationId(
-        request.destinationStationId.trim(),
-      ),
-      mobilityType: request.mobilityType,
-      constraintMode: request.constraintMode,
-      waypointStationId: waypoint == null || waypoint.isEmpty
-          ? waypoint
-          : await catalogDatabase.resolveCanonicalStationId(waypoint),
-      mobilityPreset: request.mobilityPreset,
-      transportScope: request.transportScope,
-    );
+    return (await _routeCatalogBundle()).catalog.canonicalRequest(request);
   }
 
   Future<RouteCapabilityMetadata> routeCapability(
     RouteSearchRequest request,
   ) async {
-    final catalog = await _RouteCatalogSnapshot.load(catalogDatabase);
+    final bundle = await _routeCatalogBundle();
+    final catalog = bundle.catalog;
+    final searchMode = _stationSearchMode(bundle);
+    final edgeResolver = bundle.edgeResolver(now());
     final stationExists =
         catalog.hasStation(request.originStationId) &&
         catalog.hasStation(request.destinationStationId);
@@ -60,6 +352,9 @@ class LocalRouteRepository implements RouteSearchRepository {
         ? catalog.routeResult(
             request.originStationId,
             request.destinationStationId,
+            routeGraph: bundle.routeGraph,
+            searchMode: searchMode,
+            edgeResolver: edgeResolver,
             mobilityType: local.MobilityType.luggage,
             constraintMode: local.ConstraintMode.allowWithWarnings,
           )
@@ -73,6 +368,9 @@ class LocalRouteRepository implements RouteSearchRepository {
           catalog.strictEvidenceSupportedFor(
             request.originStationId,
             request.destinationStationId,
+            routeGraph: bundle.routeGraph,
+            searchMode: searchMode,
+            edgeResolver: edgeResolver,
           ),
       realtimeSupported: catalog.realtimeSupported(
         request.originStationId,
@@ -102,17 +400,21 @@ class LocalRouteRepository implements RouteSearchRepository {
   }
 
   Future<bool> canSearchRoute(RouteSearchRequest request) async {
-    final catalog = await _RouteCatalogSnapshot.load(catalogDatabase);
+    final catalog = (await _routeCatalogBundle()).catalog;
     return catalog.hasStation(request.originStationId) &&
         catalog.hasStation(request.destinationStationId);
   }
 
   @override
   Future<RouteSearchResult> searchRoute(RouteSearchRequest rawRequest) async {
-    final catalog = await _RouteCatalogSnapshot.load(catalogDatabase);
+    final bundle = await _routeCatalogBundle();
+    final catalog = bundle.catalog;
+    final searchMode = _stationSearchMode(bundle);
+    final edgeResolver = bundle.edgeResolver(now());
     final request = catalog.canonicalRequest(rawRequest);
     final mobilityType = _mobilityType(request.mobilityType);
     final constraintMode = _constraintMode(request.effectiveConstraintMode);
+    final objective = _localObjective(request.objective);
     // #1975: 경유 요청의 strict 강등 판정은 전역 strict 지원이 아니라 두 구간을
     // 각각 본다(한 구간만 미지원이어도 강등). 경유 없는 단일 구간은 엔진이 이미
     // 구간별 strict 근거를 강제하고 구체 사유를 내므로 전역 pre-filter를 유지한다.
@@ -126,40 +428,50 @@ class LocalRouteRepository implements RouteSearchRepository {
           ? local.LocalRouteResult.unknown(const [
               'STRICT_EVIDENCE_UNSUPPORTED',
             ])
-          : LocalRouteEngine(graph: catalog.toGraph()).search(
+          : LocalRouteEngine(
+              graph: bundle.routeGraph,
+              edgeResolver: edgeResolver,
+            ).search(
               local.RouteRequest(
                 originStationId: request.originStationId,
                 destinationStationId: request.destinationStationId,
                 mobilityType: mobilityType,
                 constraintMode: constraintMode,
-                searchMode: local
-                    .RouteSearchMode
-                    .stationToStationWithOutOfStationTransfers,
+                searchMode: searchMode,
+                objective: objective,
               ),
             );
     } else if (blocksStairOnly &&
         !(catalog.strictEvidenceSupportedFor(
               request.originStationId,
               waypointStationId,
+              routeGraph: bundle.routeGraph,
+              searchMode: searchMode,
+              edgeResolver: edgeResolver,
             ) &&
             catalog.strictEvidenceSupportedFor(
               waypointStationId,
               request.destinationStationId,
+              routeGraph: bundle.routeGraph,
+              searchMode: searchMode,
+              edgeResolver: edgeResolver,
             ))) {
       result = local.LocalRouteResult.unknown(const [
         'STRICT_EVIDENCE_UNSUPPORTED',
       ]);
     } else {
-      final graphSnapshot = catalog.toGraph();
-      final engine = LocalRouteEngine(graph: graphSnapshot);
+      final engine = LocalRouteEngine(
+        graph: bundle.routeGraph,
+        edgeResolver: edgeResolver,
+      );
       final first = engine.search(
         local.RouteRequest(
           originStationId: request.originStationId,
           destinationStationId: waypointStationId,
           mobilityType: mobilityType,
           constraintMode: constraintMode,
-          searchMode:
-              local.RouteSearchMode.stationToStationWithOutOfStationTransfers,
+          searchMode: searchMode,
+          objective: objective,
         ),
       );
       final second = engine.search(
@@ -168,18 +480,23 @@ class LocalRouteRepository implements RouteSearchRepository {
           destinationStationId: request.destinationStationId,
           mobilityType: mobilityType,
           constraintMode: constraintMode,
-          searchMode:
-              local.RouteSearchMode.stationToStationWithOutOfStationTransfers,
+          searchMode: searchMode,
+          objective: objective,
         ),
       );
       result = mergeWaypointRouteResults(first, second);
     }
 
-    final plannedArrivals = await _plannedRideArrivals(result, catalog);
-    final quote = await officialOdFareRepository.findExact(
-      originStationId: request.originStationId,
-      destinationStationId: request.destinationStationId,
+    final plannedArrivals = _plannedRideArrivals(
+      result,
+      catalog,
+      bundle.timetable,
     );
+    final quote =
+        bundle.officialOdFares[_officialFareKey(
+          request.originStationId,
+          request.destinationStationId,
+        )];
     return _toRouteSearchResult(
       request,
       result,
@@ -187,6 +504,12 @@ class LocalRouteRepository implements RouteSearchRepository {
       plannedArrivals: plannedArrivals,
       officialOdFareQuote: quote,
     );
+  }
+
+  local.RouteSearchMode _stationSearchMode(_RouteCatalogBundle bundle) {
+    return !bundle.runtimeState.outOfStationTransferRuntimeEnabled
+        ? local.RouteSearchMode.stationToStation
+        : local.RouteSearchMode.stationToStationWithOutOfStationTransfers;
   }
 
   @override
@@ -256,12 +579,13 @@ class LocalRouteRepository implements RouteSearchRepository {
       blockedReasons: result.blockedReasonCodes
           .map(_blockedReasonMessage)
           .toList(growable: false),
-      createdAt: DateTime.now().toIso8601String(),
+      createdAt: DateTime.now().toUtc().toIso8601String(),
       etaSource: 'STATIC_LOCAL',
       etaConfidence: 'STATIC',
       sourceUpdatedAt: catalog.sourceUpdatedAt,
       officialOdFareQuote: officialOdFareQuote,
       transportScope: request.transportScope,
+      objective: request.objective,
     );
   }
 
@@ -352,15 +676,22 @@ class LocalRouteRepository implements RouteSearchRepository {
             carDoorCarNumber: carDoorHint?.carNumber,
             carDoorDoorNumber: carDoorHint?.doorNumber,
             carDoorFacilityType: carDoorHint?.facilityType ?? '',
+            // 오프라인 catalog는 지하철 전용이라 승차 leg의 운행 클래스는 SUBWAY로
+            // 보존한다. 운행종별은 온라인 파서와 대칭으로 대문자 enum(LOCAL·EXPRESS)만
+            // 정규화해 싣고, 그 외(공백·미상)는 null로 둬 급행 배지를 붙이지 않는다
+            // (급행 정보가 없으면 배지 없음이 정상).
+            serviceClass: step.type.name == 'ride' ? 'SUBWAY' : null,
+            servicePattern: _normalizedRideServicePattern(step),
           );
         })
         .toList(growable: false);
   }
 
-  Future<Map<int, String>> _plannedRideArrivals(
+  Map<int, String> _plannedRideArrivals(
     local.LocalRouteResult result,
     _RouteCatalogSnapshot catalog,
-  ) async {
+    _TimetableSnapshot timetable,
+  ) {
     if (result.status != local.RouteStatus.found) {
       return const {};
     }
@@ -371,11 +702,23 @@ class LocalRouteRepository implements RouteSearchRepository {
         cursor = cursor.add(Duration(seconds: step.durationSeconds));
         continue;
       }
-      final arrival = await _nextTimetableArrival(
+      // 시간표 조회는 UI 투영과 같은 정규화 값을 쓴다. edge에 'express '(소문자·
+      // 공백)가 와도 대문자 'EXPRESS' 시간표와 매칭되도록 정규화한 뒤 넘긴다.
+      final rawServicePattern = step.servicePattern.trim();
+      final normalizedServicePattern = _normalizedServicePattern(
+        rawServicePattern,
+      );
+      // non-empty인데 화이트리스트 밖(미상)이면 어떤 시간표와도 신뢰성 있게 매칭할
+      // 수 없으므로 도착 시각 조회를 포기한다(fail-safe: 빈 결과). 빈 값은 종전대로
+      // 운행종별 필터 없이 조회한다(LOCAL/미표기 동작 보존).
+      if (rawServicePattern.isNotEmpty && normalizedServicePattern == null) {
+        return const {};
+      }
+      final arrival = timetable.nextArrival(
         fromStationId: catalog.stationIdForNode(step.fromNodeId),
         toStationId: catalog.stationIdForNode(step.toNodeId),
         lineId: step.lineId,
-        servicePattern: step.servicePattern,
+        servicePattern: normalizedServicePattern ?? '',
         cursor: cursor,
       );
       if (arrival == null) {
@@ -385,107 +728,6 @@ class LocalRouteRepository implements RouteSearchRepository {
       cursor = arrival;
     }
     return arrivals;
-  }
-
-  Future<DateTime?> _nextTimetableArrival({
-    required String fromStationId,
-    required String toStationId,
-    required String lineId,
-    required String servicePattern,
-    required DateTime cursor,
-  }) async {
-    final koreaNow = cursor.toUtc().add(const Duration(hours: 9));
-    var firstServiceDate = DateTime.utc(
-      koreaNow.year,
-      koreaNow.month,
-      koreaNow.day,
-    );
-    if (koreaNow.hour < 3) {
-      firstServiceDate = firstServiceDate.subtract(const Duration(days: 1));
-    }
-    for (var dayOffset = 0; dayOffset <= 7; dayOffset += 1) {
-      final serviceDate = firstServiceDate.add(Duration(days: dayOffset));
-      final serviceMidnight = serviceDate.subtract(const Duration(hours: 9));
-      final dateKey = _compactDate(serviceDate);
-      final weekdayColumn = _weekdayColumn(serviceDate.weekday);
-      final startMicroseconds = cursor
-          .difference(serviceMidnight)
-          .inMicroseconds;
-      final startSeconds = startMicroseconds <= 0
-          ? 0
-          : (startMicroseconds + Duration.microsecondsPerSecond - 1) ~/
-                Duration.microsecondsPerSecond;
-      final servicePatternSql = servicePattern.isEmpty
-          ? ''
-          : 'AND trip.service_pattern = ?';
-      final row = await catalogDatabase
-          .customSelect(
-            '''
-        SELECT board.departure_seconds, alight.arrival_seconds
-        FROM transit_trips trip
-        INNER JOIN transit_routes route ON route.id = trip.route_id
-        INNER JOIN service_calendars calendar
-          ON calendar.service_id = trip.service_id
-        INNER JOIN transit_stop_times board ON board.trip_id = trip.id
-        INNER JOIN transit_stop_times alight ON alight.trip_id = trip.id
-        WHERE (
-            (
-              calendar.start_date <= ?
-              AND calendar.end_date >= ?
-              AND calendar.$weekdayColumn != 0
-            )
-            OR EXISTS (
-              SELECT 1
-              FROM service_calendar_dates added
-              WHERE added.service_id = trip.service_id
-                AND added.date = ?
-                AND added.exception_type = 1
-            )
-          )
-          AND NOT EXISTS (
-            SELECT 1
-            FROM service_calendar_dates removed
-            WHERE removed.service_id = trip.service_id
-              AND removed.date = ?
-              AND removed.exception_type = 2
-          )
-          AND trip.service_class = 'SUBWAY'
-          AND route.line_id = ?
-          $servicePatternSql
-          AND board.station_id = ?
-          AND board.line_id = ?
-          AND board.pickup_type != 1
-          AND alight.station_id = ?
-          AND alight.line_id = ?
-          AND alight.drop_off_type != 1
-          AND alight.stop_sequence > board.stop_sequence
-          AND board.departure_seconds >= ?
-        ORDER BY board.departure_seconds, alight.arrival_seconds, trip.id
-        LIMIT 1
-      ''',
-            variables: [
-              Variable.withString(dateKey),
-              Variable.withString(dateKey),
-              Variable.withString(dateKey),
-              Variable.withString(dateKey),
-              Variable.withString(lineId),
-              if (servicePattern.isNotEmpty)
-                Variable.withString(servicePattern),
-              Variable.withString(fromStationId),
-              Variable.withString(lineId),
-              Variable.withString(toStationId),
-              Variable.withString(lineId),
-              Variable.withInt(startSeconds),
-            ],
-          )
-          .getSingleOrNull();
-      if (row != null) {
-        return serviceMidnight.add(
-          Duration(seconds: row.read<int>('arrival_seconds')),
-        );
-      }
-    }
-    return null;
   }
 
   int _estimatedDurationSeconds(List<RouteSearchStep> steps) {
@@ -703,6 +945,37 @@ class LocalRouteRepository implements RouteSearchRepository {
       _ => throw const RouteSearchException('지원하지 않는 이동 제약 조건입니다.'),
     };
   }
+
+  local.RouteObjective _localObjective(RouteObjective objective) {
+    return switch (objective) {
+      RouteObjective.fastest => local.RouteObjective.fastest,
+      RouteObjective.fewestTransfers => local.RouteObjective.fewestTransfers,
+    };
+  }
+}
+
+/// 오프라인 catalog network edge의 운행종별 화이트리스트. 온라인 파서와 대칭으로
+/// 대문자 enum({'LOCAL','EXPRESS'})만 인정한다.
+const Set<String> _localRideServicePatterns = {'LOCAL', 'EXPRESS'};
+
+/// ride 승차 leg의 servicePattern을 정규화한다. datapack 파이프라인은
+/// network_edges.service_pattern에 대문자 enum을 강제하지 않으므로(build-datapack의
+/// 삽입은 `row.servicePattern ?? ''`로 검증 없이 통과), 계약이 불명확한 값은
+/// fail-safe로 null 처리해 급행 배지를 붙이지 않는다(온라인 파서의 fail-closed와
+/// 달리 오프라인은 배지 없음이 정상 — 기존 로컬 정책 유지). ride가 아니거나 공백·
+/// 미상 값도 모두 null.
+String? _normalizedRideServicePattern(route_step.RouteStep step) {
+  if (step.type.name != 'ride') {
+    return null;
+  }
+  return _normalizedServicePattern(step.servicePattern);
+}
+
+/// raw servicePattern을 화이트리스트({'LOCAL','EXPRESS'}) 대문자 enum으로 정규화한다.
+/// 공백·미상 값은 null. UI 투영과 시간표 조회가 같은 정규화를 쓰도록 공유한다.
+String? _normalizedServicePattern(String raw) {
+  final normalized = raw.trim().toUpperCase();
+  return _localRideServicePatterns.contains(normalized) ? normalized : null;
 }
 
 /// 경유역 지원 1단계: 출발→경유, 경유→도착 두 구간의 탐색 결과를 하나로 합성한다.
@@ -937,7 +1210,7 @@ List<route_step.RouteStep> _collapseConsecutiveRideSteps(
           : 'UNKNOWN',
       confidenceLabel: previous.confidenceLabel == step.confidenceLabel
           ? previous.confidenceLabel
-          : '안내를 준비 중이에요',
+          : '',
     );
   }
   return collapsed;
@@ -1032,7 +1305,8 @@ extension _OnlineRouteDisplayLabels on LocalRouteRepository {
   Future<RouteSearchResult> resolveDisplayLabels(
     RouteSearchResult result,
   ) async {
-    final catalog = await _RouteCatalogSnapshot.load(catalogDatabase);
+    final bundle = await _routeCatalogBundle();
+    final catalog = bundle.catalog;
     final steps = result.steps
         .map((step) {
           final fromName = catalog.stationName(step.fromStationId);
@@ -1057,10 +1331,10 @@ extension _OnlineRouteDisplayLabels on LocalRouteRepository {
       lineName: catalog.lineName(result.lineId),
       steps: steps,
       officialOdFareQuote: result.transportScope == RouteTransportScope.subway
-          ? await officialOdFareRepository.findExact(
-              originStationId: result.originStationId,
-              destinationStationId: result.destinationStationId,
-            )
+          ? bundle.officialOdFares[_officialFareKey(
+              result.originStationId,
+              result.destinationStationId,
+            )]
           : null,
     );
   }
@@ -1124,6 +1398,403 @@ enum _SeqDirectionConvention { ascendingIsDown, ascendingIsUp }
 const Map<String, _SeqDirectionConvention> _carDoorSeqConventionByLine = {
   'seoul-4': _SeqDirectionConvention.ascendingIsDown,
 };
+
+class _RouteCatalogBundle {
+  _RouteCatalogBundle({
+    required this.artifactIdentity,
+    required this.catalogDatabase,
+    required this.catalog,
+    required this.routeGraph,
+    required this.timetable,
+    required this.officialOdFares,
+    required this.runtimeState,
+    required this.ownsDatabase,
+  });
+
+  final String artifactIdentity;
+  final CatalogDatabase catalogDatabase;
+  final _RouteCatalogSnapshot catalog;
+  final graph.NetworkGraph routeGraph;
+  final _TimetableSnapshot timetable;
+  final Map<String, OfficialOdFareQuote> officialOdFares;
+  final bool ownsDatabase;
+  _RouteRuntimeState runtimeState;
+  late final Map<String, _NetworkEdgeSnapshot> _networkEdgesById = {
+    for (final edge in catalog.networkEdges) edge.id: edge,
+  };
+
+  graph.RouteEdge Function(graph.RouteEdge edge) edgeResolver(DateTime at) {
+    final state = runtimeState;
+    final nowSeconds = at.toUtc().millisecondsSinceEpoch ~/ 1000;
+    return (storedEdge) {
+      final sourceEdge = _networkEdgesById[storedEdge.sourceEdgeId];
+      if (sourceEdge == null) {
+        return storedEdge;
+      }
+      final effective = sourceEdge.facilityId.isEmpty
+          ? sourceEdge
+          : sourceEdge.resolveFacility(
+              state.facilityAt(sourceEdge.facilityId, nowSeconds),
+            );
+      return _toGraphRouteEdge(
+        effective,
+        storedEdge.type,
+        id: storedEdge.id,
+        fromNodeId: storedEdge.fromNodeId,
+        toNodeId: storedEdge.toNodeId,
+        at: at,
+      );
+    };
+  }
+
+  Future<void> dispose() async {
+    if (ownsDatabase) {
+      await catalogDatabase.close();
+    }
+  }
+}
+
+class _RouteRuntimeState {
+  const _RouteRuntimeState({
+    required this.outOfStationTransferRuntimeEnabled,
+    required this.facilitiesById,
+    required this.statusSnapshotsByFacilityId,
+  });
+
+  final bool outOfStationTransferRuntimeEnabled;
+  final Map<String, _FacilitySnapshot> facilitiesById;
+  final Map<String, List<_FacilityStatusSnapshot>> statusSnapshotsByFacilityId;
+
+  static Future<_RouteRuntimeState> load(CatalogDatabase database) async {
+    final runtimeRow = await database.customSelect('''
+      SELECT value
+      FROM catalog_metadata
+      WHERE key = 'route.outOfStationTransfer.runtimeEnabled'
+      LIMIT 1
+      ''').getSingleOrNull();
+    final operationalStatusSql = _selectFacilityColumn(
+      database.routeFacilityColumnNames,
+      'operational_status',
+      'NULL',
+    );
+    final hasDataQualityRecords = await _tableExists(
+      database,
+      'data_quality_records',
+    );
+    final rows = await database
+        .customSelect(
+          hasDataQualityRecords
+              ? '''
+          SELECT f.id, f.station_id, f.type, f.status,
+                 $operationalStatusSql AS operational_status,
+                 (
+                   SELECT q.quality_level FROM data_quality_records q
+                   WHERE UPPER(q.target_type) = 'FACILITY' AND q.target_id = f.id
+                   ORDER BY q.checked_at IS NULL, q.checked_at DESC, q.id DESC
+                   LIMIT 1
+                 ) AS quality_level,
+                 (
+                   SELECT q.checked_at FROM data_quality_records q
+                   WHERE UPPER(q.target_type) = 'FACILITY' AND q.target_id = f.id
+                   ORDER BY q.checked_at IS NULL, q.checked_at DESC, q.id DESC
+                   LIMIT 1
+                 ) AS checked_at
+          FROM facilities f ORDER BY f.id
+          '''
+              : '''
+          SELECT f.id, f.station_id, f.type, f.status,
+                 $operationalStatusSql AS operational_status,
+                 NULL AS quality_level, NULL AS checked_at
+          FROM facilities f ORDER BY f.id
+          ''',
+        )
+        .get();
+    return _RouteRuntimeState(
+      outOfStationTransferRuntimeEnabled:
+          runtimeRow?.read<String>('value').toLowerCase() != 'false',
+      facilitiesById: {
+        for (final row in rows)
+          row.read<String>('id'): _FacilitySnapshot(
+            id: row.read<String>('id'),
+            stationId: row.read<String>('station_id'),
+            type: row.read<String>('type'),
+            status: row.read<String>('status'),
+            operationalStatus: row.readNullable<String>('operational_status'),
+            qualityLevel: row.readNullable<String>('quality_level'),
+            checkedAtSeconds: row.readNullable<int>('checked_at'),
+            activeStatusSnapshot: null,
+            expiredStatusSnapshot: null,
+          ),
+      },
+      statusSnapshotsByFacilityId: await _allFacilityStatusSnapshots(database),
+    );
+  }
+
+  _FacilitySnapshot? facilityAt(String facilityId, int nowSeconds) {
+    final base = facilitiesById[facilityId];
+    if (base == null) {
+      return null;
+    }
+    _FacilityStatusSnapshot? active;
+    _FacilityStatusSnapshot? expired;
+    for (final snapshot
+        in statusSnapshotsByFacilityId[facilityId] ??
+            const <_FacilityStatusSnapshot>[]) {
+      if (snapshot.isExpiredAt(nowSeconds)) {
+        if (expired == null ||
+            _compareFacilityStatusSnapshot(snapshot, expired) > 0) {
+          expired = snapshot;
+        }
+      } else if (active == null ||
+          _compareFacilityStatusSnapshot(snapshot, active) > 0) {
+        active = snapshot;
+      }
+    }
+    return base.copyWithStatusSnapshots(
+      activeStatusSnapshot: active,
+      expiredStatusSnapshot: expired,
+    );
+  }
+}
+
+class _TimetableSnapshot {
+  const _TimetableSnapshot({
+    required this.calendarsByServiceId,
+    required this.exceptionsByDate,
+    required this.tripsByBoardStationLine,
+  });
+
+  final Map<String, _ServiceCalendarSnapshot> calendarsByServiceId;
+  final Map<String, Map<String, int>> exceptionsByDate;
+  final Map<String, List<_TimetableTripSnapshot>> tripsByBoardStationLine;
+
+  static Future<_TimetableSnapshot> load(CatalogDatabase database) async {
+    final calendarRows = await database.customSelect('''
+      SELECT service_id, monday, tuesday, wednesday, thursday, friday,
+             saturday, sunday, start_date, end_date
+      FROM service_calendars
+      ''').get();
+    final exceptionRows = await database.customSelect('''
+      SELECT service_id, date, exception_type FROM service_calendar_dates
+      ''').get();
+    final tripRows = await database.customSelect('''
+      SELECT trip.id, trip.service_id, trip.service_pattern, route.line_id
+      FROM transit_trips trip
+      INNER JOIN transit_routes route ON route.id = trip.route_id
+      WHERE trip.service_class = 'SUBWAY'
+      ORDER BY trip.id
+      ''').get();
+    final stopRows = await database.customSelect('''
+      SELECT trip_id, stop_sequence, station_id, line_id, arrival_seconds,
+             departure_seconds, pickup_type, drop_off_type
+      FROM transit_stop_times
+      ORDER BY trip_id, stop_sequence
+      ''').get();
+    final stopsByTripId = <String, List<_TimetableStopSnapshot>>{};
+    for (final row in stopRows) {
+      stopsByTripId
+          .putIfAbsent(row.read<String>('trip_id'), () => [])
+          .add(
+            _TimetableStopSnapshot(
+              stationId: row.read<String>('station_id'),
+              lineId: row.read<String>('line_id'),
+              arrivalSeconds: row.read<int>('arrival_seconds'),
+              departureSeconds: row.read<int>('departure_seconds'),
+              pickupType: row.read<int>('pickup_type'),
+              dropOffType: row.read<int>('drop_off_type'),
+            ),
+          );
+    }
+    final byBoard = <String, List<_TimetableTripSnapshot>>{};
+    for (final row in tripRows) {
+      final trip = _TimetableTripSnapshot(
+        id: row.read<String>('id'),
+        serviceId: row.read<String>('service_id'),
+        lineId: row.read<String>('line_id'),
+        servicePattern: row.read<String>('service_pattern'),
+        stops: List.unmodifiable(
+          stopsByTripId[row.read<String>('id')] ?? const [],
+        ),
+      );
+      final indexedKeys = <String>{};
+      for (final stop in trip.stops) {
+        if (stop.pickupType == 1) continue;
+        final key = _stationLineKey(stop.stationId, stop.lineId);
+        if (indexedKeys.add(key)) {
+          byBoard.putIfAbsent(key, () => []).add(trip);
+        }
+      }
+    }
+    final exceptions = <String, Map<String, int>>{};
+    for (final row in exceptionRows) {
+      exceptions.putIfAbsent(row.read<String>('date'), () => {})[row
+          .read<String>('service_id')] = row.read<int>(
+        'exception_type',
+      );
+    }
+    return _TimetableSnapshot(
+      calendarsByServiceId: {
+        for (final row in calendarRows)
+          row.read<String>('service_id'): _ServiceCalendarSnapshot(
+            weekdays: [
+              row.read<int>('monday') != 0,
+              row.read<int>('tuesday') != 0,
+              row.read<int>('wednesday') != 0,
+              row.read<int>('thursday') != 0,
+              row.read<int>('friday') != 0,
+              row.read<int>('saturday') != 0,
+              row.read<int>('sunday') != 0,
+            ],
+            startDate: row.read<String>('start_date'),
+            endDate: row.read<String>('end_date'),
+          ),
+      },
+      exceptionsByDate: {
+        for (final entry in exceptions.entries)
+          entry.key: Map.unmodifiable(entry.value),
+      },
+      tripsByBoardStationLine: {
+        for (final entry in byBoard.entries)
+          entry.key: List.unmodifiable(entry.value),
+      },
+    );
+  }
+
+  DateTime? nextArrival({
+    required String fromStationId,
+    required String toStationId,
+    required String lineId,
+    required String servicePattern,
+    required DateTime cursor,
+  }) {
+    final koreaNow = cursor.toUtc().add(const Duration(hours: 9));
+    var firstServiceDate = DateTime.utc(
+      koreaNow.year,
+      koreaNow.month,
+      koreaNow.day,
+    );
+    if (koreaNow.hour < 3) {
+      firstServiceDate = firstServiceDate.subtract(const Duration(days: 1));
+    }
+    final candidates =
+        tripsByBoardStationLine[_stationLineKey(fromStationId, lineId)] ??
+        const <_TimetableTripSnapshot>[];
+    for (var dayOffset = 0; dayOffset <= 7; dayOffset += 1) {
+      final serviceDate = firstServiceDate.add(Duration(days: dayOffset));
+      final serviceMidnight = serviceDate.subtract(const Duration(hours: 9));
+      final startMicroseconds = cursor
+          .difference(serviceMidnight)
+          .inMicroseconds;
+      final startSeconds = startMicroseconds <= 0
+          ? 0
+          : (startMicroseconds + Duration.microsecondsPerSecond - 1) ~/
+                Duration.microsecondsPerSecond;
+      int? bestDeparture;
+      int? bestArrival;
+      String? bestTripId;
+      for (final trip in candidates) {
+        if (trip.lineId != lineId ||
+            (servicePattern.isNotEmpty &&
+                trip.servicePattern != servicePattern) ||
+            !_serviceRuns(trip.serviceId, serviceDate)) {
+          continue;
+        }
+        for (var fromIndex = 0; fromIndex < trip.stops.length; fromIndex += 1) {
+          final board = trip.stops[fromIndex];
+          if (board.stationId != fromStationId ||
+              board.lineId != lineId ||
+              board.pickupType == 1 ||
+              board.departureSeconds < startSeconds) {
+            continue;
+          }
+          for (
+            var toIndex = fromIndex + 1;
+            toIndex < trip.stops.length;
+            toIndex += 1
+          ) {
+            final alight = trip.stops[toIndex];
+            if (alight.stationId != toStationId ||
+                alight.lineId != lineId ||
+                alight.dropOffType == 1) {
+              continue;
+            }
+            final isBetter =
+                bestDeparture == null ||
+                board.departureSeconds < bestDeparture ||
+                (board.departureSeconds == bestDeparture &&
+                    (alight.arrivalSeconds < bestArrival! ||
+                        (alight.arrivalSeconds == bestArrival &&
+                            trip.id.compareTo(bestTripId!) < 0)));
+            if (isBetter) {
+              bestDeparture = board.departureSeconds;
+              bestArrival = alight.arrivalSeconds;
+              bestTripId = trip.id;
+            }
+          }
+        }
+      }
+      if (bestArrival != null) {
+        return serviceMidnight.add(Duration(seconds: bestArrival));
+      }
+    }
+    return null;
+  }
+
+  bool _serviceRuns(String serviceId, DateTime serviceDate) {
+    final date = _compactDate(serviceDate);
+    final exception = exceptionsByDate[date]?[serviceId];
+    if (exception == 1) return true;
+    if (exception == 2) return false;
+    final calendar = calendarsByServiceId[serviceId];
+    return calendar != null &&
+        date.compareTo(calendar.startDate) >= 0 &&
+        date.compareTo(calendar.endDate) <= 0 &&
+        calendar.weekdays[serviceDate.weekday - 1];
+  }
+}
+
+class _ServiceCalendarSnapshot {
+  const _ServiceCalendarSnapshot({
+    required this.weekdays,
+    required this.startDate,
+    required this.endDate,
+  });
+  final List<bool> weekdays;
+  final String startDate;
+  final String endDate;
+}
+
+class _TimetableTripSnapshot {
+  const _TimetableTripSnapshot({
+    required this.id,
+    required this.serviceId,
+    required this.lineId,
+    required this.servicePattern,
+    required this.stops,
+  });
+  final String id;
+  final String serviceId;
+  final String lineId;
+  final String servicePattern;
+  final List<_TimetableStopSnapshot> stops;
+}
+
+class _TimetableStopSnapshot {
+  const _TimetableStopSnapshot({
+    required this.stationId,
+    required this.lineId,
+    required this.arrivalSeconds,
+    required this.departureSeconds,
+    required this.pickupType,
+    required this.dropOffType,
+  });
+  final String stationId;
+  final String lineId;
+  final int arrivalSeconds;
+  final int departureSeconds;
+  final int pickupType;
+  final int dropOffType;
+}
 
 class _RouteCatalogSnapshot {
   const _RouteCatalogSnapshot({
@@ -1248,12 +1919,7 @@ class _RouteCatalogSnapshot {
             );
       }
     }
-    final networkEdgeColumns = await database
-        .customSelect('PRAGMA table_info(network_edges)')
-        .get();
-    final networkEdgeColumnNames = {
-      for (final row in networkEdgeColumns) row.read<String>('name'),
-    };
+    final networkEdgeColumnNames = database.routeNetworkEdgeColumnNames;
     final servicePatternSql = _selectNetworkEdgeColumn(
       networkEdgeColumnNames,
       'service_pattern',
@@ -1332,12 +1998,7 @@ class _RouteCatalogSnapshot {
         networkEdgeColumnNames.contains('service_class')
         ? "WHERE service_class = 'SUBWAY'"
         : '';
-    final facilityColumns = await database
-        .customSelect('PRAGMA table_info(facilities)')
-        .get();
-    final facilityColumnNames = {
-      for (final row in facilityColumns) row.read<String>('name'),
-    };
+    final facilityColumnNames = database.routeFacilityColumnNames;
     final operationalStatusSql = _selectFacilityColumn(
       facilityColumnNames,
       'operational_status',
@@ -1473,6 +2134,9 @@ class _RouteCatalogSnapshot {
             includesStairs: row.read<int>('includes_stairs') != 0,
             stairAccessState: row.read<String>('stair_access_state'),
             accessibilityStatus: effectiveAccessibilityStatus,
+            rawAccessibilityStatus: accessibilityStatus,
+            facilityId: facility?.id ?? '',
+            facilityHasEligibleEvidence: facilityHasEligibleEvidence,
             isUnderMaintenance: _effectiveIsUnderMaintenance(
               accessibilityStatus,
               effectiveAccessibilityStatus,
@@ -1481,34 +2145,42 @@ class _RouteCatalogSnapshot {
               reliabilityScore,
               facility,
             ),
+            baseReliabilityScore: reliabilityScore,
             lastVerifiedAtSeconds: _effectiveLastVerifiedAtSeconds(
               lastVerifiedAtSeconds,
               facility,
             ),
+            baseLastVerifiedAtSeconds: lastVerifiedAtSeconds,
             sourceId:
                 facility?.activeStatusSnapshot?.sourceId ??
                 row.read<String>('source_id'),
+            baseSourceId: row.read<String>('source_id'),
             sourceSnapshotId:
                 facility?.activeStatusSnapshot?.sourceSnapshotId ??
                 row.read<String>('source_snapshot_id'),
+            baseSourceSnapshotId: row.read<String>('source_snapshot_id'),
             providerRecordHash:
                 facility?.activeStatusSnapshot?.providerRecordHash ??
                 row.read<String>('provider_record_hash'),
+            baseProviderRecordHash: row.read<String>('provider_record_hash'),
             provenanceKind:
                 facility?.activeStatusSnapshot?.provenanceKind ??
                 row.read<String>('provenance_kind'),
+            baseProvenanceKind: row.read<String>('provenance_kind'),
             verificationStatus:
                 facility?.activeStatusSnapshot?.verificationStatus ??
                 row.read<String>('verification_status'),
+            baseVerificationStatus: row.read<String>('verification_status'),
             evidenceHash:
                 facility?.activeStatusSnapshot?.evidenceHash ??
                 row.read<String>('evidence_hash'),
+            baseEvidenceHash: row.read<String>('evidence_hash'),
           );
         })
         .where(
           (edge) =>
               edge.routeEdgeType != graph.RouteEdgeType.outOfStationTransfer ||
-              outOfStationTransferPolicy.allows(edge),
+              outOfStationTransferPolicy.allowsDeployment(edge),
         )
         .toList(growable: false);
     final strictEvidenceSupported =
@@ -1564,33 +2236,44 @@ class _RouteCatalogSnapshot {
   local.LocalRouteResult routeResult(
     String originStationId,
     String destinationStationId, {
+    required graph.NetworkGraph routeGraph,
+    required local.RouteSearchMode searchMode,
     required local.MobilityType mobilityType,
     required local.ConstraintMode constraintMode,
+    graph.RouteEdge Function(graph.RouteEdge edge)? edgeResolver,
   }) {
     originStationId = canonicalStationId(originStationId);
     destinationStationId = canonicalStationId(destinationStationId);
-    return LocalRouteEngine(graph: toGraph()).search(
+    return LocalRouteEngine(
+      graph: routeGraph,
+      edgeResolver: edgeResolver,
+    ).search(
       local.RouteRequest(
         originStationId: originStationId,
         destinationStationId: destinationStationId,
         mobilityType: mobilityType,
         constraintMode: constraintMode,
-        searchMode:
-            local.RouteSearchMode.stationToStationWithOutOfStationTransfers,
+        searchMode: searchMode,
       ),
     );
   }
 
   bool strictEvidenceSupportedFor(
     String originStationId,
-    String destinationStationId,
-  ) {
+    String destinationStationId, {
+    required graph.NetworkGraph routeGraph,
+    required local.RouteSearchMode searchMode,
+    graph.RouteEdge Function(graph.RouteEdge edge)? edgeResolver,
+  }) {
     if (!strictEvidenceSupported) {
       return false;
     }
     return routeResult(
           originStationId,
           destinationStationId,
+          routeGraph: routeGraph,
+          searchMode: searchMode,
+          edgeResolver: edgeResolver,
           mobilityType: local.MobilityType.wheelchair,
           constraintMode: local.ConstraintMode.strictStepFree,
         ).status ==
@@ -1952,7 +2635,7 @@ class _RouteCatalogSnapshot {
   }
 
   String stationName(String stationId) {
-    return stationsById[canonicalStationId(stationId)] ?? '역 이름을 확인하고 있어요';
+    return stationsById[canonicalStationId(stationId)] ?? '역 이름 미확인';
   }
 
   bool hasStation(String stationId) {
@@ -1999,6 +2682,7 @@ class _RouteCatalogSnapshot {
           : canonicalStationId(waypoint),
       mobilityPreset: request.mobilityPreset,
       transportScope: request.transportScope,
+      objective: request.objective,
     );
   }
 }
@@ -2019,12 +2703,10 @@ String _metadataUpdatedAtIso(int? updatedAtMillis) {
 class _OutOfStationTransferPolicy {
   const _OutOfStationTransferPolicy({
     required this.enabled,
-    required this.runtimeEnabled,
     required this.allowlist,
   });
 
   final bool enabled;
-  final bool runtimeEnabled;
   final Set<String> allowlist;
 
   static Future<_OutOfStationTransferPolicy> load(
@@ -2035,7 +2717,6 @@ class _OutOfStationTransferPolicy {
       FROM catalog_metadata
       WHERE key IN (
         'route.outOfStationTransfer.enabled',
-        'route.outOfStationTransfer.runtimeEnabled',
         'route.outOfStationTransfer.allowlist'
       )
     ''').get();
@@ -2046,18 +2727,14 @@ class _OutOfStationTransferPolicy {
     return _OutOfStationTransferPolicy(
       enabled:
           values['route.outOfStationTransfer.enabled']?.toLowerCase() == 'true',
-      runtimeEnabled:
-          values['route.outOfStationTransfer.runtimeEnabled']?.toLowerCase() !=
-          'false',
       allowlist: _parseOutOfStationTransferAllowlist(
         values['route.outOfStationTransfer.allowlist'] ?? '',
       ),
     );
   }
 
-  bool allows(_NetworkEdgeSnapshot edge) {
+  bool allowsDeployment(_NetworkEdgeSnapshot edge) {
     return enabled &&
-        runtimeEnabled &&
         allowlist.contains(_edgePairKey(edge.fromNodeId, edge.toNodeId));
   }
 }
@@ -2180,6 +2857,10 @@ String _stationLineKey(String stationId, String lineId) {
   return '$stationId:$lineId';
 }
 
+String _officialFareKey(String originStationId, String destinationStationId) {
+  return '$originStationId->$destinationStationId';
+}
+
 int _carDoorFacilityPriority(String facilityType) {
   return switch (facilityType.toUpperCase()) {
     'ELEVATOR' => 0,
@@ -2196,8 +2877,10 @@ graph.RouteEdge _toGraphRouteEdge(
   String? id,
   String? fromNodeId,
   String? toNodeId,
+  DateTime? at,
 }) {
   final effectiveFromNodeId = fromNodeId ?? networkEdge.fromNodeId;
+  final evaluatedAt = at ?? DateTime.now();
 
   // route contract: local metric fallback
   // Source durations of 0 keep `durationSeconds` at 0 so UI can say the time
@@ -2205,6 +2888,7 @@ graph.RouteEdge _toGraphRouteEdge(
   // weight so the graph remains searchable.
   return graph.RouteEdge(
     id: id ?? networkEdge.id,
+    sourceEdgeId: networkEdge.id,
     fromNodeId: effectiveFromNodeId,
     toNodeId: toNodeId ?? networkEdge.toNodeId,
     type: routeEdgeType,
@@ -2224,10 +2908,10 @@ graph.RouteEdge _toGraphRouteEdge(
         ? graph.RouteStairAccessState.stairOnly
         : networkEdge.routeStairAccessState,
     reliabilityScore: networkEdge.effectiveReliabilityScore,
-    isDataStale: networkEdge.isDataStale,
+    isDataStale: networkEdge.isDataStaleAt(evaluatedAt),
     accessibilityState: networkEdge.accessibilityState,
     isUnderMaintenance: networkEdge.isUnderMaintenance,
-    safetyEvidence: networkEdge.safetyEvidence,
+    safetyEvidence: networkEdge.safetyEvidenceAt(evaluatedAt),
   );
 }
 
@@ -2241,19 +2925,6 @@ int _estimatedMinutesFor(int durationSeconds) {
 String _compactDate(DateTime date) {
   String twoDigits(int value) => value.toString().padLeft(2, '0');
   return '${date.year}${twoDigits(date.month)}${twoDigits(date.day)}';
-}
-
-String _weekdayColumn(int weekday) {
-  return switch (weekday) {
-    DateTime.monday => 'monday',
-    DateTime.tuesday => 'tuesday',
-    DateTime.wednesday => 'wednesday',
-    DateTime.thursday => 'thursday',
-    DateTime.friday => 'friday',
-    DateTime.saturday => 'saturday',
-    DateTime.sunday => 'sunday',
-    _ => throw ArgumentError.value(weekday, 'weekday'),
-  };
 }
 
 String _koreaIso(DateTime instant) {
@@ -2601,6 +3272,45 @@ Future<_FacilityStatusSnapshotIndex> _facilityStatusSnapshots(
   );
 }
 
+Future<Map<String, List<_FacilityStatusSnapshot>>> _allFacilityStatusSnapshots(
+  CatalogDatabase database,
+) async {
+  if (!await _tableExists(database, 'facility_status_snapshots')) {
+    return const {};
+  }
+  final rows = await database.customSelect('''
+        SELECT facility_id, provider_id, source_id, source_snapshot_id,
+               provider_record_hash, evidence_hash, provenance_kind,
+               verification_status, status, operational_status, confidence,
+               observed_at, expires_at
+        FROM facility_status_snapshots
+        ORDER BY facility_id
+        ''').get();
+  final byFacilityId = <String, List<_FacilityStatusSnapshot>>{};
+  for (final row in rows) {
+    final snapshot = _FacilityStatusSnapshot(
+      facilityId: row.read<String>('facility_id'),
+      providerId: row.read<String>('provider_id'),
+      sourceId: row.read<String>('source_id'),
+      sourceSnapshotId: row.read<String>('source_snapshot_id'),
+      providerRecordHash: row.read<String>('provider_record_hash'),
+      evidenceHash: row.read<String>('evidence_hash'),
+      provenanceKind: row.read<String>('provenance_kind'),
+      verificationStatus: row.read<String>('verification_status'),
+      status: row.read<String>('status'),
+      operationalStatus: row.read<String>('operational_status'),
+      confidence: row.read<int>('confidence'),
+      observedAtSeconds: row.readNullable<int>('observed_at'),
+      expiresAtSeconds: row.readNullable<int>('expires_at'),
+    );
+    byFacilityId.putIfAbsent(snapshot.facilityId, () => []).add(snapshot);
+  }
+  return {
+    for (final entry in byFacilityId.entries)
+      entry.key: List.unmodifiable(entry.value),
+  };
+}
+
 int _compareFacilityStatusSnapshot(
   _FacilityStatusSnapshot left,
   _FacilityStatusSnapshot right,
@@ -2768,14 +3478,25 @@ class _NetworkEdgeSnapshot {
     required this.includesStairs,
     required this.stairAccessState,
     required this.accessibilityStatus,
+    required this.rawAccessibilityStatus,
+    required this.facilityId,
+    required this.facilityHasEligibleEvidence,
     required this.reliabilityScore,
+    required this.baseReliabilityScore,
     required this.lastVerifiedAtSeconds,
+    required this.baseLastVerifiedAtSeconds,
     required this.sourceId,
+    required this.baseSourceId,
     required this.sourceSnapshotId,
+    required this.baseSourceSnapshotId,
     required this.providerRecordHash,
+    required this.baseProviderRecordHash,
     required this.provenanceKind,
+    required this.baseProvenanceKind,
     required this.verificationStatus,
+    required this.baseVerificationStatus,
     required this.evidenceHash,
+    required this.baseEvidenceHash,
     this.isUnderMaintenance = false,
   });
 
@@ -2789,17 +3510,88 @@ class _NetworkEdgeSnapshot {
   final bool includesStairs;
   final String stairAccessState;
   final String accessibilityStatus;
+  final String rawAccessibilityStatus;
+  final String facilityId;
+  final bool facilityHasEligibleEvidence;
   final int reliabilityScore;
+  final int baseReliabilityScore;
   final int? lastVerifiedAtSeconds;
+  final int? baseLastVerifiedAtSeconds;
   final String sourceId;
+  final String baseSourceId;
   final String sourceSnapshotId;
+  final String baseSourceSnapshotId;
   final String providerRecordHash;
+  final String baseProviderRecordHash;
   final String provenanceKind;
+  final String baseProvenanceKind;
   final String verificationStatus;
+  final String baseVerificationStatus;
   final String evidenceHash;
+  final String baseEvidenceHash;
 
   /// 정직 표시: 이 edge의 비가용이 실측 보수중에서 비롯됐는지(#1996).
   final bool isUnderMaintenance;
+
+  _NetworkEdgeSnapshot resolveFacility(_FacilitySnapshot? facility) {
+    if (facilityId.isEmpty || facility == null) {
+      return this;
+    }
+    final effectiveAccessibilityStatus = _effectiveAccessibilityStatus(
+      rawAccessibilityStatus,
+      facility,
+      facilityHasEligibleEvidence,
+    );
+    return _NetworkEdgeSnapshot(
+      id: id,
+      fromNodeId: fromNodeId,
+      toNodeId: toNodeId,
+      durationSeconds: durationSeconds,
+      distanceMeters: distanceMeters,
+      edgeType: edgeType,
+      servicePattern: servicePattern,
+      includesStairs: includesStairs,
+      stairAccessState: stairAccessState,
+      accessibilityStatus: effectiveAccessibilityStatus,
+      rawAccessibilityStatus: rawAccessibilityStatus,
+      facilityId: facilityId,
+      facilityHasEligibleEvidence: facilityHasEligibleEvidence,
+      reliabilityScore: _effectiveReliabilityScore(
+        baseReliabilityScore,
+        facility,
+      ),
+      baseReliabilityScore: baseReliabilityScore,
+      lastVerifiedAtSeconds: _effectiveLastVerifiedAtSeconds(
+        baseLastVerifiedAtSeconds,
+        facility,
+      ),
+      baseLastVerifiedAtSeconds: baseLastVerifiedAtSeconds,
+      sourceId: facility.activeStatusSnapshot?.sourceId ?? baseSourceId,
+      baseSourceId: baseSourceId,
+      sourceSnapshotId:
+          facility.activeStatusSnapshot?.sourceSnapshotId ??
+          baseSourceSnapshotId,
+      baseSourceSnapshotId: baseSourceSnapshotId,
+      providerRecordHash:
+          facility.activeStatusSnapshot?.providerRecordHash ??
+          baseProviderRecordHash,
+      baseProviderRecordHash: baseProviderRecordHash,
+      provenanceKind:
+          facility.activeStatusSnapshot?.provenanceKind ?? baseProvenanceKind,
+      baseProvenanceKind: baseProvenanceKind,
+      verificationStatus:
+          facility.activeStatusSnapshot?.verificationStatus ??
+          baseVerificationStatus,
+      baseVerificationStatus: baseVerificationStatus,
+      evidenceHash:
+          facility.activeStatusSnapshot?.evidenceHash ?? baseEvidenceHash,
+      baseEvidenceHash: baseEvidenceHash,
+      isUnderMaintenance: _effectiveIsUnderMaintenance(
+        rawAccessibilityStatus,
+        effectiveAccessibilityStatus,
+      ),
+    );
+  }
 
   graph.RouteEdgeType? get routeEdgeType =>
       graph.routeEdgeTypeFromCatalogValue(edgeType);
@@ -2833,7 +3625,9 @@ class _NetworkEdgeSnapshot {
     return reliabilityScore;
   }
 
-  bool get isDataStale {
+  bool get isDataStale => isDataStaleAt(DateTime.now());
+
+  bool isDataStaleAt(DateTime at) {
     if (_accessibilityStatusUpper == 'UNKNOWN') {
       return true;
     }
@@ -2846,11 +3640,14 @@ class _NetworkEdgeSnapshot {
       isUtc: true,
     );
     return verifiedDate.isBefore(
-      DateTime.now().toUtc().subtract(const Duration(days: 365)),
+      at.toUtc().subtract(const Duration(days: 365)),
     );
   }
 
-  graph.RouteEdgeSafetyEvidence get safetyEvidence {
+  graph.RouteEdgeSafetyEvidence get safetyEvidence =>
+      safetyEvidenceAt(DateTime.now());
+
+  graph.RouteEdgeSafetyEvidence safetyEvidenceAt(DateTime at) {
     final verifiedAt = lastVerifiedAtSeconds == null
         ? null
         : DateTime.fromMillisecondsSinceEpoch(
@@ -2880,7 +3677,7 @@ class _NetworkEdgeSnapshot {
       evidenceHashValid: evidenceHashValid,
       isPlaceholderEvidence: isPlaceholderEvidence,
       lastVerifiedAt: verifiedAt,
-      isStale: isDataStale,
+      isStale: isDataStaleAt(at),
       isGeneratedConnector: false,
       strictRouteEligible: blockerReasons.isEmpty,
       blockerReasons: blockerReasons,

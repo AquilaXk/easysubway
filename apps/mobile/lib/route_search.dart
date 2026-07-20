@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
 import 'accessible_design.dart';
 import 'ad_slot.dart';
@@ -13,6 +14,7 @@ import 'features/ads/active_ad_banner.dart';
 import 'features/ads/ad_repository.dart';
 import 'features/fare/official_od_fare_quote.dart';
 import 'features/route_draft/domain/route_draft.dart';
+import 'features/stations/presentation/service_pattern_badge.dart';
 import 'features/stations/presentation/station_line_badges.dart';
 import 'mobile_error_reporter.dart';
 import 'features/get_off_alarm/get_off_alarm_controller.dart';
@@ -22,7 +24,11 @@ import 'features/mobility_profile/mobility_preset_labels.dart';
 import 'features/mobility_profile/mobility_preset_picker.dart';
 import 'features/mobility_profile/mobility_profile_policy.dart';
 import 'route_hedge_labels.dart';
+import 'route_share_summary.dart';
 import 'station_search.dart';
+
+typedef RouteShareInvoker =
+    Future<void> Function(String text, Rect sharePositionOrigin);
 
 const _routeSearchTimeout = Duration(seconds: 8);
 const _routeSearchErrorMessage = '경로 정보를 불러오지 못했어요.';
@@ -69,8 +75,8 @@ String _routeDateLabel(String value) {
 }
 
 const routeEtaSourceLabels = <String, String>{
-  'REALTIME': '실시간 도착정보 준비 중',
-  'MIXED': '일부 도착정보를 확인하고 있어요',
+  'REALTIME': '실시간 도착정보',
+  'MIXED': '일부 실시간 도착정보',
   'PLANNED': '시간표 기준',
   'STATIC_BACKEND_ESTIMATE': '시간표 기준',
   'STATIC_BACKEND_V1': '시간표 기준',
@@ -216,6 +222,7 @@ class RouteSearchApiRepository implements RouteSearchRepository {
       return RouteSearchResult.fromJson(
         data,
         constraintMode: routeRequest.effectiveConstraintMode,
+        objective: RouteObjective.fastest,
       );
     } on RouteSearchException {
       rethrow;
@@ -311,7 +318,10 @@ class RouteSearchV2ApiRepository implements RouteSearchRepository {
       if (data is! Map<String, Object?>) {
         throw const RouteSearchOnlineException.unavailable();
       }
-      return RouteSearchResult.fromV2(RouteSearchV2Result.fromJson(data));
+      return RouteSearchResult.fromV2(
+        RouteSearchV2Result.fromJson(data),
+        objective: routeRequest.objective,
+      );
     } on RouteSearchOnlineException {
       rethrow;
     } on ApiException catch (error, stackTrace) {
@@ -405,6 +415,18 @@ RouteTransportScope _routeTransportScopeFromValue(Object? value) {
     'SUBWAY_AND_ITX_CHEONGCHUN' => RouteTransportScope.subwayAndItxCheongchun,
     _ => RouteTransportScope.subway,
   };
+}
+
+/// 길찾기 최적화 목표. 선택 컨트롤이지만 실제 운행 정보(급행 여부)와는 무관한
+/// 별개 차원이다. 서버는 null을 FASTEST로 해석하므로 기본값도 FASTEST다.
+enum RouteObjective {
+  fastest('FASTEST', '최단시간'),
+  fewestTransfers('FEWEST_TRANSFERS', '최소환승');
+
+  const RouteObjective(this.serverValue, this.label);
+
+  final String serverValue;
+  final String label;
 }
 
 class RouteFeedbackApiRepository implements RouteFeedbackRepository {
@@ -791,6 +813,7 @@ class RouteSearchRequest {
     this.waypointStationId,
     this.mobilityPreset,
     this.transportScope = RouteTransportScope.subway,
+    this.objective = RouteObjective.fastest,
   });
 
   final String originStationId;
@@ -802,6 +825,10 @@ class RouteSearchRequest {
   /// v2 요청에만 실리는 보행 프리셋 서버 문자열(하위호환으로 mobilityType도 유지).
   final String? mobilityPreset;
   final RouteTransportScope transportScope;
+
+  /// 최적화 목표(FASTEST·FEWEST_TRANSFERS). 급행 여부와는 무관한 별개 차원이며,
+  /// 요청 serialization에는 이 값만 싣고 servicePattern/expressOnly는 싣지 않는다.
+  final RouteObjective objective;
 
   String get effectiveConstraintMode =>
       constraintMode ?? _defaultConstraintMode(mobilityType);
@@ -815,6 +842,7 @@ class RouteSearchRequest {
       waypointStationId: waypointStationId?.trim(),
       mobilityPreset: mobilityPreset?.trim(),
       transportScope: transportScope,
+      objective: objective,
     );
   }
 
@@ -834,6 +862,7 @@ class RouteSearchRequest {
       ...toJson(),
       if (trimmedPreset != null && trimmedPreset.isNotEmpty)
         'mobilityPreset': trimmedPreset,
+      'objective': objective.serverValue,
       'departureTime': _routeV2DepartureTimeNow(),
       'useRealtime': true,
       'maxTransfers': 3,
@@ -918,6 +947,8 @@ class RouteSearchV2Itinerary {
     required this.accessibilityRisk,
     required this.legs,
     required this.commercialEtaEligible,
+    this.objectiveTags = const [],
+    this.officialFare,
   });
 
   factory RouteSearchV2Itinerary.fromJson(Map<String, Object?> json) {
@@ -952,6 +983,15 @@ class RouteSearchV2Itinerary {
           })
           .toList(growable: false),
       commercialEtaEligible: _requiredRouteBool(json, 'commercialEtaEligible'),
+      objectiveTags: _routeStringList(
+        json['objectiveTags'] ?? const <Object?>[],
+        'route v2 objective tag',
+      ),
+      officialFare: switch (json['officialFare']) {
+        null => null,
+        Map<String, Object?> value => RouteSearchOfficialFare.fromJson(value),
+        _ => throw const FormatException('Invalid route v2 official fare'),
+      },
     );
   }
 
@@ -967,6 +1007,51 @@ class RouteSearchV2Itinerary {
   final RouteSearchV2AccessibilityRisk accessibilityRisk;
   final List<RouteSearchV2Leg> legs;
   final bool commercialEtaEligible;
+  final RouteSearchOfficialFare? officialFare;
+
+  /// 백엔드가 dual-tag dedupe한 대표 itinerary에 붙이는 objective 태그
+  /// (FASTEST·FEWEST_TRANSFERS). 두 objective가 같은 경로면 두 태그를 모두 담는다.
+  final List<String> objectiveTags;
+
+  bool matchesObjective(RouteObjective objective) =>
+      objectiveTags.contains(objective.serverValue);
+}
+
+class RouteSearchOfficialFare {
+  const RouteSearchOfficialFare({
+    required this.adultFareWon,
+    required this.currency,
+    required this.policy,
+    required this.sourceIds,
+    required this.sourceSnapshotIds,
+  });
+
+  factory RouteSearchOfficialFare.fromJson(Map<String, Object?> json) {
+    final fare = RouteSearchOfficialFare(
+      adultFareWon: _requiredRouteInt(json, 'adultFareWon'),
+      currency: _requiredRouteString(json, 'currency'),
+      policy: _requiredRouteString(json, 'policy'),
+      sourceIds: _routeStringList(json['sourceIds'], 'official fare source'),
+      sourceSnapshotIds: _routeStringList(
+        json['sourceSnapshotIds'],
+        'official fare source snapshot',
+      ),
+    );
+    if (fare.adultFareWon <= 0 ||
+        fare.currency != 'KRW' ||
+        fare.policy != 'SUM_OF_OFFICIAL_RIDE_OD_FARES' ||
+        fare.sourceIds.isEmpty ||
+        fare.sourceSnapshotIds.isEmpty) {
+      throw const FormatException('Invalid route v2 official fare');
+    }
+    return fare;
+  }
+
+  final int adultFareWon;
+  final String currency;
+  final String policy;
+  final List<String> sourceIds;
+  final List<String> sourceSnapshotIds;
 }
 
 class RouteSearchV2Leg {
@@ -990,6 +1075,8 @@ class RouteSearchV2Leg {
     required this.etaSource,
     required this.confidence,
     required this.accessibilityRisk,
+    this.serviceClass,
+    this.servicePattern,
   });
 
   factory RouteSearchV2Leg.fromJson(Map<String, Object?> json) {
@@ -997,8 +1084,14 @@ class RouteSearchV2Leg {
     if (rawAccessibilityRisk is! Map<String, Object?>) {
       throw const FormatException('Invalid route v2 leg payload');
     }
+    final legType = _requiredRouteString(json, 'legType');
+    final (serviceClass, servicePattern) = _routeV2LegServiceFields(
+      legType,
+      json['serviceClass'],
+      json['servicePattern'],
+    );
     return RouteSearchV2Leg(
-      legType: _requiredRouteString(json, 'legType'),
+      legType: legType,
       fromStationId: _optionalRouteString(json, 'fromStationId'),
       toStationId: _optionalRouteString(json, 'toStationId'),
       fromNodeId: _optionalRouteString(json, 'fromNodeId'),
@@ -1025,6 +1118,8 @@ class RouteSearchV2Leg {
       accessibilityRisk: RouteSearchV2AccessibilityRisk.fromJson(
         rawAccessibilityRisk,
       ),
+      serviceClass: serviceClass,
+      servicePattern: servicePattern,
     );
   }
 
@@ -1047,6 +1142,47 @@ class RouteSearchV2Leg {
   final String etaSource;
   final String confidence;
   final RouteSearchV2AccessibilityRisk accessibilityRisk;
+
+  /// 운행 클래스(SUBWAY·ITX_CHEONGCHUN). RIDE leg에서만 채워지고, 그 외에는 null.
+  final String? serviceClass;
+
+  /// 운행종별(LOCAL·EXPRESS). RIDE leg에서만 채워지고, 그 외에는 null.
+  final String? servicePattern;
+
+  /// 지하철 급행 leg 여부. `급행` 배지를 노출하는 유일한 조건이다.
+  bool get isSubwayExpress =>
+      serviceClass == 'SUBWAY' && servicePattern == 'EXPRESS';
+}
+
+const _routeV2ServiceClasses = {'SUBWAY', 'ITX_CHEONGCHUN'};
+const _routeV2ServicePatterns = {'LOCAL', 'EXPRESS'};
+
+/// RIDE leg의 serviceClass·servicePattern을 필수 enum으로 검증하고, non-ride leg은
+/// null만 허용한다. unknown·blank·non-ride 값 존재는 payload error로 처리해
+/// LOCAL 추정 없이 unavailable로 흐르게 한다.
+(String?, String?) _routeV2LegServiceFields(
+  String legType,
+  Object? rawServiceClass,
+  Object? rawServicePattern,
+) {
+  final isRide = legType == 'RIDE';
+  if (!isRide) {
+    if (rawServiceClass != null || rawServicePattern != null) {
+      throw const FormatException(
+        'Non-ride route v2 leg must not carry service fields',
+      );
+    }
+    return (null, null);
+  }
+  if (rawServiceClass is! String ||
+      !_routeV2ServiceClasses.contains(rawServiceClass)) {
+    throw const FormatException('Invalid route v2 ride serviceClass');
+  }
+  if (rawServicePattern is! String ||
+      !_routeV2ServicePatterns.contains(rawServicePattern)) {
+    throw const FormatException('Invalid route v2 ride servicePattern');
+  }
+  return (rawServiceClass, rawServicePattern);
 }
 
 class RouteSearchV2AccessibilityRisk {
@@ -1140,6 +1276,10 @@ class RouteSearchResult {
     this.supportsRefresh = true,
     this.nextServiceTime = '',
     this.transportScope = RouteTransportScope.subway,
+    this.objective = RouteObjective.fastest,
+    this.departureTimeIso = '',
+    this.arrivalTimeIso = '',
+    this.officialFare,
   }) : // `burdenCost`는 API contract 이름이고 저장 필드는 private 값이다.
        // ignore: prefer_initializing_formals
        _accessibilityScore = accessibilityScore,
@@ -1155,6 +1295,7 @@ class RouteSearchResult {
   factory RouteSearchResult.fromJson(
     Map<String, Object?> json, {
     String? constraintMode,
+    RouteObjective objective = RouteObjective.fastest,
   }) {
     final rawSteps = json['steps'];
     final rawWarnings = json['warnings'];
@@ -1248,10 +1389,14 @@ class RouteSearchResult {
       sourceUpdatedAt: _optionalRouteString(json, 'sourceUpdatedAt'),
       nextServiceTime: _optionalRouteString(json, 'nextServiceTime'),
       transportScope: _routeTransportScopeFromValue(json['transportScope']),
+      objective: objective,
     );
   }
 
-  factory RouteSearchResult.fromV2(RouteSearchV2Result result) {
+  factory RouteSearchResult.fromV2(
+    RouteSearchV2Result result, {
+    RouteObjective objective = RouteObjective.fastest,
+  }) {
     if (result.itineraries.isEmpty) {
       if (result.statuses.isEmpty) {
         throw const FormatException(
@@ -1285,12 +1430,11 @@ class RouteSearchResult {
         supportsRefresh: false,
         nextServiceTime: result.nextServiceTime,
         transportScope: RouteTransportScope.subwayAndItxCheongchun,
+        objective: objective,
+        departureTimeIso: result.departureTime,
       );
     }
-    final itinerary = result.itineraries.firstWhere(
-      (candidate) => candidate.status == 'FOUND',
-      orElse: () => result.itineraries.first,
-    );
+    final itinerary = _selectRouteV2Itinerary(result.itineraries, objective);
     final lineId = _routeV2SummaryLineId(itinerary.legs);
     return RouteSearchResult(
       routeSearchId: _routeV2RouteSearchId(itinerary.itineraryId),
@@ -1345,6 +1489,11 @@ class RouteSearchResult {
       sourceUpdatedAt: result.departureTime,
       supportsRefresh: false,
       transportScope: RouteTransportScope.subwayAndItxCheongchun,
+      objective: objective,
+      departureTimeIso: result.departureTime,
+      arrivalTimeIso:
+          itinerary.realtimeArrivalTime ?? itinerary.plannedArrivalTime,
+      officialFare: itinerary.officialFare,
     );
   }
 
@@ -1381,6 +1530,10 @@ class RouteSearchResult {
   final bool supportsRefresh;
   final String nextServiceTime;
   final RouteTransportScope transportScope;
+  final RouteObjective objective;
+  final String departureTimeIso;
+  final String arrivalTimeIso;
+  final RouteSearchOfficialFare? officialFare;
 
   bool get hasOfficialOdFareQuote => officialOdFareQuote != null;
 
@@ -1469,7 +1622,7 @@ class RouteSearchResult {
 
   String get scoreLabel => burdenLevelLabel;
 
-  String get lineLabel => lineName.isEmpty ? '노선을 확인하고 있어요' : lineName;
+  String get lineLabel => lineName.isEmpty ? '노선 미확인' : lineName;
 
   bool get isBlocked => status == 'BLOCKED';
 
@@ -1537,6 +1690,7 @@ class RouteSearchResult {
     List<RouteSearchStep>? steps,
     String? etaSource,
     OfficialOdFareQuote? officialOdFareQuote,
+    RouteObjective? objective,
   }) {
     return RouteSearchResult(
       routeSearchId: routeSearchId,
@@ -1573,6 +1727,10 @@ class RouteSearchResult {
       supportsRefresh: supportsRefresh,
       nextServiceTime: nextServiceTime,
       transportScope: transportScope,
+      objective: objective ?? this.objective,
+      departureTimeIso: departureTimeIso,
+      arrivalTimeIso: arrivalTimeIso,
+      officialFare: officialFare,
     );
   }
 
@@ -1701,10 +1859,10 @@ class RouteSearchResult {
 
   String get burdenLevelLabel {
     if (isBlocked) {
-      return '이동 부담을 확인하고 있어요';
+      return '이동 부담 미확인';
     }
     if (movementSteps.isEmpty) {
-      return '이동 부담을 확인하고 있어요';
+      return '이동 부담 미확인';
     }
     if (_hasHighBurdenFact) {
       return '이동 부담 높음';
@@ -1795,6 +1953,38 @@ class RouteRefreshResult {
         ? '$statusLabel · $confidenceLabel'
         : '$statusLabel · $source · $confidenceLabel';
   }
+}
+
+/// objective-tagged 대표 itinerary 중 현재 목표에 맞는 것을 고른다. 백엔드가 두
+/// objective를 하나로 dedupe하면 그 하나가 두 태그를 모두 달고 있어 어느 목표에서도
+/// 선택된다. FOUND itinerary가 전부 무태그(레거시)일 때만 첫 FOUND, 그마저 없으면 첫
+/// itinerary로 폴백해 기존 동작을 보존한다. 태그가 하나라도 있는데 요청 objective와
+/// 매칭되는 FOUND가 없으면 silent fallback(계약 위반)을 피해 payload 오류로 fail
+/// closed한다(generic unavailable 흐름으로 흐른다).
+RouteSearchV2Itinerary _selectRouteV2Itinerary(
+  List<RouteSearchV2Itinerary> itineraries,
+  RouteObjective objective,
+) {
+  final foundItineraries = itineraries
+      .where((itinerary) => itinerary.status == 'FOUND')
+      .toList(growable: false);
+  for (final itinerary in foundItineraries) {
+    if (itinerary.matchesObjective(objective)) {
+      return itinerary;
+    }
+  }
+  final hasTaggedFound = foundItineraries.any(
+    (itinerary) => itinerary.objectiveTags.isNotEmpty,
+  );
+  if (hasTaggedFound) {
+    throw const FormatException(
+      'Route v2 FOUND itineraries missing requested objective tag',
+    );
+  }
+  return itineraries.firstWhere(
+    (candidate) => candidate.status == 'FOUND',
+    orElse: () => itineraries.first,
+  );
 }
 
 int _scoreFromRisk(RouteSearchV2AccessibilityRisk risk) {
@@ -1922,9 +2112,13 @@ class RouteSearchStep {
     this.confidenceLabel = '',
     this.plannedArrivalTimeIso = '',
     this.realtimeArrivalTimeIso = '',
+    this.plannedDepartureTimeIso = '',
+    this.realtimeDepartureTimeIso = '',
     this.carDoorCarNumber,
     this.carDoorDoorNumber,
     this.carDoorFacilityType = '',
+    this.serviceClass,
+    this.servicePattern,
   });
 
   factory RouteSearchStep.fromJson(Map<String, Object?> json) {
@@ -1969,7 +2163,7 @@ class RouteSearchStep {
       confidenceLabel: _optionalRouteString(
         json,
         'confidenceLabel',
-        fallback: '안내를 준비 중이에요',
+        fallback: '',
       ),
     );
   }
@@ -2004,6 +2198,10 @@ class RouteSearchStep {
       confidenceLabel: leg.confidence,
       plannedArrivalTimeIso: leg.plannedArrivalTime,
       realtimeArrivalTimeIso: leg.realtimeArrivalTime ?? '',
+      plannedDepartureTimeIso: leg.plannedDepartureTime,
+      realtimeDepartureTimeIso: leg.realtimeDepartureTime ?? '',
+      serviceClass: leg.serviceClass,
+      servicePattern: leg.servicePattern,
     );
   }
 
@@ -2025,6 +2223,8 @@ class RouteSearchStep {
   /// 그 외 경로/step에서는 빈 문자열이다.
   final String plannedArrivalTimeIso;
   final String realtimeArrivalTimeIso;
+  final String plannedDepartureTimeIso;
+  final String realtimeDepartureTimeIso;
   final String actionTitle;
   final String actionDetail;
   final String reason;
@@ -2038,6 +2238,19 @@ class RouteSearchStep {
   final int? carDoorCarNumber;
   final int? carDoorDoorNumber;
   final String carDoorFacilityType;
+
+  /// 승차 leg의 운행 클래스·운행종별(실제 운행 정보). 급행 배지 노출 판단에만 쓰고,
+  /// 선택 컨트롤·요청 identity에는 싣지 않는다. 승차가 아닌 step에서는 null이다.
+  final String? serviceClass;
+  final String? servicePattern;
+
+  /// 승차 정보 영역에 `급행` 배지를 노출하는 유일한 조건.
+  bool get isSubwayExpress =>
+      serviceClass == 'SUBWAY' && servicePattern == 'EXPRESS';
+
+  /// 승차 정보 영역에 `ITX-청춘` 서비스 식별 배지를 노출하는 유일한 조건. 별도
+  /// 운임의 좌석 지정 서비스라 같은 노선의 일반 전동차와 구분해 표시한다.
+  bool get isItxCheongchun => serviceClass == 'ITX_CHEONGCHUN';
 
   RouteSearchStep withDisplayLabels({
     required String title,
@@ -2071,9 +2284,13 @@ class RouteSearchStep {
           plannedArrivalTimeIso ?? this.plannedArrivalTimeIso,
       realtimeArrivalTimeIso:
           realtimeArrivalTimeIso ?? this.realtimeArrivalTimeIso,
+      plannedDepartureTimeIso: plannedDepartureTimeIso,
+      realtimeDepartureTimeIso: realtimeDepartureTimeIso,
       carDoorCarNumber: carDoorCarNumber,
       carDoorDoorNumber: carDoorDoorNumber,
       carDoorFacilityType: carDoorFacilityType,
+      serviceClass: serviceClass,
+      servicePattern: servicePattern,
     );
   }
 
@@ -2090,7 +2307,7 @@ class RouteSearchStep {
       _routeDurationLabel(estimatedMinutes),
       _routeDistanceLabel(distanceMeters),
       if (includesStairs) '계단 포함',
-      if (requiresAccessibilityCheck) '엘리베이터 안내 준비 중',
+      if (requiresAccessibilityCheck) '엘리베이터 안내 미확인',
     ];
     return labels.join(' · ');
   }
@@ -2158,7 +2375,7 @@ class RouteSearchStep {
       return '예상 시간·거리예요';
     }
     if (timeSource == 'UNKNOWN' || distanceSource == 'UNKNOWN') {
-      return '시간 또는 거리를 확인하고 있어요';
+      return '시간·거리 정보 미확인';
     }
     if (timeSource == 'REALTIME') {
       return '실시간 도착 정보 기준이에요';
@@ -2172,14 +2389,14 @@ class RouteSearchStep {
 
 String _routeDurationLabel(int estimatedMinutes) {
   if (estimatedMinutes <= 0) {
-    return '시간을 확인하고 있어요';
+    return '시간 미확인';
   }
   return '약 $estimatedMinutes분';
 }
 
 String _routeDistanceLabel(int distanceMeters) {
   if (distanceMeters <= 0) {
-    return '거리를 확인하고 있어요';
+    return '거리 미확인';
   }
   if (distanceMeters < 1000) {
     return '${distanceMeters}m';
@@ -2580,6 +2797,7 @@ class RouteSearchScreen extends StatefulWidget {
     this.shellNavigationBar,
     this.onShellBackToHome,
     this.getOffAlarmController,
+    this.routeShareInvoker,
     String? initialMobilityType,
     super.key,
   }) : initialMobilityType = _resolveInitialMobilityType(initialMobilityType);
@@ -2590,6 +2808,7 @@ class RouteSearchScreen extends StatefulWidget {
   final FavoriteRouteRepository? favoriteRouteRepository;
   final AdRepository? adRepository;
   final GetOffAlarmController? getOffAlarmController;
+  final RouteShareInvoker? routeShareInvoker;
   final RouteDraft? initialDraft;
   final RouteTransportScope initialTransportScope;
   final Widget? shellNavigationBar;
@@ -2626,6 +2845,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
   late String _selectedMobilityType;
   late String _selectedConstraintMode;
   late RouteTransportScope _selectedTransportScope;
+  // objective/scope 선택은 현재 검색 화면 lifecycle 동안만 유지하고 app restart에
+  // 영속화하지 않는다. 기본값은 FASTEST(+ SUBWAY).
+  RouteObjective _selectedObjective = RouteObjective.fastest;
   String _validationMessage = '';
 
   /// #1933 C: 출발·도착이 모두 채워진 draft로 진입하면 별도 "길찾기" 버튼을 누르지
@@ -2720,7 +2942,8 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     final waypoint = _waypointStation;
     final waypointSegment = waypoint == null ? '' : '${waypoint.id} ';
     return '${origin.id} $waypointSegment${destination.id} '
-        '$_selectedMobilityType $_selectedConstraintMode ${_selectedTransportScope.serverValue}';
+        '$_selectedMobilityType $_selectedConstraintMode '
+        '${_selectedTransportScope.serverValue} ${_selectedObjective.serverValue}';
   }
 
   void _maybeAutoSearchFromDraft() {
@@ -2791,14 +3014,6 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
           activeSubscription?.routeId != result.routeSearchId) {
         return;
       }
-      final activeStationNames = <String, String>{
-        if (activeSubscription != null)
-          for (final transfer in activeSubscription.transfers)
-            transfer.stationId: transfer.stationName,
-        if (activeSubscription != null)
-          activeSubscription.destination.stationId:
-              activeSubscription.destination.stationName,
-      };
       final stationNames = <String, String>{};
       for (final leg in rideLegs) {
         final stationId = leg.toStationId;
@@ -2807,9 +3022,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
         }
         final stationName = await _resolveGetOffAlarmStationName(
           stationId: stationId,
-          result: result,
           stationRepository: widget.stationRepository,
-          preferredStationNames: activeStationNames,
         );
         if (stationName == null) {
           throw StateError('하차 알림 역명을 확인하지 못했습니다.');
@@ -2970,13 +3183,25 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
                     // 바꾸면 그 자리에서 바로 재검색한다(별도 폼·버튼 없음).
                     _RouteConditionChips(
                       preset: _selectedPreset,
+                      objective: _selectedObjective,
                       transportScope: _selectedTransportScope,
                       itxTransportScopeEnabled: _itxTransportScopeAvailable,
+                      loading:
+                          _controller.state.status ==
+                          RouteSearchViewStatus.loading,
                       onChangePreset: _showMobilityPresetPicker,
+                      onChangeObjective: _changeObjective,
                       onChangeTransportScope: _changeTransportScope,
                     ),
                     _RouteSearchBody(
                       state: _controller.state,
+                      onSearchSubwayOnly:
+                          _selectedTransportScope ==
+                              RouteTransportScope.subwayAndItxCheongchun
+                          ? () => _changeTransportScope(
+                              RouteTransportScope.subway,
+                            )
+                          : null,
                       routeFeedbackRepository: widget.routeFeedbackRepository,
                       favoriteRouteRepository: widget.favoriteRouteRepository,
                       adRepository: widget.adRepository,
@@ -2985,6 +3210,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
                           : _endRoute,
                       getOffAlarmController: widget.getOffAlarmController,
                       stationRepository: widget.stationRepository,
+                      routeShareInvoker: widget.routeShareInvoker,
                     ),
                   ],
                 ),
@@ -3104,8 +3330,27 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
         waypointStationId: _waypointStation?.id,
         mobilityPreset: mobilityPresetServerString(_selectedPreset),
         transportScope: _selectedTransportScope,
+        objective: _selectedObjective,
       ),
     );
+  }
+
+  Future<void> _changeObjective(RouteObjective objective) async {
+    if (objective == _selectedObjective ||
+        _controller.state.status == RouteSearchViewStatus.loading) {
+      return;
+    }
+    if (!await _disableActiveGetOffAlarm()) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _selectedObjective = objective;
+      _autoSearchedSignature = null;
+    });
+    await _submit(alarmAlreadyDisabled: true);
   }
 
   Future<void> _changeTransportScope(RouteTransportScope scope) async {
@@ -3903,21 +4148,25 @@ class _RouteStationOptionTile extends StatelessWidget {
 class _RouteSearchBody extends StatelessWidget {
   const _RouteSearchBody({
     required this.state,
+    this.onSearchSubwayOnly,
     required this.routeFeedbackRepository,
     required this.favoriteRouteRepository,
     required this.adRepository,
     required this.onShellBackToHome,
     required this.getOffAlarmController,
     required this.stationRepository,
+    required this.routeShareInvoker,
   });
 
   final RouteSearchState state;
+  final AsyncCallback? onSearchSubwayOnly;
   final RouteFeedbackRepository? routeFeedbackRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
   final AdRepository? adRepository;
   final AsyncCallback? onShellBackToHome;
   final GetOffAlarmController? getOffAlarmController;
   final StationSearchRepository stationRepository;
+  final RouteShareInvoker? routeShareInvoker;
 
   @override
   Widget build(BuildContext context) {
@@ -3935,6 +4184,7 @@ class _RouteSearchBody extends StatelessWidget {
       ),
       RouteSearchViewStatus.failure => _RouteSearchFailureMessage(
         message: state.message,
+        onSearchSubwayOnly: onSearchSubwayOnly,
       ),
       RouteSearchViewStatus.success => _RouteSearchResultCard(
         result: state.result!,
@@ -3946,15 +4196,20 @@ class _RouteSearchBody extends StatelessWidget {
         onShellBackToHome: onShellBackToHome,
         getOffAlarmController: getOffAlarmController,
         stationRepository: stationRepository,
+        routeShareInvoker: routeShareInvoker,
       ),
     };
   }
 }
 
 class _RouteSearchFailureMessage extends StatelessWidget {
-  const _RouteSearchFailureMessage({required this.message});
+  const _RouteSearchFailureMessage({
+    required this.message,
+    this.onSearchSubwayOnly,
+  });
 
   final String message;
+  final AsyncCallback? onSearchSubwayOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -3966,6 +4221,14 @@ class _RouteSearchFailureMessage extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _RouteSearchMessage(message: message, liveRegion: true),
+        if (onSearchSubwayOnly != null) ...[
+          const SizedBox(height: 12),
+          OutlinedButton(
+            key: const Key('routeSearchSubwayOnlyAction'),
+            onPressed: onSearchSubwayOnly,
+            child: const Text('지하철만 보기'),
+          ),
+        ],
         if (shouldShowNextAction) ...[
           const SizedBox(height: 8),
           Semantics(
@@ -4089,6 +4352,7 @@ class _RouteSearchResultCard extends StatefulWidget {
     required this.onShellBackToHome,
     required this.getOffAlarmController,
     required this.stationRepository,
+    required this.routeShareInvoker,
   });
 
   final RouteSearchResult result;
@@ -4100,6 +4364,7 @@ class _RouteSearchResultCard extends StatefulWidget {
   final AsyncCallback? onShellBackToHome;
   final GetOffAlarmController? getOffAlarmController;
   final StationSearchRepository stationRepository;
+  final RouteShareInvoker? routeShareInvoker;
 
   @override
   State<_RouteSearchResultCard> createState() => _RouteSearchResultCardState();
@@ -4189,6 +4454,7 @@ class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
               )
             : null,
         adRepository: widget.adRepository,
+        routeShareInvoker: widget.routeShareInvoker,
       ),
     );
   }
@@ -4275,7 +4541,6 @@ class _GetOffAlarmEntryPoint extends StatelessWidget {
         rideLegs: rideLegs,
         stationName: (id) => _resolveGetOffAlarmStationName(
           stationId: id,
-          result: result,
           stationRepository: stationRepository,
         ),
       ),
@@ -4285,23 +4550,8 @@ class _GetOffAlarmEntryPoint extends StatelessWidget {
 
 Future<String?> _resolveGetOffAlarmStationName({
   required String stationId,
-  required RouteSearchResult result,
   required StationSearchRepository stationRepository,
-  Map<String, String> preferredStationNames = const {},
 }) async {
-  final preferredName = _usableGetOffAlarmStationName(
-    preferredStationNames[stationId],
-    stationId,
-  );
-  if (preferredName != null) {
-    return preferredName;
-  }
-  if (stationId == result.destinationStationId) {
-    return _usableGetOffAlarmStationName(
-      result.destinationStationName,
-      stationId,
-    );
-  }
   final detail = await stationRepository.getStationDetail(stationId);
   if (detail.id != stationId) {
     return null;
@@ -4342,8 +4592,11 @@ RouteSearchResult _preserveGetOffAlarmArrivalTimes({
   required RouteSearchResult next,
   required RouteSearchResult previous,
 }) {
+  final objectivePreserved = next.withDisplayLabels(
+    objective: previous.objective,
+  );
   if (_rideLegArrivalsFromResult(previous).isEmpty) {
-    return next;
+    return objectivePreserved;
   }
   final previousRideSteps = previous.steps
       .where(
@@ -4352,7 +4605,7 @@ RouteSearchResult _preserveGetOffAlarmArrivalTimes({
       )
       .toList(growable: false);
   var changed = false;
-  final steps = next.steps
+  final steps = objectivePreserved.steps
       .map((step) {
         if (step.stepType != 'ride' || step.plannedArrivalTimeIso.isNotEmpty) {
           return step;
@@ -4375,9 +4628,9 @@ RouteSearchResult _preserveGetOffAlarmArrivalTimes({
       })
       .toList(growable: false);
   if (!changed) {
-    return next;
+    return objectivePreserved;
   }
-  return next.withDisplayLabels(steps: steps);
+  return objectivePreserved.withDisplayLabels(steps: steps);
 }
 
 RouteSearchStep? _matchingPreviousRideStep({
@@ -4475,6 +4728,7 @@ class _RouteDetailWorkflowView extends StatelessWidget {
     required this.onOpenFeedback,
     required this.favoriteSaveButton,
     required this.adRepository,
+    required this.routeShareInvoker,
   });
 
   final RouteSearchResult result;
@@ -4483,6 +4737,7 @@ class _RouteDetailWorkflowView extends StatelessWidget {
   final VoidCallback? onOpenFeedback;
   final Widget? favoriteSaveButton;
   final AdRepository? adRepository;
+  final RouteShareInvoker? routeShareInvoker;
 
   @override
   Widget build(BuildContext context) {
@@ -4519,6 +4774,8 @@ class _RouteDetailWorkflowView extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 12),
+        _RouteShareButton(result: result, invoker: routeShareInvoker),
+        const SizedBox(height: 10),
         ?favoriteSaveButton,
         if (onStartGuidance != null) ...[
           const SizedBox(height: 10),
@@ -4549,6 +4806,261 @@ class _RouteDetailWorkflowView extends StatelessWidget {
       ],
     );
   }
+}
+
+class _RouteShareButton extends StatefulWidget {
+  const _RouteShareButton({required this.result, required this.invoker});
+
+  final RouteSearchResult result;
+  final RouteShareInvoker? invoker;
+
+  @override
+  State<_RouteShareButton> createState() => _RouteShareButtonState();
+}
+
+class _RouteShareButtonState extends State<_RouteShareButton> {
+  var _isSharing = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Builder(
+      builder: (buttonContext) {
+        final onShare = _isSharing ? null : () => _share(buttonContext);
+        return Semantics(
+          button: true,
+          label: '경로 요약 공유',
+          onTap: onShare,
+          excludeSemantics: true,
+          child: OutlinedButton.icon(
+            key: const Key('routeShareButton'),
+            onPressed: onShare,
+            icon: const Icon(Icons.share_outlined),
+            label: const Text('공유'),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _share(BuildContext context) async {
+    if (_isSharing) {
+      return;
+    }
+    setState(() => _isSharing = true);
+    try {
+      final renderBox = context.findRenderObject();
+      if (renderBox is! RenderBox || !renderBox.hasSize) {
+        throw StateError('Route share trigger is unavailable');
+      }
+      final origin = renderBox.localToGlobal(Offset.zero) & renderBox.size;
+      final text = buildRouteShareSummary(_routeShareSnapshot(widget.result));
+      final invoke = widget.invoker;
+      if (invoke != null) {
+        await invoke(text, origin);
+      } else {
+        await SharePlus.instance.share(
+          ShareParams(text: text, sharePositionOrigin: origin),
+        );
+      }
+    } on Object {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('경로 요약을 공유하지 못했어요.')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSharing = false);
+      }
+    }
+  }
+}
+
+RouteShareSnapshot _routeShareSnapshot(RouteSearchResult result) {
+  if (result.isBlocked || result.status != 'FOUND') {
+    throw StateError('Route is unavailable');
+  }
+  final originName = result.originStationName.trim();
+  final destinationName = result.destinationStationName.trim();
+  if (originName.isEmpty ||
+      destinationName.isEmpty ||
+      originName == result.originStationId ||
+      destinationName == result.destinationStationId) {
+    throw StateError('Canonical station names are unavailable');
+  }
+
+  final steps = result.movementSteps;
+  if (steps.isEmpty) {
+    throw StateError('Route itinerary is unavailable');
+  }
+  final forbiddenIdentifiers = <String>{
+    result.routeSearchId,
+    result.originStationId,
+    result.destinationStationId,
+    for (final step in steps) ...[
+      step.fromStationId,
+      step.toStationId,
+      step.lineId,
+    ],
+  }.where((value) => value.trim().isNotEmpty).toSet();
+  final legs = steps
+      .map((step) {
+        final description = step.title.trim();
+        if (description.isEmpty ||
+            forbiddenIdentifiers.any(description.contains)) {
+          throw StateError('Route leg display labels are unavailable');
+        }
+        var departureTimeSource = step.realtimeDepartureTimeIso.isNotEmpty
+            ? step.realtimeDepartureTimeIso
+            : step.plannedDepartureTimeIso;
+        var arrivalTimeSource = step.realtimeArrivalTimeIso.isNotEmpty
+            ? step.realtimeArrivalTimeIso
+            : step.plannedArrivalTimeIso;
+        if (result.isLocalResult) {
+          final duration = Duration(minutes: step.estimatedMinutes);
+          if (departureTimeSource.isEmpty && arrivalTimeSource.isNotEmpty) {
+            departureTimeSource = _shiftRouteShareTime(
+              arrivalTimeSource,
+              -duration,
+            );
+          } else if (arrivalTimeSource.isEmpty &&
+              departureTimeSource.isNotEmpty) {
+            arrivalTimeSource = _shiftRouteShareTime(
+              departureTimeSource,
+              duration,
+            );
+          }
+        }
+        return RouteShareLeg(
+          description: description,
+          departureTime: _routeShareTime(departureTimeSource, allowEmpty: true),
+          arrivalTime: _routeShareTime(arrivalTimeSource, allowEmpty: true),
+        );
+      })
+      .toList(growable: false);
+
+  var departureSource = result.departureTimeIso.isNotEmpty
+      ? result.departureTimeIso
+      : _firstRouteShareDeparture(steps);
+  var arrivalSource = result.arrivalTimeIso.isNotEmpty
+      ? result.arrivalTimeIso
+      : _lastRouteShareArrival(steps);
+  final durationMinutes = (result.estimatedDurationSeconds / 60).ceil();
+  final duration = Duration(seconds: result.estimatedDurationSeconds);
+  if (departureSource.isEmpty && arrivalSource.isEmpty) {
+    departureSource = _routeShareTime(result.createdAt);
+    arrivalSource = _shiftRouteShareTime(departureSource, duration);
+  } else if (result.isLocalResult) {
+    if (departureSource.isEmpty) {
+      departureSource = _shiftRouteShareTime(arrivalSource, -duration);
+    } else if (arrivalSource.isEmpty) {
+      arrivalSource = _shiftRouteShareTime(departureSource, duration);
+    }
+  }
+
+  RouteShareFare? fare;
+  if (result.officialFare case final officialFare?) {
+    fare = RouteShareFare(
+      adultFareWon: officialFare.adultFareWon,
+      currency: officialFare.currency,
+    );
+  } else if (result.transportScope ==
+      RouteTransportScope.subwayAndItxCheongchun) {
+    throw StateError('Official ITX fare is unavailable');
+  } else if (result.officialOdFareQuote case final quote?) {
+    fare = RouteShareFare(adultFareWon: quote.gnrlCardFare, currency: 'KRW');
+  }
+
+  return RouteShareSnapshot(
+    // 실제 역명과 leg 표시명은 아직 한국어 canonical만 제공한다.
+    languageCode: 'ko',
+    originName: originName,
+    destinationName: destinationName,
+    objective: switch (result.objective) {
+      RouteObjective.fastest => RouteShareObjective.fastest,
+      RouteObjective.fewestTransfers => RouteShareObjective.fewestTransfers,
+    },
+    transportScope: switch (result.transportScope) {
+      RouteTransportScope.subway => RouteShareTransportScope.subway,
+      RouteTransportScope.subwayAndItxCheongchun =>
+        RouteShareTransportScope.subwayAndItxCheongchun,
+    },
+    departureTime: _routeShareTime(departureSource),
+    arrivalTime: _routeShareTime(arrivalSource),
+    durationMinutes: durationMinutes,
+    transferCount: result.transferCount,
+    freshness: switch (result.etaSource) {
+      'REALTIME' => RouteShareFreshness.realtime,
+      'MIXED' => RouteShareFreshness.mixed,
+      'STATIC_LOCAL' ||
+      'STATIC_ESTIMATE' ||
+      'STALE' => RouteShareFreshness.staticData,
+      _ => RouteShareFreshness.planned,
+    },
+    legs: legs,
+    fare: fare,
+  );
+}
+
+String _firstRouteShareDeparture(List<RouteSearchStep> steps) {
+  for (final step in steps) {
+    if (step.realtimeDepartureTimeIso.isNotEmpty) {
+      return step.realtimeDepartureTimeIso;
+    }
+    if (step.plannedDepartureTimeIso.isNotEmpty) {
+      return step.plannedDepartureTimeIso;
+    }
+  }
+  return '';
+}
+
+String _lastRouteShareArrival(List<RouteSearchStep> steps) {
+  for (final step in steps.reversed) {
+    if (step.realtimeArrivalTimeIso.isNotEmpty) {
+      return step.realtimeArrivalTimeIso;
+    }
+    if (step.plannedArrivalTimeIso.isNotEmpty) {
+      return step.plannedArrivalTimeIso;
+    }
+  }
+  return '';
+}
+
+String _routeShareTime(String value, {bool allowEmpty = false}) {
+  final trimmed = value.trim();
+  if (allowEmpty && trimmed.isEmpty) {
+    return '';
+  }
+  if (RegExp(r'(?:[zZ]|[+-]\d{2}:\d{2})$').hasMatch(trimmed)) {
+    final instant = DateTime.tryParse(trimmed);
+    if (instant == null) {
+      throw StateError('Route time is unavailable');
+    }
+    final koreanTime = instant.toUtc().add(const Duration(hours: 9));
+    return '${koreanTime.hour.toString().padLeft(2, '0')}:${koreanTime.minute.toString().padLeft(2, '0')}';
+  }
+  final match = RegExp(r'(?:T|^)(\d{2}):(\d{2})').firstMatch(trimmed);
+  if (match == null) {
+    throw StateError('Route time is unavailable');
+  }
+  return '${match.group(1)}:${match.group(2)}';
+}
+
+String _shiftRouteShareTime(String value, Duration offset) {
+  final match = RegExp(
+    r'(?:T|^)(\d{2}):(\d{2})(?::(\d{2}))?',
+  ).firstMatch(value.trim());
+  if (match == null) {
+    throw StateError('Route time is unavailable');
+  }
+  final hour = int.parse(match.group(1)!);
+  final minute = int.parse(match.group(2)!);
+  final second = int.parse(match.group(3) ?? '0');
+  if (hour > 23 || minute > 59 || second > 59) {
+    throw StateError('Route time is unavailable');
+  }
+  final shifted = DateTime.utc(2000, 1, 2, hour, minute, second).add(offset);
+  return '${shifted.hour.toString().padLeft(2, '0')}:${shifted.minute.toString().padLeft(2, '0')}';
 }
 
 class _OfficialOdFareSection extends StatelessWidget {
@@ -5003,7 +5515,7 @@ class _RouteFeedbackWorkflowView extends StatelessWidget {
         const SizedBox(height: 14),
         if (feedbackRepository == null)
           const _RouteNotice(
-            title: '피드백 준비 중',
+            title: '의견을 지금 받을 수 없어요',
             text: '잠시 후 다시 시도해 주세요.',
             icon: Icons.info_outline,
           )
@@ -5367,21 +5879,31 @@ class _RouteSummaryChip {
 class _RouteConditionChips extends StatelessWidget {
   const _RouteConditionChips({
     required this.preset,
+    required this.objective,
     required this.transportScope,
     required this.itxTransportScopeEnabled,
+    required this.loading,
     required this.onChangePreset,
+    required this.onChangeObjective,
     required this.onChangeTransportScope,
   });
 
   final MobilityPreset preset;
+  final RouteObjective objective;
   final RouteTransportScope transportScope;
   final bool itxTransportScopeEnabled;
+  // 재검색 로딩 중에는 objective·교통범위 변경 핸들러가 입력을 조용히 무시하므로,
+  // 해당 칩을 시각·semantics 모두 비활성으로 표기해 활성으로 보이지 않게 한다.
+  final bool loading;
   final VoidCallback onChangePreset;
+  final ValueChanged<RouteObjective> onChangeObjective;
   final ValueChanged<RouteTransportScope> onChangeTransportScope;
 
   @override
   Widget build(BuildContext context) {
     final displayName = mobilityPresetDisplayName(preset);
+    // 일반 폭에서는 한 행에 배치되고, 큰 글자·좁은 폭에서는 objective 행 다음으로
+    // scope 행이 자연스럽게 내려가도록 Wrap이 재배치한다.
     return Padding(
       key: const Key('routeConditionChips'),
       padding: const EdgeInsets.only(bottom: 16),
@@ -5397,6 +5919,26 @@ class _RouteConditionChips extends StatelessWidget {
             active: false,
             onTap: onChangePreset,
           ),
+          // objective 탭: 기존 transport toggle 세그먼트 패턴을 재사용(무채색·radius 8·
+          // 그림자 0). 좌측에 놓고 항상 노출한다(기본값 FASTEST).
+          _RouteConditionChipButton(
+            buttonKey: const Key('routeObjectiveFastestChip'),
+            icon: Icons.bolt,
+            label: RouteObjective.fastest.label,
+            semanticLabel: '경로 목표, ${RouteObjective.fastest.label}',
+            active: objective == RouteObjective.fastest,
+            enabled: !loading,
+            onTap: () => onChangeObjective(RouteObjective.fastest),
+          ),
+          _RouteConditionChipButton(
+            buttonKey: const Key('routeObjectiveFewestTransfersChip'),
+            icon: Icons.swap_calls,
+            label: RouteObjective.fewestTransfers.label,
+            semanticLabel: '경로 목표, ${RouteObjective.fewestTransfers.label}',
+            active: objective == RouteObjective.fewestTransfers,
+            enabled: !loading,
+            onTap: () => onChangeObjective(RouteObjective.fewestTransfers),
+          ),
           if (itxTransportScopeEnabled) ...[
             _RouteConditionChipButton(
               buttonKey: const Key('routeScopeSubwayChip'),
@@ -5404,6 +5946,7 @@ class _RouteConditionChips extends StatelessWidget {
               label: '지하철만',
               semanticLabel: '교통 범위, 지하철만',
               active: transportScope == RouteTransportScope.subway,
+              enabled: !loading,
               onTap: () => onChangeTransportScope(RouteTransportScope.subway),
             ),
             _RouteConditionChipButton(
@@ -5413,6 +5956,7 @@ class _RouteConditionChips extends StatelessWidget {
               semanticLabel: '교통 범위, 지하철과 ITX-청춘',
               active:
                   transportScope == RouteTransportScope.subwayAndItxCheongchun,
+              enabled: !loading,
               onTap: () => onChangeTransportScope(
                 RouteTransportScope.subwayAndItxCheongchun,
               ),
@@ -5431,6 +5975,7 @@ class _RouteConditionChipButton extends StatelessWidget {
     required this.label,
     required this.semanticLabel,
     required this.active,
+    this.enabled = true,
     required this.onTap,
   });
 
@@ -5439,34 +5984,43 @@ class _RouteConditionChipButton extends StatelessWidget {
   final String label;
   final String semanticLabel;
   final bool active;
+  final bool enabled;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final foreground = active
+    // 비활성(재검색 로딩 중)일 때는 무채색 원칙 안에서 기존 muted 토큰만 재사용해
+    // 흐리게 표기하고 tap·semantics 모두 막는다(새 색·새 디자인 없음).
+    final foreground = !enabled
+        ? EasySubwayAccessibleColors.iconMuted
+        : active
         ? EasySubwayAccessibleColors.primary
         : EasySubwayAccessibleColors.secondaryText;
+    final tapHandler = enabled ? onTap : null;
     return Semantics(
       button: true,
+      enabled: enabled,
       toggled: active,
       label: semanticLabel,
-      onTap: onTap,
+      onTap: tapHandler,
       child: ExcludeSemantics(
         child: Material(
           color: Colors.transparent,
           child: InkWell(
             key: buttonKey,
-            onTap: onTap,
+            onTap: tapHandler,
             borderRadius: _routeSearchPillRadius,
             child: Ink(
               decoration: BoxDecoration(
                 color: EasySubwayAccessibleColors.surface,
                 borderRadius: _routeSearchPillRadius,
                 border: Border.all(
-                  color: active
+                  color: !enabled
+                      ? EasySubwayAccessibleColors.line
+                      : active
                       ? EasySubwayAccessibleColors.primary
                       : EasySubwayAccessibleColors.line,
-                  width: active ? 2 : 1,
+                  width: active && enabled ? 2 : 1,
                 ),
               ),
               child: Container(
@@ -5490,10 +6044,12 @@ class _RouteConditionChipButton extends StatelessWidget {
                     ),
                     if (active) ...[
                       const SizedBox(width: 6),
-                      const Icon(
+                      Icon(
                         Icons.check,
                         size: 16,
-                        color: EasySubwayAccessibleColors.primary,
+                        color: enabled
+                            ? EasySubwayAccessibleColors.primary
+                            : EasySubwayAccessibleColors.iconMuted,
                       ),
                     ],
                   ],
@@ -5875,6 +6431,33 @@ class _RouteStepTile extends StatelessWidget {
                 color: EasySubwayAccessibleColors.secondaryText,
                 fontWeight: FontWeight.w700,
                 height: 1.3,
+              ),
+            ),
+          ],
+          // 승차 정보 영역에만 급행 배지를 붙인다(요약 카드 전체가 아니라 leg별).
+          // SUBWAY/EXPRESS만 대상이고, ITX-청춘·LOCAL은 배지 없음. 배지는 장식이라
+          // ExcludeSemantics로 두고 TalkBack용 `급행`은 이 Semantics가 한 번만 준다.
+          if (step.stepType == 'ride' && step.isSubwayExpress) ...[
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Semantics(
+                label: '급행',
+                child: const ServicePatternBadge.express(),
+              ),
+            ),
+          ],
+          // ITX-청춘 승차 leg는 별도 운임의 좌석 지정 서비스라 같은 노선 일반 전동차와
+          // 구분해 표시한다. serviceClass=SUBWAY와 상호 배타라 급행 배지와 동시에
+          // 붙지 않는다. 배지는 장식이라 ExcludeSemantics로 두고 TalkBack용
+          // `ITX-청춘`은 이 Semantics가 한 번만 준다.
+          if (step.stepType == 'ride' && step.isItxCheongchun) ...[
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Semantics(
+                label: 'ITX-청춘',
+                child: const ServicePatternBadge.itxCheongchun(),
               ),
             ),
           ],

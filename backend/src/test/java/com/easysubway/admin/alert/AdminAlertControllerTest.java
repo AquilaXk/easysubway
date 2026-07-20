@@ -40,7 +40,8 @@ class AdminAlertControllerTest {
 		assertThat(html)
 			.contains("<!doctype html>")
 			.contains("알림 센터")
-			.contains("admin-sidebar");
+			.contains("admin-sidebar")
+			.doesNotContain("신고 급증·푸시 실패·배치 실패·데이터팩 blocker를 한 곳에서 확인합니다.");
 	}
 
 	@Test
@@ -73,9 +74,12 @@ class AdminAlertControllerTest {
 		assertThat(html)
 			.contains("class=\"admin-alert-center\"")
 			.contains("x-data=\"alertCenter\"")
-			.contains("id=\"admin-alert-live\"")
+			.contains("aria-controls=\"admin-alert-live\"")
+			.contains("id=\"admin-alert-live\" class=\"admin-alert-live\" role=\"region\" aria-label=\"알림 센터\"")
+			.doesNotContain("class=\"admin-alert-bell\" aria-haspopup=\"dialog\"")
 			// no-JS fallback: 벨은 알림 전용 페이지로 이동
 			.contains("href=\"/admin/alerts\"");
+		assertThat(html).containsOnlyOnce("role=\"region\" aria-label=\"알림 센터\"");
 	}
 
 	@Test

@@ -4,6 +4,11 @@ import 'dart:ui';
 /// 위젯은 이 박스를 실제 크기에 uniform scale로 맞춰 그린다.
 const Size kFanMenuDesignSize = Size(700, 380);
 
+/// v3 말풍선 꼬리 팁(design 좌표). 닫기 섹터·실루엣 하단 베지어의 t=0.5 접점이며
+/// 이 점이 앵커 역 노드 정중앙에 닿도록 배치한다(팬 메뉴 placement가 소비하는
+/// 단일 출처 — 배치식이 좌표를 재하드코딩하지 않게 한다).
+const Offset kFanMenuTailTip = Offset(350, 375);
+
 /// 오너 제작 방사형 액션 메뉴의 섹터별 Path 묶음. 렌더링과 히트테스트가
 /// 동일 인스턴스를 공유하도록 이 객체를 단일 출처로 쓴다.
 class StationFanMenuGeometry {
@@ -42,7 +47,38 @@ const Offset _closeNotchLeft = Offset(308.31, 345.56); // 558.31,555.56
 
 const double _rOuter = 330;
 const double _rInner = 155;
-const double _rClose = 46;
+
+/// v3 닫기 섹터·실루엣 하단의 말풍선 꼬리(큐빅 베지어 3세그먼트, design 좌표).
+/// notch 오른쪽 점([_closeNotchRight])에서 시작한다고 가정하고 왼쪽 점
+/// ([_closeNotchLeft])까지 잇는다. 두 번째 세그먼트의 t=0.5 접점이
+/// [kFanMenuTailTip]=(350,375)이다. 닫기 Path와 실루엣이 동일 꼬리를 쓰도록
+/// 단일 헬퍼로 둔다(좌표 중복 하드코딩 방지). 제어점은 [kFanMenuTailTip]
+/// 기준 오프셋으로 유도해 팁 상수를 옮기면 꼬리 전체가 함께 따라가게 한다.
+Path _appendCloseTail(Path path) => path
+  ..cubicTo(
+    kFanMenuTailTip.dx + 24,
+    kFanMenuTailTip.dy - 23,
+    kFanMenuTailTip.dx + 10,
+    kFanMenuTailTip.dy - 13,
+    kFanMenuTailTip.dx + 4,
+    kFanMenuTailTip.dy - 3,
+  )
+  ..cubicTo(
+    kFanMenuTailTip.dx + 2,
+    kFanMenuTailTip.dy + 1,
+    kFanMenuTailTip.dx - 2,
+    kFanMenuTailTip.dy + 1,
+    kFanMenuTailTip.dx - 4,
+    kFanMenuTailTip.dy - 3,
+  )
+  ..cubicTo(
+    kFanMenuTailTip.dx - 10,
+    kFanMenuTailTip.dy - 13,
+    kFanMenuTailTip.dx - 24,
+    kFanMenuTailTip.dy - 23,
+    _closeNotchLeft.dx,
+    _closeNotchLeft.dy,
+  );
 
 Path _sector({
   required Offset outerStart,
@@ -89,37 +125,30 @@ StationFanMenuGeometry buildStationFanMenuGeometry() {
     innerStart: _arrInnerEnd,
     innerEnd: _arrInnerStart,
   );
-  // 닫기(하단 노치): M 459.52,509.49 A155 ...1 740.48,509.49 L 641.69,555.56 A46 ...0 558.31,555.56 Z
-  final close = Path()
-    ..moveTo(_depInnerEnd.dx, _depInnerEnd.dy)
-    ..arcToPoint(
-      _arrInnerEnd,
-      radius: const Radius.circular(_rInner),
-      clockwise: true,
-    )
-    ..lineTo(_closeNotchRight.dx, _closeNotchRight.dy)
-    ..arcToPoint(
-      _closeNotchLeft,
-      radius: const Radius.circular(_rClose),
-      clockwise: false,
-    )
-    ..close();
-  // 실루엣(연속 윤곽): SVG 53행 통합 path 그대로 정규화 이식.
-  final silhouette = Path()
-    ..moveTo(_depOuterStart.dx, _depOuterStart.dy)
-    ..arcToPoint(
-      _arrOuterEnd,
-      radius: const Radius.circular(_rOuter),
-      clockwise: true,
-    )
-    ..lineTo(_arrInnerEnd.dx, _arrInnerEnd.dy)
-    ..lineTo(_closeNotchRight.dx, _closeNotchRight.dy)
-    ..arcToPoint(
-      _closeNotchLeft,
-      radius: const Radius.circular(_rClose),
-      clockwise: false,
-    )
-    ..close();
+  // 닫기(하단 말풍선 꼬리, v3): M 459.52,509.49 A155 ...1 740.48,509.49
+  //   L 641.69,555.56 C… 꼬리 …→ 558.31,555.56 Z
+  final close = _appendCloseTail(
+    Path()
+      ..moveTo(_depInnerEnd.dx, _depInnerEnd.dy)
+      ..arcToPoint(
+        _arrInnerEnd,
+        radius: const Radius.circular(_rInner),
+        clockwise: true,
+      )
+      ..lineTo(_closeNotchRight.dx, _closeNotchRight.dy),
+  )..close();
+  // 실루엣(연속 윤곽): SVG fan-outline path 그대로 정규화 이식(하단 v3 꼬리 포함).
+  final silhouette = _appendCloseTail(
+    Path()
+      ..moveTo(_depOuterStart.dx, _depOuterStart.dy)
+      ..arcToPoint(
+        _arrOuterEnd,
+        radius: const Radius.circular(_rOuter),
+        clockwise: true,
+      )
+      ..lineTo(_arrInnerEnd.dx, _arrInnerEnd.dy)
+      ..lineTo(_closeNotchRight.dx, _closeNotchRight.dy),
+  )..close();
   final dividers = Path()
     ..moveTo(_depInnerStart.dx, _depInnerStart.dy)
     ..lineTo(_depOuterEnd.dx, _depOuterEnd.dy)

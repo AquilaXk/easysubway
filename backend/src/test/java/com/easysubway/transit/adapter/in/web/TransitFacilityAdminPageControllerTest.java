@@ -57,7 +57,11 @@ class TransitFacilityAdminPageControllerTest {
 			.contains("확인 필요")
 			.contains("최근 확인된 정보")
 			.contains("name=\"status\"")
-			.contains("name=\"_csrf\"");
+			.contains("name=\"_csrf\"")
+			// #2313 PR②: 상태는 상태 텍스트(.admin-status, ● 점 + 텍스트)로, 갱신일은 상대 시간 + 정확한 날짜
+			// 병기로 렌더한다.
+			.contains("class=\"admin-status")
+			.contains("class=\"data-verified-relative\"");
 	}
 
 	@Test

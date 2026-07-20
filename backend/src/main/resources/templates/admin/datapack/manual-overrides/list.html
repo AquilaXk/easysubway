@@ -58,7 +58,7 @@
 					<label>expiresAt <input type="datetime-local" name="expiresAt" th:value="${overrideForm.expiresAt}" required></label>
 				</div>
 			</div>
-			<button type="submit">요청 저장</button>
+			<button type="submit" class="primary">요청 저장</button>
 		</form>
 	</section>
 
@@ -82,8 +82,8 @@
 				<option value="created" th:selected="${filter.selectedSort('created')}">시작 최신순</option>
 			</select>
 			<input type="hidden" name="candidateId" th:if="${filter.hasCandidate()}" th:value="${filter.candidateValue}">
-			<button type="submit">검색</button>
-			<a class="admin-btn" th:href="@{/admin/datapack/manual-overrides/page}">초기화</a>
+			<button type="submit" class="outline">검색</button>
+			<a class="admin-btn plain" th:href="@{/admin/datapack/manual-overrides/page}">초기화</a>
 		</form>
 		<div class="table-filters" th:if="${filter.active()}">
 			<div class="filter-chips" aria-label="적용된 필터">
@@ -92,6 +92,8 @@
 				<span class="filter-chip" th:if="${filter.hasQuery()}" th:text="${'검색 ' + filter.queryValue}">검색</span>
 			</div>
 		</div>
+		<div class="admin-table-scroll" tabindex="0" role="group"
+		     aria-label="가로로 스크롤 가능한 수동 오버라이드 표">
 		<table class="static-table">
 			<thead>
 			<tr>
@@ -126,7 +128,7 @@
 					<span th:text="${row.entityId}">entity-id</span>
 				</td>
 				<td th:text="${row.fieldName}">field</td>
-				<td th:text="${row.beforeValue}">before</td>
+				<td th:insert="~{admin/fragments/missing-value :: value(${row.beforeValue}, '미상')}">before</td>
 				<td th:text="${row.afterValue}">after</td>
 				<td>
 					<span th:text="${row.reasonCode}">FIELD_CHECK</span>
@@ -138,20 +140,20 @@
 				</td>
 				<td th:text="${row.requestedBy}">requester</td>
 				<td>
-					<span th:text="${row.approvedBy}">approver</span>
-					<span th:text="${row.approvedAt}">approved-at</span>
+					<span th:insert="~{admin/fragments/missing-value :: value(${row.approvedBy}, '미상')}">approver</span>
+					<span th:insert="~{admin/fragments/missing-value :: value(${row.approvedAt}, '미상')}">—</span>
 				</td>
 				<td th:text="${row.approvalStatus}">APPROVED</td>
 				<td th:text="${row.conflictStatus}">NONE</td>
 				<td>
 					<span th:text="${row.strictRouteEligible ? 'strict 요청' : 'strict 아님'}">strict 아님</span>
-					<span th:text="${row.routeSafetyApprovedBy}">-</span>
+					<span th:insert="~{admin/fragments/missing-value :: value(${row.routeSafetyApprovedBy}, '미상')}">—</span>
 				</td>
 				<td>
 					<span th:text="${row.effectiveFrom}">2026-06-29T03:00</span>
 					<span th:text="${row.expiresAt}">2026-07-29T03:00</span>
 				</td>
-				<td th:text="${row.supersededBy}">-</td>
+				<td th:insert="~{admin/fragments/missing-value :: value(${row.supersededBy}, '미상')}">—</td>
 				<td th:text="${row.productionStatus}">candidate 가능</td>
 				<td>
 					<form class="admin-form" method="post" th:action="@{'/admin/datapack/manual-overrides/' + ${row.id} + '/approve'}">
@@ -162,7 +164,7 @@
 							<span class="sr-only">승인 사유</span>
 							<input name="reason" value="manual override reviewed" required>
 						</label>
-						<button type="submit">승인 저장</button>
+						<button type="submit" class="primary">승인 저장</button>
 					</form>
 					<form class="admin-form" method="post" th:action="@{'/admin/datapack/manual-overrides/' + ${row.id} + '/expire'}">
 						<input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
@@ -172,12 +174,13 @@
 							<span class="sr-only">만료 사유</span>
 							<input name="reason" value="manual override expired" required>
 						</label>
-						<button type="submit">만료 저장</button>
+						<button type="submit" class="danger">만료 저장</button>
 					</form>
 				</td>
 			</tr>
 			</tbody>
 		</table>
+		</div>
 	</section>
 </main>
 </div>

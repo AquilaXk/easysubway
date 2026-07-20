@@ -13,32 +13,57 @@ import 'package:easysubway_mobile/network_map.dart'
         fanMenuDisabledSlots,
         fanMenuShouldClear,
         fanMenuWidthForViewport,
-        fanMenuPlacement;
+        fanMenuPlacement,
+        fanMenuTransferAnchor;
+import 'package:easysubway_mobile/features/network_map/presentation/station_fan_menu_geometry.dart'
+    show kFanMenuDesignSize, kFanMenuTailTip;
 
 void main() {
   group('fanMenuPlacement 배치 규칙(build·카메라 패닝 공유)', () {
-    test('위쪽 공간이 충분하면 메뉴를 노드 위에 놓는다(placeBelow=false)', () {
-      // 상단 경계에서 충분히 떨어진 역: 위쪽에 메뉴 하단이 오도록 배치.
+    test('항상 노드 위에 배치하고 꼬리 팁이 앵커 노드에 닿는다(#2192)', () {
+      // 상단 경계에서 충분히 떨어진 역: 꼬리 팁(y=375/380)이 노드에 오도록 배치.
       final placement = fanMenuPlacement(
         stationPoint: const Offset(200, 400),
         viewport: const Size(400, 800),
         clampPosition: false,
       );
-      expect(placement.placeBelow, isFalse);
-      // top = dy - menuHeight - 8 (menuHeight ≈ 141.14).
-      expect(placement.top, closeTo(400 - placement.menuHeight - 8, 0.001));
+      // top = dy - menuHeight * (팁 y / design height).
+      expect(
+        placement.top,
+        closeTo(
+          400 -
+              placement.menuHeight *
+                  (kFanMenuTailTip.dy / kFanMenuDesignSize.height),
+          0.001,
+        ),
+      );
       expect(placement.revealBounds.top, placement.top);
+      // 꼬리 팁의 뷰포트 좌표 = 앵커 노드 좌표(정중앙 접촉).
+      final tipX =
+          placement.left +
+          placement.menuWidth * (kFanMenuTailTip.dx / kFanMenuDesignSize.width);
+      final tipY =
+          placement.top +
+          placement.menuHeight *
+              (kFanMenuTailTip.dy / kFanMenuDesignSize.height);
+      expect(tipX, closeTo(200, 0.001));
+      expect(tipY, closeTo(400, 0.001));
     });
 
-    test('상단 경계 인근이면 메뉴를 노드 아래로 뒤집는다(placeBelow=true)', () {
-      // 위쪽 공간 부족(dy - menuHeight - 8 < 8): 노드 아래 배치로 전환.
+    test('flip 제거: 상단 경계 인근이어도 위 배치 유지(top이 음수여도 뒤집지 않음)', () {
+      // 위쪽 공간이 부족해도 노드 아래로 뒤집지 않는다 — 카메라 패닝 헤드룸이
+      // 메뉴 전체를 노출한다(#2192). clampPosition:false는 이상적(패닝 대상) 배치.
       final placement = fanMenuPlacement(
         stationPoint: const Offset(200, 10),
         viewport: const Size(400, 800),
         clampPosition: false,
       );
-      expect(placement.placeBelow, isTrue);
-      expect(placement.top, closeTo(10 + 28, 0.001));
+      final expectedTop =
+          10 -
+          placement.menuHeight *
+              (kFanMenuTailTip.dy / kFanMenuDesignSize.height);
+      expect(placement.top, closeTo(expectedTop, 0.001));
+      expect(placement.top, lessThan(0)); // 노드 위로 나가되 아래로 뒤집지 않는다.
       expect(placement.revealBounds.height, placement.menuHeight);
     });
 
@@ -128,6 +153,81 @@ void main() {
           ),
         );
       }
+    });
+  });
+
+  group('fanMenuTransferAnchor 환승 캡슐 시각 중심(#2192, 렌더 규칙 재사용)', () {
+    // designScale=1이라 designSpread = 멤버 최대 쌍거리(px). 임계는 렌더러와 동일
+    // (stackedMax=8, spanMax=16, separateMin=28).
+    test('멤버 2개 미만이면 일반역으로 보고 탭 좌표 그대로', () {
+      final anchor = fanMenuTransferAnchor(
+        memberPositions: const [Offset(3, 7)],
+        tappedPosition: const Offset(3, 7),
+        designScale: 1,
+      );
+      expect(anchor, const Offset(3, 7));
+    });
+
+    test('스택(소이격)은 멤버 평균 중심', () {
+      // spread=5 ≤ 8 → 평균 (2.5, 0).
+      final anchor = fanMenuTransferAnchor(
+        memberPositions: const [Offset(0, 0), Offset(5, 0)],
+        tappedPosition: const Offset(0, 0),
+        designScale: 1,
+      );
+      expect(anchor.dx, closeTo(2.5, 0.001));
+      expect(anchor.dy, closeTo(0, 0.001));
+    });
+
+    test('스팬(소이격 평행)은 멤버 bounds 중심', () {
+      // 8 < spread(12) ≤ 16 → bounds 중심 (6, 0). inflate는 대칭이라 중심 불변.
+      final anchor = fanMenuTransferAnchor(
+        memberPositions: const [Offset(0, 0), Offset(12, 0)],
+        tappedPosition: const Offset(0, 0),
+        designScale: 1,
+      );
+      expect(anchor.dx, closeTo(6, 0.001));
+      expect(anchor.dy, closeTo(0, 0.001));
+    });
+
+    test('강등 스택(스팬 상한~분리 하한)은 평균 중심', () {
+      // 16 < spread(20) ≤ 28 → 평균 (10, 0).
+      final anchor = fanMenuTransferAnchor(
+        memberPositions: const [Offset(0, 0), Offset(20, 0)],
+        tappedPosition: const Offset(0, 0),
+        designScale: 1,
+      );
+      expect(anchor.dx, closeTo(10, 0.001));
+      expect(anchor.dy, closeTo(0, 0.001));
+    });
+
+    test('분리(대이격)는 탭한 멤버의 캡슐 중심', () {
+      // spread(40) > 28 → separate. 탭한 멤버 좌표를 앵커로.
+      final anchor = fanMenuTransferAnchor(
+        memberPositions: const [Offset(0, 0), Offset(40, 0)],
+        tappedPosition: const Offset(40, 0),
+        designScale: 1,
+      );
+      expect(anchor, const Offset(40, 0));
+    });
+
+    test('designScale이 모드 임계를 스케일한다(렌더러와 동일 값 소비)', () {
+      // 비대칭 3멤버: 평균(4,0) ≠ bounds 중심(5,0)이라 모드를 구분할 수 있다.
+      const members = [Offset(0, 0), Offset(2, 0), Offset(10, 0)];
+      // designScale=1 → spread=10 → 스팬 → bounds 중심 (5,0).
+      final span = fanMenuTransferAnchor(
+        memberPositions: members,
+        tappedPosition: const Offset(0, 0),
+        designScale: 1,
+      );
+      expect(span.dx, closeTo(5, 0.001));
+      // designScale=0.5 → spread=5 ≤ 8 → 스택 → 평균 (4,0).
+      final stacked = fanMenuTransferAnchor(
+        memberPositions: members,
+        tappedPosition: const Offset(0, 0),
+        designScale: 0.5,
+      );
+      expect(stacked.dx, closeTo(4, 0.001));
     });
   });
 

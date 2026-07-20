@@ -120,13 +120,20 @@ class AdminOverviewPageController {
 			health.status(),
 			health.service()
 		));
+		// 데이터팩 출시 준비: 권한 있을 때만 조회. 상세 표의 차단 요인 행은 0건을 숨기고 비-0만 노출한다(#2349).
+		DatapackReleaseBlockerSummaryUseCase.DatapackReleaseBlockerSummary datapackSummary = null;
 		if (AdminAuthorization.hasPermission(authentication, AdminPermission.DATAPACK_READ)) {
-			model.addAttribute("datapackReleaseSummary", datapackReleaseBlockerSummaryUseCase.summarize());
+			datapackSummary = datapackReleaseBlockerSummaryUseCase.summarize();
+			model.addAttribute("datapackReleaseSummary", datapackSummary);
 		}
+		List<DatapackBlockerRow> datapackBlockerRows = datapackBlockerRows(datapackSummary);
+		model.addAttribute("datapackBlockerRows", datapackBlockerRows);
+		model.addAttribute("datapackHiddenBlockerRowCount", DATAPACK_BLOCKER_ROW_TOTAL - datapackBlockerRows.size());
 
 		// 핵심 카드: 현재 값 + 7일 스파크라인 + 전일 대비. 화면 권한이 있는 카드만 노출(역할 인지).
 		long pending = count(reportCounts, FacilityReportStatus.SUBMITTED)
 			+ count(reportCounts, FacilityReportStatus.UNDER_REVIEW);
+		long needsVerification = quality.needsVerificationFacilityCount();
 		double blockedRate = routes.totalCount() == 0
 			? 0.0 : (double) routes.blockedCount() * 100 / routes.totalCount();
 		List<AdminProgram> visible = AdminProgram.visibleTo(authentication);
@@ -136,7 +143,6 @@ class AdminOverviewPageController {
 				AdminMetricKeys.REPORTS_PENDING, pending, String.valueOf(pending)));
 		}
 		if (visible.contains(AdminProgram.FACILITIES)) {
-			long needsVerification = quality.needsVerificationFacilityCount();
 			cards.add(dashboardCardService.card("확인 필요 시설", AdminProgram.FACILITIES.path(),
 				AdminMetricKeys.FACILITIES_NEEDS_VERIFICATION, needsVerification, String.valueOf(needsVerification)));
 		}
@@ -149,6 +155,20 @@ class AdminOverviewPageController {
 				AdminMetricKeys.PUSH_FAILED, push.failedCount(), String.valueOf(push.failedCount())));
 		}
 		model.addAttribute("cards", cards);
+
+		// 확인 필요(#2349): 트리아지 최우선 통합 카드. 제보·시설·데이터팩 차단 요인 중 0건인 항목은 뺀다.
+		List<TriageItem> triageItems = new ArrayList<>();
+		if (visible.contains(AdminProgram.REPORTS) && pending > 0) {
+			triageItems.add(new TriageItem("확인할 제보", AdminProgram.REPORTS.path(), pending));
+		}
+		if (visible.contains(AdminProgram.FACILITIES) && needsVerification > 0) {
+			triageItems.add(new TriageItem("확인 필요 시설", AdminProgram.FACILITIES.path(), needsVerification));
+		}
+		if (datapackSummary != null && datapackSummary.totalBlockers() > 0) {
+			triageItems.add(new TriageItem(
+				"데이터팩 차단 요인", "#dashboard-datapack-readiness", datapackSummary.totalBlockers()));
+		}
+		model.addAttribute("triageItems", triageItems);
 
 		// 긴급 줄: 알림 센터 신호 요약(있을 때만). 지표 스냅샷 마지막 실행 상태.
 		model.addAttribute("alertSummary", alertService.summarize(authentication));
@@ -183,7 +203,7 @@ class AdminOverviewPageController {
 
 	private TrendChart trendChart(String id, String title, List<String> keys, int days) {
 		AdminMetricChart chart = metricQueryService.chart(keys, days);
-		return new TrendChart(id, title, chart, toJson(chart));
+		return new TrendChart(id, title, chart, toJson(chart), chart.empty());
 	}
 
 	// Chart.js가 읽을 데이터 섬(JSON). 직렬화 실패 시 빈 차트로 안전 폴백.
@@ -195,7 +215,11 @@ class AdminOverviewPageController {
 		}
 	}
 
-	record TrendChart(String id, String title, AdminMetricChart data, String json) {
+	// empty는 조회 기간 내 데이터가 전무한지(#2327) — dashboard-trends fragment가 canvas 대신 empty-state를
+	// 렌더하는 분기에 쓴다. 파생 메서드가 아니라 canonical record 컴포넌트로 둔 이유: SpringEL 프로퍼티 접근
+	// (${trend.empty})은 package-private 클래스에서 일반 getter(isXxx) reflection을 "public 클래스만" 허용해
+	// 실패하지만, record 컴포넌트 accessor는 별도 특례 경로로 접근 가능하다.
+	record TrendChart(String id, String title, AdminMetricChart data, String json, boolean empty) {
 	}
 
 	// 지표 스냅샷 수동 재실행(#1739). 스케줄과 별개로 지금 즉시 오늘 집계를 다시 돌린다(멱등).
@@ -236,6 +260,48 @@ class AdminOverviewPageController {
 			return "0.0%";
 		}
 		return "%.1f%%".formatted((double) summary.blockedCount() * 100 / summary.totalCount());
+	}
+
+	// 데이터팩 출시 준비 상세 표(#2349, #2352 리뷰로 10개로 확장): 후보 게이트·별칭·격리·소스 최신성·
+	// 수동 오버라이드·시설 근거·경로 게이트·콜백 정합성 확인·증거 번들 검증·매니페스트 서명 10개 차단 요인
+	// 카테고리 중 0건은 숨기고 비-0만 노출한다(뷰 모델 한정 가공, DatapackReleaseBlockerSummaryUseCase
+	// 집계 로직은 변경하지 않는다). 10개 행의 합은 항상 datapackReleaseSummary.totalBlockers()와
+	// 일치해야 한다(트리아지 카드·blocker-total 표기와의 정합, #2352 리뷰 지적).
+	private static final int DATAPACK_BLOCKER_ROW_TOTAL = 10;
+
+	private static List<DatapackBlockerRow> datapackBlockerRows(
+		DatapackReleaseBlockerSummaryUseCase.DatapackReleaseBlockerSummary summary
+	) {
+		if (summary == null) {
+			return List.of();
+		}
+		List<DatapackBlockerRow> rows = new ArrayList<>();
+		addBlockerRow(rows, "후보 게이트", summary.candidateGateBlockers());
+		addBlockerRow(rows, "별칭", summary.aliasBlockers());
+		addBlockerRow(rows, "격리", summary.quarantineBlockers());
+		addBlockerRow(rows, "소스 최신성", summary.sourceFreshnessBlockers());
+		addBlockerRow(rows, "수동 오버라이드", summary.manualOverrideBlockers());
+		addBlockerRow(rows, "시설 근거", summary.facilityBlockers());
+		addBlockerRow(rows, "경로 게이트", summary.routeGateBlockers());
+		addBlockerRow(rows, "콜백 정합성 확인", summary.callbackReconciliationBlockers());
+		// "증거 번들" 단독 라벨은 위 sha·워크플로 상세 표의 evidenceBundleSha256 행(같은 details 안,
+		// 같은 <th scope="row">증거 번들</th> 마크업)과 충돌해 "증거 번들 검증"으로 구분한다(#2352 리뷰).
+		addBlockerRow(rows, "증거 번들 검증", summary.evidenceBundleBlockers());
+		addBlockerRow(rows, "매니페스트 서명", summary.manifestBlockers());
+		return rows;
+	}
+
+	private static void addBlockerRow(List<DatapackBlockerRow> rows, String label, long count) {
+		if (count > 0) {
+			rows.add(new DatapackBlockerRow(label, count));
+		}
+	}
+
+	// 확인 필요 통합 카드(#2349)의 행 하나. count는 항상 0보다 크다(0건 항목은 컨트롤러에서 걸러진다).
+	record TriageItem(String label, String href, long count) {
+	}
+
+	record DatapackBlockerRow(String label, long count) {
 	}
 
 	record DashboardView(

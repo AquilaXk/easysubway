@@ -70,6 +70,12 @@ const capitalIntegratedAdditionalStepsJson =
 class CatalogDatabase extends _$CatalogDatabase {
   CatalogDatabase(super.executor);
 
+  Set<String> _routeNetworkEdgeColumnNames = const {};
+  Set<String> _routeFacilityColumnNames = const {};
+
+  Set<String> get routeNetworkEdgeColumnNames => _routeNetworkEdgeColumnNames;
+  Set<String> get routeFacilityColumnNames => _routeFacilityColumnNames;
+
   factory CatalogDatabase.file(File file) {
     return CatalogDatabase(NativeDatabase.createInBackground(file));
   }
@@ -172,8 +178,19 @@ class CatalogDatabase extends _$CatalogDatabase {
       },
       beforeOpen: (_) async {
         await customStatement('PRAGMA foreign_keys = ON');
+        await refreshRouteSchemaCapabilities();
       },
     );
+  }
+
+  Future<void> refreshRouteSchemaCapabilities() async {
+    _routeNetworkEdgeColumnNames = await _tableColumnNames('network_edges');
+    _routeFacilityColumnNames = await _tableColumnNames('facilities');
+  }
+
+  Future<Set<String>> _tableColumnNames(String tableName) async {
+    final rows = await customSelect('PRAGMA table_info($tableName)').get();
+    return Set.unmodifiable({for (final row in rows) row.read<String>('name')});
   }
 
   Future<void> seedBaselineIfEmpty() async {
@@ -459,7 +476,7 @@ class CatalogDatabase extends _$CatalogDatabase {
             installationStatus: const Value('INSTALLED'),
             floorFrom: const Value('B1'),
             floorTo: const Value('1F'),
-            description: const Value('안내를 준비 중인 이동 보조 시설'),
+            description: const Value(''),
           ),
           FacilitiesCompanion.insert(
             id: 'facility-sangnoksu-accessible-toilet-1',

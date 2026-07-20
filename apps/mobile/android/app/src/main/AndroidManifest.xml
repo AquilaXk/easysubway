@@ -6,6 +6,9 @@
     <!-- 하차 알림(#1766) 시간표 기반 정확 예약용. 거부 시 부정확 예약으로 강등한다.
          알람·캘린더 앱 전용인 USE_EXACT_ALARM은 Play 정책상 사용하지 않는다. -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+    <!-- 하차 알림(#2154) 재부팅·package replace 뒤 예약 자동 복원용. WorkManager(#1768)도
+         같은 권한을 병합한다. normal 권한이라 프롬프트가 없고 데이터를 수집하지 않는다. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <!-- #1768은 regular periodic WorkManager만 사용한다. long-running foreground
          worker를 도입할 때 별도 Play/permission 검토 후 복원한다. -->
     <uses-permission
@@ -69,6 +72,19 @@
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
             android:exported="false" />
+        <!-- 하차 알림(#2154) 재부팅·package replace 뒤 예약을 앱 실행 없이 복원한다.
+             flutter_local_notifications 공식 boot receiver를 exported=false로 고정하고
+             네 부팅 계열 action을 명시 선언한다. -->
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
@@ -81,6 +97,9 @@
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService"/>
+        </intent>
         <intent>
             <action android:name="android.intent.action.VIEW"/>
             <data android:scheme="kakaomap"/>

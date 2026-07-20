@@ -21,6 +21,8 @@
 		</div>
 	</header>
 
+	<div class="admin-table-scroll" tabindex="0" role="group"
+	     aria-label="가로로 스크롤 가능한 데이터 표">
 	<table>
 		<thead>
 		<tr>
@@ -35,7 +37,7 @@
 		</thead>
 		<tbody>
 		<tr th:if="${verifications.isEmpty()}">
-				<td colspan="7">현장 확인 기록이 없습니다.</td>
+				<td colspan="7"><div th:replace="~{admin/fragments/empty-state :: panel('현장 확인 기록이 없습니다.', '확인 대상이 등록되면 여기에 표시됩니다.')}"></div></td>
 		</tr>
 		<tr th:each="verification : ${verifications}">
 			<td>
@@ -48,11 +50,12 @@
 			<td th:text="|${verification.verifiedCount} / ${verification.itemCount}|">0 / 0</td>
 			<td th:text="${verification.recheckCount}">0</td>
 			<td>
-				<a class="admin-btn" th:href="@{/admin/field-verifications/{stationId}/page(stationId=${verification.stationId})}">상세</a>
+				<a class="admin-btn outline" th:href="@{/admin/field-verifications/{stationId}/page(stationId=${verification.stationId})}">상세</a>
 			</td>
 		</tr>
 		</tbody>
 	</table>
+	</div>
 		<div th:replace="~{admin/fragments/pagination :: pager('현장 확인 목록 페이지', ${page}, ${paginationLinks})}"></div>
 </main>
 </div>

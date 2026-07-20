@@ -24,7 +24,7 @@
 			<p>사진·위치·설명·중복 후보·감사 이력을 보고 승인·반려·중복 판정합니다.</p>
 		</div>
 		<div class="admin-actions">
-			<a class="admin-btn" th:href="@{/admin/reports/page}">목록으로</a>
+			<a class="admin-btn plain" th:href="@{/admin/reports/page}">목록으로</a>
 		</div>
 	</header>
 	<h1 class="sr-only">신고 상세</h1>
@@ -34,7 +34,7 @@
 	</div>
 	<div th:replace="~{admin/fragments/form-errors :: summary}"></div>
 
-	<section>
+	<section class="admin-panel">
 		<h2>신고 내용</h2>
 		<dl>
 			<dt>신고 번호</dt>
@@ -54,7 +54,7 @@
 			<dt>시설</dt>
 			<dd th:text="${facilityLabel}">엘리베이터(facility-id)</dd>
 			<dt th:if="${report.correctionOverrideHref != null}">임시 override</dt>
-			<dd th:if="${report.correctionOverrideHref != null}"><a class="admin-btn" th:href="@{__${report.correctionOverrideHref}__}">manual override 요청</a></dd>
+			<dd th:if="${report.correctionOverrideHref != null}"><a class="admin-btn outline" th:href="@{__${report.correctionOverrideHref}__}">manual override 요청</a></dd>
 			<dt>신고자</dt>
 			<dd th:text="${report.userId}">user-id</dd>
 			<dt>좌표</dt>
@@ -64,7 +64,7 @@
 		</dl>
 	</section>
 
-	<section>
+	<section class="admin-panel">
 		<h2>사진</h2>
 		<dl>
 			<dt>파일명</dt>
@@ -82,7 +82,7 @@
 		</dl>
 	</section>
 
-	<section>
+	<section class="admin-panel">
 		<h2>확인 기록</h2>
 		<dl>
 			<dt>확인한 사람</dt>
@@ -94,10 +94,14 @@
 		</dl>
 	</section>
 
-	<section>
+	<section class="admin-panel">
 		<h2>감사 이력</h2>
-		<p th:if="${reviewAudits.isEmpty()}">없음</p>
-		<table th:if="${!reviewAudits.isEmpty()}">
+		<div th:if="${reviewAudits.isEmpty()}">
+			<div th:replace="~{admin/fragments/empty-state :: panel('확인 이력이 없습니다.', '제보를 승인·반려하면 여기에 기록됩니다.')}"></div>
+		</div>
+		<div class="admin-table-scroll" tabindex="0" role="group"
+		     aria-label="가로로 스크롤 가능한 데이터 표" th:if="${!reviewAudits.isEmpty()}">
+		<table>
 			<thead>
 			<tr>
 				<th>확인한 사람</th>
@@ -117,13 +121,18 @@
 			</tr>
 			</tbody>
 		</table>
+		</div>
 	</section>
 
-	<section>
+	<section class="admin-panel">
 		<h2>같은 시설 신고</h2>
 		<!-- 같은 역·시설의 다른 신고(#1740): 판정 전 반복 신고 맥락을 준다. 읽기 전용 목록으로 #1163 병합과 독립. -->
-		<p th:if="${sameFacilityReports.isEmpty()}">같은 시설의 다른 신고가 없습니다.</p>
-		<table th:if="${!sameFacilityReports.isEmpty()}">
+		<div th:if="${sameFacilityReports.isEmpty()}">
+			<div th:replace="~{admin/fragments/empty-state :: panel('같은 시설의 다른 신고가 없습니다.', '같은 시설에 신고가 접수되면 여기에 표시됩니다.')}"></div>
+		</div>
+		<div class="admin-table-scroll" tabindex="0" role="group"
+		     aria-label="가로로 스크롤 가능한 데이터 표" th:if="${!sameFacilityReports.isEmpty()}">
+		<table>
 			<thead>
 			<tr>
 				<th scope="col">상태</th>
@@ -143,6 +152,7 @@
 			</tr>
 			</tbody>
 		</table>
+		</div>
 	</section>
 
 	<form class="review-form"
@@ -154,9 +164,11 @@
 			기준 신고 ID
 			<input name="duplicateOfReportId" type="text" autocomplete="off" placeholder="중복 처리할 때 입력" th:value="${reviewForm.duplicateOfReportId}">
 		</label>
-		<button type="submit" name="decision" value="ACCEPT">승인</button>
+		<!-- 버튼 위계 계약(V6-08 #2280, outline 이관 #2313): 승인 primary(대표 액션), 반려 danger(파괴적),
+		     중복 처리 outline(보조)로 화면당 filled 1개 원칙을 지킨다. -->
+		<button class="primary" type="submit" name="decision" value="ACCEPT">승인</button>
 		<button class="danger" type="submit" name="decision" value="REJECT">반려</button>
-		<button class="secondary" type="submit" name="decision" value="MARK_DUPLICATE">중복 처리</button>
+		<button class="outline" type="submit" name="decision" value="MARK_DUPLICATE">중복 처리</button>
 	</form>
 	</div>
 </main>

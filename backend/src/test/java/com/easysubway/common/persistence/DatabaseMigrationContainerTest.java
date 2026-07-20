@@ -3,23 +3,39 @@ package com.easysubway.common.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.easysubway.collection.adapter.out.persistence.JdbcDataCollectionRunRepository;
+import com.easysubway.collection.domain.DataCollectionSource;
+import com.easysubway.datapack.adapter.out.persistence.JdbcDatapackReleaseDeliveryRepository;
+import com.easysubway.datapack.domain.DatapackReleaseDelivery;
 import com.easysubway.route.adapter.out.persistence.JdbcRouteV2AccessStore;
 import com.easysubway.route.application.port.out.RouteV2AccessStore.RouteV2Session;
 import com.easysubway.route.application.port.out.RouteV2AccessStore.SessionStatus;
+import com.easysubway.train.adapter.out.persistence.JdbcTrainSearchCache;
+import com.easysubway.train.application.TrainSearchCache.CachedLeg;
 import com.zaxxer.hikari.HikariDataSource;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.Duration;
+import java.time.ZoneId;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationVersion;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessException;
+import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
+import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -60,6 +76,7 @@ class DatabaseMigrationContainerTest {
 				"datapack_candidates",
 				"datapack_candidate_inputs",
 				"datapack_release_evidence_bundles",
+				"datapack_release_deliveries",
 				"datapack_release_channels",
 				"datapack_release_channel_events",
 				"external_alias_approvals",
@@ -72,9 +89,15 @@ class DatabaseMigrationContainerTest {
 				"route_v2_sessions",
 				"route_v2_states",
 				"transit_master_overrides",
-				"transit_master_override_audits"
+				"transit_master_override_audits",
+				"timetable_snapshot_lock",
+				"timetable_snapshot_history",
+				"timetable_snapshot_active",
+				"train_catalog_cache",
+				"train_search_cache",
+				"train_provider_call_quota_state"
 			);
-		assertThat(successfulMigrationVersions(jdbcTemplate)).contains("1", "14", "16", "17", "18", "19", "20", "21", "22", "23", "25", "26", "48", "51", "52", "53", "54", "55", "56", "57");
+		assertThat(successfulMigrationVersions(jdbcTemplate)).contains("1", "14", "16", "17", "18", "19", "20", "21", "22", "23", "25", "26", "48", "51", "52", "53", "54", "55", "56", "57", "59", "60", "61", "65");
 		assertThat(jdbcTemplate.queryForObject("""
 			SELECT COUNT(*)
 			FROM pg_index i
@@ -106,7 +129,8 @@ class DatabaseMigrationContainerTest {
 				"fk_datapack_release_channels_candidate",
 				"fk_datapack_release_channels_previous_candidate",
 				"fk_datapack_release_channel_events_channel",
-				"fk_datapack_release_channel_events_next_candidate"
+				"fk_datapack_release_channel_events_next_candidate",
+				"fk_timetable_snapshot_active_history"
 			);
 		assertThat(checkConstraintNames(jdbcTemplate))
 			.contains(
@@ -135,9 +159,19 @@ class DatabaseMigrationContainerTest {
 				"chk_datapack_candidates_gate_status",
 				"chk_datapack_candidates_approval_status",
 				"chk_datapack_release_evidence_status",
+				"chk_datapack_release_delivery_state",
+				"chk_datapack_release_delivery_sequence",
 				"chk_datapack_release_channels_operation",
 				"chk_datapack_release_channels_rollback_target",
-				"chk_datapack_release_channel_events_operation"
+				"chk_datapack_release_channel_events_operation",
+				"chk_timetable_snapshot_lock_singleton",
+				"chk_timetable_snapshot_counts",
+				"chk_timetable_snapshot_active_singleton",
+				"chk_train_catalog_cache_hash",
+				"chk_train_catalog_cache_expiry",
+				"chk_train_search_cache_payload",
+				"chk_train_search_cache_lease",
+				"chk_train_provider_call_quota_counts"
 			);
 		assertNormalizationRunGuards(jdbcTemplate);
 		assertSnapshotSourceForeignKeysRejectMismatch(jdbcTemplate);
@@ -150,7 +184,196 @@ class DatabaseMigrationContainerTest {
 		assertRouteEdgeEvidenceStrictRouteGuards(jdbcTemplate);
 		assertDatapackPermissionMatrix(jdbcTemplate);
 		assertRouteServiceIdentityHashGuards(jdbcTemplate);
+		assertRouteServiceSourceIssueGuards(jdbcTemplate);
 		assertRouteV2AllowlistSchema(jdbcTemplate);
+	}
+
+	@Test
+	@DisplayName("PostgreSQL transaction 안의 동일 callback replay는 오류 없이 한 row로 수렴한다")
+	void postgresqlCallbackReplayIsIdempotentInsideTransaction() {
+		String schema = "datapack_callback_replay_" + System.nanoTime();
+		var migrationDataSource = new DriverManagerDataSource(
+			POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+		migrate(migrationDataSource, "classpath:db/migration/postgresql", schema);
+		try (var dataSource = new HikariDataSource()) {
+			dataSource.setJdbcUrl(POSTGRES.getJdbcUrl());
+			dataSource.setUsername(POSTGRES.getUsername());
+			dataSource.setPassword(POSTGRES.getPassword());
+			dataSource.setSchema(schema);
+			var jdbcTemplate = new JdbcTemplate(dataSource);
+			var repository = new JdbcDatapackReleaseDeliveryRepository(jdbcTemplate);
+			var transaction = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
+			var now = java.time.LocalDateTime.parse("2026-07-16T00:00:00");
+			var delivery = DatapackReleaseDelivery.pending(
+				"request-2057", 42, "a".repeat(64), "production", "candidate-2057",
+				"b".repeat(64), "c".repeat(64), now);
+
+			transaction.executeWithoutResult(ignored -> {
+				repository.upsertSameDelivery(delivery);
+				repository.upsertSameDelivery(delivery);
+				assertThat(jdbcTemplate.queryForObject(
+					"SELECT COUNT(*) FROM datapack_release_deliveries", Integer.class)).isEqualTo(1);
+			});
+		}
+	}
+
+	@Test
+	@DisplayName("PostgreSQL 기차검색 cache는 lease 경쟁과 KST quota window를 원자적으로 조정한다")
+	void postgresqlTrainSearchCacheCoordinatesLeaseAndQuota() throws Exception {
+		String schema = "train_search_cache_" + System.nanoTime();
+		var migrationDataSource = new DriverManagerDataSource(
+			POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+		migrate(migrationDataSource, "classpath:db/migration/postgresql", schema);
+		try (var dataSource = new HikariDataSource()) {
+			dataSource.setJdbcUrl(POSTGRES.getJdbcUrl());
+			dataSource.setUsername(POSTGRES.getUsername());
+			dataSource.setPassword(POSTGRES.getPassword());
+			dataSource.setSchema(schema);
+			var target = new JdbcTrainSearchCache(dataSource);
+			var factory = new ProxyFactory(target);
+			factory.setProxyTargetClass(true);
+			factory.addAdvice(new TransactionInterceptor(
+				new DataSourceTransactionManager(dataSource),
+				new AnnotationTransactionAttributeSource()
+			));
+			var repository = (JdbcTrainSearchCache) factory.getProxy();
+			var jdbcTemplate = new JdbcTemplate(dataSource);
+
+			int callers = 8;
+			var ready = new CountDownLatch(callers);
+			var start = new CountDownLatch(1);
+			var acquired = new AtomicInteger();
+			var failed = new AtomicInteger();
+			var executor = Executors.newFixedThreadPool(callers);
+			try {
+				for (int index = 0; index < callers; index++) {
+					String owner = "owner-" + index;
+					executor.submit(() -> {
+						ready.countDown();
+						start.await();
+						try {
+							if (repository.tryAcquireLease("shared", owner, Instant.EPOCH, Duration.ofSeconds(15))) {
+								acquired.incrementAndGet();
+							}
+						} catch (RuntimeException exception) {
+							failed.incrementAndGet();
+						}
+						return null;
+					});
+				}
+				assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+				start.countDown();
+				executor.shutdown();
+				assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+				assertThat(failed).hasValue(0);
+				assertThat(acquired).hasValue(1);
+			} finally {
+				executor.shutdownNow();
+			}
+
+			ZoneId korea = ZoneId.of("Asia/Seoul");
+			assertThat(repository.tryAcquireProviderCall("tago-train", korea, 1, 1)).isTrue();
+			assertThat(repository.tryAcquireProviderCall("tago-train", korea, 1, 1)).isFalse();
+			jdbcTemplate.update("""
+				UPDATE train_provider_call_quota_state
+				SET minute_window = minute_window - 1, minute_calls = 99,
+					day_window = day_window - 1, daily_calls = 99
+				WHERE provider_id = 'tago-train'
+				""");
+			assertThat(repository.tryAcquireProviderCall("tago-train", korea, 1, 1)).isTrue();
+			assertThat(jdbcTemplate.queryForMap("""
+				SELECT minute_calls, daily_calls FROM train_provider_call_quota_state
+				WHERE provider_id = 'tago-train'
+				"""))
+				.containsEntry("minute_calls", 1)
+				.containsEntry("daily_calls", 1);
+
+			// freshLeg/tryAcquireLease는 저장소의 CURRENT_TIMESTAMP(실시간 DB 시계)와 expires_at을
+			// 비교하므로 관측 시각을 실행 시점 기준 상대 시각으로 고정해 시간 의존성을 제거한다.
+			// 초 단위 절삭으로 DB 타임스탬프 정밀도에 따른 round-trip 불일치(contains(leg))도 방지한다.
+			Instant observedAt = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+			var leg = new CachedLeg(
+				"owned", "{}", "[]", "a".repeat(64), observedAt, observedAt.plusSeconds(300));
+			assertThat(repository.tryAcquireLease("owned", "owner-a", observedAt, Duration.ofSeconds(15))).isTrue();
+			assertThat(repository.storeLegAndRelease("owned", "owner-b", leg)).isFalse();
+			assertThat(repository.storeLegAndRelease("owned", "owner-a", leg)).isTrue();
+			assertThat(repository.freshLeg("owned", observedAt.plusSeconds(1))).contains(leg);
+			assertThat(repository.tryAcquireLease("owned", "owner-c", observedAt, Duration.ofSeconds(15))).isFalse();
+		}
+	}
+
+	@Test
+	@DisplayName("PostgreSQL V64는 재시도 index artifact를 교체하고 RUNNING source를 고유하게 만든다")
+	void postgresqlV64ReplacesRetryArtifactAndGuardsRunningSource() {
+		String schema = "batch_run_v64_retry_" + System.nanoTime();
+		var dataSource = new DriverManagerDataSource(
+			POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+		flyway(dataSource, "classpath:db/migration/postgresql", schema)
+			.target(MigrationVersion.fromVersion("63"))
+			.load()
+			.migrate();
+		var jdbcTemplate = new JdbcTemplate(dataSource);
+		jdbcTemplate.execute("CREATE INDEX ux_data_collection_runs_running_source ON "
+			+ schema + ".data_collection_runs (source)");
+
+		migrate(dataSource, "classpath:db/migration/postgresql", schema);
+
+		assertThat(jdbcTemplate.queryForObject("""
+			SELECT i.indisunique AND i.indisvalid AND i.indisready
+			FROM pg_index i
+			JOIN pg_class c ON c.oid = i.indexrelid
+			JOIN pg_namespace n ON n.oid = c.relnamespace
+			WHERE n.nspname = ?
+				AND c.relname = 'ux_data_collection_runs_running_source'
+			""", Boolean.class, schema)).isTrue();
+		insertLegacyRunningRun(jdbcTemplate, schema, "legacy-running-a");
+		assertThatThrownBy(() -> insertLegacyRunningRun(
+			jdbcTemplate,
+			schema,
+			"legacy-running-b"
+		)).isInstanceOf(DataAccessException.class);
+
+		try (var scopedDataSource = new HikariDataSource()) {
+			scopedDataSource.setJdbcUrl(POSTGRES.getJdbcUrl());
+			scopedDataSource.setUsername(POSTGRES.getUsername());
+			scopedDataSource.setPassword(POSTGRES.getPassword());
+			scopedDataSource.setSchema(schema);
+			var scopedJdbc = new JdbcTemplate(scopedDataSource);
+			var repository = new JdbcDataCollectionRunRepository(scopedDataSource);
+			LocalDateTime staleBefore = LocalDateTime.now().plusMinutes(1);
+			assertThat(repository.failOrphanedRunningRun(
+				DataCollectionSource.TRANSIT_MASTER,
+				staleBefore,
+				LocalDateTime.now(),
+				"배치 실행 소유권이 만료되어 고아 실행으로 정리되었습니다.",
+				"이전 실행이 비정상 종료되었습니다. 새 실행 결과를 확인하세요."
+			)).isTrue();
+
+			insertLegacyRunningRun(scopedJdbc, null, "legacy-running-live");
+			scopedJdbc.update("""
+				INSERT INTO BATCH_JOB_INSTANCE (JOB_INSTANCE_ID, VERSION, JOB_NAME, JOB_KEY)
+				VALUES (1, 0, 'transitMasterCollectionJob', 'live-job')
+				""");
+			scopedJdbc.update("""
+				INSERT INTO BATCH_JOB_EXECUTION (
+					JOB_EXECUTION_ID, VERSION, JOB_INSTANCE_ID, CREATE_TIME,
+					START_TIME, STATUS, LAST_UPDATED
+				) VALUES (1, 0, 1, ?, ?, 'STARTED', ?)
+				""", LocalDateTime.now(), LocalDateTime.now(), staleBefore.plusMinutes(1));
+			scopedJdbc.update("""
+				INSERT INTO BATCH_JOB_EXECUTION_PARAMS (
+					JOB_EXECUTION_ID, PARAMETER_NAME, PARAMETER_TYPE, PARAMETER_VALUE, IDENTIFYING
+				) VALUES (1, 'runId', 'java.lang.String', 'legacy-running-live', 'Y')
+				""");
+
+			assertThat(repository.failOrphanedRunningRun(
+				DataCollectionSource.TRANSIT_MASTER,
+				staleBefore,
+				LocalDateTime.now(),
+				"배치 실행 소유권이 만료되어 고아 실행으로 정리되었습니다.",
+				"이전 실행이 비정상 종료되었습니다. 새 실행 결과를 확인하세요."
+			)).isFalse();
+		}
 	}
 
 	@Test
@@ -400,7 +623,9 @@ class DatabaseMigrationContainerTest {
 			.load()
 			.migrate();
 
-		assertRouteServiceIdentityHashGuards(new JdbcTemplate(dataSource));
+		var jdbcTemplate = new JdbcTemplate(dataSource);
+		assertRouteServiceIdentityHashGuards(jdbcTemplate);
+		assertRouteServiceSourceIssueGuards(jdbcTemplate);
 	}
 
 	@Test
@@ -569,6 +794,18 @@ class DatabaseMigrationContainerTest {
 
 	private void migrate(javax.sql.DataSource dataSource, String location, String schema) {
 		flyway(dataSource, location, schema).load().migrate();
+	}
+
+	private void insertLegacyRunningRun(JdbcTemplate jdbcTemplate, String schema, String runId) {
+		String prefix = schema == null ? "" : schema + ".";
+		jdbcTemplate.update("""
+			INSERT INTO %sdata_collection_runs (
+				run_id, source, status, requested_by, started_at, completed_at,
+				collected_count, failure_message, retryable, operator_action
+			)
+			VALUES (?, 'TRANSIT_MASTER', 'RUNNING', 'legacy-admin', CURRENT_TIMESTAMP,
+				NULL, 0, NULL, FALSE, '수집 실행 중입니다.')
+			""".formatted(prefix), runId);
 	}
 
 	private org.flywaydb.core.api.configuration.FluentConfiguration flyway(
@@ -1254,6 +1491,27 @@ class DatabaseMigrationContainerTest {
 		assertThatThrownBy(() -> insertRouteServiceIdentity(
 			jdbcTemplate, validHash, validHash, "g".repeat(64)))
 			.isInstanceOf(DataAccessException.class);
+	}
+
+	private void assertRouteServiceSourceIssueGuards(JdbcTemplate jdbcTemplate) {
+		String validHash = "a".repeat(64);
+		jdbcTemplate.update("""
+			INSERT INTO route_service_artifact_evidence (
+				service_class, timetable_artifact_id, timetable_artifact_sha256,
+				canonical_pack_id, canonical_pack_sha256, canonical_pack_sqlite_sha256,
+				admission_status, admission_eligible, fresh_until, source_issue
+			) VALUES ('ITX_CHEONGCHUN', 'issue-2135-test', ?, 'capital', ?, ?,
+				'MISSING', FALSE, NULL, 2135)
+			""", validHash, validHash, validHash);
+		jdbcTemplate.update("DELETE FROM route_service_artifact_evidence WHERE service_class = 'ITX_CHEONGCHUN'");
+		assertThatThrownBy(() -> jdbcTemplate.update("""
+			INSERT INTO route_service_artifact_evidence (
+				service_class, timetable_artifact_id, timetable_artifact_sha256,
+				canonical_pack_id, canonical_pack_sha256, canonical_pack_sqlite_sha256,
+				admission_status, admission_eligible, fresh_until, source_issue
+			) VALUES ('ITX_CHEONGCHUN', 'invalid-source-issue-test', ?, 'capital', ?, ?,
+				'MISSING', FALSE, NULL, 9999)
+			""", validHash, validHash, validHash)).isInstanceOf(DataAccessException.class);
 	}
 
 	private void insertRouteServiceIdentity(

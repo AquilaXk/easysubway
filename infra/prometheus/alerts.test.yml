@@ -1,0 +1,110 @@
+# promtool test rules infra/prometheus/alerts.test.yml
+# 운행표 snapshot 잔여 유효기간 경보의 T-24h/T-6h 임계값을 시뮬레이션으로 검증한다.
+rule_files:
+  - alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  - interval: 1m
+    name: T-24h warning fires but not critical
+    input_series:
+      - series: 'easysubway_timetable_snapshot_remaining_seconds'
+        values: '43200x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: TimetableSnapshotFreshnessExpiringT24h
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              service: aquila-timetable-snapshot
+            exp_annotations:
+              summary: Timetable snapshot freshUntil expires within 24 hours
+              description: The server timetable snapshot freshUntil deadline is less than 24h away. The automatic re-collection workflow must have already run; owner regeneration/deploy may still be required.
+              title_ko: "운행표 snapshot 만료 24시간 전"
+              impact_ko: "재수집·재산출이 완료되지 않으면 만료 후 재시작 시 부팅 실패 위험이 있습니다."
+              action_ko: "timetable-auto-refresh 워크플로 실행 결과를 확인하고, UNCHANGED_AUTO 승격 산출물로 재산출·배포를 진행하세요."
+      - eval_time: 6m
+        alertname: TimetableSnapshotFreshnessExpiringT6h
+        exp_alerts: []
+
+  - interval: 1m
+    name: T-6h critical fires and warning suppressed
+    input_series:
+      - series: 'easysubway_timetable_snapshot_remaining_seconds'
+        values: '10800x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: TimetableSnapshotFreshnessExpiringT6h
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              service: aquila-timetable-snapshot
+            exp_annotations:
+              summary: Timetable snapshot freshUntil expires within 6 hours
+              description: The server timetable snapshot freshUntil deadline is less than 6h away or already passed. Regeneration and deploy of a refreshed snapshot are required before expiry.
+              title_ko: "운행표 snapshot 만료 6시간 전"
+              impact_ko: "만료 시점 이후 재시작하면 부팅 hard fail로 서비스 중단 위험이 있습니다."
+              action_ko: "즉시 재산출된 snapshot을 배포하거나 break-glass override 절차를 검토하세요."
+      - eval_time: 6m
+        alertname: TimetableSnapshotFreshnessExpiringT24h
+        exp_alerts: []
+
+  - interval: 1m
+    name: healthy snapshot stays silent
+    input_series:
+      - series: 'easysubway_timetable_snapshot_remaining_seconds'
+        values: '500000x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: TimetableSnapshotFreshnessExpiringT24h
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: TimetableSnapshotFreshnessExpiringT6h
+        exp_alerts: []
+
+  # NaN(활성 스냅샷 없음·파싱 불가·평가 오류)에서는 fresh_until을 알 수 없으므로 잘못된 만료 경보를 막기 위해
+  # 어떤 freshness 경보도 발화하지 않아야 한다(PromQL 비교는 NaN 표본을 걸러낸다).
+  - interval: 1m
+    name: NaN remaining seconds fires no freshness alert
+    input_series:
+      - series: 'easysubway_timetable_snapshot_remaining_seconds'
+        values: 'NaN NaN NaN NaN NaN NaN NaN'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: TimetableSnapshotFreshnessExpiringT24h
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: TimetableSnapshotFreshnessExpiringT6h
+        exp_alerts: []
+
+  # dead-man's switch: backend_app_metrics scrape가 5분 이상 멈추면(up=0) 무음 상태를 감지해 발화한다.
+  - interval: 1m
+    name: backend app metrics scrape down fires dead-mans switch
+    input_series:
+      - series: 'up{job="backend_app_metrics", instance="backend:8080"}'
+        values: '0x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: AquilaBackendAppMetricsScrapeDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              service: aquila-backend-app-metrics
+            exp_annotations:
+              summary: Backend app metrics scrape is down
+              description: Prometheus cannot scrape backend_app_metrics (backend:8080/actuator/prometheus) for 5m. The timetable snapshot freshness gauge disappears, so the T-24h/T-6h freshUntil alerts silently stop evaluating (dead-man's switch).
+              title_ko: "백엔드 앱 메트릭 수집 실패"
+              impact_ko: "운행표 snapshot 잔여시간 게이지가 사라져 만료 24/6시간 전 경보가 조용히 멈춥니다."
+              action_ko: "backend 컨테이너 상태와 /actuator/prometheus 응답, docker network 내부 backend:8080 접근을 확인하세요."
+
+  # backend_app_metrics가 정상 scrape되면(up=1) dead-man's switch는 조용하다.
+  - interval: 1m
+    name: backend app metrics scrape up stays silent
+    input_series:
+      - series: 'up{job="backend_app_metrics", instance="backend:8080"}'
+        values: '1x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: AquilaBackendAppMetricsScrapeDown
+        exp_alerts: []

@@ -188,7 +188,7 @@
   "dataSafetyDeclarations": {
     "tracking": false,
     "sharesDataWithThirdParties": true,
-    "thirdPartySharingScopeKo": "현재 위치는 사용자가 출구 도보 길안내를 명시적으로 누른 경우에만 카카오맵 앱/웹에 시작 좌표로 전달한다. 서버 저장과 tracking은 하지 않는다.",
+    "thirdPartySharingScopeKo": "사용자가 출구 도보 길안내를 명시적으로 누른 경우에만 카카오맵 앱/웹을 연다. 앱에는 현재 위치 시작 좌표와 목적지 좌표를, 웹에는 목적지 좌표만 전달한다. 이 외부 지도 전달 좌표는 자체 서버에 저장하거나 tracking에 사용하지 않는다.",
     "dataEncryptedInTransit": true,
     "dataDeletionRequestSupported": true,
     "requiredFieldsPerDataType": [
@@ -207,7 +207,8 @@
       "Personal info",
       "User-generated content",
       "Photos and videos",
-      "Diagnostics"
+      "Diagnostics",
+      "Device or other IDs"
     ],
     "answerMatrix": [
       {
@@ -216,6 +217,7 @@
         "containsCollectedData": true,
         "containsRequiredData": false,
         "containsOptionalData": true,
+        "containsDeletionUnsupportedData": false,
         "requiredConsoleFields": [
           "collected",
           "collectionType",
@@ -230,10 +232,11 @@
       },
       {
         "dataType": "App activity",
-        "inventoryDataIds": ["search_queries", "favorite_stations_routes_facilities", "route_eta_feedback"],
+        "inventoryDataIds": ["search_queries", "train_search_queries", "favorite_stations_routes_facilities", "route_eta_feedback", "route_v2_itx_request_state"],
         "containsCollectedData": true,
         "containsRequiredData": true,
         "containsOptionalData": true,
+        "containsDeletionUnsupportedData": true,
         "requiredConsoleFields": [
           "collected",
           "collectionType",
@@ -248,10 +251,11 @@
       },
       {
         "dataType": "Personal info",
-        "inventoryDataIds": ["mobility_profile"],
-        "containsCollectedData": false,
+        "inventoryDataIds": ["mobility_profile", "route_v2_itx_mobility_preferences"],
+        "containsCollectedData": true,
         "containsRequiredData": false,
-        "containsOptionalData": false,
+        "containsOptionalData": true,
+        "containsDeletionUnsupportedData": false,
         "requiredConsoleFields": [
           "collected",
           "collectionType",
@@ -270,6 +274,7 @@
         "containsCollectedData": true,
         "containsRequiredData": false,
         "containsOptionalData": true,
+        "containsDeletionUnsupportedData": false,
         "requiredConsoleFields": [
           "collected",
           "collectionType",
@@ -288,6 +293,7 @@
         "containsCollectedData": true,
         "containsRequiredData": false,
         "containsOptionalData": true,
+        "containsDeletionUnsupportedData": false,
         "requiredConsoleFields": [
           "collected",
           "collectionType",
@@ -306,7 +312,27 @@
         "containsCollectedData": true,
         "containsRequiredData": true,
         "containsOptionalData": false,
+        "containsDeletionUnsupportedData": false,
         "containsLocalOnlyDiagnostics": true,
+        "requiredConsoleFields": [
+          "collected",
+          "collectionType",
+          "optional",
+          "required",
+          "purpose",
+          "linkedToUser",
+          "encryptedInTransit",
+          "deletionSupported"
+        ],
+        "evidenceSummaryFields": ["inventoryDataIds", "consolePreviewEvidence", "networkTraceMatchResult", "localEvidencePath"]
+      },
+      {
+        "dataType": "Device or other IDs",
+        "inventoryDataIds": ["route_v2_itx_integrity", "route_v2_gateway_abuse_rate_limit_state", "facility_report_abuse_rate_limit_state", "train_search_abuse_rate_limit_state"],
+        "containsCollectedData": true,
+        "containsRequiredData": false,
+        "containsOptionalData": true,
+        "containsDeletionUnsupportedData": true,
         "requiredConsoleFields": [
           "collected",
           "collectionType",
@@ -325,10 +351,27 @@
       "facility report photo",
       "facility report location",
       "mobility profile",
-      "favorites"
+      "favorites",
+      "ITX Route V2 integrity session",
+      "ITX Route V2 gateway abuse prevention state",
+      "train search abuse prevention state",
+      "ITX Route V2 mobility preferences",
+      "ITX Route V2 route request and state"
     ],
     "binaryTraceMatchRequired": true,
-    "linkedInventory": "apps/mobile/release/store-privacy-inventory.json"
+    "linkedInventory": "apps/mobile/release/store-privacy-inventory.json",
+    "routeV2Itx": {
+      "optionalUserTriggered": true,
+      "tracking": false,
+      "backendLinkedToUserDeviceOrAccountId": false,
+      "googleIntegrityMayBeLinkedToAccountOrDevice": true,
+      "storedFieldsProcessedEphemerally": false,
+      "gatewayRateLimitStateProcessedEphemerally": false,
+      "officialPolicyReferences": [
+        "https://support.google.com/googleplay/android-developer/answer/10787469?hl=en",
+        "https://developer.android.com/google/play/integrity/terms"
+      ]
+    }
   },
   "evidenceSummarySchemas": {
     "dataSafetyConsoleSummary": {
@@ -427,6 +470,9 @@
       "개인정보 연락처",
       "외부 지도 길안내 제3자 공유 범위",
       "tracking 없음",
+      "SUBWAY 경로 검색은 단말에서만 처리",
+      "선택형 ITX-청춘 Route V2 전송 항목과 논리 만료·5분 purge·물리 파기 경계",
+      "Nginx IP·Authorization shared-memory rate-limit 처리와 DB·access log 비저장 경계",
       "사진과 위치는 사용자가 신고, 주변 역 찾기, 출구 도보 길안내 흐름에서 직접 선택할 때만 사용"
     ]
   },

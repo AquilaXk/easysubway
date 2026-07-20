@@ -27,6 +27,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
@@ -37,6 +38,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 	"easysubway.user.password=user-test-password"
 })
 @AutoConfigureMockMvc
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 @DisplayName("관리자 데이터 수집 배치 화면")
 class DataCollectionAdminPageControllerTest {
 
@@ -81,7 +83,9 @@ class DataCollectionAdminPageControllerTest {
 
 		assertThat(html)
 			.contains("데이터 수집 배치")
-			.contains("도시철도 마스터 데이터 수집")
+			// #2349 PR⑩c: 수집 대상이 1개뿐이라 라디오 대신 정적 라벨(run-form-source)로 렌더한다.
+			.contains("run-form-source")
+			.contains("도시철도 마스터")
 			.contains("수집 실행")
 			.contains("최근 실행 기록")
 			.contains("완료")
@@ -95,7 +99,10 @@ class DataCollectionAdminPageControllerTest {
 			.contains("건너뜀")
 			.contains("수동 필요")
 			.contains("admin-user")
-			.contains(">14<")
+			// #2095: InMemoryTransitMasterRepository에 ITX-청춘 pilot 정차역 14곳과
+			// 이를 연결하는 ITX-청춘 노선(LINES 1건)·STATION_LINES 14건이 추가돼
+			// 수집 건수(operators+lines+stations+...)가 28에서 43으로 늘었다.
+			.contains(">43<")
 			.contains("name=\"source\"")
 			.contains("value=\"TRANSIT_MASTER\"")
 			.contains("name=\"_csrf\"");
@@ -124,6 +131,20 @@ class DataCollectionAdminPageControllerTest {
 			.contains("도시철도 마스터")
 			.contains("완료")
 			.contains("admin-user");
+	}
+
+	@Test
+	@DisplayName("기존 데이터 수집 실행 endpoint도 같은 source RUNNING claim을 우회하지 못한다")
+	void pageRunRejectsRunningSource() throws Exception {
+		saveDataCollectionRunPort.saveRun(runningRun("running-run"));
+
+		mockMvc.perform(post("/admin/data-collections/page/run")
+				.with(httpBasic("admin-user", "admin-test-password"))
+				.with(csrf())
+				.with(commandToken("/admin/data-collections/page"))
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("source", "TRANSIT_MASTER"))
+			.andExpect(status().isBadRequest());
 	}
 
 	@Test
@@ -202,7 +223,7 @@ class DataCollectionAdminPageControllerTest {
 	}
 
 	private DataCollectionRun runningRun(String runId) {
-		LocalDateTime now = LocalDateTime.of(2026, 6, 27, 0, 0);
+		LocalDateTime now = LocalDateTime.now();
 		return new DataCollectionRun(
 			runId,
 			DataCollectionSource.TRANSIT_MASTER,

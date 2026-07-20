@@ -23,7 +23,7 @@
 			</p>
 		</div>
 		<div class="admin-actions">
-			<a class="admin-btn" th:href="@{/admin/stations/{stationId}/page(stationId=${station.stationId})}">역 상세</a>
+			<a class="admin-btn plain" th:href="@{/admin/stations/{stationId}/page(stationId=${station.stationId})}">역 상세</a>
 		</div>
 	</header>
 
@@ -37,10 +37,14 @@
 	</div>
 	<div th:replace="~{admin/fragments/form-errors :: summary}"></div>
 
-	<section>
+	<section class="admin-panel">
 		<h2>구조도 기준 자료</h2>
-		<p class="empty" th:if="${layoutSources.isEmpty()}">등록된 구조도 기준 자료가 없습니다.</p>
-		<table th:if="${!layoutSources.isEmpty()}">
+		<div th:if="${layoutSources.isEmpty()}">
+			<div th:replace="~{admin/fragments/empty-state :: panel('등록된 구조도 기준 자료가 없습니다.', '아래 표의 등록 폼에서 기준 자료를 추가하세요.')}"></div>
+		</div>
+		<div class="admin-table-scroll" tabindex="0" role="group"
+		     aria-label="가로로 스크롤 가능한 데이터 표" th:if="${!layoutSources.isEmpty()}">
+		<table>
 			<thead>
 			<tr>
 				<th scope="col">자료</th>
@@ -88,7 +92,7 @@
 						<label class="meta" th:for="|reviewed-at-${source.id}|">확인일</label>
 						<input type="date" name="reviewedAt" th:id="|reviewed-at-${source.id}|"
 						       aria-label="확인일" th:value="${source.rawReviewedAt}">
-						<button type="submit" th:disabled="${!masterDataWritable}">저장</button>
+						<button type="submit" class="primary" th:disabled="${!masterDataWritable}">저장</button>
 					</form>
 					<span class="meta" th:text="${source.sourceName}">상록수역 역사 안내도</span>
 					<span class="meta" th:text="${source.sourceUrl}">https://www.seoulmetro.co.kr</span>
@@ -106,12 +110,17 @@
 			</tr>
 			</tbody>
 		</table>
+		</div>
 	</section>
 
-	<section>
+	<section class="admin-panel">
 		<h2>쉬운 내부 구조도</h2>
-		<p class="empty" th:if="${layouts.isEmpty()}">등록된 쉬운 내부 구조도가 없습니다.</p>
-		<table th:if="${!layouts.isEmpty()}">
+		<div th:if="${layouts.isEmpty()}">
+			<div th:replace="~{admin/fragments/empty-state :: panel('등록된 쉬운 내부 구조도가 없습니다.', '구조도 기준 자료를 먼저 등록한 뒤 구조도를 추가하세요.')}"></div>
+		</div>
+		<div class="admin-table-scroll" tabindex="0" role="group"
+		     aria-label="가로로 스크롤 가능한 데이터 표" th:if="${!layouts.isEmpty()}">
+		<table>
 			<thead>
 			<tr>
 				<th scope="col">구조도</th>
@@ -140,7 +149,7 @@
 							        th:text="${option.label}"
 							        th:selected="${option.value == layout.statusValue}">DRAFT</option>
 						</select>
-						<button type="submit" th:disabled="${!masterDataWritable}">변경</button>
+						<button type="submit" class="primary" th:disabled="${!masterDataWritable}">변경</button>
 					</form>
 				</td>
 				<td th:text="${layout.confidenceLevel}">OFFICIAL_DIAGRAM_REFERENCED</td>
@@ -150,12 +159,17 @@
 			</tr>
 			</tbody>
 		</table>
+		</div>
 	</section>
 
-	<section>
+	<section class="admin-panel">
 		<h2>내부 이동 노드</h2>
-		<p class="empty" th:if="${routeNodes.isEmpty()}">등록된 내부 이동 노드가 없습니다.</p>
-		<table th:if="${!routeNodes.isEmpty()}">
+		<div th:if="${routeNodes.isEmpty()}">
+			<div th:replace="~{admin/fragments/empty-state :: panel('등록된 내부 이동 노드가 없습니다.', '아래 표의 등록 폼에서 노드를 추가하세요.')}"></div>
+		</div>
+		<div class="admin-table-scroll" tabindex="0" role="group"
+		     aria-label="가로로 스크롤 가능한 데이터 표" th:if="${!routeNodes.isEmpty()}">
+		<table>
 			<thead>
 			<tr>
 				<th scope="col">노드</th>
@@ -189,7 +203,7 @@
 						<label class="meta" th:for="|accessibility-note-${node.id}|">접근성 메모</label>
 						<input type="text" name="accessibilityNote" th:id="|accessibility-note-${node.id}|"
 						       aria-label="접근성 메모" th:value="${node.rawAccessibilityNote}">
-						<button type="submit" th:disabled="${!masterDataWritable}">저장</button>
+						<button type="submit" class="primary" th:disabled="${!masterDataWritable}">저장</button>
 						<span class="meta" th:text="${node.positionLabel}">x 120, y 240</span>
 						<span class="meta" th:text="${node.layoutId}">layout-sangnoksu-draft</span>
 					</form>
@@ -198,12 +212,17 @@
 			</tr>
 			</tbody>
 		</table>
+		</div>
 	</section>
 
-	<section>
+	<section class="admin-panel">
 		<h2>내부 이동 간선</h2>
-		<p class="empty" th:if="${routeEdges.isEmpty()}">등록된 내부 이동 간선이 없습니다.</p>
-		<table th:if="${!routeEdges.isEmpty()}">
+		<div th:if="${routeEdges.isEmpty()}">
+			<div th:replace="~{admin/fragments/empty-state :: panel('등록된 내부 이동 간선이 없습니다.', '내부 이동 노드를 먼저 등록한 뒤 간선을 추가하세요.')}"></div>
+		</div>
+		<div class="admin-table-scroll" tabindex="0" role="group"
+		     aria-label="가로로 스크롤 가능한 데이터 표" th:if="${!routeEdges.isEmpty()}">
+		<table>
 			<thead>
 			<tr>
 				<th scope="col">간선</th>
@@ -260,7 +279,7 @@
 							<option value="true" th:selected="${edge.active}">활성</option>
 							<option value="false" th:selected="${!edge.active}">비활성</option>
 						</select>
-						<button type="submit" th:disabled="${!masterDataWritable}">저장</button>
+						<button type="submit" class="primary" th:disabled="${!masterDataWritable}">저장</button>
 					</form>
 					<span class="meta" th:text="${edge.distanceLabel}">28m</span>
 					<span class="meta" th:text="${edge.estimatedSecondsLabel}">75초</span>
@@ -277,6 +296,7 @@
 			</tr>
 			</tbody>
 		</table>
+		</div>
 	</section>
 </main>
 </div>

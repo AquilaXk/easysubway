@@ -12,14 +12,17 @@ class LocalRouteEngine {
   LocalRouteEngine({
     required this.graph,
     this.costCalculator = const AccessibilityCostCalculator(),
+    this.edgeResolver,
   }) : accessGraphRouter = AccessGraphRouter(
          graph: graph,
          costCalculator: costCalculator,
+         edgeResolver: edgeResolver,
        ),
        routeAssembler = RouteAssembler(costCalculator: costCalculator);
 
   final NetworkGraph graph;
   final AccessibilityCostCalculator costCalculator;
+  final RouteEdge Function(RouteEdge edge)? edgeResolver;
   final AccessGraphRouter accessGraphRouter;
   final RouteAssembler routeAssembler;
 
@@ -30,6 +33,7 @@ class LocalRouteEngine {
       mobilityType: request.mobilityType,
       constraintMode: request.effectiveConstraintMode,
       searchMode: request.searchMode,
+      objective: request.objective,
     );
     final path = pathResult.path;
     if (path == null) {
@@ -120,10 +124,12 @@ class AccessGraphRouter {
   const AccessGraphRouter({
     required this.graph,
     this.costCalculator = const AccessibilityCostCalculator(),
+    this.edgeResolver,
   });
 
   final NetworkGraph graph;
   final AccessibilityCostCalculator costCalculator;
+  final RouteEdge Function(RouteEdge edge)? edgeResolver;
 
   AccessPathResult findPath({
     required String originNodeId,
@@ -131,6 +137,7 @@ class AccessGraphRouter {
     required MobilityType mobilityType,
     required ConstraintMode constraintMode,
     RouteSearchMode searchMode = RouteSearchMode.stationToStation,
+    RouteObjective objective = RouteObjective.fastest,
   }) {
     if (graph.nodes.isEmpty || graph.edges.isEmpty) {
       return AccessPathResult.noPath(
@@ -147,6 +154,7 @@ class AccessGraphRouter {
       constraintMode,
       RouteTraversalPolicy(searchMode),
       blockedReasonCodes,
+      objective,
     );
     if (edges != null) {
       return AccessPathResult.found(
@@ -199,6 +207,12 @@ class AccessGraphRouter {
     return AccessNoPathReason.blocked;
   }
 
+  /// fewestTransfers 목표에서 환승 edge마다 얹는 큰 사전식(lexicographic) 페널티.
+  /// 어떤 대안 경로의 총 일반화 비용보다도 크게 잡아, 탐색이 환승 수를 1차로
+  /// 최소화하고 동률에서만 일반화 비용(대체로 소요시간)으로 tie-break하게 한다.
+  /// 이 페널티는 경로 선택에만 쓰이고 결과에 보고되는 비용에는 반영되지 않는다.
+  static const int _fewestTransfersEdgePenalty = 100000000;
+
   List<RouteEdge>? _findLowestCostPath(
     String originNodeId,
     String destinationNodeId,
@@ -206,6 +220,7 @@ class AccessGraphRouter {
     ConstraintMode constraintMode,
     RouteTraversalPolicy traversalPolicy,
     Set<String> blockedReasonCodes,
+    RouteObjective objective,
   ) {
     final bestCostByNode = <String, int>{originNodeId: 0};
     final previousNode = <String, String>{};
@@ -231,7 +246,8 @@ class AccessGraphRouter {
         break;
       }
 
-      for (final edge in graph.edgesFrom(candidate.nodeId)) {
+      for (final storedEdge in graph.edgesFrom(candidate.nodeId)) {
+        final edge = edgeResolver?.call(storedEdge) ?? storedEdge;
         if (!traversalPolicy.canTraverse(
           edge,
           currentNodeId: candidate.nodeId,
@@ -249,7 +265,12 @@ class AccessGraphRouter {
           blockedReasonCodes.addAll(edgeCost.warningCodes);
           continue;
         }
-        final nextCost = candidate.cost + edgeCost.cost;
+        var stepCost = edgeCost.cost;
+        if (objective == RouteObjective.fewestTransfers &&
+            isRouteTransferEdgeType(edge.type)) {
+          stepCost += _fewestTransfersEdgePenalty;
+        }
+        final nextCost = candidate.cost + stepCost;
         if (nextCost < (bestCostByNode[edge.toNodeId] ?? 1 << 62)) {
           bestCostByNode[edge.toNodeId] = nextCost;
           previousNode[edge.toNodeId] = candidate.nodeId;
@@ -510,7 +531,7 @@ class RouteAssembler {
         edge.isDataStale ||
         edge.accessibilityState == RouteAccessibilityState.unknown ||
         edge.stairAccessState == RouteStairAccessState.unknown) {
-      return '안내를 준비 중이에요';
+      return '';
     }
     if (edge.reliabilityScore >= 80) {
       return '확인된 정보예요';
@@ -518,12 +539,12 @@ class RouteAssembler {
     if (edge.reliabilityScore >= 60) {
       return '일부 확인된 정보예요';
     }
-    return '안내를 준비 중이에요';
+    return '';
   }
 
   String _warningMessage(String code) {
     return switch (code) {
-      'LOW_DATA_CONFIDENCE' => '일부 시설 안내를 준비 중이에요.',
+      'LOW_DATA_CONFIDENCE' => '일부 시설 안내는 아직 확인되지 않았어요.',
       'STALE_ACCESSIBILITY_DATA' => '시설 상태 안내가 오래됐을 수 있어요.',
       'STAIR_ONLY_ACCESS' => '계단 포함 구간이 있습니다.',
       // 불확실성 헤지는 앱 공통 사전 한 벌로 통일한다(#1577). 연결 미확인의
@@ -535,7 +556,7 @@ class RouteAssembler {
       'BLOCKED_PLACEHOLDER_EVIDENCE_HASH' => '임시 근거만 있는 경로는 안내하지 않아요.',
       'BLOCKED_UNSUPPORTED_SCOPE' => '지원 범위 밖 경로는 안내하지 않아요.',
       'STRICT_EVIDENCE_UNSUPPORTED' => '검증 근거가 부족해 계단 없는 경로로 안내하지 않아요.',
-      'DURATION_UNKNOWN' => '소요 시간을 확인하고 있어요.',
+      'DURATION_UNKNOWN' => routeDurationUnknown,
       'ACCESSIBILITY_STATE_UNKNOWN' => routeHedgeAccessibilityUnknown,
       'FACILITY_UNDER_MAINTENANCE' => routeFacilityUnderMaintenance,
       'FACILITY_UNAVAILABLE' => routeFacilityUnavailable,

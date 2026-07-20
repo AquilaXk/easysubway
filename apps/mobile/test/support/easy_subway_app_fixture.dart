@@ -1,4 +1,5 @@
 import 'package:easysubway_mobile/app/app_dependencies.dart';
+import 'package:easysubway_mobile/app/easy_subway_app.dart';
 import 'package:easysubway_mobile/core/datapack/bundled_data_pack_freshness.dart';
 import 'package:easysubway_mobile/core/datapack/data_pack_update_state.dart';
 import 'package:easysubway_mobile/facility_report.dart';
@@ -6,9 +7,9 @@ import 'package:easysubway_mobile/favorite_facility.dart';
 import 'package:easysubway_mobile/features/ads/ad_repository.dart';
 import 'package:easysubway_mobile/features/realtime/realtime_repository.dart';
 import 'package:easysubway_mobile/features/service_notice/data/notice_repository.dart';
+import 'package:easysubway_mobile/features/support/presentation/support_access_screen.dart';
 import 'package:easysubway_mobile/internal_route.dart';
 import 'package:easysubway_mobile/legacy_credential_cleanup.dart';
-import 'package:easysubway_mobile/main.dart';
 import 'package:easysubway_mobile/network_map.dart';
 import 'package:easysubway_mobile/notification_settings.dart';
 import 'package:easysubway_mobile/onboarding.dart';

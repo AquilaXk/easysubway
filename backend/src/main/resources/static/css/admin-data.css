@@ -1,0 +1,640 @@
+/*
+ * admin-data.css — V6-04 CSS 책임 분리(#2276): 데이터·페이지 뷰(통합 대시보드 카드·핵심 지표 그리드·추이 차트·발송 이력·감사 콘솔·분포 막대 등).
+ * 데이터 밀도가 높은 화면 전용 스타일을 소유한다. import 순서상 마지막 레이어다.
+ */
+
+/* 통합 대시보드(#1739): 긴급 줄 → 핵심 카드(스파크라인·전일 대비) → 추이 → 상세. */
+.admin-panel-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+	padding-bottom: 12px;
+	margin-bottom: 16px;
+	border-bottom: 1px solid var(--admin-border);
+}
+
+/* 지표 셀 분할용 1px 구분선 유틸리티(#1982) — .metric-grid 내부 셀 경계 */
+.admin-v3 .admin-panel-divider {
+	border-top: 1px solid var(--admin-border);
+}
+
+.admin-v3 .metric-cell + .metric-cell {
+	border-left: 1px solid var(--admin-border);
+	padding-left: 16px;
+}
+
+.admin-v3 .admin-link {
+	color: var(--admin-accent);
+	font-size: 13px;
+	font-weight: var(--admin-w-medium);
+	text-decoration: none;
+}
+
+/* 긴급 신호(#2047 폴리시): 박스+틴트 콜아웃을 제거하고 플랫 행+1px 구분선으로 나열한다.
+   .admin-v3 section 박스(보더 4면·radius·surface)를 명시적으로 벗겨(플랫), 상단 1px로 목록을 열고
+   각 항목 하단 1px로 구분한다. 컨테이너 border-bottom과 마지막 항목 border-bottom이 겹쳐 하단 선이
+   이중으로 보이던 문제를 컨테이너 박스 제거로 해소한다(#2047 리뷰). 상태는 좌측 얇은(2px) 마커로만. */
+.admin-v3 .dashboard-urgent {
+	display: flex;
+	flex-direction: column;
+	margin-bottom: 16px;
+	border: 0;
+	border-top: 1px solid var(--admin-border);
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+	padding: 0;
+	overflow-x: visible;
+}
+
+.dashboard-urgent-item {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 10px 14px;
+	border-bottom: 1px solid var(--admin-border);
+	border-left: 2px solid transparent;
+	text-decoration: none;
+	color: var(--admin-ink);
+}
+
+.dashboard-urgent-item:hover {
+	background: var(--admin-bg);
+}
+
+.dashboard-urgent-item.tone-warning {
+	border-left-color: var(--admin-warn);
+}
+
+.dashboard-urgent-item.tone-failure {
+	border-left-color: var(--admin-danger);
+}
+
+.dashboard-urgent-item small {
+	color: var(--admin-ink-2);
+	font-size: 12px;
+}
+
+/* 확인 필요 통합 카드(#2349): 트리아지 최우선 영역. 상태 톤 구분 없이 플랫 행+1px 구분선만 쓴다
+   (긴급 신호와 달리 심각도가 아니라 "해야 할 일" 목록이라 tone 마커를 붙이지 않는다). */
+.dashboard-triage-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.dashboard-triage-list li + li {
+	border-top: 1px solid var(--admin-border);
+}
+
+.dashboard-triage-list a {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 10px 2px;
+	text-decoration: none;
+	color: var(--admin-ink);
+}
+
+.dashboard-triage-list a:hover .dashboard-triage-label {
+	color: var(--admin-accent);
+}
+
+.dashboard-triage-count {
+	font-variant-numeric: tabular-nums;
+}
+
+/* 전부 0건일 때 카드 대신 보여주는 한 줄 상태 텍스트(#2349). 인접 섹션과 리듬을 맞춘다. */
+.dashboard-triage-empty {
+	margin: 0 0 24px;
+}
+
+/* 데이터팩 출시 준비 | 운영 이상 신호 2열(#2349): 데이터팩 권한이 없는 계정은 운영 이상 신호만
+   단독 폭으로 렌더한다. */
+.dashboard-readiness-grid.is-single {
+	grid-template-columns: 1fr;
+}
+
+/* 핵심 지표 그리드(#1983): .admin-panel 하나 안에서 3열 반응형(최대 3열)으로 배치하고,
+   카드 자체는 보더·그림자 없이 .metric-cell 좌측 1px 구분선으로만 나뉜다(패널 보더 중복 방지).
+   좁은 화면에서는 하단 미디어쿼리로 2열 → 1열로 줄어든다(각 행 첫 열은 구분선 제외). */
+.dashboard-cards {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 0;
+}
+
+.dashboard-card {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 4px 18px;
+	text-decoration: none;
+	color: var(--admin-ink);
+}
+
+/* 셀 좌측 구분선 base(#1983): 명시도를 .admin-v3(0,3,0)로 올려 utility 구분선
+   (.admin-v3 .metric-cell + .metric-cell, 0,3,0)과 동률로 맞춘다. 첫 열(:nth-child)·반응형
+   1열(768px override) 규칙이 소스상 이 base보다 뒤에 와 동률 소스순서로 이겨 좌측 선을 벗긴다(#2298 리뷰). */
+.admin-v3 .dashboard-card.metric-cell {
+	border-left: 1px solid var(--admin-border);
+	padding-left: 18px;
+}
+
+/* 각 행의 첫 열(3열 그리드 기준 3n+1)은 좌측 구분선 없이 패널 안쪽 여백만 유지. */
+.dashboard-card.metric-cell:nth-child(3n+1) {
+	border-left: 0;
+}
+
+.dashboard-card:hover .dashboard-card-title {
+	color: var(--admin-accent);
+}
+
+.dashboard-card-title {
+	color: var(--admin-ink-2);
+	font-size: 13px;
+	font-weight: var(--admin-w-medium);
+}
+
+.dashboard-card-value {
+	font-size: 28px;
+	font-weight: var(--admin-w-title);
+	line-height: 1.1;
+}
+
+.dashboard-spark {
+	width: 100%;
+	height: 24px;
+	color: var(--admin-accent);
+}
+
+.dashboard-card-delta {
+	font-size: 12px;
+	color: var(--admin-ink-2);
+}
+
+.dashboard-card-delta.is-up {
+	color: var(--admin-danger);
+}
+
+.dashboard-card-delta.is-down {
+	color: var(--admin-good);
+}
+
+.dashboard-details {
+	margin-top: 12px;
+}
+
+.dashboard-details summary {
+	cursor: pointer;
+	color: var(--admin-ink-2);
+	font-size: 13px;
+}
+
+/* 나머지 KPI disclosure(#2281 V6-09): 대표 3개 아래로 격하된 지표를 접어 둔다. 펼치면 headline과
+   같은 카드 그리드(.dashboard-cards)를 재사용하되 요약과 카드 사이 상단 여백만 준다(구분선·시각 언어 불변). */
+.dashboard-more[open] .dashboard-cards {
+	margin-top: 12px;
+}
+
+/* 핵심 지표 패널 ↔ 기간 토글 사이 여백(#2047): #dashboard-trends는 section이 아니라 div라
+   section+section 자동 간격을 못 받으므로, 추이 섹션 상단에 명시 여백을 준다(붙어 보이는 문제).
+   대시보드 전용 스코프(#dashboard-trends)로 좁혀 usage·routes·notifications 화면에는 파급하지 않는다. */
+#dashboard-trends .dashboard-trends-section {
+	margin-top: 24px;
+}
+
+.trend-periods {
+	display: flex;
+	gap: 8px;
+	margin-bottom: 12px;
+}
+
+.trend-periods a {
+	min-height: 32px;
+	display: inline-flex;
+	align-items: center;
+	padding: 0 12px;
+	border: 1px solid var(--admin-border);
+	border-radius: var(--admin-radius-control);
+	background: var(--admin-surface);
+	color: var(--admin-ink-2);
+	text-decoration: none;
+	font-size: 13px;
+}
+
+.trend-periods a.is-active {
+	border-color: var(--admin-accent);
+	background: var(--admin-accent-soft);
+	color: var(--admin-accent-ink);
+	font-weight: var(--admin-w-strong);
+}
+
+.batch-history-charts,
+.trend-charts {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+	gap: 16px;
+	margin-bottom: 20px;
+	/* 두 추이 패널의 세로 시작 위치를 맞춘다(#2047): 한 패널 제목이 길어도 위쪽 라인을 정렬한다. */
+	align-items: start;
+}
+
+/* 그리드 안 두 차트 패널의 세로 시작 위치 정렬(#2047): .admin-v3 section + section의
+   margin-top:24px가 두 번째 패널(section 인접 형제)에만 붙어 24px 아래로 밀려 top이 어긋났다.
+   차트 그리드는 gap으로 간격을 주므로 인접 형제 margin을 0으로 되돌려 두 패널 top을 일치시킨다. */
+.batch-history-charts > section + section,
+.trend-charts > section + section {
+	margin-top: 0;
+}
+
+.batch-history-canvas-wrap,
+.trend-canvas-wrap {
+	position: relative;
+	height: 240px;
+}
+
+.batch-history-canvas,
+.trend-canvas {
+	width: 100%;
+	height: 100%;
+}
+
+/* 발송 이력 콘솔(#1746) */
+.admin-v3 .card-sparkline {
+	display: block;
+	width: 100%;
+	height: 24px;
+	margin-top: 6px;
+}
+
+.admin-v3 .card-sparkline polyline {
+	stroke: var(--admin-danger);
+	stroke-width: 1.5;
+	vector-effect: non-scaling-stroke;
+}
+
+.admin-v3 .metric .card-sparkline polyline {
+	fill: none;
+}
+
+.admin-v3 .delivery-alert-link {
+	margin: -8px 0 12px;
+	font-size: 14px;
+}
+
+.admin-v3 .section-hint {
+	color: var(--admin-ink-2);
+	font-size: 13px;
+	margin: 4px 0 12px;
+}
+
+.admin-v3 .table-summary {
+	color: var(--admin-ink);
+	font-size: 14px;
+	margin: 12px 0;
+}
+
+.admin-v3 .table-summary .filter-clear {
+	margin-left: 6px;
+	font-size: 13px;
+}
+
+.admin-v3 .status-badge {
+	display: inline-block;
+	padding: 2px 8px;
+	border-radius: var(--admin-radius-badge);
+	font-size: 12px;
+	background: var(--admin-header-bg);
+	color: var(--admin-ink);
+}
+
+.admin-v3 .status-badge.tone-ok {
+	background: var(--admin-good-soft);
+	color: var(--admin-good);
+}
+
+.admin-v3 .status-badge.tone-failure {
+	background: var(--admin-danger-soft);
+	color: var(--admin-danger);
+}
+
+.admin-v3 .status-badge.tone-pending {
+	background: var(--admin-warn-soft);
+	color: var(--admin-warn);
+}
+
+.admin-v3 .row-detail summary {
+	cursor: pointer;
+	color: var(--admin-accent);
+}
+
+.admin-v3 .row-detail-list {
+	margin: 8px 0 0;
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	gap: 4px 12px;
+}
+
+.admin-v3 .row-detail-list dt {
+	color: var(--admin-ink-2);
+	font-size: 13px;
+}
+
+.admin-v3 .row-detail-list dd {
+	margin: 0;
+	font-size: 13px;
+}
+
+.admin-v3 .failure-breakdown {
+	margin: 16px 0;
+}
+
+.admin-v3 .breakdown-bars {
+	list-style: none;
+	margin: 8px 0 0;
+	padding: 0;
+	display: grid;
+	gap: 6px;
+}
+
+.admin-v3 .breakdown-bars a {
+	display: grid;
+	grid-template-columns: minmax(140px, 1fr) 2fr max-content;
+	align-items: center;
+	gap: 12px;
+	text-decoration: none;
+	color: var(--admin-ink);
+	padding: 4px 8px;
+	border-radius: 6px;
+}
+
+.admin-v3 .breakdown-bars a:hover,
+.admin-v3 .breakdown-bars a[aria-current="true"] {
+	background: var(--admin-accent-soft);
+}
+
+.admin-v3 .breakdown-bar {
+	width: 100%;
+	height: 12px;
+}
+
+.admin-v3 .breakdown-bar rect {
+	fill: var(--admin-danger);
+}
+
+.admin-v3 .breakdown-count {
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+}
+
+/* 감사 콘솔(#1747): 필터 체크박스·점검 배너·상세 타임라인 */
+.admin-v3 .toolbar-check {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 13px;
+	color: var(--admin-ink-2);
+	white-space: nowrap;
+}
+
+.admin-v3 .compliance-banner {
+	margin: 12px 0;
+	padding: 10px 14px;
+	border-radius: var(--admin-radius-control);
+	background: var(--admin-warn-soft);
+	color: var(--admin-warn);
+	font-size: 13px;
+}
+
+/* 권한 컬럼 raw 덤프 방지(#2349 PR⑩c): 콤마 결합 권한 전체 문자열을 "첫 권한 외 N개" 요약 +
+   접힌 details로 담아 행 높이 폭증·우측 클리핑을 없앤다. */
+.admin-v3 .admin-permission-detail summary {
+	cursor: pointer;
+	color: var(--admin-ink);
+}
+
+.admin-v3 .admin-permission-list {
+	margin: 8px 0 0;
+	padding-left: 18px;
+	max-width: 320px;
+	color: var(--admin-ink-2);
+	font-size: 13px;
+	line-height: 1.6;
+	/* 권한 코드는 점(.)으로만 이어져 공백·하이픈 break 기회가 없다. overflow-wrap: anywhere로
+	   강제 줄바꿈해야 표 auto layout이 이 컬럼의 min-content를 가장 긴 권한 코드 폭까지 벌리지 않는다
+	   (그러지 않으면 펼쳤을 때 다른 컬럼이 한글 낱글자 줄바꿈으로 밀린다). */
+	overflow-wrap: anywhere;
+}
+
+.admin-v3 .compliance-banner .filter-quick {
+	margin-left: 8px;
+	color: var(--admin-warn);
+	font-weight: var(--admin-w-medium);
+}
+
+.admin-v3 td.reason-missing,
+.admin-v3 dd.reason-missing {
+	color: var(--admin-danger);
+	font-weight: var(--admin-w-medium);
+}
+
+.admin-v3 .target-link {
+	margin-left: 8px;
+	font-size: 13px;
+	color: var(--admin-accent);
+}
+
+.admin-v3 .audit-timeline {
+	margin-top: 24px;
+}
+
+.admin-v3 .timeline {
+	list-style: none;
+	margin: 12px 0 0;
+	padding: 0;
+	display: grid;
+	gap: 2px;
+	border-left: 2px solid var(--admin-border-strong);
+}
+
+.admin-v3 .timeline li {
+	display: grid;
+	grid-template-columns: max-content 1fr max-content;
+	align-items: center;
+	gap: 12px;
+	padding: 6px 12px;
+	font-size: 13px;
+}
+
+.admin-v3 .timeline .timeline-time {
+	color: var(--admin-ink-3);
+	font-variant-numeric: tabular-nums;
+}
+
+.admin-v3 .timeline .timeline-current {
+	background: var(--admin-accent-soft);
+	border-radius: 0 var(--admin-radius-control) var(--admin-radius-control) 0;
+	font-weight: var(--admin-w-medium);
+}
+
+/* 핵심 지표 그리드 반응형(#1983): 900px 이하 2열, 768px 이하 1열. 각 행의 첫 열은
+   좌측 구분선을 빼고, 1열에서는 상단 구분선으로 전환한다. */
+@media (max-width: 900px) {
+	.dashboard-cards {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.dashboard-card.metric-cell:nth-child(3n+1) {
+		border-left: 1px solid var(--admin-border);
+	}
+
+	.dashboard-card.metric-cell:nth-child(2n+1) {
+		border-left: 0;
+	}
+}
+
+@media (max-width: 768px) {
+	.dashboard-cards {
+		grid-template-columns: 1fr;
+	}
+
+	.admin-v3 .dashboard-card.metric-cell {
+		border-left: 0;
+		border-top: 1px solid var(--admin-border);
+		padding-top: 12px;
+	}
+
+	.admin-v3 .dashboard-card.metric-cell:first-child {
+		border-top: 0;
+		padding-top: 4px;
+	}
+}
+
+/* 목록 툴바 공통 계약(#2278 V6-06): 검색·필터·저장된 뷰·보기 설정을 하나의 toolbar 행으로 모은다.
+   list-toolbar.html fragment가 소비하는 데이터/목록 레이아웃 규칙이라 data 레이어가 소유한다(시각 언어 불변). */
+.admin-list-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	align-items: center;
+	margin-bottom: 12px;
+}
+
+.admin-list-toolbar-search {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	margin: 0;
+}
+
+.admin-list-toolbar-search input[type="search"] {
+	flex: 1;
+	min-width: 0;
+}
+
+/* 필터·보기 설정 시트: wide(기본)에서는 인라인 노출, compact에서는 트리거로 여닫는 시트로 접는다.
+   시트 내용은 기본 노출이라 no-JS(트리거 x-cloak 숨김)에서도 form/link가 그대로 동작한다. */
+.admin-toolbar-sheet {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	align-items: center;
+}
+
+/* 시트 트리거는 wide에서 숨긴다(인라인 노출이라 불필요). compact + JS에서만 노출한다.
+   #2349 PR⑩a 실측: 셀렉터를 `.admin-toolbar-sheet-trigger` 단독(specificity 0,1,0)으로 두면
+   admin-components.css의 `.admin-v3 button` 버튼 base(specificity 0,1,1, class 없는 button
+   compat 포함)가 더 높은 specificity로 이겨 display:none이 wide에서 무효화된다 — 트리거가
+   숨겨지지 않고 compat 파랑 filled 배경까지 그대로 노출돼(1440) 필터·보기 설정 버튼이 filled로
+   보이는 원인이었다(390은 아래 has-js 컴팩트 규칙이 specificity로 이겨 정상 outline풍으로 렌더).
+   `.admin-v3` 접두를 붙여 specificity를 0,2,0으로 올려 `.admin-v3 button`을 항상 이기게 해서
+   wide에서는 트리거가 원래 설계대로 숨겨지고 compact에서만 노출되는 단일 위계로 정리한다. */
+.admin-v3 .admin-toolbar-sheet-trigger {
+	display: none;
+}
+
+/* 첫 식별자 열 외에 "필요한 action 열"만 우측 sticky로 고정하는 유틸리티(#2278 §7).
+   wrapper(.admin-table-scroll)만 가로 overflow를 소유한다는 계약을 그대로 따른다. */
+.admin-table-scroll th.cell-sticky-action,
+.admin-table-scroll td.cell-sticky-action:not([colspan]) {
+	position: sticky;
+	right: 0;
+	z-index: 2;
+	background: var(--admin-surface);
+}
+
+.admin-table-scroll thead th.cell-sticky-action {
+	z-index: 3;
+	background: var(--admin-header-bg);
+}
+
+/* 첫 열 sticky와 동일 패턴(admin-components.css)으로 행 hover·선택 배경을 sticky action 열에도
+   동기화한다. 동기화하지 않으면 sticky 열만 hover/선택 배경이 어긋나 보인다(#2301 리뷰). */
+.admin-v3 .admin-table-scroll tbody tr:hover td.cell-sticky-action:not([colspan]) {
+	background: var(--admin-header-bg);
+}
+
+.admin-v3 .admin-table-scroll tbody tr[aria-selected="true"] td.cell-sticky-action:not([colspan]),
+.admin-v3 .admin-table-scroll tbody tr.is-selected td.cell-sticky-action:not([colspan]) {
+	background: var(--admin-accent-soft);
+}
+
+/* 시트 안 필터·정렬 form(V6-07 #2279): 시트가 소유하는 no-JS/HTMX form의 컨트롤을 인라인으로 배치한다.
+   시각 언어(무채색·flat·radius≤8)는 기존 폼 컨트롤 토큰을 그대로 상속한다. */
+.admin-toolbar-form {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	align-items: center;
+	margin: 0;
+}
+
+/* 마지막 확인/갱신일 셀(V6-07 #2279): 상대 시간을 위, 정확한 날짜를 아래(meta)로 병기한다.
+   상대 시간에는 정확한 날짜를 title로도 달아 hover·스크린리더에서 절대 시각을 확인할 수 있다. */
+.admin-v3 .data-verified {
+	display: inline-flex;
+	flex-direction: column;
+	line-height: 1.3;
+}
+
+.admin-v3 .data-verified-relative {
+	color: var(--admin-ink);
+	font-variant-numeric: tabular-nums;
+}
+
+/* 필터/정렬 적용 버튼 JS 시 숨김(#2313): 이 버튼이 속한 필터 form은 htmx `hx-trigger="change, submit"`으로
+   이미 값이 바뀌는 즉시 자동 제출된다. JS 활성 환경에서 명시 제출 버튼은 잉여이므로 숨긴다. no-JS(has-js
+   미부착)에서는 자동 제출이 동작하지 않으므로 이 규칙이 걸리지 않아 버튼이 계속 노출되고, 그대로 수동
+   GET 제출로 필터가 적용된다(폴백 유지, hidden 필터 바인딩·GET 계약은 그대로). */
+.admin-v3.has-js .admin-filter-apply {
+	display: none;
+}
+
+/* compact: 필터·보기 설정을 시트로 접는다. JS가 있을 때만(has-js) 트리거를 노출하고 시트를 접어
+   direct control을 5개 이하로 유지한다. no-JS(has-js 미부착)는 시트 내용이 인라인으로 남는다. */
+@media (max-width: 768px) {
+	.admin-v3.has-js .admin-toolbar-sheet-trigger {
+		display: inline-flex;
+		min-height: 32px;
+		align-items: center;
+		padding: 0 12px;
+		border: 1px solid var(--admin-border);
+		border-radius: var(--admin-radius-control);
+		background: var(--admin-surface);
+		color: var(--admin-ink-2);
+		font-size: 13px;
+		cursor: pointer;
+	}
+
+	.admin-v3.has-js .admin-toolbar-sheet {
+		display: none;
+		flex-basis: 100%;
+	}
+
+	.admin-v3.has-js .admin-toolbar-sheet.is-open {
+		display: flex;
+	}
+}

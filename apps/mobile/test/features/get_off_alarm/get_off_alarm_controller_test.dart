@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:easysubway_mobile/core/database/user/user_database.dart';
+import 'package:easysubway_mobile/features/get_off_alarm/data/get_off_alarm_recovery_notice_store.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/data/get_off_alarm_state_repository.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/exact_alarm_permission.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_controller.dart';
@@ -145,6 +146,26 @@ class _BlockingRefreshExactAlarmGate implements ExactAlarmPermissionGate {
   Future<bool> requestExactAlarmPermission() async => true;
 }
 
+class _RecordingRecoveryNoticeStore implements GetOffAlarmRecoveryNoticeStore {
+  bool flag = false;
+  int recordCount = 0;
+  int consumeCount = 0;
+
+  @override
+  Future<void> record() async {
+    recordCount += 1;
+    flag = true;
+  }
+
+  @override
+  Future<bool> consume() async {
+    consumeCount += 1;
+    final current = flag;
+    flag = false;
+    return current;
+  }
+}
+
 class _StubNotificationPermissionProvider
     implements NotificationPermissionProvider {
   _StubNotificationPermissionProvider(this.status);
@@ -163,6 +184,21 @@ class _StubNotificationPermissionProvider
   Future<NotificationPermissionStatus> requestNotificationPermission() async {
     requestCalls += 1;
     return status;
+  }
+}
+
+/// 호출마다 다음 시각을 돌려주는 주입용 시계. 마지막 원소에 도달하면 그대로
+/// 유지한다. now()가 몇 번 소비됐는지([calls])로 단일 스냅샷 여부를 검증한다.
+class _AdvancingClock {
+  _AdvancingClock(this._instants);
+
+  final List<DateTime> _instants;
+  int calls = 0;
+
+  DateTime now() {
+    final index = calls < _instants.length ? calls : _instants.length - 1;
+    calls += 1;
+    return _instants[index];
   }
 }
 
@@ -338,39 +374,83 @@ void main() {
     expect(restored.state.enabled, isFalse);
   });
 
-  test('restore에서 전용 pending이 0건이면 stale 구독을 끄다', () async {
+  test('restore에서 미래 구독은 pending 상태와 무관하게 전체 재예약한다', () async {
     final first = controller(exactPermitted: true);
     await first.enable(
       routeId: 'r1',
       stops: stops(),
       transferAlarmEnabled: true,
     );
-    notifier.pendingCount = 0;
+    notifier.scheduleCalls = 0;
 
     final restored = controller(exactPermitted: true);
     await restored.restore();
 
-    expect(notifier.cancelAllCount, 1);
-    expect(await repository.loadActive(), isNull);
-    expect(restored.state.enabled, isFalse);
+    expect(notifier.scheduleCalls, 1);
+    expect(notifier.scheduledAlarms, hasLength(2));
+    expect(restored.state.enabled, isTrue);
+    expect(restored.state.activeRouteId, 'r1');
+    expect((await repository.loadActive())?.routeId, 'r1');
   });
 
-  test('restore는 OS pending 드리프트를 실제 건수로 저장한다', () async {
+  test('restore는 단일 now 스냅샷으로 계산해 마지막 알림 경계에서 갈라지지 않는다', () async {
+    // 저장: 환승 9:15(fireAt 9:13)·도착 9:30(fireAt 9:28).
     final first = controller(exactPermitted: true);
     await first.enable(
       routeId: 'r1',
       stops: stops(),
       transferAlarmEnabled: true,
     );
-    notifier.pendingCount = 1;
+
+    // restore 시점의 두 후보 스냅샷: 첫 스냅샷은 마지막 fireAt(9:28) 직전이라
+    // 도착 알림 1건이 미래이고, 다음 스냅샷은 직후라 0건이다. 원자화 전이라면
+    // _restore의 만료 판정(1건)과 _schedule의 재계산(0건)이 갈려 복구가 조용히
+    // off로 정리됐다. 원자화 후에는 첫 스냅샷 결과로만 예약한다.
+    final clock = _AdvancingClock([
+      DateTime(2026, 7, 6, 9, 27, 59),
+      DateTime(2026, 7, 6, 9, 28, 1),
+    ]);
+    notifier.scheduleCalls = 0;
+    final restored = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: _StubExactAlarmGate(true),
+      notificationPermissionProvider: _StubNotificationPermissionProvider(
+        NotificationPermissionStatus.granted,
+      ),
+      repository: repository,
+      now: clock.now,
+    );
+    addTearDown(restored.dispose);
+
+    await restored.restore();
+
+    // 첫 스냅샷 결과(도착 1건)로 예약되고 켜진 상태를 유지한다.
+    expect(restored.state.enabled, isTrue);
+    expect(notifier.scheduleCalls, 1);
+    expect(notifier.scheduledAlarms, hasLength(1));
+    // restore 경로 전체가 now를 정확히 한 번만 읽어 두 스냅샷 갈림이 불가능하다.
+    expect(clock.calls, 1);
+  });
+
+  test('restore는 미래 구독을 결정적 재예약하고 실제 예약 수를 저장한다', () async {
+    notifier.result = const ScheduleDeliveryResult(
+      scheduledCount: 2,
+      failedCount: 0,
+    );
+    final first = controller(exactPermitted: true);
+    await first.enable(
+      routeId: 'r1',
+      stops: stops(),
+      transferAlarmEnabled: true,
+    );
 
     final restored = controller(exactPermitted: true);
     await restored.restore();
 
     expect(restored.state.enabled, isTrue);
-    expect(restored.state.scheduledCount, 1);
-    expect((await repository.loadActive())!.scheduledCount, 1);
-    expect(notifier.scheduleCalls, 1);
+    expect(restored.state.scheduledCount, 2);
+    expect((await repository.loadActive())!.scheduledCount, 2);
+    expect(notifier.scheduleCalls, 2);
   });
 
   test('restore에서 exact 상태가 바뀌면 저장된 stops로 권한 요청 없이 재예약한다', () async {
@@ -859,5 +939,152 @@ void main() {
     expect(notifier.cancelAllCount, 2);
     expect(stateRepository.active, isNull);
     expect(c.state.enabled, isFalse);
+  });
+
+  test('restore에서 만료 구독은 pending을 취소하고 구독을 삭제한다', () async {
+    final first = controller(exactPermitted: true);
+    await first.enable(
+      routeId: 'r1',
+      stops: stops(),
+      transferAlarmEnabled: true,
+    );
+    // 저장된 도착 시각(9:15/9:30)이 모두 지난 시점으로 복원한다.
+    final expired = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: _StubExactAlarmGate(true),
+      notificationPermissionProvider: _StubNotificationPermissionProvider(
+        NotificationPermissionStatus.granted,
+      ),
+      repository: repository,
+      now: () => DateTime(2026, 7, 6, 10, 0, 0),
+    );
+    addTearDown(expired.dispose);
+    notifier.cancelAllCount = 0;
+    notifier.scheduleCalls = 0;
+
+    await expired.restore();
+
+    expect(notifier.cancelAllCount, 1);
+    expect(notifier.scheduleCalls, 0);
+    expect(await repository.loadActive(), isNull);
+    expect(expired.state.enabled, isFalse);
+  });
+
+  test('알림 권한 거부 정리는 복구 안내 플래그를 기록하고 안내를 표시한다', () async {
+    final store = _RecordingRecoveryNoticeStore();
+    final first = controller(exactPermitted: true);
+    await first.enable(
+      routeId: 'r1',
+      stops: stops(),
+      transferAlarmEnabled: true,
+    );
+    final denied = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: _StubExactAlarmGate(true),
+      notificationPermissionProvider: _StubNotificationPermissionProvider(
+        NotificationPermissionStatus.denied,
+      ),
+      repository: repository,
+      recoveryNoticeStore: store,
+      now: () => now,
+    );
+    addTearDown(denied.dispose);
+
+    await denied.restore();
+
+    expect(store.recordCount, 1);
+    expect(await repository.loadActive(), isNull);
+    expect(denied.state.enabled, isFalse);
+    expect(denied.state.permissionNotice, '휴대전화 알림 권한을 허용해 주세요.');
+  });
+
+  test('다음 UI init은 기록된 복구 안내를 한 번 표시하고 플래그를 지운다', () async {
+    final store = _RecordingRecoveryNoticeStore()..flag = true;
+    final stateRepository = _RecordingStateRepository();
+    final restored = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: _StubExactAlarmGate(true),
+      notificationPermissionProvider: _StubNotificationPermissionProvider(
+        NotificationPermissionStatus.granted,
+      ),
+      repository: stateRepository,
+      recoveryNoticeStore: store,
+      now: () => now,
+    );
+    addTearDown(restored.dispose);
+
+    await restored.restore();
+
+    expect(restored.state.permissionNotice, '휴대전화 알림 권한을 허용해 주세요.');
+    expect(store.flag, isFalse);
+
+    // 두 번째 init은 더 이상 복구 안내를 표시하지 않는다(one-shot).
+    await restored.restore();
+    expect(restored.state.permissionNotice, isNull);
+  });
+
+  test('활성 구독 저장은 reconcile work를 등록하고 취소하지 않는다', () async {
+    var activateCount = 0;
+    var deactivateCount = 0;
+    final c = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: _StubExactAlarmGate(true),
+      notificationPermissionProvider: _StubNotificationPermissionProvider(
+        NotificationPermissionStatus.granted,
+      ),
+      repository: repository,
+      onActivateReconcileWork: () async => activateCount += 1,
+      onDeactivateReconcileWork: () async => deactivateCount += 1,
+      now: () => now,
+    );
+    addTearDown(c.dispose);
+
+    await c.enable(routeId: 'r1', stops: stops(), transferAlarmEnabled: true);
+
+    expect(activateCount, 1);
+    expect(deactivateCount, 0);
+  });
+
+  test('off 정리는 reconcile work를 취소한다', () async {
+    var deactivateCount = 0;
+    final c = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: _StubExactAlarmGate(true),
+      notificationPermissionProvider: _StubNotificationPermissionProvider(
+        NotificationPermissionStatus.granted,
+      ),
+      repository: repository,
+      onActivateReconcileWork: () async {},
+      onDeactivateReconcileWork: () async => deactivateCount += 1,
+      now: () => now,
+    );
+    addTearDown(c.dispose);
+    await c.enable(routeId: 'r1', stops: stops(), transferAlarmEnabled: true);
+
+    await c.disable();
+
+    expect(deactivateCount, greaterThanOrEqualTo(1));
+  });
+
+  test('사용자가 끈 구독(없음)은 복원하지 않는다', () async {
+    final stateRepository = _RecordingStateRepository();
+    var activateCount = 0;
+    final restored = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: _StubExactAlarmGate(true),
+      notificationPermissionProvider: _StubNotificationPermissionProvider(
+        NotificationPermissionStatus.granted,
+      ),
+      repository: stateRepository,
+      onActivateReconcileWork: () async => activateCount += 1,
+      now: () => now,
+    );
+    addTearDown(restored.dispose);
+
+    await restored.restore();
+
+    expect(activateCount, 0);
+    expect(notifier.scheduleCalls, 0);
+    expect(restored.state.enabled, isFalse);
   });
 }

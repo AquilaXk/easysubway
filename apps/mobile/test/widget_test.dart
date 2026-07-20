@@ -6,7 +6,6 @@ import 'dart:math' as math;
 import 'package:easysubway_mobile/accessible_design.dart';
 import 'package:easysubway_mobile/app/app_dependencies.dart';
 import 'package:easysubway_mobile/auth_headers.dart';
-import 'package:easysubway_mobile/main.dart';
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/favorite_facility.dart';
 import 'package:easysubway_mobile/core/external/kakao_map_launcher.dart';
@@ -16,17 +15,26 @@ import 'package:easysubway_mobile/core/datapack/bundled_data_pack_freshness.dart
 import 'package:easysubway_mobile/core/network/api_client.dart';
 import 'package:easysubway_mobile/features/ads/active_ad_banner.dart';
 import 'package:easysubway_mobile/features/ads/ad_repository.dart';
+import 'package:easysubway_mobile/features/account/presentation/user_data_deletion_screen.dart';
+import 'package:easysubway_mobile/features/attribution/presentation/data_source_attribution_screen.dart';
+import 'package:easysubway_mobile/features/favorites/presentation/favorite_home_screen.dart';
+import 'package:easysubway_mobile/features/support/presentation/support_access_screen.dart';
 import 'package:easysubway_mobile/features/fare/official_od_fare_quote.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/data/get_off_alarm_state_repository.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/exact_alarm_permission.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_controller.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_notifier.dart';
+import 'package:easysubway_mobile/features/home/presentation/home_screen.dart';
+import 'package:easysubway_mobile/features/settings/presentation/app_settings_screen.dart';
+import 'package:easysubway_mobile/features/settings/presentation/service_info_screen.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_schedule_mode.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_scheduler.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_subscription.dart';
 import 'package:easysubway_mobile/features/network_map/domain/map_camera.dart';
 import 'package:easysubway_mobile/features/realtime/realtime_repository.dart';
 import 'package:easysubway_mobile/features/route_draft/application/route_draft_controller.dart';
+import 'package:easysubway_mobile/features/stations/presentation/station_detail_screen.dart';
+import 'package:easysubway_mobile/features/stations/presentation/station_search_screen.dart';
 import 'package:easysubway_mobile/features/service_notice/data/notice_repository.dart';
 import 'package:easysubway_mobile/features/service_notice/domain/service_notice.dart';
 import 'package:easysubway_mobile/features/route_draft/domain/route_draft.dart';
@@ -39,6 +47,7 @@ import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:easysubway_mobile/network_map.dart';
 import 'package:easysubway_mobile/search_field.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/route_map_basemap_view.dart';
+import 'package:easysubway_mobile/features/network_map/presentation/nearby_direction_title.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/structured_route_map_painter.dart';
 import 'package:easysubway_mobile/notification_settings.dart';
 import 'package:easysubway_mobile/onboarding.dart';
@@ -390,6 +399,14 @@ Future<void> _openSettingsScreen(WidgetTester tester) async {
                   userDataDeletionRepository: home.userDataDeletionRepository,
                   onUserDataDeleted: home.onUserDataDeleted,
                 ),
+              ),
+            );
+          },
+          onOpenServiceInfo: () {
+            Navigator.of(homeContext).push(
+              MaterialPageRoute<void>(
+                builder: (_) =>
+                    ServiceInfoScreen(accessInfo: home.supportAccessInfo),
               ),
             );
           },
@@ -817,8 +834,13 @@ void main() {
     expect(find.byKey(const Key('nearbyStationButton')), findsOneWidget);
     expect(find.byKey(const Key('networkMapBottomAdBanner')), findsOneWidget);
     // #2068: 노선도는 일반/급행 선택 없는 단일 통합 지도라 운행종별 토글이 없다.
-    expect(find.text('일반'), findsNothing);
-    expect(find.text('급행'), findsNothing);
+    // #2099 DoD: 노선도에 일반/급행 선택 control과 별도 상태는 0건이다. 일반/급행은
+    // 선택 UI가 아니라 실제 운행 정보이므로 노선도 뷰 토글을 두지 않는다.
+    expect(
+      find.byKey(const Key('networkMapServicePatternToggle')),
+      findsNothing,
+    );
+    expect(find.widgetWithText(InkWell, '급행'), findsNothing);
   });
 
   testWidgets('온보딩 이동 조건은 경로 검색 기본값으로 이어진다', (tester) async {
@@ -1328,141 +1350,6 @@ void main() {
     );
   });
 
-  testWidgets('#2083 역 검색 화면은 홈 편집 모드와 같은 46px 시각 박스·중앙 정렬 입력 필드를 렌더한다', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: StationSearchScreen(
-          repository: FakeStationSearchRepository(),
-          reportRepository: FakeFacilityReportRepository(),
-          locationProvider: FakeCurrentLocationProvider(),
-          pickSlot: RouteDraftSlot.origin,
-          regionLabel: '수도권',
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    // 홈 편집 모드와 동일한 공용 시각 박스(46px)를 렌더한다.
-    expect(
-      tester.getSize(find.byKey(const Key('heroStationSearchInputBox'))).height,
-      46.0,
-    );
-
-    // pickSlot별 힌트가 placeholder(이자 TalkBack 라벨)로 렌더된다. #2083 오너
-    // 확정: 슬롯 검색 진입 placeholder는 슬롯명 단독.
-    expect(find.text('출발역'), findsOneWidget);
-
-    // 입력 필드 탭 타깃(병합된 터치타겟 SizedBox)은 최소 탭 타깃(≥48)을 유지한다.
-    final originInputTapTarget = find
-        .ancestor(
-          of: find.byKey(const Key('stationSearchInput')),
-          matching: find.byType(SizedBox),
-        )
-        .first;
-    expect(
-      tester.getSize(originInputTapTarget).height,
-      greaterThanOrEqualTo(48.0),
-    );
-
-    // 편집 텍스트가 46px 시각 박스 안에 렌더돼야 한다(#2082 수정을 공용 위젯이
-    // 소비함을 검증). #2082 실기기 재작업: 중앙 정렬은 고유 높이 필드 + Center
-    // 위젯으로 얻으며 실기기(Noto Sans KR)에서 오프셋 0으로 정합함을 픽셀 판독으로
-    // 확인했다(docs/2082-qa, 정본). FlutterTest 테스트 폰트·AppBar toolbar 배치
-    // 오차로 중심이 박스 중심에서 십수 px 벗어날 수 있으므로, 입력 글자가 박스
-    // 세로 범위 안에 온전히 들어오는지를 폰트 메트릭 독립적으로 계약으로 잡는다.
-    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
-    await tester.pumpAndSettle();
-    final searchScreenBoxRect = tester.getRect(
-      find.byKey(const Key('heroStationSearchInputBox')),
-    );
-    final searchScreenTextCenterDy = tester.getCenter(find.text('상록수')).dy;
-    expect(searchScreenTextCenterDy, greaterThan(searchScreenBoxRect.top));
-    expect(searchScreenTextCenterDy, lessThan(searchScreenBoxRect.bottom));
-
-    final searchField = tester.widget<TextField>(
-      find.byKey(const Key('stationSearchInput')),
-    );
-    expect(searchField.maxLines, 1);
-    expect(searchField.expands, isFalse);
-  });
-
-  testWidgets('#2082 역 검색 화면은 필드 우측에 지역 표시를 두고 필드가 그 앞에서 끝난다', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: StationSearchScreen(
-          repository: FakeStationSearchRepository(),
-          reportRepository: FakeFacilityReportRepository(),
-          locationProvider: FakeCurrentLocationProvider(),
-          pickSlot: RouteDraftSlot.origin,
-          regionLabel: '수도권',
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    // #3: 홈과 동일하게 검색 화면 우측에 현재 지역명을 표시한다.
-    final indicator = find.byKey(const Key('stationSearchRegionIndicator'));
-    expect(indicator, findsOneWidget);
-    expect(
-      find.descendant(of: indicator, matching: find.text('수도권')),
-      findsOneWidget,
-    );
-    // 표시 전용이라 지역 변경 화살표(아래 방향)를 홈과 같은 스타일로 둔다.
-    expect(
-      find.descendant(
-        of: indicator,
-        matching: find.byIcon(Icons.keyboard_arrow_down),
-      ),
-      findsOneWidget,
-    );
-
-    // #2: 검색 필드가 우측 끝까지 꽉 차지 않고 지역 표시 앞에서 끝난다
-    // (홈 idle [≡ | 필드 | 지역표시] 구성과 정합).
-    final fieldRight = tester
-        .getRect(find.byKey(const Key('heroStationSearchInputBox')))
-        .right;
-    final indicatorLeft = tester.getRect(indicator).left;
-    expect(fieldRight, lessThanOrEqualTo(indicatorLeft));
-
-    // ← 뒤로가기 버튼이 홈 ≡ 슬롯과 같은 위치(필드 왼쪽)에 남는다.
-    expect(find.byKey(const Key('stationSearchBackButton')), findsOneWidget);
-  });
-
-  testWidgets('#2090 수도권 외 지역(부산) 선택 상태에서 열어도 검색 화면 지역 표시가 실제 선택 지역을 따른다', (
-    tester,
-  ) async {
-    // 회귀 방지: 직전 구현은 regionLabel 기본값이 '수도권' 고정이고 호출부가
-    // 실제 선택 지역을 주입하지 않아, 부산 선택 상태에서 검색을 열어도
-    // '수도권'이 잘못 표시됐다. 이제 호출부(main.dart)가 NetworkMapScreen의
-    // 현재 선택 지역 표시명을 regionLabel로 넘기므로, 여기서는 그 배선의
-    // 최종 결과(regionLabel이 실제로 화면에 반영되는지)를 검증한다.
-    await tester.pumpWidget(
-      MaterialApp(
-        home: StationSearchScreen(
-          repository: FakeStationSearchRepository(),
-          reportRepository: FakeFacilityReportRepository(),
-          locationProvider: FakeCurrentLocationProvider(),
-          pickSlot: RouteDraftSlot.origin,
-          regionLabel: '부산',
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    final indicator = find.byKey(const Key('stationSearchRegionIndicator'));
-    expect(indicator, findsOneWidget);
-    expect(
-      find.descendant(of: indicator, matching: find.text('부산')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: indicator, matching: find.text('수도권')),
-      findsNothing,
-    );
-  });
-
   testWidgets('#2090 공용 검색 필드는 시스템 글자 배율에 비례해 입력 텍스트가 커지고 잘리지 않는다', (
     tester,
   ) async {
@@ -1512,100 +1399,6 @@ void main() {
     expect(measured[3.0]!, greaterThan(measured[2.0]!));
     // 배율에 대략 비례한다(2.0에서 최소 1.5배 이상 커짐 — 고정 18px 회귀 방지).
     expect(measured[2.0]!, greaterThan(measured[1.0]! * 1.5));
-  });
-
-  testWidgets('#2090 배율 3.0에서 역 검색 화면 필드가 툴바 안에서 잘리지 않는다', (tester) async {
-    // Finding 2: 툴바 높이 보정 상수가 새 필드 메트릭과 정합돼 큰 배율에서도
-    // 필드가 AppBar 세로 범위 안에 온전히 들어가야 한다.
-    await tester.pumpWidget(
-      MediaQuery(
-        data: const MediaQueryData(textScaler: TextScaler.linear(3.0)),
-        child: MaterialApp(
-          home: StationSearchScreen(
-            repository: FakeStationSearchRepository(),
-            reportRepository: FakeFacilityReportRepository(),
-            locationProvider: FakeCurrentLocationProvider(),
-            pickSlot: RouteDraftSlot.origin,
-            regionLabel: '수도권',
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
-    await tester.pumpAndSettle();
-
-    expect(tester.takeException(), isNull);
-
-    final inputFinder = find.byKey(const Key('stationSearchInput'));
-    final appBarFinder = find.ancestor(
-      of: inputFinder,
-      matching: find.byType(AppBar),
-    );
-    final appBar = tester.widget<AppBar>(appBarFinder);
-    expect(appBar.toolbarHeight, greaterThan(kToolbarHeight));
-
-    final appBarRect = tester.getRect(appBarFinder);
-    final boxRect = tester.getRect(
-      find.byKey(const Key('heroStationSearchInputBox')),
-    );
-    // 시각 박스가 툴바 세로 범위 안에 온전히 들어간다(위/아래로 잘리지 않음).
-    expect(boxRect.bottom, lessThanOrEqualTo(appBarRect.bottom + 0.5));
-    expect(boxRect.top, greaterThanOrEqualTo(appBarRect.top - 0.5));
-  });
-
-  testWidgets('#2090 역 검색 필드는 입력 후에도 슬롯 맥락 semantics 라벨을 유지한다', (tester) async {
-    // Finding 3: 이전 floating label이 유지하던 슬롯 맥락("출발역") 라벨이
-    // 입력 후에도 스크린리더 semantics 트리에 남아야 한다.
-    final handle = tester.ensureSemantics();
-    await tester.pumpWidget(
-      MaterialApp(
-        home: StationSearchScreen(
-          repository: FakeStationSearchRepository(),
-          reportRepository: FakeFacilityReportRepository(),
-          locationProvider: FakeCurrentLocationProvider(),
-          pickSlot: RouteDraftSlot.origin,
-          regionLabel: '수도권',
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    // 입력 전: 슬롯 맥락 라벨이 semantics 트리에 있다(hint 노드 + 라벨 래퍼
-    // 노드가 중첩돼 하나 이상 존재한다).
-    expect(find.bySemanticsLabel('출발역'), findsWidgets);
-
-    // 입력 후: hint는 InputDecorator가 지우지만 슬롯 맥락 라벨은 유지된다.
-    // 이전 floating label 없이도 맥락이 남아야 한다(#2090 Finding 3).
-    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
-    await tester.pumpAndSettle();
-    // 정확히 한 노드(라벨 래퍼)가 슬롯 맥락 라벨을 유지한다. 입력 필드 노드는
-    // 입력값(상록수)을 value로 갖고 라벨은 상위 래퍼 노드가 보존한다.
-    expect(find.bySemanticsLabel('출발역'), findsOneWidget);
-
-    handle.dispose();
-  });
-
-  testWidgets('#2090 도착역 슬롯은 도착역 맥락 semantics 라벨을 노출한다', (tester) async {
-    final handle = tester.ensureSemantics();
-    await tester.pumpWidget(
-      MaterialApp(
-        home: StationSearchScreen(
-          repository: FakeStationSearchRepository(),
-          reportRepository: FakeFacilityReportRepository(),
-          locationProvider: FakeCurrentLocationProvider(),
-          pickSlot: RouteDraftSlot.destination,
-          regionLabel: '수도권',
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('stationSearchInput')), '사당');
-    await tester.pumpAndSettle();
-    expect(find.bySemanticsLabel('도착역'), findsOneWidget);
-    // 출발역 맥락이 새어 나오지 않는다.
-    expect(find.bySemanticsLabel('출발역'), findsNothing);
-    handle.dispose();
   });
 
   testWidgets('#2003 상단 내비게이션(검색바·메뉴·힌트 텍스트)이 확대된 안 B 치수를 갖는다', (tester) async {
@@ -1950,7 +1743,7 @@ void main() {
     expect(find.byKey(const Key('networkMapRouteDraftOverlay')), findsNothing);
   });
 
-  testWidgets('노선도 메뉴에서 데이터 및 지도 출처 화면으로 이동한다', (tester) async {
+  testWidgets('노선도 메뉴에는 자료 제공 정보를 노출하지 않는다', (tester) async {
     await tester.pumpWidget(
       buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
@@ -1965,38 +1758,11 @@ void main() {
 
     await tester.tap(find.byKey(const Key('networkMapMenuButton')));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('networkMapMenuDataSourcesButton')),
-      120,
-    );
-    await tester.drag(find.byType(Scrollable).first, const Offset(0, -80));
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.descendant(
-        of: find.byKey(const Key('networkMapMenuDataSourcesButton')),
-        matching: find.byType(InkWell),
-      ),
-    );
-    for (var attempt = 0; attempt < 30; attempt += 1) {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 100)),
-      );
-      await tester.pump(const Duration(milliseconds: 100));
-      if (find.text('지도 표시용 asset').evaluate().isNotEmpty) {
-        break;
-      }
-    }
-
+    expect(find.text('자료 제공 정보'), findsNothing);
     expect(
-      find.byKey(const Key('dataSourceAttributionScreen')),
-      findsOneWidget,
+      find.byKey(const Key('networkMapMenuDataSourcesButton')),
+      findsNothing,
     );
-    expect(find.text('데이터 및 지도 출처'), findsOneWidget);
-    await tester.pump();
-    await tester.pump();
-    await tester.scrollUntilVisible(find.text('지도 표시용 asset'), 240);
-    expect(find.text('지도 표시용 asset'), findsOneWidget);
-    expect(find.text('지금은 상록수역·사당역 구간을 안내해요'), findsNothing);
   });
 
   testWidgets('노선도 지역 메뉴는 선택한 지역으로 지도를 다시 불러온다', (tester) async {
@@ -2236,6 +2002,71 @@ void main() {
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
     expect(find.bySemanticsLabel(_fanOriginLabel), findsOneWidget);
     expect(find.bySemanticsLabel(_fanDestinationLabel), findsOneWidget);
+  });
+
+  testWidgets('#2200 노선도 역 탭은 팬 메뉴와 함께 하단 역 정보 패널을 연다', (tester) async {
+    final repository = FakeStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      },
+    );
+    await tester.pumpWidget(
+      buildEasySubwayTestApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const Key('networkMapStation-sangnoksu-seoul-4')),
+    );
+    await tester.pumpAndSettle();
+
+    // 팬 메뉴는 그대로 뜬다(기존 동작 보존).
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+    expect(find.bySemanticsLabel(_fanOriginLabel), findsOneWidget);
+
+    // 하단 역 정보 패널이 탭한 역 기준으로 함께 열린다.
+    final panel = find.byKey(const Key('networkMapNearbyStationPanel'));
+    expect(panel, findsOneWidget);
+    final track = find.byKey(const Key('nearbyStationLineBarTrack'));
+    expect(track, findsOneWidget);
+    final trackSize = tester.getSize(track);
+    expect(trackSize.width, greaterThan(0));
+    expect(trackSize.height, greaterThan(0));
+    expect(
+      find.descendant(of: panel, matching: find.text('상록수')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('#2200 검색 결과가 없는 역 탭은 크래시 없이 팬 메뉴만 유지한다', (tester) async {
+    // 탭한 역을 StationSearchResult로 해석하지 못하면(데이터 없음) 하단 패널을
+    // 열지 않고 기존 팬 메뉴 동작을 그대로 유지한다.
+    final repository = FakeStationSearchRepository();
+    await tester.pumpWidget(
+      buildEasySubwayTestApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const Key('networkMapStation-sangnoksu-seoul-4')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+    expect(find.bySemanticsLabel(_fanOriginLabel), findsOneWidget);
+    expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
   });
 
   testWidgets(
@@ -2911,9 +2742,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // ① 홈 상단 disruption 배너.
-    expect(find.byKey(const Key('serviceNoticeBanner')), findsOneWidget);
-    expect(find.text('2호선 강남–역삼 지연 — 우회 경로를 확인하세요'), findsOneWidget);
+    // ① 홈 상단 통합 신규 알림 안내 바(disruption이 트리거). 제목이 아니라
+    //    통합 안내 문구를 노출한다(#2200 통합형 결정).
+    expect(find.byKey(const Key('newNotificationBar')), findsOneWidget);
+    expect(find.text('새로운 알림이 있어요'), findsOneWidget);
 
     // ② 좌측 메뉴 "운행 공지" 진입점 → 목록 화면.
     await tester.tap(find.byKey(const Key('networkMapMenuButton')));
@@ -2931,7 +2763,7 @@ void main() {
     expect(find.text('상행 지연이 이어지고 있어요.'), findsOneWidget);
   });
 
-  testWidgets('운행 공지 배너는 닫기로 사라진다', (tester) async {
+  testWidgets('알림이 없으면 홈 상단 안내 바를 그리지 않는다', (tester) async {
     await tester.pumpWidget(
       buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
@@ -2942,11 +2774,11 @@ void main() {
           ActiveNoticesResult(
             notices: [
               ServiceNotice(
-                id: 'n1',
+                id: 'i1',
                 scope: NoticeScope.all,
-                title: '1호선 지연 안내',
-                body: '지연이 이어지고 있어요.',
-                severity: NoticeSeverity.disruption,
+                title: '정보 공지',
+                body: '정보성 안내입니다.',
+                severity: NoticeSeverity.info,
                 publishedAt: DateTime(2026, 7, 6, 9, 0, 0),
               ),
             ],
@@ -2957,12 +2789,10 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('serviceNoticeBanner')), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('serviceNoticeBannerDismiss')));
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const Key('serviceNoticeBanner')), findsNothing);
+    // info 공지는 disruption이 아니고 알림함 새 항목도 없으므로 바가 없다.
+    expect(find.byKey(const Key('newNotificationBar')), findsNothing);
+    expect(find.text('새로운 알림이 있어요'), findsNothing);
   });
 
   test('노선도 camera revision은 같은 gesture update에서도 단조 증가한다', () {
@@ -3415,6 +3245,9 @@ void main() {
     );
   });
 
+  // #2099 WP2: 노선도의 일반/급행 뷰 토글과 급행 전용 필터 데이터 경로는
+  // 제거됐다(일반/급행은 선택 UI가 아니라 실제 운행 정보). 노선도에 선택 control이
+  // 0건임은 '노선도 첫 화면은 하단 광고 위에 지도 조작을 유지한다' 테스트가 지킨다.
   testWidgets('노선도는 일반 급행 선택 없이 모든 노선을 함께 표시한다', (tester) async {
     // #2068: 노선도는 단일 통합 지도다. LOCAL/EXPRESS가 섞인 fixture에서도
     // 운행종별 필터 없이 모든 노선·역·edge를 함께 렌더하고, 일반/급행 선택
@@ -4990,31 +4823,30 @@ void main() {
 
     await tester.tap(find.byKey(const Key('nearbyStationButton')));
     await tester.pumpAndSettle();
-    expect(find.bySemanticsLabel('현재 실시간, 시간표로 전환'), findsOneWidget);
+    // 2버튼 세그먼트 토글(#2200). 초기 선택은 실시간.
+    expect(find.bySemanticsLabel('실시간 선택됨'), findsOneWidget);
     expect(
-      tester
-          .widget<Text>(
-            find.descendant(
-              of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
-              matching: find.text('실시간'),
-            ),
-          )
-          .data,
-      '실시간',
+      find.descendant(
+        of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
+        matching: find.text('실시간'),
+      ),
+      findsOneWidget,
     );
 
-    await tester.tap(find.byKey(const Key('networkMapNearbyDataSourceToggle')));
+    // 비선택 '시간표' 세그먼트를 눌러 시간표로 전환.
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
+        matching: find.text('시간표'),
+      ),
+    );
     await tester.pumpAndSettle();
 
-    final directionTexts = find.text('오이도 방면');
-    expect(directionTexts, findsNWidgets(2));
-    for (final (index, item) in [departure, secondDeparture].indexed) {
+    // 방면 제목은 열당 1개 헤더로 올라가고, 그 아래 두 시각이 각각 한 줄.
+    expect(find.text('오이도 방면'), findsOneWidget);
+    for (final item in [departure, secondDeparture]) {
       final timeFinder = find.text(item.timeLabel);
       expect(timeFinder, findsOneWidget);
-      expect(
-        tester.getCenter(directionTexts.at(index)).dy,
-        closeTo(tester.getCenter(timeFinder).dy, 0.5),
-      );
       expect(
         tester.widget<Text>(timeFinder).style?.color,
         const Color(0xFFE23D3D),
@@ -5024,14 +4856,7 @@ void main() {
         findsOneWidget,
       );
     }
-    expect(
-      find.descendant(
-        of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
-        matching: find.text('시간표'),
-      ),
-      findsOneWidget,
-    );
-    expect(find.bySemanticsLabel('현재 시간표, 실시간으로 전환'), findsOneWidget);
+    expect(find.bySemanticsLabel('시간표 선택됨'), findsOneWidget);
     expect(
       tester
           .getSize(find.byKey(const Key('networkMapNearbyDataSourceToggle')))
@@ -5039,19 +4864,338 @@ void main() {
       greaterThanOrEqualTo(48),
     );
 
-    await tester.tap(find.byKey(const Key('networkMapNearbyDataSourceToggle')));
-    await tester.pumpAndSettle();
-    expect(
+    // 다시 '실시간' 세그먼트를 눌러 복귀.
+    await tester.tap(
       find.descendant(
         of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
         matching: find.text('실시간'),
       ),
-      findsOneWidget,
     );
-    expect(find.bySemanticsLabel('현재 실시간, 시간표로 전환'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('실시간 선택됨'), findsOneWidget);
   });
 
-  testWidgets('GPS 하단 패널은 선택한 데이터가 없으면 검정 대시 하나만 보여준다', (tester) async {
+  testWidgets('급행 운행 정보는 선택 UI 없이 시간표와 길찾기에 표시된다', (tester) async {
+    tester.view.physicalSize = const Size(320, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final semanticsHandle = tester.ensureSemantics();
+    final now = DateTime.now();
+    final baseSeconds =
+        now.hour * Duration.secondsPerHour +
+        now.minute * Duration.secondsPerMinute +
+        now.second;
+    final localDeparture = StationTimetableDeparture(
+      directionName: '오이도',
+      seconds: baseSeconds + 120,
+    );
+    final expressDeparture = StationTimetableDeparture(
+      directionName: '오이도',
+      seconds: baseSeconds + 300,
+      servicePattern: 'EXPRESS',
+      serviceClass: 'SUBWAY',
+    );
+    final repository = FakeTimetableStationRepository(
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+      networkMapRegionNames: const ['수도권'],
+      nearbyResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      timetables: {
+        for (final dayType in StationTimetableDayType.values)
+          dayType: _stationTimetable(
+            dayType,
+            directions: [
+              StationTimetableDirection(
+                name: '오이도',
+                departures: [localDeparture, expressDeparture],
+              ),
+            ],
+          ),
+      },
+    );
+
+    try {
+      await _pumpNetworkMapForGpsTest(
+        tester,
+        repository: repository,
+        locationProvider: FakeCurrentLocationProvider(
+          location: _freshCurrentLocation(),
+          needsPermissionRequest: false,
+        ),
+        realtimeRepository: _RecordingRealtimeRepository(),
+      );
+
+      await tester.tap(find.byKey(const Key('nearbyStationButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
+          matching: find.text('시간표'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // --- 시간표 부분(#2099 WP1) ---
+      // 인접역 시간표 패널로 범위를 좁힌다. 노선도 자체의 일반/급행 노선 뷰
+      // 전환 컨트롤(networkMapServicePatternToggle)은 시간표 급행 정보와 무관한
+      // 별개 기능이므로 이 검증에 섞이지 않게 한다.
+      final panel = find.byKey(const Key('networkMapNearbyStationPanel'));
+      expect(panel, findsOneWidget);
+      // 급행 출발 행에만 배지 1회, 일반 행에는 배지 없음.
+      expect(
+        find.descendant(
+          of: panel,
+          matching: find.byKey(const Key('servicePatternExpressBadge')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: panel, matching: find.text('급행')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: panel, matching: find.text('일반')),
+        findsNothing,
+      );
+      // 두 시각 모두 노출.
+      expect(
+        find.descendant(
+          of: panel,
+          matching: find.text(localDeparture.timeLabel),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: panel,
+          matching: find.text(expressDeparture.timeLabel),
+        ),
+        findsOneWidget,
+      );
+      // TalkBack은 급행을 정확히 한 번만 읽는다(배지는 장식이라 semantics 제외).
+      expect(
+        find.descendant(
+          of: panel,
+          matching: find.bySemanticsLabel(RegExp('급행')),
+        ),
+        findsOneWidget,
+      );
+      // 급행/일반은 실제 운행 정보다 — 시간표 패널 안에 toggle/chip/filter 선택
+      // 컨트롤 0건.
+      expect(
+        find.descendant(of: panel, matching: find.byType(ChoiceChip)),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: panel, matching: find.byType(FilterChip)),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: panel, matching: find.byType(Switch)),
+        findsNothing,
+      );
+
+      // --- 길찾기 부분(#2099 WP2) ---
+      // 같은 급행 배지 위젯을 길찾기 경로 타임라인의 승차 leg에서도 쓴다. SUBWAY/
+      // EXPRESS 승차 step에만 `급행` 배지가 1회 붙고, 별도 선택 컨트롤은 없다.
+      final routeRepository = FakeRouteSearchRepository(
+        result: _sampleRouteSearchResult(
+          steps: const [
+            RouteSearchStep(
+              sequence: 1,
+              stepType: 'ride',
+              title: '상록수역에서 오이도행 승차',
+              description: '승강장에서 열차를 타고 이동합니다.',
+              lineId: 'seoul-4',
+              lineName: '수도권 4호선',
+              fromStationId: 'station-sangnoksu',
+              toStationId: 'station-sadang',
+              estimatedMinutes: 18,
+              distanceMeters: 12000,
+              includesStairs: false,
+              requiresAccessibilityCheck: false,
+              actionTitle: '오이도행 열차 승차',
+              serviceClass: 'SUBWAY',
+              servicePattern: 'EXPRESS',
+            ),
+          ],
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RouteSearchScreen(
+            repository: routeRepository,
+            stationRepository: FakeStationSearchRepository(),
+            favoriteRouteRepository: FakeFavoriteRouteRepository(),
+            initialDraft: RouteDraft(
+              origin: const RouteDraftStation(
+                id: 'station-sangnoksu',
+                nameKo: '상록수',
+              ),
+              destination: const RouteDraftStation(
+                id: 'station-sadang',
+                nameKo: '사당',
+              ),
+              lastModifiedAt: DateTime(2026, 7, 17),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 승차 leg에 급행 배지 1회, 시각 텍스트도 1회.
+      expect(
+        find.byKey(const Key('servicePatternExpressBadge')),
+        findsOneWidget,
+      );
+      expect(find.text('급행'), findsOneWidget);
+      // TalkBack은 급행을 정확히 한 번만 읽는다(배지는 장식, 라벨은 승차 leg가 1회).
+      expect(find.bySemanticsLabel(RegExp('급행')), findsOneWidget);
+      // 급행/일반은 실제 운행 정보다 — 길찾기에도 toggle/chip/filter 선택 컨트롤 0건.
+      expect(find.byType(ChoiceChip), findsNothing);
+      expect(find.byType(FilterChip), findsNothing);
+      expect(find.byType(Switch), findsNothing);
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
+  testWidgets('길찾기 ITX-청춘 승차 leg은 선택 UI 없이 ITX-청춘 서비스 식별을 표시한다', (
+    tester,
+  ) async {
+    // #1414/#2099: ITX-청춘은 별도 운임의 좌석 지정 서비스라 같은 노선의 일반
+    // 전동차와 화면에서 구분되어야 한다. serviceClass=ITX_CHEONGCHUN 승차 step에만
+    // `ITX-청춘` 배지가 1회 붙고, generic 급행 배지·선택 컨트롤은 없다.
+    final semanticsHandle = tester.ensureSemantics();
+    final routeRepository = FakeRouteSearchRepository(
+      result: _sampleRouteSearchResult(
+        steps: const [
+          RouteSearchStep(
+            sequence: 1,
+            stepType: 'ride',
+            title: '상록수역에서 춘천행 승차',
+            description: '승강장에서 열차를 타고 이동합니다.',
+            lineId: 'gyeongchun',
+            lineName: '수도권 경춘',
+            fromStationId: 'station-sangnoksu',
+            toStationId: 'station-sadang',
+            estimatedMinutes: 40,
+            distanceMeters: 30000,
+            includesStairs: false,
+            requiresAccessibilityCheck: false,
+            actionTitle: '춘천행 열차 승차',
+            serviceClass: 'ITX_CHEONGCHUN',
+            servicePattern: 'EXPRESS',
+          ),
+        ],
+      ),
+    );
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RouteSearchScreen(
+            repository: routeRepository,
+            stationRepository: FakeStationSearchRepository(),
+            favoriteRouteRepository: FakeFavoriteRouteRepository(),
+            initialDraft: RouteDraft(
+              origin: const RouteDraftStation(
+                id: 'station-sangnoksu',
+                nameKo: '상록수',
+              ),
+              destination: const RouteDraftStation(
+                id: 'station-sadang',
+                nameKo: '사당',
+              ),
+              lastModifiedAt: DateTime(2026, 7, 17),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 승차 leg에 ITX-청춘 배지 1회, 텍스트도 1회.
+      expect(
+        find.byKey(const Key('servicePatternItxCheongchunBadge')),
+        findsOneWidget,
+      );
+      expect(find.text('ITX-청춘'), findsOneWidget);
+      // TalkBack은 ITX-청춘을 정확히 한 번만 읽는다(배지는 장식, 라벨은 leg가 1회).
+      expect(find.bySemanticsLabel(RegExp('ITX-청춘')), findsOneWidget);
+      // generic 급행 배지·라벨은 ITX leg에 0건.
+      expect(find.byKey(const Key('servicePatternExpressBadge')), findsNothing);
+      expect(find.text('급행'), findsNothing);
+      expect(find.bySemanticsLabel(RegExp('급행')), findsNothing);
+      // 서비스 식별은 실제 운행 정보다 — toggle/chip/filter 선택 컨트롤 0건.
+      expect(find.byType(ChoiceChip), findsNothing);
+      expect(find.byType(FilterChip), findsNothing);
+      expect(find.byType(Switch), findsNothing);
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
+  testWidgets('길찾기 SUBWAY 승차 leg에는 ITX-청춘 표시가 붙지 않는다', (tester) async {
+    // ITX-청춘 식별은 serviceClass=ITX_CHEONGCHUN 승차 leg에만 붙는다. SUBWAY
+    // 일반/급행 leg에는 ITX-청춘 배지·텍스트가 0건이어야 한다.
+    final routeRepository = FakeRouteSearchRepository(
+      result: _sampleRouteSearchResult(
+        steps: const [
+          RouteSearchStep(
+            sequence: 1,
+            stepType: 'ride',
+            title: '상록수역에서 오이도행 승차',
+            description: '승강장에서 열차를 타고 이동합니다.',
+            lineId: 'seoul-4',
+            lineName: '수도권 4호선',
+            fromStationId: 'station-sangnoksu',
+            toStationId: 'station-sadang',
+            estimatedMinutes: 18,
+            distanceMeters: 12000,
+            includesStairs: false,
+            requiresAccessibilityCheck: false,
+            actionTitle: '오이도행 열차 승차',
+            serviceClass: 'SUBWAY',
+            servicePattern: 'LOCAL',
+          ),
+        ],
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: routeRepository,
+          stationRepository: FakeStationSearchRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 17),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('servicePatternItxCheongchunBadge')),
+      findsNothing,
+    );
+    expect(find.text('ITX-청춘'), findsNothing);
+  });
+
+  testWidgets('GPS 하단 패널은 열차 정보가 없어도 인접역 두 방면 스켈레톤(제목+대시+구분선)을 유지한다', (
+    tester,
+  ) async {
+    // #2200 QA: 실시간/시간표 데이터가 전무해도 인접역이 둘이면 "○○ 방면" 제목
+    // 두 열 + 1×46 구분선을 유지하고, 데이터 없는 열에는 대시('-')만 그린다.
     final repository = FakeTimetableStationRepository(
       stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
       networkMapRegionNames: const ['수도권'],
@@ -5073,15 +5217,40 @@ void main() {
 
     await tester.tap(find.byKey(const Key('nearbyStationButton')));
     await tester.pumpAndSettle();
-    expect(find.text('-'), findsOneWidget);
+
+    final panel = find.byKey(const Key('networkMapNearbyStationPanel'));
     expect(
-      tester.widget<Text>(find.text('-')).style?.color,
+      find.descendant(of: panel, matching: find.byType(NearbyDirectionTitle)),
+      findsNWidgets(2),
+    );
+    expect(
+      find.descendant(of: panel, matching: find.text('-')),
+      findsNWidgets(2),
+    );
+    expect(
+      tester
+          .widget<Text>(
+            find.descendant(of: panel, matching: find.text('-')).first,
+          )
+          .style
+          ?.color,
       const Color(0xFF2F2F2F),
+    );
+    expect(
+      find.descendant(of: panel, matching: find.byType(VerticalDivider)),
+      findsOneWidget,
     );
 
     await tester.tap(find.byKey(const Key('networkMapNearbyDataSourceToggle')));
     await tester.pumpAndSettle();
-    expect(find.text('-'), findsOneWidget);
+    expect(
+      find.descendant(of: panel, matching: find.text('-')),
+      findsNWidgets(2),
+    );
+    expect(
+      find.descendant(of: panel, matching: find.byType(VerticalDivider)),
+      findsOneWidget,
+    );
   });
 
   testWidgets('GPS 탭은 지도 직접 선택을 즉시 해제하고 카메라를 유지한다', (tester) async {
@@ -5526,52 +5695,6 @@ void main() {
     expect(find.byType(AppSettingsScreen), findsOneWidget);
   });
 
-  testWidgets('가까운 역 화면은 위치 실패 후 역명 검색 입력을 보여준다', (tester) async {
-    final locationProvider = FakeCurrentLocationProvider(
-      error: const CurrentLocationException('현재 위치를 확인하지 못했어요.'),
-      needsPermissionRequest: false,
-    );
-    final repository = FakeStationSearchRepository(
-      networkMapRegionNames: const ['수도권'],
-      queryResults: {
-        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
-      },
-    );
-
-    await tester.pumpWidget(
-      buildEasySubwayTestApp(
-        repository: repository,
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: FakeFavoriteStationRepository(),
-        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
-        favoriteRouteRepository: FakeFavoriteRouteRepository(),
-        locationProvider: locationProvider,
-        notificationRepository: FakeNotificationSettingsRepository(),
-        initialOnboardingState: _completedOnboardingState(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('networkMapMenuNearbyButton')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('현재 위치를 확인하지 못했어요.'), findsOneWidget);
-    expect(find.byKey(const Key('stationSearchInput')), findsOneWidget);
-    expect(find.byKey(const Key('nearbyStationSearchButton')), findsOneWidget);
-    expect(find.byKey(const Key('stationRecentSearchSection')), findsNothing);
-
-    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
-    await tester.pumpAndSettle();
-    await tester.testTextInput.receiveAction(TextInputAction.search);
-    await tester.pumpAndSettle();
-
-    expect(repository.requestedQueries, contains('상록수'));
-    expect(find.text('상록수역'), findsOneWidget);
-  });
-
   testWidgets('홈 이동 조건 pill은 모든 프리셋에 맞는 표시명을 보여준다', (tester) async {
     for (final preset in MobilityPreset.values) {
       await tester.pumpWidget(
@@ -5894,7 +6017,7 @@ void main() {
 
       expect(find.text('알림'), findsOneWidget);
       expect(find.text('내 활동'), findsOneWidget);
-      expect(find.text('개인정보 및 도움말'), findsOneWidget);
+      expect(find.text('서비스 정보 및 도움말'), findsOneWidget);
       expect(
         find.byKey(const Key('settingsSection-help-privacy')),
         findsOneWidget,
@@ -5910,8 +6033,18 @@ void main() {
         findsNothing,
       );
       expect(
+        find.byKey(const Key('settingsServiceInfoButton')),
+        findsOneWidget,
+      );
+      expect(
         find.byKey(const Key('settingsSupportPrivacyButton')),
         findsOneWidget,
+      );
+      expect(
+        settingsActionSemantics(
+          '서비스 정보',
+        ).getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
       );
       expect(
         settingsActionSemantics(
@@ -5931,6 +6064,14 @@ void main() {
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('settingsServiceInfoButton')),
+        120,
+      );
+      await tester.tap(find.byKey(const Key('settingsServiceInfoButton')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('serviceInfoScreen')), findsOneWidget);
     } finally {
       semanticsHandle.dispose();
     }
@@ -6694,7 +6835,7 @@ void main() {
     expect(favoriteRepository.listCount, greaterThanOrEqualTo(2));
   });
 
-  testWidgets('홈은 도움말에서 개인정보와 삭제 요청 경로를 보여준다', (tester) async {
+  testWidgets('홈은 도움말에서 삭제 요청과 문의 경로를 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     try {
       await tester.pumpWidget(
@@ -6717,21 +6858,7 @@ void main() {
       await _openSupportAccessScreen(tester);
 
       expect(find.text('도움말·문의'), findsOneWidget);
-      expect(find.text('개인정보처리방침'), findsOneWidget);
-      expect(find.text('https://easysubway.example/privacy'), findsNothing);
-      expect(find.text('웹에서 확인'), findsOneWidget);
-      final privacyButtonSize = tester.getSize(
-        find.byKey(const Key('privacyPolicyAccessItem')),
-      );
-      expect(privacyButtonSize.height, greaterThanOrEqualTo(60));
-      final privacySemantics = tester
-          .getSemantics(find.byKey(const Key('privacyPolicyAccessItem')))
-          .getSemanticsData();
-      expect(
-        privacySemantics.label,
-        '개인정보처리방침, 웹에서 확인, https://easysubway.example/privacy',
-      );
-      expect(privacySemantics.hasAction(SemanticsAction.tap), isTrue);
+      expect(find.text('개인정보처리방침'), findsNothing);
 
       await tester.scrollUntilVisible(
         find.byKey(const Key('dataDeletionAccessItem')),
@@ -6777,7 +6904,7 @@ void main() {
     }
   });
 
-  testWidgets('도움말은 개인정보 안내를 불릿 대신 처리방침 링크로 위임한다', (tester) async {
+  testWidgets('도움말은 개인정보 처리방침 진입점을 서비스 정보로 분리한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     try {
       await tester.pumpWidget(
@@ -6798,12 +6925,11 @@ void main() {
 
       await _openSupportAccessScreen(tester);
 
-      // 개인정보 안내는 화면 카피(불릿) 대신 처리방침 링크로 위임한다.
       expect(find.byKey(const Key('privacyDataUseSummary')), findsNothing);
       expect(find.text('개인정보 사용 안내'), findsNothing);
       expect(find.text('현재 위치는 가까운 역 찾기와 시설 제보 위치 확인에만 사용됩니다.'), findsNothing);
       expect(find.text('법으로 꼭 필요한 기록은 정해진 기간 동안만 보관합니다.'), findsNothing);
-      expect(find.text('개인정보처리방침'), findsOneWidget);
+      expect(find.text('개인정보처리방침'), findsNothing);
     } finally {
       semanticsHandle.dispose();
     }
@@ -6919,37 +7045,6 @@ void main() {
     } finally {
       semanticsHandle.dispose();
     }
-  });
-
-  testWidgets('도움말은 개인정보 링크를 값 복사 화면이 아니라 외부 연결로 처리한다', (tester) async {
-    final launcher = RecordingSupportAccessLauncher();
-
-    await tester.pumpWidget(
-      buildEasySubwayTestApp(
-        repository: FakeStationSearchRepository(),
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: FakeFavoriteStationRepository(),
-        notificationRepository: FakeNotificationSettingsRepository(),
-        supportAccessLauncher: launcher,
-        supportAccessInfo: const SupportAccessInfo(
-          privacyPolicyUrl: 'https://easysubway.example/privacy',
-          supportEmail: 'support@easysubway.example',
-          dataDeletionEmail: 'privacy@easysubway.example',
-        ),
-        initialOnboardingState: _completedOnboardingState(),
-      ),
-    );
-
-    await _openSupportAccessScreen(tester);
-    await tester.tap(find.byKey(const Key('privacyPolicyAccessItem')));
-    await tester.pumpAndSettle();
-
-    expect(find.byType(AlertDialog), findsNothing);
-    expect(
-      launcher.openedUris.single.toString(),
-      'https://easysubway.example/privacy',
-    );
   });
 
   testWidgets('도움말은 고객지원을 메일 앱으로 연결한다', (tester) async {
@@ -7276,11 +7371,16 @@ void main() {
     );
 
     await _openSupportAccessScreen(tester);
-    await tester.tap(find.byKey(const Key('privacyPolicyAccessItem')));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('supportAccessItem')),
+      120,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.byKey(const Key('supportAccessItem')));
     await tester.pump();
 
     expect(
-      find.text('연결할 수 없습니다. 직접 확인해 주세요: https://easysubway.example/privacy'),
+      find.text('연결할 수 없습니다. 직접 확인해 주세요: support@easysubway.example'),
       findsOneWidget,
     );
   });
@@ -8036,69 +8136,6 @@ void main() {
     // 품질 문구 "일부 정보는 확인 중이에요"는 별도 semantic label 테스트에서 유지한다.
   });
 
-  testWidgets('역 검색 화면 AppBar 입력 필드는 시스템 글자 크기를 키워도 잘리지 않는다', (tester) async {
-    // #1962: StationSearchScreen 의 검색 입력 필드는 v4에서 idle/active 픽셀을
-    // 통일한 고정 레이아웃이라 AppBar 기본 toolbarHeight(56)에 그대로 넣으면 큰
-    // 글자 배율에서 세로로 잘린다. 툴바 높이가 배율에 맞춰 늘어나 오버플로 없이
-    // 필드가 온전히 보이는지 검증한다. 둘러보기 주변 역 메뉴로 실제 검색 화면을 연다.
-    final locationProvider = FakeCurrentLocationProvider(
-      location: _freshCurrentLocation(),
-      needsPermissionRequest: false,
-    );
-    final repository = FakeStationSearchRepository(
-      nearbyResults: [
-        _stationResult(
-          id: 'station-sangnoksu',
-          name: '상록수',
-          distanceMeters: 230,
-        ),
-      ],
-    );
-
-    await tester.pumpWidget(
-      MediaQuery(
-        data: const MediaQueryData(textScaler: TextScaler.linear(2.0)),
-        child: buildEasySubwayTestApp(
-          repository: repository,
-          reportRepository: FakeFacilityReportRepository(),
-          routeRepository: FakeRouteSearchRepository(),
-          favoriteRepository: FakeFavoriteStationRepository(),
-          locationProvider: locationProvider,
-          initialOnboardingState: _completedOnboardingState(),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('networkMapMenuNearbyButton')));
-    await tester.pumpAndSettle();
-
-    // 렌더 중 RenderFlex 오버플로 등 예외가 발생하지 않아야 한다.
-    expect(tester.takeException(), isNull);
-
-    final inputFinder = find.byKey(const Key('stationSearchInput'));
-    expect(inputFinder, findsOneWidget);
-
-    // 검색 입력 필드를 담은 AppBar 를 찾아 툴바 높이가 큰 글자 배율에서 기본
-    // 높이(56)보다 커졌는지 확인한다.
-    final appBarFinder = find.ancestor(
-      of: inputFinder,
-      matching: find.byType(AppBar),
-    );
-    expect(appBarFinder, findsOneWidget);
-    final appBar = tester.widget<AppBar>(appBarFinder);
-    expect(appBar.toolbarHeight, isNotNull);
-    expect(appBar.toolbarHeight, greaterThan(kToolbarHeight));
-
-    // 입력 필드가 툴바(AppBar) 세로 범위 안에 온전히 들어간다(아래로 잘리지 않는다).
-    final appBarRect = tester.getRect(appBarFinder);
-    final inputRect = tester.getRect(inputFinder);
-    expect(inputRect.bottom, lessThanOrEqualTo(appBarRect.bottom + 0.5));
-    expect(inputRect.top, greaterThanOrEqualTo(appBarRect.top - 0.5));
-  });
-
   testWidgets('#2109 홈 in-place 검색 결과 탭은 역을 지도에서 포커스하고 팬 메뉴를 연다', (
     tester,
   ) async {
@@ -8161,6 +8198,112 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('상록수'), findsOneWidget);
+  });
+
+  testWidgets('#2200 검색 선택으로 연 주변역 패널 body가 화면 안에 실제 크기로 렌더된다', (tester) async {
+    // 오너 QA 회귀 방지(#2207): 툴바(토글)만 뜨고 하단 body(노선 바)가
+    // 사라지는 증상을 막는다. 존재만이 아니라 히트테스트 가능한 크기와 화면
+    // 안 배치까지 단언한다.
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final repository = FakeStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      },
+    );
+
+    await tester.pumpWidget(
+      buildEasySubwayTestApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        locationProvider: FakeCurrentLocationProvider(
+          location: _freshCurrentLocation(),
+          needsPermissionRequest: false,
+        ),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.pumpAndSettle();
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('networkMapNearbyStationPanel')),
+      findsOneWidget,
+    );
+    final track = find.byKey(const Key('nearbyStationLineBarTrack'));
+    expect(track, findsOneWidget);
+    final trackSize = tester.getSize(track);
+    final trackRect = tester.getRect(track);
+    expect(trackSize.width, greaterThan(0), reason: '노선 바 폭이 0이면 body가 붕괴한 것');
+    expect(
+      trackSize.height,
+      greaterThan(0),
+      reason: '노선 바 높이가 0이면 body가 붕괴한 것',
+    );
+    expect(trackRect.top, greaterThanOrEqualTo(0), reason: '노선 바가 화면 위로 벗어남');
+    expect(
+      trackRect.bottom,
+      lessThanOrEqualTo(844),
+      reason: '노선 바가 화면 아래로 벗어남',
+    );
+  });
+
+  testWidgets('#2200 GPS 주변역 패널 body가 화면 안에 실제 크기로 렌더된다', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final repository = FakeStationSearchRepository(
+      networkMapRegionNames: const ['수도권'],
+      nearbyResults: [
+        _stationResult(
+          id: 'station-sangnoksu',
+          name: '상록수',
+          distanceMeters: 180,
+        ),
+      ],
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+      realtimeRepository: _RecordingRealtimeRepository(),
+    );
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('networkMapNearbyStationPanel')),
+      findsOneWidget,
+    );
+    final track = find.byKey(const Key('nearbyStationLineBarTrack'));
+    expect(track, findsOneWidget);
+    final trackSize = tester.getSize(track);
+    final trackRect = tester.getRect(track);
+    expect(trackSize.width, greaterThan(0));
+    expect(trackSize.height, greaterThan(0));
+    expect(trackRect.top, greaterThanOrEqualTo(0));
+    expect(trackRect.bottom, lessThanOrEqualTo(844));
   });
 
   testWidgets('#2109 검색 선택은 지도에서 직접 선택한 역을 교체한다', (tester) async {
@@ -8520,6 +8663,312 @@ void main() {
       routeRepository.requests.last.transportScope,
       RouteTransportScope.subwayAndItxCheongchun,
     );
+  });
+
+  testWidgets('길찾기 기본값은 최단시간(FASTEST)과 지하철(SUBWAY)이다', (tester) async {
+    final routeRepository = FakeRouteSearchRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: routeRepository,
+          stationRepository: FakeStationSearchRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 17),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(routeRepository.requests, hasLength(1));
+    expect(routeRepository.requests.single.objective, RouteObjective.fastest);
+    expect(
+      routeRepository.requests.single.transportScope,
+      RouteTransportScope.subway,
+    );
+    expect(find.byKey(const Key('routeObjectiveFastestChip')), findsOneWidget);
+    expect(
+      find.byKey(const Key('routeObjectiveFewestTransfersChip')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('routeObjectiveFastestChip')),
+        matching: find.byIcon(Icons.check),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('objective 탭을 최소환승으로 바꾸면 scope는 유지한 채 objective만 재검색한다', (
+    tester,
+  ) async {
+    final routeRepository = FakeRouteSearchRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: routeRepository,
+          stationRepository: FakeStationSearchRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 17),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const Key('routeObjectiveFewestTransfersChip')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(routeRepository.requests, hasLength(2));
+    expect(
+      routeRepository.requests.last.objective,
+      RouteObjective.fewestTransfers,
+    );
+    // objective만 바뀌고 scope는 SUBWAY로 유지된다(로컬-우선 동작 보존).
+    expect(
+      routeRepository.requests.last.transportScope,
+      RouteTransportScope.subway,
+    );
+    expect(
+      routeRepository.requests.every(
+        (request) => request.transportScope == RouteTransportScope.subway,
+      ),
+      isTrue,
+    );
+  });
+
+  testWidgets('같은 objective를 다시 눌러도 재검색하지 않는다', (tester) async {
+    final routeRepository = FakeRouteSearchRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: routeRepository,
+          stationRepository: FakeStationSearchRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 17),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('routeObjectiveFastestChip')));
+    await tester.pumpAndSettle();
+
+    expect(routeRepository.requests, hasLength(1));
+  });
+
+  testWidgets('objective 탭은 TalkBack 라벨·선택 상태·48dp·글자 확대를 지킨다', (tester) async {
+    tester.view.physicalSize = const Size(320, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final semanticsHandle = tester.ensureSemantics();
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: const TextScaler.linear(2.0)),
+            child: child!,
+          ),
+          home: RouteSearchScreen(
+            repository: FakeRouteSearchRepository(),
+            stationRepository: FakeStationSearchRepository(),
+            favoriteRouteRepository: FakeFavoriteRouteRepository(),
+            initialDraft: RouteDraft(
+              origin: const RouteDraftStation(
+                id: 'station-sangnoksu',
+                nameKo: '상록수',
+              ),
+              destination: const RouteDraftStation(
+                id: 'station-sadang',
+                nameKo: '사당',
+              ),
+              lastModifiedAt: DateTime(2026, 7, 17),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // TalkBack 라벨은 objective 두 탭 모두 정확히 한 번씩.
+      expect(find.bySemanticsLabel('경로 목표, 최단시간'), findsOneWidget);
+      expect(find.bySemanticsLabel('경로 목표, 최소환승'), findsOneWidget);
+      // 글자 2배·320dp에서도 오버플로 없이 렌더된다.
+      expect(tester.takeException(), isNull);
+      // 최소 48dp 터치 타깃.
+      expect(
+        tester
+            .getSize(find.byKey(const Key('routeObjectiveFastestChip')))
+            .height,
+        greaterThanOrEqualTo(48.0),
+      );
+      // 선택 상태(체크 표시)는 현재 objective에만.
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('routeObjectiveFastestChip')),
+          matching: find.byIcon(Icons.check),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('routeObjectiveFewestTransfersChip')),
+          matching: find.byIcon(Icons.check),
+        ),
+        findsNothing,
+      );
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
+  testWidgets('objective 칩은 재검색 로딩 중 비활성이고 완료 후 재활성된다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    final routeRepository = ControlledRouteSearchRepository();
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RouteSearchScreen(
+            repository: routeRepository,
+            stationRepository: FakeStationSearchRepository(),
+            favoriteRouteRepository: FakeFavoriteRouteRepository(),
+            initialDraft: RouteDraft(
+              origin: const RouteDraftStation(
+                id: 'station-sangnoksu',
+                nameKo: '상록수',
+              ),
+              destination: const RouteDraftStation(
+                id: 'station-sadang',
+                nameKo: '사당',
+              ),
+              lastModifiedAt: DateTime(2026, 7, 17),
+            ),
+          ),
+        ),
+      );
+      // 자동 검색이 시작돼 로딩 상태로 멈춘다(응답 미완료).
+      await tester.pump();
+      expect(routeRepository.requests, hasLength(1));
+
+      final chipFinder = find.byKey(
+        const Key('routeObjectiveFewestTransfersChip'),
+      );
+      // 로딩 중: semantics enabled=false, tap 액션 없음.
+      final loadingData = tester.getSemantics(chipFinder).getSemanticsData();
+      expect(loadingData.flagsCollection.isEnabled.toBoolOrNull(), isFalse);
+      expect(loadingData.hasAction(SemanticsAction.tap), isFalse);
+      // TalkBack 라벨 계약은 로딩 중에도 불변.
+      expect(find.bySemanticsLabel('경로 목표, 최소환승'), findsOneWidget);
+      // 로딩 중 tap은 무효 — 재검색이 시작되지 않는다.
+      await tester.tap(chipFinder);
+      await tester.pump();
+      expect(routeRepository.requests, hasLength(1));
+
+      // 검색 완료 → 칩 재활성.
+      routeRepository.complete(_sampleRouteSearchResult());
+      await tester.pumpAndSettle();
+      final readyData = tester.getSemantics(chipFinder).getSemanticsData();
+      expect(readyData.flagsCollection.isEnabled.toBoolOrNull(), isTrue);
+      await tester.tap(chipFinder);
+      await tester.pumpAndSettle();
+      expect(routeRepository.requests.length, greaterThan(1));
+      expect(
+        routeRepository.requests.last.objective,
+        RouteObjective.fewestTransfers,
+      );
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
+  testWidgets('ITX 실패는 명시적 지하철만 보기 선택 뒤에만 SUBWAY로 재검색한다', (tester) async {
+    final routeRepository = FakeRouteSearchRepository(
+      errorForRequest: (request) =>
+          request.transportScope == RouteTransportScope.subwayAndItxCheongchun
+          ? const RouteSearchOnlineException.unavailable(
+              failureReason: 'ITX_TIMETABLE_UNAVAILABLE',
+              message: 'ITX 시간표를 불러올 수 없어요',
+            )
+          : null,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: routeRepository,
+          stationRepository: FakeStationSearchRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
+          itxTransportScopeEnabled: true,
+          initialTransportScope: RouteTransportScope.subwayAndItxCheongchun,
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 16),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(routeRepository.requests, hasLength(1));
+    expect(
+      routeRepository.requests.single.transportScope,
+      RouteTransportScope.subwayAndItxCheongchun,
+    );
+    expect(
+      find.byKey(const Key('routeSearchSubwayOnlyAction')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const Key('routeSearchSubwayOnlyAction')));
+    await tester.pumpAndSettle();
+
+    expect(routeRepository.requests, hasLength(2));
+    expect(
+      routeRepository.requests.last.transportScope,
+      RouteTransportScope.subway,
+    );
+    expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
   });
 
   testWidgets('즐겨찾기에서 복원한 ITX transport scope로 첫 검색을 시작한다', (tester) async {
@@ -9176,8 +9625,8 @@ void main() {
     expect(find.byKey(const Key('routeStepNumber-3')), findsOneWidget);
 
     // #1948: 경유 스텝은 0값 placeholder burdenLabel을 렌더하지 않는다.
-    expect(find.text('시간을 확인하고 있어요 · 거리를 확인하고 있어요'), findsNothing);
-    expect(find.textContaining('시간을 확인하고 있어요'), findsNothing);
+    expect(find.text('시간 미확인 · 거리 미확인'), findsNothing);
+    expect(find.textContaining('시간 미확인'), findsNothing);
     // #1948: 경유 스텝은 보일러플레이트 기본 안내 문장 대신 간결 카피를 쓴다.
     expect(find.text('안내된 순서대로 이동합니다.'), findsNothing);
     expect(find.text('내리지 않고 이 역을 지나가요'), findsOneWidget);
@@ -9189,209 +9638,6 @@ void main() {
     final waypointNode = tester.getSize(waypointBadge);
     expect(waypointNode.width, lessThanOrEqualTo(16));
     expect(waypointNode.height, lessThanOrEqualTo(16));
-  });
-
-  testWidgets('역 검색 화면은 최근 검색어를 탭해 빠르게 다시 검색한다', (tester) async {
-    final semanticsHandle = tester.ensureSemantics();
-    final repository = FakeStationSearchRepository(
-      queryResults: {
-        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
-      },
-    );
-    final searchHistoryRepository = FakeSearchHistoryRepository(['상록수', '사당']);
-
-    try {
-      await tester.pumpWidget(
-        buildEasySubwayTestApp(
-          repository: repository,
-          reportRepository: FakeFacilityReportRepository(),
-          routeRepository: FakeRouteSearchRepository(),
-          favoriteRepository: FakeFavoriteStationRepository(),
-          searchHistoryRepository: searchHistoryRepository,
-          initialOnboardingState: _completedOnboardingState(),
-        ),
-      );
-
-      await tester.tap(find.byKey(const Key('networkMapMenuButton')));
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const Key('networkMapMenuStationSearchButton')),
-      );
-      await tester.pumpAndSettle();
-
-      // 최근 검색은 역 검색 화면의 빈 상태 섹션으로 통합됐다(#1581).
-      expect(find.byKey(const Key('stationSearchInput')), findsOneWidget);
-      expect(
-        find.byKey(const Key('stationRecentSearchSection')),
-        findsOneWidget,
-      );
-      expect(find.text('최근 검색'), findsOneWidget);
-      // 시스템 캡션('최근 사용 순서 …')은 제거됐다(#1581).
-      expect(find.textContaining('최근 사용 순서'), findsNothing);
-      expect(find.text('최근 사용 1번째'), findsOneWidget);
-      expect(
-        find.byKey(const Key('stationRecentSearchQuery-상록수')),
-        findsOneWidget,
-      );
-      expect(find.bySemanticsLabel('최근 검색어 상록수 검색, 최근 사용 1번째'), findsOneWidget);
-      expect(
-        tester
-            .getSemantics(find.bySemanticsLabel('최근 검색어 상록수 검색, 최근 사용 1번째'))
-            .getSemanticsData()
-            .hasAction(SemanticsAction.tap),
-        isTrue,
-      );
-
-      await tester.tap(find.byKey(const Key('stationRecentSearchQuery-상록수')));
-      await tester.pumpAndSettle();
-
-      final searchInput = tester.widget<TextField>(
-        find.byKey(const Key('stationSearchInput')),
-      );
-      expect(searchInput.controller?.text, '상록수');
-      expect(repository.requestedQueries, ['상록수']);
-      expect(searchHistoryRepository.recordedQueries, ['상록수']);
-      expect(
-        find.byKey(const Key('stationSearchResult-station-sangnoksu')),
-        findsOneWidget,
-      );
-      // #1933: 결과 행에서 인라인 출발/도착 역할 버튼을 제거했다(행 탭 = 상세 열기).
-      expect(
-        find.byKey(const Key('stationRoleOrigin-station-sangnoksu')),
-        findsNothing,
-      );
-      expect(
-        find.byKey(const Key('stationRoleDestination-station-sangnoksu')),
-        findsNothing,
-      );
-    } finally {
-      semanticsHandle.dispose();
-    }
-  });
-
-  testWidgets('역 검색 화면 안에서 최근 검색을 개별·전체 삭제한다', (tester) async {
-    final searchHistoryRepository = FakeSearchHistoryRepository(['상록수', '사당']);
-
-    await tester.pumpWidget(
-      buildEasySubwayTestApp(
-        repository: FakeStationSearchRepository(),
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: FakeFavoriteStationRepository(),
-        searchHistoryRepository: searchHistoryRepository,
-        initialOnboardingState: _completedOnboardingState(),
-      ),
-    );
-
-    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('networkMapMenuStationSearchButton')),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const Key('stationRecentSearchRemove-상록수')));
-    await tester.pumpAndSettle();
-
-    expect(searchHistoryRepository.removedQueries, ['상록수']);
-    expect(find.byKey(const Key('stationRecentSearchQuery-상록수')), findsNothing);
-    expect(find.byKey(const Key('stationRecentSearchSection')), findsOneWidget);
-
-    await tester.tap(
-      find.byKey(const Key('stationRecentSearchClearAllButton')),
-    );
-    await tester.pumpAndSettle();
-
-    // 최근 검색이 비면 전용 빈 상태 대신 섹션이 사라지고 검색 입력만 남는다(#1581).
-    expect(searchHistoryRepository.clearCount, 1);
-    expect(find.byKey(const Key('stationRecentSearchSection')), findsNothing);
-    expect(find.text('최근 검색한 역이 없습니다.'), findsNothing);
-    expect(find.byKey(const Key('stationSearchInput')), findsOneWidget);
-  });
-
-  testWidgets('역 검색 결과는 환승 역을 노선마다 한 행으로 펼쳐 보여준다', (tester) async {
-    final repository = FakeStationSearchRepository(
-      nextResults: [
-        const StationSearchResult(
-          id: 'station-transfer',
-          nameKo: '환승역',
-          nameEn: 'Transfer',
-          region: '수도권',
-          dataQualityLevel: 'LEVEL_1',
-          lastVerifiedAt: '2026-06-12',
-          lines: [
-            StationSearchLine(
-              id: 'seoul-4',
-              name: '수도권 4호선',
-              color: '#00A5DE',
-              stationCode: '448',
-            ),
-            StationSearchLine(
-              id: 'korail-gyeongui-jungang',
-              name: '경의중앙선',
-              color: '#75C5A1',
-              stationCode: 'K232',
-            ),
-            StationSearchLine(
-              id: 'suin-bundang',
-              name: '수인분당선',
-              color: '#F5A200',
-              stationCode: 'K249',
-            ),
-            StationSearchLine(
-              id: 'shinbundang',
-              name: '신분당선',
-              color: '#D4003B',
-              stationCode: 'D14',
-            ),
-          ],
-        ),
-      ],
-    );
-
-    await tester.pumpWidget(
-      buildEasySubwayTestApp(
-        repository: repository,
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: FakeFavoriteStationRepository(),
-        initialOnboardingState: _completedOnboardingState(),
-      ),
-    );
-
-    await tester.tap(find.byKey(const Key('stationSearchButton')));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('stationSearchInput')), '환승');
-    await tester.pumpAndSettle();
-    await tester.testTextInput.receiveAction(TextInputAction.search);
-    await tester.pumpAndSettle();
-
-    // #1933: 노선을 요약(+N)하지 않고 노선마다 한 행씩 펼친다. 4개 노선 = 4개 배지.
-    expect(find.byKey(const Key('stationLineBadge-seoul-4')), findsOneWidget);
-    expect(
-      find.byKey(const Key('stationLineBadge-korail-gyeongui-jungang')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const Key('stationLineBadge-suin-bundang')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const Key('stationLineBadge-shinbundang')),
-      findsOneWidget,
-    );
-    // '+N' 요약 배지는 더 이상 쓰지 않는다.
-    expect(find.text('+3'), findsNothing);
-    expect(find.byKey(const Key('stationLineBadgeOverflow')), findsNothing);
-
-    // 대표 키는 첫 행에만 두어 단일 위젯으로 남는다.
-    expect(
-      find.byKey(const Key('stationSearchResult-station-transfer')),
-      findsOneWidget,
-    );
-    // 탭 타깃 접근성 지침은 유지한다(각 행 minHeight >= 48dp).
-    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
-    await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
   });
 
   testWidgets('#1933 홈 검색바 탭은 같은 화면에서 in-place 검색 모드로 전환한다', (tester) async {
@@ -10294,14 +10540,14 @@ void main() {
         find.byKey(const Key('stationDetailLargeScreenLayout')),
         findsNothing,
       );
-      // 정상 시설은 상태 필 없이 이름으로 조용히, 문제(고장·확인 중)만 상태 필로 렌더링.
+      // 정상 시설은 상태 필 없이 이름으로 조용히, 문제(고장·미확인)만 상태 필로 렌더링.
       var sawNormalQuiet = false;
       var sawBroken = false;
       var sawNeedsCheck = false;
       for (var index = 0; index < 8; index += 1) {
         sawNormalQuiet |= find.text('1번 출구 엘리베이터').evaluate().isNotEmpty;
         sawBroken |= find.text('이용할 수 없어요').evaluate().isNotEmpty;
-        sawNeedsCheck |= find.text('상태를 확인하고 있어요').evaluate().isNotEmpty;
+        sawNeedsCheck |= find.text('상태 미확인').evaluate().isNotEmpty;
         if (sawNormalQuiet && sawBroken && sawNeedsCheck) {
           break;
         }
@@ -10474,7 +10720,7 @@ void main() {
     );
   });
 
-  testWidgets('역 상세는 시설 목록이 없으면 확인 필요 요약을 숨긴다', (tester) async {
+  testWidgets('역 상세는 시설 목록이 없으면 시설 섹션을 통째로 숨긴다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final repository = FakeStationSearchRepository(
       nextResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
@@ -10504,10 +10750,57 @@ void main() {
       await tester.drag(find.byType(ListView), const Offset(0, -520));
       await tester.pumpAndSettle();
 
-      expect(find.text('시설'), findsOneWidget);
-      expect(find.text('시설 안내를 준비 중이에요.'), findsOneWidget);
+      // #2078: 시설 데이터가 없으면 섹션 제목·빈 안내·잔여 간격을 모두 숨긴다.
+      expect(find.text('시설'), findsNothing);
+      expect(find.text('시설 안내를 준비 중이에요.'), findsNothing);
       expect(find.text('확인 필요 없음'), findsNothing);
       expect(find.bySemanticsLabel('다시 볼 시설 없음'), findsNothing);
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
+  testWidgets('역 상세는 출구 목록이 없으면 시설이 있어도 출구 섹션만 숨긴다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    final repository = FakeStationSearchRepository(
+      nextResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+      stationExits: const [],
+      stationFacilities: const [
+        StationFacilityInfo(
+          id: 'facility-sangnoksu-elevator-1',
+          stationId: 'station-sangnoksu',
+          exitId: 'exit-sangnoksu-1',
+          type: 'ELEVATOR',
+          name: '1번 출구 엘리베이터',
+          floorFrom: 'B1',
+          floorTo: '1F',
+          description: '1번 출구 앞',
+          status: 'NORMAL',
+          dataConfidence: 'HIGH',
+          dataSourceType: 'OFFICIAL_FILE',
+          lastUpdatedAt: '2026-06-12',
+          fieldValidationStatus: 'VERIFIED',
+        ),
+      ],
+    );
+
+    try {
+      await _pumpStationDetailForTest(
+        tester,
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+      );
+
+      await tester.drag(find.byType(ListView), const Offset(0, -520));
+      await tester.pumpAndSettle();
+
+      // #2078: 출구는 비고 시설은 있는 비대칭 케이스 — 출구 섹션 제목·빈
+      // 안내·잔여 간격만 숨기고, 시설 섹션은 그대로 그린다.
+      expect(find.text('출구'), findsNothing);
+      expect(find.text('출구 안내를 준비 중이에요.'), findsNothing);
+      expect(find.text('시설'), findsOneWidget);
+      expect(find.text('1번 출구 엘리베이터'), findsOneWidget);
     } finally {
       semanticsHandle.dispose();
     }
@@ -10632,7 +10925,91 @@ void main() {
     }
   });
 
-  testWidgets('역 상세 시간표는 로컬 coverage가 없으면 준비 중으로 강등한다', (tester) async {
+  testWidgets('역 시간표 화면은 일반·급행을 한 목록에 시각순으로 표시하고 급행 행에만 배지를 단다', (
+    tester,
+  ) async {
+    // #2099 WP1: LOCAL 08:00과 EXPRESS 08:03이 한 방향 목록에 시각순으로 함께
+    // 놓이고, 08:03에만 급행 배지가 붙으며 방향·첫차·막차 동작은 유지된다.
+    debugStationVerifiedClock = () => DateTime(2026, 7, 6); // 월요일(평일)
+    const line = StationSearchLine(
+      id: 'seoul-4',
+      name: '수도권 4호선',
+      color: '#00A5DE',
+      stationCode: '433',
+    );
+    final repository = FakeTimetableStationRepository(
+      stationDetail: _stationDetail(id: 'station-sadang', name: '사당'),
+      timetableLineId: 'seoul-4',
+      timetables: {
+        for (final dayType in StationTimetableDayType.values)
+          dayType: _stationTimetable(
+            dayType,
+            stationId: 'station-sadang',
+            lineId: 'seoul-4',
+            directions: const [
+              StationTimetableDirection(
+                name: '사당 방면',
+                departures: [
+                  StationTimetableDeparture(
+                    directionName: '사당 방면',
+                    seconds: 28800, // 08:00 일반
+                  ),
+                  StationTimetableDeparture(
+                    directionName: '사당 방면',
+                    seconds: 28980, // 08:03 급행
+                    servicePattern: 'EXPRESS',
+                    serviceClass: 'SUBWAY',
+                  ),
+                ],
+              ),
+            ],
+          ),
+      },
+    );
+
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StationTimetableScreen(
+            stationId: 'station-sadang',
+            stationName: '사당',
+            lines: const [line],
+            repository: repository,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 두 시각이 한 목록에 시각순으로 함께 노출된다.
+      expect(find.text('08:00'), findsOneWidget);
+      expect(find.text('08:03'), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.text('08:00')).dy,
+        lessThan(tester.getTopLeft(find.text('08:03')).dy),
+      );
+
+      // 첫차·막차 동작 유지.
+      expect(find.text('첫차 08:00'), findsOneWidget);
+      expect(find.text('막차 08:03'), findsOneWidget);
+
+      // 급행 행에만 배지 1회, 일반 행에는 배지 없음.
+      expect(find.text('급행'), findsOneWidget);
+      expect(
+        find.byKey(const Key('servicePatternExpressBadge')),
+        findsOneWidget,
+      );
+      expect(find.text('일반'), findsNothing);
+
+      // 급행/일반은 실제 운행 정보다 — 선택 컨트롤(칩·필터)로 노출하지 않는다.
+      expect(find.widgetWithText(ChoiceChip, '급행'), findsNothing);
+      expect(find.widgetWithText(ChoiceChip, '일반'), findsNothing);
+      expect(find.widgetWithText(FilterChip, '급행'), findsNothing);
+    } finally {
+      debugStationVerifiedClock = DateTime.now;
+    }
+  });
+
+  testWidgets('역 상세 시간표는 로컬 coverage가 없으면 사실형 빈 안내를 보여준다', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: StationDetailScreen(
@@ -10649,7 +11026,7 @@ void main() {
     await tester.tap(find.byKey(const Key('stationTimetableButton')));
     await tester.pumpAndSettle();
 
-    expect(find.text('시간표를 준비 중이에요.'), findsOneWidget);
+    expect(find.text('시간표 정보가 없어요'), findsOneWidget);
     expect(find.textContaining('임시'), findsNothing);
   });
 
@@ -10806,6 +11183,7 @@ void main() {
   });
 
   testWidgets('역 상세는 현재 위치 기준 출구 직선거리와 카카오맵 도보 길안내를 보여준다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
     final mapLauncher = _FakeKakaoMapLauncher();
     var locationRequestCount = 0;
     final locationProvider = FakeCurrentLocationProvider(
@@ -10864,6 +11242,17 @@ void main() {
       find.byKey(const Key('stationExitWalkingRouteButton-exit-sangnoksu-1')),
       findsOneWidget,
     );
+    expect(
+      find.text('카카오맵 앱에서는 현재 위치와 출구 좌표를, 웹에서는 출구 좌표만 카카오에 전달합니다.'),
+      findsOneWidget,
+    );
+    expect(find.bySemanticsLabel('1번 출구까지 카카오맵 도보 길안내'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(
+        '1번 출구까지 카카오맵 도보 길안내, 앱에서는 현재 위치와 출구 좌표를, 웹에서는 출구 좌표만 카카오에 전달합니다',
+      ),
+      findsNothing,
+    );
 
     await tester.tap(
       find.byKey(const Key('stationExitWalkingRouteButton-exit-sangnoksu-1')),
@@ -10878,6 +11267,7 @@ void main() {
     expect(mapLauncher.routeTargets.single.end.latitude, 37.3021);
     expect(mapLauncher.routeTargets.single.end.longitude, 126.8661);
     expect(find.text('카카오맵 도보 길안내를 열었습니다.'), findsOneWidget);
+    semanticsHandle.dispose();
   });
 
   testWidgets('역 상세는 출구 좌표가 없으면 역 좌표 기준으로 직선거리와 도보 길안내를 강등한다', (tester) async {
@@ -10934,6 +11324,10 @@ void main() {
 
     expect(find.textContaining('현재 위치에서 역까지 직선'), findsOneWidget);
     expect(find.text('출구 좌표가 없어 역 위치 기준으로 안내합니다.'), findsOneWidget);
+    expect(
+      find.text('카카오맵 앱에서는 현재 위치와 역 좌표를, 웹에서는 역 좌표만 카카오에 전달합니다.'),
+      findsOneWidget,
+    );
 
     await tester.tap(
       find.byKey(const Key('stationExitWalkingRouteButton-exit-sangnoksu-2')),
@@ -11587,11 +11981,11 @@ void main() {
       expect(find.textContaining('STATIC_ESTIMATE'), findsNothing);
       expect(find.textContaining('MEASURED'), findsNothing);
       expect(find.text('계단 없는 승강장 접근 동선을 확인해 이동합니다.'), findsOneWidget);
-      expect(find.text('약 4분 · 180m · 엘리베이터 안내 준비 중'), findsOneWidget);
+      expect(find.text('약 4분 · 180m · 엘리베이터 안내 미확인'), findsOneWidget);
       // 여러 주의는 각주 한 줄로 합쳐 하나의 '주의 확인'만 노출한다(#1577).
       expect(find.text('주의 확인'), findsOneWidget);
       expect(
-        find.text('일부 시설 안내를 준비 중이에요. · 시설 상태 안내가 오래됐을 수 있어요.'),
+        find.text('일부 시설 안내는 아직 확인되지 않았어요. · 시설 상태 안내가 오래됐을 수 있어요.'),
         findsOneWidget,
       );
       expect(
@@ -11644,6 +12038,411 @@ void main() {
     } finally {
       semanticsHandle.dispose();
     }
+  });
+
+  testWidgets('경로 상세의 공유 버튼은 표시명 요약과 실제 trigger 영역만 OS 공유에 넘긴다', (
+    tester,
+  ) async {
+    tester.binding.platformDispatcher.localeTestValue = const Locale('ko');
+    addTearDown(tester.binding.platformDispatcher.clearLocaleTestValue);
+    String? sharedText;
+    Rect? sharedOrigin;
+    var failShare = false;
+    final result = _sampleRouteSearchResult(
+      routeSearchId: 'local-private-route-id',
+      etaSource: 'STALE',
+      objective: RouteObjective.fewestTransfers,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(result: result),
+          stationRepository: FakeStationSearchRepository(),
+          routeShareInvoker: (text, origin) async {
+            sharedText = text;
+            sharedOrigin = origin;
+            if (failShare) {
+              throw StateError('private share failure');
+            }
+          },
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 18),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _tapFirstRouteResultListItem(tester);
+    await tester.pumpAndSettle();
+
+    final shareButton = find.byKey(const Key('routeShareButton'));
+    expect(shareButton, findsOneWidget);
+    final shareSemantics = find.bySemanticsLabel('경로 요약 공유');
+    expect(shareSemantics, findsOneWidget);
+    expect(
+      tester
+          .getSemantics(shareSemantics)
+          .getSemanticsData()
+          .hasAction(SemanticsAction.tap),
+      isTrue,
+    );
+    await tester.ensureVisible(shareButton);
+    await tester.tap(shareButton);
+    await tester.pumpAndSettle();
+
+    expect(sharedText, contains('상록수 → 사당'));
+    expect(sharedText, contains('기준: 최소환승'));
+    expect(sharedText, contains('시간: 04:20 → 04:27'));
+    expect(sharedText, contains('저장된 데이터 기준'));
+    expect(sharedText, isNot(contains('local-private-route-id')));
+    expect(sharedText, isNot(contains('station-sangnoksu')));
+    expect(sharedOrigin, tester.getRect(shareButton));
+
+    failShare = true;
+    await tester.tap(shareButton);
+    await tester.pumpAndSettle();
+    expect(find.text('경로 요약을 공유하지 못했어요.'), findsOneWidget);
+    expect(find.textContaining('private share failure'), findsNothing);
+  });
+
+  testWidgets('시각 없는 진입·출구 사이 공식 ride 시각을 전체 공유 시각으로 사용한다', (tester) async {
+    String? sharedText;
+    final result = _sampleRouteSearchResult(
+      routeSearchId: 'local-timed-middle-route',
+      etaSource: 'STATIC_LOCAL',
+      steps: const [
+        RouteSearchStep(
+          sequence: 1,
+          stepType: 'entry',
+          title: '상록수역 승강장으로 이동',
+          description: '승강장으로 이동합니다.',
+          lineId: 'seoul-4',
+          lineName: '수도권 4호선',
+          fromStationId: 'station-sangnoksu',
+          toStationId: 'station-sangnoksu',
+          estimatedMinutes: 2,
+          distanceMeters: 80,
+          includesStairs: false,
+          requiresAccessibilityCheck: false,
+        ),
+        RouteSearchStep(
+          sequence: 2,
+          stepType: 'ride',
+          title: '상록수에서 사당까지 4호선 이동',
+          description: '4호선 열차로 이동합니다.',
+          lineId: 'seoul-4',
+          lineName: '수도권 4호선',
+          fromStationId: 'station-sangnoksu',
+          toStationId: 'station-sadang',
+          estimatedMinutes: 7,
+          distanceMeters: 0,
+          includesStairs: false,
+          requiresAccessibilityCheck: false,
+          plannedDepartureTimeIso: '2026-07-18T08:05:00+09:00',
+          plannedArrivalTimeIso: '2026-07-18T08:12:00+09:00',
+          timeSource: 'OFFICIAL_TIMETABLE',
+        ),
+        RouteSearchStep(
+          sequence: 3,
+          stepType: 'exit',
+          title: '사당역 출구로 이동',
+          description: '출구로 이동합니다.',
+          lineId: 'seoul-4',
+          lineName: '수도권 4호선',
+          fromStationId: 'station-sadang',
+          toStationId: 'station-sadang',
+          estimatedMinutes: 2,
+          distanceMeters: 80,
+          includesStairs: false,
+          requiresAccessibilityCheck: false,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(result: result),
+          stationRepository: FakeStationSearchRepository(),
+          routeShareInvoker: (text, origin) async => sharedText = text,
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 18),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _tapFirstRouteResultListItem(tester);
+    await tester.pumpAndSettle();
+    final shareButton = find.byKey(const Key('routeShareButton'));
+    await tester.ensureVisible(shareButton);
+    await tester.tap(shareButton);
+    await tester.pumpAndSettle();
+
+    expect(sharedText, contains('시간: 08:05 → 08:12'));
+    expect(sharedText, isNot(contains('시간: 04:20')));
+    expect(find.text('경로 요약을 공유하지 못했어요.'), findsNothing);
+  });
+
+  testWidgets('시각 필드가 없는 V1 온라인 결과도 조회 시각 기반 요약을 공유한다', (tester) async {
+    String? sharedText;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(
+            result: _sampleRouteSearchResult(),
+          ),
+          stationRepository: FakeStationSearchRepository(),
+          routeShareInvoker: (text, origin) async => sharedText = text,
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 18),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _tapFirstRouteResultListItem(tester);
+    await tester.pumpAndSettle();
+    final shareButton = find.byKey(const Key('routeShareButton'));
+    await tester.ensureVisible(shareButton);
+    await tester.tap(shareButton);
+    await tester.pumpAndSettle();
+
+    expect(sharedText, contains('시간: 04:20 → 04:27'));
+    expect(sharedText, contains('계획 시간 기준'));
+    expect(find.text('경로 요약을 공유하지 못했어요.'), findsNothing);
+  });
+
+  testWidgets('서로 다른 offset의 V2 공유 시각을 한국 시간대로 통일한다', (tester) async {
+    String? sharedText;
+    final result = _sampleRouteSearchResult(
+      departureTimeIso: '2026-07-18T09:00:00Z',
+      arrivalTimeIso: '2026-07-18T18:30:00+09:00',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(result: result),
+          stationRepository: FakeStationSearchRepository(),
+          routeShareInvoker: (text, origin) async => sharedText = text,
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 18),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _tapFirstRouteResultListItem(tester);
+    await tester.pumpAndSettle();
+    final shareButton = find.byKey(const Key('routeShareButton'));
+    await tester.ensureVisible(shareButton);
+    await tester.tap(shareButton);
+    await tester.pumpAndSettle();
+
+    expect(sharedText, contains('시간: 18:00 → 18:30'));
+    expect(sharedText, isNot(contains('시간: 09:00')));
+    expect(find.text('경로 요약을 공유하지 못했어요.'), findsNothing);
+  });
+
+  testWidgets('영어 기기의 MIXED 로컬 경로도 한국어 사실 안내와 보완 시각으로 공유한다', (tester) async {
+    tester.binding.platformDispatcher.localeTestValue = const Locale('en');
+    addTearDown(tester.binding.platformDispatcher.clearLocaleTestValue);
+    String? sharedText;
+    final result = _sampleRouteSearchResult(
+      routeSearchId: 'local-planned-arrival-route',
+      etaSource: 'MIXED',
+      steps: const [
+        RouteSearchStep(
+          sequence: 1,
+          stepType: 'ride',
+          title: '상록수에서 사당까지 4호선 이동',
+          description: '4호선 열차로 이동합니다.',
+          lineId: 'seoul-4',
+          lineName: '수도권 4호선',
+          fromStationId: 'station-sangnoksu',
+          toStationId: 'station-sadang',
+          estimatedMinutes: 7,
+          distanceMeters: 0,
+          includesStairs: false,
+          requiresAccessibilityCheck: false,
+          plannedArrivalTimeIso: '2026-07-18T08:12:00+09:00',
+          timeSource: 'OFFICIAL_TIMETABLE',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(result: result),
+          stationRepository: FakeStationSearchRepository(),
+          routeShareInvoker: (text, origin) async => sharedText = text,
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 18),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _tapFirstRouteResultListItem(tester);
+    await tester.pumpAndSettle();
+    final shareButton = find.byKey(const Key('routeShareButton'));
+    await tester.ensureVisible(shareButton);
+    await tester.tap(shareButton);
+    await tester.pumpAndSettle();
+
+    expect(sharedText, contains('시간: 08:05 → 08:12'));
+    expect(sharedText, contains('일부 실시간 정보가 반영'));
+    expect(sharedText, isNot(contains('Objective:')));
+    expect(find.text('경로 요약을 공유하지 못했어요.'), findsNothing);
+  });
+
+  testWidgets('ITX 공식 운임이 없으면 공유 API를 호출하지 않는다', (tester) async {
+    var shareCalls = 0;
+    final result = _sampleRouteSearchResult(
+      etaSource: 'PLANNED',
+      departureTimeIso: '2026-07-18T09:00:00+09:00',
+      arrivalTimeIso: '2026-07-18T09:07:00+09:00',
+      transportScope: RouteTransportScope.subwayAndItxCheongchun,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(result: result),
+          stationRepository: FakeStationSearchRepository(),
+          routeShareInvoker: (text, origin) async => shareCalls++,
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 18),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _tapFirstRouteResultListItem(tester);
+    await tester.pumpAndSettle();
+    final shareButton = find.byKey(const Key('routeShareButton'));
+    await tester.ensureVisible(shareButton);
+    await tester.tap(shareButton);
+    await tester.pumpAndSettle();
+
+    expect(shareCalls, 0);
+    expect(find.text('경로 요약을 공유하지 못했어요.'), findsOneWidget);
+  });
+
+  testWidgets('공유 처리 중에는 버튼과 semantics 재진입을 막는다', (tester) async {
+    final shareCompleter = Completer<void>();
+    var shareCalls = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(
+            result: _sampleRouteSearchResult(),
+          ),
+          stationRepository: FakeStationSearchRepository(),
+          routeShareInvoker: (text, origin) {
+            shareCalls++;
+            return shareCompleter.future;
+          },
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 18),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _tapFirstRouteResultListItem(tester);
+    await tester.pumpAndSettle();
+
+    final shareButton = find.byKey(const Key('routeShareButton'));
+    final shareSemantics = find.bySemanticsLabel('경로 요약 공유');
+    await tester.ensureVisible(shareButton);
+    await tester.tap(shareButton);
+    await tester.pump();
+    await tester.tap(shareButton, warnIfMissed: false);
+    await tester.pump();
+
+    expect(shareCalls, 1);
+    expect(tester.widget<OutlinedButton>(shareButton).onPressed, isNull);
+    expect(
+      tester
+          .getSemantics(shareSemantics)
+          .getSemanticsData()
+          .hasAction(SemanticsAction.tap),
+      isFalse,
+    );
+
+    shareCompleter.complete();
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<OutlinedButton>(shareButton).onPressed, isNotNull);
+    expect(
+      tester
+          .getSemantics(shareSemantics)
+          .getSemanticsData()
+          .hasAction(SemanticsAction.tap),
+      isTrue,
+    );
   });
 
   testWidgets('광고 repository는 경로 결과와 상세에만 같은 placement로 배선된다', (tester) async {
@@ -12070,6 +12869,15 @@ void main() {
         return Uri.parse('https://fare-api-must-not-be-used.example');
       },
       enablePushNotifications: false,
+    );
+    await tester.runAsync(
+      () => dependencies.routeRepository.searchRoute(
+        const RouteSearchRequest(
+          originStationId: 'station-sangnoksu',
+          destinationStationId: 'station-sadang',
+          mobilityType: 'STANDARD',
+        ),
+      ),
     );
     final semanticsHandle = tester.ensureSemantics();
     try {
@@ -12558,6 +13366,173 @@ void main() {
     expect((await stateRepository.loadActive())?.destination.stationName, '사당');
   });
 
+  testWidgets('최초 하차 알림은 route 표시명 대신 repository canonical 역명을 저장한다', (
+    tester,
+  ) async {
+    final notifier = _RecordingGetOffAlarmNotifier();
+    final stateRepository = _MemoryGetOffAlarmStateRepository();
+    final controller = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: _StubExactAlarmPermissionGate(),
+      notificationPermissionProvider: FakeNotificationPermissionProvider(
+        nextStatus: NotificationPermissionStatus.granted,
+      ),
+      repository: stateRepository,
+      now: () => DateTime.parse('2026-07-06T09:00:00+09:00'),
+    );
+    addTearDown(controller.dispose);
+    final stationRepository = FakeStationSearchRepository(
+      stationDetails: {
+        'station-sadang': _stationDetail(id: 'station-sadang', name: '사당'),
+      },
+    );
+
+    await _pumpGetOffAlarmRouteScreen(
+      tester,
+      repository: FakeRouteSearchRepository(
+        result: _sampleGetOffAlarmRouteResult(
+          destinationStationName: '경로가 가진 오래된 사당 이름',
+        ),
+      ),
+      controller: controller,
+      stationRepository: stationRepository,
+    );
+    await tester.ensureVisible(find.text('하차 알림'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('하차 알림'));
+    await tester.pumpAndSettle();
+
+    expect(stationRepository.requestedDetailStationIds, ['station-sadang']);
+    expect(notifier.scheduledAlarms.single.stationName, '사당');
+    expect(
+      notifier.scheduledAlarms.single.stationName,
+      isNot('station-sadang'),
+    );
+    expect((await stateRepository.loadActive())?.destination.stationName, '사당');
+  });
+
+  for (final badName in ['station-sadang', '   ']) {
+    final badNameKind = badName.trim().isEmpty ? 'blank' : 'raw ID';
+    testWidgets(
+      'foreground refresh는 저장된 $badNameKind 역명을 repository canonical 역명으로 치유한다',
+      (tester) async {
+        final notifier = _RecordingGetOffAlarmNotifier();
+        final stateRepository = _MemoryGetOffAlarmStateRepository();
+        final controller = GetOffAlarmController(
+          notifier: notifier,
+          permissionGate: _StubExactAlarmPermissionGate(),
+          notificationPermissionProvider: FakeNotificationPermissionProvider(
+            nextStatus: NotificationPermissionStatus.granted,
+          ),
+          repository: stateRepository,
+          now: () => DateTime.parse('2026-07-06T09:00:00+09:00'),
+        );
+        addTearDown(controller.dispose);
+        final stationRepository = FakeStationSearchRepository(
+          stationDetails: {
+            'station-sadang': _stationDetail(id: 'station-sadang', name: '사당'),
+          },
+        );
+        final routeRepository = FakeRouteSearchRepository(
+          result: _sampleGetOffAlarmRouteResult(
+            destinationStationName: '경로가 가진 오래된 사당 이름',
+          ),
+        );
+        await _pumpGetOffAlarmRouteScreen(
+          tester,
+          repository: routeRepository,
+          controller: controller,
+          stationRepository: stationRepository,
+        );
+        await controller.enable(
+          routeId: 'route-1',
+          stops: [
+            GetOffAlarmStop(
+              stationId: 'station-sadang',
+              stationName: badName,
+              arrivalAt: DateTime.parse('2026-07-06T09:37:30+09:00'),
+              kind: GetOffAlarmKind.destination,
+            ),
+          ],
+          transferAlarmEnabled: false,
+        );
+        notifier.reset();
+
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+        await tester.pump();
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pumpAndSettle();
+
+        expect(stationRepository.requestedDetailStationIds, ['station-sadang']);
+        expect(notifier.scheduledAlarms.single.stationName, '사당');
+        expect(
+          (await stateRepository.loadActive())?.destination.stationName,
+          '사당',
+        );
+      },
+    );
+  }
+
+  testWidgets('foreground 역명 조회 실패는 기존 하차 알림과 구독을 보존한다', (tester) async {
+    final notifier = _RecordingGetOffAlarmNotifier();
+    final stateRepository = _MemoryGetOffAlarmStateRepository();
+    final controller = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: _StubExactAlarmPermissionGate(),
+      notificationPermissionProvider: FakeNotificationPermissionProvider(
+        nextStatus: NotificationPermissionStatus.granted,
+      ),
+      repository: stateRepository,
+      now: () => DateTime.parse('2026-07-06T09:00:00+09:00'),
+    );
+    addTearDown(controller.dispose);
+    final routeRepository =
+        FakeRouteSearchRepository(result: _sampleGetOffAlarmRouteResult())
+          ..refreshResult = RouteRefreshResult(
+            routeSearchId: 'route-1',
+            status: 'UPDATED_ETA',
+            result: _sampleGetOffAlarmRouteResult(
+              realtimeArrivalTimeIso: '2026-07-06T09:40:00+09:00',
+            ),
+            refreshedAt: '2026-07-06T09:01:00+09:00',
+            etaSource: 'REALTIME',
+            etaConfidence: 'HIGH',
+            sourceLabel: '실시간 도착 정보 기준',
+          );
+    await _pumpGetOffAlarmRouteScreen(
+      tester,
+      repository: routeRepository,
+      controller: controller,
+      stationRepository: FakeStationSearchRepository(
+        stationDetails: {
+          'station-sadang': _stationDetail(
+            id: 'station-sadang',
+            name: 'station-sadang',
+          ),
+        },
+      ),
+    );
+    await _enableSampleGetOffAlarm(controller);
+    final subscriptionBefore = await stateRepository.loadActive();
+    notifier.reset();
+    final reports = <FlutterErrorDetails>[];
+
+    await runWithMobileErrorReporter(reports.add, () async {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+    });
+
+    expect(reports, hasLength(1));
+    expect(find.text('하차 알림을 새로 맞추지 못했어요. 이전 경로를 유지해요.'), findsOneWidget);
+    expect(notifier.scheduleCalls, 0);
+    expect(notifier.cancelCalls, 0);
+    expect(await stateRepository.loadActive(), same(subscriptionBefore));
+  });
+
   testWidgets('여러 승차 구간 최초 하차 알림은 공식 환승역과 도착역 이름을 저장한다', (tester) async {
     final notifier = _RecordingGetOffAlarmNotifier();
     final stateRepository = _MemoryGetOffAlarmStateRepository();
@@ -12634,7 +13609,10 @@ void main() {
     final active = await stateRepository.loadActive();
     expect(active?.transfers.map((stop) => stop.stationName), ['금정']);
     expect(active?.destination.stationName, '사당');
-    expect(stationRepository.requestedDetailStationIds, ['station-geumjeong']);
+    expect(stationRepository.requestedDetailStationIds, [
+      'station-geumjeong',
+      'station-sadang',
+    ]);
   });
 
   testWidgets('ride 중 하나의 공식 도착이 없으면 부분 하차 알림을 보이지 않는다', (tester) async {
@@ -12813,7 +13791,18 @@ void main() {
       MaterialApp(
         home: RouteSearchScreen(
           repository: repository,
-          stationRepository: FakeStationSearchRepository(),
+          stationRepository: FakeStationSearchRepository(
+            stationDetails: {
+              'station-geumjeong': _stationDetail(
+                id: 'station-geumjeong',
+                name: '금정',
+              ),
+              'station-sadang': _stationDetail(
+                id: 'station-sadang',
+                name: '사당',
+              ),
+            },
+          ),
           getOffAlarmController: controller,
           initialDraft: RouteDraft(
             origin: const RouteDraftStation(
@@ -12971,7 +13960,10 @@ void main() {
     final active = await stateRepository.loadActive();
     expect(active?.transfers.map((stop) => stop.stationName), ['금정']);
     expect(active?.destination.stationName, '사당');
-    expect(stationRepository.requestedDetailStationIds, ['station-geumjeong']);
+    expect(stationRepository.requestedDetailStationIds, [
+      'station-geumjeong',
+      'station-sadang',
+    ]);
   });
 
   testWidgets('pull-to-refresh는 활성 하차 알림을 새 ETA로 재예약한다', (tester) async {
@@ -16527,7 +17519,12 @@ class FakeStationSearchRepository
     if (completer != null) {
       return completer.future;
     }
-    return stationDetails[stationId] ?? stationDetail;
+    return stationDetails[stationId] ??
+        (stationDetail.id == stationId
+            ? stationDetail
+            : stationId == 'station-sadang'
+            ? _stationDetail(id: stationId, name: '사당')
+            : stationDetail);
   }
 
   @override
@@ -16917,8 +17914,10 @@ class _FakeKakaoMapLauncher implements KakaoMapLauncher {
 RouteSearchResult _sampleGetOffAlarmRouteResult({
   String plannedArrivalTimeIso = '2026-07-06T09:37:30+09:00',
   String realtimeArrivalTimeIso = '',
+  String destinationStationName = '사당',
 }) {
   return _sampleRouteSearchResult(
+    destinationStationName: destinationStationName,
     steps: [
       RouteSearchStep(
         sequence: 1,
@@ -16990,11 +17989,15 @@ Future<void> _enableSampleGetOffAlarm(GetOffAlarmController controller) {
 }
 
 class FakeRouteSearchRepository implements RouteSearchRepository {
-  FakeRouteSearchRepository({RouteSearchResult? result, this.error})
-    : result = result ?? _sampleRouteSearchResult();
+  FakeRouteSearchRepository({
+    RouteSearchResult? result,
+    this.error,
+    this.errorForRequest,
+  }) : result = result ?? _sampleRouteSearchResult();
 
   final RouteSearchResult result;
   final Object? error;
+  final Object? Function(RouteSearchRequest request)? errorForRequest;
   final requests = <RouteSearchRequest>[];
   final refreshRouteSearchIds = <String>[];
   RouteRefreshResult? refreshResult;
@@ -17004,7 +18007,7 @@ class FakeRouteSearchRepository implements RouteSearchRepository {
   @override
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request) async {
     requests.add(request);
-    final currentError = error;
+    final currentError = errorForRequest?.call(request) ?? error;
     if (currentError != null) {
       throw currentError;
     }
@@ -17827,6 +18830,11 @@ RouteSearchResult _sampleRouteSearchResult({
   String mobilityType = 'SENIOR',
   String etaSource = '',
   String sourceUpdatedAt = '',
+  String destinationStationName = '사당',
+  String departureTimeIso = '',
+  String arrivalTimeIso = '',
+  RouteObjective objective = RouteObjective.fastest,
+  RouteTransportScope transportScope = RouteTransportScope.subway,
   OfficialOdFareQuote? officialOdFareQuote,
   List<RouteSearchStep>? steps,
   List<String> recommendationReasons = const [
@@ -17840,7 +18848,7 @@ RouteSearchResult _sampleRouteSearchResult({
     originStationId: 'station-sangnoksu',
     originStationName: '상록수',
     destinationStationId: 'station-sadang',
-    destinationStationName: '사당',
+    destinationStationName: destinationStationName,
     mobilityType: mobilityType,
     status: status,
     lineId: 'seoul-4',
@@ -17888,7 +18896,7 @@ RouteSearchResult _sampleRouteSearchResult({
     warnings: const [
       RouteSearchWarning(
         code: 'LOW_DATA_CONFIDENCE',
-        message: '일부 시설 안내를 준비 중이에요.',
+        message: '일부 시설 안내는 아직 확인되지 않았어요.',
       ),
       RouteSearchWarning(
         code: 'STALE_ACCESSIBILITY_DATA',
@@ -17901,6 +18909,10 @@ RouteSearchResult _sampleRouteSearchResult({
     etaSource: etaSource,
     sourceUpdatedAt: sourceUpdatedAt,
     officialOdFareQuote: officialOdFareQuote,
+    departureTimeIso: departureTimeIso,
+    arrivalTimeIso: arrivalTimeIso,
+    objective: objective,
+    transportScope: transportScope,
   );
 }
 

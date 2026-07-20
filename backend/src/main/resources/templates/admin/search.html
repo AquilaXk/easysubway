@@ -28,7 +28,7 @@
 	      th:attr="hx-get=@{/admin/search}" hx-trigger="submit, keyup changed delay:300ms">
 		<input type="search" name="q" th:value="${query}"
 		       placeholder="메뉴·역·제보 검색" aria-label="검색어" autocomplete="off">
-		<button type="submit">검색</button>
+		<button type="submit" class="outline">검색</button>
 	</form>
 
 	<div id="search-results">
@@ -36,7 +36,7 @@
 			<div th:if="${query != null and !query.isEmpty() and resultGroups.isEmpty()}">
 				<div th:replace="~{admin/fragments/empty-state :: panel('검색 결과가 없습니다.', '다른 검색어로 시도해 보세요.')}"></div>
 			</div>
-			<section th:each="group : ${resultGroups}" class="search-group">
+			<section th:each="group : ${resultGroups}" class="admin-section-flat search-group">
 				<h2 th:text="${group.label}">메뉴</h2>
 				<ul class="search-hits">
 					<li th:each="hit : ${group.hits}">

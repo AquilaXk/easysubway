@@ -150,16 +150,28 @@ class AdminAccessibilitySmokeTest {
 			.contains("href=\"#admin-content\"")
 			.contains("class=\"admin-shell\"")
 			.contains("aria-label=\"통합 관리자 화면\"")
+			// #2277: sidebar는 workspace disclosure로 렌더되고, no-JS 폴백을 위해 toggle은 정적
+			// aria-expanded="true"로 모든 허용 program을 노출한다.
+			.contains("class=\"admin-nav-workspace-toggle\"")
 			.contains("class=\"admin-topbar-row\" aria-label=\"관리자 실행 환경\"")
 			.contains("id=\"admin-content\" class=\"admin-content-anchor\" tabindex=\"-1\"")
 			.contains("<main class=\"admin-main\">")
 			.contains("<h1>" + expectedHeading + "</h1>")
 			.contains("aria-label=\"관리자 로그아웃\"")
+			.contains("class=\"admin-topbar-logout-form\"")
 			.contains("action=\"/admin/logout\"")
 			.contains("name=\"_csrf\"")
 			.doesNotContain("<main id=\"admin-content\"");
 		assertThat(html.indexOf("href=\"#admin-content\"")).isLessThan(html.indexOf("class=\"admin-shell\""));
 		assertThat(html.indexOf("class=\"admin-topbar-row\"")).isLessThan(html.indexOf("id=\"admin-content\""));
+		assertThat(html.indexOf("class=\"admin-sidebar-nav-control\""))
+			.isLessThan(html.indexOf("class=\"admin-topbar-brand\""));
+		assertThat(html.indexOf("class=\"admin-topbar-brand\""))
+			.isLessThan(html.indexOf("class=\"admin-alert-center\""));
+		assertThat(html.indexOf("class=\"admin-alert-center\""))
+			.isLessThan(html.indexOf("class=\"admin-user-menu\""));
+		assertThat(html.indexOf("class=\"admin-user-menu\""))
+			.isLessThan(html.indexOf("class=\"admin-topbar-logout-form\""));
 		assertThat(html.indexOf("id=\"admin-content\"")).isLessThan(html.indexOf("<header class=\"admin-page-head\">"));
 	}
 

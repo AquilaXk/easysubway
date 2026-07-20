@@ -6,7 +6,9 @@ import '../../../core/database/catalog/canonical_station_id.dart';
 import '../../../core/database/catalog/catalog_database.dart';
 import '../../../core/database/catalog/station_timetable_query.dart';
 import '../../../network_map.dart';
-import '../../../station_search.dart';
+import '../domain/station_line.dart';
+import '../domain/station_models.dart';
+import '../domain/station_repositories.dart';
 
 class DriftStationRepository
     implements
@@ -15,6 +17,9 @@ class DriftStationRepository
         StationTimetableRepository,
         NetworkMapRepository {
   DriftStationRepository({required this.database});
+
+  /// 지하철(`SUBWAY`) 출발에 허용되는 운행종별. 이 외 값은 경계에서 실패시킨다.
+  static const _validSubwayServicePatterns = {'LOCAL', 'EXPRESS'};
 
   final CatalogDatabase database;
   Future<List<_LocalStationSummary>>? _stationSummaryCache;
@@ -98,12 +103,25 @@ class DriftStationRepository
     final grouped = <String, List<StationTimetableDeparture>>{};
     for (final row in rows) {
       final directionName = row.directionName;
+      final servicePattern = row.servicePattern.trim().toUpperCase();
+      final serviceClass = row.serviceClass.trim().toUpperCase();
+      // 지하철 운행종별이 LOCAL/EXPRESS가 아니면(공백·미상) 일반으로 추정하지 않고
+      // 경계에서 실패시킨다(fail closed) — 잘못된 급행/일반 표기를 원천 차단한다.
+      if (serviceClass == 'SUBWAY' &&
+          !_validSubwayServicePatterns.contains(servicePattern)) {
+        throw StateError(
+          '알 수 없는 지하철 운행종별입니다: "${row.servicePattern}" '
+          '(station=$stationId, line=$lineId)',
+        );
+      }
       grouped
           .putIfAbsent(directionName, () => <StationTimetableDeparture>[])
           .add(
             StationTimetableDeparture(
               directionName: directionName,
               seconds: row.seconds,
+              servicePattern: servicePattern,
+              serviceClass: serviceClass,
             ),
           );
     }

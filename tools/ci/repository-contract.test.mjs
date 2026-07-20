@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile, execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { createHash, generateKeyPairSync, sign as signBytes } from "node:crypto";
+import { lstat as fsLstat, mkdir, mkdtemp, readFile, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -9,12 +9,19 @@ import { pathToFileURL } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import { promisify } from "node:util";
-import { gunzipSync, inflateSync } from "node:zlib";
+import { gzipSync, gunzipSync, inflateSync } from "node:zlib";
 import { REQUIRED_STATUS_CHECK_CONTEXTS } from "./apply-main-ruleset-required-checks.mjs";
 import { canonicalScopeHash } from "../datapack/build-launch-denominator-report.mjs";
+import { canonicalJson, withoutSignature } from "../datapack/lib/manifest-validation.mjs";
+import {
+  ROUTE_INTEGRATION_SCENARIOS,
+  ROUTE_SEARCH_CATALOG_ID,
+  buildRouteIntegrationVerdict,
+} from "../release/generate-route-integration-verdict.mjs";
 
 const root = process.cwd();
 const execFileAsync = promisify(execFile);
+const currentGitSha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
 const validDataPackPublicKeyModulus =
   "itNBIH_FyHbqONXe_z8LNzWes4rh3veI4_8RY76rb7onamA-WDoJlvFyvBG-ihBOl7LtgW1rV54hCLHz95VFLmm028-tll9ThDzSs3Bu9ychED-m0vny16tK8ZgB6gf7sJkjGBJn8MLDaiVWoVvD5TEjv433f_vMFIljdNUKZC2Xf0qHYlYv18dAwbJHKeOsmJkky13HNVn40HuEn5FWEJvFI5qqVgpJ-k1V3ip39ga2-Ek5SOVHAL6U44ypjSXUjo7NCKVpuQRwN7hAnvlYutXDdrEQ6Oa3iUtbQJIgkl-ZmTwNkYHCEIhd_ZLB9n_EEHdvyJAmUKCtAKLX5FOa9w";
 const validPlayAppSigningFingerprint =
@@ -22,6 +29,17 @@ const validPlayAppSigningFingerprint =
 
 function read(relativePath) {
   return readFileSync(path.join(root, relativePath), "utf8");
+}
+
+async function initializeFixtureGitRepo(repoPath) {
+  await execFileAsync("git", ["init", "-q"], { cwd: repoPath });
+  await execFileAsync("git", ["add", "."], { cwd: repoPath });
+  await execFileAsync("git", [
+    "-c", "user.name=EasySubway Contract Test",
+    "-c", "user.email=contract-test@easysubway.local",
+    "commit", "-q", "-m", "fixture",
+  ], { cwd: repoPath });
+  return execFileSync("git", ["rev-parse", "HEAD"], { cwd: repoPath, encoding: "utf8" }).trim();
 }
 
 function mobileProductionDartFiles() {
@@ -403,6 +421,112 @@ test("route release readiness tracker keeps issue 1414 as a release blocker", ()
 
   assert.match(prTemplate, /Route release readiness tracker impact/);
   assert.match(prTemplate, /route-release-readiness-tracker\.json/);
+});
+
+test("route integration verdict producer가 issue 1414 E1~E9 matrix를 실존 evidence에 연결한다", () => {
+  const producer = "tools/release/generate-route-integration-verdict.mjs";
+  assert.equal(existsSync(path.join(root, producer)), true, "route integration verdict producer must exist");
+
+  // E1~E9 전부를 카탈로그로 유지한다.
+  assert.deepEqual(
+    ROUTE_INTEGRATION_SCENARIOS.map((scenario) => scenario.id),
+    ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9"],
+  );
+
+  // request/response 계약은 route search v2 API catalog ID에 연결한다.
+  assert.equal(
+    ROUTE_SEARCH_CATALOG_ID,
+    "internal:POST:/api/v2/routes/search:com.easysubway.route.adapter.in.web.RouteSearchController#searchRouteV2",
+  );
+  const catalogShow = execFileSync(
+    process.execPath,
+    ["tools/ci/api-catalog.mjs", "show", ROUTE_SEARCH_CATALOG_ID],
+    { cwd: root, encoding: "utf8" },
+  );
+  assert.match(catalogShow, /\/api\/v2\/routes\/search/);
+
+  // 각 시나리오는 producer issue와, docs/ 로컬 evidence를 제외한 tracked test 파일에 연결된다.
+  for (const scenario of ROUTE_INTEGRATION_SCENARIOS) {
+    assert.equal(Number.isInteger(scenario.producerIssue), true, `${scenario.id} must reference a producer issue`);
+    assert.ok(scenario.evidenceTests.length > 0, `${scenario.id} must reference evidence tests`);
+    for (const reference of scenario.evidenceTests) {
+      const filePart = reference.split("::")[0];
+      if (filePart.startsWith("docs/")) continue; // docs/2099-qa는 gitignore 로컬 evidence.
+      assert.equal(
+        existsSync(path.join(root, filePart)),
+        true,
+        `${scenario.id} references a missing evidence file: ${filePart}`,
+      );
+    }
+  }
+});
+
+test("route integration verdict는 mixed identity·누락 입력을 fail closed하고 same-RC만 GO한다", () => {
+  const identity = {
+    gitSha: "26d1461210a36d9d969e5a18d5f13725519abdcd",
+    appVersionName: "1.0.4",
+    versionCode: "10005",
+    aabSha256: "87df6fd89fd8490a8af0d754e48a17288b880f3e918bde87729b79fee88435cc",
+    aabPayloadSha256: "e2b9753619285e685a713e101b996129781f9067de5bc6a90a125c5c9de95758",
+    backendImageDigest: null,
+    backendArtifactSha256: "74a3e35762d1973c0b05a0c0bd6f0fc6aa2a4657ef23cde359cf100e0830f631",
+    dataPackManifestSha256: "2ee9f38f3e748d7bbc6d9eba124b34e6b5c8ad539338a6cdeee7a472515456e5",
+    dataPackArtifactSha256: "7bb4bb68f0642e45377d98b083e93cd8c1c92aaa58dd353f32189e3f325a1562",
+    routeContractVersion: "route-map-contract-v1",
+    realtimeContractVersion: "seoul-topis-schema-v1",
+  };
+  const planner = {
+    sourceIssue: 2098,
+    provenance: "final-candidate",
+    releaseCandidateIdentity: { ...identity },
+    plannerIdentity: { canonicalPackSha256: identity.dataPackArtifactSha256, timetableSnapshotSha256: "a".repeat(64) },
+    checks: { unknownPatternDefaultedToLocal: false },
+    integrationScenarios: { E2: "PASS", E3: "PASS", E4: "PASS", E5: "PASS", E6: "PASS", E9: "PASS" },
+    canaryResult: {
+      plan: {
+        itineraries: [{
+          steps: [
+            { stepType: "ride", serviceClass: "SUBWAY", servicePattern: "LOCAL" },
+            { stepType: "ride", serviceClass: "ITX_CHEONGCHUN", servicePattern: "EXPRESS" },
+          ],
+        }],
+      },
+    },
+  };
+  const mobile = {
+    sourceIssue: 2099,
+    provenance: "manual-observation",
+    releaseCandidateIdentity: { ...identity },
+    integrationScenarios: { E7: "PASS", E8: "PASS", E9: "PASS" },
+  };
+  const routeMap = {
+    sourceIssue: 2068,
+    provenance: "final-candidate",
+    releaseCandidateIdentity: { ...identity },
+    integrationScenarios: { E1: "PASS" },
+  };
+  const base = {
+    rcManifest: { rcIdentity: { ...identity } },
+    plannerEvidence: planner,
+    mobileEvidence: mobile,
+    routeMapEvidence: routeMap,
+    generatedAt: "2026-07-17T15:00:00.000Z",
+  };
+
+  assert.equal(buildRouteIntegrationVerdict(base).decision, "GO");
+
+  const missing = buildRouteIntegrationVerdict({ ...base, plannerEvidence: null });
+  assert.equal(missing.decision, "NO_GO");
+
+  const mixed = buildRouteIntegrationVerdict({
+    ...base,
+    mobileEvidence: { ...mobile, releaseCandidateIdentity: { ...identity, gitSha: "0".repeat(40) } },
+  });
+  assert.equal(mixed.decision, "NO_GO");
+  assert.equal(
+    mixed.noGoConditions.find((condition) => condition.id === "mixed_rc_or_artifact_identity").triggered,
+    true,
+  );
 });
 
 function currentMobileVersionCode() {
@@ -847,6 +971,140 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
   assert.doesNotMatch(releaseGateJob, /iOS CI \/ Build Flutter iOS simulator app/);
 });
 
+// #2283 V6-11: Admin QA Gates가 실제 브라우저 하네스를 blocking으로 통합하되(shadow 구간에서 seed
+// 포함 blocking 0을 실측한 뒤 continue-on-error 한 줄을 제거해 승격, PR #2309 run 29677088560),
+// required check 이름과 기존 정적 게이트(vendor integrity·unit test)를 그대로 보존하고, admin 무관
+// 변경은 명시적 성공 skip을 반환하며, boot·seed는 shadow 여부와 무관하게 항상 강제 성공이도록 고정한다.
+test("Admin QA Gates는 실제 브라우저 QA를 blocking으로 통합하고 required check·skip 계약을 유지한다", () => {
+  const workflow = read(".github/workflows/ci.yml");
+  const adminQaJob = jobBlock(workflow, "admin-qa-gates", "repository-contracts");
+
+  // required check 이름과 job 수준 docs_only skip은 그대로 유지된다.
+  assert.match(adminQaJob, /name: Admin QA Gates/);
+  assert.match(adminQaJob, /needs\.changes\.outputs\.docs_only != 'true'/);
+  assert.ok(REQUIRED_STATUS_CHECK_CONTEXTS.includes("Admin QA Gates"));
+
+  // 기존 정적 게이트(vendor integrity + unit test)는 삭제/개명하지 않는다.
+  assert.match(adminQaJob, /Admin QA Gates \/ Install pinned QA tools/);
+  assert.match(adminQaJob, /npm ci --prefix tools\/qa/);
+  assert.match(adminQaJob, /Admin QA Gates \/ Run static QA gates/);
+  assert.match(adminQaJob, /node tools\/ci\/check-admin-vendor-integrity\.mjs/);
+  assert.match(adminQaJob, /npm test --prefix tools\/qa/);
+
+  // admin 관련 경로(backend surface) 변경에서만 heavy browser step(boot·seed·harness)을 실행한다.
+  assert.match(adminQaJob, /Admin QA Gates \/ Set up Java for actual browser QA/);
+  assert.match(adminQaJob, /Admin QA Gates \/ Set up Chrome for actual browser QA/);
+  assert.match(adminQaJob, /Admin QA Gates \/ Build backend for actual browser QA/);
+  assert.match(adminQaJob, /\.\/gradlew bootJar --no-daemon/);
+  assert.match(adminQaJob, /Admin QA Gates \/ Boot backend for actual browser QA/);
+  assert.match(adminQaJob, /Admin QA Gates \/ Seed CI facility report photo for actual browser QA/);
+  assert.match(adminQaJob, /Admin QA Gates \/ Actual browser accessibility QA \(shadow\)/);
+  assert.match(adminQaJob, /Admin QA Gates \/ Stop backend for actual browser QA/);
+  assert.match(adminQaJob, /node tools\/qa\/admin-accessibility-qa\.mjs --output/);
+  // Java·Chrome·build·boot·seed·harness step은 모두 backend == 'true' gate로만 실행한다.
+  for (const step of [
+    "Set up Java for actual browser QA",
+    "Set up Chrome for actual browser QA",
+    "Build backend for actual browser QA",
+    "Boot backend for actual browser QA",
+    "Seed CI facility report photo for actual browser QA",
+    "Actual browser accessibility QA \\(shadow\\)",
+  ]) {
+    const stepBlock = adminQaJob.match(new RegExp(`- name: Admin QA Gates / ${step}[\\s\\S]*?\\n      - `))?.[0] ?? "";
+    assert.match(stepBlock, /needs\.changes\.outputs\.backend == 'true'/, `${step} must gate on backend == 'true'`);
+  }
+
+  // 무관 변경(backend != 'true')은 explicit successful skip(exit 0)을 반환한다.
+  assert.match(adminQaJob, /Admin QA Gates \/ Skip actual browser QA \(unrelated change\)/);
+  assert.match(adminQaJob, /needs\.changes\.outputs\.backend != 'true'/);
+  assert.match(adminQaJob, /skipping the actual browser accessibility QA step\./);
+
+  // #2283 V6-11: browser step 직전 seed 단계는 dev/H2의 빈 신고 대기열(V6-08 report-queue-action
+  // -signal이 항상 blocking되는 seed-data gap)을 해소한다. 공개 API로 사진 첨부 신고 1건을 시드하고,
+  // 임의 재시도 없이 실패 시 job을 실패시킨다(shadow 여부와 무관하게 seed 단계는 continue-on-error가 아니다).
+  const seedStep = adminQaJob.match(
+    /- name: Admin QA Gates \/ Seed CI facility report photo for actual browser QA[\s\S]*?\n      (?:#|- name:)/,
+  )?.[0] ?? "";
+  assert.doesNotMatch(seedStep, /continue-on-error/);
+  assert.doesNotMatch(seedStep, /\bretry\b/i);
+  assert.match(seedStep, /station-sangnoksu/);
+  assert.match(seedStep, /facility-sangnoksu-elevator-1/);
+  assert.match(seedStep, /photoDataBase64/);
+  assert.match(seedStep, /POST http:\/\/localhost:8080\/api\/v1\/reports/);
+  assert.match(seedStep, /if \[\[ "\$\{http_code\}" != "201" \]\]; then/);
+  assert.match(seedStep, /exit 1/);
+  assert.doesNotMatch(seedStep, /secrets\./);
+
+  // boot 단계는 backend 실행 실패를 shadow와 무관하게 job 실패로 표면화한다(continue-on-error 아님).
+  const bootStep = adminQaJob.match(
+    /- name: Admin QA Gates \/ Boot backend for actual browser QA[\s\S]*?\n      (?:#|- name:)/,
+  )?.[0] ?? "";
+  assert.doesNotMatch(bootStep, /continue-on-error/);
+  assert.doesNotMatch(bootStep, /\bretry\b/i);
+  assert.match(bootStep, /openssl rand -hex 24/);
+  assert.match(bootStep, /::add-mask::\$\{admin_pw\}/);
+  assert.match(bootStep, /::add-mask::\$\{operator_pw\}/);
+  assert.match(bootStep, />> "\$\{GITHUB_ENV\}"/);
+  assert.match(bootStep, /if \[\[ "\$\{ready\}" != "1" \]\]; then/);
+  assert.doesNotMatch(bootStep, /secrets\./);
+  // #2283 리뷰: jar 해석은 pipefail-안전한 nullglob 배열이어야 한다(`ls | grep | head` 파이프라인 금지).
+  assert.doesNotMatch(bootStep, /ls backend\/build\/libs/);
+  assert.match(bootStep, /shopt -s nullglob/);
+  assert.match(bootStep, /candidate_jars=\(backend\/build\/libs\/\*\.jar\)/);
+  assert.match(bootStep, /"\$\{candidate\}" != \*-plain\.jar/);
+  // #2283 리뷰: 부팅 대기는 readiness probe로 좁힌다(permitAll 확인됨, liveness보다 정확한 신호).
+  assert.match(bootStep, /actuator\/health\/readiness/);
+  assert.doesNotMatch(bootStep, /curl -fsS http:\/\/localhost:8080\/actuator\/health >/);
+
+  // #2283 V6-11: shadow→blocking 승격 완료. harness 호출 step에 continue-on-error가 없다 —
+  // shadow 재개가 필요하면 이 한 줄(`continue-on-error: true`)을 다시 추가하는 것이 유일한 스위치다.
+  // boot·seed는 애초에 shadow 대상이 아니었으므로(항상 강제 성공) 승격 전후로 변화가 없다.
+  const browserStep = adminQaJob.match(
+    /- name: Admin QA Gates \/ Actual browser accessibility QA \(shadow\)[\s\S]*?\n      - name:/,
+  )?.[0] ?? "";
+  assert.match(browserStep, /id: browser-qa/);
+  assert.doesNotMatch(browserStep, /continue-on-error/);
+  // arbitrary retry로 flaky를 숨기지 않는다.
+  assert.doesNotMatch(browserStep, /\bretry\b/i);
+  // harness step 자체는 backend boot·seed 로직을 갖지 않는다(Boot·Seed 단계로 이관).
+  assert.doesNotMatch(browserStep, /openssl rand/);
+  assert.doesNotMatch(browserStep, /photoDataBase64/);
+  assert.match(browserStep, /"mode": "blocking"/);
+
+  // shadow artifact(report JSON·스크린샷)와 job summary를 항상 남기고, backend는 항상 정리한다.
+  assert.match(adminQaJob, /Admin QA Gates \/ Upload actual browser QA artifacts \(shadow\)/);
+  assert.match(adminQaJob, /actions\/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02/);
+  assert.match(adminQaJob, /Admin QA Gates \/ Summarize actual browser QA \(shadow\)/);
+  assert.match(adminQaJob, /GITHUB_STEP_SUMMARY/);
+  // #2283 리뷰(CodeRabbit Major): report JSON이 손상·절단돼도 Summarize step은 try/catch로
+  // fallback summary(파싱 실패 사실 + 파일 크기·head)를 남기고 항상 성공 종료해야 한다. 게이트
+  // 판정은 harness step(browser-qa)의 exit code가 이미 내렸으므로 이 step은 이를 약화하지 않는다.
+  const summarizeStep = adminQaJob.match(
+    /- name: Admin QA Gates \/ Summarize actual browser QA \(shadow\)[\s\S]*/,
+  )?.[0] ?? "";
+  assert.match(summarizeStep, /try \{/);
+  assert.match(summarizeStep, /\} catch \(error\) \{/);
+  assert.match(summarizeStep, /Report JSON parse failed \(fallback summary\)/);
+  assert.match(summarizeStep, /fs\.statSync\(reportPath\)\.size/);
+  assert.match(summarizeStep, /Head \(first 500 chars\)/);
+  assert.doesNotMatch(summarizeStep, /\bretry\b/i);
+  const stopStep = adminQaJob.match(
+    /- name: Admin QA Gates \/ Stop backend for actual browser QA[\s\S]*?\n      - name:/,
+  )?.[0] ?? "";
+  assert.match(stopStep, /always\(\) && needs\.changes\.outputs\.backend == 'true'/);
+  assert.match(stopStep, /BACKEND_QA_PID/);
+  // #2283 리뷰: backend-qa.log는 artifact로 업로드되므로(파일 내용은 ::add-mask:: 대상이 아니다)
+  // 업로드 전 생성 비밀 문자열을 scrub한다(로그 전체를 아티팩트에서 제외하는 대신 진단 가치를 보존).
+  assert.match(stopStep, /sed -i "s\/\$\{ADMIN_QA_ADMIN_PASSWORD\}\/\[REDACTED\]\/g"/);
+  assert.match(stopStep, /sed -i "s\/\$\{ADMIN_QA_OPERATOR_PASSWORD\}\/\[REDACTED\]\/g"/);
+  // tested revision·seed·profile을 artifact/summary에 기록한다.
+  assert.match(adminQaJob, /testedRevision/);
+  assert.match(adminQaJob, /"database": "h2-in-memory"/);
+
+  // CI 러너 sandbox 완화(harness step).
+  assert.match(browserStep, /ADMIN_QA_CHROME_NO_SANDBOX: "1"/);
+});
+
 test("main ruleset 필수 체크는 ci.yml 잡 이름·automerge 코디네이터와 1:1로 고정된다", () => {
   // These context names correspond 1:1 to main ruleset 17584352's
   // required_status_checks. Renaming a ci.yml job without updating the ruleset
@@ -1049,20 +1307,23 @@ test("백엔드 배포는 GHCR digest를 pull하고 서버 위 build 경로를 �
   assert.match(deploy, /image_revision_mismatch/);
   assert.match(deploy, /org\.opencontainers\.image\.revision/);
 
-  // Rollback no longer depends on the server-local image cache: a pruned image
-  // is restored from GHCR by digest.
-  assert.match(deploy, /ensure_rollback_image/);
-  assert.match(deploy, /docker pull "\$\{GHCR_IMAGE\}@\$\{prev_digest\}"/);
+  // The old "restart the previous image from GHCR" rollback path is removed
+  // entirely (issue #2331): a candidate is proven on a standby container
+  // before the canonical container is ever touched, so there is no server-
+  // local image cache to fall back to and nothing to pull by a prior digest.
+  assert.doesNotMatch(deploy, /ensure_rollback_image/);
+  assert.doesNotMatch(deploy, /GHCR_IMAGE/);
   assert.match(deploy, /current-image-digest/);
 });
 
-test("CD 배포는 production environment를 선언하고 배포 태그는 record-deploy 잡만 기록한다", () => {
+test("CD 배포는 production-cd environment를 선언하고 배포 태그는 record-deploy 잡만 기록한다", () => {
   const cd = read(".github/workflows/cd.yml");
   const cleanup = read(".github/workflows/actions-storage-cleanup.yml");
 
-  // production environment gives the deploy GitHub deployment history and lets a
-  // branch protection rule (deployment branches = main) apply (issue #1687).
-  assert.match(cd, /environment:\n\s*name: production\n\s*url: \$\{\{ vars\.DEPLOY_PUBLIC_API_BASE_URL \}\}/);
+  // production-cd environment gives the deploy GitHub deployment history without
+  // requiring manual review; the production environment stays reserved as the
+  // required-reviewer gate for sensitive workflows (issue #1687, #2350).
+  assert.match(cd, /environment:\n\s*name: production-cd\n\s*url: \$\{\{ vars\.DEPLOY_PUBLIC_API_BASE_URL \}\}/);
   assert.match(cd, /outputs:\n\s*sha: \$\{\{ steps\.target\.outputs\.sha \}\}/);
 
   // A lightweight deploy/backend/* tag records the deployed sha on GitHub.
@@ -1440,11 +1701,16 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_DATASOURCE_USERNAME=easysubway",
     "EASYSUBWAY_DATASOURCE_PASSWORD=secret",
     "EASYSUBWAY_DATA_PACK_BASE_URL=https://cdn.example.com/easysubway-datapacks",
+    "EASYSUBWAY_DATAPACK_CATALOG_BASE_URL=https://cdn.example.com/easysubway-datapacks",
     "EASYSUBWAY_REPORT_API_BASE_URL=https://api.example.com",
     "EASYSUBWAY_ADS_ASSET_ORIGIN=https://ads-assets.fixture.test-only.dev",
     "EASYSUBWAY_ADS_EVENT_DAILY_CAP=1000000",
     "EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_MINUTE=1",
     "EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_DAY=800",
+    "EASYSUBWAY_TAGO_TRAIN_SERVICE_KEY=prod-tago-train-service-key",
+    "EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_MINUTE=60",
+    "EASYSUBWAY_TAGO_TRAIN_CALL_LIMIT_PER_DAY=1000",
+    "EASYSUBWAY_TRAIN_SEARCH_RATE_LIMIT_PER_DAY=64",
     "EASYSUBWAY_REPORT_RECEIPT_TOKEN_PEPPER=legacy-pepper-with-enough-entropy",
     "EASYSUBWAY_REPORT_UPLOAD_BUCKET=easysubway-report-uploads",
     "EASYSUBWAY_REPORT_UPLOAD_MAX_BYTES=921600",
@@ -1473,7 +1739,9 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_AUDIT_ENFORCEMENT=false",
     "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_LEGACY_ENV_ADMIN_FALLBACK=true",
     "EASYSUBWAY_ADMIN_PLATFORM_FLAGS_BREAK_GLASS_BOOTSTRAP=true",
+    "EASYSUBWAY_TERMS_OF_SERVICE_URL=https://example.com/terms",
     "EASYSUBWAY_PRIVACY_POLICY_URL=https://example.com/privacy",
+    "EASYSUBWAY_LOCATION_TERMS_URL=https://example.com/location-terms",
     "EASYSUBWAY_SUPPORT_EMAIL=support@example.com",
     "EASYSUBWAY_SECURITY_EMAIL=security@example.com",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@example.com",
@@ -1511,6 +1779,70 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
   assert.match(validator, /EASYSUBWAY_ADMIN_BASIC_AUTH_EXCEPTION_EXPIRES_AT/);
   assert.match(validator, /EASYSUBWAY_ADMIN_CUTOVER_ENFORCED/);
   assert.match(validator, /SLACK_CI_WEBHOOK_URL\|SLACK_RELEASE_WEBHOOK_URL\|SLACK_SECURITY_WEBHOOK_URL/);
+  await execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root });
+
+  await writeFile(envFile, [
+    ...deploymentEnvLines,
+    "EASYSUBWAY_TIMETABLE_SEED_ENABLED=true",
+    "",
+  ].join("\n"));
+  await assert.rejects(
+    execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root }),
+    /EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX/,
+  );
+
+  await writeFile(envFile, [
+    ...deploymentEnvLines,
+    "EASYSUBWAY_TIMETABLE_SEED_ENABLED=true",
+    "EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX=false",
+    "",
+  ].join("\n"));
+  await assert.rejects(
+    execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root }),
+    /EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX/,
+  );
+
+  await writeFile(envFile, [
+    ...deploymentEnvLines,
+    "EASYSUBWAY_TIMETABLE_SEED_ENABLED=maybe",
+    "EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX=true",
+    "",
+  ].join("\n"));
+  await assert.rejects(
+    execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root }),
+    /EASYSUBWAY_TIMETABLE_SEED_ENABLED/,
+  );
+
+  for (const truthyAlias of ["on", "yes", "1"]) {
+    await writeFile(envFile, [
+      ...deploymentEnvLines,
+      `EASYSUBWAY_TIMETABLE_SEED_ENABLED=${truthyAlias}`,
+      "EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX=true",
+      "",
+    ].join("\n"));
+    await assert.rejects(
+      execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root }),
+      /EASYSUBWAY_TIMETABLE_SEED_ENABLED/,
+    );
+
+    await writeFile(envFile, [
+      ...deploymentEnvLines,
+      "EASYSUBWAY_TIMETABLE_SEED_ENABLED=true",
+      `EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX=${truthyAlias}`,
+      "",
+    ].join("\n"));
+    await assert.rejects(
+      execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root }),
+      /EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX/,
+    );
+  }
+
+  await writeFile(envFile, [
+    ...deploymentEnvLines,
+    "EASYSUBWAY_TIMETABLE_SEED_ENABLED=true",
+    "EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX=true",
+    "",
+  ].join("\n"));
   await execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root });
 
   await writeFile(envFile, [
@@ -1706,12 +2038,590 @@ test("모바일 async 실패는 빈 목록으로 조용히 숨기지 않는다",
 
 test("모바일 공통 상태 카드는 홈 즐겨찾기 노선도에서 사용된다", () => {
   const accessibleDesign = read("apps/mobile/lib/accessible_design.dart");
-  const main = read("apps/mobile/lib/main.dart");
+  const appComponents = read("apps/mobile/lib/app/app_components.dart");
   const networkMap = read("apps/mobile/lib/network_map.dart");
 
   assert.match(accessibleDesign, /class AccessibleStateCard extends StatelessWidget/);
-  assert.match(main, /class _HomeStateCard extends StatelessWidget[\s\S]*AccessibleStateCard\(/);
-  assert.match(networkMap, /AccessibleStateCard\([\s\S]*networkMapRetryButton/);
+  assert.match(
+    appComponents,
+    /class HomeStateCard extends StatelessWidget \{[\s\S]*?Widget build\(BuildContext context\) \{[\s\S]*?return AppCard\([\s\S]*?child: AccessibleStateCard\(/,
+  );
+  assert.match(
+    networkMap,
+    /child: AccessibleStateCard\([\s\S]*?key: const Key\('networkMapRetryButton'\)/,
+  );
+});
+
+test("모바일 presentation canonical 선언은 consumer가 직접 import한다", () => {
+  const main = read("apps/mobile/lib/main.dart");
+  const appComponents = read("apps/mobile/lib/app/app_components.dart");
+  const notificationInbox = read(
+    "apps/mobile/lib/features/notifications/presentation/notification_inbox_screen.dart",
+  );
+  const home = read(
+    "apps/mobile/lib/features/home/presentation/home_screen.dart",
+  );
+
+  assert.match(notificationInbox, /^class NotificationInboxScreen extends StatefulWidget/m);
+  assert.match(appComponents, /^class FeatureTile extends StatelessWidget/m);
+  assert.match(appComponents, /^class AppSectionTitle extends StatelessWidget/m);
+  assert.match(appComponents, /^class HomeStateCard extends StatelessWidget/m);
+  assert.match(
+    home,
+    /^import '\.\.\/\.\.\/notifications\/presentation\/notification_inbox_screen\.dart';$/m,
+  );
+  assert.doesNotMatch(main, /^export /m);
+  assert.doesNotMatch(
+    main,
+    /^class (?:NotificationInboxScreen|FeatureTile|AppSectionTitle|HomeStateCard)\b/m,
+  );
+});
+
+test("모바일 demo dependency와 접근성 theme는 app canonical 파일이 소유한다", () => {
+  const main = read("apps/mobile/lib/main.dart");
+  const appRoot = read("apps/mobile/lib/app/easy_subway_app.dart");
+  const demoDependencies = read("apps/mobile/lib/app/demo_dependencies.dart");
+  const accessibilityTheme = read("apps/mobile/lib/app/accessibility_theme.dart");
+
+  for (const declaration of [
+    "DemoFavoriteStationRepository",
+    "DemoFavoriteFacilityRepository",
+    "DemoFavoriteRouteRepository",
+    "DemoSearchHistoryRepository",
+  ]) {
+    assert.match(demoDependencies, new RegExp(`^class ${declaration}\\b`, "m"));
+    assert.doesNotMatch(main, new RegExp(`^class _?${declaration}\\b`, "m"));
+  }
+  assert.match(main, /^import 'app\/demo_dependencies\.dart';$/m);
+  assert.match(main, /const DemoFavoriteStationRepository\(\)/);
+  assert.match(main, /const DemoFavoriteFacilityRepository\(\)/);
+  assert.match(main, /const DemoFavoriteRouteRepository\(\)/);
+  assert.match(main, /DemoSearchHistoryRepository\(\)/);
+  assert.doesNotMatch(main, /^export 'app\/demo_dependencies\.dart'/m);
+  assert.match(appRoot, /^import 'demo_dependencies\.dart';$/m);
+  assert.match(appRoot, /const DemoFavoriteRouteRepository\(\)\.listFavoriteRoutes\(\)/);
+
+  assert.match(accessibilityTheme, /^class OnboardingPreferenceScope extends StatelessWidget/m);
+  assert.match(
+    accessibilityTheme,
+    /class OnboardingPreferenceScope extends StatelessWidget \{[\s\S]*?Widget build\(BuildContext context\) \{[\s\S]*?child: Theme\([\s\S]*?data: _themeForPlatformAccessibility\(\s*_themeForPreferences\(Theme\.of\(context\), preferences\),\s*mediaQuery,\s*\)/,
+  );
+  assert.match(appRoot, /^import 'accessibility_theme\.dart';$/m);
+  assert.match(appRoot, /OnboardingPreferenceScope\(/);
+  assert.doesNotMatch(main, /^class _?OnboardingPreferenceScope\b/m);
+  assert.doesNotMatch(main, /^ThemeData _themeForPreferences\b/m);
+  assert.doesNotMatch(main, /^ThemeData _themeForPlatformAccessibility\b/m);
+  assert.doesNotMatch(main, /^TextTheme _boldTextTheme\b/m);
+  assert.doesNotMatch(main, /^ButtonStyle _boldButtonTextStyle\b/m);
+  assert.doesNotMatch(main, /^TextStyle _boldTextStyle\b/m);
+});
+
+test("모바일 app root와 shell은 app canonical 파일이 소유한다", () => {
+  const main = read("apps/mobile/lib/main.dart");
+  const appRoot = read("apps/mobile/lib/app/easy_subway_app.dart");
+
+  assert.match(appRoot, /^class EasySubwayApp extends StatelessWidget/m);
+  assert.match(appRoot, /^class EasySubwayScrollBehavior extends MaterialScrollBehavior/m);
+  for (const helper of [
+    "_StartupLoadingScreen",
+    "_StartupLoadingScreenState",
+    "_EasySubwayHome",
+    "_EasySubwayHomeState",
+  ]) {
+    assert.match(appRoot, new RegExp(`^class ${helper}\\b`, "m"));
+    assert.doesNotMatch(main, new RegExp(`^class ${helper}\\b`, "m"));
+  }
+  assert.doesNotMatch(main, /^class EasySubwayApp\b/m);
+  assert.match(main, /^import 'app\/easy_subway_app\.dart';$/m);
+});
+
+test("모바일 설정 화면은 settings presentation canonical 파일이 소유한다", () => {
+  const main = read("apps/mobile/lib/main.dart");
+  const home = read(
+    "apps/mobile/lib/features/home/presentation/home_screen.dart",
+  );
+  const settings = read(
+    "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
+  );
+
+  assert.match(settings, /^const _settingsPagePadding = /m);
+  assert.match(settings, /^class AppSettingsScreen extends StatefulWidget/m);
+  assert.match(settings, /^class _AppSettingsScreenState extends State<AppSettingsScreen>/m);
+  assert.match(settings, /^class _AppSettingsSection extends StatelessWidget/m);
+  assert.match(settings, /^class _AppSettingsActionTile extends StatelessWidget/m);
+  assert.match(settings, /^class _AppSettingsPreferenceTile extends StatelessWidget/m);
+  assert.match(
+    home,
+    /^import '\.\.\/\.\.\/settings\/presentation\/app_settings_screen\.dart';$/m,
+  );
+  assert.match(
+    read("apps/mobile/test/widget_test.dart"),
+    /^import 'package:easysubway_mobile\/features\/settings\/presentation\/app_settings_screen\.dart';$/m,
+  );
+  assert.doesNotMatch(main, /^const _settingsPagePadding = /m);
+  assert.doesNotMatch(main, /^class AppSettingsScreen\b/m);
+  assert.doesNotMatch(main, /^class _AppSettingsScreenState\b/m);
+  assert.doesNotMatch(main, /^class _AppSettingsSection\b/m);
+  assert.doesNotMatch(main, /^class _AppSettingsActionTile\b/m);
+  assert.doesNotMatch(main, /^class _AppSettingsPreferenceTile\b/m);
+});
+
+test("모바일 즐겨찾기 화면은 favorites presentation canonical 파일이 소유한다", () => {
+  const main = read("apps/mobile/lib/main.dart");
+  const home = read(
+    "apps/mobile/lib/features/home/presentation/home_screen.dart",
+  );
+  const favorites = read(
+    "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart",
+  );
+
+  assert.match(favorites, /^class _HomeSavedRouteCard extends StatelessWidget/m);
+  assert.match(favorites, /^String _stationNameWithSuffix\(String name\)/m);
+  assert.match(favorites, /^class _HomeMiniBadge extends StatelessWidget/m);
+  assert.match(favorites, /^class FavoriteHomeScreen extends StatefulWidget/m);
+  assert.match(favorites, /^class _FavoriteHomeScreenState extends State<FavoriteHomeScreen>/m);
+  assert.match(favorites, /^class _FavoriteHomeData\b/m);
+  assert.match(favorites, /^class _FavoriteHomeStationRow extends StatelessWidget/m);
+  assert.match(favorites, /^class _FavoriteHomeFacilityRow extends StatelessWidget/m);
+  assert.match(
+    home,
+    /^import '\.\.\/\.\.\/favorites\/presentation\/favorite_home_screen\.dart';$/m,
+  );
+  assert.match(
+    read("apps/mobile/test/widget_test.dart"),
+    /^import 'package:easysubway_mobile\/features\/favorites\/presentation\/favorite_home_screen\.dart';$/m,
+  );
+  assert.doesNotMatch(main, /^class _HomeSavedRouteCard\b/m);
+  assert.doesNotMatch(main, /^String _stationNameWithSuffix\b/m);
+  assert.doesNotMatch(main, /^class _HomeMiniBadge\b/m);
+  assert.doesNotMatch(main, /^class FavoriteHomeScreen\b/m);
+  assert.doesNotMatch(main, /^class _FavoriteHomeScreenState\b/m);
+  assert.doesNotMatch(main, /^class _FavoriteHomeData\b/m);
+  assert.doesNotMatch(main, /^class _FavoriteHomeStationRow\b/m);
+  assert.doesNotMatch(main, /^class _FavoriteHomeFacilityRow\b/m);
+});
+
+test("모바일 즐겨찾기 화면은 새로고침·삭제·복귀 재조회 순서를 유지한다", () => {
+  const favorites = read(
+    "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart",
+  );
+  const sourceBlock = (start, next) => {
+    const startIndex = favorites.indexOf(start);
+    const nextIndex = favorites.indexOf(next, startIndex + start.length);
+    assert.notEqual(startIndex, -1, `${start} must exist`);
+    assert.ok(nextIndex > startIndex, `${next} must follow ${start}`);
+    return favorites.slice(startIndex, nextIndex);
+  };
+  const refreshBlock = sourceBlock("onRefresh: () async {", "child: ListView(");
+  const removeRouteBlock = sourceBlock(
+    "Future<void> _removeFavoriteRoute",
+    "Future<void> _openStationDetailFromFavorite",
+  );
+  const stationDetailBlock = sourceBlock(
+    "Future<void> _openStationDetailFromFavorite",
+    "Future<void> _openFacilityReportFromFavorite",
+  );
+  const facilityReportBlock = sourceBlock(
+    "Future<void> _openFacilityReportFromFavorite",
+    "Future<void> _reloadFavoritesAfterReturn",
+  );
+  const reloadBlock = sourceBlock(
+    "Future<void> _reloadFavoritesAfterReturn",
+    "class _FavoriteHomeData",
+  );
+
+  assert.match(
+    refreshBlock,
+    /final next = _loadData\(\);[\s\S]*?setState\(\(\) \{[\s\S]*?_dataFuture = next;[\s\S]*?\}\);[\s\S]*?try \{[\s\S]*?await next;[\s\S]*?catch \(error, stackTrace\)[\s\S]*?context: '즐겨찾기 새로고침 중 예외가 발생했습니다\.',/,
+  );
+  assert.match(
+    removeRouteBlock,
+    /await repository\.removeFavoriteRoute\(favorite\.favoriteRouteId\);[\s\S]*?catch \(error, stackTrace\)[\s\S]*?context: '즐겨찾기 경로 삭제 중 예외가 발생했습니다\.'[\s\S]*?await _reloadFavoritesAfterReturn\(\);/,
+  );
+  assert.match(
+    reloadBlock,
+    /if \(!mounted\)[\s\S]*?final next = _loadData\(\);[\s\S]*?setState\(\(\) \{[\s\S]*?_dataFuture = next;[\s\S]*?\}\);[\s\S]*?try \{[\s\S]*?await next;[\s\S]*?catch \(error, stackTrace\)[\s\S]*?context: '즐겨찾기 화면 복귀 후 새로고침 중 예외가 발생했습니다\.',/,
+  );
+  assert.match(
+    stationDetailBlock,
+    /await Navigator\.of\(context\)\.push\([\s\S]*?initiallyFavorite: true,[\s\S]*?\);[\s\S]*?await _reloadFavoritesAfterReturn\(\);/,
+  );
+  assert.match(
+    facilityReportBlock,
+    /await Navigator\.of\(context\)\.push\([\s\S]*?FacilityReportScreen\([\s\S]*?\);[\s\S]*?await _reloadFavoritesAfterReturn\(\);/,
+  );
+});
+
+test("모바일 계정 삭제와 출처 화면은 feature presentation canonical 파일이 소유한다", () => {
+  const main = read("apps/mobile/lib/main.dart");
+  const appRoot = read("apps/mobile/lib/app/easy_subway_app.dart");
+  const serviceInfo = read(
+    "apps/mobile/lib/features/settings/presentation/service_info_screen.dart",
+  );
+  const widgetTest = read("apps/mobile/test/widget_test.dart");
+  const account = read(
+    "apps/mobile/lib/features/account/presentation/user_data_deletion_screen.dart",
+  );
+  const attribution = read(
+    "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart",
+  );
+
+  assert.match(account, /^class UserDataDeletionAccessItem extends StatelessWidget/m);
+  assert.match(account, /^enum UserDataDeletionScope\b/m);
+  assert.match(account, /^UserDataDeletionScope _userDataDeletionScope\(/m);
+  assert.match(account, /^class _UserDataDeletionCopy\b/m);
+  assert.match(account, /^class UserDataDeletionScreen extends StatefulWidget/m);
+  assert.match(account, /^class _UserDataDeletionScreenState extends State<UserDataDeletionScreen>/m);
+  assert.match(account, /^class UserDataDeletionResultScreen extends StatelessWidget/m);
+  assert.match(attribution, /^class DataSourceAttributionScreen extends StatefulWidget/m);
+  assert.match(
+    attribution,
+    /^class _DataSourceAttributionScreenState\s+extends State<DataSourceAttributionScreen>/m,
+  );
+  assert.match(attribution, /^class _AttributionCard extends StatelessWidget/m);
+  assert.match(attribution, /^class _AttributionRow extends StatelessWidget/m);
+  assert.match(
+    appRoot,
+    /^import '\.\.\/features\/account\/presentation\/user_data_deletion_screen\.dart';$/m,
+  );
+  assert.match(
+    serviceInfo,
+    /^import '\.\.\/\.\.\/attribution\/presentation\/data_source_attribution_screen\.dart';$/m,
+  );
+  assert.doesNotMatch(
+    main,
+    /^export 'features\/(?:account|attribution)\/presentation\//m,
+  );
+  assert.match(
+    widgetTest,
+    /^import 'package:easysubway_mobile\/features\/account\/presentation\/user_data_deletion_screen\.dart';$/m,
+  );
+  assert.match(
+    widgetTest,
+    /^import 'package:easysubway_mobile\/features\/attribution\/presentation\/data_source_attribution_screen\.dart';$/m,
+  );
+  assert.doesNotMatch(main, /^class _UserDataDeletionAccessItem\b/m);
+  assert.doesNotMatch(main, /^enum UserDataDeletionScope\b/m);
+  assert.doesNotMatch(main, /^class _UserDataDeletionCopy\b/m);
+  assert.doesNotMatch(main, /^class UserDataDeletionScreen\b/m);
+  assert.doesNotMatch(main, /^class _UserDataDeletionScreenState\b/m);
+  assert.doesNotMatch(main, /^class UserDataDeletionResultScreen\b/m);
+  assert.doesNotMatch(main, /^class DataSourceAttributionScreen\b/m);
+  assert.doesNotMatch(main, /^class _DataSourceAttributionScreenState\b/m);
+  assert.doesNotMatch(main, /^class _AttributionCard\b/m);
+  assert.doesNotMatch(main, /^class _AttributionRow\b/m);
+});
+
+test("모바일 계정 삭제와 출처 화면은 삭제·asset load 순서를 유지한다", () => {
+  const account = read(
+    "apps/mobile/lib/features/account/presentation/user_data_deletion_screen.dart",
+  );
+  const attribution = read(
+    "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart",
+  );
+  const accountBlock = account.slice(
+    account.indexOf("Future<void> _deleteCurrentUserData()"),
+    account.indexOf("class UserDataDeletionResultScreen"),
+  );
+  const attributionBlock = attribution.slice(
+    attribution.indexOf("Future<({Map<String, Object?> manifest"),
+    attribution.indexOf("@override\n  Widget build"),
+  );
+
+  assert.match(
+    accountBlock,
+    /setState\(\(\) \{[\s\S]*?_isDeleting = true;[\s\S]*?await widget\.repository\.deleteCurrentUserData\(\);[\s\S]*?await widget\.onDeleted\?\.call\(result\);[\s\S]*?if \(!mounted\)[\s\S]*?Navigator\.of\(context\)\.popUntil\(\(route\) => route\.isFirst\);/,
+  );
+  assert.match(
+    accountBlock,
+    /on UserDataDeletionException catch \(error\)[\s\S]*?SnackBar\(content: Text\(error\.message\)\)[\s\S]*?catch \(error, stackTrace\)[\s\S]*?context: '사용자 정보 삭제 처리 중 예외가 발생했습니다\.'[\s\S]*?finally \{[\s\S]*?if \(mounted\)[\s\S]*?_isDeleting = false;/,
+  );
+  assert.match(
+    attributionBlock,
+    /if \(initialManifest != null && initialInventory != null\)[\s\S]*?return \(manifest: initialManifest, inventory: initialInventory\);[\s\S]*?Future\.wait\(\[[\s\S]*?rootBundle\.loadString\(_mapManifestAsset\)[\s\S]*?rootBundle\.loadString\(_sourceInventoryAsset\)/,
+  );
+});
+
+test("모바일 도움말과 서비스 정보 연결 계약은 각 presentation canonical 파일이 소유한다", () => {
+  const main = read("apps/mobile/lib/main.dart");
+  const appRoot = read("apps/mobile/lib/app/easy_subway_app.dart");
+  const support = read(
+    "apps/mobile/lib/features/support/presentation/support_access_screen.dart",
+  );
+  const serviceInfo = read(
+    "apps/mobile/lib/features/settings/presentation/service_info_screen.dart",
+  );
+  const openSourceLicenses = read(
+    "apps/mobile/lib/features/settings/presentation/open_source_licenses_screen.dart",
+  );
+  const widgetTest = read("apps/mobile/test/widget_test.dart");
+  const supportInfoTest = read("apps/mobile/test/support_access_info_test.dart");
+  const appFixture = read("apps/mobile/test/support/easy_subway_app_fixture.dart");
+  const androidManifest = read("apps/mobile/android/app/src/main/AndroidManifest.xml");
+
+  for (const declaration of [
+    "SupportAccessLauncher",
+    "UrlLauncherSupportAccessLauncher",
+    "SupportAccessInfo",
+    "SupportAccessScreen",
+  ]) {
+    assert.match(support, new RegExp(`^(?:abstract interface )?class ${declaration}\\b`, "m"));
+    assert.doesNotMatch(main, new RegExp(`^(?:abstract interface )?class ${declaration}\\b`, "m"));
+  }
+  assert.match(
+    appRoot,
+    /^import '\.\.\/features\/support\/presentation\/support_access_screen\.dart';$/m,
+  );
+  assert.doesNotMatch(
+    main,
+    /^export 'features\/support\/presentation\/support_access_screen\.dart'/m,
+  );
+  for (const testSource of [widgetTest, supportInfoTest, appFixture]) {
+    assert.match(
+      testSource,
+      /^import 'package:easysubway_mobile\/features\/support\/presentation\/support_access_screen\.dart';$/m,
+    );
+  }
+  for (const helper of [
+    "_SupportSectionTitle",
+    "_SupportGroupCard",
+    "_SecurityContactNotice",
+    "_SecurityContactNoticeLine",
+    "_SafetyDataNotice",
+    "_SafetyDataNoticeLine",
+    "_SupportAccessItem",
+  ]) {
+    assert.match(support, new RegExp(`^class ${helper}\\b`, "m"));
+    assert.doesNotMatch(main, new RegExp(`^class ${helper}\\b`, "m"));
+  }
+  assert.match(support, /^Uri\? _mailtoUri\(/m);
+  assert.match(serviceInfo, /^class ServiceInfoScreen\b/m);
+  assert.match(serviceInfo, /LaunchMode\.inAppBrowserView/);
+  assert.match(serviceInfo, /OpenSourceLicensesScreen/);
+  assert.match(openSourceLicenses, /^class OpenSourceLicensesScreen\b/m);
+  assert.match(openSourceLicenses, /LicenseRegistry\.licenses\.toList\(\)/);
+  assert.match(openSourceLicenses, /OSS Notice \| EasySubway/);
+  assert.doesNotMatch(serviceInfo, /showLicensePage|LicensePage/);
+  assert.match(
+    androidManifest,
+    /<queries>[\s\S]*?<action android:name="android\.support\.customtabs\.action\.CustomTabsService"\/>[\s\S]*?<\/queries>/,
+  );
+  assert.doesNotMatch(support, /privacyPolicyAccessItem|supportDataSourceAttributionButton/);
+});
+
+test("모바일 홈 화면과 shell 상태는 home presentation canonical 파일이 소유한다", () => {
+  const main = read("apps/mobile/lib/main.dart");
+  const appRoot = read("apps/mobile/lib/app/easy_subway_app.dart");
+  const home = read(
+    "apps/mobile/lib/features/home/presentation/home_screen.dart",
+  );
+
+  assert.match(home, /^class HomeScreen\b/m);
+  assert.doesNotMatch(main, /^class HomeScreen\b/m);
+  for (const helper of ["_HomeScreenState", "_HomeNotificationButton"]) {
+    assert.match(home, new RegExp(`^class ${helper}\\b`, "m"));
+    assert.doesNotMatch(main, new RegExp(`^class ${helper}\\b`, "m"));
+  }
+  assert.match(
+    appRoot,
+    /^import '\.\.\/features\/home\/presentation\/home_screen\.dart';$/m,
+  );
+  assert.doesNotMatch(
+    main,
+    /^export 'features\/home\/presentation\/home_screen\.dart'/m,
+  );
+  for (const testPath of [
+    "apps/mobile/test/accessibility_baseline_test.dart",
+    "apps/mobile/test/onboarding_app_flow_test.dart",
+    "apps/mobile/test/widget_test.dart",
+  ]) {
+    assert.match(
+      read(testPath),
+      /^import 'package:easysubway_mobile\/features\/home\/presentation\/home_screen\.dart';$/m,
+    );
+  }
+});
+
+test("역 모델과 저장소 계약은 stations domain canonical 파일이 소유한다", () => {
+  const stationSearch = read("apps/mobile/lib/station_search.dart");
+  const models = read(
+    "apps/mobile/lib/features/stations/domain/station_models.dart",
+  );
+  const repositories = read(
+    "apps/mobile/lib/features/stations/domain/station_repositories.dart",
+  );
+
+  for (const declaration of [
+    "StationTimetable",
+    "CurrentLocation",
+    "FavoriteStation",
+    "StationSearchResult",
+    "StationDetail",
+    "StationExitInfo",
+    "StationFacilityInfo",
+    "SubwayLineOption",
+  ]) {
+    assert.match(models, new RegExp(`^class ${declaration}\\b`, "m"));
+    assert.doesNotMatch(stationSearch, new RegExp(`^class ${declaration}\\b`, "m"));
+  }
+  for (const declaration of [
+    "StationSearchRepository",
+    "SearchHistoryRepository",
+    "StationLineFilterRepository",
+    "StationTimetableRepository",
+    "CurrentLocationProvider",
+    "FavoriteStationRepository",
+  ]) {
+    assert.match(
+      repositories,
+      new RegExp(`^abstract class ${declaration}\\b`, "m"),
+    );
+    assert.doesNotMatch(
+      stationSearch,
+      new RegExp(`^abstract class ${declaration}\\b`, "m"),
+    );
+  }
+  assert.doesNotMatch(models, /package:flutter\/material\.dart/);
+  assert.match(
+    stationSearch,
+    /^export 'features\/stations\/domain\/station_models\.dart';$/m,
+  );
+  assert.match(
+    stationSearch,
+    /^export 'features\/stations\/domain\/station_repositories\.dart';$/m,
+  );
+  for (const dataPath of [
+    "apps/mobile/lib/features/stations/data/station_api_repository.dart",
+    "apps/mobile/lib/features/stations/data/drift_station_repository.dart",
+  ]) {
+    const data = read(dataPath);
+    assert.doesNotMatch(data, /station_search\.dart/);
+    assert.match(data, /domain\/station_models\.dart/);
+    assert.match(data, /domain\/station_repositories\.dart/);
+  }
+});
+
+test("역 위치 채널과 controller는 stations data·application canonical 파일이 소유한다", () => {
+  const stationSearch = read("apps/mobile/lib/station_search.dart");
+  const locationProvider = read(
+    "apps/mobile/lib/features/stations/data/current_location_provider.dart",
+  );
+  const searchController = read(
+    "apps/mobile/lib/features/stations/application/station_search_controller.dart",
+  );
+  const detailController = read(
+    "apps/mobile/lib/features/stations/application/station_detail_controller.dart",
+  );
+  const locationTest = read(
+    "apps/mobile/test/current_location_provider_test.dart",
+  );
+
+  assert.match(
+    locationProvider,
+    /^class MethodChannelCurrentLocationProvider\b/m,
+  );
+  assert.doesNotMatch(
+    stationSearch,
+    /^class MethodChannelCurrentLocationProvider\b/m,
+  );
+  for (const declaration of [
+    "StationSearchState",
+    "StationSearchController",
+  ]) {
+    assert.match(
+      searchController,
+      new RegExp(`^class ${declaration}\\b`, "m"),
+    );
+    assert.doesNotMatch(
+      stationSearch,
+      new RegExp(`^class ${declaration}\\b`, "m"),
+    );
+  }
+  for (const declaration of [
+    "StationDetailState",
+    "StationDetailController",
+    "StationFavoriteToggleState",
+    "StationFavoriteToggleController",
+  ]) {
+    assert.match(
+      detailController,
+      new RegExp(`^class ${declaration}\\b`, "m"),
+    );
+    assert.doesNotMatch(
+      stationSearch,
+      new RegExp(`^class ${declaration}\\b`, "m"),
+    );
+  }
+  assert.match(
+    locationTest,
+    /^import 'package:easysubway_mobile\/features\/stations\/data\/current_location_provider\.dart';$/m,
+  );
+  assert.doesNotMatch(locationTest, /station_search\.dart/);
+});
+
+test("역 상세 화면은 stations presentation canonical 파일이 소유한다", () => {
+  const stationSearch = read("apps/mobile/lib/station_search.dart");
+  const stationDetailScreen = read(
+    "apps/mobile/lib/features/stations/presentation/station_detail_screen.dart",
+  );
+
+  assert.match(stationDetailScreen, /^class StationDetailScreen\b/m);
+  assert.doesNotMatch(stationSearch, /^class StationDetailScreen\b/m);
+  assert.doesNotMatch(
+    stationSearch,
+    /^export 'features\/stations\/presentation\/station_detail_screen\.dart';$/m,
+  );
+  for (const [consumerPath, importPattern] of [
+    [
+      "apps/mobile/lib/main.dart",
+      /^import 'features\/stations\/presentation\/station_detail_screen\.dart';$/m,
+    ],
+    [
+      "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart",
+      /^import '\.\.\/\.\.\/stations\/presentation\/station_detail_screen\.dart';$/m,
+    ],
+    [
+      "apps/mobile/test/widget_test.dart",
+      /^import 'package:easysubway_mobile\/features\/stations\/presentation\/station_detail_screen\.dart';$/m,
+    ],
+  ]) {
+    assert.match(
+      read(consumerPath),
+      importPattern,
+    );
+  }
+});
+
+test("역 검색 화면은 stations presentation canonical 파일이 소유한다", () => {
+  const stationSearch = read("apps/mobile/lib/station_search.dart");
+  const stationSearchScreen = read(
+    "apps/mobile/lib/features/stations/presentation/station_search_screen.dart",
+  );
+
+  assert.match(stationSearchScreen, /^class StationSearchScreen\b/m);
+  assert.match(stationSearchScreen, /^enum StationSearchEntryMode\b/m);
+  assert.doesNotMatch(stationSearch, /^class StationSearchScreen\b/m);
+  assert.doesNotMatch(stationSearch, /^enum StationSearchEntryMode\b/m);
+  assert.doesNotMatch(
+    stationSearch,
+    /^export 'features\/stations\/presentation\/station_search_screen\.dart';$/m,
+  );
+  for (const [consumerPath, importPattern] of [
+    [
+      "apps/mobile/lib/features/home/presentation/home_screen.dart",
+      /^import '\.\.\/\.\.\/stations\/presentation\/station_search_screen\.dart';$/m,
+    ],
+    [
+      "apps/mobile/lib/network_map.dart",
+      /^import 'features\/stations\/presentation\/station_search_screen\.dart';$/m,
+    ],
+    [
+      "apps/mobile/test/widget_test.dart",
+      /^import 'package:easysubway_mobile\/features\/stations\/presentation\/station_search_screen\.dart';$/m,
+    ],
+  ]) {
+    assert.match(read(consumerPath), importPattern);
+  }
 });
 
 test("프로덕션 모바일 UI 위젯명은 prototype 명칭을 쓰지 않는다", () => {
@@ -1777,7 +2687,12 @@ test("모바일 production 사용자 문구는 점수와 기본정보 같은 내
   assert.ok(mobileFiles.length > 0, "mobile production Dart files not found");
   for (const file of mobileFiles) {
     let source = read(file);
-    if (file === "apps/mobile/lib/main.dart") {
+    if (
+      file ===
+        "apps/mobile/lib/features/support/presentation/support_access_screen.dart" ||
+      file ===
+        "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart"
+    ) {
       source = source
         .replaceAll("'데이터 및 지도 출처'", "''")
         .replaceAll("'지도와 경로 판단 자료의 출처와 이용 조건을 확인해요'", "''");
@@ -1802,12 +2717,14 @@ test("노선도 탭 화면은 자체 하단 NavigationBar를 만들지 않는다
 });
 
 test("모바일 홈 shell과 주요 상태 UI 회귀 테스트는 유지된다", () => {
-  const main = read("apps/mobile/lib/main.dart");
+  const home = read(
+    "apps/mobile/lib/features/home/presentation/home_screen.dart",
+  );
   const widgetTest = read("apps/mobile/test/widget_test.dart");
 
-  assert.match(main, /int _selectedTabIndex = 0/);
-  assert.match(main, /if \(_selectedTabIndex == 0\)[\s\S]*NetworkMapScreen\(/);
-  assert.doesNotMatch(main, /homeBottomNavigationBar/);
+  assert.match(home, /int _selectedTabIndex = 0/);
+  assert.match(home, /if \(_selectedTabIndex == 0\)[\s\S]*NetworkMapScreen\(/);
+  assert.doesNotMatch(home, /homeBottomNavigationBar/);
   assert.match(widgetTest, /기본 앱은 저장소가 없어도 노선도 중심 첫 화면을 보여준다/);
   assert.match(widgetTest, /노선도 첫 화면은 하단 광고 위에 지도 조작을 유지한다/);
   // #1933: 폼 페이지 제거로 대체된 현행 전환 테스트 앵커
@@ -1817,15 +2734,17 @@ test("모바일 홈 shell과 주요 상태 UI 회귀 테스트는 유지된다",
   assert.match(widgetTest, /find\.byKey\(const Key\('bottomNavSaved'\)\), findsNothing/);
   assert.match(widgetTest, /홈은 시설 알림과 최근 경로 로드 실패를 인라인 오류 없이 넘긴다/);
   assert.match(widgetTest, /노선도 로드 실패는 재시도만 보여준다/);
-  assert.doesNotMatch(main, /class _HomeHero/);
-  assert.doesNotMatch(main, /class _HomeAdaptiveContent/);
-  assert.match(main, /return const SizedBox\.shrink\(\);/);
+  assert.doesNotMatch(home, /class _HomeHero/);
+  assert.doesNotMatch(home, /class _HomeAdaptiveContent/);
+  assert.match(home, /return const SizedBox\.shrink\(\);/);
 });
 
 test("모바일 역 검색 결과 시스템 글자 크기 문구 회귀 테스트는 유지된다", () => {
-  const stationSearch = read("apps/mobile/lib/station_search.dart");
+  const stationSearchBody = read(
+    "apps/mobile/lib/features/stations/presentation/station_search_body.dart",
+  );
   const widgetTest = read("apps/mobile/test/widget_test.dart");
-  const resultTileMatch = stationSearch.match(
+  const resultTileMatch = stationSearchBody.match(
     /class _StationSearchResultTile[\s\S]*?class _StationRoleActionBar/,
   );
   const largeTextTestMatch = widgetTest.match(
@@ -1877,7 +2796,9 @@ test("모바일 경로 결과 단계별 뒤로가기 회귀 테스트는 유지�
 });
 
 test("모바일 설정 저장 실패와 시설 제보 위치 실패 회귀 테스트는 유지된다", () => {
-  const main = read("apps/mobile/lib/main.dart");
+  const settings = read(
+    "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
+  );
   const facilityReport = read("apps/mobile/lib/facility_report.dart");
   const widgetTest = read("apps/mobile/test/widget_test.dart");
   const settingsFailurePattern = new RegExp([
@@ -1895,9 +2816,10 @@ test("모바일 설정 저장 실패와 시설 제보 위치 실패 회귀 테�
     "longitude, isNull",
   ].join("[\\s\\S]*"));
 
-  assert.match(main, /_updateViewPreferences/);
-  assert.match(main, /_viewPreferences\s*=\s*previous/);
-  assert.match(main, /설정을 저장하지 못했어요\. 이전 값으로 되돌렸어요\./);
+  assert.match(
+    settings,
+    /Future<void> _updateViewPreferences\([\s\S]*?final previous = _viewPreferences;[\s\S]*?_viewPreferences = preferences;[\s\S]*?await widget\.onViewPreferencesChanged\(preferences\);[\s\S]*?catch \(error, stackTrace\)[\s\S]*?if \(!mounted\)[\s\S]*?if \(_isSameViewPreferences\(_viewPreferences, preferences\)\)[\s\S]*?_viewPreferences = previous;[\s\S]*?SnackBar\(content: Text\('설정을 저장하지 못했어요\. 이전 값으로 되돌렸어요\.'\)\)/,
+  );
   assert.match(widgetTest, settingsFailurePattern);
   assert.match(facilityReport, /facilityReportAttachLocationButton/);
   assert.match(facilityReport, /facilityReportOpenLocationSettingsButton/);
@@ -1910,16 +2832,20 @@ test("모바일 설정 저장 실패와 시설 제보 위치 실패 회귀 테�
 
 test("모바일 오프라인 안내 화면(OfflineDataScreen)은 완전히 제거됐다 (#1570)", () => {
   const main = read("apps/mobile/lib/main.dart");
+  const homeScreen = read(
+    "apps/mobile/lib/features/home/presentation/home_screen.dart",
+  );
+  const appAndHome = `${main}\n${homeScreen}`;
   const widgetTest = read("apps/mobile/test/widget_test.dart");
   const finalQaEvidence = readJson("apps/mobile/release/issue-1075-final-qa-evidence.json");
   // 진입점 없는 dead screen이라 화면·상태 헬퍼·스레딩(offlineDataExpiresAtLoader)까지
   // 완전 삭제했다(#1570 후속). 오프라인 동작은 설명 없이 그냥 되는 것.
-  assert.doesNotMatch(main, /class OfflineDataScreen/);
-  assert.doesNotMatch(main, /title:\s*'인터넷 없이 이용'/);
-  assert.doesNotMatch(main, /저장된 안내 상태/);
-  assert.doesNotMatch(main, /_offlineDataSourceOfTruth/);
-  assert.doesNotMatch(main, /[Oo]fflineDataExpiresAtLoader/);
-  assert.doesNotMatch(main, /offlineDataSettingsButton/);
+  assert.doesNotMatch(appAndHome, /class OfflineDataScreen/);
+  assert.doesNotMatch(appAndHome, /title:\s*'인터넷 없이 이용'/);
+  assert.doesNotMatch(appAndHome, /저장된 안내 상태/);
+  assert.doesNotMatch(appAndHome, /_offlineDataSourceOfTruth/);
+  assert.doesNotMatch(appAndHome, /[Oo]fflineDataExpiresAtLoader/);
+  assert.doesNotMatch(appAndHome, /offlineDataSettingsButton/);
   assert.doesNotMatch(widgetTest, /OfflineDataScreen/);
   assert.match(widgetTest, /testWidgets\('홈 200% 글자 screenshot smoke는 핵심 CTA 렌더 이미지를 만든다'/);
   assert.match(widgetTest, /RepaintBoundary[\s\S]*toImage\(/);
@@ -2153,6 +3079,8 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
   assert.match(workflow, /Release Artifact \/ Record non-store-ready PR gate/);
   assert.match(workflow, /if: \$\{\{ env\.EASYSUBWAY_RELEASE_ARTIFACTS_SKIP_BUILD != 'true' \}\}/);
   assert.match(workflow, /--dart-define=EASYSUBWAY_PRIVACY_POLICY_URL="\$\{EASYSUBWAY_PRIVACY_POLICY_URL\}"/);
+  assert.match(workflow, /--dart-define=EASYSUBWAY_TERMS_OF_SERVICE_URL="\$\{EASYSUBWAY_TERMS_OF_SERVICE_URL\}"/);
+  assert.match(workflow, /--dart-define=EASYSUBWAY_LOCATION_TERMS_URL="\$\{EASYSUBWAY_LOCATION_TERMS_URL\}"/);
   assert.match(workflow, /--dart-define=EASYSUBWAY_SUPPORT_EMAIL="\$\{EASYSUBWAY_SUPPORT_EMAIL\}"/);
   assert.match(workflow, /--dart-define=EASYSUBWAY_DATA_DELETION_EMAIL="\$\{EASYSUBWAY_DATA_DELETION_EMAIL\}"/);
   assert.match(workflow, /--dart-define=EASYSUBWAY_SECURITY_EMAIL="\$\{EASYSUBWAY_SECURITY_EMAIL\}"/);
@@ -2211,6 +3139,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   const rcEvidenceManifestContractPath = "apps/mobile/release/rc-evidence-manifest-contract.json";
   const rcEvidenceManifestContract = readJson(rcEvidenceManifestContractPath);
   const workflow = read(".github/workflows/release-artifacts.yml");
+  const generator = read("tools/release/generate-rc-evidence-manifest.mjs");
   const backendBuild = read("backend/build.gradle");
 
   assert.equal(gate.schemaVersion, 1);
@@ -2405,7 +3334,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.equal(postLaunchOperationsReviewGate.releaseGate, "post-launch-operations-review");
   assert.equal(postLaunchOperationsReviewGate.issue, 1019);
   assert.equal(postLaunchOperationsReviewGate.status, "IN_PROGRESS");
-  assert.equal(postLaunchOperationsReviewGate.preLaunchReadiness.status, "PASS");
+  assert.equal(postLaunchOperationsReviewGate.preLaunchReadiness.status, "BLOCKED_EXTERNAL");
   const phaseAReleaseVersion = read("apps/mobile/pubspec.yaml").match(/^version:\s*([^+\s]+)\+([0-9]+)\s*$/m);
   assert.ok(phaseAReleaseVersion, "mobile pubspec must contain versionName+versionCode");
   assert.equal(
@@ -2483,14 +3412,14 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.deepEqual(
     postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.validatedArtifactIdentityEvidence,
     {
-      aabPayload: ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/fixed-release-rehearsal-summary.json",
+      aabPayload: ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260717/fixed-release-rehearsal-summary.json",
       backend: "apps/mobile/release/operations-release-evidence.json",
       dataPackManifest: "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
     },
   );
   assert.deepEqual(postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.evidenceValidity, {
-    appVersionName: "1.0.4",
-    versionCode: 10005,
+    appVersionName: "1.0.5",
+    versionCode: 10006,
     validFromKst: "2026-07-15",
     validUntilKst: "2026-07-28",
     refreshOn: [
@@ -2505,26 +3434,48 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     refreshBindings.map((binding) => binding.refreshOn).sort(),
     postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.evidenceValidity.refreshOn.toSorted(),
   );
+  const supportContactBinding = refreshBindings.find(
+    (binding) => binding.refreshOn === "support-contact-or-help-ui-change",
+  );
+  assert.deepEqual(
+    supportContactBinding.files.map((file) => file.path).toSorted(),
+    [
+      "apps/mobile/lib/app/accessibility_theme.dart",
+      "apps/mobile/lib/app/app_components.dart",
+      "apps/mobile/lib/app/easy_subway_app.dart",
+      "apps/mobile/lib/features/account/presentation/user_data_deletion_screen.dart",
+      "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart",
+      "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart",
+      "apps/mobile/lib/features/home/presentation/home_screen.dart",
+      "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
+      "apps/mobile/lib/features/settings/presentation/open_source_licenses_screen.dart",
+      "apps/mobile/lib/features/settings/presentation/service_info_screen.dart",
+      "apps/mobile/lib/features/support/presentation/support_access_screen.dart",
+      "apps/mobile/lib/main.dart",
+      "apps/mobile/release/support-incident-response-gate.json",
+    ],
+  );
   for (const binding of refreshBindings) {
     assert.ok(binding.files.length > 0, `${binding.refreshOn} must bind at least one file`);
     for (const file of binding.files) {
       const liveSha256 = createHash("sha256").update(read(file.path)).digest("hex");
       if (file.path === "apps/mobile/pubspec.yaml") {
         // #2068 datapack/렌더 전환(vector_graphics 의존성·basemap/ 자산 추가)으로
-        // apps/mobile/pubspec.yaml 해시가 바뀌면서 1.0.4 RC "fixed-release-procedure-change"
-        // evidence는 중단(superseded)되었다. dataPackManifestSha256와 동일 원칙: 게이트 기록값
-        // 8b831a41…은 중단된 RC evidence 체인의 고정 해시로 그대로 검증하고, live 해시와는
-        // 반드시 달라야 한다(의도된 불일치). #1016(final RC) 재개 시 새 RC 전체 identity +
+        // apps/mobile/pubspec.yaml 해시가 바뀌면서 "fixed-release-procedure-change"
+        // RC evidence는 중단(superseded)되었다. dataPackManifestSha256와 동일 원칙:
+        // 게이트 기록값(1c491874… — post-launch-operations-review-gate.json이 마지막
+        // RC 재바인딩 때 고정한 pubspec 해시)은 그대로 검증하고, live 해시와는 반드시
+        // 달라야 한다(의도된 불일치). #1016(final RC) 재개 시 새 RC 전체 identity +
         // Play evidence를 함께 재바인딩하면서 이 검증을 동등성으로 복귀시킨다. (오너 결정 2026-07-16)
         assert.equal(
           file.sha256,
-          "8b831a4108c1c77f718a4b729e7d24f36dc024b83845a4ecfa7d2b99e5ad1971",
-          `${binding.refreshOn} recorded hash for ${file.path} must stay pinned to the superseded 1.0.4 RC evidence`,
+          "1c4918747c4acf22bbe885b7cb01cc34cc311e7e44598ac6b817848712614d42",
+          `${binding.refreshOn} recorded hash for ${file.path} must stay pinned to the superseded RC evidence`,
         );
         assert.notEqual(
           liveSha256,
           file.sha256,
-          `중단된 1.0.4 RC identity는 재사용 불가 — ${file.path}의 기록 해시는 #2068 변경 후 live 해시와 달라야 한다`,
+          `중단된 RC identity는 재사용 불가 — ${file.path}의 기록 해시는 #2068 변경 후 live 해시와 달라야 한다`,
         );
         continue;
       }
@@ -2544,6 +3495,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "tools/release/summary-validation-utils.mjs",
     "tools/release/hash-android-bundle-payload.mjs",
     "tools/release/generate-rc-evidence-manifest.mjs",
+    "tools/release/count-gzip-uncompressed-bytes.mjs",
     "tools/datapack/run-emergency-datapack-drill.mjs",
     "tools/release/upload-play-internal.mjs",
     "apps/mobile/release/route-commercialization-gate.json",
@@ -2580,6 +3532,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "privacy@aquilaxk.site",
   ]);
   assert.deepEqual(postLaunchOperationsReviewGate.latestQaEvidenceSummary.remainingExternalBlockers, [
+    "fixed-release-rehearsal-after-node24-runtime-change",
     "play-review-status-summary",
     "crash-anr-vitals-summary",
     "support-ticket-summary-after-public-release",
@@ -2589,7 +3542,15 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     postLaunchOperationsReviewGate.preLaunchReadiness.evidenceSummary.map((item) => item.id),
     postLaunchOperationsReviewGate.preLaunchReadiness.requiredEvidence,
   );
-  assert.ok(postLaunchOperationsReviewGate.preLaunchReadiness.evidenceSummary.every((item) => item.status === "PASS"));
+  const fixedReleaseEvidence = postLaunchOperationsReviewGate.preLaunchReadiness.evidenceSummary.find(
+    (item) => item.id === "fixed-release-versioncode-build-submit-procedure",
+  );
+  assert.equal(fixedReleaseEvidence.status, "BLOCKED_EXTERNAL");
+  assert.ok(
+    postLaunchOperationsReviewGate.preLaunchReadiness.evidenceSummary
+      .filter((item) => item.id !== fixedReleaseEvidence.id)
+      .every((item) => item.status === "PASS"),
+  );
   assert.deepEqual(
     postLaunchOperationsReviewGate.reviewWindows.map((window) => window.id),
     ["first_2h", "first_24h", "day_7", "day_30"],
@@ -2677,7 +3638,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     ),
   );
   assert.equal(supportIncidentResponseGate.latestQaEvidenceSummary.helpScreenDeviceQa.result, "PASS");
-  assert.equal(supportIncidentResponseGate.latestQaEvidenceSummary.helpScreenDeviceQa.versionCode, 10005);
+  assert.equal(supportIncidentResponseGate.latestQaEvidenceSummary.helpScreenDeviceQa.versionCode, 10006);
   assert.match(
     supportIncidentResponseGate.latestQaEvidenceSummary.helpScreenDeviceQa.localOnlyEvidence,
     /fixed-release-help-ui-summary\.json$/,
@@ -2810,7 +3771,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.equal(abusePenetrationRehearsalGate.status, "BLOCKED_EXTERNAL");
   assert.equal(abusePenetrationRehearsalGate.androidRcEvidenceManifest, androidRcEvidencePath);
   assert.equal(abusePenetrationRehearsalGate.securityPrivacyEvidenceManifest, "apps/mobile/release/security-privacy-release-evidence.json");
-  assert.match(abusePenetrationRehearsalGate.evidenceRoot, /\.codex\/evidence\/security\/abuse-penetration-rehearsal\/<rc-or-run>/);
+  assert.equal(abusePenetrationRehearsalGate.evidenceRoot, ".codex/evidence/security/abuse-penetration-rehearsal/<git-sha>/");
   const adGuardrails = abusePenetrationRehearsalGate.adEventAbuseGuardrails;
   assert.equal(adGuardrails.issue, 1912);
   assert.deepEqual(adGuardrails.edge, {
@@ -2881,6 +3842,11 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "play-installed-build-smoke",
     "play-pre-launch-report-crash-anr-policy-summary",
     "network-trace-redaction-summary-from-play-installed-build",
+    "play-installed-attestation-positive-negative-matrix",
+    "deployed-token-lifecycle-and-session-quota-rehearsal",
+    "deployed-gateway-401-origin-403-no-write-summary",
+    "deployed-limiter-boundary-burst-retry-after-summary",
+    "credential-log-metric-ui-analytics-absence-audit",
     "deployed-public-https-backend-report-admin-base-url-evidence",
     "deployed-admin-operator-auth-session-csrf-summary",
     "deployed-signed-url-boundary-summary",
@@ -2898,6 +3864,68 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
       "raw signed URL",
     ),
   );
+  const routeV2SessionServiceTest = read(
+    "backend/src/test/java/com/easysubway/route/application/service/RouteV2SessionServiceTest.java",
+  );
+  const routeV2IngressFilterTest = read(
+    "backend/src/test/java/com/easysubway/route/adapter/in/web/RouteV2IngressFilterTest.java",
+  );
+  const productionRouteClosureTest = read(
+    "backend/src/test/java/com/easysubway/route/adapter/in/web/ProductionRouteApiClosureTest.java",
+  );
+  const routeV2GatewayTest = read("tools/ci/route-v2-gateway.test.mjs");
+  const routeV2GatewayProbe = read("tools/test/run-route-v2-gateway-integration.sh");
+  const ciWorkflow = read(".github/workflows/ci.yml");
+  const routeV2AttackMatrix = abusePenetrationRehearsalGate.routeV2IngressAttackMatrix;
+  assert.equal(routeV2AttackMatrix.issue, 1022);
+  assert.equal(routeV2AttackMatrix.status, "BLOCKED_EXTERNAL");
+  assert.equal(routeV2AttackMatrix.localRegressionStatus, "PASS");
+  assert.deepEqual(routeV2AttackMatrix.localAutomatedCases, [
+    {
+      caseId: "attestation_nonce_request_hash",
+      evidence: "RouteV2SessionServiceTest",
+    },
+    {
+      caseId: "session_token_scope_expiry_quota",
+      evidence: "RouteV2IngressFilterTest and ProductionRouteApiClosureTest",
+    },
+    {
+      caseId: "gateway_401_origin_403_no_write",
+      evidence: "ProductionRouteApiClosureTest",
+    },
+    {
+      caseId: "gateway_ip_token_limiter_retry_after",
+      evidence: "route-v2-gateway.test.mjs and run-route-v2-gateway-integration.sh",
+    },
+  ]);
+  assert.deepEqual(routeV2AttackMatrix.requiredSameRcProductionEvidence, [
+    "play-installed-attestation-positive-negative-matrix",
+    "deployed-token-lifecycle-and-session-quota-rehearsal",
+    "deployed-gateway-401-origin-403-no-write-summary",
+    "deployed-limiter-boundary-burst-retry-after-summary",
+    "credential-log-metric-ui-analytics-absence-audit",
+  ]);
+  for (const evidenceId of routeV2AttackMatrix.requiredSameRcProductionEvidence) {
+    assert.ok(
+      abusePenetrationRehearsalGate.productionLikeEvidencePolicy.requiredForClosing.includes(evidenceId),
+      `${evidenceId} must be enforced by the PASS summary evidence catalog`,
+    );
+  }
+  assert.equal(routeV2AttackMatrix.productionMutationPerformed, false);
+  assert.equal(routeV2AttackMatrix.explicitProductionApprovalRequired, true);
+  assert.equal(routeV2AttackMatrix.rawCredentialOrExploitPayloadStored, false);
+  assert.match(routeV2SessionServiceTest, /2분보다 오래됐거나 미래인 verdict와 다른 requestHash를 거부한다/);
+  assert.match(routeV2SessionServiceTest, /128-bit base64url nonce 형식과 2분 replay를 거부한다/);
+  assert.match(routeV2IngressFilterTest, /50회를 소비한 session은 exact 429와 정수 Retry-After를 반환한다/);
+  assert.match(routeV2IngressFilterTest, /만료 session은 exact 401이고 controller를 호출하지 않는다/);
+  assert.match(routeV2IngressFilterTest, /다른 scope session은 exact 422이고 controller를 호출하지 않는다/);
+  assert.match(routeV2IngressFilterTest, /ROUTE_ORIGIN_FORBIDDEN/);
+  assert.match(routeV2IngressFilterTest, /ROUTE_SESSION_REQUIRED/);
+  assert.match(productionRouteClosureTest, /direct-origin Route V2는 handler와 DB write 전에 exact 403으로 거부한다/);
+  assert.match(productionRouteClosureTest, /session 전체 50회 초과는 integer Retry-After와 exact 429다/);
+  assert.match(routeV2GatewayTest, /IP·token limiter와 exact 429 계약/);
+  assert.match(routeV2GatewayProbe, /Retry-After: 60/);
+  assert.match(ciWorkflow, /tools\/test\/run-route-v2-gateway-integration\.sh/);
   assert.deepEqual(abusePenetrationRehearsalGate.buildIdentityPolicy.requiredIssueLinks, ["#1015", "#1016", "#1020", "#1914"]);
   assert.ok(
     abusePenetrationRehearsalGate.productionLikeEvidencePolicy.requiredForClosing.includes(
@@ -2932,6 +3960,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
       "provider_and_release_secret_exposure",
       "receipt_token_replay_and_status_abuse",
       "report_photo_upload_abuse",
+      "route_v2_ingress_abuse",
       "signed_url_lifecycle_abuse",
     ],
   );
@@ -2971,6 +4000,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "providerReleaseSecretExposure",
     "receiptTokenAbuse",
     "reportUploadLifecycle",
+    "routeV2IngressAbuse",
     "signedUploadUrlBoundary",
   ]);
   assert.deepEqual(
@@ -3193,7 +4223,16 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.equal(rcEvidenceManifestContract.releaseGate, "rc-evidence-manifest");
   assert.equal(rcEvidenceManifestContract.issue, 1020);
   assert.deepEqual(rcEvidenceManifestContract.parentIssues, [1014, 1020]);
-  assert.deepEqual(rcEvidenceManifestContract.linkedEvidenceIssues, [547, 571, 1015, 1016, 1017, 1018, 1019, 1021, 1022, 1914]);
+  assert.deepEqual(
+    rcEvidenceManifestContract.linkedEvidenceIssues,
+    [547, 571, 1015, 1016, 1017, 1018, 1019, 1021, 1022, 1393, 1914, 2051, 2054, 2055, 2056, 2057, 2058, 2133],
+  );
+  assert.deepEqual(rcEvidenceManifestContract.phaseConsumers, {
+    CANDIDATE: [2058, 1393],
+    FINAL: [1020],
+  });
+  assert.deepEqual(rcEvidenceManifestContract.requiredFinalFragmentIssues, [2058, 1393]);
+  assert.deepEqual(rcEvidenceManifestContract.activeBlockerIssues, []);
   assert.equal(rcEvidenceManifestContract.androidRcEvidenceManifest, androidRcEvidencePath);
   assert.equal(rcEvidenceManifestContract.signedReleaseArtifactGate, gatePath);
   assert.equal(rcEvidenceManifestContract.releaseGovernanceGate, "apps/mobile/release/release-governance-gate.json");
@@ -3205,6 +4244,9 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "aabSha256",
     "aabPayloadSha256",
     "dataPackManifestSha256",
+    "dataPackArtifactSha256",
+    "dataPackFallbackArtifactSha256",
+    "sourceSnapshotSetHash",
     "supportContactSetSha256",
     "releaseSequence",
     "routeContractVersion",
@@ -3231,6 +4273,8 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
       { id: "android_release_quality", sourceIssue: 1021 },
       { id: "abuse_penetration_rehearsal", sourceIssue: 1022 },
       { id: "container_hardening", sourceIssue: 1914 },
+      { id: "production_equivalent_rehearsal", sourceIssue: 2058 },
+      { id: "production_artifact_android_integration", sourceIssue: 1393 },
     ],
   );
   assert.equal(rcEvidenceManifestContract.readinessPolicy.openAndroidP0BlocksGo, true);
@@ -3256,6 +4300,14 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.match(workflow, /android-production-rc/);
   assert.match(workflow, /android-production-rc-release:/);
   assert.match(workflow, /name: Android Production RC Artifact/);
+  const productionRcJob = workflow.slice(
+    workflow.indexOf("  android-production-rc-release:"),
+    workflow.indexOf("  play-internal-upload:"),
+  );
+  assert.match(
+    productionRcJob,
+    /Android Production RC Artifact \/ Set up Node[\s\S]*actions\/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e[\s\S]*node-version: "24"/,
+  );
   assert.match(workflow, /if: \$\{\{ github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/main' && inputs\.android_rc_signing_mode == 'production-upload-key' \}\}/);
   assert.match(workflow, /environment:\s*\n\s*name: android-production-rc/);
   assert.match(workflow, /EASYSUBWAY_ANDROID_UPLOAD_KEYSTORE_BASE64: \$\{\{ secrets\.EASYSUBWAY_ANDROID_UPLOAD_KEYSTORE_BASE64 \}\}/);
@@ -3311,13 +4363,42 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.match(workflow, /cp release\/rc-evidence-manifest-contract\.json release-artifacts\/android\/rc-evidence-manifest-contract\.json/);
   assert.match(workflow, /rc-evidence-manifest:/);
   assert.match(workflow, /name: RC Evidence Manifest/);
+  const rcEvidenceManifestJob = workflow.slice(
+    workflow.indexOf("  rc-evidence-manifest:"),
+    workflow.indexOf("  notify-slack-release-result:"),
+  );
+  assert.match(
+    rcEvidenceManifestJob,
+    /RC Evidence Manifest \/ Set up Node[\s\S]*actions\/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e[\s\S]*node-version: "24"/,
+  );
   assert.match(workflow, /uses: actions\/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093/);
   assert.match(workflow, /name: easysubway-android-release-\$\{\{ github\.sha \}\}/);
   assert.match(workflow, /name: easysubway-android-production-rc-\$\{\{ github\.sha \}\}/);
   assert.match(workflow, /name: easysubway-backend-release-\$\{\{ github\.sha \}\}/);
   assert.match(workflow, /node tools\/release\/generate-rc-evidence-manifest\.mjs/);
   assert.match(workflow, /"\$\{generator_args\[@\]\}"/);
-  assert.match(workflow, /--output release-artifacts\/rc\/rc-evidence-manifest\.json/);
+  assert.match(workflow, /--phase CANDIDATE/);
+  assert.match(workflow, /--output release-artifacts\/rc\/candidate-context\.json/);
+  assert.match(workflow, /datapack_run_id:/);
+  assert.match(workflow, /run-id: \$\{\{ inputs\.datapack_run_id \}\}/);
+  assert.match(workflow, /github-token: \$\{\{ secrets\.GITHUB_TOKEN \}\}/);
+  assert.match(workflow, /datapack_run_id is required for production RC identity/);
+  assert.match(workflow, /DATAPACK_RUN_ID: \$\{\{ inputs\.datapack_run_id \}\}/);
+  assert.match(workflow, /ANDROID_RC_SIGNING_MODE: \$\{\{ inputs\.android_rc_signing_mode \}\}/);
+  assert.doesNotMatch(workflow, /if \[\[.*\$\{\{ inputs\.(?:datapack_run_id|android_rc_signing_mode) \}\}/);
+  assert.match(workflow, /--require-production-data-pack-binding true/);
+  assert.match(workflow, /RC Evidence Manifest \/ Restore production data pack validation environment/);
+  assert.match(workflow, /tools\/ci\/validate-store-privacy-env\.mjs/);
+  assert.match(workflow, /tools\/release\/select-rc-datapack-artifact\.mjs/);
+  assert.doesNotMatch(workflow, /data_pack_manifest=release-artifacts\/downloaded\/datapack\/catalog\/current\.json/);
+  assert.doesNotMatch(generator, /verifySignature:\s*false/);
+  assert.match(workflow, /--data-pack-manifest "\$\{data_pack_manifest\}"/);
+  assert.match(workflow, /--data-pack-artifact "\$\{data_pack_artifact\}"/);
+  assert.match(workflow, /--data-pack-fallback-artifact "\$\{data_pack_fallback_artifact\}"/);
+  assert.match(workflow, /--data-pack-release-decision "\$\{data_pack_release_decision\}"/);
+  assert.match(workflow, /--phase FINAL/);
+  assert.match(workflow, /--candidate-context release-artifacts\/rc\/candidate-context\.json/);
+  assert.match(workflow, /--output release-artifacts\/rc\/final-readiness\.json/);
   assert.match(workflow, /--gate-status productionDatapack=BLOCKED_EXTERNAL/);
   assert.match(workflow, /--backend-image-inspect release-artifacts\/downloaded\/backend\/image-inspect\.json/);
   assert.match(workflow, /cp "\$\{boot_jar\[0\]\}" release-artifacts\/backend\/backend-boot\.jar/);
@@ -3326,11 +4407,11 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.match(backendBuild, /reproducibleFileOrder\s*=\s*true/);
   assert.match(workflow, /--gate-status backendOperations=BLOCKED_EXTERNAL/);
   assert.doesNotMatch(workflow, /--gate-status postLaunchOperations=SATISFIED/);
-  assert.match(workflow, /rc-evidence-manifest-preliminary\.json/);
+  assert.doesNotMatch(workflow, /rc-evidence-manifest-preliminary\.json/);
   assert.match(workflow, /node tools\/ops\/generate-operations-phase-a-summary\.mjs/);
   assert.match(
     workflow,
-    /node tools\/release\/generate-rc-evidence-manifest\.mjs[\s\S]*--output release-artifacts\/rc\/rc-evidence-manifest-preliminary\.json[\s\S]*node tools\/ops\/generate-operations-phase-a-summary\.mjs[\s\S]*node tools\/ops\/validate-operations-release-summary\.mjs[\s\S]*--require-pass[\s\S]*node tools\/release\/generate-rc-evidence-manifest\.mjs[\s\S]*--output release-artifacts\/rc\/rc-evidence-manifest\.json/,
+    /node tools\/release\/generate-rc-evidence-manifest\.mjs[\s\S]*--phase CANDIDATE[\s\S]*--output release-artifacts\/rc\/candidate-context\.json[\s\S]*node tools\/ops\/generate-operations-phase-a-summary\.mjs[\s\S]*node tools\/ops\/validate-operations-release-summary\.mjs[\s\S]*--require-pass[\s\S]*node tools\/release\/generate-rc-evidence-manifest\.mjs[\s\S]*--phase FINAL[\s\S]*--candidate-context release-artifacts\/rc\/candidate-context\.json[\s\S]*--output release-artifacts\/rc\/final-readiness\.json/,
   );
   assert.match(
     workflow,
@@ -3343,7 +4424,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   );
   assert.match(
     workflow,
-    /node tools\/ops\/validate-operations-release-summary\.mjs[\s\S]*--rc-manifest release-artifacts\/rc\/rc-evidence-manifest-preliminary\.json[\s\S]*--require-pass/,
+    /node tools\/ops\/validate-operations-release-summary\.mjs[\s\S]*--rc-manifest release-artifacts\/rc\/candidate-context\.json[\s\S]*--require-pass/,
   );
   assert.match(workflow, /--gate-status "postLaunchOperations=\$\{operations_status\}"/);
   assert.match(workflow, /--evidence-status "post_launch_operations=\$\{operations_status\}"/);
@@ -3397,25 +4478,25 @@ test("A RED repository locks summary v2 contract and catalog", async () => {
   assert.equal(contract.procedureIdDerivation, "matrixId + '.' + caseId");
   assert.equal(contract.targetAliasDerivation, "'target.' + matrixId");
   assert.equal(contract.ownerAliasDerivation, "'owner.' + matrixId");
-  assert.equal(contract.relativeEvidencePathPattern, "^\\.codex/evidence/security/abuse-penetration-rehearsal/[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$");
+  assert.equal(contract.relativeEvidencePathPattern, "^\\.codex/evidence/security/abuse-penetration-rehearsal/(?!\\.{1,2}(?:/|$))[A-Za-z0-9._-]+(?:/(?!\\.{1,2}(?:/|$))[A-Za-z0-9._-]+)*$");
   assert.deepEqual(contract.fieldTypes, {
     root: { schemaVersion: "integer", releaseGate: "string", issue: "integer", status: "string", rawInvocationStored: "boolean", redactionPolicyId: "string", artifactIdentity: "object", evidence: "array", productionLikeEvidence: "array", matrices: "array" },
     artifactIdentity: { gitSha: "string", versionCode: "integer", androidApplicationId: "string", dataPackManifestSha256: "string", aabSha256: "string", generatedApkSha256: "string", backendImageDigest: "string", backendArtifactSha256: "string" },
-    evidence: { evidenceId: "string", result: "string", localEvidencePath: "string" },
+    evidence: { evidenceId: "string", result: "string", localEvidencePath: "string", artifactIdentitySha256: "string" },
     matrix: { matrixId: "string", result: "string", findingCounts: "object", mediumFindingDisposition: "object", cases: "array" },
     findingCounts: { critical: "integer", high: "integer", medium: "integer", low: "integer" },
     mediumFindingDisposition: { ownerAlias: "string", fixPlanEvidencePath: "string" },
-    case: { procedureId: "string", targetAlias: "string", expectedStatus: "integer", observedStatus: "integer", redactionResult: "string", localEvidencePath: "string" },
+    case: { procedureId: "string", targetAlias: "string", expectedStatus: "integer", observedStatus: "integer", redactionResult: "string", localEvidencePath: "string", artifactIdentitySha256: "string" },
   });
   assert.deepEqual(contract.requiredFields, {
     rootForAllStatuses: ["schemaVersion", "releaseGate", "issue", "status", "rawInvocationStored", "redactionPolicyId"],
     rootAdditionalForPass: ["artifactIdentity", "evidence", "productionLikeEvidence", "matrices"],
     artifactIdentity: ["gitSha", "versionCode", "androidApplicationId", "dataPackManifestSha256"],
-    evidence: ["evidenceId", "result", "localEvidencePath"],
+    evidence: ["evidenceId", "result", "localEvidencePath", "artifactIdentitySha256"],
     matrix: ["matrixId", "result", "findingCounts", "cases"],
     findingCounts: ["critical", "high", "medium", "low"],
     mediumFindingDisposition: ["ownerAlias", "fixPlanEvidencePath"],
-    case: ["procedureId", "targetAlias", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"],
+    case: ["procedureId", "targetAlias", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath", "artifactIdentitySha256"],
   });
   assert.deepEqual(contract.fieldPatterns.artifactIdentity, {
     gitSha: "^[0-9a-f]{40}$", androidApplicationId: "^com\\.easysubway\\.app$",
@@ -3423,11 +4504,13 @@ test("A RED repository locks summary v2 contract and catalog", async () => {
     generatedApkSha256: "^[0-9a-f]{64}$", backendArtifactSha256: "^[0-9a-f]{64}$",
     backendImageDigest: "^sha256:[0-9a-f]{64}$",
   });
+  assert.deepEqual(contract.fieldPatterns.evidence, { artifactIdentitySha256: "^[0-9a-f]{64}$" });
+  assert.deepEqual(contract.fieldPatterns.case, { artifactIdentitySha256: "^[0-9a-f]{64}$" });
   assert.equal(existsSync(path.join(root, "tools/security/abuse-penetration-summary-schema.mjs")), true);
   const { deriveSummaryCatalog } = await import("../security/abuse-penetration-summary-schema.mjs");
   const catalog = deriveSummaryCatalog(abusePenetrationRehearsalGate);
   assert.equal(Object.isFrozen(catalog), true);
-  assert.deepEqual(catalog.matrixIds, ["adCounterInflation", "adminOperatorSecurity", "distributedRateLimitAbuse", "objectStorageLifecycle", "providerReleaseSecretExposure", "receiptTokenAbuse", "reportUploadLifecycle", "signedUploadUrlBoundary"]);
+  assert.deepEqual(catalog.matrixIds, ["adCounterInflation", "adminOperatorSecurity", "distributedRateLimitAbuse", "objectStorageLifecycle", "providerReleaseSecretExposure", "receiptTokenAbuse", "reportUploadLifecycle", "routeV2IngressAbuse", "signedUploadUrlBoundary"]);
   const expectedProcedures = Object.entries(abusePenetrationRehearsalGate.rehearsalMatrices).flatMap(([matrixId, matrix]) =>
     matrix.requiredCases.map((caseId) => [
       `${matrixId}.${caseId}`,
@@ -3462,6 +4545,37 @@ test("A RED repository locks summary v2 contract and catalog", async () => {
     "cloudflare-ipv4-live-oci-set-equality-summary", "postgres-atomic-daily-cap-test-output",
     "identifier-zero-request-capture-summary", "origin-log-ip-ua-absence-summary", "cloudflare-logpush-ip-ua-absence-summary",
   ]);
+  const routeV2 = abusePenetrationRehearsalGate.rehearsalMatrices.routeV2IngressAbuse;
+  assert.deepEqual(routeV2.requiredCases, [
+    "attestation_valid",
+    "attestation_invalid_nonce_format",
+    "attestation_nonce_replay",
+    "attestation_stale_verdict",
+    "attestation_future_verdict",
+    "attestation_request_hash_mismatch",
+    "attestation_wrong_request_package",
+    "attestation_wrong_app_package",
+    "attestation_certificate_mismatch",
+    "attestation_app_recognition_mismatch",
+    "attestation_licensing_mismatch",
+    "attestation_device_integrity_mismatch",
+    "attestation_provider_unavailable",
+    "session_expired",
+    "session_wrong_scope",
+    "session_quota_exhausted",
+    "gateway_session_missing",
+    "direct_origin_bypass_no_write",
+    "gateway_ip_limiter",
+    "gateway_token_limiter",
+  ]);
+  for (const caseId of routeV2.requiredCases) {
+    assert.equal(routeV2.expectedStatusByCase[caseId].length, 1, `${caseId} must require one exact result`);
+  }
+  assert.deepEqual(routeV2.expectedStatusByCase.gateway_token_limiter, [429]);
+  const gatewayScriptClassification = await classifyChangedFiles([
+    "tools/test/run-route-v2-gateway-integration.sh",
+  ]);
+  assert.equal(gatewayScriptClassification.repository, "true");
   assert.equal(abusePenetrationRehearsalGate.status, "BLOCKED_EXTERNAL");
   assert.equal(abusePenetrationRehearsalGate.findingPolicy.criticalHighAllowed, 0);
 });
@@ -3735,6 +4849,19 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   const androidReleaseMetadataPath = path.join(tempDir, "release-metadata.txt");
   const phaseASummaryPath = path.join(tempDir, "operations-phase-a-summary.json");
   const outputPath = path.join(tempDir, "rc-evidence-manifest.json");
+  const runFinalGenerator = async (generatorArgs, options) => {
+    const outputIndex = generatorArgs.indexOf("--output");
+    assert.notEqual(outputIndex, -1, "generator test invocation requires --output");
+    const finalOutput = generatorArgs[outputIndex + 1];
+    const withoutOutput = generatorArgs.filter((_, index) => index !== outputIndex && index !== outputIndex + 1);
+    const candidateOutput = `${finalOutput}.candidate-context.json`;
+    await execFileAsync(process.execPath, [
+      ...withoutOutput, "--phase", "CANDIDATE", "--output", candidateOutput,
+    ], options);
+    return execFileAsync(process.execPath, [
+      ...withoutOutput, "--phase", "FINAL", "--candidate-context", candidateOutput, "--output", finalOutput,
+    ], options);
+  };
   const appVersion = read("apps/mobile/pubspec.yaml").match(/^version:\s*([^+\s]+)\+([0-9]+)\s*$/m);
   assert.ok(appVersion, "mobile pubspec must contain versionName+versionCode");
 
@@ -3758,14 +4885,14 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     JSON.stringify([{ RepoDigests: ["ghcr.io/aquilaxk/easysubway-backend@sha256:abcdef"] }]),
   );
 
-  await execFileAsync(process.execPath, [
+  await runFinalGenerator([
     "tools/release/generate-rc-evidence-manifest.mjs",
     "--repo-root",
     ".",
     "--app-root",
     "apps/mobile",
     "--git-sha",
-    "0123456789abcdef0123456789abcdef01234567",
+    currentGitSha,
     "--now",
     "2026-07-16T00:00:00.000Z",
     "--android-release-metadata",
@@ -3791,7 +4918,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   const manifest = JSON.parse(readFileSync(outputPath, "utf8"));
   assert.equal(manifest.releaseGate, "rc-evidence-manifest");
   assert.equal(manifest.issue, 1020);
-  assert.equal(manifest.gitSha, "0123456789abcdef0123456789abcdef01234567");
+  assert.equal(manifest.gitSha, currentGitSha);
   assert.equal(manifest.generatedAt, "2026-07-16T00:00:00.000Z");
   assert.equal(manifest.supportContactSetSha256, "d".repeat(64));
   assert.equal(manifest.appVersionName, appVersion[1]);
@@ -3842,12 +4969,25 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
       { id: "android_release_quality", sourceIssue: 1021 },
       { id: "abuse_penetration_rehearsal", sourceIssue: 1022 },
       { id: "container_hardening", sourceIssue: 1914 },
+      { id: "production_equivalent_rehearsal", sourceIssue: 2058 },
+      { id: "production_artifact_android_integration", sourceIssue: 1393 },
     ],
   );
   assert.ok(manifest.evidenceEntries.every((entry) => entry.device === "local_android_emulator"));
   assert.ok(manifest.evidenceEntries.every((entry) => entry.androidVersion === "Android 16 API 36"));
   assert.ok(manifest.evidenceEntries.every((entry) => entry.testedAt === "2026-06-26T00:00:00.000Z"));
   assert.ok(manifest.evidenceEntries.every((entry) => entry.expiresWhen === "2026-07-10T00:00:00.000Z"));
+
+  const outsideCwdOutputPath = path.join(tempDir, "outside-cwd.json");
+  await runFinalGenerator([
+    path.join(root, "tools/release/generate-rc-evidence-manifest.mjs"),
+    "--repo-root", root,
+    "--app-root", path.join(root, "apps/mobile"),
+    "--git-sha", currentGitSha,
+    "--data-pack-manifest", path.join(root, "apps/mobile/assets/datapacks/metro_map_pack/manifest.json"),
+    "--output", outsideCwdOutputPath,
+  ], { cwd: tempDir });
+  assert.equal(JSON.parse(readFileSync(outsideCwdOutputPath, "utf8")).gitSha, currentGitSha);
 
   await writeFile(phaseASummaryPath, JSON.stringify({
     status: "PASS",
@@ -3858,11 +4998,11 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     },
   }));
   await assert.rejects(
-    execFileAsync(process.execPath, [
+    runFinalGenerator([
       "tools/release/generate-rc-evidence-manifest.mjs",
       "--repo-root", ".",
       "--app-root", "apps/mobile",
-      "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+      "--git-sha", currentGitSha,
       "--now", "2026-07-11T00:00:00Z",
       "--aab", aabPath,
       "--backend-image-inspect", backendInspectPath,
@@ -3884,11 +5024,11 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     },
   }));
   await assert.rejects(
-    execFileAsync(process.execPath, [
+    runFinalGenerator([
       "tools/release/generate-rc-evidence-manifest.mjs",
       "--repo-root", ".",
       "--app-root", "apps/mobile",
-      "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+      "--git-sha", currentGitSha,
       "--now", "2026-07-16T00:00:00Z",
       "--aab", aabPath,
       "--backend-image-inspect", backendInspectPath,
@@ -3910,11 +5050,11 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     },
   }));
   await assert.rejects(
-    execFileAsync(process.execPath, [
+    runFinalGenerator([
       "tools/release/generate-rc-evidence-manifest.mjs",
       "--repo-root", ".",
       "--app-root", "apps/mobile",
-      "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+      "--git-sha", currentGitSha,
       "--aab", aabPath,
       "--backend-image-inspect", backendInspectPath,
       "--data-pack-manifest", "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
@@ -3928,11 +5068,11 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
 
   await writeFile(phaseASummaryPath, "{}");
   await assert.rejects(
-    execFileAsync(process.execPath, [
+    runFinalGenerator([
       "tools/release/generate-rc-evidence-manifest.mjs",
       "--repo-root", ".",
       "--app-root", "apps/mobile",
-      "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+      "--git-sha", currentGitSha,
       "--aab", aabPath,
       "--backend-image-inspect", backendInspectPath,
       "--data-pack-manifest", "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
@@ -3953,11 +5093,11 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     },
   }));
   await assert.rejects(
-    execFileAsync(process.execPath, [
+    runFinalGenerator([
       "tools/release/generate-rc-evidence-manifest.mjs",
       "--repo-root", ".",
       "--app-root", "apps/mobile",
-      "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+      "--git-sha", currentGitSha,
       "--now", "2026-07-16T00:00:00Z",
       "--aab", aabPath,
       "--backend-image-inspect", backendInspectPath,
@@ -3970,22 +5110,76 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     /failed canonical validation/,
   );
 
+  await writeFile(phaseASummaryPath, JSON.stringify({
+    schemaVersion: 1,
+    evidenceId: "rc_device_qa",
+    sourceIssue: 571,
+    status: "SATISFIED",
+    reasonCodes: [],
+    rcIdentity: manifest.rcIdentity,
+    evidenceValidity: {
+      testedAt: "2026-07-15T00:00:00Z",
+      expiresWhen: "2026-07-20T00:00:00Z",
+    },
+    result: {
+      schemaVersion: 1,
+      checks: {
+        exactRcInstalled: true,
+        launchSmokePassed: true,
+        accessibilityPassed: true,
+        crashFree: true,
+        evidenceRedacted: true,
+      },
+      evidenceReferences: [{ artifactId: "rc-device-qa-report", sha256: "1".repeat(64) }],
+    },
+  }));
+  await runFinalGenerator([
+    "tools/release/generate-rc-evidence-manifest.mjs",
+    "--repo-root", ".",
+    "--app-root", "apps/mobile",
+    "--git-sha", currentGitSha,
+    "--now", "2026-07-16T00:00:00Z",
+    "--android-release-metadata", androidReleaseMetadataPath,
+    "--aab", aabPath,
+    "--backend-image-inspect", backendInspectPath,
+    "--data-pack-manifest", "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
+    "--output", outputPath,
+    "--tested-at", "2026-07-15T00:00:00Z",
+    "--evidence-status", "rc_device_qa=SATISFIED",
+    "--evidence-path", `rc_device_qa=${phaseASummaryPath}`,
+  ], { cwd: root });
+  const genericEvidenceManifest = JSON.parse(readFileSync(outputPath, "utf8"));
+  assert.match(
+    genericEvidenceManifest.evidenceEntries.find(({ id }) => id === "rc_device_qa").evidenceSha256,
+    /^[a-f0-9]{64}$/,
+  );
+  await writeFile(phaseASummaryPath, JSON.stringify({
+    schemaVersion: 1,
+    evidenceId: "post_launch_operations",
+    sourceIssue: 1019,
+    status: "SATISFIED",
+    reasonCodes: [],
+    rcIdentity: manifest.rcIdentity,
+    evidenceValidity: {
+      testedAt: "2026-07-15T00:00:00Z",
+      expiresWhen: "2026-07-20T00:00:00Z",
+    },
+  }));
   await assert.rejects(
-    execFileAsync(process.execPath, [
+    runFinalGenerator([
       "tools/release/generate-rc-evidence-manifest.mjs",
       "--repo-root", ".",
       "--app-root", "apps/mobile",
-      "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+      "--git-sha", currentGitSha,
       "--now", "2026-07-16T00:00:00Z",
+      "--android-release-metadata", androidReleaseMetadataPath,
       "--aab", aabPath,
       "--backend-image-inspect", backendInspectPath,
-      "--data-pack-manifest", "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
       "--output", outputPath,
-      "--tested-at", "2026-07-15T00:00:00Z",
-      "--evidence-status", "rc_device_qa=SATISFIED",
-      "--evidence-path", `rc_device_qa=${phaseASummaryPath}`,
+      "--evidence-status", "post_launch_operations=SATISFIED",
+      "--evidence-path", `post_launch_operations=${phaseASummaryPath}`,
     ], { cwd: root }),
-    /has no canonical validator/,
+    /failed canonical validation: post_launch_operations/,
   );
 
   const incompleteRepo = path.join(tempDir, "incomplete-scope-repo");
@@ -3996,12 +5190,13 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     path.join(incompleteRepo, "apps/mobile/release/production-datapack-scope.json"),
     JSON.stringify(incompleteScope),
   );
+  const incompleteRepoGitSha = await initializeFixtureGitRepo(incompleteRepo);
   await assert.rejects(
-    execFileAsync(process.execPath, [
+    runFinalGenerator([
       "tools/release/generate-rc-evidence-manifest.mjs",
       "--repo-root", incompleteRepo,
       "--app-root", path.join(root, "apps/mobile"),
-      "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+      "--git-sha", incompleteRepoGitSha,
       "--aab", aabPath,
       "--backend-image-inspect", backendInspectPath,
       "--data-pack-manifest", path.join(root, "apps/mobile/assets/datapacks/metro_map_pack/manifest.json"),
@@ -4017,14 +5212,14 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     localImageInspectPath,
     JSON.stringify([{ RepoDigests: [], Id: "sha256:2076c88dbc6590b239f6762e9c209d7ae189f2bc53725ca94d42c81c5d8e4521" }]),
   );
-  await execFileAsync(process.execPath, [
+  await runFinalGenerator([
     "tools/release/generate-rc-evidence-manifest.mjs",
     "--repo-root",
     ".",
     "--app-root",
     "apps/mobile",
     "--git-sha",
-    "0123456789abcdef0123456789abcdef01234567",
+    currentGitSha,
     "--aab",
     aabPath,
     "--backend-image-inspect",
@@ -4051,14 +5246,14 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   const metadataOnlyInspect = JSON.stringify([{ RepoDigests: [], Size: 367184804 }]);
   const metadataOnlyInspectSha256 = createHash("sha256").update(metadataOnlyInspect).digest("hex");
   await writeFile(metadataOnlyInspectPath, metadataOnlyInspect);
-  await execFileAsync(process.execPath, [
+  await runFinalGenerator([
     "tools/release/generate-rc-evidence-manifest.mjs",
     "--repo-root",
     ".",
     "--app-root",
     "apps/mobile",
     "--git-sha",
-    "0123456789abcdef0123456789abcdef01234567",
+    currentGitSha,
     "--aab",
     aabPath,
     "--backend-image-inspect",
@@ -4078,14 +5273,14 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   );
 
   await assert.rejects(
-    execFileAsync(process.execPath, [
+    runFinalGenerator([
       "tools/release/generate-rc-evidence-manifest.mjs",
       "--repo-root",
       ".",
       "--app-root",
       "apps/mobile",
       "--git-sha",
-      "0123456789abcdef0123456789abcdef01234567",
+      currentGitSha,
       "--aab",
       aabPath,
       "--backend-image-inspect",
@@ -4105,11 +5300,11 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   const corruptAabPath = path.join(tempDir, "corrupt.aab");
   const corruptManifestPath = path.join(tempDir, "corrupt-aab-manifest.json");
   await writeFile(corruptAabPath, "not-a-zip");
-  await execFileAsync(process.execPath, [
+  await runFinalGenerator([
     "tools/release/generate-rc-evidence-manifest.mjs",
     "--repo-root", ".",
     "--app-root", "apps/mobile",
-    "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+    "--git-sha", currentGitSha,
     "--aab", corruptAabPath,
     "--backend-image-inspect", backendInspectPath,
     "--data-pack-manifest", "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
@@ -4118,6 +5313,936 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   const corruptManifest = JSON.parse(readFileSync(corruptManifestPath, "utf8"));
   assert.equal(corruptManifest.aabPayloadSha256, null);
   assert.ok(corruptManifest.readiness.blockers.some((blocker) => blocker.id === "missing_aabPayloadSha256"));
+});
+
+test("datapack readiness producer는 required gate를 동일 final identity로 결정론적으로 결합한다", async () => {
+  const contract = readJson("apps/mobile/release/rc-evidence-manifest-contract.json");
+  const requiredDatapackGates = [
+    { id: "source_admission", sourceIssue: 2133, expiresAfterDays: 14 }, { id: "source_governance", sourceIssue: 2133, expiresAfterDays: 14 },
+    { id: "freshness_conditional_publish", sourceIssue: 2054, expiresAfterDays: 14 }, { id: "rollback_rescue", sourceIssue: 2051, expiresAfterDays: 14 },
+    { id: "device_performance", sourceIssue: 2055, expiresAfterDays: 14 }, { id: "callback_reconciliation", sourceIssue: 2057, expiresAfterDays: 14 },
+  ];
+  assert.deepEqual(contract.requiredDatapackGates, requiredDatapackGates);
+  const producerFiles = execFileSync("git", ["grep", "-l", "summaryArtifactDigest", "--", "tools", "apps", ".github"],
+    { cwd: root, encoding: "utf8" }).trim().split("\n").filter((file) => !file.includes(".test."));
+  assert.deepEqual(producerFiles, ["tools/release/generate-rc-evidence-manifest.mjs"]);
+  const producerSource = read("tools/release/generate-rc-evidence-manifest.mjs");
+  assert.doesNotMatch(producerSource, /gunzipSync/);
+  assert.match(producerSource, /count-gzip-uncompressed-bytes\.mjs/);
+  assert.ok(
+    producerSource.indexOf("compressed artifact exceeds the 250 MiB cap")
+      < producerSource.indexOf("count-gzip-uncompressed-bytes.mjs"),
+    "compressed size cap must be checked before streaming decompression",
+  );
+
+  const tempDir = await mkdtemp(path.join(tmpdir(), "easysubway-datapack-readiness-"));
+  const validationRepo = path.join(tempDir, "validation-repo");
+  for (const directory of ["apps/mobile/release", "tools/release", "tools/ops", "tools/security"]) {
+    await mkdir(path.join(validationRepo, directory), { recursive: true });
+  }
+  await symlink(path.join(root, "apps/mobile/release/production-datapack-scope.json"), path.join(validationRepo, "apps/mobile/release/production-datapack-scope.json"));
+  await symlink(path.join(root, "tools/release/hash-android-bundle-payload.mjs"), path.join(validationRepo, "tools/release/hash-android-bundle-payload.mjs"));
+  await symlink(path.join(root, "tools/release/count-gzip-uncompressed-bytes.mjs"), path.join(validationRepo, "tools/release/count-gzip-uncompressed-bytes.mjs"));
+  await writeFile(path.join(validationRepo, "tools/ops/validate-operations-release-summary.mjs"), `import { readFileSync } from "node:fs";
+const value = (name) => process.argv[process.argv.indexOf(name) + 1];
+const summary = JSON.parse(readFileSync(value("--summary"), "utf8"));
+const manifest = JSON.parse(readFileSync(value("--rc-manifest"), "utf8"));
+if (summary.evidenceId !== "post_launch_operations" || summary.status !== "SATISFIED") process.exit(1);
+if (JSON.stringify(summary.rcIdentity) !== JSON.stringify(manifest.rcIdentity)) process.exit(1);
+`);
+  await writeFile(path.join(validationRepo, "tools/security/validate-abuse-penetration-summary.mjs"), `import { existsSync } from "node:fs";
+const value = (name) => process.argv[process.argv.indexOf(name) + 1];
+if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass")) process.exit(1);
+`);
+  const gitSha = await initializeFixtureGitRepo(validationRepo);
+  const now = "2026-07-16T00:00:00.000Z";
+  const snapshotSetIdentity = "a".repeat(64);
+  const requiredSourceIds = readJson("apps/mobile/release/production-datapack-scope.json").productionSourceSet.requiredSourceIds;
+  const sourceInventoryEntries = requiredSourceIds.map((sourceId, index) => ({
+    sourceId, status: "APPROVED", producerVersion: 1, evidenceSha256: `${(index % 9) + 1}`.repeat(64),
+    evaluatedAt: now, expiresAt: "2026-07-30T00:00:00.000Z",
+  }));
+  const aabPayloadPath = path.join(tempDir, "payload.bin"), aabPath = path.join(tempDir, "app-release.aab");
+  const backendArtifactPath = path.join(tempDir, "backend.jar"), dataPackManifestPath = path.join(tempDir, "current.json");
+  const dataPackArtifactPath = path.join(tempDir, "capital.sqlite.gz");
+  const dataPackReleaseDecisionPath = path.join(tempDir, "final-release-decision.json");
+  await writeFile(aabPayloadPath, "datapack-readiness-aab");
+  await execFileAsync("zip", ["-q", aabPath, path.basename(aabPayloadPath)], { cwd: tempDir });
+  await writeFile(backendArtifactPath, "datapack-readiness-backend");
+  const dataPackArtifactContents = Buffer.from("datapack-readiness-pack");
+  const compressedDataPackArtifact = gzipSync(dataPackArtifactContents);
+  const dataPackArtifactBytes = compressedDataPackArtifact.length;
+  const dataPackArtifactUncompressedBytes = dataPackArtifactContents.length;
+  await writeFile(dataPackArtifactPath, compressedDataPackArtifact);
+  const dataPackArtifactSha256 = createHash("sha256").update(compressedDataPackArtifact).digest("hex");
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const signProductionManifest = (manifest) => ({ ...manifest, signature: {
+    algorithm: "rsa-sha256-manifest-v2",
+    value: signBytes("RSA-SHA256", canonicalJson(withoutSignature(manifest)), privateKey).toString("base64url"),
+  } });
+  const productionManifest = signProductionManifest({
+    manifestVersion: 2, channel: "production", releaseSequence: 102,
+    publishedAt: now, expiresAt: "2026-07-30T00:00:00.000Z", ttlSeconds: 3600,
+    keyId: "production-v1", signature: { algorithm: "rsa-sha256-manifest-v2", value: "test-signature" },
+    activePack: { id: "capital", version: "1" },
+    packs: [{
+      id: "capital", version: "1", artifactKind: "production", payloadKind: "sqlite_catalog",
+      url: "https://datapack.example.com/catalog/capital-v1.sqlite.gz", sha256: dataPackArtifactSha256,
+      sqliteSha256: "e".repeat(64), sizeBytes: dataPackArtifactBytes,
+      signature: { algorithm: "rsa-sha256-pack-manifest-v2", value: "test-signature" },
+      schemaVersion: "3", requiredTables: ["stations"],
+      minimumTableRows: { stations: 1, station_lines: 1, network_edges: 1, facilities: 1, station_facility_evidence: 1 },
+      sourceInventory: [{
+        id: "official-source", owner: "official-owner", url: "https://source.example.com/data",
+        license: "public", licenseStatus: "redistributable", redistributionAllowed: true,
+        updateFrequency: "daily", updatedAt: now, fields: ["stations"], coverageScope: {
+          regionIds: ["capital"], operatorIds: ["metro"], sourceDomains: ["topology"],
+        },
+      }],
+      regionalQualityMetrics: {
+        stationCount: 1, facilityCoverageRatio: 1, requiredFacilityEvidenceCoverageRatio: 1,
+        strictRouteEligibleFacilityRatio: 1, operationalKnownRatio: 1, freshnessValidRatio: 1,
+        fieldVerifiedPathwayRatio: 1, edgeCount: 1, unknownAccessibilityRatio: 0, unknownEdgeRatioByProfile: {
+          wheelchair: 0, stroller: 0, lowMobility: 0,
+        },
+      },
+      routeRegressionScope: { mode: "DIRECT_ONLY", excludedPatterns: [], claim: "capital pilot" },
+      representativeRouteRegressions: [{ id: "direct-1", pattern: "DIRECT", fromNodeId: "A", toNodeId: "B", requiredEdgeIds: ["A-B"] }],
+      representativeRouteRegressionSignature: { algorithm: "rsa-sha256-route-regression-v1", value: "test-signature" },
+    }],
+  });
+  await writeFile(dataPackManifestPath, JSON.stringify(productionManifest));
+  await writeFile(dataPackReleaseDecisionPath, JSON.stringify({
+    schemaVersion: 1, artifactKind: "datapack-release-decision", outcome: "PUBLISHED_AND_VERIFIED",
+    productionWriteAllowed: true, strictValidationPassed: true, publishAttempted: true,
+    remoteValidationPassed: true, sourceSnapshotSetHash: snapshotSetIdentity, reasonCodes: [],
+    selectedManifestSha256: createHash("sha256").update(JSON.stringify(productionManifest)).digest("hex"),
+    selectedReleaseSequence: productionManifest.releaseSequence,
+  }));
+  const writeBoundProductionManifest = async (manifest) => {
+    const manifestBytes = JSON.stringify(manifest);
+    await writeFile(dataPackManifestPath, manifestBytes);
+    const decision = JSON.parse(await readFile(dataPackReleaseDecisionPath, "utf8"));
+    decision.selectedManifestSha256 = createHash("sha256").update(manifestBytes).digest("hex");
+    decision.selectedReleaseSequence = manifest.releaseSequence;
+    await writeFile(dataPackReleaseDecisionPath, JSON.stringify(decision));
+  };
+  const args = [
+    "tools/release/generate-rc-evidence-manifest.mjs",
+    "--repo-root", validationRepo, "--app-root", "apps/mobile", "--git-sha", gitSha, "--now", now,
+    "--aab", aabPath, "--backend-artifact", backendArtifactPath,
+    "--data-pack-manifest", dataPackManifestPath, "--data-pack-artifact", dataPackArtifactPath,
+    "--data-pack-release-decision", dataPackReleaseDecisionPath,
+    "--require-production-data-pack-binding", "true",
+    "--support-contact-set-sha256", "d".repeat(64),
+    "--device", "qa-device-a", "--android-version", "Android 16 API 36",
+  ];
+  const publicJwk = publicKey.export({ format: "jwk" });
+  const generatorOptions = { cwd: root, env: {
+    ...process.env,
+    EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: "",
+    EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N: publicJwk.n,
+    EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E: publicJwk.e,
+  } };
+  const baselineOutput = path.join(tempDir, "baseline.json");
+  const rejectProductionManifest = async (packOverride, expected) => {
+    const manifest = signProductionManifest({ ...productionManifest, packs: [{ ...productionManifest.packs[0], ...packOverride }] });
+    await writeFile(dataPackManifestPath, JSON.stringify(manifest));
+    await assert.rejects(execFileAsync(process.execPath, [...args, "--phase", "CANDIDATE", "--output", baselineOutput], generatorOptions), expected);
+  };
+  await writeFile(dataPackManifestPath, JSON.stringify({ ...productionManifest, signature: { ...productionManifest.signature, value: "invalid" } }));
+  await assert.rejects(execFileAsync(process.execPath, [...args, "--phase", "CANDIDATE", "--output", baselineOutput], generatorOptions), /manifest signature mismatch/);
+  const expiredProductionManifest = signProductionManifest({
+    ...productionManifest,
+    publishedAt: "2026-07-15T00:00:00.000Z",
+    expiresAt: "2026-07-15T23:59:59.999Z",
+  });
+  await writeFile(dataPackManifestPath, JSON.stringify(expiredProductionManifest));
+  await assert.rejects(
+    execFileAsync(process.execPath, [...args, "--phase", "CANDIDATE", "--output", baselineOutput], generatorOptions),
+    /production data pack manifest is expired/,
+  );
+  await rejectProductionManifest({ sha256: "f".repeat(64) }, /production data pack manifest sha256 does not match the supplied artifact/);
+  await rejectProductionManifest({ sizeBytes: dataPackArtifactBytes + 1 }, /production data pack manifest sizeBytes does not match the supplied artifact/);
+  const { activePack: _activePack, ...productionManifestWithoutActivePack } = productionManifest;
+  const defaultCapitalManifest = signProductionManifest({
+    ...productionManifestWithoutActivePack,
+    packs: [
+      {
+        ...productionManifest.packs[0],
+        version: "1",
+        url: "https://datapack.example.com/catalog/capital-v1.sqlite.gz",
+        sha256: "f".repeat(64),
+      },
+      {
+        ...productionManifest.packs[0],
+        id: "aux",
+        version: "99",
+        url: "https://datapack.example.com/catalog/aux-v99.sqlite.gz",
+        sha256: "e".repeat(64),
+      },
+      {
+        ...productionManifest.packs[0],
+        version: "2",
+        url: "https://datapack.example.com/catalog/capital-v2.sqlite.gz",
+      },
+    ],
+  });
+  await writeBoundProductionManifest(defaultCapitalManifest);
+  await execFileAsync(
+    process.execPath,
+    [...args, "--phase", "CANDIDATE", "--output", baselineOutput],
+    generatorOptions,
+  );
+  const fallbackArtifactContents = Buffer.from("datapack-readiness-fallback");
+  const compressedFallbackArtifact = gzipSync(fallbackArtifactContents);
+  const emergencyOverrideManifest = signProductionManifest({
+    ...productionManifest,
+    emergencyOverride: { id: "capital-rescue", version: "2", reason: "검증된 긴급 복구" },
+    packs: [
+      {
+        ...productionManifest.packs[0],
+        sha256: createHash("sha256").update(compressedFallbackArtifact).digest("hex"),
+        sizeBytes: compressedFallbackArtifact.length,
+      },
+      {
+        ...productionManifest.packs[0],
+        id: "capital-rescue",
+        version: "2",
+        url: "https://datapack.example.com/catalog/capital-rescue-v2.sqlite.gz",
+      },
+    ],
+  });
+  const fallbackArtifactPath = path.join(tempDir, "capital-fallback.sqlite.gz");
+  await writeFile(fallbackArtifactPath, compressedFallbackArtifact);
+  await writeBoundProductionManifest(emergencyOverrideManifest);
+  await execFileAsync(
+    process.execPath,
+    [...args, "--data-pack-fallback-artifact", fallbackArtifactPath, "--phase", "CANDIDATE", "--output", baselineOutput],
+    generatorOptions,
+  );
+  await writeBoundProductionManifest(productionManifest);
+  const freshnessRenewalDecision = JSON.parse(readFileSync(dataPackReleaseDecisionPath, "utf8"));
+  freshnessRenewalDecision.reasonCodes = ["PACK_PUBLISH_FRESHNESS_EXPIRED"];
+  await writeFile(dataPackReleaseDecisionPath, JSON.stringify(freshnessRenewalDecision));
+  await execFileAsync(
+    process.execPath,
+    [...args, "--phase", "CANDIDATE", "--output", baselineOutput],
+    generatorOptions,
+  );
+  freshnessRenewalDecision.reasonCodes = ["POST_PUBLISH_REMOTE_VALIDATION_FAILED"];
+  await writeFile(dataPackReleaseDecisionPath, JSON.stringify(freshnessRenewalDecision));
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [...args, "--phase", "CANDIDATE", "--output", baselineOutput],
+      generatorOptions,
+    ),
+    /data pack release decision is not finalized/,
+  );
+  freshnessRenewalDecision.reasonCodes = [];
+  await writeFile(dataPackReleaseDecisionPath, JSON.stringify(freshnessRenewalDecision));
+  await writeBoundProductionManifest(productionManifest);
+  const releaseDecisionArgIndex = args.indexOf("--data-pack-release-decision");
+  const argsWithoutReleaseDecision = args.filter((_, index) => (
+    index !== releaseDecisionArgIndex && index !== releaseDecisionArgIndex + 1
+  ));
+  await assert.rejects(
+    execFileAsync(process.execPath, [...argsWithoutReleaseDecision, "--phase", "CANDIDATE", "--output", baselineOutput], generatorOptions),
+    /production data pack binding requires a finalized release decision/,
+  );
+  await execFileAsync(process.execPath, [...args, "--phase", "CANDIDATE", "--output", baselineOutput], generatorOptions);
+  const candidateManifest = JSON.parse(readFileSync(baselineOutput, "utf8"));
+  assert.equal(candidateManifest.phase, "CANDIDATE");
+  assert.deepEqual(candidateManifest.consumerIssues, [2058, 1393]);
+  assert.equal(Object.hasOwn(candidateManifest, "readiness"), false);
+  assert.equal(Object.hasOwn(candidateManifest, "decision"), false);
+  assert.equal(Object.hasOwn(candidateManifest, "summaryArtifactDigest"), false);
+  assert.doesNotMatch(JSON.stringify(candidateManifest), /\b(?:GO|NO_GO)\b/);
+  assert.equal(candidateManifest.releaseCandidateIdentity.releaseSequence, 102);
+  assert.equal(candidateManifest.releaseCandidateIdentity.sourceSnapshotSetHash, snapshotSetIdentity);
+  await assert.rejects(
+    execFileAsync(process.execPath, [...args, "--output", path.join(tempDir, "default-final-without-candidate.json")], generatorOptions),
+    /FINAL phase requires --candidate-context/,
+  );
+  await assert.rejects(execFileAsync(process.execPath, [...args, "--release-sequence", "2026.07.12",
+    "--phase", "CANDIDATE", "--output", path.join(tempDir, "invalid-release-sequence.json")], generatorOptions),
+  /--release-sequence must be a positive safe integer/);
+  const evidenceRcIdentity = candidateManifest.releaseCandidateIdentity;
+  const invalidCandidatePath = path.join(tempDir, "invalid-candidate-context.json");
+  await writeFile(invalidCandidatePath, JSON.stringify({ ...candidateManifest, decision: "GO" }));
+  await assert.rejects(execFileAsync(process.execPath, [...args, "--phase", "FINAL",
+    "--candidate-context", invalidCandidatePath, "--output", path.join(tempDir, "invalid-final.json")], generatorOptions),
+  /without readiness or decision fields/);
+  args.push("--phase", "FINAL", "--candidate-context", baselineOutput);
+  for (const invalidCount of ["1abc", "1.5", "-0.5"]) {
+    await assert.rejects(execFileAsync(process.execPath, [
+      ...args, "--open-android-p0-count", invalidCount,
+      "--output", path.join(tempDir, `invalid-p0-${invalidCount}.json`),
+    ], generatorOptions), /--open-android-p0-count must be a non-negative integer/);
+  }
+  await assert.rejects(execFileAsync(process.execPath, [
+    ...args, "--fail-on-blocked", "TRUE", "--output", path.join(tempDir, "invalid-fail-on-blocked.json"),
+  ], generatorOptions), /--fail-on-blocked must be true or false/);
+  const prePlayMetadataPath = path.join(tempDir, "pre-play-release-metadata.txt");
+  const prePlayOutputPath = path.join(tempDir, "pre-play-final-readiness.json");
+  await writeFile(prePlayMetadataPath, [
+    `gitSha=${evidenceRcIdentity.gitSha}`,
+    "storeReadyCandidate=true",
+    "signingKeyType=production-upload-key",
+    "packageId=com.easysubway.app",
+    `versionName=${evidenceRcIdentity.appVersionName}`,
+    `versionCode=${evidenceRcIdentity.versionCode}`,
+    `aabSha256=${evidenceRcIdentity.aabSha256}`,
+    `aabPayloadSha256=${evidenceRcIdentity.aabPayloadSha256}`,
+    `supportContactSetSha256=${evidenceRcIdentity.supportContactSetSha256}`,
+    `uploadKeySha256Fingerprint=${"a".repeat(64)}`,
+    `appSigningKeySha256Fingerprint=${"b".repeat(64)}`,
+  ].join("\n"));
+  await execFileAsync(process.execPath, [
+    ...args,
+    "--android-release-metadata", prePlayMetadataPath,
+    "--require-pre-play-upload-ready", "true",
+    "--output", prePlayOutputPath,
+  ], generatorOptions);
+  assert.equal(JSON.parse(readFileSync(prePlayOutputPath, "utf8")).decision, "NO_GO");
+  const prePlayBindingFlagIndex = args.indexOf("--require-production-data-pack-binding");
+  const implicitlyBoundArgs = args.filter((_, index) => (
+    index !== prePlayBindingFlagIndex && index !== prePlayBindingFlagIndex + 1
+  ));
+  await execFileAsync(process.execPath, [
+    ...implicitlyBoundArgs,
+    "--android-release-metadata", prePlayMetadataPath,
+    "--require-pre-play-upload-ready", "true",
+    "--output", path.join(tempDir, "implicit-production-binding.json"),
+  ], generatorOptions);
+  await writeFile(prePlayMetadataPath, readFileSync(prePlayMetadataPath, "utf8")
+    .replace("signingKeyType=production-upload-key", "signingKeyType=ci-ephemeral"));
+  await assert.rejects(execFileAsync(process.execPath, [
+    ...args,
+    "--android-release-metadata", prePlayMetadataPath,
+    "--require-pre-play-upload-ready", "true",
+    "--output", prePlayOutputPath,
+  ], generatorOptions), /pre-Play upload readiness/);
+  const gateEvidencePaths = {};
+  const evidenceReference = (artifactId, digit) => ({ artifactId, sha256: digit.repeat(64) });
+  const passingChecks = (names) => Object.fromEntries(names.map((name) => [name, true]));
+  const datapackGateResult = (gateId) => {
+    if (gateId === "rollback_rescue") {
+      return {
+        schemaVersion: 1, currentReleaseSequence: 101, failedReleaseSequence: 101,
+        catalogMaxReleaseSequence: 101, rescueReleaseSequence: 102,
+        knownGoodPackSha256: evidenceRcIdentity.dataPackFallbackArtifactSha256,
+        failedPackSha256: "f".repeat(64),
+        rescueManifestSha256: evidenceRcIdentity.dataPackManifestSha256,
+        checks: passingChecks([
+          "monotonicSequence", "signatureVerified", "sqliteIntegrityVerified", "immutableCatalogWritten", "channelManifestPublishedLast",
+          "idempotentRetryVerified", "androidReplayRecoveryVerified", "productionPreservedOnFailure", "secretRedactionVerified",
+        ]),
+        evidenceReferences: [evidenceReference("rollback-report", "6")],
+      };
+    }
+    if (gateId === "device_performance") {
+      return {
+        schemaVersion: 1,
+        deviceProfile: { model: "production-equivalent-4gib", ramBytes: 4 * 1024 * 1024 * 1024,
+          androidApiLevel: 36, osBuild: "android-16-test-build", repetitions: 20 },
+        artifact: {
+          sha256: evidenceRcIdentity.dataPackArtifactSha256,
+          compressedBytes: dataPackArtifactBytes,
+          uncompressedBytes: dataPackArtifactUncompressedBytes,
+        },
+        metrics: {
+          manifestFetchP95Ms: 2_000, downloadChunkIdleMaxMs: 10_000, decompressP95Ms: 20_000,
+          hashSignatureP95Ms: 8_000, sqliteValidationP95Ms: 12_000, activationP95Ms: 1_500,
+          peakRssIncreaseBytes: 200 * 1024 * 1024, coldLoadP50Ms: 800, coldLoadP95Ms: 1_200, routeSearchP50Ms: 100,
+          routeSearchP95Ms: 250, temporaryStorageBytes: dataPackArtifactBytes,
+          temporaryStorageLimitBytes: dataPackArtifactBytes + (2 * dataPackArtifactUncompressedBytes),
+        },
+        checks: passingChecks([
+          "productionTopologyArtifact", "lowestSupportedAndroidProfile", "allStageSlosPassed", "baselineRegressionPassed",
+          "atomicRecoveryPassed", "rolloutBlockerConnected", "zeroCrashAnrOom", "zeroMainThreadStallOver700Ms",
+          "meteredNetworkConsentVerified", "secretRedactionVerified",
+        ]),
+        evidenceReferences: [evidenceReference("device-performance-report", "7")],
+      };
+    }
+    if (gateId === "callback_reconciliation") {
+      return {
+        schemaVersion: 1,
+        deliveryIdentity: { releaseRequestId: "release-request-2057", releaseSequence: 102,
+          manifestSha256: evidenceRcIdentity.dataPackManifestSha256,
+          idempotencyKeySha256: createHash("sha256")
+            .update(`release-request-2057:102:${evidenceRcIdentity.dataPackManifestSha256}`)
+            .digest("hex") },
+        metrics: { controlPlaneConvergenceP95Ms: 8 * 60 * 1_000, terminalDispositionMaxMs: 60 * 60 * 1_000 },
+        checks: passingChecks([
+          "boundedRetryConverged", "independentReconciliationConverged", "duplicateSingleApply", "concurrentSingleApply",
+          "identityMismatchDeadLetter", "invalidSignatureDeadLetter", "missingRequestDeadLetter", "rolloutCappedUntilConfirmed",
+          "secretRedactionVerified", "manualRepairAudited",
+        ]),
+        evidenceReferences: [evidenceReference("callback-reconciliation-report", "9")],
+      };
+    }
+    return undefined;
+  };
+
+  for (const gateId of contract.requiredGateStatuses) {
+    const evidencePath = path.join(tempDir, `required-gate-${gateId}.json`);
+    await writeFile(evidencePath, `${JSON.stringify({
+      schemaVersion: 1, gateId, status: "SATISFIED", reasonCodes: [], rcIdentity: evidenceRcIdentity,
+      evidenceValidity: { evaluatedAt: now, expiresAt: "2026-07-30T00:00:00.000Z" },
+      result: {
+        schemaVersion: 1, checks: Object.fromEntries(contract.requiredGateChecks[gateId].map((check) => [check, true])),
+        evidenceReferences: [evidenceReference(`${gateId}-report`, "2")],
+      },
+    }, null, 2)}\n`);
+    args.push("--gate-status", `${gateId}=SATISFIED`, "--gate-evidence", `${gateId}=${evidencePath}`);
+  }
+
+  let postLaunchEvidencePath;
+  let abuseEvidencePath;
+  let abuseSummaryPath;
+  for (const entry of contract.requiredEvidenceEntries) {
+    const evidencePath = path.join(tempDir, `required-evidence-${entry.id}.json`);
+    if (entry.id === "post_launch_operations") postLaunchEvidencePath = evidencePath;
+    const evidence = {
+      schemaVersion: 1, evidenceId: entry.id, sourceIssue: entry.sourceIssue,
+      status: "SATISFIED", reasonCodes: [], rcIdentity: evidenceRcIdentity,
+      evidenceValidity: { testedAt: now, expiresWhen: "2026-07-30T00:00:00.000Z" },
+    };
+    if (Array.isArray(entry.requiredChecks)) {
+      evidence.result = {
+        schemaVersion: 1, checks: Object.fromEntries(entry.requiredChecks.map((check) => [check, true])),
+        evidenceReferences: [evidenceReference(`${entry.id}-report`, "1")],
+      };
+    }
+    if (entry.id === "abuse_penetration_rehearsal") {
+      abuseEvidencePath = evidencePath;
+      abuseSummaryPath = path.join(tempDir, "abuse-penetration-summary.json");
+      await writeFile(abuseSummaryPath, `${JSON.stringify({
+        artifactIdentity: {
+          gitSha: evidenceRcIdentity.gitSha,
+          versionCode: Number(evidenceRcIdentity.versionCode),
+          androidApplicationId: "com.easysubway.app",
+          dataPackManifestSha256: evidenceRcIdentity.dataPackManifestSha256,
+          aabSha256: evidenceRcIdentity.aabSha256,
+          backendArtifactSha256: evidenceRcIdentity.backendArtifactSha256,
+        },
+      })}\n`);
+      evidence.canonicalSummaryPath = abuseSummaryPath;
+      evidence.canonicalSummarySha256 = createHash("sha256").update(readFileSync(abuseSummaryPath)).digest("hex");
+    }
+    await writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
+    args.push("--evidence-status", `${entry.id}=SATISFIED`, "--evidence-path", `${entry.id}=${evidencePath}`);
+  }
+  const postLaunchGateEvidenceIndex = args.findIndex((value, index) => (
+    args[index - 1] === "--gate-evidence" && value.startsWith("postLaunchOperations=")
+  ));
+  args[postLaunchGateEvidenceIndex] = `postLaunchOperations=${postLaunchEvidencePath}`;
+
+  for (const gate of requiredDatapackGates) {
+    const evidencePath = path.join(tempDir, `${gate.id}.json`);
+    gateEvidencePaths[gate.id] = evidencePath;
+    const evidence = {
+      schemaVersion: 1, gateId: gate.id, sourceIssue: gate.sourceIssue,
+      status: "SATISFIED", reasonCodes: [], rcIdentity: evidenceRcIdentity,
+      evidenceValidity: { evaluatedAt: now, expiresAt: "2026-07-30T00:00:00.000Z" },
+    };
+    if (["source_admission", "source_governance", "freshness_conditional_publish"].includes(gate.id)) {
+      evidence.snapshotSetIdentity = snapshotSetIdentity;
+      const requiredChecks = {
+        source_admission: ["schemaValidated", "licenseApproved", "redistributionApproved", "credentialRedacted", "snapshotLocked"],
+        source_governance: ["inventoryComplete", "freshnessCurrent", "retentionPolicyCurrent", "rawPurgeAccounted", "credentialsRedacted"],
+        freshness_conditional_publish: ["freshnessValidated", "materialChangeClassified", "approvalPolicyApplied", "monotonicSequenceVerified", "noChangeHandled"],
+      };
+      evidence.result = {
+        schemaVersion: 1, snapshotSetIdentity,
+        checks: Object.fromEntries(requiredChecks[gate.id].map((check) => [check, true])),
+        evidenceReferences: [evidenceReference(`${gate.id}-report`, "3")],
+      };
+    }
+    if (gate.id === "source_governance") {
+      evidence.sourceInventory = {
+        inventoryAsOf: now, entries: [...sourceInventoryEntries].reverse(),
+        statusCounts: { APPROVED: requiredSourceIds.length, REVIEW_REQUIRED: 0, BLOCKED: 0, EXPIRED: 0 },
+      };
+    }
+    if (["rollback_rescue", "device_performance", "callback_reconciliation"].includes(gate.id)) {
+      evidence.result = datapackGateResult(gate.id);
+    }
+    await writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
+    args.push("--datapack-gate-status", `${gate.id}=SATISFIED`);
+    args.push("--datapack-gate-evidence", `${gate.id}=${evidencePath}`);
+  }
+
+  const identityLinkagePath = path.join(tempDir, "identity-linkage.json");
+  const sharedIdentity = {
+    canonicalStationVersion: "station-v3", corridorId: "capital", serviceId: "SUBWAY", lineageId: "lineage-2026-07-16", schemaVersion: 3,
+  };
+  await writeFile(identityLinkagePath, `${JSON.stringify({
+    schemaVersion: 1, status: "SATISFIED", reasonCodes: [], rcIdentity: evidenceRcIdentity,
+    evidenceValidity: { evaluatedAt: now, expiresAt: "2026-07-30T00:00:00.000Z" },
+    sourceTimetableArtifact: { artifactId: "source-timetable-v1", sha256: "1".repeat(64), freshUntil: "2026-07-30T00:00:00.000Z", identity: sharedIdentity },
+    serverTimetableSnapshot: { artifactId: "server-timetable-v1", sha256: "2".repeat(64), freshUntil: "2026-07-30T00:00:00.000Z", identity: sharedIdentity },
+    mobileTopologyPack: { artifactId: "mobile-topology-v1", sha256: evidenceRcIdentity.dataPackArtifactSha256, freshUntil: "2026-07-30T00:00:00.000Z", identity: sharedIdentity },
+  }, null, 2)}\n`);
+  args.push("--identity-linkage-evidence", identityLinkagePath);
+
+  const firstOutput = path.join(tempDir, "first.json"), secondOutput = path.join(tempDir, "second.json");
+  const reevaluatedOutput = path.join(tempDir, "reevaluated.json"), otherDeviceOutput = path.join(tempDir, "other-device.json");
+  const rejectsCurrent = (expected) => assert.rejects(
+    execFileAsync(process.execPath, [...args, "--output", firstOutput], generatorOptions), expected,
+  );
+  const releaseDecision = JSON.parse(readFileSync(dataPackReleaseDecisionPath, "utf8"));
+  releaseDecision.selectedManifestSha256 = "f".repeat(64);
+  await writeFile(dataPackReleaseDecisionPath, JSON.stringify(releaseDecision));
+  const bindingFlagIndex = args.indexOf("--require-production-data-pack-binding");
+  const argsWithoutBindingFlag = args.filter((_, index) => (
+    index !== bindingFlagIndex && index !== bindingFlagIndex + 1
+  ));
+  await assert.rejects(
+    execFileAsync(process.execPath, [...argsWithoutBindingFlag, "--output", firstOutput], generatorOptions),
+    /production data pack manifest does not match the finalized release decision/,
+  );
+  await writeBoundProductionManifest(productionManifest);
+  await execFileAsync(process.execPath, [...args, "--output", firstOutput], generatorOptions);
+  await execFileAsync(process.execPath, [...args, "--output", secondOutput], generatorOptions);
+  const reevaluatedArgs = [...args];
+  reevaluatedArgs[reevaluatedArgs.indexOf("--now") + 1] = "2026-07-17T00:00:00.000Z";
+  await execFileAsync(process.execPath, [...reevaluatedArgs, "--output", reevaluatedOutput], generatorOptions);
+  const otherDeviceArgs = [...args];
+  otherDeviceArgs[otherDeviceArgs.indexOf("--device") + 1] = "qa-device-b";
+  await execFileAsync(process.execPath, [...otherDeviceArgs, "--output", otherDeviceOutput], generatorOptions);
+
+  const firstBytes = readFileSync(firstOutput, "utf8");
+  assert.equal(readFileSync(secondOutput, "utf8"), firstBytes);
+  const manifest = JSON.parse(firstBytes);
+  const reevaluatedManifest = JSON.parse(readFileSync(reevaluatedOutput, "utf8"));
+  const otherDeviceManifest = JSON.parse(readFileSync(otherDeviceOutput, "utf8"));
+  assert.equal(manifest.producerVersion, 2);
+  assert.equal(manifest.phase, "FINAL");
+  assert.equal(manifest.evaluatedAt, now);
+  assert.deepEqual(manifest.releaseCandidateIdentity, candidateManifest.releaseCandidateIdentity);
+  assert.match(manifest.summaryArtifactDigest, /^[a-f0-9]{64}$/);
+  assert.equal(reevaluatedManifest.summaryArtifactDigest, manifest.summaryArtifactDigest);
+  assert.notEqual(otherDeviceManifest.summaryArtifactDigest, manifest.summaryArtifactDigest);
+  assert.deepEqual(manifest.consumerIssues, [1020]);
+  assert.deepEqual(manifest.activeBlockerIssues, []);
+  assert.deepEqual(manifest.sourceInventory, {
+    inventoryAsOf: now, generatedAt: now, producerVersion: 2,
+    statusCounts: { APPROVED: requiredSourceIds.length, REVIEW_REQUIRED: 0, BLOCKED: 0, EXPIRED: 0 },
+    entries: [...sourceInventoryEntries].sort((left, right) => left.sourceId.localeCompare(right.sourceId)),
+    snapshotSetIdentity,
+  });
+  assert.equal(manifest.identityLinkage.status, "SATISFIED");
+  assert.deepEqual(manifest.identityLinkage.sharedIdentity, sharedIdentity);
+  for (const artifact of ["sourceTimetableArtifact", "serverTimetableSnapshot", "mobileTopologyPack"]) {
+    assert.deepEqual(manifest.identityLinkage[artifact].identity, sharedIdentity);
+  }
+  assert.deepEqual(manifest.closureEvidence.releaseCandidateIdentity, manifest.releaseCandidateIdentity);
+  assert.equal(manifest.closureEvidence.summaryArtifactDigest, manifest.summaryArtifactDigest);
+  assert.equal(manifest.closureEvidence.producerCommand, "node tools/release/generate-rc-evidence-manifest.mjs");
+  assert.deepEqual(
+    manifest.datapackGates.map(({ id, sourceIssue, status }) => ({ id, sourceIssue, status })),
+    requiredDatapackGates.map(({ id, sourceIssue }) => ({ id, sourceIssue, status: "SATISFIED" })),
+  );
+  assert.ok(manifest.datapackGates.every(({ rcIdentity }) => rcIdentity.gitSha === gitSha));
+  assert.equal(manifest.readiness.blockers.some(({ id }) => id.startsWith("datapack_gate_")), false);
+  assert.equal(manifest.readiness.status, "GO");
+  assert.equal(manifest.readiness.blockers.length, 0);
+
+  const abuseSummary = JSON.parse(readFileSync(abuseSummaryPath, "utf8"));
+  abuseSummary.artifactIdentity.gitSha = "f".repeat(40);
+  await writeFile(abuseSummaryPath, JSON.stringify(abuseSummary));
+  const abuseEvidence = JSON.parse(readFileSync(abuseEvidencePath, "utf8"));
+  abuseEvidence.canonicalSummarySha256 = createHash("sha256").update(readFileSync(abuseSummaryPath)).digest("hex");
+  await writeFile(abuseEvidencePath, JSON.stringify(abuseEvidence));
+  await rejectsCurrent(/abuse_penetration_rehearsal canonical summary RC identity mismatch/);
+  abuseSummary.artifactIdentity.gitSha = evidenceRcIdentity.gitSha;
+  await writeFile(abuseSummaryPath, JSON.stringify(abuseSummary));
+  abuseEvidence.canonicalSummarySha256 = createHash("sha256").update(readFileSync(abuseSummaryPath)).digest("hex");
+  await writeFile(abuseEvidencePath, JSON.stringify(abuseEvidence));
+
+  const rollbackEvidence = JSON.parse(readFileSync(gateEvidencePaths.rollback_rescue, "utf8"));
+  delete rollbackEvidence.result;
+  await writeFile(gateEvidencePaths.rollback_rescue, JSON.stringify(rollbackEvidence)); await rejectsCurrent(/rollback_rescue requires result schemaVersion 1/);
+  rollbackEvidence.result = datapackGateResult("rollback_rescue");
+  rollbackEvidence.result.rescueReleaseSequence += 1;
+  await writeFile(gateEvidencePaths.rollback_rescue, JSON.stringify(rollbackEvidence)); await rejectsCurrent(/rollback_rescue result does not match the RC identity/);
+  rollbackEvidence.result = datapackGateResult("rollback_rescue");
+  rollbackEvidence.result.knownGoodPackSha256 = "4".repeat(64);
+  await writeFile(gateEvidencePaths.rollback_rescue, JSON.stringify(rollbackEvidence)); await rejectsCurrent(/rollback_rescue knownGoodPackSha256 does not match the RC identity/);
+  rollbackEvidence.result = datapackGateResult("rollback_rescue");
+  rollbackEvidence.result.failedPackSha256 = rollbackEvidence.result.knownGoodPackSha256;
+  await writeFile(gateEvidencePaths.rollback_rescue, JSON.stringify(rollbackEvidence)); await rejectsCurrent(/rollback_rescue failedPackSha256 must differ/);
+  rollbackEvidence.result = datapackGateResult("rollback_rescue");
+  rollbackEvidence.result.currentReleaseSequence -= 1;
+  await writeFile(gateEvidencePaths.rollback_rescue, JSON.stringify(rollbackEvidence)); await rejectsCurrent(/rollback_rescue currentReleaseSequence must equal failedReleaseSequence/);
+  rollbackEvidence.result = datapackGateResult("rollback_rescue");
+  await writeFile(gateEvidencePaths.rollback_rescue, JSON.stringify(rollbackEvidence));
+
+  const sourceAdmissionEvidence = JSON.parse(readFileSync(gateEvidencePaths.source_admission, "utf8"));
+  const sourceAdmissionResult = sourceAdmissionEvidence.result;
+  delete sourceAdmissionEvidence.result;
+  await writeFile(gateEvidencePaths.source_admission, JSON.stringify(sourceAdmissionEvidence)); await rejectsCurrent(/source_admission requires result schemaVersion 1/);
+  sourceAdmissionEvidence.result = sourceAdmissionResult;
+  await writeFile(gateEvidencePaths.source_admission, JSON.stringify(sourceAdmissionEvidence));
+
+  for (const gateId of ["source_admission", "source_governance", "freshness_conditional_publish"]) {
+    const evidence = JSON.parse(readFileSync(gateEvidencePaths[gateId], "utf8"));
+    evidence.snapshotSetIdentity = "b".repeat(64);
+    evidence.result.snapshotSetIdentity = "b".repeat(64);
+    await writeFile(gateEvidencePaths[gateId], JSON.stringify(evidence));
+  }
+  await rejectsCurrent(/source datapack gate snapshotSetIdentity does not match RC sourceSnapshotSetHash/);
+  for (const gateId of ["source_admission", "source_governance", "freshness_conditional_publish"]) {
+    const evidence = JSON.parse(readFileSync(gateEvidencePaths[gateId], "utf8"));
+    evidence.snapshotSetIdentity = snapshotSetIdentity;
+    evidence.result.snapshotSetIdentity = snapshotSetIdentity;
+    await writeFile(gateEvidencePaths[gateId], JSON.stringify(evidence));
+  }
+
+  const devicePerformanceEvidence = JSON.parse(readFileSync(gateEvidencePaths.device_performance, "utf8"));
+  devicePerformanceEvidence.result.artifact.sha256 = "f".repeat(64);
+  await writeFile(gateEvidencePaths.device_performance, JSON.stringify(devicePerformanceEvidence)); await rejectsCurrent(/device_performance artifact.sha256 does not match the RC identity/);
+  devicePerformanceEvidence.result = datapackGateResult("device_performance");
+  devicePerformanceEvidence.result.artifact.compressedBytes -= 1;
+  await writeFile(gateEvidencePaths.device_performance, JSON.stringify(devicePerformanceEvidence)); await rejectsCurrent(/device_performance compressedBytes does not match the supplied data pack artifact/);
+  devicePerformanceEvidence.result = datapackGateResult("device_performance");
+  devicePerformanceEvidence.result.artifact.uncompressedBytes += 1;
+  devicePerformanceEvidence.result.metrics.temporaryStorageLimitBytes += 2;
+  await writeFile(gateEvidencePaths.device_performance, JSON.stringify(devicePerformanceEvidence)); await rejectsCurrent(/device_performance uncompressedBytes does not match the supplied data pack artifact/);
+  devicePerformanceEvidence.result = datapackGateResult("device_performance");
+  devicePerformanceEvidence.result.metrics.coldLoadP95Ms = devicePerformanceEvidence.result.metrics.coldLoadP50Ms - 1;
+  await writeFile(gateEvidencePaths.device_performance, JSON.stringify(devicePerformanceEvidence)); await rejectsCurrent(/requires P95 metrics to be greater than or equal to P50 metrics/);
+  devicePerformanceEvidence.result = datapackGateResult("device_performance");
+  await writeFile(gateEvidencePaths.device_performance, JSON.stringify(devicePerformanceEvidence));
+
+  const callbackEvidence = JSON.parse(readFileSync(gateEvidencePaths.callback_reconciliation, "utf8"));
+  callbackEvidence.result.deliveryIdentity.releaseSequence = 103;
+  await writeFile(gateEvidencePaths.callback_reconciliation, JSON.stringify(callbackEvidence)); await rejectsCurrent(/callback_reconciliation releaseSequence does not match the RC identity/);
+  callbackEvidence.result = datapackGateResult("callback_reconciliation");
+  callbackEvidence.result.deliveryIdentity.idempotencyKeySha256 = "8".repeat(64);
+  await writeFile(gateEvidencePaths.callback_reconciliation, JSON.stringify(callbackEvidence)); await rejectsCurrent(/callback_reconciliation idempotencyKeySha256 does not match the delivery identity/);
+  callbackEvidence.result = datapackGateResult("callback_reconciliation");
+  await writeFile(gateEvidencePaths.callback_reconciliation, JSON.stringify(callbackEvidence));
+
+  const linkageEvidence = JSON.parse(readFileSync(identityLinkagePath, "utf8"));
+  linkageEvidence.mobileTopologyPack.identity.apiKey = "must-not-be-published";
+  await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence)); await rejectsCurrent(/identity linkage has unsafe or non-scalar mobileTopologyPack.identity/);
+  delete linkageEvidence.mobileTopologyPack.identity.apiKey;
+  await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence));
+  linkageEvidence.mobileTopologyPack.identity.corridorId = "different-corridor";
+  await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence)); await rejectsCurrent(/identity linkage shared field mismatch: corridorId/);
+  linkageEvidence.mobileTopologyPack.identity.corridorId = "capital";
+  await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence));
+
+  linkageEvidence.mobileTopologyPack.sha256 = "f".repeat(64);
+  await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence)); await rejectsCurrent(/mobileTopologyPack sha256 does not match the RC data pack artifact/);
+  linkageEvidence.mobileTopologyPack.sha256 = evidenceRcIdentity.dataPackArtifactSha256;
+  await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence));
+
+  for (const artifact of ["sourceTimetableArtifact", "serverTimetableSnapshot", "mobileTopologyPack"]) {
+    linkageEvidence[artifact].identity.schemaVersion = "3";
+  }
+  await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence)); await rejectsCurrent(/missing or invalid shared field: schemaVersion/);
+  for (const artifact of ["sourceTimetableArtifact", "serverTimetableSnapshot", "mobileTopologyPack"]) {
+    linkageEvidence[artifact].identity.schemaVersion = 3;
+  }
+  await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence));
+
+  linkageEvidence.mobileTopologyPack.freshUntil = "2026-07-20T00:00:00.000Z";
+  await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence)); await rejectsCurrent(/identity linkage freshness does not cover evidence expiry: mobileTopologyPack/);
+  linkageEvidence.mobileTopologyPack.freshUntil = "2026-07-30T00:00:00.000Z";
+  await writeFile(identityLinkagePath, JSON.stringify(linkageEvidence));
+
+  const admissionEvidence = JSON.parse(readFileSync(gateEvidencePaths.source_admission, "utf8"));
+  admissionEvidence.snapshotSetIdentity = "b".repeat(64);
+  admissionEvidence.result.snapshotSetIdentity = admissionEvidence.snapshotSetIdentity;
+  await writeFile(gateEvidencePaths.source_admission, JSON.stringify(admissionEvidence)); await rejectsCurrent(/snapshotSetIdentity does not match RC sourceSnapshotSetHash/);
+  admissionEvidence.snapshotSetIdentity = snapshotSetIdentity;
+  admissionEvidence.result.snapshotSetIdentity = snapshotSetIdentity;
+  await writeFile(gateEvidencePaths.source_admission, JSON.stringify(admissionEvidence));
+
+  const governanceEvidence = JSON.parse(readFileSync(gateEvidencePaths.source_governance, "utf8"));
+  const omittedRequiredSource = governanceEvidence.sourceInventory.entries.pop();
+  governanceEvidence.sourceInventory.statusCounts.APPROVED -= 1;
+  await writeFile(gateEvidencePaths.source_governance, JSON.stringify(governanceEvidence)); await rejectsCurrent(/include every required production source/);
+  governanceEvidence.sourceInventory.entries.push(omittedRequiredSource);
+  governanceEvidence.sourceInventory.statusCounts.APPROVED += 1;
+  governanceEvidence.sourceInventory.inventoryAsOf = "2026-07-15T23:59:59.999Z";
+  await writeFile(gateEvidencePaths.source_governance, JSON.stringify(governanceEvidence)); await rejectsCurrent(/sourceInventory.inventoryAsOf must cover child evidence/);
+  governanceEvidence.sourceInventory.inventoryAsOf = "2026-07-17T00:00:00.000Z";
+  await writeFile(gateEvidencePaths.source_governance, JSON.stringify(governanceEvidence)); await rejectsCurrent(/requires sourceInventory.inventoryAsOf/);
+  governanceEvidence.sourceInventory.inventoryAsOf = now;
+  governanceEvidence.sourceInventory.entries[0].expiresAt = "2026-07-29T23:59:59.999Z";
+  await writeFile(gateEvidencePaths.source_governance, JSON.stringify(governanceEvidence)); await rejectsCurrent(/invalid, duplicate, stale, or contradictory sourceInventory.entries/);
+  governanceEvidence.sourceInventory.entries[0].expiresAt = "2026-07-30T00:00:00.000Z";
+  governanceEvidence.sourceInventory.statusCounts.APPROVED = requiredSourceIds.length - 1;
+  await writeFile(gateEvidencePaths.source_governance, JSON.stringify(governanceEvidence)); await rejectsCurrent(/statusCounts must match current sourceInventory.entries/);
+});
+
+test("datapack readiness producer는 unknown·mixed identity·expired evidence를 거부한다", async () => {
+  const tempDir = await mkdtemp(path.join(tmpdir(), "easysubway-datapack-readiness-negative-"));
+  const outputPath = path.join(tempDir, "manifest.json");
+  const evidencePath = path.join(tempDir, "source-governance.json");
+  const gitSha = currentGitSha;
+  const now = "2026-07-16T00:00:00.000Z";
+  const requiredSourceIds = readJson(
+    "apps/mobile/release/production-datapack-scope.json",
+  ).productionSourceSet.requiredSourceIds;
+  const baseArgs = [
+    "tools/release/generate-rc-evidence-manifest.mjs",
+    "--repo-root", ".", "--app-root", "apps/mobile", "--git-sha", gitSha,
+    "--now", now, "--output", outputPath,
+  ];
+  const runFinalGenerator = async (generatorArgs, options = { cwd: root }) => {
+    const outputIndex = generatorArgs.indexOf("--output");
+    assert.notEqual(outputIndex, -1, "generator test invocation requires --output");
+    const finalOutput = generatorArgs[outputIndex + 1];
+    const withoutOutput = generatorArgs.filter((_, index) => index !== outputIndex && index !== outputIndex + 1);
+    const candidateOutput = `${finalOutput}.candidate-context.json`;
+    await execFileAsync(process.execPath, [
+      ...withoutOutput, "--phase", "CANDIDATE", "--output", candidateOutput,
+    ], options);
+    return execFileAsync(process.execPath, [
+      ...withoutOutput, "--phase", "FINAL", "--candidate-context", candidateOutput, "--output", finalOutput,
+    ], options);
+  };
+  const rejects = (extraArgs, expected) => assert.rejects(
+    runFinalGenerator([...baseArgs, ...extraArgs]), expected,
+  );
+  const contractArgs = async (name, mutate) => {
+    const app = path.join(tempDir, name);
+    await mkdir(path.join(app, "release"), { recursive: true });
+    await writeFile(path.join(app, "pubspec.yaml"), read("apps/mobile/pubspec.yaml"));
+    const contract = readJson("apps/mobile/release/rc-evidence-manifest-contract.json");
+    mutate(contract);
+    await writeFile(path.join(app, "release/rc-evidence-manifest-contract.json"), JSON.stringify(contract));
+    const result = [...baseArgs];
+    result[result.indexOf("--app-root") + 1] = app;
+    return [...result, "--data-pack-manifest", path.join(root, "apps/mobile/assets/datapacks/metro_map_pack/manifest.json")];
+  };
+
+  await runFinalGenerator(baseArgs);
+  const blockedManifest = JSON.parse(readFileSync(outputPath, "utf8"));
+  assert.ok(blockedManifest.datapackGates.every(({ status }) => status === "BLOCKED_EXTERNAL"));
+  assert.equal(blockedManifest.identityLinkage.status, "BLOCKED_EXTERNAL");
+  assert.equal(blockedManifest.sourceInventory, null);
+  assert.equal(
+    blockedManifest.readiness.blockers.filter(({ id }) => id.startsWith("datapack_gate_")).length,
+    6,
+  );
+  assert.ok(blockedManifest.readiness.blockers.some(({ id }) => id === "pending_production_equivalent_rehearsal"));
+  assert.ok(blockedManifest.readiness.blockers.some(({ id }) => id === "pending_production_artifact_android_integration"));
+
+  const finalFragmentPath = path.join(tempDir, "production-equivalent-rehearsal.json");
+  const finalFragment = {
+    schemaVersion: 1, evidenceId: "production_equivalent_rehearsal", sourceIssue: 2058,
+    status: "SATISFIED", reasonCodes: [],
+    rcIdentity: blockedManifest.releaseCandidateIdentity,
+    evidenceValidity: { testedAt: now, expiresWhen: "2026-07-30T00:00:00.000Z" },
+    result: {
+      schemaVersion: 1,
+      checks: Object.fromEntries([
+        "currentBaselineCaptured", "appFirstCompatibilityPassed", "governanceNegativeNoProductionMutation",
+        "restrictedCohortPassed", "monotonicRescueRollbackPassed", "finalTestCohortPassed",
+      ].map((check) => [check, true])),
+      evidenceReferences: [{ artifactId: "release-rehearsal-report", sha256: "3".repeat(64) }],
+    },
+  };
+  await writeFile(finalFragmentPath, JSON.stringify({
+    ...finalFragment,
+    rcIdentity: { ...finalFragment.rcIdentity, gitSha: "f".repeat(40) },
+  }));
+  await rejects(["--evidence-status", "production_equivalent_rehearsal=SATISFIED",
+    "--evidence-path", `production_equivalent_rehearsal=${finalFragmentPath}`], /failed canonical envelope validation/);
+  await writeFile(finalFragmentPath, JSON.stringify({
+    ...finalFragment,
+    evidenceValidity: { testedAt: now, expiresWhen: "2026-07-15T23:59:59.999Z" },
+  }));
+  await rejects(["--evidence-status", "production_equivalent_rehearsal=SATISFIED",
+    "--evidence-path", `production_equivalent_rehearsal=${finalFragmentPath}`], /expired evidenceValidity/);
+  await rejects(["--gate-status", "scopeCoverage=SATISFIED"], /requires existing --gate-evidence: scopeCoverage/);
+  await rejects(["--gate-status", "scopeCoverage=DEFERRED_OUT_OF_SCOPE"], /Invalid gate status for scopeCoverage/);
+  const genericGateEvidencePath = path.join(tempDir, "scope-coverage.json");
+  await writeFile(genericGateEvidencePath, JSON.stringify({
+    schemaVersion: 1, gateId: "scopeCoverage", status: "SATISFIED",
+    reasonCodes: [], rcIdentity: blockedManifest.rcIdentity,
+    evidenceValidity: { evaluatedAt: now, expiresAt: "2026-07-30T00:00:00.000Z" },
+    result: {
+      schemaVersion: 1, checks: { coverageDenominatorPassed: true, unsupportedScopeBlocked: true },
+      evidenceReferences: [{ artifactId: "scope-coverage-report", sha256: "2".repeat(64) }],
+    },
+  }));
+  await runFinalGenerator([
+    ...baseArgs,
+    "--gate-status", "scopeCoverage=SATISFIED",
+    "--gate-evidence", `scopeCoverage=${genericGateEvidencePath}`,
+  ], { cwd: root });
+  const gateEvidenceManifest = JSON.parse(readFileSync(outputPath, "utf8"));
+  assert.match(
+    gateEvidenceManifest.gateEntries.find(({ id }) => id === "scopeCoverage").evidenceSha256,
+    /^[a-f0-9]{64}$/,
+  );
+  const p0OutputPath = path.join(tempDir, "p0-manifest.json");
+  const p0Args = [...baseArgs];
+  p0Args[p0Args.indexOf("--output") + 1] = p0OutputPath;
+  await runFinalGenerator([...p0Args, "--open-android-p0-count", "1"]);
+  const p0Manifest = JSON.parse(readFileSync(p0OutputPath, "utf8"));
+  assert.deepEqual(p0Manifest.releaseCandidateIdentity, blockedManifest.releaseCandidateIdentity);
+  assert.notEqual(p0Manifest.summaryArtifactDigest, blockedManifest.summaryArtifactDigest);
+
+  const evidenceStatusOutputPath = path.join(tempDir, "evidence-status-manifest.json");
+  const evidenceStatusArgs = [...baseArgs];
+  evidenceStatusArgs[evidenceStatusArgs.indexOf("--output") + 1] = evidenceStatusOutputPath;
+  await runFinalGenerator([
+    ...evidenceStatusArgs,
+    "--evidence-status", "rc_device_qa=BLOCKED_EXTERNAL",
+  ], { cwd: root });
+  const evidenceStatusManifest = JSON.parse(readFileSync(evidenceStatusOutputPath, "utf8"));
+  assert.deepEqual(evidenceStatusManifest.releaseCandidateIdentity, blockedManifest.releaseCandidateIdentity);
+  assert.notEqual(evidenceStatusManifest.summaryArtifactDigest, blockedManifest.summaryArtifactDigest);
+
+  await rejects(["--datapack-gate-status", "unknown_gate=BLOCKED_EXTERNAL"], /Unknown datapack gate/);
+  await rejects(["--datapack-gate-status", "source_governance=BLOCKED_EXTERNAL",
+    "--datapack-gate-status", "source_governance=BLOCKED_EXTERNAL"], /Duplicate key=value pair: source_governance/);
+
+  const writeEvidence = async ({
+    schemaVersion = 1,
+    evidenceGitSha = gitSha,
+    dataPackManifestSha256 = blockedManifest.rcIdentity.dataPackManifestSha256,
+    expiresAt = "2026-07-30T00:00:00.000Z",
+    reasonCodes = [],
+  } = {}) => {
+    await writeFile(evidencePath, JSON.stringify({
+      schemaVersion, gateId: "source_governance", sourceIssue: 2133, status: "SATISFIED", reasonCodes,
+      rcIdentity: { ...blockedManifest.rcIdentity, gitSha: evidenceGitSha, dataPackManifestSha256 },
+      evidenceValidity: { evaluatedAt: now, expiresAt },
+      snapshotSetIdentity: "a".repeat(64),
+      sourceInventory: {
+        inventoryAsOf: now,
+        statusCounts: { APPROVED: requiredSourceIds.length, REVIEW_REQUIRED: 0, BLOCKED: 0, EXPIRED: 0 },
+        entries: requiredSourceIds.map((sourceId) => ({
+          sourceId, status: "APPROVED", producerVersion: 1, evidenceSha256: "9".repeat(64), evaluatedAt: now,
+          expiresAt: "2026-07-30T00:00:00.000Z",
+        })),
+      },
+    }));
+  };
+
+  await writeEvidence({ evidenceGitSha: "f".repeat(40) });
+  await rejects(["--datapack-gate-status", "source_governance=SATISFIED",
+    "--datapack-gate-evidence", `source_governance=${evidencePath}`], /RC identity mismatch/);
+
+  await writeEvidence({ dataPackManifestSha256: "f".repeat(64) });
+  await rejects(["--datapack-gate-status", "source_governance=SATISFIED",
+    "--datapack-gate-evidence", `source_governance=${evidencePath}`], /RC identity mismatch/);
+
+  await writeEvidence({ schemaVersion: 2 });
+  await rejects(["--datapack-gate-status", "source_governance=SATISFIED",
+    "--datapack-gate-evidence", `source_governance=${evidencePath}`], /unsupported schemaVersion/);
+
+  await writeEvidence({ expiresAt: "2026-07-15T23:59:59.999Z" });
+  await rejects(["--datapack-gate-status", "source_governance=SATISFIED",
+    "--datapack-gate-evidence", `source_governance=${evidencePath}`], /expired evidenceValidity/);
+
+  await writeEvidence({ reasonCodes: ["SOURCE_LINEAGE_BROKEN"] });
+  await rejects(["--datapack-gate-status", "source_governance=SATISFIED",
+    "--datapack-gate-evidence", `source_governance=${evidencePath}`], /reasonCodes must be empty/);
+
+  await rejects(
+    ["--datapack-gate-status", "source_governance=SATISFIED"],
+    /requires existing --datapack-gate-evidence/,
+  );
+
+  const duplicateContractArgs = await contractArgs("duplicate-contract-app", (contract) => {
+    contract.requiredDatapackGates.push(contract.requiredDatapackGates[0]);
+  });
+  await assert.rejects(
+    runFinalGenerator(duplicateContractArgs),
+    /Duplicate datapack gate in contract: source_admission/,
+  );
+
+  const missingFinalFragmentArgs = await contractArgs("missing-final-fragment-app", (contract) => {
+    contract.requiredEvidenceEntries = contract.requiredEvidenceEntries.filter(
+    ({ sourceIssue }) => sourceIssue !== 2058,
+    );
+  });
+  await assert.rejects(
+    runFinalGenerator(missingFinalFragmentArgs),
+    /requiredFinalFragmentIssues must exactly match required evidence entries/,
+  );
+
+  await assert.rejects(
+    runFinalGenerator([
+      ...baseArgs.slice(0, baseArgs.indexOf("--git-sha") + 1),
+      "0".repeat(40),
+      ...baseArgs.slice(baseArgs.indexOf("--git-sha") + 2),
+    ], { cwd: root }),
+    /must match the current checkout HEAD/,
+  );
+
+  await assert.rejects(
+    runFinalGenerator([...baseArgs, "--verify-github-sha", "true"], {
+      cwd: root,
+      env: { ...process.env, GITHUB_SHA: "f".repeat(40) },
+    }),
+    /GITHUB_SHA does not match --git-sha/,
+  );
+
+  const closedBlockerArgs = await contractArgs("closed-blocker-app", (contract) => {
+    contract.activeBlockerIssues = [2133];
+  });
+  await runFinalGenerator([
+    ...closedBlockerArgs,
+    "--issue-state", "2133=OPEN",
+  ], { cwd: root });
+  const openBlockerManifest = JSON.parse(readFileSync(outputPath, "utf8"));
+  assert.ok(openBlockerManifest.readiness.blockers.some(({ id }) => id === "active_blocker_issue_2133"));
+  await assert.rejects(
+    runFinalGenerator([
+      ...closedBlockerArgs,
+      "--issue-state", "2133=CLOSED",
+    ], { cwd: root }),
+    /Closed issue is still referenced as an active blocker: 2133/,
+  );
+});
+
+test("RC evidence manifest workflow는 datapack required gate를 fail closed로 연결한다", () => {
+  const workflow = read(".github/workflows/release-artifacts.yml");
+  assert.ok(workflow.includes('--git-sha "${GITHUB_SHA}"'));
+  assert.ok(workflow.includes("--verify-github-sha true"));
+  assert.ok(
+    workflow.includes("--gate-evidence postLaunchOperations=release-artifacts/rc/operations-phase-a-summary.json"),
+  );
+  for (const gate of [
+    "scopeCoverage",
+    "strictArtifactValidation",
+    "routeAccessibilityQuality",
+    "appSchemaCompatibility",
+    "stagedRollout",
+    "publicClaims",
+  ]) {
+    assert.ok(
+      workflow.includes(`--gate-status ${gate}=BLOCKED_EXTERNAL`),
+      `${gate} must be wired into the RC manifest producer`,
+    );
+  }
+  for (const gate of [
+    "source_admission",
+    "source_governance",
+    "freshness_conditional_publish",
+    "rollback_rescue",
+    "device_performance",
+    "callback_reconciliation",
+  ]) {
+    assert.ok(
+      workflow.includes(`--datapack-gate-status ${gate}=BLOCKED_EXTERNAL`),
+      `${gate} must be wired into the RC manifest producer`,
+    );
+  }
 });
 
 test("Android 16 KB page-size gate는 AAB alignment와 16384 runtime smoke 계약을 고정한다", () => {
@@ -4458,6 +6583,14 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
   assert.match(workflow, /--dart-define=EASYSUBWAY_SECURITY_EMAIL="\$\{EASYSUBWAY_SECURITY_EMAIL\}"/);
 
   assert.equal(privacyInventory.privacyPolicyUrlSource, "EASYSUBWAY_PRIVACY_POLICY_URL dart-define");
+  assert.equal(
+    privacyInventory.legalDocumentUrlSources.termsOfService,
+    "EASYSUBWAY_TERMS_OF_SERVICE_URL dart-define",
+  );
+  assert.equal(
+    privacyInventory.legalDocumentUrlSources.locationTerms,
+    "EASYSUBWAY_LOCATION_TERMS_URL dart-define",
+  );
   assert.equal(privacyInventory.userDataDeletionSupported, true);
   assert.equal(privacyInventory.encryptionInTransitRequired, true);
   assert.equal(privacyInventory.tracking, false);
@@ -4498,7 +6631,9 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
   const dir = await mkdtemp(path.join(tmpdir(), "easysubway-store-privacy-env-"));
   const validEnv = path.join(dir, "valid.env");
   await writeFile(validEnv, [
+    "EASYSUBWAY_TERMS_OF_SERVICE_URL=https://easysubway-api.aquilaxk.site/easysubway/terms",
     "EASYSUBWAY_PRIVACY_POLICY_URL=https://easysubway-api.aquilaxk.site/easysubway/privacy",
+    "EASYSUBWAY_LOCATION_TERMS_URL=https://easysubway-api.aquilaxk.site/easysubway/location-terms",
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
@@ -4514,6 +6649,8 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
   );
   const githubEnvOutput = readFileSync(githubEnv, "utf8");
   assert.match(githubEnvOutput, /^EASYSUBWAY_PRIVACY_POLICY_URL=https:\/\/easysubway-api\.aquilaxk\.site\/easysubway\/privacy$/m);
+  assert.match(githubEnvOutput, /^EASYSUBWAY_TERMS_OF_SERVICE_URL=https:\/\/easysubway-api\.aquilaxk\.site\/easysubway\/terms$/m);
+  assert.match(githubEnvOutput, /^EASYSUBWAY_LOCATION_TERMS_URL=https:\/\/easysubway-api\.aquilaxk\.site\/easysubway\/location-terms$/m);
   assert.match(githubEnvOutput, /^EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk\.site$/m);
   assert.match(githubEnvOutput, /^EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk\.site$/m);
   assert.match(githubEnvOutput, /^EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk\.site$/m);
@@ -4524,7 +6661,9 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
 
   const rcEnv = path.join(dir, "android-rc.env");
   await writeFile(rcEnv, [
+    "EASYSUBWAY_TERMS_OF_SERVICE_URL=https://easysubway-api.aquilaxk.site/easysubway/terms",
     "EASYSUBWAY_PRIVACY_POLICY_URL=https://easysubway-api.aquilaxk.site/easysubway/privacy",
+    "EASYSUBWAY_LOCATION_TERMS_URL=https://easysubway-api.aquilaxk.site/easysubway/location-terms",
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
@@ -4564,7 +6703,9 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
 
   const invalidEnv = path.join(dir, "invalid.env");
   await writeFile(invalidEnv, [
+    "EASYSUBWAY_TERMS_OF_SERVICE_URL=https://easysubway.local/terms",
     "EASYSUBWAY_PRIVACY_POLICY_URL=https://easysubway.local/privacy",
+    "EASYSUBWAY_LOCATION_TERMS_URL=https://easysubway.local/location-terms",
     "EASYSUBWAY_SUPPORT_EMAIL=support@easysubway.local",
     "EASYSUBWAY_SECURITY_EMAIL=security@easysubway.local",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@easysubway.local",
@@ -4579,7 +6720,9 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
 
   const invalidRcEnv = path.join(dir, "invalid-android-rc.env");
   await writeFile(invalidRcEnv, [
+    "EASYSUBWAY_TERMS_OF_SERVICE_URL=https://easysubway-api.aquilaxk.site/easysubway/terms",
     "EASYSUBWAY_PRIVACY_POLICY_URL=https://easysubway-api.aquilaxk.site/easysubway/privacy",
+    "EASYSUBWAY_LOCATION_TERMS_URL=https://easysubway-api.aquilaxk.site/easysubway/location-terms",
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
@@ -4606,7 +6749,9 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
 
   const invalidRcKeyEnv = path.join(dir, "invalid-android-rc-key.env");
   await writeFile(invalidRcKeyEnv, [
+    "EASYSUBWAY_TERMS_OF_SERVICE_URL=https://easysubway-api.aquilaxk.site/easysubway/terms",
     "EASYSUBWAY_PRIVACY_POLICY_URL=https://easysubway-api.aquilaxk.site/easysubway/privacy",
+    "EASYSUBWAY_LOCATION_TERMS_URL=https://easysubway-api.aquilaxk.site/easysubway/location-terms",
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
@@ -4633,7 +6778,9 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
 
   const invalidRcFingerprintEnv = path.join(dir, "invalid-android-rc-fingerprint.env");
   await writeFile(invalidRcFingerprintEnv, [
+    "EASYSUBWAY_TERMS_OF_SERVICE_URL=https://easysubway-api.aquilaxk.site/easysubway/terms",
     "EASYSUBWAY_PRIVACY_POLICY_URL=https://easysubway-api.aquilaxk.site/easysubway/privacy",
+    "EASYSUBWAY_LOCATION_TERMS_URL=https://easysubway-api.aquilaxk.site/easysubway/location-terms",
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
@@ -4733,6 +6880,23 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   const routeSearchController = read(
     "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchController.java",
   );
+  const routeSessionController = read(
+    "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteV2SessionController.java",
+  );
+  const mobileRouteIngress = read("apps/mobile/lib/route_v2_ingress.dart");
+  const mobileRouteSearch = read("apps/mobile/lib/route_search.dart");
+  const routeV2Gateway = read("infra/nginx/route-v2-gateway.conf.template");
+  const routeV2ProxyHeaders = read("infra/nginx/route-v2-proxy-headers.conf.template");
+  const routeV2OriginGateFilter = read(
+    "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteV2OriginGateFilter.java",
+  );
+  const jdbcRouteTimetableRepository = read(
+    "backend/src/main/java/com/easysubway/route/adapter/out/persistence/JdbcRouteTimetableRepository.java",
+  );
+  const jdbcRouteTimetableRepositoryTest = read(
+    "backend/src/test/java/com/easysubway/route/adapter/out/persistence/JdbcRouteTimetableRepositoryTest.java",
+  );
+  const routeV2GatewayProbe = read("tools/test/run-route-v2-gateway-integration.sh");
   const internalApiIndex = readJson("contracts/api/internal-api-index.json");
 
   assert.equal(gate.schemaVersion, 1);
@@ -5071,6 +7235,9 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
       "/api/v1/realtime/**",
       "/api/notices/active",
       "/api/ads/active",
+      // #2376: /actuator/prometheus는 permitAll이 아니라 사설망(RFC1918) IP 게이트로만 열리지만,
+      // public 체인 스코프 안에 있어 security-matcher 인벤토리에는 포함된다.
+      "/actuator/prometheus",
     ],
   );
   assert.deepEqual(
@@ -5101,6 +7268,175 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
     "/api/v2/routes/session",
     "/api/v2/routes/search",
   ]);
+  const routeV2Readiness = operationsEvidence.backendControlPlane.publicApiSurface.routeV2Readiness;
+  assert.equal(routeV2Readiness.issue, 2095);
+  assert.equal(routeV2Readiness.status, "SATISFIED");
+  assert.deepEqual(routeV2Readiness.productionReachabilityEvidence, {
+    observedAt: "2026-07-16T15:20:00+09:00",
+    candidateGitSha: "e317f3af90292b9e2dff5e7ec90c22792b845435",
+    rollbackRun: "https://github.com/AquilaXk/easysubway/actions/runs/29470369402",
+    ingressOpen: false,
+    activeProductionEndpoints: [],
+  });
+  assert.deepEqual(routeV2Readiness.intendedAndroidConsumers, [
+    {
+      method: "POST",
+      path: "/api/v2/routes/session",
+      consumer: "PlayIntegrityRouteV2SessionProvider",
+      auth: "Play Integrity attestation and gateway origin proof",
+      cacheControl: "private, no-store",
+    },
+    {
+      method: "POST",
+      path: "/api/v2/routes/search",
+      consumer: "RouteSearchV2ApiRepository",
+      auth: "Bearer route:v2:itx session and gateway origin proof",
+      cacheControl: "private, no-store",
+    },
+  ]);
+  assert.deepEqual(routeV2Readiness.closedRouteEndpoints, closedRouteEndpoints);
+  assert.deepEqual(routeV2Readiness.subwayLocalFirst, {
+    consumer: "TransportScopedRouteSearchRepository",
+    networkCalls: 0,
+  });
+  assert.deepEqual(routeV2Readiness.timetableSnapshotCache, {
+    status: "SATISFIED",
+    implementedByIssue: 2145,
+    requiredKey: {
+      format: "snapshotSha256 + freshUntil",
+      fields: ["snapshotSha256", "freshUntil"],
+      sameFreshnessDifferentHashReloadRequired: true,
+    },
+    currentImplementation: {
+      status: "SATISFIED",
+      fields: ["snapshotSha256", "freshUntil"],
+      snapshotId: "server-timetable-snapshot-9f9be14b6cdd6e4d",
+      snapshotSha256: "9f9be14b6cdd6e4d9a2eda1391b0bd7a48e6330485c9e1ec81d399958eae45d8",
+      freshUntil: "2026-07-27T00:00:00+09:00",
+      evidencePath: "tools/datapack/server-timetable-snapshot-evidence.json",
+    },
+    sharedRouteResponseCacheAllowed: false,
+  });
+  assert.deepEqual(routeV2Readiness.realisticLoadEvidence, {
+    status: "SATISFIED",
+    requires: ["normal", "burst", "unavailable", "latency", "error", "resource", "purge"],
+    evidenceSource: "local-production-runner",
+    runner: "tools/ops/verify-production-route-v2-capacity.sh",
+    workflow: ".github/workflows/production-route-v2-capacity-evidence.yml",
+    runnerExitCode: 0,
+    productionWorkflowRunUrl: "https://github.com/AquilaXk/easysubway/actions/runs/29712689840",
+    productionWorkflowRun: {
+      runUrl: "https://github.com/AquilaXk/easysubway/actions/runs/29712689840",
+      deployedSha: "3cad74667dc4c519aac0d1a9f9bcab2bcf5e5142",
+      conclusion: "success",
+      note: "production capacity workflow 최초 완주. run은 candidate SHA(e317f3af90292b9e2dff5e7ec90c22792b845435)가 아닌 이후 배포·검증된 SHA(3cad7466)에서 수행됨 — candidate 블록은 candidate identity로 불변 유지.",
+    },
+    candidate: {
+      versionName: "1.0.5",
+      versionCode: 10006,
+      candidateGitSha: "e317f3af90292b9e2dff5e7ec90c22792b845435",
+    },
+    profiles: {
+      normal: { result: "PASS", unexpectedErrorCount: 0 },
+      burst: { result: "PASS", expectedStatus: 429, retryAfterHeader: true, cacheControl: "private, no-store" },
+      unavailable: { result: "PASS", expectedStatus: 503, machineCode: "ITX_TIMETABLE_UNAVAILABLE" },
+    },
+    latencyBudget: { p95MaxMs: 2000, p99MaxMs: 5000 },
+    resourceStability: {
+      backendOomKilled: false,
+      backendRestartCount: 0,
+      gatewayOomKilled: false,
+      gatewayRestartCount: 0,
+    },
+    cache: { missObserved: true, hitObserved: true },
+    purge: { states: 1, sessions: 1, nonces: 1, budgetMs: 600000 },
+    privacy: { undeclaredDataTransferCount: 0, sensitivePayloadCount: 0 },
+    ingressClosed: true,
+  });
+  assert.deepEqual(routeV2Readiness.productionCanaryRollback, {
+    status: "BLOCKED_EXTERNAL",
+    explicitProductionApprovalRequired: true,
+    sameCandidateIdentityRequired: true,
+    preparedTooling: {
+      runner: "tools/ops/verify-production-route-v2-canary-rollback.sh",
+      evidenceLibrary: "tools/ops/route-v2-canary-rollback-evidence.mjs",
+      workflow: ".github/workflows/production-route-v2-canary-rollback-dry-run.yml",
+      requiresBeforeExecution: [
+        "explicit-owner-approval-reference",
+        "same-candidate-identity",
+        "signed-rc-canary-attestation-provisioned",
+        "route-v2-ingress-open",
+      ],
+    },
+  });
+  // 실행은 오너 명시 승인 + #1016 완료 후에만 가능하지만, canary/rollback dry-run
+  // 도구는 미리 결속해 두어 승인 즉시 실행 가능하도록 한다(status는 BLOCKED_EXTERNAL 유지).
+  const canaryRollbackWorkflow = read(".github/workflows/production-route-v2-canary-rollback-dry-run.yml");
+  const canaryRollbackRunner = read("tools/ops/verify-production-route-v2-canary-rollback.sh");
+  assert.match(canaryRollbackWorkflow, /workflow_dispatch:/);
+  assert.match(canaryRollbackWorkflow, /environment: production/);
+  assert.match(canaryRollbackWorkflow, /production_approval:\n\s+description:[^\n]+\n\s+required: true/);
+  assert.match(
+    canaryRollbackWorkflow,
+    /if \[\[ "\$\{GITHUB_REF\}" != "refs\/heads\/main" \]\]; then\s+echo "production Route V2 canary rollback dry-run must run from main" >&2\s+exit 1\s+fi/,
+  );
+  assert.match(canaryRollbackWorkflow, /tools\/ops\/verify-production-route-v2-canary-rollback\.sh/);
+  assert.match(canaryRollbackRunner, /^set -euo pipefail$/m);
+  assert.match(canaryRollbackRunner, /validate-approval/);
+  assert.match(canaryRollbackRunner, /assert-candidate/);
+  assert.match(canaryRollbackRunner, /blocked on #1016/);
+  assert.match(canaryRollbackRunner, /Route V2 ingress must be open for the signed-RC canary/);
+  assert.doesNotMatch(canaryRollbackRunner, /gh secret set|set -x/);
+  const routeCapacityWorkflow = read(".github/workflows/production-route-v2-capacity-evidence.yml");
+  const routeCapacityRunner = read("tools/ops/verify-production-route-v2-capacity.sh");
+  assert.match(routeCapacityWorkflow, /workflow_dispatch:/);
+  assert.match(routeCapacityWorkflow, /environment: production/);
+  assert.match(
+    routeCapacityWorkflow,
+    /if \[\[ "\$\{GITHUB_REF\}" != "refs\/heads\/main" \]\]; then\s+echo "production Route V2 capacity evidence must run from main" >&2\s+exit 1\s+fi/,
+  );
+  assert.match(routeCapacityWorkflow, /tools\/ops\/verify-production-route-v2-capacity\.sh/);
+  assert.match(routeCapacityRunner, /docker network create --internal/);
+  assert.match(routeCapacityRunner, /--cpus 1 --memory 1g --memory-swap 1g --pids-limit 256/);
+  const routeCapacityGatewayRun = routeCapacityRunner.match(
+    /docker run -d --name "\$\{clone_gateway\}"[\s\S]*?nginx -g 'daemon off;' >\/dev\/null/,
+  )?.[0] ?? "";
+  assert.match(routeCapacityGatewayRun, /--cpus 1 --memory 256m --memory-swap 256m --pids-limit 128/);
+  assert.doesNotMatch(routeCapacityRunner, /range \.Config\.Env/);
+  assert.match(routeCapacityRunner, /gateway_memory_peak/);
+  assert.match(routeCapacityRunner, /gateway_oom_killed/);
+  for (const profile of ["normal", "burst", "unavailable"]) {
+    assert.match(routeCapacityRunner, new RegExp(`profile=${profile}`));
+  }
+  assert.match(routeCapacityRunner, /unexpected_error_count=0/);
+  assert.match(routeCapacityRunner, /undeclared_data_transfer_count=0/);
+  assert.match(routeCapacityRunner, /sensitive_payload_count=0/);
+  assert.match(routeCapacityRunner, /trap cleanup_on_exit EXIT/);
+  assert.match(routeCapacityRunner, /ingress_closed=true/);
+  assert.doesNotMatch(routeCapacityRunner, /gh secret set|EASYSUBWAY_ROUTE_V2_INGRESS_ENABLED=true/);
+  assert.match(mobileRouteIngress, /'\/api\/v2\/routes\/session'/);
+  assert.match(mobileRouteSearch, /'\/api\/v2\/routes\/search'/);
+  assert.match(mobileRouteIngress, /request\.transportScope == RouteTransportScope\.subway[\s\S]*localRepository\.searchRoute/);
+  assert.match(mobileRouteSearch, /production ingress는 session\/search 두 경로만 열고 legacy refresh는 계속 닫는다/);
+  assert.match(routeSessionController, /header\(HttpHeaders\.CACHE_CONTROL, "private, no-store"\)/);
+  assert.match(routeSearchController, /header\(HttpHeaders\.CACHE_CONTROL, "private, no-store"\)/);
+  assert.match(routeV2OriginGateFilter, /ORIGIN_HEADER = "X-EasySubway-Origin-Verify"/);
+  assert.match(routeV2ProxyHeaders, /proxy_set_header X-EasySubway-Origin-Verify/);
+  assert.match(
+    jdbcRouteTimetableRepository,
+    /artifact\.snapshotSha256\(\)[\s\S]*artifact\.plannerIdentity\(\)\.canonicalPackSha256\(\)[\s\S]*artifact\.freshUntil\(\)/,
+  );
+  assert.match(
+    jdbcRouteTimetableRepositoryTest,
+    /동일 freshness에서도 active snapshot SHA가 바뀌면 cache key가 바뀐다/,
+  );
+  assert.match(
+    jdbcRouteTimetableRepositoryTest,
+    /canonical pack SHA가 바뀌면 cache key가 바뀐다/,
+  );
+  assert.match(routeV2GatewayProbe, /session success response must remain private, no-store/);
+  assert.match(routeV2GatewayProbe, /search success response must remain private, no-store/);
+  assert.doesNotMatch(routeV2GatewayProbe, /(^|\n)\s*rg\s/, "gateway probe must use POSIX runner tools available in GitHub Actions");
   assert.match(
     securityConfig,
     /@Profile\("prod \| staging \| release \| prod-like"\)[\s\S]*SecurityFilterChain routeV2IngressSecurityFilterChain/,
@@ -5117,9 +7453,17 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   );
   assert.ok(reportApiMatcherScope, "report API security matcher scope must be readable");
   assert.ok(publicApiMatcherScope, "public API security matcher scope must be readable");
-  const publicApiMatchers = [reportApiMatcherScope[0], publicApiMatcherScope[0]]
-    .flatMap((scope) => Array.from(scope.matchAll(/"([^"]+)"/g), (match) => match[1]))
-    .filter((matcher) => matcher.startsWith("/api/") || matcher.startsWith("/actuator/"));
+  const publicApiMatchers = [...new Set(
+    [reportApiMatcherScope[0], publicApiMatcherScope[0]]
+      .flatMap((scope) => Array.from(scope.matchAll(/"([^"]+)"/g), (match) => match[1]))
+      .filter((matcher) => matcher.startsWith("/api/") || matcher.startsWith("/actuator/")),
+  )];
+  for (const method of ["GET", "HEAD"]) {
+    assert.match(
+      publicApiMatcherScope[0],
+      new RegExp(`HttpMethod\\.${method},[\\s\\S]*?"/api/v1/trains/stations",[\\s\\S]*?"/api/v1/trains/search"`),
+    );
+  }
   assert.deepEqual(
     publicApiMatchers,
     operationsEvidence.backendControlPlane.publicApiSurface.allowedPublicSecurityMatchers,
@@ -5730,6 +8074,20 @@ test("Play internal track 업로드는 versionCode 정책·mapping·evidence를 
   // Opt-in workflow job that shares the RC environment approval and default off.
   assert.match(workflow, /play_upload:\n\s*description:[\s\S]*options:\n\s*- none\n\s*- internal/);
   assert.match(workflow, /play-internal-upload:/);
+  assert.match(
+    workflow,
+    /play-internal-upload:\n\s*name:[^\n]+\n\s*runs-on:[^\n]+\n\s*needs:\n\s*- android-production-rc-release\n\s*- rc-evidence-manifest/,
+  );
+  assert.match(workflow, /inputs\.play_upload == 'internal'[\s\S]*needs\.rc-evidence-manifest\.result == 'success'/);
+  assert.match(
+    workflow,
+    /PLAY_UPLOAD: \$\{\{ inputs\.play_upload \}\}[\s\S]*\[\[ "\$\{PLAY_UPLOAD\}" == internal \]\][\s\S]*--require-pre-play-upload-ready true/,
+  );
+  assert.match(
+    workflow,
+    /if \[\[ "\$\{PLAY_UPLOAD\}" == internal && "\$\{operations_status\}" != "SATISFIED" \]\]; then[\s\S]*exit 1/,
+  );
+  assert.doesNotMatch(workflow, /final_readiness_args\+\=\(--fail-on-blocked true\)/);
   assert.match(workflow, /inputs\.play_upload == 'internal'/);
   assert.match(workflow, /environment:\n\s*name: android-production-rc/);
   assert.match(workflow, /node tools\/release\/upload-play-internal\.mjs/);
@@ -5987,10 +8345,17 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
     "targetChannel",
   ]);
   assert.equal(releaseCallbackSchema.properties.artifactKind.const, "datapack-release-callback");
+  assert.equal(
+    releaseCallbackSchema.properties.idempotencyKey.pattern,
+    "^[^:]+:[1-9][0-9]*:[a-f0-9]{64}$",
+  );
   assert.deepEqual(releaseCallbackSchema.required, [
     "schemaVersion",
     "artifactKind",
     "releaseRequestId",
+    "releaseSequence",
+    "channel",
+    "idempotencyKey",
     "workflowRunUrl",
     "manifestSha256",
     "sqliteSha256",
@@ -6173,7 +8538,9 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   const inventory = readJson("tools/datapack/source-inventory.json");
   const appInventory = readJson("apps/mobile/assets/datapacks/source-inventory.json");
   const pubspec = read("apps/mobile/pubspec.yaml");
-  const mobileMain = read("apps/mobile/lib/main.dart");
+  const attributionScreen = read(
+    "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart",
+  );
   const targets = readJson("tools/datapack/nationwide-coverage-targets.json");
   const productionScope = readJson("apps/mobile/release/production-datapack-scope.json");
   const sourceCandidates = readJson("tools/datapack/source-candidates.json");
@@ -6181,11 +8548,11 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
 
   assert.deepEqual(appInventory, inventory);
   assert.match(pubspec, /assets\/datapacks\/source-inventory\.json/);
-  assert.match(mobileMain, /class DataSourceAttributionScreen/);
-  assert.match(mobileMain, /assets\/datapacks\/metro_map_pack\/manifest\.json/);
-  assert.match(mobileMain, /assets\/datapacks\/source-inventory\.json/);
-  assert.match(mobileMain, /지도 표시용 asset/);
-  assert.match(mobileMain, /경로·시설 안내용 데이터/);
+  assert.match(attributionScreen, /class DataSourceAttributionScreen/);
+  assert.match(attributionScreen, /assets\/datapacks\/metro_map_pack\/manifest\.json/);
+  assert.match(attributionScreen, /assets\/datapacks\/source-inventory\.json/);
+  assert.match(attributionScreen, /지도 표시용 asset/);
+  assert.match(attributionScreen, /경로·시설 안내용 데이터/);
 
   assert.equal(inventory.schemaVersion, 1);
   assert.equal(inventory.region, "nationwide");
@@ -6468,7 +8835,14 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   const sourceIds = inventory.sources.map((source) => source.id).sort();
   assert.deepEqual(sourceIds, [
     "busan-transportation-official-od-fares",
+    "busan-transportation-route-map-positions",
+    "busan-transportation-route-topology",
+    "busan-transportation-timetable",
     "busan-transportation-urban-rail-station-info",
+    "daejeon-station-distance-fare",
+    "daejeon-train-timetable",
+    "gwangju-transportation-cyberstation-timetable",
+    "gwangju-transportation-route-topology",
     "kric-disabled-toilet",
     "kric-elevator-car-number",
     "kric-metropolitan-rail-station-info",
@@ -6491,6 +8865,8 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "kric-wheelchair-lift-movement",
     "molit-tago-subway-info",
     "molit-urban-rail-full-route",
+    "molit-urban-rail-full-route-daejeon-membership",
+    "molit-urban-rail-full-route-gwangju-membership",
     "seoul-metro-accessibility",
     "seoul-metro-fast-exit-car-door",
     "seoul-metro-official-od-fare-canary",
@@ -6520,7 +8896,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     assert.match(source.license.attribution, /공공누리 제1유형|공공데이터포털 이용허락범위 제한 없음/);
     assert.match(
       source.datasetUrl,
-      /^https:\/\/(?:data\.seoul\.go\.kr\/dataList\/OA-[0-9]+\/[AFS]\/1\/datasetView\.do|www\.data\.go\.kr\/data\/[0-9]+\/(?:openapi|fileData)\.do|www\.seoulmetro\.co\.kr\/kr\/cyberStation\.do|data\.kric\.go\.kr\/rips\/M_01_02\/detail\.do\?id=[0-9]+&service=[A-Za-z0-9]+&operation=[A-Za-z0-9]+&page=[0-9]+)$/,
+      /^https:\/\/(?:data\.seoul\.go\.kr\/dataList\/OA-[0-9]+\/[AFS]\/1\/datasetView\.do|www\.data\.go\.kr\/data\/[0-9]+\/(?:openapi|fileData)\.do|www\.seoulmetro\.co\.kr\/kr\/cyberStation\.do|www\.grtc\.co\.kr\/subway\/(?:contents\/apiRunInfo|menu\/trainTimetableSubMenu)|data\.kric\.go\.kr\/rips\/M_01_02\/detail\.do\?id=[0-9]+&service=[A-Za-z0-9]+&operation=[A-Za-z0-9]+&page=[0-9]+)$/,
     );
     assert.match(source.observedDataUpdatedAt, /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/);
     assert.match(source.retrievedAt, /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/);
@@ -7630,6 +10006,8 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
   const inventory = readJson("tools/datapack/source-inventory.json");
   const candidates = readJson("tools/datapack/source-candidates.json");
   const productionSourceIds = new Set(inventory.sources.map((source) => source.id));
+  // kric-provider-code-catalog는 credential-free 공식 파일을 code mapping으로 승인한 source라
+  // "샘플 URL만 문서화된" KRIC API 후보 계약과 다르다.
   // kric-subway-timetable은 라이브 재구성 실증을 가진 schedule_timetable 후보라 "샘플 URL만 문서화된"
   // 페이퍼 KRIC 후보 계약과 다르다 — 아래 전용 테스트에서 별도로 고정하고 이 루프에서는 제외한다.
   // production inventory로 승격된 KRIC 시설 source(엘리베이터·에스컬레이터·휠체어리프트 위치/이동동선 등,
@@ -7638,6 +10016,7 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
     (candidate) =>
       candidate.id.startsWith("kric-") &&
       !new Set([
+        "kric-provider-code-catalog",
         "kric-station-timetable",
         "kric-subway-timetable",
         "kric-subway-timetable-exp",
@@ -7648,7 +10027,7 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
   assert.equal(candidates.schemaVersion, 1);
   assert.equal(candidates.artifactKind, "production-source-candidates");
   assert.equal(candidates.source, "tools/datapack/source-candidates.json");
-  assert.equal(candidates.updatedAt, "2026-07-14");
+  assert.equal(candidates.updatedAt, "2026-07-20");
   assert.deepEqual(
     kricCandidates.map((candidate) => candidate.id).sort(),
     [
@@ -8924,6 +11303,9 @@ test("로컬 PostgreSQL 백업과 복구 리허설 기준선을 제공한다", (
   assert.doesNotMatch(backupScript, /pg_restore --list -/);
   assert.match(backupScript, /mv "\$\{temp_file\}" "\$\{backup_file\}"/);
   assert.match(backupScript, /sha256sum "\$\{backup_file\}" > "\$\{backup_file\}\.sha256"/);
+  assert.match(backupScript, /--retention-days "30"/);
+  assert.doesNotMatch(backupScript, /EASYSUBWAY_SENSITIVE_BACKUP_RETENTION_DAYS/);
+  assert.match(backupScript, /prune-sensitive-backups\.mjs/);
   assert.match(backupScript, /trap - EXIT/);
 
   assert.match(restoreScript, /set -euo pipefail/);
@@ -8969,7 +11351,141 @@ test("시설 신고 사진 백업은 로컬 전용 객체와 manifest 기준선�
   assert.match(backupScript, /printf 'report_id\\tfile_name\\tcontent_type\\tobject_key\\tthumbnail_object_key\\tsha256\\tsize_bytes\\tobject_path\\tthumbnail_path\\n'/);
   assert.match(backupScript, /printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n'/);
   assert.match(backupScript, /trap cleanup EXIT/);
+  assert.doesNotMatch(backupScript, /--retention-days/);
+  assert.doesNotMatch(backupScript, /prune-sensitive-backups\.mjs/);
   assert.match(backupScript, /printf 'facility report photo backup written: %s\\n' "\$\{run_dir\}"/);
+});
+
+test("민감정보 백업 보존 작업은 일일 실행 지연을 포함해 30일 상한 안에서 안전하게 삭제한다", async () => {
+  const pruneScript = "tools/ops/prune-sensitive-backups.mjs";
+  const workflow = read(".github/workflows/sensitive-backup-retention.yml");
+  const backupRoot = await mkdtemp(path.join(tmpdir(), "easysubway-sensitive-backups-"));
+  const nested = path.join(backupRoot, "postgres", "1913-route-purge");
+  const expiredPhotoDir = path.join(
+    backupRoot,
+    "facility-report-photos",
+    "easysubway-report-photos-20260601T000000Z.ABC123",
+  );
+  const expiredDump = path.join(nested, "easysubway-postgres-20260601T000000Z.ABC123.dump");
+  const expiredChecksum = `${expiredDump}.sha256`;
+  const dailyBoundaryDump = path.join(nested, "easysubway-postgres-20260617T000000Z.GHI789.dump");
+  const copiedExpiredDump = path.join(nested, "easysubway-postgres-20260602T000000Z.CPY123.dump");
+  const retainedDump = path.join(nested, "easysubway-postgres-20260716T000000Z.DEF456.dump");
+  const unrelated = path.join(backupRoot, "operator-note.txt");
+  const outsideRoot = await mkdtemp(path.join(tmpdir(), "easysubway-backup-outside-"));
+  const outside = path.join(outsideRoot, "outside.dump");
+  const matchingSymlink = path.join(
+    backupRoot,
+    "easysubway-postgres-20260601T000000Z.SYM123.dump",
+  );
+  const old = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000);
+  const dailyBoundary = new Date(Date.now() - 29.5 * 24 * 60 * 60 * 1000);
+
+  await mkdir(expiredPhotoDir, { recursive: true });
+  await mkdir(nested, { recursive: true });
+  await writeFile(path.join(expiredPhotoDir, "manifest.tsv"), "expired");
+  await writeFile(expiredDump, "expired dump");
+  await writeFile(expiredChecksum, "expired checksum");
+  await writeFile(dailyBoundaryDump, "daily boundary dump");
+  await writeFile(copiedExpiredDump, "copied expired dump");
+  await writeFile(retainedDump, "retained dump");
+  await writeFile(unrelated, "unrelated");
+  await writeFile(outside, "outside");
+  await symlink(outside, matchingSymlink);
+  for (const candidate of [expiredPhotoDir, expiredDump, expiredChecksum, unrelated]) {
+    await utimes(candidate, old, old);
+  }
+  await utimes(dailyBoundaryDump, dailyBoundary, dailyBoundary);
+  await utimes(retainedDump, old, old);
+
+  const output = execFileSync(
+    process.execPath,
+    [
+      pruneScript,
+      "--root", backupRoot,
+      "--retention-days", "30",
+      "--now", "2026-07-16T12:00:00Z",
+    ],
+    { cwd: root, encoding: "utf8" },
+  );
+
+  assert.match(output, /pruned=4 retention_days=30/);
+  assert.equal(existsSync(expiredPhotoDir), true);
+  assert.equal(existsSync(expiredDump), false);
+  assert.equal(existsSync(expiredChecksum), false);
+  assert.equal(existsSync(dailyBoundaryDump), false);
+  assert.equal(existsSync(copiedExpiredDump), false);
+  assert.equal(existsSync(retainedDump), true);
+  assert.equal(existsSync(unrelated), true);
+  assert.equal(existsSync(matchingSymlink), true);
+  assert.equal(existsSync(outside), true);
+  assert.throws(
+    () => execFileSync(
+      process.execPath,
+      [pruneScript, "--root", path.join(backupRoot, "missing"), "--retention-days", "30"],
+      { cwd: root, encoding: "utf8", stdio: "pipe" },
+    ),
+    /ENOENT/,
+  );
+  assert.throws(
+    () => execFileSync(
+      process.execPath,
+      [pruneScript, "--root", backupRoot, "--retention-days", "366"],
+      { cwd: root, encoding: "utf8", stdio: "pipe" },
+    ),
+    /retention-days must be an integer from 1 to 365/,
+  );
+  assert.match(workflow, /cron: "47 18 \* \* \*"/);
+  assert.match(workflow, /self-hosted[\s\S]*easysubway-production/);
+  assert.doesNotMatch(workflow, /SENSITIVE_BACKUP_RETENTION_DAYS|\bRETENTION_DAYS\b/);
+  assert.match(workflow, /--root "\$\{DEPLOY_ROOT\}\/backups"/);
+  assert.match(workflow, /--retention-days "30"/);
+  assert.match(workflow, /prune-sensitive-backups\.mjs/);
+});
+
+test("민감정보 백업 보존 작업은 동시 파기로 이미 사라진 항목을 건너뛴다", async () => {
+  const pruneScript = path.join(root, "tools/ops/prune-sensitive-backups.mjs");
+  const backupRoot = await mkdtemp(path.join(tmpdir(), "easysubway-sensitive-backup-race-"));
+  const racedDump = path.join(backupRoot, "easysubway-postgres-20260601T000000Z.RACE01.dump");
+  const remainingDump = path.join(backupRoot, "easysubway-postgres-20260601T000001Z.RACE02.dump");
+  await writeFile(racedDump, "removed by concurrent pruner");
+  await writeFile(remainingDump, "removed by this pruner");
+
+  const { pruneSensitiveBackups } = await import(
+    `${pathToFileURL(pruneScript).href}?race=${Date.now()}`
+  );
+  let simulatedRace = false;
+  const pruned = await pruneSensitiveBackups({
+    root: backupRoot,
+    retentionDays: 30,
+    now: Date.parse("2026-07-16T12:00:00Z"),
+    lstat: async (candidate) => {
+      if (!simulatedRace && candidate === racedDump) {
+        simulatedRace = true;
+        await rm(candidate);
+      }
+      return fsLstat(candidate);
+    },
+  });
+
+  assert.equal(simulatedRace, true);
+  assert.equal(pruned, 1);
+  assert.equal(existsSync(racedDump), false);
+  assert.equal(existsSync(remainingDump), false);
+
+  const deniedDump = path.join(backupRoot, "easysubway-postgres-20260601T000002Z.DENIED.dump");
+  await writeFile(deniedDump, "must surface unexpected filesystem errors");
+  await assert.rejects(
+    pruneSensitiveBackups({
+      root: backupRoot,
+      retentionDays: 30,
+      now: Date.parse("2026-07-16T12:00:00Z"),
+      lstat: async () => {
+        throw Object.assign(new Error("metadata access denied"), { code: "EACCES" });
+      },
+    }),
+    /metadata access denied/,
+  );
 });
 
 test("시설 신고 사진 복구 리허설은 manifest와 object 산출물을 검증한다", async () => {
@@ -9251,6 +11767,22 @@ test("운영 백업 복구 리허설 gate는 필수 백업 대상과 dry-run 검
   }
 
   const photoTarget = backupTargets.get("facility_report_photo_objects");
+  const postgresTarget = backupTargets.get("postgres_application_database");
+  assert.equal(
+    postgresTarget.backupCommand,
+    "tools/ops/postgres-backup.sh <deploy-root>/backups/postgres",
+  );
+  assert.equal(
+    photoTarget.backupCommand,
+    "tools/ops/facility-report-photo-backup.sh",
+  );
+  assert.equal(postgresTarget.retentionDays, 30);
+  assert.match(postgresTarget.retentionCommand, /prune-sensitive-backups\.mjs/);
+  assert.ok(postgresTarget.linkedArtifacts.includes(".github/workflows/sensitive-backup-retention.yml"));
+  assert.equal(photoTarget.scope, "local-rehearsal-only");
+  assert.equal(photoTarget.retentionDays, undefined);
+  assert.equal(photoTarget.retentionCommand, undefined);
+  assert.ok(!photoTarget.linkedArtifacts.includes(".github/workflows/sensitive-backup-retention.yml"));
   assert.equal(
     photoTarget.restoreRehearsalCommand,
     'node tools/ops/facility-report-photo-restore-check.mjs "$EASYSUBWAY_PHOTO_RESTORE_DIR"',
@@ -9272,6 +11804,8 @@ test("운영 백업 복구 리허설 gate는 필수 백업 대상과 dry-run 검
   assert.match(gate.rehearsalPolicy.frequencyKo, /월 1회|릴리즈/);
   assert.match(gate.rehearsalPolicy.dataSafetyKo, /운영 데이터 직접 복원 금지|격리/);
   assert.match(gate.rehearsalPolicy.requiredOutputKo, /backup-restore-rehearsal/);
+  assert.match(gate.rehearsalPolicy.sensitiveBackupRetentionKo, /일일 workflow/);
+  assert.match(gate.rehearsalPolicy.sensitiveBackupRetentionKo, /30일/);
   assert.match(checkScript, /backup-restore-rehearsal-gate\.json/);
   assert.match(checkScript, /postgres_application_database/);
   assert.match(checkScript, /datapack_release_manifest_history/);
@@ -9300,8 +11834,9 @@ test("로컬 관측성 스택은 Prometheus와 Grafana 기준선을 제공한다
   const grafanaDatasource = read("infra/grafana/provisioning/datasources/prometheus.yml");
 
   assert.match(build, /implementation 'io\.micrometer:micrometer-registry-prometheus'/);
-  assert.match(applicationYml, /management:\s*\n\s*endpoints:\s*\n\s*web:\s*\n\s*exposure:\s*\n\s*include:\s*["']?health\s*,\s*info["']?/);
-  assert.doesNotMatch(applicationYml, /include:\s*["']?health\s*,\s*info\s*,\s*prometheus["']?/);
+  // #2376: actuator Prometheus 메트릭을 docker network 내부에서 직접 scrape하기 위해 prometheus를 노출한다
+  // (공개 경로 차단은 nginx host 템플릿에서 보장 — backend-deploy.test.mjs 참조).
+  assert.match(applicationYml, /management:\s*\n\s*endpoints:\s*\n\s*web:\s*\n\s*exposure:\s*\n\s*include:\s*["']?health\s*,\s*info\s*,\s*prometheus["']?/);
   assert.match(applicationDevYml, /management:\s*\n\s*endpoints:\s*\n\s*web:\s*\n\s*exposure:\s*\n\s*include:\s*["']?health\s*,\s*info\s*,\s*prometheus["']?/);
 
   assert.match(compose, /prometheus:\n/);
@@ -9344,7 +11879,11 @@ test("로컬 관측성 스택은 Prometheus와 Grafana 기준선을 제공한다
   assert.match(prometheusConfig, /module: \[http_2xx\]/);
   assert.match(prometheusConfig, /https:\/\/easysubway-api\.aquilaxk\.site\/actuator\/health\/readiness/);
   assert.match(prometheusConfig, /replacement: public-edge-probe:9115/);
-  assert.doesNotMatch(prometheusConfig, /\/actuator\/prometheus/);
+  // #2376: backend actuator 메트릭 직접 scrape job. docker network 내부 backend:8080/actuator/prometheus.
+  assert.match(prometheusConfig, /job_name: "backend_app_metrics"/);
+  assert.match(prometheusConfig, /job_name: "backend_app_metrics"\s*\n\s*metrics_path: "\/actuator\/prometheus"\s*\n\s*static_configs:\s*\n\s*-\s*targets:\s*\n\s*-\s*"backend:8080"/);
+  // 임시 blue/green standby는 상시 대상이 아니라 scrape 대상에서 제외한다(down 노이즈 방지).
+  assert.doesNotMatch(prometheusConfig, /backend-standby:8080/);
   assert.doesNotMatch(prometheusConfig, /host\.docker\.internal:8080/);
   assert.match(prometheusConfig, /alertmanagers:\s*\n\s*-\s*static_configs:\s*\n\s*-\s*targets: \["alertmanager:9093"\]/);
   assert.match(prometheusConfig, /rule_files:\s*\n\s*-\s*\/etc\/prometheus\/alerts\.yml/);
@@ -9355,6 +11894,9 @@ test("로컬 관측성 스택은 Prometheus와 Grafana 기준선을 제공한다
   assert.match(prometheusAlerts, /alert: AquilaPublicEdgeProbeScrapeDown[\s\S]*severity: warning[\s\S]*title_ko: "공개 접속 점검 실패"[\s\S]*impact_ko: "외부에서 API readiness를 확인하는 관측 신호가 멈췄습니다\."[\s\S]*action_ko: "public-edge-probe 컨테이너 상태와 외부 HTTPS readiness 응답을 확인하세요\."/);
   assert.match(prometheusAlerts, /alert: AquilaDockerRuntimeProbeScrapeDown[\s\S]*severity: warning[\s\S]*title_ko: "Docker 런타임 점검 실패"[\s\S]*impact_ko: "컨테이너 상태 관측 신호가 멈춰 Docker 기반 장애 탐지가 늦어질 수 있습니다\."[\s\S]*action_ko: "docker-runtime-probe 컨테이너 상태와 Docker socket 접근 권한을 확인하세요\."/);
   assert.match(prometheusAlerts, /alert: AquilaBackWorkerScrapeDown[\s\S]*severity: critical[\s\S]*title_ko: "백그라운드 작업자 상태 점검 실패"[\s\S]*impact_ko: "작업 큐와 DLQ 관련 알림 평가가 늦거나 멈출 수 있습니다\."[\s\S]*action_ko: "back-worker 컨테이너 상태와 \/actuator\/health\/readiness 응답을 확인하세요\."/);
+  // #2376 dead-man's switch: backend_app_metrics scrape가 멈추면 freshness 경보가 조용히 멈추므로 그 무음을 감시한다.
+  assert.match(prometheusAlerts, /alert: AquilaBackendAppMetricsScrapeDown/);
+  assert.match(prometheusAlerts, /alert: AquilaBackendAppMetricsScrapeDown\s*\n\s*expr: min\(up\{job="backend_app_metrics"\}\) < 1[\s\S]*severity: critical[\s\S]*service: aquila-backend-app-metrics[\s\S]*title_ko: "백엔드 앱 메트릭 수집 실패"[\s\S]*impact_ko: "운행표 snapshot 잔여시간 게이지가 사라져 만료 24\/6시간 전 경보가 조용히 멈춥니다\."[\s\S]*action_ko: "backend 컨테이너 상태와 \/actuator\/prometheus 응답, docker network 내부 backend:8080 접근을 확인하세요\."/);
   assert.match(alertmanagerConfig, /receiver: operations-null/);
   assert.match(alertmanagerConfig, /templates:\s*\n\s*-\s*\/etc\/alertmanager\/templates\/\*\.tmpl/);
   assert.match(alertmanagerTemplate, /define "easysubway\.email\.subject"/);
@@ -9971,6 +12513,7 @@ test("관리자 플랫폼 전환 계약은 shadow rollout과 legacy fallback 제
     "backend/src/main/resources/db/migration/postgresql/V12__admin_batch_operation_permission.sql",
     "backend/src/main/resources/db/migration/postgresql/V13__admin_common_code_incident.sql",
     "backend/src/main/resources/db/migration/postgresql/V15__admin_report_photo_read_permission.sql",
+    "backend/src/main/resources/db/migration/postgresql/V63__admin_batch_run_permission.sql",
   ].map(read).join("\n");
   const h2AdminMigrations = [
     "backend/src/main/resources/db/migration/h2/V10__admin_rbac_menu.sql",
@@ -9978,6 +12521,7 @@ test("관리자 플랫폼 전환 계약은 shadow rollout과 legacy fallback 제
     "backend/src/main/resources/db/migration/h2/V12__admin_batch_operation_permission.sql",
     "backend/src/main/resources/db/migration/h2/V13__admin_common_code_incident.sql",
     "backend/src/main/resources/db/migration/h2/V15__admin_report_photo_read_permission.sql",
+    "backend/src/main/resources/db/migration/h2/V63__admin_batch_run_permission.sql",
   ].map(read).join("\n");
 
   assert.match(applicationYml, /platform-transition:\s*\n\s*stage: \$\{EASYSUBWAY_ADMIN_PLATFORM_TRANSITION_STAGE:shadow\}/);
@@ -10033,6 +12577,7 @@ test("관리자 플랫폼 전환 계약은 shadow rollout과 legacy fallback 제
     "admin.security.admin",
     "admin.audit.read",
     "admin.privacy-log.read",
+    "admin.batch.run",
     "admin.batch.retry",
     "admin.operations.manage",
   ]) {
@@ -10412,7 +12957,15 @@ test("관리자 v3 공통 shell은 접근성 chrome과 inline style 제한을 �
   const formErrorsFragment = read("backend/src/main/resources/templates/admin/fragments/form-errors.html");
   const paginationFragment = read("backend/src/main/resources/templates/admin/fragments/pagination.html");
   const errorTemplate = read("backend/src/main/resources/templates/admin/error.html");
-  const adminCss = read("backend/src/main/resources/static/css/admin-v3.css");
+  // #2276 V6-04: admin-v3.css는 tokens → foundation → shell → components → data import manifest다.
+  // 관리자 CSS 선언은 4책임 파일이 소유하므로, scroll 소유권·focus 계약은 import 순서대로 이어붙인
+  // 실효 스타일시트를 검증한다(admin-v3.css @import cascade와 동일).
+  const adminCss = [
+    "backend/src/main/resources/static/css/admin-foundation.css",
+    "backend/src/main/resources/static/css/admin-shell.css",
+    "backend/src/main/resources/static/css/admin-components.css",
+    "backend/src/main/resources/static/css/admin-data.css",
+  ].map((cssFile) => read(cssFile)).join("\n");
   const navigationAdvice = read("backend/src/main/java/com/easysubway/admin/navigation/AdminNavigationAdvice.java");
   const envExample = read(".env.example");
   const backendEnvAllowlist = read("tools/deploy/backend-app-env.allowlist");
@@ -10452,10 +13005,18 @@ test("관리자 v3 공통 shell은 접근성 chrome과 inline style 제한을 �
   assert.match(adminCss, /\.admin-v3 a:focus-visible/);
   assert.match(adminCss, /outline: 3px solid #ffbf47/);
   assert.match(adminCss, /\.admin-topbar-row/);
-  assert.match(adminCss, /\.admin-main[\s\S]*min-width: 0[\s\S]*overflow-x: auto/);
+  // #2071 scroll 소유권 계약: 관리자 table의 horizontal scroll은 .admin-table-scroll wrapper가 단독 소유한다.
+  // .admin-main / .admin-panel / .admin-card 는 scroll을 소유하지 않는다(overflow-x: visible).
+  assert.match(adminCss, /\.admin-main[\s\S]*?min-width: 0[\s\S]*?overflow-x: visible/);
   assert.match(adminCss, /\.admin-sidebar[\s\S]*overflow-y: auto/);
   assert.match(adminCss, /\.admin-v3 table[\s\S]*min-width: 620px/);
-  assert.match(adminCss, /\.admin-v3 section,[\s\S]*\.admin-card[\s\S]*overflow-x: auto/);
+  assert.match(adminCss, /\.admin-panel,[\s\S]*?\.admin-card[\s\S]*?overflow-x: visible/);
+  // .admin-table-scroll 이 유일한 scroll 소유자: overflow: auto + bounded viewport(max-block-size) + inline overscroll 격리.
+  assert.match(adminCss, /\.admin-table-scroll \{[\s\S]*?max-block-size: min\(70vh, 640px\)[\s\S]*?overflow: auto[\s\S]*?overscroll-behavior-inline: contain/);
+  // vertical sticky 는 thead th 에만 적용한다(#2071 리뷰: row header td 는 vertical sticky 제외).
+  assert.match(adminCss, /\.admin-v3 thead th \{[\s\S]*?position: sticky[\s\S]*?top: 0/);
+  // 첫 열 horizontal sticky 는 scroll wrapper 안에서만: th:first-child / td:first-child:not([colspan]).
+  assert.match(adminCss, /\.admin-table-scroll th:first-child,[\s\S]*?\.admin-table-scroll td:first-child:not\(\[colspan\]\) \{[\s\S]*?position: sticky[\s\S]*?left: 0/);
   assert.match(navigationAdvice, /@ModelAttribute\("adminShell"\)/);
   assert.match(navigationAdvice, /return "PRODUCTION"/);
   assert.match(navigationAdvice, /return "STAGING"/);
@@ -10589,6 +13150,12 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   const uploadedPhotoStoragePortPath =
     "backend/src/main/java/com/easysubway/report/application/port/out/StoreFacilityReportUploadedPhotoPort.java";
   const deletePhotoPortPath = "backend/src/main/java/com/easysubway/report/application/port/out/DeleteFacilityReportPhotoPort.java";
+  const purgePersonalDataPortPath =
+    "backend/src/main/java/com/easysubway/report/application/port/out/PurgeFacilityReportPersonalDataPort.java";
+  const purgePersonalDataSchedulerPath =
+    "backend/src/main/java/com/easysubway/report/adapter/in/scheduler/FacilityReportPersonalDataPurgeScheduler.java";
+  const purgePersonalDataSchedulingConfigurationPath =
+    "backend/src/main/java/com/easysubway/report/adapter/in/scheduler/FacilityReportPersonalDataPurgeSchedulingConfiguration.java";
   const saveFacilityStatusPort = read(
     "backend/src/main/java/com/easysubway/transit/application/port/out/SaveAccessibilityFacilityStatusPort.java",
   );
@@ -10701,6 +13268,9 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.equal(existsSync(path.join(root, photoStoragePortPath)), true);
   assert.equal(existsSync(path.join(root, uploadedPhotoStoragePortPath)), true);
   assert.equal(existsSync(path.join(root, deletePhotoPortPath)), true);
+  assert.equal(existsSync(path.join(root, purgePersonalDataPortPath)), true);
+  assert.equal(existsSync(path.join(root, purgePersonalDataSchedulerPath)), true);
+  assert.equal(existsSync(path.join(root, purgePersonalDataSchedulingConfigurationPath)), true);
   assert.match(read(photoStoragePortPath), /interface StoreFacilityReportPhotoPort/);
   assert.match(read(photoStoragePortPath), /storeFacilityReportPhoto/);
   assert.match(read(photoStoragePortPath), /storedBytes/);
@@ -10708,6 +13278,20 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(read(uploadedPhotoStoragePortPath), /storeUploadedReportPhoto/);
   assert.match(read(deletePhotoPortPath), /interface DeleteFacilityReportPhotoPort/);
   assert.match(read(deletePhotoPortPath), /deleteFacilityReportPhoto/);
+  assert.match(read(purgePersonalDataPortPath), /purgePersonalDataCreatedBefore/);
+  assert.match(read(purgePersonalDataSchedulerPath), /personal-data-retention-days:365/);
+  assert.match(read(purgePersonalDataSchedulerPath), /DEFAULT_PURGE_INTERVAL_MILLIS = 86_400_000L/);
+  assert.match(read(purgePersonalDataSchedulerPath), /PURGE_SAFETY_MARGIN = Duration\.ofDays\(7\)/);
+  assert.match(read(purgePersonalDataSchedulerPath), /MIN_RETENTION_DAYS = 8/);
+  assert.match(
+    read(purgePersonalDataSchedulerPath),
+    /@Scheduled\([\s\S]*fixedRate = DEFAULT_PURGE_INTERVAL_MILLIS,[\s\S]*scheduler = "facilityReportPersonalDataPurgeTaskScheduler"[\s\S]*\)/,
+  );
+  assert.match(
+    read(purgePersonalDataSchedulingConfigurationPath),
+    /@Bean\("facilityReportPersonalDataPurgeTaskScheduler"\)/,
+  );
+  assert.doesNotMatch(read(purgePersonalDataSchedulerPath), /personal-data-purge-interval-ms/);
   assert.match(saveFacilityStatusPort, /interface SaveAccessibilityFacilityStatusPort/);
   assert.match(saveFacilityStatusPort, /saveFacilityStatus/);
   assert.match(service, /implements FacilityReportUseCase/);
@@ -10731,7 +13315,7 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(repository, /List<FacilityReport> loadReports\(\)/);
   assert.match(repository, /PageResult<FacilityReportSummary> loadReportSummaries/);
   assert.match(jdbcRepository, /@Profile\("prod \| staging \| release \| prod-like"\)/);
-  assert.match(jdbcRepository, /implements[\s\S]*LoadFacilityReportPort[\s\S]*SaveFacilityReportPort[\s\S]*AnonymizeUserFacilityReportPort/);
+  assert.match(jdbcRepository, /implements[\s\S]*LoadFacilityReportPort[\s\S]*SaveFacilityReportPort[\s\S]*AnonymizeUserFacilityReportPort[\s\S]*PurgeFacilityReportPersonalDataPort/);
   assert.match(jdbcRepository, /Optional<FacilityReport> loadReport\(String reportId\)/);
   assert.match(jdbcRepository, /List<FacilityReport> loadReports\(\)/);
   assert.match(jdbcRepository, /PageResult<FacilityReportSummary> loadReportSummaries/);
@@ -10740,6 +13324,15 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(jdbcRepository, /OFFSET \?/);
   assert.match(jdbcRepository, /FacilityReport saveReport\(FacilityReport report\)/);
   assert.match(jdbcRepository, /int anonymizeFacilityReportsByUserId\(String userId\)/);
+  assert.match(jdbcRepository, /int purgePersonalDataCreatedBefore\(LocalDateTime cutoff\)/);
+  assert.match(
+    jdbcRepository,
+    /PHOTO_DELETION_RETRY_BATCH_SIZE = 100[\s\S]*deletePendingAnonymizedPhotoObjects[\s\S]*LIMIT \?/,
+  );
+  assert.match(
+    jdbcRepository,
+    /while \(true\)[\s\S]*loadPendingAnonymizedPhotoObjectsAfter\(cursor\)[\s\S]*created_at > \?[\s\S]*report_id > \?/,
+  );
   assert.match(jdbcRepository, /ON CONFLICT \(report_id\) DO UPDATE/);
   assert.match(jdbcRepository, /FacilityReport\.ANONYMIZED_USER_ID/);
   assert.doesNotMatch(jdbcRepository, /photo_data_base64 = NULL/);
@@ -10858,7 +13451,17 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
     security,
     /requestMatchers\([\s\S]*"\/api\/health"[\s\S]*"\/actuator\/health"[\s\S]*"\/actuator\/health\/liveness"[\s\S]*"\/actuator\/health\/readiness"[\s\S]*\)\.permitAll\(\)/,
   );
-  assert.doesNotMatch(security, /"\/actuator\/prometheus"/);
+  // #2376: /actuator/prometheus는 permitAll이 아니라, 사설망(RFC1918) 출처 remoteAddr에만 여는 IP 게이트로
+  // 노출한다(공개/미상 출처는 계속 denyAll로 거부). Prometheus의 backend_app_metrics scrape만 통과한다.
+  assert.match(
+    security,
+    /requestMatchers\(HttpMethod\.GET, "\/actuator\/prometheus"\)\s*\n\s*\.access\(internalNetworkOnly\(\)\)/,
+  );
+  assert.match(security, /new IpAddressMatcher\("10\.0\.0\.0\/8"\)/);
+  assert.match(security, /new IpAddressMatcher\("172\.16\.0\.0\/12"\)/);
+  assert.match(security, /new IpAddressMatcher\("192\.168\.0\.0\/16"\)/);
+  // prometheus 경로가 health permitAll 블록으로 새어 들어가지 않도록 permitAll 직전에 오지 않음을 확인한다.
+  assert.doesNotMatch(security, /"\/actuator\/prometheus"[\s\S]{0,200}?\)\.permitAll\(\)/);
   assert.match(security, /@Order\(4\)[\s\S]*?anyRequest\(\)\.denyAll\(\)/);
   assert.match(security, /easysubway\.operator\.username/);
   assert.match(security, /easysubway\.operator\.password/);
@@ -11659,6 +14262,16 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   const collectionRunStepsPostgresSchema = read(
     "backend/src/main/resources/db/migration/postgresql/V8__data_collection_run_steps.sql",
   );
+  const batchRunPostgresSchema = read(
+    "backend/src/main/resources/db/migration/postgresql/V63__admin_batch_run_permission.sql",
+  );
+  const batchRunPostgresIndex = read(
+    "backend/src/main/resources/db/migration/postgresql/V64__data_collection_active_source_index.sql",
+  );
+  const batchRunH2Schema = read(
+    "backend/src/main/resources/db/migration/h2/V63__admin_batch_run_permission.sql",
+  );
+  const batchRunPreflight = read("tools/ops/admin-batch-run-v63-preflight.sql");
   const run = read("backend/src/main/java/com/easysubway/collection/domain/DataCollectionRun.java");
   const runStep = read("backend/src/main/java/com/easysubway/collection/domain/DataCollectionRunStep.java");
   const stepStatus = read("backend/src/main/java/com/easysubway/collection/domain/DataCollectionStepStatus.java");
@@ -11676,6 +14289,9 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
     "backend/src/main/java/com/easysubway/collection/application/port/out/TransitMasterCollectionSnapshot.java",
   );
   const service = read("backend/src/main/java/com/easysubway/collection/application/service/DataCollectionService.java");
+  const failureDetailSanitizer = read(
+    "backend/src/main/java/com/easysubway/collection/application/service/DataCollectionFailureDetailSanitizer.java",
+  );
   const recorder = read("backend/src/main/java/com/easysubway/collection/application/service/DataCollectionRunRecorder.java");
   const sourceAdapter = read(
     "backend/src/main/java/com/easysubway/collection/adapter/out/source/LoadedTransitMasterCollectionSourceAdapter.java",
@@ -11718,6 +14334,31 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   assert.match(batchPostgresSchema, /ALTER TABLE data_collection_runs[\s\S]*ADD COLUMN IF NOT EXISTS retryable BOOLEAN NOT NULL DEFAULT FALSE/);
   assert.match(batchPostgresSchema, /ALTER TABLE data_collection_runs[\s\S]*ADD COLUMN IF NOT EXISTS operator_action VARCHAR\(500\) NOT NULL DEFAULT/);
   assert.match(batchPostgresSchema, /CREATE INDEX IF NOT EXISTS idx_data_collection_runs_started_at/);
+  for (const batchRunSchema of [batchRunPostgresSchema, batchRunH2Schema]) {
+    assert.match(batchRunSchema, /ADD COLUMN active_source VARCHAR\(40\)/);
+    assert.match(batchRunSchema, /admin\.batch\.run/);
+  }
+  assert.doesNotMatch(batchRunPostgresSchema, /CREATE (?:UNIQUE )?INDEX/);
+  assert.match(batchRunPostgresIndex, /LOCK TABLE data_collection_runs IN SHARE ROW EXCLUSIVE MODE/);
+  assert.match(batchRunPostgresIndex, /DROP INDEX IF EXISTS ux_data_collection_runs_running_source/);
+  assert.match(batchRunPostgresIndex, /V64 migration blocked: duplicate RUNNING/);
+  assert.match(
+    batchRunPostgresIndex,
+    /CREATE UNIQUE INDEX ux_data_collection_runs_running_source/,
+  );
+  assert.doesNotMatch(batchRunPostgresIndex, /CONCURRENTLY/);
+  assert.match(batchRunPostgresIndex, /ON data_collection_runs \(source\)/);
+  assert.match(batchRunPostgresIndex, /WHERE status = 'RUNNING'/);
+  assert.match(batchRunH2Schema, /CREATE UNIQUE INDEX ux_data_collection_runs_active_source/);
+  assert.match(batchRunPreflight, /WHERE status = 'RUNNING'/);
+  assert.match(batchRunPreflight, /GROUP BY source/);
+  assert.match(batchRunPreflight, /HAVING COUNT\(\*\) > 1/);
+  assert.match(batchRunPreflight, /V63 preflight blocked: duplicate RUNNING/);
+  assert.match(batchRunPreflight, /performs no updates/);
+  assert.doesNotMatch(
+    batchRunPreflight,
+    /\b(?:UPDATE|DELETE|INSERT|ALTER|CREATE|DROP|TRUNCATE|MERGE)\b/i,
+  );
   assert.match(run, /record DataCollectionRun/);
   assert.match(run, /requestedBy/);
   assert.match(run, /collectedCount/);
@@ -11758,7 +14399,12 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   assert.match(sourceSnapshot, /checksum/);
   assert.match(service, /implements DataCollectionUseCase/);
   assert.match(service, /JobLauncher/);
+  assert.match(service, /ORPHANED_RUN_AFTER = Duration\.ofHours\(24\)/);
+  assert.match(service, /failOrphanedRunningRun/);
   assert.match(service, /transitMasterCollectionJob/);
+  assert.match(service, /execution\.getStatus\(\) != BatchStatus\.COMPLETED/);
+  assert.match(service, /execution\.getAllFailureExceptions\(\)/);
+  assert.match(service, /DataCollectionFailureDetailSanitizer\.operatorSafe/);
   assert.match(service, /InvalidDataCollectionException\("데이터 수집 배치를 실행하지 못했습니다\.", exception\)/);
   assert.match(service, /loadRun\(runId\)/);
   assert.match(service, /loadLatestCompletedRun\(source\)/);
@@ -11772,6 +14418,7 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   assert.match(recorder, /"STAGE"/);
   assert.match(recorder, /MANUAL_REQUIRED/);
   assert.match(recorder, /catch \(RuntimeException exception\)/);
+  assert.match(recorder, /DataCollectionFailureDetailSanitizer\.operatorSafe/);
   assert.match(recorder, /DataCollectionStatus\.FAILED/);
   assert.match(recorder, /COMPLETED_OPERATOR_ACTION/);
   assert.match(recorder, /FAILED_OPERATOR_ACTION/);
@@ -11788,6 +14435,14 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   assert.match(jdbcRepository, /@Profile\("prod \| staging \| release \| prod-like"\)/);
   assert.match(jdbcRepository, /implements[\s\S]*LoadDataCollectionRunPort[\s\S]*SaveDataCollectionRunPort/);
   assert.match(jdbcRepository, /JdbcTemplate/);
+  assert.match(jdbcRepository, /@Transactional[\s\S]*saveRun\(DataCollectionRun run\)/);
+  assert.match(jdbcRepository, /isActiveSourceConflict/);
+  assert.match(jdbcRepository, /BATCH_JOB_EXECUTION_PARAMS/);
+  assert.match(jdbcRepository, /STARTING', 'STARTED', 'STOPPING', 'UNKNOWN/);
+  assert.match(jdbcRepository, /COALESCE\(execution\.LAST_UPDATED, execution\.START_TIME, execution\.CREATE_TIME\)/);
+  assert.match(jdbcRepository, /ux_data_collection_runs_active_source/);
+  assert.match(jdbcRepository, /ux_data_collection_runs_running_source/);
+  assert.match(jdbcRepository, /throw exception/);
   assert.match(jdbcRepository, /INSERT INTO data_collection_runs/);
   assert.match(jdbcRepository, /INSERT INTO data_collection_run_steps/);
   assert.match(jdbcRepository, /DELETE FROM data_collection_run_steps WHERE run_id = \?/);
@@ -11796,6 +14451,14 @@ test("백엔드 데이터 수집 배치는 관리자 API와 Spring Batch 경계�
   assert.match(jdbcRepository, /WHERE source = \?/);
   assert.match(jdbcRepository, /ORDER BY completed_at DESC, run_id DESC/);
   assert.match(jdbcRepository, /ORDER BY started_at DESC, run_id DESC/);
+  assert.match(failureDetailSanitizer, /MAX_LENGTH = 500/);
+  assert.match(failureDetailSanitizer, /operatorSafe\(Throwable failure, BatchStatus status\)/);
+  assert.match(failureDetailSanitizer, /failure\.getClass\(\)\.getSimpleName\(\)/);
+  assert.match(failureDetailSanitizer, /BatchStatus\./);
+  assert.match(failureDetailSanitizer, /보호 정책에 따라 생략되었습니다/);
+  assert.doesNotMatch(failureDetailSanitizer, /failure\.getMessage\(\)/);
+  assert.doesNotMatch(failureDetailSanitizer, /Pattern|URL_QUERY|CREDENTIAL|AUTHORIZATION_VALUE|RAW_BODY/);
+  assert.doesNotMatch(failureDetailSanitizer, /normalize|truncate/);
   assert.match(controller, /@GetMapping\("\/admin\/data-sources"\)/);
   assert.match(controller, /@PostMapping\("\/admin\/data-sources\/\{dataSourceId\}\/sync"\)/);
   assert.match(controller, /dataCollectionSource\(String dataSourceId\)/);
@@ -12007,7 +14670,9 @@ test("백엔드 데이터 품질 요약은 관리자 API와 헥사고날 경계�
   const adminController = read("backend/src/main/java/com/easysubway/quality/adapter/in/web/DataQualityAdminPageController.java");
   const adminTemplate = read("backend/src/main/resources/templates/admin/quality/dashboard.html");
   const operatorAssembler = read("backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorAccessibilityReportAssembler.java");
-  const mobileStationSearch = read("apps/mobile/lib/station_search.dart");
+  const mobileStationSearch = read(
+    "apps/mobile/lib/features/stations/domain/station_models.dart",
+  );
   const mobileRouteRepository = read("apps/mobile/lib/features/routes/data/local_route_repository.dart");
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
 
@@ -12385,7 +15050,7 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.doesNotMatch(searchDashboardView, /routeSearchId|stationId/);
   assert.match(searchDashboardTemplate, /경로 검색 현황/);
   assert.match(searchDashboardTemplate, /전체 검색/);
-  assert.match(searchDashboardTemplate, /경로 차단율/);
+  assert.match(searchDashboardTemplate, /경로 차단률/);
   assert.match(searchDashboardTemplate, /운영 상태/);
   assert.match(searchDashboardTemplate, /summary\.blockedRateLabel/);
   assert.match(searchDashboardTemplate, /summary\.blockedAlertLabel/);
@@ -12478,7 +15143,7 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(planner, /ObjectProvider<LoadRouteTimetablePort>/);
   assert.match(planner, /getIfAvailable\(\)/);
   assert.match(planner, /timetableRequired && routeTimetablePort != null/);
-  assert.match(planner, /timetableRequired[\s\S]*canUseTimetableRaptor\(command\)[\s\S]*routeTimetablePort\.hasRouteTimetable\(\)/);
+  assert.match(planner, /timetableRequired[\s\S]*routeTimetablePort\.hasRouteTimetable\(\)/);
   assert.match(planner, /timetableCovers\(command, snapshot\)/);
   assert.match(planner, /snapshot\.timetableArtifactId\(\)/);
   assert.match(planner, /coveredStationIds\(\)/);
@@ -12490,11 +15155,14 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(h2StateMigration, /timetable_artifact_id VARCHAR\(160\) NOT NULL/);
   assert.match(postgresArtifactIdMigration, /ALTER COLUMN timetable_artifact_id TYPE VARCHAR\(200\)/);
   assert.match(h2ArtifactIdMigration, /ALTER COLUMN timetable_artifact_id VARCHAR\(200\)/);
-  assert.match(planner, /canUseTimetableRaptor/);
-  assert.match(planner, /loadRouteTimetable\(\)/);
+  assert.doesNotMatch(planner, /canUseTimetableRaptor/);
+  assert.match(planner, /loadRouteTimetableSnapshot\(\)/);
   assert.match(planner, /RouteTimetableRaptorPlanner/);
   assert.match(planner, /noTimetableServicePlan/);
-  assert.match(planner, /nextServiceTime\(command, snapshot\.timetable\(\)\)/);
+  assert.match(
+    planner,
+    /nextServiceTime\(\s*command,\s*snapshot\.compiledTimetable\(\),\s*realtimeOverlay\s*\)/,
+  );
   assert.match(planner, /searchRouteAlternatives/);
   assert.match(planner, /statusesOf/);
   assert.match(raptorPlanner, /class RouteTimetableRaptorPlanner/);
@@ -12512,7 +15180,9 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(raptorPlanner, /transitFrequencies\(\)/);
   assert.match(raptorPlanner, /pickupType\(\)/);
   assert.match(raptorPlanner, /dropOffType\(\)/);
-  assert.match(raptorPlanner, /dominates/);
+  assert.match(raptorPlanner, /PARETO_LIMIT/);
+  assert.match(raptorPlanner, /collectMarkedPatterns/);
+  assert.match(raptorPlanner, /private int\[] parentTrip/);
   assert.match(useCase, /record SearchRouteV2Command/);
   assert.match(useCase, /OffsetDateTime departureTime/);
   assert.match(useCase, /boolean useRealtime/);
@@ -12569,15 +15239,50 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const envExample = read(".env.example");
   const iosInfoPlist = read("apps/mobile/ios/Runner/Info.plist");
   const main = read("apps/mobile/lib/main.dart");
+  const appRoot = read("apps/mobile/lib/app/easy_subway_app.dart");
+  const homeScreen = read(
+    "apps/mobile/lib/features/home/presentation/home_screen.dart",
+  );
+  const supportAccessScreen = read(
+    "apps/mobile/lib/features/support/presentation/support_access_screen.dart",
+  );
+  const serviceInfoScreen = read(
+    "apps/mobile/lib/features/settings/presentation/service_info_screen.dart",
+  );
+  const openSourceLicensesScreen = read(
+    "apps/mobile/lib/features/settings/presentation/open_source_licenses_screen.dart",
+  );
+  const appSettingsScreen = read(
+    "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
+  );
+  const favoriteHomeScreen = read(
+    "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart",
+  );
+  const accessibilityTheme = read("apps/mobile/lib/app/accessibility_theme.dart");
   const appDependencies = read("apps/mobile/lib/app/app_dependencies.dart");
   const authHeaders = read("apps/mobile/lib/auth_headers.dart");
   const secureKeyValueStorage = read("apps/mobile/lib/secure_key_value_storage.dart");
   const userDataDeletion = read("apps/mobile/lib/user_data_deletion.dart");
+  const userDataDeletionScreen = read(
+    "apps/mobile/lib/features/account/presentation/user_data_deletion_screen.dart",
+  );
   const userDataDeletionTest = read("apps/mobile/test/user_data_deletion_test.dart");
   const onboarding = read("apps/mobile/lib/onboarding.dart");
   const onboardingTest = read("apps/mobile/test/onboarding_test.dart");
   const routeSearch = read("apps/mobile/lib/route_search.dart");
   const stationSearch = read("apps/mobile/lib/station_search.dart");
+  const stationExitCard = read(
+    "apps/mobile/lib/features/stations/presentation/station_exit_card.dart",
+  );
+  const stationDetailHeader = read(
+    "apps/mobile/lib/features/stations/presentation/station_detail_header.dart",
+  );
+  const stationSearchBody = read(
+    "apps/mobile/lib/features/stations/presentation/station_search_body.dart",
+  );
+  const stationModels = read(
+    "apps/mobile/lib/features/stations/domain/station_models.dart",
+  );
   const networkMap = read("apps/mobile/lib/network_map.dart");
   const stationLineBadges = read("apps/mobile/lib/features/stations/presentation/station_line_badges.dart");
   const stationLine = read("apps/mobile/lib/features/stations/domain/station_line.dart");
@@ -12639,19 +15344,22 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(envExample, /^EASYSUBWAY_ANDROID_KEY_ALIAS=$/m);
   assert.match(envExample, /^EASYSUBWAY_ANDROID_KEY_PASSWORD=$/m);
   assert.match(iosInfoPlist, /CFBundleDisplayName[\s\S]*?<string>쉬운 지하철<\/string>/);
-  assert.match(main, /class EasySubwayApp extends StatelessWidget/);
-  assert.match(`${main}\n${networkMap}\n${stationSearch}`, /역 검색/);
-  assert.match(`${main}\n${networkMap}\n${routeSearch}\n${stationSearch}`, /길찾기/);
-  assert.match(main, /이동 조건/);
-  assert.match(main, /알림 설정/);
+  assert.match(appRoot, /class EasySubwayApp extends StatelessWidget/);
+  assert.match(`${appRoot}\n${homeScreen}\n${networkMap}\n${stationSearch}`, /역 검색/);
+  assert.match(
+    `${appRoot}\n${homeScreen}\n${networkMap}\n${routeSearch}\n${stationSearch}`,
+    /길찾기/,
+  );
+  assert.match(appSettingsScreen, /이동 조건/);
+  assert.match(appSettingsScreen, /알림 설정/);
   assert.match(main, /EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS/);
   assert.match(main, /defaultValue: false/);
   assert.match(main, /enablePushNotifications/);
   assert.doesNotMatch(`${main}\n${appDependencies}`, /AnonymousAuth|enableAnonymousAuth|anonymousAuth/);
   assert.match(`${main}\n${appDependencies}`, /FavoriteStationApiRepository/);
   assert.match(`${main}\n${appDependencies}`, /NotificationSettingsApiRepository/);
-  assert.match(main, /OnboardingScreen/);
-  assert.match(main, /initialOnboardingState/);
+  assert.match(appRoot, /OnboardingScreen/);
+  assert.match(appRoot, /initialOnboardingState/);
   assert.match(onboardingAppFlowTest, /첫 실행 앱은 온보딩을 완료한 뒤 홈으로 이동한다/);
   assert.match(onboardingAppFlowTest, /첫 실행 앱은 온보딩에서 위치 권한을 준비할 수 있다/);
   assert.match(onboardingAppFlowTest, /첫 실행 앱은 온보딩에서 알림 권한을 준비할 수 있다/);
@@ -12660,31 +15368,34 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(onboardingAppFlowTest, /첫 실행 앱은 알림 권한 제공자가 직접 주입되면 온보딩 알림 권한을 요청한다/);
   assert.match(onboardingAppFlowTest, /앱은 저장된 온보딩 설정으로 홈을 바로 보여준다/);
   assert.match(onboardingAppFlowTest, /앱은 온보딩 저장소를 읽지 못하면 다시 설정을 고르게 한다/);
-  assert.match(stationSearch, /stationSearchFailureNextAction/);
-  assert.match(stationSearch, /역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다\./);
+  assert.match(stationSearchBody, /stationSearchFailureNextAction/);
+  assert.match(stationSearchBody, /역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다\./);
   assert.match(widgetTest, /역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다\./);
-  assert.match(main, /initialMobilityType: onboardingResult\?\.mobilityType/);
-  assert.match(main, /initialMobilityType: initialMobilityType/);
-  assert.match(main, /_OnboardingPreferenceScope/);
-  assert.doesNotMatch(main, /mediaQuery\.textScaler\.clamp\(minScaleFactor: 1\.18\)/);
-  assert.match(main, /highContrast:[\s\S]*preferences\.highContrastEnabled \|\| mediaQuery\.highContrast/);
-  assert.match(main, /mediaQuery\.boldText/);
-  assert.match(main, /_themeForPlatformAccessibility/);
-  assert.match(main, /WidgetStateProperty\.resolveWith/);
-  assert.match(main, /_themeForPreferences/);
-  assert.match(main, /simpleViewEnabled: preferences\.simpleViewEnabled/);
-  assert.match(main, /RouteSearchScreen\([\s\S]*simpleViewEnabled: simpleViewEnabled/);
-  assert.match(main, /AppBar\(title: const Text\('즐겨찾기'\)\)/);
+  assert.match(appRoot, /initialMobilityType: onboardingResult\?\.mobilityType/);
+  assert.match(homeScreen, /initialMobilityType: initialMobilityType/);
+  assert.match(appRoot, /OnboardingPreferenceScope/);
+  assert.doesNotMatch(accessibilityTheme, /mediaQuery\.textScaler\.clamp\(minScaleFactor: 1\.18\)/);
+  assert.match(accessibilityTheme, /highContrast:[\s\S]*preferences\.highContrastEnabled \|\| mediaQuery\.highContrast/);
+  assert.match(accessibilityTheme, /mediaQuery\.boldText/);
+  assert.match(accessibilityTheme, /_themeForPlatformAccessibility/);
+  assert.match(accessibilityTheme, /WidgetStateProperty\.resolveWith/);
+  assert.match(accessibilityTheme, /_themeForPreferences/);
+  assert.match(appRoot, /simpleViewEnabled: preferences\.simpleViewEnabled/);
+  assert.match(
+    homeScreen,
+    /RouteSearchScreen\([\s\S]*simpleViewEnabled: simpleViewEnabled/,
+  );
+  assert.match(favoriteHomeScreen, /AppBar\(title: const Text\('즐겨찾기'\)\)/);
   // 즐겨찾기 홈은 #1569에서 카테고리 카드를 없애고 역/경로/시설 인라인 섹션으로 바꿨다.
-  assert.match(main, /_AppSectionTitle\(title: '역'\)/);
-  assert.match(main, /_AppSectionTitle\(title: '시설'\)/);
-  assert.match(main, /_AppSectionTitle\(title: '경로'\)/);
-  assert.match(main, /FavoriteHomeScreen/);
+  assert.match(favoriteHomeScreen, /AppSectionTitle\(title: '역'\)/);
+  assert.match(favoriteHomeScreen, /AppSectionTitle\(title: '시설'\)/);
+  assert.match(favoriteHomeScreen, /AppSectionTitle\(title: '경로'\)/);
+  assert.match(homeScreen, /FavoriteHomeScreen/);
   // #1569: 하위 목록 화면 진입 대신 즐겨찾기 항목을 인라인 행으로 바로 나열한다.
   // (하위 목록 위젯 클래스는 각 소스 파일에 유지, main에서 진입만 제거)
-  assert.match(main, /class _FavoriteHomeStationRow/);
-  assert.match(main, /class _FavoriteHomeFacilityRow/);
-  assert.match(main, /_HomeSavedRouteCard\([\s\S]*onRemove:/);
+  assert.match(favoriteHomeScreen, /class _FavoriteHomeStationRow/);
+  assert.match(favoriteHomeScreen, /class _FavoriteHomeFacilityRow/);
+  assert.match(favoriteHomeScreen, /_HomeSavedRouteCard\([\s\S]*onRemove:/);
   assert.match(onboarding, /class OnboardingViewPreferences/);
   assert.match(onboarding, /const OnboardingViewPreferences\.defaults/);
   assert.match(onboarding, /class OnboardingResult/);
@@ -12737,17 +15448,17 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(facilityReportTest, /시설 신고 임시 대상 저장소는 secure storage 복원 실패 시 저장값을 지운다/);
   assert.match(facilityReportTest, /시설 신고 임시 대상 저장소는 secure storage 삭제 실패에도 null로 복구한다/);
   assert.ok(existsSync(path.join(root, "apps/mobile/lib/station_search.dart")));
-  assert.match(stationSearch, /features\/stations\/presentation\/station_line_badges\.dart/);
+  assert.match(stationDetailHeader, /station_line_badges\.dart/);
   assert.doesNotMatch(stationSearch, /class StationLineBadges|class StationLineBadge/);
   assert.match(stationLineBadges, /class StationLineBadges extends StatelessWidget/);
   assert.match(stationLineBadges, /class StationLineBadge extends StatelessWidget/);
   assert.match(stationLine, /class StationSearchLine/);
   assert.match(routeSearch, /features\/stations\/presentation\/station_line_badges\.dart/);
   assert.match(stationApiRepository, /typedef FavoriteStationAuthProvider = AuthorizationHeaderProvider/);
-  assert.match(stationSearch, /final double\? latitude/);
-  assert.match(stationSearch, /final double\? longitude/);
-  assert.match(stationSearch, /_optionalDouble\(json, 'latitude'\)/);
-  assert.match(stationSearch, /_optionalDouble\(json, 'longitude'\)/);
+  assert.match(stationModels, /final double\? latitude/);
+  assert.match(stationModels, /final double\? longitude/);
+  assert.match(stationModels, /_optionalDouble\(json, 'latitude'\)/);
+  assert.match(stationModels, /_optionalDouble\(json, 'longitude'\)/);
   assert.doesNotMatch(stationSearch, /import 'core\/network\/api_client\.dart';/);
   assert.doesNotMatch(stationSearch, /class StationSearchApiRepository/);
   assert.match(stationApiRepository, /class StationSearchApiRepository[\s\S]*final ApiClient _apiClient;/);
@@ -12828,9 +15539,12 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
     externalMapDeeplinkPolicy.privacyContract.locationPersistenceAllowed,
     false,
   );
-  assert.match(stationSearch, /openWalkingRoute/);
-  assert.match(stationSearch, /_coordinateDistanceMeters/);
-  assert.match(stationSearch, /현재 위치와 출구 좌표만 사용합니다/);
+  assert.match(stationExitCard, /openWalkingRoute/);
+  assert.match(stationExitCard, /_coordinateDistanceMeters/);
+  assert.match(
+    stationExitCard,
+    /카카오맵 앱에서는 현재 위치와 출구 좌표를, 웹에서는 출구 좌표만 카카오에 전달합니다/,
+  );
   assert.match(widgetTest, /출구 좌표가 없어 역 위치 기준으로 안내합니다/);
   assert.doesNotMatch(stationSearch, /EasySubwayMapAdapter\(\)\.markersForStationDetail/);
   assert.doesNotMatch(stationSearch, /Text\(\s*'지도 위치 목록'/);
@@ -12894,19 +15608,20 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(easySubwayAppDefaultsTest, /인증 저장소가 없으면 홈 즐겨찾기를 노출하지 않는다/);
   assert.match(widgetTest, /노선도 첫 화면은 핵심 이동 행동과 보조 행동을 지도 위에 제공한다/);
   assert.match(widgetTest, /홈 즐겨찾기는 하나의 진입점에서 탭 목록을 바로 보여준다/);
-  assert.match(widgetTest, /도움말은 개인정보 안내를 불릿 대신 처리방침 링크로 위임한다/);
+  assert.match(widgetTest, /도움말은 개인정보 처리방침 진입점을 서비스 정보로 분리한다/);
   assert.match(widgetTest, /도움말은 이동 전 살펴보기 안내를 함께 보여준다/);
   assert.match(widgetTest, /도움말은 보안과 개인정보 문의 경로를 안내한다/);
-  assert.match(main, /보안 문의 안내/);
-  assert.match(main, /앱 보안이나 개인정보가 걱정되면 문의로 알려주세요\./);
-  assert.match(main, /EASYSUBWAY_SECURITY_EMAIL/);
-  assert.match(main, /validatedForBuild\(\{required bool isReleaseMode\}\)/);
-  assert.match(main, /Release \$label must use HTTPS\./);
-  assert.match(main, /Release \$label must be a valid email address\./);
-  assert.match(main, /Release \$label must be configured\./);
-  assert.match(main, /supportAccessInfo\.validatedForBuild\([\s\S]*isReleaseMode: kReleaseMode/);
-  assert.match(supportAccessInfoTest, /릴리즈 도움말 연락 경로는 모두 설정되어야 한다/);
-  assert.match(supportAccessInfoTest, /릴리즈 도움말 연락 경로는 HTTPS와 메일 주소 형식만 허용한다/);
+  assert.match(supportAccessScreen, /보안 문의 안내/);
+  assert.match(supportAccessScreen, /앱 보안이나 개인정보가 걱정되면 문의로 알려주세요\./);
+  assert.match(supportAccessScreen, /EASYSUBWAY_SECURITY_EMAIL/);
+  assert.match(supportAccessScreen, /validatedForBuild\(\{required bool isReleaseMode\}\)/);
+  assert.match(supportAccessScreen, /Release \$label must use HTTPS\./);
+  assert.match(supportAccessScreen, /Release \$label must be a valid email address\./);
+  assert.match(supportAccessScreen, /Release \$label must be configured\./);
+  assert.match(appRoot, /supportAccessInfo\.validatedForBuild\([\s\S]*isReleaseMode: kReleaseMode/);
+  assert.match(supportAccessInfoTest, /릴리즈 법적 문서 URL은 모두 설정되어야 한다/);
+  assert.match(supportAccessInfoTest, /릴리즈 법적 문서는 HTTPS URL만 허용한다/);
+  assert.match(supportAccessInfoTest, /릴리즈 문의 주소는 모두 유효해야 한다/);
   assert.match(supportAccessInfoTest, /Release privacy policy URL must use HTTPS\./);
   assert.match(supportAccessInfoTest, /Release support email must be a valid email address\./);
   assert.match(supportAccessInfoTest, /Release data deletion email must be configured\./);
@@ -12949,17 +15664,21 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
     routeSearch,
     /class FavoriteRouteApiRepository[\s\S]*?_httpClient[\s\S]*?class FavoriteRouteException/,
   );
-  // 개인정보 안내는 화면 불릿 대신 개인정보처리방침 링크로 위임한다(#1571).
-  assert.match(main, /개인정보처리방침/);
-  assert.doesNotMatch(main, /개인정보 사용 안내/);
-  assert.match(main, /이동 전 살펴보기/);
-  assert.match(main, /경로와 시설 정보는 이동을 돕는 참고 정보입니다/);
-  assert.match(main, /현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요/);
-  assert.match(main, /실시간 상태나 무조건 안전한 경로를 보장하지 않습니다/);
+  // 법적 고지와 출처는 서비스 정보로 단일화하고 도움말에는 중복 진입점을 두지 않는다.
+  assert.match(serviceInfoScreen, /개인정보 처리방침/);
+  assert.match(serviceInfoScreen, /정보제공처/);
+  assert.match(serviceInfoScreen, /OpenSourceLicensesScreen/);
+  assert.match(openSourceLicensesScreen, /LicenseRegistry\.licenses/);
+  assert.doesNotMatch(supportAccessScreen, /개인정보처리방침|privacyPolicyAccessItem/);
+  assert.doesNotMatch(supportAccessScreen, /개인정보 사용 안내/);
+  assert.match(supportAccessScreen, /이동 전 살펴보기/);
+  assert.match(supportAccessScreen, /경로와 시설 정보는 이동을 돕는 참고 정보입니다/);
+  assert.match(supportAccessScreen, /현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요/);
+  assert.match(supportAccessScreen, /실시간 상태나 무조건 안전한 경로를 보장하지 않습니다/);
   // 삭제 확인 화면은 지워지는 것 1줄 + 되돌릴 수 없음 강조 + 예외 1줄로 압축한다(#1571).
-  assert.match(main, /삭제 후에는 되돌릴 수 없어요/);
+  assert.match(userDataDeletionScreen, /삭제 후에는 되돌릴 수 없어요/);
   assert.match(
-    main,
+    userDataDeletionScreen,
     /이 기기의 즐겨찾기·최근 검색·설정과 보낸 제보·사진이 삭제되거나 익명 처리돼요/,
   );
   assert.match(apiClient, /class ApiClient/);
@@ -13001,8 +15720,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(userDataDeletionTest, /기존 인증 갱신 실패 시 새 사용자 삭제로 처리하지 않는다/);
   assert.match(widgetTest, /도움말은 앱 안에서 데이터 삭제를 재확인하고 로컬 상태를 정리한다/);
   assert.match(widgetTest, /데이터 삭제 실패 시 로컬 상태를 유지하고 오류를 안내한다/);
-  assert.match(main, /UserDataDeletionScreen/);
-  assert.match(main, /dataDeletionConfirmButton/);
+  assert.match(userDataDeletionScreen, /UserDataDeletionScreen/);
+  assert.match(userDataDeletionScreen, /dataDeletionConfirmButton/);
   assert.match(widgetTest, /알림 설정 화면은 현재 설정을 불러오고 바꾼 값을 저장한다/);
   assert.match(widgetTest, /bySemanticsLabel/);
   assert.match(widgetTest, /greaterThanOrEqualTo\(60\)/);
@@ -13660,7 +16379,8 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
   const publicPrivacyPolicy = read("backend/src/main/resources/templates/legal/privacy.html");
   assert.match(publicPrivacyPolicy, /외부 지도 도보 길안내/);
   assert.match(publicPrivacyPolicy, /출구 도보 길안내/);
-  assert.match(publicPrivacyPolicy, /카카오맵 앱\/웹/);
+  assert.match(publicPrivacyPolicy, /카카오맵 앱에는 현재 위치 시작 좌표와 목적지 좌표/);
+  assert.match(publicPrivacyPolicy, /카카오맵 웹에는 목적지 좌표/);
   assert.equal(playStoreContent.storeMetadataRequirements.publicContactEmailMustMatchAppSupportEmail, true);
   assert.ok(playStoreContent.storeMetadataRequirements.requiredTagsKo.includes("대중교통"));
   assert.ok(playStoreContent.storeMetadataRequirements.requiredTagsKo.includes("접근성"));
@@ -13762,6 +16482,7 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
     read("backend/src/main/resources/db/migration/postgresql/V13__admin_common_code_incident.sql"),
     read("backend/src/main/resources/db/migration/postgresql/V15__admin_report_photo_read_permission.sql"),
     read("backend/src/main/resources/db/migration/postgresql/V22__datapack_admin_permissions.sql"),
+    read("backend/src/main/resources/db/migration/postgresql/V63__admin_batch_run_permission.sql"),
   ].join("\n");
   const adminRbacH2Schema = [
     read("backend/src/main/resources/db/migration/h2/V10__admin_rbac_menu.sql"),
@@ -13770,6 +16491,7 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
     read("backend/src/main/resources/db/migration/h2/V13__admin_common_code_incident.sql"),
     read("backend/src/main/resources/db/migration/h2/V15__admin_report_photo_read_permission.sql"),
     read("backend/src/main/resources/db/migration/h2/V22__datapack_admin_permissions.sql"),
+    read("backend/src/main/resources/db/migration/h2/V63__admin_batch_run_permission.sql"),
   ].join("\n");
   const adminProgramRegistry = read("backend/src/main/java/com/easysubway/admin/navigation/AdminProgram.java");
   const adminPermission = read("backend/src/main/java/com/easysubway/admin/authorization/AdminPermission.java");
@@ -13975,6 +16697,7 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
     "admin.security.admin",
     "admin.audit.read",
     "admin.privacy-log.read",
+    "admin.batch.run",
     "admin.batch.retry",
     "admin.operations.manage",
     "admin.datapack.read",
@@ -14111,6 +16834,53 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   assert.ok(securityPrivacyEvidence.userDataDeletionE2E.targets.includes("report photo object 삭제"));
 });
 
+test("#2272 V6-00 관리자·operator QA surface는 API catalog GET page route에 대응하고 owner를 고정한다", () => {
+  const qaSource = read("tools/qa/admin-accessibility-qa.mjs");
+
+  // API catalog의 GET page route가 정본이다. 템플릿 세그먼트({id})는 한 세그먼트 매칭으로 취급한다.
+  const catalogList = execFileSync(
+    process.execPath,
+    ["tools/ci/api-catalog.mjs", "list"],
+    { cwd: root, encoding: "utf8" },
+  );
+  const getRoutes = catalogList
+    .split("\n")
+    .filter((line) => line.startsWith("internal:GET:"))
+    .map((line) => line.split("\t")[3])
+    .filter(Boolean);
+  const routeMatchers = getRoutes.map((route) => {
+    const escaped = route
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      .replace(/\\\{[^/]+\\\}/g, "[^/]+");
+    return new RegExp(`^${escaped}$`);
+  });
+  const matchesCatalog = (url) => routeMatchers.some((matcher) => matcher.test(url));
+
+  // QA surface inventory 항목을 source에서 파싱한다(조사 수치 하드코딩 금지, source assertion).
+  const entryRegex =
+    /\{\s*url:\s*"([^"]+)",\s*name:\s*"([^"]+)",\s*archetype:\s*"([^"]+)",\s*ownerSubIssue:\s*"(V6-\d\d)",\s*permission:\s*"([^"]+)",\s*noJsPath:\s*"([^"]+)"\s*\}/g;
+  const entries = [...qaSource.matchAll(entryRegex)];
+  assert.equal(entries.length, 18, "QA surface inventory는 admin 13 + operator 5 = 18개여야 한다");
+
+  const OWNER_SUB_ISSUES = new Set(["V6-07", "V6-08", "V6-09", "V6-10"]);
+  const mismatches = [];
+  for (const [, url, , archetype, owner, permission, noJsPath] of entries) {
+    if (!matchesCatalog(url)) {
+      mismatches.push(`${url}: catalog GET page route 없음`);
+    }
+    if (!OWNER_SUB_ISSUES.has(owner)) {
+      mismatches.push(`${url}: owner=${owner} (V6-07~V6-10 아님)`);
+    }
+    if (archetype.length === 0 || permission.length === 0) {
+      mismatches.push(`${url}: archetype/permission 누락`);
+    }
+    if (noJsPath !== url) {
+      mismatches.push(`${url}: noJsPath!=url`);
+    }
+  }
+  assert.deepEqual(mismatches, [], `QA surface ↔ catalog GET page route 계약 불일치: ${mismatches.join(", ")}`);
+});
+
 test("관리자 사용자 활동 화면은 API 오류율 운영 지표를 표시한다", () => {
   const userActivityFilter = read("backend/src/main/java/com/easysubway/usage/adapter/in/web/UserActivityTrackingFilter.java");
   const summary = read("backend/src/main/java/com/easysubway/usage/domain/UserActivityDashboardSummary.java");
@@ -14167,7 +16937,22 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
   const inventory = readJson(inventoryPath);
   const privacyManifest = read("apps/mobile/ios/Runner/PrivacyInfo.xcprivacy");
   const main = read("apps/mobile/lib/main.dart");
+  const supportAccessScreen = read(
+    "apps/mobile/lib/features/support/presentation/support_access_screen.dart",
+  );
+  const serviceInfoScreen = read(
+    "apps/mobile/lib/features/settings/presentation/service_info_screen.dart",
+  );
   const stationSearch = read("apps/mobile/lib/station_search.dart");
+  const stationSearchController = read(
+    "apps/mobile/lib/features/stations/application/station_search_controller.dart",
+  );
+  const stationDetailScreen = read(
+    "apps/mobile/lib/features/stations/presentation/station_detail_screen.dart",
+  );
+  const stationExitCard = read(
+    "apps/mobile/lib/features/stations/presentation/station_exit_card.dart",
+  );
   const facilityReport = read("apps/mobile/lib/facility_report.dart");
 
   assert.equal(inventory.schemaVersion, 1);
@@ -14191,15 +16976,45 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
   assert.ok(inventory.crashAnrProviderDecision.sourceOfTruth.includes("Android vitals"));
   assert.ok(inventory.crashAnrProviderDecision.sourceOfTruth.includes("Google Play pre-launch report"));
   assert.ok(inventory.crashAnrProviderDecision.requiredEvidence.includes("android-vitals-or-play-pre-launch-report-export"));
-  assert.match(main, /EASYSUBWAY_PRIVACY_POLICY_URL/);
-  assert.match(main, /EASYSUBWAY_DATA_DELETION_EMAIL/);
+  assert.match(supportAccessScreen, /EASYSUBWAY_PRIVACY_POLICY_URL/);
+  assert.match(supportAccessScreen, /EASYSUBWAY_TERMS_OF_SERVICE_URL/);
+  assert.match(supportAccessScreen, /EASYSUBWAY_LOCATION_TERMS_URL/);
+  assert.match(supportAccessScreen, /EASYSUBWAY_DATA_DELETION_EMAIL/);
+  assert.match(serviceInfoScreen, /LaunchMode\.inAppBrowserView/);
+  assert.match(serviceInfoScreen, /accessInfo\.termsOfServiceUrl/);
+  assert.match(serviceInfoScreen, /accessInfo\.privacyPolicyUrl/);
+  assert.match(serviceInfoScreen, /accessInfo\.locationTermsUrl/);
+  const openSourceLicensesScreen = read(
+    "apps/mobile/lib/features/settings/presentation/open_source_licenses_screen.dart",
+  );
+  assert.match(serviceInfoScreen, /OpenSourceLicensesScreen/);
+  assert.match(openSourceLicensesScreen, /LicenseRegistry\.licenses/);
+  assert.match(openSourceLicensesScreen, /OSS Notice \| EasySubway/);
+  assert.doesNotMatch(serviceInfoScreen, /showLicensePage|LicensePage/);
+  assert.deepEqual(
+    [...serviceInfoScreen.matchAll(/title: '([^']+)'/g)].map((match) => match[1]),
+    [
+      "서비스 이용약관",
+      "개인정보 처리방침",
+      "위치정보 이용약관",
+      "정보제공처",
+      "오픈 소스 라이선스",
+    ],
+  );
 
   const items = new Map(inventory.dataTypes.map((item) => [item.id, item]));
   const requiredIds = [
     "precise_location",
     "search_queries",
+    "train_search_queries",
     "favorite_stations_routes_facilities",
     "route_eta_feedback",
+    "route_v2_itx_integrity",
+    "route_v2_itx_mobility_preferences",
+    "route_v2_itx_request_state",
+    "route_v2_gateway_abuse_rate_limit_state",
+    "facility_report_abuse_rate_limit_state",
+    "train_search_abuse_rate_limit_state",
     "mobility_profile",
     "facility_report_content",
     "facility_report_photo",
@@ -14247,7 +17062,22 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
         `${id} evidence artifact must exist: ${evidencePath}`,
       );
     }
-    const expectedLastVerifiedAt = id === "precise_location" ? "2026-07-09" : "2026-06-19";
+    const reviewedForLegalDisclosure = new Set([
+      "precise_location",
+      "facility_report_content",
+      "facility_report_photo",
+      "facility_report_location",
+    ]);
+    const auditedForPrivacyInventory = new Set([
+      "facility_report_abuse_rate_limit_state",
+      "train_search_queries",
+      "train_search_abuse_rate_limit_state",
+    ]);
+    const expectedLastVerifiedAt = auditedForPrivacyInventory.has(id)
+      ? id === "facility_report_abuse_rate_limit_state" ? "2026-07-18" : "2026-07-19"
+      : id.startsWith("route_v2_") || reviewedForLegalDisclosure.has(id)
+        ? "2026-07-16"
+        : "2026-06-19";
     assert.equal(item.lastVerifiedAt, expectedLastVerifiedAt, `${id} verification date must be current`);
     const expectedThirdPartySharing = id === "precise_location";
     assert.equal(
@@ -14278,7 +17108,16 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     assert.equal(typeof item.googlePlayDataSafety.purpose, "string", `${id} must declare Play purpose`);
     assert.equal(typeof item.googlePlayDataSafety.linkedToUser, "boolean", `${id} must declare Play linked-to-user value`);
     if (item.googlePlayDataSafety.collected) {
-      assert.equal(item.googlePlayDataSafety.linkedToUser, true, `${id} collected Play data must be linked to user`);
+      const routeV2ExpectedLinkage = [
+        "route_v2_itx_integrity",
+        "route_v2_gateway_abuse_rate_limit_state",
+      ].includes(id);
+      const anonymousSearchHistory = id === "train_search_queries";
+      assert.equal(
+        item.googlePlayDataSafety.linkedToUser,
+        anonymousSearchHistory ? false : id.startsWith("route_v2_itx_") ? routeV2ExpectedLinkage : true,
+        `${id} Play user linkage must match the release data model`,
+      );
     }
     assert.equal(
       item.googlePlayDataSafety.encryptedInTransit,
@@ -14296,8 +17135,142 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     } else {
       assert.equal(item.googlePlayDataSafety.required, false, `${id} not-collected Play data must not be required`);
     }
-    assert.equal(item.googlePlayDataSafety.deletionSupported, true, `${id} must declare data deletion support`);
+    const noUserDeletionBoundary = new Set([
+      "route_v2_gateway_abuse_rate_limit_state",
+      "facility_report_abuse_rate_limit_state",
+      "train_search_queries",
+      "train_search_abuse_rate_limit_state",
+    ]);
+    assert.equal(
+      item.googlePlayDataSafety.deletionSupported,
+      !noUserDeletionBoundary.has(id),
+      `${id} must declare the implemented data deletion boundary`,
+    );
   }
+
+  const preciseLocationException = items.get("precise_location").userInitiatedSharingException;
+  assert.ok(preciseLocationException, "precise_location must document the user-initiated sharing exception");
+  assert.equal(preciseLocationException.applies, true, "precise_location sharing exception must be applied");
+  assert.equal(
+    preciseLocationException.consoleThirdPartySharingDeclared,
+    false,
+    "precise_location Console third-party sharing must stay declared as none under the exception",
+  );
+  assert.equal(preciseLocationException.policyClause, "user-initiated-action");
+  assert.equal(
+    preciseLocationException.policyReference,
+    "https://support.google.com/googleplay/android-developer/answer/10787469?hl=en",
+  );
+  assert.match(preciseLocationException.rationaleKo, /버튼/, "exception rationale must cite the dedicated user tap");
+  assert.match(preciseLocationException.rationaleKo, /자동 실행이나 백그라운드 전송은 없다/);
+  assert.match(preciseLocationException.rationaleKo, /user-initiated action/);
+  assert.deepEqual(preciseLocationException.evidence, [
+    "apps/mobile/lib/features/stations/presentation/station_exit_card.dart",
+    "apps/mobile/lib/core/external/kakao_map_launcher.dart",
+    "apps/mobile/release/external-map-deeplink-policy.json",
+  ]);
+  for (const evidencePath of preciseLocationException.evidence) {
+    assert.ok(
+      existsSync(path.join(root, evidencePath)),
+      `precise_location exception evidence must exist: ${evidencePath}`,
+    );
+  }
+
+  const reportAbuseState = items.get("facility_report_abuse_rate_limit_state");
+  assert.equal(reportAbuseState.implementationStatus, "backend-collected");
+  assert.equal(reportAbuseState.sharedWithThirdParties, false);
+  assert.equal(reportAbuseState.storeMode, "local");
+  assert.equal(reportAbuseState.persistedToDatabase, false);
+  assert.equal(reportAbuseState.includedInAccessLog, false);
+  assert.deepEqual(reportAbuseState.storageLocations, ["backend-jvm-memory"]);
+  assert.equal(reportAbuseState.retention.fixedTtl, false);
+  assert.equal(reportAbuseState.retention.windowSeconds, 60);
+  assert.equal(reportAbuseState.retention.maxCounterKeys, 4096);
+  assert.equal(reportAbuseState.retention.finalDeletionBoundary, "JVM process lifecycle end");
+  assert.equal(reportAbuseState.googlePlayDataSafety.dataType, "Device or other IDs");
+  assert.equal(reportAbuseState.googlePlayDataSafety.purpose, "Fraud prevention, security, and compliance");
+  assert.equal(reportAbuseState.googlePlayDataSafety.deletionSupported, false);
+  assert.equal(reportAbuseState.googlePlayDataSafety.processedEphemerally, false);
+  assert.equal(reportAbuseState.googlePlayDataSafety.linkedToUser, true);
+  assert.deepEqual(reportAbuseState.rateLimitedEndpoints, [
+    "POST /api/v1/report-uploads",
+    "PUT /api/v1/report-uploads/{uploadId}",
+    "POST /api/v1/reports",
+    "GET /api/v1/reports/{reportId}",
+    "POST /api/v1/reports/{reportId}/confirm",
+  ]);
+  assert.match(reportAbuseState.clientIdentityKey, /ip:remoteAddr/);
+  assert.ok(
+    reportAbuseState.evidence.includes(
+      "backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportAbuseControl.java",
+    ),
+  );
+  const reportAbuseControlSource = read(
+    "backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportAbuseControl.java",
+  );
+  assert.match(reportAbuseControlSource, /Map<LimiterKey, WindowCounter> counters = new ConcurrentHashMap<>/);
+  assert.match(reportAbuseControlSource, /return "ip:" \+ remoteAddress/);
+  assert.match(
+    reportAbuseControlSource,
+    /report abuse control store mode must be local until distributed store is implemented/,
+  );
+
+  const trainSearchAbuseState = items.get("train_search_abuse_rate_limit_state");
+  assert.equal(trainSearchAbuseState.implementationStatus, "backend-collected");
+  assert.equal(trainSearchAbuseState.sharedWithThirdParties, false);
+  assert.equal(trainSearchAbuseState.storeMode, "local");
+  assert.equal(trainSearchAbuseState.persistedToDatabase, false);
+  assert.equal(trainSearchAbuseState.includedInAccessLog, false);
+  assert.deepEqual(trainSearchAbuseState.storageLocations, ["backend-jvm-memory"]);
+  assert.ok(trainSearchAbuseState.evidence.includes("infra/nginx/host-easysubway.conf.template"));
+  assert.equal(trainSearchAbuseState.retention.fixedTtl, false);
+  assert.equal(trainSearchAbuseState.retention.windowSeconds, 60);
+  assert.equal(trainSearchAbuseState.retention.dailyCostLimit, 64);
+  assert.equal(trainSearchAbuseState.retention.dailyWindowZone, "Asia/Seoul");
+  assert.equal(trainSearchAbuseState.retention.maxCounterKeysPerLimiter, 4096);
+  assert.equal(trainSearchAbuseState.googlePlayDataSafety.dataType, "Device or other IDs");
+  assert.equal(trainSearchAbuseState.googlePlayDataSafety.deletionSupported, false);
+  assert.equal(trainSearchAbuseState.googlePlayDataSafety.processedEphemerally, false);
+  assert.deepEqual(trainSearchAbuseState.rateLimitedEndpoints, [
+    "GET /api/v1/trains/stations",
+    "GET /api/v1/trains/search",
+  ]);
+  const trainSearchRateLimitSource = read(
+    "backend/src/main/java/com/easysubway/train/adapter/in/web/TrainSearchRateLimitFilter.java",
+  );
+  assert.match(trainSearchRateLimitSource, /Map<String, WindowCounter> counters = new ConcurrentHashMap<>/);
+  assert.match(trainSearchRateLimitSource, /return "ip:" \+ remote/);
+  assert.ok(
+    readJson("apps/mobile/release/play-store-submission-content.json")
+      .dataSafetyDeclarations.answerMatrix
+      .find((item) => item.dataType === "Device or other IDs")
+      .inventoryDataIds.includes("train_search_abuse_rate_limit_state"),
+  );
+
+  const trainSearchQueries = items.get("train_search_queries");
+  assert.equal(trainSearchQueries.implementationStatus, "backend-collected");
+  assert.equal(trainSearchQueries.sharedWithThirdParties, false);
+  assert.deepEqual(trainSearchQueries.storageLocations, ["backend-database"]);
+  assert.deepEqual(trainSearchQueries.persistedFields, [
+    "departureStationId",
+    "arrivalStationId",
+    "departureDate",
+    "trainType",
+  ]);
+  assert.equal(trainSearchQueries.accountLinked, false);
+  assert.equal(trainSearchQueries.retention.todayFreshSeconds, 300);
+  assert.equal(trainSearchQueries.retention.futureFreshSeconds, 21600);
+  assert.equal(trainSearchQueries.retention.purgeEligibilityAfterExpirySeconds, 172800);
+  assert.equal(trainSearchQueries.retention.purgeCron, "0 10 4 * * * Asia/Seoul");
+  assert.equal(trainSearchQueries.retention.maximumPurgeLagSeconds, 86400);
+  assert.equal(trainSearchQueries.googlePlayDataSafety.linkedToUser, false);
+  assert.equal(trainSearchQueries.googlePlayDataSafety.deletionSupported, false);
+  assert.equal(trainSearchQueries.appStorePrivacy.linkedToUser, false);
+  const appActivityDeclaration = readJson("apps/mobile/release/play-store-submission-content.json")
+    .dataSafetyDeclarations.answerMatrix
+    .find((item) => item.dataType === "App activity");
+  assert.ok(appActivityDeclaration.inventoryDataIds.includes("train_search_queries"));
+  assert.equal(appActivityDeclaration.containsDeletionUnsupportedData, true);
 
   const appStoreTypes = [...new Set(
     inventory.dataTypes
@@ -14342,19 +17315,29 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     "favorite station evidence must include the station search implementation",
   );
   assert.deepEqual(items.get("facility_report_photo").storageLocations.toSorted(), [
-    "backend-database-legacy-column",
     "backend-database-metadata",
     "backend-object-storage",
     "mobile-memory",
   ]);
   assert.match(
     items.get("facility_report_photo").backendTableOrService.join("\n"),
-    /facility_reports\.photo_object_key[\s\S]*facility_reports\.photo_thumbnail_object_key[\s\S]*facility_reports\.photo_data_base64/,
+    /facility_reports\.photo_object_key[\s\S]*facility_reports\.photo_thumbnail_object_key/,
   );
+  assert.doesNotMatch(items.get("facility_report_photo").backendTableOrService.join("\n"), /photo_data_base64/);
   assert.match(
     items.get("facility_report_photo").deletionImplementation,
-    /deleteFacilityReportPhoto[\s\S]*photo_data_base64 = NULL/,
+    /FacilityReportPersonalDataPurgeScheduler[\s\S]*deleteFacilityReportPhoto/,
   );
+  for (const id of ["precise_location", "facility_report_content", "facility_report_location"]) {
+    assert.match(items.get(id).retentionKo, /최대 1년/);
+    assert.match(items.get(id).retentionKo, /백업.*30일/);
+    assert.match(items.get(id).deletionImplementation, /FacilityReportPersonalDataPurgeScheduler/);
+    assert.match(items.get(id).deletionImplementation, /prune-sensitive-backups\.mjs/);
+    assert.ok(items.get(id).storageLocations.includes("restricted-operations-backup"));
+  }
+  assert.match(items.get("facility_report_photo").retentionKo, /최대 1년/);
+  assert.doesNotMatch(items.get("facility_report_photo").retentionKo, /백업|30일/);
+  assert.doesNotMatch(items.get("facility_report_photo").deletionImplementation, /prune-sensitive-backups\.mjs/);
 
   const excludedItems = new Map((inventory.excludedDataTypes ?? []).map((item) => [item.id, item]));
   assert.deepEqual([...excludedItems.keys()].sort(), ["push_notification_token"]);
@@ -14374,11 +17357,288 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
   }
   assert.doesNotMatch(privacyManifest, /NSPrivacyCollectedDataTypeDeviceID/);
 
-  assert.match(stationSearch, /currentLocation\(\)/);
+  assert.match(
+    `${stationSearchController}\n${stationDetailScreen}\n${stationExitCard}`,
+    /currentLocation\(\)/,
+  );
   assert.match(facilityReport, /photoDataBase64/);
   assert.match(facilityReport, /latitude/);
   const appDependencies = read("apps/mobile/lib/app/app_dependencies.dart");
   assert.match(`${main}\n${appDependencies}`, /pushNotificationsEnabled/);
+});
+
+test("Route V2 ITX 개인정보와 Data Safety 공개 기준은 실제 전송·보관 경계를 고정한다", () => {
+  const inventory = readJson("apps/mobile/release/store-privacy-inventory.json");
+  const playStoreContent = readJson("apps/mobile/release/play-store-submission-content.json");
+  const publicPrivacyPolicy = read("backend/src/main/resources/templates/legal/privacy.html");
+  const mobileRouteSearch = read("apps/mobile/lib/route_search.dart");
+  const sessionService = read("backend/src/main/java/com/easysubway/route/application/service/RouteV2SessionService.java");
+  const purgeScheduler = read("backend/src/main/java/com/easysubway/route/adapter/in/scheduler/RouteV2StatePurgeScheduler.java");
+  const integrityDecoder = read("backend/src/main/java/com/easysubway/route/adapter/out/integrity/GooglePlayIntegrityDecoder.java");
+  const routeAccessStore = read("backend/src/main/java/com/easysubway/route/adapter/out/persistence/JdbcRouteV2AccessStore.java");
+  const routeController = read("backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchController.java");
+  const sessionController = read("backend/src/main/java/com/easysubway/route/adapter/in/web/RouteV2SessionController.java");
+  const productionRouteSupport = read("backend/src/main/java/com/easysubway/route/application/service/ProductionRouteV2Support.java");
+  const routeStateMigration = read("backend/src/main/resources/db/migration/postgresql/V57__route_v2_access_state.sql");
+  const nginxGateway = read("infra/nginx/route-v2-gateway.conf.template");
+  const nginxProxyHeaders = read("infra/nginx/route-v2-proxy-headers.conf.template");
+  const items = new Map(inventory.dataTypes.map((item) => [item.id, item]));
+  const integrity = items.get("route_v2_itx_integrity");
+  const mobility = items.get("route_v2_itx_mobility_preferences");
+  const route = items.get("route_v2_itx_request_state");
+  const gatewayRateLimitState = items.get("route_v2_gateway_abuse_rate_limit_state");
+  const officialPolicyReferences = [
+    "https://support.google.com/googleplay/android-developer/answer/10787469?hl=en",
+    "https://developer.android.com/google/play/integrity/terms",
+  ];
+
+  assert.deepEqual(inventory.googlePlayDataSafetyPolicy.officialReferences, officialPolicyReferences);
+  assert.equal(inventory.googlePlayDataSafetyPolicy.offDeviceEphemeralProcessingMustBeDeclared, true);
+  assert.equal(inventory.googlePlayDataSafetyPolicy.ephemeralProcessingRequiresMemoryOnlyRealTime, true);
+  assert.equal(inventory.googlePlayDataSafetyPolicy.routeV2StoredDataIsEphemeral, false);
+
+  assert.ok(integrity);
+  assert.equal(integrity.googlePlayDataSafety.collected, true);
+  assert.equal(integrity.googlePlayDataSafety.dataType, "Device or other IDs");
+  assert.equal(integrity.googlePlayDataSafety.linkedToUser, true);
+  assert.equal(integrity.googlePlayDataSafety.optional, true);
+  assert.equal(integrity.googlePlayDataSafety.processedEphemerally, false);
+  assert.equal(integrity.backendLinkedToUserDeviceOrAccountId, false);
+  assert.equal(integrity.googleProcessingMayBeLinkedToSignedInAccountOrDevice, true);
+  assert.deepEqual(integrity.googlePlayProcessing.alwaysCollected, [
+    "requestHashOrNonce",
+    "appPackageName",
+    "appVersion",
+    "appCertificate",
+    "appLicensingStatus",
+    "deviceAttestationInformation",
+  ]);
+  assert.equal(integrity.googlePlayProcessing.encryptedInTransit, true);
+  assert.equal(integrity.googlePlayProcessing.sharedOnward, false);
+  assert.equal(integrity.googlePlayProcessing.retention, "fixed-by-google-play-integrity-policy");
+  assert.deepEqual(integrity.mobileToBackendFields, ["integrityToken", "128-bit clientNonce"]);
+  assert.deepEqual(integrity.backendToGoogleFields, ["rawIntegrityToken"]);
+  assert.equal(
+    integrity.googleDecodeEndpoint,
+    "https://playintegrity.googleapis.com/v1/com.easysubway.app:decodeIntegrityToken",
+  );
+  assert.deepEqual(integrity.backendStoredFields, [
+    "tokenSha256",
+    "scope",
+    "issuedAt",
+    "expiresAt",
+    "requestCount",
+    "nonceSha256",
+  ]);
+  assert.equal(integrity.retention.sessionLogicalExpiry, "10 minutes");
+  assert.equal(integrity.retention.sessionPhysicalDeletionWithin, "approximately 15 minutes from issuance");
+  assert.equal(integrity.retention.nonceLogicalExpiry, "2 minutes");
+  assert.equal(integrity.retention.noncePhysicalDeletionWithin, "approximately 7 minutes from receipt");
+  assert.equal(integrity.retention.purgeInterval, "5 minutes");
+  assert.ok(integrity.evidence.includes("backend/src/main/java/com/easysubway/route/adapter/out/integrity/GooglePlayIntegrityDecoder.java"));
+  assert.ok(integrity.evidence.includes("backend/src/main/java/com/easysubway/route/adapter/in/scheduler/RouteV2StatePurgeScheduler.java"));
+
+  assert.ok(mobility);
+  assert.deepEqual(mobility.routeRequestFields, ["mobilityType", "mobilityPreset", "constraintMode"]);
+  assert.equal(mobility.googlePlayDataSafety.dataType, "Personal info");
+  assert.equal(mobility.googlePlayDataSafety.collected, true);
+  assert.equal(mobility.googlePlayDataSafety.optional, true);
+  assert.equal(mobility.googlePlayDataSafety.linkedToUser, false);
+  assert.equal(mobility.googlePlayDataSafety.processedEphemerally, false);
+  assert.equal(mobility.persistedRepresentation.mobilityPreset, "itinerary_json[].legs[].appliedPreset");
+  assert.equal(mobility.persistedRepresentation.mobilityTypeAndConstraintMode, "computed-itinerary-only");
+  assert.ok(mobility.evidence.includes("backend/src/main/java/com/easysubway/route/application/service/ProductionRouteV2Support.java"));
+
+  assert.ok(route);
+  assert.equal(route.googlePlayDataSafety.collected, true);
+  assert.equal(route.googlePlayDataSafety.linkedToUser, false);
+  assert.equal(route.googlePlayDataSafety.optional, true);
+  assert.equal(route.googlePlayDataSafety.processedEphemerally, false);
+  assert.equal(
+    route.purposeKo,
+    "사용자가 선택한 ITX-청춘 경로 계산 결과를 제한된 기간 동안 보관",
+  );
+  assert.deepEqual(route.routeRequestFields, [
+    "originStationId",
+    "destinationStationId",
+    "mobilityType",
+    "constraintMode",
+    "mobilityPreset",
+    "departureTime",
+    "useRealtime",
+    "maxTransfers",
+    "alternativeCount",
+  ]);
+  assert.deepEqual(route.backendStoredFields, [
+    "route_state_id",
+    "origin_station_id",
+    "destination_station_id",
+    "transport_scope",
+    "requested_departure_at",
+    "itinerary_json",
+    "timetable_artifact_id",
+    "created_at",
+    "planned_arrival_at",
+    "expires_at",
+  ]);
+  assert.equal(route.backendStoredTransportScope, "SUBWAY_AND_ITX_CHEONGCHUN");
+  assert.equal(route.retention.logicalExpiresAt, "min(createdAt+6h,max(createdAt+30m,plannedArrivalAt+30m))");
+  assert.equal(route.retention.physicalDeletionWithin, "expiresAt+5m");
+  assert.equal(route.retention.purgeInterval, "5 minutes");
+  assert.ok(route.evidence.includes("backend/src/main/java/com/easysubway/route/adapter/in/scheduler/RouteV2StatePurgeScheduler.java"));
+  assert.deepEqual(integrity.backendNeverPersistedOrLogged, [
+    "rawIntegrityToken",
+    "rawClientNonce",
+    "integrityPayloadOrVerdict",
+  ]);
+  assert.deepEqual(route.notSentOrStoredByRouteV2, ["rawSearchText", "coordinates"]);
+  assert.equal(integrity.usedForTracking, false);
+  assert.equal(route.usedForTracking, false);
+  assert.equal(integrity.responseCacheControl, "private, no-store");
+  assert.equal(route.responseCacheControl, "private, no-store");
+
+  assert.ok(gatewayRateLimitState);
+  assert.equal(gatewayRateLimitState.googlePlayDataSafety.dataType, "Device or other IDs");
+  assert.equal(gatewayRateLimitState.googlePlayDataSafety.collected, true);
+  assert.equal(gatewayRateLimitState.googlePlayDataSafety.linkedToUser, true);
+  assert.equal(gatewayRateLimitState.googlePlayDataSafety.optional, true);
+  assert.equal(gatewayRateLimitState.googlePlayDataSafety.deletionSupported, false);
+  assert.equal(gatewayRateLimitState.googlePlayDataSafety.processedEphemerally, false);
+  assert.deepEqual(gatewayRateLimitState.gatewayKeyFields, [
+    "$binary_remote_addr",
+    "$http_authorization",
+  ]);
+  assert.equal(gatewayRateLimitState.retention.fixedTtl, false);
+  assert.equal(gatewayRateLimitState.retention.zoneSizeIsRetention, false);
+  assert.equal(gatewayRateLimitState.retention.evictionBoundary, "LRU under zone memory pressure");
+  assert.equal(gatewayRateLimitState.retention.finalDeletionBoundary, "gateway process or shared-memory zone lifecycle end");
+  assert.equal(
+    gatewayRateLimitState.operationReference,
+    "https://nginx.org/en/docs/http/ngx_http_limit_req_module.html",
+  );
+
+  assert.deepEqual(inventory.routeV2GatewayRateLimit.keys, [
+    {
+      nginxVariable: "$binary_remote_addr",
+      scopes: ["session", "search"],
+      processing: "nginx-shared-memory-rate-limit-key",
+      persistedToDatabase: false,
+      includedInAccessLog: false,
+    },
+    {
+      nginxVariable: "$http_authorization",
+      scopes: ["search"],
+      processing: "nginx-shared-memory-rate-limit-key",
+      persistedToDatabase: false,
+      includedInAccessLog: false,
+    },
+  ]);
+  assert.equal(inventory.routeV2GatewayRateLimit.rateLimitedLogContainsKeyValues, false);
+  assert.equal(inventory.routeV2GatewayRateLimit.zoneSizeIsRetention, false);
+
+  assert.deepEqual(
+    playStoreContent.dataSafetyDeclarations.routeV2Itx.officialPolicyReferences,
+    officialPolicyReferences,
+  );
+  assert.equal(playStoreContent.dataSafetyDeclarations.routeV2Itx.optionalUserTriggered, true);
+  assert.equal(playStoreContent.dataSafetyDeclarations.routeV2Itx.tracking, false);
+  assert.equal(playStoreContent.dataSafetyDeclarations.routeV2Itx.backendLinkedToUserDeviceOrAccountId, false);
+  assert.equal(playStoreContent.dataSafetyDeclarations.routeV2Itx.googleIntegrityMayBeLinkedToAccountOrDevice, true);
+  assert.equal(playStoreContent.dataSafetyDeclarations.routeV2Itx.storedFieldsProcessedEphemerally, false);
+  assert.ok(
+    playStoreContent.dataSafetyDeclarations.answerMatrix
+      .find((item) => item.dataType === "App activity")
+      .inventoryDataIds.includes("route_v2_itx_request_state"),
+  );
+  assert.ok(
+    playStoreContent.dataSafetyDeclarations.answerMatrix
+      .find((item) => item.dataType === "Device or other IDs")
+      .inventoryDataIds.includes("route_v2_itx_integrity"),
+  );
+  assert.ok(
+    playStoreContent.dataSafetyDeclarations.answerMatrix
+      .find((item) => item.dataType === "Device or other IDs")
+      .inventoryDataIds.includes("route_v2_gateway_abuse_rate_limit_state"),
+  );
+  assert.ok(
+    playStoreContent.dataSafetyDeclarations.answerMatrix
+      .find((item) => item.dataType === "Device or other IDs")
+      .inventoryDataIds.includes("facility_report_abuse_rate_limit_state"),
+  );
+  assert.equal(
+    playStoreContent.dataSafetyDeclarations.routeV2Itx.gatewayRateLimitStateProcessedEphemerally,
+    false,
+  );
+  assert.equal(
+    playStoreContent.dataSafetyDeclarations.answerMatrix
+      .find((item) => item.dataType === "Device or other IDs")
+      .containsDeletionUnsupportedData,
+    true,
+  );
+  assert.ok(
+    playStoreContent.dataSafetyDeclarations.answerMatrix
+      .find((item) => item.dataType === "Personal info")
+      .inventoryDataIds.includes("route_v2_itx_mobility_preferences"),
+  );
+
+  const toJson = mobileRouteSearch.match(/Map<String, Object\?> toJson\(\) \{[\s\S]*?\n  \}/)?.[0] ?? "";
+  const toV2Json = mobileRouteSearch.match(/Map<String, Object\?> toV2Json\(\) \{[\s\S]*?\n  \}/)?.[0] ?? "";
+  const routeWireBuilders = `${toJson}\n${toV2Json}`;
+  for (const field of route.routeRequestFields) {
+    assert.match(routeWireBuilders, new RegExp(`'${field}'`), `mobile Route V2 wire must send ${field}`);
+  }
+  assert.doesNotMatch(routeWireBuilders, /canonicalOriginStationId|canonicalDestinationStationId|transportScope|realtimeFlag/);
+  assert.match(sessionService, /SESSION_TTL = Duration\.ofMinutes\(10\)/);
+  assert.match(sessionService, /VERDICT_MAX_AGE = Duration\.ofMinutes\(2\)/);
+  assert.match(purgeScheduler, /state-purge-interval-ms:300000/);
+  assert.match(routeAccessStore, /DELETE FROM route_v2_states WHERE expires_at <= \?/);
+  assert.match(routeAccessStore, /DELETE FROM route_v2_nonce_replays WHERE expires_at <= \?/);
+  assert.match(routeAccessStore, /DELETE FROM route_v2_sessions WHERE expires_at <= \?/);
+  assert.match(integrityDecoder, /playintegrity\.googleapis\.com\/v1\/com\.easysubway\.app:decodeIntegrityToken/);
+  assert.match(integrityDecoder, /body\(Map\.of\("integrityToken", integrityToken\)\)/);
+  assert.doesNotMatch(`${sessionService}\n${integrityDecoder}`, /log\.(?:info|warn|error|debug|trace)\([^\n]*integrityToken/);
+  assert.match(routeController, /String appliedPreset/);
+  assert.match(routeController, /walkSeconds > 0 \? mobilityPreset : ""/);
+  assert.match(productionRouteSupport, /saveState[\s\S]*json\(computedItinerary\)/);
+  assert.match(routeController, /header\(HttpHeaders\.CACHE_CONTROL, "private, no-store"\)/);
+  assert.match(sessionController, /header\(HttpHeaders\.CACHE_CONTROL, "private, no-store"\)/);
+  for (const column of route.backendStoredFields) {
+    assert.match(routeStateMigration, new RegExp(`\\b${column}\\b`), `route state migration must store ${column}`);
+  }
+  assert.match(nginxGateway, /limit_req_zone \$binary_remote_addr zone=route_session_ip/);
+  assert.match(nginxGateway, /limit_req_zone \$binary_remote_addr zone=route_search_ip/);
+  assert.match(nginxGateway, /limit_req_zone \$http_authorization zone=route_search_token/);
+  assert.match(nginxGateway, /limit_req zone=route_session_ip/);
+  assert.match(nginxGateway, /limit_req zone=route_search_ip/);
+  assert.match(nginxGateway, /limit_req zone=route_search_token/);
+  assert.match(nginxGateway, /access_log off;/);
+  assert.match(nginxGateway, /add_header Cache-Control "private, no-store" always/);
+  assert.match(nginxGateway, /log_format route_v2_session_rate_limited[^\n]*"status":429/);
+  assert.match(nginxGateway, /log_format route_v2_search_rate_limited[^\n]*"status":429/);
+  assert.doesNotMatch(nginxGateway, /log_format[^\n]*\$(?:binary_remote_addr|http_authorization)/);
+  assert.match(nginxProxyHeaders, /proxy_set_header X-Forwarded-For ""/);
+  assert.match(nginxProxyHeaders, /proxy_set_header X-Real-IP ""/);
+
+  assert.match(publicPrivacyPolicy, /SUBWAY 경로 검색은 단말 안에서만 처리하며 서버로 전송하지 않습니다/);
+  assert.match(publicPrivacyPolicy, /ITX-청춘 경로 검색은 사용자가 직접 선택할 때만/);
+  assert.match(publicPrivacyPolicy, /tracking에 사용하지 않습니다/);
+  assert.match(publicPrivacyPolicy, /128-bit clientNonce/);
+  assert.match(publicPrivacyPolicy, /발급한 Route V2 세션 token의 SHA-256/);
+  assert.match(publicPrivacyPolicy, /세션은 발급 후 약 15분 이내/);
+  assert.match(publicPrivacyPolicy, /nonce 해시는 수신 후 약 7분 이내/);
+  assert.match(publicPrivacyPolicy, /expiresAt 뒤 5분 이내/);
+  assert.match(publicPrivacyPolicy, /mobilityType, mobilityPreset, constraintMode/);
+  assert.match(publicPrivacyPolicy, /raw integrityToken을 Google Play Integrity decode API로 전송/);
+  assert.match(publicPrivacyPolicy, /raw 검색어와 좌표/);
+  assert.match(publicPrivacyPolicy, /\$binary_remote_addr/);
+  assert.match(publicPrivacyPolicy, /\$http_authorization/);
+  assert.match(publicPrivacyPolicy, /Nginx shared memory/);
+  assert.match(publicPrivacyPolicy, /요청이 끝난 뒤에도 shared memory에 남을 수 있어 ephemeral 처리로 분류하지 않습니다/);
+  assert.match(publicPrivacyPolicy, /고정 TTL은 없으며/);
+  assert.match(publicPrivacyPolicy, /zone 메모리가 부족할 때 LRU 방식으로 퇴출/);
+  assert.match(publicPrivacyPolicy, /gateway process 또는 shared-memory zone 수명 종료/);
+  assert.match(publicPrivacyPolicy, /DB나 access log에는 저장하지 않습니다/);
+  assert.match(publicPrivacyPolicy, /private, no-store/);
 });
 
 test("iOS 위치 권한은 앱 사용 중 목적만 설명한다", () => {
@@ -14455,6 +17715,29 @@ test("Android 릴리즈 권한은 앱 기능에 필요한 항목만 선언한다
     "android.permission.VIBRATE",
     "android.permission.WAKE_LOCK",
   ]);
+  // #2154: 재부팅·package replace 뒤 예약을 앱 실행 없이 복원하려면 merged
+  // manifest가 공식 boot receiver를 exported=false로 등록하고 네 부팅 계열 action을
+  // 정확히 포함해야 한다. RECEIVE_BOOT_COMPLETED 권한은 위 permissions 목록에서 검증한다.
+  const mergedBootReceiver = androidManifest.match(
+    /<receiver[^>]*android:name="com\.dexterous\.flutterlocalnotifications\.ScheduledNotificationBootReceiver"[\s\S]*?<\/receiver>/,
+  );
+  assert.ok(
+    mergedBootReceiver,
+    "Merged manifest must register ScheduledNotificationBootReceiver for boot restore.",
+  );
+  assert.match(mergedBootReceiver[0], /android:exported="false"/);
+  for (const action of [
+    "android.intent.action.BOOT_COMPLETED",
+    "android.intent.action.MY_PACKAGE_REPLACED",
+    "android.intent.action.QUICKBOOT_POWERON",
+    "com.htc.intent.action.QUICKBOOT_POWERON",
+  ]) {
+    assert.match(
+      mergedBootReceiver[0],
+      new RegExp(`android:name="${action.replace(/\./g, "\\.")}"`),
+      `merged boot receiver must include intent action ${action}`,
+    );
+  }
   // regular periodic worker는 foreground promotion을 사용하지 않으므로 FGS 권한은
   // 제거한다. 향후 long-running worker 도입 시 별도 Play/permission 검토가 필요하다.
   assert.doesNotMatch(androidManifest, /android\.permission\.USE_EXACT_ALARM/);
@@ -14973,7 +18256,8 @@ test("build-release-callback.mjs는 스키마 유효 payload와 공유 fixture �
   const out = execFileSync("node", ["tools/datapack/build-release-callback.mjs"], {
     cwd: root, encoding: "utf8",
     env: { ...process.env,
-      RELEASE_REQUEST_ID: f.releaseRequestId, WORKFLOW_RUN_URL: f.workflowRunUrl,
+      RELEASE_REQUEST_ID: f.releaseRequestId, RELEASE_SEQUENCE: String(f.releaseSequence),
+      TARGET_CHANNEL: f.channel, WORKFLOW_RUN_URL: f.workflowRunUrl,
       MANIFEST_SHA256: f.manifestSha256, SQLITE_SHA256: f.sqliteSha256, GZIP_SHA256: f.gzipSha256,
       EVIDENCE_BUNDLE_SHA256: f.evidenceBundleSha256, VALIDATOR_STATUS: f.validatorStatus,
       ROUTE_REGRESSION_STATUS: f.routeRegressionStatus, PUBLISH_STATUS: f.publishStatus,
@@ -14981,11 +18265,11 @@ test("build-release-callback.mjs는 스키마 유효 payload와 공유 fixture �
   });
   const payload = JSON.parse(out);
   assert.equal(payload.artifactKind, "datapack-release-callback");
-  assert.equal(payload.schemaVersion, 1);
+  assert.equal(payload.schemaVersion, 2);
   assert.equal(payload.callbackVerifier.kind, "payload-signature");
   assert.equal(payload.callbackVerifier.value, vec.expectedHmacHex); // node↔Java 합의
-  // required 12필드 + additionalProperties:false 준수
-  assert.deepEqual(Object.keys(payload).sort(), ["artifactKind","callbackVerifier","evidenceBundleSha256","gzipSha256","manifestSha256","publishStatus","releaseRequestId","routeRegressionStatus","schemaVersion","sqliteSha256","validatorStatus","workflowRunUrl"]);
+  // required 15필드 + additionalProperties:false 준수
+  assert.deepEqual(Object.keys(payload).sort(), ["artifactKind","callbackVerifier","channel","evidenceBundleSha256","gzipSha256","idempotencyKey","manifestSha256","publishStatus","releaseRequestId","releaseSequence","routeRegressionStatus","schemaVersion","sqliteSha256","validatorStatus","workflowRunUrl"]);
 });
 
 async function classifyChangedFiles(files) {
@@ -15047,19 +18331,38 @@ test("get-off-alarm policy contract pins the no-location, degrade-ladder invaria
   assert.equal(policy.realtimeCorrection.correctionOverlayIssue, 1416);
 });
 
-test("하차 알림 Android source manifest는 boot receiver 없이 예약 receiver만 선언한다", () => {
+test("하차 알림 Android source manifest는 예약·부팅 복원 receiver를 exported=false로 선언한다", () => {
   const androidManifest = read("apps/mobile/android/app/src/main/AndroidManifest.xml");
 
   assert.match(
     androidManifest,
     /<receiver\s+android:name="com\.dexterous\.flutterlocalnotifications\.ScheduledNotificationReceiver"\s+android:exported="false"\s*\/>/,
   );
-  assert.doesNotMatch(androidManifest, /ScheduledNotificationBootReceiver/);
-  // BOOT permission은 #1768 WorkManager의 release merge가 소유하며,
-  // 하차 알림 source manifest가 직접 선언하지 않는다.
-  assert.doesNotMatch(
+  // #2154: 재부팅·package replace 뒤 예약 자동 복원용 공식 boot receiver를
+  // exported=false로 등록하고 네 부팅 계열 action을 명시 선언한다.
+  const bootReceiver = androidManifest.match(
+    /<receiver\s+android:name="com\.dexterous\.flutterlocalnotifications\.ScheduledNotificationBootReceiver"\s+android:exported="false"\s*>([\s\S]*?)<\/receiver>/,
+  );
+  assert.ok(
+    bootReceiver,
+    "ScheduledNotificationBootReceiver must be declared with android:exported=\"false\".",
+  );
+  for (const action of [
+    "android.intent.action.BOOT_COMPLETED",
+    "android.intent.action.MY_PACKAGE_REPLACED",
+    "android.intent.action.QUICKBOOT_POWERON",
+    "com.htc.intent.action.QUICKBOOT_POWERON",
+  ]) {
+    assert.match(
+      bootReceiver[1],
+      new RegExp(`<action\\s+android:name="${action.replace(/\./g, "\\.")}"\\s*/>`),
+      `boot receiver must include intent action ${action}`,
+    );
+  }
+  // #2154: 부팅 복원 권한을 source manifest가 직접 선언한다(WorkManager도 병합).
+  assert.match(
     androidManifest,
-    /android\.permission\.RECEIVE_BOOT_COMPLETED/,
+    /<uses-permission\s+android:name="android\.permission\.RECEIVE_BOOT_COMPLETED"\s*\/>/,
   );
 });
 
@@ -15437,4 +18740,39 @@ test("#1702 STANDARD 환승 parity 리포트는 재현 가능하고 ±10% 이내
     assert.equal(pair.withinTolerance, true);
     assert.ok(Math.abs(pair.deviationPercent) <= report.toleranceProfile.maxDeviationPercent);
   }
+});
+
+test("서비스·위치정보 이용약관은 공개 경로와 사실 계약을 함께 유지한다", () => {
+  const controller = read(
+    "backend/src/main/java/com/easysubway/legal/adapter/in/web/PrivacyPolicyPageController.java",
+  );
+  const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
+  const terms = read("backend/src/main/resources/templates/legal/terms.html");
+  const locationTerms = read("backend/src/main/resources/templates/legal/location-terms.html");
+
+  for (const route of ["/terms", "/easysubway/terms", "/location-terms", "/easysubway/location-terms"]) {
+    assert.ok(controller.includes(`\"${route}\"`), `legal controller must map ${route}`);
+    assert.ok(security.includes(`\"${route}\"`), `public security must permit ${route}`);
+  }
+
+  assert.match(terms, /쉬운 지하철 서비스 이용약관/);
+  assert.match(terms, /제 16 조 \(운영자 정보 및 문의\)/);
+  assert.match(terms, /현장 안내를 우선/);
+  assert.match(terms, /서비스의 이용 요금은 무료/);
+  assert.match(terms, /support@aquilaxk\.site/);
+  assert.match(locationTerms, /쉬운 지하철 위치정보 이용약관/);
+  assert.match(locationTerms, /가까운 역/);
+  assert.match(locationTerms, /위치기반서비스는 무료/);
+  assert.match(locationTerms, /접수일부터 최대 1년/);
+  assert.match(locationTerms, /매일 보관 상한이 지난/);
+  assert.match(locationTerms, /백업 생성일부터 최대 30일/);
+  assert.match(locationTerms, /운영 환경의 일일 자동 작업/);
+  assert.match(locationTerms, /제공받는 자는 카카오/);
+  assert.match(locationTerms, /카카오맵 앱에는 현재 위치의 시작 좌표와 목적지 좌표/);
+  assert.match(locationTerms, /카카오맵 웹에는 목적지 좌표/);
+  assert.match(locationTerms, /privacy@aquilaxk\.site/);
+  assert.doesNotMatch(locationTerms, /법정대리인의 동의를 받습니다/);
+  assert.match(locationTerms, /제 16 조 \(사업자 및 위치정보관리책임자\)/);
+  assert.match(locationTerms, /약관을 단순히 게시하거나 이용자가 열람했다는 사실만으로 별도 동의를 받은 것으로 보지 않습니다/);
+  assert.doesNotMatch(`${terms}\n${locationTerms}`, /TBD|TODO|준비 중/);
 });

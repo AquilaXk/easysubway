@@ -10,7 +10,7 @@
   "supportIncidentResponseGate": "apps/mobile/release/support-incident-response-gate.json",
   "evidenceRoot": ".codex/evidence/release/post-launch-operations-review/<rc-or-run>/",
   "preLaunchReadiness": {
-    "status": "PASS",
+    "status": "BLOCKED_EXTERNAL",
     "evidenceDateKst": "2026-07-15",
     "requiredEvidence": [
       "signal-owner-threshold-first-response",
@@ -28,18 +28,18 @@
       "requiredFields": ["gitSha", "versionCode", "aabSha256", "aabPayloadSha256", "dataPackManifestSha256", "supportContactSetSha256"],
       "backendIdentityFieldsAnyOf": ["backendImageDigest", "backendArtifactSha256"],
       "validatedArtifactIdentity": {
-        "aabPayloadSha256": "6c4962a7858d7b6887d22770adaa1a3988dbed17f36d76e1298bd789639ad281",
-        "backendArtifactSha256": "8bc8f71f92fa82b38739a02424c6758f317b6dd4d3f07398cdf29a886c4b5f98",
+        "aabPayloadSha256": "e83fc611df261ab99ce268ae9ac47e2d193253a01cc28801a32d4cca8507b663",
+        "backendArtifactSha256": "74a3e35762d1973c0b05a0c0bd6f0fc6aa2a4657ef23cde359cf100e0830f631",
         "dataPackManifestSha256": "2ee9f38f3e748d7bbc6d9eba124b34e6b5c8ad539338a6cdeee7a472515456e5"
       },
       "validatedArtifactIdentityEvidence": {
-        "aabPayload": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/fixed-release-rehearsal-summary.json",
+        "aabPayload": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260717/fixed-release-rehearsal-summary.json",
         "backend": "apps/mobile/release/operations-release-evidence.json",
         "dataPackManifest": "apps/mobile/assets/datapacks/metro_map_pack/manifest.json"
       },
       "evidenceValidity": {
-        "appVersionName": "1.0.4",
-        "versionCode": 10005,
+        "appVersionName": "1.0.5",
+        "versionCode": 10006,
         "validFromKst": "2026-07-15",
         "validUntilKst": "2026-07-28",
         "refreshOn": [
@@ -53,7 +53,7 @@
         {
           "refreshOn": "operations-contract-change",
           "files": [
-            {"path": "apps/mobile/release/operations-release-evidence.json", "sha256": "a2547abb148ed8b7172db82def62b21b52626d93fc58b0d5dbe225b087c27f5a"},
+            {"path": "apps/mobile/release/operations-release-evidence.json", "sha256": "8cb0c151ca9f57a1716bf76f5d8564051252960ac74f94a698526deb8403169a"},
             {"path": "apps/mobile/release/operations-observability-gate.json", "sha256": "6955ac139fbc57be0721bb955e834164015050f397f2562e4402298578027afe"},
             {"path": "tools/ops/generate-operations-phase-a-summary.mjs", "sha256": "e89a520d6b229c5fd042ef8bcaf74873476c7253cd03b48fac1de21cf55e0c4d"},
             {"path": "tools/ops/validate-operations-release-summary.mjs", "sha256": "71a2a51da2b9c3a20d14512b608bccfbfee9022ca5718b77d44ff9254cc67979"},
@@ -66,15 +66,26 @@
         {
           "refreshOn": "support-contact-or-help-ui-change",
           "files": [
-            {"path": "apps/mobile/release/support-incident-response-gate.json", "sha256": "82db73ed9b0e84ed140f8ebc16326844dd2cc58181b918806fa4aba29bfcb4ca"},
-            {"path": "apps/mobile/lib/main.dart", "sha256": "720db583db46f6f88ee6f6b71acccb8d00be1eaf9a3c67739db1d2b613ef2cb7"}
+            {"path": "apps/mobile/release/support-incident-response-gate.json", "sha256": "2b1942f223b63aa18cae0481649d46fa41a671ddae4dccab041098ca3e2d6903"},
+            {"path": "apps/mobile/lib/app/easy_subway_app.dart", "sha256": "aed5718c2d731cf7b844ecca2dce4d9fd0994d187779fea8db1e5fe6a22c110b"},
+            {"path": "apps/mobile/lib/app/app_components.dart", "sha256": "f0a53231cc819a6136049b979334d215968a54f0ce5cf8f17c1952674c926ac5"},
+            {"path": "apps/mobile/lib/app/accessibility_theme.dart", "sha256": "a13c1ded6008a883060ef34bb52d3e54a83b103d0c0bcfba05fd6e9370e9128a"},
+            {"path": "apps/mobile/lib/features/account/presentation/user_data_deletion_screen.dart", "sha256": "e7636ee91d36df8033c3619167ee6b7712f1421faf91880abeff1cc6cfb95669"},
+            {"path": "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart", "sha256": "7ef5b7236a008f54a22040931f294b00192987fe35cc56fc94ebc2d815ef4620"},
+            {"path": "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart", "sha256": "bb293eb895b557c50c43079d5ca7e1ebc2f22367c171754c8ac7c8a4eb641c26"},
+            {"path": "apps/mobile/lib/features/home/presentation/home_screen.dart", "sha256": "a7d7ea0396fc7bf8783f6f307c51a9f3f1801f1c6c51d42fbdb24d88ce3c5ade"},
+            {"path": "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart", "sha256": "ba119a6b716528c943f31e7ba13ef0274db3f3b391ecfdb2f2d87e6605e968be"},
+            {"path": "apps/mobile/lib/features/settings/presentation/open_source_licenses_screen.dart", "sha256": "822762b61cd3824340c4e45cf5ffe3079e221d28712dd98d94fd9a03fe5fd591"},
+            {"path": "apps/mobile/lib/features/settings/presentation/service_info_screen.dart", "sha256": "62e036e62f5e5ce235d494d5d730a6dd6ea5659e1b53290d94a6c7c954bcdcd9"},
+            {"path": "apps/mobile/lib/features/support/presentation/support_access_screen.dart", "sha256": "d407c10fdf20cf821b0273065388885d2511b6eb14b6ef02183f1723d0a83112"},
+            {"path": "apps/mobile/lib/main.dart", "sha256": "7acfce0eff73e5bd10d912a2da72a2990db2e2fb87a5d91c7ef907ed0f559de3"}
           ]
         },
         {
           "refreshOn": "observability-infrastructure-change",
           "files": [
-            {"path": "infra/prometheus/prometheus.yml", "sha256": "258441d7b2881a629145a9bfae65574769ccf2d218d94f70c29148bebad33ae0"},
-            {"path": "infra/prometheus/alerts.yml", "sha256": "1d8c2c05b9da8b105d0b9db45512f14932006b16c0de1f2d4715c0cac74ce323"},
+            {"path": "infra/prometheus/prometheus.yml", "sha256": "9bcde0205620224c01d86ec99fd2ef68314a9a96f40bd70c58fe67f8123e366f"},
+            {"path": "infra/prometheus/alerts.yml", "sha256": "41c18d783219a073e84abed81127a4217bd70306c48d5a3b3c0411e291bc6b39"},
             {"path": "infra/grafana/provisioning/datasources/prometheus.yml", "sha256": "857e2caebec8b70f3aa50c0b968c1ceed46b668a8f08a08532b47be22af3ed97"},
             {"path": "infra/grafana/provisioning/datasources/loki.yml", "sha256": "9156897987a95d3fe59f98651ade7802ad2fc9b65acd2845da90b36dd6f5949c"},
             {"path": "infra/loki/loki.yml", "sha256": "101b9286a15cc0c4f2a66879d801995efabd2c4d98cac904c4c3bd0816bf0e20"}
@@ -84,12 +95,19 @@
           "refreshOn": "fixed-release-procedure-change",
           "files": [
             {"path": "apps/mobile/release/signed-release-artifact-gate.json", "sha256": "42c9f83dca5a1c2c24d921cf6ab748c9be5a901dd1b62212a81055098349fc67"},
-            {"path": "apps/mobile/pubspec.yaml", "sha256": "8b831a4108c1c77f718a4b729e7d24f36dc024b83845a4ecfa7d2b99e5ad1971"},
-            {"path": ".github/workflows/release-artifacts.yml", "sha256": "6ce3f35ca192657fd6594a11445ed729f763e71e2f788f8768edc97bcb950c00"},
+            {"path": "apps/mobile/pubspec.yaml", "sha256": "1c4918747c4acf22bbe885b7cb01cc34cc311e7e44598ac6b817848712614d42"},
+            {"path": ".github/workflows/release-artifacts.yml", "sha256": "b430a8f8cbe0278b126d6347c1d3e4d21c541e9893ac387ce32720d567f4a276"},
+            {"path": ".github/workflows/datapack-release.yml", "sha256": "dc93cb03764e035d8cd4c05a96a3f979f0ffa2c7a332395b4c8ae1a528e875d7"},
+            {"path": "tools/ci/validate-store-privacy-env.mjs", "sha256": "18bb0dd8b93d6268c8f60f9cc12272d2ff31c03b60fbbafd6c1e8d16957ada2a"},
             {"path": "backend/build.gradle", "sha256": "00106be89d1834db166c0c4cfba04674e2a456e7e57648595b74feb933c31273"},
             {"path": "backend/Dockerfile", "sha256": "7d9608f490113e655aeaf9544f061896d20f391d5c309b50a42f6303e5eb676b"},
-            {"path": "apps/mobile/release/rc-evidence-manifest-contract.json", "sha256": "2a73141971a85b165669906f9468588349167b0885ef8e0569e1191f90b63a67"},
-            {"path": "tools/release/generate-rc-evidence-manifest.mjs", "sha256": "e01166d4c290e07945e8d9b096e6c9d3c6f90db67edc01e10e3bc5820bfae105"},
+            {"path": "apps/mobile/release/rc-evidence-manifest-contract.json", "sha256": "7caaa17fc34e13e5e35076be4b4f35456f4fa57add102561e31267934bd6cd41"},
+            {"path": "tools/datapack/lib/manifest-validation.mjs", "sha256": "8ac183f1aa33864a5fc309efe6089961e1dbcd7a0ed7c9b0aff138961e8845ac"},
+            {"path": "tools/datapack/decide-datapack-release.mjs", "sha256": "19df0719c5c030db1981bd34622a42b98e610ac35851a4d0219c70c51dda675c"},
+            {"path": "tools/datapack/validate-remote-datapack-artifact.mjs", "sha256": "153a5888903c503fb572b5596afac58d1b0ac1ae973f3e8fda5806948d168b26"},
+            {"path": "tools/release/generate-rc-evidence-manifest.mjs", "sha256": "d4dcae15ee381ce16463ad4a8235353327b53adce6fb4d56f25dd6db8c0547c4"},
+            {"path": "tools/release/count-gzip-uncompressed-bytes.mjs", "sha256": "e44ccdd89af5260c6a8027b6b03fdd660640bc52c99be9ba5d024a629d24dbb9"},
+            {"path": "tools/release/select-rc-datapack-artifact.mjs", "sha256": "06b1d4e60c041e7cd44e461722a7e5519c515e1135612a16429845bdeac32287"},
             {"path": "tools/release/upload-play-internal.mjs", "sha256": "7bc41b1fb3ce86b2e24043a9a43e47e91577ab33c5170535c8e8c85c09b5c5eb"}
           ]
         }
@@ -129,8 +147,8 @@
       },
       {
         "id": "fixed-release-versioncode-build-submit-procedure",
-        "status": "PASS",
-        "evidence": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/fixed-release-rehearsal-summary.json"
+        "status": "BLOCKED_EXTERNAL",
+        "evidence": "Node 24 runtime 변경 후 fixed-release rehearsal 재실행 필요"
       },
       {
         "id": "post-launch-window-owner-time-checklist-record-location-reservation",
@@ -179,6 +197,7 @@
       "summaryKo": "QA 수동 메일 테스트로 support/security/privacy 주소 routing을 정상 확인했다."
     },
     "remainingExternalBlockers": [
+      "fixed-release-rehearsal-after-node24-runtime-change",
       "play-review-status-summary",
       "crash-anr-vitals-summary",
       "support-ticket-summary-after-public-release",

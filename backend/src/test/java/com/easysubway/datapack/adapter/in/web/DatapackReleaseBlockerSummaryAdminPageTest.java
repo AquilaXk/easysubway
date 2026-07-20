@@ -73,13 +73,13 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 			.contains(SHA_A)
 			.contains("https://github.com/AquilaXk/easysubway/actions/runs/1164?redacted")
 			.contains("candidate-previous-stable")
-			.contains("production promote 차단: blocker 9건")
-			.contains("전체 blocker 9건")
-			.contains("<dt>alias</dt><dd>1</dd>")
-			.contains("<dt>quarantine</dt><dd>1</dd>")
-			.contains("<dt>manual override</dt><dd>1</dd>")
-			.contains("<dt>route gate</dt><dd>1</dd>")
-			.contains("manifest signature")
+			.contains("프로덕션 반영 차단: 차단 요인 9건")
+			.contains("전체 차단 요인 9건")
+			.contains("<dt>별칭</dt><dd>1</dd>")
+			.contains("<dt>격리</dt><dd>1</dd>")
+			.contains("<dt>수동 오버라이드</dt><dd>1</dd>")
+			.contains("<dt>경로 게이트</dt><dd>1</dd>")
+			.contains("매니페스트 서명")
 			.doesNotContain("name=\"commandToken\"")
 			.doesNotContain("serviceKey");
 	}
@@ -110,13 +110,13 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 		String qualityHtml = getAdminHtml("/admin/data-quality/page");
 
 		assertThat(dashboardHtml)
-			.contains("production promote 차단: blocker 1건")
-			.contains("전체 blocker 1건")
-			.doesNotContain("production promote 가능")
+			.contains("프로덕션 반영 차단: 차단 요인 1건")
+			.contains("전체 차단 요인 1건")
+			.doesNotContain("프로덕션 반영 가능")
 			.doesNotContain("READY");
 		assertThat(qualityHtml)
-			.contains("Route gate")
-			.contains("ENTRY/EXIT/TRANSFER and generated connector gates");
+			.contains("경로 게이트")
+			.contains("ENTRY/EXIT/TRANSFER 및 생성된 커넥터 게이트");
 	}
 
 	@Test
@@ -143,9 +143,75 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 		String html = getAdminHtml("/admin/dashboard/page");
 
 		assertThat(html)
-			.contains("production promote 가능")
+			.contains("프로덕션 반영 가능")
 			.contains("class=\"admin-status  good\"")
 			.contains(">READY</span>");
+	}
+
+	@Test
+	@DisplayName("미확정 production callback은 rollout readiness를 차단한다")
+	void pendingCallbackBlocksReadiness() {
+		jdbcTemplate.update("""
+			INSERT INTO datapack_release_deliveries (
+			 idempotency_key, release_request_id, release_sequence, manifest_sha256,
+			 channel, candidate_id, payload_sha256, signature_sha256, state, attempts,
+			 next_attempt_at, reconcile_deadline, dead_letter_deadline, created_at, updated_at)
+			VALUES (?, 'request-blocked', 42, ?, 'production', 'candidate-release-blocked',
+			 ?, ?, 'RECONCILIATION_REQUIRED', 4, '2026-07-06 03:00:00',
+			 '2026-07-06 03:00:00', '2026-07-06 04:00:00',
+			 '2026-07-06 02:50:00', '2026-07-06 03:00:00')
+			""", "request-blocked:42:" + SHA_A, SHA_A, SHA_B, SHA_C);
+
+		var callback = blockerSummaryUseCase.summarize().readinessRows().stream()
+			.filter(row -> "콜백 정합성 확인".equals(row.label()))
+			.findFirst().orElseThrow();
+		assertThat(callback.blockerCount()).isEqualTo(1);
+		assertThat(callback.note()).isEqualTo("CALLBACK_RECONCILIATION_REQUIRED");
+		assertThat(callback.status()).isEqualTo("FAIL");
+	}
+
+	@Test
+	@DisplayName("후속 release로 해소된 stale dead-letter는 readiness를 차단하지 않는다")
+	void supersededStaleCallbackDoesNotBlockReadiness() {
+		jdbcTemplate.update("""
+			INSERT INTO datapack_release_deliveries (
+			 idempotency_key, release_request_id, release_sequence, manifest_sha256,
+			 channel, candidate_id, payload_sha256, signature_sha256, state, attempts,
+			 reconcile_deadline, dead_letter_deadline, http_class, sanitized_detail,
+			 created_at, updated_at)
+			VALUES (?, 'request-superseded', 41, ?, 'production', 'candidate-release-blocked',
+			 ?, ?, 'DEAD_LETTER', 1, '2026-07-06 03:00:00', '2026-07-06 04:00:00',
+			 'STALE', 'CURRENT_RELEASE_ADVANCED', '2026-07-06 02:50:00', '2026-07-06 03:00:00')
+			""", "request-superseded:41:" + SHA_A, SHA_A, SHA_B, SHA_C);
+
+		var callback = blockerSummaryUseCase.summarize().readinessRows().stream()
+			.filter(row -> "콜백 정합성 확인".equals(row.label()))
+			.findFirst().orElseThrow();
+
+		assertThat(callback.blockerCount()).isZero();
+	}
+
+	@Test
+	@DisplayName("기한이 지난 production request에 delivery 행이 없으면 rollout readiness를 차단한다")
+	void missingCallbackDeliveryBlocksReadiness() {
+		jdbcTemplate.update("""
+			INSERT INTO datapack_release_request (
+			 approval_id, candidate_id, scope_id, target_channel,
+			 build_spec_sha256, source_snapshot_set_hash, approved_ledger_hash,
+			 requested_by, approved_by, status, dispatch_idempotency_key, workflow_run_url,
+			 created_at, approved_at, updated_at, promote_outcome, promote_detail)
+			VALUES ('request-without-delivery', 'candidate-release-blocked', 'capital_pilot_android_v1',
+			 'production', ?, ?, ?, 'requester', 'approver', 'DISPATCHED', 'dispatch-2057',
+			 'https://github.com/AquilaXk/easysubway/actions/runs/2057',
+			 '2026-07-06 02:00:00', '2026-07-06 02:00:00', '2026-07-06 02:00:00', NULL, NULL)
+			""", SHA_A, SHA_B, SHA_C);
+
+		var callback = blockerSummaryUseCase.summarize().readinessRows().stream()
+			.filter(row -> "콜백 정합성 확인".equals(row.label()))
+			.findFirst().orElseThrow();
+
+		assertThat(callback.blockerCount()).isEqualTo(1);
+		assertThat(callback.note()).isEqualTo("CALLBACK_RECONCILIATION_REQUIRED");
 	}
 
 	@Test
@@ -156,7 +222,7 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 		assertThat(html)
 			.doesNotContain("데이터팩 출시 준비")
 			.doesNotContain("candidate-release-blocked")
-			.doesNotContain("전체 blocker 9건");
+			.doesNotContain("전체 차단 요인 9건");
 	}
 
 	@Test
@@ -165,9 +231,9 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 		String html = getAdminHtmlWithoutDatapackRead("/admin/data-quality/page");
 
 		assertThat(html)
-			.doesNotContain("데이터팩 Release readiness")
+			.doesNotContain("데이터팩 출시 준비도")
 			.doesNotContain("candidate-release-blocked")
-			.doesNotContain("Manifest signature");
+			.doesNotContain("매니페스트 서명");
 	}
 
 	@Test
@@ -176,8 +242,8 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 		String html = getAdminHtmlWithoutDatapackRead("/admin/stations/station-sangnoksu/page");
 
 		assertThat(html)
-			.doesNotContain("Release readiness")
-			.doesNotContain("상록수역 release blocker")
+			.doesNotContain("출시 준비도")
+			.doesNotContain("상록수역 릴리스 차단 요인")
 			.doesNotContain("확인 필요 2건");
 	}
 
@@ -187,7 +253,7 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 		clearDatapackTables();
 		var summary = blockerSummaryUseCase.summarize();
 		var sourceFreshness = summary.readinessRows().stream()
-			.filter(row -> "Source freshness".equals(row.label()))
+			.filter(row -> "소스 최신성".equals(row.label()))
 			.findFirst()
 			.orElseThrow();
 
@@ -198,16 +264,16 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 		assertThat(dashboardHtml)
 			.contains("데이터팩 출시 준비")
 			.contains("확인 필요")
-			.contains("전체 blocker 1건")
+			.contains("전체 차단 요인 1건")
 			.doesNotContain("FAIL")
 			.doesNotContain("PASS");
 		assertThat(qualityHtml)
-			.contains("데이터팩 Release readiness")
-			.contains("Source coverage")
+			.contains("데이터팩 출시 준비도")
+			.contains("소스 커버리지")
 			.contains("확인 필요");
 		assertThat(stationHtml)
-			.contains("Release readiness")
-			.contains("상록수역 release blocker")
+			.contains("출시 준비도")
+			.contains("상록수역 릴리스 차단 요인")
 			.contains("확인 필요 0건")
 			.contains("집계 전")
 			.doesNotContain("PASS 0건");
@@ -223,10 +289,10 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 		String html = getAdminHtml("/admin/dashboard/page");
 
 		assertThat(html)
-			.contains("전체 blocker 9건")
-			.contains("<dt>manual override</dt><dd>1</dd>")
-			.doesNotContain("전체 blocker 10건")
-			.doesNotContain("<dt>manual override</dt><dd>2</dd>");
+			.contains("전체 차단 요인 9건")
+			.contains("<dt>수동 오버라이드</dt><dd>1</dd>")
+			.doesNotContain("전체 차단 요인 10건")
+			.doesNotContain("<dt>수동 오버라이드</dt><dd>2</dd>");
 	}
 
 	@Test
@@ -235,14 +301,14 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 		String html = getAdminHtml("/admin/data-quality/page");
 
 		assertThat(html)
-			.contains("데이터팩 Release readiness")
-			.contains("Source coverage")
-			.contains("Validator")
-			.contains("Facility evidence")
-			.contains("Route gate")
-			.contains("Android evidence")
-			.contains("Manifest signature")
-			.contains("Manual override")
+			.contains("데이터팩 출시 준비도")
+			.contains("소스 커버리지")
+			.contains("검증기")
+			.contains("시설 근거")
+			.contains("경로 게이트")
+			.contains("Android 증거")
+			.contains("매니페스트 서명")
+			.contains("수동 오버라이드")
 			.contains("FAIL")
 			.contains("확인 필요");
 	}
@@ -261,17 +327,17 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 		String pipelineHtml = getAdminHtml("/admin/datapack/pipeline/page");
 
 		assertThat(dashboardHtml)
-			.contains("production promote 차단: blocker 10건")
-			.contains("전체 blocker 10건")
-			.doesNotContain("production promote 가능")
+			.contains("프로덕션 반영 차단: 차단 요인 10건")
+			.contains("전체 차단 요인 10건")
+			.doesNotContain("프로덕션 반영 가능")
 			.doesNotContain(">READY</span>");
 		assertThat(qualityHtml)
-			.contains("Source freshness")
+			.contains("소스 최신성")
 			.contains("SOURCE_SNAPSHOT_EXPIRED")
 			.contains("FAIL");
 		assertThat(pipelineHtml)
 			.contains("원천 스냅샷")
-			.contains("blocker 1건");
+			.contains("차단 요인 1건");
 		assertThat(blockerSummaryUseCase.summarize().sourceFreshnessBlockers()).isEqualTo(1);
 	}
 
@@ -335,10 +401,10 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 		String html = getAdminHtml("/admin/stations/station-sangnoksu/page");
 
 		assertThat(html)
-			.contains("Release readiness")
-			.contains("상록수역 release blocker")
-			.contains("Facility evidence")
-			.contains("Route gate")
+			.contains("출시 준비도")
+			.contains("상록수역 릴리스 차단 요인")
+			.contains("시설 근거")
+			.contains("경로 게이트")
 			.contains("확인 필요 2건");
 	}
 
@@ -364,6 +430,8 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 	}
 
 	private void clearDatapackTables() {
+		jdbcTemplate.update("DELETE FROM datapack_release_deliveries");
+		jdbcTemplate.update("DELETE FROM datapack_release_request");
 		jdbcTemplate.update("DELETE FROM datapack_release_channel_events");
 		jdbcTemplate.update("DELETE FROM datapack_release_channels");
 		jdbcTemplate.update("DELETE FROM datapack_release_evidence_bundles");

@@ -117,6 +117,29 @@ class EasySubwayAccessibleColors {
   /// 지도 위 지역 선택 칩 톤(밝은 블루).
   static const mapRegionAccent = Color(0xFF006FD6);
 
+  // --- 홈 신규 알림 안내 바 (오너 스펙 2026-07-16, #2200) ---
+  /// 신규 알림 안내 바 배경.
+  static const noticeBarSurface = Color(0xFFFFF7ED);
+
+  /// 신규 알림 안내 바 하단 테두리(1dp).
+  static const noticeBarBorder = Color(0xFFF2DFC8);
+
+  /// 신규 알림 안내 바 기본 문구.
+  static const noticeBarText = Color(0xFF5D4932);
+
+  /// 신규 알림 안내 바 벨 아이콘·"알림 보기".
+  static const noticeBarAccent = Color(0xFF8F4B1E);
+
+  // --- 주변역 패널 실시간/시간표 토글 (오너 스펙 2026-07-16, #2200) ---
+  /// 토글 비선택 세그먼트 배경.
+  static const nearbyToggleIdleFill = Color(0xFFF6F6F8);
+
+  /// 토글 비선택 세그먼트 글자.
+  static const nearbyToggleIdleText = Color(0xFF70717B);
+
+  /// 좌우 열차 정보 구분선.
+  static const arrivalColumnDivider = Color(0xFFDEDEE3);
+
   // --- 고대비 모드 ---
   static const highContrastText = Color(0xFF000000);
   static const highContrastPrimary = Color(0xFF1A1D1E);

@@ -5,6 +5,13 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 NETWORK="easysubway-route-v2-gateway-test-$$"
 BACKEND="route-v2-test-backend-$$"
 GATEWAY="route-v2-test-gateway-$$"
+GATEWAY_READY_ATTEMPTS="${GATEWAY_READY_ATTEMPTS:-100}"
+case "$GATEWAY_READY_ATTEMPTS" in
+	''|*[!0-9]*|0)
+		echo "GATEWAY_READY_ATTEMPTS must be a positive integer" >&2
+		exit 2
+		;;
+esac
 
 cleanup() {
 	docker rm -f "$GATEWAY" "$BACKEND" >/dev/null 2>&1 || true
@@ -45,15 +52,22 @@ set_gateway_base() {
 
 wait_gateway() {
 	ready=false
-	for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+	attempt=1
+	while [ "$attempt" -le "$GATEWAY_READY_ATTEMPTS" ]; do
 		if docker exec "$BACKEND" wget -qO- http://127.0.0.1:8080/probe >/dev/null 2>&1 \
 			&& curl -sS -o /dev/null "$BASE/"; then
 			ready=true
 			break
 		fi
 		sleep 0.2
+		attempt=$((attempt + 1))
 	done
-	[ "$ready" = true ]
+	if [ "$ready" != true ]; then
+		echo "gateway readiness timed out after $GATEWAY_READY_ATTEMPTS attempts" >&2
+		docker logs "$GATEWAY" >&2 || true
+		docker logs "$BACKEND" >&2 || true
+		return 1
+	fi
 }
 
 start_gateway ""
@@ -72,8 +86,12 @@ trap 'rm -f "$TMP_BODY" "$TMP_HEADERS" "$TMP_LOG"; cleanup' EXIT INT TERM
 
 wait_gateway
 
-BODY=$(curl -fsS -H 'CF-Connecting-IP: 198.51.100.10' -H 'True-Client-IP: 198.51.100.11' "$BASE/api/v2/routes/session")
+BODY=$(curl -fsS -D "$TMP_HEADERS" -H 'CF-Connecting-IP: 198.51.100.10' -H 'True-Client-IP: 198.51.100.11' "$BASE/api/v2/routes/session")
 [ "$BODY" = '{"rawIpHeaderCount":0,"originVerified":true}' ]
+grep -Eqi '^Cache-Control: private, no-store' "$TMP_HEADERS" || {
+	echo "session success response must remain private, no-store" >&2
+	exit 1
+}
 
 for attempt in 1 2; do
 	curl -fsS -o /dev/null -H 'CF-Connecting-IP: 198.51.100.10' "$BASE/api/v2/routes/session"
@@ -82,18 +100,22 @@ done
 STATUS=$(curl -sS -D "$TMP_HEADERS" -o "$TMP_BODY" -w '%{http_code}' -H 'CF-Connecting-IP: 198.51.100.10' "$BASE/api/v2/routes/session")
 [ "$STATUS" = 429 ]
 [ "$(tr -d '\n' < "$TMP_BODY")" = '{"success":false,"code":"ROUTE_RATE_LIMITED","message":"잠시 후 다시 시도"}' ]
-rg -qi '^Retry-After: 60' "$TMP_HEADERS"
-rg -qi '^Cache-Control: private, no-store' "$TMP_HEADERS"
+grep -Eqi '^Retry-After: 60' "$TMP_HEADERS"
+grep -Eqi '^Cache-Control: private, no-store' "$TMP_HEADERS"
 
 curl -fsS -o /dev/null -H 'CF-Connecting-IP: 198.51.100.20' "$BASE/api/v2/routes/session"
 
 for client_suffix in 31 32 33 34; do
-	curl -fsS -o /dev/null \
+	curl -fsS -D "$TMP_HEADERS" -o /dev/null \
 		-H "CF-Connecting-IP: 198.51.100.$client_suffix" \
 		-H 'Authorization: Bearer integration-token' \
 		"$BASE/api/v2/routes/search"
 	sleep 0.5
 done
+grep -Eqi '^Cache-Control: private, no-store' "$TMP_HEADERS" || {
+	echo "search success response must remain private, no-store" >&2
+	exit 1
+}
 STATUS=$(curl -sS -o "$TMP_BODY" -w '%{http_code}' \
 	-H 'CF-Connecting-IP: 198.51.100.35' \
 	-H 'Authorization: Bearer integration-token' \
@@ -117,9 +139,9 @@ STATUS=$(curl -sS -o "$TMP_BODY" -w '%{http_code}' \
 
 sleep 1
 docker logs "$GATEWAY" > "$TMP_LOG" 2>&1
-[ "$(rg -c '"scope":"session"' "$TMP_LOG")" = 1 ]
-[ "$(rg -c '"scope":"search"' "$TMP_LOG")" = 2 ]
-! rg -q '198\.51\.100\.|integration-token|rotating-token' "$TMP_LOG"
+[ "$(grep -Ec '"scope":"session"' "$TMP_LOG")" = 1 ]
+[ "$(grep -Ec '"scope":"search"' "$TMP_LOG")" = 2 ]
+! grep -Eq '198\.51\.100\.|integration-token|rotating-token' "$TMP_LOG"
 BACKEND_PROBE=$(docker exec "$BACKEND" wget -qO- http://127.0.0.1:8080/probe)
 [ "$BACKEND_PROBE" = '{"requests":13}' ]
 

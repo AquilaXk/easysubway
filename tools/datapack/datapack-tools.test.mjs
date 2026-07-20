@@ -5512,7 +5512,7 @@ test("데이터팩 검증기는 분리된 route graph component를 거부한다"
       nameKo: "분리A역",
       nameEn: "Disconnected A",
       normalizedName: "disconnected-a",
-      region: "capital",
+      region: "수도권",
       latitude: 37.2,
       longitude: 127.2,
       dataQualityLevel: "LEVEL_2",
@@ -5524,7 +5524,7 @@ test("데이터팩 검증기는 분리된 route graph component를 거부한다"
       nameKo: "분리B역",
       nameEn: "Disconnected B",
       normalizedName: "disconnected-b",
-      region: "capital",
+      region: "수도권",
       latitude: 37.3,
       longitude: 127.3,
       dataQualityLevel: "LEVEL_2",
@@ -8602,6 +8602,7 @@ test("전국 coverage target은 공식 snapshot의 현재 catalog 노선과 정�
       "tools/datapack/build-molit-nationwide-fixture.mjs",
       "--csv", "tools/datapack/sources/molit-urban-rail-full-route-20251211.csv",
       "--svg-csv", "tools/datapack/sources/molit-rail-station-svg-route-20250811.csv",
+      "--kric-code-catalog", "tools/datapack/sources/kric-provider-code-catalog-20260228.json",
       "--seoulmetro-js", "tools/datapack/sources/seoulmetro-cyberstation-line-data-20260623.js",
       "--humetro-html", "tools/datapack/sources/humetro-cyberstation-map-20260623.html",
       "--humetro-css", "tools/datapack/sources/humetro-cyber-station-20250310c.css",
@@ -8616,6 +8617,14 @@ test("전국 coverage target은 공식 snapshot의 현재 catalog 노선과 정�
 
   const targets = JSON.parse(await readFile(path.join(root, "tools/datapack/nationwide-coverage-targets.json"), "utf8"));
   const fixture = JSON.parse(await readFile(fixturePath, "utf8"));
+  for (const pack of fixture.packs) {
+    const kricCodeCatalog = pack.sourceInventory.find(
+      ({ id }) => id === "kric-provider-code-catalog-20260228",
+    );
+    assert.ok(kricCodeCatalog, `${pack.packId} KRIC provider code catalog source missing`);
+    assert.equal(kricCodeCatalog.licenseStatus, "review-required");
+    assert.equal(kricCodeCatalog.redistributionAllowed, false);
+  }
   const compareCoverageLineScopes = (left, right) =>
     `${left.regionId}:${left.operatorId}:${left.lineId}`.localeCompare(
       `${right.regionId}:${right.operatorId}:${right.lineId}`,
@@ -8695,6 +8704,26 @@ test("전국 coverage target은 공식 snapshot의 현재 catalog 노선과 정�
   assert.equal(new Set(actual.map(({ lineId }) => lineId)).size, 36);
   assert.equal(actual.length, 45);
   assert.deepEqual(actual, expected);
+
+  const providerScopes = fixture.providerLineScopes
+    .filter(({ lineId }) => !inactiveLineIds.has(lineId))
+    .map(({ lineId, operatorId, regionId }) => ({ lineId, operatorId, regionId }))
+    .sort(compareCoverageLineScopes);
+  assert.equal(fixture.providerLineScopes.length, 46);
+  assert.deepEqual(providerScopes, expected);
+  assert.deepEqual(
+    fixture.providerLineScopes.find(({ lineId, operatorId }) => (
+      lineId === "line-ab1a041f6266" && operatorId === "busan-transportation"
+    )),
+    {
+      regionId: "busan",
+      operatorId: "busan-transportation",
+      lineId: "line-ab1a041f6266",
+      mreaWideCd: "02",
+      lnCd: "1",
+      railOprIsttCd: "BS",
+    },
+  );
 });
 
 test("전국 coverage target은 train-search-only 열차를 route scope에 섞으면 거부한다", async () => {
@@ -16839,7 +16868,7 @@ test("bundled 공식 OD quote 재적용은 SQLite와 gzip hash를 변경하지 �
   }
 });
 
-test("bundled 공식 OD quote check는 catalog user_version 16을 요구한다", async () => {
+test("bundled 공식 OD quote check는 catalog user_version 18을 요구한다", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "bundled-official-od-check-version-"));
   const packPath = path.join(directory, "capital.sqlite.gz");
   const indexPath = path.join(directory, "index.json");
@@ -16872,14 +16901,14 @@ test("bundled 공식 OD quote check는 catalog user_version 16을 요구한다",
         "--index", indexPath,
         "--check",
       ], { cwd: root }),
-      /bundled catalog user_version must be 16/,
+      /bundled catalog user_version must be 18/,
     );
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
 });
 
-test("bundled 공식 OD quote no-op도 catalog user_version 16을 강제한다", async () => {
+test("bundled 공식 OD quote no-op는 입력 catalog user_version 16을 보존한다", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "bundled-official-od-user-version-"));
   const packPath = path.join(directory, "capital.sqlite.gz");
   const indexPath = path.join(directory, "index.json");
@@ -16890,7 +16919,7 @@ test("bundled 공식 OD quote no-op도 catalog user_version 16을 강제한다",
       gunzipSync(await readFile(path.join(root, "apps/mobile/assets/datapacks/capital.sqlite.gz"))),
     );
     const database = new DatabaseSync(sqlitePath);
-    database.exec("PRAGMA user_version = 15");
+    database.exec("PRAGMA user_version = 16");
     database.close();
     await writeFile(packPath, gzipSync(await readFile(sqlitePath), { level: 9, mtime: 0 }));
     await copyFile(path.join(root, "apps/mobile/assets/datapacks/index.json"), indexPath);
@@ -16910,7 +16939,7 @@ test("bundled 공식 OD quote no-op도 catalog user_version 16을 강제한다",
   }
 });
 
-test("bundled 공식 OD quote 후처리기는 v18 catalog를 v16으로 낮추지 않는다", async () => {
+test("bundled 공식 OD quote 후처리기는 v19 catalog를 v18로 낮추지 않는다", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "bundled-official-od-newer-version-"));
   const packPath = path.join(directory, "capital.sqlite.gz");
   const indexPath = path.join(directory, "index.json");
@@ -16921,7 +16950,7 @@ test("bundled 공식 OD quote 후처리기는 v18 catalog를 v16으로 낮추지
       gunzipSync(await readFile(path.join(root, "apps/mobile/assets/datapacks/capital.sqlite.gz"))),
     );
     const database = new DatabaseSync(sqlitePath);
-    database.exec("PRAGMA user_version = 18");
+    database.exec("PRAGMA user_version = 19");
     database.close();
     const inputPack = gzipSync(await readFile(sqlitePath), { level: 9, mtime: 0 });
     await writeFile(packPath, inputPack);
@@ -16933,7 +16962,7 @@ test("bundled 공식 OD quote 후처리기는 v18 catalog를 v16으로 낮추지
         "--pack", packPath,
         "--index", indexPath,
       ], { cwd: root }),
-      /does not support catalog user_version 18 newer than 16/,
+      /does not support catalog user_version 19 newer than 18/,
     );
 
     assert.equal(sha256(await readFile(packPath)), sha256(inputPack));
@@ -16999,7 +17028,7 @@ test("bundled 차량·출입문 힌트 재적용은 SQLite와 gzip hash를 변�
   }
 });
 
-test("bundled 차량·출입문 힌트 check는 catalog user_version 16을 요구한다", async () => {
+test("bundled 차량·출입문 힌트 check는 catalog user_version 18을 요구한다", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "bundled-car-door-hints-check-version-"));
   const packPath = path.join(directory, "capital.sqlite.gz");
   const indexPath = path.join(directory, "index.json");
@@ -17032,14 +17061,45 @@ test("bundled 차량·출입문 힌트 check는 catalog user_version 16을 요�
         "--index", indexPath,
         "--check",
       ], { cwd: root }),
-      /bundled catalog user_version must be 16/,
+      /bundled catalog user_version must be 18/,
     );
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
 });
 
-test("bundled 차량·출입문 힌트 후처리기는 v18 catalog를 v16으로 낮추지 않는다", async () => {
+test("bundled 차량·출입문 힌트 no-op는 입력 catalog user_version 16을 보존한다", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "bundled-car-door-hints-user-version-"));
+  const packPath = path.join(directory, "capital.sqlite.gz");
+  const indexPath = path.join(directory, "index.json");
+  const sqlitePath = path.join(directory, "capital.sqlite");
+  try {
+    await writeFile(
+      sqlitePath,
+      gunzipSync(await readFile(path.join(root, "apps/mobile/assets/datapacks/capital.sqlite.gz"))),
+    );
+    const database = new DatabaseSync(sqlitePath);
+    database.exec("PRAGMA user_version = 16");
+    database.close();
+    await writeFile(packPath, gzipSync(await readFile(sqlitePath), { level: 9, mtime: 0 }));
+    await copyFile(path.join(root, "apps/mobile/assets/datapacks/index.json"), indexPath);
+
+    await execFileAsync(process.execPath, [
+      "tools/datapack/apply-car-door-hints-to-bundled-pack.mjs",
+      "--pack", packPath,
+      "--index", indexPath,
+    ], { cwd: root });
+
+    await writeFile(sqlitePath, gunzipSync(await readFile(packPath)));
+    const updated = new DatabaseSync(sqlitePath, { readOnly: true });
+    assert.equal(updated.prepare("PRAGMA user_version").get().user_version, 16);
+    updated.close();
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("bundled 차량·출입문 힌트 후처리기는 v19 catalog를 v18로 낮추지 않는다", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "bundled-car-door-hints-newer-version-"));
   const packPath = path.join(directory, "capital.sqlite.gz");
   const indexPath = path.join(directory, "index.json");
@@ -17050,7 +17110,7 @@ test("bundled 차량·출입문 힌트 후처리기는 v18 catalog를 v16으로 
       gunzipSync(await readFile(path.join(root, "apps/mobile/assets/datapacks/capital.sqlite.gz"))),
     );
     const database = new DatabaseSync(sqlitePath);
-    database.exec("PRAGMA user_version = 18");
+    database.exec("PRAGMA user_version = 19");
     database.close();
     const inputPack = gzipSync(await readFile(sqlitePath), { level: 9, mtime: 0 });
     await writeFile(packPath, inputPack);
@@ -17062,7 +17122,7 @@ test("bundled 차량·출입문 힌트 후처리기는 v18 catalog를 v16으로 
         "--pack", packPath,
         "--index", indexPath,
       ], { cwd: root }),
-      /does not support catalog user_version 18 newer than 16/,
+      /does not support catalog user_version 19 newer than 18/,
     );
 
     assert.equal(sha256(await readFile(packPath)), sha256(inputPack));

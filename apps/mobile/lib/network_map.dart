@@ -14,12 +14,18 @@ import 'design_tokens.dart';
 import 'facility_report.dart';
 import 'features/ads/ad_repository.dart';
 import 'features/network_map/domain/map_camera.dart';
+import 'features/network_map/domain/route_map_design_space.dart';
 import 'features/network_map/domain/route_map_major_stations.dart';
 import 'features/network_map/domain/route_map_owner_labels.dart';
 import 'features/network_map/domain/structured_route_map.dart';
+import 'features/network_map/presentation/nearby_data_source_toggle.dart';
+import 'features/network_map/presentation/nearby_direction_columns.dart';
+import 'features/network_map/presentation/nearby_direction_title.dart';
+import 'features/network_map/presentation/nearby_station_line_bar.dart';
+import 'features/network_map/presentation/route_map_transfer_marker.dart';
 import 'features/network_map/presentation/station_fan_menu.dart';
 import 'features/network_map/presentation/station_fan_menu_geometry.dart'
-    show kFanMenuDesignSize;
+    show kFanMenuDesignSize, kFanMenuTailTip;
 import 'features/network_map/presentation/route_map_basemap_view.dart';
 import 'features/network_map/presentation/route_map_label_layout.dart'
     show routeMapOwnerLabelMaxAnchorDistancePxFor;
@@ -27,6 +33,8 @@ import 'features/network_map/presentation/structured_route_map_painter.dart';
 import 'features/realtime/realtime_repository.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
 import 'features/route_draft/domain/route_draft.dart';
+import 'features/stations/presentation/service_pattern_badge.dart';
+import 'features/stations/presentation/station_search_screen.dart';
 import 'internal_route.dart';
 import 'mobile_error_reporter.dart';
 import 'search_field.dart';
@@ -386,8 +394,8 @@ class NetworkMapScreen extends StatefulWidget {
     this.realtimeRepository,
     this.onOpenSavedItems,
     this.onOpenNearbyStations,
+    this.onOpenTrainSearch,
     this.onOpenSettings,
-    this.onOpenDataSources,
     this.onOpenServiceNotices,
     this.notificationAction,
     this.disruptionBanner,
@@ -438,8 +446,8 @@ class NetworkMapScreen extends StatefulWidget {
 
   /// 현재 선택 지역 표시명을 함께 전달한다(#2090 검색 화면 지역 표시 배선).
   final ValueChanged<String>? onOpenNearbyStations;
+  final VoidCallback? onOpenTrainSearch;
   final VoidCallback? onOpenSettings;
-  final VoidCallback? onOpenDataSources;
 
   /// 좌측 메뉴 "운행 공지" 목록 화면 열기.
   final VoidCallback? onOpenServiceNotices;
@@ -482,6 +490,9 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   int _selectionClearRevision = 0;
   int _nearestStationRequestToken = 0;
   int _nearbyDataRequestToken = 0;
+  // #2200: 캔버스 역 탭 → StationSearchResult 해석은 비동기라 연속 탭 시 마지막
+  // 탭만 패널에 반영되도록 토큰으로 앞선 요청을 무효화한다.
+  int _canvasTapPanelToken = 0;
   RealtimeSnapshot _nearbyRealtime = const RealtimeSnapshot.loading();
   _NearbyPanelDataSource _nearbyDataSource = _NearbyPanelDataSource.realtime;
   StationTimetable? _nearbyTimetable;
@@ -608,6 +619,42 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     if (firstLine != null) {
       unawaited(_loadNearbyRealtime(result, firstLine));
     }
+  }
+
+  /// #2200 캔버스에서 역을 탭하면(팬 메뉴는 canvas가 이미 띄운다) 그 역을
+  /// 검색과 동일한 방식([StationSearchRepository.searchStations])으로
+  /// [StationSearchResult]로 해석해 [_showStationPanelFromSearch]와 같은 상태
+  /// 갱신으로 하단 역 정보 패널을 연다. 해석에 실패하면(저장소 없음·데이터 없음)
+  /// 패널을 열지 않고 canvas가 띄운 팬 메뉴만 유지한다.
+  Future<void> _handleCanvasStationTapped(NetworkMapStation station) async {
+    final repository = widget.stationSearchRepository;
+    if (repository == null) {
+      return;
+    }
+    final token = ++_canvasTapPanelToken;
+    List<StationSearchResult> results;
+    try {
+      results = await repository.searchStations(station.nameKo);
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '노선도 역 탭 패널 해석 중 예외가 발생했습니다.',
+      );
+      // 해석 실패 → 팬 메뉴만 유지(패널 없음).
+      return;
+    }
+    if (!mounted || token != _canvasTapPanelToken) {
+      return;
+    }
+    final match = results
+        .where((result) => result.id == station.id)
+        .firstOrNull;
+    if (match == null) {
+      // 데이터 없음 → 팬 메뉴만 유지(크래시·빈 패널 금지).
+      return;
+    }
+    _showStationPanelFromSearch(match);
   }
 
   /// #2109 검색 결과 탭으로 연 팬 메뉴가 닫히면(액션 선택·닫기·배경 탭·팬) 이
@@ -864,6 +911,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                     selectedStationId: _searchFanMenuStationId,
                     selectionClearRevision: _selectionClearRevision,
                     onSelectionDismissed: _dismissSearchFanMenu,
+                    onStationTapped: _handleCanvasStationTapped,
                     originStationId:
                         widget.routeDraftController.draft.origin?.id,
                     waypointStationId:
@@ -1273,9 +1321,9 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               widget.onOpenStationSearch(_currentRegionDisplayName),
           onOpenSavedItems: widget.onOpenSavedItems,
           onOpenNearbyStations: _openNearbyStationsWithRegion,
+          onOpenTrainSearch: widget.onOpenTrainSearch,
           onOpenServiceNotices: widget.onOpenServiceNotices,
           onOpenSettings: widget.onOpenSettings,
-          onOpenDataSources: widget.onOpenDataSources,
         );
       },
       transitionBuilder: (context, animation, secondaryAnimation, child) {
@@ -1294,18 +1342,37 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     widget.routeDraftController.setOrigin(
       RouteDraftStation(id: station.id, nameKo: station.nameKo),
     );
+    _dismissNearbyPanelForDraft();
   }
 
   void _setDestinationStation(NetworkMapStation station) {
     widget.routeDraftController.setDestination(
       RouteDraftStation(id: station.id, nameKo: station.nameKo),
     );
+    _dismissNearbyPanelForDraft();
   }
 
   void _setWaypointStation(NetworkMapStation station) {
     widget.routeDraftController.setWaypoint(
       RouteDraftStation(id: station.id, nameKo: station.nameKo),
     );
+    _dismissNearbyPanelForDraft();
+  }
+
+  /// #2200 팬 메뉴로 출발/경유/도착 슬롯을 지정하면 OD 경로 편집 모드로 넘어가므로
+  /// #2200에서 역 탭과 함께 열린 단일 역 정보 패널을 닫는다(검색 모드가 draft
+  /// 변경 시 닫히는 것과 같은 상호배제). 캔버스 팬 메뉴 대상 역 id도 함께 비워
+  /// 다음 프레임 rebuild가 패널을 되살리지 않게 한다. 패널·팬 메뉴가 이미 없으면
+  /// 불필요한 setState를 피한다.
+  void _dismissNearbyPanelForDraft() {
+    if (!_nearbyPanelVisible && _searchFanMenuStationId == null) {
+      return;
+    }
+    setState(() {
+      _canvasTapPanelToken++;
+      _searchFanMenuStationId = null;
+      _resetNearbyPanelState();
+    });
   }
 
   void _clearOriginStation() {
@@ -1585,7 +1652,6 @@ class _NetworkMapChrome extends StatelessWidget {
               timetableLoading: nearbyTimetableLoading,
               adjacentStations: adjacentStations,
               onClose: onCloseNearbyPanel,
-              onRetry: onCurrentLocationTap,
               onLineSelected: onNearbyLineSelected,
               onDataSourceToggle: onNearbyDataSourceToggle,
             ),
@@ -2394,7 +2460,6 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
     required this.timetableLoading,
     required this.adjacentStations,
     required this.onClose,
-    required this.onRetry,
     required this.onLineSelected,
     required this.onDataSourceToggle,
   });
@@ -2407,7 +2472,6 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
   final bool timetableLoading;
   final _NetworkMapAdjacentStations adjacentStations;
   final VoidCallback onClose;
-  final VoidCallback onRetry;
   final ValueChanged<StationSearchLine> onLineSelected;
   final VoidCallback onDataSourceToggle;
 
@@ -2415,9 +2479,6 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final primary = data.results.isEmpty ? null : data.results.first;
     final dataSourceToggleEnabled = !(primary?.lines.isEmpty ?? true);
-    final dataSourceToggleLabel = dataSource == _NearbyPanelDataSource.realtime
-        ? '현재 실시간, 시간표로 전환'
-        : '현재 시간표, 실시간으로 전환';
     return Material(
       key: const Key('networkMapNearbyStationPanel'),
       color: Colors.white,
@@ -2459,57 +2520,11 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
                     ),
                     Padding(
                       padding: const EdgeInsets.only(bottom: 2),
-                      child: Semantics(
-                        button: true,
+                      child: NearbyDataSourceToggle(
+                        isRealtime:
+                            dataSource == _NearbyPanelDataSource.realtime,
                         enabled: dataSourceToggleEnabled,
-                        label: dataSourceToggleLabel,
-                        onTap: dataSourceToggleEnabled
-                            ? onDataSourceToggle
-                            : null,
-                        excludeSemantics: true,
-                        child: TextButton(
-                          key: const Key('networkMapNearbyDataSourceToggle'),
-                          onPressed: dataSourceToggleEnabled
-                              ? onDataSourceToggle
-                              : null,
-                          style: TextButton.styleFrom(
-                            minimumSize: const Size(58, 48),
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            foregroundColor: EasySubwayAccessibleColors.mint,
-                            side: const BorderSide(
-                              color: EasySubwayAccessibleColors.mintBorder,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                          ),
-                          child: Text(
-                            dataSource == _NearbyPanelDataSource.realtime
-                                ? '실시간'
-                                : '시간표',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 2),
-                      child: IconButton(
-                        tooltip: '다시 찾기',
-                        onPressed: onRetry,
-                        constraints: const BoxConstraints.tightFor(
-                          width: 48,
-                          height: 48,
-                        ),
-                        padding: EdgeInsets.zero,
-                        icon: const Icon(
-                          Icons.refresh,
-                          color: Color(0xFF5A5A5A),
-                          size: 27,
-                        ),
+                        onToggle: onDataSourceToggle,
                       ),
                     ),
                     Padding(
@@ -2538,6 +2553,7 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
               _NetworkMapNearbyPanelBody(
                 data: data,
                 realtime: realtime,
+                selectedLineId: selectedLineId,
                 dataSource: dataSource,
                 timetable: timetable,
                 timetableLoading: timetableLoading,
@@ -2555,6 +2571,7 @@ class _NetworkMapNearbyPanelBody extends StatelessWidget {
   const _NetworkMapNearbyPanelBody({
     required this.data,
     required this.realtime,
+    required this.selectedLineId,
     required this.dataSource,
     required this.timetable,
     required this.timetableLoading,
@@ -2563,6 +2580,7 @@ class _NetworkMapNearbyPanelBody extends StatelessWidget {
 
   final _NetworkMapNearbyPanelData data;
   final RealtimeSnapshot realtime;
+  final String? selectedLineId;
   final _NearbyPanelDataSource dataSource;
   final StationTimetable? timetable;
   final bool timetableLoading;
@@ -2579,6 +2597,7 @@ class _NetworkMapNearbyPanelBody extends StatelessWidget {
       _NetworkMapNearbyPanelStatus.success => _NetworkMapNearbySuccessList(
         results: data.results,
         realtime: realtime,
+        selectedLineId: selectedLineId,
         dataSource: dataSource,
         timetable: timetable,
         timetableLoading: timetableLoading,
@@ -2588,10 +2607,41 @@ class _NetworkMapNearbyPanelBody extends StatelessWidget {
   }
 }
 
+/// 주변역 패널의 선택 노선색 단일 소스. 카탈로그 색을 우선하고 값이 없으면
+/// 노선 이름·식별자 폴백을 쓴다(2호선 = #00A84D).
+Color _nearbySelectedLineColor(StationSearchLine? line) {
+  if (line == null) {
+    return stationLineColor(stationLineFallbackBrandHex);
+  }
+  final raw = line.color.trim();
+  if (raw.isEmpty) {
+    return stationLineColor(
+      fallbackLineColorHex(lineId: line.id, lineName: line.name),
+    );
+  }
+  return stationLineColor(raw);
+}
+
+StationSearchLine? _nearbySelectedLine(
+  StationSearchResult primary,
+  String? selectedLineId,
+) {
+  if (primary.lines.isEmpty) {
+    return null;
+  }
+  for (final line in primary.lines) {
+    if (line.id == selectedLineId) {
+      return line;
+    }
+  }
+  return primary.lines.first;
+}
+
 class _NetworkMapNearbySuccessList extends StatelessWidget {
   const _NetworkMapNearbySuccessList({
     required this.results,
     required this.realtime,
+    required this.selectedLineId,
     required this.dataSource,
     required this.timetable,
     required this.timetableLoading,
@@ -2600,6 +2650,7 @@ class _NetworkMapNearbySuccessList extends StatelessWidget {
 
   final List<StationSearchResult> results;
   final RealtimeSnapshot realtime;
+  final String? selectedLineId;
   final _NearbyPanelDataSource dataSource;
   final StationTimetable? timetable;
   final bool timetableLoading;
@@ -2608,83 +2659,34 @@ class _NetworkMapNearbySuccessList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final primary = results.first;
-    final leftName = adjacentStations.leftName;
-    final rightName = adjacentStations.rightName;
+    final selectedLine = _nearbySelectedLine(primary, selectedLineId);
+    final lineColor = _nearbySelectedLineColor(selectedLine);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(13, 18, 13, 0),
-          child: Container(
-            height: 26,
-            decoration: BoxDecoration(
-              color: EasySubwayAccessibleColors.mapSelectionAccent,
-              borderRadius: BorderRadius.circular(13),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    leftName == null ? '' : '< $leftName',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                Container(
-                  constraints: const BoxConstraints(minWidth: 126),
-                  height: 34,
-                  alignment: Alignment.center,
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: EasySubwayAccessibleColors.mapSelectionAccent,
-                      width: 3,
-                    ),
-                  ),
-                  child: Text(
-                    primary.nameKo,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF2C2C2C),
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    rightName == null ? '' : '$rightName >',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+        NearbyStationLineBar(
+          leftName: adjacentStations.leftName,
+          rightName: adjacentStations.rightName,
+          stationName: primary.nameKo,
+          badgeText: selectedLine?.badgeText ?? '',
+          lineColor: lineColor,
         ),
         const SizedBox(height: 17),
         Padding(
           padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
           child: dataSource == _NearbyPanelDataSource.realtime
-              ? _SubwayArrivalPanel(snapshot: realtime)
+              ? _SubwayArrivalPanel(
+                  snapshot: realtime,
+                  lineColor: lineColor,
+                  leftName: adjacentStations.leftName,
+                  rightName: adjacentStations.rightName,
+                )
               : _SubwayTimetablePanel(
                   timetable: timetable,
                   loading: timetableLoading,
+                  lineColor: lineColor,
+                  leftName: adjacentStations.leftName,
+                  rightName: adjacentStations.rightName,
                 ),
         ),
       ],
@@ -2776,95 +2778,125 @@ String _arrivalDirectionLabel(RealtimeArrival arrival) {
   return destination.isEmpty ? '' : '$destination 방면';
 }
 
-/// 주변역 패널의 실시간 도착 정보. 선택 호선에 표시할 데이터가
-/// 없으면 상태 문구를 늘리지 않고 검정 대시 하나로 수렴한다.
+/// 주변역 패널의 실시간 도착 정보. 열차 정보가 없어도(전체 또는 한쪽) 인접역에서
+/// "○○ 방면" 제목을 유도해 두 열 + 구분선 스켈레톤을 유지하고, 데이터 없는 열에는
+/// 대시('-')를 그린다(오너 스펙 #2200 QA). 인접역 정보도 없고 데이터도 없으면
+/// 기존 대시 폴백(`_SubwayDataUnavailable`)으로 수렴한다.
 class _SubwayArrivalPanel extends StatelessWidget {
-  const _SubwayArrivalPanel({required this.snapshot});
+  const _SubwayArrivalPanel({
+    required this.snapshot,
+    required this.lineColor,
+    required this.leftName,
+    required this.rightName,
+  });
 
   final RealtimeSnapshot snapshot;
+  final Color lineColor;
+  final String? leftName;
+  final String? rightName;
 
   @override
   Widget build(BuildContext context) {
-    switch (snapshot.status) {
-      case RealtimeSnapshotStatus.loading:
-        return const SizedBox(
-          key: Key('networkMapNearbyArrivalLoading'),
-          height: 46,
-          child: Center(
-            child: SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
+    if (snapshot.status == RealtimeSnapshotStatus.loading) {
+      return const SizedBox(
+        key: Key('networkMapNearbyArrivalLoading'),
+        height: 46,
+        child: Center(
+          child: SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2),
           ),
-        );
-      case RealtimeSnapshotStatus.unsupported:
-      case RealtimeSnapshotStatus.unavailable:
-        return const _SubwayDataUnavailable();
-      case RealtimeSnapshotStatus.fresh:
-      case RealtimeSnapshotStatus.stale:
-        if (snapshot.arrivals.isEmpty) {
-          return const _SubwayDataUnavailable();
-        }
-        final groups = <String, List<RealtimeArrival>>{};
-        for (final arrival in snapshot.arrivals) {
-          groups.putIfAbsent(arrival.direction, () => []).add(arrival);
-        }
-        final directions = groups.keys.toList(growable: false);
-        final left = groups[directions.first]!;
-        final right = directions.length > 1
-            ? groups[directions[1]]!
-            : const <RealtimeArrival>[];
-        final isStale = snapshot.status == RealtimeSnapshotStatus.stale;
-        final semanticParts = <String>[
-          for (final arrival in [...left, ...right])
-            [
-              _arrivalDirectionLabel(arrival),
-              arrival.destination.trim().isEmpty
-                  ? ''
-                  : '${arrival.destination.trim()}행',
-              _formatArrivalEta(arrival),
-            ].where((part) => part.isNotEmpty).join(' '),
-        ].where((part) => part.isNotEmpty).toList(growable: false);
-        return Semantics(
-          liveRegion: true,
-          label: semanticParts.isEmpty ? '도착 정보 없음' : semanticParts.join(', '),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (isStale) ...[
-                Text(
-                  snapshot.receivedAt.trim().isEmpty
-                      ? '최근 도착 정보'
-                      : '최근 도착 정보 · ${snapshot.receivedAt.trim()}',
-                  style: const TextStyle(
-                    color: EasySubwayAccessibleColors.mutedText,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 6),
-              ],
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: _SubwayArrivalColumn(arrivals: left)),
-                  if (right.isNotEmpty) ...[
-                    const SizedBox(
-                      height: 46,
-                      child: VerticalDivider(
-                        color: Color(0xFFE0E0E0),
-                        width: 30,
-                      ),
-                    ),
-                    Expanded(child: _SubwayArrivalColumn(arrivals: right)),
-                  ],
-                ],
-              ),
-            ],
-          ),
-        );
+        ),
+      );
     }
+
+    final hasData =
+        (snapshot.status == RealtimeSnapshotStatus.fresh ||
+            snapshot.status == RealtimeSnapshotStatus.stale) &&
+        snapshot.arrivals.isNotEmpty;
+    final dataGroups = <List<RealtimeArrival>>[];
+    if (hasData) {
+      final groups = <String, List<RealtimeArrival>>{};
+      for (final arrival in snapshot.arrivals) {
+        groups.putIfAbsent(arrival.direction, () => []).add(arrival);
+      }
+      for (final key in groups.keys) {
+        dataGroups.add(groups[key]!);
+      }
+    }
+    final dataTitles = [
+      for (final group in dataGroups) _arrivalDirectionLabel(group.first),
+    ];
+    final slots = resolveNearbyColumnSlots(
+      dataTitles: dataTitles,
+      leftName: leftName,
+      rightName: rightName,
+    );
+    if (slots.isEmpty) {
+      return const _SubwayDataUnavailable();
+    }
+
+    final columns = <NearbyPanelColumn>[];
+    final semanticParts = <String>[];
+    for (final slot in slots) {
+      final dataIndex = slot.dataIndex;
+      if (dataIndex == null) {
+        columns.add(NearbyPanelColumn(title: slot.title));
+        semanticParts.add('${slot.title} 정보 없음');
+        continue;
+      }
+      final visible = dataGroups[dataIndex].take(2).toList(growable: false);
+      columns.add(
+        NearbyPanelColumn(
+          title: slot.title,
+          rows: [
+            for (final arrival in visible)
+              NearbyArrivalRow(
+                destination: arrival.destination.trim(),
+                eta: _formatArrivalEta(arrival),
+              ),
+          ],
+        ),
+      );
+      for (final arrival in visible) {
+        final part = [
+          _arrivalDirectionLabel(arrival),
+          arrival.destination.trim().isEmpty
+              ? ''
+              : '${arrival.destination.trim()}행',
+          _formatArrivalEta(arrival),
+        ].where((part) => part.isNotEmpty).join(' ');
+        if (part.isNotEmpty) {
+          semanticParts.add(part);
+        }
+      }
+    }
+
+    final isStale = snapshot.status == RealtimeSnapshotStatus.stale && hasData;
+    return Semantics(
+      liveRegion: true,
+      label: semanticParts.isEmpty ? '도착 정보 없음' : semanticParts.join(', '),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isStale) ...[
+            Text(
+              snapshot.receivedAt.trim().isEmpty
+                  ? '최근 도착 정보'
+                  : '최근 도착 정보 · ${snapshot.receivedAt.trim()}',
+              style: const TextStyle(
+                color: EasySubwayAccessibleColors.mutedText,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+          ],
+          NearbyPanelColumns(columns: columns, lineColor: lineColor),
+        ],
+      ),
+    );
   }
 }
 
@@ -2896,10 +2928,19 @@ class _SubwayDataUnavailable extends StatelessWidget {
 }
 
 class _SubwayTimetablePanel extends StatelessWidget {
-  const _SubwayTimetablePanel({required this.timetable, required this.loading});
+  const _SubwayTimetablePanel({
+    required this.timetable,
+    required this.loading,
+    required this.lineColor,
+    required this.leftName,
+    required this.rightName,
+  });
 
   final StationTimetable? timetable;
   final bool loading;
+  final Color lineColor;
+  final String? leftName;
+  final String? rightName;
 
   @override
   Widget build(BuildContext context) {
@@ -2917,47 +2958,54 @@ class _SubwayTimetablePanel extends StatelessWidget {
       );
     }
     final departures = _nextTimetableDepartures(timetable, DateTime.now());
-    if (departures.isEmpty) {
-      return const _SubwayDataUnavailable();
-    }
-    final columns = <List<_NextTimetableDeparture>>[];
+    // 방면별로 그룹핑(실시간과 동일한 열 구성 원칙 적용).
+    final dataGroups = <List<_NextTimetableDeparture>>[];
     for (final departure in departures) {
-      if (columns.isEmpty ||
-          columns.last.first.directionLabel != departure.directionLabel) {
-        columns.add([departure]);
+      if (dataGroups.isEmpty ||
+          dataGroups.last.first.directionLabel != departure.directionLabel) {
+        dataGroups.add([departure]);
       } else {
-        columns.last.add(departure);
+        dataGroups.last.add(departure);
       }
     }
+    final dataTitles = [
+      for (final group in dataGroups) group.first.directionLabel,
+    ];
+    final slots = resolveNearbyColumnSlots(
+      dataTitles: dataTitles,
+      leftName: leftName,
+      rightName: rightName,
+    );
+    if (slots.isEmpty) {
+      return const _SubwayDataUnavailable();
+    }
+
+    final columns = <NearbyPanelColumn>[];
+    final semanticParts = <String>[];
+    for (final slot in slots) {
+      final dataIndex = slot.dataIndex;
+      if (dataIndex == null) {
+        columns.add(NearbyPanelColumn(title: slot.title));
+        semanticParts.add('${slot.title} 정보 없음');
+        continue;
+      }
+      final group = dataGroups[dataIndex];
+      final rows = <Widget>[];
+      for (var row = 0; row < group.length; row++) {
+        if (row > 0) {
+          rows.add(const SizedBox(height: 4));
+        }
+        rows.add(_SubwayTimetableDepartureView(data: group[row]));
+        semanticParts.add(group[row].departure.semanticLabel);
+      }
+      columns.add(NearbyPanelColumn(title: slot.title, rows: rows));
+    }
+
     return Semantics(
       liveRegion: true,
       excludeSemantics: true,
-      label: departures
-          .map((entry) => entry.departure.semanticLabel)
-          .join(', '),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (var index = 0; index < columns.length; index++) ...[
-            if (index > 0)
-              const SizedBox(
-                height: 46,
-                child: VerticalDivider(color: Color(0xFFE0E0E0), width: 30),
-              ),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (var row = 0; row < columns[index].length; row++) ...[
-                    if (row > 0) const SizedBox(height: 4),
-                    _SubwayTimetableDepartureView(data: columns[index][row]),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
+      label: semanticParts.isEmpty ? '정보 없음' : semanticParts.join(', '),
+      child: NearbyPanelColumns(columns: columns, lineColor: lineColor),
     );
   }
 }
@@ -3019,110 +3067,27 @@ class _SubwayTimetableDepartureView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Flexible(
-          child: Text(
-            data.directionLabel,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Color(0xFF2F2F2F),
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          data.departure.timeLabel,
-          style: const TextStyle(
-            color: Color(0xFFE23D3D),
-            fontSize: 15,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SubwayArrivalColumn extends StatelessWidget {
-  const _SubwayArrivalColumn({required this.arrivals});
-
-  final List<RealtimeArrival> arrivals;
-
-  @override
-  Widget build(BuildContext context) {
-    final visible = arrivals.take(2).toList(growable: false);
-    final directionLabel = visible.isEmpty
-        ? ''
-        : _arrivalDirectionLabel(visible.first);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (directionLabel.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Text(
-              directionLabel,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: EasySubwayAccessibleColors.primary,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        for (final arrival in visible) _SubwayArrivalRow(arrival: arrival),
-      ],
-    );
-  }
-}
-
-class _SubwayArrivalRow extends StatelessWidget {
-  const _SubwayArrivalRow({required this.arrival});
-
-  final RealtimeArrival arrival;
-
-  @override
-  Widget build(BuildContext context) {
-    final destination = arrival.destination.trim();
-    final eta = _formatArrivalEta(arrival);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Column(
-        children: [
-          if (destination.isNotEmpty)
-            Text(
-              '$destination행',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Color(0xFF2F2F2F),
-                fontSize: 13,
-                height: 1.3,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          if (eta.isNotEmpty)
-            Text(
-              eta,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: EasySubwayAccessibleColors.secondaryText,
-                fontSize: 12,
-                height: 1.3,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-        ],
+    final time = Text(
+      data.departure.timeLabel,
+      style: const TextStyle(
+        color: Color(0xFFE23D3D),
+        fontSize: 15,
+        fontWeight: FontWeight.w800,
       ),
+    );
+    if (!data.departure.isExpress) {
+      return time;
+    }
+    // 급행 출발은 시각 옆에 배지를 붙인다. text scale·좁은 폭·landscape에서
+    // 시각과 배지가 겹치지 않게 Wrap으로 다음 줄 배치한다(clipping 금지).
+    return Wrap(
+      spacing: 4,
+      runSpacing: 2,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        time,
+        ServicePatternBadge(departure: data.departure),
+      ],
     );
   }
 }
@@ -3145,26 +3110,21 @@ class _NetworkMapMenuPanel extends StatelessWidget {
     required this.onOpenStationSearch,
     required this.onOpenSavedItems,
     required this.onOpenNearbyStations,
+    required this.onOpenTrainSearch,
     required this.onOpenServiceNotices,
     required this.onOpenSettings,
-    required this.onOpenDataSources,
   });
 
   final VoidCallback onOpenStationSearch;
   final VoidCallback? onOpenSavedItems;
   final VoidCallback? onOpenNearbyStations;
+  final VoidCallback? onOpenTrainSearch;
   final VoidCallback? onOpenServiceNotices;
   final VoidCallback? onOpenSettings;
-  final VoidCallback? onOpenDataSources;
 
   void _runAction(BuildContext context, VoidCallback action) {
     Navigator.of(context).pop();
     action();
-  }
-
-  void _runActionAfterMenuClose(BuildContext context, VoidCallback action) {
-    Navigator.of(context).pop();
-    Future<void>.delayed(const Duration(milliseconds: 180), action);
   }
 
   @override
@@ -3206,6 +3166,13 @@ class _NetworkMapMenuPanel extends StatelessWidget {
                           onTap: () =>
                               _runAction(context, onOpenNearbyStations!),
                         ),
+                      if (onOpenTrainSearch != null)
+                        _NetworkMapMenuTile(
+                          key: const Key('networkMapMenuTrainSearchButton'),
+                          icon: Icons.train_outlined,
+                          label: '기차 검색',
+                          onTap: () => _runAction(context, onOpenTrainSearch!),
+                        ),
                       if (onOpenSavedItems != null ||
                           onOpenSettings != null) ...[
                         const _NetworkMapMenuSectionLabel('내 정보'),
@@ -3224,8 +3191,7 @@ class _NetworkMapMenuPanel extends StatelessWidget {
                             onTap: () => _runAction(context, onOpenSettings!),
                           ),
                       ],
-                      if (onOpenServiceNotices != null ||
-                          onOpenDataSources != null) ...[
+                      if (onOpenServiceNotices != null) ...[
                         const _NetworkMapMenuSectionLabel('안내'),
                         if (onOpenServiceNotices != null)
                           _NetworkMapMenuTile(
@@ -3236,16 +3202,6 @@ class _NetworkMapMenuPanel extends StatelessWidget {
                             label: '운행 공지',
                             onTap: () =>
                                 _runAction(context, onOpenServiceNotices!),
-                          ),
-                        if (onOpenDataSources != null)
-                          _NetworkMapMenuTile(
-                            key: const Key('networkMapMenuDataSourcesButton'),
-                            icon: Icons.source_outlined,
-                            label: '자료 제공 정보',
-                            onTap: () => _runActionAfterMenuClose(
-                              context,
-                              onOpenDataSources!,
-                            ),
                           ),
                       ],
                     ],
@@ -3513,6 +3469,7 @@ class _NetworkMapCanvas extends StatefulWidget {
     required this.onClearDestination,
     required this.onViewportChanged,
     required this.onSelectionDismissed,
+    required this.onStationTapped,
     this.originStationId,
     this.waypointStationId,
     this.destinationStationId,
@@ -3544,6 +3501,11 @@ class _NetworkMapCanvas extends StatefulWidget {
   /// 메뉴가 닫힐 때(액션 선택·닫기·배경 탭) 부모의 선택 상태도 비워야 한다.
   /// 내부 [_selectedStation]만 null로 두면 prop이 다시 메뉴를 띄운다.
   final VoidCallback onSelectionDismissed;
+
+  /// #2200 캔버스에서 역 노드를 탭하면(팬 메뉴 표시와 동시에) 부모가 그 역을
+  /// 해석해 하단 역 정보 패널을 함께 열도록 통지한다. 검색·focus 채널로 열린
+  /// 팬 메뉴([selectedStationId] prop 경로)는 이 콜백을 태우지 않는다.
+  final ValueChanged<NetworkMapStation> onStationTapped;
 
   @override
   State<_NetworkMapCanvas> createState() => _NetworkMapCanvasState();
@@ -3608,13 +3570,18 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   Offset? _gestureStartFocalPoint;
   String? _geometryCacheKey;
   _MapGeometry? _geometryCache;
-  NetworkMapData? _structuredMapData;
-  StructuredRouteMap? _structuredMap;
-  Map<String, Color>? _structuredLineColors;
-  Map<String, String>? _structuredLabelTextByStationId;
+  // 구조화 canvas 렌더러(#1641) 파생 데이터 캐시 — region 단위로 재계산.
+  String? _structuredCacheKey;
+  StructuredRouteMap? _structuredRouteMapCache;
+  Map<String, Color>? _structuredLineColorsCache;
+  Map<String, String>? _structuredLabelTextCache;
+  Map<String, String>? _structuredLineBadgeLabelCache;
   // basemap 6차(#2068): stationId → 축약 전 원본 nameKo(오너 라벨 sidecar 매칭 키).
-  Map<String, String>? _structuredStationNameByStationId;
-  Map<String, String>? _structuredLineBadgeLabelByLineId;
+  Map<String, String>? _structuredStationNameByStationIdCache;
+  // 팬 메뉴 환승 앵커(#2192): 렌더 캡슐 중심 유도에 쓰는 파생값. structured 캐시와
+  // 같은 키로 무효화한다. designScale은 렌더러 모드 판정과 동일 값이어야 한다.
+  double? _structuredDesignScaleCache;
+  Map<String, RouteMapTransferGroup>? _structuredTransferGroupCache;
   NetworkMapStation? _selectedStation;
   // region → attribution 표시 문자열(#1951). manifest 로드 전에는 null로 두고
   // attribution을 표시하지 않는다(로드 실패 시에도 동일하게 조용히 미표기).
@@ -3895,10 +3862,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                 Builder(
                   builder: (context) {
                     final stationPoint = camera.sourceToViewportPoint(
-                      Offset(
-                        geometry.x(selectedStation),
-                        geometry.y(selectedStation),
-                      ),
+                      _fanMenuAnchorSource(selectedStation, geometry),
                     );
                     // #2109: 배치 규칙은 fanMenuPlacement 단일 함수가 소유한다
                     // (카메라 최소 패닝 _panCameraToRevealFanMenu와 동일 규칙 소비).
@@ -4200,6 +4164,9 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
 
   void _selectStation(NetworkMapStation station) {
     setState(() => _selectedStation = station);
+    // #2200: 캔버스 역 탭은 팬 메뉴와 함께 하단 역 정보 패널도 열도록 부모에
+    // 통지한다(부모가 역을 StationSearchResult로 해석해 패널을 연다).
+    widget.onStationTapped(station);
     // #2109: 화면 경계에서 팬 메뉴가 잘리면 카메라를 최소 거리만 패닝해 전체
     // 노출한다. 다음 프레임(레이아웃 확정 후) 뷰포트 대비 메뉴 bbox를 계산한다.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -4217,7 +4184,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     }
     final geometry = _geometryFor(widget.data);
     final stationPoint = camera.sourceToViewportPoint(
-      Offset(geometry.x(station), geometry.y(station)),
+      _fanMenuAnchorSource(station, geometry),
     );
     const margin = kFanMenuViewportMargin;
     // #2109: 배치 bbox는 build와 동일하게 fanMenuPlacement가 계산한다
@@ -4225,11 +4192,12 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     // 패닝은 같은 viewport의 클램프 없는 이상적 배치로 최대한 노출을 시도하고,
     // 패닝이 .clamped() 한계로 다 못 드러내는 잔여는 build 경로의 viewport 클램프
     // 폴백이 처리한다.
-    final menuRect = fanMenuPlacement(
+    final placement = fanMenuPlacement(
       stationPoint: stationPoint,
       viewport: camera.viewportSize,
       clampPosition: false,
-    ).revealBounds;
+    );
+    final menuRect = placement.revealBounds;
     final viewport = Offset.zero & camera.viewportSize;
     var dx = 0.0;
     var dy = 0.0;
@@ -4248,10 +4216,16 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     }
     // 뷰포트 픽셀 이동 → source 좌표 center 이동(반대 방향).
     final nextCenter = camera.center - Offset(dx, dy) / camera.scale;
+    // #2192: v3는 flip을 제거하고 항상 노드 위에 배치하므로, 지도 최상단(경계)
+    // 역에서도 꼬리 팁이 노드에 닿은 채 메뉴 전체가 드러나려면 카메라가 source
+    // 경계를 메뉴 높이만큼 넘겨 패닝할 수 있어야 한다. clamped 헤드룸을 메뉴
+    // 높이+여백으로 열어 상단 여유를 준다(dx·dy는 필요한 방향으로만 이동하므로
+    // 다른 역 배치에는 영향 없음). 잔여는 build 경로의 viewport 클램프가 처리한다.
+    final headroom = placement.menuHeight + margin;
     _setCamera(
       camera
           .copyWith(center: nextCenter, revision: camera.revision + 1)
-          .clamped(),
+          .clamped(viewportMargin: headroom),
     );
   }
 
@@ -4264,10 +4238,11 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     Offset sourceOrigin,
   ) {
     final attribution = _attributionTextByRegion?[widget.data.selectedRegion];
-    final map = _currentStructuredMap();
-    final lineColors = _structuredLineColors!;
-    final labelTextByStationId = _structuredLabelTextByStationId!;
-    final lineBadgeLabelByLineId = _structuredLineBadgeLabelByLineId!;
+    _ensureStructuredRouteMap();
+    final map = _structuredRouteMapCache!;
+    final lineColors = _structuredLineColorsCache!;
+    final labelTextByStationId = _structuredLabelTextCache!;
+    final lineBadgeLabelByLineId = _structuredLineBadgeLabelCache!;
     // basemap 6차(#2068): asset id(예: '수도권'→'seoul')로 오너 라벨 sidecar를
     // 조회한다. 매핑에 없는 region·로드 전이면 빈 맵 → 4차 자동 솔버 폴백.
     // widget.data.selectedRegion은 저장형('광주권' 등)이라 _geometryFor와 같이
@@ -4309,34 +4284,73 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
           sourceOrigin: sourceOrigin,
           ownerLabelsByStationName: ownerLabelsByStationName,
           ownerLabelMaxAnchorDistancePx: ownerLabelMaxAnchorDistancePx,
-          stationNameByStationId: _structuredStationNameByStationId!,
+          stationNameByStationId: _structuredStationNameByStationIdCache!,
         ),
       ],
     );
   }
 
-  StructuredRouteMap _currentStructuredMap() {
-    if (!identical(_structuredMapData, widget.data)) {
-      _structuredMapData = widget.data;
-      _structuredMap = widget.data.toStructuredRouteMap();
-      _structuredLineColors = routeMapLineColors({
-        for (final line in widget.data.lines) line.id: line.color,
-      });
-      _structuredLabelTextByStationId = {
-        for (final station in widget.data.stations)
-          station.id: routeMapStationLabel(station.nameKo),
-      };
-      // basemap 6차(#2068): 오너 라벨 sidecar 매칭은 축약 전 원본 nameKo
-      // 기준이라 위 축약 맵과 별도로 둔다.
-      _structuredStationNameByStationId = {
-        for (final station in widget.data.stations) station.id: station.nameKo,
-      };
-      _structuredLineBadgeLabelByLineId = {
-        for (final line in widget.data.lines)
-          line.id: routeMapLineBadgeLabel(line.name),
-      };
+  void _ensureStructuredRouteMap() {
+    final data = widget.data;
+    // geometry 캐시와 동일하게 identityHashCode를 포함해, 같은 region·같은 개수라도
+    // data 인스턴스가 바뀌면(좌표 수정/노선 교체) 재계산되게 한다(overlay와 정합).
+    final key =
+        '${data.selectedRegion}:${identityHashCode(data.stations)}:${data.stations.length}:${data.lines.length}';
+    if (_structuredCacheKey == key && _structuredRouteMapCache != null) {
+      return;
     }
-    return _structuredMap!;
+    _structuredCacheKey = key;
+    final structured = data.toStructuredRouteMap();
+    _structuredRouteMapCache = structured;
+    _structuredDesignScaleCache = routeMapDesignSpaceFor(
+      structured,
+    ).designScale;
+    _structuredTransferGroupCache = {
+      for (final group in structured.transferGroups) group.stationId: group,
+    };
+    _structuredLineColorsCache = routeMapLineColors({
+      for (final line in data.lines) line.id: line.color,
+    });
+    _structuredLabelTextCache = {
+      for (final station in data.stations)
+        station.id: routeMapStationLabel(station.nameKo),
+    };
+    // basemap 6차(#2068): 오너 라벨 sidecar 매칭은 축약 전 원본 nameKo
+    // 기준이라 위 축약 맵과 별도로 둔다.
+    _structuredStationNameByStationIdCache = {
+      for (final station in data.stations) station.id: station.nameKo,
+    };
+    _structuredLineBadgeLabelCache = {
+      for (final line in data.lines) line.id: routeMapLineBadgeLabel(line.name),
+    };
+  }
+
+  /// 팬 메뉴 앵커의 source 좌표(#2192). 환승역은 렌더 캡슐의 시각 중심으로,
+  /// 일반역은 노드 좌표 그대로 유도한 뒤 [_MapGeometry] 원점을 빼
+  /// [MapCameraState.sourceToViewportPoint] 입력 좌표계로 맞춘다.
+  /// build(렌더)와 [_panCameraToRevealFanMenu](카메라)가 같은 앵커를 소비하도록
+  /// 단일 헬퍼로 둔다.
+  Offset _fanMenuAnchorSource(
+    NetworkMapStation station,
+    _MapGeometry geometry,
+  ) {
+    _ensureStructuredRouteMap();
+    final tapped = Offset(
+      station.position.x.toDouble(),
+      station.position.y.toDouble(),
+    );
+    final group = _structuredTransferGroupCache?[station.id];
+    final center = group == null
+        ? tapped
+        : fanMenuTransferAnchor(
+            memberPositions: group.memberPositions,
+            tappedPosition: tapped,
+            designScale: _structuredDesignScaleCache ?? 1.0,
+          );
+    return Offset(
+      center.dx - geometry.origin.dx,
+      center.dy - geometry.origin.dy,
+    );
   }
 }
 
@@ -6044,16 +6058,12 @@ const double kFanMenuViewportMargin = 12.0;
 
 class FanMenuPlacement {
   const FanMenuPlacement({
-    required this.placeBelow,
     required this.left,
     required this.top,
     required this.menuWidth,
     required this.menuHeight,
     required this.revealBounds,
   });
-
-  /// 위쪽 공간이 부족해 메뉴를 노드 아래로 뒤집었는지.
-  final bool placeBelow;
 
   /// 팬 메뉴 Positioned의 left/top.
   final double left;
@@ -6065,10 +6075,11 @@ class FanMenuPlacement {
   final Rect revealBounds;
 }
 
-/// 역 노드의 뷰포트 좌표([stationPoint])로 팬 메뉴 배치를 계산한다.
-/// 기본은 노드 위쪽에 메뉴 하단(닫기 노치)이 오도록 배치하되, 지도 상단 경계에
-/// 붙은 역은 위쪽 공간이 부족하므로 노드 아래로 뒤집어 항상 화면 안에 들어오게
-/// 한다(#2109).
+/// 역 노드의 뷰포트 좌표([stationPoint])로 팬 메뉴 배치를 계산한다(#2192 v3).
+/// 항상 노드 위쪽에 배치하되, 말풍선 꼬리 팁([kFanMenuTailTip])이 앵커 노드
+/// 정중앙에 닿도록 정렬한다(노드 위 8px 갭·flip 제거). 지도 최상단 역에서도
+/// 성립하도록 카메라 최소 패닝([_NetworkMapCanvasState._panCameraToRevealFanMenu])이
+/// 메뉴 높이만큼 상단 헤드룸을 열어 노출한다.
 ///
 /// 렌더와 카메라 패닝이 같은 viewport 기반 메뉴 크기를 사용한다. 렌더 경로는
 /// [clampPosition]을 켜 극단 경계에서도 메뉴를 화면 안에 두고, 카메라 경로는
@@ -6088,11 +6099,14 @@ FanMenuPlacement fanMenuPlacement({
   final menuWidth = fanMenuWidthForViewport(viewport.width);
   final menuHeight =
       menuWidth * (kFanMenuDesignSize.height / kFanMenuDesignSize.width);
-  var left = stationPoint.dx - menuWidth / 2;
-  final placeBelow = stationPoint.dy - menuHeight - 8 < 8;
-  var top = placeBelow
-      ? stationPoint.dy + 28
-      : stationPoint.dy - menuHeight - 8;
+  // 꼬리 팁(design 좌표 kFanMenuTailTip)이 앵커 노드 정중앙에 오도록 배치.
+  // 팁 x=350/700=중앙, 팁 y=375/380이므로 top은 노드에서 팁 높이만큼 위로 민다.
+  var left =
+      stationPoint.dx -
+      menuWidth * (kFanMenuTailTip.dx / kFanMenuDesignSize.width);
+  var top =
+      stationPoint.dy -
+      menuHeight * (kFanMenuTailTip.dy / kFanMenuDesignSize.height);
   if (clampPosition) {
     const margin = kFanMenuViewportMargin;
     final maxLeft = viewport.width - margin - menuWidth;
@@ -6105,13 +6119,48 @@ FanMenuPlacement fanMenuPlacement({
     }
   }
   return FanMenuPlacement(
-    placeBelow: placeBelow,
     left: left,
     top: top,
     menuWidth: menuWidth,
     menuHeight: menuHeight,
     revealBounds: Rect.fromLTWH(left, top, menuWidth, menuHeight),
   );
+}
+
+/// 환승 캡슐의 시각 중심(source 좌표)을 렌더러와 동일 규칙으로 유도한다(#2192).
+/// 팬 메뉴 앵커가 실제로 그려지는 캡슐 중심과 어긋나지 않도록
+/// [routeMapTransferMarkers]를 그대로 재사용한다(모드 판정 독립 재유도 금지):
+/// 스택·강등 스택은 평균, 스팬은 bounds 중심, separate는 탭한 멤버의 캡슐 중심.
+///
+/// [memberPositions]는 환승 그룹의 노선별 노드 좌표(source), [tappedPosition]은
+/// 탭한 멤버의 좌표(source). 멤버가 2개 미만이면 일반역으로 보고 그대로 반환한다.
+/// [designScale]은 렌더러가 모드 임계를 판정할 때 쓰는 값(source→design 배율)과
+/// 동일해야 한다.
+@visibleForTesting
+Offset fanMenuTransferAnchor({
+  required List<Offset> memberPositions,
+  required Offset tappedPosition,
+  required double designScale,
+}) {
+  if (memberPositions.length < 2) {
+    return tappedPosition;
+  }
+  final markers = routeMapTransferMarkers(
+    memberCenters: memberPositions,
+    // 캡슐 기하(중심)는 색과 무관하나 함수 계약상 길이가 멤버 수와 같아야 한다.
+    colors: List<Color>.filled(memberPositions.length, const Color(0xFF000000)),
+    designSpread: offsetsMaxPairwiseDistance(memberPositions) * designScale,
+    dotRadius: kRouteMapTransferDotRadiusPx,
+    dotGap: kRouteMapTransferDotGapPx,
+    padding: kRouteMapTransferDotPaddingPx,
+  );
+  // 스택·강등 스택·스팬 모드는 단일 캡슐 → 그 중심. horizontalDots는 캡슐 중심에
+  // 영향을 주지 않으므로 corridor 방향 계산 없이도 렌더 중심과 일치한다.
+  if (markers.length == 1) {
+    return markers.first.capsule.center;
+  }
+  // separate 모드: 멤버별 캡슐 → 탭한 멤버의 캡슐 중심(=탭 좌표).
+  return tappedPosition;
 }
 
 /// 팬 메뉴 배선용: 탭한 역이 이미 배정된 슬롯 집합(진한 채움 selected).

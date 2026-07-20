@@ -246,7 +246,7 @@ class AdminAuditPageController {
 
 	private List<FilterOption> actorOptions(AdminAuditEventType scopeEventType, String selected) {
 		List<FilterOption> options = new ArrayList<>();
-		options.add(new FilterOption("", "actor 전체", selected == null));
+		options.add(new FilterOption("", "수행자 전체", selected == null));
 		for (String actor : auditEventRepository.findDistinctActors(scopeEventType)) {
 			options.add(new FilterOption(actor, actor, actor.equals(selected)));
 		}
@@ -326,14 +326,14 @@ class AdminAuditPageController {
 				AuditLabels.outcome(event.outcome()),
 				event.outcome() == AdminAuditOutcome.FAILURE ? "failure" : "ok",
 				orDash(event.reason()),
-				// 사유 누락은 표시 문자열("-")이 아니라 실제 도메인 값(null·공백)으로 판정한다.
+				// 사유 누락은 표시 문자열("—")이 아니라 실제 도메인 값(null·공백)으로 판정한다.
 				event.reason() == null || event.reason().isBlank(),
 				event.occurredAt().toString()
 			);
 		}
 
 		private static String orDash(String value) {
-			return value == null || value.isBlank() ? "-" : value;
+			return value == null || value.isBlank() ? "—" : value;
 		}
 	}
 }

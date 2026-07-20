@@ -2,7 +2,10 @@ package com.easysubway.route.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,10 +27,19 @@ class JdbcRouteTimetableRepositoryTest {
 		);
 		jdbcTemplate = new JdbcTemplate(dataSource);
 		jdbcTemplate.execute("DROP ALL OBJECTS");
+		jdbcTemplate.execute("RUNSCRIPT FROM 'src/main/resources/db/migration/h2/V16__datapack_source_snapshots.sql'");
+		jdbcTemplate.execute("RUNSCRIPT FROM 'src/main/resources/db/migration/h2/V17__datapack_alias_quarantine_ledgers.sql'");
+		jdbcTemplate.execute("RUNSCRIPT FROM 'src/main/resources/db/migration/h2/V19__datapack_route_edge_evidence.sql'");
 		jdbcTemplate.execute("RUNSCRIPT FROM 'src/main/resources/db/migration/h2/V29__canonical_transit_schedule.sql'");
+		jdbcTemplate.execute("RUNSCRIPT FROM 'src/main/resources/db/migration/h2/V30__canonical_station_pathways.sql'");
 		jdbcTemplate.execute("RUNSCRIPT FROM 'src/main/resources/db/migration/h2/V37__transit_feed_info.sql'");
 		jdbcTemplate.execute("RUNSCRIPT FROM 'src/main/resources/db/migration/h2/V50__route_service_identity.sql'");
-		repository = new JdbcRouteTimetableRepository(jdbcTemplate);
+		jdbcTemplate.execute("RUNSCRIPT FROM 'src/main/resources/db/migration/h2/V61__timetable_snapshot_state.sql'");
+		jdbcTemplate.execute("RUNSCRIPT FROM 'src/main/resources/db/migration/h2/V62__route_v2_planner_identity.sql'");
+		repository = new JdbcRouteTimetableRepository(
+			jdbcTemplate,
+			Clock.fixed(Instant.parse("2026-07-16T00:00:00Z"), ZoneOffset.UTC)
+		);
 	}
 
 	@Test
@@ -54,22 +66,68 @@ class JdbcRouteTimetableRepositoryTest {
 		assertThat(repository.hasRouteTimetable()).isFalse();
 
 		insertTimetableRows();
+		insertItxRows("2026-07-20T00:00:00+09:00");
 
 		assertThat(repository.hasRouteTimetable()).isTrue();
 	}
 
 	@Test
-	@DisplayName("만료된 ITX admission은 요청 시점 snapshot과 availability에서 제외한다")
-	void excludesExpiredItxRowsAtRequestTime() {
+	@DisplayName("만료된 active snapshot은 런타임에서 fail closed한다")
+	void rejectsExpiredActiveSnapshotAtRequestTime() {
 		insertTimetableRows();
 		insertItxRows("2000-01-01T00:00:00Z");
 
-		var timetable = repository.loadRouteTimetable();
+		assertThat(repository.hasRouteTimetable()).isFalse();
+		assertThat(repository.activeItxTimetableArtifactId()).isEmpty();
+		assertThat(repository.timetableCacheKey()).isEqualTo("UNAVAILABLE");
+	}
 
-		assertThat(repository.hasRouteTimetable()).isTrue();
-		assertThat(timetable.transitTrips()).extracting("id").containsExactly("trip-seoul-4-0900");
-		assertThat(timetable.transitStopTimes()).extracting("tripId").containsOnly("trip-seoul-4-0900");
-		assertThat(repository.timetableCacheKey()).isEqualTo("SUBWAY_ONLY");
+	@Test
+	@DisplayName("break-glass override가 켜지면 만료된 active snapshot도 서빙한다")
+	void breakGlassOverrideServesExpiredSnapshot() {
+		insertTimetableRows();
+		insertItxRows("2000-01-01T00:00:00Z");
+
+		var override = new JdbcRouteTimetableRepository(
+			jdbcTemplate,
+			Clock.fixed(Instant.parse("2026-07-16T00:00:00Z"), ZoneOffset.UTC),
+			true
+		);
+
+		assertThat(override.hasRouteTimetable()).isTrue();
+		assertThat(override.activeItxTimetableArtifactId()).contains("snapshot-test");
+		assertThat(override.timetableCacheKey()).isNotEqualTo("UNAVAILABLE");
+	}
+
+	@Test
+	@DisplayName("break-glass override여도 무결성(schema·lineage) 실패는 계속 fail closed한다")
+	void breakGlassOverrideDoesNotBypassIntegrity() {
+		insertTimetableRows();
+		insertItxRows("2000-01-01T00:00:00Z");
+
+		var override = new JdbcRouteTimetableRepository(
+			jdbcTemplate,
+			Clock.fixed(Instant.parse("2026-07-16T00:00:00Z"), ZoneOffset.UTC),
+			true
+		);
+		assertThat(override.activeItxTimetableArtifactId()).contains("snapshot-test");
+
+		jdbcTemplate.update(
+			"UPDATE timetable_snapshot_history SET schema_identity = 'invalid' WHERE snapshot_sha256 = ?",
+			"a".repeat(64)
+		);
+		assertThat(override.activeItxTimetableArtifactId()).isEmpty();
+
+		jdbcTemplate.update(
+			"UPDATE timetable_snapshot_history SET schema_identity = 'backend-timetable-snapshot-v1' "
+				+ "WHERE snapshot_sha256 = ?",
+			"a".repeat(64)
+		);
+		jdbcTemplate.update(
+			"UPDATE route_service_artifact_evidence SET canonical_pack_sha256 = ? WHERE service_class = 'ITX_CHEONGCHUN'",
+			"9".repeat(64)
+		);
+		assertThat(override.activeItxTimetableArtifactId()).isEmpty();
 	}
 
 	@Test
@@ -84,24 +142,136 @@ class JdbcRouteTimetableRepositoryTest {
 			WHERE service_class = 'ITX_CHEONGCHUN'
 			""");
 
-		assertThat(freshKey).startsWith("ITX_CHEONGCHUN:");
-		assertThat(repository.timetableCacheKey()).isEqualTo("SUBWAY_ONLY");
+		assertThat(freshKey).isEqualTo("a".repeat(64) + "b".repeat(64) + "2999-01-01T00:00:00Z");
+		assertThat(repository.timetableCacheKey()).isEqualTo("UNAVAILABLE");
 	}
 
 	@Test
-	@DisplayName("동일 freshness에서도 ITX artifact identity가 바뀌면 cache key가 바뀐다")
-	void changesCacheKeyWhenItxArtifactIdentityChanges() {
+	@DisplayName("동일 freshness에서도 active snapshot SHA가 바뀌면 cache key가 바뀐다")
+	void changesCacheKeyWhenActiveSnapshotShaChanges() {
 		insertItxRows("2999-01-01T00:00:00Z");
 		String firstKey = repository.timetableCacheKey();
 
-		jdbcTemplate.update("""
-			UPDATE route_service_artifact_evidence
-			SET timetable_artifact_id = 'itx-replacement'
-			WHERE service_class = 'ITX_CHEONGCHUN'
-			""");
+		insertSnapshotHistory("f".repeat(64), "snapshot-replacement", "2999-01-01T00:00:00Z");
+		jdbcTemplate.update(
+			"UPDATE timetable_snapshot_active SET snapshot_sha256 = ? WHERE singleton_id = 1",
+			"f".repeat(64)
+		);
 
-		assertThat(firstKey).contains("itx-test");
-		assertThat(repository.timetableCacheKey()).contains("itx-replacement").isNotEqualTo(firstKey);
+		assertThat(firstKey).isEqualTo("a".repeat(64) + "b".repeat(64) + "2999-01-01T00:00:00Z");
+		assertThat(repository.timetableCacheKey())
+			.isEqualTo("f".repeat(64) + "b".repeat(64) + "2999-01-01T00:00:00Z")
+			.isNotEqualTo(firstKey);
+	}
+	@Test
+	@DisplayName("canonical pack SHA가 바뀌면 cache key가 바뀐다")
+	void changesCacheKeyWhenCanonicalPackShaChanges() {
+		insertItxRows("2999-01-01T00:00:00Z");
+		String firstKey = repository.timetableCacheKey();
+		jdbcTemplate.update(
+			"UPDATE timetable_snapshot_history SET canonical_pack_sha256 = ? WHERE snapshot_sha256 = ?",
+			"9".repeat(64),
+			"a".repeat(64)
+		);
+		jdbcTemplate.update(
+			"UPDATE route_service_artifact_evidence SET canonical_pack_sha256 = ? WHERE service_class = 'ITX_CHEONGCHUN'",
+			"9".repeat(64)
+		);
+		assertThat(repository.timetableCacheKey())
+			.isEqualTo("a".repeat(64) + "9".repeat(64) + "2999-01-01T00:00:00Z")
+			.isNotEqualTo(firstKey);
+	}
+
+	@Test
+	@DisplayName("활성 snapshot의 EXPRESS pattern과 통과역 승하차 금지를 그대로 읽는다")
+	void preservesExpressPatternAndPassThroughRestrictions() {
+		insertItxRows("2999-01-01T00:00:00Z");
+
+		var timetable = repository.loadRouteTimetable();
+		var itxTrip = timetable.transitTrips().stream()
+			.filter(trip -> trip.id().equals("trip-itx"))
+			.findFirst()
+			.orElseThrow();
+		var passThrough = timetable.transitStopTimes().stream()
+			.filter(stop -> stop.stationId().equals("station-gapyeong-pass"))
+			.findFirst()
+			.orElseThrow();
+
+		assertThat(itxTrip.servicePattern()).isEqualTo("EXPRESS");
+		assertThat(itxTrip.serviceClass()).isEqualTo("ITX_CHEONGCHUN");
+		assertThat(itxTrip.trainNo()).isEqualTo("2001");
+		assertThat(timetable.officialFares()).singleElement().satisfies(fare -> {
+			assertThat(fare.tripId()).isEqualTo("trip-itx");
+			assertThat(fare.originStationId()).isEqualTo("station-cheongnyangni");
+			assertThat(fare.destinationStationId()).isEqualTo("station-chuncheon");
+			assertThat(fare.adultFareWon()).isEqualTo(9_800);
+			assertThat(fare.currency()).isEqualTo("KRW");
+			assertThat(fare.sourceId()).isEqualTo("tago-train-schedule-fares");
+		});
+		assertThat(passThrough.pickupType()).isOne();
+		assertThat(passThrough.dropOffType()).isOne();
+	}
+
+	@Test
+	@DisplayName("active snapshot identity와 시간표 row를 하나의 조회 값으로 반환한다")
+	void loadsActiveSnapshotIdentityAndTimetableTogether() {
+		insertTimetableRows();
+		insertItxRows("2999-01-01T00:00:00Z");
+
+		var snapshot = repository.loadRouteTimetableSnapshot();
+
+		assertThat(snapshot.cacheKey()).isEqualTo("a".repeat(64) + "b".repeat(64) + "2999-01-01T00:00:00Z");
+		assertThat(snapshot.timetableArtifactId()).isEqualTo("snapshot-test");
+		assertThat(snapshot.plannerIdentity()).satisfies(identity -> {
+			assertThat(identity.timetableSnapshotSha256()).isEqualTo("a".repeat(64));
+			assertThat(identity.canonicalPackSha256()).isEqualTo("b".repeat(64));
+			assertThat(identity.canonicalPackSqliteSha256()).isEqualTo("c".repeat(64));
+			assertThat(identity.canonicalStationVersion()).isEqualTo("sha256:" + "e".repeat(64));
+			assertThat(identity.canonicalStationSetSha256()).isEqualTo("e".repeat(64));
+			assertThat(identity.sourceLineageSha256()).isEqualTo("f".repeat(64));
+			assertThat(identity.evidenceHash()).isEqualTo("1".repeat(64));
+		});
+		assertThat(snapshot.timetable().transitTrips()).extracting("id")
+			.contains("trip-seoul-4-0900", "trip-itx");
+	}
+
+	@Test
+	@DisplayName("접근성 4개 테이블을 timetable snapshot row로 함께 읽는다")
+	void loadsRouteAccessDataWithTimetableSnapshot() {
+		insertTimetableRows();
+		insertItxRows("2999-01-01T00:00:00Z");
+		insertRouteAccessRows();
+		var access = repository.loadRouteTimetableSnapshot().timetable().routeAccessData();
+		assertThat(access.pathwayNodes()).extracting("id")
+			.containsExactly("node-entry", "node-platform");
+		assertThat(access.pathwayEdges()).singleElement().satisfies(edge -> {
+			assertThat(edge.id()).isEqualTo("edge-entry");
+			assertThat(edge.legacyInternalRouteEdgeId()).isEqualTo("legacy-entry");
+			assertThat(edge.durationSeconds()).isEqualTo(120);
+			assertThat(edge.includesStairs()).isFalse();
+		});
+		assertThat(access.transferRules()).singleElement().satisfies(rule ->
+			assertThat(rule.strictStepFreePathwayEdgeId()).isEqualTo("edge-entry"));
+		assertThat(access.routeEdgeEvidence()).singleElement().satisfies(evidence -> {
+			assertThat(evidence.edgeId()).isEqualTo("legacy-entry");
+			assertThat(evidence.strictRouteEligible()).isTrue();
+		});
+	}
+	@Test
+	@DisplayName("missing·schema-invalid·lineage mismatch active snapshot은 모두 fail closed한다")
+	void rejectsMissingInvalidSchemaAndLineageMismatch() {
+		insertItxRows("2999-01-01T00:00:00Z");
+		assertThat(repository.activeItxTimetableArtifactId()).contains("snapshot-test");
+
+		jdbcTemplate.update("UPDATE timetable_snapshot_history SET schema_identity = 'invalid' WHERE snapshot_sha256 = ?", "a".repeat(64));
+		assertThat(repository.activeItxTimetableArtifactId()).isEmpty();
+
+		jdbcTemplate.update("UPDATE timetable_snapshot_history SET schema_identity = 'backend-timetable-snapshot-v1' WHERE snapshot_sha256 = ?", "a".repeat(64));
+		jdbcTemplate.update("UPDATE route_service_artifact_evidence SET canonical_pack_sha256 = ? WHERE service_class = 'ITX_CHEONGCHUN'", "9".repeat(64));
+		assertThat(repository.activeItxTimetableArtifactId()).isEmpty();
+
+		jdbcTemplate.update("DELETE FROM timetable_snapshot_active");
+		assertThat(repository.activeItxTimetableArtifactId()).isEmpty();
 	}
 
 	@Test
@@ -184,20 +354,115 @@ class JdbcRouteTimetableRepositoryTest {
 				service_day_start_seconds, trip_headsign, direction_id
 			) VALUES ('trip-itx', 'route-itx', 'itx-weekday', 'EXPRESS', 'ITX_CHEONGCHUN', 0, '춘천', 'down')
 			""");
+		jdbcTemplate.update("UPDATE transit_trips SET train_no = '2001' WHERE id = 'trip-itx'");
 		jdbcTemplate.update("""
 			INSERT INTO transit_stop_times (
 				trip_id, stop_sequence, station_id, line_id,
 				pickup_type, drop_off_type, arrival_seconds, departure_seconds
 			) VALUES
 				('trip-itx', 1, 'station-cheongnyangni', 'line-k2', 0, 0, 32400, 32400),
-				('trip-itx', 2, 'station-chuncheon', 'line-k2', 0, 0, 36000, 36000)
+				('trip-itx', 2, 'station-gapyeong-pass', 'line-k2', 1, 1, 34200, 34200),
+				('trip-itx', 3, 'station-chuncheon', 'line-k2', 0, 0, 36000, 36000)
+			""");
+		jdbcTemplate.update("""
+			INSERT INTO transit_trip_official_fares (
+				trip_id, origin_station_id, destination_station_id, adult_fare_won,
+				currency, source_id, source_snapshot_id
+			) VALUES (
+				'trip-itx', 'station-cheongnyangni', 'station-chuncheon', 9800,
+				'KRW', 'tago-train-schedule-fares', 'itx-test'
+			)
 			""");
 		jdbcTemplate.update("""
 			INSERT INTO route_service_artifact_evidence (
 				service_class, timetable_artifact_id, timetable_artifact_sha256,
 				canonical_pack_id, canonical_pack_sha256, canonical_pack_sqlite_sha256,
 				admission_status, admission_eligible, fresh_until, source_issue
-			) VALUES ('ITX_CHEONGCHUN', 'itx-test', ?, 'capital', ?, ?, 'ADMITTED', TRUE, ?, 2116)
+			) VALUES ('ITX_CHEONGCHUN', 'itx-test', ?, 'capital', ?, ?, 'ADMITTED', TRUE, ?, 2135)
 			""", "a".repeat(64), "b".repeat(64), "c".repeat(64), freshUntil);
+		insertSnapshotHistory("a".repeat(64), "snapshot-test", freshUntil);
+		jdbcTemplate.update(
+			"INSERT INTO timetable_snapshot_active (singleton_id, snapshot_sha256) VALUES (1, ?)",
+			"a".repeat(64)
+		);
+	}
+
+	private void insertSnapshotHistory(String snapshotSha256, String snapshotId, String freshUntil) {
+		jdbcTemplate.update("""
+			INSERT INTO timetable_snapshot_history (
+				snapshot_sha256, snapshot_id, schema_identity, fresh_until,
+				source_artifact_id, source_artifact_sha256, completeness_evidence_sha256,
+				canonical_pack_sha256, canonical_pack_sqlite_sha256,
+				canonical_station_version, canonical_station_set_sha256, canonical_station_member_count,
+				source_lineage_sha256, evidence_hash,
+				calendar_count, route_count, trip_count, stop_time_count
+			) VALUES (?, ?, 'backend-timetable-snapshot-v1', ?, 'itx-test', ?, ?, ?, ?, ?, ?, 2, ?, ?, ?, ?, ?, ?)
+			""",
+			snapshotSha256,
+			snapshotId,
+			freshUntil,
+			"a".repeat(64),
+			"d".repeat(64),
+			"b".repeat(64),
+			"c".repeat(64),
+			"sha256:" + "e".repeat(64),
+			"e".repeat(64),
+			"f".repeat(64),
+			"1".repeat(64),
+			jdbcTemplate.queryForObject("SELECT COUNT(*) FROM service_calendars", Integer.class),
+			jdbcTemplate.queryForObject("SELECT COUNT(*) FROM transit_routes", Integer.class),
+			jdbcTemplate.queryForObject("SELECT COUNT(*) FROM transit_trips", Integer.class),
+			jdbcTemplate.queryForObject("SELECT COUNT(*) FROM transit_stop_times", Integer.class)
+		);
+	}
+	private void insertRouteAccessRows() {
+		jdbcTemplate.update("""
+			INSERT INTO data_source_snapshots (
+				snapshot_id, source_id, provider, retrieved_at, row_count, raw_sha256,
+				raw_object_uri, redacted_request_fingerprint, schema_fingerprint,
+				snapshot_status, schema_status, license_status, fetch_status,
+				redistribution_allowed, credential_redacted, freshness_expires_at
+			) VALUES (
+				'access-snapshot', 'operator-source', 'operator', CURRENT_TIMESTAMP, 1, ?,
+				'local://access', ?, ?, 'ACTIVE', 'VALID', 'ALLOWED', 'SUCCESS', TRUE, TRUE,
+				TIMESTAMP '2999-01-01 00:00:00'
+			)
+			""", "2".repeat(64), "3".repeat(64), "4".repeat(64));
+		jdbcTemplate.update("""
+			INSERT INTO station_pathway_nodes (id, station_id, line_id, node_type, label)
+			VALUES
+				('node-entry', 'station-sangnoksu', 'seoul-4', 'ENTRANCE', '입구'),
+				('node-platform', 'station-sangnoksu', 'seoul-4', 'PLATFORM', '승강장')
+			""");
+		jdbcTemplate.update("""
+			INSERT INTO station_pathway_edges (
+				id, from_node_id, to_node_id, duration_seconds, distance_meters,
+				includes_stairs, provenance_kind, verification_status, legacy_internal_route_edge_id
+			) VALUES (
+				'edge-entry', 'node-entry', 'node-platform', 120, 80,
+				FALSE, 'OFFICIAL_SOURCE', 'VERIFIED', 'legacy-entry'
+			)
+			""");
+		jdbcTemplate.update("""
+			INSERT INTO transfer_rules (
+				id, from_station_id, from_line_id, to_station_id, to_line_id,
+				transfer_type, min_transfer_seconds, pathway_edge_id,
+				strict_step_free_pathway_edge_id, verification_status
+			) VALUES (
+				'transfer-a', 'station-sangnoksu', 'seoul-4', 'station-sangnoksu', 'seoul-4',
+				'IN_STATION', 120, 'edge-entry', 'edge-entry', 'VERIFIED'
+			)
+			""");
+		jdbcTemplate.update("""
+			INSERT INTO route_edge_evidence (
+				id, station_id, line_id, edge_id, edge_type, source_id, source_snapshot_id,
+				provenance_kind, verification_status, last_verified_at, evidence_hash,
+				strict_route_eligible, created_at
+			) VALUES (
+				'evidence-entry', 'station-sangnoksu', 'seoul-4', 'legacy-entry', 'ENTRY',
+				'operator-source', 'access-snapshot', 'OFFICIAL_SOURCE', 'VERIFIED',
+				CURRENT_TIMESTAMP, ?, TRUE, CURRENT_TIMESTAMP
+			)
+			""", "5".repeat(64));
 	}
 }

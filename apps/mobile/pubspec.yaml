@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.4+10005
+version: 1.0.5+10006
 
 environment:
   sdk: ^3.12.0
@@ -48,8 +48,11 @@ dependencies:
   workmanager_android: ^0.9.0+2
   workmanager_platform_interface: ^0.9.1+1
   vector_graphics: ^1.2.2
+  share_plus: ^13.2.1
 dev_dependencies:
   flutter_test:
+    sdk: flutter
+  integration_test:
     sdk: flutter
 
   vector_graphics_compiler: ^1.2.6
@@ -84,6 +87,7 @@ flutter:
     - assets/datapacks/metro_map_pack/SOURCE_URLS.txt
     - assets/datapacks/metro_map_pack/SHA256SUMS.txt
     - assets/datapacks/metro_map_pack/basemap/
+    - assets/datapacks/prelaunch/
     - assets/metro_symbols/line_badges/
 
   # #2068: 노선도 basemap 라벨을 오너 SVG와 동일한 자폭으로 렌더하기 위해

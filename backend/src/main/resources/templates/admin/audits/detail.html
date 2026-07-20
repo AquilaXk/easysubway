@@ -25,29 +25,28 @@
 				<p th:if="${privacyMode}">개인정보 조회 상세와 조회 사유, 같은 담당자의 전후 조회 흐름을 확인합니다.</p>
 			</div>
 			<div class="admin-actions">
-				<a class="admin-btn" th:href="@{${basePath}}">목록으로</a>
+				<a class="admin-btn plain" th:href="@{${basePath}}">목록으로</a>
 			</div>
 		</header>
 
-		<section aria-labelledby="audit-detail-heading">
+		<section class="admin-panel" aria-labelledby="audit-detail-heading">
 			<h2 id="audit-detail-heading">이벤트 상세</h2>
 			<dl class="detail-list">
 				<dt>발생</dt>
 				<dd th:text="${event.occurredAt}">2026-06-27T00:00</dd>
 				<dt th:if="${!privacyMode}">유형</dt>
 				<dd th:if="${!privacyMode}" th:text="${event.eventTypeLabel}">관리자 작업</dd>
-				<dt>actor</dt>
+				<dt>수행자</dt>
 				<dd th:text="${event.actor}">admin</dd>
 				<dt>권한</dt>
 				<dd th:text="${event.rolePermission}">admin.view</dd>
-				<dt>action</dt>
+				<dt>동작</dt>
 				<dd th:text="${event.action}">action</dd>
 				<dt>결과</dt>
 				<dd>
-					<span class="status-badge" th:classappend="${'tone-' + event.outcomeTone}"
-					      th:text="${event.outcomeLabel}">성공</span>
+					<span th:replace="~{admin/fragments/shell :: status(${event.outcomeLabel}, ${event.outcomeTone == 'failure'} ? 'bad' : 'good')}">성공</span>
 				</dd>
-				<dt>target</dt>
+				<dt>대상</dt>
 				<dd>
 					<span th:text="${event.targetType}">target</span>
 					<span class="meta" th:text="${event.targetId}">id</span>
@@ -55,15 +54,15 @@
 				</dd>
 				<dt>사유</dt>
 				<dd th:class="${privacyMode and event.reasonMissing} ? 'reason-missing'"
-				    th:text="${event.reason}">-</dd>
+				    th:insert="~{admin/fragments/missing-value :: value(${event.reason}, '미상')}">—</dd>
 				<dt>요청 ID</dt>
-				<dd th:text="${event.requestId}">-</dd>
+				<dd th:insert="~{admin/fragments/missing-value :: value(${event.requestId}, '미상')}">—</dd>
 				<dt>클라이언트 IP</dt>
-				<dd th:text="${event.clientIp}">-</dd>
+				<dd th:insert="~{admin/fragments/missing-value :: value(${event.clientIp}, '미상')}">—</dd>
 			</dl>
 		</section>
 
-		<section aria-labelledby="audit-timeline-heading" class="audit-timeline">
+		<section class="admin-panel audit-timeline" aria-labelledby="audit-timeline-heading">
 			<h2 id="audit-timeline-heading" th:text="'같은 담당자(' + ${event.actor} + ') 전후 흐름'">전후 흐름</h2>
 			<p class="section-hint" th:if="${timelineBefore.isEmpty() and timelineAfter.isEmpty()}">
 				이 담당자의 다른 이벤트가 없습니다.
@@ -72,20 +71,17 @@
 				<li th:each="row : ${timelineBefore}">
 					<span class="timeline-time" th:text="${row.occurredAt}">시각</span>
 					<span class="timeline-action" th:text="${row.action}">action</span>
-					<span class="status-badge" th:classappend="${'tone-' + row.outcomeTone}"
-					      th:text="${row.outcomeLabel}">성공</span>
+					<span th:replace="~{admin/fragments/shell :: status(${row.outcomeLabel}, ${row.outcomeTone == 'failure'} ? 'bad' : 'good')}">성공</span>
 				</li>
 				<li class="timeline-current" aria-current="true">
 					<span class="timeline-time" th:text="${event.occurredAt}">시각</span>
 					<span class="timeline-action" th:text="${event.action}">현재 이벤트</span>
-					<span class="status-badge" th:classappend="${'tone-' + event.outcomeTone}"
-					      th:text="${event.outcomeLabel}">성공</span>
+					<span th:replace="~{admin/fragments/shell :: status(${event.outcomeLabel}, ${event.outcomeTone == 'failure'} ? 'bad' : 'good')}">성공</span>
 				</li>
 				<li th:each="row : ${timelineAfter}">
 					<span class="timeline-time" th:text="${row.occurredAt}">시각</span>
 					<span class="timeline-action" th:text="${row.action}">action</span>
-					<span class="status-badge" th:classappend="${'tone-' + row.outcomeTone}"
-					      th:text="${row.outcomeLabel}">성공</span>
+					<span th:replace="~{admin/fragments/shell :: status(${row.outcomeLabel}, ${row.outcomeTone == 'failure'} ? 'bad' : 'good')}">성공</span>
 				</li>
 			</ol>
 		</section>

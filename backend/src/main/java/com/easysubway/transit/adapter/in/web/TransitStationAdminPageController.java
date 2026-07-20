@@ -462,6 +462,12 @@ class TransitStationAdminPageController {
 		return level.label();
 	}
 
+	// 데이터 품질 tone(#2349 PR⑩c 리뷰 반영): 템플릿이 라벨 문자열("고장·공사 반영")을 직접 비교하지 않도록
+	// severity 기반으로 tone을 미리 계산해 노출한다. VERIFIED만 정상 완료 상태(good)이고 나머지는 진행 중(info)이다.
+	private static String qualityTone(DataQualityLevel level) {
+		return level.severity() == DataQualityLevel.DataQualitySeverity.VERIFIED ? "good" : "info";
+	}
+
 	private static String confidenceLabel(DataConfidenceLevel level) {
 		return switch (level) {
 			case HIGH -> "확인된 정보";
@@ -500,7 +506,7 @@ class TransitStationAdminPageController {
 			return new StationRow(
 				stationWithLines.station().id(),
 				stationWithLines.station().nameKo(),
-				stationWithLines.lines().stream().map(line -> line.name()).reduce((a, b) -> a + ", " + b).orElse("-"),
+				stationWithLines.lines().stream().map(line -> line.name()).reduce((a, b) -> a + ", " + b).orElse("—"),
 				stationWithLines.station().region(),
 				TransitStationAdminPageController.qualityLabel(stationWithLines.station().dataQualityLevel()),
 				String.valueOf(stationWithLines.station().lastVerifiedAt()),
@@ -527,6 +533,7 @@ class TransitStationAdminPageController {
 		String latitude,
 		String longitude,
 		String qualityLabel,
+		String qualityTone,
 		String sourceType,
 		String lastVerifiedAt
 	) {
@@ -535,12 +542,13 @@ class TransitStationAdminPageController {
 			return new StationDetail(
 				stationWithLines.station().id(),
 				stationWithLines.station().nameKo(),
-				stationWithLines.lines().stream().map(line -> line.name()).reduce((a, b) -> a + ", " + b).orElse("-"),
+				stationWithLines.lines().stream().map(line -> line.name()).reduce((a, b) -> a + ", " + b).orElse("—"),
 				stationWithLines.station().region(),
 				String.valueOf(stationWithLines.station().latitude()),
 				String.valueOf(stationWithLines.station().longitude()),
 				TransitStationAdminPageController.qualityLabel(stationWithLines.station().dataQualityLevel()),
-				stationWithLines.station().dataSourceType().name(),
+				TransitStationAdminPageController.qualityTone(stationWithLines.station().dataQualityLevel()),
+				stationWithLines.station().dataSourceType().label(),
 				String.valueOf(stationWithLines.station().lastVerifiedAt())
 			);
 		}
@@ -649,7 +657,7 @@ class TransitStationAdminPageController {
 				facility.id(),
 				facility.name(),
 				facility.type(),
-				facility.type().name(),
+				facility.type().label(),
 				facility.exitId(),
 				facility.floorFrom(),
 				facility.floorTo(),
@@ -689,7 +697,7 @@ class TransitStationAdminPageController {
 	record RouteNodeRow(String nodeName, String nodeType, String floor) {
 
 		static RouteNodeRow from(RouteNode node) {
-			return new RouteNodeRow(node.name(), node.type().name(), node.floor());
+			return new RouteNodeRow(node.name(), node.type().label(), node.floor());
 		}
 	}
 
@@ -698,7 +706,7 @@ class TransitStationAdminPageController {
 		static RouteEdgeRow from(RouteEdge edge) {
 			return new RouteEdgeRow(
 				edge.fromNodeId() + " → " + edge.toNodeId(),
-				edge.type().name(),
+				edge.type().label(),
 				edge.reliabilityScore()
 			);
 		}

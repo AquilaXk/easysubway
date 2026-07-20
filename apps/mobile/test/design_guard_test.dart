@@ -131,12 +131,16 @@ void main() {
       RegExp(r'^const _\w*Color\b\s*=', multiLine: true),
       exclude: {'accessible_design.dart', 'design_tokens.dart'},
     );
-    expectRatchet(actual, {'lib/main.dart': 8}, rule: '로컬 색 상수');
+    expectRatchet(actual, const {}, rule: '로컬 색 상수');
   });
 
   test('FontWeight.w900 ratchet — 전면 제거 대상', () {
     final actual = countPerFile(RegExp(r'FontWeight\.w900'));
-    expectRatchet(actual, const {}, rule: 'w900');
+    expectRatchet(actual, {
+      // 주변역 패널 "○○ 방면" 제목 — 실시간·시간표 공유 단일 스타일 1건.
+      // — 오너 결정 2026-07-16, #2200
+      'lib/features/network_map/presentation/nearby_direction_title.dart': 1,
+    }, rule: 'w900');
   });
 
   test('FontWeight.w800 ratchet — 화면 타이틀 한정', () {
@@ -145,8 +149,12 @@ void main() {
       exclude: {'accessible_design.dart', 'design_tokens.dart'},
     );
     expectRatchet(actual, {
-      // 의도 잔존: 기준 화면(노선도 홈·좌측 메뉴) — 룩 불변 원칙
-      'lib/network_map.dart': 8,
+      // 의도 잔존: 기준 화면(노선도 홈·좌측 메뉴) — 룩 불변 원칙.
+      // 방면 제목 2건이 w900으로 이동해 8→5로 하향. — 오너 결정 2026-07-16, #2200
+      'lib/network_map.dart': 5,
+      // 주변역 패널 현재역 캡슐 역명 + 원형 노선 배지 번호 — 색/캡슐 위 시인성.
+      // — 오너 결정 2026-07-16, #2200
+      'lib/features/network_map/presentation/nearby_station_line_bar.dart': 2,
       // 의도 잔존: 온보딩 시작·프리셋·권한 화면 타이틀 (#1936 전면 재설계로 축소)
       'lib/onboarding.dart': 4,
       // 의도 잔존: 노선 배지 번호 — 색 배지 위 시인성 (w900은 w800로 강등)
@@ -161,10 +169,12 @@ void main() {
     );
     expectRatchet(actual, {
       // 의도 잔존: 시설 상태 카드 blocked/caution — 상태 의미 틴트 (v4 허용 예외)
-      'lib/main.dart': 2,
-      'lib/station_search.dart': 1,
-      // 의도 잔존: 운행 공지 배너 — 운행 중단 상태 의미 (v4 허용 예외)
-      'lib/features/service_notice/presentation/service_notice_banner.dart': 1,
+      'lib/features/notifications/presentation/notification_inbox_screen.dart':
+          2,
+      'lib/features/stations/presentation/station_facility_status_summary.dart':
+          1,
+      // 홈 풍선형 운행 공지 배너(amberSoft) 제거로 예외 삭제.
+      // — 오너 결정 2026-07-16, #2200
     }, rule: '장식 Soft 틴트');
   });
 
@@ -306,10 +316,18 @@ void main() {
     expectRatchet(actual, {
       // 의도 잔존: 역 상세 정보/도움/시설 카드·액션 버튼 radius (16/12) — 무박스 전환 진행 중
       'lib/station_search.dart': 4,
-      // 의도 잔존: _AppCard(20)·역 정보 컨테이너(16)·입력 필드(12x2) — v4 정리 대상
-      'lib/main.dart': 4,
-      // 의도 잔존: 노선 선택 헤더 캡슐(13)·역명 배지(24) — 노선도 룩 불변, 완전 원 아님
-      'lib/network_map.dart': 2,
+      // 의도 잔존: AppCard(20)·공용 control radius(12) — v4 정리 대상
+      'lib/app/app_components.dart': 2,
+      // 의도 잔존: 앱 shell 입력 필드(12) — v4 정리 대상
+      'lib/app/easy_subway_app.dart': 1,
+      // 의도 잔존: 홈 알림 control radius(12) — v4 정리 대상
+      'lib/features/home/presentation/home_screen.dart': 1,
+      // 주변역 패널 현재역 캡슐(24) — 노선 바 위 흰 캡슐, 완전 원 아님.
+      // 노선 바 양끝 반원은 LayoutBuilder 계산값이라 리터럴 매치 없음.
+      // — 오너 결정 2026-07-16, #2200
+      'lib/features/network_map/presentation/nearby_station_line_bar.dart': 1,
+      // 주변역 패널 실시간/시간표 토글 세그먼트(16). — 오너 결정 2026-07-16, #2200
+      'lib/features/network_map/presentation/nearby_data_source_toggle.dart': 1,
       // 의도 잔존: 시설 신고 카드 radius(16) — 무박스 전환 대상
       'lib/facility_report.dart': 1,
       // 의도 잔존: 알림 설정 카드 radius(16) — 무박스 전환 대상
@@ -317,8 +335,8 @@ void main() {
       // 의도 잔존: 운행 공지 리스트 카드 radius(12) — 무박스 전환 대상
       'lib/features/service_notice/presentation/service_notice_list_screen.dart':
           1,
-      // 의도 잔존: 운행 공지 배너 radius(14) — 운행 상태 배너 룩
-      'lib/features/service_notice/presentation/service_notice_banner.dart': 1,
+      // 홈 풍선형 운행 공지 배너(radius 14) 제거로 예외 삭제.
+      // — 오너 결정 2026-07-16, #2200
     }, rule: '과한 라운딩(radius > 8)');
   });
 
@@ -328,10 +346,23 @@ void main() {
     // 상한은 내리기만 한다.
     final actual = countPerFile(RegExp(r'\bCard\('));
     expectRatchet(actual, {
-      // 의도 잔존: 역 상세/검색 결과 카드 6곳 — 무박스(행+구분선) 전환 진행 중
-      'lib/station_search.dart': 6,
-      // 의도 잔존: _AppCard 공용 래퍼·정보 카드 2곳 — 무박스 전환 대상
-      'lib/main.dart': 2,
+      // 동일 총량 중 시설 상태 카드 1곳은 canonical presentation 경로로 이동했다.
+      'lib/features/stations/presentation/station_facility_status_summary.dart':
+          1,
+      // 동일 총량 중 출구 카드 1곳은 canonical presentation 경로로 이동했다.
+      'lib/features/stations/presentation/station_exit_card.dart': 1,
+      // 동일 총량 중 시설 상세 카드 1곳은 canonical presentation 경로로 이동했다.
+      'lib/features/stations/presentation/station_facility_detail_screen.dart':
+          1,
+      // 동일 총량 중 시설 목록 카드 1곳은 canonical presentation 경로로 이동했다.
+      'lib/features/stations/presentation/station_facility_card.dart': 1,
+      // 안내 확인 방법 카드는 두 화면이 공유하는 canonical component로 이동했다.
+      'lib/features/stations/presentation/station_info_basis_disclosure.dart':
+          1,
+      // 동일 총량 중 주변 역 검색 카드 1곳은 canonical presentation 경로로 이동했다.
+      'lib/features/stations/presentation/station_search_body.dart': 1,
+      // 의도 잔존: AppCard 공용 래퍼·정보 카드 2곳 — 무박스 전환 대상
+      'lib/app/app_components.dart': 2,
     }, rule: '블록(박스) Card');
   });
 
