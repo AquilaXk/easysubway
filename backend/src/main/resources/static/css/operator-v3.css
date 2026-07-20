@@ -224,11 +224,16 @@ input:focus-visible {
 	color: #fff;
 }
 
-/* auto-fit(#2349 PR⑩e): 4개 카드 화면은 기존과 동일하게 4열을 채우고, 5개 카드 화면(접근성 현황)은
-   4+1로 어색하게 랩되는 대신 5열로 정렬된다(빈 트랙은 collapse되어 4개 카드 화면 폭에 영향 없음). */
+/* auto-fit(#2349 PR⑩e 리뷰 반영): 4개 카드 화면은 4열을 채우고, 5개 카드 화면(접근성 현황)은
+   4+1로 어색하게 랩되는 대신 5열로 정렬된다(빈 트랙은 collapse되어 4개 카드 화면 폭에 영향 없음).
+   하한을 180px로 두면 사이드바(252px)가 보이는 981~1059px 구간에서 4카드 화면조차 3열까지만
+   들어가 3+1로 랩됐다(실측: metric-grid-fixture + playwright, 981px에서 auto-fit 열폭 220px로
+   3열만 배치). 하한을 160px로 낮춰 981px(사이드바 표시 최소 폭)에서도 4열이 들어가도록 한다
+   (981px 콘텐츠 가용폭 685px 기준 4×160+3×12=676px ≤ 685px). 5카드 화면은 이 하한에서도
+   1144px 미만에서는 여전히 랩된다 — 요구사항대로 5카드 랩은 허용. */
 .metric-grid {
 	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+	grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 	gap: 12px;
 	margin-bottom: 12px;
 }
