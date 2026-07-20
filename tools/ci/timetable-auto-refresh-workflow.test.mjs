@@ -107,6 +107,14 @@ test("승인 게이트를 우회하지 않고 review-required·수집 실패 시
   assert.doesNotMatch(workflow, /--approval-url\s+["$]/);
 });
 
+test("UNCHANGED_AUTO 안내는 원커맨드 적용 도구 사용법을 현행화한다", () => {
+  assert.match(
+    workflow,
+    /node tools\/datapack\/apply-timetable-refresh\.mjs --patch/,
+  );
+  assert.match(workflow, /promotion\.patch/);
+});
+
 test("Prometheus alerts는 T-24h/T-6h 임계값을 구성한다", () => {
   assert.match(alerts, /alert: TimetableSnapshotFreshnessExpiringT24h/);
   assert.match(alerts, /alert: TimetableSnapshotFreshnessExpiringT6h/);
