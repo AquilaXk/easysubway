@@ -107,16 +107,25 @@ void main() {
     'assets/datapacks/metro_map_pack/basemap/labels.json',
   ).readAsStringSync();
 
-  // (dbRegion, sidecarId, 기대 매치 수, 후보(=물리역) 수).
-  const cases = <(String, String, int, int)>[
-    ('수도권', 'seoul', 652, 656),
-    ('부산권', 'busan', 146, 146),
-    ('대구권', 'daegu', 97, 97),
-    ('대전권', 'daejeon', 22, 22),
-    ('광주권', 'gwangju', 20, 20),
+  // (dbRegion, sidecarId, 기대 매치 수, 후보(=물리역) 수, 위치 게이트 px).
+  // 위치 게이트는 기본 kRouteMapOwnerLabelMaxAnchorDistancePx(185, seoul
+  // 캘리브레이션) — 부산만 450(#2068 라벨 지오메트리 튜닝 라운드, 근거는
+  // route_map_label_layout.dart의 ownerLabelMaxAnchorDistancePx 문서 참고).
+  const cases = <(String, String, int, int, double)>[
+    ('수도권', 'seoul', 652, 656, kRouteMapOwnerLabelMaxAnchorDistancePx),
+    ('부산권', 'busan', 146, 146, 450.0),
+    ('대구권', 'daegu', 97, 97, kRouteMapOwnerLabelMaxAnchorDistancePx),
+    ('대전권', 'daejeon', 22, 22, kRouteMapOwnerLabelMaxAnchorDistancePx),
+    ('광주권', 'gwangju', 20, 20, kRouteMapOwnerLabelMaxAnchorDistancePx),
   ];
 
-  for (final (dbRegion, sidecarId, expectedMatched, expectedCandidates)
+  for (final (
+        dbRegion,
+        sidecarId,
+        expectedMatched,
+        expectedCandidates,
+        maxAnchorDistancePx,
+      )
       in cases) {
     test('$dbRegion basemap 오너 라벨 매치 $expectedMatched건 고정 (#2068)', () {
       final fixture = loadCapitalRouteMapFixture(region: dbRegion);
@@ -152,6 +161,7 @@ void main() {
         design: design,
         ownerLabelsByStationName: ownerLabels,
         stationNameByStationId: fixture.stationNameByStationId,
+        maxAnchorDistancePx: maxAnchorDistancePx,
       );
       expect(
         resolved.length,

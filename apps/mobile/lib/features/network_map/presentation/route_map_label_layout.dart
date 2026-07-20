@@ -283,6 +283,16 @@ Map<String, RouteMapOwnerLabelEntry> _resolveOwnerLabelsByCandidateKey({
   required RouteMapDesignSpace design,
   required Map<String, List<RouteMapOwnerLabelEntry>> ownerLabelsByStationName,
   required Map<String, String> stationNameByStationId,
+  // #2068 부산 라벨 지오메트리 튜닝 라운드(2026-07-20): 기본값 185.0은 seoul
+  // 실측(정상 매치 최댓값 122.7 × 1.5) 캘리브레이션이다. 부산은 designScale이
+  // 훨씬 작고(0.237 vs seoul 1.373) 오너가 밀집·折 회랑에서 라벨을 자기 노드로
+  // 부터 상대적으로 멀리 떼어 그리는 화풍이라, 같은 정상 매치들(예: 토성
+  // 421.7·연지공원 232.4)이 185px 밖에 있어 오매치로 오분류됐다(#2068 부산
+  // 라운드 실측). 좌천의 교차-노선 오배정 후보는 1113~1120px로 훨씬 멀어
+  // 넉넉한 안전마진이 있다 — 이 값을 올려도 좌천 오매치 방지 안전장치는
+  // 그대로 유효하다. 호출자가 넘기지 않으면 기존 seoul 상수 그대로(하위호환,
+  // 타 권역 영향 없음).
+  double maxAnchorDistancePx = kRouteMapOwnerLabelMaxAnchorDistancePx,
 }) {
   if (ownerLabelsByStationName.isEmpty || stationNameByStationId.isEmpty) {
     return const {};
@@ -329,7 +339,7 @@ Map<String, RouteMapOwnerLabelEntry> _resolveOwnerLabelsByCandidateKey({
       final anchorDesign = design.toDesign(labels[i].position);
       for (final (key, stationAnchor) in candidates) {
         final distance = (stationAnchor - anchorDesign).distance;
-        if (distance > kRouteMapOwnerLabelMaxAnchorDistancePx) {
+        if (distance > maxAnchorDistancePx) {
           continue;
         }
         pairs.add((labelIndex: i, key: key, distance: distance));
@@ -436,11 +446,13 @@ Map<String, RouteMapOwnerLabelEntry> resolveRouteMapOwnerLabelsForTesting({
   required RouteMapDesignSpace design,
   required Map<String, List<RouteMapOwnerLabelEntry>> ownerLabelsByStationName,
   required Map<String, String> stationNameByStationId,
+  double maxAnchorDistancePx = kRouteMapOwnerLabelMaxAnchorDistancePx,
 }) => _resolveOwnerLabelsByCandidateKey(
   map: map,
   design: design,
   ownerLabelsByStationName: ownerLabelsByStationName,
   stationNameByStationId: stationNameByStationId,
+  maxAnchorDistancePx: maxAnchorDistancePx,
 );
 
 RouteMapStaticLabelLayout solveRouteMapLabelLayout({
@@ -475,6 +487,10 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
   // 모드에서 라벨이 표장 위에 올라앉지 않도록 노드·캡슐과 같은 방식으로
   // 회피 대상에 더한다. 기본값 빈 리스트 — 넘기지 않는 기존 호출부는 불변.
   List<RouteMapServiceTagObstacle> serviceTagObstacles = const [],
+  // #2068 부산 라벨 지오메트리 튜닝 라운드: 오너 라벨↔후보 위치 게이트(기본
+  // kRouteMapOwnerLabelMaxAnchorDistancePx=185, seoul 캘리브레이션). 호출자가
+  // 넘기지 않으면 기존 동작 그대로(하위호환, 타 권역 영향 없음).
+  double ownerLabelMaxAnchorDistancePx = kRouteMapOwnerLabelMaxAnchorDistancePx,
 }) {
   final terminusIds = routeMapTerminusStationIds(map);
   final candidates = <_Candidate>[];
@@ -490,6 +506,7 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
           design: design,
           ownerLabelsByStationName: ownerLabelsByStationName,
           stationNameByStationId: stationNameByStationId,
+          maxAnchorDistancePx: ownerLabelMaxAnchorDistancePx,
         )
       : const <String, RouteMapOwnerLabelEntry>{};
   // #2068 9차: 폴백 라벨·뱃지 pill의 공통 font-size. basemap은 권역 오너 라벨

@@ -513,6 +513,7 @@ class StructuredRouteMapView extends StatefulWidget {
     this.attributionText,
     this.ownerLabelsByStationName = const {},
     this.stationNameByStationId = const {},
+    this.ownerLabelMaxAnchorDistancePx = kRouteMapOwnerLabelMaxAnchorDistancePx,
     super.key,
   });
 
@@ -536,6 +537,12 @@ class StructuredRouteMapView extends StatefulWidget {
 
   /// stationId → 원본 nameKo(축약 전). ownerLabelsByStationName 매칭 키.
   final Map<String, String> stationNameByStationId;
+
+  /// #2068 부산 라벨 지오메트리 튜닝 라운드: 오너 라벨↔후보 위치 게이트(design
+  /// px). 기본값은 seoul 캘리브레이션(185.0) 그대로 — 넘기지 않는 기존
+  /// 호출부는 동작 불변. 부산은 designScale이 작고 밀집 회랑에서 라벨을
+  /// 자기 노드로부터 상대적으로 멀리 그리는 화풍이라 region별 값이 필요하다.
+  final double ownerLabelMaxAnchorDistancePx;
 
   @override
   State<StructuredRouteMapView> createState() => _StructuredRouteMapViewState();
@@ -609,6 +616,7 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
       suppressLineBadges: widget.ownerLabelsByStationName.values
           .expand((entries) => entries)
           .any((entry) => entry.hasLineTerminalBadge),
+      ownerLabelMaxAnchorDistancePx: widget.ownerLabelMaxAnchorDistancePx,
     );
     _picture = recordRouteMapPicture(
       map: widget.map,
