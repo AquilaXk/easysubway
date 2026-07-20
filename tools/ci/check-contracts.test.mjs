@@ -161,6 +161,37 @@ test("membership production admission evidence는 domain과 production 승인을
   )));
 });
 
+test("route map production admission evidence는 domain과 production 승인을 함께 요구한다", () => {
+  const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const routeMapSource = inventory.sources.find((source) => source.routeMapAdmissionEvidence != null);
+  delete routeMapSource.routeMapAdmissionEvidence;
+
+  const missingErrors = [];
+  validateSourceInventory(inventory, "source-inventory.json", missingErrors);
+  assert.ok(missingErrors.some((error) => error.includes(
+    "route_map_positions production 승인은 routeMapAdmissionEvidence가 필요하다",
+  )));
+
+  const freshInventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const mismatchedSource = freshInventory.sources.find((source) => source.routeMapAdmissionEvidence != null);
+  mismatchedSource.coverageScope.sourceDomains = mismatchedSource.coverageScope.sourceDomains
+    .filter((domain) => domain !== "route_map_positions");
+  const mismatchedErrors = [];
+  validateSourceInventory(freshInventory, "source-inventory.json", mismatchedErrors);
+  assert.ok(mismatchedErrors.some((error) => error.includes(
+    "routeMapAdmissionEvidence: route_map_positions source domain이 필요하다",
+  )));
+
+  const prohibitedInventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const prohibitedSource = prohibitedInventory.sources.find((source) => source.routeMapAdmissionEvidence != null);
+  prohibitedSource.productionUseAllowed = false;
+  const prohibitedErrors = [];
+  validateSourceInventory(prohibitedInventory, "source-inventory.json", prohibitedErrors);
+  assert.ok(prohibitedErrors.some((error) => error.includes(
+    "routeMapAdmissionEvidence: productionUseAllowed true가 필요하다",
+  )));
+});
+
 test("source inventory semantic 검증은 schema-invalid sourceDomains에서 오류 수집을 중단하지 않는다", () => {
   assert.doesNotThrow(() => validateSourceInventory({
     sources: [{ coverageScope: { sourceDomains: 1 } }],
@@ -200,6 +231,18 @@ test("membership admission evidence는 승인 필드 외 값을 거부한다", (
 
   assert.ok(validateSchema(schema, inventory).errors.some((error) => (
     error.includes("membershipAdmissionEvidence.serviceKey")
+  )));
+});
+
+test("route map admission evidence는 승인 필드 외 값을 거부한다", () => {
+  const schema = loadJson("contracts/datapack/source-inventory.schema.json");
+  const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const routeMapSource = inventory.sources.find((source) => source.routeMapAdmissionEvidence != null);
+
+  routeMapSource.routeMapAdmissionEvidence.serviceKey = "must-never-enter-contract";
+
+  assert.ok(validateSchema(schema, inventory).errors.some((error) => (
+    error.includes("routeMapAdmissionEvidence.serviceKey")
   )));
 });
 
