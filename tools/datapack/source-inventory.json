@@ -514,7 +514,7 @@
         "regionIds": ["gwangju"],
         "operatorIds": ["gwangju-metropolitan-rapid-transit"],
         "lineIds": ["line-e57a361e8892"],
-        "sourceDomains": ["route_graph_topology"]
+        "sourceDomains": ["route_graph_topology", "station_line_membership"]
       },
       "requiredForProductionPack": false,
       "productionUseAllowed": true,
@@ -569,6 +569,23 @@
         "excludedTransferCount": 0,
         "rawSha256": "15e4a6835dff21997d29707b0554580560fd770388156b2ac169508cdfd6636a",
         "contentSha256": "d8197488bc6dda94e595f7e350cc65c547117da804fb59b7dff85d18b3192e43"
+      },
+      "membershipAdmissionEvidence": {
+        "issue": 2383,
+        "materializer": "tools/datapack/materialize-gwangju-timetable.mjs",
+        "verificationTest": "tools/datapack/materialize-gwangju-timetable.test.mjs",
+        "snapshotId": "molit-urban-rail-full-route-gwangju-membership-20260720",
+        "lineIds": ["line-e57a361e8892"],
+        "verifiedAt": "2026-07-20T13:08:47.161Z",
+        "stationCount": 20,
+        "membershipSourceId": "molit-urban-rail-full-route",
+        "membershipSourceRawSha256": "178af75ece72b2f6a58226063e05f1e1f45f50c779c7fbf2905f7df1384a9e22",
+        "membershipSourceSnapshotSha256": "3f08fb398bcb16e8ff047ec17f094a28590ec8d5aa1b8df2d6e9cec85ed0f6e7",
+        "mappingSha256": "f7515bed1908e7b1aff2674f58b8425d94a8177d1fb5bed1f3fb8545cb347a03",
+        "stationCodesSha256": "dc831a8f14fd33808b6e17ecbf829eb6d4c199b6c1d75c7673adaa97ad69df83",
+        "stationCodeSourceId": "gwangju-transportation-route-topology",
+        "stationCodeSnapshotId": "gwangju-transportation-route-topology-20260720",
+        "stationCodeContentSha256": "d8197488bc6dda94e595f7e350cc65c547117da804fb59b7dff85d18b3192e43"
       }
     },
     {
@@ -676,7 +693,7 @@
         "redistributionAllowed": true,
         "evidenceUrl": "https://www.data.go.kr/data/15122916/fileData.do"
       },
-      "fieldsProvided": ["line", "station_name", "station_code"],
+      "fieldsProvided": ["line", "station_name"],
       "capabilities": {
         "schedule": {
           "status": "UNSUPPORTED",

@@ -26,9 +26,9 @@ const SERVICES = Object.freeze({
   DAYOFF: "gwangju-sunday-2026",
 });
 const HOLIDAYS_2026 = Object.freeze([
-  "20260101", "20260216", "20260217", "20260218", "20260302", "20260505", "20260525",
-  "20260603", "20260606", "20260815", "20260817", "20260924", "20260925", "20260926",
-  "20261003", "20261005", "20261009", "20261225",
+  "20260101", "20260216", "20260217", "20260218", "20260301", "20260302", "20260501",
+  "20260505", "20260524", "20260525", "20260603", "20260606", "20260717", "20260815",
+  "20260817", "20260924", "20260925", "20260926", "20261003", "20261005", "20261009", "20261225",
 ]);
 const QUARANTINED_KEYS = Object.freeze([
   "DAYOFF:st:119:0756",
@@ -243,7 +243,8 @@ function requiredSources(inventory, timetableSnapshot, topologySnapshot, mapping
     || topologyEvidence.freshUntil !== topologySnapshot.freshUntil
     || topologyEvidence.stationCount !== 20 || topologyEvidence.excludedTransferCount !== 0
     || topologyEvidence.edgeCount !== 38 || topologyEvidence.rawSha256 !== topologySnapshot.rawSha256
-    || topologyEvidence.contentSha256 !== topologySnapshot.contentSha256) {
+    || topologyEvidence.contentSha256 !== topologySnapshot.contentSha256
+    || JSON.stringify(topology.membershipAdmissionEvidence) !== JSON.stringify(membershipEvidence)) {
     throw new Error(`${TOPOLOGY_SOURCE_ID} inventory evidence does not match snapshot`);
   }
   if (!Array.isArray(mappings) || mappings.length !== 20
@@ -320,12 +321,12 @@ function addStationsAndTopology(pack, snapshot, mappings, sources) {
       evidenceHash: membershipEvidence.mappingSha256,
       fieldProvenance: {
         station_code: {
-          sourceId: MEMBERSHIP_SOURCE_ID,
-          sourceSnapshotId: membershipEvidence.snapshotId,
+          sourceId: TOPOLOGY_SOURCE_ID,
+          sourceSnapshotId: topologyEvidence.snapshotId,
           providerRecordHash: sha256(JSON.stringify(scope)),
-          evidenceHash: membershipEvidence.stationCodesSha256,
+          evidenceHash: snapshot.contentSha256,
           derivationKind: "OFFICIAL",
-          verifiedAt: membershipEvidence.verifiedAt,
+          verifiedAt: snapshot.capturedAt,
         },
       },
       derivationKind: "OFFICIAL",

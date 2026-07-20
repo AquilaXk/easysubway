@@ -51,6 +51,20 @@ test("광주 공식 topology·시간표를 20역·38 edge·810 trip·14171 stop_
     "gwangju-holiday-2026": 162,
     "gwangju-sunday-2026": 202,
   });
+  const correctedHolidayDates = new Set(["20260301", "20260501", "20260524", "20260717"]);
+  assert.deepEqual(pack.serviceCalendarDates
+    .filter(({ date }) => correctedHolidayDates.has(date))
+    .map(({ serviceId, date, exceptionType }) => ({ serviceId, date, exceptionType }))
+    .sort((left, right) => `${left.date}:${left.serviceId}`.localeCompare(`${right.date}:${right.serviceId}`, "en")), [
+    { serviceId: "gwangju-holiday-2026", date: "20260301", exceptionType: 1 },
+    { serviceId: "gwangju-sunday-2026", date: "20260301", exceptionType: 2 },
+    { serviceId: "gwangju-holiday-2026", date: "20260501", exceptionType: 1 },
+    { serviceId: "gwangju-weekday-2026", date: "20260501", exceptionType: 2 },
+    { serviceId: "gwangju-holiday-2026", date: "20260524", exceptionType: 1 },
+    { serviceId: "gwangju-sunday-2026", date: "20260524", exceptionType: 2 },
+    { serviceId: "gwangju-holiday-2026", date: "20260717", exceptionType: 1 },
+    { serviceId: "gwangju-weekday-2026", date: "20260717", exceptionType: 2 },
+  ]);
   const repaired = stopTimes.filter(({ repairReason }) => repairReason === "OFFICIAL_ADJACENT_TIMES_AND_TOPOLOGY");
   assert.equal(repaired.length, 1);
   assert.equal(repaired[0].arrivalSeconds, 75_570);
@@ -61,7 +75,12 @@ test("광주 공식 topology·시간표를 20역·38 edge·810 trip·14171 stop_
       && evidenceHash === values.gwangjuTopology.contentSha256));
   assert.ok(pack.stationLines.filter(({ lineId }) => lineId === "line-e57a361e8892")
     .every(({ fieldProvenance }) =>
-      fieldProvenance.station_code.sourceId === "molit-urban-rail-full-route-gwangju-membership"));
+      fieldProvenance.station_code.sourceId === "gwangju-transportation-route-topology"
+      && fieldProvenance.station_code.sourceSnapshotId === "gwangju-transportation-route-topology-20260720"
+      && fieldProvenance.station_code.evidenceHash === values.gwangjuTopology.contentSha256));
+  assert.deepEqual(values.inventory.sources.find(({ id }) => id === topologySourceId).membershipAdmissionEvidence,
+    values.inventory.sources.find(({ id }) => id === "molit-urban-rail-full-route-gwangju-membership")
+      .membershipAdmissionEvidence);
 });
 
 test("광주 materializer는 완결되지 않은 일요일 0756 열차 2행만 exact tuple로 격리한다", async () => {
@@ -218,6 +237,12 @@ test("materialized SQLite·provenance가 광주 membership·topology·schedule 3
     .map(({ sourceDomain }) => sourceDomain), [
     "station_line_membership", "route_graph_topology", "schedule_timetable",
   ], JSON.stringify(gwangjuRequirements, null, 2));
+  const membership = gwangjuRequirements.find(({ sourceDomain }) => sourceDomain === "station_line_membership");
+  assert.deepEqual(Object.fromEntries(membership.fieldCoverage.map(({ field, sourceIds }) => [field, sourceIds])), {
+    line: ["molit-urban-rail-full-route-gwangju-membership"],
+    station_name: ["molit-urban-rail-full-route-gwangju-membership"],
+    station_code: ["gwangju-transportation-route-topology"],
+  });
   assert.deepEqual(report.summary.launchRequired, {
     totalCount: 270,
     supportedCount: 22,
