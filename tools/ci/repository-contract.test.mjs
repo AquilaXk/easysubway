@@ -17897,6 +17897,8 @@ test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경�
   assert.equal(releaseGate.release, "true");
   assert.equal(releaseGate.contracts, "true");
   assert.equal(releaseGate.mobile, "true");
+  // #2390: release 자산 변경은 repository=true여야 claim 스캔(contract test)이 스킵되지 않는다.
+  assert.equal(releaseGate.repository, "true");
 });
 
 test("경로 분류기는 백엔드 품질 gate 변경을 repository contract 대상으로 처리한다", async () => {
