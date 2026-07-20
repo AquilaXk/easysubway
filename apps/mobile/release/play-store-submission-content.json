@@ -217,6 +217,7 @@
         "containsCollectedData": true,
         "containsRequiredData": false,
         "containsOptionalData": true,
+        "containsDeletionUnsupportedData": false,
         "requiredConsoleFields": [
           "collected",
           "collectionType",
@@ -254,6 +255,7 @@
         "containsCollectedData": true,
         "containsRequiredData": false,
         "containsOptionalData": true,
+        "containsDeletionUnsupportedData": false,
         "requiredConsoleFields": [
           "collected",
           "collectionType",
@@ -272,6 +274,7 @@
         "containsCollectedData": true,
         "containsRequiredData": false,
         "containsOptionalData": true,
+        "containsDeletionUnsupportedData": false,
         "requiredConsoleFields": [
           "collected",
           "collectionType",
@@ -290,6 +293,7 @@
         "containsCollectedData": true,
         "containsRequiredData": false,
         "containsOptionalData": true,
+        "containsDeletionUnsupportedData": false,
         "requiredConsoleFields": [
           "collected",
           "collectionType",
@@ -308,6 +312,7 @@
         "containsCollectedData": true,
         "containsRequiredData": true,
         "containsOptionalData": false,
+        "containsDeletionUnsupportedData": false,
         "containsLocalOnlyDiagnostics": true,
         "requiredConsoleFields": [
           "collected",
