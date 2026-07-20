@@ -1314,13 +1314,14 @@ test("백엔드 배포는 GHCR digest를 pull하고 서버 위 build 경로를 �
   assert.match(deploy, /current-image-digest/);
 });
 
-test("CD 배포는 production environment를 선언하고 배포 태그는 record-deploy 잡만 기록한다", () => {
+test("CD 배포는 production-cd environment를 선언하고 배포 태그는 record-deploy 잡만 기록한다", () => {
   const cd = read(".github/workflows/cd.yml");
   const cleanup = read(".github/workflows/actions-storage-cleanup.yml");
 
-  // production environment gives the deploy GitHub deployment history and lets a
-  // branch protection rule (deployment branches = main) apply (issue #1687).
-  assert.match(cd, /environment:\n\s*name: production\n\s*url: \$\{\{ vars\.DEPLOY_PUBLIC_API_BASE_URL \}\}/);
+  // production-cd environment gives the deploy GitHub deployment history without
+  // requiring manual review; the production environment stays reserved as the
+  // required-reviewer gate for sensitive workflows (issue #1687, #2350).
+  assert.match(cd, /environment:\n\s*name: production-cd\n\s*url: \$\{\{ vars\.DEPLOY_PUBLIC_API_BASE_URL \}\}/);
   assert.match(cd, /outputs:\n\s*sha: \$\{\{ steps\.target\.outputs\.sha \}\}/);
 
   // A lightweight deploy/backend/* tag records the deployed sha on GitHub.
