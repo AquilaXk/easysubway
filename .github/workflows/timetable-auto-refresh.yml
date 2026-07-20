@@ -113,6 +113,28 @@ jobs:
           echo "Timetable snapshot freshUntil is within the T-6h critical window or already expired." >&2
           exit 1
 
+      - name: Snapshot Freshness Alert / Skip missing Slack webhook for watchdog failure
+        if: ${{ failure() && steps.check.outcome == 'failure' && env.SLACK_RELEASE_WEBHOOK_URL == '' }}
+        run: echo "::notice title=Timetable snapshot freshness::SLACK_RELEASE_WEBHOOK_URL is not configured; watchdog failure was not reported to Slack."
+
+      - name: Snapshot Freshness Alert / Notify Slack on watchdog failure
+        if: ${{ failure() && steps.check.outcome == 'failure' && env.SLACK_RELEASE_WEBHOOK_URL != '' }}
+        uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c
+        with:
+          webhook: ${{ env.SLACK_RELEASE_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            text: "EasySubway timetable snapshot freshness watchdog failed"
+            blocks:
+              - type: section
+                text:
+                  type: mrkdwn
+                  text: |
+                    *EasySubway Timetable Snapshot Freshness Watchdog Failure*
+                    • the freshness check step itself failed (evidence missing/corrupt or script error), not a FIRING alert
+                    • repo: `${{ github.repository }}`
+                    • run: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|GitHub Actions 열기>
+
   auto-refresh:
     name: Auto Refresh Collect and Promote
     needs: snapshot-freshness-alert

@@ -9,6 +9,7 @@ import {
   DEFAULT_WARN_SECONDS,
   classifySnapshotFreshness,
   computeItxAdmissionServiceDates,
+  parseArgs,
   renderPrometheusMetrics,
   runCheckTimetableSnapshotFreshnessCli,
 } from "./check-timetable-snapshot-freshness.mjs";
@@ -73,6 +74,18 @@ test("admission service dates는 창 안의 평일·토·일을 고른다", () =
   assert.equal(dates["8"], "2026-07-20"); // 월요일(평일)
   assert.equal(dates["7"], "2026-07-25"); // 토요일
   assert.equal(dates["9"], "2026-07-26"); // 일요일
+});
+
+test("parseArgs는 --로 시작하지만 플래그 이름 형태가 아닌 값을 값으로 인식한다", () => {
+  const result = parseArgs(["--evidence", "--not-a-flag.json", "--fail-on-critical"]);
+  assert.equal(result.evidence, "--not-a-flag.json");
+  assert.equal(result["fail-on-critical"], true);
+});
+
+test("parseArgs는 실제 플래그 이름 형태의 다음 토큰은 여전히 플래그 경계로 인식한다", () => {
+  const result = parseArgs(["--warn-seconds", "--critical-seconds", "60"]);
+  assert.equal(result["warn-seconds"], true);
+  assert.equal(result["critical-seconds"], "60");
 });
 
 test("CLI는 evidence를 읽어 evidence/metrics/github-output를 남기고 fail-on-critical을 반영한다", async () => {

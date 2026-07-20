@@ -115,11 +115,18 @@ export function computeItxAdmissionServiceDates(now) {
   return dates;
 }
 
-function parseArgs(argv) {
+// "--"로 시작하되 실제 플래그 이름 형태(문자 시작, 이어서 단어문자·하이픈만)가 아닌 값은
+// 플래그가 아니라 값으로 취급한다(예: 값이 우연히 "--"로 시작하는 파일명인 경우).
+function looksLikeFlag(token) {
+  return typeof token === "string" && /^--[a-zA-Z][\w-]*$/.test(token);
+}
+
+export function parseArgs(argv) {
   const result = {};
   for (let index = 0; index < argv.length; index += 1) {
     const key = argv[index]?.replace(/^--/, "");
-    if (argv[index + 1]?.startsWith("--") || argv[index + 1] === undefined) result[key] = true;
+    const next = argv[index + 1];
+    if (next === undefined || looksLikeFlag(next)) result[key] = true;
     else result[key] = argv[index += 1];
   }
   return result;

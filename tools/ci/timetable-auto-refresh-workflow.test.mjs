@@ -14,6 +14,22 @@ test("만료 이전 스케줄과 dry-run/force 수동 트리거를 노출한다"
   assert.match(inputsBlock, /dry_run:/);
 });
 
+test("트리거는 schedule과 workflow_dispatch만 허용한다 — pull_request 유입 시 fork에서 DATA_GO_KR_SERVICE_KEY 노출 위험", () => {
+  const lines = workflow.split("\n");
+  const onIndex = lines.findIndex((line) => line === "on:");
+  assert.notEqual(onIndex, -1);
+  const triggers = [];
+  for (let index = onIndex + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (/^\S/.test(line)) break; // 다음 최상위(0-indent) 섹션(concurrency: 등) 진입 시 종료
+    const match = line.match(/^ {2}([a-z_]+):/);
+    if (match) triggers.push(match[1]);
+  }
+  assert.deepEqual(triggers, ["schedule", "workflow_dispatch"]);
+  assert.doesNotMatch(workflow, /^ {2}pull_request:/m);
+  assert.doesNotMatch(workflow, /^ {2}pull_request_target:/m);
+});
+
 test("워크플로 권한은 read 전용이며 write 권한을 요구하지 않는다", () => {
   assert.match(workflow, /^permissions:\n {2}contents: read$/m);
   assert.doesNotMatch(workflow, /contents:\s*write/);
@@ -39,6 +55,17 @@ test("잔여 유효기간을 계산해 github-output과 metrics를 남기고 cri
 test("Slack webhook 미설정 시 알림을 건너뛰고 fail 하지 않는다", () => {
   assert.match(workflow, /env\.SLACK_RELEASE_WEBHOOK_URL == ''[\s\S]*?::notice/);
   assert.match(workflow, /env\.SLACK_RELEASE_WEBHOOK_URL != ''/);
+});
+
+test("check 스텝 자체가 죽어도(watchdog 고장) Slack으로 보고한다", () => {
+  assert.match(
+    workflow,
+    /Notify Slack on watchdog failure[\s\S]*?if:\s*\$\{\{ failure\(\) && steps\.check\.outcome == 'failure' && env\.SLACK_RELEASE_WEBHOOK_URL != '' \}\}/,
+  );
+  assert.match(
+    workflow,
+    /Skip missing Slack webhook for watchdog failure[\s\S]*?if:\s*\$\{\{ failure\(\) && steps\.check\.outcome == 'failure' && env\.SLACK_RELEASE_WEBHOOK_URL == '' \}\}/,
+  );
 });
 
 test("auto-refresh는 refresh lead 창 또는 force 시에만 실행되고 alert job에 의존한다", () => {
