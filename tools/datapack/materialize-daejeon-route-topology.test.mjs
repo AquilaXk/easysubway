@@ -218,6 +218,7 @@ test("materialized production SQLite와 field provenance만 대전 1호선 membe
     publicKeyEncoding: { type: "spki", format: "pem" },
   });
   for (const [sourceId, expectedError] of [
+    ["", /fieldProvenance sourceId must be a non-empty string/],
     ["missing-membership-source", /fieldProvenance source is missing from sourceInventory/],
     ["molit-urban-rail-full-route-daejeon-membership", /fieldProvenance source does not provide station_code/],
   ]) {

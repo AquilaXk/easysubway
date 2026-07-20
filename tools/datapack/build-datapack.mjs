@@ -585,6 +585,9 @@ function packFieldProvenance(pack, { artifactKind, sqliteSha256 }) {
       && (!fieldProvenance || typeof fieldProvenance !== "object" || Array.isArray(fieldProvenance))) {
       throw new Error(`${entityType}.${field} fieldProvenance must be an object`);
     }
+    if (fieldProvenance?.sourceId !== undefined) {
+      requiredString(fieldProvenance.sourceId, `${entityType}.${field} fieldProvenance sourceId`);
+    }
     const rowSourceId = row.sourceId ?? defaultSourceId;
     if (fieldProvenance?.sourceId !== undefined && fieldProvenance.sourceId !== rowSourceId) {
       for (const linkageField of ["sourceSnapshotId", "providerRecordHash", "evidenceHash", "verifiedAt"]) {
