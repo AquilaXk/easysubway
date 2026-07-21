@@ -69,7 +69,17 @@ export function decodeOfficialCsv(bytes) {
 }
 
 function parseCsv(text) {
-  return text.split(/\r?\n/).filter((line) => line.length > 0).map((line) => line.split(","));
+  const rows = text.split(/\r?\n/).filter((line) => line.length > 0).map((line) => line.split(","));
+  // quoted-field 정식 파서 교체 전까지의 최소 가드: 행별 열 수가 헤더와 다르면 원문 결함으로 보고 fail-closed한다.
+  const [header, ...body] = rows;
+  if (header) {
+    for (const [index, row] of body.entries()) {
+      if (row.length !== header.length) {
+        throw new Error(`CSV column count mismatch at row ${index + 2}: expected ${header.length}, got ${row.length}`);
+      }
+    }
+  }
+  return rows;
 }
 
 export function normalizedStationName(name) {

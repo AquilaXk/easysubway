@@ -104,6 +104,85 @@ test("대구 materializer는 snapshot·inventory·freshness 변조를 fail close
   }), /stale/);
 });
 
+test("대구 시각표 snapshot의 trips 변조(tripsSha256 불일치)는 fail-closed된다", async () => {
+  const values = await inputs({ materialize: false });
+  const timetable = structuredClone(values.timetableSnapshots[1]);
+  timetable.trips[0].stops[0].a += 1; // tripsSha256을 재계산하지 않고 trips 본문만 변조한다.
+  assert.throws(() => materializeDaeguTimetable({
+    baseFixture: values.baseFixture, topologySnapshots: values.topologySnapshots,
+    timetableSnapshots: { ...values.timetableSnapshots, 1: timetable },
+    inventory: values.inventory, canonicalStationMappings: values.mappings, now,
+  }), /timetable snapshot/);
+});
+
+test("대구 시각표 snapshot의 contentSha256 변조(trips 자체는 정상)는 fail-closed된다", async () => {
+  const values = await inputs({ materialize: false });
+  const timetable = structuredClone(values.timetableSnapshots[1]);
+  // trips·tripsSha256은 그대로 두고 contentSha256만 위조한다.
+  timetable.contentSha256 = timetable.contentSha256.endsWith("0")
+    ? `${timetable.contentSha256.slice(0, -1)}1`
+    : `${timetable.contentSha256.slice(0, -1)}0`;
+  assert.throws(() => materializeDaeguTimetable({
+    baseFixture: values.baseFixture, topologySnapshots: values.topologySnapshots,
+    timetableSnapshots: { ...values.timetableSnapshots, 1: timetable },
+    inventory: values.inventory, canonicalStationMappings: values.mappings, now,
+  }), /timetable snapshot/);
+});
+
+test("inventory에 기록된 topology admission evidence가 실제 snapshot과 불일치하면 fail-closed된다", async () => {
+  const values = await inputs({ materialize: false });
+  const inventory = structuredClone(values.inventory);
+  const topologySource = inventory.sources.find(({ id }) => id === "daegu-line1-route-topology");
+  topologySource.topologyAdmissionEvidence.contentSha256 = "0".repeat(64);
+  assert.throws(() => materializeDaeguTimetable({
+    baseFixture: values.baseFixture, topologySnapshots: values.topologySnapshots, timetableSnapshots: values.timetableSnapshots,
+    inventory, canonicalStationMappings: values.mappings, now,
+  }), /inventory evidence does not match snapshot/);
+});
+
+test("MOLIT membership mapping이 topology에 없는 역명으로 위조되면(mappingSha256까지 위조해도) fail-closed된다", async () => {
+  const values = await inputs({ materialize: false });
+  const sha256 = (value) => createHash("sha256").update(value).digest("hex");
+  const mapping1 = values.mappings[1].map((mapping) => ({ ...mapping }));
+  Object.defineProperty(mapping1, "sourceRawSha256", { value: values.mappings[1].sourceRawSha256, enumerable: true });
+  mapping1[0] = { ...mapping1[0], stationName: "존재하지않는역이름" };
+
+  const inventory = structuredClone(values.inventory);
+  const membershipSource = inventory.sources.find(({ id }) => id === "molit-urban-rail-full-route-daegu-line1-membership");
+  // membership evidence 해시 게이트까지 위조자가 통과시켰다고 가정해도(mappingSha256 재계산),
+  // topology와의 역명 정합 자체가 깨져 있으므로 fail-closed되어야 한다.
+  membershipSource.membershipAdmissionEvidence.mappingSha256 = sha256(JSON.stringify(mapping1));
+
+  assert.throws(() => materializeDaeguTimetable({
+    baseFixture: values.baseFixture, topologySnapshots: values.topologySnapshots, timetableSnapshots: values.timetableSnapshots,
+    inventory, canonicalStationMappings: { ...values.mappings, 1: mapping1 }, now,
+  }), /mismatch/);
+});
+
+test("membership↔topology index 정합 가드는 이름 집합은 그대로 두고 순서만 뒤바뀐 topology 위조를 fail-closed로 잡아낸다", async () => {
+  const values = await inputs({ materialize: false });
+  const sha256 = (value) => createHash("sha256").update(value).digest("hex");
+  const topology = structuredClone(values.topologySnapshots[1]);
+  // scope[1]과 scope[2]를 통째로 맞바꾼다. 역명 집합(Set)은 그대로라 이름 기반 결속(scopeByNorm)만으로는
+  // 감지되지 않는다 — index-wise 순서 정합 단언(가드 1)만 이 재정렬 위조를 잡아낸다.
+  [topology.scope[1], topology.scope[2]] = [topology.scope[2], topology.scope[1]];
+  topology.scopeSha256 = sha256(JSON.stringify(topology.scope));
+  topology.contentSha256 = sha256(JSON.stringify({ scope: topology.scope, edges: topology.edges }));
+
+  const inventory = structuredClone(values.inventory);
+  const topologySource = inventory.sources.find(({ id }) => id === "daegu-line1-route-topology");
+  topologySource.topologyAdmissionEvidence.contentSha256 = topology.contentSha256;
+  const membershipSource = inventory.sources.find(({ id }) => id === "molit-urban-rail-full-route-daegu-line1-membership");
+  membershipSource.membershipAdmissionEvidence.stationCodeContentSha256 = topology.contentSha256;
+  membershipSource.membershipAdmissionEvidence.stationCodesSha256 =
+    sha256(JSON.stringify(topology.scope.map(({ stationCode }) => stationCode)));
+
+  assert.throws(() => materializeDaeguTimetable({
+    baseFixture: values.baseFixture, topologySnapshots: { ...values.topologySnapshots, 1: topology },
+    timetableSnapshots: values.timetableSnapshots, inventory, canonicalStationMappings: values.mappings, now,
+  }), /membership↔topology index mismatch/);
+});
+
 test("MOLIT 대구 station mapping과 materializer CLI를 고정한다", async () => {
   const values = await inputs({ materialize: false });
   assert.equal(values.mappings[1].length, 35);

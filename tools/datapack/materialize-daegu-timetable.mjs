@@ -273,6 +273,17 @@ function addStationsAndTopology(pack, line, addedStations) {
   const topologyEvidence = sources.topology.topologyAdmissionEvidence;
   const stationIdByCode = new Map();
   const membershipId = `molit-urban-rail-full-route-daegu-line${config.lineNumber}-membership`;
+  // membership(mappings)과 topology(scope)는 둘 다 노선 순서(sequence)로 정렬되어 있어야 한다.
+  // 이름 결속(scopeByNorm)만으로는 두 소스가 서로 다른 순서로 재정렬되어도 감지하지 못하므로,
+  // index-wise로 정규화 역명이 일치하는지 전 index에서 단언하고 불일치 시 fail-closed한다.
+  for (let index = 0; index < mappings.length; index += 1) {
+    const molitNorm = normalizedStationName(mappings[index].stationName);
+    const topologyNorm = normalizedStationName(topology.scope[index].stationName);
+    if (molitNorm !== topologyNorm) {
+      throw new Error(`Daegu line ${config.lineNumber} membership↔topology index mismatch at ${index}: `
+        + `${mappings[index].stationName} (membership) vs ${topology.scope[index].stationName} (topology)`);
+    }
+  }
   for (const mapping of mappings) {
     const scope = scopeByNorm.get(normalizedStationName(mapping.stationName));
     if (!scope) throw new Error(`Daegu line ${config.lineNumber} canonical station mapping mismatch: ${mapping.stationName}`);
