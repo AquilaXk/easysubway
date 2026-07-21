@@ -10,8 +10,17 @@ if (!aabPath || !existsSync(aabPath)) {
   throw new Error("--aab must reference an existing Android App Bundle");
 }
 
+// unzip을 이름으로 호출하면 쓰기 가능한 PATH를 상속하므로, 신뢰된 시스템 경로에서
+// 절대 경로를 한 번만 해석해 PATH 조작을 차단한다(macOS·Linux CI 모두 /usr/bin/unzip).
+const unzipBinary = ["/usr/bin/unzip", "/bin/unzip", "/usr/local/bin/unzip", "/opt/homebrew/bin/unzip"].find(
+  (candidate) => existsSync(candidate),
+);
+if (!unzipBinary) {
+  throw new Error("unzip executable was not found in a trusted system path");
+}
+
 const signatureEntry = /^META-INF\/(?:MANIFEST\.MF|[^/]+\.(?:SF|RSA|DSA|EC))$/i;
-const entries = execFileSync("unzip", ["-Z1", aabPath], {
+const entries = execFileSync(unzipBinary, ["-Z1", aabPath], {
   encoding: "utf8",
   maxBuffer: 16 * 1024 * 1024,
 })
@@ -26,7 +35,7 @@ if (entries.length === 0) {
 const digest = createHash("sha256");
 for (const entry of entries) {
   const entryName = Buffer.from(entry, "utf8");
-  const contents = execFileSync("unzip", ["-p", aabPath, entry], {
+  const contents = execFileSync(unzipBinary, ["-p", aabPath, entry], {
     encoding: "buffer",
     maxBuffer: 512 * 1024 * 1024,
   });

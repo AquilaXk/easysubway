@@ -180,7 +180,7 @@ run_backend_clone 30 -d --name "${cache_app}" --network "${production_network}" 
 	"${backend_image}" >/dev/null
 cache_binding="$(docker port "${cache_app}" 8080/tcp)"
 [[ "${cache_binding}" =~ ^127\.0\.0\.1:[0-9]+$ ]] || { echo 'controlled cache application port binding is invalid' >&2; exit 1; }
-cache_base_url="http://${cache_binding}"
+cache_base_url="http://${cache_binding}" # NOSONAR -- 로컬 루프백(127.0.0.1) 컨테이너 전용 평문 HTTP 프로브로 외부 노출이 없다.
 origin_secret="$(node -e '
 const entries = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
 const entry = entries.find((value) => value.startsWith("EASYSUBWAY_ROUTE_V2_ORIGIN_SECRET="));
