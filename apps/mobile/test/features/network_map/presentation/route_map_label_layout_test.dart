@@ -1019,6 +1019,67 @@ void main() {
       );
       expect(layout.labels.single.rect.left, 0); // 오너 앵커 사용 확인.
     });
+
+    test('이름 정규화(#2408 후속): 아래아 가운뎃점(ㆍ U+318D)↔마침표(.) 표기 차도 매칭한다', () {
+      const design = RouteMapDesignSpace(designScale: 1);
+      final map = soloStationMap();
+      final layout = solveRouteMapLabelLayout(
+        map: map,
+        design: design,
+        labelTextByStationId: const {'s': '전대.에버랜드'},
+        badgeLabelByLineId: const {},
+        measureLabel: _measureLabel,
+        measureBadge: _measureBadge,
+        basemap: true,
+        ownerLabelsByStationName: {
+          '전대ㆍ에버랜드': [entry(position: const Offset(0, 0))],
+        },
+        stationNameByStationId: const {'s': '전대.에버랜드'},
+      );
+      expect(layout.labels.single.rect.left, 0); // 오너 앵커 사용 확인.
+    });
+
+    test('#2408 실기기 반려(전대·에버랜드): 다줄 라벨 판정도 가운뎃점/마침표 '
+        '표기 차를 정규화해 개행 렌더를 유지한다(정규화 없으면 폴백 한 줄로 붕괴)', () {
+      const design = RouteMapDesignSpace(designScale: 1);
+      final map = soloStationMap();
+      // sidecar 원문(오너 표기, 중점) — 화면 렌더는 이 원문 그대로 나와야
+      // 한다. datapack 파생 표시 텍스트(labelTextByStationId)는 마침표라
+      // 정규화 없는 정확 일치 비교로는 joinedLines("전대·에버랜드") !=
+      // text("전대.에버랜드")가 되어 다줄 경로를 못 타고 단일 줄로
+      // 붕괴했다(오너 실기기 지적 원인) — 이 테스트는 그 회귀를 잡는다.
+      final layout = solveRouteMapLabelLayout(
+        map: map,
+        design: design,
+        labelTextByStationId: const {'s': '전대.에버랜드'},
+        badgeLabelByLineId: const {},
+        measureLabel: _measureLabel,
+        measureBadge: _measureBadge,
+        basemap: true,
+        ownerLabelsByStationName: {
+          '전대·에버랜드': [
+            RouteMapOwnerLabelEntry(
+              station: '전대·에버랜드',
+              role: 'terminal',
+              position: const Offset(0, 0),
+              anchor: RouteMapOwnerLabelAnchor.start,
+              fontSizePx: 13.0,
+              lines: const [
+                RouteMapOwnerLabelLine(text: '전대·', position: Offset(0, 0)),
+                RouteMapOwnerLabelLine(text: '에버랜드', position: Offset(0, 14)),
+              ],
+            ),
+          ],
+        },
+        stationNameByStationId: const {'s': '전대.에버랜드'},
+      );
+      final label = layout.labels.single;
+      // 다줄 경로 확인 — 폴백이면 lines가 비어(단일 줄) 있다.
+      expect(label.lines.length, 2);
+      // 렌더 텍스트는 오너 원문 그대로(가운뎃점 보존, 마침표로 바뀌지 않음).
+      expect(label.lines[0].text, '전대·');
+      expect(label.lines[1].text, '에버랜드');
+    });
   });
 }
 
