@@ -131,7 +131,8 @@
 							워크플로 실행 URL
 							<input name="workflowRunUrl" type="url" required>
 						</label>
-						<button type="submit" class="primary">프로덕션 승인</button>
+						<button type="submit" class="primary"
+						        th:text="${channel.channel == 'production' ? '프로덕션 승인' : '승격 승인'}">승격 승인</button>
 						</form>
 					</details>
 					<details class="admin-promote-confirm" th:if="${channel.previousStableCandidateId != '—'}">
