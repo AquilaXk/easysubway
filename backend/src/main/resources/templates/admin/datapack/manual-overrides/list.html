@@ -174,7 +174,11 @@
 							<span class="sr-only">만료 사유</span>
 							<input name="reason" value="manual override expired" required>
 						</label>
-						<button type="submit" class="danger">만료 저장</button>
+						<details class="admin-action-confirm">
+							<summary class="danger">만료…</summary>
+							<p class="meta">이 수동 오버라이드를 만료할까요? 이 작업은 되돌리기 어렵습니다.</p>
+							<button type="submit" class="danger">만료 저장</button>
+						</details>
 					</form>
 				</td>
 			</tr>

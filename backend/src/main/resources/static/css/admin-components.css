@@ -494,6 +494,78 @@
 	min-width: 0;
 }
 
+/* htmx 요청 인디케이터(#1736, #2416): includeIndicatorStyles=false이므로 CSS 파일에서 정의한다. */
+.admin-v3 .htmx-indicator {
+	display: none;
+	align-items: center;
+	gap: 6px;
+	font-size: var(--admin-fs-caption);
+	color: var(--admin-ink-muted);
+}
+
+.admin-v3 .htmx-request .htmx-indicator,
+.admin-v3 .htmx-request.htmx-indicator {
+	display: inline-flex;
+}
+
+.admin-v3 .admin-htmx-indicator {
+	position: fixed;
+	inset-block-start: calc(var(--admin-topbar-height, 56px) + 8px);
+	inset-inline-end: 16px;
+	z-index: var(--admin-z-overlay, 40);
+	padding: 6px 10px;
+	border-radius: var(--admin-radius-control);
+	background: var(--admin-surface);
+	border: 1px solid var(--admin-border);
+	box-shadow: var(--admin-shadow-card);
+}
+
+.admin-v3 .admin-htmx-indicator::before {
+	content: "";
+	inline-size: 14px;
+	block-size: 14px;
+	border: 2px solid var(--admin-border);
+	border-block-start-color: var(--admin-accent);
+	border-radius: 50%;
+	animation: admin-htmx-spin 0.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.admin-v3 .admin-htmx-indicator::before {
+		animation: none;
+		border-block-start-color: var(--admin-accent);
+		opacity: 0.7;
+	}
+}
+
+@keyframes admin-htmx-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* 파괴적 액션 2단 확인(details disclosure, CSP 안전) */
+.admin-v3 .admin-action-confirm {
+	margin-block: 4px;
+}
+
+.admin-v3 .admin-action-confirm summary {
+	cursor: pointer;
+	list-style: none;
+}
+
+.admin-v3 .admin-action-confirm summary::-webkit-details-marker {
+	display: none;
+}
+
+.admin-v3 .admin-action-confirm summary.danger {
+	color: var(--admin-danger);
+}
+
+.admin-v3 .admin-action-confirm .meta {
+	margin-block: 6px 8px;
+}
+
 .admin-v3 table th[aria-sort] a {
 	display: inline-flex;
 	align-items: center;

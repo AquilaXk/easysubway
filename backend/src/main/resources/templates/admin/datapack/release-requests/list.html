@@ -152,7 +152,11 @@
 						<input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
 						<input type="hidden" name="commandToken" th:value="${commandTokens.next()}">
 						<label>복구 사유 <input name="reason" required maxlength="200"></label>
-						<button type="submit" class="outline">수동 복구</button>
+						<details class="admin-action-confirm">
+							<summary>수동 복구…</summary>
+							<p class="meta">이 콜백 전송을 수동 복구할까요? 이 작업은 되돌리기 어렵습니다.</p>
+							<button type="submit" class="outline">수동 복구</button>
+						</details>
 					</form>
 					<span th:unless="${delivery.repairable}"><th:block
 					      th:insert="~{admin/fragments/missing-value :: value(null, '미상')}">—</th:block></span>

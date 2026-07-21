@@ -181,6 +181,18 @@
 			<strong th:insert="~{admin/fragments/missing-value :: value(${adminShell != null and adminShell.masterDataVersion != null and adminShell.masterDataVersion != 'unknown' ? adminShell.masterDataVersion : null}, '미상')}">—</strong>
 		</span>
 	</div>
+	<!-- htmx 전역 인디케이터(#2416): body hx-indicator로 모든 htmx 요청에 연결한다(app.js). -->
+	<div id="admin-htmx-indicator" class="htmx-indicator admin-htmx-indicator" aria-live="polite" aria-busy="true">
+		<span class="admin-htmx-indicator-label">불러오는 중…</span>
+	</div>
+	<!-- 토스트(#1737, #2416): htmx HX-Trigger·responseError가 공유한다. topbar에 두어 전 화면에서 사용. -->
+	<div class="toast-region" aria-live="polite" aria-atomic="true"
+	     x-data="toastHub" x-on:admin-toast.window="show">
+		<output class="toast-item" x-cloak x-show="visible" x-bind:class="toneClass">
+			<span x-text="message">알림</span>
+			<button type="button" class="toast-dismiss" x-on:click="hide" aria-label="알림 닫기"><span aria-hidden="true">✕</span></button>
+		</output>
+	</div>
 </div>
 <div th:fragment="contentStart" id="admin-content" class="admin-content-anchor" tabindex="-1"></div>
 <!--
