@@ -1152,10 +1152,8 @@ void main() {
     );
     expect(internalDividers, hasLength(2));
     expect(
-      internalDividers.every(
-        (divider) => divider.color == EasySubwayAccessibleColors.line,
-      ),
-      isTrue,
+      internalDividers.map((divider) => divider.color),
+      everyElement(EasySubwayAccessibleColors.line),
     );
     expect(
       find.descendant(of: panel, matching: find.byType(Divider)),
