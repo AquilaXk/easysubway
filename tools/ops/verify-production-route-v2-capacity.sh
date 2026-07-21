@@ -428,7 +428,8 @@ fi
 
 backend_ready=false
 for _ in $(seq 1 120); do
-	if [[ "$(docker exec "${clone_curl}" curl -sS --noproxy '*' --connect-timeout 1 --max-time 2 -o /dev/null -w '%{http_code}' "http://backend:8080/actuator/health/readiness" 2>/dev/null || true)" == 200 ]]; then
+	# 격리된 내부 docker 네트워크(backend) 전용 평문 HTTP, TLS는 프로덕션 엣지에서 종단한다.
+	if [[ "$(docker exec "${clone_curl}" curl -sS --noproxy '*' --connect-timeout 1 --max-time 2 -o /dev/null -w '%{http_code}' "http://backend:8080/actuator/health/readiness" 2>/dev/null || true)" == 200 ]]; then # NOSONAR
 		backend_ready=true
 		break
 	fi
@@ -450,7 +451,7 @@ docker run -d --name "${clone_gateway}" --network "${network}" --network-alias g
 	-v "${PWD}/infra/nginx/route-v2-gateway.conf.template:/etc/nginx/templates/default.conf.template:ro" \
 	-v "${PWD}/infra/nginx/route-v2-proxy-headers.conf.template:/etc/nginx/templates/route-v2-proxy-headers.inc.template:ro" \
 	"${gateway_image}" nginx -g 'daemon off;' >/dev/null
-gateway_base="http://gateway:8081"
+gateway_base="http://gateway:8081" # NOSONAR -- 격리된 내부 docker 네트워크(gateway) 전용 평문 HTTP, TLS는 프로덕션 엣지에서 종단한다.
 gateway_ready=false
 for _ in $(seq 1 60); do
 	if [[ "$(docker exec "${clone_curl}" curl -sS --noproxy '*' --connect-timeout 1 --max-time 2 -o /dev/null -w '%{http_code}' "${gateway_base}/" 2>/dev/null || true)" == 404 ]]; then
