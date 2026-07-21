@@ -133,10 +133,7 @@ class StationSearchController extends ChangeNotifier {
     }
   }
 
-  Future<void> searchNearby(
-    CurrentLocationProvider locationProvider, {
-    String? region,
-  }) async {
+  Future<void> searchNearby(CurrentLocationProvider locationProvider) async {
     final requestId = ++_searchRequestId;
     _state = const StationSearchState(
       status: StationSearchStatus.loading,
@@ -163,9 +160,7 @@ class StationSearchController extends ChangeNotifier {
       if (!_isActiveRequest(requestId)) {
         return;
       }
-      // 주변 검색도 현재 선택 지역으로 좁힌다(다른 권역 역이 섞이지 않게).
-      final filtered = _filterByRegion(results, region);
-      if (filtered.isEmpty) {
+      if (results.isEmpty) {
         _state = const StationSearchState(
           status: StationSearchStatus.empty,
           results: [],
@@ -174,7 +169,7 @@ class StationSearchController extends ChangeNotifier {
       } else {
         _state = StationSearchState(
           status: StationSearchStatus.success,
-          results: filtered,
+          results: results,
           source: StationSearchResultSource.nearby,
         );
       }

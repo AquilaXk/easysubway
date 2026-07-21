@@ -137,6 +137,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// 풀페이지 역 검색 ↔ 홈 노선도 지역 동기화용.
   final NetworkMapRegionBridge _mapRegionBridge = NetworkMapRegionBridge();
 
+  /// #2419 Fix: 노선도의 현재 지역 표시명. 노선 탭이 draft(출발/도착) 역의
+  /// 지역 폴백으로 써서 최근 경로 기록이 항상 스킵되던 결함을 고친다.
+  String _currentRegionLabel = '수도권';
+
   @override
   void initState() {
     super.initState();
@@ -584,6 +588,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           focusStationRequest: _mapFocusStationRequest,
           onFocusStationRequestHandled: () =>
               setState(() => _mapFocusStationRequest = null),
+          onRegionLabelChanged: (regionLabel) {
+            if (regionLabel == _currentRegionLabel) {
+              return;
+            }
+            setState(() => _currentRegionLabel = regionLabel);
+          },
         ),
       );
     }
@@ -623,6 +633,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           initialMobilityType: _routeTabMobilityType ?? initialMobilityType,
           initialTransportScope: _routeTabTransportScope,
           initialDraft: _routeDraftController.draft,
+          regionLabel: _currentRegionLabel,
           simpleViewEnabled: simpleViewEnabled,
           onShellBackToHome: () {
             _routeDraftController.clear();

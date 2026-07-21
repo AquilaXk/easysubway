@@ -17046,6 +17046,43 @@ void main() {
     );
     expect(submitButton.onPressed, isNotNull);
   });
+
+  testWidgets(
+    '#2419: region 없는 draft로 자동 검색 성공 시 regionLabel 폴백으로 최근 경로가 기록된다',
+    (tester) async {
+      final searchHistoryRepository = FakeSearchHistoryRepository(const []);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RouteSearchScreen(
+            repository: FakeRouteSearchRepository(),
+            stationRepository: FakeStationSearchRepository(),
+            searchHistoryRepository: searchHistoryRepository,
+            regionLabel: '수도권',
+            initialDraft: RouteDraft(
+              origin: const RouteDraftStation(
+                id: 'station-sangnoksu',
+                nameKo: '상록수',
+              ),
+              destination: const RouteDraftStation(
+                id: 'station-sadang',
+                nameKo: '사당',
+              ),
+              lastModifiedAt: DateTime(2026, 7, 6),
+            ),
+          ),
+        ),
+      );
+      // #1933 D: 완성된 draft는 자동 검색으로 결과-우선 화면에 도달한다.
+      await tester.pumpAndSettle();
+
+      expect(searchHistoryRepository.recordedRouteSearches, hasLength(1));
+      final recorded = searchHistoryRepository.recordedRouteSearches.single;
+      expect(recorded.originStationId, 'station-sangnoksu');
+      expect(recorded.destinationStationId, 'station-sadang');
+      expect(recorded.region, '수도권');
+    },
+  );
 }
 
 Future<void> _showFacilityReportAttachLocationButton(
@@ -17762,8 +17799,12 @@ class FakeSearchHistoryRepository implements SearchHistoryRepository {
     ].take(limit).toList(growable: false);
   }
 
+  final recordedRouteSearches = <RecentRouteSearchEntry>[];
+
   @override
-  Future<void> recordRouteSearch(RecentRouteSearchEntry entry) async {}
+  Future<void> recordRouteSearch(RecentRouteSearchEntry entry) async {
+    recordedRouteSearches.add(entry);
+  }
 
   @override
   Future<void> removeSearch(String query, {String? region}) async {

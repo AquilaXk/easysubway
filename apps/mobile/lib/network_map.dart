@@ -422,6 +422,7 @@ class NetworkMapScreen extends StatefulWidget {
     this.focusStationRequestId,
     this.onFocusStationRequestHandled,
     this.regionBridge,
+    this.onRegionLabelChanged,
     super.key,
   });
 
@@ -488,6 +489,10 @@ class NetworkMapScreen extends StatefulWidget {
   /// [focusStationRequestId]를 소비했음을 부모에게 알린다(같은 id로 재요청되지
   /// 않도록 부모가 필드를 비우게 한다).
   final VoidCallback? onFocusStationRequestHandled;
+
+  /// #2419 Fix: 노선도 지역이 로드·전환될 때 현재 지역 표시명을 부모(홈)에
+  /// 알린다. 노선 탭(길찾기 draft 자동검색)이 draft 역의 지역 폴백으로 쓴다.
+  final ValueChanged<String>? onRegionLabelChanged;
 
   @override
   State<NetworkMapScreen> createState() => _NetworkMapScreenState();
@@ -756,6 +761,9 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     // 그대로 리포지토리 요청에 반영되어 data.selectedRegion과 같아지므로
     // 값이 보존된다(덮어써도 동일).
     _selectedRegion = data.selectedRegion;
+    if (mounted) {
+      _notifyRegionLabelChanged();
+    }
     final viewport = await widget.viewportRepository?.loadViewport(
       _displayRegionName(data.selectedRegion),
     );
@@ -782,6 +790,13 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
       _initialNearbyFocusStarted = false;
       _future = _loadMap();
     });
+    _notifyRegionLabelChanged();
+  }
+
+  /// #2419 Fix: 노선 탭(길찾기 draft 자동검색)이 draft 역의 지역 폴백으로 쓸 수
+  /// 있도록, 지역이 로드·전환될 때마다 현재 지역 표시명을 부모(홈)에 알린다.
+  void _notifyRegionLabelChanged() {
+    widget.onRegionLabelChanged?.call(_currentRegionDisplayName);
   }
 
   @override

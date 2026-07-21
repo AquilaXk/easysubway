@@ -2799,6 +2799,7 @@ class RouteSearchScreen extends StatefulWidget {
     this.onShellBackToHome,
     this.getOffAlarmController,
     this.routeShareInvoker,
+    this.regionLabel,
     String? initialMobilityType,
     super.key,
   }) : initialMobilityType = _resolveInitialMobilityType(initialMobilityType);
@@ -2812,6 +2813,11 @@ class RouteSearchScreen extends StatefulWidget {
   final GetOffAlarmController? getOffAlarmController;
   final RouteShareInvoker? routeShareInvoker;
   final RouteDraft? initialDraft;
+
+  /// #2419 Fix: draft로 채운 역은 region 정보가 없어 최근 경로 기록이 항상
+  /// 스킵됐다. 홈이 현재 노선도 지역 표시명을 넘겨주면 draft 역의 지역 폴백으로
+  /// 쓴다(예: '수도권').
+  final String? regionLabel;
   final RouteTransportScope initialTransportScope;
   final Widget? shellNavigationBar;
   final VoidCallback? onShellBackToHome;
@@ -2890,9 +2896,18 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _controller = RouteSearchController(repository: widget.repository);
-    _originStation = _stationFromDraft(widget.initialDraft?.origin);
-    _destinationStation = _stationFromDraft(widget.initialDraft?.destination);
-    _waypointStation = _stationFromDraft(widget.initialDraft?.waypoint);
+    _originStation = _stationFromDraft(
+      widget.initialDraft?.origin,
+      regionLabel: widget.regionLabel,
+    );
+    _destinationStation = _stationFromDraft(
+      widget.initialDraft?.destination,
+      regionLabel: widget.regionLabel,
+    );
+    _waypointStation = _stationFromDraft(
+      widget.initialDraft?.waypoint,
+      regionLabel: widget.regionLabel,
+    );
     _selectedPreset =
         mobilityPresetFromRepresentativeMobilityType(
           widget.initialMobilityType,
@@ -2914,9 +2929,18 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     // 갱신된 draft로 자동 검색을 이어간다.
     if (!identical(widget.initialDraft, oldWidget.initialDraft)) {
       final draft = widget.initialDraft;
-      _originStation = _stationFromDraft(draft?.origin);
-      _destinationStation = _stationFromDraft(draft?.destination);
-      _waypointStation = _stationFromDraft(draft?.waypoint);
+      _originStation = _stationFromDraft(
+        draft?.origin,
+        regionLabel: widget.regionLabel,
+      );
+      _destinationStation = _stationFromDraft(
+        draft?.destination,
+        regionLabel: widget.regionLabel,
+      );
+      _waypointStation = _stationFromDraft(
+        draft?.waypoint,
+        regionLabel: widget.regionLabel,
+      );
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _maybeAutoSearchFromDraft();
       });
@@ -3358,7 +3382,12 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     if (origin == null || destination == null) {
       return;
     }
-    final region = normalizeStationRegion(origin.region);
+    // #2419 Fix: draft로 채운 역은 region이 빈 문자열이라 항상 스킵됐다.
+    // 그 경우 홈이 넘긴 현재 노선도 지역 표시명으로 폴백한다.
+    final originRegion = origin.region.trim();
+    final region = normalizeStationRegion(
+      originRegion.isEmpty ? (widget.regionLabel ?? '') : originRegion,
+    );
     if (region.isEmpty) {
       return;
     }
@@ -3560,7 +3589,10 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
   }
 }
 
-StationSearchResult? _stationFromDraft(RouteDraftStation? station) {
+StationSearchResult? _stationFromDraft(
+  RouteDraftStation? station, {
+  String? regionLabel,
+}) {
   if (station == null) {
     return null;
   }
@@ -3568,7 +3600,9 @@ StationSearchResult? _stationFromDraft(RouteDraftStation? station) {
     id: station.id,
     nameKo: station.nameKo,
     nameEn: '',
-    region: '',
+    // #2419 Fix: draft에는 지역 정보가 없어 홈이 넘긴 현재 노선도 지역
+    // 표시명을 폴백으로 채운다. 없으면 빈 문자열로 두어 기존 동작을 유지한다.
+    region: regionLabel?.trim() ?? '',
     dataQualityLevel: '',
     lastVerifiedAt: '',
     lines: const [],

@@ -121,11 +121,8 @@ class DriftSearchHistoryRepository implements SearchHistoryRepository {
     int limit = 10,
   }) async {
     final filterRegion = _normalizeRegion(region);
-    // 지역 없는 레거시 행은 필터 목록에 절대 안 나오므로 정리한다.
-    await userDatabase.customStatement(
-      "DELETE FROM search_history WHERE region IS NULL OR TRIM(region) = ''",
-    );
-
+    // 지역 없는 레거시 행은 v3 마이그레이션에서 한 번만 정리된다(#2419).
+    // 조회는 아래 _stationMatchesRegion 필터로 결과에서만 제외한다.
     final stationRows = await userDatabase
         .customSelect(
           '''
