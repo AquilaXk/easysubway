@@ -50,11 +50,14 @@ class RouteMapStaticLabel {
   final bool bold;
 
   /// #2068 다줄 라벨 렌더: 오너 SVG가 이 라벨을 2줄 이상으로 나눴고 그 줄을
-  /// 이어붙인 텍스트가 [text]와 정확히 같을 때만 채워진다(대괄호 축약 등으로
-  /// 다르면 안전하게 단일 줄로 폴백 — 비어 있으면 painter가 기존처럼 [text]/
-  /// [rect] 하나로 그린다). 비어 있지 않으면 painter가 줄마다 독립적으로 그린다
+  /// 이어붙인 텍스트가 [text]와 (가운뎃점/마침표 표기 차 정규화 후) 같을
+  /// 때만 채워진다(#2408 — 정규화 없는 정확 일치였을 때 "전대·에버랜드"류가
+  /// 표기 차만으로 단일 줄 폴백에 빠졌다). 정규화 후에도 다르면(대괄호 축약
+  /// 등) 안전하게 단일 줄 폴백 — 비어 있으면 painter가 기존처럼 [text]/
+  /// [rect] 하나로 그린다. 비어 있지 않으면 painter가 줄마다 독립적으로 그린다
   /// (오너가 좁게 접어둔 이름을 앱이 풀네임 1줄로 오판해 이웃과 오탐 겹치는
-  /// 문제를 없앤다).
+  /// 문제를 없앤다). 각 줄 텍스트는 오너 SVG 원문 그대로다(정규화는 동일성
+  /// 판정에만 쓰고 화면 문안은 바꾸지 않는다).
   final List<RouteMapStaticLabelLine> lines;
 }
 
@@ -173,13 +176,23 @@ Rect _ownerLabelRect(
 
 /// 오너 매치 라벨 1건을 [RouteMapStaticLabel]로 만든다(#2068 다줄 라벨 렌더).
 /// 오너 SVG가 이 라벨을 2줄 이상으로 나눴고([entry.lines]) 그 줄을 이어붙인
-/// 텍스트가 앱 표시 텍스트([text])와 정확히 같으면 줄마다 독립 rect로 그린다
-/// — SVG가 좁게 접어둔 이름(예: 검단사거리="검단"/"사거리")을 앱이 풀네임
-/// 1줄 폭으로 오판해 이웃 라벨과 오탐 겹치는 문제(#2068 조사 3)를 없앤다.
-/// 이어붙인 텍스트가 다르면(괄호 축약 등으로 [text]가 entry.station과 달라진
-/// 드문 경우) 안전하게 단일 줄 폴백 — 기존(다줄 지원 전) 동작과 동일하다.
+/// 텍스트가 앱 표시 텍스트([text])와 (표기 차 정규화 후) 같으면 줄마다 독립
+/// rect로 그린다 — SVG가 좁게 접어둔 이름(예: 검단사거리="검단"/"사거리")을
+/// 앱이 풀네임 1줄 폭으로 오판해 이웃 라벨과 오탐 겹치는 문제(#2068 조사 3)를
+/// 없앤다. 이어붙인 텍스트가 정규화 후에도 다르면(괄호 축약 등으로 [text]가
+/// entry.station과 달라진 드문 경우) 안전하게 단일 줄 폴백 — 기존(다줄 지원
+/// 전) 동작과 동일하다. **렌더 텍스트는 항상 [entry.lines]의 오너 원문 그대로
+/// 쓴다**(정규화는 이 동일성 판정에만 쓰고 화면 문안은 절대 안 바꾼다).
 /// [rect]는 항상 채워진다: 단일 줄이면 그 텍스트의 rect, 다줄이면 줄별 rect의
 /// 합집합(솔버·감사 로직이 라벨 전체 점유 영역으로 계속 쓴다).
+///
+/// #2408 실기기 반려(전대·에버랜드): [joinedLines]는 오너 SVG 원문
+/// ("전대·에버랜드", 중점)이고 [text]는 datapack nameKo 파생
+/// ("전대.에버랜드", 마침표)라 정규화 없는 정확 일치 비교로는 항상 어긋나
+/// 다줄 경로가 못 타고 폴백 단일 줄로 렌더됐다(개행 없이 한 줄, 오너 지적
+/// 원인). [_resolveOwnerLabelsByCandidateKey]가 매칭 단계에서 이미
+/// [_normalizeOwnerLabelNameKey]로 후보를 찾아 이 함수까지 도달하므로,
+/// 여기서도 같은 정규화로 비교해야 매칭 성공이 다줄 렌더까지 이어진다.
 RouteMapStaticLabel _ownerFixedLabel({
   required String id,
   required String text,
@@ -197,7 +210,11 @@ RouteMapStaticLabel _ownerFixedLabel({
   final joinedLines = entry.lines.isEmpty
       ? null
       : entry.lines.map((line) => line.text).join();
-  if (entry.lines.length >= 2 && joinedLines == text) {
+  final linesMatchText =
+      joinedLines != null &&
+      _normalizeOwnerLabelNameKey(joinedLines) ==
+          _normalizeOwnerLabelNameKey(text);
+  if (entry.lines.length >= 2 && linesMatchText) {
     final lines = <RouteMapStaticLabelLine>[];
     for (final line in entry.lines) {
       final lineSize = measureLabel(
@@ -272,12 +289,17 @@ const double kRouteMapOwnerLabelMaxAnchorDistancePx = 185.0;
 double routeMapOwnerLabelMaxAnchorDistancePxFor(String? basemapAssetId) =>
     basemapAssetId == 'busan' ? 450.0 : kRouteMapOwnerLabelMaxAnchorDistancePx;
 
-/// SVG·DB 표기 차 정규화(#2068 7차 지시 2) — 중점(·)을 마침표(.)로 통일해
-/// "4·19민주묘지"/DB "4.19민주묘지", "전대·에버랜드"/DB "전대.에버랜드" 2건을
-/// 회수한다. **다른 정규화는 과매칭 위험이 있어 추가하지 않는다**(공백·괄호·
-/// "역" 접미 등은 그대로 둔다 — 시청·용인대·총신대입구(이수)·하남검단산 등은
-/// 여전히 미매치로 남아 솔버 폴백).
-String _normalizeOwnerLabelNameKey(String name) => name.replaceAll('·', '.');
+/// SVG·DB 표기 차 정규화(#2068 7차 지시 2, #2408 후속 확장) — 가운뎃점 변형
+/// (U+00B7 `·`, U+318D `ㆍ`)을 마침표(.)로 통일하고 앞뒤 공백을 trim한다.
+/// "4·19민주묘지"/DB "4.19민주묘지", "전대·에버랜드"/DB "전대.에버랜드"를
+/// 회수한다. **다른 정규화는 과매칭 위험이 있어 추가하지 않는다**(괄호·"역"
+/// 접미·내부 공백 붕괴 등은 그대로 둔다 — 시청·용인대·총신대입구(이수)·
+/// 하남검단산 등은 여전히 미매치로 남아 솔버 폴백). 유니코드 NFC 정준 결합은
+/// 적용하지 않는다 — Dart core에 표준 NFC API가 없고(패키지 도입은 이 좁은
+/// 케이스에 과함), #2408 전 권역 감사(labels.json 5권역 vs datapack 역명)에서
+/// NFD/NFC 분해형 불일치 사례가 0건으로 실측됐다(가운뎃점 변형만 실존).
+String _normalizeOwnerLabelNameKey(String name) =>
+    name.replaceAll('·', '.').replaceAll('ㆍ', '.').trim();
 
 /// basemap 모드에서 candidate id(`transfer:<stationId>` 또는
 /// `<stationId>:<lineId>`) → 채택된 오너 라벨을 사전 해소한다(#2068 7차).

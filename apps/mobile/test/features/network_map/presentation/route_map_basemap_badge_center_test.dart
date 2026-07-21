@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -6,17 +7,24 @@ import 'package:vector_graphics/vector_graphics.dart';
 
 import '../../../support/pretendard_test_font.dart';
 
-// #2068 오너 기준본 전환(2026-07-19) 근본 원인 수정: 이 게이트는 seoul.vec
-// 좌표를 "로컬 → 렌더" 재계산할 때 scale 레이어(id="main-map-scaled-layer")의
-// translate를 써야 하는데, 예전에는 소스 SVG(구 v2)가 항상
-// translate(70,138)이라 하드코딩해 왔다. 오너 새 SVG(viewBox 3800×3020)는
-// translate(757.0146 664.5656)로 바뀌었는데 하드코딩은 그대로 남아, 연천·
-// 신창 종점 배지 샘플링 창이 실제 배지 위치에서 render 공간으로 약
-// (687,527)px나 벗어나 잉크가 전혀 안 잡혔다(cnt=0) — compile-basemap-vec.mjs
-// 는 소스 SVG의 실제 transform을 그대로 컴파일 산출물에 굽기 때문에, 배지
-// 자체는 항상 정상 위치에 그려지고 있었다(기능 결함 아님, 테스트만 어긋남).
-// 매번 하드코딩을 갱신하는 대신, 컴파일러와 동일한 정규식으로 소스 SVG에서
-// 직접 파싱해 앞으로 소스가 또 바뀌어도 이 게이트가 저절로 따라가게 한다.
+// #2408 수도권 종점 표현 게이트(컴파일 seoul.vec 픽셀 실측).
+//
+// 오너가 직접 제작한 종점 노선 심볼(캡슐 배지, terminal-route-badges-layer)을
+// 기계 이식 배지(line-terminal-badges-layer, #2408에서 제거) 대신 그대로 렌더한다.
+// 오너 칩 그룹은 matrix(2.198,…)/translate…scale(2.198)… 축정렬 스케일을 갖는데,
+// vector_graphics_compiler 1.2.6이 그 그룹 스케일을 텍스트 fontSize엔 반영하지
+// 않는 버그가 있어 compile-basemap-vec.mjs의 foldTerminalChipScale가 fontSize를
+// 그룹 스케일만큼 선보정한다(안 하면 캡슐 대비 글자가 ~2.198× 작게 렌더). 이
+// 게이트는 앱과 동일 경로(번들 Pretendard + vector_graphics 런타임)로 컴파일된
+// seoul.vec을 디코드→렌더→픽셀 실측해 다음을 고정한다:
+//   (A) 오너 칩: 캡슐 안에 흰 글자 잉크가 존재하고(선보정 누락 시 사실상 소멸),
+//       세로 중심이 캡슐 중심과 정렬되며(baseline 보정), 글자가 캡슐 좌우 폭 안에
+//       들어온다(넘침 없음).
+//   (B) 마곡 환승 배지: scale(-1) 반전 프레임의 오너 원본 배지(구 마곡나루 버그와
+//       동일 위험군). #2068에서 소스 사전 중심정렬로 회귀 가드에 편입, 그대로 유지.
+//
+// seoul 좌표는 scale(0.455)+translate(...) 적용 전 scale-레이어 로컬(오너 기준본
+// viewBox). translate는 소스 SVG에서 직접 파싱해 좌표가 바뀌어도 게이트가 따라간다.
 ({double tx, double ty}) _seoulScaleLayerTranslate() {
   final svg = File(
     '../../tools/route-map/route-map-defs/svg-sources/easy-subway-sma-v2.svg',
@@ -39,152 +47,151 @@ import '../../../support/pretendard_test_font.dart';
   return (tx: dx, ty: dy);
 }
 
-// #2068 배지 텍스트 세로 중심 게이트 (전 권역, 컴파일 .vec 픽셀 실측).
-//
-// 오너 강반려(수도권): 마곡나루 환승 캡슐의 9호선 배지 "9"가 원 하단으로 쏠려
-// 원 밖으로 이탈. 원인은 그 배지가 scale(-1)+rotate(180) 중첩 프레임에 있어
-// compile-basemap-vec.mjs의 central-baseline 보정(+0.35*fontSize)이 렌더에서
-// 반대 방향으로 작동한 것(전 권역 유일한 반전 배지). 소스에서 두 배지를
-// alphabetic 기준 y로 사전 중심 정렬하고 central/middle 속성을 제거해 보정
-// 대상에서 뺐다.
-//
-// 이 게이트는 앱과 동일 경로(번들 Pretendard + vector_graphics 런타임)로
-// 컴파일된 .vec을 디코드→렌더→픽셀 실측해 배지 잉크의 세로 중심이 원 중심과
-// 정렬됨을 고정한다. 검증 방식이 SVG 헤드리스가 아니라 실제 .vec 렌더라는 점이
-// 핵심이다(오너가 본 실기기 렌더와 동일 파이프라인).
-//
-// 측정: 원 중심을 이미지 중심에 두고, 원 반경 마스크 안에서 잉크(흰/어두운)
-// 픽셀 세로 centroid의 원 중심 대비 오프셋을 fontSize(렌더) 비로 구한다.
-
-class _Badge {
-  const _Badge(
+// 오너 종점 칩(캡슐). cx/cy는 chip transform 적용 후·wrapper 적용 전 scale-레이어
+// 로컬 좌표(rect 중심). capHalfW/H는 로컬 rect 반폭/반높이 × 그룹 스케일.
+// fontRender는 최종 렌더 fontSize(= 로컬 fontSize × 그룹 스케일 × k).
+class _OwnerChip {
+  const _OwnerChip(
     this.label,
-    this.region,
+    this.cx,
+    this.cy,
+    this.capHalfWLocal,
+    this.capHalfHLocal,
+    this.fontRender,
+  );
+  final String label;
+  final double cx; // scale-레이어 로컬(캡슐 중심)
+  final double cy;
+  final double capHalfWLocal; // = rect.w/2 × 그룹 스케일 (로컬 단위)
+  final double capHalfHLocal; // = rect.h/2 × 그룹 스케일 (로컬 단위)
+  final double fontRender; // 렌더 fontSize
+}
+
+const double _k = 0.455; // 수도권 scale 레이어 배율.
+
+// 대표 칩 3개: 단자리 숫자(신창 1·개화 9)와 다자 캡슐(광교 신분당). 글자 fill 전부
+// #FFFFFF. 값은 오너 SVG 칩 transform 실측(foldTerminalChipScale 경로).
+const _ownerChips = <_OwnerChip>[
+  _OwnerChip('신창(1)', 6150.1831, 4417.5466, 32.970, 25.277, 10.5009),
+  _OwnerChip('개화(9)', -138.3960, 634.7050, 32.970, 25.277, 10.5009),
+  _OwnerChip('광교(신분당)', 2478.9530, 3472.6850, 52.752, 25.277, 10.5009),
+];
+
+// 마곡 환승 배지(반전, 오너 원본 구조 transform="scale(-1)"). #2068 회귀 가드 유지.
+class _DiscBadge {
+  const _DiscBadge(
+    this.label,
     this.cx,
     this.cy,
     this.fontLocal,
     this.discR,
-    this.inkWhite,
-    this.k,
     this.tolerance,
   );
   final String label;
-  final String region; // vec 파일 stem
-  final double cx; // scale 레이어 로컬 좌표(원 중심)
+  final double cx;
   final double cy;
   final double fontLocal;
   final double discR;
-  final bool inkWhite; // true=흰 잉크, false=#333D4B 어두운 잉크
-  final double k; // scale 레이어 배율(수도권 0.455, 그 외 1)
-  final double tolerance; // |ratio| 상한
+  final double tolerance;
 }
 
-// 수도권(오너 반려 권역) 배지로 게이트한다. 수도권 배지는 scale(0.455) 레이어
-// 안에 있어 컴파일 시 텍스트가 축정렬 transform과 함께 path로 outline되므로
-// 렌더가 폰트 로드에 무관하게 결정적이다 — 픽셀 실측이 신뢰 가능하다.
-//
-// (타 권역 SVG는 scale 레이어가 없어 배지 텍스트가 런타임 drawParagraph로 남고,
-//  배지 텍스트에 font-family가 없어 flutter_test 런타임에서 기본 폰트(Ahem 등)로
-//  tofu 렌더된다 — 픽셀 실측 불가. 타 권역 배지는 반전 배지가 전무하고 동일한
-//  normalizeTextBaselineAndScale(+0.35) 경로를 타므로, 이 게이트의 종점 숫자
-//  검증이 그 계수 정합성을 대표한다. 타 권역 회귀는 compile --verify(2회 sha256
-//  동일)와 매치율·정렬 게이트가 담당한다.)
-//
-// 정상(비반전) 종점 숫자 배지: 오차 ≤ fontSize의 5%(task 기준). 실측 ~2~3%.
-// 마곡 반전 배지(수정본): 원 반경 마스크로 캡슐 흰 링을 배제한 잉크 centroid.
-// 상한 0.12(글리프 잉크 비대칭 여유)로 두어 오너가 반려한 '원 하단/밖 이탈'
-// (반전 버그 재발 시 ratio ≳ 0.5)을 확실히 잡는다.
-// seoul 좌표는 scale(0.455)+translate(757.0146,664.5656) 적용 전 로컬(오너
-// 기준본 viewBox 3800×3020 — 구 v2의 2400×1860과 좌표계 전혀 다름).
-//
-// #2068 오너 기준본 전환(2026-07-19): 라운드 2~5 산출물(구 v2 좌표계) 전부
-// 폐기, 새 SVG의 실제 badge 좌표로 재실측(line-terminal-badge-1-연천·
-// line-terminal-badge-9-개화 — 새로 이식한 종점 마크; transfer-station-badge
-// -마곡나루-9호선-1/공항철도-2 — 오너 원본에 이미 있던 scale(-1) 반전 패턴,
-// 구 마곡나루 버그와 동일 위험군이라 그대로 회귀 가드 대상으로 유지).
-//
-// #2068 종점 마크 문법 교정(2026-07-19 후속): 종점 마크를 역 위에 그대로
-// 겹쳐 찍던 v1 배치를 폐기하고, 노선 진행 방향으로 12 로컬단위 연장한
-// 지점에 마크를 옮기는 v2 배치(광주 라운드 관례 재적용)로 전 30개 종점
-// 마크를 재생성했다 — 신창 cx 6035.1327→6047.1327(+12), 개화
-// cy 726.2295→738.2295(+12)로 하드코딩 좌표를 실측 재동기화한다.
-const _badges = <_Badge>[
-  // 수도권 레퍼런스 종점 숫자(비반전) — 이식한 종점 마크(line-terminal-badge).
-  _Badge(
-    'seoul 종점1(흰, 신창)',
-    'seoul',
-    6047.1327,
-    4416.3393,
-    22.5,
-    19.5,
-    true,
-    0.455,
-    0.05,
-  ),
-  _Badge(
-    'seoul 종점9(어두움, 개화)',
-    'seoul',
-    -138.4936,
-    738.2295,
-    22.5,
-    19.5,
-    false,
-    0.455,
-    0.05,
-  ),
-  // 수도권 마곡 환승 배지(반전, 오너 원본 구조 — transform="scale(-1)").
-  _Badge(
-    'seoul 마곡9(반전)',
-    'seoul',
-    382.2393,
-    1027.5074,
-    18,
-    12,
-    true,
-    0.455,
-    0.12,
-  ),
-  _Badge(
-    'seoul 마곡공항(반전)',
-    'seoul',
-    355.6894,
-    1027.5075,
-    10.3,
-    12,
-    true,
-    0.455,
-    0.12,
-  ),
+const _discBadges = <_DiscBadge>[
+  _DiscBadge('마곡9(반전)', 382.2393, 1027.5074, 18, 12, 0.12),
+  _DiscBadge('마곡공항(반전)', 355.6894, 1027.5075, 10.3, 12, 0.12),
 ];
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('전 권역 배지 텍스트 세로 중심 정렬(컴파일 .vec 픽셀 실측)', (tester) async {
+  testWidgets('#2408 오너 종점 칩 + 마곡 반전 배지 세로 중심 정렬(컴파일 .vec 픽셀 실측)', (
+    tester,
+  ) async {
     await loadPretendardTestFont();
     await tester.runAsync(() async {
-      final pictures = <String, ui.Picture>{};
-      for (final region in {for (final b in _badges) b.region}) {
-        final info = await vg.loadPicture(
-          AssetBytesLoader(
-            'assets/datapacks/metro_map_pack/basemap/$region.vec',
-          ),
-          null,
+      final info = await vg.loadPicture(
+        const AssetBytesLoader(
+          'assets/datapacks/metro_map_pack/basemap/seoul.vec',
+        ),
+        null,
+      );
+      final picture = info.picture;
+      final t = _seoulScaleLayerTranslate();
+      const double s = 24.0; // 픽셀/유닛
+      final failures = <String>[];
+
+      // (A) 오너 종점 칩: 흰 글자 존재 + 세로 중심 정렬 + 수평 캡슐 내 포함.
+      for (final c in _ownerChips) {
+        final cx = t.tx + _k * c.cx;
+        final cy = t.ty + _k * c.cy;
+        final halfWpx = c.capHalfWLocal * _k * s;
+        final halfHpx = c.capHalfHLocal * _k * s;
+        // 창: 캡슐보다 살짝 크게(포함 판정용 좌우 여유 3유닛).
+        final winHalfW = (halfWpx + 3 * _k * s).ceil();
+        // 세로는 캡슐 중앙 밴드(둥근 끝단 근처 이웃 잉크 배제).
+        final winHalfH = (halfHpx * 0.72).ceil();
+        final w = winHalfW * 2, h = winHalfH * 2;
+        final rec = ui.PictureRecorder();
+        final canvas = ui.Canvas(rec);
+        canvas.translate(w / 2, h / 2);
+        canvas.scale(s);
+        canvas.translate(-cx, -cy);
+        canvas.drawPicture(picture);
+        final img = await rec.endRecording().toImage(w, h);
+        final data = (await img.toByteData(
+          format: ui.ImageByteFormat.rawRgba,
+        ))!.buffer.asUint8List();
+        double sy = 0;
+        int cnt = 0, minX = w, maxX = -1;
+        for (int py = 0; py < h; py++) {
+          for (int px = 0; px < w; px++) {
+            final o = (py * w + px) * 4;
+            if (data[o] > 232 && data[o + 1] > 232 && data[o + 2] > 232) {
+              sy += py;
+              cnt++;
+              minX = math.min(minX, px);
+              maxX = math.max(maxX, px);
+            }
+          }
+        }
+        img.dispose();
+        if (cnt < 150) {
+          failures.add(
+            '${c.label}: 흰 글자 잉크 거의 없음(cnt=$cnt) — 그룹 스케일 '
+            'fontSize 선보정 누락 의심.',
+          );
+          continue;
+        }
+        // 세로 중심 정렬: 잉크 centroid의 캡슐 중심 대비 오프셋 / 렌더 fontSize.
+        final ratio = ((sy / cnt) - h / 2) / s / c.fontRender;
+        // 수평 포함: 글자 반폭이 캡슐 반폭(± 여유) 안.
+        final textHalfWpx = (maxX - minX) / 2;
+        final overflowX = textHalfWpx - halfWpx;
+        // ignore: avoid_print
+        print(
+          '[owner-chip] ${c.label}: cnt=$cnt ratio=${ratio.toStringAsFixed(4)} '
+          'overflowXpx=${overflowX.toStringAsFixed(1)} '
+          '(여유 ${(0.6 * _k * s).toStringAsFixed(1)})',
         );
-        pictures[region] = info.picture;
+        if (ratio.abs() > 0.15) {
+          failures.add(
+            '${c.label}: 세로 중심 이탈 |ratio|='
+            '${ratio.abs().toStringAsFixed(4)} > 0.15',
+          );
+        }
+        if (overflowX > 0.6 * _k * s) {
+          failures.add(
+            '${c.label}: 글자가 캡슐 폭 초과 '
+            '(${overflowX.toStringAsFixed(1)}px)',
+          );
+        }
       }
 
-      const double s = 24.0;
-      final seoulTranslate = _seoulScaleLayerTranslate();
-      final failures = <String>[];
-      for (final b in _badges) {
-        final picture = pictures[b.region]!;
-        final tx = b.region == 'seoul' ? seoulTranslate.tx : 0.0;
-        final ty = b.region == 'seoul' ? seoulTranslate.ty : 0.0;
-        final cx = tx + b.k * b.cx;
-        final cy = ty + b.k * b.cy;
-        final discRpx = b.discR * b.k * s;
-        final maskR = discRpx * 1.0; // 원 반경(캡슐 흰 링·이웃 배제)
+      // (B) 마곡 반전 배지: 원 반경 마스크 안 잉크 centroid(구 반전 버그 회귀 가드).
+      for (final b in _discBadges) {
+        final cx = t.tx + _k * b.cx;
+        final cy = t.ty + _k * b.cy;
+        final discRpx = b.discR * _k * s;
+        final maskR = discRpx;
         final half = (discRpx * 1.35).ceil();
         final w = half * 2, h = half * 2;
         final rec = ui.PictureRecorder();
@@ -204,47 +211,32 @@ void main() {
             final dx = px - w / 2, dy = py - h / 2;
             if (dx * dx + dy * dy > maskR * maskR) continue;
             final o = (py * w + px) * 4;
-            final r = data[o], g = data[o + 1], bl = data[o + 2];
-            final ink = b.inkWhite
-                ? (r > 200 && g > 200 && bl > 200)
-                : (r < 110 && g < 110 && bl < 120);
-            if (ink) {
+            if (data[o] > 200 && data[o + 1] > 200 && data[o + 2] > 200) {
               sy += py;
               cnt++;
             }
           }
         }
         img.dispose();
-        expect(
-          cnt,
-          greaterThan(200),
-          reason:
-              '${b.label}: 잉크 픽셀이 거의 없음 — 배지가 원 밖으로 이탈했거나 '
-              '좌표/색 판정이 어긋남(cnt=$cnt).',
-        );
-        final fontRendered = b.fontLocal * b.k;
-        final ratio = ((sy / cnt) - h / 2) / s / fontRendered;
+        if (cnt < 200) {
+          failures.add('${b.label}: 잉크 픽셀 거의 없음(cnt=$cnt).');
+          continue;
+        }
+        final ratio = ((sy / cnt) - h / 2) / s / (b.fontLocal * _k);
         // ignore: avoid_print
         print(
-          '[badge-center] ${b.label}: cnt=$cnt '
-          'ratio=${ratio.toStringAsFixed(4)} (상한 ${b.tolerance})',
+          '[disc-badge] ${b.label}: cnt=$cnt ratio=${ratio.toStringAsFixed(4)} '
+          '(상한 ${b.tolerance})',
         );
         if (ratio.abs() > b.tolerance) {
           failures.add(
-            '${b.label}: |ratio|=${ratio.abs().toStringAsFixed(4)} '
-            '> ${b.tolerance}',
+            '${b.label}: |ratio|=${ratio.abs().toStringAsFixed(4)} > ${b.tolerance}',
           );
         }
       }
 
-      for (final p in pictures.values) {
-        p.dispose();
-      }
-      expect(
-        failures,
-        isEmpty,
-        reason: '배지 텍스트 세로 중심 이탈:\n${failures.join('\n')}',
-      );
+      picture.dispose();
+      expect(failures, isEmpty, reason: '종점 표현 렌더 이탈:\n${failures.join('\n')}');
     });
   });
 }
