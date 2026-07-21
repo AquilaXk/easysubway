@@ -112,10 +112,12 @@ import '../../../support/pretendard_test_font.dart';
 // 밀집 제약으로, 허브 라벨을 고정하는 한 남는 하드 케이스다. baseline을 1로
 // 갱신한다(악화 금지).
 //
-// 이름 매칭은 중점(·)↔마침표(.) 정규화만 적용한다(#2068 7차 지시 2 — 다른
-// 정규화는 과매칭 위험이라 하지 않는다, route_map_label_layout.dart의
-// _normalizeOwnerLabelNameKey와 동일 규칙을 이 파일 매치율 계산에도 미러링).
-String _normalizeNameForMatchRate(String name) => name.replaceAll('·', '.');
+// 이름 매칭은 가운뎃점 변형(·/ㆍ)↔마침표(.) 정규화 + 공백 trim만 적용한다
+// (#2068 7차 지시 2, #2408 후속 확장 — 다른 정규화는 과매칭 위험이라 하지
+// 않는다, route_map_label_layout.dart의 _normalizeOwnerLabelNameKey와 동일
+// 규칙을 이 파일 매치율 계산에도 미러링).
+String _normalizeNameForMatchRate(String name) =>
+    name.replaceAll('·', '.').replaceAll('ㆍ', '.').trim();
 
 Size _measureLabel(
   String text, {
