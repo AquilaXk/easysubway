@@ -1332,6 +1332,14 @@ function shiftTextYAttr(tag, shift) {
 //     축정렬(비반전) 균일 스케일만 대상으로 하며, 그 외(회전·비균일·s=1)는 건드리지
 //     않는다. 다른 권역 SVG엔 이 클래스가 없어 영향이 없다. 오너 SVG 원본은 불변이며
 //     이 정규화는 컴파일 입력 사본에만 적용된다.
+//   - #2408 리뷰 반영: inlineSimpleClassStyles 이후에 적용해야 한다 — CSS 클래스
+//     유래 font-size/baseline(단순 compound class 선택자로 인라인되는 경우)도 이
+//     함수의 attr·style 판독 대상이 되도록 하기 위함. 현재 오너 칩은 전부 속성형
+//     font-size(attr="10.5", 일부 style override)만 쓰고 관련 CSS 규칙
+//     (.ui-chip text {...})은 descendant 결합자라 애초에 inlineSimpleClassStyles가
+//     인식하지 않는 단순 선택자 요건 밖이라 순서 무관하게 현재 결과는 불변이지만,
+//     향후 단순 class 선택자로 font-size/baseline을 주는 칩이 추가되면 이 순서가
+//     아니면 fold가 그 값을 놓친다.
 function foldTerminalChipScale(svgText) {
   return svgText.replace(
     /<g\b[^>]*\bclass="ui-chip terminal-route-badge"[^>]*>[\s\S]*?<\/g>/g,
@@ -1403,7 +1411,7 @@ export function normalizeSvgForCompile(svgText) {
       /<g id="compiled-map-coordinate-layer" transform="([^"]+)"/,
     )?.[1],
   );
-  const inlined = inlineSimpleClassStyles(foldTerminalChipScale(extracted))
+  const inlined = foldTerminalChipScale(inlineSimpleClassStyles(extracted))
     .replace(
       /font-weight="(\d+)"/g,
       (_m, v) => `font-weight="${normalizeFontWeightValue(v)}"`,
