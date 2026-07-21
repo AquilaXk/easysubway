@@ -917,4 +917,3 @@ test("같은 id의 builtin과 catalog 후보 충돌 시 catalog 후보의 필드
   assert.equal(candidateIds.length, 1);
   assert.equal(candidateIds[0], "kric-nationwide-station-interval-distance");
 });
-
