@@ -104,6 +104,18 @@ class AdminAccessibilitySmokeTest {
 	}
 
 	@Test
+	@DisplayName("제보 대기열은 드로어 dialog 마크업 계약을 유지한다")
+	void reportsPageKeepsDrawerDialogMarkup() throws Exception {
+		String html = getAdminHtml("/admin/reports/page", new MockHttpSession(), fullAdmin());
+
+		assertThat(html)
+			.contains("class=\"admin-drawer\"")
+			.contains("role=\"dialog\" aria-modal=\"true\" aria-label=\"상세 패널\"")
+			.contains("x-on:keydown=\"trapFocusKey\"")
+			.contains("id=\"admin-drawer-body\"");
+	}
+
+	@Test
 	@DisplayName("관리자 오류와 validation 화면은 alert 의미와 기존 입력 확인 문구를 제공한다")
 	void adminErrorAndValidationPagesExposeAlertSemantics() throws Exception {
 		RequestPostProcessor admin = fullAdmin();
@@ -161,6 +173,13 @@ class AdminAccessibilitySmokeTest {
 			.contains("class=\"admin-topbar-logout-form\"")
 			.contains("action=\"/admin/logout\"")
 			.contains("name=\"_csrf\"")
+			// #2416: 커맨드 팔레트·htmx 인디케이터 마크업 계약(포커스 트랩 동작은 JS 런타임).
+			.contains("class=\"command-palette\"")
+			.contains("x-bind:aria-expanded=\"ariaExpanded\"")
+			.contains("id=\"command-palette-overlay\"")
+			.contains("role=\"dialog\" aria-modal=\"true\" aria-label=\"통합 검색\"")
+			.contains("id=\"admin-htmx-indicator\"")
+			.contains("class=\"htmx-indicator admin-htmx-indicator\"")
 			.doesNotContain("<main id=\"admin-content\"");
 		assertThat(html.indexOf("href=\"#admin-content\"")).isLessThan(html.indexOf("class=\"admin-shell\""));
 		assertThat(html.indexOf("class=\"admin-topbar-row\"")).isLessThan(html.indexOf("id=\"admin-content\""));

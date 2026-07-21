@@ -13,6 +13,51 @@
 // app.js는 defer라 이 시점에 document.body가 존재한다.
 document.body.classList.add('has-js');
 
+// 오버레이 포커스 트랩(#2416): 드로어·커맨드 팔레트·알림 패널이 Tab/Shift+Tab을 순환하고
+// 닫을 때 트리거로 포커스를 복원한다. CSP 빌드 Alpine은 표현식을 쓰지 않으므로 공유 헬퍼로 둔다.
+function adminFocusableElements(root) {
+	if (!root) {
+		return [];
+	}
+	var nodes = root.querySelectorAll(
+		'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+	);
+	return Array.prototype.filter.call(nodes, function (el) {
+		return !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true';
+	});
+}
+
+function adminTrapTabKey(event, root) {
+	if (event.key !== 'Tab' || !root) {
+		return;
+	}
+	var focusable = adminFocusableElements(root);
+	if (!focusable.length) {
+		event.preventDefault();
+		return;
+	}
+	var first = focusable[0];
+	var last = focusable[focusable.length - 1];
+	if (event.shiftKey) {
+		if (document.activeElement === first || !root.contains(document.activeElement)) {
+			event.preventDefault();
+			last.focus();
+		}
+	} else if (document.activeElement === last || !root.contains(document.activeElement)) {
+		event.preventDefault();
+		first.focus();
+	}
+}
+
+function adminFocusFirst(root) {
+	var focusable = adminFocusableElements(root);
+	if (focusable.length) {
+		focusable[0].focus();
+	} else if (root && root.focus) {
+		root.focus();
+	}
+}
+
 // htmx 전역 피드백(#2416): topbar 인디케이터·실패 토스트. no-JS 폴백(form GET·링크)은 그대로다.
 (function initHtmxFeedback() {
 	var indicator = document.getElementById('admin-htmx-indicator');
@@ -175,17 +220,38 @@ document.addEventListener('alpine:init', function () {
 	Alpine.data('commandPalette', function () {
 		return {
 			open: false,
+			returnFocus: null,
+			get ariaExpanded() {
+				return this.open ? 'true' : 'false';
+			},
 			show: function () {
+				this.returnFocus = document.activeElement;
 				this.open = true;
-				var input = this.$refs.input;
+				var self = this;
 				this.$nextTick(function () {
+					var input = self.$refs.input;
 					if (input) {
 						input.focus();
 					}
 				});
 			},
 			hide: function () {
+				if (!this.open) {
+					return;
+				}
 				this.open = false;
+				var target = this.returnFocus || this.$refs.trigger;
+				this.returnFocus = null;
+				if (target && target.focus) {
+					target.focus();
+				}
+			},
+			trapFocusKey: function (event) {
+				if (!this.open) {
+					return;
+				}
+				var panel = this.$root.querySelector('.command-palette-panel');
+				adminTrapTabKey(event, panel || this.$root);
 			},
 			// 입력에서 아래 방향키 → 첫 결과 링크로 포커스 이동.
 			focusResults: function () {
@@ -223,22 +289,31 @@ document.addEventListener('alpine:init', function () {
 	Alpine.data('drawer', function () {
 		return {
 			visible: false,
+			returnFocus: null,
 			open: function () {
+				this.returnFocus = document.activeElement;
 				this.visible = true;
-				var panel = this.$refs.panel;
-				var focusPanel = function () {
-					if (panel) {
-						panel.focus();
-					}
-				};
-				if (this.$nextTick) {
-					this.$nextTick(focusPanel);
-				} else {
-					focusPanel();
-				}
+				var self = this;
+				this.$nextTick(function () {
+					adminFocusFirst(self.$refs.panel || self.$el);
+				});
 			},
 			close: function () {
+				if (!this.visible) {
+					return;
+				}
 				this.visible = false;
+				var target = this.returnFocus;
+				this.returnFocus = null;
+				if (target && target.focus) {
+					target.focus();
+				}
+			},
+			trapFocusKey: function (event) {
+				if (!this.visible) {
+					return;
+				}
+				adminTrapTabKey(event, this.$refs.panel || this.$el);
 			},
 		};
 	});
@@ -251,6 +326,7 @@ document.addEventListener('alpine:init', function () {
 	Alpine.data('alertCenter', function () {
 		return {
 			open: false,
+			returnFocus: null,
 			timer: null,
 			get rootClass() {
 				return this.open ? 'is-open' : '';
@@ -297,10 +373,41 @@ document.addEventListener('alpine:init', function () {
 				}
 			},
 			toggle: function () {
-				this.open = !this.open;
+				if (this.open) {
+					this.closePanel();
+				} else {
+					this.openPanel();
+				}
+			},
+			openPanel: function () {
+				this.returnFocus = document.activeElement;
+				this.open = true;
+				var self = this;
+				this.$nextTick(function () {
+					var panel = self.$root.querySelector('.admin-alert-panel');
+					adminFocusFirst(panel || self.$refs.live);
+				});
+			},
+			closePanel: function () {
+				if (!this.open) {
+					return;
+				}
+				this.open = false;
+				var target = this.returnFocus || this.$refs.trigger;
+				this.returnFocus = null;
+				if (target && target.focus) {
+					target.focus();
+				}
 			},
 			hide: function () {
-				this.open = false;
+				this.closePanel();
+			},
+			trapFocusKey: function (event) {
+				if (!this.open) {
+					return;
+				}
+				var panel = this.$root.querySelector('.admin-alert-panel');
+				adminTrapTabKey(event, panel || this.$root);
 			},
 		};
 	});

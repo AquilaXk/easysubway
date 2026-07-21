@@ -1622,6 +1622,28 @@
 		z-index: 80;
 		background: color-mix(in srgb, var(--admin-ink) 40%, transparent);
 	}
+
+	/* 오프캔버스 터치 타깃(#2416): ≤1024px에서 페이지네이션·표 액션·일반 버튼이 44×44px 이상. */
+	.admin-v3 .pagination a,
+	.admin-v3 .status-filter a {
+		min-height: 44px;
+	}
+
+	.admin-v3 button,
+	.admin-btn {
+		min-height: 44px;
+	}
+
+	.admin-v3 .tiny-btn {
+		min-height: 44px;
+	}
+
+	.admin-v3 .detail-link {
+		display: inline-flex;
+		align-items: center;
+		min-height: 44px;
+		padding: 0 4px;
+	}
 }
 
 /* ≤768px: 표준 테이블 밀도를 좁힌다(table min-width + admin-table-scroll이 scroll을 담당). */

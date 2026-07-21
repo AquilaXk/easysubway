@@ -21,12 +21,15 @@
 	     x-on:keydown.cmd.k.window.prevent="show"
 	     x-on:keydown.ctrl.k.window.prevent="show"
 	     x-on:keydown.escape.window="hide">
-		<a class="admin-sidebar-quicksearch command-palette-trigger" th:href="@{/admin/search}" x-on:click.prevent="show">
+		<a class="admin-sidebar-quicksearch command-palette-trigger" th:href="@{/admin/search}"
+		   x-ref="trigger" x-on:click.prevent="show"
+		   x-bind:aria-expanded="ariaExpanded" aria-controls="command-palette-overlay">
 			<span aria-hidden="true">🔍</span>
 			<span>메뉴·역 검색</span>
 			<kbd>⌘K</kbd>
 		</a>
-		<div class="command-palette-overlay" x-cloak x-show="open"
+		<div id="command-palette-overlay" class="command-palette-overlay" x-cloak x-show="open"
+		     x-on:keydown="trapFocusKey"
 		     role="dialog" aria-modal="true" aria-label="통합 검색">
 			<div class="command-palette-backdrop" x-on:click="hide"></div>
 			<div class="command-palette-panel">
@@ -115,13 +118,13 @@
 			  탭이 비활성이면 폴링을 멈춘다. no-JS는 벨이 /admin/alerts 전용 페이지로 이동한다.
 			-->
 			<div class="admin-alert-center" x-data="alertCenter"
-			     x-bind:class="rootClass" x-on:keydown.escape.window="hide">
-				<a class="admin-alert-bell" th:href="@{/admin/alerts}" x-on:click.prevent="toggle"
+			     x-bind:class="rootClass" x-on:keydown.escape.window="hide" x-on:keydown="trapFocusKey">
+				<a class="admin-alert-bell" th:href="@{/admin/alerts}" x-ref="trigger" x-on:click.prevent="toggle"
 				   x-bind:aria-expanded="ariaExpanded"
 				   aria-controls="admin-alert-live" aria-label="알림 센터">
 					<svg class="admin-alert-bell-icon" th:replace="~{admin/fragments/icon :: icon('alert')}"></svg>
 				</a>
-				<div id="admin-alert-live" class="admin-alert-live" role="region" aria-label="알림 센터"></div>
+				<div id="admin-alert-live" x-ref="live" class="admin-alert-live" role="region" aria-label="알림 센터"></div>
 			</div>
 			<!--
 			  사용자 메뉴 disclosure(#2047): 이름·권한 요약을 트리거로 계정 정보를 보여준다.
@@ -229,10 +232,10 @@
 <!--
   드로어(사이드 패널, #1737): htmx가 #admin-drawer-body에 상세 fragment를 로드하고 HX-Trigger로
   admin-drawer-open을 쏘면 열린다. Esc·백드롭·닫기 버튼으로 닫는다. no-JS는 상세 링크가 상세 페이지로 이동.
-  화면군 이슈가 재사용한다. 열림/닫힘 포커스 이동·복귀 키보드 검증은 접근성 QA(#1749)에서 확인한다.
+  화면군 이슈가 재사용한다. 열림/닫힘 포커스 이동·Tab 순환·복귀는 app.js drawer 컴포넌트가 담당한다(#2416).
 -->
 <aside th:fragment="drawer" class="admin-drawer" x-data="drawer" x-show="visible" x-cloak
-       x-on:admin-drawer-open.window="open" x-on:keydown.escape.window="close"
+       x-on:admin-drawer-open.window="open" x-on:keydown.escape.window="close" x-on:keydown="trapFocusKey"
        role="dialog" aria-modal="true" aria-label="상세 패널">
 	<div class="admin-drawer-backdrop" x-on:click="close"></div>
 	<div class="admin-drawer-panel" x-ref="panel" tabindex="-1">
