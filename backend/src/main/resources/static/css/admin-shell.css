@@ -334,7 +334,7 @@
 
 .admin-page-head h1 {
 	margin: 0;
-	font-size: 34px;
+	font-size: var(--admin-fs-h1);
 	font-weight: var(--admin-w-title);
 	line-height: 1.16;
 	letter-spacing: 0;

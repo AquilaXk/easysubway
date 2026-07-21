@@ -44,6 +44,10 @@
 	--admin-shadow-card: none;
 
 	/* 타이포 위계 */
+	--admin-fs-h1: 34px;
+	--admin-fs-h2: 18px;
+	--admin-fs-body: 14px;
+	--admin-fs-caption: 13px;
 	--admin-w-body: 500;
 	--admin-w-medium: 600;
 	--admin-w-strong: 700;
