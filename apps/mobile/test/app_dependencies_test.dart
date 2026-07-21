@@ -14,9 +14,32 @@ import 'package:easysubway_mobile/features/stations/data/drift_station_repositor
 import 'package:easysubway_mobile/features/train_search/domain/train_search_models.dart';
 import 'package:easysubway_mobile/main.dart' as app;
 import 'package:easysubway_mobile/route_search.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('빈 공지 일러스트 CC Attribution을 라이선스 화면에 등록한다', () async {
+    app.registerBundledAssetLicenses();
+
+    final entry = await LicenseRegistry.licenses.firstWhere(
+      (entry) => entry.packages.contains('empty-notices-illustration'),
+    );
+    final text = entry.paragraphs.map((paragraph) => paragraph.text).join('\n');
+
+    expect(text, contains('Anton Kalashnyk'));
+    expect(text, contains('Customer Relation Vectors With Faces'));
+    expect(
+      text,
+      contains(
+        'https://www.svgrepo.com/collection/customer-relation-vectors-with-faces/',
+      ),
+    );
+    expect(
+      text,
+      contains('https://www.svgrepo.com/page/licensing/#CC%20Attribution'),
+    );
+  });
+
   test(
     '광고 repository 주입 identity를 유지하고 기본값은 fetch 전 base URI를 읽지 않는다',
     () async {

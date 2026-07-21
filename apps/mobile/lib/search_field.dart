@@ -132,7 +132,7 @@ class EasySubwaySearchField extends StatelessWidget {
             key: const Key('heroStationSearchInputBox'),
             height: visualBoxHeight,
             decoration: BoxDecoration(
-              color: EasySubwayAccessibleColors.surface,
+              color: EasySubwayAccessibleColors.searchFieldSurface,
               border: Border.all(
                 color: EasySubwayAccessibleColors.line,
                 width: easySubwaySearchFieldBorderWidth,

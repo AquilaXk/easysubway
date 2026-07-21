@@ -292,7 +292,11 @@ void main() {
 
     await tester.tap(find.byKey(const Key('networkMapMenuButton')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('networkMapMenuNearbyButton')));
+    await tester.tap(
+      find.byKey(const Key('networkMapMenuStationSearchButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
     await tester.pumpAndSettle();
 
     expect(find.text('현재 위치를 확인하지 못했어요.'), findsOneWidget);
@@ -330,7 +334,11 @@ void main() {
 
     await tester.tap(find.byKey(const Key('networkMapMenuButton')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('networkMapMenuNearbyButton')));
+    await tester.tap(
+      find.byKey(const Key('networkMapMenuStationSearchButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);

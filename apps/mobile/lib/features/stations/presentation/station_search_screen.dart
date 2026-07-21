@@ -182,37 +182,12 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       onSubmitted: _submit,
       onClear: _queryController.clear,
     );
-    // 공용 필드는 56 터치타겟 안에 46px 시각 박스를 배치하고, 그 안 단일 줄
-    // TextField가 입력 텍스트(fontSize 17)를 세로 contentPadding으로 감싼다. AppBar
-    // 기본 toolbarHeight(56)에 그대로 넣으면 시스템 글자 크기를 키웠을 때 필드가
-    // 세로로 잘리므로 필드 실제 렌더 높이에 맞춰 툴바를 키운다. 축소는 하지 않아
-    // 기본 배율의 레이아웃은 불변이고, titleSpacing·즉시 입력·뒤로가기 leading
-    // 동작은 유지된다.
-    final textScaler = MediaQuery.textScalerOf(context);
-    // #2090: 공용 필드(EasySubwaySearchField)는 배율에 비례해 바깥 터치타겟(56),
-    // 시각 박스(46), 입력 필드(48)를 함께 키운다. 필드가 실제로 차지하는 세로
-    // 높이는 이 셋의 최댓값이며 항상 터치타겟(56*배율)이 지배한다. 이전
-    // 보정 상수(scale(17*1.2)+30)는 새 필드 메트릭을 과소평가해 확대 시 필드가
-    // 툴바 아래로 잘렸으므로, 공용 위젯이 쓰는 것과 동일한 상수·산식으로 필드
-    // 높이를 재도출해 정합한다.
+    final scaler = MediaQuery.textScalerOf(context);
     final scaledFieldHeight = math.max(
-      math.max(
-        EasySubwayTouchTarget.general,
-        textScaler.scale(EasySubwayTouchTarget.general),
-      ),
-      math.max(
-        easySubwaySearchFieldVisualHeight,
-        textScaler.scale(easySubwaySearchFieldVisualHeight),
-      ),
+      EasySubwayTouchTarget.general,
+      scaler.scale(EasySubwayTouchTarget.general),
     );
-    // #2082: title Row를 홈 search row와 동일하게 상하 6px 패딩으로 감싸므로,
-    // 툴바 높이도 그만큼(12) 키워 필드가 잘리지 않게 한다(홈 상단바 60 = 필드
-    // 46/터치타겟 대비 여백과 같은 원리).
-    const stationSearchToolbarVerticalPadding = 12.0;
-    final toolbarHeight = math.max(
-      kToolbarHeight,
-      scaledFieldHeight + stationSearchToolbarVerticalPadding,
-    );
+    final toolbarHeight = math.max(kToolbarHeight, scaledFieldHeight + 12);
     final recentSearchSection = AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
@@ -242,33 +217,25 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
             final isSearching =
                 _controller.state.status == StationSearchStatus.loading;
             final isNearbyDisabled = isSearching || _isNearbySearchRunning;
-            if (showNearbyRetryButton) {
-              return TextButton.icon(
-                key: const Key('nearbyStationSearchButton'),
-                style: TextButton.styleFrom(
-                  foregroundColor: EasySubwayAccessibleColors.text,
-                  alignment: Alignment.centerLeft,
-                  minimumSize: const Size.fromHeight(56),
-                ),
-                onPressed: isNearbyDisabled ? null : _searchNearby,
-                icon: const Icon(Icons.my_location),
-                label: const Text('내 주변 역 다시 찾기'),
-              );
-            }
             if (_hasSearchQuery) {
               // 즉시(디바운스) 검색으로 통일했으므로 별도 검색 버튼을 두지 않는다.
               return const SizedBox.shrink();
             }
-            return TextButton.icon(
+            return FilledButton.icon(
               key: const Key('nearbyStationSearchButton'),
-              style: TextButton.styleFrom(
-                foregroundColor: EasySubwayAccessibleColors.text,
-                alignment: Alignment.centerLeft,
-                minimumSize: const Size.fromHeight(56),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(
+                  EasySubwayTouchTarget.primary,
+                ),
+                backgroundColor: EasySubwayAccessibleColors.brandSignature,
+                foregroundColor: Colors.white,
+                textStyle: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
               ),
               onPressed: isNearbyDisabled ? null : _searchNearby,
               icon: const Icon(Icons.my_location),
-              label: const Text('내 주변 역 찾기'),
+              label: Text(showNearbyRetryButton ? '내 주변 역 다시 찾기' : '내 주변 역 찾기'),
             );
           },
         ),
@@ -297,30 +264,15 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       },
     );
     return Scaffold(
-      // 큰 타이틀 화면(예: "역 검색")을 없애고 입력 필드 자체가 헤더가 된다. 열리는
-      // 즉시 입력 모드로 들어가 탭 두 번을 요구하던 랜딩 단계를 지운다. 뒤로가기는
-      // AppBar 기본 leading을 그대로 쓴다(자동 back 버튼 → 입력 필드 순서 유지).
+      key: const Key('stationSearchScreen'),
+      backgroundColor: EasySubwayAccessibleColors.surface,
       appBar: AppBar(
+        key: const Key('stationSearchAppBar'),
         titleSpacing: 0,
         toolbarHeight: toolbarHeight,
-        // #2082: 검색 화면 상단바를 홈 idle 상단바 [≡ | 검색필드 | 지역표시]와
-        // 픽셀 단위로 정합한다. AppBar 기본 leading/titleSpacing 대신 홈의 search
-        // row 구조(Padding.fromLTRB(10,6,10,6) 안 Row[뒤로 56, SB 4, Expanded 필드,
-        // SB 8, 지역표시])를 그대로 재현해, ← 버튼이 홈의 ≡ 슬롯과 같은 x를 차지하고
-        // 필드의 좌우 시작·끝 x가 홈 idle 필드와 일치하며, 지역 표시가 필드 우측에
-        // 홈과 같은 위치·스타일로 온다. 뒤로가기 아이콘·색·탭타깃도 홈 ≡ 버튼과
-        // 동일 규격이다. 지역 표시는 홈 지역 선택기 스타일이되 검색 맥락에선 표시
-        // 전용이다(오너 지시: "변경은 못해도 알려는 줘야").
-        //
-        // automaticallyImplyLeading: false + 커스텀 IconButton(아래)을 쓰는 이유:
-        // ① 이 앱은 한국어 한정 서비스라(오너 결정) 자동 BackButton이 제공하는
-        // MaterialLocalizations 지역화 툴팁("Back" 등)이 불필요하고, 커스텀
-        // IconButton으로 한글 tooltip('뒤로')을 직접 지정하는 편이 맥락에 맞는다.
-        // ② 자동 BackButton은 크기·패딩이 Material 기본 규격을 따라 위 홈 ≡ 슬롯
-        // (56 정사각 탭타깃)과 폭이 정합되지 않는다. 여기서는 minimumSize·
-        // tapTargetSize·padding을 홈 ≡ 버튼과 동일 규격으로 명시 통제해야 위 주석의
-        // 픽셀 정합이 성립한다. "코드 정리" 목적으로 automaticallyImplyLeading을
-        // true로 되돌리거나 IconButton을 BackButton으로 바꾸면 이 폭 정합이 깨진다.
+        backgroundColor: EasySubwayAccessibleColors.topBarSurface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
         automaticallyImplyLeading: false,
         title: Padding(
           padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
@@ -335,17 +287,19 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   padding: EdgeInsets.zero,
                 ),
-                icon: const Icon(
-                  Icons.arrow_back,
-                  size: 26,
-                  color: Color(0xFF4B4B4B),
-                ),
+                icon: const Icon(Icons.arrow_back, size: 26),
               ),
               const SizedBox(width: 4),
               Expanded(child: searchInputField),
               const SizedBox(width: 8),
               _StationSearchRegionIndicator(regionLabel: widget.regionLabel),
             ],
+          ),
+        ),
+        flexibleSpace: const Align(
+          alignment: Alignment.bottomCenter,
+          child: EasySubwayHeaderDivider(
+            key: Key('stationSearchHeaderDivider'),
           ),
         ),
       ),
