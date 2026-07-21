@@ -87,11 +87,9 @@ void main() {
     semanticsHandle.dispose();
   });
 
-  testWidgets('시작 화면 타이틀은 "갈 수 있는 길"까지만 브랜드 색이고 조사 "을"·1·3행은 잉크 토큰이다', (
-    tester,
-  ) async {
+  testWidgets('시작 화면 타이틀은 "갈 수 있는 길"만 브랜드 색이고 나머지는 보조 텍스트 색이다', (tester) async {
     // #2089(오너 실기기 검수): 강조는 2행 중 "갈 수 있는 길"까지로 고정하고
-    // 조사 "을"은 잉크로 남긴다. Text.rich 전환 후에도 스크린리더가 읽는 전체
+    // 나머지 문구는 보조 텍스트 색으로 낮춘다. Text.rich 전환 후에도 스크린리더가 읽는 전체
     // 문자열은 그대로 유지되고, span별 색만 브랜드/잉크로 갈린다.
     await tester.pumpWidget(MaterialApp(home: StartScreen(onStart: () {})));
 
@@ -115,8 +113,8 @@ void main() {
     expect(children[2].text, '을\n안내합니다');
     expect(children[2].style?.color, isNull);
 
-    // 루트 스타일은 기존 잉크 토큰을 유지한다.
-    expect(titleWidget.style?.color, EasySubwayAccessibleColors.text);
+    // 루트 스타일을 한 단계 낮춰 브랜드 색 강조가 먼저 읽히게 한다.
+    expect(titleWidget.style?.color, EasySubwayAccessibleColors.secondaryText);
   });
 
   testWidgets('시작 화면 CTA는 시그니처 브랜드 색 채움 + 흰 글자 + 키운 라벨이다', (tester) async {
@@ -245,13 +243,14 @@ void main() {
         ),
       );
 
-      expect(find.text('쉬운 지하철'), findsOneWidget);
+      expect(find.text('쉬운 지하철'), findsNothing);
+      expect(find.byType(AppBar), findsNothing);
       expect(find.text('어떻게 걸으세요?'), findsOneWidget);
       expect(find.text('보통 걸음'), findsOneWidget);
       expect(find.text('휠체어 이용'), findsOneWidget);
       // #1703: 온보딩 step0은 표시명과 부가설명을 함께 노출한다.
       expect(
-        find.text('엘리베이터로만 이동하는 길을 안내해요 · 유아차와 함께일 때도 좋아요'),
+        find.text('엘리베이터로만 이동하는 길을 안내해요.\n유모차와 함께일 때도 좋아요.'),
         findsOneWidget,
       );
 
@@ -261,11 +260,26 @@ void main() {
       );
       expect(doneButton.onPressed, isNotNull);
       expect(find.text('이대로 시작'), findsOneWidget);
+      expect(
+        doneButton.style?.backgroundColor?.resolve(<WidgetState>{}),
+        EasySubwayAccessibleColors.brandSignature,
+      );
+      expect(
+        doneButton.style?.foregroundColor?.resolve(<WidgetState>{}),
+        EasySubwayAccessibleColors.surface,
+      );
+      final doneButtonTextStyle = doneButton.style?.textStyle?.resolve(
+        <WidgetState>{},
+      );
+      expect(doneButtonTextStyle?.fontSize, 22);
+      expect(doneButtonTextStyle?.fontWeight, FontWeight.w700);
 
       await tester.tap(find.byKey(const Key('mobilityPresetRow-stepFree')));
       await tester.pumpAndSettle();
       expect(
-        find.bySemanticsLabel('휠체어 이용, 엘리베이터로만 이동하는 길을 안내해요 · 유아차와 함께일 때도 좋아요'),
+        find.bySemanticsLabel(
+          '휠체어 이용, 엘리베이터로만 이동하는 길을 안내해요.\n유모차와 함께일 때도 좋아요.',
+        ),
         findsOneWidget,
       );
 
@@ -371,6 +385,176 @@ void main() {
         EasySubwayAccessibleColors.mutedText,
       ),
     );
+  });
+
+  testWidgets('온보딩 단계 점은 활성 10px 비활성 8px 간격 8px로 표시한다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(home: OnboardingScreen(onCompleted: (_) {})),
+    );
+
+    Finder dotWithColor(Color color) => find.byWidgetPredicate((widget) {
+      final decoration = widget is DecoratedBox ? widget.decoration : null;
+      return decoration is BoxDecoration &&
+          decoration.shape == BoxShape.circle &&
+          decoration.color == color;
+    });
+
+    final activeDot = dotWithColor(EasySubwayAccessibleColors.primary);
+    final inactiveDot = dotWithColor(EasySubwayAccessibleColors.line);
+
+    expect(tester.getSize(activeDot), const Size.square(10));
+    expect(tester.getSize(inactiveDot), const Size.square(8));
+    expect(
+      tester.getTopLeft(inactiveDot).dx - tester.getTopLeft(activeDot).dx,
+      18,
+    );
+
+    await tester.tap(find.byKey(const Key('onboardingDoneButton')));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.getTopLeft(activeDot).dx,
+      greaterThan(tester.getTopLeft(inactiveDot).dx),
+    );
+    expect(tester.getSize(activeDot), const Size.square(10));
+    expect(tester.getSize(inactiveDot), const Size.square(8));
+  });
+
+  testWidgets('권한 화면은 첫 화면과 같은 본문 위치와 CTA 스타일을 쓴다', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(home: OnboardingScreen(onCompleted: (_) {})),
+    );
+    final firstTitleTop = tester.getTopLeft(find.text('어떻게 걸으세요?')).dy;
+
+    await tester.tap(find.byKey(const Key('onboardingDoneButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AppBar), findsNothing);
+    expect(find.byTooltip('이전 단계'), findsOneWidget);
+    expect(tester.getTopLeft(find.text('가까운 역을 바로 찾아줘요.')).dy, firstTitleTop);
+
+    final allowButton = tester.widget<FilledButton>(
+      find.byKey(const Key('onboardingPermissionAllowButton')),
+    );
+    expect(
+      allowButton.style?.backgroundColor?.resolve(<WidgetState>{}),
+      EasySubwayAccessibleColors.brandSignature,
+    );
+    final allowTextStyle = allowButton.style?.textStyle?.resolve(
+      <WidgetState>{},
+    );
+    expect(allowTextStyle?.fontSize, 22);
+    expect(allowTextStyle?.fontWeight, FontWeight.w700);
+
+    final skipButton = tester.widget<TextButton>(
+      find.byKey(const Key('onboardingPermissionSkipButton')),
+    );
+    expect(skipButton.style?.minimumSize?.resolve(<WidgetState>{})?.height, 48);
+    final skipTextStyle = skipButton.style?.textStyle?.resolve(<WidgetState>{});
+    expect(skipTextStyle?.fontSize, 18);
+    expect(skipTextStyle?.fontWeight, FontWeight.w700);
+
+    final locationSwitch = tester.widget<Switch>(find.byType(Switch));
+    expect(
+      locationSwitch.activeTrackColor,
+      EasySubwayAccessibleColors.brandSignature,
+    );
+  });
+
+  testWidgets('권한 화면 이전 버튼은 큰 글자 스크롤 위에서 불투명 표면을 유지한다', (tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+        child: MaterialApp(home: OnboardingScreen(onCompleted: (_) {})),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('onboardingDoneButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SingleChildScrollView), findsOneWidget);
+    final backButton = tester.widget<IconButton>(
+      find.byKey(const Key('onboardingBackButton')),
+    );
+    expect(
+      backButton.style?.backgroundColor?.resolve(<WidgetState>{}),
+      EasySubwayAccessibleColors.surface,
+    );
+    expect(
+      backButton.style?.minimumSize?.resolve(<WidgetState>{}),
+      const Size.square(EasySubwayTouchTarget.general),
+    );
+  });
+
+  testWidgets('온보딩 프로필 묶음은 아래로 내리고 선택 상태를 은은한 보라색 원으로 표시한다', (tester) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(home: OnboardingScreen(onCompleted: (_) {})),
+    );
+
+    final list = tester.widget<ListView>(find.byType(ListView));
+    expect(
+      list.padding?.resolve(TextDirection.ltr).top,
+      EasySubwaySpacing.xxl * 2,
+    );
+    expect(find.byIcon(Icons.check), findsNothing);
+    expect(tester.getSize(find.text('일반적인 걸음 속도로 안내해요.')).height, lessThan(30));
+
+    final selectedIndicator = tester.widget<Container>(
+      find.byKey(const Key('mobilityPresetRadio-standard')),
+    );
+    final selectedDecoration = selectedIndicator.decoration! as BoxDecoration;
+    expect(
+      selectedDecoration.color,
+      EasySubwayAccessibleColors.brandSignature.withValues(alpha: 0.12),
+    );
+    expect(
+      (selectedDecoration.border! as Border).top.color,
+      EasySubwayAccessibleColors.brandSignature,
+    );
+    final selectedCheck = tester.widget<CustomPaint>(
+      find.byKey(const Key('mobilityPresetCheck-standard')),
+    );
+    expect(selectedCheck.size, const Size.square(12));
+    expect(selectedCheck.painter, isNotNull);
+
+    final unselectedIndicator = tester.widget<Container>(
+      find.byKey(const Key('mobilityPresetRadio-slow')),
+    );
+    final unselectedDecoration =
+        unselectedIndicator.decoration! as BoxDecoration;
+    expect(unselectedDecoration.color, Colors.transparent);
+    expect(
+      (unselectedDecoration.border! as Border).top.color,
+      EasySubwayAccessibleColors.mutedText,
+    );
+
+    await tester.tap(find.byKey(const Key('mobilityPresetRow-slow')));
+    await tester.pump();
+
+    final newlySelectedIndicator = tester.widget<Container>(
+      find.byKey(const Key('mobilityPresetRadio-slow')),
+    );
+    final newlySelectedDecoration =
+        newlySelectedIndicator.decoration! as BoxDecoration;
+    expect(
+      newlySelectedDecoration.color,
+      EasySubwayAccessibleColors.brandSignature.withValues(alpha: 0.12),
+    );
+    expect(find.byKey(const Key('mobilityPresetCheck-slow')), findsOneWidget);
   });
 
   testWidgets('온보딩 권한 단계는 나중에 설정을 누르면 권한 요청 없이 완료한다', (tester) async {
@@ -558,7 +742,11 @@ void main() {
   });
 
   testWidgets('온보딩 단계별로 하단 CTA 고정과 스크롤 여백을 확보한다', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1;
     tester.view.viewPadding = const FakeViewPadding(bottom: 34);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetViewPadding);
 
     await tester.pumpWidget(
@@ -567,6 +755,16 @@ void main() {
 
     final firstStepList = tester.widget<ListView>(find.byType(ListView));
     expect(firstStepList.padding?.resolve(TextDirection.ltr).bottom, 104);
+
+    final doneButtonRect = tester.getRect(
+      find.byKey(const Key('onboardingDoneButton')),
+    );
+    expect(doneButtonRect.left, EasySubwaySpacing.xl);
+    expect(1080 - doneButtonRect.right, EasySubwaySpacing.xl);
+    expect(
+      2400 - doneButtonRect.bottom,
+      closeTo(34 + EasySubwaySpacing.xxl * 2, 0.5),
+    );
 
     await tester.tap(find.byKey(const Key('mobilityPresetRow-slow')));
     await tester.pumpAndSettle();
@@ -586,7 +784,7 @@ void main() {
       findsOneWidget,
     );
 
-    // 하단 인셋은 SafeArea가 적용하므로 패딩은 토큰(xxl)만 쓴다.
+    // 하단 인셋은 SafeArea가 적용하므로 첫 화면과 같은 64px 여백만 둔다.
     final scrollPadding = tester.widget<Padding>(
       find
           .descendant(
@@ -597,7 +795,7 @@ void main() {
     );
     expect(
       scrollPadding.padding.resolve(TextDirection.ltr).bottom,
-      moreOrLessEquals(EasySubwaySpacing.xxl),
+      moreOrLessEquals(EasySubwaySpacing.xxl * 2),
     );
   });
 

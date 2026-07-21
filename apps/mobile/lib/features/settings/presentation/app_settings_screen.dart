@@ -8,7 +8,7 @@ import '../../../onboarding.dart';
 import '../../mobility_profile/mobility_preset_labels.dart';
 import '../../mobility_profile/mobility_profile_policy.dart';
 
-const _settingsPagePadding = EdgeInsets.fromLTRB(20, 16, 20, 32);
+const _settingsPagePadding = EdgeInsets.only(bottom: 32);
 
 class AppSettingsScreen extends StatefulWidget {
   const AppSettingsScreen({
@@ -59,7 +59,19 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
       preferences: _viewPreferences,
       child: Scaffold(
         key: const Key('settingsScreen'),
-        appBar: AppBar(title: const Text('더보기')),
+        backgroundColor: EasySubwayAccessibleColors.surface,
+        appBar: AppBar(
+          key: const Key('settingsAppBar'),
+          title: const Text('설정'),
+          toolbarHeight: 60,
+          backgroundColor: EasySubwayAccessibleColors.topBarSurface,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          flexibleSpace: const Align(
+            alignment: Alignment.bottomCenter,
+            child: EasySubwayHeaderDivider(key: Key('settingsHeaderDivider')),
+          ),
+        ),
         bottomNavigationBar: widget.bottomNavigationBar,
         body: SafeArea(
           child: ListView(
@@ -71,7 +83,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                 children: [
                   _AppSettingsActionTile(
                     key: const Key('mobilityProfileButton'),
-                    icon: Icons.directions_walk,
                     title: mobilityPresetDisplayName(_preset),
                     subtitle: mobilityPresetDescription(_preset),
                     onTap: () async {
@@ -92,7 +103,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                 children: [
                   _AppSettingsPreferenceTile(
                     key: const Key('simpleViewSettingsButton'),
-                    icon: Icons.visibility_outlined,
                     title: '간편 보기',
                     subtitle: '필수 행동과 상태 안내를 먼저 보여줘요',
                     enabled: _viewPreferences.simpleViewEnabled,
@@ -104,7 +114,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                   ),
                   _AppSettingsPreferenceTile(
                     key: const Key('highContrastSettingsButton'),
-                    icon: Icons.contrast,
                     title: '고대비',
                     subtitle: '버튼과 상태 문구의 대비를 더 강하게 보여줘요',
                     enabled: _viewPreferences.highContrastEnabled,
@@ -125,7 +134,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                   children: [
                     _AppSettingsActionTile(
                       key: const Key('notificationSettingsButton'),
-                      icon: Icons.notifications_active_outlined,
                       title: '알림 설정',
                       onTap: () {
                         Navigator.of(context).push(
@@ -147,7 +155,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                 children: [
                   _AppSettingsActionTile(
                     key: const Key('myReportsSettingsButton'),
-                    icon: Icons.receipt_long_outlined,
                     title: '내 제보',
                     onTap: widget.onOpenMyReports,
                   ),
@@ -159,13 +166,11 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                 children: [
                   _AppSettingsActionTile(
                     key: const Key('settingsServiceInfoButton'),
-                    icon: Icons.info_outline,
                     title: '서비스 정보',
                     onTap: widget.onOpenServiceInfo,
                   ),
                   _AppSettingsActionTile(
                     key: const Key('settingsSupportPrivacyButton'),
-                    icon: Icons.help_outline,
                     title: '도움말·문의',
                     onTap: widget.onOpenSupportAccess,
                   ),
@@ -221,40 +226,54 @@ class _AppSettingsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Semantics(
-            header: true,
-            child: Text(
-              title,
-              style: textTheme.titleMedium?.copyWith(
-                color: EasySubwayAccessibleColors.text,
-                fontWeight: FontWeight.w700,
-                height: 1.25,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ColoredBox(
+          key: Key('settingsSectionHeader-$title'),
+          color: EasySubwayAccessibleColors.scaffoldSurface,
+          child: SizedBox(
+            width: double.infinity,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+              child: Semantics(
+                header: true,
+                child: Text(
+                  title,
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: EasySubwayAccessibleColors.secondaryText,
+                    fontWeight: FontWeight.w700,
+                    height: 1.25,
+                  ),
+                ),
               ),
             ),
           ),
-          const SizedBox(height: 8),
-          ...children,
+        ),
+        for (var index = 0; index < children.length; index++) ...[
+          children[index],
+          if (index < children.length - 1)
+            const Divider(
+              height: 1,
+              thickness: 1,
+              indent: 20,
+              endIndent: 20,
+              color: EasySubwayAccessibleColors.line,
+            ),
         ],
-      ),
+      ],
     );
   }
 }
 
 class _AppSettingsActionTile extends StatelessWidget {
   const _AppSettingsActionTile({
-    required this.icon,
     required this.title,
     this.subtitle,
     required this.onTap,
     super.key,
   });
 
-  final IconData icon;
   final String title;
   // 제목만으로 자명한 행은 회색 부가설명을 생략한다(#1570).
   final String? subtitle;
@@ -271,8 +290,8 @@ class _AppSettingsActionTile extends StatelessWidget {
         child: ListTile(
           onTap: onTap,
           minVerticalPadding: 12,
-          minLeadingWidth: 32,
-          leading: Icon(icon, color: EasySubwayAccessibleColors.primary),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+          tileColor: EasySubwayAccessibleColors.surface,
           title: Text(
             title,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -290,11 +309,9 @@ class _AppSettingsActionTile extends StatelessWidget {
                     height: 1.3,
                   ),
                 ),
-          trailing: const Icon(Icons.chevron_right),
-          shape: Border(
-            bottom: BorderSide(
-              color: Theme.of(context).colorScheme.outlineVariant,
-            ),
+          trailing: const Icon(
+            Icons.chevron_right,
+            color: EasySubwayAccessibleColors.disclosure,
           ),
         ),
       ),
@@ -304,7 +321,6 @@ class _AppSettingsActionTile extends StatelessWidget {
 
 class _AppSettingsPreferenceTile extends StatelessWidget {
   const _AppSettingsPreferenceTile({
-    required this.icon,
     required this.title,
     required this.subtitle,
     required this.enabled,
@@ -312,7 +328,6 @@ class _AppSettingsPreferenceTile extends StatelessWidget {
     super.key,
   });
 
-  final IconData icon;
   final String title;
   final String subtitle;
   final bool enabled;
@@ -330,8 +345,8 @@ class _AppSettingsPreferenceTile extends StatelessWidget {
         child: ListTile(
           onTap: () => onChanged(!enabled),
           minVerticalPadding: 12,
-          minLeadingWidth: 32,
-          leading: Icon(icon, color: EasySubwayAccessibleColors.primary),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+          tileColor: EasySubwayAccessibleColors.surface,
           title: Text(
             title,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -369,11 +384,6 @@ class _AppSettingsPreferenceTile extends StatelessWidget {
                 materialTapTargetSize: MaterialTapTargetSize.padded,
               ),
             ],
-          ),
-          shape: Border(
-            bottom: BorderSide(
-              color: Theme.of(context).colorScheme.outlineVariant,
-            ),
           ),
         ),
       ),

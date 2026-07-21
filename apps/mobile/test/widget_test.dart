@@ -354,6 +354,20 @@ Future<void> _openStationSearchScreenViaMenu(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> _openNearbyStationSearchScreen(
+  WidgetTester tester, {
+  bool settleAfterTap = true,
+}) async {
+  await _openStationSearchScreenViaMenu(tester);
+  await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
+  if (settleAfterTap) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+  }
+}
+
 Future<void> _openSettingsScreen(WidgetTester tester) async {
   final homeContext = tester.element(find.byType(HomeScreen));
   final home = tester.widget<HomeScreen>(find.byType(HomeScreen));
@@ -768,6 +782,10 @@ void main() {
 
     expect(reportedErrors, isEmpty);
     expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
+    final networkMapTopBar = tester.widget<Material>(
+      find.byKey(const Key('networkMapTopBar')),
+    );
+    expect(networkMapTopBar.color, EasySubwayAccessibleColors.topBarSurface);
     expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
     expect(find.byKey(const Key('networkMapMenuButton')), findsOneWidget);
     expect(find.byKey(const Key('routeSearchButton')), findsNothing);
@@ -828,6 +846,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
+    final networkMapScaffold = tester.widget<Scaffold>(
+      find.byKey(const Key('networkMapScreen')),
+    );
+    expect(
+      networkMapScaffold.backgroundColor,
+      EasySubwayAccessibleColors.surface,
+    );
     expect(find.byKey(const Key('networkMapSurface')), findsOneWidget);
     expect(find.byKey(const Key('homeBottomNavigationBar')), findsNothing);
     expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
@@ -906,7 +931,7 @@ void main() {
     expect(onboardingStore.savedResult, isNull);
     // 저장 실패 시 홈으로 넘어가지 않고 온보딩(권한 단계)에 머문다.
     expect(find.byType(HomeScreen), findsNothing);
-    expect(find.text('위치는 나중에도 켤 수 있어요'), findsOneWidget);
+    expect(find.text('가까운 역을 바로 찾아줘요.'), findsOneWidget);
     expect(find.text('설정을 저장하지 못했어요. 다시 시도해 주세요.'), findsOneWidget);
   });
 
@@ -956,7 +981,7 @@ void main() {
     // 2단계: 권한 — 조건 확인 화면과 옛 CTA는 없다. 알림 provider 미주입이라
     // 알림 요청은 숨고 위치만 남는다(#1579).
     expect(find.text('적용할 조건을 확인하세요'), findsNothing);
-    expect(find.text('위치는 나중에도 켤 수 있어요'), findsOneWidget);
+    expect(find.text('가까운 역을 바로 찾아줘요.'), findsOneWidget);
     expect(find.text('시작하기'), findsOneWidget);
     expect(find.text('선택한 기능 설정하고 시작'), findsNothing);
     expect(find.text('나중에 설정'), findsOneWidget);
@@ -1068,6 +1093,78 @@ void main() {
     } finally {
       semanticsHandle.dispose();
     }
+  });
+
+  testWidgets('노선도 메뉴는 256px 폭과 구분선 중심의 간결한 항목을 쓴다', (tester) async {
+    await tester.pumpWidget(
+      buildEasySubwayTestApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        noticeRepository: _FakeNoticeRepository(
+          const ActiveNoticesResult(notices: [], stale: false),
+        ),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
+    await tester.pumpAndSettle();
+
+    final panel = find.byKey(const Key('networkMapMenuPanel'));
+    expect(tester.getSize(panel).width, 256);
+    expect(find.byKey(const Key('networkMapMenuAppIcon')), findsOneWidget);
+    expect(
+      tester.getSize(find.byKey(const Key('networkMapMenuAppIcon'))),
+      const Size.square(44),
+    );
+    expect(
+      tester
+          .widget<Image>(find.byKey(const Key('networkMapMenuAppIcon')))
+          .excludeFromSemantics,
+      isTrue,
+    );
+    expect(find.byKey(const Key('networkMapMenuNearbyButton')), findsNothing);
+    expect(find.text('탐색'), findsNothing);
+    expect(find.text('내 정보'), findsNothing);
+    expect(find.text('안내'), findsNothing);
+    expect(find.text('공지사항'), findsOneWidget);
+    expect(
+      tester.getSize(find.byKey(const Key('networkMapMenuHeader'))).height,
+      60,
+    );
+
+    final topBarDivider = tester.widget<SizedBox>(
+      find.byKey(const Key('networkMapTopBarDivider')),
+    );
+    final topBarDecoration =
+        (topBarDivider.child! as DecoratedBox).decoration as BoxDecoration;
+    expect(topBarDecoration.color, const Color(0xFFCBD6DD));
+    expect(topBarDecoration.boxShadow, const <BoxShadow>[
+      BoxShadow(color: Color(0x0D000000), offset: Offset(0, 1), blurRadius: 2),
+    ]);
+
+    final menuHeaderDivider = tester.widget<SizedBox>(
+      find.byKey(const Key('networkMapMenuHeaderDivider')),
+    );
+    final menuHeaderDecoration =
+        (menuHeaderDivider.child! as DecoratedBox).decoration as BoxDecoration;
+    expect(menuHeaderDecoration, topBarDecoration);
+
+    final internalDividers = tester.widgetList<Divider>(
+      find.descendant(of: panel, matching: find.byType(Divider)),
+    );
+    expect(internalDividers, hasLength(2));
+    expect(
+      internalDividers.map((divider) => divider.color),
+      everyElement(EasySubwayAccessibleColors.line),
+    );
+    expect(
+      find.descendant(of: panel, matching: find.byType(Divider)),
+      findsNWidgets(2),
+    );
   });
 
   testWidgets('노선도 첫 화면은 태블릿 landscape에서도 지도와 overlay를 유지한다', (tester) async {
@@ -1256,6 +1353,10 @@ void main() {
   });
 
   testWidgets('홈 검색바는 idle에서 active로 전환돼도 시각 박스 높이가 그대로 유지된다', (tester) async {
+    expect(
+      EasySubwayAccessibleColors.searchFieldSurface,
+      const Color(0xFFF6F8F9),
+    );
     await tester.pumpWidget(
       buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
@@ -1271,6 +1372,17 @@ void main() {
     final idleHeight = tester
         .getSize(find.byKey(const Key('heroStationSearchButton')))
         .height;
+    final idleSearchDecoration =
+        tester
+                .widget<Container>(
+                  find.byKey(const Key('heroStationSearchButton')),
+                )
+                .decoration
+            as BoxDecoration;
+    expect(
+      idleSearchDecoration.color,
+      EasySubwayAccessibleColors.searchFieldSurface,
+    );
 
     await tester.tap(find.byKey(const Key('stationSearchButton')));
     await tester.pumpAndSettle();
@@ -1278,9 +1390,20 @@ void main() {
     final activeHeight = tester
         .getSize(find.byKey(const Key('heroStationSearchInputBox')))
         .height;
+    final activeSearchDecoration =
+        tester
+                .widget<Container>(
+                  find.byKey(const Key('heroStationSearchInputBox')),
+                )
+                .decoration
+            as BoxDecoration;
 
     expect(idleHeight, 46.0);
     expect(activeHeight, 46.0);
+    expect(
+      activeSearchDecoration.color,
+      EasySubwayAccessibleColors.searchFieldSurface,
+    );
     expect(find.text('역 이름을 입력해 주세요'), findsOneWidget);
 
     // hint는 부유 라벨이 아니라 박스 내부에 렌더돼야 한다(idle의 '지하철역 검색'
@@ -2747,7 +2870,7 @@ void main() {
     expect(find.byKey(const Key('newNotificationBar')), findsOneWidget);
     expect(find.text('새로운 알림이 있어요'), findsOneWidget);
 
-    // ② 좌측 메뉴 "운행 공지" 진입점 → 목록 화면.
+    // ② 좌측 메뉴 "공지사항" 진입점 → 목록 화면.
     await tester.tap(find.byKey(const Key('networkMapMenuButton')));
     await tester.pumpAndSettle();
     expect(
@@ -2759,7 +2882,7 @@ void main() {
       find.byKey(const Key('networkMapMenuServiceNoticesButton')),
     );
     await tester.pumpAndSettle();
-    expect(find.text('운행 공지'), findsOneWidget); // 목록 화면 AppBar 제목.
+    expect(find.text('공지사항'), findsOneWidget); // 목록 화면 AppBar 제목.
     expect(find.text('상행 지연이 이어지고 있어요.'), findsOneWidget);
   });
 
@@ -5715,7 +5838,6 @@ void main() {
       await _openSettingsScreen(tester);
 
       expect(find.text(mobilityPresetDisplayName(preset)), findsWidgets);
-      expect(find.byIcon(Icons.directions_walk), findsOneWidget);
     }
   });
 
@@ -5961,9 +6083,43 @@ void main() {
       }
 
       expect(
-        find.descendant(of: find.byType(AppBar), matching: find.text('더보기')),
+        find.descendant(of: find.byType(AppBar), matching: find.text('설정')),
         findsOneWidget,
       );
+      expect(find.text('더보기'), findsNothing);
+      final settingsAppBar = tester.widget<AppBar>(
+        find.byKey(const Key('settingsAppBar')),
+      );
+      expect(settingsAppBar.toolbarHeight, 60);
+      expect(
+        settingsAppBar.backgroundColor,
+        EasySubwayAccessibleColors.topBarSurface,
+      );
+      expect(find.byKey(const Key('settingsHeaderDivider')), findsOneWidget);
+      final readingHeader = tester.widget<ColoredBox>(
+        find.byKey(const Key('settingsSectionHeader-화면 및 접근성')),
+      );
+      expect(readingHeader.color, EasySubwayAccessibleColors.scaffoldSurface);
+      final settingsSectionDividers = tester.widgetList<Divider>(
+        find.descendant(
+          of: find.byKey(const Key('settingsScreen')),
+          matching: find.byType(Divider),
+        ),
+      );
+      final contentDividers = settingsSectionDividers
+          .where((divider) => divider.color == EasySubwayAccessibleColors.line)
+          .toList();
+      expect(contentDividers, hasLength(2));
+      expect(
+        contentDividers,
+        everyElement(predicate<Divider>((divider) => divider.key == null)),
+      );
+      expect(find.byIcon(Icons.directions_walk), findsNothing);
+      expect(find.byIcon(Icons.visibility_outlined), findsNothing);
+      expect(find.byIcon(Icons.contrast), findsNothing);
+      expect(find.byIcon(Icons.receipt_long_outlined), findsNothing);
+      expect(find.byIcon(Icons.info_outline), findsNothing);
+      expect(find.byIcon(Icons.help_outline), findsNothing);
       expect(find.text('화면·접근성 설정'), findsNothing);
       expect(find.text('이동 조건'), findsOneWidget);
       expect(find.text('화면 및 접근성'), findsOneWidget);
@@ -5971,18 +6127,46 @@ void main() {
       // '저장된 안내'(인터넷 없이 이용·데이터 출처) 섹션은 제거됐다(#1570).
       expect(find.text('저장된 안내'), findsNothing);
       expect(find.text('천천히'), findsWidgets);
-      expect(find.text('여유 있는 걸음 속도로 시간을 계산해요'), findsOneWidget);
+      expect(find.text('여유 있는 걸음 속도로 시간을 계산해요.'), findsOneWidget);
       expect(find.text('큰 글자'), findsNothing);
       expect(find.text('고대비'), findsOneWidget);
       expect(find.text('간편 보기'), findsOneWidget);
       expect(find.text('켜짐'), findsWidgets);
       expect(find.text('꺼짐'), findsWidgets);
+      expect(
+        EasySubwayAccessibleColors.brandSignature,
+        const Color(0xFF7C3AED),
+      );
+      expect(
+        EasySubwayAccessibleColors.brandSignatureMedium,
+        const Color(0xFFAA7FF3),
+      );
+      expect(
+        EasySubwayAccessibleColors.brandSignatureSoft,
+        const Color(0xFFD8C4FA),
+      );
+      expect(
+        EasySubwayAccessibleColors.brandSignatureSurface,
+        const Color(0xFFF5EFFE),
+      );
+      final activeSettingsSwitch = tester
+          .widgetList<Switch>(
+            find.descendant(
+              of: find.byKey(const Key('settingsScreen')),
+              matching: find.byType(Switch),
+            ),
+          )
+          .singleWhere((widget) => widget.value);
+      expect(
+        activeSettingsSwitch.activeTrackColor,
+        EasySubwayAccessibleColors.brandSignature,
+      );
       expect(find.textContaining('데이터팩'), findsNothing);
       expect(find.textContaining('실기기 QA'), findsNothing);
       expect(find.byKey(const Key('mobilityProfileButton')), findsOneWidget);
       expect(
         settingsActionSemantics(
-          '천천히, 여유 있는 걸음 속도로 시간을 계산해요',
+          '천천히, 여유 있는 걸음 속도로 시간을 계산해요.',
         ).getSemanticsData().hasAction(SemanticsAction.tap),
         isTrue,
       );
@@ -6005,7 +6189,7 @@ void main() {
 
       expect(find.text('휠체어 이용'), findsWidgets);
       expect(
-        find.text('엘리베이터로만 이동하는 길을 안내해요 · 유아차와 함께일 때도 좋아요'),
+        find.text('엘리베이터로만 이동하는 길을 안내해요.\n유모차와 함께일 때도 좋아요.'),
         findsOneWidget,
       );
 
@@ -6689,12 +6873,15 @@ void main() {
     expect(find.byKey(const Key('homeTripControlPanel')), findsNothing);
     await _openSettingsScreen(tester);
 
-    expect(find.text('여유 있는 걸음 속도로 시간을 계산해요'), findsOneWidget);
+    expect(find.text('여유 있는 걸음 속도로 시간을 계산해요.'), findsOneWidget);
 
     await _openMobilityProfileFromSettings(tester);
     await tester.tap(find.byKey(const Key('mobilityPresetRow-stepFree')));
     await tester.pumpAndSettle();
-    expect(find.text('엘리베이터로만 이동하는 길을 안내해요 · 유아차와 함께일 때도 좋아요'), findsOneWidget);
+    expect(
+      find.text('엘리베이터로만 이동하는 길을 안내해요.\n유모차와 함께일 때도 좋아요.'),
+      findsOneWidget,
+    );
     semanticsHandle.dispose();
   });
 
@@ -9780,11 +9967,60 @@ void main() {
         ),
       );
 
-      // #1933: 홈 노선도 검색바 탭은 in-place 검색 모드라 주변 역 버튼이 없다.
-      // 둘러보기 "주변 역"은 좌측 메뉴로 StationSearchScreen(nearby)을 연다.
-      await tester.tap(find.byKey(const Key('networkMapMenuButton')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('networkMapMenuNearbyButton')));
+      await _openStationSearchScreenViaMenu(tester);
+
+      final stationSearchScaffold = tester.widget<Scaffold>(
+        find.byKey(const Key('stationSearchScreen')),
+      );
+      expect(
+        stationSearchScaffold.backgroundColor,
+        EasySubwayAccessibleColors.surface,
+      );
+      final stationSearchAppBar = tester.widget<AppBar>(
+        find.byKey(const Key('stationSearchAppBar')),
+      );
+      expect(stationSearchAppBar.toolbarHeight, greaterThanOrEqualTo(60));
+      expect(
+        stationSearchAppBar.backgroundColor,
+        EasySubwayAccessibleColors.topBarSurface,
+      );
+      expect(
+        Theme.of(
+          tester.element(find.byKey(const Key('stationSearchScreen'))),
+        ).appBarTheme.backgroundColor,
+        EasySubwayAccessibleColors.topBarSurface,
+      );
+      expect(find.text('역 검색'), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('stationSearchAppBar')),
+          matching: find.byKey(const Key('stationSearchInput')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('stationSearchAppBar')),
+          matching: find.byKey(const Key('stationSearchRegionIndicator')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('stationSearchHeaderDivider')),
+        findsOneWidget,
+      );
+      expect(stationSearchAppBar.flexibleSpace, isNull);
+      expect(stationSearchAppBar.bottom, isNotNull);
+
+      final nearbyButton = find.byKey(const Key('nearbyStationSearchButton'));
+      expect(nearbyButton, findsOneWidget);
+      expect(tester.widget(nearbyButton), isA<FilledButton>());
+      expect(
+        tester.getSize(nearbyButton).height,
+        greaterThanOrEqualTo(EasySubwayTouchTarget.primary),
+      );
+
+      await tester.tap(nearbyButton);
       await tester.pumpAndSettle();
 
       expect(find.text('현재 위치 사용'), findsNothing);
@@ -9800,14 +10036,6 @@ void main() {
       );
       expect(find.bySemanticsLabel('상록수역을 출발역으로 설정'), findsOneWidget);
       expect(find.bySemanticsLabel('상록수역을 도착역으로 설정'), findsOneWidget);
-
-      final nearbyButtonSize = tester.getSize(
-        find.byKey(const Key('nearbyStationSearchButton')),
-      );
-      expect(
-        nearbyButtonSize.height,
-        greaterThanOrEqualTo(EasySubwayTouchTarget.general),
-      );
 
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
@@ -9845,11 +10073,7 @@ void main() {
       ),
     );
 
-    // #1933: 둘러보기 주변 역은 좌측 메뉴로 StationSearchScreen(nearby)을 연다.
-    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('networkMapMenuNearbyButton')));
-    await tester.pumpAndSettle();
+    await _openNearbyStationSearchScreen(tester);
 
     final primaryCard = find.byKey(const Key('nearbyStationPrimaryCard'));
     expect(primaryCard, findsOneWidget);
@@ -9901,11 +10125,7 @@ void main() {
       ),
     );
 
-    // #1933: 둘러보기 주변 역은 좌측 메뉴로 StationSearchScreen(nearby)을 연다.
-    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('networkMapMenuNearbyButton')));
-    await tester.pumpAndSettle();
+    await _openNearbyStationSearchScreen(tester);
 
     // 사전 rationale 다이얼로그(제목·본문·계속/취소) 없이 곧바로 위치를 요청한다.
     expect(find.text('현재 위치 사용'), findsNothing);
@@ -9943,16 +10163,7 @@ void main() {
       ),
     );
 
-    // #1933: 둘러보기 주변 역은 좌측 메뉴로 StationSearchScreen(nearby)을 연다.
-    // nearby 진입 시 위치 조회가 한 번 자동 시작되고(위치는 completer로 지연),
-    // 조회가 진행 중이면 재시도 버튼 중복 탭은 무시된다.
-    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('networkMapMenuNearbyButton')));
-    // 메뉴 다이얼로그 해제 + StationSearchScreen 라우트 전환을 진행시킨다(위치
-    // completer가 열려 있어 pumpAndSettle은 사용할 수 없다).
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await _openNearbyStationSearchScreen(tester, settleAfterTap: false);
     await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
     await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
     await tester.pump();
@@ -9992,13 +10203,7 @@ void main() {
       ),
     );
 
-    // #1933: 둘러보기 주변 역은 좌측 메뉴로 StationSearchScreen(nearby)을 연다.
-    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('networkMapMenuNearbyButton')));
-    // 메뉴 해제 + 라우트 전환 진행(위치 completer가 열려 있어 settle 불가).
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await _openNearbyStationSearchScreen(tester, settleAfterTap: false);
 
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상');
     await tester.pump();
@@ -10033,11 +10238,7 @@ void main() {
         ),
       );
 
-      // #1933: 둘러보기 주변 역은 좌측 메뉴로 StationSearchScreen(nearby)을 연다.
-      await tester.tap(find.byKey(const Key('networkMapMenuButton')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('networkMapMenuNearbyButton')));
-      await tester.pumpAndSettle();
+      await _openNearbyStationSearchScreen(tester);
 
       expect(locationProvider.requestCount, 1);
       expect(repository.requestedNearbyLocations, isEmpty);
@@ -10113,11 +10314,7 @@ void main() {
       ),
     );
 
-    // #1933: 둘러보기 주변 역은 좌측 메뉴로 StationSearchScreen(nearby)을 연다.
-    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('networkMapMenuNearbyButton')));
-    await tester.pumpAndSettle();
+    await _openNearbyStationSearchScreen(tester);
 
     expect(find.text('휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.'), findsOneWidget);
     expect(
@@ -11761,17 +11958,17 @@ void main() {
       expect(find.text('계단 없이'), findsWidgets);
       expect(find.text('휠체어 이용'), findsWidgets);
       // 시트에만 나타나는 프리셋 부가설명(설정 행 뒤 기본값은 천천히라 별개).
-      expect(find.text('계단 대신 에스컬레이터·엘리베이터로 안내해요'), findsOneWidget);
-      expect(find.text('일반적인 걸음 속도로 안내해요'), findsOneWidget);
+      expect(find.text('계단 대신 에스컬레이터·엘리베이터로 안내해요.'), findsOneWidget);
+      expect(find.text('일반적인 걸음 속도로 안내해요.'), findsOneWidget);
 
       expect(
         tester.getSemantics(
           find.bySemanticsLabel(
-            '휠체어 이용, 엘리베이터로만 이동하는 길을 안내해요 · 유아차와 함께일 때도 좋아요',
+            '휠체어 이용, 엘리베이터로만 이동하는 길을 안내해요.\n유모차와 함께일 때도 좋아요.',
           ),
         ),
         isSemantics(
-          label: '휠체어 이용, 엘리베이터로만 이동하는 길을 안내해요 · 유아차와 함께일 때도 좋아요',
+          label: '휠체어 이용, 엘리베이터로만 이동하는 길을 안내해요.\n유모차와 함께일 때도 좋아요.',
           isButton: true,
           hasTapAction: true,
         ),
@@ -11816,7 +12013,7 @@ void main() {
       expect(
         tester.getSemantics(
           find.bySemanticsLabel(
-            '휠체어 이용, 엘리베이터로만 이동하는 길을 안내해요 · 유아차와 함께일 때도 좋아요',
+            '휠체어 이용, 엘리베이터로만 이동하는 길을 안내해요.\n유모차와 함께일 때도 좋아요.',
           ),
         ),
         isSemantics(isSelected: true),
@@ -12663,9 +12860,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('mobilityPresetRow-standard')), findsOneWidget);
-    expect(find.text('계단 대신 에스컬레이터·엘리베이터로 안내해요'), findsOneWidget);
+    expect(find.text('계단 대신 에스컬레이터·엘리베이터로 안내해요.'), findsOneWidget);
     expect(
-      find.bySemanticsLabel('휠체어 이용, 엘리베이터로만 이동하는 길을 안내해요 · 유아차와 함께일 때도 좋아요'),
+      find.bySemanticsLabel('휠체어 이용, 엘리베이터로만 이동하는 길을 안내해요.\n유모차와 함께일 때도 좋아요.'),
       findsOneWidget,
     );
 
