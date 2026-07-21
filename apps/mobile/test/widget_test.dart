@@ -1120,6 +1120,12 @@ void main() {
       tester.getSize(find.byKey(const Key('networkMapMenuAppIcon'))),
       const Size.square(44),
     );
+    expect(
+      tester
+          .widget<Image>(find.byKey(const Key('networkMapMenuAppIcon')))
+          .excludeFromSemantics,
+      isTrue,
+    );
     expect(find.byKey(const Key('networkMapMenuNearbyButton')), findsNothing);
     expect(find.text('탐색'), findsNothing);
     expect(find.text('내 정보'), findsNothing);

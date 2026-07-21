@@ -3235,6 +3235,7 @@ class _NetworkMapMenuHeader extends StatelessWidget {
                 image: AssetImage('assets/branding/app_icon/app_icon.png'),
                 width: 44,
                 height: 44,
+                excludeFromSemantics: true,
               ),
               SizedBox(width: 12),
               Expanded(

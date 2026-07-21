@@ -466,6 +466,35 @@ void main() {
     );
   });
 
+  testWidgets('권한 화면 이전 버튼은 큰 글자 스크롤 위에서 불투명 표면을 유지한다', (tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+        child: MaterialApp(home: OnboardingScreen(onCompleted: (_) {})),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('onboardingDoneButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SingleChildScrollView), findsOneWidget);
+    final backButton = tester.widget<IconButton>(
+      find.byKey(const Key('onboardingBackButton')),
+    );
+    expect(
+      backButton.style?.backgroundColor?.resolve(<WidgetState>{}),
+      EasySubwayAccessibleColors.surface,
+    );
+    expect(
+      backButton.style?.minimumSize?.resolve(<WidgetState>{}),
+      const Size.square(EasySubwayTouchTarget.general),
+    );
+  });
+
   testWidgets('온보딩 프로필 묶음은 아래로 내리고 선택 상태를 은은한 보라색 원으로 표시한다', (tester) async {
     tester.view.physicalSize = const Size(360, 800);
     tester.view.devicePixelRatio = 1;
