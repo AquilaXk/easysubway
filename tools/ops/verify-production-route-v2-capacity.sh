@@ -454,7 +454,7 @@ docker run -d --name "${clone_gateway}" --network "${network}" --network-alias g
 gateway_base="http://gateway:8081" # NOSONAR -- 격리된 내부 docker 네트워크(gateway) 전용 평문 HTTP, TLS는 프로덕션 엣지에서 종단한다.
 gateway_ready=false
 for _ in $(seq 1 60); do
-	if [[ "$(docker exec "${clone_curl}" curl -sS --noproxy '*' --connect-timeout 1 --max-time 2 -o /dev/null -w '%{http_code}' "${gateway_base}/" 2>/dev/null || true)" == 404 ]]; then
+	if [[ "$(docker exec "${clone_curl}" curl -sS --noproxy '*' --connect-timeout 1 --max-time 2 -o /dev/null -w '%{http_code}' "${gateway_base}/" 2>/dev/null || true)" == 404 ]]; then # NOSONAR
 		gateway_ready=true
 		break
 	fi
@@ -522,7 +522,7 @@ process.stdout.write(JSON.stringify({ integrityToken: `${nonce}.${signature}`, c
 		--request POST --header 'content-type: application/json' \
 		--header "CF-Connecting-IP: ${client_ip}" \
 		--data-binary "${session_request}" \
-		"${gateway_base}/api/v2/routes/session")"
+		"${gateway_base}/api/v2/routes/session")" # NOSONAR
 	last_status="${result%% *}"
 	time_seconds="${result#* }"
 	latency_ms="$(node -e 'const value = Number(process.argv[1]); if (!Number.isFinite(value)) process.exit(1); process.stdout.write(String(Math.round(value * 1000)));' "${time_seconds}")"
@@ -558,7 +558,7 @@ send_search() {
 		-D "$(to_curl_mount_path "${last_headers}")" -o "$(to_curl_mount_path "${last_body}")" -w '%{http_code} %{time_total}' \
 		--request POST --header 'content-type: application/json' \
 		--header "CF-Connecting-IP: ${client_ip}" --header "Authorization: Bearer ${token}" \
-		--data-binary "${request_body}" "${gateway_base}/api/v2/routes/search")"
+		--data-binary "${request_body}" "${gateway_base}/api/v2/routes/search")" # NOSONAR
 	last_status="${result%% *}"
 	time_seconds="${result#* }"
 	latency_ms="$(node -e 'const value = Number(process.argv[1]); if (!Number.isFinite(value)) process.exit(1); process.stdout.write(String(Math.round(value * 1000)));' "${time_seconds}")"
@@ -711,7 +711,7 @@ for ((index = 0; index <= search_burst; index += 1)); do
 			-D "$(to_curl_mount_path "${burst_headers}")" -o "$(to_curl_mount_path "${burst_body}")" -w '%{http_code} %{time_total}' \
 			--request POST --header 'content-type: application/json' \
 			--header 'CF-Connecting-IP: 198.51.100.200' --header "Authorization: Bearer ${burst_token}" \
-			--data-binary "${request_body}" "${gateway_base}/api/v2/routes/search" > "${burst_result}"
+			--data-binary "${request_body}" "${gateway_base}/api/v2/routes/search" > "${burst_result}" # NOSONAR
 	) &
 	burst_pids+=("$!")
 	burst_headers_files+=("${burst_headers}")

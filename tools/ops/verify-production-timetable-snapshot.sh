@@ -195,7 +195,7 @@ for _ in $(seq 1 90); do
 		echo 'controlled cache application stopped before readiness' >&2
 		exit 1
 	fi
-	if [[ "$(curl -sS --noproxy '*' --connect-timeout 1 --max-time 2 -o /dev/null -w '%{http_code}' "${cache_base_url}/actuator/health/readiness" 2>/dev/null || true)" == 200 ]]; then
+	if [[ "$(curl -sS --noproxy '*' --connect-timeout 1 --max-time 2 -o /dev/null -w '%{http_code}' "${cache_base_url}/actuator/health/readiness" 2>/dev/null || true)" == 200 ]]; then # NOSONAR
 		cache_ready=true
 		break
 	fi
@@ -222,7 +222,7 @@ for attempt in 0 1; do
 	chmod 600 "${curl_config}"
 	status="$(curl --config "${curl_config}" -sS --noproxy '*' --connect-timeout 2 --max-time 10 --output "${response_file}" --write-out '%{http_code}' \
 		--request POST --header 'content-type: application/json' \
-		--data-binary "${request_body}" "${cache_base_url}/api/v2/routes/search")"
+		--data-binary "${request_body}" "${cache_base_url}/api/v2/routes/search")" # NOSONAR
 	rm -f "${curl_config}"
 	route_state_id="$(node -e '
 const response = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
