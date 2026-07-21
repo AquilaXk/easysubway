@@ -4,7 +4,7 @@ import '../../../accessible_design.dart';
 import '../domain/service_notice.dart';
 import 'notice_controller.dart';
 
-/// 좌측 메뉴 "운행 공지"에서 여는 목록 화면. 활성 공지 전체(info·disruption)를
+/// 좌측 메뉴 "공지사항"에서 여는 목록 화면. 활성 공지 전체(info·disruption)를
 /// 보여주고, 오프라인 강등이면 마지막 수신 시각을 함께 알린다.
 class ServiceNoticeListScreen extends StatelessWidget {
   const ServiceNoticeListScreen({
@@ -21,10 +21,18 @@ class ServiceNoticeListScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: EasySubwayAccessibleColors.surface,
       appBar: AppBar(
-        title: const Text('운행 공지'),
-        backgroundColor: EasySubwayAccessibleColors.surface,
+        key: const Key('serviceNoticeAppBar'),
+        title: const Text('공지사항'),
+        toolbarHeight: 60,
+        backgroundColor: EasySubwayAccessibleColors.topBarSurface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
+        flexibleSpace: const Align(
+          alignment: Alignment.bottomCenter,
+          child: EasySubwayHeaderDivider(
+            key: Key('serviceNoticeHeaderDivider'),
+          ),
+        ),
       ),
       body: ListenableBuilder(
         listenable: controller,
@@ -147,7 +155,7 @@ class _NoticeItem extends StatelessWidget {
               Text(
                 _formatPublishedAt(notice.publishedAt),
                 style: const TextStyle(
-                  color: EasySubwayAccessibleColors.mutedText,
+                  color: EasySubwayAccessibleColors.brandSignature,
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                 ),
@@ -189,34 +197,41 @@ class _EmptyNotices extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
+    return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
-      children: [
-        if (staleLabel != null) _StaleBar(label: staleLabel!),
-        SizedBox(height: MediaQuery.sizeOf(context).height * 0.22),
-        const Icon(
-          Icons.check_circle_outline_rounded,
-          size: 44,
-          color: EasySubwayAccessibleColors.mutedText,
-        ),
-        const SizedBox(height: 14),
-        const Text(
-          '지금은 운행 공지가 없어요',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: EasySubwayAccessibleColors.text,
-            fontSize: 17,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 6),
-        const Text(
-          '운행 장애나 안내가 생기면 여기에 표시돼요',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: EasySubwayAccessibleColors.mutedText,
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
+      slivers: [
+        if (staleLabel != null)
+          SliverToBoxAdapter(child: _StaleBar(label: staleLabel!)),
+        SliverFillRemaining(
+          key: const Key('serviceNoticeEmptyFill'),
+          hasScrollBody: false,
+          child: Align(
+            key: const Key('serviceNoticeEmptyContent'),
+            alignment: const Alignment(0, -0.28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'assets/illustrations/empty_notices.png',
+                  key: const Key('serviceNoticeEmptyImage'),
+                  width: 80,
+                  height: 80,
+                  color: EasySubwayAccessibleColors.brandSignature,
+                  colorBlendMode: BlendMode.srcIn,
+                  excludeFromSemantics: true,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  '지금은 공지사항이 없어요',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: EasySubwayAccessibleColors.text,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],

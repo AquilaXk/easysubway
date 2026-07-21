@@ -23,6 +23,7 @@ const defaultPushNotificationsEnabled = bool.fromEnvironment(
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  registerBundledAssetLicenses();
   validateReleaseBuildFlags(
     isReleaseMode: kReleaseMode,
     demoHomeDataEnabled: defaultDemoHomeDataEnabled,
@@ -116,6 +117,23 @@ Future<void> main() async {
       ),
     ),
   );
+}
+
+@visibleForTesting
+void registerBundledAssetLicenses() {
+  LicenseRegistry.addLicense(() async* {
+    yield const LicenseEntryWithLineBreaks(
+      ['empty-notices-illustration'],
+      '''
+Empty notices illustration from Customer Relation Vectors With Faces
+Author: Anton Kalashnyk
+Source: https://www.svgrepo.com/collection/customer-relation-vectors-with-faces/
+License: CC Attribution
+License URL: https://www.svgrepo.com/page/licensing/#CC%20Attribution
+Changes: converted from SVG to PNG and colorized for EasySubway.
+''',
+    );
+  });
 }
 
 @pragma('vm:entry-point')

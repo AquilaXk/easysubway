@@ -109,6 +109,7 @@ class MobilityPresetRow extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.showDescription = false,
+    this.showBrandRadio = false,
     super.key,
   });
 
@@ -118,6 +119,9 @@ class MobilityPresetRow extends StatelessWidget {
 
   /// true면 표시명 아래 부가설명도 노출한다(온보딩·시트).
   final bool showDescription;
+
+  /// true면 온보딩용 보라색 원형 선택 표시를 쓴다.
+  final bool showBrandRadio;
 
   @override
   Widget build(BuildContext context) {
@@ -179,8 +183,39 @@ class MobilityPresetRow extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(width: EasySubwaySpacing.md),
-                  if (selected)
+                  SizedBox(
+                    width: showBrandRadio
+                        ? EasySubwaySpacing.xs
+                        : EasySubwaySpacing.md,
+                  ),
+                  if (showBrandRadio)
+                    Container(
+                      key: Key('mobilityPresetRadio-${preset.name}'),
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: selected
+                            ? EasySubwayAccessibleColors.brandSignature
+                                  .withValues(alpha: 0.12)
+                            : Colors.transparent,
+                        border: Border.all(
+                          color: selected
+                              ? EasySubwayAccessibleColors.brandSignature
+                              : EasySubwayAccessibleColors.mutedText,
+                          width: 1.5,
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: selected
+                          ? CustomPaint(
+                              key: Key('mobilityPresetCheck-${preset.name}'),
+                              size: const Size.square(12),
+                              painter: const _BrandCheckPainter(),
+                            )
+                          : null,
+                    )
+                  else if (selected)
                     const Icon(
                       Icons.check,
                       size: 22,
@@ -196,4 +231,26 @@ class MobilityPresetRow extends StatelessWidget {
       ),
     );
   }
+}
+
+class _BrandCheckPainter extends CustomPainter {
+  const _BrandCheckPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = EasySubwayAccessibleColors.brandSignature
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.6
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final path = Path()
+      ..moveTo(size.width * 0.1, size.height * 0.5)
+      ..lineTo(size.width * 0.4, size.height * 0.8)
+      ..lineTo(size.width * 0.9, size.height * 0.2);
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(_BrandCheckPainter oldDelegate) => false;
 }

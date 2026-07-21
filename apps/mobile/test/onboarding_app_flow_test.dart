@@ -159,7 +159,7 @@ void main() {
     await _continueFromProfileToPermission(tester);
 
     // 켜라고 요청하지 않는다(더보기 '사용할 수 없어요' 고지와의 모순 제거, #1579).
-    expect(find.text('위치는 나중에도 켤 수 있어요'), findsOneWidget);
+    expect(find.text('가까운 역을 바로 찾아줘요.'), findsOneWidget);
     expect(find.text('위치와 알림은 나중에도 켤 수 있어요'), findsNothing);
     expect(find.text('필요한 권한을 나중에 켤 수 있어요'), findsNothing);
     expect(find.text('현재 위치'), findsOneWidget);
