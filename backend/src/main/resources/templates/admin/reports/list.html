@@ -6,7 +6,7 @@
 	<!-- htmx는 기본으로 로드 시 인라인 스타일 태그(indicator)를 head에 주입한다. CSP style-src 'self'에서
 	     차단되어 콘솔 위반이 나므로 끈다. htmx-indicator가 필요하면 admin-v3.css에 정의한다(#1736). -->
 	<meta name="htmx-config" content='{"includeIndicatorStyles":false}'>
-	<title>시설 신고 확인</title>
+	<title>제보 확인 대기열</title>
 	<link rel="stylesheet" th:href="@{/css/admin-v3.css}">
 </head>
 <body class="admin-v3">
@@ -18,7 +18,7 @@
 	<div th:replace="~{admin/fragments/shell :: contentStart}"></div>
 	<header class="admin-page-head">
 		<div>
-			<h1>시설 신고 확인</h1>
+			<h1>제보 확인 대기열</h1>
 		</div>
 	</header>
 
