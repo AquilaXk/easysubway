@@ -69,15 +69,15 @@
 			       placeholder="entity·field·reason 검색" aria-label="수동 오버라이드 검색" autocomplete="off">
 			<select name="status" aria-label="상태 필터">
 				<option value="ALL" th:selected="${filter.selectedStatus('ALL')}">전체 상태</option>
-				<option value="BLOCKER" th:selected="${filter.selectedStatus('BLOCKER')}">blocker</option>
+				<option value="BLOCKER" th:selected="${filter.selectedStatus('BLOCKER')}">차단</option>
 				<option value="STRICT" th:selected="${filter.selectedStatus('STRICT')}">strict 요청</option>
-				<option value="PENDING" th:selected="${filter.selectedStatus('PENDING')}">PENDING</option>
-				<option value="APPROVED" th:selected="${filter.selectedStatus('APPROVED')}">APPROVED</option>
-				<option value="EXPIRED" th:selected="${filter.selectedStatus('EXPIRED')}">EXPIRED</option>
+				<option value="PENDING" th:selected="${filter.selectedStatus('PENDING')}">대기</option>
+				<option value="APPROVED" th:selected="${filter.selectedStatus('APPROVED')}">승인됨</option>
+				<option value="EXPIRED" th:selected="${filter.selectedStatus('EXPIRED')}">만료됨</option>
 				<option value="UNRESOLVED" th:selected="${filter.selectedStatus('UNRESOLVED')}">충돌 미해결</option>
 			</select>
 			<select name="sort" aria-label="정렬">
-				<option value="" th:selected="${filter.selectedSort('')}">production blocker 우선</option>
+				<option value="" th:selected="${filter.selectedSort('')}">운영 차단 우선</option>
 				<option value="entity" th:selected="${filter.selectedSort('entity')}">entity순</option>
 				<option value="created" th:selected="${filter.selectedSort('created')}">시작 최신순</option>
 			</select>

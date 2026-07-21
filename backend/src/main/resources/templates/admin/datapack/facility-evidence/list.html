@@ -28,7 +28,7 @@
 			       placeholder="역·시설·source 검색" aria-label="시설 근거 검색" autocomplete="off">
 			<select name="status" aria-label="상태 필터">
 				<option value="ALL" th:selected="${filter.selectedStatus('ALL')}">전체 상태</option>
-				<option value="BLOCKER" th:selected="${filter.selectedStatus('BLOCKER')}">blocker</option>
+				<option value="BLOCKER" th:selected="${filter.selectedStatus('BLOCKER')}">차단</option>
 				<option value="STRICT" th:selected="${filter.selectedStatus('STRICT')}">strict 가능</option>
 				<option value="UNKNOWN_PENDING_REVIEW" th:selected="${filter.selectedStatus('UNKNOWN_PENDING_REVIEW')}">근거 확인 필요</option>
 				<option value="UNKNOWN" th:selected="${filter.selectedStatus('UNKNOWN')}">상태 미상</option>

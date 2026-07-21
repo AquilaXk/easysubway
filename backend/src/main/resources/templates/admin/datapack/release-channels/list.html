@@ -32,11 +32,11 @@
 				<option value="staging" th:selected="${filter.selectedStatus('staging')}">staging</option>
 				<option value="dev" th:selected="${filter.selectedStatus('dev')}">dev</option>
 				<option value="ROLLBACK_AVAILABLE" th:selected="${filter.selectedStatus('ROLLBACK_AVAILABLE')}">rollback 가능</option>
-				<option value="PROMOTE" th:selected="${filter.selectedStatus('PROMOTE')}">PROMOTE</option>
-				<option value="ROLLBACK" th:selected="${filter.selectedStatus('ROLLBACK')}">ROLLBACK</option>
-				<option value="PASS" th:selected="${filter.selectedStatus('PASS')}">PASS</option>
-				<option value="FAIL" th:selected="${filter.selectedStatus('FAIL')}">FAIL</option>
-				<option value="PENDING" th:selected="${filter.selectedStatus('PENDING')}">PENDING</option>
+				<option value="PROMOTE" th:selected="${filter.selectedStatus('PROMOTE')}">승격</option>
+				<option value="ROLLBACK" th:selected="${filter.selectedStatus('ROLLBACK')}">롤백</option>
+				<option value="PASS" th:selected="${filter.selectedStatus('PASS')}">통과</option>
+				<option value="FAIL" th:selected="${filter.selectedStatus('FAIL')}">실패</option>
+				<option value="PENDING" th:selected="${filter.selectedStatus('PENDING')}">대기</option>
 			</select>
 			<select name="sort" aria-label="정렬">
 				<option value="" th:selected="${filter.selectedSort('')}">채널 우선순</option>

@@ -125,13 +125,13 @@
 						<input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
 						<input type="hidden" name="commandToken" th:value="${commandTokens.next()}">
 						<input type="hidden" name="returnTo" th:value="${currentListHref}">
-						<button type="submit" class="tertiary" title="기본으로 지정" aria-label="기본 뷰로 지정">★</button>
+						<button type="submit" class="tertiary" title="기본으로 지정" aria-label="기본 뷰로 지정"><span aria-hidden="true">★</span></button>
 					</form>
 					<form method="post" th:action="@{/admin/saved-views/{id}/delete(id=${view.viewId})}">
 						<input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
 						<input type="hidden" name="commandToken" th:value="${commandTokens.next()}">
 						<input type="hidden" name="returnTo" th:value="${currentListHref}">
-						<button type="submit" class="tertiary" title="삭제" aria-label="저장된 뷰 삭제">✕</button>
+						<button type="submit" class="tertiary" title="삭제" aria-label="저장된 뷰 삭제"><span aria-hidden="true">✕</span></button>
 					</form>
 				</span>
 			</div>

@@ -27,6 +27,8 @@
 	--admin-sidebar-accent: #F6F8F9;
 	--admin-primary: #006FD6;
 	--admin-primary-hover: color-mix(in srgb, #006FD6 85%, #000);
+	--admin-on-primary: #FFFFFF;
+	--admin-danger-hover: color-mix(in srgb, var(--admin-danger) 85%, #000);
 	--admin-good: #0A705A;
 	--admin-warn: #9A5600;
 	--admin-danger: #B42318;

@@ -45,7 +45,7 @@
 .admin-v3 button.primary {
 	border-color: var(--admin-primary);
 	background: var(--admin-primary);
-	color: #fff;
+	color: var(--admin-on-primary);
 }
 
 .admin-btn.primary:hover,
@@ -791,7 +791,7 @@
 	padding: 0 5px;
 	border-radius: var(--admin-radius-control);
 	background: var(--admin-accent);
-	color: #fff;
+	color: var(--admin-on-primary);
 	font-size: 11px;
 	font-weight: 600;
 }
@@ -814,7 +814,7 @@
 	padding: 0 7px;
 	border-radius: var(--admin-radius-badge);
 	background: var(--admin-accent);
-	color: #fff;
+	color: var(--admin-on-primary);
 	font-size: 12px;
 	font-weight: 600;
 	text-decoration: none;
@@ -1320,7 +1320,7 @@
 .admin-v3 .pagination a[aria-current="page"] {
 	border-color: var(--admin-primary);
 	background: var(--admin-primary);
-	color: #fff;
+	color: var(--admin-on-primary);
 }
 
 .admin-v3 .pagination {
@@ -1519,12 +1519,12 @@
 .admin-btn.danger {
 	border-color: var(--admin-danger);
 	background: var(--admin-danger);
-	color: #fff;
+	color: var(--admin-on-primary);
 }
 
 .admin-v3 button.danger:hover,
 .admin-btn.danger:hover {
-	background: color-mix(in srgb, var(--admin-danger) 85%, #000);
+	background: var(--admin-danger-hover);
 }
 
 /* 컴포넌트 소유 selector의 반응형 규칙(#2298 리뷰): 앱 프레임 셸 규칙은 admin-shell.css로
@@ -1708,7 +1708,7 @@
 	padding: 0 5px;
 	border-radius: var(--admin-radius-control);
 	background: var(--admin-danger);
-	color: #fff;
+	color: var(--admin-on-primary);
 	font-size: 11px;
 	line-height: 18px;
 	text-align: center;

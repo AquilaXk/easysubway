@@ -100,7 +100,7 @@
 				<button type="button" class="admin-sidebar-toggle" x-on:click="toggle"
 				        x-bind:aria-expanded="ariaExpanded" aria-controls="admin-primary-nav"
 				        aria-label="주 메뉴 열기·닫기">
-					<span aria-hidden="true">☰</span>
+					<svg th:replace="~{admin/fragments/icon :: icon('menu')}"></svg>
 				</button>
 				<div class="admin-sidebar-backdrop" x-cloak x-show="open" x-on:click="close"></div>
 			</div>
@@ -119,7 +119,7 @@
 				<a class="admin-alert-bell" th:href="@{/admin/alerts}" x-on:click.prevent="toggle"
 				   x-bind:aria-expanded="ariaExpanded"
 				   aria-controls="admin-alert-live" aria-label="알림 센터">
-					<span class="admin-alert-bell-icon" aria-hidden="true">🔔</span>
+					<svg class="admin-alert-bell-icon" th:replace="~{admin/fragments/icon :: icon('alert')}"></svg>
 				</a>
 				<div id="admin-alert-live" class="admin-alert-live" role="region" aria-label="알림 센터"></div>
 			</div>
@@ -201,7 +201,7 @@
         th:classappend="${flashTone == 'failure'} ? ' failure' : (${flashTone == 'warning'} ? ' warning' : ' good')"
         x-data="dismissibleAlert" x-show="visible">
 	<span th:text="${flashMessage}">처리되었습니다.</span>
-	<button type="button" class="alert-dismiss" x-cloak x-on:click="dismiss" aria-label="알림 닫기">✕</button>
+	<button type="button" class="alert-dismiss" x-cloak x-on:click="dismiss" aria-label="알림 닫기"><span aria-hidden="true">✕</span></button>
 </output>
 <!--
   토스트 영역(#1737): htmx 응답의 HX-Trigger("admin-toast", {message, tone}) 이벤트로 우상단 알림을 띄운다.
@@ -211,7 +211,7 @@
      x-data="toastHub" x-on:admin-toast.window="show">
 	<output class="toast-item" x-cloak x-show="visible" x-bind:class="toneClass">
 		<span x-text="message">알림</span>
-		<button type="button" class="toast-dismiss" x-on:click="hide" aria-label="알림 닫기">✕</button>
+		<button type="button" class="toast-dismiss" x-on:click="hide" aria-label="알림 닫기"><span aria-hidden="true">✕</span></button>
 	</output>
 </div>
 <!--
@@ -224,7 +224,7 @@
        role="dialog" aria-modal="true" aria-label="상세 패널">
 	<div class="admin-drawer-backdrop" x-on:click="close"></div>
 	<div class="admin-drawer-panel" x-ref="panel" tabindex="-1">
-		<button type="button" class="admin-drawer-close" x-on:click="close" aria-label="패널 닫기">✕</button>
+		<button type="button" class="admin-drawer-close" x-on:click="close" aria-label="패널 닫기"><span aria-hidden="true">✕</span></button>
 		<div id="admin-drawer-body" class="admin-drawer-body"></div>
 	</div>
 </aside>

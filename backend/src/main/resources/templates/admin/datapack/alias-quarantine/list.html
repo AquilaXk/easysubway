@@ -28,12 +28,12 @@
 			       placeholder="alias·quarantine·station 검색" aria-label="별칭·격리 검색" autocomplete="off">
 			<select name="status" aria-label="상태 필터">
 				<option value="ALL" th:selected="${filter.selectedStatus('ALL')}">전체 상태</option>
-				<option value="BLOCKER" th:selected="${filter.selectedStatus('BLOCKER')}">blocker</option>
-				<option value="PENDING" th:selected="${filter.selectedStatus('PENDING')}">Alias PENDING</option>
-				<option value="APPROVED" th:selected="${filter.selectedStatus('APPROVED')}">Alias APPROVED</option>
-				<option value="REJECTED" th:selected="${filter.selectedStatus('REJECTED')}">Alias REJECTED</option>
-				<option value="OPEN" th:selected="${filter.selectedStatus('OPEN')}">Quarantine OPEN</option>
-				<option value="RESOLVED" th:selected="${filter.selectedStatus('RESOLVED')}">Quarantine RESOLVED</option>
+				<option value="BLOCKER" th:selected="${filter.selectedStatus('BLOCKER')}">차단</option>
+				<option value="PENDING" th:selected="${filter.selectedStatus('PENDING')}">별칭 대기</option>
+				<option value="APPROVED" th:selected="${filter.selectedStatus('APPROVED')}">별칭 승인됨</option>
+				<option value="REJECTED" th:selected="${filter.selectedStatus('REJECTED')}">별칭 반려됨</option>
+				<option value="OPEN" th:selected="${filter.selectedStatus('OPEN')}">격리 열림</option>
+				<option value="RESOLVED" th:selected="${filter.selectedStatus('RESOLVED')}">격리 해결됨</option>
 			</select>
 			<input type="hidden" name="candidateId" th:if="${filter.hasCandidate()}" th:value="${filter.candidateValue}">
 			<input type="hidden" name="sourceSnapshotId" th:if="${filter.hasSourceSnapshot()}" th:value="${filter.sourceSnapshotValue}">
