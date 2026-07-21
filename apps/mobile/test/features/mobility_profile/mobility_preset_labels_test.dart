@@ -114,19 +114,19 @@ void main() {
     test('부가설명이 확정 문구와 일치한다', () {
       expect(
         mobilityPresetDescription(MobilityPreset.standard),
-        '일반적인 걸음 속도로 안내해요',
+        '일반적인 걸음 속도로 안내해요.',
       );
       expect(
         mobilityPresetDescription(MobilityPreset.slow),
-        '여유 있는 걸음 속도로 시간을 계산해요',
+        '여유 있는 걸음 속도로 시간을 계산해요.',
       );
       expect(
         mobilityPresetDescription(MobilityPreset.noStairs),
-        '계단 대신 에스컬레이터·엘리베이터로 안내해요',
+        '계단 대신 에스컬레이터·엘리베이터로 안내해요.',
       );
       expect(
         mobilityPresetDescription(MobilityPreset.stepFree),
-        '엘리베이터로만 이동하는 길을 안내해요 · 유아차와 함께일 때도 좋아요',
+        '엘리베이터로만 이동하는 길을 안내해요.\n유모차와 함께일 때도 좋아요.',
       );
     });
   });

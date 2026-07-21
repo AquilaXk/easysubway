@@ -51,10 +51,24 @@ class EasySubwayAccessibleColors {
   /// 과거 navy 액센트. 단일 브랜드 액센트로 통일했다. 신규 코드는 [primary] 사용.
   static const brand = primary;
 
-  /// 시그니처 브랜드 색(라이트 단일 모드). 오너 결정(#2089)으로 1차 적용 —
-  /// 온보딩 시작 화면의 강조 행·CTA에만 쓴다. 흰 글자 대비 5.7:1(AA 통과).
-  /// 이 앱은 라이트 단일 모드(#1917 revert)라 다크 변형을 두지 않는다.
+  /// 시그니처 라벤더 팔레트(라이트 단일 모드).
+  /// 기준색은 흰 글자 대비 5.7:1(AA 통과)이며 CTA·활성 컨트롤에 쓴다.
   static const brandSignature = Color(0xFF7C3AED);
+
+  /// 포커스·강조 아이콘에 쓰는 중간 라벤더.
+  static const brandSignatureMedium = Color(0xFFAA7FF3);
+
+  /// 선택 배경·강조선에 쓰는 연한 라벤더.
+  static const brandSignatureSoft = Color(0xFFD8C4FA);
+
+  /// 선택 영역에 쓰는 가장 연한 라벤더.
+  static const brandSignatureSurface = Color(0xFFF5EFFE);
+
+  /// 흰색에 가까운 전역 상단바 라벤더.
+  static const topBarSurface = Color(0xFFFAF8FF);
+
+  /// 플레이스홀더보다 연한 공용 검색창 중성 배경.
+  static const searchFieldSurface = Color(0xFFF6F8F9);
 
   /// 다크 히어로 등 짙은 브랜드 표면(레거시). 신규 화면에서는 사용하지 않는다.
   static const brandDark = Color(0xFF071B2F);
@@ -102,8 +116,8 @@ class EasySubwayAccessibleColors {
   /// 카드 그림자(최소 그림자 원칙).
   static const cardShadow = Color(0x0A071B2F);
 
-  /// 스위치 켜짐 트랙(브랜드 액센트 1계열).
-  static const switchActiveTrack = primary;
+  /// 스위치 켜짐 트랙.
+  static const switchActiveTrack = brandSignature;
 
   /// 스위치 꺼짐 트랙.
   static const switchInactiveTrack = Color(0xFFC8D3DC);
@@ -152,6 +166,26 @@ class EasySubwayTouchTarget {
   static const iconOnly = 48.0;
   static const general = 56.0;
   static const primary = 60.0;
+}
+
+class EasySubwayHeaderDivider extends SizedBox {
+  const EasySubwayHeaderDivider({super.key})
+    : super(
+        height: 1,
+        width: double.infinity,
+        child: const DecoratedBox(
+          decoration: BoxDecoration(
+            color: Color(0xFFCBD6DD),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: Color(0x0D000000),
+                offset: Offset(0, 1),
+                blurRadius: 2,
+              ),
+            ],
+          ),
+        ),
+      );
 }
 
 EdgeInsets easySubwayBottomActionInsets(

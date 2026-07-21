@@ -746,7 +746,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
       },
       child: Scaffold(
         key: const Key('networkMapScreen'),
-        backgroundColor: const Color(0xFFFFFAFD),
+        backgroundColor: EasySubwayAccessibleColors.surface,
         body: FutureBuilder<_NetworkMapLoadResult>(
           future: _future,
           builder: (context, snapshot) {
@@ -1298,8 +1298,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   String get _currentRegionDisplayName =>
       _displayRegionName(_selectedRegion ?? '수도권');
 
-  /// 파라미터 없는 [VoidCallback]만 받는 하위 위젯(_NetworkMapChrome,
-  /// _NetworkMapMenuPanel)에 현재 지역을 실어 전달하기 위한 래퍼.
   VoidCallback? get _openNearbyStationsWithRegion {
     final callback = widget.onOpenNearbyStations;
     if (callback == null) {
@@ -1320,7 +1318,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
           onOpenStationSearch: () =>
               widget.onOpenStationSearch(_currentRegionDisplayName),
           onOpenSavedItems: widget.onOpenSavedItems,
-          onOpenNearbyStations: _openNearbyStationsWithRegion,
           onOpenTrainSearch: widget.onOpenTrainSearch,
           onOpenServiceNotices: widget.onOpenServiceNotices,
           onOpenSettings: widget.onOpenSettings,
@@ -1760,40 +1757,45 @@ class _NetworkMapTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: EasySubwayAccessibleColors.surface,
+      key: const Key('networkMapTopBar'),
+      color: EasySubwayAccessibleColors.topBarSurface,
       elevation: 0,
-      child: DecoratedBox(
-        decoration: const BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: EasySubwayAccessibleColors.line),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          SafeArea(
+            bottom: false,
+            // #1933 요구 2: draft가 비면 검색바, 하나라도 차면 출발/도착 2줄 입력으로
+            // 상단바 자체가 변신한다. 별도 카드를 아래에 띄우지 않는다.
+            child: ListenableBuilder(
+              listenable: routeDraftController,
+              builder: (context, _) {
+                final draft = routeDraftController.draft;
+                if (draft.isEmpty) {
+                  return _buildSearchRow(context);
+                }
+                return _NetworkMapTopBarRouteDraft(
+                  key: const Key('networkMapRouteDraftOverlay'),
+                  draft: draft,
+                  onClearOrigin: onClearOrigin,
+                  onClearDestination: onClearDestination,
+                  onClearWaypoint: onClearWaypoint,
+                  onSwapDraft: onSwapDraft,
+                  onReorderDraft: onReorderDraft,
+                  onPickOrigin: onPickOrigin,
+                  onPickDestination: onPickDestination,
+                  onPickWaypoint: onPickWaypoint,
+                );
+              },
+            ),
           ),
-        ),
-        child: SafeArea(
-          bottom: false,
-          // #1933 요구 2: draft가 비면 검색바, 하나라도 차면 출발/도착 2줄 입력으로
-          // 상단바 자체가 변신한다. 별도 카드를 아래에 띄우지 않는다.
-          child: ListenableBuilder(
-            listenable: routeDraftController,
-            builder: (context, _) {
-              final draft = routeDraftController.draft;
-              if (draft.isEmpty) {
-                return _buildSearchRow(context);
-              }
-              return _NetworkMapTopBarRouteDraft(
-                key: const Key('networkMapRouteDraftOverlay'),
-                draft: draft,
-                onClearOrigin: onClearOrigin,
-                onClearDestination: onClearDestination,
-                onClearWaypoint: onClearWaypoint,
-                onSwapDraft: onSwapDraft,
-                onReorderDraft: onReorderDraft,
-                onPickOrigin: onPickOrigin,
-                onPickDestination: onPickDestination,
-                onPickWaypoint: onPickWaypoint,
-              );
-            },
+          const Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: EasySubwayHeaderDivider(key: Key('networkMapTopBarDivider')),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -2111,7 +2113,7 @@ class _NetworkMapSearchField extends StatelessWidget {
                     key: const Key('heroStationSearchButton'),
                     height: easySubwaySearchFieldVisualHeight,
                     decoration: BoxDecoration(
-                      color: EasySubwayAccessibleColors.surface,
+                      color: EasySubwayAccessibleColors.searchFieldSurface,
                       border: Border.all(
                         color: EasySubwayAccessibleColors.line,
                         width: easySubwaySearchFieldBorderWidth,
@@ -3109,7 +3111,6 @@ class _NetworkMapMenuPanel extends StatelessWidget {
   const _NetworkMapMenuPanel({
     required this.onOpenStationSearch,
     required this.onOpenSavedItems,
-    required this.onOpenNearbyStations,
     required this.onOpenTrainSearch,
     required this.onOpenServiceNotices,
     required this.onOpenSettings,
@@ -3117,7 +3118,6 @@ class _NetworkMapMenuPanel extends StatelessWidget {
 
   final VoidCallback onOpenStationSearch;
   final VoidCallback? onOpenSavedItems;
-  final VoidCallback? onOpenNearbyStations;
   final VoidCallback? onOpenTrainSearch;
   final VoidCallback? onOpenServiceNotices;
   final VoidCallback? onOpenSettings;
@@ -3129,14 +3129,13 @@ class _NetworkMapMenuPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width * 0.625;
     return Align(
       alignment: Alignment.centerLeft,
       child: Material(
         key: const Key('networkMapMenuPanel'),
         color: Colors.white,
         child: SizedBox(
-          width: width.clamp(280.0, 430.0).toDouble(),
+          width: 256,
           height: double.infinity,
           child: Column(
             children: [
@@ -3147,8 +3146,9 @@ class _NetworkMapMenuPanel extends StatelessWidget {
                     padding: EdgeInsets.zero,
                     children: [
                       const _NetworkMapMenuHeader(),
-                      const Divider(height: 1, color: Color(0xFFE4E4E4)),
-                      const _NetworkMapMenuSectionLabel('탐색'),
+                      const EasySubwayHeaderDivider(
+                        key: Key('networkMapMenuHeaderDivider'),
+                      ),
                       _NetworkMapMenuTile(
                         key: const Key('networkMapMenuStationSearchButton'),
                         icon: Icons.search,
@@ -3158,14 +3158,6 @@ class _NetworkMapMenuPanel extends StatelessWidget {
                       // #1933 요구 3: 별도 길찾기 폼 페이지를 없앴다. 길찾기 진입은
                       // 노선도 역 탭(팝오버 출발/도착)·상단바 변신으로만 하므로,
                       // 폼으로 보내던 좌측 메뉴 "길찾기" 항목을 제거한다.
-                      if (onOpenNearbyStations != null)
-                        _NetworkMapMenuTile(
-                          key: const Key('networkMapMenuNearbyButton'),
-                          icon: Icons.near_me_outlined,
-                          label: '가까운 역',
-                          onTap: () =>
-                              _runAction(context, onOpenNearbyStations!),
-                        ),
                       if (onOpenTrainSearch != null)
                         _NetworkMapMenuTile(
                           key: const Key('networkMapMenuTrainSearchButton'),
@@ -3175,7 +3167,10 @@ class _NetworkMapMenuPanel extends StatelessWidget {
                         ),
                       if (onOpenSavedItems != null ||
                           onOpenSettings != null) ...[
-                        const _NetworkMapMenuSectionLabel('내 정보'),
+                        const Divider(
+                          height: 1,
+                          color: EasySubwayAccessibleColors.line,
+                        ),
                         if (onOpenSavedItems != null)
                           _NetworkMapMenuTile(
                             key: const Key('networkMapMenuSavedButton'),
@@ -3192,17 +3187,17 @@ class _NetworkMapMenuPanel extends StatelessWidget {
                           ),
                       ],
                       if (onOpenServiceNotices != null) ...[
-                        const _NetworkMapMenuSectionLabel('안내'),
-                        if (onOpenServiceNotices != null)
-                          _NetworkMapMenuTile(
-                            key: const Key(
-                              'networkMapMenuServiceNoticesButton',
-                            ),
-                            icon: Icons.campaign_outlined,
-                            label: '운행 공지',
-                            onTap: () =>
-                                _runAction(context, onOpenServiceNotices!),
-                          ),
+                        const Divider(
+                          height: 1,
+                          color: EasySubwayAccessibleColors.line,
+                        ),
+                        _NetworkMapMenuTile(
+                          key: const Key('networkMapMenuServiceNoticesButton'),
+                          icon: Icons.campaign_outlined,
+                          label: '공지사항',
+                          onTap: () =>
+                              _runAction(context, onOpenServiceNotices!),
+                        ),
                       ],
                     ],
                   ),
@@ -3226,46 +3221,37 @@ class _NetworkMapMenuHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.fromLTRB(24, 14, 20, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '쉬운 지하철',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: EasySubwayAccessibleColors.listRowText,
-              fontSize: 21,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.2,
-            ),
+    return const ColoredBox(
+      color: EasySubwayAccessibleColors.topBarSurface,
+      child: SizedBox(
+        key: Key('networkMapMenuHeader'),
+        height: _networkMapTopBarHeight,
+        child: Padding(
+          padding: EdgeInsets.only(left: 24, right: 20),
+          child: Row(
+            children: [
+              Image(
+                key: Key('networkMapMenuAppIcon'),
+                image: AssetImage('assets/branding/app_icon/app_icon.png'),
+                width: 44,
+                height: 44,
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '쉬운 지하철',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: EasySubwayAccessibleColors.listRowText,
+                    fontSize: 21,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NetworkMapMenuSectionLabel extends StatelessWidget {
-  const _NetworkMapMenuSectionLabel(this.label);
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 18, 24, 6),
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-          color: EasySubwayAccessibleColors.caption,
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.2,
         ),
       ),
     );
