@@ -127,7 +127,7 @@ void main() {
         home: NetworkMapScreen(
           repository: _FakeNetworkMapRepository(selectedRegion: '광주'),
           routeDraftController: RouteDraftController(),
-          onOpenStationSearch: (_) {},
+          onOpenStationSearch: (_, _) {},
         ),
       ),
     );
@@ -165,7 +165,7 @@ void main() {
         home: NetworkMapScreen(
           repository: _FakeNetworkMapRepository(selectedRegion: '수도권'),
           routeDraftController: RouteDraftController(),
-          onOpenStationSearch: (_) {},
+          onOpenStationSearch: (_, _) {},
         ),
       ),
     );
@@ -237,7 +237,7 @@ void main() {
           home: NetworkMapScreen(
             repository: _FakeNetworkMapRepository(selectedRegion: '광주'),
             routeDraftController: RouteDraftController(),
-            onOpenStationSearch: (_) {},
+            onOpenStationSearch: (_, _) {},
           ),
         ),
       );
@@ -266,7 +266,7 @@ void main() {
           home: NetworkMapScreen(
             repository: _FakeNetworkMapRepository(selectedRegion: '광주'),
             routeDraftController: RouteDraftController(),
-            onOpenStationSearch: (_) {},
+            onOpenStationSearch: (_, _) {},
           ),
         ),
       );

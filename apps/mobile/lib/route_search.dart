@@ -3382,9 +3382,30 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     if (origin == null || destination == null) {
       return;
     }
-    // #2419 Fix: draft로 채운 역은 region이 빈 문자열이라 항상 스킵됐다.
-    // 그 경우 홈이 넘긴 현재 노선도 지역 표시명으로 폴백한다.
-    final originRegion = origin.region.trim();
+    // #2419 리뷰 finding: draft로 채운 역은 region이 빈 문자열이라 항상
+    // 스킵됐던 걸 이전 커밋이 [widget.regionLabel](현재 노선도 지역 표시명)
+    // 폴백으로 고쳤지만, `_stationFromDraft`가 그 폴백을 origin.region에
+    // 미리 채워두므로 즐겨찾기처럼 다른 지역 경로를 열면 origin.region이 항상
+    // "현재 보고 있는 지도 지역"으로 오염돼 있었다(비어 있지 않아 폴백 분기가
+    // 아예 안 탐). 그래서 항상 origin.id로 실제 지역을 먼저 조회하고, 조회가
+    // 실패하거나 비었을 때만 draft/지도 폴백(origin.region → regionLabel)으로
+    // 되돌아간다.
+    var originRegion = '';
+    try {
+      final detail = await widget.stationRepository.getStationDetail(
+        origin.id,
+      );
+      originRegion = detail.region.trim();
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '최근 경로 검색 저장 중 origin 지역 조회에 실패했습니다.',
+      );
+    }
+    if (originRegion.isEmpty) {
+      originRegion = origin.region.trim();
+    }
     final region = normalizeStationRegion(
       originRegion.isEmpty ? (widget.regionLabel ?? '') : originRegion,
     );

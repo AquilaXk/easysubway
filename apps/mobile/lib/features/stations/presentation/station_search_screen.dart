@@ -25,7 +25,9 @@ const _stationSearchPagePadding = EdgeInsets.fromLTRB(20, 20, 20, 32);
 const _stationSearchLargePagePadding = EdgeInsets.fromLTRB(24, 24, 24, 40);
 
 /// 홈 노선도 지역 메뉴와 같은 기본 목록. 호출부가 regions를 안 넘기면 쓴다.
-const _defaultStationSearchRegions = <EasySubwayRegionMenuItem>[
+/// 호출부(홈)가 맵에만 있는 지역을 이 기본 목록에 병합할 때도 재사용한다
+/// (#2419 리뷰 finding — 검색 메뉴가 맵 지역을 무시하던 문제).
+const defaultStationSearchRegions = <EasySubwayRegionMenuItem>[
   EasySubwayRegionMenuItem(id: '수도권', label: '수도권'),
   EasySubwayRegionMenuItem(id: '광주', label: '광주'),
   EasySubwayRegionMenuItem(id: '대구', label: '대구'),
@@ -48,7 +50,7 @@ class StationSearchScreen extends StatefulWidget {
     this.pickSlot,
     required this.regionLabel,
     this.onRegionChanged,
-    this.regions = _defaultStationSearchRegions,
+    this.regions = defaultStationSearchRegions,
     this.bottomNavigationBar,
     super.key,
   });
@@ -78,7 +80,7 @@ class StationSearchScreen extends StatefulWidget {
   /// 지역 메뉴에서 고른 원본 지역 키(예: `부산`, `부산권`). 홈 노선도 동기화용.
   final ValueChanged<String>? onRegionChanged;
 
-  /// 지역 메뉴 항목. 비우면 [_defaultStationSearchRegions]를 쓴다.
+  /// 지역 메뉴 항목. 비우면 [defaultStationSearchRegions]를 쓴다.
   final List<EasySubwayRegionMenuItem> regions;
   final Widget? bottomNavigationBar;
 
@@ -277,7 +279,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
                             return _StationSearchRegionSelector(
                               regionLabel: _regionLabel,
                               regions: widget.regions.isEmpty
-                                  ? _defaultStationSearchRegions
+                                  ? defaultStationSearchRegions
                                   : widget.regions,
                               canChangeRegion: !regionLocked,
                               onRegionSelected: _onRegionSelected,
@@ -363,7 +365,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       return;
     }
     final regions = widget.regions.isEmpty
-        ? _defaultStationSearchRegions
+        ? defaultStationSearchRegions
         : widget.regions;
     EasySubwayRegionMenuItem? match;
     for (final item in regions) {

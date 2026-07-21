@@ -303,7 +303,7 @@ class _FocusRequestHostState extends State<_FocusRequestHost> {
     return NetworkMapScreen(
       repository: widget.repository,
       routeDraftController: widget.routeDraftController,
-      onOpenStationSearch: (_) {},
+      onOpenStationSearch: (_, _) {},
       focusStationRequestId: _requestId,
       onFocusStationRequestHandled: () {
         widget.onHandled();
@@ -2066,7 +2066,7 @@ void main() {
             networkMapRegionNames: const ['부산'],
           ),
           routeDraftController: RouteDraftController(),
-          onOpenStationSearch: (regionLabel) {
+          onOpenStationSearch: (regionLabel, _) {
             openedRegionLabel = regionLabel;
           },
         ),
@@ -2092,7 +2092,7 @@ void main() {
             networkMapError: StateError('map failed'),
           ),
           routeDraftController: RouteDraftController(),
-          onOpenStationSearch: (_) {},
+          onOpenStationSearch: (_, _) {},
         ),
       ),
     );
@@ -2256,7 +2256,7 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: (_) {},
+          onOpenStationSearch: (_, _) {},
         ),
       ),
     );
@@ -2322,7 +2322,7 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: (_) {},
+          onOpenStationSearch: (_, _) {},
         ),
       ),
     );
@@ -2369,7 +2369,7 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: (_) {},
+          onOpenStationSearch: (_, _) {},
         ),
       ),
     );
@@ -2409,11 +2409,11 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: (_) {},
+          onOpenStationSearch: (_, _) {},
           // main.dart의 openStationSearchForSlot 대역: 실제 앱에서는 역 검색을 열어
           // 결과 탭 시 같은 controller에 slot을 설정한다. 여기선 그 계약(어떤 slot을
           // 채우려 열렸는지 + 같은 controller로 수렴)만 검증한다.
-          onPickStationForSlot: (slot, _) {
+          onPickStationForSlot: (slot, _, _) {
             pickedSlots.add(slot);
             switch (slot) {
               case RouteDraftSlot.origin:
@@ -2492,8 +2492,8 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: (_) {},
-          onPickStationForSlot: (slot, _) {
+          onOpenStationSearch: (_, _) {},
+          onPickStationForSlot: (slot, _, _) {
             switch (slot) {
               case RouteDraftSlot.origin:
                 routeDraftController.setOrigin(
@@ -2601,7 +2601,7 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: (_) {},
+          onOpenStationSearch: (_, _) {},
         ),
       ),
     );
@@ -2632,7 +2632,7 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: (_) {},
+          onOpenStationSearch: (_, _) {},
         ),
       ),
     );
@@ -2662,7 +2662,7 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: (_) {},
+          onOpenStationSearch: (_, _) {},
         ),
       ),
     );
@@ -2691,7 +2691,7 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: (_) {},
+          onOpenStationSearch: (_, _) {},
         ),
       ),
     );
@@ -2725,7 +2725,7 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: (_) {},
+          onOpenStationSearch: (_, _) {},
         ),
       ),
     );
@@ -2756,7 +2756,7 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: (_) {},
+          onOpenStationSearch: (_, _) {},
         ),
       ),
     );
@@ -2778,8 +2778,8 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: (_) {},
-          onPickStationForSlot: (slot, _) {},
+          onOpenStationSearch: (_, _) {},
+          onPickStationForSlot: (slot, _, _) {},
         ),
       ),
     );
@@ -3742,8 +3742,8 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: (_) {},
-          onPickStationForSlot: (slot, _) {},
+          onOpenStationSearch: (_, _) {},
+          onPickStationForSlot: (slot, _, _) {},
         ),
       ),
     );
@@ -17083,6 +17083,50 @@ void main() {
       expect(recorded.region, '수도권');
     },
   );
+
+  testWidgets(
+    '#2419: region 없는 draft라도 origin 실제 지역이 조회되면 map regionLabel로 오염되지 않는다',
+    (tester) async {
+      final searchHistoryRepository = FakeSearchHistoryRepository(const []);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RouteSearchScreen(
+            repository: FakeRouteSearchRepository(),
+            stationRepository: FakeStationSearchRepository(
+              stationDetails: {
+                'station-sangnoksu': _stationDetail(
+                  id: 'station-sangnoksu',
+                  name: '상록수',
+                  region: '부산',
+                ),
+              },
+            ),
+            searchHistoryRepository: searchHistoryRepository,
+            regionLabel: '수도권',
+            initialDraft: RouteDraft(
+              origin: const RouteDraftStation(
+                id: 'station-sangnoksu',
+                nameKo: '상록수',
+              ),
+              destination: const RouteDraftStation(
+                id: 'station-sadang',
+                nameKo: '사당',
+              ),
+              lastModifiedAt: DateTime(2026, 7, 6),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(searchHistoryRepository.recordedRouteSearches, hasLength(1));
+      final recorded = searchHistoryRepository.recordedRouteSearches.single;
+      expect(recorded.originStationId, 'station-sangnoksu');
+      expect(recorded.destinationStationId, 'station-sadang');
+      expect(recorded.region, '부산');
+    },
+  );
 }
 
 Future<void> _showFacilityReportAttachLocationButton(
@@ -18795,12 +18839,13 @@ StationDetail _stationDetail({
   double? latitude,
   double? longitude,
   List<StationSearchLine>? lines,
+  String region = '수도권',
 }) {
   return StationDetail(
     id: id,
     nameKo: name,
     nameEn: id,
-    region: '수도권',
+    region: region,
     latitude: latitude,
     longitude: longitude,
     dataQualityLevel: 'LEVEL_1',

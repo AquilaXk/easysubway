@@ -101,19 +101,35 @@ class _RecentSearchHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // TextButton 대신 Text로 두어 좌·우 외곽 여백과 밑줄을 맞춘다.
+    // #2419 리뷰: GestureDetector만으로는 버튼 semantics·최소 터치 영역(48px)이
+    // 없었다. InkWell + Semantics(button)로 복원하고, baseline 대신 center로
+    // 정렬한다(48px 터치 영역이 텍스트보다 커서 baseline이 어긋난다).
     return Padding(
       padding: const EdgeInsets.only(bottom: EasySubwaySpacing.sm),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           const Expanded(child: Text('최근 검색', style: _titleStyle)),
-          GestureDetector(
-            key: const Key('stationRecentSearchClearAllButton'),
-            behavior: HitTestBehavior.opaque,
+          Semantics(
+            button: true,
+            enabled: enabled,
+            label: '모두 지우기',
             onTap: enabled ? onClearAll : null,
-            child: const Text('모두 지우기', style: _clearStyle),
+            child: ExcludeSemantics(
+              child: InkWell(
+                key: const Key('stationRecentSearchClearAllButton'),
+                onTap: enabled ? onClearAll : null,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minWidth: EasySubwayTouchTarget.iconOnly,
+                    minHeight: EasySubwayTouchTarget.iconOnly,
+                  ),
+                  child: const Center(
+                    child: Text('모두 지우기', style: _clearStyle),
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),

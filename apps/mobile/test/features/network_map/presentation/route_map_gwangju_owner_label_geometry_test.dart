@@ -226,7 +226,7 @@ void main() {
         home: NetworkMapScreen(
           repository: _FakeGwangjuRepository(fixture.data),
           routeDraftController: RouteDraftController(),
-          onOpenStationSearch: (_) {},
+          onOpenStationSearch: (_, _) {},
         ),
       ),
     );

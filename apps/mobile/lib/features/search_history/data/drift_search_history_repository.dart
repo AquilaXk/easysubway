@@ -240,11 +240,18 @@ class DriftSearchHistoryRepository implements SearchHistoryRepository {
 
   /// 역·경로를 합친 통합 목록이 [maxEntries]를 넘으면 오래된 것부터 지운다.
   Future<void> _pruneUnified() async {
+    // 리뷰 finding E: 지역 없는 레거시 행(v3 마이그레이션 이전에 생긴 것 등)이
+    // 남아 있으면 통합 prune 슬롯을 차지해 정상 행을 밀어낸다. prune마다 먼저
+    // 지운다(listRecentEntries 읽기 경로에는 넣지 않음 — 이전 리뷰에서 마이그
+    // 레이션으로 옮긴 결정 유지).
+    await userDatabase.customStatement('''
+          DELETE FROM search_history WHERE region IS NULL OR region = ''
+          ''');
     final rows = await userDatabase.customSelect('''
           SELECT id, 'station' AS kind, searched_at FROM search_history
           UNION ALL
           SELECT id, 'route' AS kind, searched_at FROM route_search_history
-          ORDER BY searched_at DESC, kind DESC, id DESC
+          ORDER BY searched_at DESC, id DESC, kind ASC
           ''').get();
     if (rows.length <= maxEntries) {
       return;

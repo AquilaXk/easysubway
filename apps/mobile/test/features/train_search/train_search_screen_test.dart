@@ -473,7 +473,7 @@ void main() {
         home: NetworkMapScreen(
           repository: const _EmptyNetworkMapRepository(),
           routeDraftController: RouteDraftController(),
-          onOpenStationSearch: (_) {},
+          onOpenStationSearch: (_, _) {},
           onOpenTrainSearch: () => opened = true,
         ),
       ),

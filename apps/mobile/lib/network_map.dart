@@ -432,11 +432,14 @@ class NetworkMapScreen extends StatefulWidget {
   /// 역 검색 등 외부에서 노선도 지역을 바꿀 때 연결한다.
   final NetworkMapRegionBridge? regionBridge;
 
-  /// 역 검색을 열 때 현재 선택 지역 표시명(예: '수도권', '부산')을 함께 전달한다.
-  /// #2090에서 검색 화면에 지역 표시가 추가됐는데 호출부가 이를 안 넘겨 기본값
-  /// '수도권'이 고정 표시되던 결함을 고치기 위해, 파라미터 없는 VoidCallback에서
-  /// `ValueChanged<String>`으로 바꿨다.
-  final ValueChanged<String> onOpenStationSearch;
+  /// 역 검색을 열 때 현재 선택 지역 표시명(예: '수도권', '부산')과, 이 지도가
+  /// 아는 지역 표시명 전체 목록을 함께 전달한다. #2090에서 검색 화면에 지역
+  /// 표시가 추가됐는데 호출부가 이를 안 넘겨 기본값 '수도권'이 고정 표시되던
+  /// 결함을 고치려 파라미터 없는 VoidCallback에서 `ValueChanged<String>`으로
+  /// 바꿨고, 리뷰 finding(#2419)로 지역 목록도 함께 넘기도록 다시 확장했다 —
+  /// 맵에만 있는 지역이 검색 화면 지역 메뉴 기본 목록에 없으면 누락됐다.
+  final void Function(String regionLabel, List<String> availableRegions)
+  onOpenStationSearch;
 
   /// #1933 홈 in-place 역 검색 모드를 빠져나올 때(← 또는 시스템 back) 호출된다.
   /// 셸이 알림/신고 상태를 다시 불러오도록 하기 위한 훅이다. 라우트 기반 검색이
@@ -446,8 +449,13 @@ class NetworkMapScreen extends StatefulWidget {
   /// 상단 draft 오버레이의 출발/도착 칸을 탭했을 때, 그 칸을 채우려고 기존 역 검색을
   /// 여는 콜백. 지도 탭과 같은 [routeDraftController]로 수렴한다. null이면 오버레이
   /// 칸은 탭할 수 없다(둘러보기 검색만 메뉴로 제공). 두 번째 인자는 현재 선택 지역
-  /// 표시명(#2090 검색 화면 지역 표시 배선).
-  final void Function(RouteDraftSlot slot, String regionLabel)?
+  /// 표시명(#2090 검색 화면 지역 표시 배선), 세 번째 인자는 이 지도가 아는 지역
+  /// 표시명 전체 목록(#2419 리뷰 finding).
+  final void Function(
+    RouteDraftSlot slot,
+    String regionLabel,
+    List<String> availableRegions,
+  )?
   onPickStationForSlot;
   final StationSearchRepository? stationSearchRepository;
 
@@ -500,6 +508,10 @@ class NetworkMapScreen extends StatefulWidget {
 
 class _NetworkMapScreenState extends State<NetworkMapScreen> {
   String? _selectedRegion;
+  // #2419 리뷰 finding: 역 검색 메뉴가 항상 기본 지역 목록만 알아, 이 지도에만
+  // 있는 지역이 검색 화면 지역 메뉴에서 빠졌다. 로드된 지도의 지역 표시명을
+  // 캐싱해 검색을 열 때 함께 넘긴다.
+  List<String> _availableRegionLabels = const ['수도권'];
   bool _nearbyPanelVisible = false;
   _NetworkMapNearbyPanelData _nearbyPanelData =
       const _NetworkMapNearbyPanelData.idle();
@@ -761,6 +773,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     // 그대로 리포지토리 요청에 반영되어 data.selectedRegion과 같아지므로
     // 값이 보존된다(덮어써도 동일).
     _selectedRegion = data.selectedRegion;
+    _cacheAvailableRegionLabels(data.regions);
     if (mounted) {
       _notifyRegionLabelChanged();
     }
@@ -772,10 +785,17 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
 
   Future<_NetworkMapLoadResult> _loadMapForRegion(String region) async {
     final data = await widget.repository.getNetworkMap(region: region);
+    _cacheAvailableRegionLabels(data.regions);
     final viewport = await widget.viewportRepository?.loadViewport(
       _displayRegionName(data.selectedRegion),
     );
     return _NetworkMapLoadResult(data: data, initialViewport: viewport);
+  }
+
+  void _cacheAvailableRegionLabels(List<NetworkMapRegion> regions) {
+    _availableRegionLabels = regions.isEmpty
+        ? const ['수도권']
+        : regions.map((region) => region.displayName).toList(growable: false);
   }
 
   void _reload({String? region}) {
@@ -1373,8 +1393,10 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
       transitionDuration: const Duration(milliseconds: 180),
       pageBuilder: (context, animation, secondaryAnimation) {
         return _NetworkMapMenuPanel(
-          onOpenStationSearch: () =>
-              widget.onOpenStationSearch(_currentRegionDisplayName),
+          onOpenStationSearch: () => widget.onOpenStationSearch(
+            _currentRegionDisplayName,
+            _availableRegionLabels,
+          ),
           onOpenSavedItems: widget.onOpenSavedItems,
           onOpenTrainSearch: widget.onOpenTrainSearch,
           onOpenServiceNotices: widget.onOpenServiceNotices,
@@ -1468,6 +1490,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     widget.onPickStationForSlot?.call(
       RouteDraftSlot.origin,
       _currentRegionDisplayName,
+      _availableRegionLabels,
     );
   }
 
@@ -1476,6 +1499,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     widget.onPickStationForSlot?.call(
       RouteDraftSlot.destination,
       _currentRegionDisplayName,
+      _availableRegionLabels,
     );
   }
 
@@ -1484,6 +1508,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     widget.onPickStationForSlot?.call(
       RouteDraftSlot.waypoint,
       _currentRegionDisplayName,
+      _availableRegionLabels,
     );
   }
 

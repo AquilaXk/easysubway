@@ -21,6 +21,7 @@ import '../../get_off_alarm/get_off_alarm_controller.dart';
 import '../../mobility_profile/mobility_preset_labels.dart';
 import '../../mobility_profile/mobility_preset_picker.dart';
 import '../../mobility_profile/mobility_profile_policy.dart';
+import '../../network_map/presentation/region_menu.dart';
 import '../../notifications/presentation/new_notification_bar.dart';
 import '../../notifications/presentation/notification_inbox_screen.dart';
 import '../../realtime/realtime_repository.dart';
@@ -37,6 +38,25 @@ import '../../train_search/domain/train_search_models.dart';
 import '../../train_search/presentation/train_search_screen.dart';
 
 const _mainIconControlRadius = BorderRadius.all(Radius.circular(12));
+
+/// 역 검색 화면 지역 메뉴에 노선도가 아는 지역을 모두 담는다(#2419 리뷰
+/// finding). 기본 목록 5개를 우선 유지하고, 맵에만 있는 지역 표시명이 있으면
+/// 뒤에 이어붙인다(기본 목록에 없는 지역은 id도 표시명 그대로 쓴다).
+List<EasySubwayRegionMenuItem> _stationSearchRegionsForMap(
+  List<String> mapRegionLabels,
+) {
+  final knownLabels = defaultStationSearchRegions
+      .map((item) => item.label)
+      .toSet();
+  final extras = <EasySubwayRegionMenuItem>[
+    for (final label in mapRegionLabels)
+      if (knownLabels.add(label))
+        EasySubwayRegionMenuItem(id: label, label: label),
+  ];
+  return extras.isEmpty
+      ? defaultStationSearchRegions
+      : [...defaultStationSearchRegions, ...extras];
+}
 
 class HomeScreen extends StatefulWidget {
   HomeScreen({
@@ -394,7 +414,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
     }
 
-    Future<void> openStationSearch(String regionLabel) async {
+    Future<void> openStationSearch(
+      String regionLabel,
+      List<String> mapRegionLabels,
+    ) async {
       // #2109 Fix: 둘러보기 모드 결과 탭은 더 이상 즉시 상세를 밀지 않고
       // 선택한 역 결과를 pop으로 반환한다(_returnStationToMap). 여기서 노선
       // 정보까지 받아 노선도에 focus + 팬 메뉴 + 하단 패널을 요청한다.
@@ -412,6 +435,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             realtimeRepository: realtimeRepository,
             routeDraftController: _routeDraftController,
             regionLabel: regionLabel,
+            regions: _stationSearchRegionsForMap(mapRegionLabels),
             onRegionChanged: _mapRegionBridge.selectRegion,
           ),
         ),
@@ -430,6 +454,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     Future<void> openStationSearchForSlot(
       RouteDraftSlot slot,
       String regionLabel,
+      List<String> mapRegionLabels,
     ) async {
       await Navigator.of(context).push(
         MaterialPageRoute<RouteDraftStation>(
@@ -445,6 +470,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             routeDraftController: _routeDraftController,
             pickSlot: slot,
             regionLabel: regionLabel,
+            regions: _stationSearchRegionsForMap(mapRegionLabels),
             onRegionChanged: _mapRegionBridge.selectRegion,
           ),
         ),
@@ -538,11 +564,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           repository: networkMapRepository,
           routeDraftController: _routeDraftController,
           regionBridge: _mapRegionBridge,
-          onOpenStationSearch: (regionLabel) =>
-              unawaited(openStationSearch(regionLabel)),
+          onOpenStationSearch: (regionLabel, mapRegionLabels) =>
+              unawaited(openStationSearch(regionLabel, mapRegionLabels)),
           onStationSearchClosed: () => unawaited(refreshHomeState()),
-          onPickStationForSlot: (slot, regionLabel) =>
-              unawaited(openStationSearchForSlot(slot, regionLabel)),
+          onPickStationForSlot: (slot, regionLabel, mapRegionLabels) =>
+              unawaited(
+                openStationSearchForSlot(slot, regionLabel, mapRegionLabels),
+              ),
           stationSearchRepository: repository,
           reportRepository: reportRepository,
           favoriteRepository: favoriteRepository,
