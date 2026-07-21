@@ -58,12 +58,46 @@ function adminFocusFirst(root) {
 	}
 }
 
+function adminReturnFocus(state, fallbackEl) {
+	var target = state.returnFocus || fallbackEl;
+	state.returnFocus = null;
+	if (target && target.focus) {
+		target.focus();
+	}
+}
+
 // htmx 전역 피드백(#2416): topbar 인디케이터·실패 토스트. no-JS 폴백(form GET·링크)은 그대로다.
 (function initHtmxFeedback() {
 	var indicator = document.getElementById('admin-htmx-indicator');
-	if (indicator && window.htmx) {
-		document.body.setAttribute('hx-indicator', '#admin-htmx-indicator');
-		window.htmx.process(document.body);
+	var pendingRequests = 0;
+
+	function setIndicatorBusy(isBusy) {
+		if (!indicator) {
+			return;
+		}
+		indicator.setAttribute('aria-busy', isBusy ? 'true' : 'false');
+	}
+
+	function beginHtmxRequest() {
+		pendingRequests += 1;
+		setIndicatorBusy(true);
+	}
+
+	function endHtmxRequest() {
+		pendingRequests = Math.max(0, pendingRequests - 1);
+		if (pendingRequests === 0) {
+			setIndicatorBusy(false);
+		}
+	}
+
+	if (indicator) {
+		setIndicatorBusy(false);
+		if (window.htmx) {
+			document.body.setAttribute('hx-indicator', '#admin-htmx-indicator');
+			window.htmx.process(document.body);
+		}
+		document.body.addEventListener('htmx:beforeRequest', beginHtmxRequest);
+		document.body.addEventListener('htmx:afterRequest', endHtmxRequest);
 	}
 	document.body.addEventListener('htmx:responseError', function () {
 		window.dispatchEvent(
@@ -240,11 +274,7 @@ document.addEventListener('alpine:init', function () {
 					return;
 				}
 				this.open = false;
-				var target = this.returnFocus || this.$refs.trigger;
-				this.returnFocus = null;
-				if (target && target.focus) {
-					target.focus();
-				}
+				adminReturnFocus(this, this.$refs.trigger);
 			},
 			trapFocusKey: function (event) {
 				if (!this.open) {
@@ -303,11 +333,7 @@ document.addEventListener('alpine:init', function () {
 					return;
 				}
 				this.visible = false;
-				var target = this.returnFocus;
-				this.returnFocus = null;
-				if (target && target.focus) {
-					target.focus();
-				}
+				adminReturnFocus(this, null);
 			},
 			trapFocusKey: function (event) {
 				if (!this.visible) {
@@ -393,11 +419,7 @@ document.addEventListener('alpine:init', function () {
 					return;
 				}
 				this.open = false;
-				var target = this.returnFocus || this.$refs.trigger;
-				this.returnFocus = null;
-				if (target && target.focus) {
-					target.focus();
-				}
+				adminReturnFocus(this, this.$refs.trigger);
 			},
 			hide: function () {
 				this.closePanel();

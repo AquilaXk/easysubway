@@ -132,9 +132,9 @@
 						<input type="hidden" name="commandToken" th:value="${commandTokens.next()}">
 						<input type="hidden" name="returnTo" th:value="${currentListHref}">
 						<details class="admin-action-confirm">
-							<summary class="tertiary" title="삭제" aria-label="저장된 뷰 삭제"><span aria-hidden="true">✕</span></summary>
+							<summary class="tertiary" title="삭제" aria-label="저장된 뷰 삭제 실행"><span aria-hidden="true">✕</span></summary>
 							<p class="meta" th:text="|저장된 뷰 '${view.name}'을(를) 삭제할까요? 이 작업은 되돌리기 어렵습니다.|">확인</p>
-							<button type="submit" class="tertiary" aria-label="저장된 뷰 삭제">삭제 실행</button>
+							<button type="submit" class="tertiary" aria-label="저장된 뷰 삭제 실행">삭제 실행</button>
 						</details>
 					</form>
 				</span>

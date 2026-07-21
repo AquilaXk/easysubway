@@ -24,7 +24,7 @@
 		<a class="admin-sidebar-quicksearch command-palette-trigger" th:href="@{/admin/search}"
 		   x-ref="trigger" x-on:click.prevent="show"
 		   x-bind:aria-expanded="ariaExpanded" aria-controls="command-palette-overlay">
-			<span aria-hidden="true">🔍</span>
+			<svg th:replace="~{admin/fragments/icon :: icon('search')}"></svg>
 			<span>메뉴·역 검색</span>
 			<kbd>⌘K</kbd>
 		</a>
@@ -185,7 +185,7 @@
 		</span>
 	</div>
 	<!-- htmx 전역 인디케이터(#2416): body hx-indicator로 모든 htmx 요청에 연결한다(app.js). -->
-	<div id="admin-htmx-indicator" class="htmx-indicator admin-htmx-indicator" aria-live="polite" aria-busy="true">
+	<div id="admin-htmx-indicator" class="htmx-indicator admin-htmx-indicator" aria-live="polite">
 		<span class="admin-htmx-indicator-label">불러오는 중…</span>
 	</div>
 	<!-- 토스트(#1737, #2416): htmx HX-Trigger·responseError가 공유한다. topbar에 두어 전 화면에서 사용. -->

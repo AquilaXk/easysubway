@@ -1644,6 +1644,26 @@
 		min-height: 44px;
 		padding: 0 4px;
 	}
+
+	/* tertiary dismiss·아이콘 버튼(#2416): 데스크톱 24px 유지, ≤1024px에서만 44×44px 터치 타깃. */
+	.admin-v3 .alert-dismiss,
+	.toast-region .toast-dismiss,
+	.admin-drawer-close {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-height: 44px;
+		min-width: 44px;
+	}
+
+	.admin-btn.tertiary,
+	.admin-v3 button.tertiary,
+	.admin-btn.plain,
+	.admin-v3 button.plain {
+		display: inline-flex;
+		align-items: center;
+		min-height: 44px;
+	}
 }
 
 /* ≤768px: 표준 테이블 밀도를 좁힌다(table min-width + admin-table-scroll이 scroll을 담당). */
