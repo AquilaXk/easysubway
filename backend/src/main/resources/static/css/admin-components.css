@@ -500,7 +500,7 @@
 	align-items: center;
 	gap: 6px;
 	font-size: var(--admin-fs-caption);
-	color: var(--admin-ink-muted);
+	color: var(--admin-ink-3);
 }
 
 .admin-v3 .htmx-request .htmx-indicator,
