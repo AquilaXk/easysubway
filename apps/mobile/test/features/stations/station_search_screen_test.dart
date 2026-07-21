@@ -1,5 +1,7 @@
+import 'package:easysubway_mobile/accessible_design.dart';
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/features/mobility_profile/mobility_profile_policy.dart';
+import 'package:easysubway_mobile/features/route_draft/application/route_draft_controller.dart';
 import 'package:easysubway_mobile/features/route_draft/domain/route_draft.dart';
 import 'package:easysubway_mobile/features/stations/domain/station_line.dart';
 import 'package:easysubway_mobile/features/stations/domain/station_models.dart';
@@ -28,7 +30,6 @@ void main() {
         home: StationSearchScreen(
           repository: _EmptyStationSearchRepository(),
           reportRepository: const UnavailableFacilityReportRepository(),
-          locationProvider: const _FixedCurrentLocationProvider(),
           pickSlot: RouteDraftSlot.origin,
           regionLabel: '수도권',
         ),
@@ -86,7 +87,6 @@ void main() {
         home: StationSearchScreen(
           repository: _EmptyStationSearchRepository(),
           reportRepository: const UnavailableFacilityReportRepository(),
-          locationProvider: const _FixedCurrentLocationProvider(),
           pickSlot: RouteDraftSlot.origin,
           regionLabel: '수도권',
         ),
@@ -101,12 +101,16 @@ void main() {
       find.descendant(of: indicator, matching: find.text('수도권')),
       findsOneWidget,
     );
-    // 표시 전용이라 지역 변경 화살표(아래 방향)를 홈과 같은 스타일로 둔다.
+    // 검색 결과 지역 필터용 선택기 — 홈과 같은 화살표 스타일 + 탭 가능.
     expect(
       find.descendant(
         of: indicator,
         matching: find.byIcon(Icons.keyboard_arrow_down),
       ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('stationSearchRegionDropdown')),
       findsOneWidget,
     );
 
@@ -122,6 +126,108 @@ void main() {
     expect(find.byKey(const Key('stationSearchBackButton')), findsOneWidget);
   });
 
+  testWidgets('역 검색 지역 선택은 결과 필터와 함께 홈 노선도 동기화 콜백을 호출한다', (tester) async {
+    final repository = _EmptyStationSearchRepository(
+      queryResults: {
+        '중앙': [
+          _stationResult(),
+          const StationSearchResult(
+            id: 'station-busan-jungang',
+            nameKo: '중앙',
+            nameEn: 'Jungang',
+            region: '부산권',
+            dataQualityLevel: 'LEVEL_1',
+            lastVerifiedAt: '2026-06-13',
+            lines: [
+              StationSearchLine(
+                id: 'busan-1',
+                name: '부산 1호선',
+                color: '#F73A3A',
+                stationCode: '119',
+              ),
+            ],
+          ),
+        ],
+      },
+    );
+    final changedRegions = <String>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StationSearchScreen(
+          repository: repository,
+          reportRepository: const UnavailableFacilityReportRepository(),
+          regionLabel: '수도권',
+          onRegionChanged: changedRegions.add,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '중앙');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+
+    // 수도권 필터: 수도권 역만 남는다.
+    expect(find.text('상록수역'), findsOneWidget);
+    expect(
+      find.byKey(const Key('stationSearchResult-station-busan-jungang')),
+      findsNothing,
+    );
+
+    await tester.tap(find.byKey(const Key('stationSearchRegionDropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('networkMapRegionMenuRow_부산')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('stationSearchRegionIndicator')),
+        matching: find.text('부산'),
+      ),
+      findsOneWidget,
+    );
+    // 부산 필터: 부산권 역만 남고, 홈 노선도 동기화용 콜백도 같은 지역 키를 받는다.
+    expect(find.text('상록수역'), findsNothing);
+    expect(
+      find.byKey(const Key('stationSearchResult-station-busan-jungang')),
+      findsOneWidget,
+    );
+    expect(changedRegions, ['부산']);
+  });
+
+  testWidgets('출발·도착·경유 중 하나라도 있으면 지역 변경과 ▾을 막는다', (tester) async {
+    final draftController = RouteDraftController()
+      ..setOrigin(const RouteDraftStation(id: 'station-a', nameKo: '상록수'));
+    final changedRegions = <String>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StationSearchScreen(
+          repository: _EmptyStationSearchRepository(),
+          reportRepository: const UnavailableFacilityReportRepository(),
+          routeDraftController: draftController,
+          pickSlot: RouteDraftSlot.destination,
+          regionLabel: '수도권',
+          onRegionChanged: changedRegions.add,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.keyboard_arrow_down), findsNothing);
+    expect(find.bySemanticsLabel('지역: 수도권'), findsOneWidget);
+    expect(find.bySemanticsLabel('지역: 수도권, 지역 변경'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('stationSearchRegionDropdown')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('networkMapRegionMenuRow_부산')),
+      findsNothing,
+    );
+    expect(changedRegions, isEmpty);
+  });
+
   testWidgets('#2090 수도권 외 지역(부산) 선택 상태에서 열어도 검색 화면 지역 표시가 실제 선택 지역을 따른다', (
     tester,
   ) async {
@@ -134,7 +240,6 @@ void main() {
         home: StationSearchScreen(
           repository: _EmptyStationSearchRepository(),
           reportRepository: const UnavailableFacilityReportRepository(),
-          locationProvider: const _FixedCurrentLocationProvider(),
           pickSlot: RouteDraftSlot.origin,
           regionLabel: '부산',
         ),
@@ -156,7 +261,7 @@ void main() {
 
   testWidgets('#2090 배율 3.0에서 역 검색 화면 필드가 툴바 안에서 잘리지 않는다', (tester) async {
     // 툴바 높이 보정 상수가 필드 메트릭과 정합돼 큰 배율에서도 필드가
-    // AppBar 세로 범위 안에 온전히 들어가야 한다.
+    // 상단바 세로 범위 안에 온전히 들어가야 한다.
     await tester.pumpWidget(
       MediaQuery(
         data: const MediaQueryData(textScaler: TextScaler.linear(3.0)),
@@ -164,7 +269,6 @@ void main() {
           home: StationSearchScreen(
             repository: _EmptyStationSearchRepository(),
             reportRepository: const UnavailableFacilityReportRepository(),
-            locationProvider: const _FixedCurrentLocationProvider(),
             pickSlot: RouteDraftSlot.origin,
             regionLabel: '수도권',
           ),
@@ -177,21 +281,22 @@ void main() {
 
     expect(tester.takeException(), isNull);
 
-    final inputFinder = find.byKey(const Key('stationSearchInput'));
-    final appBarFinder = find.ancestor(
-      of: inputFinder,
-      matching: find.byType(AppBar),
+    final topBarFinder = find.byKey(const Key('stationSearchAppBar'));
+    expect(topBarFinder, findsOneWidget);
+    expect(
+      tester
+          .getSize(find.byKey(const Key('stationSearchTopBarContent')))
+          .height,
+      greaterThan(easySubwayTopBarContentHeight),
     );
-    final appBar = tester.widget<AppBar>(appBarFinder);
-    expect(appBar.toolbarHeight, greaterThan(kToolbarHeight));
 
-    final appBarRect = tester.getRect(appBarFinder);
+    final topBarRect = tester.getRect(topBarFinder);
     final boxRect = tester.getRect(
       find.byKey(const Key('heroStationSearchInputBox')),
     );
-    // 시각 박스가 툴바 세로 범위 안에 온전히 들어간다(위/아래로 잘리지 않음).
-    expect(boxRect.bottom, lessThanOrEqualTo(appBarRect.bottom + 0.5));
-    expect(boxRect.top, greaterThanOrEqualTo(appBarRect.top - 0.5));
+    // 시각 박스가 상단바 세로 범위 안에 온전히 들어간다(위/아래로 잘리지 않음).
+    expect(boxRect.bottom, lessThanOrEqualTo(topBarRect.bottom + 0.5));
+    expect(boxRect.top, greaterThanOrEqualTo(topBarRect.top - 0.5));
   });
 
   testWidgets('#2090 역 검색 필드는 입력 후에도 슬롯 맥락 semantics 라벨을 유지한다', (tester) async {
@@ -203,7 +308,6 @@ void main() {
         home: StationSearchScreen(
           repository: _EmptyStationSearchRepository(),
           reportRepository: const UnavailableFacilityReportRepository(),
-          locationProvider: const _FixedCurrentLocationProvider(),
           pickSlot: RouteDraftSlot.origin,
           regionLabel: '수도권',
         ),
@@ -229,7 +333,6 @@ void main() {
         home: StationSearchScreen(
           repository: _EmptyStationSearchRepository(),
           reportRepository: const UnavailableFacilityReportRepository(),
-          locationProvider: const _FixedCurrentLocationProvider(),
           pickSlot: RouteDraftSlot.destination,
           regionLabel: '수도권',
         ),
@@ -252,7 +355,6 @@ void main() {
         repository: _EmptyStationSearchRepository(),
         reportRepository: const UnavailableFacilityReportRepository(),
         searchHistoryRepository: searchHistoryRepository,
-        locationProvider: const _FixedCurrentLocationProvider(),
         initialOnboardingState: _completedOnboardingState,
       ),
     );
@@ -271,20 +373,11 @@ void main() {
     );
   });
 
-  testWidgets('가까운 역 화면은 위치 실패 후 역명 검색 입력을 보여준다', (tester) async {
-    final repository = _EmptyStationSearchRepository(
-      queryResults: {
-        '상록수': [_stationResult()],
-      },
-    );
-
+  testWidgets('역 검색 화면에는 내 주변 역 찾기 버튼이 없다', (tester) async {
     await tester.pumpWidget(
       buildEasySubwayTestApp(
-        repository: repository,
+        repository: _EmptyStationSearchRepository(),
         reportRepository: const UnavailableFacilityReportRepository(),
-        locationProvider: const _FixedCurrentLocationProvider(
-          error: CurrentLocationException('현재 위치를 확인하지 못했어요.'),
-        ),
         initialOnboardingState: _completedOnboardingState,
       ),
     );
@@ -296,36 +389,52 @@ void main() {
       find.byKey(const Key('networkMapMenuStationSearchButton')),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
-    await tester.pumpAndSettle();
 
-    expect(find.text('현재 위치를 확인하지 못했어요.'), findsOneWidget);
+    expect(find.byKey(const Key('nearbyStationSearchButton')), findsNothing);
+    expect(find.text('내 주변 역 찾기'), findsNothing);
+    expect(find.text('내 주변 역 다시 찾기'), findsNothing);
     expect(find.byKey(const Key('stationSearchInput')), findsOneWidget);
-    expect(find.byKey(const Key('nearbyStationSearchButton')), findsOneWidget);
-    expect(find.byKey(const Key('stationRecentSearchSection')), findsNothing);
-
-    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
-    await tester.pumpAndSettle();
-    await tester.testTextInput.receiveAction(TextInputAction.search);
-    await tester.pumpAndSettle();
-
-    expect(repository.requestedQueries, contains('상록수'));
-    expect(find.text('상록수역'), findsOneWidget);
   });
 
-  testWidgets('역 검색 화면 AppBar 입력 필드는 시스템 글자 크기를 키워도 잘리지 않는다', (tester) async {
-    // #1962: 고정 높이 검색 필드가 큰 글자 배율에서도 AppBar 경계를 넘지 않아야 한다.
-    final repository = _EmptyStationSearchRepository(
-      nearbyResults: [_stationResult()],
+  testWidgets('최근 검색이 없으면 빈 상태 안내를 보여준다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StationSearchScreen(
+          repository: _EmptyStationSearchRepository(),
+          reportRepository: const UnavailableFacilityReportRepository(),
+          searchHistoryRepository: _MemorySearchHistoryRepository(const []),
+          regionLabel: '수도권',
+        ),
+      ),
     );
+    await tester.pumpAndSettle();
 
+    expect(
+      find.byKey(const Key('stationRecentSearchEmptyState')),
+      findsOneWidget,
+    );
+    expect(find.text('최근 검색 내역이 없습니다.'), findsOneWidget);
+    expect(
+      find.byKey(const Key('stationRecentSearchEmptyImage')),
+      findsOneWidget,
+    );
+    // 내역이 없으면 헤더(최근 검색 / 모두 지우기)는 숨긴다.
+    expect(find.text('최근 검색'), findsNothing);
+    expect(find.text('모두 지우기'), findsNothing);
+    expect(
+      find.byKey(const Key('stationRecentSearchClearAllButton')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('역 검색 화면 상단바 입력 필드는 시스템 글자 크기를 키워도 잘리지 않는다', (tester) async {
+    // #1962: 고정 높이 검색 필드가 큰 글자 배율에서도 상단바 경계를 넘지 않아야 한다.
     await tester.pumpWidget(
       MediaQuery(
         data: const MediaQueryData(textScaler: TextScaler.linear(2.0)),
         child: buildEasySubwayTestApp(
-          repository: repository,
+          repository: _EmptyStationSearchRepository(),
           reportRepository: const UnavailableFacilityReportRepository(),
-          locationProvider: const _FixedCurrentLocationProvider(),
           initialOnboardingState: _completedOnboardingState,
         ),
       ),
@@ -338,27 +447,25 @@ void main() {
       find.byKey(const Key('networkMapMenuStationSearchButton')),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
-    await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
 
     final inputFinder = find.byKey(const Key('stationSearchInput'));
     expect(inputFinder, findsOneWidget);
 
-    final appBarFinder = find.ancestor(
-      of: inputFinder,
-      matching: find.byType(AppBar),
+    final topBarFinder = find.byKey(const Key('stationSearchAppBar'));
+    expect(topBarFinder, findsOneWidget);
+    expect(
+      tester
+          .getSize(find.byKey(const Key('stationSearchTopBarContent')))
+          .height,
+      greaterThan(easySubwayTopBarContentHeight),
     );
-    expect(appBarFinder, findsOneWidget);
-    final appBar = tester.widget<AppBar>(appBarFinder);
-    expect(appBar.toolbarHeight, isNotNull);
-    expect(appBar.toolbarHeight, greaterThan(kToolbarHeight));
 
-    final appBarRect = tester.getRect(appBarFinder);
+    final topBarRect = tester.getRect(topBarFinder);
     final inputRect = tester.getRect(inputFinder);
-    expect(inputRect.bottom, lessThanOrEqualTo(appBarRect.bottom + 0.5));
-    expect(inputRect.top, greaterThanOrEqualTo(appBarRect.top - 0.5));
+    expect(inputRect.bottom, lessThanOrEqualTo(topBarRect.bottom + 0.5));
+    expect(inputRect.top, greaterThanOrEqualTo(topBarRect.top - 0.5));
   });
 
   testWidgets('역 검색 화면은 최근 검색어를 탭해 빠르게 다시 검색한다', (tester) async {
@@ -379,7 +486,6 @@ void main() {
           home: StationSearchScreen(
             repository: repository,
             reportRepository: const UnavailableFacilityReportRepository(),
-            locationProvider: const _FixedCurrentLocationProvider(),
             searchHistoryRepository: searchHistoryRepository,
             regionLabel: '수도권',
           ),
@@ -393,16 +499,24 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('최근 검색'), findsOneWidget);
-      expect(find.textContaining('최근 사용 순서'), findsNothing);
-      expect(find.text('최근 사용 1번째'), findsOneWidget);
+      expect(find.text('모두 보기'), findsNothing);
+      expect(find.text('모두 지우기'), findsOneWidget);
+      expect(
+        find.byKey(const Key('stationRecentSearchViewAllButton')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const Key('stationRecentSearchClearAllButton')),
+        findsOneWidget,
+      );
       expect(
         find.byKey(const Key('stationRecentSearchQuery-상록수')),
         findsOneWidget,
       );
-      expect(find.bySemanticsLabel('최근 검색어 상록수 검색, 최근 사용 1번째'), findsOneWidget);
+      expect(find.bySemanticsLabel('최근 검색어 상록수 검색'), findsOneWidget);
       expect(
         tester
-            .getSemantics(find.bySemanticsLabel('최근 검색어 상록수 검색, 최근 사용 1번째'))
+            .getSemantics(find.bySemanticsLabel('최근 검색어 상록수 검색'))
             .getSemanticsData()
             .hasAction(SemanticsAction.tap),
         isTrue,
@@ -434,7 +548,7 @@ void main() {
     }
   });
 
-  testWidgets('역 검색 화면 안에서 최근 검색을 개별·전체 삭제한다', (tester) async {
+  testWidgets('역 검색 화면 안에서 최근 검색을 개별 삭제한다', (tester) async {
     final searchHistoryRepository = _MemorySearchHistoryRepository([
       '상록수',
       '사당',
@@ -445,7 +559,6 @@ void main() {
         home: StationSearchScreen(
           repository: _EmptyStationSearchRepository(),
           reportRepository: const UnavailableFacilityReportRepository(),
-          locationProvider: const _FixedCurrentLocationProvider(),
           searchHistoryRepository: searchHistoryRepository,
           regionLabel: '수도권',
         ),
@@ -453,22 +566,81 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(
+      find.byKey(const Key('stationRecentSearchClearAllButton')),
+      findsOneWidget,
+    );
+
     await tester.tap(find.byKey(const Key('stationRecentSearchRemove-상록수')));
     await tester.pumpAndSettle();
 
     expect(searchHistoryRepository.removedQueries, ['상록수']);
     expect(find.byKey(const Key('stationRecentSearchQuery-상록수')), findsNothing);
+    expect(
+      find.byKey(const Key('stationRecentSearchQuery-사당')),
+      findsOneWidget,
+    );
     expect(find.byKey(const Key('stationRecentSearchSection')), findsOneWidget);
+    expect(find.byKey(const Key('stationSearchInput')), findsOneWidget);
+  });
 
-    await tester.tap(
-      find.byKey(const Key('stationRecentSearchClearAllButton')),
+  testWidgets('역 검색 최근 목록은 현재 지역 항목만 보여준다', (tester) async {
+    final searchHistoryRepository = _MemorySearchHistoryRepository(const []);
+    await searchHistoryRepository.recordSearch('상록수', region: '수도권');
+    await searchHistoryRepository.recordSearch('서면', region: '부산');
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StationSearchScreen(
+          repository: _EmptyStationSearchRepository(),
+          reportRepository: const UnavailableFacilityReportRepository(),
+          searchHistoryRepository: searchHistoryRepository,
+          regionLabel: '수도권',
+        ),
+      ),
     );
     await tester.pumpAndSettle();
 
-    expect(searchHistoryRepository.clearCount, 1);
-    expect(find.byKey(const Key('stationRecentSearchSection')), findsNothing);
-    expect(find.text('최근 검색한 역이 없습니다.'), findsNothing);
-    expect(find.byKey(const Key('stationSearchInput')), findsOneWidget);
+    // 수도권을 보는 동안 부산 검색어는 목록에 없다.
+    expect(
+      find.byKey(const Key('stationRecentSearchQuery-상록수')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('stationRecentSearchQuery-서면')), findsNothing);
+  });
+
+  testWidgets('최근 경로 항목은 화살표 라벨로 통합 목록에 표시된다', (tester) async {
+    final searchHistoryRepository = _MemorySearchHistoryRepository(const [])
+      ..seedRoute(
+        RecentRouteSearchEntry(
+          originStationId: 'station-sangnoksu',
+          originStationName: '상록수',
+          destinationStationId: 'station-sadang',
+          destinationStationName: '사당',
+          region: '수도권',
+          searchedAt: DateTime.utc(2026, 7, 21),
+        ),
+      );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StationSearchScreen(
+          repository: _EmptyStationSearchRepository(),
+          reportRepository: const UnavailableFacilityReportRepository(),
+          searchHistoryRepository: searchHistoryRepository,
+          regionLabel: '수도권',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('상록수역 → 사당역'), findsOneWidget);
+    expect(
+      find.byKey(
+        const Key('recentRouteSearch-station-sangnoksu--station-sadang'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('역 검색 결과는 환승 역을 노선마다 한 행으로 펼쳐 보여준다', (tester) async {
@@ -518,7 +690,6 @@ void main() {
         home: StationSearchScreen(
           repository: repository,
           reportRepository: const UnavailableFacilityReportRepository(),
-          locationProvider: const _FixedCurrentLocationProvider(),
           regionLabel: '수도권',
         ),
       ),
@@ -554,13 +725,9 @@ void main() {
 }
 
 class _EmptyStationSearchRepository implements StationSearchRepository {
-  _EmptyStationSearchRepository({
-    this.queryResults = const {},
-    this.nearbyResults = const [],
-  });
+  _EmptyStationSearchRepository({this.queryResults = const {}});
 
   final Map<String, List<StationSearchResult>> queryResults;
-  final List<StationSearchResult> nearbyResults;
   final requestedQueries = <String>[];
 
   @override
@@ -580,7 +747,7 @@ class _EmptyStationSearchRepository implements StationSearchRepository {
     CurrentLocation location, {
     int radiusMeters = 2000,
     int limit = 10,
-  }) async => nearbyResults.take(limit).toList(growable: false);
+  }) async => const [];
 
   @override
   Future<List<StationSearchResult>> searchStations(String query) async {
@@ -590,39 +757,136 @@ class _EmptyStationSearchRepository implements StationSearchRepository {
 }
 
 class _MemorySearchHistoryRepository implements SearchHistoryRepository {
-  _MemorySearchHistoryRepository(List<String> queries) : queries = [...queries];
+  _MemorySearchHistoryRepository(
+    List<String> queries, {
+    String? seedRegion = '수도권',
+  }) {
+    for (final query in queries.reversed) {
+      _addStation(query, region: seedRegion);
+    }
+  }
 
-  final List<String> queries;
+  final _stations = <RecentStationSearchEntry>[];
+  final _routes = <RecentRouteSearchEntry>[];
   final recordedQueries = <String>[];
   final removedQueries = <String>[];
   int clearCount = 0;
+  int _clock = 0;
+
+  DateTime _tick() =>
+      DateTime.fromMillisecondsSinceEpoch(++_clock, isUtc: true);
+
+  void _addStation(String query, {String? region}) {
+    final normalized = region?.trim() ?? '';
+    _stations.removeWhere(
+      (entry) =>
+          entry.query == query && (entry.region?.trim() ?? '') == normalized,
+    );
+    _stations.insert(
+      0,
+      RecentStationSearchEntry(
+        query: query,
+        region: normalized.isEmpty ? null : normalized,
+        searchedAt: _tick(),
+      ),
+    );
+  }
+
+  void seedRoute(RecentRouteSearchEntry entry) {
+    _routes.insert(
+      0,
+      RecentRouteSearchEntry(
+        originStationId: entry.originStationId,
+        originStationName: entry.originStationName,
+        waypointStationId: entry.waypointStationId,
+        waypointStationName: entry.waypointStationName,
+        destinationStationId: entry.destinationStationId,
+        destinationStationName: entry.destinationStationName,
+        region: entry.region,
+        searchedAt: _tick(),
+      ),
+    );
+  }
 
   @override
   Future<void> clearSearches() async {
     clearCount++;
-    queries.clear();
+    _stations.clear();
+    _routes.clear();
   }
 
   @override
-  Future<List<String>> listRecentQueries() async => [...queries];
+  Future<List<String>> listRecentQueries() async =>
+      _stations.map((entry) => entry.query).toList(growable: false);
 
   @override
-  Future<void> recordSearch(String query) async {
+  Future<List<RecentSearchEntry>> listRecentEntries({
+    String? region,
+    int limit = 10,
+  }) async {
+    final filter = region?.trim();
+    final entries = <RecentSearchEntry>[
+      for (final entry in _stations)
+        if (_stationMatches(entry.region, filter)) entry,
+      for (final entry in _routes)
+        if (filter == null ||
+            filter.isEmpty ||
+            stationBelongsToRegion(entry.region, filter))
+          entry,
+    ]..sort((a, b) => b.searchedAt.compareTo(a.searchedAt));
+    return entries.take(limit).toList(growable: false);
+  }
+
+  @override
+  Future<void> recordSearch(String query, {String? region}) async {
     final trimmed = query.trim();
-    if (trimmed.isEmpty) {
+    final normalized = region?.trim() ?? '';
+    if (trimmed.isEmpty || normalized.isEmpty) {
       return;
     }
     recordedQueries.add(trimmed);
-    queries
-      ..remove(trimmed)
-      ..insert(0, trimmed);
+    _addStation(trimmed, region: normalized);
   }
 
   @override
-  Future<void> removeSearch(String query) async {
+  Future<void> recordRouteSearch(RecentRouteSearchEntry entry) async {
+    _routes.removeWhere(
+      (existing) => existing.identityKey == entry.identityKey,
+    );
+    seedRoute(entry);
+  }
+
+  @override
+  Future<void> removeSearch(String query, {String? region}) async {
     final trimmed = query.trim();
     removedQueries.add(trimmed);
-    queries.remove(trimmed);
+    final normalized = region?.trim();
+    if (normalized == null || normalized.isEmpty) {
+      _stations.removeWhere((entry) => entry.query == trimmed);
+      return;
+    }
+    _stations.removeWhere(
+      (entry) =>
+          entry.query == trimmed &&
+          stationBelongsToRegion(entry.region ?? '', normalized),
+    );
+  }
+
+  @override
+  Future<void> removeRouteSearch(RecentRouteSearchEntry entry) async {
+    _routes.removeWhere(
+      (existing) => existing.identityKey == entry.identityKey,
+    );
+  }
+
+  bool _stationMatches(String? rowRegion, String? filter) {
+    if (filter == null || filter.isEmpty) {
+      return true;
+    }
+    if (rowRegion == null || rowRegion.isEmpty) {
+      return false;
+    }
+    return stationBelongsToRegion(rowRegion, filter);
   }
 }
 
@@ -643,32 +907,4 @@ StationSearchResult _stationResult() {
       ),
     ],
   );
-}
-
-class _FixedCurrentLocationProvider implements CurrentLocationProvider {
-  const _FixedCurrentLocationProvider({this.error});
-
-  final CurrentLocationException? error;
-
-  @override
-  Future<CurrentLocation> currentLocation() async {
-    final currentError = error;
-    if (currentError != null) {
-      throw currentError;
-    }
-    return CurrentLocation(
-      latitude: 37.3028,
-      longitude: 126.8665,
-      accuracyMeters: 25,
-      measuredAt: DateTime.now(),
-      provider: 'test',
-      permissionPrecision: LocationPermissionPrecision.precise,
-    );
-  }
-
-  @override
-  Future<bool> needsLocationPermissionRequest() async => false;
-
-  @override
-  Future<bool> openLocationSettings() async => true;
 }

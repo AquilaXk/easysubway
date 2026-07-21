@@ -474,7 +474,6 @@ void main() {
           repository: const _EmptyNetworkMapRepository(),
           routeDraftController: RouteDraftController(),
           onOpenStationSearch: (_) {},
-          onOpenNearbyStations: (_) {},
           onOpenTrainSearch: () => opened = true,
         ),
       ),

@@ -323,6 +323,23 @@ class StationSearchResult {
   }
 }
 
+/// 역 검색 지역 필터: DB의 `부산권` 등과 UI 표시명 `부산`을 같은 권역으로 본다.
+bool stationBelongsToRegion(String stationRegion, String filterRegion) {
+  return normalizeStationRegion(stationRegion) ==
+      normalizeStationRegion(filterRegion);
+}
+
+String normalizeStationRegion(String region) {
+  final trimmed = region.trim();
+  return switch (trimmed) {
+    '부산권' => '부산',
+    '광주권' => '광주',
+    '대구권' => '대구',
+    '대전권' => '대전',
+    _ => trimmed,
+  };
+}
+
 class StationDetail {
   const StationDetail({
     required this.id,

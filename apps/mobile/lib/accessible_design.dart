@@ -168,6 +168,12 @@ class EasySubwayTouchTarget {
   static const primary = 60.0;
 }
 
+/// 홈 노선도·역 검색 상단바 콘텐츠 높이(SafeArea/상태바 제외).
+///
+/// 두 화면은 왼쪽 아이콘(메뉴/뒤로)만 다르고 패딩·검색 필드·지역·구분선
+/// 계약을 공유한다. 이 상수를 바꾸면 양쪽을 함께 갱신한다.
+const easySubwayTopBarContentHeight = 60.0;
+
 class EasySubwayHeaderDivider extends SizedBox {
   const EasySubwayHeaderDivider({super.key})
     : super(

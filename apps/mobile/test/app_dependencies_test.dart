@@ -40,6 +40,19 @@ void main() {
     );
   });
 
+  test('최근 검색 빈 상태 경고 일러스트 출처를 라이선스 화면에 등록한다', () async {
+    app.registerBundledAssetLicenses();
+
+    final entry = await LicenseRegistry.licenses.firstWhere(
+      (entry) =>
+          entry.packages.contains('empty-recent-search-warning-illustration'),
+    );
+    final text = entry.paragraphs.map((paragraph) => paragraph.text).join('\n');
+
+    expect(text, contains('https://www.svgrepo.com/svg/501793/warning'));
+    expect(text, contains('https://www.svgrepo.com/page/licensing/'));
+  });
+
   test(
     '광고 repository 주입 identity를 유지하고 기본값은 fetch 전 base URI를 읽지 않는다',
     () async {

@@ -133,6 +133,16 @@ License URL: https://www.svgrepo.com/page/licensing/#CC%20Attribution
 Changes: converted from SVG to PNG and colorized for EasySubway.
 ''',
     );
+    yield const LicenseEntryWithLineBreaks(
+      ['empty-recent-search-warning-illustration'],
+      '''
+Empty recent-search warning illustration
+Source: https://www.svgrepo.com/svg/501793/warning
+License: SVG Repo (see SVG Repo licensing)
+License URL: https://www.svgrepo.com/page/licensing/
+Changes: converted from SVG to PNG and colorized for EasySubway.
+''',
+    );
   });
 }
 

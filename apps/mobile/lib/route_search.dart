@@ -2784,6 +2784,7 @@ class RouteSearchScreen extends StatefulWidget {
   RouteSearchScreen({
     required this.repository,
     required this.stationRepository,
+    this.searchHistoryRepository,
     this.routeFeedbackRepository,
     this.favoriteRouteRepository,
     this.adRepository,
@@ -2804,6 +2805,7 @@ class RouteSearchScreen extends StatefulWidget {
 
   final RouteSearchRepository repository;
   final StationSearchRepository stationRepository;
+  final SearchHistoryRepository? searchHistoryRepository;
   final RouteFeedbackRepository? routeFeedbackRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
   final AdRepository? adRepository;
@@ -3333,6 +3335,54 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
         objective: _selectedObjective,
       ),
     );
+    unawaited(_recordRouteSearchHistory());
+  }
+
+  /// 검색이 실제 이동 경로로 성공했을 때만 최근 경로 목록에 기록한다. blocked
+  /// 결과나 지역을 알 수 없는 경우(origin 지역 미상)는 지역 필터 목록에 노출될 수
+  /// 없으므로 저장하지 않는다.
+  Future<void> _recordRouteSearchHistory() async {
+    final repository = widget.searchHistoryRepository;
+    if (repository == null || !mounted) {
+      return;
+    }
+    final state = _controller.state;
+    final result = state.result;
+    if (state.status != RouteSearchViewStatus.success ||
+        result == null ||
+        result.isBlocked) {
+      return;
+    }
+    final origin = _originStation;
+    final destination = _destinationStation;
+    if (origin == null || destination == null) {
+      return;
+    }
+    final region = normalizeStationRegion(origin.region);
+    if (region.isEmpty) {
+      return;
+    }
+    final waypoint = _waypointStation;
+    try {
+      await repository.recordRouteSearch(
+        RecentRouteSearchEntry(
+          originStationId: origin.id,
+          originStationName: origin.nameKo,
+          waypointStationId: waypoint?.id,
+          waypointStationName: waypoint?.nameKo,
+          destinationStationId: destination.id,
+          destinationStationName: destination.nameKo,
+          region: region,
+          searchedAt: DateTime.now().toUtc(),
+        ),
+      );
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '최근 경로 검색 저장 중 예외가 발생했습니다.',
+      );
+    }
   }
 
   Future<void> _changeObjective(RouteObjective objective) async {

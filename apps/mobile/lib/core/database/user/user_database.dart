@@ -13,6 +13,7 @@ part 'user_database.g.dart';
     FavoriteFacilities,
     FavoriteRoutes,
     SearchHistory,
+    RouteSearchHistory,
     AppPreferences,
     InstalledDataPacks,
     DataPackUpdateState,
@@ -36,7 +37,7 @@ class UserDatabase extends _$UserDatabase {
   }
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration {
@@ -52,6 +53,24 @@ class UserDatabase extends _$UserDatabase {
           await customStatement(
             'ALTER TABLE report_receipts ADD COLUMN public_receipt_code TEXT',
           );
+        }
+        if (from < 3) {
+          await customStatement(
+            'ALTER TABLE search_history ADD COLUMN region TEXT',
+          );
+          await customStatement('''
+            CREATE TABLE route_search_history (
+              id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+              origin_station_id TEXT NOT NULL,
+              origin_station_name TEXT NOT NULL,
+              waypoint_station_id TEXT NULL,
+              waypoint_station_name TEXT NULL,
+              destination_station_id TEXT NOT NULL,
+              destination_station_name TEXT NOT NULL,
+              region TEXT NOT NULL,
+              searched_at INTEGER NOT NULL
+            )
+          ''');
         }
       },
       beforeOpen: (_) async {

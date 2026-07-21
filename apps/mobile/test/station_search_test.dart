@@ -1791,7 +1791,7 @@ class FakeSearchHistoryRepository implements SearchHistoryRepository {
   final recordedQueries = <String>[];
 
   @override
-  Future<void> recordSearch(String query) async {
+  Future<void> recordSearch(String query, {String? region}) async {
     recordedQueries.add(query);
   }
 
@@ -1801,9 +1801,32 @@ class FakeSearchHistoryRepository implements SearchHistoryRepository {
   }
 
   @override
-  Future<void> removeSearch(String query) async {
+  Future<List<RecentSearchEntry>> listRecentEntries({
+    String? region,
+    int limit = 10,
+  }) async {
+    final now = DateTime.now();
+    var offset = recordedQueries.length;
+    return [
+      for (final query in recordedQueries.reversed)
+        RecentStationSearchEntry(
+          query: query,
+          region: region,
+          searchedAt: now.subtract(Duration(microseconds: offset--)),
+        ),
+    ].take(limit).toList(growable: false);
+  }
+
+  @override
+  Future<void> recordRouteSearch(RecentRouteSearchEntry entry) async {}
+
+  @override
+  Future<void> removeSearch(String query, {String? region}) async {
     recordedQueries.remove(query.trim());
   }
+
+  @override
+  Future<void> removeRouteSearch(RecentRouteSearchEntry entry) async {}
 
   @override
   Future<void> clearSearches() async {

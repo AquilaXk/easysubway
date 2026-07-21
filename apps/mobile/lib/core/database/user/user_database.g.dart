@@ -914,6 +914,15 @@ class $SearchHistoryTable extends SearchHistory
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _regionMeta = const VerificationMeta('region');
+  @override
+  late final GeneratedColumn<String> region = GeneratedColumn<String>(
+    'region',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _searchedAtMeta = const VerificationMeta(
     'searchedAt',
   );
@@ -926,7 +935,7 @@ class $SearchHistoryTable extends SearchHistory
     requiredDuringInsert: true,
   );
   @override
-  List<GeneratedColumn> get $columns => [id, query, searchedAt];
+  List<GeneratedColumn> get $columns => [id, query, region, searchedAt];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -949,6 +958,12 @@ class $SearchHistoryTable extends SearchHistory
       );
     } else if (isInserting) {
       context.missing(_queryMeta);
+    }
+    if (data.containsKey('region')) {
+      context.handle(
+        _regionMeta,
+        region.isAcceptableOrUnknown(data['region']!, _regionMeta),
+      );
     }
     if (data.containsKey('searched_at')) {
       context.handle(
@@ -975,6 +990,10 @@ class $SearchHistoryTable extends SearchHistory
         DriftSqlType.string,
         data['${effectivePrefix}query'],
       )!,
+      region: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}region'],
+      ),
       searchedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}searched_at'],
@@ -992,10 +1011,15 @@ class SearchHistoryData extends DataClass
     implements Insertable<SearchHistoryData> {
   final int id;
   final String query;
+
+  /// 검색 당시 선택 지역(예: `수도권`, `부산`). 지역별 최근 목록 필터에 쓴다.
+  /// 지역 정보 없이 저장된 레거시 행은 null이며, 지역 필터 목록에서 제외한다.
+  final String? region;
   final DateTime searchedAt;
   const SearchHistoryData({
     required this.id,
     required this.query,
+    this.region,
     required this.searchedAt,
   });
   @override
@@ -1003,6 +1027,9 @@ class SearchHistoryData extends DataClass
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
     map['query'] = Variable<String>(query);
+    if (!nullToAbsent || region != null) {
+      map['region'] = Variable<String>(region);
+    }
     map['searched_at'] = Variable<DateTime>(searchedAt);
     return map;
   }
@@ -1011,6 +1038,9 @@ class SearchHistoryData extends DataClass
     return SearchHistoryCompanion(
       id: Value(id),
       query: Value(query),
+      region: region == null && nullToAbsent
+          ? const Value.absent()
+          : Value(region),
       searchedAt: Value(searchedAt),
     );
   }
@@ -1023,6 +1053,7 @@ class SearchHistoryData extends DataClass
     return SearchHistoryData(
       id: serializer.fromJson<int>(json['id']),
       query: serializer.fromJson<String>(json['query']),
+      region: serializer.fromJson<String?>(json['region']),
       searchedAt: serializer.fromJson<DateTime>(json['searchedAt']),
     );
   }
@@ -1032,20 +1063,27 @@ class SearchHistoryData extends DataClass
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'query': serializer.toJson<String>(query),
+      'region': serializer.toJson<String?>(region),
       'searchedAt': serializer.toJson<DateTime>(searchedAt),
     };
   }
 
-  SearchHistoryData copyWith({int? id, String? query, DateTime? searchedAt}) =>
-      SearchHistoryData(
-        id: id ?? this.id,
-        query: query ?? this.query,
-        searchedAt: searchedAt ?? this.searchedAt,
-      );
+  SearchHistoryData copyWith({
+    int? id,
+    String? query,
+    Value<String?> region = const Value.absent(),
+    DateTime? searchedAt,
+  }) => SearchHistoryData(
+    id: id ?? this.id,
+    query: query ?? this.query,
+    region: region.present ? region.value : this.region,
+    searchedAt: searchedAt ?? this.searchedAt,
+  );
   SearchHistoryData copyWithCompanion(SearchHistoryCompanion data) {
     return SearchHistoryData(
       id: data.id.present ? data.id.value : this.id,
       query: data.query.present ? data.query.value : this.query,
+      region: data.region.present ? data.region.value : this.region,
       searchedAt: data.searchedAt.present
           ? data.searchedAt.value
           : this.searchedAt,
@@ -1057,45 +1095,52 @@ class SearchHistoryData extends DataClass
     return (StringBuffer('SearchHistoryData(')
           ..write('id: $id, ')
           ..write('query: $query, ')
+          ..write('region: $region, ')
           ..write('searchedAt: $searchedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, query, searchedAt);
+  int get hashCode => Object.hash(id, query, region, searchedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is SearchHistoryData &&
           other.id == this.id &&
           other.query == this.query &&
+          other.region == this.region &&
           other.searchedAt == this.searchedAt);
 }
 
 class SearchHistoryCompanion extends UpdateCompanion<SearchHistoryData> {
   final Value<int> id;
   final Value<String> query;
+  final Value<String?> region;
   final Value<DateTime> searchedAt;
   const SearchHistoryCompanion({
     this.id = const Value.absent(),
     this.query = const Value.absent(),
+    this.region = const Value.absent(),
     this.searchedAt = const Value.absent(),
   });
   SearchHistoryCompanion.insert({
     this.id = const Value.absent(),
     required String query,
+    this.region = const Value.absent(),
     required DateTime searchedAt,
   }) : query = Value(query),
        searchedAt = Value(searchedAt);
   static Insertable<SearchHistoryData> custom({
     Expression<int>? id,
     Expression<String>? query,
+    Expression<String>? region,
     Expression<DateTime>? searchedAt,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (query != null) 'query': query,
+      if (region != null) 'region': region,
       if (searchedAt != null) 'searched_at': searchedAt,
     });
   }
@@ -1103,11 +1148,13 @@ class SearchHistoryCompanion extends UpdateCompanion<SearchHistoryData> {
   SearchHistoryCompanion copyWith({
     Value<int>? id,
     Value<String>? query,
+    Value<String?>? region,
     Value<DateTime>? searchedAt,
   }) {
     return SearchHistoryCompanion(
       id: id ?? this.id,
       query: query ?? this.query,
+      region: region ?? this.region,
       searchedAt: searchedAt ?? this.searchedAt,
     );
   }
@@ -1121,6 +1168,9 @@ class SearchHistoryCompanion extends UpdateCompanion<SearchHistoryData> {
     if (query.present) {
       map['query'] = Variable<String>(query.value);
     }
+    if (region.present) {
+      map['region'] = Variable<String>(region.value);
+    }
     if (searchedAt.present) {
       map['searched_at'] = Variable<DateTime>(searchedAt.value);
     }
@@ -1132,6 +1182,618 @@ class SearchHistoryCompanion extends UpdateCompanion<SearchHistoryData> {
     return (StringBuffer('SearchHistoryCompanion(')
           ..write('id: $id, ')
           ..write('query: $query, ')
+          ..write('region: $region, ')
+          ..write('searchedAt: $searchedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $RouteSearchHistoryTable extends RouteSearchHistory
+    with TableInfo<$RouteSearchHistoryTable, RouteSearchHistoryData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RouteSearchHistoryTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _originStationIdMeta = const VerificationMeta(
+    'originStationId',
+  );
+  @override
+  late final GeneratedColumn<String> originStationId = GeneratedColumn<String>(
+    'origin_station_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _originStationNameMeta = const VerificationMeta(
+    'originStationName',
+  );
+  @override
+  late final GeneratedColumn<String> originStationName =
+      GeneratedColumn<String>(
+        'origin_station_name',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _waypointStationIdMeta = const VerificationMeta(
+    'waypointStationId',
+  );
+  @override
+  late final GeneratedColumn<String> waypointStationId =
+      GeneratedColumn<String>(
+        'waypoint_station_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _waypointStationNameMeta =
+      const VerificationMeta('waypointStationName');
+  @override
+  late final GeneratedColumn<String> waypointStationName =
+      GeneratedColumn<String>(
+        'waypoint_station_name',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _destinationStationIdMeta =
+      const VerificationMeta('destinationStationId');
+  @override
+  late final GeneratedColumn<String> destinationStationId =
+      GeneratedColumn<String>(
+        'destination_station_id',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _destinationStationNameMeta =
+      const VerificationMeta('destinationStationName');
+  @override
+  late final GeneratedColumn<String> destinationStationName =
+      GeneratedColumn<String>(
+        'destination_station_name',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _regionMeta = const VerificationMeta('region');
+  @override
+  late final GeneratedColumn<String> region = GeneratedColumn<String>(
+    'region',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _searchedAtMeta = const VerificationMeta(
+    'searchedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> searchedAt = GeneratedColumn<DateTime>(
+    'searched_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    originStationId,
+    originStationName,
+    waypointStationId,
+    waypointStationName,
+    destinationStationId,
+    destinationStationName,
+    region,
+    searchedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'route_search_history';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RouteSearchHistoryData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('origin_station_id')) {
+      context.handle(
+        _originStationIdMeta,
+        originStationId.isAcceptableOrUnknown(
+          data['origin_station_id']!,
+          _originStationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_originStationIdMeta);
+    }
+    if (data.containsKey('origin_station_name')) {
+      context.handle(
+        _originStationNameMeta,
+        originStationName.isAcceptableOrUnknown(
+          data['origin_station_name']!,
+          _originStationNameMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_originStationNameMeta);
+    }
+    if (data.containsKey('waypoint_station_id')) {
+      context.handle(
+        _waypointStationIdMeta,
+        waypointStationId.isAcceptableOrUnknown(
+          data['waypoint_station_id']!,
+          _waypointStationIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('waypoint_station_name')) {
+      context.handle(
+        _waypointStationNameMeta,
+        waypointStationName.isAcceptableOrUnknown(
+          data['waypoint_station_name']!,
+          _waypointStationNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('destination_station_id')) {
+      context.handle(
+        _destinationStationIdMeta,
+        destinationStationId.isAcceptableOrUnknown(
+          data['destination_station_id']!,
+          _destinationStationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_destinationStationIdMeta);
+    }
+    if (data.containsKey('destination_station_name')) {
+      context.handle(
+        _destinationStationNameMeta,
+        destinationStationName.isAcceptableOrUnknown(
+          data['destination_station_name']!,
+          _destinationStationNameMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_destinationStationNameMeta);
+    }
+    if (data.containsKey('region')) {
+      context.handle(
+        _regionMeta,
+        region.isAcceptableOrUnknown(data['region']!, _regionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_regionMeta);
+    }
+    if (data.containsKey('searched_at')) {
+      context.handle(
+        _searchedAtMeta,
+        searchedAt.isAcceptableOrUnknown(data['searched_at']!, _searchedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_searchedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  RouteSearchHistoryData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RouteSearchHistoryData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      originStationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}origin_station_id'],
+      )!,
+      originStationName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}origin_station_name'],
+      )!,
+      waypointStationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}waypoint_station_id'],
+      ),
+      waypointStationName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}waypoint_station_name'],
+      ),
+      destinationStationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}destination_station_id'],
+      )!,
+      destinationStationName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}destination_station_name'],
+      )!,
+      region: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}region'],
+      )!,
+      searchedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}searched_at'],
+      )!,
+    );
+  }
+
+  @override
+  $RouteSearchHistoryTable createAlias(String alias) {
+    return $RouteSearchHistoryTable(attachedDatabase, alias);
+  }
+}
+
+class RouteSearchHistoryData extends DataClass
+    implements Insertable<RouteSearchHistoryData> {
+  final int id;
+  final String originStationId;
+  final String originStationName;
+  final String? waypointStationId;
+  final String? waypointStationName;
+  final String destinationStationId;
+  final String destinationStationName;
+  final String region;
+  final DateTime searchedAt;
+  const RouteSearchHistoryData({
+    required this.id,
+    required this.originStationId,
+    required this.originStationName,
+    this.waypointStationId,
+    this.waypointStationName,
+    required this.destinationStationId,
+    required this.destinationStationName,
+    required this.region,
+    required this.searchedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['origin_station_id'] = Variable<String>(originStationId);
+    map['origin_station_name'] = Variable<String>(originStationName);
+    if (!nullToAbsent || waypointStationId != null) {
+      map['waypoint_station_id'] = Variable<String>(waypointStationId);
+    }
+    if (!nullToAbsent || waypointStationName != null) {
+      map['waypoint_station_name'] = Variable<String>(waypointStationName);
+    }
+    map['destination_station_id'] = Variable<String>(destinationStationId);
+    map['destination_station_name'] = Variable<String>(destinationStationName);
+    map['region'] = Variable<String>(region);
+    map['searched_at'] = Variable<DateTime>(searchedAt);
+    return map;
+  }
+
+  RouteSearchHistoryCompanion toCompanion(bool nullToAbsent) {
+    return RouteSearchHistoryCompanion(
+      id: Value(id),
+      originStationId: Value(originStationId),
+      originStationName: Value(originStationName),
+      waypointStationId: waypointStationId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(waypointStationId),
+      waypointStationName: waypointStationName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(waypointStationName),
+      destinationStationId: Value(destinationStationId),
+      destinationStationName: Value(destinationStationName),
+      region: Value(region),
+      searchedAt: Value(searchedAt),
+    );
+  }
+
+  factory RouteSearchHistoryData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RouteSearchHistoryData(
+      id: serializer.fromJson<int>(json['id']),
+      originStationId: serializer.fromJson<String>(json['originStationId']),
+      originStationName: serializer.fromJson<String>(json['originStationName']),
+      waypointStationId: serializer.fromJson<String?>(
+        json['waypointStationId'],
+      ),
+      waypointStationName: serializer.fromJson<String?>(
+        json['waypointStationName'],
+      ),
+      destinationStationId: serializer.fromJson<String>(
+        json['destinationStationId'],
+      ),
+      destinationStationName: serializer.fromJson<String>(
+        json['destinationStationName'],
+      ),
+      region: serializer.fromJson<String>(json['region']),
+      searchedAt: serializer.fromJson<DateTime>(json['searchedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'originStationId': serializer.toJson<String>(originStationId),
+      'originStationName': serializer.toJson<String>(originStationName),
+      'waypointStationId': serializer.toJson<String?>(waypointStationId),
+      'waypointStationName': serializer.toJson<String?>(waypointStationName),
+      'destinationStationId': serializer.toJson<String>(destinationStationId),
+      'destinationStationName': serializer.toJson<String>(
+        destinationStationName,
+      ),
+      'region': serializer.toJson<String>(region),
+      'searchedAt': serializer.toJson<DateTime>(searchedAt),
+    };
+  }
+
+  RouteSearchHistoryData copyWith({
+    int? id,
+    String? originStationId,
+    String? originStationName,
+    Value<String?> waypointStationId = const Value.absent(),
+    Value<String?> waypointStationName = const Value.absent(),
+    String? destinationStationId,
+    String? destinationStationName,
+    String? region,
+    DateTime? searchedAt,
+  }) => RouteSearchHistoryData(
+    id: id ?? this.id,
+    originStationId: originStationId ?? this.originStationId,
+    originStationName: originStationName ?? this.originStationName,
+    waypointStationId: waypointStationId.present
+        ? waypointStationId.value
+        : this.waypointStationId,
+    waypointStationName: waypointStationName.present
+        ? waypointStationName.value
+        : this.waypointStationName,
+    destinationStationId: destinationStationId ?? this.destinationStationId,
+    destinationStationName:
+        destinationStationName ?? this.destinationStationName,
+    region: region ?? this.region,
+    searchedAt: searchedAt ?? this.searchedAt,
+  );
+  RouteSearchHistoryData copyWithCompanion(RouteSearchHistoryCompanion data) {
+    return RouteSearchHistoryData(
+      id: data.id.present ? data.id.value : this.id,
+      originStationId: data.originStationId.present
+          ? data.originStationId.value
+          : this.originStationId,
+      originStationName: data.originStationName.present
+          ? data.originStationName.value
+          : this.originStationName,
+      waypointStationId: data.waypointStationId.present
+          ? data.waypointStationId.value
+          : this.waypointStationId,
+      waypointStationName: data.waypointStationName.present
+          ? data.waypointStationName.value
+          : this.waypointStationName,
+      destinationStationId: data.destinationStationId.present
+          ? data.destinationStationId.value
+          : this.destinationStationId,
+      destinationStationName: data.destinationStationName.present
+          ? data.destinationStationName.value
+          : this.destinationStationName,
+      region: data.region.present ? data.region.value : this.region,
+      searchedAt: data.searchedAt.present
+          ? data.searchedAt.value
+          : this.searchedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RouteSearchHistoryData(')
+          ..write('id: $id, ')
+          ..write('originStationId: $originStationId, ')
+          ..write('originStationName: $originStationName, ')
+          ..write('waypointStationId: $waypointStationId, ')
+          ..write('waypointStationName: $waypointStationName, ')
+          ..write('destinationStationId: $destinationStationId, ')
+          ..write('destinationStationName: $destinationStationName, ')
+          ..write('region: $region, ')
+          ..write('searchedAt: $searchedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    originStationId,
+    originStationName,
+    waypointStationId,
+    waypointStationName,
+    destinationStationId,
+    destinationStationName,
+    region,
+    searchedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RouteSearchHistoryData &&
+          other.id == this.id &&
+          other.originStationId == this.originStationId &&
+          other.originStationName == this.originStationName &&
+          other.waypointStationId == this.waypointStationId &&
+          other.waypointStationName == this.waypointStationName &&
+          other.destinationStationId == this.destinationStationId &&
+          other.destinationStationName == this.destinationStationName &&
+          other.region == this.region &&
+          other.searchedAt == this.searchedAt);
+}
+
+class RouteSearchHistoryCompanion
+    extends UpdateCompanion<RouteSearchHistoryData> {
+  final Value<int> id;
+  final Value<String> originStationId;
+  final Value<String> originStationName;
+  final Value<String?> waypointStationId;
+  final Value<String?> waypointStationName;
+  final Value<String> destinationStationId;
+  final Value<String> destinationStationName;
+  final Value<String> region;
+  final Value<DateTime> searchedAt;
+  const RouteSearchHistoryCompanion({
+    this.id = const Value.absent(),
+    this.originStationId = const Value.absent(),
+    this.originStationName = const Value.absent(),
+    this.waypointStationId = const Value.absent(),
+    this.waypointStationName = const Value.absent(),
+    this.destinationStationId = const Value.absent(),
+    this.destinationStationName = const Value.absent(),
+    this.region = const Value.absent(),
+    this.searchedAt = const Value.absent(),
+  });
+  RouteSearchHistoryCompanion.insert({
+    this.id = const Value.absent(),
+    required String originStationId,
+    required String originStationName,
+    this.waypointStationId = const Value.absent(),
+    this.waypointStationName = const Value.absent(),
+    required String destinationStationId,
+    required String destinationStationName,
+    required String region,
+    required DateTime searchedAt,
+  }) : originStationId = Value(originStationId),
+       originStationName = Value(originStationName),
+       destinationStationId = Value(destinationStationId),
+       destinationStationName = Value(destinationStationName),
+       region = Value(region),
+       searchedAt = Value(searchedAt);
+  static Insertable<RouteSearchHistoryData> custom({
+    Expression<int>? id,
+    Expression<String>? originStationId,
+    Expression<String>? originStationName,
+    Expression<String>? waypointStationId,
+    Expression<String>? waypointStationName,
+    Expression<String>? destinationStationId,
+    Expression<String>? destinationStationName,
+    Expression<String>? region,
+    Expression<DateTime>? searchedAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (originStationId != null) 'origin_station_id': originStationId,
+      if (originStationName != null) 'origin_station_name': originStationName,
+      if (waypointStationId != null) 'waypoint_station_id': waypointStationId,
+      if (waypointStationName != null)
+        'waypoint_station_name': waypointStationName,
+      if (destinationStationId != null)
+        'destination_station_id': destinationStationId,
+      if (destinationStationName != null)
+        'destination_station_name': destinationStationName,
+      if (region != null) 'region': region,
+      if (searchedAt != null) 'searched_at': searchedAt,
+    });
+  }
+
+  RouteSearchHistoryCompanion copyWith({
+    Value<int>? id,
+    Value<String>? originStationId,
+    Value<String>? originStationName,
+    Value<String?>? waypointStationId,
+    Value<String?>? waypointStationName,
+    Value<String>? destinationStationId,
+    Value<String>? destinationStationName,
+    Value<String>? region,
+    Value<DateTime>? searchedAt,
+  }) {
+    return RouteSearchHistoryCompanion(
+      id: id ?? this.id,
+      originStationId: originStationId ?? this.originStationId,
+      originStationName: originStationName ?? this.originStationName,
+      waypointStationId: waypointStationId ?? this.waypointStationId,
+      waypointStationName: waypointStationName ?? this.waypointStationName,
+      destinationStationId: destinationStationId ?? this.destinationStationId,
+      destinationStationName:
+          destinationStationName ?? this.destinationStationName,
+      region: region ?? this.region,
+      searchedAt: searchedAt ?? this.searchedAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (originStationId.present) {
+      map['origin_station_id'] = Variable<String>(originStationId.value);
+    }
+    if (originStationName.present) {
+      map['origin_station_name'] = Variable<String>(originStationName.value);
+    }
+    if (waypointStationId.present) {
+      map['waypoint_station_id'] = Variable<String>(waypointStationId.value);
+    }
+    if (waypointStationName.present) {
+      map['waypoint_station_name'] = Variable<String>(
+        waypointStationName.value,
+      );
+    }
+    if (destinationStationId.present) {
+      map['destination_station_id'] = Variable<String>(
+        destinationStationId.value,
+      );
+    }
+    if (destinationStationName.present) {
+      map['destination_station_name'] = Variable<String>(
+        destinationStationName.value,
+      );
+    }
+    if (region.present) {
+      map['region'] = Variable<String>(region.value);
+    }
+    if (searchedAt.present) {
+      map['searched_at'] = Variable<DateTime>(searchedAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RouteSearchHistoryCompanion(')
+          ..write('id: $id, ')
+          ..write('originStationId: $originStationId, ')
+          ..write('originStationName: $originStationName, ')
+          ..write('waypointStationId: $waypointStationId, ')
+          ..write('waypointStationName: $waypointStationName, ')
+          ..write('destinationStationId: $destinationStationId, ')
+          ..write('destinationStationName: $destinationStationName, ')
+          ..write('region: $region, ')
           ..write('searchedAt: $searchedAt')
           ..write(')'))
         .toString();
@@ -2752,6 +3414,8 @@ abstract class _$UserDatabase extends GeneratedDatabase {
       $FavoriteFacilitiesTable(this);
   late final $FavoriteRoutesTable favoriteRoutes = $FavoriteRoutesTable(this);
   late final $SearchHistoryTable searchHistory = $SearchHistoryTable(this);
+  late final $RouteSearchHistoryTable routeSearchHistory =
+      $RouteSearchHistoryTable(this);
   late final $AppPreferencesTable appPreferences = $AppPreferencesTable(this);
   late final $InstalledDataPacksTable installedDataPacks =
       $InstalledDataPacksTable(this);
@@ -2768,6 +3432,7 @@ abstract class _$UserDatabase extends GeneratedDatabase {
     favoriteFacilities,
     favoriteRoutes,
     searchHistory,
+    routeSearchHistory,
     appPreferences,
     installedDataPacks,
     dataPackUpdateState,
@@ -3314,12 +3979,14 @@ typedef $$SearchHistoryTableCreateCompanionBuilder =
     SearchHistoryCompanion Function({
       Value<int> id,
       required String query,
+      Value<String?> region,
       required DateTime searchedAt,
     });
 typedef $$SearchHistoryTableUpdateCompanionBuilder =
     SearchHistoryCompanion Function({
       Value<int> id,
       Value<String> query,
+      Value<String?> region,
       Value<DateTime> searchedAt,
     });
 
@@ -3339,6 +4006,11 @@ class $$SearchHistoryTableFilterComposer
 
   ColumnFilters<String> get query => $composableBuilder(
     column: $table.query,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get region => $composableBuilder(
+    column: $table.region,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3367,6 +4039,11 @@ class $$SearchHistoryTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get region => $composableBuilder(
+    column: $table.region,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get searchedAt => $composableBuilder(
     column: $table.searchedAt,
     builder: (column) => ColumnOrderings(column),
@@ -3387,6 +4064,9 @@ class $$SearchHistoryTableAnnotationComposer
 
   GeneratedColumn<String> get query =>
       $composableBuilder(column: $table.query, builder: (column) => column);
+
+  GeneratedColumn<String> get region =>
+      $composableBuilder(column: $table.region, builder: (column) => column);
 
   GeneratedColumn<DateTime> get searchedAt => $composableBuilder(
     column: $table.searchedAt,
@@ -3431,20 +4111,24 @@ class $$SearchHistoryTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 Value<String> query = const Value.absent(),
+                Value<String?> region = const Value.absent(),
                 Value<DateTime> searchedAt = const Value.absent(),
               }) => SearchHistoryCompanion(
                 id: id,
                 query: query,
+                region: region,
                 searchedAt: searchedAt,
               ),
           createCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
                 required String query,
+                Value<String?> region = const Value.absent(),
                 required DateTime searchedAt,
               }) => SearchHistoryCompanion.insert(
                 id: id,
                 query: query,
+                region: region,
                 searchedAt: searchedAt,
               ),
           withReferenceMapper: (p0) => p0
@@ -3470,6 +4154,303 @@ typedef $$SearchHistoryTableProcessedTableManager =
         BaseReferences<_$UserDatabase, $SearchHistoryTable, SearchHistoryData>,
       ),
       SearchHistoryData,
+      PrefetchHooks Function()
+    >;
+typedef $$RouteSearchHistoryTableCreateCompanionBuilder =
+    RouteSearchHistoryCompanion Function({
+      Value<int> id,
+      required String originStationId,
+      required String originStationName,
+      Value<String?> waypointStationId,
+      Value<String?> waypointStationName,
+      required String destinationStationId,
+      required String destinationStationName,
+      required String region,
+      required DateTime searchedAt,
+    });
+typedef $$RouteSearchHistoryTableUpdateCompanionBuilder =
+    RouteSearchHistoryCompanion Function({
+      Value<int> id,
+      Value<String> originStationId,
+      Value<String> originStationName,
+      Value<String?> waypointStationId,
+      Value<String?> waypointStationName,
+      Value<String> destinationStationId,
+      Value<String> destinationStationName,
+      Value<String> region,
+      Value<DateTime> searchedAt,
+    });
+
+class $$RouteSearchHistoryTableFilterComposer
+    extends Composer<_$UserDatabase, $RouteSearchHistoryTable> {
+  $$RouteSearchHistoryTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get originStationId => $composableBuilder(
+    column: $table.originStationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get originStationName => $composableBuilder(
+    column: $table.originStationName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get waypointStationId => $composableBuilder(
+    column: $table.waypointStationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get waypointStationName => $composableBuilder(
+    column: $table.waypointStationName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get destinationStationId => $composableBuilder(
+    column: $table.destinationStationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get destinationStationName => $composableBuilder(
+    column: $table.destinationStationName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get region => $composableBuilder(
+    column: $table.region,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get searchedAt => $composableBuilder(
+    column: $table.searchedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$RouteSearchHistoryTableOrderingComposer
+    extends Composer<_$UserDatabase, $RouteSearchHistoryTable> {
+  $$RouteSearchHistoryTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get originStationId => $composableBuilder(
+    column: $table.originStationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get originStationName => $composableBuilder(
+    column: $table.originStationName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get waypointStationId => $composableBuilder(
+    column: $table.waypointStationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get waypointStationName => $composableBuilder(
+    column: $table.waypointStationName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get destinationStationId => $composableBuilder(
+    column: $table.destinationStationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get destinationStationName => $composableBuilder(
+    column: $table.destinationStationName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get region => $composableBuilder(
+    column: $table.region,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get searchedAt => $composableBuilder(
+    column: $table.searchedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$RouteSearchHistoryTableAnnotationComposer
+    extends Composer<_$UserDatabase, $RouteSearchHistoryTable> {
+  $$RouteSearchHistoryTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get originStationId => $composableBuilder(
+    column: $table.originStationId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get originStationName => $composableBuilder(
+    column: $table.originStationName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get waypointStationId => $composableBuilder(
+    column: $table.waypointStationId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get waypointStationName => $composableBuilder(
+    column: $table.waypointStationName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get destinationStationId => $composableBuilder(
+    column: $table.destinationStationId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get destinationStationName => $composableBuilder(
+    column: $table.destinationStationName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get region =>
+      $composableBuilder(column: $table.region, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get searchedAt => $composableBuilder(
+    column: $table.searchedAt,
+    builder: (column) => column,
+  );
+}
+
+class $$RouteSearchHistoryTableTableManager
+    extends
+        RootTableManager<
+          _$UserDatabase,
+          $RouteSearchHistoryTable,
+          RouteSearchHistoryData,
+          $$RouteSearchHistoryTableFilterComposer,
+          $$RouteSearchHistoryTableOrderingComposer,
+          $$RouteSearchHistoryTableAnnotationComposer,
+          $$RouteSearchHistoryTableCreateCompanionBuilder,
+          $$RouteSearchHistoryTableUpdateCompanionBuilder,
+          (
+            RouteSearchHistoryData,
+            BaseReferences<
+              _$UserDatabase,
+              $RouteSearchHistoryTable,
+              RouteSearchHistoryData
+            >,
+          ),
+          RouteSearchHistoryData,
+          PrefetchHooks Function()
+        > {
+  $$RouteSearchHistoryTableTableManager(
+    _$UserDatabase db,
+    $RouteSearchHistoryTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RouteSearchHistoryTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$RouteSearchHistoryTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$RouteSearchHistoryTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> originStationId = const Value.absent(),
+                Value<String> originStationName = const Value.absent(),
+                Value<String?> waypointStationId = const Value.absent(),
+                Value<String?> waypointStationName = const Value.absent(),
+                Value<String> destinationStationId = const Value.absent(),
+                Value<String> destinationStationName = const Value.absent(),
+                Value<String> region = const Value.absent(),
+                Value<DateTime> searchedAt = const Value.absent(),
+              }) => RouteSearchHistoryCompanion(
+                id: id,
+                originStationId: originStationId,
+                originStationName: originStationName,
+                waypointStationId: waypointStationId,
+                waypointStationName: waypointStationName,
+                destinationStationId: destinationStationId,
+                destinationStationName: destinationStationName,
+                region: region,
+                searchedAt: searchedAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String originStationId,
+                required String originStationName,
+                Value<String?> waypointStationId = const Value.absent(),
+                Value<String?> waypointStationName = const Value.absent(),
+                required String destinationStationId,
+                required String destinationStationName,
+                required String region,
+                required DateTime searchedAt,
+              }) => RouteSearchHistoryCompanion.insert(
+                id: id,
+                originStationId: originStationId,
+                originStationName: originStationName,
+                waypointStationId: waypointStationId,
+                waypointStationName: waypointStationName,
+                destinationStationId: destinationStationId,
+                destinationStationName: destinationStationName,
+                region: region,
+                searchedAt: searchedAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$RouteSearchHistoryTableProcessedTableManager =
+    ProcessedTableManager<
+      _$UserDatabase,
+      $RouteSearchHistoryTable,
+      RouteSearchHistoryData,
+      $$RouteSearchHistoryTableFilterComposer,
+      $$RouteSearchHistoryTableOrderingComposer,
+      $$RouteSearchHistoryTableAnnotationComposer,
+      $$RouteSearchHistoryTableCreateCompanionBuilder,
+      $$RouteSearchHistoryTableUpdateCompanionBuilder,
+      (
+        RouteSearchHistoryData,
+        BaseReferences<
+          _$UserDatabase,
+          $RouteSearchHistoryTable,
+          RouteSearchHistoryData
+        >,
+      ),
+      RouteSearchHistoryData,
       PrefetchHooks Function()
     >;
 typedef $$AppPreferencesTableCreateCompanionBuilder =
@@ -4430,6 +5411,8 @@ class $UserDatabaseManager {
       $$FavoriteRoutesTableTableManager(_db, _db.favoriteRoutes);
   $$SearchHistoryTableTableManager get searchHistory =>
       $$SearchHistoryTableTableManager(_db, _db.searchHistory);
+  $$RouteSearchHistoryTableTableManager get routeSearchHistory =>
+      $$RouteSearchHistoryTableTableManager(_db, _db.routeSearchHistory);
   $$AppPreferencesTableTableManager get appPreferences =>
       $$AppPreferencesTableTableManager(_db, _db.appPreferences);
   $$InstalledDataPacksTableTableManager get installedDataPacks =>

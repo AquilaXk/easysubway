@@ -48,6 +48,8 @@ class StationSearchController extends ChangeNotifier {
   Future<void> search(
     String query, {
     String? lineId,
+    String? region,
+    String? recordRegion,
     bool recordHistory = true,
   }) async {
     final requestId = ++_searchRequestId;
@@ -76,12 +78,14 @@ class StationSearchController extends ChangeNotifier {
       if (!_isActiveRequest(requestId)) {
         return;
       }
-      // 디바운스 타이핑 검색은 최근 검색에 기록하지 않는다(부분 입력 기록 방지).
-      // 키보드 검색·최근 검색 선택 등 명시적 검색만 기록한다.
-      if (recordHistory) {
-        await _recordSearch(trimmedQuery);
+      // 지역이 주어지면 해당 지역 역만 남긴다(홈 노선도·풀페이지 검색 공통).
+      final filtered = _filterByRegion(results, region);
+      // 디바운스 타이핑은 기록하지 않는다. 명시적 검색은 현재 지역에 실제
+      // 결과가 있을 때만 기록해 타 지역 역이 잘못된 지역 이력으로 남지 않게 한다.
+      if (recordHistory && filtered.isNotEmpty) {
+        await _recordSearch(trimmedQuery, recordRegion ?? region);
       }
-      if (results.isEmpty) {
+      if (filtered.isEmpty) {
         _state = const StationSearchState(
           status: StationSearchStatus.empty,
           results: [],
@@ -90,7 +94,7 @@ class StationSearchController extends ChangeNotifier {
       } else {
         _state = StationSearchState(
           status: StationSearchStatus.success,
-          results: results,
+          results: filtered,
           source: StationSearchResultSource.search,
         );
       }
@@ -117,19 +121,22 @@ class StationSearchController extends ChangeNotifier {
     _notifyIfActive(requestId);
   }
 
-  Future<void> _recordSearch(String query) async {
+  Future<void> _recordSearch(String query, String? region) async {
     final repository = searchHistoryRepository;
     if (repository == null) {
       return;
     }
     try {
-      await repository.recordSearch(query);
+      await repository.recordSearch(query, region: region);
     } catch (error, stackTrace) {
       reportMobileError(error, stackTrace, context: '최근 검색어 저장 중 예외가 발생했습니다.');
     }
   }
 
-  Future<void> searchNearby(CurrentLocationProvider locationProvider) async {
+  Future<void> searchNearby(
+    CurrentLocationProvider locationProvider, {
+    String? region,
+  }) async {
     final requestId = ++_searchRequestId;
     _state = const StationSearchState(
       status: StationSearchStatus.loading,
@@ -156,7 +163,9 @@ class StationSearchController extends ChangeNotifier {
       if (!_isActiveRequest(requestId)) {
         return;
       }
-      if (results.isEmpty) {
+      // 주변 검색도 현재 선택 지역으로 좁힌다(다른 권역 역이 섞이지 않게).
+      final filtered = _filterByRegion(results, region);
+      if (filtered.isEmpty) {
         _state = const StationSearchState(
           status: StationSearchStatus.empty,
           results: [],
@@ -165,7 +174,7 @@ class StationSearchController extends ChangeNotifier {
       } else {
         _state = StationSearchState(
           status: StationSearchStatus.success,
-          results: results,
+          results: filtered,
           source: StationSearchResultSource.nearby,
         );
       }
@@ -203,6 +212,19 @@ class StationSearchController extends ChangeNotifier {
       );
     }
     _notifyIfActive(requestId);
+  }
+
+  List<StationSearchResult> _filterByRegion(
+    List<StationSearchResult> results,
+    String? region,
+  ) {
+    final trimmed = region?.trim() ?? '';
+    if (trimmed.isEmpty) {
+      return results;
+    }
+    return results
+        .where((result) => stationBelongsToRegion(result.region, trimmed))
+        .toList(growable: false);
   }
 
   bool _isActiveRequest(int requestId) {

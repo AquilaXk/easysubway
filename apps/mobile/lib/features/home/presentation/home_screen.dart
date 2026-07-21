@@ -134,6 +134,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // focus + 팬 메뉴 + 해당 역 하단 패널을 요청하는 채널이다.
   StationSearchResult? _mapFocusStationRequest;
 
+  /// 풀페이지 역 검색 ↔ 홈 노선도 지역 동기화용.
+  final NetworkMapRegionBridge _mapRegionBridge = NetworkMapRegionBridge();
+
   @override
   void initState() {
     super.initState();
@@ -387,10 +390,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
     }
 
-    Future<void> openStationSearch(
-      String regionLabel, [
-      StationSearchEntryMode entryMode = StationSearchEntryMode.search,
-    ]) async {
+    Future<void> openStationSearch(String regionLabel) async {
       // #2109 Fix: 둘러보기 모드 결과 탭은 더 이상 즉시 상세를 밀지 않고
       // 선택한 역 결과를 pop으로 반환한다(_returnStationToMap). 여기서 노선
       // 정보까지 받아 노선도에 focus + 팬 메뉴 + 하단 패널을 요청한다.
@@ -402,14 +402,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             favoriteRepository: favoriteRepository,
             adRepository: adRepository,
             searchHistoryRepository: searchHistoryRepository,
-            locationProvider: locationProvider,
             facilityReportDraftTargetStore: facilityReportDraftTargetStore,
             internalRouteRepository: internalRouteRepository,
             internalRouteMobilityType: initialMobilityType,
             realtimeRepository: realtimeRepository,
             routeDraftController: _routeDraftController,
-            entryMode: entryMode,
             regionLabel: regionLabel,
+            onRegionChanged: _mapRegionBridge.selectRegion,
           ),
         ),
       );
@@ -435,7 +434,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             reportRepository: reportRepository,
             favoriteRepository: favoriteRepository,
             searchHistoryRepository: searchHistoryRepository,
-            locationProvider: locationProvider,
             facilityReportDraftTargetStore: facilityReportDraftTargetStore,
             internalRouteRepository: internalRouteRepository,
             internalRouteMobilityType: initialMobilityType,
@@ -443,6 +441,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             routeDraftController: _routeDraftController,
             pickSlot: slot,
             regionLabel: regionLabel,
+            onRegionChanged: _mapRegionBridge.selectRegion,
           ),
         ),
       );
@@ -534,6 +533,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         NetworkMapScreen(
           repository: networkMapRepository,
           routeDraftController: _routeDraftController,
+          regionBridge: _mapRegionBridge,
           onOpenStationSearch: (regionLabel) =>
               unawaited(openStationSearch(regionLabel)),
           onStationSearchClosed: () => unawaited(refreshHomeState()),
@@ -551,9 +551,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           viewportRepository: widget.networkMapViewportRepository,
           realtimeRepository: widget.realtimeRepository,
           onOpenSavedItems: openSavedTab,
-          onOpenNearbyStations: (regionLabel) => unawaited(
-            openStationSearch(regionLabel, StationSearchEntryMode.nearby),
-          ),
           onOpenTrainSearch: openTrainSearch,
           onOpenSettings: openMoreTab,
           onOpenServiceNotices: noticeController == null
@@ -603,7 +600,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           favoriteRepository: favoriteRepository,
           adRepository: adRepository,
           searchHistoryRepository: searchHistoryRepository,
-          locationProvider: locationProvider,
           facilityReportDraftTargetStore: facilityReportDraftTargetStore,
           internalRouteRepository: internalRouteRepository,
           internalRouteMobilityType: initialMobilityType,
@@ -619,6 +615,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         RouteSearchScreen(
           repository: routeRepository,
           stationRepository: repository,
+          searchHistoryRepository: searchHistoryRepository,
           routeFeedbackRepository: routeFeedbackRepository,
           getOffAlarmController: getOffAlarmController,
           favoriteRouteRepository: favoriteRouteRepository,
