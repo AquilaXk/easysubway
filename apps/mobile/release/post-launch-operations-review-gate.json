@@ -58,7 +58,7 @@
             {"path": "tools/ops/generate-operations-phase-a-summary.mjs", "sha256": "e89a520d6b229c5fd042ef8bcaf74873476c7253cd03b48fac1de21cf55e0c4d"},
             {"path": "tools/ops/validate-operations-release-summary.mjs", "sha256": "71a2a51da2b9c3a20d14512b608bccfbfee9022ca5718b77d44ff9254cc67979"},
             {"path": "tools/release/summary-validation-utils.mjs", "sha256": "d6c8980536e6aba14d9d2f41879339c434759bfa986aca2045d6bf5909fe0d8e"},
-            {"path": "tools/release/hash-android-bundle-payload.mjs", "sha256": "86b5e211f2f8be3308092f71613fdca1b88dfa9fc9b3101d4ba384236d945c9f"},
+            {"path": "tools/release/hash-android-bundle-payload.mjs", "sha256": "0bea0f2d7775960a4672e27622aa32a239cabadad07399cb3ee51ae524b234eb"},
             {"path": "tools/datapack/run-emergency-datapack-drill.mjs", "sha256": "d371ece038c80d6ba9e50798528339344d3a314e983085aa4b8d3009813d83e7"},
             {"path": "apps/mobile/release/route-commercialization-gate.json", "sha256": "0ac7b2c2ee1e75fc556fa5418ddeac1473d329d2ccd5a1e539e8aced869cab30"}
           ]
@@ -96,7 +96,7 @@
           "files": [
             {"path": "apps/mobile/release/signed-release-artifact-gate.json", "sha256": "42c9f83dca5a1c2c24d921cf6ab748c9be5a901dd1b62212a81055098349fc67"},
             {"path": "apps/mobile/pubspec.yaml", "sha256": "1c4918747c4acf22bbe885b7cb01cc34cc311e7e44598ac6b817848712614d42"},
-            {"path": ".github/workflows/release-artifacts.yml", "sha256": "b430a8f8cbe0278b126d6347c1d3e4d21c541e9893ac387ce32720d567f4a276"},
+            {"path": ".github/workflows/release-artifacts.yml", "sha256": "702f8c80aa7cf793f30eb5072dcca51c2f8d8a92df552c8d615d6e8c3dd4d0e0"},
             {"path": ".github/workflows/datapack-release.yml", "sha256": "0927e5dc0cf4bf04136d9ff7612d14c892ccec1c21e8655b703a10f22556ccea"},
             {"path": "tools/ci/validate-store-privacy-env.mjs", "sha256": "18bb0dd8b93d6268c8f60f9cc12272d2ff31c03b60fbbafd6c1e8d16957ada2a"},
             {"path": "backend/build.gradle", "sha256": "00106be89d1834db166c0c4cfba04674e2a456e7e57648595b74feb933c31273"},
