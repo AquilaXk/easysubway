@@ -749,8 +749,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 top: 0,
                 left: EasySubwaySpacing.sm,
                 child: IconButton(
+                  key: const Key('onboardingBackButton'),
                   tooltip: '이전 단계',
                   onPressed: _goBack,
+                  style: IconButton.styleFrom(
+                    backgroundColor: EasySubwayAccessibleColors.surface,
+                    foregroundColor: EasySubwayAccessibleColors.text,
+                    minimumSize: const Size.square(
+                      EasySubwayTouchTarget.general,
+                    ),
+                  ),
                   icon: const Icon(Icons.arrow_back),
                 ),
               ),
