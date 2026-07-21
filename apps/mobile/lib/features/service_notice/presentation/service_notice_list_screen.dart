@@ -218,6 +218,7 @@ class _EmptyNotices extends StatelessWidget {
                   height: 80,
                   color: EasySubwayAccessibleColors.brandSignature,
                   colorBlendMode: BlendMode.srcIn,
+                  excludeFromSemantics: true,
                 ),
                 const SizedBox(height: 16),
                 const Text(

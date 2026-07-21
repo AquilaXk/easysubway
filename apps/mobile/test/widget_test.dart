@@ -1153,7 +1153,7 @@ void main() {
     expect(internalDividers, hasLength(2));
     expect(
       internalDividers.every(
-        (divider) => divider.color == const Color(0xFFE4E4E4),
+        (divider) => divider.color == EasySubwayAccessibleColors.line,
       ),
       isTrue,
     );
@@ -6096,7 +6096,20 @@ void main() {
         find.byKey(const Key('settingsSectionHeader-화면 및 접근성')),
       );
       expect(readingHeader.color, EasySubwayAccessibleColors.scaffoldSurface);
-      expect(find.byKey(const Key('settingsSectionDivider')), findsNWidgets(2));
+      final settingsSectionDividers = tester.widgetList<Divider>(
+        find.descendant(
+          of: find.byKey(const Key('settingsScreen')),
+          matching: find.byType(Divider),
+        ),
+      );
+      final contentDividers = settingsSectionDividers
+          .where((divider) => divider.color == EasySubwayAccessibleColors.line)
+          .toList();
+      expect(contentDividers, hasLength(2));
+      expect(
+        contentDividers,
+        everyElement(predicate<Divider>((divider) => divider.key == null)),
+      );
       expect(find.byIcon(Icons.directions_walk), findsNothing);
       expect(find.byIcon(Icons.visibility_outlined), findsNothing);
       expect(find.byIcon(Icons.contrast), findsNothing);
@@ -9992,6 +10005,8 @@ void main() {
         find.byKey(const Key('stationSearchHeaderDivider')),
         findsOneWidget,
       );
+      expect(stationSearchAppBar.flexibleSpace, isNull);
+      expect(stationSearchAppBar.bottom, isNotNull);
 
       final nearbyButton = find.byKey(const Key('nearbyStationSearchButton'));
       expect(nearbyButton, findsOneWidget);

@@ -254,7 +254,6 @@ class _AppSettingsSection extends StatelessWidget {
           children[index],
           if (index < children.length - 1)
             const Divider(
-              key: Key('settingsSectionDivider'),
               height: 1,
               thickness: 1,
               indent: 20,

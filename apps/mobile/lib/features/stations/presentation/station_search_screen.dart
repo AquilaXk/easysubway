@@ -296,8 +296,8 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
             ],
           ),
         ),
-        flexibleSpace: const Align(
-          alignment: Alignment.bottomCenter,
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
           child: EasySubwayHeaderDivider(
             key: Key('stationSearchHeaderDivider'),
           ),

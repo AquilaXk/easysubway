@@ -109,6 +109,7 @@ void main() {
     );
     expect(image.color, EasySubwayAccessibleColors.brandSignature);
     expect(image.colorBlendMode, BlendMode.srcIn);
+    expect(image.excludeFromSemantics, isTrue);
     final emptyText = tester.widget<Text>(find.text('지금은 공지사항이 없어요'));
     expect(emptyText.style?.fontSize, 22);
     final content = tester.widget<Align>(

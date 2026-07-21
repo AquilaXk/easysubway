@@ -3167,7 +3167,10 @@ class _NetworkMapMenuPanel extends StatelessWidget {
                         ),
                       if (onOpenSavedItems != null ||
                           onOpenSettings != null) ...[
-                        const Divider(height: 1, color: Color(0xFFE4E4E4)),
+                        const Divider(
+                          height: 1,
+                          color: EasySubwayAccessibleColors.line,
+                        ),
                         if (onOpenSavedItems != null)
                           _NetworkMapMenuTile(
                             key: const Key('networkMapMenuSavedButton'),
@@ -3184,7 +3187,10 @@ class _NetworkMapMenuPanel extends StatelessWidget {
                           ),
                       ],
                       if (onOpenServiceNotices != null) ...[
-                        const Divider(height: 1, color: Color(0xFFE4E4E4)),
+                        const Divider(
+                          height: 1,
+                          color: EasySubwayAccessibleColors.line,
+                        ),
                         _NetworkMapMenuTile(
                           key: const Key('networkMapMenuServiceNoticesButton'),
                           icon: Icons.campaign_outlined,
