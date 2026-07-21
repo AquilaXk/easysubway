@@ -109,7 +109,8 @@ class _StationSearchResultTile extends StatelessWidget {
               key: Key('stationSearchResult-${result.id}'),
               stationName: stationName,
               line: lines[i],
-              semanticLabel: '$stationName, ${lines[i].name}, 선택',
+              semanticLabel:
+                  '$stationName, ${lines.map((line) => line.name).join(', ')}, 선택',
               onTap: onTap,
             )
           else

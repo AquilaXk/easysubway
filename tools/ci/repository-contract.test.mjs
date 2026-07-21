@@ -15527,7 +15527,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.doesNotMatch(stationSearch, /Text\(\s*result\.dataQualityLabel,/);
   assert.match(widgetTest, /expect\(find\.text\('출처 확인 필요'\), findsNothing\);/);
   // #1933: 결과 재설계로 각 행 시맨틱은 자신의 노선 하나만 담아 "역명, 노선명, 선택" 형태다.
-  assert.match(widgetTest, /상록수역, 수도권 4호선, 선택/);
+  assert.match(widgetTest, /상록수역, 수도권 4호선, 경의중앙선, 선택/);
   assert.match(read("apps/mobile/test/station_search_test.dart"), /인증 실패 시 인증을 지우고 한 번 재시도한다/);
   assert.match(read("apps/mobile/test/station_search_test.dart"), /릴리즈 빌드는 API 기본 주소를 반드시 설정해야 한다/);
   assert.match(read("apps/mobile/test/station_search_test.dart"), /릴리즈 빌드는 HTTPS API 주소만 사용한다/);

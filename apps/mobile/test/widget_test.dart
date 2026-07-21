@@ -8220,12 +8220,13 @@ void main() {
       // 시맨틱은 첫 행만 노출한다 — 스크린리더에 같은 선택 버튼이 노선 수만큼
       // 중복되지 않도록 이후 행은 ExcludeSemantics 로 감싼다. 첫 행 라벨만 존재하고
       // 두 번째 노선 라벨은 시맨틱 트리에 없다.
-      expect(find.bySemanticsLabel('상록수역, 수도권 4호선, 선택'), findsOneWidget);
+      expect(find.bySemanticsLabel('상록수역, 수도권 4호선, 경의중앙선, 선택'), findsOneWidget);
       expect(find.bySemanticsLabel('상록수역, 경의중앙선, 선택'), findsNothing);
+      // #2419 Codex: 대표 라벨에 전 노선명을 넣고, 둘째 행 단독 라벨은 없다.
       expect(
-        tester.getSemantics(find.bySemanticsLabel('상록수역, 수도권 4호선, 선택')),
+        tester.getSemantics(find.bySemanticsLabel('상록수역, 수도권 4호선, 경의중앙선, 선택')),
         isSemantics(
-          label: '상록수역, 수도권 4호선, 선택',
+          label: '상록수역, 수도권 4호선, 경의중앙선, 선택',
           isButton: true,
           hasTapAction: true,
         ),
