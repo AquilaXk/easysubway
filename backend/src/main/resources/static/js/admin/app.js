@@ -589,6 +589,8 @@ document.addEventListener('alpine:init', function () {
 			},
 			// 활성 행 하나만 선택 상태로 만들고 일괄 검수 폼을 해당 결정으로 제출한다(단일 처리 시맨틱).
 			// 포커스가 표 밖이면 아무 것도 하지 않는다(첫 행 오처리 방지) — focusedRowLink는 폴백이 없다.
+			// 반려(REJECT)는 details 확인 UI를 연 뒤 확인 버튼에 포커스만 옮긴다 — 단축키로 확인 단계를
+			// 건너뛰지 않는다(#2416 Bugbot). 승인은 기존처럼 즉시 제출한다.
 			processActive: function (decision) {
 				var link = this.focusedRowLink();
 				if (!link) {
@@ -605,6 +607,18 @@ document.addEventListener('alpine:init', function () {
 				var checkbox = row.querySelector('input[name="reportIds"]');
 				if (checkbox) {
 					checkbox.checked = true;
+				}
+				this.recount();
+				if (decision === 'REJECT') {
+					var confirm = form.querySelector('details.admin-action-confirm');
+					var rejectBtn = confirm ? confirm.querySelector('button[value="REJECT"]') : null;
+					if (confirm && rejectBtn) {
+						confirm.open = true;
+						this.$nextTick(function () {
+							rejectBtn.focus();
+						});
+						return;
+					}
 				}
 				var button = form.querySelector('button[value="' + decision + '"]');
 				if (button) {
