@@ -67,18 +67,18 @@
           "refreshOn": "support-contact-or-help-ui-change",
           "files": [
             {"path": "apps/mobile/release/support-incident-response-gate.json", "sha256": "2b1942f223b63aa18cae0481649d46fa41a671ddae4dccab041098ca3e2d6903"},
-            {"path": "apps/mobile/lib/app/easy_subway_app.dart", "sha256": "aed5718c2d731cf7b844ecca2dce4d9fd0994d187779fea8db1e5fe6a22c110b"},
+            {"path": "apps/mobile/lib/app/easy_subway_app.dart", "sha256": "5d6558aa07fc2343a14cddebbe8db0ee1f0ff98088f63f7ab126326bcd532b7a"},
             {"path": "apps/mobile/lib/app/app_components.dart", "sha256": "f0a53231cc819a6136049b979334d215968a54f0ce5cf8f17c1952674c926ac5"},
             {"path": "apps/mobile/lib/app/accessibility_theme.dart", "sha256": "a13c1ded6008a883060ef34bb52d3e54a83b103d0c0bcfba05fd6e9370e9128a"},
             {"path": "apps/mobile/lib/features/account/presentation/user_data_deletion_screen.dart", "sha256": "e7636ee91d36df8033c3619167ee6b7712f1421faf91880abeff1cc6cfb95669"},
             {"path": "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart", "sha256": "7ef5b7236a008f54a22040931f294b00192987fe35cc56fc94ebc2d815ef4620"},
             {"path": "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart", "sha256": "bb293eb895b557c50c43079d5ca7e1ebc2f22367c171754c8ac7c8a4eb641c26"},
             {"path": "apps/mobile/lib/features/home/presentation/home_screen.dart", "sha256": "a7d7ea0396fc7bf8783f6f307c51a9f3f1801f1c6c51d42fbdb24d88ce3c5ade"},
-            {"path": "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart", "sha256": "ba119a6b716528c943f31e7ba13ef0274db3f3b391ecfdb2f2d87e6605e968be"},
+            {"path": "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart", "sha256": "cd694bcac78573846f7404af988cf6fa2f631a4618e6c039e2729d71e15c95b0"},
             {"path": "apps/mobile/lib/features/settings/presentation/open_source_licenses_screen.dart", "sha256": "822762b61cd3824340c4e45cf5ffe3079e221d28712dd98d94fd9a03fe5fd591"},
             {"path": "apps/mobile/lib/features/settings/presentation/service_info_screen.dart", "sha256": "62e036e62f5e5ce235d494d5d730a6dd6ea5659e1b53290d94a6c7c954bcdcd9"},
             {"path": "apps/mobile/lib/features/support/presentation/support_access_screen.dart", "sha256": "d407c10fdf20cf821b0273065388885d2511b6eb14b6ef02183f1723d0a83112"},
-            {"path": "apps/mobile/lib/main.dart", "sha256": "7acfce0eff73e5bd10d912a2da72a2990db2e2fb87a5d91c7ef907ed0f559de3"}
+            {"path": "apps/mobile/lib/main.dart", "sha256": "1cbd43196e2df5a4db9e3aa6a7f8ae6bf1fdef0afdc9c3cda54fcd0bf11da31a"}
           ]
         },
         {
