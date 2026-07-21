@@ -10,11 +10,9 @@ if (!aabPath || !existsSync(aabPath)) {
   throw new Error("--aab must reference an existing Android App Bundle");
 }
 
-// unzip을 이름으로 호출하면 쓰기 가능한 PATH를 상속하므로, 신뢰된 시스템 경로에서
-// 절대 경로를 한 번만 해석해 PATH 조작을 차단한다(macOS·Linux CI 모두 /usr/bin/unzip).
-const unzipBinary = ["/usr/bin/unzip", "/bin/unzip", "/usr/local/bin/unzip", "/opt/homebrew/bin/unzip"].find(
-  (candidate) => existsSync(candidate),
-);
+// unzip을 이름으로 호출하면 쓰기 가능한 PATH를 상속하므로, root 소유 고정 경로에서만
+// 절대 경로를 해석해 PATH 조작을 차단한다(macOS·Linux CI: /usr/bin/unzip).
+const unzipBinary = ["/usr/bin/unzip", "/bin/unzip"].find((candidate) => existsSync(candidate));
 if (!unzipBinary) {
   throw new Error("unzip executable was not found in a trusted system path");
 }

@@ -46,9 +46,13 @@ export function openPack(packRelPath, tmpPrefix) {
  * 갱신된 `byteSize`와 gz `sha256`을 돌려준다.
  */
 export function writePack({ sqlitePath, packPath, packRelPath, indexRelPath }) {
+  const resolvedPackPath = resolveWithinRepo(packRelPath);
+  if (path.resolve(packPath) !== resolvedPackPath) {
+    throw new Error(`packPath가 packRelPath와 일치하지 않는다: ${packPath}`);
+  }
   const sqliteBytes = readFileSync(sqlitePath);
   const gz = gzipSync(sqliteBytes, { level: 9 });
-  writeFileSync(packPath, gz);
+  writeFileSync(resolvedPackPath, gz);
   const indexPath = resolveWithinRepo(indexRelPath);
   const index = JSON.parse(readFileSync(indexPath, "utf8"));
   const pack = index.packs.find((p) => packRelPath.endsWith(p.asset));
