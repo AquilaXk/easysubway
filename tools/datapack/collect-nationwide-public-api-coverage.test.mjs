@@ -885,3 +885,36 @@ test("sanitized 진단은 reason과 transport code별 건수만 고정한다", (
     transportReason: "ENOTFOUND\nnever-print-this-key",
   }]).join(","), /never-print-this-key|\n/);
 });
+
+test("같은 id의 builtin과 catalog 후보 충돌 시 catalog 후보의 필드를 보존한다", () => {
+  const searchPlan = buildNationwidePublicApiSearchPlan({
+    targets: {
+      targetVersion: "2026-07-13",
+      activeLineScopes: [{ regionId: "capital", operatorId: "korail", lineId: "korail-1" }],
+      requiredSourceDomains: [{ id: "route_graph_topology", releaseTier: "LAUNCH_REQUIRED" }],
+    },
+    fixture: {
+      packs: [{
+        operators: [{ id: "korail", nameKo: "코레일" }],
+        lines: [{ id: "korail-1", nameKo: "수도권 1호선" }],
+      }],
+    },
+    sourceCandidates: {
+      // builtin과 같은 id를 가지는 catalog 후보를 추가한다.
+      // builtin은 { id: "kric-nationwide-station-interval-distance" } 형태이고,
+      // catalog에서는 온전한 객체를 전달한다.
+      candidates: [{
+        id: "kric-nationwide-station-interval-distance",
+        domain: "route_graph_topology",
+        requestUrl: "https://openapi.kric.go.kr/api/override",
+        // coverageScope를 명시하지 않음: 필터링을 통과하고, 병합 후 builtin 필드와 함께 보존됨
+      }],
+    },
+  });
+
+  // catalog 후보가 builtin을 덮어써서, 온전한 필드들이 보존되어야 한다.
+  const candidateIds = searchPlan.entries[0].knownProviderCandidateIds;
+  assert.equal(candidateIds.length, 1);
+  assert.equal(candidateIds[0], "kric-nationwide-station-interval-distance");
+});
+

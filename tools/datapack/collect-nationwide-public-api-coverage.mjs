@@ -148,7 +148,7 @@ function publicApiSearchQuery({ organizations, keyword, coverageScope, matchTerm
 
 function mergeBuiltinProviderCandidates(indexed) {
   for (const [domain, builtins] of Object.entries(BUILTIN_KNOWN_PROVIDER_CANDIDATES)) {
-    const merged = [...(indexed.get(domain) ?? []), ...builtins];
+    const merged = [...builtins, ...(indexed.get(domain) ?? [])];
     indexed.set(domain, [...new Map(merged.map((candidate) => [candidate.id, candidate])).values()]
       .sort((a, b) => alphabeticalCompare(a.id, b.id)));
   }
