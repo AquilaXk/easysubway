@@ -2784,6 +2784,7 @@ class RouteSearchScreen extends StatefulWidget {
   RouteSearchScreen({
     required this.repository,
     required this.stationRepository,
+    this.searchHistoryRepository,
     this.routeFeedbackRepository,
     this.favoriteRouteRepository,
     this.adRepository,
@@ -2798,18 +2799,25 @@ class RouteSearchScreen extends StatefulWidget {
     this.onShellBackToHome,
     this.getOffAlarmController,
     this.routeShareInvoker,
+    this.regionLabel,
     String? initialMobilityType,
     super.key,
   }) : initialMobilityType = _resolveInitialMobilityType(initialMobilityType);
 
   final RouteSearchRepository repository;
   final StationSearchRepository stationRepository;
+  final SearchHistoryRepository? searchHistoryRepository;
   final RouteFeedbackRepository? routeFeedbackRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
   final AdRepository? adRepository;
   final GetOffAlarmController? getOffAlarmController;
   final RouteShareInvoker? routeShareInvoker;
   final RouteDraft? initialDraft;
+
+  /// #2419 Fix: draft로 채운 역은 region 정보가 없어 최근 경로 기록이 항상
+  /// 스킵됐다. 홈이 현재 노선도 지역 표시명을 넘겨주면 draft 역의 지역 폴백으로
+  /// 쓴다(예: '수도권').
+  final String? regionLabel;
   final RouteTransportScope initialTransportScope;
   final Widget? shellNavigationBar;
   final VoidCallback? onShellBackToHome;
@@ -3333,6 +3341,81 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
         objective: _selectedObjective,
       ),
     );
+    unawaited(_recordRouteSearchHistory());
+  }
+
+  /// 검색이 실제 이동 경로로 성공했을 때만 최근 경로 목록에 기록한다. blocked
+  /// 결과나 지역을 알 수 없는 경우(origin 지역 미상)는 지역 필터 목록에 노출될 수
+  /// 없으므로 저장하지 않는다.
+  Future<void> _recordRouteSearchHistory() async {
+    final repository = widget.searchHistoryRepository;
+    if (repository == null || !mounted) {
+      return;
+    }
+    final state = _controller.state;
+    final result = state.result;
+    if (state.status != RouteSearchViewStatus.success ||
+        result == null ||
+        result.isBlocked) {
+      return;
+    }
+    final origin = _originStation;
+    final destination = _destinationStation;
+    if (origin == null || destination == null) {
+      return;
+    }
+    // #2419 리뷰 finding: draft로 채운 역은 region이 빈 문자열이라 항상
+    // 스킵됐던 걸 이전 커밋이 [widget.regionLabel](현재 노선도 지역 표시명)
+    // 폴백으로 고쳤지만, `_stationFromDraft`가 그 폴백을 origin.region에
+    // 미리 채워두므로 즐겨찾기처럼 다른 지역 경로를 열면 origin.region이 항상
+    // "현재 보고 있는 지도 지역"으로 오염돼 있었다(비어 있지 않아 폴백 분기가
+    // 아예 안 탐). 그래서 항상 origin.id로 실제 지역을 먼저 조회하고, 조회가
+    // 실패하거나 비었을 때만 draft/지도 폴백(origin.region → regionLabel)으로
+    // 되돌아간다.
+    var originRegion = '';
+    try {
+      final detail = await widget.stationRepository.getStationDetail(origin.id);
+      originRegion = detail.region.trim();
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '최근 경로 검색 저장 중 origin 지역 조회에 실패했습니다.',
+      );
+    }
+    // detail 조회 실패·공백이면 지도 regionLabel/오염된 draft region으로
+    // 추측 저장하지 않는다(타 지역 즐겨찾기 오기록 방지 — Bugbot).
+    if (originRegion.isEmpty) {
+      final pickedRegion = origin.region.trim();
+      // 검색 피커로 고른 역만 자체 region을 신뢰한다. draft 폴백으로
+      // 채워진 값은 _stationFromDraft가 빈 문자열을 유지하므로 여기 안 온다.
+      originRegion = pickedRegion;
+    }
+    final region = normalizeStationRegion(originRegion);
+    if (region.isEmpty) {
+      return;
+    }
+    final waypoint = _waypointStation;
+    try {
+      await repository.recordRouteSearch(
+        RecentRouteSearchEntry(
+          originStationId: origin.id,
+          originStationName: origin.nameKo,
+          waypointStationId: waypoint?.id,
+          waypointStationName: waypoint?.nameKo,
+          destinationStationId: destination.id,
+          destinationStationName: destination.nameKo,
+          region: region,
+          searchedAt: DateTime.now().toUtc(),
+        ),
+      );
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '최근 경로 검색 저장 중 예외가 발생했습니다.',
+      );
+    }
   }
 
   Future<void> _changeObjective(RouteObjective objective) async {
@@ -3518,6 +3601,7 @@ StationSearchResult? _stationFromDraft(RouteDraftStation? station) {
     id: station.id,
     nameKo: station.nameKo,
     nameEn: '',
+    // draft에는 지역이 없다. 최근 경로 기록은 getStationDetail로 조회한다.
     region: '',
     dataQualityLevel: '',
     lastVerifiedAt: '',

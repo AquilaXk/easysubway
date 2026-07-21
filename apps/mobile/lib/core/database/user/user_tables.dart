@@ -44,6 +44,29 @@ class SearchHistory extends Table {
 
   IntColumn get id => integer().autoIncrement()();
   TextColumn get query => text()();
+
+  /// 검색 당시 선택 지역(예: `수도권`, `부산`). 지역별 최근 목록 필터에 쓴다.
+  /// 지역 정보 없이 저장된 레거시 행은 null이며, 지역 필터 목록에서 제외한다.
+  TextColumn get region => text().nullable()();
+  DateTimeColumn get searchedAt => dateTime().named('searched_at')();
+}
+
+class RouteSearchHistory extends Table {
+  @override
+  String get tableName => 'route_search_history';
+
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get originStationId => text().named('origin_station_id')();
+  TextColumn get originStationName => text().named('origin_station_name')();
+  TextColumn get waypointStationId =>
+      text().named('waypoint_station_id').nullable()();
+  TextColumn get waypointStationName =>
+      text().named('waypoint_station_name').nullable()();
+  TextColumn get destinationStationId =>
+      text().named('destination_station_id')();
+  TextColumn get destinationStationName =>
+      text().named('destination_station_name')();
+  TextColumn get region => text()();
   DateTimeColumn get searchedAt => dateTime().named('searched_at')();
 }
 

@@ -113,31 +113,128 @@ class DemoFavoriteRouteRepository implements FavoriteRouteRepository {
 }
 
 class DemoSearchHistoryRepository implements SearchHistoryRepository {
-  final _queries = <String>['상록수', '사당'];
+  DemoSearchHistoryRepository() {
+    _addStation('사당', region: '수도권');
+    _addStation('상록수', region: '수도권');
+  }
+
+  final _stations = <RecentStationSearchEntry>[];
+  final _routes = <RecentRouteSearchEntry>[];
+  int _clock = 0;
+
+  DateTime _tick() =>
+      DateTime.fromMillisecondsSinceEpoch(++_clock, isUtc: true);
+
+  void _addStation(String query, {required String region}) {
+    _stations.removeWhere(
+      (entry) => entry.query == query && (entry.region?.trim() ?? '') == region,
+    );
+    _stations.insert(
+      0,
+      RecentStationSearchEntry(
+        query: query,
+        region: region,
+        searchedAt: _tick(),
+      ),
+    );
+  }
 
   @override
-  Future<void> recordSearch(String query) async {
+  Future<void> recordSearch(String query, {String? region}) async {
     final trimmed = query.trim();
-    if (trimmed.isEmpty) {
+    final normalizedRegion = region?.trim() ?? '';
+    if (trimmed.isEmpty || normalizedRegion.isEmpty) {
       return;
     }
-    _queries
-      ..remove(trimmed)
-      ..insert(0, trimmed);
+    _addStation(trimmed, region: normalizeStationRegion(normalizedRegion));
+  }
+
+  @override
+  Future<void> recordRouteSearch(RecentRouteSearchEntry entry) async {
+    final region = entry.region.trim();
+    if (region.isEmpty) {
+      return;
+    }
+    _routes.removeWhere(
+      (existing) => existing.identityKey == entry.identityKey,
+    );
+    _routes.insert(
+      0,
+      RecentRouteSearchEntry(
+        originStationId: entry.originStationId,
+        originStationName: entry.originStationName,
+        waypointStationId: entry.waypointStationId,
+        waypointStationName: entry.waypointStationName,
+        destinationStationId: entry.destinationStationId,
+        destinationStationName: entry.destinationStationName,
+        region: entry.region,
+        searchedAt: _tick(),
+      ),
+    );
   }
 
   @override
   Future<List<String>> listRecentQueries() async {
-    return List.unmodifiable(_queries);
+    return _stations.map((entry) => entry.query).toList(growable: false);
   }
 
   @override
-  Future<void> removeSearch(String query) async {
-    _queries.remove(query.trim());
+  Future<List<RecentSearchEntry>> listRecentEntries({
+    String? region,
+    int limit = 10,
+  }) async {
+    final filter = region?.trim();
+    final entries = <RecentSearchEntry>[
+      ..._stations.where((entry) => _stationMatches(entry.region, filter)),
+      ..._routes.where(
+        (entry) =>
+            filter == null ||
+            filter.isEmpty ||
+            stationBelongsToRegion(entry.region, filter),
+      ),
+    ]..sort((a, b) => b.searchedAt.compareTo(a.searchedAt));
+    return entries.take(limit).toList(growable: false);
+  }
+
+  @override
+  Future<void> removeSearch(String query, {String? region}) async {
+    final trimmed = query.trim();
+    final normalizedRegion = region?.trim();
+    if (trimmed.isEmpty) {
+      return;
+    }
+    if (normalizedRegion == null || normalizedRegion.isEmpty) {
+      _stations.removeWhere((entry) => entry.query == trimmed);
+      return;
+    }
+    final filter = normalizeStationRegion(normalizedRegion);
+    _stations.removeWhere(
+      (entry) =>
+          entry.query == trimmed &&
+          stationBelongsToRegion(entry.region ?? '', filter),
+    );
+  }
+
+  @override
+  Future<void> removeRouteSearch(RecentRouteSearchEntry entry) async {
+    _routes.removeWhere(
+      (existing) => existing.identityKey == entry.identityKey,
+    );
   }
 
   @override
   Future<void> clearSearches() async {
-    _queries.clear();
+    _stations.clear();
+    _routes.clear();
+  }
+
+  bool _stationMatches(String? rowRegion, String? filter) {
+    if (filter == null || filter.isEmpty) {
+      return true;
+    }
+    if (rowRegion == null || rowRegion.isEmpty) {
+      return false;
+    }
+    return stationBelongsToRegion(rowRegion, filter);
   }
 }

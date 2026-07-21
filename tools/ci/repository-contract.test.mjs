@@ -2609,21 +2609,26 @@ test("역 검색 화면은 stations presentation canonical 파일이 소유한�
   );
 
   assert.match(stationSearchScreen, /^class StationSearchScreen\b/m);
-  assert.match(stationSearchScreen, /^enum StationSearchEntryMode\b/m);
+  // #2419: EntryMode 분기는 제거하고 지역 잠금·최근 검색 중심 화면으로 정리했다.
+  assert.doesNotMatch(stationSearchScreen, /^enum StationSearchEntryMode\b/m);
+  assert.match(stationSearchScreen, /_isRegionLocked/);
   assert.doesNotMatch(stationSearch, /^class StationSearchScreen\b/m);
   assert.doesNotMatch(stationSearch, /^enum StationSearchEntryMode\b/m);
   assert.doesNotMatch(
     stationSearch,
     /^export 'features\/stations\/presentation\/station_search_screen\.dart';$/m,
   );
+  // #2419: 노선도는 StationSearchScreen을 직접 import하지 않고
+  // NetworkMapRegionBridge로 홈 임베드 검색과 지역만 맞춘다.
+  assert.doesNotMatch(
+    read("apps/mobile/lib/network_map.dart"),
+    /^import 'features\/stations\/presentation\/station_search_screen\.dart';$/m,
+  );
+  assert.match(read("apps/mobile/lib/network_map.dart"), /NetworkMapRegionBridge/);
   for (const [consumerPath, importPattern] of [
     [
       "apps/mobile/lib/features/home/presentation/home_screen.dart",
       /^import '\.\.\/\.\.\/stations\/presentation\/station_search_screen\.dart';$/m,
-    ],
-    [
-      "apps/mobile/lib/network_map.dart",
-      /^import 'features\/stations\/presentation\/station_search_screen\.dart';$/m,
     ],
     [
       "apps/mobile/test/widget_test.dart",
@@ -2755,7 +2760,7 @@ test("모바일 역 검색 결과 시스템 글자 크기 문구 회귀 테스�
   );
   const widgetTest = read("apps/mobile/test/widget_test.dart");
   const resultTileMatch = stationSearchBody.match(
-    /class _StationSearchResultTile[\s\S]*?class _StationRoleActionBar/,
+    /class _StationSearchResultTile[\s\S]*?class _StationSearchResultLineRow[\s\S]*?^String _stationResultDisplayName/m,
   );
   const largeTextTestMatch = widgetTest.match(
     /testWidgets\('역 검색 결과 핵심 문구는 시스템 글자 크기에서 한 줄 말줄임으로 고정하지 않는다'[\s\S]*?\n  testWidgets\('/,
@@ -15387,9 +15392,22 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(onboardingAppFlowTest, /첫 실행 앱은 알림 권한 제공자가 직접 주입되면 온보딩 알림 권한을 요청한다/);
   assert.match(onboardingAppFlowTest, /앱은 저장된 온보딩 설정으로 홈을 바로 보여준다/);
   assert.match(onboardingAppFlowTest, /앱은 온보딩 저장소를 읽지 못하면 다시 설정을 고르게 한다/);
-  assert.match(stationSearchBody, /stationSearchFailureNextAction/);
-  assert.match(stationSearchBody, /역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다\./);
-  assert.match(widgetTest, /역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다\./);
+  // #2419: 역 검색 화면의 「내 주변 역 찾기」 실패 복구 CTA는 제거하고,
+  // 주변 역은 홈 노선도 GPS FAB만 담당한다. 결과 본문은 탭 전용 타일로 유지한다.
+  assert.doesNotMatch(stationSearchBody, /stationSearchFailureNextAction/);
+  assert.doesNotMatch(stationSearchBody, /내 주변 역/);
+  assert.doesNotMatch(stationSearchBody, /역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다\./);
+  assert.match(stationSearchBody, /onResultTap/);
+  const stationSearchScreen = read(
+    "apps/mobile/lib/features/stations/presentation/station_search_screen.dart",
+  );
+  assert.doesNotMatch(stationSearchScreen, /내 주변 역 찾기/);
+  assert.match(stationSearchScreen, /_isRegionLocked/);
+  const stationRecentSearch = read(
+    "apps/mobile/lib/features/stations/presentation/station_recent_search_section.dart",
+  );
+  assert.match(stationRecentSearch, /최근 검색 내역이 없습니다\./);
+  assert.match(networkMap, /NetworkMapRegionBridge/);
   assert.match(appRoot, /initialMobilityType: onboardingResult\?\.mobilityType/);
   assert.match(homeScreen, /initialMobilityType: initialMobilityType/);
   assert.match(appRoot, /OnboardingPreferenceScope/);
@@ -15509,7 +15527,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.doesNotMatch(stationSearch, /Text\(\s*result\.dataQualityLabel,/);
   assert.match(widgetTest, /expect\(find\.text\('출처 확인 필요'\), findsNothing\);/);
   // #1933: 결과 재설계로 각 행 시맨틱은 자신의 노선 하나만 담아 "역명, 노선명, 선택" 형태다.
-  assert.match(widgetTest, /상록수역, 수도권 4호선, 선택/);
+  assert.match(widgetTest, /상록수역, 수도권 4호선, 경의중앙선, 선택/);
   assert.match(read("apps/mobile/test/station_search_test.dart"), /인증 실패 시 인증을 지우고 한 번 재시도한다/);
   assert.match(read("apps/mobile/test/station_search_test.dart"), /릴리즈 빌드는 API 기본 주소를 반드시 설정해야 한다/);
   assert.match(read("apps/mobile/test/station_search_test.dart"), /릴리즈 빌드는 HTTPS API 주소만 사용한다/);

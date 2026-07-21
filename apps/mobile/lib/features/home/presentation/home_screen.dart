@@ -21,6 +21,7 @@ import '../../get_off_alarm/get_off_alarm_controller.dart';
 import '../../mobility_profile/mobility_preset_labels.dart';
 import '../../mobility_profile/mobility_preset_picker.dart';
 import '../../mobility_profile/mobility_profile_policy.dart';
+import '../../network_map/presentation/region_menu.dart';
 import '../../notifications/presentation/new_notification_bar.dart';
 import '../../notifications/presentation/notification_inbox_screen.dart';
 import '../../realtime/realtime_repository.dart';
@@ -37,6 +38,25 @@ import '../../train_search/domain/train_search_models.dart';
 import '../../train_search/presentation/train_search_screen.dart';
 
 const _mainIconControlRadius = BorderRadius.all(Radius.circular(12));
+
+/// 역 검색 화면 지역 메뉴에 노선도가 아는 지역을 모두 담는다(#2419 리뷰
+/// finding). 기본 목록 5개를 우선 유지하고, 맵에만 있는 지역 표시명이 있으면
+/// 뒤에 이어붙인다(기본 목록에 없는 지역은 id도 표시명 그대로 쓴다).
+List<EasySubwayRegionMenuItem> _stationSearchRegionsForMap(
+  List<String> mapRegionLabels,
+) {
+  final knownLabels = defaultStationSearchRegions
+      .map((item) => item.label)
+      .toSet();
+  final extras = <EasySubwayRegionMenuItem>[
+    for (final label in mapRegionLabels)
+      if (knownLabels.add(label))
+        EasySubwayRegionMenuItem(id: label, label: label),
+  ];
+  return extras.isEmpty
+      ? defaultStationSearchRegions
+      : [...defaultStationSearchRegions, ...extras];
+}
 
 class HomeScreen extends StatefulWidget {
   HomeScreen({
@@ -133,6 +153,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // #2109 Fix: 풀페이지 검색(햄버거 메뉴 경유) 결과 탭으로 반환된 역. 노선도에
   // focus + 팬 메뉴 + 해당 역 하단 패널을 요청하는 채널이다.
   StationSearchResult? _mapFocusStationRequest;
+
+  /// 풀페이지 역 검색 ↔ 홈 노선도 지역 동기화용.
+  final NetworkMapRegionBridge _mapRegionBridge = NetworkMapRegionBridge();
+
+  /// #2419 Fix: 노선도의 현재 지역 표시명. 노선 탭이 draft(출발/도착) 역의
+  /// 지역 폴백으로 써서 최근 경로 기록이 항상 스킵되던 결함을 고친다.
+  String _currentRegionLabel = '수도권';
 
   @override
   void initState() {
@@ -388,9 +415,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
 
     Future<void> openStationSearch(
-      String regionLabel, [
-      StationSearchEntryMode entryMode = StationSearchEntryMode.search,
-    ]) async {
+      String regionLabel,
+      List<String> mapRegionLabels,
+    ) async {
       // #2109 Fix: 둘러보기 모드 결과 탭은 더 이상 즉시 상세를 밀지 않고
       // 선택한 역 결과를 pop으로 반환한다(_returnStationToMap). 여기서 노선
       // 정보까지 받아 노선도에 focus + 팬 메뉴 + 하단 패널을 요청한다.
@@ -402,14 +429,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             favoriteRepository: favoriteRepository,
             adRepository: adRepository,
             searchHistoryRepository: searchHistoryRepository,
-            locationProvider: locationProvider,
             facilityReportDraftTargetStore: facilityReportDraftTargetStore,
             internalRouteRepository: internalRouteRepository,
             internalRouteMobilityType: initialMobilityType,
             realtimeRepository: realtimeRepository,
             routeDraftController: _routeDraftController,
-            entryMode: entryMode,
             regionLabel: regionLabel,
+            regions: _stationSearchRegionsForMap(mapRegionLabels),
+            onRegionChanged: _mapRegionBridge.selectRegion,
           ),
         ),
       );
@@ -427,6 +454,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     Future<void> openStationSearchForSlot(
       RouteDraftSlot slot,
       String regionLabel,
+      List<String> mapRegionLabels,
     ) async {
       await Navigator.of(context).push(
         MaterialPageRoute<RouteDraftStation>(
@@ -435,7 +463,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             reportRepository: reportRepository,
             favoriteRepository: favoriteRepository,
             searchHistoryRepository: searchHistoryRepository,
-            locationProvider: locationProvider,
             facilityReportDraftTargetStore: facilityReportDraftTargetStore,
             internalRouteRepository: internalRouteRepository,
             internalRouteMobilityType: initialMobilityType,
@@ -443,6 +470,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             routeDraftController: _routeDraftController,
             pickSlot: slot,
             regionLabel: regionLabel,
+            regions: _stationSearchRegionsForMap(mapRegionLabels),
+            onRegionChanged: _mapRegionBridge.selectRegion,
           ),
         ),
       );
@@ -534,11 +563,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         NetworkMapScreen(
           repository: networkMapRepository,
           routeDraftController: _routeDraftController,
-          onOpenStationSearch: (regionLabel) =>
-              unawaited(openStationSearch(regionLabel)),
+          regionBridge: _mapRegionBridge,
+          onOpenStationSearch: (regionLabel, mapRegionLabels) =>
+              unawaited(openStationSearch(regionLabel, mapRegionLabels)),
           onStationSearchClosed: () => unawaited(refreshHomeState()),
-          onPickStationForSlot: (slot, regionLabel) =>
-              unawaited(openStationSearchForSlot(slot, regionLabel)),
+          onPickStationForSlot: (slot, regionLabel, mapRegionLabels) =>
+              unawaited(
+                openStationSearchForSlot(slot, regionLabel, mapRegionLabels),
+              ),
           stationSearchRepository: repository,
           reportRepository: reportRepository,
           favoriteRepository: favoriteRepository,
@@ -551,9 +583,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           viewportRepository: widget.networkMapViewportRepository,
           realtimeRepository: widget.realtimeRepository,
           onOpenSavedItems: openSavedTab,
-          onOpenNearbyStations: (regionLabel) => unawaited(
-            openStationSearch(regionLabel, StationSearchEntryMode.nearby),
-          ),
           onOpenTrainSearch: openTrainSearch,
           onOpenSettings: openMoreTab,
           onOpenServiceNotices: noticeController == null
@@ -587,6 +616,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           focusStationRequest: _mapFocusStationRequest,
           onFocusStationRequestHandled: () =>
               setState(() => _mapFocusStationRequest = null),
+          onRegionLabelChanged: (regionLabel) {
+            if (regionLabel == _currentRegionLabel) {
+              return;
+            }
+            setState(() => _currentRegionLabel = regionLabel);
+          },
         ),
       );
     }
@@ -603,7 +638,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           favoriteRepository: favoriteRepository,
           adRepository: adRepository,
           searchHistoryRepository: searchHistoryRepository,
-          locationProvider: locationProvider,
           facilityReportDraftTargetStore: facilityReportDraftTargetStore,
           internalRouteRepository: internalRouteRepository,
           internalRouteMobilityType: initialMobilityType,
@@ -619,6 +653,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         RouteSearchScreen(
           repository: routeRepository,
           stationRepository: repository,
+          searchHistoryRepository: searchHistoryRepository,
           routeFeedbackRepository: routeFeedbackRepository,
           getOffAlarmController: getOffAlarmController,
           favoriteRouteRepository: favoriteRouteRepository,
@@ -626,6 +661,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           initialMobilityType: _routeTabMobilityType ?? initialMobilityType,
           initialTransportScope: _routeTabTransportScope,
           initialDraft: _routeDraftController.draft,
+          regionLabel: _currentRegionLabel,
           simpleViewEnabled: simpleViewEnabled,
           onShellBackToHome: () {
             _routeDraftController.clear();

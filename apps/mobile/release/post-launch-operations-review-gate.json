@@ -73,12 +73,12 @@
             {"path": "apps/mobile/lib/features/account/presentation/user_data_deletion_screen.dart", "sha256": "e7636ee91d36df8033c3619167ee6b7712f1421faf91880abeff1cc6cfb95669"},
             {"path": "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart", "sha256": "7ef5b7236a008f54a22040931f294b00192987fe35cc56fc94ebc2d815ef4620"},
             {"path": "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart", "sha256": "bb293eb895b557c50c43079d5ca7e1ebc2f22367c171754c8ac7c8a4eb641c26"},
-            {"path": "apps/mobile/lib/features/home/presentation/home_screen.dart", "sha256": "a7d7ea0396fc7bf8783f6f307c51a9f3f1801f1c6c51d42fbdb24d88ce3c5ade"},
+            {"path": "apps/mobile/lib/features/home/presentation/home_screen.dart", "sha256": "98ce4da21e7e004dfc4f716473be8f3ecd693cd6d12f7aa3e1febe85eeaa3b00"},
             {"path": "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart", "sha256": "b359341adfdec05a06af18e0585d5bf31d27231ab4d51779b53c0a7605b405f1"},
             {"path": "apps/mobile/lib/features/settings/presentation/open_source_licenses_screen.dart", "sha256": "822762b61cd3824340c4e45cf5ffe3079e221d28712dd98d94fd9a03fe5fd591"},
             {"path": "apps/mobile/lib/features/settings/presentation/service_info_screen.dart", "sha256": "62e036e62f5e5ce235d494d5d730a6dd6ea5659e1b53290d94a6c7c954bcdcd9"},
             {"path": "apps/mobile/lib/features/support/presentation/support_access_screen.dart", "sha256": "d407c10fdf20cf821b0273065388885d2511b6eb14b6ef02183f1723d0a83112"},
-            {"path": "apps/mobile/lib/main.dart", "sha256": "1cbd43196e2df5a4db9e3aa6a7f8ae6bf1fdef0afdc9c3cda54fcd0bf11da31a"}
+            {"path": "apps/mobile/lib/main.dart", "sha256": "8b4cc60e9cc979c933af7949dcce1f62638ac1ff2f2b0212e48be2a8096ff505"}
           ]
         },
         {

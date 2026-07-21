@@ -96,13 +96,13 @@ void main() {
     final repository = DemoSearchHistoryRepository();
 
     expect(await repository.listRecentQueries(), ['상록수', '사당']);
-    await repository.recordSearch(' 사당 ');
+    await repository.recordSearch(' 사당 ', region: '수도권');
     expect(await repository.listRecentQueries(), ['사당', '상록수']);
     await repository.recordSearch('  ');
     expect(await repository.listRecentQueries(), ['사당', '상록수']);
-    await repository.recordSearch('강남');
+    await repository.recordSearch('강남', region: '수도권');
     expect(await repository.listRecentQueries(), ['강남', '사당', '상록수']);
-    await repository.removeSearch(' 사당 ');
+    await repository.removeSearch(' 사당 ', region: '수도권');
     expect(await repository.listRecentQueries(), ['강남', '상록수']);
     await repository.clearSearches();
     expect(await repository.listRecentQueries(), isEmpty);

@@ -1800,6 +1800,52 @@ void main() {
     expect(receipts.single.receiptId, 'receipt-migration-1');
     expect(receipts.single.reportId, 'report-migration-1');
   });
+
+  test('user DB migration은 schema 2 → 3에서 region 컬럼·route_search_history를 만들고 '
+      'region 없는 레거시 행을 정리한다(#2419)', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-user-v2-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final file = File('${directory.path}/user.sqlite');
+    final legacy = sqlite.sqlite3.open(file.path);
+    legacy.execute('''
+        CREATE TABLE search_history (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          query TEXT NOT NULL,
+          searched_at INTEGER NOT NULL
+        )
+      ''');
+    legacy.execute('''
+        INSERT INTO search_history (query, searched_at)
+        VALUES ('상록수', 1750320060)
+      ''');
+    legacy.execute('PRAGMA user_version = 2');
+    legacy.close();
+
+    final database = UserDatabase.file(file);
+    addTearDown(database.close);
+
+    final searchHistoryColumns = await database
+        .customSelect('PRAGMA table_info(search_history)')
+        .get();
+    final routeSearchHistoryTable = await database.customSelect('''
+        SELECT name FROM sqlite_master
+        WHERE type = 'table' AND name = 'route_search_history'
+      ''').get();
+    final remainingSearchHistory = await database
+        .customSelect('SELECT COUNT(*) AS count FROM search_history')
+        .getSingle();
+
+    expect(
+      searchHistoryColumns.map((row) => row.read<String>('name')),
+      contains('region'),
+    );
+    expect(routeSearchHistoryTable, hasLength(1));
+    // v2에는 region 개념이 없어 ALTER 직후 기존 행은 모두 region이 비고,
+    // v3 onUpgrade가 이를 마이그레이션 시점에 정리한다.
+    expect(remainingSearchHistory.read<int>('count'), 0);
+  });
 }
 
 final class _CloseTrackingCatalogDatabase extends CatalogDatabase {

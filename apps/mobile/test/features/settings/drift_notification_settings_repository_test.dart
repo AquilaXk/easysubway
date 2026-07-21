@@ -36,9 +36,9 @@ void main() {
       maxEntries: 2,
     );
 
-    await repository.recordSearch(' 상록수 ');
-    await repository.recordSearch('사당');
-    await repository.recordSearch('상록수');
+    await repository.recordSearch(' 상록수 ', region: '수도권');
+    await repository.recordSearch('사당', region: '수도권');
+    await repository.recordSearch('상록수', region: '수도권');
 
     expect(await repository.listRecentQueries(), ['상록수', '사당']);
   });

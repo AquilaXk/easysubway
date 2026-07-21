@@ -10,7 +10,6 @@ import 'package:flutter/services.dart' show rootBundle;
 
 import 'accessible_design.dart';
 import 'ad_slot.dart';
-import 'design_tokens.dart';
 import 'facility_report.dart';
 import 'features/ads/ad_repository.dart';
 import 'features/network_map/domain/map_camera.dart';
@@ -22,6 +21,7 @@ import 'features/network_map/presentation/nearby_data_source_toggle.dart';
 import 'features/network_map/presentation/nearby_direction_columns.dart';
 import 'features/network_map/presentation/nearby_direction_title.dart';
 import 'features/network_map/presentation/nearby_station_line_bar.dart';
+import 'features/network_map/presentation/region_menu.dart';
 import 'features/network_map/presentation/route_map_transfer_marker.dart';
 import 'features/network_map/presentation/station_fan_menu.dart';
 import 'features/network_map/presentation/station_fan_menu_geometry.dart'
@@ -34,13 +34,12 @@ import 'features/realtime/realtime_repository.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
 import 'features/route_draft/domain/route_draft.dart';
 import 'features/stations/presentation/service_pattern_badge.dart';
-import 'features/stations/presentation/station_search_screen.dart';
 import 'internal_route.dart';
 import 'mobile_error_reporter.dart';
 import 'search_field.dart';
 import 'station_search.dart';
 
-const _networkMapTopBarHeight = 60.0;
+const _networkMapTopBarHeight = easySubwayTopBarContentHeight;
 
 abstract interface class NetworkMapRepository {
   Future<NetworkMapData> getNetworkMap({String? region, String? lineId});
@@ -374,6 +373,26 @@ class NetworkMapPositionSource {
   }
 }
 
+/// 홈 노선도 지역을 역 검색 화면 등 외부에서 바꿀 때 쓰는 브리지.
+///
+/// [NetworkMapScreen]이 attach한 뒤 [selectRegion]으로 지도 지역을 전환한다.
+/// 역 검색에서 지역을 바꾸면 홈 노선도도 같은 지역으로 맞춘다.
+class NetworkMapRegionBridge {
+  void Function(String region)? _apply;
+
+  void attach(void Function(String region) apply) {
+    _apply = apply;
+  }
+
+  void detach() {
+    _apply = null;
+  }
+
+  void selectRegion(String region) {
+    _apply?.call(region);
+  }
+}
+
 class NetworkMapScreen extends StatefulWidget {
   const NetworkMapScreen({
     required this.repository,
@@ -393,7 +412,6 @@ class NetworkMapScreen extends StatefulWidget {
     this.viewportRepository,
     this.realtimeRepository,
     this.onOpenSavedItems,
-    this.onOpenNearbyStations,
     this.onOpenTrainSearch,
     this.onOpenSettings,
     this.onOpenServiceNotices,
@@ -403,17 +421,25 @@ class NetworkMapScreen extends StatefulWidget {
     this.focusStationRequest,
     this.focusStationRequestId,
     this.onFocusStationRequestHandled,
+    this.regionBridge,
+    this.onRegionLabelChanged,
     super.key,
   });
 
   final NetworkMapRepository repository;
   final RouteDraftController routeDraftController;
 
-  /// 역 검색을 열 때 현재 선택 지역 표시명(예: '수도권', '부산')을 함께 전달한다.
-  /// #2090에서 검색 화면에 지역 표시가 추가됐는데 호출부가 이를 안 넘겨 기본값
-  /// '수도권'이 고정 표시되던 결함을 고치기 위해, 파라미터 없는 VoidCallback에서
-  /// `ValueChanged<String>`으로 바꿨다.
-  final ValueChanged<String> onOpenStationSearch;
+  /// 역 검색 등 외부에서 노선도 지역을 바꿀 때 연결한다.
+  final NetworkMapRegionBridge? regionBridge;
+
+  /// 역 검색을 열 때 현재 선택 지역 표시명(예: '수도권', '부산')과, 이 지도가
+  /// 아는 지역 표시명 전체 목록을 함께 전달한다. #2090에서 검색 화면에 지역
+  /// 표시가 추가됐는데 호출부가 이를 안 넘겨 기본값 '수도권'이 고정 표시되던
+  /// 결함을 고치려 파라미터 없는 VoidCallback에서 `ValueChanged<String>`으로
+  /// 바꿨고, 리뷰 finding(#2419)로 지역 목록도 함께 넘기도록 다시 확장했다 —
+  /// 맵에만 있는 지역이 검색 화면 지역 메뉴 기본 목록에 없으면 누락됐다.
+  final void Function(String regionLabel, List<String> availableRegions)
+  onOpenStationSearch;
 
   /// #1933 홈 in-place 역 검색 모드를 빠져나올 때(← 또는 시스템 back) 호출된다.
   /// 셸이 알림/신고 상태를 다시 불러오도록 하기 위한 훅이다. 라우트 기반 검색이
@@ -423,8 +449,13 @@ class NetworkMapScreen extends StatefulWidget {
   /// 상단 draft 오버레이의 출발/도착 칸을 탭했을 때, 그 칸을 채우려고 기존 역 검색을
   /// 여는 콜백. 지도 탭과 같은 [routeDraftController]로 수렴한다. null이면 오버레이
   /// 칸은 탭할 수 없다(둘러보기 검색만 메뉴로 제공). 두 번째 인자는 현재 선택 지역
-  /// 표시명(#2090 검색 화면 지역 표시 배선).
-  final void Function(RouteDraftSlot slot, String regionLabel)?
+  /// 표시명(#2090 검색 화면 지역 표시 배선), 세 번째 인자는 이 지도가 아는 지역
+  /// 표시명 전체 목록(#2419 리뷰 finding).
+  final void Function(
+    RouteDraftSlot slot,
+    String regionLabel,
+    List<String> availableRegions,
+  )?
   onPickStationForSlot;
   final StationSearchRepository? stationSearchRepository;
 
@@ -443,9 +474,6 @@ class NetworkMapScreen extends StatefulWidget {
   final NetworkMapViewportRepository? viewportRepository;
   final RealtimeRepository? realtimeRepository;
   final VoidCallback? onOpenSavedItems;
-
-  /// 현재 선택 지역 표시명을 함께 전달한다(#2090 검색 화면 지역 표시 배선).
-  final ValueChanged<String>? onOpenNearbyStations;
   final VoidCallback? onOpenTrainSearch;
   final VoidCallback? onOpenSettings;
 
@@ -470,12 +498,20 @@ class NetworkMapScreen extends StatefulWidget {
   /// 않도록 부모가 필드를 비우게 한다).
   final VoidCallback? onFocusStationRequestHandled;
 
+  /// #2419 Fix: 노선도 지역이 로드·전환될 때 현재 지역 표시명을 부모(홈)에
+  /// 알린다. 노선 탭(길찾기 draft 자동검색)이 draft 역의 지역 폴백으로 쓴다.
+  final ValueChanged<String>? onRegionLabelChanged;
+
   @override
   State<NetworkMapScreen> createState() => _NetworkMapScreenState();
 }
 
 class _NetworkMapScreenState extends State<NetworkMapScreen> {
   String? _selectedRegion;
+  // #2419 리뷰 finding: 역 검색 메뉴가 항상 기본 지역 목록만 알아, 이 지도에만
+  // 있는 지역이 검색 화면 지역 메뉴에서 빠졌다. 로드된 지도의 지역 표시명을
+  // 캐싱해 검색을 열 때 함께 넘긴다.
+  List<String> _availableRegionLabels = const ['수도권'];
   bool _nearbyPanelVisible = false;
   _NetworkMapNearbyPanelData _nearbyPanelData =
       const _NetworkMapNearbyPanelData.idle();
@@ -517,6 +553,26 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   void initState() {
     super.initState();
     widget.routeDraftController.addListener(_handleDraftChangedForSearch);
+    widget.regionBridge?.attach(_selectRegionFromBridge);
+  }
+
+  void _selectRegionFromBridge(String region) {
+    if (!mounted) {
+      return;
+    }
+    // 출발·도착·경유 중 하나라도 있으면 경로 지역을 고정한다.
+    if (!widget.routeDraftController.draft.isEmpty) {
+      return;
+    }
+    final next = region.trim();
+    if (next.isEmpty) {
+      return;
+    }
+    // 이미 같은 표시 지역이면 불필요한 지도 재로드를 피한다.
+    if (_displayRegionName(next) == _displayRegionName(_selectedRegion ?? '')) {
+      return;
+    }
+    _reload(region: next);
   }
 
   /// #2109 Fix: 풀페이지 검색(햄버거 메뉴 경유) 결과 탭으로 반환된
@@ -528,6 +584,10 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   @override
   void didUpdateWidget(covariant NetworkMapScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.regionBridge != widget.regionBridge) {
+      oldWidget.regionBridge?.detach();
+      widget.regionBridge?.attach(_selectRegionFromBridge);
+    }
     final request = widget.focusStationRequest;
     if (request != null && request != oldWidget.focusStationRequest) {
       _showStationPanelFromSearch(request);
@@ -689,13 +749,15 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
       searchQueryController: _searchQueryController,
       stationSearchRepository: searchRepository,
       searchHistoryRepository: widget.searchHistoryRepository,
-      locationProvider: widget.locationProvider,
+      routeDraftController: widget.routeDraftController,
+      regionLabel: _displayRegionName(_selectedRegion ?? '수도권'),
     );
   }
 
   @override
   void dispose() {
     _nearbyLookupMessageTimer?.cancel();
+    widget.regionBridge?.detach();
     widget.routeDraftController.removeListener(_handleDraftChangedForSearch);
     _searchQueryController.dispose();
     _searchFocusNode.dispose();
@@ -711,6 +773,10 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     // 그대로 리포지토리 요청에 반영되어 data.selectedRegion과 같아지므로
     // 값이 보존된다(덮어써도 동일).
     _selectedRegion = data.selectedRegion;
+    _cacheAvailableRegionLabels(data.regions);
+    if (mounted) {
+      _notifyRegionLabelChanged();
+    }
     final viewport = await widget.viewportRepository?.loadViewport(
       _displayRegionName(data.selectedRegion),
     );
@@ -719,13 +785,24 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
 
   Future<_NetworkMapLoadResult> _loadMapForRegion(String region) async {
     final data = await widget.repository.getNetworkMap(region: region);
+    _cacheAvailableRegionLabels(data.regions);
     final viewport = await widget.viewportRepository?.loadViewport(
       _displayRegionName(data.selectedRegion),
     );
     return _NetworkMapLoadResult(data: data, initialViewport: viewport);
   }
 
+  void _cacheAvailableRegionLabels(List<NetworkMapRegion> regions) {
+    _availableRegionLabels = regions.isEmpty
+        ? const ['수도권']
+        : regions.map((region) => region.displayName).toList(growable: false);
+  }
+
   void _reload({String? region}) {
+    // 출발·도착·경유 중 하나라도 있으면 지역 전환을 막는다.
+    if (region != null && !widget.routeDraftController.draft.isEmpty) {
+      return;
+    }
     _nearestStationRequestToken++;
     setState(() {
       _selectedRegion = region ?? _selectedRegion;
@@ -733,6 +810,13 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
       _initialNearbyFocusStarted = false;
       _future = _loadMap();
     });
+    _notifyRegionLabelChanged();
+  }
+
+  /// #2419 Fix: 노선 탭(길찾기 draft 자동검색)이 draft 역의 지역 폴백으로 쓸 수
+  /// 있도록, 지역이 로드·전환될 때마다 현재 지역 표시명을 부모(홈)에 알린다.
+  void _notifyRegionLabelChanged() {
+    widget.onRegionLabelChanged?.call(_currentRegionDisplayName);
   }
 
   @override
@@ -776,7 +860,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                 nearbyLookupMessage: _nearbyLookupMessage,
                 adjacentStations: const _NetworkMapAdjacentStations(),
                 onCurrentLocationTap: _showNearestStationFanMenu,
-                onOpenNearbyStations: _openNearbyStationsWithRegion,
                 onCloseNearbyPanel: _hideNearbyPanel,
                 onNearbyLineSelected: _selectNearbyLine,
                 onNearbyDataSourceToggle: _toggleNearbyDataSource,
@@ -824,7 +907,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                 nearbyLookupMessage: _nearbyLookupMessage,
                 adjacentStations: const _NetworkMapAdjacentStations(),
                 onCurrentLocationTap: _showNearestStationFanMenu,
-                onOpenNearbyStations: _openNearbyStationsWithRegion,
                 onCloseNearbyPanel: _hideNearbyPanel,
                 onNearbyLineSelected: _selectNearbyLine,
                 onNearbyDataSourceToggle: _toggleNearbyDataSource,
@@ -877,7 +959,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               nearbyLookupMessage: _nearbyLookupMessage,
               adjacentStations: _adjacentStationsFor(data),
               onCurrentLocationTap: _showNearestStationFanMenu,
-              onOpenNearbyStations: _openNearbyStationsWithRegion,
               onCloseNearbyPanel: _hideNearbyPanel,
               onNearbyLineSelected: _selectNearbyLine,
               onNearbyDataSourceToggle: _toggleNearbyDataSource,
@@ -997,6 +1078,11 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
 
       if (_displayRegionName(targetMap.data.selectedRegion) !=
           pendingResult.region) {
+        // 경로 칸이 하나라도 있으면 지역을 바꾸지 않는다.
+        if (!widget.routeDraftController.draft.isEmpty) {
+          _showNearbyLookupMessage('경로를 정한 뒤에는 지역을 바꿀 수 없어요.');
+          return;
+        }
         final matchingRegions = targetMap.data.regions
             .where((region) => region.displayName == pendingResult.region)
             .toList(growable: false);
@@ -1298,14 +1384,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   String get _currentRegionDisplayName =>
       _displayRegionName(_selectedRegion ?? '수도권');
 
-  VoidCallback? get _openNearbyStationsWithRegion {
-    final callback = widget.onOpenNearbyStations;
-    if (callback == null) {
-      return null;
-    }
-    return () => callback(_currentRegionDisplayName);
-  }
-
   Future<void> _openMapMenu() {
     return showGeneralDialog<void>(
       context: context,
@@ -1315,8 +1393,10 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
       transitionDuration: const Duration(milliseconds: 180),
       pageBuilder: (context, animation, secondaryAnimation) {
         return _NetworkMapMenuPanel(
-          onOpenStationSearch: () =>
-              widget.onOpenStationSearch(_currentRegionDisplayName),
+          onOpenStationSearch: () => widget.onOpenStationSearch(
+            _currentRegionDisplayName,
+            _availableRegionLabels,
+          ),
           onOpenSavedItems: widget.onOpenSavedItems,
           onOpenTrainSearch: widget.onOpenTrainSearch,
           onOpenServiceNotices: widget.onOpenServiceNotices,
@@ -1410,6 +1490,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     widget.onPickStationForSlot?.call(
       RouteDraftSlot.origin,
       _currentRegionDisplayName,
+      _availableRegionLabels,
     );
   }
 
@@ -1418,6 +1499,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     widget.onPickStationForSlot?.call(
       RouteDraftSlot.destination,
       _currentRegionDisplayName,
+      _availableRegionLabels,
     );
   }
 
@@ -1426,6 +1508,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     widget.onPickStationForSlot?.call(
       RouteDraftSlot.waypoint,
       _currentRegionDisplayName,
+      _availableRegionLabels,
     );
   }
 
@@ -1516,7 +1599,6 @@ class _NetworkMapChrome extends StatelessWidget {
     required this.nearbyLookupMessage,
     required this.adjacentStations,
     required this.onCurrentLocationTap,
-    required this.onOpenNearbyStations,
     required this.onCloseNearbyPanel,
     required this.onNearbyLineSelected,
     required this.onNearbyDataSourceToggle,
@@ -1556,7 +1638,6 @@ class _NetworkMapChrome extends StatelessWidget {
   final String? nearbyLookupMessage;
   final _NetworkMapAdjacentStations adjacentStations;
   final VoidCallback onCurrentLocationTap;
-  final VoidCallback? onOpenNearbyStations;
   final VoidCallback onCloseNearbyPanel;
   final ValueChanged<StationSearchLine> onNearbyLineSelected;
   final VoidCallback onNearbyDataSourceToggle;
@@ -1660,7 +1741,7 @@ class _NetworkMapChrome extends StatelessWidget {
             bottom: nearbyPanelVisible ? 318 : 132,
             child: _NetworkMapLookupToast(message: nearbyLookupMessage!),
           ),
-        if (onOpenNearbyStations != null && !inSearchMode)
+        if (!inSearchMode)
           Positioned(
             right: 16,
             bottom: nearbyPanelVisible ? 280 : 26,
@@ -1777,6 +1858,7 @@ class _NetworkMapTopBar extends StatelessWidget {
                 return _NetworkMapTopBarRouteDraft(
                   key: const Key('networkMapRouteDraftOverlay'),
                   draft: draft,
+                  regionLabel: _displayRegionName(selectedRegion),
                   onClearOrigin: onClearOrigin,
                   onClearDestination: onClearDestination,
                   onClearWaypoint: onClearWaypoint,
@@ -1858,56 +1940,67 @@ class _NetworkMapTopBar extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Builder(
-              builder: (regionContext) => Semantics(
-                key: const Key('mapRegionTabs'),
-                container: true,
-                button: true,
-                label: '지역: $currentRegion, 지역 변경',
-                // 시맨틱 활성화 액션을 제공해 스크린리더로도 지역 메뉴를 연다
-                // (형제 검색 필드와 동일한 패턴).
-                onTap: () => _showRegionMenu(regionContext, availableRegions),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 148),
-                  child: ExcludeSemantics(
-                    // 트리거의 ▾ 캐럿과 반응 위치를 맞춘다: 트리거 바로 아래
-                    // 앵커된 드롭다운 메뉴로 지역을 표시한다(하단 시트 대신).
-                    child: InkWell(
-                      key: const Key('networkMapRegionDropdown'),
-                      onTap: () =>
-                          _showRegionMenu(regionContext, availableRegions),
-                      splashFactory: NoSplash.splashFactory,
-                      splashColor: Colors.transparent,
-                      highlightColor: Colors.transparent,
-                      child: SizedBox(
-                        height: EasySubwayTouchTarget.general,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                currentRegion,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Color(0xFF606060),
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w600,
+              builder: (regionContext) {
+                // 검색 행은 draft가 비었을 때만 렌더되지만, 경로 칸이 생기면
+                // 지역 변경을 막고 ▾도 숨긴다(표시명만 유지).
+                final canChangeRegion = routeDraftController.draft.isEmpty;
+                return Semantics(
+                  key: const Key('mapRegionTabs'),
+                  container: true,
+                  button: canChangeRegion,
+                  label: canChangeRegion
+                      ? '지역: $currentRegion, 지역 변경'
+                      : '지역: $currentRegion',
+                  onTap: canChangeRegion
+                      ? () => _showRegionMenu(regionContext, availableRegions)
+                      : null,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 148),
+                    child: ExcludeSemantics(
+                      child: InkWell(
+                        key: const Key('networkMapRegionDropdown'),
+                        onTap: canChangeRegion
+                            ? () => _showRegionMenu(
+                                regionContext,
+                                availableRegions,
+                              )
+                            : null,
+                        splashFactory: NoSplash.splashFactory,
+                        splashColor: Colors.transparent,
+                        highlightColor: Colors.transparent,
+                        child: SizedBox(
+                          height: EasySubwayTouchTarget.general,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  currentRegion,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Color(0xFF606060),
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 2),
-                            const Icon(
-                              Icons.keyboard_arrow_down,
-                              color: Color(0xFF606060),
-                              size: 22,
-                            ),
-                          ],
+                              if (canChangeRegion) ...[
+                                const SizedBox(width: 2),
+                                const Icon(
+                                  Icons.keyboard_arrow_down,
+                                  color: Color(0xFF606060),
+                                  size: 22,
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
             if (notificationAction != null) ...[
               const SizedBox(width: 8),
@@ -1922,164 +2015,15 @@ class _NetworkMapTopBar extends StatelessWidget {
   Future<void> _showRegionMenu(
     BuildContext triggerContext,
     List<NetworkMapRegion> availableRegions,
-  ) async {
-    final RenderBox? triggerBox =
-        triggerContext.findRenderObject() as RenderBox?;
-    final RenderBox? overlayBox =
-        Overlay.of(triggerContext).context.findRenderObject() as RenderBox?;
-    if (triggerBox == null || overlayBox == null) {
-      return;
-    }
-    final topRight = triggerBox.localToGlobal(
-      triggerBox.size.bottomRight(Offset.zero),
-      ancestor: overlayBox,
-    );
-    final topY = topRight.dy;
-    await showGeneralDialog<String>(
-      context: triggerContext,
-      barrierDismissible: true,
-      barrierLabel: '지역 메뉴 닫기',
-      // 참고 07에서 차용하는 것은 모달 구조가 아니라 주변을 어둡게 해
-      // 노선도 색 소음을 죽이는 딤 스크림뿐이다. 앱 다이얼로그 관례값
-      // (Color(0x99000000))과 동일하게 맞춰 메뉴 뒤를 어둡게 한다. 메뉴는
-      // 현행대로 트리거 바로 아래·화면 우측 밀착 위치를 유지한다.
-      barrierColor: const Color(0x99000000),
-      pageBuilder: (context, animation, secondaryAnimation) {
-        return Stack(
-          children: [
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => Navigator.of(context).pop(),
-                child: const SizedBox.expand(),
-              ),
-            ),
-            Positioned(
-              top: topY,
-              right: 0,
-              child: _NetworkMapRegionMenuOverlay(
-                availableRegions: availableRegions,
-                selectedRegion: selectedRegion,
-                onRegionSelected: onRegionSelected,
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _NetworkMapRegionMenuOverlay extends StatelessWidget {
-  const _NetworkMapRegionMenuOverlay({
-    required this.availableRegions,
-    required this.selectedRegion,
-    required this.onRegionSelected,
-  });
-
-  final List<NetworkMapRegion> availableRegions;
-  final String selectedRegion;
-  final ValueChanged<String> onRegionSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final rows = <Widget>[];
-    for (var i = 0; i < availableRegions.length; i++) {
-      final region = availableRegions[i];
-      final isSelected = region.name == selectedRegion;
-      rows.add(
-        InkWell(
-          key: ValueKey('networkMapRegionMenuRow_${region.name}'),
-          splashFactory: NoSplash.splashFactory,
-          splashColor: Colors.transparent,
-          highlightColor: Colors.transparent,
-          onTap: () {
-            onRegionSelected(region.name);
-            Navigator.of(context).pop();
-          },
-          child: SizedBox(
-            height: 48,
-            child: Semantics(
-              button: true,
-              selected: isSelected,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    // 라벨은 좌측 기준(좌패딩 16), ✓는 행 오른쪽 끝(우패딩 16)에
-                    // 트레일링으로 둔다(참고 07과 동일 배치). 비선택 행은
-                    // 트레일링 자리를 비운다 — 라벨이 좌측 기준이라 정렬용
-                    // 고정 폭은 불필요하다.
-                    Expanded(
-                      child: Text(
-                        region.displayName,
-                        style: TextStyle(
-                          color: EasySubwayAccessibleColors.listRowText,
-                          fontSize: 16,
-                          fontWeight: isSelected
-                              ? FontWeight.w600
-                              : FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                    if (isSelected) ...[
-                      const SizedBox(width: 12),
-                      const Icon(
-                        Icons.check,
-                        color: EasySubwayAccessibleColors.mutedText,
-                        size: 20,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-      if (i != availableRegions.length - 1) {
-        rows.add(const _NetworkMapRegionMenuDivider());
-      }
-    }
-    return ConstrainedBox(
-      // 콘텐츠 자연폭을 따르되(IntrinsicWidth), 극단 협폭만 방지할 정도의
-      // 하한만 둔다. 폭을 강제로 넓히지 않는다.
-      constraints: const BoxConstraints(minWidth: 120),
-      child: IntrinsicWidth(
-        child: Material(
-          elevation: 0,
-          color: EasySubwayAccessibleColors.surface,
-          surfaceTintColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            side: const BorderSide(color: EasySubwayAccessibleColors.line),
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(EasySubwayRadius.control),
-              bottomLeft: Radius.circular(EasySubwayRadius.control),
-              topRight: Radius.zero,
-              bottomRight: Radius.zero,
-            ),
-          ),
-          child: Column(mainAxisSize: MainAxisSize.min, children: rows),
-        ),
-      ),
-    );
-  }
-}
-
-class _NetworkMapRegionMenuDivider extends StatelessWidget {
-  const _NetworkMapRegionMenuDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    // full-width 절단형은 행을 과하게 분리해 보이게 하므로, 텍스트 시작선
-    // (좌 16)부터 우 16 전까지의 인셋 구분선으로 둔다. 색·두께는 유지.
-    return const Padding(
-      key: Key('networkMapRegionMenuDivider'),
-      padding: EdgeInsets.symmetric(horizontal: 16),
-      child: SizedBox(
-        height: 1,
-        child: ColoredBox(color: EasySubwayAccessibleColors.line),
-      ),
+  ) {
+    return showEasySubwayRegionMenu(
+      triggerContext: triggerContext,
+      regions: [
+        for (final region in availableRegions)
+          EasySubwayRegionMenuItem(id: region.name, label: region.displayName),
+      ],
+      selectedRegion: selectedRegion,
+      onRegionSelected: onRegionSelected,
     );
   }
 }
@@ -2176,14 +2120,16 @@ class _NetworkMapSearchSession extends StatefulWidget {
     required this.searchQueryController,
     required this.stationSearchRepository,
     required this.searchHistoryRepository,
-    required this.locationProvider,
+    required this.routeDraftController,
+    required this.regionLabel,
   });
 
   final ValueChanged<StationSearchResult> onResultFocus;
   final TextEditingController searchQueryController;
   final StationSearchRepository stationSearchRepository;
   final SearchHistoryRepository? searchHistoryRepository;
-  final CurrentLocationProvider? locationProvider;
+  final RouteDraftController routeDraftController;
+  final String regionLabel;
 
   @override
   State<_NetworkMapSearchSession> createState() =>
@@ -2193,8 +2139,7 @@ class _NetworkMapSearchSession extends StatefulWidget {
 class _NetworkMapSearchSessionState extends State<_NetworkMapSearchSession> {
   late final StationSearchController _searchController;
   Timer? _searchDebounce;
-  List<String> _searchRecentQueries = const [];
-  bool _searchOpeningLocationSettings = false;
+  List<RecentSearchEntry> _searchRecentEntries = const [];
 
   TextEditingController get _queryController => widget.searchQueryController;
 
@@ -2208,7 +2153,21 @@ class _NetworkMapSearchSessionState extends State<_NetworkMapSearchSession> {
       searchHistoryRepository: widget.searchHistoryRepository,
     );
     _queryController.addListener(_handleSearchQueryChanged);
-    unawaited(_loadSearchRecentQueries());
+    unawaited(_loadSearchRecentEntries());
+  }
+
+  @override
+  void didUpdateWidget(covariant _NetworkMapSearchSession oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.regionLabel == widget.regionLabel) {
+      return;
+    }
+    // 홈 노선도 지역이 바뀌면 임베디드 검색의 최근 목록·결과 필터도 맞춘다.
+    if (_hasSearchQuery) {
+      unawaited(_runInPlaceSearch(_queryController.text, recordHistory: false));
+    } else {
+      unawaited(_loadSearchRecentEntries());
+    }
   }
 
   @override
@@ -2241,9 +2200,16 @@ class _NetworkMapSearchSessionState extends State<_NetworkMapSearchSession> {
     String query, {
     bool recordHistory = true,
   }) async {
-    await _searchController.search(query, recordHistory: recordHistory);
+    // 노선도 지역과 같은 범위로 결과·기록을 맞춘다. 전국 결과만 보고 현재
+    // 지역 라벨로 저장하던 경로가 타 지역 역을 수도권 최근 검색에 남겼다.
+    await _searchController.search(
+      query,
+      region: widget.regionLabel,
+      recordRegion: widget.regionLabel,
+      recordHistory: recordHistory,
+    );
     if (recordHistory) {
-      await _loadSearchRecentQueries();
+      await _loadSearchRecentEntries();
     }
   }
 
@@ -2257,23 +2223,26 @@ class _NetworkMapSearchSessionState extends State<_NetworkMapSearchSession> {
     unawaited(_runInPlaceSearch(query));
   }
 
-  Future<void> _loadSearchRecentQueries() async {
+  Future<void> _loadSearchRecentEntries() async {
     final repository = widget.searchHistoryRepository;
     if (repository == null) {
       return;
     }
     try {
-      final queries = await repository.listRecentQueries();
+      final entries = await repository.listRecentEntries(
+        region: widget.regionLabel,
+      );
       if (!mounted) {
         return;
       }
-      setState(() => _searchRecentQueries = queries);
+      setState(() => _searchRecentEntries = entries);
     } catch (error, stackTrace) {
-      reportMobileError(error, stackTrace, context: '최근 검색어 조회 중 예외가 발생했습니다.');
+      reportMobileError(error, stackTrace, context: '최근 검색 조회 중 예외가 발생했습니다.');
     }
   }
 
-  void _searchRecentQuerySelected(String query) {
+  void _searchRecentStationSelected(RecentStationSearchEntry entry) {
+    final query = entry.query;
     _queryController.value = TextEditingValue(
       text: query,
       selection: TextSelection.collapsed(offset: query.length),
@@ -2281,37 +2250,63 @@ class _NetworkMapSearchSessionState extends State<_NetworkMapSearchSession> {
     submitSearch(query);
   }
 
-  Future<void> _removeSearchRecentQuery(String query) async {
-    final repository = widget.searchHistoryRepository;
-    if (repository == null) {
-      return;
-    }
-    try {
-      await repository.removeSearch(query);
-      await _loadSearchRecentQueries();
-    } catch (error, stackTrace) {
-      reportMobileError(error, stackTrace, context: '최근 검색어 삭제 중 예외가 발생했습니다.');
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('최근 검색을 지우지 못했어요.')));
-      }
+  /// 최근 경로 항목을 탭하면 draft에 출발·경유·도착을 채운다. draft가 채워지면
+  /// 상위 화면이 검색 모드를 자동 종료하고 홈이 경로 결과 탭으로 전환한다.
+  void _searchRecentRouteSelected(RecentRouteSearchEntry entry) {
+    final controller = widget.routeDraftController;
+    controller.clear();
+    controller.setOrigin(
+      RouteDraftStation(
+        id: entry.originStationId,
+        nameKo: entry.originStationName,
+      ),
+    );
+    controller.setDestination(
+      RouteDraftStation(
+        id: entry.destinationStationId,
+        nameKo: entry.destinationStationName,
+      ),
+    );
+    final waypointId = entry.waypointStationId;
+    final waypointName = entry.waypointStationName;
+    if (waypointId != null &&
+        waypointId.isNotEmpty &&
+        waypointName != null &&
+        waypointName.isNotEmpty) {
+      controller.setWaypoint(
+        RouteDraftStation(id: waypointId, nameKo: waypointName),
+      );
     }
   }
 
-  Future<void> _clearSearchRecentQueries() async {
+  Future<void> _clearAllSearchRecentEntries() async {
     final repository = widget.searchHistoryRepository;
     if (repository == null) {
       return;
     }
+    final confirmed = await confirmClearRecentSearches(context);
+    if (confirmed != true || !mounted) {
+      return;
+    }
     try {
-      await repository.clearSearches();
-      await _loadSearchRecentQueries();
+      final entries = await repository.listRecentEntries(
+        region: widget.regionLabel,
+        limit: 50,
+      );
+      for (final entry in entries) {
+        switch (entry) {
+          case RecentStationSearchEntry():
+            await repository.removeSearch(entry.query, region: entry.region);
+          case RecentRouteSearchEntry():
+            await repository.removeRouteSearch(entry);
+        }
+      }
+      await _loadSearchRecentEntries();
     } catch (error, stackTrace) {
       reportMobileError(
         error,
         stackTrace,
-        context: '최근 검색어 전체 삭제 중 예외가 발생했습니다.',
+        context: '최근 검색 전체 삭제 중 예외가 발생했습니다.',
       );
       if (mounted) {
         ScaffoldMessenger.of(
@@ -2321,17 +2316,25 @@ class _NetworkMapSearchSessionState extends State<_NetworkMapSearchSession> {
     }
   }
 
-  Future<void> _openSearchLocationSettings() async {
-    final locationProvider = widget.locationProvider;
-    if (_searchOpeningLocationSettings || locationProvider == null) {
+  Future<void> _removeSearchRecentEntry(RecentSearchEntry entry) async {
+    final repository = widget.searchHistoryRepository;
+    if (repository == null) {
       return;
     }
-    setState(() => _searchOpeningLocationSettings = true);
     try {
-      await locationProvider.openLocationSettings();
-    } finally {
+      switch (entry) {
+        case RecentStationSearchEntry():
+          await repository.removeSearch(entry.query, region: entry.region);
+        case RecentRouteSearchEntry():
+          await repository.removeRouteSearch(entry);
+      }
+      await _loadSearchRecentEntries();
+    } catch (error, stackTrace) {
+      reportMobileError(error, stackTrace, context: '최근 검색 삭제 중 예외가 발생했습니다.');
       if (mounted) {
-        setState(() => _searchOpeningLocationSettings = false);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('최근 검색을 지우지 못했어요.')));
       }
     }
   }
@@ -2348,8 +2351,7 @@ class _NetworkMapSearchSessionState extends State<_NetworkMapSearchSession> {
             animation: Listenable.merge([_searchController, _queryController]),
             builder: (context, _) {
               final state = _searchController.state;
-              final showRecent =
-                  !_hasSearchQuery && _searchRecentQueries.isNotEmpty;
+              final showRecent = !_hasSearchQuery;
               final isSearching = state.status == StationSearchStatus.loading;
               return ListView(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -2358,21 +2360,19 @@ class _NetworkMapSearchSessionState extends State<_NetworkMapSearchSession> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: StationRecentSearchSection(
-                        queries: _searchRecentQueries,
+                        entries: _searchRecentEntries,
                         enabled: !isSearching,
-                        onQuerySelected: _searchRecentQuerySelected,
-                        onQueryRemoved: (query) =>
-                            unawaited(_removeSearchRecentQuery(query)),
+                        onStationSelected: _searchRecentStationSelected,
+                        onRouteSelected: _searchRecentRouteSelected,
+                        onRemove: (entry) =>
+                            unawaited(_removeSearchRecentEntry(entry)),
                         onClearAll: () =>
-                            unawaited(_clearSearchRecentQueries()),
+                            unawaited(_clearAllSearchRecentEntries()),
                       ),
                     ),
                   StationSearchBody(
                     state: state,
                     onResultTap: widget.onResultFocus,
-                    isOpeningLocationSettings: _searchOpeningLocationSettings,
-                    onOpenLocationSettings: () =>
-                        unawaited(_openSearchLocationSettings()),
                   ),
                 ],
               );
@@ -5549,6 +5549,7 @@ enum _RouteDraftFieldKind { origin, waypoint, destination }
 class _NetworkMapTopBarRouteDraft extends StatelessWidget {
   const _NetworkMapTopBarRouteDraft({
     required this.draft,
+    required this.regionLabel,
     required this.onClearOrigin,
     required this.onClearDestination,
     required this.onClearWaypoint,
@@ -5561,6 +5562,9 @@ class _NetworkMapTopBarRouteDraft extends StatelessWidget {
   });
 
   final RouteDraft draft;
+
+  /// 경로 칸이 있을 때는 지역 변경 불가 — 표시명만 두고 ▾은 숨긴다.
+  final String regionLabel;
   final VoidCallback onClearOrigin;
   final VoidCallback onClearDestination;
   final VoidCallback onClearWaypoint;
@@ -5666,6 +5670,31 @@ class _NetworkMapTopBarRouteDraft extends StatelessWidget {
                   _NetworkMapRouteDraftAddWaypoint(onTap: onPickWaypoint!),
                 ],
               ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Semantics(
+            key: const Key('networkMapRouteDraftRegionLabel'),
+            container: true,
+            label: '지역: $regionLabel',
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 148),
+              child: SizedBox(
+                height: EasySubwayTouchTarget.general,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    regionLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF606060),
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         ],

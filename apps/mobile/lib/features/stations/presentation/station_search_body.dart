@@ -1,39 +1,20 @@
 import 'package:flutter/material.dart';
 
 import '../../../accessible_design.dart';
-import '../../../design_tokens.dart';
 import '../application/station_search_controller.dart';
 import '../domain/station_line.dart';
 import '../domain/station_models.dart';
 import 'station_line_badges.dart';
-
-const _currentLocationDisabledMessage =
-    '휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.';
-const _currentLocationPermissionMessage = '현재 위치를 사용할 수 없어요.';
-const _stationSearchFailureNextAction =
-    '역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다.';
-const _stationRoleActionPadding = EdgeInsets.fromLTRB(12, 0, 12, 12);
-const _stationSearchFacilityCardRadius = BorderRadius.all(
-  Radius.circular(EasySubwayRadius.sheet),
-);
 
 class StationSearchBody extends StatelessWidget {
   const StationSearchBody({
     super.key,
     required this.state,
     required this.onResultTap,
-    required this.isOpeningLocationSettings,
-    required this.onOpenLocationSettings,
-    this.onSetOrigin,
-    this.onSetDestination,
   });
 
   final StationSearchState state;
   final ValueChanged<StationSearchResult> onResultTap;
-  final bool isOpeningLocationSettings;
-  final VoidCallback onOpenLocationSettings;
-  final ValueChanged<StationSearchResult>? onSetOrigin;
-  final ValueChanged<StationSearchResult>? onSetDestination;
 
   @override
   Widget build(BuildContext context) {
@@ -49,52 +30,18 @@ class StationSearchBody extends StatelessWidget {
           ),
         ),
       ),
-      StationSearchStatus.empty ||
-      StationSearchStatus.failure => _StationSearchFailureMessage(
-        message: state.message,
-        isOpeningLocationSettings: isOpeningLocationSettings,
-        onOpenLocationSettings: onOpenLocationSettings,
-      ),
+      StationSearchStatus.empty || StationSearchStatus.failure =>
+        _StationSearchMessage(message: state.message, liveRegion: true),
       StationSearchStatus.success => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Semantics(
             container: true,
-            label: state.source == StationSearchResultSource.nearby
-                ? '주변 역 ${state.results.length}개'
-                : '검색 결과 ${state.results.length}개',
+            label: '검색 결과 ${state.results.length}개',
             liveRegion: true,
             child: const SizedBox(width: 1, height: 1),
           ),
-          if (state.source == StationSearchResultSource.nearby) ...[
-            if (state.results.isEmpty)
-              _StationSearchFailureMessage(
-                message: '주변 역을 찾지 못했어요.',
-                isOpeningLocationSettings: isOpeningLocationSettings,
-                onOpenLocationSettings: onOpenLocationSettings,
-              )
-            else ...[
-              _NearbyStationOverview(
-                result: state.results.first,
-                onTap: () => onResultTap(state.results.first),
-                onSetOrigin: onSetOrigin == null
-                    ? null
-                    : () => onSetOrigin!(state.results.first),
-                onSetDestination: onSetDestination == null
-                    ? null
-                    : () => onSetDestination!(state.results.first),
-              ),
-              if (state.results.length > 1) ...[
-                const SizedBox(height: 18),
-                const _StationSearchSectionTitle(title: '다른 주변 역'),
-                const SizedBox(height: 12),
-              ],
-            ],
-          ],
-          for (final result
-              in state.source == StationSearchResultSource.nearby
-                  ? state.results.skip(1)
-                  : state.results)
+          for (final result in state.results)
             _StationSearchResultTile(
               result: result,
               onTap: () => onResultTap(result),
@@ -103,177 +50,6 @@ class StationSearchBody extends StatelessWidget {
       ),
     };
   }
-}
-
-class _NearbyStationOverview extends StatelessWidget {
-  const _NearbyStationOverview({
-    required this.result,
-    required this.onTap,
-    this.onSetOrigin,
-    this.onSetDestination,
-  });
-
-  final StationSearchResult result;
-  final VoidCallback onTap;
-  final VoidCallback? onSetOrigin;
-  final VoidCallback? onSetDestination;
-
-  @override
-  Widget build(BuildContext context) {
-    final stationName = _stationResultDisplayName(result.nameKo);
-    return Card(
-      margin: EdgeInsets.zero,
-      color: EasySubwayAccessibleColors.surface,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: _stationSearchFacilityCardRadius,
-        side: const BorderSide(color: EasySubwayAccessibleColors.line),
-      ),
-      child: Column(
-        children: [
-          Semantics(
-            container: true,
-            button: true,
-            label: '가장 가까운 역, ${_stationResultSemanticLabel(result)}',
-            onTap: onTap,
-            child: ExcludeSemantics(
-              child: InkWell(
-                key: const Key('nearbyStationPrimaryCard'),
-                borderRadius: _stationSearchFacilityCardRadius,
-                onTap: onTap,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '가장 가까운 역',
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(
-                                    color: EasySubwayAccessibleColors.mutedText,
-                                    fontWeight: FontWeight.w700,
-                                    height: 1.25,
-                                  ),
-                            ),
-                            const SizedBox(height: 5),
-                            Text(
-                              stationName,
-                              style: Theme.of(context).textTheme.headlineSmall
-                                  ?.copyWith(
-                                    color: EasySubwayAccessibleColors.text,
-                                    fontWeight: FontWeight.w700,
-                                    height: 1.2,
-                                  ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              result.distanceLabel.isEmpty
-                                  ? result.lineLabel
-                                  : '${result.distanceLabel} · ${result.lineLabel}',
-                              style: Theme.of(context).textTheme.bodyLarge
-                                  ?.copyWith(
-                                    color: EasySubwayAccessibleColors.mutedText,
-                                    fontWeight: FontWeight.w700,
-                                    height: 1.3,
-                                  ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      StationLineBadges(
-                        lines: result.lines,
-                        size: 38,
-                        maxBadgeCount: 1,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          if (onSetOrigin != null || onSetDestination != null)
-            _StationRoleActionBar(
-              stationId: result.id,
-              stationName: stationName,
-              onSetOrigin: onSetOrigin,
-              onSetDestination: onSetDestination,
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StationSearchFailureMessage extends StatelessWidget {
-  const _StationSearchFailureMessage({
-    required this.message,
-    required this.isOpeningLocationSettings,
-    required this.onOpenLocationSettings,
-  });
-
-  final String message;
-  final bool isOpeningLocationSettings;
-  final VoidCallback onOpenLocationSettings;
-
-  @override
-  Widget build(BuildContext context) {
-    final shouldShowLocationSettings =
-        message == _currentLocationDisabledMessage;
-    final shouldShowStationSearchNextAction =
-        _shouldShowStationSearchFailureNextAction(message);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _StationSearchMessage(message: message, liveRegion: true),
-        if (shouldShowStationSearchNextAction) ...[
-          const SizedBox(height: 8),
-          Semantics(
-            key: const Key('stationSearchFailureNextAction'),
-            container: true,
-            excludeSemantics: true,
-            label: '도움말, $_stationSearchFailureNextAction',
-            child: Text(
-              _stationSearchFailureNextAction,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: EasySubwayAccessibleColors.mutedText,
-                fontWeight: FontWeight.w700,
-                height: 1.35,
-              ),
-            ),
-          ),
-        ],
-        if (shouldShowLocationSettings) ...[
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            key: const Key('stationSearchOpenLocationSettingsButton'),
-            onPressed: isOpeningLocationSettings
-                ? null
-                : onOpenLocationSettings,
-            icon: isOpeningLocationSettings
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2.5),
-                  )
-                : const Icon(Icons.settings),
-            label: const Text('위치 설정 열기'),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-bool _shouldShowStationSearchFailureNextAction(String message) {
-  return message == _currentLocationPermissionMessage ||
-      message == _currentLocationDisabledMessage ||
-      message == '현재 위치를 확인하지 못했어요.' ||
-      message == '주변 역을 찾지 못했어요.';
 }
 
 class _StationSearchMessage extends StatelessWidget {
@@ -333,7 +109,8 @@ class _StationSearchResultTile extends StatelessWidget {
               key: Key('stationSearchResult-${result.id}'),
               stationName: stationName,
               line: lines[i],
-              semanticLabel: '$stationName, ${lines[i].name}, 선택',
+              semanticLabel:
+                  '$stationName, ${lines.map((line) => line.name).join(', ')}, 선택',
               onTap: onTap,
             )
           else
@@ -421,87 +198,6 @@ class _StationSearchResultLineRow extends StatelessWidget {
   }
 }
 
-class _StationRoleActionBar extends StatelessWidget {
-  const _StationRoleActionBar({
-    required this.stationId,
-    required this.stationName,
-    this.onSetOrigin,
-    this.onSetDestination,
-  });
-
-  final String stationId;
-  final String stationName;
-  final VoidCallback? onSetOrigin;
-  final VoidCallback? onSetDestination;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: _stationRoleActionPadding,
-      child: Row(
-        children: [
-          Expanded(
-            child: _StationRoleButton(
-              key: Key('stationRoleOrigin-$stationId'),
-              icon: Icons.trip_origin,
-              label: '출발',
-              semanticLabel: '$stationName을 출발역으로 설정',
-              onPressed: onSetOrigin,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _StationRoleButton(
-              key: Key('stationRoleDestination-$stationId'),
-              icon: Icons.flag_outlined,
-              label: '도착',
-              semanticLabel: '$stationName을 도착역으로 설정',
-              onPressed: onSetDestination,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StationRoleButton extends StatelessWidget {
-  const _StationRoleButton({
-    required this.icon,
-    required this.label,
-    required this.semanticLabel,
-    required this.onPressed,
-    super.key,
-  });
-
-  final IconData icon;
-  final String label;
-  final String semanticLabel;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      enabled: onPressed != null,
-      label: semanticLabel,
-      onTap: onPressed,
-      child: ExcludeSemantics(
-        child: OutlinedButton.icon(
-          onPressed: onPressed,
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(EasySubwayTouchTarget.iconOnly),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            textStyle: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-          icon: Icon(icon, size: 20),
-          label: Text(label, textAlign: TextAlign.center),
-        ),
-      ),
-    );
-  }
-}
-
 String _stationResultDisplayName(String name) {
   final trimmedName = name.trim();
   // 백엔드 역 이름은 접미사 없이 내려올 수 있어 검색 결과 화면에서만 보정한다.
@@ -509,34 +205,4 @@ String _stationResultDisplayName(String name) {
     return trimmedName;
   }
   return '$trimmedName역';
-}
-
-String _stationResultSemanticLabel(StationSearchResult result) {
-  final stationName = _stationResultDisplayName(result.nameKo);
-  final distance = result.distanceLabel;
-  if (distance.isEmpty) {
-    return '$stationName, ${result.lineLabel}, ${result.region}';
-  }
-  return '$stationName, $distance, ${result.lineLabel}, ${result.region}';
-}
-
-class _StationSearchSectionTitle extends StatelessWidget {
-  const _StationSearchSectionTitle({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      header: true,
-      child: Text(
-        title,
-        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-          color: EasySubwayAccessibleColors.text,
-          fontWeight: FontWeight.w700,
-          height: 1.25,
-        ),
-      ),
-    );
-  }
 }

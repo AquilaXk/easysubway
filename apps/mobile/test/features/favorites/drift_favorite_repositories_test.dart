@@ -482,9 +482,9 @@ void main() {
         favoriteRouteFacilityAlerts: true,
       ),
     );
-    await searchHistoryRepository.recordSearch(' 상록수 ');
-    await searchHistoryRepository.recordSearch('사당');
-    await searchHistoryRepository.recordSearch('상록수');
+    await searchHistoryRepository.recordSearch(' 상록수 ', region: '수도권');
+    await searchHistoryRepository.recordSearch('사당', region: '수도권');
+    await searchHistoryRepository.recordSearch('상록수', region: '수도권');
 
     expect(defaultSettings.userId, 'local-user');
     expect(savedSettings.favoriteStationFacilityAlerts, isTrue);
