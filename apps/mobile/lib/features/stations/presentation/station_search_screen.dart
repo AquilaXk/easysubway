@@ -111,6 +111,19 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
   }
 
   @override
+  void didUpdateWidget(covariant StationSearchScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.regionLabel == widget.regionLabel) {
+      return;
+    }
+    if (widget.regionLabel == _regionLabel) {
+      return;
+    }
+    setState(() => _regionLabel = widget.regionLabel);
+    unawaited(_loadRecentEntries());
+  }
+
+  @override
   void dispose() {
     _controller
       ..removeListener(_handleControllerChanged)

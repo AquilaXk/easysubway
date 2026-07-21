@@ -2896,18 +2896,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _controller = RouteSearchController(repository: widget.repository);
-    _originStation = _stationFromDraft(
-      widget.initialDraft?.origin,
-      regionLabel: widget.regionLabel,
-    );
-    _destinationStation = _stationFromDraft(
-      widget.initialDraft?.destination,
-      regionLabel: widget.regionLabel,
-    );
-    _waypointStation = _stationFromDraft(
-      widget.initialDraft?.waypoint,
-      regionLabel: widget.regionLabel,
-    );
+    _originStation = _stationFromDraft(widget.initialDraft?.origin);
+    _destinationStation = _stationFromDraft(widget.initialDraft?.destination);
+    _waypointStation = _stationFromDraft(widget.initialDraft?.waypoint);
     _selectedPreset =
         mobilityPresetFromRepresentativeMobilityType(
           widget.initialMobilityType,
@@ -2929,18 +2920,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     // 갱신된 draft로 자동 검색을 이어간다.
     if (!identical(widget.initialDraft, oldWidget.initialDraft)) {
       final draft = widget.initialDraft;
-      _originStation = _stationFromDraft(
-        draft?.origin,
-        regionLabel: widget.regionLabel,
-      );
-      _destinationStation = _stationFromDraft(
-        draft?.destination,
-        regionLabel: widget.regionLabel,
-      );
-      _waypointStation = _stationFromDraft(
-        draft?.waypoint,
-        regionLabel: widget.regionLabel,
-      );
+      _originStation = _stationFromDraft(draft?.origin);
+      _destinationStation = _stationFromDraft(draft?.destination);
+      _waypointStation = _stationFromDraft(draft?.waypoint);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _maybeAutoSearchFromDraft();
       });
@@ -3392,9 +3374,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     // 되돌아간다.
     var originRegion = '';
     try {
-      final detail = await widget.stationRepository.getStationDetail(
-        origin.id,
-      );
+      final detail = await widget.stationRepository.getStationDetail(origin.id);
       originRegion = detail.region.trim();
     } catch (error, stackTrace) {
       reportMobileError(
@@ -3403,12 +3383,15 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
         context: '최근 경로 검색 저장 중 origin 지역 조회에 실패했습니다.',
       );
     }
+    // detail 조회 실패·공백이면 지도 regionLabel/오염된 draft region으로
+    // 추측 저장하지 않는다(타 지역 즐겨찾기 오기록 방지 — Bugbot).
     if (originRegion.isEmpty) {
-      originRegion = origin.region.trim();
+      final pickedRegion = origin.region.trim();
+      // 검색 피커로 고른 역만 자체 region을 신뢰한다. draft 폴백으로
+      // 채워진 값은 _stationFromDraft가 빈 문자열을 유지하므로 여기 안 온다.
+      originRegion = pickedRegion;
     }
-    final region = normalizeStationRegion(
-      originRegion.isEmpty ? (widget.regionLabel ?? '') : originRegion,
-    );
+    final region = normalizeStationRegion(originRegion);
     if (region.isEmpty) {
       return;
     }
@@ -3610,10 +3593,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
   }
 }
 
-StationSearchResult? _stationFromDraft(
-  RouteDraftStation? station, {
-  String? regionLabel,
-}) {
+StationSearchResult? _stationFromDraft(RouteDraftStation? station) {
   if (station == null) {
     return null;
   }
@@ -3621,9 +3601,8 @@ StationSearchResult? _stationFromDraft(
     id: station.id,
     nameKo: station.nameKo,
     nameEn: '',
-    // #2419 Fix: draft에는 지역 정보가 없어 홈이 넘긴 현재 노선도 지역
-    // 표시명을 폴백으로 채운다. 없으면 빈 문자열로 두어 기존 동작을 유지한다.
-    region: regionLabel?.trim() ?? '',
+    // draft에는 지역이 없다. 최근 경로 기록은 getStationDetail로 조회한다.
+    region: '',
     dataQualityLevel: '',
     lastVerifiedAt: '',
     lines: const [],
