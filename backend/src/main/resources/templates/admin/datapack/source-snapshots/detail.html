@@ -57,7 +57,7 @@
 			<tr><th scope="row">라이선스 상태</th><td th:text="${snapshot.licenseStatus == 'PASS' ? '통과' : (snapshot.licenseStatus == 'FAIL' ? '실패' : snapshot.licenseStatus)}">통과</td></tr>
 			<tr><th scope="row">수집 상태</th><td th:text="${snapshot.fetchStatus}">SUCCESS</td></tr>
 			<tr><th scope="row">재배포</th><td th:text="${snapshot.redistributionLabel()}">허용</td></tr>
-			<tr><th scope="row">자격증명 마스킹</th><td th:text="${snapshot.credentialRedactedLabel()}">마스킹됨</td></tr>
+			<tr><th scope="row">자격증명 마스킹</th><td th:text="${snapshot.credentialRedacted ? '마스킹됨' : '마스킹 필요'}">마스킹됨</td></tr>
 			<tr><th scope="row">신선도 만료</th><td th:text="${snapshot.freshnessExpiresAt}">2026-07-06T03:00</td></tr>
 			<tr><th scope="row">원본 보존 기한</th><td th:text="${snapshot.rawRetentionExpiresAt}">2026-09-29T03:00</td></tr>
 			<tr><th scope="row">거버넌스 정책 버전</th><td th:insert="~{admin/fragments/missing-value :: value(${snapshot.governancePolicyVersion}, '미상')}">—</td></tr>
