@@ -37,7 +37,12 @@
 					<TimeBasedTriggeringPolicy interval="1" modulate="true"/>
 					<SizeBasedTriggeringPolicy size="100MB"/>
 				</Policies>
-				<DefaultRolloverStrategy max="14" totalSizeCap="2GB"/>
+				<DefaultRolloverStrategy max="14" totalSizeCap="2GB">
+					<Delete basePath="${LOG_DIR}" maxDepth="1">
+						<IfFileName glob="easysubway-backend-*.log.gz"/>
+						<IfLastModified age="14d"/>
+					</Delete>
+				</DefaultRolloverStrategy>
 			</RollingFile>
 		</Appenders>
 		<Loggers>
