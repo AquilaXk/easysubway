@@ -16,6 +16,8 @@ final class ErrorStackHash {
 	static String of(Throwable exception) {
 		try {
 			MessageDigest digest = MessageDigest.getInstance("SHA-256");
+			digest.update(exception.getClass().getName().getBytes(StandardCharsets.UTF_8));
+			digest.update("\n".getBytes(StandardCharsets.UTF_8));
 			StackTraceElement[] frames = exception.getStackTrace();
 			int limit = Math.min(frames.length, FRAME_LIMIT);
 			for (int index = 0; index < limit; index++) {
@@ -27,9 +29,6 @@ final class ErrorStackHash {
 					+ frame.getLineNumber()
 					+ "\n";
 				digest.update(line.getBytes(StandardCharsets.UTF_8));
-			}
-			if (limit == 0) {
-				digest.update(exception.getClass().getName().getBytes(StandardCharsets.UTF_8));
 			}
 			return HexFormat.of().formatHex(digest.digest());
 		}

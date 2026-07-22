@@ -35,11 +35,13 @@ public class JdbcErrorEventRepository implements ErrorEventRepository {
 		int updated = jdbcTemplate.update(
 			"""
 				UPDATE error_events
-				SET last_occurred_at = ?,
+				SET first_occurred_at = LEAST(first_occurred_at, ?),
+					last_occurred_at = GREATEST(last_occurred_at, ?),
 					sample_correlation_id = ?,
 					occurrence_count = occurrence_count + 1
 				WHERE stack_hash = ? AND code = ? AND path_pattern = ?
 				""",
+			timestamp(event.firstOccurredAt()),
 			timestamp(event.lastOccurredAt()),
 			event.sampleCorrelationId(),
 			event.stackHash(),
@@ -75,11 +77,13 @@ public class JdbcErrorEventRepository implements ErrorEventRepository {
 			jdbcTemplate.update(
 				"""
 					UPDATE error_events
-					SET last_occurred_at = ?,
+					SET first_occurred_at = LEAST(first_occurred_at, ?),
+						last_occurred_at = GREATEST(last_occurred_at, ?),
 						sample_correlation_id = ?,
 						occurrence_count = occurrence_count + 1
 					WHERE stack_hash = ? AND code = ? AND path_pattern = ?
 					""",
+				timestamp(event.firstOccurredAt()),
 				timestamp(event.lastOccurredAt()),
 				event.sampleCorrelationId(),
 				event.stackHash(),
