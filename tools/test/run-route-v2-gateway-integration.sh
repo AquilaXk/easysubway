@@ -50,6 +50,62 @@ set_gateway_base() {
 	BASE="http://127.0.0.1:$PORT"
 }
 
+assert_route_rate_limited_body() {
+	body_file="$1"
+	headers_file="$2"
+	header_correlation_id=$(
+		grep -i '^X-Correlation-Id:' "$headers_file" | head -n 1 | tr -d '\r' | sed 's/^[^:]*:[[:space:]]*//'
+	)
+	[ -n "$header_correlation_id" ] || {
+		echo "429 response missing X-Correlation-Id header" >&2
+		exit 1
+	}
+
+	if command -v jq >/dev/null 2>&1; then
+		jq -e \
+			--arg header_id "$header_correlation_id" \
+			'.success == false
+			and .code == "ROUTE_RATE_LIMITED"
+			and .message == "잠시 후 다시 시도"
+			and (.correlationId | type == "string" and length > 0)
+			and .correlationId == $header_id' \
+			"$body_file" >/dev/null
+		return
+	fi
+
+	if command -v python3 >/dev/null 2>&1; then
+		python3 - "$body_file" "$header_correlation_id" <<'PY'
+import json, sys
+body = json.load(open(sys.argv[1], encoding="utf-8"))
+header_id = sys.argv[2]
+assert body.get("success") is False
+assert body.get("code") == "ROUTE_RATE_LIMITED"
+assert body.get("message") == "잠시 후 다시 시도"
+cid = body.get("correlationId")
+assert isinstance(cid, str) and cid
+assert cid == header_id
+PY
+		return
+	fi
+
+	if command -v node >/dev/null 2>&1; then
+		node -e '
+const fs = require("node:fs");
+const body = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+const headerId = process.argv[2];
+if (body.success !== false) process.exit(1);
+if (body.code !== "ROUTE_RATE_LIMITED") process.exit(1);
+if (body.message !== "잠시 후 다시 시도") process.exit(1);
+if (typeof body.correlationId !== "string" || !body.correlationId) process.exit(1);
+if (body.correlationId !== headerId) process.exit(1);
+' "$body_file" "$header_correlation_id"
+		return
+	fi
+
+	echo "assert_route_rate_limited_body requires jq, python3, or node" >&2
+	exit 1
+}
+
 wait_gateway() {
 	ready=false
 	attempt=1
@@ -99,7 +155,7 @@ for attempt in 1 2; do
 done
 STATUS=$(curl -sS -D "$TMP_HEADERS" -o "$TMP_BODY" -w '%{http_code}' -H 'CF-Connecting-IP: 198.51.100.10' "$BASE/api/v2/routes/session")
 [ "$STATUS" = 429 ]
-[ "$(tr -d '\n' < "$TMP_BODY")" = '{"success":false,"code":"ROUTE_RATE_LIMITED","message":"잠시 후 다시 시도"}' ]
+assert_route_rate_limited_body "$TMP_BODY" "$TMP_HEADERS"
 grep -Eqi '^Retry-After: 60' "$TMP_HEADERS"
 grep -Eqi '^Cache-Control: private, no-store' "$TMP_HEADERS"
 
@@ -116,12 +172,12 @@ grep -Eqi '^Cache-Control: private, no-store' "$TMP_HEADERS" || {
 	echo "search success response must remain private, no-store" >&2
 	exit 1
 }
-STATUS=$(curl -sS -o "$TMP_BODY" -w '%{http_code}' \
+STATUS=$(curl -sS -D "$TMP_HEADERS" -o "$TMP_BODY" -w '%{http_code}' \
 	-H 'CF-Connecting-IP: 198.51.100.35' \
 	-H 'Authorization: Bearer integration-token' \
 	"$BASE/api/v2/routes/search")
 [ "$STATUS" = 429 ]
-[ "$(tr -d '\n' < "$TMP_BODY")" = '{"success":false,"code":"ROUTE_RATE_LIMITED","message":"잠시 후 다시 시도"}' ]
+assert_route_rate_limited_body "$TMP_BODY" "$TMP_HEADERS"
 
 for attempt in 1 2 3 4; do
 	curl -fsS -o /dev/null \
@@ -130,12 +186,12 @@ for attempt in 1 2 3 4; do
 		"$BASE/api/v2/routes/search"
 	sleep 0.5
 done
-STATUS=$(curl -sS -o "$TMP_BODY" -w '%{http_code}' \
+STATUS=$(curl -sS -D "$TMP_HEADERS" -o "$TMP_BODY" -w '%{http_code}' \
 	-H 'CF-Connecting-IP: 198.51.100.40' \
 	-H 'Authorization: Bearer rotating-token-5' \
 	"$BASE/api/v2/routes/search")
 [ "$STATUS" = 429 ]
-[ "$(tr -d '\n' < "$TMP_BODY")" = '{"success":false,"code":"ROUTE_RATE_LIMITED","message":"잠시 후 다시 시도"}' ]
+assert_route_rate_limited_body "$TMP_BODY" "$TMP_HEADERS"
 
 sleep 1
 docker logs "$GATEWAY" > "$TMP_LOG" 2>&1
