@@ -11986,6 +11986,18 @@ test("로컬 관측성 스택은 Prometheus와 Grafana 기준선을 제공한다
   assert.match(grafanaDatasource, /type: prometheus/);
   assert.match(grafanaDatasource, /url: http:\/\/prometheus:9090/);
   assert.match(grafanaDatasource, /isDefault: true/);
+
+  // #2434 WP4: multi-window 5xx burn-rate alerts + traffic guard
+  assert.match(prometheusAlerts, /alert: Backend5xxBurnRateCritical/);
+  assert.match(prometheusAlerts, /alert: Backend5xxBurnRateWarning/);
+  assert.match(prometheusAlerts, /alert: Backend5xxBurnRateTicket/);
+  assert.match(prometheusAlerts, /alert: Backend5xxBurnRateCritical[\s\S]*severity: critical[\s\S]*service: aquila-backend-5xx/);
+  assert.match(prometheusAlerts, /alert: Backend5xxBurnRateWarning[\s\S]*severity: warning[\s\S]*service: aquila-backend-5xx/);
+  assert.match(prometheusAlerts, /alert: Backend5xxBurnRateTicket[\s\S]*severity: info[\s\S]*service: aquila-backend-5xx/);
+  assert.match(prometheusAlerts, /\* 60 > 1/);
+  assert.match(prometheusAlerts, /alert: Backend5xxBurnRateCritical[\s\S]*\* 60 > 1/);
+  assert.match(prometheusAlerts, /alert: Backend5xxBurnRateWarning[\s\S]*\* 60 > 1/);
+  assert.match(prometheusAlerts, /alert: Backend5xxBurnRateTicket[\s\S]*\* 60 > 1/);
 });
 
 test("로컬 로그 관측성 스택은 Loki 기준선을 제공한다", () => {
@@ -11993,6 +12005,9 @@ test("로컬 로그 관측성 스택은 Loki 기준선을 제공한다", () => {
   const lokiConfig = read("infra/loki/loki.yml");
   const lokiDatasource = read("infra/grafana/provisioning/datasources/loki.yml");
   const prometheusDatasource = read("infra/grafana/provisioning/datasources/prometheus.yml");
+  const alloyConfig = read("infra/alloy/config.alloy");
+  const dashboardProvider = read("infra/grafana/provisioning/dashboards/dashboards.yml");
+  const errorOpsDashboard = read("infra/grafana/provisioning/dashboards/json/error-ops.json");
 
   assert.match(compose, /loki:\n/);
   assert.match(compose, /loki-volume-init:\n/);
@@ -12016,12 +12031,38 @@ test("로컬 로그 관측성 스택은 Loki 기준선을 제공한다", () => {
   assert.match(lokiConfig, /rules_directory: \/loki\/rules/);
   assert.match(lokiConfig, /store: tsdb/);
   assert.match(lokiConfig, /object_store: filesystem/);
+  assert.match(lokiConfig, /retention_period: 720h/);
+  assert.match(lokiConfig, /retention_enabled: true/);
+  assert.match(lokiConfig, /delete_request_store: filesystem/);
 
   assert.match(lokiDatasource, /name: easysubway-loki/);
   assert.match(lokiDatasource, /type: loki/);
   assert.match(lokiDatasource, /url: http:\/\/loki:3100/);
   assert.match(lokiDatasource, /isDefault: false/);
   assert.match(prometheusDatasource, /isDefault: true/);
+
+  // #2434 WP4: Alloy log shipper + Grafana error-ops dashboard
+  assert.match(compose, /alloy:\n/);
+  assert.match(compose, /alloy:[\s\S]*profiles:\s*\n\s*-\s*observability/);
+  assert.match(compose, /image: grafana\/alloy:v[0-9]+\.[0-9]+\.[0-9]+/);
+  assert.match(compose, /\/var\/run\/docker\.sock:\/var\/run\/docker\.sock:ro/);
+  assert.match(compose, /\.\/alloy\/config\.alloy:\/etc\/alloy\/config\.alloy:ro/);
+  assert.match(compose, /alloy:[\s\S]*depends_on:\s*\n\s*loki:\s*\n\s*condition: service_healthy/);
+  assert.match(compose, /alloy:[\s\S]*restart: unless-stopped/);
+
+  assert.ok(existsSync(path.join(root, "infra/alloy/config.alloy")), "alloy config must exist");
+  assert.match(alloyConfig, /discovery\.docker/);
+  assert.match(alloyConfig, /loki\.source\.docker/);
+  assert.match(alloyConfig, /loki\.write/);
+  assert.match(alloyConfig, /stage\.labels[\s\S]*level/);
+  assert.doesNotMatch(alloyConfig, /stage\.labels[\s\S]*correlationId/);
+  assert.doesNotMatch(alloyConfig, /target_label\s*=\s*"correlationId"/);
+  assert.doesNotMatch(alloyConfig, /values\s*=\s*\{[^}]*correlationId/);
+
+  assert.match(dashboardProvider, /easysubway-error-ops|path: \/etc\/grafana\/provisioning\/dashboards\/json/);
+  assert.match(errorOpsDashboard, /"uid":\s*"easysubway-error-ops"/);
+  assert.match(errorOpsDashboard, /"title":\s*"오류 조회"/);
+  assert.match(errorOpsDashboard, /"name":\s*"correlationId"/);
 });
 
 test("백엔드 스캐폴드는 eGovFrame 5.0 Spring Boot Java 21 헥사고날 프로젝트다", () => {

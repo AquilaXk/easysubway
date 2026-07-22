@@ -86,10 +86,10 @@
           "refreshOn": "observability-infrastructure-change",
           "files": [
             {"path": "infra/prometheus/prometheus.yml", "sha256": "9bcde0205620224c01d86ec99fd2ef68314a9a96f40bd70c58fe67f8123e366f"},
-            {"path": "infra/prometheus/alerts.yml", "sha256": "41c18d783219a073e84abed81127a4217bd70306c48d5a3b3c0411e291bc6b39"},
-            {"path": "infra/grafana/provisioning/datasources/prometheus.yml", "sha256": "857e2caebec8b70f3aa50c0b968c1ceed46b668a8f08a08532b47be22af3ed97"},
-            {"path": "infra/grafana/provisioning/datasources/loki.yml", "sha256": "9156897987a95d3fe59f98651ade7802ad2fc9b65acd2845da90b36dd6f5949c"},
-            {"path": "infra/loki/loki.yml", "sha256": "101b9286a15cc0c4f2a66879d801995efabd2c4d98cac904c4c3bd0816bf0e20"}
+            {"path": "infra/prometheus/alerts.yml", "sha256": "764c3e88fb604ed598d053de5376c531e64f122fa7f496f5969e8511f00538af"},
+            {"path": "infra/grafana/provisioning/datasources/prometheus.yml", "sha256": "9598a3fc9b36ce35c997233ac4a61ff0293023dbb45e1d872270c2a3f8666fc5"},
+            {"path": "infra/grafana/provisioning/datasources/loki.yml", "sha256": "57bb87c11cec9f9e728e37a636de9eca2a291c8cd051c67d4e1cd2c683a7675e"},
+            {"path": "infra/loki/loki.yml", "sha256": "35ed63f6a069c0c6da0d711d4495f871886ec7466916cf61cd29989825c690b2"}
           ]
         },
         {

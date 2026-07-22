@@ -108,3 +108,37 @@ tests:
       - eval_time: 6m
         alertname: AquilaBackendAppMetricsScrapeDown
         exp_alerts: []
+
+  # #2434: 높은 5xx + 충분한 트래픽(>1 req/min)이면 Critical multi-window burn-rate가 발화한다.
+  # interval 1m × 70표본으로 1h/5m 창을 채운다. rate()*60 ≈ 분당 증가분.
+  - interval: 1m
+    name: Backend5xxBurnRateCritical fires with high 5xx and traffic
+    input_series:
+      - series: 'http_server_requests_seconds_count{status="500",uri="/api/x",method="GET",outcome="SERVER_ERROR"}'
+        values: '0+50x70'
+      - series: 'http_server_requests_seconds_count{status="200",uri="/api/x",method="GET",outcome="SUCCESS"}'
+        values: '0+5x70'
+    alert_rule_test:
+      - eval_time: 65m
+        alertname: Backend5xxBurnRateCritical
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              service: aquila-backend-5xx
+            exp_annotations:
+              summary: Backend 5xx burn rate exceeds critical multi-window threshold
+              description: 5xx error ratio burn rate is above 14.4x the 0.001 error budget on both the 1h and 5m windows, with traffic above 1 req/min on the 1h window.
+              title_ko: "백엔드 5xx 버짓 소진 긴급"
+              impact_ko: "짧은 시간에 오류 예산이 빠르게 소진되고 있어 사용자 요청 실패가 급증했을 수 있습니다."
+              action_ko: "Grafana '오류 조회' 대시보드에서 5xx 비율·버짓 소진과 ERROR 로그를 확인한 뒤, /admin/api/errors로 동일 구간 오류를 대조 확인하세요."
+
+  # #2434: 트래픽 가드(<1 req/min)에서는 5xx가 있어도 Critical이 발화하지 않는다.
+  - interval: 1m
+    name: Backend5xxBurnRateCritical stays silent under traffic guard
+    input_series:
+      - series: 'http_server_requests_seconds_count{status="500",uri="/api/x",method="GET",outcome="SERVER_ERROR"}'
+        values: '0+0.1x70'
+    alert_rule_test:
+      - eval_time: 65m
+        alertname: Backend5xxBurnRateCritical
+        exp_alerts: []
