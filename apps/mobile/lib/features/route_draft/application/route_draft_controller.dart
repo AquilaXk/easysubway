@@ -77,6 +77,10 @@ class RouteDraftController extends ChangeNotifier {
       waypoint: _draft.waypoint,
       lastModifiedAt: DateTime.now(),
     );
+    // 마지막 역을 지워 draft가 비면 빈 경유 칸도 닫아 검색바 모드와 상태를 맞춘다.
+    if (_draft.isEmpty) {
+      _waypointSlotOpen = false;
+    }
     notifyListeners();
   }
 
@@ -90,6 +94,9 @@ class RouteDraftController extends ChangeNotifier {
       waypoint: _draft.waypoint,
       lastModifiedAt: DateTime.now(),
     );
+    if (_draft.isEmpty) {
+      _waypointSlotOpen = false;
+    }
     notifyListeners();
   }
 

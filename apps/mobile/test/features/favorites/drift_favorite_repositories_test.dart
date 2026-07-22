@@ -64,6 +64,28 @@ void main() {
     expect(await repository.listFavoriteStations(), isEmpty);
   });
 
+  test('레거시 line_id와 호선 단위 행이 공존하면 레거시는 목록에서 제외한다', () async {
+    final catalogDatabase = CatalogDatabase.memory();
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(catalogDatabase.close);
+    addTearDown(userDatabase.close);
+    await catalogDatabase.seedBaselineIfEmpty();
+    final repository = DriftFavoriteStationRepository(
+      catalogDatabase: catalogDatabase,
+      userDatabase: userDatabase,
+    );
+
+    await repository.saveFavoriteStation('station-sangnoksu');
+    await repository.saveFavoriteStation(
+      'station-sangnoksu',
+      lineId: 'seoul-4',
+    );
+
+    final favorites = await repository.listFavoriteStations();
+    expect(favorites, hasLength(1));
+    expect(favorites.single.lineId, 'seoul-4');
+  });
+
   test('레거시 역 전체 즐겨찾기에서 한 호선만 해제하면 나머지로 펼친다', () async {
     final catalogDatabase = CatalogDatabase.memory();
     final userDatabase = user_db.UserDatabase.memory();

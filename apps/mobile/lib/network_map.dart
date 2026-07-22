@@ -1689,7 +1689,8 @@ class _NetworkMapChrome extends StatelessWidget {
       children: [
         Positioned.fill(
           top: mapTop,
-          child: ClipRect(child: inSearchMode ? searchBody! : child),
+          // ClipRect를 쓰면 가장자리 draft 핀의 soft drop·✕가 잘린다.
+          child: inSearchMode ? searchBody! : child,
         ),
         Positioned(
           left: 0,

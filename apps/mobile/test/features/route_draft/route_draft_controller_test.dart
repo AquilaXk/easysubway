@@ -29,6 +29,17 @@ void main() {
       expect(controller.isWaypointRowVisible, isFalse);
     });
 
+    test('마지막 역 clear 시 열린 경유 슬롯도 닫힌다', () {
+      final controller = RouteDraftController()
+        ..setOrigin(origin)
+        ..openWaypointSlot();
+      expect(controller.isWaypointRowVisible, isTrue);
+
+      controller.clearOrigin();
+      expect(controller.draft.isEmpty, isTrue);
+      expect(controller.isWaypointRowVisible, isFalse);
+    });
+
     test('setOrigin·setDestination은 경유역을 보존한다', () {
       final controller = RouteDraftController();
       controller.setWaypoint(waypoint);

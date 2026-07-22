@@ -37,8 +37,17 @@ class DriftFavoriteStationRepository implements FavoriteStationRepository {
         )
         .get();
 
-    final favorites = <FavoriteStation>[];
-    final seenKeys = <String>{};
+    // 호선 단위 행이 있는 역은 레거시(line_id='') 행을 건너뛰어 중복 노출을 막는다.
+    final stationsWithLineScoped = <String>{};
+    final resolvedRows =
+        <
+          ({
+            String storedStationId,
+            String stationId,
+            String favoritedLineId,
+            int addedAt,
+          })
+        >[];
     for (final favoriteRow in favoriteRows) {
       final storedStationId = favoriteRow.read<String>('station_id');
       final favoritedLineId = favoriteRow.read<String>('line_id');
@@ -55,6 +64,26 @@ class DriftFavoriteStationRepository implements FavoriteStationRepository {
           favoritedLineId,
           favoriteRow.read<int>('added_at_value'),
         );
+      }
+      if (favoritedLineId.isNotEmpty) {
+        stationsWithLineScoped.add(stationId);
+      }
+      resolvedRows.add((
+        storedStationId: storedStationId,
+        stationId: stationId,
+        favoritedLineId: favoritedLineId,
+        addedAt: favoriteRow.read<int>('added_at_value'),
+      ));
+    }
+
+    final favorites = <FavoriteStation>[];
+    final seenKeys = <String>{};
+    for (final resolved in resolvedRows) {
+      final stationId = resolved.stationId;
+      final favoritedLineId = resolved.favoritedLineId;
+      if (favoritedLineId.isEmpty &&
+          stationsWithLineScoped.contains(stationId)) {
+        continue;
       }
       final key = favoriteStationLineKey(stationId, favoritedLineId);
       if (!seenKeys.add(key)) {
@@ -104,7 +133,7 @@ class DriftFavoriteStationRepository implements FavoriteStationRepository {
         lastVerifiedAt: _dateLabelFromEpoch(
           firstRow.read<int?>('last_verified_at_value'),
         ),
-        addedAt: _isoFromEpoch(favoriteRow.read<int?>('added_at_value')),
+        addedAt: _isoFromEpoch(resolved.addedAt),
       );
       for (final row in stationRows) {
         final lineId = row.read<String?>('line_id');
