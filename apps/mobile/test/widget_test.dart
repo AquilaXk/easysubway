@@ -18,6 +18,7 @@ import 'package:easysubway_mobile/features/ads/ad_repository.dart';
 import 'package:easysubway_mobile/features/account/presentation/user_data_deletion_screen.dart';
 import 'package:easysubway_mobile/features/attribution/presentation/data_source_attribution_screen.dart';
 import 'package:easysubway_mobile/features/favorites/presentation/favorite_home_screen.dart';
+import 'package:easysubway_mobile/features/support/presentation/inquiry_screen.dart';
 import 'package:easysubway_mobile/features/support/presentation/support_access_screen.dart';
 import 'package:easysubway_mobile/features/fare/official_od_fare_quote.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/data/get_off_alarm_state_repository.dart';
@@ -402,6 +403,16 @@ Future<void> _openSettingsScreen(WidgetTester tester) async {
               ),
             );
           },
+          onOpenInquiry: () {
+            Navigator.of(homeContext).push(
+              MaterialPageRoute<void>(
+                builder: (_) => InquiryScreen(
+                  accessInfo: home.supportAccessInfo,
+                  launcher: home.supportAccessLauncher,
+                ),
+              ),
+            );
+          },
           onOpenServiceInfo: () {
             Navigator.of(homeContext).push(
               MaterialPageRoute<void>(
@@ -467,6 +478,17 @@ Future<void> _openSupportAccessScreen(WidgetTester tester) async {
   );
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const Key('settingsSupportPrivacyButton')));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _openInquiryScreen(WidgetTester tester) async {
+  await _openSettingsScreen(tester);
+  await tester.scrollUntilVisible(
+    find.byKey(const Key('settingsInquiryButton')),
+    160,
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const Key('settingsInquiryButton')));
   await tester.pumpAndSettle();
 }
 
@@ -5825,6 +5847,58 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(AppSettingsScreen), findsOneWidget);
+    expect(find.byKey(const Key('settingsBackButton')), findsOneWidget);
+  });
+
+  testWidgets('설정 뒤로가기는 직전 탭(홈)으로 돌아간다', (tester) async {
+    await tester.pumpWidget(
+      buildEasySubwayTestApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+        favoriteRouteRepository: FakeFavoriteRouteRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('networkMapMenuSettingsButton')));
+    await tester.pumpAndSettle();
+    expect(find.byType(AppSettingsScreen), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('settingsBackButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AppSettingsScreen), findsNothing);
+    expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
+  });
+
+  testWidgets('도움말 뒤로가기는 설정으로 돌아간다', (tester) async {
+    await tester.pumpWidget(
+      buildEasySubwayTestApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _openSupportAccessScreen(tester);
+    expect(find.byKey(const Key('supportAccessScreen')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('supportAccessBackButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('supportAccessScreen')), findsNothing);
+    expect(find.byType(AppSettingsScreen), findsOneWidget);
   });
 
   testWidgets('홈 이동 조건 pill은 모든 프리셋에 맞는 표시명을 보여준다', (tester) async {
@@ -6118,7 +6192,7 @@ void main() {
       final contentDividers = settingsSectionDividers
           .where((divider) => divider.color == EasySubwayAccessibleColors.line)
           .toList();
-      expect(contentDividers, hasLength(2));
+      expect(contentDividers, hasLength(3));
       expect(
         contentDividers,
         everyElement(predicate<Divider>((divider) => divider.key == null)),
@@ -6248,10 +6322,18 @@ void main() {
       // 자명한 행은 부가설명 없이 제목만 시맨틱에 담는다(#1570·#1572).
       expect(
         settingsActionSemantics(
-          '도움말·문의',
+          '도움말',
         ).getSemanticsData().hasAction(SemanticsAction.tap),
         isTrue,
       );
+      expect(
+        settingsActionSemantics(
+          '문의하기',
+        ).getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+      expect(find.byKey(const Key('settingsInquiryButton')), findsOneWidget);
+      expect(find.byKey(const Key('settingsBackButton')), findsOneWidget);
       expectNoForbiddenUserCopy(tester);
 
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
@@ -7053,8 +7135,17 @@ void main() {
 
       await _openSupportAccessScreen(tester);
 
-      expect(find.text('도움말·문의'), findsOneWidget);
+      expect(find.text('도움말'), findsOneWidget);
+      expect(find.text('도움말 및 문의'), findsNothing);
+      expect(find.text('도움말·문의'), findsNothing);
+      expect(find.byKey(const Key('supportAccessBackButton')), findsOneWidget);
+      expect(
+        find.byKey(const Key('supportAccessHeaderDivider')),
+        findsOneWidget,
+      );
       expect(find.text('개인정보처리방침'), findsNothing);
+      expect(find.byKey(const Key('supportAccessItem')), findsNothing);
+      expect(find.byKey(const Key('securityContactAccessItem')), findsNothing);
 
       await tester.scrollUntilVisible(
         find.byKey(const Key('dataDeletionAccessItem')),
@@ -7077,24 +7168,6 @@ void main() {
         '내 정보 삭제 요청, 이메일 보내기, privacy@easysubway.example',
       );
       expect(deletionSemantics.hasAction(SemanticsAction.tap), isTrue);
-
-      await tester.scrollUntilVisible(
-        find.byKey(const Key('supportAccessItem')),
-        120,
-        scrollable: find.byType(Scrollable).last,
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('고객지원'), findsOneWidget);
-      expect(find.text('support@easysubway.example'), findsNothing);
-      expect(find.text('이메일 보내기'), findsWidgets);
-      await tester.scrollUntilVisible(
-        find.byKey(const Key('securityContactAccessItem')),
-        120,
-        scrollable: find.byType(Scrollable).last,
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('보안 문의'), findsOneWidget);
-      expect(find.text('아직 준비 중이에요'), findsNothing);
     } finally {
       semanticsHandle.dispose();
     }
@@ -7177,7 +7250,7 @@ void main() {
     }
   });
 
-  testWidgets('도움말은 보안과 개인정보 문의 경로를 안내한다', (tester) async {
+  testWidgets('문의하기는 일반·보안 유형을 선택해 메일로 보낸다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final launcher = RecordingSupportAccessLauncher();
     try {
@@ -7199,13 +7272,37 @@ void main() {
         ),
       );
 
-      await _openSupportAccessScreen(tester);
+      await _openInquiryScreen(tester);
 
-      await tester.scrollUntilVisible(
-        find.byKey(const Key('securityContactNotice')),
-        120,
-        scrollable: find.byType(Scrollable).last,
+      expect(find.byType(InquiryScreen), findsOneWidget);
+      expect(find.byKey(const Key('inquiryBackButton')), findsOneWidget);
+      expect(find.text('일반 문의'), findsOneWidget);
+      expect(find.text('보안 문의'), findsOneWidget);
+      expect(find.textContaining('취약점'), findsNothing);
+      expect(find.textContaining('계정 접근'), findsNothing);
+
+      await tester.enterText(
+        find.byKey(const Key('inquiryBodyField')),
+        '경로 안내가 잘 안 보여요.',
       );
+      await tester.enterText(
+        find.byKey(const Key('inquirySubjectField')),
+        '앱 사용 문의',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('inquirySendButton')));
+      await tester.pumpAndSettle();
+
+      expect(launcher.openedUris, hasLength(1));
+      expect(launcher.openedUris.single.scheme, 'mailto');
+      expect(launcher.openedUris.single.path, 'support@easysubway.example');
+      expect(
+        launcher.openedUris.single.query,
+        contains(Uri.encodeQueryComponent('앱 사용 문의')),
+      );
+
+      launcher.openedUris.clear();
+      await tester.tap(find.byKey(const Key('inquiryKindSecurity')));
       await tester.pumpAndSettle();
       expect(find.text('보안 문의 안내'), findsOneWidget);
       expect(find.text('앱 보안이나 개인정보가 걱정되면 문의로 알려주세요.'), findsOneWidget);
@@ -7213,27 +7310,14 @@ void main() {
         find.text('위치, 제보 사진, 알림, 개인정보 관련 걱정을 함께 보낼 수 있습니다.'),
         findsOneWidget,
       );
-      expect(find.textContaining('취약점'), findsNothing);
-      expect(find.textContaining('계정 접근'), findsNothing);
-      await tester.scrollUntilVisible(
-        find.byKey(const Key('securityContactAccessItem')),
-        120,
-        scrollable: find.byType(Scrollable).last,
+      expect(find.byKey(const Key('securityContactNotice')), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const Key('inquiryBodyField')),
+        '위치 사용이 걱정됩니다.',
       );
       await tester.pumpAndSettle();
-
-      expect(find.text('보안 문의'), findsOneWidget);
-      expect(find.text('security@easysubway.example'), findsNothing);
-      expect(find.text('보안 문제 알리기'), findsOneWidget);
-      expect(
-        tester
-            .getSemantics(find.byKey(const Key('securityContactAccessItem')))
-            .getSemanticsData()
-            .label,
-        '보안 문의, 보안 문제 알리기, security@easysubway.example',
-      );
-
-      await tester.tap(find.byKey(const Key('securityContactAccessItem')));
+      await tester.tap(find.byKey(const Key('inquirySendButton')));
       await tester.pumpAndSettle();
 
       expect(launcher.openedUris.single.scheme, 'mailto');
@@ -7243,9 +7327,7 @@ void main() {
     }
   });
 
-  testWidgets('도움말은 고객지원을 메일 앱으로 연결한다', (tester) async {
-    final launcher = RecordingSupportAccessLauncher();
-
+  testWidgets('설정에서 문의하기 화면으로 들어간다', (tester) async {
     await tester.pumpWidget(
       buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
@@ -7253,7 +7335,6 @@ void main() {
         routeRepository: FakeRouteSearchRepository(),
         favoriteRepository: FakeFavoriteStationRepository(),
         notificationRepository: FakeNotificationSettingsRepository(),
-        supportAccessLauncher: launcher,
         supportAccessInfo: const SupportAccessInfo(
           privacyPolicyUrl: 'https://easysubway.example/privacy',
           supportEmail: 'support@easysubway.example',
@@ -7263,18 +7344,9 @@ void main() {
       ),
     );
 
-    await _openSupportAccessScreen(tester);
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('supportAccessItem')),
-      120,
-      scrollable: find.byType(Scrollable).last,
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('supportAccessItem')));
-    await tester.pumpAndSettle();
-    expect(launcher.openedUris, hasLength(1));
-    expect(launcher.openedUris.single.scheme, 'mailto');
-    expect(launcher.openedUris.single.path, 'support@easysubway.example');
+    await _openInquiryScreen(tester);
+    expect(find.byType(InquiryScreen), findsOneWidget);
+    expect(find.text('메일로 보내기'), findsOneWidget);
   });
 
   testWidgets('도움말은 앱 안에서 데이터 삭제를 재확인하고 로컬 상태를 정리한다', (tester) async {
@@ -7546,7 +7618,51 @@ void main() {
     expect(launcher.openedUris, isEmpty);
   });
 
-  testWidgets('도움말은 외부 연결 실패를 짧게 안내한다', (tester) async {
+  testWidgets('문의하기는 메일 주소가 없어도 유형을 보여주고 보내기는 비활성화한다', (tester) async {
+    await tester.pumpWidget(
+      buildEasySubwayTestApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        supportAccessInfo: const SupportAccessInfo(
+          privacyPolicyUrl: '',
+          supportEmail: '',
+          dataDeletionEmail: '',
+          securityEmail: '',
+        ),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await _openInquiryScreen(tester);
+    expect(find.text('일반 문의'), findsOneWidget);
+    expect(find.text('보안 문의'), findsOneWidget);
+    expect(find.text('제목'), findsOneWidget);
+    expect(find.text('내용 *'), findsOneWidget);
+    expect(
+      find.byKey(
+        const Key('inquiryEmailMissingNotice'),
+        skipOffstage: false,
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        '지금은 문의 메일을 보낼 주소를 확인할 수 없어요. 잠시 후 다시 시도해 주세요.',
+        skipOffstage: false,
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('inquirySendButton')), findsOneWidget);
+    final sendButton = tester.widget<FilledButton>(
+      find.byKey(const Key('inquirySendButton')),
+    );
+    expect(sendButton.onPressed, isNull);
+  });
+
+  testWidgets('문의하기는 메일 앱 연결 실패를 짧게 안내한다', (tester) async {
     final launcher = RecordingSupportAccessLauncher(openResult: false);
 
     await tester.pumpWidget(
@@ -7566,17 +7682,17 @@ void main() {
       ),
     );
 
-    await _openSupportAccessScreen(tester);
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('supportAccessItem')),
-      120,
-      scrollable: find.byType(Scrollable).last,
+    await _openInquiryScreen(tester);
+    await tester.enterText(
+      find.byKey(const Key('inquiryBodyField')),
+      '연결 실패 안내를 확인합니다.',
     );
-    await tester.tap(find.byKey(const Key('supportAccessItem')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('inquirySendButton')));
     await tester.pump();
 
     expect(
-      find.text('연결할 수 없습니다. 직접 확인해 주세요: support@easysubway.example'),
+      find.text('메일 앱을 열 수 없어요. 직접 보내 주세요: support@easysubway.example'),
       findsOneWidget,
     );
   });

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../accessible_design.dart';
-import '../../../app/app_components.dart';
 import '../../../mobile_error_reporter.dart';
 import '../../../user_data_deletion.dart';
 
@@ -34,42 +33,33 @@ class UserDataDeletionAccessItem extends StatelessWidget {
     return Semantics(
       key: const Key('dataDeletionAccessItem'),
       button: true,
+      container: true,
       label: '${copy.title}, ${copy.helperText}',
       onTap: openDeletionScreen,
       child: ExcludeSemantics(
-        child: InkWell(
+        child: ListTile(
           onTap: openDeletionScreen,
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 56),
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            child: Row(
-              children: [
-                const Padding(
-                  padding: EdgeInsets.only(top: 1),
-                  child: Icon(
-                    Icons.delete_outline,
-                    color: EasySubwayAccessibleColors.red,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Text(
-                    copy.title,
-                    style: const TextStyle(
-                      color: EasySubwayAccessibleColors.text,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      height: 1.25,
-                    ),
-                  ),
-                ),
-                const Icon(
-                  Icons.chevron_right,
-                  color: EasySubwayAccessibleColors.mutedText,
-                ),
-              ],
+          minVerticalPadding: 12,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+          tileColor: EasySubwayAccessibleColors.surface,
+          title: Text(
+            copy.title,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: EasySubwayAccessibleColors.text,
+              fontWeight: FontWeight.w700,
+              height: 1.25,
             ),
+          ),
+          subtitle: Text(
+            copy.helperText,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: EasySubwayAccessibleColors.mutedText,
+              height: 1.3,
+            ),
+          ),
+          trailing: const Icon(
+            Icons.chevron_right,
+            color: EasySubwayAccessibleColors.disclosure,
           ),
         ),
       ),
@@ -168,10 +158,54 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     final copy = _UserDataDeletionCopy.forScope(widget.deletionScope);
+    final noticeLines = <Widget>[
+      _UserDataNoticeBullet(text: copy.deletedSummary),
+      const SizedBox(height: 10),
+      const _UserDataNoticeBullet(
+        text: _UserDataDeletionCopy.irreversibleLine,
+        emphasis: true,
+      ),
+      if (copy.exceptionNote != null) ...[
+        const SizedBox(height: 10),
+        _UserDataNoticeBullet(text: copy.exceptionNote!, muted: true),
+      ],
+    ];
     return Scaffold(
-      appBar: AppBar(title: Text(copy.title)),
+      key: const Key('userDataDeletionScreen'),
+      backgroundColor: EasySubwayAccessibleColors.surface,
+      appBar: AppBar(
+        key: const Key('userDataDeletionAppBar'),
+        title: Text(copy.title),
+        toolbarHeight: 60,
+        backgroundColor: EasySubwayAccessibleColors.topBarSurface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        leading: IconButton(
+          key: const Key('userDataDeletionBackButton'),
+          tooltip: '뒤로',
+          onPressed: _isDeleting
+              ? null
+              : () => Navigator.of(context).maybePop(),
+          style: IconButton.styleFrom(
+            minimumSize: const Size.square(EasySubwayTouchTarget.general),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            padding: EdgeInsets.zero,
+          ),
+          icon: const Icon(
+            Icons.arrow_back,
+            size: 26,
+            color: Color(0xFF4B4B4B),
+          ),
+        ),
+        flexibleSpace: const Align(
+          alignment: Alignment.bottomCenter,
+          child: EasySubwayHeaderDivider(
+            key: Key('userDataDeletionHeaderDivider'),
+          ),
+        ),
+      ),
       bottomNavigationBar: Padding(
         padding: easySubwayBottomActionInsets(context),
         child: FilledButton.icon(
@@ -193,46 +227,39 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
       ),
       body: SafeArea(
         child: ListView(
-          padding: mainPagePadding,
+          padding: const EdgeInsets.only(bottom: 32),
           children: [
-            Semantics(
-              header: true,
-              child: Text(
-                '삭제 전에 확인해 주세요',
-                style: textTheme.headlineSmall?.copyWith(
-                  color: EasySubwayAccessibleColors.text,
-                  fontWeight: FontWeight.w700,
-                  height: 1.25,
+            ColoredBox(
+              key: const Key('userDataDeletionSectionHeader'),
+              color: EasySubwayAccessibleColors.scaffoldSurface,
+              child: SizedBox(
+                width: double.infinity,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+                  child: Semantics(
+                    header: true,
+                    child: Text(
+                      '삭제 전에 확인해 주세요',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: EasySubwayAccessibleColors.secondaryText,
+                        fontWeight: FontWeight.w700,
+                        height: 1.25,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 12),
-            Text(
-              copy.deletedSummary,
-              style: textTheme.bodyLarge?.copyWith(
-                color: EasySubwayAccessibleColors.text,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              _UserDataDeletionCopy.irreversibleLine,
-              style: textTheme.bodyLarge?.copyWith(
-                color: EasySubwayAccessibleColors.red,
-                fontWeight: FontWeight.w700,
-                height: 1.4,
-              ),
-            ),
-            if (copy.exceptionNote != null) ...[
-              const SizedBox(height: 10),
-              Text(
-                copy.exceptionNote!,
-                style: textTheme.bodyMedium?.copyWith(
-                  color: EasySubwayAccessibleColors.mutedText,
-                  height: 1.4,
+            ColoredBox(
+              color: EasySubwayAccessibleColors.surface,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: noticeLines,
                 ),
               ),
-            ],
+            ),
           ],
         ),
       ),
@@ -314,10 +341,24 @@ class UserDataDeletionResultScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Scaffold(
+      key: const Key('userDataDeletionResultScreen'),
+      backgroundColor: EasySubwayAccessibleColors.surface,
       appBar: AppBar(
+        key: const Key('userDataDeletionResultAppBar'),
         title: const Text('삭제 완료'),
+        toolbarHeight: 60,
+        backgroundColor: EasySubwayAccessibleColors.topBarSurface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
         automaticallyImplyLeading: false,
+        flexibleSpace: const Align(
+          alignment: Alignment.bottomCenter,
+          child: EasySubwayHeaderDivider(
+            key: Key('userDataDeletionResultHeaderDivider'),
+          ),
+        ),
       ),
       bottomNavigationBar: Padding(
         padding: easySubwayBottomActionInsets(context),
@@ -330,47 +371,142 @@ class UserDataDeletionResultScreen extends StatelessWidget {
       ),
       body: SafeArea(
         child: ListView(
-          padding: mainPagePadding,
+          padding: const EdgeInsets.only(bottom: 32),
           children: [
-            AppCard(
-              backgroundColor: EasySubwayAccessibleColors.surface,
-              borderColor: EasySubwayAccessibleColors.line,
-              child: Column(
-                children: [
-                  const Icon(
-                    Icons.check_circle,
-                    color: EasySubwayAccessibleColors.mintDark,
-                    size: 56,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    '내 정보가 삭제됐어요',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: EasySubwayAccessibleColors.text,
-                      fontWeight: FontWeight.w700,
+            ColoredBox(
+              color: EasySubwayAccessibleColors.surface,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 28, 20, 18),
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.check_circle,
+                      color: EasySubwayAccessibleColors.mintDark,
+                      size: 56,
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    '앱이 처음 사용하는 상태로 돌아갑니다.',
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                    Text(
+                      '내 정보가 삭제됐어요',
+                      style: textTheme.titleLarge?.copyWith(
+                        color: EasySubwayAccessibleColors.text,
+                        fontWeight: FontWeight.w700,
+                        height: 1.25,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '앱이 처음 사용하는 상태로 돌아갑니다.',
+                      style: textTheme.bodyLarge?.copyWith(
+                        color: EasySubwayAccessibleColors.mutedText,
+                        height: 1.35,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 12),
-            const AppCard(
-              showBorder: true,
-              child: AppInfoRow(
-                icon: Icons.map_outlined,
-                iconColor: EasySubwayAccessibleColors.primary,
-                title: '노선도와 역 정보는 계속 이용할 수 있어요',
+            ColoredBox(
+              color: EasySubwayAccessibleColors.scaffoldSurface,
+              child: SizedBox(
+                width: double.infinity,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+                  child: Semantics(
+                    header: true,
+                    child: Text(
+                      '이용 안내',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: EasySubwayAccessibleColors.secondaryText,
+                        fontWeight: FontWeight.w700,
+                        height: 1.25,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            ColoredBox(
+              color: EasySubwayAccessibleColors.surface,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.map_outlined,
+                      color: EasySubwayAccessibleColors.primary,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        '노선도와 역 정보는 계속 이용할 수 있어요',
+                        style: textTheme.bodyLarge?.copyWith(
+                          color: EasySubwayAccessibleColors.text,
+                          fontWeight: FontWeight.w700,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _UserDataNoticeBullet extends StatelessWidget {
+  const _UserDataNoticeBullet({
+    required this.text,
+    this.emphasis = false,
+    this.muted = false,
+  });
+
+  final String text;
+  final bool emphasis;
+  final bool muted;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = emphasis
+        ? EasySubwayAccessibleColors.red
+        : muted
+        ? EasySubwayAccessibleColors.mutedText
+        : EasySubwayAccessibleColors.text;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 9),
+          child: Container(
+            width: 5,
+            height: 5,
+            decoration: BoxDecoration(
+              color: emphasis
+                  ? EasySubwayAccessibleColors.red
+                  : EasySubwayAccessibleColors.secondaryText,
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: color,
+              fontWeight: emphasis ? FontWeight.w700 : FontWeight.w400,
+              height: 1.4,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

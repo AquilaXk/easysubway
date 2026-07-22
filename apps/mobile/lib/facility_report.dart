@@ -1406,7 +1406,36 @@ class _MyFacilityReportListScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('내 제보')),
+      key: const Key('myReportsScreen'),
+      backgroundColor: EasySubwayAccessibleColors.surface,
+      appBar: AppBar(
+        key: const Key('myReportsAppBar'),
+        title: const Text('내 제보'),
+        toolbarHeight: 60,
+        backgroundColor: EasySubwayAccessibleColors.topBarSurface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        leading: IconButton(
+          key: const Key('myReportsBackButton'),
+          tooltip: '뒤로',
+          onPressed: () => Navigator.of(context).maybePop(),
+          style: IconButton.styleFrom(
+            minimumSize: const Size.square(EasySubwayTouchTarget.general),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            padding: EdgeInsets.zero,
+          ),
+          icon: const Icon(
+            Icons.arrow_back,
+            size: 26,
+            color: Color(0xFF4B4B4B),
+          ),
+        ),
+        flexibleSpace: const Align(
+          alignment: Alignment.bottomCenter,
+          child: EasySubwayHeaderDivider(key: Key('myReportsHeaderDivider')),
+        ),
+      ),
       body: SafeArea(
         child: FutureBuilder<List<FacilityReportResult>>(
           future: _reportsFuture,
@@ -1423,13 +1452,43 @@ class _MyFacilityReportListScreenState
               return const _MyReportEmpty();
             }
 
-            return ListView.separated(
-              padding: _facilityReportPagePadding,
-              itemCount: reports.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                return _MyReportListItem(report: reports[index]);
-              },
+            return ListView(
+              padding: const EdgeInsets.only(bottom: 32),
+              children: [
+                ColoredBox(
+                  key: const Key('myReportsSectionHeader'),
+                  color: EasySubwayAccessibleColors.scaffoldSurface,
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+                      child: Semantics(
+                        header: true,
+                        child: Text(
+                          '접수 내역',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: EasySubwayAccessibleColors.secondaryText,
+                                fontWeight: FontWeight.w700,
+                                height: 1.25,
+                              ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                for (var index = 0; index < reports.length; index++) ...[
+                  _MyReportListItem(report: reports[index]),
+                  if (index < reports.length - 1)
+                    const Divider(
+                      height: 1,
+                      thickness: 1,
+                      indent: 20,
+                      endIndent: 20,
+                      color: EasySubwayAccessibleColors.line,
+                    ),
+                ],
+              ],
             );
           },
         ),
@@ -1462,9 +1521,11 @@ class _MyReportEmpty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    // 알림함·최근 검색 빈 상태와 같이 정중앙보다 위에 둔다.
+    return Align(
+      alignment: const Alignment(0, -0.55),
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.symmetric(horizontal: 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1550,67 +1611,60 @@ class _MyReportListItem extends StatelessWidget {
       label:
           '내 제보, ${report.reportTypeLabel}, 제보 번호 ${report.displayReceiptCode}, ${report.statusLabel}, $description, 접수일 $createdAtLabel',
       button: true,
+      container: true,
       onTap: openReportDetail,
       child: ExcludeSemantics(
-        child: Material(
-          color: EasySubwayAccessibleColors.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: _facilityReportCardRadius,
-            side: const BorderSide(color: EasySubwayAccessibleColors.line),
-          ),
-          child: InkWell(
-            key: Key('myReport-${report.id}'),
-            borderRadius: _facilityReportCardRadius,
-            onTap: openReportDetail,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          report.reportTypeLabel,
-                          style: textTheme.titleMedium?.copyWith(
-                            color: EasySubwayAccessibleColors.text,
-                            fontWeight: FontWeight.w700,
-                            height: 1.25,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      _MyReportStatusLabel(
-                        status: report.status,
-                        label: report.statusLabel,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    description,
-                    style: textTheme.bodyLarge?.copyWith(
-                      color: EasySubwayAccessibleColors.text,
-                      fontWeight: FontWeight.w700,
-                      height: 1.35,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 6,
-                    children: [
-                      _MyReportMetaText(
-                        label: '제보 번호',
-                        value: report.displayReceiptCode,
-                      ),
-                      _MyReportMetaText(label: '접수일', value: createdAtLabel),
-                    ],
-                  ),
-                ],
-              ),
+        child: ListTile(
+          key: Key('myReport-${report.id}'),
+          onTap: openReportDetail,
+          minVerticalPadding: 12,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+          tileColor: EasySubwayAccessibleColors.surface,
+          title: Text(
+            report.reportTypeLabel,
+            style: textTheme.bodyLarge?.copyWith(
+              color: EasySubwayAccessibleColors.text,
+              fontWeight: FontWeight.w700,
+              height: 1.25,
             ),
+          ),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  description,
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: EasySubwayAccessibleColors.text,
+                    fontWeight: FontWeight.w700,
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '제보 번호 ${report.displayReceiptCode} · 접수일 $createdAtLabel',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: EasySubwayAccessibleColors.mutedText,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _MyReportStatusLabel(
+                status: report.status,
+                label: report.statusLabel,
+              ),
+              const SizedBox(width: 4),
+              const Icon(
+                Icons.chevron_right,
+                color: EasySubwayAccessibleColors.disclosure,
+              ),
+            ],
           ),
         ),
       ),
@@ -1629,37 +1683,131 @@ class MyFacilityReportDetailScreen extends StatelessWidget {
         ? report.reportTypeLabel
         : report.description;
     final createdAtLabel = _reportDateLabel(report.createdAt);
+    final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('제보 상세')),
+      key: const Key('myReportDetailScreen'),
+      backgroundColor: EasySubwayAccessibleColors.surface,
+      appBar: AppBar(
+        key: const Key('myReportDetailAppBar'),
+        title: const Text('제보 상세'),
+        toolbarHeight: 60,
+        backgroundColor: EasySubwayAccessibleColors.topBarSurface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        leading: IconButton(
+          key: const Key('myReportDetailBackButton'),
+          tooltip: '뒤로',
+          onPressed: () => Navigator.of(context).maybePop(),
+          style: IconButton.styleFrom(
+            minimumSize: const Size.square(EasySubwayTouchTarget.general),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            padding: EdgeInsets.zero,
+          ),
+          icon: const Icon(
+            Icons.arrow_back,
+            size: 26,
+            color: Color(0xFF4B4B4B),
+          ),
+        ),
+        flexibleSpace: const Align(
+          alignment: Alignment.bottomCenter,
+          child: EasySubwayHeaderDivider(
+            key: Key('myReportDetailHeaderDivider'),
+          ),
+        ),
+      ),
       body: SafeArea(
         child: Semantics(
           label:
               '내 제보 상세, ${report.reportTypeLabel}, 현재 상태 ${report.statusLabel}, 제보 번호 ${report.displayReceiptCode}',
           child: ListView(
-            padding: _facilityReportPagePadding,
+            padding: const EdgeInsets.only(bottom: 32),
             children: [
-              Text(
-                report.reportTypeLabel,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: EasySubwayAccessibleColors.text,
-                  fontWeight: FontWeight.w700,
-                  height: 1.25,
+              ColoredBox(
+                color: EasySubwayAccessibleColors.scaffoldSurface,
+                child: SizedBox(
+                  width: double.infinity,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+                    child: Semantics(
+                      header: true,
+                      child: Text(
+                        '진행 상태',
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: EasySubwayAccessibleColors.secondaryText,
+                          fontWeight: FontWeight.w700,
+                          height: 1.25,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(height: 12),
-              _MyReportDetailStatus(
-                status: report.status,
-                label: report.statusLabel,
+              ColoredBox(
+                color: EasySubwayAccessibleColors.surface,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        report.reportTypeLabel,
+                        style: textTheme.bodyLarge?.copyWith(
+                          color: EasySubwayAccessibleColors.text,
+                          fontWeight: FontWeight.w700,
+                          height: 1.25,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      _MyReportDetailStatus(
+                        status: report.status,
+                        label: report.statusLabel,
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(height: 24),
+              ColoredBox(
+                color: EasySubwayAccessibleColors.scaffoldSurface,
+                child: SizedBox(
+                  width: double.infinity,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+                    child: Semantics(
+                      header: true,
+                      child: Text(
+                        '제보 정보',
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: EasySubwayAccessibleColors.secondaryText,
+                          fontWeight: FontWeight.w700,
+                          height: 1.25,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
               _MyReportDetailRow(
                 label: '제보 번호',
                 value: report.displayReceiptCode,
               ),
-              const Divider(height: 32),
+              const Divider(
+                height: 1,
+                thickness: 1,
+                indent: 20,
+                endIndent: 20,
+                color: EasySubwayAccessibleColors.line,
+              ),
               _MyReportDetailRow(label: '접수일', value: createdAtLabel),
-              const Divider(height: 32),
+              const Divider(
+                height: 1,
+                thickness: 1,
+                indent: 20,
+                endIndent: 20,
+                color: EasySubwayAccessibleColors.line,
+              ),
               _MyReportDetailRow(label: '제보 내용', value: description),
             ],
           ),
@@ -1711,27 +1859,34 @@ class _MyReportDetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            color: EasySubwayAccessibleColors.mutedText,
-            fontWeight: FontWeight.w700,
-            height: 1.2,
-          ),
+    final textTheme = Theme.of(context).textTheme;
+    return ColoredBox(
+      color: EasySubwayAccessibleColors.surface,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: textTheme.bodyMedium?.copyWith(
+                color: EasySubwayAccessibleColors.mutedText,
+                fontWeight: FontWeight.w700,
+                height: 1.25,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: textTheme.bodyLarge?.copyWith(
+                color: EasySubwayAccessibleColors.text,
+                fontWeight: FontWeight.w700,
+                height: 1.35,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            color: EasySubwayAccessibleColors.text,
-            fontWeight: FontWeight.w700,
-            height: 1.3,
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -1763,25 +1918,6 @@ class _MyReportStatusLabel extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _MyReportMetaText extends StatelessWidget {
-  const _MyReportMetaText({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      '$label $value',
-      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-        color: EasySubwayAccessibleColors.mutedText,
-        fontWeight: FontWeight.w700,
-        height: 1.3,
-      ),
     );
   }
 }

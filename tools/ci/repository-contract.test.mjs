@@ -2358,6 +2358,15 @@ test("모바일 도움말과 서비스 정보 연결 계약은 각 presentation 
   const support = read(
     "apps/mobile/lib/features/support/presentation/support_access_screen.dart",
   );
+  const inquiry = read(
+    "apps/mobile/lib/features/support/presentation/inquiry_screen.dart",
+  );
+  const settings = read(
+    "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
+  );
+  const home = read(
+    "apps/mobile/lib/features/home/presentation/home_screen.dart",
+  );
   const serviceInfo = read(
     "apps/mobile/lib/features/settings/presentation/service_info_screen.dart",
   );
@@ -2378,6 +2387,9 @@ test("모바일 도움말과 서비스 정보 연결 계약은 각 presentation 
     assert.match(support, new RegExp(`^(?:abstract interface )?class ${declaration}\\b`, "m"));
     assert.doesNotMatch(main, new RegExp(`^(?:abstract interface )?class ${declaration}\\b`, "m"));
   }
+  assert.match(inquiry, /^class InquiryScreen\b/m);
+  assert.match(inquiry, /^enum InquiryKind\b/m);
+  assert.doesNotMatch(main, /^class InquiryScreen\b/m);
   assert.match(
     appRoot,
     /^import '\.\.\/features\/support\/presentation\/support_access_screen\.dart';$/m,
@@ -2386,25 +2398,57 @@ test("모바일 도움말과 서비스 정보 연결 계약은 각 presentation 
     main,
     /^export 'features\/support\/presentation\/support_access_screen\.dart'/m,
   );
+  assert.match(
+    home,
+    /^import '\.\.\/\.\.\/support\/presentation\/inquiry_screen\.dart';$/m,
+  );
+  assert.match(home, /onOpenInquiry:\s*openInquiry/);
+  assert.match(settings, /settingsInquiryButton/);
+  assert.match(settings, /title: '문의하기'/);
+  assert.match(settings, /required this\.onOpenInquiry/);
   for (const testSource of [widgetTest, supportInfoTest, appFixture]) {
     assert.match(
       testSource,
       /^import 'package:easysubway_mobile\/features\/support\/presentation\/support_access_screen\.dart';$/m,
     );
   }
+  assert.match(
+    widgetTest,
+    /^import 'package:easysubway_mobile\/features\/support\/presentation\/inquiry_screen\.dart';$/m,
+  );
   for (const helper of [
-    "_SupportSectionTitle",
-    "_SupportGroupCard",
-    "_SecurityContactNotice",
-    "_SecurityContactNoticeLine",
+    "_SupportSettingsSection",
+    "_SupportNoticeBullet",
     "_SafetyDataNotice",
-    "_SafetyDataNoticeLine",
     "_SupportAccessItem",
   ]) {
     assert.match(support, new RegExp(`^class ${helper}\\b`, "m"));
     assert.doesNotMatch(main, new RegExp(`^class ${helper}\\b`, "m"));
   }
-  assert.match(support, /^Uri\? _mailtoUri\(/m);
+  for (const helper of [
+    "_InquirySection",
+    "_InquiryKindTile",
+    "_InquirySecurityNotice",
+    "_InquiryNoticeBullet",
+  ]) {
+    assert.match(inquiry, new RegExp(`^class ${helper}\\b`, "m"));
+    assert.doesNotMatch(main, new RegExp(`^class ${helper}\\b`, "m"));
+  }
+  // 설정 화면과 같은 섹션·타일 양식(#2436). 카드형 보조 위젯은 쓰지 않는다.
+  for (const removed of [
+    "_SupportSectionTitle",
+    "_SupportGroupCard",
+    "_SecurityContactNotice",
+    "_SecurityContactNoticeLine",
+    "_SafetyDataNoticeLine",
+  ]) {
+    assert.doesNotMatch(support, new RegExp(`^class ${removed}\\b`, "m"));
+  }
+  assert.match(support, /title: const Text\('도움말'\)/);
+  assert.doesNotMatch(support, /도움말 및 문의|도움말·문의/);
+  assert.match(support, /^Uri\? buildSupportMailtoUri\(/m);
+  assert.match(inquiry, /buildSupportMailtoUri\(/);
+  assert.match(inquiry, /메일로 보내기/);
   assert.match(serviceInfo, /^class ServiceInfoScreen\b/m);
   assert.match(serviceInfo, /LaunchMode\.inAppBrowserView/);
   assert.match(serviceInfo, /OpenSourceLicensesScreen/);
@@ -3465,6 +3509,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
       "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
       "apps/mobile/lib/features/settings/presentation/open_source_licenses_screen.dart",
       "apps/mobile/lib/features/settings/presentation/service_info_screen.dart",
+      "apps/mobile/lib/features/support/presentation/inquiry_screen.dart",
       "apps/mobile/lib/features/support/presentation/support_access_screen.dart",
       "apps/mobile/lib/main.dart",
       "apps/mobile/release/support-incident-response-gate.json",
@@ -15687,9 +15732,15 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(widgetTest, /홈 즐겨찾기는 하나의 진입점에서 탭 목록을 바로 보여준다/);
   assert.match(widgetTest, /도움말은 개인정보 처리방침 진입점을 서비스 정보로 분리한다/);
   assert.match(widgetTest, /도움말은 이동 전 살펴보기 안내를 함께 보여준다/);
-  assert.match(widgetTest, /도움말은 보안과 개인정보 문의 경로를 안내한다/);
-  assert.match(supportAccessScreen, /보안 문의 안내/);
-  assert.match(supportAccessScreen, /앱 보안이나 개인정보가 걱정되면 문의로 알려주세요\./);
+  assert.match(widgetTest, /문의하기는 일반·보안 유형을 선택해 메일로 보낸다/);
+  assert.match(widgetTest, /설정에서 문의하기 화면으로 들어간다/);
+  assert.match(widgetTest, /문의하기는 메일 앱 연결 실패를 짧게 안내한다/);
+  const inquiryScreen = read(
+    "apps/mobile/lib/features/support/presentation/inquiry_screen.dart",
+  );
+  assert.match(inquiryScreen, /보안 문의 안내/);
+  assert.match(inquiryScreen, /앱 보안이나 개인정보가 걱정되면 문의로 알려주세요\./);
+  assert.doesNotMatch(supportAccessScreen, /보안 문의 안내/);
   assert.match(supportAccessScreen, /EASYSUBWAY_SECURITY_EMAIL/);
   assert.match(supportAccessScreen, /validatedForBuild\(\{required bool isReleaseMode\}\)/);
   assert.match(supportAccessScreen, /Release \$label must use HTTPS\./);
