@@ -522,7 +522,7 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, standby 승격
   assert.match(deploy, /--profile observability up -d --no-build --force-recreate "\$\{OBSERVABILITY_CONFIG_SERVICES\[@\]\}" \|\| return 1/);
   assert.match(deploy, /--profile observability up -d --no-build --force-recreate alertmanager \|\| return 1/);
   assert.match(deploy, /if \[\[ "\$\{current_env_hash\}" != "\$\{target_env_hash\}" \]\]; then/);
-  assert.match(deploy, /git diff --quiet "\$\{current_sha\}" "\$\{DEPLOY_SHA\}" -- infra\/prometheus infra\/alertmanager\/templates infra\/loki infra\/grafana\/provisioning/);
+  assert.match(deploy, /git diff --quiet "\$\{current_sha\}" "\$\{DEPLOY_SHA\}" -- infra\/prometheus infra\/alertmanager\/templates infra\/loki infra\/grafana\/provisioning infra\/alloy/);
   assert.doesNotMatch(deploy, /--force-recreate "\$\{OBSERVABILITY_SERVICES\[@\]\}"/);
   assert.match(deploy, /verify_runtime_hardening\(\)/);
   assert.match(deploy, /runtime_services_hardened\(\)/);
