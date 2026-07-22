@@ -105,7 +105,7 @@ class ServiceInfoScreen extends StatelessWidget {
           children: [
             _ServiceInfoSection(
               key: const Key('serviceInfoSection-documents'),
-              title: '약관 및 출처',
+              sectionTitle: '약관 및 정책',
               children: rows,
             ),
           ],
@@ -153,12 +153,13 @@ class ServiceInfoScreen extends StatelessWidget {
 
 class _ServiceInfoSection extends StatelessWidget {
   const _ServiceInfoSection({
-    required this.title,
+    required this.sectionTitle,
     required this.children,
     super.key,
   });
 
-  final String title;
+  // action tile의 `title:` 계약 추출과 구분한다(#2442).
+  final String sectionTitle;
   final List<Widget> children;
 
   @override
@@ -168,7 +169,7 @@ class _ServiceInfoSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         ColoredBox(
-          key: Key('serviceInfoSectionHeader-$title'),
+          key: Key('serviceInfoSectionHeader-$sectionTitle'),
           color: EasySubwayAccessibleColors.scaffoldSurface,
           child: SizedBox(
             width: double.infinity,
@@ -177,7 +178,7 @@ class _ServiceInfoSection extends StatelessWidget {
               child: Semantics(
                 header: true,
                 child: Text(
-                  title,
+                  sectionTitle,
                   style: textTheme.bodyMedium?.copyWith(
                     color: EasySubwayAccessibleColors.secondaryText,
                     fontWeight: FontWeight.w700,

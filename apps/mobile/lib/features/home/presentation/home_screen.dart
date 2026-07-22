@@ -536,6 +536,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           if (didPop || _selectedTabIndex == 0) {
             return;
           }
+          // 설정 탭은 AppBar 뒤로가기와 같이 직전 탭(없으면 홈)으로 돌아간다.
+          if (_selectedTabIndex == 4) {
+            openPreviousTabOrHome();
+            return;
+          }
           openHomeTab();
         },
         child: staleLabel == null
