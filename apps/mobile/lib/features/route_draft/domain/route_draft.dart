@@ -3,10 +3,21 @@
 enum RouteDraftSlot { origin, destination, waypoint }
 
 class RouteDraftStation {
-  const RouteDraftStation({required this.id, required this.nameKo});
+  const RouteDraftStation({
+    required this.id,
+    required this.nameKo,
+    this.lineId = '',
+    this.lineName = '',
+    this.lineColor = '',
+    this.stationCode = '',
+  });
 
   final String id;
   final String nameKo;
+  final String lineId;
+  final String lineName;
+  final String lineColor;
+  final String stationCode;
 
   String get displayName {
     final trimmedName = nameKo.trim();
@@ -15,6 +26,8 @@ class RouteDraftStation {
     }
     return '$trimmedName역';
   }
+
+  bool get hasLine => lineId.trim().isNotEmpty;
 }
 
 class RouteDraft {

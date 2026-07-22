@@ -2188,9 +2188,9 @@ test("모바일 즐겨찾기 화면은 favorites presentation canonical 파일�
     "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart",
   );
 
-  assert.match(favorites, /^class _HomeSavedRouteCard extends StatelessWidget/m);
+  assert.match(favorites, /^class _FavoriteHomeRouteRow extends StatelessWidget/m);
   assert.match(favorites, /^String _stationNameWithSuffix\(String name\)/m);
-  assert.match(favorites, /^class _HomeMiniBadge extends StatelessWidget/m);
+  assert.match(favorites, /^class _FavoriteHomeSectionHeader extends StatelessWidget/m);
   assert.match(favorites, /^class FavoriteHomeScreen extends StatefulWidget/m);
   assert.match(favorites, /^class _FavoriteHomeScreenState extends State<FavoriteHomeScreen>/m);
   assert.match(favorites, /^class _FavoriteHomeData\b/m);
@@ -2204,9 +2204,9 @@ test("모바일 즐겨찾기 화면은 favorites presentation canonical 파일�
     read("apps/mobile/test/widget_test.dart"),
     /^import 'package:easysubway_mobile\/features\/favorites\/presentation\/favorite_home_screen\.dart';$/m,
   );
-  assert.doesNotMatch(main, /^class _HomeSavedRouteCard\b/m);
+  assert.doesNotMatch(main, /^class _FavoriteHomeRouteRow\b/m);
   assert.doesNotMatch(main, /^String _stationNameWithSuffix\b/m);
-  assert.doesNotMatch(main, /^class _HomeMiniBadge\b/m);
+  assert.doesNotMatch(main, /^class _FavoriteHomeSectionHeader\b/m);
   assert.doesNotMatch(main, /^class FavoriteHomeScreen\b/m);
   assert.doesNotMatch(main, /^class _FavoriteHomeScreenState\b/m);
   assert.doesNotMatch(main, /^class _FavoriteHomeData\b/m);
@@ -2225,7 +2225,7 @@ test("모바일 즐겨찾기 화면은 새로고침·삭제·복귀 재조회 �
     assert.ok(nextIndex > startIndex, `${next} must follow ${start}`);
     return favorites.slice(startIndex, nextIndex);
   };
-  const refreshBlock = sourceBlock("onRefresh: () async {", "child: ListView(");
+  const refreshBlock = sourceBlock("onRefresh: () async {", "child: LayoutBuilder(");
   const removeRouteBlock = sourceBlock(
     "Future<void> _removeFavoriteRoute",
     "Future<void> _openStationDetailFromFavorite",
@@ -2807,13 +2807,13 @@ test("모바일 역 검색 결과 시스템 글자 크기 문구 회귀 테스�
   );
   const widgetTest = read("apps/mobile/test/widget_test.dart");
   const resultTileMatch = stationSearchBody.match(
-    /class _StationSearchResultTile[\s\S]*?class _StationSearchResultLineRow[\s\S]*?^String _stationResultDisplayName/m,
+    /class _StationSearchResultLineRow[\s\S]*?^String _stationResultDisplayName/m,
   );
   const largeTextTestMatch = widgetTest.match(
     /testWidgets\('역 검색 결과 핵심 문구는 시스템 글자 크기에서 한 줄 말줄임으로 고정하지 않는다'[\s\S]*?\n  testWidgets\('/,
   );
 
-  assert.ok(resultTileMatch, "_StationSearchResultTile block not found");
+  assert.ok(resultTileMatch, "_StationSearchResultLineRow block not found");
   const resultTile = resultTileMatch[0];
   // #1933: 결과 행은 노선마다 한 행씩(_StationSearchResultLineRow) 펼치고
   // 각 행 우측에 해당 노선 배지(StationLineBadge) 하나만 둔다. '+N' 요약·거리 문구 없음.
@@ -2821,7 +2821,8 @@ test("모바일 역 검색 결과 시스템 글자 크기 문구 회귀 테스�
   assert.match(resultTile, /StationLineBadge\(line: line/);
   assert.doesNotMatch(resultTile, /maxBadgeCount/);
   // 역명만 노출한다(거리·노선 요약 부가 문구 제거).
-  assert.match(resultTile, /child: Text\(\s*stationName/);
+  assert.match(resultTile, /child: Text\.rich\(/);
+  assert.match(resultTile, /_highlightedNameSpans\(\s*stationName/);
   assert.doesNotMatch(resultTile, /result\.distanceLabel/);
   assert.doesNotMatch(resultTile, /maxLines:\s*1/);
   assert.doesNotMatch(resultTile, /overflow:\s*TextOverflow\.ellipsis/);
@@ -15585,17 +15586,19 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
     homeScreen,
     /RouteSearchScreen\([\s\S]*simpleViewEnabled: simpleViewEnabled/,
   );
-  assert.match(favoriteHomeScreen, /AppBar\(title: const Text\('즐겨찾기'\)\)/);
-  // 즐겨찾기 홈은 #1569에서 카테고리 카드를 없애고 역/경로/시설 인라인 섹션으로 바꿨다.
-  assert.match(favoriteHomeScreen, /AppSectionTitle\(title: '역'\)/);
-  assert.match(favoriteHomeScreen, /AppSectionTitle\(title: '시설'\)/);
-  assert.match(favoriteHomeScreen, /AppSectionTitle\(title: '경로'\)/);
+  assert.match(favoriteHomeScreen, /title: const Text\('즐겨찾기'\)/);
+  assert.match(favoriteHomeScreen, /Key\('favoriteHomeAppBar'\)/);
+  // 즐겨찾기 홈은 설정형 섹션 헤더로 역/경로/시설을 인라인 나열한다(#1569·#2436).
+  assert.match(favoriteHomeScreen, /_FavoriteHomeSectionHeader\(title: '역'\)/);
+  assert.match(favoriteHomeScreen, /_FavoriteHomeSectionHeader\(title: '시설'\)/);
+  assert.match(favoriteHomeScreen, /_FavoriteHomeSectionHeader\(title: '경로'\)/);
   assert.match(homeScreen, /FavoriteHomeScreen/);
+  assert.match(homeScreen, /onShellBack: openPreviousTabOrHome/);
   // #1569: 하위 목록 화면 진입 대신 즐겨찾기 항목을 인라인 행으로 바로 나열한다.
   // (하위 목록 위젯 클래스는 각 소스 파일에 유지, main에서 진입만 제거)
   assert.match(favoriteHomeScreen, /class _FavoriteHomeStationRow/);
   assert.match(favoriteHomeScreen, /class _FavoriteHomeFacilityRow/);
-  assert.match(favoriteHomeScreen, /_HomeSavedRouteCard\([\s\S]*onRemove:/);
+  assert.match(favoriteHomeScreen, /_FavoriteHomeRouteRow\([\s\S]*onRemove:/);
   assert.match(onboarding, /class OnboardingViewPreferences/);
   assert.match(onboarding, /const OnboardingViewPreferences\.defaults/);
   assert.match(onboarding, /class OnboardingResult/);
@@ -15690,7 +15693,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.doesNotMatch(stationSearch, /Text\(\s*result\.dataQualityLabel,/);
   assert.match(widgetTest, /expect\(find\.text\('출처 확인 필요'\), findsNothing\);/);
   // #1933: 결과 재설계로 각 행 시맨틱은 자신의 노선 하나만 담아 "역명, 노선명, 선택" 형태다.
-  assert.match(widgetTest, /상록수역, 수도권 4호선, 경의중앙선, 선택/);
+  assert.match(widgetTest, /상록수역, 수도권 4호선, 선택/);
+  assert.match(widgetTest, /상록수역, 경의중앙선, 선택/);
   assert.match(read("apps/mobile/test/station_search_test.dart"), /인증 실패 시 인증을 지우고 한 번 재시도한다/);
   assert.match(read("apps/mobile/test/station_search_test.dart"), /릴리즈 빌드는 API 기본 주소를 반드시 설정해야 한다/);
   assert.match(read("apps/mobile/test/station_search_test.dart"), /릴리즈 빌드는 HTTPS API 주소만 사용한다/);

@@ -80,10 +80,9 @@ void main() {
     );
     final decoration =
         (divider.child! as DecoratedBox).decoration as BoxDecoration;
-    expect(decoration.color, const Color(0xFFCBD6DD));
-    expect(decoration.boxShadow, const <BoxShadow>[
-      BoxShadow(color: Color(0x0D000000), offset: Offset(0, 1), blurRadius: 2),
-    ]);
+    expect(decoration.color, easySubwayHeaderDividerColor);
+    // 설정·공지 등 일반 네비는 선만(그림자 없음). 노선도·메뉴만 mapChrome.
+    expect(decoration.boxShadow, isNull);
     expect(find.text('2호선 지연'), findsOneWidget);
     expect(find.text('역사 안내'), findsOneWidget);
   });

@@ -36,6 +36,74 @@ void main() {
     expect(await repository.listFavoriteStations(), isEmpty);
   });
 
+  test('호선 단위 즐겨찾기는 lineId로 저장하고 해당 호선만 해제한다', () async {
+    final catalogDatabase = CatalogDatabase.memory();
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(catalogDatabase.close);
+    addTearDown(userDatabase.close);
+    await catalogDatabase.seedBaselineIfEmpty();
+    final repository = DriftFavoriteStationRepository(
+      catalogDatabase: catalogDatabase,
+      userDatabase: userDatabase,
+    );
+
+    final saved = await repository.saveFavoriteStation(
+      'station-sangnoksu',
+      lineId: 'seoul-4',
+    );
+    expect(saved.stationId, 'station-sangnoksu');
+    expect(saved.lineId, 'seoul-4');
+
+    final favorites = await repository.listFavoriteStations();
+    expect(favorites.single.lineId, 'seoul-4');
+
+    await repository.removeFavoriteStation(
+      'station-sangnoksu',
+      lineId: 'seoul-4',
+    );
+    expect(await repository.listFavoriteStations(), isEmpty);
+  });
+
+  test('레거시 line_id와 호선 단위 행이 공존하면 레거시는 목록에서 제외한다', () async {
+    final catalogDatabase = CatalogDatabase.memory();
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(catalogDatabase.close);
+    addTearDown(userDatabase.close);
+    await catalogDatabase.seedBaselineIfEmpty();
+    final repository = DriftFavoriteStationRepository(
+      catalogDatabase: catalogDatabase,
+      userDatabase: userDatabase,
+    );
+
+    await repository.saveFavoriteStation('station-sangnoksu');
+    await repository.saveFavoriteStation(
+      'station-sangnoksu',
+      lineId: 'seoul-4',
+    );
+
+    final favorites = await repository.listFavoriteStations();
+    expect(favorites, hasLength(1));
+    expect(favorites.single.lineId, 'seoul-4');
+  });
+
+  test('레거시 역 전체 즐겨찾기에서 한 호선만 해제하면 나머지로 펼친다', () async {
+    final catalogDatabase = CatalogDatabase.memory();
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(catalogDatabase.close);
+    addTearDown(userDatabase.close);
+    await catalogDatabase.seedBaselineIfEmpty();
+    final repository = DriftFavoriteStationRepository(
+      catalogDatabase: catalogDatabase,
+      userDatabase: userDatabase,
+    );
+
+    await repository.saveFavoriteStation('station-sadang');
+    await repository.removeFavoriteStation('station-sadang', lineId: 'seoul-2');
+
+    final favorites = await repository.listFavoriteStations();
+    expect(favorites.map((favorite) => favorite.lineId), ['seoul-4']);
+  });
+
   test('흡수 station ID 즐겨찾기는 대표 ID로 이관한다', () async {
     final catalogDatabase = CatalogDatabase.memory();
     final userDatabase = user_db.UserDatabase.memory();

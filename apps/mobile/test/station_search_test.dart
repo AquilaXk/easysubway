@@ -1565,10 +1565,15 @@ List<FlutterErrorDetails> _captureReportedErrors() {
   return <FlutterErrorDetails>[];
 }
 
-FavoriteStation _favoriteStation({required String id, required String name}) {
+FavoriteStation _favoriteStation({
+  required String id,
+  required String name,
+  String lineId = '',
+}) {
   return FavoriteStation(
     userId: 'anonymous-user-1',
     stationId: id,
+    lineId: lineId,
     nameKo: name,
     nameEn: id,
     region: '수도권',
@@ -2069,7 +2074,9 @@ class FakeCurrentLocationProvider implements CurrentLocationProvider {
 class FakeFavoriteStationRepository implements FavoriteStationRepository {
   List<FavoriteStation> favorites = const [];
   final savedStationIds = <String>[];
+  final savedLineIds = <String?>[];
   final removedStationIds = <String>[];
+  final removedLineIds = <String?>[];
   Object? error;
 
   @override
@@ -2082,26 +2089,53 @@ class FakeFavoriteStationRepository implements FavoriteStationRepository {
   }
 
   @override
-  Future<FavoriteStation> saveFavoriteStation(String stationId) async {
+  Future<FavoriteStation> saveFavoriteStation(
+    String stationId, {
+    String? lineId,
+  }) async {
     savedStationIds.add(stationId);
+    savedLineIds.add(lineId);
     final currentError = error;
     if (currentError != null) {
       throw currentError;
     }
-    final favorite = _favoriteStation(id: stationId, name: '상록수');
-    favorites = [favorite];
+    final normalizedLineId = (lineId ?? '').trim();
+    final favorite = _favoriteStation(
+      id: stationId,
+      name: '상록수',
+      lineId: normalizedLineId,
+    );
+    favorites = [
+      ...favorites.where(
+        (item) =>
+            !(item.stationId == stationId && item.lineId == normalizedLineId),
+      ),
+      favorite,
+    ];
     return favorite;
   }
 
   @override
-  Future<void> removeFavoriteStation(String stationId) async {
+  Future<void> removeFavoriteStation(String stationId, {String? lineId}) async {
     removedStationIds.add(stationId);
+    removedLineIds.add(lineId);
     final currentError = error;
     if (currentError != null) {
       throw currentError;
     }
+    final normalizedLineId = (lineId ?? '').trim();
+    if (normalizedLineId.isEmpty) {
+      favorites = favorites
+          .where((favorite) => favorite.stationId != stationId)
+          .toList(growable: false);
+      return;
+    }
     favorites = favorites
-        .where((favorite) => favorite.stationId != stationId)
+        .where(
+          (favorite) =>
+              !(favorite.stationId == stationId &&
+                  favorite.lineId == normalizedLineId),
+        )
         .toList(growable: false);
   }
 }

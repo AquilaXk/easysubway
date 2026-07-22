@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 
 /// 노선도 화면을 기준으로 삼는 앱 공용 색 팔레트.
@@ -174,24 +176,103 @@ class EasySubwayTouchTarget {
 /// 계약을 공유한다. 이 상수를 바꾸면 양쪽을 함께 갱신한다.
 const easySubwayTopBarContentHeight = 60.0;
 
+/// 네비/상단바 하단 구분선 색. 카카오 지하철 상단 카드 하단 엣지 실측
+/// 뉴트럴 그레이(#D5D5D5). 예전 청회색(#CBD6DD)은 선이 탁하고 두껍게 보였다.
+const easySubwayHeaderDividerColor = Color(0xFFD5D5D5);
+
+/// 상단바·시트와 본문을 나누는 1px 구분선.
+///
+/// 선 톤은 전 화면이 [easySubwayHeaderDividerColor]를 쓴다. 카카오식 짧은
+/// 드롭은 노선도·좌측 메뉴만 [EasySubwayHeaderDivider.mapChrome]으로 켠다.
+/// 그림자는 이 공용 위젯에만 두고 화면 파일에 직접 쓰지 않는다(#1933).
 class EasySubwayHeaderDivider extends SizedBox {
   const EasySubwayHeaderDivider({super.key})
     : super(
         height: 1,
         width: double.infinity,
         child: const DecoratedBox(
-          decoration: BoxDecoration(
-            color: Color(0xFFCBD6DD),
-            boxShadow: <BoxShadow>[
-              BoxShadow(
-                color: Color(0x0D000000),
-                offset: Offset(0, 1),
-                blurRadius: 2,
-              ),
-            ],
-          ),
+          decoration: BoxDecoration(color: easySubwayHeaderDividerColor),
         ),
       );
+
+  /// 노선도 상단바·좌측 메뉴 헤더용. 동일 선 톤 + 카카오식 짧은 드롭.
+  ///
+  /// 그림자 톤은 카카오 참조 스크린의 흰 지도 위 페이드
+  /// (#CD→#E2→#EE→#F8→투명, ~5px)를 검정 반투명으로 그대로 환산했다.
+  /// BoxShadow 근사 대신 짧은 페이드 드롭으로 길이와 색을 맞춘다.
+  const EasySubwayHeaderDivider.mapChrome({super.key})
+    : super(
+        height: 1,
+        width: double.infinity,
+        child: const _EasySubwayMapChromeHeaderDivider(),
+      );
+}
+
+/// 카카오 참조: 흰 배경 기준 205/226/238/248 → alpha 0x32/0x1D/0x11/0x07.
+///
+/// Material gradient decoration은 design_guard 하드 밴(#1915)이라
+/// [CustomPaint] + `dart:ui` 셰이더로만 그린다.
+const easySubwayMapChromeHeaderDropColors = <Color>[
+  Color(0x32000000),
+  Color(0x1D000000),
+  Color(0x11000000),
+  Color(0x07000000),
+  Color(0x00000000),
+];
+
+/// [EasySubwayHeaderDivider.mapChrome] 본체. 1px 선 + 아래로 넘치는 짧은 드롭.
+class _EasySubwayMapChromeHeaderDivider extends StatelessWidget {
+  const _EasySubwayMapChromeHeaderDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    // 카카오 참조 페이드는 물리 픽셀 ~5px. logical height로 환산한다.
+    final dropHeight = 5 / MediaQuery.devicePixelRatioOf(context);
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        const ColoredBox(
+          color: easySubwayHeaderDividerColor,
+          child: SizedBox.expand(),
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          top: 1,
+          height: dropHeight,
+          child: IgnorePointer(
+            child: CustomPaint(
+              painter: const _MapChromeHeaderDropPainter(),
+              child: SizedBox(height: dropHeight, width: double.infinity),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MapChromeHeaderDropPainter extends CustomPainter {
+  const _MapChromeHeaderDropPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) {
+      return;
+    }
+    final paint = Paint()
+      ..shader = ui.Gradient.linear(
+        Offset.zero,
+        Offset(0, size.height),
+        easySubwayMapChromeHeaderDropColors,
+        const <double>[0, 0.25, 0.5, 0.75, 1],
+      );
+    canvas.drawRect(Offset.zero & size, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _MapChromeHeaderDropPainter oldDelegate) =>
+      false;
 }
 
 EdgeInsets easySubwayBottomActionInsets(

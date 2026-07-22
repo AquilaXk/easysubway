@@ -344,12 +344,18 @@ class FakeFavoriteStationRepository implements FavoriteStationRepository {
   }
 
   @override
-  Future<FavoriteStation> saveFavoriteStation(String stationId) {
+  Future<FavoriteStation> saveFavoriteStation(
+    String stationId, {
+    String? lineId,
+  }) {
     throw UnimplementedError();
   }
 
   @override
-  Future<void> removeFavoriteStation(String stationId) async {}
+  Future<void> removeFavoriteStation(
+    String stationId, {
+    String? lineId,
+  }) async {}
 }
 
 class _DefaultNotificationPermissionProvider

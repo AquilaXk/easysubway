@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -10,6 +11,7 @@ import 'package:flutter/services.dart' show rootBundle;
 
 import 'accessible_design.dart';
 import 'ad_slot.dart';
+import 'design_tokens.dart';
 import 'facility_report.dart';
 import 'features/ads/ad_repository.dart';
 import 'features/network_map/domain/map_camera.dart';
@@ -34,6 +36,7 @@ import 'features/realtime/realtime_repository.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
 import 'features/route_draft/domain/route_draft.dart';
 import 'features/stations/presentation/service_pattern_badge.dart';
+import 'features/stations/presentation/station_line_badges.dart';
 import 'internal_route.dart';
 import 'mobile_error_reporter.dart';
 import 'search_field.dart';
@@ -535,6 +538,10 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   bool _nearbyTimetableLoading = false;
   late Future<_NetworkMapLoadResult> _future = _loadMap();
 
+  /// 지도 탭 → draft 슬롯 지정 시 역의 [NetworkMapStation.lineId]로 노선
+  /// 이름·색을 채우기 위해 마지막으로 로드된 맵 데이터를 캐시한다.
+  NetworkMapData? _latestMapData;
+
   // #1933/#1915 홈 노선도 위 in-place 역 검색 모드. 모드 플래그만 이 화면에
   // 남는다. 검색 컨트롤러·디바운스·최근 검색어·결과 본문 등 키 입력마다 바뀌는
   // 상태는 [_NetworkMapSearchSession]으로 격리해 타이핑이 지도 canvas/chrome을
@@ -648,27 +655,33 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
 
   /// #2109 일반(비픽) 모드의 인플레이스 검색 결과 탭: 검색을 닫고 해당 역으로
   /// 카메라를 이동한 뒤 부채꼴 팬 메뉴와 해당 역 하단 정보 패널을 띄운다.
-  void _focusStationFromSearch(StationSearchResult result) {
+  void _focusStationFromSearch(
+    StationSearchResult result,
+    StationSearchLine? line,
+  ) {
     // _exitSearchMode 가 이미 setState 로 검색을 닫으므로, 선택 역 상태는 그 뒤
     // 별도 setState 로 세팅해 검색 종료에 덮이지 않도록 한다.
     _exitSearchMode();
     if (!mounted) {
       return;
     }
-    _showStationPanelFromSearch(result);
+    _showStationPanelFromSearch(result, preferredLine: line);
   }
 
-  void _showStationPanelFromSearch(StationSearchResult result) {
-    final firstLine = result.lines.firstOrNull;
+  void _showStationPanelFromSearch(
+    StationSearchResult result, {
+    StationSearchLine? preferredLine,
+  }) {
+    final selectedLine = preferredLine ?? result.lines.firstOrNull;
     setState(() {
       _nearestStationRequestToken++;
       _selectionClearRevision++;
       _nearbyDataRequestToken++;
       _nearbyPanelVisible = true;
       _nearbySelectedStationId = result.id;
-      _nearbySelectedLineId = firstLine?.id;
+      _nearbySelectedLineId = selectedLine?.id;
       _nearbyPanelData = _NetworkMapNearbyPanelData.success([result]);
-      _nearbyRealtime = firstLine == null
+      _nearbyRealtime = selectedLine == null
           ? const RealtimeSnapshot(status: RealtimeSnapshotStatus.unsupported)
           : const RealtimeSnapshot.loading();
       _nearbyDataSource = _NearbyPanelDataSource.realtime;
@@ -676,8 +689,8 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
       _nearbyTimetableLoading = false;
       _searchFanMenuStationId = result.id;
     });
-    if (firstLine != null) {
-      unawaited(_loadNearbyRealtime(result, firstLine));
+    if (selectedLine != null) {
+      unawaited(_loadNearbyRealtime(result, selectedLine));
     }
   }
 
@@ -749,6 +762,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
       searchQueryController: _searchQueryController,
       stationSearchRepository: searchRepository,
       searchHistoryRepository: widget.searchHistoryRepository,
+      favoriteRepository: widget.favoriteRepository,
       routeDraftController: widget.routeDraftController,
       regionLabel: _displayRegionName(_selectedRegion ?? '수도권'),
     );
@@ -867,7 +881,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                 onClearOrigin: _clearOriginStation,
                 onClearDestination: _clearDestinationStation,
                 onClearWaypoint: _clearWaypointStation,
-                onSwapDraft: _swapDraftStations,
                 onReorderDraft: _reorderDraftStations,
                 onPickOrigin: widget.onPickStationForSlot == null
                     ? null
@@ -914,7 +927,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                 onClearOrigin: _clearOriginStation,
                 onClearDestination: _clearDestinationStation,
                 onClearWaypoint: _clearWaypointStation,
-                onSwapDraft: _swapDraftStations,
                 onReorderDraft: _reorderDraftStations,
                 onPickOrigin: widget.onPickStationForSlot == null
                     ? null
@@ -934,6 +946,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
             // 시간표·길찾기 trip 속성으로만 유지되고, 지도는 항상 원본 data 전체를
             // 렌더한다(운행종별 필터 없음).
             _startInitialNearbyFocus();
+            _latestMapData = data;
             return _NetworkMapChrome(
               regions: data.regions,
               selectedRegion: data.selectedRegion,
@@ -966,7 +979,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               onClearOrigin: _clearOriginStation,
               onClearDestination: _clearDestinationStation,
               onClearWaypoint: _clearWaypointStation,
-              onSwapDraft: _swapDraftStations,
               onReorderDraft: _reorderDraftStations,
               onPickOrigin: widget.onPickStationForSlot == null
                   ? null
@@ -1417,21 +1429,21 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
 
   void _setOriginStation(NetworkMapStation station) {
     widget.routeDraftController.setOrigin(
-      RouteDraftStation(id: station.id, nameKo: station.nameKo),
+      _routeDraftStationFromMapStation(station, _latestMapData),
     );
     _dismissNearbyPanelForDraft();
   }
 
   void _setDestinationStation(NetworkMapStation station) {
     widget.routeDraftController.setDestination(
-      RouteDraftStation(id: station.id, nameKo: station.nameKo),
+      _routeDraftStationFromMapStation(station, _latestMapData),
     );
     _dismissNearbyPanelForDraft();
   }
 
   void _setWaypointStation(NetworkMapStation station) {
     widget.routeDraftController.setWaypoint(
-      RouteDraftStation(id: station.id, nameKo: station.nameKo),
+      _routeDraftStationFromMapStation(station, _latestMapData),
     );
     _dismissNearbyPanelForDraft();
   }
@@ -1462,10 +1474,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
 
   void _clearWaypointStation() {
     widget.routeDraftController.clearWaypoint();
-  }
-
-  void _swapDraftStations() {
-    widget.routeDraftController.swapOriginDestination();
   }
 
   /// #1985: draft 행 드래그 재배열. 대상 슬롯이 이미 차 있으면 두 값을 맞바꾸고,
@@ -1606,7 +1614,6 @@ class _NetworkMapChrome extends StatelessWidget {
     required this.onClearOrigin,
     required this.onClearDestination,
     required this.onClearWaypoint,
-    required this.onSwapDraft,
     required this.onReorderDraft,
     this.onPickOrigin,
     this.onPickDestination,
@@ -1645,7 +1652,6 @@ class _NetworkMapChrome extends StatelessWidget {
   final VoidCallback onClearOrigin;
   final VoidCallback onClearDestination;
   final VoidCallback onClearWaypoint;
-  final VoidCallback onSwapDraft;
 
   /// #1985: draft 행 드래그 재배열 콜백. (from, to) 슬롯을 받아 swap/move를 분기한다.
   final void Function(RouteDraftSlot from, RouteDraftSlot to) onReorderDraft;
@@ -1672,11 +1678,19 @@ class _NetworkMapChrome extends StatelessWidget {
     debugNetworkMapChromeBuildCount++;
     final topPadding = MediaQuery.paddingOf(context).top;
     final inSearchMode = searchMode && searchBody != null;
+    // 지도를 상단바 아래로 약간 겹쳐 그리면, 구분선·짧은 드롭이 흰 배경이 아니라
+    // 노선 색 위에 앉아 카카오처럼 닿는 부위가 하얗게 끊기지 않는다.
+    const mapUnderTopBarPx = 10.0;
+    final mapTop = topPadding + _networkMapTopBarHeight - mapUnderTopBarPx;
+    // 상단바 mapChrome 드롭이 지도 위로 그려지려면 이 Stack이 자식을 잘라내면
+    // 안 된다(기본 Clip.hardEdge면 그림자만 사라짐).
     return Stack(
+      clipBehavior: Clip.none,
       children: [
         Positioned.fill(
-          top: topPadding + _networkMapTopBarHeight,
-          child: ClipRect(child: inSearchMode ? searchBody! : child),
+          top: mapTop,
+          // ClipRect를 쓰면 가장자리 draft 핀의 soft drop·✕가 잘린다.
+          child: inSearchMode ? searchBody! : child,
         ),
         Positioned(
           left: 0,
@@ -1702,7 +1716,6 @@ class _NetworkMapChrome extends StatelessWidget {
             onClearOrigin: onClearOrigin,
             onClearDestination: onClearDestination,
             onClearWaypoint: onClearWaypoint,
-            onSwapDraft: onSwapDraft,
             onReorderDraft: onReorderDraft,
             onPickOrigin: onPickOrigin,
             onPickDestination: onPickDestination,
@@ -1806,7 +1819,6 @@ class _NetworkMapTopBar extends StatelessWidget {
     required this.onClearOrigin,
     required this.onClearDestination,
     required this.onClearWaypoint,
-    required this.onSwapDraft,
     required this.onReorderDraft,
     this.onPickOrigin,
     this.onPickDestination,
@@ -1829,7 +1841,6 @@ class _NetworkMapTopBar extends StatelessWidget {
   final VoidCallback onClearOrigin;
   final VoidCallback onClearDestination;
   final VoidCallback onClearWaypoint;
-  final VoidCallback onSwapDraft;
   final void Function(RouteDraftSlot from, RouteDraftSlot to) onReorderDraft;
   final VoidCallback? onPickOrigin;
   final VoidCallback? onPickDestination;
@@ -1841,6 +1852,8 @@ class _NetworkMapTopBar extends StatelessWidget {
       key: const Key('networkMapTopBar'),
       color: EasySubwayAccessibleColors.topBarSurface,
       elevation: 0,
+      // mapChrome 짧은 드롭이 지도 위로 그려지도록 클립하지 않는다.
+      clipBehavior: Clip.none,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -1858,11 +1871,13 @@ class _NetworkMapTopBar extends StatelessWidget {
                 return _NetworkMapTopBarRouteDraft(
                   key: const Key('networkMapRouteDraftOverlay'),
                   draft: draft,
+                  showWaypointRow: routeDraftController.isWaypointRowVisible,
                   regionLabel: _displayRegionName(selectedRegion),
+                  onClearDraft: routeDraftController.clear,
+                  onOpenWaypointSlot: routeDraftController.openWaypointSlot,
                   onClearOrigin: onClearOrigin,
                   onClearDestination: onClearDestination,
                   onClearWaypoint: onClearWaypoint,
-                  onSwapDraft: onSwapDraft,
                   onReorderDraft: onReorderDraft,
                   onPickOrigin: onPickOrigin,
                   onPickDestination: onPickDestination,
@@ -1875,7 +1890,9 @@ class _NetworkMapTopBar extends StatelessWidget {
             left: 0,
             right: 0,
             bottom: 0,
-            child: EasySubwayHeaderDivider(key: Key('networkMapTopBarDivider')),
+            child: EasySubwayHeaderDivider.mapChrome(
+              key: Key('networkMapTopBarDivider'),
+            ),
           ),
         ],
       ),
@@ -2120,14 +2137,16 @@ class _NetworkMapSearchSession extends StatefulWidget {
     required this.searchQueryController,
     required this.stationSearchRepository,
     required this.searchHistoryRepository,
+    this.favoriteRepository,
     required this.routeDraftController,
     required this.regionLabel,
   });
 
-  final ValueChanged<StationSearchResult> onResultFocus;
+  final StationSearchResultTap onResultFocus;
   final TextEditingController searchQueryController;
   final StationSearchRepository stationSearchRepository;
   final SearchHistoryRepository? searchHistoryRepository;
+  final FavoriteStationRepository? favoriteRepository;
   final RouteDraftController routeDraftController;
   final String regionLabel;
 
@@ -2140,6 +2159,7 @@ class _NetworkMapSearchSessionState extends State<_NetworkMapSearchSession> {
   late final StationSearchController _searchController;
   Timer? _searchDebounce;
   List<RecentSearchEntry> _searchRecentEntries = const [];
+  Set<String> _favoriteKeys = const <String>{};
 
   TextEditingController get _queryController => widget.searchQueryController;
 
@@ -2154,6 +2174,7 @@ class _NetworkMapSearchSessionState extends State<_NetworkMapSearchSession> {
     );
     _queryController.addListener(_handleSearchQueryChanged);
     unawaited(_loadSearchRecentEntries());
+    unawaited(_loadFavoriteStationIds());
   }
 
   @override
@@ -2339,22 +2360,108 @@ class _NetworkMapSearchSessionState extends State<_NetworkMapSearchSession> {
     }
   }
 
+  Future<void> _loadFavoriteStationIds() async {
+    final repository = widget.favoriteRepository;
+    if (repository == null) {
+      return;
+    }
+    try {
+      final favorites = await repository.listFavoriteStations();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _favoriteKeys = {
+          for (final favorite in favorites)
+            favoriteStationLineKey(favorite.stationId, favorite.lineId),
+        };
+      });
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '노선도 검색 즐겨찾기 조회 중 예외가 발생했습니다.',
+      );
+    }
+  }
+
+  Future<void> _toggleFavoriteStation(
+    StationSearchResult result,
+    StationSearchLine? line,
+  ) async {
+    final repository = widget.favoriteRepository;
+    if (repository == null) {
+      return;
+    }
+    final stationId = result.id;
+    final lineId = line?.id;
+    final key = favoriteStationLineKey(stationId, lineId);
+    final removing = isFavoriteStationLine(_favoriteKeys, stationId, lineId);
+    try {
+      if (removing) {
+        await repository.removeFavoriteStation(stationId, lineId: lineId);
+      } else {
+        await repository.saveFavoriteStation(stationId, lineId: lineId);
+      }
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        final next = Set<String>.from(_favoriteKeys);
+        // 레거시 역 전체 키가 있으면 구체 호선 키로 정리한다.
+        next.remove(favoriteStationLineKey(stationId, ''));
+        if (removing) {
+          next.remove(key);
+        } else {
+          next.add(key);
+        }
+        _favoriteKeys = next;
+      });
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '노선도 검색 즐겨찾기 변경 중 예외가 발생했습니다.',
+      );
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(removing ? '즐겨찾기를 해제하지 못했어요.' : '즐겨찾기를 추가하지 못했어요.'),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: EasySubwayAccessibleColors.scaffoldSurface,
-      child: SafeArea(
-        top: false,
-        child: Semantics(
-          container: true,
-          child: AnimatedBuilder(
-            animation: Listenable.merge([_searchController, _queryController]),
-            builder: (context, _) {
-              final state = _searchController.state;
-              final showRecent = !_hasSearchQuery;
-              final isSearching = state.status == StationSearchStatus.loading;
-              return ListView(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+    // 검색어/결과 상태 변화는 setState 없이 AnimatedBuilder만 갱신한다.
+    // searching·여백·배경은 builder 안에서 읽어야 한다. 바깥 build 클로저에
+    // 묶으면 타이핑 때는 여백이 남고 즐겨찾기 setState 때만 풀블리드로
+    // 바뀌어 화면이 갑자기 넓어진다.
+    return Semantics(
+      container: true,
+      child: AnimatedBuilder(
+        animation: Listenable.merge([_searchController, _queryController]),
+        builder: (context, _) {
+          final searching = _hasSearchQuery;
+          final state = _searchController.state;
+          final showRecent = !searching;
+          final isSearching = state.status == StationSearchStatus.loading;
+          // 최근 검색만 SafeArea(좌우)·패딩. 검색 결과는 가장자리까지.
+          return ColoredBox(
+            color: searching
+                ? EasySubwayAccessibleColors.surface
+                : EasySubwayAccessibleColors.scaffoldSurface,
+            child: SafeArea(
+              top: false,
+              left: !searching,
+              right: !searching,
+              child: ListView(
+                padding: searching
+                    ? EdgeInsets.zero
+                    : const EdgeInsets.fromLTRB(16, 12, 16, 24),
                 children: [
                   if (showRecent)
                     Padding(
@@ -2372,13 +2479,18 @@ class _NetworkMapSearchSessionState extends State<_NetworkMapSearchSession> {
                     ),
                   StationSearchBody(
                     state: state,
+                    query: _queryController.text,
+                    favoriteKeys: _favoriteKeys,
                     onResultTap: widget.onResultFocus,
+                    onToggleFavorite: widget.favoriteRepository == null
+                        ? null
+                        : _toggleFavoriteStation,
                   ),
                 ],
-              );
-            },
-          ),
-        ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -3144,9 +3256,11 @@ class _NetworkMapMenuPanel extends StatelessWidget {
                   bottom: false,
                   child: ListView(
                     padding: EdgeInsets.zero,
+                    // 메뉴 헤더 mapChrome 짧은 드롭이 아래 타일 위로 보이게.
+                    clipBehavior: Clip.none,
                     children: [
                       const _NetworkMapMenuHeader(),
-                      const EasySubwayHeaderDivider(
+                      const EasySubwayHeaderDivider.mapChrome(
                         key: Key('networkMapMenuHeaderDivider'),
                       ),
                       _NetworkMapMenuTile(
@@ -3815,35 +3929,53 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                       onTap: () => _selectStation(station),
                     ),
                   ),
-              if (!_gestureActive && originStation != null)
+              // 드래프트 핀은 줌/팬 중에도 유지한다(역 hit·팬 메뉴와 달리 상태
+              // 표시). Positioned는 Stack 직접 자식이어야 하므로, 제스처 중
+              // 포인터 통과는 핀 위젯 내부 IgnorePointer로 처리한다.
+              if (originStation != null)
                 _NetworkMapDraftPin(
                   key: const Key('networkMapDraftPin-origin'),
                   station: originStation,
-                  geometry: geometry,
+                  // 환승역은 캡슐 중심, 일반역은 노드 중심(팬 메뉴와 동일 앵커).
+                  anchorSource: _fanMenuAnchorSource(originStation, geometry),
                   camera: camera,
                   label: '출발',
-                  surfaceColor: EasySubwayAccessibleColors.primary,
+                  surfaceColor: EasySubwayFanMenuColors.departure,
                   semanticSuffix: '출발 지정됨',
+                  clearButtonKey: const Key('networkMapDraftPinClear-origin'),
+                  ignorePointers: _gestureActive,
+                  onClear: widget.onClearOrigin,
                 ),
-              if (!_gestureActive && waypointStation != null)
+              if (waypointStation != null)
                 _NetworkMapDraftPin(
                   key: const Key('networkMapDraftPin-waypoint'),
                   station: waypointStation,
-                  geometry: geometry,
+                  anchorSource: _fanMenuAnchorSource(waypointStation, geometry),
                   camera: camera,
                   label: '경유',
-                  surfaceColor: const Color(0xE8404445),
+                  surfaceColor: EasySubwayFanMenuColors.waypoint,
                   semanticSuffix: '경유 지정됨',
+                  clearButtonKey: const Key('networkMapDraftPinClear-waypoint'),
+                  ignorePointers: _gestureActive,
+                  onClear: widget.onClearWaypoint,
                 ),
-              if (!_gestureActive && destinationStation != null)
+              if (destinationStation != null)
                 _NetworkMapDraftPin(
                   key: const Key('networkMapDraftPin-destination'),
                   station: destinationStation,
-                  geometry: geometry,
+                  anchorSource: _fanMenuAnchorSource(
+                    destinationStation,
+                    geometry,
+                  ),
                   camera: camera,
                   label: '도착',
-                  surfaceColor: EasySubwayAccessibleColors.primary,
+                  surfaceColor: EasySubwayFanMenuColors.arrival,
                   semanticSuffix: '도착 지정됨',
+                  clearButtonKey: const Key(
+                    'networkMapDraftPinClear-destination',
+                  ),
+                  ignorePointers: _gestureActive,
+                  onClear: widget.onClearDestination,
                 ),
               if (!_gestureActive && selectedStation != null)
                 Builder(
@@ -5546,14 +5678,21 @@ enum _RouteDraftFieldKind { origin, waypoint, destination }
 /// 구조(출발/도착 각각을 무채색 채움 필드 2개로 표시)로 변신한다. 아래 별도
 /// 카드를 띄우지 않는다 — 그림자/elevation 0, 라운딩은 8 이하, splash 없이
 /// 채움 색과 여백만으로 depth를 준다. 무채색 잉크만.
+///
+/// 검색바와 같은 문법:
+/// `[←][출발 필드........]  수도권`  ← 지역은 필드 열 밖(필드 폭 통일)
+/// `[+][도착 필드........]`       ← 출발·도착 중 하나만 있을 때 +
+/// `+`는 검색을 열지 않고 출발·도착 사이에 빈 경유 칸만 삽입한다.
 class _NetworkMapTopBarRouteDraft extends StatelessWidget {
   const _NetworkMapTopBarRouteDraft({
     required this.draft,
+    required this.showWaypointRow,
     required this.regionLabel,
+    required this.onClearDraft,
+    required this.onOpenWaypointSlot,
     required this.onClearOrigin,
     required this.onClearDestination,
     required this.onClearWaypoint,
-    required this.onSwapDraft,
     required this.onReorderDraft,
     this.onPickOrigin,
     this.onPickDestination,
@@ -5561,14 +5700,26 @@ class _NetworkMapTopBarRouteDraft extends StatelessWidget {
     super.key,
   });
 
+  static const _leadingWidth = EasySubwayTouchTarget.general;
+  static const _rowGap = 6.0;
+
+  /// 노선홈 지하철역 검색 시각 박스와 동일 높이(#2083).
+  static const _fieldMinHeight = easySubwaySearchFieldVisualHeight;
+
   final RouteDraft draft;
 
-  /// 경로 칸이 있을 때는 지역 변경 불가 — 표시명만 두고 ▾은 숨긴다.
+  /// 빈 경유 칸 포함, 경유 행을 그릴지.
+  final bool showWaypointRow;
+
+  /// 현재 지도 지역 표시명. draft가 있으면 변경 불가(잠김 텍스트만).
   final String regionLabel;
+  final VoidCallback onClearDraft;
+
+  /// 왼쪽 +: 빈 경유 칸을 출발·도착 사이에 연다.
+  final VoidCallback onOpenWaypointSlot;
   final VoidCallback onClearOrigin;
   final VoidCallback onClearDestination;
   final VoidCallback onClearWaypoint;
-  final VoidCallback onSwapDraft;
 
   /// #1985: draft 행 드래그 재배열 콜백. (from, to) 슬롯 쌍을 넘긴다.
   final void Function(RouteDraftSlot from, RouteDraftSlot to) onReorderDraft;
@@ -5577,177 +5728,171 @@ class _NetworkMapTopBarRouteDraft extends StatelessWidget {
   final VoidCallback? onPickOrigin;
   final VoidCallback? onPickDestination;
 
-  /// #1948: 경유역 채우기(경유 행 탭·경유 추가 진입점). null이면 경유를 추가할 수 없다.
+  /// #1948: 경유 칸 탭 → 역 검색. null이면 칸을 탭할 수 없다.
   final VoidCallback? onPickWaypoint;
 
   @override
   Widget build(BuildContext context) {
-    final canSwap = draft.origin != null || draft.destination != null;
-    // #1985: 현재 렌더 중인 행 슬롯 순서. 경유가 있으면 출발·경유·도착 3행.
+    // #1985: 현재 렌더 중인 행 슬롯 순서. 경유 행이 있으면 출발·경유·도착 3행.
     final visibleSlots = <RouteDraftSlot>[
       RouteDraftSlot.origin,
-      if (draft.waypoint != null) RouteDraftSlot.waypoint,
+      if (showWaypointRow) RouteDraftSlot.waypoint,
       RouteDraftSlot.destination,
     ];
-    // 각 행이 이동할 수 있는 다른 슬롯 목록(자기 자신 제외).
     List<RouteDraftSlot> targetsFor(RouteDraftSlot slot) =>
         visibleSlots.where((s) => s != slot).toList();
-    // 출발/도착 2개의 무채색 채움 필드. TalkBack 순서: 출발 먼저, 도착.
-    // 행 리스트로 렌더해 중간 행 확장이 구조 변경 없이 가능하다.
-    final fields = <Widget>[
-      _NetworkMapRouteDraftField(
-        kind: _RouteDraftFieldKind.origin,
-        slot: RouteDraftSlot.origin,
-        station: draft.origin,
-        onClear: onClearOrigin,
-        onPick: onPickOrigin,
-        reorderTargets: targetsFor(RouteDraftSlot.origin),
-        onReorder: onReorderDraft,
-      ),
-      // #1948: 경유가 있으면 출발과 도착 사이에 경유 행을 삽입한다.
-      if (draft.waypoint != null)
-        _NetworkMapRouteDraftField(
-          kind: _RouteDraftFieldKind.waypoint,
-          slot: RouteDraftSlot.waypoint,
-          station: draft.waypoint,
-          onClear: onClearWaypoint,
-          onPick: onPickWaypoint,
-          reorderTargets: targetsFor(RouteDraftSlot.waypoint),
-          onReorder: onReorderDraft,
+
+    // 경유 +: 출발·도착 중 하나만 있고 경유 행이 아직 없을 때.
+    final hasOrigin = draft.origin != null;
+    final hasDestination = draft.destination != null;
+    final canAddWaypoint = !showWaypointRow && (hasOrigin != hasDestination);
+
+    final originField = _NetworkMapRouteDraftField(
+      kind: _RouteDraftFieldKind.origin,
+      slot: RouteDraftSlot.origin,
+      station: draft.origin,
+      onClear: onClearOrigin,
+      onPick: onPickOrigin,
+      reorderTargets: targetsFor(RouteDraftSlot.origin),
+      onReorder: onReorderDraft,
+    );
+    final destinationField = _NetworkMapRouteDraftField(
+      kind: _RouteDraftFieldKind.destination,
+      slot: RouteDraftSlot.destination,
+      station: draft.destination,
+      onClear: onClearDestination,
+      onPick: onPickDestination,
+      reorderTargets: targetsFor(RouteDraftSlot.destination),
+      onReorder: onReorderDraft,
+    );
+
+    // 필드 열은 모두 같은 Expanded 폭. 지역은 열 밖에 두어 출발 행만 짧아지지 않게 한다.
+    final fieldRows = <Widget>[
+      _draftChromeRow(
+        leading: _draftIconButton(
+          key: const Key('networkMapRouteDraftBackButton'),
+          tooltip: '경로 입력 지우기',
+          icon: Icons.arrow_back,
+          onPressed: onClearDraft,
         ),
-      _NetworkMapRouteDraftField(
-        kind: _RouteDraftFieldKind.destination,
-        slot: RouteDraftSlot.destination,
-        station: draft.destination,
-        onClear: onClearDestination,
-        onPick: onPickDestination,
-        reorderTargets: targetsFor(RouteDraftSlot.destination),
-        onReorder: onReorderDraft,
+        field: originField,
+      ),
+      if (showWaypointRow)
+        _draftChromeRow(
+          leading: const SizedBox(width: _leadingWidth),
+          field: _NetworkMapRouteDraftField(
+            kind: _RouteDraftFieldKind.waypoint,
+            slot: RouteDraftSlot.waypoint,
+            station: draft.waypoint,
+            onClear: onClearWaypoint,
+            onPick: onPickWaypoint,
+            reorderTargets: targetsFor(RouteDraftSlot.waypoint),
+            onReorder: onReorderDraft,
+            showClearWhenEmpty: true,
+          ),
+        ),
+      _draftChromeRow(
+        leading: canAddWaypoint
+            ? _draftIconButton(
+                key: const Key('networkMapRouteDraftAddWaypoint'),
+                tooltip: '경유역 칸 추가',
+                icon: Icons.add,
+                onPressed: onOpenWaypointSlot,
+              )
+            : const SizedBox(width: _leadingWidth),
+        field: destinationField,
       ),
     ];
-    // #1948: 경유는 출발·도착 한 쌍이 정해진 뒤에 더하는 옵션이다. 출발/도착이
-    // 모두 차 있고 아직 경유가 없으며 추가가 가능할 때만 '경유 추가' 어포던스를
-    // 필드 아래 둔다(출발만 정한 중간 상태에서는 노출하지 않는다).
-    final showAddWaypoint =
-        draft.origin != null &&
-        draft.destination != null &&
-        draft.waypoint == null &&
-        onPickWaypoint != null;
+
+    // 노선홈 검색 행과 동일: 상·하 6(구분선↔박스 간격), 필드는 46 시각 높이.
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 2, 10, 4),
+      padding: const EdgeInsets.fromLTRB(4, 6, 8, 6),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 출발/도착 맞바꾸기(⇅). 참고 앱 상단 입력바의 스왑 어포던스와 같은 원리.
-          Semantics(
-            button: true,
-            enabled: canSwap,
-            label: '출발 도착 바꾸기',
-            onTap: canSwap ? onSwapDraft : null,
-            child: ExcludeSemantics(
-              child: IconButton(
-                key: const Key('networkMapRouteDraftSwap'),
-                tooltip: '출발 도착 바꾸기',
-                onPressed: canSwap ? onSwapDraft : null,
-                icon: const Icon(Icons.swap_vert, size: 22),
-                color: EasySubwayAccessibleColors.mutedText,
-                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-                padding: EdgeInsets.zero,
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
           Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                for (var i = 0; i < fields.length; i++) ...[
-                  if (i > 0) const SizedBox(height: 6),
-                  fields[i],
-                ],
-                if (showAddWaypoint) ...[
-                  const SizedBox(height: 6),
-                  _NetworkMapRouteDraftAddWaypoint(onTap: onPickWaypoint!),
+                for (var i = 0; i < fieldRows.length; i++) ...[
+                  if (i > 0) const SizedBox(height: _rowGap),
+                  fieldRows[i],
                 ],
               ],
             ),
           ),
           const SizedBox(width: 8),
-          Semantics(
-            key: const Key('networkMapRouteDraftRegionLabel'),
-            container: true,
-            label: '지역: $regionLabel',
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 148),
-              child: SizedBox(
-                height: EasySubwayTouchTarget.general,
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: Text(
-                    regionLabel,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF606060),
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
+          SizedBox(
+            height: _fieldMinHeight,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: _draftLockedRegionLabel(regionLabel),
             ),
           ),
         ],
       ),
     );
   }
-}
 
-/// #1948: 경유가 없을 때 노출되는 '경유 추가' 어포던스. 무채색·radius 8·splash
-/// 없음·터치 타깃 48. 탭 시 경유역 검색을 연다.
-class _NetworkMapRouteDraftAddWaypoint extends StatelessWidget {
-  const _NetworkMapRouteDraftAddWaypoint({required this.onTap});
+  /// 검색 모드 ← 와 같은 테두리 없는 아이콘 버튼.
+  static Widget _draftIconButton({
+    required Key key,
+    required String tooltip,
+    required IconData icon,
+    required VoidCallback? onPressed,
+  }) {
+    return SizedBox(
+      width: _leadingWidth,
+      height: _fieldMinHeight,
+      child: IconButton(
+        key: key,
+        tooltip: tooltip,
+        onPressed: onPressed,
+        style: IconButton.styleFrom(
+          minimumSize: const Size.square(EasySubwayTouchTarget.general),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          padding: EdgeInsets.zero,
+        ),
+        icon: Icon(icon, size: 26, color: const Color(0xFF4B4B4B)),
+      ),
+    );
+  }
 
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
+  /// 검색바 지역 라벨과 같은 톤의 잠김 표시(▾·탭 없음).
+  static Widget _draftLockedRegionLabel(String regionLabel) {
     return Semantics(
-      button: true,
-      label: '경유역 추가',
-      onTap: onTap,
+      label: '지역: $regionLabel, 변경할 수 없음',
       child: ExcludeSemantics(
-        child: GestureDetector(
-          key: const Key('networkMapRouteDraftAddWaypoint'),
-          behavior: HitTestBehavior.opaque,
-          onTap: onTap,
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 48),
-            decoration: BoxDecoration(
-              color: EasySubwayAccessibleColors.scaffoldSurface,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.add,
-                  size: 18,
-                  color: EasySubwayAccessibleColors.mutedText,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '경유 추가',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: EasySubwayAccessibleColors.mutedText,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
+        child: ConstrainedBox(
+          key: const Key('networkMapRouteDraftRegionLabel'),
+          constraints: const BoxConstraints(maxWidth: 88),
+          child: Text(
+            regionLabel,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.right,
+            style: const TextStyle(
+              color: Color(0xFF606060),
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
       ),
+    );
+  }
+
+  static Widget _draftChromeRow({
+    required Widget leading,
+    required Widget field,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        leading,
+        const SizedBox(width: 4),
+        Expanded(child: field),
+      ],
     );
   }
 }
@@ -5764,6 +5909,7 @@ class _NetworkMapRouteDraftField extends StatelessWidget {
     required this.reorderTargets,
     required this.onReorder,
     this.onPick,
+    this.showClearWhenEmpty = false,
   });
 
   final _RouteDraftFieldKind kind;
@@ -5782,14 +5928,14 @@ class _NetworkMapRouteDraftField extends StatelessWidget {
   /// G4: 이 칸(역명/플레이스홀더 영역)을 탭하면 역 검색을 연다. null이면 탭 불가.
   final VoidCallback? onPick;
 
-  String get _label => switch (kind) {
-    _RouteDraftFieldKind.origin => '출발',
-    _RouteDraftFieldKind.waypoint => '경유',
-    _RouteDraftFieldKind.destination => '도착',
-  };
+  /// 빈 경유 칸처럼 값이 없어도 ✕로 행을 닫을 때 true.
+  final bool showClearWhenEmpty;
 
-  /// #1985: 빈 행 placeholder 표시·낭독 문구('출발역'/'경유역'/'도착역').
-  String get _placeholderLabel => slot.displayLabel;
+  /// 칸 왼쪽 고정 역할 라벨('출발역'/'경유역'/'도착역').
+  String get _roleLabel => slot.displayLabel;
+
+  /// 값 영역 빈 칸 플레이스홀더.
+  String get _valuePlaceholder => '${slot.displayLabel} 입력';
 
   String get _searchLabel => '${slot.displayLabel} 검색';
 
@@ -5813,86 +5959,159 @@ class _NetworkMapRouteDraftField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = _label;
+    final roleLabel = _roleLabel;
     final filled = station != null;
-    // #1985: 빈 행은 placeholder 문구('출발역'/'경유역'/'도착역')를 표시한다.
-    final stationName = filled ? station!.displayName : _placeholderLabel;
-    // 접근성: 검색 진입 라벨을 "출발역 검색"/"경유역 검색"/"도착역 검색"으로 낭독한다.
+    final filledStation = station;
+    final showLineBadge = filledStation != null && filledStation.hasLine;
+    final lineForBadge = showLineBadge
+        ? StationSearchLine(
+            id: filledStation.lineId,
+            name: filledStation.lineName,
+            color: filledStation.lineColor,
+            stationCode: filledStation.stationCode,
+          )
+        : null;
+    // 값 영역: 비면 '출발역 입력', 채우면 역명(+호선 뱃지).
+    final valueText = filled ? filledStation!.displayName : _valuePlaceholder;
+    final lineNameLabel =
+        showLineBadge && filledStation.lineName.trim().isNotEmpty
+        ? filledStation.lineName.trim()
+        : null;
     final searchLabel = _searchLabel;
-    // #1985: 빈 행은 '역역' 중복을 피하려 검색 라벨(예: '출발역 검색')만 낭독한다.
+    final filledSemanticsCore = lineNameLabel == null
+        ? '$roleLabel $valueText'
+        : '$roleLabel $lineNameLabel $valueText';
     final pickSemanticsLabel = filled
-        ? '$label $stationName, $searchLabel'
-        : searchLabel;
-    final textRow = Row(
+        ? '$filledSemanticsCore, $searchLabel'
+        : '$roleLabel, $_valuePlaceholder, $searchLabel';
+
+    // 역할 라벨은 시각 전용·고정 폭(출발역 기준)이라 행마다 구분선이 어긋나지 않는다.
+    // 색은 길찾기/팬메뉴와 동일(출발 파랑·경유 주황·도착 빨강).
+    final roleColor = switch (kind) {
+      _RouteDraftFieldKind.origin => EasySubwayFanMenuColors.departure,
+      _RouteDraftFieldKind.waypoint => EasySubwayFanMenuColors.waypoint,
+      _RouteDraftFieldKind.destination => EasySubwayFanMenuColors.arrival,
+    };
+    final roleLabelWidget = ExcludeSemantics(
+      child: SizedBox(
+        width: 72,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Text(
+            roleLabel,
+            maxLines: 1,
+            softWrap: false,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: roleColor,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              height: 1.2,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final valueRow = Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
+        if (lineForBadge != null) ...[
+          StationLineBadge(line: lineForBadge, size: 26),
+          const SizedBox(width: 8),
+        ],
         Expanded(
           child: Text(
-            stationName,
+            valueText,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            style: TextStyle(
               color: filled
                   ? EasySubwayAccessibleColors.text
                   : EasySubwayAccessibleColors.mutedText,
+              fontSize: filled ? 17 : 15,
+              fontWeight: filled ? FontWeight.w700 : FontWeight.w600,
+              height: 1.2,
             ),
           ),
         ),
       ],
     );
-    // 역명/플레이스홀더 영역: onPick이 있으면 검색을 여는 버튼. 없으면 정보 표시만.
+
     final Widget pickArea = onPick == null
         ? Semantics(
-            // #1985: 빈 행은 '역역' 중복을 피하려 placeholder 문구만 낭독한다.
-            label: filled ? '$label $stationName' : _placeholderLabel,
-            child: ExcludeSemantics(child: textRow),
+            label: filled ? filledSemanticsCore : _valuePlaceholder,
+            child: ExcludeSemantics(
+              child: SizedBox(
+                height: easySubwaySearchFieldVisualHeight,
+                child: Center(child: valueRow),
+              ),
+            ),
           )
         : Semantics(
             button: true,
             label: pickSemanticsLabel,
             onTap: onPick,
             child: ExcludeSemantics(
-              // 탭 시 요란한 splash/highlight 사각형을 남기지 않는다(#1933 원칙).
-              // 입력 필드처럼 보이되 조용히 역 검색으로 전환.
               child: GestureDetector(
                 key: Key(_pickKey),
                 behavior: HitTestBehavior.opaque,
                 onTap: onPick,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 48),
-                  child: Center(child: textRow),
+                child: SizedBox(
+                  height: easySubwaySearchFieldVisualHeight,
+                  child: Center(child: valueRow),
                 ),
               ),
             ),
           );
+
+    // 검색 박스(heroStationSearch*)와 동일 높이·면·외곽선·radius로 UX 톤을 통일한다.
     final rowContainer = Container(
-      constraints: const BoxConstraints(minHeight: 54),
+      height: easySubwaySearchFieldVisualHeight,
       decoration: BoxDecoration(
-        color: EasySubwayAccessibleColors.scaffoldSurface,
-        borderRadius: BorderRadius.circular(8),
+        color: EasySubwayAccessibleColors.searchFieldSurface,
+        borderRadius: easySubwaySearchFieldRadius,
+        border: Border.all(
+          color: EasySubwayAccessibleColors.line,
+          width: easySubwaySearchFieldBorderWidth,
+        ),
       ),
-      child: Padding(
-        padding: const EdgeInsets.only(left: 14, right: 4),
+      clipBehavior: Clip.antiAlias,
+      child: IntrinsicHeight(
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(child: pickArea),
-            if (filled)
+            // 역할 라벨 구역(왼쪽 고정).
+            Align(alignment: Alignment.centerLeft, child: roleLabelWidget),
+            // 출발역 | 선택역 사이 경계(외곽선과 동일 톤·굵기).
+            Container(
+              width: easySubwaySearchFieldBorderWidth,
+              color: EasySubwayAccessibleColors.line,
+            ),
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 10,
+                  right: (filled || showClearWhenEmpty) ? 0 : 10,
+                ),
+                child: pickArea,
+              ),
+            ),
+            if (filled || showClearWhenEmpty)
               Semantics(
                 button: true,
-                label: '$label역 지우기',
+                label: filled ? '$roleLabel 지우기' : '$roleLabel 칸 닫기',
                 onTap: onClear,
                 child: ExcludeSemantics(
                   child: IconButton(
                     key: Key(_clearKey),
                     onPressed: onClear,
-                    // 작은 원형 배지형 지우기(✕) — 무채색. 탭 시 요란한
-                    // splash/highlight 사각형을 남기지 않는다(#1933 원칙).
                     style: IconButton.styleFrom(
                       splashFactory: NoSplash.splashFactory,
                       highlightColor: Colors.transparent,
                       backgroundColor: Colors.transparent,
                       elevation: 0,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
                     icon: Container(
                       width: 22,
@@ -5909,10 +6128,10 @@ class _NetworkMapRouteDraftField extends StatelessWidget {
                       ),
                     ),
                     constraints: const BoxConstraints(
-                      minWidth: 48,
-                      minHeight: 48,
+                      minWidth: 40,
+                      minHeight: 40,
                     ),
-                    padding: EdgeInsets.zero,
+                    padding: const EdgeInsets.only(right: 4),
                   ),
                 ),
               ),
@@ -5936,20 +6155,42 @@ class _NetworkMapRouteDraftField extends StatelessWidget {
           child: SizedBox(
             width: 220,
             child: Container(
-              constraints: const BoxConstraints(minHeight: 54),
+              height: easySubwaySearchFieldVisualHeight,
               decoration: BoxDecoration(
-                color: EasySubwayAccessibleColors.scaffoldSurface,
-                borderRadius: BorderRadius.circular(8),
+                color: EasySubwayAccessibleColors.searchFieldSurface,
+                borderRadius: easySubwaySearchFieldRadius,
+                border: Border.all(
+                  color: EasySubwayAccessibleColors.line,
+                  width: easySubwaySearchFieldBorderWidth,
+                ),
               ),
               alignment: Alignment.centerLeft,
               padding: const EdgeInsets.symmetric(horizontal: 14),
-              child: Text(
-                station!.displayName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: EasySubwayAccessibleColors.text,
-                ),
+              child: Row(
+                children: [
+                  Text(
+                    roleLabel,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: EasySubwayAccessibleColors.mutedText,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (lineForBadge != null) ...[
+                    StationLineBadge(line: lineForBadge, size: 30),
+                    const SizedBox(width: 8),
+                  ],
+                  Expanded(
+                    child: Text(
+                      station!.displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: EasySubwayAccessibleColors.text,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -5981,82 +6222,284 @@ class _NetworkMapRouteDraftField extends StatelessWidget {
   }
 }
 
-/// #1948: 출발/경유/도착으로 지정된 역 위에 말풍선형 draft 핀을 표시한다.
+/// #1948: 출발/경유/도착으로 지정된 역 위에 맵 핀을 표시한다.
+/// 실루엣 에셋 + 내부 팬 메뉴색 + 외곽선은 상단바 '수도권' 글자색(#606060).
+/// 뾰족한 끝은 [anchorSource](일반 노드/환승 캡슐 중심) 정중앙에 둔다.
 class _NetworkMapDraftPin extends StatelessWidget {
   const _NetworkMapDraftPin({
     super.key,
     required this.station,
-    required this.geometry,
+    required this.anchorSource,
     required this.camera,
     required this.label,
     required this.surfaceColor,
     required this.semanticSuffix,
+    required this.clearButtonKey,
+    required this.onClear,
+    this.ignorePointers = false,
   });
 
+  static const _assetPath = 'assets/illustrations/map_draft_pin.png';
+  // 에셋은 800², 끝점은 하단 중앙. 표시 크기는 터치·가독 균형.
+  static const _pinWidth = 52.0;
+  static const _pinHeight = 52.0;
+  static const _clearSize = 18.0;
+
+  /// 역할색 외곽 ≈1.5px 고정 두께(양옆 합 3px / 핀 폭).
+  static const _edgeStrokePx = 1.5;
+  static const _edgeScale = 1 + (2 * _edgeStrokePx) / _pinWidth;
+
+  /// soft drop: y 3 · blur 6 상당(sigma 3).
+  static const _shadowOffsetY = 3.0;
+  static const _shadowBlurSigma = 3.0;
+
+  /// ✕ soft drop: y 2 · blur 4 상당(sigma 2).
+  static const _clearShadowOffsetY = 2.0;
+  static const _clearShadowBlurSigma = 2.0;
+  static const _labelFontSize = 13.0;
+  static const _labelStrokeWidth = 3.0;
+
+  static Color _pinEdgeFor(Color fill) {
+    if (fill == EasySubwayFanMenuColors.departure) {
+      return EasySubwayFanMenuColors.pinEdgeDeparture;
+    }
+    if (fill == EasySubwayFanMenuColors.waypoint) {
+      return EasySubwayFanMenuColors.pinEdgeWaypoint;
+    }
+    return EasySubwayFanMenuColors.pinEdgeArrival;
+  }
+
   final NetworkMapStation station;
-  final _MapGeometry geometry;
+
+  /// geometry 원점 보정된 source 좌표. 환승이면 캡슐 중심.
+  final Offset anchorSource;
   final MapCameraState camera;
   final String label;
   final Color surfaceColor;
   final String semanticSuffix;
+  final Key clearButtonKey;
+  final VoidCallback onClear;
+
+  /// 줌/팬 제스처 중 핀치가 핀에 먹히지 않도록 포인터를 통과시킨다.
+  final bool ignorePointers;
 
   @override
   Widget build(BuildContext context) {
-    final stationPoint = camera.sourceToViewportPoint(
-      Offset(geometry.x(station), geometry.y(station)),
-    );
-    const width = 72.0;
-    const height = 40.0;
+    final anchorPoint = camera.sourceToViewportPoint(anchorSource);
+    // ✕는 핀 머리 우상단에 붙이므로, 핀 기준으로 여유를 둔다.
+    const hitPadLeft = 8.0;
+    const hitPadRight = 18.0;
+    const hitPadTop = 10.0;
+    const hitPadBottom = 0.0;
+    const hitWidth = _pinWidth + hitPadLeft + hitPadRight;
+    const hitHeight = _pinHeight + hitPadTop + hitPadBottom;
     final viewportWidth = camera.viewportSize.width;
-    final left = (stationPoint.dx - width / 2)
-        .clamp(12.0, math.max(12.0, viewportWidth - width - 12))
+    // 핀 이미지 하단 중앙(뾰족한 끝)이 앵커에 오도록 배치.
+    final pinLeft = anchorPoint.dx - _pinWidth / 2;
+    final pinTop = anchorPoint.dy - _pinHeight;
+    final hitLeft = (pinLeft - hitPadLeft)
+        .clamp(4.0, math.max(4.0, viewportWidth - hitWidth - 4))
         .toDouble();
-    final top = math.max(12.0, stationPoint.dy - height - 14);
-    final arrowLeft = (stationPoint.dx - left - 11).clamp(4.0, width - 26);
+    final hitTop = math.max(4.0, pinTop - hitPadTop);
+    final pinOffsetInHit = Offset(pinLeft - hitLeft, pinTop - hitTop);
+    // ✕는 카카오처럼 핀 머리 안쪽·약간 위에 붙인다. 터치 타깃은 그 중심 기준 56.
+    final clearVisualLeft = pinOffsetInHit.dx + _pinWidth - (_clearSize * 0.92);
+    final clearVisualTop = pinOffsetInHit.dy - (_clearSize * 0.42);
+    final clearHitLeft =
+        clearVisualLeft + _clearSize / 2 - EasySubwayTouchTarget.general / 2;
+    final clearHitTop =
+        clearVisualTop + _clearSize / 2 - EasySubwayTouchTarget.general / 2;
+    final edgeColor = _pinEdgeFor(surfaceColor);
     return Positioned(
-      left: left,
-      top: top,
-      width: width,
-      child: Semantics(
-        container: true,
-        label: '${station.displayName}, $semanticSuffix',
-        child: ExcludeSemantics(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Material(
-                color: surfaceColor,
-                elevation: 0,
-                borderRadius: BorderRadius.circular(6),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
+      left: hitLeft,
+      top: hitTop,
+      width: hitWidth,
+      height: hitHeight,
+      child: IgnorePointer(
+        ignoring: ignorePointers,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              left: pinOffsetInHit.dx,
+              top: pinOffsetInHit.dy,
+              width: _pinWidth,
+              height: _pinHeight,
+              child: Semantics(
+                container: true,
+                label: '${station.displayName}, $semanticSuffix',
+                child: ExcludeSemantics(
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    alignment: Alignment.center,
+                    children: [
+                      // soft drop → 역할색 외곽(≈1.5px) → 역할색 면.
+                      ImageFiltered(
+                        imageFilter: ImageFilter.blur(
+                          sigmaX: _shadowBlurSigma,
+                          sigmaY: _shadowBlurSigma,
+                          tileMode: TileMode.decal,
+                        ),
+                        child: Transform.translate(
+                          offset: const Offset(0, _shadowOffsetY),
+                          child: ColorFiltered(
+                            colorFilter: const ColorFilter.mode(
+                              EasySubwayFanMenuColors.pinShadow,
+                              BlendMode.srcIn,
+                            ),
+                            child: Image.asset(
+                              _assetPath,
+                              width: _pinWidth,
+                              height: _pinHeight,
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.high,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Transform.scale(
+                        scale: _edgeScale,
+                        child: ColorFiltered(
+                          colorFilter: ColorFilter.mode(
+                            edgeColor,
+                            BlendMode.srcIn,
+                          ),
+                          child: Image.asset(
+                            _assetPath,
+                            width: _pinWidth,
+                            height: _pinHeight,
+                            fit: BoxFit.contain,
+                            filterQuality: FilterQuality.high,
+                          ),
+                        ),
+                      ),
+                      ColorFiltered(
+                        colorFilter: ColorFilter.mode(
+                          surfaceColor,
+                          BlendMode.srcIn,
+                        ),
+                        child: Image.asset(
+                          _assetPath,
+                          width: _pinWidth,
+                          height: _pinHeight,
+                          fit: BoxFit.contain,
+                          filterQuality: FilterQuality.high,
+                        ),
+                      ),
+                      // 라벨: 흰 글자 + 핀색 외곽선.
+                      Align(
+                        alignment: const Alignment(0, -0.28),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Text(
+                                  label,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 1,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: _labelFontSize,
+                                    height: 1.0,
+                                    foreground: Paint()
+                                      ..style = PaintingStyle.stroke
+                                      ..strokeWidth = _labelStrokeWidth
+                                      ..strokeJoin = StrokeJoin.round
+                                      ..color = surfaceColor,
+                                  ),
+                                ),
+                                Text(
+                                  label,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 1,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: _labelFontSize,
+                                    height: 1.0,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  child: Text(
-                    label,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 11,
+                ),
+              ),
+            ),
+            Positioned(
+              left: clearHitLeft,
+              top: clearHitTop,
+              width: EasySubwayTouchTarget.general,
+              height: EasySubwayTouchTarget.general,
+              child: Semantics(
+                button: true,
+                label: '$label 지우기',
+                onTap: onClear,
+                child: ExcludeSemantics(
+                  child: GestureDetector(
+                    key: clearButtonKey,
+                    behavior: HitTestBehavior.opaque,
+                    onTap: onClear,
+                    child: Center(
+                      child: SizedBox(
+                        width: _clearSize + 4,
+                        height: _clearSize + 4,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          clipBehavior: Clip.none,
+                          children: [
+                            ImageFiltered(
+                              imageFilter: ImageFilter.blur(
+                                sigmaX: _clearShadowBlurSigma,
+                                sigmaY: _clearShadowBlurSigma,
+                                tileMode: TileMode.decal,
+                              ),
+                              child: Transform.translate(
+                                offset: const Offset(0, _clearShadowOffsetY),
+                                child: Container(
+                                  width: _clearSize,
+                                  height: _clearSize,
+                                  decoration: const BoxDecoration(
+                                    color:
+                                        EasySubwayFanMenuColors.pinClearShadow,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Container(
+                              width: _clearSize,
+                              height: _clearSize,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: EasySubwayFanMenuColors.pinClearBg,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: EasySubwayFanMenuColors.pinClearBorder,
+                                  width: 1,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.close_rounded,
+                                size: 11,
+                                color: EasySubwayFanMenuColors.pinClearInk,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Padding(
-                  padding: EdgeInsets.only(left: arrowLeft),
-                  child: Icon(
-                    Icons.arrow_drop_down,
-                    size: 22,
-                    color: surfaceColor,
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -6253,6 +6696,30 @@ Map<String, List<NetworkMapLine>> _stationLinesById(NetworkMapData data) {
     }
   }
   return stationLinesById;
+}
+
+RouteDraftStation _routeDraftStationFromMapStation(
+  NetworkMapStation station,
+  NetworkMapData? data,
+) {
+  NetworkMapLine? line;
+  final lineId = station.lineId.trim();
+  if (data != null && lineId.isNotEmpty) {
+    for (final candidate in data.lines) {
+      if (candidate.id == lineId) {
+        line = candidate;
+        break;
+      }
+    }
+  }
+  return RouteDraftStation(
+    id: station.id,
+    nameKo: station.nameKo,
+    lineId: lineId,
+    lineName: line?.name ?? '',
+    lineColor: line?.color ?? '',
+    stationCode: station.stationCode,
+  );
 }
 
 NetworkMapStation? _stationById(

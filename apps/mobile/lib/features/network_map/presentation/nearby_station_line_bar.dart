@@ -58,7 +58,8 @@ class NearbyStationLineBar extends StatelessWidget {
         final endRadius = barHeight / 2;
         final capsuleWidth = centerWidth;
         final capsuleHeight = capsuleWidth * 41 / 129;
-        final badgeDiameter = capsuleWidth * 0.14;
+        final badgeDiameter = capsuleWidth * 0.18;
+        final stationNameSize = (capsuleHeight * 0.42).clamp(16.0, 20.0);
         return Padding(
           padding: const EdgeInsets.only(top: 18),
           child: Center(
@@ -116,10 +117,11 @@ class NearbyStationLineBar extends StatelessWidget {
                             stationName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Color(0xFF2C2C2C),
-                              fontSize: 15,
+                            style: TextStyle(
+                              color: const Color(0xFF102A2C),
+                              fontSize: stationNameSize,
                               fontWeight: FontWeight.w800,
+                              height: 1.1,
                             ),
                           ),
                         ),

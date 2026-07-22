@@ -31,12 +31,18 @@ class DemoFavoriteStationRepository implements FavoriteStationRepository {
   }
 
   @override
-  Future<FavoriteStation> saveFavoriteStation(String stationId) async {
+  Future<FavoriteStation> saveFavoriteStation(
+    String stationId, {
+    String? lineId,
+  }) async {
     return _station;
   }
 
   @override
-  Future<void> removeFavoriteStation(String stationId) async {}
+  Future<void> removeFavoriteStation(
+    String stationId, {
+    String? lineId,
+  }) async {}
 }
 
 class DemoFavoriteFacilityRepository implements FavoriteFacilityRepository {

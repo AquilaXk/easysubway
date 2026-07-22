@@ -171,7 +171,9 @@ void main() {
     // 수도권 필터: 수도권 역만 남는다.
     expect(find.text('상록수역'), findsOneWidget);
     expect(
-      find.byKey(const Key('stationSearchResult-station-busan-jungang')),
+      find.byKey(
+        const Key('stationSearchResult-station-busan-jungang-busan-1'),
+      ),
       findsNothing,
     );
 
@@ -190,7 +192,9 @@ void main() {
     // 부산 필터: 부산권 역만 남고, 홈 노선도 동기화용 콜백도 같은 지역 키를 받는다.
     expect(find.text('상록수역'), findsNothing);
     expect(
-      find.byKey(const Key('stationSearchResult-station-busan-jungang')),
+      find.byKey(
+        const Key('stationSearchResult-station-busan-jungang-busan-1'),
+      ),
       findsOneWidget,
     );
     expect(changedRegions, ['부산']);
@@ -532,7 +536,7 @@ void main() {
       expect(repository.requestedQueries, ['상록수']);
       expect(searchHistoryRepository.recordedQueries, ['상록수']);
       expect(
-        find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+        find.byKey(const Key('stationSearchResult-station-sangnoksu-seoul-4')),
         findsOneWidget,
       );
       expect(
@@ -716,7 +720,25 @@ void main() {
     expect(find.text('+3'), findsNothing);
     expect(find.byKey(const Key('stationLineBadgeOverflow')), findsNothing);
     expect(
-      find.byKey(const Key('stationSearchResult-station-transfer')),
+      find.byKey(const Key('stationSearchResult-station-transfer-seoul-4')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(
+        const Key(
+          'stationSearchResult-station-transfer-korail-gyeongui-jungang',
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(
+        const Key('stationSearchResult-station-transfer-suin-bundang'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('stationSearchResult-station-transfer-shinbundang')),
       findsOneWidget,
     );
     await expectLater(tester, meetsGuideline(androidTapTargetGuideline));

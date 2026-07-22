@@ -184,9 +184,14 @@ class StationSearchException implements Exception {
 abstract class FavoriteStationRepository {
   Future<List<FavoriteStation>> listFavoriteStations();
 
-  Future<FavoriteStation> saveFavoriteStation(String stationId);
+  /// [lineId]가 있으면 호선+역 단위로 저장. 없거나 빈 값이면 역 전체(레거시).
+  Future<FavoriteStation> saveFavoriteStation(
+    String stationId, {
+    String? lineId,
+  });
 
-  Future<void> removeFavoriteStation(String stationId);
+  /// [lineId]가 있으면 해당 호선만 해제. 없거나 빈 값이면 그 역 전체 해제.
+  Future<void> removeFavoriteStation(String stationId, {String? lineId});
 }
 
 class FavoriteStationException implements Exception {

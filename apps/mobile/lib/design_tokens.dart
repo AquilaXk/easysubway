@@ -153,21 +153,47 @@ class EasySubwayTokens extends ThemeExtension<EasySubwayTokens> {
   }
 }
 
-/// 방사형 역 액션 메뉴(#2109) 전용 색. 오너 제작 SVG 원본 수치를 그대로
-/// 옮긴 화면 로컬 톤이라 [EasySubwayTokens] 의미 토큰으로 수렴하지 않는다
-/// (design_guard_test.dart 로컬 색 상수 ratchet 해소 경로).
+/// 경로 역할색(팬메뉴·출발/경유/도착 라벨·물방울 핀 공통).
+///
+/// Palette A — City Sophistication (2026-07-22):
+/// 흰 노선도·교통약자 UX에 맞춰 원색 힘을 빼고 선명도만 남긴 시티 톤.
+/// (Palette B 네온 틸/마젠타는 노선색 충돌·고령 시인성 리스크로 보류.)
+/// 예전 SVG 원본(`#176FD1`/`#BF5700`/`#D9252E`)은 탁·갈색으로 보여 폐기.
+/// [EasySubwayTokens] 의미 토큰으로 수렴하지 않는다(design_guard 로컬 상수).
 abstract final class EasySubwayFanMenuColors {
   static const disabledOpacity = 0.40;
   static const pressedOpacity = 0.84;
-  static const departure = Color(0xFF176FD1);
-  static const departureSurface = Color(0xFFF7FAFF);
-  static const departurePressed = Color(0xFFEAF3FF);
-  static const waypoint = Color(0xFFBF5700);
-  static const waypointSurface = Color(0xFFFFFAF4);
-  static const waypointPressed = Color(0xFFFFF0DE);
-  static const arrival = Color(0xFFD9252E);
-  static const arrivalSurface = Color(0xFFFFF8F8);
-  static const arrivalPressed = Color(0xFFFFECEE);
+
+  /// City Sky — 맑고 살짝 보랏빛 도는 모던 스카이 블루.
+  static const departure = Color(0xFF0A84FF);
+  static const departureSurface = Color(0xFFF2F8FF);
+  static const departurePressed = Color(0xFFE1F0FF);
+
+  /// Amber Gold — 갈색 없는 선명한 엠버. 경유 역할이 한눈에 구분되게.
+  static const waypoint = Color(0xFFFF9F0A);
+  static const waypointSurface = Color(0xFFFFF8ED);
+  static const waypointPressed = Color(0xFFFFEFCC);
+
+  /// Coral Burst — 화사한 코랄 레드. 도착 주목도↑·답답함↓.
+  static const arrival = Color(0xFFFF3B30);
+  static const arrivalSurface = Color(0xFFFFF5F4);
+  static const arrivalPressed = Color(0xFFFFE8E6);
+
+  /// 물방울 핀 soft drop — rgba(0,0,0,0.25), Y:3, Blur:6.
+  static const pinShadow = Color(0x40000000);
+
+  /// 역할색보다 한 톤 진한 외곽(참조: 블루 면 `#2B66F6` → 선 `#1A429F` 대비).
+  static const pinEdgeDeparture = Color(0xFF0654A1);
+  static const pinEdgeWaypoint = Color(0xFFA16506);
+  static const pinEdgeArrival = Color(0xFFA1251E);
+
+  /// ✕ — 흰 원 + 헤어라인 + 차분한 잉크.
+  static const pinClearBg = Color(0xFFFFFFFF);
+  static const pinClearBorder = Color(0xFFE5E5E5);
+  static const pinClearInk = Color(0xFF666666);
+
+  /// ✕ soft drop — rgba(0,0,0,0.15), Y:2, Blur:4.
+  static const pinClearShadow = Color(0x26000000);
   static const closeSurface = Color(0xFFF5F7FA);
   static const closePressed = Color(0xFFE9EDF2);
   static const closeInk = Color(0xFF475467);

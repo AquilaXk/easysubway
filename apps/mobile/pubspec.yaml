@@ -85,6 +85,7 @@ flutter:
     - assets/branding/app_icon/app_icon.png
     - assets/illustrations/empty_notices.png
     - assets/illustrations/empty_recent_search_warning.png
+    - assets/illustrations/map_draft_pin.png
     - assets/datapacks/index.json
     - assets/datapacks/core.sqlite.gz
     - assets/datapacks/capital.sqlite.gz

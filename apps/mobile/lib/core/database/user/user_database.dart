@@ -37,7 +37,7 @@ class UserDatabase extends _$UserDatabase {
   }
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration {
@@ -77,6 +77,42 @@ class UserDatabase extends _$UserDatabase {
               searched_at INTEGER NOT NULL
             )
           ''');
+        }
+        if (from < 4) {
+          // 즐겨찾기 역을 호선+역 단위로 분리한다. 기존 행은 line_id=''(역 전체).
+          // schema 2→3 최소 fixture처럼 favorite_stations가 없을 수 있다.
+          final existingFavoriteStations = await customSelect('''
+            SELECT name FROM sqlite_master
+            WHERE type = 'table' AND name = 'favorite_stations'
+          ''').get();
+          if (existingFavoriteStations.isEmpty) {
+            await customStatement('''
+              CREATE TABLE favorite_stations (
+                station_id TEXT NOT NULL,
+                line_id TEXT NOT NULL DEFAULT '',
+                added_at INTEGER NOT NULL,
+                PRIMARY KEY (station_id, line_id)
+              )
+            ''');
+          } else {
+            await customStatement('''
+              CREATE TABLE favorite_stations_v4 (
+                station_id TEXT NOT NULL,
+                line_id TEXT NOT NULL DEFAULT '',
+                added_at INTEGER NOT NULL,
+                PRIMARY KEY (station_id, line_id)
+              )
+            ''');
+            await customStatement('''
+              INSERT INTO favorite_stations_v4 (station_id, line_id, added_at)
+              SELECT station_id, '', CAST(added_at AS INTEGER)
+              FROM favorite_stations
+            ''');
+            await customStatement('DROP TABLE favorite_stations');
+            await customStatement(
+              'ALTER TABLE favorite_stations_v4 RENAME TO favorite_stations',
+            );
+          }
         }
       },
       beforeOpen: (_) async {

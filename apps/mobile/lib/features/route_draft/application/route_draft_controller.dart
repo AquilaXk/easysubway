@@ -5,7 +5,23 @@ import '../domain/route_draft.dart';
 class RouteDraftController extends ChangeNotifier {
   RouteDraft _draft = const RouteDraft.empty();
 
+  /// 경유 칸이 비어 있어도 출발·도착 사이에 행을 보여줄지.
+  /// [openWaypointSlot]으로 열고, 역을 채우거나 [clearWaypoint]로 닫는다.
+  bool _waypointSlotOpen = false;
+
   RouteDraft get draft => _draft;
+
+  /// 경유 행 표시 여부(빈 칸 포함).
+  bool get isWaypointRowVisible => _waypointSlotOpen || _draft.waypoint != null;
+
+  /// 출발·도착 사이에 빈 경유 칸을 연다. 이미 열려 있거나 경유가 있으면 no-op.
+  void openWaypointSlot() {
+    if (_waypointSlotOpen || _draft.waypoint != null) {
+      return;
+    }
+    _waypointSlotOpen = true;
+    notifyListeners();
+  }
 
   void setOrigin(RouteDraftStation station) {
     // 같은 역이 다른 슬롯(도착·경유)에 이미 있으면 지정을 거부한다. 같은 슬롯
@@ -41,6 +57,7 @@ class RouteDraftController extends ChangeNotifier {
         station.id == _draft.destination?.id) {
       return;
     }
+    _waypointSlotOpen = true;
     _draft = RouteDraft(
       origin: _draft.origin,
       destination: _draft.destination,
@@ -60,6 +77,10 @@ class RouteDraftController extends ChangeNotifier {
       waypoint: _draft.waypoint,
       lastModifiedAt: DateTime.now(),
     );
+    // 마지막 역을 지워 draft가 비면 빈 경유 칸도 닫아 검색바 모드와 상태를 맞춘다.
+    if (_draft.isEmpty) {
+      _waypointSlotOpen = false;
+    }
     notifyListeners();
   }
 
@@ -73,19 +94,27 @@ class RouteDraftController extends ChangeNotifier {
       waypoint: _draft.waypoint,
       lastModifiedAt: DateTime.now(),
     );
+    if (_draft.isEmpty) {
+      _waypointSlotOpen = false;
+    }
     notifyListeners();
   }
 
   void clearWaypoint() {
-    if (_draft.waypoint == null) {
+    final hadStation = _draft.waypoint != null;
+    final hadSlot = _waypointSlotOpen;
+    if (!hadStation && !hadSlot) {
       return;
     }
-    _draft = RouteDraft(
-      origin: _draft.origin,
-      destination: _draft.destination,
-      waypoint: null,
-      lastModifiedAt: DateTime.now(),
-    );
+    _waypointSlotOpen = false;
+    if (hadStation) {
+      _draft = RouteDraft(
+        origin: _draft.origin,
+        destination: _draft.destination,
+        waypoint: null,
+        lastModifiedAt: DateTime.now(),
+      );
+    }
     notifyListeners();
   }
 
@@ -203,9 +232,10 @@ class RouteDraftController extends ChangeNotifier {
   }
 
   void clear() {
-    if (_draft.isEmpty) {
+    if (_draft.isEmpty && !_waypointSlotOpen) {
       return;
     }
+    _waypointSlotOpen = false;
     _draft = const RouteDraft.empty();
     notifyListeners();
   }
