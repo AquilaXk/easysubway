@@ -3,11 +3,6 @@ set_real_ip_from ${EASYSUBWAY_ROUTE_V2_TRUSTED_PROXY_CIDR};
 real_ip_header CF-Connecting-IP;
 real_ip_recursive on;
 
-map $http_x_correlation_id $route_v2_correlation_id {
-	default $http_x_correlation_id;
-	"" $request_id;
-}
-
 limit_req_zone $binary_remote_addr zone=route_session_ip:10m rate=${EASYSUBWAY_ROUTE_V2_SESSION_RATE_PER_MINUTE}r/m;
 limit_req_zone $binary_remote_addr zone=route_search_ip:10m rate=${EASYSUBWAY_ROUTE_V2_SEARCH_RATE_PER_MINUTE}r/m;
 limit_req_zone $http_authorization zone=route_search_token:10m rate=${EASYSUBWAY_ROUTE_V2_SEARCH_RATE_PER_MINUTE}r/m;
@@ -43,8 +38,8 @@ server {
 		default_type application/json;
 		add_header Retry-After 60 always;
 		add_header Cache-Control "private, no-store" always;
-		add_header X-Correlation-Id $route_v2_correlation_id always;
-		return 429 '{"success":false,"code":"ROUTE_RATE_LIMITED","message":"잠시 후 다시 시도","correlationId":"$route_v2_correlation_id"}';
+		add_header X-Correlation-Id $request_id always;
+		return 429 '{"success":false,"code":"ROUTE_RATE_LIMITED","message":"잠시 후 다시 시도","correlationId":"$request_id"}';
 	}
 
 	location @route_search_rate_limited {
@@ -52,8 +47,8 @@ server {
 		default_type application/json;
 		add_header Retry-After 60 always;
 		add_header Cache-Control "private, no-store" always;
-		add_header X-Correlation-Id $route_v2_correlation_id always;
-		return 429 '{"success":false,"code":"ROUTE_RATE_LIMITED","message":"잠시 후 다시 시도","correlationId":"$route_v2_correlation_id"}';
+		add_header X-Correlation-Id $request_id always;
+		return 429 '{"success":false,"code":"ROUTE_RATE_LIMITED","message":"잠시 후 다시 시도","correlationId":"$request_id"}';
 	}
 
 	location / {
