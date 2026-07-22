@@ -504,8 +504,8 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, standby 승격
   assert.match(deploy, /tools\/ops\/postgres-backup\.sh/);
   assert.match(deploy, /EASYSUBWAY_BACKEND_ENV_FILE="\$\{BACKEND_ENV\}"/);
   assert.match(deploy, /RUNTIME_SERVICES=\(backend back-worker route-v2-gateway\)/);
-  assert.match(deploy, /OBSERVABILITY_SERVICES=\(public-edge-probe docker-runtime-probe alertmanager prometheus loki grafana\)/);
-  assert.match(deploy, /OBSERVABILITY_CONFIG_SERVICES=\(alertmanager prometheus loki grafana\)/);
+  assert.match(deploy, /OBSERVABILITY_SERVICES=\(public-edge-probe docker-runtime-probe alertmanager prometheus loki grafana alloy\)/);
+  assert.match(deploy, /OBSERVABILITY_CONFIG_SERVICES=\(alertmanager prometheus loki grafana alloy\)/);
   assert.match(deploy, /EASYSUBWAY_ALERTMANAGER_CONFIG_FILE=/);
   assert.match(deploy, /write_alertmanager_config "\$\{tmp_env_set\}\/alertmanager\.yml"/);
   assert.match(deploy, /chmod 600 "\$\{tmp_env_set\}\/compose\.env" "\$\{tmp_env_set\}\/backend\.env" "\$\{tmp_env_set\}\/metadata\.env"/);
@@ -522,7 +522,7 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, standby 승격
   assert.match(deploy, /--profile observability up -d --no-build --force-recreate "\$\{OBSERVABILITY_CONFIG_SERVICES\[@\]\}" \|\| return 1/);
   assert.match(deploy, /--profile observability up -d --no-build --force-recreate alertmanager \|\| return 1/);
   assert.match(deploy, /if \[\[ "\$\{current_env_hash\}" != "\$\{target_env_hash\}" \]\]; then/);
-  assert.match(deploy, /git diff --quiet "\$\{current_sha\}" "\$\{DEPLOY_SHA\}" -- infra\/prometheus infra\/alertmanager\/templates infra\/loki infra\/grafana\/provisioning/);
+  assert.match(deploy, /git diff --quiet "\$\{current_sha\}" "\$\{DEPLOY_SHA\}" -- infra\/prometheus infra\/alertmanager\/templates infra\/loki infra\/grafana\/provisioning infra\/alloy/);
   assert.doesNotMatch(deploy, /--force-recreate "\$\{OBSERVABILITY_SERVICES\[@\]\}"/);
   assert.match(deploy, /verify_runtime_hardening\(\)/);
   assert.match(deploy, /runtime_services_hardened\(\)/);

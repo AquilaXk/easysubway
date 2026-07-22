@@ -12069,6 +12069,22 @@ test("로컬 로그 관측성 스택은 Loki 기준선을 제공한다", () => {
   assert.match(errorOpsDashboard, /"name":\s*"correlationId"/);
   assert.match(errorOpsDashboard, /"legendFormat":\s*"burn 3d"/);
   assert.match(compose, /alloy:[\s\S]*healthcheck:[\s\S]*localhost:12345\/-\/ready/);
+  const deployBackend = read("tools/deploy/deploy-backend.sh");
+  assert.match(
+    deployBackend,
+    /OBSERVABILITY_SERVICES=\([^)]*\balloy\b[^)]*\)/,
+    "deploy-backend must start Alloy in the observability profile",
+  );
+  assert.match(
+    deployBackend,
+    /OBSERVABILITY_CONFIG_SERVICES=\([^)]*\balloy\b[^)]*\)/,
+    "deploy-backend must recreate Alloy when observability config changes",
+  );
+  assert.match(
+    deployBackend,
+    /git diff --quiet "\$\{current_sha\}" "\$\{DEPLOY_SHA\}" --[\s\S]*infra\/alloy/,
+    "deploy-backend must treat infra/alloy changes as observability config recreate",
+  );
   assert.match(compose, /\/var\/lib\/docker\/containers:\/var\/lib\/docker\/containers:ro/);
 });
 
