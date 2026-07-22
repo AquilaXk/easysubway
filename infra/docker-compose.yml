@@ -45,8 +45,7 @@ services:
     read_only: true
     tmpfs:
       - /tmp:rw,nosuid,nodev
-    volumes:
-      - backend-logs:/opt/easysubway/logs
+      - /opt/easysubway/logs:rw,nosuid,nodev,uid=10001,gid=10001,mode=0755,size=2147483648
     cap_drop:
       - ALL
     security_opt:
@@ -95,8 +94,7 @@ services:
     read_only: true
     tmpfs:
       - /tmp:rw,nosuid,nodev
-    volumes:
-      - backend-standby-logs:/opt/easysubway/logs
+      - /opt/easysubway/logs:rw,nosuid,nodev,uid=10001,gid=10001,mode=0755,size=2147483648
     cap_drop:
       - ALL
     security_opt:
@@ -130,8 +128,7 @@ services:
     read_only: true
     tmpfs:
       - /tmp:rw,nosuid,nodev
-    volumes:
-      - back-worker-logs:/opt/easysubway/logs
+      - /opt/easysubway/logs:rw,nosuid,nodev,uid=10001,gid=10001,mode=0755,size=2147483648
     cap_drop:
       - ALL
     security_opt:
@@ -324,6 +321,3 @@ volumes:
   prometheus-data:
   loki-data:
   grafana-data:
-  backend-logs:
-  backend-standby-logs:
-  back-worker-logs:
