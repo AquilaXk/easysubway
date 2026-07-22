@@ -4,8 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../accessible_design.dart';
-import '../../../app/app_components.dart';
-import '../../../design_tokens.dart';
 import '../../../mobile_error_reporter.dart';
 import '../../../user_data_deletion.dart';
 import '../../account/presentation/user_data_deletion_screen.dart';
@@ -116,72 +114,78 @@ class SupportAccessScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final deletionChildren = <Widget>[
+      if (userDataDeletionRepository != null)
+        UserDataDeletionAccessItem(
+          repository: userDataDeletionRepository!,
+          onDeleted: onUserDataDeleted,
+        )
+      else if (buildSupportMailtoUri(
+            email: accessInfo.dataDeletionEmail,
+            subject: '쉬운 지하철 내 정보 삭제 요청',
+          ) !=
+          null)
+        _SupportAccessItem(
+          key: const Key('dataDeletionAccessItem'),
+          title: '내 정보 삭제 요청',
+          value: accessInfo.dataDeletionEmail,
+          displayValue: '이메일 보내기',
+          uri: buildSupportMailtoUri(
+            email: accessInfo.dataDeletionEmail,
+            subject: '쉬운 지하철 내 정보 삭제 요청',
+          ),
+          launcher: launcher,
+        ),
+    ];
+
     return Scaffold(
-      appBar: AppBar(title: const Text('도움말·문의')),
+      key: const Key('supportAccessScreen'),
+      backgroundColor: EasySubwayAccessibleColors.surface,
+      appBar: AppBar(
+        key: const Key('supportAccessAppBar'),
+        title: const Text('도움말'),
+        toolbarHeight: 60,
+        backgroundColor: EasySubwayAccessibleColors.topBarSurface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        leading: IconButton(
+          key: const Key('supportAccessBackButton'),
+          tooltip: '뒤로',
+          onPressed: () => Navigator.of(context).maybePop(),
+          style: IconButton.styleFrom(
+            minimumSize: const Size.square(EasySubwayTouchTarget.general),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            padding: EdgeInsets.zero,
+          ),
+          icon: const Icon(
+            Icons.arrow_back,
+            size: 26,
+            color: Color(0xFF4B4B4B),
+          ),
+        ),
+        flexibleSpace: const Align(
+          alignment: Alignment.bottomCenter,
+          child: EasySubwayHeaderDivider(
+            key: Key('supportAccessHeaderDivider'),
+          ),
+        ),
+      ),
       body: SafeArea(
         child: ListView(
-          padding: mainPagePadding,
+          padding: const EdgeInsets.only(bottom: 32),
           children: [
-            const _SupportSectionTitle(title: '내 정보와 개인정보'),
-            _SupportGroupCard(
-              children: [
-                if (userDataDeletionRepository != null)
-                  UserDataDeletionAccessItem(
-                    repository: userDataDeletionRepository!,
-                    onDeleted: onUserDataDeleted,
-                  )
-                else if (_mailtoUri(
-                      accessInfo.dataDeletionEmail,
-                      '쉬운 지하철 내 정보 삭제 요청',
-                    ) !=
-                    null)
-                  _SupportAccessItem(
-                    key: const Key('dataDeletionAccessItem'),
-                    icon: Icons.delete_outline,
-                    title: '내 정보 삭제 요청',
-                    value: accessInfo.dataDeletionEmail,
-                    displayValue: '이메일 보내기',
-                    uri: _mailtoUri(
-                      accessInfo.dataDeletionEmail,
-                      '쉬운 지하철 내 정보 삭제 요청',
-                    ),
-                    launcher: launcher,
-                  ),
-              ],
+            if (deletionChildren.isNotEmpty)
+              _SupportSettingsSection(
+                key: const Key('supportSection-privacy'),
+                title: '내 정보와 개인정보',
+                children: deletionChildren,
+              ),
+            _SupportSettingsSection(
+              key: const Key('supportSection-safety'),
+              title: '이동 전 살펴보기',
+              children: const [_SafetyDataNotice()],
             ),
-            const SizedBox(height: 20),
-            const _SupportSectionTitle(title: '이동 전 살펴보기'),
-            const _SafetyDataNotice(),
-            const SizedBox(height: 20),
-            const _SupportSectionTitle(title: '문의'),
-            _SupportGroupCard(
-              children: [
-                if (_mailtoUri(accessInfo.supportEmail, '쉬운 지하철 고객지원 문의') !=
-                    null)
-                  _SupportAccessItem(
-                    key: const Key('supportAccessItem'),
-                    icon: Icons.support_agent,
-                    title: '고객지원',
-                    value: accessInfo.supportEmail,
-                    displayValue: '이메일 보내기',
-                    uri: _mailtoUri(accessInfo.supportEmail, '쉬운 지하철 고객지원 문의'),
-                    launcher: launcher,
-                  ),
-                if (_mailtoUri(accessInfo.securityEmail, '쉬운 지하철 보안 문의') !=
-                    null)
-                  _SupportAccessItem(
-                    key: const Key('securityContactAccessItem'),
-                    icon: Icons.security_outlined,
-                    title: '보안 문의',
-                    value: accessInfo.securityEmail,
-                    displayValue: '보안 문제 알리기',
-                    uri: _mailtoUri(accessInfo.securityEmail, '쉬운 지하철 보안 문의'),
-                    launcher: launcher,
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const _SecurityContactNotice(),
           ],
         ),
       ),
@@ -189,160 +193,55 @@ class SupportAccessScreen extends StatelessWidget {
   }
 }
 
-class _SupportSectionTitle extends StatelessWidget {
-  const _SupportSectionTitle({required this.title});
+class _SupportSettingsSection extends StatelessWidget {
+  const _SupportSettingsSection({
+    required this.title,
+    required this.children,
+    super.key,
+  });
 
   final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Semantics(
-        header: true,
-        child: Text(
-          title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: EasySubwayAccessibleColors.text,
-            fontWeight: FontWeight.w700,
-            height: 1.25,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SupportGroupCard extends StatelessWidget {
-  const _SupportGroupCard({required this.children});
-
   final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
-    // 연결 가능한 항목이 없으면(전 항목 숨김) 빈 테두리 카드를 그리지 않는다.
-    if (children.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    final rows = <Widget>[];
-    for (var i = 0; i < children.length; i++) {
-      rows.add(children[i]);
-      if (i != children.length - 1) {
-        rows.add(
-          const Divider(height: 1, color: EasySubwayAccessibleColors.line),
-        );
-      }
-    }
-    return Container(
-      decoration: BoxDecoration(
-        color: EasySubwayAccessibleColors.surface,
-        border: Border.all(color: EasySubwayAccessibleColors.line),
-        borderRadius: const BorderRadius.all(
-          Radius.circular(EasySubwayRadius.sheet),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: rows,
-        ),
-      ),
-    );
-  }
-}
-
-class _SecurityContactNotice extends StatelessWidget {
-  const _SecurityContactNotice();
-
-  static const _title = '보안 문의 안내';
-  static const _contactNotice = '앱 보안이나 개인정보가 걱정되면 문의로 알려주세요.';
-  static const _scopeNotice = '위치, 제보 사진, 알림, 개인정보 관련 걱정을 함께 보낼 수 있습니다.';
-
-  @override
-  Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return Semantics(
-      key: const Key('securityContactNotice'),
-      container: true,
-      label: '$_title, $_contactNotice $_scopeNotice',
-      child: ExcludeSemantics(
-        child: Container(
-          decoration: const BoxDecoration(
-            border: Border(
-              top: BorderSide(color: EasySubwayAccessibleColors.line),
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(
-                      Icons.security_outlined,
-                      color: EasySubwayAccessibleColors.brand,
-                      size: 24,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        _title,
-                        style: textTheme.titleMedium?.copyWith(
-                          color: EasySubwayAccessibleColors.text,
-                          fontWeight: FontWeight.w700,
-                          height: 1.25,
-                        ),
-                      ),
-                    ),
-                  ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ColoredBox(
+          key: Key('supportSectionHeader-$title'),
+          color: EasySubwayAccessibleColors.scaffoldSurface,
+          child: SizedBox(
+            width: double.infinity,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+              child: Semantics(
+                header: true,
+                child: Text(
+                  title,
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: EasySubwayAccessibleColors.secondaryText,
+                    fontWeight: FontWeight.w700,
+                    height: 1.25,
+                  ),
                 ),
-                const SizedBox(height: 10),
-                const _SecurityContactNoticeLine(text: _contactNotice),
-                const _SecurityContactNoticeLine(text: _scopeNotice),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SecurityContactNoticeLine extends StatelessWidget {
-  const _SecurityContactNoticeLine({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Padding(
-            padding: EdgeInsets.only(top: 7),
-            child: Icon(
-              Icons.circle,
-              size: 7,
-              color: EasySubwayAccessibleColors.brand,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: EasySubwayAccessibleColors.text,
-                height: 1.35,
               ),
             ),
           ),
+        ),
+        for (var index = 0; index < children.length; index++) ...[
+          children[index],
+          if (index < children.length - 1)
+            const Divider(
+              height: 1,
+              thickness: 1,
+              indent: 20,
+              endIndent: 20,
+              color: EasySubwayAccessibleColors.line,
+            ),
         ],
-      ),
+      ],
     );
   }
 }
@@ -357,48 +256,23 @@ class _SafetyDataNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     return Semantics(
       key: const Key('safetyDataNotice'),
       container: true,
       label: '$_title, $_referenceNotice $_fieldNotice $_limitationNotice',
       child: ExcludeSemantics(
-        child: Container(
-          decoration: const BoxDecoration(
-            border: Border(
-              top: BorderSide(color: EasySubwayAccessibleColors.line),
-            ),
-          ),
+        child: ColoredBox(
+          color: EasySubwayAccessibleColors.surface,
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 14),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(
-                      Icons.info_outline,
-                      color: EasySubwayAccessibleColors.amber,
-                      size: 24,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        _title,
-                        style: textTheme.titleMedium?.copyWith(
-                          color: EasySubwayAccessibleColors.text,
-                          fontWeight: FontWeight.w700,
-                          height: 1.25,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                const _SupportNoticeBullet(text: _referenceNotice),
                 const SizedBox(height: 10),
-                const _SafetyDataNoticeLine(text: _referenceNotice),
-                const _SafetyDataNoticeLine(text: _fieldNotice),
-                const _SafetyDataNoticeLine(text: _limitationNotice),
+                const _SupportNoticeBullet(text: _fieldNotice),
+                const SizedBox(height: 10),
+                const _SupportNoticeBullet(text: _limitationNotice),
               ],
             ),
           ),
@@ -408,45 +282,44 @@ class _SafetyDataNotice extends StatelessWidget {
   }
 }
 
-class _SafetyDataNoticeLine extends StatelessWidget {
-  const _SafetyDataNoticeLine({required this.text});
+class _SupportNoticeBullet extends StatelessWidget {
+  const _SupportNoticeBullet({required this.text});
 
   final String text;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Padding(
-            padding: EdgeInsets.only(top: 7),
-            child: Icon(
-              Icons.circle,
-              size: 7,
-              color: EasySubwayAccessibleColors.amber,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 9),
+          child: Container(
+            width: 5,
+            height: 5,
+            decoration: const BoxDecoration(
+              color: EasySubwayAccessibleColors.secondaryText,
+              shape: BoxShape.circle,
             ),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: EasySubwayAccessibleColors.text,
-                height: 1.35,
-              ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: EasySubwayAccessibleColors.text,
+              height: 1.35,
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
 class _SupportAccessItem extends StatelessWidget {
   const _SupportAccessItem({
-    required this.icon,
     required this.title,
     required this.value,
     required this.uri,
@@ -455,7 +328,6 @@ class _SupportAccessItem extends StatelessWidget {
     super.key,
   });
 
-  final IconData icon;
   final String title;
   final String value;
   final Uri? uri;
@@ -471,71 +343,42 @@ class _SupportAccessItem extends StatelessWidget {
     if (targetUri != null && displayValue != targetText) {
       semanticLabelParts.add(targetText);
     }
+    final onTap = targetUri == null
+        ? null
+        : () => unawaited(_openTarget(context, targetUri, targetText));
     return Semantics(
       button: true,
+      container: true,
       enabled: targetUri != null,
       label: semanticLabelParts.join(', '),
-      onTap: targetUri == null
-          ? null
-          : () => unawaited(_openTarget(context, targetUri, targetText)),
+      onTap: onTap,
       child: ExcludeSemantics(
-        child: InkWell(
-          onTap: targetUri == null
-              ? null
-              : () => unawaited(_openTarget(context, targetUri, targetText)),
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 56),
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 1),
-                  child: Icon(
-                    icon,
-                    size: 24,
-                    color: targetUri == null
-                        ? EasySubwayAccessibleColors.mutedText
-                        : EasySubwayAccessibleColors.primary,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          color: EasySubwayAccessibleColors.text,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          height: 1.25,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        displayValue,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: EasySubwayAccessibleColors.secondaryText,
-                          height: 1.3,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (targetUri != null) ...[
-                  const SizedBox(width: 8),
-                  const Icon(
-                    Icons.chevron_right,
-                    color: EasySubwayAccessibleColors.mutedText,
-                    size: 22,
-                  ),
-                ],
-              ],
+        child: ListTile(
+          onTap: onTap,
+          minVerticalPadding: 12,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+          tileColor: EasySubwayAccessibleColors.surface,
+          title: Text(
+            title,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: EasySubwayAccessibleColors.text,
+              fontWeight: FontWeight.w700,
+              height: 1.25,
             ),
           ),
+          subtitle: Text(
+            displayValue,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: EasySubwayAccessibleColors.mutedText,
+              height: 1.3,
+            ),
+          ),
+          trailing: targetUri == null
+              ? null
+              : const Icon(
+                  Icons.chevron_right,
+                  color: EasySubwayAccessibleColors.disclosure,
+                ),
         ),
       ),
     );
@@ -567,14 +410,20 @@ class _SupportAccessItem extends StatelessWidget {
   }
 }
 
-Uri? _mailtoUri(String value, String subject) {
-  final email = value.trim();
-  if (email.isEmpty) {
+/// 지원·문의 mailto URI. [body]가 있으면 메일 초안 본문으로 넣는다.
+Uri? buildSupportMailtoUri({
+  required String email,
+  required String subject,
+  String? body,
+}) {
+  final normalizedEmail = email.trim();
+  if (normalizedEmail.isEmpty) {
     return null;
   }
-  return Uri(
-    scheme: 'mailto',
-    path: email,
-    queryParameters: {'subject': subject},
-  );
+  final query = <String, String>{'subject': subject};
+  final normalizedBody = body?.trim();
+  if (normalizedBody != null && normalizedBody.isNotEmpty) {
+    query['body'] = normalizedBody;
+  }
+  return Uri(scheme: 'mailto', path: normalizedEmail, queryParameters: query);
 }

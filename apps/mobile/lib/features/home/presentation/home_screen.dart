@@ -33,6 +33,7 @@ import '../../service_notice/presentation/service_notice_list_screen.dart';
 import '../../settings/presentation/app_settings_screen.dart';
 import '../../settings/presentation/service_info_screen.dart';
 import '../../stations/presentation/station_search_screen.dart';
+import '../../support/presentation/inquiry_screen.dart';
 import '../../support/presentation/support_access_screen.dart';
 import '../../train_search/domain/train_search_models.dart';
 import '../../train_search/presentation/train_search_screen.dart';
@@ -135,6 +136,9 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _selectedTabIndex = 0;
+
+  /// 설정 탭 뒤로가기용. 직전에 보던 탭(없으면 홈).
+  int? _previousTabIndex;
   late String _mobilityType;
   String? _routeTabMobilityType;
   RouteTransportScope _routeTabTransportScope = RouteTransportScope.subway;
@@ -233,7 +237,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         setState(() {
           _routeTabMobilityType = _mobilityType;
           _routeTabTransportScope = RouteTransportScope.subway;
-          _selectedTabIndex = 2;
+          _selectTab(2);
         });
       } else {
         setState(() {});
@@ -314,6 +318,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       );
     }
 
+    void openInquiry() {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => InquiryScreen(
+            accessInfo: supportAccessInfo,
+            launcher: supportAccessLauncher,
+          ),
+        ),
+      );
+    }
+
     void openServiceInfo() {
       Navigator.of(context).push(
         MaterialPageRoute<void>(
@@ -349,7 +364,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         return;
       }
       setState(() {
-        _selectedTabIndex = 0;
+        _selectTab(0);
       });
     }
 
@@ -366,7 +381,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       setState(() {
         _routeTabMobilityType = nextMobilityType;
         _routeTabTransportScope = transportScope;
-        _selectedTabIndex = 2;
+        _selectTab(2);
       });
     }
 
@@ -375,7 +390,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         return;
       }
       setState(() {
-        _selectedTabIndex = 4;
+        _selectTab(4);
       });
     }
 
@@ -390,7 +405,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         return;
       }
       setState(() {
-        _selectedTabIndex = 3;
+        _selectTab(3);
+      });
+    }
+
+    void openPreviousTabOrHome() {
+      final previous = _previousTabIndex;
+      setState(() {
+        if (previous != null && previous != _selectedTabIndex) {
+          _selectedTabIndex = previous;
+        } else {
+          _selectedTabIndex = 0;
+        }
       });
     }
 
@@ -508,6 +534,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         canPop: false,
         onPopInvokedWithResult: (didPop, _) {
           if (didPop || _selectedTabIndex == 0) {
+            return;
+          }
+          // 설정 탭은 AppBar 뒤로가기와 같이 직전 탭(없으면 홈)으로 돌아간다.
+          if (_selectedTabIndex == 4) {
+            openPreviousTabOrHome();
             return;
           }
           openHomeTab();
@@ -705,14 +736,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           onViewPreferencesChanged: widget.onViewPreferencesChanged,
           onOpenMobilityProfile: _openMobilityProfile,
           onOpenSupportAccess: openSupportAccess,
+          onOpenInquiry: openInquiry,
           onOpenServiceInfo: openServiceInfo,
           onOpenMyReports: openMyReports,
+          onShellBack: openPreviousTabOrHome,
         ),
       );
     }
 
     // 탭 셸(0~4)이 모든 경로를 처리하므로 여기까지 도달하지 않는다.
     return const SizedBox.shrink();
+  }
+
+  void _selectTab(int index) {
+    if (index == _selectedTabIndex) {
+      return;
+    }
+    _previousTabIndex = _selectedTabIndex;
+    _selectedTabIndex = index;
   }
 
   Future<List<FavoriteFacility>>? _loadNotificationFacilities() {

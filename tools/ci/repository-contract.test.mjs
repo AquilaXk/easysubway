@@ -2358,6 +2358,15 @@ test("모바일 도움말과 서비스 정보 연결 계약은 각 presentation 
   const support = read(
     "apps/mobile/lib/features/support/presentation/support_access_screen.dart",
   );
+  const inquiry = read(
+    "apps/mobile/lib/features/support/presentation/inquiry_screen.dart",
+  );
+  const settings = read(
+    "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
+  );
+  const home = read(
+    "apps/mobile/lib/features/home/presentation/home_screen.dart",
+  );
   const serviceInfo = read(
     "apps/mobile/lib/features/settings/presentation/service_info_screen.dart",
   );
@@ -2378,6 +2387,9 @@ test("모바일 도움말과 서비스 정보 연결 계약은 각 presentation 
     assert.match(support, new RegExp(`^(?:abstract interface )?class ${declaration}\\b`, "m"));
     assert.doesNotMatch(main, new RegExp(`^(?:abstract interface )?class ${declaration}\\b`, "m"));
   }
+  assert.match(inquiry, /^class InquiryScreen\b/m);
+  assert.match(inquiry, /^enum InquiryKind\b/m);
+  assert.doesNotMatch(main, /^class InquiryScreen\b/m);
   assert.match(
     appRoot,
     /^import '\.\.\/features\/support\/presentation\/support_access_screen\.dart';$/m,
@@ -2386,25 +2398,57 @@ test("모바일 도움말과 서비스 정보 연결 계약은 각 presentation 
     main,
     /^export 'features\/support\/presentation\/support_access_screen\.dart'/m,
   );
+  assert.match(
+    home,
+    /^import '\.\.\/\.\.\/support\/presentation\/inquiry_screen\.dart';$/m,
+  );
+  assert.match(home, /onOpenInquiry:\s*openInquiry/);
+  assert.match(settings, /settingsInquiryButton/);
+  assert.match(settings, /title: '문의하기'/);
+  assert.match(settings, /required this\.onOpenInquiry/);
   for (const testSource of [widgetTest, supportInfoTest, appFixture]) {
     assert.match(
       testSource,
       /^import 'package:easysubway_mobile\/features\/support\/presentation\/support_access_screen\.dart';$/m,
     );
   }
+  assert.match(
+    widgetTest,
+    /^import 'package:easysubway_mobile\/features\/support\/presentation\/inquiry_screen\.dart';$/m,
+  );
   for (const helper of [
-    "_SupportSectionTitle",
-    "_SupportGroupCard",
-    "_SecurityContactNotice",
-    "_SecurityContactNoticeLine",
+    "_SupportSettingsSection",
+    "_SupportNoticeBullet",
     "_SafetyDataNotice",
-    "_SafetyDataNoticeLine",
     "_SupportAccessItem",
   ]) {
     assert.match(support, new RegExp(`^class ${helper}\\b`, "m"));
     assert.doesNotMatch(main, new RegExp(`^class ${helper}\\b`, "m"));
   }
-  assert.match(support, /^Uri\? _mailtoUri\(/m);
+  for (const helper of [
+    "_InquirySection",
+    "_InquiryKindTile",
+    "_InquirySecurityNotice",
+    "_InquiryNoticeBullet",
+  ]) {
+    assert.match(inquiry, new RegExp(`^class ${helper}\\b`, "m"));
+    assert.doesNotMatch(main, new RegExp(`^class ${helper}\\b`, "m"));
+  }
+  // 설정 화면과 같은 섹션·타일 양식(#2436). 카드형 보조 위젯은 쓰지 않는다.
+  for (const removed of [
+    "_SupportSectionTitle",
+    "_SupportGroupCard",
+    "_SecurityContactNotice",
+    "_SecurityContactNoticeLine",
+    "_SafetyDataNoticeLine",
+  ]) {
+    assert.doesNotMatch(support, new RegExp(`^class ${removed}\\b`, "m"));
+  }
+  assert.match(support, /title: const Text\('도움말'\)/);
+  assert.doesNotMatch(support, /도움말 및 문의|도움말·문의/);
+  assert.match(support, /^Uri\? buildSupportMailtoUri\(/m);
+  assert.match(inquiry, /buildSupportMailtoUri\(/);
+  assert.match(inquiry, /메일로 보내기/);
   assert.match(serviceInfo, /^class ServiceInfoScreen\b/m);
   assert.match(serviceInfo, /LaunchMode\.inAppBrowserView/);
   assert.match(serviceInfo, /OpenSourceLicensesScreen/);
@@ -3465,6 +3509,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
       "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
       "apps/mobile/lib/features/settings/presentation/open_source_licenses_screen.dart",
       "apps/mobile/lib/features/settings/presentation/service_info_screen.dart",
+      "apps/mobile/lib/features/support/presentation/inquiry_screen.dart",
       "apps/mobile/lib/features/support/presentation/support_access_screen.dart",
       "apps/mobile/lib/main.dart",
       "apps/mobile/release/support-incident-response-gate.json",
@@ -12313,11 +12358,13 @@ test("백엔드 품질 gate feasibility는 정적 분석 도입 조건을 계약
   const gate = readJson(gatePath);
   const build = read("backend/build.gradle");
   const ci = read(".github/workflows/ci.yml");
+  const sonarProps = read("sonar-project.properties");
+  const sonarWorkflow = read(".github/workflows/sonarcloud.yml");
 
   assert.equal(gate.schemaVersion, 1);
   assert.equal(gate.gateId, "backend-static-analysis-feasibility");
   assert.equal(gate.defaultPolicy, "contract-only-before-enforcement");
-  assert.equal(gate.enforcementStatus, "deferred_until_p0_release_contracts_stabilize");
+  assert.equal(gate.enforcementStatus, "partial_report_only_enabled");
   assert.equal(gate.ciRuntimeBudgetMinutes.maxAdditionalMinutes, 3);
   assert.equal(gate.ciRuntimeBudgetMinutes.measurementRequiredBeforeEnforcement, true);
 
@@ -12325,28 +12372,62 @@ test("백엔드 품질 gate feasibility는 정적 분석 도입 조건을 계약
   for (const id of ["checkstyle", "spotbugs", "errorprone", "archunit", "jacoco"]) {
     const tool = tools.get(id);
     assert.ok(tool, `${id} must be listed in backend static analysis gate`);
-    if (id === "archunit") {
-      assert.equal(tool.enforcement, "enabled");
-      assert.match(build, /com\.tngtech\.archunit:archunit-junit5:1\.4\.2/);
-      assert.ok(tool.evidence.ciRuntimeMeasurement.includes("PackageDependencyRulesTest"));
-    } else {
-      assert.equal(tool.enforcement, "not_enabled_in_this_slice");
-    }
     assert.ok(tool.requires.length > 0, `${id} must declare enforcement prerequisites`);
   }
 
-  assert.equal(tools.get("archunit").firstAllowedGate, "public_mobile_api_absence");
+  assert.equal(tools.get("archunit").enforcement, "enabled");
+  assert.match(build, /com\.tngtech\.archunit:archunit-junit5:1\.4\.2/);
+  assert.ok(tools.get("archunit").evidence.ciRuntimeMeasurement.includes("PackageDependencyRulesTest"));
+
+  assert.equal(tools.get("jacoco").enforcement, "report_only");
   assert.equal(tools.get("jacoco").firstAllowedGate, "coverage_baseline_after_p0_tests_stabilize");
+  assert.match(build, /id ['"]jacoco['"]/);
+  assert.doesNotMatch(build, /jacocoTestCoverageVerification/);
+  assert.equal(
+    existsSync(path.join(root, tools.get("jacoco").evidence.coverageExclusionPolicy)),
+    true,
+    "jacoco exclusion policy must exist",
+  );
+  assert.ok(tools.get("jacoco").evidence.ciRuntimeMeasurement.length > 0);
+
+  assert.equal(tools.get("spotbugs").enforcement, "report_only");
+  assert.match(build, /id ['"]com\.github\.spotbugs['"]/);
+  assert.match(build, /ignoreFailures\s*=\s*true/);
+  assert.equal(
+    existsSync(path.join(root, tools.get("spotbugs").evidence.suppressionPolicy)),
+    true,
+    "spotbugs suppression policy must exist",
+  );
+  assert.equal(
+    existsSync(path.join(root, tools.get("spotbugs").evidence.excludeFilter)),
+    true,
+    "spotbugs exclude filter must exist",
+  );
+  assert.ok(tools.get("spotbugs").evidence.ciRuntimeMeasurement.length > 0);
+  assert.ok(
+    Number.isInteger(tools.get("spotbugs").evidence.baselineViolationCount)
+      && tools.get("spotbugs").evidence.baselineViolationCount > 0,
+    "spotbugs baseline violation count must be recorded",
+  );
+
+  assert.equal(tools.get("checkstyle").enforcement, "not_enabled_in_this_slice");
+  assert.equal(tools.get("errorprone").enforcement, "not_enabled_in_this_slice");
+  assert.doesNotMatch(build, /id ['"]checkstyle['"]/);
+  assert.doesNotMatch(build, /id ['"]net\.ltgt\.errorprone['"]/);
+
   assert.ok(gate.mustNotDo.includes("enable_style_or_coverage_plugins_without_runtime_budget_evidence"));
   assert.ok(gate.mustNotDo.includes("reformat_unrelated_backend_sources"));
   assert.ok(gate.mustNotDo.includes("weaken_security_route_or_release_contract_tests"));
 
   assert.match(ci, /Repository CI \/ Run contract tests/);
-  assert.doesNotMatch(build, /id ['"]checkstyle['"]/);
-  assert.doesNotMatch(build, /id ['"]com\.github\.spotbugs['"]/);
-  assert.doesNotMatch(build, /id ['"]net\.ltgt\.errorprone['"]/);
-  assert.doesNotMatch(build, /id ['"]jacoco['"]/);
-
+  assert.match(ci, /flutter test --coverage/);
+  assert.match(ci, /filter-mobile-lcov\.mjs/);
+  assert.match(sonarProps, /sonar\.coverage\.jacoco\.xmlReportPaths=backend\/build\/reports\/jacoco\/test\/jacocoTestReport\.xml/);
+  assert.match(sonarProps, /sonar\.dart\.lcov\.reportPaths=apps\/mobile\/coverage\/lcov\.info/);
+  assert.match(sonarWorkflow, /jacocoTestReport/);
+  assert.match(sonarWorkflow, /flutter test --coverage/);
+  assert.match(sonarWorkflow, /filter-mobile-lcov\.mjs/);
+  assert.equal(existsSync(path.join(root, "tools/ci/filter-mobile-lcov.mjs")), true);
 });
 
 test("MVP 기본 경로는 익명 계정과 bearer token 인증을 발급하지 않는다", () => {
@@ -15653,9 +15734,15 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(widgetTest, /홈 즐겨찾기는 하나의 진입점에서 탭 목록을 바로 보여준다/);
   assert.match(widgetTest, /도움말은 개인정보 처리방침 진입점을 서비스 정보로 분리한다/);
   assert.match(widgetTest, /도움말은 이동 전 살펴보기 안내를 함께 보여준다/);
-  assert.match(widgetTest, /도움말은 보안과 개인정보 문의 경로를 안내한다/);
-  assert.match(supportAccessScreen, /보안 문의 안내/);
-  assert.match(supportAccessScreen, /앱 보안이나 개인정보가 걱정되면 문의로 알려주세요\./);
+  assert.match(widgetTest, /문의하기는 일반·보안 유형을 선택해 메일로 보낸다/);
+  assert.match(widgetTest, /설정에서 문의하기 화면으로 들어간다/);
+  assert.match(widgetTest, /문의하기는 메일 앱 연결 실패를 짧게 안내한다/);
+  const inquiryScreen = read(
+    "apps/mobile/lib/features/support/presentation/inquiry_screen.dart",
+  );
+  assert.match(inquiryScreen, /보안 문의 안내/);
+  assert.match(inquiryScreen, /앱 보안이나 개인정보가 걱정되면 문의로 알려주세요\./);
+  assert.doesNotMatch(supportAccessScreen, /보안 문의 안내/);
   assert.match(supportAccessScreen, /EASYSUBWAY_SECURITY_EMAIL/);
   assert.match(supportAccessScreen, /validatedForBuild\(\{required bool isReleaseMode\}\)/);
   assert.match(supportAccessScreen, /Release \$label must use HTTPS\./);
