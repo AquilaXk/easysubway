@@ -25,7 +25,7 @@ test("Route V2 gateway는 IP·token limiter와 exact 429 계약을 소유한다"
   const searchLocation = nginx.match(/location = \/api\/v2\/routes\/search \{([\s\S]*?)\n\t\}/)?.[1] ?? "";
   assert.match(searchLocation, /limit_req zone=route_search_ip burst=\$\{EASYSUBWAY_ROUTE_V2_SEARCH_BURST\} nodelay;/);
   assert.match(searchLocation, /limit_req zone=route_search_token burst=\$\{EASYSUBWAY_ROUTE_V2_SEARCH_BURST\} nodelay;/);
-  assert.match(nginx, /map \$request_id \$request_id \{/);
+  assert.doesNotMatch(nginx, /map \$http_x_correlation_id/);
   assert.match(nginx, /return 429 '\{"success":false,"code":"ROUTE_RATE_LIMITED","message":"잠시 후 다시 시도","correlationId":"\$request_id"\}';/);
   assert.match(nginx, /add_header Retry-After 60 always;/);
   assert.match(nginx, /add_header Cache-Control "private, no-store" always;/);
