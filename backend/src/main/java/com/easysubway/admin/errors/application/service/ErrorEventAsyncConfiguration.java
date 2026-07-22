@@ -19,6 +19,8 @@ class ErrorEventAsyncConfiguration {
 		executor.setCorePoolSize(1);
 		executor.setMaxPoolSize(2);
 		executor.setQueueCapacity(500);
+		executor.setWaitForTasksToCompleteOnShutdown(true);
+		executor.setAwaitTerminationSeconds(30);
 		executor.initialize();
 		return executor;
 	}

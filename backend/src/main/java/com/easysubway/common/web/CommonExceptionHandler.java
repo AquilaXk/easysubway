@@ -138,8 +138,9 @@ class CommonExceptionHandler {
 			|| exception instanceof HttpMessageNotWritableException) {
 			return true;
 		}
+		// INTERNAL_ERROR(500)와 응답 status가 어긋나지 않도록 500만 기록한다.
 		return exception instanceof ResponseStatusException responseStatusException
-			&& responseStatusException.getStatusCode().is5xxServerError();
+			&& responseStatusException.getStatusCode().value() == HttpStatus.INTERNAL_SERVER_ERROR.value();
 	}
 
 	private ResponseEntity<ApiResponse<Void>> fail(

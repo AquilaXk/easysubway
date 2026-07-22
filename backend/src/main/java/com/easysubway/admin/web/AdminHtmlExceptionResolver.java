@@ -42,7 +42,8 @@ class AdminHtmlExceptionResolver implements HandlerExceptionResolver, Ordered {
 			return null;
 		}
 		AdminHtmlError error = AdminHtmlError.from(exception);
-		if (error.status() >= 500) {
+		// ErrorCode 와이어 계약상 일반 시스템 장애는 INTERNAL_ERROR(500)만 기록한다.
+		if (error.status() == HttpStatus.INTERNAL_SERVER_ERROR.value()) {
 			String correlationId = CorrelationId.currentOrCreate(request);
 			errorEventRecorder.recordIfNeeded(request, ErrorCode.INTERNAL_ERROR, exception, correlationId);
 		}
