@@ -618,6 +618,7 @@ function assertActionsEnvSecretPolicy(file, source) {
       "EASYSUBWAY_ANDROID_STORE_PASSWORD",
       "EASYSUBWAY_ANDROID_KEY_ALIAS",
       "EASYSUBWAY_ANDROID_KEY_PASSWORD",
+      "EASYSUBWAY_ANDROID_GOOGLE_SERVICES_JSON_BASE64",
     ]),
   };
   const allowedExtraSecrets = allowedExtraSecretsByFile[file] ?? new Set();

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../accessible_design.dart';
 import '../core/datapack/bundled_data_pack_freshness.dart';
+import '../core/error/error_feedback.dart';
 import '../core/datapack/data_pack_metered_consent_gate.dart';
 import '../core/datapack/data_pack_update_state.dart';
 import '../design_tokens.dart';
@@ -697,9 +698,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome>
           _startScreenDismissed = previousStartScreenDismissed;
         });
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('설정을 저장하지 못했어요. 다시 시도해 주세요.')),
-      );
+      showAnnouncedErrorSnackBar(context, '설정을 저장하지 못했어요. 다시 시도해 주세요.');
       return;
     }
     if (!mounted) {

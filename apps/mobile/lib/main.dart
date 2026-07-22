@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'app/app_bootstrap.dart';
 import 'app/demo_dependencies.dart';
 import 'app/easy_subway_app.dart';
+import 'core/crashlytics/mobile_crash_reporting.dart';
 import 'core/datapack/data_pack_update_state.dart';
 import 'features/get_off_alarm/get_off_alarm_controller.dart';
 import 'features/home_widget/home_widget_link_handler.dart';
@@ -23,6 +24,8 @@ const defaultPushNotificationsEnabled = bool.fromEnvironment(
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  installMobileErrorHandlers();
+  await initializeMobileCrashReporting(isReleaseMode: kReleaseMode);
   registerBundledAssetLicenses();
   validateReleaseBuildFlags(
     isReleaseMode: kReleaseMode,

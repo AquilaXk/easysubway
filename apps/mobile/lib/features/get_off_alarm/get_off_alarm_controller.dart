@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../core/logging/app_logger.dart';
 import '../../mobile_error_reporter.dart';
 import '../../notification_settings.dart';
 import 'data/get_off_alarm_recovery_notice_store.dart';
@@ -278,13 +279,11 @@ class GetOffAlarmController extends ChangeNotifier {
         activeRouteId == null ||
         subscription.routeId != activeRouteId ||
         activeRouteId != routeId) {
-      if (kDebugMode) {
-        debugPrint(
-          'get_off_alarm refresh route_mismatch '
-          'subscription_route_id=${subscription?.routeId} '
-          'active_route_id=$activeRouteId input_route_id=$routeId',
-        );
-      }
+      appLog.d(
+        'get_off_alarm refresh route_mismatch '
+        'subscription_route_id=${subscription?.routeId} '
+        'active_route_id=$activeRouteId input_route_id=$routeId',
+      );
       return GetOffAlarmRefreshResult.routeMismatch;
     }
     if (stops.isEmpty) {

@@ -1,0 +1,38 @@
+{
+  "purpose": "Store / privacy disclosure checklist for Crashlytics introduction (WP5 #2435).",
+  "privacyPolicyItems": [
+    "앱 안정성 개선을 위해 크래시·오류 진단 정보(스택트레이스, 기기·OS 메타)를 Firebase Crashlytics로 수집할 수 있음",
+    "사용자 식별자·정밀 위치 좌표는 크래시 커스텀 키로 전송하지 않음",
+    "debug 빌드에서는 Crashlytics 전송을 비활성화함"
+  ],
+  "appStorePrivacyLabels": [
+    {
+      "dataType": "Crash Data",
+      "linkedToUser": true,
+      "usedForTracking": false,
+      "purpose": "App Functionality"
+    },
+    {
+      "dataType": "Performance Data",
+      "linkedToUser": true,
+      "usedForTracking": false,
+      "purpose": "App Functionality"
+    }
+  ],
+  "playDataSafety": [
+    {
+      "dataType": "App info and performance — Crash logs",
+      "collected": true,
+      "shared": true,
+      "sharedWith": "Firebase Crashlytics (Google)",
+      "optional": false,
+      "purpose": "App functionality / stability"
+    }
+  ],
+  "iosPrivacyManifest": {
+    "file": "apps/mobile/ios/Runner/PrivacyInfo.xcprivacy",
+    "alreadyDeclares": ["NSPrivacyCollectedDataTypeCrashData", "NSPrivacyCollectedDataTypePerformanceData"],
+    "action": "keep declarations; no tracking domains added for Crashlytics"
+  },
+  "legalReview": "본 항목은 반영 필요성 식별·초안이며 개인정보 처리방침 문안의 법적 검토는 제외 범위(#2435)."
+}

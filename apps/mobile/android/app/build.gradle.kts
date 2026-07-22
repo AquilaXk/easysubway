@@ -6,6 +6,13 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// 키 파일은 리포 커밋 금지(.gitignore). CI/로컬 시크릿으로 주입된 경우에만 플러그인 적용.
+val googleServicesFile = file("google-services.json")
+if (googleServicesFile.exists()) {
+    apply(plugin = "com.google.gms.google-services")
+    apply(plugin = "com.google.firebase.crashlytics")
+}
+
 val releaseSigningValueNames = listOf(
     "EASYSUBWAY_ANDROID_KEYSTORE_PATH",
     "EASYSUBWAY_ANDROID_STORE_PASSWORD",

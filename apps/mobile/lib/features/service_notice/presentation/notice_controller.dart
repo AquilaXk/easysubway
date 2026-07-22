@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../core/logging/app_logger.dart';
 import '../data/notice_repository.dart';
 import '../domain/service_notice.dart';
 import 'notice_time_label.dart';
@@ -65,7 +66,7 @@ class NoticeController extends ChangeNotifier {
     } catch (error, stackTrace) {
       // 조회 실패는 조용히 이전 상태를 유지한다(repository가 이미 stale 강등을
       // 담당하므로 여기까지 오는 예외는 표시할 사용자 메시지가 없다).
-      debugPrint('운행 공지 조회 실패: $error\n$stackTrace');
+      appLog.w('운행 공지 조회 실패', error: error, stackTrace: stackTrace);
     } finally {
       _loading = false;
       _inFlight = null;

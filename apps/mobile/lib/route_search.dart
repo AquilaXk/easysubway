@@ -9,6 +9,8 @@ import 'package:share_plus/share_plus.dart';
 import 'accessible_design.dart';
 import 'ad_slot.dart';
 import 'auth_headers.dart';
+import 'core/error/error_feedback.dart';
+import 'core/error/server_error_mapper.dart';
 import 'core/network/api_client.dart';
 import 'features/ads/active_ad_banner.dart';
 import 'features/ads/ad_repository.dart';
@@ -355,6 +357,7 @@ class RouteSearchOnlineException extends RouteSearchException {
     this.statusCode,
     this.failureReason = 'online-unavailable',
     String message = _routeOnlineSearchErrorMessage,
+    this.correlationId,
   }) : super(message);
 
   factory RouteSearchOnlineException.http(int statusCode) {
@@ -372,33 +375,51 @@ class RouteSearchOnlineException extends RouteSearchException {
 
   factory RouteSearchOnlineException.response(ApiResponse response) {
     final body = response.jsonBody;
-    final code = body is Map<String, Object?> ? body['code'] : null;
-    const messages = <String, String>{
-      'ROUTE_SESSION_ATTESTATION_REJECTED': 'ITX 시간표를 불러올 수 없어요',
-      'ROUTE_SESSION_ATTESTATION_UNAVAILABLE': 'ITX 시간표를 불러올 수 없어요',
-      'ROUTE_SESSION_REQUIRED': '다시 시도',
-      'ROUTE_SCOPE_INVALID': '지원하지 않는 경로예요',
-      'ROUTE_RATE_LIMITED': '잠시 후 다시 시도',
-      'ITX_TIMETABLE_UNAVAILABLE': 'ITX 시간표를 불러올 수 없어요',
-    };
-    if (code is String && messages.containsKey(code)) {
+    final map = body is Map ? Map<String, Object?>.from(body) : null;
+    final rawCode = map?['code'];
+    final rawCorrelationId = map?['correlationId'];
+    final correlationId = rawCorrelationId is String
+        ? rawCorrelationId.trim()
+        : null;
+    final normalizedCorrelationId =
+        (correlationId == null || correlationId.isEmpty)
+        ? null
+        : correlationId;
+
+    if (rawCode is String && rawCode.isNotEmpty) {
+      final mapped = serverErrorMapper.resolve(
+        code: rawCode,
+        correlationId: normalizedCorrelationId,
+        statusCode: response.statusCode,
+        defaultMessage: _routeOnlineSearchErrorMessage,
+      );
       return RouteSearchOnlineException._(
         statusCode: response.statusCode,
-        failureReason: code,
-        message: messages[code]!,
+        failureReason: rawCode,
+        message: mapped.userMessage,
+        correlationId: mapped.correlationId,
       );
     }
-    return RouteSearchOnlineException.http(response.statusCode);
+
+    final httpFallback = RouteSearchOnlineException.http(response.statusCode);
+    return RouteSearchOnlineException._(
+      statusCode: httpFallback.statusCode,
+      failureReason: httpFallback.failureReason,
+      message: httpFallback.message,
+      correlationId: normalizedCorrelationId,
+    );
   }
 
   const RouteSearchOnlineException._({
     required this.statusCode,
     required this.failureReason,
     String message = _routeOnlineSearchErrorMessage,
+    this.correlationId,
   }) : super(message);
 
   final int? statusCode;
   final String failureReason;
+  final String? correlationId;
 }
 
 enum RouteTransportScope {
@@ -2531,6 +2552,7 @@ class RouteSearchState {
     this.message = '',
     this.isRefreshing = false,
     this.refreshMessage = '',
+    this.correlationId,
   });
 
   const RouteSearchState.idle()
@@ -2538,13 +2560,15 @@ class RouteSearchState {
       result = null,
       message = '',
       isRefreshing = false,
-      refreshMessage = '';
+      refreshMessage = '',
+      correlationId = null;
 
   final RouteSearchViewStatus status;
   final RouteSearchResult? result;
   final String message;
   final bool isRefreshing;
   final String refreshMessage;
+  final String? correlationId;
 
   RouteSearchState copyWith({
     RouteSearchViewStatus? status,
@@ -2552,6 +2576,7 @@ class RouteSearchState {
     String? message,
     bool? isRefreshing,
     String? refreshMessage,
+    String? correlationId,
   }) {
     return RouteSearchState(
       status: status ?? this.status,
@@ -2559,6 +2584,7 @@ class RouteSearchState {
       message: message ?? this.message,
       isRefreshing: isRefreshing ?? this.isRefreshing,
       refreshMessage: refreshMessage ?? this.refreshMessage,
+      correlationId: correlationId ?? this.correlationId,
     );
   }
 }
@@ -2618,10 +2644,14 @@ class RouteSearchController extends ChangeNotifier {
       if (_disposed || requestId != _searchRequestId) {
         return;
       }
+      final correlationId = error is RouteSearchOnlineException
+          ? error.correlationId
+          : null;
       _emitState(
         RouteSearchState(
           status: RouteSearchViewStatus.failure,
           message: error.message,
+          correlationId: correlationId,
         ),
       );
     } catch (error, stackTrace) {
@@ -4268,6 +4298,7 @@ class _RouteSearchBody extends StatelessWidget {
       ),
       RouteSearchViewStatus.failure => _RouteSearchFailureMessage(
         message: state.message,
+        correlationId: state.correlationId,
         onSearchSubwayOnly: onSearchSubwayOnly,
       ),
       RouteSearchViewStatus.success => _RouteSearchResultCard(
@@ -4289,10 +4320,12 @@ class _RouteSearchBody extends StatelessWidget {
 class _RouteSearchFailureMessage extends StatelessWidget {
   const _RouteSearchFailureMessage({
     required this.message,
+    this.correlationId,
     this.onSearchSubwayOnly,
   });
 
   final String message;
+  final String? correlationId;
   final AsyncCallback? onSearchSubwayOnly;
 
   @override
@@ -4305,6 +4338,13 @@ class _RouteSearchFailureMessage extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _RouteSearchMessage(message: message, liveRegion: true),
+        if (correlationId != null && correlationId!.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          ErrorReferenceDetails(
+            message: '',
+            correlationId: correlationId,
+          ),
+        ],
         if (onSearchSubwayOnly != null) ...[
           const SizedBox(height: 12),
           OutlinedButton(
@@ -4341,19 +4381,42 @@ bool _shouldShowRouteSearchFailureNextAction(String message) {
       message != '출발역과 도착역을 검색 결과에서 선택해 주세요.';
 }
 
-class _RouteSearchMessage extends StatelessWidget {
+class _RouteSearchMessage extends StatefulWidget {
   const _RouteSearchMessage({required this.message, this.liveRegion = false});
 
   final String message;
   final bool liveRegion;
 
   @override
+  State<_RouteSearchMessage> createState() => _RouteSearchMessageState();
+}
+
+class _RouteSearchMessageState extends State<_RouteSearchMessage> {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.liveRegion && widget.message.isNotEmpty) {
+      announceErrorMessage(widget.message);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _RouteSearchMessage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.liveRegion &&
+        widget.message.isNotEmpty &&
+        widget.message != oldWidget.message) {
+      announceErrorMessage(widget.message);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Semantics(
       container: true,
-      liveRegion: liveRegion,
+      liveRegion: widget.liveRegion,
       child: Text(
-        message,
+        widget.message,
         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
           color: EasySubwayAccessibleColors.secondaryText,
           fontWeight: FontWeight.w700,
