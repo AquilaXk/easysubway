@@ -1,0 +1,74 @@
+[
+  {
+    "code": "INVALID_REQUEST",
+    "category": "USER",
+    "httpStatus": 400,
+    "koMessageKey": "error.invalid-request"
+  },
+  {
+    "code": "RESOURCE_NOT_FOUND",
+    "category": "USER",
+    "httpStatus": 404,
+    "koMessageKey": "error.resource-not-found"
+  },
+  {
+    "code": "CONFLICT",
+    "category": "USER",
+    "httpStatus": 409,
+    "koMessageKey": "error.conflict"
+  },
+  {
+    "code": "UNREADABLE_BODY",
+    "category": "USER",
+    "httpStatus": 400,
+    "koMessageKey": "error.unreadable-body"
+  },
+  {
+    "code": "INTERNAL_ERROR",
+    "category": "SYSTEM",
+    "httpStatus": 500,
+    "koMessageKey": "error.internal-error"
+  },
+  {
+    "code": "ROUTE_SESSION_ATTESTATION_REJECTED",
+    "category": "USER",
+    "httpStatus": 403,
+    "koMessageKey": "error.route-session-attestation-rejected"
+  },
+  {
+    "code": "ROUTE_SESSION_ATTESTATION_UNAVAILABLE",
+    "category": "DEPENDENCY",
+    "httpStatus": 503,
+    "koMessageKey": "error.route-session-attestation-unavailable"
+  },
+  {
+    "code": "ITX_TIMETABLE_UNAVAILABLE",
+    "category": "DEPENDENCY",
+    "httpStatus": 503,
+    "koMessageKey": "error.itx-timetable-unavailable"
+  },
+  {
+    "code": "ROUTE_SCOPE_INVALID",
+    "category": "USER",
+    "httpStatus": 422,
+    "koMessageKey": "error.route-scope-invalid"
+  },
+  {
+    "code": "ROUTE_SESSION_REQUIRED",
+    "category": "USER",
+    "httpStatus": 401,
+    "koMessageKey": "error.route-session-required"
+  },
+  {
+    "code": "ROUTE_RATE_LIMITED",
+    "category": "USER",
+    "httpStatus": 429,
+    "koMessageKey": "error.route-rate-limited"
+  },
+  {
+    "code": "ROUTE_ORIGIN_FORBIDDEN",
+    "category": "USER",
+    "httpStatus": 403,
+    "koMessageKey": "error.route-origin-forbidden"
+  }
+]

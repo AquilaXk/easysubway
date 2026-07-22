@@ -13515,7 +13515,11 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
     /admin_operator_state_change_audit method=\{\} path=\{\} principal=\{\} roles=\{\} tenant=\{\} status=\{\} outcome=\{\} correlation_id=\{\}/,
   );
   assert.match(adminOperatorAuditFilter, /ROLE_OPERATOR_ADMIN/);
-  assert.match(adminOperatorAuditFilter, /X-Correlation-Id/);
+  assert.match(adminOperatorAuditFilter, /CorrelationId\.(HEADER|ATTRIBUTE)/);
+  assert.match(
+    read("backend/src/main/java/com/easysubway/common/error/CorrelationId.java"),
+    /X-Correlation-Id/,
+  );
   assert.match(adminOperatorAuditFilter, /SUCCESS/);
   assert.match(adminOperatorAuditFilter, /FAILURE/);
   assert.match(adminOperatorAuditFilter, /HandlerMapping\.BEST_MATCHING_PATTERN_ATTRIBUTE/);
@@ -18990,4 +18994,87 @@ test("tools/**/*.mjs는 로케일 미지정 localeCompare 호출을 두지 않�
     [],
     `로케일 미지정 localeCompare는 금지된다(#2390). codepointCompare(tools/lib/codepoint-compare.mjs) 사용 또는 명시 로케일로 바꿔라:\n${violations.join("\n")}`,
   );
+});
+
+test("error-codes.json은 ErrorCode enum과 완전 일치하고 category·httpStatus 조합이 유효하다", () => {
+  const HTTP_STATUS_BY_NAME = {
+    BAD_REQUEST: 400,
+    UNAUTHORIZED: 401,
+    FORBIDDEN: 403,
+    NOT_FOUND: 404,
+    CONFLICT: 409,
+    UNPROCESSABLE_ENTITY: 422,
+    TOO_MANY_REQUESTS: 429,
+    INTERNAL_SERVER_ERROR: 500,
+    BAD_GATEWAY: 502,
+    SERVICE_UNAVAILABLE: 503,
+  };
+
+  const contractPath = "contracts/error-codes.json";
+  assert.equal(existsSync(path.join(root, contractPath)), true, "contracts/error-codes.json must exist");
+
+  const contract = readJson(contractPath);
+  assert.ok(Array.isArray(contract), "error-codes.json must be an array");
+
+  const errorCodeSource = read("backend/src/main/java/com/easysubway/common/error/ErrorCode.java");
+  const categorySource = read("backend/src/main/java/com/easysubway/common/error/ErrorCategory.java");
+  assert.match(categorySource, /enum ErrorCategory/);
+  assert.match(categorySource, /\bUSER\b/);
+  assert.match(categorySource, /\bSYSTEM\b/);
+  assert.match(categorySource, /\bDEPENDENCY\b/);
+
+  const enumEntries = [...errorCodeSource.matchAll(
+    /^\s*([A-Z_]+)\(\s*"([^"]+)"\s*,\s*ErrorCategory\.([A-Z_]+)\s*,\s*HttpStatus\.([A-Z_]+)\s*,\s*"([^"]+)"\s*\)/gm,
+  )].map((match) => {
+    const httpStatus = HTTP_STATUS_BY_NAME[match[4]];
+    assert.notEqual(httpStatus, undefined, `unknown HttpStatus.${match[4]} in ErrorCode.${match[1]}`);
+    return {
+      code: match[2],
+      category: match[3],
+      httpStatus,
+      koMessageKey: match[5],
+    };
+  });
+
+  assert.ok(enumEntries.length > 0, "ErrorCode enum constants must be parseable");
+  assert.deepEqual(
+    contract,
+    enumEntries,
+    "contracts/error-codes.json must match ErrorCode.java wire fields exactly",
+  );
+
+  for (const entry of contract) {
+    assert.equal(typeof entry.code, "string");
+    assert.equal(typeof entry.category, "string");
+    assert.equal(typeof entry.httpStatus, "number");
+    assert.equal(typeof entry.koMessageKey, "string");
+    if (entry.category === "USER") {
+      assert.ok(entry.httpStatus >= 400 && entry.httpStatus < 500, `${entry.code} USER must be 4xx`);
+    } else if (entry.category === "SYSTEM") {
+      assert.ok(entry.httpStatus >= 500 && entry.httpStatus < 600, `${entry.code} SYSTEM must be 5xx`);
+    } else if (entry.category === "DEPENDENCY") {
+      assert.ok(
+        entry.httpStatus === 502 || entry.httpStatus === 503,
+        `${entry.code} DEPENDENCY must be 502 or 503`,
+      );
+    } else {
+      assert.fail(`unknown category ${entry.category} for ${entry.code}`);
+    }
+  }
+
+  const messages = read("backend/src/main/resources/messages.properties");
+  assert.match(messages, /^error\.internal-error=일시적인 문제가 발생했어요\. 잠시 후 다시 시도해 주세요\.$/m);
+  const messageKeys = new Set(
+    messages
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith("#") && line.includes("="))
+      .map((line) => line.split("=", 1)[0]),
+  );
+  for (const entry of contract) {
+    assert.ok(
+      messageKeys.has(entry.koMessageKey),
+      `koMessageKey missing in messages.properties: ${entry.koMessageKey}`,
+    );
+  }
 });
