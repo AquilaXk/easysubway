@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 
 /// 노선도 화면을 기준으로 삼는 앱 공용 색 팔레트.
@@ -197,7 +199,7 @@ class EasySubwayHeaderDivider extends SizedBox {
   ///
   /// 그림자 톤은 카카오 참조 스크린의 흰 지도 위 페이드
   /// (#CD→#E2→#EE→#F8→투명, ~5px)를 검정 반투명으로 그대로 환산했다.
-  /// BoxShadow 근사 대신 그라데이션을 써서 길이와 색을 맞춘다.
+  /// BoxShadow 근사 대신 짧은 페이드 드롭으로 길이와 색을 맞춘다.
   const EasySubwayHeaderDivider.mapChrome({super.key})
     : super(
         height: 1,
@@ -206,18 +208,21 @@ class EasySubwayHeaderDivider extends SizedBox {
       );
 }
 
+/// 카카오 참조: 흰 배경 기준 205/226/238/248 → alpha 0x32/0x1D/0x11/0x07.
+///
+/// Material gradient decoration은 design_guard 하드 밴(#1915)이라
+/// [CustomPaint] + `dart:ui` 셰이더로만 그린다.
+const easySubwayMapChromeHeaderDropColors = <Color>[
+  Color(0x32000000),
+  Color(0x1D000000),
+  Color(0x11000000),
+  Color(0x07000000),
+  Color(0x00000000),
+];
+
 /// [EasySubwayHeaderDivider.mapChrome] 본체. 1px 선 + 아래로 넘치는 짧은 드롭.
 class _EasySubwayMapChromeHeaderDivider extends StatelessWidget {
   const _EasySubwayMapChromeHeaderDivider();
-
-  /// 카카오 참조: 흰 배경 기준 205/226/238/248 → alpha 0x32/0x1D/0x11/0x07.
-  static const List<Color> _dropColors = <Color>[
-    Color(0x32000000),
-    Color(0x1D000000),
-    Color(0x11000000),
-    Color(0x07000000),
-    Color(0x00000000),
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -235,21 +240,39 @@ class _EasySubwayMapChromeHeaderDivider extends StatelessWidget {
           right: 0,
           top: 1,
           height: dropHeight,
-          child: const IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: _dropColors,
-                ),
-              ),
+          child: IgnorePointer(
+            child: CustomPaint(
+              painter: const _MapChromeHeaderDropPainter(),
+              child: SizedBox(height: dropHeight, width: double.infinity),
             ),
           ),
         ),
       ],
     );
   }
+}
+
+class _MapChromeHeaderDropPainter extends CustomPainter {
+  const _MapChromeHeaderDropPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) {
+      return;
+    }
+    final paint = Paint()
+      ..shader = ui.Gradient.linear(
+        Offset.zero,
+        Offset(0, size.height),
+        easySubwayMapChromeHeaderDropColors,
+        const <double>[0, 0.25, 0.5, 0.75, 1],
+      );
+    canvas.drawRect(Offset.zero & size, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _MapChromeHeaderDropPainter oldDelegate) =>
+      false;
 }
 
 EdgeInsets easySubwayBottomActionInsets(

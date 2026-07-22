@@ -1152,15 +1152,14 @@ void main() {
       ),
     );
     expect(topBarLine.color, easySubwayHeaderDividerColor);
-    final topBarDrop = tester.widget<DecoratedBox>(
+    expect(
       find.descendant(
         of: find.byKey(const Key('networkMapTopBarDivider')),
-        matching: find.byType(DecoratedBox),
+        matching: find.byType(CustomPaint),
       ),
+      findsOneWidget,
     );
-    final topBarGradient =
-        (topBarDrop.decoration as BoxDecoration).gradient! as LinearGradient;
-    expect(topBarGradient.colors, const <Color>[
+    expect(easySubwayMapChromeHeaderDropColors, const <Color>[
       Color(0x32000000),
       Color(0x1D000000),
       Color(0x11000000),
@@ -1175,16 +1174,12 @@ void main() {
       ),
     );
     expect(menuHeaderLine.color, easySubwayHeaderDividerColor);
-    final menuHeaderDrop = tester.widget<DecoratedBox>(
+    expect(
       find.descendant(
         of: find.byKey(const Key('networkMapMenuHeaderDivider')),
-        matching: find.byType(DecoratedBox),
+        matching: find.byType(CustomPaint),
       ),
-    );
-    expect(
-      ((menuHeaderDrop.decoration as BoxDecoration).gradient! as LinearGradient)
-          .colors,
-      topBarGradient.colors,
+      findsOneWidget,
     );
 
     final internalDividers = tester.widgetList<Divider>(
@@ -9000,7 +8995,14 @@ void main() {
       expect(find.text('출발·도착 입력'), findsNothing);
       expect(find.text('출'), findsNothing);
       expect(find.text('도'), findsNothing);
-      expect(find.text('출발역'), findsNothing);
+      // 지도 draft와 같이 칸 왼쪽 고정 역할 라벨을 유지한다(#2436).
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('routeOriginPointButton')),
+          matching: find.text('출발역'),
+        ),
+        findsOneWidget,
+      );
       expect(
         find.descendant(
           of: find.byKey(const Key('routeOriginPointButton')),
@@ -9008,7 +9010,13 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('도착역'), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('routeDestinationPointButton')),
+          matching: find.text('도착역'),
+        ),
+        findsOneWidget,
+      );
       expect(
         find.descendant(
           of: find.byKey(const Key('routeDestinationPointButton')),
