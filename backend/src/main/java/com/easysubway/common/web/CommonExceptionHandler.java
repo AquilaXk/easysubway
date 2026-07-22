@@ -113,6 +113,7 @@ class CommonExceptionHandler {
 	ResponseEntity<ApiResponse<Void>> handleUnhandled(HttpServletRequest request, Exception exception)
 		throws Exception {
 		if (shouldPropagate(exception)) {
+			recordPropagatedServerError(request, exception);
 			throw exception;
 		}
 		String correlationId = CorrelationId.currentOrCreate(request);
@@ -122,6 +123,23 @@ class CommonExceptionHandler {
 		}
 		return ResponseEntity.status(ErrorCode.INTERNAL_ERROR.httpStatus())
 			.body(ApiResponse.fail(ErrorCode.INTERNAL_ERROR, messages.message("error.internal-error"), correlationId));
+	}
+
+	private void recordPropagatedServerError(HttpServletRequest request, Exception exception) {
+		if (errorEventRecorder == null || !isPropagatedServerError(exception)) {
+			return;
+		}
+		String correlationId = CorrelationId.currentOrCreate(request);
+		errorEventRecorder.recordIfNeeded(request, ErrorCode.INTERNAL_ERROR, exception, correlationId);
+	}
+
+	private static boolean isPropagatedServerError(Exception exception) {
+		if (exception instanceof ConversionNotSupportedException
+			|| exception instanceof HttpMessageNotWritableException) {
+			return true;
+		}
+		return exception instanceof ResponseStatusException responseStatusException
+			&& responseStatusException.getStatusCode().is5xxServerError();
 	}
 
 	private ResponseEntity<ApiResponse<Void>> fail(
