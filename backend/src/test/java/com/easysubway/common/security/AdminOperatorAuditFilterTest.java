@@ -1,11 +1,11 @@
 package com.easysubway.common.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.easysubway.admin.audit.adapter.out.persistence.InMemoryAdminAuditEventRepository;
@@ -110,12 +110,12 @@ class AdminOperatorAuditFilterTest {
 
 	@Test
 	@DisplayName("관리자 상태 변경 예외 요청은 500 감사 로그를 남긴다")
-	void adminMutationFailureWritesServerErrorAuditLog(CapturedOutput output) {
-		assertThatThrownBy(() -> mockMvc.perform(post("/admin/audit-test/fail")
+	void adminMutationFailureWritesServerErrorAuditLog(CapturedOutput output) throws Exception {
+		mockMvc.perform(post("/admin/audit-test/fail")
 				.with(httpBasic("admin-test", "admin-test-password"))
 				.with(csrf()))
-			.andReturn())
-			.hasRootCauseMessage("forced admin audit failure");
+			.andExpect(status().isInternalServerError())
+			.andExpect(jsonPath("$.code").value("INTERNAL_ERROR"));
 
 		assertThat(output.getOut())
 			.contains("admin_operator_state_change_audit")

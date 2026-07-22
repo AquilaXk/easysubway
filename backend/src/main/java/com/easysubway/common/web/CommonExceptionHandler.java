@@ -1,18 +1,30 @@
 package com.easysubway.common.web;
 
 import com.easysubway.common.error.ConflictException;
+import com.easysubway.common.error.CorrelationId;
+import com.easysubway.common.error.ErrorCode;
 import com.easysubway.common.error.InvalidRequestException;
 import com.easysubway.common.error.ResourceNotFoundException;
+import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 class CommonExceptionHandler {
+
+	private static final Logger log = LoggerFactory.getLogger(CommonExceptionHandler.class);
 
 	private final WebMessageResolver messages;
 
@@ -21,42 +33,119 @@ class CommonExceptionHandler {
 	}
 
 	@ExceptionHandler(HttpMessageNotReadableException.class)
-	@ResponseStatus(HttpStatus.BAD_REQUEST)
-	ApiResponse<Void> handleUnreadableMessage() {
-		return ApiResponse.fail(messages.message("common.error.unreadable-body"));
+	ResponseEntity<ApiResponse<Void>> handleUnreadableMessage(HttpServletRequest request) {
+		return fail(request, ErrorCode.UNREADABLE_BODY, messages.message("common.error.unreadable-body"));
 	}
 
 	@ExceptionHandler(InvalidRequestException.class)
-	@ResponseStatus(HttpStatus.BAD_REQUEST)
-	ApiResponse<Void> handleInvalidRequest(InvalidRequestException exception) {
-		return ApiResponse.fail(exception.getMessage());
+	ResponseEntity<ApiResponse<Void>> handleInvalidRequest(
+		HttpServletRequest request,
+		InvalidRequestException exception
+	) {
+		return fail(request, ErrorCode.INVALID_REQUEST, exception.getMessage());
 	}
 
 	@ExceptionHandler(MethodArgumentNotValidException.class)
-	@ResponseStatus(HttpStatus.BAD_REQUEST)
-	ApiResponse<Void> handleInvalidRequestBody(MethodArgumentNotValidException exception) {
+	ResponseEntity<ApiResponse<Void>> handleInvalidRequestBody(
+		HttpServletRequest request,
+		MethodArgumentNotValidException exception
+	) {
 		String message = exception.getBindingResult().getFieldErrors().stream()
 			.findFirst()
 			.map(error -> error.getDefaultMessage())
 			.orElseGet(() -> messages.message("common.error.invalid-body"));
-		return ApiResponse.fail(message);
+		return fail(request, ErrorCode.INVALID_REQUEST, message);
 	}
 
 	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
-	@ResponseStatus(HttpStatus.BAD_REQUEST)
-	ApiResponse<Void> handleInvalidRequestParameter() {
-		return ApiResponse.fail(messages.message("common.error.invalid-parameter"));
+	ResponseEntity<ApiResponse<Void>> handleInvalidRequestParameter(HttpServletRequest request) {
+		return fail(request, ErrorCode.INVALID_REQUEST, messages.message("common.error.invalid-parameter"));
 	}
 
 	@ExceptionHandler(ConflictException.class)
-	@ResponseStatus(HttpStatus.CONFLICT)
-	ApiResponse<Void> handleConflict(ConflictException exception) {
-		return ApiResponse.fail(exception.getMessage());
+	ResponseEntity<ApiResponse<Void>> handleConflict(HttpServletRequest request, ConflictException exception) {
+		return fail(request, ErrorCode.CONFLICT, exception.getMessage());
 	}
 
 	@ExceptionHandler(ResourceNotFoundException.class)
-	@ResponseStatus(HttpStatus.NOT_FOUND)
-	ApiResponse<Void> handleResourceNotFound(ResourceNotFoundException exception) {
-		return ApiResponse.fail(exception.getMessage());
+	ResponseEntity<ApiResponse<Void>> handleResourceNotFound(
+		HttpServletRequest request,
+		ResourceNotFoundException exception
+	) {
+		return fail(request, ErrorCode.RESOURCE_NOT_FOUND, exception.getMessage());
+	}
+
+	@ExceptionHandler(NoResourceFoundException.class)
+	ResponseEntity<ApiResponse<Void>> handleNoResourceFound(
+		HttpServletRequest request,
+		NoResourceFoundException exception
+	) {
+		return fail(request, ErrorCode.RESOURCE_NOT_FOUND, exception.getMessage());
+	}
+
+	@ExceptionHandler(ResponseStatusException.class)
+	ResponseEntity<ApiResponse<Void>> handleResponseStatus(
+		HttpServletRequest request,
+		ResponseStatusException exception
+	) {
+		ErrorCode errorCode = mapStatus(exception.getStatusCode());
+		String message = exception.getReason() == null || exception.getReason().isBlank()
+			? defaultMessage(errorCode)
+			: exception.getReason();
+		String correlationId = CorrelationId.currentOrCreate(request);
+		return ResponseEntity.status(exception.getStatusCode())
+			.body(ApiResponse.fail(errorCode, message, correlationId));
+	}
+
+	@ExceptionHandler(AccessDeniedException.class)
+	ResponseEntity<Void> handleAccessDenied(HttpServletRequest request) {
+		CorrelationId.currentOrCreate(request);
+		return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+	}
+
+	@ExceptionHandler(AuthenticationException.class)
+	ResponseEntity<Void> handleAuthentication(HttpServletRequest request) {
+		CorrelationId.currentOrCreate(request);
+		return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+	}
+
+	@ExceptionHandler(Exception.class)
+	ResponseEntity<ApiResponse<Void>> handleUnhandled(HttpServletRequest request, Exception exception) {
+		String correlationId = CorrelationId.currentOrCreate(request);
+		log.error("unhandled exception correlationId={}", correlationId, exception);
+		return ResponseEntity.status(ErrorCode.INTERNAL_ERROR.httpStatus())
+			.body(ApiResponse.fail(ErrorCode.INTERNAL_ERROR, messages.message("error.internal-error"), correlationId));
+	}
+
+	private ResponseEntity<ApiResponse<Void>> fail(
+		HttpServletRequest request,
+		ErrorCode errorCode,
+		String message
+	) {
+		String correlationId = CorrelationId.currentOrCreate(request);
+		return ResponseEntity.status(errorCode.httpStatus())
+			.body(ApiResponse.fail(errorCode, message, correlationId));
+	}
+
+	private String defaultMessage(ErrorCode errorCode) {
+		if (errorCode == ErrorCode.INTERNAL_ERROR) {
+			return messages.message("error.internal-error");
+		}
+		if (errorCode == ErrorCode.UNREADABLE_BODY) {
+			return messages.message("common.error.unreadable-body");
+		}
+		if (errorCode == ErrorCode.INVALID_REQUEST) {
+			return messages.message("common.error.invalid-body");
+		}
+		return errorCode.code();
+	}
+
+	private static ErrorCode mapStatus(HttpStatusCode status) {
+		return switch (status.value()) {
+			case 404 -> ErrorCode.RESOURCE_NOT_FOUND;
+			case 409 -> ErrorCode.CONFLICT;
+			case 500, 501, 502, 504 -> ErrorCode.INTERNAL_ERROR;
+			default -> status.is4xxClientError() ? ErrorCode.INVALID_REQUEST : ErrorCode.INTERNAL_ERROR;
+		};
 	}
 }
