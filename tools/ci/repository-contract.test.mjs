@@ -13515,7 +13515,11 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
     /admin_operator_state_change_audit method=\{\} path=\{\} principal=\{\} roles=\{\} tenant=\{\} status=\{\} outcome=\{\} correlation_id=\{\}/,
   );
   assert.match(adminOperatorAuditFilter, /ROLE_OPERATOR_ADMIN/);
-  assert.match(adminOperatorAuditFilter, /X-Correlation-Id/);
+  assert.match(adminOperatorAuditFilter, /CorrelationId\.(HEADER|ATTRIBUTE)/);
+  assert.match(
+    read("backend/src/main/java/com/easysubway/common/error/CorrelationId.java"),
+    /X-Correlation-Id/,
+  );
   assert.match(adminOperatorAuditFilter, /SUCCESS/);
   assert.match(adminOperatorAuditFilter, /FAILURE/);
   assert.match(adminOperatorAuditFilter, /HandlerMapping\.BEST_MATCHING_PATTERN_ATTRIBUTE/);
