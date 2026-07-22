@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/error/error_feedback.dart';
 import '../../mobile_error_reporter.dart';
 import 'get_off_alarm_controller.dart';
 import 'get_off_alarm_route_mapping.dart';
@@ -107,9 +108,7 @@ class _GetOffAlarmToggleState extends State<GetOffAlarmToggle> {
     } catch (error, stackTrace) {
       reportMobileError(error, stackTrace, context: '하차 알림 설정 중 예외가 발생했습니다.');
       if (mounted) {
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          const SnackBar(content: Text('하차 알림을 바꾸지 못했어요. 다시 시도해 주세요.')),
-        );
+        showAnnouncedErrorSnackBar(context, '하차 알림을 바꾸지 못했어요. 다시 시도해 주세요.');
       }
     } finally {
       if (mounted) {
