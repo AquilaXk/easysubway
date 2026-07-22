@@ -12068,7 +12068,19 @@ test("로컬 로그 관측성 스택은 Loki 기준선을 제공한다", () => {
   assert.match(errorOpsDashboard, /"title":\s*"오류 조회"/);
   assert.match(errorOpsDashboard, /"name":\s*"correlationId"/);
   assert.match(errorOpsDashboard, /"legendFormat":\s*"burn 3d"/);
-  assert.match(compose, /alloy:[\s\S]*healthcheck:[\s\S]*localhost:12345\/-\/ready/);
+  assert.match(
+    compose,
+    /container_name: easysubway-alloy[\s\S]*?healthcheck:[\s\S]*?\/dev\/tcp\/localhost\/12345[\s\S]*?\/-\/ready/,
+  );
+  assert.match(
+    compose,
+    /container_name: easysubway-alloy[\s\S]*?healthcheck:[\s\S]*?Alloy is ready/,
+  );
+  assert.doesNotMatch(
+    compose,
+    /container_name: easysubway-alloy[\s\S]*?healthcheck:[\s\S]*?wget --spider/,
+    "Alloy healthcheck must not rely on wget (missing in grafana/alloy image)",
+  );
   const deployBackend = read("tools/deploy/deploy-backend.sh");
   assert.match(
     deployBackend,
