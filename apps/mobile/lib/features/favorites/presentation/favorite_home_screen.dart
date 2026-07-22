@@ -160,7 +160,9 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
                             },
                           ),
                         )
-                      else if (data.isEmpty)
+                      else if (snapshot.connectionState ==
+                              ConnectionState.done &&
+                          data.isEmpty)
                         SizedBox(
                           height: viewportHeight,
                           child: const _FavoriteHomeEmptyState(),

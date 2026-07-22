@@ -72,7 +72,7 @@
             {"path": "apps/mobile/lib/app/accessibility_theme.dart", "sha256": "a13c1ded6008a883060ef34bb52d3e54a83b103d0c0bcfba05fd6e9370e9128a"},
             {"path": "apps/mobile/lib/features/account/presentation/user_data_deletion_screen.dart", "sha256": "58a527c44cfa1e19876f753d1433dac6952b32cf89bd29f42b15330033249484"},
             {"path": "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart", "sha256": "7ef5b7236a008f54a22040931f294b00192987fe35cc56fc94ebc2d815ef4620"},
-            {"path": "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart", "sha256": "f2ed78beac4fc5c02cc42f397b77c200185bcbd6d33c60105dc1ae2d55ce15f1"},
+            {"path": "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart", "sha256": "15ff6434e2e0584ed7f0404ebeb9dde62cfe1eaf04ab8e5f95c5e21d10a41edc"},
             {"path": "apps/mobile/lib/features/home/presentation/home_screen.dart", "sha256": "7d7b8e91f87b3682525ee64396870133d24b71bd482df0841c9e31b76807c547"},
             {"path": "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart", "sha256": "a25942153cb6d2bbfeaab6054c09f7e6813026596c635292d5b36b50714f81e8"},
             {"path": "apps/mobile/lib/features/settings/presentation/open_source_licenses_screen.dart", "sha256": "822762b61cd3824340c4e45cf5ffe3079e221d28712dd98d94fd9a03fe5fd591"},
