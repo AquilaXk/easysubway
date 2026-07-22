@@ -12055,14 +12055,18 @@ test("로컬 로그 관측성 스택은 Loki 기준선을 제공한다", () => {
   assert.match(alloyConfig, /loki\.source\.docker/);
   assert.match(alloyConfig, /loki\.write/);
   assert.match(alloyConfig, /stage\.labels[\s\S]*level/);
-  assert.doesNotMatch(alloyConfig, /stage\.labels[\s\S]*correlationId/);
+  assert.doesNotMatch(alloyConfig, /stage\.labels\s*\{[^}]*correlationId/);
   assert.doesNotMatch(alloyConfig, /target_label\s*=\s*"correlationId"/);
   assert.doesNotMatch(alloyConfig, /values\s*=\s*\{[^}]*correlationId/);
 
-  assert.match(dashboardProvider, /easysubway-error-ops|path: \/etc\/grafana\/provisioning\/dashboards\/json/);
+  assert.match(dashboardProvider, /easysubway-error-ops/);
+  assert.match(dashboardProvider, /path: \/etc\/grafana\/provisioning\/dashboards\/json/);
   assert.match(errorOpsDashboard, /"uid":\s*"easysubway-error-ops"/);
   assert.match(errorOpsDashboard, /"title":\s*"오류 조회"/);
   assert.match(errorOpsDashboard, /"name":\s*"correlationId"/);
+  assert.match(errorOpsDashboard, /"legendFormat":\s*"burn 3d"/);
+  assert.match(compose, /alloy:[\s\S]*healthcheck:[\s\S]*localhost:12345\/-\/ready/);
+  assert.match(compose, /\/var\/lib\/docker\/containers:\/var\/lib\/docker\/containers:ro/);
 });
 
 test("백엔드 스캐폴드는 eGovFrame 5.0 Spring Boot Java 21 헥사고날 프로젝트다", () => {
