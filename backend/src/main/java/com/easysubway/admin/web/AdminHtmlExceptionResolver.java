@@ -1,21 +1,30 @@
 package com.easysubway.admin.web;
 
+import com.easysubway.admin.errors.application.service.ErrorEventRecorder;
 import com.easysubway.common.error.ConflictException;
+import com.easysubway.common.error.CorrelationId;
+import com.easysubway.common.error.ErrorCode;
 import com.easysubway.common.error.InvalidRequestException;
 import com.easysubway.common.error.ResourceNotFoundException;
 import com.easysubway.transit.domain.MasterDataWriteNotAllowedException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.core.Ordered;
-import org.springframework.web.ErrorResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 import org.springframework.web.servlet.ModelAndView;
 
 @Component
 class AdminHtmlExceptionResolver implements HandlerExceptionResolver, Ordered {
+
+	private final ErrorEventRecorder errorEventRecorder;
+
+	AdminHtmlExceptionResolver(ErrorEventRecorder errorEventRecorder) {
+		this.errorEventRecorder = errorEventRecorder;
+	}
 
 	@Override
 	public int getOrder() {
@@ -33,6 +42,10 @@ class AdminHtmlExceptionResolver implements HandlerExceptionResolver, Ordered {
 			return null;
 		}
 		AdminHtmlError error = AdminHtmlError.from(exception);
+		if (error.status() >= 500) {
+			String correlationId = CorrelationId.currentOrCreate(request);
+			errorEventRecorder.recordIfNeeded(request, ErrorCode.INTERNAL_ERROR, exception, correlationId);
+		}
 		response.setStatus(error.status());
 		ModelAndView view = new ModelAndView("admin/error");
 		view.addObject("status", error.status());
