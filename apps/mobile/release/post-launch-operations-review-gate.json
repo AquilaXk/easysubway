@@ -93,7 +93,7 @@
             {"path": "infra/alloy/config.alloy", "sha256": "cb8333eecd52ef6cf5fc9ccf62e87a2990deaa57b6ff3b9a2effcfa33a9b3f5a"},
             {"path": "infra/grafana/provisioning/dashboards/dashboards.yml", "sha256": "648f908f7ddf556b3ec4de0dd9d66dfc75e58a747ebfda411725b8ad301aeb41"},
             {"path": "infra/grafana/provisioning/dashboards/json/error-ops.json", "sha256": "8d28d95d06780698b51014697ee4e942851876ea75ffcbf2c2a5ce7d394ec862"},
-            {"path": "infra/docker-compose.yml", "sha256": "a20b0acfc4f47caa72da7e7afdb0bb1f3d91eb6cdd0970d9fdf88a697a29f366"}
+            {"path": "infra/docker-compose.yml", "sha256": "0f14db02823e85a748b2918b0ea72360f90573bfd31c6042a4fcbf78db6ee145"}
           ]
         },
         {
