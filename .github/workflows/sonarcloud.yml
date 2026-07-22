@@ -76,6 +76,16 @@ jobs:
         working-directory: backend
         run: ./gradlew check jacocoTestReport spotbugsMain --no-daemon
 
+      - name: Upload SpotBugs reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: spotbugs-reports
+          path: |
+            backend/build/reports/spotbugs/
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Generate Flutter coverage
         working-directory: apps/mobile
         shell: bash
