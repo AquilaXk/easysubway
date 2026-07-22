@@ -504,8 +504,8 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, standby 승격
   assert.match(deploy, /tools\/ops\/postgres-backup\.sh/);
   assert.match(deploy, /EASYSUBWAY_BACKEND_ENV_FILE="\$\{BACKEND_ENV\}"/);
   assert.match(deploy, /RUNTIME_SERVICES=\(backend back-worker route-v2-gateway\)/);
-  assert.match(deploy, /OBSERVABILITY_SERVICES=\(public-edge-probe docker-runtime-probe alertmanager prometheus loki grafana\)/);
-  assert.match(deploy, /OBSERVABILITY_CONFIG_SERVICES=\(alertmanager prometheus loki grafana\)/);
+  assert.match(deploy, /OBSERVABILITY_SERVICES=\(public-edge-probe docker-runtime-probe alertmanager prometheus loki grafana alloy\)/);
+  assert.match(deploy, /OBSERVABILITY_CONFIG_SERVICES=\(alertmanager prometheus loki grafana alloy\)/);
   assert.match(deploy, /EASYSUBWAY_ALERTMANAGER_CONFIG_FILE=/);
   assert.match(deploy, /write_alertmanager_config "\$\{tmp_env_set\}\/alertmanager\.yml"/);
   assert.match(deploy, /chmod 600 "\$\{tmp_env_set\}\/compose\.env" "\$\{tmp_env_set\}\/backend\.env" "\$\{tmp_env_set\}\/metadata\.env"/);
