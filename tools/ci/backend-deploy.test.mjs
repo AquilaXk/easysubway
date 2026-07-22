@@ -577,6 +577,8 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, standby 승격
   // recreate < current-sha recorded.
   const noopExitIndex = deploy.indexOf('write_result "noop" "same_sha_same_env_services_ready"');
   const precheckIndex = deploy.indexOf("check-snapshot-freshness-precheck.mjs");
+  const logsInitPhaseIndex = deploy.indexOf('write_phase "backend_logs_init"');
+  const logsInitRunIndex = deploy.indexOf("run --rm --no-deps backend-logs-init");
   const standbyUpIndex = deploy.indexOf('write_phase "standby_starting"');
   const standbyForceRecreateIndex = deploy.indexOf("up -d --no-deps --no-build --force-recreate backend-standby");
   const standbyHardenedIndex = deploy.indexOf("if ! runtime_services_hardened backend-standby; then");
@@ -599,7 +601,7 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, standby 승격
   const currentShaWriteIndex = deploy.indexOf('printf \'%s\\n\' "${DEPLOY_SHA}" > "${SHARED_DIR}/current-sha"');
 
   for (const index of [
-    noopExitIndex, precheckIndex, standbyUpIndex, standbyForceRecreateIndex, standbyHardenedIndex,
+    noopExitIndex, precheckIndex, logsInitPhaseIndex, logsInitRunIndex, standbyUpIndex, standbyForceRecreateIndex, standbyHardenedIndex,
     standbyReadyWaitIndex, standbyReadyPhaseIndex, nginxAltIndex, nginxAltPhaseIndex, promotingPhaseIndex,
     canonicalForceRecreateIndex, canonicalHardenedIndex, canonicalReadyWaitIndex, promotedPhaseIndex,
     nginxCanonicalIndex, standbyCleanupPhaseIndex, standbyRmIndex, finalizingPhaseIndex,
@@ -609,6 +611,9 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, standby 승격
   }
 
   assert.ok(noopExitIndex < precheckIndex, "no-op success must exit before the freshness precheck runs");
+  assert.ok(precheckIndex < logsInitPhaseIndex, "freshness precheck must run before backend log volume init");
+  assert.ok(logsInitPhaseIndex < logsInitRunIndex, "backend_logs_init phase must precede the init container run");
+  assert.ok(logsInitRunIndex < standbyUpIndex, "log volume init must run before the standby container starts");
   assert.ok(precheckIndex < standbyUpIndex, "freshness precheck must run before the standby container starts");
   assert.ok(standbyUpIndex < standbyForceRecreateIndex);
   assert.ok(standbyForceRecreateIndex < standbyHardenedIndex, "standby must exist before it is hardening-checked");
