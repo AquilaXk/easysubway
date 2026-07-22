@@ -19,6 +19,7 @@ class AppSettingsScreen extends StatefulWidget {
     required this.onViewPreferencesChanged,
     required this.onOpenMobilityProfile,
     required this.onOpenSupportAccess,
+    required this.onOpenInquiry,
     required this.onOpenServiceInfo,
     required this.onOpenMyReports,
     this.onShellBack,
@@ -34,6 +35,7 @@ class AppSettingsScreen extends StatefulWidget {
   onViewPreferencesChanged;
   final Future<MobilityPreset?> Function() onOpenMobilityProfile;
   final VoidCallback onOpenSupportAccess;
+  final VoidCallback onOpenInquiry;
   final VoidCallback onOpenServiceInfo;
   final VoidCallback onOpenMyReports;
 
@@ -153,7 +155,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                 ],
               ),
               // 오프라인 안내 섹션·화면은 완전히 제거됐다(#1570): 오프라인 동작은
-              // 설명 없이 그냥 되는 것이고, 데이터·지도 출처는 도움말 및 문의·서비스 정보에 있다.
+              // 설명 없이 그냥 되는 것이고, 데이터·지도 출처는 도움말·서비스 정보에 있다.
               if (widget.notificationRepository != null)
                 _AppSettingsSection(
                   key: const Key('settingsSection-notification'),
@@ -198,8 +200,13 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                   ),
                   _AppSettingsActionTile(
                     key: const Key('settingsSupportPrivacyButton'),
-                    title: '도움말 및 문의',
+                    title: '도움말',
                     onTap: widget.onOpenSupportAccess,
+                  ),
+                  _AppSettingsActionTile(
+                    key: const Key('settingsInquiryButton'),
+                    title: '문의하기',
+                    onTap: widget.onOpenInquiry,
                   ),
                 ],
               ),

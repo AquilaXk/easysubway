@@ -120,34 +120,20 @@ class SupportAccessScreen extends StatelessWidget {
           repository: userDataDeletionRepository!,
           onDeleted: onUserDataDeleted,
         )
-      else if (_mailtoUri(accessInfo.dataDeletionEmail, '쉬운 지하철 내 정보 삭제 요청') !=
+      else if (buildSupportMailtoUri(
+            email: accessInfo.dataDeletionEmail,
+            subject: '쉬운 지하철 내 정보 삭제 요청',
+          ) !=
           null)
         _SupportAccessItem(
           key: const Key('dataDeletionAccessItem'),
           title: '내 정보 삭제 요청',
           value: accessInfo.dataDeletionEmail,
           displayValue: '이메일 보내기',
-          uri: _mailtoUri(accessInfo.dataDeletionEmail, '쉬운 지하철 내 정보 삭제 요청'),
-          launcher: launcher,
-        ),
-    ];
-    final inquiryChildren = <Widget>[
-      if (_mailtoUri(accessInfo.supportEmail, '쉬운 지하철 고객지원 문의') != null)
-        _SupportAccessItem(
-          key: const Key('supportAccessItem'),
-          title: '고객지원',
-          value: accessInfo.supportEmail,
-          displayValue: '이메일 보내기',
-          uri: _mailtoUri(accessInfo.supportEmail, '쉬운 지하철 고객지원 문의'),
-          launcher: launcher,
-        ),
-      if (_mailtoUri(accessInfo.securityEmail, '쉬운 지하철 보안 문의') != null)
-        _SupportAccessItem(
-          key: const Key('securityContactAccessItem'),
-          title: '보안 문의',
-          value: accessInfo.securityEmail,
-          displayValue: '보안 문제 알리기',
-          uri: _mailtoUri(accessInfo.securityEmail, '쉬운 지하철 보안 문의'),
+          uri: buildSupportMailtoUri(
+            email: accessInfo.dataDeletionEmail,
+            subject: '쉬운 지하철 내 정보 삭제 요청',
+          ),
           launcher: launcher,
         ),
     ];
@@ -157,7 +143,7 @@ class SupportAccessScreen extends StatelessWidget {
       backgroundColor: EasySubwayAccessibleColors.surface,
       appBar: AppBar(
         key: const Key('supportAccessAppBar'),
-        title: const Text('도움말 및 문의'),
+        title: const Text('도움말'),
         toolbarHeight: 60,
         backgroundColor: EasySubwayAccessibleColors.topBarSurface,
         surfaceTintColor: Colors.transparent,
@@ -200,13 +186,6 @@ class SupportAccessScreen extends StatelessWidget {
               title: '이동 전 살펴보기',
               children: const [_SafetyDataNotice()],
             ),
-            if (inquiryChildren.isNotEmpty)
-              _SupportSettingsSection(
-                key: const Key('supportSection-inquiry'),
-                title: '문의',
-                children: inquiryChildren,
-              ),
-            const _SecurityContactNotice(),
           ],
         ),
       ),
@@ -262,65 +241,6 @@ class _SupportSettingsSection extends StatelessWidget {
               color: EasySubwayAccessibleColors.line,
             ),
         ],
-      ],
-    );
-  }
-}
-
-class _SecurityContactNotice extends StatelessWidget {
-  const _SecurityContactNotice();
-
-  static const _title = '보안 문의 안내';
-  static const _contactNotice = '앱 보안이나 개인정보가 걱정되면 문의로 알려주세요.';
-  static const _scopeNotice = '위치, 제보 사진, 알림, 개인정보 관련 걱정을 함께 보낼 수 있습니다.';
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        ColoredBox(
-          color: EasySubwayAccessibleColors.scaffoldSurface,
-          child: SizedBox(
-            width: double.infinity,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
-              child: Semantics(
-                header: true,
-                child: Text(
-                  _title,
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: EasySubwayAccessibleColors.secondaryText,
-                    fontWeight: FontWeight.w700,
-                    height: 1.25,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-        Semantics(
-          key: const Key('securityContactNotice'),
-          container: true,
-          label: '$_title, $_contactNotice $_scopeNotice',
-          child: ExcludeSemantics(
-            child: ColoredBox(
-              color: EasySubwayAccessibleColors.surface,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _SupportNoticeBullet(text: _contactNotice),
-                    const SizedBox(height: 10),
-                    _SupportNoticeBullet(text: _scopeNotice),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -490,14 +410,20 @@ class _SupportAccessItem extends StatelessWidget {
   }
 }
 
-Uri? _mailtoUri(String value, String subject) {
-  final email = value.trim();
-  if (email.isEmpty) {
+/// 지원·문의 mailto URI. [body]가 있으면 메일 초안 본문으로 넣는다.
+Uri? buildSupportMailtoUri({
+  required String email,
+  required String subject,
+  String? body,
+}) {
+  final normalizedEmail = email.trim();
+  if (normalizedEmail.isEmpty) {
     return null;
   }
-  return Uri(
-    scheme: 'mailto',
-    path: email,
-    queryParameters: {'subject': subject},
-  );
+  final query = <String, String>{'subject': subject};
+  final normalizedBody = body?.trim();
+  if (normalizedBody != null && normalizedBody.isNotEmpty) {
+    query['body'] = normalizedBody;
+  }
+  return Uri(scheme: 'mailto', path: normalizedEmail, queryParameters: query);
 }

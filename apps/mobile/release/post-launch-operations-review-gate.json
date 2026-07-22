@@ -73,11 +73,12 @@
             {"path": "apps/mobile/lib/features/account/presentation/user_data_deletion_screen.dart", "sha256": "58a527c44cfa1e19876f753d1433dac6952b32cf89bd29f42b15330033249484"},
             {"path": "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart", "sha256": "7ef5b7236a008f54a22040931f294b00192987fe35cc56fc94ebc2d815ef4620"},
             {"path": "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart", "sha256": "bb293eb895b557c50c43079d5ca7e1ebc2f22367c171754c8ac7c8a4eb641c26"},
-            {"path": "apps/mobile/lib/features/home/presentation/home_screen.dart", "sha256": "a58cd50bb6c700236ffbcebbcc41c4429b2e067e2c8fba0bdd7652999a40c575"},
-            {"path": "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart", "sha256": "f53d6851dc8410243708e28efda9dfa66aa647a22b8cce5bcd7bff06c7539964"},
+            {"path": "apps/mobile/lib/features/home/presentation/home_screen.dart", "sha256": "526c3a9d1e2dfb16127e852ebe9fc53bcf1c48fe4d3c3abd049eee45e23d4dc9"},
+            {"path": "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart", "sha256": "a25942153cb6d2bbfeaab6054c09f7e6813026596c635292d5b36b50714f81e8"},
             {"path": "apps/mobile/lib/features/settings/presentation/open_source_licenses_screen.dart", "sha256": "822762b61cd3824340c4e45cf5ffe3079e221d28712dd98d94fd9a03fe5fd591"},
             {"path": "apps/mobile/lib/features/settings/presentation/service_info_screen.dart", "sha256": "16977a4dadb5f8898d8dc8d152e373401c89ac0244f3a8f9234e32871c5f45ac"},
-            {"path": "apps/mobile/lib/features/support/presentation/support_access_screen.dart", "sha256": "fe54e754b90cb57b4f915e20298c6ab8bbe48799b240789d65553235d82b3014"},
+            {"path": "apps/mobile/lib/features/support/presentation/support_access_screen.dart", "sha256": "add48d006d50e4405b2668354ea72e010423594d5d0dcf4ed932bbbde2ce8db7"},
+            {"path": "apps/mobile/lib/features/support/presentation/inquiry_screen.dart", "sha256": "f108ce5939e6542ec36438a2f6cbe8f9183eef09e4edcbacbc5549e5256f5581"},
             {"path": "apps/mobile/lib/main.dart", "sha256": "8b4cc60e9cc979c933af7949dcce1f62638ac1ff2f2b0212e48be2a8096ff505"}
           ]
         },

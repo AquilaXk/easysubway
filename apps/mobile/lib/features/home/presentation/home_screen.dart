@@ -33,6 +33,7 @@ import '../../service_notice/presentation/service_notice_list_screen.dart';
 import '../../settings/presentation/app_settings_screen.dart';
 import '../../settings/presentation/service_info_screen.dart';
 import '../../stations/presentation/station_search_screen.dart';
+import '../../support/presentation/inquiry_screen.dart';
 import '../../support/presentation/support_access_screen.dart';
 import '../../train_search/domain/train_search_models.dart';
 import '../../train_search/presentation/train_search_screen.dart';
@@ -312,6 +313,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             launcher: supportAccessLauncher,
             userDataDeletionRepository: userDataDeletionRepository,
             onUserDataDeleted: onUserDataDeleted,
+          ),
+        ),
+      );
+    }
+
+    void openInquiry() {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => InquiryScreen(
+            accessInfo: supportAccessInfo,
+            launcher: supportAccessLauncher,
           ),
         ),
       );
@@ -719,6 +731,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           onViewPreferencesChanged: widget.onViewPreferencesChanged,
           onOpenMobilityProfile: _openMobilityProfile,
           onOpenSupportAccess: openSupportAccess,
+          onOpenInquiry: openInquiry,
           onOpenServiceInfo: openServiceInfo,
           onOpenMyReports: openMyReports,
           onShellBack: openPreviousTabOrHome,
