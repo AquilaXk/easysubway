@@ -2188,9 +2188,9 @@ test("모바일 즐겨찾기 화면은 favorites presentation canonical 파일�
     "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart",
   );
 
-  assert.match(favorites, /^class _HomeSavedRouteCard extends StatelessWidget/m);
+  assert.match(favorites, /^class _FavoriteHomeRouteRow extends StatelessWidget/m);
   assert.match(favorites, /^String _stationNameWithSuffix\(String name\)/m);
-  assert.match(favorites, /^class _HomeMiniBadge extends StatelessWidget/m);
+  assert.match(favorites, /^class _FavoriteHomeSectionHeader extends StatelessWidget/m);
   assert.match(favorites, /^class FavoriteHomeScreen extends StatefulWidget/m);
   assert.match(favorites, /^class _FavoriteHomeScreenState extends State<FavoriteHomeScreen>/m);
   assert.match(favorites, /^class _FavoriteHomeData\b/m);
@@ -2204,9 +2204,9 @@ test("모바일 즐겨찾기 화면은 favorites presentation canonical 파일�
     read("apps/mobile/test/widget_test.dart"),
     /^import 'package:easysubway_mobile\/features\/favorites\/presentation\/favorite_home_screen\.dart';$/m,
   );
-  assert.doesNotMatch(main, /^class _HomeSavedRouteCard\b/m);
+  assert.doesNotMatch(main, /^class _FavoriteHomeRouteRow\b/m);
   assert.doesNotMatch(main, /^String _stationNameWithSuffix\b/m);
-  assert.doesNotMatch(main, /^class _HomeMiniBadge\b/m);
+  assert.doesNotMatch(main, /^class _FavoriteHomeSectionHeader\b/m);
   assert.doesNotMatch(main, /^class FavoriteHomeScreen\b/m);
   assert.doesNotMatch(main, /^class _FavoriteHomeScreenState\b/m);
   assert.doesNotMatch(main, /^class _FavoriteHomeData\b/m);
@@ -15585,17 +15585,19 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
     homeScreen,
     /RouteSearchScreen\([\s\S]*simpleViewEnabled: simpleViewEnabled/,
   );
-  assert.match(favoriteHomeScreen, /AppBar\(title: const Text\('즐겨찾기'\)\)/);
-  // 즐겨찾기 홈은 #1569에서 카테고리 카드를 없애고 역/경로/시설 인라인 섹션으로 바꿨다.
-  assert.match(favoriteHomeScreen, /AppSectionTitle\(title: '역'\)/);
-  assert.match(favoriteHomeScreen, /AppSectionTitle\(title: '시설'\)/);
-  assert.match(favoriteHomeScreen, /AppSectionTitle\(title: '경로'\)/);
+  assert.match(favoriteHomeScreen, /title: const Text\('즐겨찾기'\)/);
+  assert.match(favoriteHomeScreen, /Key\('favoriteHomeAppBar'\)/);
+  // 즐겨찾기 홈은 설정형 섹션 헤더로 역/경로/시설을 인라인 나열한다(#1569·#2436).
+  assert.match(favoriteHomeScreen, /_FavoriteHomeSectionHeader\(title: '역'\)/);
+  assert.match(favoriteHomeScreen, /_FavoriteHomeSectionHeader\(title: '시설'\)/);
+  assert.match(favoriteHomeScreen, /_FavoriteHomeSectionHeader\(title: '경로'\)/);
   assert.match(homeScreen, /FavoriteHomeScreen/);
+  assert.match(homeScreen, /onShellBack: openPreviousTabOrHome/);
   // #1569: 하위 목록 화면 진입 대신 즐겨찾기 항목을 인라인 행으로 바로 나열한다.
   // (하위 목록 위젯 클래스는 각 소스 파일에 유지, main에서 진입만 제거)
   assert.match(favoriteHomeScreen, /class _FavoriteHomeStationRow/);
   assert.match(favoriteHomeScreen, /class _FavoriteHomeFacilityRow/);
-  assert.match(favoriteHomeScreen, /_HomeSavedRouteCard\([\s\S]*onRemove:/);
+  assert.match(favoriteHomeScreen, /_FavoriteHomeRouteRow\([\s\S]*onRemove:/);
   assert.match(onboarding, /class OnboardingViewPreferences/);
   assert.match(onboarding, /const OnboardingViewPreferences\.defaults/);
   assert.match(onboarding, /class OnboardingResult/);

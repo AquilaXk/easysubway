@@ -722,6 +722,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 mobilityType,
                 transportScope ?? RouteTransportScope.subway,
               ),
+          onShellBack: openPreviousTabOrHome,
         ),
       );
     }

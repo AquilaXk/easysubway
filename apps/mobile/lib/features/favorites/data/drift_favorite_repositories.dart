@@ -26,7 +26,10 @@ class DriftFavoriteStationRepository implements FavoriteStationRepository {
     final favoriteRows = await userDatabase
         .customSelect(
           '''
-          SELECT station_id, CAST(added_at AS INTEGER) AS added_at_value
+          SELECT
+            station_id,
+            line_id,
+            CAST(added_at AS INTEGER) AS added_at_value
           FROM favorite_stations
           ORDER BY added_at DESC
           ''',
@@ -35,9 +38,10 @@ class DriftFavoriteStationRepository implements FavoriteStationRepository {
         .get();
 
     final favorites = <FavoriteStation>[];
-    final seenStationIds = <String>{};
+    final seenKeys = <String>{};
     for (final favoriteRow in favoriteRows) {
       final storedStationId = favoriteRow.read<String>('station_id');
+      final favoritedLineId = favoriteRow.read<String>('line_id');
       final stationId = await catalogDatabase.findCanonicalStationId(
         storedStationId,
       );
@@ -48,10 +52,12 @@ class DriftFavoriteStationRepository implements FavoriteStationRepository {
         await _migrateFavoriteStationId(
           storedStationId,
           stationId,
+          favoritedLineId,
           favoriteRow.read<int>('added_at_value'),
         );
       }
-      if (!seenStationIds.add(stationId)) {
+      final key = favoriteStationLineKey(stationId, favoritedLineId);
+      if (!seenKeys.add(key)) {
         continue;
       }
       final stationRows = await catalogDatabase
@@ -89,6 +95,7 @@ class DriftFavoriteStationRepository implements FavoriteStationRepository {
       final firstRow = stationRows.first;
       final builder = FavoriteStationBuilder(
         stationId: stationId,
+        lineId: favoritedLineId,
         nameKo: firstRow.read<String>('name_ko'),
         nameEn: firstRow.read<String?>('name_en') ?? '',
         region: firstRow.read<String?>('region') ?? '',
@@ -101,16 +108,21 @@ class DriftFavoriteStationRepository implements FavoriteStationRepository {
       );
       for (final row in stationRows) {
         final lineId = row.read<String?>('line_id');
-        if (lineId != null) {
-          builder.lines.add(
-            StationSearchLine(
-              id: lineId,
-              name: row.read<String>('line_name'),
-              color: row.read<String>('line_color'),
-              stationCode: row.read<String>('station_code'),
-            ),
-          );
+        if (lineId == null) {
+          continue;
         }
+        // 호선 단위 즐겨찾기는 해당 호선만, 레거시(빈 line_id)는 전 호선.
+        if (favoritedLineId.isNotEmpty && lineId != favoritedLineId) {
+          continue;
+        }
+        builder.lines.add(
+          StationSearchLine(
+            id: lineId,
+            name: row.read<String>('line_name'),
+            color: row.read<String>('line_color'),
+            stationCode: row.read<String>('station_code'),
+          ),
+        );
       }
       favorites.add(builder.build());
     }
@@ -119,8 +131,12 @@ class DriftFavoriteStationRepository implements FavoriteStationRepository {
   }
 
   @override
-  Future<FavoriteStation> saveFavoriteStation(String stationId) async {
+  Future<FavoriteStation> saveFavoriteStation(
+    String stationId, {
+    String? lineId,
+  }) async {
     final trimmedStationId = stationId.trim();
+    final normalizedLineId = (lineId ?? '').trim();
     final canonicalStationId = await catalogDatabase.findCanonicalStationId(
       trimmedStationId,
     );
@@ -128,49 +144,117 @@ class DriftFavoriteStationRepository implements FavoriteStationRepository {
       throw const FavoriteStationException('즐겨찾기 역을 저장하지 못했어요.');
     }
     await _ensureStationExists(canonicalStationId);
+    if (normalizedLineId.isNotEmpty) {
+      await _ensureStationLineExists(canonicalStationId, normalizedLineId);
+    }
     await userDatabase
         .into(userDatabase.favoriteStations)
         .insertOnConflictUpdate(
           user_db.FavoriteStationsCompanion.insert(
             stationId: canonicalStationId,
+            lineId: Value(normalizedLineId),
             addedAt: DateTime.now().toUtc(),
           ),
         );
-    return (await listFavoriteStations()).singleWhere(
-      (favorite) => favorite.stationId == canonicalStationId,
+    return (await listFavoriteStations()).firstWhere(
+      (favorite) =>
+          favorite.stationId == canonicalStationId &&
+          favorite.lineId == normalizedLineId,
     );
   }
 
   @override
-  Future<void> removeFavoriteStation(String stationId) async {
+  Future<void> removeFavoriteStation(String stationId, {String? lineId}) async {
     final trimmedStationId = stationId.trim();
+    final normalizedLineId = (lineId ?? '').trim();
     final canonicalStationId = await catalogDatabase.findCanonicalStationId(
       trimmedStationId,
     );
-    await userDatabase.customStatement(
-      'DELETE FROM favorite_stations WHERE station_id = ? OR station_id = ?',
-      [trimmedStationId, canonicalStationId ?? trimmedStationId],
-    );
+    final resolvedStationId = canonicalStationId ?? trimmedStationId;
+    if (normalizedLineId.isEmpty) {
+      await userDatabase.customStatement(
+        'DELETE FROM favorite_stations WHERE station_id = ? OR station_id = ?',
+        [trimmedStationId, resolvedStationId],
+      );
+      return;
+    }
+
+    await userDatabase.transaction(() async {
+      await userDatabase.customStatement(
+        '''
+        DELETE FROM favorite_stations
+        WHERE (station_id = ? OR station_id = ?) AND line_id = ?
+        ''',
+        [trimmedStationId, resolvedStationId, normalizedLineId],
+      );
+
+      // 레거시 역 전체 즐겨찾기가 있으면, 해제한 호선만 빼고 나머지로 펼친다.
+      final legacy = await userDatabase
+          .customSelect(
+            '''
+            SELECT CAST(added_at AS INTEGER) AS added_at_value
+            FROM favorite_stations
+            WHERE (station_id = ? OR station_id = ?) AND line_id = ''
+            LIMIT 1
+            ''',
+            variables: [
+              Variable.withString(trimmedStationId),
+              Variable.withString(resolvedStationId),
+            ],
+            readsFrom: {userDatabase.favoriteStations},
+          )
+          .getSingleOrNull();
+      if (legacy == null) {
+        return;
+      }
+      final addedAt = legacy.read<int>('added_at_value');
+      final otherLineIds = await _lineIdsForStation(resolvedStationId);
+      await userDatabase.customStatement(
+        '''
+        DELETE FROM favorite_stations
+        WHERE (station_id = ? OR station_id = ?) AND line_id = ''
+        ''',
+        [trimmedStationId, resolvedStationId],
+      );
+      for (final otherLineId in otherLineIds) {
+        if (otherLineId == normalizedLineId) {
+          continue;
+        }
+        await userDatabase.customStatement(
+          '''
+          INSERT INTO favorite_stations (station_id, line_id, added_at)
+          VALUES (?, ?, ?)
+          ON CONFLICT(station_id, line_id) DO UPDATE SET
+            added_at = MAX(favorite_stations.added_at, excluded.added_at)
+          ''',
+          [resolvedStationId, otherLineId, addedAt],
+        );
+      }
+    });
   }
 
   Future<void> _migrateFavoriteStationId(
     String storedStationId,
     String canonicalStationId,
+    String lineId,
     int addedAt,
   ) async {
     await userDatabase.transaction(() async {
       await userDatabase.customStatement(
         '''
-        INSERT INTO favorite_stations (station_id, added_at)
-        VALUES (?, ?)
-        ON CONFLICT(station_id) DO UPDATE SET
+        INSERT INTO favorite_stations (station_id, line_id, added_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(station_id, line_id) DO UPDATE SET
           added_at = MAX(favorite_stations.added_at, excluded.added_at)
         ''',
-        [canonicalStationId, addedAt],
+        [canonicalStationId, lineId, addedAt],
       );
       await userDatabase.customStatement(
-        'DELETE FROM favorite_stations WHERE station_id = ?',
-        [storedStationId],
+        '''
+        DELETE FROM favorite_stations
+        WHERE station_id = ? AND line_id = ?
+        ''',
+        [storedStationId, lineId],
       );
     });
   }
@@ -186,6 +270,43 @@ class DriftFavoriteStationRepository implements FavoriteStationRepository {
     if (row == null) {
       throw const FavoriteStationException('즐겨찾기 역을 저장하지 못했어요.');
     }
+  }
+
+  Future<void> _ensureStationLineExists(String stationId, String lineId) async {
+    final row = await catalogDatabase
+        .customSelect(
+          '''
+          SELECT station_id
+          FROM station_lines
+          WHERE station_id = ? AND line_id = ?
+          LIMIT 1
+          ''',
+          variables: [
+            Variable.withString(stationId),
+            Variable.withString(lineId),
+          ],
+          readsFrom: {catalogDatabase.stationLines},
+        )
+        .getSingleOrNull();
+    if (row == null) {
+      throw const FavoriteStationException('즐겨찾기 역을 저장하지 못했어요.');
+    }
+  }
+
+  Future<List<String>> _lineIdsForStation(String stationId) async {
+    final rows = await catalogDatabase
+        .customSelect(
+          '''
+          SELECT line_id
+          FROM station_lines
+          WHERE station_id = ?
+          ORDER BY line_sequence
+          ''',
+          variables: [Variable.withString(stationId)],
+          readsFrom: {catalogDatabase.stationLines},
+        )
+        .get();
+    return [for (final row in rows) row.read<String>('line_id')];
   }
 }
 
@@ -529,6 +650,7 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
 class FavoriteStationBuilder {
   FavoriteStationBuilder({
     required this.stationId,
+    this.lineId = '',
     required this.nameKo,
     required this.nameEn,
     required this.region,
@@ -539,6 +661,7 @@ class FavoriteStationBuilder {
   });
 
   final String stationId;
+  final String lineId;
   final String nameKo;
   final String nameEn;
   final String region;
@@ -552,6 +675,7 @@ class FavoriteStationBuilder {
     return FavoriteStation(
       userId: _localUserId,
       stationId: stationId,
+      lineId: lineId,
       nameKo: nameKo,
       nameEn: nameEn,
       region: region,

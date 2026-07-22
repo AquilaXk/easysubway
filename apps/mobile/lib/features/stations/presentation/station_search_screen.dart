@@ -15,6 +15,7 @@ import '../../realtime/realtime_repository.dart';
 import '../../route_draft/application/route_draft_controller.dart';
 import '../../route_draft/domain/route_draft.dart';
 import '../application/station_search_controller.dart';
+import '../domain/station_line.dart';
 import '../domain/station_models.dart';
 import '../domain/station_repositories.dart';
 import 'station_recent_search_section.dart';
@@ -93,6 +94,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
   final TextEditingController _queryController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   List<RecentSearchEntry> _recentEntries = const [];
+  Set<String> _favoriteKeys = const <String>{};
   Timer? _searchDebounce;
   late String _regionLabel;
 
@@ -107,6 +109,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     _controller.addListener(_handleControllerChanged);
     _queryController.addListener(_handleQueryChanged);
     unawaited(_loadRecentEntries());
+    unawaited(_loadFavoriteStationIds());
     // 검색 진입은 화면을 여는 즉시 입력 모드로 들어간다. autofocus가 담당한다.
   }
 
@@ -231,10 +234,15 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       builder: (context, _) {
         return StationSearchBody(
           state: _controller.state,
+          query: _queryController.text,
+          favoriteKeys: _favoriteKeys,
           // 칸 채우기 모드에서는 결과 한 번 탭 = 해당 칸 설정 후 닫기. 지도 탭과 동일
           // 하게 "출발역 선택 → 도착역 선택" UX로 수렴시킨다. 둘러보기 모드에서는
           // 선택한 역을 지도로 반환한다.
           onResultTap: isPicking ? _pickStation : _returnStationToMap,
+          onToggleFavorite: widget.favoriteRepository == null
+              ? null
+              : _toggleFavoriteStation,
         );
       },
     );
@@ -326,10 +334,15 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
                 constraints,
                 textScaleFactor: MediaQuery.textScalerOf(context).scale(1),
               );
+              // 검색어가 있으면 결과 목록을 좌·우·위 여백 없이 채운다.
+              // (_handleQueryChanged가 setState하므로 타이핑 직후 바로 반영)
+              final pagePadding = _hasSearchQuery
+                  ? EdgeInsets.zero
+                  : (isLargeScreen
+                        ? _stationSearchLargePagePadding
+                        : _stationSearchPagePadding);
               return ListView(
-                padding: isLargeScreen
-                    ? _stationSearchLargePagePadding
-                    : _stationSearchPagePadding,
+                padding: pagePadding,
                 children: [
                   _StationSearchAdaptiveContent(
                     isLargeScreen: isLargeScreen,
@@ -343,6 +356,80 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _loadFavoriteStationIds() async {
+    final repository = widget.favoriteRepository;
+    if (repository == null) {
+      return;
+    }
+    try {
+      final favorites = await repository.listFavoriteStations();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _favoriteKeys = {
+          for (final favorite in favorites)
+            favoriteStationLineKey(favorite.stationId, favorite.lineId),
+        };
+      });
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '역 검색 즐겨찾기 조회 중 예외가 발생했습니다.',
+      );
+    }
+  }
+
+  Future<void> _toggleFavoriteStation(
+    StationSearchResult result,
+    StationSearchLine? line,
+  ) async {
+    final repository = widget.favoriteRepository;
+    if (repository == null) {
+      return;
+    }
+    final stationId = result.id;
+    final lineId = line?.id;
+    final key = favoriteStationLineKey(stationId, lineId);
+    final removing = isFavoriteStationLine(_favoriteKeys, stationId, lineId);
+    try {
+      if (removing) {
+        await repository.removeFavoriteStation(stationId, lineId: lineId);
+      } else {
+        await repository.saveFavoriteStation(stationId, lineId: lineId);
+      }
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        final next = Set<String>.from(_favoriteKeys);
+        // 레거시 역 전체 키가 있으면 구체 호선 키로 정리한다.
+        next.remove(favoriteStationLineKey(stationId, ''));
+        if (removing) {
+          next.remove(key);
+        } else {
+          next.add(key);
+        }
+        _favoriteKeys = next;
+      });
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '역 검색 즐겨찾기 변경 중 예외가 발생했습니다.',
+      );
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(removing ? '즐겨찾기를 해제하지 못했어요.' : '즐겨찾기를 추가하지 못했어요.'),
+        ),
+      );
+    }
   }
 
   void _submit(String query) {
@@ -527,13 +614,14 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
 
   /// 칸 채우기 모드: 결과를 탭하면 지정된 칸을 [routeDraftController]에 설정하고
   /// 화면을 닫으면서 선택한 역을 반환한다. 지도 탭 경로와 같은 컨트롤러·같은 draft로
-  /// 수렴한다.
-  void _pickStation(StationSearchResult result) {
+  /// 수렴한다. 탭한 행의 노선(없으면 결과의 첫 노선)을 draft에 함께 담아 상단바
+  /// 뱃지를 그린다.
+  void _pickStation(StationSearchResult result, StationSearchLine? line) {
     final slot = widget.pickSlot;
     if (slot == null) {
       return;
     }
-    final station = RouteDraftStation(id: result.id, nameKo: result.nameKo);
+    final station = _routeDraftStationFromSearch(result, line);
     switch (slot) {
       case RouteDraftSlot.origin:
         widget.routeDraftController?.setOrigin(station);
@@ -549,9 +637,24 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
   /// 반환하며 화면을 닫는다. 호출부(main.dart openStationSearch)가 이 결과를
   /// 받아 노선도 focus + 팬 메뉴 + 해당 역 하단 패널을 트리거한다(임베디드
   /// 검색과 동일한 흐름으로 수렴).
-  void _returnStationToMap(StationSearchResult result) {
+  void _returnStationToMap(StationSearchResult result, StationSearchLine? _) {
     Navigator.of(context).pop(result);
   }
+}
+
+RouteDraftStation _routeDraftStationFromSearch(
+  StationSearchResult result,
+  StationSearchLine? line,
+) {
+  final resolved = line ?? result.lines.firstOrNull;
+  return RouteDraftStation(
+    id: result.id,
+    nameKo: result.nameKo,
+    lineId: resolved?.id ?? '',
+    lineName: resolved?.name ?? '',
+    lineColor: resolved?.color ?? '',
+    stationCode: resolved?.stationCode ?? '',
+  );
 }
 
 /// 검색 화면 상단 필드 우측 지역 선택기. 홈과 같은 위치·스타일이지만, 선택은

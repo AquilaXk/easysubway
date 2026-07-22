@@ -5,10 +5,14 @@ class FavoriteStations extends Table {
   String get tableName => 'favorite_stations';
 
   TextColumn get stationId => text().named('station_id')();
+
+  /// 호선 단위 즐겨찾기. 빈 문자열은 레거시(역 전체) 즐겨찾기다.
+  TextColumn get lineId =>
+      text().named('line_id').withDefault(const Constant(''))();
   DateTimeColumn get addedAt => dateTime().named('added_at')();
 
   @override
-  Set<Column> get primaryKey => {stationId};
+  Set<Column> get primaryKey => {stationId, lineId};
 }
 
 class FavoriteFacilities extends Table {

@@ -1144,22 +1144,48 @@ void main() {
       60,
     );
 
-    final topBarDivider = tester.widget<SizedBox>(
-      find.byKey(const Key('networkMapTopBarDivider')),
+    // 노선도·메뉴만 mapChrome 짧은 드롭(카카오 페이드 환산). 선 톤은 전 화면 공통.
+    final topBarLine = tester.widget<ColoredBox>(
+      find.descendant(
+        of: find.byKey(const Key('networkMapTopBarDivider')),
+        matching: find.byType(ColoredBox),
+      ),
     );
-    final topBarDecoration =
-        (topBarDivider.child! as DecoratedBox).decoration as BoxDecoration;
-    expect(topBarDecoration.color, const Color(0xFFCBD6DD));
-    expect(topBarDecoration.boxShadow, const <BoxShadow>[
-      BoxShadow(color: Color(0x0D000000), offset: Offset(0, 1), blurRadius: 2),
+    expect(topBarLine.color, easySubwayHeaderDividerColor);
+    final topBarDrop = tester.widget<DecoratedBox>(
+      find.descendant(
+        of: find.byKey(const Key('networkMapTopBarDivider')),
+        matching: find.byType(DecoratedBox),
+      ),
+    );
+    final topBarGradient =
+        (topBarDrop.decoration as BoxDecoration).gradient! as LinearGradient;
+    expect(topBarGradient.colors, const <Color>[
+      Color(0x32000000),
+      Color(0x1D000000),
+      Color(0x11000000),
+      Color(0x07000000),
+      Color(0x00000000),
     ]);
 
-    final menuHeaderDivider = tester.widget<SizedBox>(
-      find.byKey(const Key('networkMapMenuHeaderDivider')),
+    final menuHeaderLine = tester.widget<ColoredBox>(
+      find.descendant(
+        of: find.byKey(const Key('networkMapMenuHeaderDivider')),
+        matching: find.byType(ColoredBox),
+      ),
     );
-    final menuHeaderDecoration =
-        (menuHeaderDivider.child! as DecoratedBox).decoration as BoxDecoration;
-    expect(menuHeaderDecoration, topBarDecoration);
+    expect(menuHeaderLine.color, easySubwayHeaderDividerColor);
+    final menuHeaderDrop = tester.widget<DecoratedBox>(
+      find.descendant(
+        of: find.byKey(const Key('networkMapMenuHeaderDivider')),
+        matching: find.byType(DecoratedBox),
+      ),
+    );
+    expect(
+      ((menuHeaderDrop.decoration as BoxDecoration).gradient! as LinearGradient)
+          .colors,
+      topBarGradient.colors,
+    );
 
     final internalDividers = tester.widgetList<Divider>(
       find.descendant(of: panel, matching: find.byType(Divider)),
@@ -2310,8 +2336,16 @@ void main() {
       ),
       findsOneWidget,
     );
-    // #1985: draft 빈 행 placeholder는 '출발역'/'경유역'/'도착역'으로 낭독·표시한다.
-    expect(find.text('도착역'), findsOneWidget);
+    // 역할 라벨(도착역) + 값 영역 플레이스홀더(도착역 입력).
+    expect(find.text('도착역'), findsWidgets); // 역할 라벨(출발에도 역할 라벨 있음)
+    expect(find.text('도착역 입력'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('networkMapRouteDraftOriginRow')),
+        matching: find.text('출발역'),
+      ),
+      findsOneWidget,
+    );
     // owner spec: 라벨 프리픽스 텍스트와 노드 점 커넥터 컬럼은 제거되고, 두 개의
     // 무채색 채움 필드만 남는다.
     expect(find.text('출발역을 탭하거나 검색'), findsNothing);
@@ -2324,8 +2358,24 @@ void main() {
       find.byKey(const Key('networkMapRouteDraftDestinationRow')),
       findsOneWidget,
     );
-    // 스왑(⇅) 어포던스가 상단바에 존재한다.
-    expect(find.byKey(const Key('networkMapRouteDraftSwap')), findsOneWidget);
+    // 스왑(⇅)은 없고, 지역은 왼쪽 잠김 표시로만 남는다.
+    expect(find.byKey(const Key('networkMapRouteDraftSwap')), findsNothing);
+    expect(
+      find.byKey(const Key('networkMapRouteDraftRegionLabel')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('networkMapRouteDraftBackButton')),
+      findsOneWidget,
+    );
+    // 채워진 출발 칸은 노선 뱃지 + 역명을 보여 준다.
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('networkMapRouteDraftOriginRow')),
+        matching: find.byKey(const Key('stationLineBadge-seoul-4')),
+      ),
+      findsOneWidget,
+    );
 
     // 출발칸 지우기(✕) → draft에서 출발이 지워지고, 도착도 없으니 상단바는 다시
     // 검색바로 돌아온다.
@@ -2369,6 +2419,10 @@ void main() {
     // 출발 지정 후 출발 핀이 그 역 위에 뜬다.
     expect(find.byKey(const Key('networkMapDraftPin-origin')), findsOneWidget);
     expect(find.bySemanticsLabel('상록수역, 출발 지정됨'), findsOneWidget);
+    expect(
+      find.byKey(const Key('networkMapDraftPinClear-origin')),
+      findsOneWidget,
+    );
 
     // 다른 역 탭 → "경유" 선택 → 경유 핀이 뜬다.
     await tester.tap(find.byKey(const Key('networkMapStation-sadang-seoul-2')));
@@ -2376,6 +2430,21 @@ void main() {
     await _tapFanMenuSector(tester, _fanWaypointLabel);
     await tester.pumpAndSettle();
 
+    expect(
+      find.byKey(const Key('networkMapDraftPin-waypoint')),
+      findsOneWidget,
+    );
+
+    // 핀 ✕ 콜백이 출발 슬롯을 비운다(상단바에 가려 hit-test가 막힐 수 있어
+    // onTap을 직접 호출해 배선을 검증한다).
+    tester
+        .widget<GestureDetector>(
+          find.byKey(const Key('networkMapDraftPinClear-origin')),
+        )
+        .onTap!();
+    await tester.pumpAndSettle();
+    expect(routeDraftController.draft.origin, isNull);
+    expect(find.byKey(const Key('networkMapDraftPin-origin')), findsNothing);
     expect(
       find.byKey(const Key('networkMapDraftPin-waypoint')),
       findsOneWidget,
@@ -2497,12 +2566,10 @@ void main() {
       findsOneWidget,
     );
 
-    // 스왑(⇅): 출발/도착이 맞바뀌어 같은 상단바 입력에 반영된다(#1933 요구 2).
+    // 스왑(⇅)은 draft 바에서 제거됐다. 재배열은 드래그로만 한다.
+    expect(find.byKey(const Key('networkMapRouteDraftSwap')), findsNothing);
+    expect(routeDraftController.draft.origin?.nameKo, '강남');
     expect(routeDraftController.draft.destination?.nameKo, '잠실');
-    await tester.tap(find.byKey(const Key('networkMapRouteDraftSwap')));
-    await tester.pumpAndSettle();
-    expect(routeDraftController.draft.origin?.nameKo, '잠실');
-    expect(routeDraftController.draft.destination?.nameKo, '강남');
   });
 
   testWidgets('#1948 상단바 경유 추가 진입점 탭은 출발/도착 사이에 경유 행을 넣고 지우면 추가 버튼이 복귀한다', (
@@ -2536,20 +2603,16 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 출발·도착을 채워 상단바를 draft 입력으로 변신시킨다.
+    // 출발만 채워 상단바를 draft로 변신시킨다. '+'는 출발·도착 중 하나일 때만.
     await tester.tap(
       find.byKey(const Key('networkMapStation-sangnoksu-seoul-4')),
     );
     await tester.pumpAndSettle();
     await _tapFanMenuSector(tester, _fanOriginLabel);
     await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('networkMapRouteDraftPickDestination')),
-    );
-    await tester.pumpAndSettle();
-    expect(routeDraftController.draft.destination?.nameKo, '잠실');
+    expect(routeDraftController.draft.origin, isNotNull);
+    expect(routeDraftController.draft.destination, isNull);
 
-    // 경유가 없을 때는 경유 행이 없고 '경유 추가' 진입점이 보인다.
     expect(
       find.byKey(const Key('networkMapRouteDraftWaypointRow')),
       findsNothing,
@@ -2559,16 +2622,32 @@ void main() {
       findsOneWidget,
     );
 
-    // 경유 추가 진입점 탭 → waypoint slot으로 검색이 열려 경유가 채워진다.
+    // 왼쪽 '+' 탭 → 검색으로 가지 않고 빈 경유 칸만 생긴다.
     await tester.tap(find.byKey(const Key('networkMapRouteDraftAddWaypoint')));
     await tester.pumpAndSettle();
-    expect(routeDraftController.draft.waypoint?.nameKo, '선릉');
-
-    // 경유 행이 출발과 도착 사이에 삽입된다.
+    expect(routeDraftController.draft.waypoint, isNull);
+    expect(routeDraftController.isWaypointRowVisible, isTrue);
     expect(
       find.byKey(const Key('networkMapRouteDraftWaypointRow')),
       findsOneWidget,
     );
+    expect(
+      find.byKey(const Key('networkMapRouteDraftAddWaypoint')),
+      findsNothing,
+    );
+    expect(find.text('경유역 입력'), findsOneWidget);
+
+    // 경유 칸 탭 → 그때 검색으로 채워진다.
+    await tester.tap(find.byKey(const Key('networkMapRouteDraftPickWaypoint')));
+    await tester.pumpAndSettle();
+    expect(routeDraftController.draft.waypoint?.nameKo, '선릉');
+
+    // 도착도 채우면 경유 행이 출발·도착 사이에 있다.
+    await tester.tap(
+      find.byKey(const Key('networkMapRouteDraftPickDestination')),
+    );
+    await tester.pumpAndSettle();
+    expect(routeDraftController.draft.destination?.nameKo, '잠실');
     expect(
       find.descendant(
         of: find.byKey(const Key('networkMapRouteDraftWaypointRow')),
@@ -2588,26 +2667,28 @@ void main() {
     expect(originDy < waypointDy, isTrue);
     expect(waypointDy < destinationDy, isTrue);
 
-    // 경유가 채워졌으므로 추가 버튼은 사라지고 경유 지우기가 보인다.
-    expect(
-      find.byKey(const Key('networkMapRouteDraftAddWaypoint')),
-      findsNothing,
-    );
-    expect(
-      find.byKey(const Key('networkMapRouteDraftClearWaypoint')),
-      findsOneWidget,
-    );
-
-    // 경유 지우기 → 경유 행이 사라지고 추가 버튼이 복귀한다.
+    // 경유 칸 ✕ → 경유 행 사라짐. 출발·도착이 둘 다 있으면 '+'는 나오지 않는다.
     await tester.tap(
       find.byKey(const Key('networkMapRouteDraftClearWaypoint')),
     );
     await tester.pumpAndSettle();
     expect(routeDraftController.draft.waypoint, isNull);
+    expect(routeDraftController.isWaypointRowVisible, isFalse);
     expect(
       find.byKey(const Key('networkMapRouteDraftWaypointRow')),
       findsNothing,
     );
+    expect(
+      find.byKey(const Key('networkMapRouteDraftAddWaypoint')),
+      findsNothing,
+    );
+
+    // 도착을 비우면 다시 한쪽만 남은 상태라 '+'가 복귀한다.
+    await tester.tap(
+      find.byKey(const Key('networkMapRouteDraftClearDestination')),
+    );
+    await tester.pumpAndSettle();
+    expect(routeDraftController.draft.destination, isNull);
     expect(
       find.byKey(const Key('networkMapRouteDraftAddWaypoint')),
       findsOneWidget,
@@ -2770,7 +2851,7 @@ void main() {
     semanticsHandle.dispose();
   });
 
-  testWidgets('#1985 빈 출발 행 placeholder는 출발역으로 표시된다', (tester) async {
+  testWidgets('#1985 빈 출발 행은 역할 라벨과 입력 플레이스홀더를 보여 준다', (tester) async {
     final routeDraftController = RouteDraftController()
       ..setDestination(const RouteDraftStation(id: 'jamsil', nameKo: '잠실'));
     await tester.pumpWidget(
@@ -2788,6 +2869,13 @@ void main() {
       find.descendant(
         of: find.byKey(const Key('networkMapRouteDraftOriginRow')),
         matching: find.text('출발역'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('networkMapRouteDraftOriginRow')),
+        matching: find.text('출발역 입력'),
       ),
       findsOneWidget,
     );
@@ -7642,10 +7730,7 @@ void main() {
     expect(find.text('제목'), findsOneWidget);
     expect(find.text('내용 *'), findsOneWidget);
     expect(
-      find.byKey(
-        const Key('inquiryEmailMissingNotice'),
-        skipOffstage: false,
-      ),
+      find.byKey(const Key('inquiryEmailMissingNotice'), skipOffstage: false),
       findsOneWidget,
     );
     expect(
@@ -8085,7 +8170,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(favoriteRouteRepository.removedFavoriteRouteIds, ['route-1']);
-      expect(find.text('즐겨찾기한 항목이 없습니다'), findsOneWidget);
+      expect(find.text('즐겨찾기한 항목이 없습니다.'), findsOneWidget);
     } finally {
       semanticsHandle.dispose();
     }
@@ -8312,7 +8397,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(repository.requestedQueries, ['상록수']);
-      // #1933: 역이 지나는 노선마다 한 행씩(각 행 우측에 색 배지). '+N' 요약 없음.
+      // 역이 지나는 노선마다 한 행씩(각 행 우측에 색 배지). '+N' 요약 없음.
       expect(find.byKey(const Key('stationLineBadge-seoul-4')), findsOneWidget);
       expect(
         find.byKey(const Key('stationLineBadge-korail-gyeongui-jungang')),
@@ -8323,7 +8408,9 @@ void main() {
       expect(find.text('수도권 4호선, 경의중앙선'), findsNothing);
       expect(
         find.descendant(
-          of: find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+          of: find.byKey(
+            const Key('stationSearchResult-station-sangnoksu-seoul-4'),
+          ),
           matching: find.text('수도권'),
         ),
         findsNothing,
@@ -8332,28 +8419,31 @@ void main() {
       expect(find.text('일부 정보는 확인 중이에요'), findsNothing);
       expect(find.text('출처 확인 필요'), findsNothing);
       expect(find.bySemanticsLabel('검색 결과 1개'), findsOneWidget);
-      // 다중 노선 역은 시각적으로 노선마다 한 행씩 펼치지만(배지 2개), 선택 버튼
-      // 시맨틱은 첫 행만 노출한다 — 스크린리더에 같은 선택 버튼이 노선 수만큼
-      // 중복되지 않도록 이후 행은 ExcludeSemantics 로 감싼다. 첫 행 라벨만 존재하고
-      // 두 번째 노선 라벨은 시맨틱 트리에 없다.
-      expect(find.bySemanticsLabel('상록수역, 수도권 4호선, 경의중앙선, 선택'), findsOneWidget);
-      expect(find.bySemanticsLabel('상록수역, 경의중앙선, 선택'), findsNothing);
-      // #2419 Codex: 대표 라벨에 전 노선명을 넣고, 둘째 행 단독 라벨은 없다.
+      // 호선별 행은 각각 독립 선택 시맨틱·즐겨찾기 키를 갖는다.
+      expect(find.bySemanticsLabel('상록수역, 수도권 4호선, 선택'), findsOneWidget);
+      expect(find.bySemanticsLabel('상록수역, 경의중앙선, 선택'), findsOneWidget);
       expect(
-        tester.getSemantics(find.bySemanticsLabel('상록수역, 수도권 4호선, 경의중앙선, 선택')),
+        tester.getSemantics(find.bySemanticsLabel('상록수역, 수도권 4호선, 선택')),
         isSemantics(
-          label: '상록수역, 수도권 4호선, 경의중앙선, 선택',
+          label: '상록수역, 수도권 4호선, 선택',
           isButton: true,
           hasTapAction: true,
         ),
       );
-      // 대표 키는 첫 행에만 두어 단일 위젯으로 남는다.
       expect(
-        find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+        find.byKey(const Key('stationSearchResult-station-sangnoksu-seoul-4')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          const Key(
+            'stationSearchResult-station-sangnoksu-korail-gyeongui-jungang',
+          ),
+        ),
         findsOneWidget,
       );
       final resultTileSize = tester.getSize(
-        find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+        find.byKey(const Key('stationSearchResult-station-sangnoksu-seoul-4')),
       );
       expect(resultTileSize.height, lessThanOrEqualTo(112));
 
@@ -8381,7 +8471,7 @@ void main() {
       // in-place 모드에는 주변 역 버튼이 없다. 비우면 결과만 사라진다.
       expect(find.byKey(const Key('nearbyStationSearchButton')), findsNothing);
       expect(
-        find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+        find.byKey(const Key('stationSearchResult-station-sangnoksu-seoul-4')),
         findsNothing,
       );
     } finally {
@@ -8509,7 +8599,7 @@ void main() {
 
     // 결과 행 탭 = 검색 종료 + 역 포커스 + 팬 메뉴.
     await tester.tap(
-      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+      find.byKey(const Key('stationSearchResult-station-sangnoksu-seoul-2')),
     );
     await tester.pumpAndSettle();
 
@@ -8564,7 +8654,7 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
     await tester.tap(
-      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+      find.byKey(const Key('stationSearchResult-station-sangnoksu-seoul-2')),
     );
     await tester.pumpAndSettle();
 
@@ -8663,7 +8753,7 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
     await tester.tap(
-      find.byKey(const Key('stationSearchResult-station-sadang')),
+      find.byKey(const Key('stationSearchResult-station-sadang-seoul-2')),
     );
     await tester.pumpAndSettle();
 
@@ -8702,7 +8792,7 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
     await tester.tap(
-      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+      find.byKey(const Key('stationSearchResult-station-sangnoksu-seoul-2')),
     );
     await tester.pumpAndSettle();
 
@@ -8739,7 +8829,7 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
     await tester.tap(
-      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+      find.byKey(const Key('stationSearchResult-station-sangnoksu-seoul-2')),
     );
     await tester.pumpAndSettle();
 
@@ -8803,7 +8893,7 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
     await tester.tap(
-      find.byKey(const Key('stationSearchResult-station-sadang')),
+      find.byKey(const Key('stationSearchResult-station-sadang-seoul-2')),
     );
     await tester.pumpAndSettle();
 
@@ -8850,7 +8940,7 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
     await tester.tap(
-      find.byKey(const Key('stationSearchResult-station-sadang')),
+      find.byKey(const Key('stationSearchResult-station-sadang-seoul-2')),
     );
     await tester.pumpAndSettle();
     expect(find.text('사당'), findsOneWidget);
@@ -10178,6 +10268,8 @@ void main() {
 
     expect(repository.requestedQueries, ['없는역']);
     expect(find.text('검색 결과가 없습니다.'), findsOneWidget);
+    expect(find.byKey(const Key('stationSearchEmptyState')), findsOneWidget);
+    expect(find.byKey(const Key('stationSearchEmptyImage')), findsOneWidget);
     expect(find.text('역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다.'), findsNothing);
     expect(
       find.bySemanticsLabel('도움말, 역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다.'),
@@ -10214,9 +10306,201 @@ void main() {
       expect(find.text('출처 공식 파일'), findsNothing);
       expect(find.text('상록수역'), findsOneWidget);
       expect(find.bySemanticsLabel('상록수역, 수도권 2호선, 선택'), findsOneWidget);
+      expect(
+        find.byKey(
+          const Key('stationSearchFavorite-station-sangnoksu-seoul-2'),
+        ),
+        findsOneWidget,
+      );
     } finally {
       semanticsHandle.dispose();
     }
+  });
+
+  testWidgets('역 검색 결과는 쿼리 하이라이트와 즐겨찾기 우선 정렬을 제공한다', (tester) async {
+    final favoriteRepository = FakeFavoriteStationRepository(
+      favorites: [_favoriteStation(id: 'station-seoul-forest', name: '서울숲')],
+    );
+    final repository = FakeStationSearchRepository(
+      nextResults: [
+        _stationResult(id: 'station-gangbyeon', name: '강변'),
+        _stationResult(id: 'station-seoul-univ', name: '서울대입구'),
+        _stationResult(id: 'station-seoul-forest', name: '서울숲'),
+      ],
+      networkMapRegionNames: const ['수도권'],
+    );
+
+    await tester.pumpWidget(
+      buildEasySubwayTestApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: favoriteRepository,
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await _openStationSearchScreenViaMenu(tester);
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '서울');
+    await tester.pumpAndSettle();
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+
+    // 즐겨찾기 역이 결과 목록 상단에 온다.
+    final firstResult = tester.widget<Semantics>(
+      find
+          .descendant(
+            of: find.byKey(
+              const Key('stationSearchResult-station-seoul-forest-seoul-2'),
+            ),
+            matching: find.byType(Semantics),
+          )
+          .first,
+    );
+    expect(firstResult.properties.label, contains('서울숲역'));
+
+    final resultOrder = [
+      for (final id in [
+        'station-seoul-forest',
+        'station-gangbyeon',
+        'station-seoul-univ',
+      ])
+        tester
+            .getTopLeft(find.byKey(Key('stationSearchResult-$id-seoul-2')))
+            .dy,
+    ];
+    expect(resultOrder[0], lessThan(resultOrder[1]));
+    expect(resultOrder[0], lessThan(resultOrder[2]));
+
+    // 쿼리 일치 구간은 푸른색 하이라이트 span을 갖는다.
+    final richTexts = tester.widgetList<RichText>(find.byType(RichText));
+    final hasHighlight = richTexts.any((rich) {
+      var found = false;
+      rich.text.visitChildren((span) {
+        if (span is TextSpan &&
+            span.text == '서울' &&
+            span.style?.color == const Color(0xFF1565C0)) {
+          found = true;
+        }
+        return true;
+      });
+      return found;
+    });
+    expect(hasHighlight, isTrue);
+
+    await tester.tap(
+      find.byKey(const Key('stationSearchFavorite-station-seoul-univ-seoul-2')),
+    );
+    await tester.pumpAndSettle();
+    expect(favoriteRepository.savedStationIds, contains('station-seoul-univ'));
+    expect(favoriteRepository.savedLineIds, contains('seoul-2'));
+  });
+
+  testWidgets('역 검색 결과는 호선 단위 즐겨찾기와 정렬을 제공한다', (tester) async {
+    final favoriteRepository = FakeFavoriteStationRepository();
+    final sadangLines = const [
+      StationSearchLine(
+        id: 'seoul-2',
+        name: '수도권 2호선',
+        color: '#00A84D',
+        stationCode: '226',
+      ),
+      StationSearchLine(
+        id: 'seoul-4',
+        name: '수도권 4호선',
+        color: '#00A5DE',
+        stationCode: '433',
+      ),
+    ];
+    final repository = FakeStationSearchRepository(
+      nextResults: [
+        _stationResult(id: 'station-sadang', name: '사당', lines: sadangLines),
+        _stationResult(id: 'station-sangnoksu', name: '상록수'),
+      ],
+      networkMapRegionNames: const ['수도권'],
+    );
+
+    await tester.pumpWidget(
+      buildEasySubwayTestApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: favoriteRepository,
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await _openStationSearchScreenViaMenu(tester);
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '사');
+    await tester.pumpAndSettle();
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+
+    double yOf(String key) => tester.getTopLeft(find.byKey(Key(key))).dy;
+
+    final originalSadang2Y = yOf('stationSearchResult-station-sadang-seoul-2');
+    final originalSadang4Y = yOf('stationSearchResult-station-sadang-seoul-4');
+    final originalSangnoksuY = yOf(
+      'stationSearchResult-station-sangnoksu-seoul-2',
+    );
+    expect(originalSadang2Y, lessThan(originalSadang4Y));
+    expect(originalSadang4Y, lessThan(originalSangnoksuY));
+
+    await tester.tap(
+      find.byKey(const Key('stationSearchFavorite-station-sadang-seoul-2')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(favoriteRepository.savedStationIds, ['station-sadang']);
+    expect(favoriteRepository.savedLineIds, ['seoul-2']);
+    expect(
+      tester
+          .widget<Icon>(
+            find.descendant(
+              of: find.byKey(
+                const Key('stationSearchFavorite-station-sadang-seoul-2'),
+              ),
+              matching: find.byType(Icon),
+            ),
+          )
+          .icon,
+      Icons.star,
+    );
+    expect(
+      tester
+          .widget<Icon>(
+            find.descendant(
+              of: find.byKey(
+                const Key('stationSearchFavorite-station-sadang-seoul-4'),
+              ),
+              matching: find.byType(Icon),
+            ),
+          )
+          .icon,
+      Icons.star_border,
+    );
+
+    final favoritedSadang2Y = yOf('stationSearchResult-station-sadang-seoul-2');
+    final afterSadang4Y = yOf('stationSearchResult-station-sadang-seoul-4');
+    final afterSangnoksuY = yOf(
+      'stationSearchResult-station-sangnoksu-seoul-2',
+    );
+    expect(favoritedSadang2Y, lessThan(afterSadang4Y));
+    expect(favoritedSadang2Y, lessThan(afterSangnoksuY));
+
+    await tester.tap(
+      find.byKey(const Key('stationSearchFavorite-station-sadang-seoul-2')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(favoriteRepository.removedStationIds, ['station-sadang']);
+    expect(favoriteRepository.removedLineIds, ['seoul-2']);
+    expect(
+      yOf('stationSearchResult-station-sadang-seoul-2'),
+      lessThan(yOf('stationSearchResult-station-sadang-seoul-4')),
+    );
+    expect(
+      yOf('stationSearchResult-station-sadang-seoul-4'),
+      lessThan(yOf('stationSearchResult-station-sangnoksu-seoul-2')),
+    );
   });
 
   testWidgets('역 상세는 출구와 시설 상태를 쉬운 문구로 보여준다', (tester) async {
@@ -11794,7 +12078,7 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    expect(find.text('즐겨찾기한 항목이 없습니다'), findsOneWidget);
+    expect(find.text('즐겨찾기한 항목이 없습니다.'), findsOneWidget);
     expect(
       find.byKey(const Key('favoriteHomeStationRow-station-sangnoksu')),
       findsNothing,
@@ -17303,10 +17587,15 @@ Future<void> _continuePhotoUse(
   }
 }
 
-FavoriteStation _favoriteStation({required String id, required String name}) {
+FavoriteStation _favoriteStation({
+  required String id,
+  required String name,
+  String lineId = '',
+}) {
   return FavoriteStation(
     userId: 'anonymous-user-1',
     stationId: id,
+    lineId: lineId,
     nameKo: name,
     nameEn: id,
     region: '수도권',
@@ -18358,7 +18647,9 @@ class FakeFavoriteStationRepository implements FavoriteStationRepository {
   List<FavoriteStation> favorites;
   int listCount = 0;
   final savedStationIds = <String>[];
+  final savedLineIds = <String?>[];
   final removedStationIds = <String>[];
+  final removedLineIds = <String?>[];
   Object? error;
 
   @override
@@ -18372,26 +18663,53 @@ class FakeFavoriteStationRepository implements FavoriteStationRepository {
   }
 
   @override
-  Future<FavoriteStation> saveFavoriteStation(String stationId) async {
+  Future<FavoriteStation> saveFavoriteStation(
+    String stationId, {
+    String? lineId,
+  }) async {
     savedStationIds.add(stationId);
+    savedLineIds.add(lineId);
     final currentError = error;
     if (currentError != null) {
       throw currentError;
     }
-    final favorite = _favoriteStation(id: stationId, name: '상록수');
-    favorites = [favorite];
+    final normalizedLineId = (lineId ?? '').trim();
+    final favorite = _favoriteStation(
+      id: stationId,
+      name: '상록수',
+      lineId: normalizedLineId,
+    );
+    favorites = [
+      ...favorites.where(
+        (item) =>
+            !(item.stationId == stationId && item.lineId == normalizedLineId),
+      ),
+      favorite,
+    ];
     return favorite;
   }
 
   @override
-  Future<void> removeFavoriteStation(String stationId) async {
+  Future<void> removeFavoriteStation(String stationId, {String? lineId}) async {
     removedStationIds.add(stationId);
+    removedLineIds.add(lineId);
     final currentError = error;
     if (currentError != null) {
       throw currentError;
     }
+    final normalizedLineId = (lineId ?? '').trim();
+    if (normalizedLineId.isEmpty) {
+      favorites = favorites
+          .where((favorite) => favorite.stationId != stationId)
+          .toList(growable: false);
+      return;
+    }
     favorites = favorites
-        .where((favorite) => favorite.stationId != stationId)
+        .where(
+          (favorite) =>
+              !(favorite.stationId == stationId &&
+                  favorite.lineId == normalizedLineId),
+        )
         .toList(growable: false);
   }
 }
@@ -18584,12 +18902,15 @@ class ControlledFavoriteStationRepository implements FavoriteStationRepository {
   }
 
   @override
-  Future<FavoriteStation> saveFavoriteStation(String stationId) {
+  Future<FavoriteStation> saveFavoriteStation(
+    String stationId, {
+    String? lineId,
+  }) {
     throw UnimplementedError();
   }
 
   @override
-  Future<void> removeFavoriteStation(String stationId) {
+  Future<void> removeFavoriteStation(String stationId, {String? lineId}) {
     throw UnimplementedError();
   }
 

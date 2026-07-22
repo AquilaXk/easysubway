@@ -172,6 +172,7 @@ class FavoriteStation {
   const FavoriteStation({
     required this.userId,
     required this.stationId,
+    this.lineId = '',
     required this.nameKo,
     required this.nameEn,
     required this.region,
@@ -191,6 +192,7 @@ class FavoriteStation {
     return FavoriteStation(
       userId: _requiredString(json, 'userId'),
       stationId: _requiredString(json, 'stationId'),
+      lineId: _stringOrEmpty(json, 'lineId'),
       nameKo: _requiredString(json, 'nameKo'),
       nameEn: _requiredString(json, 'nameEn'),
       region: _requiredString(json, 'region'),
@@ -213,6 +215,9 @@ class FavoriteStation {
 
   final String userId;
   final String stationId;
+
+  /// 즐겨찾기한 호선 id. 빈 문자열은 레거시(역 전체) 즐겨찾기.
+  final String lineId;
   final String nameKo;
   final String nameEn;
   final String region;
@@ -236,6 +241,20 @@ class FavoriteStation {
   String get semanticLabel {
     return '즐겨찾기 역, $nameKo, $lineLabel, $region';
   }
+}
+
+/// 로컬 즐겨찾기 키(stationId + lineId). lineId 빈 값은 역 전체(레거시).
+String favoriteStationLineKey(String stationId, [String? lineId]) =>
+    '$stationId\u001f${lineId ?? ''}';
+
+bool isFavoriteStationLine(
+  Set<String> favoriteKeys,
+  String stationId, [
+  String? lineId,
+]) {
+  final concrete = favoriteStationLineKey(stationId, lineId);
+  final wholeStation = favoriteStationLineKey(stationId, '');
+  return favoriteKeys.contains(concrete) || favoriteKeys.contains(wholeStation);
 }
 
 class StationSearchResult {

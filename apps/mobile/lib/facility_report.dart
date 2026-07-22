@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'accessible_design.dart';
+import 'design_tokens.dart';
 import 'auth_headers.dart';
 import 'core/database/user/user_database.dart' as user_db;
 import 'core/network/api_client.dart';
@@ -1519,9 +1520,12 @@ class _MyReportLoading extends StatelessWidget {
 class _MyReportEmpty extends StatelessWidget {
   const _MyReportEmpty();
 
+  // 역 검색 최근 검색 빈 상태와 동일 토큰(아이콘 56·글자 16·disclosure·정렬 -0.55).
+  static const _iconSize = 56.0;
+  static const _emptyTone = EasySubwayAccessibleColors.disclosure;
+
   @override
   Widget build(BuildContext context) {
-    // 알림함·최근 검색 빈 상태와 같이 정중앙보다 위에 둔다.
     return Align(
       alignment: const Alignment(0, -0.55),
       child: Padding(
@@ -1531,17 +1535,18 @@ class _MyReportEmpty extends StatelessWidget {
           children: [
             const Icon(
               Icons.receipt_long_outlined,
-              size: 40,
-              color: EasySubwayAccessibleColors.mutedText,
+              size: _iconSize,
+              color: _emptyTone,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: EasySubwaySpacing.md),
             Text(
               '접수한 제보가 없습니다.',
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: EasySubwayAccessibleColors.text,
-                fontWeight: FontWeight.w700,
-                height: 1.3,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: _emptyTone,
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+                fontSize: 16,
               ),
             ),
           ],

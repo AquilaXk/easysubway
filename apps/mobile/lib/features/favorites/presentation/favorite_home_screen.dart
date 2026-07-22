@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../accessible_design.dart';
-import '../../../app/app_components.dart';
+import '../../../design_tokens.dart';
 import '../../../facility_report.dart';
 import '../../../favorite_facility.dart';
 import '../../../internal_route.dart';
@@ -16,125 +16,8 @@ import '../../route_draft/application/route_draft_controller.dart';
 import '../../route_draft/domain/route_draft.dart';
 import '../../stations/presentation/station_detail_screen.dart';
 
-class _HomeSavedRouteCard extends StatelessWidget {
-  const _HomeSavedRouteCard({
-    required this.route,
-    required this.onTap,
-    this.onRemove,
-  });
-
-  final FavoriteRoute route;
-  final VoidCallback onTap;
-  // 즐겨찾기 목록에서 바로 삭제할 수 있게 오른쪽 액션을 준다. null이면 진입 화살표만.
-  final VoidCallback? onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    final originName = _stationNameWithSuffix(route.originStationName);
-    final destinationName = _stationNameWithSuffix(
-      route.destinationStationName,
-    );
-    final tappable = Semantics(
-      button: true,
-      label:
-          '즐겨찾기 경로, $originName에서 $destinationName까지, ${route.lineLabel}, ${route.mobilityLabel}',
-      onTap: onTap,
-      child: ExcludeSemantics(
-        child: InkWell(
-          onTap: onTap,
-          child: Row(
-            children: [
-              const Icon(
-                Icons.route_outlined,
-                color: EasySubwayAccessibleColors.primary,
-                size: 30,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '$originName → $destinationName',
-                      style: const TextStyle(
-                        color: EasySubwayAccessibleColors.text,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        height: 1.25,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 5,
-                      children: [
-                        _HomeMiniBadge(route.lineLabel),
-                        _HomeMiniBadge(route.mobilityLabel),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    return AppCard(
-      showBorder: true,
-      child: Row(
-        children: [
-          Expanded(child: tappable),
-          const SizedBox(width: 8),
-          if (onRemove != null)
-            IconButton(
-              key: Key('favoriteRouteRemoveButton-${route.favoriteRouteId}'),
-              onPressed: onRemove,
-              icon: const Icon(
-                Icons.delete_outline,
-                color: EasySubwayAccessibleColors.mutedText,
-              ),
-              tooltip: '즐겨찾기 경로 삭제',
-            )
-          else
-            const Icon(
-              Icons.chevron_right,
-              color: EasySubwayAccessibleColors.brand,
-            ),
-        ],
-      ),
-    );
-  }
-}
-
 String _stationNameWithSuffix(String name) {
   return name.endsWith('역') ? name : '$name역';
-}
-
-class _HomeMiniBadge extends StatelessWidget {
-  const _HomeMiniBadge(this.label);
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Chip(
-      label: Text(label),
-      visualDensity: VisualDensity.compact,
-      backgroundColor: EasySubwayAccessibleColors.surface,
-      side: const BorderSide(color: EasySubwayAccessibleColors.line),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(8)),
-      ),
-      labelStyle: const TextStyle(
-        color: EasySubwayAccessibleColors.secondaryText,
-        fontSize: 11,
-        fontWeight: FontWeight.w700,
-        height: 1.2,
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 2),
-    );
-  }
 }
 
 class FavoriteHomeScreen extends StatefulWidget {
@@ -152,6 +35,7 @@ class FavoriteHomeScreen extends StatefulWidget {
     required this.routeDraftController,
     required this.initialMobilityType,
     this.onOpenRouteSearch,
+    this.onShellBack,
     this.bottomNavigationBar,
     super.key,
   });
@@ -173,6 +57,9 @@ class FavoriteHomeScreen extends StatefulWidget {
     RouteTransportScope? transportScope,
   ])?
   onOpenRouteSearch;
+
+  /// 루트 탭으로 열린 즐겨찾기에서 Navigator.pop이 안 될 때 이전 탭(없으면 홈)으로 돌아간다.
+  final VoidCallback? onShellBack;
   final Widget? bottomNavigationBar;
 
   @override
@@ -192,7 +79,42 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: const Key('favoriteHomeScreen'),
-      appBar: AppBar(title: const Text('즐겨찾기')),
+      backgroundColor: EasySubwayAccessibleColors.surface,
+      appBar: AppBar(
+        key: const Key('favoriteHomeAppBar'),
+        title: const Text('즐겨찾기'),
+        toolbarHeight: 60,
+        backgroundColor: EasySubwayAccessibleColors.topBarSurface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        leading: IconButton(
+          key: const Key('favoriteHomeBackButton'),
+          tooltip: '뒤로',
+          onPressed: () {
+            final navigator = Navigator.of(context);
+            if (navigator.canPop()) {
+              navigator.pop();
+              return;
+            }
+            widget.onShellBack?.call();
+          },
+          style: IconButton.styleFrom(
+            minimumSize: const Size.square(EasySubwayTouchTarget.general),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            padding: EdgeInsets.zero,
+          ),
+          icon: const Icon(
+            Icons.arrow_back,
+            size: 26,
+            color: Color(0xFF4B4B4B),
+          ),
+        ),
+        flexibleSpace: const Align(
+          alignment: Alignment.bottomCenter,
+          child: EasySubwayHeaderDivider(key: Key('favoriteHomeHeaderDivider')),
+        ),
+      ),
       bottomNavigationBar: widget.bottomNavigationBar,
       body: SafeArea(
         child: FutureBuilder<_FavoriteHomeData>(
@@ -216,75 +138,100 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
                   );
                 }
               },
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: mainListPagePadding,
-                children: [
-                  if (snapshot.connectionState != ConnectionState.done)
-                    const LinearProgressIndicator(minHeight: 3),
-                  if (hasError)
-                    HomeStateCard(
-                      key: const Key('favoriteHomeErrorState'),
-                      icon: Icons.error_outline,
-                      title: '즐겨찾기를 불러오지 못했어요',
-                      subtitle: '잠시 후 다시 불러와 주세요.',
-                      actionLabel: '다시 시도',
-                      onAction: () {
-                        setState(() {
-                          _dataFuture = _loadData();
-                        });
-                      },
-                    )
-                  else if (data.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 16),
-                      child: AppCard(
-                        child: AppInfoRow(
-                          icon: Icons.bookmark_border,
-                          iconColor: EasySubwayAccessibleColors.mutedText,
-                          title: '즐겨찾기한 항목이 없습니다',
-                          subtitle: '역, 시설, 경로에서 즐겨찾기를 추가해 주세요.',
-                        ),
-                      ),
-                    )
-                  else ...[
-                    // 카테고리 카드·개수 없이 저장한 항목을 바로 나열한다. 섹션
-                    // 헤더는 해당 항목이 있을 때만 보여준다(#1569).
-                    if (data.stations.isNotEmpty) ...[
-                      const AppSectionTitle(title: '역'),
-                      for (final station in data.stations)
-                        _FavoriteHomeStationRow(
-                          station: station,
-                          onTap: widget.favoriteRepository == null
-                              ? null
-                              : () => _openStationDetailFromFavorite(station),
-                        ),
-                    ],
-                    if (data.routes.isNotEmpty) ...[
-                      const AppSectionTitle(title: '경로'),
-                      for (final route in data.routes)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: _HomeSavedRouteCard(
-                            route: route,
-                            onTap: () => _openRouteSearchFromFavorite(route),
-                            onRemove: widget.favoriteRouteRepository == null
-                                ? null
-                                : () => _removeFavoriteRoute(route),
+              // 빈/오류 상태는 내 제보처럼 본문 전체 높이를 기준으로 Align 한다.
+              // (ListView 자식에 짧은 SizedBox만 주면 같은 -0.55라도 더 위로 붙는다.)
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final viewportHeight = constraints.maxHeight;
+                  return ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.only(bottom: 32),
+                    children: [
+                      if (snapshot.connectionState != ConnectionState.done)
+                        const LinearProgressIndicator(minHeight: 3),
+                      if (hasError)
+                        SizedBox(
+                          height: viewportHeight,
+                          child: _FavoriteHomeErrorState(
+                            onRetry: () {
+                              setState(() {
+                                _dataFuture = _loadData();
+                              });
+                            },
                           ),
-                        ),
+                        )
+                      else if (data.isEmpty)
+                        SizedBox(
+                          height: viewportHeight,
+                          child: const _FavoriteHomeEmptyState(),
+                        )
+                      else ...[
+                        // 카테고리 카드·개수 없이 저장한 항목을 바로 나열한다.
+                        // ListView 자식은 헤더/행 단위로 펼쳐 IndexedSemantics가
+                        // 행 라벨을 섹션 헤더에 합치지 않게 한다(#1569·#2436).
+                        if (data.stations.isNotEmpty) ...[
+                          const _FavoriteHomeSectionHeader(title: '역'),
+                          for (
+                            var index = 0;
+                            index < data.stations.length;
+                            index++
+                          ) ...[
+                            _FavoriteHomeStationRow(
+                              station: data.stations[index],
+                              onTap: widget.favoriteRepository == null
+                                  ? null
+                                  : () => _openStationDetailFromFavorite(
+                                      data.stations[index],
+                                    ),
+                            ),
+                            if (index < data.stations.length - 1)
+                              const _FavoriteHomeRowDivider(),
+                          ],
+                        ],
+                        if (data.routes.isNotEmpty) ...[
+                          const _FavoriteHomeSectionHeader(title: '경로'),
+                          for (
+                            var index = 0;
+                            index < data.routes.length;
+                            index++
+                          ) ...[
+                            _FavoriteHomeRouteRow(
+                              route: data.routes[index],
+                              onTap: () => _openRouteSearchFromFavorite(
+                                data.routes[index],
+                              ),
+                              onRemove: widget.favoriteRouteRepository == null
+                                  ? null
+                                  : () => _removeFavoriteRoute(
+                                      data.routes[index],
+                                    ),
+                            ),
+                            if (index < data.routes.length - 1)
+                              const _FavoriteHomeRowDivider(),
+                          ],
+                        ],
+                        if (data.facilities.isNotEmpty) ...[
+                          const _FavoriteHomeSectionHeader(title: '시설'),
+                          for (
+                            var index = 0;
+                            index < data.facilities.length;
+                            index++
+                          ) ...[
+                            _FavoriteHomeFacilityRow(
+                              facility: data.facilities[index],
+                              onReportTap: () =>
+                                  _openFacilityReportFromFavorite(
+                                    data.facilities[index],
+                                  ),
+                            ),
+                            if (index < data.facilities.length - 1)
+                              const _FavoriteHomeRowDivider(),
+                          ],
+                        ],
+                      ],
                     ],
-                    if (data.facilities.isNotEmpty) ...[
-                      const AppSectionTitle(title: '시설'),
-                      for (final facility in data.facilities)
-                        _FavoriteHomeFacilityRow(
-                          facility: facility,
-                          onReportTap: () =>
-                              _openFacilityReportFromFavorite(facility),
-                        ),
-                    ],
-                  ],
-                ],
+                  );
+                },
               ),
             );
           },
@@ -434,6 +381,136 @@ class _FavoriteHomeData {
   bool get isEmpty => stations.isEmpty && facilities.isEmpty && routes.isEmpty;
 }
 
+class _FavoriteHomeSectionHeader extends StatelessWidget {
+  const _FavoriteHomeSectionHeader({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return ColoredBox(
+      key: Key('favoriteHomeSectionHeader-$title'),
+      color: EasySubwayAccessibleColors.scaffoldSurface,
+      child: SizedBox(
+        width: double.infinity,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+          child: Semantics(
+            header: true,
+            child: Text(
+              title,
+              style: textTheme.bodyMedium?.copyWith(
+                color: EasySubwayAccessibleColors.secondaryText,
+                fontWeight: FontWeight.w700,
+                height: 1.25,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FavoriteHomeRowDivider extends StatelessWidget {
+  const _FavoriteHomeRowDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Divider(
+      height: 1,
+      thickness: 1,
+      indent: 20,
+      endIndent: 20,
+      color: EasySubwayAccessibleColors.line,
+    );
+  }
+}
+
+class _FavoriteHomeEmptyState extends StatelessWidget {
+  const _FavoriteHomeEmptyState();
+
+  // 역 검색 최근 검색 빈 상태와 동일 토큰(아이콘 56·글자 16·disclosure·정렬 -0.55).
+  static const _iconSize = 56.0;
+  static const _emptyTone = EasySubwayAccessibleColors.disclosure;
+
+  @override
+  Widget build(BuildContext context) {
+    // 높이는 호출부가 viewport로 채운다. 내 제보처럼 Align만 둔다.
+    return Align(
+      alignment: const Alignment(0, -0.55),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.star_outline, size: _iconSize, color: _emptyTone),
+            const SizedBox(height: EasySubwaySpacing.md),
+            Text(
+              '즐겨찾기한 항목이 없습니다.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: _emptyTone,
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FavoriteHomeErrorState extends StatelessWidget {
+  const _FavoriteHomeErrorState({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      key: const Key('favoriteHomeErrorState'),
+      alignment: const Alignment(0, -0.55),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '즐겨찾기를 불러오지 못했어요',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: EasySubwayAccessibleColors.text,
+                fontWeight: FontWeight.w700,
+                height: 1.3,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '잠시 후 다시 불러와 주세요.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: EasySubwayAccessibleColors.mutedText,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              key: const Key('favoriteHomeRetryButton'),
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('다시 시도'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _FavoriteHomeStationRow extends StatelessWidget {
   const _FavoriteHomeStationRow({required this.station, required this.onTap});
 
@@ -444,6 +521,7 @@ class _FavoriteHomeStationRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final name = _stationNameWithSuffix(station.nameKo);
     final lineLabel = station.lineLabel;
+    final textTheme = Theme.of(context).textTheme;
     return Semantics(
       button: true,
       enabled: onTap != null,
@@ -453,47 +531,139 @@ class _FavoriteHomeStationRow extends StatelessWidget {
         child: InkWell(
           key: Key('favoriteHomeStationRow-${station.stationId}'),
           onTap: onTap,
-          child: Container(
-            decoration: const BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: EasySubwayAccessibleColors.line),
+          child: ColoredBox(
+            color: EasySubwayAccessibleColors.surface,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: textTheme.bodyLarge?.copyWith(
+                            color: EasySubwayAccessibleColors.text,
+                            fontWeight: FontWeight.w700,
+                            height: 1.25,
+                          ),
+                        ),
+                        if (lineLabel.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            lineLabel,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: EasySubwayAccessibleColors.mutedText,
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right,
+                    color: EasySubwayAccessibleColors.disclosure,
+                  ),
+                ],
               ),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.train_outlined,
-                  color: EasySubwayAccessibleColors.primary,
-                  size: 26,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        style: const TextStyle(
-                          color: EasySubwayAccessibleColors.text,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          height: 1.25,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FavoriteHomeRouteRow extends StatelessWidget {
+  const _FavoriteHomeRouteRow({
+    required this.route,
+    required this.onTap,
+    this.onRemove,
+  });
+
+  final FavoriteRoute route;
+  final VoidCallback onTap;
+  // 즐겨찾기 목록에서 바로 삭제할 수 있게 오른쪽 액션을 준다. null이면 진입 화살표만.
+  final VoidCallback? onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final originName = _stationNameWithSuffix(route.originStationName);
+    final destinationName = _stationNameWithSuffix(
+      route.destinationStationName,
+    );
+    final subtitle = [
+      if (route.lineLabel.trim().isNotEmpty) route.lineLabel.trim(),
+      if (route.mobilityLabel.trim().isNotEmpty) route.mobilityLabel.trim(),
+    ].join(' · ');
+    final textTheme = Theme.of(context).textTheme;
+    return Semantics(
+      button: true,
+      label:
+          '즐겨찾기 경로, $originName에서 $destinationName까지, ${route.lineLabel}, ${route.mobilityLabel}',
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: InkWell(
+          onTap: onTap,
+          child: ColoredBox(
+            color: EasySubwayAccessibleColors.surface,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$originName → $destinationName',
+                          style: textTheme.bodyLarge?.copyWith(
+                            color: EasySubwayAccessibleColors.text,
+                            fontWeight: FontWeight.w700,
+                            height: 1.25,
+                          ),
                         ),
-                      ),
-                      if (lineLabel.isNotEmpty) ...[
-                        const SizedBox(height: 5),
-                        _HomeMiniBadge(lineLabel),
+                        if (subtitle.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            subtitle,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: EasySubwayAccessibleColors.mutedText,
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                const Icon(
-                  Icons.chevron_right,
-                  color: EasySubwayAccessibleColors.brand,
-                ),
-              ],
+                  if (onRemove == null)
+                    const Icon(
+                      Icons.chevron_right,
+                      color: EasySubwayAccessibleColors.disclosure,
+                    )
+                  else
+                    IconButton(
+                      key: Key(
+                        'favoriteRouteRemoveButton-${route.favoriteRouteId}',
+                      ),
+                      onPressed: onRemove,
+                      tooltip: '즐겨찾기 경로 삭제',
+                      style: IconButton.styleFrom(
+                        minimumSize: const Size.square(
+                          EasySubwayTouchTarget.general,
+                        ),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        padding: EdgeInsets.zero,
+                      ),
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        color: EasySubwayAccessibleColors.mutedText,
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
@@ -513,54 +683,44 @@ class _FavoriteHomeFacilityRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: EasySubwayAccessibleColors.line),
+    final textTheme = Theme.of(context).textTheme;
+    return Material(
+      color: EasySubwayAccessibleColors.surface,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    facility.name,
+                    style: textTheme.bodyLarge?.copyWith(
+                      color: EasySubwayAccessibleColors.text,
+                      fontWeight: FontWeight.w700,
+                      height: 1.25,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    facility.stationLabel,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: EasySubwayAccessibleColors.mutedText,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (onReportTap != null)
+              TextButton(
+                key: Key('favoriteFacilityReportButton-${facility.facilityId}'),
+                onPressed: onReportTap,
+                child: const Text('시설 알려주기'),
+              ),
+          ],
         ),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.elevator_outlined,
-            color: EasySubwayAccessibleColors.primary,
-            size: 26,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  facility.name,
-                  style: const TextStyle(
-                    color: EasySubwayAccessibleColors.text,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    height: 1.25,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  facility.stationLabel,
-                  style: const TextStyle(
-                    color: EasySubwayAccessibleColors.mutedText,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    height: 1.3,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (onReportTap != null)
-            TextButton(
-              key: Key('favoriteFacilityReportButton-${facility.facilityId}'),
-              onPressed: onReportTap,
-              child: const Text('시설 알려주기'),
-            ),
-        ],
       ),
     );
   }

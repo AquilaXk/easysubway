@@ -20,6 +20,16 @@ class $FavoriteStationsTable extends FavoriteStations
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _lineIdMeta = const VerificationMeta('lineId');
+  @override
+  late final GeneratedColumn<String> lineId = GeneratedColumn<String>(
+    'line_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
   static const VerificationMeta _addedAtMeta = const VerificationMeta(
     'addedAt',
   );
@@ -32,7 +42,7 @@ class $FavoriteStationsTable extends FavoriteStations
     requiredDuringInsert: true,
   );
   @override
-  List<GeneratedColumn> get $columns => [stationId, addedAt];
+  List<GeneratedColumn> get $columns => [stationId, lineId, addedAt];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -53,6 +63,12 @@ class $FavoriteStationsTable extends FavoriteStations
     } else if (isInserting) {
       context.missing(_stationIdMeta);
     }
+    if (data.containsKey('line_id')) {
+      context.handle(
+        _lineIdMeta,
+        lineId.isAcceptableOrUnknown(data['line_id']!, _lineIdMeta),
+      );
+    }
     if (data.containsKey('added_at')) {
       context.handle(
         _addedAtMeta,
@@ -65,7 +81,7 @@ class $FavoriteStationsTable extends FavoriteStations
   }
 
   @override
-  Set<GeneratedColumn> get $primaryKey => {stationId};
+  Set<GeneratedColumn> get $primaryKey => {stationId, lineId};
   @override
   FavoriteStation map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
@@ -73,6 +89,10 @@ class $FavoriteStationsTable extends FavoriteStations
       stationId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}station_id'],
+      )!,
+      lineId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}line_id'],
       )!,
       addedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
@@ -89,12 +109,20 @@ class $FavoriteStationsTable extends FavoriteStations
 
 class FavoriteStation extends DataClass implements Insertable<FavoriteStation> {
   final String stationId;
+
+  /// 호선 단위 즐겨찾기. 빈 문자열은 레거시(역 전체) 즐겨찾기다.
+  final String lineId;
   final DateTime addedAt;
-  const FavoriteStation({required this.stationId, required this.addedAt});
+  const FavoriteStation({
+    required this.stationId,
+    required this.lineId,
+    required this.addedAt,
+  });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['station_id'] = Variable<String>(stationId);
+    map['line_id'] = Variable<String>(lineId);
     map['added_at'] = Variable<DateTime>(addedAt);
     return map;
   }
@@ -102,6 +130,7 @@ class FavoriteStation extends DataClass implements Insertable<FavoriteStation> {
   FavoriteStationsCompanion toCompanion(bool nullToAbsent) {
     return FavoriteStationsCompanion(
       stationId: Value(stationId),
+      lineId: Value(lineId),
       addedAt: Value(addedAt),
     );
   }
@@ -113,6 +142,7 @@ class FavoriteStation extends DataClass implements Insertable<FavoriteStation> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return FavoriteStation(
       stationId: serializer.fromJson<String>(json['stationId']),
+      lineId: serializer.fromJson<String>(json['lineId']),
       addedAt: serializer.fromJson<DateTime>(json['addedAt']),
     );
   }
@@ -121,18 +151,24 @@ class FavoriteStation extends DataClass implements Insertable<FavoriteStation> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'stationId': serializer.toJson<String>(stationId),
+      'lineId': serializer.toJson<String>(lineId),
       'addedAt': serializer.toJson<DateTime>(addedAt),
     };
   }
 
-  FavoriteStation copyWith({String? stationId, DateTime? addedAt}) =>
-      FavoriteStation(
-        stationId: stationId ?? this.stationId,
-        addedAt: addedAt ?? this.addedAt,
-      );
+  FavoriteStation copyWith({
+    String? stationId,
+    String? lineId,
+    DateTime? addedAt,
+  }) => FavoriteStation(
+    stationId: stationId ?? this.stationId,
+    lineId: lineId ?? this.lineId,
+    addedAt: addedAt ?? this.addedAt,
+  );
   FavoriteStation copyWithCompanion(FavoriteStationsCompanion data) {
     return FavoriteStation(
       stationId: data.stationId.present ? data.stationId.value : this.stationId,
+      lineId: data.lineId.present ? data.lineId.value : this.lineId,
       addedAt: data.addedAt.present ? data.addedAt.value : this.addedAt,
     );
   }
@@ -141,43 +177,50 @@ class FavoriteStation extends DataClass implements Insertable<FavoriteStation> {
   String toString() {
     return (StringBuffer('FavoriteStation(')
           ..write('stationId: $stationId, ')
+          ..write('lineId: $lineId, ')
           ..write('addedAt: $addedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(stationId, addedAt);
+  int get hashCode => Object.hash(stationId, lineId, addedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is FavoriteStation &&
           other.stationId == this.stationId &&
+          other.lineId == this.lineId &&
           other.addedAt == this.addedAt);
 }
 
 class FavoriteStationsCompanion extends UpdateCompanion<FavoriteStation> {
   final Value<String> stationId;
+  final Value<String> lineId;
   final Value<DateTime> addedAt;
   final Value<int> rowid;
   const FavoriteStationsCompanion({
     this.stationId = const Value.absent(),
+    this.lineId = const Value.absent(),
     this.addedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   FavoriteStationsCompanion.insert({
     required String stationId,
+    this.lineId = const Value.absent(),
     required DateTime addedAt,
     this.rowid = const Value.absent(),
   }) : stationId = Value(stationId),
        addedAt = Value(addedAt);
   static Insertable<FavoriteStation> custom({
     Expression<String>? stationId,
+    Expression<String>? lineId,
     Expression<DateTime>? addedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (stationId != null) 'station_id': stationId,
+      if (lineId != null) 'line_id': lineId,
       if (addedAt != null) 'added_at': addedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -185,11 +228,13 @@ class FavoriteStationsCompanion extends UpdateCompanion<FavoriteStation> {
 
   FavoriteStationsCompanion copyWith({
     Value<String>? stationId,
+    Value<String>? lineId,
     Value<DateTime>? addedAt,
     Value<int>? rowid,
   }) {
     return FavoriteStationsCompanion(
       stationId: stationId ?? this.stationId,
+      lineId: lineId ?? this.lineId,
       addedAt: addedAt ?? this.addedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -200,6 +245,9 @@ class FavoriteStationsCompanion extends UpdateCompanion<FavoriteStation> {
     final map = <String, Expression>{};
     if (stationId.present) {
       map['station_id'] = Variable<String>(stationId.value);
+    }
+    if (lineId.present) {
+      map['line_id'] = Variable<String>(lineId.value);
     }
     if (addedAt.present) {
       map['added_at'] = Variable<DateTime>(addedAt.value);
@@ -214,6 +262,7 @@ class FavoriteStationsCompanion extends UpdateCompanion<FavoriteStation> {
   String toString() {
     return (StringBuffer('FavoriteStationsCompanion(')
           ..write('stationId: $stationId, ')
+          ..write('lineId: $lineId, ')
           ..write('addedAt: $addedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -3444,12 +3493,14 @@ abstract class _$UserDatabase extends GeneratedDatabase {
 typedef $$FavoriteStationsTableCreateCompanionBuilder =
     FavoriteStationsCompanion Function({
       required String stationId,
+      Value<String> lineId,
       required DateTime addedAt,
       Value<int> rowid,
     });
 typedef $$FavoriteStationsTableUpdateCompanionBuilder =
     FavoriteStationsCompanion Function({
       Value<String> stationId,
+      Value<String> lineId,
       Value<DateTime> addedAt,
       Value<int> rowid,
     });
@@ -3465,6 +3516,11 @@ class $$FavoriteStationsTableFilterComposer
   });
   ColumnFilters<String> get stationId => $composableBuilder(
     column: $table.stationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lineId => $composableBuilder(
+    column: $table.lineId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3488,6 +3544,11 @@ class $$FavoriteStationsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get lineId => $composableBuilder(
+    column: $table.lineId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get addedAt => $composableBuilder(
     column: $table.addedAt,
     builder: (column) => ColumnOrderings(column),
@@ -3505,6 +3566,9 @@ class $$FavoriteStationsTableAnnotationComposer
   });
   GeneratedColumn<String> get stationId =>
       $composableBuilder(column: $table.stationId, builder: (column) => column);
+
+  GeneratedColumn<String> get lineId =>
+      $composableBuilder(column: $table.lineId, builder: (column) => column);
 
   GeneratedColumn<DateTime> get addedAt =>
       $composableBuilder(column: $table.addedAt, builder: (column) => column);
@@ -3548,20 +3612,24 @@ class $$FavoriteStationsTableTableManager
           updateCompanionCallback:
               ({
                 Value<String> stationId = const Value.absent(),
+                Value<String> lineId = const Value.absent(),
                 Value<DateTime> addedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FavoriteStationsCompanion(
                 stationId: stationId,
+                lineId: lineId,
                 addedAt: addedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
               ({
                 required String stationId,
+                Value<String> lineId = const Value.absent(),
                 required DateTime addedAt,
                 Value<int> rowid = const Value.absent(),
               }) => FavoriteStationsCompanion.insert(
                 stationId: stationId,
+                lineId: lineId,
                 addedAt: addedAt,
                 rowid: rowid,
               ),

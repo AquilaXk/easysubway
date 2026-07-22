@@ -289,7 +289,11 @@ class FavoriteStationApiRepository implements FavoriteStationRepository {
   }
 
   @override
-  Future<FavoriteStation> saveFavoriteStation(String stationId) async {
+  Future<FavoriteStation> saveFavoriteStation(
+    String stationId, {
+    String? lineId,
+  }) async {
+    // lineId는 로컬 즐겨찾기 모델용. HTTP 계약은 아직 역 단위라 무시한다.
     final path =
         '/api/v1/me/favorites/stations/${Uri.encodeComponent(stationId)}';
     final data = await _requestData(
@@ -314,7 +318,8 @@ class FavoriteStationApiRepository implements FavoriteStationRepository {
   }
 
   @override
-  Future<void> removeFavoriteStation(String stationId) async {
+  Future<void> removeFavoriteStation(String stationId, {String? lineId}) async {
+    // lineId는 로컬 즐겨찾기 모델용. HTTP 계약은 아직 역 단위라 무시한다.
     final path =
         '/api/v1/me/favorites/stations/${Uri.encodeComponent(stationId)}';
     await _requestData(
