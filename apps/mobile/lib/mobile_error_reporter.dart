@@ -52,7 +52,8 @@ void installMobileErrorHandlers() {
       stackTrace: details.stack,
     );
     // 미초기화·테스트 환경에서도 예외를 던지지 않는다.
-    unawaited(recordFatalFlutterError(details));
+    // Crashlytics Future 실패가 PlatformDispatcher.onError로 재진입하지 않게 흡수한다.
+    unawaited(_recordCrashlyticsSafely(recordFatalFlutterError(details)));
     FlutterError.presentError(details);
   };
 
@@ -72,8 +73,23 @@ void installMobileErrorHandlers() {
 
     appLog.e('Unhandled platform/async error', error: error, stackTrace: stack);
     unawaited(
-      recordFatalError(error, stack, reason: 'PlatformDispatcher.onError'),
+      _recordCrashlyticsSafely(
+        recordFatalError(error, stack, reason: 'PlatformDispatcher.onError'),
+      ),
     );
     return true;
   };
+}
+
+Future<void> _recordCrashlyticsSafely(Future<void> recording) async {
+  try {
+    await recording;
+  } catch (error, stackTrace) {
+    // 기록 경로 자체 실패는 전역 핸들러 루프를 만들지 않는다.
+    appLog.w(
+      'Crashlytics record failed; swallowed to avoid handler re-entry',
+      error: error,
+      stackTrace: stackTrace,
+    );
+  }
 }

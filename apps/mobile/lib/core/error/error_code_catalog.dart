@@ -124,7 +124,7 @@ const errorCodeCatalog = <ErrorCodeEntry>[
 ];
 
 const Map<ErrorCategory, String> errorCategoryFallbackMessages = {
-  ErrorCategory.user: '요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.',
+  ErrorCategory.user: '요청을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.',
   ErrorCategory.system: '일시적인 문제가 발생했어요. 잠시 후 다시 시도해 주세요.',
   ErrorCategory.dependency: '외부 서비스를 잠시 사용할 수 없어요. 잠시 후 다시 시도해 주세요.',
 };

@@ -23,7 +23,7 @@ class ServerErrorMapper {
 
   MappedServerError fromApiResponse(
     ApiResponse response, {
-    String defaultMessage = '요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.',
+    String defaultMessage = '요청을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.',
   }) {
     final body = response.jsonBody;
     final map = body is Map ? Map<String, Object?>.from(body) : null;
@@ -41,7 +41,7 @@ class ServerErrorMapper {
     String? code,
     String? correlationId,
     int? statusCode,
-    String defaultMessage = '요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.',
+    String defaultMessage = '요청을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.',
   }) {
     final entry = code == null ? null : errorCodeByWire[code];
     if (entry != null) {
