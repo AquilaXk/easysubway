@@ -12619,6 +12619,7 @@ test("관리자 플랫폼 전환 계약은 shadow rollout과 legacy fallback 제
     "backend/src/main/resources/db/migration/postgresql/V13__admin_common_code_incident.sql",
     "backend/src/main/resources/db/migration/postgresql/V15__admin_report_photo_read_permission.sql",
     "backend/src/main/resources/db/migration/postgresql/V63__admin_batch_run_permission.sql",
+    "backend/src/main/resources/db/migration/postgresql/V69__admin_error_events_permission.sql",
   ].map(read).join("\n");
   const h2AdminMigrations = [
     "backend/src/main/resources/db/migration/h2/V10__admin_rbac_menu.sql",
@@ -12627,6 +12628,7 @@ test("관리자 플랫폼 전환 계약은 shadow rollout과 legacy fallback 제
     "backend/src/main/resources/db/migration/h2/V13__admin_common_code_incident.sql",
     "backend/src/main/resources/db/migration/h2/V15__admin_report_photo_read_permission.sql",
     "backend/src/main/resources/db/migration/h2/V63__admin_batch_run_permission.sql",
+    "backend/src/main/resources/db/migration/h2/V69__admin_error_events_permission.sql",
   ].map(read).join("\n");
 
   assert.match(applicationYml, /platform-transition:\s*\n\s*stage: \$\{EASYSUBWAY_ADMIN_PLATFORM_TRANSITION_STAGE:shadow\}/);
@@ -16611,6 +16613,7 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
     read("backend/src/main/resources/db/migration/postgresql/V15__admin_report_photo_read_permission.sql"),
     read("backend/src/main/resources/db/migration/postgresql/V22__datapack_admin_permissions.sql"),
     read("backend/src/main/resources/db/migration/postgresql/V63__admin_batch_run_permission.sql"),
+    read("backend/src/main/resources/db/migration/postgresql/V69__admin_error_events_permission.sql"),
   ].join("\n");
   const adminRbacH2Schema = [
     read("backend/src/main/resources/db/migration/h2/V10__admin_rbac_menu.sql"),
@@ -16620,6 +16623,7 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
     read("backend/src/main/resources/db/migration/h2/V15__admin_report_photo_read_permission.sql"),
     read("backend/src/main/resources/db/migration/h2/V22__datapack_admin_permissions.sql"),
     read("backend/src/main/resources/db/migration/h2/V63__admin_batch_run_permission.sql"),
+    read("backend/src/main/resources/db/migration/h2/V69__admin_error_events_permission.sql"),
   ].join("\n");
   const adminProgramRegistry = read("backend/src/main/java/com/easysubway/admin/navigation/AdminProgram.java");
   const adminPermission = read("backend/src/main/java/com/easysubway/admin/authorization/AdminPermission.java");
@@ -16840,6 +16844,7 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
     "admin.datapack.production.approve",
     "admin.datapack.rollback",
     "admin.datapack.audit.read",
+    "admin.errors.read",
   ]);
   for (const adminRbacSchema of [adminRbacPostgresSchema, adminRbacH2Schema]) {
     const compactAdminRbacSchema = adminRbacSchema.replace(/\s+/g, "");
@@ -19164,4 +19169,43 @@ test("error-codes.json은 ErrorCode enum과 완전 일치하고 category·httpSt
       `koMessageKey missing in messages.properties: ${entry.koMessageKey}`,
     );
   }
+});
+
+test("error_events 스키마는 허용 컬럼만 갖고 민감 원문 컬럼을 금지한다", () => {
+  const postgres = read("backend/src/main/resources/db/migration/postgresql/V68__create_error_events.sql");
+  const h2 = read("backend/src/main/resources/db/migration/h2/V68__create_error_events.sql");
+  const expectedColumns = [
+    "id",
+    "first_occurred_at",
+    "last_occurred_at",
+    "code",
+    "category",
+    "http_status",
+    "method",
+    "path_pattern",
+    "exception_class",
+    "stack_hash",
+    "sample_correlation_id",
+    "occurrence_count",
+  ];
+  for (const migration of [postgres, h2]) {
+    assert.match(migration, /CREATE TABLE error_events/);
+    assert.match(migration, /UNIQUE \(stack_hash, code, path_pattern\)/);
+    assert.match(migration, /idx_error_events_last_occurred_at/);
+    assert.match(migration, /idx_error_events_code/);
+    const createTable = migration.match(/CREATE TABLE error_events \([\s\S]*?\);/)?.[0] ?? "";
+    assert.notEqual(createTable, "");
+    assert.doesNotMatch(createTable, /\b(message|body|query|header|user_id|login_id|request_body)\b/i);
+    for (const column of expectedColumns) {
+      assert.match(createTable, new RegExp(`\\b${column}\\b`));
+    }
+  }
+  assert.match(
+    read("backend/src/main/resources/db/migration/postgresql/V69__admin_error_events_permission.sql"),
+    /admin\.errors\.read/,
+  );
+  assert.match(
+    read("backend/src/main/resources/db/migration/h2/V69__admin_error_events_permission.sql"),
+    /admin\.errors\.read/,
+  );
 });

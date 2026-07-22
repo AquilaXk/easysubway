@@ -9,6 +9,7 @@ import {
   parseVersion,
   loadMigrationFiles,
   evaluateMigrationSet,
+  loadJson,
 } from "./check-migration-ddl-compat.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -145,13 +146,17 @@ test("evaluateMigrationSet은 공백만 있는 사유·승인 allowlist 항목�
   }
 });
 
-test("현재 트리의 실제 마이그레이션은 baseline(V66)에서 위반이 없다(회귀 없음)", () => {
+test("현재 트리의 실제 마이그레이션은 baseline(V66)·공식 allowlist에서 위반이 없다(회귀 없음)", () => {
+  const policy = loadJson(path.join(repoRoot, "backend/quality/migration-ddl-gate.json"));
   const files = loadMigrationFiles(realMigrationDir);
-  const violations = evaluateMigrationSet(files, { baselineVersion: 66, allowlist: [] });
+  const violations = evaluateMigrationSet(files, {
+    baselineVersion: policy.baselineVersion,
+    allowlist: policy.allowlist ?? [],
+  });
   assert.deepEqual(
     violations,
     [],
-    `baseline 66에서 위반 발생: ${JSON.stringify(violations)}`,
+    `baseline ${policy.baselineVersion}에서 위반 발생: ${JSON.stringify(violations)}`,
   );
 });
 
