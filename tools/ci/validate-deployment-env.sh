@@ -175,6 +175,10 @@ is_satisfied_by_runtime_fallback() {
     EASYSUBWAY_ALERTMANAGER_EXTERNAL_URL|EASYSUBWAY_ALERT_EMAIL_TO|EASYSUBWAY_ALERT_EMAIL_FROM|EASYSUBWAY_ALERT_SMTP_SMARTHOST|EASYSUBWAY_ALERT_SMTP_USERNAME|EASYSUBWAY_ALERT_SMTP_PASSWORD)
       ! is_alert_email_enabled
       ;;
+    # Mobile Crashlytics config is injected via dedicated release secrets, not backend CD dotenv.
+    EASYSUBWAY_ANDROID_GOOGLE_SERVICES_JSON_BASE64|EASYSUBWAY_IOS_GOOGLE_SERVICE_INFO_PLIST_BASE64)
+      true
+      ;;
     *)
       false
       ;;
