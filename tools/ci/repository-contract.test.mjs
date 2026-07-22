@@ -12313,11 +12313,13 @@ test("백엔드 품질 gate feasibility는 정적 분석 도입 조건을 계약
   const gate = readJson(gatePath);
   const build = read("backend/build.gradle");
   const ci = read(".github/workflows/ci.yml");
+  const sonarProps = read("sonar-project.properties");
+  const sonarWorkflow = read(".github/workflows/sonarcloud.yml");
 
   assert.equal(gate.schemaVersion, 1);
   assert.equal(gate.gateId, "backend-static-analysis-feasibility");
   assert.equal(gate.defaultPolicy, "contract-only-before-enforcement");
-  assert.equal(gate.enforcementStatus, "deferred_until_p0_release_contracts_stabilize");
+  assert.equal(gate.enforcementStatus, "partial_report_only_enabled");
   assert.equal(gate.ciRuntimeBudgetMinutes.maxAdditionalMinutes, 3);
   assert.equal(gate.ciRuntimeBudgetMinutes.measurementRequiredBeforeEnforcement, true);
 
@@ -12325,28 +12327,62 @@ test("백엔드 품질 gate feasibility는 정적 분석 도입 조건을 계약
   for (const id of ["checkstyle", "spotbugs", "errorprone", "archunit", "jacoco"]) {
     const tool = tools.get(id);
     assert.ok(tool, `${id} must be listed in backend static analysis gate`);
-    if (id === "archunit") {
-      assert.equal(tool.enforcement, "enabled");
-      assert.match(build, /com\.tngtech\.archunit:archunit-junit5:1\.4\.2/);
-      assert.ok(tool.evidence.ciRuntimeMeasurement.includes("PackageDependencyRulesTest"));
-    } else {
-      assert.equal(tool.enforcement, "not_enabled_in_this_slice");
-    }
     assert.ok(tool.requires.length > 0, `${id} must declare enforcement prerequisites`);
   }
 
-  assert.equal(tools.get("archunit").firstAllowedGate, "public_mobile_api_absence");
+  assert.equal(tools.get("archunit").enforcement, "enabled");
+  assert.match(build, /com\.tngtech\.archunit:archunit-junit5:1\.4\.2/);
+  assert.ok(tools.get("archunit").evidence.ciRuntimeMeasurement.includes("PackageDependencyRulesTest"));
+
+  assert.equal(tools.get("jacoco").enforcement, "report_only");
   assert.equal(tools.get("jacoco").firstAllowedGate, "coverage_baseline_after_p0_tests_stabilize");
+  assert.match(build, /id ['"]jacoco['"]/);
+  assert.doesNotMatch(build, /jacocoTestCoverageVerification/);
+  assert.equal(
+    existsSync(path.join(root, tools.get("jacoco").evidence.coverageExclusionPolicy)),
+    true,
+    "jacoco exclusion policy must exist",
+  );
+  assert.ok(tools.get("jacoco").evidence.ciRuntimeMeasurement.length > 0);
+
+  assert.equal(tools.get("spotbugs").enforcement, "report_only");
+  assert.match(build, /id ['"]com\.github\.spotbugs['"]/);
+  assert.match(build, /ignoreFailures\s*=\s*true/);
+  assert.equal(
+    existsSync(path.join(root, tools.get("spotbugs").evidence.suppressionPolicy)),
+    true,
+    "spotbugs suppression policy must exist",
+  );
+  assert.equal(
+    existsSync(path.join(root, tools.get("spotbugs").evidence.excludeFilter)),
+    true,
+    "spotbugs exclude filter must exist",
+  );
+  assert.ok(tools.get("spotbugs").evidence.ciRuntimeMeasurement.length > 0);
+  assert.ok(
+    Number.isInteger(tools.get("spotbugs").evidence.baselineViolationCount)
+      && tools.get("spotbugs").evidence.baselineViolationCount > 0,
+    "spotbugs baseline violation count must be recorded",
+  );
+
+  assert.equal(tools.get("checkstyle").enforcement, "not_enabled_in_this_slice");
+  assert.equal(tools.get("errorprone").enforcement, "not_enabled_in_this_slice");
+  assert.doesNotMatch(build, /id ['"]checkstyle['"]/);
+  assert.doesNotMatch(build, /id ['"]net\.ltgt\.errorprone['"]/);
+
   assert.ok(gate.mustNotDo.includes("enable_style_or_coverage_plugins_without_runtime_budget_evidence"));
   assert.ok(gate.mustNotDo.includes("reformat_unrelated_backend_sources"));
   assert.ok(gate.mustNotDo.includes("weaken_security_route_or_release_contract_tests"));
 
   assert.match(ci, /Repository CI \/ Run contract tests/);
-  assert.doesNotMatch(build, /id ['"]checkstyle['"]/);
-  assert.doesNotMatch(build, /id ['"]com\.github\.spotbugs['"]/);
-  assert.doesNotMatch(build, /id ['"]net\.ltgt\.errorprone['"]/);
-  assert.doesNotMatch(build, /id ['"]jacoco['"]/);
-
+  assert.match(ci, /flutter test --coverage/);
+  assert.match(ci, /filter-mobile-lcov\.mjs/);
+  assert.match(sonarProps, /sonar\.coverage\.jacoco\.xmlReportPaths=backend\/build\/reports\/jacoco\/test\/jacocoTestReport\.xml/);
+  assert.match(sonarProps, /sonar\.dart\.lcov\.reportPaths=apps\/mobile\/coverage\/lcov\.info/);
+  assert.match(sonarWorkflow, /jacocoTestReport/);
+  assert.match(sonarWorkflow, /flutter test --coverage/);
+  assert.match(sonarWorkflow, /filter-mobile-lcov\.mjs/);
+  assert.equal(existsSync(path.join(root, "tools/ci/filter-mobile-lcov.mjs")), true);
 });
 
 test("MVP 기본 경로는 익명 계정과 bearer token 인증을 발급하지 않는다", () => {
