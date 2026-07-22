@@ -2394,6 +2394,7 @@ test("모바일 도움말과 서비스 정보 연결 계약은 각 presentation 
   }
   for (const helper of [
     "_SupportSettingsSection",
+    "_SupportNoticeBullet",
     "_SecurityContactNotice",
     "_SafetyDataNotice",
     "_SupportAccessItem",

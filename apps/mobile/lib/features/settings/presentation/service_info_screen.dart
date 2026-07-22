@@ -26,75 +26,91 @@ class ServiceInfoScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final rows = [
+      _ServiceInfoActionTile(
+        key: const Key('termsOfServiceItem'),
+        title: '서비스 이용약관',
+        onTap: () => _openDocument(context, accessInfo.termsOfServiceUrl),
+      ),
+      _ServiceInfoActionTile(
+        key: const Key('privacyPolicyItem'),
+        title: '개인정보 처리방침',
+        onTap: () => _openDocument(context, accessInfo.privacyPolicyUrl),
+      ),
+      _ServiceInfoActionTile(
+        key: const Key('locationTermsItem'),
+        title: '위치정보 이용약관',
+        onTap: () => _openDocument(context, accessInfo.locationTermsUrl),
+      ),
+      _ServiceInfoActionTile(
+        key: const Key('dataSourceAttributionItem'),
+        title: '정보제공처',
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const DataSourceAttributionScreen(),
+            ),
+          );
+        },
+      ),
+      _ServiceInfoActionTile(
+        key: const Key('openSourceLicensesItem'),
+        title: '오픈 소스 라이선스',
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => OpenSourceLicensesScreen(
+                licenseEntriesLoader: licenseEntriesLoader,
+              ),
+            ),
+          );
+        },
+      ),
+    ];
+
     return Scaffold(
       key: const Key('serviceInfoScreen'),
-      appBar: AppBar(title: const Text('서비스 정보')),
+      backgroundColor: EasySubwayAccessibleColors.surface,
+      appBar: AppBar(
+        key: const Key('serviceInfoAppBar'),
+        title: const Text('서비스 정보'),
+        toolbarHeight: 60,
+        backgroundColor: EasySubwayAccessibleColors.topBarSurface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        leading: IconButton(
+          key: const Key('serviceInfoBackButton'),
+          tooltip: '뒤로',
+          onPressed: () => Navigator.of(context).maybePop(),
+          style: IconButton.styleFrom(
+            minimumSize: const Size.square(EasySubwayTouchTarget.general),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            padding: EdgeInsets.zero,
+          ),
+          icon: const Icon(
+            Icons.arrow_back,
+            size: 26,
+            color: Color(0xFF4B4B4B),
+          ),
+        ),
+        flexibleSpace: const Align(
+          alignment: Alignment.bottomCenter,
+          child: EasySubwayHeaderDivider(key: Key('serviceInfoHeaderDivider')),
+        ),
+      ),
       body: SafeArea(
         child: ListView(
+          padding: const EdgeInsets.only(bottom: 32),
           children: [
-            _row(
-              key: const Key('termsOfServiceItem'),
-              title: '서비스 이용약관',
-              onTap: () => _openDocument(context, accessInfo.termsOfServiceUrl),
-            ),
-            _row(
-              key: const Key('privacyPolicyItem'),
-              title: '개인정보 처리방침',
-              onTap: () => _openDocument(context, accessInfo.privacyPolicyUrl),
-            ),
-            _row(
-              key: const Key('locationTermsItem'),
-              title: '위치정보 이용약관',
-              onTap: () => _openDocument(context, accessInfo.locationTermsUrl),
-            ),
-            _row(
-              key: const Key('dataSourceAttributionItem'),
-              title: '정보제공처',
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const DataSourceAttributionScreen(),
-                  ),
-                );
-              },
-            ),
-            _row(
-              key: const Key('openSourceLicensesItem'),
-              title: '오픈 소스 라이선스',
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => OpenSourceLicensesScreen(
-                      licenseEntriesLoader: licenseEntriesLoader,
-                    ),
-                  ),
-                );
-              },
+            _ServiceInfoSection(
+              key: const Key('serviceInfoSection-documents'),
+              title: '약관 및 출처',
+              children: rows,
             ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _row({
-    required Key key,
-    required String title,
-    required VoidCallback onTap,
-  }) {
-    return ListTile(
-      key: key,
-      minTileHeight: 60,
-      title: Text(
-        title,
-        style: const TextStyle(
-          color: EasySubwayAccessibleColors.text,
-          fontSize: 16,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: onTap,
     );
   }
 
@@ -132,5 +148,99 @@ class ServiceInfoScreen extends StatelessWidget {
           const SnackBar(content: Text('문서를 열 수 없어요. 잠시 후 다시 시도해 주세요.')),
         );
     }
+  }
+}
+
+class _ServiceInfoSection extends StatelessWidget {
+  const _ServiceInfoSection({
+    required this.title,
+    required this.children,
+    super.key,
+  });
+
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ColoredBox(
+          key: Key('serviceInfoSectionHeader-$title'),
+          color: EasySubwayAccessibleColors.scaffoldSurface,
+          child: SizedBox(
+            width: double.infinity,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+              child: Semantics(
+                header: true,
+                child: Text(
+                  title,
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: EasySubwayAccessibleColors.secondaryText,
+                    fontWeight: FontWeight.w700,
+                    height: 1.25,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        for (var index = 0; index < children.length; index++) ...[
+          children[index],
+          if (index < children.length - 1)
+            const Divider(
+              height: 1,
+              thickness: 1,
+              indent: 20,
+              endIndent: 20,
+              color: EasySubwayAccessibleColors.line,
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+class _ServiceInfoActionTile extends StatelessWidget {
+  const _ServiceInfoActionTile({
+    required this.title,
+    required this.onTap,
+    super.key,
+  });
+
+  final String title;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      container: true,
+      label: title,
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: ListTile(
+          onTap: onTap,
+          minVerticalPadding: 12,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+          tileColor: EasySubwayAccessibleColors.surface,
+          title: Text(
+            title,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: EasySubwayAccessibleColors.text,
+              fontWeight: FontWeight.w700,
+              height: 1.25,
+            ),
+          ),
+          trailing: const Icon(
+            Icons.chevron_right,
+            color: EasySubwayAccessibleColors.disclosure,
+          ),
+        ),
+      ),
+    );
   }
 }

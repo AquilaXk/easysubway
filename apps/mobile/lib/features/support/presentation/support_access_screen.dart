@@ -308,25 +308,13 @@ class _SecurityContactNotice extends StatelessWidget {
             child: ColoredBox(
               color: EasySubwayAccessibleColors.surface,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      _contactNotice,
-                      style: textTheme.bodyLarge?.copyWith(
-                        color: EasySubwayAccessibleColors.text,
-                        height: 1.35,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _scopeNotice,
-                      style: textTheme.bodyLarge?.copyWith(
-                        color: EasySubwayAccessibleColors.text,
-                        height: 1.35,
-                      ),
-                    ),
+                    _SupportNoticeBullet(text: _contactNotice),
+                    const SizedBox(height: 10),
+                    _SupportNoticeBullet(text: _scopeNotice),
                   ],
                 ),
               ),
@@ -348,7 +336,6 @@ class _SafetyDataNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     return Semantics(
       key: const Key('safetyDataNotice'),
       container: true,
@@ -357,38 +344,56 @@ class _SafetyDataNotice extends StatelessWidget {
         child: ColoredBox(
           color: EasySubwayAccessibleColors.surface,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  _referenceNotice,
-                  style: textTheme.bodyLarge?.copyWith(
-                    color: EasySubwayAccessibleColors.text,
-                    height: 1.35,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _fieldNotice,
-                  style: textTheme.bodyLarge?.copyWith(
-                    color: EasySubwayAccessibleColors.text,
-                    height: 1.35,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _limitationNotice,
-                  style: textTheme.bodyLarge?.copyWith(
-                    color: EasySubwayAccessibleColors.text,
-                    height: 1.35,
-                  ),
-                ),
+                const _SupportNoticeBullet(text: _referenceNotice),
+                const SizedBox(height: 10),
+                const _SupportNoticeBullet(text: _fieldNotice),
+                const SizedBox(height: 10),
+                const _SupportNoticeBullet(text: _limitationNotice),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _SupportNoticeBullet extends StatelessWidget {
+  const _SupportNoticeBullet({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 9),
+          child: Container(
+            width: 5,
+            height: 5,
+            decoration: const BoxDecoration(
+              color: EasySubwayAccessibleColors.secondaryText,
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: EasySubwayAccessibleColors.text,
+              height: 1.35,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
