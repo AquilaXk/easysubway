@@ -28,6 +28,16 @@ public record ErrorEventQuery(
 		);
 	}
 
+	public ErrorEventQuery withPage(int page) {
+		return new ErrorEventQuery(
+			fromInclusive,
+			toExclusive,
+			code,
+			category,
+			AdminPageRequest.of(page, pageRequest.size())
+		);
+	}
+
 	private static String blankToNull(String value) {
 		if (value == null || value.isBlank()) {
 			return null;

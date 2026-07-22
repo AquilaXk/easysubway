@@ -86,13 +86,14 @@ class ErrorEventAdminPageController {
 			pageRequest.page(),
 			pageRequest.size()
 		);
-		PageResult<ErrorEvent> result = errorEventRepository.search(query);
 		long total = errorEventRepository.count(query);
 		EgovPaginationView pageView = EgovPaginationView.from(
 			pageRequest.page(),
 			pageRequest.size(),
 			total
 		);
+		ErrorEventQuery pageQuery = query.withPage(pageView.page());
+		PageResult<ErrorEvent> result = errorEventRepository.search(pageQuery);
 
 		model.addAttribute("title", "오류 이벤트");
 		model.addAttribute("activeProgram", AdminProgram.ERROR_EVENTS.id());
@@ -106,7 +107,7 @@ class ErrorEventAdminPageController {
 		model.addAttribute("total", total);
 		model.addAttribute("page", pageView);
 		model.addAttribute("paginationLabel", "오류 이벤트 페이지");
-		model.addAttribute("paginationLinks", pageView.links(PAGE_PATH, filterParams(query, effectiveFrom, effectiveTo)));
+		model.addAttribute("paginationLinks", pageView.links(PAGE_PATH, filterParams(pageQuery, effectiveFrom, effectiveTo)));
 	}
 
 	private static List<Map<String, Object>> categoryOptions(String selected) {
