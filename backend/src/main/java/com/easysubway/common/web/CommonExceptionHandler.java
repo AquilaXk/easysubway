@@ -84,11 +84,8 @@ class CommonExceptionHandler {
 	}
 
 	@ExceptionHandler(NoResourceFoundException.class)
-	ResponseEntity<ApiResponse<Void>> handleNoResourceFound(
-		HttpServletRequest request,
-		NoResourceFoundException exception
-	) {
-		return fail(request, ErrorCode.RESOURCE_NOT_FOUND, exception.getMessage());
+	ResponseEntity<ApiResponse<Void>> handleNoResourceFound(HttpServletRequest request) {
+		return fail(request, ErrorCode.RESOURCE_NOT_FOUND, messages.message("error.resource-not-found"));
 	}
 
 	@ExceptionHandler(AccessDeniedException.class)
