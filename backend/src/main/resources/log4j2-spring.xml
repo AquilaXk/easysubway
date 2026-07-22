@@ -12,7 +12,7 @@
 
 	<SpringProfile name="!prod">
 		<Appenders>
-			<Console name="Console" target="SYSTEM_OUT">
+			<Console name="Console" target="SYSTEM_OUT" follow="true">
 				<PatternLayout pattern="${CONSOLE_PATTERN}"/>
 			</Console>
 		</Appenders>
@@ -25,7 +25,7 @@
 
 	<SpringProfile name="prod">
 		<Appenders>
-			<Console name="ConsoleJson" target="SYSTEM_OUT">
+			<Console name="ConsoleJson" target="SYSTEM_OUT" follow="true">
 				<JsonTemplateLayout eventTemplateUri="classpath:log4j2-json-template.json"/>
 			</Console>
 			<RollingFile
