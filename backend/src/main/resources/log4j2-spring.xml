@@ -37,10 +37,16 @@
 					<TimeBasedTriggeringPolicy interval="1" modulate="true"/>
 					<SizeBasedTriggeringPolicy size="100MB"/>
 				</Policies>
-				<DefaultRolloverStrategy max="14" totalSizeCap="2GB">
+				<DefaultRolloverStrategy max="14">
+					<!-- Log4j 2.25 has no totalSizeCap on DefaultRolloverStrategy; enforce via Delete. -->
 					<Delete basePath="${LOG_DIR}" maxDepth="1">
 						<IfFileName glob="easysubway-backend-*.log.gz"/>
 						<IfLastModified age="14d"/>
+					</Delete>
+					<Delete basePath="${LOG_DIR}" maxDepth="1">
+						<IfFileName glob="easysubway-backend-*.log.gz">
+							<IfAccumulatedFileSize exceeds="2 GB"/>
+						</IfFileName>
 					</Delete>
 				</DefaultRolloverStrategy>
 			</RollingFile>
