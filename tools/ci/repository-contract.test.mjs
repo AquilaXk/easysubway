@@ -19064,4 +19064,17 @@ test("error-codes.json은 ErrorCode enum과 완전 일치하고 category·httpSt
 
   const messages = read("backend/src/main/resources/messages.properties");
   assert.match(messages, /^error\.internal-error=일시적인 문제가 발생했어요\. 잠시 후 다시 시도해 주세요\.$/m);
+  const messageKeys = new Set(
+    messages
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith("#") && line.includes("="))
+      .map((line) => line.split("=", 1)[0]),
+  );
+  for (const entry of contract) {
+    assert.ok(
+      messageKeys.has(entry.koMessageKey),
+      `koMessageKey missing in messages.properties: ${entry.koMessageKey}`,
+    );
+  }
 });
