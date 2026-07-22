@@ -15,11 +15,13 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -94,6 +96,30 @@ class ErrorContractIntegrationTest {
 	}
 
 	@Test
+	@DisplayName("401 ResponseStatusException은 잘못된 code 없이 빈 바디로 유지한다")
+	void unauthorizedResponseStatusKeepsEmptyBody() throws Exception {
+		MvcResult result = mockMvc.perform(get("/api/test/error-contract/unauthorized"))
+			.andExpect(status().isUnauthorized())
+			.andExpect(header().exists(CorrelationId.HEADER))
+			.andReturn();
+
+		assertThat(result.getResponse().getContentAsString()).isBlank();
+	}
+
+	@Test
+	@DisplayName("허용되지 않은 HTTP 메서드는 500 INTERNAL_ERROR가 아닌 405로 응답한다")
+	void methodNotAllowedIsNotInternalError() throws Exception {
+		MvcResult result = mockMvc.perform(post("/api/test/error-contract/ok")
+				.contentType(MediaType.APPLICATION_JSON))
+			.andExpect(status().isMethodNotAllowed())
+			.andReturn();
+
+		String body = result.getResponse().getContentAsString();
+		assertThat(body).doesNotContain("INTERNAL_ERROR");
+		assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED.value());
+	}
+
+	@Test
 	@DisplayName("성공 응답 JSON에 code·correlationId 필드가 나타나지 않는다")
 	void successOmitsErrorFields() throws Exception {
 		String body = mockMvc.perform(get("/api/test/error-contract/ok"))
@@ -136,6 +162,11 @@ class ErrorContractIntegrationTest {
 		@GetMapping("/api/test/error-contract/boom")
 		ApiResponse<Void> boom() {
 			throw new RuntimeException("secret-internal");
+		}
+
+		@GetMapping("/api/test/error-contract/unauthorized")
+		ApiResponse<Void> unauthorized() {
+			throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
 		}
 
 		@GetMapping("/api/test/error-contract/ok")

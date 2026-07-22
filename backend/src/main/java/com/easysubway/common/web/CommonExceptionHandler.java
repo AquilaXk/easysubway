@@ -8,17 +8,25 @@ import com.easysubway.common.error.ResourceNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.ConversionNotSupportedException;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
@@ -83,20 +91,6 @@ class CommonExceptionHandler {
 		return fail(request, ErrorCode.RESOURCE_NOT_FOUND, exception.getMessage());
 	}
 
-	@ExceptionHandler(ResponseStatusException.class)
-	ResponseEntity<ApiResponse<Void>> handleResponseStatus(
-		HttpServletRequest request,
-		ResponseStatusException exception
-	) {
-		ErrorCode errorCode = mapStatus(exception.getStatusCode());
-		String message = exception.getReason() == null || exception.getReason().isBlank()
-			? defaultMessage(errorCode)
-			: exception.getReason();
-		String correlationId = CorrelationId.currentOrCreate(request);
-		return ResponseEntity.status(exception.getStatusCode())
-			.body(ApiResponse.fail(errorCode, message, correlationId));
-	}
-
 	@ExceptionHandler(AccessDeniedException.class)
 	ResponseEntity<Void> handleAccessDenied(HttpServletRequest request) {
 		CorrelationId.currentOrCreate(request);
@@ -110,7 +104,11 @@ class CommonExceptionHandler {
 	}
 
 	@ExceptionHandler(Exception.class)
-	ResponseEntity<ApiResponse<Void>> handleUnhandled(HttpServletRequest request, Exception exception) {
+	ResponseEntity<ApiResponse<Void>> handleUnhandled(HttpServletRequest request, Exception exception)
+		throws Exception {
+		if (shouldPropagate(exception)) {
+			throw exception;
+		}
 		String correlationId = CorrelationId.currentOrCreate(request);
 		log.error("unhandled exception correlationId={}", correlationId, exception);
 		return ResponseEntity.status(ErrorCode.INTERNAL_ERROR.httpStatus())
@@ -127,25 +125,21 @@ class CommonExceptionHandler {
 			.body(ApiResponse.fail(errorCode, message, correlationId));
 	}
 
-	private String defaultMessage(ErrorCode errorCode) {
-		if (errorCode == ErrorCode.INTERNAL_ERROR) {
-			return messages.message("error.internal-error");
-		}
-		if (errorCode == ErrorCode.UNREADABLE_BODY) {
-			return messages.message("common.error.unreadable-body");
-		}
-		if (errorCode == ErrorCode.INVALID_REQUEST) {
-			return messages.message("common.error.invalid-body");
-		}
-		return errorCode.code();
-	}
-
-	private static ErrorCode mapStatus(HttpStatusCode status) {
-		return switch (status.value()) {
-			case 404 -> ErrorCode.RESOURCE_NOT_FOUND;
-			case 409 -> ErrorCode.CONFLICT;
-			case 500, 501, 502, 504 -> ErrorCode.INTERNAL_ERROR;
-			default -> status.is4xxClientError() ? ErrorCode.INVALID_REQUEST : ErrorCode.INTERNAL_ERROR;
-		};
+	/**
+	 * Spring MVC/client framework exceptions and {@link ResponseStatusException} keep their native
+	 * HTTP status via remaining resolvers. Never wrap them as {@code INTERNAL_ERROR} 500.
+	 */
+	private static boolean shouldPropagate(Exception exception) {
+		return exception instanceof HttpRequestMethodNotSupportedException
+			|| exception instanceof HttpMediaTypeNotSupportedException
+			|| exception instanceof HttpMediaTypeNotAcceptableException
+			|| exception instanceof MissingServletRequestParameterException
+			|| exception instanceof ServletRequestBindingException
+			|| exception instanceof MethodArgumentNotValidException
+			|| exception instanceof ConversionNotSupportedException
+			|| exception instanceof TypeMismatchException
+			|| exception instanceof HttpMessageNotWritableException
+			|| exception instanceof NoHandlerFoundException
+			|| exception instanceof ResponseStatusException;
 	}
 }
