@@ -34,42 +34,33 @@ class UserDataDeletionAccessItem extends StatelessWidget {
     return Semantics(
       key: const Key('dataDeletionAccessItem'),
       button: true,
+      container: true,
       label: '${copy.title}, ${copy.helperText}',
       onTap: openDeletionScreen,
       child: ExcludeSemantics(
-        child: InkWell(
+        child: ListTile(
           onTap: openDeletionScreen,
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 56),
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            child: Row(
-              children: [
-                const Padding(
-                  padding: EdgeInsets.only(top: 1),
-                  child: Icon(
-                    Icons.delete_outline,
-                    color: EasySubwayAccessibleColors.red,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Text(
-                    copy.title,
-                    style: const TextStyle(
-                      color: EasySubwayAccessibleColors.text,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      height: 1.25,
-                    ),
-                  ),
-                ),
-                const Icon(
-                  Icons.chevron_right,
-                  color: EasySubwayAccessibleColors.mutedText,
-                ),
-              ],
+          minVerticalPadding: 12,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+          tileColor: EasySubwayAccessibleColors.surface,
+          title: Text(
+            copy.title,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: EasySubwayAccessibleColors.text,
+              fontWeight: FontWeight.w700,
+              height: 1.25,
             ),
+          ),
+          subtitle: Text(
+            copy.helperText,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: EasySubwayAccessibleColors.mutedText,
+              height: 1.3,
+            ),
+          ),
+          trailing: const Icon(
+            Icons.chevron_right,
+            color: EasySubwayAccessibleColors.disclosure,
           ),
         ),
       ),

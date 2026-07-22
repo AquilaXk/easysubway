@@ -21,6 +21,7 @@ class AppSettingsScreen extends StatefulWidget {
     required this.onOpenSupportAccess,
     required this.onOpenServiceInfo,
     required this.onOpenMyReports,
+    this.onShellBack,
     this.bottomNavigationBar,
     super.key,
   });
@@ -35,6 +36,9 @@ class AppSettingsScreen extends StatefulWidget {
   final VoidCallback onOpenSupportAccess;
   final VoidCallback onOpenServiceInfo;
   final VoidCallback onOpenMyReports;
+
+  /// 루트 탭으로 열린 설정에서 Navigator.pop이 안 될 때 이전 탭(없으면 홈)으로 돌아간다.
+  final VoidCallback? onShellBack;
   final Widget? bottomNavigationBar;
 
   @override
@@ -67,6 +71,29 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
           backgroundColor: EasySubwayAccessibleColors.topBarSurface,
           surfaceTintColor: Colors.transparent,
           elevation: 0,
+          automaticallyImplyLeading: false,
+          leading: IconButton(
+            key: const Key('settingsBackButton'),
+            tooltip: '뒤로',
+            onPressed: () {
+              final navigator = Navigator.of(context);
+              if (navigator.canPop()) {
+                navigator.pop();
+                return;
+              }
+              widget.onShellBack?.call();
+            },
+            style: IconButton.styleFrom(
+              minimumSize: const Size.square(EasySubwayTouchTarget.general),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              padding: EdgeInsets.zero,
+            ),
+            icon: const Icon(
+              Icons.arrow_back,
+              size: 26,
+              color: Color(0xFF4B4B4B),
+            ),
+          ),
           flexibleSpace: const Align(
             alignment: Alignment.bottomCenter,
             child: EasySubwayHeaderDivider(key: Key('settingsHeaderDivider')),
@@ -126,7 +153,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                 ],
               ),
               // 오프라인 안내 섹션·화면은 완전히 제거됐다(#1570): 오프라인 동작은
-              // 설명 없이 그냥 되는 것이고, 데이터·지도 출처는 도움말·문의 하위에 이미 있다.
+              // 설명 없이 그냥 되는 것이고, 데이터·지도 출처는 도움말 및 문의·서비스 정보에 있다.
               if (widget.notificationRepository != null)
                 _AppSettingsSection(
                   key: const Key('settingsSection-notification'),
@@ -171,7 +198,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                   ),
                   _AppSettingsActionTile(
                     key: const Key('settingsSupportPrivacyButton'),
-                    title: '도움말·문의',
+                    title: '도움말 및 문의',
                     onTap: widget.onOpenSupportAccess,
                   ),
                 ],

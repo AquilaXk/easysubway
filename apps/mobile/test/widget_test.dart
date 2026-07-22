@@ -5825,6 +5825,58 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(AppSettingsScreen), findsOneWidget);
+    expect(find.byKey(const Key('settingsBackButton')), findsOneWidget);
+  });
+
+  testWidgets('설정 뒤로가기는 직전 탭(홈)으로 돌아간다', (tester) async {
+    await tester.pumpWidget(
+      buildEasySubwayTestApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+        favoriteRouteRepository: FakeFavoriteRouteRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('networkMapMenuSettingsButton')));
+    await tester.pumpAndSettle();
+    expect(find.byType(AppSettingsScreen), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('settingsBackButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AppSettingsScreen), findsNothing);
+    expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
+  });
+
+  testWidgets('도움말 및 문의 뒤로가기는 설정으로 돌아간다', (tester) async {
+    await tester.pumpWidget(
+      buildEasySubwayTestApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _openSupportAccessScreen(tester);
+    expect(find.byKey(const Key('supportAccessScreen')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('supportAccessBackButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('supportAccessScreen')), findsNothing);
+    expect(find.byType(AppSettingsScreen), findsOneWidget);
   });
 
   testWidgets('홈 이동 조건 pill은 모든 프리셋에 맞는 표시명을 보여준다', (tester) async {
@@ -6248,10 +6300,11 @@ void main() {
       // 자명한 행은 부가설명 없이 제목만 시맨틱에 담는다(#1570·#1572).
       expect(
         settingsActionSemantics(
-          '도움말·문의',
+          '도움말 및 문의',
         ).getSemanticsData().hasAction(SemanticsAction.tap),
         isTrue,
       );
+      expect(find.byKey(const Key('settingsBackButton')), findsOneWidget);
       expectNoForbiddenUserCopy(tester);
 
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
@@ -7053,7 +7106,13 @@ void main() {
 
       await _openSupportAccessScreen(tester);
 
-      expect(find.text('도움말·문의'), findsOneWidget);
+      expect(find.text('도움말 및 문의'), findsOneWidget);
+      expect(find.text('도움말·문의'), findsNothing);
+      expect(find.byKey(const Key('supportAccessBackButton')), findsOneWidget);
+      expect(
+        find.byKey(const Key('supportAccessHeaderDivider')),
+        findsOneWidget,
+      );
       expect(find.text('개인정보처리방침'), findsNothing);
 
       await tester.scrollUntilVisible(

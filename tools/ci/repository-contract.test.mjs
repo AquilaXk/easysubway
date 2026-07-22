@@ -2393,17 +2393,25 @@ test("모바일 도움말과 서비스 정보 연결 계약은 각 presentation 
     );
   }
   for (const helper of [
-    "_SupportSectionTitle",
-    "_SupportGroupCard",
+    "_SupportSettingsSection",
     "_SecurityContactNotice",
-    "_SecurityContactNoticeLine",
     "_SafetyDataNotice",
-    "_SafetyDataNoticeLine",
     "_SupportAccessItem",
   ]) {
     assert.match(support, new RegExp(`^class ${helper}\\b`, "m"));
     assert.doesNotMatch(main, new RegExp(`^class ${helper}\\b`, "m"));
   }
+  // 설정 화면과 같은 섹션·타일 양식(#2436). 카드형 보조 위젯은 쓰지 않는다.
+  for (const removed of [
+    "_SupportSectionTitle",
+    "_SupportGroupCard",
+    "_SecurityContactNoticeLine",
+    "_SafetyDataNoticeLine",
+  ]) {
+    assert.doesNotMatch(support, new RegExp(`^class ${removed}\\b`, "m"));
+  }
+  assert.match(support, /도움말 및 문의/);
+  assert.doesNotMatch(support, /도움말·문의/);
   assert.match(support, /^Uri\? _mailtoUri\(/m);
   assert.match(serviceInfo, /^class ServiceInfoScreen\b/m);
   assert.match(serviceInfo, /LaunchMode\.inAppBrowserView/);
