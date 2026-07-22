@@ -19122,4 +19122,3 @@ test("error_events 스키마는 허용 컬럼만 갖고 민감 원문 컬럼을 
     /admin\.errors\.read/,
   );
 });
-
