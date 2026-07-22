@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Spring Boot recognizes log4j2-spring.xml and enables <SpringProfile>.
+  staging/release/prod-like activate the prod profile group (application.yml),
+  so JSON+file appenders apply there without separate profile blocks.
+-->
+<Configuration status="WARN" monitorInterval="30">
+	<Properties>
+		<Property name="LOG_DIR">${sys:easysubway.log.dir:-/opt/easysubway/logs}</Property>
+		<Property name="CONSOLE_PATTERN">%d{yyyy-MM-dd'T'HH:mm:ss.SSS} %-5level [%X{correlationId}] %logger{36} - %msg%n%throwable</Property>
+	</Properties>
+
+	<SpringProfile name="!prod">
+		<Appenders>
+			<Console name="Console" target="SYSTEM_OUT">
+				<PatternLayout pattern="${CONSOLE_PATTERN}"/>
+			</Console>
+		</Appenders>
+		<Loggers>
+			<Root level="INFO">
+				<AppenderRef ref="Console"/>
+			</Root>
+		</Loggers>
+	</SpringProfile>
+
+	<SpringProfile name="prod">
+		<Appenders>
+			<Console name="ConsoleJson" target="SYSTEM_OUT">
+				<JsonTemplateLayout eventTemplateUri="classpath:log4j2-json-template.json"/>
+			</Console>
+			<RollingFile
+				name="FileJson"
+				fileName="${LOG_DIR}/easysubway-backend.log"
+				filePattern="${LOG_DIR}/easysubway-backend-%d{yyyy-MM-dd}-%i.log.gz">
+				<JsonTemplateLayout eventTemplateUri="classpath:log4j2-json-template.json"/>
+				<Policies>
+					<TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+					<SizeBasedTriggeringPolicy size="100MB"/>
+				</Policies>
+				<DefaultRolloverStrategy max="14" totalSizeCap="2GB"/>
+			</RollingFile>
+		</Appenders>
+		<Loggers>
+			<Root level="INFO">
+				<AppenderRef ref="ConsoleJson"/>
+				<AppenderRef ref="FileJson"/>
+			</Root>
+		</Loggers>
+	</SpringProfile>
+</Configuration>
