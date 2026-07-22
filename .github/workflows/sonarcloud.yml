@@ -91,7 +91,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          flutter pub get
+          flutter pub get --enforce-lockfile
           flutter test --coverage
           node ../../tools/ci/filter-mobile-lcov.mjs --input coverage/lcov.info --output coverage/lcov.info
 
