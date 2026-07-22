@@ -42,7 +42,7 @@ services:
     image: busybox:1.37.0
     container_name: easysubway-backend-logs-init
     restart: "no"
-    command: ["sh", "-c", "for d in /logs/backend /logs/standby /logs/worker; do mkdir -p "$d" && chown -R 10001:10001 "$d" && chmod 0755 "$d"; done"]
+    command: ["sh", "-c", "mkdir -p /logs/backend /logs/standby /logs/worker && chown -R 10001:10001 /logs/backend /logs/standby /logs/worker"]
     volumes:
       - backend-logs:/logs/backend
       - backend-standby-logs:/logs/standby
