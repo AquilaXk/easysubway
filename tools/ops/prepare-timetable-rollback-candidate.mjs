@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { isMainModule } from "../lib/is-main-module.mjs";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -83,7 +84,7 @@ export async function prepareRollbackCandidate(seedPath, evidencePath, outputDir
   ]);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   const [, , seedPath, evidencePath, outputDirectory] = process.argv;
   if (!seedPath || !evidencePath || !outputDirectory) {
     throw new Error("usage: prepare-timetable-rollback-candidate.mjs <seed.gz> <evidence.json> <output-dir>");

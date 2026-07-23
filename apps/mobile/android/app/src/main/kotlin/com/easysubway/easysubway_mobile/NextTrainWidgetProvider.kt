@@ -1,9 +1,12 @@
 package com.easysubway.easysubway_mobile
 
+import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.net.Uri
+import android.os.Build
 import android.view.View
 import android.widget.RemoteViews
 import androidx.work.WorkManager
@@ -29,10 +32,29 @@ class NextTrainWidgetProvider : HomeWidgetProvider() {
             val stationName = widgetData.getString("widget_${widgetId}_station_name", "역을 선택해 주세요").orEmpty()
             val lineName = widgetData.getString("${prefix}line_name", "").orEmpty()
             val status = widgetData.getString("${prefix}status", "timetableUnavailable").orEmpty()
-            val detailUri = Uri.parse("easysubway://station/detail").buildUpon()
-                .appendQueryParameter("stationId", stationId)
-                .appendQueryParameter("lineId", lineId)
-                .build()
+            val configured = stationId.isNotBlank() && lineId.isNotBlank()
+            val clickIntent = if (configured) {
+                val detailUri = Uri.parse("easysubway://station/detail").buildUpon()
+                    .appendQueryParameter("stationId", stationId)
+                    .appendQueryParameter("lineId", lineId)
+                    .build()
+                HomeWidgetLaunchIntent.getActivity(context, MainActivity::class.java, detailUri)
+            } else {
+                val configIntent = Intent(context, WidgetConfigurationActivity::class.java).apply {
+                    action = AppWidgetManager.ACTION_APPWIDGET_CONFIGURE
+                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                    data = Uri.parse("easysubway://widget/configure").buildUpon()
+                        .appendQueryParameter("widgetId", widgetId.toString())
+                        .build()
+                }
+                val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        PendingIntent.FLAG_IMMUTABLE
+                    } else {
+                        0
+                    }
+                PendingIntent.getActivity(context, widgetId, configIntent, flags)
+            }
             val views = RemoteViews(context.packageName, R.layout.next_train_widget).apply {
                 setTextViewText(R.id.widget_station_name, stationName)
                 setTextViewText(R.id.widget_line_name, lineName)
@@ -45,10 +67,7 @@ class NextTrainWidgetProvider : HomeWidgetProvider() {
                     R.id.widget_departures,
                     if (status == "timetableUnavailable") View.GONE else View.VISIBLE,
                 )
-                setOnClickPendingIntent(
-                    R.id.widget_container,
-                    HomeWidgetLaunchIntent.getActivity(context, MainActivity::class.java, detailUri),
-                )
+                setOnClickPendingIntent(R.id.widget_container, clickIntent)
             }
             appWidgetManager.updateAppWidget(widgetId, views)
         }

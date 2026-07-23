@@ -438,6 +438,25 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         // 화면이 사라질 때 진행 중인 위치 요청을 취소해 콜백 누수와 크래시를 막는다.
         clearPendingLocation()
+        // MethodChannel Result는 한 번만 complete 가능 — destroy 시 hang 방지.
+        pendingLocationResult?.error(
+            "activityDestroyed",
+            "activity destroyed before location result",
+            null,
+        )
+        pendingLocationResult = null
+        pendingNotificationPermissionResult?.error(
+            "activityDestroyed",
+            "activity destroyed before notification permission result",
+            null,
+        )
+        pendingNotificationPermissionResult = null
+        pendingIntegrityResult?.error(
+            "activityDestroyed",
+            "activity destroyed before integrity result",
+            null,
+        )
+        pendingIntegrityResult = null
         super.onDestroy()
     }
 

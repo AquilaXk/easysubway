@@ -105,7 +105,7 @@
             {"path": ".github/workflows/datapack-release.yml", "sha256": "0927e5dc0cf4bf04136d9ff7612d14c892ccec1c21e8655b703a10f22556ccea"},
             {"path": "tools/ci/validate-store-privacy-env.mjs", "sha256": "18bb0dd8b93d6268c8f60f9cc12272d2ff31c03b60fbbafd6c1e8d16957ada2a"},
             {"path": "backend/build.gradle", "sha256": "edae786dc261f88411afc3da939df4dff9c37ab58870783d029380dbe0ae6833"},
-            {"path": "backend/Dockerfile", "sha256": "bac06167fb06010318e2f163cdeb00e72b38942079b503d570a9d8c742e1c66c"},
+            {"path": "backend/Dockerfile", "sha256": "414582565d7b0bfe25c140aba96e82be775e60f737597d2fb114231ae5639898"},
             {"path": "apps/mobile/release/rc-evidence-manifest-contract.json", "sha256": "7caaa17fc34e13e5e35076be4b4f35456f4fa57add102561e31267934bd6cd41"},
             {"path": "tools/datapack/lib/manifest-validation.mjs", "sha256": "8ac183f1aa33864a5fc309efe6089961e1dbcd7a0ed7c9b0aff138961e8845ac"},
             {"path": "tools/datapack/decide-datapack-release.mjs", "sha256": "19df0719c5c030db1981bd34622a42b98e610ac35851a4d0219c70c51dda675c"},

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { isMainModule } from "../lib/is-main-module.mjs";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { validateSourceGovernancePolicy } from "../datapack/source-governance-policy.mjs";
@@ -253,7 +254,7 @@ function compareText(left, right) {
   return codepointCompare(left, right);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   const errors = collectContractErrors();
   if (errors.length) {
     console.error(errors.map((error) => `- ${error}`).join("\n"));

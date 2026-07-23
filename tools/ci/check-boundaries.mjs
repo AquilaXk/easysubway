@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { isMainModule } from "../lib/is-main-module.mjs";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { loadJson } from "./check-contracts.mjs";
@@ -43,7 +44,7 @@ function walk(dir) {
   return out;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   const boundaries = loadJson("contracts/boundaries.json");
   const violations = findViolations(boundaries.forbiddenReferences ?? [], {
     root: ".",

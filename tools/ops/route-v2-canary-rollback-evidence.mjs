@@ -16,6 +16,7 @@
 // bash runner is the only place that touches the live edge, and only after this
 // module's gates pass. Keeping the logic here makes every gate unit-testable
 // without a production runner.
+import { isMainModule } from "../lib/is-main-module.mjs";
 import { readFile } from "node:fs/promises";
 
 export const CANARY_TIMELINE_STAGES = [
@@ -562,7 +563,7 @@ async function main(argv) {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   main(process.argv.slice(2)).catch((error) => {
     console.error(error.message);
     process.exitCode = 2;

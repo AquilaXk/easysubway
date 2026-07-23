@@ -31,6 +31,7 @@
 //   out-of-scope    타 이슈 소유 또는 비노출
 //   review          규칙 미매칭 — 사람이 판단 필요
 
+import { isMainModule } from "../lib/is-main-module.mjs";
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -412,6 +413,6 @@ function main() {
   );
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   main();
 }
