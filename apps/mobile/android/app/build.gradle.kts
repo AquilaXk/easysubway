@@ -88,14 +88,28 @@ flutter {
     source = "../.."
 }
 
-// AGP UTP 내부 구성(_internal-unified-test-platform-gradle-work-action)이 끌어오는
-// bcprov 1.79의 GHSA-574f-3g2m-x479(CVE-2025-14813) 해소 — 권고 최소 패치 1.80.2 강제.
-// bcpkix·bcutil은 bcprov와 버전 정합을 위해 함께 맞춘다.
+// AGP UTP 내부 구성(_internal-unified-test-platform-*) transitive 보안 패치 강제(#2459).
+// APK runtime이 아니라 빌드/테스트 classpath 전용이다.
 configurations.configureEach {
     resolutionStrategy {
-        force("org.bouncycastle:bcprov-jdk18on:1.80.2")
-        force("org.bouncycastle:bcpkix-jdk18on:1.80.2")
-        force("org.bouncycastle:bcutil-jdk18on:1.80.2")
+        force("org.bouncycastle:bcprov-jdk18on:1.84")
+        force("org.bouncycastle:bcpkix-jdk18on:1.84")
+        force("org.bouncycastle:bcutil-jdk18on:1.84")
+        force("io.netty:netty-buffer:4.1.136.Final")
+        force("io.netty:netty-codec:4.1.136.Final")
+        force("io.netty:netty-codec-http:4.1.136.Final")
+        force("io.netty:netty-codec-http2:4.1.136.Final")
+        force("io.netty:netty-codec-socks:4.1.136.Final")
+        force("io.netty:netty-common:4.1.136.Final")
+        force("io.netty:netty-handler:4.1.136.Final")
+        force("io.netty:netty-handler-proxy:4.1.136.Final")
+        force("io.netty:netty-resolver:4.1.136.Final")
+        force("io.netty:netty-transport:4.1.136.Final")
+        force("io.netty:netty-transport-native-unix-common:4.1.136.Final")
+        force("com.google.protobuf:protobuf-java:3.25.5")
+        force("com.google.protobuf:protobuf-kotlin:3.25.5")
+        force("org.apache.commons:commons-lang3:3.18.0")
+        force("org.apache.httpcomponents:httpclient:4.5.13")
         // Flutter integration-test의 오래된 test-only transitive 보안 버전을 고정한다.
         force("com.google.guava:guava:32.0.0-android", "junit:junit:4.13.2")
     }
