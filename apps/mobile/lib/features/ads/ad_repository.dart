@@ -48,23 +48,24 @@ final class AdRepository {
   final Uri? Function()? _baseUri;
 
   /// ponytail: 현재 200 응답만 사용한다. 소재 캐시와 event 저장/재시도는 범위 밖이다.
+  ///
+  /// 소재 없음(204·비정상 payload)은 `null`, 네트워크/non-200 조회 실패는
+  /// [ApiException]으로 전파한다. 배너가 resume 재조회 실패와 비활성화를 구분한다.
   Future<AdCreative?> fetchActive(AdPlacement placement) async {
     final apiClient = _apiClient;
     final resolvedClient = apiClient ?? _lazyClient();
     if (resolvedClient == null) {
       return null;
     }
-    final ApiResponse response;
-    try {
-      response = await resolvedClient.getJson(
-        '/api/ads/active?placement=${placement.id}',
-      );
-    } on ApiException {
+    final response = await resolvedClient.getJson(
+      '/api/ads/active?placement=${placement.id}',
+    );
+
+    if (response.statusCode == 204) {
       return null;
     }
-
     if (!response.isOk) {
-      return null;
+      throw ApiException('ads active failed', statusCode: response.statusCode);
     }
     final body = response.jsonBody;
     if (body is! Map<String, Object?> || body['success'] != true) {

@@ -32,13 +32,20 @@ class ActiveAdBanner extends StatefulWidget {
   State<ActiveAdBanner> createState() => _ActiveAdBannerState();
 }
 
-class _ActiveAdBannerState extends State<ActiveAdBanner> {
+class _ActiveAdBannerState extends State<ActiveAdBanner>
+    with WidgetsBindingObserver {
   AdCreative? _creative;
   ImageProvider<Object>? _image;
   bool _started = false;
   int _generation = 0;
   Timer? _expiryTimer;
   bool _impressionRecorded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
 
   @override
   void didChangeDependencies() {
@@ -62,8 +69,20 @@ class _ActiveAdBannerState extends State<ActiveAdBanner> {
     }
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (!_started || state != AppLifecycleState.resumed) {
+      return;
+    }
+    // 운영 비활성화·endsAt null 소재는 Timer만으로는 내려가지 않으므로
+    // 포그라운드 복귀 때 active를 다시 조회한다.
+    _reload();
+  }
+
   void _reload() {
-    _resetLifecycle();
+    // 재조회 중에도 기존 endsAt Timer를 유지한다. Timer를 먼저 끊으면
+    // generation bump 때문에 만료 콜백이 무시되는 빈 구간이 생긴다.
     final generation = ++_generation;
     unawaited(
       _load(
@@ -83,25 +102,53 @@ class _ActiveAdBannerState extends State<ActiveAdBanner> {
   ) async {
     try {
       final creative = await repository.fetchActive(placement);
-      if (!mounted || generation != _generation || creative == null) {
+      if (!mounted || generation != _generation) {
         return;
       }
-      if (_isExpired(creative)) {
+      if (creative == null || _isExpired(creative)) {
+        _collapseRenderedBanner();
         return;
       }
       final image = await imageLoader(creative.imageUrl, context);
-      if (!mounted || generation != _generation || _isExpired(creative)) {
+      if (!mounted || generation != _generation) {
         return;
+      }
+      if (_isExpired(creative)) {
+        _collapseRenderedBanner();
+        return;
+      }
+      final replaced = _creative?.creativeId != creative.creativeId;
+      if (replaced) {
+        _impressionRecorded = false;
       }
       setState(() {
         _creative = creative;
         _image = image;
       });
-      _scheduleExpiry(generation, creative);
+      _scheduleExpiry(creative);
       _recordImpressionAfterFrame(generation, repository, creative);
     } on Exception {
-      // ponytail: 조회·decode 실패는 사용자에게 빈 슬롯을 남기지 않고 닫는다.
+      // 조회·decode 실패는 이미 그린 유효 배너와 기존 endsAt Timer를 유지한다.
+      if (!mounted || generation != _generation) {
+        return;
+      }
+      final kept = _creative;
+      if (kept != null && _isExpired(kept)) {
+        _collapseRenderedBanner();
+      }
     }
+  }
+
+  void _collapseRenderedBanner() {
+    _expiryTimer?.cancel();
+    _expiryTimer = null;
+    if (_creative == null && _image == null) {
+      return;
+    }
+    setState(() {
+      _creative = null;
+      _image = null;
+    });
   }
 
   bool _isExpired(AdCreative creative) {
@@ -109,15 +156,15 @@ class _ActiveAdBannerState extends State<ActiveAdBanner> {
     return endsAt != null && !endsAt.isAfter(widget.now());
   }
 
-  void _scheduleExpiry(int generation, AdCreative creative) {
+  void _scheduleExpiry(AdCreative creative) {
     final endsAt = creative.endsAt;
     if (endsAt == null) {
       return;
     }
+    _expiryTimer?.cancel();
     _expiryTimer = Timer(endsAt.difference(widget.now()), () {
-      if (!mounted ||
-          generation != _generation ||
-          !identical(_creative, creative)) {
+      // generation과 무관하게, 아직 같은 creative가 그려져 있으면 만료한다.
+      if (!mounted || !identical(_creative, creative)) {
         return;
       }
       setState(() {
@@ -192,6 +239,7 @@ class _ActiveAdBannerState extends State<ActiveAdBanner> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _generation++;
     _resetLifecycle();
     super.dispose();
