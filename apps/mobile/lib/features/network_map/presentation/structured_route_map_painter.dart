@@ -1,8 +1,10 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 
+import '../../../core/perf/easy_subway_perf.dart';
 import '../../stations/domain/station_line.dart' show stationLineColor;
 import '../domain/map_camera.dart';
 import '../domain/route_map_design_space.dart';
@@ -11,6 +13,10 @@ import '../domain/route_map_parallel_offsets.dart';
 import '../domain/structured_route_map.dart';
 import 'route_map_label_layout.dart';
 import 'route_map_transfer_marker.dart';
+
+/// profile 계측용. [easySubwayPerfLogsEnabled]일 때만 증가한다.
+int debugStructuredRouteMapPictureBuildCount = 0;
+int debugStructuredRouteMapPaintCount = 0;
 
 // 구조화 노선도 정적 스케일 렌더러 (#1789 스펙 S6).
 //
@@ -447,6 +453,12 @@ class StructuredRouteMapPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (easySubwayPerfLogsEnabled) {
+      debugStructuredRouteMapPaintCount++;
+      easySubwayPerfLog(
+        'structured_route_map.paint #$debugStructuredRouteMapPaintCount',
+      );
+    }
     canvas.save();
     final vc = camera.viewportSize.center(Offset.zero);
     // viewport = vc + (source − sourceOrigin − camera.center)·scale,
@@ -559,6 +571,50 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
   // TextPainter 생성·layout 할당을 제거하기 위한 캐시(#1973). State가 dispose를 소유한다.
   TextPainter? _attributionPainter;
   String? _attributionPainterText;
+  int _pictureBuildGeneration = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // cold 진입 첫 프레임에서 label layout + picture record가 build를 막지 않게
+    // 다음 프레임으로 미룬다. 그 사이 바탕(.vec)만 보여 체감 jank를 줄인다.
+    _schedulePictureBuild();
+  }
+
+  @override
+  void didUpdateWidget(StructuredRouteMapView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final mapChanged = !identical(oldWidget.map, widget.map);
+    final flagsChanged =
+        oldWidget.drawLines != widget.drawLines ||
+        oldWidget.drawStationSymbols != widget.drawStationSymbols ||
+        !identical(
+          oldWidget.ownerLabelsByStationName,
+          widget.ownerLabelsByStationName,
+        );
+    if (mapChanged || flagsChanged) {
+      _picture?.dispose();
+      _picture = null;
+      _sourceMap = null;
+      _schedulePictureBuild();
+    }
+  }
+
+  void _schedulePictureBuild() {
+    final generation = ++_pictureBuildGeneration;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || generation != _pictureBuildGeneration) {
+        return;
+      }
+      easySubwayPerfTimeSync('structured_route_map.picture_build', () {
+        _ensurePicture();
+      });
+      if (!mounted || generation != _pictureBuildGeneration) {
+        return;
+      }
+      setState(() {});
+    });
+  }
 
   void _ensurePicture() {
     if (identical(_sourceMap, widget.map) &&
@@ -627,6 +683,13 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
       drawLines: widget.drawLines,
       drawStationSymbols: widget.drawStationSymbols,
     );
+    if (easySubwayPerfLogsEnabled) {
+      debugStructuredRouteMapPictureBuildCount++;
+      easySubwayPerfLog(
+        'structured_route_map.picture_build '
+        '#$debugStructuredRouteMapPictureBuildCount',
+      );
+    }
   }
 
   void _ensureAttributionPainter() {
@@ -659,8 +722,14 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
 
   @override
   Widget build(BuildContext context) {
-    _ensurePicture();
     _ensureAttributionPainter();
+    final picture = _picture;
+    final design = _design;
+    // Picture 준비 전: 빈 레이어만 두어 첫 프레임 build를 가볍게 유지한다.
+    // 바탕(.vec)은 형제 RouteMapBasemapView가 담당한다.
+    if (picture == null || design == null) {
+      return SizedBox.fromSize(size: widget.camera.viewportSize);
+    }
     // RepaintBoundary로 지도 레이어를 부모 Stack의 형제 오버레이 rebuild와 분리한다.
     // isComplex/willChange 힌트로 정적 Picture 재생 레이어의 raster 캐싱을 돕는다(#1973).
     return RepaintBoundary(
@@ -669,8 +738,8 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
         isComplex: true,
         willChange: true,
         painter: StructuredRouteMapPainter(
-          picture: _picture!,
-          designScale: _design!.designScale,
+          picture: picture,
+          designScale: design.designScale,
           camera: widget.camera,
           sourceOrigin: widget.sourceOrigin,
           attributionText: widget.attributionText,
