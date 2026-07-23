@@ -145,7 +145,7 @@ class NearbyPanelColumns extends StatelessWidget {
   }
 
   Widget _buildColumn(NearbyPanelColumn column) {
-    return Column(
+    final body = Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -160,11 +160,20 @@ class NearbyPanelColumns extends StatelessWidget {
         if (column.hasData)
           ...column.rows
         else
-          const SizedBox(
-            height: 46,
-            child: Center(child: Text('-', style: dashStyle)),
+          // 시각 대시('-')는 TalkBack에 반복 발화되지 않게 제외하고,
+          // 열 단위 Semantics 라벨로만 의미를 전달한다(#2453 Task 5).
+          const ExcludeSemantics(
+            child: SizedBox(
+              height: 46,
+              child: Center(child: Text('-', style: dashStyle)),
+            ),
           ),
       ],
     );
+    if (column.hasData) {
+      return body;
+    }
+    final label = column.title.isEmpty ? '정보 없음' : '${column.title} 정보 없음';
+    return Semantics(label: label, excludeSemantics: true, child: body);
   }
 }

@@ -5055,30 +5055,21 @@ void main() {
         location: _freshCurrentLocation(),
         needsPermissionRequest: false,
       ),
-      // 도착이 있으면 실시간 탭을 유지한 뒤 수동으로 시간표로 전환한다.
+      // 기본 탭은 시간표. 실시간 토글 회귀를 위해 fresh 응답을 둔다.
       realtimeRepository: _FreshRealtimeRepository(),
     );
 
     await tester.tap(find.byKey(const Key('nearbyStationButton')));
     await tester.pumpAndSettle();
-    // 2버튼 세그먼트 토글(#2200). 초기 선택은 실시간.
-    expect(find.bySemanticsLabel('실시간 선택됨'), findsOneWidget);
+    // 2버튼 세그먼트 토글(#2200). 초기 선택은 시간표.
+    expect(find.bySemanticsLabel('시간표 선택됨'), findsOneWidget);
     expect(
-      find.descendant(
-        of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
-        matching: find.text('실시간'),
-      ),
-      findsOneWidget,
-    );
-
-    // 비선택 '시간표' 세그먼트를 눌러 시간표로 전환.
-    await tester.tap(
       find.descendant(
         of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
         matching: find.text('시간표'),
       ),
+      findsOneWidget,
     );
-    await tester.pumpAndSettle();
 
     // 방면 제목은 열당 1개 헤더로 올라가고, 그 아래 두 시각이 각각 한 줄.
     expect(find.text('오이도 방면'), findsOneWidget);
@@ -5094,7 +5085,6 @@ void main() {
         findsOneWidget,
       );
     }
-    expect(find.bySemanticsLabel('시간표 선택됨'), findsOneWidget);
     expect(
       tester
           .getSize(find.byKey(const Key('networkMapNearbyDataSourceToggle')))
@@ -5102,7 +5092,7 @@ void main() {
       greaterThanOrEqualTo(48),
     );
 
-    // 다시 '실시간' 세그먼트를 눌러 복귀.
+    // '실시간' 세그먼트를 눌러 전환 후 복귀.
     await tester.tap(
       find.descendant(
         of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
@@ -5111,9 +5101,17 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.bySemanticsLabel('실시간 선택됨'), findsOneWidget);
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
+        matching: find.text('시간표'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('시간표 선택됨'), findsOneWidget);
   });
 
-  testWidgets('GPS 하단 패널은 실시간 불가 시 시간표로 자동 전환한다', (tester) async {
+  testWidgets('시간표 선택 중 실시간 prefetch 실패는 선택 상태를 변경하지 않는다', (tester) async {
     tester.view.physicalSize = const Size(320, 1200);
     tester.view.devicePixelRatio = 1;
     addTearDown(() {
@@ -5156,12 +5154,13 @@ void main() {
     await tester.tap(find.byKey(const Key('nearbyStationButton')));
     await tester.pumpAndSettle();
 
+    // #2453: 기본 시간표 탭에서 prefetch unavailable은 탭을 바꾸지 않는다.
     expect(find.bySemanticsLabel('시간표 선택됨'), findsOneWidget);
     expect(find.text('오이도 방면'), findsOneWidget);
     expect(find.text(departure.timeLabel), findsOneWidget);
   });
 
-  testWidgets('GPS 하단 패널은 실시간 응답이 늦으면 시간표로 자동 전환한다', (tester) async {
+  testWidgets('GPS 하단 패널은 늦은 실시간 prefetch에도 시간표 선택을 유지한다', (tester) async {
     tester.view.physicalSize = const Size(320, 1200);
     tester.view.devicePixelRatio = 1;
     addTearDown(() {
@@ -5203,7 +5202,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('nearbyStationButton')));
     await tester.pump();
-    // 2초 타임아웃 전에는 로딩일 수 있다.
+    // #2453: 기본 시간표 탭은 hanging 실시간과 무관하게 즉시 유지된다.
     await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
 
@@ -5213,6 +5212,1254 @@ void main() {
       find.byKey(const Key('networkMapNearbyArrivalLoading')),
       findsNothing,
     );
+  });
+
+  testWidgets('GPS 하단 패널은 조회 완료 전에도 첫 프레임에 시간표 골격과 패널을 표시한다', (tester) async {
+    tester.view.physicalSize = const Size(320, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final timetableCompleter = Completer<StationTimetable>();
+    addTearDown(() {
+      if (!timetableCompleter.isCompleted) {
+        timetableCompleter.complete(
+          _stationTimetable(
+            StationTimetableDayType.weekday,
+            directions: const [],
+          ),
+        );
+      }
+    });
+    final repository = _HangingTimetableStationRepository(
+      completer: timetableCompleter,
+      stationDetail: _stationDetail(
+        id: 'station-sangnoksu',
+        name: '상록수',
+        lines: const [
+          StationSearchLine(
+            id: 'seoul-4',
+            name: '수도권 4호선',
+            color: '#00A5DE',
+            stationCode: '448',
+          ),
+        ],
+      ),
+      networkMapRegionNames: const ['수도권'],
+      nearbyResults: [
+        _stationResult(
+          id: 'station-sangnoksu',
+          name: '상록수',
+          lines: const [
+            StationSearchLine(
+              id: 'seoul-4',
+              name: '수도권 4호선',
+              color: '#00A5DE',
+              stationCode: '448',
+            ),
+          ],
+        ),
+      ],
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+      realtimeRepository: _HangingRealtimeRepository(),
+    );
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    // GPS 역 확정 후 공통 오픈이 첫 프레임에 패널을 그린다. settle 금지.
+    await tester.pump();
+    await tester.pump();
+
+    final panel = find.byKey(const Key('networkMapNearbyStationPanel'));
+    expect(panel, findsOneWidget);
+    expect(find.bySemanticsLabel('시간표 선택됨'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: panel,
+        matching: find.byType(CircularProgressIndicator),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: panel,
+        matching: find.byKey(const Key('networkMapNearbyTimetableSkeleton')),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: panel, matching: find.text('반월 방면')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: panel, matching: find.text('한대앞 방면')),
+      findsOneWidget,
+    );
+
+    // hanging realtime .timeout(2s) FakeTimer를 dispose 전에 비운다.
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+  });
+
+  testWidgets('검색 선택은 조회 완료 전에 하단 패널을 표시한다', (tester) async {
+    tester.view.physicalSize = const Size(320, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final timetableCompleter = Completer<StationTimetable>();
+    addTearDown(() {
+      if (!timetableCompleter.isCompleted) {
+        timetableCompleter.complete(
+          _stationTimetable(
+            StationTimetableDayType.weekday,
+            directions: const [],
+          ),
+        );
+      }
+    });
+    const sangnoksuLines = [
+      StationSearchLine(
+        id: 'seoul-4',
+        name: '수도권 4호선',
+        color: '#00A5DE',
+        stationCode: '448',
+      ),
+    ];
+    final repository = _HangingTimetableStationRepository(
+      completer: timetableCompleter,
+      stationDetail: _stationDetail(
+        id: 'station-sangnoksu',
+        name: '상록수',
+        lines: sangnoksuLines,
+      ),
+      networkMapRegionNames: const ['수도권'],
+      queryResults: {
+        '상록수': [
+          _stationResult(
+            id: 'station-sangnoksu',
+            name: '상록수',
+            lines: sangnoksuLines,
+          ),
+        ],
+      },
+    );
+
+    await tester.pumpWidget(
+      buildEasySubwayTestApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        locationProvider: FakeCurrentLocationProvider(
+          location: _freshCurrentLocation(),
+          needsPermissionRequest: false,
+        ),
+        realtimeRepository: _HangingRealtimeRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.pumpAndSettle();
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('stationSearchResult-station-sangnoksu-seoul-4')),
+    );
+    // 조회 완료 전 첫 프레임: settle 없이 패널·시간표 골격이 보여야 한다.
+    await tester.pump();
+
+    final panel = find.byKey(const Key('networkMapNearbyStationPanel'));
+    expect(panel, findsOneWidget);
+    expect(find.bySemanticsLabel('시간표 선택됨'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: panel,
+        matching: find.byType(CircularProgressIndicator),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: panel,
+        matching: find.byKey(const Key('networkMapNearbyTimetableSkeleton')),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: panel, matching: find.text('상록수')),
+      findsOneWidget,
+    );
+
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+  });
+
+  testWidgets('GPS 하단 패널 시간표는 로컬 조회 전에도 스피너 없이 방면 골격을 표시한다', (tester) async {
+    tester.view.physicalSize = const Size(320, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final timetableCompleter = Completer<StationTimetable>();
+    addTearDown(() {
+      if (!timetableCompleter.isCompleted) {
+        timetableCompleter.complete(
+          _stationTimetable(
+            StationTimetableDayType.weekday,
+            directions: const [],
+          ),
+        );
+      }
+    });
+    final repository = _HangingTimetableStationRepository(
+      completer: timetableCompleter,
+      stationDetail: _stationDetail(
+        id: 'station-sangnoksu',
+        name: '상록수',
+        lines: const [
+          StationSearchLine(
+            id: 'seoul-4',
+            name: '수도권 4호선',
+            color: '#00A5DE',
+            stationCode: '448',
+          ),
+        ],
+      ),
+      networkMapRegionNames: const ['수도권'],
+      nearbyResults: [
+        _stationResult(
+          id: 'station-sangnoksu',
+          name: '상록수',
+          lines: const [
+            StationSearchLine(
+              id: 'seoul-4',
+              name: '수도권 4호선',
+              color: '#00A5DE',
+              stationCode: '448',
+            ),
+          ],
+        ),
+      ],
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+      // 기본 탭은 시간표. 시간표만 hanging으로 첫 프레임 골격을 검증한다.
+      realtimeRepository: _FreshRealtimeRepository(),
+    );
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    // 첫 프레임 계약: settle 없이 pump로 시간표 골격이 보여야 한다.
+    await tester.pump();
+    await tester.pump();
+
+    final panel = find.byKey(const Key('networkMapNearbyStationPanel'));
+    expect(panel, findsOneWidget);
+    expect(find.bySemanticsLabel('시간표 선택됨'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: panel,
+        matching: find.byType(CircularProgressIndicator),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: panel,
+        matching: find.byKey(const Key('networkMapNearbyTimetableLoading')),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: panel,
+        matching: find.byKey(const Key('networkMapNearbyTimetableSkeleton')),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: panel, matching: find.text('반월 방면')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: panel, matching: find.text('한대앞 방면')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: panel, matching: find.text('-')),
+      findsNWidgets(2),
+    );
+  });
+
+  testWidgets('실시간 탭은 응답 전에도 스피너 없이 방면 골격을 표시한다', (tester) async {
+    tester.view.physicalSize = const Size(320, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final realtimeCompleter = Completer<RealtimeSnapshot>();
+    addTearDown(() {
+      if (!realtimeCompleter.isCompleted) {
+        realtimeCompleter.complete(const RealtimeSnapshot.unavailable());
+      }
+    });
+    final repository = FakeStationSearchRepository(
+      networkMapRegionNames: const ['수도권'],
+      nearbyResults: [
+        _stationResult(
+          id: 'station-sangnoksu',
+          name: '상록수',
+          lines: const [
+            StationSearchLine(
+              id: 'seoul-4',
+              name: '수도권 4호선',
+              color: '#00A5DE',
+              stationCode: '448',
+            ),
+          ],
+        ),
+      ],
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+      realtimeRepository: _CompleterRealtimeRepository(realtimeCompleter),
+    );
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    // GPS 조회는 완료하되 hanging 실시간 Future는 settle하지 않는다.
+    await tester.pump();
+    await tester.pump();
+    // 기본은 시간표이므로 실시간 탭을 명시한 뒤 골격 계약을 검증한다.
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
+        matching: find.text('실시간'),
+      ),
+    );
+    await tester.pump();
+
+    final panel = find.byKey(const Key('networkMapNearbyStationPanel'));
+    expect(panel, findsOneWidget);
+    expect(find.bySemanticsLabel('실시간 선택됨'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: panel,
+        matching: find.byType(CircularProgressIndicator),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: panel,
+        matching: find.byKey(const Key('networkMapNearbyArrivalLoading')),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: panel,
+        matching: find.byKey(const Key('networkMapNearbyArrivalSkeleton')),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: panel, matching: find.text('반월 방면')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: panel, matching: find.text('한대앞 방면')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: panel, matching: find.text('-')),
+      findsNWidgets(2),
+    );
+
+    // 실시간 .timeout(2s) FakeTimer가 dispose 전에 남아 있지 않게 비운다.
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+  });
+
+  testWidgets('실시간 성공 후 다시 실시간을 선택하면 직전 도착을 즉시 표시한다', (tester) async {
+    tester.view.physicalSize = const Size(320, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final now = DateTime.now();
+    final departure = StationTimetableDeparture(
+      directionName: '오이도',
+      seconds:
+          now.hour * Duration.secondsPerHour +
+          now.minute * Duration.secondsPerMinute +
+          now.second +
+          120,
+    );
+    final repository = FakeTimetableStationRepository(
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+      networkMapRegionNames: const ['수도권'],
+      nearbyResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      timetables: {
+        for (final dayType in StationTimetableDayType.values)
+          dayType: _stationTimetable(
+            dayType,
+            directions: [
+              StationTimetableDirection(name: '오이도', departures: [departure]),
+            ],
+          ),
+      },
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+      realtimeRepository: _FreshRealtimeRepository(),
+    );
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('시간표 선택됨'), findsOneWidget);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
+        matching: find.text('실시간'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final panel = find.byKey(const Key('networkMapNearbyStationPanel'));
+    expect(find.bySemanticsLabel('실시간 선택됨'), findsOneWidget);
+    expect(
+      find.descendant(of: panel, matching: find.text('오이도행')),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
+        matching: find.text('시간표'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('시간표 선택됨'), findsOneWidget);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
+        matching: find.text('실시간'),
+      ),
+    );
+    // 첫 프레임: 직전 성공 캐시를 settle 없이 즉시 표시.
+    await tester.pump();
+
+    expect(find.bySemanticsLabel('실시간 선택됨'), findsOneWidget);
+    expect(
+      find.descendant(of: panel, matching: find.text('오이도행')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: panel,
+        matching: find.byType(CircularProgressIndicator),
+      ),
+      findsNothing,
+    );
+  });
+
+  testWidgets('첫 실시간 선택에서 API가 지연돼도 방면 골격을 즉시 표시한다', (tester) async {
+    tester.view.physicalSize = const Size(320, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final realtimeCompleter = Completer<RealtimeSnapshot>();
+    addTearDown(() {
+      if (!realtimeCompleter.isCompleted) {
+        realtimeCompleter.complete(const RealtimeSnapshot.unavailable());
+      }
+    });
+    final repository = FakeStationSearchRepository(
+      networkMapRegionNames: const ['수도권'],
+      nearbyResults: [
+        _stationResult(
+          id: 'station-sangnoksu',
+          name: '상록수',
+          lines: const [
+            StationSearchLine(
+              id: 'seoul-4',
+              name: '수도권 4호선',
+              color: '#00A5DE',
+              stationCode: '448',
+            ),
+          ],
+        ),
+      ],
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+      realtimeRepository: _CompleterRealtimeRepository(realtimeCompleter),
+    );
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
+        matching: find.text('실시간'),
+      ),
+    );
+    await tester.pump();
+
+    final panel = find.byKey(const Key('networkMapNearbyStationPanel'));
+    expect(find.bySemanticsLabel('실시간 선택됨'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: panel,
+        matching: find.byKey(const Key('networkMapNearbyArrivalSkeleton')),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: panel,
+        matching: find.byType(CircularProgressIndicator),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: panel, matching: find.text('반월 방면')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: panel, matching: find.text('한대앞 방면')),
+      findsOneWidget,
+    );
+
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+  });
+
+  testWidgets('실시간 unavailable 시 시간표로 자동 전환한다', (tester) async {
+    tester.view.physicalSize = const Size(320, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final now = DateTime.now();
+    final departure = StationTimetableDeparture(
+      directionName: '오이도',
+      seconds:
+          now.hour * Duration.secondsPerHour +
+          now.minute * Duration.secondsPerMinute +
+          now.second +
+          120,
+    );
+    final repository = FakeTimetableStationRepository(
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+      networkMapRegionNames: const ['수도권'],
+      nearbyResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      timetables: {
+        for (final dayType in StationTimetableDayType.values)
+          dayType: _stationTimetable(
+            dayType,
+            directions: [
+              StationTimetableDirection(name: '오이도', departures: [departure]),
+            ],
+          ),
+      },
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+      realtimeRepository: _UnavailableRealtimeRepository(),
+    );
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('시간표 선택됨'), findsOneWidget);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
+        matching: find.text('실시간'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 수동 실시간 선택이어도 최신 요청 unavailable이면 시간표로 돌아온다.
+    expect(find.bySemanticsLabel('시간표 선택됨'), findsOneWidget);
+    expect(find.text(departure.timeLabel), findsOneWidget);
+  });
+
+  testWidgets('실시간 empty 시 시간표로 자동 전환한다', (tester) async {
+    tester.view.physicalSize = const Size(320, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final now = DateTime.now();
+    final departure = StationTimetableDeparture(
+      directionName: '오이도',
+      seconds:
+          now.hour * Duration.secondsPerHour +
+          now.minute * Duration.secondsPerMinute +
+          now.second +
+          120,
+    );
+    final repository = FakeTimetableStationRepository(
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+      networkMapRegionNames: const ['수도권'],
+      nearbyResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      timetables: {
+        for (final dayType in StationTimetableDayType.values)
+          dayType: _stationTimetable(
+            dayType,
+            directions: [
+              StationTimetableDirection(name: '오이도', departures: [departure]),
+            ],
+          ),
+      },
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+      realtimeRepository: _EmptyRealtimeRepository(),
+    );
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
+        matching: find.text('실시간'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.bySemanticsLabel('시간표 선택됨'), findsOneWidget);
+    expect(find.text(departure.timeLabel), findsOneWidget);
+  });
+
+  testWidgets('실시간 timeout 시 시간표로 자동 전환한다', (tester) async {
+    tester.view.physicalSize = const Size(320, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final now = DateTime.now();
+    final departure = StationTimetableDeparture(
+      directionName: '오이도',
+      seconds:
+          now.hour * Duration.secondsPerHour +
+          now.minute * Duration.secondsPerMinute +
+          now.second +
+          120,
+    );
+    final repository = FakeTimetableStationRepository(
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+      networkMapRegionNames: const ['수도권'],
+      nearbyResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      timetables: {
+        for (final dayType in StationTimetableDayType.values)
+          dayType: _stationTimetable(
+            dayType,
+            directions: [
+              StationTimetableDirection(name: '오이도', departures: [departure]),
+            ],
+          ),
+      },
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+      realtimeRepository: _HangingRealtimeRepository(),
+    );
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
+        matching: find.text('실시간'),
+      ),
+    );
+    await tester.pump();
+    expect(find.bySemanticsLabel('실시간 선택됨'), findsOneWidget);
+
+    // 패널 실시간 timeout 상수(2초)를 실제로 흘려 폴백을 검증한다.
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+
+    expect(find.bySemanticsLabel('시간표 선택됨'), findsOneWidget);
+    expect(find.text(departure.timeLabel), findsOneWidget);
+  });
+
+  testWidgets('호선을 변경해도 현재 데이터 소스 선택을 유지한다', (tester) async {
+    tester.view.physicalSize = const Size(320, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    // 기본 선택 호선을 4호선으로 두어 인접 방면(반월·한대앞) 골격을 바로 쓸 수 있게 한다.
+    const lines = [
+      StationSearchLine(
+        id: 'seoul-4',
+        name: '수도권 4호선',
+        color: '#00A5DE',
+        stationCode: '454',
+      ),
+      StationSearchLine(
+        id: 'seoul-2',
+        name: '수도권 2호선',
+        color: '#00A84D',
+        stationCode: '222',
+      ),
+    ];
+    final line2Completer = Completer<RealtimeSnapshot>();
+    final line4Completer = Completer<RealtimeSnapshot>();
+    addTearDown(() {
+      if (!line2Completer.isCompleted) {
+        line2Completer.complete(const RealtimeSnapshot.unavailable());
+      }
+      if (!line4Completer.isCompleted) {
+        line4Completer.complete(const RealtimeSnapshot.unavailable());
+      }
+    });
+    final realtimeRepository = _PerLineCompleterRealtimeRepository({
+      'seoul-2': line2Completer,
+      'seoul-4': line4Completer,
+    });
+    final now = DateTime.now();
+    final line2Departure = StationTimetableDeparture(
+      directionName: '성수',
+      seconds:
+          now.hour * Duration.secondsPerHour +
+          now.minute * Duration.secondsPerMinute +
+          now.second +
+          180,
+    );
+    final repository = FakeTimetableStationRepository(
+      stationDetail: _stationDetail(
+        id: 'station-sangnoksu',
+        name: '상록수',
+        lines: lines,
+      ),
+      networkMapRegionNames: const ['수도권'],
+      nearbyResults: [
+        _stationResult(id: 'station-sangnoksu', name: '상록수', lines: lines),
+      ],
+      timetableLineId: 'seoul-2',
+      timetables: {
+        for (final dayType in StationTimetableDayType.values)
+          dayType: _stationTimetable(
+            dayType,
+            directions: [
+              StationTimetableDirection(
+                name: '성수',
+                departures: [line2Departure],
+              ),
+            ],
+          ),
+      },
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+      realtimeRepository: realtimeRepository,
+    );
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pump();
+    await tester.pump();
+
+    final panel = find.byKey(const Key('networkMapNearbyStationPanel'));
+    // 기본 탭 시간표 + 4호선: 시간표 데이터 없음 → 인접 방면 골격.
+    expect(find.bySemanticsLabel('시간표 선택됨'), findsOneWidget);
+    expect(
+      find.descendant(of: panel, matching: find.text('반월 방면')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: panel, matching: find.text('한대앞 방면')),
+      findsOneWidget,
+    );
+
+    // 2호선으로 바꿔도 시간표 선택 유지. 2호선 시간표가 오면 이전 4호선 전용 도착 텍스트는 없다.
+    await tester.tap(find.byKey(const Key('networkMapNearbyLineTab-seoul-2')));
+    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('시간표 선택됨'), findsOneWidget);
+    expect(
+      find.descendant(of: panel, matching: find.text(line2Departure.timeLabel)),
+      findsOneWidget,
+    );
+
+    // 다시 4호선: 시간표 유지 + 이전 호선(2호선) 시간표 시각 미노출 + 새 호선 방면.
+    await tester.tap(find.byKey(const Key('networkMapNearbyLineTab-seoul-4')));
+    await tester.pump();
+    expect(find.bySemanticsLabel('시간표 선택됨'), findsOneWidget);
+    expect(
+      find.descendant(of: panel, matching: find.text(line2Departure.timeLabel)),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: panel, matching: find.text('반월 방면')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: panel, matching: find.text('한대앞 방면')),
+      findsOneWidget,
+    );
+
+    // 실시간 전환 후 호선 변경해도 실시간 선택 유지, 이전 호선 도착 텍스트 미노출.
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
+        matching: find.text('실시간'),
+      ),
+    );
+    await tester.pump();
+    line4Completer.complete(
+      const RealtimeSnapshot(
+        status: RealtimeSnapshotStatus.fresh,
+        receivedAt: '방금',
+        arrivals: [
+          RealtimeArrival(
+            lineId: 'seoul-4',
+            stationName: '상록수',
+            destination: '오이도',
+            direction: '오이도',
+            trainNo: '4001',
+            message: '곧 도착',
+            etaSeconds: 90,
+          ),
+        ],
+      ),
+    );
+    await tester.pump();
+    expect(find.bySemanticsLabel('실시간 선택됨'), findsOneWidget);
+    expect(
+      find.descendant(of: panel, matching: find.text('오이도행')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const Key('networkMapNearbyLineTab-seoul-2')));
+    await tester.pump();
+    expect(find.bySemanticsLabel('실시간 선택됨'), findsOneWidget);
+    expect(find.bySemanticsLabel('시간표 선택됨'), findsNothing);
+    expect(
+      find.descendant(of: panel, matching: find.text('오이도행')),
+      findsNothing,
+    );
+
+    line2Completer.complete(
+      const RealtimeSnapshot(
+        status: RealtimeSnapshotStatus.fresh,
+        receivedAt: '방금',
+        arrivals: [
+          RealtimeArrival(
+            lineId: 'seoul-2',
+            stationName: '상록수',
+            destination: '성수',
+            direction: '성수',
+            trainNo: '2002',
+            message: '곧 도착',
+            etaSeconds: 60,
+          ),
+        ],
+      ),
+    );
+    await tester.pump();
+    expect(
+      find.descendant(of: panel, matching: find.text('성수행')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: panel, matching: find.text('오이도행')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('호선 변경 후 이전 호선의 늦은 실시간 응답을 무시한다', (tester) async {
+    tester.view.physicalSize = const Size(320, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    const lines = [
+      StationSearchLine(
+        id: 'seoul-2',
+        name: '수도권 2호선',
+        color: '#00A84D',
+        stationCode: '222',
+      ),
+      StationSearchLine(
+        id: 'seoul-4',
+        name: '수도권 4호선',
+        color: '#00A5DE',
+        stationCode: '454',
+      ),
+    ];
+    final line2Completer = Completer<RealtimeSnapshot>();
+    final line4Completer = Completer<RealtimeSnapshot>();
+    addTearDown(() {
+      if (!line2Completer.isCompleted) {
+        line2Completer.complete(const RealtimeSnapshot.unavailable());
+      }
+      if (!line4Completer.isCompleted) {
+        line4Completer.complete(const RealtimeSnapshot.unavailable());
+      }
+    });
+    final realtimeRepository = _PerLineCompleterRealtimeRepository({
+      'seoul-2': line2Completer,
+      'seoul-4': line4Completer,
+    });
+    final repository = FakeStationSearchRepository(
+      networkMapRegionNames: const ['수도권'],
+      nearbyResults: [
+        _stationResult(id: 'station-sangnoksu', name: '상록수', lines: lines),
+      ],
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+      realtimeRepository: realtimeRepository,
+    );
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pump();
+    await tester.pump();
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
+        matching: find.text('실시간'),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('networkMapNearbyLineTab-seoul-4')));
+    await tester.pump();
+
+    // 이전 호선(2호선)의 늦은 성공 응답은 현재 4호선 패널에 반영되면 안 된다.
+    line2Completer.complete(
+      const RealtimeSnapshot(
+        status: RealtimeSnapshotStatus.fresh,
+        receivedAt: '방금',
+        arrivals: [
+          RealtimeArrival(
+            lineId: 'seoul-2',
+            stationName: '상록수',
+            destination: '성수',
+            direction: '성수',
+            trainNo: '2002',
+            message: '곧 도착',
+            etaSeconds: 60,
+          ),
+        ],
+      ),
+    );
+    await tester.pump();
+
+    final panel = find.byKey(const Key('networkMapNearbyStationPanel'));
+    expect(panel, findsOneWidget);
+    expect(
+      find.descendant(of: panel, matching: find.text('성수행')),
+      findsNothing,
+    );
+    expect(find.bySemanticsLabel('실시간 선택됨'), findsOneWidget);
+
+    line4Completer.complete(
+      const RealtimeSnapshot(
+        status: RealtimeSnapshotStatus.fresh,
+        receivedAt: '방금',
+        arrivals: [
+          RealtimeArrival(
+            lineId: 'seoul-4',
+            stationName: '상록수',
+            destination: '오이도',
+            direction: '오이도',
+            trainNo: '4001',
+            message: '곧 도착',
+            etaSeconds: 90,
+          ),
+        ],
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      find.descendant(of: panel, matching: find.text('오이도행')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: panel, matching: find.text('성수행')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('이전 호선의 실시간 실패는 현재 호선을 시간표로 전환하지 않는다', (tester) async {
+    tester.view.physicalSize = const Size(320, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    const lines = [
+      StationSearchLine(
+        id: 'seoul-2',
+        name: '수도권 2호선',
+        color: '#00A84D',
+        stationCode: '222',
+      ),
+      StationSearchLine(
+        id: 'seoul-4',
+        name: '수도권 4호선',
+        color: '#00A5DE',
+        stationCode: '454',
+      ),
+    ];
+    final line2Completer = Completer<RealtimeSnapshot>();
+    final line4Completer = Completer<RealtimeSnapshot>();
+    addTearDown(() {
+      if (!line2Completer.isCompleted) {
+        line2Completer.complete(const RealtimeSnapshot.unavailable());
+      }
+      if (!line4Completer.isCompleted) {
+        line4Completer.complete(const RealtimeSnapshot.unavailable());
+      }
+    });
+    final realtimeRepository = _PerLineCompleterRealtimeRepository({
+      'seoul-2': line2Completer,
+      'seoul-4': line4Completer,
+    });
+    final now = DateTime.now();
+    final departure = StationTimetableDeparture(
+      directionName: '오이도',
+      seconds:
+          now.hour * Duration.secondsPerHour +
+          now.minute * Duration.secondsPerMinute +
+          now.second +
+          120,
+    );
+    final repository = FakeTimetableStationRepository(
+      stationDetail: _stationDetail(
+        id: 'station-sangnoksu',
+        name: '상록수',
+        lines: lines,
+      ),
+      networkMapRegionNames: const ['수도권'],
+      nearbyResults: [
+        _stationResult(id: 'station-sangnoksu', name: '상록수', lines: lines),
+      ],
+      timetables: {
+        for (final dayType in StationTimetableDayType.values)
+          dayType: _stationTimetable(
+            dayType,
+            directions: [
+              StationTimetableDirection(name: '오이도', departures: [departure]),
+            ],
+          ),
+      },
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+      realtimeRepository: realtimeRepository,
+    );
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pump();
+    await tester.pump();
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
+        matching: find.text('실시간'),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('networkMapNearbyLineTab-seoul-4')));
+    await tester.pump();
+    expect(find.bySemanticsLabel('실시간 선택됨'), findsOneWidget);
+
+    // 이전 호선 실패만 완료한다. 현재 호선(4호선)은 hanging 유지해 timeout 폴백과 구분한다.
+    line2Completer.complete(const RealtimeSnapshot.unavailable());
+    await tester.pump();
+
+    expect(find.bySemanticsLabel('실시간 선택됨'), findsOneWidget);
+    expect(find.bySemanticsLabel('시간표 선택됨'), findsNothing);
+
+    // 현재 호선 hanging .timeout(2s) FakeTimer를 dispose 전에 성공으로 비운다.
+    line4Completer.complete(
+      const RealtimeSnapshot(
+        status: RealtimeSnapshotStatus.fresh,
+        receivedAt: '방금',
+        arrivals: [
+          RealtimeArrival(
+            lineId: 'seoul-4',
+            stationName: '상록수',
+            destination: '오이도',
+            direction: '오이도',
+            trainNo: '4001',
+            message: '곧 도착',
+            etaSeconds: 90,
+          ),
+        ],
+      ),
+    );
+    await tester.pump();
+  });
+
+  testWidgets('패널을 닫은 뒤 완료된 요청은 패널 상태를 변경하지 않는다', (tester) async {
+    tester.view.physicalSize = const Size(320, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final realtimeCompleter = Completer<RealtimeSnapshot>();
+    addTearDown(() {
+      if (!realtimeCompleter.isCompleted) {
+        realtimeCompleter.complete(const RealtimeSnapshot.unavailable());
+      }
+    });
+    final repository = FakeStationSearchRepository(
+      networkMapRegionNames: const ['수도권'],
+      nearbyResults: [
+        _stationResult(
+          id: 'station-sangnoksu',
+          name: '상록수',
+          lines: const [
+            StationSearchLine(
+              id: 'seoul-4',
+              name: '수도권 4호선',
+              color: '#00A5DE',
+              stationCode: '448',
+            ),
+          ],
+        ),
+      ],
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+      realtimeRepository: _CompleterRealtimeRepository(realtimeCompleter),
+    );
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pump();
+    await tester.pump();
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
+        matching: find.text('실시간'),
+      ),
+    );
+    await tester.pump();
+    expect(
+      find.byKey(const Key('networkMapNearbyStationPanel')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const Key('networkMapNearbyPanelCloseButton')));
+    await tester.pump();
+    expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
+
+    realtimeCompleter.complete(
+      const RealtimeSnapshot(
+        status: RealtimeSnapshotStatus.fresh,
+        receivedAt: '방금',
+        arrivals: [
+          RealtimeArrival(
+            lineId: 'seoul-4',
+            stationName: '상록수',
+            destination: '오이도',
+            direction: '오이도',
+            trainNo: '4001',
+            message: '곧 도착',
+            etaSeconds: 90,
+          ),
+        ],
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+
+    expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
+    expect(find.text('오이도행'), findsNothing);
   });
 
   testWidgets('급행 운행 정보는 선택 UI 없이 시간표와 길찾기에 표시된다', (tester) async {
@@ -5269,13 +6516,7 @@ void main() {
 
       await tester.tap(find.byKey(const Key('nearbyStationButton')));
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.descendant(
-          of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
-          matching: find.text('시간표'),
-        ),
-      );
-      await tester.pumpAndSettle();
+      // 기본 탭이 시간표이므로 추가 토글 없이 급행 배지를 검증한다.
 
       // --- 시간표 부분(#2099 WP1) ---
       // 인접역 시간표 패널로 범위를 좁힌다. 노선도 자체의 일반/급행 노선 뷰
@@ -5283,6 +6524,7 @@ void main() {
       // 별개 기능이므로 이 검증에 섞이지 않게 한다.
       final panel = find.byKey(const Key('networkMapNearbyStationPanel'));
       expect(panel, findsOneWidget);
+      expect(find.bySemanticsLabel('시간표 선택됨'), findsOneWidget);
       // 급행 출발 행에만 배지 1회, 일반 행에는 배지 없음.
       expect(
         find.descendant(
@@ -18418,6 +19660,51 @@ class FakeTimetableStationRepository extends FakeStationSearchRepository
   }
 }
 
+/// #2453: 로컬 시간표 Future를 완료하지 않아 패널 첫 프레임 골격을 검증한다.
+class _HangingTimetableStationRepository extends FakeStationSearchRepository
+    implements StationTimetableRepository {
+  _HangingTimetableStationRepository({
+    required this.completer,
+    required super.stationDetail,
+    super.nearbyResults,
+    super.networkMapRegionNames,
+    super.queryResults,
+  });
+
+  final Completer<StationTimetable> completer;
+  final requestedDayTypes = <StationTimetableDayType>[];
+
+  @override
+  Future<StationTimetable> loadStationTimetable({
+    required String stationId,
+    required String lineId,
+    required StationTimetableDayType dayType,
+    required DateTime referenceDate,
+  }) {
+    requestedDayTypes.add(dayType);
+    return completer.future;
+  }
+
+  @override
+  Future<StationTimetable> loadStationTimetableForDate({
+    required String stationId,
+    required String lineId,
+    required DateTime date,
+  }) {
+    final dayType = switch (date.weekday) {
+      DateTime.saturday => StationTimetableDayType.saturday,
+      DateTime.sunday => StationTimetableDayType.sundayHoliday,
+      _ => StationTimetableDayType.weekday,
+    };
+    return loadStationTimetable(
+      stationId: stationId,
+      lineId: lineId,
+      dayType: dayType,
+      referenceDate: date,
+    );
+  }
+}
+
 class FakeSearchHistoryRepository implements SearchHistoryRepository {
   FakeSearchHistoryRepository(List<String> queries) : queries = [...queries];
 
@@ -19429,6 +20716,16 @@ class _UnavailableRealtimeRepository implements RealtimeRepository {
   }
 }
 
+class _EmptyRealtimeRepository implements RealtimeRepository {
+  @override
+  Future<RealtimeSnapshot> arrivals(RealtimeStationQuery query) async {
+    return const RealtimeSnapshot(
+      status: RealtimeSnapshotStatus.fresh,
+      arrivals: [],
+    );
+  }
+}
+
 class _FreshRealtimeRepository implements RealtimeRepository {
   @override
   Future<RealtimeSnapshot> arrivals(RealtimeStationQuery query) async {
@@ -19454,6 +20751,37 @@ class _HangingRealtimeRepository implements RealtimeRepository {
   @override
   Future<RealtimeSnapshot> arrivals(RealtimeStationQuery query) {
     return Completer<RealtimeSnapshot>().future;
+  }
+}
+
+class _CompleterRealtimeRepository implements RealtimeRepository {
+  _CompleterRealtimeRepository(this.completer);
+
+  final Completer<RealtimeSnapshot> completer;
+
+  @override
+  Future<RealtimeSnapshot> arrivals(RealtimeStationQuery query) {
+    return completer.future;
+  }
+}
+
+/// 호선별 Completer로 늦은 응답·경합을 재현한다(#2453 Task 3).
+class _PerLineCompleterRealtimeRepository implements RealtimeRepository {
+  _PerLineCompleterRealtimeRepository(this.completersByLineId);
+
+  final Map<String, Completer<RealtimeSnapshot>> completersByLineId;
+  final queries = <RealtimeStationQuery>[];
+
+  @override
+  Future<RealtimeSnapshot> arrivals(RealtimeStationQuery query) {
+    queries.add(query);
+    final completer = completersByLineId[query.lineId];
+    if (completer == null) {
+      return Future<RealtimeSnapshot>.value(
+        const RealtimeSnapshot.unavailable(),
+      );
+    }
+    return completer.future;
   }
 }
 
