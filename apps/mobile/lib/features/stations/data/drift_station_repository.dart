@@ -145,8 +145,11 @@ class DriftStationRepository
     if (existing != null) {
       try {
         return await existing;
-      } catch (_) {
+      } catch (error, stackTrace) {
         // 실패한 Future는 영구 캐시하지 않고 재시도한다.
+        easySubwayPerfLog(
+          'station_search_index warm retry after failure: $error\n$stackTrace',
+        );
         if (identical(_searchIndexFuture, existing)) {
           _searchIndexFuture = null;
         }
@@ -157,11 +160,11 @@ class DriftStationRepository
     _searchIndexFuture = future;
     try {
       return await future;
-    } catch (_) {
+    } catch (error, stackTrace) {
       if (identical(_searchIndexFuture, future)) {
         _searchIndexFuture = null;
       }
-      rethrow;
+      Error.throwWithStackTrace(error, stackTrace);
     }
   }
 
