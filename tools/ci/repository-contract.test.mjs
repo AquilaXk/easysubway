@@ -11202,7 +11202,14 @@ test("backend release image는 bootJar 산출물만 포함하는 runtime image�
   assert.match(dockerfile, /^RUN groupadd --system --gid 10001 app && \\$/m);
   assert.match(dockerfile, /useradd --uid 10001 --gid 10001 --no-create-home --home-dir \/nonexistent --shell \/usr\/sbin\/nologin app/);
   assert.match(dockerfile, /^WORKDIR \/app$/m);
-  assert.match(dockerfile, /^COPY --chown=10001:10001 build\/libs\/\*\.jar app\.jar$/m);
+  assert.match(dockerfile, /^COPY --chown=10001:10001 build\/libs\/ \/tmp\/jars\/$/m);
+  assert.match(
+    dockerfile,
+    /jar="\$\(find \/tmp\/jars -maxdepth 1 -type f -name '\*\.jar' ! -name '\*-plain\.jar' \| head -n 1\)"/,
+  );
+  assert.match(dockerfile, /mv "\$jar" \/app\/app\.jar/);
+  assert.match(dockerfile, /rm -rf \/tmp\/jars/);
+  assert.doesNotMatch(dockerfile, /^COPY --chown=10001:10001 build\/libs\/\*\.jar app\.jar$/m);
   assert.match(dockerfile, /^EXPOSE 8080$/m);
   assert.match(dockerfile, /^ENV SPRING_PROFILES_ACTIVE=prod$/m);
   assert.match(dockerfile, /^USER 10001:10001$/m);
