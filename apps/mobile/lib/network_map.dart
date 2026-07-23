@@ -545,9 +545,38 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   _NearbyPanelDataSource _nearbyDataSource = _NearbyPanelDataSource.realtime;
 
   /// 요청 중복 방지용 in-flight. UI 렌더 분기에는 쓰지 않는다(#2453).
-  /// 이전 요청 완료가 현재 요청 플래그를 내리지 않도록 현재 키일 때만 false로 돌린다.
+  /// 채널별 generation을 함께 두어, stale 완료도 자기 generation의 플래그만 내린다
+  /// (토글이 한쪽만 재조회해도 반대 채널이 고아 in-flight로 남지 않게).
   bool _nearbyRealtimeRequestInFlight = false;
   bool _nearbyTimetableRequestInFlight = false;
+  int? _nearbyRealtimeInFlightGeneration;
+  int? _nearbyTimetableInFlightGeneration;
+
+  void _markNearbyRealtimeInFlight(_NearbyPanelRequestKey request) {
+    _nearbyRealtimeRequestInFlight = true;
+    _nearbyRealtimeInFlightGeneration = request.generation;
+  }
+
+  void _markNearbyTimetableInFlight(_NearbyPanelRequestKey request) {
+    _nearbyTimetableRequestInFlight = true;
+    _nearbyTimetableInFlightGeneration = request.generation;
+  }
+
+  void _clearNearbyRealtimeInFlightIf(_NearbyPanelRequestKey request) {
+    if (_nearbyRealtimeInFlightGeneration != request.generation) {
+      return;
+    }
+    _nearbyRealtimeRequestInFlight = false;
+    _nearbyRealtimeInFlightGeneration = null;
+  }
+
+  void _clearNearbyTimetableInFlightIf(_NearbyPanelRequestKey request) {
+    if (_nearbyTimetableInFlightGeneration != request.generation) {
+      return;
+    }
+    _nearbyTimetableRequestInFlight = false;
+    _nearbyTimetableInFlightGeneration = null;
+  }
 
   /// 하단 패널 실시간은 API 기본 8초보다 짧게 끊고 시간표로 넘긴다.
   static const _nearbyRealtimeTimeout = Duration(seconds: 2);
@@ -735,8 +764,15 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
       // 모든 오픈 경로 기본 탭은 시간표. 실시간은 백그라운드 prefetch.
       // keyed display는 지우지 않는다 — 키 불일치면 미표시, 일치하면 즉시 재사용.
       _nearbyDataSource = _NearbyPanelDataSource.timetable;
-      _nearbyRealtimeRequestInFlight = selectedLine != null;
-      _nearbyTimetableRequestInFlight = selectedLine != null;
+      if (request != null) {
+        _markNearbyRealtimeInFlight(request);
+        _markNearbyTimetableInFlight(request);
+      } else {
+        _nearbyRealtimeRequestInFlight = false;
+        _nearbyTimetableRequestInFlight = false;
+        _nearbyRealtimeInFlightGeneration = null;
+        _nearbyTimetableInFlightGeneration = null;
+      }
       _searchFanMenuStationId = station.id;
     });
     if (request != null && selectedLine != null) {
@@ -1341,6 +1377,8 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     _nearbyTimetableDisplay = null;
     _nearbyRealtimeRequestInFlight = false;
     _nearbyTimetableRequestInFlight = false;
+    _nearbyRealtimeInFlightGeneration = null;
+    _nearbyTimetableInFlightGeneration = null;
   }
 
   /// 실시간과 시간표를 같은 요청 키로 병렬 로드한다. 실시간 실패 시 즉시 시간표로 넘긴다.
@@ -1360,12 +1398,14 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   }) async {
     final repository = widget.realtimeRepository;
     if (repository == null) {
+      if (mounted) {
+        setState(() => _clearNearbyRealtimeInFlightIf(request));
+      } else {
+        _clearNearbyRealtimeInFlightIf(request);
+      }
       if (!_isCurrentNearbyRequest(request)) {
         return;
       }
-      setState(() {
-        _nearbyRealtimeRequestInFlight = false;
-      });
       unawaited(
         _handleNearbyRealtimeUnavailable(station, line, request: request),
       );
@@ -1388,6 +1428,11 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
             onTimeout: () => const RealtimeSnapshot.unavailable(),
           );
       if (!_isCurrentNearbyRequest(request)) {
+        if (mounted) {
+          setState(() => _clearNearbyRealtimeInFlightIf(request));
+        } else {
+          _clearNearbyRealtimeInFlightIf(request);
+        }
         return;
       }
       if (_isCacheableNearbyRealtime(snapshot)) {
@@ -1397,24 +1442,25 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
             lineId: request.lineId,
             snapshot: snapshot,
           );
-          _nearbyRealtimeRequestInFlight = false;
+          _clearNearbyRealtimeInFlightIf(request);
         });
         return;
       }
       // unavailable/empty/loading 등은 성공 캐시를 덮지 않는다.
-      setState(() {
-        _nearbyRealtimeRequestInFlight = false;
-      });
+      setState(() => _clearNearbyRealtimeInFlightIf(request));
       unawaited(
         _handleNearbyRealtimeUnavailable(station, line, request: request),
       );
     } on RealtimeException {
       if (!_isCurrentNearbyRequest(request)) {
+        if (mounted) {
+          setState(() => _clearNearbyRealtimeInFlightIf(request));
+        } else {
+          _clearNearbyRealtimeInFlightIf(request);
+        }
         return;
       }
-      setState(() {
-        _nearbyRealtimeRequestInFlight = false;
-      });
+      setState(() => _clearNearbyRealtimeInFlightIf(request));
       unawaited(
         _handleNearbyRealtimeUnavailable(station, line, request: request),
       );
@@ -1425,11 +1471,14 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
         context: '노선도 최근접 역 실시간 정보 조회 중 예외가 발생했습니다.',
       );
       if (!_isCurrentNearbyRequest(request)) {
+        if (mounted) {
+          setState(() => _clearNearbyRealtimeInFlightIf(request));
+        } else {
+          _clearNearbyRealtimeInFlightIf(request);
+        }
         return;
       }
-      setState(() {
-        _nearbyRealtimeRequestInFlight = false;
-      });
+      setState(() => _clearNearbyRealtimeInFlightIf(request));
       unawaited(
         _handleNearbyRealtimeUnavailable(station, line, request: request),
       );
@@ -1460,7 +1509,9 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     final hasTimetable = _nearbyTimetableDisplayMatchesCurrent();
     setState(() {
       _nearbyDataSource = _NearbyPanelDataSource.timetable;
-      _nearbyTimetableRequestInFlight = !hasTimetable;
+      if (!hasTimetable) {
+        _markNearbyTimetableInFlight(request);
+      }
     });
     if (!hasTimetable) {
       await _loadNearbyTimetable(station, line, request: request);
@@ -1474,12 +1525,11 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   }) async {
     final repository = widget.stationSearchRepository;
     if (repository is! StationTimetableRepository) {
-      if (!_isCurrentNearbyRequest(request)) {
-        return;
+      if (mounted) {
+        setState(() => _clearNearbyTimetableInFlightIf(request));
+      } else {
+        _clearNearbyTimetableInFlightIf(request);
       }
-      setState(() {
-        _nearbyTimetableRequestInFlight = false;
-      });
       return;
     }
     final timetableRepository = repository as StationTimetableRepository;
@@ -1490,6 +1540,11 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
         date: DateTime.now(),
       );
       if (!_isCurrentNearbyRequest(request)) {
+        if (mounted) {
+          setState(() => _clearNearbyTimetableInFlightIf(request));
+        } else {
+          _clearNearbyTimetableInFlightIf(request);
+        }
         return;
       }
       setState(() {
@@ -1498,7 +1553,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
           lineId: request.lineId,
           timetable: timetable,
         );
-        _nearbyTimetableRequestInFlight = false;
+        _clearNearbyTimetableInFlightIf(request);
       });
     } catch (error, stackTrace) {
       reportMobileError(
@@ -1507,12 +1562,15 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
         context: '노선도 최근접 역 시간표 조회 중 예외가 발생했습니다.',
       );
       if (!_isCurrentNearbyRequest(request)) {
+        if (mounted) {
+          setState(() => _clearNearbyTimetableInFlightIf(request));
+        } else {
+          _clearNearbyTimetableInFlightIf(request);
+        }
         return;
       }
       // 실패로 성공 캐시를 지우지 않는다.
-      setState(() {
-        _nearbyTimetableRequestInFlight = false;
-      });
+      setState(() => _clearNearbyTimetableInFlightIf(request));
     }
   }
 
@@ -1529,8 +1587,8 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     // 호선 변경 시 모드 유지. 이전 호선 display는 키 불일치로 미표시.
     setState(() {
       _nearbySelectedLineId = line.id;
-      _nearbyRealtimeRequestInFlight = true;
-      _nearbyTimetableRequestInFlight = true;
+      _markNearbyRealtimeInFlight(request);
+      _markNearbyTimetableInFlight(request);
     });
     _startNearbyPanelDataLoads(station, line, request);
   }
@@ -1567,7 +1625,11 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
         generation: ++_nearbyDataRequestToken,
       );
       setState(() {
-        _nearbyRealtimeRequestInFlight = true;
+        _markNearbyRealtimeInFlight(request);
+        // generation을 올린 뒤 반대 채널 이전 요청은 무효 — 고아 in-flight로
+        // 재요청이 영구 스킵되지 않게 플래그를 함께 정리한다.
+        _nearbyTimetableRequestInFlight = false;
+        _nearbyTimetableInFlightGeneration = null;
       });
       unawaited(_loadNearbyRealtime(station, line, request: request));
       return;
@@ -1584,7 +1646,9 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
       generation: ++_nearbyDataRequestToken,
     );
     setState(() {
-      _nearbyTimetableRequestInFlight = true;
+      _markNearbyTimetableInFlight(request);
+      _nearbyRealtimeRequestInFlight = false;
+      _nearbyRealtimeInFlightGeneration = null;
     });
     unawaited(_loadNearbyTimetable(station, line, request: request));
   }

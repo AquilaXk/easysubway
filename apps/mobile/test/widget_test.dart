@@ -5775,6 +5775,137 @@ void main() {
     await tester.pump();
   });
 
+  testWidgets(
+    '토글 후 이전 채널 요청이 끝나도 시간표 재조회가 고아 in-flight에 막히지 않는다',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 1200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      final secondRealtimeCompleter = Completer<RealtimeSnapshot>();
+      final timetableCompleter = Completer<StationTimetable>();
+      addTearDown(() {
+        if (!secondRealtimeCompleter.isCompleted) {
+          secondRealtimeCompleter.complete(
+            const RealtimeSnapshot.unavailable(),
+          );
+        }
+        if (!timetableCompleter.isCompleted) {
+          timetableCompleter.complete(
+            StationTimetable(
+              stationId: 'station-sangnoksu',
+              lineId: 'seoul-4',
+              dayType: StationTimetableDayType.weekday,
+              directions: const [],
+            ),
+          );
+        }
+      });
+      final now = DateTime.now();
+      final departure = StationTimetableDeparture(
+        directionName: '오이도',
+        seconds:
+            now.hour * Duration.secondsPerHour +
+            now.minute * Duration.secondsPerMinute +
+            now.second +
+            180,
+      );
+      final repository = _HangingTimetableStationRepository(
+        completer: timetableCompleter,
+        stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+        networkMapRegionNames: const ['수도권'],
+        nearbyResults: [
+          _stationResult(
+            id: 'station-sangnoksu',
+            name: '상록수',
+            lines: const [
+              StationSearchLine(
+                id: 'seoul-4',
+                name: '수도권 4호선',
+                color: '#00A5DE',
+                stationCode: '448',
+              ),
+            ],
+          ),
+        ],
+      );
+      await _pumpNetworkMapForGpsTest(
+        tester,
+        repository: repository,
+        locationProvider: FakeCurrentLocationProvider(
+          location: _freshCurrentLocation(),
+          needsPermissionRequest: false,
+        ),
+        realtimeRepository: _SequenceRealtimeRepository(
+          first: const RealtimeSnapshot.unavailable(),
+          second: secondRealtimeCompleter,
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('nearbyStationButton')));
+      await tester.pump();
+      await tester.pump();
+
+      // 오픈 prefetch 실시간 실패는 시간표 탭에서 no-op. 시간표는 hanging.
+      expect(find.bySemanticsLabel('시간표 선택됨'), findsOneWidget);
+
+      // 실시간 토글 → generation 상승 + 실시간만 재조회(두 번째 호출은 hanging).
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
+          matching: find.text('실시간'),
+        ),
+      );
+      await tester.pump();
+      expect(find.bySemanticsLabel('실시간 선택됨'), findsOneWidget);
+
+      // stale 시간표 완료. 고아 in-flight가 남으면 다음 시간표 토글이 재조회를 막는다.
+      timetableCompleter.complete(
+        StationTimetable(
+          stationId: 'station-sangnoksu',
+          lineId: 'seoul-4',
+          dayType: StationTimetableDayType.weekday,
+          directions: [
+            StationTimetableDirection(name: '오이도', departures: [departure]),
+          ],
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
+          matching: find.text('시간표'),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      final panel = find.byKey(const Key('networkMapNearbyStationPanel'));
+      expect(find.bySemanticsLabel('시간표 선택됨'), findsOneWidget);
+      expect(
+        find.descendant(of: panel, matching: find.text(departure.timeLabel)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: panel,
+          matching: find.byType(CircularProgressIndicator),
+        ),
+        findsNothing,
+      );
+
+      // 두 번째 실시간 Future·timeout Timer를 정리한다.
+      if (!secondRealtimeCompleter.isCompleted) {
+        secondRealtimeCompleter.complete(const RealtimeSnapshot.unavailable());
+      }
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pump();
+    },
+  );
+
   testWidgets('실시간 unavailable 시 시간표로 자동 전환한다', (tester) async {
     tester.view.physicalSize = const Size(320, 1200);
     tester.view.devicePixelRatio = 1;
@@ -20762,6 +20893,24 @@ class _CompleterRealtimeRepository implements RealtimeRepository {
   @override
   Future<RealtimeSnapshot> arrivals(RealtimeStationQuery query) {
     return completer.future;
+  }
+}
+
+/// 첫 호출은 즉시 응답, 두 번째부터는 Completer로 지연(#2453 in-flight 고아 회귀).
+class _SequenceRealtimeRepository implements RealtimeRepository {
+  _SequenceRealtimeRepository({required this.first, required this.second});
+
+  final RealtimeSnapshot first;
+  final Completer<RealtimeSnapshot> second;
+  var _calls = 0;
+
+  @override
+  Future<RealtimeSnapshot> arrivals(RealtimeStationQuery query) async {
+    _calls += 1;
+    if (_calls == 1) {
+      return first;
+    }
+    return second.future;
   }
 }
 
