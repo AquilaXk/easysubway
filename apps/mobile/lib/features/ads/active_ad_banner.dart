@@ -123,11 +123,8 @@ class _ActiveAdBannerState extends State<ActiveAdBanner>
       _scheduleExpiry(generation, creative);
       _recordImpressionAfterFrame(generation, repository, creative);
     } on Exception {
-      // ponytail: 조회·decode 실패는 사용자에게 빈 슬롯을 남기지 않고 닫는다.
-      if (!mounted || generation != _generation) {
-        return;
-      }
-      _collapseRenderedBanner();
+      // 조회·decode 실패는 이미 그린 유효 배너를 유지한다.
+      // 소재 없음(null)과 만료만 collapse한다.
     }
   }
 

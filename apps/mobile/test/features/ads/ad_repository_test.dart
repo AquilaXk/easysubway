@@ -302,27 +302,44 @@ void main() {
     }
   });
 
-  test('204와 non-200은 null이다', () async {
-    for (final statusCode in [204, 400, 404, 500]) {
-      final result = await AdRepository(
-        _StubApiClient(_response(statusCode)),
-      ).fetchActive(AdPlacement.routeResultBottom);
+  test('204는 소재 없음(null)이고 non-200은 ApiException이다', () async {
+    expect(
+      await AdRepository(
+        _StubApiClient(_response(204)),
+      ).fetchActive(AdPlacement.routeResultBottom),
+      isNull,
+    );
 
-      expect(result, isNull, reason: '$statusCode');
+    for (final statusCode in [400, 404, 500]) {
+      await expectLater(
+        AdRepository(
+          _StubApiClient(_response(statusCode)),
+        ).fetchActive(AdPlacement.routeResultBottom),
+        throwsA(
+          isA<ApiException>().having(
+            (error) => error.statusCode,
+            'statusCode',
+            statusCode,
+          ),
+        ),
+        reason: '$statusCode',
+      );
     }
   });
 
-  test('network, timeout, malformed JSON은 null이다', () async {
+  test('network, timeout, malformed JSON은 ApiException으로 전파한다', () async {
     for (final error in [
       const ApiException('network'),
       const ApiException('timeout'),
       const ApiException('malformed JSON'),
     ]) {
-      final result = await AdRepository(
-        _StubApiClient(_response(200), error: error),
-      ).fetchActive(AdPlacement.routeResultBottom);
-
-      expect(result, isNull, reason: error.message);
+      await expectLater(
+        AdRepository(
+          _StubApiClient(_response(200), error: error),
+        ).fetchActive(AdPlacement.routeResultBottom),
+        throwsA(same(error)),
+        reason: error.message,
+      );
     }
   });
 

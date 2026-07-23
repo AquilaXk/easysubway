@@ -79,6 +79,36 @@ class _SequencedApiClient extends ApiClient {
   }
 }
 
+class _FailAfterFirstApiClient extends ApiClient {
+  _FailAfterFirstApiClient({required this.first, required this.error})
+    : super(baseUri: Uri.parse('https://api.easysubway.example'));
+
+  final ApiResponse first;
+  final Object error;
+  var calls = 0;
+
+  @override
+  Future<ApiResponse> getJson(
+    String path, {
+    Map<String, String> headers = const {},
+  }) async {
+    calls++;
+    if (calls == 1) {
+      return first;
+    }
+    throw error;
+  }
+
+  @override
+  Future<ApiResponse> postJson(
+    String path, {
+    required Map<String, Object?> body,
+    Map<String, String> headers = const {},
+  }) async {
+    return const ApiResponse(statusCode: 204, jsonBody: null);
+  }
+}
+
 enum _ReloadDependency { repository, placement, imageLoader }
 
 ApiResponse _creativeResponse({
@@ -468,6 +498,31 @@ void main() {
     expect(find.text('현재 광고'), findsOneWidget);
     expect(find.text('이전 광고'), findsNothing);
     expect(client.calls, 2);
+  });
+
+  testWidgets('포그라운드 복귀 재조회 실패는 기존 유효 배너를 유지한다', (tester) async {
+    final client = _FailAfterFirstApiClient(
+      first: _creativeResponse(endsAt: null, advertiserName: '유지 광고'),
+      error: const ApiException('offline'),
+    );
+    await _pumpBanner(
+      tester,
+      repository: AdRepository(client),
+      imageLoader: (_, _) async => _image,
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('유지 광고'), findsOneWidget);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('유지 광고'), findsOneWidget);
+    expect(find.byType(AdBannerSlot), findsOneWidget);
+    expect(client.calls, 2);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets(
