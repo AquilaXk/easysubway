@@ -11242,39 +11242,32 @@ test("backend release image는 bootJar 산출물만 포함하는 runtime image�
   );
 });
 
-test("OSV baseline은 기존 취약점 ID를 lockfile 위치별로 좁게 예외 처리한다", () => {
+test("OSV baseline은 lockfile별 ignore TOML을 유지하고 unused ignore를 두지 않는다", () => {
   assert.equal(existsSync(path.join(root, ".github/osv-scanner-release-baseline.toml")), false);
 
   const baselineConfigs = [
     {
       configPath: "apps/mobile/android/app/osv-scanner.toml",
       lockfilePath: "apps/mobile/android/app/gradle.lockfile",
-      expectedCount: 32,
-      reasonPattern: /^reason = "기존 Android Gradle lockfile 기준선에서 발견된 취약점은 별도 업그레이드 작업으로 처리한다\."/m,
     },
     {
       configPath: "backend/osv-scanner.toml",
       lockfilePath: "backend/gradle.lockfile",
-      expectedCount: 1,
-      reasonPatternsById: {
-        "GHSA-5jmj-h7xm-6q6v":
-          /^reason = "jackson-databind 2\.21\.4 CVE-2026-54515 — 취약 조건 미해당.+수정 버전 미출시.+#1854.+"/m,
-      },
     },
   ];
   const allIds = new Set();
   let totalIds = 0;
 
-  for (const { configPath, lockfilePath, expectedCount, reasonPattern, reasonPatternsById } of baselineConfigs) {
+  for (const { configPath, lockfilePath } of baselineConfigs) {
     assert.equal(path.dirname(configPath), path.dirname(lockfilePath));
     const config = read(configPath);
     const blocks = ignoredVulnBlocks(config);
     const ids = new Set();
 
-    assert.equal(blocks.length, expectedCount, `${configPath} must document the current vulnerable advisory IDs`);
     assert.doesNotMatch(config, /\[\[PackageOverrides\]\]/);
     assert.doesNotMatch(config, /^vulnerability\.ignore = true/m);
     assert.doesNotMatch(config, /^ignore = true/m);
+    assert.match(config, /ignoreUntil|tracking/i, `${configPath} header must document ignoreUntil + tracking requirement`);
 
     for (const block of blocks) {
       const id = block.match(/^id = "([^"]+)"/m)?.[1];
@@ -11282,19 +11275,16 @@ test("OSV baseline은 기존 취약점 ID를 lockfile 위치별로 좁게 예외
       assert.ok(id, "OSV baseline ignore must include a vulnerability id");
       assert.match(id, /^GHSA-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}$/);
       assert.ok(!ids.has(id), `${configPath} must not duplicate vulnerability IDs`);
-
-      const blockReasonPattern = reasonPattern ?? reasonPatternsById?.[id];
-
-      assert.ok(blockReasonPattern, `${configPath} must declare a reason pattern for ${id}`);
-      assert.match(block, blockReasonPattern);
+      assert.match(block, /^reason = "/m, `${configPath} must declare a reason for ${id}`);
+      assert.match(block, /^ignoreUntil = "/m, `${configPath} must declare ignoreUntil for ${id}`);
       ids.add(id);
       allIds.add(id);
       totalIds += 1;
     }
   }
 
-  assert.equal(totalIds, 33, "OSV baseline must keep per-lockfile findings explicit");
-  assert.equal(allIds.size, 33, "OSV baseline must track the current unique advisory ID set");
+  assert.equal(totalIds, 0, "OSV baseline must not keep unused IgnoredVulns entries");
+  assert.equal(allIds.size, 0, "OSV baseline must not track stale advisory IDs");
 });
 
 test("백엔드 런타임 의존성은 보안 패치 기준 버전을 사용한다", () => {
