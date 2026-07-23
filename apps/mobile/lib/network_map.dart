@@ -916,7 +916,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                 onCloseNearbyPanel: _hideNearbyPanel,
                 onNearbyLineSelected: _selectNearbyLine,
                 onNearbyDataSourceToggle: _toggleNearbyDataSource,
-                onOpenNearbyStationDetail: _openNearbyStationDetail,
+                onOpenNearbyStationDetail: _nearbyStationDetailAction,
                 routeDraftController: widget.routeDraftController,
                 onClearOrigin: _clearOriginStation,
                 onClearDestination: _clearDestinationStation,
@@ -963,7 +963,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                 onCloseNearbyPanel: _hideNearbyPanel,
                 onNearbyLineSelected: _selectNearbyLine,
                 onNearbyDataSourceToggle: _toggleNearbyDataSource,
-                onOpenNearbyStationDetail: _openNearbyStationDetail,
+                onOpenNearbyStationDetail: _nearbyStationDetailAction,
                 routeDraftController: widget.routeDraftController,
                 onClearOrigin: _clearOriginStation,
                 onClearDestination: _clearDestinationStation,
@@ -1016,7 +1016,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               onCloseNearbyPanel: _hideNearbyPanel,
               onNearbyLineSelected: _selectNearbyLine,
               onNearbyDataSourceToggle: _toggleNearbyDataSource,
-              onOpenNearbyStationDetail: _openNearbyStationDetail,
+              onOpenNearbyStationDetail: _nearbyStationDetailAction,
               routeDraftController: widget.routeDraftController,
               onClearOrigin: _clearOriginStation,
               onClearDestination: _clearDestinationStation,
@@ -1513,6 +1513,12 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   }
 
   void _hideNearbyPanel() => setState(_resetNearbyPanelState);
+
+  /// 저장소가 있을 때만 "상세 보기"를 탭 가능 컨트롤로 노출한다.
+  VoidCallback? get _nearbyStationDetailAction =>
+      widget.stationSearchRepository != null && widget.reportRepository != null
+      ? _openNearbyStationDetail
+      : null;
 
   void _openNearbyStationDetail() {
     final results = _nearbyPanelData.results;

@@ -3923,11 +3923,6 @@ class _RoutePointRow extends StatelessWidget {
       _RouteStationRole.waypoint => '경유역',
       _RouteStationRole.destination => '도착역',
     };
-    final roleColor = switch (role) {
-      _RouteStationRole.origin => EasySubwayFanMenuColors.departure,
-      _RouteStationRole.waypoint => EasySubwayFanMenuColors.waypoint,
-      _RouteStationRole.destination => EasySubwayFanMenuColors.arrival,
-    };
     final filledStation = station;
     final lineForBadge = filledStation == null || filledStation.lines.isEmpty
         ? null
@@ -3971,8 +3966,9 @@ class _RoutePointRow extends StatelessWidget {
                         maxLines: 1,
                         softWrap: false,
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: roleColor,
+                        style: const TextStyle(
+                          // 역할 색은 배지 등 비텍스트에만. 라벨은 AA 통과 본문색.
+                          color: EasySubwayAccessibleColors.text,
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
                           height: 1.2,
@@ -4197,11 +4193,6 @@ class _RouteStationPickerState extends State<_RouteStationPicker> {
   @override
   Widget build(BuildContext context) {
     final selectedStation = widget.selectedStation;
-    final roleColor = switch (widget.role) {
-      _RouteStationRole.origin => EasySubwayFanMenuColors.departure,
-      _RouteStationRole.waypoint => EasySubwayFanMenuColors.waypoint,
-      _RouteStationRole.destination => EasySubwayFanMenuColors.arrival,
-    };
     // 요약 행(_RoutePointRow)과 같은 검색필드 크롬 위에서 인라인 검색한다.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -4227,8 +4218,9 @@ class _RouteStationPickerState extends State<_RouteStationPicker> {
                     maxLines: 1,
                     softWrap: false,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: roleColor,
+                    style: const TextStyle(
+                      // 역할 색은 배지 등 비텍스트에만. 라벨은 AA 통과 본문색.
+                      color: EasySubwayAccessibleColors.text,
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
                       height: 1.2,
@@ -4269,13 +4261,11 @@ class _RouteStationPickerState extends State<_RouteStationPicker> {
                       suffixIcon: AnimatedBuilder(
                         animation: _controller,
                         builder: (context, _) {
-                          final isLoading =
-                              _controller.state.status ==
-                              StationSearchStatus.loading;
                           return IconButton(
                             key: widget.searchButtonKey,
                             tooltip: '${widget.labelText} 검색',
-                            onPressed: isLoading ? null : _search,
+                            // Enter(onSubmitted)와 같이 loading 중에도 재검색을 허용한다.
+                            onPressed: _search,
                             icon: const Icon(
                               Icons.search,
                               color: EasySubwayAccessibleColors.iconMuted,

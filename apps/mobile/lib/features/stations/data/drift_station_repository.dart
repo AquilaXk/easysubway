@@ -797,6 +797,7 @@ class _LocalStationSummary {
   final List<StationSearchLine> lines;
 
   List<String>? _normalizedTermsCache;
+  List<String>? _chosungTermsCache;
 
   /// 검색은 역 이름만 본다(한글명·영문명·부역명).
   /// aliases에 섞인 역번호·호선 합성어("448", "4호선 상록수")는 쓰지 않는다.
@@ -809,8 +810,17 @@ class _LocalStationSummary {
     ].map(_normalize).where((term) => term.isNotEmpty).toList(growable: false);
   }
 
+  /// 정규화 term의 초성 키. 키입력마다 `_chosungKey`를 다시 돌리지 않는다.
+  List<String> get _chosungTerms {
+    return _chosungTermsCache ??= _normalizedTerms
+        .map(_chosungKey)
+        .where((key) => key.isNotEmpty)
+        .toList(growable: false);
+  }
+
   void primeSearchTerms() {
     _normalizedTerms;
+    _chosungTerms;
   }
 
   bool matches(String query) {
@@ -849,11 +859,7 @@ class _LocalStationSummary {
     if (queryChosung.isEmpty || !_isHangulJamoOnly(normalizedQuery)) {
       return null;
     }
-    for (final term in _normalizedTerms) {
-      final termChosung = _chosungKey(term);
-      if (termChosung.isEmpty) {
-        continue;
-      }
+    for (final termChosung in _chosungTerms) {
       if (termChosung == queryChosung) {
         return 0;
       }

@@ -30,12 +30,25 @@ class DriftSearchHistoryRepository implements SearchHistoryRepository {
     }
 
     final resolvedStationId = stationId?.trim() ?? '';
+    // 지역 변수로 받아 null 승격 — storeLine bool만으로는 필드 접근이 안전하지 않다.
     final resolvedLine = line;
     final resolvedLineId = resolvedLine?.id.trim() ?? '';
     final storeLine =
         resolvedLine != null &&
         resolvedLineId.isNotEmpty &&
         resolvedStationId.isNotEmpty;
+    final String? lineName;
+    final String? lineColor;
+    final String? stationCode;
+    if (resolvedLine != null && storeLine) {
+      lineName = resolvedLine.name.trim();
+      lineColor = resolvedLine.color.trim();
+      stationCode = resolvedLine.stationCode.trim();
+    } else {
+      lineName = null;
+      lineColor = null;
+      stationCode = null;
+    }
 
     await userDatabase.transaction(() async {
       // 같은 검색어라도 지역이 다르면 별도 행으로 유지한다.
@@ -55,11 +68,9 @@ class DriftSearchHistoryRepository implements SearchHistoryRepository {
               region: Value(normalizedRegion),
               stationId: Value(storeLine ? resolvedStationId : null),
               lineId: Value(storeLine ? resolvedLineId : null),
-              lineName: Value(storeLine ? resolvedLine.name.trim() : null),
-              lineColor: Value(storeLine ? resolvedLine.color.trim() : null),
-              stationCode: Value(
-                storeLine ? resolvedLine.stationCode.trim() : null,
-              ),
+              lineName: Value(lineName),
+              lineColor: Value(lineColor),
+              stationCode: Value(stationCode),
               searchedAt: DateTime.now().toUtc(),
             ),
           );

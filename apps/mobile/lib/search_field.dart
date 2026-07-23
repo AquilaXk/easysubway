@@ -24,8 +24,9 @@ const easySubwaySearchFieldHorizontalPadding = 12.0;
 /// 진하게 두어 얇아도 윤곽이 읽히게 한다(#2436).
 const easySubwaySearchFieldBorderWidth = 1.0;
 
-/// 검색·출발/도착/경유 박스 외곽선. 상단 구분선([easySubwayHeaderDividerColor])과 동일.
-const easySubwaySearchFieldBorderColor = easySubwayHeaderDividerColor;
+/// 검색·출발/도착/경유 박스 외곽선.
+/// 표면 `#F6F8F9` 대비 약 3:1 이상인 전용 색(구분선 `#C5CDD4`와 분리).
+const easySubwaySearchFieldBorderColor = Color(0xFF8A9AA0);
 
 /// 검색/지우기 아이콘 시각 크기(22).
 const easySubwaySearchFieldIconSize = 22.0;
