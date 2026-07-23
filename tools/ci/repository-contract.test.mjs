@@ -1677,14 +1677,21 @@ test("스케줄 취약점 스캔은 PR 스캔과 동일 SHA·동일 lockfile로 
   const ci = read(".github/workflows/ci.yml");
 
   // Same pinned reusable OSV workflow SHA as ci.yml, non-PR variant.
+  // export-results gate: google/osv-scanner-action#129 / fix PR #130
   assert.match(
     ci,
-    /uses: google\/osv-scanner-action\/\.github\/workflows\/osv-scanner-reusable-pr\.yml@9a498708959aeaef5ef730655706c5a1df1edbc2/,
+    /uses: google\/osv-scanner-action\/\.github\/workflows\/osv-scanner-reusable-pr\.yml@3a7550f43ba5b58905a821ce3a0ed24c4858b3f4/,
   );
   assert.match(
     scheduled,
-    /uses: google\/osv-scanner-action\/\.github\/workflows\/osv-scanner-reusable\.yml@9a498708959aeaef5ef730655706c5a1df1edbc2/,
+    /uses: google\/osv-scanner-action\/\.github\/workflows\/osv-scanner-reusable\.yml@3a7550f43ba5b58905a821ce3a0ed24c4858b3f4/,
   );
+  assert.match(ci, /export-results:\s*false/);
+  assert.match(scheduled, /export-results:\s*false/);
+  assert.match(ci, /upload-sarif:\s*true/);
+  assert.match(scheduled, /upload-sarif:\s*true/);
+  assert.match(ci, /fail-on-vuln:\s*true/);
+  assert.match(scheduled, /fail-on-vuln:\s*true/);
   assert.match(scheduled, /- cron: "17 21 \* \* 1"/);
   assert.match(scheduled, /workflow_dispatch:/);
   for (const lockfile of [
@@ -2973,8 +2980,11 @@ test("OSV 의존성 취약점 게이트는 PR 의존성 취약점을 차단한�
   assert.match(dependencyScanJob, /contents:\s*read/);
   assert.match(
     dependencyScanJob,
-    /uses: google\/osv-scanner-action\/\.github\/workflows\/osv-scanner-reusable-pr\.yml@9a498708959aeaef5ef730655706c5a1df1edbc2/,
+    /uses: google\/osv-scanner-action\/\.github\/workflows\/osv-scanner-reusable-pr\.yml@3a7550f43ba5b58905a821ce3a0ed24c4858b3f4/,
   );
+  assert.match(dependencyScanJob, /export-results:\s*false/);
+  assert.match(dependencyScanJob, /upload-sarif:\s*true/);
+  assert.match(dependencyScanJob, /fail-on-vuln:\s*true/);
   assert.match(dependencyScanJob, /scan-args:\s*\|-/);
   assert.match(dependencyScanJob, /--lockfile=apps\/mobile\/pubspec\.lock/);
   assert.match(dependencyScanJob, /--lockfile=apps\/mobile\/android\/app\/gradle\.lockfile/);
