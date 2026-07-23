@@ -1675,16 +1675,26 @@ test("GitHub Actions Slack 알림은 채널별 webhook secret으로 필터링한
 test("스케줄 취약점 스캔은 PR 스캔과 동일 SHA·동일 lockfile로 상시 감시한다", () => {
   const scheduled = read(".github/workflows/osv-scheduled.yml");
   const ci = read(".github/workflows/ci.yml");
+  const dependencyScanJob = jobBlock(ci, "dependency-vulnerability-scan", "pr-title");
+  const scheduledScanJob = jobBlock(scheduled, "osv-scan", "notify-slack-security-failure");
 
   // Same pinned reusable OSV workflow SHA as ci.yml, non-PR variant.
+  // export-results gate: google/osv-scanner-action#129 / fix PR #130
+  // Assert against OSV job blocks only so unrelated jobs cannot satisfy the contract.
   assert.match(
-    ci,
-    /uses: google\/osv-scanner-action\/\.github\/workflows\/osv-scanner-reusable-pr\.yml@9a498708959aeaef5ef730655706c5a1df1edbc2/,
+    dependencyScanJob,
+    /uses: google\/osv-scanner-action\/\.github\/workflows\/osv-scanner-reusable-pr\.yml@3a7550f43ba5b58905a821ce3a0ed24c4858b3f4/,
   );
   assert.match(
-    scheduled,
-    /uses: google\/osv-scanner-action\/\.github\/workflows\/osv-scanner-reusable\.yml@9a498708959aeaef5ef730655706c5a1df1edbc2/,
+    scheduledScanJob,
+    /uses: google\/osv-scanner-action\/\.github\/workflows\/osv-scanner-reusable\.yml@3a7550f43ba5b58905a821ce3a0ed24c4858b3f4/,
   );
+  assert.match(dependencyScanJob, /export-results:\s*false/);
+  assert.match(scheduledScanJob, /export-results:\s*false/);
+  assert.match(dependencyScanJob, /upload-sarif:\s*true/);
+  assert.match(scheduledScanJob, /upload-sarif:\s*true/);
+  assert.match(dependencyScanJob, /fail-on-vuln:\s*true/);
+  assert.match(scheduledScanJob, /fail-on-vuln:\s*true/);
   assert.match(scheduled, /- cron: "17 21 \* \* 1"/);
   assert.match(scheduled, /workflow_dispatch:/);
   for (const lockfile of [
@@ -1693,11 +1703,11 @@ test("스케줄 취약점 스캔은 PR 스캔과 동일 SHA·동일 lockfile로 
     "--lockfile=backend/gradle.lockfile",
     "--lockfile=tools/qa/package-lock.json",
   ]) {
-    assert.ok(scheduled.includes(lockfile), `scheduled scan must include ${lockfile}`);
+    assert.ok(scheduledScanJob.includes(lockfile), `scheduled scan must include ${lockfile}`);
   }
   // Least privilege on the scan job; top-level workflow has no ambient perms.
   assert.match(scheduled, /permissions: \{\}/);
-  assert.match(scheduled, /security-events: write/);
+  assert.match(scheduledScanJob, /security-events: write/);
 });
 
 test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () => {
@@ -2961,7 +2971,7 @@ test("모바일 변경 CI는 모바일 계약 테스트를 실행한다", () => 
 
 test("OSV 의존성 취약점 게이트는 PR 의존성 취약점을 차단한다", () => {
   const workflow = read(".github/workflows/ci.yml");
-  const dependencyScanJob = jobBlock(workflow, "dependency-vulnerability-scan", "repository-contracts");
+  const dependencyScanJob = jobBlock(workflow, "dependency-vulnerability-scan", "pr-title");
 
   assert.match(workflow, /permissions:\s*\n\s*contents:\s*read/);
   assert.match(dependencyScanJob, /name: Dependency Vulnerability Scan/);
@@ -2973,8 +2983,11 @@ test("OSV 의존성 취약점 게이트는 PR 의존성 취약점을 차단한�
   assert.match(dependencyScanJob, /contents:\s*read/);
   assert.match(
     dependencyScanJob,
-    /uses: google\/osv-scanner-action\/\.github\/workflows\/osv-scanner-reusable-pr\.yml@9a498708959aeaef5ef730655706c5a1df1edbc2/,
+    /uses: google\/osv-scanner-action\/\.github\/workflows\/osv-scanner-reusable-pr\.yml@3a7550f43ba5b58905a821ce3a0ed24c4858b3f4/,
   );
+  assert.match(dependencyScanJob, /export-results:\s*false/);
+  assert.match(dependencyScanJob, /upload-sarif:\s*true/);
+  assert.match(dependencyScanJob, /fail-on-vuln:\s*true/);
   assert.match(dependencyScanJob, /scan-args:\s*\|-/);
   assert.match(dependencyScanJob, /--lockfile=apps\/mobile\/pubspec\.lock/);
   assert.match(dependencyScanJob, /--lockfile=apps\/mobile\/android\/app\/gradle\.lockfile/);
