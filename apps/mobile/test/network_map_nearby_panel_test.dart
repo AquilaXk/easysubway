@@ -234,6 +234,21 @@ void main() {
       handle.dispose();
     });
 
+    testWidgets('시간표 선택 세그먼트도 Semantics selected를 노출한다', (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(hostToggle(isRealtime: false));
+
+      final selected = tester
+          .getSemantics(find.bySemanticsLabel('시간표 선택됨'))
+          .getSemanticsData();
+      expect(selected.flagsCollection.isSelected, Tristate.isTrue);
+      final unselected = tester
+          .getSemantics(find.bySemanticsLabel('실시간로 전환'))
+          .getSemanticsData();
+      expect(unselected.flagsCollection.isSelected, isNot(Tristate.isTrue));
+      handle.dispose();
+    });
+
     testWidgets('비선택 세그먼트 탭은 onToggle, 선택 세그먼트 탭은 no-op이다', (tester) async {
       var calls = 0;
       await tester.pumpWidget(
@@ -445,6 +460,17 @@ void main() {
       expect(slots.single.dataIndex, isNull);
     });
 
+    test('(c\'\') 종착(다음역만)도 한 열만이다', () {
+      final slots = resolveNearbyColumnSlots(
+        dataTitles: const [],
+        leftName: null,
+        rightName: '한양대',
+      );
+      expect(slots.length, 1);
+      expect(slots.single.title, '한양대 방면');
+      expect(slots.single.dataIndex, isNull);
+    });
+
     test('(c\') 데이터 1방면 + 인접 0개 → 데이터 한 열만', () {
       final slots = resolveNearbyColumnSlots(
         dataTitles: const ['성수 방면'],
@@ -521,6 +547,22 @@ void main() {
       expect(find.text('-'), findsOneWidget);
     });
 
+    testWidgets('종착역(인접 1개) 슬롯은 한 열·대시만 그리고 구분선이 없다', (tester) async {
+      final slots = resolveNearbyColumnSlots(
+        dataTitles: const [],
+        leftName: '건대입구',
+        rightName: null,
+      );
+      await tester.pumpWidget(
+        host([for (final slot in slots) NearbyPanelColumn(title: slot.title)]),
+      );
+
+      expect(find.byType(NearbyDirectionTitle), findsOneWidget);
+      expect(find.text('건대입구 방면'), findsOneWidget);
+      expect(find.text('-'), findsOneWidget);
+      expect(find.byType(VerticalDivider), findsNothing);
+    });
+
     testWidgets('대시 스타일은 16sp w700 #2F2F2F이다', (tester) async {
       await tester.pumpWidget(
         host(const [NearbyPanelColumn(title: '건대입구 방면')]),
@@ -529,6 +571,22 @@ void main() {
       expect(dash.style!.fontSize, 16);
       expect(dash.style!.fontWeight, FontWeight.w700);
       expect(dash.style!.color, const Color(0xFF2F2F2F));
+    });
+
+    testWidgets('대시 열은 열 단위 Semantics 라벨을 쓰고 대시 문자는 제외한다', (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(
+        host(const [
+          NearbyPanelColumn(title: '건대입구 방면'),
+          NearbyPanelColumn(title: '한양대 방면'),
+        ]),
+      );
+
+      expect(find.bySemanticsLabel('건대입구 방면 정보 없음'), findsOneWidget);
+      expect(find.bySemanticsLabel('한양대 방면 정보 없음'), findsOneWidget);
+      // 시각 대시('-')는 ExcludeSemantics라 단독 Semantics 라벨로 노출되지 않는다.
+      expect(find.bySemanticsLabel('-'), findsNothing);
+      handle.dispose();
     });
   });
 }
