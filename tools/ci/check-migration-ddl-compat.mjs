@@ -9,6 +9,7 @@
 //
 // h2 디렉토리(db/migration/h2)는 테스트 전용 스키마이므로 이 게이트의 검사 대상에서 제외한다
 // (라이브 배포 대상이 아니며 standby 부팅 윈도우와 무관).
+import { isMainModule } from "../lib/is-main-module.mjs";
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -240,7 +241,7 @@ export function evaluateMigrationSet(files, { baselineVersion = 0, allowlist = [
   return violations;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   const policy = loadJson(path.join(repoRoot, POLICY_PATH));
   const files = loadMigrationFiles(path.join(repoRoot, MIGRATION_DIR));
   const violations = evaluateMigrationSet(files, {
