@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { isMainModule } from "../lib/is-main-module.mjs";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -190,7 +191,7 @@ function hashFile(filePath, algorithm, encoding) {
   return createHash(algorithm).update(readFileSync(filePath)).digest(encoding);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   const rootIndex = process.argv.indexOf("--root");
   const root = rootIndex >= 0 ? path.resolve(process.argv[rootIndex + 1]) : defaultRoot;
   try {

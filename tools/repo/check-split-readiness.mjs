@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { isMainModule } from "../lib/is-main-module.mjs";
 import { existsSync, readFileSync } from "node:fs";
 import { collectContractErrors, loadJson } from "../ci/check-contracts.mjs";
 import { findViolations } from "../ci/check-boundaries.mjs";
@@ -78,7 +79,7 @@ function readTextIfExists(path) {
   return readFileSync(path, "utf8");
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   const target = process.argv.includes("--target") ? process.argv[process.argv.indexOf("--target") + 1] : "datapack";
   const result = evaluateReadiness(target);
   for (const check of result.checks) {
