@@ -209,8 +209,9 @@ abstract class StationLineFilterRepository {
 
   Future<List<StationSearchResult>> searchStationsOnLine(
     String query,
-    String lineId,
-  );
+    String lineId, {
+    String? region,
+  });
 }
 
 abstract class StationTimetableRepository {

@@ -529,15 +529,17 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     }
     controller.clear();
     controller.setOrigin(
-      RouteDraftStation(
+      _routeDraftStationFromRecent(
         id: entry.originStationId,
         nameKo: entry.originStationName,
+        lines: entry.originLines,
       ),
     );
     controller.setDestination(
-      RouteDraftStation(
+      _routeDraftStationFromRecent(
         id: entry.destinationStationId,
         nameKo: entry.destinationStationName,
+        lines: entry.destinationLines,
       ),
     );
     final waypointId = entry.waypointStationId;
@@ -547,7 +549,11 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
         waypointName != null &&
         waypointName.isNotEmpty) {
       controller.setWaypoint(
-        RouteDraftStation(id: waypointId, nameKo: waypointName),
+        _routeDraftStationFromRecent(
+          id: waypointId,
+          nameKo: waypointName,
+          lines: entry.waypointLines,
+        ),
       );
     }
     Navigator.of(context).maybePop();
@@ -649,9 +655,12 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       return;
     }
     final selected = line ?? result.lines.firstOrNull;
+    // 명시 검색과 같은 query 키를 써야 최근 목록이 중복되지 않는다.
+    final typedQuery = _queryController.text.trim();
+    final historyQuery = typedQuery.isNotEmpty ? typedQuery : result.nameKo;
     try {
       await repository.recordSearch(
-        result.nameKo,
+        historyQuery,
         region: _regionLabel,
         stationId: result.id,
         line: selected,
@@ -715,6 +724,22 @@ RouteDraftStation _routeDraftStationFromSearch(
   return RouteDraftStation(
     id: result.id,
     nameKo: result.nameKo,
+    lineId: resolved?.id ?? '',
+    lineName: resolved?.name ?? '',
+    lineColor: resolved?.color ?? '',
+    stationCode: resolved?.stationCode ?? '',
+  );
+}
+
+RouteDraftStation _routeDraftStationFromRecent({
+  required String id,
+  required String nameKo,
+  required List<StationSearchLine> lines,
+}) {
+  final resolved = lines.firstOrNull;
+  return RouteDraftStation(
+    id: id,
+    nameKo: nameKo,
     lineId: resolved?.id ?? '',
     lineName: resolved?.name ?? '',
     lineColor: resolved?.color ?? '',

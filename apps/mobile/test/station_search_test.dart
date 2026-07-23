@@ -1743,8 +1743,9 @@ class FakeStationSearchRepository
   @override
   Future<List<StationSearchResult>> searchStationsOnLine(
     String query,
-    String lineId,
-  ) async {
+    String lineId, {
+    String? region,
+  }) async {
     requestedQueries.add(query);
     requestedLineIds.add(lineId);
     final currentError = error;

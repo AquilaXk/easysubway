@@ -44,6 +44,16 @@ class DriftStationRepository
   Future<List<StationSearchResult>> searchStations(
     String query, {
     String? region,
+  }) {
+    return _rankSearchStations(query, region: region);
+  }
+
+  /// [region]/[lineId]는 상한 적용 전에 거른다. 완전일치(rank 0)는 상한에
+  /// 잘리지 않게 해 동명·정확 질의 누락을 막는다.
+  Future<List<StationSearchResult>> _rankSearchStations(
+    String query, {
+    String? region,
+    String? lineId,
   }) async {
     final trimmedQuery = query.trim();
     if (trimmedQuery.isEmpty) {
@@ -55,12 +65,17 @@ class DriftStationRepository
       return const [];
     }
     final regionFilter = region?.trim() ?? '';
+    final lineFilter = lineId?.trim() ?? '';
 
     final stations = await _listStationSummaries();
     final ranked = <({_LocalStationSummary station, int rank})>[];
     for (final station in stations) {
       if (regionFilter.isNotEmpty &&
           !stationBelongsToRegion(station.region, regionFilter)) {
+        continue;
+      }
+      if (lineFilter.isNotEmpty &&
+          !station.lines.any((line) => line.id == lineFilter)) {
         continue;
       }
       final rank = station.matchRank(normalizedQuery);
@@ -76,8 +91,10 @@ class DriftStationRepository
       }
       return a.station.nameKo.compareTo(b.station.nameKo);
     });
+    final exactCount = ranked.where((entry) => entry.rank == 0).length;
+    final limit = math.max(_maxSearchResults, exactCount);
     return ranked
-        .take(_maxSearchResults)
+        .take(limit)
         .map((entry) => entry.station.toSearchResult())
         .toList(growable: false);
   }
@@ -182,14 +199,10 @@ class DriftStationRepository
   @override
   Future<List<StationSearchResult>> searchStationsOnLine(
     String query,
-    String lineId,
-  ) async {
-    final trimmedLineId = lineId.trim();
-    return (await searchStations(query))
-        .where(
-          (station) => station.lines.any((line) => line.id == trimmedLineId),
-        )
-        .toList(growable: false);
+    String lineId, {
+    String? region,
+  }) {
+    return _rankSearchStations(query, region: region, lineId: lineId);
   }
 
   @override

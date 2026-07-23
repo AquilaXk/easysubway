@@ -37,9 +37,14 @@ class StationSearchApiRepository
   @override
   Future<List<StationSearchResult>> searchStationsOnLine(
     String query,
-    String lineId,
-  ) {
-    return _searchStations({'query': query, 'lineId': lineId});
+    String lineId, {
+    String? region,
+  }) {
+    return _searchStations({
+      'query': query,
+      'lineId': lineId,
+      if (region != null && region.trim().isNotEmpty) 'region': region.trim(),
+    });
   }
 
   Future<List<StationSearchResult>> _searchStations(

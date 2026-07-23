@@ -43,6 +43,9 @@ class StationSearchController extends ChangeNotifier {
   int _searchRequestId = 0;
   bool _isDisposed = false;
 
+  /// 직전 검색에 쓴 지역. 지역만 바뀌면 이전 결과 유지(keepPrevious)를 끈다.
+  String _lastSearchRegion = '';
+
   StationSearchState get state => _state;
 
   /// 한글 조합 중·검색 대기 UI. 성공 결과가 있으면 유지하고, empty/idle이면
@@ -85,11 +88,15 @@ class StationSearchController extends ChangeNotifier {
     // 타이핑 재검색: 이전 검색 결과를 비우지 않는다. 스피너로 갈아끼우면
     // 글자마다 목록이 깜빡인다. 첫 검색(결과 없음)만 loading을 노출한다.
     // empty 상태에서 다음 글자를 칠 때도 empty를 유지하지 않고 loading으로 간다.
+    // 지역이 바뀌면 이전 지역 역이 탭되지 않게 목록을 비운다.
+    final normalizedRegion = region?.trim() ?? '';
     final keepPreviousResults =
         _state.source == StationSearchResultSource.search &&
         _state.results.isNotEmpty &&
         (_state.status == StationSearchStatus.success ||
-            _state.status == StationSearchStatus.loading);
+            _state.status == StationSearchStatus.loading) &&
+        _lastSearchRegion == normalizedRegion;
+    _lastSearchRegion = normalizedRegion;
     if (!keepPreviousResults) {
       _state = const StationSearchState(
         status: StationSearchStatus.loading,
@@ -105,7 +112,11 @@ class StationSearchController extends ChangeNotifier {
               selectedLineId.isNotEmpty &&
               repository is StationLineFilterRepository
           ? await (repository as StationLineFilterRepository)
-                .searchStationsOnLine(trimmedQuery, selectedLineId)
+                .searchStationsOnLine(
+                  trimmedQuery,
+                  selectedLineId,
+                  region: region,
+                )
           : await repository.searchStations(trimmedQuery, region: region);
       if (!_isActiveRequest(requestId)) {
         return;
