@@ -106,11 +106,11 @@ class StationSearchController extends ChangeNotifier {
               repository is StationLineFilterRepository
           ? await (repository as StationLineFilterRepository)
                 .searchStationsOnLine(trimmedQuery, selectedLineId)
-          : await repository.searchStations(trimmedQuery);
+          : await repository.searchStations(trimmedQuery, region: region);
       if (!_isActiveRequest(requestId)) {
         return;
       }
-      // 지역이 주어지면 해당 지역 역만 남긴다(홈 노선도·풀페이지 검색 공통).
+      // 저장소가 region을 무시하는 구현(구 API 등)을 대비해 한 번 더 거른다.
       final filtered = _filterByRegion(results, region);
       // 디바운스 타이핑은 기록하지 않는다. 명시적 검색은 현재 지역에 실제
       // 결과가 있을 때만 기록해 타 지역 역이 잘못된 지역 이력으로 남지 않게 한다.

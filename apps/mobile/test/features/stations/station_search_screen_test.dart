@@ -777,7 +777,10 @@ class _EmptyStationSearchRepository implements StationSearchRepository {
   }) async => const [];
 
   @override
-  Future<List<StationSearchResult>> searchStations(String query) async {
+  Future<List<StationSearchResult>> searchStations(
+    String query, {
+    String? region,
+  }) async {
     requestedQueries.add(query);
     return queryResults[query] ?? [];
   }

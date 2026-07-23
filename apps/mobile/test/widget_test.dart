@@ -18098,7 +18098,10 @@ class FakeStationSearchRepository
   final requestedNetworkMapLineIds = <String?>[];
 
   @override
-  Future<List<StationSearchResult>> searchStations(String query) async {
+  Future<List<StationSearchResult>> searchStations(
+    String query, {
+    String? region,
+  }) async {
     requestedQueries.add(query);
     requestedLineIds.add(null);
     final delayedResults = searchCompleter;
@@ -18517,7 +18520,10 @@ class ControlledStationSearchRepository implements StationSearchRepository {
   final _completer = Completer<List<StationSearchResult>>();
 
   @override
-  Future<List<StationSearchResult>> searchStations(String query) {
+  Future<List<StationSearchResult>> searchStations(
+    String query, {
+    String? region,
+  }) {
     requestedQueries.add(query);
     return _completer.future;
   }

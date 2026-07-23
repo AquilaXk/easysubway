@@ -1727,7 +1727,10 @@ class FakeStationSearchRepository
   List<StationSearchResult> nextNearbyResults = const [];
 
   @override
-  Future<List<StationSearchResult>> searchStations(String query) async {
+  Future<List<StationSearchResult>> searchStations(
+    String query, {
+    String? region,
+  }) async {
     requestedQueries.add(query);
     requestedLineIds.add(null);
     final currentError = error;
@@ -1795,7 +1798,10 @@ class ControlledStationSearchRepository implements StationSearchRepository {
   final _pending = <String, Completer<List<StationSearchResult>>>{};
 
   @override
-  Future<List<StationSearchResult>> searchStations(String query) {
+  Future<List<StationSearchResult>> searchStations(
+    String query, {
+    String? region,
+  }) {
     requestedQueries.add(query);
     final completer = Completer<List<StationSearchResult>>();
     _pending[query] = completer;
@@ -1893,7 +1899,10 @@ class ControlledNearbyStationSearchRepository
   final _nearbyCompleter = Completer<List<StationSearchResult>>();
 
   @override
-  Future<List<StationSearchResult>> searchStations(String query) {
+  Future<List<StationSearchResult>> searchStations(
+    String query, {
+    String? region,
+  }) {
     throw UnimplementedError();
   }
 
@@ -1963,7 +1972,10 @@ class ControlledStationDetailRepository implements StationSearchRepository {
   final _facilitiesCompleter = Completer<List<StationFacilityInfo>>();
 
   @override
-  Future<List<StationSearchResult>> searchStations(String query) {
+  Future<List<StationSearchResult>> searchStations(
+    String query, {
+    String? region,
+  }) {
     throw UnimplementedError();
   }
 
@@ -2005,7 +2017,10 @@ class ControlledStationDetailRepository implements StationSearchRepository {
 
 class FailingStationDetailRepository implements StationSearchRepository {
   @override
-  Future<List<StationSearchResult>> searchStations(String query) async {
+  Future<List<StationSearchResult>> searchStations(
+    String query, {
+    String? region,
+  }) async {
     return const [];
   }
 

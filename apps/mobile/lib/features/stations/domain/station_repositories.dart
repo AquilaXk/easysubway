@@ -2,7 +2,12 @@ import 'station_line.dart';
 import 'station_models.dart';
 
 abstract class StationSearchRepository {
-  Future<List<StationSearchResult>> searchStations(String query);
+  /// [region]이 있으면 해당 지역 역만 상한(_maxSearchResults 등) 적용 대상에 넣는다.
+  /// 짧은 초성 질의에서 타 지역이 상한을 채우며 현재 지역이 비는 것을 막는다.
+  Future<List<StationSearchResult>> searchStations(
+    String query, {
+    String? region,
+  });
 
   Future<List<StationSearchResult>> searchNearbyStations(
     CurrentLocation location, {

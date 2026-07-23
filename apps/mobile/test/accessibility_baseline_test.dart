@@ -155,7 +155,10 @@ OnboardingState _completedOnboardingState({
 
 class _AccessibilityStationSearchRepository implements StationSearchRepository {
   @override
-  Future<List<StationSearchResult>> searchStations(String query) {
+  Future<List<StationSearchResult>> searchStations(
+    String query, {
+    String? region,
+  }) {
     throw UnimplementedError('접근성 기준선 테스트는 역 검색 API를 호출하지 않는다.');
   }
 

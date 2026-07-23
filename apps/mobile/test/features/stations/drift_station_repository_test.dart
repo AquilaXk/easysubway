@@ -34,7 +34,9 @@ void main() {
       "('station-surisan', '수리산', 'Surisan', '', '수리산', "
       "'수도권', 'LEVEL_1', 'OFFICIAL_FILE'), "
       "('station-sanbon', '산본', 'Sanbon', '', '산본', "
-      "'수도권', 'LEVEL_1', 'OFFICIAL_FILE')",
+      "'수도권', 'LEVEL_1', 'OFFICIAL_FILE'), "
+      "('station-seomyeon', '서면', 'Seomyeon', '', '서면', "
+      "'부산', 'LEVEL_1', 'OFFICIAL_FILE')",
     );
     final repository = DriftStationRepository(database: database);
 
@@ -44,6 +46,10 @@ void main() {
     final bySb = await repository.searchStations('ㅅㅂ');
     expect(bySb.map((s) => s.nameKo), contains('산본'));
     expect(bySb.map((s) => s.nameKo), isNot(contains('수리산')));
+
+    final busanOnly = await repository.searchStations('ㅅ', region: '부산');
+    expect(busanOnly.map((s) => s.nameKo), contains('서면'));
+    expect(busanOnly.map((s) => s.region), everyElement('부산'));
   });
 
   test('로컬 역 검색은 호선명·역번호만으로는 결과를 내지 않는다', () async {

@@ -709,6 +709,8 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     setState(() {
       _nearestStationRequestToken++;
       _selectionClearRevision++;
+      // 호선이 없어도 이전 역의 비동기 로드가 이 패널을 덮지 않게 무효화한다.
+      _nearbyDataRequestToken++;
       _nearbyPanelVisible = true;
       _nearbySelectedStationId = result.id;
       _nearbySelectedLineId = selectedLine?.id;
@@ -761,7 +763,10 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
       // 데이터 없음 → 팬 메뉴만 유지(크래시·빈 패널 금지).
       return;
     }
-    _showStationPanelFromSearch(match);
+    final preferredLine = match.lines
+        .where((line) => line.id == station.lineId)
+        .firstOrNull;
+    _showStationPanelFromSearch(match, preferredLine: preferredLine);
   }
 
   /// #2109 검색 결과 탭으로 연 팬 메뉴가 닫히면(액션 선택·닫기·배경 탭·팬) 이

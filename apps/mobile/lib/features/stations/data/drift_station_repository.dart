@@ -41,7 +41,10 @@ class DriftStationRepository
   }
 
   @override
-  Future<List<StationSearchResult>> searchStations(String query) async {
+  Future<List<StationSearchResult>> searchStations(
+    String query, {
+    String? region,
+  }) async {
     final trimmedQuery = query.trim();
     if (trimmedQuery.isEmpty) {
       return const [];
@@ -51,10 +54,15 @@ class DriftStationRepository
     if (normalizedQuery.isEmpty) {
       return const [];
     }
+    final regionFilter = region?.trim() ?? '';
 
     final stations = await _listStationSummaries();
     final ranked = <({_LocalStationSummary station, int rank})>[];
     for (final station in stations) {
+      if (regionFilter.isNotEmpty &&
+          !stationBelongsToRegion(station.region, regionFilter)) {
+        continue;
+      }
       final rank = station.matchRank(normalizedQuery);
       if (rank == null) {
         continue;

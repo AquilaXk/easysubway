@@ -64,7 +64,10 @@ OnboardingState _completedOnboardingState() {
 
 class _UnusedStationSearchRepository implements StationSearchRepository {
   @override
-  Future<List<StationSearchResult>> searchStations(String query) {
+  Future<List<StationSearchResult>> searchStations(
+    String query, {
+    String? region,
+  }) {
     throw UnimplementedError();
   }
 
