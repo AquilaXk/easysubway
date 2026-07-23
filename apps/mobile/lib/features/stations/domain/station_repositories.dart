@@ -1,3 +1,4 @@
+import 'station_line.dart';
 import 'station_models.dart';
 
 abstract class StationSearchRepository {
@@ -16,6 +17,24 @@ abstract class StationSearchRepository {
   Future<List<StationFacilityInfo>> listStationFacilities(String stationId);
 }
 
+/// 로컬 카탈로그 검색 인덱스를 미리 올리는 선택 계약.
+/// 첫 글자 입력 전에 SQLite·정규화 비용을 걷긴다.
+abstract interface class StationSearchCache {
+  Future<void> warmSearchCache();
+}
+
+Future<void> warmStationSearchCacheIfSupported(
+  StationSearchRepository repository,
+) {
+  final cache = repository is StationSearchCache
+      ? repository as StationSearchCache
+      : null;
+  if (cache == null) {
+    return Future<void>.value();
+  }
+  return cache.warmSearchCache();
+}
+
 /// 최근 검색 목록의 한 항목. 역 검색과 경로 검색을 같은 시간순 목록에 섞기
 /// 위한 공통 타입이다.
 sealed class RecentSearchEntry {
@@ -26,23 +45,38 @@ sealed class RecentSearchEntry {
 
 /// 역 검색 한 건. [region]은 검색 당시 선택 지역이며, 지역 정보 없이 저장된
 /// 레거시 항목은 null이다(지역 필터 목록에서 제외).
+///
+/// [lines]는 표시용 호선 마크. 저장소에는 없고 조회 직후 카탈로그로 채운다.
 class RecentStationSearchEntry extends RecentSearchEntry {
   const RecentStationSearchEntry({
     required this.query,
     required this.region,
     required this.searchedAt,
+    this.lines = const [],
   });
 
   final String query;
   final String? region;
+  final List<StationSearchLine> lines;
 
   @override
   final DateTime searchedAt;
+
+  RecentStationSearchEntry withLines(List<StationSearchLine> lines) {
+    return RecentStationSearchEntry(
+      query: query,
+      region: region,
+      searchedAt: searchedAt,
+      lines: lines,
+    );
+  }
 }
 
 /// 경로 검색 한 건. [displayLabel]은 `출발역 → 도착역` 또는
 /// `출발역 → 경유역 → 도착역` 형태이며, 역 접미사 보정은 검색 결과 화면과
 /// 같은 규칙(끝이 `역`이 아니면 붙임)을 쓴다.
+///
+/// `*Lines`는 표시용 호선 마크. 저장소에는 없고 조회 직후 카탈로그로 채운다.
 class RecentRouteSearchEntry extends RecentSearchEntry {
   const RecentRouteSearchEntry({
     required this.originStationId,
@@ -53,6 +87,9 @@ class RecentRouteSearchEntry extends RecentSearchEntry {
     required this.destinationStationName,
     required this.region,
     required this.searchedAt,
+    this.originLines = const [],
+    this.waypointLines = const [],
+    this.destinationLines = const [],
   });
 
   final String originStationId;
@@ -62,9 +99,32 @@ class RecentRouteSearchEntry extends RecentSearchEntry {
   final String destinationStationId;
   final String destinationStationName;
   final String region;
+  final List<StationSearchLine> originLines;
+  final List<StationSearchLine> waypointLines;
+  final List<StationSearchLine> destinationLines;
 
   @override
   final DateTime searchedAt;
+
+  RecentRouteSearchEntry withLines({
+    List<StationSearchLine> originLines = const [],
+    List<StationSearchLine> waypointLines = const [],
+    List<StationSearchLine> destinationLines = const [],
+  }) {
+    return RecentRouteSearchEntry(
+      originStationId: originStationId,
+      originStationName: originStationName,
+      waypointStationId: waypointStationId,
+      waypointStationName: waypointStationName,
+      destinationStationId: destinationStationId,
+      destinationStationName: destinationStationName,
+      region: region,
+      searchedAt: searchedAt,
+      originLines: originLines,
+      waypointLines: waypointLines,
+      destinationLines: destinationLines,
+    );
+  }
 
   String get displayLabel {
     final origin = _withStationSuffix(originStationName);
@@ -92,7 +152,15 @@ String _withStationSuffix(String name) {
 abstract class SearchHistoryRepository {
   /// 역 검색을 기록한다. [region]은 검색 당시 선택 지역(예: `수도권`, `부산`)이며,
   /// 지역별 최근 목록 필터에 쓴다.
-  Future<void> recordSearch(String query, {String? region});
+  ///
+  /// 결과에서 고른 호선이 있으면 [stationId]/[line]을 함께 넘겨 최근 목록에
+  /// 그 호선 마크만 보이게 한다. 검색어만 기록할 때는 호선 필드를 비운다.
+  Future<void> recordSearch(
+    String query, {
+    String? region,
+    String? stationId,
+    StationSearchLine? line,
+  });
 
   /// 경로 검색을 기록한다.
   Future<void> recordRouteSearch(RecentRouteSearchEntry entry) async {}

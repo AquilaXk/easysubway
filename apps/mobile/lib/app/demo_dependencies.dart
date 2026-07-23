@@ -131,7 +131,11 @@ class DemoSearchHistoryRepository implements SearchHistoryRepository {
   DateTime _tick() =>
       DateTime.fromMillisecondsSinceEpoch(++_clock, isUtc: true);
 
-  void _addStation(String query, {required String region}) {
+  void _addStation(
+    String query, {
+    required String region,
+    List<StationSearchLine> lines = const [],
+  }) {
     _stations.removeWhere(
       (entry) => entry.query == query && (entry.region?.trim() ?? '') == region,
     );
@@ -141,18 +145,28 @@ class DemoSearchHistoryRepository implements SearchHistoryRepository {
         query: query,
         region: region,
         searchedAt: _tick(),
+        lines: lines,
       ),
     );
   }
 
   @override
-  Future<void> recordSearch(String query, {String? region}) async {
+  Future<void> recordSearch(
+    String query, {
+    String? region,
+    String? stationId,
+    StationSearchLine? line,
+  }) async {
     final trimmed = query.trim();
     final normalizedRegion = region?.trim() ?? '';
     if (trimmed.isEmpty || normalizedRegion.isEmpty) {
       return;
     }
-    _addStation(trimmed, region: normalizeStationRegion(normalizedRegion));
+    _addStation(
+      trimmed,
+      region: normalizeStationRegion(normalizedRegion),
+      lines: line == null || line.id.trim().isEmpty ? const [] : [line],
+    );
   }
 
   @override
@@ -169,10 +183,13 @@ class DemoSearchHistoryRepository implements SearchHistoryRepository {
       RecentRouteSearchEntry(
         originStationId: entry.originStationId,
         originStationName: entry.originStationName,
+        originLines: entry.originLines,
         waypointStationId: entry.waypointStationId,
         waypointStationName: entry.waypointStationName,
+        waypointLines: entry.waypointLines,
         destinationStationId: entry.destinationStationId,
         destinationStationName: entry.destinationStationName,
+        destinationLines: entry.destinationLines,
         region: entry.region,
         searchedAt: _tick(),
       ),

@@ -37,7 +37,7 @@ class UserDatabase extends _$UserDatabase {
   }
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration {
@@ -111,6 +111,42 @@ class UserDatabase extends _$UserDatabase {
             await customStatement('DROP TABLE favorite_stations');
             await customStatement(
               'ALTER TABLE favorite_stations_v4 RENAME TO favorite_stations',
+            );
+          }
+        }
+        if (from < 5) {
+          // 최근 검색·경로에 "선택한 호선"만 저장해 환승역 전 호선 마크를 막는다.
+          await customStatement(
+            'ALTER TABLE search_history ADD COLUMN station_id TEXT',
+          );
+          await customStatement(
+            'ALTER TABLE search_history ADD COLUMN line_id TEXT',
+          );
+          await customStatement(
+            'ALTER TABLE search_history ADD COLUMN line_name TEXT',
+          );
+          await customStatement(
+            'ALTER TABLE search_history ADD COLUMN line_color TEXT',
+          );
+          await customStatement(
+            'ALTER TABLE search_history ADD COLUMN station_code TEXT',
+          );
+          for (final column in const [
+            'origin_line_id',
+            'origin_line_name',
+            'origin_line_color',
+            'origin_station_code',
+            'waypoint_line_id',
+            'waypoint_line_name',
+            'waypoint_line_color',
+            'waypoint_station_code',
+            'destination_line_id',
+            'destination_line_name',
+            'destination_line_color',
+            'destination_station_code',
+          ]) {
+            await customStatement(
+              'ALTER TABLE route_search_history ADD COLUMN $column TEXT',
             );
           }
         }

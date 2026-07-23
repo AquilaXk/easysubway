@@ -972,6 +972,49 @@ void main() {
     expect(historyRepository.recordedQueries, ['상록수']);
   });
 
+  test('역 검색 컨트롤러 showPendingSearch는 empty를 loading으로 바꿔 빈 결과 깜빡임을 막는다', () {
+    final repository = FakeStationSearchRepository();
+    final controller = StationSearchController(repository: repository);
+
+    // empty와 같은 시각 상태(결과 없음)에서 대기 UI로 올린다.
+    controller.showPendingSearch();
+    expect(controller.state.status, StationSearchStatus.loading);
+    expect(controller.state.results, isEmpty);
+
+    controller.showPendingSearch();
+    expect(controller.state.status, StationSearchStatus.loading);
+  });
+
+  test('역 검색 컨트롤러는 재검색 중 이전 결과를 유지한다', () async {
+    final repository = ControlledStationSearchRepository();
+    final controller = StationSearchController(repository: repository);
+
+    final firstSearch = controller.search('상록수');
+    expect(controller.state.status, StationSearchStatus.loading);
+    expect(controller.state.results, isEmpty);
+
+    repository.complete('상록수', [
+      _stationResult(id: 'station-sangnoksu', name: '상록수'),
+    ]);
+    await firstSearch;
+    expect(controller.state.status, StationSearchStatus.success);
+    expect(controller.state.results.single.nameKo, '상록수');
+
+    final secondSearch = controller.search('강남');
+    await Future<void>.delayed(Duration.zero);
+
+    expect(controller.state.status, StationSearchStatus.success);
+    expect(controller.state.results.single.nameKo, '상록수');
+
+    repository.complete('강남', [
+      _stationResult(id: 'station-gangnam', name: '강남'),
+    ]);
+    await secondSearch;
+
+    expect(controller.state.status, StationSearchStatus.success);
+    expect(controller.state.results.single.nameKo, '강남');
+  });
+
   test('역 검색 컨트롤러는 늦게 도착한 이전 응답을 무시한다', () async {
     final repository = ControlledStationSearchRepository();
     final controller = StationSearchController(repository: repository);
@@ -1796,7 +1839,12 @@ class FakeSearchHistoryRepository implements SearchHistoryRepository {
   final recordedQueries = <String>[];
 
   @override
-  Future<void> recordSearch(String query, {String? region}) async {
+  Future<void> recordSearch(
+    String query, {
+    String? region,
+    String? stationId,
+    StationSearchLine? line,
+  }) async {
     recordedQueries.add(query);
   }
 

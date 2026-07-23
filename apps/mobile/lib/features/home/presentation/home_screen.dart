@@ -444,11 +444,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       String regionLabel,
       List<String> mapRegionLabels,
     ) async {
-      // #2109 Fix: 둘러보기 모드 결과 탭은 더 이상 즉시 상세를 밀지 않고
-      // 선택한 역 결과를 pop으로 반환한다(_returnStationToMap). 여기서 노선
-      // 정보까지 받아 노선도에 focus + 팬 메뉴 + 하단 패널을 요청한다.
-      final station = await Navigator.of(context).push<StationSearchResult>(
-        MaterialPageRoute<StationSearchResult>(
+      // 메뉴 역 검색: 결과 탭은 검색 화면이 상세를 push한다(목록 유지).
+      // 노선도 부채는 홈 in-place 검색 전용이다.
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
           builder: (_) => StationSearchScreen(
             repository: repository,
             reportRepository: reportRepository,
@@ -468,9 +467,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       );
       if (!context.mounted) {
         return;
-      }
-      if (station != null) {
-        setState(() => _mapFocusStationRequest = station);
       }
       await refreshHomeState();
     }

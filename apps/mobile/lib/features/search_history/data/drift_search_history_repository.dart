@@ -13,7 +13,12 @@ class DriftSearchHistoryRepository implements SearchHistoryRepository {
   final int maxEntries;
 
   @override
-  Future<void> recordSearch(String query, {String? region}) async {
+  Future<void> recordSearch(
+    String query, {
+    String? region,
+    String? stationId,
+    StationSearchLine? line,
+  }) async {
     final trimmed = query.trim();
     if (trimmed.isEmpty) {
       return;
@@ -23,6 +28,14 @@ class DriftSearchHistoryRepository implements SearchHistoryRepository {
     if (normalizedRegion == null || normalizedRegion.isEmpty) {
       return;
     }
+
+    final resolvedStationId = stationId?.trim() ?? '';
+    final resolvedLine = line;
+    final resolvedLineId = resolvedLine?.id.trim() ?? '';
+    final storeLine =
+        resolvedLine != null &&
+        resolvedLineId.isNotEmpty &&
+        resolvedStationId.isNotEmpty;
 
     await userDatabase.transaction(() async {
       // 같은 검색어라도 지역이 다르면 별도 행으로 유지한다.
@@ -40,6 +53,13 @@ class DriftSearchHistoryRepository implements SearchHistoryRepository {
             user_db.SearchHistoryCompanion.insert(
               query: trimmed,
               region: Value(normalizedRegion),
+              stationId: Value(storeLine ? resolvedStationId : null),
+              lineId: Value(storeLine ? resolvedLineId : null),
+              lineName: Value(storeLine ? resolvedLine.name.trim() : null),
+              lineColor: Value(storeLine ? resolvedLine.color.trim() : null),
+              stationCode: Value(
+                storeLine ? resolvedLine.stationCode.trim() : null,
+              ),
               searchedAt: DateTime.now().toUtc(),
             ),
           );
@@ -61,6 +81,9 @@ class DriftSearchHistoryRepository implements SearchHistoryRepository {
     }
     final waypointId = entry.waypointStationId?.trim();
     final waypointName = entry.waypointStationName?.trim();
+    final originLine = _singleStoredLine(entry.originLines);
+    final waypointLine = _singleStoredLine(entry.waypointLines);
+    final destinationLine = _singleStoredLine(entry.destinationLines);
 
     await userDatabase.transaction(() async {
       // 같은 경로(출발·경유·도착·지역)는 기존 항목을 지우고 다시 넣어 최신순으로 올린다.
@@ -80,6 +103,10 @@ class DriftSearchHistoryRepository implements SearchHistoryRepository {
             user_db.RouteSearchHistoryCompanion.insert(
               originStationId: originId,
               originStationName: entry.originStationName.trim(),
+              originLineId: Value(originLine?.id),
+              originLineName: Value(originLine?.name),
+              originLineColor: Value(originLine?.color),
+              originStationCode: Value(originLine?.stationCode),
               waypointStationId: Value(
                 waypointId == null || waypointId.isEmpty ? null : waypointId,
               ),
@@ -88,8 +115,16 @@ class DriftSearchHistoryRepository implements SearchHistoryRepository {
                     ? null
                     : waypointName,
               ),
+              waypointLineId: Value(waypointLine?.id),
+              waypointLineName: Value(waypointLine?.name),
+              waypointLineColor: Value(waypointLine?.color),
+              waypointStationCode: Value(waypointLine?.stationCode),
               destinationStationId: destinationId,
               destinationStationName: entry.destinationStationName.trim(),
+              destinationLineId: Value(destinationLine?.id),
+              destinationLineName: Value(destinationLine?.name),
+              destinationLineColor: Value(destinationLine?.color),
+              destinationStationCode: Value(destinationLine?.stationCode),
               region: region,
               searchedAt: DateTime.now().toUtc(),
             ),
@@ -126,7 +161,8 @@ class DriftSearchHistoryRepository implements SearchHistoryRepository {
     final stationRows = await userDatabase
         .customSelect(
           '''
-          SELECT query, region, searched_at
+          SELECT query, region, searched_at,
+                 station_id, line_id, line_name, line_color, station_code
           FROM search_history
           ORDER BY searched_at DESC, id DESC
           ''',
@@ -137,8 +173,14 @@ class DriftSearchHistoryRepository implements SearchHistoryRepository {
         .customSelect(
           '''
           SELECT origin_station_id, origin_station_name,
+                 origin_line_id, origin_line_name, origin_line_color,
+                 origin_station_code,
                  waypoint_station_id, waypoint_station_name,
+                 waypoint_line_id, waypoint_line_name, waypoint_line_color,
+                 waypoint_station_code,
                  destination_station_id, destination_station_name,
+                 destination_line_id, destination_line_name,
+                 destination_line_color, destination_station_code,
                  region, searched_at
           FROM route_search_history
           ORDER BY searched_at DESC, id DESC
@@ -158,6 +200,12 @@ class DriftSearchHistoryRepository implements SearchHistoryRepository {
           query: row.read<String>('query'),
           region: rowRegion,
           searchedAt: row.read<DateTime>('searched_at'),
+          lines: _linesFromStored(
+            lineId: row.read<String?>('line_id'),
+            lineName: row.read<String?>('line_name'),
+            lineColor: row.read<String?>('line_color'),
+            stationCode: row.read<String?>('station_code'),
+          ),
         ),
       );
     }
@@ -172,10 +220,28 @@ class DriftSearchHistoryRepository implements SearchHistoryRepository {
         RecentRouteSearchEntry(
           originStationId: row.read<String>('origin_station_id'),
           originStationName: row.read<String>('origin_station_name'),
+          originLines: _linesFromStored(
+            lineId: row.read<String?>('origin_line_id'),
+            lineName: row.read<String?>('origin_line_name'),
+            lineColor: row.read<String?>('origin_line_color'),
+            stationCode: row.read<String?>('origin_station_code'),
+          ),
           waypointStationId: row.read<String?>('waypoint_station_id'),
           waypointStationName: row.read<String?>('waypoint_station_name'),
+          waypointLines: _linesFromStored(
+            lineId: row.read<String?>('waypoint_line_id'),
+            lineName: row.read<String?>('waypoint_line_name'),
+            lineColor: row.read<String?>('waypoint_line_color'),
+            stationCode: row.read<String?>('waypoint_station_code'),
+          ),
           destinationStationId: row.read<String>('destination_station_id'),
           destinationStationName: row.read<String>('destination_station_name'),
+          destinationLines: _linesFromStored(
+            lineId: row.read<String?>('destination_line_id'),
+            lineName: row.read<String?>('destination_line_name'),
+            lineColor: row.read<String?>('destination_line_color'),
+            stationCode: row.read<String?>('destination_station_code'),
+          ),
           region: rowRegion,
           searchedAt: row.read<DateTime>('searched_at'),
         ),
@@ -300,4 +366,36 @@ class DriftSearchHistoryRepository implements SearchHistoryRepository {
   }
 
   String _placeholders(int count) => List.filled(count, '?').join(', ');
+}
+
+List<StationSearchLine> _linesFromStored({
+  String? lineId,
+  String? lineName,
+  String? lineColor,
+  String? stationCode,
+}) {
+  final id = lineId?.trim() ?? '';
+  if (id.isEmpty) {
+    return const [];
+  }
+  final name = lineName?.trim() ?? '';
+  return [
+    StationSearchLine(
+      id: id,
+      name: name.isEmpty ? id : name,
+      color: lineColor?.trim() ?? '',
+      stationCode: stationCode?.trim() ?? '',
+    ),
+  ];
+}
+
+StationSearchLine? _singleStoredLine(List<StationSearchLine> lines) {
+  if (lines.length != 1) {
+    return null;
+  }
+  final line = lines.first;
+  if (line.id.trim().isEmpty) {
+    return null;
+  }
+  return line;
 }

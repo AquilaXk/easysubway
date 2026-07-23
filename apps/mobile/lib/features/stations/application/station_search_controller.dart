@@ -45,6 +45,28 @@ class StationSearchController extends ChangeNotifier {
 
   StationSearchState get state => _state;
 
+  /// 한글 조합 중·검색 대기 UI. 성공 결과가 있으면 유지하고, empty/idle이면
+  /// loading으로 바꿔 "검색 결과가 없습니다" 깜빡임을 막는다.
+  void showPendingSearch() {
+    if (_isDisposed) {
+      return;
+    }
+    if (_state.source == StationSearchResultSource.search &&
+        _state.results.isNotEmpty &&
+        (_state.status == StationSearchStatus.success ||
+            _state.status == StationSearchStatus.loading)) {
+      return;
+    }
+    if (_state.status == StationSearchStatus.loading) {
+      return;
+    }
+    _state = const StationSearchState(
+      status: StationSearchStatus.loading,
+      results: [],
+    );
+    notifyListeners();
+  }
+
   Future<void> search(
     String query, {
     String? lineId,
@@ -60,11 +82,21 @@ class StationSearchController extends ChangeNotifier {
       return;
     }
 
-    _state = const StationSearchState(
-      status: StationSearchStatus.loading,
-      results: [],
-    );
-    _notifyIfActive(requestId);
+    // 타이핑 재검색: 이전 검색 결과를 비우지 않는다. 스피너로 갈아끼우면
+    // 글자마다 목록이 깜빡인다. 첫 검색(결과 없음)만 loading을 노출한다.
+    // empty 상태에서 다음 글자를 칠 때도 empty를 유지하지 않고 loading으로 간다.
+    final keepPreviousResults =
+        _state.source == StationSearchResultSource.search &&
+        _state.results.isNotEmpty &&
+        (_state.status == StationSearchStatus.success ||
+            _state.status == StationSearchStatus.loading);
+    if (!keepPreviousResults) {
+      _state = const StationSearchState(
+        status: StationSearchStatus.loading,
+        results: [],
+      );
+      _notifyIfActive(requestId);
+    }
 
     try {
       final selectedLineId = lineId?.trim();

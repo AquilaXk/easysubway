@@ -972,6 +972,59 @@ class $SearchHistoryTable extends SearchHistory
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _stationIdMeta = const VerificationMeta(
+    'stationId',
+  );
+  @override
+  late final GeneratedColumn<String> stationId = GeneratedColumn<String>(
+    'station_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lineIdMeta = const VerificationMeta('lineId');
+  @override
+  late final GeneratedColumn<String> lineId = GeneratedColumn<String>(
+    'line_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lineNameMeta = const VerificationMeta(
+    'lineName',
+  );
+  @override
+  late final GeneratedColumn<String> lineName = GeneratedColumn<String>(
+    'line_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lineColorMeta = const VerificationMeta(
+    'lineColor',
+  );
+  @override
+  late final GeneratedColumn<String> lineColor = GeneratedColumn<String>(
+    'line_color',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _stationCodeMeta = const VerificationMeta(
+    'stationCode',
+  );
+  @override
+  late final GeneratedColumn<String> stationCode = GeneratedColumn<String>(
+    'station_code',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _searchedAtMeta = const VerificationMeta(
     'searchedAt',
   );
@@ -984,7 +1037,17 @@ class $SearchHistoryTable extends SearchHistory
     requiredDuringInsert: true,
   );
   @override
-  List<GeneratedColumn> get $columns => [id, query, region, searchedAt];
+  List<GeneratedColumn> get $columns => [
+    id,
+    query,
+    region,
+    stationId,
+    lineId,
+    lineName,
+    lineColor,
+    stationCode,
+    searchedAt,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1012,6 +1075,39 @@ class $SearchHistoryTable extends SearchHistory
       context.handle(
         _regionMeta,
         region.isAcceptableOrUnknown(data['region']!, _regionMeta),
+      );
+    }
+    if (data.containsKey('station_id')) {
+      context.handle(
+        _stationIdMeta,
+        stationId.isAcceptableOrUnknown(data['station_id']!, _stationIdMeta),
+      );
+    }
+    if (data.containsKey('line_id')) {
+      context.handle(
+        _lineIdMeta,
+        lineId.isAcceptableOrUnknown(data['line_id']!, _lineIdMeta),
+      );
+    }
+    if (data.containsKey('line_name')) {
+      context.handle(
+        _lineNameMeta,
+        lineName.isAcceptableOrUnknown(data['line_name']!, _lineNameMeta),
+      );
+    }
+    if (data.containsKey('line_color')) {
+      context.handle(
+        _lineColorMeta,
+        lineColor.isAcceptableOrUnknown(data['line_color']!, _lineColorMeta),
+      );
+    }
+    if (data.containsKey('station_code')) {
+      context.handle(
+        _stationCodeMeta,
+        stationCode.isAcceptableOrUnknown(
+          data['station_code']!,
+          _stationCodeMeta,
+        ),
       );
     }
     if (data.containsKey('searched_at')) {
@@ -1043,6 +1139,26 @@ class $SearchHistoryTable extends SearchHistory
         DriftSqlType.string,
         data['${effectivePrefix}region'],
       ),
+      stationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}station_id'],
+      ),
+      lineId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}line_id'],
+      ),
+      lineName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}line_name'],
+      ),
+      lineColor: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}line_color'],
+      ),
+      stationCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}station_code'],
+      ),
       searchedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}searched_at'],
@@ -1064,11 +1180,23 @@ class SearchHistoryData extends DataClass
   /// 검색 당시 선택 지역(예: `수도권`, `부산`). 지역별 최근 목록 필터에 쓴다.
   /// 지역 정보 없이 저장된 레거시 행은 null이며, 지역 필터 목록에서 제외한다.
   final String? region;
+
+  /// 결과에서 고른 역·호선. 검색어만 있는 레거시/타이핑 기록은 null.
+  final String? stationId;
+  final String? lineId;
+  final String? lineName;
+  final String? lineColor;
+  final String? stationCode;
   final DateTime searchedAt;
   const SearchHistoryData({
     required this.id,
     required this.query,
     this.region,
+    this.stationId,
+    this.lineId,
+    this.lineName,
+    this.lineColor,
+    this.stationCode,
     required this.searchedAt,
   });
   @override
@@ -1078,6 +1206,21 @@ class SearchHistoryData extends DataClass
     map['query'] = Variable<String>(query);
     if (!nullToAbsent || region != null) {
       map['region'] = Variable<String>(region);
+    }
+    if (!nullToAbsent || stationId != null) {
+      map['station_id'] = Variable<String>(stationId);
+    }
+    if (!nullToAbsent || lineId != null) {
+      map['line_id'] = Variable<String>(lineId);
+    }
+    if (!nullToAbsent || lineName != null) {
+      map['line_name'] = Variable<String>(lineName);
+    }
+    if (!nullToAbsent || lineColor != null) {
+      map['line_color'] = Variable<String>(lineColor);
+    }
+    if (!nullToAbsent || stationCode != null) {
+      map['station_code'] = Variable<String>(stationCode);
     }
     map['searched_at'] = Variable<DateTime>(searchedAt);
     return map;
@@ -1090,6 +1233,21 @@ class SearchHistoryData extends DataClass
       region: region == null && nullToAbsent
           ? const Value.absent()
           : Value(region),
+      stationId: stationId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(stationId),
+      lineId: lineId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lineId),
+      lineName: lineName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lineName),
+      lineColor: lineColor == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lineColor),
+      stationCode: stationCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(stationCode),
       searchedAt: Value(searchedAt),
     );
   }
@@ -1103,6 +1261,11 @@ class SearchHistoryData extends DataClass
       id: serializer.fromJson<int>(json['id']),
       query: serializer.fromJson<String>(json['query']),
       region: serializer.fromJson<String?>(json['region']),
+      stationId: serializer.fromJson<String?>(json['stationId']),
+      lineId: serializer.fromJson<String?>(json['lineId']),
+      lineName: serializer.fromJson<String?>(json['lineName']),
+      lineColor: serializer.fromJson<String?>(json['lineColor']),
+      stationCode: serializer.fromJson<String?>(json['stationCode']),
       searchedAt: serializer.fromJson<DateTime>(json['searchedAt']),
     );
   }
@@ -1113,6 +1276,11 @@ class SearchHistoryData extends DataClass
       'id': serializer.toJson<int>(id),
       'query': serializer.toJson<String>(query),
       'region': serializer.toJson<String?>(region),
+      'stationId': serializer.toJson<String?>(stationId),
+      'lineId': serializer.toJson<String?>(lineId),
+      'lineName': serializer.toJson<String?>(lineName),
+      'lineColor': serializer.toJson<String?>(lineColor),
+      'stationCode': serializer.toJson<String?>(stationCode),
       'searchedAt': serializer.toJson<DateTime>(searchedAt),
     };
   }
@@ -1121,11 +1289,21 @@ class SearchHistoryData extends DataClass
     int? id,
     String? query,
     Value<String?> region = const Value.absent(),
+    Value<String?> stationId = const Value.absent(),
+    Value<String?> lineId = const Value.absent(),
+    Value<String?> lineName = const Value.absent(),
+    Value<String?> lineColor = const Value.absent(),
+    Value<String?> stationCode = const Value.absent(),
     DateTime? searchedAt,
   }) => SearchHistoryData(
     id: id ?? this.id,
     query: query ?? this.query,
     region: region.present ? region.value : this.region,
+    stationId: stationId.present ? stationId.value : this.stationId,
+    lineId: lineId.present ? lineId.value : this.lineId,
+    lineName: lineName.present ? lineName.value : this.lineName,
+    lineColor: lineColor.present ? lineColor.value : this.lineColor,
+    stationCode: stationCode.present ? stationCode.value : this.stationCode,
     searchedAt: searchedAt ?? this.searchedAt,
   );
   SearchHistoryData copyWithCompanion(SearchHistoryCompanion data) {
@@ -1133,6 +1311,13 @@ class SearchHistoryData extends DataClass
       id: data.id.present ? data.id.value : this.id,
       query: data.query.present ? data.query.value : this.query,
       region: data.region.present ? data.region.value : this.region,
+      stationId: data.stationId.present ? data.stationId.value : this.stationId,
+      lineId: data.lineId.present ? data.lineId.value : this.lineId,
+      lineName: data.lineName.present ? data.lineName.value : this.lineName,
+      lineColor: data.lineColor.present ? data.lineColor.value : this.lineColor,
+      stationCode: data.stationCode.present
+          ? data.stationCode.value
+          : this.stationCode,
       searchedAt: data.searchedAt.present
           ? data.searchedAt.value
           : this.searchedAt,
@@ -1145,13 +1330,28 @@ class SearchHistoryData extends DataClass
           ..write('id: $id, ')
           ..write('query: $query, ')
           ..write('region: $region, ')
+          ..write('stationId: $stationId, ')
+          ..write('lineId: $lineId, ')
+          ..write('lineName: $lineName, ')
+          ..write('lineColor: $lineColor, ')
+          ..write('stationCode: $stationCode, ')
           ..write('searchedAt: $searchedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, query, region, searchedAt);
+  int get hashCode => Object.hash(
+    id,
+    query,
+    region,
+    stationId,
+    lineId,
+    lineName,
+    lineColor,
+    stationCode,
+    searchedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1159,6 +1359,11 @@ class SearchHistoryData extends DataClass
           other.id == this.id &&
           other.query == this.query &&
           other.region == this.region &&
+          other.stationId == this.stationId &&
+          other.lineId == this.lineId &&
+          other.lineName == this.lineName &&
+          other.lineColor == this.lineColor &&
+          other.stationCode == this.stationCode &&
           other.searchedAt == this.searchedAt);
 }
 
@@ -1166,17 +1371,32 @@ class SearchHistoryCompanion extends UpdateCompanion<SearchHistoryData> {
   final Value<int> id;
   final Value<String> query;
   final Value<String?> region;
+  final Value<String?> stationId;
+  final Value<String?> lineId;
+  final Value<String?> lineName;
+  final Value<String?> lineColor;
+  final Value<String?> stationCode;
   final Value<DateTime> searchedAt;
   const SearchHistoryCompanion({
     this.id = const Value.absent(),
     this.query = const Value.absent(),
     this.region = const Value.absent(),
+    this.stationId = const Value.absent(),
+    this.lineId = const Value.absent(),
+    this.lineName = const Value.absent(),
+    this.lineColor = const Value.absent(),
+    this.stationCode = const Value.absent(),
     this.searchedAt = const Value.absent(),
   });
   SearchHistoryCompanion.insert({
     this.id = const Value.absent(),
     required String query,
     this.region = const Value.absent(),
+    this.stationId = const Value.absent(),
+    this.lineId = const Value.absent(),
+    this.lineName = const Value.absent(),
+    this.lineColor = const Value.absent(),
+    this.stationCode = const Value.absent(),
     required DateTime searchedAt,
   }) : query = Value(query),
        searchedAt = Value(searchedAt);
@@ -1184,12 +1404,22 @@ class SearchHistoryCompanion extends UpdateCompanion<SearchHistoryData> {
     Expression<int>? id,
     Expression<String>? query,
     Expression<String>? region,
+    Expression<String>? stationId,
+    Expression<String>? lineId,
+    Expression<String>? lineName,
+    Expression<String>? lineColor,
+    Expression<String>? stationCode,
     Expression<DateTime>? searchedAt,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (query != null) 'query': query,
       if (region != null) 'region': region,
+      if (stationId != null) 'station_id': stationId,
+      if (lineId != null) 'line_id': lineId,
+      if (lineName != null) 'line_name': lineName,
+      if (lineColor != null) 'line_color': lineColor,
+      if (stationCode != null) 'station_code': stationCode,
       if (searchedAt != null) 'searched_at': searchedAt,
     });
   }
@@ -1198,12 +1428,22 @@ class SearchHistoryCompanion extends UpdateCompanion<SearchHistoryData> {
     Value<int>? id,
     Value<String>? query,
     Value<String?>? region,
+    Value<String?>? stationId,
+    Value<String?>? lineId,
+    Value<String?>? lineName,
+    Value<String?>? lineColor,
+    Value<String?>? stationCode,
     Value<DateTime>? searchedAt,
   }) {
     return SearchHistoryCompanion(
       id: id ?? this.id,
       query: query ?? this.query,
       region: region ?? this.region,
+      stationId: stationId ?? this.stationId,
+      lineId: lineId ?? this.lineId,
+      lineName: lineName ?? this.lineName,
+      lineColor: lineColor ?? this.lineColor,
+      stationCode: stationCode ?? this.stationCode,
       searchedAt: searchedAt ?? this.searchedAt,
     );
   }
@@ -1220,6 +1460,21 @@ class SearchHistoryCompanion extends UpdateCompanion<SearchHistoryData> {
     if (region.present) {
       map['region'] = Variable<String>(region.value);
     }
+    if (stationId.present) {
+      map['station_id'] = Variable<String>(stationId.value);
+    }
+    if (lineId.present) {
+      map['line_id'] = Variable<String>(lineId.value);
+    }
+    if (lineName.present) {
+      map['line_name'] = Variable<String>(lineName.value);
+    }
+    if (lineColor.present) {
+      map['line_color'] = Variable<String>(lineColor.value);
+    }
+    if (stationCode.present) {
+      map['station_code'] = Variable<String>(stationCode.value);
+    }
     if (searchedAt.present) {
       map['searched_at'] = Variable<DateTime>(searchedAt.value);
     }
@@ -1232,6 +1487,11 @@ class SearchHistoryCompanion extends UpdateCompanion<SearchHistoryData> {
           ..write('id: $id, ')
           ..write('query: $query, ')
           ..write('region: $region, ')
+          ..write('stationId: $stationId, ')
+          ..write('lineId: $lineId, ')
+          ..write('lineName: $lineName, ')
+          ..write('lineColor: $lineColor, ')
+          ..write('stationCode: $stationCode, ')
           ..write('searchedAt: $searchedAt')
           ..write(')'))
         .toString();
@@ -1280,6 +1540,51 @@ class $RouteSearchHistoryTable extends RouteSearchHistory
         type: DriftSqlType.string,
         requiredDuringInsert: true,
       );
+  static const VerificationMeta _originLineIdMeta = const VerificationMeta(
+    'originLineId',
+  );
+  @override
+  late final GeneratedColumn<String> originLineId = GeneratedColumn<String>(
+    'origin_line_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _originLineNameMeta = const VerificationMeta(
+    'originLineName',
+  );
+  @override
+  late final GeneratedColumn<String> originLineName = GeneratedColumn<String>(
+    'origin_line_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _originLineColorMeta = const VerificationMeta(
+    'originLineColor',
+  );
+  @override
+  late final GeneratedColumn<String> originLineColor = GeneratedColumn<String>(
+    'origin_line_color',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _originStationCodeMeta = const VerificationMeta(
+    'originStationCode',
+  );
+  @override
+  late final GeneratedColumn<String> originStationCode =
+      GeneratedColumn<String>(
+        'origin_station_code',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _waypointStationIdMeta = const VerificationMeta(
     'waypointStationId',
   );
@@ -1298,6 +1603,51 @@ class $RouteSearchHistoryTable extends RouteSearchHistory
   late final GeneratedColumn<String> waypointStationName =
       GeneratedColumn<String>(
         'waypoint_station_name',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _waypointLineIdMeta = const VerificationMeta(
+    'waypointLineId',
+  );
+  @override
+  late final GeneratedColumn<String> waypointLineId = GeneratedColumn<String>(
+    'waypoint_line_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _waypointLineNameMeta = const VerificationMeta(
+    'waypointLineName',
+  );
+  @override
+  late final GeneratedColumn<String> waypointLineName = GeneratedColumn<String>(
+    'waypoint_line_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _waypointLineColorMeta = const VerificationMeta(
+    'waypointLineColor',
+  );
+  @override
+  late final GeneratedColumn<String> waypointLineColor =
+      GeneratedColumn<String>(
+        'waypoint_line_color',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _waypointStationCodeMeta =
+      const VerificationMeta('waypointStationCode');
+  @override
+  late final GeneratedColumn<String> waypointStationCode =
+      GeneratedColumn<String>(
+        'waypoint_station_code',
         aliasedName,
         true,
         type: DriftSqlType.string,
@@ -1325,6 +1675,51 @@ class $RouteSearchHistoryTable extends RouteSearchHistory
         type: DriftSqlType.string,
         requiredDuringInsert: true,
       );
+  static const VerificationMeta _destinationLineIdMeta = const VerificationMeta(
+    'destinationLineId',
+  );
+  @override
+  late final GeneratedColumn<String> destinationLineId =
+      GeneratedColumn<String>(
+        'destination_line_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _destinationLineNameMeta =
+      const VerificationMeta('destinationLineName');
+  @override
+  late final GeneratedColumn<String> destinationLineName =
+      GeneratedColumn<String>(
+        'destination_line_name',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _destinationLineColorMeta =
+      const VerificationMeta('destinationLineColor');
+  @override
+  late final GeneratedColumn<String> destinationLineColor =
+      GeneratedColumn<String>(
+        'destination_line_color',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _destinationStationCodeMeta =
+      const VerificationMeta('destinationStationCode');
+  @override
+  late final GeneratedColumn<String> destinationStationCode =
+      GeneratedColumn<String>(
+        'destination_station_code',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _regionMeta = const VerificationMeta('region');
   @override
   late final GeneratedColumn<String> region = GeneratedColumn<String>(
@@ -1350,10 +1745,22 @@ class $RouteSearchHistoryTable extends RouteSearchHistory
     id,
     originStationId,
     originStationName,
+    originLineId,
+    originLineName,
+    originLineColor,
+    originStationCode,
     waypointStationId,
     waypointStationName,
+    waypointLineId,
+    waypointLineName,
+    waypointLineColor,
+    waypointStationCode,
     destinationStationId,
     destinationStationName,
+    destinationLineId,
+    destinationLineName,
+    destinationLineColor,
+    destinationStationCode,
     region,
     searchedAt,
   ];
@@ -1394,6 +1801,42 @@ class $RouteSearchHistoryTable extends RouteSearchHistory
     } else if (isInserting) {
       context.missing(_originStationNameMeta);
     }
+    if (data.containsKey('origin_line_id')) {
+      context.handle(
+        _originLineIdMeta,
+        originLineId.isAcceptableOrUnknown(
+          data['origin_line_id']!,
+          _originLineIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('origin_line_name')) {
+      context.handle(
+        _originLineNameMeta,
+        originLineName.isAcceptableOrUnknown(
+          data['origin_line_name']!,
+          _originLineNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('origin_line_color')) {
+      context.handle(
+        _originLineColorMeta,
+        originLineColor.isAcceptableOrUnknown(
+          data['origin_line_color']!,
+          _originLineColorMeta,
+        ),
+      );
+    }
+    if (data.containsKey('origin_station_code')) {
+      context.handle(
+        _originStationCodeMeta,
+        originStationCode.isAcceptableOrUnknown(
+          data['origin_station_code']!,
+          _originStationCodeMeta,
+        ),
+      );
+    }
     if (data.containsKey('waypoint_station_id')) {
       context.handle(
         _waypointStationIdMeta,
@@ -1409,6 +1852,42 @@ class $RouteSearchHistoryTable extends RouteSearchHistory
         waypointStationName.isAcceptableOrUnknown(
           data['waypoint_station_name']!,
           _waypointStationNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('waypoint_line_id')) {
+      context.handle(
+        _waypointLineIdMeta,
+        waypointLineId.isAcceptableOrUnknown(
+          data['waypoint_line_id']!,
+          _waypointLineIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('waypoint_line_name')) {
+      context.handle(
+        _waypointLineNameMeta,
+        waypointLineName.isAcceptableOrUnknown(
+          data['waypoint_line_name']!,
+          _waypointLineNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('waypoint_line_color')) {
+      context.handle(
+        _waypointLineColorMeta,
+        waypointLineColor.isAcceptableOrUnknown(
+          data['waypoint_line_color']!,
+          _waypointLineColorMeta,
+        ),
+      );
+    }
+    if (data.containsKey('waypoint_station_code')) {
+      context.handle(
+        _waypointStationCodeMeta,
+        waypointStationCode.isAcceptableOrUnknown(
+          data['waypoint_station_code']!,
+          _waypointStationCodeMeta,
         ),
       );
     }
@@ -1433,6 +1912,42 @@ class $RouteSearchHistoryTable extends RouteSearchHistory
       );
     } else if (isInserting) {
       context.missing(_destinationStationNameMeta);
+    }
+    if (data.containsKey('destination_line_id')) {
+      context.handle(
+        _destinationLineIdMeta,
+        destinationLineId.isAcceptableOrUnknown(
+          data['destination_line_id']!,
+          _destinationLineIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('destination_line_name')) {
+      context.handle(
+        _destinationLineNameMeta,
+        destinationLineName.isAcceptableOrUnknown(
+          data['destination_line_name']!,
+          _destinationLineNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('destination_line_color')) {
+      context.handle(
+        _destinationLineColorMeta,
+        destinationLineColor.isAcceptableOrUnknown(
+          data['destination_line_color']!,
+          _destinationLineColorMeta,
+        ),
+      );
+    }
+    if (data.containsKey('destination_station_code')) {
+      context.handle(
+        _destinationStationCodeMeta,
+        destinationStationCode.isAcceptableOrUnknown(
+          data['destination_station_code']!,
+          _destinationStationCodeMeta,
+        ),
+      );
     }
     if (data.containsKey('region')) {
       context.handle(
@@ -1471,6 +1986,22 @@ class $RouteSearchHistoryTable extends RouteSearchHistory
         DriftSqlType.string,
         data['${effectivePrefix}origin_station_name'],
       )!,
+      originLineId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}origin_line_id'],
+      ),
+      originLineName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}origin_line_name'],
+      ),
+      originLineColor: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}origin_line_color'],
+      ),
+      originStationCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}origin_station_code'],
+      ),
       waypointStationId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}waypoint_station_id'],
@@ -1478,6 +2009,22 @@ class $RouteSearchHistoryTable extends RouteSearchHistory
       waypointStationName: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}waypoint_station_name'],
+      ),
+      waypointLineId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}waypoint_line_id'],
+      ),
+      waypointLineName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}waypoint_line_name'],
+      ),
+      waypointLineColor: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}waypoint_line_color'],
+      ),
+      waypointStationCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}waypoint_station_code'],
       ),
       destinationStationId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -1487,6 +2034,22 @@ class $RouteSearchHistoryTable extends RouteSearchHistory
         DriftSqlType.string,
         data['${effectivePrefix}destination_station_name'],
       )!,
+      destinationLineId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}destination_line_id'],
+      ),
+      destinationLineName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}destination_line_name'],
+      ),
+      destinationLineColor: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}destination_line_color'],
+      ),
+      destinationStationCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}destination_station_code'],
+      ),
       region: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}region'],
@@ -1509,20 +2072,44 @@ class RouteSearchHistoryData extends DataClass
   final int id;
   final String originStationId;
   final String originStationName;
+  final String? originLineId;
+  final String? originLineName;
+  final String? originLineColor;
+  final String? originStationCode;
   final String? waypointStationId;
   final String? waypointStationName;
+  final String? waypointLineId;
+  final String? waypointLineName;
+  final String? waypointLineColor;
+  final String? waypointStationCode;
   final String destinationStationId;
   final String destinationStationName;
+  final String? destinationLineId;
+  final String? destinationLineName;
+  final String? destinationLineColor;
+  final String? destinationStationCode;
   final String region;
   final DateTime searchedAt;
   const RouteSearchHistoryData({
     required this.id,
     required this.originStationId,
     required this.originStationName,
+    this.originLineId,
+    this.originLineName,
+    this.originLineColor,
+    this.originStationCode,
     this.waypointStationId,
     this.waypointStationName,
+    this.waypointLineId,
+    this.waypointLineName,
+    this.waypointLineColor,
+    this.waypointStationCode,
     required this.destinationStationId,
     required this.destinationStationName,
+    this.destinationLineId,
+    this.destinationLineName,
+    this.destinationLineColor,
+    this.destinationStationCode,
     required this.region,
     required this.searchedAt,
   });
@@ -1532,14 +2119,52 @@ class RouteSearchHistoryData extends DataClass
     map['id'] = Variable<int>(id);
     map['origin_station_id'] = Variable<String>(originStationId);
     map['origin_station_name'] = Variable<String>(originStationName);
+    if (!nullToAbsent || originLineId != null) {
+      map['origin_line_id'] = Variable<String>(originLineId);
+    }
+    if (!nullToAbsent || originLineName != null) {
+      map['origin_line_name'] = Variable<String>(originLineName);
+    }
+    if (!nullToAbsent || originLineColor != null) {
+      map['origin_line_color'] = Variable<String>(originLineColor);
+    }
+    if (!nullToAbsent || originStationCode != null) {
+      map['origin_station_code'] = Variable<String>(originStationCode);
+    }
     if (!nullToAbsent || waypointStationId != null) {
       map['waypoint_station_id'] = Variable<String>(waypointStationId);
     }
     if (!nullToAbsent || waypointStationName != null) {
       map['waypoint_station_name'] = Variable<String>(waypointStationName);
     }
+    if (!nullToAbsent || waypointLineId != null) {
+      map['waypoint_line_id'] = Variable<String>(waypointLineId);
+    }
+    if (!nullToAbsent || waypointLineName != null) {
+      map['waypoint_line_name'] = Variable<String>(waypointLineName);
+    }
+    if (!nullToAbsent || waypointLineColor != null) {
+      map['waypoint_line_color'] = Variable<String>(waypointLineColor);
+    }
+    if (!nullToAbsent || waypointStationCode != null) {
+      map['waypoint_station_code'] = Variable<String>(waypointStationCode);
+    }
     map['destination_station_id'] = Variable<String>(destinationStationId);
     map['destination_station_name'] = Variable<String>(destinationStationName);
+    if (!nullToAbsent || destinationLineId != null) {
+      map['destination_line_id'] = Variable<String>(destinationLineId);
+    }
+    if (!nullToAbsent || destinationLineName != null) {
+      map['destination_line_name'] = Variable<String>(destinationLineName);
+    }
+    if (!nullToAbsent || destinationLineColor != null) {
+      map['destination_line_color'] = Variable<String>(destinationLineColor);
+    }
+    if (!nullToAbsent || destinationStationCode != null) {
+      map['destination_station_code'] = Variable<String>(
+        destinationStationCode,
+      );
+    }
     map['region'] = Variable<String>(region);
     map['searched_at'] = Variable<DateTime>(searchedAt);
     return map;
@@ -1550,14 +2175,50 @@ class RouteSearchHistoryData extends DataClass
       id: Value(id),
       originStationId: Value(originStationId),
       originStationName: Value(originStationName),
+      originLineId: originLineId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(originLineId),
+      originLineName: originLineName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(originLineName),
+      originLineColor: originLineColor == null && nullToAbsent
+          ? const Value.absent()
+          : Value(originLineColor),
+      originStationCode: originStationCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(originStationCode),
       waypointStationId: waypointStationId == null && nullToAbsent
           ? const Value.absent()
           : Value(waypointStationId),
       waypointStationName: waypointStationName == null && nullToAbsent
           ? const Value.absent()
           : Value(waypointStationName),
+      waypointLineId: waypointLineId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(waypointLineId),
+      waypointLineName: waypointLineName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(waypointLineName),
+      waypointLineColor: waypointLineColor == null && nullToAbsent
+          ? const Value.absent()
+          : Value(waypointLineColor),
+      waypointStationCode: waypointStationCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(waypointStationCode),
       destinationStationId: Value(destinationStationId),
       destinationStationName: Value(destinationStationName),
+      destinationLineId: destinationLineId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(destinationLineId),
+      destinationLineName: destinationLineName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(destinationLineName),
+      destinationLineColor: destinationLineColor == null && nullToAbsent
+          ? const Value.absent()
+          : Value(destinationLineColor),
+      destinationStationCode: destinationStationCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(destinationStationCode),
       region: Value(region),
       searchedAt: Value(searchedAt),
     );
@@ -1572,17 +2233,43 @@ class RouteSearchHistoryData extends DataClass
       id: serializer.fromJson<int>(json['id']),
       originStationId: serializer.fromJson<String>(json['originStationId']),
       originStationName: serializer.fromJson<String>(json['originStationName']),
+      originLineId: serializer.fromJson<String?>(json['originLineId']),
+      originLineName: serializer.fromJson<String?>(json['originLineName']),
+      originLineColor: serializer.fromJson<String?>(json['originLineColor']),
+      originStationCode: serializer.fromJson<String?>(
+        json['originStationCode'],
+      ),
       waypointStationId: serializer.fromJson<String?>(
         json['waypointStationId'],
       ),
       waypointStationName: serializer.fromJson<String?>(
         json['waypointStationName'],
       ),
+      waypointLineId: serializer.fromJson<String?>(json['waypointLineId']),
+      waypointLineName: serializer.fromJson<String?>(json['waypointLineName']),
+      waypointLineColor: serializer.fromJson<String?>(
+        json['waypointLineColor'],
+      ),
+      waypointStationCode: serializer.fromJson<String?>(
+        json['waypointStationCode'],
+      ),
       destinationStationId: serializer.fromJson<String>(
         json['destinationStationId'],
       ),
       destinationStationName: serializer.fromJson<String>(
         json['destinationStationName'],
+      ),
+      destinationLineId: serializer.fromJson<String?>(
+        json['destinationLineId'],
+      ),
+      destinationLineName: serializer.fromJson<String?>(
+        json['destinationLineName'],
+      ),
+      destinationLineColor: serializer.fromJson<String?>(
+        json['destinationLineColor'],
+      ),
+      destinationStationCode: serializer.fromJson<String?>(
+        json['destinationStationCode'],
       ),
       region: serializer.fromJson<String>(json['region']),
       searchedAt: serializer.fromJson<DateTime>(json['searchedAt']),
@@ -1595,11 +2282,25 @@ class RouteSearchHistoryData extends DataClass
       'id': serializer.toJson<int>(id),
       'originStationId': serializer.toJson<String>(originStationId),
       'originStationName': serializer.toJson<String>(originStationName),
+      'originLineId': serializer.toJson<String?>(originLineId),
+      'originLineName': serializer.toJson<String?>(originLineName),
+      'originLineColor': serializer.toJson<String?>(originLineColor),
+      'originStationCode': serializer.toJson<String?>(originStationCode),
       'waypointStationId': serializer.toJson<String?>(waypointStationId),
       'waypointStationName': serializer.toJson<String?>(waypointStationName),
+      'waypointLineId': serializer.toJson<String?>(waypointLineId),
+      'waypointLineName': serializer.toJson<String?>(waypointLineName),
+      'waypointLineColor': serializer.toJson<String?>(waypointLineColor),
+      'waypointStationCode': serializer.toJson<String?>(waypointStationCode),
       'destinationStationId': serializer.toJson<String>(destinationStationId),
       'destinationStationName': serializer.toJson<String>(
         destinationStationName,
+      ),
+      'destinationLineId': serializer.toJson<String?>(destinationLineId),
+      'destinationLineName': serializer.toJson<String?>(destinationLineName),
+      'destinationLineColor': serializer.toJson<String?>(destinationLineColor),
+      'destinationStationCode': serializer.toJson<String?>(
+        destinationStationCode,
       ),
       'region': serializer.toJson<String>(region),
       'searchedAt': serializer.toJson<DateTime>(searchedAt),
@@ -1610,25 +2311,71 @@ class RouteSearchHistoryData extends DataClass
     int? id,
     String? originStationId,
     String? originStationName,
+    Value<String?> originLineId = const Value.absent(),
+    Value<String?> originLineName = const Value.absent(),
+    Value<String?> originLineColor = const Value.absent(),
+    Value<String?> originStationCode = const Value.absent(),
     Value<String?> waypointStationId = const Value.absent(),
     Value<String?> waypointStationName = const Value.absent(),
+    Value<String?> waypointLineId = const Value.absent(),
+    Value<String?> waypointLineName = const Value.absent(),
+    Value<String?> waypointLineColor = const Value.absent(),
+    Value<String?> waypointStationCode = const Value.absent(),
     String? destinationStationId,
     String? destinationStationName,
+    Value<String?> destinationLineId = const Value.absent(),
+    Value<String?> destinationLineName = const Value.absent(),
+    Value<String?> destinationLineColor = const Value.absent(),
+    Value<String?> destinationStationCode = const Value.absent(),
     String? region,
     DateTime? searchedAt,
   }) => RouteSearchHistoryData(
     id: id ?? this.id,
     originStationId: originStationId ?? this.originStationId,
     originStationName: originStationName ?? this.originStationName,
+    originLineId: originLineId.present ? originLineId.value : this.originLineId,
+    originLineName: originLineName.present
+        ? originLineName.value
+        : this.originLineName,
+    originLineColor: originLineColor.present
+        ? originLineColor.value
+        : this.originLineColor,
+    originStationCode: originStationCode.present
+        ? originStationCode.value
+        : this.originStationCode,
     waypointStationId: waypointStationId.present
         ? waypointStationId.value
         : this.waypointStationId,
     waypointStationName: waypointStationName.present
         ? waypointStationName.value
         : this.waypointStationName,
+    waypointLineId: waypointLineId.present
+        ? waypointLineId.value
+        : this.waypointLineId,
+    waypointLineName: waypointLineName.present
+        ? waypointLineName.value
+        : this.waypointLineName,
+    waypointLineColor: waypointLineColor.present
+        ? waypointLineColor.value
+        : this.waypointLineColor,
+    waypointStationCode: waypointStationCode.present
+        ? waypointStationCode.value
+        : this.waypointStationCode,
     destinationStationId: destinationStationId ?? this.destinationStationId,
     destinationStationName:
         destinationStationName ?? this.destinationStationName,
+    destinationLineId: destinationLineId.present
+        ? destinationLineId.value
+        : this.destinationLineId,
+    destinationLineName: destinationLineName.present
+        ? destinationLineName.value
+        : this.destinationLineName,
+    destinationLineColor: destinationLineColor.present
+        ? destinationLineColor.value
+        : this.destinationLineColor,
+    destinationStationCode: destinationStationCode.present
+        ? destinationStationCode.value
+        : this.destinationStationCode,
     region: region ?? this.region,
     searchedAt: searchedAt ?? this.searchedAt,
   );
@@ -1641,18 +2388,54 @@ class RouteSearchHistoryData extends DataClass
       originStationName: data.originStationName.present
           ? data.originStationName.value
           : this.originStationName,
+      originLineId: data.originLineId.present
+          ? data.originLineId.value
+          : this.originLineId,
+      originLineName: data.originLineName.present
+          ? data.originLineName.value
+          : this.originLineName,
+      originLineColor: data.originLineColor.present
+          ? data.originLineColor.value
+          : this.originLineColor,
+      originStationCode: data.originStationCode.present
+          ? data.originStationCode.value
+          : this.originStationCode,
       waypointStationId: data.waypointStationId.present
           ? data.waypointStationId.value
           : this.waypointStationId,
       waypointStationName: data.waypointStationName.present
           ? data.waypointStationName.value
           : this.waypointStationName,
+      waypointLineId: data.waypointLineId.present
+          ? data.waypointLineId.value
+          : this.waypointLineId,
+      waypointLineName: data.waypointLineName.present
+          ? data.waypointLineName.value
+          : this.waypointLineName,
+      waypointLineColor: data.waypointLineColor.present
+          ? data.waypointLineColor.value
+          : this.waypointLineColor,
+      waypointStationCode: data.waypointStationCode.present
+          ? data.waypointStationCode.value
+          : this.waypointStationCode,
       destinationStationId: data.destinationStationId.present
           ? data.destinationStationId.value
           : this.destinationStationId,
       destinationStationName: data.destinationStationName.present
           ? data.destinationStationName.value
           : this.destinationStationName,
+      destinationLineId: data.destinationLineId.present
+          ? data.destinationLineId.value
+          : this.destinationLineId,
+      destinationLineName: data.destinationLineName.present
+          ? data.destinationLineName.value
+          : this.destinationLineName,
+      destinationLineColor: data.destinationLineColor.present
+          ? data.destinationLineColor.value
+          : this.destinationLineColor,
+      destinationStationCode: data.destinationStationCode.present
+          ? data.destinationStationCode.value
+          : this.destinationStationCode,
       region: data.region.present ? data.region.value : this.region,
       searchedAt: data.searchedAt.present
           ? data.searchedAt.value
@@ -1666,10 +2449,22 @@ class RouteSearchHistoryData extends DataClass
           ..write('id: $id, ')
           ..write('originStationId: $originStationId, ')
           ..write('originStationName: $originStationName, ')
+          ..write('originLineId: $originLineId, ')
+          ..write('originLineName: $originLineName, ')
+          ..write('originLineColor: $originLineColor, ')
+          ..write('originStationCode: $originStationCode, ')
           ..write('waypointStationId: $waypointStationId, ')
           ..write('waypointStationName: $waypointStationName, ')
+          ..write('waypointLineId: $waypointLineId, ')
+          ..write('waypointLineName: $waypointLineName, ')
+          ..write('waypointLineColor: $waypointLineColor, ')
+          ..write('waypointStationCode: $waypointStationCode, ')
           ..write('destinationStationId: $destinationStationId, ')
           ..write('destinationStationName: $destinationStationName, ')
+          ..write('destinationLineId: $destinationLineId, ')
+          ..write('destinationLineName: $destinationLineName, ')
+          ..write('destinationLineColor: $destinationLineColor, ')
+          ..write('destinationStationCode: $destinationStationCode, ')
           ..write('region: $region, ')
           ..write('searchedAt: $searchedAt')
           ..write(')'))
@@ -1677,17 +2472,29 @@ class RouteSearchHistoryData extends DataClass
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     originStationId,
     originStationName,
+    originLineId,
+    originLineName,
+    originLineColor,
+    originStationCode,
     waypointStationId,
     waypointStationName,
+    waypointLineId,
+    waypointLineName,
+    waypointLineColor,
+    waypointStationCode,
     destinationStationId,
     destinationStationName,
+    destinationLineId,
+    destinationLineName,
+    destinationLineColor,
+    destinationStationCode,
     region,
     searchedAt,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1695,10 +2502,22 @@ class RouteSearchHistoryData extends DataClass
           other.id == this.id &&
           other.originStationId == this.originStationId &&
           other.originStationName == this.originStationName &&
+          other.originLineId == this.originLineId &&
+          other.originLineName == this.originLineName &&
+          other.originLineColor == this.originLineColor &&
+          other.originStationCode == this.originStationCode &&
           other.waypointStationId == this.waypointStationId &&
           other.waypointStationName == this.waypointStationName &&
+          other.waypointLineId == this.waypointLineId &&
+          other.waypointLineName == this.waypointLineName &&
+          other.waypointLineColor == this.waypointLineColor &&
+          other.waypointStationCode == this.waypointStationCode &&
           other.destinationStationId == this.destinationStationId &&
           other.destinationStationName == this.destinationStationName &&
+          other.destinationLineId == this.destinationLineId &&
+          other.destinationLineName == this.destinationLineName &&
+          other.destinationLineColor == this.destinationLineColor &&
+          other.destinationStationCode == this.destinationStationCode &&
           other.region == this.region &&
           other.searchedAt == this.searchedAt);
 }
@@ -1708,20 +2527,44 @@ class RouteSearchHistoryCompanion
   final Value<int> id;
   final Value<String> originStationId;
   final Value<String> originStationName;
+  final Value<String?> originLineId;
+  final Value<String?> originLineName;
+  final Value<String?> originLineColor;
+  final Value<String?> originStationCode;
   final Value<String?> waypointStationId;
   final Value<String?> waypointStationName;
+  final Value<String?> waypointLineId;
+  final Value<String?> waypointLineName;
+  final Value<String?> waypointLineColor;
+  final Value<String?> waypointStationCode;
   final Value<String> destinationStationId;
   final Value<String> destinationStationName;
+  final Value<String?> destinationLineId;
+  final Value<String?> destinationLineName;
+  final Value<String?> destinationLineColor;
+  final Value<String?> destinationStationCode;
   final Value<String> region;
   final Value<DateTime> searchedAt;
   const RouteSearchHistoryCompanion({
     this.id = const Value.absent(),
     this.originStationId = const Value.absent(),
     this.originStationName = const Value.absent(),
+    this.originLineId = const Value.absent(),
+    this.originLineName = const Value.absent(),
+    this.originLineColor = const Value.absent(),
+    this.originStationCode = const Value.absent(),
     this.waypointStationId = const Value.absent(),
     this.waypointStationName = const Value.absent(),
+    this.waypointLineId = const Value.absent(),
+    this.waypointLineName = const Value.absent(),
+    this.waypointLineColor = const Value.absent(),
+    this.waypointStationCode = const Value.absent(),
     this.destinationStationId = const Value.absent(),
     this.destinationStationName = const Value.absent(),
+    this.destinationLineId = const Value.absent(),
+    this.destinationLineName = const Value.absent(),
+    this.destinationLineColor = const Value.absent(),
+    this.destinationStationCode = const Value.absent(),
     this.region = const Value.absent(),
     this.searchedAt = const Value.absent(),
   });
@@ -1729,10 +2572,22 @@ class RouteSearchHistoryCompanion
     this.id = const Value.absent(),
     required String originStationId,
     required String originStationName,
+    this.originLineId = const Value.absent(),
+    this.originLineName = const Value.absent(),
+    this.originLineColor = const Value.absent(),
+    this.originStationCode = const Value.absent(),
     this.waypointStationId = const Value.absent(),
     this.waypointStationName = const Value.absent(),
+    this.waypointLineId = const Value.absent(),
+    this.waypointLineName = const Value.absent(),
+    this.waypointLineColor = const Value.absent(),
+    this.waypointStationCode = const Value.absent(),
     required String destinationStationId,
     required String destinationStationName,
+    this.destinationLineId = const Value.absent(),
+    this.destinationLineName = const Value.absent(),
+    this.destinationLineColor = const Value.absent(),
+    this.destinationStationCode = const Value.absent(),
     required String region,
     required DateTime searchedAt,
   }) : originStationId = Value(originStationId),
@@ -1745,10 +2600,22 @@ class RouteSearchHistoryCompanion
     Expression<int>? id,
     Expression<String>? originStationId,
     Expression<String>? originStationName,
+    Expression<String>? originLineId,
+    Expression<String>? originLineName,
+    Expression<String>? originLineColor,
+    Expression<String>? originStationCode,
     Expression<String>? waypointStationId,
     Expression<String>? waypointStationName,
+    Expression<String>? waypointLineId,
+    Expression<String>? waypointLineName,
+    Expression<String>? waypointLineColor,
+    Expression<String>? waypointStationCode,
     Expression<String>? destinationStationId,
     Expression<String>? destinationStationName,
+    Expression<String>? destinationLineId,
+    Expression<String>? destinationLineName,
+    Expression<String>? destinationLineColor,
+    Expression<String>? destinationStationCode,
     Expression<String>? region,
     Expression<DateTime>? searchedAt,
   }) {
@@ -1756,13 +2623,29 @@ class RouteSearchHistoryCompanion
       if (id != null) 'id': id,
       if (originStationId != null) 'origin_station_id': originStationId,
       if (originStationName != null) 'origin_station_name': originStationName,
+      if (originLineId != null) 'origin_line_id': originLineId,
+      if (originLineName != null) 'origin_line_name': originLineName,
+      if (originLineColor != null) 'origin_line_color': originLineColor,
+      if (originStationCode != null) 'origin_station_code': originStationCode,
       if (waypointStationId != null) 'waypoint_station_id': waypointStationId,
       if (waypointStationName != null)
         'waypoint_station_name': waypointStationName,
+      if (waypointLineId != null) 'waypoint_line_id': waypointLineId,
+      if (waypointLineName != null) 'waypoint_line_name': waypointLineName,
+      if (waypointLineColor != null) 'waypoint_line_color': waypointLineColor,
+      if (waypointStationCode != null)
+        'waypoint_station_code': waypointStationCode,
       if (destinationStationId != null)
         'destination_station_id': destinationStationId,
       if (destinationStationName != null)
         'destination_station_name': destinationStationName,
+      if (destinationLineId != null) 'destination_line_id': destinationLineId,
+      if (destinationLineName != null)
+        'destination_line_name': destinationLineName,
+      if (destinationLineColor != null)
+        'destination_line_color': destinationLineColor,
+      if (destinationStationCode != null)
+        'destination_station_code': destinationStationCode,
       if (region != null) 'region': region,
       if (searchedAt != null) 'searched_at': searchedAt,
     });
@@ -1772,10 +2655,22 @@ class RouteSearchHistoryCompanion
     Value<int>? id,
     Value<String>? originStationId,
     Value<String>? originStationName,
+    Value<String?>? originLineId,
+    Value<String?>? originLineName,
+    Value<String?>? originLineColor,
+    Value<String?>? originStationCode,
     Value<String?>? waypointStationId,
     Value<String?>? waypointStationName,
+    Value<String?>? waypointLineId,
+    Value<String?>? waypointLineName,
+    Value<String?>? waypointLineColor,
+    Value<String?>? waypointStationCode,
     Value<String>? destinationStationId,
     Value<String>? destinationStationName,
+    Value<String?>? destinationLineId,
+    Value<String?>? destinationLineName,
+    Value<String?>? destinationLineColor,
+    Value<String?>? destinationStationCode,
     Value<String>? region,
     Value<DateTime>? searchedAt,
   }) {
@@ -1783,11 +2678,24 @@ class RouteSearchHistoryCompanion
       id: id ?? this.id,
       originStationId: originStationId ?? this.originStationId,
       originStationName: originStationName ?? this.originStationName,
+      originLineId: originLineId ?? this.originLineId,
+      originLineName: originLineName ?? this.originLineName,
+      originLineColor: originLineColor ?? this.originLineColor,
+      originStationCode: originStationCode ?? this.originStationCode,
       waypointStationId: waypointStationId ?? this.waypointStationId,
       waypointStationName: waypointStationName ?? this.waypointStationName,
+      waypointLineId: waypointLineId ?? this.waypointLineId,
+      waypointLineName: waypointLineName ?? this.waypointLineName,
+      waypointLineColor: waypointLineColor ?? this.waypointLineColor,
+      waypointStationCode: waypointStationCode ?? this.waypointStationCode,
       destinationStationId: destinationStationId ?? this.destinationStationId,
       destinationStationName:
           destinationStationName ?? this.destinationStationName,
+      destinationLineId: destinationLineId ?? this.destinationLineId,
+      destinationLineName: destinationLineName ?? this.destinationLineName,
+      destinationLineColor: destinationLineColor ?? this.destinationLineColor,
+      destinationStationCode:
+          destinationStationCode ?? this.destinationStationCode,
       region: region ?? this.region,
       searchedAt: searchedAt ?? this.searchedAt,
     );
@@ -1805,12 +2713,38 @@ class RouteSearchHistoryCompanion
     if (originStationName.present) {
       map['origin_station_name'] = Variable<String>(originStationName.value);
     }
+    if (originLineId.present) {
+      map['origin_line_id'] = Variable<String>(originLineId.value);
+    }
+    if (originLineName.present) {
+      map['origin_line_name'] = Variable<String>(originLineName.value);
+    }
+    if (originLineColor.present) {
+      map['origin_line_color'] = Variable<String>(originLineColor.value);
+    }
+    if (originStationCode.present) {
+      map['origin_station_code'] = Variable<String>(originStationCode.value);
+    }
     if (waypointStationId.present) {
       map['waypoint_station_id'] = Variable<String>(waypointStationId.value);
     }
     if (waypointStationName.present) {
       map['waypoint_station_name'] = Variable<String>(
         waypointStationName.value,
+      );
+    }
+    if (waypointLineId.present) {
+      map['waypoint_line_id'] = Variable<String>(waypointLineId.value);
+    }
+    if (waypointLineName.present) {
+      map['waypoint_line_name'] = Variable<String>(waypointLineName.value);
+    }
+    if (waypointLineColor.present) {
+      map['waypoint_line_color'] = Variable<String>(waypointLineColor.value);
+    }
+    if (waypointStationCode.present) {
+      map['waypoint_station_code'] = Variable<String>(
+        waypointStationCode.value,
       );
     }
     if (destinationStationId.present) {
@@ -1821,6 +2755,24 @@ class RouteSearchHistoryCompanion
     if (destinationStationName.present) {
       map['destination_station_name'] = Variable<String>(
         destinationStationName.value,
+      );
+    }
+    if (destinationLineId.present) {
+      map['destination_line_id'] = Variable<String>(destinationLineId.value);
+    }
+    if (destinationLineName.present) {
+      map['destination_line_name'] = Variable<String>(
+        destinationLineName.value,
+      );
+    }
+    if (destinationLineColor.present) {
+      map['destination_line_color'] = Variable<String>(
+        destinationLineColor.value,
+      );
+    }
+    if (destinationStationCode.present) {
+      map['destination_station_code'] = Variable<String>(
+        destinationStationCode.value,
       );
     }
     if (region.present) {
@@ -1838,10 +2790,22 @@ class RouteSearchHistoryCompanion
           ..write('id: $id, ')
           ..write('originStationId: $originStationId, ')
           ..write('originStationName: $originStationName, ')
+          ..write('originLineId: $originLineId, ')
+          ..write('originLineName: $originLineName, ')
+          ..write('originLineColor: $originLineColor, ')
+          ..write('originStationCode: $originStationCode, ')
           ..write('waypointStationId: $waypointStationId, ')
           ..write('waypointStationName: $waypointStationName, ')
+          ..write('waypointLineId: $waypointLineId, ')
+          ..write('waypointLineName: $waypointLineName, ')
+          ..write('waypointLineColor: $waypointLineColor, ')
+          ..write('waypointStationCode: $waypointStationCode, ')
           ..write('destinationStationId: $destinationStationId, ')
           ..write('destinationStationName: $destinationStationName, ')
+          ..write('destinationLineId: $destinationLineId, ')
+          ..write('destinationLineName: $destinationLineName, ')
+          ..write('destinationLineColor: $destinationLineColor, ')
+          ..write('destinationStationCode: $destinationStationCode, ')
           ..write('region: $region, ')
           ..write('searchedAt: $searchedAt')
           ..write(')'))
@@ -4048,6 +5012,11 @@ typedef $$SearchHistoryTableCreateCompanionBuilder =
       Value<int> id,
       required String query,
       Value<String?> region,
+      Value<String?> stationId,
+      Value<String?> lineId,
+      Value<String?> lineName,
+      Value<String?> lineColor,
+      Value<String?> stationCode,
       required DateTime searchedAt,
     });
 typedef $$SearchHistoryTableUpdateCompanionBuilder =
@@ -4055,6 +5024,11 @@ typedef $$SearchHistoryTableUpdateCompanionBuilder =
       Value<int> id,
       Value<String> query,
       Value<String?> region,
+      Value<String?> stationId,
+      Value<String?> lineId,
+      Value<String?> lineName,
+      Value<String?> lineColor,
+      Value<String?> stationCode,
       Value<DateTime> searchedAt,
     });
 
@@ -4079,6 +5053,31 @@ class $$SearchHistoryTableFilterComposer
 
   ColumnFilters<String> get region => $composableBuilder(
     column: $table.region,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get stationId => $composableBuilder(
+    column: $table.stationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lineId => $composableBuilder(
+    column: $table.lineId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lineName => $composableBuilder(
+    column: $table.lineName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lineColor => $composableBuilder(
+    column: $table.lineColor,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get stationCode => $composableBuilder(
+    column: $table.stationCode,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4112,6 +5111,31 @@ class $$SearchHistoryTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get stationId => $composableBuilder(
+    column: $table.stationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lineId => $composableBuilder(
+    column: $table.lineId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lineName => $composableBuilder(
+    column: $table.lineName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lineColor => $composableBuilder(
+    column: $table.lineColor,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get stationCode => $composableBuilder(
+    column: $table.stationCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get searchedAt => $composableBuilder(
     column: $table.searchedAt,
     builder: (column) => ColumnOrderings(column),
@@ -4135,6 +5159,23 @@ class $$SearchHistoryTableAnnotationComposer
 
   GeneratedColumn<String> get region =>
       $composableBuilder(column: $table.region, builder: (column) => column);
+
+  GeneratedColumn<String> get stationId =>
+      $composableBuilder(column: $table.stationId, builder: (column) => column);
+
+  GeneratedColumn<String> get lineId =>
+      $composableBuilder(column: $table.lineId, builder: (column) => column);
+
+  GeneratedColumn<String> get lineName =>
+      $composableBuilder(column: $table.lineName, builder: (column) => column);
+
+  GeneratedColumn<String> get lineColor =>
+      $composableBuilder(column: $table.lineColor, builder: (column) => column);
+
+  GeneratedColumn<String> get stationCode => $composableBuilder(
+    column: $table.stationCode,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get searchedAt => $composableBuilder(
     column: $table.searchedAt,
@@ -4180,11 +5221,21 @@ class $$SearchHistoryTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<String> query = const Value.absent(),
                 Value<String?> region = const Value.absent(),
+                Value<String?> stationId = const Value.absent(),
+                Value<String?> lineId = const Value.absent(),
+                Value<String?> lineName = const Value.absent(),
+                Value<String?> lineColor = const Value.absent(),
+                Value<String?> stationCode = const Value.absent(),
                 Value<DateTime> searchedAt = const Value.absent(),
               }) => SearchHistoryCompanion(
                 id: id,
                 query: query,
                 region: region,
+                stationId: stationId,
+                lineId: lineId,
+                lineName: lineName,
+                lineColor: lineColor,
+                stationCode: stationCode,
                 searchedAt: searchedAt,
               ),
           createCompanionCallback:
@@ -4192,11 +5243,21 @@ class $$SearchHistoryTableTableManager
                 Value<int> id = const Value.absent(),
                 required String query,
                 Value<String?> region = const Value.absent(),
+                Value<String?> stationId = const Value.absent(),
+                Value<String?> lineId = const Value.absent(),
+                Value<String?> lineName = const Value.absent(),
+                Value<String?> lineColor = const Value.absent(),
+                Value<String?> stationCode = const Value.absent(),
                 required DateTime searchedAt,
               }) => SearchHistoryCompanion.insert(
                 id: id,
                 query: query,
                 region: region,
+                stationId: stationId,
+                lineId: lineId,
+                lineName: lineName,
+                lineColor: lineColor,
+                stationCode: stationCode,
                 searchedAt: searchedAt,
               ),
           withReferenceMapper: (p0) => p0
@@ -4229,10 +5290,22 @@ typedef $$RouteSearchHistoryTableCreateCompanionBuilder =
       Value<int> id,
       required String originStationId,
       required String originStationName,
+      Value<String?> originLineId,
+      Value<String?> originLineName,
+      Value<String?> originLineColor,
+      Value<String?> originStationCode,
       Value<String?> waypointStationId,
       Value<String?> waypointStationName,
+      Value<String?> waypointLineId,
+      Value<String?> waypointLineName,
+      Value<String?> waypointLineColor,
+      Value<String?> waypointStationCode,
       required String destinationStationId,
       required String destinationStationName,
+      Value<String?> destinationLineId,
+      Value<String?> destinationLineName,
+      Value<String?> destinationLineColor,
+      Value<String?> destinationStationCode,
       required String region,
       required DateTime searchedAt,
     });
@@ -4241,10 +5314,22 @@ typedef $$RouteSearchHistoryTableUpdateCompanionBuilder =
       Value<int> id,
       Value<String> originStationId,
       Value<String> originStationName,
+      Value<String?> originLineId,
+      Value<String?> originLineName,
+      Value<String?> originLineColor,
+      Value<String?> originStationCode,
       Value<String?> waypointStationId,
       Value<String?> waypointStationName,
+      Value<String?> waypointLineId,
+      Value<String?> waypointLineName,
+      Value<String?> waypointLineColor,
+      Value<String?> waypointStationCode,
       Value<String> destinationStationId,
       Value<String> destinationStationName,
+      Value<String?> destinationLineId,
+      Value<String?> destinationLineName,
+      Value<String?> destinationLineColor,
+      Value<String?> destinationStationCode,
       Value<String> region,
       Value<DateTime> searchedAt,
     });
@@ -4273,6 +5358,26 @@ class $$RouteSearchHistoryTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get originLineId => $composableBuilder(
+    column: $table.originLineId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get originLineName => $composableBuilder(
+    column: $table.originLineName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get originLineColor => $composableBuilder(
+    column: $table.originLineColor,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get originStationCode => $composableBuilder(
+    column: $table.originStationCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get waypointStationId => $composableBuilder(
     column: $table.waypointStationId,
     builder: (column) => ColumnFilters(column),
@@ -4283,6 +5388,26 @@ class $$RouteSearchHistoryTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get waypointLineId => $composableBuilder(
+    column: $table.waypointLineId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get waypointLineName => $composableBuilder(
+    column: $table.waypointLineName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get waypointLineColor => $composableBuilder(
+    column: $table.waypointLineColor,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get waypointStationCode => $composableBuilder(
+    column: $table.waypointStationCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get destinationStationId => $composableBuilder(
     column: $table.destinationStationId,
     builder: (column) => ColumnFilters(column),
@@ -4290,6 +5415,26 @@ class $$RouteSearchHistoryTableFilterComposer
 
   ColumnFilters<String> get destinationStationName => $composableBuilder(
     column: $table.destinationStationName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get destinationLineId => $composableBuilder(
+    column: $table.destinationLineId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get destinationLineName => $composableBuilder(
+    column: $table.destinationLineName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get destinationLineColor => $composableBuilder(
+    column: $table.destinationLineColor,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get destinationStationCode => $composableBuilder(
+    column: $table.destinationStationCode,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4328,6 +5473,26 @@ class $$RouteSearchHistoryTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get originLineId => $composableBuilder(
+    column: $table.originLineId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get originLineName => $composableBuilder(
+    column: $table.originLineName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get originLineColor => $composableBuilder(
+    column: $table.originLineColor,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get originStationCode => $composableBuilder(
+    column: $table.originStationCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get waypointStationId => $composableBuilder(
     column: $table.waypointStationId,
     builder: (column) => ColumnOrderings(column),
@@ -4338,6 +5503,26 @@ class $$RouteSearchHistoryTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get waypointLineId => $composableBuilder(
+    column: $table.waypointLineId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get waypointLineName => $composableBuilder(
+    column: $table.waypointLineName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get waypointLineColor => $composableBuilder(
+    column: $table.waypointLineColor,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get waypointStationCode => $composableBuilder(
+    column: $table.waypointStationCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get destinationStationId => $composableBuilder(
     column: $table.destinationStationId,
     builder: (column) => ColumnOrderings(column),
@@ -4345,6 +5530,26 @@ class $$RouteSearchHistoryTableOrderingComposer
 
   ColumnOrderings<String> get destinationStationName => $composableBuilder(
     column: $table.destinationStationName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get destinationLineId => $composableBuilder(
+    column: $table.destinationLineId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get destinationLineName => $composableBuilder(
+    column: $table.destinationLineName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get destinationLineColor => $composableBuilder(
+    column: $table.destinationLineColor,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get destinationStationCode => $composableBuilder(
+    column: $table.destinationStationCode,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -4381,6 +5586,26 @@ class $$RouteSearchHistoryTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get originLineId => $composableBuilder(
+    column: $table.originLineId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get originLineName => $composableBuilder(
+    column: $table.originLineName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get originLineColor => $composableBuilder(
+    column: $table.originLineColor,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get originStationCode => $composableBuilder(
+    column: $table.originStationCode,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get waypointStationId => $composableBuilder(
     column: $table.waypointStationId,
     builder: (column) => column,
@@ -4391,6 +5616,26 @@ class $$RouteSearchHistoryTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get waypointLineId => $composableBuilder(
+    column: $table.waypointLineId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get waypointLineName => $composableBuilder(
+    column: $table.waypointLineName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get waypointLineColor => $composableBuilder(
+    column: $table.waypointLineColor,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get waypointStationCode => $composableBuilder(
+    column: $table.waypointStationCode,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get destinationStationId => $composableBuilder(
     column: $table.destinationStationId,
     builder: (column) => column,
@@ -4398,6 +5643,26 @@ class $$RouteSearchHistoryTableAnnotationComposer
 
   GeneratedColumn<String> get destinationStationName => $composableBuilder(
     column: $table.destinationStationName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get destinationLineId => $composableBuilder(
+    column: $table.destinationLineId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get destinationLineName => $composableBuilder(
+    column: $table.destinationLineName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get destinationLineColor => $composableBuilder(
+    column: $table.destinationLineColor,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get destinationStationCode => $composableBuilder(
+    column: $table.destinationStationCode,
     builder: (column) => column,
   );
 
@@ -4453,20 +5718,44 @@ class $$RouteSearchHistoryTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<String> originStationId = const Value.absent(),
                 Value<String> originStationName = const Value.absent(),
+                Value<String?> originLineId = const Value.absent(),
+                Value<String?> originLineName = const Value.absent(),
+                Value<String?> originLineColor = const Value.absent(),
+                Value<String?> originStationCode = const Value.absent(),
                 Value<String?> waypointStationId = const Value.absent(),
                 Value<String?> waypointStationName = const Value.absent(),
+                Value<String?> waypointLineId = const Value.absent(),
+                Value<String?> waypointLineName = const Value.absent(),
+                Value<String?> waypointLineColor = const Value.absent(),
+                Value<String?> waypointStationCode = const Value.absent(),
                 Value<String> destinationStationId = const Value.absent(),
                 Value<String> destinationStationName = const Value.absent(),
+                Value<String?> destinationLineId = const Value.absent(),
+                Value<String?> destinationLineName = const Value.absent(),
+                Value<String?> destinationLineColor = const Value.absent(),
+                Value<String?> destinationStationCode = const Value.absent(),
                 Value<String> region = const Value.absent(),
                 Value<DateTime> searchedAt = const Value.absent(),
               }) => RouteSearchHistoryCompanion(
                 id: id,
                 originStationId: originStationId,
                 originStationName: originStationName,
+                originLineId: originLineId,
+                originLineName: originLineName,
+                originLineColor: originLineColor,
+                originStationCode: originStationCode,
                 waypointStationId: waypointStationId,
                 waypointStationName: waypointStationName,
+                waypointLineId: waypointLineId,
+                waypointLineName: waypointLineName,
+                waypointLineColor: waypointLineColor,
+                waypointStationCode: waypointStationCode,
                 destinationStationId: destinationStationId,
                 destinationStationName: destinationStationName,
+                destinationLineId: destinationLineId,
+                destinationLineName: destinationLineName,
+                destinationLineColor: destinationLineColor,
+                destinationStationCode: destinationStationCode,
                 region: region,
                 searchedAt: searchedAt,
               ),
@@ -4475,20 +5764,44 @@ class $$RouteSearchHistoryTableTableManager
                 Value<int> id = const Value.absent(),
                 required String originStationId,
                 required String originStationName,
+                Value<String?> originLineId = const Value.absent(),
+                Value<String?> originLineName = const Value.absent(),
+                Value<String?> originLineColor = const Value.absent(),
+                Value<String?> originStationCode = const Value.absent(),
                 Value<String?> waypointStationId = const Value.absent(),
                 Value<String?> waypointStationName = const Value.absent(),
+                Value<String?> waypointLineId = const Value.absent(),
+                Value<String?> waypointLineName = const Value.absent(),
+                Value<String?> waypointLineColor = const Value.absent(),
+                Value<String?> waypointStationCode = const Value.absent(),
                 required String destinationStationId,
                 required String destinationStationName,
+                Value<String?> destinationLineId = const Value.absent(),
+                Value<String?> destinationLineName = const Value.absent(),
+                Value<String?> destinationLineColor = const Value.absent(),
+                Value<String?> destinationStationCode = const Value.absent(),
                 required String region,
                 required DateTime searchedAt,
               }) => RouteSearchHistoryCompanion.insert(
                 id: id,
                 originStationId: originStationId,
                 originStationName: originStationName,
+                originLineId: originLineId,
+                originLineName: originLineName,
+                originLineColor: originLineColor,
+                originStationCode: originStationCode,
                 waypointStationId: waypointStationId,
                 waypointStationName: waypointStationName,
+                waypointLineId: waypointLineId,
+                waypointLineName: waypointLineName,
+                waypointLineColor: waypointLineColor,
+                waypointStationCode: waypointStationCode,
                 destinationStationId: destinationStationId,
                 destinationStationName: destinationStationName,
+                destinationLineId: destinationLineId,
+                destinationLineName: destinationLineName,
+                destinationLineColor: destinationLineColor,
+                destinationStationCode: destinationStationCode,
                 region: region,
                 searchedAt: searchedAt,
               ),

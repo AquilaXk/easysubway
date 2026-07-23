@@ -2874,6 +2874,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
   StationSearchResult? _originStation;
   StationSearchResult? _destinationStation;
   StationSearchResult? _waypointStation;
+
+  /// 경유역 칸은 선택(또는 추가) 전에는 숨긴다. draft에 경유가 있으면 연다.
+  bool _waypointSlotOpen = false;
   _RouteStationRole? _activeStationPicker;
   late MobilityPreset _selectedPreset;
   late String _selectedMobilityType;
@@ -2925,6 +2928,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     _originStation = _stationFromDraft(widget.initialDraft?.origin);
     _destinationStation = _stationFromDraft(widget.initialDraft?.destination);
     _waypointStation = _stationFromDraft(widget.initialDraft?.waypoint);
+    _waypointSlotOpen = _waypointStation != null;
     _selectedPreset =
         mobilityPresetFromRepresentativeMobilityType(
           widget.initialMobilityType,
@@ -2949,6 +2953,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
       _originStation = _stationFromDraft(draft?.origin);
       _destinationStation = _stationFromDraft(draft?.destination);
       _waypointStation = _stationFromDraft(draft?.waypoint);
+      _waypointSlotOpen = _waypointStation != null;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _maybeAutoSearchFromDraft();
       });
@@ -3170,27 +3175,8 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
         }
         return Scaffold(
           key: const Key('routeSearchScreen'),
-          backgroundColor: EasySubwayAccessibleColors.scaffoldSurface,
-          appBar: AppBar(
-            toolbarHeight: 60,
-            backgroundColor: EasySubwayAccessibleColors.topBarSurface,
-            foregroundColor: EasySubwayAccessibleColors.text,
-            surfaceTintColor: Colors.transparent,
-            elevation: 0,
-            title: const Text(
-              '길찾기',
-              style: TextStyle(
-                color: EasySubwayAccessibleColors.text,
-                fontWeight: FontWeight.w700,
-                fontSize: 20,
-                height: 1.2,
-              ),
-            ),
-            flexibleSpace: const Align(
-              alignment: Alignment.bottomCenter,
-              child: EasySubwayHeaderDivider(),
-            ),
-          ),
+          backgroundColor: EasySubwayAccessibleColors.surface,
+          appBar: _routeSearchAppBar(onBack: () => unawaited(_endRoute())),
           bottomNavigationBar: widget.shellNavigationBar,
           body: Semantics(
             container: true,
@@ -3204,14 +3190,19 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
                   children: [
                     _RoutePointPickerCard(
                       key: const Key('routePointPickerCard'),
-                      // #1933 요구 3: 폼이 사라졌으므로 항상 얇은 헤더로 축소한다.
-                      // 역명 탭 → 인라인 역 검색으로 편집(→ 재검색)만 남긴다.
-                      compact: true,
+                      // #1933 요구 3 / #2436: 경유는 추가 시에만 칸을 열고, 역명 옆 호선 마크.
                       originStation: _originStation,
+                      waypointStation: _waypointStation,
                       destinationStation: _destinationStation,
+                      showWaypointRow: _waypointSlotOpen,
                       originPicker:
                           _activeStationPicker == _RouteStationRole.origin
                           ? _buildRouteStationPicker(_RouteStationRole.origin)
+                          : null,
+                      waypointPicker:
+                          _waypointSlotOpen &&
+                              _activeStationPicker == _RouteStationRole.waypoint
+                          ? _buildRouteStationPicker(_RouteStationRole.waypoint)
                           : null,
                       destinationPicker:
                           _activeStationPicker == _RouteStationRole.destination
@@ -3221,8 +3212,13 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
                           : null,
                       onOriginTap: () =>
                           _openStationPicker(_RouteStationRole.origin),
+                      onWaypointTap: _waypointSlotOpen
+                          ? () => _openStationPicker(_RouteStationRole.waypoint)
+                          : null,
                       onDestinationTap: () =>
                           _openStationPicker(_RouteStationRole.destination),
+                      onAddWaypoint: _openWaypointSlot,
+                      onRemoveWaypoint: _removeWaypointSlot,
                       onSwap: _swapStations,
                     ),
                     const SizedBox(height: 18),
@@ -3447,10 +3443,15 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
         RecentRouteSearchEntry(
           originStationId: origin.id,
           originStationName: origin.nameKo,
+          originLines: _recentLinesForStation(origin),
           waypointStationId: waypoint?.id,
           waypointStationName: waypoint?.nameKo,
+          waypointLines: waypoint == null
+              ? const []
+              : _recentLinesForStation(waypoint),
           destinationStationId: destination.id,
           destinationStationName: destination.nameKo,
+          destinationLines: _recentLinesForStation(destination),
           region: region,
           searchedAt: DateTime.now().toUtc(),
         ),
@@ -3508,43 +3509,101 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
   }
 
   Widget _buildRouteStationPicker(_RouteStationRole role) {
-    final isOrigin = role == _RouteStationRole.origin;
+    final (
+      label,
+      inputKey,
+      searchKey,
+      optionPrefix,
+      selected,
+      onSelected,
+    ) = switch (role) {
+      _RouteStationRole.origin => (
+        '출발역',
+        const Key('routeOriginStationInput'),
+        const Key('routeOriginStationSearchButton'),
+        'routeOriginStationOption',
+        _originStation,
+        _updateOriginStation,
+      ),
+      _RouteStationRole.waypoint => (
+        '경유역',
+        const Key('routeWaypointStationInput'),
+        const Key('routeWaypointStationSearchButton'),
+        'routeWaypointStationOption',
+        _waypointStation,
+        _updateWaypointStation,
+      ),
+      _RouteStationRole.destination => (
+        '도착역',
+        const Key('routeDestinationStationInput'),
+        const Key('routeDestinationStationSearchButton'),
+        'routeDestinationStationOption',
+        _destinationStation,
+        _updateDestinationStation,
+      ),
+    };
     return _RouteStationPicker(
-      isOrigin: isOrigin,
-      labelText: isOrigin ? '출발역' : '도착역',
-      inputKey: isOrigin
-          ? const Key('routeOriginStationInput')
-          : const Key('routeDestinationStationInput'),
-      searchButtonKey: isOrigin
-          ? const Key('routeOriginStationSearchButton')
-          : const Key('routeDestinationStationSearchButton'),
-      optionKeyPrefix: isOrigin
-          ? 'routeOriginStationOption'
-          : 'routeDestinationStationOption',
-      selectedStation: isOrigin ? _originStation : _destinationStation,
+      role: role,
+      labelText: label,
+      inputKey: inputKey,
+      searchButtonKey: searchKey,
+      optionKeyPrefix: optionPrefix,
+      selectedStation: selected,
       repository: widget.stationRepository,
-      onSelected: isOrigin ? _updateOriginStation : _updateDestinationStation,
+      onSelected: onSelected,
     );
   }
 
   Future<void> _updateOriginStation(StationSearchResult? station) async {
-    if (!await _disableActiveGetOffAlarm()) {
-      return;
-    }
-    if (!mounted) {
-      return;
-    }
+    await _updateRouteStation(
+      apply: () => _originStation = station,
+      selected: station,
+    );
+  }
+
+  Future<void> _updateWaypointStation(StationSearchResult? station) async {
+    await _updateRouteStation(
+      apply: () {
+        _waypointStation = station;
+        if (station != null) {
+          _waypointSlotOpen = true;
+        }
+      },
+      selected: station,
+    );
+  }
+
+  void _openWaypointSlot() {
     setState(() {
-      _originStation = station;
-      if (station != null) {
-        _activeStationPicker = null;
-      }
+      _waypointSlotOpen = true;
       _validationMessage = '';
     });
-    _controller.reset();
+  }
+
+  Future<void> _removeWaypointSlot() async {
+    await _updateRouteStation(
+      apply: () {
+        _waypointStation = null;
+        _waypointSlotOpen = false;
+        if (_activeStationPicker == _RouteStationRole.waypoint) {
+          _activeStationPicker = null;
+        }
+      },
+      selected: null,
+    );
   }
 
   Future<void> _updateDestinationStation(StationSearchResult? station) async {
+    await _updateRouteStation(
+      apply: () => _destinationStation = station,
+      selected: station,
+    );
+  }
+
+  Future<void> _updateRouteStation({
+    required VoidCallback apply,
+    required StationSearchResult? selected,
+  }) async {
     if (!await _disableActiveGetOffAlarm()) {
       return;
     }
@@ -3552,13 +3611,17 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
       return;
     }
     setState(() {
-      _destinationStation = station;
-      if (station != null) {
+      apply();
+      if (selected != null) {
         _activeStationPicker = null;
       }
       _validationMessage = '';
+      _autoSearchedSignature = null;
     });
     _controller.reset();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeAutoSearchFromDraft();
+    });
   }
 
   void _openStationPicker(_RouteStationRole role) {
@@ -3643,6 +3706,18 @@ StationSearchResult? _stationFromDraft(RouteDraftStation? station) {
   if (station == null) {
     return null;
   }
+  final lines = station.hasLine
+      ? <StationSearchLine>[
+          StationSearchLine(
+            id: station.lineId,
+            name: station.lineName.trim().isEmpty
+                ? station.lineId
+                : station.lineName,
+            color: station.lineColor,
+            stationCode: station.stationCode,
+          ),
+        ]
+      : const <StationSearchLine>[];
   return StationSearchResult(
     id: station.id,
     nameKo: station.nameKo,
@@ -3651,11 +3726,19 @@ StationSearchResult? _stationFromDraft(RouteDraftStation? station) {
     region: '',
     dataQualityLevel: '',
     lastVerifiedAt: '',
-    lines: const [],
+    lines: lines,
   );
 }
 
-enum _RouteStationRole { origin, destination }
+/// 최근 경로 마크용. 선택 호선이 하나로 확정된 경우만 넘긴다(환승 전 호선 금지).
+List<StationSearchLine> _recentLinesForStation(StationSearchResult station) {
+  if (station.lines.length != 1) {
+    return const [];
+  }
+  return station.lines;
+}
+
+enum _RouteStationRole { origin, waypoint, destination }
 
 class _RoutePointPickerCard extends StatelessWidget {
   const _RoutePointPickerCard({
@@ -3666,71 +3749,78 @@ class _RoutePointPickerCard extends StatelessWidget {
     required this.onOriginTap,
     required this.onDestinationTap,
     required this.onSwap,
-    this.compact = false,
+    required this.showWaypointRow,
+    required this.onAddWaypoint,
+    required this.onRemoveWaypoint,
+    this.waypointStation,
+    this.waypointPicker,
+    this.onWaypointTap,
     super.key,
   });
 
   final StationSearchResult? originStation;
+  final StationSearchResult? waypointStation;
   final StationSearchResult? destinationStation;
+  final bool showWaypointRow;
   final Widget? originPicker;
+  final Widget? waypointPicker;
   final Widget? destinationPicker;
   final VoidCallback onOriginTap;
+  final VoidCallback? onWaypointTap;
   final VoidCallback onDestinationTap;
+  final VoidCallback onAddWaypoint;
+  final VoidCallback onRemoveWaypoint;
   final VoidCallback onSwap;
-
-  /// #1933 E: 결과-우선 화면에서는 이 카드를 얇은 헤더로 강등한다(역명 작게·세로
-  /// 패딩 축소). 입력 상태에서는 기존 큰 피커 크기를 그대로 둔다(false 기본).
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    // 지도 draft 필드와 같은 문법: [출발역|도착역 | 역명] 검색필드 크롬 + 우측 스왑.
+    // 지도 draft와 같은 문법: [역할 | 호선마크·역명] + 출발 옆 경유 추가/제거 + 우측 스왑.
     final originChild =
         originPicker ??
         _RoutePointRow(
           key: const Key('routeOriginPointButton'),
-          isOrigin: true,
+          role: _RouteStationRole.origin,
           station: originStation,
           fallback: '출발역 선택',
           onTap: onOriginTap,
-          compact: compact,
         );
+    final waypointTap = onWaypointTap;
+    final waypointChild = !showWaypointRow
+        ? null
+        : (waypointPicker ??
+              (waypointTap == null
+                  ? null
+                  : _RoutePointRow(
+                      key: const Key('routeWaypointPointButton'),
+                      role: _RouteStationRole.waypoint,
+                      station: waypointStation,
+                      fallback: '경유역 선택',
+                      onTap: waypointTap,
+                    )));
     final destinationChild =
         destinationPicker ??
         _RoutePointRow(
           key: const Key('routeDestinationPointButton'),
-          isOrigin: false,
+          role: _RouteStationRole.destination,
           station: destinationStation,
           fallback: '도착역 선택',
           onTap: onDestinationTap,
-          compact: compact,
         );
-    final swapButton = Semantics(
-      button: true,
-      label: '출발 도착 바꾸기',
-      onTap: onSwap,
-      child: ExcludeSemantics(
-        child: IconButton(
-          key: const Key('routeSwapStationsButton'),
-          onPressed: onSwap,
-          icon: const Icon(Icons.swap_vert, size: 22),
-          color: EasySubwayAccessibleColors.text,
-          style: IconButton.styleFrom(
-            minimumSize: const Size(
-              EasySubwayTouchTarget.general,
-              EasySubwayTouchTarget.general,
-            ),
-            backgroundColor: EasySubwayAccessibleColors.searchFieldSurface,
-            side: const BorderSide(
-              color: EasySubwayAccessibleColors.line,
-              width: easySubwaySearchFieldBorderWidth,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: easySubwaySearchFieldRadius,
-            ),
-          ),
-        ),
+    final waypointToggle = _routeChromeIconButton(
+      key: Key(
+        showWaypointRow
+            ? 'routeRemoveWaypointButton'
+            : 'routeAddWaypointButton',
       ),
+      semanticsLabel: showWaypointRow ? '경유역 제거' : '경유역 추가',
+      icon: showWaypointRow ? Icons.remove : Icons.add,
+      onPressed: showWaypointRow ? onRemoveWaypoint : onAddWaypoint,
+    );
+    final swapButton = _routeChromeIconButton(
+      key: const Key('routeSwapStationsButton'),
+      semanticsLabel: '출발 도착 바꾸기',
+      icon: Icons.swap_vert,
+      onPressed: onSwap,
     );
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -3738,9 +3828,35 @@ class _RoutePointPickerCard extends StatelessWidget {
         Expanded(
           child: Column(
             children: [
-              originChild,
+              // 출발 행만 왼쪽에 경유 추가/제거 — 필드 폭은 경유·도착과 맞춘다.
+              Row(
+                children: [
+                  waypointToggle,
+                  const SizedBox(width: EasySubwaySpacing.sm),
+                  Expanded(child: originChild),
+                ],
+              ),
+              if (waypointChild != null) ...[
+                const SizedBox(height: EasySubwaySpacing.sm),
+                Row(
+                  children: [
+                    const SizedBox(
+                      width:
+                          EasySubwayTouchTarget.general + EasySubwaySpacing.sm,
+                    ),
+                    Expanded(child: waypointChild),
+                  ],
+                ),
+              ],
               const SizedBox(height: EasySubwaySpacing.sm),
-              destinationChild,
+              Row(
+                children: [
+                  const SizedBox(
+                    width: EasySubwayTouchTarget.general + EasySubwaySpacing.sm,
+                  ),
+                  Expanded(child: destinationChild),
+                ],
+              ),
             ],
           ),
         ),
@@ -3751,39 +3867,80 @@ class _RoutePointPickerCard extends StatelessWidget {
   }
 }
 
+Widget _routeChromeIconButton({
+  required Key key,
+  required String semanticsLabel,
+  required IconData icon,
+  required VoidCallback onPressed,
+}) {
+  return Semantics(
+    button: true,
+    label: semanticsLabel,
+    onTap: onPressed,
+    child: ExcludeSemantics(
+      child: IconButton(
+        key: key,
+        onPressed: onPressed,
+        icon: Icon(icon, size: 22),
+        color: EasySubwayAccessibleColors.text,
+        style: IconButton.styleFrom(
+          minimumSize: const Size(
+            EasySubwayTouchTarget.general,
+            EasySubwayTouchTarget.general,
+          ),
+          backgroundColor: EasySubwayAccessibleColors.searchFieldSurface,
+          side: const BorderSide(
+            color: easySubwaySearchFieldBorderColor,
+            width: easySubwaySearchFieldBorderWidth,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: easySubwaySearchFieldRadius,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 class _RoutePointRow extends StatelessWidget {
   const _RoutePointRow({
-    required this.isOrigin,
+    required this.role,
     required this.station,
     required this.fallback,
     required this.onTap,
-    this.compact = false,
     super.key,
   });
 
-  final bool isOrigin;
+  final _RouteStationRole role;
   final StationSearchResult? station;
   final String fallback;
   final VoidCallback onTap;
 
-  /// #1933 E: 결과-우선 헤더에서는 역명을 조금 작게·세로 패딩을 좁힌다.
-  /// 키·시맨틱·탭 편집은 그대로 둔다.
-  final bool compact;
-
   @override
   Widget build(BuildContext context) {
-    final roleLabel = isOrigin ? '출발역' : '도착역';
-    final roleColor = isOrigin
-        ? EasySubwayFanMenuColors.departure
-        : EasySubwayFanMenuColors.arrival;
-    final stationName = station == null
+    final roleLabel = switch (role) {
+      _RouteStationRole.origin => '출발역',
+      _RouteStationRole.waypoint => '경유역',
+      _RouteStationRole.destination => '도착역',
+    };
+    final roleColor = switch (role) {
+      _RouteStationRole.origin => EasySubwayFanMenuColors.departure,
+      _RouteStationRole.waypoint => EasySubwayFanMenuColors.waypoint,
+      _RouteStationRole.destination => EasySubwayFanMenuColors.arrival,
+    };
+    final filledStation = station;
+    final lineForBadge = filledStation == null || filledStation.lines.isEmpty
+        ? null
+        : filledStation.lines.first;
+    final stationName = filledStation == null
         ? fallback
-        : _routeStationDisplayName(station!);
-    final semanticsLabel = station == null
+        : _routeStationDisplayName(filledStation);
+    final lineNameLabel = lineForBadge?.name.trim();
+    final semanticsLabel = filledStation == null
         ? stationName
-        : '$roleLabel $stationName';
-    final minHeight = compact ? 48.0 : 52.0;
-    final nameFontSize = compact ? 16.0 : 17.0;
+        : (lineNameLabel == null || lineNameLabel.isEmpty
+              ? '$roleLabel $stationName'
+              : '$roleLabel $lineNameLabel $stationName');
     return Semantics(
       button: true,
       label: semanticsLabel,
@@ -3795,68 +3952,73 @@ class _RoutePointRow extends StatelessWidget {
             onTap: onTap,
             borderRadius: easySubwaySearchFieldRadius,
             child: Ink(
+              height: easySubwaySearchFieldVisualHeight,
               decoration: BoxDecoration(
                 color: EasySubwayAccessibleColors.searchFieldSurface,
                 borderRadius: easySubwaySearchFieldRadius,
                 border: Border.all(
-                  color: EasySubwayAccessibleColors.line,
+                  color: easySubwaySearchFieldBorderColor,
                   width: easySubwaySearchFieldBorderWidth,
                 ),
               ),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: minHeight),
-                child: IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      SizedBox(
-                        width: 72,
-                        child: Center(
-                          child: Text(
-                            roleLabel,
-                            maxLines: 1,
-                            softWrap: false,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: roleColor,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              height: 1.2,
-                            ),
-                          ),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 72,
+                    child: Center(
+                      child: Text(
+                        roleLabel,
+                        maxLines: 1,
+                        softWrap: false,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: roleColor,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          height: 1.2,
                         ),
                       ),
-                      Container(
-                        width: easySubwaySearchFieldBorderWidth,
-                        color: EasySubwayAccessibleColors.line,
-                      ),
-                      Expanded(
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: compact ? 10 : 12,
-                          ),
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              stationName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: station == null
-                                    ? EasySubwayAccessibleColors.mutedText
-                                    : EasySubwayAccessibleColors.text,
-                                fontSize: nameFontSize,
-                                fontWeight: FontWeight.w700,
-                                height: 1.2,
+                    ),
+                  ),
+                  Container(
+                    width: easySubwaySearchFieldBorderWidth,
+                    height: double.infinity,
+                    color: easySubwaySearchFieldBorderColor,
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Row(
+                          children: [
+                            if (lineForBadge != null) ...[
+                              StationLineBadge(line: lineForBadge, size: 26),
+                              const SizedBox(width: 8),
+                            ],
+                            Expanded(
+                              child: Text(
+                                stationName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: filledStation == null
+                                      ? EasySubwayAccessibleColors.mutedText
+                                      : EasySubwayAccessibleColors.text,
+                                  fontSize: filledStation == null ? 15 : 17,
+                                  fontWeight: filledStation == null
+                                      ? FontWeight.w600
+                                      : FontWeight.w700,
+                                  height: 1.2,
+                                ),
                               ),
                             ),
-                          ),
+                          ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
           ),
@@ -3878,26 +4040,14 @@ class _RouteSearchEmptyRedirect extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       key: const Key('routeSearchScreen'),
-      backgroundColor: EasySubwayAccessibleColors.scaffoldSurface,
-      appBar: AppBar(
-        toolbarHeight: 60,
-        backgroundColor: EasySubwayAccessibleColors.topBarSurface,
-        foregroundColor: EasySubwayAccessibleColors.text,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        title: const Text(
-          '길찾기',
-          style: TextStyle(
-            color: EasySubwayAccessibleColors.text,
-            fontWeight: FontWeight.w700,
-            fontSize: 20,
-            height: 1.2,
-          ),
-        ),
-        flexibleSpace: const Align(
-          alignment: Alignment.bottomCenter,
-          child: EasySubwayHeaderDivider(),
-        ),
+      backgroundColor: EasySubwayAccessibleColors.surface,
+      appBar: _routeSearchAppBar(
+        onBack: () {
+          final navigator = Navigator.of(context);
+          if (navigator.canPop()) {
+            navigator.pop();
+          }
+        },
       ),
       bottomNavigationBar: shellNavigationBar,
       body: SafeArea(
@@ -3919,6 +4069,43 @@ class _RouteSearchEmptyRedirect extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 설정·도움말과 같은 AppBar 골격: 뒤로가기 + 제목 + 하단 구분선(#2436).
+PreferredSizeWidget _routeSearchAppBar({required VoidCallback onBack}) {
+  return AppBar(
+    key: const Key('routeSearchAppBar'),
+    toolbarHeight: easySubwayTopBarContentHeight,
+    backgroundColor: EasySubwayAccessibleColors.topBarSurface,
+    foregroundColor: EasySubwayAccessibleColors.text,
+    surfaceTintColor: Colors.transparent,
+    elevation: 0,
+    automaticallyImplyLeading: false,
+    leading: IconButton(
+      key: const Key('routeSearchBackButton'),
+      tooltip: '뒤로',
+      onPressed: onBack,
+      style: IconButton.styleFrom(
+        minimumSize: const Size.square(EasySubwayTouchTarget.general),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        padding: EdgeInsets.zero,
+      ),
+      icon: const Icon(Icons.arrow_back, size: 26, color: Color(0xFF4B4B4B)),
+    ),
+    title: const Text(
+      '길찾기',
+      style: TextStyle(
+        color: EasySubwayAccessibleColors.text,
+        fontWeight: FontWeight.w700,
+        fontSize: 20,
+        height: 1.2,
+      ),
+    ),
+    flexibleSpace: const Align(
+      alignment: Alignment.bottomCenter,
+      child: EasySubwayHeaderDivider(key: Key('routeSearchHeaderDivider')),
+    ),
+  );
 }
 
 class _RouteSectionHeader extends StatelessWidget {
@@ -3957,7 +4144,7 @@ bool _showsRouteDataQualityLabel(String dataQualityLevel) {
 
 class _RouteStationPicker extends StatefulWidget {
   const _RouteStationPicker({
-    required this.isOrigin,
+    required this.role,
     required this.labelText,
     required this.inputKey,
     required this.searchButtonKey,
@@ -3967,7 +4154,7 @@ class _RouteStationPicker extends StatefulWidget {
     required this.onSelected,
   });
 
-  final bool isOrigin;
+  final _RouteStationRole role;
   final String labelText;
   final Key inputKey;
   final Key searchButtonKey;
@@ -4010,99 +4197,98 @@ class _RouteStationPickerState extends State<_RouteStationPicker> {
   @override
   Widget build(BuildContext context) {
     final selectedStation = widget.selectedStation;
-    final roleColor = widget.isOrigin
-        ? EasySubwayFanMenuColors.departure
-        : EasySubwayFanMenuColors.arrival;
+    final roleColor = switch (widget.role) {
+      _RouteStationRole.origin => EasySubwayFanMenuColors.departure,
+      _RouteStationRole.waypoint => EasySubwayFanMenuColors.waypoint,
+      _RouteStationRole.destination => EasySubwayFanMenuColors.arrival,
+    };
     // 요약 행(_RoutePointRow)과 같은 검색필드 크롬 위에서 인라인 검색한다.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Container(
-          constraints: const BoxConstraints(minHeight: 52),
+          height: easySubwaySearchFieldVisualHeight,
           decoration: BoxDecoration(
             color: EasySubwayAccessibleColors.searchFieldSurface,
             borderRadius: easySubwaySearchFieldRadius,
             border: Border.all(
-              color: EasySubwayAccessibleColors.line,
+              color: easySubwaySearchFieldBorderColor,
               width: easySubwaySearchFieldBorderWidth,
             ),
           ),
           clipBehavior: Clip.antiAlias,
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(
-                  width: 72,
-                  child: Center(
-                    child: Text(
-                      widget.labelText,
-                      maxLines: 1,
-                      softWrap: false,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: roleColor,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        height: 1.2,
-                      ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 72,
+                child: Center(
+                  child: Text(
+                    widget.labelText,
+                    maxLines: 1,
+                    softWrap: false,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: roleColor,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      height: 1.2,
                     ),
                   ),
                 ),
-                Container(
-                  width: easySubwaySearchFieldBorderWidth,
-                  color: EasySubwayAccessibleColors.line,
-                ),
-                Expanded(
-                  child: Semantics(
-                    label: selectedStation == null
-                        ? '${widget.labelText} 입력'
-                        : '${widget.labelText} 선택됨, ${selectedStation.nameKo}',
-                    textField: true,
-                    liveRegion: selectedStation != null,
-                    child: TextField(
-                      key: widget.inputKey,
-                      controller: _textController,
-                      minLines: 1,
-                      textInputAction: TextInputAction.search,
-                      style: easySubwaySearchFieldInputStyle,
-                      decoration: InputDecoration(
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 12,
-                        ),
-                        hintText: '역 이름을 입력해 주세요',
-                        hintStyle: easySubwaySearchFieldHintStyle,
-                        filled: true,
-                        fillColor: Colors.transparent,
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        suffixIcon: AnimatedBuilder(
-                          animation: _controller,
-                          builder: (context, _) {
-                            final isLoading =
-                                _controller.state.status ==
-                                StationSearchStatus.loading;
-                            return IconButton(
-                              key: widget.searchButtonKey,
-                              tooltip: '${widget.labelText} 검색',
-                              onPressed: isLoading ? null : _search,
-                              icon: const Icon(
-                                Icons.search,
-                                color: EasySubwayAccessibleColors.iconMuted,
-                              ),
-                            );
-                          },
-                        ),
+              ),
+              Container(
+                width: easySubwaySearchFieldBorderWidth,
+                height: double.infinity,
+                color: easySubwaySearchFieldBorderColor,
+              ),
+              Expanded(
+                child: Semantics(
+                  label: selectedStation == null
+                      ? '${widget.labelText} 입력'
+                      : '${widget.labelText} 선택됨, ${selectedStation.nameKo}',
+                  textField: true,
+                  liveRegion: selectedStation != null,
+                  child: TextField(
+                    key: widget.inputKey,
+                    controller: _textController,
+                    maxLines: 1,
+                    textInputAction: TextInputAction.search,
+                    style: easySubwaySearchFieldInputStyle,
+                    decoration: InputDecoration(
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 10,
                       ),
-                      onSubmitted: (_) => _search(),
+                      hintText: '역 이름을 입력해 주세요',
+                      hintStyle: easySubwaySearchFieldHintStyle,
+                      filled: true,
+                      fillColor: Colors.transparent,
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      suffixIcon: AnimatedBuilder(
+                        animation: _controller,
+                        builder: (context, _) {
+                          final isLoading =
+                              _controller.state.status ==
+                              StationSearchStatus.loading;
+                          return IconButton(
+                            key: widget.searchButtonKey,
+                            tooltip: '${widget.labelText} 검색',
+                            onPressed: isLoading ? null : _search,
+                            icon: const Icon(
+                              Icons.search,
+                              color: EasySubwayAccessibleColors.iconMuted,
+                            ),
+                          );
+                        },
+                      ),
                     ),
+                    onSubmitted: (_) => _search(),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: EasySubwaySpacing.sm),
@@ -4122,9 +4308,7 @@ class _RouteStationPickerState extends State<_RouteStationPicker> {
   }
 
   void _search() {
-    if (_controller.state.status == StationSearchStatus.loading) {
-      return;
-    }
+    // 진행 중 검색은 requestId로 무효화되므로 loading이어도 막지 않는다.
     _controller.search(_textController.text);
   }
 
@@ -4182,6 +4366,8 @@ class _RouteStationSearchBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return switch (state.status) {
       StationSearchStatus.idle => const SizedBox.shrink(),
+      StationSearchStatus.loading when state.results.isNotEmpty =>
+        _buildResults(announceSearching: true),
       StationSearchStatus.loading => Semantics(
         label: '$labelText 검색 중',
         liveRegion: true,
@@ -4194,27 +4380,33 @@ class _RouteStationSearchBody extends StatelessWidget {
       ),
       StationSearchStatus.empty || StationSearchStatus.failure =>
         _RouteSearchMessage(message: state.message, liveRegion: true),
-      StationSearchStatus.success => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Semantics(
-            label: '$labelText 검색 결과 ${state.results.length}개',
-            liveRegion: true,
-            child: const SizedBox.shrink(),
-          ),
-          for (final entry in state.results.indexed) ...[
-            if (entry.$1 > 0)
-              const Divider(height: 1, color: EasySubwayAccessibleColors.line),
-            _RouteStationOptionTile(
-              key: Key('$optionKeyPrefix-${entry.$2.id}'),
-              labelText: labelText,
-              result: entry.$2,
-              onSelected: onSelected,
-            ),
-          ],
-        ],
-      ),
+      StationSearchStatus.success => _buildResults(announceSearching: false),
     };
+  }
+
+  Widget _buildResults({required bool announceSearching}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          label: announceSearching
+              ? '$labelText 검색 중'
+              : '$labelText 검색 결과 ${state.results.length}개',
+          liveRegion: true,
+          child: const SizedBox.shrink(),
+        ),
+        for (final entry in state.results.indexed) ...[
+          if (entry.$1 > 0)
+            const Divider(height: 1, color: EasySubwayAccessibleColors.line),
+          _RouteStationOptionTile(
+            key: Key('$optionKeyPrefix-${entry.$2.id}'),
+            labelText: labelText,
+            result: entry.$2,
+            onSelected: onSelected,
+          ),
+        ],
+      ],
+    );
   }
 }
 
@@ -5748,7 +5940,7 @@ class _RouteResultListButton extends StatelessWidget {
                 color: EasySubwayAccessibleColors.surface,
                 borderRadius: easySubwaySearchFieldRadius,
                 border: Border.all(
-                  color: EasySubwayAccessibleColors.line,
+                  color: easySubwaySearchFieldBorderColor,
                   width: easySubwaySearchFieldBorderWidth,
                 ),
               ),
@@ -6045,7 +6237,7 @@ class _RouteStatusChip extends StatelessWidget {
         color: EasySubwayAccessibleColors.searchFieldSurface,
         borderRadius: _routeSearchPillRadius,
         border: Border.all(
-          color: EasySubwayAccessibleColors.line,
+          color: easySubwaySearchFieldBorderColor,
           width: easySubwaySearchFieldBorderWidth,
         ),
       ),

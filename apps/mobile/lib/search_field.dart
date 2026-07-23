@@ -6,21 +6,26 @@ import 'accessible_design.dart';
 
 /// #2083 홈 노선도 편집 모드와 역 검색 화면의 입력 필드가 픽셀 단위로 동일한
 /// 시각 규격을 공유하도록 추출한 공용 검색 입력 위젯. 두 화면이 같은 시각
-/// 껍데기(46px 박스·아이콘 배치·단일 줄 TextField·지우기 버튼)를 소비해 규격이
+/// 껍데기(40px 박스·아이콘 배치·단일 줄 TextField·지우기 버튼)를 소비해 규격이
 /// 어긋나지 않게 한다. 홈 idle 검색 버튼도 아래 공유 상수를 참조해 탭 전환 시
 /// 박스가 점프하지 않는다(#1933).
 
 /// idle/active 시각 박스 radius(8).
 const easySubwaySearchFieldRadius = BorderRadius.all(Radius.circular(8));
 
-/// idle/active가 공유하는 시각 박스 높이(46). 바깥 터치타겟(56)과 분리된다.
-const easySubwaySearchFieldVisualHeight = 46.0;
+/// idle/active가 공유하는 시각 박스 높이(40). 바깥 터치타겟(56)과 분리된다.
+/// 17sp 입력 글자 대비 내부 상하 여백을 줄여 검색창이 덜 헐렁하게 보이게 한다(#2436).
+const easySubwaySearchFieldVisualHeight = 40.0;
 
 /// 시각 박스 좌우 내부 패딩(12).
 const easySubwaySearchFieldHorizontalPadding = 12.0;
 
-/// 시각 박스 테두리 두께(1.5).
-const easySubwaySearchFieldBorderWidth = 1.5;
+/// 시각 박스 테두리 두께(1.0). 선 색은 전역 [EasySubwayAccessibleColors.line]보다
+/// 진하게 두어 얇아도 윤곽이 읽히게 한다(#2436).
+const easySubwaySearchFieldBorderWidth = 1.0;
+
+/// 검색·출발/도착/경유 박스 외곽선. 상단 구분선([easySubwayHeaderDividerColor])과 동일.
+const easySubwaySearchFieldBorderColor = easySubwayHeaderDividerColor;
 
 /// 검색/지우기 아이콘 시각 크기(22).
 const easySubwaySearchFieldIconSize = 22.0;
@@ -47,12 +52,12 @@ const easySubwaySearchFieldInputStyle = TextStyle(
 );
 
 /// 홈 편집 모드와 역 검색 화면이 공유하는 편집 가능한 검색 입력 필드. 바깥
-/// 터치타겟(56)은 확보하되, 안쪽 시각 박스는 46px 고정 높이·패딩(12)·테두리·
+/// 터치타겟(56)은 확보하되, 안쪽 시각 박스는 40px 고정 높이·패딩(12)·테두리·
 /// 아이콘 배치를 공유 상수로 재사용한다. TextField 자체는 border/배경 없이 텍스트
 /// 편집만 담당하고, 시각적 테두리·배경·아이콘은 시각 껍데기 Container가 그린다.
 ///
-/// 시각(46px 박스)과 히트 영역(≥48px)은 Stack으로 분리한다: 배경 레이어가
-/// 46px 시각 껍데기를 그리고, 그 위 Positioned.fill 레이어에서 TextField가
+/// 시각(40px 박스)과 히트 영역(≥48px)은 Stack으로 분리한다: 배경 레이어가
+/// 40px 시각 껍데기를 그리고, 그 위 Positioned.fill 레이어에서 TextField가
 /// 바깥 터치타겟 높이(56)를 그대로 채우며 지우기 IconButton도 독립적인
 /// 48x48 탭 타깃을 갖는다. TextField와 지우기 버튼을 하나의 semantics로
 /// 병합하지 않아야 스크린리더 사용자가 '검색어 지우기' 액션에 별도로 접근할
@@ -90,10 +95,10 @@ class EasySubwaySearchField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final editController = controller;
-    // #2090: 시스템 글자 배율을 키우면 고정 높이(시각 박스 46·입력 필드 48/56)가
+    // #2090: 시스템 글자 배율을 키우면 고정 높이(시각 박스 40·입력 필드 48/56)가
     // 확대된 입력 줄을 세로로 잘라 WCAG 1.4.4를 위반한다. 배율에 비례해 시각 박스와
     // 터치타겟이 함께 자라도록 배율을 곱해 높이를 재도출한다. clamp(min: 1.0)로
-    // 축소는 하지 않아 기본 배율(1.0)에서는 46/48/56 픽셀이 그대로 보존된다.
+    // 축소는 하지 않아 기본 배율(1.0)에서는 40/48/56 픽셀이 그대로 보존된다.
     final scaler = MediaQuery.textScalerOf(context);
     // 바깥 터치타겟: 기본 56, 배율에 비례해 확대(입력 줄이 자라도 필드가
     // 터치타겟보다 작아지지 않게). 배율 1.0에서 정확히 56.
@@ -102,19 +107,19 @@ class EasySubwaySearchField extends StatelessWidget {
       scaler.scale(EasySubwayTouchTarget.general),
     );
     // #2082 재작업: 편집 텍스트를 홈 idle 검색 필드와 동일한 폰트 메트릭 독립
-    // 방식으로 중앙 정렬한다. idle 필드는 Container(height 46) 안 Row가 고유 높이
+    // 방식으로 중앙 정렬한다. idle 필드는 Container(height 40) 안 Row가 고유 높이
     // Text를 crossAxis 중앙에 놓아 실기기 Noto Sans KR에서도 오프셋 0으로
     // 정합한다. 편집 필드도 TextField를 고유 높이(글자 줄)로 두고 Center로 시각
     // 박스 중앙에 놓아, 절대값 비대칭 패딩(구 21/9) 없이 동일 정합을 얻는다.
     // 비대칭 패딩은 FlutterTest 테스트 폰트 기준으로 맞춰 실기기 폰트에서는
-    // 편향됐다(#2082 실기기 QA). 시각 박스 높이: 기본 46, 배율에 비례해 확대.
+    // 편향됐다(#2082 실기기 QA). 시각 박스 높이: 기본 40, 배율에 비례해 확대.
     final visualBoxHeight = math.max(
       easySubwaySearchFieldVisualHeight,
       scaler.scale(easySubwaySearchFieldVisualHeight),
     );
     final field = ConstrainedBox(
       // 터치 타겟(≥48, 실제로는 56)을 만족시키기 위해 필드 자체가 전체 높이를
-      // 차지한다. 시각적 박스(46px)는 배경 레이어 Container가 idle 필드와
+      // 차지한다. 시각적 박스(40px)는 배경 레이어 Container가 idle 필드와
       // 동일하게 그리고, 입력/버튼 히트 영역은 그 위 레이어에서 시각 박스와
       // 독립적으로 ≥48px를 확보한다. 고정 높이 대신 minHeight를 써서 배율 확대
       // 시 안쪽 입력 줄이 세로로 자라도 잘리지 않게 한다(#2090).
@@ -122,11 +127,11 @@ class EasySubwaySearchField extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // 시각 껍데기: idle 필드와 픽셀 단위로 동일(높이 46, radius 8,
-          // line 1.5, surface 배경). 히트 영역과 분리된 순수 배경이다.
+          // 시각 껍데기: idle 필드와 픽셀 단위로 동일(높이 40, radius 8,
+          // border 1.0·진한 외곽, surface 배경). 히트 영역과 분리된 순수 배경이다.
           // heroStationSearchInputBox 키는 홈/역 검색 두 화면 위젯 테스트가
           // 시각 박스 높이·중앙 정합을 검증하는 데 쓴다(두 화면은 동시에
-          // 렌더되지 않아 키 충돌 없음). 배율 1.0에서는 46 고정, 확대 시 배율에
+          // 렌더되지 않아 키 충돌 없음). 배율 1.0에서는 40 고정, 확대 시 배율에
           // 비례해 커져 확대된 입력 줄을 담는다.
           Container(
             key: const Key('heroStationSearchInputBox'),
@@ -134,7 +139,7 @@ class EasySubwaySearchField extends StatelessWidget {
             decoration: BoxDecoration(
               color: EasySubwayAccessibleColors.searchFieldSurface,
               border: Border.all(
-                color: EasySubwayAccessibleColors.line,
+                color: easySubwaySearchFieldBorderColor,
                 width: easySubwaySearchFieldBorderWidth,
               ),
               borderRadius: easySubwaySearchFieldRadius,
@@ -142,7 +147,7 @@ class EasySubwaySearchField extends StatelessWidget {
           ),
           Positioned.fill(
             child: Padding(
-              // idle의 콘텐츠 시작 위치와 동일: 테두리(1.5) + 패딩(12).
+              // idle의 콘텐츠 시작 위치와 동일: 테두리(1.0) + 패딩(12).
               padding: const EdgeInsets.symmetric(
                 horizontal:
                     easySubwaySearchFieldBorderWidth +
@@ -178,8 +183,8 @@ class EasySubwaySearchField extends StatelessWidget {
                       child: _maybeWrapSemantics(
                         // 터치타겟(56·배율확대) 안에서 단일 줄 필드를 세로 중앙에
                         // 놓는다. TextField는 고유 높이(글자 줄 높이 + isDense 최소
-                        // 여백)로 두고 Center가 그 줄을 46px 시각 박스 중앙(=터치타겟
-                        // 중앙)에 정렬한다. idle 필드가 Container(46) 안 Row로 고유
+                        // 여백)로 두고 Center가 그 줄을 40px 시각 박스 중앙(=터치타겟
+                        // 중앙)에 정렬한다. idle 필드가 Container(40) 안 Row로 고유
                         // 높이 Text를 중앙에 놓는 것과 같은 폰트 메트릭 독립 원리라,
                         // 실기기 Noto Sans KR에서 hint·캐럿·입력 글자가 시각 박스
                         // 중앙에 오프셋 0으로 정합함을 픽셀 판독으로 확인했다(정본 —
@@ -187,7 +192,7 @@ class EasySubwaySearchField extends StatelessWidget {
                         // textAlignVertical 조합은 실기기에서 입력 줄을 위/아래로
                         // 편향시켜 버렸다.
                         //
-                        // 입력 필드 자체(고유 높이)의 semantics 노드는 46 미만이지만,
+                        // 입력 필드 자체(고유 높이)의 semantics 노드는 40 미만이지만,
                         // 바깥 SizedBox(56)와 함께 MergeSemantics로 병합해 탭 타깃
                         // semantics 노드가 터치타겟 높이(≥48)를 갖게 한다(접근성 최소
                         // 탭 타깃). 지우기 버튼은 이 병합 밖 형제라 자체 탭 타깃·
@@ -241,7 +246,7 @@ class EasySubwaySearchField extends StatelessWidget {
                         }
                         // 시각 아이콘은 22px이지만 탭 타깃은 독립적으로 48x48을
                         // 확보한다(top bar IconButton 패턴과 동일). 히트 영역은
-                        // 46px 시각 박스 밖으로 넘치되 바깥 56px 터치타겟 안에
+                        // 40px 시각 박스 밖으로 넘치되 바깥 56px 터치타겟 안에
                         // 머물러 시각 박스 높이를 밀어 올리지 않는다.
                         return IconButton(
                           tooltip: '검색어 지우기',

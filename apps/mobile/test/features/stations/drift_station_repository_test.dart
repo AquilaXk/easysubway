@@ -6,19 +6,56 @@ import 'package:easysubway_mobile/features/stations/domain/station_repositories.
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('로컬 역 검색은 역명과 역 suffix, 영문명, 역 번호, 노선명 검색어를 같은 역으로 찾는다', () async {
+  test('로컬 역 검색은 역명·역 suffix·영문명만으로 찾는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
     await database.seedBaselineIfEmpty();
     final repository = DriftStationRepository(database: database);
 
-    for (final query in ['상록수', '상록수역', 'Sangnoksu', '448', '4호선 상록수']) {
+    for (final query in ['상록수', '상록수역', 'Sangnoksu']) {
       final results = await repository.searchStations(query);
 
       expect(results, hasLength(1), reason: query);
       expect(results.single.id, 'station-sangnoksu', reason: query);
       expect(results.single.nameKo, '상록수', reason: query);
       expect(results.single.lines.single.stationCode, '448', reason: query);
+    }
+  });
+
+  test('로컬 역 검색은 초성 질의로 역명 접두를 찾는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement(
+      "INSERT INTO stations "
+      "(id, name_ko, name_en, name_sub, normalized_name, region, "
+      "data_quality_level, data_source_type) "
+      "VALUES "
+      "('station-surisan', '수리산', 'Surisan', '', '수리산', "
+      "'수도권', 'LEVEL_1', 'OFFICIAL_FILE'), "
+      "('station-sanbon', '산본', 'Sanbon', '', '산본', "
+      "'수도권', 'LEVEL_1', 'OFFICIAL_FILE')",
+    );
+    final repository = DriftStationRepository(database: database);
+
+    final byS = await repository.searchStations('ㅅ');
+    expect(byS.map((s) => s.nameKo), containsAll(['수리산', '산본', '상록수']));
+
+    final bySb = await repository.searchStations('ㅅㅂ');
+    expect(bySb.map((s) => s.nameKo), contains('산본'));
+    expect(bySb.map((s) => s.nameKo), isNot(contains('수리산')));
+  });
+
+  test('로컬 역 검색은 호선명·역번호만으로는 결과를 내지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    final repository = DriftStationRepository(database: database);
+
+    for (final query in ['448', '4호선', '4호선 상록수', '수인분당선']) {
+      final results = await repository.searchStations(query);
+
+      expect(results, isEmpty, reason: query);
     }
   });
 

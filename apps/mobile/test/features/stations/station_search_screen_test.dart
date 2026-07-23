@@ -8,6 +8,7 @@ import 'package:easysubway_mobile/features/stations/domain/station_models.dart';
 import 'package:easysubway_mobile/features/stations/domain/station_repositories.dart';
 import 'package:easysubway_mobile/features/stations/presentation/station_search_screen.dart';
 import 'package:easysubway_mobile/onboarding.dart';
+import 'package:easysubway_mobile/search_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -22,7 +23,7 @@ const _completedOnboardingState = OnboardingState.completed(
 );
 
 void main() {
-  testWidgets('#2083 역 검색 화면은 홈 편집 모드와 같은 46px 시각 박스·중앙 정렬 입력 필드를 렌더한다', (
+  testWidgets('#2083 역 검색 화면은 홈 편집 모드와 같은 40px 시각 박스·중앙 정렬 입력 필드를 렌더한다', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -37,10 +38,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 홈 편집 모드와 동일한 공용 시각 박스(46px)를 렌더한다.
+    // 홈 편집 모드와 동일한 공용 시각 박스(40px)를 렌더한다.
     expect(
       tester.getSize(find.byKey(const Key('heroStationSearchInputBox'))).height,
-      46.0,
+      easySubwaySearchFieldVisualHeight,
     );
 
     // pickSlot별 힌트가 placeholder(이자 TalkBack 라벨)로 렌더된다. #2083 오너
@@ -59,7 +60,7 @@ void main() {
       greaterThanOrEqualTo(48.0),
     );
 
-    // 편집 텍스트가 46px 시각 박스 안에 렌더돼야 한다(#2082 수정을 공용 위젯이
+    // 편집 텍스트가 40px 시각 박스 안에 렌더돼야 한다(#2082 수정을 공용 위젯이
     // 소비함을 검증). #2082 실기기 재작업: 중앙 정렬은 고유 높이 필드 + Center
     // 위젯으로 얻으며 실기기(Noto Sans KR)에서 오프셋 0으로 정합함을 픽셀 판독으로
     // 확인했다(docs/2082-qa, 정본). FlutterTest 테스트 폰트·AppBar toolbar 배치
@@ -533,7 +534,8 @@ void main() {
         find.byKey(const Key('stationSearchInput')),
       );
       expect(searchInput.controller?.text, '상록수');
-      expect(repository.requestedQueries, ['상록수']);
+      // 최근 목록 호선 마크용 조회·재로드가 섞이므로 제출 기록만 본다.
+      expect(repository.requestedQueries, contains('상록수'));
       expect(searchHistoryRepository.recordedQueries, ['상록수']);
       expect(
         find.byKey(const Key('stationSearchResult-station-sangnoksu-seoul-4')),
@@ -638,7 +640,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('상록수역 → 사당역'), findsOneWidget);
+    // 경로 최근 항목은 역마다 호선 마크+이름을 나눠 그린다(한 줄 문자열 아님).
+    expect(find.text('상록수역'), findsOneWidget);
+    expect(find.text('사당역'), findsOneWidget);
+    expect(find.text('→'), findsOneWidget);
     expect(
       find.byKey(
         const Key('recentRouteSearch-station-sangnoksu--station-sadang'),
@@ -798,7 +803,11 @@ class _MemorySearchHistoryRepository implements SearchHistoryRepository {
   DateTime _tick() =>
       DateTime.fromMillisecondsSinceEpoch(++_clock, isUtc: true);
 
-  void _addStation(String query, {String? region}) {
+  void _addStation(
+    String query, {
+    String? region,
+    List<StationSearchLine> lines = const [],
+  }) {
     final normalized = region?.trim() ?? '';
     _stations.removeWhere(
       (entry) =>
@@ -810,6 +819,7 @@ class _MemorySearchHistoryRepository implements SearchHistoryRepository {
         query: query,
         region: normalized.isEmpty ? null : normalized,
         searchedAt: _tick(),
+        lines: lines,
       ),
     );
   }
@@ -860,14 +870,23 @@ class _MemorySearchHistoryRepository implements SearchHistoryRepository {
   }
 
   @override
-  Future<void> recordSearch(String query, {String? region}) async {
+  Future<void> recordSearch(
+    String query, {
+    String? region,
+    String? stationId,
+    StationSearchLine? line,
+  }) async {
     final trimmed = query.trim();
     final normalized = region?.trim() ?? '';
     if (trimmed.isEmpty || normalized.isEmpty) {
       return;
     }
     recordedQueries.add(trimmed);
-    _addStation(trimmed, region: normalized);
+    _addStation(
+      trimmed,
+      region: normalized,
+      lines: line == null || line.id.trim().isEmpty ? const [] : [line],
+    );
   }
 
   @override
