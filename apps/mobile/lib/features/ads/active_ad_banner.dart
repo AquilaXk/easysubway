@@ -81,7 +81,8 @@ class _ActiveAdBannerState extends State<ActiveAdBanner>
   }
 
   void _reload() {
-    _resetLifecycle();
+    // 재조회 중에도 기존 endsAt Timer를 유지한다. Timer를 먼저 끊으면
+    // generation bump 때문에 만료 콜백이 무시되는 빈 구간이 생긴다.
     final generation = ++_generation;
     unawaited(
       _load(
@@ -116,19 +117,25 @@ class _ActiveAdBannerState extends State<ActiveAdBanner>
         _collapseRenderedBanner();
         return;
       }
+      final replaced = _creative?.creativeId != creative.creativeId;
+      if (replaced) {
+        _impressionRecorded = false;
+      }
       setState(() {
         _creative = creative;
         _image = image;
       });
-      _scheduleExpiry(generation, creative);
+      _scheduleExpiry(creative);
       _recordImpressionAfterFrame(generation, repository, creative);
     } on Exception {
-      // 조회·decode 실패는 이미 그린 유효 배너를 유지한다.
-      // _reload가 Timer를 지웠으므로 유지 소재의 endsAt Timer를 복구한다.
+      // 조회·decode 실패는 이미 그린 유효 배너와 기존 endsAt Timer를 유지한다.
       if (!mounted || generation != _generation) {
         return;
       }
-      _restoreExpiryForKeptBanner(generation);
+      final kept = _creative;
+      if (kept != null && _isExpired(kept)) {
+        _collapseRenderedBanner();
+      }
     }
   }
 
@@ -144,32 +151,20 @@ class _ActiveAdBannerState extends State<ActiveAdBanner>
     });
   }
 
-  void _restoreExpiryForKeptBanner(int generation) {
-    final creative = _creative;
-    if (creative == null) {
-      return;
-    }
-    if (_isExpired(creative)) {
-      _collapseRenderedBanner();
-      return;
-    }
-    _scheduleExpiry(generation, creative);
-  }
-
   bool _isExpired(AdCreative creative) {
     final endsAt = creative.endsAt;
     return endsAt != null && !endsAt.isAfter(widget.now());
   }
 
-  void _scheduleExpiry(int generation, AdCreative creative) {
+  void _scheduleExpiry(AdCreative creative) {
     final endsAt = creative.endsAt;
     if (endsAt == null) {
       return;
     }
+    _expiryTimer?.cancel();
     _expiryTimer = Timer(endsAt.difference(widget.now()), () {
-      if (!mounted ||
-          generation != _generation ||
-          !identical(_creative, creative)) {
+      // generation과 무관하게, 아직 같은 creative가 그려져 있으면 만료한다.
+      if (!mounted || !identical(_creative, creative)) {
         return;
       }
       setState(() {
