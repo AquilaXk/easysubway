@@ -52,6 +52,13 @@ class SearchHistory extends Table {
   /// 검색 당시 선택 지역(예: `수도권`, `부산`). 지역별 최근 목록 필터에 쓴다.
   /// 지역 정보 없이 저장된 레거시 행은 null이며, 지역 필터 목록에서 제외한다.
   TextColumn get region => text().nullable()();
+
+  /// 결과에서 고른 역·호선. 검색어만 있는 레거시/타이핑 기록은 null.
+  TextColumn get stationId => text().named('station_id').nullable()();
+  TextColumn get lineId => text().named('line_id').nullable()();
+  TextColumn get lineName => text().named('line_name').nullable()();
+  TextColumn get lineColor => text().named('line_color').nullable()();
+  TextColumn get stationCode => text().named('station_code').nullable()();
   DateTimeColumn get searchedAt => dateTime().named('searched_at')();
 }
 
@@ -62,14 +69,37 @@ class RouteSearchHistory extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get originStationId => text().named('origin_station_id')();
   TextColumn get originStationName => text().named('origin_station_name')();
+  TextColumn get originLineId => text().named('origin_line_id').nullable()();
+  TextColumn get originLineName =>
+      text().named('origin_line_name').nullable()();
+  TextColumn get originLineColor =>
+      text().named('origin_line_color').nullable()();
+  TextColumn get originStationCode =>
+      text().named('origin_station_code').nullable()();
   TextColumn get waypointStationId =>
       text().named('waypoint_station_id').nullable()();
   TextColumn get waypointStationName =>
       text().named('waypoint_station_name').nullable()();
+  TextColumn get waypointLineId =>
+      text().named('waypoint_line_id').nullable()();
+  TextColumn get waypointLineName =>
+      text().named('waypoint_line_name').nullable()();
+  TextColumn get waypointLineColor =>
+      text().named('waypoint_line_color').nullable()();
+  TextColumn get waypointStationCode =>
+      text().named('waypoint_station_code').nullable()();
   TextColumn get destinationStationId =>
       text().named('destination_station_id')();
   TextColumn get destinationStationName =>
       text().named('destination_station_name')();
+  TextColumn get destinationLineId =>
+      text().named('destination_line_id').nullable()();
+  TextColumn get destinationLineName =>
+      text().named('destination_line_name').nullable()();
+  TextColumn get destinationLineColor =>
+      text().named('destination_line_color').nullable()();
+  TextColumn get destinationStationCode =>
+      text().named('destination_station_code').nullable()();
   TextColumn get region => text()();
   DateTimeColumn get searchedAt => dateTime().named('searched_at')();
 }

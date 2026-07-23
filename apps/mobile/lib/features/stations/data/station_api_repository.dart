@@ -24,16 +24,27 @@ class StationSearchApiRepository
   final ApiClient _apiClient;
 
   @override
-  Future<List<StationSearchResult>> searchStations(String query) async {
-    return _searchStations({'query': query});
+  Future<List<StationSearchResult>> searchStations(
+    String query, {
+    String? region,
+  }) async {
+    return _searchStations({
+      'query': query,
+      if (region != null && region.trim().isNotEmpty) 'region': region.trim(),
+    });
   }
 
   @override
   Future<List<StationSearchResult>> searchStationsOnLine(
     String query,
-    String lineId,
-  ) {
-    return _searchStations({'query': query, 'lineId': lineId});
+    String lineId, {
+    String? region,
+  }) {
+    return _searchStations({
+      'query': query,
+      'lineId': lineId,
+      if (region != null && region.trim().isNotEmpty) 'region': region.trim(),
+    });
   }
 
   Future<List<StationSearchResult>> _searchStations(

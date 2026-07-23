@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../../accessible_design.dart';
 import '../../../design_tokens.dart';
+import '../domain/station_line.dart';
 import '../domain/station_repositories.dart';
+import 'station_line_badges.dart';
 
 /// 최근 검색 모두 지우기 확인 다이얼로그. `true`면 지우기.
 Future<bool?> confirmClearRecentSearches(BuildContext context) {
@@ -105,7 +107,7 @@ class _RecentSearchHeader extends StatelessWidget {
     // 없었다. InkWell + Semantics(button)로 복원하고, baseline 대신 center로
     // 정렬한다(48px 터치 영역이 텍스트보다 커서 baseline이 어긋난다).
     return Padding(
-      padding: const EdgeInsets.only(bottom: EasySubwaySpacing.sm),
+      padding: const EdgeInsets.only(bottom: EasySubwaySpacing.xs),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -213,29 +215,33 @@ class _RecentSearchItem extends StatelessWidget {
   final ValueChanged<RecentRouteSearchEntry> onRouteSelected;
   final ValueChanged<RecentSearchEntry> onRemove;
 
+  static const _badgeSize = 26.0;
+
   @override
   Widget build(BuildContext context) {
     final entry = this.entry;
-    // 역 검색은 지하철역, 경로 검색은 경로(갈래) 아이콘으로 구분한다.
+    final titleStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
+      color: EasySubwayAccessibleColors.text,
+      fontWeight: FontWeight.w700,
+      height: 1.25,
+    );
     final (
-      label,
-      icon,
       itemKey,
       removeKey,
       removeTooltip,
       semanticsLabel,
+      leading,
+      title,
     ) = switch (entry) {
       RecentStationSearchEntry() => (
-        entry.query,
-        Icons.train_outlined,
         Key('stationRecentSearchQuery-${entry.query}'),
         Key('stationRecentSearchRemove-${entry.query}'),
         '${entry.query} 최근 검색 삭제',
         '최근 검색어 ${entry.query} 검색',
+        _stationLeading(entry.lines),
+        Text(entry.query, style: titleStyle),
       ),
       RecentRouteSearchEntry() => (
-        entry.displayLabel,
-        Icons.alt_route,
         Key(
           'recentRouteSearch-${entry.originStationId}-'
           '${entry.waypointStationId ?? ''}-${entry.destinationStationId}',
@@ -246,6 +252,8 @@ class _RecentSearchItem extends StatelessWidget {
         ),
         '${entry.displayLabel} 최근 경로 삭제',
         '최근 경로 ${entry.displayLabel} 다시 찾기',
+        null,
+        _RouteStationsLabel(entry: entry, textStyle: titleStyle),
       ),
     };
 
@@ -259,7 +267,7 @@ class _RecentSearchItem extends StatelessWidget {
     }
 
     return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 56),
+      constraints: const BoxConstraints(minHeight: 48),
       child: Row(
         children: [
           Expanded(
@@ -274,23 +282,15 @@ class _RecentSearchItem extends StatelessWidget {
                   onTap: enabled ? onTap : null,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                      vertical: EasySubwaySpacing.md,
+                      vertical: EasySubwaySpacing.xs,
                     ),
                     child: Row(
                       children: [
-                        Icon(icon, color: EasySubwayAccessibleColors.iconMuted),
-                        const SizedBox(width: EasySubwaySpacing.md),
-                        Expanded(
-                          child: Text(
-                            label,
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(
-                                  color: EasySubwayAccessibleColors.text,
-                                  fontWeight: FontWeight.w700,
-                                  height: 1.25,
-                                ),
-                          ),
-                        ),
+                        if (leading != null) ...[
+                          leading,
+                          const SizedBox(width: EasySubwaySpacing.sm),
+                        ],
+                        Expanded(child: title),
                       ],
                     ),
                   ),
@@ -308,4 +308,77 @@ class _RecentSearchItem extends StatelessWidget {
       ),
     );
   }
+
+  static Widget _stationLeading(List<StationSearchLine> lines) {
+    if (lines.isEmpty) {
+      return const Icon(
+        Icons.train_outlined,
+        color: EasySubwayAccessibleColors.iconMuted,
+      );
+    }
+    return StationLineBadges(lines: lines, size: _badgeSize, maxBadgeCount: 3);
+  }
+}
+
+class _RouteStationsLabel extends StatelessWidget {
+  const _RouteStationsLabel({required this.entry, required this.textStyle});
+
+  final RecentRouteSearchEntry entry;
+  final TextStyle? textStyle;
+
+  static const _badgeSize = 26.0;
+  static const _arrowStyle = TextStyle(
+    color: EasySubwayAccessibleColors.mutedText,
+    fontSize: 15,
+    fontWeight: FontWeight.w600,
+    height: 1.25,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final waypointName = entry.waypointStationName?.trim();
+    final hasWaypoint = waypointName != null && waypointName.isNotEmpty;
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _station(entry.originStationName, entry.originLines),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4),
+            child: Text('→', style: _arrowStyle),
+          ),
+          if (hasWaypoint) ...[
+            _station(waypointName, entry.waypointLines),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4),
+              child: Text('→', style: _arrowStyle),
+            ),
+          ],
+          _station(entry.destinationStationName, entry.destinationLines),
+        ],
+      ),
+    );
+  }
+
+  Widget _station(String name, List<StationSearchLine> lines) {
+    final label = _withStationSuffix(name);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (lines.isNotEmpty) ...[
+          StationLineBadges(lines: lines, size: _badgeSize, maxBadgeCount: 2),
+          const SizedBox(width: 6),
+        ],
+        Text(label, style: textStyle),
+      ],
+    );
+  }
+}
+
+String _withStationSuffix(String name) {
+  final trimmed = name.trim();
+  if (trimmed.isEmpty || trimmed.endsWith('역')) {
+    return trimmed;
+  }
+  return '$trimmed역';
 }

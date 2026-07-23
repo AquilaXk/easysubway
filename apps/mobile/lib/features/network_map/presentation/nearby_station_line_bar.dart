@@ -13,6 +13,7 @@ class NearbyStationLineBar extends StatelessWidget {
     required this.stationName,
     required this.badgeText,
     required this.lineColor,
+    this.onStationNameTap,
     super.key,
   });
 
@@ -22,11 +23,19 @@ class NearbyStationLineBar extends StatelessWidget {
   final String badgeText;
   final Color lineColor;
 
+  /// 현재 역 이름 탭 → 역 상세. null이면 이름만 표시한다.
+  final VoidCallback? onStationNameTap;
+
   @override
   Widget build(BuildContext context) {
+    final openDetail = onStationNameTap;
     return Semantics(
       container: true,
-      label: _semanticsLabel(),
+      label: openDetail == null
+          ? _semanticsLabel()
+          : '${_semanticsLabel()}, 상세 보기',
+      button: openDetail != null,
+      onTap: openDetail,
       child: ExcludeSemantics(child: _buildBar()),
     );
   }
@@ -113,16 +122,10 @@ class NearbyStationLineBar extends StatelessWidget {
                           const SizedBox(width: 7),
                         ],
                         Flexible(
-                          child: Text(
-                            stationName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: const Color(0xFF102A2C),
-                              fontSize: stationNameSize,
-                              fontWeight: FontWeight.w800,
-                              height: 1.1,
-                            ),
+                          child: _StationNameLabel(
+                            stationName: stationName,
+                            fontSize: stationNameSize,
+                            onTap: onStationNameTap,
                           ),
                         ),
                       ],
@@ -134,6 +137,44 @@ class NearbyStationLineBar extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _StationNameLabel extends StatelessWidget {
+  const _StationNameLabel({
+    required this.stationName,
+    required this.fontSize,
+    this.onTap,
+  });
+
+  final String stationName;
+  final double fontSize;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Text(
+      stationName,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        color: const Color(0xFF102A2C),
+        fontSize: fontSize,
+        fontWeight: FontWeight.w800,
+        height: 1.1,
+      ),
+    );
+    final tap = onTap;
+    if (tap == null) {
+      return text;
+    }
+    // TalkBack 라벨·동작은 상위 NearbyStationLineBar Semantics가 담당한다.
+    return InkWell(
+      key: const Key('nearbyStationLineBarStationName'),
+      onTap: tap,
+      borderRadius: BorderRadius.circular(8),
+      child: text,
     );
   }
 }

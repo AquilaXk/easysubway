@@ -13,6 +13,7 @@ import '../domain/station_repositories.dart';
 class DriftStationRepository
     implements
         StationSearchRepository,
+        StationSearchCache,
         StationLineFilterRepository,
         StationTimetableRepository,
         NetworkMapRepository {
@@ -20,6 +21,9 @@ class DriftStationRepository
 
   /// 지하철(`SUBWAY`) 출발에 허용되는 운행종별. 이 외 값은 경계에서 실패시킨다.
   static const _validSubwayServicePatterns = {'LOCAL', 'EXPRESS'};
+
+  /// 짧은 검색어가 전 역을 펼치면 목록·배지 빌드가 메인 스레드를 막는다.
+  static const _maxSearchResults = 40;
 
   final CatalogDatabase database;
   Future<List<_LocalStationSummary>>? _stationSummaryCache;
@@ -29,16 +33,69 @@ class DriftStationRepository
   }
 
   @override
-  Future<List<StationSearchResult>> searchStations(String query) async {
+  Future<void> warmSearchCache() async {
+    final stations = await _listStationSummaries();
+    for (final station in stations) {
+      station.primeSearchTerms();
+    }
+  }
+
+  @override
+  Future<List<StationSearchResult>> searchStations(
+    String query, {
+    String? region,
+  }) {
+    return _rankSearchStations(query, region: region);
+  }
+
+  /// [region]/[lineId]는 상한 적용 전에 거른다. 완전일치(rank 0)는 상한에
+  /// 잘리지 않게 해 동명·정확 질의 누락을 막는다.
+  Future<List<StationSearchResult>> _rankSearchStations(
+    String query, {
+    String? region,
+    String? lineId,
+  }) async {
     final trimmedQuery = query.trim();
     if (trimmedQuery.isEmpty) {
       return const [];
     }
 
+    final normalizedQuery = _normalize(trimmedQuery);
+    if (normalizedQuery.isEmpty) {
+      return const [];
+    }
+    final regionFilter = region?.trim() ?? '';
+    final lineFilter = lineId?.trim() ?? '';
+
     final stations = await _listStationSummaries();
-    return stations
-        .where((station) => station.matches(trimmedQuery))
-        .map((station) => station.toSearchResult())
+    final ranked = <({_LocalStationSummary station, int rank})>[];
+    for (final station in stations) {
+      if (regionFilter.isNotEmpty &&
+          !stationBelongsToRegion(station.region, regionFilter)) {
+        continue;
+      }
+      if (lineFilter.isNotEmpty &&
+          !station.lines.any((line) => line.id == lineFilter)) {
+        continue;
+      }
+      final rank = station.matchRank(normalizedQuery);
+      if (rank == null) {
+        continue;
+      }
+      ranked.add((station: station, rank: rank));
+    }
+    ranked.sort((a, b) {
+      final byRank = a.rank.compareTo(b.rank);
+      if (byRank != 0) {
+        return byRank;
+      }
+      return a.station.nameKo.compareTo(b.station.nameKo);
+    });
+    final exactCount = ranked.where((entry) => entry.rank == 0).length;
+    final limit = math.max(_maxSearchResults, exactCount);
+    return ranked
+        .take(limit)
+        .map((entry) => entry.station.toSearchResult())
         .toList(growable: false);
   }
 
@@ -142,14 +199,10 @@ class DriftStationRepository
   @override
   Future<List<StationSearchResult>> searchStationsOnLine(
     String query,
-    String lineId,
-  ) async {
-    final trimmedLineId = lineId.trim();
-    return (await searchStations(query))
-        .where(
-          (station) => station.lines.any((line) => line.id == trimmedLineId),
-        )
-        .toList(growable: false);
+    String lineId, {
+    String? region,
+  }) {
+    return _rankSearchStations(query, region: region, lineId: lineId);
   }
 
   @override
@@ -756,27 +809,81 @@ class _LocalStationSummary {
   final List<String> aliases;
   final List<StationSearchLine> lines;
 
+  List<String>? _normalizedTermsCache;
+  List<String>? _chosungTermsCache;
+
+  /// 검색은 역 이름만 본다(한글명·영문명·부역명).
+  /// aliases에 섞인 역번호·호선 합성어("448", "4호선 상록수")는 쓰지 않는다.
+  List<String> get _normalizedTerms {
+    return _normalizedTermsCache ??= [
+      nameKo,
+      '$nameKo역',
+      nameEn,
+      if (nameSub.isNotEmpty) nameSub,
+    ].map(_normalize).where((term) => term.isNotEmpty).toList(growable: false);
+  }
+
+  /// 정규화 term의 초성 키. 키입력마다 `_chosungKey`를 다시 돌리지 않는다.
+  List<String> get _chosungTerms {
+    return _chosungTermsCache ??= _normalizedTerms
+        .map(_chosungKey)
+        .where((key) => key.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  void primeSearchTerms() {
+    _normalizedTerms;
+    _chosungTerms;
+  }
+
   bool matches(String query) {
     final normalizedQuery = _normalize(query);
     if (normalizedQuery.isEmpty) {
       return false;
     }
+    return matchRank(normalizedQuery) != null;
+  }
 
-    final terms = <String>{
-      nameKo,
-      '$nameKo역',
-      nameEn,
-      if (nameSub.isNotEmpty) nameSub,
-      ...aliases,
-      ...lines.map((line) => line.stationCode),
-      ...lines.map((line) => '${_lineSearchName(line.name)}$nameKo'),
-    };
-
-    return terms
-        .map(_normalize)
-        .any(
-          (term) => term == normalizedQuery || term.contains(normalizedQuery),
-        );
+  /// 낮을수록 우선. 0=완전일치, 1=접두, 2=포함. 미매칭은 null.
+  /// 초성 질의(`ㅅ`, `ㅅㅂ`)는 역명 초성 접두/완전일치로 매칭한다.
+  int? matchRank(String normalizedQuery) {
+    var best = 3;
+    var matched = false;
+    for (final term in _normalizedTerms) {
+      if (term == normalizedQuery) {
+        return 0;
+      }
+      if (term.startsWith(normalizedQuery)) {
+        matched = true;
+        if (best > 1) {
+          best = 1;
+        }
+      } else if (term.contains(normalizedQuery)) {
+        matched = true;
+        if (best > 2) {
+          best = 2;
+        }
+      }
+    }
+    if (matched) {
+      return best;
+    }
+    final queryChosung = _chosungKey(normalizedQuery);
+    if (queryChosung.isEmpty || !_isHangulJamoOnly(normalizedQuery)) {
+      return null;
+    }
+    for (final termChosung in _chosungTerms) {
+      if (termChosung == queryChosung) {
+        return 0;
+      }
+      if (termChosung.startsWith(queryChosung)) {
+        matched = true;
+        if (best > 1) {
+          best = 1;
+        }
+      }
+    }
+    return matched ? best : null;
   }
 
   StationSearchResult toSearchResult({int? distanceMeters}) {
@@ -795,8 +902,68 @@ class _LocalStationSummary {
   }
 }
 
+final _whitespacePattern = RegExp(r'\s+');
+
+/// 음절 초성 인덱스(0–18) → 호환 자모.
+const _hangulChoseongCompat = <String>[
+  'ㄱ',
+  'ㄲ',
+  'ㄴ',
+  'ㄷ',
+  'ㄸ',
+  'ㄹ',
+  'ㅁ',
+  'ㅂ',
+  'ㅃ',
+  'ㅅ',
+  'ㅆ',
+  'ㅇ',
+  'ㅈ',
+  'ㅉ',
+  'ㅊ',
+  'ㅋ',
+  'ㅌ',
+  'ㅍ',
+  'ㅎ',
+];
+
 String _normalize(String value) {
-  return value.toLowerCase().replaceAll(RegExp(r'\s+'), '').trim();
+  return value.toLowerCase().replaceAll(_whitespacePattern, '').trim();
+}
+
+bool _isHangulJamoRune(int rune) {
+  return (rune >= 0x3131 && rune <= 0x318E) ||
+      (rune >= 0x1100 && rune <= 0x11FF) ||
+      (rune >= 0xA960 && rune <= 0xA97F) ||
+      (rune >= 0xD7B0 && rune <= 0xD7FF);
+}
+
+bool _isHangulJamoOnly(String value) {
+  if (value.isEmpty) {
+    return false;
+  }
+  return value.runes.every(_isHangulJamoRune);
+}
+
+/// 음절·자모를 호환 초성 문자열로 펼친다. 영문 등은 건너뛴다.
+String _chosungKey(String value) {
+  final buffer = StringBuffer();
+  for (final rune in value.runes) {
+    if (rune >= 0xAC00 && rune <= 0xD7A3) {
+      buffer.write(_hangulChoseongCompat[(rune - 0xAC00) ~/ 588]);
+      continue;
+    }
+    // 호환 자모 초성만 유지(중·종성은 초성 질의에 쓰지 않음).
+    if (rune >= 0x3131 && rune <= 0x314E) {
+      buffer.write(String.fromCharCode(rune));
+      continue;
+    }
+    // 현대 초성 jamo (U+1100–U+1112)
+    if (rune >= 0x1100 && rune <= 0x1112) {
+      buffer.write(_hangulChoseongCompat[rune - 0x1100]);
+    }
+  }
+  return buffer.toString();
 }
 
 String _lineSearchName(String lineName) {

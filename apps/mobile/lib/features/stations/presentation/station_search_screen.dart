@@ -18,12 +18,13 @@ import '../application/station_search_controller.dart';
 import '../domain/station_line.dart';
 import '../domain/station_models.dart';
 import '../domain/station_repositories.dart';
+import 'station_detail_screen.dart';
 import 'station_recent_search_section.dart';
 import 'station_search_body.dart';
 
 const _searchHistoryChangeErrorMessage = '최근 검색을 지우지 못했어요.';
-const _stationSearchPagePadding = EdgeInsets.fromLTRB(20, 20, 20, 32);
-const _stationSearchLargePagePadding = EdgeInsets.fromLTRB(24, 24, 24, 40);
+const _stationSearchPagePadding = EdgeInsets.fromLTRB(20, 8, 20, 20);
+const _stationSearchLargePagePadding = EdgeInsets.fromLTRB(24, 12, 24, 24);
 
 /// 홈 노선도 지역 메뉴와 같은 기본 목록. 호출부가 regions를 안 넘기면 쓴다.
 /// 호출부(홈)가 맵에만 있는 지역을 이 기본 목록에 병합할 때도 재사용한다
@@ -94,9 +95,16 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
   final TextEditingController _queryController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   List<RecentSearchEntry> _recentEntries = const [];
+  bool _recentEntriesReady = false;
   Set<String> _favoriteKeys = const <String>{};
   Timer? _searchDebounce;
   late String _regionLabel;
+
+  /// 최근 검색 ↔ 결과 레이아웃(패딩) 전환 추적. 글자마다 Scaffold setState 방지.
+  bool _layoutHasSearchQuery = false;
+
+  /// 하이라이트용. 검색 완료 시점의 질의만 반영해 타이핑 재빌드를 막는다.
+  String _highlightQuery = '';
 
   @override
   void initState() {
@@ -110,6 +118,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     _queryController.addListener(_handleQueryChanged);
     unawaited(_loadRecentEntries());
     unawaited(_loadFavoriteStationIds());
+    unawaited(warmStationSearchCacheIfSupported(widget.repository));
     // 검색 진입은 화면을 여는 즉시 입력 모드로 들어간다. autofocus가 담당한다.
   }
 
@@ -150,18 +159,30 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     }
     _searchDebounce?.cancel();
     if (!_hasSearchQuery) {
+      _highlightQuery = '';
       if (_controller.state.status != StationSearchStatus.idle) {
         _controller.search('');
       }
     } else {
-      // 타이핑 즉시(디바운스) 검색으로 통일한다. 부분 입력은 최근 검색에 기록하지 않는다.
+      // 부분 입력·초성(ㅅ)도 검색한다. 첫 글자는 즉시, 이후는 짧게 디바운스.
       final query = _queryController.text;
-      _searchDebounce = Timer(
-        const Duration(milliseconds: 300),
-        () => unawaited(_runSearch(query, recordHistory: false)),
-      );
+      if (!_layoutHasSearchQuery) {
+        unawaited(_runSearch(query, recordHistory: false));
+      } else {
+        _searchDebounce = Timer(
+          const Duration(milliseconds: 180),
+          () => unawaited(_runSearch(query, recordHistory: false)),
+        );
+      }
     }
-    setState(() {});
+    // 최근 검색 ↔ 결과 패딩 전환일 때만 전체 Scaffold를 다시 그린다.
+    // 글자마다 setState하면 상단바까지 매 키입력마다 재빌드된다.
+    final hasQuery = _hasSearchQuery;
+    if (_layoutHasSearchQuery != hasQuery) {
+      setState(() {
+        _layoutHasSearchQuery = hasQuery;
+      });
+    }
   }
 
   bool get _hasSearchQuery => _queryController.text.trim().isNotEmpty;
@@ -182,7 +203,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     // #2083 홈 편집 모드와 동일한 공용 검색 필드를 쓴다. pickSlot별 힌트는
     // hintText로 전달돼 placeholder이자 TalkBack 라벨 역할을 유지하고, 즉시
     // (디바운스) 검색은 _queryController를, 지우기는 onClear를 통해 보존된다.
-    // AppBar leading(자동 뒤로가기)은 title 왼쪽에 그대로 남아 "← + 46px 필드"
+    // AppBar leading(자동 뒤로가기)은 title 왼쪽에 그대로 남아 "← + 40px 필드"
     // 구성이 홈 편집 모드와 일치한다.
     final searchInputField = EasySubwaySearchField(
       controller: _queryController,
@@ -212,19 +233,16 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       builder: (context, _) {
         final isSearching =
             _controller.state.status == StationSearchStatus.loading;
-        if (_hasSearchQuery) {
+        if (_hasSearchQuery || !_recentEntriesReady) {
           return const SizedBox.shrink();
         }
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: StationRecentSearchSection(
-            entries: _recentEntries,
-            enabled: !isSearching,
-            onStationSelected: _searchRecentEntry,
-            onRouteSelected: _selectRecentRoute,
-            onRemove: (entry) => unawaited(_removeRecentEntry(entry)),
-            onClearAll: () => unawaited(_clearAllRecentEntries()),
-          ),
+        return StationRecentSearchSection(
+          entries: _recentEntries,
+          enabled: !isSearching,
+          onStationSelected: _searchRecentEntry,
+          onRouteSelected: _selectRecentRoute,
+          onRemove: (entry) => unawaited(_removeRecentEntry(entry)),
+          onClearAll: () => unawaited(_clearAllRecentEntries()),
         );
       },
     );
@@ -234,12 +252,12 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       builder: (context, _) {
         return StationSearchBody(
           state: _controller.state,
-          query: _queryController.text,
+          query: _highlightQuery,
           favoriteKeys: _favoriteKeys,
           // 칸 채우기 모드에서는 결과 한 번 탭 = 해당 칸 설정 후 닫기. 지도 탭과 동일
           // 하게 "출발역 선택 → 도착역 선택" UX로 수렴시킨다. 둘러보기 모드에서는
           // 선택한 역을 지도로 반환한다.
-          onResultTap: isPicking ? _pickStation : _returnStationToMap,
+          onResultTap: isPicking ? _pickStation : _openStationDetail,
           onToggleFavorite: widget.favoriteRepository == null
               ? null
               : _toggleFavoriteStation,
@@ -434,14 +452,13 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
 
   void _submit(String query) {
     // 키보드 검색 액션 등 명시적 검색: 디바운스를 취소하고 최근 검색에 기록한다.
+    // 진행 중 검색은 requestId로 무효화되므로 loading이어도 제출을 막지 않는다.
     _searchDebounce?.cancel();
-    if (_controller.state.status == StationSearchStatus.loading) {
-      return;
-    }
     unawaited(_runSearch(query));
   }
 
   Future<void> _runSearch(String query, {bool recordHistory = true}) async {
+    _highlightQuery = query.trim();
     await _controller.search(
       query,
       region: _regionLabel,
@@ -512,15 +529,17 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     }
     controller.clear();
     controller.setOrigin(
-      RouteDraftStation(
+      _routeDraftStationFromRecent(
         id: entry.originStationId,
         nameKo: entry.originStationName,
+        lines: entry.originLines,
       ),
     );
     controller.setDestination(
-      RouteDraftStation(
+      _routeDraftStationFromRecent(
         id: entry.destinationStationId,
         nameKo: entry.destinationStationName,
+        lines: entry.destinationLines,
       ),
     );
     final waypointId = entry.waypointStationId;
@@ -530,7 +549,11 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
         waypointName != null &&
         waypointName.isNotEmpty) {
       controller.setWaypoint(
-        RouteDraftStation(id: waypointId, nameKo: waypointName),
+        _routeDraftStationFromRecent(
+          id: waypointId,
+          nameKo: waypointName,
+          lines: entry.waypointLines,
+        ),
       );
     }
     Navigator.of(context).maybePop();
@@ -599,6 +622,11 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
   Future<void> _loadRecentEntries() async {
     final repository = widget.searchHistoryRepository;
     if (repository == null) {
+      if (mounted) {
+        setState(() => _recentEntriesReady = true);
+      } else {
+        _recentEntriesReady = true;
+      }
       return;
     }
     try {
@@ -606,9 +634,39 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       if (!mounted) {
         return;
       }
-      setState(() => _recentEntries = entries);
+      setState(() {
+        _recentEntries = entries;
+        _recentEntriesReady = true;
+      });
     } catch (error, stackTrace) {
       reportMobileError(error, stackTrace, context: '최근 검색 조회 중 예외가 발생했습니다.');
+      if (mounted) {
+        setState(() => _recentEntriesReady = true);
+      }
+    }
+  }
+
+  Future<void> _recordSelectedStation(
+    StationSearchResult result,
+    StationSearchLine? line,
+  ) async {
+    final repository = widget.searchHistoryRepository;
+    if (repository == null) {
+      return;
+    }
+    final selected = line ?? result.lines.firstOrNull;
+    // 명시 검색과 같은 query 키를 써야 최근 목록이 중복되지 않는다.
+    final typedQuery = _queryController.text.trim();
+    final historyQuery = typedQuery.isNotEmpty ? typedQuery : result.nameKo;
+    try {
+      await repository.recordSearch(
+        historyQuery,
+        region: _regionLabel,
+        stationId: result.id,
+        line: selected,
+      );
+    } catch (error, stackTrace) {
+      reportMobileError(error, stackTrace, context: '최근 검색 저장 중 예외가 발생했습니다.');
     }
   }
 
@@ -621,6 +679,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     if (slot == null) {
       return;
     }
+    unawaited(_recordSelectedStation(result, line));
     final station = _routeDraftStationFromSearch(result, line);
     switch (slot) {
       case RouteDraftSlot.origin:
@@ -633,12 +692,27 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     Navigator.of(context).pop(station);
   }
 
-  /// #2109 둘러보기(비픽) 모드: 결과를 탭하면 상세를 밀지 않고 선택한 역 결과를
-  /// 반환하며 화면을 닫는다. 호출부(main.dart openStationSearch)가 이 결과를
-  /// 받아 노선도 focus + 팬 메뉴 + 해당 역 하단 패널을 트리거한다(임베디드
-  /// 검색과 동일한 흐름으로 수렴).
-  void _returnStationToMap(StationSearchResult result, StationSearchLine? _) {
-    Navigator.of(context).pop(result);
+  /// 메뉴·풀페이지 둘러보기: 결과 탭 → 상세를 검색 위에 push.
+  /// 뒤로가면 검색 목록(검색어)이 그대로 남는다. 홈 in-place 검색의 부채 흐름과
+  /// 분리한다.
+  void _openStationDetail(StationSearchResult result, StationSearchLine? line) {
+    unawaited(_recordSelectedStation(result, line));
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => StationDetailScreen(
+          repository: widget.repository,
+          reportRepository: widget.reportRepository,
+          favoriteRepository: widget.favoriteRepository,
+          adRepository: widget.adRepository,
+          realtimeRepository: widget.realtimeRepository,
+          stationId: result.id,
+          facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
+          internalRouteRepository: widget.internalRouteRepository,
+          internalRouteMobilityType: widget.internalRouteMobilityType,
+          routeDraftController: widget.routeDraftController,
+        ),
+      ),
+    );
   }
 }
 
@@ -650,6 +724,22 @@ RouteDraftStation _routeDraftStationFromSearch(
   return RouteDraftStation(
     id: result.id,
     nameKo: result.nameKo,
+    lineId: resolved?.id ?? '',
+    lineName: resolved?.name ?? '',
+    lineColor: resolved?.color ?? '',
+    stationCode: resolved?.stationCode ?? '',
+  );
+}
+
+RouteDraftStation _routeDraftStationFromRecent({
+  required String id,
+  required String nameKo,
+  required List<StationSearchLine> lines,
+}) {
+  final resolved = lines.firstOrNull;
+  return RouteDraftStation(
+    id: id,
+    nameKo: nameKo,
     lineId: resolved?.id ?? '',
     lineName: resolved?.name ?? '',
     lineColor: resolved?.color ?? '',

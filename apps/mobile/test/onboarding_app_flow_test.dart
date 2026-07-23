@@ -275,7 +275,10 @@ class _DefaultCurrentLocationProvider implements CurrentLocationProvider {
 
 class FakeStationSearchRepository implements StationSearchRepository {
   @override
-  Future<List<StationSearchResult>> searchStations(String query) async {
+  Future<List<StationSearchResult>> searchStations(
+    String query, {
+    String? region,
+  }) async {
     return const [];
   }
 

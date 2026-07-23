@@ -51,12 +51,15 @@ class StationLineBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final assetPath = line.badgeAssetPath;
     if (assetPath != null) {
+      final cachePx = (size * MediaQuery.devicePixelRatioOf(context)).round();
       final image = Image.asset(
         assetPath,
         width: size,
         height: size,
         fit: BoxFit.contain,
-        filterQuality: FilterQuality.high,
+        filterQuality: FilterQuality.medium,
+        cacheWidth: cachePx,
+        cacheHeight: cachePx,
       );
       return SizedBox(
         key: Key('stationLineBadge-${line.id}'),

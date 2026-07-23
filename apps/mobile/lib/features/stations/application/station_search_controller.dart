@@ -43,7 +43,32 @@ class StationSearchController extends ChangeNotifier {
   int _searchRequestId = 0;
   bool _isDisposed = false;
 
+  /// 직전 검색에 쓴 지역. 지역만 바뀌면 이전 결과 유지(keepPrevious)를 끈다.
+  String _lastSearchRegion = '';
+
   StationSearchState get state => _state;
+
+  /// 한글 조합 중·검색 대기 UI. 성공 결과가 있으면 유지하고, empty/idle이면
+  /// loading으로 바꿔 "검색 결과가 없습니다" 깜빡임을 막는다.
+  void showPendingSearch() {
+    if (_isDisposed) {
+      return;
+    }
+    if (_state.source == StationSearchResultSource.search &&
+        _state.results.isNotEmpty &&
+        (_state.status == StationSearchStatus.success ||
+            _state.status == StationSearchStatus.loading)) {
+      return;
+    }
+    if (_state.status == StationSearchStatus.loading) {
+      return;
+    }
+    _state = const StationSearchState(
+      status: StationSearchStatus.loading,
+      results: [],
+    );
+    notifyListeners();
+  }
 
   Future<void> search(
     String query, {
@@ -60,11 +85,25 @@ class StationSearchController extends ChangeNotifier {
       return;
     }
 
-    _state = const StationSearchState(
-      status: StationSearchStatus.loading,
-      results: [],
-    );
-    _notifyIfActive(requestId);
+    // 타이핑 재검색: 이전 검색 결과를 비우지 않는다. 스피너로 갈아끼우면
+    // 글자마다 목록이 깜빡인다. 첫 검색(결과 없음)만 loading을 노출한다.
+    // empty 상태에서 다음 글자를 칠 때도 empty를 유지하지 않고 loading으로 간다.
+    // 지역이 바뀌면 이전 지역 역이 탭되지 않게 목록을 비운다.
+    final normalizedRegion = region?.trim() ?? '';
+    final keepPreviousResults =
+        _state.source == StationSearchResultSource.search &&
+        _state.results.isNotEmpty &&
+        (_state.status == StationSearchStatus.success ||
+            _state.status == StationSearchStatus.loading) &&
+        _lastSearchRegion == normalizedRegion;
+    _lastSearchRegion = normalizedRegion;
+    if (!keepPreviousResults) {
+      _state = const StationSearchState(
+        status: StationSearchStatus.loading,
+        results: [],
+      );
+      _notifyIfActive(requestId);
+    }
 
     try {
       final selectedLineId = lineId?.trim();
@@ -73,12 +112,16 @@ class StationSearchController extends ChangeNotifier {
               selectedLineId.isNotEmpty &&
               repository is StationLineFilterRepository
           ? await (repository as StationLineFilterRepository)
-                .searchStationsOnLine(trimmedQuery, selectedLineId)
-          : await repository.searchStations(trimmedQuery);
+                .searchStationsOnLine(
+                  trimmedQuery,
+                  selectedLineId,
+                  region: region,
+                )
+          : await repository.searchStations(trimmedQuery, region: region);
       if (!_isActiveRequest(requestId)) {
         return;
       }
-      // 지역이 주어지면 해당 지역 역만 남긴다(홈 노선도·풀페이지 검색 공통).
+      // 저장소가 region을 무시하는 구현(구 API 등)을 대비해 한 번 더 거른다.
       final filtered = _filterByRegion(results, region);
       // 디바운스 타이핑은 기록하지 않는다. 명시적 검색은 현재 지역에 실제
       // 결과가 있을 때만 기록해 타 지역 역이 잘못된 지역 이력으로 남지 않게 한다.

@@ -41,6 +41,9 @@ class StationSearchBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return switch (state.status) {
       StationSearchStatus.idle => const SizedBox.shrink(),
+      // 재검색 중에도 이전 결과가 있으면 목록을 유지한다(스피너 깜빡임 방지).
+      StationSearchStatus.loading when state.results.isNotEmpty =>
+        _buildResults(announceCount: false),
       StationSearchStatus.loading => Semantics(
         label: '역 검색 중',
         liveRegion: true,
@@ -60,43 +63,54 @@ class StationSearchBody extends StatelessWidget {
         message: state.message,
         liveRegion: true,
       ),
-      StationSearchStatus.success => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+      StationSearchStatus.success => _buildResults(announceCount: true),
+    };
+  }
+
+  Widget _buildResults({required bool announceCount}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (announceCount)
           Semantics(
             container: true,
             label: '검색 결과 ${state.results.length}개',
             liveRegion: true,
             child: const SizedBox(width: 1, height: 1),
           ),
-          for (final row in _sortedResultRows(state.results, favoriteKeys))
-            _StationSearchResultLineRow(
-              key: Key(
-                'stationSearchResult-${row.result.id}-${row.line?.id ?? 'none'}',
-              ),
-              stationName: _stationResultDisplayName(row.result.nameKo),
-              query: query,
-              line: row.line,
-              showFavorite: onToggleFavorite != null,
-              isFavorite: isFavoriteStationLine(
-                favoriteKeys,
-                row.result.id,
-                row.line?.id,
-              ),
-              semanticLabel: row.line == null
-                  ? '${_stationResultDisplayName(row.result.nameKo)}, 선택'
-                  : '${_stationResultDisplayName(row.result.nameKo)}, ${row.line!.name}, 선택',
-              onTap: () => onResultTap(row.result, row.line),
-              onToggleFavorite: onToggleFavorite == null
-                  ? null
-                  : () => onToggleFavorite!(row.result, row.line),
-              favoriteButtonKey: Key(
-                'stationSearchFavorite-${row.result.id}-${row.line?.id ?? 'none'}',
-              ),
+        if (!announceCount)
+          Semantics(
+            label: '역 검색 중',
+            liveRegion: true,
+            child: const SizedBox(width: 1, height: 1),
+          ),
+        for (final row in _sortedResultRows(state.results, favoriteKeys))
+          _StationSearchResultLineRow(
+            key: Key(
+              'stationSearchResult-${row.result.id}-${row.line?.id ?? 'none'}',
             ),
-        ],
-      ),
-    };
+            stationName: _stationResultDisplayName(row.result.nameKo),
+            query: query,
+            line: row.line,
+            showFavorite: onToggleFavorite != null,
+            isFavorite: isFavoriteStationLine(
+              favoriteKeys,
+              row.result.id,
+              row.line?.id,
+            ),
+            semanticLabel: row.line == null
+                ? '${_stationResultDisplayName(row.result.nameKo)}, 선택'
+                : '${_stationResultDisplayName(row.result.nameKo)}, ${row.line!.name}, 선택',
+            onTap: () => onResultTap(row.result, row.line),
+            onToggleFavorite: onToggleFavorite == null
+                ? null
+                : () => onToggleFavorite!(row.result, row.line),
+            favoriteButtonKey: Key(
+              'stationSearchFavorite-${row.result.id}-${row.line?.id ?? 'none'}',
+            ),
+          ),
+      ],
+    );
   }
 }
 

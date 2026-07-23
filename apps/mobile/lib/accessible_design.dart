@@ -176,9 +176,8 @@ class EasySubwayTouchTarget {
 /// 계약을 공유한다. 이 상수를 바꾸면 양쪽을 함께 갱신한다.
 const easySubwayTopBarContentHeight = 60.0;
 
-/// 네비/상단바 하단 구분선 색. 카카오 지하철 상단 카드 하단 엣지 실측
-/// 뉴트럴 그레이(#D5D5D5). 예전 청회색(#CBD6DD)은 선이 탁하고 두껍게 보였다.
-const easySubwayHeaderDividerColor = Color(0xFFD5D5D5);
+/// 네비/상단바 하단 구분선 색. 검색 박스 외곽선과 동일 톤(#C5CDD4).
+const easySubwayHeaderDividerColor = Color(0xFFC5CDD4);
 
 /// 상단바·시트와 본문을 나누는 1px 구분선.
 ///
