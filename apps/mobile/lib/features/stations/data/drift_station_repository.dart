@@ -30,10 +30,12 @@ class DriftStationRepository
   final CatalogDatabase database;
   Future<List<_LocalStationSummary>>? _stationSummaryCache;
   Future<StationSearchIndex>? _searchIndexFuture;
+  Map<String, _LocalStationSummary>? _stationByIdCache;
 
   void invalidateStationSummaryCache() {
     _stationSummaryCache = null;
     _searchIndexFuture = null;
+    _stationByIdCache = null;
   }
 
   @override
@@ -74,7 +76,9 @@ class DriftStationRepository
 
       final stations = await _listStationSummaries();
       final index = await _ensureSearchIndex(stations);
-      final byId = {for (final station in stations) station.id: station};
+      final byId = _stationByIdCache ??= {
+        for (final station in stations) station.id: station,
+      };
 
       final candidateIds = <String>{};
       if (_isHangulJamoOnly(normalizedQuery)) {

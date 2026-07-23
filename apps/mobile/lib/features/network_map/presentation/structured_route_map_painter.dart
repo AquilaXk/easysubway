@@ -565,6 +565,11 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
   bool? _drawLines;
   bool? _drawStationSymbols;
   Map<String, List<RouteMapOwnerLabelEntry>>? _ownerLabelsByStationName;
+  Map<String, Color>? _lineColors;
+  Map<String, String>? _labelTextByStationId;
+  Map<String, String>? _lineBadgeLabelByLineId;
+  Map<String, String>? _stationNameByStationId;
+  double? _ownerLabelMaxAnchorDistancePx;
   RouteMapDesignSpace? _design;
   ui.Picture? _picture;
   // attribution TextPainter는 region(텍스트) 변경 시에만 재생성한다. 매 pan 프레임의
@@ -572,6 +577,36 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
   TextPainter? _attributionPainter;
   String? _attributionPainterText;
   int _pictureBuildGeneration = 0;
+
+  bool _pictureInputsDiffer(
+    StructuredRouteMapView a,
+    StructuredRouteMapView b,
+  ) {
+    return !identical(a.map, b.map) ||
+        a.drawLines != b.drawLines ||
+        a.drawStationSymbols != b.drawStationSymbols ||
+        !identical(a.ownerLabelsByStationName, b.ownerLabelsByStationName) ||
+        !identical(a.lineColors, b.lineColors) ||
+        !identical(a.labelTextByStationId, b.labelTextByStationId) ||
+        !identical(a.lineBadgeLabelByLineId, b.lineBadgeLabelByLineId) ||
+        !identical(a.stationNameByStationId, b.stationNameByStationId) ||
+        a.ownerLabelMaxAnchorDistancePx != b.ownerLabelMaxAnchorDistancePx;
+  }
+
+  bool _cachedPictureInputsMatch(StructuredRouteMapView current) {
+    return identical(_sourceMap, current.map) &&
+        _drawLines == current.drawLines &&
+        _drawStationSymbols == current.drawStationSymbols &&
+        identical(
+          _ownerLabelsByStationName,
+          current.ownerLabelsByStationName,
+        ) &&
+        identical(_lineColors, current.lineColors) &&
+        identical(_labelTextByStationId, current.labelTextByStationId) &&
+        identical(_lineBadgeLabelByLineId, current.lineBadgeLabelByLineId) &&
+        identical(_stationNameByStationId, current.stationNameByStationId) &&
+        _ownerLabelMaxAnchorDistancePx == current.ownerLabelMaxAnchorDistancePx;
+  }
 
   @override
   void initState() {
@@ -584,15 +619,7 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
   @override
   void didUpdateWidget(StructuredRouteMapView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final mapChanged = !identical(oldWidget.map, widget.map);
-    final flagsChanged =
-        oldWidget.drawLines != widget.drawLines ||
-        oldWidget.drawStationSymbols != widget.drawStationSymbols ||
-        !identical(
-          oldWidget.ownerLabelsByStationName,
-          widget.ownerLabelsByStationName,
-        );
-    if (mapChanged || flagsChanged) {
+    if (_pictureInputsDiffer(oldWidget, widget)) {
       _picture?.dispose();
       _picture = null;
       _sourceMap = null;
@@ -658,11 +685,7 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
   }
 
   void _ensurePicture() {
-    if (identical(_sourceMap, widget.map) &&
-        _drawLines == widget.drawLines &&
-        _drawStationSymbols == widget.drawStationSymbols &&
-        identical(_ownerLabelsByStationName, widget.ownerLabelsByStationName) &&
-        _picture != null) {
+    if (_cachedPictureInputsMatch(widget) && _picture != null) {
       return;
     }
     _picture?.dispose();
@@ -670,6 +693,11 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
     _drawLines = widget.drawLines;
     _drawStationSymbols = widget.drawStationSymbols;
     _ownerLabelsByStationName = widget.ownerLabelsByStationName;
+    _lineColors = widget.lineColors;
+    _labelTextByStationId = widget.labelTextByStationId;
+    _lineBadgeLabelByLineId = widget.lineBadgeLabelByLineId;
+    _stationNameByStationId = widget.stationNameByStationId;
+    _ownerLabelMaxAnchorDistancePx = widget.ownerLabelMaxAnchorDistancePx;
     final design = routeMapDesignSpaceFor(widget.map);
     _design = design;
     // #2068 9차: fontSize를 인자로 받아 라벨별(오너 매치=오너 크기, 폴백=권역

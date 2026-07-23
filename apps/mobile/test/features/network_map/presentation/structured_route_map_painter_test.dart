@@ -207,4 +207,57 @@ void main() {
     await tester.pump(); // post-frame picture build + setState
     expect(find.byType(CustomPaint), findsOneWidget);
   });
+
+  testWidgets('StructuredRouteMapView는 라벨 입력이 바뀌면 picture를 다시 만든다', (
+    tester,
+  ) async {
+    final map = _map();
+    const camera = MapCameraState(
+      sourceBounds: Rect.fromLTWH(0, 0, 48, 48),
+      viewportSize: Size(400, 800),
+      center: Offset(24, 24),
+      scale: 8,
+      minScale: 8,
+      maxScale: 20,
+      revision: 1,
+      initialScale: 8,
+    );
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: StructuredRouteMapView(
+          map: map,
+          camera: camera,
+          lineColors: const {'L1': Color(0xFF00A0E0)},
+          labelTextByStationId: const {'s0': '가', 's1': '나', 's2': '다'},
+          lineBadgeLabelByLineId: const {'L1': '1'},
+        ),
+      ),
+    );
+    await tester.pump();
+    final firstPaint = tester.widget<CustomPaint>(find.byType(CustomPaint));
+    final firstPicture =
+        (firstPaint.painter! as StructuredRouteMapPainter).picture;
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: StructuredRouteMapView(
+          map: map,
+          camera: camera,
+          lineColors: const {'L1': Color(0xFF00A0E0)},
+          labelTextByStationId: const {'s0': '가가', 's1': '나', 's2': '다'},
+          lineBadgeLabelByLineId: const {'L1': '1'},
+        ),
+      ),
+    );
+    // 입력 변경 직후는 picture를 비우고 다시 post-frame 구축한다.
+    expect(find.byType(CustomPaint), findsNothing);
+    await tester.pump();
+    final secondPaint = tester.widget<CustomPaint>(find.byType(CustomPaint));
+    final secondPicture =
+        (secondPaint.painter! as StructuredRouteMapPainter).picture;
+    expect(identical(firstPicture, secondPicture), isFalse);
+  });
 }
