@@ -600,15 +600,56 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
     }
   }
 
-  void _schedulePictureBuild() {
+  void _schedulePictureBuild({int retry = 0}) {
     final generation = ++_pictureBuildGeneration;
     SchedulerBinding.instance.addPostFrameCallback((_) {
       if (!mounted || generation != _pictureBuildGeneration) {
         return;
       }
-      easySubwayPerfTimeSync('structured_route_map.picture_build', () {
-        _ensurePicture();
-      });
+      try {
+        easySubwayPerfTimeSync('structured_route_map.picture_build', () {
+          _ensurePicture();
+        });
+      } catch (error, stackTrace) {
+        FlutterError.reportError(
+          FlutterErrorDetails(
+            exception: error,
+            stack: stackTrace,
+            library: 'network_map',
+            context: ErrorDescription('구조화 노선도 picture 구축 실패'),
+          ),
+        );
+        // map/flags가 안 바뀌어도 한 번은 다음 프레임에 재시도한다.
+        // generation을 올리지 않고 같은 세대에서만 재시도해 최신 예약과 경합하지 않는다.
+        if (retry < 1 && mounted && generation == _pictureBuildGeneration) {
+          SchedulerBinding.instance.addPostFrameCallback((_) {
+            if (!mounted || generation != _pictureBuildGeneration) {
+              return;
+            }
+            try {
+              easySubwayPerfTimeSync(
+                'structured_route_map.picture_build_retry',
+                () {
+                  _ensurePicture();
+                },
+              );
+              if (mounted && generation == _pictureBuildGeneration) {
+                setState(() {});
+              }
+            } catch (error, stackTrace) {
+              FlutterError.reportError(
+                FlutterErrorDetails(
+                  exception: error,
+                  stack: stackTrace,
+                  library: 'network_map',
+                  context: ErrorDescription('구조화 노선도 picture 재시도 실패'),
+                ),
+              );
+            }
+          });
+        }
+        return;
+      }
       if (!mounted || generation != _pictureBuildGeneration) {
         return;
       }
