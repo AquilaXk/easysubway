@@ -5,7 +5,7 @@ import 'package:easysubway_mobile/features/network_map/domain/route_map_design_s
 import 'package:easysubway_mobile/features/network_map/domain/structured_route_map.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/route_map_label_layout.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/structured_route_map_painter.dart';
-import 'package:flutter/painting.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 StructuredRouteMap _map() {
@@ -172,5 +172,92 @@ void main() {
     expect(routeMapStationLabel('신금호'), '신금호');
     // 맨 앞이 '('이면 축약할 역명이 없으므로 원문 유지.
     expect(routeMapStationLabel('(임시)역'), '(임시)역');
+  });
+
+  testWidgets('StructuredRouteMapView는 첫 프레임에서 picture를 미룬다', (tester) async {
+    final map = _map();
+    const camera = MapCameraState(
+      sourceBounds: Rect.fromLTWH(0, 0, 48, 48),
+      viewportSize: Size(400, 800),
+      center: Offset(24, 24),
+      scale: 8,
+      minScale: 8,
+      maxScale: 20,
+      revision: 1,
+      initialScale: 8,
+    );
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: StructuredRouteMapView(
+          map: map,
+          camera: camera,
+          lineColors: const {'L1': Color(0xFF00A0E0)},
+          labelTextByStationId: const {'s0': '가', 's1': '나', 's2': '다'},
+          lineBadgeLabelByLineId: const {'L1': '1'},
+        ),
+      ),
+    );
+
+    // 첫 build: CustomPaint(라벨 picture) 없이 SizedBox만.
+    expect(find.byType(CustomPaint), findsNothing);
+    expect(find.byType(SizedBox), findsWidgets);
+
+    await tester.pump(); // post-frame picture build + setState
+    expect(find.byType(CustomPaint), findsOneWidget);
+  });
+
+  testWidgets('StructuredRouteMapView는 라벨 입력이 바뀌면 picture를 다시 만든다', (
+    tester,
+  ) async {
+    final map = _map();
+    const camera = MapCameraState(
+      sourceBounds: Rect.fromLTWH(0, 0, 48, 48),
+      viewportSize: Size(400, 800),
+      center: Offset(24, 24),
+      scale: 8,
+      minScale: 8,
+      maxScale: 20,
+      revision: 1,
+      initialScale: 8,
+    );
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: StructuredRouteMapView(
+          map: map,
+          camera: camera,
+          lineColors: const {'L1': Color(0xFF00A0E0)},
+          labelTextByStationId: const {'s0': '가', 's1': '나', 's2': '다'},
+          lineBadgeLabelByLineId: const {'L1': '1'},
+        ),
+      ),
+    );
+    await tester.pump();
+    final firstPaint = tester.widget<CustomPaint>(find.byType(CustomPaint));
+    final firstPicture =
+        (firstPaint.painter! as StructuredRouteMapPainter).picture;
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: StructuredRouteMapView(
+          map: map,
+          camera: camera,
+          lineColors: const {'L1': Color(0xFF00A0E0)},
+          labelTextByStationId: const {'s0': '가가', 's1': '나', 's2': '다'},
+          lineBadgeLabelByLineId: const {'L1': '1'},
+        ),
+      ),
+    );
+    // 입력 변경 직후는 picture를 비우고 다시 post-frame 구축한다.
+    expect(find.byType(CustomPaint), findsNothing);
+    await tester.pump();
+    final secondPaint = tester.widget<CustomPaint>(find.byType(CustomPaint));
+    final secondPicture =
+        (secondPaint.painter! as StructuredRouteMapPainter).picture;
+    expect(identical(firstPicture, secondPicture), isFalse);
   });
 }
