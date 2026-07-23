@@ -98,6 +98,112 @@ void main() {
     }
   });
 
+  test('로컬 역 검색은 warm 전후·중복 warm에서 결과 집합과 순서가 같다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement(
+      "INSERT INTO stations "
+      "(id, name_ko, name_en, name_sub, normalized_name, region, "
+      "data_quality_level, data_source_type) "
+      "VALUES "
+      "('station-surisan', '수리산', 'Surisan', '', '수리산', "
+      "'수도권', 'LEVEL_1', 'OFFICIAL_FILE'), "
+      "('station-sanbon', '산본', 'Sanbon', '', '산본', "
+      "'수도권', 'LEVEL_1', 'OFFICIAL_FILE')",
+    );
+    final repository = DriftStationRepository(database: database);
+
+    Future<List<String>> idsFor(String query) async {
+      final results = await repository.searchStations(query);
+      return results.map((station) => station.id).toList(growable: false);
+    }
+
+    final beforeWarm = await idsFor('ㅅ');
+    await Future.wait([
+      repository.warmSearchCache(),
+      repository.warmSearchCache(),
+    ]);
+    final afterWarm = await idsFor('ㅅ');
+    final afterSecondSearch = await idsFor('ㅅ');
+
+    expect(afterWarm, beforeWarm);
+    expect(afterSecondSearch, beforeWarm);
+    expect(await idsFor('상'), await idsFor('상'));
+  });
+
+  test('로컬 역 검색은 중간 문자열(substring) 매칭을 유지한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement(
+      "INSERT INTO stations "
+      "(id, name_ko, name_en, name_sub, normalized_name, region, "
+      "data_quality_level, data_source_type) "
+      "VALUES "
+      "('station-mid-sangnok', '테스트상록중앙', 'MidSangnok', '', "
+      "'테스트상록중앙', '수도권', 'LEVEL_1', 'OFFICIAL_FILE')",
+    );
+    final repository = DriftStationRepository(database: database);
+
+    final results = await repository.searchStations('상록');
+    expect(
+      results.map((station) => station.id),
+      contains('station-mid-sangnok'),
+    );
+    expect(results.map((station) => station.id), contains('station-sangnoksu'));
+  });
+
+  test('로컬 역 검색은 결과 상한 40과 완전일치 예외를 지킨다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    final buffer = StringBuffer();
+    for (var i = 0; i < 50; i++) {
+      if (i > 0) {
+        buffer.write(', ');
+      }
+      final id = 'station-bulk-$i';
+      final name = '상테스트$i';
+      buffer.write(
+        "('$id', '$name', 'Sang$i', '', '$name', "
+        "'수도권', 'LEVEL_1', 'OFFICIAL_FILE')",
+      );
+    }
+    await database.customStatement(
+      "INSERT INTO stations "
+      "(id, name_ko, name_en, name_sub, normalized_name, region, "
+      "data_quality_level, data_source_type) "
+      "VALUES ${buffer.toString()}",
+    );
+    final repository = DriftStationRepository(database: database);
+
+    final prefixResults = await repository.searchStations('상');
+    expect(prefixResults.length, lessThanOrEqualTo(40));
+
+    // 동명 완전일치가 40을 넘어도 잘리지 않는다.
+    final exactBuffer = StringBuffer();
+    for (var i = 0; i < 45; i++) {
+      if (i > 0) {
+        exactBuffer.write(', ');
+      }
+      exactBuffer.write(
+        "('station-exact-$i', '동일역명', 'Same$i', '', '동일역명', "
+        "'수도권', 'LEVEL_1', 'OFFICIAL_FILE')",
+      );
+    }
+    await database.customStatement(
+      "INSERT INTO stations "
+      "(id, name_ko, name_en, name_sub, normalized_name, region, "
+      "data_quality_level, data_source_type) "
+      "VALUES ${exactBuffer.toString()}",
+    );
+    repository.invalidateStationSummaryCache();
+    final exactResults = await repository.searchStations('동일역명');
+    expect(exactResults.length, greaterThanOrEqualTo(45));
+    expect(exactResults.every((station) => station.nameKo == '동일역명'), isTrue);
+  });
+
   test('노선 필터 검색과 노선 목록은 로컬 라인 매핑을 사용한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);

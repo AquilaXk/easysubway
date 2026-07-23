@@ -5,10 +5,12 @@ import 'package:drift/drift.dart';
 import '../../../core/database/catalog/canonical_station_id.dart';
 import '../../../core/database/catalog/catalog_database.dart';
 import '../../../core/database/catalog/station_timetable_query.dart';
+import '../../../core/perf/easy_subway_perf.dart';
 import '../../../network_map.dart';
 import '../domain/station_line.dart';
 import '../domain/station_models.dart';
 import '../domain/station_repositories.dart';
+import 'station_search_index.dart';
 
 class DriftStationRepository
     implements
@@ -27,17 +29,16 @@ class DriftStationRepository
 
   final CatalogDatabase database;
   Future<List<_LocalStationSummary>>? _stationSummaryCache;
+  Future<StationSearchIndex>? _searchIndexFuture;
 
   void invalidateStationSummaryCache() {
     _stationSummaryCache = null;
+    _searchIndexFuture = null;
   }
 
   @override
   Future<void> warmSearchCache() async {
-    final stations = await _listStationSummaries();
-    for (final station in stations) {
-      station.primeSearchTerms();
-    }
+    await _ensureSearchIndex();
   }
 
   @override
@@ -50,53 +51,132 @@ class DriftStationRepository
 
   /// [region]/[lineId]는 상한 적용 전에 거른다. 완전일치(rank 0)는 상한에
   /// 잘리지 않게 해 동명·정확 질의 누락을 막는다.
+  ///
+  /// 초성·이름 prefix는 정렬 term 인덱스로 후보를 좁히고, 포함(substring)
+  /// 매칭은 기존과 동일한 선형 fallback으로 의미를 보존한다.
   Future<List<StationSearchResult>> _rankSearchStations(
     String query, {
     String? region,
     String? lineId,
-  }) async {
-    final trimmedQuery = query.trim();
-    if (trimmedQuery.isEmpty) {
-      return const [];
-    }
+  }) {
+    return easySubwayPerfTimeAsync('station_search.rank', () async {
+      final trimmedQuery = query.trim();
+      if (trimmedQuery.isEmpty) {
+        return const [];
+      }
 
-    final normalizedQuery = _normalize(trimmedQuery);
-    if (normalizedQuery.isEmpty) {
-      return const [];
-    }
-    final regionFilter = region?.trim() ?? '';
-    final lineFilter = lineId?.trim() ?? '';
+      final normalizedQuery = _normalize(trimmedQuery);
+      if (normalizedQuery.isEmpty) {
+        return const [];
+      }
+      final regionFilter = region?.trim() ?? '';
+      final lineFilter = lineId?.trim() ?? '';
 
-    final stations = await _listStationSummaries();
-    final ranked = <({_LocalStationSummary station, int rank})>[];
-    for (final station in stations) {
-      if (regionFilter.isNotEmpty &&
-          !stationBelongsToRegion(station.region, regionFilter)) {
-        continue;
+      final stations = await _listStationSummaries();
+      final index = await _ensureSearchIndex(stations);
+      final byId = {for (final station in stations) station.id: station};
+
+      final candidateIds = <String>{};
+      if (_isHangulJamoOnly(normalizedQuery)) {
+        candidateIds.addAll(
+          index.lookupChosungPrefix(_chosungKey(normalizedQuery)),
+        );
+      } else {
+        candidateIds.addAll(index.lookupNamePrefix(normalizedQuery));
+        // substring(rank 2) 보존: prefix에 없는 역만 포함 여부를 검사한다.
+        for (final station in stations) {
+          if (candidateIds.contains(station.id)) {
+            continue;
+          }
+          if (regionFilter.isNotEmpty &&
+              !stationBelongsToRegion(station.region, regionFilter)) {
+            continue;
+          }
+          if (lineFilter.isNotEmpty &&
+              !station.lines.any((line) => line.id == lineFilter)) {
+            continue;
+          }
+          if (station.hasNormalizedContains(normalizedQuery)) {
+            candidateIds.add(station.id);
+          }
+        }
       }
-      if (lineFilter.isNotEmpty &&
-          !station.lines.any((line) => line.id == lineFilter)) {
-        continue;
+
+      final ranked = <({_LocalStationSummary station, int rank})>[];
+      for (final stationId in candidateIds) {
+        final station = byId[stationId];
+        if (station == null) {
+          continue;
+        }
+        if (regionFilter.isNotEmpty &&
+            !stationBelongsToRegion(station.region, regionFilter)) {
+          continue;
+        }
+        if (lineFilter.isNotEmpty &&
+            !station.lines.any((line) => line.id == lineFilter)) {
+          continue;
+        }
+        final rank = station.matchRank(normalizedQuery);
+        if (rank == null) {
+          continue;
+        }
+        ranked.add((station: station, rank: rank));
       }
-      final rank = station.matchRank(normalizedQuery);
-      if (rank == null) {
-        continue;
-      }
-      ranked.add((station: station, rank: rank));
-    }
-    ranked.sort((a, b) {
-      final byRank = a.rank.compareTo(b.rank);
-      if (byRank != 0) {
-        return byRank;
-      }
-      return a.station.nameKo.compareTo(b.station.nameKo);
+      ranked.sort((a, b) {
+        final byRank = a.rank.compareTo(b.rank);
+        if (byRank != 0) {
+          return byRank;
+        }
+        return a.station.nameKo.compareTo(b.station.nameKo);
+      });
+      final exactCount = ranked.where((entry) => entry.rank == 0).length;
+      final limit = math.max(_maxSearchResults, exactCount);
+      return ranked
+          .take(limit)
+          .map((entry) => entry.station.toSearchResult())
+          .toList(growable: false);
     });
-    final exactCount = ranked.where((entry) => entry.rank == 0).length;
-    final limit = math.max(_maxSearchResults, exactCount);
-    return ranked
-        .take(limit)
-        .map((entry) => entry.station.toSearchResult())
-        .toList(growable: false);
+  }
+
+  Future<StationSearchIndex> _ensureSearchIndex([
+    List<_LocalStationSummary>? preloaded,
+  ]) async {
+    final existing = _searchIndexFuture;
+    if (existing != null) {
+      try {
+        return await existing;
+      } catch (_) {
+        // 실패한 Future는 영구 캐시하지 않고 재시도한다.
+        if (identical(_searchIndexFuture, existing)) {
+          _searchIndexFuture = null;
+        }
+      }
+    }
+
+    final future = _buildSearchIndex(preloaded);
+    _searchIndexFuture = future;
+    try {
+      return await future;
+    } catch (_) {
+      if (identical(_searchIndexFuture, future)) {
+        _searchIndexFuture = null;
+      }
+      rethrow;
+    }
+  }
+
+  Future<StationSearchIndex> _buildSearchIndex(
+    List<_LocalStationSummary>? preloaded,
+  ) async {
+    final stations = preloaded ?? await _listStationSummaries();
+    for (final station in stations) {
+      station.primeSearchTerms();
+    }
+    return easySubwayPerfTimeSync('station_search_index.build', () {
+      return StationSearchIndex.build([
+        for (final station in stations) station.toIndexRow(),
+      ]);
+    });
   }
 
   @override
@@ -834,6 +914,39 @@ class _LocalStationSummary {
   void primeSearchTerms() {
     _normalizedTerms;
     _chosungTerms;
+  }
+
+  StationSearchIndexStationRow toIndexRow() {
+    final korean = <String>[
+      _normalize(nameKo),
+      _normalize('$nameKo역'),
+    ].where((term) => term.isNotEmpty).toList(growable: false);
+    final english = <String>[
+      _normalize(nameEn),
+    ].where((term) => term.isNotEmpty).toList(growable: false);
+    final subname = <String>[
+      if (nameSub.isNotEmpty) _normalize(nameSub),
+    ].where((term) => term.isNotEmpty).toList(growable: false);
+    return StationSearchIndexStationRow(
+      stationId: id,
+      koreanTerms: korean,
+      englishTerms: english,
+      subnameTerms: subname,
+      chosungTerms: _chosungTerms,
+    );
+  }
+
+  /// substring fallback용. chosung·rank 계산 없이 정규화 term 포함만 본다.
+  bool hasNormalizedContains(String normalizedQuery) {
+    if (normalizedQuery.isEmpty) {
+      return false;
+    }
+    for (final term in _normalizedTerms) {
+      if (term.contains(normalizedQuery)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   bool matches(String query) {
