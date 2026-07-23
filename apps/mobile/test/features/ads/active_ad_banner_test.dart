@@ -525,6 +525,40 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('포그라운드 복귀 재조회 실패 후에도 endsAt Timer로 collapse한다', (tester) async {
+    var now = DateTime.utc(2026, 7, 12, 1);
+    final endsAt = now.add(const Duration(seconds: 5));
+    final client = _FailAfterFirstApiClient(
+      first: _creativeResponse(
+        endsAt: endsAt.toIso8601String(),
+        advertiserName: '만료 예정 광고',
+      ),
+      error: const ApiException('offline'),
+    );
+    await _pumpBanner(
+      tester,
+      repository: AdRepository(client),
+      imageLoader: (_, _) async => _image,
+      now: () => now,
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('만료 예정 광고'), findsOneWidget);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('만료 예정 광고'), findsOneWidget);
+    expect(client.calls, 2);
+
+    now = endsAt;
+    await tester.pump(const Duration(seconds: 5));
+
+    expect(find.byType(AdBannerSlot), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'endsAt 이후 timer cleanup 전 tap은 collapse하고 click과 landing을 생략한다',
     (tester) async {

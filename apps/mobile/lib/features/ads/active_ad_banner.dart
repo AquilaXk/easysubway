@@ -124,11 +124,17 @@ class _ActiveAdBannerState extends State<ActiveAdBanner>
       _recordImpressionAfterFrame(generation, repository, creative);
     } on Exception {
       // 조회·decode 실패는 이미 그린 유효 배너를 유지한다.
-      // 소재 없음(null)과 만료만 collapse한다.
+      // _reload가 Timer를 지웠으므로 유지 소재의 endsAt Timer를 복구한다.
+      if (!mounted || generation != _generation) {
+        return;
+      }
+      _restoreExpiryForKeptBanner(generation);
     }
   }
 
   void _collapseRenderedBanner() {
+    _expiryTimer?.cancel();
+    _expiryTimer = null;
     if (_creative == null && _image == null) {
       return;
     }
@@ -136,6 +142,18 @@ class _ActiveAdBannerState extends State<ActiveAdBanner>
       _creative = null;
       _image = null;
     });
+  }
+
+  void _restoreExpiryForKeptBanner(int generation) {
+    final creative = _creative;
+    if (creative == null) {
+      return;
+    }
+    if (_isExpired(creative)) {
+      _collapseRenderedBanner();
+      return;
+    }
+    _scheduleExpiry(generation, creative);
   }
 
   bool _isExpired(AdCreative creative) {
