@@ -8494,7 +8494,9 @@ void main() {
       await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pumpAndSettle();
 
-      expect(repository.requestedQueries, ['상록수']);
+      // 입력 즉시 검색 + 키보드 검색 액션으로 같은 질의가 두 번 나갈 수 있다.
+      expect(repository.requestedQueries, isNotEmpty);
+      expect(repository.requestedQueries, everyElement(equals('상록수')));
       // 역이 지나는 노선마다 한 행씩(각 행 우측에 색 배지). '+N' 요약 없음.
       expect(find.byKey(const Key('stationLineBadge-seoul-4')), findsOneWidget);
       expect(
@@ -8557,8 +8559,17 @@ void main() {
           matching: find.byType(Image),
         ),
       );
+      final lineBadgeProvider = lineBadgeImage.image;
+      final lineBadgeAsset = switch (lineBadgeProvider) {
+        AssetImage value => value,
+        ResizeImage(:final imageProvider) when imageProvider is AssetImage =>
+          imageProvider,
+        _ => throw TestFailure(
+          'expected AssetImage, got ${lineBadgeProvider.runtimeType}',
+        ),
+      };
       expect(
-        (lineBadgeImage.image as AssetImage).assetName,
+        lineBadgeAsset.assetName,
         'assets/metro_symbols/line_badges/seoul_4_compact_256.png',
       );
 
@@ -10464,7 +10475,8 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
 
-    expect(repository.requestedQueries, ['없는역']);
+    expect(repository.requestedQueries, isNotEmpty);
+    expect(repository.requestedQueries, everyElement(equals('없는역')));
     expect(find.text('검색 결과가 없습니다.'), findsOneWidget);
     expect(find.byKey(const Key('stationSearchEmptyState')), findsOneWidget);
     expect(find.byKey(const Key('stationSearchEmptyImage')), findsOneWidget);

@@ -745,7 +745,7 @@ void main() {
     expect((additionalSteps[8] as Map)['distanceMeters'], 8000);
   });
 
-  test('내장 데이터팩은 로컬 역 검색 repository에서 역 번호 검색을 제공한다', () async {
+  test('로컬 역 검색은 역 번호가 아니라 역 이름으로만 찾는다', () async {
     final directory = await Directory.systemTemp.createTemp(
       'easysubway-catalog-search-',
     );
@@ -758,10 +758,12 @@ void main() {
     addTearDown(database.close);
     final repository = DriftStationRepository(database: database);
 
-    final results = await repository.searchStations('448');
+    // stationCode(예: 448)는 검색 대상이 아니다. 역 이름만 매칭한다.
+    expect(await repository.searchStations('448'), isEmpty);
 
-    expect(results, hasLength(1));
-    expect(results.single.id, 'station-sangnoksu');
+    final byName = await repository.searchStations('상록수');
+    expect(byName, isNotEmpty);
+    expect(byName.any((station) => station.id == 'station-sangnoksu'), isTrue);
   });
 
   test('내장 데이터팩은 설치된 파일이 손상되어 있으면 번들 asset으로 교체한다', () async {

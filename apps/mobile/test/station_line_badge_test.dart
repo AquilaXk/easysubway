@@ -97,10 +97,17 @@ void main() {
         find.descendant(of: finder, matching: find.byType(Image)),
       );
       expect(tester.getSize(finder), const Size(40, 40));
-      expect(
-        (image.image as AssetImage).assetName,
-        'assets/metro_symbols/line_badges/$asset',
-      );
+      // Flutter는 cacheWidth/Height가 있으면 AssetImage를 ResizeImage로 감싼다.
+      final provider = image.image;
+      final assetImage = switch (provider) {
+        AssetImage value => value,
+        ResizeImage(:final imageProvider) when imageProvider is AssetImage =>
+          imageProvider,
+        _ => throw TestFailure(
+          'expected AssetImage, got ${provider.runtimeType}',
+        ),
+      };
+      expect(assetImage.assetName, 'assets/metro_symbols/line_badges/$asset');
     }
 
     expect(
