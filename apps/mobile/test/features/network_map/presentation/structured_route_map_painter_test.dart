@@ -6,7 +6,6 @@ import 'package:easysubway_mobile/features/network_map/domain/structured_route_m
 import 'package:easysubway_mobile/features/network_map/presentation/route_map_label_layout.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/structured_route_map_painter.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 StructuredRouteMap _map() {
