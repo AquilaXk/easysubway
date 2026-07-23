@@ -79,6 +79,36 @@ class _SequencedApiClient extends ApiClient {
   }
 }
 
+class _FailAfterFirstApiClient extends ApiClient {
+  _FailAfterFirstApiClient({required this.first, required this.error})
+    : super(baseUri: Uri.parse('https://api.easysubway.example'));
+
+  final ApiResponse first;
+  final Object error;
+  var calls = 0;
+
+  @override
+  Future<ApiResponse> getJson(
+    String path, {
+    Map<String, String> headers = const {},
+  }) async {
+    calls++;
+    if (calls == 1) {
+      return first;
+    }
+    throw error;
+  }
+
+  @override
+  Future<ApiResponse> postJson(
+    String path, {
+    required Map<String, Object?> body,
+    Map<String, String> headers = const {},
+  }) async {
+    return const ApiResponse(statusCode: 204, jsonBody: null);
+  }
+}
+
 enum _ReloadDependency { repository, placement, imageLoader }
 
 ApiResponse _creativeResponse({
@@ -420,6 +450,151 @@ void main() {
 
     expect(find.byType(AdBannerSlot), findsNothing);
     expect(client.getCalls, 1);
+  });
+
+  testWidgets('포그라운드 복귀 시 active를 다시 조회하고 없으면 collapse한다', (tester) async {
+    final client = _SequencedApiClient([
+      Future.value(_creativeResponse(endsAt: null)),
+      Future.value(const ApiResponse(statusCode: 204, jsonBody: null)),
+    ]);
+    await _pumpBanner(
+      tester,
+      repository: AdRepository(client),
+      imageLoader: (_, _) async => _image,
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(AdBannerSlot), findsOneWidget);
+    expect(client.calls, 1);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byType(AdBannerSlot), findsNothing);
+    expect(client.calls, 2);
+  });
+
+  testWidgets('포그라운드 복귀 재조회가 새 소재면 배너를 교체한다', (tester) async {
+    final client = _SequencedApiClient([
+      Future.value(_creativeResponse(endsAt: null, advertiserName: '이전 광고')),
+      Future.value(_creativeResponse(endsAt: null, advertiserName: '현재 광고')),
+    ]);
+    await _pumpBanner(
+      tester,
+      repository: AdRepository(client),
+      imageLoader: (_, _) async => _image,
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('이전 광고'), findsOneWidget);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('현재 광고'), findsOneWidget);
+    expect(find.text('이전 광고'), findsNothing);
+    expect(client.calls, 2);
+  });
+
+  testWidgets('포그라운드 복귀 재조회 실패는 기존 유효 배너를 유지한다', (tester) async {
+    final client = _FailAfterFirstApiClient(
+      first: _creativeResponse(endsAt: null, advertiserName: '유지 광고'),
+      error: const ApiException('offline'),
+    );
+    await _pumpBanner(
+      tester,
+      repository: AdRepository(client),
+      imageLoader: (_, _) async => _image,
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('유지 광고'), findsOneWidget);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('유지 광고'), findsOneWidget);
+    expect(find.byType(AdBannerSlot), findsOneWidget);
+    expect(client.calls, 2);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('포그라운드 복귀 재조회 실패 후에도 endsAt Timer로 collapse한다', (tester) async {
+    var now = DateTime.utc(2026, 7, 12, 1);
+    final endsAt = now.add(const Duration(seconds: 5));
+    final client = _FailAfterFirstApiClient(
+      first: _creativeResponse(
+        endsAt: endsAt.toIso8601String(),
+        advertiserName: '만료 예정 광고',
+      ),
+      error: const ApiException('offline'),
+    );
+    await _pumpBanner(
+      tester,
+      repository: AdRepository(client),
+      imageLoader: (_, _) async => _image,
+      now: () => now,
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('만료 예정 광고'), findsOneWidget);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('만료 예정 광고'), findsOneWidget);
+    expect(client.calls, 2);
+
+    now = endsAt;
+    await tester.pump(const Duration(seconds: 5));
+
+    expect(find.byType(AdBannerSlot), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('포그라운드 복귀 재조회 중에도 endsAt이 지나면 collapse한다', (tester) async {
+    var now = DateTime.utc(2026, 7, 12, 1);
+    final endsAt = now.add(const Duration(seconds: 5));
+    final pending = Completer<ApiResponse>();
+    final client = _SequencedApiClient([
+      Future.value(
+        _creativeResponse(
+          endsAt: endsAt.toIso8601String(),
+          advertiserName: '조회 중 만료 광고',
+        ),
+      ),
+      pending.future,
+    ]);
+    await _pumpBanner(
+      tester,
+      repository: AdRepository(client),
+      imageLoader: (_, _) async => _image,
+      now: () => now,
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('조회 중 만료 광고'), findsOneWidget);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    expect(client.calls, 2);
+    expect(find.text('조회 중 만료 광고'), findsOneWidget);
+
+    now = endsAt;
+    await tester.pump(const Duration(seconds: 5));
+
+    expect(find.byType(AdBannerSlot), findsNothing);
+    pending.complete(const ApiResponse(statusCode: 204, jsonBody: null));
+    await tester.pump();
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets(
