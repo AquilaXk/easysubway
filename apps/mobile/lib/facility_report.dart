@@ -2820,9 +2820,7 @@ class _FacilityReportTypeRow extends StatelessWidget {
         ? EasySubwayAccessibleColors.primary
         : EasySubwayAccessibleColors.text;
     final enabled = onTap != null;
-    final stateLabel = !enabled
-        ? '선택 불가'
-        : (selected ? '선택됨' : '선택 가능');
+    final stateLabel = !enabled ? '선택 불가' : (selected ? '선택됨' : '선택 가능');
     final semanticsLabel = '${option.label} $stateLabel';
 
     return Semantics(

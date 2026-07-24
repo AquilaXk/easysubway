@@ -10311,7 +10311,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(StationDetailScreen), findsOneWidget);
-    // 검색은 스택 아래(offstage)에 남아 있어야 한다.
+    expect(find.byKey(const Key('stationDetailSheet')), findsOneWidget);
+    // 검색은 시트 아래(offstage)에 남아 있어야 한다.
     expect(
       find.byKey(const Key('stationSearchScreen'), skipOffstage: false),
       findsOneWidget,
@@ -10322,6 +10323,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(StationDetailScreen), findsNothing);
+    expect(find.byKey(const Key('stationDetailSheet')), findsNothing);
     expect(find.byKey(const Key('stationSearchScreen')), findsOneWidget);
     expect(find.byKey(const Key('stationSearchInput')), findsOneWidget);
     expect(find.text('상록수'), findsWidgets);
@@ -12202,14 +12204,16 @@ void main() {
         find.bySemanticsLabel('상록수역 자세한 안내, 수도권 2호선, 마지막 확인 2일 전'),
         findsOneWidget,
       );
-      // 패밀리룩 섹션 순서: 지금 열차 → 이용하기 → 역 정보 → 안내(#2436).
+      // 카카오식 IA: 지금 열차 → 이용하기 → 출구 정보 → 시설 정보 → 안내(#2436).
       await tester.scrollUntilVisible(
-        find.text('역 정보'),
+        find.text('출구 정보'),
         120,
         scrollable: find.byType(Scrollable).last,
       );
       await tester.pumpAndSettle();
-      expect(find.text('역 정보'), findsOneWidget);
+      expect(find.text('출구 정보'), findsOneWidget);
+      expect(find.text('시설 정보'), findsOneWidget);
+      expect(find.text('역 정보'), findsNothing);
       expect(find.text('1번 출구'), findsWidgets);
       expect(find.text('엘리베이터 연결'), findsOneWidget);
       expect(find.text('계단 없는 이동 가능'), findsOneWidget);
@@ -12723,12 +12727,14 @@ void main() {
       await tester.drag(find.byType(ListView), const Offset(0, -520));
       await tester.pumpAndSettle();
 
-      // #2078/#2436: 시설 데이터가 없으면 시설 행·빈 안내를 숨긴다(역 정보는 출구로 유지).
+      // #2078/#2436: 시설 데이터가 없으면 시설 섹션을 숨기고 출구 정보만 유지.
       expect(find.text('시설 안내를 준비 중이에요.'), findsNothing);
       expect(find.text('확인 필요 없음'), findsNothing);
       expect(find.bySemanticsLabel('다시 볼 시설 없음'), findsNothing);
       expect(find.text('1번 출구'), findsWidgets);
-      expect(find.text('역 정보'), findsOneWidget);
+      expect(find.text('출구 정보'), findsOneWidget);
+      expect(find.text('시설 정보'), findsNothing);
+      expect(find.text('역 정보'), findsNothing);
       expect(
         find.byKey(
           const Key('facilityReportButton-facility-sangnoksu-elevator-1'),
@@ -12775,9 +12781,11 @@ void main() {
       await tester.drag(find.byType(ListView), const Offset(0, -520));
       await tester.pumpAndSettle();
 
-      // #2078/#2436: 출구가 없으면 출구 행만 숨기고, 시설 행은 역 정보 아래에 그린다.
+      // #2078/#2436: 출구가 없으면 출구 섹션만 숨기고, 시설 정보 섹션에 시설 행을 그린다.
       expect(find.text('출구 안내를 준비 중이에요.'), findsNothing);
-      expect(find.text('역 정보'), findsOneWidget);
+      expect(find.text('출구 정보'), findsNothing);
+      expect(find.text('시설 정보'), findsOneWidget);
+      expect(find.text('역 정보'), findsNothing);
       expect(find.text('1번 출구 엘리베이터'), findsOneWidget);
     } finally {
       semanticsHandle.dispose();
