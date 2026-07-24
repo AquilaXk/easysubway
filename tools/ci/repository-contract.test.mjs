@@ -8927,6 +8927,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "daegu-transportation-route-map-positions",
     "daejeon-station-distance-fare",
     "daejeon-train-timetable",
+    "daejeon-transportation-accessibility",
     "gwangju-transportation-cyberstation-timetable",
     "gwangju-transportation-route-topology",
     "kric-disabled-toilet",
