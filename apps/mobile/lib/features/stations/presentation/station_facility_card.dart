@@ -21,15 +21,15 @@ class StationFacilityCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    return Semantics(
-      container: true,
-      explicitChildNodes: true,
-      label: facility.semanticLabel,
-      button: true,
-      onTap: () => _openFacilityDetail(context),
-      child: Column(
-        children: [
-          InkWell(
+    return Column(
+      children: [
+        Semantics(
+          container: true,
+          explicitChildNodes: true,
+          label: facility.semanticLabel,
+          button: true,
+          onTap: () => _openFacilityDetail(context),
+          child: InkWell(
             key: Key('stationFacilityCard-${facility.id}'),
             onTap: () => _openFacilityDetail(context),
             child: Padding(
@@ -103,13 +103,13 @@ class StationFacilityCard extends StatelessWidget {
               ),
             ),
           ),
-          const Divider(
-            height: 1,
-            thickness: 1,
-            color: EasySubwayAccessibleColors.line,
-          ),
-        ],
-      ),
+        ),
+        const Divider(
+          height: 1,
+          thickness: 1,
+          color: EasySubwayAccessibleColors.line,
+        ),
+      ],
     );
   }
 

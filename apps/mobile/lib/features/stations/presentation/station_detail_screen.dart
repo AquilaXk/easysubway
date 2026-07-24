@@ -434,12 +434,15 @@ class _StationDetailContent extends StatelessWidget {
       ),
       if (layoutSummaryItems.isNotEmpty || hasInternalRouteGuidance) ...[
         const SizedBox(height: 16),
-        Text(
-          '역 안 이동',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: EasySubwayAccessibleColors.text,
-            fontWeight: FontWeight.w700,
-            height: 1.25,
+        Semantics(
+          header: true,
+          child: Text(
+            '역 안 이동',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: EasySubwayAccessibleColors.text,
+              fontWeight: FontWeight.w700,
+              height: 1.25,
+            ),
           ),
         ),
         const SizedBox(height: 12),
