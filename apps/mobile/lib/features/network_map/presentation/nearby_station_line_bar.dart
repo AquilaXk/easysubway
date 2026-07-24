@@ -167,7 +167,10 @@ class _StationNameLabel extends StatelessWidget {
     );
     final tap = onTap;
     if (tap == null) {
-      return text;
+      return KeyedSubtree(
+        key: const Key('nearbyStationLineBarStationName'),
+        child: text,
+      );
     }
     // TalkBack 라벨·동작은 상위 NearbyStationLineBar Semantics가 담당한다.
     return InkWell(

@@ -58,6 +58,7 @@ class StationDetailBody extends StatelessWidget {
     this.facilityReportDraftTargetStore,
     this.timetableRepository,
     this.showContextChrome = false,
+    this.showRealtimeSection = true,
     this.onClose,
     this.previousStation,
     this.nextStation,
@@ -78,6 +79,10 @@ class StationDetailBody extends StatelessWidget {
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
   final StationTimetableRepository? timetableRepository;
   final bool showContextChrome;
+
+  /// false면 「지금 열차」블록을 생략한다. 노선도 확장처럼 상단에
+  /// 실시간/시간표 패널을 이미 붙인 셸에서 중복·실패 카드 교체를 막는다.
+  final bool showRealtimeSection;
   final VoidCallback? onClose;
   final StationDetailNeighbor? previousStation;
   final StationDetailNeighbor? nextStation;
@@ -116,6 +121,7 @@ class StationDetailBody extends StatelessWidget {
         facilityReportDraftTargetStore: facilityReportDraftTargetStore,
         timetableRepository: timetableRepository,
         showContextChrome: showContextChrome,
+        showRealtimeSection: showRealtimeSection,
         onClose: onClose,
         previousStation: previousStation,
         nextStation: nextStation,
@@ -170,6 +176,7 @@ class _StationDetailContent extends StatelessWidget {
     required this.facilityReportDraftTargetStore,
     required this.timetableRepository,
     required this.showContextChrome,
+    required this.showRealtimeSection,
     required this.onClose,
     required this.previousStation,
     required this.nextStation,
@@ -196,6 +203,7 @@ class _StationDetailContent extends StatelessWidget {
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
   final StationTimetableRepository? timetableRepository;
   final bool showContextChrome;
+  final bool showRealtimeSection;
   final VoidCallback? onClose;
   final StationDetailNeighbor? previousStation;
   final StationDetailNeighbor? nextStation;
@@ -217,13 +225,15 @@ class _StationDetailContent extends StatelessWidget {
         ),
         const SizedBox(height: 16),
       ],
-      const _StationDetailSectionTitle(title: '지금 열차'),
-      const SizedBox(height: 12),
-      StationRealtimeSummary(
-        snapshot: realtimeSnapshot,
-        onRetry: onRetryRealtime,
-      ),
-      const SizedBox(height: 20),
+      if (showRealtimeSection) ...[
+        const _StationDetailSectionTitle(title: '지금 열차'),
+        const SizedBox(height: 12),
+        StationRealtimeSummary(
+          snapshot: realtimeSnapshot,
+          onRetry: onRetryRealtime,
+        ),
+        const SizedBox(height: 20),
+      ],
       const _StationDetailSectionTitle(title: '이용하기'),
       const SizedBox(height: 12),
       StationDetailRouteActions(

@@ -256,6 +256,8 @@ class StationDetailExpandHost extends StatefulWidget {
     this.internalRouteMobilityType = 'SENIOR',
     this.routeDraftController,
     this.mapLauncher = const UrlLauncherKakaoMapLauncher(),
+    this.showContextChrome = true,
+    this.showRealtimeSection = true,
     this.onClose,
     this.previousStation,
     this.nextStation,
@@ -278,6 +280,8 @@ class StationDetailExpandHost extends StatefulWidget {
   final String internalRouteMobilityType;
   final RouteDraftController? routeDraftController;
   final KakaoMapLauncher mapLauncher;
+  final bool showContextChrome;
+  final bool showRealtimeSection;
   final VoidCallback? onClose;
   final StationDetailNeighbor? previousStation;
   final StationDetailNeighbor? nextStation;
@@ -385,7 +389,8 @@ class _StationDetailExpandHostState extends State<StationDetailExpandHost> {
             timetableRepository: widget.repository is StationTimetableRepository
                 ? widget.repository as StationTimetableRepository
                 : null,
-            showContextChrome: true,
+            showContextChrome: widget.showContextChrome,
+            showRealtimeSection: widget.showRealtimeSection,
             onClose: widget.onClose,
             previousStation: widget.previousStation,
             nextStation: widget.nextStation,

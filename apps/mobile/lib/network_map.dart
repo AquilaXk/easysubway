@@ -1894,59 +1894,99 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     if (selectedStationId == null) {
       return const _NetworkMapAdjacentStations();
     }
-    final primaryLineId = _nearbySelectedLineId;
-    final selectedStations = data.stations
-        .where((station) => station.id == selectedStationId)
-        .toList(growable: false);
-    if (selectedStations.isEmpty) {
-      return const _NetworkMapAdjacentStations();
-    }
-    final selectedStation = selectedStations.firstWhere(
-      (station) => station.lineId == primaryLineId,
-      orElse: () => selectedStations.first,
+    final pair = networkMapAdjacentStationPair(
+      stations: data.stations,
+      edges: data.edges,
+      stationId: selectedStationId,
+      lineId: _nearbySelectedLineId,
     );
-    NetworkMapStation? left;
-    NetworkMapStation? right;
-    for (final edge in data.edges) {
-      if (edge.lineId != selectedStation.lineId) {
-        continue;
-      }
-      final from = networkMapStationForMapEdgeEndpoint(
-        endpoint: edge.fromStationId,
-        lineId: edge.lineId,
-        stations: data.stations,
-      );
-      final to = networkMapStationForMapEdgeEndpoint(
-        endpoint: edge.toStationId,
-        lineId: edge.lineId,
-        stations: data.stations,
-      );
-      NetworkMapStation? candidate;
-      if (_sameMapStation(from, selectedStation)) {
-        candidate = to;
-      } else if (_sameMapStation(to, selectedStation)) {
-        candidate = from;
-      }
-      if (candidate == null) {
-        continue;
-      }
-      if (candidate.sequence < selectedStation.sequence) {
-        if (left == null || candidate.sequence > left.sequence) {
-          left = candidate;
-        }
-      } else if (candidate.sequence > selectedStation.sequence) {
-        if (right == null || candidate.sequence < right.sequence) {
-          right = candidate;
-        }
-      }
-    }
     return _NetworkMapAdjacentStations(
-      leftName: left?.nameKo,
-      rightName: right?.nameKo,
-      leftStationId: left?.id,
-      rightStationId: right?.id,
+      leftName: pair.leftName,
+      rightName: pair.rightName,
+      leftStationId: pair.leftStationId,
+      rightStationId: pair.rightStationId,
     );
   }
+}
+
+/// 노선도 하단 패널의 이전/다음 역.
+///
+/// [NetworkMapData.edges]는 카탈로그 `network_edges` LOCAL SUBWAY RIDE다.
+/// sequence/좌표로 이웃을 만들지 않고, 이미 적재된 topology edge만 따른다.
+@visibleForTesting
+({
+  String? leftName,
+  String? rightName,
+  String? leftStationId,
+  String? rightStationId,
+})
+networkMapAdjacentStationPair({
+  required Iterable<NetworkMapStation> stations,
+  required Iterable<NetworkMapEdge> edges,
+  required String stationId,
+  String? lineId,
+}) {
+  final selectedStations = stations
+      .where((station) => station.id == stationId)
+      .toList(growable: false);
+  if (selectedStations.isEmpty) {
+    return (
+      leftName: null,
+      rightName: null,
+      leftStationId: null,
+      rightStationId: null,
+    );
+  }
+  final selectedLineId = lineId?.trim();
+  final selected = selectedLineId == null || selectedLineId.isEmpty
+      ? selectedStations.first
+      : selectedStations.firstWhere(
+          (station) => station.lineId == selectedLineId,
+          orElse: () => selectedStations.first,
+        );
+
+  NetworkMapStation? left;
+  NetworkMapStation? right;
+  for (final edge in edges) {
+    if (edge.lineId != selected.lineId) {
+      continue;
+    }
+    final from = networkMapStationForMapEdgeEndpoint(
+      endpoint: edge.fromStationId,
+      lineId: edge.lineId,
+      stations: stations,
+    );
+    final to = networkMapStationForMapEdgeEndpoint(
+      endpoint: edge.toStationId,
+      lineId: edge.lineId,
+      stations: stations,
+    );
+    NetworkMapStation? candidate;
+    if (_sameMapStation(from, selected)) {
+      candidate = to;
+    } else if (_sameMapStation(to, selected)) {
+      candidate = from;
+    }
+    if (candidate == null) {
+      continue;
+    }
+    if (candidate.sequence < selected.sequence) {
+      if (left == null || candidate.sequence > left.sequence) {
+        left = candidate;
+      }
+    } else if (candidate.sequence > selected.sequence) {
+      if (right == null || candidate.sequence < right.sequence) {
+        right = candidate;
+      }
+    }
+  }
+
+  return (
+    leftName: left?.nameKo,
+    rightName: right?.nameKo,
+    leftStationId: left?.id,
+    rightStationId: right?.id,
+  );
 }
 
 bool _sameMapStation(NetworkMapStation? a, NetworkMapStation b) {
@@ -2124,8 +2164,10 @@ class _NetworkMapChrome extends StatelessWidget {
           ),
         if (nearbyPanelVisible && !inSearchMode)
           Positioned(
+            // 확장 시 상단 검색바까지 덮어 반쯤 열린 슬롭 시트를 막는다.
             left: 0,
             right: 0,
+            top: nearbyPanelExpanded ? 0 : null,
             bottom: 0,
             child: _NetworkMapNearbyStationPanel(
               data: nearbyPanelData,
@@ -3127,131 +3169,135 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
     final selectedLine = primary == null
         ? null
         : _nearbySelectedLine(primary, selectedLineId);
-    final panelHeight = expanded
-        ? MediaQuery.sizeOf(context).height * 0.92
-        : null;
     final canExpandDetail =
         expanded &&
         primary != null &&
         stationSearchRepository != null &&
         reportRepository != null;
 
+    final panel = SafeArea(
+      top: expanded,
+      bottom: true,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: expanded
+              ? null
+              : const Border(top: BorderSide(color: Color(0xFFD8D8D8))),
+        ),
+        child: Column(
+          mainAxisSize: expanded ? MainAxisSize.max : MainAxisSize.min,
+          children: [
+            SizedBox(
+              height: 52,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          for (final line
+                              in primary?.lines ?? const <StationSearchLine>[])
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 2),
+                              child: StationLineBadgeTab(
+                                line: line,
+                                selected: line.id == selectedLineId,
+                                onTap: () => onLineSelected(line),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 2),
+                    child: NearbyDataSourceToggle(
+                      isRealtime: dataSource == _NearbyPanelDataSource.realtime,
+                      enabled: dataSourceToggleEnabled,
+                      onToggle: onDataSourceToggle,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 2),
+                    child: IconButton(
+                      key: const Key('networkMapNearbyPanelCloseButton'),
+                      tooltip: '닫기',
+                      onPressed: onClose,
+                      constraints: const BoxConstraints.tightFor(
+                        width: 48,
+                        height: 48,
+                      ),
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(
+                        Icons.close,
+                        color: Color(0xFF454545),
+                        size: 27,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+              ),
+            ),
+            const Divider(height: 1, color: Color(0xFFD8D8D8)),
+            // 접힘·확장 모두 실시간/시간표 요약을 유지한다. 확장에서 Body로
+            // 갈아끼우면 이미 뜬 열차 정보가 실패 카드로 사라진다.
+            _NetworkMapNearbyPanelBody(
+              data: data,
+              realtime: realtime,
+              selectedLineId: selectedLineId,
+              dataSource: dataSource,
+              timetable: timetable,
+              adjacentStations: adjacentStations,
+              onOpenStationDetail: canExpandDetail ? null : onOpenStationDetail,
+            ),
+            if (canExpandDetail) ...[
+              const Divider(height: 1, color: Color(0xFFD8D8D8)),
+              Expanded(
+                child: StationDetailExpandHost(
+                  key: ValueKey('nearbyStationDetailHost-${primary.id}'),
+                  repository: stationSearchRepository!,
+                  reportRepository: reportRepository!,
+                  favoriteRepository: favoriteRepository,
+                  adRepository: adRepository,
+                  realtimeRepository: realtimeRepository,
+                  locationProvider: locationProvider,
+                  stationId: primary.id,
+                  facilityReportDraftTargetStore:
+                      facilityReportDraftTargetStore,
+                  internalRouteRepository: internalRouteRepository,
+                  internalRouteMobilityType: internalRouteMobilityType,
+                  routeDraftController: routeDraftController,
+                  // 상단 호선바·실시간/시간표가 맥락·열차를 담당한다.
+                  showContextChrome: false,
+                  showRealtimeSection: false,
+                  onClose: null,
+                  previousStation: adjacentStations.previousNeighbor,
+                  nextStation: adjacentStations.nextNeighbor,
+                  onSelectNeighbor: onSelectNeighbor,
+                  lineForChrome: selectedLine,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+
     return Material(
       key: const Key('networkMapNearbyStationPanel'),
       color: Colors.white,
       elevation: 0,
-      child: SizedBox(
-        key: expanded
-            ? const Key('networkMapNearbyStationPanelExpanded')
-            : null,
-        height: panelHeight,
-        child: SafeArea(
-          top: false,
-          child: DecoratedBox(
-            decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: Color(0xFFD8D8D8))),
-            ),
-            child: Column(
-              mainAxisSize: expanded ? MainAxisSize.max : MainAxisSize.min,
-              children: [
-                SizedBox(
-                  height: 52,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              for (final line
-                                  in primary?.lines ??
-                                      const <StationSearchLine>[])
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 2),
-                                  child: _SubwayLinePanelTab(
-                                    line: line,
-                                    selected: line.id == selectedLineId,
-                                    onTap: () => onLineSelected(line),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      if (!expanded)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 2),
-                          child: NearbyDataSourceToggle(
-                            isRealtime:
-                                dataSource == _NearbyPanelDataSource.realtime,
-                            enabled: dataSourceToggleEnabled,
-                            onToggle: onDataSourceToggle,
-                          ),
-                        ),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 2),
-                        child: IconButton(
-                          key: const Key('networkMapNearbyPanelCloseButton'),
-                          tooltip: '닫기',
-                          onPressed: onClose,
-                          constraints: const BoxConstraints.tightFor(
-                            width: 48,
-                            height: 48,
-                          ),
-                          padding: EdgeInsets.zero,
-                          icon: const Icon(
-                            Icons.close,
-                            color: Color(0xFF454545),
-                            size: 27,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1, color: Color(0xFFD8D8D8)),
-                if (canExpandDetail)
-                  Expanded(
-                    child: StationDetailExpandHost(
-                      key: ValueKey('nearbyStationDetailHost-${primary.id}'),
-                      repository: stationSearchRepository!,
-                      reportRepository: reportRepository!,
-                      favoriteRepository: favoriteRepository,
-                      adRepository: adRepository,
-                      realtimeRepository: realtimeRepository,
-                      locationProvider: locationProvider,
-                      stationId: primary.id,
-                      facilityReportDraftTargetStore:
-                          facilityReportDraftTargetStore,
-                      internalRouteRepository: internalRouteRepository,
-                      internalRouteMobilityType: internalRouteMobilityType,
-                      routeDraftController: routeDraftController,
-                      // 패널 상단 X가 닫기를 담당. Body chrome은 이웃 역·역명만.
-                      onClose: null,
-                      previousStation: adjacentStations.previousNeighbor,
-                      nextStation: adjacentStations.nextNeighbor,
-                      onSelectNeighbor: onSelectNeighbor,
-                      lineForChrome: selectedLine,
-                    ),
-                  )
-                else
-                  _NetworkMapNearbyPanelBody(
-                    data: data,
-                    realtime: realtime,
-                    selectedLineId: selectedLineId,
-                    dataSource: dataSource,
-                    timetable: timetable,
-                    adjacentStations: adjacentStations,
-                    onOpenStationDetail: onOpenStationDetail,
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
+      child: expanded
+          ? SizedBox.expand(
+              key: const Key('networkMapNearbyStationPanelExpanded'),
+              child: panel,
+            )
+          : panel,
     );
   }
 }
@@ -3379,72 +3425,6 @@ class _NetworkMapNearbySuccessList extends StatelessWidget {
                 ),
         ),
       ],
-    );
-  }
-}
-
-class _SubwayLinePanelTab extends StatelessWidget {
-  const _SubwayLinePanelTab({
-    required this.line,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final StationSearchLine line;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: '${line.name} 선택',
-      child: InkWell(
-        key: Key('networkMapNearbyLineTab-${line.id}'),
-        onTap: onTap,
-        child: SizedBox(
-          width: 48,
-          height: 48,
-          child: Center(
-            child: SizedBox(
-              width: 36,
-              height: 33,
-              child: Column(
-                children: [
-                  Container(
-                    width: 24,
-                    height: 24,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: line.badgeColor,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(
-                      line.badgeText,
-                      maxLines: 1,
-                      overflow: TextOverflow.clip,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  Container(
-                    width: 30,
-                    height: 2,
-                    color: selected
-                        ? const Color(0xFF5A5A5A)
-                        : Colors.transparent,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

@@ -103,6 +103,52 @@ class StationLineBadge extends StatelessWidget {
   }
 }
 
+/// 호선 선택 탭. [StationLineBadge]와 동일 마크에 선택 밑줄만 얹는다.
+class StationLineBadgeTab extends StatelessWidget {
+  const StationLineBadgeTab({
+    required this.line,
+    required this.selected,
+    required this.onTap,
+    this.size = 28,
+    super.key,
+  });
+
+  final StationSearchLine line;
+  final bool selected;
+  final VoidCallback onTap;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '${line.name} 선택',
+      child: InkWell(
+        key: Key('stationLineBadgeTab-${line.id}'),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: SizedBox(
+          width: 48,
+          height: 48,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              StationLineBadge(line: line, size: size),
+              const SizedBox(height: 4),
+              Container(
+                width: 30,
+                height: 2,
+                color: selected ? const Color(0xFF5A5A5A) : Colors.transparent,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _StationLineOverflowBadge extends StatelessWidget {
   const _StationLineOverflowBadge({required this.count, required this.size});
 
