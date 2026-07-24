@@ -34,6 +34,7 @@ import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_subscript
 import 'package:easysubway_mobile/features/network_map/domain/map_camera.dart';
 import 'package:easysubway_mobile/features/realtime/realtime_repository.dart';
 import 'package:easysubway_mobile/features/route_draft/application/route_draft_controller.dart';
+import 'package:easysubway_mobile/features/stations/presentation/station_detail_body.dart';
 import 'package:easysubway_mobile/features/stations/presentation/station_detail_screen.dart';
 import 'package:easysubway_mobile/features/stations/presentation/station_search_screen.dart';
 import 'package:easysubway_mobile/features/service_notice/data/notice_repository.dart';
@@ -10367,13 +10368,23 @@ void main() {
     await tester.tap(find.byKey(const Key('nearbyStationLineBarStationName')));
     await tester.pumpAndSettle();
 
-    expect(find.byType(StationDetailScreen), findsOneWidget);
-    await tester.tap(find.byKey(const Key('stationDetailBackButton')));
-    await tester.pumpAndSettle();
+    // #2436 PR-B: 역 이름 탭은 라우트 push 대신 패널 확장 + StationDetailBody.
     expect(find.byType(StationDetailScreen), findsNothing);
     expect(
-      find.byKey(const Key('networkMapNearbyStationPanel')),
+      find.byKey(const Key('networkMapNearbyStationPanelExpanded')),
       findsOneWidget,
+    );
+    expect(find.byType(StationDetailBody), findsOneWidget);
+    expect(find.byKey(const Key('stationDetailList')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('networkMapNearbyPanelCloseButton')));
+    await tester.pumpAndSettle();
+    expect(find.byType(StationDetailScreen), findsNothing);
+    expect(find.byType(StationDetailBody), findsNothing);
+    expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
+    expect(
+      find.byKey(const Key('networkMapNearbyStationPanelExpanded')),
+      findsNothing,
     );
   });
 
