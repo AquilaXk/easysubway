@@ -508,7 +508,8 @@ class _StationDetailContextChrome extends StatelessWidget {
                   '${detail.nameKo}역',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: EasySubwayAccessibleColors.text,
-                    fontWeight: FontWeight.w800,
+                    // #1915: 섹션/컨텍스트 헤더는 w800 금지. 화면 타이틀 전용 ratchet.
+                    fontWeight: FontWeight.w700,
                     height: 1.2,
                   ),
                 ),
