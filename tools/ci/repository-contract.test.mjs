@@ -8931,6 +8931,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "gwangju-transportation-accessibility",
     "gwangju-transportation-cyberstation-timetable",
     "gwangju-transportation-route-topology",
+    "incheon-transit-station-info",
     "kric-disabled-toilet",
     "kric-elevator-car-number",
     "kric-metropolitan-rail-station-info",
