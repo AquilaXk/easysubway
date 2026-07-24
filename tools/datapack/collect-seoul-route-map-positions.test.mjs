@@ -135,4 +135,3 @@ test("서로 다른 역명이 동일 좌표를 쓰면 snapshot validation이 fai
   tampered.positionsSha256 = createHash("sha256").update(JSON.stringify(tampered.positions)).digest("hex");
   assert.throws(() => validateSeoulRouteMapPositionsSnapshot(tampered), /invalid Seoul route map positions snapshot/);
 });
-
