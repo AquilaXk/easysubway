@@ -41,7 +41,7 @@ class EasySubwayFamilyAppBar extends StatelessWidget
       leading:
           leading ??
           IconButton(
-            key: backButtonKey,
+            key: backButtonKey ?? const Key('easySubwayFamilyAppBarBack'),
             tooltip: '뒤로',
             onPressed: onBack ?? () => Navigator.of(context).maybePop(),
             style: IconButton.styleFrom(

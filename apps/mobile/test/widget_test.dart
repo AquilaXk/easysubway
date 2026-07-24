@@ -8661,7 +8661,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     favoriteRepository.error = StateError('favorite failed');
-    await tester.pageBack();
+    await tester.tap(find.byKey(const Key('stationDetailBackButton')));
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
@@ -10318,7 +10318,7 @@ void main() {
     );
     expect(find.byKey(const Key('networkMapStationSheet')), findsNothing);
 
-    await tester.pageBack();
+    await tester.tap(find.byKey(const Key('stationDetailBackButton')));
     await tester.pumpAndSettle();
 
     expect(find.byType(StationDetailScreen), findsNothing);
@@ -10366,7 +10366,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(StationDetailScreen), findsOneWidget);
-    await tester.pageBack();
+    await tester.tap(find.byKey(const Key('stationDetailBackButton')));
     await tester.pumpAndSettle();
     expect(find.byType(StationDetailScreen), findsNothing);
     expect(
@@ -13693,7 +13693,7 @@ void main() {
 
     expect(favoriteRepository.removedStationIds, ['station-sangnoksu']);
 
-    await tester.pageBack();
+    await tester.tap(find.byKey(const Key('stationDetailBackButton')));
     await tester.pumpAndSettle();
 
     expect(find.text('즐겨찾기한 항목이 없습니다.'), findsOneWidget);
