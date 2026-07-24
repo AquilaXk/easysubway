@@ -8966,6 +8966,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "molit-urban-rail-full-route-gwangju-membership",
     "seoul-metro-accessibility",
     "seoul-metro-fast-exit-car-door",
+    "seoul-metro-line9-23-route-map-positions",
     "seoul-metro-official-od-fare-canary",
     "seoul-metro-official-od-fares",
     "seoul-metro-route-map-positions",
