@@ -63,6 +63,7 @@ test("인천 timetable collector는 1·2호선 WEEK/HOLI 상·하선 FILE을 tri
     assert.equal(snapshot.topologySnapshotId, "incheon-transit-station-info-20260724");
     assert.equal(snapshot.topologyContentSha256, topologySnapshot.contentSha256);
     assert.equal(snapshot.tripsSha256, createHash("sha256").update(JSON.stringify(snapshot.trips)).digest("hex"));
+    assert.equal(snapshot.rowsSha256, snapshot.tripsSha256);
     assert.equal(
       snapshot.contentSha256,
       createHash("sha256").update(JSON.stringify({

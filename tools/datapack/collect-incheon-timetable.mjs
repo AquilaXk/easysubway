@@ -190,6 +190,7 @@ export function parseIncheonTrainTimetable(files, topologySnapshot, {
     }],
     trips,
     tripsSha256,
+    rowsSha256: tripsSha256,
     rawWeekdayUpSha256: rawHashes["WEEK:up"],
     rawWeekdayDownSha256: rawHashes["WEEK:dn"],
     rawHolidayUpSha256: rawHashes["HOLI:up"],

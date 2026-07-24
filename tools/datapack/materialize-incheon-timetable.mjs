@@ -182,12 +182,12 @@ function requiredSource(inventory, config, timetable, topologySnapshot, now) {
     || evidence.capturedAt !== timetable.capturedAt || evidence.freshUntil !== timetable.freshUntil
     || evidence.tripCount !== config.tripCount || evidence.stopTimeCount !== config.stopTimeCount
     || evidence.rowCount !== timetable.rowCount || evidence.departureCount !== config.stopTimeCount
-    || evidence.rawSha256 !== timetable.rawSha256 || evidence.rowsSha256 !== timetable.tripsSha256
+    || evidence.rawSha256 !== timetable.rawSha256 || evidence.rowsSha256 !== timetable.rowsSha256
     || evidence.tripsSha256 !== timetable.tripsSha256
     || evidence.contentSha256 !== timetable.contentSha256
     || evidence.rawUpSha256 !== timetable.rawUpSha256 || evidence.rawDownSha256 !== timetable.rawDownSha256
     || evidence.rolloverTripCount !== timetable.rolloverTripCount
-    || evidence.dayLabelNormalizedCount !== timetable.destinationLabelNormalizedCount
+    || evidence.destinationLabelNormalizedCount !== timetable.destinationLabelNormalizedCount
     || evidence.topologySourceId !== TOPOLOGY_SOURCE_ID
     || evidence.topologySnapshotId !== TOPOLOGY_SNAPSHOT_ID
     || evidence.topologyContentSha256 !== topologySnapshot.contentSha256

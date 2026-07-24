@@ -1290,9 +1290,9 @@
         "rawUpSha256": "f07b4a0c314169fe8359f8ee998b47a4549177c15fd8e24782dc083313bf1891",
         "rawDownSha256": "119944b4a66c4602a425841b0528eb208838145772612d469e06383492a161d1",
         "tripsSha256": "cadbf0e7b064b097674769833b051ca1334b346285dbb5c2babe1d84a862fd71",
-        "dayLabelNormalizedCount": 35,
         "rolloverTripCount": 25,
-        "contentSha256": "27a2afeef9f8f8c2224bf6f1f54e28b0c6dd4e10e2bab802a5e7f6a2dc41f50f"
+        "contentSha256": "27a2afeef9f8f8c2224bf6f1f54e28b0c6dd4e10e2bab802a5e7f6a2dc41f50f",
+        "destinationLabelNormalizedCount": 35
       }
     },
     {
@@ -1383,9 +1383,9 @@
         "rawUpSha256": "5ff5b31fb13d165a0026cb8406c5dc213bbf2d1a28bc46daa52fccc6945d205c",
         "rawDownSha256": "7a39e1b8f7a8139db184aece45f0b6c66da0c941540481efb50f71e46021c6cd",
         "tripsSha256": "00558f197df117c76f3704e93bb0a53a620130c06382a5056b35e84f94285c2b",
-        "dayLabelNormalizedCount": 0,
         "rolloverTripCount": 23,
-        "contentSha256": "077fbc0d5186e19063e6082c2345417c1051d1d5fbc8d426f37f50a9b2e47ba0"
+        "contentSha256": "077fbc0d5186e19063e6082c2345417c1051d1d5fbc8d426f37f50a9b2e47ba0",
+        "destinationLabelNormalizedCount": 0
       }
     },
     {
