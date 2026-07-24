@@ -630,7 +630,10 @@ class DriftStationRepository
       selectedRegion: selectedRegion,
       lines: lines,
       stations: stations,
-      edges: _networkMapEdges(stations),
+      edges: await _networkMapRideEdges(
+        stations: stations,
+        selectedLineIds: selectedLineIds,
+      ),
       positionSources: await _networkMapPositionSources(selectedRegion),
       stationLineMemberships: stationLineMemberships,
       lineTracks: await _networkMapLineTracks(selectedRegion, selectedLineIds),
@@ -726,29 +729,61 @@ class DriftStationRepository
         .toList(growable: false);
   }
 
-  List<NetworkMapEdge> _networkMapEdges(List<NetworkMapStation> stations) {
-    final byLine = <String, List<NetworkMapStation>>{};
-    for (final station in stations) {
-      byLine.putIfAbsent(station.lineId, () => []).add(station);
+  /// 패널 앞·뒤 역은 `line_sequence` 체인/좌표 휴리스틱이 아니라
+  /// 카탈로그 `network_edges` LOCAL SUBWAY RIDE만 쓴다.
+  Future<List<NetworkMapEdge>> _networkMapRideEdges({
+    required List<NetworkMapStation> stations,
+    required Set<String> selectedLineIds,
+  }) async {
+    if (stations.isEmpty || selectedLineIds.isEmpty) {
+      return const [];
     }
+    final stationKeys = {
+      for (final station in stations) _mapStationKey(station),
+    };
+    final rows = await database
+        .customSelect(
+          '''
+          SELECT
+            id,
+            from_node_id,
+            to_node_id,
+            accessibility_status,
+            reliability_score
+          FROM network_edges
+          WHERE edge_type = 'RIDE'
+            AND UPPER(COALESCE(service_class, 'SUBWAY')) = 'SUBWAY'
+            AND UPPER(COALESCE(NULLIF(service_pattern, ''), 'LOCAL')) = 'LOCAL'
+          ''',
+        )
+        .get();
     final edges = <NetworkMapEdge>[];
-    for (final entry in byLine.entries) {
-      final sortedStations = [...entry.value]
-        ..sort((a, b) => a.sequence.compareTo(b.sequence));
-      for (var index = 0; index < sortedStations.length - 1; index += 1) {
-        final from = sortedStations[index];
-        final to = sortedStations[index + 1];
-        edges.add(
-          NetworkMapEdge(
-            id: 'map-edge-${entry.key}-${from.id}-${to.id}',
-            lineId: entry.key,
-            fromStationId: _mapStationKey(from),
-            toStationId: _mapStationKey(to),
-            accessibilityStatus: 'AVAILABLE',
-            reliabilityScore: 100,
-          ),
-        );
+    for (final row in rows) {
+      final fromNodeId = row.read<String>('from_node_id');
+      final toNodeId = row.read<String>('to_node_id');
+      final fromLineId = _lineIdFromNetworkNode(fromNodeId);
+      final toLineId = _lineIdFromNetworkNode(toNodeId);
+      if (fromLineId == null ||
+          toLineId == null ||
+          fromLineId != toLineId ||
+          !selectedLineIds.contains(fromLineId)) {
+        continue;
       }
+      if (!stationKeys.contains(fromNodeId) ||
+          !stationKeys.contains(toNodeId)) {
+        continue;
+      }
+      edges.add(
+        NetworkMapEdge(
+          id: row.read<String>('id'),
+          lineId: fromLineId,
+          fromStationId: fromNodeId,
+          toStationId: toNodeId,
+          accessibilityStatus:
+              row.read<String?>('accessibility_status') ?? 'UNKNOWN',
+          reliabilityScore: row.read<int?>('reliability_score') ?? 100,
+        ),
+      );
     }
     return edges;
   }
@@ -866,6 +901,14 @@ class DriftStationRepository
 
 String _mapStationKey(NetworkMapStation station) =>
     '${station.id}:${station.lineId}';
+
+String? _lineIdFromNetworkNode(String nodeId) {
+  final separator = nodeId.indexOf(':');
+  if (separator <= 0 || separator >= nodeId.length - 1) {
+    return null;
+  }
+  return nodeId.substring(separator + 1);
+}
 
 class _LocalStationSummary {
   _LocalStationSummary({

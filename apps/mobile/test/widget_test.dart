@@ -3483,6 +3483,75 @@ void main() {
     );
   });
 
+  test('패널 인접은 network_edges RIDE만 따르고 sequence 충돌 역은 무시한다', () {
+    // 1호선 지선이 같은 line_sequence를 공유해도, 공식 topology edge
+    // (관악↔안양↔명학)만 있으면 소사/부천이 끼어들지 않는다.
+    NetworkMapStation station({
+      required String id,
+      required String name,
+      required int sequence,
+      required int x,
+      required int y,
+    }) {
+      return NetworkMapStation(
+        id: id,
+        nameKo: name,
+        nameEn: name,
+        region: '수도권',
+        lineId: 'line-472a81add377',
+        stationCode: id,
+        sequence: sequence,
+        position: NetworkMapPosition(
+          x: x,
+          y: y,
+          labelDx: 0,
+          labelDy: 0,
+          upPath: '',
+          downPath: '',
+          sourceId: 'fixture-line1-branch',
+        ),
+      );
+    }
+
+    NetworkMapEdge ride(String fromId, String toId) {
+      return NetworkMapEdge(
+        id: 'edge-$fromId-$toId',
+        lineId: 'line-472a81add377',
+        fromStationId: '$fromId:line-472a81add377',
+        toStationId: '$toId:line-472a81add377',
+        accessibilityStatus: 'UNKNOWN',
+        reliabilityScore: 100,
+      );
+    }
+
+    final stations = [
+      station(id: 'gwanak', name: '관악', sequence: 50, x: 1240, y: 2075),
+      station(id: 'yeokgok', name: '역곡', sequence: 50, x: 869, y: 1758),
+      station(id: 'sosa', name: '소사', sequence: 51, x: 820, y: 1757),
+      station(id: 'anyang', name: '안양', sequence: 51, x: 1282, y: 2122),
+      station(id: 'bucheon', name: '부천', sequence: 52, x: 755, y: 1758),
+      station(id: 'myeonghak', name: '명학', sequence: 52, x: 1328, y: 2173),
+    ];
+    final edges = [
+      ride('gwanak', 'anyang'),
+      ride('anyang', 'gwanak'),
+      ride('anyang', 'myeonghak'),
+      ride('myeonghak', 'anyang'),
+    ];
+
+    final pair = networkMapAdjacentStationPair(
+      stations: stations,
+      edges: edges,
+      stationId: 'anyang',
+      lineId: 'line-472a81add377',
+    );
+
+    expect(pair.leftName, '관악');
+    expect(pair.rightName, '명학');
+    expect(pair.leftStationId, 'gwanak');
+    expect(pair.rightStationId, 'myeonghak');
+  });
+
   // #2099 WP2: 노선도의 일반/급행 뷰 토글과 급행 전용 필터 데이터 경로는
   // 제거됐다(일반/급행은 선택 UI가 아니라 실제 운행 정보). 노선도에 선택 control이
   // 0건임은 '노선도 첫 화면은 하단 광고 위에 지도 조작을 유지한다' 테스트가 지킨다.
@@ -4993,20 +5062,20 @@ void main() {
     );
     expect(find.text('상록수'), findsOneWidget);
     expect(
-      find.byKey(const Key('networkMapNearbyLineTab-seoul-2')),
+      find.byKey(const Key('stationLineBadgeTab-seoul-2')),
       findsOneWidget,
     );
     expect(
-      find.byKey(const Key('networkMapNearbyLineTab-seoul-4')),
+      find.byKey(const Key('stationLineBadgeTab-seoul-4')),
       findsOneWidget,
     );
     expect(
-      tester.getSize(find.byKey(const Key('networkMapNearbyLineTab-seoul-2'))),
+      tester.getSize(find.byKey(const Key('stationLineBadgeTab-seoul-2'))),
       const Size(48, 48),
     );
     expect(realtimeRepository.queries.last.lineId, 'seoul-2');
 
-    await tester.tap(find.byKey(const Key('networkMapNearbyLineTab-seoul-4')));
+    await tester.tap(find.byKey(const Key('stationLineBadgeTab-seoul-4')));
     await tester.pumpAndSettle();
 
     expect(realtimeRepository.queries.last.lineId, 'seoul-4');
@@ -6173,7 +6242,7 @@ void main() {
     );
 
     // 2호선으로 바꿔도 시간표 선택 유지. 2호선 시간표가 오면 이전 4호선 전용 도착 텍스트는 없다.
-    await tester.tap(find.byKey(const Key('networkMapNearbyLineTab-seoul-2')));
+    await tester.tap(find.byKey(const Key('stationLineBadgeTab-seoul-2')));
     await tester.pump();
     await tester.pumpAndSettle();
     expect(find.bySemanticsLabel('시간표 선택됨'), findsOneWidget);
@@ -6183,7 +6252,7 @@ void main() {
     );
 
     // 다시 4호선: 시간표 유지 + 이전 호선(2호선) 시간표 시각 미노출 + 새 호선 방면.
-    await tester.tap(find.byKey(const Key('networkMapNearbyLineTab-seoul-4')));
+    await tester.tap(find.byKey(const Key('stationLineBadgeTab-seoul-4')));
     await tester.pump();
     expect(find.bySemanticsLabel('시간표 선택됨'), findsOneWidget);
     expect(
@@ -6231,7 +6300,7 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.byKey(const Key('networkMapNearbyLineTab-seoul-2')));
+    await tester.tap(find.byKey(const Key('stationLineBadgeTab-seoul-2')));
     await tester.pump();
     expect(find.bySemanticsLabel('실시간 선택됨'), findsOneWidget);
     expect(find.bySemanticsLabel('시간표 선택됨'), findsNothing);
@@ -6330,7 +6399,7 @@ void main() {
     );
     await tester.pump();
 
-    await tester.tap(find.byKey(const Key('networkMapNearbyLineTab-seoul-4')));
+    await tester.tap(find.byKey(const Key('stationLineBadgeTab-seoul-4')));
     await tester.pump();
 
     // 이전 호선(2호선)의 늦은 성공 응답은 현재 4호선 패널에 반영되면 안 된다.
@@ -6475,7 +6544,7 @@ void main() {
     );
     await tester.pump();
 
-    await tester.tap(find.byKey(const Key('networkMapNearbyLineTab-seoul-4')));
+    await tester.tap(find.byKey(const Key('stationLineBadgeTab-seoul-4')));
     await tester.pump();
     expect(find.bySemanticsLabel('실시간 선택됨'), findsOneWidget);
 
@@ -10368,14 +10437,19 @@ void main() {
     await tester.tap(find.byKey(const Key('nearbyStationLineBarStationName')));
     await tester.pumpAndSettle();
 
-    // #2436 PR-B: 역 이름 탭은 라우트 push 대신 패널 확장 + StationDetailBody.
+    // #2436: 역 이름 탭은 전체 화면 확장. 상단 실시간/시간표 요약은 유지하고
+    // Body는 「지금 열차」중복 없이 아래에 붙는다.
     expect(find.byType(StationDetailScreen), findsNothing);
     expect(
       find.byKey(const Key('networkMapNearbyStationPanelExpanded')),
       findsOneWidget,
     );
     expect(find.byType(StationDetailBody), findsOneWidget);
-    expect(find.byKey(const Key('stationDetailList')), findsOneWidget);
+    expect(
+      find.byKey(const Key('nearbyStationLineBarStationName')),
+      findsOneWidget,
+    );
+    expect(find.text('지금 열차'), findsNothing);
 
     await tester.tap(find.byKey(const Key('networkMapNearbyPanelCloseButton')));
     await tester.pumpAndSettle();

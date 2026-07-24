@@ -18,6 +18,8 @@ Widget _hostBar({
   String stationName = '왕십리',
   String badgeText = '2',
   double width = 375,
+  VoidCallback? onLeftNameTap,
+  VoidCallback? onRightNameTap,
 }) {
   return MaterialApp(
     home: Scaffold(
@@ -30,6 +32,8 @@ Widget _hostBar({
             stationName: stationName,
             badgeText: badgeText,
             lineColor: lineColor,
+            onLeftNameTap: onLeftNameTap,
+            onRightNameTap: onRightNameTap,
           ),
         ),
       ),
@@ -43,6 +47,25 @@ BoxDecoration _decoration(WidgetTester tester, Key key) {
 
 void main() {
   group('NearbyStationLineBar (Task 3)', () {
+    testWidgets('이전·다음 역 이름을 탭하면 콜백이 호출된다', (tester) async {
+      var leftTaps = 0;
+      var rightTaps = 0;
+      await tester.pumpWidget(
+        _hostBar(
+          lineColor: _line2Green,
+          onLeftNameTap: () => leftTaps++,
+          onRightNameTap: () => rightTaps++,
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('nearbyStationLineBarLeftName')));
+      await tester.tap(find.byKey(const Key('nearbyStationLineBarRightName')));
+      await tester.pump();
+
+      expect(leftTaps, 1);
+      expect(rightTaps, 1);
+    });
+
     testWidgets('2호선 선택 시 좌우 바가 모두 동일 노선색(#00A84D)이다', (tester) async {
       await tester.pumpWidget(_hostBar(lineColor: _line2Green));
 

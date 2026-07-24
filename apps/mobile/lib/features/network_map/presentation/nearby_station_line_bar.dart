@@ -14,6 +14,8 @@ class NearbyStationLineBar extends StatelessWidget {
     required this.badgeText,
     required this.lineColor,
     this.onStationNameTap,
+    this.onLeftNameTap,
+    this.onRightNameTap,
     super.key,
   });
 
@@ -26,9 +28,25 @@ class NearbyStationLineBar extends StatelessWidget {
   /// 현재 역 이름 탭 → 역 상세. null이면 이름만 표시한다.
   final VoidCallback? onStationNameTap;
 
+  /// 이전(왼쪽) 역 탭. null이면 표시만 한다.
+  final VoidCallback? onLeftNameTap;
+
+  /// 다음(오른쪽) 역 탭. null이면 표시만 한다.
+  final VoidCallback? onRightNameTap;
+
   @override
   Widget build(BuildContext context) {
     final openDetail = onStationNameTap;
+    final hasNeighborActions = onLeftNameTap != null || onRightNameTap != null;
+    // 좌·우 이웃 탭이 있으면 자식 Semantics가 담당한다. 없으면 기존처럼
+    // 바 전체를 상세 보기 버튼으로 묶는다.
+    if (hasNeighborActions) {
+      return Semantics(
+        container: true,
+        label: _semanticsLabel(),
+        child: _buildBar(excludeChildSemantics: false),
+      );
+    }
     return Semantics(
       container: true,
       label: openDetail == null
@@ -36,7 +54,7 @@ class NearbyStationLineBar extends StatelessWidget {
           : '${_semanticsLabel()}, 상세 보기',
       button: openDetail != null,
       onTap: openDetail,
-      child: ExcludeSemantics(child: _buildBar()),
+      child: ExcludeSemantics(child: _buildBar(excludeChildSemantics: true)),
     );
   }
 
@@ -56,7 +74,7 @@ class NearbyStationLineBar extends StatelessWidget {
     return parts.join(', ');
   }
 
-  Widget _buildBar() {
+  Widget _buildBar({required bool excludeChildSemantics}) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final fullWidth = constraints.maxWidth;
@@ -69,7 +87,7 @@ class NearbyStationLineBar extends StatelessWidget {
         final capsuleHeight = capsuleWidth * 41 / 129;
         final badgeDiameter = capsuleWidth * 0.18;
         final stationNameSize = (capsuleHeight * 0.42).clamp(16.0, 20.0);
-        return Padding(
+        final bar = Padding(
           padding: const EdgeInsets.only(top: 18),
           child: Center(
             child: SizedBox(
@@ -90,9 +108,21 @@ class NearbyStationLineBar extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        Expanded(child: _SideName(name: leftName)),
+                        Expanded(
+                          child: _SideName(
+                            name: leftName,
+                            semanticsPrefix: '이전역',
+                            onTap: onLeftNameTap,
+                          ),
+                        ),
                         SizedBox(width: centerWidth),
-                        Expanded(child: _SideName(name: rightName)),
+                        Expanded(
+                          child: _SideName(
+                            name: rightName,
+                            semanticsPrefix: '다음역',
+                            onTap: onRightNameTap,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -136,6 +166,7 @@ class NearbyStationLineBar extends StatelessWidget {
             ),
           ),
         );
+        return excludeChildSemantics ? ExcludeSemantics(child: bar) : bar;
       },
     );
   }
@@ -167,7 +198,10 @@ class _StationNameLabel extends StatelessWidget {
     );
     final tap = onTap;
     if (tap == null) {
-      return text;
+      return KeyedSubtree(
+        key: const Key('nearbyStationLineBarStationName'),
+        child: text,
+      );
     }
     // TalkBack 라벨·동작은 상위 NearbyStationLineBar Semantics가 담당한다.
     return InkWell(
@@ -180,9 +214,15 @@ class _StationNameLabel extends StatelessWidget {
 }
 
 class _SideName extends StatelessWidget {
-  const _SideName({required this.name});
+  const _SideName({
+    required this.name,
+    required this.semanticsPrefix,
+    this.onTap,
+  });
 
   final String? name;
+  final String semanticsPrefix;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -190,17 +230,40 @@ class _SideName extends StatelessWidget {
     if (value == null || value.isEmpty) {
       return const SizedBox.shrink();
     }
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      child: Text(
-        value,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 15,
-          fontWeight: FontWeight.w700,
+    final label = Text(
+      value,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      textAlign: TextAlign.center,
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 15,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+    final tap = onTap;
+    if (tap == null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: label,
+      );
+    }
+    return Semantics(
+      button: true,
+      label: '$semanticsPrefix $value',
+      child: InkWell(
+        key: Key(
+          semanticsPrefix == '이전역'
+              ? 'nearbyStationLineBarLeftName'
+              : 'nearbyStationLineBarRightName',
+        ),
+        onTap: tap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Center(child: label),
+          ),
         ),
       ),
     );
