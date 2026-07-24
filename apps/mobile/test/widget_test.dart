@@ -5775,136 +5775,133 @@ void main() {
     await tester.pump();
   });
 
-  testWidgets(
-    '토글 후 이전 채널 요청이 끝나도 시간표 재조회가 고아 in-flight에 막히지 않는다',
-    (tester) async {
-      tester.view.physicalSize = const Size(320, 1200);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(() {
-        tester.view.resetPhysicalSize();
-        tester.view.resetDevicePixelRatio();
-      });
-      final secondRealtimeCompleter = Completer<RealtimeSnapshot>();
-      final timetableCompleter = Completer<StationTimetable>();
-      addTearDown(() {
-        if (!secondRealtimeCompleter.isCompleted) {
-          secondRealtimeCompleter.complete(
-            const RealtimeSnapshot.unavailable(),
-          );
-        }
-        if (!timetableCompleter.isCompleted) {
-          timetableCompleter.complete(
-            StationTimetable(
-              stationId: 'station-sangnoksu',
-              lineId: 'seoul-4',
-              dayType: StationTimetableDayType.weekday,
-              directions: const [],
-            ),
-          );
-        }
-      });
-      final now = DateTime.now();
-      final departure = StationTimetableDeparture(
-        directionName: '오이도',
-        seconds:
-            now.hour * Duration.secondsPerHour +
-            now.minute * Duration.secondsPerMinute +
-            now.second +
-            180,
-      );
-      final repository = _HangingTimetableStationRepository(
-        completer: timetableCompleter,
-        stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
-        networkMapRegionNames: const ['수도권'],
-        nearbyResults: [
-          _stationResult(
-            id: 'station-sangnoksu',
-            name: '상록수',
-            lines: const [
-              StationSearchLine(
-                id: 'seoul-4',
-                name: '수도권 4호선',
-                color: '#00A5DE',
-                stationCode: '448',
-              ),
-            ],
-          ),
-        ],
-      );
-      await _pumpNetworkMapForGpsTest(
-        tester,
-        repository: repository,
-        locationProvider: FakeCurrentLocationProvider(
-          location: _freshCurrentLocation(),
-          needsPermissionRequest: false,
-        ),
-        realtimeRepository: _SequenceRealtimeRepository(
-          first: const RealtimeSnapshot.unavailable(),
-          second: secondRealtimeCompleter,
-        ),
-      );
-
-      await tester.tap(find.byKey(const Key('nearbyStationButton')));
-      await tester.pump();
-      await tester.pump();
-
-      // 오픈 prefetch 실시간 실패는 시간표 탭에서 no-op. 시간표는 hanging.
-      expect(find.bySemanticsLabel('시간표 선택됨'), findsOneWidget);
-
-      // 실시간 토글 → generation 상승 + 실시간만 재조회(두 번째 호출은 hanging).
-      await tester.tap(
-        find.descendant(
-          of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
-          matching: find.text('실시간'),
-        ),
-      );
-      await tester.pump();
-      expect(find.bySemanticsLabel('실시간 선택됨'), findsOneWidget);
-
-      // stale 시간표 완료. 고아 in-flight가 남으면 다음 시간표 토글이 재조회를 막는다.
-      timetableCompleter.complete(
-        StationTimetable(
-          stationId: 'station-sangnoksu',
-          lineId: 'seoul-4',
-          dayType: StationTimetableDayType.weekday,
-          directions: [
-            StationTimetableDirection(name: '오이도', departures: [departure]),
-          ],
-        ),
-      );
-      await tester.pump();
-
-      await tester.tap(
-        find.descendant(
-          of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
-          matching: find.text('시간표'),
-        ),
-      );
-      await tester.pump();
-      await tester.pump();
-
-      final panel = find.byKey(const Key('networkMapNearbyStationPanel'));
-      expect(find.bySemanticsLabel('시간표 선택됨'), findsOneWidget);
-      expect(
-        find.descendant(of: panel, matching: find.text(departure.timeLabel)),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: panel,
-          matching: find.byType(CircularProgressIndicator),
-        ),
-        findsNothing,
-      );
-
-      // 두 번째 실시간 Future·timeout Timer를 정리한다.
+  testWidgets('토글 후 이전 채널 요청이 끝나도 시간표 재조회가 고아 in-flight에 막히지 않는다', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final secondRealtimeCompleter = Completer<RealtimeSnapshot>();
+    final timetableCompleter = Completer<StationTimetable>();
+    addTearDown(() {
       if (!secondRealtimeCompleter.isCompleted) {
         secondRealtimeCompleter.complete(const RealtimeSnapshot.unavailable());
       }
-      await tester.pump(const Duration(seconds: 2));
-      await tester.pump();
-    },
-  );
+      if (!timetableCompleter.isCompleted) {
+        timetableCompleter.complete(
+          StationTimetable(
+            stationId: 'station-sangnoksu',
+            lineId: 'seoul-4',
+            dayType: StationTimetableDayType.weekday,
+            directions: const [],
+          ),
+        );
+      }
+    });
+    final now = DateTime.now();
+    final departure = StationTimetableDeparture(
+      directionName: '오이도',
+      seconds:
+          now.hour * Duration.secondsPerHour +
+          now.minute * Duration.secondsPerMinute +
+          now.second +
+          180,
+    );
+    final repository = _HangingTimetableStationRepository(
+      completer: timetableCompleter,
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+      networkMapRegionNames: const ['수도권'],
+      nearbyResults: [
+        _stationResult(
+          id: 'station-sangnoksu',
+          name: '상록수',
+          lines: const [
+            StationSearchLine(
+              id: 'seoul-4',
+              name: '수도권 4호선',
+              color: '#00A5DE',
+              stationCode: '448',
+            ),
+          ],
+        ),
+      ],
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+      realtimeRepository: _SequenceRealtimeRepository(
+        first: const RealtimeSnapshot.unavailable(),
+        second: secondRealtimeCompleter,
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pump();
+    await tester.pump();
+
+    // 오픈 prefetch 실시간 실패는 시간표 탭에서 no-op. 시간표는 hanging.
+    expect(find.bySemanticsLabel('시간표 선택됨'), findsOneWidget);
+
+    // 실시간 토글 → generation 상승 + 실시간만 재조회(두 번째 호출은 hanging).
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
+        matching: find.text('실시간'),
+      ),
+    );
+    await tester.pump();
+    expect(find.bySemanticsLabel('실시간 선택됨'), findsOneWidget);
+
+    // stale 시간표 완료. 고아 in-flight가 남으면 다음 시간표 토글이 재조회를 막는다.
+    timetableCompleter.complete(
+      StationTimetable(
+        stationId: 'station-sangnoksu',
+        lineId: 'seoul-4',
+        dayType: StationTimetableDayType.weekday,
+        directions: [
+          StationTimetableDirection(name: '오이도', departures: [departure]),
+        ],
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
+        matching: find.text('시간표'),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    final panel = find.byKey(const Key('networkMapNearbyStationPanel'));
+    expect(find.bySemanticsLabel('시간표 선택됨'), findsOneWidget);
+    expect(
+      find.descendant(of: panel, matching: find.text(departure.timeLabel)),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: panel,
+        matching: find.byType(CircularProgressIndicator),
+      ),
+      findsNothing,
+    );
+
+    // 두 번째 실시간 Future·timeout Timer를 정리한다.
+    if (!secondRealtimeCompleter.isCompleted) {
+      secondRealtimeCompleter.complete(const RealtimeSnapshot.unavailable());
+    }
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+  });
 
   testWidgets('실시간 unavailable 시 시간표로 자동 전환한다', (tester) async {
     tester.view.physicalSize = const Size(320, 1200);
@@ -8664,7 +8661,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     favoriteRepository.error = StateError('favorite failed');
-    await tester.pageBack();
+    await tester.tap(find.byKey(const Key('stationDetailBackButton')));
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
@@ -9513,7 +9510,7 @@ void main() {
       expect(find.text('상록수역'), findsOneWidget);
       expect(find.text('정보 신뢰도 높음'), findsNothing);
       expect(find.text('출처 공식 파일'), findsNothing);
-      expect(find.widgetWithText(TextButton, '시설 알려주기'), findsOneWidget);
+      expect(find.widgetWithText(TextButton, '시설 제보'), findsOneWidget);
       expect(
         find.byKey(
           const Key(
@@ -9553,7 +9550,7 @@ void main() {
       tester,
       tabKey: const Key('favoriteFacilitiesTabButton'),
     );
-    await tester.tap(find.widgetWithText(TextButton, '시설 알려주기'));
+    await tester.tap(find.widgetWithText(TextButton, '시설 제보'));
     await tester.pumpAndSettle();
 
     // 진입 시에는 위치 권한 확인·요청을 하지 않는다.
@@ -10321,7 +10318,7 @@ void main() {
     );
     expect(find.byKey(const Key('networkMapStationSheet')), findsNothing);
 
-    await tester.pageBack();
+    await tester.tap(find.byKey(const Key('stationDetailBackButton')));
     await tester.pumpAndSettle();
 
     expect(find.byType(StationDetailScreen), findsNothing);
@@ -10369,7 +10366,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(StationDetailScreen), findsOneWidget);
-    await tester.pageBack();
+    await tester.tap(find.byKey(const Key('stationDetailBackButton')));
     await tester.pumpAndSettle();
     expect(find.byType(StationDetailScreen), findsNothing);
     expect(
@@ -12172,13 +12169,32 @@ void main() {
       expect(repository.requestedDetailStationIds, ['station-sangnoksu']);
       expect(repository.requestedExitStationIds, ['station-sangnoksu']);
       expect(repository.requestedFacilityStationIds, ['station-sangnoksu']);
-      expect(find.text('상록수역'), findsOneWidget);
-      expect(find.text('수도권 2호선'), findsOneWidget);
+      // 패밀리룩 AppBar: 호선 배지 + 역명. 지역명(수도권)은 AppBar에 두지 않는다.
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('stationDetailAppBar')),
+          matching: find.text('상록수역'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('stationDetailAppBar')),
+          matching: find.byKey(const Key('stationLineBadge-seoul-2')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('stationDetailAppBar')),
+          matching: find.text('수도권'),
+        ),
+        findsNothing,
+      );
+      expect(find.text('지금 열차'), findsOneWidget);
+      expect(find.text('이용하기'), findsOneWidget);
       // 상세 헤더는 데이터 품질 문구를 노출하지 않는다(간결화, 시맨틱 라벨에는 유지).
       expect(find.text('일부 정보는 확인 중이에요'), findsNothing);
-      // '마지막 확인'은 역명 우측에 라벨/상대시간 두 줄로 표시된다(#1567 후속).
-      expect(find.text('마지막 확인'), findsOneWidget);
-      expect(find.text('2일 전'), findsOneWidget);
       expect(find.text('출처 공식 파일'), findsNothing);
       // 상시 안전 안내는 제거됐다(#1497).
       expect(find.text('이동 전 현장 안내와 역무원 안내를 확인해 주세요.'), findsNothing);
@@ -12186,41 +12202,14 @@ void main() {
         find.bySemanticsLabel('상록수역 자세한 안내, 수도권 2호선, 마지막 확인 2일 전'),
         findsOneWidget,
       );
-      // 역 안 이동 안내·순서는 "역 안 이동" 한 섹션으로 통합됐다(#1497).
+      // 패밀리룩 섹션 순서: 지금 열차 → 이용하기 → 역 정보 → 안내(#2436).
       await tester.scrollUntilVisible(
-        find.text('역 안 이동'),
+        find.text('역 정보'),
         120,
         scrollable: find.byType(Scrollable).last,
       );
       await tester.pumpAndSettle();
-      expect(find.text('역 안 이동'), findsOneWidget);
-      await tester.scrollUntilVisible(
-        find.text('승강장'),
-        120,
-        scrollable: find.byType(Scrollable).last,
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('승강장'), findsOneWidget);
-      final platformText = tester.widget<Text>(find.text('승강장'));
-      expect(platformText.maxLines, isNot(2));
-      expect(platformText.overflow, isNot(TextOverflow.ellipsis));
-      expect(
-        find.bySemanticsLabel('역 안 이동 안내, 1번 출구, 엘리베이터, 승강장'),
-        findsOneWidget,
-      );
-      // 중복 "지도 위치 목록" 섹션은 제거됐다(#1497).
-      expect(find.text('지도 위치 목록'), findsNothing);
-      expect(
-        find.byKey(const Key('stationMapTextListItem-station-sangnoksu')),
-        findsNothing,
-      );
-      await tester.scrollUntilVisible(
-        find.text('출구'),
-        120,
-        scrollable: find.byType(Scrollable).last,
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('출구'), findsOneWidget);
+      expect(find.text('역 정보'), findsOneWidget);
       expect(find.text('1번 출구'), findsWidgets);
       expect(find.text('엘리베이터 연결'), findsOneWidget);
       expect(find.text('계단 없는 이동 가능'), findsOneWidget);
@@ -12229,12 +12218,11 @@ void main() {
         findsOneWidget,
       );
       await tester.scrollUntilVisible(
-        find.text('시설'),
+        find.text('2번 출구 엘리베이터'),
         120,
         scrollable: find.byType(Scrollable).last,
       );
       await tester.pumpAndSettle();
-      expect(find.text('시설'), findsOneWidget);
       expect(find.text('2번 출구 엘리베이터'), findsOneWidget);
       // 시설 종류 필은 제거(이름에 포함). 문제 상태만 상태 필로 노출.
       expect(find.text('엘리베이터'), findsNothing);
@@ -12291,7 +12279,7 @@ void main() {
       expect(find.text('최근 확인 3일 전'), findsOneWidget);
       expect(
         find.bySemanticsLabel(
-          '1번 출구 엘리베이터, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 3일 전, 시설 알려주기',
+          '1번 출구 엘리베이터, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 3일 전, 시설 제보',
         ),
         findsOneWidget,
       );
@@ -12301,11 +12289,48 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.bySemanticsLabel('1번 출구 엘리베이터 시설 알려주기'), findsOneWidget);
-      // #1567: 카드 전체 탭이 상세를 열므로 중복 '상세 보기' 텍스트는 없애고,
-      // 보조 액션 '시설 알려주기'는 아웃라인 대신 텍스트 버튼 수준으로 낮춘다.
+      expect(find.bySemanticsLabel('1번 출구 엘리베이터 시설 제보'), findsOneWidget);
+      // #1567/#2436: 카드 전체 탭이 상세를 열므로 중복 '상세 보기' 텍스트는 없애고,
+      // 보조 액션은 「시설 제보」 텍스트 버튼으로 둔다.
       expect(find.text('상세 보기'), findsNothing);
-      expect(find.widgetWithText(TextButton, '시설 알려주기'), findsWidgets);
+      expect(find.widgetWithText(TextButton, '시설 제보'), findsWidgets);
+
+      // 안내 섹션: 마지막 확인 메타 + 역 안 이동(#2436).
+      await tester.scrollUntilVisible(
+        find.text('안내'),
+        120,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('마지막 확인'), findsOneWidget);
+      expect(find.text('2일 전'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('역 안 이동'),
+        120,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('역 안 이동'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('승강장'),
+        120,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('승강장'), findsOneWidget);
+      final platformText = tester.widget<Text>(find.text('승강장'));
+      expect(platformText.maxLines, isNot(2));
+      expect(platformText.overflow, isNot(TextOverflow.ellipsis));
+      expect(
+        find.bySemanticsLabel('역 안 이동 안내, 1번 출구, 엘리베이터, 승강장'),
+        findsOneWidget,
+      );
+      // 중복 "지도 위치 목록" 섹션은 제거됐다(#1497).
+      expect(find.text('지도 위치 목록'), findsNothing);
+      expect(
+        find.byKey(const Key('stationMapTextListItem-station-sangnoksu')),
+        findsNothing,
+      );
 
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
@@ -12497,7 +12522,7 @@ void main() {
     }
   });
 
-  testWidgets('시설 상세는 실제 시설 데이터로 시설 알려주기 진입을 보여준다', (tester) async {
+  testWidgets('시설 상세는 실제 시설 데이터로 시설 제보 진입을 보여준다', (tester) async {
     debugStationVerifiedClock = () => DateTime(2026, 6, 15);
     final reportRepository = FakeFacilityReportRepository();
     final repository = FakeStationSearchRepository(
@@ -12547,14 +12572,17 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.descendant(of: find.byType(AppBar), matching: find.text('시설 상세')),
+      find.descendant(
+        of: find.byKey(const Key('facilityDetailAppBar')),
+        matching: find.text('2번 출구 엘리베이터'),
+      ),
       findsOneWidget,
     );
     expect(find.text('상록수역'), findsOneWidget);
-    expect(find.text('2번 출구 엘리베이터'), findsOneWidget);
     expect(find.text('이용할 수 없어요'), findsOneWidget);
     expect(find.text('고장·폐쇄 · 고장'), findsOneWidget);
-    expect(find.text('현장 안내와 다르면 시설 알려주기로 알려 주세요.'), findsOneWidget);
+    expect(find.text('현장 안내와 다르면 시설 제보로 알려 주세요.'), findsOneWidget);
+    expect(find.text('이동 전 다른 출구와 역무원 안내를 확인하세요.'), findsOneWidget);
     expect(find.text('연결 위치 B1 ↔ 1F'), findsOneWidget);
     expect(find.text('2번 출구 앞'), findsOneWidget);
     expect(find.text('최근 확인 어제'), findsOneWidget);
@@ -12577,6 +12605,7 @@ void main() {
       scrollable: find.byType(Scrollable).last,
     );
     await tester.pumpAndSettle();
+    expect(find.widgetWithText(FilledButton, '시설 제보'), findsOneWidget);
     await tester.tap(
       find.byKey(
         const Key('facilityDetailReportButton-facility-sangnoksu-elevator-2'),
@@ -12584,6 +12613,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // 폼 AppBar 문구 통일은 PR②. 상세 CTA는 「시설 제보」.
     expect(find.text('시설 알려주기'), findsOneWidget);
     expect(find.text('2번 출구 엘리베이터'), findsOneWidget);
   });
@@ -12678,11 +12708,18 @@ void main() {
       await tester.drag(find.byType(ListView), const Offset(0, -520));
       await tester.pumpAndSettle();
 
-      // #2078: 시설 데이터가 없으면 섹션 제목·빈 안내·잔여 간격을 모두 숨긴다.
-      expect(find.text('시설'), findsNothing);
+      // #2078/#2436: 시설 데이터가 없으면 시설 행·빈 안내를 숨긴다(역 정보는 출구로 유지).
       expect(find.text('시설 안내를 준비 중이에요.'), findsNothing);
       expect(find.text('확인 필요 없음'), findsNothing);
       expect(find.bySemanticsLabel('다시 볼 시설 없음'), findsNothing);
+      expect(find.text('1번 출구'), findsWidgets);
+      expect(find.text('역 정보'), findsOneWidget);
+      expect(
+        find.byKey(
+          const Key('facilityReportButton-facility-sangnoksu-elevator-1'),
+        ),
+        findsNothing,
+      );
     } finally {
       semanticsHandle.dispose();
     }
@@ -12723,11 +12760,9 @@ void main() {
       await tester.drag(find.byType(ListView), const Offset(0, -520));
       await tester.pumpAndSettle();
 
-      // #2078: 출구는 비고 시설은 있는 비대칭 케이스 — 출구 섹션 제목·빈
-      // 안내·잔여 간격만 숨기고, 시설 섹션은 그대로 그린다.
-      expect(find.text('출구'), findsNothing);
+      // #2078/#2436: 출구가 없으면 출구 행만 숨기고, 시설 행은 역 정보 아래에 그린다.
       expect(find.text('출구 안내를 준비 중이에요.'), findsNothing);
-      expect(find.text('시설'), findsOneWidget);
+      expect(find.text('역 정보'), findsOneWidget);
       expect(find.text('1번 출구 엘리베이터'), findsOneWidget);
     } finally {
       semanticsHandle.dispose();
@@ -13417,7 +13452,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(internalRouteRepository.requests, hasLength(1));
+    await tester.scrollUntilVisible(find.text('역 안 이동'), 500);
+    await tester.pumpAndSettle();
     expect(find.text('역 안 이동'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('역 안 이동 경로를 찾았어요'), 500);
+    await tester.pumpAndSettle();
     expect(find.text('역 안 이동 경로를 찾았어요'), findsOneWidget);
     expect(find.text('1번 출구 엘리베이터에서 개찰구까지'), findsWidgets);
     expect(find.text('약 1분 15초 · 28m'), findsOneWidget);
@@ -13658,7 +13697,7 @@ void main() {
 
     expect(favoriteRepository.removedStationIds, ['station-sangnoksu']);
 
-    await tester.pageBack();
+    await tester.tap(find.byKey(const Key('stationDetailBackButton')));
     await tester.pumpAndSettle();
 
     expect(find.text('즐겨찾기한 항목이 없습니다.'), findsOneWidget);

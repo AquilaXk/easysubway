@@ -171,8 +171,7 @@ void main() {
       // 의도 잔존: 시설 상태 카드 blocked/caution — 상태 의미 틴트 (v4 허용 예외)
       'lib/features/notifications/presentation/notification_inbox_screen.dart':
           2,
-      'lib/features/stations/presentation/station_facility_status_summary.dart':
-          1,
+      // station_facility_status_summary redSoft 배너 제거(#2436).
       // 홈 풍선형 운행 공지 배너(amberSoft) 제거로 예외 삭제.
       // — 오너 결정 2026-07-16, #2200
     }, rule: '장식 Soft 틴트');
@@ -346,16 +345,7 @@ void main() {
     // 상한은 내리기만 한다.
     final actual = countPerFile(RegExp(r'\bCard\('));
     expectRatchet(actual, {
-      // 동일 총량 중 시설 상태 카드 1곳은 canonical presentation 경로로 이동했다.
-      'lib/features/stations/presentation/station_facility_status_summary.dart':
-          1,
-      // 동일 총량 중 출구 카드 1곳은 canonical presentation 경로로 이동했다.
-      'lib/features/stations/presentation/station_exit_card.dart': 1,
-      // 동일 총량 중 시설 상세 카드 1곳은 canonical presentation 경로로 이동했다.
-      'lib/features/stations/presentation/station_facility_detail_screen.dart':
-          1,
-      // 동일 총량 중 시설 목록 카드 1곳은 canonical presentation 경로로 이동했다.
-      'lib/features/stations/presentation/station_facility_card.dart': 1,
+      // 역·시설 상세 패밀리룩(#2436): 상태/출구/시설 카드 Card 제거.
       // 안내 확인 방법 카드는 두 화면이 공유하는 canonical component로 이동했다.
       'lib/features/stations/presentation/station_info_basis_disclosure.dart':
           1,

@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../../../accessible_design.dart';
 import '../../../core/external/kakao_map_launcher.dart';
-import '../../../design_tokens.dart';
 import '../../../mobile_error_reporter.dart';
 import '../domain/station_models.dart';
 import '../domain/station_repositories.dart';
@@ -12,9 +11,6 @@ import 'station_detail_info_row.dart';
 
 const _currentLocationDisabledMessage =
     '휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.';
-const _stationExitCardRadius = BorderRadius.all(
-  Radius.circular(EasySubwayRadius.sheet),
-);
 
 class StationExitCard extends StatefulWidget {
   const StationExitCard({
@@ -56,192 +52,196 @@ class _StationExitCardState extends State<StationExitCard> {
             toLongitude: mapTarget.target.longitude,
           );
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      color: Colors.white,
-      elevation: 0,
-      shape: const RoundedRectangleBorder(
-        borderRadius: _stationExitCardRadius,
-        side: BorderSide(color: EasySubwayAccessibleColors.line),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Semantics(
-              container: true,
-              label: exit.semanticLabel,
-              child: ExcludeSemantics(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      exit.name,
-                      style: textTheme.titleMedium?.copyWith(
-                        color: EasySubwayAccessibleColors.text,
-                        fontWeight: FontWeight.w700,
-                        height: 1.25,
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Semantics(
+                container: true,
+                label: exit.semanticLabel,
+                child: ExcludeSemantics(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        exit.name,
+                        style: textTheme.titleMedium?.copyWith(
+                          color: EasySubwayAccessibleColors.text,
+                          fontWeight: FontWeight.w700,
+                          height: 1.25,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    _StationDetailStatusPill(
-                      icon: Icons.elevator,
-                      text: exit.elevatorConnectionLabel,
-                      positive: exit.hasElevatorConnection,
-                    ),
-                    const SizedBox(height: 8),
-                    _StationDetailStatusPill(
-                      icon: Icons.stairs_outlined,
-                      text: exit.stairPathLabel,
-                      positive: !exit.hasStairOnlyPath,
-                    ),
-                    if (exit.lastVerifiedAt.trim().isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      _StationDetailStatusPill(
+                        icon: Icons.elevator,
+                        text: exit.elevatorConnectionLabel,
+                        positive: exit.hasElevatorConnection,
+                      ),
                       const SizedBox(height: 8),
-                      StationDetailInfoRow(
-                        icon: Icons.verified_outlined,
-                        text:
-                            '최근 확인 ${stationVerifiedRelativeLabel(exit.lastVerifiedAt)}',
+                      _StationDetailStatusPill(
+                        icon: Icons.stairs_outlined,
+                        text: exit.stairPathLabel,
+                        positive: !exit.hasStairOnlyPath,
                       ),
+                      if (exit.lastVerifiedAt.trim().isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        StationDetailInfoRow(
+                          icon: Icons.verified_outlined,
+                          text:
+                              '최근 확인 ${stationVerifiedRelativeLabel(exit.lastVerifiedAt)}',
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
-            ),
-            if (mapTarget?.usesStationFallback ?? false) ...[
-              const SizedBox(height: 8),
-              const StationDetailInfoRow(
-                icon: Icons.info_outline,
-                text: '출구 좌표가 없어 역 위치 기준으로 안내합니다.',
-              ),
-            ],
-            if (distanceMeters != null) ...[
-              const SizedBox(height: 8),
-              StationDetailInfoRow(
-                icon: Icons.straighten,
-                text: _exitDistanceLabel(
-                  distanceMeters,
-                  usesStationFallback: mapTarget!.usesStationFallback,
-                ),
-              ),
-            ],
-            if (_locationMessage.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Semantics(
-                liveRegion: true,
-                child: StationDetailInfoRow(
+              if (mapTarget?.usesStationFallback ?? false) ...[
+                const SizedBox(height: 8),
+                const StationDetailInfoRow(
                   icon: Icons.info_outline,
-                  text: _locationMessage,
+                  text: '출구 좌표가 없어 역 위치 기준으로 안내합니다.',
                 ),
-              ),
-            ],
-            if (mapTarget != null) ...[
-              const SizedBox(height: 12),
-              Semantics(
-                container: true,
-                button: true,
-                label: mapTarget.usesStationFallback
-                    ? '${exit.name} 카카오맵에서 보기, 출구 좌표가 없어 역 위치 기준으로 새 앱이 열립니다'
-                    : '${exit.name} 카카오맵에서 보기, 새 앱이 열립니다',
-                onTap: () => _openExitMap(context),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ExcludeSemantics(
-                    child: OutlinedButton.icon(
-                      key: Key('stationExitMapButton-${exit.id}'),
-                      icon: const Icon(Icons.map_outlined),
-                      label: const Text('카카오맵에서 보기'),
-                      onPressed: () => _openExitMap(context),
-                    ),
+              ],
+              if (distanceMeters != null) ...[
+                const SizedBox(height: 8),
+                StationDetailInfoRow(
+                  icon: Icons.straighten,
+                  text: _exitDistanceLabel(
+                    distanceMeters,
+                    usesStationFallback: mapTarget!.usesStationFallback,
                   ),
                 ),
-              ),
-            ],
-            if (mapTarget != null && widget.locationProvider != null) ...[
-              const SizedBox(height: 8),
-              Semantics(
-                container: true,
-                button: true,
-                enabled: !_isLoadingLocation,
-                label: mapTarget.usesStationFallback
-                    ? '${exit.name} 역 위치 기준 직선거리 보기'
-                    : '${exit.name}까지 직선거리 보기',
-                onTap: _isLoadingLocation ? null : _loadCurrentLocationForExit,
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ExcludeSemantics(
-                    child: OutlinedButton.icon(
-                      key: Key('stationExitDistanceButton-${exit.id}'),
-                      icon: _isLoadingLocation
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.near_me_outlined),
-                      label: Text(
-                        _isLoadingLocation
-                            ? '현재 위치 확인 중'
-                            : mapTarget.usesStationFallback
-                            ? '역까지 거리 보기'
-                            : '출구까지 거리 보기',
+              ],
+              if (_locationMessage.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Semantics(
+                  liveRegion: true,
+                  child: StationDetailInfoRow(
+                    icon: Icons.info_outline,
+                    text: _locationMessage,
+                  ),
+                ),
+              ],
+              if (mapTarget != null) ...[
+                const SizedBox(height: 12),
+                Semantics(
+                  container: true,
+                  button: true,
+                  label: mapTarget.usesStationFallback
+                      ? '${exit.name} 카카오맵에서 보기, 출구 좌표가 없어 역 위치 기준으로 새 앱이 열립니다'
+                      : '${exit.name} 카카오맵에서 보기, 새 앱이 열립니다',
+                  onTap: () => _openExitMap(context),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ExcludeSemantics(
+                      child: OutlinedButton.icon(
+                        key: Key('stationExitMapButton-${exit.id}'),
+                        icon: const Icon(Icons.map_outlined),
+                        label: const Text('카카오맵에서 보기'),
+                        onPressed: () => _openExitMap(context),
                       ),
-                      onPressed: _isLoadingLocation
-                          ? null
-                          : _loadCurrentLocationForExit,
                     ),
                   ),
                 ),
-              ),
-            ],
-            if (mapTarget != null && walkingRouteStart != null) ...[
-              const SizedBox(height: 8),
-              StationDetailInfoRow(
-                icon: Icons.privacy_tip_outlined,
-                text: mapTarget.usesStationFallback
-                    ? '카카오맵 앱에서는 현재 위치와 역 좌표를, 웹에서는 역 좌표만 카카오에 전달합니다.'
-                    : '카카오맵 앱에서는 현재 위치와 출구 좌표를, 웹에서는 출구 좌표만 카카오에 전달합니다.',
-              ),
-              const SizedBox(height: 8),
-              Semantics(
-                container: true,
-                button: true,
-                enabled: !_isOpeningWalkingRoute,
-                label: mapTarget.usesStationFallback
-                    ? '${exit.name} 역 위치 기준 카카오맵 도보 길안내'
-                    : '${exit.name}까지 카카오맵 도보 길안내',
-                onTap: _isOpeningWalkingRoute
-                    ? null
-                    : () => _openWalkingRoute(context),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ExcludeSemantics(
-                    child: FilledButton.icon(
-                      key: Key('stationExitWalkingRouteButton-${exit.id}'),
-                      icon: _isOpeningWalkingRoute
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(Icons.directions_walk),
-                      label: Text(
-                        _isOpeningWalkingRoute ? '길안내 여는 중' : '도보 길안내',
+              ],
+              if (mapTarget != null && widget.locationProvider != null) ...[
+                const SizedBox(height: 8),
+                Semantics(
+                  container: true,
+                  button: true,
+                  enabled: !_isLoadingLocation,
+                  label: mapTarget.usesStationFallback
+                      ? '${exit.name} 역 위치 기준 직선거리 보기'
+                      : '${exit.name}까지 직선거리 보기',
+                  onTap: _isLoadingLocation
+                      ? null
+                      : _loadCurrentLocationForExit,
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ExcludeSemantics(
+                      child: OutlinedButton.icon(
+                        key: Key('stationExitDistanceButton-${exit.id}'),
+                        icon: _isLoadingLocation
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.near_me_outlined),
+                        label: Text(
+                          _isLoadingLocation
+                              ? '현재 위치 확인 중'
+                              : mapTarget.usesStationFallback
+                              ? '역까지 거리 보기'
+                              : '출구까지 거리 보기',
+                        ),
+                        onPressed: _isLoadingLocation
+                            ? null
+                            : _loadCurrentLocationForExit,
                       ),
-                      onPressed: _isOpeningWalkingRoute
-                          ? null
-                          : () => _openWalkingRoute(context),
                     ),
                   ),
                 ),
-              ),
+              ],
+              if (mapTarget != null && walkingRouteStart != null) ...[
+                const SizedBox(height: 8),
+                StationDetailInfoRow(
+                  icon: Icons.privacy_tip_outlined,
+                  text: mapTarget.usesStationFallback
+                      ? '카카오맵 앱에서는 현재 위치와 역 좌표를, 웹에서는 역 좌표만 카카오에 전달합니다.'
+                      : '카카오맵 앱에서는 현재 위치와 출구 좌표를, 웹에서는 출구 좌표만 카카오에 전달합니다.',
+                ),
+                const SizedBox(height: 8),
+                Semantics(
+                  container: true,
+                  button: true,
+                  enabled: !_isOpeningWalkingRoute,
+                  label: mapTarget.usesStationFallback
+                      ? '${exit.name} 역 위치 기준 카카오맵 도보 길안내'
+                      : '${exit.name}까지 카카오맵 도보 길안내',
+                  onTap: _isOpeningWalkingRoute
+                      ? null
+                      : () => _openWalkingRoute(context),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ExcludeSemantics(
+                      child: FilledButton.icon(
+                        key: Key('stationExitWalkingRouteButton-${exit.id}'),
+                        icon: _isOpeningWalkingRoute
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.directions_walk),
+                        label: Text(
+                          _isOpeningWalkingRoute ? '길안내 여는 중' : '도보 길안내',
+                        ),
+                        onPressed: _isOpeningWalkingRoute
+                            ? null
+                            : () => _openWalkingRoute(context),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
-      ),
+        const Divider(
+          height: 1,
+          thickness: 1,
+          color: EasySubwayAccessibleColors.line,
+        ),
+      ],
     );
   }
 
