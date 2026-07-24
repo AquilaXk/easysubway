@@ -474,6 +474,27 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
   assert.equal(daejeonAccessibilitySnapshot.credentialRedacted, true);
   assert.equal(daejeonAccessibilitySnapshot.credentialRequired, false);
   assert.doesNotMatch(JSON.stringify(daejeonAccessibilitySnapshot), /serviceKey/i);
+  const gwangjuAccessibility = findCatalogEntry(catalog, "provider:gwangju-transportation-accessibility");
+  const gwangjuAccessibilityCandidate = providerDocument.candidates.find(
+    ({ id }) => id === "gwangju-transportation-accessibility",
+  );
+  const gwangjuAccessibilitySnapshot = JSON.parse(await readFile(
+    new URL("../datapack/sources/gwangju-transportation-accessibility-20260724.json", import.meta.url),
+    "utf8",
+  ));
+  assert.equal(gwangjuAccessibility.detailUrl, "https://www.data.go.kr/data/15041385/fileData.do");
+  assert.equal(gwangjuAccessibility.endpoint, "https://www.data.go.kr/data/15041385/fileData.do");
+  assert.deepEqual(gwangjuAccessibility.operation.auth, { placement: "none" });
+  assert.deepEqual(gwangjuAccessibility.operation.runner.requiredEnv, []);
+  assert.equal(gwangjuAccessibilityCandidate.evidence.liveValidation.snapshotId, "gwangju-transportation-accessibility-20260724");
+  assert.equal(gwangjuAccessibilityCandidate.evidence.liveValidation.rawSha256, gwangjuAccessibilitySnapshot.rawSha256);
+  assert.equal(gwangjuAccessibilityCandidate.evidence.liveValidation.rowsSha256, gwangjuAccessibilitySnapshot.rowsSha256);
+  assert.deepEqual(gwangjuAccessibilityCandidate.evidence.liveValidation.datasetIds, ["15041385", "15041362"]);
+  assert.equal(gwangjuAccessibilityCandidate.evidence.liveSampleRawSha256, gwangjuAccessibilitySnapshot.rawSha256);
+  assert.equal(gwangjuAccessibilityCandidate.evidence.liveSampleEvidenceHash, gwangjuAccessibilitySnapshot.rowsSha256);
+  assert.equal(gwangjuAccessibilitySnapshot.credentialRedacted, true);
+  assert.equal(gwangjuAccessibilitySnapshot.credentialRequired, false);
+  assert.doesNotMatch(JSON.stringify(gwangjuAccessibilitySnapshot), /serviceKey/i);
   const gwangjuTimetable = findCatalogEntry(catalog, "provider:gwangju-transportation-timetable");
   assert.equal(gwangjuTimetable.detailUrl, "https://www.data.go.kr/data/15111298/openapi.do");
   assert.equal(gwangjuTimetable.endpoint, "https://apis.data.go.kr/B551232/grtcTimetable/timetable");
@@ -622,7 +643,7 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
 test("프로젝트 provider catalog는 비API source를 제외하고 모든 호출 계약을 제공한다", async () => {
   const providers = (await loadProjectCatalog()).filter((entry) => entry.kind === "provider");
 
-  assert.equal(providers.length, 49);
+  assert.equal(providers.length, 50);
   assert.equal(providers.some((entry) => entry.documentationStatus === "metadata-only"), false);
   assert.equal(providers.some((entry) => entry.id === "provider:molit-urban-rail-full-route"), false);
   assert.equal(providers.some((entry) => entry.id === "provider:seoulmetro-cyberstation-route-map"), false);
