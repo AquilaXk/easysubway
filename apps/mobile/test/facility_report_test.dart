@@ -1118,6 +1118,23 @@ void main() {
     expect(controller.state.result?.id, 'report-1');
     expect(controller.state.result?.statusLabel, '접수됨');
   });
+
+  test('시설 제보 컨트롤러 성공 문구는 제보 용어를 유지한다', () async {
+    final repository = PendingFacilityReportRepository();
+    final controller = FacilityReportController(repository: repository);
+    addTearDown(controller.dispose);
+
+    final submit = controller.submit(
+      target: _reportTarget(),
+      selectedType: FacilityReportTypeOption.broken,
+      description: '문이 열리지 않습니다.',
+    );
+    repository.complete();
+    await submit;
+
+    expect(controller.state.message, '제보를 보냈어요.');
+    expect(controller.state.message, isNot(contains('알려주기')));
+  });
 }
 
 class FakeLostDataImagePicker extends ImagePicker {
