@@ -171,9 +171,19 @@ export function applyCapitalRouteTopology(sqlitePath, snapshot) {
       `);
 
       const selectLine = database.prepare(`
-        SELECT id, from_node_id AS fromNodeId, to_node_id AS toNodeId,
-               duration_seconds AS durationSeconds, distance_meters AS distanceMeters,
-               edge_type AS edgeType, service_pattern AS servicePattern,
+        SELECT id,
+               from_node_id AS fromNodeId,
+               to_node_id AS toNodeId,
+               duration_seconds AS durationSeconds,
+               distance_meters AS distanceMeters,
+               edge_type AS edgeType,
+               service_pattern AS servicePattern,
+               includes_stairs AS includesStairs,
+               stair_access_state AS stairAccessState,
+               accessibility_status AS accessibilityStatus,
+               reliability_score AS reliabilityScore,
+               last_verified_at AS lastVerifiedAt,
+               facility_id AS facilityId,
                service_class AS serviceClass
         FROM network_edges
         WHERE edge_type = 'RIDE'
@@ -183,6 +193,14 @@ export function applyCapitalRouteTopology(sqlitePath, snapshot) {
             from_node_id GLOB ?
             OR to_node_id GLOB ?
           )
+      `);
+      const insertPreserved = database.prepare(`
+        INSERT INTO network_edges (
+          id, from_node_id, to_node_id, duration_seconds, distance_meters,
+          edge_type, service_pattern, includes_stairs, stair_access_state,
+          accessibility_status, reliability_score, last_verified_at, facility_id,
+          service_class
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       const selectTimetablePairs = database.prepare(`
         SELECT DISTINCT
@@ -216,7 +234,7 @@ export function applyCapitalRouteTopology(sqlitePath, snapshot) {
           return !officialPairs.has(pair) && timetablePairs.has(pair);
         });
         deleteLine.run(glob, glob);
-        for (const edge of [...edges, ...preserved]) {
+        for (const edge of edges) {
           insert.run(
             edge.id,
             edge.fromNodeId,
@@ -225,6 +243,24 @@ export function applyCapitalRouteTopology(sqlitePath, snapshot) {
             edge.distanceMeters,
             edge.edgeType,
             edge.servicePattern,
+            edge.serviceClass,
+          );
+        }
+        for (const edge of preserved) {
+          insertPreserved.run(
+            edge.id,
+            edge.fromNodeId,
+            edge.toNodeId,
+            edge.durationSeconds,
+            edge.distanceMeters,
+            edge.edgeType,
+            edge.servicePattern,
+            edge.includesStairs,
+            edge.stairAccessState,
+            edge.accessibilityStatus,
+            edge.reliabilityScore,
+            edge.lastVerifiedAt,
+            edge.facilityId,
             edge.serviceClass,
           );
         }
