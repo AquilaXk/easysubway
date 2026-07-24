@@ -100,7 +100,13 @@ test("source admission evidence envelope는 승인 필드 외 값을 거부하�
 test("inventory production 사용 승인은 domain별 admission evidence를 요구한다", () => {
   const schema = loadJson("contracts/datapack/source-inventory.schema.json");
   const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
-  const admissionDomains = new Set(["route_graph_topology", "schedule_timetable", "station_line_membership"]);
+  const admissionDomains = new Set([
+    "route_graph_topology",
+    "schedule_timetable",
+    "station_line_membership",
+    "route_map_positions",
+    "accessibility_facilities",
+  ]);
   const provenanceOnlySource = inventory.sources.find((source) => source.productionUseAllowed === false
     && !source.coverageScope.sourceDomains.some((domain) => admissionDomains.has(domain)));
 
@@ -189,6 +195,37 @@ test("route map production admission evidence는 domain과 production 승인을 
   validateSourceInventory(prohibitedInventory, "source-inventory.json", prohibitedErrors);
   assert.ok(prohibitedErrors.some((error) => error.includes(
     "routeMapAdmissionEvidence: productionUseAllowed true가 필요하다",
+  )));
+});
+
+test("accessibility production admission evidence는 domain과 production 승인을 함께 요구한다", () => {
+  const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const accessibilitySource = inventory.sources.find((source) => source.accessibilityAdmissionEvidence != null);
+  delete accessibilitySource.accessibilityAdmissionEvidence;
+
+  const missingErrors = [];
+  validateSourceInventory(inventory, "source-inventory.json", missingErrors);
+  assert.ok(missingErrors.some((error) => error.includes(
+    "accessibility_facilities production 승인은 accessibilityAdmissionEvidence가 필요하다",
+  )));
+
+  const freshInventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const mismatchedSource = freshInventory.sources.find((source) => source.accessibilityAdmissionEvidence != null);
+  mismatchedSource.coverageScope.sourceDomains = mismatchedSource.coverageScope.sourceDomains
+    .filter((domain) => domain !== "accessibility_facilities");
+  const mismatchedErrors = [];
+  validateSourceInventory(freshInventory, "source-inventory.json", mismatchedErrors);
+  assert.ok(mismatchedErrors.some((error) => error.includes(
+    "accessibilityAdmissionEvidence: accessibility_facilities source domain이 필요하다",
+  )));
+
+  const prohibitedInventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const prohibitedSource = prohibitedInventory.sources.find((source) => source.accessibilityAdmissionEvidence != null);
+  prohibitedSource.productionUseAllowed = false;
+  const prohibitedErrors = [];
+  validateSourceInventory(prohibitedInventory, "source-inventory.json", prohibitedErrors);
+  assert.ok(prohibitedErrors.some((error) => error.includes(
+    "accessibilityAdmissionEvidence: productionUseAllowed true가 필요하다",
   )));
 });
 

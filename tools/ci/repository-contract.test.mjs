@@ -8911,6 +8911,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
 
   const sourceIds = inventory.sources.map((source) => source.id).sort();
   assert.deepEqual(sourceIds, [
+    "busan-transportation-accessibility",
     "busan-transportation-official-od-fares",
     "busan-transportation-route-map-positions",
     "busan-transportation-route-topology",
