@@ -12613,9 +12613,24 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 폼 AppBar 문구 통일은 PR②. 상세 CTA는 「시설 제보」.
-    expect(find.text('시설 알려주기'), findsOneWidget);
+    expect(find.byKey(const Key('facilityReportAppBar')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('facilityReportAppBar')),
+        matching: find.text('시설 제보'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('2번 출구 엘리베이터'), findsOneWidget);
+    expect(find.text('어떤 일인가요?'), findsOneWidget);
+    await _showFacilityReportSubmitButton(tester);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('facilityReportSubmitButton')),
+        matching: find.text('보내기'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('역 상세에서 연 시설 신고는 앱에 주입한 사진 복구 대상을 저장한다', (tester) async {
@@ -17520,12 +17535,22 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('시설 알려주기'), findsOneWidget);
+      expect(find.byKey(const Key('facilityReportAppBar')), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('facilityReportAppBar')),
+          matching: find.text('시설 제보'),
+        ),
+        findsOneWidget,
+      );
       expect(find.text('상록수역'), findsOneWidget);
       expect(find.text('1번 출구 엘리베이터'), findsOneWidget);
-      expect(find.text('무엇을 알려드릴까요?'), findsOneWidget);
+      expect(find.text('대상'), findsOneWidget);
+      expect(find.text('어떤 일인가요?'), findsOneWidget);
       expect(find.bySemanticsLabel('고장 선택됨'), findsOneWidget);
+      expect(find.byType(ListTile), findsWidgets);
 
+      await _showFacilityReportTypeOption(tester, 'CLOSED');
       await tester.tap(find.byKey(const Key('facilityReportType-CLOSED')));
       await tester.pumpAndSettle();
       await _showFacilityReportDescriptionInput(tester);
@@ -17537,6 +17562,15 @@ void main() {
         find.byKey(const Key('facilityReportPhotoUrlInput')),
         findsNothing,
       );
+      await _showFacilityReportSubmitButton(tester);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('facilityReportSubmitButton')),
+          matching: find.text('보내기'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('제보 보내기'), findsNothing);
       await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
       await tester.pumpAndSettle();
 
@@ -17641,6 +17675,54 @@ void main() {
     } finally {
       semanticsHandle.dispose();
     }
+  });
+
+  testWidgets('시설 제보 폼은 패밀리룩 AppBar·플랫 유형·보내기 CTA를 쓴다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FacilityReportScreen(
+          repository: FakeFacilityReportRepository(),
+          target: const FacilityReportTarget(
+            stationId: 'station-sangnoksu',
+            stationName: '상록수',
+            facilityId: 'facility-sangnoksu-elevator-1',
+            facilityName: '1번 출구 엘리베이터',
+            facilityTypeLabel: '엘리베이터',
+            facilityStatusLabel: '정상',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('facilityReportAppBar')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('facilityReportAppBar')),
+        matching: find.text('시설 제보'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('시설 알려주기'), findsNothing);
+    expect(find.text('대상'), findsOneWidget);
+    expect(find.text('상록수역'), findsOneWidget);
+    expect(find.text('1번 출구 엘리베이터'), findsOneWidget);
+    expect(find.text('어떤 일인가요?'), findsOneWidget);
+    expect(find.byKey(const Key('facilityReportType-BROKEN')), findsOneWidget);
+    expect(find.byType(ListTile), findsWidgets);
+    await _showFacilityReportSubmitButton(tester);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('facilityReportSubmitButton')),
+        matching: find.text('보내기'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('제보 보내기'), findsNothing);
+    expect(
+      find.byKey(const Key('facilityReportAddPhotoButton')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('시설 제보 화면은 에스컬레이터 정상 상태에 유효한 유형만 노출한다', (tester) async {
@@ -17907,7 +17989,9 @@ void main() {
       await _showFacilityReportSubmitButton(tester);
       await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('보내기'));
+      await tester.tap(
+        find.byKey(const Key('facilityReportUploadConfirmButton')),
+      );
       await tester.pumpAndSettle();
 
       expect(reportRepository.requests, hasLength(1));
@@ -17973,7 +18057,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('사진·위치 확인'), findsOneWidget);
-    await tester.tap(find.text('보내기'));
+    await tester.tap(
+      find.byKey(const Key('facilityReportUploadConfirmButton')),
+    );
     await tester.pumpAndSettle();
 
     expect(reportRepository.requests, hasLength(1));
@@ -18076,7 +18162,14 @@ void main() {
 
     expect(restoreCount, 1);
     expect(draftTargetStore.clearCount, 1);
-    expect(find.text('시설 알려주기'), findsOneWidget);
+    expect(find.byKey(const Key('facilityReportAppBar')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('facilityReportAppBar')),
+        matching: find.text('시설 제보'),
+      ),
+      findsOneWidget,
+    );
     expect(
       find.bySemanticsLabel('상록수역, 장애인 화장실, 장애인 화장실, 현재 상태를 확인하고 있어요'),
       findsOneWidget,
@@ -18098,7 +18191,9 @@ void main() {
     await _showFacilityReportSubmitButton(tester);
     await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('보내기'));
+    await tester.tap(
+      find.byKey(const Key('facilityReportUploadConfirmButton')),
+    );
     await tester.pumpAndSettle();
 
     expect(reportRepository.requests, hasLength(1));
@@ -18164,7 +18259,14 @@ void main() {
 
     expect(restoreCount, 1);
     expect(draftTargetStore.clearCount, 1);
-    expect(find.text('시설 알려주기'), findsOneWidget);
+    expect(find.byKey(const Key('facilityReportAppBar')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('facilityReportAppBar')),
+        matching: find.text('시설 제보'),
+      ),
+      findsOneWidget,
+    );
     expect(
       find.bySemanticsLabel('상록수역, 장애인 화장실, 장애인 화장실, 현재 상태를 확인하고 있어요'),
       findsOneWidget,
@@ -18216,7 +18318,14 @@ void main() {
     expect(reportedErrors, hasLength(1));
     expect(reportedErrors.single.exception, isA<StateError>());
     expect(draftTargetStore.clearCount, 1);
-    expect(find.text('시설 알려주기'), findsOneWidget);
+    expect(find.byKey(const Key('facilityReportAppBar')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('facilityReportAppBar')),
+        matching: find.text('시설 제보'),
+      ),
+      findsOneWidget,
+    );
     await tester.dragUntilVisible(
       find.bySemanticsLabel('사진 1장 추가됨'),
       find.byType(Scrollable).first,
@@ -18299,7 +18408,9 @@ void main() {
 
     await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('보내기'));
+    await tester.tap(
+      find.byKey(const Key('facilityReportUploadConfirmButton')),
+    );
     await tester.pumpAndSettle();
 
     expect(reportRepository.requests, hasLength(1));
@@ -18419,7 +18530,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('사진·위치 확인'), findsOneWidget);
-    await tester.tap(find.text('보내기'));
+    await tester.tap(
+      find.byKey(const Key('facilityReportUploadConfirmButton')),
+    );
     await tester.pumpAndSettle();
 
     expect(reportRepository.requests, hasLength(1));
@@ -18921,7 +19034,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('시설 알려주기'), findsOneWidget);
+    expect(find.byKey(const Key('facilityReportAppBar')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('facilityReportAppBar')),
+        matching: find.text('시설 제보'),
+      ),
+      findsOneWidget,
+    );
     // 위치는 자동 요청되지 않는다. 첨부 버튼으로 켠 뒤 첨부된다.
     expect(locationProvider.requestCount, 0);
     await _showFacilityReportAttachLocationButton(tester);
@@ -18949,7 +19069,9 @@ void main() {
     );
     expect(reportRepository.requests, isEmpty);
 
-    await tester.tap(find.text('보내기'));
+    await tester.tap(
+      find.byKey(const Key('facilityReportUploadConfirmButton')),
+    );
     await tester.pumpAndSettle();
 
     expect(reportRepository.requests, hasLength(1));
@@ -19150,6 +19272,23 @@ void main() {
       expect(recorded.region, '부산');
     },
   );
+}
+
+Future<void> _showFacilityReportTypeOption(
+  WidgetTester tester,
+  String reportType,
+) async {
+  final finder = find.byKey(Key('facilityReportType-$reportType'));
+  if (finder.evaluate().isNotEmpty) {
+    await tester.ensureVisible(finder);
+  } else {
+    await tester.dragUntilVisible(
+      finder,
+      find.byType(Scrollable).first,
+      const Offset(0, -300),
+    );
+  }
+  await tester.pumpAndSettle();
 }
 
 Future<void> _showFacilityReportAttachLocationButton(
