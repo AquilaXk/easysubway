@@ -38,7 +38,8 @@ const routeMapNow = new Date("2026-07-25T04:00:00.000Z");
 const execFileAsync = promisify(execFile);
 const SOURCE_ID = "seoul-metro-line9-23-route-map-positions";
 const LINE_ID = "line-f0e747248a31";
-const OPERATOR_ID = "operator-936e454d0bfb";
+const FILE_OPERATOR_ID = "seoul-metro";
+const LINE_OPERATOR_ID = "operator-936e454d0bfb";
 // daejeon route_map 누적 fixture coverage baseline(실측): supportedCount=25.
 // 이번 FILE admission이 seoul9 route_map_positions +1을 만든다.
 const DAEJEON_ROUTE_MAP_BASELINE = 25;
@@ -183,6 +184,17 @@ test("공식 서울 9호선 2·3단계 역사좌표 snapshot을 누적 productio
     && latitude > 37 && longitude > 127
     && Number.isInteger(x) && Number.isInteger(y)
   )));
+  const positionsByStationId = new Map(
+    seoul9Snapshot.positions.map((position) => [position.stationId, position]),
+  );
+  assert.ok(rows.every((row) => {
+    const position = positionsByStationId.get(row.stationId);
+    return position != null
+      && row.x === position.x
+      && row.y === position.y
+      && row.labelDx === position.labelDx
+      && row.labelDy === position.labelDy;
+  }), "materialized canvas coordinates must equal snapshot positions without projection");
   assert.equal(seoul9Snapshot.schematicCanvasSourceId, "owner-self-drawn-sma-schematic");
   assert.deepEqual(source.coverageScope.lineIds, [LINE_ID]);
   assert.equal(pack.minimumTableRows.route_map_positions, pack.routeMapPositions.length);
@@ -190,7 +202,14 @@ test("공식 서울 9호선 2·3단계 역사좌표 snapshot을 누적 productio
   assert.match(materializedSeoul9RouteMapPackContentHash(pack, pack.version), /^[a-f0-9]{64}$/);
   assert.equal(pack.version, "20260725");
   assert.deepEqual(fixture.manifest.activePack, { id: pack.id, version: "20260725" });
-  assert.ok(pack.operators.some(({ id }) => id === OPERATOR_ID));
+  assert.ok(pack.operators.some(({ id }) => id === FILE_OPERATOR_ID));
+  assert.ok(pack.operators.some(({ id }) => id === LINE_OPERATOR_ID));
+  assert.ok(pack.coverageLineOperatorScopes?.some((scope) => (
+    scope.lineId === LINE_ID && scope.operatorId === LINE_OPERATOR_ID
+  )));
+  assert.ok(pack.coverageLineOperatorScopes?.some((scope) => (
+    scope.lineId === LINE_ID && scope.operatorId === FILE_OPERATOR_ID
+  )));
   assert.ok(pack.sourceInventory.some(({ id }) => id === "daejeon-transportation-route-map-positions"));
 
   const mismatchedInventory = structuredClone(inventory);
@@ -281,12 +300,15 @@ test("materialized SQLite와 provenance가 서울 9호선 route_map_positions를
     "--allow-gaps",
   ], { cwd: root });
   const report = JSON.parse(await readFile(reportPath, "utf8"));
-  const routeMapRequirements = report.requirements.filter(
-    ({ operatorId, sourceDomain }) => operatorId === OPERATOR_ID && sourceDomain === "route_map_positions",
+    const routeMapRequirements = report.requirements.filter(
+    ({ lineId, sourceDomain }) => lineId === LINE_ID && sourceDomain === "route_map_positions",
   );
   assert.equal(routeMapRequirements.length, 1);
   assert.ok(routeMapRequirements.every(({ status }) => status === "SUPPORTED"));
   assert.deepEqual(routeMapRequirements.map(({ lineId }) => lineId), [LINE_ID]);
+  assert.ok(routeMapRequirements.every(({ operatorId }) => (
+    operatorId === LINE_OPERATOR_ID || operatorId === FILE_OPERATOR_ID
+  )));
   assert.deepEqual(report.summary.launchRequired, {
     totalCount: 270,
     supportedCount: SEOUL9_ROUTE_MAP_SUPPORTED_COUNT,

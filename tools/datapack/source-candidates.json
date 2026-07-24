@@ -5521,10 +5521,14 @@
           "capital"
         ],
         "operatorIds": [
+          "seoul-metro",
           "operator-936e454d0bfb"
         ],
         "lineIds": [
           "line-f0e747248a31"
+        ],
+        "sourceDomains": [
+          "route_map_positions"
         ]
       },
       "displayName": "서울교통공사_9호선 2·3단계 역사 좌표(위경도) 정보",

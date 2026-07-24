@@ -4540,12 +4540,13 @@
       "sourceSystem": "서울교통공사·공공데이터포털",
       "datasetUrl": "https://www.data.go.kr/data/15099317/fileData.do",
       "datasetKind": "official-file-data",
-      "coverage": "서울교통공사 9호선 2·3단계 공식 FILE 위경도 13역(언주~중앙보훈병원, FILE codes 926–938)을 provenance로 유지하고, pack station 26–38은 capital topology 정규화 역명 join + owner-self-drawn-sma-schematic canvas x/y로 admission한다(위경도 투영 금지). FILE provider는 서울교통공사, active operator coverage는 operator-936e454d0bfb(서울시메트로9호선)이다",
+      "coverage": "서울교통공사 9호선 2·3단계(언주~중앙보훈병원) 공식 FILE 위경도 13역(FILE codes 926–938)을 provenance로 유지하고, pack station 26–38은 capital topology 정규화 역명 join + owner-self-drawn-sma-schematic canvas x/y로 admission한다(위경도 투영 금지). FILE·2·3단계 운영기관은 서울교통공사(seoul-metro)이며, #2138 active line scope의 line operator(서울시메트로9호선, operator-936e454d0bfb)도 coverage에 포함한다. 1단계(개화~신논현)는 이번 FILE 범위 밖이다.",
       "coverageScope": {
         "regionIds": [
           "capital"
         ],
         "operatorIds": [
+          "seoul-metro",
           "operator-936e454d0bfb"
         ],
         "lineIds": [

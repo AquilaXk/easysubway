@@ -10,8 +10,11 @@ const SOURCE_ID = "seoul-metro-line9-23-route-map-positions";
 const TOPOLOGY_SOURCE_ID = "capital-route-topology";
 const TOPOLOGY_SNAPSHOT_ID = "capital-route-topology-20260724";
 const PACK_ID = "nationwide-seoul9-route-map";
-const OPERATOR_ID = "operator-936e454d0bfb";
-const OPERATOR_NAME_KO = "서울시메트로9호선";
+const FILE_OPERATOR_ID = "seoul-metro";
+const FILE_OPERATOR_NAME_KO = "서울교통공사";
+const LINE_OPERATOR_ID = "operator-936e454d0bfb";
+const LINE_OPERATOR_NAME_KO = "서울시메트로9호선";
+const COVERAGE_OPERATOR_IDS = Object.freeze([FILE_OPERATOR_ID, LINE_OPERATOR_ID]);
 const REGION = "수도권";
 const LINE_ID = "line-f0e747248a31";
 const LINE_NUMBER = "9";
@@ -62,8 +65,10 @@ export function materializeSeoul9RouteMapPositions({
   }
 
   validateTopologyLineage(source.routeMapAdmissionEvidence, topologySnapshot);
-  ensureOperator(pack);
+  ensureOperator(pack, FILE_OPERATOR_ID, FILE_OPERATOR_NAME_KO);
+  ensureOperator(pack, LINE_OPERATOR_ID, LINE_OPERATOR_NAME_KO);
   ensureLine(pack);
+  ensureCoverageLineOperatorScopes(fixture, pack);
   const stations = ensureStationsAndMembership(pack, snapshot);
   const rows = [];
   for (const position of snapshot.positions) {
@@ -173,7 +178,7 @@ function requiredSource(inventory, snapshot, snapshotSha256, topologySnapshot, n
     || JSON.stringify(evidence.topologyLineages) !== JSON.stringify(snapshot.topologyLineages)
     || JSON.stringify(source.coverageScope) !== JSON.stringify({
       regionIds: ["capital"],
-      operatorIds: [OPERATOR_ID],
+      operatorIds: [...COVERAGE_OPERATOR_IDS],
       lineIds: [...LINE_IDS],
       sourceDomains: ["route_map_positions"],
     })
@@ -213,12 +218,12 @@ function validateTopologyLineage(evidence, topologySnapshot) {
   }
 }
 
-function ensureOperator(pack) {
+function ensureOperator(pack, operatorId, nameKo) {
   if (!Array.isArray(pack.operators)) pack.operators = [];
-  if (pack.operators.some(({ id }) => id === OPERATOR_ID)) return;
+  if (pack.operators.some(({ id }) => id === operatorId)) return;
   pack.operators.push({
-    id: OPERATOR_ID,
-    nameKo: OPERATOR_NAME_KO,
+    id: operatorId,
+    nameKo,
     nameEn: "",
   });
   pack.operators.sort((left, right) => left.id.localeCompare(right.id, "en"));
@@ -229,12 +234,52 @@ function ensureLine(pack) {
   if (pack.lines.some(({ id }) => id === LINE_ID)) return;
   pack.lines.push({
     id: LINE_ID,
-    operatorId: OPERATOR_ID,
+    operatorId: LINE_OPERATOR_ID,
     nameKo: LINE_NAME_KO,
     nameEn: LINE_NAME_EN,
     color: LINE_COLOR,
   });
   pack.lines.sort((left, right) => left.id.localeCompare(right.id, "en"));
+}
+
+function ensureCoverageLineOperatorScopes(fixture, pack) {
+  const scopes = COVERAGE_OPERATOR_IDS.map((operatorId) => ({
+    regionId: "capital",
+    operatorId,
+    lineId: LINE_ID,
+  }));
+  const packScopes = [...(pack.coverageLineOperatorScopes ?? [])];
+  for (const scope of scopes) {
+    if (!packScopes.some((entry) => (
+      entry.regionId === scope.regionId
+        && entry.operatorId === scope.operatorId
+        && entry.lineId === scope.lineId
+    ))) {
+      packScopes.push(scope);
+    }
+  }
+  packScopes.sort((left, right) => (
+    `${left.regionId}:${left.operatorId}:${left.lineId}`
+      .localeCompare(`${right.regionId}:${right.operatorId}:${right.lineId}`, "en")
+  ));
+  pack.coverageLineOperatorScopes = packScopes;
+  if (fixture.coverageLineOperatorScopes !== undefined
+    || fixture.coverageLineOperatorScopeSemantics !== undefined
+    || pack.coverageLineOperatorScopes !== undefined) {
+    const union = [...new Map(
+      [...(fixture.coverageLineOperatorScopes ?? []), ...(pack.coverageLineOperatorScopes ?? [])]
+        .map((entry) => [`${entry.regionId}:${entry.operatorId}:${entry.lineId}`, entry]),
+    ).values()].sort((left, right) => (
+      `${left.regionId}:${left.operatorId}:${left.lineId}`
+        .localeCompare(`${right.regionId}:${right.operatorId}:${right.lineId}`, "en")
+    ));
+    fixture.coverageLineOperatorScopeSemantics = "UNION_OF_PACK_SCOPES";
+    fixture.coverageLineOperatorScopes = union;
+    pack.coverageLineOperatorScopes = union.filter((entry) => (
+      pack.operators.some(({ id }) => id === entry.operatorId)
+        && pack.lines.some(({ id }) => id === entry.lineId)
+    ));
+  }
 }
 
 function ensureStationsAndMembership(pack, snapshot) {
