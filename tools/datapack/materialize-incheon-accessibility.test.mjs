@@ -283,7 +283,7 @@ test("인천 accessibility admission은 freshness·hash·scope·중복을 fail c
   }), /already exists/);
 });
 
-test("materialized SQLite와 provenance가 인천 accessibility_facilities 2건을 SUPPORTED로 만든다", async (context) => {
+test("materialized SQLite와 provenance가 인천 accessibility_facilities 3건을 SUPPORTED로 만든다", async (context) => {
   const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-incheon-accessibility-pack-"));
   context.after(() => rm(outputDir, { recursive: true, force: true }));
   const fixturePath = path.join(outputDir, "fixture.json");
@@ -317,9 +317,9 @@ test("materialized SQLite와 provenance가 인천 accessibility_facilities 2건�
   ).replace(/\.gz$/, "");
   const database = new DatabaseSync(sqlitePath, { readOnly: true });
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM facilities WHERE source_id = ?")
-    .get(SOURCE_ID).count, 180);
+    .get(SOURCE_ID).count, 213);
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM station_facility_evidence WHERE source_id = ?")
-    .get(SOURCE_ID).count, 180);
+    .get(SOURCE_ID).count, 213);
   assert.equal(database.prepare(`
     SELECT COUNT(DISTINCT facility_type) AS count
     FROM station_facility_evidence
@@ -336,7 +336,7 @@ test("materialized SQLite와 provenance가 인천 accessibility_facilities 2건�
     assert.ok(fieldRecords.length > 0, `provenance missing field: ${field}`);
     assert.deepEqual(
       [...new Set(fieldRecords.flatMap(({ coverageScope }) => coverageScope?.lineIds ?? []))].sort(),
-      [LINE2, LINE1].sort(),
+      [LINE2, LINE1, LINE7].sort(),
     );
     assert.ok(fieldRecords.every((record) => (
       record.sourceSnapshotId === "incheon-transit-accessibility-20260724"
@@ -361,13 +361,13 @@ test("materialized SQLite와 provenance가 인천 accessibility_facilities 2건�
   const accessibilityRequirements = report.requirements.filter(
     ({ operatorId, sourceDomain, lineId }) => operatorId === OPERATOR_ID
       && sourceDomain === "accessibility_facilities"
-      && [LINE1, LINE2].includes(lineId),
+      && [LINE1, LINE2, LINE7].includes(lineId),
   );
-  assert.equal(accessibilityRequirements.length, 2);
+  assert.equal(accessibilityRequirements.length, 3);
   assert.ok(accessibilityRequirements.every(({ status }) => status === "SUPPORTED"));
   assert.deepEqual(
     accessibilityRequirements.map(({ lineId }) => lineId).sort(),
-    [LINE2, LINE1].sort(),
+    [LINE2, LINE1, LINE7].sort(),
   );
   assert.deepEqual(report.summary.launchRequired, {
     totalCount: 270,

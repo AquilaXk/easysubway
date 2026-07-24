@@ -1203,7 +1203,9 @@
             "snapshotId": "incheon-transit-station-info-20260724",
             "contentSha256": "710878689282ba967697cd9411940b657a51eee5499106ed884d5bd9111501a8",
             "lineId": "line-98718184f016"
-          },
+          }
+        ],
+        "membershipLineages": [
           {
             "sourceId": "incheon-transit-station-info",
             "snapshotId": "incheon-transit-station-info-20260724",

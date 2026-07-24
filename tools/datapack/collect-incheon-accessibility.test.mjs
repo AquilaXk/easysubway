@@ -92,7 +92,7 @@ test("인천 accessibility collector는 엘리베이터·에스컬레이터·휠
   assert.deepEqual(snapshot.fieldsProvided, [
     "elevator", "escalator", "wheelchair_lift", "status", "verified_at",
   ]);
-  assert.equal(snapshot.topologyLineages.length, 3);
+  assert.equal(snapshot.topologyLineages.length, 2);
   assert.deepEqual(snapshot.topologyLineages, [
     {
       sourceId: "incheon-transit-station-info",
@@ -106,6 +106,9 @@ test("인천 accessibility collector는 엘리베이터·에스컬레이터·휠
       contentSha256: inputs.topologySnapshot.contentSha256,
       lineId: LINE1,
     },
+  ]);
+  assert.equal(snapshot.membershipLineages.length, 1);
+  assert.deepEqual(snapshot.membershipLineages, [
     {
       sourceId: "incheon-transit-station-info",
       snapshotId: "incheon-transit-station-info-20260724",

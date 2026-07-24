@@ -190,12 +190,15 @@ export function collectIncheonAccessibility({
     topologySnapshot,
   });
   const scope = rows.map(({ stationCode, stationName, lineId }) => ({ stationCode, stationName, lineId }));
-  const topologyLineages = LINE_IDS.map((lineId) => ({
+  const lineageFor = (lineId) => ({
     sourceId: TOPOLOGY_SOURCE_ID,
     snapshotId: TOPOLOGY_SNAPSHOT_ID,
     contentSha256: topologySnapshot.contentSha256,
     lineId,
-  }));
+  });
+  // topology edges are admitted for 1·2 only; line-15 is membership-backed.
+  const topologyLineages = TOPOLOGY_LINE_IDS.map(lineageFor);
+  const membershipLineages = [LINE7].map(lineageFor);
   const elevatorSha256 = sha256(Buffer.from(elevatorBytes));
   const escalatorSha256 = sha256(Buffer.from(escalatorBytes));
   const wheelchairSha256 = sha256(Buffer.from(wheelchairBytes));
@@ -236,6 +239,7 @@ export function collectIncheonAccessibility({
       evidenceUrl: ELEVATOR_DETAIL_URL,
     },
     topologyLineages,
+    membershipLineages,
     scope,
     scopeSha256: sha256(JSON.stringify(scope)),
     rawSha256: sha256(JSON.stringify({
