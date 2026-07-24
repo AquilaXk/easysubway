@@ -93,8 +93,8 @@ export function materializeSeoulRouteMapPositions({
     existingKeys.add(key);
   }
   const materializedCount = rows.length;
-  // capital cyberstation과 겹치는 station/line/region(예: 사당·seoul-4)만 건너뛴다.
-  if (materializedCount < EXPECTED_STATION_COUNT - 2 || materializedCount >= EXPECTED_STATION_COUNT) {
+  // capital cyberstation PK와 충돌하는 행만 건너뛴다. 충돌 0건이면 276 전량 허용.
+  if (materializedCount < EXPECTED_STATION_COUNT - 2 || materializedCount > EXPECTED_STATION_COUNT) {
     throw new Error(`Seoul route map materialized row count mismatch: ${materializedCount}`);
   }
   const coveredLineIds = new Set([
