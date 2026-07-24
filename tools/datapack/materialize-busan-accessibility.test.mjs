@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { createHash, generateKeyPairSync } from "node:crypto";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
+import { promisify } from "node:util";
 
 import { parseMolitDaejeonStationMappings } from "./build-molit-nationwide-fixture.mjs";
 import {
@@ -17,11 +21,24 @@ import {
 import { materializeBusanTimetable } from "./materialize-busan-timetable.mjs";
 import { materializeDaejeonTimetable } from "./materialize-daejeon-timetable.mjs";
 
+const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
 const topologyNow = new Date("2026-07-19T18:14:03.004Z");
 const routeMapNow = new Date("2026-07-20T11:13:18.000Z");
 const accessibilityNow = new Date("2026-07-24T12:00:00.000Z");
 const SOURCE_ID = "busan-transportation-accessibility";
+// route-map 누적 fixture coverage baseline(실측): supportedCount=19 → accessibility +4 = 23.
+const ROUTE_MAP_BASELINE_SUPPORTED_COUNT = 19;
+const ACCESSIBILITY_SUPPORTED_COUNT = ROUTE_MAP_BASELINE_SUPPORTED_COUNT + 4;
+const BUSAN_LINE_IDS = Object.freeze([
+  "line-ab1a041f6266",
+  "line-d74614a04530",
+  "line-d812a5bc1e5f",
+  "line-eb7b47920390",
+]);
+const ACCESSIBILITY_FIELDS = Object.freeze([
+  "elevator", "escalator", "wheelchair_lift", "status", "verified_at",
+]);
 
 async function inputs() {
   const [
@@ -230,6 +247,102 @@ test("부산 accessibility admission은 freshness·hash·scope·중복을 fail c
     inventory,
     now: accessibilityNow,
   }), /already exists/);
+});
+
+test("materialized SQLite와 provenance가 부산 accessibility_facilities 4건을 SUPPORTED로 만든다", async (context) => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-busan-accessibility-pack-"));
+  context.after(() => rm(outputDir, { recursive: true, force: true }));
+  const fixturePath = path.join(outputDir, "fixture.json");
+  const packOutput = path.join(outputDir, "pack");
+  const reportPath = path.join(outputDir, "coverage.json");
+  const { routeMapFixture, topologySnapshot, accessibilitySnapshot, inventory } = await inputs();
+  const fixture = materializeBusanAccessibility({
+    baseFixture: routeMapFixture,
+    accessibilitySnapshot,
+    topologySnapshot,
+    inventory,
+    now: accessibilityNow,
+  });
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+  await mkdir(packOutput, { recursive: true });
+
+  const { privateKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    privateKeyEncoding: { type: "pkcs8", format: "pem" },
+    publicKeyEncoding: { type: "spki", format: "pem" },
+  });
+  await execFileAsync(process.execPath, [
+    "tools/datapack/build-datapack.mjs", "--fixture", fixturePath, "--output", packOutput,
+  ], { cwd: root, env: { ...process.env, EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM: privateKey } });
+
+  const manifestPath = path.join(packOutput, "current.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  const sqlitePath = path.join(
+    packOutput,
+    new URL(manifest.packs[0].url).pathname.split("/").slice(-2).join("/"),
+  ).replace(/\.gz$/, "");
+  const database = new DatabaseSync(sqlitePath, { readOnly: true });
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM facilities WHERE source_id = ?")
+    .get(SOURCE_ID).count, 342);
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM station_facility_evidence WHERE source_id = ?")
+    .get(SOURCE_ID).count, 342);
+  assert.equal(database.prepare(`
+    SELECT COUNT(DISTINCT facility_type) AS count
+    FROM station_facility_evidence
+    WHERE source_id = ?
+  `).get(SOURCE_ID).count, 3);
+  database.close();
+
+  const provenance = JSON.parse(await readFile(path.join(packOutput, "current.provenance.json"), "utf8"));
+  const facilityRecords = provenance.packs.flatMap(({ records }) => records).filter(
+    ({ sourceId, entityType }) => sourceId === SOURCE_ID && entityType === "facility",
+  );
+  for (const field of ACCESSIBILITY_FIELDS) {
+    const fieldRecords = facilityRecords.filter((record) => record.field === field);
+    assert.ok(fieldRecords.length > 0, `provenance missing field: ${field}`);
+    assert.deepEqual(
+      [...new Set(fieldRecords.flatMap(({ coverageScope }) => coverageScope?.lineIds ?? []))].sort(),
+      [...BUSAN_LINE_IDS],
+    );
+    assert.ok(fieldRecords.every((record) => (
+      record.sourceSnapshotId === "busan-transportation-accessibility-20260724"
+        && record.evidenceHash === accessibilitySnapshot.rowsSha256
+        && /^[a-f0-9]{64}$/.test(record.providerRecordHash)
+        && record.derivationKind === "OFFICIAL"
+    )));
+  }
+
+  await execFileAsync(process.execPath, [
+    "tools/datapack/report-coverage-gaps.mjs",
+    "--targets", "tools/datapack/nationwide-coverage-targets.json",
+    "--inventory", "tools/datapack/source-inventory.json",
+    "--manifest", manifestPath,
+    "--provenance", path.join(packOutput, "current.provenance.json"),
+    "--resolution-plan", "tools/datapack/release/nationwide-public-api-coverage-search-plan-20260721.json",
+    "--resolutions", "tools/datapack/release/nationwide-public-api-coverage-resolutions-20260721.json",
+    "--output", reportPath,
+    "--allow-gaps",
+  ], { cwd: root });
+  const report = JSON.parse(await readFile(reportPath, "utf8"));
+  const accessibilityRequirements = report.requirements.filter(
+    ({ operatorId, sourceDomain }) => operatorId === "busan-transportation"
+      && sourceDomain === "accessibility_facilities",
+  );
+  assert.equal(accessibilityRequirements.length, 4);
+  assert.ok(accessibilityRequirements.every(({ status }) => status === "SUPPORTED"));
+  assert.deepEqual(
+    accessibilityRequirements.map(({ lineId }) => lineId).sort(),
+    [...BUSAN_LINE_IDS],
+  );
+  assert.deepEqual(report.summary.launchRequired, {
+    totalCount: 270,
+    supportedCount: ACCESSIBILITY_SUPPORTED_COUNT,
+    explicitlyUnsupportedCount: 4,
+    missingCount: 270 - ACCESSIBILITY_SUPPORTED_COUNT - 4,
+    supportedRatio: Number((ACCESSIBILITY_SUPPORTED_COUNT / 270).toFixed(4)),
+    terminalResolutionRatio: Number(((ACCESSIBILITY_SUPPORTED_COUNT + 4) / 270).toFixed(4)),
+    completionReady: false,
+  });
 });
 
 async function readJson(relativePath) {

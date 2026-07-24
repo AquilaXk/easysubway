@@ -3634,7 +3634,7 @@
       },
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "live_capture_confirmed",
-      "admissionStatus": "production_materializable_coverage_pending",
+      "admissionStatus": "production_materialized",
       "productionInventoryReferenceId": "busan-transportation-accessibility",
       "serviceKeyHandling": "offline_collector_secret_only",
       "mobileEmbeddingAllowed": false,
@@ -3669,16 +3669,19 @@
           "rowsSha256": "429c4034ab866ad78b30603e6d26b9aa092e76e3c019fc137e7f2f96bfd3dbfa",
           "credentialRedacted": true,
           "materializer": "tools/datapack/materialize-busan-accessibility.mjs",
-          "verificationTest": "tools/datapack/materialize-busan-accessibility.test.mjs"
+          "verificationTest": "tools/datapack/materialize-busan-accessibility.test.mjs",
+          "coverageSupportedCount": 4
         },
         "coverageAssessment": {
-          "state": "MATERIALIZABLE_NOT_YET_SUPPORTED",
+          "state": "SUPPORTED",
           "requirementCount": 4,
           "sourceDomain": "accessibility_facilities",
-          "noteKo": "materializer·inventory·live sample 바인딩까지 완료. 누적 pack build + report-coverage-gaps로 Busan 4개 line accessibility_facilities SUPPORTED 승격이 남았다."
+          "artifactKind": "production",
+          "materializer": "tools/datapack/materialize-busan-accessibility.mjs",
+          "verificationTest": "tools/datapack/materialize-busan-accessibility.test.mjs"
         }
       },
-      "nextAction": "누적 production fixture에 materialize한 뒤 build-datapack·report-coverage-gaps로 accessibility_facilities 4 requirements를 SUPPORTED로 승격한다"
+      "nextAction": "24시간 admission snapshot을 갱신해 immutable production pack을 재생성한다"
     },
     {
       "id": "busan-transportation-route-topology",
