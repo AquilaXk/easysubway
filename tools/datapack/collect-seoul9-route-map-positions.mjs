@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // 서울교통공사 data.go.kr 15099317 (9호선 2·3단계 역사 좌표 CSV)를 결정론적 snapshot으로 수집한다.
 // API key·포털 활용신청 없이 FILE CSV만 사용한다.
+// fixture CSV는 공식 다운로드 CRLF를 LF로 정규화한 바이트를 고정한다(git diff --check).
 //
 // 하이브리드 정렬:
 // - 공식 FILE 위경도는 provenance(latitude/longitude)로만 유지한다.

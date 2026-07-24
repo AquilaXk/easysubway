@@ -33,7 +33,7 @@ const SCHEMATIC_X_MAX = 3171;
 const SCHEMATIC_Y_MIN = 1620;
 const SCHEMATIC_Y_MAX = 1993;
 const GEO_SCALE_FLOOR = 5000;
-const EXPECTED_RAW_SHA256 = "f37b016d89576916f728a7eae4c1f0636134570ee718ada2bfa2852a4e785971";
+const EXPECTED_RAW_SHA256 = "6a8b48ff370e9a364986ec10670fa934033ec88d569b3dc2f7f2b7b1e5acd683";
 const SOURCE_ID = "seoul-metro-line9-23-route-map-positions";
 const LINE_ID = "line-f0e747248a31";
 const DOWNLOAD_URL =
@@ -176,7 +176,7 @@ test("#2498 inventory·candidate는 snapshot byte identity와 자유 이용 근�
   );
   assert.equal(
     source.routeMapAdmissionEvidence.snapshotSha256,
-    "183be54c1171be39b91a52c32fcc1105316e38fa13ce3f785bc0bd9b733ac09d",
+    "2db140beb94048ca65df3ef455bf45bafa2939812776d4944fe0c73da3517d53",
   );
   assert.equal(candidate.admissionStatus, "production_route_map_positions_materialized");
   assert.equal(candidate.apiCatalog, false);
@@ -190,6 +190,7 @@ test("#2498 inventory·candidate는 snapshot byte identity와 자유 이용 근�
 test("fixture CSV는 trailing whitespace와 EOF 빈 줄이 없다", async () => {
   const bytes = await readFile(FIXTURE_PATH);
   assert.equal(createHash("sha256").update(bytes).digest("hex"), EXPECTED_RAW_SHA256);
+  assert.equal(bytes.includes(0x0d), false, "CRLF must be LF-normalized for git diff --check");
   assert.equal(bytes[bytes.length - 1], 0x0a);
   assert.notEqual(bytes[bytes.length - 2], 0x0a);
   const text = decodeOfficialCsv(bytes);

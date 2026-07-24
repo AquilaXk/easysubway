@@ -4605,7 +4605,7 @@
         "verificationTest": "tools/datapack/materialize-seoul9-route-map-positions.test.mjs",
         "snapshotId": "seoul-metro-line9-23-route-map-positions-20260725",
         "snapshotPath": "tools/datapack/sources/seoul-metro-line9-23-route-map-positions-20260725.json",
-        "snapshotSha256": "183be54c1171be39b91a52c32fcc1105316e38fa13ce3f785bc0bd9b733ac09d",
+        "snapshotSha256": "2db140beb94048ca65df3ef455bf45bafa2939812776d4944fe0c73da3517d53",
         "capturedAt": "2026-07-25T04:00:00.000Z",
         "stationCount": 13,
         "rawStationCount": 13,
@@ -4614,7 +4614,7 @@
         "datasetIds": [
           "15099317"
         ],
-        "rawSha256": "f37b016d89576916f728a7eae4c1f0636134570ee718ada2bfa2852a4e785971",
+        "rawSha256": "6a8b48ff370e9a364986ec10670fa934033ec88d569b3dc2f7f2b7b1e5acd683",
         "positionsSha256": "a3ac35749f4910ec75aff9fad38293b6f09e5d9fb178d036b1cfa72844fc4ec8",
         "lineIds": [
           "line-f0e747248a31"
