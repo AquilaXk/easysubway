@@ -2730,7 +2730,6 @@ class _FacilityReportHeader extends StatelessWidget {
     return Semantics(
       label:
           '${target.stationName}역, ${target.facilityName}, ${target.facilityTypeLabel}, 현재 ${target.facilityStatusLabel}',
-      header: true,
       child: ExcludeSemantics(
         child: ColoredBox(
           color: EasySubwayAccessibleColors.surface,
@@ -2820,11 +2819,16 @@ class _FacilityReportTypeRow extends StatelessWidget {
     final textColor = selected
         ? EasySubwayAccessibleColors.primary
         : EasySubwayAccessibleColors.text;
-    final semanticsLabel = '${option.label} ${selected ? '선택됨' : '선택 가능'}';
+    final enabled = onTap != null;
+    final stateLabel = !enabled
+        ? '선택 불가'
+        : (selected ? '선택됨' : '선택 가능');
+    final semanticsLabel = '${option.label} $stateLabel';
 
     return Semantics(
       label: semanticsLabel,
       button: true,
+      enabled: enabled,
       selected: selected,
       onTap: onTap,
       child: ExcludeSemantics(
