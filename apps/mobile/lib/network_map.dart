@@ -539,6 +539,9 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   // 탭만 패널에 반영되도록 토큰으로 앞선 요청을 무효화한다.
   int _canvasTapPanelToken = 0;
 
+  /// #2436: 인접 역 탭 해석도 비동기라 연타·닫기 후 늦은 응답을 토큰으로 버린다.
+  int _neighborSelectPanelToken = 0;
+
   /// 성공한 실시간만 stationId+lineId 키로 보관. unavailable/loading/empty로 덮지 않는다.
   _NearbyRealtimeDisplay? _nearbyRealtimeDisplay;
 
@@ -746,6 +749,8 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     StationSearchResult station, {
     StationSearchLine? preferredLine,
   }) {
+    // 인접 역 해석 중 다른 경로로 패널이 열리면 늦은 neighbor 응답을 버린다.
+    _neighborSelectPanelToken++;
     final selectedLine = preferredLine ?? station.lines.firstOrNull;
     // generation을 먼저 올려 이전 요청을 무효화한 뒤 패널을 연다.
     final generation = ++_nearbyDataRequestToken;
@@ -1406,6 +1411,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   void _resetNearbyPanelState() {
     // 닫힌 뒤 완료되는 요청이 UI를 건드리지 않도록 generation을 무효화한다.
     _nearbyDataRequestToken++;
+    _neighborSelectPanelToken++;
     _nearbyPanelVisible = false;
     _nearbyPanelExpanded = false;
     _nearbySelectedStationId = null;
@@ -1721,6 +1727,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     if (repository == null) {
       return;
     }
+    final token = ++_neighborSelectPanelToken;
     List<StationSearchResult> results;
     try {
       results = await repository.searchStations(neighbor.nameKo);
@@ -1732,7 +1739,10 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
       );
       return;
     }
-    if (!mounted) {
+    // 연타·닫기 후 늦은 응답은 패널을 다시 열거나 잘못된 역으로 덮지 않는다.
+    if (!mounted ||
+        token != _neighborSelectPanelToken ||
+        !_nearbyPanelVisible) {
       return;
     }
     final match = results
