@@ -13,12 +13,14 @@ const OPERATOR_ID = "incheon-transit";
 const PACK_ID = "nationwide-incheon-accessibility";
 const LINE1 = "line-98718184f016";
 const LINE2 = "line-42b5805f3b5a";
-const LINE_IDS = Object.freeze([LINE2, LINE1]);
-const EXPECTED_STATION_COUNT = 60;
+const LINE7 = "line-15b3b8a93259";
+const LINE_IDS = Object.freeze([LINE2, LINE1, LINE7]);
+const EXPECTED_STATION_COUNT = 71;
 const EXPECTED_FACILITY_COUNT = EXPECTED_STATION_COUNT * 3;
-const EXPECTED_ELEVATOR_ROWS = 213;
-const EXPECTED_ESCALATOR_ROWS = 490;
+const EXPECTED_ELEVATOR_ROWS = 265;
+const EXPECTED_ESCALATOR_ROWS = 653;
 const EXPECTED_WHEELCHAIR_ROWS = 3;
+const EXPECTED_TOPOLOGY_LINEAGE_COUNT = LINE_IDS.length;
 const FRESHNESS_MILLIS = 24 * 60 * 60 * 1_000;
 const DATASET_IDS = Object.freeze(["15083478", "15010199", "15146049"]);
 const FIELDS_PROVIDED = Object.freeze([
@@ -203,7 +205,8 @@ function validateSnapshot(snapshot) {
     || JSON.stringify(snapshot.lineIds) !== JSON.stringify([...LINE_IDS])
     || JSON.stringify(snapshot.datasetIds) !== JSON.stringify(DATASET_IDS)
     || JSON.stringify(snapshot.fieldsProvided) !== JSON.stringify(FIELDS_PROVIDED)
-    || !Array.isArray(snapshot.topologyLineages) || snapshot.topologyLineages.length !== 2) {
+    || !Array.isArray(snapshot.topologyLineages)
+    || snapshot.topologyLineages.length !== EXPECTED_TOPOLOGY_LINEAGE_COUNT) {
     throw new Error("invalid Incheon accessibility snapshot");
   }
   const codes = new Set();
@@ -231,7 +234,7 @@ function requiredSource(inventory, snapshot, topologySnapshot, now) {
     || source.license?.type !== "PUBLIC_DATA_FREE_USE"
     || source.capabilities?.facility?.productionUseAllowed !== true
     || source.capabilities?.facility?.status !== "SUPPORTED"
-    || evidence?.issue !== 2484
+    || evidence?.issue !== 2492
     || evidence.materializer !== "tools/datapack/materialize-incheon-accessibility.mjs"
     || evidence.verificationTest !== "tools/datapack/materialize-incheon-accessibility.test.mjs"
     || !/^incheon-transit-accessibility-\d{8}$/.test(evidence.snapshotId ?? "")
@@ -244,6 +247,7 @@ function requiredSource(inventory, snapshot, topologySnapshot, now) {
     || evidence.topologySnapshotId !== TOPOLOGY_SNAPSHOT_ID
     || JSON.stringify(evidence.datasetIds) !== JSON.stringify(DATASET_IDS)
     || !Array.isArray(evidence.topologyLineages)
+    || evidence.topologyLineages.length !== EXPECTED_TOPOLOGY_LINEAGE_COUNT
     || JSON.stringify(evidence.topologyLineages) !== JSON.stringify(snapshot.topologyLineages)
     || evidence.topologyContentSha256 !== topologySnapshot.contentSha256
     || JSON.stringify(source.coverageScope) !== JSON.stringify({
@@ -281,7 +285,7 @@ function validateTopologyLineage(inventory, evidence, topologySnapshot) {
     || topologySnapshot.sourceId !== TOPOLOGY_SOURCE_ID
     || topologyEvidence?.snapshotId !== TOPOLOGY_SNAPSHOT_ID
     || !Array.isArray(evidence.topologyLineages)
-    || evidence.topologyLineages.length !== 2
+    || evidence.topologyLineages.length !== EXPECTED_TOPOLOGY_LINEAGE_COUNT
     || JSON.stringify(evidence.topologyLineages.map(({ lineId }) => lineId)) !== JSON.stringify([...LINE_IDS])
     || evidence.topologyLineages.some((lineage) => (
       lineage.sourceId !== TOPOLOGY_SOURCE_ID
