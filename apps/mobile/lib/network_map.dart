@@ -3254,6 +3254,7 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
               timetable: timetable,
               adjacentStations: adjacentStations,
               onOpenStationDetail: canExpandDetail ? null : onOpenStationDetail,
+              onSelectNeighbor: onSelectNeighbor,
             ),
             if (canExpandDetail) ...[
               const Divider(height: 1, color: Color(0xFFD8D8D8)),
@@ -3311,6 +3312,7 @@ class _NetworkMapNearbyPanelBody extends StatelessWidget {
     required this.timetable,
     required this.adjacentStations,
     this.onOpenStationDetail,
+    this.onSelectNeighbor,
   });
 
   final _NetworkMapNearbyPanelData data;
@@ -3320,6 +3322,7 @@ class _NetworkMapNearbyPanelBody extends StatelessWidget {
   final StationTimetable? timetable;
   final _NetworkMapAdjacentStations adjacentStations;
   final VoidCallback? onOpenStationDetail;
+  final ValueChanged<StationDetailNeighbor>? onSelectNeighbor;
 
   @override
   Widget build(BuildContext context) {
@@ -3337,6 +3340,7 @@ class _NetworkMapNearbyPanelBody extends StatelessWidget {
         timetable: timetable,
         adjacentStations: adjacentStations,
         onOpenStationDetail: onOpenStationDetail,
+        onSelectNeighbor: onSelectNeighbor,
       ),
     };
   }
@@ -3381,6 +3385,7 @@ class _NetworkMapNearbySuccessList extends StatelessWidget {
     required this.timetable,
     required this.adjacentStations,
     this.onOpenStationDetail,
+    this.onSelectNeighbor,
   });
 
   final List<StationSearchResult> results;
@@ -3390,12 +3395,16 @@ class _NetworkMapNearbySuccessList extends StatelessWidget {
   final StationTimetable? timetable;
   final _NetworkMapAdjacentStations adjacentStations;
   final VoidCallback? onOpenStationDetail;
+  final ValueChanged<StationDetailNeighbor>? onSelectNeighbor;
 
   @override
   Widget build(BuildContext context) {
     final primary = results.first;
     final selectedLine = _nearbySelectedLine(primary, selectedLineId);
     final lineColor = _nearbySelectedLineColor(selectedLine);
+    final selectNeighbor = onSelectNeighbor;
+    final previous = adjacentStations.previousNeighbor;
+    final next = adjacentStations.nextNeighbor;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -3406,6 +3415,12 @@ class _NetworkMapNearbySuccessList extends StatelessWidget {
           badgeText: selectedLine?.badgeText ?? '',
           lineColor: lineColor,
           onStationNameTap: onOpenStationDetail,
+          onLeftNameTap: selectNeighbor == null || previous == null
+              ? null
+              : () => selectNeighbor(previous),
+          onRightNameTap: selectNeighbor == null || next == null
+              ? null
+              : () => selectNeighbor(next),
         ),
         const SizedBox(height: 17),
         Padding(
