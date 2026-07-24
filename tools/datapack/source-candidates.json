@@ -4729,6 +4729,74 @@
       "nextAction": "24시간 admission snapshot을 갱신해 immutable production pack을 재생성한다"
     },
     {
+      "id": "gwangju-transportation-route-map-positions",
+      "apiCatalog": false,
+      "priority": "P1",
+      "domain": "route_map_positions",
+      "coverageScope": {
+        "regionIds": [
+          "gwangju"
+        ],
+        "operatorIds": [
+          "gwangju-metropolitan-rapid-transit"
+        ],
+        "lineIds": [
+          "line-e57a361e8892"
+        ]
+      },
+      "displayName": "광주교통공사_문화노선도 현황",
+      "detailUrl": "https://www.data.go.kr/data/15109340/fileData.do",
+      "requestUrl": "https://www.data.go.kr/data/15109340/fileData.do",
+      "licenseEvidenceStatus": "confirmed_unrestricted_public_data_free_use",
+      "sampleEvidenceStatus": "validated_official_full_snapshot",
+      "admissionStatus": "production_route_map_positions_materialized",
+      "productionInventoryReferenceId": "gwangju-transportation-route-map-positions",
+      "serviceKeyHandling": "not_required",
+      "mobileEmbeddingAllowed": true,
+      "evidence": {
+        "retrievedAt": "2026-07-25",
+        "endpoint": "https://www.data.go.kr/data/15109340/fileData.do",
+        "licenseEvidenceUrl": "https://www.data.go.kr/data/15109340/fileData.do",
+        "usePermissionRange": "공공데이터포털 이용허락범위 제한 없음",
+        "formats": [
+          "CSV",
+          "JSON"
+        ],
+        "outputFields": [
+          "route_map_position",
+          "route_map_label_polygon"
+        ],
+        "stationCount": 20,
+        "datasetId": "15109340",
+        "datasetIds": [
+          "15109340"
+        ],
+        "rawSha256": "ca322fe16d180edf9fd98bc01414919dacc8c0b4ecd038ebfd1a7b4184d0b176",
+        "positionsSha256": "bb2c37005c98bf58957f775707cdcd6d0f0cfac748ea464d64a1a7144b5e411c",
+        "lineIds": [
+          "line-e57a361e8892"
+        ],
+        "lineStationCounts": {
+          "1": 20
+        },
+        "evidenceArtifact": "tools/datapack/sources/gwangju-transportation-route-map-positions-20260725.json",
+        "coverageAssessment": {
+          "state": "SUPPORTED",
+          "requirementCount": 1,
+          "sourceDomain": "route_map_positions",
+          "artifactKind": "production",
+          "materializer": "tools/datapack/materialize-gwangju-route-map-positions.mjs",
+          "verificationTest": "tools/datapack/materialize-gwangju-route-map-positions.test.mjs"
+        },
+        "coverageLimitations": [
+          "광주교통공사 1호선 공식 FILE 문화노선도 위경도 20역을 stationCode(역번호) join으로 admission한다",
+          "CSV 역사명 표기 차이(예: 문화전당(구도청))는 topology 정본 역명을 사용하며 좌표 발명·추정은 하지 않는다",
+          "공식 FILE 위경도를 offline materializer에서 canvas 정수 좌표로 투영하며 runtime 네트워크 호출은 하지 않는다"
+        ]
+      },
+      "nextAction": "공식 FILE 갱신 시 CSV byte hash와 admitted 좌표 snapshot을 함께 갱신한다"
+    },
+    {
       "id": "gwangju-transportation-accessibility",
       "priority": "P0",
       "domain": "accessibility_facilities",
