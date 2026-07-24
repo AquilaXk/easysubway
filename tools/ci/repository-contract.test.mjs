@@ -2267,7 +2267,7 @@ test("모바일 즐겨찾기 화면은 새로고침·삭제·복귀 재조회 �
   );
   assert.match(
     stationDetailBlock,
-    /await Navigator\.of\(context\)\.push\([\s\S]*?initiallyFavorite: true,[\s\S]*?\);[\s\S]*?await _reloadFavoritesAfterReturn\(\);/,
+    /await showStationDetailSheet<void>\([\s\S]*?initiallyFavorite: true,[\s\S]*?\);[\s\S]*?await _reloadFavoritesAfterReturn\(\);/,
   );
   assert.match(
     facilityReportBlock,

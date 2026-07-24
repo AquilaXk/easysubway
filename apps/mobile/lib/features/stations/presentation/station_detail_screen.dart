@@ -34,7 +34,7 @@ Future<T?> showStationDetailSheet<T>({
   return showModalBottomSheet<T>(
     context: context,
     isScrollControlled: true,
-    useSafeArea: true,
+    useSafeArea: false,
     backgroundColor: EasySubwayAccessibleColors.surface,
     builder: (sheetContext) {
       final height = MediaQuery.sizeOf(sheetContext).height;
