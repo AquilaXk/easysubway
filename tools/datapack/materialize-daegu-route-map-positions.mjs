@@ -11,7 +11,7 @@ const SOURCE_ID = "daegu-transportation-route-map-positions";
 const PACK_ID = "nationwide-daegu-route-map";
 const OPERATOR_ID = "daegu-transportation";
 const REGION = "대구권";
-const EXPECTED_STATION_COUNT = 85;
+const EXPECTED_STATION_COUNT = 91;
 const LINE_IDS = Object.freeze(DAEGU_LINES.map(({ lineId }) => lineId));
 const COMPOSITE_TOPOLOGY_SOURCE_ID = "daegu-transportation-route-map-topology-lineage";
 const COMPOSITE_TOPOLOGY_SNAPSHOT_ID = "daegu-transportation-route-map-topology-lineage-20260721";

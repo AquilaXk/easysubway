@@ -32,7 +32,7 @@ async function loadInputs() {
   return { csvByDatasetId, topologySnapshots };
 }
 
-test("대구 공식 출구 FILE CSV에서 1·2·3호선 대표 좌표 snapshot을 만든다(중복 위경도 quarantine)", async () => {
+test("대구 공식 출구 FILE CSV에서 1·2·3호선 대표 좌표 snapshot을 만든다(환승역 동일 stationId 유지)", async () => {
   const { csvByDatasetId, topologySnapshots } = await loadInputs();
   const snapshot = collectDaeguRouteMapPositions({
     csvByDatasetId,
@@ -45,26 +45,14 @@ test("대구 공식 출구 FILE CSV에서 1·2·3호선 대표 좌표 snapshot�
   assert.deepEqual(snapshot.datasetIds, DATASET_IDS);
   assert.equal(snapshot.exitRowCount, 429);
   assert.equal(snapshot.rawStationCount, 91);
-  assert.equal(snapshot.stationCount, 85);
-  assert.equal(snapshot.quarantinedCount, 6);
+  assert.equal(snapshot.stationCount, 91);
+  assert.equal(snapshot.quarantinedCount, 0);
   assert.equal(snapshot.topologyGapCount, 3);
-  assert.deepEqual(snapshot.lineStationCounts, { "1": 30, "2": 27, "3": 28 });
-  assert.deepEqual(
-    snapshot.quarantinedPositions.map(({ stationCode, stationName, reasonCode }) => ({
-      stationCode, stationName, reasonCode,
-    })),
-    [
-      { stationCode: "129", stationName: "명덕1", reasonCode: "OFFICIAL_DUPLICATE_LATLON" },
-      { stationCode: "130", stationName: "반월당1", reasonCode: "OFFICIAL_DUPLICATE_LATLON" },
-      { stationCode: "229", stationName: "청라언덕2", reasonCode: "OFFICIAL_DUPLICATE_LATLON" },
-      { stationCode: "230", stationName: "반월당2", reasonCode: "OFFICIAL_DUPLICATE_LATLON" },
-      { stationCode: "329", stationName: "청라언덕3", reasonCode: "OFFICIAL_DUPLICATE_LATLON" },
-      { stationCode: "331", stationName: "명덕3", reasonCode: "OFFICIAL_DUPLICATE_LATLON" },
-    ],
-  );
+  assert.deepEqual(snapshot.lineStationCounts, { "1": 32, "2": 29, "3": 30 });
+  assert.deepEqual(snapshot.quarantinedPositions, []);
   assert.equal(
     snapshot.positions.some(({ stationCode }) => ["129", "130", "229", "230", "329", "331"].includes(stationCode)),
-    false,
+    true,
   );
   assert.deepEqual(snapshot.lineIds, DAEGU_LINES.map(({ lineId }) => lineId));
   assert.equal(snapshot.credentialRequired, false);
@@ -136,7 +124,7 @@ test("#2473 inventory·candidate는 snapshot byte identity와 자유 이용 근�
   assert.equal(candidate.admissionStatus, "production_route_map_positions_materialized");
   assert.equal(candidate.apiCatalog, false);
   assert.equal(candidate.evidence.coverageAssessment.requirementCount, 3);
-  assert.equal(JSON.parse(snapshotBytes).stationCount, 85);
+  assert.equal(JSON.parse(snapshotBytes).stationCount, 91);
   assert.equal(JSON.parse(snapshotBytes).rawStationCount, 91);
 });
 

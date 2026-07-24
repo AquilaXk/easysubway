@@ -45,23 +45,23 @@
           "route_map_position",
           "route_map_label_polygon"
         ],
-        "stationCount": 85,
+        "stationCount": 91,
         "datasetIds": [
           "15133918",
           "15133920",
           "15133922"
         ],
         "rawSha256": "ff79e8ec13d5ebf22cae7afa0908263ff27349afe68a210de243f0f17db0676e",
-        "positionsSha256": "e51b2d580fbaa4b2a3ff58f0116991c3cd7c7842fd46c3de9dfa672844fb48f7",
+        "positionsSha256": "b29b538c004ef849df98fbcbc1a1bf4f7f2aff260f3995e5de07cdd81ee3ac59",
         "lineIds": [
           "line-5b8d9b05e7e6",
           "line-e2938a4cc492",
           "line-0ffaa95b1b5d"
         ],
         "lineStationCounts": {
-          "1": 30,
-          "2": 27,
-          "3": 28
+          "1": 32,
+          "2": 29,
+          "3": 30
         },
         "evidenceArtifact": "tools/datapack/sources/daegu-transportation-route-map-positions-20260724.json",
         "coverageAssessment": {
@@ -73,7 +73,8 @@
           "verificationTest": "tools/datapack/materialize-daegu-route-map-positions.test.mjs"
         },
         "coverageLimitations": [
-          "대구교통공사 1·2·3호선 공식 FILE 출구별 위경도 429행을 exit→station median aggregation으로 91 joined station 후 6 OFFICIAL_DUPLICATE_LATLON(명덕·반월당·청라언덕 환승 중복) quarantine하고 85개만 admission한다",
+          "대구교통공사 1·2·3호선 공식 FILE 출구별 위경도 429행을 exit→station median aggregation으로 91 joined station을 admission한다. 환승역(명덕·반월당·청라언덕)은 동일 stationId·동일 위경도를 호선별 역명으로 공유하며 quarantine하지 않는다",
+          "서로 다른 stationId가 동일 위경도를 쓰면 OFFICIAL_DUPLICATE_LATLON으로 quarantine한다(좌표 발명 금지)",
           "topology lineage 대비 하양연장 3역 gap은 positions admission에서 제외한다",
           "CSV 역명 alias(수성운동장·어린이회관)를 topology station code에 매칭한다",
           "공식 FILE 위경도를 offline materializer에서 canvas 정수 좌표로 투영하며 runtime 네트워크 호출은 하지 않는다"

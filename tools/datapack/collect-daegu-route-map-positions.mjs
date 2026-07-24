@@ -48,9 +48,9 @@ const DATASETS = Object.freeze([
 const LINE_IDS = Object.freeze(DATASETS.map(({ lineId }) => lineId));
 const EXPECTED_EXIT_ROW_COUNT = 429;
 const EXPECTED_RAW_STATION_COUNT = 91;
-const EXPECTED_QUARANTINED_COUNT = 6;
-const EXPECTED_STATION_COUNT = 85;
-const EXPECTED_LINE_STATION_COUNTS = Object.freeze({ "1": 30, "2": 27, "3": 28 });
+const EXPECTED_QUARANTINED_COUNT = 0;
+const EXPECTED_STATION_COUNT = 91;
+const EXPECTED_LINE_STATION_COUNTS = Object.freeze({ "1": 32, "2": 29, "3": 30 });
 const EXPECTED_RAW_LINE_STATION_COUNTS = Object.freeze({ "1": 32, "2": 29, "3": 30 });
 const TOPOLOGY_GAPS = Object.freeze([
   { lineId: "line-5b8d9b05e7e6", stationCode: "147", stationName: "대구한의대병원" },
@@ -201,8 +201,8 @@ export function parseDaeguRouteMapPositionsCsvs({ csvByDatasetId, topologySnapsh
     }
   }
 
-  // 환승역은 동일 역명·동일 위경도를 호선별로 공유할 수 있다.
-  // 서로 다른 역명이 같은 위경도를 쓰면 공식 FILE 결함으로 전량 quarantine한다(좌표 발명 금지).
+  // 환승역은 동일 stationId·동일 위경도를 호선별 역명으로 공유할 수 있다.
+  // 서로 다른 stationId가 같은 위경도를 쓰면 공식 FILE 결함으로 전량 quarantine한다(좌표 발명 금지).
   const byLatLon = new Map();
   for (const row of joined) {
     const key = `${row.latitude},${row.longitude}`;
@@ -213,8 +213,8 @@ export function parseDaeguRouteMapPositionsCsvs({ csvByDatasetId, topologySnapsh
   const positions = [];
   const quarantinedPositions = [];
   for (const group of byLatLon.values()) {
-    const distinctNames = new Set(group.map((row) => row.stationName));
-    if (distinctNames.size <= 1) {
+    const distinctStationIds = new Set(group.map((row) => row.stationId));
+    if (distinctStationIds.size <= 1) {
       positions.push(...group);
       continue;
     }
@@ -325,7 +325,7 @@ export function validateDaeguRouteMapPositionsSnapshot(snapshot) {
   const validPositions = Array.isArray(positions) && positions.length === EXPECTED_STATION_COUNT
     && positions.every((position) => {
       const key = `${position.lineId}:${position.stationCode}`;
-      const owner = `${position.stationId}\0${position.stationName}`;
+      const owner = position.stationId;
       const latLonKey = `${position.latitude},${position.longitude}`;
       const canvasKey = `${position.x},${position.y}`;
       const latLonOwner = latLonOwners.get(latLonKey);

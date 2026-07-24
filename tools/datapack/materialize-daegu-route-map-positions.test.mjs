@@ -128,7 +128,7 @@ test("공식 대구 출구 위경도 snapshot을 누적 production candidate pac
   const rows = pack.routeMapPositions.filter(({ sourceId }) => sourceId === SOURCE_ID);
   const source = pack.sourceInventory.find(({ id }) => id === SOURCE_ID);
 
-  assert.equal(rows.length, 85);
+  assert.equal(rows.length, 91);
   assert.equal(new Set(rows.map(({ lineId }) => lineId)).size, 3);
   assert.deepEqual([...new Set(rows.map(({ lineId }) => lineId))].sort(), [...LINE_IDS].sort());
   assert.ok(rows.every(({ labelPolygon, region }) => labelPolygon.length === 4 && region === "대구권"));
@@ -197,7 +197,7 @@ test("materialized SQLite와 provenance가 대구 1·2·3호선 route_map_positi
   ).replace(/\.gz$/, "");
   const database = new DatabaseSync(sqlitePath, { readOnly: true });
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM route_map_positions WHERE source_id = ?")
-    .get(SOURCE_ID).count, 85);
+    .get(SOURCE_ID).count, 91);
   assert.equal(database.prepare(
     "SELECT COUNT(DISTINCT line_id) AS count FROM route_map_positions WHERE source_id = ?",
   ).get(SOURCE_ID).count, 3);
