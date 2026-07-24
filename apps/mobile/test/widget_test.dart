@@ -9510,7 +9510,7 @@ void main() {
       expect(find.text('상록수역'), findsOneWidget);
       expect(find.text('정보 신뢰도 높음'), findsNothing);
       expect(find.text('출처 공식 파일'), findsNothing);
-      expect(find.widgetWithText(TextButton, '시설 알려주기'), findsOneWidget);
+      expect(find.widgetWithText(TextButton, '시설 제보'), findsOneWidget);
       expect(
         find.byKey(
           const Key(
@@ -9550,7 +9550,7 @@ void main() {
       tester,
       tabKey: const Key('favoriteFacilitiesTabButton'),
     );
-    await tester.tap(find.widgetWithText(TextButton, '시설 알려주기'));
+    await tester.tap(find.widgetWithText(TextButton, '시설 제보'));
     await tester.pumpAndSettle();
 
     // 진입 시에는 위치 권한 확인·요청을 하지 않는다.
@@ -13452,7 +13452,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(internalRouteRepository.requests, hasLength(1));
+    await tester.scrollUntilVisible(find.text('역 안 이동'), 500);
+    await tester.pumpAndSettle();
     expect(find.text('역 안 이동'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('역 안 이동 경로를 찾았어요'), 500);
+    await tester.pumpAndSettle();
     expect(find.text('역 안 이동 경로를 찾았어요'), findsOneWidget);
     expect(find.text('1번 출구 엘리베이터에서 개찰구까지'), findsWidgets);
     expect(find.text('약 1분 15초 · 28m'), findsOneWidget);

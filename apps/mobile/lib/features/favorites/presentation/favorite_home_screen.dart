@@ -719,7 +719,7 @@ class _FavoriteHomeFacilityRow extends StatelessWidget {
               TextButton(
                 key: Key('favoriteFacilityReportButton-${facility.facilityId}'),
                 onPressed: onReportTap,
-                child: const Text('시설 알려주기'),
+                child: const Text('시설 제보'),
               ),
           ],
         ),
