@@ -138,8 +138,8 @@ test("공식 서울 위경도 snapshot을 누적 production candidate pack에 ma
 
   assert.equal(cyberstationAfter.length, 2);
   assert.deepEqual(cyberstationAfter, cyberstationBefore);
-  // FILE 276개 중 capital cyberstation과 PK가 겹치는 사당(seoul-4) 1건만 건너뛴다.
-  assert.equal(rows.length, 275);
+  // admitted 274개 중 capital cyberstation과 PK가 겹치는 사당(seoul-4) 1건만 건너뛴다.
+  assert.equal(rows.length, 273);
   assert.equal(new Set(rows.map(({ lineId }) => lineId)).size, 8);
   assert.deepEqual([...new Set(rows.map(({ lineId }) => lineId))].sort(), [...LINE_IDS].sort());
   assert.ok(rows.every(({ labelPolygon, region }) => labelPolygon.length === 4 && region === "수도권"));
@@ -207,7 +207,7 @@ test("materialized SQLite와 provenance가 서울 1~8호선 route_map_positions�
   ).replace(/\.gz$/, "");
   const database = new DatabaseSync(sqlitePath, { readOnly: true });
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM route_map_positions WHERE source_id = ?")
-    .get(SOURCE_ID).count, 275);
+    .get(SOURCE_ID).count, 273);
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM route_map_positions WHERE source_id = ?")
     .get("seoulmetro-cyberstation-route-map").count, 2);
   assert.equal(database.prepare(

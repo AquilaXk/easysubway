@@ -11,7 +11,7 @@ const CYBERSTATION_SOURCE_ID = "seoulmetro-cyberstation-route-map";
 const PACK_ID = "nationwide-seoul-route-map";
 const OPERATOR_ID = "seoul-metro";
 const REGION = "수도권";
-const EXPECTED_STATION_COUNT = 276;
+const EXPECTED_STATION_COUNT = 274;
 const LINE_META = Object.freeze({
   "line-472a81add377": { nameKo: "수도권 1호선", nameEn: "Seoul Subway Line 1", color: "#052f93", line: "1" },
   "seoul-2": { nameKo: "수도권 2호선", nameEn: "Seoul Subway Line 2", color: "#10a643", line: "2" },

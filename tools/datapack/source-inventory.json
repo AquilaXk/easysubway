@@ -3561,7 +3561,7 @@
       "sourceSystem": "서울교통공사·공공데이터포털",
       "datasetUrl": "https://www.data.go.kr/data/15099316/fileData.do",
       "datasetKind": "official-file-data",
-      "coverage": "서울교통공사 1~8호선 276개 역사 공식 위경도 좌표",
+      "coverage": "서울교통공사 1~8호선 공식 위경도 좌표(원본 276행, 중복 좌표 quarantine 후 274개 admission)",
       "coverageScope": {
         "regionIds": [
           "capital"
@@ -3633,12 +3633,12 @@
         "verificationTest": "tools/datapack/materialize-seoul-route-map-positions.test.mjs",
         "snapshotId": "seoul-metro-route-map-positions-20260724",
         "snapshotPath": "tools/datapack/sources/seoul-metro-route-map-positions-20260724.json",
-        "snapshotSha256": "961a6d2acd3eded93ce6741dd0f46d5af2acf47a0319e4a84970265efca472d5",
+        "snapshotSha256": "9632acc47f76e735d40dc3346cf7b2298c7c921b61693d1f2f1cac940162633a",
         "capturedAt": "2026-07-24T02:00:00.000Z",
-        "stationCount": 276,
+        "stationCount": 274,
         "datasetId": "15099316",
         "rawSha256": "713d6a7353748f1f29b974cd70df9b7a24b3600b6aeb60a58ed7bfa6975e02ed",
-        "positionsSha256": "d7147ce2a4b8e8cad00517b195d073064c7d1d5dcad4fc6285667807c58ea90f",
+        "positionsSha256": "fb04a674e9e1ccf7491e1a20ac87cb79604edbbe31517d712fc290f919ee6398",
         "lineIds": [
           "line-472a81add377",
           "seoul-2",
@@ -3654,7 +3654,7 @@
           "2": 51,
           "3": 34,
           "4": 26,
-          "5": 56,
+          "5": 54,
           "6": 39,
           "7": 42,
           "8": 18

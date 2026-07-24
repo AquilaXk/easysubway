@@ -3960,10 +3960,10 @@
         "usePermissionRange": "공공데이터포털 이용허락범위 제한 없음",
         "formats": ["CSV", "JSON"],
         "outputFields": ["route_map_position", "route_map_label_polygon"],
-        "stationCount": 276,
+        "stationCount": 274,
         "datasetId": "15099316",
         "rawSha256": "713d6a7353748f1f29b974cd70df9b7a24b3600b6aeb60a58ed7bfa6975e02ed",
-        "positionsSha256": "d7147ce2a4b8e8cad00517b195d073064c7d1d5dcad4fc6285667807c58ea90f",
+        "positionsSha256": "fb04a674e9e1ccf7491e1a20ac87cb79604edbbe31517d712fc290f919ee6398",
         "lineIds": [
           "line-472a81add377",
           "seoul-2",
@@ -3979,7 +3979,7 @@
           "2": 51,
           "3": 34,
           "4": 26,
-          "5": 56,
+          "5": 54,
           "6": 39,
           "7": 42,
           "8": 18
@@ -3994,12 +3994,12 @@
           "verificationTest": "tools/datapack/materialize-seoul-route-map-positions.test.mjs"
         },
         "coverageLimitations": [
-          "서울교통공사 1~8호선 276개 역사에 한정한다(9호선·다른 운영사 구간 제외)",
+          "서울교통공사 1~8호선 공식 FILE 원본 276행 중 마곡·발산 동일 위경도 2건은 OFFICIAL_DUPLICATE_LATLON으로 quarantine하고 274개만 admission한다(9호선·다른 운영사 구간 제외)",
           "공식 FILE 위경도를 offline materializer에서 canvas 정수 좌표로 투영하며 runtime 네트워크 호출은 하지 않는다",
           "기존 seoulmetro-cyberstation-route-map capital pilot 행은 유지하고 동일 station/line/region PK(사당·seoul-4)는 FILE 행을 건너뛴다"
         ]
       },
-      "nextAction": "공식 FILE 갱신 시 CSV byte hash와 276개 좌표 snapshot을 함께 갱신한다"
+      "nextAction": "공식 FILE 갱신 시 CSV byte hash와 admitted 좌표 snapshot·quarantine을 함께 갱신한다"
     },
     {
       "id": "daejeon-station-distance-fare",

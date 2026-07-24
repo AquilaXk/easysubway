@@ -15,7 +15,7 @@ const FIXTURE_CSV = path.join(root, "tools/datapack/fixtures/seoul-route-map-pos
 const SNAPSHOT_PATH = path.join(root, "tools/datapack/sources/seoul-metro-route-map-positions-20260724.json");
 const capturedAt = "2026-07-24T02:00:00.000Z";
 
-test("서울 공식 FILE CSV에서 1~8호선 276개 좌표 snapshot을 만든다", async () => {
+test("서울 공식 FILE CSV에서 1~8호선 274개 좌표 snapshot을 만든다(중복 위경도 quarantine)", async () => {
   const csvBytes = await readFile(FIXTURE_CSV);
   const snapshot = collectSeoulRouteMapPositions({
     csvBytes,
@@ -25,10 +25,22 @@ test("서울 공식 FILE CSV에서 1~8호선 276개 좌표 snapshot을 만든다
   assert.equal(snapshot.artifactKind, "seoul-metro-route-map-positions-snapshot");
   assert.equal(snapshot.sourceId, "seoul-metro-route-map-positions");
   assert.equal(snapshot.datasetId, "15099316");
-  assert.equal(snapshot.stationCount, 276);
+  assert.equal(snapshot.rawStationCount, 276);
+  assert.equal(snapshot.stationCount, 274);
+  assert.equal(snapshot.quarantinedCount, 2);
   assert.deepEqual(snapshot.lineStationCounts, {
-    "1": 10, "2": 51, "3": 34, "4": 26, "5": 56, "6": 39, "7": 42, "8": 18,
+    "1": 10, "2": 51, "3": 34, "4": 26, "5": 54, "6": 39, "7": 42, "8": 18,
   });
+  assert.deepEqual(
+    snapshot.quarantinedPositions.map(({ stationCode, stationName, reasonCode, latitude, longitude }) => ({
+      stationCode, stationName, reasonCode, latitude, longitude,
+    })),
+    [
+      { stationCode: "2515", stationName: "마곡", reasonCode: "OFFICIAL_DUPLICATE_LATLON", latitude: 37.562182, longitude: 126.82693 },
+      { stationCode: "2516", stationName: "발산", reasonCode: "OFFICIAL_DUPLICATE_LATLON", latitude: 37.562182, longitude: 126.82693 },
+    ],
+  );
+  assert.equal(snapshot.positions.some(({ stationCode }) => stationCode === "2515" || stationCode === "2516"), false);
   assert.deepEqual(snapshot.lineIds, [
     "line-472a81add377", "seoul-2", "line-41a8c75ec9d8", "seoul-4",
     "line-80fc4d5350d4", "line-3f41718e0833", "line-15b3b8a93259", "line-2b2d9eaa53d0",
@@ -103,5 +115,24 @@ test("#2470 inventory·candidate는 snapshot byte identity와 자유 이용 근�
   assert.equal(candidate.admissionStatus, "production_route_map_positions_materialized");
   assert.equal(candidate.apiCatalog, false);
   assert.equal(candidate.evidence.coverageAssessment.requirementCount, 8);
-  assert.equal(JSON.parse(snapshotBytes).stationCount, 276);
+  assert.equal(JSON.parse(snapshotBytes).stationCount, 274);
+  assert.equal(JSON.parse(snapshotBytes).rawStationCount, 276);
 });
+
+test("서로 다른 역명이 동일 좌표를 쓰면 snapshot validation이 fail-closed 한다", async () => {
+  const csvBytes = await readFile(FIXTURE_CSV);
+  const snapshot = collectSeoulRouteMapPositions({
+    csvBytes,
+    now: new Date(capturedAt),
+  });
+  const tampered = structuredClone(snapshot);
+  const donor = tampered.positions[0];
+  const victim = tampered.positions.find((row) => row.stationName !== donor.stationName);
+  victim.latitude = donor.latitude;
+  victim.longitude = donor.longitude;
+  victim.x = donor.x;
+  victim.y = donor.y;
+  tampered.positionsSha256 = createHash("sha256").update(JSON.stringify(tampered.positions)).digest("hex");
+  assert.throws(() => validateSeoulRouteMapPositionsSnapshot(tampered), /invalid Seoul route map positions snapshot/);
+});
+

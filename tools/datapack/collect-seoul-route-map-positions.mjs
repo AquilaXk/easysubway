@@ -11,8 +11,9 @@ const DATASET_ID = "15099316";
 const DETAIL_URL = `https://www.data.go.kr/data/${DATASET_ID}/fileData.do`;
 const SOURCE_ID = "seoul-metro-route-map-positions";
 const ARTIFACT_KIND = "seoul-metro-route-map-positions-snapshot";
-const EXPECTED_STATION_COUNT = 276;
-const EXPECTED_LINE_STATION_COUNTS = Object.freeze({
+// 공식 FILE CSV 원본 행 수. 마곡·발산 동일 위경도(OFFICIAL_DUPLICATE_LATLON)는 admission에서 제외한다.
+const EXPECTED_RAW_STATION_COUNT = 276;
+const EXPECTED_RAW_LINE_STATION_COUNTS = Object.freeze({
   "1": 10,
   "2": 51,
   "3": 34,
@@ -22,6 +23,19 @@ const EXPECTED_LINE_STATION_COUNTS = Object.freeze({
   "7": 42,
   "8": 18,
 });
+const EXPECTED_STATION_COUNT = 274;
+const EXPECTED_LINE_STATION_COUNTS = Object.freeze({
+  "1": 10,
+  "2": 51,
+  "3": 34,
+  "4": 26,
+  "5": 54,
+  "6": 39,
+  "7": 42,
+  "8": 18,
+});
+const EXPECTED_QUARANTINED_COUNT = 2;
+const OFFICIAL_DUPLICATE_LATLON = "OFFICIAL_DUPLICATE_LATLON";
 const OBSERVED_DATA_UPDATED_AT = "2025-08-14";
 const LINE_IDS_BY_NUMBER = Object.freeze({
   "1": "line-472a81add377",
@@ -109,16 +123,63 @@ export function parseSeoulRouteMapPositionsCsv(csvBytes) {
       labelPolygon: label.labelPolygon,
     });
   }
-  if (parsed.length !== EXPECTED_STATION_COUNT) {
+  if (parsed.length !== EXPECTED_RAW_STATION_COUNT) {
     throw new Error(`Seoul route map positions station count mismatch: ${parsed.length}`);
   }
-  for (const [line, expected] of Object.entries(EXPECTED_LINE_STATION_COUNTS)) {
+  for (const [line, expected] of Object.entries(EXPECTED_RAW_LINE_STATION_COUNTS)) {
     const count = parsed.filter((row) => row.line === line).length;
     if (count !== expected) {
       throw new Error(`Seoul route map positions line ${line} station count mismatch: ${count}`);
     }
   }
-  return parsed.sort(comparePositions);
+
+  // 환승역은 동일 역명·동일 위경도를 호선별로 공유할 수 있다.
+  // 서로 다른 역명이 같은 위경도를 쓰면 공식 FILE 결함으로 전량 quarantine한다.
+  const byLatLon = new Map();
+  for (const row of parsed) {
+    const key = `${row.latitude},${row.longitude}`;
+    const group = byLatLon.get(key);
+    if (group) group.push(row);
+    else byLatLon.set(key, [row]);
+  }
+  const positions = [];
+  const quarantinedPositions = [];
+  for (const group of byLatLon.values()) {
+    const distinctNames = new Set(group.map((row) => row.stationName));
+    if (distinctNames.size <= 1) {
+      positions.push(...group);
+      continue;
+    }
+    for (const row of group) {
+      quarantinedPositions.push({
+        lineId: row.lineId,
+        line: row.line,
+        stationCode: row.stationCode,
+        stationName: row.stationName,
+        stationId: row.stationId,
+        latitude: row.latitude,
+        longitude: row.longitude,
+        x: row.x,
+        y: row.y,
+        reasonCode: OFFICIAL_DUPLICATE_LATLON,
+      });
+    }
+  }
+  positions.sort(comparePositions);
+  quarantinedPositions.sort(comparePositions);
+  if (positions.length !== EXPECTED_STATION_COUNT) {
+    throw new Error(`Seoul route map positions admitted station count mismatch: ${positions.length}`);
+  }
+  if (quarantinedPositions.length !== EXPECTED_QUARANTINED_COUNT) {
+    throw new Error(`Seoul route map positions quarantined count mismatch: ${quarantinedPositions.length}`);
+  }
+  for (const [line, expected] of Object.entries(EXPECTED_LINE_STATION_COUNTS)) {
+    const count = positions.filter((row) => row.line === line).length;
+    if (count !== expected) {
+      throw new Error(`Seoul route map positions admitted line ${line} station count mismatch: ${count}`);
+    }
+  }
+  return { positions, quarantinedPositions };
 }
 
 export function collectSeoulRouteMapPositions({
@@ -126,7 +187,7 @@ export function collectSeoulRouteMapPositions({
   now = new Date(),
 } = {}) {
   const capturedAt = validDate(now, "now");
-  const positions = parseSeoulRouteMapPositionsCsv(csvBytes);
+  const { positions, quarantinedPositions } = parseSeoulRouteMapPositionsCsv(csvBytes);
   const scope = positions.map(({ lineId, stationCode, stationName, stationId }) => ({
     lineId,
     stationCode,
@@ -147,7 +208,9 @@ export function collectSeoulRouteMapPositions({
     fixture: false,
     credentialRequired: false,
     credentialRedacted: true,
+    rawStationCount: EXPECTED_RAW_STATION_COUNT,
     stationCount: positions.length,
+    quarantinedCount: quarantinedPositions.length,
     lineIds: [...LINE_IDS],
     lineStationCounts: { ...EXPECTED_LINE_STATION_COUNTS },
     fieldsProvided: [...FIELDS_PROVIDED],
@@ -162,16 +225,27 @@ export function collectSeoulRouteMapPositions({
     rawSha256: sha256(Buffer.from(csvBytes)),
     positionsSha256: sha256(JSON.stringify(positions)),
     positions,
+    quarantinedPositions,
   };
   return validateSeoulRouteMapPositionsSnapshot(snapshot);
 }
 
 export function validateSeoulRouteMapPositionsSnapshot(snapshot) {
   const positions = snapshot?.positions;
+  const quarantinedPositions = snapshot?.quarantinedPositions;
   const keys = new Set();
+  const latLonOwners = new Map();
+  const canvasOwners = new Map();
   const validPositions = Array.isArray(positions) && positions.length === EXPECTED_STATION_COUNT
     && positions.every((position) => {
       const key = `${position.lineId}:${position.stationCode}`;
+      const owner = `${position.stationId}\0${position.stationName}`;
+      const latLonKey = `${position.latitude},${position.longitude}`;
+      const canvasKey = `${position.x},${position.y}`;
+      const latLonOwner = latLonOwners.get(latLonKey);
+      const canvasOwner = canvasOwners.get(canvasKey);
+      const uniqueCoords = (latLonOwner == null || latLonOwner === owner)
+        && (canvasOwner == null || canvasOwner === owner);
       const valid = LINE_IDS_BY_NUMBER[position.line] === position.lineId
         && /^\d{3,4}$/.test(position.stationCode)
         && typeof position.stationName === "string" && position.stationName.length > 0
@@ -181,8 +255,28 @@ export function validateSeoulRouteMapPositionsSnapshot(snapshot) {
         && Number.isFinite(position.latitude) && Number.isFinite(position.longitude)
         && Array.isArray(position.labelPolygon) && position.labelPolygon.length === 4
         && position.labelPolygon.every(({ x, y }) => Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0)
-        && !keys.has(key);
+        && !keys.has(key)
+        && uniqueCoords;
       keys.add(key);
+      latLonOwners.set(latLonKey, owner);
+      canvasOwners.set(canvasKey, owner);
+      return valid;
+    });
+  const quarantinedKeys = new Set();
+  const validQuarantine = Array.isArray(quarantinedPositions)
+    && quarantinedPositions.length === EXPECTED_QUARANTINED_COUNT
+    && quarantinedPositions.every((entry) => {
+      const key = `${entry.lineId}:${entry.stationCode}`;
+      const valid = LINE_IDS_BY_NUMBER[entry.line] === entry.lineId
+        && /^\d{3,4}$/.test(entry.stationCode)
+        && typeof entry.stationName === "string" && entry.stationName.length > 0
+        && typeof entry.stationId === "string" && entry.stationId.startsWith("station-")
+        && Number.isFinite(entry.latitude) && Number.isFinite(entry.longitude)
+        && Number.isInteger(entry.x) && Number.isInteger(entry.y)
+        && entry.reasonCode === OFFICIAL_DUPLICATE_LATLON
+        && !quarantinedKeys.has(key)
+        && !keys.has(key);
+      quarantinedKeys.add(key);
       return valid;
     });
   if (snapshot?.schemaVersion !== 1 || snapshot.artifactKind !== ARTIFACT_KIND
@@ -192,7 +286,10 @@ export function validateSeoulRouteMapPositionsSnapshot(snapshot) {
     || snapshot.datasetUrl !== DETAIL_URL || snapshot.endpoint !== DETAIL_URL
     || Number.isNaN(Date.parse(snapshot.capturedAt))
     || snapshot.observedDataUpdatedAt !== OBSERVED_DATA_UPDATED_AT
+    || snapshot.rawStationCount !== EXPECTED_RAW_STATION_COUNT
     || snapshot.stationCount !== EXPECTED_STATION_COUNT
+    || snapshot.quarantinedCount !== EXPECTED_QUARANTINED_COUNT
+    || snapshot.rawStationCount !== snapshot.stationCount + snapshot.quarantinedCount
     || JSON.stringify(snapshot.lineIds) !== JSON.stringify(LINE_IDS)
     || JSON.stringify(snapshot.lineStationCounts) !== JSON.stringify(EXPECTED_LINE_STATION_COUNTS)
     || JSON.stringify(snapshot.fieldsProvided) !== JSON.stringify(FIELDS_PROVIDED)
@@ -200,7 +297,9 @@ export function validateSeoulRouteMapPositionsSnapshot(snapshot) {
     || !/^[a-f0-9]{64}$/.test(snapshot.scopeSha256 ?? "")
     || snapshot.scopeSha256 !== sha256(JSON.stringify(snapshot.scope))
     || !validPositions
+    || !validQuarantine
     || JSON.stringify([...positions].sort(comparePositions)) !== JSON.stringify(positions)
+    || JSON.stringify([...quarantinedPositions].sort(comparePositions)) !== JSON.stringify(quarantinedPositions)
     || snapshot.positionsSha256 !== sha256(JSON.stringify(positions))) {
     throw new Error("invalid Seoul route map positions snapshot");
   }
