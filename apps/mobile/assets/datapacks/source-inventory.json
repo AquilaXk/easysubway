@@ -1888,7 +1888,14 @@
         "snapshotSha256": "9e5df3f0bf398a45dd453d442abeb7138e289423aee721144dd743834a0c90ee",
         "capturedAt": "2026-07-24T03:00:00.000Z",
         "stationCount": 91,
-        "datasetId": "15133918",
+        "rawStationCount": 91,
+        "quarantinedCount": 0,
+        "exitRowCount": 429,
+        "datasetIds": [
+          "15133918",
+          "15133920",
+          "15133922"
+        ],
         "rawSha256": "ff79e8ec13d5ebf22cae7afa0908263ff27349afe68a210de243f0f17db0676e",
         "positionsSha256": "b29b538c004ef849df98fbcbc1a1bf4f7f2aff260f3995e5de07cdd81ee3ac59",
         "lineIds": [
@@ -1904,6 +1911,26 @@
         "observedDataUpdatedAt": "2024-10-14",
         "topologySourceId": "daegu-transportation-route-map-topology-lineage",
         "topologySnapshotId": "daegu-transportation-route-map-topology-lineage-20260721",
+        "topologyLineages": [
+          {
+            "sourceId": "daegu-line1-route-topology",
+            "snapshotId": "daegu-line1-route-topology-20260721",
+            "contentSha256": "6db720b38a9bcaa5aa3493059c33c2201cdfc885d4910d4ba96e43cd3ec2546f",
+            "lineId": "line-5b8d9b05e7e6"
+          },
+          {
+            "sourceId": "daegu-line2-route-topology",
+            "snapshotId": "daegu-line2-route-topology-20260721",
+            "contentSha256": "4d6b85ad5069a7d80c19ad0c2c8ac1243539ae1f0d0dda54e821e38daafadf00",
+            "lineId": "line-e2938a4cc492"
+          },
+          {
+            "sourceId": "daegu-line3-route-topology",
+            "snapshotId": "daegu-line3-route-topology-20260721",
+            "contentSha256": "0079b0af16ba42921c012557f45b8b7dfccadf69fdcad73590d4bddc013ca653",
+            "lineId": "line-0ffaa95b1b5d"
+          }
+        ],
         "topologyContentSha256": "4e76459d4588f97bd55e767374b81031402c768d8f4805c69484d7c3f8771d1f"
       }
     },
