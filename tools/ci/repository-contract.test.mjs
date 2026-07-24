@@ -8959,6 +8959,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "seoul-metro-fast-exit-car-door",
     "seoul-metro-official-od-fare-canary",
     "seoul-metro-official-od-fares",
+    "seoul-metro-route-map-positions",
     "seoul-metro-transfer-distance-duration",
     "seoul-realtime-arrival-station-info",
     "seoul-subway-hourly-boarding",
