@@ -8924,6 +8924,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "daegu-line3-route-topology",
     "daegu-line3-train-timetable",
     "daegu-transportation-accessibility",
+    "daegu-transportation-route-map-positions",
     "daejeon-station-distance-fare",
     "daejeon-train-timetable",
     "gwangju-transportation-cyberstation-timetable",
