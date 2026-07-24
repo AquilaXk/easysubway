@@ -692,25 +692,24 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     Navigator.of(context).pop(station);
   }
 
-  /// 메뉴·풀페이지 둘러보기: 결과 탭 → 상세를 검색 위에 push.
-  /// 뒤로가면 검색 목록(검색어)이 그대로 남는다. 홈 in-place 검색의 부채 흐름과
+  /// 메뉴·풀페이지 둘러보기: 결과 탭 → 공통 상세 본문 시트.
+  /// 닫으면 검색 목록(검색어)이 그대로 남는다. 홈 in-place 검색의 부채 흐름과
   /// 분리한다.
   void _openStationDetail(StationSearchResult result, StationSearchLine? line) {
     unawaited(_recordSelectedStation(result, line));
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => StationDetailScreen(
-          repository: widget.repository,
-          reportRepository: widget.reportRepository,
-          favoriteRepository: widget.favoriteRepository,
-          adRepository: widget.adRepository,
-          realtimeRepository: widget.realtimeRepository,
-          stationId: result.id,
-          facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
-          internalRouteRepository: widget.internalRouteRepository,
-          internalRouteMobilityType: widget.internalRouteMobilityType,
-          routeDraftController: widget.routeDraftController,
-        ),
+    unawaited(
+      showStationDetailSheet<void>(
+        context: context,
+        repository: widget.repository,
+        reportRepository: widget.reportRepository,
+        favoriteRepository: widget.favoriteRepository,
+        adRepository: widget.adRepository,
+        realtimeRepository: widget.realtimeRepository,
+        stationId: result.id,
+        facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
+        internalRouteRepository: widget.internalRouteRepository,
+        internalRouteMobilityType: widget.internalRouteMobilityType,
+        routeDraftController: widget.routeDraftController,
       ),
     );
   }

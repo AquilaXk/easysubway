@@ -299,24 +299,21 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
     if (repository == null) {
       return;
     }
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => StationDetailScreen(
-          repository: widget.stationRepository,
-          reportRepository: widget.reportRepository,
-          favoriteRepository: repository,
-          adRepository: widget.adRepository,
-          locationProvider: widget.locationProvider,
-          realtimeRepository: widget.realtimeRepository,
-          stationId: favorite.stationId,
-          facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
-          internalRouteRepository: widget.internalRouteRepository,
-          internalRouteMobilityType: widget.initialMobilityType,
-          routeDraftController: widget.routeDraftController,
-          // 즐겨찾기에서 들어온 역은 이미 저장 상태로 열어 바로 해제할 수 있게 한다.
-          initiallyFavorite: true,
-        ),
-      ),
+    await showStationDetailSheet<void>(
+      context: context,
+      repository: widget.stationRepository,
+      reportRepository: widget.reportRepository,
+      favoriteRepository: repository,
+      adRepository: widget.adRepository,
+      locationProvider: widget.locationProvider,
+      realtimeRepository: widget.realtimeRepository,
+      stationId: favorite.stationId,
+      facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
+      internalRouteRepository: widget.internalRouteRepository,
+      internalRouteMobilityType: widget.initialMobilityType,
+      routeDraftController: widget.routeDraftController,
+      // 즐겨찾기에서 들어온 역은 이미 저장 상태로 열어 바로 해제할 수 있게 한다.
+      initiallyFavorite: true,
     );
     await _reloadFavoritesAfterReturn();
   }
