@@ -4772,7 +4772,7 @@
           "15109340"
         ],
         "rawSha256": "ca322fe16d180edf9fd98bc01414919dacc8c0b4ecd038ebfd1a7b4184d0b176",
-        "positionsSha256": "bb2c37005c98bf58957f775707cdcd6d0f0cfac748ea464d64a1a7144b5e411c",
+        "positionsSha256": "005b98a894e10ffaddf78cb053abf9d3aad2e450960cf118c15089ee74753001",
         "lineIds": [
           "line-e57a361e8892"
         ],
@@ -4790,8 +4790,8 @@
         },
         "coverageLimitations": [
           "광주교통공사 1호선 공식 FILE 문화노선도 위경도 20역을 stationCode(역번호) join으로 admission한다",
-          "CSV 역사명 표기 차이(예: 문화전당(구도청))는 topology 정본 역명을 사용하며 좌표 발명·추정은 하지 않는다",
-          "공식 FILE 위경도를 offline materializer에서 canvas 정수 좌표로 투영하며 runtime 네트워크 호출은 하지 않는다"
+          "CSV 역사명 표기 차이(예: 문화전당(구도청), 김대중컨벤션센터(마륵), 광주송정역)는 topology 정본 역명·schematic 별칭으로 정규화하며 좌표 발명·추정은 하지 않는다",
+          "admitted canvas x/y/label*는 owner-self-drawn-sma-schematic fixture에서 결속하고, 공식 FILE 위경도는 provenance로만 유지한다(위경도 투영 금지)"
         ]
       },
       "nextAction": "공식 FILE 갱신 시 CSV byte hash와 admitted 좌표 snapshot을 함께 갱신한다"

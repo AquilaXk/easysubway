@@ -142,6 +142,18 @@ test("공식 광주 문화노선도 위경도 snapshot을 누적 production cand
   assert.equal(new Set(rows.map(({ lineId }) => lineId)).size, 1);
   assert.deepEqual([...new Set(rows.map(({ lineId }) => lineId))], [LINE_ID]);
   assert.ok(rows.every(({ labelPolygon, region }) => labelPolygon.length === 4 && region === "광주권"));
+  // schematic canvas 범위(하이브리드 basemap). 위경도 투영(~10^4)이면 실패해야 한다.
+  assert.ok(rows.every(({ x, y }) => (
+    Number.isInteger(x) && Number.isInteger(y)
+    && x >= 272 && x <= 1882 && y >= 284 && y <= 1667
+    && x < 5000 && y < 5000
+  )));
+  assert.ok(gwangjuSnapshot.positions.every(({ latitude, longitude, x, y }) => (
+    Number.isFinite(latitude) && Number.isFinite(longitude)
+    && latitude > 35 && longitude > 126
+    && Number.isInteger(x) && Number.isInteger(y)
+  )));
+  assert.equal(gwangjuSnapshot.schematicCanvasSourceId, "owner-self-drawn-sma-schematic");
   assert.deepEqual(source.coverageScope.lineIds, [LINE_ID]);
   assert.equal(pack.minimumTableRows.route_map_positions, pack.routeMapPositions.length);
   assert.match(pack.id, /^nationwide-gwangju-route-map-[a-f0-9]{64}$/);
@@ -252,6 +264,18 @@ test("materialized SQLite와 provenance가 광주 1호선 route_map_positions를
     terminalResolutionRatio: Number(((GWANGJU_ROUTE_MAP_SUPPORTED_COUNT + 4) / 270).toFixed(4)),
     completionReady: false,
   });
+});
+
+test("광주 route_map_positions materialize는 metro_map_pack·capital.sqlite.gz를 건드리지 않는다", async () => {
+  const { stdout } = await execFileAsync("git", [
+    "diff",
+    "--name-only",
+    "HEAD",
+    "--",
+    "apps/mobile/assets/datapacks/metro_map_pack",
+    "apps/mobile/assets/datapacks/capital.sqlite.gz",
+  ], { cwd: root });
+  assert.equal(stdout.trim(), "");
 });
 
 async function readJson(relativePath) {

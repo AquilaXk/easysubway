@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 // 광주교통공사 1호선 문화노선도 현황(공식 FILE CSV)을 결정론적 snapshot으로 수집한다.
 // API key·포털 활용신청 없이 data.go.kr 파일데이터(15109340)만 사용한다.
+//
+// 하이브리드 정렬:
+// - 공식 FILE 위경도는 provenance(latitude/longitude)로만 유지한다.
+// - admitted route_map_positions x/y/label*는 앱 하이브리드 basemap이 쓰는
+//   owner-self-drawn-sma-schematic canvas 좌표 fixture에서 역명(정규화) join으로 결속한다.
+// - 위경도→canvas 투영(projectLatLon 식 ~10^4 scale)은 basemap과 불일치하므로 admission에 사용하지 않는다.
 import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -26,17 +32,33 @@ const TOPOLOGY_SNAPSHOT_ID = "gwangju-transportation-route-topology-20260720";
 const OBSERVED_DATA_UPDATED_AT = "2022-12-02";
 const OFFICIAL_DUPLICATE_LATLON = "OFFICIAL_DUPLICATE_LATLON";
 const FIELDS_PROVIDED = Object.freeze(["route_map_position", "route_map_label_polygon"]);
+const SCHEMATIC_CANVAS_SOURCE_ID = "owner-self-drawn-sma-schematic";
+// 앱 pack schematic canvas 실측 범위(x≈272–1881, y≈284–1666)에 여유를 둔다.
+// 위경도 투영(~10^4) 좌표가 이 범위에 들어오면 admission을 거부한다.
+const CANVAS_X_MIN = 200;
+const CANVAS_X_MAX = 2000;
+const CANVAS_Y_MIN = 200;
+const CANVAS_Y_MAX = 1800;
 // 광주 도심 공식 위경도 허용 범위(실측 35.10–35.16 / 126.76–126.94에 여유 포함).
 const LAT_MIN = 35.05;
 const LAT_MAX = 35.25;
 const LON_MIN = 126.70;
 const LON_MAX = 127.00;
+// topology/CSV 정규화 역명 → schematic pack stationName.
+const SCHEMATIC_NAME_ALIASES = Object.freeze({
+  광주송정: "광주송정역",
+});
 
-export function parseGwangjuRouteMapPositionsCsv({ csvBytes, topologySnapshot }) {
+export function parseGwangjuRouteMapPositionsCsv({
+  csvBytes,
+  topologySnapshot,
+  schematicCanvas,
+} = {}) {
   if (!(csvBytes instanceof Uint8Array) || csvBytes.byteLength === 0) {
     throw new Error("Gwangju route map positions CSV bytes are required");
   }
   const scope = validateTopologySnapshot(topologySnapshot);
+  const canvasByName = indexSchematicCanvas(schematicCanvas);
   const byCode = new Map(scope.map((station) => [station.stationCode, station]));
   const rows = parseCsv(decodeOfficialCsv(csvBytes));
   if (rows.length < 2) throw new Error("Gwangju route map positions CSV has no data rows");
@@ -88,8 +110,19 @@ export function parseGwangjuRouteMapPositionsCsv({ csvBytes, topologySnapshot })
     if (!station) {
       throw new Error(`Gwangju route map positions topology join failed: ${stationCode}`);
     }
-    const { x, y } = projectLatLon(latitude, longitude);
-    const label = labelGeometry(station.stationName, x, y);
+    // FILE↔topology는 stationCode=역번호, canvas는 정규화 역명(+별칭)으로 결속한다.
+    const canvas = lookupSchematicCanvas(canvasByName, station.stationName);
+    if (!canvas) {
+      throw new Error(
+        `Gwangju route map positions schematic canvas join failed: ${station.stationName}`,
+      );
+    }
+    // pack builder/SQLite 계약은 정수 canvas를 요구한다. schematic 실수 좌표를 반올림해 결속한다.
+    const x = Math.round(canvas.x);
+    const y = Math.round(canvas.y);
+    if (!isSchematicCanvasCoordinate(x, y)) {
+      throw new Error(`Gwangju route map schematic canvas out of bounds: ${station.stationName}`);
+    }
     joined.push({
       lineId: LINE_ID,
       line: LINE_NUMBER,
@@ -101,9 +134,9 @@ export function parseGwangjuRouteMapPositionsCsv({ csvBytes, topologySnapshot })
       longitude,
       x,
       y,
-      labelDx: label.labelDx,
-      labelDy: label.labelDy,
-      labelPolygon: label.labelPolygon,
+      labelDx: canvas.labelDx,
+      labelDy: canvas.labelDy,
+      labelPolygon: structuredClone(canvas.labelPolygon),
     });
   }
   if (joined.length !== EXPECTED_STATION_COUNT) {
@@ -158,12 +191,14 @@ export function parseGwangjuRouteMapPositionsCsv({ csvBytes, topologySnapshot })
 export function collectGwangjuRouteMapPositions({
   csvBytes,
   topologySnapshot,
+  schematicCanvas,
   now = new Date(),
 } = {}) {
   const capturedAt = validDate(now, "now");
   const { positions, quarantinedPositions } = parseGwangjuRouteMapPositionsCsv({
     csvBytes,
     topologySnapshot,
+    schematicCanvas,
   });
   const topologyLineages = [{
     sourceId: topologySnapshot.sourceId,
@@ -208,6 +243,7 @@ export function collectGwangjuRouteMapPositions({
     topologySnapshotId: TOPOLOGY_SNAPSHOT_ID,
     topologyContentSha256: topologySnapshot.contentSha256,
     topologyLineages,
+    schematicCanvasSourceId: SCHEMATIC_CANVAS_SOURCE_ID,
     scope,
     scopeSha256: sha256(JSON.stringify(scope)),
     rawSha256: sha256(Buffer.from(csvBytes)),
@@ -239,8 +275,9 @@ export function validateGwangjuRouteMapPositionsSnapshot(snapshot) {
         && /^\d{3}$/.test(position.stationCode)
         && typeof position.stationName === "string" && position.stationName.length > 0
         && typeof position.stationId === "string" && position.stationId.startsWith("station-")
-        && [position.x, position.y, position.labelDx, position.labelDy].every(Number.isInteger)
-        && position.x >= 0 && position.y >= 0
+        && Number.isInteger(position.x) && Number.isInteger(position.y)
+        && isSchematicCanvasCoordinate(position.x, position.y)
+        && Number.isInteger(position.labelDx) && Number.isInteger(position.labelDy)
         && Number.isFinite(position.latitude) && Number.isFinite(position.longitude)
         && position.latitude >= LAT_MIN && position.latitude <= LAT_MAX
         && position.longitude >= LON_MIN && position.longitude <= LON_MAX
@@ -264,6 +301,7 @@ export function validateGwangjuRouteMapPositionsSnapshot(snapshot) {
         && typeof entry.stationId === "string" && entry.stationId.startsWith("station-")
         && Number.isFinite(entry.latitude) && Number.isFinite(entry.longitude)
         && Number.isInteger(entry.x) && Number.isInteger(entry.y)
+        && isSchematicCanvasCoordinate(entry.x, entry.y)
         && entry.reasonCode === OFFICIAL_DUPLICATE_LATLON
         && !quarantinedKeys.has(key)
         && !keys.has(key);
@@ -287,6 +325,7 @@ export function validateGwangjuRouteMapPositionsSnapshot(snapshot) {
     || JSON.stringify(snapshot.fieldsProvided) !== JSON.stringify(FIELDS_PROVIDED)
     || snapshot.topologySourceId !== TOPOLOGY_SOURCE_ID
     || snapshot.topologySnapshotId !== TOPOLOGY_SNAPSHOT_ID
+    || snapshot.schematicCanvasSourceId !== SCHEMATIC_CANVAS_SOURCE_ID
     || !/^[a-f0-9]{64}$/.test(snapshot.topologyContentSha256 ?? "")
     || !Array.isArray(snapshot.topologyLineages) || snapshot.topologyLineages.length !== 1
     || snapshot.topologyLineages[0]?.sourceId !== TOPOLOGY_SOURCE_ID
@@ -306,14 +345,49 @@ export function validateGwangjuRouteMapPositionsSnapshot(snapshot) {
   return snapshot;
 }
 
-export function projectLatLon(latitude, longitude) {
-  // 공식 위경도를 결정론적 양의 정수 canvas 좌표로 투영한다(경도→x, 북→작은 y).
-  const x = Math.round((longitude - LON_MIN) * 100_000);
-  const y = Math.round((LAT_MAX - latitude) * 100_000);
-  if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0) {
-    throw new Error(`Gwangju route map projection out of bounds: ${latitude},${longitude}`);
+function indexSchematicCanvas(schematicCanvas) {
+  if (!Array.isArray(schematicCanvas) || schematicCanvas.length !== EXPECTED_STATION_COUNT) {
+    throw new Error("Gwangju route map schematic canvas fixture must contain 20 stations");
   }
-  return { x, y };
+  const byName = new Map();
+  for (const entry of schematicCanvas) {
+    if (entry?.canvasSourceId !== SCHEMATIC_CANVAS_SOURCE_ID) {
+      throw new Error(`Gwangju route map schematic canvasSourceId mismatch: ${entry?.canvasSourceId}`);
+    }
+    if (typeof entry.stationName !== "string" || entry.stationName.length === 0) {
+      throw new Error("Gwangju route map schematic canvas stationName is required");
+    }
+    if (!isSchematicCanvasCoordinate(entry.x, entry.y)
+      || !Number.isInteger(entry.labelDx) || !Number.isInteger(entry.labelDy)
+      || !Array.isArray(entry.labelPolygon) || entry.labelPolygon.length !== 4
+      || !entry.labelPolygon.every(({ x, y }) => Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0)) {
+      throw new Error(`Gwangju route map schematic canvas invalid geometry: ${entry.stationName}`);
+    }
+    const key = normalizeStationName(entry.stationName);
+    if (byName.has(key)) {
+      throw new Error(`Gwangju route map schematic canvas duplicate station name: ${key}`);
+    }
+    byName.set(key, {
+      x: entry.x,
+      y: entry.y,
+      labelDx: entry.labelDx,
+      labelDy: entry.labelDy,
+      labelPolygon: entry.labelPolygon,
+    });
+  }
+  return byName;
+}
+
+function lookupSchematicCanvas(canvasByName, stationName) {
+  const normalized = normalizeStationName(stationName);
+  const aliased = SCHEMATIC_NAME_ALIASES[normalized] ?? normalized;
+  return canvasByName.get(aliased) ?? canvasByName.get(normalized) ?? null;
+}
+
+function isSchematicCanvasCoordinate(x, y) {
+  return Number.isFinite(x) && Number.isFinite(y)
+    && x >= CANVAS_X_MIN && x <= CANVAS_X_MAX
+    && y >= CANVAS_Y_MIN && y <= CANVAS_Y_MAX;
 }
 
 function validateTopologySnapshot(topologySnapshot) {
@@ -342,27 +416,6 @@ function validateTopologySnapshot(topologySnapshot) {
     throw new Error("Gwangju route map positions topology station code scope mismatch");
   }
   return topologySnapshot.scope;
-}
-
-function labelGeometry(stationName, x, y) {
-  const width = Math.max(28, [...normalizeStationName(stationName)].length * 14);
-  const height = 22;
-  const left = Math.max(0, x - Math.floor(width / 2));
-  const top = Math.max(0, y - 34);
-  const right = left + width;
-  const bottom = top + height;
-  const labelCenterX = (left + right) / 2;
-  const labelCenterY = (top + bottom) / 2;
-  return {
-    labelDx: Math.round(labelCenterX - x),
-    labelDy: Math.round(labelCenterY - y),
-    labelPolygon: [
-      { x: left, y: top },
-      { x: right, y: top },
-      { x: right, y: bottom },
-      { x: left, y: bottom },
-    ],
-  };
 }
 
 function stationIdFor(stationName) {
@@ -409,25 +462,27 @@ function parseArgs(argv) {
   const args = {};
   for (let index = 0; index < argv.length; index += 2) {
     if (!argv[index]?.startsWith("--")) {
-      throw new Error("usage: collect-gwangju-route-map-positions.mjs --input <csv> --topology <json> --output <absolute.json> [--captured-at <iso>]");
+      throw new Error("usage: collect-gwangju-route-map-positions.mjs --input <csv> --topology <json> --schematic <json> --output <absolute.json> [--captured-at <iso>]");
     }
     args[argv[index].slice(2)] = argv[index + 1];
   }
-  if (!args.input || !args.topology || !args.output || !path.isAbsolute(args.output)) {
-    throw new Error("usage: collect-gwangju-route-map-positions.mjs --input <csv> --topology <json> --output <absolute.json> [--captured-at <iso>]");
+  if (!args.input || !args.topology || !args.schematic || !args.output || !path.isAbsolute(args.output)) {
+    throw new Error("usage: collect-gwangju-route-map-positions.mjs --input <csv> --topology <json> --schematic <json> --output <absolute.json> [--captured-at <iso>]");
   }
   return args;
 }
 
 export async function runGwangjuRouteMapPositionsCollector(argv) {
   const args = parseArgs(argv);
-  const [csvBytes, topologySnapshot] = await Promise.all([
+  const [csvBytes, topologySnapshot, schematicCanvas] = await Promise.all([
     readFile(args.input),
     readFile(args.topology, "utf8").then(JSON.parse),
+    readFile(args.schematic, "utf8").then(JSON.parse),
   ]);
   const snapshot = collectGwangjuRouteMapPositions({
     csvBytes,
     topologySnapshot,
+    schematicCanvas,
     now: args["captured-at"] ? new Date(args["captured-at"]) : new Date(),
   });
   await writeFile(args.output, `${JSON.stringify(snapshot)}\n`);
