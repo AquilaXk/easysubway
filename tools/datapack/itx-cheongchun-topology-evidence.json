@@ -28,10 +28,10 @@
     "inputSha256": "7bb4bb68f0642e45377d98b083e93cd8c1c92aaa58dd353f32189e3f325a1562",
     "inputSqliteSha256": "ed84a649952cd2ccbb238b3a63265f2bd3144497ae8fd36fab5181ad776542fc",
     "inputByteSize": 359319,
-    "outputSha256": "177952caad58b9f72d4f0b2e141274ea44f2d28c4e721a68f338850cdbd6b734",
-    "outputSqliteSha256": "cf028146f1cc9207d7a296224bdbbaf2603245c3d757932e706c93f75fba2999",
-    "byteSize": 360727,
-    "byteSizeDelta": 1408
+    "outputSha256": "1e8f2ab4d88674288d035eed8e4a0ce398a32ffe27f5b788fee14f3849c562be",
+    "outputSqliteSha256": "882cd9e857d7b2d45a4e391b17af0edb893c1a6bc6ca1fb4c0b8d45a5387f57f",
+    "byteSize": 358062,
+    "byteSizeDelta": -1257
   },
   "readmissions": [
     {
@@ -490,6 +490,75 @@
           "rowsRemoved": 192,
           "rowsAdded": 176,
           "rowsChanged": 1362
+        }
+      ]
+    },
+    {
+      "readmittedAt": "2026-07-24T08:53:22.872Z",
+      "provenance": "오너 승인 2026-07-24 — #2436 capital topology 재적용(seoul-4 KRIC pilot hop 보존, ITX 하위그래프 불변)",
+      "previousPack": {
+        "sha256": "177952caad58b9f72d4f0b2e141274ea44f2d28c4e721a68f338850cdbd6b734",
+        "sqliteSha256": "cf028146f1cc9207d7a296224bdbbaf2603245c3d757932e706c93f75fba2999",
+        "byteSize": 360727
+      },
+      "newPack": {
+        "sha256": "1e8f2ab4d88674288d035eed8e4a0ce398a32ffe27f5b788fee14f3849c562be",
+        "sqliteSha256": "882cd9e857d7b2d45a4e391b17af0edb893c1a6bc6ca1fb4c0b8d45a5387f57f",
+        "byteSize": 358062
+      },
+      "byteSizeDelta": -2665,
+      "itxSubgraph": {
+        "unchanged": true,
+        "edgeCount": 48,
+        "edgesSha256": "e09f9ece35f261b0690753b9c88749d2e460c79e889bea045fb44a46bae78709",
+        "evidenceSha256": "a4834c3638dd45500292f67bd39e5a8ff9660162e1ffa2a78359c5d645b74996"
+      },
+      "rowDiff": [
+        {
+          "table": "network_edges",
+          "previousRowCount": 2176,
+          "newRowCount": 2178,
+          "rowsRemoved": 0,
+          "rowsAdded": 2,
+          "rowsChanged": 0,
+          "detail": {
+            "removed": [],
+            "added": [
+              {
+                "id": "edge-sangnoksu-sadang-seoul-4",
+                "from_node_id": "station-sangnoksu:seoul-4",
+                "to_node_id": "station-sadang:seoul-4",
+                "duration_seconds": 2430,
+                "distance_meters": 18600,
+                "edge_type": "RIDE",
+                "service_pattern": "LOCAL",
+                "includes_stairs": 0,
+                "stair_access_state": "UNKNOWN",
+                "accessibility_status": "UNKNOWN",
+                "reliability_score": 100,
+                "facility_id": null,
+                "last_verified_at": null,
+                "service_class": "SUBWAY"
+              },
+              {
+                "id": "edge-sadang-sangnoksu-seoul-4",
+                "from_node_id": "station-sadang:seoul-4",
+                "to_node_id": "station-sangnoksu:seoul-4",
+                "duration_seconds": 2430,
+                "distance_meters": 18600,
+                "edge_type": "RIDE",
+                "service_pattern": "LOCAL",
+                "includes_stairs": 0,
+                "stair_access_state": "UNKNOWN",
+                "accessibility_status": "UNKNOWN",
+                "reliability_score": 100,
+                "facility_id": null,
+                "last_verified_at": null,
+                "service_class": "SUBWAY"
+              }
+            ],
+            "changed": []
+          }
         }
       ]
     }

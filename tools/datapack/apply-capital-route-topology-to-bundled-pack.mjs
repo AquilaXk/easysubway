@@ -115,6 +115,10 @@ function buildStationIdMap(database, lineId, edges) {
   return map;
 }
 
+function undirectedPairKey(leftNodeId, rightNodeId) {
+  return [leftNodeId, rightNodeId].sort(codepointCompare).join("\0");
+}
+
 export function materializeLineEdges(lineId, edges, stationIdByName) {
   const out = [];
   for (const edge of edges) {
@@ -166,13 +170,53 @@ export function applyCapitalRouteTopology(sqlitePath, snapshot) {
           )
       `);
 
+      const selectLine = database.prepare(`
+        SELECT id, from_node_id AS fromNodeId, to_node_id AS toNodeId,
+               duration_seconds AS durationSeconds, distance_meters AS distanceMeters,
+               edge_type AS edgeType, service_pattern AS servicePattern,
+               service_class AS serviceClass
+        FROM network_edges
+        WHERE edge_type = 'RIDE'
+          AND service_class = 'SUBWAY'
+          AND service_pattern = 'LOCAL'
+          AND (
+            from_node_id GLOB ?
+            OR to_node_id GLOB ?
+          )
+      `);
+      const selectTimetablePairs = database.prepare(`
+        SELECT DISTINCT
+          (st1.station_id || ':' || st1.line_id) AS fromNodeId,
+          (st2.station_id || ':' || st2.line_id) AS toNodeId
+        FROM transit_stop_times st1
+        JOIN transit_stop_times st2
+          ON st1.trip_id = st2.trip_id
+         AND st2.stop_sequence = st1.stop_sequence + 1
+        WHERE st1.line_id = ?
+      `);
+
       for (const line of snapshot.lines) {
         if (gapIds.has(line.lineId)) continue;
         const stationIdByName = buildStationIdMap(database, line.lineId, line.edges);
         const edges = materializeLineEdges(line.lineId, line.edges, stationIdByName);
         const glob = `*:${line.lineId}`;
+        // 공식 consecutive topology에 없지만 timetable stop_times에서 연속 정차하는
+        // hop(예: seoul-4 KRIC pilot 상록수↔사당)만 보존한다. 안양↔소사처럼
+        // timetable에 없는 잘못된 hop은 버린다.
+        const previous = selectLine.all(glob, glob);
+        const officialPairs = new Set(
+          edges.map((edge) => undirectedPairKey(edge.fromNodeId, edge.toNodeId)),
+        );
+        const timetablePairs = new Set(
+          selectTimetablePairs.all(line.lineId)
+            .map((row) => undirectedPairKey(row.fromNodeId, row.toNodeId)),
+        );
+        const preserved = previous.filter((edge) => {
+          const pair = undirectedPairKey(edge.fromNodeId, edge.toNodeId);
+          return !officialPairs.has(pair) && timetablePairs.has(pair);
+        });
         deleteLine.run(glob, glob);
-        for (const edge of edges) {
+        for (const edge of [...edges, ...preserved]) {
           insert.run(
             edge.id,
             edge.fromNodeId,
@@ -184,7 +228,12 @@ export function applyCapitalRouteTopology(sqlitePath, snapshot) {
             edge.serviceClass,
           );
         }
-        applied.push({ lineId: line.lineId, edgeCount: edges.length, stationCount: stationIdByName.size });
+        applied.push({
+          lineId: line.lineId,
+          edgeCount: edges.length + preserved.length,
+          stationCount: stationIdByName.size,
+          preservedHopCount: preserved.length,
+        });
       }
 
       const foreignKeys = database.prepare("PRAGMA foreign_key_check").all();
