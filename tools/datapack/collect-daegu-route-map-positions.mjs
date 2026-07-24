@@ -322,6 +322,7 @@ export function validateDaeguRouteMapPositionsSnapshot(snapshot) {
   const keys = new Set();
   const latLonOwners = new Map();
   const canvasOwners = new Map();
+  const stationIdCoords = new Map();
   const validPositions = Array.isArray(positions) && positions.length === EXPECTED_STATION_COUNT
     && positions.every((position) => {
       const key = `${position.lineId}:${position.stationCode}`;
@@ -332,6 +333,12 @@ export function validateDaeguRouteMapPositionsSnapshot(snapshot) {
       const canvasOwner = canvasOwners.get(canvasKey);
       const uniqueCoords = (latLonOwner == null || latLonOwner === owner)
         && (canvasOwner == null || canvasOwner === owner);
+      const expectedCoords = stationIdCoords.get(owner);
+      const sharedStationCoords = expectedCoords == null
+        || (expectedCoords.latitude === position.latitude
+          && expectedCoords.longitude === position.longitude
+          && expectedCoords.x === position.x
+          && expectedCoords.y === position.y);
       const dataset = DATASETS.find(({ lineNumber }) => lineNumber === position.line);
       const valid = dataset?.lineId === position.lineId
         && /^\d{3}$/.test(position.stationCode)
@@ -344,10 +351,19 @@ export function validateDaeguRouteMapPositionsSnapshot(snapshot) {
         && Array.isArray(position.labelPolygon) && position.labelPolygon.length === 4
         && position.labelPolygon.every(({ x, y }) => Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0)
         && !keys.has(key)
-        && uniqueCoords;
+        && uniqueCoords
+        && sharedStationCoords;
       keys.add(key);
       latLonOwners.set(latLonKey, owner);
       canvasOwners.set(canvasKey, owner);
+      if (expectedCoords == null) {
+        stationIdCoords.set(owner, {
+          latitude: position.latitude,
+          longitude: position.longitude,
+          x: position.x,
+          y: position.y,
+        });
+      }
       return valid;
     });
   const quarantinedKeys = new Set();

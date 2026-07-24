@@ -104,6 +104,24 @@ test("snapshot hash나 좌표가 바뀌면 admission을 거부한다", async () 
   assert.throws(() => validateDaeguRouteMapPositionsSnapshot(tampered), /invalid Daegu route map positions snapshot/);
 });
 
+test("동일 stationId 환승 행의 좌표가 갈라지면 admission을 거부한다", async () => {
+  const { csvByDatasetId, topologySnapshots } = await loadInputs();
+  const snapshot = collectDaeguRouteMapPositions({
+    csvByDatasetId,
+    topologySnapshots,
+    now: new Date(capturedAt),
+  });
+  const byStationId = Map.groupBy(snapshot.positions, ({ stationId }) => stationId);
+  const transferId = [...byStationId.entries()].find(([, rows]) => rows.length > 1)?.[0];
+  assert.ok(transferId, "환승 공유 stationId가 있어야 한다");
+  const tampered = structuredClone(snapshot);
+  const divergent = tampered.positions.find(({ stationId }) => stationId === transferId);
+  divergent.latitude += 0.0001;
+  divergent.y += 1;
+  tampered.positionsSha256 = createHash("sha256").update(JSON.stringify(tampered.positions)).digest("hex");
+  assert.throws(() => validateDaeguRouteMapPositionsSnapshot(tampered), /invalid Daegu route map positions snapshot/);
+});
+
 test("#2473 inventory·candidate는 snapshot byte identity와 자유 이용 근거를 고정한다", async () => {
   const [snapshotBytes, inventory, candidates] = await Promise.all([
     readFile(SNAPSHOT_PATH),
