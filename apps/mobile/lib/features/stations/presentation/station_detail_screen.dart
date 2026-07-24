@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../accessible_design.dart';
 import '../../../adaptive_layout.dart';
+import '../../../app/easy_subway_family_app_bar.dart';
 import '../../../core/external/kakao_map_launcher.dart';
 import '../../../facility_report.dart';
 import '../../../internal_route.dart';
@@ -16,7 +17,6 @@ import '../application/station_detail_controller.dart';
 import '../domain/station_line.dart';
 import '../domain/station_models.dart';
 import '../domain/station_repositories.dart';
-import 'station_detail_header.dart';
 import 'station_detail_route_actions.dart';
 import 'station_exit_card.dart';
 import 'station_facility_card.dart';
@@ -24,11 +24,12 @@ import 'station_facility_status_summary.dart';
 import 'station_info_basis_disclosure.dart';
 import 'station_internal_route_guidance.dart';
 import 'station_layout_summary.dart';
+import 'station_line_badges.dart';
 import 'station_realtime_summary.dart';
 import 'station_timetable_screen.dart';
 
-const _stationDetailPagePadding = EdgeInsets.fromLTRB(20, 20, 20, 32);
-const _stationDetailLargePagePadding = EdgeInsets.fromLTRB(24, 24, 24, 40);
+const _stationDetailPagePadding = EdgeInsets.fromLTRB(20, 12, 20, 32);
+const _stationDetailLargePagePadding = EdgeInsets.fromLTRB(24, 16, 24, 40);
 
 class StationDetailScreen extends StatefulWidget {
   const StationDetailScreen({
@@ -121,18 +122,21 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('역 상세')),
-      body: Semantics(
-        container: true,
-        child: SafeArea(
-          child: AnimatedBuilder(
-            animation: Listenable.merge([
-              _controller,
-              ?_internalRouteController,
-            ]),
-            builder: (context, _) {
-              return _StationDetailBody(
+    return AnimatedBuilder(
+      animation: Listenable.merge([_controller, ?_internalRouteController]),
+      builder: (context, _) {
+        return Scaffold(
+          backgroundColor: EasySubwayAccessibleColors.surface,
+          appBar: EasySubwayFamilyAppBar(
+            key: const Key('stationDetailAppBar'),
+            title: _StationDetailAppBarTitle(state: _controller.state),
+            backButtonKey: const Key('stationDetailBackButton'),
+            dividerKey: const Key('stationDetailHeaderDivider'),
+          ),
+          body: Semantics(
+            container: true,
+            child: SafeArea(
+              child: _StationDetailBody(
                 state: _controller.state,
                 onRetryRealtime: _controller.retryRealtime,
                 internalRouteState: _internalRouteController?.state,
@@ -148,13 +152,64 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
                     widget.repository is StationTimetableRepository
                     ? widget.repository as StationTimetableRepository
                     : null,
-              );
-            },
+              ),
+            ),
           ),
+        );
+      },
+    );
+  }
+}
+
+class _StationDetailAppBarTitle extends StatelessWidget {
+  const _StationDetailAppBarTitle({required this.state});
+
+  final StationDetailState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final detail = state.detail;
+    if (state.status != StationDetailStatus.success || detail == null) {
+      return const Text('역 상세');
+    }
+
+    final primaryLine = _primaryStationLine(detail);
+
+    return Semantics(
+      // 본문 헤더를 없애므로 상세 요약 시맨틱을 AppBar 타이틀에 둔다.
+      label: detail.semanticLabel,
+      header: true,
+      child: ExcludeSemantics(
+        child: Row(
+          children: [
+            if (primaryLine != null) ...[
+              StationLineBadge(line: primaryLine, size: 28),
+              const SizedBox(width: 8),
+            ],
+            Expanded(
+              child: Text(
+                '${detail.nameKo}역',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: EasySubwayAccessibleColors.text,
+                  fontWeight: FontWeight.w700,
+                  height: 1.2,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
+}
+
+StationSearchLine? _primaryStationLine(StationDetail detail) {
+  if (detail.lines.isEmpty) {
+    return null;
+  }
+  return detail.lines.first;
 }
 
 class _StationDetailBody extends StatelessWidget {
@@ -286,43 +341,107 @@ class _StationDetailContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 정보구조 다이어트(#1497): 첫 화면에서 역 이름·고장 여부·실시간 도착·주요
-    // 행동이 보이도록 실시간을 위로, 메타는 맨 아래로, 중복 "지도 위치 목록"과
-    // 상시 안전 안내는 제거, "역 안 이동 안내"+"순서"는 한 섹션으로 통합한다.
+    // 패밀리룩(#2436): AppBar에 호선·역명. 본문은
+    // 지금 열차 → 이용하기 → 역 정보 → 안내 순.
     final primaryChildren = <Widget>[
-      StationDetailHeader(detail: detail),
-      const SizedBox(height: 12),
-      if (facilityAttentionSummary.isNotEmpty) ...[
-        StationFacilityStatusSummary(
-          text: facilityAttentionSummary,
-          semanticLabel: facilityAttentionSemanticLabel,
-        ),
-        const SizedBox(height: 16),
-      ],
-      const _StationDetailSectionTitle(title: '실시간 열차'),
+      const _StationDetailSectionTitle(title: '지금 열차'),
       const SizedBox(height: 12),
       StationRealtimeSummary(
         snapshot: realtimeSnapshot,
         onRetry: onRetryRealtime,
       ),
       const SizedBox(height: 20),
+      const _StationDetailSectionTitle(title: '이용하기'),
+      const SizedBox(height: 12),
       StationDetailRouteActions(
         detail: detail,
         routeDraftController: routeDraftController,
         favoriteController: favoriteController,
       ),
-      const SizedBox(height: 20),
+      const SizedBox(height: 12),
       _StationTimetableEntry(detail: detail, repository: timetableRepository),
     ];
-    // 데이터 부재(unavailable) 상태는 화면에 아무것도 그리지 않으므로
-    // 역 안 이동 섹션 노출 여부·간격 계산에서도 빈 안내로 취급한다(#1577).
+
     final internalRouteStateValue = internalRouteState;
     final hasInternalRouteGuidance =
         internalRouteStateValue != null &&
         internalRouteStateValue.status != InternalRouteViewStatus.unavailable;
+
+    final hasStationInfo =
+        facilityAttentionSummary.isNotEmpty ||
+        exits.isNotEmpty ||
+        facilities.isNotEmpty;
+
     final detailChildren = <Widget>[
+      if (hasStationInfo) ...[
+        const _StationDetailSectionTitle(title: '역 정보'),
+        const SizedBox(height: 8),
+        if (facilityAttentionSummary.isNotEmpty) ...[
+          StationFacilityStatusSummary(
+            text: facilityAttentionSummary,
+            semanticLabel: facilityAttentionSemanticLabel,
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (exits.isNotEmpty) ...[
+          for (final exit in exits)
+            StationExitCard(
+              station: detail,
+              exit: exit,
+              mapLauncher: mapLauncher,
+              locationProvider: locationProvider,
+            ),
+        ],
+        if (facilities.isNotEmpty) ...[
+          for (final facility in facilities)
+            StationFacilityCard(
+              facility: facility,
+              station: detail,
+              onReportTap: () => _openFacilityReport(context, facility),
+            ),
+        ],
+        const SizedBox(height: 12),
+      ],
+      const _StationDetailSectionTitle(title: '안내'),
+      const SizedBox(height: 12),
+      if (detail.nameSub.isNotEmpty) ...[
+        Text(
+          detail.nameSub,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: EasySubwayAccessibleColors.secondaryText,
+            fontWeight: FontWeight.w600,
+            height: 1.2,
+          ),
+        ),
+        const SizedBox(height: 8),
+      ],
+      Text(
+        '마지막 확인',
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: EasySubwayAccessibleColors.mutedText,
+          fontWeight: FontWeight.w500,
+          height: 1.2,
+        ),
+      ),
+      const SizedBox(height: 2),
+      Text(
+        stationVerifiedRelativeLabel(detail.lastVerifiedAt),
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: EasySubwayAccessibleColors.mutedText,
+          fontWeight: FontWeight.w600,
+          height: 1.2,
+        ),
+      ),
       if (layoutSummaryItems.isNotEmpty || hasInternalRouteGuidance) ...[
-        const _StationDetailSectionTitle(title: '역 안 이동'),
+        const SizedBox(height: 16),
+        Text(
+          '역 안 이동',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: EasySubwayAccessibleColors.text,
+            fontWeight: FontWeight.w700,
+            height: 1.25,
+          ),
+        ),
         const SizedBox(height: 12),
         if (layoutSummaryItems.isNotEmpty) ...[
           StationLayoutSummary(
@@ -333,35 +452,8 @@ class _StationDetailContent extends StatelessWidget {
         ],
         if (hasInternalRouteGuidance)
           StationInternalRouteGuidance(state: internalRouteState!),
-        const SizedBox(height: 24),
       ],
-      // 데이터가 없으면 섹션 자체를 그리지 않는다(#2078 무표시 원칙). 사과·준비
-      // 중 문구 없이 제목·간격까지 함께 감춰 빈 섹션 헤더나 잔여 간격을 남기지
-      // 않는다.
-      if (exits.isNotEmpty) ...[
-        const _StationDetailSectionTitle(title: '출구'),
-        const SizedBox(height: 12),
-        for (final exit in exits)
-          StationExitCard(
-            station: detail,
-            exit: exit,
-            mapLauncher: mapLauncher,
-            locationProvider: locationProvider,
-          ),
-        const SizedBox(height: 24),
-      ],
-      if (facilities.isNotEmpty) ...[
-        const _StationDetailSectionTitle(title: '시설'),
-        const SizedBox(height: 12),
-        for (final facility in facilities)
-          StationFacilityCard(
-            facility: facility,
-            station: detail,
-            onReportTap: () => _openFacilityReport(context, facility),
-          ),
-        const SizedBox(height: 24),
-      ],
-      // 메타 정보(안내 출처·마지막 확인)는 맨 아래로.
+      const SizedBox(height: 16),
       StationInfoBasisDisclosure(
         labels: [
           detail.dataSourceLabel,
@@ -516,8 +608,6 @@ class _StationTimetableEntryState extends State<_StationTimetableEntry> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _StationDetailSectionTitle(title: '시간표'),
-        const SizedBox(height: 8),
         // 로컬 coverage가 없으면 준비 중 문구 대신 요약 줄을 그리지 않는다(#2078).
         // '시간표 보기' 버튼은 남겨 전체 시간표 화면으로 진입할 수 있게 한다.
         if (timetable != null && timetable.isAvailable) ...[
@@ -604,14 +694,23 @@ class _StationDetailSectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      header: true,
-      child: Text(
-        title,
-        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-          color: EasySubwayAccessibleColors.text,
-          fontWeight: FontWeight.w700,
-          height: 1.25,
+    return ColoredBox(
+      color: EasySubwayAccessibleColors.scaffoldSurface,
+      child: SizedBox(
+        width: double.infinity,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+          child: Semantics(
+            header: true,
+            child: Text(
+              title,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: EasySubwayAccessibleColors.secondaryText,
+                fontWeight: FontWeight.w700,
+                height: 1.25,
+              ),
+            ),
+          ),
         ),
       ),
     );
