@@ -117,11 +117,49 @@ function labelCenterByName(extraction) {
 // 오배정은 훨씬 멀다는 실측에 맞춘 값이다.
 export const MAX_STATION_CANDIDATE_SPREAD_PX = 100;
 
-function assertNoScatteredStationCandidates(candidatesByStation, exemptStationIds) {
+// 권역 config의 명시 예외를 station_id → 허용 spread 상한으로 해소한다.
+//
+// 두 가지를 지킨다.
+//  1) **권역 한정**: 이름 대조를 전역으로 하면 다른 권역의 동명 역까지 면제된다
+//     (resolveStationIds가 lineNamePrefix LIKE로 권역을 한정하는 것과 같은 이유).
+//  2) **사유별 상한 pin**: 면제를 "그 역 무제한"으로 두면, reason에 적힌 알려진
+//     결함과 무관한 새 산발(김포공항형 오배정)이 그 역에서 재발해도 게이트가
+//     침묵한다. 각 예외가 실측값 기준 상한을 들고, 그 위는 다시 실패한다.
+// 이름이 그 권역에서 하나도 해소되지 않는 예외는 오타·이관 잔재이므로 fail-closed
+// (조용히 무효가 된 면제가 남아 있는 편이 더 위험하다).
+function resolveScatteredCandidateExemptions(db, config) {
+  const limitByStationId = new Map();
+  for (const exception of config.scatteredCandidateExceptions ?? []) {
+    const rows = db
+      .prepare(
+        `SELECT DISTINCT s.id AS id
+         FROM stations s
+         JOIN station_lines sl ON sl.station_id = s.id
+         JOIN lines l ON l.id = sl.line_id
+         WHERE s.name_ko = ? AND l.name_ko LIKE ?`,
+      )
+      .all(exception.name, `${config.lineNamePrefix} %`);
+    if (rows.length === 0) {
+      throw new Error(
+        `산발 후보 예외 "${exception.name}"이(가) ${config.regionKey} 카탈로그에서 해소되지 않습니다 ` +
+          "— 이름이 바뀌었거나 예외가 낡았습니다(무효 면제 방지 fail-closed).",
+      );
+    }
+    const limit = Number(exception.maxSpreadPx);
+    if (!Number.isFinite(limit) || limit <= 0) {
+      throw new Error(
+        `산발 후보 예외 "${exception.name}"에 maxSpreadPx(실측 근거 상한)가 없습니다.`,
+      );
+    }
+    for (const row of rows) limitByStationId.set(row.id, limit);
+  }
+  return limitByStationId;
+}
+
+function assertNoScatteredStationCandidates(candidatesByStation, exemptLimitByStationId) {
   const conflicts = [];
   for (const [stationId, candidates] of candidatesByStation) {
     if (candidates.length < 2) continue;
-    if (exemptStationIds.has(stationId)) continue;
     let worst = null;
     for (let i = 0; i < candidates.length; i += 1) {
       for (let j = i + 1; j < candidates.length; j += 1) {
@@ -134,9 +172,11 @@ function assertNoScatteredStationCandidates(candidatesByStation, exemptStationId
         }
       }
     }
-    if (worst && worst.distance > MAX_STATION_CANDIDATE_SPREAD_PX) {
+    const limit =
+      exemptLimitByStationId.get(stationId) ?? MAX_STATION_CANDIDATE_SPREAD_PX;
+    if (worst && worst.distance > limit) {
       conflicts.push(
-        `${stationId}: ${worst.distance.toFixed(1)}px ` +
+        `${stationId}: ${worst.distance.toFixed(1)}px (허용 ${limit}px) ` +
           `[${worst.a.svgName}/${worst.a.svgLine || "-"} (${worst.a.x},${worst.a.y})] vs ` +
           `[${worst.b.svgName}/${worst.b.svgLine || "-"} (${worst.b.x},${worst.b.y})]`,
       );
@@ -144,8 +184,9 @@ function assertNoScatteredStationCandidates(candidatesByStation, exemptStationId
   }
   if (conflicts.length > 0) {
     throw new Error(
-      `한 역에 ${MAX_STATION_CANDIDATE_SPREAD_PX}px 넘게 떨어진 노드가 복수 배정 후보로 잡혔습니다 ` +
-        `(${conflicts.length}건) — 도식의 역 마커 중복/장식 노드를 확인하세요:\n  ` +
+      "한 역에 허용 상한을 넘게 떨어진 노드가 복수 배정 후보로 잡혔습니다 " +
+        `(${conflicts.length}건, 기본 상한 ${MAX_STATION_CANDIDATE_SPREAD_PX}px) ` +
+        "— 도식의 역 마커 중복/장식 노드를 확인하세요:\n  " +
         conflicts.join("\n  "),
     );
   }
@@ -206,18 +247,13 @@ export function buildAssignments(db, extraction, config = SEOUL) {
     assignOne(ids, center.x, center.y, name, "label-fallback");
   }
 
-  // 명시 예외(권역 config): 카탈로그가 서로 떨어진 두 물리역을 하나로 오병합해
-  // 둬서, 도식이 각자 그린 두 노드가 같은 station_id로 broadcast되는 알려진
-  // 케이스만 면제한다. 예외는 이름으로 선언하고 여기서 id로 해소한다.
-  const exemptStationIds = new Set();
-  for (const exception of config.scatteredCandidateExceptions ?? []) {
-    for (const row of db
-      .prepare("SELECT id FROM stations WHERE name_ko = ?")
-      .all(exception.name)) {
-      exemptStationIds.add(row.id);
-    }
-  }
-  assertNoScatteredStationCandidates(candidatesByStation, exemptStationIds);
+  // 명시 예외(권역 config): 도식이 각자 그린 두 노드가 같은 station_id로 몰리는
+  // **알려진 선재 결함만** 면제한다. 예외는 이름으로 선언하고 여기서 권역 한정으로
+  // id를 해소하며, 각 예외가 pin한 실측 상한을 넘으면 그 역도 다시 실패한다.
+  assertNoScatteredStationCandidates(
+    candidatesByStation,
+    resolveScatteredCandidateExemptions(db, config),
+  );
   return { assignments: [...byStation.values()], unresolvedNodes };
 }
 

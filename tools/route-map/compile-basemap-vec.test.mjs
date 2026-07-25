@@ -1187,3 +1187,42 @@ test("easy-subway-sma-v4: 종점 칩 라벨은 오너 로컬 font-size를 그대
     Number((88.134506 + 0.35 * 10.5).toFixed(4)),
   );
 });
+
+// #2068 리뷰 A6: 칩 폰트 면제 표식이 <text>에만 붙으면, 소비 측
+// scaleStyleFontSize가 <text|tspan> 양쪽을 대상으로 잡으므로 칩 내부 tspan의
+// style font-size만 ×k돼 한 칩 안에 두 배율이 섞인다(v4 실측 해당 tspan 0건 —
+// 잠복 결함). 표식이 tspan에도 붙어 로컬 원값이 유지되는지 고정한다.
+test("foldTerminalChipScale: 칩 내부 tspan의 style font-size도 맵 스케일 ×k에서 면제된다", () => {
+  const normalized = normalizeSvgForCompile(`
+    <svg id="seoul-metro-map" viewBox="0 0 100 100">
+      <g id="main-map-scaled-layer" transform="translate(10 20) scale(0.455)">
+        <g id="route-lines-layer"></g>
+        <g id="terminal-route-badges-layer">
+          <g class="ui-chip terminal-route-badge" transform="matrix(2.7475,0,0,2.7475,5,7)">
+            <rect x="0" y="0" width="30" height="23" rx="11.5" fill="#004a85" />
+            <text x="15" y="11.5" font-size="10.5" text-anchor="middle"
+                  dominant-baseline="central"><tspan x="15" y="11.5"
+                  style="font-size:10.5px">1</tspan></text>
+          </g>
+        </g>
+      </g>
+    </svg>
+  `);
+  const tspan = /<tspan\b[^>]*>/.exec(normalized)[0];
+  // 로컬 원값 10.5 그대로여야 한다(×k = 4.7775가 되면 안 된다).
+  assert.match(tspan, /font-size:10\.5px/);
+  // 면제 표식은 컴파일 입력에 남지 않는다.
+  assert.doesNotMatch(normalized, /data-basemap-chip-font-exempt/);
+  // 칩 밖 텍스트는 기존대로 ×k 된다(면제가 전역으로 새지 않는지 대조).
+  const outside = normalizeSvgForCompile(`
+    <svg id="seoul-metro-map" viewBox="0 0 100 100">
+      <g id="main-map-scaled-layer" transform="translate(10 20) scale(0.455)">
+        <g id="route-lines-layer"></g>
+        <g id="station-symbols-layer">
+          <text x="5" y="5" font-size="10"><tspan x="5" y="5" style="font-size:10px">A</tspan></text>
+        </g>
+      </g>
+    </svg>
+  `);
+  assert.match(outside, /font-size:4\.55px/);
+});

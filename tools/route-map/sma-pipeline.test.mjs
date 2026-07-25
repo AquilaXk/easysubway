@@ -245,7 +245,8 @@ test("buildAssignments: 한 역에 100px 넘게 떨어진 복수 노드가 잡�
   assert.throws(
     () => buildAssignments(db, scatterProbeExtraction, scatterProbeConfig()),
     (error) =>
-      /100px 넘게 떨어진 노드/.test(error.message) &&
+      /복수 배정 후보로 잡혔습니다/.test(error.message) &&
+      /기본 상한 100px/.test(error.message) &&
       /s-gimpo/.test(error.message) &&
       /109\.2px/.test(error.message),
   );
@@ -264,7 +265,9 @@ test("buildAssignments: 100px 이내 중복 노드와 명시 예외는 통과한
   };
   assert.equal(buildAssignments(db, near, scatterProbeConfig()).assignments.length, 1);
   // (b) 카탈로그 오병합 등 알려진 케이스는 config 명시 예외로만 면제된다.
-  const exempt = scatterProbeConfig([{ name: "김포공항", reason: "테스트 예외" }]);
+  const exempt = scatterProbeConfig([
+    { name: "김포공항", maxSpreadPx: 150, reason: "테스트 예외" },
+  ]);
   assert.equal(
     buildAssignments(db, scatterProbeExtraction, exempt).assignments.length,
     1,
@@ -332,5 +335,149 @@ test("SEOUL.distinctSameNameStations는 수도권 카탈로그의 동명 역명 
     );
   } finally {
     rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+// #2068 리뷰 A2: 면제는 "권역 한정 + 사유별 실측 상한"이어야 한다.
+// 전역 이름 대조면 타 권역 동명 역까지 면제되고, 상한이 없으면 알려진 결함과
+// 무관한 새 산발(김포공항형)이 그 역에서 재발해도 게이트가 침묵한다.
+function exemptionProbeDb() {
+  const db = new DatabaseSync(":memory:");
+  db.exec(`
+    CREATE TABLE stations (id TEXT PRIMARY KEY, name_ko TEXT);
+    CREATE TABLE lines (id TEXT PRIMARY KEY, name_ko TEXT);
+    CREATE TABLE station_lines (station_id TEXT, line_id TEXT);
+    INSERT INTO stations VALUES ('s-busan-x','시청'),('s-seoul-x','시청');
+    INSERT INTO lines VALUES ('l-busan1','부산 1호선'),('l-seoul1','수도권 1호선');
+    INSERT INTO station_lines VALUES ('s-busan-x','l-busan1'),('s-seoul-x','l-seoul1');
+  `);
+  return db;
+}
+
+function exemptionProbeConfig(exceptions) {
+  return {
+    ...getRegionConfig("busan"),
+    slugToSuffix: { line1: "1호선" },
+    canonicalRules: (name) => ({ name }),
+    excludedStations: [],
+    scatteredCandidateExceptions: exceptions,
+  };
+}
+
+// 부산 시청 노드 2개가 300px 떨어져 잡히는 상황(면제가 없으면 실패해야 한다).
+const exemptionProbeExtraction = {
+  labels: [],
+  stationNodes: [
+    { dataStation: "시청", dataLine: "line1", x: 0, y: 0, nodeRole: "ordinary" },
+    { dataStation: "시청", dataLine: "line1", x: 300, y: 0, nodeRole: "ordinary" },
+  ],
+};
+
+test("scatteredCandidateExceptions: 권역 한정으로 해소하고 maxSpreadPx를 넘으면 다시 실패한다", () => {
+  const db = exemptionProbeDb();
+  // (a) 면제 없으면 실패.
+  assert.throws(
+    () => buildAssignments(db, exemptionProbeExtraction, exemptionProbeConfig([])),
+    /복수 배정 후보/,
+  );
+  // (b) 실측 상한 안이면 통과하고, 면제는 **부산 시청에만** 적용된다(수도권 시청 미면제).
+  const exempt = exemptionProbeConfig([
+    { name: "시청", maxSpreadPx: 400, reason: "테스트 예외" },
+  ]);
+  assert.equal(buildAssignments(db, exemptionProbeExtraction, exempt).assignments.length, 1);
+  // (c) 상한을 넘는 새 산발은 면제 역이라도 실패한다(과잉 면제 차단).
+  const tooTight = exemptionProbeConfig([
+    { name: "시청", maxSpreadPx: 200, reason: "테스트 예외" },
+  ]);
+  assert.throws(
+    () => buildAssignments(db, exemptionProbeExtraction, tooTight),
+    /허용 200px/,
+  );
+  // (d) maxSpreadPx 없는 예외는 fail-closed.
+  assert.throws(
+    () =>
+      buildAssignments(
+        db,
+        exemptionProbeExtraction,
+        exemptionProbeConfig([{ name: "시청", reason: "상한 누락" }]),
+      ),
+    /maxSpreadPx/,
+  );
+  // (e) 그 권역에서 해소되지 않는 예외(오타·낡은 항목)도 fail-closed.
+  assert.throws(
+    () =>
+      buildAssignments(
+        db,
+        exemptionProbeExtraction,
+        exemptionProbeConfig([
+          { name: "시청", maxSpreadPx: 400, reason: "ok" },
+          { name: "없는역", maxSpreadPx: 400, reason: "낡은 예외" },
+        ]),
+      ),
+    /해소되지 않습니다/,
+  );
+  db.close();
+});
+
+// #2068 리뷰 A3: 산발 후보 게이트는 전 권역 공통 경로다. 소비처 `?? []` 폴백에
+// 기대지 않고 권역마다 명시 선언하도록 고정한다(실측 근거는 각 config 주석).
+test("scatteredCandidateExceptions는 5권역 전부에 명시 선언되고 예외는 실측 상한을 든다", () => {
+  for (const region of ["seoul", "busan", "daegu", "daejeon", "gwangju"]) {
+    const config = getRegionConfig(region);
+    assert.ok(
+      Array.isArray(config.scatteredCandidateExceptions),
+      `${region}: scatteredCandidateExceptions를 명시 선언해야 한다`,
+    );
+    for (const exception of config.scatteredCandidateExceptions) {
+      assert.ok(exception.name, `${region}: 예외에 name이 필요하다`);
+      assert.ok(
+        Number.isFinite(exception.maxSpreadPx) && exception.maxSpreadPx > 0,
+        `${region}/${exception.name}: 실측 근거 상한(maxSpreadPx)이 필요하다`,
+      );
+      assert.ok(exception.reason, `${region}/${exception.name}: reason이 필요하다`);
+    }
+  }
+  // 실측(2026-07-26): 산발 예외가 필요한 권역은 부산뿐(동래·부전 선재 결함).
+  assert.deepEqual(
+    ["seoul", "daegu", "daejeon", "gwangju"].map(
+      (r) => getRegionConfig(r).scatteredCandidateExceptions.length,
+    ),
+    [0, 0, 0, 0],
+  );
+  assert.deepEqual(
+    getRegionConfig("busan").scatteredCandidateExceptions.map((e) => e.name),
+    ["동래", "부전"],
+  );
+});
+
+// #2068 리뷰 A10: 수도권 유지보수 도구를 인자 없이 돌리면 구 도식을 감사하던
+// 문제. 기본 경로가 컴파일러의 seoul 정본과 어긋나면 실패시킨다.
+test("수도권 유지보수 도구의 기본 --svg/--geometry가 컴파일 정본과 같은 버전을 가리킨다", () => {
+  const routeMapDir = import.meta.dirname;
+  const compiler = readFileSync(path.join(routeMapDir, "compile-basemap-vec.mjs"), "utf8");
+  const canonical = /\{\s*id:\s*"seoul",\s*svg:\s*"(easy-subway-sma-v\d+)\.svg"\s*\}/.exec(
+    compiler,
+  );
+  assert.ok(canonical, "compile-basemap-vec.mjs의 seoul regions 항목을 찾지 못했다");
+  const version = canonical[1];
+  const tools = [
+    "apply-euclidean-svg-respacing.mjs",
+    "audit-octolinear-node-on-stroke.mjs",
+    "audit-route-line-layout-quality.mjs",
+    "fix-svg-station-line-membership.mjs",
+    "octolinearize-svg-route-lines.mjs",
+    "relayout-svg-route-lines.mjs",
+    "generate-basemap-alignment-fixture.mjs",
+  ];
+  for (const tool of tools) {
+    const source = readFileSync(path.join(routeMapDir, tool), "utf8");
+    const stale = [...source.matchAll(/easy-subway-sma-v\d+(?:-geometry)?/g)]
+      .map((m) => m[0])
+      .filter((token) => !token.startsWith(version));
+    assert.deepEqual(
+      stale,
+      [],
+      `${tool}: 기본 경로가 정본(${version})이 아닌 도식을 가리킨다 — 인자 없이 실행하면 구 도식을 감사한다`,
+    );
   }
 });

@@ -291,7 +291,16 @@ test("test-only ADMITTED timetable은 ITX trip·stop·EXPRESS edge를 materializ
     assert.equal(evidence.timetable_artifact_sha256, createHash("sha256").update(admissionBytes).digest("hex"));
     // #2068: 번들 pack이 재생성되면(노선도 재설계) 이 pin도 함께 바뀐다 —
     // 상수 하드코딩 대신 test-only fixture가 pin한 값과 대조해, fixture 갱신만
-    // 하면 되도록 한다(fixture 자체는 build-datapack이 라이브 pack과 검증한다).
+    // 하면 되도록 한다.
+    //
+    // 주의(탐지 범위): 아래 두 값은 build-datapack.mjs가 같은 fixture에서 복사해
+    // 양쪽에 써 넣으므로, 이 assert는 "복사 경로가 살아 있다"만 본다(두 값이 함께
+    // 틀리면 통과한다). **라이브 번들 pack 바이트와의 실대조는 두 곳에 있다** —
+    // ① build-datapack.mjs의 validateTestOnlyItxCanonicalIdentity(fixture pin ↔
+    // 라이브 pack sha256/sqliteSha256, 불일치 시 빌드 fail-closed), ② 이 저장소의
+    // itx-cheongchun-coverage-contract.test.mjs "deterministic ADMITTED fixture는
+    // test-only이며 production evidence에 연결되지 않는다"(fixture pin ↔ 라이브 pack
+    // 재계산 해시 deepEqual). pin 자체의 정합은 그 두 축이 지킨다.
     const admission = JSON.parse(admissionBytes);
     assert.equal(evidence.canonical_pack_sha256, admission.canonicalPackIdentity.sha256);
     assert.equal(

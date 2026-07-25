@@ -1342,6 +1342,12 @@ function scaleStyleFontSize(tag, k) {
 //      반전) central 텍스트에만 적용되며 반전 프레임 특례가 필요 없다.
 // inlineSimpleClassStyles 이후에 적용해 class에서 온 font-size·baseline도 속성으로
 // 정리된 상태를 다룬다. text·tspan 이외 요소는 건드리지 않으며, 텍스트 내용은 불변이다.
+// #2408/#2068 종점 칩 텍스트 표식. foldTerminalChipScale이 이미 렌더 배율을
+// 반영해 둔 텍스트라, normalizeTextBaselineAndScale의 전역 font-size ×k 패스에서
+// 제외해야 한다(이중 적용 방지). 컴파일 입력 사본에만 붙고 정규화 마지막 단계에서
+// 제거되므로 산출 .vec에는 남지 않는다.
+const TERMINAL_CHIP_FONT_EXEMPT_ATTR = "data-basemap-chip-font-exempt";
+
 function normalizeTextBaselineAndScale(svgText, k) {
   const withStyleFontSizeScaled = svgText.replace(
     /<(?:text|tspan)\b[^>]*>/g,
@@ -1419,12 +1425,6 @@ function shiftTextYAttr(tag, shift) {
 //     인식하지 않는 단순 선택자 요건 밖이라 순서 무관하게 현재 결과는 불변이지만,
 //     향후 단순 class 선택자로 font-size/baseline을 주는 칩이 추가되면 이 순서가
 //     아니면 fold가 그 값을 놓친다.
-// #2408/#2068 종점 칩 텍스트 표식. foldTerminalChipScale이 이미 렌더 배율을
-// 반영해 둔 텍스트라, normalizeTextBaselineAndScale의 전역 font-size ×k 패스에서
-// 제외해야 한다(이중 적용 방지). 컴파일 입력 사본에만 붙고 정규화 마지막 단계에서
-// 제거되므로 산출 .vec에는 남지 않는다.
-const TERMINAL_CHIP_FONT_EXEMPT_ATTR = "data-basemap-chip-font-exempt";
-
 function foldTerminalChipScale(svgText) {
   return svgText.replace(
     /<g\b[^>]*\bclass="ui-chip terminal-route-badge"[^>]*>[\s\S]*?<\/g>/g,
@@ -1492,9 +1492,18 @@ function foldTerminalChipScale(svgText) {
         // s는 이제 font-size 산술에는 쓰이지 않지만, "축정렬 균일 스케일 그룹만
         // 대상"이라는 적용 범위 판정에는 그대로 쓴다(회전·비균일 그룹은 이 모델이
         // 성립하지 않으므로 손대지 않는다).
+        // 면제 표식은 `<text>`뿐 아니라 **칩 내부 `<tspan>`에도** 붙인다.
+        // 소비 측 scaleStyleFontSize는 `/<(?:text|tspan)\b[^>]*>/`로 tspan까지
+        // 대상으로 잡으므로, tspan에 표식이 없으면 그 style font-size만 ×k돼
+        // 한 칩 안에 로컬 원값과 ×k 값 두 배율이 섞인다(v4 실측 해당 tspan 0건 —
+        // 잠복 결함 선차단). 산출물에는 남지 않는다(normalizeSvgForCompile 말미 제거).
         newOpen = newOpen.replace(
           /^<text\b/,
           `<text ${TERMINAL_CHIP_FONT_EXEMPT_ATTR}="true"`,
+        );
+        newRest = newRest.replace(
+          /<tspan\b/g,
+          `<tspan ${TERMINAL_CHIP_FONT_EXEMPT_ATTR}="true"`,
         );
         return newOpen + newRest;
       });
