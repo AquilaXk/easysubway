@@ -17,9 +17,16 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { parseArgs, requiredArg } from "./lib/cli-args.mjs";
+
 // decide-datapack-release.mjs의 validApproval()과 같은 술어를 검사한다.
 // 여기서 통과하고 거기서 막히는 경우가 없도록 항목을 일치시킨다.
-export function releaseRequestBindingViolations({ buildSpec, buildSpecSha256, releaseRequest }) {
+// expectedApprovalId를 넘기면 "요청된 release request ID == release request의 approvalId" 대조까지
+// 더한다. workflow의 인라인 대조(datapack-release.yml)가 파일 입력 경로에만 걸려 있어 API 조회
+// 경로에서는 아무도 보지 않던 항목이라, 이 인자로 preflight가 기존 검사의 실제 상위집합이 된다.
+export function releaseRequestBindingViolations({
+  buildSpec, buildSpecSha256, releaseRequest, expectedApprovalId = null,
+}) {
   if (!buildSpec || typeof buildSpec !== "object") return ["build spec을 읽지 못했다"];
   if (!releaseRequest || typeof releaseRequest !== "object") return ["release request를 읽지 못했다"];
   const violations = [];
@@ -31,6 +38,9 @@ export function releaseRequestBindingViolations({ buildSpec, buildSpecSha256, re
   }
   if (typeof releaseRequest.approvalId !== "string" || releaseRequest.approvalId.length === 0) {
     violations.push("approvalId는 비어 있지 않은 문자열이어야 한다");
+  }
+  if (expectedApprovalId != null && releaseRequest.approvalId !== expectedApprovalId) {
+    violations.push(`approvalId가 요청된 release request ID와 다르다 (request: ${describe(releaseRequest.approvalId)}, 요청: ${describe(expectedApprovalId)})`);
   }
   if (!nonEmptyString(releaseRequest.requestedBy) || !nonEmptyString(releaseRequest.approvedBy)
     || releaseRequest.requestedBy === releaseRequest.approvedBy) {
@@ -77,7 +87,10 @@ async function main(argv) {
   const buildSpec = JSON.parse(buildSpecBytes.toString("utf8"));
   const releaseRequest = JSON.parse(await readFile(releaseRequestPath, "utf8"));
   const buildSpecSha256 = createHash("sha256").update(buildSpecBytes).digest("hex");
-  const violations = releaseRequestBindingViolations({ buildSpec, buildSpecSha256, releaseRequest });
+  const violations = releaseRequestBindingViolations({
+    buildSpec, buildSpecSha256, releaseRequest,
+    expectedApprovalId: args.get("expected-approval-id") ?? null,
+  });
   if (violations.length > 0) {
     throw new Error([
       "release request가 현행 build spec에 결속돼 있지 않다 — release를 진행할 수 없다.",
@@ -94,26 +107,8 @@ async function main(argv) {
   })}\n`);
 }
 
-function parseArgs(argv) {
-  const args = new Map();
-  for (let index = 0; index < argv.length; index += 2) {
-    const key = argv[index];
-    const value = argv[index + 1];
-    if (!key?.startsWith("--") || value === undefined || value.startsWith("--")) {
-      throw new Error(`invalid argument near ${key ?? "<end>"}`);
-    }
-    if (args.has(key.slice(2))) throw new Error(`duplicate argument: ${key}`);
-    args.set(key.slice(2), value);
-  }
-  return args;
-}
-
-function requiredArg(args, name) {
-  const value = args.get(name);
-  if (typeof value !== "string" || value.length === 0) throw new Error(`--${name} is required`);
-  return value;
-}
-
+// main().catch(...)는 decide-datapack-release.mjs 말미와 같은 리포 관용구다. top-level await로
+// 바꾸면 이 모듈을 import하는 테스트가 CLI 실패 경로의 rejection을 그대로 떠안게 되므로 유지한다.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main(process.argv.slice(2)).catch((error) => {
     console.error(error.message);

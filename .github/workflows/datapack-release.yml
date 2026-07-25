@@ -400,11 +400,22 @@ jobs:
         run: |
           set -euo pipefail
           release_request_path="${RELEASE_REQUEST_PATH:-${EASYSUBWAY_DATAPACK_RELEASE_REQUEST_PATH:-}}"
-          test -n "${release_request_path}"
-          test -f "${release_request_path}"
+          if [[ -z "${release_request_path}" ]]; then
+            echo "production-publish requires a release request path (API fetch or file input)" >&2
+            exit 1
+          fi
+          if [[ ! -f "${release_request_path}" ]]; then
+            echo "release request not found: ${release_request_path}" >&2
+            exit 1
+          fi
+          if [[ -z "${EASYSUBWAY_DATAPACK_RELEASE_REQUEST_ID:-}" ]]; then
+            echo "production-publish requires a release request id" >&2
+            exit 1
+          fi
           node tools/datapack/verify-release-request-binding.mjs \
             --build-spec "${EASYSUBWAY_DATAPACK_BUILD_SPEC_PATH}" \
-            --release-request "${release_request_path}"
+            --release-request "${release_request_path}" \
+            --expected-approval-id "${EASYSUBWAY_DATAPACK_RELEASE_REQUEST_ID}"
 
       - name: Data Pack Release / Fetch rollback approval
         if: ${{ steps.release-mode.outputs.mode == 'rollback' }}
