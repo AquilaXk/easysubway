@@ -18264,6 +18264,24 @@ test("CI 계약 테스트 스텝은 tools/lib, tools/mobile 테스트 글롭을 
   }
 });
 
+// #2518: status voice 인벤토리는 apps/mobile/lib 트리를 스캔하는 drift 가드라,
+// repository 게이트의 계약 테스트 스텝만으로는 Dart 전용 PR(mobile=true, repository=false)에서
+// 스킵된다. mobile 게이트에도 배선되어 있어야 두 변경 클래스가 모두 닫힌다.
+test("Mobile App CI는 tools/mobile 도구 테스트를 mobile 게이트 전용 스텝으로 실행한다", () => {
+  const workflow = read(".github/workflows/ci.yml");
+  const mobileToolStep = workflow.match(
+    /- name: Mobile App CI \/ Run mobile tool tests\n        if: (\$\{\{[^\n]*\}\})\n[\s\S]*?\n        run: (node --test [^\n]*)\n/,
+  );
+  assert.ok(mobileToolStep, "Mobile App CI must declare a mobile-gated tools/mobile test step");
+
+  const [, gate, command] = mobileToolStep;
+  assert.match(gate, /needs\.changes\.outputs\.mobile == 'true'/);
+  assert.match(gate, /steps\.scaffold\.outputs\.present == 'true'/);
+  assert.ok(command.includes("tools/mobile/*.test.mjs"), "mobile tool test step must run tools/mobile/*.test.mjs");
+  // --test-name-pattern이 붙으면 이름이 걸러져 drift 가드가 실행되지 않는다.
+  assert.doesNotMatch(command, /--test-name-pattern/);
+});
+
 test("경로 분류기는 백엔드 품질 gate 변경을 repository contract 대상으로 처리한다", async () => {
   const outputs = await classifyChangedFiles(["backend/quality/static-analysis-gate.json"]);
 
