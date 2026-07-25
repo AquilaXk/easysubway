@@ -169,17 +169,25 @@ function lineageTopologyPaths(admissionEvidence, lineId) {
     }));
 }
 
-function indexScopeCoverage(coverage, snapshot, lineId) {
-  for (const position of snapshot.positions ?? []) {
-    if (position.lineId === lineId) {
-      coverage.positionsByName.set(normalizeStationName(position.stationName), position);
+// 정규화 키가 겹치면 뒤 항목이 앞 항목을 덮어 서로 다른 두 역이 한 칸으로 접합된다.
+// 결측 은폐로 이어지므로 덮어쓰기 대신 위반으로 올린다.
+function indexPositions(target, positions, lineId, push) {
+  for (const position of positions ?? []) {
+    if (position.lineId !== lineId) {
+      continue;
     }
-  }
-  for (const position of snapshot.quarantinedPositions ?? []) {
-    if (position.lineId === lineId) {
-      coverage.quarantinedByName.set(normalizeStationName(position.stationName), position);
+    const key = normalizeStationName(position.stationName);
+    const previous = target.get(key);
+    if (previous && previous.stationName !== position.stationName) {
+      push(`정규화 표기가 충돌한다 (${previous.stationName} / ${position.stationName})`);
     }
+    target.set(key, position);
   }
+}
+
+function indexScopeCoverage(coverage, snapshot, lineId, push) {
+  indexPositions(coverage.positionsByName, snapshot.positions, lineId, push);
+  indexPositions(coverage.quarantinedByName, snapshot.quarantinedPositions, lineId, push);
 }
 
 // coverageScope가 route_map_positions를 claim한 소스에서 (scope, snapshot) 결속을 모은다.
@@ -215,7 +223,11 @@ function collectScopeCoverage({ inventory, snapshotsByPath, violations }) {
         coverage.topologyPaths.add(lineage.path);
         coverage.topologyContentByPath.set(lineage.path, lineage.contentSha256);
       }
-      indexScopeCoverage(coverage, resolved.snapshot, lineId);
+      indexScopeCoverage(coverage, resolved.snapshot, lineId, (message) => violations.push({
+        kind: "SNAPSHOT_NAME_COLLISION",
+        scopeKey: key,
+        message: `${key} (${source.id}): ${message}`,
+      }));
       coverageByScope.set(key, coverage);
     }
   }
@@ -263,7 +275,7 @@ function collectRegisteredTopologyPaths(inventory) {
   return paths;
 }
 
-function resolveTopologyNames({ topologyPath, coverage, registeredTopologyPaths, topologiesByPath, prefix, push }) {
+function resolveTopologyNames({ topologyPath, coverage, registeredTopologyPaths, topologiesByPath, prefix, push, requireLineage = false }) {
   const allowed = coverage.topologyPaths.size > 0 ? coverage.topologyPaths : registeredTopologyPaths;
   if (!isNonEmptyString(topologyPath) || !allowed.has(topologyPath)) {
     push(`${prefix}_PACK_TOPOLOGY_UNBOUND`, "packTopologyPath가 이 scope에 등재된 topology snapshot이 아니다");
@@ -280,6 +292,12 @@ function resolveTopologyNames({ topologyPath, coverage, registeredTopologyPaths,
     return null;
   }
   const declared = coverage.topologyContentByPath.get(topologyPath);
+  // "topology에 역이 없다"를 근거로 쓰는 검사는 파일 자기정합성만으로는 부족하다. 해시를 함께 다시
+  // 계산해 붙이면 자기정합성은 통과하므로, admission lineage가 선언한 contentSha256 결속을 요구한다.
+  if (requireLineage && !isNonEmptyString(declared)) {
+    push(`${prefix}_PACK_TOPOLOGY_LINEAGE_UNDECLARED`, "이 scope의 admission lineage가 topology contentSha256을 선언하지 않았다");
+    return null;
+  }
   if (isNonEmptyString(declared) && declared !== topology.contentSha256) {
     push(`${prefix}_PACK_TOPOLOGY_LINEAGE_MISMATCH`, "pack topology가 admission lineage의 contentSha256과 다르다");
     return null;
@@ -391,7 +409,7 @@ function verifyRosterSubnameCrossCheck({ alias, snapshotName, push }) {
   return true;
 }
 
-function renameTopologyNames(context) {
+function renameTopologyNames(context, requireLineage) {
   return resolveTopologyNames({
     topologyPath: context.alias.evidence?.packTopologyPath,
     coverage: context.coverage,
@@ -399,6 +417,7 @@ function renameTopologyNames(context) {
     topologiesByPath: context.topologiesByPath,
     prefix: "ALIAS",
     push: context.push,
+    requireLineage,
   });
 }
 
@@ -406,7 +425,7 @@ function renameTopologyNames(context) {
 // snapshot 표기가 오염되면 topology에는 roster측 표기가 남아 있으므로 여기서 걸린다.
 function verifyAdoptedNameCrossCheck(context) {
   const { snapshotName, rosterName, push } = context;
-  const topologyNames = renameTopologyNames(context);
+  const topologyNames = renameTopologyNames(context, true);
   if (!topologyNames) {
     return false;
   }
@@ -426,7 +445,8 @@ function verifyAdoptedNameCrossCheck(context) {
 // 실재하는지까지 확인해야 근거가 된다.
 function verifyStaleNameCrossCheck(context) {
   const { alias, coverage, snapshotName, rosterName, rawSourcesByPath, push } = context;
-  const topologyNames = renameTopologyNames(context);
+  // 이 방향의 결정적 근거는 공식 원문 바이트 대조라 lineage 선언까지 요구하지 않는다.
+  const topologyNames = renameTopologyNames(context, false);
   if (!topologyNames) {
     return false;
   }
@@ -619,7 +639,7 @@ function validateGapBinding({ gap, coverage, roster, rosterName, aliased, seen, 
   return true;
 }
 
-function gapTopologyNames(context) {
+function gapTopologyNames(context, requireLineage) {
   return resolveTopologyNames({
     topologyPath: context.gap.evidence.packTopologyPath,
     coverage: context.coverage,
@@ -627,6 +647,7 @@ function gapTopologyNames(context) {
     topologiesByPath: context.topologiesByPath,
     prefix: "LEDGER",
     push: context.push,
+    requireLineage,
   });
 }
 
@@ -665,7 +686,8 @@ function verifyOfficialFileRowAbsence({ coverage, rosterName, snapshot, push }) 
 // pack은 이 역을 요구하는데 공식 원문에 행이 없는 경우만 이 사유에 해당한다.
 function verifyOfficialFileRowAbsentGap(context) {
   const { coverage, rosterName, push } = context;
-  const topologyNames = gapTopologyNames(context);
+  // topology가 역을 싣고 있다는 존재 근거라 재해시 삭제로 유리해지지 않는다.
+  const topologyNames = gapTopologyNames(context, false);
   if (!topologyNames) {
     return false;
   }
@@ -682,7 +704,7 @@ function verifyOfficialFileRowAbsentGap(context) {
 
 // pack 노선 topology 자체가 역을 싣지 않은 경우만 이 사유에 해당한다.
 function verifyPackScopeAbsentGap(context) {
-  const topologyNames = gapTopologyNames(context);
+  const topologyNames = gapTopologyNames(context, true);
   if (!topologyNames) {
     return false;
   }
@@ -782,8 +804,22 @@ function reportMissingStations({ auditedScopeKeys, rosters, coverageByScope, ali
     const coverage = coverageByScope.get(key);
     const aliased = aliasedRosterNamesByScope.get(key) ?? new Set();
     const ledgered = gapRosterNamesByScope.get(key) ?? new Set();
+    // roster 두 역이 한 키로 접합되면 한쪽만 커버돼도 결측이 보고되지 않으므로 충돌을 위반으로 올린다.
+    const rosterByKey = new Map();
+    for (const stationName of roster.stationNames) {
+      const normalized = normalizeStationName(stationName);
+      const previous = rosterByKey.get(normalized);
+      if (previous && previous !== stationName) {
+        violations.push({
+          kind: "ROSTER_NAME_COLLISION",
+          scopeKey: key,
+          message: `${key}: MOLIT roster 정규화 표기가 충돌한다 (${previous} / ${stationName})`,
+        });
+      }
+      rosterByKey.set(normalized, stationName);
+    }
     // MOLIT roster 나열 순서를 유지한다(노선 순서). 정렬은 로케일 의존이라 쓰지 않는다.
-    const missing = [...new Set(roster.stationNames.map(normalizeStationName))]
+    const missing = [...rosterByKey.keys()]
       .filter((stationName) => !coverage.positionsByName.has(stationName)
         && !aliased.has(stationName)
         && !ledgered.has(stationName));

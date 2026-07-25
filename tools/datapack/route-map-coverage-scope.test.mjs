@@ -410,7 +410,8 @@ test("snapshot 표기 오염은 모든 교차 근거 경로에서 거부된다 (
   };
   const rejected = {
     ROSTER_SUBNAME: "ALIAS_RENAME_SUBNAME_ABSENT",
-    PACK_TOPOLOGY_ADOPTED_NAME: "ALIAS_RENAME_ADOPTED_NAME_ABSENT",
+    // seoul-metro 노선은 topology lineage 미등재라 부재 근거 경로가 lineage 단계에서 먼저 막힌다.
+    PACK_TOPOLOGY_ADOPTED_NAME: "ALIAS_PACK_TOPOLOGY_LINEAGE_UNDECLARED",
     OFFICIAL_FILE_STALE_NAME: "ALIAS_RENAME_RAW_NAME_ABSENT",
   };
 
@@ -460,11 +461,27 @@ test("quarantine 사유 항목도 공식 출처 URL을 요구한다 (#2516)", as
 test("pack topology가 싣고 있는 역은 pack 결측으로 면제할 수 없다 (#2516)", async () => {
   const inputs = await loadAuditInputs();
   const exemptions = structuredClone(inputs.exemptions);
-  gapNamed(exemptions, "암사역사공원").reasonCode = "PACK_SCOPE_ABSENT";
+  gapNamed(exemptions, "하양").reasonCode = "PACK_SCOPE_ABSENT";
 
   const result = auditRouteMapCoverageScopes({ ...inputs, exemptions });
 
   assert.deepEqual(violationKinds(result), ["LEDGER_PACK_TOPOLOGY_STATION_PRESENT", "MISSING_STATION"]);
+});
+
+test("lineage 미등재 topology는 pack 결측 근거로 쓸 수 없다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const exemptions = structuredClone(inputs.exemptions);
+  // 서울교통공사 노선은 topology lineage 미등재라 재해시 삭제로 세탁할 수 없다.
+  gapNamed(exemptions, "암사역사공원").reasonCode = "PACK_SCOPE_ABSENT";
+  const topology = structuredClone(inputs.topologiesByPath.get(CAPITAL_TOPOLOGY_PATH));
+  const line = topology.lines.find(({ lineId }) => lineId === "line-2b2d9eaa53d0");
+  line.scope = line.scope.filter(({ stationName }) => stationName !== "암사역사공원");
+  const topologiesByPath = new Map(inputs.topologiesByPath).set(CAPITAL_TOPOLOGY_PATH, rehashTopology(topology));
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, exemptions, topologiesByPath });
+
+  assert.ok(violationKinds(result).includes("LEDGER_PACK_TOPOLOGY_LINEAGE_UNDECLARED"));
+  assert.ok(violationKinds(result).includes("MISSING_STATION"));
 });
 
 test("pack topology에 없는 역은 공식 원문 결측으로 면제할 수 없다 (#2516)", async () => {
@@ -528,6 +545,108 @@ test("admission으로 해소된 결측은 ledger에 남길 수 없다 (#2516)", 
   const result = auditRouteMapCoverageScopes({ ...inputs, snapshotsByPath });
 
   assert.deepEqual(violationKinds(result), ["LEDGER_NOT_NEEDED"]);
+});
+
+test("정규화 표기가 겹치는 snapshot 역은 위반으로 올린다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const snapshot = structuredClone(inputs.snapshotsByPath.get(SEOUL_SNAPSHOT_PATH));
+  // 서로 다른 두 역이 한 칸으로 접합되면 결측이 조용히 가려진다.
+  for (const position of snapshot.positions) {
+    if (position.lineId === "seoul-4" && position.stationName === "쌍문") {
+      position.stationName = "노원(당고개방면)";
+    }
+  }
+  const snapshotsByPath = new Map(inputs.snapshotsByPath).set(SEOUL_SNAPSHOT_PATH, snapshot);
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, snapshotsByPath });
+
+  assert.deepEqual(violationKinds(result), ["SNAPSHOT_NAME_COLLISION", "MISSING_STATION"]);
+});
+
+test("정규화 표기가 겹치는 roster 역은 위반으로 올린다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const rosters = new Map(inputs.rosters);
+  const key = "gwangju:gwangju-metropolitan-rapid-transit:line-e57a361e8892";
+  const roster = structuredClone(rosters.get(key));
+  roster.stationNames = roster.stationNames.map((name) => (name === "돌고개" ? "농성역" : name));
+  rosters.set(key, roster);
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, rosters });
+
+  // 충돌 감지가 없으면 두 역이 한 칸으로 접합돼 결측이 조용히 사라진다.
+  assert.deepEqual(violationKinds(result), ["ROSTER_NAME_COLLISION"]);
+});
+
+test("같은 scope에서 별칭을 중복 등재할 수 없다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const exemptions = structuredClone(inputs.exemptions);
+  exemptions.approvedStationNameAliases.push(structuredClone(aliasNamed(exemptions, "명덕1")));
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, exemptions });
+
+  assert.deepEqual(violationKinds(result), ["ALIAS_DUPLICATE"]);
+});
+
+test("roster 원문과 다른 표기를 가리키는 별칭·ledger는 거부된다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const exemptions = structuredClone(inputs.exemptions);
+  aliasNamed(exemptions, "명덕1").rosterStationName = "명덕";
+  gapNamed(exemptions, "하양").rosterStationName = "하양역";
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, exemptions });
+
+  assert.deepEqual(violationKinds(result), [
+    "ALIAS_ROSTER_STATION_ABSENT",
+    "LEDGER_ROSTER_STATION_ABSENT",
+    "MISSING_STATION",
+  ]);
+});
+
+test("같은 scope에서 결측 ledger를 중복 등재할 수 없다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const exemptions = structuredClone(inputs.exemptions);
+  exemptions.documentedCoverageGaps.push(structuredClone(gapNamed(exemptions, "하양")));
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, exemptions });
+
+  assert.deepEqual(violationKinds(result), ["LEDGER_DUPLICATE"]);
+});
+
+test("원본 행 회계가 맞지 않으면 공식 원문 결측으로 면제할 수 없다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const snapshot = structuredClone(inputs.snapshotsByPath.get(SEOUL_SNAPSHOT_PATH));
+  snapshot.rawStationCount += 1;
+  const snapshotsByPath = new Map(inputs.snapshotsByPath).set(SEOUL_SNAPSHOT_PATH, snapshot);
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, snapshotsByPath });
+
+  assert.deepEqual(violationKinds(result), ["LEDGER_RAW_ROW_ACCOUNTING_MISMATCH", "MISSING_STATION"]);
+});
+
+test("quarantine 기록이 있는 역은 공식 원문 결측으로 분류할 수 없다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const exemptions = structuredClone(inputs.exemptions);
+  const gap = gapNamed(exemptions, "마곡");
+  gap.reasonCode = "OFFICIAL_FILE_ROW_ABSENT";
+  gap.evidence.packTopologyPath = CAPITAL_TOPOLOGY_PATH;
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, exemptions });
+
+  assert.deepEqual(violationKinds(result), ["LEDGER_STATION_QUARANTINED", "MISSING_STATION"]);
+});
+
+test("MOLIT roster가 없는 scope는 감사에서 제외되고 위반으로 남는다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const rosters = new Map(inputs.rosters);
+  rosters.delete("gwangju:gwangju-metropolitan-rapid-transit:line-e57a361e8892");
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, rosters });
+
+  assert.deepEqual(violationKinds(result), ["ROSTER_MISSING"]);
+  assert.equal(
+    result.auditedScopeKeys.includes("gwangju:gwangju-metropolitan-rapid-transit:line-e57a361e8892"),
+    false,
+  );
 });
 
 test("lineIds를 claim한 route_map_positions 소스는 admitted snapshot 경로가 있어야 한다 (#2516)", async () => {
