@@ -28,6 +28,8 @@ class RouteTimetableRaptorPlannerStepFreeAlternativeTest {
 	private static final String STAIR_HUB = "stair-hub";
 	private static final String STEP_FREE_HUB = "step-free-hub";
 	private static final String UNVERIFIED_HUB = "unverified-hub";
+	private static final String STALE_HUB = "stale-hub";
+	private static final String MID_HUB = "mid-hub";
 	private static final String DESTINATION = "destination";
 
 	@Test
@@ -55,10 +57,67 @@ class RouteTimetableRaptorPlannerStepFreeAlternativeTest {
 		List<RouteSearchResult> results = planner.search(
 			command(ConstraintMode.PREFER_STEP_FREE, 1, 2), timetable(true));
 
-		assertThat(results).hasSizeLessThanOrEqualTo(2);
 		assertThat(results)
 			.extracting(RouteSearchResult::score, RouteTimetableRaptorPlannerStepFreeAlternativeTest::transferStationId)
 			.containsExactly(tuple(37, STAIR_HUB), tuple(40, STEP_FREE_HUB));
+	}
+
+	@Test
+	@DisplayName("자리가 하나뿐이면(candidateLimit()==1) 최속 경로를 교체하지 않는다")
+	void keepsFastestRouteWhenCandidateLimitIsOne() {
+		var planner = new RouteTimetableRaptorPlanner();
+
+		List<RouteSearchResult> results = planner.search(
+			command(ConstraintMode.PREFER_STEP_FREE, 0, 1), directRoutesTimetable());
+
+		assertThat(results)
+			.extracting(RouteSearchResult::score, RouteTimetableRaptorPlannerStepFreeAlternativeTest::warningCodes)
+			.containsExactly(tuple(30, List.of(RouteWarningCode.STAIR_ONLY_ACCESS)));
+	}
+
+	@Test
+	@DisplayName("상한 교체가 유일한 최소 환승 후보를 축출하지 않는다")
+	void keepsUniqueFewestTransferCandidateWhenLimitTruncates() {
+		var planner = new RouteTimetableRaptorPlanner();
+
+		List<RouteSearchResult> results = planner.search(
+			command(ConstraintMode.PREFER_STEP_FREE, 1, 2), mixedBoardingsTimetable());
+
+		assertThat(results)
+			.extracting(RouteSearchResult::score, RouteSearchResult::transferCount)
+			.containsExactly(tuple(30, 1), tuple(35, 0));
+	}
+
+	@Test
+	@DisplayName("무단차 대안이 환승을 한 번 더 해도 보존된다")
+	void keepsStepFreeAlternativeThatNeedsMoreTransfers() {
+		var planner = new RouteTimetableRaptorPlanner();
+
+		List<RouteSearchResult> results = planner.search(
+			command(ConstraintMode.PREFER_STEP_FREE, 2, 2), deeperStepFreeTimetable());
+
+		assertThat(results)
+			.extracting(RouteSearchResult::score, RouteSearchResult::transferCount,
+				RouteTimetableRaptorPlannerStepFreeAlternativeTest::warningCodes)
+			.containsExactly(
+				tuple(37, 1, List.of(RouteWarningCode.STAIR_ONLY_ACCESS)),
+				tuple(50, 2, List.of()));
+	}
+
+	@Test
+	@DisplayName("경고 0개 후보가 없어도 유일한 무단차 후보를 남긴다")
+	void keepsOnlyStepFreeCandidateWhenNoWarningFreeCandidateExists() {
+		var planner = new RouteTimetableRaptorPlanner();
+
+		List<RouteSearchResult> results = planner.search(
+			command(ConstraintMode.PREFER_STEP_FREE, 1, 2), noWarningFreeTimetable());
+
+		assertThat(results)
+			.extracting(RouteSearchResult::score, RouteTimetableRaptorPlannerStepFreeAlternativeTest::warningCodes)
+			.containsExactly(
+				tuple(30, List.of(RouteWarningCode.LOW_DATA_CONFIDENCE, RouteWarningCode.STAIR_ONLY_ACCESS,
+					RouteWarningCode.STALE_ACCESSIBILITY_DATA)),
+				tuple(50, List.of(RouteWarningCode.LOW_DATA_CONFIDENCE)));
 	}
 
 	@Test
@@ -69,7 +128,6 @@ class RouteTimetableRaptorPlannerStepFreeAlternativeTest {
 		List<RouteSearchResult> results = planner.search(
 			command(ConstraintMode.PREFER_STEP_FREE, 1, 3), timetable(true));
 
-		assertThat(results).hasSizeLessThanOrEqualTo(3);
 		assertThat(results)
 			.extracting(RouteSearchResult::score, RouteTimetableRaptorPlannerStepFreeAlternativeTest::transferStationId)
 			.containsExactly(tuple(37, STAIR_HUB), tuple(38, UNVERIFIED_HUB), tuple(40, STEP_FREE_HUB));
@@ -143,9 +201,6 @@ class RouteTimetableRaptorPlannerStepFreeAlternativeTest {
 	 * </ul>
 	 */
 	private static RouteTimetable timetable(boolean includeUnverifiedHub) {
-		var daily = new LoadRouteTimetablePort.ServiceCalendar(
-			"daily", true, true, true, true, true, true, true,
-			SERVICE_DATE, SERVICE_DATE.plusDays(7), "Asia/Seoul");
 		List<LoadRouteTimetablePort.TransitRoute> routes = new ArrayList<>(List.of(
 			route("r1", "l1"), route("r2", "l2"), route("r3", "l3")));
 		List<LoadRouteTimetablePort.TransitTrip> trips = new ArrayList<>(List.of(
@@ -165,9 +220,146 @@ class RouteTimetableRaptorPlannerStepFreeAlternativeTest {
 			stops.add(stop("t4", 1, UNVERIFIED_HUB, "l4", 30660));
 			stops.add(stop("t4", 2, DESTINATION, "l4", 30837));
 		}
+		return timetable(routes, trips, stops, accessData(includeUnverifiedHub));
+	}
+
+	private static RouteTimetable timetable(
+		List<LoadRouteTimetablePort.TransitRoute> routes,
+		List<LoadRouteTimetablePort.TransitTrip> trips,
+		List<LoadRouteTimetablePort.TransitStopTime> stops,
+		LoadRouteTimetablePort.RouteAccessData accessData
+	) {
+		var daily = new LoadRouteTimetablePort.ServiceCalendar(
+			"daily", true, true, true, true, true, true, true,
+			SERVICE_DATE, SERVICE_DATE.plusDays(7), "Asia/Seoul");
 		return new RouteTimetable(
 			List.of(daily), List.of(), List.copyOf(routes), List.copyOf(trips), List.copyOf(stops),
-			List.of(), List.of(), null, accessData(includeUnverifiedHub));
+			List.of(), List.of(), null, accessData);
+	}
+
+	/**
+	 * 직통 두 개만 있는 시각표 — 30분(계단 진입, `STAIR_ONLY_ACCESS`)과 35분(무단차, 경고 없음).
+	 * `candidateLimit()`이 1이 되는 경계를 만들기 위해 환승 경로를 두지 않는다.
+	 */
+	private static RouteTimetable directRoutesTimetable() {
+		List<LoadRouteTimetablePort.PathwayNode> nodes = new ArrayList<>();
+		List<LoadRouteTimetablePort.PathwayEdge> edges = new ArrayList<>();
+		List<LoadRouteTimetablePort.RouteEdgeEvidence> evidence = new ArrayList<>();
+		addAccess(nodes, edges, evidence, ORIGIN, "lf", true);
+		addAccess(nodes, edges, evidence, DESTINATION, "lf", false);
+		addAccess(nodes, edges, evidence, ORIGIN, "ls", false);
+		addAccess(nodes, edges, evidence, DESTINATION, "ls", false);
+		return timetable(
+			List.of(route("rf", "lf"), route("rs", "ls")),
+			List.of(trip("tf", "rf"), trip("ts", "rs")),
+			List.of(
+				stop("tf", 1, ORIGIN, "lf", 29400), stop("tf", 2, DESTINATION, "lf", 30357),
+				stop("ts", 1, ORIGIN, "ls", 29400), stop("ts", 2, DESTINATION, "ls", 30657)),
+			new LoadRouteTimetablePort.RouteAccessData(nodes, edges, List.of(), evidence));
+	}
+
+	/**
+	 * 환승 수가 서로 다른 세 경로 — 30분(환승 1회, 계단), 35분(직통, 계단 진입), 40분(환승 1회, 무단차).
+	 * 상한 교체가 유일한 최소 환승 후보(직통 35분)를 축출하는지 보기 위한 시각표다.
+	 */
+	private static RouteTimetable mixedBoardingsTimetable() {
+		List<LoadRouteTimetablePort.PathwayNode> nodes = new ArrayList<>();
+		List<LoadRouteTimetablePort.PathwayEdge> edges = new ArrayList<>();
+		List<LoadRouteTimetablePort.RouteEdgeEvidence> evidence = new ArrayList<>();
+		for (String stationLine : List.of(
+			ORIGIN + ":l1", STAIR_HUB + ":l1", STAIR_HUB + ":l2", STEP_FREE_HUB + ":l1",
+			STEP_FREE_HUB + ":l3", DESTINATION + ":l2", DESTINATION + ":l3", DESTINATION + ":ld")) {
+			String[] parts = stationLine.split(":");
+			addAccess(nodes, edges, evidence, parts[0], parts[1], false);
+		}
+		addAccess(nodes, edges, evidence, ORIGIN, "ld", true);
+		List<LoadRouteTimetablePort.TransferRule> transfers = new ArrayList<>();
+		addTransfer(nodes, edges, evidence, transfers, STAIR_HUB, "l1", "l2", 120, true, "VERIFIED");
+		addTransfer(nodes, edges, evidence, transfers, STEP_FREE_HUB, "l1", "l3", 360, false, "VERIFIED");
+		return timetable(
+			List.of(route("r1", "l1"), route("r2", "l2"), route("r3", "l3"), route("rd", "ld")),
+			List.of(trip("t1", "r1"), trip("t2", "r2"), trip("t3", "r3"), trip("td", "rd")),
+			List.of(
+				stop("t1", 1, ORIGIN, "l1", 29400),
+				stop("t1", 2, STAIR_HUB, "l1", 29700),
+				stop("t1", 3, STEP_FREE_HUB, "l1", 30000),
+				stop("t2", 1, STAIR_HUB, "l2", 30000),
+				stop("t2", 2, DESTINATION, "l2", 30357),
+				stop("t3", 1, STEP_FREE_HUB, "l3", 30600),
+				stop("t3", 2, DESTINATION, "l3", 30957),
+				stop("td", 1, ORIGIN, "ld", 29400),
+				stop("td", 2, DESTINATION, "ld", 30657)),
+			new LoadRouteTimetablePort.RouteAccessData(nodes, edges, transfers, evidence));
+	}
+
+	/**
+	 * 무단차 대안이 환승을 한 번 더 하는 시각표 — 37분(환승 1회, 계단)과 50분(환승 2회, 무단차).
+	 * 경고 부분집합 관계가 성립하지 않아 환승 수·시간만으로는 무단차 쪽이 지배당한다.
+	 */
+	private static RouteTimetable deeperStepFreeTimetable() {
+		List<LoadRouteTimetablePort.PathwayNode> nodes = new ArrayList<>();
+		List<LoadRouteTimetablePort.PathwayEdge> edges = new ArrayList<>();
+		List<LoadRouteTimetablePort.RouteEdgeEvidence> evidence = new ArrayList<>();
+		for (String stationLine : List.of(
+			ORIGIN + ":l1", STAIR_HUB + ":l1", STAIR_HUB + ":l2", STEP_FREE_HUB + ":l1",
+			STEP_FREE_HUB + ":l3", MID_HUB + ":l3", MID_HUB + ":l4",
+			DESTINATION + ":l2", DESTINATION + ":l4")) {
+			String[] parts = stationLine.split(":");
+			addAccess(nodes, edges, evidence, parts[0], parts[1], false);
+		}
+		List<LoadRouteTimetablePort.TransferRule> transfers = new ArrayList<>();
+		addTransfer(nodes, edges, evidence, transfers, STAIR_HUB, "l1", "l2", 120, true, "VERIFIED");
+		addTransfer(nodes, edges, evidence, transfers, STEP_FREE_HUB, "l1", "l3", 360, false, "VERIFIED");
+		addTransfer(nodes, edges, evidence, transfers, MID_HUB, "l3", "l4", 360, false, "VERIFIED");
+		return timetable(
+			List.of(route("r1", "l1"), route("r2", "l2"), route("r3", "l3"), route("r4", "l4")),
+			List.of(trip("t1", "r1"), trip("t2", "r2"), trip("t3", "r3"), trip("t4", "r4")),
+			List.of(
+				stop("t1", 1, ORIGIN, "l1", 29400),
+				stop("t1", 2, STAIR_HUB, "l1", 29700),
+				stop("t1", 3, STEP_FREE_HUB, "l1", 30000),
+				stop("t2", 1, STAIR_HUB, "l2", 30000),
+				stop("t2", 2, DESTINATION, "l2", 30777),
+				stop("t3", 1, STEP_FREE_HUB, "l3", 30600),
+				stop("t3", 2, MID_HUB, "l3", 30900),
+				stop("t4", 1, MID_HUB, "l4", 31500),
+				stop("t4", 2, DESTINATION, "l4", 31557)),
+			new LoadRouteTimetablePort.RouteAccessData(nodes, edges, transfers, evidence));
+	}
+
+	/**
+	 * 경고 0개 후보가 없는 시각표 — 30분(계단+만료), 45분(계단), 50분(미검증 환승, 계단 없음).
+	 * 경고 개수만 보면 45분이 뽑히지만 무단차인 것은 50분뿐이다.
+	 */
+	private static RouteTimetable noWarningFreeTimetable() {
+		List<LoadRouteTimetablePort.PathwayNode> nodes = new ArrayList<>();
+		List<LoadRouteTimetablePort.PathwayEdge> edges = new ArrayList<>();
+		List<LoadRouteTimetablePort.RouteEdgeEvidence> evidence = new ArrayList<>();
+		for (String stationLine : List.of(
+			ORIGIN + ":l1", STALE_HUB + ":l1", STALE_HUB + ":l2", STAIR_HUB + ":l1", STAIR_HUB + ":l3",
+			UNVERIFIED_HUB + ":l1", UNVERIFIED_HUB + ":l4",
+			DESTINATION + ":l2", DESTINATION + ":l3", DESTINATION + ":l4")) {
+			String[] parts = stationLine.split(":");
+			addAccess(nodes, edges, evidence, parts[0], parts[1], false);
+		}
+		List<LoadRouteTimetablePort.TransferRule> transfers = new ArrayList<>();
+		addTransfer(nodes, edges, evidence, transfers, STALE_HUB, "l1", "l2", 120, true, "STALE");
+		addTransfer(nodes, edges, evidence, transfers, STAIR_HUB, "l1", "l3", 120, true, "VERIFIED");
+		return timetable(
+			List.of(route("r1", "l1"), route("r2", "l2"), route("r3", "l3"), route("r4", "l4")),
+			List.of(trip("t1", "r1"), trip("t2", "r2"), trip("t3", "r3"), trip("t4", "r4")),
+			List.of(
+				stop("t1", 1, ORIGIN, "l1", 29400),
+				stop("t1", 2, STALE_HUB, "l1", 29700),
+				stop("t1", 3, STAIR_HUB, "l1", 29760),
+				stop("t1", 4, UNVERIFIED_HUB, "l1", 29820),
+				stop("t2", 1, STALE_HUB, "l2", 30000),
+				stop("t2", 2, DESTINATION, "l2", 30357),
+				stop("t3", 1, STAIR_HUB, "l3", 30060),
+				stop("t3", 2, DESTINATION, "l3", 31257),
+				stop("t4", 1, UNVERIFIED_HUB, "l4", 30420),
+				stop("t4", 2, DESTINATION, "l4", 31557)),
+			new LoadRouteTimetablePort.RouteAccessData(nodes, edges, transfers, evidence));
 	}
 
 	private static LoadRouteTimetablePort.RouteAccessData accessData(boolean includeUnverifiedHub) {
@@ -184,24 +376,25 @@ class RouteTimetableRaptorPlannerStepFreeAlternativeTest {
 		}
 		for (String stationLine : stationLines) {
 			String[] parts = stationLine.split(":");
-			addVerifiedAccess(nodes, edges, evidence, parts[0], parts[1]);
+			addAccess(nodes, edges, evidence, parts[0], parts[1], false);
 		}
 		List<LoadRouteTimetablePort.TransferRule> transfers = new ArrayList<>();
-		addTransfer(nodes, edges, evidence, transfers, STAIR_HUB, "l1", "l2", 120, true);
-		addTransfer(nodes, edges, evidence, transfers, STEP_FREE_HUB, "l1", "l3", 360, false);
+		addTransfer(nodes, edges, evidence, transfers, STAIR_HUB, "l1", "l2", 120, true, "VERIFIED");
+		addTransfer(nodes, edges, evidence, transfers, STEP_FREE_HUB, "l1", "l3", 360, false, "VERIFIED");
 		return new LoadRouteTimetablePort.RouteAccessData(nodes, edges, transfers, evidence);
 	}
 
-	private static void addVerifiedAccess(
+	private static void addAccess(
 		List<LoadRouteTimetablePort.PathwayNode> nodes,
 		List<LoadRouteTimetablePort.PathwayEdge> edges,
 		List<LoadRouteTimetablePort.RouteEdgeEvidence> evidence,
 		String station,
-		String line
+		String line,
+		boolean entryIncludesStairs
 	) {
 		String key = station + "-" + line;
-		var entry = verifiedEdge(key + "-entry", 240, 180, false);
-		var exit = verifiedEdge(key + "-exit", 180, 120, false);
+		var entry = edge(key + "-entry", 240, 180, entryIncludesStairs, "VERIFIED");
+		var exit = edge(key + "-exit", 180, 120, false, "VERIFIED");
 		edges.add(entry);
 		edges.add(exit);
 		nodes.add(new LoadRouteTimetablePort.PathwayNode(entry.fromNodeId(), station, null, "ENTRANCE"));
@@ -221,10 +414,11 @@ class RouteTimetableRaptorPlannerStepFreeAlternativeTest {
 		String fromLine,
 		String toLine,
 		int durationSeconds,
-		boolean includesStairs
+		boolean includesStairs,
+		String verificationStatus
 	) {
 		String key = station + "-" + fromLine + "-" + toLine;
-		var edge = verifiedEdge(key + "-transfer", durationSeconds, durationSeconds, includesStairs);
+		var edge = edge(key + "-transfer", durationSeconds, durationSeconds, includesStairs, verificationStatus);
 		edges.add(edge);
 		nodes.add(new LoadRouteTimetablePort.PathwayNode(edge.fromNodeId(), station, fromLine, "PLATFORM"));
 		nodes.add(new LoadRouteTimetablePort.PathwayNode(edge.toNodeId(), station, toLine, "PLATFORM"));
@@ -234,12 +428,12 @@ class RouteTimetableRaptorPlannerStepFreeAlternativeTest {
 			edge.id(), includesStairs ? null : edge.id(), "VERIFIED"));
 	}
 
-	private static LoadRouteTimetablePort.PathwayEdge verifiedEdge(
-		String id, int duration, int distance, boolean includesStairs
+	private static LoadRouteTimetablePort.PathwayEdge edge(
+		String id, int duration, int distance, boolean includesStairs, String verificationStatus
 	) {
 		return new LoadRouteTimetablePort.PathwayEdge(
 			id, id + "-from", id + "-to", duration, distance, false, includesStairs, 100,
-			"AVAILABLE", "OFFICIAL_SOURCE", "VERIFIED");
+			"AVAILABLE", "OFFICIAL_SOURCE", verificationStatus);
 	}
 
 	private static LoadRouteTimetablePort.RouteEdgeEvidence verifiedEvidence(
