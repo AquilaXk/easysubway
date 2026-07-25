@@ -67,6 +67,24 @@ test("유한하지 않은 숫자는 null로 조용히 대체되지 않고 거부
   }
 });
 
+test("최단 왕복 표기가 아닌 리터럴은 파서가 배정도로 접어 정준형으로 만든다", () => {
+  for (const entry of contract.nonCanonicalLiterals) {
+    const document = JSON.parse(`{"value":${entry.literal}}`);
+    assert.equal(
+      canonicalJson(document),
+      `{"value":${entry.doubleCanonical}}`,
+      `nonCanonicalLiterals/${entry.id} (${entry.literal})`,
+    );
+  }
+});
+
+test("정준 표기 표본은 파싱 후 재정준화해도 자기 자신으로 돌아온다", () => {
+  assert.ok(contract.roundTripSamples.length >= 300);
+  for (const sample of contract.roundTripSamples) {
+    assert.equal(ecmascriptNumber(JSON.parse(sample)), sample, `roundTripSamples/${sample}`);
+  }
+});
+
 test("키는 UTF-16 코드 유닛 순서로 정렬되고 공백 없이 이어붙인다", () => {
   assert.equal(
     canonicalJson({ b: [1, true, null, "x"], A: 2, a: { z: 3, y: 4 } }),

@@ -11,7 +11,9 @@
     "maxSafeIntegerMagnitude",
     "formatting",
     "rejectedLiterals",
-    "rejectedSpecialValues"
+    "rejectedSpecialValues",
+    "nonCanonicalLiterals",
+    "roundTripSamples"
   ],
   "additionalProperties": false,
   "properties": {
@@ -65,6 +67,29 @@
           "note": { "type": "string", "minLength": 1 }
         }
       }
+    },
+    "nonCanonicalLiterals": {
+      "description": "배정도의 최단 왕복 표기가 아닌 리터럴. Node·Dart는 파서가 값을 배정도로 접어 doubleCanonical을 만들고, 리터럴을 그대로 들고 있는 Java는 거부한다.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "literal", "doubleCanonical", "note"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "literal": { "type": "string", "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][-+]?[0-9]+)?$" },
+          "doubleCanonical": { "type": "string", "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?(e[-+][0-9]+)?$" },
+          "note": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "roundTripSamples": {
+      "description": "Node JSON.stringify가 산출한 정준 표기 표본. 세 구현이 각각 파싱해 다시 정준화하면 자기 자신으로 돌아와야 한다.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?(e[-+][0-9]+)?$" }
     }
   }
 }

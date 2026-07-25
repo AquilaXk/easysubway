@@ -88,6 +88,32 @@ class HttpDatapackReleaseCatalogAdapterTest {
 	}
 
 	@Test
+	void canonicalSerializationRejectsLiteralsThatAreNotShortestRoundTripDecimals() throws Exception {
+		for (JsonNode entry : canonicalNumberContract().get("nonCanonicalLiterals")) {
+			var literal = entry.get("literal").asText();
+			var document = HttpDatapackReleaseCatalogAdapter.JSON.readTree("{\"value\":" + literal + "}");
+
+			assertThatThrownBy(() -> HttpDatapackReleaseCatalogAdapter.canonical(document))
+				.as("nonCanonicalLiterals/%s (%s)", entry.get("id").asText(), literal)
+				.isInstanceOf(IllegalArgumentException.class);
+		}
+	}
+
+	@Test
+	void canonicalSerializationReproducesEveryRoundTripSample() throws Exception {
+		var samples = canonicalNumberContract().get("roundTripSamples");
+		assertThat(samples.size()).isGreaterThanOrEqualTo(300);
+		for (JsonNode sample : samples) {
+			var text = sample.asText();
+
+			assertThat(HttpDatapackReleaseCatalogAdapter.ecmascriptNumber(
+				HttpDatapackReleaseCatalogAdapter.JSON.readTree(text).decimalValue()))
+				.as("roundTripSamples/%s", text)
+				.isEqualTo(text);
+		}
+	}
+
+	@Test
 	void canonicalSerializationSortsKeysAndOmitsWhitespace() throws Exception {
 		var value = JSON.readTree("""
 			{"b":[1,true,null,"x"],"A":2,"a":{"z":3,"y":4}}

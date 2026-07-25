@@ -8,6 +8,8 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.math.MathContext;
+import java.math.RoundingMode;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -189,20 +191,50 @@ public class HttpDatapackReleaseCatalogAdapter implements DatapackReleaseCatalog
 
 	/**
 	 * 정준 숫자 표기 계약: contracts/datapack/canonical-number-contract.json
-	 * Node는 JSON 숫자를 IEEE-754 배정도로만 표현하므로 안전 정수 범위 밖 리터럴을
-	 * 왕복시키지 못한다. 범위 밖이거나 유한하지 않은 숫자는 fail closed로 거부한다.
+	 * Node·Dart는 JSON 숫자를 IEEE-754 배정도로 파싱하므로 정준 문자열이 언제나 그 배정도의
+	 * 최단 왕복 십진 표기다. 이 어댑터는 USE_BIG_DECIMAL_FOR_FLOATS로 리터럴의 정확한 십진
+	 * 값을 유지하므로, 리터럴이 자기 배정도의 최단 왕복 표기가 아니면 혼자 다른 정준 문자열을
+	 * 만든다(1e-400·4e-324·비최단 소수). 세 축을 모두 fail closed로 닫는다.
+	 * 유한성(배정도 오버플로·언더플로 아님) / 안전 정수 범위 / 최단 왕복 표기.
 	 */
 	private static String canonicalNumber(JsonNode value) {
+		// USE_BIG_DECIMAL_FOR_FLOATS 때문에 파싱 경로는 DecimalNode를 만든다. 이 가드는
+		// 코드로 조립한 DoubleNode/FloatNode(NaN·Infinity)를 막고, 파싱 경로의 오버플로는
+		// 아래 decimalValue()의 배정도 변환이 잡는다.
 		if ((value.isDouble() || value.isFloat()) && !Double.isFinite(value.doubleValue())) {
 			throw new IllegalArgumentException("manifest canonical number must be finite");
 		}
 		var decimal = value.decimalValue();
+		var binary = decimal.doubleValue();
+		if (!Double.isFinite(binary)) {
+			throw new IllegalArgumentException("manifest canonical number must be finite");
+		}
 		if (decimal.compareTo(MAX_SAFE_CANONICAL_NUMBER) > 0
 			|| decimal.compareTo(MIN_SAFE_CANONICAL_NUMBER) < 0) {
 			throw new IllegalArgumentException(
 				"manifest canonical number must be within the safe integer range");
 		}
+		if (shortestRoundTripDecimal(binary).compareTo(decimal) != 0) {
+			throw new IllegalArgumentException(
+				"manifest canonical number must be the shortest round-trip decimal of its double");
+		}
 		return ecmascriptNumber(decimal);
+	}
+
+	/**
+	 * ECMAScript Number::toString이 고르는 십진 표기 — 배정도로 왕복하는 것 중 유효 자릿수가
+	 * 가장 적고, 같은 자릿수 안에서는 정확한 이진 값에 가장 가까운 값(동률은 짝수). Java
+	 * Double.toString은 가수에 소수점 이하 한 자리를 강제해 최단형이 아니므로(MIN_VALUE →
+	 * 4.9E-324, ECMAScript는 5e-324) 쓸 수 없다.
+	 */
+	private static BigDecimal shortestRoundTripDecimal(double value) {
+		if (value == 0) return BigDecimal.ZERO;
+		var exact = new BigDecimal(value);
+		for (int precision = 1; precision <= 17; precision += 1) {
+			var candidate = exact.round(new MathContext(precision, RoundingMode.HALF_EVEN));
+			if (candidate.doubleValue() == value) return candidate;
+		}
+		return exact;
 	}
 
 	static String ecmascriptNumber(BigDecimal value) {

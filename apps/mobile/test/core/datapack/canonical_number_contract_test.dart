@@ -16,6 +16,9 @@ void main() {
   final rejectedSpecialValues =
       (contract['rejectedSpecialValues']! as List<Object?>)
           .cast<Map<String, Object?>>();
+  final nonCanonicalLiterals =
+      (contract['nonCanonicalLiterals']! as List<Object?>)
+          .cast<Map<String, Object?>>();
 
   test('fixture가 이슈 #2528이 요구한 경계값을 모두 담는다', () {
     final ids = {
@@ -23,6 +26,7 @@ void main() {
         ...formatting,
         ...rejectedLiterals,
         ...rejectedSpecialValues,
+        ...nonCanonicalLiterals,
       ])
         entry['id']! as String,
     };
@@ -30,7 +34,8 @@ void main() {
       ids.length,
       formatting.length +
           rejectedLiterals.length +
-          rejectedSpecialValues.length,
+          rejectedSpecialValues.length +
+          nonCanonicalLiterals.length,
     );
     expect(contract['maxSafeIntegerMagnitude'], 9007199254740991);
   });
@@ -87,6 +92,37 @@ void main() {
       );
     });
   }
+
+  for (final entry in nonCanonicalLiterals) {
+    final id = entry['id']! as String;
+    final literal = entry['literal']! as String;
+    final doubleCanonical = entry['doubleCanonical']! as String;
+
+    test(
+      'nonCanonicalLiterals/$id: $literal 은 배정도로 접혀 $doubleCanonical 이 된다',
+      () {
+        expect(
+          canonicalDataPackJson(<String, Object?>{
+            'value': jsonDecode(literal),
+          }),
+          '{"value":$doubleCanonical}',
+        );
+      },
+    );
+  }
+
+  test('정준 표기 표본은 파싱 후 재정준화해도 자기 자신으로 돌아온다', () {
+    final samples = (contract['roundTripSamples']! as List<Object?>)
+        .cast<String>();
+    expect(samples.length, greaterThanOrEqualTo(300));
+    for (final sample in samples) {
+      expect(
+        ecmascriptNumberText(jsonDecode(sample) as num),
+        sample,
+        reason: 'roundTripSamples/$sample',
+      );
+    }
+  });
 
   test('키는 UTF-16 코드 유닛 순서로 정렬되고 공백 없이 이어붙인다', () {
     expect(
