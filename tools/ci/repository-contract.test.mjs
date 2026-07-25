@@ -18132,6 +18132,7 @@ test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경�
   assert.equal(sharedLib.datapack, "true");
   assert.equal(sharedLib.route_map, "true");
   assert.equal(sharedLib.release, "true");
+  assert.equal(sharedLib.deploy, "false");
   assert.equal(sharedLib.docs_only, "false");
 
   const envExample = await classifyChangedFiles([".env.example"]);
