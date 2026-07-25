@@ -1,0 +1,208 @@
+{
+  "$schema": "./canonical-number-contract.schema.json",
+  "schemaVersion": 1,
+  "specification": "매니페스트 서명에 쓰이는 정준 JSON 직렬화의 숫자 표기는 ECMAScript Number::toString(= Node JSON.stringify) 규칙을 따른다. 정수값은 소수점·지수 없이, -0은 0으로, trailing zero는 제거하고, 절댓값이 1e-6 이상 1e21 미만이면 plain 표기, 그 밖은 e+N/e-N 지수 표기를 쓴다.",
+  "policy": "Node는 JSON 숫자를 IEEE-754 배정도로만 표현하므로 안전 정수 범위 밖 리터럴을 왕복시키지 못한다. 따라서 정준화 대상 숫자는 유한해야 하고 절댓값이 maxSafeIntegerMagnitude 이하여야 하며, 위반 시 세 구현 모두 fail closed로 거부한다.",
+  "maxSafeIntegerMagnitude": 9007199254740991,
+  "formatting": [
+    {
+      "id": "zero",
+      "literal": "0",
+      "canonical": "0",
+      "withinSafeRange": true,
+      "note": "정수 0"
+    },
+    {
+      "id": "negative-zero-integer",
+      "literal": "-0",
+      "canonical": "0",
+      "withinSafeRange": true,
+      "note": "부호 있는 0은 0으로 통일한다"
+    },
+    {
+      "id": "negative-zero-fraction",
+      "literal": "-0.0",
+      "canonical": "0",
+      "withinSafeRange": true,
+      "note": "Dart jsonEncode는 -0.0을 그대로 찍어 분열의 원인이 된다"
+    },
+    {
+      "id": "integer-valued-fraction",
+      "literal": "1.0",
+      "canonical": "1",
+      "withinSafeRange": true,
+      "note": "정수값은 소수점을 남기지 않는다"
+    },
+    {
+      "id": "integer-valued-fraction-three",
+      "literal": "3.0",
+      "canonical": "3",
+      "withinSafeRange": true,
+      "note": "정수값 소수점 제거 반복 확인"
+    },
+    {
+      "id": "exponent-integer-valued",
+      "literal": "1.0e2",
+      "canonical": "100",
+      "withinSafeRange": true,
+      "note": "지수 리터럴이라도 plain 범위의 정수값이면 지수를 남기지 않는다"
+    },
+    {
+      "id": "trailing-zero-fraction",
+      "literal": "100.500",
+      "canonical": "100.5",
+      "withinSafeRange": true,
+      "note": "소수부 trailing zero 제거"
+    },
+    {
+      "id": "plain-fraction",
+      "literal": "0.1",
+      "canonical": "0.1",
+      "withinSafeRange": true,
+      "note": "최단 왕복 표기를 그대로 쓴다"
+    },
+    {
+      "id": "double-rounding-artifact",
+      "literal": "0.30000000000000004",
+      "canonical": "0.30000000000000004",
+      "withinSafeRange": true,
+      "note": "배정도 반올림 잔차도 유효 자리를 잘라내지 않는다"
+    },
+    {
+      "id": "plain-boundary-lower",
+      "literal": "1e-6",
+      "canonical": "0.000001",
+      "withinSafeRange": true,
+      "note": "1e-6은 plain 표기 경계에 포함된다"
+    },
+    {
+      "id": "exponent-boundary-lower",
+      "literal": "1e-7",
+      "canonical": "1e-7",
+      "withinSafeRange": true,
+      "note": "1e-6 미만은 지수 표기로 넘어간다"
+    },
+    {
+      "id": "exponent-small-mantissa",
+      "literal": "1.5e-7",
+      "canonical": "1.5e-7",
+      "withinSafeRange": true,
+      "note": "지수 표기 가수는 trailing zero 없이 유지한다"
+    },
+    {
+      "id": "exponent-small",
+      "literal": "2.5e-10",
+      "canonical": "2.5e-10",
+      "withinSafeRange": true,
+      "note": "음의 지수는 e-N 형식"
+    },
+    {
+      "id": "smallest-subnormal",
+      "literal": "5e-324",
+      "canonical": "5e-324",
+      "withinSafeRange": true,
+      "note": "배정도 최소 비정규값도 최단 왕복 표기를 유지한다"
+    },
+    {
+      "id": "max-safe-integer",
+      "literal": "9007199254740991",
+      "canonical": "9007199254740991",
+      "withinSafeRange": true,
+      "note": "2^53-1은 세 런타임이 정확히 왕복시키는 최대 정수"
+    },
+    {
+      "id": "min-safe-integer",
+      "literal": "-9007199254740991",
+      "canonical": "-9007199254740991",
+      "withinSafeRange": true,
+      "note": "-(2^53-1)"
+    },
+    {
+      "id": "safe-integer-boundary",
+      "literal": "9007199254740992",
+      "canonical": "9007199254740992",
+      "withinSafeRange": false,
+      "note": "2^53 자체는 배정도로 정확하지만 인접 정수를 왕복시키지 못하므로 정책상 거부한다"
+    },
+    {
+      "id": "plain-boundary-upper",
+      "literal": "1e20",
+      "canonical": "100000000000000000000",
+      "withinSafeRange": false,
+      "note": "1e21 미만은 plain 표기이나 안전 정수 범위 밖이라 매니페스트에서는 거부한다"
+    },
+    {
+      "id": "exponent-boundary-upper",
+      "literal": "1e21",
+      "canonical": "1e+21",
+      "withinSafeRange": false,
+      "note": "1e21 이상은 e+N 지수 표기"
+    },
+    {
+      "id": "exponent-large-mantissa",
+      "literal": "1.5e21",
+      "canonical": "1.5e+21",
+      "withinSafeRange": false,
+      "note": "양의 지수는 부호를 명시한다"
+    },
+    {
+      "id": "max-double",
+      "literal": "1.7976931348623157e308",
+      "canonical": "1.7976931348623157e+308",
+      "withinSafeRange": false,
+      "note": "배정도 최대값"
+    }
+  ],
+  "rejectedLiterals": [
+    {
+      "id": "safe-integer-boundary-exceeded",
+      "literal": "9007199254740993",
+      "reason": "precisionLoss",
+      "note": "Node는 9007199254740992로 반올림하고 Java·Dart는 원값을 유지한다"
+    },
+    {
+      "id": "max-long",
+      "literal": "9223372036854775807",
+      "reason": "precisionLoss",
+      "note": "Node는 9223372036854776000으로 반올림한다"
+    },
+    {
+      "id": "min-long",
+      "literal": "-9223372036854775808",
+      "reason": "precisionLoss",
+      "note": "음수 방향 안전 정수 범위 초과"
+    },
+    {
+      "id": "overflow-double",
+      "literal": "1e400",
+      "reason": "nonFinite",
+      "note": "Node·Dart는 Infinity로 파싱하고 Java는 유한 BigDecimal 1e+400을 만든다"
+    },
+    {
+      "id": "overflow-double-negative",
+      "literal": "-1e400",
+      "reason": "nonFinite",
+      "note": "음수 방향 오버플로"
+    }
+  ],
+  "rejectedSpecialValues": [
+    {
+      "id": "positive-infinity",
+      "value": "Infinity",
+      "reason": "nonFinite",
+      "note": "Dart jsonEncode는 Error를 던져 FormatException 핸들러를 우회한다"
+    },
+    {
+      "id": "negative-infinity",
+      "value": "-Infinity",
+      "reason": "nonFinite",
+      "note": "Node JSON.stringify는 null로 조용히 바꾼다"
+    },
+    {
+      "id": "not-a-number",
+      "value": "NaN",
+      "reason": "nonFinite",
+      "note": "JSON 리터럴로 표현할 수 없는 값"
+    }
+  ]
+}

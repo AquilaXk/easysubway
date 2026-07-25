@@ -27,12 +27,16 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class HttpDatapackReleaseCatalogAdapter implements DatapackReleaseCatalogPort {
-	private static final ObjectMapper JSON = JsonMapper.builder()
+	// 정준 문자열은 리터럴의 정확한 십진 값에 결속된다. 계약 테스트가 같은 파서
+	// 설정으로 fixture 리터럴을 읽어야 하므로 package-private으로 노출한다.
+	static final ObjectMapper JSON = JsonMapper.builder()
 		.enable(JsonNodeFeature.USE_BIG_DECIMAL_FOR_FLOATS)
 		.disable(JsonNodeFeature.STRIP_TRAILING_BIGDECIMAL_ZEROES)
 		.build();
 	private static final Duration TIMEOUT = Duration.ofSeconds(10);
 	private static final int MAX_CATALOG_BYTES = 1024 * 1024;
+	private static final BigDecimal MAX_SAFE_CANONICAL_NUMBER = new BigDecimal("9007199254740991");
+	private static final BigDecimal MIN_SAFE_CANONICAL_NUMBER = MAX_SAFE_CANONICAL_NUMBER.negate();
 
 	private final HttpClient httpClient;
 	private final String baseUrl;
@@ -179,11 +183,29 @@ public class HttpDatapackReleaseCatalogAdapter implements DatapackReleaseCatalog
 				.collect(java.util.stream.Collectors.joining(",")) + "]";
 		}
 		if (value.isTextual()) return quoted(value.textValue());
-		if (value.isNumber()) return ecmascriptNumber(value.decimalValue());
+		if (value.isNumber()) return canonicalNumber(value);
 		return value.toString();
 	}
 
-	private static String ecmascriptNumber(BigDecimal value) {
+	/**
+	 * 정준 숫자 표기 계약: contracts/datapack/canonical-number-contract.json
+	 * Node는 JSON 숫자를 IEEE-754 배정도로만 표현하므로 안전 정수 범위 밖 리터럴을
+	 * 왕복시키지 못한다. 범위 밖이거나 유한하지 않은 숫자는 fail closed로 거부한다.
+	 */
+	private static String canonicalNumber(JsonNode value) {
+		if ((value.isDouble() || value.isFloat()) && !Double.isFinite(value.doubleValue())) {
+			throw new IllegalArgumentException("manifest canonical number must be finite");
+		}
+		var decimal = value.decimalValue();
+		if (decimal.compareTo(MAX_SAFE_CANONICAL_NUMBER) > 0
+			|| decimal.compareTo(MIN_SAFE_CANONICAL_NUMBER) < 0) {
+			throw new IllegalArgumentException(
+				"manifest canonical number must be within the safe integer range");
+		}
+		return ecmascriptNumber(decimal);
+	}
+
+	static String ecmascriptNumber(BigDecimal value) {
 		if (value.signum() == 0) return "0";
 		var decimal = value.stripTrailingZeros();
 		var absolute = decimal.abs();

@@ -96,12 +96,29 @@ export function withoutSignature(value) {
   return copy;
 }
 
+// 정준 숫자 표기 계약: contracts/datapack/canonical-number-contract.json
+// Node는 JSON 숫자를 IEEE-754 배정도로만 표현하므로 안전 정수 범위 밖 리터럴을
+// 왕복시키지 못한다. Java·Dart는 원값을 유지하므로 같은 매니페스트에서 서로 다른
+// 정준 문자열이 나온다. 범위 밖 숫자는 세 구현 모두 fail closed로 거부한다.
+export const MAX_SAFE_CANONICAL_NUMBER_MAGNITUDE = Number.MAX_SAFE_INTEGER;
+
+// ECMAScript Number::toString 표기. JSON.stringify가 숫자에 쓰는 규칙과 같다.
+export function ecmascriptNumber(value) {
+  if (!Number.isFinite(value)) {
+    throw new Error("manifest canonical number must be finite");
+  }
+  return String(value);
+}
+
 export function canonicalJson(value) {
   return JSON.stringify(canonicalValue(value));
 }
 
 function canonicalValue(value) {
-  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+  if (typeof value === "number") {
+    return canonicalNumber(value);
+  }
+  if (value === null || typeof value === "string" || typeof value === "boolean") {
     return value;
   }
   if (Array.isArray(value)) {
@@ -116,6 +133,18 @@ function canonicalValue(value) {
     );
   }
   throw new Error("manifest canonical value is unsupported");
+}
+
+function canonicalNumber(value) {
+  if (!Number.isFinite(value)) {
+    // JSON.stringify는 Infinity·NaN을 조용히 null로 바꾼다. 서명 경계에서는
+    // 그 대체가 곧 규칙 분열이므로 거부한다.
+    throw new Error("manifest canonical number must be finite");
+  }
+  if (value > MAX_SAFE_CANONICAL_NUMBER_MAGNITUDE || value < -MAX_SAFE_CANONICAL_NUMBER_MAGNITUDE) {
+    throw new Error("manifest canonical number must be within the safe integer range");
+  }
+  return value;
 }
 
 export function isAbsoluteHttpsWithHost(value) {

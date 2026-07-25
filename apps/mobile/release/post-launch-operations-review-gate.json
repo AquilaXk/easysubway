@@ -107,7 +107,7 @@
             {"path": "backend/build.gradle", "sha256": "cfefe1f4884d0f4b44f2875dc4e1bedabad358a7c9aab030c6504c87d8f21f2d"},
             {"path": "backend/Dockerfile", "sha256": "bb190eb507645836df69934a0ca6cf4dc7499bd508ed0a485e688eede70e615a"},
             {"path": "apps/mobile/release/rc-evidence-manifest-contract.json", "sha256": "7caaa17fc34e13e5e35076be4b4f35456f4fa57add102561e31267934bd6cd41"},
-            {"path": "tools/datapack/lib/manifest-validation.mjs", "sha256": "8ac183f1aa33864a5fc309efe6089961e1dbcd7a0ed7c9b0aff138961e8845ac"},
+            {"path": "tools/datapack/lib/manifest-validation.mjs", "sha256": "f8ae0114d353b9ffa8e34b840d784d32238af9762b008b5b80ea8923a76d158c"},
             {"path": "tools/datapack/decide-datapack-release.mjs", "sha256": "19df0719c5c030db1981bd34622a42b98e610ac35851a4d0219c70c51dda675c"},
             {"path": "tools/datapack/validate-remote-datapack-artifact.mjs", "sha256": "153a5888903c503fb572b5596afac58d1b0ac1ae973f3e8fda5806948d168b26"},
             {"path": "tools/release/generate-rc-evidence-manifest.mjs", "sha256": "d4dcae15ee381ce16463ad4a8235353327b53adce6fb4d56f25dd6db8c0547c4"},
