@@ -18,7 +18,14 @@
 // 수도권 값은 #1950/#2011(v2) 정본과 byte-identical 회귀를 위해 apply-sma-svg-positions의
 // 기존 하드코딩과 100% 동일하게 유지한다(회귀 게이트).
 
-// ── 수도권(seoul): #1950/#2011 정본. 기존 하드코딩과 동일. ─────────────────────
+// #2068 수도권 동명 별개역: 이름은 같지만 카탈로그에 각각 별도 station_id로 실재해
+// 좌표 broadcast를 금지하고 노선으로 1:1 해소해야 하는 역(신촌 2호선/경의중앙,
+// 양평 5호선/경의중앙). v2는 data-station 콜론 표기가 이 힌트를 담았으나 v4는
+// 콜론을 걷어냈다 — 목록을 넓힐 때는 반드시 카탈로그 실측(동일 이름 2행이 서로
+// 다른 물리역인지)으로 확인한다.
+const SEOUL_DISTINCT_SAME_NAME_STATIONS = new Set(["신촌", "양평"]);
+
+// ── 수도권(seoul): #1950/#2011 정본. #2068 오너 재제작 v4로 교체. ─────────────
 const SEOUL = {
   id: "seoul",
   regionKey: "수도권",
@@ -26,7 +33,7 @@ const SEOUL = {
   svgSource: {
     sourceId: "owner-self-drawn-sma-schematic",
     sourceName: "오너 자작 수도권 8선형 정본 도식",
-    sourceUrl: "internal:route-map/route-map-defs/svg-sources/easy-subway-sma-v2.svg",
+    sourceUrl: "internal:route-map/route-map-defs/svg-sources/easy-subway-sma-v4.svg",
     license: "self-drawn",
     licenseStatus: "confirmed",
     commercialUseAllowed: true,
@@ -79,12 +86,32 @@ const SEOUL = {
   // 정합 대상에서 제외할 SVG data-station(범례 등). 수도권 도식엔 없음.
   excludedStations: [],
   // canonical 정합 규칙(#1950 대조표): SVG 이름 → {name, disambiguateByLine?}.
+  //
+  // #2068 v4 실측 표기 변경(v2 → v4):
+  //   - `신촌:2호선`/`신촌:경의중앙선` → `신촌`/`신촌(경의중앙선)`
+  //   - `양평:5호선`/`양평:경의중앙선` → 둘 다 `양평`
+  //   - `이수` → `총신대입구(이수)`
+  //   - `시청.용인대`/`전대.에버랜드` → `시청·용인대`/`전대·에버랜드`(가운뎃점)
+  // 콜론 표기가 사라져 신촌·양평의 동명 별개역 힌트가 data-station에서 없어졌다.
+  // 두 역은 카탈로그에 각각 2행(2호선/경의중앙, 5호선/경의중앙)으로 실재하는
+  // **별개 물리역**이라 broadcast(같은 좌표를 두 station_id에 복사)하면 신원이
+  // 뒤섞인다. SEOUL_DISTINCT_SAME_NAME_STATIONS 명시 목록으로 노선 1:1 해소를
+  // 유지한다(v2 콜론 규칙과 동일 의미). 두 노드 모두 data-line을 정확히 들고
+  // 있어 해소가 결정적이다.
   canonicalRules: (svgName) => {
+    // v2 콜론 표기 하위호환(구 geometry 재처리·회귀 대조용).
     const colon = svgName.indexOf(":");
     if (colon >= 0) return { name: svgName.slice(0, colon), disambiguateByLine: true };
-    if (svgName === "하남검단산") return { name: "하남검단산역" };
-    if (svgName === "이수") return { name: "총신대입구" };
-    return { name: svgName };
+    // 가운뎃점(U+00B7)을 카탈로그 표기(마침표)로 정규화 — 시청·용인대·전대·에버랜드.
+    let name = svgName.replace(/·/g, ".");
+    // 괄호 부제 제거 — 총신대입구(이수)→총신대입구, 신촌(경의중앙선)→신촌.
+    name = name.replace(/\s*\([^)]*\)\s*$/, "").trim();
+    if (name === "하남검단산") name = "하남검단산역";
+    if (name === "이수") name = "총신대입구";
+    if (SEOUL_DISTINCT_SAME_NAME_STATIONS.has(name)) {
+      return { name, disambiguateByLine: true };
+    }
+    return { name };
   },
   // #2068 오너 기준본 전환(2026-07-19): 오너 v2.1은 viewBox 3800×3020(구 v2는
   // 2400×1860)으로 캔버스 자체가 커져, 구 하드코딩(340~1720)이 실제 콘텐츠

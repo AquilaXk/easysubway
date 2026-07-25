@@ -421,9 +421,60 @@ function browserExtractorExpression(svg) {
       });
     }
 
+    // #2068 오너 v4 실측: 편집기가 남긴 **빈 <text>/<tspan>**(내용 없는 라인
+    // 자리표시자)이 환승 캡슐 <g> 안에 섞여 들어오는 경우가 있다. Chrome의
+    // getBBox()는 그 퇴화 박스(width=height=0, 대개 로컬 원점)까지 합집합에
+    // 넣으므로 그룹 bbox가 통째로 원점까지 끌려가고, 중심이 실제 캡슐에서
+    // 수백 px 벗어난다(v4 보라매 692.7px·마곡나루 242.0px 실측 — 캡슐 도형
+    // 자체는 v2와 같은 자리에 있다. 오너 도식 문제가 아니라 측정 문제다).
+    // 그래서 그룹은 통짜 getBBox가 아니라 **면적이 있는 자손 박스만** 그룹
+    // 로컬 좌표계로 모아 합집합한다. 면적 있는 자손이 하나도 없으면 기존
+    // getBBox로 폴백한다(회귀 0 — v2·busan v3·daegu v3 전 노드 Δ=0 실측).
+    function renderableBBoxLocal(element) {
+      const ownMatrix = element.getScreenCTM();
+      if (!ownMatrix) return null;
+      const ownInverse = ownMatrix.inverse();
+      const skipTags = new Set(["title", "desc", "metadata", "defs"]);
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      for (const child of element.querySelectorAll("*")) {
+        if (skipTags.has(child.tagName.toLowerCase())) continue;
+        if (typeof child.getBBox !== "function") continue;
+        let childBox;
+        try {
+          childBox = child.getBBox();
+        } catch {
+          continue;
+        }
+        // 퇴화 박스(가로·세로 모두 0)는 렌더 잉크가 없다 — 합집합에서 배제.
+        if (!(childBox.width > 0) && !(childBox.height > 0)) continue;
+        const childMatrix = child.getScreenCTM();
+        if (!childMatrix) continue;
+        const toOwn = ownInverse.multiply(childMatrix);
+        const corners = [
+          [childBox.x, childBox.y],
+          [childBox.x + childBox.width, childBox.y],
+          [childBox.x, childBox.y + childBox.height],
+          [childBox.x + childBox.width, childBox.y + childBox.height],
+        ];
+        for (const [x, y] of corners) {
+          const point = matrixPoint(toOwn, x, y);
+          if (point.x < minX) minX = point.x;
+          if (point.x > maxX) maxX = point.x;
+          if (point.y < minY) minY = point.y;
+          if (point.y > maxY) maxY = point.y;
+        }
+      }
+      if (!(minX <= maxX) || !(minY <= maxY)) return null;
+      return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+    }
+
     // 역 노드: data-station + data-node-role를 가진 요소(circle/g/path)의 root 좌표
     // 중심을 조상 transform 체인(scaled-layer + 그룹 로컬 rotate/translate/matrix)까지
-    // 합성해 산출한다. circle은 cx/cy를, 그 외는 getBBox 중심을 로컬 기준점으로 쓴다.
+    // 합성해 산출한다. circle은 cx/cy를, 그 외는 잉크 있는 자손 bbox 합집합(없으면
+    // getBBox) 중심을 로컬 기준점으로 쓴다.
     // 상위 요소가 이미 data-station을 들고 있으면 자식은 건너뛴다(그룹 대표 1노드).
     function nodeCenterLocal(element) {
       const tag = element.tagName.toLowerCase();
@@ -433,11 +484,13 @@ function browserExtractorExpression(svg) {
           y: Number.parseFloat(element.getAttribute("cy") || "0"),
         };
       }
-      let bbox;
-      try {
-        bbox = element.getBBox();
-      } catch {
-        return null;
+      let bbox = renderableBBoxLocal(element);
+      if (!bbox) {
+        try {
+          bbox = element.getBBox();
+        } catch {
+          return null;
+        }
       }
       if (!(bbox.width >= 0) || !(bbox.height >= 0)) return null;
       return { x: bbox.x + bbox.width / 2, y: bbox.y + bbox.height / 2 };
@@ -523,11 +576,15 @@ function browserExtractorExpression(svg) {
       const name = element.getAttribute("data-station-name") || "";
       const code = element.getAttribute("data-station") || "";
       if (!name) continue;
-      let bbox;
-      try {
-        bbox = element.getBBox();
-      } catch {
-        continue;
+      // 위 nodeCenterLocal과 같은 규칙(퇴화 자식 박스 배제)을 대칭 적용한다 —
+      // 이 경로도 <g> 통짜 getBBox라 같은 잠복 결함을 갖는다.
+      let bbox = renderableBBoxLocal(element);
+      if (!bbox) {
+        try {
+          bbox = element.getBBox();
+        } catch {
+          continue;
+        }
       }
       if (!(bbox.width >= 0) || !(bbox.height >= 0)) continue;
       const elementMatrix = element.getScreenCTM();

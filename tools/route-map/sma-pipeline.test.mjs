@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
-import { canonicalStationName } from "./apply-sma-svg-positions.mjs";
+import { canonicalStationName, resolveStationIds } from "./apply-sma-svg-positions.mjs";
 import { octolinearizeChain, stitchToPaths, SVG_COLOR_TO_SLUG } from "./build-sma-tracks.mjs";
 import { diffExtractions } from "./diff-sma-versions.mjs";
 
@@ -20,6 +23,74 @@ test("canonicalStationName: 콜론 동명이역·역 접미·이수 별칭 규�
   assert.deepEqual(canonicalStationName("이수"), { name: "총신대입구" });
   // 일반 역은 그대로.
   assert.deepEqual(canonicalStationName("용인중앙시장"), { name: "용인중앙시장" });
+});
+
+// #2068 오너 v4 반입: data-station 표기가 바뀌었다(콜론 동명이역 힌트 제거,
+// 괄호 부제, 가운뎃점). 규칙이 v4 표기를 흡수하는지 고정한다.
+test("canonicalStationName: v4 표기(괄호 부제·가운뎃점·콜론 제거)를 카탈로그 표기로 정규화한다", () => {
+  // 콜론이 사라진 신촌·양평은 이름만으로 동명 별개역이므로 여전히 노선 해소가 필요하다.
+  assert.deepEqual(canonicalStationName("신촌"), {
+    name: "신촌",
+    disambiguateByLine: true,
+  });
+  assert.deepEqual(canonicalStationName("신촌(경의중앙선)"), {
+    name: "신촌",
+    disambiguateByLine: true,
+  });
+  assert.deepEqual(canonicalStationName("양평"), {
+    name: "양평",
+    disambiguateByLine: true,
+  });
+  // 괄호 부제 제거 후 이수 별칭까지 적용된다.
+  assert.deepEqual(canonicalStationName("총신대입구(이수)"), { name: "총신대입구" });
+  // 가운뎃점(U+00B7) → 카탈로그 표기(마침표).
+  assert.deepEqual(canonicalStationName("시청·용인대"), { name: "시청.용인대" });
+  assert.deepEqual(canonicalStationName("전대·에버랜드"), { name: "전대.에버랜드" });
+  // 마침표를 이름에 포함하는 역은 건드리지 않는다.
+  assert.deepEqual(canonicalStationName("4.19민주묘지"), { name: "4.19민주묘지" });
+});
+
+// #2068 신원 보호: 신촌·양평은 이름이 같아도 별개 물리역이다. 노선 해소가 풀리면
+// resolveStationIds가 두 station_id에 같은 좌표를 broadcast해 신원이 뒤섞인다
+// (부산역↔부산진 전례). 노선당 정확히 1개 id만 나오도록 계약을 고정한다.
+test("resolveStationIds: 동명 별개역(신촌·양평)은 노선으로 1:1 해소하고 broadcast하지 않는다", () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec(`
+    CREATE TABLE stations (id TEXT PRIMARY KEY, name_ko TEXT);
+    CREATE TABLE lines (id TEXT PRIMARY KEY, name_ko TEXT);
+    CREATE TABLE station_lines (station_id TEXT, line_id TEXT);
+    INSERT INTO stations VALUES ('s-yp-5','양평'),('s-yp-gj','양평');
+    INSERT INTO lines VALUES ('l-5','수도권 5호선'),('l-gj','수도권 경의중앙');
+    INSERT INTO station_lines VALUES ('s-yp-5','l-5'),('s-yp-gj','l-gj');
+  `);
+  const canon = canonicalStationName("양평");
+  const opts = { disambiguateByLine: canon.disambiguateByLine === true };
+  assert.deepEqual(resolveStationIds(db, canon.name, "l-5", opts), ["s-yp-5"]);
+  assert.deepEqual(resolveStationIds(db, canon.name, "l-gj", opts), ["s-yp-gj"]);
+  // 규칙이 풀리면(플래그 없음) 두 id에 같은 좌표가 broadcast된다 — 회귀 감지용 대조.
+  assert.deepEqual(resolveStationIds(db, "양평", "l-5", {}), ["s-yp-5", "s-yp-gj"]);
+  db.close();
+});
+
+// 위 계약은 오너 SVG가 두 노드에 서로 다른 data-line을 실어 줄 때만 성립한다.
+// v4 실 SVG에서 그 전제를 실측으로 고정한다(도식이 힌트를 잃으면 즉시 실패).
+test("easy-subway-sma-v4: 동명 별개역 노드는 서로 다른 data-line을 들고 있다", () => {
+  const svg = readFileSync(
+    path.join(
+      import.meta.dirname,
+      "route-map-defs/svg-sources/easy-subway-sma-v4.svg",
+    ),
+    "utf8",
+  );
+  const lineAttrsFor = (dataStation) =>
+    [...svg.matchAll(/<circle\b[^>]*>/g)]
+      .map((m) => m[0])
+      .filter((tag) => tag.includes(`data-station="${dataStation}"`))
+      .map((tag) => /\bdata-line="([^"]*)"/.exec(tag)?.[1] ?? "");
+
+  assert.deepEqual(lineAttrsFor("양평"), ["5", "gyeongui-jungang"]);
+  assert.deepEqual(lineAttrsFor("신촌"), ["2"]);
+  assert.deepEqual(lineAttrsFor("신촌(경의중앙선)"), ["gyeongui-jungang"]);
 });
 
 test("SVG_COLOR_TO_SLUG: 24 노선색이 슬러그와 1:1", () => {

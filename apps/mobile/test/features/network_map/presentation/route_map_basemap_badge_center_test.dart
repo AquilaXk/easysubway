@@ -27,7 +27,7 @@ import '../../../support/pretendard_test_font.dart';
 // viewBox). translate는 소스 SVG에서 직접 파싱해 좌표가 바뀌어도 게이트가 따라간다.
 ({double tx, double ty}) _seoulScaleLayerTranslate() {
   final svg = File(
-    '../../tools/route-map/route-map-defs/svg-sources/easy-subway-sma-v2.svg',
+    '../../tools/route-map/route-map-defs/svg-sources/easy-subway-sma-v4.svg',
   ).readAsStringSync();
   final groupMatch = RegExp(
     r'<g\b(?=[^>]*\bid="main-map-scaled-layer")(?=[^>]*\btransform="([^"]+)")[^>]*>',
@@ -71,10 +71,19 @@ const double _k = 0.455; // 수도권 scale 레이어 배율.
 
 // 대표 칩 3개: 단자리 숫자(신창 1·개화 9)와 다자 캡슐(광교 신분당). 글자 fill 전부
 // #FFFFFF. 값은 오너 SVG 칩 transform 실측(foldTerminalChipScale 경로).
+//
+// #2068 오너 v4(2026-07-25) 재실측: 오너가 칩 그룹 배치를
+// `translate(...) scale(2.198) translate(...)` 에서 `matrix(2.7475,0,0,2.7475,e,f)`
+// 로 바꿨다 — 그룹 스케일 s가 2.198→2.7475로 커졌다(캡슐 rect 로컬 크기
+// 30×23·48×23과 로컬 font-size 10.5는 불변). 아래 상수는 전부 s에서 파생된
+// 실측값이라 함께 갱신한다(게이트 임계 0.15·폭 여유는 불변):
+//   capHalfW/H = rect 반폭·반높이 × s, fontRender = 10.5 × s × k.
+//   cx/cy = 칩 transform 적용 후 rect 중심(scale-레이어 로컬) — 신창·개화는
+//   v2와 같은 자리, 광교는 캡슐이 넓어지며 중심이 31.5px 좌측으로 옮겨졌다.
 const _ownerChips = <_OwnerChip>[
-  _OwnerChip('신창(1)', 6150.1831, 4417.5466, 32.970, 25.277, 10.5009),
-  _OwnerChip('개화(9)', -138.3960, 634.7050, 32.970, 25.277, 10.5009),
-  _OwnerChip('광교(신분당)', 2478.9530, 3472.6850, 52.752, 25.277, 10.5009),
+  _OwnerChip('신창(1)', 6150.1812, 4417.5457, 41.212, 31.596, 13.1262),
+  _OwnerChip('개화(9)', -138.3960, 634.7052, 41.212, 31.596, 13.1262),
+  _OwnerChip('광교(신분당)', 2447.4280, 3472.1745, 65.940, 31.596, 13.1262),
 ];
 
 // 마곡 환승 배지(반전, 오너 원본 구조 transform="scale(-1)"). #2068 회귀 가드 유지.

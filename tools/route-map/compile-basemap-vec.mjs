@@ -53,7 +53,7 @@ const buildManifestPath = path.join(
 
 // manifest maps[].id → 원본 SVG 파일명. .vec 파일명은 manifest id를 따른다.
 const regions = [
-  { id: "seoul", svg: "easy-subway-sma-v2.svg" },
+  { id: "seoul", svg: "easy-subway-sma-v4.svg" },
   { id: "busan", svg: "easy-subway-busan-v3.svg" },
   { id: "daegu", svg: "easy-subway-daegu-v3.svg" },
   { id: "daejeon", svg: "easy-subway-daejeon-v1.svg" },
@@ -1010,7 +1010,19 @@ function ownerLabelStationKey(textOpenTag, textBlock, canonicalize) {
     const canonical = DAEJEON.canonicalRules(fullOfficialName)?.name;
     if (canonical) return canonical;
   }
-  const textContent = ownerLabelTextContent(textBlock);
+  // #2068 오너 v4 실측: 오너가 라벨에 직접 단 data-station이 역 신원의 제1
+  // 원천이다. v2까지는 렌더 텍스트가 그 값과 (콜론 접미 표기를 빼면) 항상
+  // 같아 텍스트만 써도 됐지만, v4의 성신여대입구는 오너가 둘째 줄 tspan
+  // ("입구")을 걷어내 렌더 텍스트가 "성신여대"가 됐다 — 텍스트를 키로 쓰면
+  // 카탈로그 "성신여대입구"와 어긋나 그 역만 폴백 미니 크기로 회귀한다
+  // (#2068 광주송정역 사례와 동형). 명시 신원 속성을 우선한다.
+  // 실측 영향 범위: seoul v4 1건(성신여대입구)뿐 — busan은 147건 전부
+  // 텍스트와 동일하고, daegu·daejeon·gwangju 라벨엔 이 속성이 없어 기존
+  // 텍스트 경로를 그대로 탄다(산출물 불변).
+  const dataStation =
+    firstAttr(textOpenTag, "data-station") ??
+    firstAttr(textOpenTag, "data-station-name");
+  const textContent = dataStation || ownerLabelTextContent(textBlock);
   if (canonicalize) {
     const canonical = canonicalize(textContent)?.name;
     if (canonical) return canonical;
@@ -1397,7 +1409,7 @@ function shiftTextYAttr(tag, shift) {
 //     인식하지 않는 단순 선택자 요건 밖이라 순서 무관하게 현재 결과는 불변이지만,
 //     향후 단순 class 선택자로 font-size/baseline을 주는 칩이 추가되면 이 순서가
 //     아니면 fold가 그 값을 놓친다.
-function foldTerminalChipScale(svgText) {
+function foldTerminalChipScale(svgText, mapScale = 1) {
   return svgText.replace(
     /<g\b[^>]*\bclass="ui-chip terminal-route-badge"[^>]*>[\s\S]*?<\/g>/g,
     (chip) => {
@@ -1441,19 +1453,40 @@ function foldTerminalChipScale(svgText) {
             shiftTextYAttr(t, shift),
           );
         }
-        // font-size(attr·style 양쪽)에 그룹 스케일 s를 곱한다. SVG에서 style이
-        // presentation attribute보다 우선하므로 어느 쪽이 렌더에 쓰이든 일관되게
-        // s배되도록 둘 다 처리한다(기존 normalizeTextBaselineAndScale의 attr·style
-        // 병행 스케일 관례와 동일).
+        // font-size(attr·style 양쪽)를 보정한다. SVG에서 style이 presentation
+        // attribute보다 우선하므로 어느 쪽이 렌더에 쓰이든 일관되게 같은 값이
+        // 되도록 둘 다 처리한다(기존 normalizeTextBaselineAndScale 관례와 동일).
+        //
+        // #2068 오너 v4(2026-07-25) 픽셀 실측 교정 — 이 자리의 계수는 s가 아니라
+        // 1/mapScale이다. 렌더러가 칩 텍스트에 적용하는 실효 배율은 (칩 그룹
+        // 스케일 s × 맵 레이어 스케일 k)이므로, 최종 렌더 em이 오너 의도값
+        // L×s×k가 되려면 .vec에 적힌 font-size가 **로컬 원값 L 그대로**여야 한다.
+        // 여기서 1/k를 곱해 두면 뒤이은 normalizeTextBaselineAndScale의 ×k와
+        // 정확히 상쇄돼 L이 남는다.
+        //
+        // v2까지 `×s`가 통했던 이유는 우연이다 — v2 칩은 s=2.198, k=0.455라
+        // s×k=1.00009로 사실상 1이어서 `L×s×k ≈ L`이었다. 오너가 v4에서 칩
+        // 배치를 matrix(2.7475,…)로 키우며 s×k=1.25011이 되자 이 우연이 깨져
+        // 칩 숫자가 1.25배 커지고 캡슐 중심에서 1.85design px 위로 떠올랐다
+        // (route_map_basemap_badge_center_test 실측: 신창 ratio -0.19 > 0.15).
+        // 실측 대조(신창 "1" 잉크, design px):
+        //   v2(정상)        높이 7.79  · bbox 중심 -0.06 · ratio -0.035
+        //   v4 `×s`(결함)   높이 12.04 · bbox 중심 -1.85 · ratio -0.190
+        //   v4 `×1/k`(교정) 높이 9.63  · bbox 중심 -0.06 · ratio -0.044
+        // 교정본 높이 9.63 = v2 높이 × 1.25(오너가 키운 배율) — 오너 디자인을
+        // 그대로 렌더한다. baseline shift(0.35×L, 위)는 그대로 두면 렌더에서
+        // 0.35×L×s×k = 0.35×(렌더 em)이 돼 중심 정렬이 유지된다.
+        const fontScale = mapScale > 0 ? 1 / mapScale : 1;
         newOpen = newOpen
           .replace(
             /(\sfont-size=")([\d.]+)(px)?(")/,
             (_m, pre, n, px, post) =>
-              `${pre}${roundCoord(Number(n) * s)}${px ?? ""}${post}`,
+              `${pre}${roundCoord(Number(n) * fontScale)}${px ?? ""}${post}`,
           )
           .replace(
             /(font-size\s*:\s*)([\d.]+)(px)?/,
-            (_m, pre, n, px) => `${pre}${roundCoord(Number(n) * s)}${px ?? ""}`,
+            (_m, pre, n, px) =>
+              `${pre}${roundCoord(Number(n) * fontScale)}${px ?? ""}`,
           );
         return newOpen + newRest;
       });
@@ -1468,7 +1501,7 @@ export function normalizeSvgForCompile(svgText) {
       /<g id="compiled-map-coordinate-layer" transform="([^"]+)"/,
     )?.[1],
   );
-  const inlined = foldTerminalChipScale(inlineSimpleClassStyles(extracted))
+  const inlined = foldTerminalChipScale(inlineSimpleClassStyles(extracted), k)
     .replace(
       /font-weight="(\d+)"/g,
       (_m, v) => `font-weight="${normalizeFontWeightValue(v)}"`,
