@@ -7,6 +7,12 @@
 // - 문서화된 결측 ledger: quarantine 기록·공식 원문 결함처럼 실측 가능한 근거가 있는 결측만.
 //   근거가 데이터로 확인되지 않으면 면제하지 않는다.
 // 그 외 불일치는 전부 fail-closed다.
+//
+// 근거 필드 검증 범위(정직한 한계 서술):
+// - officialUrl은 source-inventory와 admitted snapshot이 등재한 공식 데이터셋 URL 집합에만 든다.
+//   URL이 그 역명을 실제로 싣는지는 원격 조회 없이 확인할 수 없다.
+// - issue 번호와 note 서술의 내용은 검증하지 않는다. 형식과 존재만 강제한다.
+// - renamedAt은 형식과 상한(snapshot capturedAt)만 본다. 개명 사실 자체는 crossCheck로 확인한다.
 
 export const ROUTE_MAP_DOMAIN = "route_map_positions";
 
@@ -22,6 +28,11 @@ const GAP_REASON_CODES = Object.freeze([
   "PACK_SCOPE_ABSENT",
 ]);
 
+// OFFICIAL_RENAME은 URL·날짜만으로는 세탁이 가능하므로 기계적 교차 근거를 하나 요구한다.
+const ALIAS_CROSS_CHECKS = Object.freeze(["ROSTER_SUBNAME", "PACK_TOPOLOGY_SINGLE_NAME"]);
+
+const TOPOLOGY_SNAPSHOT_DIR = "tools/datapack/sources";
+
 // MOLIT 원본과 admitted snapshot은 같은 역을 다른 표기로 싣는다(부역명 병기, 역 접미사).
 // 판정 대상은 역 집합의 포함 관계뿐이므로 표기 차이만 제거하고 비교한다.
 function normalizeStationName(value) {
@@ -31,6 +42,12 @@ function normalizeStationName(value) {
     .replace(/[·.\s]/gu, "")
     .replace(/역$/u, "")
     .trim();
+}
+
+// 부역명 병기 표기에서 괄호 안 이름만 뽑는다(불암산(당고개) → 당고개).
+function parentheticalNames(rawName) {
+  return [...String(rawName).normalize("NFKC").matchAll(/\(([^()]*)\)/gu)]
+    .map(([, inner]) => normalizeStationName(inner));
 }
 
 function scopeKey({ regionId, operatorId, lineId }) {
@@ -43,10 +60,6 @@ function isNonEmptyString(value) {
 
 function isIssueNumber(value) {
   return Number.isInteger(value) && value > 0;
-}
-
-function isHttpsUrl(value) {
-  return isNonEmptyString(value) && value.startsWith("https://");
 }
 
 function isIsoDate(value) {
@@ -114,6 +127,13 @@ function routeMapSnapshotOf(source, snapshotsByPath, violations) {
   return { snapshotPath, snapshot };
 }
 
+// snapshotId → 등재 경로. topology snapshot 파일명은 snapshotId를 그대로 쓴다.
+function lineageTopologyPaths(admissionEvidence, lineId) {
+  return (admissionEvidence.topologyLineages ?? [])
+    .filter((lineage) => lineage.lineId === lineId && isNonEmptyString(lineage.snapshotId))
+    .map((lineage) => `${TOPOLOGY_SNAPSHOT_DIR}/${lineage.snapshotId}.json`);
+}
+
 function indexScopeCoverage(coverage, snapshot, lineId) {
   for (const position of snapshot.positions ?? []) {
     if (position.lineId === lineId) {
@@ -143,11 +163,17 @@ function collectScopeCoverage({ inventory, snapshotsByPath, violations }) {
         lineId,
         sourceIds: [],
         snapshotPaths: [],
+        capturedAts: [],
+        topologyPaths: new Set(),
         positionsByName: new Map(),
         quarantinedByName: new Map(),
       };
       coverage.sourceIds.push(source.id);
       coverage.snapshotPaths.push(resolved.snapshotPath);
+      coverage.capturedAts.push(String(resolved.snapshot.capturedAt ?? ""));
+      for (const topologyPath of lineageTopologyPaths(source.routeMapAdmissionEvidence, lineId)) {
+        coverage.topologyPaths.add(topologyPath);
+      }
       indexScopeCoverage(coverage, resolved.snapshot, lineId);
       coverageByScope.set(key, coverage);
     }
@@ -155,7 +181,62 @@ function collectScopeCoverage({ inventory, snapshotsByPath, violations }) {
   return { coverageByScope, claims };
 }
 
-function validateAliasShape(alias, auditedScopeKeys, push) {
+// 근거 URL은 inventory·admitted snapshot이 등재한 공식 데이터셋 URL만 허용한다.
+function collectOfficialUrls({ inventory, snapshotsByPath }) {
+  const urls = new Set();
+  const add = (value) => {
+    if (typeof value === "string" && value.startsWith("https://")) {
+      urls.add(value);
+    } else if (Array.isArray(value)) {
+      value.forEach(add);
+    }
+  };
+  for (const source of inventory.sources ?? []) {
+    add(source.datasetUrl);
+    add(source.datasetUrls);
+    add(source.detailUrl);
+    add(source.license?.evidenceUrl);
+  }
+  for (const snapshot of snapshotsByPath.values()) {
+    add(snapshot.datasetUrl);
+    add(snapshot.datasetUrls);
+    add(snapshot.detailUrl);
+  }
+  return urls;
+}
+
+// scope가 topology lineage를 등재했으면 그 snapshot만, 없으면 inventory에 등재된
+// route_map topology snapshot 전체를 허용한다(서울 8호선처럼 lineage 미등재 scope 대응).
+function collectRegisteredTopologyPaths(inventory) {
+  const paths = new Set();
+  for (const source of inventory.sources ?? []) {
+    if (!source.coverageScope?.sourceDomains?.includes(ROUTE_MAP_DOMAIN)) {
+      continue;
+    }
+    for (const lineage of source.routeMapAdmissionEvidence?.topologyLineages ?? []) {
+      if (isNonEmptyString(lineage.snapshotId)) {
+        paths.add(`${TOPOLOGY_SNAPSHOT_DIR}/${lineage.snapshotId}.json`);
+      }
+    }
+  }
+  return paths;
+}
+
+function resolveTopologyNames({ topologyPath, coverage, registeredTopologyPaths, topologiesByPath, prefix, push }) {
+  const allowed = coverage.topologyPaths.size > 0 ? coverage.topologyPaths : registeredTopologyPaths;
+  if (!isNonEmptyString(topologyPath) || !allowed.has(topologyPath)) {
+    push(`${prefix}_PACK_TOPOLOGY_UNBOUND`, "packTopologyPath가 이 scope에 등재된 topology snapshot이 아니다");
+    return null;
+  }
+  const stationNames = topologyStationNames(topologiesByPath.get(topologyPath), coverage.lineId);
+  if (!stationNames) {
+    push(`${prefix}_PACK_TOPOLOGY_MISSING`, `pack topology에서 ${coverage.lineId} scope를 찾지 못했다`);
+    return null;
+  }
+  return new Set(stationNames.map(normalizeStationName));
+}
+
+function validateAliasShape({ alias, auditedScopeKeys, officialUrls, push }) {
   if (!isNonEmptyString(alias?.scopeKey) || !auditedScopeKeys.has(alias.scopeKey)) {
     push("ALIAS_SCOPE_NOT_AUDITED", "containment 감사 대상 scope가 아니다");
     return false;
@@ -168,9 +249,16 @@ function validateAliasShape(alias, auditedScopeKeys, push) {
     push("ALIAS_REASON_CODE_INVALID", `reasonCode가 승인 목록에 없다 (${alias.reasonCode})`);
     return false;
   }
-  const evidence = alias.evidence;
-  if (!isIssueNumber(evidence?.issue) || !isHttpsUrl(evidence?.officialUrl) || !isNonEmptyString(evidence?.note)) {
-    push("ALIAS_EVIDENCE_INVALID", "evidence.issue·officialUrl·note 근거가 필요하다");
+  if (!isIssueNumber(alias.evidence?.issue)) {
+    push("ALIAS_EVIDENCE_ISSUE_INVALID", "evidence.issue는 양의 정수 이슈 번호여야 한다");
+    return false;
+  }
+  if (!officialUrls.has(alias.evidence.officialUrl)) {
+    push("ALIAS_EVIDENCE_URL_UNREGISTERED", "evidence.officialUrl이 등재된 공식 데이터셋 URL이 아니다");
+    return false;
+  }
+  if (!isNonEmptyString(alias.evidence.note)) {
+    push("ALIAS_EVIDENCE_NOTE_MISSING", "evidence.note 근거 서술이 필요하다");
     return false;
   }
   return true;
@@ -235,9 +323,59 @@ function verifyLineOrdinalSuffixAlias({ coverage, snapshotName, rosterName, push
   return true;
 }
 
-function verifyRenameAlias({ alias, coverage, roster, snapshotName, rosterName, push }) {
-  if (!isIsoDate(alias.evidence?.renamedAt)) {
-    push("ALIAS_RENAME_EVIDENCE_INVALID", "evidence.renamedAt(YYYY-MM-DD) 공식 변경일이 필요하다");
+function verifyAbbreviationAlias({ snapshotName, rosterName, push }) {
+  if (snapshotName.length >= rosterName.length || !isSubsequence(snapshotName, rosterName)) {
+    push("ALIAS_ABBREVIATION_MISMATCH", "snapshot 표기가 roster 표기의 축약형이 아니다");
+    return false;
+  }
+  return true;
+}
+
+// 두 표기가 같은 역이라는 기계적 교차 근거. 선언한 방식이 실제로 성립해야 한다.
+function verifyRenameCrossCheck(context) {
+  const { alias, coverage, snapshotName, rosterName, push } = context;
+  const crossCheck = alias.evidence?.crossCheck;
+  if (!ALIAS_CROSS_CHECKS.includes(crossCheck)) {
+    push("ALIAS_RENAME_CROSS_CHECK_INVALID", `evidence.crossCheck가 승인 목록에 없다 (${crossCheck})`);
+    return false;
+  }
+  if (crossCheck === "ROSTER_SUBNAME") {
+    if (!parentheticalNames(alias.rosterStationName).includes(snapshotName)) {
+      push("ALIAS_RENAME_SUBNAME_ABSENT", "roster 원문이 옛 표기를 부역명으로 병기하지 않는다");
+      return false;
+    }
+    return true;
+  }
+  const topologyNames = resolveTopologyNames({
+    topologyPath: alias.evidence?.packTopologyPath,
+    coverage,
+    registeredTopologyPaths: context.registeredTopologyPaths,
+    topologiesByPath: context.topologiesByPath,
+    prefix: "ALIAS",
+    push,
+  });
+  if (!topologyNames) {
+    return false;
+  }
+  // pack topology가 두 표기 중 하나만 실어야 같은 역 하나로 취급한다는 근거가 된다.
+  if (topologyNames.has(snapshotName) === topologyNames.has(rosterName)) {
+    push("ALIAS_RENAME_TOPOLOGY_AMBIGUOUS", "pack topology가 두 표기를 모두 싣거나 모두 싣지 않는다");
+    return false;
+  }
+  return true;
+}
+
+function verifyRenameAlias(context) {
+  const { alias, coverage, roster, snapshotName, rosterName, push } = context;
+  const renamedAt = alias.evidence?.renamedAt;
+  if (!isIsoDate(renamedAt)) {
+    push("ALIAS_RENAME_DATE_INVALID", "evidence.renamedAt(YYYY-MM-DD) 공식 변경 시행일이 필요하다");
+    return false;
+  }
+  // 개명일이 snapshot 수집 시점보다 늦을 수 없다.
+  const capturedOn = coverage.capturedAts.map((value) => value.slice(0, 10)).filter(isIsoDate);
+  if (capturedOn.length === 0 || capturedOn.some((captured) => renamedAt > captured)) {
+    push("ALIAS_RENAME_DATE_OUT_OF_RANGE", "renamedAt이 admitted snapshot capturedAt보다 늦다");
     return false;
   }
   // 같은 역이라는 근거를 데이터로 확인한다: 노선 나열에서 이웃 역이 같아야 한다.
@@ -248,25 +386,34 @@ function verifyRenameAlias({ alias, coverage, roster, snapshotName, rosterName, 
     push("ALIAS_RENAME_SEQUENCE_MISMATCH", "노선 나열에서 두 표기의 이웃 역이 다르다");
     return false;
   }
-  return true;
+  return verifyRenameCrossCheck(context);
 }
 
 function validateAliasReason(context) {
-  const { alias, snapshotName, rosterName, push } = context;
-  if (alias.reasonCode === "OFFICIAL_LINE_ORDINAL_SUFFIX") {
+  const { reasonCode } = context.alias;
+  if (reasonCode === "OFFICIAL_LINE_ORDINAL_SUFFIX") {
     return verifyLineOrdinalSuffixAlias(context);
   }
-  if (alias.reasonCode === "OFFICIAL_RENAME") {
+  if (reasonCode === "OFFICIAL_ABBREVIATION") {
+    return verifyAbbreviationAlias(context);
+  }
+  if (reasonCode === "OFFICIAL_RENAME") {
     return verifyRenameAlias(context);
   }
-  if (snapshotName.length >= rosterName.length || !isSubsequence(snapshotName, rosterName)) {
-    push("ALIAS_ABBREVIATION_MISMATCH", "snapshot 표기가 roster 표기의 축약형이 아니다");
-    return false;
-  }
-  return true;
+  context.push("ALIAS_REASON_CODE_UNSUPPORTED", `reasonCode 검증 분기가 없다 (${reasonCode})`);
+  return false;
 }
 
-function validateAliases({ aliases, auditedScopeKeys, coverageByScope, rosters, violations }) {
+function validateAliases({
+  aliases,
+  auditedScopeKeys,
+  coverageByScope,
+  rosters,
+  officialUrls,
+  registeredTopologyPaths,
+  topologiesByPath,
+  violations,
+}) {
   const aliasedRosterNamesByScope = new Map();
   const seenByScope = new Map();
   for (const [index, alias] of aliases.entries()) {
@@ -276,17 +423,25 @@ function validateAliases({ aliases, auditedScopeKeys, coverageByScope, rosters, 
       scopeKey: alias?.scopeKey,
       message: `${label}: ${message}`,
     });
-    if (!validateAliasShape(alias, auditedScopeKeys, push)) {
+    if (!validateAliasShape({ alias, auditedScopeKeys, officialUrls, push })) {
       continue;
     }
-    const coverage = coverageByScope.get(alias.scopeKey);
-    const roster = rosters.get(alias.scopeKey);
-    const snapshotName = normalizeStationName(alias.snapshotStationName);
-    const rosterName = normalizeStationName(alias.rosterStationName);
     const seen = seenByScope.get(alias.scopeKey)
       ?? { snapshotNames: new Set(), rosterNames: new Set() };
     seenByScope.set(alias.scopeKey, seen);
-    const context = { alias, coverage, roster, snapshotName, rosterName, seen, push };
+    const snapshotName = normalizeStationName(alias.snapshotStationName);
+    const rosterName = normalizeStationName(alias.rosterStationName);
+    const context = {
+      alias,
+      coverage: coverageByScope.get(alias.scopeKey),
+      roster: rosters.get(alias.scopeKey),
+      snapshotName,
+      rosterName,
+      seen,
+      registeredTopologyPaths,
+      topologiesByPath,
+      push,
+    };
     if (!validateAliasBinding(context) || !validateAliasReason(context)) {
       continue;
     }
@@ -299,7 +454,7 @@ function validateAliases({ aliases, auditedScopeKeys, coverageByScope, rosters, 
   return aliasedRosterNamesByScope;
 }
 
-function validateGapShape(gap, auditedScopeKeys, push) {
+function validateGapShape({ gap, auditedScopeKeys, officialUrls, push }) {
   if (!isNonEmptyString(gap?.scopeKey) || !auditedScopeKeys.has(gap.scopeKey)) {
     push("LEDGER_SCOPE_NOT_AUDITED", "containment 감사 대상 scope가 아니다");
     return false;
@@ -312,8 +467,16 @@ function validateGapShape(gap, auditedScopeKeys, push) {
     push("LEDGER_REASON_CODE_INVALID", `reasonCode가 승인 목록에 없다 (${gap.reasonCode})`);
     return false;
   }
-  if (!isIssueNumber(gap.evidence?.issue) || !isNonEmptyString(gap.evidence?.note)) {
-    push("LEDGER_EVIDENCE_INVALID", "evidence.issue·note 근거가 필요하다");
+  if (!isIssueNumber(gap.evidence?.issue)) {
+    push("LEDGER_EVIDENCE_ISSUE_INVALID", "evidence.issue는 양의 정수 이슈 번호여야 한다");
+    return false;
+  }
+  if (!officialUrls.has(gap.evidence.officialUrl)) {
+    push("LEDGER_EVIDENCE_URL_UNREGISTERED", "evidence.officialUrl이 등재된 공식 데이터셋 URL이 아니다");
+    return false;
+  }
+  if (!isNonEmptyString(gap.evidence.note)) {
+    push("LEDGER_EVIDENCE_NOTE_MISSING", "evidence.note 근거 서술이 필요하다");
     return false;
   }
   return true;
@@ -341,22 +504,15 @@ function validateGapBinding({ gap, coverage, roster, rosterName, aliased, seen, 
   return true;
 }
 
-function packTopologyNames({ gap, coverage, topologiesByPath, push }) {
-  const topologyPath = gap.evidence.packTopologyPath;
-  if (!isHttpsUrl(gap.evidence.officialUrl)) {
-    push("LEDGER_EVIDENCE_INVALID", "evidence.officialUrl 공식 원문 출처가 필요하다");
-    return null;
-  }
-  if (!isNonEmptyString(topologyPath)) {
-    push("LEDGER_PACK_TOPOLOGY_MISSING", "evidence.packTopologyPath가 필요하다");
-    return null;
-  }
-  const stationNames = topologyStationNames(topologiesByPath.get(topologyPath), coverage.lineId);
-  if (!stationNames) {
-    push("LEDGER_PACK_TOPOLOGY_MISSING", `pack topology에서 ${coverage.lineId} scope를 찾지 못했다`);
-    return null;
-  }
-  return new Set(stationNames.map(normalizeStationName));
+function gapTopologyNames(context) {
+  return resolveTopologyNames({
+    topologyPath: context.gap.evidence.packTopologyPath,
+    coverage: context.coverage,
+    registeredTopologyPaths: context.registeredTopologyPaths,
+    topologiesByPath: context.topologiesByPath,
+    prefix: "LEDGER",
+    push: context.push,
+  });
 }
 
 function verifyQuarantinedGap({ gap, coverage, rosterName, push }) {
@@ -369,10 +525,32 @@ function verifyQuarantinedGap({ gap, coverage, rosterName, push }) {
   return true;
 }
 
+// 공식 원문에 행이 없다는 근거. collector가 topologyGaps로 결측을 직접 선언했으면 그 목록을 정본으로 쓰고,
+// 선언이 없는 snapshot은 원본 행이 전부 admitted·quarantined로 회계되는지로 판정한다.
+// rawStationCount의 의미는 collector마다 다르므로(pack 밖 잉여 행을 세지 않는 수집기가 있다) 회계 검사만으로는
+// 부족하고, topologyGaps 선언이 있으면 그쪽을 우선한다.
+function verifyOfficialFileRowAbsence({ coverage, rosterName, snapshot, push }) {
+  const declaredGaps = snapshot?.topologyGaps;
+  if (Array.isArray(declaredGaps)) {
+    const declared = declaredGaps.some((entry) => entry?.lineId === coverage.lineId
+      && normalizeStationName(entry.stationName) === rosterName);
+    if (!declared) {
+      push("LEDGER_TOPOLOGY_GAP_NOT_DECLARED", "snapshot topologyGaps에 선언되지 않은 역이다");
+    }
+    return declared;
+  }
+  const accounted = (snapshot?.stationCount ?? Number.NaN) + (snapshot?.quarantinedCount ?? Number.NaN);
+  if (!Number.isInteger(snapshot?.rawStationCount) || snapshot.rawStationCount !== accounted) {
+    push("LEDGER_RAW_ROW_ACCOUNTING_MISMATCH", "snapshot rawStationCount가 stationCount+quarantinedCount와 다르다");
+    return false;
+  }
+  return true;
+}
+
 // pack은 이 역을 요구하는데 공식 원문에 행이 없는 경우만 이 사유에 해당한다.
 function verifyOfficialFileRowAbsentGap(context) {
-  const { coverage, rosterName, snapshot, push } = context;
-  const topologyNames = packTopologyNames(context);
+  const { coverage, rosterName, push } = context;
+  const topologyNames = gapTopologyNames(context);
   if (!topologyNames) {
     return false;
   }
@@ -384,18 +562,12 @@ function verifyOfficialFileRowAbsentGap(context) {
     push("LEDGER_STATION_QUARANTINED", "quarantine 기록이 있는 역은 ADMISSION_QUARANTINED로 분류한다");
     return false;
   }
-  // 원본 행이 전부 admitted·quarantined로 회계되면 남은 결측은 공식 원문 자체의 행 부재다.
-  const accounted = (snapshot?.stationCount ?? Number.NaN) + (snapshot?.quarantinedCount ?? Number.NaN);
-  if (!Number.isInteger(snapshot?.rawStationCount) || snapshot.rawStationCount !== accounted) {
-    push("LEDGER_RAW_ROW_ACCOUNTING_MISMATCH", "snapshot rawStationCount가 stationCount+quarantinedCount와 다르다");
-    return false;
-  }
-  return true;
+  return verifyOfficialFileRowAbsence(context);
 }
 
 // pack 노선 topology 자체가 역을 싣지 않은 경우만 이 사유에 해당한다.
 function verifyPackScopeAbsentGap(context) {
-  const topologyNames = packTopologyNames(context);
+  const topologyNames = gapTopologyNames(context);
   if (!topologyNames) {
     return false;
   }
@@ -407,13 +579,18 @@ function verifyPackScopeAbsentGap(context) {
 }
 
 function validateGapReason(context) {
-  if (context.gap.reasonCode === "ADMISSION_QUARANTINED") {
+  const { reasonCode } = context.gap;
+  if (reasonCode === "ADMISSION_QUARANTINED") {
     return verifyQuarantinedGap(context);
   }
-  if (context.gap.reasonCode === "OFFICIAL_FILE_ROW_ABSENT") {
+  if (reasonCode === "OFFICIAL_FILE_ROW_ABSENT") {
     return verifyOfficialFileRowAbsentGap(context);
   }
-  return verifyPackScopeAbsentGap(context);
+  if (reasonCode === "PACK_SCOPE_ABSENT") {
+    return verifyPackScopeAbsentGap(context);
+  }
+  context.push("LEDGER_REASON_CODE_UNSUPPORTED", `reasonCode 검증 분기가 없다 (${reasonCode})`);
+  return false;
 }
 
 function validateGaps({
@@ -422,6 +599,8 @@ function validateGaps({
   coverageByScope,
   rosters,
   aliasedRosterNamesByScope,
+  officialUrls,
+  registeredTopologyPaths,
   snapshotsByPath,
   topologiesByPath,
   violations,
@@ -434,21 +613,21 @@ function validateGaps({
       scopeKey: gap?.scopeKey,
       message: `${label}: ${message}`,
     });
-    if (!validateGapShape(gap, auditedScopeKeys, push)) {
+    if (!validateGapShape({ gap, auditedScopeKeys, officialUrls, push })) {
       continue;
     }
-    const coverage = coverageByScope.get(gap.scopeKey);
     const rosterName = normalizeStationName(gap.rosterStationName);
     const seen = gapRosterNamesByScope.get(gap.scopeKey) ?? new Set();
     gapRosterNamesByScope.set(gap.scopeKey, seen);
     const context = {
       gap,
-      coverage,
+      coverage: coverageByScope.get(gap.scopeKey),
       roster: rosters.get(gap.scopeKey),
       rosterName,
       aliased: aliasedRosterNamesByScope.get(gap.scopeKey) ?? new Set(),
       seen,
       snapshot: snapshotsByPath.get(gap.evidence.snapshotPath),
+      registeredTopologyPaths,
       topologiesByPath,
       push,
     };
@@ -482,43 +661,7 @@ function auditableScopeKeys({ claims, activeScopeKeys, rosters, violations }) {
   return auditedScopeKeys;
 }
 
-/**
- * route_map_positions 전 scope containment를 판정한다.
- *
- * @returns {{ auditedScopeKeys: string[], violations: Array<{ kind: string, message: string }> }}
- */
-export function auditRouteMapCoverageScopes({
-  inventory,
-  targets,
-  rosters,
-  exemptions,
-  snapshotsByPath,
-  topologiesByPath = new Map(),
-}) {
-  const violations = [];
-  const activeScopeKeys = new Set((targets.activeLineScopes ?? []).map(scopeKey));
-  const { coverageByScope, claims } = collectScopeCoverage({ inventory, snapshotsByPath, violations });
-  const auditedScopeKeys = auditableScopeKeys({ claims, activeScopeKeys, rosters, violations });
-  const auditedScopeKeySet = new Set(auditedScopeKeys);
-
-  const aliasedRosterNamesByScope = validateAliases({
-    aliases: exemptions.approvedStationNameAliases ?? [],
-    auditedScopeKeys: auditedScopeKeySet,
-    coverageByScope,
-    rosters,
-    violations,
-  });
-  const gapRosterNamesByScope = validateGaps({
-    gaps: exemptions.documentedCoverageGaps ?? [],
-    auditedScopeKeys: auditedScopeKeySet,
-    coverageByScope,
-    rosters,
-    aliasedRosterNamesByScope,
-    snapshotsByPath,
-    topologiesByPath,
-    violations,
-  });
-
+function reportMissingStations({ auditedScopeKeys, rosters, coverageByScope, aliasedRosterNamesByScope, gapRosterNamesByScope, violations }) {
   for (const key of auditedScopeKeys) {
     const roster = rosters.get(key);
     const coverage = coverageByScope.get(key);
@@ -537,6 +680,54 @@ export function auditRouteMapCoverageScopes({
       });
     }
   }
+}
+
+/**
+ * route_map_positions admitted 소스가 claim하는 scope 전량의 containment를 판정한다.
+ *
+ * @returns {{ auditedScopeKeys: string[], violations: Array<{ kind: string, message: string }> }}
+ */
+export function auditRouteMapCoverageScopes({
+  inventory,
+  targets,
+  rosters,
+  exemptions,
+  snapshotsByPath,
+  topologiesByPath = new Map(),
+}) {
+  const violations = [];
+  const activeScopeKeys = new Set((targets.activeLineScopes ?? []).map(scopeKey));
+  const { coverageByScope, claims } = collectScopeCoverage({ inventory, snapshotsByPath, violations });
+  const auditedScopeKeys = auditableScopeKeys({ claims, activeScopeKeys, rosters, violations });
+  const shared = {
+    auditedScopeKeys: new Set(auditedScopeKeys),
+    coverageByScope,
+    rosters,
+    officialUrls: collectOfficialUrls({ inventory, snapshotsByPath }),
+    registeredTopologyPaths: collectRegisteredTopologyPaths(inventory),
+    topologiesByPath,
+    violations,
+  };
+
+  const aliasedRosterNamesByScope = validateAliases({
+    ...shared,
+    aliases: exemptions.approvedStationNameAliases ?? [],
+  });
+  const gapRosterNamesByScope = validateGaps({
+    ...shared,
+    gaps: exemptions.documentedCoverageGaps ?? [],
+    aliasedRosterNamesByScope,
+    snapshotsByPath,
+  });
+
+  reportMissingStations({
+    auditedScopeKeys,
+    rosters,
+    coverageByScope,
+    aliasedRosterNamesByScope,
+    gapRosterNamesByScope,
+    violations,
+  });
 
   return { auditedScopeKeys, violations };
 }

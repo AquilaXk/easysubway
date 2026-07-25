@@ -91,9 +91,10 @@
       "reasonCode": "OFFICIAL_RENAME",
       "evidence": {
         "issue": 2470,
-        "renamedAt": "2024-10-10",
+        "renamedAt": "2025-05-15",
         "officialUrl": "https://www.data.go.kr/data/15099316/fileData.do",
-        "note": "서울시 지명위원회 의결로 4호선 당고개역이 불암산역으로 변경됐다. 공식 역사 좌표 파일(2025-08-14 기준)은 변경 전 표기 당고개를 유지하고, MOLIT roster는 불암산(당고개)로 옛 역명을 부역명에 병기한다."
+        "note": "서울시 지명위원회 의결(2024-10-10) 뒤 2025-05-15 시행으로 4호선 당고개역이 불암산역이 됐다. 공식 역사 좌표 파일(2025-08-14 기준)은 변경 전 표기 당고개를 유지하고, MOLIT roster는 불암산(당고개)로 옛 역명을 부역명에 병기한다.",
+        "crossCheck": "ROSTER_SUBNAME"
       }
     },
     {
@@ -103,9 +104,11 @@
       "reasonCode": "OFFICIAL_RENAME",
       "evidence": {
         "issue": 2470,
-        "renamedAt": "2024-03-14",
+        "renamedAt": "2024-02-29",
         "officialUrl": "https://www.data.go.kr/data/15099316/fileData.do",
-        "note": "서울시 지명위원회 의결로 7호선 뚝섬유원지역이 자양(뚝섬한강공원)역으로 변경됐다. 공식 역사 좌표 파일(2025-08-14 기준)은 변경 전 표기를 유지하며 건대입구와 청담 사이 같은 위치다."
+        "note": "서울특별시고시 제2024-109호(서울시보 제3956호, 2024-02-29 확정고시·시행)로 7호선 뚝섬유원지역이 자양(뚝섬한강공원)역이 됐다. 공식 역사 좌표 파일(2025-08-14 기준)은 변경 전 표기를 유지하며 건대입구와 청담 사이 같은 위치다.",
+        "crossCheck": "PACK_TOPOLOGY_SINGLE_NAME",
+        "packTopologyPath": "tools/datapack/sources/capital-route-topology-20260724.json"
       }
     },
     {
@@ -117,7 +120,9 @@
         "issue": 2505,
         "renamedAt": "2024-01-29",
         "officialUrl": "https://www.data.go.kr/data/15041326/fileData.do",
-        "note": "용인시 결정으로 에버라인 운동장·송담대역이 용인중앙시장역으로 변경됐다. 공식 역위치 파일(2024-10-15 기준)과 MOLIT roster는 변경 전 표기를 유지하고, admission에서 공식 rename join으로 결속했다(tools/datapack/collect-kric-capital-light-rail-route-map-positions.mjs)."
+        "note": "용인종합운동장 폐장에 따라 2024-01-29 시행으로 에버라인 운동장·송담대역이 용인중앙시장역이 됐다. 공식 역위치 파일(2024-10-15 기준)과 MOLIT roster는 변경 전 표기를 유지하고, admission에서 공식 rename join으로 결속했다(tools/datapack/collect-kric-capital-light-rail-route-map-positions.mjs).",
+        "crossCheck": "PACK_TOPOLOGY_SINGLE_NAME",
+        "packTopologyPath": "tools/datapack/sources/capital-route-topology-20260724.json"
       }
     }
   ],
@@ -166,7 +171,8 @@
         "issue": 2470,
         "snapshotPath": "tools/datapack/sources/seoul-metro-route-map-positions-20260724.json",
         "quarantineReasonCode": "OFFICIAL_DUPLICATE_LATLON",
-        "note": "공식 역사 좌표 파일이 5호선 마곡·발산에 동일 위경도를 실어 admission에서 OFFICIAL_DUPLICATE_LATLON으로 quarantine했다(#2470·#2471). snapshot quarantinedPositions에 기록이 남아 있다."
+        "note": "공식 역사 좌표 파일이 5호선 마곡·발산에 동일 위경도를 실어 admission에서 OFFICIAL_DUPLICATE_LATLON으로 quarantine했다(#2470·#2471). snapshot quarantinedPositions에 기록이 남아 있다.",
+        "officialUrl": "https://www.data.go.kr/data/15099316/fileData.do"
       }
     },
     {
@@ -177,7 +183,8 @@
         "issue": 2470,
         "snapshotPath": "tools/datapack/sources/seoul-metro-route-map-positions-20260724.json",
         "quarantineReasonCode": "OFFICIAL_DUPLICATE_LATLON",
-        "note": "공식 역사 좌표 파일이 5호선 마곡·발산에 동일 위경도를 실어 admission에서 OFFICIAL_DUPLICATE_LATLON으로 quarantine했다(#2470·#2471). snapshot quarantinedPositions에 기록이 남아 있다."
+        "note": "공식 역사 좌표 파일이 5호선 마곡·발산에 동일 위경도를 실어 admission에서 OFFICIAL_DUPLICATE_LATLON으로 quarantine했다(#2470·#2471). snapshot quarantinedPositions에 기록이 남아 있다.",
+        "officialUrl": "https://www.data.go.kr/data/15099316/fileData.do"
       }
     },
     {
@@ -216,5 +223,6 @@
         "note": "공식 역위치 파일에는 행이 있으나 pack 노선 topology(12역)가 우이신설 남단 종점을 싣지 않아 admission에서 잉여 행으로 제외했다(allowExtraFileRows). pack scope 확장은 별도 배치."
       }
     }
-  ]
+  ],
+  "renamedAtBasis": "renamedAt은 공식 역명 변경 시행일(고시와 시행이 같은 날이면 그 날)을 단일 기준으로 적는다."
 }

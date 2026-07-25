@@ -9,6 +9,11 @@ import { ROUTE_MAP_DOMAIN, auditRouteMapCoverageScopes } from "./route-map-cover
 const root = path.resolve(import.meta.dirname, "../..");
 const MOLIT_ROSTER_PATH = "tools/datapack/sources/molit-urban-rail-full-route-20251211.csv";
 const EXEMPTIONS_PATH = "tools/datapack/route-map-coverage-scope-exemptions.json";
+const SEOUL_SNAPSHOT_PATH = "tools/datapack/sources/seoul-metro-route-map-positions-20260724.json";
+const GWANGJU_SNAPSHOT_PATH = "tools/datapack/sources/gwangju-transportation-route-map-positions-20260725.json";
+const UI_SNAPSHOT_PATH = "tools/datapack/sources/kric-ui-sinseol-route-map-positions-20260725.json";
+const DAEGU_SNAPSHOT_PATH = "tools/datapack/sources/daegu-transportation-route-map-positions-20260724.json";
+const CAPITAL_TOPOLOGY_PATH = "tools/datapack/sources/capital-route-topology-20260724.json";
 
 // #2499·#2508에서 배선한 dual-operator containment는 전 scope 감사의 부분집합으로 유지한다.
 const DUAL_OPERATOR_SCOPE_KEYS = Object.freeze([
@@ -80,11 +85,12 @@ async function loadAuditInputs() {
     }
   }
   const topologiesByPath = new Map();
-  for (const gap of exemptions.documentedCoverageGaps) {
-    const topologyPath = gap.evidence?.packTopologyPath;
-    if (topologyPath && !topologiesByPath.has(topologyPath)) {
-      topologiesByPath.set(topologyPath, await readJson(topologyPath));
-    }
+  const topologyPaths = [
+    ...exemptions.documentedCoverageGaps,
+    ...exemptions.approvedStationNameAliases,
+  ].map((entry) => entry.evidence?.packTopologyPath).filter(Boolean);
+  for (const topologyPath of [...new Set(topologyPaths), CAPITAL_TOPOLOGY_PATH]) {
+    topologiesByPath.set(topologyPath, await readJson(topologyPath));
   }
   return {
     inventory,
@@ -99,6 +105,16 @@ async function loadAuditInputs() {
 // 위반은 별칭 → 결측 ledger → containment 순서로 쌓이므로 나열 순서가 결정론적이다.
 function violationKinds(result) {
   return result.violations.map(({ kind }) => kind);
+}
+
+function aliasNamed(exemptions, snapshotStationName) {
+  return exemptions.approvedStationNameAliases
+    .find((alias) => alias.snapshotStationName === snapshotStationName);
+}
+
+function gapNamed(exemptions, rosterStationName) {
+  return exemptions.documentedCoverageGaps
+    .find((gap) => gap.rosterStationName === rosterStationName);
 }
 
 test("route_map_positions 전 scope containment는 승인 별칭·문서화 결측 반영 후 fail-closed다 (#2516)", async () => {
@@ -119,26 +135,37 @@ test("route_map_positions 전 scope containment는 승인 별칭·문서화 결�
   }
 });
 
-test("면제 fixture는 항목마다 공식 근거를 싣는다 (#2516)", async () => {
+test("면제 fixture는 사유별로 요구되는 근거 필드를 모두 싣는다 (#2516)", async () => {
   const { exemptions } = await loadAuditInputs();
 
   assert.equal(exemptions.artifactKind, "route-map-coverage-scope-exemptions");
+  assert.equal(typeof exemptions.renamedAtBasis, "string");
   for (const alias of exemptions.approvedStationNameAliases) {
-    assert.ok(alias.evidence.officialUrl.startsWith("https://"), `${alias.snapshotStationName} 근거 URL이 없다`);
-    assert.ok(alias.evidence.note.length > 0, `${alias.snapshotStationName} 근거 서술이 없다`);
+    const label = `${alias.scopeKey} ${alias.snapshotStationName}`;
+    assert.equal(typeof alias.evidence?.officialUrl, "string", `${label}: officialUrl이 없다`);
+    assert.ok(alias.evidence.officialUrl.startsWith("https://"), `${label}: officialUrl이 https가 아니다`);
+    assert.equal(typeof alias.evidence.note, "string", `${label}: 근거 서술이 없다`);
+    assert.ok(alias.evidence.note.length > 0, `${label}: 근거 서술이 비어 있다`);
+    if (alias.reasonCode === "OFFICIAL_RENAME") {
+      assert.match(alias.evidence.renamedAt ?? "", /^\d{4}-\d{2}-\d{2}$/u, `${label}: 시행일이 없다`);
+      assert.equal(typeof alias.evidence.crossCheck, "string", `${label}: 교차 근거 방식이 없다`);
+    }
   }
   for (const gap of exemptions.documentedCoverageGaps) {
-    assert.ok(gap.evidence.snapshotPath.startsWith("tools/datapack/sources/"));
-    assert.ok(gap.evidence.note.length > 0, `${gap.rosterStationName} 근거 서술이 없다`);
+    const label = `${gap.scopeKey} ${gap.rosterStationName}`;
+    assert.equal(typeof gap.evidence?.snapshotPath, "string", `${label}: snapshotPath가 없다`);
+    assert.ok(gap.evidence.snapshotPath.startsWith("tools/datapack/sources/"), `${label}: snapshotPath 경로가 다르다`);
+    assert.equal(typeof gap.evidence.officialUrl, "string", `${label}: officialUrl이 없다`);
+    assert.equal(typeof gap.evidence.note, "string", `${label}: 근거 서술이 없다`);
+    assert.ok(gap.evidence.note.length > 0, `${label}: 근거 서술이 비어 있다`);
   }
 });
 
 test("admitted snapshot에서 커버 역이 사라지면 containment가 실패한다 (#2516)", async () => {
   const inputs = await loadAuditInputs();
-  const snapshotPath = "tools/datapack/sources/gwangju-transportation-route-map-positions-20260725.json";
-  const snapshot = structuredClone(inputs.snapshotsByPath.get(snapshotPath));
+  const snapshot = structuredClone(inputs.snapshotsByPath.get(GWANGJU_SNAPSHOT_PATH));
   snapshot.positions = snapshot.positions.filter(({ stationName }) => stationName !== "광주송정");
-  const snapshotsByPath = new Map(inputs.snapshotsByPath).set(snapshotPath, snapshot);
+  const snapshotsByPath = new Map(inputs.snapshotsByPath).set(GWANGJU_SNAPSHOT_PATH, snapshot);
 
   const result = auditRouteMapCoverageScopes({ ...inputs, snapshotsByPath });
 
@@ -160,6 +187,7 @@ test("결측을 가리는 별칭은 거부된다 (#2516)", async () => {
     evidence: {
       issue: 2516,
       renamedAt: "2024-08-10",
+      crossCheck: "ROSTER_SUBNAME",
       officialUrl: "https://www.data.go.kr/data/15099316/fileData.do",
       note: "근거 없는 별칭",
     },
@@ -183,6 +211,7 @@ test("snapshot에 없는 역을 가리키는 별칭은 거부된다 (#2516)", as
     evidence: {
       issue: 2516,
       renamedAt: "2017-09-02",
+      crossCheck: "ROSTER_SUBNAME",
       officialUrl: "https://www.data.go.kr/data/15041324/fileData.do",
       note: "근거 없는 별칭",
     },
@@ -193,22 +222,46 @@ test("snapshot에 없는 역을 가리키는 별칭은 거부된다 (#2516)", as
   assert.deepEqual(violationKinds(result), ["ALIAS_SNAPSHOT_STATION_ABSENT", "MISSING_STATION"]);
 });
 
-test("근거가 빠진 별칭은 거부된다 (#2516)", async () => {
+test("근거 서술이 빠진 별칭은 거부된다 (#2516)", async () => {
   const inputs = await loadAuditInputs();
   const exemptions = structuredClone(inputs.exemptions);
-  delete exemptions.approvedStationNameAliases[0].evidence.officialUrl;
+  delete exemptions.approvedStationNameAliases[0].evidence.note;
 
   const result = auditRouteMapCoverageScopes({ ...inputs, exemptions });
 
-  assert.deepEqual(violationKinds(result), ["ALIAS_EVIDENCE_INVALID", "MISSING_STATION"]);
+  assert.deepEqual(violationKinds(result), ["ALIAS_EVIDENCE_NOTE_MISSING", "MISSING_STATION"]);
+});
+
+test("등재되지 않은 URL을 근거로 단 별칭은 거부된다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const exemptions = structuredClone(inputs.exemptions);
+  exemptions.approvedStationNameAliases[0].evidence.officialUrl = "https://example.com/";
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, exemptions });
+
+  assert.deepEqual(violationKinds(result), ["ALIAS_EVIDENCE_URL_UNREGISTERED", "MISSING_STATION"]);
+});
+
+test("승인 목록 밖 사유 코드는 별칭·ledger 모두에서 거부된다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const exemptions = structuredClone(inputs.exemptions);
+  aliasNamed(exemptions, "성서산단").reasonCode = "OFFICIAL_WHATEVER";
+  gapNamed(exemptions, "하양").reasonCode = "OFFICIAL_WHATEVER";
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, exemptions });
+
+  assert.deepEqual(violationKinds(result), [
+    "ALIAS_REASON_CODE_INVALID",
+    "LEDGER_REASON_CODE_INVALID",
+    "MISSING_STATION",
+    "MISSING_STATION",
+  ]);
 });
 
 test("호선 접미사 표기 별칭은 표기 규칙이 어긋나면 거부된다 (#2516)", async () => {
   const inputs = await loadAuditInputs();
   const exemptions = structuredClone(inputs.exemptions);
-  const alias = exemptions.approvedStationNameAliases
-    .find(({ snapshotStationName }) => snapshotStationName === "성서산단");
-  alias.reasonCode = "OFFICIAL_LINE_ORDINAL_SUFFIX";
+  aliasNamed(exemptions, "성서산단").reasonCode = "OFFICIAL_LINE_ORDINAL_SUFFIX";
 
   const result = auditRouteMapCoverageScopes({ ...inputs, exemptions });
 
@@ -217,27 +270,67 @@ test("호선 접미사 표기 별칭은 표기 규칙이 어긋나면 거부된�
 
 test("공식 개명 별칭은 노선 나열 위치가 다르면 거부된다 (#2516)", async () => {
   const inputs = await loadAuditInputs();
-  const exemptions = structuredClone(inputs.exemptions);
-  const alias = exemptions.approvedStationNameAliases
-    .find(({ snapshotStationName }) => snapshotStationName === "당고개");
-  const snapshotPath = "tools/datapack/sources/seoul-metro-route-map-positions-20260724.json";
-  const snapshot = structuredClone(inputs.snapshotsByPath.get(snapshotPath));
+  const snapshot = structuredClone(inputs.snapshotsByPath.get(SEOUL_SNAPSHOT_PATH));
   // 상계를 지우면 당고개의 이웃이 노원으로 바뀌어 불암산과 같은 위치라는 근거가 깨진다.
   snapshot.positions = snapshot.positions
     .filter((position) => !(position.lineId === "seoul-4" && position.stationName === "상계"));
-  const snapshotsByPath = new Map(inputs.snapshotsByPath).set(snapshotPath, snapshot);
+  const snapshotsByPath = new Map(inputs.snapshotsByPath).set(SEOUL_SNAPSHOT_PATH, snapshot);
 
   const result = auditRouteMapCoverageScopes({ ...inputs, snapshotsByPath });
 
-  assert.equal(alias.reasonCode, "OFFICIAL_RENAME");
   assert.deepEqual(violationKinds(result), ["ALIAS_RENAME_SEQUENCE_MISMATCH", "MISSING_STATION"]);
+});
+
+test("허위 근거를 단 공식 개명 별칭은 거부된다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const exemptions = structuredClone(inputs.exemptions);
+  // 축약 표기를 개명으로 세탁하려는 시도. 이웃 역은 같지만 교차 근거가 성립하지 않는다.
+  const alias = aliasNamed(exemptions, "성서산단");
+  alias.reasonCode = "OFFICIAL_RENAME";
+  alias.evidence.renamedAt = "2024-01-01";
+  alias.evidence.crossCheck = "ROSTER_SUBNAME";
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, exemptions });
+
+  assert.deepEqual(violationKinds(result), ["ALIAS_RENAME_SUBNAME_ABSENT", "MISSING_STATION"]);
+});
+
+test("교차 근거 방식을 선언하지 않은 개명 별칭은 거부된다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const exemptions = structuredClone(inputs.exemptions);
+  delete aliasNamed(exemptions, "당고개").evidence.crossCheck;
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, exemptions });
+
+  assert.deepEqual(violationKinds(result), ["ALIAS_RENAME_CROSS_CHECK_INVALID", "MISSING_STATION"]);
+});
+
+test("snapshot 수집 시점보다 늦은 개명일은 거부된다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const exemptions = structuredClone(inputs.exemptions);
+  aliasNamed(exemptions, "당고개").evidence.renamedAt = "2027-01-01";
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, exemptions });
+
+  assert.deepEqual(violationKinds(result), ["ALIAS_RENAME_DATE_OUT_OF_RANGE", "MISSING_STATION"]);
+});
+
+test("pack topology가 두 표기를 모두 실으면 개명 별칭이 거부된다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const topology = structuredClone(inputs.topologiesByPath.get(CAPITAL_TOPOLOGY_PATH));
+  const line = topology.lines.find(({ lineId }) => lineId === "line-15b3b8a93259");
+  line.scope = [...line.scope, { ...line.scope[0], stationName: "뚝섬유원지" }];
+  const topologiesByPath = new Map(inputs.topologiesByPath).set(CAPITAL_TOPOLOGY_PATH, topology);
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, topologiesByPath });
+
+  assert.deepEqual(violationKinds(result), ["ALIAS_RENAME_TOPOLOGY_AMBIGUOUS", "MISSING_STATION"]);
 });
 
 test("quarantine 기록이 없는 결측 ledger 항목은 거부된다 (#2516)", async () => {
   const inputs = await loadAuditInputs();
   const exemptions = structuredClone(inputs.exemptions);
-  const gap = exemptions.documentedCoverageGaps
-    .find(({ rosterStationName }) => rosterStationName === "암사역사공원");
+  const gap = gapNamed(exemptions, "암사역사공원");
   gap.reasonCode = "ADMISSION_QUARANTINED";
   gap.evidence.quarantineReasonCode = "OFFICIAL_DUPLICATE_LATLON";
 
@@ -246,12 +339,20 @@ test("quarantine 기록이 없는 결측 ledger 항목은 거부된다 (#2516)",
   assert.deepEqual(violationKinds(result), ["LEDGER_QUARANTINE_RECORD_ABSENT", "MISSING_STATION"]);
 });
 
+test("quarantine 사유 항목도 공식 출처 URL을 요구한다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const exemptions = structuredClone(inputs.exemptions);
+  delete gapNamed(exemptions, "마곡").evidence.officialUrl;
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, exemptions });
+
+  assert.deepEqual(violationKinds(result), ["LEDGER_EVIDENCE_URL_UNREGISTERED", "MISSING_STATION"]);
+});
+
 test("pack topology가 싣고 있는 역은 pack 결측으로 면제할 수 없다 (#2516)", async () => {
   const inputs = await loadAuditInputs();
   const exemptions = structuredClone(inputs.exemptions);
-  const gap = exemptions.documentedCoverageGaps
-    .find(({ rosterStationName }) => rosterStationName === "암사역사공원");
-  gap.reasonCode = "PACK_SCOPE_ABSENT";
+  gapNamed(exemptions, "암사역사공원").reasonCode = "PACK_SCOPE_ABSENT";
 
   const result = auditRouteMapCoverageScopes({ ...inputs, exemptions });
 
@@ -261,13 +362,32 @@ test("pack topology가 싣고 있는 역은 pack 결측으로 면제할 수 없�
 test("pack topology에 없는 역은 공식 원문 결측으로 면제할 수 없다 (#2516)", async () => {
   const inputs = await loadAuditInputs();
   const exemptions = structuredClone(inputs.exemptions);
-  const gap = exemptions.documentedCoverageGaps
-    .find(({ rosterStationName }) => rosterStationName === "신설동");
-  gap.reasonCode = "OFFICIAL_FILE_ROW_ABSENT";
+  gapNamed(exemptions, "신설동").reasonCode = "OFFICIAL_FILE_ROW_ABSENT";
 
   const result = auditRouteMapCoverageScopes({ ...inputs, exemptions });
 
   assert.deepEqual(violationKinds(result), ["LEDGER_PACK_TOPOLOGY_STATION_ABSENT", "MISSING_STATION"]);
+});
+
+test("collector가 선언하지 않은 결측은 공식 원문 결측으로 면제할 수 없다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const snapshot = structuredClone(inputs.snapshotsByPath.get(DAEGU_SNAPSHOT_PATH));
+  snapshot.topologyGaps = snapshot.topologyGaps.filter(({ stationName }) => stationName !== "하양");
+  const snapshotsByPath = new Map(inputs.snapshotsByPath).set(DAEGU_SNAPSHOT_PATH, snapshot);
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, snapshotsByPath });
+
+  assert.deepEqual(violationKinds(result), ["LEDGER_TOPOLOGY_GAP_NOT_DECLARED", "MISSING_STATION"]);
+});
+
+test("scope에 등재되지 않은 topology 파일을 가리키면 거부된다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const exemptions = structuredClone(inputs.exemptions);
+  gapNamed(exemptions, "하양").evidence.packTopologyPath = CAPITAL_TOPOLOGY_PATH;
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, exemptions });
+
+  assert.deepEqual(violationKinds(result), ["LEDGER_PACK_TOPOLOGY_UNBOUND", "MISSING_STATION"]);
 });
 
 test("이미 커버된 역을 임의로 면제하는 ledger 항목은 거부된다 (#2516)", async () => {
@@ -279,8 +399,8 @@ test("이미 커버된 역을 임의로 면제하는 ledger 항목은 거부된�
     reasonCode: "OFFICIAL_FILE_ROW_ABSENT",
     evidence: {
       issue: 2516,
-      snapshotPath: "tools/datapack/sources/gwangju-transportation-route-map-positions-20260725.json",
-      packTopologyPath: "tools/datapack/sources/capital-route-topology-20260724.json",
+      snapshotPath: GWANGJU_SNAPSHOT_PATH,
+      packTopologyPath: CAPITAL_TOPOLOGY_PATH,
       officialUrl: "https://www.data.go.kr/data/15122916/fileData.do",
       note: "근거 없는 면제",
     },
@@ -293,10 +413,9 @@ test("이미 커버된 역을 임의로 면제하는 ledger 항목은 거부된�
 
 test("admission으로 해소된 결측은 ledger에 남길 수 없다 (#2516)", async () => {
   const inputs = await loadAuditInputs();
-  const snapshotPath = "tools/datapack/sources/kric-ui-sinseol-route-map-positions-20260725.json";
-  const snapshot = structuredClone(inputs.snapshotsByPath.get(snapshotPath));
+  const snapshot = structuredClone(inputs.snapshotsByPath.get(UI_SNAPSHOT_PATH));
   snapshot.positions = [...snapshot.positions, { ...snapshot.positions[0], stationName: "신설동" }];
-  const snapshotsByPath = new Map(inputs.snapshotsByPath).set(snapshotPath, snapshot);
+  const snapshotsByPath = new Map(inputs.snapshotsByPath).set(UI_SNAPSHOT_PATH, snapshot);
 
   const result = auditRouteMapCoverageScopes({ ...inputs, snapshotsByPath });
 
