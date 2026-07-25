@@ -39,6 +39,10 @@
     "tool": "tools/datapack/run-nationwide-candidate-coverage-gate.mjs"
   },
   "inputs": {
+    "inheritedPack": {
+      "path": "tools/datapack/release/capital-production-reviewed-pack.json",
+      "sha256": "6b64e5e9f16306e7602a52fd47247c770b2b192c058f1f07a718aaf2dab2ff4a"
+    },
     "inventory": {
       "path": "tools/datapack/source-inventory.json",
       "sha256": "8856a81a49f8f3814c9abd1a54fca7451dbcd1b5a3c2613e6427c3f1a3f49ff8"
@@ -77,6 +81,11 @@
     2510,
     2138
   ],
+  "readingGuide": {
+    "denominatorSemanticsKo": "pilotRequirements의 denominator·coveredFields는 domain requiredFields 개수이지 데이터 행 수가 아니다. route_map_positions의 denominator 2는 필수 필드 2개(route_map_position·route_map_label_polygon)를 뜻하며 역 2개나 행 2개를 뜻하지 않는다. 실제로 그 판정을 뒷받침한 provenance 행 수는 필드별 supportingRecordCountByField에 따로 기록한다.",
+    "supportedScopeKo": "이 evidence는 SUPPORTED 축만 기록하므로 전국 gap 총량 판독에 쓰면 안 된다. 전국 진행 집계는 tools/datapack/reports/nationwide-coverage-tally.json이 정본이다.",
+    "variantComparisonKo": "전이 판정은 두 variant의 상대 비교다. baseline SUPPORTED 총량은 승계 팩의 다른 소스가 line-scope를 갖게 되면 함께 늘어날 수 있고, 하네스는 파일럿 키가 baseline에 없고 lineScoped가 baseline ∪ 파일럿 키와 정확히 같은지만 fail closed로 본다."
+  },
   "regeneration": {
     "command": "node tools/datapack/run-nationwide-candidate-coverage-gate.mjs --spec tools/datapack/nationwide-candidate-pack-spec.json --targets tools/datapack/nationwide-coverage-targets.json --inventory tools/datapack/source-inventory.json --resolution-plan tools/datapack/release/nationwide-public-api-coverage-search-plan-20260725.json --resolutions tools/datapack/release/nationwide-public-api-coverage-resolutions-20260725.json --output tools/datapack/reports/nationwide-candidate-coverage-gate.json",
     "evidencePath": "tools/datapack/reports/nationwide-candidate-coverage-gate.json",
@@ -134,7 +143,11 @@
           "releaseTier": "LAUNCH_REQUIRED",
           "requirementKey": "capital:seoul-metro:seoul-4:route_map_positions",
           "sourceIds": [],
-          "status": "MISSING"
+          "status": "MISSING",
+          "supportingRecordCountByField": {
+            "route_map_label_polygon": 0,
+            "route_map_position": 0
+          }
         }
       ],
       "supportedRequirementKeys": []
@@ -179,7 +192,11 @@
           "sourceIds": [
             "seoulmetro-cyberstation-route-map"
           ],
-          "status": "SUPPORTED"
+          "status": "SUPPORTED",
+          "supportingRecordCountByField": {
+            "route_map_label_polygon": 2,
+            "route_map_position": 2
+          }
         }
       ],
       "supportedRequirementKeys": [

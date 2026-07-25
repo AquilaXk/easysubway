@@ -37,7 +37,11 @@ const INPUT_PATHS = {
   inventory: INVENTORY_PATH,
   resolutionPlan: RESOLUTION_PLAN_PATH,
   resolutions: RESOLUTIONS_PATH,
+  // 승계 원본도 해시 축이다. 경로만 기록하면 원본의 값 drift가 evidence를 바이트 동일하게 통과한다.
+  inheritedPack: REVIEWED_PACK_PATH,
 };
+// 임시 RSA 키·런타임 SQLite에 좌우되는 축은 evidence 어느 노드에도 key로 존재하면 안 된다.
+const FORBIDDEN_EVIDENCE_KEYS = ["manifestSha256", "sqliteSha256", "signature"];
 
 async function readJson(relativePath) {
   return JSON.parse(await readFile(path.join(root, relativePath), "utf8"));
@@ -45,6 +49,18 @@ async function readJson(relativePath) {
 
 async function sha256Of(relativePath) {
   return createHash("sha256").update(await readFile(path.join(root, relativePath))).digest("hex");
+}
+
+// 문자열 substring 탐침은 서술 문자열의 인접 문자에 좌우된다 — 전 노드를 순회해 금지 key 부재를 본다.
+function forbiddenKeyPaths(node, nodePath = "$") {
+  if (Array.isArray(node)) {
+    return node.flatMap((entry, index) => forbiddenKeyPaths(entry, `${nodePath}[${index}]`));
+  }
+  if (!node || typeof node !== "object") return [];
+  return Object.entries(node).flatMap(([key, value]) => [
+    ...(FORBIDDEN_EVIDENCE_KEYS.includes(key) ? [`${nodePath}.${key}`] : []),
+    ...forbiddenKeyPaths(value, `${nodePath}.${key}`),
+  ]);
 }
 
 test("커밋된 candidate 게이트 evidence는 현행 입력에서 바이트 단위로 재생성된다", async () => {
@@ -86,7 +102,7 @@ test("커밋된 candidate 게이트 evidence는 현행 입력에서 바이트 �
     // 임시 RSA 키·SQLite 바이트·wall-clock 의존 집계는 기록 축이 아니다(결정성 계약).
     assert.equal(evidence.harness.signing.mode, "EPHEMERAL_RSA_2048");
     assert.equal(evidence.determinism.packPayloadIdenticalAcrossVariants, true);
-    assert.equal(JSON.stringify(evidence).includes("manifestSha256\":\""), false);
+    assert.deepEqual(forbiddenKeyPaths(evidence), []);
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }
@@ -100,10 +116,18 @@ test("파일럿 scope는 line-scope 재기술로 MISSING에서 SUPPORTED로 전�
   assert.equal(evidence.candidatePack.artifactKind, "production");
   assert.equal(evidence.candidatePack.inheritsFrom.path, REVIEWED_PACK_PATH);
 
-  assert.deepEqual(evidence.variants.baseline.supportedRequirementKeys, []);
-  assert.equal(evidence.variants.baseline.launchRequired.supportedCount, 0);
-  assert.deepEqual(evidence.variants.lineScoped.supportedRequirementKeys, [PILOT_REQUIREMENT_KEY]);
-  assert.equal(evidence.variants.lineScoped.launchRequired.supportedCount, 1);
+  // 전이는 절대 수치가 아니라 상대 비교로 본다. 승계 팩의 다른 소스가 line-scope를 갖게 되면
+  // 두 variant의 supported 총량이 함께 늘 수 있고, 그때도 아래 두 축은 그대로 성립해야 한다.
+  const baselineKeys = evidence.variants.baseline.supportedRequirementKeys;
+  assert.equal(baselineKeys.includes(PILOT_REQUIREMENT_KEY), false);
+  assert.deepEqual(
+    evidence.variants.lineScoped.supportedRequirementKeys,
+    [...new Set([...baselineKeys, PILOT_REQUIREMENT_KEY])].sort(),
+  );
+  assert.equal(
+    evidence.variants.lineScoped.launchRequired.supportedCount,
+    evidence.variants.baseline.launchRequired.supportedCount + 1,
+  );
   assert.equal(evidence.variants.lineScoped.launchRequired.totalCount, 270);
 
   const [before] = evidence.variants.baseline.pilotRequirements;
@@ -117,6 +141,16 @@ test("파일럿 scope는 line-scope 재기술로 MISSING에서 SUPPORTED로 전�
   assert.equal(after.denominator, 2);
   assert.deepEqual(after.sourceIds, [PILOT_SOURCE_ID]);
   assert.deepEqual(after.missingFields, []);
+  // denominator 2는 필수 필드 2개를 뜻하고 데이터 행 2개가 아니다 — 뒷받침 행수를 따로 고정한다.
+  assert.deepEqual(after.supportingRecordCountByField, {
+    route_map_position: 2,
+    route_map_label_polygon: 2,
+  });
+  assert.deepEqual(before.supportingRecordCountByField, {
+    route_map_position: 0,
+    route_map_label_polygon: 0,
+  });
+  assert.match(evidence.readingGuide.denominatorSemanticsKo, /데이터 행 수가 아니다/);
 
   assert.deepEqual(evidence.transitions, [{
     requirementKey: PILOT_REQUIREMENT_KEY,
@@ -166,6 +200,57 @@ test("candidate spec의 line-scope 재기술은 tracked source inventory와 동�
   });
 });
 
+// candidate 안전 경계를 산문이 아니라 코드가 강제하는지 본다. 이 도구는 artifactKind production으로 실제
+// RSA 서명 manifest를 만들기 때문에, spec 편집만으로 production 채널·게시 가능 URL 서명본이 나오면 안 된다.
+test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async (context) => {
+  const spec = await readJson(SPEC_PATH);
+  const inventory = await readJson(INVENTORY_PATH);
+
+  async function rejectsWith(mutate, expected) {
+    const workspace = await mkdtemp(path.join(tmpdir(), "nationwide-candidate-gate-guard-"));
+    const mutated = structuredClone(spec);
+    mutate(mutated);
+    try {
+      await assert.rejects(
+        runNationwideCandidateCoverageGate({
+          spec: mutated,
+          specInput: { path: SPEC_PATH, sha256: "a".repeat(64) },
+          targetsInput: { path: TARGETS_PATH, sha256: "b".repeat(64) },
+          inventory,
+          inventoryInput: { path: INVENTORY_PATH, sha256: "c".repeat(64) },
+          resolutionPlanInput: { path: RESOLUTION_PLAN_PATH, sha256: "d".repeat(64) },
+          resolutionsInput: { path: RESOLUTIONS_PATH, sha256: "e".repeat(64) },
+          workDir: workspace,
+        }),
+        expected,
+      );
+    } finally {
+      await rm(workspace, { recursive: true, force: true });
+    }
+  }
+
+  await context.test("production 채널 manifest는 거부된다", async () => {
+    await rejectsWith(
+      (value) => { value.manifest.channel = "production"; },
+      /manifest\.channel must be candidate/,
+    );
+  });
+
+  await context.test("게시 가능한 pack url은 거부된다", async () => {
+    await rejectsWith(
+      (value) => { value.pack.url = "https://objectstorage.example.com/catalog/nationwide-candidate-v1.sqlite.gz"; },
+      /pack\.url host must be the non-publishable host/,
+    );
+  });
+
+  await context.test("파일럿 범위를 넘는 다중 lineIds는 거부된다", async () => {
+    await rejectsWith(
+      (value) => { value.lineScopeRedescriptions[0].lineIds = ["seoul-4", "seoul-2"]; },
+      /lineIds must describe exactly one line/,
+    );
+  });
+});
+
 test("production 게시 트랙 fixture는 candidate 조립에 영향받지 않는다", async () => {
   const spec = await readJson(SPEC_PATH);
   const reviewed = await readJson(REVIEWED_PACK_PATH);
@@ -179,8 +264,8 @@ test("production 게시 트랙 fixture는 candidate 조립에 영향받지 않�
   assert.deepEqual(reviewed.manifest.activePack, { id: "capital", version: "1" });
   assert.notEqual(spec.pack.id, pack.id);
   assert.notEqual(spec.pack.url, pack.url);
-
-  // 게시 트랙 fixture는 operator-scope 기술을 유지한다. line-scope 재기술은 candidate 조립에서만 일어난다.
-  const source = pack.sourceInventory.find(({ id }) => id === PILOT_SOURCE_ID);
-  assert.equal(source.coverageScope.lineIds, undefined);
+  // 게시 fixture의 coverageScope 기술 자체는 여기서 못박지 않는다. #2510 로드맵의 최종 목표가 게시 팩의
+  // line-scope화이므로 operator-scope를 영구 계약으로 고정하면 정상 진행과 충돌한다. 게시 동작 불변은
+  // candidate 조립이 게시 정체성(id·version·url·channel·activePack)을 건드리지 않는다는 위 행위 단언과
+  // datapack/release 계약 테스트로 유지한다.
 });

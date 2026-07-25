@@ -71,6 +71,9 @@ const ALLOWED_FLAGS = new Set([
 ]);
 const SPEC_ARTIFACT_KIND = "nationwide-candidate-pack-spec";
 const CANDIDATE_ARTIFACT_KIND = "production";
+const CANDIDATE_MANIFEST_CHANNEL = "candidate";
+// 예약 TLD(.invalid, RFC 2606)라 어떤 게시 경로에서도 해석되지 않는다.
+const NON_PUBLISHABLE_HOST = "easysubway-datapack-candidate.invalid";
 const SIGNING_MODE = "EPHEMERAL_RSA_2048";
 
 export async function runNationwideCandidateCoverageGate({
@@ -86,7 +89,10 @@ export async function runNationwideCandidateCoverageGate({
 }) {
   validateSpec(spec);
   assertInventoryLineScopeSync(spec, inventory);
-  const inherited = JSON.parse(await readFile(path.resolve(root, spec.inheritsFrom.path), "utf8"));
+  // 승계 원본도 입력 해시 축에 넣는다. 경로·pack 정체성만 기록하면 원본 좌표 같은 값 drift가
+  // evidence를 바이트 동일하게 통과시킨다(구조 drift만 잡히는 상태) — 파일 바이트로 결속한다.
+  const inheritedInput = await readJsonInput(spec.inheritsFrom.path);
+  const inherited = inheritedInput.document;
 
   const signing = ephemeralSigningKeys();
   const variants = {};
@@ -134,7 +140,8 @@ export async function runNationwideCandidateCoverageGate({
     ], { cwd: root });
 
     reports[variant] = JSON.parse(await readFile(reportPath, "utf8"));
-    variants[variant] = summarizeVariant(spec, reports[variant]);
+    const provenance = JSON.parse(await readFile(path.join(buildDir, "current.provenance.json"), "utf8"));
+    variants[variant] = summarizeVariant(spec, reports[variant], provenance);
   }
 
   return buildEvidence({
@@ -145,6 +152,7 @@ export async function runNationwideCandidateCoverageGate({
       inventory: inventoryInput,
       resolutionPlan: resolutionPlanInput,
       resolutions: resolutionsInput,
+      inheritedPack: inheritedInput.input,
     },
     reports,
     variants,
@@ -213,15 +221,10 @@ function coverageScopeWithLineIds(coverageScope, lineIds, label) {
   if (!coverageScope || typeof coverageScope !== "object" || Array.isArray(coverageScope)) {
     throw new Error(`${label} must be an object`);
   }
+  // coverageScope에 새 key가 생겨도 조립분에서 조용히 탈락하지 않도록 spread로 보존한다
+  // (고정 key 재조립은 미래 key를 무성 유실시킨다).
   const { lineIds: _dropped, ...rest } = coverageScope;
-  if (lineIds === null) return rest;
-  // source-inventory.json의 key 순서(regionIds → operatorIds → lineIds → sourceDomains)를 유지한다.
-  return {
-    regionIds: rest.regionIds,
-    operatorIds: rest.operatorIds,
-    lineIds: [...lineIds],
-    sourceDomains: rest.sourceDomains,
-  };
+  return lineIds === null ? rest : { ...rest, lineIds: [...lineIds] };
 }
 
 // fixture와 tracked inventory의 line-scope 재기술이 어긋나면 게이트 판정이 조용히 갈린다 — fail closed.
@@ -245,7 +248,7 @@ function assertInventoryLineScopeSync(spec, inventory) {
   }
 }
 
-function summarizeVariant(spec, report) {
+function summarizeVariant(spec, report, provenance) {
   const supportedRequirementKeys = report.requirements
     .filter((entry) => entry.status === "SUPPORTED")
     .map(requirementKey)
@@ -257,7 +260,7 @@ function summarizeVariant(spec, report) {
     pilotRequirements: spec.lineScopeRedescriptions
       .flatMap(({ requirementKeys }) => requirementKeys)
       .sort(codepointCompare)
-      .map((key) => pilotRequirement(report, key)),
+      .map((key) => pilotRequirement(report, key, provenance)),
   };
 }
 
@@ -270,13 +273,15 @@ function supportedCounts(tier) {
   };
 }
 
-function pilotRequirement(report, key) {
+function pilotRequirement(report, key, provenance) {
   const entry = report.requirements.find((requirement) => requirementKey(requirement) === key);
   if (!entry) throw new Error(`pilot requirement is not in the coverage report: ${key}`);
   return {
     requirementKey: key,
     releaseTier: entry.releaseTier,
     status: entry.status,
+    // denominator·coveredFields는 domain requiredFields 개수이지 데이터 행 수가 아니다.
+    // 실제 뒷받침 행 수는 supportingRecordCountByField로 따로 기록한다.
     denominator: entry.denominator,
     coveredFields: entry.coveredFields,
     coverageRatio: entry.coverageRatio,
@@ -284,7 +289,24 @@ function pilotRequirement(report, key) {
     missingFields: entry.missingFields,
     sourceIds: entry.sourceIds,
     fieldCoverage: entry.fieldCoverage.map(({ field, status, sourceIds }) => ({ field, status, sourceIds })),
+    supportingRecordCountByField: supportingRecordCountByField(provenance, entry),
   };
+}
+
+// requirement scope와 정확히 일치하는 official/field-verified provenance 레코드 수를 필드별로 센다.
+// "분모 2 = 데이터 2행"으로 읽히는 오독을 막는 뒷받침 행수 축이다(결정적 — 개수만 기록한다).
+function supportingRecordCountByField(provenance, entry) {
+  const records = (provenance.packs ?? []).flatMap((pack) => pack.records ?? []);
+  return Object.fromEntries(entry.fieldCoverage.map(({ field }) => [
+    field,
+    records.filter((record) =>
+      record.field === field
+      && ["OFFICIAL", "FIELD_VERIFIED"].includes(record.derivationKind)
+      && (record.coverageScope?.regionIds ?? []).includes(entry.regionId)
+      && (record.coverageScope?.operatorIds ?? []).includes(entry.operatorId)
+      && (record.coverageScope?.lineIds ?? []).includes(entry.lineId)
+      && (record.coverageScope?.sourceDomains ?? []).includes(entry.sourceDomain)).length,
+  ]));
 }
 
 function buildEvidence({ spec, inputs, reports, variants, signing }) {
@@ -292,16 +314,22 @@ function buildEvidence({ spec, inputs, reports, variants, signing }) {
     .flatMap(({ requirementKeys }) => requirementKeys)
     .sort(codepointCompare);
   assertCandidateRootPack(spec, reports);
-  // before가 0이 아니면 전이 실증이 성립하지 않는다 — fail closed.
-  if (variants.baseline.supportedRequirementKeys.length !== 0) {
+  // 전이 판정은 절대 수치가 아니라 두 variant의 상대 비교다. baseline SUPPORTED 총량을 0으로 못박으면
+  // 승계 팩의 다른 소스가 line-scope를 갖는 순간(#2510 로드맵의 정상 진행) 무관한 PR에서 하네스가 깨진다.
+  // 아래 두 축은 그대로 fail closed로 남는다: 파일럿 키가 baseline에 이미 있으면 전이 실증이 성립하지 않고,
+  // lineScoped가 baseline ∪ 파일럿 키와 다르면 선언보다 넓거나 좁은 전이가 일어난 것이다.
+  const baselineKeys = variants.baseline.supportedRequirementKeys;
+  const alreadySupported = expectedKeys.filter((key) => baselineKeys.includes(key));
+  if (alreadySupported.length > 0) {
     throw new Error(
-      `baseline variant must have zero SUPPORTED requirements: ${variants.baseline.supportedRequirementKeys.join(",")}`,
+      `pilot requirements must be MISSING before the line-scope redescription: ${alreadySupported.join(",")}`,
     );
   }
-  if (JSON.stringify(variants.lineScoped.supportedRequirementKeys) !== JSON.stringify(expectedKeys)) {
+  const expectedLineScopedKeys = [...new Set([...baselineKeys, ...expectedKeys])].sort(codepointCompare);
+  if (JSON.stringify(variants.lineScoped.supportedRequirementKeys) !== JSON.stringify(expectedLineScopedKeys)) {
     throw new Error(
-      "line-scoped SUPPORTED requirements must equal the spec redescription requirementKeys: "
-        + `expected ${expectedKeys.join(",")}, got ${variants.lineScoped.supportedRequirementKeys.join(",")}`,
+      "line-scoped SUPPORTED requirements must equal baseline plus the spec redescription requirementKeys: "
+        + `expected ${expectedLineScopedKeys.join(",")}, got ${variants.lineScoped.supportedRequirementKeys.join(",")}`,
     );
   }
   const baselineStatuses = new Map(
@@ -361,6 +389,20 @@ function buildEvidence({ spec, inputs, reports, variants, signing }) {
       packPayloadIdenticalReasonKo:
         "line-scope 재기술은 소스 coverageScope 기술만 바꾸고 pack row 데이터를 바꾸지 않는다 — 두 variant의 "
         + "sqliteSha256이 같은 실행에서 동일함을 하네스가 확인한다.",
+    },
+    readingGuide: {
+      denominatorSemanticsKo:
+        "pilotRequirements의 denominator·coveredFields는 domain requiredFields 개수이지 데이터 행 수가 아니다. "
+        + "route_map_positions의 denominator 2는 필수 필드 2개(route_map_position·route_map_label_polygon)를 "
+        + "뜻하며 역 2개나 행 2개를 뜻하지 않는다. 실제로 그 판정을 뒷받침한 provenance 행 수는 필드별 "
+        + "supportingRecordCountByField에 따로 기록한다.",
+      supportedScopeKo:
+        "이 evidence는 SUPPORTED 축만 기록하므로 전국 gap 총량 판독에 쓰면 안 된다. 전국 진행 집계는 "
+        + "tools/datapack/reports/nationwide-coverage-tally.json이 정본이다.",
+      variantComparisonKo:
+        "전이 판정은 두 variant의 상대 비교다. baseline SUPPORTED 총량은 승계 팩의 다른 소스가 line-scope를 "
+        + "갖게 되면 함께 늘어날 수 있고, 하네스는 파일럿 키가 baseline에 없고 lineScoped가 baseline ∪ 파일럿 "
+        + "키와 정확히 같은지만 fail closed로 본다.",
     },
     inputs: Object.fromEntries(
       Object.entries(inputs).map(([name, input]) => [name, { path: input.path, sha256: input.sha256 }]),
@@ -471,7 +513,12 @@ function validateSpec(spec) {
   requiredString(spec.inheritsFrom?.path, "candidate spec inheritsFrom.path");
   requiredString(spec.inheritsFrom?.packId, "candidate spec inheritsFrom.packId");
   requiredString(spec.inheritsFrom?.packVersion, "candidate spec inheritsFrom.packVersion");
-  requiredString(spec.manifest?.channel, "candidate spec manifest.channel");
+  // candidate 안전 경계는 주석이 아니라 단언으로 강제한다. 이 도구는 artifactKind production으로
+  // 실제 RSA 서명 manifest를 만들기 때문에, spec 편집만으로 production 채널·게시 가능 URL 서명본이
+  // 나오면 안 된다(심층방어 — 게시 경로에 오르지 못하게 채널과 호스트를 fail closed로 묶는다).
+  if (spec.manifest?.channel !== CANDIDATE_MANIFEST_CHANNEL) {
+    throw new Error(`candidate spec manifest.channel must be ${CANDIDATE_MANIFEST_CHANNEL}`);
+  }
   requiredString(spec.manifest?.publishedAt, "candidate spec manifest.publishedAt");
   requiredString(spec.manifest?.expiresAt, "candidate spec manifest.expiresAt");
   requiredString(spec.manifest?.keyId, "candidate spec manifest.keyId");
@@ -484,7 +531,7 @@ function validateSpec(spec) {
   }
   requiredString(spec.pack?.id, "candidate spec pack.id");
   requiredString(spec.pack?.version, "candidate spec pack.version");
-  requiredString(spec.pack?.url, "candidate spec pack.url");
+  assertNonPublishablePackUrl(requiredString(spec.pack?.url, "candidate spec pack.url"));
   if (spec.pack.artifactKind !== CANDIDATE_ARTIFACT_KIND) {
     throw new Error(`candidate spec pack.artifactKind must be ${CANDIDATE_ARTIFACT_KIND}`);
   }
@@ -500,8 +547,27 @@ function validateSpec(spec) {
     if (sourceIds.has(sourceId)) throw new Error(`duplicate line-scope redescription: ${sourceId}`);
     sourceIds.add(sourceId);
     requiredString(redescription.sourceDomain, `${sourceId}.sourceDomain`);
-    requiredStringArray(redescription.lineIds, `${sourceId}.lineIds`);
+    // B0 파일럿은 (operator, line) 단일 pair 전환만 다룬다. 여러 노선을 한 번에 열려면 그 배치에서
+    // 이 단언을 근거와 함께 넓혀야 한다 — spec 편집만으로 전환 범위가 넓어지지 않게 막는다.
+    if (requiredStringArray(redescription.lineIds, `${sourceId}.lineIds`).length !== 1) {
+      throw new Error(`${sourceId}.lineIds must describe exactly one line for the pilot redescription`);
+    }
     requiredStringArray(redescription.requirementKeys, `${sourceId}.requirementKeys`);
+  }
+}
+
+// candidate pack url은 예약 TLD(.invalid)만 허용한다. 게이트가 root pack artifactKind=production을
+// 요구해 production 형태로 서명하지만, 그 산출물이 게시 가능한 호스트를 가리키면 안 된다.
+function assertNonPublishablePackUrl(packUrl) {
+  let url;
+  try {
+    url = new URL(packUrl);
+  } catch {
+    throw new Error("candidate spec pack.url must be an absolute URL");
+  }
+  if (url.protocol !== "https:") throw new Error("candidate spec pack.url must use https");
+  if (url.hostname.toLowerCase().replace(/\.$/, "") !== NON_PUBLISHABLE_HOST) {
+    throw new Error(`candidate spec pack.url host must be the non-publishable host ${NON_PUBLISHABLE_HOST}`);
   }
 }
 
