@@ -124,16 +124,15 @@ async function stageWorkspace(mutate) {
   return workspace;
 }
 
-async function regenerateLedger(workspace, extraArgs = []) {
+async function regenerateLedger(workspace, expectedLaunchRequiredTotal = EXPECTED_LAUNCH_REQUIRED_TOTAL) {
   const output = path.join(workspace, "ledger.json");
   await execFileAsync(process.execPath, [
     path.join(root, TOOL_PATH),
     "--targets", TARGETS_PATH,
     "--inventory", INVENTORY_PATH,
     "--resolutions", RESOLUTIONS_PATH,
-    "--expected-launch-required-total", EXPECTED_LAUNCH_REQUIRED_TOTAL,
+    "--expected-launch-required-total", expectedLaunchRequiredTotal,
     "--output", output,
-    ...extraArgs,
   ], { cwd: workspace });
   return readFile(output, "utf8");
 }
@@ -246,7 +245,7 @@ test("분모 drift는 fail closed다", async (context) => {
     const workspace = await stageWorkspace();
     try {
       await assert.rejects(
-        regenerateLedger(workspace, ["--expected-launch-required-total", "269"]),
+        regenerateLedger(workspace, "269"),
         (error) => /launch-required denominator drift: expected 269, computed 270/.test(error.stderr),
       );
     } finally {
@@ -381,7 +380,11 @@ test("ENHANCEMENT tier는 LAUNCH_REQUIRED 집계와 분리 보고된다", () => 
 test("tally 산출물은 wall-clock을 쓰지 않고 결정적이다", async () => {
   const source = await readFile(path.join(root, TOOL_PATH), "utf8");
   const code = source.split("\n").filter((line) => !line.trimStart().startsWith("//")).join("\n");
-  assert.doesNotMatch(code, /Date\.now\(|new Date\(/, "산출물 값은 입력에서만 유도해야 한다");
+  assert.doesNotMatch(
+    code,
+    /Date\.now\(|Date\.UTC\(|new Date\(|performance\.now\(|process\.hrtime|Math\.random\(/,
+    "산출물 값은 입력에서만 유도해야 한다",
+  );
 
   const build = () => buildFixtureLedger({
     targets: fixtureTargets(),

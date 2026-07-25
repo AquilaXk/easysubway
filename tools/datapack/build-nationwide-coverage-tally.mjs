@@ -100,6 +100,12 @@ export function buildNationwideCoverageTally({
         `${scopes.length} scopes × ${launchRequiredDomainCount} domains`,
     );
   }
+  if (tiers.ENHANCEMENT.totalCount !== scopes.length * enhancementDomainCount) {
+    throw new Error(
+      `enhancement denominator is inconsistent: ${tiers.ENHANCEMENT.totalCount} != ` +
+        `${scopes.length} scopes × ${enhancementDomainCount} domains`,
+    );
+  }
   if (expectedLaunchRequiredTotal !== null && launchRequiredTotal !== expectedLaunchRequiredTotal) {
     throw new Error(
       `launch-required denominator drift: expected ${expectedLaunchRequiredTotal}, ` +
