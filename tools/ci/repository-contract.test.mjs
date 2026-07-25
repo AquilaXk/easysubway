@@ -8937,11 +8937,17 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "incheon-line2-train-timetable",
     "incheon-transit-accessibility",
     "incheon-transit-station-info",
+    "kric-airport-railroad-route-map-positions",
     "kric-disabled-toilet",
     "kric-elevator-car-number",
+    "kric-gtx-a-route-map-positions",
+    "kric-gyeongchun-route-map-positions",
+    "kric-gyeonggang-route-map-positions",
+    "kric-gyeongui-jungang-route-map-positions",
     "kric-metropolitan-rail-station-info",
     "kric-platform-train-distance",
     "kric-safety-platform",
+    "kric-seohae-route-map-positions",
     "kric-seoul-metro-line9-1-route-map-positions",
     "kric-station-convenience-standard",
     "kric-station-elevator",
@@ -8954,8 +8960,10 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "kric-station-transfer-info",
     "kric-subway-route-info",
     "kric-subway-timetable",
+    "kric-suin-bundang-route-map-positions",
     "kric-train-operation-organ",
     "kric-transfer-movement-detailed",
+    "kric-uijeongbu-route-map-positions",
     "kric-wheelchair-lift-location",
     "kric-wheelchair-lift-movement",
     "molit-tago-subway-info",
@@ -10112,8 +10120,8 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
   // 페이퍼 KRIC 후보 계약과 다르다 — 아래 전용 테스트에서 별도로 고정하고 이 루프에서는 제외한다.
   // production inventory로 승격된 KRIC 시설 source(엘리베이터·에스컬레이터·휠체어리프트 위치/이동동선 등,
   // #1397 capital admission)도 페이퍼 후보가 아니라 admitted production 후보이므로 이 루프에서 제외한다.
-  // #2500 국가철도공단 data.go.kr FILE route_map_positions admission
-  // (kric-seoul-metro-line9-1-route-map-positions)도 credential-free official-file
+  // #2500/#2503 국가철도공단 data.go.kr·KRIC FILE route_map_positions admission
+  // (line9-1 및 capital-wide 8노선)도 credential-free official-file
   // production materialize라 페이퍼 OpenAPI 후보 계약과 다르다.
   const kricCandidates = candidates.candidates.filter(
     (candidate) =>
