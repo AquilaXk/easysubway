@@ -1,10 +1,12 @@
-// #2514 (#2510 B0) 전국 candidate pack 게이트 하네스 회귀.
+// #2514 (#2510 B0) 전국 candidate pack 게이트 하네스 회귀. #2549 (#2510 B1) 대구 편입으로 확장.
 //
 // 검증 축:
 //   1. tracked evidence가 현행 입력에서 바이트 단위로 재생성된다(오프라인·서명 키 없이).
 //   2. 파일럿 scope가 line-scope 재기술 전 MISSING → 후 SUPPORTED로 전이한다.
-//   3. spec의 line-scope 재기술과 tracked source-inventory가 어긋나면 하네스가 fail closed 한다.
-//   4. production 게시 트랙 fixture는 candidate 조립에 영향받지 않는다.
+//   3. 대구 9 requirement가 같은 실행에서 MISSING → SUPPORTED로 전이한다(B1).
+//   4. spec의 line-scope 재기술과 tracked source-inventory가 어긋나면 하네스가 fail closed 한다.
+//   5. 지역 데이터 편입은 allowlist materializer·tracked 입력·선언 행수에 묶인다(B1).
+//   6. production 게시 트랙 fixture는 candidate 조립에 영향받지 않는다.
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -30,6 +32,12 @@ const RESOLUTIONS_PATH =
 const REVIEWED_PACK_PATH = "tools/datapack/release/capital-production-reviewed-pack.json";
 const PILOT_REQUIREMENT_KEY = "capital:seoul-metro:seoul-4:route_map_positions";
 const PILOT_SOURCE_ID = "seoulmetro-cyberstation-route-map";
+// #2549 B1 대상 9 requirement(대구 3노선 × membership/topology/timetable).
+const DAEGU_LINE_IDS = ["line-5b8d9b05e7e6", "line-e2938a4cc492", "line-0ffaa95b1b5d"];
+const DAEGU_DOMAINS = ["station_line_membership", "route_graph_topology", "schedule_timetable"];
+const DAEGU_REQUIREMENT_KEYS = DAEGU_LINE_IDS
+  .flatMap((lineId) => DAEGU_DOMAINS.map((domain) => `daegu:daegu-transportation:${lineId}:${domain}`));
+const DAEGU_MATERIALIZER = "tools/datapack/materialize-daegu-timetable.mjs";
 
 const INPUT_PATHS = {
   spec: SPEC_PATH,
@@ -83,7 +91,7 @@ test("커밋된 candidate 게이트 evidence는 현행 입력에서 바이트 �
 
     const evidence = JSON.parse(tracked);
     assert.equal(evidence.artifactKind, "nationwide-candidate-coverage-gate-evidence");
-    assert.equal(evidence.issue, 2514);
+    assert.equal(evidence.issue, 2549);
     assert.deepEqual(evidence.parentIssues, [2510, 2138]);
     assert.equal(evidence.regeneration.evidencePath, EVIDENCE_PATH);
     assert.equal(
@@ -97,6 +105,15 @@ test("커밋된 candidate 게이트 evidence는 현행 입력에서 바이트 �
     for (const [name, relativePath] of Object.entries(INPUT_PATHS)) {
       assert.equal(evidence.inputs[name].path, relativePath);
       assert.equal(evidence.inputs[name].sha256, await sha256Of(relativePath));
+    }
+    // 지역 편입 입력도 같은 축이다. 저장소에 편입 행을 복제하지 않으므로 이 해시가 candidate 구성의
+    // 유일한 결속이며, snapshot 한 바이트가 바뀌면 evidence 재생성이 강제돼야 한다.
+    const [daeguInclusion] = evidence.packDataInclusions.entries;
+    assert.equal(daeguInclusion.regionId, "daegu");
+    assert.equal(daeguInclusion.materializer, DAEGU_MATERIALIZER);
+    assert.ok(daeguInclusion.inputs.length > 0);
+    for (const input of daeguInclusion.inputs) {
+      assert.equal(input.sha256, await sha256Of(input.path));
     }
 
     // 임시 RSA 키·SQLite 바이트·wall-clock 의존 집계는 기록 축이 아니다(결정성 계약).
@@ -118,18 +135,22 @@ test("파일럿 scope는 line-scope 재기술로 MISSING에서 SUPPORTED로 전�
 
   // 전이는 절대 수치가 아니라 상대 비교로 본다. 승계 팩의 다른 소스가 line-scope를 갖게 되면
   // 두 variant의 supported 총량이 함께 늘 수 있고, 그때도 아래 두 축은 그대로 성립해야 한다.
+  const transitioningKeys = [PILOT_REQUIREMENT_KEY, ...DAEGU_REQUIREMENT_KEYS];
   const baselineKeys = evidence.variants.baseline.supportedRequirementKeys;
-  assert.equal(baselineKeys.includes(PILOT_REQUIREMENT_KEY), false);
+  for (const key of transitioningKeys) {
+    assert.equal(baselineKeys.includes(key), false, `${key}는 재기술 전 SUPPORTED가 아니어야 한다`);
+  }
   assert.deepEqual(
     evidence.variants.lineScoped.supportedRequirementKeys,
-    [...new Set([...baselineKeys, PILOT_REQUIREMENT_KEY])].sort(),
+    [...new Set([...baselineKeys, ...transitioningKeys])].sort(),
   );
   assert.equal(
     evidence.variants.lineScoped.launchRequired.supportedCount,
-    evidence.variants.baseline.launchRequired.supportedCount + 1,
+    evidence.variants.baseline.launchRequired.supportedCount + transitioningKeys.length,
   );
   assert.equal(evidence.variants.lineScoped.launchRequired.totalCount, 270);
 
+  // pilotRequirements는 codepoint 순이라 capital 파일럿이 항상 첫 항목이다.
   const [before] = evidence.variants.baseline.pilotRequirements;
   const [after] = evidence.variants.lineScoped.pilotRequirements;
   assert.equal(before.requirementKey, PILOT_REQUIREMENT_KEY);
@@ -152,14 +173,61 @@ test("파일럿 scope는 line-scope 재기술로 MISSING에서 SUPPORTED로 전�
   });
   assert.match(evidence.readingGuide.denominatorSemanticsKo, /데이터 행 수가 아니다/);
 
-  assert.deepEqual(evidence.transitions, [{
+  assert.deepEqual(evidence.transitions.find((entry) => entry.requirementKey === PILOT_REQUIREMENT_KEY), {
     requirementKey: PILOT_REQUIREMENT_KEY,
     before: "MISSING",
     after: "SUPPORTED",
     sourceIds: [PILOT_SOURCE_ID],
     coveredFields: 2,
     denominator: 2,
-  }]);
+  });
+  assert.deepEqual(
+    evidence.transitions.map(({ requirementKey }) => requirementKey),
+    [...transitioningKeys].sort(),
+  );
+});
+
+// #2549 B1: 대구 3노선 × membership/topology/timetable 9 requirement가 한 실행에서 함께 전이한다.
+test("대구 9 requirement는 candidate 편입으로 MISSING에서 SUPPORTED로 전이한다", async () => {
+  const evidence = await readJson(EVIDENCE_PATH);
+  const byKey = new Map(evidence.variants.lineScoped.pilotRequirements.map((entry) => [entry.requirementKey, entry]));
+  const baselineByKey = new Map(
+    evidence.variants.baseline.pilotRequirements.map((entry) => [entry.requirementKey, entry]),
+  );
+  // 도메인별 필수 필드 3개가 전부 covered여야 SUPPORTED다 — 부분 충족이 통과하지 않는지 필드 단위로 본다.
+  const expectedFields = {
+    station_line_membership: ["line", "station_name", "station_code"],
+    route_graph_topology: ["network_edges", "duration_seconds", "distance_meters"],
+    schedule_timetable: ["service_calendar", "trip", "stop_time"],
+  };
+
+  assert.equal(DAEGU_REQUIREMENT_KEYS.length, 9);
+  for (const requirementKey of DAEGU_REQUIREMENT_KEYS) {
+    const [, , , sourceDomain] = requirementKey.split(":");
+    const before = baselineByKey.get(requirementKey);
+    const after = byKey.get(requirementKey);
+    assert.equal(before.status, "MISSING", `${requirementKey} baseline`);
+    assert.deepEqual(before.sourceIds, [], `${requirementKey} baseline sourceIds`);
+    assert.deepEqual(before.missingFields, expectedFields[sourceDomain], `${requirementKey} baseline missingFields`);
+    assert.equal(after.status, "SUPPORTED", `${requirementKey} lineScoped`);
+    assert.equal(after.releaseTier, "LAUNCH_REQUIRED");
+    assert.equal(after.denominator, 3);
+    assert.equal(after.coveredFields, 3);
+    assert.deepEqual(after.missingFields, []);
+    assert.deepEqual(after.fieldCoverage.map(({ field }) => field), expectedFields[sourceDomain]);
+    // 뒷받침 provenance 행이 0인데 covered로 잡히는 판정은 없어야 한다.
+    assert.ok(
+      Object.values(after.supportingRecordCountByField).every((count) => count > 0),
+      `${requirementKey} supporting rows`,
+    );
+  }
+
+  // membership은 molit 소속 소스와 topology 소스가 함께 뒷받침해야 필수 필드 3개가 채워진다.
+  const membership = byKey.get(`daegu:daegu-transportation:${DAEGU_LINE_IDS[0]}:station_line_membership`);
+  assert.deepEqual(membership.sourceIds, [
+    "daegu-line1-route-topology",
+    "molit-urban-rail-full-route-daegu-line1-membership",
+  ]);
 });
 
 test("candidate spec의 line-scope 재기술은 tracked source inventory와 동기다", async (context) => {
@@ -171,9 +239,24 @@ test("candidate spec의 line-scope 재기술은 tracked source inventory와 동�
   assert.deepEqual(redescription.lineIds, ["seoul-4"]);
   assert.deepEqual(redescription.requirementKeys, [PILOT_REQUIREMENT_KEY]);
 
-  const source = inventory.sources.find(({ id }) => id === PILOT_SOURCE_ID);
-  assert.deepEqual(source.coverageScope.lineIds, redescription.lineIds);
-  assert.ok(source.coverageScope.sourceDomains.includes(redescription.sourceDomain));
+  // 재기술 전건이 admission 정본과 동기여야 한다. #2549는 inventory를 바꾸지 않고 이미 line-scope로
+  // 기술된 대구 소스를 그대로 승계하므로, 이 축이 깨지면 재기술이 정본을 앞질렀다는 뜻이다.
+  assert.deepEqual(
+    [...new Set(spec.lineScopeRedescriptions.flatMap(({ requirementKeys }) => requirementKeys))].sort(),
+    [PILOT_REQUIREMENT_KEY, ...DAEGU_REQUIREMENT_KEYS].sort(),
+  );
+  for (const entry of spec.lineScopeRedescriptions) {
+    const declared = inventory.sources.find(({ id }) => id === entry.sourceId);
+    assert.deepEqual(declared.coverageScope.lineIds, entry.lineIds, entry.sourceId);
+    assert.ok(declared.coverageScope.sourceDomains.includes(entry.sourceDomain), entry.sourceId);
+    for (const requirementKey of entry.requirementKeys) {
+      const [regionId, operatorId, lineId, sourceDomain] = requirementKey.split(":");
+      assert.ok(declared.coverageScope.regionIds.includes(regionId), requirementKey);
+      assert.ok(declared.coverageScope.operatorIds.includes(operatorId), requirementKey);
+      assert.ok(entry.lineIds.includes(lineId), requirementKey);
+      assert.equal(sourceDomain, entry.sourceDomain, requirementKey);
+    }
+  }
   assert.deepEqual(appInventory, inventory, "앱 번들 사본은 datapack 정본과 같아야 한다");
 
   await context.test("inventory lineIds가 spec과 어긋나면 하네스가 거부한다", async () => {
@@ -243,10 +326,76 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
     );
   });
 
-  await context.test("파일럿 범위를 넘는 다중 lineIds는 거부된다", async () => {
+  // #2549 B1이 파일럿의 "lineIds 1개" 단언을 근거 결속으로 바꿨다. 개수 제한이 사라진 자리를 아래 축이
+  // 대신 막는지 본다 — 선언 범위는 admission 정본(inventory)과 declare한 requirementKeys에 묶여 있다.
+  await context.test("선언 lineIds가 admission 정본과 다르면 거부된다", async () => {
     await rejectsWith(
-      (value) => { value.lineScopeRedescriptions[0].lineIds = ["seoul-4", "seoul-2"]; },
-      /lineIds must describe exactly one line/,
+      (value) => {
+        // requirementKeys까지 함께 넓혀 spec 내부 정합은 맞춘 채로 정본 결속만 어긋나게 한다.
+        value.lineScopeRedescriptions[0].lineIds = ["seoul-4", "seoul-2"];
+        value.lineScopeRedescriptions[0].requirementKeys = [
+          PILOT_REQUIREMENT_KEY,
+          "capital:seoul-metro:seoul-2:route_map_positions",
+        ];
+      },
+      /source inventory coverageScope\.lineIds must match the spec redescription/,
+    );
+  });
+
+  await context.test("requirementKeys가 덮지 않는 lineIds는 거부된다", async () => {
+    await rejectsWith(
+      (value) => {
+        value.lineScopeRedescriptions[0].lineIds = ["seoul-4", "seoul-2"];
+        value.lineScopeRedescriptions[0].requirementKeys = [PILOT_REQUIREMENT_KEY];
+      },
+      /requirementKeys must cover every redescribed line/,
+    );
+  });
+
+  await context.test("재기술 도메인을 벗어난 requirementKey는 거부된다", async () => {
+    await rejectsWith(
+      (value) => {
+        value.lineScopeRedescriptions[0].requirementKeys = ["capital:seoul-metro:seoul-4:route_graph_topology"];
+      },
+      /requirementKeys must stay in the redescribed source domain/,
+    );
+  });
+
+  await context.test("같은 소스를 도메인별로 갈라 다른 lineIds를 선언할 수 없다", async () => {
+    await rejectsWith(
+      (value) => {
+        const [first] = value.lineScopeRedescriptions;
+        value.lineScopeRedescriptions.push({ ...first, sourceDomain: "station_line_membership" });
+      },
+      /must declare the same lineIds across domains|requirementKeys must stay in the redescribed source domain/,
+    );
+  });
+
+  await context.test("allowlist에 없는 materializer는 거부된다", async () => {
+    await rejectsWith(
+      (value) => { value.packDataInclusions[0].materializer = "tools/datapack/materialize-busan-timetable.mjs"; },
+      /unknown pack data materializer/,
+    );
+  });
+
+  await context.test("저장소 밖 편입 입력은 거부된다", async () => {
+    await rejectsWith(
+      (value) => { value.packDataInclusions[0].stationMapPath = "../molit-urban-rail-full-route-20251211.csv"; },
+      /pack data inclusion input must be a tracked repository path/,
+    );
+  });
+
+  await context.test("선언과 다른 행수를 싣는 편입은 거부된다", async () => {
+    await rejectsWith(
+      (value) => { value.packDataInclusions[0].addedRows.transitStopTimes += 1; },
+      /added rows do not match the spec declaration/,
+    );
+  });
+
+  await context.test("snapshot 신선도 창 밖으로 기준 시각을 옮기면 거부된다", async () => {
+    await rejectsWith(
+      (value) => { value.packDataInclusions[0].materializedAt = "2026-07-25T00:00:00.000Z"; },
+      /evidence is stale or future-dated/,
     );
   });
 });
