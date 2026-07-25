@@ -9,7 +9,7 @@
    preserveAspectRatio="xMidYMid meet"
    id="seoul-metro-current-all-lines-map"
    style="font-family: Pretendard;"
-   sodipodi:docname="easy_subway_sma_v3_transfer_text_station_matching_fixed.svg"
+   sodipodi:docname="easy_subway_sma_v4.svg"
    inkscape:version="1.4.4 (dcaf3e7, 2026-05-05)"
    data-transfer-center-alignment-version="v4-clean"
    data-transfer-center-alignment-note="서울역/공덕/효창공원앞 중심 이탈 및 깨짐 보정; 김포공항/삼각지 기존 보정 유지"
@@ -72,15 +72,15 @@
      inkscape:pageopacity="0.0"
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
-     inkscape:zoom="1.2096014"
-     inkscape:cx="604.74465"
-     inkscape:cy="925.51146"
+     inkscape:zoom="1.4252368"
+     inkscape:cx="2197.1787"
+     inkscape:cy="860.55873"
      inkscape:window-width="1920"
      inkscape:window-height="1022"
-     inkscape:window-x="0"
-     inkscape:window-y="30"
+     inkscape:window-x="329"
+     inkscape:window-y="318"
      inkscape:window-maximized="0"
-     inkscape:current-layer="route-line-9" />
+     inkscape:current-layer="station-label-group-전곡" />
   <title
      id="map-title">수도권 지하철 통합 노선도 — v2 디자인 토큰/공식 색상 적용본</title>
   <desc
@@ -38380,11 +38380,11 @@
              xml:space="preserve"><tspan
                x="669.53387"
                y="3371.2263"
-               id="tspan22">송도
+               id="tspan8">송도
 </tspan><tspan
                x="669.53387"
                y="3405.2264"
-               id="tspan23">달빛축제공원</tspan></text>
+               id="tspan15">달빛축제공원</tspan></text>
           <text
              id="station-label-귤현"
              data-name="귤현"
@@ -44349,11 +44349,11 @@
              xml:space="preserve"><tspan
                x="2695.292"
                y="1906.5151"
-               id="tspan86">압구정
+               id="tspan16">압구정
 </tspan><tspan
                x="2695.292"
                y="1940.5151"
-               id="tspan87">로데오</tspan></text>
+               id="tspan21">로데오</tspan></text>
           <g
              id="station-label-group-이매"
              data-name="이매"
@@ -44494,14 +44494,14 @@
              xml:space="preserve"><tspan
                x="1089.8801"
                y="2576.178"
-               id="tspan122">
+               id="tspan22">
 </tspan><tspan
                x="1089.8801"
                y="2614.1781"
-               id="tspan139">가산디지털</tspan><tspan
+               id="tspan23">가산디지털</tspan><tspan
                x="1089.8801"
                y="2652.1781"
-               id="tspan174">단지</tspan></text>
+               id="tspan24">단지</tspan></text>
           <g
              id="station-label-group-성신여대입구"
              data-name="성신여대입구"
@@ -44516,14 +44516,19 @@
                data-station="성신여대입구"
                data-label-role="transfer"
                font-weight="600"
-               x="2854.561"
-               y="985.03113"
+               x="2836.2466"
+               y="949.75873"
                style="line-height:1;text-align:center;text-anchor:middle"><tspan
                  sodipodi:role="line"
                  id="tspan123"
-                 x="2854.561"
-                 y="985.03113"
-                 style="line-height:1">성신여대</tspan></text>
+                 x="2836.2466"
+                 y="949.75873"
+                 style="line-height:1">성신여대</tspan><tspan
+                 sodipodi:role="line"
+                 x="2836.2466"
+                 y="987.75873"
+                 style="line-height:1"
+                 id="tspan7">입구</tspan></text>
           </g>
           <g
              id="station-label-group-광교"
@@ -46434,11 +46439,11 @@
              xml:space="preserve"><tspan
                x="805.01556"
                y="3375.7837"
-               id="tspan178">국제
+               id="tspan28">국제
 </tspan><tspan
                x="805.01556"
                y="3409.7838"
-               id="tspan179">업무지구</tspan></text>
+               id="tspan86">업무지구</tspan></text>
           <text
              id="station-label-산곡"
              data-name="산곡"
