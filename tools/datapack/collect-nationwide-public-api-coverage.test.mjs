@@ -97,6 +97,130 @@ test("전국 target과 fixture에서 line AND domain 실제 검색 계획을 만
   ]]);
 });
 
+test("이미 admission된 requirement는 재크롤 계획에서 빠진다", () => {
+  const targets = {
+    targetVersion: "2026-07-13",
+    activeLineScopes: [
+      { regionId: "busan", operatorId: "busan-transportation", lineId: "busan-1" },
+      { regionId: "busan", operatorId: "busan-transportation", lineId: "busan-2" },
+    ],
+    requiredSourceDomains: [
+      {
+        id: "schedule_timetable",
+        releaseTier: "LAUNCH_REQUIRED",
+        requiredFields: ["service_calendar", "trip"],
+        blockingThreshold: { minimumOfficialFieldCoverageRatio: 1 },
+      },
+      {
+        id: "realtime_arrivals",
+        releaseTier: "LAUNCH_REQUIRED",
+        requiredFields: ["realtime_arrival_reference"],
+        blockingThreshold: { minimumOfficialFieldCoverageRatio: 1 },
+      },
+    ],
+  };
+  const fixture = {
+    packs: [{
+      operators: [{ id: "busan-transportation", nameKo: "부산교통공사" }],
+      lines: [{ id: "busan-1", nameKo: "부산 1호선" }, { id: "busan-2", nameKo: "부산 2호선" }],
+    }],
+  };
+  const coverageScope = {
+    regionIds: ["busan"],
+    operatorIds: ["busan-transportation"],
+    lineIds: ["busan-1"],
+    sourceDomains: ["schedule_timetable"],
+  };
+  const searchPlan = buildNationwidePublicApiSearchPlan({
+    targets,
+    fixture,
+    inventory: {
+      sources: [
+        { id: "busan-timetable", coverageScope, fieldsProvided: ["service_calendar", "trip"] },
+        // 필수 field를 일부만 채우는 소스는 admission이 아니므로 재크롤 대상으로 남는다.
+        {
+          id: "busan-2-timetable-partial",
+          coverageScope: { ...coverageScope, lineIds: ["busan-2"] },
+          fieldsProvided: ["service_calendar"],
+        },
+      ],
+    },
+  });
+
+  assert.deepEqual(searchPlan.entries.map(({ lineId, sourceDomain }) => `${lineId}:${sourceDomain}`), [
+    "busan-1:realtime_arrivals",
+    "busan-2:schedule_timetable",
+    "busan-2:realtime_arrivals",
+  ]);
+  // inventory를 주지 않으면 전량 감사 계획이 된다.
+  assert.equal(buildNationwidePublicApiSearchPlan({ targets, fixture }).entries.length, 4);
+});
+
+test("빈 lineIds coverageScope는 재크롤 제외의 와일드카드가 아니다", () => {
+  const searchPlan = buildNationwidePublicApiSearchPlan({
+    targets: {
+      targetVersion: "2026-07-13",
+      activeLineScopes: [{ regionId: "busan", operatorId: "busan-transportation", lineId: "busan-1" }],
+      requiredSourceDomains: [{
+        id: "realtime_arrivals",
+        releaseTier: "LAUNCH_REQUIRED",
+        requiredFields: ["realtime_arrival_reference"],
+      }],
+    },
+    fixture: {
+      packs: [{
+        operators: [{ id: "busan-transportation", nameKo: "부산교통공사" }],
+        lines: [{ id: "busan-1", nameKo: "부산 1호선" }],
+      }],
+    },
+    inventory: {
+      sources: [{
+        id: "busan-realtime",
+        coverageScope: {
+          regionIds: ["busan"],
+          operatorIds: ["busan-transportation"],
+          sourceDomains: ["realtime_arrivals"],
+        },
+        fieldsProvided: ["realtime_arrival_reference"],
+      }],
+    },
+  });
+
+  assert.equal(searchPlan.entries.length, 1);
+});
+
+test("후보 coverageScope의 sourceDomains는 허용하되 도메인 색인은 candidate.domain을 따른다", () => {
+  const searchPlan = buildNationwidePublicApiSearchPlan({
+    targets: {
+      targetVersion: "2026-07-13",
+      activeLineScopes: [{ regionId: "capital", operatorId: "korail", lineId: "korail-1" }],
+      requiredSourceDomains: [
+        { id: "route_map_positions", releaseTier: "LAUNCH_REQUIRED" },
+        { id: "schedule_timetable", releaseTier: "LAUNCH_REQUIRED" },
+      ],
+    },
+    fixture: {
+      packs: [{
+        operators: [{ id: "korail", nameKo: "코레일" }],
+        lines: [{ id: "korail-1", nameKo: "수도권 1호선" }],
+      }],
+    },
+    sourceCandidates: {
+      candidates: [{
+        id: "kric-korail-1-route-map-positions",
+        domain: "route_map_positions",
+        requestUrl: "https://api.odcloud.kr/api/15041331/v1/example",
+        coverageScope: { lineIds: ["korail-1"], sourceDomains: ["route_map_positions"] },
+      }],
+    },
+  });
+
+  const byDomain = new Map(searchPlan.entries.map((entry) => [entry.sourceDomain, entry]));
+  assert.ok(byDomain.get("route_map_positions").knownProviderCandidateIds
+    .includes("kric-korail-1-route-map-positions"));
+  assert.deepEqual(byDomain.get("schedule_timetable").knownProviderCandidateIds, []);
+});
+
 test("KORAIL 검색은 공공데이터포털 정식 기관명을 사용한다", () => {
   const searchPlan = buildNationwidePublicApiSearchPlan({
     targets: {

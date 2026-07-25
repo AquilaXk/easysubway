@@ -76,58 +76,118 @@ const SOURCE_DOMAIN_SEARCH = Object.freeze({
   },
 });
 
-export function buildNationwidePublicApiSearchPlan({ targets, fixture, sourceCandidates } = {}) {
+export function buildNationwidePublicApiSearchPlan({ targets, fixture, sourceCandidates, inventory } = {}) {
   const pack = fixture?.packs?.[0];
   if (!pack || !Array.isArray(pack.operators) || !Array.isArray(pack.lines)) {
     throw new Error("nationwide fixture operators and lines are required");
   }
   const operators = new Map(pack.operators.map((operator) => [operator.id, requiredString(operator.nameKo, "operator.nameKo")]));
   const lines = new Map(pack.lines.map((line) => [line.id, requiredString(line.nameKo, "line.nameKo")]));
-  const domains = (targets?.requiredSourceDomains ?? [])
-    .filter(({ releaseTier }) => releaseTier === "LAUNCH_REQUIRED")
-    .map(({ id }) => id);
+  const launchDomains = (targets?.requiredSourceDomains ?? [])
+    .filter(({ releaseTier }) => releaseTier === "LAUNCH_REQUIRED");
+  const domains = launchDomains.map(({ id }) => id);
   if (!Array.isArray(targets?.activeLineScopes) || domains.length === 0) {
     throw new Error("nationwide targets active scopes and launch domains are required");
   }
+  // inventory를 주면 이미 admission된 requirement는 재크롤 대상에서 뺀다(생략하면 전량 감사 plan).
+  const admitted = inventory === undefined
+    ? new Set()
+    : admittedRequirementKeys(targets.activeLineScopes, launchDomains, inventory);
   const knownProviderCandidatesByDomain = mergeBuiltinProviderCandidates(indexKnownProviderCandidates(sourceCandidates));
-  const entries = targets.activeLineScopes.flatMap((scope) => domains.map((sourceDomain) => {
-    const domain = SOURCE_DOMAIN_SEARCH[sourceDomain];
-    if (!domain) throw new Error(`unsupported launch source domain: ${sourceDomain}`);
-    const fixtureOperatorName = requiredString(operators.get(scope.operatorId), `operator ${scope.operatorId}`);
-    const operatorName = DATA_GO_ORGANIZATION_NAMES.get(scope.operatorId) ?? fixtureOperatorName;
-    const organizations = [...new Set([operatorName, ...(domain.organizations ?? [])])];
-    const lineName = requiredString(lines.get(scope.lineId), `line ${scope.lineId}`);
-    const lineTerms = lineSearchTerms(lineName);
-    return {
-      ...scope,
-      sourceDomain,
-      fallback: domain.fallback,
-      userMessageKo: domain.userMessageKo,
-      knownProviderCandidateIds: (knownProviderCandidatesByDomain.get(sourceDomain) ?? [])
-        .filter((candidate) => candidateAppliesToScope(candidate.coverageScope, scope))
-        .map(({ id }) => id),
-      queries: [
-        ...lineTerms.map((keyword) => publicApiSearchQuery({
-          organizations,
-          keyword,
-          coverageScope: "LINE_EVIDENCE",
-          matchTermGroups: [domain.terms, lineTerms],
-        })),
-        ...domain.terms.map((keyword) => publicApiSearchQuery({
-          organizations,
-          keyword,
-          coverageScope: "OPERATOR_DISCOVERY",
-          matchTermGroups: [domain.terms],
-        })),
-      ],
-    };
-  }));
+  const entries = targets.activeLineScopes.flatMap((scope) => domains
+    .filter((sourceDomain) => !admitted.has(requirementKey(scope, sourceDomain)))
+    .map((sourceDomain) => {
+      const domain = SOURCE_DOMAIN_SEARCH[sourceDomain];
+      if (!domain) throw new Error(`unsupported launch source domain: ${sourceDomain}`);
+      const fixtureOperatorName = requiredString(operators.get(scope.operatorId), `operator ${scope.operatorId}`);
+      const operatorName = DATA_GO_ORGANIZATION_NAMES.get(scope.operatorId) ?? fixtureOperatorName;
+      const organizations = [...new Set([operatorName, ...(domain.organizations ?? [])])];
+      const lineName = requiredString(lines.get(scope.lineId), `line ${scope.lineId}`);
+      const lineTerms = lineSearchTerms(lineName);
+      return {
+        ...scope,
+        sourceDomain,
+        fallback: domain.fallback,
+        userMessageKo: domain.userMessageKo,
+        knownProviderCandidateIds: (knownProviderCandidatesByDomain.get(sourceDomain) ?? [])
+          .filter((candidate) => candidateAppliesToScope(candidate.coverageScope, scope))
+          .map(({ id }) => id),
+        queries: [
+          ...lineTerms.map((keyword) => publicApiSearchQuery({
+            organizations,
+            keyword,
+            coverageScope: "LINE_EVIDENCE",
+            matchTermGroups: [domain.terms, lineTerms],
+          })),
+          ...domain.terms.map((keyword) => publicApiSearchQuery({
+            organizations,
+            keyword,
+            coverageScope: "OPERATOR_DISCOVERY",
+            matchTermGroups: [domain.terms],
+          })),
+        ],
+      };
+    }));
   return {
     schemaVersion: 1,
     artifactKind: "nationwide-public-api-coverage-search-plan",
     targetVersion: requiredString(targets.targetVersion, "targets.targetVersion"),
     entries,
   };
+}
+
+// admission 판정 규칙은 게이트 report-coverage-gaps.mjs coveredField(strictLineScope=true,
+// requireProvenance=false)·tally ledger build-nationwide-coverage-tally.mjs의 INVENTORY_ADMITTED와 같다.
+// 빈 lineIds는 와일드카드가 아니다. 두 축이 어긋나지 않는지는 evidence 테스트가 tracked ledger와 대조한다.
+function admittedRequirementKeys(activeLineScopes, launchDomains, inventory) {
+  if (!inventory || typeof inventory !== "object" || Array.isArray(inventory) || !Array.isArray(inventory.sources)) {
+    throw new Error("source inventory sources are required");
+  }
+  const sources = inventory.sources.map((source, index) => {
+    const label = `source inventory sources[${index}]`;
+    const coverage = source?.coverageScope;
+    if (!coverage || typeof coverage !== "object" || Array.isArray(coverage)) {
+      throw new Error(`${label}.coverageScope must be an object`);
+    }
+    return {
+      regionIds: coverageIds(coverage.regionIds, `${label}.coverageScope.regionIds`),
+      operatorIds: coverageIds(coverage.operatorIds, `${label}.coverageScope.operatorIds`),
+      lineIds: coverageIds(coverage.lineIds, `${label}.coverageScope.lineIds`),
+      sourceDomains: coverageIds(coverage.sourceDomains, `${label}.coverageScope.sourceDomains`),
+      fields: coverageIds(source.fieldsProvided ?? source.fields, `${label}.fieldsProvided`),
+    };
+  });
+  const admitted = new Set();
+  for (const scope of activeLineScopes) {
+    for (const domain of launchDomains) {
+      const requiredFields = coverageIds(domain.requiredFields, `${domain.id}.requiredFields`);
+      if (requiredFields.length === 0) throw new Error(`${domain.id}.requiredFields is required`);
+      const threshold = domain.blockingThreshold?.minimumOfficialFieldCoverageRatio ?? 1;
+      const coveredFields = requiredFields.filter((field) => sources.some((source) => (
+        source.regionIds.includes(scope.regionId)
+        && source.operatorIds.includes(scope.operatorId)
+        && source.lineIds.includes(scope.lineId)
+        && source.sourceDomains.includes(domain.id)
+        && source.fields.includes(field)
+      ))).length;
+      if (Number((coveredFields / requiredFields.length).toFixed(4)) >= threshold) {
+        admitted.add(requirementKey(scope, domain.id));
+      }
+    }
+  }
+  return admitted;
+}
+
+function coverageIds(value, label) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.some((id) => typeof id !== "string" || id.trim() === "")) {
+    throw new Error(`${label} must be a string array`);
+  }
+  return value;
+}
+
+function requirementKey({ regionId, operatorId, lineId }, sourceDomain) {
+  return `${regionId}:${operatorId}:${lineId}:${sourceDomain}`;
 }
 
 function publicApiSearchQuery({ organizations, keyword, coverageScope, matchTermGroups }) {
@@ -308,7 +368,9 @@ function isKnownProviderApiEndpoint(endpoint) {
 function validateCoverageScope(scope, label) {
   if (scope === undefined) return;
   if (!scope || typeof scope !== "object" || Array.isArray(scope)) throw new Error(`${label} is invalid`);
-  const allowedFields = new Set(["regionIds", "operatorIds", "lineIds"]);
+  // sourceDomains는 source-inventory와 같은 coverageScope 형식을 쓰는 후보 문서를 받기 위한 허용 필드다.
+  // 도메인 색인의 정본은 candidate.domain이므로 이 필드는 scope 매칭에 쓰지 않는다.
+  const allowedFields = new Set(["regionIds", "operatorIds", "lineIds", "sourceDomains"]);
   if (Object.keys(scope).some((field) => !allowedFields.has(field))) throw new Error(`${label} is invalid`);
   for (const field of allowedFields) {
     if (scope[field] !== undefined && (
@@ -707,14 +769,23 @@ function sha256(value) {
 }
 
 function parseArgs(argv) {
-  if (argv.length === 8 && argv[0] === "--targets" && argv[2] === "--fixture"
-    && argv[4] === "--source-candidates" && argv[6] === "--plan-output") {
-    return { mode: "build", targets: argv[1], fixture: argv[3], sourceCandidates: argv[5], output: argv[7] };
+  // --inventory는 필수다. inventory 없이 만든 plan은 이미 admission된 requirement까지 재크롤해
+  // unresolved 우선순위를 부풀리므로 CLI 경계에서 fail closed 한다.
+  if (argv.length === 10 && argv[0] === "--targets" && argv[2] === "--fixture"
+    && argv[4] === "--source-candidates" && argv[6] === "--inventory" && argv[8] === "--plan-output") {
+    return {
+      mode: "build",
+      targets: argv[1],
+      fixture: argv[3],
+      sourceCandidates: argv[5],
+      inventory: argv[7],
+      output: argv[9],
+    };
   }
   if (argv.length === 4 && argv[0] === "--plan" && argv[2] === "--output") {
     return { mode: "collect", plan: argv[1], output: argv[3] };
   }
-  throw new Error("usage: collect-nationwide-public-api-coverage.mjs --targets <targets.json> --fixture <fixture.json> --source-candidates <source-candidates.json> --plan-output <plan.json> | --plan <plan.json> --output <resolutions.json>");
+  throw new Error("usage: collect-nationwide-public-api-coverage.mjs --targets <targets.json> --fixture <fixture.json> --source-candidates <source-candidates.json> --inventory <source-inventory.json> --plan-output <plan.json> | --plan <plan.json> --output <resolutions.json>");
 }
 
 async function main(argv) {
@@ -723,9 +794,13 @@ async function main(argv) {
     const targets = JSON.parse(await readFile(args.targets, "utf8"));
     const fixture = JSON.parse(await readFile(args.fixture, "utf8"));
     const sourceCandidates = JSON.parse(await readFile(args.sourceCandidates, "utf8"));
-    const plan = buildNationwidePublicApiSearchPlan({ targets, fixture, sourceCandidates });
+    const inventory = JSON.parse(await readFile(args.inventory, "utf8"));
+    const plan = buildNationwidePublicApiSearchPlan({ targets, fixture, sourceCandidates, inventory });
+    const launchDomainCount = targets.requiredSourceDomains
+      .filter(({ releaseTier }) => releaseTier === "LAUNCH_REQUIRED").length;
+    const admittedCount = targets.activeLineScopes.length * launchDomainCount - plan.entries.length;
     await writeFile(args.output, `${JSON.stringify(plan, null, 2)}\n`);
-    console.log(`public API coverage search plan ready: entries=${plan.entries.length}`);
+    console.log(`public API coverage search plan ready: entries=${plan.entries.length} admittedExcluded=${admittedCount}`);
     return;
   }
   const searchPlan = JSON.parse(await readFile(args.plan, "utf8"));

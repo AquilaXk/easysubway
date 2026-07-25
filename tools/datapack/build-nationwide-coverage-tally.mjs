@@ -36,7 +36,7 @@
 // 사용: node tools/datapack/build-nationwide-coverage-tally.mjs \
 //   --targets tools/datapack/nationwide-coverage-targets.json \
 //   --inventory tools/datapack/source-inventory.json \
-//   --resolutions tools/datapack/release/nationwide-public-api-coverage-resolutions-20260721.json \
+//   --resolutions tools/datapack/release/nationwide-public-api-coverage-resolutions-20260725.json \
 //   --expected-launch-required-total 270 \
 //   --output tools/datapack/reports/nationwide-coverage-tally.json
 import { createHash } from "node:crypto";
@@ -48,7 +48,7 @@ import { isMainModule } from "../lib/is-main-module.mjs";
 import { parseArgs, requireArg, sortJson } from "./lib/ledger-admission-cli.mjs";
 
 export const DEFAULT_RESOLUTIONS_PATH =
-  "tools/datapack/release/nationwide-public-api-coverage-resolutions-20260721.json";
+  "tools/datapack/release/nationwide-public-api-coverage-resolutions-20260725.json";
 // 재생성 명령에 기록하는 tracked ledger 경로. --output이 임시 경로여도 산출 바이트가 달라지지
 // 않도록 명령 문자열은 이 상수를 쓴다(재현성 검증이 임시 출력으로 가능해야 한다).
 export const LEDGER_PATH = "tools/datapack/reports/nationwide-coverage-tally.json";
