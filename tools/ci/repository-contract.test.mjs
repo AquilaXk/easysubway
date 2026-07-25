@@ -8942,6 +8942,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "kric-metropolitan-rail-station-info",
     "kric-platform-train-distance",
     "kric-safety-platform",
+    "kric-seoul-metro-line9-1-route-map-positions",
     "kric-station-convenience-standard",
     "kric-station-elevator",
     "kric-station-elevator-movement",
@@ -10111,6 +10112,9 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
   // 페이퍼 KRIC 후보 계약과 다르다 — 아래 전용 테스트에서 별도로 고정하고 이 루프에서는 제외한다.
   // production inventory로 승격된 KRIC 시설 source(엘리베이터·에스컬레이터·휠체어리프트 위치/이동동선 등,
   // #1397 capital admission)도 페이퍼 후보가 아니라 admitted production 후보이므로 이 루프에서 제외한다.
+  // #2500 국가철도공단 data.go.kr FILE route_map_positions admission
+  // (kric-seoul-metro-line9-1-route-map-positions)도 credential-free official-file
+  // production materialize라 페이퍼 OpenAPI 후보 계약과 다르다.
   const kricCandidates = candidates.candidates.filter(
     (candidate) =>
       candidate.id.startsWith("kric-") &&
@@ -10120,7 +10124,8 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
         "kric-subway-timetable",
         "kric-subway-timetable-exp",
       ]).has(candidate.id) &&
-      candidate.admissionStatus !== "admitted_to_production_inventory",
+      candidate.admissionStatus !== "admitted_to_production_inventory" &&
+      candidate.admissionStatus !== "production_route_map_positions_materialized",
   );
 
   assert.equal(candidates.schemaVersion, 1);
