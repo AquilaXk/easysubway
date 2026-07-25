@@ -18123,6 +18123,18 @@ test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경�
   assert.equal(repoTool.repository, "true");
   assert.equal(repoTool.ci, "true");
 
+  // #2515: tools/lib는 도구 전반이 공유하는 단일 원본이라, 이 파일만 바뀌어도
+  // 계약·datapack 테스트가 스킵되면 안 된다.
+  const sharedLib = await classifyChangedFiles(["tools/lib/codepoint-compare.mjs"]);
+  assert.equal(sharedLib.repository, "true");
+  assert.equal(sharedLib.ci, "true");
+  assert.equal(sharedLib.contracts, "true");
+  assert.equal(sharedLib.datapack, "true");
+  assert.equal(sharedLib.route_map, "true");
+  assert.equal(sharedLib.release, "true");
+  assert.equal(sharedLib.deploy, "false");
+  assert.equal(sharedLib.docs_only, "false");
+
   const envExample = await classifyChangedFiles([".env.example"]);
   assert.equal(envExample.repository, "true");
   assert.equal(envExample.contracts, "true");
