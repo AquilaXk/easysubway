@@ -6,12 +6,12 @@
 # (--region gwangju)로 파라미터화된 공통 추출→canonical 정합→track→투영→enrich 체인을 재사용.
 #
 # 사용: tools/route-map/run-sma-pipeline-gwangju.sh [svg경로] [이전버전추출JSON]
-#   svg 경로 미지정 시 반입된 정본 easy-subway-gwangju-v1.svg를 쓴다.
+#   svg 경로 미지정 시 반입된 정본 easy-subway-gwangju-v3.svg를 쓴다.
 # 환경: Chrome/Chromium 필요(추출기). CHROME_PATH로 지정 가능.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SVG="${1:-$ROOT/tools/route-map/route-map-defs/svg-sources/easy-subway-gwangju-v1.svg}"
+SVG="${1:-$ROOT/tools/route-map/route-map-defs/svg-sources/easy-subway-gwangju-v3.svg}"
 PREV_GEOM="${2:-}"
 PACK="apps/mobile/assets/datapacks/capital.sqlite.gz"
 INDEX="apps/mobile/assets/datapacks/index.json"
@@ -37,7 +37,11 @@ node tools/route-map/apply-route-map-line-tracks.mjs --pack "$PACK" --index "$IN
 node tools/route-map/project-nodes-to-tracks.mjs --region "$REGION_KEY" --pack "$PACK" --index "$INDEX"
 
 echo "[5/7] 재간격 → 8선형 잔차 스냅"
-respace_out="$(node tools/route-map/respace-route-map.mjs --region "$REGION_KEY" --pack "$PACK" --index "$INDEX")"
+# --pin-stations(#2068 P-65): 역 좌표를 오너 SVG 배정에 고정한다. 수도권·부산·대구는
+# 처음부터 이 모드였으나 대전·광주만 빠져 있어, 재간격이 팩 좌표를 SVG 노드에서
+# 밀어냈다(광주 v3 실측 최대 25.81px — 바탕↔인터랙션 정합 <5px 하드 게이트 초과).
+# 오너 배치를 그대로 쓰는 것이 정답이라 5권역 모두 같은 모드로 맞춘다.
+respace_out="$(node tools/route-map/respace-route-map.mjs --region "$REGION_KEY" --pack "$PACK" --index "$INDEX" --pin-stations)"
 printf '%s\n' "$respace_out" | head -1
 node tools/route-map/snap-tracks-octolinear.mjs --region "$REGION_KEY" --pack "$PACK" --index "$INDEX"
 
