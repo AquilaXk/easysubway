@@ -145,6 +145,41 @@ function rehashTopology(topology) {
   return topology;
 }
 
+// topology 바이트를 고치면 상위 contentSha256이 바뀌므로 그 파일을 가리키는 admission lineage 선언도
+// 함께 맞춰야 다른 scope가 lineage 불일치로 먼저 막히지 않는다.
+function rebindTopologyLineages(inventory, topologyPath, contentSha256) {
+  const snapshotId = path.basename(topologyPath, ".json");
+  for (const source of inventory.sources) {
+    for (const lineage of source.routeMapAdmissionEvidence?.topologyLineages ?? []) {
+      if (lineage.snapshotId === snapshotId) {
+        lineage.contentSha256 = contentSha256;
+      }
+    }
+  }
+  return inventory;
+}
+
+// 무결성·lineage 결속을 전부 통과시킨 상태에서 표기 방향 조건만 시험하기 위한 장치다.
+function withPatchedCapitalTopology(inputs, lineId, patchScope) {
+  const topology = structuredClone(inputs.topologiesByPath.get(CAPITAL_TOPOLOGY_PATH));
+  const line = topology.lines.find((entry) => entry.lineId === lineId);
+  line.scope = patchScope(line.scope);
+  rehashTopology(topology);
+  return {
+    ...inputs,
+    inventory: rebindTopologyLineages(
+      structuredClone(inputs.inventory),
+      CAPITAL_TOPOLOGY_PATH,
+      topology.contentSha256,
+    ),
+    topologiesByPath: new Map(inputs.topologiesByPath).set(CAPITAL_TOPOLOGY_PATH, topology),
+  };
+}
+
+function scopeKeyOf({ regionId, operatorId, lineId }) {
+  return `${regionId}:${operatorId}:${lineId}`;
+}
+
 // 위반은 별칭 → 결측 ledger → containment 순서로 쌓이므로 나열 순서가 결정론적이다.
 function violationKinds(result) {
   return result.violations.map(({ kind }) => kind);
@@ -285,6 +320,17 @@ test("등재되지 않은 URL을 근거로 단 별칭은 거부된다 (#2516)", 
   assert.deepEqual(violationKinds(result), ["ALIAS_EVIDENCE_URL_UNREGISTERED", "MISSING_STATION"]);
 });
 
+test("다른 scope에 등재된 공식 URL은 근거가 되지 못한다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const exemptions = structuredClone(inputs.exemptions);
+  // 서울 역사 좌표 데이터셋은 inventory에 등재돼 있지만 대구 1호선 scope를 커버하는 출처가 아니다.
+  aliasNamed(exemptions, "명덕1").evidence.officialUrl = "https://www.data.go.kr/data/15099316/fileData.do";
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, exemptions });
+
+  assert.deepEqual(violationKinds(result), ["ALIAS_EVIDENCE_URL_UNREGISTERED", "MISSING_STATION"]);
+});
+
 test("승인 목록 밖 사유 코드는 별칭·ledger 모두에서 거부된다 (#2516)", async () => {
   const inputs = await loadAuditInputs();
   const exemptions = structuredClone(inputs.exemptions);
@@ -396,6 +442,40 @@ test("topology 해시를 맞춰도 admission lineage 선언과 다르면 거부�
   assert.ok(violationKinds(result).includes("ALIAS_PACK_TOPOLOGY_LINEAGE_MISMATCH"));
 });
 
+// 아래 세 회귀는 lineage가 등재된 에버라인·7호선 scope를 써서 개명 방향 조건 자체를 실행시킨다.
+// lineage 미등재 scope로는 앞단에서 막혀 방향 판정에 도달하지 못한다.
+test("pack topology가 snapshot 신표기를 싣지 않으면 채택 근거 개명 별칭이 거부된다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const patched = withPatchedCapitalTopology(inputs, "line-828f04afc588", (scope) => scope
+    .filter(({ stationName }) => stationName !== "용인중앙시장"));
+
+  const result = auditRouteMapCoverageScopes(patched);
+
+  assert.deepEqual(violationKinds(result), ["ALIAS_RENAME_ADOPTED_NAME_ABSENT", "MISSING_STATION"]);
+});
+
+test("pack topology가 roster 구표기도 실으면 채택 근거 개명 별칭이 거부된다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const patched = withPatchedCapitalTopology(inputs, "line-828f04afc588", (scope) => [
+    ...scope,
+    { ...scope[0], stationName: "운동장.송담대" },
+  ]);
+
+  const result = auditRouteMapCoverageScopes(patched);
+
+  assert.deepEqual(violationKinds(result), ["ALIAS_RENAME_ROSTER_NAME_PRESENT", "MISSING_STATION"]);
+});
+
+test("pack topology가 roster 신표기를 싣지 않으면 원문 구표기 개명 별칭이 거부된다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const patched = withPatchedCapitalTopology(inputs, "line-15b3b8a93259", (scope) => scope
+    .filter(({ stationName }) => stationName !== "자양"));
+
+  const result = auditRouteMapCoverageScopes(patched);
+
+  assert.deepEqual(violationKinds(result), ["ALIAS_RENAME_ROSTER_NAME_ABSENT", "MISSING_STATION"]);
+});
+
 test("snapshot 표기 오염은 모든 교차 근거 경로에서 거부된다 (#2516)", async () => {
   const inputs = await loadAuditInputs();
   const snapshot = structuredClone(inputs.snapshotsByPath.get(SEOUL_SNAPSHOT_PATH));
@@ -435,6 +515,45 @@ test("snapshot 표기 오염은 모든 교차 근거 경로에서 거부된다 (
     });
     const result = auditRouteMapCoverageScopes({ ...inputs, exemptions, snapshotsByPath });
     assert.deepEqual(violationKinds(result), [expected, "MISSING_STATION"], `crossCheck=${crossCheck}`);
+  }
+});
+
+test("공식 원문에 실재하는 표기로 오염시켜도 구표기 근거로 세탁되지 않는다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  // 원문 부분문자열 일치만 요구하면 같은 CSV의 다른 노선 행 역명(종로3가)이나 한 글자(쌍)로
+  // 4호선 쌍문을 제자리에서 오염시켜도 근거가 성립한다. 밀려난 roster 표기가 원문에 남아 있어야 한다.
+  for (const polluted of ["종로3가", "쌍"]) {
+    const snapshot = structuredClone(inputs.snapshotsByPath.get(SEOUL_SNAPSHOT_PATH));
+    for (const position of snapshot.positions) {
+      if (position.lineId === "seoul-4" && position.stationName === "쌍문") {
+        position.stationName = polluted;
+      }
+    }
+    const snapshotsByPath = new Map(inputs.snapshotsByPath).set(SEOUL_SNAPSHOT_PATH, snapshot);
+    const exemptions = structuredClone(inputs.exemptions);
+    exemptions.approvedStationNameAliases.push({
+      scopeKey: "capital:seoul-metro:seoul-4",
+      snapshotStationName: polluted,
+      rosterStationName: "쌍문",
+      reasonCode: "OFFICIAL_RENAME",
+      evidence: {
+        issue: 2516,
+        renamedAt: "2024-01-01",
+        crossCheck: "OFFICIAL_FILE_STALE_NAME",
+        officialUrl: "https://www.data.go.kr/data/15099316/fileData.do",
+        packTopologyPath: CAPITAL_TOPOLOGY_PATH,
+        officialRawPath: "tools/datapack/fixtures/seoul-route-map-positions-raw/data-go-15099316.csv",
+        note: "오염 세탁 시도",
+      },
+    });
+
+    const result = auditRouteMapCoverageScopes({ ...inputs, exemptions, snapshotsByPath });
+
+    assert.deepEqual(
+      violationKinds(result),
+      ["ALIAS_RENAME_RAW_ROSTER_NAME_PRESENT", "MISSING_STATION"],
+      `오염 표기=${polluted}`,
+    );
   }
 });
 
@@ -538,7 +657,7 @@ test("이미 커버된 역을 임의로 면제하는 ledger 항목은 거부된�
       issue: 2516,
       snapshotPath: GWANGJU_SNAPSHOT_PATH,
       packTopologyPath: CAPITAL_TOPOLOGY_PATH,
-      officialUrl: "https://www.data.go.kr/data/15122916/fileData.do",
+      officialUrl: "https://www.data.go.kr/data/15109340/fileData.do",
       note: "근거 없는 면제",
     },
   });
@@ -744,5 +863,18 @@ test("재기술만으로는 containment 감사가 사라진 scope를 통과시�
   const result = auditRouteMapCoverageScopes({ ...inputs, inventory });
 
   assert.ok(violationKinds(result).includes("SOURCE_CANDIDATE_SCOPE_UNAUDITED"));
+  assert.equal(result.auditedScopeKeys.includes(CANDIDATE_REDESCRIBED_SCOPE_KEY), false);
+});
+
+test("activeLineScopes에서 빠진 scope는 재기술 claim으로 통과시킬 수 없다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const targets = structuredClone(inputs.targets);
+  // snapshot이 그대로 커버해도 #2138 requirement에서 빠지면 containment 감사 자체가 사라진다.
+  targets.activeLineScopes = targets.activeLineScopes
+    .filter((scope) => scopeKeyOf(scope) !== CANDIDATE_REDESCRIBED_SCOPE_KEY);
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, targets });
+
+  assert.deepEqual(violationKinds(result), ["SOURCE_CANDIDATE_SCOPE_UNAUDITED", "ALIAS_SCOPE_NOT_AUDITED"]);
   assert.equal(result.auditedScopeKeys.includes(CANDIDATE_REDESCRIBED_SCOPE_KEY), false);
 });

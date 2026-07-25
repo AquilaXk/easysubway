@@ -9,7 +9,8 @@
 // 그 외 불일치는 전부 fail-closed다.
 //
 // 근거 필드 검증 범위(정직한 한계 서술):
-// - officialUrl은 source-inventory와 admitted snapshot이 등재한 공식 데이터셋 URL 집합에만 든다.
+// - officialUrl은 그 scope를 커버하는 소스·admitted snapshot과 그 scope의 topology lineage 소스가
+//   등재한 공식 데이터셋 URL만 허용한다. 전역 집합이면 다른 지역 데이터셋 URL도 근거가 된다.
 //   URL이 그 역명을 실제로 싣는지는 원격 조회 없이 확인할 수 없다.
 // - issue 번호와 note 서술의 내용은 검증하지 않는다. 형식과 존재만 강제한다.
 // - renamedAt은 형식과 상한(snapshot capturedAt)만 본다. 개명 사실 자체는 crossCheck로 확인한다.
@@ -22,7 +23,9 @@
 //   저장소에 admitted snapshot 파일이 없어 역 집합을 실측할 수 없으므로 이 claim은 containment 근거가
 //   되지 못하고 감사 대상 scope도 만들지 못한다. 근거 없는 claim이 감사를 침묵시키지 못하도록
 //   ① candidate pack spec의 재기술 등재(lineIds 동형), ② 그 spec 바이트에 결속된 게이트 evidence의
-//   SUPPORTED 실증, ③ 같은 scope를 collector snapshot 모델 소스가 여전히 커버함을 모두 요구한다.
+//   SUPPORTED 실증, ③ 같은 scope가 실제 containment 감사 대상으로 남아 있음을 모두 요구한다.
+//   ③은 snapshot 커버 여부가 아니라 auditableScopeKeys가 확정한 감사 집합으로 판정한다. scope가
+//   activeLineScopes에서 빠지거나 roster가 없으면 감사가 사라지는데 커버 여부만 보면 그대로 통과한다.
 //   ③이 없으면 재기술 등재만으로 containment 감사를 끌 수 있으므로 fail-closed의 핵심이다.
 
 import { createHash } from "node:crypto";
@@ -202,21 +205,21 @@ function boundCandidateRedescription({ source, admission, push }) {
   return redescription;
 }
 
-function validateCandidateScope({ key, redescription, supported, coverageByScope, push }) {
+function validateCandidateScope({ key, redescription, supported, auditedScopeKeys, push }) {
   const requirementKey = `${key}:${ROUTE_MAP_DOMAIN}`;
   if (!(redescription.requirementKeys ?? []).includes(requirementKey) || !supported.has(requirementKey)) {
     push("SOURCE_CANDIDATE_SCOPE_NOT_SUPPORTED", `candidate 게이트가 ${requirementKey}를 SUPPORTED로 실증하지 않았다`);
     return;
   }
-  // 같은 scope를 admitted snapshot으로 커버하는 소스가 없으면 containment 감사가 사라진다.
-  if (!coverageByScope.has(key)) {
-    push("SOURCE_CANDIDATE_SCOPE_UNAUDITED", `${key}를 admitted snapshot으로 커버하는 소스가 없어 containment를 판정할 수 없다`);
+  // 같은 scope가 containment 감사 대상으로 남아 있지 않으면 이 claim만으로는 판정할 근거가 없다.
+  if (!auditedScopeKeys.has(key)) {
+    push("SOURCE_CANDIDATE_SCOPE_UNAUDITED", `${key}가 containment 감사 대상 scope가 아니어서 판정할 수 없다`);
   }
 }
 
 // snapshot 없는 lineIds claim은 candidate 게이트 재기술 근거가 전부 성립할 때만 위반이 아니다.
 // 재기술 claim 자체는 역 집합을 싣지 않으므로 감사 대상 scope를 만들지 않는다.
-function validateCandidateLineScopeClaims({ sources, admission, coverageByScope, violations }) {
+function validateCandidateLineScopeClaims({ sources, admission, auditedScopeKeys, violations }) {
   for (const source of sources) {
     const push = (kind, message) => violations.push({ kind, sourceId: source.id, message: `${source.id}: ${message}` });
     const redescription = boundCandidateRedescription({ source, admission, push });
@@ -225,7 +228,7 @@ function validateCandidateLineScopeClaims({ sources, admission, coverageByScope,
     }
     const supported = new Set(admission.evidence.variants?.lineScoped?.supportedRequirementKeys ?? []);
     for (const { key } of claimedScopes(source.coverageScope)) {
-      validateCandidateScope({ key, redescription, supported, coverageByScope, push });
+      validateCandidateScope({ key, redescription, supported, auditedScopeKeys, push });
     }
   }
 }
@@ -237,7 +240,35 @@ function lineageTopologyPaths(admissionEvidence, lineId) {
     .map((lineage) => ({
       path: `${TOPOLOGY_SNAPSHOT_DIR}/${lineage.snapshotId}.json`,
       contentSha256: lineage.contentSha256,
+      snapshotId: lineage.snapshotId,
     }));
+}
+
+function addOfficialUrls(target, entry) {
+  const add = (value) => {
+    if (typeof value === "string" && value.startsWith("https://")) {
+      target.add(value);
+    } else if (Array.isArray(value)) {
+      value.forEach(add);
+    }
+  };
+  add(entry?.datasetUrl);
+  add(entry?.datasetUrls);
+  add(entry?.detailUrl);
+  add(entry?.license?.evidenceUrl);
+}
+
+// topology snapshotId → 그 snapshot을 admission한 inventory 소스. lineage 소스의 공식 URL도
+// 그 scope의 근거로 인정하기 위한 색인이다(대구 2호선 역 구간정보 파일 등).
+function topologySourcesBySnapshotId(inventory) {
+  const sources = new Map();
+  for (const source of inventory.sources ?? []) {
+    const snapshotId = source.topologyAdmissionEvidence?.snapshotId;
+    if (isNonEmptyString(snapshotId)) {
+      sources.set(snapshotId, source);
+    }
+  }
+  return sources;
 }
 
 // 정규화 키가 겹치면 뒤 항목이 앞 항목을 덮어 서로 다른 두 역이 한 칸으로 접합된다.
@@ -263,10 +294,13 @@ function indexScopeCoverage(coverage, snapshot, lineId, push) {
 
 // coverageScope가 route_map_positions를 claim한 소스에서 (scope, snapshot) 결속을 모은다.
 // 같은 scope를 여러 소스가 나눠 커버할 수 있으므로(예: 9호선 1단계 + 2·3단계) 역 집합은 합집합이다.
-function collectScopeCoverage({ inventory, snapshotsByPath, candidateAdmission, violations }) {
+// 근거 URL 화이트리스트도 여기서 scope 단위로 모은다 — 전역 집합이면 그 scope와 무관한 출처가 통과한다.
+function collectScopeCoverage({ inventory, snapshotsByPath, violations }) {
   const coverageByScope = new Map();
+  const officialUrlsByScope = new Map();
   const claims = [];
   const candidateClaimants = [];
+  const topologySources = topologySourcesBySnapshotId(inventory);
   for (const source of inventory.sources ?? []) {
     if (!claimsRouteMapLineScope(source)) {
       continue;
@@ -304,9 +338,14 @@ function collectScopeCoverage({ inventory, snapshotsByPath, candidateAdmission, 
       if (isNonEmptyString(snapshot.rawSha256)) {
         coverage.rawSha256s.add(snapshot.rawSha256);
       }
+      const officialUrls = officialUrlsByScope.get(key) ?? new Set();
+      addOfficialUrls(officialUrls, source);
+      addOfficialUrls(officialUrls, snapshot);
+      officialUrlsByScope.set(key, officialUrls);
       for (const lineage of lineageTopologyPaths(source.routeMapAdmissionEvidence, lineId)) {
         coverage.topologyPaths.add(lineage.path);
         coverage.topologyContentByPath.set(lineage.path, lineage.contentSha256);
+        addOfficialUrls(officialUrls, topologySources.get(lineage.snapshotId));
       }
       indexScopeCoverage(coverage, snapshot, lineId, (message) => violations.push({
         kind: "SNAPSHOT_NAME_COLLISION",
@@ -316,37 +355,7 @@ function collectScopeCoverage({ inventory, snapshotsByPath, candidateAdmission, 
       coverageByScope.set(key, coverage);
     }
   }
-  validateCandidateLineScopeClaims({
-    sources: candidateClaimants,
-    admission: candidateAdmission,
-    coverageByScope,
-    violations,
-  });
-  return { coverageByScope, claims };
-}
-
-// 근거 URL은 inventory·admitted snapshot이 등재한 공식 데이터셋 URL만 허용한다.
-function collectOfficialUrls({ inventory, snapshotsByPath }) {
-  const urls = new Set();
-  const add = (value) => {
-    if (typeof value === "string" && value.startsWith("https://")) {
-      urls.add(value);
-    } else if (Array.isArray(value)) {
-      value.forEach(add);
-    }
-  };
-  for (const source of inventory.sources ?? []) {
-    add(source.datasetUrl);
-    add(source.datasetUrls);
-    add(source.detailUrl);
-    add(source.license?.evidenceUrl);
-  }
-  for (const snapshot of snapshotsByPath.values()) {
-    add(snapshot.datasetUrl);
-    add(snapshot.datasetUrls);
-    add(snapshot.detailUrl);
-  }
-  return urls;
+  return { coverageByScope, officialUrlsByScope, claims, candidateClaimants };
 }
 
 // scope가 topology lineage를 등재했으면 그 snapshot만, 없으면 inventory에 등재된
@@ -396,7 +405,7 @@ function resolveTopologyNames({ topologyPath, coverage, registeredTopologyPaths,
   return new Set(line.scope.map((entry) => normalizeStationName(entry?.stationName)));
 }
 
-function validateAliasShape({ alias, auditedScopeKeys, officialUrls, push }) {
+function validateAliasShape({ alias, auditedScopeKeys, officialUrlsByScope, push }) {
   if (!isNonEmptyString(alias?.scopeKey) || !auditedScopeKeys.has(alias.scopeKey)) {
     push("ALIAS_SCOPE_NOT_AUDITED", "containment 감사 대상 scope가 아니다");
     return false;
@@ -413,8 +422,8 @@ function validateAliasShape({ alias, auditedScopeKeys, officialUrls, push }) {
     push("ALIAS_EVIDENCE_ISSUE_INVALID", "evidence.issue는 양의 정수 이슈 번호여야 한다");
     return false;
   }
-  if (!officialUrls.has(alias.evidence.officialUrl)) {
-    push("ALIAS_EVIDENCE_URL_UNREGISTERED", "evidence.officialUrl이 등재된 공식 데이터셋 URL이 아니다");
+  if (!officialUrlsByScope.get(alias.scopeKey)?.has(alias.evidence.officialUrl)) {
+    push("ALIAS_EVIDENCE_URL_UNREGISTERED", "evidence.officialUrl이 이 scope에 등재된 공식 데이터셋 URL이 아니다");
     return false;
   }
   if (!isNonEmptyString(alias.evidence.note)) {
@@ -555,8 +564,16 @@ function verifyStaleNameCrossCheck(context) {
     push("ALIAS_RENAME_RAW_SOURCE_UNBOUND", "officialRawPath가 admitted snapshot의 rawSha256과 결속되지 않는다");
     return false;
   }
-  if (!decodedRawTexts(rawBytes).some((text) => text.includes(alias.snapshotStationName))) {
+  const rawTexts = decodedRawTexts(rawBytes);
+  if (!rawTexts.some((text) => text.includes(alias.snapshotStationName))) {
     push("ALIAS_RENAME_RAW_NAME_ABSENT", "공식 원문 바이트에 snapshot 표기가 없다");
+    return false;
+  }
+  // 부분문자열 일치는 행·노선 범위가 없어 다른 노선 행의 역명이나 한 글자도 근거가 된다. 방향을 함께
+  // 요구해 오염과 구분한다 — 구표기를 싣는 원문이라면 roster 신표기는 아직 없어야 한다. snapshot 표기를
+  // 제자리에서 오염시키면 밀려난 roster 표기가 원문에 그대로 남아 있으므로 여기서 걸린다.
+  if (rawTexts.some((text) => text.includes(rosterName))) {
+    push("ALIAS_RENAME_RAW_ROSTER_NAME_PRESENT", "공식 원문 바이트가 roster 신표기도 실어 구표기로 볼 수 없다");
     return false;
   }
   return true;
@@ -633,7 +650,7 @@ function validateAliases({
   auditedScopeKeys,
   coverageByScope,
   rosters,
-  officialUrls,
+  officialUrlsByScope,
   registeredTopologyPaths,
   topologiesByPath,
   rawSourcesByPath,
@@ -648,7 +665,7 @@ function validateAliases({
       scopeKey: alias?.scopeKey,
       message: `${label}: ${message}`,
     });
-    if (!validateAliasShape({ alias, auditedScopeKeys, officialUrls, push })) {
+    if (!validateAliasShape({ alias, auditedScopeKeys, officialUrlsByScope, push })) {
       continue;
     }
     const seen = seenByScope.get(alias.scopeKey)
@@ -680,7 +697,7 @@ function validateAliases({
   return aliasedRosterNamesByScope;
 }
 
-function validateGapShape({ gap, auditedScopeKeys, officialUrls, push }) {
+function validateGapShape({ gap, auditedScopeKeys, officialUrlsByScope, push }) {
   if (!isNonEmptyString(gap?.scopeKey) || !auditedScopeKeys.has(gap.scopeKey)) {
     push("LEDGER_SCOPE_NOT_AUDITED", "containment 감사 대상 scope가 아니다");
     return false;
@@ -697,8 +714,8 @@ function validateGapShape({ gap, auditedScopeKeys, officialUrls, push }) {
     push("LEDGER_EVIDENCE_ISSUE_INVALID", "evidence.issue는 양의 정수 이슈 번호여야 한다");
     return false;
   }
-  if (!officialUrls.has(gap.evidence.officialUrl)) {
-    push("LEDGER_EVIDENCE_URL_UNREGISTERED", "evidence.officialUrl이 등재된 공식 데이터셋 URL이 아니다");
+  if (!officialUrlsByScope.get(gap.scopeKey)?.has(gap.evidence.officialUrl)) {
+    push("LEDGER_EVIDENCE_URL_UNREGISTERED", "evidence.officialUrl이 이 scope에 등재된 공식 데이터셋 URL이 아니다");
     return false;
   }
   if (!isNonEmptyString(gap.evidence.note)) {
@@ -827,7 +844,7 @@ function validateGaps({
   coverageByScope,
   rosters,
   aliasedRosterNamesByScope,
-  officialUrls,
+  officialUrlsByScope,
   registeredTopologyPaths,
   snapshotsByPath,
   topologiesByPath,
@@ -841,7 +858,7 @@ function validateGaps({
       scopeKey: gap?.scopeKey,
       message: `${label}: ${message}`,
     });
-    if (!validateGapShape({ gap, auditedScopeKeys, officialUrls, push })) {
+    if (!validateGapShape({ gap, auditedScopeKeys, officialUrlsByScope, push })) {
       continue;
     }
     const rosterName = normalizeStationName(gap.rosterStationName);
@@ -941,18 +958,25 @@ export function auditRouteMapCoverageScopes({
 }) {
   const violations = [];
   const activeScopeKeys = new Set((targets.activeLineScopes ?? []).map(scopeKey));
-  const { coverageByScope, claims } = collectScopeCoverage({
+  const { coverageByScope, officialUrlsByScope, claims, candidateClaimants } = collectScopeCoverage({
     inventory,
     snapshotsByPath,
-    candidateAdmission: readCandidateLineScopeAdmission(candidateLineScopeAdmission),
     violations,
   });
   const auditedScopeKeys = auditableScopeKeys({ claims, activeScopeKeys, rosters, violations });
+  const auditedScopeKeySet = new Set(auditedScopeKeys);
+  // 재기술 claim의 ③은 실제 감사 집합이 확정된 뒤에만 판정할 수 있다.
+  validateCandidateLineScopeClaims({
+    sources: candidateClaimants,
+    admission: readCandidateLineScopeAdmission(candidateLineScopeAdmission),
+    auditedScopeKeys: auditedScopeKeySet,
+    violations,
+  });
   const shared = {
-    auditedScopeKeys: new Set(auditedScopeKeys),
+    auditedScopeKeys: auditedScopeKeySet,
     coverageByScope,
     rosters,
-    officialUrls: collectOfficialUrls({ inventory, snapshotsByPath }),
+    officialUrlsByScope,
     registeredTopologyPaths: collectRegisteredTopologyPaths(inventory),
     topologiesByPath,
     rawSourcesByPath,
