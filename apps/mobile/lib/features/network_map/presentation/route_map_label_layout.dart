@@ -308,8 +308,13 @@ String _normalizeOwnerLabelNameKey(String name) =>
 ///    거리 오름차순으로 훑어 가장 가까운 쌍부터 1:1로 확정한다 — 이미 쓰인
 ///    라벨·후보는 재사용하지 않는다(같은 라벨 이중 귀속 금지). 이로써 busan
 ///    좌천 2역·동래 2역이 각자 자기 최근접 라벨을 독립적으로 갖는다. 라벨이
-///    후보보다 적으면(seoul 신촌·양평처럼 SVG에 한쪽만 그려진 경우) 남는 후보는
-///    결과 맵에 없어(null) 기존 솔버로 폴백한다.
+///    후보보다 적으면(도식이 라벨을 아예 싣지 않은 경우 — 예: 도식 미수록 도라산)
+///    남는 후보는 결과 맵에 없어(null) 기존 솔버로 폴백한다.
+///    (#2068 v4 기준 정정: seoul 신촌·양평은 v2와 달리 두 라벨이 모두 존재해 더는
+///    이 예시가 아니다. 대신 sidecar 키에 canonicalRules가 적용되면서 (station,
+///    role) 중복 키가 생겼다 — 신촌|ordinary ×2, 양평|ordinary ×2. 현 소비자는
+///    위 2)의 근접 그리디 1:1 해소라 무해하지만, **이름 단일 맵으로 바꾸면 둘 중
+///    하나가 소실된다** — 목록 구조를 유지할 것.)
 /// 3) 채택된 쌍도 [kRouteMapOwnerLabelMaxAnchorDistancePx] 위치 게이트를
 ///    통과해야 한다(양평의 원거리 오배치 등 병리적 케이스 방어).
 Map<String, RouteMapOwnerLabelEntry> _resolveOwnerLabelsByCandidateKey({
