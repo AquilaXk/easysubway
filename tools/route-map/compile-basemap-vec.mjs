@@ -644,6 +644,44 @@ function composeTransformValues(...values) {
   return values.filter(Boolean).join(" ");
 }
 
+// 표장 레이어(service-tags-layer·rail-transfer-layer) `<g>` 슬라이스.
+//
+// #2068 오너 v3 리뷰 지적(2026-07-25): extractGroup(:115)과 같은 결함이 표장
+// 추출기 두 곳에 복제돼 있었다 — 여는 태그를 `/<g\b|<\/g>/`(태그 접두만)로 세어
+// **자기폐쇄 `<g …/>`도 depth를 올려** 균형이 영구히 깨진다. 그러면 layerEnd를
+// 못 찾고 조용히 `return []`이 되어 **표장 회피 목록이 통째로 사라져도 게이트가
+// green**이다(라벨이 KTX·SRT 로고 위에 얹혀도 아무도 못 잡는다). 세 가지를
+// 고친다:
+//   1) 레이어 여는 태그 자체가 자기폐쇄면 그 태그가 곧 빈 레이어다(표장 0건).
+//   2) depth는 자기폐쇄가 아닌 여는 태그에서만 올린다(extractGroup과 동일 규칙).
+//   3) 닫는 태그를 못 찾으면 빈 배열이 아니라 **명시 실패(throw)** — 회피 목록
+//      소실을 조용히 통과시키지 않는다(fail-closed).
+// 레이어가 아예 없는 권역은 null(정상 — 호출부가 빈 배열을 낸다).
+function extractObstacleLayerSlice(svgText, layerId) {
+  const layerStart = svgText.indexOf(`id="${layerId}"`);
+  if (layerStart < 0) return null;
+  const groupStart = svgText.lastIndexOf("<g", layerStart);
+  if (groupStart < 0) return null;
+
+  const selfClosing = svgText.slice(groupStart).match(/^<g\b[^>]*?\/>/);
+  if (selfClosing) return selfClosing[0]; // 내용 없는 빈 레이어.
+
+  const tagRe = /<g\b[^>]*>|<\/g>/g;
+  tagRe.lastIndex = groupStart;
+  let depth = 0;
+  for (let m = tagRe.exec(svgText); m; m = tagRe.exec(svgText)) {
+    if (m[0].startsWith("</")) {
+      depth -= 1;
+      if (depth === 0) return svgText.slice(groupStart, tagRe.lastIndex);
+    } else if (!m[0].endsWith("/>")) {
+      depth += 1;
+    }
+  }
+  throw new Error(
+    `${layerId}의 닫는 태그를 찾지 못했습니다 — 표장 회피 목록을 조용히 비우지 않고 실패합니다.`,
+  );
+}
+
 // service-tag(KTX·SRT·AIR 표장) 장애물 목록(#2068 마감 라운드 item 3) — 라벨
 // solver가 이 표장 위에 라벨을 얹지 않도록 회피 대상으로 쓴다. 각
 // `<g class="service-tag">` 서브그룹의 transform 체인(중첩 `<g transform>`
@@ -656,23 +694,8 @@ function composeTransformValues(...values) {
 // 커버리지가 되어 더 안전하다. 반환 좌표는 mapScaleAndTranslateFrom으로 최종
 // 좌표계로 변환됨(위 주석 참고).
 export function extractServiceTagObstacles(svgText) {
-  const layerStart = svgText.indexOf('id="service-tags-layer"');
-  if (layerStart < 0) return [];
-  const groupStart = svgText.lastIndexOf("<g", layerStart);
-  let depth = 0;
-  let layerEnd = -1;
-  const tagRe = /<g\b|<\/g>/g;
-  tagRe.lastIndex = groupStart;
-  let m;
-  while ((m = tagRe.exec(svgText))) {
-    depth += m[0] === "</g>" ? -1 : 1;
-    if (depth === 0) {
-      layerEnd = tagRe.lastIndex;
-      break;
-    }
-  }
-  if (layerEnd < 0) return [];
-  const layer = svgText.slice(groupStart, layerEnd);
+  const layer = extractObstacleLayerSlice(svgText, "service-tags-layer");
+  if (layer === null) return [];
   const layerTransform = layerOwnTransform(layer);
 
   const obstacles = [];
@@ -742,23 +765,8 @@ export function extractServiceTagObstacles(svgText) {
 // id)으로 잡는다. bbox는 extractServiceTagObstacles와 같은 transform 체인 합성·
 // 재귀 도형 수집으로 절대 좌표화한다. 표장이 없는 권역은 빈 배열.
 export function extractRailTransferChipObstacles(svgText) {
-  const layerStart = svgText.indexOf('id="rail-transfer-layer"');
-  if (layerStart < 0) return [];
-  const groupStart = svgText.lastIndexOf("<g", layerStart);
-  let depth = 0;
-  let layerEnd = -1;
-  const tagRe = /<g\b|<\/g>/g;
-  tagRe.lastIndex = groupStart;
-  let m;
-  while ((m = tagRe.exec(svgText))) {
-    depth += m[0] === "</g>" ? -1 : 1;
-    if (depth === 0) {
-      layerEnd = tagRe.lastIndex;
-      break;
-    }
-  }
-  if (layerEnd < 0) return [];
-  const layer = svgText.slice(groupStart, layerEnd);
+  const layer = extractObstacleLayerSlice(svgText, "rail-transfer-layer");
+  if (layer === null) return [];
   const layerTransform = layerOwnTransform(layer);
 
   const obstacles = [];

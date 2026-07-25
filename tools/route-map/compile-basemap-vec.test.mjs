@@ -788,6 +788,82 @@ test("extractServiceTagObstacles: 표장 레이어 자신의 transform도 체인
   assert.equal(obstacle.halfHeight, 10.5);
 });
 
+// #2068 리뷰 지적(2026-07-25): 자기폐쇄 `<g …/>`를 depth로 세던 결함이 표장
+// 추출기 두 곳에 남아 있었다 — 균형이 깨지면 조용히 빈 배열이 되어 표장 회피가
+// 통째로 사라져도 게이트가 green이었다. 아래 4건이 그 시나리오를 고정한다.
+test("extractServiceTagObstacles: 앞선 자기폐쇄 빈 레이어가 표장 레이어 인식을 깨뜨리지 않는다", () => {
+  const svgText = `
+    <svg>
+      <g id="terminal-route-badges-layer" class="render-layer" />
+      <g id="service-tags-layer">
+        <g id="service-tag-ktx-1" class="service-tag" data-station="테스트역">
+          <rect x="0" y="0" width="10" height="4" />
+        </g>
+      </g>
+    </svg>`;
+  const obstacles = extractServiceTagObstacles(svgText);
+  assert.equal(obstacles.length, 1);
+  assert.equal(obstacles[0].station, "테스트역");
+  assert.equal(obstacles[0].halfWidth, 5);
+  assert.equal(obstacles[0].halfHeight, 2);
+});
+
+test("extractServiceTagObstacles·extractRailTransferChipObstacles: 레이어 안의 자기폐쇄 <g/>가 표장을 잃게 하지 않는다", () => {
+  const serviceSvg = `
+    <svg>
+      <g id="service-tags-layer">
+        <g id="spacer" data-note="빈 자리표시" />
+        <g id="service-tag-ktx-1" class="service-tag" data-station="테스트역">
+          <rect x="0" y="0" width="10" height="4" />
+        </g>
+      </g>
+      <g id="station-name-labels-layer"><text>테스트역</text></g>
+    </svg>`;
+  const serviceObstacles = extractServiceTagObstacles(serviceSvg);
+  assert.equal(serviceObstacles.length, 1);
+  assert.equal(serviceObstacles[0].station, "테스트역");
+
+  const railSvg = `
+    <svg>
+      <g id="rail-transfer-layer">
+        <g id="spacer" data-note="빈 자리표시" />
+        <g id="chip-1" data-services="KTX" data-station-name="테스트역">
+          <rect x="0" y="0" width="10" height="4" />
+        </g>
+      </g>
+    </svg>`;
+  const railObstacles = extractRailTransferChipObstacles(railSvg);
+  assert.equal(railObstacles.length, 1);
+  assert.equal(railObstacles[0].station, "테스트역");
+});
+
+test("extractServiceTagObstacles·extractRailTransferChipObstacles: 닫히지 않은 표장 레이어는 빈 배열이 아니라 실패한다(fail-closed)", () => {
+  const serviceSvg =
+    '<svg><g id="service-tags-layer"><g id="service-tag-ktx-1" class="service-tag" data-station="테스트역"><rect x="0" y="0" width="10" height="4" /></g></svg>';
+  assert.throws(
+    () => extractServiceTagObstacles(serviceSvg),
+    /service-tags-layer의 닫는 태그를 찾지 못했습니다/,
+  );
+  const railSvg =
+    '<svg><g id="rail-transfer-layer"><g id="chip-1" data-services="KTX"><rect x="0" y="0" width="10" height="4" /></g></svg>';
+  assert.throws(
+    () => extractRailTransferChipObstacles(railSvg),
+    /rail-transfer-layer의 닫는 태그를 찾지 못했습니다/,
+  );
+});
+
+test("extractServiceTagObstacles: 자기폐쇄로 마감된 빈 표장 레이어는 빈 목록이다(부산 v3 실 SVG)", () => {
+  const svgText = readFileSync(
+    path.join(
+      import.meta.dirname,
+      "route-map-defs/svg-sources/easy-subway-busan-v3.svg",
+    ),
+    "utf8",
+  );
+  assert.match(svgText, /<g\b[^>]*\bid="service-tags-layer"[^>]*?\/>/);
+  assert.deepEqual(extractServiceTagObstacles(svgText), []);
+});
+
 test("extractServiceTagObstacles: 대구 동대구역 KTX·SRT 표장 bbox가 Chrome 실측과 일치한다", () => {
   // Chrome(headless, getBBox/getScreenCTM) 실측 — root viewBox 사용자 좌표.
   // 이 값은 오너 도식이 실제로 렌더하는 위치이며, 동대구역 환승 라벨 실측
