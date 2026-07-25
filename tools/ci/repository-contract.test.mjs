@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile, execFileSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign as signBytes } from "node:crypto";
-import { lstat as fsLstat, mkdir, mkdtemp, readFile, rm, symlink, utimes, writeFile } from "node:fs/promises";
+import { lstat as fsLstat, mkdir, mkdtemp, readFile, readdir, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -18200,12 +18200,86 @@ test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경�
   assert.equal(releaseTool.deploy, "false");
   assert.equal(releaseTool.release, "true");
 
+  // #2518: tools/mobile은 Android 릴리즈 산출물 가드를 담고 있어, 단독 변경에서도
+  // 계약 테스트(repository)와 release-artifacts android-release(android)가 돌아야 한다.
+  // mobile=false도 계약이다 — tools/mobile을 소비하지 않는 Flutter mobile-app job까지
+  // 깨우지 않는다. 알려진 파일과 임의의 중첩 경로를 각각 따로 분류해, 매핑이 특정 파일로
+  // 좁아지는 회귀와 mobile 게이트가 잘못 올라가는 회귀를 모두 잡는다.
+  for (const mobileToolFile of [
+    "tools/mobile/validate-release-dart-defines.sh",
+    "tools/mobile/nested/arbitrary-coverage-probe.txt",
+  ]) {
+    const mobileTool = await classifyChangedFiles([mobileToolFile]);
+    assert.equal(mobileTool.repository, "true", `${mobileToolFile} must map to repository=true`);
+    assert.equal(mobileTool.android, "true", `${mobileToolFile} must map to android=true`);
+    assert.equal(mobileTool.mobile, "false", `${mobileToolFile} must not raise the mobile gate`);
+    assert.equal(mobileTool.docs_only, "false", `${mobileToolFile} must not be docs-only`);
+    assert.equal(mobileTool.ios, "false", `${mobileToolFile} must not raise the ios gate`);
+    assert.equal(mobileTool.deploy, "false", `${mobileToolFile} must not raise the deploy gate`);
+  }
+
   const releaseGate = await classifyChangedFiles(["apps/mobile/release/release-governance-gate.json"]);
   assert.equal(releaseGate.release, "true");
   assert.equal(releaseGate.contracts, "true");
   assert.equal(releaseGate.mobile, "true");
   // #2390: release 자산 변경은 repository=true여야 claim 스캔(contract test)이 스킵되지 않는다.
   assert.equal(releaseGate.repository, "true");
+});
+
+// #2518: tools/ 하위에 새 디렉토리가 생겨도 detect-changed-paths.sh 매핑 누락이
+// 조용히 재발하지 않도록, 실제 디렉토리 목록을 열거해 최소 게이트를 강제한다.
+test("경로 분류기는 tools/ 하위 모든 디렉토리를 최소 repository 게이트로 분류한다", async () => {
+  const entries = await readdir(path.join(root, "tools"), { withFileTypes: true });
+  const toolDirs = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
+  assert.ok(toolDirs.length > 0, "tools/ must contain at least one subdirectory");
+
+  for (const dir of toolDirs) {
+    const outputs = await classifyChangedFiles([`tools/${dir}/detect-changed-paths-coverage-probe.txt`]);
+    assert.equal(
+      outputs.repository,
+      "true",
+      `tools/${dir}/** must map to repository=true in tools/ci/detect-changed-paths.sh`,
+    );
+    assert.equal(outputs.docs_only, "false", `tools/${dir}/** must not be classified as docs-only`);
+  }
+});
+
+// #2518: orphan 테스트 재발 방지 — tools/lib, tools/mobile 테스트는 계약 테스트 스텝 글롭에 있어야 한다.
+test("CI 계약 테스트 스텝은 tools/lib, tools/mobile 테스트 글롭을 포함한다", () => {
+  const workflow = read(".github/workflows/ci.yml");
+  const contractStep = workflow.match(
+    /- name: Repository CI \/ Run contract tests\n[\s\S]*?\n        run: (node --test [^\n]*)\n/,
+  );
+  assert.ok(contractStep, "Repository CI / Run contract tests step must declare a node --test run");
+
+  const command = contractStep[1];
+  for (const glob of [
+    "tools/ci/*.test.mjs",
+    "tools/ci/lib/*.test.mjs",
+    "tools/repo/*.test.mjs",
+    "tools/lib/*.test.mjs",
+    "tools/mobile/*.test.mjs",
+  ]) {
+    assert.ok(command.includes(glob), `contract test step must run ${glob}`);
+  }
+});
+
+// #2518: status voice 인벤토리는 apps/mobile/lib 트리를 스캔하는 drift 가드라,
+// repository 게이트의 계약 테스트 스텝만으로는 Dart 전용 PR(mobile=true, repository=false)에서
+// 스킵된다. mobile 게이트에도 배선되어 있어야 두 변경 클래스가 모두 닫힌다.
+test("Mobile App CI는 tools/mobile 도구 테스트를 mobile 게이트 전용 스텝으로 실행한다", () => {
+  const workflow = read(".github/workflows/ci.yml");
+  const mobileToolStep = workflow.match(
+    /- name: Mobile App CI \/ Run mobile tool tests\n        if: (\$\{\{[^\n]*\}\})\n[\s\S]*?\n        run: (node --test [^\n]*)\n/,
+  );
+  assert.ok(mobileToolStep, "Mobile App CI must declare a mobile-gated tools/mobile test step");
+
+  const [, gate, command] = mobileToolStep;
+  assert.match(gate, /needs\.changes\.outputs\.mobile == 'true'/);
+  assert.match(gate, /steps\.scaffold\.outputs\.present == 'true'/);
+  assert.ok(command.includes("tools/mobile/*.test.mjs"), "mobile tool test step must run tools/mobile/*.test.mjs");
+  // --test-name-pattern이 붙으면 이름이 걸러져 drift 가드가 실행되지 않는다.
+  assert.doesNotMatch(command, /--test-name-pattern/);
 });
 
 test("경로 분류기는 백엔드 품질 gate 변경을 repository contract 대상으로 처리한다", async () => {
