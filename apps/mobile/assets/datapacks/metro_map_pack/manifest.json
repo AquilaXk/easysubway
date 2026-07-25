@@ -54,7 +54,7 @@
       "name_ko": "부산",
       "app_region": "부산",
       "operator": "부산교통공사",
-      "source_url": "https://www2.humetro.busan.kr/homepage/cyberstation/map.do",
+      "source_url": "internal:route-map/route-map-defs/svg-sources/easy-subway-busan-v3.svg",
       "route_map_strategy": {
         "rendering_strategy": "self-drawn-hybrid-basemap",
         "bundled_svg_role": "hybrid-basemap-source",
@@ -76,7 +76,7 @@
         "url": "internal:route-map/route-map-defs/svg-sources/easy-subway-busan-v3.svg",
         "source": "오너 자작 부산 8선형 정본 도식(easy-subway-busan-v3)",
         "source_page": "internal:route-map/route-map-defs/svg-sources/easy-subway-busan-v3.svg",
-        "date": "2026-07-12",
+        "date": "2026-07-25",
         "authors": [
           "오너"
         ],
@@ -157,7 +157,7 @@
         "url": "internal:route-map/route-map-defs/svg-sources/easy-subway-daegu-v3.svg",
         "source": "오너 자작 대구 8선형 정본 도식(easy-subway-daegu-v3)",
         "source_page": "internal:route-map/route-map-defs/svg-sources/easy-subway-daegu-v3.svg",
-        "date": "2026-07-12",
+        "date": "2026-07-25",
         "authors": [
           "오너"
         ],
