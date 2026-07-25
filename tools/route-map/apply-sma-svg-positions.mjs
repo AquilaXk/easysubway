@@ -107,6 +107,50 @@ function labelCenterByName(extraction) {
   return byName;
 }
 
+// #2068 신원 사고 구조적 방어. 한 station_id에 서로 멀리 떨어진 노드가 여러 개
+// 배정 후보로 잡히면, "첫 배정 채택"이 어느 노드를 고르느냐에 따라 그 역 좌표가
+// 통째로 엉뚱한 자리로 간다 — 그런데 그 사고는 미매핑·미해소 게이트를 전부
+// 통과한다(개수는 맞기 때문). 실제로 v4 김포공항이 이 경로로 캡슐(763,1055)
+// 대신 공항 픽토그램 중심(870,1033)에 배정됐다. 도식이 한 역을 한 자리에 그린다는
+// 전제가 깨진 것이므로 **경고가 아니라 실패**로 막는다(fail-closed).
+// 임계는 역 심벌 지름·환승 캡슐 길이보다 넉넉히 크고(정상 중복 노드는 수 px 이내)
+// 오배정은 훨씬 멀다는 실측에 맞춘 값이다.
+export const MAX_STATION_CANDIDATE_SPREAD_PX = 100;
+
+function assertNoScatteredStationCandidates(candidatesByStation, exemptStationIds) {
+  const conflicts = [];
+  for (const [stationId, candidates] of candidatesByStation) {
+    if (candidates.length < 2) continue;
+    if (exemptStationIds.has(stationId)) continue;
+    let worst = null;
+    for (let i = 0; i < candidates.length; i += 1) {
+      for (let j = i + 1; j < candidates.length; j += 1) {
+        const distance = Math.hypot(
+          candidates[i].x - candidates[j].x,
+          candidates[i].y - candidates[j].y,
+        );
+        if (!worst || distance > worst.distance) {
+          worst = { distance, a: candidates[i], b: candidates[j] };
+        }
+      }
+    }
+    if (worst && worst.distance > MAX_STATION_CANDIDATE_SPREAD_PX) {
+      conflicts.push(
+        `${stationId}: ${worst.distance.toFixed(1)}px ` +
+          `[${worst.a.svgName}/${worst.a.svgLine || "-"} (${worst.a.x},${worst.a.y})] vs ` +
+          `[${worst.b.svgName}/${worst.b.svgLine || "-"} (${worst.b.x},${worst.b.y})]`,
+      );
+    }
+  }
+  if (conflicts.length > 0) {
+    throw new Error(
+      `한 역에 ${MAX_STATION_CANDIDATE_SPREAD_PX}px 넘게 떨어진 노드가 복수 배정 후보로 잡혔습니다 ` +
+        `(${conflicts.length}건) — 도식의 역 마커 중복/장식 노드를 확인하세요:\n  ` +
+        conflicts.join("\n  "),
+    );
+  }
+}
+
 export function buildAssignments(db, extraction, config = SEOUL) {
   const slugToLineId = resolveLineMap(db, config);
   const normalize = computeNormalizer(extraction.stationNodes);
@@ -115,11 +159,19 @@ export function buildAssignments(db, extraction, config = SEOUL) {
 
   const byStation = new Map(); // stationId -> {stationId,x,y,svgName,svgLine}
   const unresolvedNodes = [];
+  // stationId -> 그 역에 배정 후보로 잡힌 모든 노드(채택 여부 무관).
+  const candidatesByStation = new Map();
 
   const assignOne = (stationIds, x, y, svgName, svgLine) => {
+    const p = normalize(x, y);
     for (const stationId of stationIds) {
+      let candidates = candidatesByStation.get(stationId);
+      if (!candidates) {
+        candidates = [];
+        candidatesByStation.set(stationId, candidates);
+      }
+      candidates.push({ x: p.x, y: p.y, svgName, svgLine });
       if (byStation.has(stationId)) continue; // 첫 배정 채택(결정적)
-      const p = normalize(x, y);
       byStation.set(stationId, { stationId, x: p.x, y: p.y, svgName, svgLine });
     }
   };
@@ -154,6 +206,18 @@ export function buildAssignments(db, extraction, config = SEOUL) {
     assignOne(ids, center.x, center.y, name, "label-fallback");
   }
 
+  // 명시 예외(권역 config): 카탈로그가 서로 떨어진 두 물리역을 하나로 오병합해
+  // 둬서, 도식이 각자 그린 두 노드가 같은 station_id로 broadcast되는 알려진
+  // 케이스만 면제한다. 예외는 이름으로 선언하고 여기서 id로 해소한다.
+  const exemptStationIds = new Set();
+  for (const exception of config.scatteredCandidateExceptions ?? []) {
+    for (const row of db
+      .prepare("SELECT id FROM stations WHERE name_ko = ?")
+      .all(exception.name)) {
+      exemptStationIds.add(row.id);
+    }
+  }
+  assertNoScatteredStationCandidates(candidatesByStation, exemptStationIds);
   return { assignments: [...byStation.values()], unresolvedNodes };
 }
 

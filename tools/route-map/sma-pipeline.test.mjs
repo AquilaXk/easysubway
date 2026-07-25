@@ -1,9 +1,16 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { gunzipSync } from "node:zlib";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
-import { canonicalStationName, resolveStationIds } from "./apply-sma-svg-positions.mjs";
+import {
+  buildAssignments,
+  canonicalStationName,
+  resolveStationIds,
+} from "./apply-sma-svg-positions.mjs";
+import { getRegionConfig } from "./sma-region-configs.mjs";
 import { octolinearizeChain, stitchToPaths, SVG_COLOR_TO_SLUG } from "./build-sma-tracks.mjs";
 import { diffExtractions } from "./diff-sma-versions.mjs";
 
@@ -185,4 +192,145 @@ test("diffExtractions: moveThreshold 초과 이동을 moved로 감지", () => {
   assert.deepEqual(report.moved[0].to, { x: 20, y: 0 });
   // 임계 이하 이동(가: dist 0)은 moved에 포함되지 않는다.
   assert.ok(!report.moved.some((m) => m.station === "가"));
+});
+
+// #2068 신원 사고 구조적 방어(C2). 한 station_id에 서로 멀리 떨어진 노드가 여러 개
+// 배정 후보로 잡히면 "첫 배정 채택"이 좌표를 통째로 엉뚱한 자리로 보낼 수 있는데,
+// 미매핑·미해소 게이트는 개수만 보므로 그대로 통과한다(v4 김포공항 픽토그램).
+function scatterProbeDb() {
+  const db = new DatabaseSync(":memory:");
+  db.exec(`
+    CREATE TABLE stations (id TEXT PRIMARY KEY, name_ko TEXT);
+    CREATE TABLE lines (id TEXT PRIMARY KEY, name_ko TEXT);
+    CREATE TABLE station_lines (station_id TEXT, line_id TEXT);
+    CREATE TABLE route_map_positions (station_id TEXT, line_id TEXT, region TEXT, x REAL, y REAL);
+    INSERT INTO stations VALUES ('s-gimpo','김포공항');
+    INSERT INTO lines VALUES ('l-air','수도권 공항'),('l-gold','수도권 김포골드라인');
+    INSERT INTO station_lines VALUES ('s-gimpo','l-air'),('s-gimpo','l-gold');
+  `);
+  return db;
+}
+
+function scatterProbeConfig(exceptions = []) {
+  return {
+    ...getRegionConfig("seoul"),
+    slugToSuffix: { "airport-railroad": "공항", "gimpo-goldline": "김포골드라인" },
+    scatteredCandidateExceptions: exceptions,
+  };
+}
+
+const scatterProbeExtraction = {
+  stationNodes: [
+    {
+      dataStation: "김포공항",
+      dataLine: "gimpo-goldline",
+      x: 763,
+      y: 1055,
+      nodeRole: "transfer",
+    },
+    // 장식 픽토그램이 역 마커로 오인된 상황 재현(캡슐에서 200px 떨어짐).
+    {
+      dataStation: "김포공항",
+      dataLine: "airport-railroad",
+      x: 870,
+      y: 1033,
+      nodeRole: "transfer",
+    },
+  ],
+  labels: [],
+};
+
+test("buildAssignments: 한 역에 100px 넘게 떨어진 복수 노드가 잡히면 실패한다(fail-closed)", () => {
+  const db = scatterProbeDb();
+  assert.throws(
+    () => buildAssignments(db, scatterProbeExtraction, scatterProbeConfig()),
+    (error) =>
+      /100px 넘게 떨어진 노드/.test(error.message) &&
+      /s-gimpo/.test(error.message) &&
+      /109\.2px/.test(error.message),
+  );
+  db.close();
+});
+
+test("buildAssignments: 100px 이내 중복 노드와 명시 예외는 통과한다", () => {
+  const db = scatterProbeDb();
+  // (a) 같은 자리 근처의 정상 중복 노드는 통과.
+  const near = {
+    labels: [],
+    stationNodes: [
+      { ...scatterProbeExtraction.stationNodes[0] },
+      { ...scatterProbeExtraction.stationNodes[1], x: 770, y: 1060 },
+    ],
+  };
+  assert.equal(buildAssignments(db, near, scatterProbeConfig()).assignments.length, 1);
+  // (b) 카탈로그 오병합 등 알려진 케이스는 config 명시 예외로만 면제된다.
+  const exempt = scatterProbeConfig([{ name: "김포공항", reason: "테스트 예외" }]);
+  assert.equal(
+    buildAssignments(db, scatterProbeExtraction, exempt).assignments.length,
+    1,
+  );
+  db.close();
+});
+
+test("easy-subway-sma-v4 geometry: 김포공항 노드는 캡슐 1개뿐이고 장식 픽토그램은 없다", () => {
+  const geometry = JSON.parse(
+    readFileSync(
+      path.join(import.meta.dirname, "route-map-defs/easy-subway-sma-v4-geometry.json"),
+      "utf8",
+    ),
+  );
+  const gimpo = geometry.stationNodes.filter((n) => n.dataStation === "김포공항");
+  assert.equal(gimpo.length, 1, "김포공항 노드는 환승 캡슐 1개여야 한다");
+  assert.equal(gimpo[0].id, "transfer-station-symbol-김포공항");
+  // 캡슐 실좌표(오염 값 (870,1033)·(763,864)가 아니다).
+  assert.ok(Math.abs(gimpo[0].x - 763.3) < 1, `x=${gimpo[0].x}`);
+  assert.ok(Math.abs(gimpo[0].y - 1055.0) < 1, `y=${gimpo[0].y}`);
+  assert.equal(
+    geometry.stationNodes.some((n) => n.id === "transfer-station-symbol-김포공항-0"),
+    false,
+    "공항 픽토그램 장식 노드는 geometry에 남으면 안 된다",
+  );
+});
+
+// #2068 I4: 동명 별개역 목록은 손으로 유지하는 값이라, 카탈로그가 새 동명 역을
+// 들이면 갱신을 놓치기 쉽다(놓치면 두 역이 한 좌표로 broadcast된다). 팩 실측
+// 집합과 deepEqual로 묶어 누락을 자동으로 잡는다.
+test("SEOUL.distinctSameNameStations는 수도권 카탈로그의 동명 역명 집합과 일치한다", () => {
+  const tmp = mkdtempSync(path.join(tmpdir(), "sma-distinct-"));
+  try {
+    const packPath = path.join(tmp, "capital.sqlite");
+    writeFileSync(
+      packPath,
+      gunzipSync(
+        readFileSync(
+          path.join(
+            import.meta.dirname,
+            "../../apps/mobile/assets/datapacks/capital.sqlite.gz",
+          ),
+        ),
+      ),
+    );
+    const db = new DatabaseSync(packPath);
+    const catalogDuplicates = db
+      .prepare(
+        `SELECT s.name_ko AS nameKo
+         FROM stations s
+         JOIN station_lines sl ON sl.station_id = s.id
+         JOIN lines l ON l.id = sl.line_id
+         WHERE l.name_ko LIKE ?
+         GROUP BY s.name_ko
+         HAVING COUNT(DISTINCT s.id) > 1
+         ORDER BY s.name_ko`,
+      )
+      .all(`${getRegionConfig("seoul").lineNamePrefix} %`)
+      .map((row) => row.nameKo);
+    db.close();
+    assert.deepEqual(
+      [...getRegionConfig("seoul").distinctSameNameStations].sort(),
+      catalogDuplicates.sort(),
+      "동명 별개역 목록이 카탈로그 실측과 어긋납니다 — 목록을 갱신하세요(누락 시 좌표 broadcast 사고).",
+    );
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
 });

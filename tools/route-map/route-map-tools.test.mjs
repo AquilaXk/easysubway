@@ -402,7 +402,7 @@ test("SVG geometry extractor returns transformed visible text polygons", async (
 
   // v3: 역 노드(data-station+data-node-role)를 조상 transform 체인 정규화한 root 중심으로.
   const nodesByName = new Map(output.stationNodes.map((node) => [node.dataStation, node]));
-  assert.equal(output.stationNodes.length, 2);
+  assert.equal(output.stationNodes.length, 5);
   const ordinary = nodesByName.get("노드역");
   assert.equal(ordinary.nodeRole, "ordinary");
   assert.equal(ordinary.dataLine, "1");
@@ -415,8 +415,30 @@ test("SVG geometry extractor returns transformed visible text polygons", async (
   assert.equal(transfer.dataLine, "2");
   // 회전 그룹 중심(30,30)은 회전 pivot이라 root에서 (4+60, 6+60)=(64,66) 근처.
   assert.ok(Math.abs(transfer.x - 64) < 2 && Math.abs(transfer.y - 66) < 2);
-  // 결정적 정렬: dataLine 사전순(1 < 2).
-  assert.deepEqual(output.stationNodes.map((node) => node.dataLine), ["1", "2"]);
+  // #2068 C1: 빈 <text>를 품은 중간 <g> 래퍼가 있어도 노드 중심은 circle 중심이다.
+  // 래퍼 bbox를 합집합에 넣으면 로컬 원점까지 끌려가 (4,6) 쪽으로 무너진다.
+  const emptyTextNode = nodesByName.get("빈텍스트노드");
+  assert.equal(emptyTextNode.x, 84); // 4 + 40*2
+  assert.equal(emptyTextNode.y, 106); // 6 + 50*2
+
+  // #2068 C2: 자기 심벌 잉크를 가진 노드가 따로 있는 역의 장식 아이콘 노드는
+  // 좌표 후보에서 배제된다(중복역은 circle 노드 1개만 남는다).
+  const duplicated = output.stationNodes.filter((node) => node.dataStation === "중복역");
+  assert.equal(duplicated.length, 1);
+  assert.equal(duplicated[0].id, "transfer-station-symbol-중복역");
+  assert.equal(duplicated[0].x, 124); // 4 + 60*2
+  assert.equal(duplicated[0].y, 46); // 6 + 20*2
+
+  // 반대로 아이콘이 그 역의 유일한 마커면 노드로 남는다(인천공항1·2터미널·부산 공항).
+  const iconOnly = nodesByName.get("아이콘단독역");
+  assert.ok(iconOnly, "아이콘만 가진 단독 마커 역은 노드로 유지돼야 한다");
+  assert.equal(iconOnly.id, "transfer-station-symbol-아이콘단독역");
+
+  // 결정적 정렬: dataLine 사전순(1 < 2 < 3 < 4 < 5).
+  assert.deepEqual(
+    output.stationNodes.map((node) => node.dataLine),
+    ["1", "2", "3", "4", "5"],
+  );
 });
 
 test("SVG label polygon join applies only unambiguous station labels", async () => {

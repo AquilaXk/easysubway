@@ -113,10 +113,10 @@
       "stationId": "station-1f38f0831cb1",
       "lineId": "line-051552e50435",
       "name": "김포공항",
-      "svgX": 870,
-      "svgY": 1033,
-      "packX": 870,
-      "packY": 1033,
+      "svgX": 763,
+      "svgY": 1055,
+      "packX": 763,
+      "packY": 1055,
       "deltaPx": 0
     },
     {
@@ -3603,10 +3603,10 @@
       "stationId": "station-1f38f0831cb1",
       "lineId": "line-5500c1600f71",
       "name": "김포공항",
-      "svgX": 870,
-      "svgY": 1033,
-      "packX": 870,
-      "packY": 1033,
+      "svgX": 763,
+      "svgY": 1055,
+      "packX": 763,
+      "packY": 1055,
       "deltaPx": 0
     },
     {
@@ -4983,10 +4983,10 @@
       "stationId": "station-1f38f0831cb1",
       "lineId": "line-80fc4d5350d4",
       "name": "김포공항",
-      "svgX": 870,
-      "svgY": 1033,
-      "packX": 870,
-      "packY": 1033,
+      "svgX": 763,
+      "svgY": 1055,
+      "packX": 763,
+      "packY": 1055,
       "deltaPx": 0
     },
     {
@@ -6363,10 +6363,10 @@
       "stationId": "station-1f38f0831cb1",
       "lineId": "line-e9e9a5b520a4",
       "name": "김포공항",
-      "svgX": 870,
-      "svgY": 1033,
-      "packX": 870,
-      "packY": 1033,
+      "svgX": 763,
+      "svgY": 1055,
+      "packX": 763,
+      "packY": 1055,
       "deltaPx": 0
     },
     {
@@ -6463,10 +6463,10 @@
       "stationId": "station-1f38f0831cb1",
       "lineId": "line-f0e747248a31",
       "name": "김포공항",
-      "svgX": 870,
-      "svgY": 1033,
-      "packX": 870,
-      "packY": 1033,
+      "svgX": 763,
+      "svgY": 1055,
+      "packX": 763,
+      "packY": 1055,
       "deltaPx": 0
     },
     {

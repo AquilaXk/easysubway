@@ -85,6 +85,14 @@ const SEOUL = {
   ],
   // 정합 대상에서 제외할 SVG data-station(범례 등). 수도권 도식엔 없음.
   excludedStations: [],
+  // 한 station_id에 100px 넘게 떨어진 노드가 복수 배정 후보로 잡히는 알려진
+  // 예외(카탈로그 오병합 등). 수도권은 없다 — 새로 생기면 파이프라인이 실패해야
+  // 한다(#2068 김포공항 픽토그램 오배정 방어).
+  scatteredCandidateExceptions: [],
+  // 동명 별개역 목록(위 SEOUL_DISTINCT_SAME_NAME_STATIONS)을 설정 객체로도
+  // 노출한다 — 카탈로그의 실제 권역 내 중복 이름 집합과 일치하는지 테스트가
+  // 팩 SELECT로 대조해 목록 갱신 누락을 자동 방어한다.
+  distinctSameNameStations: SEOUL_DISTINCT_SAME_NAME_STATIONS,
   // canonical 정합 규칙(#1950 대조표): SVG 이름 → {name, disambiguateByLine?}.
   //
   // #2068 v4 실측 표기 변경(v2 → v4):
@@ -155,6 +163,16 @@ const BUSAN = {
   topologyExceptions: [],
   // 범례 노드(data-station="범례")는 카탈로그 역이 아니므로 정합 대상에서 제외.
   excludedStations: ["범례"],
+  // #2068 산발 후보 게이트 명시 예외(선재 카탈로그 오병합 2건).
+  // 동래(1·4호선)와 동해선 동래, 부전(1호선)과 동해선 부전은 도보 환승 거리만큼
+  // 떨어진 **별개 물리역**인데 카탈로그가 같은 이름 한 역으로 병합해 둬서, 도식이
+  // 각자 그린 두 노드가 같은 station_id로 broadcast된다(동래 660.9px·부전 470.1px
+  // 실측 — 둘 다 v3 반입 이전부터 존재). 좌표는 "첫 배정 채택"으로 결정적이지만
+  // 근본 해소는 카탈로그 분리(#2068 범위 밖)라 여기서는 명시 면제만 한다.
+  scatteredCandidateExceptions: [
+    { name: "동래", reason: "1·4호선 동래 ↔ 동해선 동래 카탈로그 오병합(별개 물리역)" },
+    { name: "부전", reason: "1호선 부전 ↔ 동해선 부전 카탈로그 오병합(별개 물리역)" },
+  ],
   // canonical 정합 규칙(부산 카탈로그 실측 6건):
   //   벡스코 (시립미술관)→벡스코, 괘법 르네시떼→괘법르네시떼,
   //   서부산 유통지구→서부산유통지구, 부산역→부산, 가운뎃점(·)→마침표(.).
