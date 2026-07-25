@@ -32,15 +32,21 @@ node tools/route-map/apply-sma-svg-positions.mjs --extraction "$GEOM" --region "
 echo "[3/7] 노선 track 생성(SVG 색→슬러그→line_id 결정적 배정 + 8선형 stitch)"
 node tools/route-map/build-sma-tracks.mjs --geometry "$GEOM" --pack "$PACK" --region "$REGION_ID" --out "$TRACKS" --stitch-tolerance 40
 
-echo "[4/7] track 팩 반영 + 역 노드 track 투영(투영 게이트)"
+# #2068 P-65 정합(팩=SVG 고정 — 역은 옮기지 않는다)을 대전·광주에도 적용한다. 수도권
+# (9afd026a)·부산·대구는 이미 이 모드였으나 두 권역만 구방식(project-nodes가 역을 트랙
+# 위로 이동 + respace가 좌표 재이동)으로 남아 있었다. 두 플래그는 한 쌍이다 —
+#   · project-nodes-to-tracks --check : 역-트랙 이탈을 보고만 하고 좌표를 옮기지 않는다.
+#     이 플래그가 없으면 투영이 먼저 좌표를 옮기고, 뒤이은 --pin-stations가 "오너 SVG
+#     배정"이 아니라 "투영된 좌표"에 고정해 버려 오너 배치가 조용히 훼손된다.
+#   · respace --pin-stations   : 역 좌표를 오너 SVG 배정에 고정한 채 트랙만 정리한다.
+#     빠져 있던 탓에 재간격이 팩 좌표를 SVG 노드에서 밀어냈다(광주 v3 실측 최대
+#     25.81px — 바탕↔인터랙션 정합 <5px 하드 게이트 초과).
+echo "[4/7] track 팩 반영 + 역-트랙 이탈 진단(#2068 P-65: 팩=SVG 고정 — 역은 옮기지 않는다,"
+echo "      --check로 보고만; project-nodes-to-tracks가 하던 이동은 respace --pin-stations로 대체)"
 node tools/route-map/apply-route-map-line-tracks.mjs --pack "$PACK" --index "$INDEX" --tracks "$TRACKS"
-node tools/route-map/project-nodes-to-tracks.mjs --region "$REGION_KEY" --pack "$PACK" --index "$INDEX"
+node tools/route-map/project-nodes-to-tracks.mjs --region "$REGION_KEY" --pack "$PACK" --index "$INDEX" --check
 
-echo "[5/7] 재간격 → 8선형 잔차 스냅"
-# --pin-stations(#2068 P-65): 역 좌표를 오너 SVG 배정에 고정한다. 수도권·부산·대구는
-# 처음부터 이 모드였으나 대전·광주만 빠져 있어, 재간격이 팩 좌표를 SVG 노드에서
-# 밀어냈다(광주 v3 실측 최대 25.81px — 바탕↔인터랙션 정합 <5px 하드 게이트 초과).
-# 오너 배치를 그대로 쓰는 것이 정답이라 5권역 모두 같은 모드로 맞춘다.
+echo "[5/7] 재간격(역 좌표 고정, 트랙만 정리) → 8선형 잔차 스냅"
 respace_out="$(node tools/route-map/respace-route-map.mjs --region "$REGION_KEY" --pack "$PACK" --index "$INDEX" --pin-stations)"
 printf '%s\n' "$respace_out" | head -1
 node tools/route-map/snap-tracks-octolinear.mjs --region "$REGION_KEY" --pack "$PACK" --index "$INDEX"
