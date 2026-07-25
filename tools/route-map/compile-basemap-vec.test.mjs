@@ -837,6 +837,138 @@ test("extractServiceTagObstacles·extractRailTransferChipObstacles: 레이어 �
   assert.equal(railObstacles[0].station, "테스트역");
 });
 
+// #2068 리뷰 후속: 레이어 한 단계 아래 "블록 스캐너"(service-tag 블록·rail chip
+// 블록·collectShapeBoundsRecursive의 중첩 <g>)에도 같은 규칙을 적용했다. 후속
+// PR이 반입할 수도권 SVG에 자기폐쇄 <g/>가 다수라 실제로 밟히는 경로다.
+test("표장 블록 안의 자기폐쇄 <g/>가 obstacle을 버리거나 bbox를 부풀리지 않는다", () => {
+  const serviceSvg = `
+    <svg>
+      <g id="service-tags-layer">
+        <g id="service-tag-ktx-1" class="service-tag" data-station="테스트역">
+          <g id="spacer" data-note="빈 자리표시" />
+          <g id="logo" transform="translate(100 200)">
+            <rect x="0" y="0" width="10" height="4" />
+          </g>
+        </g>
+        <g id="service-tag-ktx-2" class="service-tag" data-station="다음역">
+          <rect x="500" y="500" width="10" height="10" />
+        </g>
+      </g>
+    </svg>`;
+  const obstacles = extractServiceTagObstacles(serviceSvg);
+  // 자기폐쇄 <g/>를 depth로 세면 첫 블록이 다음 형제까지 삼켜 bbox가 부풀거나
+  // 균형을 못 찾아 통째로 버려진다. 두 표장이 각자 정확한 bbox로 나와야 한다.
+  assert.equal(obstacles.length, 2);
+  assert.deepEqual(obstacles[0], {
+    station: "테스트역",
+    x: 105,
+    y: 202,
+    halfWidth: 5,
+    halfHeight: 2,
+  });
+  assert.deepEqual(obstacles[1], {
+    station: "다음역",
+    x: 505,
+    y: 505,
+    halfWidth: 5,
+    halfHeight: 5,
+  });
+
+  const railSvg = `
+    <svg>
+      <g id="rail-transfer-layer">
+        <g id="chip-1" data-services="KTX" data-station-name="테스트역">
+          <g id="spacer" data-note="빈 자리표시" />
+          <g id="logo" transform="translate(100 200)">
+            <rect x="0" y="0" width="10" height="4" />
+          </g>
+        </g>
+      </g>
+    </svg>`;
+  const railObstacles = extractRailTransferChipObstacles(railSvg);
+  assert.equal(railObstacles.length, 1);
+  assert.deepEqual(railObstacles[0], {
+    station: "테스트역",
+    x: 105,
+    y: 202,
+    halfWidth: 5,
+    halfHeight: 2,
+  });
+});
+
+test("닫히지 않은 표장 블록은 조용히 건너뛰지 않고 실패한다(fail-closed)", () => {
+  const serviceSvg =
+    '<svg><g id="service-tags-layer"><g id="service-tag-ktx-1" class="service-tag" data-station="테스트역"><rect x="0" y="0" width="10" height="4" /></g></svg>';
+  // 레이어는 닫혀 있지만 블록이 닫히지 않은 형태.
+  const blockOnlySvg =
+    '<svg><g id="service-tags-layer"><g id="service-tag-ktx-1" class="service-tag" data-station="테스트역"><rect x="0" y="0" width="10" height="4" /></g>';
+  assert.throws(() => extractServiceTagObstacles(serviceSvg), /찾지 못했습니다/);
+  assert.throws(() => extractServiceTagObstacles(blockOnlySvg), /찾지 못했습니다/);
+});
+
+test("extractServiceTagObstacles: service-tag <g>의 id가 첫 속성이 아니어도 인식한다(속성 순서 무관)", () => {
+  const svgText = `
+    <svg>
+      <g id="service-tags-layer">
+        <g class="service-tag" transform="translate(10 20)" data-station="테스트역" id="service-tag-ktx-9">
+          <rect x="0" y="0" width="10" height="4" />
+        </g>
+      </g>
+    </svg>`;
+  const obstacles = extractServiceTagObstacles(svgText);
+  assert.equal(obstacles.length, 1);
+  assert.equal(obstacles[0].station, "테스트역");
+  assert.deepEqual(obstacles[0], {
+    station: "테스트역",
+    x: 15,
+    y: 22,
+    halfWidth: 5,
+    halfHeight: 2,
+  });
+});
+
+test("parseTransformChain: 미지원 transform 함수(rotate·skew)는 항등 무시가 아니라 실패한다", () => {
+  const rotatedLayer = `
+    <svg>
+      <g id="service-tags-layer" transform="rotate(-90,100,200)">
+        <g id="service-tag-ktx-1" class="service-tag" data-station="테스트역">
+          <rect x="0" y="0" width="10" height="4" />
+        </g>
+      </g>
+    </svg>`;
+  assert.throws(
+    () => extractServiceTagObstacles(rotatedLayer),
+    /지원하지 않는 transform 함수 rotate\(\.\.\.\)/,
+  );
+
+  const skewedChip = `
+    <svg>
+      <g id="rail-transfer-layer">
+        <g id="chip-1" data-services="KTX" data-station-name="테스트역" transform="skewX(10)">
+          <rect x="0" y="0" width="10" height="4" />
+        </g>
+      </g>
+    </svg>`;
+  assert.throws(
+    () => extractRailTransferChipObstacles(skewedChip),
+    /지원하지 않는 transform 함수 skewX\(\.\.\.\)/,
+  );
+
+  // 지원 함수 조합은 그대로 통과한다(회귀 가드).
+  const supported = `
+    <svg>
+      <g id="service-tags-layer" transform="matrix(2,0,0,3,100,200)">
+        <g id="service-tag-ktx-1" class="service-tag" data-station="테스트역" transform="translate(10 20) scale(2)">
+          <rect x="0" y="0" width="5" height="1" />
+        </g>
+      </g>
+    </svg>`;
+  const [obstacle] = extractServiceTagObstacles(supported);
+  assert.equal(obstacle.station, "테스트역");
+  assert.equal(obstacle.halfWidth, 10); // 5 × scale 2 × matrix a 2 → 폭 20.
+  assert.equal(obstacle.halfHeight, 3); // 1 × 2 × 3 → 높이 6.
+});
+
 test("extractServiceTagObstacles·extractRailTransferChipObstacles: 닫히지 않은 표장 레이어는 빈 배열이 아니라 실패한다(fail-closed)", () => {
   const serviceSvg =
     '<svg><g id="service-tags-layer"><g id="service-tag-ktx-1" class="service-tag" data-station="테스트역"><rect x="0" y="0" width="10" height="4" /></g></svg>';

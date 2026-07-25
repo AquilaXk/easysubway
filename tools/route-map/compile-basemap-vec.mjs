@@ -570,20 +570,32 @@ function applyMatrix([a, b, c, d, e, f], x, y) {
  * 거의 미스케일된 채로 절대화돼 바운딩박스가 터무니없이 커진다(#2068 마감
  * 라운드 실측: 센텀·태화강·공항 KTX/AIR 로고가 `scale(0.036)`류를 쓴다).
  */
+// 이 체인 파서가 아는 transform 함수. 그 밖(rotate·skewX·skewY 등)을 만나면
+// 조용히 항등 취급하지 않고 실패한다(#2068 리뷰): 표장 obstacle bbox는 게이트가
+// 교차 검증할 수단이 없어서, 무시된 회전 하나가 회피 영역을 통째로 엉뚱한 곳에
+// 놓아도 label overlap 게이트는 green으로 통과한다. 반입된 오너 SVG에 rotate가
+// 이미 존재하므로(부산 v3·대구 v3·수도권 v2) 표장 경로로 들어오는 순간 잘못된
+// 좌표가 아니라 빌드 실패로 드러나야 한다.
+const SUPPORTED_TRANSFORM_FUNCTIONS = new Set(["translate", "matrix", "scale"]);
+
 function parseTransformChain(transformValue) {
   let M = IDENTITY_MATRIX;
   if (!transformValue) return M;
-  for (const m of transformValue.matchAll(
-    /(translate|matrix|scale)\(([^)]*)\)/g,
-  )) {
+  for (const m of transformValue.matchAll(/([A-Za-z]+)\s*\(([^)]*)\)/g)) {
+    const fn = m[1];
+    if (!SUPPORTED_TRANSFORM_FUNCTIONS.has(fn)) {
+      throw new Error(
+        `지원하지 않는 transform 함수 ${fn}(...)입니다 — 조용히 무시하지 않고 실패합니다: "${transformValue}"`,
+      );
+    }
     const args = m[2]
       .trim()
       .split(/[,\s]+/)
       .map(Number);
     let T;
-    if (m[1] === "translate") {
+    if (fn === "translate") {
       T = [1, 0, 0, 1, args[0], args[1] ?? 0];
-    } else if (m[1] === "scale") {
+    } else if (fn === "scale") {
       const sx = args[0];
       const sy = args[1] ?? sx;
       T = [sx, 0, 0, sy, 0, 0];
@@ -657,28 +669,42 @@ function composeTransformValues(...values) {
 //   3) 닫는 태그를 못 찾으면 빈 배열이 아니라 **명시 실패(throw)** — 회피 목록
 //      소실을 조용히 통과시키지 않는다(fail-closed).
 // 레이어가 아예 없는 권역은 null(정상 — 호출부가 빈 배열을 낸다).
-function extractObstacleLayerSlice(svgText, layerId) {
-  const layerStart = svgText.indexOf(`id="${layerId}"`);
-  if (layerStart < 0) return null;
-  const groupStart = svgText.lastIndexOf("<g", layerStart);
-  if (groupStart < 0) return null;
-
-  const selfClosing = svgText.slice(groupStart).match(/^<g\b[^>]*?\/>/);
-  if (selfClosing) return selfClosing[0]; // 내용 없는 빈 레이어.
+// [startIndex]의 여는 `<g>` 태그에 대응하는 `</g>` 끝 인덱스(자기폐쇄면 그 태그
+// 끝). depth는 자기폐쇄가 아닌 여는 태그에서만 올린다 — `/<g\b|<\/g>/`처럼 태그
+// 접두만 세면 자기폐쇄 `<g …/>`가 균형을 깨고, 깨진 스캔을 조용한 continue나
+// 부분 슬라이스로 넘기면 표장이 목록에서 사라지거나 다음 형제까지 삼킨 과대
+// bbox가 된다. 균형을 못 찾으면 실패한다(fail-closed).
+function matchingGroupEnd(text, startIndex, context) {
+  const openTag = text.slice(startIndex).match(/^<g\b[^>]*>/)?.[0];
+  if (!openTag) {
+    throw new Error(`${context}의 여는 <g> 태그를 해석하지 못했습니다.`);
+  }
+  if (openTag.endsWith("/>")) return startIndex + openTag.length;
 
   const tagRe = /<g\b[^>]*>|<\/g>/g;
-  tagRe.lastIndex = groupStart;
+  tagRe.lastIndex = startIndex;
   let depth = 0;
-  for (let m = tagRe.exec(svgText); m; m = tagRe.exec(svgText)) {
+  for (let m = tagRe.exec(text); m; m = tagRe.exec(text)) {
     if (m[0].startsWith("</")) {
       depth -= 1;
-      if (depth === 0) return svgText.slice(groupStart, tagRe.lastIndex);
+      if (depth === 0) return tagRe.lastIndex;
     } else if (!m[0].endsWith("/>")) {
       depth += 1;
     }
   }
   throw new Error(
-    `${layerId}의 닫는 태그를 찾지 못했습니다 — 표장 회피 목록을 조용히 비우지 않고 실패합니다.`,
+    `${context}의 닫는 태그를 찾지 못했습니다 — 조용히 건너뛰지 않고 실패합니다.`,
+  );
+}
+
+function extractObstacleLayerSlice(svgText, layerId) {
+  const layerStart = svgText.indexOf(`id="${layerId}"`);
+  if (layerStart < 0) return null;
+  const groupStart = svgText.lastIndexOf("<g", layerStart);
+  if (groupStart < 0) return null;
+  return svgText.slice(
+    groupStart,
+    matchingGroupEnd(svgText, groupStart, layerId),
   );
 }
 
@@ -704,27 +730,23 @@ export function extractServiceTagObstacles(svgText) {
   // data-station). 예전 정규식은 data-station이 transform보다 앞에 오는 순서를
   // 고정 가정해 대구 동대구 KTX·SRT 표장을 놓쳤다. 여는 태그 전체를 먼저 잡고
   // class·data-station·transform을 각각 순서 독립으로 추출한다.
-  const tagOpenRe = /<g\s+id="service-tag-[^"]*"[^>]*>/g;
+  const tagOpenRe = /<g\b[^>]*>/g;
   for (const tm of layer.matchAll(tagOpenRe)) {
     const openTag = tm[0];
+    // id·class를 순서 독립으로 검사한다 — id를 첫 속성으로 고정 가정하면
+    // 편집기가 class·transform을 앞에 내보내는 순간 그 권역 표장이 전량 0건이
+    // 되고, 회피 목록 소실을 아무 게이트도 잡지 못한다(#2068 리뷰).
+    if (!/\bid="service-tag-[^"]*"/.test(openTag)) continue;
     if (!/\bclass="service-tag"/.test(openTag)) continue;
     const station = (openTag.match(/\bdata-station="([^"]*)"/) || [])[1] ?? "";
     const rootTransform =
       (openTag.match(/\btransform="([^"]*)"/) || [])[1] ?? "";
     const blockStart = tm.index;
-    let d = 0;
-    const innerRe = /<g\b|<\/g>/g;
-    innerRe.lastIndex = blockStart;
-    let im;
-    let blockEnd = -1;
-    while ((im = innerRe.exec(layer))) {
-      d += im[0] === "</g>" ? -1 : 1;
-      if (d === 0) {
-        blockEnd = innerRe.lastIndex;
-        break;
-      }
-    }
-    if (blockEnd < 0) continue;
+    const blockEnd = matchingGroupEnd(
+      layer,
+      blockStart,
+      `service-tag 블록(${station || openTag.match(/\bid="([^"]*)"/)?.[1] || "id 없음"})`,
+    );
     const block = layer.slice(blockStart + openTag.length, blockEnd);
     let minX = Infinity;
     let minY = Infinity;
@@ -781,19 +803,11 @@ export function extractRailTransferChipObstacles(svgText) {
     const rootTransform =
       (openTag.match(/\btransform="([^"]*)"/) || [])[1] ?? "";
     const blockStart = tm.index;
-    let d = 0;
-    const innerRe = /<g\b|<\/g>/g;
-    innerRe.lastIndex = blockStart;
-    let im;
-    let blockEnd = -1;
-    while ((im = innerRe.exec(layer))) {
-      d += im[0] === "</g>" ? -1 : 1;
-      if (d === 0) {
-        blockEnd = innerRe.lastIndex;
-        break;
-      }
-    }
-    if (blockEnd < 0) continue;
+    const blockEnd = matchingGroupEnd(
+      layer,
+      blockStart,
+      `rail chip 블록(${station || "id 없음"})`,
+    );
     const block = layer.slice(blockStart + openTag.length, blockEnd);
     let minX = Infinity;
     let minY = Infinity;
@@ -841,24 +855,19 @@ function collectShapeBoundsRecursive(text, matrix, visit) {
     const childMatrix = childTransform
       ? composeMatrix(matrix, parseTransformChain(childTransform))
       : matrix;
-    let d = 1;
-    const innerRe = /<g\b|<\/g>/g;
-    innerRe.lastIndex = m.index + openTag.length;
-    let im;
-    let innerEnd = -1;
-    while ((im = innerRe.exec(text))) {
-      d += im[0] === "</g>" ? -1 : 1;
-      if (d === 0) {
-        innerEnd = innerRe.lastIndex;
-        break;
-      }
+    const innerEnd = matchingGroupEnd(
+      text,
+      m.index,
+      `중첩 <g>(${firstAttr(openTag, "id") ?? "id 없음"})`,
+    );
+    // 자기폐쇄 <g …/>는 내용이 없다 — 도형 없이 건너뛴다(부분 슬라이스 폴백 금지).
+    if (!openTag.endsWith("/>")) {
+      const innerBody = text.slice(
+        m.index + openTag.length,
+        innerEnd - "</g>".length,
+      );
+      collectShapeBoundsRecursive(innerBody, childMatrix, visit);
     }
-    if (innerEnd < 0) {
-      cursor = m.index + openTag.length;
-      continue;
-    }
-    const innerBody = text.slice(m.index + openTag.length, innerEnd - "</g>".length);
-    collectShapeBoundsRecursive(innerBody, childMatrix, visit);
     cursor = innerEnd;
     nestedGroupRe.lastIndex = innerEnd;
   }
