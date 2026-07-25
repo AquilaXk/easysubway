@@ -64,6 +64,12 @@ while IFS= read -r file; do
       ci=true
       repository=true
       ;;
+    tools/lib/**)
+      # tools/lib는 계약·datapack·route-map 등 도구 전반이 공유하는 단일 원본이다(#2515).
+      # ci=true로 올려야 정렬 의미 변경이 tracked ledger 회귀까지 도달한다.
+      ci=true
+      repository=true
+      ;;
     .env.example)
       repository=true
       contracts=true
