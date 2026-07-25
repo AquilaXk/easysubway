@@ -20,45 +20,45 @@ const DUAL_OPERATOR_SCOPE_KEYS = Object.freeze([
   "capital:operator-9e999d4aa596:line-8604048b6430",
 ]);
 
-// route_map_positions admitted 소스가 claim한 활성 (region, operator, line) scope 전량.
-// 감사 대상이 줄어드는 회귀를 잡기 위해 목록을 고정한다.
+// route_map_positions admitted 소스가 claim한 활성 (region, operator, line) scope 전량을
+// source-inventory 등재 순서 그대로 고정한다. 감사 대상이 줄어드는 회귀를 잡기 위한 장치다.
 const AUDITED_SCOPE_KEYS = Object.freeze([
   "busan:busan-transportation:line-ab1a041f6266",
   "busan:busan-transportation:line-d74614a04530",
   "busan:busan-transportation:line-d812a5bc1e5f",
   "busan:busan-transportation:line-eb7b47920390",
-  "capital:incheon-transit:line-15b3b8a93259",
-  "capital:incheon-transit:line-42b5805f3b5a",
-  "capital:incheon-transit:line-98718184f016",
-  "capital:korail:line-051552e50435",
-  "capital:korail:line-54a7b980b7c3",
-  "capital:korail:line-558d0bd8312d",
-  "capital:korail:line-6e39be0cb6e2",
-  "capital:korail:line-e4939a4b4713",
-  "capital:operator-10d7cf275a80:line-aefa08ccc0a9",
-  "capital:operator-28e01fb8509d:shinbundang",
-  "capital:operator-29e323a78a93:line-62096860ab09",
-  "capital:operator-2e23276dfa94:line-5500c1600f71",
-  "capital:operator-38450e138464:line-051552e50435",
-  "capital:operator-3c623bf1a427:line-30886152e4f8",
-  "capital:operator-5ca780d7dee1:line-8604048b6430",
-  "capital:operator-8134e61f8dbd:line-e9e9a5b520a4",
-  "capital:operator-936e454d0bfb:line-f0e747248a31",
-  "capital:operator-9e999d4aa596:line-8604048b6430",
-  "capital:operator-b2d80436b438:line-828f04afc588",
-  "capital:seoul-metro:line-15b3b8a93259",
-  "capital:seoul-metro:line-2b2d9eaa53d0",
-  "capital:seoul-metro:line-3f41718e0833",
-  "capital:seoul-metro:line-41a8c75ec9d8",
-  "capital:seoul-metro:line-472a81add377",
-  "capital:seoul-metro:line-80fc4d5350d4",
-  "capital:seoul-metro:seoul-2",
-  "capital:seoul-metro:seoul-4",
-  "daegu:daegu-transportation:line-0ffaa95b1b5d",
   "daegu:daegu-transportation:line-5b8d9b05e7e6",
   "daegu:daegu-transportation:line-e2938a4cc492",
+  "daegu:daegu-transportation:line-0ffaa95b1b5d",
   "daejeon:daejeon-transportation:line-7051a9c2525c",
   "gwangju:gwangju-metropolitan-rapid-transit:line-e57a361e8892",
+  "capital:incheon-transit:line-42b5805f3b5a",
+  "capital:incheon-transit:line-98718184f016",
+  "capital:incheon-transit:line-15b3b8a93259",
+  "capital:operator-8134e61f8dbd:line-e9e9a5b520a4",
+  "capital:operator-b2d80436b438:line-828f04afc588",
+  "capital:operator-2e23276dfa94:line-5500c1600f71",
+  "capital:operator-5ca780d7dee1:line-8604048b6430",
+  "capital:operator-9e999d4aa596:line-8604048b6430",
+  "capital:korail:line-54a7b980b7c3",
+  "capital:korail:line-e4939a4b4713",
+  "capital:korail:line-6e39be0cb6e2",
+  "capital:korail:line-051552e50435",
+  "capital:operator-38450e138464:line-051552e50435",
+  "capital:operator-936e454d0bfb:line-f0e747248a31",
+  "capital:operator-28e01fb8509d:shinbundang",
+  "capital:operator-10d7cf275a80:line-aefa08ccc0a9",
+  "capital:korail:line-558d0bd8312d",
+  "capital:operator-3c623bf1a427:line-30886152e4f8",
+  "capital:operator-29e323a78a93:line-62096860ab09",
+  "capital:seoul-metro:line-472a81add377",
+  "capital:seoul-metro:seoul-2",
+  "capital:seoul-metro:line-41a8c75ec9d8",
+  "capital:seoul-metro:seoul-4",
+  "capital:seoul-metro:line-80fc4d5350d4",
+  "capital:seoul-metro:line-3f41718e0833",
+  "capital:seoul-metro:line-15b3b8a93259",
+  "capital:seoul-metro:line-2b2d9eaa53d0",
 ]);
 
 async function readJson(relativePath) {
@@ -96,8 +96,9 @@ async function loadAuditInputs() {
   };
 }
 
+// 위반은 별칭 → 결측 ledger → containment 순서로 쌓이므로 나열 순서가 결정론적이다.
 function violationKinds(result) {
-  return result.violations.map(({ kind }) => kind).sort();
+  return result.violations.map(({ kind }) => kind);
 }
 
 test("route_map_positions 전 scope containment는 승인 별칭·문서화 결측 반영 후 fail-closed다 (#2516)", async () => {
