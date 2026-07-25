@@ -15,6 +15,11 @@ const GWANGJU_SNAPSHOT_PATH = "tools/datapack/sources/gwangju-transportation-rou
 const UI_SNAPSHOT_PATH = "tools/datapack/sources/kric-ui-sinseol-route-map-positions-20260725.json";
 const DAEGU_SNAPSHOT_PATH = "tools/datapack/sources/daegu-transportation-route-map-positions-20260724.json";
 const CAPITAL_TOPOLOGY_PATH = "tools/datapack/sources/capital-route-topology-20260724.json";
+const CANDIDATE_SPEC_PATH = "tools/datapack/nationwide-candidate-pack-spec.json";
+const CANDIDATE_EVIDENCE_PATH = "tools/datapack/reports/nationwide-candidate-coverage-gate.json";
+// #2514(#2510 B0)가 line-scope로 재기술한 소스. admitted snapshot 파일이 없어 containment 근거가 되지 못한다.
+const CANDIDATE_REDESCRIBED_SOURCE_ID = "seoulmetro-cyberstation-route-map";
+const CANDIDATE_REDESCRIBED_SCOPE_KEY = "capital:seoul-metro:seoul-4";
 
 // #2499·#2508에서 배선한 dual-operator containment는 전 scope 감사의 부분집합으로 유지한다.
 const DUAL_OPERATOR_SCOPE_KEYS = Object.freeze([
@@ -72,11 +77,13 @@ async function readJson(relativePath) {
 }
 
 async function loadAuditInputs() {
-  const [inventory, targets, exemptions, molitCsvBytes] = await Promise.all([
+  const [inventory, targets, exemptions, molitCsvBytes, candidateSpecBytes, candidateEvidence] = await Promise.all([
     readJson("tools/datapack/source-inventory.json"),
     readJson("tools/datapack/nationwide-coverage-targets.json"),
     readJson(EXEMPTIONS_PATH),
     readFile(path.join(root, MOLIT_ROSTER_PATH)),
+    readFile(path.join(root, CANDIDATE_SPEC_PATH)),
+    readJson(CANDIDATE_EVIDENCE_PATH),
   ]);
   const snapshotsByPath = new Map();
   for (const source of inventory.sources) {
@@ -107,6 +114,11 @@ async function loadAuditInputs() {
     snapshotsByPath,
     topologiesByPath,
     rawSourcesByPath,
+    candidateLineScopeAdmission: {
+      specPath: CANDIDATE_SPEC_PATH,
+      specBytes: candidateSpecBytes,
+      evidence: candidateEvidence,
+    },
   };
 }
 
@@ -659,4 +671,78 @@ test("lineIds를 claim한 route_map_positions 소스는 admitted snapshot 경로
 
   assert.deepEqual(violationKinds(result), ["SOURCE_SNAPSHOT_PATH_MISSING"]);
   assert.equal(result.auditedScopeKeys.includes("daejeon:daejeon-transportation:line-7051a9c2525c"), false);
+});
+
+// #2514(#2510 B0)의 candidate 게이트 line-scope 재기술은 admitted snapshot 파일 없이 lineIds를 claim한다.
+// 이 claim은 containment 근거가 아니므로 감사 대상 scope를 만들지 못하고, 근거 결속이 하나라도
+// 깨지면 위반으로 남아야 한다.
+test("admitted snapshot 없는 재기술 claim은 근거가 전부 결속되면 위반이 아니다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+
+  const result = auditRouteMapCoverageScopes(inputs);
+
+  // 이 소스에는 저장소에 admitted snapshot 파일이 없다. 창작한 snapshotPath로 통과시킨 것이 아님을 고정한다.
+  assert.equal(
+    inputs.inventory.sources
+      .find(({ id }) => id === CANDIDATE_REDESCRIBED_SOURCE_ID).routeMapAdmissionEvidence,
+    undefined,
+  );
+  assert.deepEqual(violationKinds(result), []);
+  // 이 scope의 containment는 admitted snapshot을 가진 seoul-metro-route-map-positions가 계속 실측한다.
+  assert.ok(result.auditedScopeKeys.includes(CANDIDATE_REDESCRIBED_SCOPE_KEY));
+});
+
+test("candidate 재기술 근거가 없으면 snapshot 없는 lineIds claim은 위반이다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, candidateLineScopeAdmission: {} });
+
+  assert.deepEqual(violationKinds(result), ["SOURCE_SNAPSHOT_PATH_MISSING"]);
+});
+
+test("candidate spec 재기술 lineIds가 claim과 다르면 거부된다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const inventory = structuredClone(inputs.inventory);
+  const source = inventory.sources.find(({ id }) => id === CANDIDATE_REDESCRIBED_SOURCE_ID);
+  source.coverageScope.lineIds = [...source.coverageScope.lineIds, "seoul-2"];
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, inventory });
+
+  assert.deepEqual(violationKinds(result), ["SOURCE_CANDIDATE_LINE_SCOPE_MISMATCH"]);
+});
+
+test("게이트 evidence에 결속되지 않은 candidate spec은 근거가 되지 못한다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  // JSON 의미는 그대로 두고 바이트만 바꾼다 — evidence가 기록한 spec 해시와 어긋난다.
+  const specBytes = Buffer.concat([inputs.candidateLineScopeAdmission.specBytes, Buffer.from("\n")]);
+  const candidateLineScopeAdmission = { ...inputs.candidateLineScopeAdmission, specBytes };
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, candidateLineScopeAdmission });
+
+  assert.deepEqual(violationKinds(result), ["SOURCE_CANDIDATE_EVIDENCE_SPEC_UNBOUND"]);
+});
+
+test("게이트가 SUPPORTED로 실증하지 않은 재기술 scope는 거부된다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const evidence = structuredClone(inputs.candidateLineScopeAdmission.evidence);
+  evidence.variants.lineScoped.supportedRequirementKeys = evidence.variants.lineScoped.supportedRequirementKeys
+    .filter((key) => key !== `${CANDIDATE_REDESCRIBED_SCOPE_KEY}:${ROUTE_MAP_DOMAIN}`);
+  const candidateLineScopeAdmission = { ...inputs.candidateLineScopeAdmission, evidence };
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, candidateLineScopeAdmission });
+
+  assert.deepEqual(violationKinds(result), ["SOURCE_CANDIDATE_SCOPE_NOT_SUPPORTED"]);
+});
+
+test("재기술만으로는 containment 감사가 사라진 scope를 통과시킬 수 없다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const inventory = structuredClone(inputs.inventory);
+  // 이 scope를 실측하던 admitted snapshot 소스의 claim을 지우면 containment를 판정할 근거가 없어진다.
+  const source = inventory.sources.find(({ id }) => id === "seoul-metro-route-map-positions");
+  source.coverageScope.lineIds = source.coverageScope.lineIds.filter((lineId) => lineId !== "seoul-4");
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, inventory });
+
+  assert.ok(violationKinds(result).includes("SOURCE_CANDIDATE_SCOPE_UNAUDITED"));
+  assert.equal(result.auditedScopeKeys.includes(CANDIDATE_REDESCRIBED_SCOPE_KEY), false);
 });
