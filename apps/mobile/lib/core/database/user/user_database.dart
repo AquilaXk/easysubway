@@ -2,10 +2,25 @@ import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import 'user_tables.dart';
 
 part 'user_database.g.dart';
+
+/// 지원하지 않는 스키마 버전을 만났을 때 던지는 오류 문구의 고정 접두사.
+///
+/// `UserDatabaseOpener`가 이 실패를 "DB 내용 결함"으로 분류하는 데 쓴다.
+/// isolate 경계를 넘으면 예외 타입이 사라질 수 있어 타입 대신 문구로 판별한다.
+const unsupportedUserDatabaseSchemaVersionMarker =
+    'easysubway user database: unsupported schema version';
+
+/// 파일 DB 연결 설정. isolate로 전달되므로 최상위 함수여야 한다.
+void _setUpUserDatabaseConnection(sqlite.Database database) {
+  // user.db는 foreground와 WorkManager isolate(홈 위젯·하차 알람)가 같은 경로로
+  // 연다. busy timeout이 0이면 순간적인 쓰기 락도 즉시 SQLITE_BUSY로 떨어진다.
+  database.execute('PRAGMA busy_timeout = 5000');
+}
 
 @DriftDatabase(
   tables: [
@@ -37,7 +52,12 @@ class UserDatabase extends _$UserDatabase {
   UserDatabase(super.executor);
 
   factory UserDatabase.file(File file) {
-    return UserDatabase(NativeDatabase.createInBackground(file));
+    return UserDatabase(
+      NativeDatabase.createInBackground(
+        file,
+        setup: _setUpUserDatabaseConnection,
+      ),
+    );
   }
 
   factory UserDatabase.memory() {
@@ -54,8 +74,13 @@ class UserDatabase extends _$UserDatabase {
         await migrator.createAll();
       },
       onUpgrade: (migrator, from, to) async {
-        if (from < 1) {
-          throw StateError('Unsupported user database schema version: $from');
+        if (from < 1 || from > to) {
+          // downgrade도 drift가 onUpgrade로 보낸다. 걸러내지 않으면 상위 스키마
+          // DB가 조용히 v5로 표시된다. 여기서 던지면 열기 실패로 이어져
+          // UserDatabaseOpener가 원본을 보관한 뒤 새 DB로 부분 복구한다(#2546).
+          throw StateError(
+            '$unsupportedUserDatabaseSchemaVersionMarker (from=$from, to=$to)',
+          );
         }
         // drift는 onUpgrade를 트랜잭션으로 감싸지 않는다. 전 단계를 한
         // 트랜잭션으로 묶어 어느 문장에서 실패하든 원본 스키마와 행이 그대로
@@ -124,8 +149,9 @@ class UserDatabase extends _$UserDatabase {
       }
     }
     // 위 단계가 건너뛴 결손 테이블을 현재 정의로 만든다. drift가
-    // `CREATE TABLE IF NOT EXISTS`를 쓰므로 살아 있는 테이블은 건드리지
-    // 않는다. 부분 생성 DB도 열린 뒤 모든 읽기 경로가 동작해야 한다(#2546).
+    // `CREATE TABLE IF NOT EXISTS`를 쓰므로 이미 있는 테이블은 이름만 보고
+    // 건너뛴다 — 보장 범위는 "테이블 통째 결손"까지다. 마이그레이션이 손대지
+    // 않는 테이블에 컬럼만 빠져 있는 경우는 여기서 교정되지 않는다(#2546).
     await migrator.createAll();
   }
 
@@ -134,8 +160,21 @@ class UserDatabase extends _$UserDatabase {
   /// `DROP`과 `RENAME` 사이에서 실패하면 즐겨찾기 역이 통째로 사라지므로
   /// 재작성 4문장은 반드시 원자적이어야 한다. 원자성은 [migration]의 onUpgrade
   /// 트랜잭션이 보장한다(#2546).
+  ///
+  /// 원자성이 없던 구 코드에서 중단된 설치본은 `favorite_stations_v4` 잔재를
+  /// 남겼을 수 있다. 두 잔재 상태를 모두 여기서 정리한다.
   Future<void> _splitFavoriteStationsByLine() async {
+    final hasLeftoverRewrite = await _tableExists('favorite_stations_v4');
     if (!await _tableExists('favorite_stations')) {
+      if (hasLeftoverRewrite) {
+        // 구 코드가 DROP과 RENAME 사이에서 멈춘 설치본. 남은 재작성 테이블을
+        // 인수해 즐겨찾기를 회수한다. 인수하지 않으면 아래 createAll이 빈
+        // 테이블을 만들어 유실이 확정된다.
+        await customStatement(
+          'ALTER TABLE favorite_stations_v4 RENAME TO favorite_stations',
+        );
+        return;
+      }
       // schema 2→3 최소 fixture처럼 favorite_stations가 없을 수 있다.
       // 결손 테이블은 onUpgrade 끝의 createAll이 현재 정의로 만든다.
       return;
@@ -144,6 +183,12 @@ class UserDatabase extends _$UserDatabase {
       // 이 단계까지 마치고 뒤 단계에서 실패해 user_version이 안 오른 DB.
       // 다시 재작성하면 호선별 즐겨찾기가 역 전체로 되돌아가므로 건너뛴다.
       return;
+    }
+    if (hasLeftoverRewrite) {
+      // 구 코드가 CREATE·INSERT까지만 하고 멈춘 설치본. 잔재는 원본
+      // favorite_stations의 부분 사본이라 버려도 손실이 없고, 그대로 두면
+      // 아래 CREATE가 `table already exists`로 던진다.
+      await customStatement('DROP TABLE favorite_stations_v4');
     }
     await customStatement('''
       CREATE TABLE favorite_stations_v4 (
@@ -173,7 +218,9 @@ class UserDatabase extends _$UserDatabase {
   }
 
   Future<bool> _columnExists(String tableName, String columnName) async {
-    final columns = await customSelect('PRAGMA table_info($tableName)').get();
+    final columns = await customSelect(
+      'PRAGMA main.table_info("$tableName")',
+    ).get();
     return columns.any((row) => row.read<String>('name') == columnName);
   }
 
