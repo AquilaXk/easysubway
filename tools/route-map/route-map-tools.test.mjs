@@ -415,8 +415,16 @@ test("SVG geometry extractor returns transformed visible text polygons", async (
   assert.equal(transfer.dataLine, "2");
   // 회전 그룹 중심(30,30)은 회전 pivot이라 root에서 (4+60, 6+60)=(64,66) 근처.
   assert.ok(Math.abs(transfer.x - 64) < 2 && Math.abs(transfer.y - 66) < 2);
-  // #2068 C1: 빈 <text>를 품은 중간 <g> 래퍼가 있어도 노드 중심은 circle 중심이다.
-  // 래퍼 bbox를 합집합에 넣으면 로컬 원점까지 끌려가 (4,6) 쪽으로 무너진다.
+  // #2068 C1(v4 김포공항 형상): 중간 <g> 래퍼가 잉크(circle)와 x/y 없는 빈 <text>를
+  // 함께 품어도 노드 중심은 circle 중심이어야 한다.
+  //
+  // 회귀 실증(구 코드 재현본 실행으로 확인) — 이 형상에서만 old-fail/new-pass가
+  // 갈린다:
+  //   · 통짜 element.getBBox()        → (48,60)  실패
+  //   · "퇴화 자손만 배제" 필터        → (48,60)  실패 (래퍼 자신은 퇴화가 아니다)
+  //   · leaf 렌더 요소만 합집합(현행)  → (84,106) 통과
+  // 래퍼가 빈 <text>"만" 품으면 래퍼 bbox까지 퇴화해 구 필터에서도 배제돼
+  // old-pass가 된다 — 회귀를 잡으려면 잉크를 래퍼 **안**에 둬야 한다.
   const emptyTextNode = nodesByName.get("빈텍스트노드");
   assert.equal(emptyTextNode.x, 84); // 4 + 40*2
   assert.equal(emptyTextNode.y, 106); // 6 + 50*2
