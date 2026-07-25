@@ -18202,12 +18202,21 @@ test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경�
 
   // #2518: tools/mobile은 Android 릴리즈 산출물 가드를 담고 있어, 단독 변경에서도
   // 계약 테스트(repository)와 release-artifacts android-release(android)가 돌아야 한다.
-  const mobileTool = await classifyChangedFiles(["tools/mobile/validate-release-dart-defines.sh"]);
-  assert.equal(mobileTool.repository, "true");
-  assert.equal(mobileTool.android, "true");
-  assert.equal(mobileTool.docs_only, "false");
-  assert.equal(mobileTool.ios, "false");
-  assert.equal(mobileTool.deploy, "false");
+  // mobile=false도 계약이다 — tools/mobile을 소비하지 않는 Flutter mobile-app job까지
+  // 깨우지 않는다. 알려진 파일과 임의의 중첩 경로를 각각 따로 분류해, 매핑이 특정 파일로
+  // 좁아지는 회귀와 mobile 게이트가 잘못 올라가는 회귀를 모두 잡는다.
+  for (const mobileToolFile of [
+    "tools/mobile/validate-release-dart-defines.sh",
+    "tools/mobile/nested/arbitrary-coverage-probe.txt",
+  ]) {
+    const mobileTool = await classifyChangedFiles([mobileToolFile]);
+    assert.equal(mobileTool.repository, "true", `${mobileToolFile} must map to repository=true`);
+    assert.equal(mobileTool.android, "true", `${mobileToolFile} must map to android=true`);
+    assert.equal(mobileTool.mobile, "false", `${mobileToolFile} must not raise the mobile gate`);
+    assert.equal(mobileTool.docs_only, "false", `${mobileToolFile} must not be docs-only`);
+    assert.equal(mobileTool.ios, "false", `${mobileToolFile} must not raise the ios gate`);
+    assert.equal(mobileTool.deploy, "false", `${mobileToolFile} must not raise the deploy gate`);
+  }
 
   const releaseGate = await classifyChangedFiles(["apps/mobile/release/release-governance-gate.json"]);
   assert.equal(releaseGate.release, "true");
