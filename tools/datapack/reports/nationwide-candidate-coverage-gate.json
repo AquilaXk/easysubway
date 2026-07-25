@@ -57,7 +57,7 @@
     },
     "spec": {
       "path": "tools/datapack/nationwide-candidate-pack-spec.json",
-      "sha256": "abf740d26642721acce0d392f4e50d0b6eccbd7d1c7e73b4d08d5df049cfc51b"
+      "sha256": "760656a39affb35889484cba066dbd485dc7040c87f5488f820ef830ed79af88"
     },
     "targets": {
       "path": "tools/datapack/nationwide-coverage-targets.json",
@@ -201,14 +201,27 @@
     "entries": [
       {
         "addedRows": {
+          "facilities": 0,
           "lines": 3,
+          "movementPathCandidates": 0,
           "networkEdges": 182,
+          "officialOdFareQuotes": 0,
           "operators": 1,
+          "representativeRouteRegressions": 0,
+          "requiredTables": 0,
+          "routeMapPositions": 0,
+          "routeServiceArtifactEvidence": 0,
           "serviceCalendarDates": 126,
           "serviceCalendars": 9,
           "sourceInventory": 9,
+          "stationAccessibilitySummaries": 0,
+          "stationAliases": 0,
+          "stationExits": 0,
+          "stationFacilityEvidence": 0,
           "stationLines": 94,
           "stations": 91,
+          "transitFeedInfo": 0,
+          "transitFrequencies": 0,
           "transitRoutes": 6,
           "transitStopTimes": 77970,
           "transitTrips": 2540
@@ -248,13 +261,15 @@
         "regionId": "daegu"
       }
     ],
-    "modelKo": "승계 원본에 없는 지역 행은 tracked materializer가 tracked snapshot을 재생해 조립한다. 저장소에 행을 복제하지 않으므로 아래 입력 해시가 candidate 구성의 유일한 결속 축이며, 실제로 실린 행수(addedRows)가 spec 선언과 다르면 조립이 fail closed 된다."
+    "modelKo": "승계 원본에 없는 지역 행은 tracked materializer가 tracked snapshot을 재생해 조립한다. 저장소에 행을 복제하지 않으므로 아래 입력 해시가 candidate 구성의 유일한 결속 축이며, 실제로 실린 행수(addedRows)가 spec 선언과 다르면(또는 승계 행이 바뀌면) 조립이 fail closed 된다.",
+    "variantParityKo": "편입 행은 두 variant에 동일하게 들어간다. 편입은 line-scope 재기술과 독립이며, variant를 가르는 축은 재기술뿐이다."
   },
   "parentIssues": [
     2510,
     2138
   ],
   "readingGuide": {
+    "baselineSemanticsKo": "baseline은 저장소의 특정 과거 커밋 상태가 아니라 '등재된 재기술을 걷어낸' counterfactual이다. 아래 lineScopeRedescriptions에 등재된 소스의 coverageScope.lineIds만 fixture와 inventory 사본에서 지운 실행이며, 편입 행은 두 variant에 동일하게 들어간다. 따라서 이 evidence의 전이는 '어떤 소스의 line-scope 기술이 그 requirement를 여는가'를 뜻하고, 그 소스의 line-scope가 admission 정본에 언제 들어왔는지(대구 소스는 #2549 이전부터 line-scope였다)와는 다른 축이다. 전이를 뒷받침한 소스가 등재 목록과 정확히 같은지는 하네스가 fail closed로 확인한다.",
     "denominatorSemanticsKo": "pilotRequirements의 denominator·coveredFields는 domain requiredFields 개수이지 데이터 행 수가 아니다. route_map_positions의 denominator 2는 필수 필드 2개(route_map_position·route_map_label_polygon)를 뜻하며 역 2개나 행 2개를 뜻하지 않는다. 실제로 그 판정을 뒷받침한 provenance 행 수는 필드별 supportingRecordCountByField에 따로 기록한다.",
     "supportedScopeKo": "이 evidence는 SUPPORTED 축만 기록하므로 전국 gap 총량 판독에 쓰면 안 된다. 전국 진행 집계는 tools/datapack/reports/nationwide-coverage-tally.json이 정본이다.",
     "variantComparisonKo": "전이 판정은 두 variant의 상대 비교다. baseline SUPPORTED 총량은 승계 팩의 다른 소스가 line-scope를 갖게 되면 함께 늘어날 수 있고, 하네스는 파일럿 키가 baseline에 없고 lineScoped가 baseline ∪ 파일럿 키와 정확히 같은지만 fail closed로 본다."

@@ -10,7 +10,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -361,13 +361,19 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
     );
   });
 
+  // 두 항목 각각은 내부 정합(도메인·lineIds·requirementKeys)이 맞아 도메인 가드에 걸리지 않는다 —
+  // 오직 소스 간 lineIds 동일 강제 축만 이 mutation을 잡는다(정규식 alternation 없이 그 축을 고정한다).
   await context.test("같은 소스를 도메인별로 갈라 다른 lineIds를 선언할 수 없다", async () => {
     await rejectsWith(
       (value) => {
-        const [first] = value.lineScopeRedescriptions;
-        value.lineScopeRedescriptions.push({ ...first, sourceDomain: "station_line_membership" });
+        const entry = value.lineScopeRedescriptions.find(
+          ({ sourceId, sourceDomain }) =>
+            sourceId === "daegu-line1-route-topology" && sourceDomain === "route_graph_topology",
+        );
+        entry.lineIds = [DAEGU_LINE_IDS[1]];
+        entry.requirementKeys = [`daegu:daegu-transportation:${DAEGU_LINE_IDS[1]}:route_graph_topology`];
       },
-      /must declare the same lineIds across domains|requirementKeys must stay in the redescribed source domain/,
+      /must declare the same lineIds across domains/,
     );
   });
 
@@ -381,7 +387,46 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
   await context.test("저장소 밖 편입 입력은 거부된다", async () => {
     await rejectsWith(
       (value) => { value.packDataInclusions[0].stationMapPath = "../molit-urban-rail-full-route-20251211.csv"; },
-      /pack data inclusion input must be a tracked repository path/,
+      /must be a repository-relative path inside the repo/,
+    );
+  });
+
+  // 저장소 안 symlink가 밖을 가리키면 문자열 containment는 통과한다 — 실경로 재확인 축을 고정한다.
+  await context.test("저장소 밖을 가리키는 symlink 입력은 거부된다", async () => {
+    const outside = await mkdtemp(path.join(tmpdir(), "nationwide-candidate-gate-outside-"));
+    const linkPath = path.join(root, "tools/datapack/sources", `escape-${process.pid}.csv`);
+    await writeFile(path.join(outside, "escape.csv"), "");
+    await symlink(path.join(outside, "escape.csv"), linkPath);
+    try {
+      await rejectsWith(
+        (value) => {
+          value.packDataInclusions[0].stationMapPath = path.relative(root, linkPath);
+        },
+        /must not resolve outside the repo/,
+      );
+    } finally {
+      await rm(linkPath, { force: true });
+      await rm(outside, { recursive: true, force: true });
+    }
+  });
+
+  await context.test("offset 없는 materializedAt은 거부된다", async () => {
+    await rejectsWith(
+      (value) => { value.packDataInclusions[0].materializedAt = "2026-07-20T16:00:00"; },
+      /materializedAt must be a UTC ISO-8601 timestamp/,
+    );
+  });
+
+  // 등재 소스를 빼면 그 소스는 baseline에서도 line-scope를 유지해 판정 자체는 그대로 나온다 —
+  // 전이를 뒷받침한 소스와 등재 목록의 일치 축만 이 누락을 잡는다.
+  await context.test("전이를 뒷받침한 소스가 등재 목록과 다르면 거부된다", async () => {
+    await rejectsWith(
+      (value) => {
+        value.lineScopeRedescriptions = value.lineScopeRedescriptions.filter(
+          ({ sourceId }) => sourceId !== "molit-urban-rail-full-route-daegu-line1-membership",
+        );
+      },
+      /supporting sources must equal the spec redescriptions/,
     );
   });
 

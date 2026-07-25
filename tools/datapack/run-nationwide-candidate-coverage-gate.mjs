@@ -48,7 +48,7 @@
 //   --emit-fixture   조립된 lineScoped candidate fixture를 이 경로에 남긴다(수동 재현·검수용).
 import { execFile } from "node:child_process";
 import { createHash, generateKeyPairSync } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -88,20 +88,6 @@ const SIGNING_MODE = "EPHEMERAL_RSA_2048";
 // spec이 가리킬 수 있는 지역 데이터 materializer 목록. spec 편집만으로 임의 모듈을 실행시킬 수 없다.
 const PACK_DATA_MATERIALIZERS = new Map([
   ["tools/datapack/materialize-daegu-timetable.mjs", materializeDaeguInclusion],
-]);
-// 편입이 실제로 무엇을 실었는지 spec 선언과 대조하는 축. 조립 전후 행수 차이를 이 표로만 센다.
-const PACK_ROW_TABLES = Object.freeze([
-  "operators",
-  "lines",
-  "stations",
-  "stationLines",
-  "networkEdges",
-  "serviceCalendars",
-  "serviceCalendarDates",
-  "transitRoutes",
-  "transitTrips",
-  "transitStopTimes",
-  "sourceInventory",
 ]);
 
 export async function runNationwideCandidateCoverageGate({
@@ -214,12 +200,14 @@ async function applyPackDataInclusions(spec, inherited, inventory) {
     const inputs = new Map();
     const readTracked = (relativePath) => readTrackedBytes(relativePath, inputs);
     const before = packRowCounts(fixture.packs[0]);
+    const beforeRows = packRowFingerprints(fixture.packs[0]);
     fixture = await materialize(fixture, inclusion, { readTracked, inventory });
     if (!Array.isArray(fixture?.packs) || fixture.packs.length !== 1) {
       throw new Error(`${inclusion.materializer} must keep the candidate pack single`);
     }
     const addedRows = subtractRowCounts(packRowCounts(fixture.packs[0]), before);
     assertDeclaredRows(inclusion, addedRows);
+    assertInheritedRowsUnchanged(inclusion, fixture.packs[0], before, beforeRows);
     records.push({
       regionId: inclusion.regionId,
       materializer: inclusion.materializer,
@@ -270,16 +258,33 @@ async function materializeDaeguInclusion(fixture, inclusion, { readTracked, inve
   });
 }
 
+// 집계 대상 표를 상수로 못박지 않고 pack 자신의 배열 필드에서 끌어온다. 고정 목록은 목록 밖 표
+// (routeMapPositions·facilities·officialOdFareQuotes 등 requirement 판정을 직접 뒷받침하는 표)로의
+// 주입을 대조 축 밖에 남긴다 — 새 표가 생겨도 자동으로 축에 들어오게 한다.
+function packRowTables(pack) {
+  return Object.entries(pack)
+    .filter(([, value]) => Array.isArray(value))
+    .map(([table]) => table);
+}
+
 function packRowCounts(pack) {
-  return Object.fromEntries(PACK_ROW_TABLES.map((table) => [table, (pack[table] ?? []).length]));
+  return Object.fromEntries(packRowTables(pack).map((table) => [table, pack[table].length]));
+}
+
+// 승계 행이 in-place로 바뀌면 행수 차이는 0이라 assertDeclaredRows가 못 잡는다. 편입 전 각 표의
+// 바이트를 해시해 두고, 편입 후 같은 표의 앞쪽 before개 행이 그대로인지 본다(materializer는 append만
+// 한다는 전제 — 삽입·재정렬·수정이 일어나면 그 자체가 검토 대상이므로 fail closed가 옳다).
+function packRowFingerprints(pack) {
+  return Object.fromEntries(packRowTables(pack).map((table) => [table, sha256Hex(JSON.stringify(pack[table]))]));
 }
 
 function subtractRowCounts(after, before) {
-  return Object.fromEntries(PACK_ROW_TABLES.map((table) => [table, after[table] - before[table]]));
+  const tables = [...new Set([...Object.keys(after), ...Object.keys(before)])].sort(codepointCompare);
+  return Object.fromEntries(tables.map((table) => [table, (after[table] ?? 0) - (before[table] ?? 0)]));
 }
 
-// 편입이 실제로 실은 행수가 spec 선언과 다르면 조립을 멈춘다 — snapshot drift가 candidate 구성을
-// 조용히 바꾸지 못하게 하는 축이다.
+// 편입이 실제로 실은 행수가 spec 선언과 다르면 조립을 멈춘다 — snapshot drift나 선언하지 않은 표로의
+// 주입이 candidate 구성을 조용히 바꾸지 못하게 하는 축이다.
 function assertDeclaredRows(inclusion, addedRows) {
   if (JSON.stringify(sortJson(addedRows)) !== JSON.stringify(sortJson(inclusion.addedRows))) {
     throw new Error(
@@ -289,21 +294,48 @@ function assertDeclaredRows(inclusion, addedRows) {
   }
 }
 
-// 편입 입력은 저장소 안 tracked 상대 경로만 허용한다(경로 이탈·절대 경로 fail closed).
-// 읽은 바이트는 경로별로 한 번만 해시해 evidence의 drift 감지 축이 된다.
+function assertInheritedRowsUnchanged(inclusion, pack, before, beforeRows) {
+  for (const [table, fingerprint] of Object.entries(beforeRows)) {
+    const rows = pack[table];
+    if (!Array.isArray(rows) || rows.length < before[table]) {
+      throw new Error(`${inclusion.regionId} pack data inclusion dropped inherited rows: ${table}`);
+    }
+    if (sha256Hex(JSON.stringify(rows.slice(0, before[table]))) !== fingerprint) {
+      throw new Error(`${inclusion.regionId} pack data inclusion modified inherited rows: ${table}`);
+    }
+  }
+}
+
+// 편입 입력은 저장소 안 상대 경로만 허용한다(절대 경로·경로 이탈 fail closed). 문자열 containment만
+// 보면 저장소 안 symlink가 밖을 가리킬 때 통과하므로, 링크를 해석한 실경로로 containment를 다시 본다.
+// git tracked 여부까지 보지는 않는다 — 그 축은 입력 바이트 해시를 evidence에 남기는 것으로 대신한다.
 async function readTrackedBytes(relativePath, inputs) {
   const resolved = path.resolve(root, relativePath);
   if (path.isAbsolute(relativePath) || !resolved.startsWith(`${root}${path.sep}`)) {
-    throw new Error(`pack data inclusion input must be a tracked repository path: ${relativePath}`);
+    throw new Error(`pack data inclusion input must be a repository-relative path inside the repo: ${relativePath}`);
   }
-  const bytes = await readFile(resolved);
+  const realRoot = await realpath(root);
+  let realResolved;
+  try {
+    realResolved = await realpath(resolved);
+  } catch {
+    throw new Error(`pack data inclusion input is missing: ${relativePath}`);
+  }
+  if (!realResolved.startsWith(`${realRoot}${path.sep}`)) {
+    throw new Error(`pack data inclusion input must not resolve outside the repo: ${relativePath}`);
+  }
+  const bytes = await readFile(realResolved);
   if (!inputs.has(relativePath)) {
     inputs.set(relativePath, {
       path: relativePath,
-      sha256: createHash("sha256").update(bytes).digest("hex"),
+      sha256: sha256Hex(bytes),
     });
   }
   return bytes;
+}
+
+function sha256Hex(value) {
+  return createHash("sha256").update(value).digest("hex");
 }
 
 function parseJsonBytes(bytes, label) {
@@ -495,6 +527,7 @@ function buildEvidence({ spec, inputs, packDataInclusions, reports, variants, si
         + `expected ${expectedLineScopedKeys.join(",")}, got ${variants.lineScoped.supportedRequirementKeys.join(",")}`,
     );
   }
+  assertDeclaredTransitionSources(spec, variants.lineScoped);
   const baselineStatuses = new Map(
     reports.baseline.requirements.map((entry) => [requirementKey(entry), entry.status]),
   );
@@ -566,6 +599,13 @@ function buildEvidence({ spec, inputs, packDataInclusions, reports, variants, si
         "전이 판정은 두 variant의 상대 비교다. baseline SUPPORTED 총량은 승계 팩의 다른 소스가 line-scope를 "
         + "갖게 되면 함께 늘어날 수 있고, 하네스는 파일럿 키가 baseline에 없고 lineScoped가 baseline ∪ 파일럿 "
         + "키와 정확히 같은지만 fail closed로 본다.",
+      baselineSemanticsKo:
+        "baseline은 저장소의 특정 과거 커밋 상태가 아니라 '등재된 재기술을 걷어낸' counterfactual이다. 아래 "
+        + "lineScopeRedescriptions에 등재된 소스의 coverageScope.lineIds만 fixture와 inventory 사본에서 지운 "
+        + "실행이며, 편입 행은 두 variant에 동일하게 들어간다. 따라서 이 evidence의 전이는 '어떤 소스의 "
+        + "line-scope 기술이 그 requirement를 여는가'를 뜻하고, 그 소스의 line-scope가 admission 정본에 언제 "
+        + "들어왔는지(대구 소스는 #2549 이전부터 line-scope였다)와는 다른 축이다. 전이를 뒷받침한 소스가 등재 "
+        + "목록과 정확히 같은지는 하네스가 fail closed로 확인한다.",
     },
     inputs: Object.fromEntries(
       Object.entries(inputs).map(([name, input]) => [name, { path: input.path, sha256: input.sha256 }]),
@@ -589,7 +629,10 @@ function buildEvidence({ spec, inputs, packDataInclusions, reports, variants, si
       modelKo:
         "승계 원본에 없는 지역 행은 tracked materializer가 tracked snapshot을 재생해 조립한다. 저장소에 "
         + "행을 복제하지 않으므로 아래 입력 해시가 candidate 구성의 유일한 결속 축이며, 실제로 실린 "
-        + "행수(addedRows)가 spec 선언과 다르면 조립이 fail closed 된다.",
+        + "행수(addedRows)가 spec 선언과 다르면(또는 승계 행이 바뀌면) 조립이 fail closed 된다.",
+      variantParityKo:
+        "편입 행은 두 variant에 동일하게 들어간다. 편입은 line-scope 재기술과 독립이며, variant를 가르는 "
+        + "축은 재기술뿐이다.",
       entries: packDataInclusions,
     },
     lineScopeRedescriptions: spec.lineScopeRedescriptions.map((redescription) => ({
@@ -614,6 +657,29 @@ function buildEvidence({ spec, inputs, packDataInclusions, reports, variants, si
     },
     transitions,
   };
+}
+
+// 전이한 requirement를 실제로 뒷받침한 소스가 spec 등재분과 정확히 같아야 한다. 이 축이 없으면
+// 등재 소스를 spec에서 빼도(그 소스는 baseline에서도 line-scope를 유지해 판정이 그대로 나온다) 하네스가
+// 통과해, evidence의 재기술 목록이 실제 근거보다 좁아진 채로 남는다.
+function assertDeclaredTransitionSources(spec, lineScoped) {
+  const declaredSourceIds = new Map();
+  for (const redescription of spec.lineScopeRedescriptions) {
+    for (const key of redescription.requirementKeys) {
+      const sourceIds = declaredSourceIds.get(key) ?? new Set();
+      sourceIds.add(redescription.sourceId);
+      declaredSourceIds.set(key, sourceIds);
+    }
+  }
+  for (const entry of lineScoped.pilotRequirements) {
+    const declared = [...(declaredSourceIds.get(entry.requirementKey) ?? [])].sort(codepointCompare);
+    if (JSON.stringify(entry.sourceIds) !== JSON.stringify(declared)) {
+      throw new Error(
+        `supporting sources must equal the spec redescriptions for ${entry.requirementKey}: `
+          + `expected ${declared.join(",")}, got ${entry.sourceIds.join(",")}`,
+      );
+    }
+  }
 }
 
 function assertCandidateRootPack(spec, reports) {
@@ -775,9 +841,12 @@ function validatePackDataInclusions(spec) {
     if (!PACK_DATA_MATERIALIZERS.has(materializer)) {
       throw new Error(`unknown pack data materializer: ${materializer}`);
     }
+    // offset 없는 값(예: "2026-07-20T16:00:00")은 new Date()가 로컬 타임존으로 해석해 같은 tracked
+    // 입력이 머신 타임존에 따라 조립 성공/실패로 갈린다 — UTC ISO-8601 왕복을 강제해 검사와 메시지를 맞춘다.
     const materializedAt = requiredString(inclusion.materializedAt, `${regionId}.materializedAt`);
-    if (!Number.isFinite(Date.parse(materializedAt))) {
-      throw new Error(`${regionId}.materializedAt must be an ISO timestamp`);
+    if (!Number.isFinite(Date.parse(materializedAt))
+      || new Date(materializedAt).toISOString() !== materializedAt) {
+      throw new Error(`${regionId}.materializedAt must be a UTC ISO-8601 timestamp`);
     }
     requiredString(inclusion.stationMapPath, `${regionId}.stationMapPath`);
     if (!Array.isArray(inclusion.lines) || inclusion.lines.length === 0) {
@@ -791,13 +860,13 @@ function validatePackDataInclusions(spec) {
       requiredString(line.topologySnapshotPath, `${regionId}.lines[].topologySnapshotPath`);
       requiredString(line.timetableSnapshotPath, `${regionId}.lines[].timetableSnapshotPath`);
     }
+    // 표 목록은 pack 자신에서 끌어오므로 여기서 정적으로 고정하지 않는다. "선언이 pack의 모든 표를
+    // 빠짐없이 덮는가"는 assertDeclaredRows가 실제 산출 map과 전키 비교로 강제한다.
     const addedRows = inclusion.addedRows;
     if (!addedRows || typeof addedRows !== "object" || Array.isArray(addedRows)) {
       throw new Error(`${regionId}.addedRows must be an object`);
     }
-    const declaredTables = Object.keys(addedRows).sort(codepointCompare);
-    const knownTables = [...PACK_ROW_TABLES].sort(codepointCompare);
-    if (JSON.stringify(declaredTables) !== JSON.stringify(knownTables)) {
+    if (Object.keys(addedRows).length === 0) {
       throw new Error(`${regionId}.addedRows must declare every pack row table`);
     }
     for (const [table, count] of Object.entries(addedRows)) {
