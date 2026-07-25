@@ -9,6 +9,7 @@ import '../../datapack/data_pack_index.dart';
 import '../../datapack/data_pack_update_state.dart';
 import '../../datapack/emergency_override_repository.dart';
 import 'catalog_database.dart';
+import 'catalog_schema_diagnostics.dart';
 
 class CatalogDatabaseOpener {
   CatalogDatabaseOpener({
@@ -35,6 +36,9 @@ class CatalogDatabaseOpener {
     _openedArtifactIdentity = '';
     final installedDatabase = await _openInstalledCurrentDataPack();
     if (installedDatabase != null) {
+      // 구제 DDL은 설치 팩 파일을 수정하므로 활성 팩이 확정된 뒤 이 한 곳에서만 실행한다(#2527).
+      // known-good 후보를 훑는 동안에는 읽기 전용 판정만 하고 탐색 대상 파일은 건드리지 않는다.
+      await installedDatabase.rescueMissingCatalogTables();
       return installedDatabase;
     }
 
@@ -263,10 +267,14 @@ class CatalogDatabaseOpener {
       if (!await _isUsableCatalogDatabase(database)) {
         return null;
       }
-      // 설치 팩도 번들 팩과 같은 구제를 거친다(#2527). 빈 테이블 생성이 안전하지 않은
-      // 테이블이 빠져 있으면 이 팩을 열지 않고 known-good 또는 번들로 강등한다.
-      final rescue = await database.rescueMissingCatalogTables();
-      if (rescue.isBlocked) {
+      // 빈 테이블 생성이 안전하지 않은 테이블이 빠져 있으면 이 팩을 열지 않고 known-good
+      // 또는 번들로 강등한다(#2527). 판정은 읽기 전용이라 거부한 파일은 그대로 남는다.
+      final plan = await database.planCatalogSchemaRescue();
+      if (plan.isBlocked) {
+        CatalogSchemaDiagnostics.instance.recordPackRejected(
+          artifact: p.basename(file.path),
+          blockingTableNames: plan.blockingMissingTables,
+        );
         return null;
       }
       returned = true;

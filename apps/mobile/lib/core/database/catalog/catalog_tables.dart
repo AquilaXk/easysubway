@@ -258,9 +258,13 @@ class FareRules extends Table {
   @override
   Set<Column> get primaryKey => {id};
 
+  // 팩 스키마 원본(tools/datapack/schema/catalog-schema.sql)과 제약을 맞춘다(#2527).
   @override
   List<String> get customConstraints => [
     'FOREIGN KEY (zone_id) REFERENCES fare_zones(id)',
+    'CHECK (base_card_fare >= 0)',
+    'CHECK (base_cash_fare >= 0)',
+    'CHECK (base_distance_meters >= 0)',
   ];
 }
 
@@ -281,9 +285,12 @@ class FareDiscounts extends Table {
   @override
   Set<Column> get primaryKey => {id};
 
+  // 팩 스키마 원본(tools/datapack/schema/catalog-schema.sql)과 제약을 맞춘다(#2527).
   @override
   List<String> get customConstraints => [
     'FOREIGN KEY (zone_id) REFERENCES fare_zones(id)',
+    'CHECK (card_fare IS NULL OR card_fare >= 0)',
+    'CHECK (cash_fare IS NULL OR cash_fare >= 0)',
   ];
 }
 
@@ -585,6 +592,12 @@ class StationFacilityEvidence extends Table {
 
   @override
   Set<Column> get primaryKey => {stationId, lineId, facilityType};
+
+  // 팩 스키마 원본(tools/datapack/schema/catalog-schema.sql)과 제약을 맞춘다(#2527).
+  @override
+  List<String> get customConstraints => [
+    'FOREIGN KEY (station_id, line_id) REFERENCES station_lines(station_id, line_id)',
+  ];
 }
 
 class FacilityStatusSnapshots extends Table {
@@ -714,6 +727,13 @@ class StationPathwayNodes extends Table {
 
   @override
   Set<Column> get primaryKey => {id};
+
+  // 팩 스키마 원본(tools/datapack/schema/catalog-schema.sql)과 제약을 맞춘다(#2527).
+  @override
+  List<String> get customConstraints => [
+    'FOREIGN KEY (station_id) REFERENCES stations(id)',
+    'FOREIGN KEY (station_id, line_id) REFERENCES station_lines(station_id, line_id)',
+  ];
 }
 
 class StationPathwayEdges extends Table {
@@ -774,6 +794,17 @@ class StationPathwayEdges extends Table {
 
   @override
   Set<Column> get primaryKey => {id};
+
+  // 팩 스키마 원본(tools/datapack/schema/catalog-schema.sql)과 제약을 맞춘다(#2527).
+  @override
+  List<String> get customConstraints => [
+    'FOREIGN KEY (from_node_id) REFERENCES station_pathway_nodes(id)',
+    'FOREIGN KEY (to_node_id) REFERENCES station_pathway_nodes(id)',
+    'FOREIGN KEY (requires_facility_id) REFERENCES facilities(id)',
+    'CHECK (duration_seconds >= 0)',
+    'CHECK (distance_meters >= 0)',
+    'CHECK (reliability_score >= 0 AND reliability_score <= 100)',
+  ];
 }
 
 class TransferRules extends Table {
@@ -800,6 +831,16 @@ class TransferRules extends Table {
 
   @override
   Set<Column> get primaryKey => {id};
+
+  // 팩 스키마 원본(tools/datapack/schema/catalog-schema.sql)과 제약을 맞춘다(#2527).
+  @override
+  List<String> get customConstraints => [
+    'FOREIGN KEY (from_station_id, from_line_id) REFERENCES station_lines(station_id, line_id)',
+    'FOREIGN KEY (to_station_id, to_line_id) REFERENCES station_lines(station_id, line_id)',
+    'FOREIGN KEY (pathway_edge_id) REFERENCES station_pathway_edges(id)',
+    'FOREIGN KEY (strict_step_free_pathway_edge_id) REFERENCES station_pathway_edges(id)',
+    'CHECK (min_transfer_seconds >= 0)',
+  ];
 }
 
 class DataQualityRecords extends Table {

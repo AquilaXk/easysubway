@@ -33,7 +33,7 @@
 // 사용:
 //   node tools/ci/check-pack-app-schema-parity.mjs
 //   node tools/ci/check-pack-app-schema-parity.mjs --allowlist <경로>
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -43,31 +43,44 @@ import { codepointCompare } from "../lib/codepoint-compare.mjs";
 import { isMainModule } from "../lib/is-main-module.mjs";
 
 export const ALLOWLIST_PATH = "contracts/datapack/pack-app-schema-parity-allowlist.json";
+export const RAW_SQL_TABLES_PATH = "contracts/datapack/catalog-raw-sql-tables.json";
 export const DRIFT_GENERATED_PATH = "apps/mobile/lib/core/database/catalog/catalog_database.g.dart";
+export const USER_DRIFT_GENERATED_PATH = "apps/mobile/lib/core/database/user/user_database.g.dart";
 export const CATALOG_DATABASE_PATH = "apps/mobile/lib/core/database/catalog/catalog_database.dart";
 export const CATALOG_OPENER_PATH = "apps/mobile/lib/core/database/catalog/catalog_database_opener.dart";
 export const PACK_SCHEMA_PATH = "tools/datapack/schema/catalog-schema.sql";
 export const DATAPACK_INDEX_PATH = "apps/mobile/assets/datapacks/index.json";
 export const DATAPACK_ASSET_ROOT = "apps/mobile";
+export const MOBILE_SOURCE_ROOT = "apps/mobile/lib";
+// 사용자 DB는 데이터팩이 교체하지 않는 별개 저장소다. 그 테이블을 raw SQL로 읽는 코드는
+// feature 디렉터리에도 흩어져 있으므로 경로가 아니라 drift 선언 집합으로 걸러낸다.
+const USER_DATABASE_SOURCE_PREFIX = "apps/mobile/lib/core/database/user/";
 
 export const REPOSITORY_ROOT = path.resolve(import.meta.dirname, "../..");
 
 export const TABLE_DISPOSITIONS = Object.freeze(["APP_RESCUE"]);
 export const INDEX_DISPOSITIONS = Object.freeze(["MISSING_TABLE_DEPENDENT", "PACK_REBUILD_PENDING"]);
 
+// drift 생성물·포맷터 출력 형식에 묶인 파서가 앵커를 잃었을 때 복구 경로를 알려 준다.
+const PARSER_RECOVERY_HINT = "drift 생성물 형식이 바뀌었을 수 있다 — `dart run build_runner build`로"
+  + " 재생성한 뒤 이 파서의 앵커를 다시 맞춰라. `allSchemaEntities`에 테이블이 아닌 엔티티"
+  + "(drift Index·View)가 들어와도 같은 방식으로 깨진다.";
+
 /** drift `@DriftDatabase(tables: [...])`가 선언한 SQL 테이블 이름을 생성 산출물에서 읽는다. */
 export function parseDriftDeclaredTables(generatedSource) {
   const entities = /^  List<DatabaseSchemaEntity> get allSchemaEntities => \[([\s\S]*?)^  \];$/m
     .exec(generatedSource);
   if (entities == null) {
-    throw new Error(`${DRIFT_GENERATED_PATH}: allSchemaEntities 선언을 찾지 못했다`);
+    throw new Error(
+      `${DRIFT_GENERATED_PATH}: allSchemaEntities 선언을 찾지 못했다. ${PARSER_RECOVERY_HINT}`,
+    );
   }
   const getters = entities[1]
     .split(",")
     .map((entry) => entry.trim())
     .filter((entry) => entry.length > 0);
   if (getters.length === 0) {
-    throw new Error(`${DRIFT_GENERATED_PATH}: allSchemaEntities가 비어 있다`);
+    throw new Error(`${DRIFT_GENERATED_PATH}: allSchemaEntities가 비어 있다. ${PARSER_RECOVERY_HINT}`);
   }
 
   const getterToClass = new Map();
@@ -82,11 +95,15 @@ export function parseDriftDeclaredTables(generatedSource) {
   for (const getter of getters) {
     const className = getterToClass.get(getter);
     if (className === undefined) {
-      throw new Error(`${DRIFT_GENERATED_PATH}: '${getter}' 테이블 필드 선언을 찾지 못했다`);
+      throw new Error(
+        `${DRIFT_GENERATED_PATH}: '${getter}' 테이블 필드 선언을 찾지 못했다. ${PARSER_RECOVERY_HINT}`,
+      );
     }
     const tableName = classToTable.get(className);
     if (tableName === undefined) {
-      throw new Error(`${DRIFT_GENERATED_PATH}: '${className}'의 실제 테이블 이름을 찾지 못했다`);
+      throw new Error(
+        `${DRIFT_GENERATED_PATH}: '${className}'의 실제 테이블 이름을 찾지 못했다. ${PARSER_RECOVERY_HINT}`,
+      );
     }
     tables.push(tableName);
   }
@@ -127,18 +144,92 @@ export function parseAppSchemaVersion(catalogDatabaseSource) {
   return Number(match[1]);
 }
 
-/** 앱이 "빈 테이블로 구제한다"고 선언한 테이블 목록. allowlist의 APP_RESCUE와 대조한다. */
-export function parseRescuableTableNames(catalogDatabaseSource) {
-  const match = /^const rescuableCatalogTableNames = <String>\{([\s\S]*?)^\};$/m
-    .exec(catalogDatabaseSource);
+/**
+ * 앱 소스의 `const <이름> = <String>{...}` 문자열 집합 상수를 읽는다.
+ *
+ * 한 줄 선언과 여러 줄 선언 모두 받는다(`dart format`이 원소 수에 따라 형태를 바꾼다).
+ */
+export function parseDartStringSetConstant(source, constantName, sourcePath = CATALOG_DATABASE_PATH) {
+  const match = new RegExp(`^const ${constantName} = <String>\\{([\\s\\S]*?)\\};$`, "m")
+    .exec(source);
   if (match == null) {
-    throw new Error(`${CATALOG_DATABASE_PATH}: rescuableCatalogTableNames 선언을 찾지 못했다`);
+    throw new Error(`${sourcePath}: ${constantName} 선언을 찾지 못했다`);
   }
   const names = [...match[1].matchAll(/'([a-z0-9_]+)'/g)].map(([, name]) => name);
   if (names.length === 0) {
-    throw new Error(`${CATALOG_DATABASE_PATH}: rescuableCatalogTableNames가 비어 있다`);
+    throw new Error(`${sourcePath}: ${constantName}가 비어 있다`);
   }
   return new Set(names);
+}
+
+/** 앱이 "빈 테이블로 구제한다"고 선언한 테이블 목록. allowlist의 APP_RESCUE와 대조한다. */
+export function parseRescuableTableNames(catalogDatabaseSource) {
+  return parseDartStringSetConstant(catalogDatabaseSource, "rescuableCatalogTableNames");
+}
+
+/**
+ * 앱 소스의 raw SQL이 참조하는 테이블 토큰을 훑는다(#2527).
+ *
+ * drift 선언 밖에서만 읽는 카탈로그 테이블이 계약 문서 없이 새로 생기면 판정 기준집합에서
+ * 조용히 빠지므로, 계약 목록이 실제 코드와 어긋나면 게이트가 실패해야 한다. 주석은 제거하고
+ * `FROM`·`JOIN`·`INTO`·`UPDATE`·`CREATE TABLE` 뒤의 식별자만 본다.
+ */
+export function scanRawSqlTableTokens(sources) {
+  const pattern = /\b(?:FROM|JOIN|INTO|UPDATE|TABLE(?:\s+IF\s+NOT\s+EXISTS)?)\s+([a-z_][a-z0-9_]*)/gi;
+  const tokens = new Map();
+  for (const { path: sourcePath, text } of sources) {
+    for (const [, token] of stripDartComments(text).matchAll(pattern)) {
+      const name = token.toLowerCase();
+      if (!tokens.has(name)) tokens.set(name, new Set());
+      tokens.get(name).add(sourcePath);
+    }
+  }
+  return tokens;
+}
+
+function stripDartComments(text) {
+  return text
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .split("\n")
+    .map((line) => line.replace(/(^|\s)\/\/.*$/, "$1"))
+    .join("\n");
+}
+
+/**
+ * raw SQL 계약 목록이 실제 앱 소스와 일치하는지 대조한다.
+ *
+ * 계약에 없는 새 토큰(미분류 테이블), 코드에서 사라진 계약 항목(낡은 등재), 실제로는 나타나지
+ * 않는 무시 토큰을 모두 실패로 본다.
+ */
+export function evaluateRawSqlTableContract({
+  tokens,
+  driftTables,
+  userDriftTables,
+  contractTables,
+  ignoredTokens,
+}) {
+  const known = new Set([...driftTables, ...userDriftTables]);
+  const observed = [...tokens.keys()].filter((token) => !known.has(token)).sort(codepointCompare);
+  const declared = new Set([...contractTables, ...ignoredTokens]);
+  const undeclared = observed.filter((token) => !declared.has(token));
+  const staleTables = [...contractTables]
+    .filter((token) => !tokens.has(token))
+    .sort(codepointCompare);
+  const staleIgnored = [...ignoredTokens]
+    .filter((token) => !tokens.has(token) || known.has(token))
+    .sort(codepointCompare);
+  return {
+    observed,
+    errors: [
+      ...undeclared.map((token) =>
+        `${RAW_SQL_TABLES_PATH}: 앱 raw SQL이 참조하는 '${token}'이 계약에 없다`
+        + " (카탈로그 테이블이면 tables에, 오탐이면 ignoredTokens에 사유와 함께 등재하라)"),
+      ...staleTables.map((token) =>
+        `${RAW_SQL_TABLES_PATH}: '${token}'을 raw SQL로 읽는 코드가 더 이상 없다`),
+      ...staleIgnored.map((token) =>
+        `${RAW_SQL_TABLES_PATH}: ignoredTokens '${token}'이 더 이상 오탐으로 나타나지 않는다`),
+    ],
+  };
 }
 
 /** 앱이 카탈로그 DB로 여는 번들 팩 id. 여러 개거나 없으면 판정 대상이 모호하므로 멈춘다. */
@@ -254,13 +345,19 @@ export function evaluatePackAppSchemaParity({
   packUserVersion,
   appSchemaVersion,
   driftTables,
+  rawSqlTables = [],
   schemaIndexes,
   rescuableTables,
   allowlistEntry,
 }) {
   const packTableSet = new Set(packTables);
   const packIndexSet = new Set(packIndexes);
-  const missingTables = driftTables.filter((name) => !packTableSet.has(name)).sort(codepointCompare);
+  // 기준집합은 drift 선언 ∪ raw SQL 필수 테이블이다. drift 선언만 보면 노선도·시간표가
+  // raw SQL로만 읽는 테이블의 결측이 판정 밖으로 새어 나간다.
+  const requiredTables = [...new Set([...driftTables, ...rawSqlTables])].sort(codepointCompare);
+  const missingTables = requiredTables
+    .filter((name) => !packTableSet.has(name))
+    .sort(codepointCompare);
   const missingIndexes = [...schemaIndexes.keys()]
     .filter((name) => !packIndexSet.has(name))
     .sort(codepointCompare);
@@ -279,6 +376,16 @@ export function evaluatePackAppSchemaParity({
     if (entry.disposition === "APP_RESCUE" && !rescuableTables.has(name)) {
       allowlistErrors.push(
         `'${name}'은 APP_RESCUE로 등재됐지만 앱의 rescuableCatalogTableNames에 없다`,
+      );
+    }
+  }
+  // 역방향: 앱 구제 목록에 오타나 옛 이름이 남으면 그 테이블이 실제로 결측일 때 런타임이
+  // blocking으로 오분류해 설치 팩을 거부하는데 CI 신호는 0이 된다.
+  const requiredTableSet = new Set(requiredTables);
+  for (const name of [...rescuableTables].sort(codepointCompare)) {
+    if (!requiredTableSet.has(name)) {
+      allowlistErrors.push(
+        `앱의 rescuableCatalogTableNames '${name}'이 필수 테이블 집합(drift 선언 ∪ raw SQL)에 없다`,
       );
     }
   }
@@ -342,6 +449,8 @@ export function evaluatePackAppSchemaParity({
     packTableCount: packTables.length,
     packIndexCount: packIndexes.length,
     driftTableCount: driftTables.length,
+    rawSqlTableCount: rawSqlTables.length,
+    requiredTableCount: requiredTables.length,
     schemaIndexCount: schemaIndexes.size,
     missingTables,
     missingIndexes,
@@ -364,7 +473,8 @@ export function formatReport({ results, skippedPackIds, allowlistPath }) {
       + (result.migrationMayRun ? " (팩이 낮다 — 일부 마이그레이션이 돌 수 있다)" : " (동일 — 마이그레이션이 결측을 메우지 않는다)"),
     );
     lines.push(
-      `    팩 테이블 ${result.packTableCount}개 / 앱 drift 선언 테이블 ${result.driftTableCount}개`,
+      `    팩 테이블 ${result.packTableCount}개 / 앱 필수 테이블 ${result.requiredTableCount}개`
+      + ` (drift 선언 ${result.driftTableCount}개 + raw SQL ${result.rawSqlTableCount}개)`,
     );
     lines.push(
       `    팩 명시 인덱스 ${result.packIndexCount}개 / 팩 스키마 원본 선언 인덱스 ${result.schemaIndexCount}개`,
@@ -390,21 +500,72 @@ function nameBlock(label, names) {
   return [`    ${label} ${names.length}개:`, ...names.map((name) => `      - ${name}`)];
 }
 
+/** raw SQL 스캔 대상: 사용자 DB 구현 파일을 뺀 앱 소스 전체. */
+async function readMobileSources(root) {
+  const sources = [];
+  const visit = async (relative) => {
+    for (const entry of await readdir(path.resolve(root, relative), { withFileTypes: true })) {
+      const child = path.posix.join(relative, entry.name);
+      if (entry.isDirectory()) {
+        await visit(child);
+        continue;
+      }
+      if (!entry.name.endsWith(".dart")) continue;
+      if (child.startsWith(USER_DATABASE_SOURCE_PREFIX)) continue;
+      sources.push({ path: child, text: await readFile(path.resolve(root, child), "utf8") });
+    }
+  };
+  await visit(MOBILE_SOURCE_ROOT);
+  return sources;
+}
+
 export async function checkPackAppSchemaParity({
   root = REPOSITORY_ROOT,
   allowlistPath = ALLOWLIST_PATH,
 } = {}) {
   const read = (relative) => readFile(path.resolve(root, relative), "utf8");
   const driftTables = parseDriftDeclaredTables(await read(DRIFT_GENERATED_PATH));
+  const userDriftTables = parseDriftDeclaredTables(await read(USER_DRIFT_GENERATED_PATH));
   const catalogDatabaseSource = await read(CATALOG_DATABASE_PATH);
   const appSchemaVersion = parseAppSchemaVersion(catalogDatabaseSource);
   const rescuableTables = parseRescuableTableNames(catalogDatabaseSource);
+  const declaredRawSqlTables = parseDartStringSetConstant(
+    catalogDatabaseSource,
+    "rawSqlCatalogTableNames",
+  );
   const schemaIndexes = parsePackSchemaIndexes(await read(PACK_SCHEMA_PATH));
   const catalogPackId = parseCatalogPackId(await read(CATALOG_OPENER_PATH));
   const index = JSON.parse(await read(DATAPACK_INDEX_PATH));
   const { entriesByPackId, errors: allowlistErrors } = normalizeAllowlist(
     JSON.parse(await readFile(path.resolve(root, allowlistPath), "utf8")),
   );
+  const rawSqlContract = JSON.parse(await read(RAW_SQL_TABLES_PATH));
+  const contractTables = (rawSqlContract.tables ?? []).map((entry) => String(entry.name));
+  const rawSqlScan = evaluateRawSqlTableContract({
+    tokens: scanRawSqlTableTokens(await readMobileSources(root)),
+    driftTables,
+    userDriftTables,
+    contractTables,
+    ignoredTokens: (rawSqlContract.ignoredTokens ?? []).map((entry) => String(entry.token)),
+  });
+  // 계약 목록과 앱 런타임 분류가 갈리면 게이트가 보는 기준집합과 실제 동작이 어긋난다.
+  const contractSyncErrors = [
+    ...contractTables
+      .filter((name) => !declaredRawSqlTables.has(name))
+      .map((name) => `${CATALOG_DATABASE_PATH}: rawSqlCatalogTableNames에 '${name}'이 없다`),
+    ...[...declaredRawSqlTables]
+      .filter((name) => !contractTables.includes(name))
+      .sort(codepointCompare)
+      .map((name) => `${RAW_SQL_TABLES_PATH}: rawSqlCatalogTableNames의 '${name}' 항목이 없다`),
+    ...(rawSqlContract.tables ?? [])
+      .filter((entry) => entry.disposition === "APP_RESCUE" && !rescuableTables.has(String(entry.name)))
+      .map((entry) =>
+        `${CATALOG_DATABASE_PATH}: '${entry.name}'이 APP_RESCUE인데 rescuableCatalogTableNames에 없다`),
+    ...(rawSqlContract.tables ?? [])
+      .filter((entry) => entry.disposition !== "APP_RESCUE" && rescuableTables.has(String(entry.name)))
+      .map((entry) =>
+        `${RAW_SQL_TABLES_PATH}: '${entry.name}'은 ${entry.disposition}인데 앱이 구제 대상으로 선언했다`),
+  ];
 
   const packs = Array.isArray(index.packs) ? index.packs : [];
   const catalogPacks = packs.filter((pack) => pack.id === catalogPackId);
@@ -432,6 +593,7 @@ export async function checkPackAppSchemaParity({
         packUserVersion: packSchema.userVersion,
         appSchemaVersion,
         driftTables,
+        rawSqlTables: [...declaredRawSqlTables].sort(codepointCompare),
         schemaIndexes,
         rescuableTables,
         allowlistEntry: entriesByPackId.get(String(pack.id)),
@@ -447,6 +609,8 @@ export async function checkPackAppSchemaParity({
   const documentErrors = [
     ...allowlistErrors,
     ...unknownPackIds.map((packId) => `${allowlistPath}: 카탈로그 팩이 아닌 '${packId}' 항목`),
+    ...rawSqlScan.errors,
+    ...contractSyncErrors,
   ];
 
   return {

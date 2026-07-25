@@ -10,25 +10,25 @@
           "name": "fare_zones",
           "disposition": "APP_RESCUE",
           "issue": "#2527",
-          "reason": "요금 구역. 비어 있으면 요금 안내만 빠지고 경로·시간표 결과는 그대로다. 앱이 rescuableCatalogTableNames로 빈 테이블을 만든다."
+          "reason": "요금 구역. 앱 lib에 이 테이블을 읽는 쿼리가 없다(경로 화면 요금은 official_od_fare_quotes에서 온다). 앱이 쓰는 쪽은 수도권 baseline 요금 backfill뿐이라 빈 테이블이 어떤 조회 결과도 바꾸지 않는다."
         },
         {
           "name": "fare_rules",
           "disposition": "APP_RESCUE",
           "issue": "#2527",
-          "reason": "요금 규칙. 비어 있으면 요금 안내만 빠진다. 앱이 빈 테이블을 만든 뒤 수도권 baseline 요금을 backfill한다."
+          "reason": "요금 규칙. 앱 lib에 이 테이블을 읽는 쿼리가 없다. 앱이 쓰는 쪽은 수도권 baseline 요금 backfill뿐이라 빈 테이블이 어떤 조회 결과도 바꾸지 않는다."
         },
         {
           "name": "fare_discounts",
           "disposition": "APP_RESCUE",
           "issue": "#2527",
-          "reason": "요금 할인. 비어 있으면 할인 안내만 빠진다. 앱이 빈 테이블을 만든다."
+          "reason": "요금 할인. 앱 lib에 이 테이블을 읽는 쿼리가 없다. 앱이 쓰는 쪽은 수도권 baseline 요금 backfill뿐이라 빈 테이블이 어떤 조회 결과도 바꾸지 않는다."
         },
         {
           "name": "station_fare_zones",
           "disposition": "APP_RESCUE",
           "issue": "#2527",
-          "reason": "역-요금구역 매핑. 비어 있으면 요금 구역 판정만 빠지고 다른 조회는 영향이 없다. 앱이 빈 테이블을 만든다."
+          "reason": "역-요금구역 매핑. 앱 lib에 이 테이블을 읽는 쿼리가 없다. 앱이 쓰는 쪽은 수도권 baseline 요금 backfill뿐이라 빈 테이블이 어떤 조회 결과도 바꾸지 않는다."
         },
         {
           "name": "station_facility_evidence",
@@ -102,7 +102,7 @@
           "name": "idx_route_map_line_tracks_region_line",
           "disposition": "PACK_REBUILD_PENDING",
           "issue": "#2527",
-          "reason": "대상 테이블 route_map_line_tracks는 팩에 있는데 인덱스만 빠진 단독 누락이다. 앱이 여는 팩은 대체되는 산출물이라 앱이 인덱스를 만들면 팩마다 실제 스키마가 갈라진다. 팩 스키마 원본(tools/datapack/schema/catalog-schema.sql)으로 팩을 재빌드할 때 해소한다."
+          "reason": "대상 테이블 route_map_line_tracks가 이미 팩에 있으므로 앱이 인덱스를 덧붙일 자리가 아니라 팩 재빌드로 고칠 결측이다. 앱이 만드는 인덱스는 자기가 구제한 빈 테이블에 onCreate와 같은 인덱스를 붙이는 경우로 한정한다. 팩 스키마 원본(tools/datapack/schema/catalog-schema.sql)으로 팩을 재빌드할 때 해소하며, 그때 이 항목은 stale 판정으로 실패해 정리가 강제된다."
         }
       ]
     }
