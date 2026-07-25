@@ -54,8 +54,8 @@ const buildManifestPath = path.join(
 // manifest maps[].id → 원본 SVG 파일명. .vec 파일명은 manifest id를 따른다.
 const regions = [
   { id: "seoul", svg: "easy-subway-sma-v2.svg" },
-  { id: "busan", svg: "easy-subway-busan-v1.svg" },
-  { id: "daegu", svg: "easy-subway-daegu-v1.svg" },
+  { id: "busan", svg: "easy-subway-busan-v3.svg" },
+  { id: "daegu", svg: "easy-subway-daegu-v3.svg" },
   { id: "daejeon", svg: "easy-subway-daejeon-v1.svg" },
   { id: "gwangju", svg: "easy-subway-gwangju-v1.svg" },
 ];
@@ -114,6 +114,16 @@ function extractGroup(svgText, groupId) {
   if (idIndex < 0) return "";
   const groupStart = svgText.lastIndexOf("<g", idIndex);
   if (groupStart < 0) return "";
+
+  // #2068 오너 v3 반입 실측: 내용이 빈 레이어를 편집기가 자기폐쇄 태그
+  // (`<g id="service-tags-layer" ... />`)로 마감하는 경우가 있다(busan v3의
+  // service-tags-layer — v1은 같은 빈 레이어를 `<g ...></g>`로 썼다). 아래
+  // depth 카운터는 자기폐쇄 태그로 depth를 올리지 않으므로, 이 태그에서
+  // 시작하면 depth가 0인 채로 다음 형제 레이어까지 삼켜 첫 `</g>`에서 끊긴다
+  // — 그 결과 allow-list 밖 레이어(station-name-labels-layer 등)가 바탕층에
+  // 딸려 들어간다. 자기폐쇄 여는 태그면 그 태그 하나가 곧 빈 그룹 전체다.
+  const selfClosingGroup = svgText.slice(groupStart).match(/^<g\b[^>]*?\/>/);
+  if (selfClosingGroup) return selfClosingGroup[0];
 
   const groupTags = /<\/?g\b[^>]*>/g;
   groupTags.lastIndex = groupStart;

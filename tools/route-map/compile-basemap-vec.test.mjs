@@ -50,12 +50,33 @@ test("컴파일 전에 단순 class 스타일을 SVG 속성으로 인라인한�
   assert.doesNotMatch(normalized, /\/\s+[\w-]+="/);
 });
 
+// #2068 오너 v3 반입 회귀: 빈 레이어를 자기폐쇄 태그로 마감한 SVG(busan v3의
+// service-tags-layer)에서 extractGroup의 depth 카운터가 다음 형제 레이어를 삼켜
+// allow-list 밖 레이어(역명 라벨)가 바탕층에 딸려 들어갔다.
+test("자기폐쇄 태그로 마감된 빈 레이어가 뒤따르는 형제 레이어를 삼키지 않는다", () => {
+  const normalized = normalizeSvgForCompile(`
+    <svg>
+      <g id="route-lines-layer">
+        <polyline class="route-line" points="0,0 10,10" />
+      </g>
+      <g id="service-tags-layer" class="render-layer service-tag-layer" />
+      <g id="station-name-labels-layer">
+        <text id="station-label-test">테스트역</text>
+      </g>
+    </svg>
+  `);
+
+  assert.match(normalized, /id="route-lines-layer"/);
+  assert.match(normalized, /id="service-tags-layer"/);
+  assert.doesNotMatch(normalized, /station-name-labels-layer|테스트역/);
+});
+
 test("5권역 basemap에는 노선·기존 역 심벌만 남기고 미개통 노선을 제외한다", () => {
   const sources = path.join(import.meta.dirname, "route-map-defs/svg-sources");
   const files = [
     "easy-subway-sma-v2.svg",
-    "easy-subway-busan-v1.svg",
-    "easy-subway-daegu-v1.svg",
+    "easy-subway-busan-v3.svg",
+    "easy-subway-daegu-v3.svg",
     "easy-subway-daejeon-v1.svg",
     "easy-subway-gwangju-v1.svg",
   ];
@@ -510,8 +531,8 @@ test("extractOwnerLabels: 5권역 실 SVG에서 ordinary/transfer/terminal 개�
     // #2068 벡스코 병합: 2호선·동해선을 단일 환승 station_id로 합치면서, 동해선
     // 노드용 중복 ordinary 라벨(벡스코_DH)을 제거했다(단일 환승 캡슐이 전사 라벨을
     // 이미 가지므로 중복 표기 불필요) → ordinary 129→128.
-    "easy-subway-busan-v1.svg": { ordinary: 128, transfer: 12, terminal: 7 },
-    "easy-subway-daegu-v1.svg": { ordinary: 84, transfer: 5, terminal: 8 },
+    "easy-subway-busan-v3.svg": { ordinary: 128, transfer: 12, terminal: 7 },
+    "easy-subway-daegu-v3.svg": { ordinary: 84, transfer: 5, terminal: 8 },
     // daejeon: SVG상 ordinary/transfer/terminal 64건 중 39건이 미개통(2호선
     // 트램) data-status="construction"이라 제외 → 25건(15/8/2)만 남는다.
     "easy-subway-daejeon-v1.svg": { ordinary: 15, transfer: 8, terminal: 2 },
@@ -749,8 +770,8 @@ test("extractServiceTagObstacles·extractRailTransferChipObstacles: main-map-sca
     "route-map-defs/svg-sources",
   );
   for (const [id, file] of [
-    ["busan", "easy-subway-busan-v1.svg"],
-    ["daegu", "easy-subway-daegu-v1.svg"],
+    ["busan", "easy-subway-busan-v3.svg"],
+    ["daegu", "easy-subway-daegu-v3.svg"],
     ["daejeon", "easy-subway-daejeon-v1.svg"],
     ["gwangju", "easy-subway-gwangju-v1.svg"],
   ]) {

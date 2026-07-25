@@ -73,9 +73,9 @@
       "license": {
         "name": "오너 자작 노선도(self-drawn)",
         "spdx": "LicenseRef-Self-Drawn",
-        "url": "internal:route-map/route-map-defs/svg-sources/easy-subway-busan-v1.svg",
-        "source": "오너 자작 부산 8선형 정본 도식(easy-subway-busan-v1)",
-        "source_page": "internal:route-map/route-map-defs/svg-sources/easy-subway-busan-v1.svg",
+        "url": "internal:route-map/route-map-defs/svg-sources/easy-subway-busan-v3.svg",
+        "source": "오너 자작 부산 8선형 정본 도식(easy-subway-busan-v3)",
+        "source_page": "internal:route-map/route-map-defs/svg-sources/easy-subway-busan-v3.svg",
         "date": "2026-07-12",
         "authors": [
           "오너"
@@ -89,7 +89,7 @@
           "Font Awesome Free plane icon (FortAwesome, CC BY 4.0)",
           "KTX/SRT and other brand marks"
         ],
-        "changes": "App rendering uses structured coordinates (route_map_positions) derived from the owner's self-drawn 8-linear Busan schematic (easy-subway-busan-v1), not the raw SVG. The self-drawn SVG is now the basemap paint source (build-time compiled, hybrid rendering), while interaction (station tap hit-testing, focus camera, popover anchoring, route highlighting) still trusts the structured coordinates. The compiled basemap `.vec` (vector_graphics binary, compiled from the self-drawn SVG via tools/route-map/compile-basemap-vec.mjs) is now bundled offline (offline.included=true, type vector-graphics-vec)."
+        "changes": "App rendering uses structured coordinates (route_map_positions) derived from the owner's self-drawn 8-linear Busan schematic (easy-subway-busan-v3), not the raw SVG. The self-drawn SVG is now the basemap paint source (build-time compiled, hybrid rendering), while interaction (station tap hit-testing, focus camera, popover anchoring, route highlighting) still trusts the structured coordinates. The compiled basemap `.vec` (vector_graphics binary, compiled from the self-drawn SVG via tools/route-map/compile-basemap-vec.mjs) is now bundled offline (offline.included=true, type vector-graphics-vec)."
       }
     },
     {
@@ -135,7 +135,7 @@
       "name_ko": "대구",
       "app_region": "대구",
       "operator": "오너 자작(self-drawn)",
-      "source_url": "internal:route-map/route-map-defs/svg-sources/easy-subway-daegu-v1.svg",
+      "source_url": "internal:route-map/route-map-defs/svg-sources/easy-subway-daegu-v3.svg",
       "route_map_strategy": {
         "rendering_strategy": "self-drawn-hybrid-basemap",
         "bundled_svg_role": "hybrid-basemap-source",
@@ -154,9 +154,9 @@
       "license": {
         "name": "오너 자작 노선도(self-drawn)",
         "spdx": "LicenseRef-Self-Drawn",
-        "url": "internal:route-map/route-map-defs/svg-sources/easy-subway-daegu-v1.svg",
-        "source": "오너 자작 대구 8선형 정본 도식(easy-subway-daegu-v1)",
-        "source_page": "internal:route-map/route-map-defs/svg-sources/easy-subway-daegu-v1.svg",
+        "url": "internal:route-map/route-map-defs/svg-sources/easy-subway-daegu-v3.svg",
+        "source": "오너 자작 대구 8선형 정본 도식(easy-subway-daegu-v3)",
+        "source_page": "internal:route-map/route-map-defs/svg-sources/easy-subway-daegu-v3.svg",
         "date": "2026-07-12",
         "authors": [
           "오너"
@@ -166,7 +166,7 @@
         "derivativeWorkAllowed": true,
         "redistributionAllowed": true,
         "reviewStatus": "self-drawn-confirmed",
-        "changes": "App rendering uses structured coordinates (route_map_positions) derived from the owner's self-drawn 8-linear Daegu schematic (easy-subway-daegu-v1), not the raw SVG. The self-drawn SVG is now the basemap paint source (build-time compiled, hybrid rendering), while interaction (station tap hit-testing, focus camera, popover anchoring, route highlighting) still trusts the structured coordinates. The compiled basemap `.vec` (vector_graphics binary, compiled from the self-drawn SVG via tools/route-map/compile-basemap-vec.mjs) is now bundled offline (offline.included=true, type vector-graphics-vec)."
+        "changes": "App rendering uses structured coordinates (route_map_positions) derived from the owner's self-drawn 8-linear Daegu schematic (easy-subway-daegu-v3), not the raw SVG. The self-drawn SVG is now the basemap paint source (build-time compiled, hybrid rendering), while interaction (station tap hit-testing, focus camera, popover anchoring, route highlighting) still trusts the structured coordinates. The compiled basemap `.vec` (vector_graphics binary, compiled from the self-drawn SVG via tools/route-map/compile-basemap-vec.mjs) is now bundled offline (offline.included=true, type vector-graphics-vec)."
       }
     },
     {

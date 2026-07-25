@@ -94,7 +94,7 @@ const SEOUL = {
   contentBand: { minY: 300, maxY: 2900 },
 };
 
-// ── 부산(busan): #2011 2단계. 오너 자작 easy-subway-busan-v1. ─────────────────
+// ── 부산(busan): #2011 2단계. 오너 자작 easy-subway-busan-v3(#2068 재제작본). ──
 // 문법 차이(수도권 대비): viewBox 4000×2700, route-line은 노선당 단일 <polyline>
 // (수도권은 파편 stroke 다수), data-line 슬러그가 line1..line4/donghae/bgl,
 // lines.name_ko 접두가 "부산"이나 route_map_positions.region은 "부산권"(불일치),
@@ -106,7 +106,7 @@ const BUSAN = {
   svgSource: {
     sourceId: "owner-self-drawn-sma-schematic",
     sourceName: "오너 자작 부산 8선형 정본 도식",
-    sourceUrl: "internal:route-map/route-map-defs/svg-sources/easy-subway-busan-v1.svg",
+    sourceUrl: "internal:route-map/route-map-defs/svg-sources/easy-subway-busan-v3.svg",
     license: "self-drawn",
     licenseStatus: "confirmed",
     commercialUseAllowed: true,
@@ -151,7 +151,7 @@ const BUSAN = {
   contentBand: { minY: 300, maxY: 6000 },
 };
 
-// ── 대구(daegu): #2011 3단계. 오너 자작 easy-subway-daegu-v1. ─────────────────
+// ── 대구(daegu): #2011 3단계. 오너 자작 easy-subway-daegu-v3(#2068 재제작본). ──
 // 문법 차이(수도권 대비): viewBox 2400×1800, route-line은 노선당 단일 <path>
 // (route-line-1/2/3/daegyeong 그룹), data-line 슬러그가 line1..line3/daegyeong,
 // lines.name_ko 접두가 "대구"이나 route_map_positions.region은 "대구권"(불일치),
@@ -166,7 +166,7 @@ const DAEGU = {
   svgSource: {
     sourceId: "owner-self-drawn-sma-schematic",
     sourceName: "오너 자작 대구 8선형 정본 도식",
-    sourceUrl: "internal:route-map/route-map-defs/svg-sources/easy-subway-daegu-v1.svg",
+    sourceUrl: "internal:route-map/route-map-defs/svg-sources/easy-subway-daegu-v3.svg",
     license: "self-drawn",
     licenseStatus: "confirmed",
     commercialUseAllowed: true,
