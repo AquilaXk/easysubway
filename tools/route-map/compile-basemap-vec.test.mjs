@@ -683,10 +683,17 @@ test("extractOwnerLabels: 5권역 실 SVG에서 ordinary/transfer/terminal 개�
 });
 
 // #2068 대전·광주 v3 반입 회귀 가드 — 컴파일러를 손댈 때(권역별 canonicalRules
-// 확장·지도 본문 래퍼 흡수·rail-service-marks 반입) 미변경 3권역이 정말 불변인지
-// 커밋된 산출물과 직접 대조한다. 라벨 sidecar와 정규화 SVG(=.vec 입력) 양쪽을
+// 확장·지도 본문 래퍼 흡수·rail-service-marks 반입) 산출물이 정말 그대로인지
+// 커밋된 파일과 직접 대조한다. 라벨 sidecar와 정규화 SVG(=.vec 입력) 양쪽을
 // 본다 — 둘 다 같으면 .vec 바이트도 같다(결정적 컴파일).
-test("미변경 권역(seoul·busan·daegu)의 오너 라벨·정규화 SVG는 커밋된 산출물과 완전히 동일하다", () => {
+//
+// **5권역 전부**를 돈다. 미변경 3권역(seoul·busan·daegu)은 "건드리지 않았음"을,
+// 변경 2권역(daejeon·gwangju)은 "의도한 값으로 고정됐음"을 각각 고정한다 —
+// 이 PR이 새로 도입한 두 축이 정확히 sidecar의 station 키(권역별
+// OWNER_LABEL_CANONICAL_RULES)와 x/y(MAP_WRAPPER_LAYER_IDS의 대전
+// translate(0 88) 흡수)를 결정하므로, 두 권역을 빼면 그 두 축의 회귀를
+// node 층에서 아무도 못 잡는다(개수·부가 필드만 보던 상태).
+test("5권역 오너 라벨 sidecar·정규화 SVG가 커밋된 산출물과 완전히 동일하다", () => {
   const root = path.resolve(import.meta.dirname, "../..");
   const manifest = JSON.parse(
     readFileSync(
@@ -703,23 +710,60 @@ test("미변경 권역(seoul·busan·daegu)의 오너 라벨·정규화 SVG는 �
       "utf8",
     ),
   );
-  for (const id of ["seoul", "busan", "daegu"]) {
+  for (const id of ["seoul", "busan", "daegu", "daejeon", "gwangju"]) {
     const map = manifest.maps.find((entry) => entry.id === id);
     assert.ok(map, `${id}: build manifest 항목 없음`);
     const source = readFileSync(path.join(root, map.source), "utf8");
     assert.deepEqual(
       markLineTerminalBadgeEntries(extractOwnerLabels(source, id), source),
       sidecar.regions[id],
-      `${id}: 오너 라벨 sidecar가 달라졌습니다(미변경 권역 회귀)`,
+      `${id}: 오너 라벨 sidecar가 달라졌습니다(station 키·x/y 포함)`,
     );
     assert.equal(
       createHash("sha256")
         .update(normalizeSvgForCompile(source))
         .digest("hex"),
       map.normalizedSvgSha256,
-      `${id}: 컴파일 입력(정규화 SVG)이 달라졌습니다(미변경 권역 회귀)`,
+      `${id}: 컴파일 입력(정규화 SVG)이 달라졌습니다`,
     );
   }
+});
+
+// #2068 대전·광주 v3: canonicalRules 변환이 걸린 4건이 **카탈로그 표기**로
+// 떨어지는지 직접 못 박는다. 위 sidecar deepEqual이 값 전체를 고정하지만, 그
+// 고정값이 왜 그 문자열이어야 하는지(=카탈로그와 매칭되어야 앱이 오너 라벨로
+// 렌더한다)는 드러나지 않는다 — 변환 전 마크업 원문이 키로 남으면 그 역만
+// 조용히 폴백 미니 크기가 되는 #2068 광주송정역 사례라, 원문 표기가 키에
+// 없다는 것까지 함께 고정한다.
+test("대전·광주 sidecar 키는 마크업 원문이 아니라 카탈로그 표기다(canonicalRules 변환 4건)", () => {
+  const root = path.resolve(import.meta.dirname, "../..");
+  const sidecar = JSON.parse(
+    readFileSync(
+      path.join(
+        root,
+        "apps/mobile/assets/datapacks/metro_map_pack/basemap/labels.json",
+      ),
+      "utf8",
+    ),
+  );
+  // [권역, 마크업 data-full-official-name, 카탈로그 표기]
+  const conversions = [
+    ["daejeon", "대전역", "대전"],
+    ["gwangju", "김대중컨벤션센터(마륵)", "김대중컨벤션센터"],
+    ["gwangju", "문화전당(구도청)", "문화전당"],
+    ["gwangju", "학동·증심사입구", "학동증심사입구"],
+  ];
+  for (const [id, markup, catalog] of conversions) {
+    const keys = new Set(sidecar.regions[id].map((entry) => entry.station));
+    assert.ok(keys.has(catalog), `${id}: 카탈로그 표기 '${catalog}' 키가 없다`);
+    assert.ok(
+      !keys.has(markup),
+      `${id}: 마크업 원문 '${markup}'이 키로 남았다(권역 규칙 미적용 회귀)`,
+    );
+  }
+  // 나머지 키는 변환 없이 마크업 표기 그대로다(대전 21 / 광주 17).
+  assert.equal(sidecar.regions.daejeon.length, 22);
+  assert.equal(sidecar.regions.gwangju.length, 20);
 });
 
 test("build manifest가 source·normalized·vec hash와 viewBox를 결합한다", () => {
@@ -748,7 +792,12 @@ test("build manifest가 source·normalized·vec hash와 viewBox를 결합한다"
     assert.equal(map.normalizedSvgSha256, hash(normalized));
     assert.equal(map.compiledVectorSha256, hash(vec));
     assert.equal(map.viewBox.length, 4);
-    const ownerLabels = extractOwnerLabels(source.toString("utf8"));
+    // #2068: 프로덕션 경로(main())가 extractOwnerLabels(sourceText, region.id)로
+    // 권역 규칙을 태우므로 계약 테스트도 같은 인자를 넘겨야 한다. regionId를
+    // 빼면 daejeon·gwangju는 data-full-official-name 원문이 키가 돼(대전역·
+    // 학동·증심사입구·문화전당(구도청)·김대중컨벤션센터(마륵)) 프로덕션과 다른
+    // 코드 경로를 검증하게 된다 — 개수만 비교해 통과하던 사각지대.
+    const ownerLabels = extractOwnerLabels(source.toString("utf8"), map.id);
     assert.equal(map.ownerLabelCount, ownerLabels.length);
   }
 
