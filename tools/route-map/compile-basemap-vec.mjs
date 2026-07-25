@@ -624,6 +624,26 @@ function applyMapScaleToObstacles(obstacles, svgText) {
   }));
 }
 
+// 표장 레이어(service-tags-layer·rail-transfer-layer) 자신의 transform.
+//
+// #2068 오너 v3 실측 회귀(2026-07-25): 표장 bbox 합성이 `<g class="service-tag">`
+// 자신의 transform에서 시작해, 그 부모인 레이어 <g>의 transform을 빠뜨렸다.
+// 대구 service-tags-layer는 matrix(1.2543717,0,0,1.1621081,-619.36561,-141.97865)
+// 를 갖고 있어 동대구역 KTX·SRT 표장 장애물이 실제 렌더 위치에서 x +58~62px
+// 어긋나고 크기도 1/1.25배로 축소돼, 오너 도식에서는 4.2px 떨어져 있는 동대구역
+// 환승 라벨과 유령 겹침(18px)을 만들었다(Chrome getBBox 실측 대조로 확정).
+// 레이어 transform을 체인 최외곽에 합성한다.
+function layerOwnTransform(layerSlice) {
+  const openTag = layerSlice.match(/^<g\b[^>]*>/)?.[0] ?? "";
+  return (openTag.match(/\btransform="([^"]*)"/) || [])[1] ?? "";
+}
+
+// SVG transform 속성값들을 바깥→안 순서로 이어 붙인다(SVG `transform="A B"`는
+// A·B 합성이고 parseTransformChain도 같은 순서로 곱한다).
+function composeTransformValues(...values) {
+  return values.filter(Boolean).join(" ");
+}
+
 // service-tag(KTX·SRT·AIR 표장) 장애물 목록(#2068 마감 라운드 item 3) — 라벨
 // solver가 이 표장 위에 라벨을 얹지 않도록 회피 대상으로 쓴다. 각
 // `<g class="service-tag">` 서브그룹의 transform 체인(중첩 `<g transform>`
@@ -653,6 +673,7 @@ export function extractServiceTagObstacles(svgText) {
   }
   if (layerEnd < 0) return [];
   const layer = svgText.slice(groupStart, layerEnd);
+  const layerTransform = layerOwnTransform(layer);
 
   const obstacles = [];
   // 속성 순서 무관용(#2068 마감): 소스마다 여는 <g> 태그의 속성 나열 순서가
@@ -694,7 +715,7 @@ export function extractServiceTagObstacles(svgText) {
     };
     collectShapeBoundsRecursive(
       block,
-      parseTransformChain(rootTransform),
+      parseTransformChain(composeTransformValues(layerTransform, rootTransform)),
       visit,
     );
     if (!Number.isFinite(minX)) {
@@ -738,6 +759,7 @@ export function extractRailTransferChipObstacles(svgText) {
   }
   if (layerEnd < 0) return [];
   const layer = svgText.slice(groupStart, layerEnd);
+  const layerTransform = layerOwnTransform(layer);
 
   const obstacles = [];
   const tagOpenRe = /<g\b[^>]*>/g;
@@ -777,7 +799,7 @@ export function extractRailTransferChipObstacles(svgText) {
     };
     collectShapeBoundsRecursive(
       block,
-      parseTransformChain(rootTransform),
+      parseTransformChain(composeTransformValues(layerTransform, rootTransform)),
       visit,
     );
     if (!Number.isFinite(minX)) continue; // 시각 내용 없는 빈 chip — 회피 대상 아님.

@@ -764,6 +764,65 @@ test("extractServiceTagObstacles: main-map-scaled-layer 안 chip은 mapScale·ma
   assert.equal(obstacle.halfHeight, 100 * 0.455);
 });
 
+test("extractServiceTagObstacles: 표장 레이어 자신의 transform도 체인에 합성한다", () => {
+  // 레이어 <g>와 표장 <g>가 각자 transform을 가지면 SVG 렌더는 둘을 합성한다
+  // (레이어가 바깥). 레이어 transform을 빠뜨리면 obstacle이 실제 렌더 위치에서
+  // 어긋난다(#2068 대구 동대구역 KTX·SRT 유령 겹침의 원인).
+  const svgText = `
+    <svg>
+      <g id="service-tags-layer" transform="matrix(2,0,0,3,100,200)">
+        <g id="service-tag-ktx-1" class="service-tag" data-station="테스트역"
+           transform="translate(10 20)">
+          <rect x="0" y="0" width="5" height="7" />
+        </g>
+      </g>
+    </svg>`;
+  const [obstacle] = extractServiceTagObstacles(svgText);
+  // 로컬 rect [0,5]×[0,7] → tag translate → 레이어 matrix.
+  // x: 2*(0+10)+100 = 120 … 2*(5+10)+100 = 130 → center 125 halfWidth 5
+  // y: 3*(0+20)+200 = 260 … 3*(7+20)+200 = 281 → center 270.5 halfHeight 10.5
+  assert.equal(obstacle.station, "테스트역");
+  assert.equal(obstacle.x, 125);
+  assert.equal(obstacle.y, 270.5);
+  assert.equal(obstacle.halfWidth, 5);
+  assert.equal(obstacle.halfHeight, 10.5);
+});
+
+test("extractServiceTagObstacles: 대구 동대구역 KTX·SRT 표장 bbox가 Chrome 실측과 일치한다", () => {
+  // Chrome(headless, getBBox/getScreenCTM) 실측 — root viewBox 사용자 좌표.
+  // 이 값은 오너 도식이 실제로 렌더하는 위치이며, 동대구역 환승 라벨 실측
+  // bbox(minX=2344.771)와 4.19px 떨어져 있어 겹치지 않는다.
+  const svgText = readFileSync(
+    path.join(
+      import.meta.dirname,
+      "route-map-defs/svg-sources/easy-subway-daegu-v3.svg",
+    ),
+    "utf8",
+  );
+  const [obstacle] = extractServiceTagObstacles(svgText);
+  assert.equal(obstacle.station, "동대구역");
+  const measured = {
+    minX: 2277.7148,
+    minY: 839.9228,
+    maxX: 2340.5828,
+    maxY: 866.0353,
+  };
+  const actual = {
+    minX: obstacle.x - obstacle.halfWidth,
+    minY: obstacle.y - obstacle.halfHeight,
+    maxX: obstacle.x + obstacle.halfWidth,
+    maxY: obstacle.y + obstacle.halfHeight,
+  };
+  for (const edge of ["minX", "minY", "maxX", "maxY"]) {
+    assert.ok(
+      Math.abs(actual[edge] - measured[edge]) < 0.01,
+      `${edge}: 산정 ${actual[edge]} vs Chrome 실측 ${measured[edge]}`,
+    );
+  }
+  // 표장 오른쪽 끝이 라벨 왼쪽 끝(실측 2344.771)보다 왼쪽 — 겹침 없음.
+  assert.ok(actual.maxX < 2344.771);
+});
+
 test("extractServiceTagObstacles·extractRailTransferChipObstacles: main-map-scaled-layer가 없는 권역(busan·daegu·daejeon·gwangju)은 mapScale=1로 obstacle 좌표가 항등 변환된다(회귀 가드)", () => {
   const svgSourceDir = path.join(
     import.meta.dirname,
