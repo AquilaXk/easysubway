@@ -1,4 +1,20 @@
 #!/usr/bin/env node
+// #2138 전국 coverage 재크롤 파이프라인 — search plan 생성기 + 공공기관 API 실조회 collector.
+//
+// 두 단계로 쓴다.
+//   1) plan 생성(오프라인): --targets/--fixture/--source-candidates/--inventory → plan.json
+//      --inventory의 admission을 반영해 이미 입고된 requirement를 재크롤 대상에서 뺀다.
+//   2) 재크롤(live): --plan/--output → resolutions.json
+//      DATA_GO_KR_SERVICE_KEY가 필요하며 자격증명은 `node --env-file=<.env> <이 스크립트>`로만 주입한다.
+//
+// 재발행 절차(언제 live probe가 필요한가):
+//   - inventory admission만 늘어난 PR은 두 아티팩트를 재발행하지 않아도 된다. 계획이 미admission
+//     requirement를 전부 덮고 있으면 되고(nationwide-public-api-coverage-evidence.test.mjs가 포함 관계로
+//     검증), 계획에 남은 admitted entry는 다음 정기 재생성에서 정리된다.
+//   - 계획을 재생성하면 resolutions의 searchPlanSha256이 어긋나 게이트(report-coverage-gaps.mjs)가
+//     throw하므로, 계획과 resolutions는 반드시 같은 커밋에서 함께 재발행한다(= live 재크롤 필요).
+//   - 재발행 시 파일명 날짜를 올리고 datapack-release.yml 참조 경로, release gate refreshBinding
+//     SHA-256 pin, tally ledger(build-nationwide-coverage-tally.mjs)를 같은 커밋에서 갱신한다.
 import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -92,7 +108,7 @@ export function buildNationwidePublicApiSearchPlan({ targets, fixture, sourceCan
   // inventory를 주면 이미 admission된 requirement는 재크롤 대상에서 뺀다(생략하면 전량 감사 plan).
   const admitted = inventory === undefined
     ? new Set()
-    : admittedRequirementKeys(targets.activeLineScopes, launchDomains, inventory);
+    : admittedRequirementKeys(targets, launchDomains, inventory);
   const knownProviderCandidatesByDomain = mergeBuiltinProviderCandidates(indexKnownProviderCandidates(sourceCandidates));
   const entries = targets.activeLineScopes.flatMap((scope) => domains
     .filter((sourceDomain) => !admitted.has(requirementKey(scope, sourceDomain)))
@@ -139,29 +155,45 @@ export function buildNationwidePublicApiSearchPlan({ targets, fixture, sourceCan
 // admission 판정 규칙은 게이트 report-coverage-gaps.mjs coveredField(strictLineScope=true,
 // requireProvenance=false)·tally ledger build-nationwide-coverage-tally.mjs의 INVENTORY_ADMITTED와 같다.
 // 빈 lineIds는 와일드카드가 아니다. 두 축이 어긋나지 않는지는 evidence 테스트가 tracked ledger와 대조한다.
-function admittedRequirementKeys(activeLineScopes, launchDomains, inventory) {
-  if (!inventory || typeof inventory !== "object" || Array.isArray(inventory) || !Array.isArray(inventory.sources)) {
-    throw new Error("source inventory sources are required");
+// 입력 검증도 tally normalizeSource와 같은 수준(schemaVersion·빈 배열·미등록 id fail closed)으로 맞춘다 —
+// 오타를 조용한 미매칭(=재크롤 과다)으로 흘리면 두 도구의 admitted 판정이 갈린 채로 진행된다.
+function admittedRequirementKeys(targets, launchDomains, inventory) {
+  if (!inventory || typeof inventory !== "object" || Array.isArray(inventory)) {
+    throw new Error("source inventory must be an object");
   }
+  if (inventory.schemaVersion !== 1) throw new Error("source inventory schemaVersion must be 1");
+  if (!Array.isArray(inventory.sources) || inventory.sources.length === 0) {
+    throw new Error("source inventory sources must be a non-empty array");
+  }
+  const targetIndex = coverageTargetIndex(targets);
   const sources = inventory.sources.map((source, index) => {
     const label = `source inventory sources[${index}]`;
     const coverage = source?.coverageScope;
     if (!coverage || typeof coverage !== "object" || Array.isArray(coverage)) {
       throw new Error(`${label}.coverageScope must be an object`);
     }
-    return {
-      regionIds: coverageIds(coverage.regionIds, `${label}.coverageScope.regionIds`),
-      operatorIds: coverageIds(coverage.operatorIds, `${label}.coverageScope.operatorIds`),
-      lineIds: coverageIds(coverage.lineIds, `${label}.coverageScope.lineIds`),
-      sourceDomains: coverageIds(coverage.sourceDomains, `${label}.coverageScope.sourceDomains`),
-      fields: coverageIds(source.fieldsProvided ?? source.fields, `${label}.fieldsProvided`),
+    const normalized = {
+      regionIds: requiredIds(coverage.regionIds, `${label}.coverageScope.regionIds`),
+      operatorIds: requiredIds(coverage.operatorIds, `${label}.coverageScope.operatorIds`),
+      lineIds: optionalIds(coverage.lineIds, `${label}.coverageScope.lineIds`),
+      sourceDomains: requiredIds(coverage.sourceDomains, `${label}.coverageScope.sourceDomains`),
+      fields: requiredIds(source.fieldsProvided ?? source.fields, `${label}.fieldsProvided`),
     };
+    validateKnownIds(normalized.regionIds, targetIndex.regionIds, `${label}.coverageScope.regionIds`, "region");
+    validateKnownIds(normalized.operatorIds, targetIndex.operatorIds, `${label}.coverageScope.operatorIds`, "operator");
+    validateKnownIds(normalized.lineIds, targetIndex.lineIds, `${label}.coverageScope.lineIds`, "line");
+    validateKnownIds(
+      normalized.sourceDomains,
+      targetIndex.sourceDomains,
+      `${label}.coverageScope.sourceDomains`,
+      "source domain",
+    );
+    return normalized;
   });
   const admitted = new Set();
-  for (const scope of activeLineScopes) {
+  for (const scope of targets.activeLineScopes) {
     for (const domain of launchDomains) {
-      const requiredFields = coverageIds(domain.requiredFields, `${domain.id}.requiredFields`);
-      if (requiredFields.length === 0) throw new Error(`${domain.id}.requiredFields is required`);
+      const requiredFields = requiredIds(domain.requiredFields, `${domain.id}.requiredFields`);
       const threshold = domain.blockingThreshold?.minimumOfficialFieldCoverageRatio ?? 1;
       const coveredFields = requiredFields.filter((field) => sources.some((source) => (
         source.regionIds.includes(scope.regionId)
@@ -178,7 +210,44 @@ function admittedRequirementKeys(activeLineScopes, launchDomains, inventory) {
   return admitted;
 }
 
-function coverageIds(value, label) {
+// 게이트·tally의 coverageTargetIndex와 같은 known id 집합.
+function coverageTargetIndex(targets) {
+  if (!Array.isArray(targets.regions) || targets.regions.length === 0) {
+    throw new Error("coverage targets regions must be a non-empty array");
+  }
+  return {
+    regionIds: new Set([
+      ...targets.regions.map((region) => region.id),
+      ...optionalIds(targets.knownRegionIds, "targets.knownRegionIds"),
+    ]),
+    operatorIds: new Set([
+      ...targets.regions.flatMap((region) => region.operatorIds ?? []),
+      ...targets.activeLineScopes.map((scope) => scope.operatorId),
+      ...optionalIds(targets.knownOperatorIds, "targets.knownOperatorIds"),
+    ]),
+    lineIds: new Set([
+      ...targets.activeLineScopes.map((scope) => scope.lineId),
+      ...(targets.inactiveLineExclusions ?? []).map((exclusion) => exclusion.lineId),
+    ]),
+    sourceDomains: new Set([
+      ...targets.requiredSourceDomains.map((domain) => domain.id),
+      ...optionalIds(targets.knownSourceDomains, "targets.knownSourceDomains"),
+    ]),
+  };
+}
+
+function validateKnownIds(values, knownValues, label, valueLabel) {
+  for (const value of values) {
+    if (!knownValues.has(value)) throw new Error(`${label} contains undefined ${valueLabel}: ${value}`);
+  }
+}
+
+function requiredIds(value, label) {
+  if (optionalIds(value, label).length === 0) throw new Error(`${label} must be a non-empty string array`);
+  return value;
+}
+
+function optionalIds(value, label) {
   if (value === undefined) return [];
   if (!Array.isArray(value) || value.some((id) => typeof id !== "string" || id.trim() === "")) {
     throw new Error(`${label} must be a string array`);
@@ -341,7 +410,7 @@ function indexKnownProviderCandidates(sourceCandidates) {
     const domain = typeof candidate.domain === "string" ? candidate.domain.trim() : "";
     const endpointValue = candidate.operation?.endpoint ?? candidate.requestUrl;
     if (!id || !domain || typeof endpointValue !== "string") continue;
-    validateCoverageScope(candidate.coverageScope, `source candidates[${index}].coverageScope`);
+    validateCoverageScope(candidate.coverageScope, `source candidates[${index}].coverageScope`, domain);
     let endpoint;
     try {
       endpoint = new URL(endpointValue);
@@ -365,11 +434,13 @@ function isKnownProviderApiEndpoint(endpoint) {
     || (endpoint.protocol === "http:" && KNOWN_HTTP_PROVIDER_HOSTS.has(endpoint.host));
 }
 
-function validateCoverageScope(scope, label) {
+function validateCoverageScope(scope, label, candidateDomain) {
   if (scope === undefined) return;
   if (!scope || typeof scope !== "object" || Array.isArray(scope)) throw new Error(`${label} is invalid`);
   // sourceDomains는 source-inventory와 같은 coverageScope 형식을 쓰는 후보 문서를 받기 위한 허용 필드다.
-  // 도메인 색인의 정본은 candidate.domain이므로 이 필드는 scope 매칭에 쓰지 않는다.
+  // 도메인 색인의 정본은 candidate.domain이며 이 필드는 scope 매칭에 쓰지 않는다 — 대신 두 값의 정합을
+  // fail closed로 강제한다. 불일치를 허용하면 해당 도메인을 제공하지 않는 후보가 requirement를
+  // KNOWN_PROVIDER_REQUIRES_LINE_VALIDATION으로 무기한 붙잡아 미해결로 남긴다.
   const allowedFields = new Set(["regionIds", "operatorIds", "lineIds", "sourceDomains"]);
   if (Object.keys(scope).some((field) => !allowedFields.has(field))) throw new Error(`${label} is invalid`);
   for (const field of allowedFields) {
@@ -379,6 +450,9 @@ function validateCoverageScope(scope, label) {
       || scope[field].some((id) => typeof id !== "string" || id.trim() === "")
       || new Set(scope[field]).size !== scope[field].length
     )) throw new Error(`${label}.${field} is invalid`);
+  }
+  if (scope.sourceDomains !== undefined && !scope.sourceDomains.includes(candidateDomain)) {
+    throw new Error(`${label}.sourceDomains must include the candidate domain: ${candidateDomain}`);
   }
 }
 

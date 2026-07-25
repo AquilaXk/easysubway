@@ -37,21 +37,29 @@ test("전국 공공데이터 재감사는 4건만 공식 미지원으로 닫고 
   assert.doesNotMatch(resolutionsText, /"(?:serviceKey|secret|token)"\s*:/i);
   assert.doesNotMatch(resolutionsText, /Infuser\s+/i);
 
-  // 재크롤 대상은 tally ledger의 미admission requirement와 정확히 같아야 한다. 이미 입고된 requirement가
-  // 재크롤 목록에 남으면 다음 배치 우선순위가 재작업을 지시하게 되므로 두 산출물을 서로 대조해 고정한다.
+  // 재크롤 계획은 tally ledger의 미admission requirement를 전부 덮어야 한다(포함 관계). 덮지 못한
+  // requirement는 재크롤 대상에서 사라져 우선순위 산정에서 누락되므로 fail closed다. 반대로 이미
+  // 입고된 requirement가 계획에 남는 것은 허용한다 — 정확일치를 요구하면 admission 배치마다 계획
+  // 재생성이 강제되고, 계획이 바뀌면 searchPlanSha256 때문에 resolutions까지 live probe로 재발행해야 한다.
+  // 잔존 admitted entry는 다음 정기 재생성에서 정리한다(ledger regeneration.pairedUpdateKo 참조).
   const ledger = JSON.parse(await readFile(path.join(root, ledgerPath), "utf8"));
   const planKeys = new Set(plan.entries.map(requirementKey));
-  const admittedKeys = ledger.launchRequired.requirements
-    .filter(({ status }) => status === "INVENTORY_ADMITTED")
-    .map(requirementKey);
-  assert.equal(admittedKeys.length, ledger.launchRequired.inventoryAdmittedCount);
-  assert.equal(planKeys.size + admittedKeys.length, ledger.launchRequired.totalCount);
-  assert.deepEqual(admittedKeys.filter((key) => planKeys.has(key)), []);
+  const admittedKeys = new Set(
+    ledger.launchRequired.requirements
+      .filter(({ status }) => status === "INVENTORY_ADMITTED")
+      .map(requirementKey),
+  );
+  assert.equal(admittedKeys.size, ledger.launchRequired.inventoryAdmittedCount);
   assert.deepEqual(
     ledger.launchRequired.requirements
       .filter(({ status }) => status !== "INVENTORY_ADMITTED")
       .filter((requirement) => !planKeys.has(requirementKey(requirement)))
       .map(requirementKey),
+    [],
+  );
+  // 공식 미지원 판정과 admission은 서로 반대 주장이므로 한 requirement에 겹치면 fail closed다.
+  assert.deepEqual(
+    resolutions.entries.map(requirementKey).filter((key) => admittedKeys.has(key)),
     [],
   );
 
