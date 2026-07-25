@@ -107,8 +107,9 @@
         "renamedAt": "2024-02-29",
         "officialUrl": "https://www.data.go.kr/data/15099316/fileData.do",
         "note": "서울특별시고시 제2024-109호(서울시보 제3956호, 2024-02-29 확정고시·시행)로 7호선 뚝섬유원지역이 자양(뚝섬한강공원)역이 됐다. 공식 역사 좌표 파일(2025-08-14 기준)은 변경 전 표기를 유지하며 건대입구와 청담 사이 같은 위치다.",
-        "crossCheck": "PACK_TOPOLOGY_SINGLE_NAME",
-        "packTopologyPath": "tools/datapack/sources/capital-route-topology-20260724.json"
+        "crossCheck": "OFFICIAL_FILE_STALE_NAME",
+        "packTopologyPath": "tools/datapack/sources/capital-route-topology-20260724.json",
+        "officialRawPath": "tools/datapack/fixtures/seoul-route-map-positions-raw/data-go-15099316.csv"
       }
     },
     {
@@ -121,7 +122,7 @@
         "renamedAt": "2024-01-29",
         "officialUrl": "https://www.data.go.kr/data/15041326/fileData.do",
         "note": "용인종합운동장 폐장에 따라 2024-01-29 시행으로 에버라인 운동장·송담대역이 용인중앙시장역이 됐다. 공식 역위치 파일(2024-10-15 기준)과 MOLIT roster는 변경 전 표기를 유지하고, admission에서 공식 rename join으로 결속했다(tools/datapack/collect-kric-capital-light-rail-route-map-positions.mjs).",
-        "crossCheck": "PACK_TOPOLOGY_SINGLE_NAME",
+        "crossCheck": "PACK_TOPOLOGY_ADOPTED_NAME",
         "packTopologyPath": "tools/datapack/sources/capital-route-topology-20260724.json"
       }
     }

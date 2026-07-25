@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
@@ -92,6 +93,12 @@ async function loadAuditInputs() {
   for (const topologyPath of [...new Set(topologyPaths), CAPITAL_TOPOLOGY_PATH]) {
     topologiesByPath.set(topologyPath, await readJson(topologyPath));
   }
+  const rawSourcesByPath = new Map();
+  const rawPaths = exemptions.approvedStationNameAliases
+    .map((alias) => alias.evidence?.officialRawPath).filter(Boolean);
+  for (const rawPath of new Set(rawPaths)) {
+    rawSourcesByPath.set(rawPath, await readFile(path.join(root, rawPath)));
+  }
   return {
     inventory,
     targets,
@@ -99,7 +106,31 @@ async function loadAuditInputs() {
     rosters: parseMolitLineOperatorRosters(molitCsvBytes),
     snapshotsByPath,
     topologiesByPath,
+    rawSourcesByPath,
   };
+}
+
+const sha256 = (value) => createHash("sha256").update(value).digest("hex");
+
+// topology를 고쳐도 무결성 검사를 통과시키려면 선언 해시를 같이 다시 계산해야 한다.
+// 표기 방향 판정 자체를 시험할 때만 쓴다.
+function rehashTopology(topology) {
+  for (const line of topology.lines) {
+    line.stationCount = line.scope.length;
+    line.contentSha256 = sha256(JSON.stringify({ scope: line.scope, edges: line.edges }));
+  }
+  topology.contentSha256 = sha256(JSON.stringify({
+    lines: topology.lines.map(({ lineId, edgeCount, stationCount, contentSha256, rawSha256, datasetId }) => ({
+      lineId,
+      edgeCount,
+      stationCount,
+      contentSha256,
+      rawSha256,
+      datasetId,
+    })),
+    topologyGaps: topology.topologyGaps,
+  }));
+  return topology;
 }
 
 // 위반은 별칭 → 결측 ledger → containment 순서로 쌓이므로 나열 순서가 결정론적이다.
@@ -315,16 +346,93 @@ test("snapshot 수집 시점보다 늦은 개명일은 거부된다 (#2516)", as
   assert.deepEqual(violationKinds(result), ["ALIAS_RENAME_DATE_OUT_OF_RANGE", "MISSING_STATION"]);
 });
 
-test("pack topology가 두 표기를 모두 실으면 개명 별칭이 거부된다 (#2516)", async () => {
+test("pack topology가 snapshot 구표기도 실으면 개명 별칭이 거부된다 (#2516)", async () => {
   const inputs = await loadAuditInputs();
   const topology = structuredClone(inputs.topologiesByPath.get(CAPITAL_TOPOLOGY_PATH));
   const line = topology.lines.find(({ lineId }) => lineId === "line-15b3b8a93259");
   line.scope = [...line.scope, { ...line.scope[0], stationName: "뚝섬유원지" }];
+  const topologiesByPath = new Map(inputs.topologiesByPath).set(CAPITAL_TOPOLOGY_PATH, rehashTopology(topology));
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, topologiesByPath });
+
+  // 해시를 다시 맞추면 lineage 선언과 어긋나므로 다른 scope 위반도 함께 난다.
+  assert.ok(violationKinds(result).includes("ALIAS_RENAME_SNAPSHOT_NAME_PRESENT"));
+  assert.ok(violationKinds(result).includes("MISSING_STATION"));
+});
+
+test("pack topology에서 역을 지워 pack 결측을 세탁할 수 없다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const topology = structuredClone(inputs.topologiesByPath.get(CAPITAL_TOPOLOGY_PATH));
+  const line = topology.lines.find(({ lineId }) => lineId === "line-2b2d9eaa53d0");
+  line.scope = line.scope.filter(({ stationName }) => stationName !== "암사역사공원");
   const topologiesByPath = new Map(inputs.topologiesByPath).set(CAPITAL_TOPOLOGY_PATH, topology);
 
   const result = auditRouteMapCoverageScopes({ ...inputs, topologiesByPath });
 
-  assert.deepEqual(violationKinds(result), ["ALIAS_RENAME_TOPOLOGY_AMBIGUOUS", "MISSING_STATION"]);
+  assert.deepEqual(violationKinds(result), ["LEDGER_PACK_TOPOLOGY_CONTENT_MISMATCH", "MISSING_STATION"]);
+});
+
+test("topology 해시를 맞춰도 admission lineage 선언과 다르면 거부된다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const topology = structuredClone(inputs.topologiesByPath.get(CAPITAL_TOPOLOGY_PATH));
+  const line = topology.lines.find(({ lineId }) => lineId === "line-828f04afc588");
+  line.scope = line.scope.filter(({ stationName }) => stationName !== "용인중앙시장");
+  const topologiesByPath = new Map(inputs.topologiesByPath).set(CAPITAL_TOPOLOGY_PATH, rehashTopology(topology));
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, topologiesByPath });
+
+  assert.ok(violationKinds(result).includes("ALIAS_PACK_TOPOLOGY_LINEAGE_MISMATCH"));
+});
+
+test("snapshot 표기 오염은 모든 교차 근거 경로에서 거부된다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const snapshot = structuredClone(inputs.snapshotsByPath.get(SEOUL_SNAPSHOT_PATH));
+  // 4호선 쌍문을 오수집 표기로 오염시킨 뒤 개명으로 세탁하려는 시도.
+  for (const position of snapshot.positions) {
+    if (position.lineId === "seoul-4" && position.stationName === "쌍문") {
+      position.stationName = "쌍문사거리";
+    }
+  }
+  const snapshotsByPath = new Map(inputs.snapshotsByPath).set(SEOUL_SNAPSHOT_PATH, snapshot);
+  const laundering = {
+    scopeKey: "capital:seoul-metro:seoul-4",
+    snapshotStationName: "쌍문사거리",
+    rosterStationName: "쌍문",
+    reasonCode: "OFFICIAL_RENAME",
+    evidence: {
+      issue: 2516,
+      renamedAt: "2024-01-01",
+      officialUrl: "https://www.data.go.kr/data/15099316/fileData.do",
+      packTopologyPath: CAPITAL_TOPOLOGY_PATH,
+      officialRawPath: "tools/datapack/fixtures/seoul-route-map-positions-raw/data-go-15099316.csv",
+      note: "오염 세탁 시도",
+    },
+  };
+  const rejected = {
+    ROSTER_SUBNAME: "ALIAS_RENAME_SUBNAME_ABSENT",
+    PACK_TOPOLOGY_ADOPTED_NAME: "ALIAS_RENAME_ADOPTED_NAME_ABSENT",
+    OFFICIAL_FILE_STALE_NAME: "ALIAS_RENAME_RAW_NAME_ABSENT",
+  };
+
+  for (const [crossCheck, expected] of Object.entries(rejected)) {
+    const exemptions = structuredClone(inputs.exemptions);
+    exemptions.approvedStationNameAliases.push({
+      ...laundering,
+      evidence: { ...laundering.evidence, crossCheck },
+    });
+    const result = auditRouteMapCoverageScopes({ ...inputs, exemptions, snapshotsByPath });
+    assert.deepEqual(violationKinds(result), [expected, "MISSING_STATION"], `crossCheck=${crossCheck}`);
+  }
+});
+
+test("공식 원문에 결속되지 않은 원본 경로는 개명 근거가 되지 못한다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const exemptions = structuredClone(inputs.exemptions);
+  delete aliasNamed(exemptions, "뚝섬유원지").evidence.officialRawPath;
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, exemptions });
+
+  assert.deepEqual(violationKinds(result), ["ALIAS_RENAME_RAW_SOURCE_UNBOUND", "MISSING_STATION"]);
 });
 
 test("quarantine 기록이 없는 결측 ledger 항목은 거부된다 (#2516)", async () => {

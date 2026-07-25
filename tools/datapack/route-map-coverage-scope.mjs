@@ -14,6 +14,8 @@
 // - issue 번호와 note 서술의 내용은 검증하지 않는다. 형식과 존재만 강제한다.
 // - renamedAt은 형식과 상한(snapshot capturedAt)만 본다. 개명 사실 자체는 crossCheck로 확인한다.
 
+import { createHash } from "node:crypto";
+
 export const ROUTE_MAP_DOMAIN = "route_map_positions";
 
 const ALIAS_REASON_CODES = Object.freeze([
@@ -29,8 +31,11 @@ const GAP_REASON_CODES = Object.freeze([
 ]);
 
 // OFFICIAL_RENAME은 URL·날짜만으로는 세탁이 가능하므로 기계적 교차 근거를 하나 요구한다.
-const ALIAS_CROSS_CHECKS = Object.freeze(["ROSTER_SUBNAME", "PACK_TOPOLOGY_SINGLE_NAME"]);
-
+// 표기 방향을 분리한다. XOR 하나로 묶으면 정당한 개명과 snapshot 표기 오염이 같은 시그니처가 된다.
+// - ROSTER_SUBNAME: roster 원문이 snapshot측 표기를 부역명으로 병기한다.
+// - PACK_TOPOLOGY_ADOPTED_NAME: pack topology가 snapshot측 신표기를 채택하고 roster측 구표기를 싣지 않는다.
+// - OFFICIAL_FILE_STALE_NAME: pack topology·roster는 신표기인데 admitted snapshot만 구표기다.
+//   이 방향은 오염과 구분되지 않으므로 공식 원문 바이트(rawSha256 결속)에 그 표기가 실재해야 한다.
 const TOPOLOGY_SNAPSHOT_DIR = "tools/datapack/sources";
 
 // MOLIT 원본과 admitted snapshot은 같은 역을 다른 표기로 싣는다(부역명 병기, 역 접미사).
@@ -76,16 +81,43 @@ function isSubsequence(short, long) {
   return index === short.length;
 }
 
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
 // 노선 topology snapshot은 두 형태다: capital처럼 lines[] 묶음, daegu처럼 단일 lineId.
-function topologyStationNames(topology, lineId) {
+function topologyLineOf(topology, lineId) {
   if (Array.isArray(topology?.lines)) {
     const line = topology.lines.find((entry) => entry?.lineId === lineId);
-    return Array.isArray(line?.scope) ? line.scope.map((entry) => entry?.stationName) : null;
+    return Array.isArray(line?.scope) ? { scope: line.scope, edges: line.edges, contentSha256: line.contentSha256 } : null;
   }
   if (topology?.lineId === lineId && Array.isArray(topology.scope)) {
-    return topology.scope.map((entry) => entry?.stationName);
+    return { scope: topology.scope, edges: topology.edges, contentSha256: topology.contentSha256 };
   }
   return null;
+}
+
+// topology snapshot에서 역을 지워 결측을 세탁하지 못하도록 선언된 content 해시를 재계산해 대조한다.
+// capital 묶음 형태는 상위 payload 해시까지 재계산해 lineage 선언과 결속한다.
+function topologyContentMatches(topology, line) {
+  if (sha256(JSON.stringify({ scope: line.scope, edges: line.edges })) !== line.contentSha256) {
+    return false;
+  }
+  if (!Array.isArray(topology.lines)) {
+    return true;
+  }
+  const payload = {
+    lines: topology.lines.map(({ lineId, edgeCount, stationCount, contentSha256, rawSha256, datasetId }) => ({
+      lineId,
+      edgeCount,
+      stationCount,
+      contentSha256,
+      rawSha256,
+      datasetId,
+    })),
+    topologyGaps: topology.topologyGaps,
+  };
+  return sha256(JSON.stringify(payload)) === topology.contentSha256;
 }
 
 function claimedScopes(scope) {
@@ -131,7 +163,10 @@ function routeMapSnapshotOf(source, snapshotsByPath, violations) {
 function lineageTopologyPaths(admissionEvidence, lineId) {
   return (admissionEvidence.topologyLineages ?? [])
     .filter((lineage) => lineage.lineId === lineId && isNonEmptyString(lineage.snapshotId))
-    .map((lineage) => `${TOPOLOGY_SNAPSHOT_DIR}/${lineage.snapshotId}.json`);
+    .map((lineage) => ({
+      path: `${TOPOLOGY_SNAPSHOT_DIR}/${lineage.snapshotId}.json`,
+      contentSha256: lineage.contentSha256,
+    }));
 }
 
 function indexScopeCoverage(coverage, snapshot, lineId) {
@@ -164,15 +199,21 @@ function collectScopeCoverage({ inventory, snapshotsByPath, violations }) {
         sourceIds: [],
         snapshotPaths: [],
         capturedAts: [],
+        rawSha256s: new Set(),
         topologyPaths: new Set(),
+        topologyContentByPath: new Map(),
         positionsByName: new Map(),
         quarantinedByName: new Map(),
       };
       coverage.sourceIds.push(source.id);
       coverage.snapshotPaths.push(resolved.snapshotPath);
       coverage.capturedAts.push(String(resolved.snapshot.capturedAt ?? ""));
-      for (const topologyPath of lineageTopologyPaths(source.routeMapAdmissionEvidence, lineId)) {
-        coverage.topologyPaths.add(topologyPath);
+      if (isNonEmptyString(resolved.snapshot.rawSha256)) {
+        coverage.rawSha256s.add(resolved.snapshot.rawSha256);
+      }
+      for (const lineage of lineageTopologyPaths(source.routeMapAdmissionEvidence, lineId)) {
+        coverage.topologyPaths.add(lineage.path);
+        coverage.topologyContentByPath.set(lineage.path, lineage.contentSha256);
       }
       indexScopeCoverage(coverage, resolved.snapshot, lineId);
       coverageByScope.set(key, coverage);
@@ -228,12 +269,22 @@ function resolveTopologyNames({ topologyPath, coverage, registeredTopologyPaths,
     push(`${prefix}_PACK_TOPOLOGY_UNBOUND`, "packTopologyPath가 이 scope에 등재된 topology snapshot이 아니다");
     return null;
   }
-  const stationNames = topologyStationNames(topologiesByPath.get(topologyPath), coverage.lineId);
-  if (!stationNames) {
+  const topology = topologiesByPath.get(topologyPath);
+  const line = topologyLineOf(topology, coverage.lineId);
+  if (!line) {
     push(`${prefix}_PACK_TOPOLOGY_MISSING`, `pack topology에서 ${coverage.lineId} scope를 찾지 못했다`);
     return null;
   }
-  return new Set(stationNames.map(normalizeStationName));
+  if (!topologyContentMatches(topology, line)) {
+    push(`${prefix}_PACK_TOPOLOGY_CONTENT_MISMATCH`, "pack topology 내용이 선언된 contentSha256과 다르다");
+    return null;
+  }
+  const declared = coverage.topologyContentByPath.get(topologyPath);
+  if (isNonEmptyString(declared) && declared !== topology.contentSha256) {
+    push(`${prefix}_PACK_TOPOLOGY_LINEAGE_MISMATCH`, "pack topology가 admission lineage의 contentSha256과 다르다");
+    return null;
+  }
+  return new Set(line.scope.map((entry) => normalizeStationName(entry?.stationName)));
 }
 
 function validateAliasShape({ alias, auditedScopeKeys, officialUrls, push }) {
@@ -331,38 +382,100 @@ function verifyAbbreviationAlias({ snapshotName, rosterName, push }) {
   return true;
 }
 
-// 두 표기가 같은 역이라는 기계적 교차 근거. 선언한 방식이 실제로 성립해야 한다.
-function verifyRenameCrossCheck(context) {
-  const { alias, coverage, snapshotName, rosterName, push } = context;
-  const crossCheck = alias.evidence?.crossCheck;
-  if (!ALIAS_CROSS_CHECKS.includes(crossCheck)) {
-    push("ALIAS_RENAME_CROSS_CHECK_INVALID", `evidence.crossCheck가 승인 목록에 없다 (${crossCheck})`);
-    return false;
-  }
-  if (crossCheck === "ROSTER_SUBNAME") {
-    if (!parentheticalNames(alias.rosterStationName).includes(snapshotName)) {
-      push("ALIAS_RENAME_SUBNAME_ABSENT", "roster 원문이 옛 표기를 부역명으로 병기하지 않는다");
-      return false;
-    }
-    return true;
-  }
-  const topologyNames = resolveTopologyNames({
-    topologyPath: alias.evidence?.packTopologyPath,
-    coverage,
-    registeredTopologyPaths: context.registeredTopologyPaths,
-    topologiesByPath: context.topologiesByPath,
-    prefix: "ALIAS",
-    push,
-  });
-  if (!topologyNames) {
-    return false;
-  }
-  // pack topology가 두 표기 중 하나만 실어야 같은 역 하나로 취급한다는 근거가 된다.
-  if (topologyNames.has(snapshotName) === topologyNames.has(rosterName)) {
-    push("ALIAS_RENAME_TOPOLOGY_AMBIGUOUS", "pack topology가 두 표기를 모두 싣거나 모두 싣지 않는다");
+// roster 원문이 snapshot측 표기를 부역명으로 병기하는 경우.
+function verifyRosterSubnameCrossCheck({ alias, snapshotName, push }) {
+  if (!parentheticalNames(alias.rosterStationName).includes(snapshotName)) {
+    push("ALIAS_RENAME_SUBNAME_ABSENT", "roster 원문이 옛 표기를 부역명으로 병기하지 않는다");
     return false;
   }
   return true;
+}
+
+function renameTopologyNames(context) {
+  return resolveTopologyNames({
+    topologyPath: context.alias.evidence?.packTopologyPath,
+    coverage: context.coverage,
+    registeredTopologyPaths: context.registeredTopologyPaths,
+    topologiesByPath: context.topologiesByPath,
+    prefix: "ALIAS",
+    push: context.push,
+  });
+}
+
+// pack topology가 snapshot측 신표기를 채택하고 roster측 구표기를 버린 경우.
+// snapshot 표기가 오염되면 topology에는 roster측 표기가 남아 있으므로 여기서 걸린다.
+function verifyAdoptedNameCrossCheck(context) {
+  const { snapshotName, rosterName, push } = context;
+  const topologyNames = renameTopologyNames(context);
+  if (!topologyNames) {
+    return false;
+  }
+  if (!topologyNames.has(snapshotName)) {
+    push("ALIAS_RENAME_ADOPTED_NAME_ABSENT", "pack topology가 snapshot 표기를 싣지 않는다");
+    return false;
+  }
+  if (topologyNames.has(rosterName)) {
+    push("ALIAS_RENAME_ROSTER_NAME_PRESENT", "pack topology가 roster 표기도 실어 신표기 채택으로 볼 수 없다");
+    return false;
+  }
+  return true;
+}
+
+// pack topology·roster는 신표기인데 admitted snapshot만 구표기인 경우.
+// 이 방향은 표기 오염과 형태가 같아서, 구표기가 rawSha256으로 결속된 공식 원문 바이트에
+// 실재하는지까지 확인해야 근거가 된다.
+function verifyStaleNameCrossCheck(context) {
+  const { alias, coverage, snapshotName, rosterName, rawSourcesByPath, push } = context;
+  const topologyNames = renameTopologyNames(context);
+  if (!topologyNames) {
+    return false;
+  }
+  if (!topologyNames.has(rosterName)) {
+    push("ALIAS_RENAME_ROSTER_NAME_ABSENT", "pack topology가 roster 표기를 싣지 않는다");
+    return false;
+  }
+  if (topologyNames.has(snapshotName)) {
+    push("ALIAS_RENAME_SNAPSHOT_NAME_PRESENT", "pack topology가 snapshot 표기도 실어 구표기로 볼 수 없다");
+    return false;
+  }
+  const rawPath = alias.evidence?.officialRawPath;
+  const rawBytes = isNonEmptyString(rawPath) ? rawSourcesByPath.get(rawPath) : undefined;
+  if (!rawBytes || !coverage.rawSha256s.has(sha256(rawBytes))) {
+    push("ALIAS_RENAME_RAW_SOURCE_UNBOUND", "officialRawPath가 admitted snapshot의 rawSha256과 결속되지 않는다");
+    return false;
+  }
+  if (!decodedRawTexts(rawBytes).some((text) => text.includes(alias.snapshotStationName))) {
+    push("ALIAS_RENAME_RAW_NAME_ABSENT", "공식 원문 바이트에 snapshot 표기가 없다");
+    return false;
+  }
+  return true;
+}
+
+// 공식 원문 CSV는 EUC-KR과 UTF-8이 섞여 있어 두 해석 모두에서 표기를 찾는다.
+function decodedRawTexts(bytes) {
+  return ["euc-kr", "utf-8"].map((encoding) => {
+    try {
+      return new TextDecoder(encoding).decode(bytes);
+    } catch {
+      return "";
+    }
+  });
+}
+
+// 두 표기가 같은 역이라는 기계적 교차 근거. 선언한 방식이 실제로 성립해야 한다.
+function verifyRenameCrossCheck(context) {
+  const crossCheck = context.alias.evidence?.crossCheck;
+  if (crossCheck === "ROSTER_SUBNAME") {
+    return verifyRosterSubnameCrossCheck(context);
+  }
+  if (crossCheck === "PACK_TOPOLOGY_ADOPTED_NAME") {
+    return verifyAdoptedNameCrossCheck(context);
+  }
+  if (crossCheck === "OFFICIAL_FILE_STALE_NAME") {
+    return verifyStaleNameCrossCheck(context);
+  }
+  context.push("ALIAS_RENAME_CROSS_CHECK_INVALID", `evidence.crossCheck가 승인 목록에 없다 (${crossCheck})`);
+  return false;
 }
 
 function verifyRenameAlias(context) {
@@ -412,6 +525,7 @@ function validateAliases({
   officialUrls,
   registeredTopologyPaths,
   topologiesByPath,
+  rawSourcesByPath,
   violations,
 }) {
   const aliasedRosterNamesByScope = new Map();
@@ -440,6 +554,7 @@ function validateAliases({
       seen,
       registeredTopologyPaths,
       topologiesByPath,
+      rawSourcesByPath,
       push,
     };
     if (!validateAliasBinding(context) || !validateAliasReason(context)) {
@@ -694,6 +809,7 @@ export function auditRouteMapCoverageScopes({
   exemptions,
   snapshotsByPath,
   topologiesByPath = new Map(),
+  rawSourcesByPath = new Map(),
 }) {
   const violations = [];
   const activeScopeKeys = new Set((targets.activeLineScopes ?? []).map(scopeKey));
@@ -706,6 +822,7 @@ export function auditRouteMapCoverageScopes({
     officialUrls: collectOfficialUrls({ inventory, snapshotsByPath }),
     registeredTopologyPaths: collectRegisteredTopologyPaths(inventory),
     topologiesByPath,
+    rawSourcesByPath,
     violations,
   };
 
