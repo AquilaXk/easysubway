@@ -10,13 +10,13 @@
 
 export const ROUTE_MAP_DOMAIN = "route_map_positions";
 
-export const ALIAS_REASON_CODES = Object.freeze([
+const ALIAS_REASON_CODES = Object.freeze([
   "OFFICIAL_LINE_ORDINAL_SUFFIX",
   "OFFICIAL_ABBREVIATION",
   "OFFICIAL_RENAME",
 ]);
 
-export const GAP_REASON_CODES = Object.freeze([
+const GAP_REASON_CODES = Object.freeze([
   "ADMISSION_QUARANTINED",
   "OFFICIAL_FILE_ROW_ABSENT",
   "PACK_SCOPE_ABSENT",
@@ -24,7 +24,7 @@ export const GAP_REASON_CODES = Object.freeze([
 
 // MOLIT 원본과 admitted snapshot은 같은 역을 다른 표기로 싣는다(부역명 병기, 역 접미사).
 // 판정 대상은 역 집합의 포함 관계뿐이므로 표기 차이만 제거하고 비교한다.
-export function normalizeStationName(value) {
+function normalizeStationName(value) {
   return String(value)
     .normalize("NFKC")
     .replace(/\([^)]*\)/gu, "")
@@ -33,7 +33,7 @@ export function normalizeStationName(value) {
     .trim();
 }
 
-export function scopeKey({ regionId, operatorId, lineId }) {
+function scopeKey({ regionId, operatorId, lineId }) {
   return `${regionId}:${operatorId}:${lineId}`;
 }
 
@@ -64,7 +64,7 @@ function isSubsequence(short, long) {
 }
 
 // 노선 topology snapshot은 두 형태다: capital처럼 lines[] 묶음, daegu처럼 단일 lineId.
-export function resolveTopologyStationNames(topology, lineId) {
+function resolveTopologyStationNames(topology, lineId) {
   if (Array.isArray(topology?.lines)) {
     const line = topology.lines.find((entry) => entry?.lineId === lineId);
     return Array.isArray(line?.scope) ? line.scope.map((entry) => entry?.stationName) : null;
@@ -187,8 +187,8 @@ function validateAliases({ aliases, auditedScopeKeys, coverageByScope, rosters, 
       push("ALIAS_SHADOWS_ROSTER_STATION", "snapshotStationName이 roster의 다른 역과 같다");
       continue;
     }
-    const snapshotKey = `${alias.scopeKey} ${snapshotName}`;
-    const rosterKey = `${alias.scopeKey} ${rosterName}`;
+    const snapshotKey = `${alias.scopeKey}\u0000${snapshotName}`;
+    const rosterKey = `${alias.scopeKey}\u0000${rosterName}`;
     if (seenSnapshotNames.has(snapshotKey) || seenRosterNames.has(rosterKey)) {
       push("ALIAS_DUPLICATE", "같은 scope에서 별칭은 1:1이어야 한다");
       continue;
@@ -312,7 +312,7 @@ function validateGaps({
       push("LEDGER_NOT_NEEDED", "역이 이미 admitted snapshot에 있어 면제가 필요 없다");
       continue;
     }
-    const key = `${gap.scopeKey} ${rosterName}`;
+    const key = `${gap.scopeKey}\u0000${rosterName}`;
     if (seen.has(key)) {
       push("LEDGER_DUPLICATE", "같은 scope에 중복 항목이 있다");
       continue;
