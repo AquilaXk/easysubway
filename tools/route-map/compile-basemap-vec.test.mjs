@@ -9,6 +9,7 @@ import {
   extractRailTransferChipObstacles,
   extractServiceTagObstacles,
   markLineTerminalBadgeEntries,
+  matchingGroupEnd,
   normalizeSvgForCompile,
   parseSvgNumbers,
 } from "./compile-basemap-vec.mjs";
@@ -896,14 +897,74 @@ test("표장 블록 안의 자기폐쇄 <g/>가 obstacle을 버리거나 bbox를
   });
 });
 
-test("닫히지 않은 표장 블록은 조용히 건너뛰지 않고 실패한다(fail-closed)", () => {
-  const serviceSvg =
-    '<svg><g id="service-tags-layer"><g id="service-tag-ktx-1" class="service-tag" data-station="테스트역"><rect x="0" y="0" width="10" height="4" /></g></svg>';
-  // 레이어는 닫혀 있지만 블록이 닫히지 않은 형태.
-  const blockOnlySvg =
-    '<svg><g id="service-tags-layer"><g id="service-tag-ktx-1" class="service-tag" data-station="테스트역"><rect x="0" y="0" width="10" height="4" /></g>';
-  assert.throws(() => extractServiceTagObstacles(serviceSvg), /찾지 못했습니다/);
-  assert.throws(() => extractServiceTagObstacles(blockOnlySvg), /찾지 못했습니다/);
+// 블록·중첩 층위의 fail-closed 가드는 공개 진입점으로 도달할 수 없다 — 레이어
+// 슬라이스가 균형을 이루면 그 안은 well-nested가 보장돼, 블록이 닫히지 않은
+// 입력은 레이어 스캔이 먼저 잡는다. 아래 첫 테스트가 그 사실을 실측으로 고정하고
+// (어떤 배치든 예외가 레이어 층위에서 난다), 둘째 테스트가 블록·중첩 층위 가드를
+// matchingGroupEnd 직접 호출로 덮는다.
+test("블록 미종료 입력은 어떤 배치든 레이어 층위 fail-closed가 먼저 잡는다", () => {
+  const layerMessage = /service-tags-layer의 닫는 태그를 찾지 못했습니다/;
+  // 블록만 닫히지 않은 형태(레이어 닫는 태그를 블록이 흡수한다).
+  assert.throws(
+    () =>
+      extractServiceTagObstacles(
+        '<svg><g id="service-tags-layer"><g id="service-tag-ktx-1" class="service-tag" data-station="테스트역"><rect x="0" y="0" width="10" height="4" /></g>',
+      ),
+    layerMessage,
+  );
+  // 블록 안 중첩 <g> 2개가 닫히지 않은 형태.
+  assert.throws(
+    () =>
+      extractServiceTagObstacles(
+        '<svg><g id="service-tags-layer"><g id="service-tag-ktx-1" class="service-tag" data-station="테스트역"><g id="a"><g id="b"></g></g></g></svg>',
+      ),
+    layerMessage,
+  );
+  // 잉여 </g>가 블록 앞에 온 형태 — 레이어 슬라이스가 블록 전에 끝나 표장 0건.
+  assert.deepEqual(
+    extractServiceTagObstacles(
+      '<svg><g id="service-tags-layer"></g><g id="service-tag-ktx-1" class="service-tag" data-station="테스트역"><rect x="0" y="0" width="10" height="4" /></g></svg>',
+    ),
+    [],
+  );
+});
+
+test("matchingGroupEnd: 블록·중첩 층위 가드 — 자기폐쇄는 태그 끝, 미종료는 실패한다", () => {
+  // 자기폐쇄 여는 태그는 그 태그 하나가 곧 빈 그룹이다.
+  const selfClosing = '<g id="spacer" data-note="빈 자리표시" /><rect />';
+  assert.equal(
+    matchingGroupEnd(selfClosing, 0, "블록"),
+    '<g id="spacer" data-note="빈 자리표시" />'.length,
+  );
+
+  // 내부 자기폐쇄 <g/>는 depth를 올리지 않는다 — 형제까지 삼키지 않는다.
+  const withInnerSelfClosing =
+    '<g id="a"><g id="spacer" /><rect /></g><g id="b"></g>';
+  assert.equal(
+    matchingGroupEnd(withInnerSelfClosing, 0, "블록"),
+    withInnerSelfClosing.indexOf("</g>") + "</g>".length,
+  );
+
+  // 닫는 태그가 없으면 부분 슬라이스로 넘기지 않고 실패한다(fail-closed).
+  assert.throws(
+    () =>
+      matchingGroupEnd(
+        '<g id="service-tag-ktx-1"><rect />',
+        0,
+        "service-tag 블록(테스트역)",
+      ),
+    /service-tag 블록\(테스트역\)의 닫는 태그를 찾지 못했습니다/,
+  );
+  // 중첩이 하나 더 열려 균형이 모자란 경우도 동일하다.
+  assert.throws(
+    () => matchingGroupEnd('<g id="a"><g id="b"></g>', 0, "중첩 <g>(a)"),
+    /중첩 <g>\(a\)의 닫는 태그를 찾지 못했습니다/,
+  );
+  // 여는 <g> 태그로 시작하지 않으면 해석 실패로 알린다.
+  assert.throws(
+    () => matchingGroupEnd("<rect />", 0, "블록"),
+    /블록의 여는 <g> 태그를 해석하지 못했습니다/,
+  );
 });
 
 test("extractServiceTagObstacles: service-tag <g>의 id가 첫 속성이 아니어도 인식한다(속성 순서 무관)", () => {

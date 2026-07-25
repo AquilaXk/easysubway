@@ -674,7 +674,15 @@ function composeTransformValues(...values) {
 // 접두만 세면 자기폐쇄 `<g …/>`가 균형을 깨고, 깨진 스캔을 조용한 continue나
 // 부분 슬라이스로 넘기면 표장이 목록에서 사라지거나 다음 형제까지 삼킨 과대
 // bbox가 된다. 균형을 못 찾으면 실패한다(fail-closed).
-function matchingGroupEnd(text, startIndex, context) {
+//
+// 표장 레이어·표장 블록·중첩 <g> 세 층위가 모두 이 함수를 쓴다. 다만 공개
+// 진입점(extractServiceTagObstacles·extractRailTransferChipObstacles)으로는
+// 블록 층위의 throw에 도달할 수 없다 — 레이어 슬라이스가 균형을 이룬 시점에
+// 그 안은 well-nested가 보장되므로, 블록이 닫히지 않은 입력은 레이어 스캔이
+// 먼저 잡는다(실측: 블록 미종료·중첩 2중 미종료·잉여 </g> 배치를 모두 시도해도
+// 예외 메시지가 항상 레이어 층위였다). 블록·중첩 층위 가드는 그래서 이 함수를
+// 직접 호출하는 단위 테스트로 고정한다.
+export function matchingGroupEnd(text, startIndex, context) {
   const openTag = text.slice(startIndex).match(/^<g\b[^>]*>/)?.[0];
   if (!openTag) {
     throw new Error(`${context}의 여는 <g> 태그를 해석하지 못했습니다.`);
