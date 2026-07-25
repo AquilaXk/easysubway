@@ -9,6 +9,13 @@ part 'catalog_database.g.dart';
 
 const catalogDatabaseSchemaVersion = 18;
 
+/// `transit_feed_info.feed_end_date`의 `YYYYMMDD` 형식 판정(#2530).
+///
+/// 형식을 통과하지 못한 값(`NULL`·`2026-12-31` 등)은 유효기간 비교에서 어떤
+/// 기준일에도 참이 될 수 없다. 값 존재 판정과 조립되는 필터가 같은 조건을 써야
+/// "행은 있는데 결과만 사라지는" 상태가 생기지 않는다.
+const transitFeedEndDateGlob = '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]';
+
 /// 수도권 통합요금 기본거리(10km) 초과분 요금 단계(#1911).
 ///
 /// 10~50km 구간은 5km당 100원씩 8회, 50km 초과 구간은 8km당 100원씩
@@ -72,7 +79,7 @@ class CatalogDatabase extends _$CatalogDatabase {
 
   Set<String> _routeNetworkEdgeColumnNames = const {};
   Set<String> _routeFacilityColumnNames = const {};
-  Future<bool>? _transitFeedValidityWindow;
+  Future<String?>? _transitFeedEndDate;
 
   Set<String> get routeNetworkEdgeColumnNames => _routeNetworkEdgeColumnNames;
   Set<String> get routeFacilityColumnNames => _routeFacilityColumnNames;
@@ -189,29 +196,56 @@ class CatalogDatabase extends _$CatalogDatabase {
     _routeFacilityColumnNames = await _tableColumnNames('facilities');
   }
 
-  /// 피드 유효기간(`transit_feed_info.feed_end_date`)을 이 카탈로그에서 읽을 수
-  /// 있는지 알린다(#2530).
+  /// 이 카탈로그에서 읽을 수 있는 피드 종료일(`YYYYMMDD`)을 돌려준다(#2530).
   ///
   /// `transit_feed_info`는 데이터팩만 제공하는 테이블이라 앱 drift 선언에 없다.
-  /// 테이블이 없거나, `feed_end_date` 열이 없거나, 행이 하나도 없으면 "피드 정보
-  /// 없음"으로 본다 — 홈 위젯의 피드 종료일 조회가 같은 상태에서 `null`을 돌려주는
-  /// 강등과 의미가 같다. 이 경우 호출자는 유효기간 필터를 걸지 않는다.
+  /// 테이블이 없거나, `feed_end_date` 열이 없거나, `YYYYMMDD` 형식 행이 하나도
+  /// 없으면(행 0·`NULL`·형식 불일치 포함) "피드 정보 없음"으로 보고 `null`을
+  /// 돌려준다. 형식을 통과하지 못한 값은 유효기간 비교에 쓰면 어떤 기준일에도
+  /// 참이 될 수 없어, 값이 있다고 보면 결과가 통째로 사라진다.
+  ///
+  /// 여러 행이 있으면 가장 늦은 종료일을 고른다. 팩 스키마는 단일 행을 강제하지만
+  /// 이 함수의 전제는 "앱이 만들지 않은 카탈로그"이므로 판정을 결정적으로 둔다.
   ///
   /// 결과는 이 인스턴스에 캐시한다. 카탈로그 교체는 새 `CatalogDatabase`를 열므로
-  /// (`CatalogDatabaseOpener`) 캐시는 설치된 팩 단위로 무효화된다.
-  Future<bool> hasTransitFeedValidityWindow() {
-    return _transitFeedValidityWindow ??= _readTransitFeedValidityWindow();
+  /// (`CatalogDatabaseOpener`) 캐시는 설치된 팩 단위로 무효화된다. 조회가 실패하면
+  /// 캐시를 비워 다음 호출이 다시 시도한다 — 일시적 SQLite 오류 하나가 인스턴스
+  /// 수명 내내 고정되지 않게 한다.
+  Future<String?> transitFeedEndDate() async {
+    final cached = _transitFeedEndDate;
+    if (cached != null) {
+      return cached;
+    }
+    final pending = _readTransitFeedEndDate();
+    _transitFeedEndDate = pending;
+    try {
+      return await pending;
+    } on Object {
+      _transitFeedEndDate = null;
+      rethrow;
+    }
   }
 
-  Future<bool> _readTransitFeedValidityWindow() async {
+  /// 피드 유효기간 필터를 걸 수 있는지 알린다(#2530).
+  ///
+  /// `transitFeedEndDate()`가 `null`이면 호출자는 유효기간 필터를 조립하지 않는다.
+  Future<bool> hasTransitFeedValidityWindow() async {
+    return await transitFeedEndDate() != null;
+  }
+
+  Future<String?> _readTransitFeedEndDate() async {
     final columnNames = await _tableColumnNames('transit_feed_info');
     if (!columnNames.contains('feed_end_date')) {
-      return false;
+      return null;
     }
-    final row = await customSelect(
-      'SELECT EXISTS (SELECT 1 FROM transit_feed_info) AS has_row',
-    ).getSingle();
-    return row.read<int>('has_row') == 1;
+    final row = await customSelect('''
+      SELECT feed_end_date
+      FROM transit_feed_info
+      WHERE feed_end_date GLOB '$transitFeedEndDateGlob'
+      ORDER BY feed_end_date DESC
+      LIMIT 1
+      ''').getSingleOrNull();
+    return row?.read<String>('feed_end_date');
   }
 
   Future<Set<String>> _tableColumnNames(String tableName) async {
