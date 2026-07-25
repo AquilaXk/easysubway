@@ -63,6 +63,12 @@ const ALLOWED_FLAGS = new Set([
 const TALLY_STATUSES = ["INVENTORY_ADMITTED", "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE", "MISSING"];
 const MISSING_KINDS = ["DUAL_OPERATOR_UNMATCHED", "NO_ADMITTED_SOURCE"];
 const RELEASE_TIERS = ["LAUNCH_REQUIRED", "ENHANCEMENT"];
+// 게이트 validateUnsupportedResolution과 같은 allowlist.
+const RESOLUTION_REASON_CODE = "PUBLIC_API_NO_DATA";
+const COVERAGE_FALLBACKS = ["PLANNED", "STATIC_LOCAL", "UNSUPPORTED_REGION"];
+// 게이트의 `new Date(text).toISOString() === text`와 같은 canonical UTC instant. wall-clock을 읽지 않고
+// 형식만 강제해 nextReviewAt의 코드포인트 정렬이 시간순 정렬과 일치하도록 보장한다.
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
 export function buildNationwideCoverageTally({
   targets,
@@ -73,7 +79,8 @@ export function buildNationwideCoverageTally({
 }) {
   validateTargets(targets);
   validateInventory(inventory);
-  const sources = inventory.sources.map(normalizeSource);
+  const targetIndex = coverageTargetIndex(targets);
+  const sources = inventory.sources.map((source) => normalizeSource(source, targetIndex));
   const scopes = [...targets.activeLineScopes]
     .map(({ regionId, operatorId, lineId }) => ({ regionId, operatorId, lineId }))
     .sort(compareScopes);
@@ -122,6 +129,10 @@ export function buildNationwideCoverageTally({
     regeneration: {
       command: regenerationCommand(inputs, expectedLaunchRequiredTotal),
       ledgerPath: LEDGER_PATH,
+      pairedUpdateKo:
+        "targets·inventory·resolutions를 바꾸는 PR은 이 명령으로 ledger를 함께 재생성하고, "
+        + "tools/datapack/build-nationwide-coverage-tally.test.mjs의 집계 기대 상수(admitted/EU/missing)도 "
+        + "같은 커밋에서 갱신해야 한다. 재생성 누락은 datapack 도구 테스트에서 fail closed 된다.",
     },
     statusAxis: {
       values: [...TALLY_STATUSES],
@@ -130,8 +141,13 @@ export function buildNationwideCoverageTally({
         "source-inventory coverageScope의 (operatorIds, lineIds, sourceDomains) 엄격 매칭으로 domain의 "
         + "requiredFields를 blockingThreshold 이상 충족한 requirement. 빈 lineIds는 와일드카드가 아니다.",
       explicitlyUnsupportedRuleKo:
-        "resolutions 문서의 EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE entry가 정본이다. entry의 evidence "
-        + "심층 검증과 nextReviewAt 만료 재검토는 wall-clock에 의존하므로 report-coverage-gaps.mjs 게이트 몫이다.",
+        "resolutions 문서의 EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE entry가 정본이다. supportStartedAt이 있는 "
+        + "entry는 게이트와 같이 terminal에서 제외하고 MISSING + resolutionReviewStatus=SUPPORT_STARTED로 남긴다. "
+        + "publicApiQueries 재계산·search plan 대조와 nextReviewAt 만료 재검토는 report-coverage-gaps.mjs 게이트 몫이다.",
+      resolutionExpiryDivergenceKo:
+        "이 ledger는 wall-clock을 읽지 않으므로 nextReviewAt이 지난 entry도 terminal로 계상한다. "
+        + "각 tier의 earliestResolutionNextReviewAt이 그 유효 지평이며, 이 시각을 넘기면 입력이 그대로여도 "
+        + "게이트는 해당 entry를 MISSING(EXPIRED)로 판정해 수치가 갈린다 — resolutions 재검토로 해소한다.",
       dualOperatorRuleKo:
         "MISSING 중 operator 조건만 풀면 admitted가 되는 requirement는 DUAL_OPERATOR_UNMATCHED로 구분한다. "
         + "같은 노선을 커버하는 소스가 있으나 해당 운영기관이 coverageScope에 없는 경우다.",
@@ -164,6 +180,8 @@ export function buildNationwideCoverageTally({
 
 // requirement 하나의 상태를 판정한다. 우선순위는 INVENTORY_ADMITTED > EXPLICITLY_UNSUPPORTED > MISSING이며,
 // admitted requirement에 unsupported resolution이 붙으면 판정 충돌이므로 fail closed한다.
+// resolution에 supportStartedAt이 있으면 게이트(report-coverage-gaps.mjs applyCoverageResolutions)와 같이
+// EU 전이를 취소하고 MISSING으로 남기되 resolutionReviewStatus=SUPPORT_STARTED로 표시한다.
 function evaluateRequirement(scope, domain, sources, resolutionIndex) {
   const threshold = domain.blockingThreshold?.minimumOfficialFieldCoverageRatio ?? 1;
   const fieldRows = domain.requiredFields.map((field) => ({
@@ -190,20 +208,34 @@ function evaluateRequirement(scope, domain, sources, resolutionIndex) {
   };
   const resolution = resolutionIndex.get(key) ?? null;
   if (base.admissionRatio >= threshold) {
+    // 게이트는 provenance 기반 SUPPORTED와의 충돌만 throw하지만, 이 도구는 더 넓은 INVENTORY_ADMITTED
+    // 기준으로 throw한다(의도적으로 게이트보다 엄격). admission-only 소스가 unsupported resolution이 붙은
+    // requirement를 덮으면 ledger 재생성이 hard fail하며, resolutions 문서를 정리해야 풀린다 — 두 정본이
+    // 서로 반대 판정을 주장하는 상태로 집계가 계속되는 것을 막기 위한 fail closed다.
     if (resolution) {
       throw new Error(`inventory-admitted requirement must not have an unsupported resolution: ${key}`);
     }
-    return { ...base, status: "INVENTORY_ADMITTED", missingKind: null, dualOperator: null, resolution: null };
+    return {
+      ...base,
+      status: "INVENTORY_ADMITTED",
+      missingKind: null,
+      dualOperator: null,
+      resolution: null,
+      resolutionReviewStatus: null,
+    };
   }
-  if (resolution) {
+  if (resolution && !resolution.supportStartedAt) {
+    // EU는 terminal 상태라 dual-operator 진단을 계산하지 않는다(가시화 대상은 미해결 MISSING이다).
     return {
       ...base,
       status: "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE",
       missingKind: null,
       dualOperator: null,
       resolution,
+      resolutionReviewStatus: "CURRENT",
     };
   }
+  const resolutionReviewStatus = resolution ? "SUPPORT_STARTED" : null;
 
   // dual-operator 미매칭: operator 조건만 풀면 admitted가 되는지 확인한다.
   const relaxedRows = domain.requiredFields.map((field) => ({
@@ -215,7 +247,14 @@ function evaluateRequirement(scope, domain, sources, resolutionIndex) {
     relaxedRows.length,
   );
   if (relaxedRatio < threshold) {
-    return { ...base, status: "MISSING", missingKind: "NO_ADMITTED_SOURCE", dualOperator: null, resolution: null };
+    return {
+      ...base,
+      status: "MISSING",
+      missingKind: "NO_ADMITTED_SOURCE",
+      dualOperator: null,
+      resolution,
+      resolutionReviewStatus,
+    };
   }
   const unadmitted = new Set(unadmittedFields);
   const coveringSourceIds = uniqueSorted(
@@ -233,7 +272,8 @@ function evaluateRequirement(scope, domain, sources, resolutionIndex) {
     status: "MISSING",
     missingKind: "DUAL_OPERATOR_UNMATCHED",
     dualOperator: { coveringOperatorIds, coveringSourceIds },
-    resolution: null,
+    resolution,
+    resolutionReviewStatus,
   };
 }
 
@@ -285,11 +325,28 @@ function tierCounts(entries) {
     terminalCount,
     terminalRatio: ratio(terminalCount, entries.length),
     inventoryAdmittedRatio: ratio(inventoryAdmittedCount, entries.length),
+    // 게이트가 EU 전이를 취소한 supportStartedAt entry 수 — MISSING에 포함되며 terminal이 아니다.
+    supportStartedResolutionCount: entries.filter(
+      (entry) => entry.resolutionReviewStatus === "SUPPORT_STARTED").length,
+    // EU terminal 계상의 유효 지평. wall-clock을 읽지 않으므로 만료를 판정하지 않고 입력 값만 노출한다.
+    // 이 시각이 지나면 게이트는 같은 입력에서도 해당 entry를 MISSING(EXPIRED)로 판정해 수치가 갈린다.
+    earliestResolutionNextReviewAt: earliestNextReviewAt(entries),
   };
 }
 
-// resolutions는 EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE의 정본이다. 이 도구는 requirement 매핑 무결성만
-// fail closed로 확인하고, evidence 심층 검증(query·hash·만료)은 report-coverage-gaps.mjs 게이트에 맡긴다.
+function earliestNextReviewAt(entries) {
+  const horizons = entries
+    .filter((entry) => entry.status === "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE")
+    .map((entry) => entry.resolution.nextReviewAt)
+    .sort(codepointCompare);
+  return horizons.length === 0 ? null : horizons[0];
+}
+
+// resolutions는 EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE의 정본이다. 이 도구는 requirement 매핑 무결성과
+// 게이트 validateUnsupportedResolution의 계약 축(state·reasonCode·fallback allowlist, evidenceHash 형식,
+// ISO instant 형식)을 fail closed로 확인한다. publicApiQueries 재계산·search plan 대조·wall-clock 만료
+// 판정은 report-coverage-gaps.mjs 게이트에 남긴다. 게이트가 PR CI가 아니라 datapack-release workflow에서만
+// 돌기 때문에, 무효 entry가 이 ledger의 terminal 수치를 부풀리는 경로는 여기서 막는다.
 function indexResolutions(targets, resolutions, scopes, domains) {
   if (!resolutions || typeof resolutions !== "object" || Array.isArray(resolutions)) {
     throw new Error("coverage resolutions must be an object");
@@ -326,12 +383,25 @@ function indexResolutions(targets, resolutions, scopes, domains) {
     );
     if (byKey.has(key)) throw new Error(`duplicate coverage resolution: ${key}`);
     if (!requirementKeys.has(key)) throw new Error(`unknown coverage resolution requirement: ${key}`);
+    if (entry.reasonCode !== RESOLUTION_REASON_CODE) {
+      throw new Error(`${label}.reasonCode must be ${RESOLUTION_REASON_CODE}: ${entry.reasonCode ?? "missing"}`);
+    }
+    if (!COVERAGE_FALLBACKS.includes(entry.fallback)) {
+      throw new Error(`${label}.fallback is invalid: ${entry.fallback ?? "missing"}`);
+    }
+    if (!/^[a-f0-9]{64}$/.test(entry.evidenceHash ?? "")) {
+      throw new Error(`${label}.evidenceHash must be sha256 hex`);
+    }
     byKey.set(key, {
-      reasonCode: requiredString(entry.reasonCode, `${label}.reasonCode`),
-      fallback: requiredString(entry.fallback, `${label}.fallback`),
-      evidenceHash: requiredString(entry.evidenceHash, `${label}.evidenceHash`),
-      reviewedAt: requiredString(entry.reviewedAt, `${label}.reviewedAt`),
-      nextReviewAt: requiredString(entry.nextReviewAt, `${label}.nextReviewAt`),
+      reasonCode: entry.reasonCode,
+      fallback: entry.fallback,
+      evidenceHash: entry.evidenceHash,
+      reviewedAt: isoInstant(entry.reviewedAt, `${label}.reviewedAt`),
+      nextReviewAt: isoInstant(entry.nextReviewAt, `${label}.nextReviewAt`),
+      // 게이트는 supportStartedAt이 있으면 EU 전이를 취소한다. 순수 입력 필드라 결정성에 영향이 없다.
+      supportStartedAt: entry.supportStartedAt === undefined
+        ? null
+        : isoInstant(entry.supportStartedAt, `${label}.supportStartedAt`),
     });
   }
   return byKey;
@@ -366,6 +436,16 @@ function validateTargets(targets) {
   if (!targets.requiredSourceDomains.some(({ releaseTier }) => releaseTier === "LAUNCH_REQUIRED")) {
     throw new Error("coverage targets must include at least one LAUNCH_REQUIRED domain");
   }
+  if (!Array.isArray(targets.regions) || targets.regions.length === 0) {
+    throw new Error("coverage targets regions must be a non-empty array");
+  }
+  const regionIds = new Set();
+  for (const region of targets.regions) {
+    const id = requiredString(region?.id, "regions.id");
+    if (regionIds.has(id)) throw new Error(`duplicate region id: ${id}`);
+    regionIds.add(id);
+    requiredStringArray(region.operatorIds, `${id}.operatorIds`);
+  }
   if (!Array.isArray(targets.activeLineScopes) || targets.activeLineScopes.length === 0) {
     throw new Error("coverage targets activeLineScopes must be a non-empty array");
   }
@@ -373,11 +453,11 @@ function validateTargets(targets) {
   const scopeKeys = new Set();
   for (const scope of targets.activeLineScopes) {
     const lineId = requiredString(scope?.lineId, "activeLineScopes.lineId");
-    const key = [
-      requiredString(scope.regionId, `${lineId}.regionId`),
-      requiredString(scope.operatorId, `${lineId}.operatorId`),
-      lineId,
-    ].join(":");
+    const regionId = requiredString(scope.regionId, `${lineId}.regionId`);
+    if (!regionIds.has(regionId)) {
+      throw new Error(`${lineId}.regionId contains undefined region: ${regionId}`);
+    }
+    const key = [regionId, requiredString(scope.operatorId, `${lineId}.operatorId`), lineId].join(":");
     if (scopeKeys.has(key)) throw new Error(`duplicate active line scope: ${key}`);
     scopeKeys.add(key);
   }
@@ -394,13 +474,13 @@ function validateInventory(inventory) {
   requiredString(inventory.retrievedAt, "source inventory retrievedAt");
 }
 
-function normalizeSource(source) {
+function normalizeSource(source, targetIndex) {
   const id = requiredString(source?.id, "source.id");
   const coverage = source.coverageScope;
   if (!coverage || typeof coverage !== "object" || Array.isArray(coverage)) {
     throw new Error(`${id}.coverageScope must be an object`);
   }
-  return {
+  const normalized = {
     id,
     regionIds: requiredStringArray(coverage.regionIds, `${id}.coverageScope.regionIds`),
     operatorIds: requiredStringArray(coverage.operatorIds, `${id}.coverageScope.operatorIds`),
@@ -408,6 +488,50 @@ function normalizeSource(source) {
     lineIds: optionalStringArray(coverage.lineIds, `${id}.coverageScope.lineIds`),
     fields: requiredStringArray(source.fieldsProvided ?? source.fields, `${id}.fieldsProvided`),
   };
+  // 게이트 validateKnownValues 대응. 오타 id를 조용한 매칭 실패(=과소 집계)로 흘리지 않고 fail closed한다.
+  validateKnownValues(normalized.regionIds, targetIndex.regionIds, `${id}.coverageScope.regionIds`, "region");
+  validateKnownValues(normalized.operatorIds, targetIndex.operatorIds, `${id}.coverageScope.operatorIds`, "operator");
+  validateKnownValues(
+    normalized.sourceDomains,
+    targetIndex.sourceDomains,
+    `${id}.coverageScope.sourceDomains`,
+    "source domain",
+  );
+  if (targetIndex.lineIds.size > 0) {
+    validateKnownValues(normalized.lineIds, targetIndex.lineIds, `${id}.coverageScope.lineIds`, "line");
+  }
+  return normalized;
+}
+
+// 게이트 coverageTargetIndex와 같은 known id 집합.
+function coverageTargetIndex(targets) {
+  return {
+    regionIds: new Set([
+      ...targets.regions.map((region) => region.id),
+      ...optionalStringArray(targets.knownRegionIds, "knownRegionIds"),
+    ]),
+    operatorIds: new Set([
+      ...targets.regions.flatMap((region) => region.operatorIds),
+      ...targets.activeLineScopes.map((scope) => scope.operatorId),
+      ...optionalStringArray(targets.knownOperatorIds, "knownOperatorIds"),
+    ]),
+    lineIds: new Set([
+      ...targets.activeLineScopes.map((scope) => scope.lineId),
+      ...(targets.inactiveLineExclusions ?? []).map((exclusion) => exclusion.lineId),
+    ]),
+    sourceDomains: new Set([
+      ...targets.requiredSourceDomains.map((domain) => domain.id),
+      ...optionalStringArray(targets.knownSourceDomains, "knownSourceDomains"),
+    ]),
+  };
+}
+
+function validateKnownValues(values, knownValues, label, valueLabel) {
+  for (const value of values) {
+    if (!knownValues.has(value)) {
+      throw new Error(`${label} contains undefined ${valueLabel}: ${value}`);
+    }
+  }
 }
 
 function regenerationCommand(inputs, expectedLaunchRequiredTotal) {
@@ -460,6 +584,13 @@ function ratio(numerator, denominator) {
 
 function requiredString(value, label) {
   if (typeof value !== "string" || value.trim() === "") throw new Error(`${label} is required`);
+  return value;
+}
+
+function isoInstant(value, label) {
+  if (!ISO_INSTANT.test(requiredString(value, label))) {
+    throw new Error(`${label} must be a canonical UTC instant (YYYY-MM-DDTHH:MM:SS.sssZ)`);
+  }
   return value;
 }
 

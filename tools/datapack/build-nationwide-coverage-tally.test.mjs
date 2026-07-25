@@ -47,6 +47,7 @@ function fixtureTargets(overrides = {}) {
       { lineId: "line-a", regionId: "capital", operatorId: "operator-a" },
       { lineId: "line-a", regionId: "capital", operatorId: "operator-b" },
     ],
+    regions: [{ id: "capital", displayName: "수도권", operatorIds: ["operator-a", "operator-b"] }],
     ...overrides,
   };
 }
@@ -177,6 +178,9 @@ test("커밋된 전국 coverage tally ledger는 현행 입력에서 바이트 �
       enhancementTotal: 45,
       expectedLaunchRequiredTotal: 270,
     });
+    // 아래 집계 상수는 tracked ledger와 짝을 이루는 이중 장부다. targets·inventory·resolutions를 바꾸는
+    // 후속 #2138 admission PR은 (1) ledger.regeneration.command로 ledger를 재생성하고 (2) 이 상수를
+    // 같은 커밋에서 함께 갱신해야 한다. 둘 중 하나만 하면 이 테스트가 fail closed 된다.
     assert.equal(ledger.launchRequired.totalCount, 270);
     assert.equal(ledger.launchRequired.inventoryAdmittedCount, 80);
     assert.equal(ledger.launchRequired.explicitlyUnsupportedWithEvidenceCount, 4);
@@ -186,8 +190,11 @@ test("커밋된 전국 coverage tally ledger는 현행 입력에서 바이트 �
       NO_ADMITTED_SOURCE: 174,
     });
     assert.equal(ledger.launchRequired.terminalCount, 84);
+    assert.equal(ledger.launchRequired.supportStartedResolutionCount, 0);
+    assert.equal(ledger.launchRequired.earliestResolutionNextReviewAt, "2026-10-19T02:43:09.257Z");
     assert.equal(ledger.launchRequired.requirements.length, 270);
     assert.equal(ledger.enhancement.totalCount, 45);
+    assert.equal(ledger.enhancement.earliestResolutionNextReviewAt, null);
     assert.equal(ledger.enhancement.requirements.length, 45);
   } finally {
     await rm(workspace, { recursive: true, force: true });
@@ -295,6 +302,44 @@ test("빈 lineIds coverageScope는 와일드카드가 아니다", () => {
   });
 });
 
+test("coverageScope의 unknown id는 조용한 미매칭이 아니라 fail closed다", async (context) => {
+  const unknownScopes = [
+    ["region", { regionIds: ["capitol"] }, /coverageScope.regionIds contains undefined region: capitol/],
+    ["operator", { operatorIds: ["operator-zz"] }, /coverageScope.operatorIds contains undefined operator: operator-zz/],
+    ["line", { lineIds: ["line-zz"] }, /coverageScope.lineIds contains undefined line: line-zz/],
+    [
+      "source domain",
+      { sourceDomains: ["station_line_membershop"] },
+      /coverageScope.sourceDomains contains undefined source domain: station_line_membershop/,
+    ],
+  ];
+  for (const [name, override, expected] of unknownScopes) {
+    await context.test(name, () => {
+      const source = operatorAMembershipSource();
+      Object.assign(source.coverageScope, override);
+      assert.throws(
+        () => buildFixtureLedger({
+          targets: fixtureTargets(),
+          inventory: fixtureInventory([source]),
+          resolutions: fixtureResolutions(),
+        }),
+        expected,
+      );
+    });
+  }
+
+  await context.test("targets가 아는 id는 통과한다", () => {
+    const source = operatorAMembershipSource();
+    source.coverageScope.regionIds = ["capital"];
+    const ledger = buildFixtureLedger({
+      targets: fixtureTargets(),
+      inventory: fixtureInventory([source]),
+      resolutions: fixtureResolutions(),
+    });
+    assert.equal(ledger.launchRequired.inventoryAdmittedCount, 1);
+  });
+});
+
 test("resolutions는 EXPLICITLY_UNSUPPORTED 정본이며 계약 위반은 fail closed다", async (context) => {
   const inventory = fixtureInventory([operatorAMembershipSource()]);
 
@@ -307,9 +352,31 @@ test("resolutions는 EXPLICITLY_UNSUPPORTED 정본이며 계약 위반은 fail c
     const resolved = requirementFor(ledger, "operator-b");
     assert.equal(resolved.status, "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE");
     assert.equal(resolved.resolution.reasonCode, "PUBLIC_API_NO_DATA");
+    assert.equal(resolved.resolutionReviewStatus, "CURRENT");
     assert.equal(resolved.missingKind, null);
     assert.equal(ledger.launchRequired.terminalCount, 2);
     assert.equal(ledger.launchRequired.missingCount, 0);
+    assert.equal(ledger.launchRequired.earliestResolutionNextReviewAt, "2026-10-19T02:43:09.257Z");
+  });
+
+  // 게이트(report-coverage-gaps.mjs)는 supportStartedAt이 있으면 EU 전이를 취소한다. 같은 판정을 유지한다.
+  await context.test("supportStartedAt entry는 terminal에서 제외된다", () => {
+    const ledger = buildFixtureLedger({
+      targets: fixtureTargets(),
+      inventory,
+      resolutions: fixtureResolutions([
+        fixtureResolutionEntry({ supportStartedAt: "2026-07-24T00:00:00.000Z" }),
+      ]),
+    });
+    const entry = requirementFor(ledger, "operator-b");
+    assert.equal(entry.status, "MISSING");
+    assert.equal(entry.resolutionReviewStatus, "SUPPORT_STARTED");
+    assert.equal(entry.missingKind, "DUAL_OPERATOR_UNMATCHED");
+    assert.equal(entry.resolution.supportStartedAt, "2026-07-24T00:00:00.000Z");
+    assert.equal(ledger.launchRequired.explicitlyUnsupportedWithEvidenceCount, 0);
+    assert.equal(ledger.launchRequired.supportStartedResolutionCount, 1);
+    assert.equal(ledger.launchRequired.terminalCount, 1);
+    assert.equal(ledger.launchRequired.earliestResolutionNextReviewAt, null);
   });
 
   const rejections = [
@@ -337,6 +404,26 @@ test("resolutions는 EXPLICITLY_UNSUPPORTED 정본이며 계약 위반은 fail c
       "state 위반",
       fixtureResolutions([fixtureResolutionEntry({ state: "SUPPORTED" })]),
       /state is invalid: SUPPORTED/,
+    ],
+    [
+      "reasonCode allowlist 위반",
+      fixtureResolutions([fixtureResolutionEntry({ reasonCode: "WHATEVER" })]),
+      /reasonCode must be PUBLIC_API_NO_DATA: WHATEVER/,
+    ],
+    [
+      "fallback allowlist 위반",
+      fixtureResolutions([fixtureResolutionEntry({ fallback: "SOMETHING_ELSE" })]),
+      /fallback is invalid: SOMETHING_ELSE/,
+    ],
+    [
+      "evidenceHash 형식 위반",
+      fixtureResolutions([fixtureResolutionEntry({ evidenceHash: "zz" })]),
+      /evidenceHash must be sha256 hex/,
+    ],
+    [
+      "nextReviewAt ISO instant 위반",
+      fixtureResolutions([fixtureResolutionEntry({ nextReviewAt: "2026-10-19" })]),
+      /nextReviewAt must be a canonical UTC instant/,
     ],
   ];
   for (const [name, resolutions, expected] of rejections) {
