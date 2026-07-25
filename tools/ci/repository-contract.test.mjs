@@ -8940,6 +8940,8 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "kric-airport-railroad-route-map-positions",
     "kric-disabled-toilet",
     "kric-elevator-car-number",
+    "kric-everline-route-map-positions",
+    "kric-gimpo-goldline-route-map-positions",
     "kric-gtx-a-route-map-positions",
     "kric-gyeongchun-route-map-positions",
     "kric-gyeonggang-route-map-positions",
@@ -8949,6 +8951,8 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "kric-safety-platform",
     "kric-seohae-route-map-positions",
     "kric-seoul-metro-line9-1-route-map-positions",
+    "kric-shinbundang-route-map-positions",
+    "kric-sillim-route-map-positions",
     "kric-station-convenience-standard",
     "kric-station-elevator",
     "kric-station-elevator-movement",
@@ -8963,6 +8967,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "kric-suin-bundang-route-map-positions",
     "kric-train-operation-organ",
     "kric-transfer-movement-detailed",
+    "kric-ui-sinseol-route-map-positions",
     "kric-uijeongbu-route-map-positions",
     "kric-wheelchair-lift-location",
     "kric-wheelchair-lift-movement",
@@ -8984,7 +8989,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "seoul-subway-hourly-boarding",
     "seoul-topis-realtime-train-position",
     "seoulmetro-cyberstation-route-map",
-    "seoulmetro-station-line-info",
+    "seoulmetro-station-line-info"
   ]);
   assert.equal(
     sourceCandidates.candidates.find(({ id }) => id === "seoul-metro-official-od-fare-canary")
@@ -10120,8 +10125,8 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
   // 페이퍼 KRIC 후보 계약과 다르다 — 아래 전용 테스트에서 별도로 고정하고 이 루프에서는 제외한다.
   // production inventory로 승격된 KRIC 시설 source(엘리베이터·에스컬레이터·휠체어리프트 위치/이동동선 등,
   // #1397 capital admission)도 페이퍼 후보가 아니라 admitted production 후보이므로 이 루프에서 제외한다.
-  // #2500/#2503 국가철도공단 data.go.kr·KRIC FILE route_map_positions admission
-  // (line9-1 및 capital-wide 8노선)도 credential-free official-file
+  // #2500/#2503/#2505 국가철도공단 data.go.kr·KRIC FILE route_map_positions admission
+  // (line9-1, capital-wide 8노선, capital-light 5노선)도 credential-free official-file
   // production materialize라 페이퍼 OpenAPI 후보 계약과 다르다.
   const kricCandidates = candidates.candidates.filter(
     (candidate) =>
@@ -10139,7 +10144,7 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
   assert.equal(candidates.schemaVersion, 1);
   assert.equal(candidates.artifactKind, "production-source-candidates");
   assert.equal(candidates.source, "tools/datapack/source-candidates.json");
-  assert.equal(candidates.updatedAt, "2026-07-20");
+  assert.equal(candidates.updatedAt, "2026-07-25");
   assert.deepEqual(
     kricCandidates.map((candidate) => candidate.id).sort(),
     [
