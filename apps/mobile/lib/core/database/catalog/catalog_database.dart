@@ -72,6 +72,7 @@ class CatalogDatabase extends _$CatalogDatabase {
 
   Set<String> _routeNetworkEdgeColumnNames = const {};
   Set<String> _routeFacilityColumnNames = const {};
+  Future<bool>? _transitFeedValidityWindow;
 
   Set<String> get routeNetworkEdgeColumnNames => _routeNetworkEdgeColumnNames;
   Set<String> get routeFacilityColumnNames => _routeFacilityColumnNames;
@@ -186,6 +187,31 @@ class CatalogDatabase extends _$CatalogDatabase {
   Future<void> refreshRouteSchemaCapabilities() async {
     _routeNetworkEdgeColumnNames = await _tableColumnNames('network_edges');
     _routeFacilityColumnNames = await _tableColumnNames('facilities');
+  }
+
+  /// 피드 유효기간(`transit_feed_info.feed_end_date`)을 이 카탈로그에서 읽을 수
+  /// 있는지 알린다(#2530).
+  ///
+  /// `transit_feed_info`는 데이터팩만 제공하는 테이블이라 앱 drift 선언에 없다.
+  /// 테이블이 없거나, `feed_end_date` 열이 없거나, 행이 하나도 없으면 "피드 정보
+  /// 없음"으로 본다 — 홈 위젯의 피드 종료일 조회가 같은 상태에서 `null`을 돌려주는
+  /// 강등과 의미가 같다. 이 경우 호출자는 유효기간 필터를 걸지 않는다.
+  ///
+  /// 결과는 이 인스턴스에 캐시한다. 카탈로그 교체는 새 `CatalogDatabase`를 열므로
+  /// (`CatalogDatabaseOpener`) 캐시는 설치된 팩 단위로 무효화된다.
+  Future<bool> hasTransitFeedValidityWindow() {
+    return _transitFeedValidityWindow ??= _readTransitFeedValidityWindow();
+  }
+
+  Future<bool> _readTransitFeedValidityWindow() async {
+    final columnNames = await _tableColumnNames('transit_feed_info');
+    if (!columnNames.contains('feed_end_date')) {
+      return false;
+    }
+    final row = await customSelect(
+      'SELECT EXISTS (SELECT 1 FROM transit_feed_info) AS has_row',
+    ).getSingle();
+    return row.read<int>('has_row') == 1;
   }
 
   Future<Set<String>> _tableColumnNames(String tableName) async {

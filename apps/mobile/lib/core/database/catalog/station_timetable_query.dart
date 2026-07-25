@@ -142,16 +142,26 @@ class CatalogStationTimetableQuery {
       CatalogTimetableDayType.sundayHoliday => 'AND c.sunday = 1',
       null => '',
     };
-    final validityFilter = dayType == null
-        ? ''
-        : '''
-            AND c.start_date <= ?
-            AND c.end_date >= ?
+    // transit_feed_info는 데이터팩만 제공하는 테이블이라 없을 수도, 비어 있을 수도
+    // 있다(#2530). 피드 유효기간을 읽을 수 없으면 필터를 조립하지 않고 나머지
+    // 조건으로 조회한다 — 홈 위젯의 피드 종료일 강등과 같은 의미다.
+    final hasFeedValidityWindow =
+        dayType != null && await database.hasTransitFeedValidityWindow();
+    final feedValidityFilter = hasFeedValidityWindow
+        ? '''
             AND EXISTS (
               SELECT 1
               FROM transit_feed_info feed
               WHERE feed.feed_end_date >= ?
             )
+          '''
+        : '';
+    final validityFilter = dayType == null
+        ? ''
+        : '''
+            AND c.start_date <= ?
+            AND c.end_date >= ?
+            $feedValidityFilter
           ''';
     final serviceFilter = sortedServiceIds == null
         ? ''
@@ -183,7 +193,7 @@ class CatalogStationTimetableQuery {
             if (referenceDateKey != null) ...[
               Variable.withString(referenceDateKey),
               Variable.withString(referenceDateKey),
-              Variable.withString(referenceDateKey),
+              if (hasFeedValidityWindow) Variable.withString(referenceDateKey),
             ],
             ...?sortedServiceIds?.map(Variable.withString),
           ],
