@@ -1075,7 +1075,7 @@
     "inventory": {
       "path": "tools/datapack/source-inventory.json",
       "retrievedAt": "2026-06-22",
-      "sha256": "284a5b0ed4d47428531f07594f153bbdf8e18153bdc268049b79ae3df2c9931d"
+      "sha256": "1b5642c0530b59568d979208633c0e965b3cca8d49fb5ffce88f22231343426a"
     },
     "resolutions": {
       "entryCount": 4,
@@ -1143,17 +1143,17 @@
       {
         "earliestResolutionNextReviewAt": null,
         "explicitlyUnsupportedWithEvidenceCount": 0,
-        "inventoryAdmittedCount": 33,
-        "inventoryAdmittedRatio": 0.7333,
+        "inventoryAdmittedCount": 36,
+        "inventoryAdmittedRatio": 0.8,
         "missingByKind": {
-          "DUAL_OPERATOR_UNMATCHED": 9,
+          "DUAL_OPERATOR_UNMATCHED": 6,
           "NO_ADMITTED_SOURCE": 3
         },
-        "missingCount": 12,
+        "missingCount": 9,
         "sourceDomain": "route_map_positions",
         "supportStartedResolutionCount": 0,
-        "terminalCount": 33,
-        "terminalRatio": 0.7333,
+        "terminalCount": 36,
+        "terminalRatio": 0.8,
         "totalCount": 45
       },
       {
@@ -1209,17 +1209,17 @@
       {
         "earliestResolutionNextReviewAt": null,
         "explicitlyUnsupportedWithEvidenceCount": 0,
-        "inventoryAdmittedCount": 35,
-        "inventoryAdmittedRatio": 0.1768,
+        "inventoryAdmittedCount": 38,
+        "inventoryAdmittedRatio": 0.1919,
         "missingByKind": {
-          "DUAL_OPERATOR_UNMATCHED": 12,
+          "DUAL_OPERATOR_UNMATCHED": 9,
           "NO_ADMITTED_SOURCE": 151
         },
-        "missingCount": 163,
+        "missingCount": 160,
         "regionId": "capital",
         "supportStartedResolutionCount": 0,
-        "terminalCount": 35,
-        "terminalRatio": 0.1768,
+        "terminalCount": 38,
+        "terminalRatio": 0.1919,
         "totalCount": 198
       },
       {
@@ -1273,13 +1273,13 @@
     ],
     "earliestResolutionNextReviewAt": "2026-10-19T02:43:09.257Z",
     "explicitlyUnsupportedWithEvidenceCount": 4,
-    "inventoryAdmittedCount": 80,
-    "inventoryAdmittedRatio": 0.2963,
+    "inventoryAdmittedCount": 83,
+    "inventoryAdmittedRatio": 0.3074,
     "missingByKind": {
-      "DUAL_OPERATOR_UNMATCHED": 12,
+      "DUAL_OPERATOR_UNMATCHED": 9,
       "NO_ADMITTED_SOURCE": 174
     },
-    "missingCount": 186,
+    "missingCount": 183,
     "requirements": [
       {
         "admissionRatio": 1,
@@ -3791,20 +3791,15 @@
         ]
       },
       {
-        "admissionRatio": 0,
-        "admittedFieldCount": 0,
-        "admittedSourceIds": [],
+        "admissionRatio": 1,
+        "admittedFieldCount": 2,
+        "admittedSourceIds": [
+          "kric-shinbundang-route-map-positions"
+        ],
         "blockingThreshold": 1,
-        "dualOperator": {
-          "coveringOperatorIds": [
-            "seoul-metro"
-          ],
-          "coveringSourceIds": [
-            "kric-shinbundang-route-map-positions"
-          ]
-        },
+        "dualOperator": null,
         "lineId": "shinbundang",
-        "missingKind": "DUAL_OPERATOR_UNMATCHED",
+        "missingKind": null,
         "operatorId": "operator-28e01fb8509d",
         "regionId": "capital",
         "releaseTier": "LAUNCH_REQUIRED",
@@ -3812,11 +3807,8 @@
         "resolution": null,
         "resolutionReviewStatus": null,
         "sourceDomain": "route_map_positions",
-        "status": "MISSING",
-        "unadmittedFields": [
-          "route_map_position",
-          "route_map_label_polygon"
-        ]
+        "status": "INVENTORY_ADMITTED",
+        "unadmittedFields": []
       },
       {
         "admissionRatio": 0,
@@ -4189,20 +4181,15 @@
         ]
       },
       {
-        "admissionRatio": 0,
-        "admittedFieldCount": 0,
-        "admittedSourceIds": [],
+        "admissionRatio": 1,
+        "admittedFieldCount": 2,
+        "admittedSourceIds": [
+          "kric-seohae-route-map-positions"
+        ],
         "blockingThreshold": 1,
-        "dualOperator": {
-          "coveringOperatorIds": [
-            "korail"
-          ],
-          "coveringSourceIds": [
-            "kric-seohae-route-map-positions"
-          ]
-        },
+        "dualOperator": null,
         "lineId": "line-051552e50435",
-        "missingKind": "DUAL_OPERATOR_UNMATCHED",
+        "missingKind": null,
         "operatorId": "operator-38450e138464",
         "regionId": "capital",
         "releaseTier": "LAUNCH_REQUIRED",
@@ -4210,11 +4197,8 @@
         "resolution": null,
         "resolutionReviewStatus": null,
         "sourceDomain": "route_map_positions",
-        "status": "MISSING",
-        "unadmittedFields": [
-          "route_map_position",
-          "route_map_label_polygon"
-        ]
+        "status": "INVENTORY_ADMITTED",
+        "unadmittedFields": []
       },
       {
         "admissionRatio": 0,
@@ -4848,20 +4832,15 @@
         ]
       },
       {
-        "admissionRatio": 0,
-        "admittedFieldCount": 0,
-        "admittedSourceIds": [],
+        "admissionRatio": 1,
+        "admittedFieldCount": 2,
+        "admittedSourceIds": [
+          "kric-gtx-a-route-map-positions"
+        ],
         "blockingThreshold": 1,
-        "dualOperator": {
-          "coveringOperatorIds": [
-            "operator-5ca780d7dee1"
-          ],
-          "coveringSourceIds": [
-            "kric-gtx-a-route-map-positions"
-          ]
-        },
+        "dualOperator": null,
         "lineId": "line-8604048b6430",
-        "missingKind": "DUAL_OPERATOR_UNMATCHED",
+        "missingKind": null,
         "operatorId": "operator-9e999d4aa596",
         "regionId": "capital",
         "releaseTier": "LAUNCH_REQUIRED",
@@ -4869,11 +4848,8 @@
         "resolution": null,
         "resolutionReviewStatus": null,
         "sourceDomain": "route_map_positions",
-        "status": "MISSING",
-        "unadmittedFields": [
-          "route_map_position",
-          "route_map_label_polygon"
-        ]
+        "status": "INVENTORY_ADMITTED",
+        "unadmittedFields": []
       },
       {
         "admissionRatio": 0,
@@ -7145,8 +7121,8 @@
       }
     ],
     "supportStartedResolutionCount": 0,
-    "terminalCount": 84,
-    "terminalRatio": 0.3111,
+    "terminalCount": 87,
+    "terminalRatio": 0.3222,
     "totalCount": 270
   },
   "parentIssue": 2138,
