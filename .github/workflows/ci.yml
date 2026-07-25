@@ -473,7 +473,7 @@ jobs:
         if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.docs_only == 'true' || needs.changes.outputs.ci == 'true' }}
         env:
           NODE_OPTIONS: --disable-warning=ExperimentalWarning
-        run: node --test tools/ci/*.test.mjs tools/ci/lib/*.test.mjs tools/repo/*.test.mjs
+        run: node --test tools/ci/*.test.mjs tools/ci/lib/*.test.mjs tools/repo/*.test.mjs tools/lib/*.test.mjs tools/mobile/*.test.mjs
 
       - name: Repository CI / Validate contracts
         if: ${{ needs.changes.outputs.contracts == 'true' }}
