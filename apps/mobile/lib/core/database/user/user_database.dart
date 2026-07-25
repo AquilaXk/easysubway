@@ -25,6 +25,14 @@ part 'user_database.g.dart';
 ///
 /// App updates and catalog pack swaps must preserve favorites, search history,
 /// report receipts, drafts, preferences, and installed-pack audit rows.
+///
+/// 계약 예외 — region이 없는 레거시 검색 이력은 v3 마이그레이션에서 정리한다
+/// (#2419). 지역 필터 목록에 절대 나올 수 없어 보존해도 읽히지 않는 행이고,
+/// 매 조회마다 지우던 방식을 마이그레이션 시점 1회로 옮긴 결정의 결과다.
+/// 추정 region 백필은 틀린 지역이 필터 결과를 오염시키므로 택하지 않았다(#2546).
+///
+/// 마이그레이션이 실패해 DB를 열지 못하면 `UserDatabaseOpener`가 원본 파일을
+/// 삭제하지 않고 보관한 뒤 보존 우선순위대로 부분 복구한다(#2546).
 class UserDatabase extends _$UserDatabase {
   UserDatabase(super.executor);
 
@@ -45,115 +53,155 @@ class UserDatabase extends _$UserDatabase {
       onCreate: (migrator) async {
         await migrator.createAll();
       },
-      onUpgrade: (_, from, to) async {
+      onUpgrade: (migrator, from, to) async {
         if (from < 1) {
           throw StateError('Unsupported user database schema version: $from');
         }
-        if (from < 2) {
-          await customStatement(
-            'ALTER TABLE report_receipts ADD COLUMN public_receipt_code TEXT',
-          );
-        }
-        if (from < 3) {
-          await customStatement(
-            'ALTER TABLE search_history ADD COLUMN region TEXT',
-          );
-          // 지역 없는 레거시 행은 지역 필터 목록에 절대 나올 수 없으므로
-          // 마이그레이션 시점에 한 번만 정리한다(#2419: 매 조회마다 지우던
-          // 방식은 읽기 경로에 쓰기를 섞어 제거했다).
-          await customStatement(
-            "DELETE FROM search_history WHERE region IS NULL OR TRIM(region) = ''",
-          );
-          await customStatement('''
-            CREATE TABLE route_search_history (
-              id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-              origin_station_id TEXT NOT NULL,
-              origin_station_name TEXT NOT NULL,
-              waypoint_station_id TEXT NULL,
-              waypoint_station_name TEXT NULL,
-              destination_station_id TEXT NOT NULL,
-              destination_station_name TEXT NOT NULL,
-              region TEXT NOT NULL,
-              searched_at INTEGER NOT NULL
-            )
-          ''');
-        }
-        if (from < 4) {
-          // 즐겨찾기 역을 호선+역 단위로 분리한다. 기존 행은 line_id=''(역 전체).
-          // schema 2→3 최소 fixture처럼 favorite_stations가 없을 수 있다.
-          final existingFavoriteStations = await customSelect('''
-            SELECT name FROM sqlite_master
-            WHERE type = 'table' AND name = 'favorite_stations'
-          ''').get();
-          if (existingFavoriteStations.isEmpty) {
-            await customStatement('''
-              CREATE TABLE favorite_stations (
-                station_id TEXT NOT NULL,
-                line_id TEXT NOT NULL DEFAULT '',
-                added_at INTEGER NOT NULL,
-                PRIMARY KEY (station_id, line_id)
-              )
-            ''');
-          } else {
-            await customStatement('''
-              CREATE TABLE favorite_stations_v4 (
-                station_id TEXT NOT NULL,
-                line_id TEXT NOT NULL DEFAULT '',
-                added_at INTEGER NOT NULL,
-                PRIMARY KEY (station_id, line_id)
-              )
-            ''');
-            await customStatement('''
-              INSERT INTO favorite_stations_v4 (station_id, line_id, added_at)
-              SELECT station_id, '', CAST(added_at AS INTEGER)
-              FROM favorite_stations
-            ''');
-            await customStatement('DROP TABLE favorite_stations');
-            await customStatement(
-              'ALTER TABLE favorite_stations_v4 RENAME TO favorite_stations',
-            );
-          }
-        }
-        if (from < 5) {
-          // 최근 검색·경로에 "선택한 호선"만 저장해 환승역 전 호선 마크를 막는다.
-          await customStatement(
-            'ALTER TABLE search_history ADD COLUMN station_id TEXT',
-          );
-          await customStatement(
-            'ALTER TABLE search_history ADD COLUMN line_id TEXT',
-          );
-          await customStatement(
-            'ALTER TABLE search_history ADD COLUMN line_name TEXT',
-          );
-          await customStatement(
-            'ALTER TABLE search_history ADD COLUMN line_color TEXT',
-          );
-          await customStatement(
-            'ALTER TABLE search_history ADD COLUMN station_code TEXT',
-          );
-          for (final column in const [
-            'origin_line_id',
-            'origin_line_name',
-            'origin_line_color',
-            'origin_station_code',
-            'waypoint_line_id',
-            'waypoint_line_name',
-            'waypoint_line_color',
-            'waypoint_station_code',
-            'destination_line_id',
-            'destination_line_name',
-            'destination_line_color',
-            'destination_station_code',
-          ]) {
-            await customStatement(
-              'ALTER TABLE route_search_history ADD COLUMN $column TEXT',
-            );
-          }
-        }
+        // drift는 onUpgrade를 트랜잭션으로 감싸지 않는다. 전 단계를 한
+        // 트랜잭션으로 묶어 어느 문장에서 실패하든 원본 스키마와 행이 그대로
+        // 남게 한다. SQLite는 DDL도 트랜잭션 대상이라 CREATE·DROP·RENAME까지
+        // 되돌아간다(#2546).
+        await transaction(() async {
+          await _upgradeFrom(migrator, from);
+        });
       },
       beforeOpen: (_) async {
         await customStatement('PRAGMA foreign_keys = ON');
       },
     );
+  }
+
+  Future<void> _upgradeFrom(Migrator migrator, int from) async {
+    if (from < 2) {
+      await _addColumnIfTableExists(
+        'report_receipts',
+        'public_receipt_code',
+        'TEXT',
+      );
+    }
+    if (from < 3) {
+      if (await _tableExists('search_history')) {
+        await _addColumnIfMissing('search_history', 'region', 'TEXT');
+        // 지역 없는 레거시 행은 지역 필터 목록에 절대 나올 수 없으므로
+        // 마이그레이션 시점에 한 번만 정리한다(#2419: 매 조회마다 지우던
+        // 방식은 읽기 경로에 쓰기를 섞어 제거했다).
+        await customStatement(
+          "DELETE FROM search_history WHERE region IS NULL OR TRIM(region) = ''",
+        );
+      }
+      // route_search_history는 이 단계에서 처음 생긴다. 결손 테이블 생성은
+      // 아래 createAll 한 곳에서만 해 raw DDL과 테이블 정의가 갈리지 않게 한다.
+    }
+    if (from < 4) {
+      await _splitFavoriteStationsByLine();
+    }
+    if (from < 5) {
+      // 최근 검색·경로에 "선택한 호선"만 저장해 환승역 전 호선 마크를 막는다.
+      for (final column in const [
+        'station_id',
+        'line_id',
+        'line_name',
+        'line_color',
+        'station_code',
+      ]) {
+        await _addColumnIfTableExists('search_history', column, 'TEXT');
+      }
+      for (final column in const [
+        'origin_line_id',
+        'origin_line_name',
+        'origin_line_color',
+        'origin_station_code',
+        'waypoint_line_id',
+        'waypoint_line_name',
+        'waypoint_line_color',
+        'waypoint_station_code',
+        'destination_line_id',
+        'destination_line_name',
+        'destination_line_color',
+        'destination_station_code',
+      ]) {
+        await _addColumnIfTableExists('route_search_history', column, 'TEXT');
+      }
+    }
+    // 위 단계가 건너뛴 결손 테이블을 현재 정의로 만든다. drift가
+    // `CREATE TABLE IF NOT EXISTS`를 쓰므로 살아 있는 테이블은 건드리지
+    // 않는다. 부분 생성 DB도 열린 뒤 모든 읽기 경로가 동작해야 한다(#2546).
+    await migrator.createAll();
+  }
+
+  /// v4 즐겨찾기 역 분리. 기존 행은 `line_id=''`(역 전체)로 옮긴다.
+  ///
+  /// `DROP`과 `RENAME` 사이에서 실패하면 즐겨찾기 역이 통째로 사라지므로
+  /// 재작성 4문장은 반드시 원자적이어야 한다. 원자성은 [migration]의 onUpgrade
+  /// 트랜잭션이 보장한다(#2546).
+  Future<void> _splitFavoriteStationsByLine() async {
+    if (!await _tableExists('favorite_stations')) {
+      // schema 2→3 최소 fixture처럼 favorite_stations가 없을 수 있다.
+      // 결손 테이블은 onUpgrade 끝의 createAll이 현재 정의로 만든다.
+      return;
+    }
+    if (await _columnExists('favorite_stations', 'line_id')) {
+      // 이 단계까지 마치고 뒤 단계에서 실패해 user_version이 안 오른 DB.
+      // 다시 재작성하면 호선별 즐겨찾기가 역 전체로 되돌아가므로 건너뛴다.
+      return;
+    }
+    await customStatement('''
+      CREATE TABLE favorite_stations_v4 (
+        station_id TEXT NOT NULL,
+        line_id TEXT NOT NULL DEFAULT '',
+        added_at INTEGER NOT NULL,
+        PRIMARY KEY (station_id, line_id)
+      )
+    ''');
+    await customStatement('''
+      INSERT INTO favorite_stations_v4 (station_id, line_id, added_at)
+      SELECT station_id, '', CAST(added_at AS INTEGER)
+      FROM favorite_stations
+    ''');
+    await customStatement('DROP TABLE favorite_stations');
+    await customStatement(
+      'ALTER TABLE favorite_stations_v4 RENAME TO favorite_stations',
+    );
+  }
+
+  Future<bool> _tableExists(String tableName) async {
+    final table = await customSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+      variables: [Variable<String>(tableName)],
+    ).getSingleOrNull();
+    return table != null;
+  }
+
+  Future<bool> _columnExists(String tableName, String columnName) async {
+    final columns = await customSelect('PRAGMA table_info($tableName)').get();
+    return columns.any((row) => row.read<String>('name') == columnName);
+  }
+
+  Future<void> _addColumnIfMissing(
+    String tableName,
+    String columnName,
+    String definition,
+  ) async {
+    if (await _columnExists(tableName, columnName)) {
+      return;
+    }
+    await customStatement(
+      'ALTER TABLE $tableName ADD COLUMN $columnName $definition',
+    );
+  }
+
+  /// 대상 테이블이 없는 부분 생성 DB에서 `ALTER TABLE`이 던지지 않게 막는다.
+  ///
+  /// 컬럼 단위로도 확인해 앞선 실행이 중간에 실패한 DB에서 재실행해도
+  /// `duplicate column name`으로 깨지지 않는다.
+  Future<void> _addColumnIfTableExists(
+    String tableName,
+    String columnName,
+    String definition,
+  ) async {
+    if (!await _tableExists(tableName)) {
+      return;
+    }
+    await _addColumnIfMissing(tableName, columnName, definition);
   }
 }
