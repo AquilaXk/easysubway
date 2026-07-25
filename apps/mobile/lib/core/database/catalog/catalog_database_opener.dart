@@ -47,6 +47,9 @@ class CatalogDatabaseOpener {
     final database = CatalogDatabase.file(
       File(p.join(datapackDirectory.path, 'capital.sqlite')),
     );
+    // 번들 경로도 설치 경로와 같은 구제를 거친다(#2527). 번들 팩은 마지막 대안이라
+    // 거부할 상위 팩이 없으므로 구제만 하고 강등 판정은 하지 않는다.
+    await database.rescueMissingCatalogTables();
     await database.seedBaselineIfEmpty();
     await _writeBundledFreshness(datapackDirectory, index);
     _openedBundledDataPack = true;
@@ -257,12 +260,18 @@ class CatalogDatabaseOpener {
     final database = CatalogDatabase.file(file);
     var returned = false;
     try {
-      if (await _isUsableCatalogDatabase(database)) {
-        returned = true;
-        _openedArtifactIdentity = p.normalize(file.absolute.path);
-        return database;
+      if (!await _isUsableCatalogDatabase(database)) {
+        return null;
       }
-      return null;
+      // 설치 팩도 번들 팩과 같은 구제를 거친다(#2527). 빈 테이블 생성이 안전하지 않은
+      // 테이블이 빠져 있으면 이 팩을 열지 않고 known-good 또는 번들로 강등한다.
+      final rescue = await database.rescueMissingCatalogTables();
+      if (rescue.isBlocked) {
+        return null;
+      }
+      returned = true;
+      _openedArtifactIdentity = p.normalize(file.absolute.path);
+      return database;
     } finally {
       if (!returned) {
         await database.close();
