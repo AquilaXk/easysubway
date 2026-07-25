@@ -289,8 +289,15 @@ test("test-only ADMITTED timetable은 ITX trip·stop·EXPRESS edge를 materializ
     assert.equal(evidence.admission_status, "ADMITTED");
     assert.equal(evidence.admission_eligible, 1);
     assert.equal(evidence.timetable_artifact_sha256, createHash("sha256").update(admissionBytes).digest("hex"));
-    assert.equal(evidence.canonical_pack_sha256, "b0f8caafa8ab8b71c57dc05461138c0fb7ac58fe4f9df7045e5d4a729dcae1f7");
-    assert.equal(evidence.canonical_pack_sqlite_sha256, "d261231c0f05ef2ab1974375b0434eec4d38a90b7df9ee5679fe6815cdcf1d37");
+    // #2068: 번들 pack이 재생성되면(노선도 재설계) 이 pin도 함께 바뀐다 —
+    // 상수 하드코딩 대신 test-only fixture가 pin한 값과 대조해, fixture 갱신만
+    // 하면 되도록 한다(fixture 자체는 build-datapack이 라이브 pack과 검증한다).
+    const admission = JSON.parse(admissionBytes);
+    assert.equal(evidence.canonical_pack_sha256, admission.canonicalPackIdentity.sha256);
+    assert.equal(
+      evidence.canonical_pack_sqlite_sha256,
+      admission.canonicalPackIdentity.sqliteSha256,
+    );
   } finally {
     database.close();
   }
