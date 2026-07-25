@@ -88,6 +88,7 @@ const LINE_DEFINITIONS = Object.freeze([
     lineNameToken: "경춘",
     operatorNameToken: "코레일",
     datasetId: "15041483",
+    datasetIds: ["15041483", "1294"],
     detailUrl: "https://www.data.go.kr/data/15041483/fileData.do",
     downloadUrl:
       "https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FILE_000000002647504&fileDetailSn=1&insertDataPrcus=N",
@@ -144,6 +145,7 @@ const LINE_DEFINITIONS = Object.freeze([
     lineNameToken: "경강",
     operatorNameToken: "코레일",
     datasetId: "15041486",
+    datasetIds: ["15041486", "1294"],
     detailUrl: "https://www.data.go.kr/data/15041486/fileData.do",
     downloadUrl:
       "https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FILE_000000003045974&fileDetailSn=1&insertDataPrcus=N",

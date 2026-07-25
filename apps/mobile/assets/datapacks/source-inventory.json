@@ -3035,14 +3035,15 @@
         "verificationTest": "tools/datapack/materialize-kric-capital-wide-rail-route-map-positions.test.mjs",
         "snapshotId": "kric-gyeongchun-route-map-positions-20260725",
         "snapshotPath": "tools/datapack/sources/kric-gyeongchun-route-map-positions-20260725.json",
-        "snapshotSha256": "84b54ae133b493138b431a76d786c5b48b1b40d1c53d313d65d7f11b09133f6d",
+        "snapshotSha256": "0e5321625953e55060a2fea04ac834f226ffd6d048b0afaf7bbc88606db6fd39",
         "capturedAt": "2026-07-25T06:00:00.000Z",
         "stationCount": 25,
         "rawStationCount": 25,
         "quarantinedCount": 0,
         "datasetId": "15041483",
         "datasetIds": [
-          "15041483"
+          "15041483",
+          "1294"
         ],
         "rawSha256": "b41d276479134953c888500d97394b75771d5e89e628d936e2f4070695f84b48",
         "positionsSha256": "93f62022992ab755211f1bc4d222b369c262a195335d1eafd95d4977fa985082",
@@ -3148,14 +3149,15 @@
         "verificationTest": "tools/datapack/materialize-kric-capital-wide-rail-route-map-positions.test.mjs",
         "snapshotId": "kric-gyeonggang-route-map-positions-20260725",
         "snapshotPath": "tools/datapack/sources/kric-gyeonggang-route-map-positions-20260725.json",
-        "snapshotSha256": "828275df2aff823897a62ecc975dda2ea8745d72dadbce20125832f4101f1a72",
+        "snapshotSha256": "48b6f150880cbda8fb16f7aefff2dd08825922d24b5b95d8d6d45e47ed1fbb08",
         "capturedAt": "2026-07-25T06:00:00.000Z",
         "stationCount": 12,
         "rawStationCount": 12,
         "quarantinedCount": 0,
         "datasetId": "15041486",
         "datasetIds": [
-          "15041486"
+          "15041486",
+          "1294"
         ],
         "rawSha256": "4744c6dc298db3a5f34e7bc91a1ad182daba6676b314a07094ad8da0b1e5c7df",
         "positionsSha256": "21adbcaed325e48f206cf8f4648c4ff38d1a92a8fbdb94bdf798f98a08a14677",
