@@ -62,6 +62,25 @@ test("production-publish는 release request 조회 스텝과 !cancelled() 콜백
   assert.doesNotMatch(yml, /steps\.evidence-bundle\.outputs\.manifestSha256/);
 });
 
+test("production-publish는 pack 빌드 전에 release request ↔ build spec 결속을 확인한다", () => {
+  const verifyStep = yml.match(
+    /- name: Data Pack Release \/ Verify release request binding[\s\S]*?\n\s+- name:/,
+  )?.[0];
+  assert.ok(verifyStep, "release request binding 검증 스텝을 찾지 못함");
+  assert.match(verifyStep, /if:\s*\$\{\{ steps\.release-mode\.outputs\.mode == 'production-publish' \}\}/);
+  assert.match(verifyStep, /verify-release-request-binding\.mjs/);
+  assert.match(verifyStep, /--build-spec "\$\{EASYSUBWAY_DATAPACK_BUILD_SPEC_PATH\}"/);
+  assert.match(verifyStep, /--release-request/);
+  // API 조회 경로(RELEASE_REQUEST_PATH)와 파일 입력 경로 양쪽을 모두 검증해야 한다.
+  assert.match(verifyStep, /RELEASE_REQUEST_PATH:-\$\{EASYSUBWAY_DATAPACK_RELEASE_REQUEST_PATH:-\}/);
+  // release request를 확보한 뒤, 그러나 pack을 빌드하고 판정하기 전에 놓여야 앞당긴 fail-closed가 된다.
+  const fetchRequest = yml.indexOf("Data Pack Release / Fetch release request");
+  const verify = yml.indexOf("Data Pack Release / Verify release request binding");
+  const buildPacks = yml.indexOf("Data Pack Release / Build data packs");
+  const decide = yml.indexOf("Data Pack Release / Decide conditional publish");
+  assert.ok(fetchRequest >= 0 && verify > fetchRequest && buildPacks > verify && decide > buildPacks);
+});
+
 test("production callback은 bounded sender 증적을 항상 보존하고 실패를 fail-closed한다", () => {
   const productionPublishStep = yml.match(
     /- name: Data Pack Release \/ Publish staged data packs to object storage[\s\S]*?\n\s+- name:/,
