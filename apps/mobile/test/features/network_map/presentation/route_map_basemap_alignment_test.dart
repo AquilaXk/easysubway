@@ -180,7 +180,7 @@ void main() {
 
   // (C) 부산 전 역: seoul과 동일 하드 게이트를 부산에 미러(#2068 완주 라운드,
   // 오너 v2 재배치 승인 반영). fixture 출처는 (B)와 동일 생성기(부산 재실행,
-  // --region 부산권 --geometry easy-subway-busan-v1-geometry.json)이며, 파이프라인이
+  // --region 부산권 --geometry easy-subway-busan-v3-geometry.json)이며, 파이프라인이
   // seoul과 동일하게 respace --pin-stations로 팩 좌표를 SVG 배정에 고정한다.
   //
   // 예외 1건: 국제금융센터·부산은행(station-080c154ce646/line-eb7b47920390)은
@@ -203,7 +203,7 @@ void main() {
       isTrue,
       reason:
           'fixture 없음 — node tools/route-map/generate-basemap-alignment-fixture.mjs '
-          '--region 부산권 --geometry tools/route-map/route-map-defs/easy-subway-busan-v1-geometry.json '
+          '--region 부산권 --geometry tools/route-map/route-map-defs/easy-subway-busan-v3-geometry.json '
           '--out tools/route-map/route-map-defs/busan-alignment-fixture.json 로 생성 필요: ${file.path}',
     );
     final fixture = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
@@ -242,7 +242,7 @@ void main() {
 
   // (D) 대구 전 역: seoul(B)·busan(C)과 동일 하드 게이트를 대구에 미러(#2068
   // 완주 라운드, 오너 직접 제작본 전환 반영). fixture 출처는 동일 생성기(대구
-  // 재실행, --region 대구권 --geometry easy-subway-daegu-v1-geometry.json)이며,
+  // 재실행, --region 대구권 --geometry easy-subway-daegu-v3-geometry.json)이며,
   // 파이프라인이 seoul·busan과 동일하게 respace --pin-stations로 팩 좌표를 SVG
   // 배정에 고정한다 — 실측 delta는 전부 0px(정수 반올림 일치). 대구는 라벨
   // nudge 파일이 없어 예외 없이 전 역 하드다(seoul(B) 패턴).
@@ -257,7 +257,7 @@ void main() {
       isTrue,
       reason:
           'fixture 없음 — node tools/route-map/generate-basemap-alignment-fixture.mjs '
-          '--region 대구권 --geometry tools/route-map/route-map-defs/easy-subway-daegu-v1-geometry.json '
+          '--region 대구권 --geometry tools/route-map/route-map-defs/easy-subway-daegu-v3-geometry.json '
           '--out tools/route-map/route-map-defs/daegu-alignment-fixture.json 로 생성 필요: ${file.path}',
     );
     final fixture = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;

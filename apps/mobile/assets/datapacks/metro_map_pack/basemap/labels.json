@@ -6706,7 +6706,7 @@
         "x": 5549.7959,
         "y": 4390.3604,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -6715,7 +6715,7 @@
         "x": 922.0085,
         "y": 1201.4739,
         "anchor": "middle",
-        "fontSizePx": 53.903,
+        "fontSizePx": 48.8526,
         "lines": [],
         "hasLineTerminalBadge": true
       },
@@ -6725,7 +6725,7 @@
         "x": 3923.7537,
         "y": 4382.4502,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -6734,7 +6734,7 @@
         "x": 2613.1318,
         "y": 2658.8396,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -6743,7 +6743,7 @@
         "x": 4873.1426,
         "y": 4388.4497,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -6752,7 +6752,7 @@
         "x": 10699.548,
         "y": 1742.9459,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -6761,7 +6761,7 @@
         "x": 5945.5801,
         "y": 3356.9746,
         "anchor": "end",
-        "fontSizePx": 58.103,
+        "fontSizePx": 54.6,
         "lines": []
       },
       {
@@ -6770,7 +6770,7 @@
         "x": 5786.188,
         "y": 3679.4685,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -6779,8 +6779,19 @@
         "x": 8889.5059,
         "y": 4512.6626,
         "anchor": "start",
-        "fontSizePx": 51.803,
-        "lines": []
+        "fontSizePx": 48.8526,
+        "lines": [
+          {
+            "text": "경성대·",
+            "x": 8889.5059,
+            "y": 4512.6626
+          },
+          {
+            "text": "부경대",
+            "x": 8889.5059,
+            "y": 4577.4165
+          }
+        ]
       },
       {
         "station": "고촌",
@@ -6788,7 +6799,7 @@
         "x": 7993.0439,
         "y": 1641.7123,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -6797,7 +6808,7 @@
         "x": 1499.032,
         "y": 4065.7998,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -6806,7 +6817,7 @@
         "x": 9197.6045,
         "y": 3971.9795,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -6815,7 +6826,7 @@
         "x": 2925.5356,
         "y": 4492.4219,
         "anchor": "end",
-        "fontSizePx": 47.602,
+        "fontSizePx": 48.8526,
         "lines": [
           {
             "text": "괘법",
@@ -6835,7 +6846,7 @@
         "x": 2191.1589,
         "y": 4937.6211,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -6844,7 +6855,7 @@
         "x": 6356.3135,
         "y": 3003.011,
         "anchor": "end",
-        "fontSizePx": 58.103,
+        "fontSizePx": 54.6,
         "lines": []
       },
       {
@@ -6853,7 +6864,7 @@
         "x": 3612.4143,
         "y": 3300.4612,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -6862,7 +6873,7 @@
         "x": 3609.0967,
         "y": 2998.9265,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -6871,7 +6882,7 @@
         "x": 6315.1758,
         "y": 1824.48,
         "anchor": "middle",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -6880,7 +6891,7 @@
         "x": 3049.9871,
         "y": 2663.8281,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -6889,8 +6900,19 @@
         "x": 6984.6455,
         "y": 4499.2051,
         "anchor": "start",
-        "fontSizePx": 47.602,
-        "lines": []
+        "fontSizePx": 48.8526,
+        "lines": [
+          {
+            "text": "국제금융센터·",
+            "x": 6984.6455,
+            "y": 4499.2051
+          },
+          {
+            "text": "부산은행",
+            "x": 6984.6455,
+            "y": 4558.7075
+          }
+        ]
       },
       {
         "station": "금곡",
@@ -6898,7 +6920,7 @@
         "x": 3608.9563,
         "y": 1894.1719,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -6907,7 +6929,7 @@
         "x": 9113.7666,
         "y": 4149.0664,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -6916,7 +6938,7 @@
         "x": 7357.8984,
         "y": 2318.49,
         "anchor": "middle",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -6925,7 +6947,7 @@
         "x": 9823.7295,
         "y": 2617.4961,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -6934,7 +6956,7 @@
         "x": 1012.0455,
         "y": 2395.7249,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -6943,7 +6965,7 @@
         "x": 1017.0214,
         "y": 2075.7981,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -6952,7 +6974,7 @@
         "x": 6667.2393,
         "y": 2779.3838,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -6961,7 +6983,7 @@
         "x": 6312.269,
         "y": 1536.2678,
         "anchor": "middle",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -6970,7 +6992,7 @@
         "x": 4568.2378,
         "y": 2664.2051,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -6979,7 +7001,7 @@
         "x": 3649.7261,
         "y": 1351.8759,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -6988,7 +7010,7 @@
         "x": 10377.973,
         "y": 2062.1697,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -6997,7 +7019,7 @@
         "x": 9117.8574,
         "y": 4329.8262,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7006,7 +7028,7 @@
         "x": 4352.7588,
         "y": 4944.2666,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7015,7 +7037,7 @@
         "x": 2444.4749,
         "y": 5818.4175,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7024,7 +7046,7 @@
         "x": 4539.1558,
         "y": 4386.5068,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7033,7 +7055,7 @@
         "x": 6314.584,
         "y": 1228.7761,
         "anchor": "middle",
-        "fontSizePx": 53.903,
+        "fontSizePx": 48.8526,
         "lines": [],
         "hasLineTerminalBadge": true
       },
@@ -7043,7 +7065,7 @@
         "x": 2769.9651,
         "y": 5813.5439,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7052,7 +7074,7 @@
         "x": 3217.1033,
         "y": 5812.3604,
         "anchor": "end",
-        "fontSizePx": 53.903,
+        "fontSizePx": 48.8526,
         "lines": [],
         "hasLineTerminalBadge": true
       },
@@ -7062,7 +7084,7 @@
         "x": 1587.7665,
         "y": 5028.4624,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7071,7 +7093,7 @@
         "x": 1193.7886,
         "y": 2777.5283,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7080,7 +7102,7 @@
         "x": 8575.9678,
         "y": 4504.874,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7089,7 +7111,7 @@
         "x": 1616.9707,
         "y": 2641.5122,
         "anchor": "end",
-        "fontSizePx": 58.103,
+        "fontSizePx": 54.6,
         "lines": []
       },
       {
@@ -7098,7 +7120,7 @@
         "x": 2498.3145,
         "y": 4940.9189,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7107,7 +7129,7 @@
         "x": 1529.9771,
         "y": 3461.1763,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7116,7 +7138,7 @@
         "x": 3615.3167,
         "y": 2644.5078,
         "anchor": "end",
-        "fontSizePx": 58.103,
+        "fontSizePx": 54.6,
         "lines": []
       },
       {
@@ -7125,7 +7147,7 @@
         "x": 3618.9387,
         "y": 4108.1089,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7134,7 +7156,7 @@
         "x": 10592.03,
         "y": 1847.8217,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7143,7 +7165,7 @@
         "x": 3246.4724,
         "y": 4940.939,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7152,7 +7174,7 @@
         "x": 6788.2603,
         "y": 3138.9758,
         "anchor": "middle",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7161,7 +7183,7 @@
         "x": 6354.7534,
         "y": 2635.5723,
         "anchor": "end",
-        "fontSizePx": 58.103,
+        "fontSizePx": 54.6,
         "lines": []
       },
       {
@@ -7170,7 +7192,7 @@
         "x": 1583.9727,
         "y": 5594.4468,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7179,7 +7201,7 @@
         "x": 9476.3662,
         "y": 3205.9746,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7188,7 +7210,7 @@
         "x": 3605.6111,
         "y": 2034.6925,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7197,7 +7219,7 @@
         "x": 5233.4404,
         "y": 4390.4487,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7206,7 +7228,7 @@
         "x": 6311.2026,
         "y": 1681.5442,
         "anchor": "middle",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7215,7 +7237,7 @@
         "x": 1531.5553,
         "y": 3020.1218,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7224,7 +7246,7 @@
         "x": 4982.9712,
         "y": 2666.832,
         "anchor": "middle",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7233,7 +7255,7 @@
         "x": 8190.104,
         "y": 3491.5593,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7242,7 +7264,7 @@
         "x": 10488.771,
         "y": 1950.9917,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7251,7 +7273,7 @@
         "x": 6356.4302,
         "y": 2477.343,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7260,7 +7282,7 @@
         "x": 7081.2822,
         "y": 2651.199,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7269,7 +7291,7 @@
         "x": 3617.6277,
         "y": 3837.5542,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7278,7 +7300,7 @@
         "x": 3615.948,
         "y": 3592.0286,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7287,7 +7309,7 @@
         "x": 8277.6309,
         "y": 4502.064,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7296,7 +7318,7 @@
         "x": 7574.2583,
         "y": 4501.1416,
         "anchor": "middle",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7305,7 +7327,7 @@
         "x": 6813.8965,
         "y": 3497.3689,
         "anchor": "middle",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7314,7 +7336,7 @@
         "x": 5508.0332,
         "y": 2643.4844,
         "anchor": "middle",
-        "fontSizePx": 58.103,
+        "fontSizePx": 54.6,
         "lines": []
       },
       {
@@ -7323,7 +7345,7 @@
         "x": 9098.373,
         "y": 3513.2271,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7332,7 +7354,7 @@
         "x": 982.8857,
         "y": 1545.8351,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7341,7 +7363,7 @@
         "x": 7570.6533,
         "y": 2159.0334,
         "anchor": "middle",
-        "fontSizePx": 47.602,
+        "fontSizePx": 48.8526,
         "lines": [
           {
             "text": "반여농산물",
@@ -7361,7 +7383,7 @@
         "x": 7512.3022,
         "y": 3493.9602,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7370,7 +7392,7 @@
         "x": 6201.4404,
         "y": 4576.9497,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7379,7 +7401,7 @@
         "x": 6332.374,
         "y": 1385.5375,
         "anchor": "middle",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7388,7 +7410,7 @@
         "x": 6205.3564,
         "y": 4741.7842,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7397,7 +7419,7 @@
         "x": 9301.377,
         "y": 2928.2429,
         "anchor": "start",
-        "fontSizePx": 58.103,
+        "fontSizePx": 54.6,
         "lines": []
       },
       {
@@ -7406,7 +7428,7 @@
         "x": 934.904,
         "y": 1802.8237,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7415,7 +7437,7 @@
         "x": 5124.9683,
         "y": 4940.9985,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7424,25 +7446,25 @@
         "x": 6400.1777,
         "y": 2130.3643,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
         "station": "부산대양산캠퍼스",
         "role": "ordinary",
-        "x": 3518.6711,
+        "x": 3518.6714,
         "y": 1473.5315,
         "anchor": "end",
-        "fontSizePx": 47.602,
+        "fontSizePx": 48.8526,
         "lines": [
           {
             "text": "부산대양산",
-            "x": 3518.6711,
+            "x": 3518.6714,
             "y": 1473.5315
           },
           {
             "text": "캠퍼스",
-            "x": 3518.6711,
+            "x": 3518.6714,
             "y": 1529.1315
           }
         ]
@@ -7453,7 +7475,7 @@
         "x": 7671.563,
         "y": 3142.3845,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7462,7 +7484,7 @@
         "x": 5788.0918,
         "y": 4937.7314,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7471,7 +7493,7 @@
         "x": 5893.0518,
         "y": 4382.6045,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7480,7 +7502,7 @@
         "x": 935.3086,
         "y": 1939.3724,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7489,7 +7511,7 @@
         "x": 6361.6738,
         "y": 4172.2349,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7498,7 +7520,7 @@
         "x": 5690.002,
         "y": 3955.7803,
         "anchor": "start",
-        "fontSizePx": 58.103,
+        "fontSizePx": 54.6,
         "lines": []
       },
       {
@@ -7507,7 +7529,7 @@
         "x": 968.553,
         "y": 2784.7278,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7516,7 +7538,7 @@
         "x": 3620.4094,
         "y": 4357.4238,
         "anchor": "end",
-        "fontSizePx": 58.103,
+        "fontSizePx": 54.6,
         "lines": []
       },
       {
@@ -7525,7 +7547,7 @@
         "x": 5485.4102,
         "y": 2969.0391,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7534,7 +7556,7 @@
         "x": 1839.7488,
         "y": 4938.2822,
         "anchor": "middle",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7543,7 +7565,7 @@
         "x": 2862.8101,
         "y": 4940.9292,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7552,16 +7574,16 @@
         "x": 7195.8477,
         "y": 2483.0605,
         "anchor": "middle",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
         "station": "서면",
         "role": "transfer",
-        "x": 6307.4507,
-        "y": 4361.2295,
+        "x": 6298.7227,
+        "y": 4373.5942,
         "anchor": "middle",
-        "fontSizePx": 58.103,
+        "fontSizePx": 54.6,
         "lines": []
       },
       {
@@ -7570,7 +7592,7 @@
         "x": 2157.6216,
         "y": 4493.9556,
         "anchor": "end",
-        "fontSizePx": 47.602,
+        "fontSizePx": 48.8526,
         "lines": [
           {
             "text": "서부산",
@@ -7590,7 +7612,7 @@
         "x": 10268.011,
         "y": 2173.6111,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7599,7 +7621,7 @@
         "x": 7657.2271,
         "y": 2022.2629,
         "anchor": "middle",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7608,7 +7630,7 @@
         "x": 8744.8184,
         "y": 3143.2175,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7617,7 +7639,7 @@
         "x": 9094.7783,
         "y": 3286.5679,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7626,7 +7648,7 @@
         "x": 9570.4189,
         "y": 2874.6021,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7635,7 +7657,7 @@
         "x": 1023.9158,
         "y": 1670.0905,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7644,7 +7666,7 @@
         "x": 6380.1294,
         "y": 2779.7612,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7653,7 +7675,7 @@
         "x": 9140.0479,
         "y": 3748.0854,
         "anchor": "start",
-        "fontSizePx": 58.103,
+        "fontSizePx": 54.6,
         "lines": []
       },
       {
@@ -7662,7 +7684,7 @@
         "x": 3521.0659,
         "y": 2481.4338,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7671,7 +7693,7 @@
         "x": 4080.4978,
         "y": 2664.2051,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7680,7 +7702,7 @@
         "x": 6361.8687,
         "y": 3670.1025,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7689,7 +7711,7 @@
         "x": 2165.0134,
         "y": 5819.2354,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7698,7 +7720,7 @@
         "x": 1581.9813,
         "y": 5402.4692,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7707,7 +7729,7 @@
         "x": 9428.6104,
         "y": 3012.6111,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7716,7 +7738,7 @@
         "x": 7255.9434,
         "y": 3135.3796,
         "anchor": "middle",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7725,7 +7747,7 @@
         "x": 8117.3608,
         "y": 1515.4741,
         "anchor": "start",
-        "fontSizePx": 53.903,
+        "fontSizePx": 48.8526,
         "lines": [],
         "hasLineTerminalBadge": true
       },
@@ -7735,7 +7757,7 @@
         "x": 3614.0979,
         "y": 1227.4097,
         "anchor": "end",
-        "fontSizePx": 53.903,
+        "fontSizePx": 48.8526,
         "lines": [],
         "hasLineTerminalBadge": true
       },
@@ -7745,16 +7767,16 @@
         "x": 6358.7461,
         "y": 3920.5183,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
         "station": "연산",
         "role": "transfer",
-        "x": 6254.3765,
-        "y": 3361.7429,
+        "x": 6248.4565,
+        "y": 3373.583,
         "anchor": "start",
-        "fontSizePx": 58.103,
+        "fontSizePx": 54.6,
         "lines": []
       },
       {
@@ -7763,7 +7785,7 @@
         "x": 1025.9353,
         "y": 1427.3591,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7772,7 +7794,7 @@
         "x": 7729.8857,
         "y": 1898.5637,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7781,7 +7803,7 @@
         "x": 9699.7061,
         "y": 2744.3137,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7790,7 +7812,7 @@
         "x": 6397.9434,
         "y": 2306.8625,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7799,7 +7821,7 @@
         "x": 10156.455,
         "y": 2286.7068,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7808,7 +7830,7 @@
         "x": 7865.418,
         "y": 1768.9548,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7817,7 +7839,7 @@
         "x": 3607.6726,
         "y": 2182.1389,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7826,7 +7848,7 @@
         "x": 969.6033,
         "y": 2235.9497,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7835,7 +7857,7 @@
         "x": 9925.9932,
         "y": 2515.6631,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7844,7 +7866,7 @@
         "x": 4002.9336,
         "y": 4944.2568,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7853,7 +7875,7 @@
         "x": 1833.9675,
         "y": 5814.6147,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7862,7 +7884,7 @@
         "x": 10374.152,
         "y": 3206.0393,
         "anchor": "start",
-        "fontSizePx": 53.903,
+        "fontSizePx": 48.8526,
         "lines": [],
         "hasLineTerminalBadge": true
       },
@@ -7872,7 +7894,7 @@
         "x": 985.155,
         "y": 1313.7234,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7881,7 +7903,7 @@
         "x": 6359.5337,
         "y": 1973.0613,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7890,7 +7912,7 @@
         "x": 8217.6074,
         "y": 3142.3845,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7899,7 +7921,7 @@
         "x": 6593.0098,
         "y": 4501.1216,
         "anchor": "middle",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7908,7 +7930,7 @@
         "x": 5486.269,
         "y": 3244.062,
         "anchor": "end",
-        "fontSizePx": 47.602,
+        "fontSizePx": 48.8526,
         "lines": [
           {
             "text": "종합",
@@ -7928,7 +7950,7 @@
         "x": 10043.818,
         "y": 2396.7571,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7937,7 +7959,7 @@
         "x": 6101.3218,
         "y": 4936.6313,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7946,7 +7968,7 @@
         "x": 4159.2402,
         "y": 4382.8623,
         "anchor": "middle",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7955,7 +7977,7 @@
         "x": 10082.795,
         "y": 3205.3088,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7964,7 +7986,7 @@
         "x": 4742.1958,
         "y": 4940.9893,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7973,7 +7995,7 @@
         "x": 3610.3596,
         "y": 1639.8263,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7982,7 +8004,7 @@
         "x": 7958.9902,
         "y": 4504.4751,
         "anchor": "middle",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -7991,7 +8013,7 @@
         "x": 930.6923,
         "y": 2563.4749,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -8000,7 +8022,7 @@
         "x": 2158.6472,
         "y": 2655.6963,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -8009,7 +8031,7 @@
         "x": 5435.1294,
         "y": 4941.0093,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -8018,7 +8040,7 @@
         "x": 6936.5732,
         "y": 2777.8081,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -8027,7 +8049,7 @@
         "x": 10796.511,
         "y": 1643.3491,
         "anchor": "start",
-        "fontSizePx": 53.903,
+        "fontSizePx": 48.8526,
         "lines": [],
         "hasLineTerminalBadge": true
       },
@@ -8037,7 +8059,7 @@
         "x": 3613.3359,
         "y": 4944.2466,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -8046,7 +8068,7 @@
         "x": 1397.6931,
         "y": 2777.1848,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -8055,7 +8077,7 @@
         "x": 1581.6902,
         "y": 5231.7959,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -8064,7 +8086,7 @@
         "x": 9752.5996,
         "y": 3206.3992,
         "anchor": "start",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -8073,7 +8095,7 @@
         "x": 3611.0879,
         "y": 1774.0789,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       },
       {
@@ -8082,7 +8104,7 @@
         "x": 3609.8396,
         "y": 2335.2026,
         "anchor": "end",
-        "fontSizePx": 51.803,
+        "fontSizePx": 48.8526,
         "lines": []
       }
     ],
@@ -8093,7 +8115,7 @@
         "x": 3836.5776,
         "y": 757.1605,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8102,7 +8124,7 @@
         "x": 1258.1272,
         "y": 1467.0861,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8111,7 +8133,7 @@
         "x": 541.8728,
         "y": 1466.1497,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8120,7 +8142,7 @@
         "x": 2363.7329,
         "y": 1663.5748,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8129,7 +8151,7 @@
         "x": 2320.7385,
         "y": 1476.3612,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8138,7 +8160,7 @@
         "x": 3961.3462,
         "y": 1241.8811,
         "anchor": "end",
-        "fontSizePx": 29,
+        "fontSizePx": 34,
         "lines": [],
         "hasLineTerminalBadge": true
       },
@@ -8148,7 +8170,7 @@
         "x": 660.9364,
         "y": 1465.9015,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8157,7 +8179,7 @@
         "x": 3520,
         "y": 1476.3612,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8166,7 +8188,7 @@
         "x": 1502.6344,
         "y": 848.8137,
         "anchor": "start",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8175,7 +8197,7 @@
         "x": 2125.1921,
         "y": 1750,
         "anchor": "start",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8184,7 +8206,7 @@
         "x": 418.2901,
         "y": 598.9549,
         "anchor": "end",
-        "fontSizePx": 29,
+        "fontSizePx": 34,
         "lines": [],
         "hasLineTerminalBadge": true
       },
@@ -8194,7 +8216,7 @@
         "x": 1074.2085,
         "y": 549.088,
         "anchor": "start",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8203,7 +8225,7 @@
         "x": 1950,
         "y": 1660.1072,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8212,7 +8234,7 @@
         "x": 1501.7194,
         "y": 1468.5482,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8221,16 +8243,16 @@
         "x": 301.4493,
         "y": 1469.8566,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "달성공원",
         "role": "ordinary",
-        "x": 1912.3131,
-        "y": 1322.9033,
+        "x": 1784.857,
+        "y": 1323.8264,
         "anchor": "end",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8239,7 +8261,7 @@
         "x": 3070.7385,
         "y": 1474.5399,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8248,16 +8270,16 @@
         "x": 457.7456,
         "y": 2148.2126,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "대구역",
         "role": "transfer",
-        "x": 2109.7695,
-        "y": 1229.057,
+        "x": 2114.9619,
+        "y": 1222.3811,
         "anchor": "end",
-        "fontSizePx": 31,
+        "fontSizePx": 38,
         "lines": []
       },
       {
@@ -8266,7 +8288,7 @@
         "x": 2470,
         "y": 1474.5399,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8275,7 +8297,7 @@
         "x": 3930.8428,
         "y": 573.8559,
         "anchor": "middle",
-        "fontSizePx": 25,
+        "fontSizePx": 34,
         "lines": [
           {
             "text": "대구한의대",
@@ -8295,7 +8317,7 @@
         "x": 1687.2544,
         "y": 2144.7102,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8304,7 +8326,7 @@
         "x": 2582.9863,
         "y": 1662.2841,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8313,7 +8335,7 @@
         "x": 420,
         "y": 1469.6471,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8322,16 +8344,16 @@
         "x": 2575.437,
         "y": 757.6455,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "동대구역",
         "role": "transfer",
         "x": 2472.9429,
-        "y": 869.0461,
+        "y": 864.5955,
         "anchor": "end",
-        "fontSizePx": 31,
+        "fontSizePx": 38,
         "lines": []
       },
       {
@@ -8340,7 +8362,7 @@
         "x": 1074.6298,
         "y": 388.091,
         "anchor": "start",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8349,7 +8371,7 @@
         "x": 2855.437,
         "y": 757.6455,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8358,7 +8380,7 @@
         "x": 1378.1272,
         "y": 1466.8379,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8367,7 +8389,7 @@
         "x": 2918.5227,
         "y": 1474.884,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8376,7 +8398,7 @@
         "x": 1667.5306,
         "y": 846.4849,
         "anchor": "start",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8385,7 +8407,7 @@
         "x": 1072.3248,
         "y": 721.3325,
         "anchor": "start",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8394,16 +8416,16 @@
         "x": 1143.0547,
         "y": 847.6616,
         "anchor": "start",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "명덕",
         "role": "transfer",
-        "x": 2034.686,
-        "y": 1589.5231,
+        "x": 2110.0234,
+        "y": 1586.1064,
         "anchor": "start",
-        "fontSizePx": 31,
+        "fontSizePx": 38,
         "lines": []
       },
       {
@@ -8412,7 +8434,7 @@
         "x": 181.4493,
         "y": 1469.7832,
         "anchor": "middle",
-        "fontSizePx": 29,
+        "fontSizePx": 34,
         "lines": [],
         "hasLineTerminalBadge": true
       },
@@ -8422,7 +8444,7 @@
         "x": 1617.4209,
         "y": 1469.3877,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8431,16 +8453,16 @@
         "x": 3695.437,
         "y": 757.6455,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "반월당",
         "role": "transfer",
-        "x": 2007.8186,
-        "y": 1467.8866,
+        "x": 2111.9932,
+        "y": 1463.8087,
         "anchor": "start",
-        "fontSizePx": 31,
+        "fontSizePx": 38,
         "lines": []
       },
       {
@@ -8449,7 +8471,7 @@
         "x": 3135.437,
         "y": 757.6455,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8458,7 +8480,7 @@
         "x": 3272.1475,
         "y": 2023.515,
         "anchor": "start",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8467,7 +8489,7 @@
         "x": 2618.5227,
         "y": 1474.1454,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8476,7 +8498,7 @@
         "x": 3931.7871,
         "y": 460.3242,
         "anchor": "middle",
-        "fontSizePx": 25,
+        "fontSizePx": 34,
         "lines": [
           {
             "text": "부호",
@@ -8496,7 +8518,7 @@
         "x": 1821.6771,
         "y": 1182.4412,
         "anchor": "start",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8505,7 +8527,7 @@
         "x": 646.6173,
         "y": 834.3638,
         "anchor": "end",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8514,7 +8536,7 @@
         "x": 532.4537,
         "y": 716.6594,
         "anchor": "end",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8523,7 +8545,7 @@
         "x": 3819.2615,
         "y": 1478.577,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8532,7 +8554,7 @@
         "x": 985,
         "y": 2146.9646,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8541,16 +8563,16 @@
         "x": 939.1207,
         "y": 1125.3158,
         "anchor": "end",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "서문시장",
         "role": "ordinary",
-        "x": 1913.0009,
-        "y": 1422.3251,
+        "x": 1784.7134,
+        "y": 1423.3129,
         "anchor": "end",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8559,7 +8581,7 @@
         "x": 1512.2544,
         "y": 2147.0291,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": [
           {
             "text": "서부",
@@ -8579,7 +8601,7 @@
         "x": 167.4557,
         "y": 2152.1899,
         "anchor": "middle",
-        "fontSizePx": 29,
+        "fontSizePx": 34,
         "lines": [],
         "hasLineTerminalBadge": true
       },
@@ -8589,7 +8611,7 @@
         "x": 780.9364,
         "y": 1435.8491,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": [
           {
             "text": "성서산업",
@@ -8609,7 +8631,7 @@
         "x": 1335,
         "y": 2144.7102,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8618,7 +8640,7 @@
         "x": 3017.3313,
         "y": 1703.7738,
         "anchor": "start",
-        "fontSizePx": 25,
+        "fontSizePx": 34,
         "lines": [
           {
             "text": "수성구민",
@@ -8638,7 +8660,7 @@
         "x": 2768.5227,
         "y": 1474.5399,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8647,7 +8669,7 @@
         "x": 3030.8555,
         "y": 2023.9202,
         "anchor": "start",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8656,7 +8678,7 @@
         "x": 2802.9863,
         "y": 1661.3351,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8665,7 +8687,7 @@
         "x": 3368.5227,
         "y": 1441.2452,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": [
           {
             "text": "수성알파",
@@ -8685,7 +8707,7 @@
         "x": 3556.5776,
         "y": 757.1605,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8694,7 +8716,7 @@
         "x": 3669.2615,
         "y": 1476.7556,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8703,7 +8725,7 @@
         "x": 2336.7358,
         "y": 1002.5633,
         "anchor": "end",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8712,7 +8734,7 @@
         "x": 2716.5776,
         "y": 757.1605,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8721,7 +8743,7 @@
         "x": 3955.4939,
         "y": 703.9178,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8730,7 +8752,7 @@
         "x": 1863.3816,
         "y": 2145.9583,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8739,7 +8761,7 @@
         "x": 3020.3362,
         "y": 1811.8029,
         "anchor": "start",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8748,7 +8770,7 @@
         "x": 3217.0457,
         "y": 1475.6226,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8757,7 +8779,7 @@
         "x": 4270,
         "y": 1474.5399,
         "anchor": "middle",
-        "fontSizePx": 29,
+        "fontSizePx": 34,
         "lines": [],
         "hasLineTerminalBadge": true
       },
@@ -8767,7 +8789,7 @@
         "x": 2122.2915,
         "y": 1870,
         "anchor": "start",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8776,7 +8798,7 @@
         "x": 796.1898,
         "y": 983.9363,
         "anchor": "end",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8785,7 +8807,7 @@
         "x": 3276.5776,
         "y": 757.1605,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8794,7 +8816,7 @@
         "x": 1018.1272,
         "y": 1468.9589,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8803,7 +8825,7 @@
         "x": 3364.179,
         "y": 2024.1195,
         "anchor": "start",
-        "fontSizePx": 29,
+        "fontSizePx": 34,
         "lines": [],
         "hasLineTerminalBadge": true
       },
@@ -8813,7 +8835,7 @@
         "x": 1818.9128,
         "y": 1052.5439,
         "anchor": "start",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8822,7 +8844,7 @@
         "x": 811.1273,
         "y": 2148.2126,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8831,7 +8853,7 @@
         "x": 1160,
         "y": 2145.9583,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8840,7 +8862,7 @@
         "x": 3415.437,
         "y": 757.6455,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8849,7 +8871,7 @@
         "x": 897.1908,
         "y": 1469.6471,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8858,7 +8880,7 @@
         "x": 4119.2612,
         "y": 1474.884,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8867,7 +8889,7 @@
         "x": 3969.2615,
         "y": 1476.0171,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8876,16 +8898,16 @@
         "x": 1140,
         "y": 1465.9015,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "중앙로",
         "role": "ordinary",
-        "x": 2119.3093,
-        "y": 1388.6874,
+        "x": 1996.9691,
+        "y": 1392.906,
         "anchor": "start",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8894,7 +8916,7 @@
         "x": 3155.1799,
         "y": 2024.1985,
         "anchor": "start",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8903,16 +8925,16 @@
         "x": 635,
         "y": 2149.219,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "청라언덕",
         "role": "transfer",
-        "x": 1790.4613,
-        "y": 1468.7999,
+        "x": 1941.4565,
+        "y": 1465.5112,
         "anchor": "end",
-        "fontSizePx": 31,
+        "fontSizePx": 38,
         "lines": []
       },
       {
@@ -8921,7 +8943,7 @@
         "x": 1073.7229,
         "y": 148.9979,
         "anchor": "start",
-        "fontSizePx": 29,
+        "fontSizePx": 34,
         "lines": [],
         "hasLineTerminalBadge": true
       },
@@ -8931,7 +8953,7 @@
         "x": 1071.8538,
         "y": 469.088,
         "anchor": "start",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8940,7 +8962,7 @@
         "x": 2218.897,
         "y": 1122.5632,
         "anchor": "end",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8949,7 +8971,7 @@
         "x": 1074.6795,
         "y": 629.559,
         "anchor": "start",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8958,7 +8980,7 @@
         "x": 1073.7229,
         "y": 313.5325,
         "anchor": "start",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8967,7 +8989,7 @@
         "x": 1334.4972,
         "y": 847.6914,
         "anchor": "start",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8976,7 +8998,7 @@
         "x": 1825.1044,
         "y": 911.1319,
         "anchor": "start",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -8985,7 +9007,7 @@
         "x": 3933.1687,
         "y": 357.437,
         "anchor": "middle",
-        "fontSizePx": 29,
+        "fontSizePx": 34,
         "lines": [
           {
             "text": "하양",
@@ -9006,7 +9028,7 @@
         "x": 1075.5368,
         "y": 237.1602,
         "anchor": "start",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -9015,7 +9037,7 @@
         "x": 2996.5776,
         "y": 757.1605,
         "anchor": "middle",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -9024,7 +9046,7 @@
         "x": 2122.2915,
         "y": 1989.0331,
         "anchor": "start",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -9033,7 +9055,7 @@
         "x": 283.1481,
         "y": 2149.2751,
         "anchor": "start",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       },
       {
@@ -9042,7 +9064,7 @@
         "x": 3021.5381,
         "y": 1901.8029,
         "anchor": "start",
-        "fontSizePx": 28,
+        "fontSizePx": 34,
         "lines": []
       }
     ],
@@ -9855,10 +9877,10 @@
     "daegu": [
       {
         "station": "동대구역",
-        "x": 2334.646266186466,
-        "y": 856.1661726656077,
-        "halfWidth": 25.05958297067741,
-        "halfHeight": 11.234918168417778
+        "x": 2309.1485958149706,
+        "y": 852.9789942007014,
+        "halfWidth": 31.434031692219605,
+        "halfHeight": 13.056189406355372
       }
     ],
     "daejeon": [],
