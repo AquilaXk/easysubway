@@ -5,7 +5,7 @@
 //   2. 파일럿 scope가 line-scope 재기술 전 MISSING → 후 SUPPORTED로 전이한다.
 //   3. 대구 9 requirement가 같은 실행에서 MISSING → SUPPORTED로 전이한다(B1).
 //   4. spec의 line-scope 재기술과 tracked source-inventory가 어긋나면 하네스가 fail closed 한다.
-//   5. 지역 데이터 편입은 allowlist materializer·tracked 입력·선언 행수에 묶인다(B1).
+//   5. 지역 데이터 편입은 allowlist materializer·tracked 입력·선언 행수·승계 행 불변에 묶인다(B1).
 //   6. production 게시 트랙 fixture는 candidate 조립에 영향받지 않는다.
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
@@ -16,7 +16,12 @@ import path from "node:path";
 import { test } from "node:test";
 import { promisify } from "node:util";
 
-import { EVIDENCE_PATH, runNationwideCandidateCoverageGate } from "./run-nationwide-candidate-coverage-gate.mjs";
+import {
+  EVIDENCE_PATH,
+  assertInheritedRowsUnchanged,
+  inheritedRowSnapshot,
+  runNationwideCandidateCoverageGate,
+} from "./run-nationwide-candidate-coverage-gate.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
@@ -443,6 +448,92 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
       /evidence is stale or future-dated/,
     );
   });
+});
+
+// 승계 행 불변 축은 행수가 그대로인 변조를 잡으므로 addedRows 대조가 대신 지켜 주지 못한다.
+// 합성 pack으로 단언 자체를 직접 고정한다(append 정상 / 앞쪽 행 수정 / 승계 행 삭제).
+test("승계 행 불변 단언은 append만 통과시키고 수정·삭제를 거부한다", () => {
+  const inherited = {
+    stations: [{ id: "a" }, { id: "b" }],
+    networkEdges: [{ id: "e1" }],
+    // 배열이 아닌 필드는 집계 축이 아니다.
+    metadata: { activePack: "candidate" },
+  };
+  const snapshot = inheritedRowSnapshot(inherited);
+  assert.deepEqual(Object.keys(snapshot.counts).sort(), ["networkEdges", "stations"]);
+  assert.deepEqual(snapshot.counts, { stations: 2, networkEdges: 1 });
+
+  assertInheritedRowsUnchanged("synthetic", snapshot, {
+    ...inherited,
+    stations: [...inherited.stations, { id: "appended" }],
+    networkEdges: [...inherited.networkEdges, { id: "e2" }],
+  });
+
+  assert.throws(
+    () => assertInheritedRowsUnchanged("synthetic", snapshot, {
+      ...inherited,
+      stations: [{ id: "a", nameKo: "변조" }, inherited.stations[1], { id: "appended" }],
+    }),
+    /synthetic pack data inclusion modified inherited rows: stations/,
+  );
+
+  assert.throws(
+    () => assertInheritedRowsUnchanged("synthetic", snapshot, {
+      ...inherited,
+      stations: [inherited.stations[0]],
+    }),
+    /synthetic pack data inclusion dropped inherited rows: stations/,
+  );
+});
+
+// 위 단위 축과 별개로, 조립 경로가 그 단언을 실제로 호출하는지를 고정한다(호출이 사라지면 이 회귀가 깨진다).
+// PACK_DATA_MATERIALIZERS는 모듈 내부 상수라 spec 편집으로는 이 경로에 닿을 수 없어 in-process seam을 쓴다.
+test("조립 경로는 승계 행을 변조하는 materializer를 거부한다", async () => {
+  const spec = structuredClone(await readJson(SPEC_PATH));
+  const inventory = await readJson(INVENTORY_PATH);
+  const [inheritedPack] = (await readJson(REVIEWED_PACK_PATH)).packs;
+  const materializerId = "test://mutates-inherited-rows";
+  // 행을 더하지 않으므로 선언 행수는 전부 0이다 — addedRows 대조는 통과하고 승계 행 불변 축만 걸린다.
+  spec.packDataInclusions = [{
+    regionId: "synthetic",
+    materializer: materializerId,
+    materializedAt: "2026-07-20T16:00:00.000Z",
+    stationMapPath: "tools/datapack/sources/molit-urban-rail-full-route-20251211.csv",
+    lines: [{
+      lineNumber: 1,
+      lineId: "line-5b8d9b05e7e6",
+      topologySnapshotPath: "tools/datapack/sources/daegu-line1-route-topology-20260721.json",
+      timetableSnapshotPath: "tools/datapack/sources/daegu-line1-train-timetable-20260721.json",
+    }],
+    addedRows: Object.fromEntries(
+      Object.entries(inheritedPack).filter(([, value]) => Array.isArray(value)).map(([table]) => [table, 0]),
+    ),
+  }];
+  const materializers = new Map([[materializerId, (fixture) => {
+    const mutated = structuredClone(fixture);
+    mutated.packs[0].stations[0].nameKo = "변조";
+    return mutated;
+  }]]);
+
+  const workspace = await mkdtemp(path.join(tmpdir(), "nationwide-candidate-gate-inherited-"));
+  try {
+    await assert.rejects(
+      runNationwideCandidateCoverageGate({
+        spec,
+        specInput: { path: SPEC_PATH, sha256: "a".repeat(64) },
+        targetsInput: { path: TARGETS_PATH, sha256: "b".repeat(64) },
+        inventory,
+        inventoryInput: { path: INVENTORY_PATH, sha256: "c".repeat(64) },
+        resolutionPlanInput: { path: RESOLUTION_PLAN_PATH, sha256: "d".repeat(64) },
+        resolutionsInput: { path: RESOLUTIONS_PATH, sha256: "e".repeat(64) },
+        workDir: workspace,
+        materializers,
+      }),
+      /synthetic pack data inclusion modified inherited rows: stations/,
+    );
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
 });
 
 test("production 게시 트랙 fixture는 candidate 조립에 영향받지 않는다", async () => {

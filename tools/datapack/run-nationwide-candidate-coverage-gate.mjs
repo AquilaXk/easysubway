@@ -100,8 +100,12 @@ export async function runNationwideCandidateCoverageGate({
   resolutionsInput,
   workDir,
   emitFixturePath = null,
+  // 조립 계약(승계 행 불변·선언 행수)을 회귀에서 직접 때리기 위한 in-process seam이다. CLI는 넘기지
+  // 않으므로 기본 allowlist가 그대로 적용되고, spec은 이 맵에 항목을 추가할 수 없다 — "spec 편집만으로
+  // 임의 모듈을 실행시킬 수 없다"는 성질은 그대로다.
+  materializers = PACK_DATA_MATERIALIZERS,
 }) {
-  validateSpec(spec);
+  validateSpec(spec, materializers);
   assertInventoryLineScopeSync(spec, inventory);
   // 승계 원본도 입력 해시 축에 넣는다. 경로·pack 정체성만 기록하면 원본 좌표 같은 값 drift가
   // evidence를 바이트 동일하게 통과시킨다(구조 drift만 잡히는 상태) — 파일 바이트로 결속한다.
@@ -109,7 +113,7 @@ export async function runNationwideCandidateCoverageGate({
   const inherited = inheritedInput.document;
   // 지역 데이터 편입은 두 variant가 공유한다. line-scope 재기술은 소스 기술만 바꾸므로 편입 결과가
   // variant마다 달라질 수 없고, 한 번만 조립해 두 실행이 같은 행 바이트를 쓰는 것을 구조로 보장한다.
-  const inclusions = await applyPackDataInclusions(spec, inherited, inventory);
+  const inclusions = await applyPackDataInclusions(spec, inherited, inventory, materializers);
 
   const signing = ephemeralSigningKeys();
   const variants = {};
@@ -180,7 +184,7 @@ export async function runNationwideCandidateCoverageGate({
 
 // 승계 pack에 지역 데이터를 싣는다. 승계 원본(production 트랙 파일)은 읽기만 하고, 편입은 tracked
 // materializer가 tracked snapshot을 재생하는 방식으로만 이뤄진다.
-async function applyPackDataInclusions(spec, inherited, inventory) {
+async function applyPackDataInclusions(spec, inherited, inventory, materializers) {
   const inheritedPack = (inherited.packs ?? []).find(
     (pack) => pack.id === spec.inheritsFrom.packId && pack.version === spec.inheritsFrom.packVersion,
   );
@@ -195,19 +199,18 @@ async function applyPackDataInclusions(spec, inherited, inventory) {
   };
   const records = [];
   for (const inclusion of spec.packDataInclusions ?? []) {
-    const materialize = PACK_DATA_MATERIALIZERS.get(inclusion.materializer);
+    const materialize = materializers.get(inclusion.materializer);
     if (!materialize) throw new Error(`unknown pack data materializer: ${inclusion.materializer}`);
     const inputs = new Map();
     const readTracked = (relativePath) => readTrackedBytes(relativePath, inputs);
-    const before = packRowCounts(fixture.packs[0]);
-    const beforeRows = packRowFingerprints(fixture.packs[0]);
+    const inheritedSnapshot = inheritedRowSnapshot(fixture.packs[0]);
     fixture = await materialize(fixture, inclusion, { readTracked, inventory });
     if (!Array.isArray(fixture?.packs) || fixture.packs.length !== 1) {
       throw new Error(`${inclusion.materializer} must keep the candidate pack single`);
     }
-    const addedRows = subtractRowCounts(packRowCounts(fixture.packs[0]), before);
+    const addedRows = subtractRowCounts(packRowCounts(fixture.packs[0]), inheritedSnapshot.counts);
     assertDeclaredRows(inclusion, addedRows);
-    assertInheritedRowsUnchanged(inclusion, fixture.packs[0], before, beforeRows);
+    assertInheritedRowsUnchanged(inclusion.regionId, inheritedSnapshot, fixture.packs[0]);
     records.push({
       regionId: inclusion.regionId,
       materializer: inclusion.materializer,
@@ -272,10 +275,15 @@ function packRowCounts(pack) {
 }
 
 // 승계 행이 in-place로 바뀌면 행수 차이는 0이라 assertDeclaredRows가 못 잡는다. 편입 전 각 표의
-// 바이트를 해시해 두고, 편입 후 같은 표의 앞쪽 before개 행이 그대로인지 본다(materializer는 append만
+// 행수와 바이트 해시를 떠 두고, 편입 후 같은 표의 앞쪽 승계 행이 그대로인지 본다(materializer는 append만
 // 한다는 전제 — 삽입·재정렬·수정이 일어나면 그 자체가 검토 대상이므로 fail closed가 옳다).
-function packRowFingerprints(pack) {
-  return Object.fromEntries(packRowTables(pack).map((table) => [table, sha256Hex(JSON.stringify(pack[table]))]));
+export function inheritedRowSnapshot(pack) {
+  return {
+    counts: packRowCounts(pack),
+    fingerprints: Object.fromEntries(
+      packRowTables(pack).map((table) => [table, sha256Hex(JSON.stringify(pack[table]))]),
+    ),
+  };
 }
 
 function subtractRowCounts(after, before) {
@@ -294,14 +302,14 @@ function assertDeclaredRows(inclusion, addedRows) {
   }
 }
 
-function assertInheritedRowsUnchanged(inclusion, pack, before, beforeRows) {
-  for (const [table, fingerprint] of Object.entries(beforeRows)) {
+export function assertInheritedRowsUnchanged(regionId, snapshot, pack) {
+  for (const [table, fingerprint] of Object.entries(snapshot.fingerprints)) {
     const rows = pack[table];
-    if (!Array.isArray(rows) || rows.length < before[table]) {
-      throw new Error(`${inclusion.regionId} pack data inclusion dropped inherited rows: ${table}`);
+    if (!Array.isArray(rows) || rows.length < snapshot.counts[table]) {
+      throw new Error(`${regionId} pack data inclusion dropped inherited rows: ${table}`);
     }
-    if (sha256Hex(JSON.stringify(rows.slice(0, before[table]))) !== fingerprint) {
-      throw new Error(`${inclusion.regionId} pack data inclusion modified inherited rows: ${table}`);
+    if (sha256Hex(JSON.stringify(rows.slice(0, snapshot.counts[table]))) !== fingerprint) {
+      throw new Error(`${regionId} pack data inclusion modified inherited rows: ${table}`);
     }
   }
 }
@@ -731,7 +739,7 @@ function ephemeralSigningKeys() {
   };
 }
 
-function validateSpec(spec) {
+function validateSpec(spec, materializers) {
   if (!spec || typeof spec !== "object" || Array.isArray(spec)) {
     throw new Error("candidate spec must be an object");
   }
@@ -774,7 +782,7 @@ function validateSpec(spec) {
   if (spec.pack.id === spec.inheritsFrom.packId) {
     throw new Error("candidate pack id must differ from the inherited production pack id");
   }
-  validatePackDataInclusions(spec);
+  validatePackDataInclusions(spec, materializers);
   if (!Array.isArray(spec.lineScopeRedescriptions) || spec.lineScopeRedescriptions.length === 0) {
     throw new Error("candidate spec lineScopeRedescriptions must be a non-empty array");
   }
@@ -827,7 +835,7 @@ function validateSpec(spec) {
   }
 }
 
-function validatePackDataInclusions(spec) {
+function validatePackDataInclusions(spec, materializers) {
   if (spec.packDataInclusions === undefined) return;
   if (!Array.isArray(spec.packDataInclusions)) {
     throw new Error("candidate spec packDataInclusions must be an array");
@@ -838,7 +846,7 @@ function validatePackDataInclusions(spec) {
     if (regionIds.has(regionId)) throw new Error(`duplicate pack data inclusion: ${regionId}`);
     regionIds.add(regionId);
     const materializer = requiredString(inclusion.materializer, `${regionId}.materializer`);
-    if (!PACK_DATA_MATERIALIZERS.has(materializer)) {
+    if (!materializers.has(materializer)) {
       throw new Error(`unknown pack data materializer: ${materializer}`);
     }
     // offset 없는 값(예: "2026-07-20T16:00:00")은 new Date()가 로컬 타임존으로 해석해 같은 tracked
