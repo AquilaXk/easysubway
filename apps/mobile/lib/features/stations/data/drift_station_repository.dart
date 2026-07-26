@@ -741,9 +741,7 @@ class DriftStationRepository
     final stationKeys = {
       for (final station in stations) _mapStationKey(station),
     };
-    final rows = await database
-        .customSelect(
-          '''
+    final rows = await database.customSelect('''
           SELECT
             id,
             from_node_id,
@@ -754,9 +752,7 @@ class DriftStationRepository
           WHERE edge_type = 'RIDE'
             AND UPPER(COALESCE(service_class, 'SUBWAY')) = 'SUBWAY'
             AND UPPER(COALESCE(NULLIF(service_pattern, ''), 'LOCAL')) = 'LOCAL'
-          ''',
-        )
-        .get();
+          ''').get();
     final edges = <NetworkMapEdge>[];
     for (final row in rows) {
       final fromNodeId = row.read<String>('from_node_id');
