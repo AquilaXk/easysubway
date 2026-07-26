@@ -97,10 +97,20 @@ flutter:
     - assets/datapacks/prelaunch/
     - assets/metro_symbols/line_badges/
 
-  # #2068: 노선도 basemap 라벨을 오너 SVG와 동일한 자폭으로 렌더하기 위해
-  # Pretendard(SIL OFL 1.1)를 번들한다. 앱 전역 폰트는 시스템 기본을 유지하고,
-  # basemap 라벨(structured_route_map_painter의 basemap 스타일)만 이 family를
-  # 쓴다. 라이선스 원문은 fonts/OFL.txt.
+  # #2068: 노선도 basemap을 오너 SVG와 동일한 자폭·굵기로 렌더하기 위해
+  # Pretendard(SIL OFL 1.1)를 번들한다. 라이선스 원문은 fonts/OFL.txt.
+  #
+  # [2026-07-26 #2068 리뷰 m9] 오너 SVG가 실제로 쓰는 굵기를 **전부** 번들한다.
+  # 역명 라벨 레이어를 .vec에 굽게 되면서 굵기 해석이 런타임 Flutter 폰트 매칭에
+  # 달렸는데(.vec는 글리프 아웃라인이 아니라 텍스트 draw 명령을 담는다), 미번들
+  # 굵기는 가장 가까운 번들 굵기로 대체돼 "화면이 SVG와 픽셀 동일"이 깨진다.
+  # 실측(정규화 컴파일 입력 기준 요소 수):
+  #   800 = busan 12 · daegu 5 (환승역 라벨 .transfer-name)
+  #   900 = seoul 312 · busan 32 · daegu 18 · daejeon 3 · gwangju 2
+  #         (환승 배지 숫자·종점 칩 — 이 PR 이전부터 700으로 대체 렌더되던
+  #          선재 격차이며 여기서 함께 해소한다)
+  # 계약 게이트: tools/route-map/basemap-font-weight-gate.test.mjs
+  # (오너 SVG 사용 굵기 ⊆ 번들 굵기, 위반 시 fail-closed).
   fonts:
     - family: Pretendard
       fonts:
@@ -110,6 +120,10 @@ flutter:
           weight: 600
         - asset: fonts/Pretendard-Bold.otf
           weight: 700
+        - asset: fonts/Pretendard-ExtraBold.otf
+          weight: 800
+        - asset: fonts/Pretendard-Black.otf
+          weight: 900
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

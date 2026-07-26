@@ -29,8 +29,6 @@ import 'features/network_map/presentation/station_fan_menu.dart';
 import 'features/network_map/presentation/station_fan_menu_geometry.dart'
     show kFanMenuDesignSize, kFanMenuTailTip;
 import 'features/network_map/presentation/route_map_basemap_view.dart';
-import 'features/network_map/presentation/route_map_label_layout.dart'
-    show routeMapOwnerLabelMaxAnchorDistancePxFor;
 import 'features/network_map/presentation/structured_route_map_painter.dart';
 import 'features/realtime/realtime_repository.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
@@ -4324,8 +4322,6 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   Map<String, Color>? _structuredLineColorsCache;
   Map<String, String>? _structuredLabelTextCache;
   Map<String, String>? _structuredLineBadgeLabelCache;
-  // basemap 6차(#2068): stationId → 축약 전 원본 nameKo(오너 라벨 sidecar 매칭 키).
-  Map<String, String>? _structuredStationNameByStationIdCache;
   // 팬 메뉴 환승 앵커(#2192): 렌더 캡슐 중심 유도에 쓰는 파생값. structured 캐시와
   // 같은 키로 무효화한다. designScale은 렌더러 모드 판정과 동일 값이어야 한다.
   double? _structuredDesignScaleCache;
@@ -4335,7 +4331,10 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   // attribution을 표시하지 않는다(로드 실패 시에도 동일하게 조용히 미표기).
   Map<String, String>? _attributionTextByRegion;
   // basemap 6차(#2068): asset id(seoul/busan/...) → station명 → 오너 라벨 앵커.
-  // 로드 전·실패 시 null → basemap 라벨은 4차 자동 솔버로 전부 폴백(fail-safe).
+  // 소비처는 (1) geometry bounds 확장(networkMapOwnerLabelSourceRects — 라벨까지
+  // 담아 탭 히트·팬 한계를 맞춘다)과 (2) 초기 카메라 가독 배율뿐이다. 라벨 렌더는
+  // .vec 바탕층이 담당한다(#2068 SVG 충실도). 로드 전·실패 시 null → 두 소비처
+  // 모두 기존(라벨 미반영) 동작으로 안전 폴백한다.
   Map<String, Map<String, List<RouteMapOwnerLabelEntry>>>? _ownerLabelsByRegion;
   // 초기 카메라 가독 배율(#2068 트랙 QA 후속) 캐시 — _readableInitialMapScaleFor.
   double? _readableInitialMapScaleCache;
@@ -5065,27 +5064,6 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     final lineColors = _structuredLineColorsCache!;
     final labelTextByStationId = _structuredLabelTextCache!;
     final lineBadgeLabelByLineId = _structuredLineBadgeLabelCache!;
-    // basemap 6차(#2068): asset id(예: '수도권'→'seoul')로 오너 라벨 sidecar를
-    // 조회한다. 매핑에 없는 region·로드 전이면 빈 맵 → 4차 자동 솔버 폴백.
-    // widget.data.selectedRegion은 저장형('광주권' 등)이라 _geometryFor와 같이
-    // _displayRegionName으로 정규화해야 kRouteMapBasemapRegionToId 조회가
-    // 성공한다(정규화 누락 시 basemapAssetId가 항상 null 회귀, #2068).
-    final basemapAssetId =
-        kRouteMapBasemapRegionToId[_displayRegionName(
-          widget.data.selectedRegion,
-        )];
-    final ownerLabelsByStationName = basemapAssetId == null
-        ? const <String, List<RouteMapOwnerLabelEntry>>{}
-        : _ownerLabelsByRegion?[basemapAssetId] ??
-              const <String, List<RouteMapOwnerLabelEntry>>{};
-    // #2068 부산 라벨 지오메트리 튜닝 라운드(2026-07-20): 부산은 designScale이
-    // 작고(0.237) 밀집·折 회랑에서 라벨을 자기 노드에서 상대적으로 멀리 그리는
-    // 화풍이라 seoul 캘리브레이션(185px)로는 정상 매치(예: 토성 421.7px)가
-    // 오매치로 분류된다. 실측 근거: 정상 매치 최댓값 421.7px, 좌천 교차-노선
-    // 오배정 후보는 1113px+ (안전마진 충분) — route_map_label_layout.dart의
-    // kRouteMapOwnerLabelMaxAnchorDistancePx 문서 참고.
-    final ownerLabelMaxAnchorDistancePx =
-        routeMapOwnerLabelMaxAnchorDistancePxFor(basemapAssetId);
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -5104,9 +5082,6 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
           drawLines: false,
           drawStationSymbols: false,
           sourceOrigin: sourceOrigin,
-          ownerLabelsByStationName: ownerLabelsByStationName,
-          ownerLabelMaxAnchorDistancePx: ownerLabelMaxAnchorDistancePx,
-          stationNameByStationId: _structuredStationNameByStationIdCache!,
         ),
       ],
     );
@@ -5136,11 +5111,6 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     _structuredLabelTextCache = {
       for (final station in data.stations)
         station.id: routeMapStationLabel(station.nameKo),
-    };
-    // basemap 6차(#2068): 오너 라벨 sidecar 매칭은 축약 전 원본 nameKo
-    // 기준이라 위 축약 맵과 별도로 둔다.
-    _structuredStationNameByStationIdCache = {
-      for (final station in data.stations) station.id: station.nameKo,
     };
     _structuredLineBadgeLabelCache = {
       for (final line in data.lines) line.id: routeMapLineBadgeLabel(line.name),
@@ -6247,18 +6217,15 @@ Rect _ownerLabelLineSourceRect(
 }
 
 /// basemap 오너 라벨 1건의 실제 렌더 rect를 source 좌표로 산출한다(#2068,
-/// 다줄 라벨 렌더 갱신). painter(route_map_label_layout.dart의 [_ownerFixedLabel])
-/// 와 같은 규칙을 source 단위로 옮긴 것 — entry.fontSizePx는 이미 source(viewBox)
-/// 단위 로컬 font-size라 design 변환·클램프 없이 그대로 쓴다(Pretendard 번들로
-/// 앱 자폭이 SVG와 동일해져 10차의 13px 상한 클램프를 제거했다 — 클램프가
-/// 여전히 있다면 이 함수의 bounds가 실제(더 큰) 렌더보다 좁게 잡혀 라벨이
-/// 잘릴 수 있었다).
+/// 다줄 라벨 렌더 갱신). 라벨 자체는 .vec 바탕층이 그리므로(#2068 SVG 충실도)
+/// 이 rect는 렌더가 아니라 **geometry bounds 확장**(팬 한계·탭 히트 소스 경계)에
+/// 쓰인다 — entry.fontSizePx는 이미 source(viewBox) 단위 로컬 font-size라 design
+/// 변환·클램프 없이 그대로 쓴다(클램프가 있으면 bounds가 실제 렌더보다 좁게
+/// 잡혀 라벨이 잘릴 수 있다).
 ///
-/// [entry.lines]가 2줄 이상이면(오너 SVG가 줄바꿈한 라벨) 실제 렌더은 painter가
-/// 카탈로그 표시 텍스트 일치 여부로 다줄/단일 줄을 고르지만, 이 함수는 그
-/// 텍스트에 접근할 수 없다 — 단일 줄 근사(entry.station 전체 폭)와 줄별 근사의
-/// **합집합**을 잡아 항상 안전한 상위집합이 되게 한다(과대 방향, 절대 과소
-/// 방향 아님).
+/// [entry.lines]가 2줄 이상이면(오너 SVG가 줄바꿈한 라벨) 단일 줄 근사
+/// (entry.station 전체 폭)와 줄별 근사의 **합집합**을 잡아 항상 안전한
+/// 상위집합이 되게 한다(과대 방향, 절대 과소 방향 아님).
 Rect _ownerLabelSourceRect(RouteMapOwnerLabelEntry entry) {
   var rect = _ownerLabelLineSourceRect(
     entry.station,
