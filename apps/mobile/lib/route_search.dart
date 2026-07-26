@@ -6534,7 +6534,12 @@ String _routeStairAccessLabel(String stairAccess) {
 /// 판정 규칙이 여러 벌로 갈리지 않도록 두 경로가 이 함수 하나만 쓴다. 격자는 백엔드
 /// `StairAccess`와 같다: 계단 구간이 하나라도 있으면 `stairOnly`, 미확인이 있으면
 /// `unknown`, 계단 개념이 적용되지 않는 구간(`notApplicable`)은 판정에 기여하지
-/// 않는다. 스텝이 없으면 판정 근거 자체가 없으므로 `unknown`이다.
+/// 않는다. 스텝이 없으면 판정 근거 자체가 없으므로 `unknown`이며, 백엔드의 표시
+/// 판정(`RouteSearchController.itineraryStairAccess`)도 같은 규칙으로 fail closed다.
+///
+/// 스텝이 전부 `notApplicable`이면 `stepFree`다 — 계단 장벽이 놓인 구간이 하나도
+/// 없다는 뜻이라 "근거 없음"과 다르다. 이 갈래는 경로 단위 신뢰도 경고를 짊어질
+/// 스텝이 없어 백엔드 판정을 복원하지 못하는 유일한 지점이기도 하다.
 String _routeStairAccessFromSteps(List<RouteSearchStep> steps) {
   if (steps.isEmpty) {
     return 'unknown';

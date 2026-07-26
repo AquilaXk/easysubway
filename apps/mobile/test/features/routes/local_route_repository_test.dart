@@ -5760,8 +5760,7 @@ Map<String, Object?> _routeV2Payload({
               'level': 'LOW',
               'reasons': <Object?>[],
             },
-            if (accessLegStairAccess != null)
-              'stairAccess': accessLegStairAccess,
+            'stairAccess': ?accessLegStairAccess,
           },
           {
             'legType': 'RIDE',
@@ -5796,11 +5795,11 @@ Map<String, Object?> _routeV2Payload({
               'level': 'LOW',
               'reasons': <Object?>[],
             },
-            if (rideLegStairAccess != null) 'stairAccess': rideLegStairAccess,
+            'stairAccess': ?rideLegStairAccess,
           },
         ],
         'commercialEtaEligible': status == 'FOUND',
-        if (stairAccess != null) 'stairAccess': stairAccess,
+        'stairAccess': ?stairAccess,
       },
     ],
   };
