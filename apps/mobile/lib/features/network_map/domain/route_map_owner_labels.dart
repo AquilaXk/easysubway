@@ -182,74 +182,11 @@ routeMapOwnerLabelsByRegionFrom(String sidecarJson) {
 
 /// basemap 모드 sidecar asset 경로. metro_map_pack/basemap/는 pubspec.yaml에
 /// 디렉터리째 등록돼 있어 별도 자산 선언이 필요 없다.
+///
+/// 이 sidecar의 최상위 `serviceTagObstacles` 블록은 **소비처가 없다**. 유일
+/// 소비처였던 라벨 솔버 basemap 분기가 #2577에서 사라지면서 Dart 쪽 파서·모델을
+/// #2571로 제거했고, 생산자(compile-basemap-vec.mjs)와 sidecar 필드는 남아 있어
+/// 지금도 배포 payload에 실린다. 살아 있는 계약이 아니므로 새 코드가 이 필드를
+/// 승계하지 않는다 — 스키마 제거는 schemaVersion 정책과 함께 #2571 m12에서 다룬다.
 const String kRouteMapOwnerLabelsAssetPath =
     'assets/datapacks/metro_map_pack/basemap/labels.json';
-
-/// 오너 SVG service-tag(KTX·SRT·AIR 표장) 1건의 장애물 사각형(#2068 마감
-/// 라운드 item 3). compile-basemap-vec.mjs의 extractServiceTagObstacles가
-/// 표장 도형(중첩 transform·scale 전부 합성) 외접 바운딩박스를 실측해 낸다.
-/// 좌표계는 [RouteMapOwnerLabelEntry.position]과 같은 viewBox(source) 단위 —
-/// 호출부가 design.toDesign()으로 변환한다.
-class RouteMapServiceTagObstacle {
-  const RouteMapServiceTagObstacle({
-    required this.station,
-    required this.center,
-    required this.halfWidth,
-    required this.halfHeight,
-  });
-
-  /// SVG data-station 원문(참고용 — 매칭에는 쓰지 않는다. 장애물은 위치
-  /// 기반으로만 회피하면 충분하고, 이름 매칭은 오배치 위험만 늘린다).
-  final String station;
-
-  /// viewBox(source) 좌표.
-  final Offset center;
-  final double halfWidth;
-  final double halfHeight;
-}
-
-/// sidecar의 `serviceTagObstacles[regionId]`를 파싱한다. 필드가 없거나
-/// 형식이 어긋나면 빈 리스트(호출부가 안전 폴백 — 장애물 없이 기존 동작).
-List<RouteMapServiceTagObstacle> parseRouteMapServiceTagObstaclesForRegion(
-  String sidecarJson,
-  String regionId,
-) {
-  final Object? decoded;
-  try {
-    decoded = jsonDecode(sidecarJson);
-  } on FormatException {
-    return const [];
-  }
-  if (decoded is! Map || decoded['serviceTagObstacles'] is! Map) {
-    return const [];
-  }
-  final regionEntries = (decoded['serviceTagObstacles'] as Map)[regionId];
-  if (regionEntries is! List) {
-    return const [];
-  }
-  final result = <RouteMapServiceTagObstacle>[];
-  for (final raw in regionEntries) {
-    if (raw is! Map) continue;
-    final station = raw['station'];
-    final x = raw['x'];
-    final y = raw['y'];
-    final halfWidth = raw['halfWidth'];
-    final halfHeight = raw['halfHeight'];
-    if (station is! String ||
-        x is! num ||
-        y is! num ||
-        halfWidth is! num ||
-        halfHeight is! num) {
-      continue;
-    }
-    result.add(
-      RouteMapServiceTagObstacle(
-        station: station,
-        center: Offset(x.toDouble(), y.toDouble()),
-        halfWidth: halfWidth.toDouble(),
-        halfHeight: halfHeight.toDouble(),
-      ),
-    );
-  }
-  return result;
-}
