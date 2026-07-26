@@ -128,17 +128,6 @@ class _Candidate {
   final String? badgeLineId; // null이면 역 라벨.
 }
 
-/// basemap 캡슐 반폭(design px) — SVG 캡슐 장축이 멤버(배지) 수에 비례해 는다.
-/// route_map_positions의 환승 멤버 좌표 수렴 파이프라인 때문에 member bbox가
-/// 실제 SVG 캡슐 장축을 반영하지 못해(예: 종로3가 3-노선 환승이 스프레드
-/// 14.4로 눌림) 고정 반폭만으로는 과소평가한다 — 멤버 수 기반 하한을 둔다.
-/// 방향 정보가 없어 균등 inflate(과대는 라벨이 조금 더 밀릴 뿐 안전 방향).
-double _basemapCapsuleHalfWidthFor(int memberCount) => math.max(
-  kRouteMapBasemapTransferCapsuleHalfWidthPx,
-  (memberCount - 1) * kRouteMapBasemapTransferSlotHalfWidthPx +
-      kRouteMapBasemapTransferCapsuleBaseHalfWidthPx,
-);
-
 /// 오너 SVG 앵커 [anchorDesign](design px)에 [anchor] 의미(start=좌측·middle=
 /// 수평중앙·end=우측, 전부 baseline)대로 [size] 텍스트를 배치한다(#2068 6차,
 /// 9차 갱신). baseline 근사: SVG는 y가 baseline이므로
@@ -453,7 +442,11 @@ List<Rect> routeMapTransferObstacleRects(
           Rect.fromCenter(center: center, width: 0, height: 0),
         );
       }
-      rects.add(bounds.inflate(_basemapCapsuleHalfWidthFor(centers.length)));
+      rects.add(
+        bounds.inflate(
+          routeMapBasemapTransferCapsuleHalfWidthFor(centers.length),
+        ),
+      );
       continue;
     }
     final markers = routeMapTransferMarkers(
@@ -709,7 +702,9 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
         // 않게 한다. (이 경로는 오너 라벨 미매치 폴백 — #2068 6차.)
         anchorPadding:
             (basemap
-                ? _basemapCapsuleHalfWidthFor(group.memberPositions.length)
+                ? routeMapBasemapTransferCapsuleHalfWidthFor(
+                    group.memberPositions.length,
+                  )
                 : kRouteMapDesignBadgeRadiusPx) +
             _memberSpread(group.memberPositions) * design.designScale / 2,
         bold: true,

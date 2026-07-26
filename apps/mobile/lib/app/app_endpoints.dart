@@ -1,5 +1,14 @@
 import '../core/datapack/data_pack_manifest.dart';
 
+/// production 채널 매니페스트 수락 절대 순번 하한(이슈 #2531).
+///
+/// 값의 단일 원본은 `apps/mobile/release/datapack-manifest-acceptance-policy.json`이고
+/// 두 값이 어긋나면
+/// `apps/mobile/test/core/datapack/data_pack_manifest_acceptance_policy_test.dart`가
+/// 실패한다. 하한을 올리려면 그 정책 파일에 새 관측값을 기록해야 하며, 데이터팩 릴리즈
+/// workflow가 publish 직전 `releaseSequence >= minimumReleaseSequence`를 검사한다.
+const int productionDataPackMinimumReleaseSequence = 114;
+
 class AppEndpoints {
   const AppEndpoints({
     required this.dataPackBaseUrl,
@@ -72,6 +81,21 @@ class AppEndpoints {
           ? 'production-v1'
           : dataPackSigningKeyId.trim(),
     );
+  }
+
+  /// 이 빌드에 적용되는 매니페스트 수락 순번 하한. 정책 파일이 선언한 적용 범위와
+  /// 같은 조건 — production 서명 공개키가 주입되고 기대 채널이 production인 빌드 —
+  /// 에서만 값이 있고, 개발·테스트 빌드에서는 null이라 기존 동작이 유지된다.
+  ///
+  /// 채널 조건이 필요한 이유: `EASYSUBWAY_DATAPACK_CHANNEL`은 서명 공개키와 독립된
+  /// dart-define이라, 키를 주입하면서 채널만 다르게 준 빌드는 순번 계열이 다른 카탈로그에
+  /// production 하한을 적용하게 된다.
+  int? get dataPackMinimumReleaseSequence {
+    if (productionDataPackSigningPublicKey == null ||
+        expectedDataPackChannel != 'production') {
+      return null;
+    }
+    return productionDataPackMinimumReleaseSequence;
   }
 
   String get expectedDataPackChannel {

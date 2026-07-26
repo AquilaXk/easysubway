@@ -513,6 +513,59 @@ void main() {
     );
     await stateRepository.ensureManifestCanBeAccepted(accepted);
   });
+
+  test('update state는 신규 설치 단말에도 절대 순번 하한을 적용한다', () async {
+    // 이슈 #2531: 수락 이력이 비어 있는 단말(재설치 포함)이 리플레이 방어의 사각이었다.
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final stateRepository = DataPackUpdateStateRepository(
+      userDatabase: userDatabase,
+      minimumReleaseSequence: 42,
+      now: () => DateTime.utc(2026, 6, 25, 12),
+    );
+
+    expect(await stateRepository.hasAcceptedManifestState(), isFalse);
+
+    // (a) 하한 이상인 최신 v2는 그대로 수락한다.
+    await stateRepository.ensureManifestCanBeAccepted(
+      _v2Manifest(sequence: 42, version: '18'),
+    );
+    await stateRepository.ensureManifestCanBeAccepted(
+      _v2Manifest(sequence: 43, version: '19'),
+    );
+
+    // (b) 하한 아래는 수락 이력이 없어도 거부한다.
+    await expectLater(
+      stateRepository.ensureManifestCanBeAccepted(
+        _v2Manifest(sequence: 41, version: '17'),
+      ),
+      throwsA(isA<DataPackManifestReplayException>()),
+    );
+
+    // (c) v1 봉투는 순번을 증명할 수 없으므로 이력 유무와 무관하게 거부한다.
+    await expectLater(
+      stateRepository.ensureManifestCanBeAccepted(_v1Manifest(version: '17')),
+      throwsA(isA<DataPackManifestReplayException>()),
+    );
+    expect(await stateRepository.hasAcceptedManifestState(), isFalse);
+  });
+
+  test('update state는 하한이 없는 개발 빌드의 신규 설치 동작을 유지한다', () async {
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final stateRepository = DataPackUpdateStateRepository(
+      userDatabase: userDatabase,
+      now: () => DateTime.utc(2026, 6, 25, 12),
+    );
+
+    expect(stateRepository.minimumReleaseSequence, isNull);
+    await stateRepository.ensureManifestCanBeAccepted(
+      _v2Manifest(sequence: 1, version: '17'),
+    );
+    await stateRepository.ensureManifestCanBeAccepted(
+      _v1Manifest(version: '17'),
+    );
+  });
 }
 
 String _signatureValue(

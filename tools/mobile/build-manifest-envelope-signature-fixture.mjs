@@ -3,6 +3,9 @@
 // `publicKey != null` 분기와 `DataPackSigningPublicKey.verify`) 테스트가 쓰는 서명
 // fixture를 만든다.
 //
+// 이슈 #2531(DP-05)이 같은 fixture에 `legacyEnvelopeManifest`(v1 봉투)를 더한다.
+// production 공개키가 주입된 빌드가 v1 봉투를 거부하는지 확인하는 회귀 테스트가 쓴다.
+//
 // Dart 테스트가 기대값을 스스로 계산하면 검증 대상 구현을 복제하게 되어(tautology)
 // 회귀를 잡지 못한다. 그래서 정준 문자열은 Node 구현(`tools/datapack/lib/
 // manifest-validation.mjs`)이, 서명은 Node `crypto`가 만들어 이 fixture에 고정하고
@@ -187,6 +190,53 @@ function signPack(pack, privateKey) {
     value: sha256Hex(routeRegressionPayload(pack)),
   };
   return pack;
+}
+
+// 이슈 #2531(DP-05): v1 봉투용 팩 서명. 서명 payload는 v2와 **같은 문자열**이고
+// 알고리즘 식별자만 `-v1`이다. 즉 v2 시절에 정당하게 서명된 팩 값이 v1 봉투에서도
+// 그대로 유효하다 — 팩 서명이 봉투 버전도 신선도도 결속하지 않는다는 사실을 fixture
+// 수준에서 고정한다.
+function signLegacyPack(pack, privateKey) {
+  const suffix = `:${pack.url}`;
+  pack.signature = {
+    algorithm: "rsa-sha256-pack-manifest-v1",
+    value: rsaSha256Signature(privateKey, `${packPayload(pack)}${suffix}`),
+  };
+  pack.representativeRouteRegressionSignature = {
+    algorithm: "rsa-sha256-route-regression-v1",
+    value: rsaSha256Signature(privateKey, `${routeRegressionPayload(pack)}${suffix}`),
+  };
+  return pack;
+}
+
+// v1 봉투용 fixture 팩 서명(공개키 미주입 개발·테스트 빌드 경로). 알고리즘 식별자만
+// `-v1`이고 값은 자기해시다.
+function signLegacyFixturePack(pack) {
+  pack.signature = {
+    algorithm: "sha256-pack-manifest-v1",
+    value: sha256Hex(packPayload(pack)),
+  };
+  pack.representativeRouteRegressionSignature = {
+    algorithm: "sha256-route-regression-v1",
+    value: sha256Hex(routeRegressionPayload(pack)),
+  };
+  return pack;
+}
+
+// v1 봉투: `manifestVersion`·`channel`·`releaseSequence`·`publishedAt`·`expiresAt`·
+// `keyId`·`signature`가 전부 없다. 팩만 서명돼 있어 팩 단위 검증은 모두 통과하고,
+// 봉투 서명·만료·순번은 애초에 표현되지 않는다.
+function legacyEnvelopeManifest({ production, keyId, privateKeyPem }) {
+  const manifest = baseManifest({ production, keyId });
+  // `signature`는 지금 baseManifest가 만들지 않지만 함께 지운다. 나중에 baseManifest가
+  // 봉투 서명을 달면 v1 fixture에 v2 봉투 서명이 남아 회귀 테스트가 조용히 의미를 잃는다.
+  for (const field of ["manifestVersion", "channel", "releaseSequence", "publishedAt", "expiresAt", "keyId", "signature"]) {
+    delete manifest[field];
+  }
+  manifest.packs = manifest.packs.map((pack) =>
+    production ? signLegacyPack(pack, privateKeyPem) : signLegacyFixturePack(pack),
+  );
+  return manifest;
 }
 
 function baseManifest({ production, keyId }) {
@@ -438,6 +488,8 @@ export function buildFixture(privateKeyPem) {
     },
     fallbackManifest,
     fallbackCanonicalSignedPayload: fallbackCanonical,
+    legacyEnvelopeManifest: legacyEnvelopeManifest({ production: true, keyId: KEY_ID, privateKeyPem }),
+    legacyFallbackEnvelopeManifest: legacyEnvelopeManifest({ production: false, keyId: KEY_ID, privateKeyPem }),
   };
 
   return fixture;

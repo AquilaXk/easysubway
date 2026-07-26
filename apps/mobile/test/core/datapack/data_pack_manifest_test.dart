@@ -177,12 +177,31 @@ void main() {
   test('manifest v2 replay hash는 signed payload만 사용한다', () {
     final json = _v2FixtureManifest();
     final manifest = DataPackManifest.fromJson(json);
+    final signedCanonical = canonicalDataPackJson({
+      for (final entry in json.entries)
+        if (entry.key != 'signature') entry.key: entry.value,
+    });
+
+    expect(
+      manifest.manifestHash,
+      sha256.convert(utf8.encode(signedCanonical)).toString(),
+    );
+
+    // 이슈 #2531(DP-05): signature 객체는 봉투에서 유일하게 서명 대상 밖에 있는
+    // 자리다. 아래 추가 필드는 정준 문자열을 전혀 바꾸지 않는다(= 서명은 그대로
+    // 유효하다). 그래서 서명되지 않은 값이 몰래 실려 오는 것을 막으려면 파싱이
+    // fail closed로 거부하는 수밖에 없다.
     final signature = json['signature']! as Map<String, Object?>;
     signature['unsignedTrace'] = 'debug';
 
-    final withUnsignedSignatureField = DataPackManifest.fromJson(json);
-
-    expect(withUnsignedSignatureField.manifestHash, manifest.manifestHash);
+    expect(
+      canonicalDataPackJson({
+        for (final entry in json.entries)
+          if (entry.key != 'signature') entry.key: entry.value,
+      }),
+      signedCanonical,
+    );
+    expect(() => DataPackManifest.fromJson(json), throwsFormatException);
   });
 
   test('manifest v2는 timezone 없는 timestamp를 거부한다', () {
@@ -354,53 +373,49 @@ void main() {
   });
 
   test('production 데이터팩 manifest는 signature와 source URL 출처 계약을 검증한다', () {
-    final validManifest = DataPackManifest.fromJson({
-      'ttlSeconds': 3600,
-      'packs': [_productionPack()],
-    }, productionSigningPublicKey: _productionSigningPublicKey);
-    expect(
-      validManifest.packs.single.artifactKind,
-      DataPackArtifactKind.production,
+    // 이슈 #2531(DP-05) 이후 v1 봉투는 공개키가 주입되면 봉투 단계에서 거부되므로,
+    // 팩 단위 계약은 팩 파서로 직접 확인한다(검증 대상이 봉투가 아니라 팩이다).
+    final validPack = DataPackManifestEntry.fromJson(
+      _productionPack(),
+      productionSigningPublicKey: _productionSigningPublicKey,
     );
-    final uppercaseHostManifest = DataPackManifest.fromJson({
-      'ttlSeconds': 3600,
-      'packs': [
-        _productionPack(
-          url: 'https://CDN.easysubway.example/catalog/capital-v18.sqlite.gz',
-        ),
-      ],
-    }, productionSigningPublicKey: _productionSigningPublicKey);
+    expect(validPack.artifactKind, DataPackArtifactKind.production);
+
+    final uppercaseHostPack = DataPackManifestEntry.fromJson(
+      _productionPack(
+        url: 'https://CDN.easysubway.example/catalog/capital-v18.sqlite.gz',
+      ),
+      productionSigningPublicKey: _productionSigningPublicKey,
+    );
     expect(
-      uppercaseHostManifest.packs.single.url.toString(),
+      uppercaseHostPack.url.toString(),
       'https://cdn.easysubway.example/catalog/capital-v18.sqlite.gz',
     );
 
     expect(
-      () => DataPackManifest.fromJson({
-        'ttlSeconds': 3600,
-        'packs': [_productionPack(signatureValue: 'c' * 64)],
-      }, productionSigningPublicKey: _productionSigningPublicKey),
+      () => DataPackManifestEntry.fromJson(
+        _productionPack(signatureValue: 'c' * 64),
+        productionSigningPublicKey: _productionSigningPublicKey,
+      ),
       throwsFormatException,
     );
 
     expect(
-      () => DataPackManifest.fromJson({
-        'ttlSeconds': 3600,
-        'packs': [_productionPack(sourceUrl: 'http://example.invalid/source')],
-      }, productionSigningPublicKey: _productionSigningPublicKey),
+      () => DataPackManifestEntry.fromJson(
+        _productionPack(sourceUrl: 'http://example.invalid/source'),
+        productionSigningPublicKey: _productionSigningPublicKey,
+      ),
       throwsFormatException,
     );
 
     expect(
-      () => DataPackManifest.fromJson({
-        'ttlSeconds': 3600,
-        'packs': [
-          _productionPack(
-            url:
-                'https://mirror.easysubway.example/catalog/capital-v18.sqlite.gz',
-          ),
-        ],
-      }, productionSigningPublicKey: _productionSigningPublicKey),
+      () => DataPackManifestEntry.fromJson(
+        _productionPack(
+          url:
+              'https://mirror.easysubway.example/catalog/capital-v18.sqlite.gz',
+        ),
+        productionSigningPublicKey: _productionSigningPublicKey,
+      ),
       throwsFormatException,
     );
 
@@ -415,10 +430,10 @@ void main() {
       },
     ];
     expect(
-      () => DataPackManifest.fromJson({
-        'ttlSeconds': 3600,
-        'packs': [changedRouteContract],
-      }, productionSigningPublicKey: _productionSigningPublicKey),
+      () => DataPackManifestEntry.fromJson(
+        changedRouteContract,
+        productionSigningPublicKey: _productionSigningPublicKey,
+      ),
       throwsFormatException,
     );
 
@@ -432,34 +447,44 @@ void main() {
       'value': _productionRouteRegressionSignatureValue,
     };
     expect(
-      () => DataPackManifest.fromJson({
-        'ttlSeconds': 3600,
-        'packs': [missingPatternContract],
-      }, productionSigningPublicKey: _productionSigningPublicKey),
+      () => DataPackManifestEntry.fromJson(
+        missingPatternContract,
+        productionSigningPublicKey: _productionSigningPublicKey,
+      ),
       throwsFormatException,
     );
 
     expect(
-      () => DataPackManifest.fromJson({
-        'ttlSeconds': 3600,
-        'packs': [_productionPack(url: 'https:catalog/capital-v18.sqlite.gz')],
-      }, productionSigningPublicKey: _productionSigningPublicKey),
+      () => DataPackManifestEntry.fromJson(
+        _productionPack(url: 'https:catalog/capital-v18.sqlite.gz'),
+        productionSigningPublicKey: _productionSigningPublicKey,
+      ),
       throwsFormatException,
     );
 
     expect(
-      () => DataPackManifest.fromJson({
-        'ttlSeconds': 3600,
-        'packs': [_productionPack(sourceUrl: 'https://')],
-      }, productionSigningPublicKey: _productionSigningPublicKey),
+      () => DataPackManifestEntry.fromJson(
+        _productionPack(sourceUrl: 'https://'),
+        productionSigningPublicKey: _productionSigningPublicKey,
+      ),
       throwsFormatException,
     );
 
+    // 공개키가 없으면 production 팩 서명을 검증할 수 없어 v1 봉투 단계에서도 거부된다.
     expect(
       () => DataPackManifest.fromJson({
         'ttlSeconds': 3600,
         'packs': [_productionPack()],
       }),
+      throwsFormatException,
+    );
+
+    // 공개키가 주입되면 같은 문서가 봉투 버전 때문에 거부된다(이슈 #2531).
+    expect(
+      () => DataPackManifest.fromJson({
+        'ttlSeconds': 3600,
+        'packs': [_productionPack()],
+      }, productionSigningPublicKey: _productionSigningPublicKey),
       throwsFormatException,
     );
   });
