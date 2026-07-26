@@ -3353,7 +3353,7 @@ void main() {
     expect(license['spdx'], 'LicenseRef-Self-Drawn');
     expect(
       license['url'],
-      'internal:route-map/route-map-defs/svg-sources/easy-subway-gwangju-v1.svg',
+      'internal:route-map/route-map-defs/svg-sources/easy-subway-gwangju-v3.svg',
     );
     expect(license['reviewStatus'], 'self-drawn-confirmed');
     expect(license['attributionRequired'], isFalse);

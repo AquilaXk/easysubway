@@ -4,6 +4,9 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:easysubway_mobile/core/database/user/user_database.dart'
     as user_db;
+// 정준 직렬화는 검증 대상 구현을 그대로 쓴다. 테스트가 규칙을 복제하면 3언어
+// 분열(이슈 #2528)을 구조적으로 검출할 수 없다.
+import 'package:easysubway_mobile/core/datapack/canonical_json.dart';
 import 'package:easysubway_mobile/core/datapack/data_pack_client.dart';
 import 'package:easysubway_mobile/core/datapack/data_pack_manifest.dart';
 import 'package:easysubway_mobile/core/datapack/data_pack_update_state.dart';
@@ -637,7 +640,9 @@ Map<String, Object?> _v2ManifestJson({
   };
   manifest['signature'] = {
     'algorithm': 'sha256-manifest-v2',
-    'value': sha256.convert(utf8.encode(_canonicalJson(manifest))).toString(),
+    'value': sha256
+        .convert(utf8.encode(canonicalDataPackJson(manifest)))
+        .toString(),
   };
   return manifest;
 }
@@ -661,20 +666,4 @@ class _RecordingUpdateStateRepository extends DataPackUpdateStateRepository {
   }) async {
     calls.add('cache');
   }
-}
-
-String _canonicalJson(Object? value) => jsonEncode(_canonicalValue(value));
-
-Object? _canonicalValue(Object? value) {
-  if (value == null || value is String || value is num || value is bool) {
-    return value;
-  }
-  if (value is List<Object?>) {
-    return value.map(_canonicalValue).toList(growable: false);
-  }
-  if (value is Map<String, Object?>) {
-    final sortedKeys = value.keys.toList()..sort();
-    return {for (final key in sortedKeys) key: _canonicalValue(value[key])};
-  }
-  throw StateError('unsupported value: $value');
 }
