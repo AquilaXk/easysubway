@@ -688,12 +688,12 @@ class LocalRouteRepository implements RouteSearchRepository {
         .toList(growable: false);
   }
 
-  /// 로컬 경로의 계단 판정과 확인 필요 표기(#2590).
+  /// 로컬 경로의 계단 판정과 검증 근거 없음 표기(#2590).
   ///
   /// 백엔드 시간표 플래너는 이 둘을 **두 축으로 나눠** 싣는다 — 상태는
-  /// `STAIR_ONLY`/`STEP_FREE`/`UNKNOWN`, 확인 필요는 `!verified`
+  /// `STAIR_ONLY`/`STEP_FREE`/`UNKNOWN`, 검증 근거 없음은 `!verified`
   /// (`RouteTimetableRaptorPlanner`의 접근 전이 생성). 계단이 있다고 확인된 동선에
-  /// 검증 근거가 없으면 계단 표기와 확인 필요가 함께 붙는다. 여기서도 같은 구조를 쓴다.
+  /// 검증 근거가 없으면 계단 표기와 이 표기가 함께 붙는다. 여기서도 같은 구조를 쓴다.
   ///
   /// 승차와 경유 경계 표식은 오르내릴 계단 자체가 없어 원자료와 무관하게 비적용으로
   /// 확정한다. 데이터팩 `network_edges.stair_access_state`의 `UNKNOWN`은 "확인 결과
@@ -808,8 +808,9 @@ class LocalRouteRepository implements RouteSearchRepository {
       return const [];
     }
     // 스텝 플래그와 같은 파생을 쓴다(#2590). 두 벌로 계산하면 같은 결과 객체 안에서
-    // 스텝은 확인 필요가 없다고 하고 요약은 확인 필요라고 하는 어긋남이 난다. 이 요약은
-    // 즐겨찾기에 직렬화되어 남으므로 어긋남이 저장까지 따라간다.
+    // 스텝은 requiresCheck가 false인데 요약은 ACCESSIBILITY_CHECK_REQUIRED를 내는
+    // 어긋남이 난다. 이 요약은 즐겨찾기에 직렬화되어 남으므로 어긋남이 저장까지
+    // 따라간다.
     final requiresAccessibilityCheck = steps.any(
       (step) => _stairAccessOf(step).requiresCheck,
     );
