@@ -19,12 +19,13 @@ const double kRouteMapDesignBadgeFontPx = 11.0;
 const double kRouteMapDesignBadgeRadiusPx = 9.0;
 const double kRouteMapDesignLabelGapPx = 4.0;
 
-/// basemap 모드 라벨 gap 사다리 시작값(design px). 기본 모드는
-/// [kRouteMapDesignLabelGapPx](4.0)를 그대로 쓰지만(게이트 baseline 의존이라
-/// 불변), basemap은 기하상 통과해도 sliver 수준 여유(예: 종로3가 3.8px)가
-/// 실기기에서 라벨-캡슐 접촉으로 보이는 문제를 없애기 위해 6.0으로 상향한다
-/// (2026-07-16 실기기 재확인 대응).
-const double kRouteMapBasemapLabelGapPx = 6.0;
+// #2068 SVG 충실도(2026-07-26): basemap 전용 라벨 배치 상수 2종을 제거했다 —
+// kRouteMapBasemapLabelGapPx(라벨 gap 사다리 시작값)·kRouteMapBasemapLineHalfWidthPx
+// (선 장애물 반폭). 오너 결정("글자도 복붙")으로 바탕층 모드에서 앱이 역명을
+// 그리지 않게 되면서 이 값들을 쓰던 라벨 솔버의 basemap 분기가 사라져 참조가
+// 0이 됐다. public const는 analyzer가 미사용 경고를 내지 않으므로 명시적으로
+// 걷어낸다. 나머지 basemap 상수(환승 캡슐 3종·역 노드 반경)는 팬 메뉴 앵커
+// (fanMenuAnchorNodeHeight)가 계속 쓰므로 남긴다.
 
 /// SVG 바탕층(#2068) 환승 캡슐의 design px 반폭. basemap 모드에서는 구조화 캡슐
 /// 대신 오너 SVG 캡슐이 화면에 그려지고 실측 반폭이 훨씬 크므로, 라벨 장애물·
@@ -73,14 +74,6 @@ double routeMapBasemapTransferCapsuleHalfWidthFor(int memberCount) => math.max(
   (memberCount - 1) * kRouteMapBasemapTransferSlotHalfWidthPx +
       kRouteMapBasemapTransferCapsuleBaseHalfWidthPx,
 );
-
-/// SVG 바탕층(#2068) 노선 선의 design px 반폭. basemap 모드에서 선 장애물을
-/// 중심선만이 아니라 실제 선 폭으로 마킹해, 라벨이 선 위에 올라앉지 않게 한다
-/// (실기기 반려: 수도권 '시청'이 2호선 초록 선 위). 수도권 SVG 최대 노선
-/// stroke-width=13 local, 레이어 스케일 0.455, 실측 designScale=1.3729673 →
-/// 반폭 13/2 × 0.455 × 1.373 ≈ 4.06 design px. 라운드 코너·안티에일리어싱 여유를
-/// 더해 4.5로 잡는다. 기본 모드(구조화 노선)는 이 값을 쓰지 않고 중심선만 마킹.
-const double kRouteMapBasemapLineHalfWidthPx = 4.5;
 
 /// SVG 바탕층(#2068) 일반(비환승) 역 심벌의 design px 외곽 반경. basemap 모드에서
 /// 이웃 라벨이 남의 역 노드를 덮지 않도록 장애물로 시드하고, 자기 라벨의
