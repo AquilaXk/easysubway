@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'auth_headers.dart';
 import 'core/database/user/user_database.dart';
+import 'core/database/user/user_database_opener.dart';
 import 'core/network/api_client.dart';
 import 'mobile_error_reporter.dart';
 
@@ -91,9 +92,18 @@ class UserDataDeletionApiRepository implements UserDataDeletionRepository {
 }
 
 class UserDataDeletionLocalRepository implements UserDataDeletionRepository {
-  UserDataDeletionLocalRepository({required this.userDatabase});
+  UserDataDeletionLocalRepository({
+    required this.userDatabase,
+    this.databaseDirectory,
+  });
 
   final UserDatabase userDatabase;
+
+  /// 사용자 DB 디렉터리. 마이그레이션 실패로 보관된 원본 DB가 여기에 남는다.
+  ///
+  /// 보관본에는 즐겨찾기·검색 이력·신고 초안·접수증이 원본 그대로 들어 있어
+  /// 행 삭제만으로는 기기에서 지워지지 않는다(#2546).
+  final Directory? databaseDirectory;
 
   @override
   Future<UserDataDeletionResult> deleteCurrentUserData() async {
@@ -125,6 +135,7 @@ class UserDataDeletionLocalRepository implements UserDataDeletionRepository {
             .delete(userDatabase.reportDrafts)
             .go();
       });
+      await _deletePreservedDatabases();
 
       return UserDataDeletionResult(
         userId: 'local-user',
@@ -147,6 +158,14 @@ class UserDataDeletionLocalRepository implements UserDataDeletionRepository {
       );
       throw const UserDataDeletionException(userDataDeletionErrorMessage);
     }
+  }
+
+  Future<void> _deletePreservedDatabases() async {
+    final directory = databaseDirectory;
+    if (directory == null) {
+      return;
+    }
+    await UserDatabaseOpener.deletePreservedDatabases(directory);
   }
 }
 
