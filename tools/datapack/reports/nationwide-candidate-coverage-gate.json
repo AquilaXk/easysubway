@@ -57,7 +57,7 @@
     },
     "spec": {
       "path": "tools/datapack/nationwide-candidate-pack-spec.json",
-      "sha256": "b6790c109043695d08cb16e270fb5ba3825f556933ee5dfe49c1cd23cc37365c"
+      "sha256": "346d7c617a02cc450229a3fdc9fd8671ca7ef68c936a8ec908dc9745dea05f39"
     },
     "targets": {
       "path": "tools/datapack/nationwide-coverage-targets.json",
@@ -226,7 +226,7 @@
     }
   ],
   "packDataInclusions": {
-    "chainKo": "entries는 적용 순서다. 한 지역에 여러 도메인을 편입하면 뒤 편입의 승계 원본은 앞 편입 결과이므로 앞선 편입이 실은 행도 뒤 편입의 불변 대상이 되고, 선행 조건을 요구하는 materializer(대구 route_map·accessibility는 pack에 대구 시각표 소스가 이미 있을 것을 검사한다)는 그 조건을 채운 편입 뒤에 와야 한다. 순서를 바꾸면 조립이 fail closed 된다.",
+    "chainKo": "entries는 적용 순서다. 한 지역에 여러 도메인을 편입하면 뒤 편입의 승계 원본은 앞 편입 결과이므로 앞선 편입이 실은 행도 뒤 편입의 불변 대상이 된다. 순서를 조립이 강제하는 구간은 선행 조건이 있는 쌍뿐이다 — 대구 route_map·accessibility는 pack에 대구 시각표 소스가 이미 있을 것을 검사하므로 시각표 편입보다 앞서면 fail closed 되지만, 서로 선행 조건이 없는 두 편입(route_map↔accessibility)은 순서를 바꿔도 조립이 통과한다. 따라서 기록된 전체 순서를 고정하는 축은 조립 fail closed가 아니라 이 entries 배열 순서를 그대로 대조하는 회귀다.",
     "entries": [
       {
         "addedRows": {

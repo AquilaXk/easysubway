@@ -189,7 +189,7 @@
         "sourceInventory": 1
       },
       "reasonKo": "#2580 B2-a. 대구 3노선 accessibility_facilities requirement를 판정에 올리려면 candidate root pack이 공식 편의시설 행을 담아야 한다. 이 materializer도 대구 시각표 소스를 선행 조건으로 검사하므로 같은 체인 뒤에 붙인다. 이미 admission이 끝난 snapshot(#2467)을 재생한다.",
-      "materializedAtReasonKo": "이 snapshot의 신선도 창은 capturedAt 2026-07-24T01:00:00Z ~ freshUntil 2026-07-25T01:00:00Z이며 materializer가 그 밖의 기준 시각을 fail closed 한다. 시각표·노선도 편입과 창이 겹치지 않으므로 pin을 하나로 묶을 수 없다."
+      "materializedAtReasonKo": "이 snapshot의 신선도 창은 capturedAt 2026-07-24T01:00:00Z ~ freshUntil 2026-07-25T01:00:00Z이며 materializer가 그 밖의 기준 시각을 fail closed 한다. 창은 소스마다 다르고 상한 유무도 갈린다 — 시각표는 [capturedAt, freshUntil) 양끝을 검사하지만 노선도 materializer는 하한(capturedAt 이후)만 검사해 상한이 없다. 시각표 창은 이 창과 서로소이고 노선도 창은 이 창과 겹치므로, 편입 하나의 창만 보고 pin을 묶으면 그 소스의 snapshot이 갱신될 때 다른 편입의 기준 시각까지 함께 흔들린다. pin을 편입마다 따로 두면 각 pin이 자기 소스의 창에만 묶인다."
     }
   ],
   "lineScopeRedescriptions": [

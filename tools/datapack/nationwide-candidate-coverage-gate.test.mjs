@@ -304,10 +304,46 @@ test("대구 route_map/accessibility 6 requirement는 체인 편입으로 MISSIN
   assert.equal(accessibility.addedRows.stationFacilityEvidence, 282);
   assert.equal(accessibility.addedRows.sourceInventory, 1);
   assert.equal(accessibility.addedRows.routeMapPositions, 0);
-  // 소스마다 신선도 창이 달라 기준 시각 pin도 편입마다 따로여야 한다.
-  assert.equal(
-    new Set(evidence.packDataInclusions.entries.map(({ materializedAt }) => materializedAt)).size,
-    DAEGU_MATERIALIZERS.length,
+  // pin 상호 상이성은 불변식이 아니다 — 노선도 창과 편의시설 창은 겹쳐서 두 편입이 같은 pin을 써도
+  // 조립은 통과한다(실측). 대신 각 pin이 그 소스의 admission 창 안인지를 직접 본다. 창의 모양은
+  // 소스마다 다르다.
+  const inventory = await readJson(INVENTORY_PATH);
+  const admissionEvidence = (sourceId, evidenceKey) =>
+    inventory.sources.find(({ id }) => id === sourceId)[evidenceKey];
+  const pins = new Map(evidence.packDataInclusions.entries.map(
+    ({ materializer, materializedAt }) => [materializer, Date.parse(materializedAt)],
+  ));
+
+  // 시각표 편입: 3노선의 topology·시각표 admission 창 [capturedAt, freshUntil)을 모두 만족해야 한다.
+  for (const lineNumber of [1, 2, 3]) {
+    for (const [sourceId, evidenceKey] of [
+      [`daegu-line${lineNumber}-route-topology`, "topologyAdmissionEvidence"],
+      [`daegu-line${lineNumber}-train-timetable`, "scheduleAdmissionEvidence"],
+    ]) {
+      const { capturedAt, freshUntil } = admissionEvidence(sourceId, evidenceKey);
+      const pin = pins.get(DAEGU_MATERIALIZERS[0]);
+      assert.ok(pin >= Date.parse(capturedAt) && pin < Date.parse(freshUntil), `${sourceId} 창`);
+    }
+  }
+  // 노선도 편입: 신선도 보장이 다른 두 편입과 비대칭이다 — admission 정본에 freshUntil이 없고
+  // materializer도 하한(capturedAt 이후)만 검사해 상한이 없다(먼 미래 pin도 통과함이 실측된다).
+  // 상한 도입 여부는 materializer 쪽 판단이라 이 하네스의 축이 아니며, 여기서는 그 비대칭을 기록한다.
+  const routeMapEvidence = admissionEvidence(
+    "daegu-transportation-route-map-positions",
+    "routeMapAdmissionEvidence",
+  );
+  assert.equal(routeMapEvidence.freshUntil, undefined, "노선도 admission 정본에는 상한이 없다");
+  assert.ok(pins.get(DAEGU_MATERIALIZERS[1]) >= Date.parse(routeMapEvidence.capturedAt), "노선도 창 하한");
+  // 편의시설 편입: [capturedAt, freshUntil) 양끝을 검사한다.
+  const accessibilityEvidence = admissionEvidence(
+    "daegu-transportation-accessibility",
+    "accessibilityAdmissionEvidence",
+  );
+  const accessibilityPin = pins.get(DAEGU_MATERIALIZERS[2]);
+  assert.ok(
+    accessibilityPin >= Date.parse(accessibilityEvidence.capturedAt)
+      && accessibilityPin < Date.parse(accessibilityEvidence.freshUntil),
+    "편의시설 창",
   );
 });
 
@@ -543,6 +579,61 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
     );
   });
 
+  // 형상 분기가 넓힌 자리의 반대 방향 축: 등재 형상에 없는 키는 어댑터가 읽지 않으므로 그대로 두면
+  // spec이 선언한 입력이 읽히지도 해시되지도 않은 채 통과한다(실측: 무시됐다) — 좁혀서 거부한다.
+  await context.test("materializer 형상에 없는 편입 키는 거부된다", async () => {
+    await rejectsWith(
+      (value) => {
+        value.packDataInclusions[1].timetableSnapshotPath =
+          "tools/datapack/sources/daegu-line1-train-timetable-20260721.json";
+      },
+      /materialize-daegu-route-map-positions\.mjs has unknown keys: timetableSnapshotPath/,
+    );
+  });
+
+  await context.test("materializer 형상에 없는 lines 키는 거부된다", async () => {
+    await rejectsWith(
+      (value) => {
+        value.packDataInclusions[1].lines[0].timetableSnapshotPath =
+          "tools/datapack/sources/daegu-line1-train-timetable-20260721.json";
+      },
+      /materialize-daegu-route-map-positions\.mjs\.lines\[\] has unknown keys: timetableSnapshotPath/,
+    );
+  });
+
+  // spec 단계 중복 금지 단위는 (regionId, materializer)라 같은 materializer를 다른 regionId로 두 번
+  // 실으면 그 축에 걸리지 않는다 — materializer의 소스 재등재 거부가 그 자리를 실제로 막는지 본다.
+  await context.test("같은 materializer를 다른 regionId로 두 번 실으면 거부된다", async () => {
+    await rejectsWith(
+      (value) => {
+        const duplicated = structuredClone(value.packDataInclusions[1]);
+        duplicated.regionId = "daegu-mirror";
+        value.packDataInclusions.push(duplicated);
+      },
+      /daegu-transportation-route-map-positions already exists/,
+    );
+  });
+
+  // 노선도 편입은 snapshot 바이트 해시를 admission 정본(snapshotSha256)과 대조하지만 편의시설 정본에는
+  // 바이트 축이 없다 — rawSha256·rowsSha256은 snapshot 내용에서 파생돼 재직렬화 사본도 같은 값을 낸다.
+  // 편입 경로를 정본 snapshotPath에 결속하지 않으면 아래 사본이 그대로 조립을 통과한다(실측).
+  await context.test("편의시설 편입이 admission 정본 밖 snapshot 사본을 가리키면 거부된다", async () => {
+    const copyPath = `tools/datapack/sources/accessibility-copy-${process.pid}.json`;
+    const original = await readFile(
+      path.join(root, "tools/datapack/sources/daegu-transportation-accessibility-20260724.json"),
+      "utf8",
+    );
+    await writeFile(path.join(root, copyPath), JSON.stringify(JSON.parse(original)));
+    try {
+      await rejectsWith(
+        (value) => { value.packDataInclusions[2].snapshotPath = copyPath; },
+        /snapshotPath must match the daegu-transportation-accessibility admission evidence snapshotPath/,
+      );
+    } finally {
+      await rm(path.join(root, copyPath), { force: true });
+    }
+  });
+
   await context.test("일반화된 형상의 편입 입력도 저장소 밖을 가리키면 거부된다", async () => {
     await rejectsWith(
       (value) => {
@@ -574,9 +665,11 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
     );
   });
 
-  // 편입마다 신선도 창이 다르므로 기준 시각 pin도 편입 단위다. 한 편입의 pin을 다른 편입의
-  // 창으로 옮기면 그 materializer가 fail closed 해야 한다.
-  await context.test("노선도 편입 기준 시각을 snapshot 포착 이전으로 옮기면 거부된다", async () => {
+  // 편입마다 신선도 창이 다르므로 기준 시각 pin도 편입 단위다. 다만 노선도 편입의 창은 하한뿐이라
+  // 다른 두 편입(시각표·편의시설의 [capturedAt, freshUntil))과 신선도 보장이 비대칭이다 — 포착 이전
+  // pin만 fail closed 되고 먼 미래 pin은 통과한다. 상한 도입은 materializer 쪽 판단이라 여기서
+  // 동작으로 고정하지 않고 비대칭을 기록만 한다.
+  await context.test("노선도 편입 기준 시각을 snapshot 포착 이전으로 옮기면 거부된다(하한만 검사·상한 없음)", async () => {
     await rejectsWith(
       (value) => { value.packDataInclusions[1].materializedAt = "2026-07-20T16:00:00.000Z"; },
       /daegu-transportation-route-map-positions inventory evidence does not match snapshot/,
@@ -698,6 +791,117 @@ test("조립 경로는 승계 행을 변조하는 materializer를 거부한다",
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }
+});
+
+// 아래 두 회귀도 in-process seam으로 항목을 넘긴다(allowlist는 모듈 내부 상수라 spec 편집으로 닿을 수 없다).
+// 공통 실행부와 합성 편입 레코드만 묶고, 항목 형상·materializer 동작은 회귀마다 다르게 준다.
+const SEAM_INPUTS = { paths: ["stationMapPath"], linePaths: ["topologySnapshotPath"] };
+
+async function runWithMaterializers(spec, inventory, materializers) {
+  const workspace = await mkdtemp(path.join(tmpdir(), "nationwide-candidate-gate-seam-"));
+  try {
+    return await runNationwideCandidateCoverageGate({
+      spec,
+      specInput: { path: SPEC_PATH, sha256: "a".repeat(64) },
+      targetsInput: { path: TARGETS_PATH, sha256: "b".repeat(64) },
+      inventory,
+      inventoryInput: { path: INVENTORY_PATH, sha256: "c".repeat(64) },
+      resolutionPlanInput: { path: RESOLUTION_PLAN_PATH, sha256: "d".repeat(64) },
+      resolutionsInput: { path: RESOLUTIONS_PATH, sha256: "e".repeat(64) },
+      workDir: workspace,
+      materializers,
+    });
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+}
+
+function seamInclusion(materializer, addedRows) {
+  return {
+    regionId: "synthetic",
+    materializer,
+    materializedAt: "2026-07-20T16:00:00.000Z",
+    stationMapPath: "tools/datapack/sources/molit-urban-rail-full-route-20251211.csv",
+    lines: [{
+      lineNumber: 1,
+      lineId: "line-5b8d9b05e7e6",
+      topologySnapshotPath: "tools/datapack/sources/daegu-line1-route-topology-20260721.json",
+    }],
+    addedRows,
+  };
+}
+
+async function zeroAddedRows() {
+  const [inheritedPack] = (await readJson(REVIEWED_PACK_PATH)).packs;
+  return Object.fromEntries(
+    Object.entries(inheritedPack).filter(([, value]) => Array.isArray(value)).map(([table]) => [table, 0]),
+  );
+}
+
+// 단일 편입 회귀는 승계 원본(capital pack) 행만 태운다. 체인에서는 앞 편입이 실은 행도 뒤 편입의 불변
+// 대상이므로, 1번째가 append한 행을 2번째가 in-place로 변조하는 2단 케이스를 따로 고정한다
+// (행수는 그대로라 addedRows 대조는 통과하고 승계 행 불변 축만 걸린다).
+test("조립 경로는 앞 편입이 실은 행을 뒤 편입이 변조하면 거부한다", async () => {
+  const spec = structuredClone(await readJson(SPEC_PATH));
+  const inventory = await readJson(INVENTORY_PATH);
+  const zeroRows = await zeroAddedRows();
+  const appendId = "test://appends-station-row";
+  const mutateId = "test://mutates-chained-row";
+  spec.packDataInclusions = [
+    seamInclusion(appendId, { ...zeroRows, stations: 1 }),
+    seamInclusion(mutateId, zeroRows),
+  ];
+  const materializers = new Map([
+    [appendId, {
+      materialize: (fixture) => {
+        const mutated = structuredClone(fixture);
+        mutated.packs[0].stations.push({
+          ...mutated.packs[0].stations[0],
+          id: "station-synthetic-chained",
+        });
+        return mutated;
+      },
+      inputs: SEAM_INPUTS,
+    }],
+    [mutateId, {
+      materialize: (fixture) => {
+        const mutated = structuredClone(fixture);
+        // 승계 원본 행이 아니라 직전 편입이 append한 마지막 행을 건드린다.
+        mutated.packs[0].stations.at(-1).nameKo = "변조";
+        return mutated;
+      },
+      inputs: SEAM_INPUTS,
+    }],
+  ]);
+
+  await assert.rejects(
+    runWithMaterializers(spec, inventory, materializers),
+    /synthetic:test:\/\/mutates-chained-row pack data inclusion modified inherited rows: stations/,
+  );
+});
+
+// 등재 항목의 형상 자체가 깨지면(inputs 결측·형 오류) 무검사 구조분해는 TypeError로 터져 진단이
+// "무엇이 잘못됐나" 대신 스택으로 붕괴한다 — 형상 검사가 그 자리를 대신 잡는지 본다.
+test("allowlist 항목의 inputs 형상이 깨지면 진단 가능한 오류로 거부된다", async () => {
+  const spec = structuredClone(await readJson(SPEC_PATH));
+  const inventory = await readJson(INVENTORY_PATH);
+  const zeroRows = await zeroAddedRows();
+  const keep = (fixture) => fixture;
+
+  spec.packDataInclusions = [seamInclusion("test://missing-inputs", zeroRows)];
+  await assert.rejects(
+    runWithMaterializers(spec, inventory, new Map([["test://missing-inputs", { materialize: keep }]])),
+    /pack data materializer inputs shape is invalid: test:\/\/missing-inputs/,
+  );
+
+  spec.packDataInclusions = [seamInclusion("test://broken-inputs", zeroRows)];
+  await assert.rejects(
+    runWithMaterializers(spec, inventory, new Map([["test://broken-inputs", {
+      materialize: keep,
+      inputs: { paths: "stationMapPath", linePaths: ["topologySnapshotPath"] },
+    }]])),
+    /pack data materializer inputs shape is invalid: test:\/\/broken-inputs/,
+  );
 });
 
 test("production 게시 트랙 fixture는 candidate 조립에 영향받지 않는다", async () => {

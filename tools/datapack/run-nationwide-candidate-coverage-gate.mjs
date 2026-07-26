@@ -106,6 +106,9 @@ const PACK_DATA_MATERIALIZERS = new Map([
     inputs: { paths: ["snapshotPath"], linePaths: ["topologySnapshotPath"] },
   }],
 ]);
+// 형상과 무관하게 모든 편입 레코드가 갖는 키. 나머지 허용 키는 등재 형상의 경로 키뿐이다(*Ko 서술 키 예외).
+const INCLUSION_BASE_KEYS = Object.freeze(["regionId", "materializer", "materializedAt", "lines", "addedRows"]);
+const INCLUSION_LINE_BASE_KEYS = Object.freeze(["lineNumber", "lineId"]);
 
 export async function runNationwideCandidateCoverageGate({
   spec,
@@ -307,7 +310,19 @@ async function materializeDaeguRouteMapInclusion(fixture, inclusion, { readTrack
 }
 
 // 대구 교통약자 편의시설 편입 어댑터(#2580).
+//
+// route_map 어댑터는 snapshot 바이트 해시를 materializer에 넘겨 admission 정본(snapshotSha256)과 대조하지만
+// accessibility 정본에는 바이트 축이 없다 — rawSha256·rowsSha256은 snapshot 내용에서 파생돼 재직렬화 사본도
+// 같은 값을 낸다(실측: 사본이 그대로 조립을 통과했다). materializer에 검사 지점이 없으므로 하네스가 편입이
+// 읽는 경로를 admission 정본의 snapshotPath에 결속해 대칭을 맞춘다. 그 경로에서 실제로 읽은 바이트 해시는
+// evidence inputs에 남으므로, 정본 경로 파일 자체가 재직렬화되면 evidence 바이트 재생성 회귀가 잡는다.
 async function materializeDaeguAccessibilityInclusion(fixture, inclusion, { readTracked, inventory }) {
+  assertAdmissionSnapshotPath(
+    inventory,
+    "daegu-transportation-accessibility",
+    "accessibilityAdmissionEvidence",
+    inclusion.snapshotPath,
+  );
   const topologySnapshots = await daeguTopologySnapshots(inclusion, readTracked);
   return materializeDaeguAccessibility({
     baseFixture: fixture,
@@ -319,6 +334,17 @@ async function materializeDaeguAccessibilityInclusion(fixture, inclusion, { read
     inventory,
     now: new Date(inclusion.materializedAt),
   });
+}
+
+// 편입이 읽는 snapshot 경로를 admission 정본이 선언한 경로와 결속한다(바이트 축이 없는 소스의 대칭 보완).
+function assertAdmissionSnapshotPath(inventory, sourceId, evidenceKey, snapshotPath) {
+  const declared = inventory?.sources?.find(({ id }) => id === sourceId)?.[evidenceKey]?.snapshotPath;
+  if (typeof declared !== "string" || declared !== snapshotPath) {
+    throw new Error(
+      `pack data inclusion snapshotPath must match the ${sourceId} admission evidence snapshotPath: `
+        + `expected ${declared}, got ${snapshotPath}`,
+    );
+  }
 }
 
 // 집계 대상 표를 상수로 못박지 않고 pack 자신의 배열 필드에서 끌어온다. 고정 목록은 목록 밖 표
@@ -709,9 +735,11 @@ function buildEvidence({ spec, inputs, packDataInclusions, reports, variants, si
         + "축은 재기술뿐이다.",
       chainKo:
         "entries는 적용 순서다. 한 지역에 여러 도메인을 편입하면 뒤 편입의 승계 원본은 앞 편입 결과이므로 "
-        + "앞선 편입이 실은 행도 뒤 편입의 불변 대상이 되고, 선행 조건을 요구하는 materializer(대구 "
-        + "route_map·accessibility는 pack에 대구 시각표 소스가 이미 있을 것을 검사한다)는 그 조건을 채운 "
-        + "편입 뒤에 와야 한다. 순서를 바꾸면 조립이 fail closed 된다.",
+        + "앞선 편입이 실은 행도 뒤 편입의 불변 대상이 된다. 순서를 조립이 강제하는 구간은 선행 조건이 "
+        + "있는 쌍뿐이다 — 대구 route_map·accessibility는 pack에 대구 시각표 소스가 이미 있을 것을 "
+        + "검사하므로 시각표 편입보다 앞서면 fail closed 되지만, 서로 선행 조건이 없는 두 편입"
+        + "(route_map↔accessibility)은 순서를 바꿔도 조립이 통과한다. 따라서 기록된 전체 순서를 고정하는 "
+        + "축은 조립 fail closed가 아니라 이 entries 배열 순서를 그대로 대조하는 회귀다.",
       entries: packDataInclusions,
     },
     lineScopeRedescriptions: spec.lineScopeRedescriptions.map((redescription) => ({
@@ -953,10 +981,16 @@ function validatePackDataInclusions(spec, materializers) {
 // 편입 입력 형상은 allowlist 항목이 등재한 경로 키만 요구한다. 선언한 경로는 전부 어댑터가 readTracked로
 // 읽어 저장소 안 실경로 강제와 입력 해시 결속을 받으므로, 형상을 넓혀도 안전 경계는 그대로다.
 // lines는 형상과 무관하게 편입이 선언한 노선 범위라 어느 materializer에서도 요구한다.
-function validateInclusionInputs(inclusion, { paths, linePaths }, label) {
+//
+// 허용 키는 등재 형상이 정하고 그 밖의 키는 거부한다. 미등재 키를 조용히 무시하면 spec이 선언한 입력이
+// 읽히지도 해시되지도 않은 채 evidence를 통과해(예: 노선도 편입에 남은 시각표 경로), 선언과 실제 결속이
+// 갈린 상태가 무성으로 남는다. 서술용 *Ko 키는 저장소 문서 관례라 예외로 둔다.
+function validateInclusionInputs(inclusion, inputs, label) {
+  const { paths, linePaths } = materializerInputShape(inclusion.materializer, inputs);
   for (const key of paths) {
     requiredString(inclusion[key], `${label}.${key}`);
   }
+  assertKnownKeys(inclusion, [...INCLUSION_BASE_KEYS, ...paths], label);
   if (!Array.isArray(inclusion.lines) || inclusion.lines.length === 0) {
     throw new Error(`${label}.lines must be a non-empty array`);
   }
@@ -968,6 +1002,32 @@ function validateInclusionInputs(inclusion, { paths, linePaths }, label) {
     for (const key of linePaths) {
       requiredString(line[key], `${label}.lines[].${key}`);
     }
+    assertKnownKeys(line, [...INCLUSION_LINE_BASE_KEYS, ...linePaths], `${label}.lines[]`);
+  }
+}
+
+// allowlist 항목의 형상 자체도 검사한다. 무검사 구조분해는 형상이 빠진 항목에서 TypeError로 터져
+// 진단이 "무엇이 잘못됐나" 대신 스택으로 붕괴한다(in-process seam으로 항목을 넘기는 경로가 그렇다).
+function materializerInputShape(materializer, inputs) {
+  if (!inputs || typeof inputs !== "object" || Array.isArray(inputs)
+    || !isPathKeyList(inputs.paths) || !isPathKeyList(inputs.linePaths)) {
+    throw new Error(`pack data materializer inputs shape is invalid: ${materializer}`);
+  }
+  return { paths: inputs.paths, linePaths: inputs.linePaths };
+}
+
+// 경로 키 목록은 비어 있어도 된다(그 층에 경로 입력이 없는 materializer). 항목은 전부 비어 있지 않은 문자열이어야 한다.
+function isPathKeyList(value) {
+  return Array.isArray(value) && value.every((entry) => typeof entry === "string" && entry.trim() !== "");
+}
+
+function assertKnownKeys(record, knownKeys, label) {
+  const known = new Set(knownKeys);
+  const unknown = Object.keys(record)
+    .filter((key) => !known.has(key) && !key.endsWith("Ko"))
+    .sort(codepointCompare);
+  if (unknown.length > 0) {
+    throw new Error(`${label} has unknown keys: ${unknown.join(",")}`);
   }
 }
 
