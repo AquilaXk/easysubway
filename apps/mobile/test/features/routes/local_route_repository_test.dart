@@ -4413,7 +4413,7 @@ void main() {
           'STEP_FREE',
           'AVAILABLE',
           95,
-          1781827200,
+          $_recentlyVerifiedAtSeconds,
           'facility-a-elevator'
         ),
         (
@@ -4426,7 +4426,7 @@ void main() {
           'STEP_FREE',
           'AVAILABLE',
           95,
-          1781827200,
+          $_recentlyVerifiedAtSeconds,
           NULL
         )
     ''');
@@ -4477,7 +4477,7 @@ void main() {
         'facility',
         'facility-a-elevator',
         'LEVEL_4',
-        1781827200
+        $_recentlyVerifiedAtSeconds
       )
     ''');
     await database.customStatement('''
@@ -4497,7 +4497,7 @@ void main() {
           'STEP_FREE',
           'AVAILABLE',
           95,
-          1781827200,
+          $_recentlyVerifiedAtSeconds,
           'facility-a-elevator'
         ),
         (
@@ -4510,7 +4510,7 @@ void main() {
           'STEP_FREE',
           'AVAILABLE',
           95,
-          1781827200,
+          $_recentlyVerifiedAtSeconds,
           NULL
         )
     ''');
@@ -4570,7 +4570,7 @@ void main() {
           'STEP_FREE',
           'AVAILABLE',
           95,
-          1781827200,
+          $_recentlyVerifiedAtSeconds,
           'facility-a-elevator'
         ),
         (
@@ -4583,7 +4583,7 @@ void main() {
           'STEP_FREE',
           'AVAILABLE',
           95,
-          1781827200,
+          $_recentlyVerifiedAtSeconds,
           NULL
         )
     ''');
@@ -6147,6 +6147,17 @@ Future<void> _setOutOfStationTransferRuntimeEnabled(
   );
 }
 
+/// 픽스처가 말하는 "최근에 확인됨" 시각.
+///
+/// 절대 시각을 박으면 `isDataStaleAt`의 365일 창이 언젠가 그 시각을 지나 테스트가
+/// 스스로 뒤집힌다. 주입 시계를 쓰지 않는 테스트가 있으므로 벽시계 기준 상대 시각으로
+/// 둔다 — 고정 시계를 주입한 테스트에서는 그 시각보다 미래가 되지만, 만료 판정은
+/// "365일보다 과거인가"만 보므로 신선한 쪽으로 안전하다. 만료를 재현하려는 픽스처는
+/// 이 값을 쓰지 않고 만료된 시각을 직접 준다.
+final int _recentlyVerifiedAtSeconds =
+    DateTime.now().subtract(const Duration(days: 30)).millisecondsSinceEpoch ~/
+    1000;
+
 Future<void> _fillInsertedNetworkEdgeEvidence(CatalogDatabase database) async {
   await database.customStatement('''
     CREATE TRIGGER test_fill_network_edge_evidence
@@ -6160,7 +6171,7 @@ Future<void> _fillInsertedNetworkEdgeEvidence(CatalogDatabase database) async {
             'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
           provenance_kind = 'OFFICIAL_SOURCE',
           verification_status = 'VERIFIED',
-          last_verified_at = COALESCE(NEW.last_verified_at, 1781827200),
+          last_verified_at = COALESCE(NEW.last_verified_at, $_recentlyVerifiedAtSeconds),
           evidence_hash =
             '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       WHERE id = NEW.id
@@ -6192,7 +6203,7 @@ Future<void> _addExplicitAccessEdges(CatalogDatabase database) async {
         'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
         'OFFICIAL_SOURCE',
         'VERIFIED',
-        1781827200,
+        $_recentlyVerifiedAtSeconds,
         '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
@@ -6209,7 +6220,7 @@ Future<void> _addExplicitAccessEdges(CatalogDatabase database) async {
         'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
         'OFFICIAL_SOURCE',
         'VERIFIED',
-        1781827200,
+        $_recentlyVerifiedAtSeconds,
         '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
@@ -6226,7 +6237,7 @@ Future<void> _addExplicitAccessEdges(CatalogDatabase database) async {
         'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
         'OFFICIAL_SOURCE',
         'VERIFIED',
-        1781827200,
+        $_recentlyVerifiedAtSeconds,
         '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
@@ -6243,7 +6254,7 @@ Future<void> _addExplicitAccessEdges(CatalogDatabase database) async {
         'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
         'OFFICIAL_SOURCE',
         'VERIFIED',
-        1781827200,
+        $_recentlyVerifiedAtSeconds,
         '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
@@ -6260,7 +6271,7 @@ Future<void> _addExplicitAccessEdges(CatalogDatabase database) async {
         'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
         'OFFICIAL_SOURCE',
         'VERIFIED',
-        1781827200,
+        $_recentlyVerifiedAtSeconds,
         '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
@@ -6277,7 +6288,7 @@ Future<void> _addExplicitAccessEdges(CatalogDatabase database) async {
         'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
         'OFFICIAL_SOURCE',
         'VERIFIED',
-        1781827200,
+        $_recentlyVerifiedAtSeconds,
         '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       )
   ''');
@@ -6295,7 +6306,7 @@ Future<void> _insertVerifiedNetworkEdge(
   String serviceClass = 'SUBWAY',
   String verificationStatus = 'VERIFIED',
   String provenanceKind = 'OFFICIAL_SOURCE',
-  int lastVerifiedAtSeconds = 1781827200,
+  int? lastVerifiedAtSeconds,
   String evidenceHash =
       '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
 }) async {
@@ -6323,7 +6334,7 @@ Future<void> _insertVerifiedNetworkEdge(
       serviceClass,
       provenanceKind,
       verificationStatus,
-      lastVerifiedAtSeconds,
+      lastVerifiedAtSeconds ?? _recentlyVerifiedAtSeconds,
       evidenceHash,
     ],
   );
@@ -6367,7 +6378,7 @@ Future<void> _addSecondLineForTransferFixture(CatalogDatabase database) async {
         'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
         'OFFICIAL_SOURCE',
         'VERIFIED',
-        1781827200,
+        $_recentlyVerifiedAtSeconds,
         '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
@@ -6384,7 +6395,7 @@ Future<void> _addSecondLineForTransferFixture(CatalogDatabase database) async {
         'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
         'OFFICIAL_SOURCE',
         'VERIFIED',
-        1781827200,
+        $_recentlyVerifiedAtSeconds,
         '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
@@ -6401,7 +6412,7 @@ Future<void> _addSecondLineForTransferFixture(CatalogDatabase database) async {
         'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
         'OFFICIAL_SOURCE',
         'VERIFIED',
-        1781827200,
+        $_recentlyVerifiedAtSeconds,
         '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
@@ -6418,7 +6429,7 @@ Future<void> _addSecondLineForTransferFixture(CatalogDatabase database) async {
         'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
         'OFFICIAL_SOURCE',
         'VERIFIED',
-        1781827200,
+        $_recentlyVerifiedAtSeconds,
         '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       )
   ''');
@@ -6441,7 +6452,7 @@ Future<void> _addEligibleStationFacilityEvidence(
       )
       VALUES (?, ?, ?, 'EXISTS', 'test-source', 'test-source-snapshot',
         'provider-hash', 'evidence-hash', 'OFFICIAL_SOURCE', 'INSTALLED',
-        'AVAILABLE', 'REALTIME_OPERATION', 100, 1781827200, 1781827200, 1,
+        'AVAILABLE', 'REALTIME_OPERATION', 100, $_recentlyVerifiedAtSeconds, $_recentlyVerifiedAtSeconds, 1,
         'FACILITY_EXISTS_AND_PROVENANCE_VERIFIED')
     ''',
     [stationId, lineId, facilityType],
