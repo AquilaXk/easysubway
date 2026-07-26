@@ -9,30 +9,57 @@
 // Dart 테스트는 저장된 값과 비교만 한다.
 //
 // 실행 방법:
-//   EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM="$(cat <테스트 전용 개인키 PEM>)" \
+//   EASYSUBWAY_DATAPACK_TEST_SIGNING_PRIVATE_KEY_PEM="$(cat <테스트 전용 개인키 PEM>)" \
 //     node tools/mobile/build-manifest-envelope-signature-fixture.mjs
 //
 // 키 출처: 저장소가 이미 쓰고 있는 **테스트 전용** 데이터팩 서명 키쌍이다. 공개
 // modulus는 `tools/ci/repository-contract.test.mjs`와
 // `apps/mobile/test/core/datapack/data_pack_manifest_test.dart`에 이미 커밋돼 있고,
 // 짝이 되는 개인키 PEM은 `tools/datapack/datapack-tools.test.mjs`의 테스트 상수다.
-// 운영 서명 키는 저장소에 존재하지 않으며 CI 시크릿으로만 주입되므로 이 fixture와
-// 무관하다. 이 스크립트는 개인키를 인자로 받기만 하고 어디에도 기록하지 않는다.
+// 개인키는 릴리즈 파이프라인이 쓰는 `EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM`이
+// **아닌** 전용 변수로만 받고, 유도한 공개 modulus가 아래 상수와 다르면 즉시 실패한다.
+// 운영 시크릿이 export된 셸에서 이 스크립트를 돌려도 fixture가 운영 키 산출물로
+// 바뀌지 않게 fail closed로 닫은 것이다. 개인키 값은 어디에도 기록하지 않는다.
+//
+// 배치: 이 파일은 `apps/mobile` 테스트가 쓰는 fixture를 만들지만 `tools/mobile/**`는
+// 경로 계약상 repository=true와 **android=true**를 함께 올린다(`tools/ci/
+// repository-contract.test.mjs`). 즉 이 생성기만 고쳐도 Android 릴리즈 산출물 잡이
+// 함께 돈다. 그 비용을 감수하는 이유는 짝이 되는 검증 테스트(`*.test.mjs`)가
+// `tools/mobile/*.test.mjs` 글롭으로 repository 게이트와 mobile 게이트 **양쪽**에
+// 배선돼 있어(#2518), Node 정준 규칙 변경과 Dart 전용 변경 모두에서 stale fixture를
+// 잡을 수 있기 때문이다. `tools/datapack/`에 두면 datapack 게이트에서만 돈다.
 import { constants, createHash, createPrivateKey, createPublicKey, privateDecrypt, publicEncrypt } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { canonicalJson, withoutSignature } from "../datapack/lib/manifest-validation.mjs";
-import { rsaSha256Signature, signingPrivateKey } from "../datapack/lib/manifest-signing.mjs";
+import { rsaSha256Signature } from "../datapack/lib/manifest-signing.mjs";
 
 const root = path.resolve(import.meta.dirname, "../..");
 const outputPath = path.join(root, "apps/mobile/test/core/datapack/fixtures/production_manifest_envelope.json");
 
 const KEY_ID = "datapack-test-v1";
+const PRIVATE_KEY_ENV = "EASYSUBWAY_DATAPACK_TEST_SIGNING_PRIVATE_KEY_PEM";
 
-// `contracts/datapack/canonical-number-contract.json`의 경계 숫자 중 JSON 파일에
-// 리터럴로 살아남는 것들. `1.0`·`-0.0`처럼 파서가 접어버리는 표기는 JSON 파일에
-// 담을 수 없어(JSON.stringify가 `1`·`0`으로 되돌린다) DP-02 자체 테스트가 맡는다.
-const boundaryNumbers = [
+// 저장소에 이미 커밋된 테스트 전용 키쌍의 공개 modulus. 같은 값이
+// `tools/ci/repository-contract.test.mjs`와
+// `apps/mobile/test/core/datapack/data_pack_manifest_test.dart`에 있다.
+export const EXPECTED_TEST_MODULUS_BASE64URL =
+  "itNBIH_FyHbqONXe_z8LNzWes4rh3veI4_8RY76rb7onamA-WDoJlvFyvBG-ihBOl7LtgW1rV54hCLHz95VFLmm028-tll9ThDzSs3Bu9ychED-m0vny16tK8ZgB6gf7sJkjGBJn8MLDaiVWoVvD5TEjv433f_vMFIljdNUKZC2Xf0qHYlYv18dAwbJHKeOsmJkky13HNVn40HuEn5FWEJvFI5qqVgpJ-k1V3ip39ga2-Ek5SOVHAL6U44ypjSXUjo7NCKVpuQRwN7hAnvlYutXDdrEQ6Oa3iUtbQJIgkl-ZmTwNkYHCEIhd_ZLB9n_EEHdvyJAmUKCtAKLX5FOa9w";
+
+// `contracts/datapack/canonical-number-contract.json`의 `formatting` 21건 중 v2
+// 매니페스트 필드에 실제로 실을 수 있는 값들. 배제 사유는 JSON 파서 접힘이 아니라
+// 필드 값 범위 제약이다.
+//   - `integer-valued-fraction`(`1.0`)·`negative-zero-*`(`-0`, `-0.0`) 계열: JSON 파일에
+//     리터럴로 살아남지 못한다(`JSON.stringify`가 `1`·`0`으로 되돌린다). DP-02 자체
+//     테스트가 맡는다.
+//   - `plain-boundary-upper`(1e20)·`exponent-boundary-upper`(1e21)·`max-double`·
+//     `safe-integer-boundary`(2^53): 정준화가 안전 정수 범위 밖으로 fail closed 거부하므로
+//     서명 가능한 매니페스트에 담을 자리가 없다.
+//   - 나머지 1 초과 값: ratio 필드는 `_requiredRatio`가 0..1로 막고, 정수 필드는
+//     `sizeBytes`가 양수 정수라 소수를 담을 수 없다.
+// 아래 9건이 담을 수 있는 전부다.
+export const boundaryNumbers = [
   { contractId: "max-safe-integer", pointer: "/packs/1/sizeBytes", canonical: "9007199254740991" },
   {
     contractId: "double-rounding-artifact",
@@ -53,6 +80,26 @@ const boundaryNumbers = [
     contractId: "smallest-subnormal",
     pointer: "/packs/1/regionalQualityMetrics/unknownAccessibilityRatio",
     canonical: "5e-324",
+  },
+  {
+    contractId: "plain-fraction",
+    pointer: "/packs/2/regionalQualityMetrics/facilityCoverageRatio",
+    canonical: "0.1",
+  },
+  {
+    contractId: "exponent-small-mantissa",
+    pointer: "/packs/2/regionalQualityMetrics/unknownAccessibilityRatio",
+    canonical: "1.5e-7",
+  },
+  {
+    contractId: "exponent-small",
+    pointer: "/packs/3/regionalQualityMetrics/facilityCoverageRatio",
+    canonical: "2.5e-10",
+  },
+  {
+    contractId: "zero",
+    pointer: "/packs/3/regionalQualityMetrics/unknownAccessibilityRatio",
+    canonical: "0",
   },
 ];
 
@@ -94,15 +141,15 @@ const representativeRouteRegressions = [
   },
 ];
 
-function sha256Hex(value) {
+export function sha256Hex(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
-function packPayload(pack) {
+export function packPayload(pack) {
   return `${pack.id}:${pack.version}:${pack.sha256}:${pack.sqliteSha256}:${pack.sizeBytes}`;
 }
 
-function routeRegressionPayload(pack) {
+export function routeRegressionPayload(pack) {
   return `${packPayload(pack)}:${JSON.stringify(representativeRouteRegressions)}`;
 }
 
@@ -196,6 +243,22 @@ function baseManifest({ production, keyId }) {
         sizeBytes: 9007199254740991,
         facilityCoverageRatio: 1e-7,
         unknownAccessibilityRatio: 5e-324,
+        production,
+      }),
+      buildPack({
+        id: "harbor",
+        version: "3",
+        sizeBytes: 2048,
+        facilityCoverageRatio: 0.1,
+        unknownAccessibilityRatio: 1.5e-7,
+        production,
+      }),
+      buildPack({
+        id: "valley",
+        version: "11",
+        sizeBytes: 4096,
+        facilityCoverageRatio: 2.5e-10,
+        unknownAccessibilityRatio: 0,
         production,
       }),
     ],
@@ -333,10 +396,18 @@ function undersizedModulusCase(message) {
   };
 }
 
-async function main() {
-  const privateKeyPem = signingPrivateKey();
+export function buildFixture(privateKeyPem) {
   const publicKey = createPublicKey(createPrivateKey(privateKeyPem));
   const modulus = modulusBytes(publicKey);
+
+  // fail closed: 운영 서명 키(같은 이름의 릴리즈 시크릿)로 fixture가 재생성되어 공개
+  // 저장소에 커밋되는 경로를 막는다. Dart 테스트는 검증 공개키를 fixture 자신에서
+  // 읽으므로 어떤 키로 만든 fixture든 초록이라, 이 가드가 유일한 기계적 방어다.
+  if (modulus.toString("base64url") !== EXPECTED_TEST_MODULUS_BASE64URL) {
+    throw new Error(
+      "이 생성기는 저장소의 테스트 전용 데이터팩 서명 키로만 실행한다 (유도한 modulus가 기대값과 다르다)",
+    );
+  }
 
   const manifest = baseManifest({ production: true, keyId: KEY_ID });
   manifest.packs = manifest.packs.map((pack) => signPack(pack, privateKeyPem));
@@ -385,7 +456,11 @@ async function main() {
       packManifestAlgorithmValue: signatureValue,
       shortSignatureValue: Buffer.from(signatureValue, "base64url").subarray(0, 128).toString("base64url"),
       signatureAboveModulusValue: Buffer.alloc(modulus.length, 0xff).toString("base64url"),
-      nonBase64UrlValue: "A".repeat(341),
+      // 문자는 전부 base64url 알파벳이고 길이만 4의 배수+1이라 틀렸다. charset 위반
+      // 문자열은 `DataPackSignature.fromJson`의 `^[A-Za-z0-9_-]+$` 검사가 verify 앞에서
+      // 거부하므로, verify 내부의 `on FormatException` 폴백에 도달할 수 있는 입력은
+      // 길이 위반뿐이다.
+      invalidBase64UrlLengthValue: "A".repeat(341),
       corruptedPaddingValue: forgeCorruptedPadding(privateKeyPem, signatureValue),
       undersizedModulusKey: undersizedModulusCase(canonicalSignedPayload),
     },
@@ -393,8 +468,19 @@ async function main() {
     fallbackCanonicalSignedPayload: fallbackCanonical,
   };
 
+  return fixture;
+}
+
+async function main() {
+  const privateKeyPem = process.env[PRIVATE_KEY_ENV]?.trim();
+  if (!privateKeyPem) {
+    throw new Error(`${PRIVATE_KEY_ENV} 가 필요하다 (저장소의 테스트 전용 데이터팩 서명 개인키 PEM)`);
+  }
+  const fixture = buildFixture(privateKeyPem);
   await writeFile(outputPath, `${JSON.stringify(fixture, null, 2)}\n`, "utf8");
   process.stdout.write(`${path.relative(root, outputPath)} 갱신 완료\n`);
 }
 
-await main();
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  await main();
+}

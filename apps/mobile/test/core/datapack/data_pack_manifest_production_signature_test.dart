@@ -72,7 +72,12 @@ void main() {
     expect(manifest.keyId, publicKey.keyId);
     expect(manifest.signature?.algorithm, 'rsa-sha256-manifest-v2');
     expect(manifest.signature?.value, validSignatureValue);
-    expect(manifest.packs.map((pack) => pack.id), ['capital', 'metro']);
+    expect(manifest.packs.map((pack) => pack.id), [
+      'capital',
+      'metro',
+      'harbor',
+      'valley',
+    ]);
     expect(
       manifest.packs.map((pack) => pack.artifactKind),
       everyElement(DataPackArtifactKind.production),
@@ -108,17 +113,24 @@ void main() {
   test('3. 서명 대상은 signature 키를 제외한 정준 JSON이다', () {
     expect(_canonicalWithoutSignature(manifestJson()), canonicalSignedPayload);
 
-    // signature 객체 안에 서명되지 않은 필드를 넣어도 검증과 replay hash는 그대로다.
-    final withUnsignedTrace = withSignature(manifestJson(), {
-      'algorithm': 'rsa-sha256-manifest-v2',
-      'value': validSignatureValue,
-      'unsignedTrace': 'debug',
+    // signature 객체를 통째로 다른 내용으로 바꿔도 서명 대상 정준 문자열과 replay
+    // hash는 달라지지 않는다 — 봉투가 서명 범위 밖이라는 사실을 이것으로 고정한다.
+    // 알 수 없는 키를 봉투에 넣었을 때 수용할지 거부할지는 여기서 판단하지 않는다.
+    // 그 정책은 DP-05(#2531, v2 봉투 엄격 파싱)의 몫이고, 여기서 "수용한다"를 고정하면
+    // 후속 하드닝이 테스트 회귀로 보이는 함정이 된다.
+    final replacedEnvelope = withSignature(manifestJson(), {
+      'algorithm': 'sha256-manifest-v2',
+      'value': rejections['selfHashAlgorithmValue']! as String,
     });
-    final manifest = DataPackManifest.fromJson(
-      withUnsignedTrace,
-      productionSigningPublicKey: publicKey,
+    expect(
+      _canonicalWithoutSignature(replacedEnvelope),
+      canonicalSignedPayload,
     );
 
+    final manifest = DataPackManifest.fromJson(
+      manifestJson(),
+      productionSigningPublicKey: publicKey,
+    );
     expect(manifest.manifestHash, manifestHashSha256);
     expect(
       publicKey.verify(canonicalSignedPayload, validSignatureValue),
@@ -223,14 +235,24 @@ void main() {
     );
   });
 
-  test('9. signature 필드 자체가 없으면 거부한다', () {
+  test('9. signature 필드 자체가 없으면 파싱 단계 타입 가드가 먼저 거부한다', () {
     final withoutSignature = manifestJson()..remove('signature');
 
+    // 실측: `manifestVersion == 2`면 `DataPackManifest.fromJson`이 봉투 검증보다 먼저
+    // `_parseManifestEnvelopeSignature(json['signature'])`를 호출하고, 인자가 null이면
+    // Map이 아니라서 그 자리에서 FormatException이 난다. 그래서 이슈가 지목한
+    // `_validateEnvelopeSignature`의 `parsedSignature == null` 가드는 v2 경로에서
+    // 도달 불가능하고, 이 케이스는 봉투 검증이 아니라 파싱 단계에서 닫힌다.
+    // 공개키 유무와 무관하게 같은 지점에서 거부되는 것이 그 근거다.
     expect(
       () => DataPackManifest.fromJson(
         withoutSignature,
         productionSigningPublicKey: publicKey,
       ),
+      throwsFormatException,
+    );
+    expect(
+      () => DataPackManifest.fromJson(manifestJson()..remove('signature')),
       throwsFormatException,
     );
   });
@@ -275,8 +297,21 @@ void main() {
     );
   });
 
-  test('12. base64url이 아닌 서명 값은 예외가 새지 않고 거부로 닫힌다', () {
-    final invalidValue = rejections['nonBase64UrlValue']! as String;
+  test('12. base64url 디코딩이 실패하는 서명 값은 예외가 새지 않고 거부로 닫힌다', () {
+    final invalidValue = rejections['invalidBase64UrlLengthValue']! as String;
+
+    // 문자는 전부 base64url 알파벳이고 길이만 4의 배수+1이다. charset 위반 문자열은
+    // `DataPackSignature.fromJson`의 `^[A-Za-z0-9_-]+$` 검사가 verify 앞에서 거부하므로,
+    // verify 내부의 `on FormatException` 폴백에 도달할 수 있는 입력은 길이 위반뿐이다.
+    expect(RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(invalidValue), isTrue);
+    expect(invalidValue.length % 4, 1);
+    expect(
+      () => DataPackSignature.fromJson({
+        'algorithm': 'rsa-sha256-manifest-v2',
+        'value': 'not/base64url+value',
+      }),
+      throwsFormatException,
+    );
 
     // 서명 값 문법 검사(DataPackSignature)는 통과해 verify까지 도달한다.
     expect(
@@ -364,19 +399,23 @@ void main() {
     expect(boundaries, isNotEmpty);
 
     final manifest = manifestJson();
+    // 서명 대상 정준 문자열을 되짚어 같은 pointer 위치의 값을 확인한다. 키 이름만
+    // 보는 `contains`는 `/packs/0`과 `/packs/1`처럼 같은 키가 여러 곳에 있을 때 값이
+    // 서로 뒤바뀌어도 통과하므로 위치까지 닫지 못한다.
+    final signedDocument =
+        jsonDecode(canonicalSignedPayload) as Map<String, Object?>;
     for (final boundary in boundaries) {
       final pointer = boundary['pointer']! as String;
       final canonical = boundary['canonical']! as String;
-      final value = _resolvePointer(manifest, pointer);
       expect(
-        canonicalDataPackJson(value),
+        canonicalDataPackJson(_resolvePointer(manifest, pointer)),
         canonical,
         reason: '$pointer 값의 정준 표기가 계약과 다르다',
       );
       expect(
-        canonicalSignedPayload,
-        contains('${jsonEncode(pointer.split('/').last)}:$canonical'),
-        reason: '$pointer 가 서명 대상 정준 문자열에 계약 표기로 들어가 있어야 한다',
+        canonicalDataPackJson(_resolvePointer(signedDocument, pointer)),
+        canonical,
+        reason: '$pointer 위치의 값이 서명 대상 정준 문자열에서 계약 표기와 다르다',
       );
     }
 
