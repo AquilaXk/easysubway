@@ -17,6 +17,7 @@ import 'features/ads/ad_repository.dart';
 import 'features/network_map/domain/map_camera.dart';
 import 'features/network_map/domain/route_map_design_space.dart';
 import 'features/network_map/domain/route_map_major_stations.dart';
+import 'features/network_map/domain/route_map_min_scale.dart';
 import 'features/network_map/domain/route_map_owner_labels.dart';
 import 'features/network_map/domain/structured_route_map.dart';
 import 'features/network_map/presentation/nearby_data_source_toggle.dart';
@@ -4245,7 +4246,9 @@ class _NetworkMapCanvas extends StatefulWidget {
   State<_NetworkMapCanvas> createState() => _NetworkMapCanvasState();
 }
 
-const _minMapScale = 0.08;
+/// 축소 하한을 명시하지 않는 테스트 헬퍼 기본값(#2600 이전 동작). 프로덕션
+/// 하한은 [_minimumMapScaleForRegion]이 오너 지정 표에서 조회한다.
+const _fallbackMinMapScale = 0.08;
 const _maxMapScale = 4.8;
 
 /// 역 focus 시 카메라 bounds를 지역 초기 화면(축소 하한, #1789) bounds의 이 비율로
@@ -4454,7 +4457,9 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
             geometry.width,
             geometry.height,
           );
-          final minScale = _minimumMapScaleForBounds(fullBounds, constraints);
+          final minScale = _minimumMapScaleForRegion(
+            widget.data.selectedRegion,
+          );
           // #2068 트랙 QA 후속: 저장 viewport가 없을 때의 초기 카메라는
           // 콘텐츠 중앙을 오너 라벨이 읽히는 배율로 연다. 오너 라벨 sidecar는
           // 비동기 로드라 로드 전후로 가독 배율이 바뀌므로 layoutKey에 포함해
@@ -5253,7 +5258,7 @@ MapCameraState _cameraForBounds(
   BoxConstraints constraints, {
   required Rect sourceBounds,
   bool contain = false,
-  double minScale = _minMapScale,
+  double minScale = _fallbackMinMapScale,
   int revision = 0,
   // LOD 기준이 될 지역 baseline scale. null이면 이 카메라가 baseline이 되어
   // 자신의 fit scale을 쓴다(초기 카메라). focus/파생 카메라는 지역 초기
@@ -5304,12 +5309,16 @@ MapCameraState networkMapInitialCameraForRegion({
   required Rect regionBounds,
   required Rect fullBounds,
   required Size viewport,
+  // 프로덕션은 [_minimumMapScaleForRegion]이 조회한 축소 하한을 넘긴다(#2600).
+  // 미지정 시 폴백 하한이라 하한 도입 전 회귀 테스트는 그대로 성립한다.
+  double? minScale,
 }) {
   return _cameraForBounds(
     regionBounds,
     BoxConstraints.tightFor(width: viewport.width, height: viewport.height),
     sourceBounds: fullBounds,
     contain: true,
+    minScale: minScale ?? _fallbackMinMapScale,
   );
 }
 
@@ -5323,6 +5332,9 @@ MapCameraState networkMapStationFocusCameraForRegion({
   required Rect fullBounds,
   required Size viewport,
   double? initialScaleOverride,
+  // 프로덕션 focus 분기와 같은 축소 하한을 넘긴다(#2600). 미지정 시 폴백 하한이라
+  // 하한 도입 전 회귀 테스트는 그대로 성립한다.
+  double? minScale,
 }) {
   return _cameraForBounds(
     _stationFocusBounds(
@@ -5334,8 +5346,16 @@ MapCameraState networkMapStationFocusCameraForRegion({
     BoxConstraints.tightFor(width: viewport.width, height: viewport.height),
     sourceBounds: fullBounds,
     contain: true,
+    minScale: minScale ?? _fallbackMinMapScale,
     initialScaleOverride: initialScaleOverride,
   );
+}
+
+/// 프로덕션 축소 하한(테스트용). 프로덕션 build 분기와 같은 조회를 쓴다(#2600).
+/// [region]은 저장형('광주권')·표시형('광주') 모두 받는다.
+@visibleForTesting
+double networkMapMinimumScaleForRegion(String region) {
+  return _minimumMapScaleForRegion(region);
 }
 
 @visibleForTesting
@@ -5481,25 +5501,15 @@ Rect _sourceRectToViewport(Rect sourceRect, MapCameraState camera) {
   );
 }
 
-double _minimumMapScaleForBounds(Rect bounds, BoxConstraints constraints) {
-  final viewportWidth = constraints.hasBoundedWidth ? constraints.maxWidth : 0;
-  final viewportHeight = constraints.hasBoundedHeight
-      ? constraints.maxHeight
-      : 0;
-  if (viewportWidth <= 0 ||
-      viewportHeight <= 0 ||
-      bounds.width <= 0 ||
-      bounds.height <= 0) {
-    return _minMapScale;
-  }
-  final fitScale = math.min(
-    viewportWidth / bounds.width,
-    viewportHeight / bounds.height,
+/// 이 권역의 축소 하한(#2600). 값의 정본은
+/// [kRouteMapMinScaleByRegion](오너 지정·실기기 실측 표)이다.
+///
+/// [region]은 저장형 권역명이라 표 조회 전에 표시용으로 정규화한다.
+double _minimumMapScaleForRegion(String region) {
+  return routeMapMinimumScale(
+    region: _displayRegionName(region),
+    maxScale: _maxMapScale,
   );
-  if (!fitScale.isFinite || fitScale <= 0) {
-    return _minMapScale;
-  }
-  return math.min(_minMapScale, fitScale);
 }
 
 /// 이 역 수(route_map_positions 행) 이하 지역은 초기 bounds **기준선**을 지역
