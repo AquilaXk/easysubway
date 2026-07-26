@@ -14122,7 +14122,7 @@ void main() {
       expect(find.textContaining('STATIC_ESTIMATE'), findsNothing);
       expect(find.textContaining('MEASURED'), findsNothing);
       expect(find.text('계단 없는 승강장 접근 동선을 확인해 이동합니다.'), findsOneWidget);
-      expect(find.text('약 4분 · 180m · 엘리베이터 안내 미확인'), findsOneWidget);
+      expect(find.text('약 4분 · 180m'), findsOneWidget);
       // 여러 주의는 각주 한 줄로 합쳐 하나의 '주의 확인'만 노출한다(#1577).
       expect(find.text('주의 확인'), findsOneWidget);
       expect(
@@ -14176,6 +14176,74 @@ void main() {
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
+  testWidgets('확인이 필요한 경로도 구간 줄에 "미확인"을 적지 않고 경로 단위로만 말한다', (tester) async {
+    // 구간마다 "확인 안 됨"을 붙이면 확인된 구간과 아닌 구간이 뒤섞여 읽힌다.
+    // 구간 줄은 확인된 사실만 적고, 확인이 필요하다는 사실은 경로 단위 표기가 진다.
+    // 화면 전체를 훑는 단언이라 이 fixture가 닿는 문구 전부를 잡는다. 시간·거리
+    // 값이 없을 때 나오는 다른 "미확인" 문구는 이 fixture가 닿지 않는다.
+    final semanticsHandle = tester.ensureSemantics();
+    final result = _sampleRouteSearchResult();
+    // 판정 자체는 살아 있어야 한다 — 판정이 꺼지면 이 테스트는 아무것도 지키지 못한다.
+    expect(
+      result.steps.map((step) => step.requiresAccessibilityCheck),
+      everyElement(isTrue),
+    );
+    expect(result.stairAccessLabel, '계단 여부를 확인하고 있어요');
+    expect(result.accessibilityBadgeLabel, '엘리베이터 상태를 살펴봐 주세요');
+
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RouteSearchScreen(
+            repository: FakeRouteSearchRepository(result: result),
+            stationRepository: FakeStationSearchRepository(),
+            initialDraft: RouteDraft(
+              origin: const RouteDraftStation(
+                id: 'station-sangnoksu',
+                nameKo: '상록수',
+              ),
+              destination: const RouteDraftStation(
+                id: 'station-sadang',
+                nameKo: '사당',
+              ),
+              lastModifiedAt: DateTime(2026, 7, 26),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 결과 목록: 화면에 "미확인"이 없고, 경로 단위 정직성 신호는 칩으로 남는다.
+      expect(find.textContaining('미확인'), findsNothing);
+      expect(find.text('계단 여부를 확인하고 있어요'), findsWidgets);
+      expect(
+        find.byKey(const Key('routeResultBadge-엘리베이터 상태를 살펴봐 주세요')),
+        findsOneWidget,
+      );
+      // 스크린리더도 같은 말을 한다: 구간 낭독에 "미확인"이 없고 경로 단위 신호는 읽힌다.
+      expect(result.semanticLabel, isNot(contains('미확인')));
+      expect(find.bySemanticsLabel(RegExp('엘리베이터 상태를 살펴봐 주세요')), findsWidgets);
+      expect(find.bySemanticsLabel(RegExp('미확인')), findsNothing);
+
+      await _tapFirstRouteResultListItem(tester);
+      await tester.pumpAndSettle();
+
+      // 상세 타임라인: 구간 줄은 확인된 사실(시간·거리)만 적는다.
+      // (2번 구간은 도착 안내 카드로 빠져 구간 줄을 그리지 않는다.)
+      expect(find.text('약 4분 · 180m'), findsOneWidget);
+      expect(find.text('도착 안내'), findsOneWidget);
+      expect(find.textContaining('미확인'), findsNothing);
+      expect(find.bySemanticsLabel(RegExp('미확인')), findsNothing);
+      // 상세에서도 경로 단위 계단 표기는 그대로 남는다.
+      expect(
+        find.byKey(const Key('routeDarkSummaryChip-계단 여부를 확인하고 있어요')),
+        findsOneWidget,
+      );
     } finally {
       semanticsHandle.dispose();
     }

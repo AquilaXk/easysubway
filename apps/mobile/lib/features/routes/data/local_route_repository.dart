@@ -645,6 +645,7 @@ class LocalRouteRepository implements RouteSearchRepository {
                   lineId: step.lineId,
                 )
               : null;
+          final stairAccess = _stairAccessOf(step);
 
           return RouteSearchStep(
             sequence: index + 1,
@@ -658,9 +659,8 @@ class LocalRouteRepository implements RouteSearchRepository {
             estimatedMinutes: _estimatedMinutesFor(adjustedDurationSeconds),
             distanceMeters: step.distanceMeters,
             includesStairs: step.includesStairs,
-            stairAccessState: step.stairAccessState,
-            requiresAccessibilityCheck:
-                step.type.name == 'entry' || step.type.name == 'exit',
+            stairAccessState: stairAccess.state,
+            requiresAccessibilityCheck: stairAccess.requiresCheck,
             actionTitle: _stepActionTitle(step.type.name),
             actionDetail: _stepActionDetail(
               step.type.name,
@@ -686,6 +686,43 @@ class LocalRouteRepository implements RouteSearchRepository {
           );
         })
         .toList(growable: false);
+  }
+
+  /// 로컬 경로의 계단 판정과 검증 근거 없음 표기(#2590).
+  ///
+  /// 백엔드 시간표 플래너는 이 둘을 **두 축으로 나눠** 싣는다 — 상태는
+  /// `STAIR_ONLY`/`STEP_FREE`/`UNKNOWN`, 검증 근거 없음은 `!verified`
+  /// (`RouteTimetableRaptorPlanner`의 접근 전이 생성). 계단이 있다고 확인된 동선에
+  /// 검증 근거가 없으면 계단 표기와 이 표기가 함께 붙는다. 여기서도 같은 구조를 쓴다.
+  ///
+  /// 계단이 있다고 적힌 구간은 타입보다 계단 사실을 먼저 말한다. 백엔드
+  /// `StairAccess.ofStep`이 `includesStairs`를 최우선으로 보고 승차 구간이라도
+  /// `STAIR_ONLY`를 내는 것과 같은 순서다. 타입을 먼저 보면 계단이 적힌 승차·경유 행이
+  /// 비적용으로 빠져 화면에서 계단 사실이 사라지므로, 과소 표시 방향으로 갈래가 열린다.
+  ///
+  /// 승차와 경유 경계 표식은 **계단이 적혀 있지 않은 한** 오르내릴 계단 자체가 없어
+  /// 원자료와 무관하게 비적용으로 확정한다. 데이터팩 `network_edges.stair_access_state`의
+  /// `UNKNOWN`은 "확인 결과 미상"이 아니라 컬럼 기본값이고, 출시 팩의 승차 edge는 사실상
+  /// 전부 이 값이라 그대로 옮기면 열차 안에서 엘리베이터를 확인하라는 안내가 붙는다 —
+  /// #2590이 없애려던 증상 그대로다.
+  ({String state, bool requiresCheck}) _stairAccessOf(
+    route_step.RouteStep step,
+  ) {
+    if (step.includesStairs) {
+      return (state: 'stairOnly', requiresCheck: !step.accessibilityVerified);
+    }
+    if (_isStairIrrelevantStepType(step.type)) {
+      return (state: 'notApplicable', requiresCheck: false);
+    }
+    return (
+      // 근거가 없으면 무단차라 적혀 있어도 그렇게 말하지 않는다. 계단이 있다는 사실은
+      // 근거와 축이 달라 흔들지 않는다(`_accessibilityVerified`가 `unknown` 상태를
+      // 이미 걸러 내므로 미확인 상태가 무단차로 올라갈 갈래는 없다).
+      state: step.stairAccessState == 'stepFree' && !step.accessibilityVerified
+          ? 'unknown'
+          : step.stairAccessState,
+      requiresCheck: !step.accessibilityVerified,
+    );
   }
 
   Map<int, String> _plannedRideArrivals(
@@ -777,11 +814,12 @@ class LocalRouteRepository implements RouteSearchRepository {
     if (steps.isEmpty) {
       return const [];
     }
+    // 스텝 플래그와 같은 파생을 쓴다(#2590). 두 벌로 계산하면 같은 결과 객체 안에서
+    // 스텝은 requiresCheck가 false인데 요약은 ACCESSIBILITY_CHECK_REQUIRED를 내는
+    // 어긋남이 난다. 이 요약은 즐겨찾기에 직렬화되어 남으므로 어긋남이 저장까지
+    // 따라간다.
     final requiresAccessibilityCheck = steps.any(
-      (step) =>
-          step.type.name == 'entry' ||
-          step.type.name == 'exit' ||
-          step.stairAccessState == 'unknown',
+      (step) => _stairAccessOf(step).requiresCheck,
     );
     final hasDurationEstimate = steps.every((step) => step.durationSeconds > 0);
     final hasDistanceMeasure = steps.every((step) => step.distanceMeters > 0);
@@ -1079,6 +1117,7 @@ local.LocalRouteResult mergeWaypointRouteResults(
         timeSource: step.timeSource,
         distanceSource: step.distanceSource,
         confidenceLabel: step.confidenceLabel,
+        accessibilityVerified: step.accessibilityVerified,
       ),
     );
   }
@@ -1212,6 +1251,8 @@ List<route_step.RouteStep> _collapseConsecutiveRideSteps(
       confidenceLabel: previous.confidenceLabel == step.confidenceLabel
           ? previous.confidenceLabel
           : '',
+      accessibilityVerified:
+          previous.accessibilityVerified && step.accessibilityVerified,
     );
   }
   return collapsed;
@@ -2955,6 +2996,13 @@ String _lineIdForNode(String nodeId) {
     return '';
   }
   return parts[1];
+}
+
+/// 오르내릴 계단 자체가 놓이지 않는 구간(#2590). 승차는 열차 안이고, 경유 경계
+/// 표식은 이동이 아니라 표식이다.
+bool _isStairIrrelevantStepType(route_step.RouteStepType type) {
+  return type == route_step.RouteStepType.ride ||
+      type == route_step.RouteStepType.waypoint;
 }
 
 String _selectNetworkEdgeColumn(

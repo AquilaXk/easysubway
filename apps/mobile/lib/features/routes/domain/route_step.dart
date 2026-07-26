@@ -34,6 +34,7 @@ class RouteStep {
     this.timeSource = 'UNKNOWN',
     this.distanceSource = 'UNKNOWN',
     this.confidenceLabel = '',
+    this.accessibilityVerified = false,
   });
 
   final int sequence;
@@ -53,4 +54,9 @@ class RouteStep {
   final String timeSource;
   final String distanceSource;
   final String confidenceLabel;
+
+  /// 이 구간의 접근성이 실제로 검증된 근거를 갖는지(#2590). 표시 계층의
+  /// `requiresAccessibilityCheck`가 이 값에서 파생되므로 근거를 아는 곳,
+  /// 즉 그래프 edge를 손에 쥔 라우터에서만 채운다. 기본값은 fail closed다.
+  final bool accessibilityVerified;
 }
