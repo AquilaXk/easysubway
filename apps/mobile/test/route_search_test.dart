@@ -2184,6 +2184,28 @@ void main() {
       );
     });
 
+    test('재구성 가드의 파라미터 파서는 감싼 선언과 중첩 인자를 정확히 읽는다', () {
+      // 가드가 필드를 조용히 놓치면 C1 같은 유실이 다시 통과한다. `dart format`이 긴
+      // 기본값을 여러 줄로 감싸는 것이 그 갈래라 파서 자신을 고정한다.
+      const parameterList = '''
+    required this.sequence,
+    this.wrapped =
+        const RouteSearchOfficialFare(currency: 'KRW', amount: 1450),
+    this.counts = const <String, int>{'a': 1, 'b': 2},
+    // 주석 줄은 필드가 아니다.
+    List<String> plain = const [],
+    this.trailing,
+''';
+
+      expect(_namedParameters(parameterList), {
+        'sequence',
+        'wrapped',
+        'counts',
+        'plain',
+        'trailing',
+      });
+    });
+
     test('화면은 leg 판정을 재계산하지 않고 백엔드 값을 그대로 쓴다', () {
       final display = _judgedDisplay(
         stairAccess: 'STEP_FREE',
@@ -2326,27 +2348,71 @@ String _parameterList(String source, String signature) {
   return source.substring(start + signature.length, index);
 }
 
+/// 파라미터 목록에서 선언 이름을 뽑는다.
+///
+/// 줄 단위로 `,`로 끝나는 줄만 보면 `dart format`이 긴 기본값을 여러 줄로 감쌌을 때 그
+/// 필드를 **조용히 건너뛰고**, 중첩 인자 줄을 가짜 필드로 잡을 수도 있다. 커버리지가
+/// 소리 없이 줄어드는 것이 이 가드에서 가장 나쁜 고장이라, 최상위 쉼표로 잘라 조각마다
+/// 이름을 뽑고 하나라도 못 뽑으면 실패시킨다.
+///
+/// 알려진 한계: 주석 제거가 문자열 리터럴 안의 `//`를 구분하지 않는다. Dart 파서가
+/// 아니라 소스 가드이므로 그 형태가 나타나면 여기서 다뤄야 한다.
 Set<String> _namedParameters(String parameterList) {
   final names = <String>{};
-  for (final rawLine in parameterList.split('\n')) {
-    final line = rawLine.trim();
-    if (!line.endsWith(',') || line.startsWith('//')) {
-      continue;
-    }
-    final declaration = line
-        .substring(0, line.length - 1)
+  for (final segment in _topLevelSegments(parameterList)) {
+    final declaration = segment
+        .split('\n')
+        .map((line) {
+          final comment = line.indexOf('//');
+          return comment < 0 ? line : line.substring(0, comment);
+        })
+        .join(' ')
         .split('=')
         .first
         .trim()
         .replaceFirst('required ', '');
+    if (declaration.isEmpty) {
+      continue;
+    }
     final name = declaration.startsWith('this.')
         ? declaration.substring('this.'.length)
         : declaration.split(RegExp(r'\s+')).last;
-    if (RegExp(r'^[A-Za-z_][A-Za-z0-9_]*$').hasMatch(name)) {
-      names.add(name);
-    }
+    expect(
+      RegExp(r'^[A-Za-z_][A-Za-z0-9_]*$').hasMatch(name),
+      isTrue,
+      reason: '파라미터 선언에서 이름을 뽑지 못했다: $segment',
+    );
+    names.add(name);
   }
   return names;
+}
+
+/// 괄호·중괄호·대괄호·꺾쇠 깊이를 세어 최상위 쉼표로만 자른다. 제네릭 인자
+/// (`Map<String, int>`)와 중첩 기본값 안의 쉼표는 조각을 나누지 않는다.
+List<String> _topLevelSegments(String source) {
+  final segments = <String>[];
+  final buffer = StringBuffer();
+  var depth = 0;
+  var angleDepth = 0;
+  for (final character in source.split('')) {
+    if (character == '(' || character == '[' || character == '{') {
+      depth += 1;
+    } else if (character == ')' || character == ']' || character == '}') {
+      depth -= 1;
+    } else if (character == '<' && depth == 0) {
+      angleDepth += 1;
+    } else if (character == '>' && depth == 0 && angleDepth > 0) {
+      angleDepth -= 1;
+    }
+    if (character == ',' && depth == 0 && angleDepth == 0) {
+      segments.add(buffer.toString());
+      buffer.clear();
+    } else {
+      buffer.write(character);
+    }
+  }
+  segments.add(buffer.toString());
+  return segments;
 }
 
 /// 재구성 호출이 생성자 필드를 전부, 그리고 실제 값으로 옮기는지 본다.
