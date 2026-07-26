@@ -200,14 +200,29 @@ class DataPackUpdater {
         final installedOverride = await installer.readInstalledPointer(
           id: override.id,
           version: override.version,
+          expectedSha256: _manifestSqliteSha256(
+            manifest,
+            id: override.id,
+            version: override.version,
+          ),
         );
-        if (installedOverride != null) {
+        if (installedOverride.pointer != null) {
           await emergencyOverrideRepository?.saveOverride(
             EmergencyDataPackOverride(
               id: override.id,
               version: override.version,
               reason: override.reason,
             ),
+          );
+        } else if (installedOverride.rejection ==
+            InstalledDataPackRejection.baselineMissing) {
+          // 무결성을 "확인하지 못한" 것은 "확인해 보니 다른" 것과 다르다(#2532).
+          // 기준선 없는 기존 설치본 때문에 장애 대응으로 고정해 둔 override를 해제하면
+          // 단말이 문제가 있던 활성 팩으로 되돌아간다. 기록은 그대로 두고 신호만 남긴다.
+          developer.log(
+            'emergencyOverrideRetained=baselineMissing '
+            'pack=${override.id}-v${override.version}',
+            name: 'DataPackUpdater',
           );
         } else {
           await emergencyOverrideRepository?.clearOverride();
@@ -345,9 +360,28 @@ class DataPackUpdater {
       final installedPointer = await installer.readInstalledPointer(
         id: activePack.id,
         version: activePack.version,
+        expectedSha256: _manifestSqliteSha256(
+          manifest,
+          id: activePack.id,
+          version: activePack.version,
+        ),
       );
-      if (installedPointer != null) {
-        return installedPointer;
+      final verifiedPointer = installedPointer.pointer;
+      if (verifiedPointer != null) {
+        return verifiedPointer;
+      }
+      // 무결성을 "확인하지 못한" 경우는 override 경로와 같은 기준으로 기존 pointer를
+      // 유지한다(#2532). 예외로 올리면 이 블록 밖으로 나가 backoff도 manifest 캐시 저장도
+      // 남기지 못해, 매 세션 매니페스트를 다시 받고 팩 전체 해시를 다시 계산한 뒤 같은
+      // 예외로 끝나는 상태가 굳는다.
+      if (installedPointer.rejection ==
+          InstalledDataPackRejection.baselineMissing) {
+        developer.log(
+          'activePackUnverified=baselineMissing '
+          'pack=${activePack.id}-v${activePack.version}',
+          name: 'DataPackUpdater',
+        );
+        return null;
       }
       // heldOut 단말 + activePack 미설치: 예외 대신 null 반환(기존 포인터 유지).
       // rolloutApplied 단말이거나 activePack이 설치된 경우는 이미 위에서 반환.
@@ -376,6 +410,24 @@ class DataPackUpdater {
       throw const DataPackClientException('사용할 이동 정보를 선택하지 못했어요.');
     }
     return selected;
+  }
+
+  /// 서명된 매니페스트가 선언한 설치 파일 기대 해시(#2532).
+  ///
+  /// 이미 설치된 팩을 다시 가리킬 때 쓰는 기준값이다. 매니페스트가 그 버전을 더 이상 담지
+  /// 않으면(예: 설치본만 남은 롤백 대상) `null`이고, 단말에 기록된 기준선으로 판정한다.
+  String? _manifestSqliteSha256(
+    DataPackManifest manifest, {
+    required String id,
+    required String version,
+  }) {
+    for (final pack in manifest.packs) {
+      if (pack.id == id &&
+          _versionNumber(pack.version) == _versionNumber(version)) {
+        return pack.sqliteSha256;
+      }
+    }
+    return null;
   }
 
   Uri _packBaseUriForManifest(Uri manifestUri) {

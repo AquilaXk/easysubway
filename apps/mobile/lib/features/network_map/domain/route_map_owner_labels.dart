@@ -102,10 +102,9 @@ List<RouteMapOwnerLabelLine> _parseRouteMapOwnerLabelLines(Object? raw) {
 ///
 /// 동명이역(#2068 실측: seoul 신촌·양평, busan 좌천·동래 — 서로 다른 물리역이
 /// 같은 렌더 텍스트를 공유)은 **한 이름 아래 모든 라벨을 위치로 구분해 리스트로
-/// 보존한다**. 이전엔 role 우선순위로 하나만 남겨(6차 한계) busan 1호선 좌천
-/// 노드가 실기기에서 무명으로 보였다 — 이제 각 물리역이 자기 최근접 라벨을
-/// 독립적으로 짝지을 수 있도록(route_map_label_layout.dart의
-/// _resolveOwnerLabelsByCandidateKey 1:1 최근접 매칭) 전부 넘긴다.
+/// 보존한다**. 이전엔 role 우선순위로 하나만 남겨(6차 한계) 라벨 하나가 통째로
+/// 소실됐다 — 소비처(geometry bounds 확장·초기 카메라 가독 배율)가 엔트리를
+/// 빠짐없이 훑도록 전부 넘긴다.
 /// 리스트 안 순서는 sidecar 등장 순(=station→role 정렬)으로 결정적이다.
 Map<String, List<RouteMapOwnerLabelEntry>> parseRouteMapOwnerLabelsForRegion(
   String sidecarJson,

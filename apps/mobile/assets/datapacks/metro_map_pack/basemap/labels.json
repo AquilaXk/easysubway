@@ -415,20 +415,20 @@
       {
         "station": "경기도청북부청사",
         "role": "ordinary",
-        "x": 1872.2991,
-        "y": 454.9941,
+        "x": 1871.9317,
+        "y": 453.0479,
         "anchor": "start",
         "fontSizePx": 15.47,
         "lines": [
           {
             "text": "경기도청",
-            "x": 1872.2991,
-            "y": 454.9941
+            "x": 1871.9317,
+            "y": 453.0479
           },
           {
             "text": "북부청사",
-            "x": 1872.2991,
-            "y": 470.4641
+            "x": 1871.9587,
+            "y": 468.5179
           }
         ]
       },
@@ -603,8 +603,8 @@
       {
         "station": "곤제",
         "role": "ordinary",
-        "x": 1736.0912,
-        "y": 471.4625,
+        "x": 1735.7527,
+        "y": 469.754,
         "anchor": "start",
         "fontSizePx": 15.47,
         "lines": []
@@ -1810,8 +1810,8 @@
       {
         "station": "동오",
         "role": "ordinary",
-        "x": 2032.2113,
-        "y": 471.0602,
+        "x": 2031.8716,
+        "y": 468.8349,
         "anchor": "start",
         "fontSizePx": 15.47,
         "lines": []
@@ -2450,8 +2450,8 @@
       {
         "station": "범골",
         "role": "ordinary",
-        "x": 2402.888,
-        "y": 497.0801,
+        "x": 2399.7143,
+        "y": 468.3812,
         "anchor": "start",
         "fontSizePx": 15.47,
         "lines": []
@@ -2477,8 +2477,8 @@
       {
         "station": "병점",
         "role": "ordinary",
-        "x": 2007.7982,
-        "y": 2678.8366,
+        "x": 1983.0965,
+        "y": 2693.9671,
         "anchor": "start",
         "fontSizePx": 15.47,
         "lines": []
@@ -3046,8 +3046,8 @@
       {
         "station": "새말",
         "role": "ordinary",
-        "x": 1958.1603,
-        "y": 470.931,
+        "x": 1957.8205,
+        "y": 468.8349,
         "anchor": "start",
         "fontSizePx": 15.47,
         "lines": []
@@ -3596,8 +3596,8 @@
       {
         "station": "송산",
         "role": "ordinary",
-        "x": 1589.2878,
-        "y": 470.0292,
+        "x": 1588.947,
+        "y": 468.5769,
         "anchor": "start",
         "fontSizePx": 15.47,
         "lines": []
@@ -4538,8 +4538,8 @@
       {
         "station": "어룡",
         "role": "ordinary",
-        "x": 1662.859,
-        "y": 471.3347,
+        "x": 1662.5204,
+        "y": 469.754,
         "anchor": "start",
         "fontSizePx": 15.47,
         "lines": []
@@ -6220,7 +6220,18 @@
         "y": 1836.0554,
         "anchor": "start",
         "fontSizePx": 17.29,
-        "lines": []
+        "lines": [
+          {
+            "text": "총신대입구",
+            "x": 1900.8135,
+            "y": 1836.0554
+          },
+          {
+            "text": "(이수)",
+            "x": 1900.8135,
+            "y": 1853.3454
+          }
+        ]
       },
       {
         "station": "춘의",
@@ -6687,8 +6698,8 @@
       {
         "station": "효자",
         "role": "ordinary",
-        "x": 1810.3926,
-        "y": 471.5922,
+        "x": 1810.0542,
+        "y": 469.754,
         "anchor": "start",
         "fontSizePx": 15.47,
         "lines": []
@@ -6725,8 +6736,8 @@
       {
         "station": "흥선",
         "role": "ordinary",
-        "x": 2182.274,
-        "y": 494.4701,
+        "x": 2179.0883,
+        "y": 469.6218,
         "anchor": "start",
         "fontSizePx": 15.47,
         "lines": []
@@ -6858,7 +6869,7 @@
         "role": "ordinary",
         "x": 2925.5356,
         "y": 4492.4219,
-        "anchor": "end",
+        "anchor": "middle",
         "fontSizePx": 48.8526,
         "lines": [
           {
@@ -7451,9 +7462,20 @@
         "role": "transfer",
         "x": 9301.377,
         "y": 2928.2429,
-        "anchor": "start",
+        "anchor": "end",
         "fontSizePx": 54.6,
-        "lines": []
+        "lines": [
+          {
+            "text": "벡스코",
+            "x": 9301.377,
+            "y": 2928.2429
+          },
+          {
+            "text": "(시립미술관)",
+            "x": 9299.9766,
+            "y": 3000.8716
+          }
+        ]
       },
       {
         "station": "봉황",
@@ -7487,7 +7509,7 @@
         "role": "ordinary",
         "x": 3518.6714,
         "y": 1473.5315,
-        "anchor": "end",
+        "anchor": "start",
         "fontSizePx": 48.8526,
         "lines": [
           {
@@ -7624,7 +7646,7 @@
         "role": "ordinary",
         "x": 2157.6216,
         "y": 4493.9556,
-        "anchor": "end",
+        "anchor": "middle",
         "fontSizePx": 48.8526,
         "lines": [
           {
@@ -8329,7 +8351,7 @@
         "role": "ordinary",
         "x": 3930.8428,
         "y": 573.8559,
-        "anchor": "middle",
+        "anchor": "start",
         "fontSizePx": 34,
         "lines": [
           {
@@ -8530,7 +8552,7 @@
         "role": "ordinary",
         "x": 3931.7871,
         "y": 460.3242,
-        "anchor": "middle",
+        "anchor": "start",
         "fontSizePx": 34,
         "lines": [
           {
@@ -9039,7 +9061,7 @@
         "role": "terminal",
         "x": 3933.1687,
         "y": 357.437,
-        "anchor": "middle",
+        "anchor": "start",
         "fontSizePx": 34,
         "lines": [
           {
