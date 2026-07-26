@@ -521,6 +521,68 @@ class RouteSearchV2ControllerTest {
 	}
 
 	@Test
+	@DisplayName("승차 leg는 계단 개념 비적용이라 경로 계단 판정을 막지 않는다")
+	void routeSearchV2RideLegDoesNotBlockStepFreeJudgment() throws Exception {
+		stubStairAccessRoute("station-stepfree-origin", false, List.of());
+
+		mockMvc.perform(stairAccessSearch("station-stepfree-origin"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.itineraries[0].stairAccess").value("STEP_FREE"))
+			.andExpect(jsonPath("$.data.itineraries[0].legs[0].stairAccess").value("STEP_FREE"))
+			.andExpect(jsonPath("$.data.itineraries[0].legs[1].stairAccess").value("NOT_APPLICABLE"))
+			// 원자료는 그대로 둔다 — 판정 필드만 새로 싣는다.
+			.andExpect(jsonPath("$.data.itineraries[0].legs[1].accessibilityRisk.unknownAccessibilityCount").value(1));
+	}
+
+	@Test
+	@DisplayName("계단 전이가 있으면 경로 계단 판정은 STAIR_ONLY다")
+	void routeSearchV2StairTransitionMakesItineraryStairOnly() throws Exception {
+		stubStairAccessRoute("station-stair-origin", true, List.of());
+
+		mockMvc.perform(stairAccessSearch("station-stair-origin"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.itineraries[0].stairAccess").value("STAIR_ONLY"))
+			.andExpect(jsonPath("$.data.itineraries[0].legs[0].stairAccess").value("STAIR_ONLY"))
+			.andExpect(jsonPath("$.data.itineraries[0].legs[1].stairAccess").value("NOT_APPLICABLE"));
+	}
+
+	@Test
+	@DisplayName("실제 미확인 사유가 있는 경로는 무단차로 승격되지 않는다")
+	void routeSearchV2DoesNotPromoteUnverifiedRouteToStepFree() throws Exception {
+		stubStairAccessRoute("station-unverified-origin", false, List.of(
+			new RouteWarning(RouteWarningCode.STALE_ACCESSIBILITY_DATA),
+			new RouteWarning(RouteWarningCode.LOW_DATA_CONFIDENCE)
+		));
+
+		mockMvc.perform(stairAccessSearch("station-unverified-origin"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.itineraries[0].stairAccess").value("UNKNOWN"));
+	}
+
+	private void stubStairAccessRoute(String originStationId, boolean stairEntry, List<RouteWarning> warnings) {
+		when(routeSearchUseCase.searchRouteAlternatives(argThat(command ->
+			originStationId.equals(command.originStationId())
+		), eq(1))).thenReturn(List.of(stairAccessRouteSearch(originStationId, stairEntry, warnings)));
+	}
+
+	private org.springframework.test.web.servlet.RequestBuilder stairAccessSearch(String originStationId) {
+		return post("/api/v2/routes/search")
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("""
+				{
+				  "originStationId": "%s",
+				  "destinationStationId": "station-stairaccess-destination",
+				  "departureTime": "2026-06-30T09:15:00+09:00",
+				  "mobilityType": "WHEELCHAIR",
+				  "constraintMode": "ALLOW_WITH_WARNINGS",
+				  "useRealtime": false,
+				  "maxTransfers": 1,
+				  "alternativeCount": 1
+				}
+				""".formatted(originStationId));
+	}
+
+	@Test
 	@DisplayName("V2 leg ETA source와 confidence는 step data에서 파생한다")
 	void routeSearchV2MapsLegEtaSourceAndConfidence() throws Exception {
 		when(routeSearchUseCase.searchRouteAlternatives(argThat(command ->
@@ -1256,6 +1318,84 @@ class RouteSearchV2ControllerTest {
 			),
 			List.of(),
 			LocalDateTime.of(2026, 6, 30, 9, 0)
+		);
+	}
+
+	// 접근(전이) → 승차 → 하차(전이) 3단 경로. 승차 step은 실제 플래너와 같은 형태로
+	// includesStairs=false · stairAccessState="UNKNOWN" · requiresAccessibilityCheck=false다.
+	private RouteSearchResult stairAccessRouteSearch(
+		String originStationId,
+		boolean stairEntry,
+		List<RouteWarning> warnings
+	) {
+		return new RouteSearchResult(
+			"route-search-stair-access",
+			originStationId,
+			"판정 출발역",
+			"station-stairaccess-destination",
+			"판정 도착역",
+			MobilityType.WHEELCHAIR,
+			RouteSearchStatus.FOUND,
+			"line-stair-access",
+			"판정 노선",
+			12,
+			List.of(
+				stairAccessTransitionStep(1, "entry", originStationId, stairEntry),
+				new RouteStep(
+					2,
+					"ride",
+					"판정 노선 승차",
+					"시간표 기준으로 이동",
+					"line-stair-access",
+					"판정 노선",
+					originStationId,
+					"station-stairaccess-destination",
+					6,
+					0,
+					false,
+					"UNKNOWN",
+					false,
+					"PLANNED",
+					"TIMETABLE",
+					"시간표",
+					List.of(),
+					null,
+					null,
+					null,
+					null
+				),
+				stairAccessTransitionStep(3, "exit", "station-stairaccess-destination", false)
+			),
+			warnings,
+			List.of(),
+			LocalDateTime.of(2026, 6, 30, 9, 0)
+		);
+	}
+
+	private RouteStep stairAccessTransitionStep(int sequence, String stepType, String stationId, boolean includesStairs) {
+		return new RouteStep(
+			sequence,
+			stepType,
+			"판정 노선 접근 동선 확인",
+			"시간표 경로의 승하차 접근성과 환승 동선을 확인합니다.",
+			"line-stair-access",
+			"판정 노선",
+			stationId,
+			stationId,
+			2,
+			40,
+			includesStairs,
+			includesStairs ? "STAIR_ONLY" : "STEP_FREE",
+			false,
+			"PLANNED",
+			"TIMETABLE",
+			"검증됨",
+			List.of(),
+			null,
+			null,
+			null,
+			null,
+			60
 		);
 	}
 

@@ -25,6 +25,7 @@ import com.easysubway.route.domain.RouteSearchStatus;
 import com.easysubway.route.domain.RouteStep;
 import com.easysubway.route.domain.RouteWarning;
 import com.easysubway.route.domain.RouteWarningCode;
+import com.easysubway.route.domain.StairAccess;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
@@ -372,6 +373,18 @@ class RouteSearchController {
 		}
 	}
 
+	/**
+	 * 계단 판정을 응답에 싣기 전에 "확인되지 않은 근거"를 반영한다(#2590 정직성 제약).
+	 * {@code stairAccessState}의 {@code UNKNOWN}은 판정 결과가 아니라 미확인 원자료이고,
+	 * 접근성 리스크 사유(GENERATED_CONNECTOR_UNVERIFIED·STALE_ACCESSIBILITY_DATA·
+	 * LOW_DATA_CONFIDENCE·FACILITY_UNAVAILABLE)도 무단차 단언을 막는다.
+	 */
+	private static StairAccess stairAccessOf(RouteStep step) {
+		AccessibilityRiskDto risk = AccessibilityRiskDto.from(step);
+		return StairAccess.ofStep(step)
+			.demotedIfUnverified("UNKNOWN".equals(step.stairAccessState()) || risk.hasUnverifiedEvidence());
+	}
+
 	private record ItineraryDto(
 		String itineraryId,
 		String status,
@@ -386,7 +399,8 @@ class RouteSearchController {
 		List<String> objectiveTags,
 		OfficialFareDto officialFare,
 		List<LegDto> legs,
-		boolean commercialEtaEligible
+		boolean commercialEtaEligible,
+		String stairAccess
 	) {
 
 		private static ItineraryDto from(RouteSearchResult result, OffsetDateTime departureTime, String mobilityPreset) {
@@ -395,6 +409,7 @@ class RouteSearchController {
 				? departureTime
 				: OffsetDateTime.parse(legs.getLast().plannedArrivalTime());
 			int durationSeconds = Math.toIntExact(Duration.between(departureTime, plannedArrivalTime).toSeconds());
+			AccessibilityRiskDto accessibilityRisk = AccessibilityRiskDto.from(result);
 			return new ItineraryDto(
 				"route-v2-state-" + UUID.randomUUID(),
 				statusOf(result),
@@ -405,12 +420,23 @@ class RouteSearchController {
 				durationSeconds,
 				result.transferCount(),
 				result.walkingDistanceMeters(),
-				AccessibilityRiskDto.from(result),
+				accessibilityRisk,
 				result.objectiveTags(),
 				OfficialFareDto.from(result.officialFare()),
 				legs,
-				false
+				false,
+				itineraryStairAccess(result, accessibilityRisk).name()
 			);
+		}
+
+		// leg 판정을 접어 올려 경로 판정을 만든다 — 화면이 leg를 훑어 다시 계산할 여지를
+		// 남기지 않는다. STAIR_ONLY_ACCESS 경고는 StairAccess.ofItinerary가 반영하므로
+		// 병합으로 받는다.
+		private static StairAccess itineraryStairAccess(RouteSearchResult result, AccessibilityRiskDto accessibilityRisk) {
+			return StairAccess
+				.ofStepJudgments(result.steps().stream().map(RouteSearchController::stairAccessOf).toList())
+				.merge(StairAccess.ofItinerary(result))
+				.demotedIfUnverified(accessibilityRisk.hasUnverifiedEvidence());
 		}
 
 		private static String statusOf(RouteSearchResult result) {
@@ -523,6 +549,15 @@ class RouteSearchController {
 			);
 		}
 
+		// 계단 사실과 무관하게 "확인되지 않았다"를 말하는 사유들. unknownAccessibilityCount는
+		// stairAccessState를 그대로 옮긴 원자료라 여기 넣지 않는다 — 그 해석은 StairAccess가 한다.
+		private boolean hasUnverifiedEvidence() {
+			return generatedConnectorCount > 0
+				|| staleDataCount > 0
+				|| lowConfidenceCount > 0
+				|| unavailableFacilityCount > 0;
+		}
+
 		private static List<String> reasonCodesFrom(RouteSearchResult result) {
 			List<String> reasonCodes = new ArrayList<>();
 			if (result.status() == RouteSearchStatus.BLOCKED) {
@@ -623,7 +658,8 @@ class RouteSearchController {
 		String providerObservedAt,
 		String gatewayReceivedAt,
 		String servedAt,
-		AccessibilityRiskDto accessibilityRisk
+		AccessibilityRiskDto accessibilityRisk,
+		String stairAccess
 	) {
 
 		private static List<LegDto> fromSteps(
@@ -691,7 +727,8 @@ class RouteSearchController {
 				step.providerObservedAt(),
 				step.gatewayReceivedAt(),
 				step.servedAt(),
-				AccessibilityRiskDto.from(step)
+				AccessibilityRiskDto.from(step),
+				stairAccessOf(step).name()
 			);
 		}
 
