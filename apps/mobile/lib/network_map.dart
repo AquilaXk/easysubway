@@ -610,6 +610,28 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     super.initState();
     widget.routeDraftController.addListener(_handleDraftChangedForSearch);
     widget.regionBridge?.attach(_selectRegionFromBridge);
+    // #2068 트랙 QA 후속: 오너 라벨 sidecar를 노선도 데이터 로드(_future)와
+    // **동시에** 시작한다. 종전에는 캔버스가 마운트된 뒤에야(=데이터 로드 완료
+    // 후) 로드가 시작돼 직렬화됐고, 초기 카메라 가독 배율이 sidecar에 의존하게
+    // 된 지금은 그 지연이 그대로 줌 팝으로 보인다. 데이터 로드가 끝날 때쯤 값이
+    // 준비돼 캔버스 첫 build가 동기 캐시로 이를 집어간다.
+    //
+    // [cold start 성질 — 정확히] 이 호출은 **대기 게이트가 아니다**(unawaited라
+    // _future를 막지 않는다). 다만 노선도는 홈 기본 탭이라 이 선행 로드가 앱 시작
+    // 직후 걸리므로, "cold start 경로에 아무 영향이 없다"는 뜻은 아니다 — 정확한
+    // 성질은 "UI isolate 작업을 늘리지 않는다"이며, 그 근거는
+    // [_loadNetworkMapOwnerLabelsByRegion]이 디코드·파싱 전체를 compute 워커로
+    // 넘기기 때문이다(그 함수 주석의 리뷰 finding 참고). UI isolate에는 asset
+    // 바이트 읽기와 결과 대입만 남는다.
+    //
+    // 실패는 캔버스의 _loadOwnerLabels가 리포팅·재시도를 담당하므로 여기서는
+    // 삼킨다(중복 리포트 방지).
+    unawaited(
+      _loadNetworkMapOwnerLabelsByRegion().catchError(
+        (Object _, StackTrace _) =>
+            const <String, Map<String, List<RouteMapOwnerLabelEntry>>>{},
+      ),
+    );
   }
 
   void _selectRegionFromBridge(String region) {
@@ -4100,16 +4122,56 @@ void resetNetworkMapAttributionCacheForTest() {
 Future<Map<String, Map<String, List<RouteMapOwnerLabelEntry>>>>?
 _sharedOwnerLabelsByRegionFuture;
 
+/// 해석이 끝난 sidecar 값의 **동기** 캐시(#2068 트랙 QA 후속).
+///
+/// 초기 카메라 가독 배율이 sidecar에 의존하게 되면서, 캔버스 첫 build가 sidecar를
+/// 못 받으면 과축소로 1프레임 그린 뒤 확대로 튀는 "줌 팝"이 생긴다. Future만으로는
+/// 이미 완료된 값이라도 마이크로태스크 뒤에야 도착해 첫 build를 놓치므로, 해석된
+/// 값을 동기적으로 읽을 수 있게 따로 들고 있는다([_NetworkMapCanvasState.initState]
+/// 가 이 값으로 자신을 시드한다). 로드는 [NetworkMapScreen] initState에서 노선도
+/// 데이터 로드와 **동시에** 시작하므로(선행 로드), 캔버스가 마운트될 때쯤이면 보통
+/// 채워져 있다. 경합에서 지더라도 동작은 종전(카메라 1회 재계산)으로 퇴화할 뿐이다.
+Map<String, Map<String, List<RouteMapOwnerLabelEntry>>>?
+_sharedOwnerLabelsByRegionValue;
+
+/// sidecar 바이트를 워커 isolate에서 통째로 해석한다(utf8 decode + jsonDecode +
+/// 엔트리 맵 구성). [compute] 콜백이라 최상위 함수여야 한다.
+Map<String, Map<String, List<RouteMapOwnerLabelEntry>>>
+_decodeNetworkMapOwnerLabelsSidecar(Uint8List bytes) {
+  return routeMapOwnerLabelsByRegionFrom(utf8.decode(bytes));
+}
+
 Future<Map<String, Map<String, List<RouteMapOwnerLabelEntry>>>>
 _loadNetworkMapOwnerLabelsByRegion() {
+  // 해석 전체를 워커 isolate로 넘긴다(#2068 트랙 QA 후속 리뷰 finding).
+  //
+  // 종전 `rootBundle.loadString(...).then(routeMapOwnerLabelsByRegionFrom)`은
+  // 50KB 초과 자산의 **utf8 decode만** 워커로 보내고, 이어지는 jsonDecode와
+  // 5권역 986건 엔트리 맵 구성은 root(UI) isolate에서 돌았다(현재 sidecar
+  // 218,720 bytes). 노선도는 홈 기본 탭이라 이 로드가 앱 시작 직후 걸리므로
+  // 그 CPU가 datapack 로드·첫 프레임과 같은 isolate에서 경쟁했다.
+  //
+  // 이제 바이트만 읽고(rootBundle.load는 compute를 타지 않는다) 한 번의 compute로
+  // 디코드·파싱을 모두 워커에서 처리한다 — isolate spawn 수는 종전(loadString이
+  // 내부적으로 1회)과 같고, UI isolate에 남는 파싱 작업은 없다.
   return _sharedOwnerLabelsByRegionFuture ??= rootBundle
-      .loadString(kRouteMapOwnerLabelsAssetPath)
-      .then(routeMapOwnerLabelsByRegionFrom);
+      .load(kRouteMapOwnerLabelsAssetPath)
+      .then(
+        (data) => compute(
+          _decodeNetworkMapOwnerLabelsSidecar,
+          data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+        ),
+      )
+      .then((byRegion) {
+        _sharedOwnerLabelsByRegionValue = byRegion;
+        return byRegion;
+      });
 }
 
 @visibleForTesting
 void resetNetworkMapOwnerLabelsCacheForTest() {
   _sharedOwnerLabelsByRegionFuture = null;
+  _sharedOwnerLabelsByRegionValue = null;
 }
 
 /// 위젯 테스트가 실제 sidecar 로드 경로(rootBundle.loadString)를 거치지 않고
@@ -4125,6 +4187,7 @@ void primeNetworkMapOwnerLabelsCacheForTest(
   Map<String, Map<String, List<RouteMapOwnerLabelEntry>>> byRegion,
 ) {
   _sharedOwnerLabelsByRegionFuture = Future.value(byRegion);
+  _sharedOwnerLabelsByRegionValue = byRegion;
 }
 
 class _NetworkMapCanvas extends StatefulWidget {
@@ -4200,6 +4263,18 @@ const _maxMapScale = 4.8;
 /// 아래로 내려가진 않는다(둘 다 같은 상한을 공유하므로) — pan-only로 완전히
 /// 퇴행하진 않되, 극단적으로 작은 지역에서는 확대가 체감되지 않을 수 있다.
 const _stationFocusInitialBoundsFraction = 0.42;
+
+/// 저장된 viewport가 없을 때 초기 카메라가 보장할 역명의 최소 화면 글자 크기
+/// (logical px, #2068 트랙 QA 후속). 오너 결정: "글자가 읽힐 정도로 중앙을 확대".
+///
+/// 값의 근거는 리포 내 기존 캘리브레이션 상수 [kRouteMapDesignLabelFontPx]
+/// (13.0)를 그대로 재사용한 것이다 — design space는 "일반 탐색 줌(라벨이 design
+/// 크기 그대로 보이는 scale ≈ k*)"에서 역명이 갖는 크기로 이 값을 정했고
+/// (route_map_design_space.dart), 그 반대편 상한이
+/// [kRouteMapMaxLabelScreenPx](26.0)다. 즉 13px은 이 노선도가 이미 "읽히는
+/// 역명 크기"로 캘리브레이션해 둔 값이라 새 기준을 창작하지 않는다(모바일 최소
+/// 가독 관례 12px보다 약간 보수적이기도 하다).
+const double _initialCameraReadableLabelScreenPx = kRouteMapDesignLabelFontPx;
 const _routeMapGestureRendererCommitInterval = Duration(milliseconds: 1100);
 const _routeMapGestureMaxTranslationDriftFraction = 1.35;
 const _routeMapGestureMaxScaleRatio = 3.4;
@@ -4262,6 +4337,9 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   // basemap 6차(#2068): asset id(seoul/busan/...) → station명 → 오너 라벨 앵커.
   // 로드 전·실패 시 null → basemap 라벨은 4차 자동 솔버로 전부 폴백(fail-safe).
   Map<String, Map<String, List<RouteMapOwnerLabelEntry>>>? _ownerLabelsByRegion;
+  // 초기 카메라 가독 배율(#2068 트랙 QA 후속) 캐시 — _readableInitialMapScaleFor.
+  double? _readableInitialMapScaleCache;
+  String? _readableInitialMapScaleCacheKey;
   // onTapUp 경로에서만 쓰는 stationLinesById를 매 build(팬 프레임)마다 재계산하지 않도록
   // region·stations identity로 캐시한다(#1973). 800역/24노선 재계산이 build 스파이크 원인.
   Map<String, List<NetworkMapLine>>? _stationLinesByIdCache;
@@ -4278,7 +4356,14 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
       SchedulerBinding.instance.addTimingsCallback(_logRouteMapFrameTimings);
     }
     _loadAttributionText();
-    _loadOwnerLabels();
+    // #2068 트랙 QA 후속: 초기 카메라 가독 배율이 sidecar에 의존하므로, 이미
+    // 해석된 값이 있으면 **첫 build 전에 동기로** 시드해 과축소 → 확대 줌 팝을
+    // 없앤다. 값이 없을 때만 비동기 로드를 태운다(선행 로드가 아직 끝나지 않은
+    // 경합 케이스 — 도착하면 setState로 카메라가 한 번 재계산된다).
+    _ownerLabelsByRegion = _sharedOwnerLabelsByRegionValue;
+    if (_ownerLabelsByRegion == null) {
+      _loadOwnerLabels();
+    }
   }
 
   Future<void> _loadAttributionText() async {
@@ -4371,8 +4456,22 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
             geometry.height,
           );
           final minScale = _minimumMapScaleForBounds(fullBounds, constraints);
+          // #2068 트랙 QA 후속: 저장 viewport가 없을 때의 초기 카메라는
+          // 콘텐츠 중앙을 오너 라벨이 읽히는 배율로 연다. 오너 라벨 sidecar는
+          // 비동기 로드라 로드 전후로 가독 배율이 바뀌므로 layoutKey에 포함해
+          // 로드 완료 시 초기 카메라가 다시 계산되게 한다.
+          final readableScale = _readableInitialMapScaleFor(widget.data);
+          final initialCameraBounds = networkMapInitialCameraBounds(
+            fullBounds: fullBounds,
+            regionInitialBounds: geometry.initialBounds,
+            viewport: Size(
+              constraints.hasBoundedWidth ? constraints.maxWidth : 0,
+              constraints.hasBoundedHeight ? constraints.maxHeight : 0,
+            ),
+            readableScale: readableScale,
+          );
           final layoutKey =
-              '${widget.data.selectedRegion}:${geometry.width}:${geometry.height}:${constraints.maxWidth}:${constraints.maxHeight}';
+              '${widget.data.selectedRegion}:${geometry.width}:${geometry.height}:${constraints.maxWidth}:${constraints.maxHeight}:$readableScale';
           if (_layoutKey != layoutKey) {
             _layoutKey = layoutKey;
             _pendingCamera = null;
@@ -4380,7 +4479,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
             _gestureActive = false;
             _cameraFocusedStationId = null;
             final initialCamera = _cameraForBounds(
-              widget.initialViewport ?? geometry.initialBounds,
+              widget.initialViewport ?? initialCameraBounds,
               constraints,
               sourceBounds: fullBounds,
               contain: true,
@@ -4391,7 +4490,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
           var camera =
               _camera ??
               _cameraForBounds(
-                geometry.initialBounds,
+                initialCameraBounds,
                 constraints,
                 sourceBounds: fullBounds,
                 minScale: minScale,
@@ -4418,7 +4517,11 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
               focusedStation != null &&
               _cameraFocusedStationId != focusedStation.id) {
             final focusedCamera = _cameraForBounds(
-              _stationFocusBoundsFor(focusedStation, geometry),
+              _stationFocusBoundsFor(
+                focusedStation,
+                geometry,
+                initialBounds: initialCameraBounds,
+              ),
               constraints,
               sourceBounds: fullBounds,
               contain: true,
@@ -4675,6 +4778,34 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     _geometryCacheKey = cacheKey;
     _geometryCache = geometry;
     return geometry;
+  }
+
+  /// 이 지역 오너 라벨 sidecar로 산출한 초기 카메라 가독 배율(#2068 트랙 QA
+  /// 후속). sidecar 미로드·미매핑이면 null → 초기 카메라는 기존 contain-fit.
+  /// build는 팬 프레임마다 호출되므로 [_geometryFor]와 같은 키 규칙으로 캐시해
+  /// 라벨 수백~수천 건 중앙값 계산이 매 프레임 반복되지 않게 한다.
+  double? _readableInitialMapScaleFor(NetworkMapData data) {
+    final basemapAssetId =
+        kRouteMapBasemapRegionToId[_displayRegionName(data.selectedRegion)];
+    final ownerEntries = basemapAssetId == null
+        ? null
+        : _ownerLabelsByRegion?[basemapAssetId];
+    final cacheKey =
+        '${data.selectedRegion}:${identityHashCode(data.stations)}:'
+        '${data.stations.length}:'
+        '${ownerEntries == null ? 'none' : 'owner:${ownerEntries.length}'}';
+    if (_readableInitialMapScaleCacheKey == cacheKey) {
+      return _readableInitialMapScaleCache;
+    }
+    final scale = ownerEntries == null || ownerEntries.isEmpty
+        ? null
+        : networkMapReadableInitialMapScale(
+            ownerLabelsByStationName: ownerEntries,
+            stationNames: {for (final station in data.stations) station.nameKo},
+          );
+    _readableInitialMapScaleCacheKey = cacheKey;
+    _readableInitialMapScaleCache = scale;
+    return scale;
   }
 
   void _updateCameraForGesture(ScaleUpdateDetails details) {
@@ -5381,22 +5512,30 @@ double _minimumMapScaleForBounds(Rect bounds, BoxConstraints constraints) {
   return math.min(_minMapScale, fitScale);
 }
 
-/// 이 역 수(route_map_positions 행) 이하 지역은 초기 화면에 지역 전체를 담는다
-/// (소규모 tight-fit, #1764 E). 광주·대전급(수십 역)은 소규모, 부산·대구·수도권급
-/// (백 역 이상)은 대형. 임계 40은 소규모(~20)와 대형(100+) 사이 넓은 간극에 둔다.
+/// 이 역 수(route_map_positions 행) 이하 지역은 초기 bounds **기준선**을 지역
+/// 전체로 잡는다(소규모 tight-fit, #1764 E). 광주·대전급(수십 역)은 소규모,
+/// 부산·대구·수도권급(백 역 이상)은 대형. 임계 40은 소규모(~20)와 대형(100+)
+/// 사이 넓은 간극에 둔다.
 const int _smallRegionStationCountThreshold = 40;
 
-/// 초기 화면에 지역 전체를 담는(소규모 tight-fit) 지역인지(#1764 E). 이 역 수
-/// 이하면 38% 도심 확대 대신 전체 조망으로 시작한다(광주·대전=true).
+/// 초기 bounds 기준선을 지역 전체로 잡는(소규모 tight-fit) 지역인지(#1764 E).
+/// 이 역 수 이하면 38% 도심 확대 대신 지역 전체가 기준선이 된다(광주·대전=true).
+///
+/// **주의(#2068 트랙 QA 후속): 이 판정이 곧 "초기 화면 = 전체 조망"은 아니다.**
+/// 최종 초기 카메라는 [networkMapInitialCameraBounds]가 이 기준선의 contain-fit과
+/// 오너 라벨 가독 배율 중 **큰 쪽**으로 정한다. 그래서 소규모 지역이라도 그
+/// 배율에서 라벨이 기준(13px)에 못 미치면 더 확대돼 전체가 담기지 않는다
+/// (실측: 대전은 이미 13.3px이라 전체 조망 유지, 광주는 10.8px이라 1.20배 확대).
 @visibleForTesting
 bool networkMapUsesWholeRegionInitialView(int stationCount) =>
     stationCount <= _smallRegionStationCountThreshold;
 
+/// 초기 카메라 bounds의 **기준선**(하한 배율)을 만든다. 최종 초기 카메라는
+/// [networkMapInitialCameraBounds]가 여기에 가독 배율을 얹어 정한다.
 Rect _readableBoundsFor(_MapGeometry geometry, {required int stationCount}) {
-  // 소규모 지역은 38% 도심 확대 대신 지역 전체를 초기 viewport로 둬 과확대를
-  // 막는다(초기 화면=bucket 1에서 전 역·환승/주요 라벨이 보이도록, #1764 E).
-  // 판정은 networkMapUsesWholeRegionInitialView 단일 소스를 쓴다(테스트가 실제
-  // 렌더 분기를 가드하도록).
+  // 소규모 지역은 38% 도심 확대 대신 지역 전체를 기준선으로 둬 과확대를
+  // 막는다(#1764 E). 판정은 networkMapUsesWholeRegionInitialView 단일 소스를
+  // 쓴다(테스트가 실제 렌더 분기를 가드하도록).
   if (networkMapUsesWholeRegionInitialView(stationCount)) {
     return Rect.fromLTWH(0, 0, geometry.width, geometry.height);
   }
@@ -5415,6 +5554,92 @@ Rect _readableBoundsFor(_MapGeometry geometry, {required int stationCount}) {
   return Rect.fromLTWH(left, top, width, height);
 }
 
+/// 오너 라벨이 "읽히는" 초기 카메라 배율(#2068 트랙 QA 후속). 없으면 null —
+/// 호출부는 기존 contain-fit 동작을 그대로 쓴다(sidecar 미로드·미매핑 fail-safe).
+///
+/// basemap 모드에서 화면에 실제로 그려지는 역명은 오너 라벨이다. 라벨은
+/// design px(`entry.fontSizePx × designScale`)로 그려지고 캔버스는
+/// `camera.scale / designScale`로 스케일되므로(structured_route_map_painter)
+/// designScale이 약분되어 **화면 글자 크기 = entry.fontSizePx × camera.scale**
+/// 이다. 따라서 중앙값 라벨이 [_initialCameraReadableLabelScreenPx]에 닿는
+/// scale은 `기준 px / 중앙값 fontSizePx`가 된다.
+///
+/// 모집단은 [stationNames]에 실제로 있는 역과 매칭되는 엔트리로 한정한다.
+/// sidecar에는 그 권역 데이터에 없는 라벨이 섞여 있다 — 광주 sidecar는 미개통
+/// 2호선 라벨(글자 14)이 42건이라 전 엔트리 중앙값이 14가 되는데, 운영 중인
+/// 1호선 라벨은 60이라 그대로 쓰면 실제 역 라벨 기준으로 5배 넘게 과확대된다.
+/// 매칭이 하나도 없으면 전 엔트리로 폴백한다 — 그 경우 렌더 경로도 전 엔트리
+/// 중앙값(폴백 라벨 크기, route_map_label_layout의 중앙값 규칙)으로 그린다.
+@visibleForTesting
+double? networkMapReadableInitialMapScale({
+  required Map<String, List<RouteMapOwnerLabelEntry>> ownerLabelsByStationName,
+  required Set<String> stationNames,
+}) {
+  final matched = <double>[
+    for (final entry in ownerLabelsByStationName.entries)
+      if (stationNames.contains(entry.key))
+        for (final label in entry.value)
+          if (label.fontSizePx > 0) label.fontSizePx,
+  ];
+  final sizes =
+      (matched.isNotEmpty
+            ? matched
+            : <double>[
+                for (final entries in ownerLabelsByStationName.values)
+                  for (final label in entries)
+                    if (label.fontSizePx > 0) label.fontSizePx,
+              ])
+        ..sort();
+  if (sizes.isEmpty) {
+    return null;
+  }
+  return _initialCameraReadableLabelScreenPx / sizes[sizes.length ~/ 2];
+}
+
+/// 저장된 viewport가 없을 때의 초기 카메라 bounds(#2068 트랙 QA 후속).
+///
+/// - 중심: 노선도 콘텐츠 bounding box 중앙 = [fullBounds].center. geometry는
+///   역·노선·라벨 extents에 대칭 54px 여백을 더한 것이라 그 중앙이 곧 콘텐츠
+///   중앙이다(viewBox 캔버스 중앙·헤더·여백이 아니다).
+/// - 배율: 기존 contain-fit([regionInitialBounds] 기준)과 [readableScale] 중 큰
+///   값. 하한이 기존 contain-fit이므로 지금보다 축소되는 권역은 없고, 이미
+///   가독 배율 이상인 소형 권역(대전)은 동작이 그대로다. 상한은
+///   [_maxMapScale] — readableScale만 캡하고 contain-fit은 캡하지 않는다
+///   (초소형 권역에서 오히려 축소되는 것을 막기 위해. 최종 scale은
+///   [_cameraForBounds]가 다시 상한으로 클램프한다).
+///
+/// viewport나 bounds가 비어 있으면 기존 [regionInitialBounds]를 그대로 돌려준다.
+@visibleForTesting
+Rect networkMapInitialCameraBounds({
+  required Rect fullBounds,
+  required Rect regionInitialBounds,
+  required Size viewport,
+  required double? readableScale,
+}) {
+  if (viewport.width <= 0 ||
+      viewport.height <= 0 ||
+      regionInitialBounds.width <= 0 ||
+      regionInitialBounds.height <= 0) {
+    return regionInitialBounds;
+  }
+  final containFitScale = math.min(
+    viewport.width / regionInitialBounds.width,
+    viewport.height / regionInitialBounds.height,
+  );
+  if (!containFitScale.isFinite || containFitScale <= 0) {
+    return regionInitialBounds;
+  }
+  final targetScale = math.max(
+    containFitScale,
+    math.min(readableScale ?? 0.0, _maxMapScale),
+  );
+  return Rect.fromCenter(
+    center: fullBounds.center,
+    width: viewport.width / targetScale,
+    height: viewport.height / targetScale,
+  );
+}
+
 @visibleForTesting
 Rect networkMapInitialOriginalAssetBounds({
   required double sourceWidth,
@@ -5431,9 +5656,19 @@ Rect networkMapInitialOriginalAssetBounds({
   );
 }
 
-Rect _stationFocusBoundsFor(NetworkMapStation station, _MapGeometry geometry) {
+/// [initialBounds]는 이 지역이 실제로 쓰는 초기 카메라 bounds다(#2068 트랙 QA
+/// 후속으로 [networkMapInitialCameraBounds]가 확대해 준 값). geometry의 원
+/// initialBounds를 쓰면 초기 화면이 확대된 만큼 focus가 오히려 축소돼 #2062
+/// ("focus는 초기 화면보다 확대") 불변식이 깨진다 — 두 카메라가 같은 bounds를
+/// 공유해야 focus 배율이 항상 초기 배율의 1/[_stationFocusInitialBoundsFraction]
+/// 배(≈2.38, 상한 이하 범위)로 유지된다.
+Rect _stationFocusBoundsFor(
+  NetworkMapStation station,
+  _MapGeometry geometry, {
+  required Rect initialBounds,
+}) {
   return _stationFocusBounds(
-    initialBounds: geometry.initialBounds,
+    initialBounds: initialBounds,
     center: Offset(geometry.x(station), geometry.y(station)),
     sourceWidth: geometry.width,
     sourceHeight: geometry.height,
