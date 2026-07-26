@@ -47,6 +47,7 @@ class _RegionFixture {
 const _regionsUnderTest = <String, String>{
   '수도권': 'seoul',
   '부산권': 'busan',
+  '대구권': 'daegu',
   '대전권': 'daejeon',
   '광주권': 'gwangju',
 };
@@ -218,35 +219,47 @@ void _usePhoneSurface(WidgetTester tester) {
   addTearDown(tester.view.reset);
 }
 
+Widget _screen(
+  _RegionFixture fixture, {
+  Rect? storedViewport,
+  String? focusStationRequestId,
+}) {
+  return MaterialApp(
+    home: NetworkMapScreen(
+      repository: _FakeRegionRepository(fixture.data),
+      routeDraftController: RouteDraftController(),
+      onOpenStationSearch: (_, _) {},
+      focusStationRequestId: focusStationRequestId,
+      viewportRepository: storedViewport == null
+          ? null
+          : _StubViewportRepository(storedViewport),
+    ),
+  );
+}
+
+MapCameraState _readCamera(WidgetTester tester) {
+  expect(find.byType(RouteMapBasemapView), findsOneWidget);
+  return tester
+      .widget<RouteMapBasemapView>(find.byType(RouteMapBasemapView))
+      .camera;
+}
+
+Future<void> _primeSidecar() async {
+  primeNetworkMapOwnerLabelsCacheForTest(
+    routeMapOwnerLabelsByRegionFrom(await _loadSidecarJson()),
+  );
+}
+
 Future<MapCameraState> _mountAndReadCamera(
   WidgetTester tester,
   _RegionFixture fixture, {
   Rect? storedViewport,
 }) async {
   _usePhoneSurface(tester);
-  final sidecarJson = await _loadSidecarJson();
-  primeNetworkMapOwnerLabelsCacheForTest(
-    routeMapOwnerLabelsByRegionFrom(sidecarJson),
-  );
-
-  await tester.pumpWidget(
-    MaterialApp(
-      home: NetworkMapScreen(
-        repository: _FakeRegionRepository(fixture.data),
-        routeDraftController: RouteDraftController(),
-        onOpenStationSearch: (_, _) {},
-        viewportRepository: storedViewport == null
-            ? null
-            : _StubViewportRepository(storedViewport),
-      ),
-    ),
-  );
+  await _primeSidecar();
+  await tester.pumpWidget(_screen(fixture, storedViewport: storedViewport));
   await tester.pumpAndSettle();
-
-  expect(find.byType(RouteMapBasemapView), findsOneWidget);
-  return tester
-      .widget<RouteMapBasemapView>(find.byType(RouteMapBasemapView))
-      .camera;
+  return _readCamera(tester);
 }
 
 void main() {
@@ -339,6 +352,89 @@ void main() {
         );
       });
     }
+  });
+
+  group('역 focus 카메라는 확대된 초기 배율 위에서 다시 확대된다 (#2062 · 프로덕션 배선)', () {
+    // seam이 아니라 프로덕션 배선(focusStationRequestId → _searchFanMenuStationId
+    // → _NetworkMapCanvas.focusedStationId → _stationFocusBoundsFor)을 그대로
+    // 태운다. network_map.dart의 focus 분기가 초기 카메라 bounds 대신 geometry의
+    // 원 initialBounds를 다시 넘기면 이 테스트가 red가 된다(수도권 실측: 비율이
+    // 2.38 → 0.86으로 뒤집혀 focus가 오히려 축소된다).
+    testWidgets('수도권: focus scale / 초기 scale == 1/0.42 (≈2.38)', (
+      tester,
+    ) async {
+      _usePhoneSurface(tester);
+      await _primeSidecar();
+      final fixture = _loadRegionFixture('수도권');
+
+      await tester.pumpWidget(_screen(fixture));
+      await tester.pumpAndSettle();
+      final initialCamera = _readCamera(tester);
+
+      // 화면 중앙에 가까운 역을 골라 focus 시 경계 클램프 영향을 줄인다.
+      final target = fixture.data.stations.reduce((a, b) {
+        double d(NetworkMapStation s) =>
+            ((s.position.x - initialCamera.center.dx).abs() +
+            (s.position.y - initialCamera.center.dy).abs());
+        return d(a) <= d(b) ? a : b;
+      });
+
+      await tester.pumpWidget(
+        _screen(fixture, focusStationRequestId: target.id),
+      );
+      await tester.pumpAndSettle();
+      final focusCamera = _readCamera(tester);
+
+      expect(
+        focusCamera.scale / initialCamera.scale,
+        closeTo(1 / 0.42, 0.02),
+        reason:
+            'focus scale=${focusCamera.scale} / 초기 scale=${initialCamera.scale} '
+            '= ${focusCamera.scale / initialCamera.scale} — focus가 초기 화면 '
+            'bounds를 공유하지 않으면 이 비율이 무너진다(축소 회귀)',
+      );
+      // LOD baseline(initialScale)은 지역 초기 카메라 값을 그대로 상속한다.
+      expect(focusCamera.initialScale, closeTo(initialCamera.scale, 1e-6));
+    });
+  });
+
+  group('cold-open: sidecar가 이미 캐시돼 있으면 첫 프레임부터 가독 카메라 (#2068 QA)', () {
+    testWidgets('수도권: 캔버스 첫 build에서 과축소 카메라를 거치지 않는다', (tester) async {
+      _usePhoneSurface(tester);
+      await _primeSidecar();
+      final fixture = _loadRegionFixture('수도권');
+      final ownerLabels =
+          routeMapOwnerLabelsByRegionFrom(await _loadSidecarJson())['seoul'] ??
+          const {};
+      final medianFontPx = _matchedOwnerFontSizeMedian(
+        ownerLabels,
+        fixture.stationNames,
+      );
+
+      await tester.pumpWidget(_screen(fixture));
+      // 캔버스가 처음 등장하는 프레임을 잡는다(pumpAndSettle 금지 — 중간 프레임을
+      // 삼켜 줌 팝을 못 본다).
+      for (var i = 0; i < 30; i += 1) {
+        if (tester.any(find.byType(RouteMapBasemapView))) {
+          break;
+        }
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      final firstFrameCamera = _readCamera(tester);
+
+      expect(
+        medianFontPx * firstFrameCamera.scale,
+        greaterThanOrEqualTo(kRouteMapDesignLabelFontPx - 0.001),
+        reason:
+            '첫 프레임 라벨이 '
+            '${(medianFontPx * firstFrameCamera.scale).toStringAsFixed(2)}px로 '
+            '과축소다 — sidecar 로드 후 확대로 튀는 줌 팝이 보인다',
+      );
+
+      // 이후 프레임에서 카메라가 다시 바뀌지 않는다(= 팝이 없다).
+      await tester.pumpAndSettle();
+      expect(_readCamera(tester).scale, closeTo(firstFrameCamera.scale, 1e-9));
+    });
   });
 
   group('networkMapReadableInitialMapScale 모집단 규칙', () {

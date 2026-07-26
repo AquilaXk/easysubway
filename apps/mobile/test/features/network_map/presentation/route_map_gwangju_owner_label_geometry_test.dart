@@ -185,88 +185,111 @@ void main() {
 
   tearDown(resetNetworkMapOwnerLabelsCacheForTest);
 
-  testWidgets('#2068 광주 실데이터(저장형 region=광주권): 오너 라벨 sidecar가 초기 카메라 '
-      'bounds에 반영된다(region 키 정규화 회귀 가드)', (tester) async {
-    final fixture = _loadGwangjuFixture();
+  // 서피스별로 같은 불변식을 검증한다. 기본 800×600은 폰보다 가로가 훨씬 넓어
+  // 세로 폰 형태의 fit 조건을 못 덮으므로 실기기급 세로 폰(411×914)도 함께 돈다.
+  const surfaces = <String, Size?>{
+    '기본 서피스': null,
+    '세로 폰(411×914)': Size(411, 914),
+  };
 
-    // ground truth: 실 sidecar 콘텐츠를 gwangju 오너 라벨 엔트리로 파싱해 기대
-    // rect를 독립 산출한다(프로덕션 코드 경로와 별도).
-    final sidecarJson = await _loadSidecarJsonBytesDecoded();
-    final byRegion = routeMapOwnerLabelsByRegionFrom(sidecarJson);
-    final ownerLabels = byRegion['gwangju'] ?? const {};
-    expect(ownerLabels, isNotEmpty, reason: 'gwangju sidecar 엔트리가 없다');
+  surfaces.forEach((surfaceLabel, surfaceSize) {
+    testWidgets('#2068 광주 실데이터(저장형 region=광주권): 오너 라벨 sidecar가 초기 카메라 '
+        'bounds에 반영된다(region 키 정규화 회귀 가드) — $surfaceLabel', (tester) async {
+      if (surfaceSize != null) {
+        tester.view.physicalSize = surfaceSize;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+      }
+      final fixture = _loadGwangjuFixture();
 
-    final expectedOwnerRects = networkMapOwnerLabelSourceRects(
-      ownerLabels: ownerLabels.values.expand((entries) => entries),
-    );
+      // ground truth: 실 sidecar 콘텐츠를 gwangju 오너 라벨 엔트리로 파싱해 기대
+      // rect를 독립 산출한다(프로덕션 코드 경로와 별도).
+      final sidecarJson = await _loadSidecarJsonBytesDecoded();
+      final byRegion = routeMapOwnerLabelsByRegionFrom(sidecarJson);
+      final ownerLabels = byRegion['gwangju'] ?? const {};
+      expect(ownerLabels, isNotEmpty, reason: 'gwangju sidecar 엔트리가 없다');
 
-    // 프로덕션 _MapGeometry.fromStations와 동일 계산(테스트 노출 함수)으로
-    // "라벨 미포함" vs "라벨 포함" 두 기대 bounds를 미리 구해둔다.
-    final boundsWithoutLabels = networkMapGeometrySourceBoundsFor(
-      fixture.data.stations,
-    );
-    final boundsWithLabels = networkMapGeometrySourceBoundsFor(
-      fixture.data.stations,
-      ownerLabelSourceRects: expectedOwnerRects,
-    );
-    expect(
-      boundsWithLabels.width,
-      greaterThan(boundsWithoutLabels.width),
-      reason: '오너 라벨이 station 기반 bounds보다 넓어야 회귀 재현 의미가 있다',
-    );
+      final expectedOwnerRects = networkMapOwnerLabelSourceRects(
+        ownerLabels: ownerLabels.values.expand((entries) => entries),
+      );
 
-    // 프로덕션이 쓰는 것과 동일한 공유 캐시 슬롯에 파싱 결과를 주입한다 — 마운트된
-    // 위젯의 _loadOwnerLabels()가 실제 rootBundle.loadString 호출 없이 이 값을
-    // 즉시 받는다(테스트 인프라 메모 참고). region 키 정규화(_displayRegionName)
-    // 로직 자체는 실제 프로덕션 코드 경로 그대로 실행된다.
-    primeNetworkMapOwnerLabelsCacheForTest(byRegion);
+      // 프로덕션 _MapGeometry.fromStations와 동일 계산(테스트 노출 함수)으로
+      // "라벨 미포함" vs "라벨 포함" 두 기대 bounds를 미리 구해둔다.
+      final boundsWithoutLabels = networkMapGeometrySourceBoundsFor(
+        fixture.data.stations,
+      );
+      final boundsWithLabels = networkMapGeometrySourceBoundsFor(
+        fixture.data.stations,
+        ownerLabelSourceRects: expectedOwnerRects,
+      );
+      expect(
+        boundsWithLabels.width,
+        greaterThan(boundsWithoutLabels.width),
+        reason: '오너 라벨이 station 기반 bounds보다 넓어야 회귀 재현 의미가 있다',
+      );
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: NetworkMapScreen(
-          repository: _FakeGwangjuRepository(fixture.data),
-          routeDraftController: RouteDraftController(),
-          onOpenStationSearch: (_, _) {},
+      // 프로덕션이 쓰는 것과 동일한 공유 캐시 슬롯에 파싱 결과를 주입한다 — 마운트된
+      // 위젯의 _loadOwnerLabels()가 실제 rootBundle.loadString 호출 없이 이 값을
+      // 즉시 받는다(테스트 인프라 메모 참고). region 키 정규화(_displayRegionName)
+      // 로직 자체는 실제 프로덕션 코드 경로 그대로 실행된다.
+      primeNetworkMapOwnerLabelsCacheForTest(byRegion);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: NetworkMapScreen(
+            repository: _FakeGwangjuRepository(fixture.data),
+            routeDraftController: RouteDraftController(),
+            onOpenStationSearch: (_, _) {},
+          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.byType(RouteMapBasemapView), findsOneWidget);
-    final camera = tester
-        .widget<RouteMapBasemapView>(find.byType(RouteMapBasemapView))
-        .camera;
+      expect(find.byType(RouteMapBasemapView), findsOneWidget);
+      final camera = tester
+          .widget<RouteMapBasemapView>(find.byType(RouteMapBasemapView))
+          .camera;
 
-    // 회귀 가드 1: 실행 중인 위젯의 초기 카메라 sourceBounds(=fullBounds=
-    // geometry 전체)가 station-only bounds보다 넓다 — sidecar가 실제로
-    // geometry에 반영됐다는 직접 증거. region 키 정규화가 빠지면
-    // basemapAssetId가 항상 null이 되어 이 값이 boundsWithoutLabels와
-    // 같아져 실패한다.
-    expect(
-      camera.sourceBounds.width,
-      greaterThan(boundsWithoutLabels.width),
-      reason:
-          '카메라 sourceBounds.width=${camera.sourceBounds.width}가 '
-          'station-only width=${boundsWithoutLabels.width}보다 넓지 않다 — '
-          '오너 라벨이 geometry에 반영되지 않았다(region 키 불일치 재발?)',
-    );
+      // 회귀 가드 1: 실행 중인 위젯의 초기 카메라 sourceBounds(=fullBounds=
+      // geometry 전체)가 station-only bounds보다 넓다 — sidecar가 실제로
+      // geometry에 반영됐다는 직접 증거. region 키 정규화가 빠지면
+      // basemapAssetId가 항상 null이 되어 이 값이 boundsWithoutLabels와
+      // 같아져 실패한다.
+      expect(
+        camera.sourceBounds.width,
+        greaterThan(boundsWithoutLabels.width),
+        reason:
+            '카메라 sourceBounds.width=${camera.sourceBounds.width}가 '
+            'station-only width=${boundsWithoutLabels.width}보다 넓지 않다 — '
+            '오너 라벨이 geometry에 반영되지 않았다(region 키 불일치 재발?)',
+      );
 
-    // 회귀 가드 2: 프로덕션 계산과 독립 산출한 "라벨 포함" 기대 bounds와
-    // 실제 카메라 bounds가 일치한다(동일 입력·동일 알고리즘이므로 엄격 일치).
-    expect(camera.sourceBounds.width, closeTo(boundsWithLabels.width, 0.5));
-    expect(camera.sourceBounds.height, closeTo(boundsWithLabels.height, 0.5));
+      // 회귀 가드 2: 프로덕션 계산과 독립 산출한 "라벨 포함" 기대 bounds와
+      // 실제 카메라 bounds가 일치한다(동일 입력·동일 알고리즘이므로 엄격 일치).
+      expect(camera.sourceBounds.width, closeTo(boundsWithLabels.width, 0.5));
+      expect(camera.sourceBounds.height, closeTo(boundsWithLabels.height, 0.5));
 
-    // 회귀 가드 3(초기 카메라 scale ≤ 폭fit-라벨포함): 초기 카메라가 라벨을
-    // 포함한 source 폭 전체를 뷰포트 안에 담아야 한다 — contain-fit이므로
-    // scale × sourceBounds.width가 뷰포트 폭을 넘지 않는다(라벨이 화면 밖으로
-    // 잘리지 않음을 뜻하는 직접 조건).
-    final viewportWidth = camera.viewportSize.width;
-    expect(
-      camera.scale * camera.sourceBounds.width,
-      lessThanOrEqualTo(viewportWidth + 0.5),
-      reason:
-          'scale=${camera.scale} × sourceBounds.width=${camera.sourceBounds.width} '
-          '가 viewportWidth=$viewportWidth를 넘는다 — 라벨이 화면 밖으로 잘린다',
-    );
+      // 회귀 가드 3(축소 하한에서 라벨 포함 폭 전체가 담긴다):
+      //
+      // [계약 변경 · #2068 트랙 QA 후속] 종전에는 **초기** 카메라가 라벨 포함 폭
+      // 전체를 담는지(`camera.scale × width ≤ viewportWidth`)로 검증했다. 초기
+      // 카메라가 "콘텐츠 중앙을 글자가 읽히는 배율로 확대"로 바뀌면서 그 전체-fit
+      // 전제는 폐기됐다(오너 결정) — 이제 초기 화면은 의도적으로 라벨 일부를
+      // 화면 밖에 둘 수 있다.
+      //
+      // 살아 있는 불변식은 "라벨 extents가 팬·축소로 **도달 가능**하다"이며, 그
+      // 직접 조건은 축소 하한(minScale)에서 폭 전체가 담기는 것이다. 오너 라벨이
+      // geometry(=팬 한계 sourceBounds)에서 빠지면 가드 1·2가 잡고, 팬 한계는
+      // 잡았는데 축소로 다 못 보는 회귀는 이 가드가 잡는다.
+      final viewportWidth = camera.viewportSize.width;
+      expect(
+        camera.minScale * camera.sourceBounds.width,
+        lessThanOrEqualTo(viewportWidth + 0.5),
+        reason:
+            'minScale=${camera.minScale} × '
+            'sourceBounds.width=${camera.sourceBounds.width}가 '
+            'viewportWidth=$viewportWidth를 넘는다 — 축소해도 라벨 폭 전체를 볼 수 없다',
+      );
+    });
   });
 }

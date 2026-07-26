@@ -610,6 +610,20 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     super.initState();
     widget.routeDraftController.addListener(_handleDraftChangedForSearch);
     widget.regionBridge?.attach(_selectRegionFromBridge);
+    // #2068 트랙 QA 후속: 오너 라벨 sidecar를 노선도 데이터 로드(_future)와
+    // **동시에** 시작한다. 종전에는 캔버스가 마운트된 뒤에야(=데이터 로드 완료
+    // 후) 로드가 시작돼 직렬화됐고, 초기 카메라 가독 배율이 sidecar에 의존하게
+    // 된 지금은 그 지연이 그대로 줌 팝으로 보인다. 여기서는 기다리지 않으므로
+    // (게이트 아님) cold start 경로에 지연을 더하지 않는다 — 데이터 로드가
+    // 끝날 때쯤 값이 준비돼 캔버스 첫 build가 동기 캐시로 이를 집어간다.
+    // 실패는 캔버스의 _loadOwnerLabels가 리포팅·재시도를 담당하므로 여기서는
+    // 삼킨다(중복 리포트 방지).
+    unawaited(
+      _loadNetworkMapOwnerLabelsByRegion().catchError(
+        (Object _, StackTrace _) =>
+            const <String, Map<String, List<RouteMapOwnerLabelEntry>>>{},
+      ),
+    );
   }
 
   void _selectRegionFromBridge(String region) {
@@ -4100,16 +4114,34 @@ void resetNetworkMapAttributionCacheForTest() {
 Future<Map<String, Map<String, List<RouteMapOwnerLabelEntry>>>>?
 _sharedOwnerLabelsByRegionFuture;
 
+/// 해석이 끝난 sidecar 값의 **동기** 캐시(#2068 트랙 QA 후속).
+///
+/// 초기 카메라 가독 배율이 sidecar에 의존하게 되면서, 캔버스 첫 build가 sidecar를
+/// 못 받으면 과축소로 1프레임 그린 뒤 확대로 튀는 "줌 팝"이 생긴다. Future만으로는
+/// 이미 완료된 값이라도 마이크로태스크 뒤에야 도착해 첫 build를 놓치므로, 해석된
+/// 값을 동기적으로 읽을 수 있게 따로 들고 있는다([_NetworkMapCanvasState.initState]
+/// 가 이 값으로 자신을 시드한다). 로드는 [NetworkMapScreen] initState에서 노선도
+/// 데이터 로드와 **동시에** 시작하므로(선행 로드), 캔버스가 마운트될 때쯤이면 보통
+/// 채워져 있다 — 별도 대기 게이트를 두지 않아 cold start 경로에 지연을 더하지
+/// 않는다. 경합에서 지더라도 동작은 종전(카메라 1회 재계산)으로 퇴화할 뿐이다.
+Map<String, Map<String, List<RouteMapOwnerLabelEntry>>>?
+_sharedOwnerLabelsByRegionValue;
+
 Future<Map<String, Map<String, List<RouteMapOwnerLabelEntry>>>>
 _loadNetworkMapOwnerLabelsByRegion() {
   return _sharedOwnerLabelsByRegionFuture ??= rootBundle
       .loadString(kRouteMapOwnerLabelsAssetPath)
-      .then(routeMapOwnerLabelsByRegionFrom);
+      .then(routeMapOwnerLabelsByRegionFrom)
+      .then((byRegion) {
+        _sharedOwnerLabelsByRegionValue = byRegion;
+        return byRegion;
+      });
 }
 
 @visibleForTesting
 void resetNetworkMapOwnerLabelsCacheForTest() {
   _sharedOwnerLabelsByRegionFuture = null;
+  _sharedOwnerLabelsByRegionValue = null;
 }
 
 /// 위젯 테스트가 실제 sidecar 로드 경로(rootBundle.loadString)를 거치지 않고
@@ -4125,6 +4157,7 @@ void primeNetworkMapOwnerLabelsCacheForTest(
   Map<String, Map<String, List<RouteMapOwnerLabelEntry>>> byRegion,
 ) {
   _sharedOwnerLabelsByRegionFuture = Future.value(byRegion);
+  _sharedOwnerLabelsByRegionValue = byRegion;
 }
 
 class _NetworkMapCanvas extends StatefulWidget {
@@ -4293,7 +4326,14 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
       SchedulerBinding.instance.addTimingsCallback(_logRouteMapFrameTimings);
     }
     _loadAttributionText();
-    _loadOwnerLabels();
+    // #2068 트랙 QA 후속: 초기 카메라 가독 배율이 sidecar에 의존하므로, 이미
+    // 해석된 값이 있으면 **첫 build 전에 동기로** 시드해 과축소 → 확대 줌 팝을
+    // 없앤다. 값이 없을 때만 비동기 로드를 태운다(선행 로드가 아직 끝나지 않은
+    // 경합 케이스 — 도착하면 setState로 카메라가 한 번 재계산된다).
+    _ownerLabelsByRegion = _sharedOwnerLabelsByRegionValue;
+    if (_ownerLabelsByRegion == null) {
+      _loadOwnerLabels();
+    }
   }
 
   Future<void> _loadAttributionText() async {
@@ -5442,22 +5482,30 @@ double _minimumMapScaleForBounds(Rect bounds, BoxConstraints constraints) {
   return math.min(_minMapScale, fitScale);
 }
 
-/// 이 역 수(route_map_positions 행) 이하 지역은 초기 화면에 지역 전체를 담는다
-/// (소규모 tight-fit, #1764 E). 광주·대전급(수십 역)은 소규모, 부산·대구·수도권급
-/// (백 역 이상)은 대형. 임계 40은 소규모(~20)와 대형(100+) 사이 넓은 간극에 둔다.
+/// 이 역 수(route_map_positions 행) 이하 지역은 초기 bounds **기준선**을 지역
+/// 전체로 잡는다(소규모 tight-fit, #1764 E). 광주·대전급(수십 역)은 소규모,
+/// 부산·대구·수도권급(백 역 이상)은 대형. 임계 40은 소규모(~20)와 대형(100+)
+/// 사이 넓은 간극에 둔다.
 const int _smallRegionStationCountThreshold = 40;
 
-/// 초기 화면에 지역 전체를 담는(소규모 tight-fit) 지역인지(#1764 E). 이 역 수
-/// 이하면 38% 도심 확대 대신 전체 조망으로 시작한다(광주·대전=true).
+/// 초기 bounds 기준선을 지역 전체로 잡는(소규모 tight-fit) 지역인지(#1764 E).
+/// 이 역 수 이하면 38% 도심 확대 대신 지역 전체가 기준선이 된다(광주·대전=true).
+///
+/// **주의(#2068 트랙 QA 후속): 이 판정이 곧 "초기 화면 = 전체 조망"은 아니다.**
+/// 최종 초기 카메라는 [networkMapInitialCameraBounds]가 이 기준선의 contain-fit과
+/// 오너 라벨 가독 배율 중 **큰 쪽**으로 정한다. 그래서 소규모 지역이라도 그
+/// 배율에서 라벨이 기준(13px)에 못 미치면 더 확대돼 전체가 담기지 않는다
+/// (실측: 대전은 이미 13.3px이라 전체 조망 유지, 광주는 10.8px이라 1.20배 확대).
 @visibleForTesting
 bool networkMapUsesWholeRegionInitialView(int stationCount) =>
     stationCount <= _smallRegionStationCountThreshold;
 
+/// 초기 카메라 bounds의 **기준선**(하한 배율)을 만든다. 최종 초기 카메라는
+/// [networkMapInitialCameraBounds]가 여기에 가독 배율을 얹어 정한다.
 Rect _readableBoundsFor(_MapGeometry geometry, {required int stationCount}) {
-  // 소규모 지역은 38% 도심 확대 대신 지역 전체를 초기 viewport로 둬 과확대를
-  // 막는다(초기 화면=bucket 1에서 전 역·환승/주요 라벨이 보이도록, #1764 E).
-  // 판정은 networkMapUsesWholeRegionInitialView 단일 소스를 쓴다(테스트가 실제
-  // 렌더 분기를 가드하도록).
+  // 소규모 지역은 38% 도심 확대 대신 지역 전체를 기준선으로 둬 과확대를
+  // 막는다(#1764 E). 판정은 networkMapUsesWholeRegionInitialView 단일 소스를
+  // 쓴다(테스트가 실제 렌더 분기를 가드하도록).
   if (networkMapUsesWholeRegionInitialView(stationCount)) {
     return Rect.fromLTWH(0, 0, geometry.width, geometry.height);
   }
