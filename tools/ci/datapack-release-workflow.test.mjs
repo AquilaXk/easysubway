@@ -90,6 +90,17 @@ test("production-publish는 pack 빌드 전에 release request ↔ build spec �
   assert.ok(verify > resolveRequest, "결속 검증은 release request 경로 확정 뒤여야 한다");
   assert.ok(buildPacks > verify, "결속 검증은 pack 빌드 전이어야 한다");
   assert.ok(decide > buildPacks, "판정은 pack 빌드 뒤여야 한다");
+  // 삭제된 `Fetch release request`를 앵커로 쓸 수 없게 되면서 위 `verify > resolveRequest`는
+  // 느슨해졌다(release-mode는 job 앞쪽 스텝). 인접성 대신 "결속 검증이 release request 경로의
+  // 첫 소비자"라는 성질로 원래 계약 강도를 되살린다 — 이게 앞당긴 fail-closed의 실제 내용이다.
+  const consumers = [...yml.matchAll(/release_request_path="\$\{EASYSUBWAY_DATAPACK_RELEASE_REQUEST_PATH:-\}"/g)]
+    .map((m) => m.index);
+  assert.equal(consumers.length, 3, "release request 경로 소비 지점은 결속 검증·판정·최종 판정 3곳이다");
+  assert.ok(
+    consumers[0] > verify && consumers[0] < buildPacks,
+    "release request 경로의 첫 소비자는 결속 검증 스텝이어야 한다",
+  );
+  assert.ok(consumers[1] > buildPacks, "나머지 소비 지점은 pack 빌드 뒤에 있어야 한다");
 });
 
 test("production-publish의 release request 입력은 리포 파일 전용이고 API 조회 경로가 없다", () => {
@@ -111,6 +122,26 @@ test("production-publish의 release request 입력은 리포 파일 전용이고
     /production-publish requires a release request file path \(modeArgs\.releaseRequestPath\)[^\n]*>&2/,
   );
   assert.match(releaseModeStep, /if \[\[ -z "\$\{release_request_path\}" \]\]; then[\s\S]*?exit 1/);
+  // 경로는 있고 파일이 없는 경우도 침묵으로 죽지 않는다(스케줄 분기·결속 검증 스텝과 대칭).
+  // `scheduled release request not found:`의 부분 일치로 공허해지지 않도록 echo까지 묶어 대조한다.
+  assert.match(releaseModeStep, /echo "release request not found: \$\{release_request_path\}" >&2/);
+  assert.doesNotMatch(releaseModeStep, /^\s*test -f "\$\{release_request_path\}"\s*$/m);
+
+  // build spec과 대칭인 release request 경로 가드: 리포 상대 경로 강제 + fixture 마커 금지.
+  // 스케줄 변수 경로(파일을 읽기 전)와 dispatch 입력 양쪽에 걸려야 한다.
+  assert.match(releaseModeStep, /assert_release_request_path\(\) \{/);
+  assert.match(releaseModeStep, /release request path must be a repo-relative path: \$1"? >&2/);
+  assert.match(releaseModeStep, /\$1" == \/\* \|\| "\$1" == \*\.\.\*/);
+  assert.match(releaseModeStep, /"\$1" =~ \(fixture\|debug\|demo\|sample\) \|\| "\$1" == tools\/datapack\/fixtures\/\*/);
+  const guardCalls = releaseModeStep.match(/assert_release_request_path "\$\{release_request_path\}"/g) ?? [];
+  assert.equal(guardCalls.length, 2, "경로 가드는 스케줄 분기와 release 모드 양쪽에서 호출돼야 한다");
+  // 스케줄 분기는 파일을 읽기(-f·JSON 파싱) 전에 경로를 먼저 거절해야 한다.
+  const scheduledGuard = releaseModeStep.indexOf('assert_release_request_path "${release_request_path}"');
+  const scheduledExists = releaseModeStep.indexOf('scheduled release request not found');
+  assert.ok(
+    scheduledGuard >= 0 && scheduledExists > scheduledGuard,
+    "스케줄 분기의 경로 가드는 파일 존재 확인보다 앞서야 한다",
+  );
 
   // EASYSUBWAY_DATAPACK_WORKFLOW_TOKEN은 rollback approval 조회 하나에만 남는다(별도 아티팩트).
   const tokenUses = yml.match(/EASYSUBWAY_DATAPACK_WORKFLOW_TOKEN/g) ?? [];
@@ -386,6 +417,13 @@ test("scheduled publish는 명시적 opt-in과 승인된 입력 경로 없이는
   assert.match(yml, /scheduled release request not found: \$\{release_request_path\}"? >&2/);
   assert.match(yml, /release_request_id="\$\(RELEASE_REQUEST_FILE="\$\{release_request_path\}" node -e/);
   assert.match(yml, /scheduled release request approvalId is required/);
+  // 파생값은 GITHUB_ENV·GITHUB_OUTPUT으로 흘러가므로 개행 주입을 막는 단일 토큰 형식 검사가 필수다.
+  // (같은 파일 "Parse modeArgs"의 `must not contain newlines` 가드와 같은 수준)
+  assert.match(yml, /!\/\^\[A-Za-z0-9\._-\]\+\\?\$\/\.test\(request\.approvalId\)/);
+  assert.match(yml, /scheduled release request approvalId must be a single \[A-Za-z0-9\._-\] token/);
+  // 비-JSON 파일은 raw SyntaxError 스택·파일 내용 대신 한 줄 진단으로 종료한다.
+  assert.match(yml, /scheduled release request is not valid JSON: ' \+ file/);
+  assert.match(yml, /try \{\s*\n\s*request = JSON\.parse\(fs\.readFileSync\(file, 'utf8'\)\);\s*\n\s*\} catch \{/);
   assert.match(yml, /SCHEDULED_ANDROID_EVIDENCE_PATH/);
   assert.match(yml, /SCHEDULED_STRICT_ROUTE_REGRESSION_PATH/);
   // 변수군이 없으면 기존과 동일하게 fail-closed로 남는다(활성화는 별도 오너 결정).

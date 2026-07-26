@@ -150,6 +150,19 @@ jobs:
           strict_route_regression_path="${STRICT_ROUTE_REGRESSION_PATH_INPUT:-}"
           source_governance_evaluation_at="${SOURCE_GOVERNANCE_EVALUATION_AT_INPUT:-}"
 
+          # release request 경로도 build spec과 같은 기준을 받는다: 체크아웃 안의 상대 경로여야 하고
+          # fixture 계열은 금지한다. "단일 진실 원본은 리포 파일"을 경로 수준에서 기계적으로 강제한다.
+          assert_release_request_path() {
+            if [[ "$1" == /* || "$1" == *..* ]]; then
+              echo "release request path must be a repo-relative path: $1" >&2
+              exit 1
+            fi
+            if [[ "$1" =~ (fixture|debug|demo|sample) || "$1" == tools/datapack/fixtures/* ]]; then
+              echo "release mode cannot use fixture input" >&2
+              exit 1
+            fi
+          }
+
           if [[ "${GITHUB_EVENT_NAME}" == "schedule" && "${SCHEDULED_PUBLISH_ENABLED:-}" == "true" ]]; then
             mode=production-publish
             target_channel=production
@@ -162,12 +175,35 @@ jobs:
               echo "scheduled production publish requires configured approval evidence" >&2
               exit 1
             fi
+            assert_release_request_path "${release_request_path}"
             if [[ ! -f "${release_request_path}" ]]; then
               echo "scheduled release request not found: ${release_request_path}" >&2
               exit 1
             fi
             # release request의 단일 원본은 리포 파일이므로 승인 식별자도 그 파일에서 읽는다.
-            release_request_id="$(RELEASE_REQUEST_FILE="${release_request_path}" node -e "const fs=require('fs'); const request=JSON.parse(fs.readFileSync(process.env.RELEASE_REQUEST_FILE, 'utf8')); if (typeof request.approvalId !== 'string' || request.approvalId === '') { console.error('scheduled release request approvalId is required'); process.exit(1); } process.stdout.write(request.approvalId);")"
+            # 파생값은 아래에서 GITHUB_ENV·GITHUB_OUTPUT으로 흘러가므로 "Parse modeArgs"의 개행 가드와
+            # 같은 수준으로 단일 토큰만 허용한다 — 개행이 섞이면 후행 중복 키가 앞서 확정된
+            # mode·build spec 경로를 덮어써 release-mode 게이트를 우회시킬 수 있다.
+            release_request_id="$(RELEASE_REQUEST_FILE="${release_request_path}" node -e "
+              const fs = require('fs');
+              const file = process.env.RELEASE_REQUEST_FILE;
+              let request;
+              try {
+                request = JSON.parse(fs.readFileSync(file, 'utf8'));
+              } catch {
+                console.error('scheduled release request is not valid JSON: ' + file);
+                process.exit(1);
+              }
+              if (typeof request.approvalId !== 'string' || request.approvalId === '') {
+                console.error('scheduled release request approvalId is required');
+                process.exit(1);
+              }
+              if (!/^[A-Za-z0-9._-]+\$/.test(request.approvalId)) {
+                console.error('scheduled release request approvalId must be a single [A-Za-z0-9._-] token');
+                process.exit(1);
+              }
+              process.stdout.write(request.approvalId);
+            ")"
           fi
 
           if [[ -z "${allow_gaps}" ]]; then
@@ -186,6 +222,9 @@ jobs:
               echo "release mode cannot use fixture input" >&2
               exit 1
             fi
+            if [[ -n "${release_request_path}" ]]; then
+              assert_release_request_path "${release_request_path}"
+            fi
             test -n "${release_request_id}"
             test -f "${build_spec}"
             test -n "${android_evidence_path}"
@@ -199,7 +238,10 @@ jobs:
                 echo "production-publish requires a release request file path (modeArgs.releaseRequestPath)" >&2
                 exit 1
               fi
-              test -f "${release_request_path}"
+              if [[ ! -f "${release_request_path}" ]]; then
+                echo "release request not found: ${release_request_path}" >&2
+                exit 1
+              fi
             fi
             node - "${build_spec}" "${release_request_id}" "${release_request_path}" "${target_channel}" "${mode}" "${source_governance_evaluation_at}" <<'NODE'
             const fs = require("fs");
