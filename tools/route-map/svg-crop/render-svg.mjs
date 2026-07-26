@@ -23,6 +23,29 @@ import {
   svgPathFor,
 } from "./regions.mjs";
 
+/** PATH 조회 없이 고정 경로로 git을 찾는다(PATH 오염 차단). */
+function resolveGit() {
+  for (const candidate of ["/usr/bin/git", "/opt/homebrew/bin/git", "/usr/local/bin/git"]) {
+    if (existsSync(candidate) && statSync(candidate).isFile()) return candidate;
+  }
+  throw new Error("git 실행 파일을 고정 경로에서 찾지 못했습니다.");
+}
+
+/**
+ * `.out/` 안으로만 해석되는 산출물 경로를 만든다.
+ * 구성 요소가 검증된 값이어도 최종 경로를 한 번 더 확인한다 — 파일 시스템에
+ * 닿기 전에 경계를 벗어나지 않았음을 여기서 단정한다.
+ */
+function outPathFor(fileName) {
+  const base = path.basename(fileName);
+  const resolved = path.resolve(outDir, base);
+  const root = path.resolve(outDir);
+  if (resolved !== root && !resolved.startsWith(root + path.sep)) {
+    throw new Error(`산출물 경로가 .out/ 밖입니다: ${resolved}`);
+  }
+  return resolved;
+}
+
 /** 실행할 브라우저. 실제 파일인지 확인해 임의 명령 실행을 막는다. */
 function resolveChrome() {
   const candidate =
@@ -58,7 +81,7 @@ if (!Number.isFinite(scale) || scale <= 0) {
 function readSvg() {
   if (!ref) return readFileSync(svgPathFor(region), "utf8");
   return execFileSync(
-    "git",
+    resolveGit(),
     ["show", `${assertSafeRef(ref)}:${repoRelativeSvg(region)}`],
     { cwd: repoRoot(), encoding: "utf8", maxBuffer: 1024 * 1024 * 64 },
   );
@@ -94,10 +117,12 @@ const html =
   `${inkCss}</style></head><body>${inlined}</body></html>`;
 
 mkdirSync(outDir, { recursive: true });
+// stem 구성 요소는 전부 검증을 통과한 값이지만(region은 고정 표의 키, ref는
+// assertSafeRef 통과), 최종 경로는 outPathFor가 다시 .out/ 안인지 확인한다.
 const refPart = ref ? ref.replaceAll(/[^\w.-]/g, "_") : "working";
 const stem = `${region}-${refPart}${inkOnly ? "-ink" : ""}`;
-const htmlPath = path.join(outDir, `${stem}.html`);
-const outPng = path.join(outDir, `${stem}.png`);
+const htmlPath = outPathFor(`${stem}.html`);
+const outPng = outPathFor(`${stem}.png`);
 writeFileSync(htmlPath, html);
 
 const args = [
