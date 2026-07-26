@@ -961,14 +961,10 @@ class RouteSearchV2Result {
 /// 백엔드 계약(#2560): 대표 중 `stairAccess == STEP_FREE`가 하나도 없고
 /// alternativeCount에 자리가 남을 때만, 같은 기준을 만족하는 후보 1건에 붙는다.
 ///
-/// 주의 — 이 태그는 모바일의 `계단 없는 길이에요`와 같은 뜻이 아니다. 백엔드
-/// `RouteV2Planner.stairAccess()`는 step의 `includesStairs`·
-/// `requiresAccessibilityCheck`만 보는데, 승차 step은 둘 다 false이면서
-/// `stairAccessState`가 `UNKNOWN`이다. 그 값이 leg DTO의
-/// `unknownAccessibilityCount = 1`로 실려 오면 모바일은 그 leg를 `unknown`으로
-/// 보므로([_routeV2StairAccessState]), 태그가 붙은 후보라도
-/// [RouteSearchResult.stairAccessLabel]은 `계단 여부를 확인하고 있어요`가 된다.
-/// 따라서 이 태그를 "확인된 무단차"로 표기하면 과대 주장이다.
+/// 주의 — 이 태그는 `계단 없는 길이에요`와 같은 뜻이 아니다. 태깅 술어는 계단
+/// 사실만 보는 반면(#2560), 화면에 실리는 판정(`stairAccess`)은 데이터 신뢰도
+/// 경고까지 반영해 한 단계 낮아질 수 있다(#2590). 따라서 대안의 계단 표기는 태그가
+/// 아니라 대안 자신의 [RouteSearchResult.stairAccessLabel]로만 말한다.
 const _stepFreePreferredObjectiveTag = 'STEP_FREE_PREFERRED';
 
 class RouteSearchV2Itinerary {
@@ -985,6 +981,7 @@ class RouteSearchV2Itinerary {
     required this.accessibilityRisk,
     required this.legs,
     required this.commercialEtaEligible,
+    this.stairAccess = '',
     this.objectiveTags = const [],
     this.officialFare,
   });
@@ -1021,6 +1018,7 @@ class RouteSearchV2Itinerary {
           })
           .toList(growable: false),
       commercialEtaEligible: _requiredRouteBool(json, 'commercialEtaEligible'),
+      stairAccess: _optionalRouteString(json, 'stairAccess'),
       objectiveTags: _routeStringList(
         json['objectiveTags'] ?? const <Object?>[],
         'route v2 objective tag',
@@ -1046,6 +1044,10 @@ class RouteSearchV2Itinerary {
   final List<RouteSearchV2Leg> legs;
   final bool commercialEtaEligible;
   final RouteSearchOfficialFare? officialFare;
+
+  /// 백엔드가 내린 경로 전체의 계단 판정(#2590). 화면은 이 값을 표시만 하고 leg를
+  /// 훑어 다시 계산하지 않는다. 판정 필드가 없는 레거시 응답에서는 빈 문자열이다.
+  final String stairAccess;
 
   /// 백엔드가 itinerary에 붙이는 objective 태그.
   ///
@@ -1117,6 +1119,7 @@ class RouteSearchV2Leg {
     required this.etaSource,
     required this.confidence,
     required this.accessibilityRisk,
+    this.stairAccess = '',
     this.serviceClass,
     this.servicePattern,
   });
@@ -1160,6 +1163,7 @@ class RouteSearchV2Leg {
       accessibilityRisk: RouteSearchV2AccessibilityRisk.fromJson(
         rawAccessibilityRisk,
       ),
+      stairAccess: _optionalRouteString(json, 'stairAccess'),
       serviceClass: serviceClass,
       servicePattern: servicePattern,
     );
@@ -1184,6 +1188,11 @@ class RouteSearchV2Leg {
   final String etaSource;
   final String confidence;
   final RouteSearchV2AccessibilityRisk accessibilityRisk;
+
+  /// 백엔드가 내린 leg 계단 판정(#2590). `STAIR_ONLY`·`STEP_FREE`·`UNKNOWN`과, 계단
+  /// 개념이 적용되지 않는 구간을 뜻하는 `NOT_APPLICABLE`을 받는다. 판정 필드가 없는
+  /// 레거시 응답에서는 빈 문자열이고, 그때만 화면이 원자료로 폴백한다.
+  final String stairAccess;
 
   /// 운행 클래스(SUBWAY·ITX_CHEONGCHUN). RIDE leg에서만 채워지고, 그 외에는 null.
   final String? serviceClass;
@@ -1323,6 +1332,7 @@ class RouteSearchResult {
     this.arrivalTimeIso = '',
     this.officialFare,
     this.stepFreeAlternative,
+    this.stairAccess = '',
   }) : // `burdenCost`는 API contract 이름이고 저장 필드는 private 값이다.
        // ignore: prefer_initializing_formals
        _accessibilityScore = accessibilityScore,
@@ -1542,6 +1552,11 @@ class RouteSearchResult {
   /// 되돌아갈 대표는 화면이 계속 들고 있다.
   final RouteSearchResult? stepFreeAlternative;
 
+  /// 백엔드가 내린 경로 계단 판정(#2590). 판정 원천은 백엔드 하나이고 화면은 이
+  /// 값을 표시만 한다. 판정 필드가 없는 응답(레거시 백엔드)과 로컬 폴백 결과에서는
+  /// 비어 있으며, 그때만 [stairAccessLabel]이 스텝 원자료로 폴백한다.
+  final String stairAccess;
+
   bool get hasOfficialOdFareQuote => officialOdFareQuote != null;
 
   int get accessibilityScore => _accessibilityScore ?? score;
@@ -1574,14 +1589,11 @@ class RouteSearchResult {
   }
 
   String get stairAccessLabel {
-    if (steps.any((step) => _routeStepStairState(step) == 'stairOnly')) {
-      return '계단 포함';
-    }
-    if (steps.isNotEmpty &&
-        steps.every((step) => _routeStepStairState(step) == 'stepFree')) {
-      return '계단 없는 길이에요';
-    }
-    return '계단 여부를 확인하고 있어요';
+    return _routeStairAccessLabel(
+      stairAccess.isEmpty
+          ? _routeStairAccessFromSteps(steps)
+          : _normalizeRouteStairState(stairAccess),
+    );
   }
 
   int get walkingDistanceMeters {
@@ -2032,6 +2044,7 @@ RouteSearchResult _routeSearchResultFromV2Itinerary({
         itinerary.realtimeArrivalTime ?? itinerary.plannedArrivalTime,
     officialFare: itinerary.officialFare,
     stepFreeAlternative: stepFreeAlternative,
+    stairAccess: itinerary.stairAccess,
   );
 }
 
@@ -2156,6 +2169,11 @@ bool _routeV2RiskRequiresCheck(RouteSearchV2AccessibilityRisk risk) {
       risk.unavailableFacilityCount > 0;
 }
 
+/// 판정 필드(`stairAccess`)가 없는 레거시 응답에서만 쓰는 leg 폴백 판정.
+///
+/// 미확인 신호를 하나라도 보면 `unknown`으로 떨어지므로 무단차로 과대 표기되지
+/// 않는다(fail closed). 승차 leg가 `unknown`으로 잡히는 것이 #2590의 증상이며,
+/// 판정 필드를 싣는 백엔드에서는 이 경로를 타지 않는다.
 String _routeV2StairAccessState(RouteSearchV2AccessibilityRisk risk) {
   if (risk.stairCount > 0) {
     return 'stairOnly';
@@ -2304,7 +2322,9 @@ class RouteSearchStep {
       estimatedMinutes: minutes,
       distanceMeters: leg.distanceMeters,
       includesStairs: leg.accessibilityRisk.stairCount > 0,
-      stairAccessState: _routeV2StairAccessState(leg.accessibilityRisk),
+      stairAccessState: leg.stairAccess.isEmpty
+          ? _routeV2StairAccessState(leg.accessibilityRisk)
+          : _normalizeRouteStairState(leg.stairAccess),
       requiresAccessibilityCheck: _routeV2RiskRequiresCheck(
         leg.accessibilityRisk,
       ),
@@ -5176,9 +5196,8 @@ RouteSearchStep? _matchingPreviousRideStep({
 ///
 /// 부제는 언제나 [target]의 [RouteSearchResult.stairAccessLabel]이다. 행이
 /// 약속하는 계단 상태와 전환 뒤 결과 카드의 칩이 같은 값이라 어긋날 수 없다.
-/// (백엔드는 `requiresAccessibilityCheck`로 무단차를 판정하지만 승차 leg는
-/// `stairAccessState=UNKNOWN`이라 모바일 라벨이 `계단 여부를 확인하고 있어요`로
-/// 떨어진다. 행이 "확인된 무단차"라고 단언하면 이 조합에서 과대 주장이 된다.)
+/// 태그(`STEP_FREE_PREFERRED`)를 "확인된 무단차"로 옮겨 적지 않는 이유는
+/// [_stepFreePreferredObjectiveTag] 주석 참고.
 class _StepFreeRouteSwitch {
   const _StepFreeRouteSwitch._({
     required this.target,
@@ -6488,7 +6507,45 @@ String _normalizeRouteStairState(String value) {
   return switch (value.trim().toUpperCase()) {
     'STEP_FREE' || 'STEPFREE' => 'stepFree',
     'STAIR_ONLY' || 'STAIRONLY' => 'stairOnly',
+    'NOT_APPLICABLE' || 'NOTAPPLICABLE' => 'notApplicable',
     _ => 'unknown',
+  };
+}
+
+String _routeStairAccessLabel(String stairAccess) {
+  return switch (stairAccess) {
+    'stairOnly' => '계단 포함',
+    'stepFree' => '계단 없는 길이에요',
+    _ => '계단 여부를 확인하고 있어요',
+  };
+}
+
+/// 판정 필드가 없는 응답(레거시 백엔드·로컬 폴백)에서 쓰는 유일한 폴백 판정.
+///
+/// 판정 규칙이 여러 벌로 갈리지 않도록 두 경로가 이 함수 하나만 쓴다. 격자는 백엔드
+/// `StairAccess`와 같다: 계단 구간이 하나라도 있으면 `stairOnly`, 미확인이 있으면
+/// `unknown`, 계단 개념이 적용되지 않는 구간(`notApplicable`)은 판정에 기여하지
+/// 않는다. 스텝이 없으면 판정 근거 자체가 없으므로 `unknown`이다.
+String _routeStairAccessFromSteps(List<RouteSearchStep> steps) {
+  if (steps.isEmpty) {
+    return 'unknown';
+  }
+  var merged = 'notApplicable';
+  for (final step in steps) {
+    final state = _routeStepStairState(step);
+    if (_routeStairAccessRank(state) > _routeStairAccessRank(merged)) {
+      merged = state;
+    }
+  }
+  return merged == 'notApplicable' ? 'stepFree' : merged;
+}
+
+int _routeStairAccessRank(String stairAccess) {
+  return switch (stairAccess) {
+    'stairOnly' => 3,
+    'unknown' => 2,
+    'stepFree' => 1,
+    _ => 0,
   };
 }
 

@@ -658,7 +658,7 @@ class LocalRouteRepository implements RouteSearchRepository {
             estimatedMinutes: _estimatedMinutesFor(adjustedDurationSeconds),
             distanceMeters: step.distanceMeters,
             includesStairs: step.includesStairs,
-            stairAccessState: step.stairAccessState,
+            stairAccessState: _stairAccessStateOf(step),
             requiresAccessibilityCheck:
                 step.type.name == 'entry' || step.type.name == 'exit',
             actionTitle: _stepActionTitle(step.type.name),
@@ -686,6 +686,19 @@ class LocalRouteRepository implements RouteSearchRepository {
           );
         })
         .toList(growable: false);
+  }
+
+  /// 로컬 폴백도 백엔드 `StairAccess`와 같은 어휘로 계단 상태를 말한다(#2590).
+  ///
+  /// 로컬 그래프는 계단 상태가 명시되지 않은 승차 edge를 `stepFree`로 기본 파생한다
+  /// (`RouteEdge` 생성자). 그건 "확인된 무단차"가 아니라 "계단 장벽이 놓이지 않는
+  /// 구간"이라는 뜻이므로 표시 어휘에서도 그대로 말한다. 데이터팩이 승차 edge에
+  /// 계단 상태를 명시했으면(예: `UNKNOWN`) 그 판단이 우선이라 건드리지 않는다.
+  String _stairAccessStateOf(route_step.RouteStep step) {
+    return step.type == route_step.RouteStepType.ride &&
+            step.stairAccessState == 'stepFree'
+        ? 'notApplicable'
+        : step.stairAccessState;
   }
 
   Map<int, String> _plannedRideArrivals(

@@ -1834,12 +1834,11 @@ void main() {
       expect(alternative.warningNoticeText, '일부 시설 안내는 아직 확인되지 않았어요.');
     });
 
-    test('#2582 STEP_FREE_PREFERRED 태그는 계단 없음 단언이 아니다 — 승차 leg는 미확인으로 남는다', () {
-      // 백엔드 stairAccess()는 includesStairs·requiresAccessibilityCheck만 보고
-      // 태그를 붙이지만, 승차 step의 stairAccessState는 "UNKNOWN"이라 leg DTO의
-      // unknownAccessibilityCount가 1이 된다. 모바일은 그 leg를 미확인으로 보므로
-      // 태그가 붙은 대안도 라벨은 "계단 여부를 확인하고 있어요"다. 화면 문구가
-      // "확인된 무단차"를 단언하면 안 되는 근거다.
+    test('#2582 판정 필드가 없는 레거시 응답에서는 태그가 붙어도 미확인으로 남는다', () {
+      // 백엔드가 계단 판정을 싣지 않는 응답에서는 화면이 원자료로 폴백한다(#2590).
+      // 승차 leg의 unknownAccessibilityCount=1을 미확인으로 읽어 라벨이 "계단 여부를
+      // 확인하고 있어요"로 떨어지므로, 태그를 "확인된 무단차"로 옮겨 적으면 과대
+      // 주장이 된다. 폴백은 이렇게 fail closed 쪽으로만 틀린다.
       final result = _objectiveResult([
         _taggedItinerary(
           lineId: 'line-stair',
@@ -1957,6 +1956,250 @@ void main() {
       expect(controller.state.result?.routeSearchId, 'route-few');
     });
   });
+
+  group('#2590 계단 접근성 판정 원천 통일', () {
+    test('승차 leg만 미확인인 경로는 백엔드 판정대로 계단 없는 길로 표시한다', () {
+      final display = _judgedDisplay(
+        stairAccess: 'STEP_FREE',
+        legs: [
+          _judgedLeg(legType: 'ACCESS', stairAccess: 'STEP_FREE'),
+          _judgedLeg(
+            legType: 'RIDE',
+            stairAccess: 'NOT_APPLICABLE',
+            unknownAccessibilityCount: 1,
+          ),
+          _judgedLeg(legType: 'EGRESS', stairAccess: 'STEP_FREE'),
+        ],
+      );
+
+      expect(display.stairAccessLabel, '계단 없는 길이에요');
+    });
+
+    test('계단 전이가 있는 경로는 계단 포함으로 표시한다', () {
+      final display = _judgedDisplay(
+        stairAccess: 'STAIR_ONLY',
+        legs: [
+          _judgedLeg(
+            legType: 'ACCESS',
+            stairAccess: 'STAIR_ONLY',
+            stairCount: 1,
+          ),
+          _judgedLeg(
+            legType: 'RIDE',
+            stairAccess: 'NOT_APPLICABLE',
+            unknownAccessibilityCount: 1,
+          ),
+        ],
+      );
+
+      expect(display.stairAccessLabel, '계단 포함');
+    });
+
+    test('실제 미확인 사유가 있는 경로는 계단 없는 길로 승격되지 않는다', () {
+      for (final reason in const [
+        'generatedConnectorCount',
+        'staleDataCount',
+        'lowConfidenceCount',
+        'unavailableFacilityCount',
+      ]) {
+        final display = _judgedDisplay(
+          stairAccess: 'UNKNOWN',
+          legs: [
+            _judgedLeg(
+              legType: 'ACCESS',
+              stairAccess: 'UNKNOWN',
+              generatedConnectorCount: reason == 'generatedConnectorCount'
+                  ? 1
+                  : 0,
+              staleDataCount: reason == 'staleDataCount' ? 1 : 0,
+              lowConfidenceCount: reason == 'lowConfidenceCount' ? 1 : 0,
+              unavailableFacilityCount: reason == 'unavailableFacilityCount'
+                  ? 1
+                  : 0,
+            ),
+            _judgedLeg(
+              legType: 'RIDE',
+              stairAccess: 'NOT_APPLICABLE',
+              unknownAccessibilityCount: 1,
+            ),
+          ],
+        );
+
+        expect(
+          display.stairAccessLabel,
+          '계단 여부를 확인하고 있어요',
+          reason: '$reason가 있는 경로는 무단차로 단언하지 않는다',
+        );
+      }
+    });
+
+    test('화면은 leg 판정을 재계산하지 않고 백엔드 값을 그대로 쓴다', () {
+      final display = _judgedDisplay(
+        stairAccess: 'STEP_FREE',
+        legs: [
+          _judgedLeg(legType: 'ACCESS', stairAccess: 'STEP_FREE'),
+          _judgedLeg(
+            legType: 'RIDE',
+            stairAccess: 'NOT_APPLICABLE',
+            unknownAccessibilityCount: 1,
+          ),
+        ],
+      );
+
+      expect(display.steps.map((step) => step.stairAccessState).toList(), [
+        'stepFree',
+        'notApplicable',
+      ]);
+    });
+
+    test('판정 필드가 없는 레거시 응답은 미확인 사유를 무단차로 올리지 않는다', () {
+      final display = _judgedDisplay(
+        stairAccess: '',
+        legs: [
+          _judgedLeg(legType: 'ACCESS', stairAccess: '', staleDataCount: 1),
+          _judgedLeg(legType: 'RIDE', stairAccess: ''),
+        ],
+      );
+
+      expect(display.stairAccessLabel, '계단 여부를 확인하고 있어요');
+    });
+
+    test('JSON 계약은 leg와 itinerary의 계단 판정을 읽고, 없으면 빈 값으로 폴백한다', () {
+      final withJudgment = RouteSearchV2Itinerary.fromJson(
+        _judgedItineraryJson(
+          stairAccess: 'STEP_FREE',
+          legStairAccess: 'NOT_APPLICABLE',
+        ),
+      );
+      expect(withJudgment.stairAccess, 'STEP_FREE');
+      expect(withJudgment.legs.single.stairAccess, 'NOT_APPLICABLE');
+
+      final legacy = RouteSearchV2Itinerary.fromJson(_judgedItineraryJson());
+      expect(legacy.stairAccess, '');
+      expect(legacy.legs.single.stairAccess, '');
+    });
+  });
+}
+
+/// #2590 판정 필드를 실은 leg. [stairAccess]가 비면 판정 필드가 없는 레거시 응답이다.
+RouteSearchV2Leg _judgedLeg({
+  required String legType,
+  required String stairAccess,
+  int stairCount = 0,
+  int unknownAccessibilityCount = 0,
+  int generatedConnectorCount = 0,
+  int staleDataCount = 0,
+  int lowConfidenceCount = 0,
+  int unavailableFacilityCount = 0,
+}) {
+  final isRide = legType == 'RIDE';
+  return RouteSearchV2Leg(
+    legType: legType,
+    fromStationId: 'station-a',
+    toStationId: 'station-b',
+    fromNodeId: '',
+    toNodeId: '',
+    lineId: 'line-4',
+    tripId: isRide ? 'trip-1' : '',
+    trainNo: isRide ? '4001' : '',
+    plannedDepartureTime: '2026-06-30T09:17:00+09:00',
+    realtimeDepartureTime: null,
+    plannedArrivalTime: '2026-06-30T09:42:00+09:00',
+    realtimeArrivalTime: null,
+    waitTimeSeconds: 0,
+    slackSeconds: 0,
+    durationSeconds: 1500,
+    distanceMeters: 12000,
+    etaSource: 'PLANNED',
+    confidence: 'MEDIUM',
+    accessibilityRisk: RouteSearchV2AccessibilityRisk(
+      stairCount: stairCount,
+      unknownAccessibilityCount: unknownAccessibilityCount,
+      generatedConnectorCount: generatedConnectorCount,
+      staleDataCount: staleDataCount,
+      lowConfidenceCount: lowConfidenceCount,
+      unavailableFacilityCount: unavailableFacilityCount,
+      riskLevel: 'LOW',
+      reasonCodes: const [],
+      level: 'LOW',
+      reasons: const [],
+    ),
+    stairAccess: stairAccess,
+    serviceClass: isRide ? 'SUBWAY' : null,
+    servicePattern: isRide ? 'LOCAL' : null,
+  );
+}
+
+RouteSearchResult _judgedDisplay({
+  required String stairAccess,
+  required List<RouteSearchV2Leg> legs,
+}) {
+  final itinerary = RouteSearchV2Itinerary(
+    itineraryId: 'route-judged',
+    status: 'FOUND',
+    plannedArrivalTime: '2026-06-30T09:42:00+09:00',
+    realtimeArrivalTime: null,
+    etaSource: 'PLANNED',
+    etaConfidence: 'MEDIUM',
+    durationSeconds: 1620,
+    transferCount: 0,
+    walkingDistanceMeters: 80,
+    accessibilityRisk: const RouteSearchV2AccessibilityRisk(
+      stairCount: 0,
+      unknownAccessibilityCount: 0,
+      generatedConnectorCount: 0,
+      staleDataCount: 0,
+      lowConfidenceCount: 0,
+      unavailableFacilityCount: 0,
+      riskLevel: 'LOW',
+      reasonCodes: [],
+      level: 'LOW',
+      reasons: [],
+    ),
+    legs: legs,
+    commercialEtaEligible: false,
+    stairAccess: stairAccess,
+  );
+  return RouteSearchResult.fromV2(
+    _objectiveResult([itinerary]),
+    objective: RouteObjective.fastest,
+  );
+}
+
+Map<String, Object?> _judgedItineraryJson({
+  String? stairAccess,
+  String? legStairAccess,
+}) {
+  final leg = _rideLegJson();
+  if (legStairAccess != null) {
+    leg['stairAccess'] = legStairAccess;
+  }
+  return <String, Object?>{
+    'itineraryId': 'route-judged',
+    'status': 'FOUND',
+    'plannedArrivalTime': '2026-06-30T09:42:00+09:00',
+    'realtimeArrivalTime': null,
+    'etaSource': 'PLANNED',
+    'etaConfidence': 'MEDIUM',
+    'durationSeconds': 1620,
+    'transferCount': 0,
+    'walkingDistanceMeters': 80,
+    'accessibilityRisk': <String, Object?>{
+      'stairCount': 0,
+      'unknownAccessibilityCount': 0,
+      'generatedConnectorCount': 0,
+      'staleDataCount': 0,
+      'lowConfidenceCount': 0,
+      'unavailableFacilityCount': 0,
+      'riskLevel': 'LOW',
+      'reasonCodes': <String>[],
+      'level': 'LOW',
+      'reasons': <String>[],
+    },
+    'legs': <Object?>[leg],
+    'commercialEtaEligible': false,
+    'stairAccess': ?stairAccess,
+  };
 }
 
 class _ManualRouteSearchRepository implements RouteSearchRepository {

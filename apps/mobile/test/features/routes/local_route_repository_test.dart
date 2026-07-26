@@ -2305,6 +2305,74 @@ void main() {
     expect(rideStep.confidenceLabel, '');
   });
 
+  test('#2590 로컬 폴백의 승차 구간은 계단 개념 비적용으로 표기한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'ride-a-b-step-free',
+      fromNodeId: 'station-a:line-test:LOCAL',
+      toNodeId: 'station-b:line-test:LOCAL',
+      edgeType: 'RIDE',
+      durationSeconds: 120,
+      distanceMeters: 830,
+    );
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'SENIOR',
+      ),
+    );
+
+    final rideStep = result.steps.singleWhere(
+      (step) => step.stepType == 'ride',
+    );
+    expect(rideStep.stairAccessState, 'notApplicable');
+    expect(result.stairAccessLabel, '계단 없는 길이에요');
+  });
+
+  test('#2590 데이터팩이 승차 구간에 미확인을 명시하면 무단차로 승격하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, distance_meters,
+        edge_type, stair_access_state, accessibility_status, reliability_score
+      )
+      VALUES (
+        'ride-a-b-unknown-stair',
+        'station-a:line-test:LOCAL',
+        'station-b:line-test:LOCAL',
+        120,
+        830,
+        'RIDE',
+        'UNKNOWN',
+        'AVAILABLE',
+        95
+      )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'SENIOR',
+      ),
+    );
+
+    final rideStep = result.steps.singleWhere(
+      (step) => step.stepType == 'ride',
+    );
+    expect(rideStep.stairAccessState, 'unknown');
+    expect(result.stairAccessLabel, '계단 여부를 확인하고 있어요');
+  });
+
   test('로컬 경로 추천 이유와 음성 안내는 선택 경로에 없는 계단 차단 근거를 말하지 않는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
