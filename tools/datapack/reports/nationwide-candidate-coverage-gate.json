@@ -57,7 +57,7 @@
     },
     "spec": {
       "path": "tools/datapack/nationwide-candidate-pack-spec.json",
-      "sha256": "fe03f5df996cb6f1347dc9cefe333cfff00b6c568dfdc2a83c8cdd88f9f6b3d2"
+      "sha256": "6424e03e1e311b8055efccaeb34bf50b3092233d810190a9dd62d010869ae59f"
     },
     "targets": {
       "path": "tools/datapack/nationwide-coverage-targets.json",

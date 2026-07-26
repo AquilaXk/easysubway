@@ -82,6 +82,47 @@ const INCLUSION_CHAIN = [
 ];
 // 부산 편입 인덱스(대구 3건 뒤에 이어 붙는다).
 const BUSAN_TOPOLOGY_INDEX = DAEGU_MATERIALIZERS.length;
+// 부산 편입 4종의 결속 지점·신선도 창 축. 결속 회귀를 편입 하나로만 두면 나머지 편입의 가드가 풀려도
+// 회귀가 침묵하므로(네 편입 모두 실측상 fail closed다) 이 표로 편입별로 돌린다. 경로·창 값은 admission
+// 정본(source-inventory)에서 끌어오고, 창 밖 진단은 판정 지점이 materializer마다 달라 문구가 갈리므로
+// 편입별 패턴으로 고정한다.
+const BUSAN_INCLUSION_BINDINGS = [
+  {
+    labelKo: "topology",
+    slug: "route-topology",
+    offset: 0,
+    sourceId: "busan-transportation-route-topology",
+    evidenceKey: "topologyAdmissionEvidence",
+    stalePinPattern: /Busan route topology admission stale snapshot is rejected/,
+  },
+  {
+    labelKo: "시각표",
+    slug: "timetable",
+    offset: 1,
+    sourceId: "busan-transportation-timetable",
+    evidenceKey: "scheduleAdmissionEvidence",
+    stalePinPattern: /busan-transportation-timetable evidence freshness is invalid/,
+  },
+  {
+    labelKo: "노선도",
+    slug: "route-map-positions",
+    offset: 2,
+    sourceId: "busan-transportation-route-map-positions",
+    evidenceKey: "routeMapAdmissionEvidence",
+    stalePinPattern: /busan-transportation-route-map-positions inventory evidence does not match snapshot/,
+  },
+  {
+    labelKo: "편의시설",
+    slug: "accessibility",
+    offset: 3,
+    sourceId: "busan-transportation-accessibility",
+    evidenceKey: "accessibilityAdmissionEvidence",
+    stalePinPattern: /busan-transportation-accessibility evidence freshness is invalid/,
+  },
+];
+const [BUSAN_TOPOLOGY_BINDING, , BUSAN_ROUTE_MAP_BINDING] = BUSAN_INCLUSION_BINDINGS;
+const admissionEvidenceOf = (inventory, sourceId, evidenceKey) =>
+  inventory.sources.find(({ id }) => id === sourceId)[evidenceKey];
 
 const INPUT_PATHS = {
   spec: SPEC_PATH,
@@ -324,7 +365,8 @@ test("대구 route_map/accessibility 6 requirement는 체인 편입으로 MISSIN
     );
   }
 
-  // 체인 편입이 실제로 실은 행수. 노선도 좌표 91역, 편의시설 94역 × 3종 = 282행이며 각 편입은
+  // 체인 편입이 실제로 실은 행수. 두 표 모두 축이 역이 아니라 역·노선 쌍이다(고유 역 91 / 역·노선 쌍
+  // 94) — 노선도 좌표 91 역·노선 쌍, 편의시설 94 역·노선 쌍 × 3종 = 282행이며 각 편입은
   // 소스 등재 1건씩만 더한다(승계 행과 앞선 편입 행은 그대로여야 한다).
   const [, routeMap, accessibility] = evidence.packDataInclusions.entries;
   assert.equal(routeMap.addedRows.routeMapPositions, 91);
@@ -338,8 +380,7 @@ test("대구 route_map/accessibility 6 requirement는 체인 편입으로 MISSIN
   // 조립은 통과한다(실측). 대신 각 pin이 그 소스의 admission 창 안인지를 직접 본다. 창의 모양은
   // 소스마다 다르다.
   const inventory = await readJson(INVENTORY_PATH);
-  const admissionEvidence = (sourceId, evidenceKey) =>
-    inventory.sources.find(({ id }) => id === sourceId)[evidenceKey];
+  const admissionEvidence = (sourceId, evidenceKey) => admissionEvidenceOf(inventory, sourceId, evidenceKey);
   const pins = new Map(evidence.packDataInclusions.entries.map(
     ({ materializer, materializedAt }) => [materializer, Date.parse(materializedAt)],
   ));
@@ -453,7 +494,8 @@ test("부산 20 requirement는 체인 편입으로 MISSING에서 SUPPORTED로 �
   // 대상이며, 뒤 편입은 그 표를 0으로 선언해야 대조를 통과한다.
   assert.equal(routeMap.addedRows.routeMapLineTracks, 4);
   assert.equal(accessibility.addedRows.routeMapLineTracks, 0);
-  // 114역 × 3종(엘리베이터·에스컬레이터·휠체어리프트). 미설치도 NOT_EXISTS 근거로 함께 실린다.
+  // 114 역·노선 쌍 × 3종(엘리베이터·에스컬레이터·휠체어리프트). 축은 역이 아니라 역·노선 쌍이라 고유 역
+  // 108과 갈린다 — 두 노선에 걸친 환승역 6곳은 6행씩 낸다. 미설치도 NOT_EXISTS 근거로 함께 실린다.
   assert.equal(accessibility.addedRows.facilities, 342);
   assert.equal(accessibility.addedRows.stationFacilityEvidence, 342);
   assert.equal(accessibility.addedRows.routeMapPositions, 0);
@@ -461,8 +503,7 @@ test("부산 20 requirement는 체인 편입으로 MISSING에서 SUPPORTED로 �
   // pin은 편입마다 따로 두고 각각 그 소스의 admission 창 안이어야 한다. 부산 4소스의 창은 모양이 갈린다 —
   // topology·시각표·편의시설은 [capturedAt, freshUntil) 양끝을 검사하고 노선도는 상한이 없다.
   const inventory = await readJson(INVENTORY_PATH);
-  const admissionEvidence = (sourceId, evidenceKey) =>
-    inventory.sources.find(({ id }) => id === sourceId)[evidenceKey];
+  const admissionEvidence = (sourceId, evidenceKey) => admissionEvidenceOf(inventory, sourceId, evidenceKey);
   const boundedWindows = [
     [topology, "busan-transportation-route-topology", "topologyAdmissionEvidence"],
     [timetable, "busan-transportation-timetable", "scheduleAdmissionEvidence"],
@@ -476,11 +517,24 @@ test("부산 20 requirement는 체인 편입으로 MISSING에서 SUPPORTED로 �
   const routeMapEvidence = admissionEvidence("busan-transportation-route-map-positions", "routeMapAdmissionEvidence");
   assert.equal(routeMapEvidence.freshUntil, undefined, "부산 노선도 admission 정본에도 상한이 없다");
   assert.ok(Date.parse(routeMap.materializedAt) >= Date.parse(routeMapEvidence.capturedAt), "노선도 창 하한");
-  // 편의시설 창은 나머지 세 창과 서로소다 — 부산 편입은 pin 하나로 묶는 것이 애초에 불가능하다.
+  // 편의시설 창은 상한이 있는 두 창(topology·시각표)과 서로소다 — 그 셋은 pin 하나로 묶는 것이 애초에
+  // 불가능하다. 다만 "부산 네 창이 전부 서로소"는 아니다: 노선도 창은 상한이 없어 [capturedAt, ∞)이고
+  // 편의시설 창을 통째로 품는다(실측: 노선도 pin을 편의시설 capturedAt으로 옮기면 조립이 통과하고
+  // 시각표 capturedAt으로 옮기면 거부된다). 그 포함 관계까지 함께 고정한다.
+  const accessibilityWindow = admissionEvidence("busan-transportation-accessibility", "accessibilityAdmissionEvidence");
+  for (const [sourceId, evidenceKey] of [
+    ["busan-transportation-route-topology", "topologyAdmissionEvidence"],
+    ["busan-transportation-timetable", "scheduleAdmissionEvidence"],
+  ]) {
+    assert.ok(
+      Date.parse(admissionEvidence(sourceId, evidenceKey).freshUntil)
+        <= Date.parse(accessibilityWindow.capturedAt),
+      `${sourceId} 창은 편의시설 창보다 앞에서 닫혀 겹치지 않는다`,
+    );
+  }
   assert.ok(
-    Date.parse(admissionEvidence("busan-transportation-timetable", "scheduleAdmissionEvidence").freshUntil)
-      <= Date.parse(admissionEvidence("busan-transportation-accessibility", "accessibilityAdmissionEvidence").capturedAt),
-    "편의시설 창은 시각표 창보다 뒤에 있어 겹치지 않는다",
+    Date.parse(routeMapEvidence.capturedAt) <= Date.parse(accessibilityWindow.capturedAt),
+    "상한 없는 노선도 창은 편의시설 창을 통째로 품는다",
   );
 });
 
@@ -773,13 +827,13 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
   // 노선도 정본에는 바이트 축(snapshotSha256)이 있지만 바이트 동일 사본은 그 축을 그대로 지난다.
   // 사본은 하네스가 읽을 수 있게 저장소 안에 두되 gitignore된 tmp/ 아래에 둔다(강제 종료 시 tracked
   // 디렉터리에 잔재가 남지 않게).
-  async function rejectsSnapshotCopy({ index, sourcePath, copyName, serialize, expected }) {
+  async function rejectsSnapshotCopy({ index, key = "snapshotPath", sourcePath, copyName, serialize, expected }) {
     const copyDir = path.join(root, "tmp", `nationwide-candidate-gate-copy-${process.pid}-${Date.now()}`);
     await mkdir(copyDir, { recursive: true });
     const copyPath = path.relative(root, path.join(copyDir, copyName));
     await writeFile(path.join(root, copyPath), serialize(await readFile(path.join(root, sourcePath))));
     try {
-      await rejectsWith((value) => { value.packDataInclusions[index].snapshotPath = copyPath; }, expected);
+      await rejectsWith((value) => { value.packDataInclusions[index][key] = copyPath; }, expected);
     } finally {
       await rm(copyDir, { recursive: true, force: true });
     }
@@ -897,39 +951,46 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
     );
   });
 
-  // 부산 편입은 대구와 달리 편입 층 경로 키만 쓴다(topology snapshot이 4노선 한 파일). 그 키들도 전부
-  // admission 정본 경로에 결속돼 저장소 안 사본을 가리킬 수 없다.
-  await context.test("부산 편입이 admission 정본 밖 바이트 동일 사본을 가리키면 거부된다", async () => {
-    await rejectsSnapshotCopy({
-      index: BUSAN_TOPOLOGY_INDEX,
-      sourcePath: "tools/datapack/sources/busan-transportation-route-topology-20260720.json",
-      copyName: "busan-topology-copy.json",
-      serialize: (bytes) => bytes,
-      expected:
-        /snapshotPath must match the busan-transportation-route-topology admission evidence snapshotPath/,
+  // 부산 편입은 대구와 달리 편입 층 경로 키만 쓴다(topology snapshot이 4노선 한 파일). 편입 4종의
+  // snapshotPath와, topology 계보를 읽는 뒤 세 편입의 topologySnapshotPath가 admission 정본 경로에
+  // 결속돼 있다 — 결속 지점을 하나만 덮으면 나머지가 풀려도 회귀가 침묵하므로 편입별로 돈다.
+  //
+  // 다만 "부산 편입의 경로 키가 전부 정본 경로에 결속"은 아니다: topology 편입의 stationMapPath에는
+  // 경로 결속이 없고 admission 정본의 membership.mappingSha256(파싱 결과에서 파생된 내용 해시)만
+  // 판정에 쓴다. 부산권 행만 남긴 축약 CSV(158줄, tracked 원본 302줄)를 gitignore된 tmp/ 아래에 두고
+  // 가리켜도 조립이 그대로 통과한다(실측) — 이 키의 결속 축은 경로가 아니라 내용 해시다.
+  for (const { labelKo, slug, offset, sourceId, evidenceKey } of BUSAN_INCLUSION_BINDINGS) {
+    await context.test(`부산 ${labelKo} 편입 snapshotPath가 정본 밖 바이트 동일 사본이면 거부된다`, async () => {
+      await rejectsSnapshotCopy({
+        index: BUSAN_TOPOLOGY_INDEX + offset,
+        sourcePath: admissionEvidenceOf(inventory, sourceId, evidenceKey).snapshotPath,
+        copyName: `busan-${slug}-copy.json`,
+        // 바이트를 그대로 옮긴다 — materializer의 바이트·내용 대조만으로는 사본이 통과한다(실측).
+        serialize: (bytes) => bytes,
+        expected: new RegExp(`snapshotPath must match the ${sourceId} admission evidence snapshotPath`),
+      });
     });
-  });
+  }
 
-  await context.test("부산 노선도 편입의 topology 입력이 정본 밖 사본이면 거부된다", async () => {
-    const copyDir = path.join(root, "tmp", `nationwide-candidate-gate-copy-${process.pid}-${Date.now()}`);
-    await mkdir(copyDir, { recursive: true });
-    const copyPath = path.relative(root, path.join(copyDir, "busan-topology-copy.json"));
-    // 재직렬화 사본도 contentSha256(내용 파생)은 그대로라 materializer의 계보 대조만으로는 통과한다.
-    await writeFile(
-      path.join(root, copyPath),
-      JSON.stringify(JSON.parse(
-        await readFile(path.join(root, "tools/datapack/sources/busan-transportation-route-topology-20260720.json"), "utf8"),
-      )),
-    );
-    try {
-      await rejectsWith(
-        (value) => { value.packDataInclusions[BUSAN_TOPOLOGY_INDEX + 2].topologySnapshotPath = copyPath; },
-        /snapshotPath must match the busan-transportation-route-topology admission evidence snapshotPath/,
-      );
-    } finally {
-      await rm(copyDir, { recursive: true, force: true });
-    }
-  });
+  for (const { labelKo, slug, offset } of BUSAN_INCLUSION_BINDINGS.slice(1)) {
+    await context.test(`부산 ${labelKo} 편입 topologySnapshotPath가 정본 밖 사본이면 거부된다`, async () => {
+      await rejectsSnapshotCopy({
+        index: BUSAN_TOPOLOGY_INDEX + offset,
+        key: "topologySnapshotPath",
+        sourcePath: admissionEvidenceOf(
+          inventory,
+          BUSAN_TOPOLOGY_BINDING.sourceId,
+          BUSAN_TOPOLOGY_BINDING.evidenceKey,
+        ).snapshotPath,
+        copyName: `busan-${slug}-topology-copy.json`,
+        // 재직렬화 사본도 contentSha256(내용 파생)은 그대로라 materializer의 계보 대조만으로는 통과한다.
+        serialize: (bytes) => JSON.stringify(JSON.parse(bytes.toString("utf8"))),
+        expected: new RegExp(
+          `snapshotPath must match the ${BUSAN_TOPOLOGY_BINDING.sourceId} admission evidence snapshotPath`,
+        ),
+      });
+    });
+  }
 
   // 부산 lines 선언은 장식이 아니다 — 저장소 정본(BUSAN_LINES)과 대조하지 않으면 틀린 노선 구성이
   // 그대로 통과해 evidence의 선언과 실제 조립이 갈린다.
@@ -948,14 +1009,32 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
     );
   });
 
-  await context.test("부산 편의시설 편입 기준 시각을 신선도 창 밖으로 옮기면 거부된다", async () => {
-    await rejectsWith(
-      (value) => {
-        value.packDataInclusions[BUSAN_TOPOLOGY_INDEX + 3].materializedAt = "2026-07-25T00:19:05.836Z";
-      },
-      /busan-transportation-accessibility evidence freshness is invalid/,
-    );
-  });
+  // pin 창 회귀도 편입 단위다. 편입 하나의 창만 덮으면 나머지 세 창이 풀려도 침묵하는데, 창 모양이
+  // 편입마다 갈리므로(양끝 검사 3편입 / 하한만 1편입) 한 편입의 통과가 다른 편입의 근거가 되지도
+  // 않는다. 창 값은 admission 정본에서 끌어와 하한 직전(capturedAt - 1ms)과 상한 정각(freshUntil,
+  // 반개구간이라 이미 창 밖)을 각각 때린다.
+  for (const { labelKo, offset, sourceId, evidenceKey, stalePinPattern } of BUSAN_INCLUSION_BINDINGS) {
+    const { capturedAt, freshUntil } = admissionEvidenceOf(inventory, sourceId, evidenceKey);
+    await context.test(`부산 ${labelKo} 편입 기준 시각을 창 하한 미만으로 옮기면 거부된다`, async () => {
+      await rejectsWith(
+        (value) => {
+          value.packDataInclusions[BUSAN_TOPOLOGY_INDEX + offset].materializedAt =
+            new Date(Date.parse(capturedAt) - 1).toISOString();
+        },
+        stalePinPattern,
+      );
+    });
+    // 노선도 편입의 창에는 상한이 없다 — 그 비대칭은 아래 별도 축이 "먼 미래 pin도 통과한다"로 고정한다.
+    if (freshUntil === undefined) continue;
+    await context.test(`부산 ${labelKo} 편입 기준 시각을 창 상한 이상으로 옮기면 거부된다`, async () => {
+      await rejectsWith(
+        (value) => {
+          value.packDataInclusions[BUSAN_TOPOLOGY_INDEX + offset].materializedAt = freshUntil;
+        },
+        stalePinPattern,
+      );
+    });
+  }
 
   // B2-a 재기술도 B0 파일럿과 같은 축에 묶여 있다: spec만 고쳐서 전환 범위를 넓힐 수 없다.
   // snapshot 근거가 없는 노선을 spec 내부 정합을 맞춰 끼워 넣어도 admission 정본 결속이 막는다.
@@ -974,6 +1053,47 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
       /source inventory coverageScope\.lineIds must match the spec redescription/,
     );
   });
+});
+
+// 부산 편입 넷 중 노선도만 신선도 창에 상한이 없다 — admission 정본에 freshUntil이 없고 materializer도
+// 하한(capturedAt 이후)만 검사한다. 하한 미만은 위 회귀가 fail closed로 고정하지만 상한 쪽에는 가드가
+// 아예 없어 100년 뒤 pin도 조립을 완주하고 판정까지 그대로 낸다. 상한 도입은 materializer 쪽 판단이라
+// 이 하네스가 동작으로 바꾸지 않고, 그 비대칭이 의도된 기록이라는 것을 성질 자체로 고정한다 — 나중에
+// 상한이 생기면 이 단언이 깨져 spec·evidence 서술까지 함께 고치도록 강제한다.
+test("부산 노선도 편입은 상한이 없어 먼 미래 기준 시각도 조립을 통과한다", async () => {
+  const spec = await readJson(SPEC_PATH);
+  const inventory = await readJson(INVENTORY_PATH);
+  const { capturedAt, freshUntil } = admissionEvidenceOf(
+    inventory,
+    BUSAN_ROUTE_MAP_BINDING.sourceId,
+    BUSAN_ROUTE_MAP_BINDING.evidenceKey,
+  );
+  assert.equal(freshUntil, undefined, "이 축은 노선도 정본에 상한이 없다는 전제 위에 있다");
+  const farFuture = capturedAt.replace(/^\d{4}/, (year) => String(Number(year) + 100));
+  const index = BUSAN_TOPOLOGY_INDEX + BUSAN_ROUTE_MAP_BINDING.offset;
+  spec.packDataInclusions[index].materializedAt = farFuture;
+
+  const workspace = await mkdtemp(path.join(tmpdir(), "nationwide-candidate-gate-unbounded-"));
+  try {
+    const evidence = await runNationwideCandidateCoverageGate({
+      spec,
+      specInput: { path: SPEC_PATH, sha256: "a".repeat(64) },
+      targetsInput: { path: TARGETS_PATH, sha256: "b".repeat(64) },
+      inventory,
+      inventoryInput: { path: INVENTORY_PATH, sha256: "c".repeat(64) },
+      resolutionPlanInput: { path: RESOLUTION_PLAN_PATH, sha256: "d".repeat(64) },
+      resolutionsInput: { path: RESOLUTIONS_PATH, sha256: "e".repeat(64) },
+      workDir: workspace,
+    });
+    assert.equal(evidence.packDataInclusions.entries[index].materializedAt, farFuture);
+    // 조립만 통과하는 것이 아니라 전이 판정도 그대로다 — 상한 부재가 판정에 남기는 흔적이 없다.
+    assert.deepEqual(
+      evidence.transitions.map(({ requirementKey }) => requirementKey),
+      [PILOT_REQUIREMENT_KEY, ...DAEGU_REQUIREMENT_KEYS, ...BUSAN_REQUIREMENT_KEYS].sort(),
+    );
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
 });
 
 // 승계 행 불변 축은 행수가 그대로인 변조를 잡으므로 addedRows 대조가 대신 지켜 주지 못한다.

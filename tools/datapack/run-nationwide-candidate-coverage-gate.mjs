@@ -133,7 +133,12 @@ const PACK_DATA_MATERIALIZERS = new Map([
     inputs: { paths: ["snapshotPath", "topologySnapshotPath"], linePaths: [] },
   }],
 ]);
+// 부산 편입이 admission 정본을 찾을 때 쓰는 소스 id. 네 편입 모두 상수로 두어 문자열이 어댑터마다
+// 인라인으로 흩어지지 않게 한다.
 const BUSAN_TOPOLOGY_SOURCE_ID = "busan-transportation-route-topology";
+const BUSAN_TIMETABLE_SOURCE_ID = "busan-transportation-timetable";
+const BUSAN_ROUTE_MAP_SOURCE_ID = "busan-transportation-route-map-positions";
+const BUSAN_ACCESSIBILITY_SOURCE_ID = "busan-transportation-accessibility";
 // 형상과 무관하게 모든 편입 레코드가 갖는 키. 나머지 허용 키는 등재 형상의 경로 키와 아래 서술 키뿐이다.
 const INCLUSION_BASE_KEYS = Object.freeze(["regionId", "materializer", "materializedAt", "lines", "addedRows"]);
 const INCLUSION_LINE_BASE_KEYS = Object.freeze(["lineNumber", "lineId"]);
@@ -434,7 +439,7 @@ async function materializeBusanTimetableInclusion(fixture, inclusion, { readTrac
   assertBusanLines(inclusion);
   assertAdmissionSnapshotPath(
     inventory,
-    "busan-transportation-timetable",
+    BUSAN_TIMETABLE_SOURCE_ID,
     "scheduleAdmissionEvidence",
     inclusion.snapshotPath,
   );
@@ -458,7 +463,7 @@ async function materializeBusanRouteMapInclusion(fixture, inclusion, { readTrack
   assertBusanLines(inclusion);
   assertAdmissionSnapshotPath(
     inventory,
-    "busan-transportation-route-map-positions",
+    BUSAN_ROUTE_MAP_SOURCE_ID,
     "routeMapAdmissionEvidence",
     inclusion.snapshotPath,
   );
@@ -480,7 +485,7 @@ async function materializeBusanAccessibilityInclusion(fixture, inclusion, { read
   assertBusanLines(inclusion);
   assertAdmissionSnapshotPath(
     inventory,
-    "busan-transportation-accessibility",
+    BUSAN_ACCESSIBILITY_SOURCE_ID,
     "accessibilityAdmissionEvidence",
     inclusion.snapshotPath,
   );
