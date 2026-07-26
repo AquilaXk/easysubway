@@ -374,15 +374,20 @@ class RouteSearchController {
 	}
 
 	/**
-	 * 계단 판정을 응답에 싣기 전에 "확인되지 않은 근거"를 반영한다(#2590 정직성 제약).
-	 * {@code stairAccessState}의 {@code UNKNOWN}은 판정 결과가 아니라 미확인 원자료이고,
-	 * 접근성 리스크 사유(GENERATED_CONNECTOR_UNVERIFIED·STALE_ACCESSIBILITY_DATA·
-	 * LOW_DATA_CONFIDENCE·FACILITY_UNAVAILABLE)도 무단차 단언을 막는다.
+	 * 응답에 실을 leg 계단 판정(#2590 정직성 제약). {@link StairAccess#ofStep(RouteStep)}은
+	 * #2560 태깅 술어와 같은 계단 사실만 보므로, 여기서 데이터 신뢰도 축을 겹쳐 한 단계 내린다.
+	 *
+	 * <p>{@code unverifiedItinerary}는 경로 단위 신뢰도 경고다. 특정 leg에 매달 수 없는
+	 * 신호지만 모든 leg에 내려 주지 않으면 leg 판정이 경로 판정보다 강하게 단언하게 되고,
+	 * 경로 판정을 잃은 화면(폴백·스냅샷)이 그 강한 값을 그대로 표시한다.
+	 *
+	 * <p>{@code stairAccessState}의 {@code UNKNOWN}은 판정이 아니라 미확인 원자료라
+	 * {@code requiresAccessibilityCheck}와 어긋난 스텝이 무단차로 새지 않게 함께 막는다.
+	 * 승차 구간은 {@link StairAccess#NOT_APPLICABLE}이라 이 강등에 걸리지 않는다.
 	 */
-	private static StairAccess stairAccessOf(RouteStep step) {
-		AccessibilityRiskDto risk = AccessibilityRiskDto.from(step);
+	private static StairAccess legStairAccess(RouteStep step, boolean unverifiedItinerary) {
 		return StairAccess.ofStep(step)
-			.demotedIfUnverified("UNKNOWN".equals(step.stairAccessState()) || risk.hasUnverifiedEvidence());
+			.demotedIfUnverified(unverifiedItinerary || "UNKNOWN".equals(step.stairAccessState()));
 	}
 
 	private record ItineraryDto(
@@ -404,7 +409,9 @@ class RouteSearchController {
 	) {
 
 		private static ItineraryDto from(RouteSearchResult result, OffsetDateTime departureTime, String mobilityPreset) {
-			List<LegDto> legs = LegDto.fromSteps(result.steps(), departureTime, result.mobilityType(), mobilityPreset);
+			boolean unverifiedItinerary = StairAccess.hasUnverifiedEvidence(result.warnings());
+			List<LegDto> legs = LegDto.fromSteps(
+				result.steps(), departureTime, result.mobilityType(), mobilityPreset, unverifiedItinerary);
 			OffsetDateTime plannedArrivalTime = legs.isEmpty()
 				? departureTime
 				: OffsetDateTime.parse(legs.getLast().plannedArrivalTime());
@@ -425,18 +432,31 @@ class RouteSearchController {
 				OfficialFareDto.from(result.officialFare()),
 				legs,
 				false,
-				itineraryStairAccess(result, accessibilityRisk).name()
+				itineraryStairAccess(result, legs, unverifiedItinerary).name()
 			);
 		}
 
-		// leg 판정을 접어 올려 경로 판정을 만든다 — 화면이 leg를 훑어 다시 계산할 여지를
-		// 남기지 않는다. STAIR_ONLY_ACCESS 경고는 StairAccess.ofItinerary가 반영하므로
-		// 병합으로 받는다.
-		private static StairAccess itineraryStairAccess(RouteSearchResult result, AccessibilityRiskDto accessibilityRisk) {
-			return StairAccess
-				.ofStepJudgments(result.steps().stream().map(RouteSearchController::stairAccessOf).toList())
-				.merge(StairAccess.ofItinerary(result))
-				.demotedIfUnverified(accessibilityRisk.hasUnverifiedEvidence());
+		/**
+		 * leg 판정을 접어 올려 경로 판정을 만든다. 여기에 겹치는 두 신호는 어느 leg에도
+		 * 매달 수 없는 경로 단위 신호다 — 계단 경고와, 계단 장벽을 질 수 있는 leg가 하나도
+		 * 없는 경로의 신뢰도 강등. 그래서 경로 판정은 leg를 접은 값보다 결코 덜 신중하지 않다.
+		 *
+		 * <p>leg가 하나도 없으면 무단차라 말할 근거 자체가 없으므로 fail closed로 멈춘다.
+		 * 모바일 폴백(`_routeStairAccessFromSteps`)의 빈 목록 규칙과 같은 판단이다.
+		 * #2560 태깅 술어({@link StairAccess#ofItinerary})는 후보 집합을 흔들지 않도록
+		 * 종전 규칙을 유지하며, 그 갈래는 완결성 계약상 응답에 실릴 수 없다.
+		 */
+		private static StairAccess itineraryStairAccess(
+			RouteSearchResult result,
+			List<LegDto> legs,
+			boolean unverifiedItinerary
+		) {
+			StairAccess folded = legs.isEmpty()
+				? StairAccess.UNKNOWN
+				: StairAccess.ofStepJudgments(legs.stream().map(leg -> StairAccess.valueOf(leg.stairAccess())).toList());
+			return folded
+				.merge(StairAccess.ofWarnings(result.warnings()))
+				.demotedIfUnverified(unverifiedItinerary);
 		}
 
 		private static String statusOf(RouteSearchResult result) {
@@ -490,7 +510,9 @@ class RouteSearchController {
 			int unknownAccessibilityCount = Math.toIntExact(result.steps().stream()
 				.filter(step -> "UNKNOWN".equals(step.stairAccessState()))
 				.count());
-			// Keep the V2 response shape stable until route warnings expose these signals.
+			// RouteWarningCode에 대응 값이 없어 늘 0인 자리다. 응답 형태를 유지하려 남겨 두되,
+			// 계단 판정은 이 카운터가 아니라 경고 코드를 직접 분류하는 StairAccess가 내린다 —
+			// 새 사유가 생겨도 0에 걸려 무단차 단언을 통과시키는 fail open이 생기지 않는다.
 			int generatedConnectorCount = 0;
 			int staleDataCount = countWarning(result.warnings(), RouteWarningCode.STALE_ACCESSIBILITY_DATA);
 			int lowConfidenceCount = countWarning(result.warnings(), RouteWarningCode.LOW_DATA_CONFIDENCE);
@@ -522,10 +544,13 @@ class RouteSearchController {
 			List<String> reasonCodes = reasonCodesFrom(step);
 			int stairCount = step.includesStairs() ? 1 : 0;
 			int unknownAccessibilityCount = "UNKNOWN".equals(step.stairAccessState()) ? 1 : 0;
-			int generatedConnectorCount = countReason(reasonCodes, "GENERATED_CONNECTOR_UNVERIFIED");
-			int staleDataCount = countReason(reasonCodes, "STALE_ACCESSIBILITY_DATA");
-			int lowConfidenceCount = countReason(reasonCodes, "LOW_DATA_CONFIDENCE");
-			int unavailableFacilityCount = countReason(reasonCodes, "FACILITY_UNAVAILABLE");
+			// reasonCodesFrom(RouteStep)이 만드는 사유는 STAIR_ONLY_ACCESS·ACCESSIBILITY_CHECK_REQUIRED
+			// 둘뿐이라 아래 네 카운터는 leg에서 구조적으로 늘 0이다. 응답 형태를 위해 자리만 유지하며,
+			// 신뢰도 사유를 실제로 반영하는 것은 경로 단위 경고를 분류하는 StairAccess다.
+			int generatedConnectorCount = 0;
+			int staleDataCount = 0;
+			int lowConfidenceCount = 0;
+			int unavailableFacilityCount = 0;
 			String riskLevel = riskLevel(
 				RouteSearchStatus.FOUND,
 				stairCount,
@@ -547,15 +572,6 @@ class RouteSearchController {
 				legacyLevel(riskLevel),
 				reasonCodes
 			);
-		}
-
-		// 계단 사실과 무관하게 "확인되지 않았다"를 말하는 사유들. unknownAccessibilityCount는
-		// stairAccessState를 그대로 옮긴 원자료라 여기 넣지 않는다 — 그 해석은 StairAccess가 한다.
-		private boolean hasUnverifiedEvidence() {
-			return generatedConnectorCount > 0
-				|| staleDataCount > 0
-				|| lowConfidenceCount > 0
-				|| unavailableFacilityCount > 0;
 		}
 
 		private static List<String> reasonCodesFrom(RouteSearchResult result) {
@@ -581,12 +597,6 @@ class RouteSearchController {
 				reasonCodes.add("ACCESSIBILITY_CHECK_REQUIRED");
 			}
 			return List.copyOf(reasonCodes);
-		}
-
-		private static int countReason(List<String> reasonCodes, String reasonCode) {
-			return Math.toIntExact(reasonCodes.stream()
-				.filter(reasonCode::equals)
-				.count());
 		}
 
 		private static int countWarning(List<RouteWarning> warnings, RouteWarningCode warningCode) {
@@ -666,7 +676,8 @@ class RouteSearchController {
 			List<RouteStep> steps,
 			OffsetDateTime departureTime,
 			MobilityType mobilityType,
-			String mobilityPreset
+			String mobilityPreset,
+			boolean unverifiedItinerary
 		) {
 			List<LegDto> legs = new ArrayList<>();
 			OffsetDateTime cursor = departureTime;
@@ -681,7 +692,8 @@ class RouteSearchController {
 					? plannedDepartureTime.plusSeconds(durationSeconds)
 					: OffsetDateTime.parse(step.plannedArrivalTime());
 				durationSeconds = Math.toIntExact(Duration.between(plannedDepartureTime, plannedArrivalTime).toSeconds());
-				legs.add(from(step, legType, plannedDepartureTime, plannedArrivalTime, durationSeconds, slackSeconds, mobilityPreset));
+				legs.add(from(step, legType, plannedDepartureTime, plannedArrivalTime, durationSeconds, slackSeconds,
+					mobilityPreset, unverifiedItinerary));
 				cursor = plannedArrivalTime;
 			}
 			return List.copyOf(legs);
@@ -694,7 +706,8 @@ class RouteSearchController {
 			OffsetDateTime plannedArrivalTime,
 			int durationSeconds,
 			int slackSeconds,
-			String mobilityPreset
+			String mobilityPreset,
+			boolean unverifiedItinerary
 		) {
 			boolean hasTimetableWait = "TIMETABLE".equals(step.distanceSource()) && !"exit".equals(step.stepType());
 			int walkSeconds = walkSeconds(step, legType, durationSeconds, hasTimetableWait);
@@ -728,7 +741,7 @@ class RouteSearchController {
 				step.gatewayReceivedAt(),
 				step.servedAt(),
 				AccessibilityRiskDto.from(step),
-				stairAccessOf(step).name()
+				legStairAccess(step, unverifiedItinerary).name()
 			);
 		}
 
