@@ -59,6 +59,10 @@ dev_dependencies:
     sdk: flutter
 
   vector_graphics_compiler: ^1.2.6
+  # #2068 바탕층 .vec 텍스트 좌표 대조 게이트(basemap_vec_label_position_gate_test.dart)가
+  # 컴파일 산출 .vec를 디코드해 오너 SVG 좌표와 기계 대조하는 데 쓴다. 이미
+  # vector_graphics·vector_graphics_compiler의 전이 의존이라 잠금 버전은 그대로다.
+  vector_graphics_codec: ^1.1.13
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
