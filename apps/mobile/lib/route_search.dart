@@ -38,7 +38,6 @@ const _routeSearchTimeout = Duration(seconds: 8);
 const _routeSearchErrorMessage = '경로 정보를 불러오지 못했어요.';
 const _routeOnlineSearchErrorMessage = '실시간/서버 경로를 확인하지 못했어요.';
 const _routeRefreshErrorMessage = '도착 시간을 새로 확인하지 못했어요.';
-const _getOffAlarmCancelFailureMessage = '하차 알림을 취소하지 못했어요. 다시 시도해 주세요.';
 const _getOffAlarmRefreshRollbackMessage = '하차 알림을 갱신하지 못해 이전 경로를 유지해요.';
 const _getOffAlarmRefreshFailureMessage = '하차 알림을 새로 맞추지 못했어요. 이전 경로를 유지해요.';
 const _routeFeedbackErrorMessage = '의견을 보내지 못했어요.';
@@ -49,11 +48,12 @@ const _routeSearchFailureNextAction = '역을 다시 선택하거나 이동 조�
 const _routeFeedbackFailureNextAction = '잠시 후 다시 보내거나 경로 조건을 바꿔 다시 찾아보세요.';
 const _favoriteRouteSaveFailureNextAction =
     '네트워크 상태를 확인한 뒤 자주 쓰는 경로 저장을 다시 눌러 주세요.';
-// #2582 무단차 대안 전환 행 문구. 앱에 이미 있는 "계단 없는 …" 어휘를 그대로 쓰고
+// #2582 무단차 대안 전환 행 제목. 앱에 이미 있는 "계단 없는 …" 어휘를 그대로 쓰고
 // 시간 차("N분 더")는 쓰지 않는다 — 접근성 경로를 느린 경로로 프레이밍하지 않는다.
+// 되돌아가는 행은 요청 objective 라벨(최단시간·최소환승)을 쓴다. 상수 '빠른 경로'는
+// 최소환승 대표가 대안보다 느릴 수 있어(백엔드 대안 선정에 소요시간 비교가 없다)
+// 화면의 숫자와 어긋난다.
 const _stepFreeAlternativeTitle = '계단 없는 다른 경로';
-const _stepFreeAlternativeDetail = '계단 없는 길로 확인된 경로예요';
-const _stepFreePrimaryTitle = '빠른 경로';
 const _routeSearchPagePadding = EdgeInsets.only(
   left: EasySubwaySpacing.xl,
   top: EasySubwaySpacing.lg,
@@ -958,10 +958,17 @@ class RouteSearchV2Result {
 
 /// 무단차 선호(`PREFER_STEP_FREE`) 검색에서 백엔드가 덧붙이는 대안 후보 태그.
 ///
-/// 백엔드 계약(#2560): 대표 중 검증된 무단차가 하나도 없고 alternativeCount에
-/// 자리가 남을 때만, `stairAccess == STEP_FREE`로 **검증된** 후보 1건에만 붙는다.
-/// 따라서 이 태그가 달린 후보가 있으면 요청 objective 대표는 계단 포함이거나
-/// 계단 여부 미확인이며, 대안은 항상 검증된 무단차다.
+/// 백엔드 계약(#2560): 대표 중 `stairAccess == STEP_FREE`가 하나도 없고
+/// alternativeCount에 자리가 남을 때만, 같은 기준을 만족하는 후보 1건에 붙는다.
+///
+/// 주의 — 이 태그는 모바일의 `계단 없는 길이에요`와 같은 뜻이 아니다. 백엔드
+/// `RouteV2Planner.stairAccess()`는 step의 `includesStairs`·
+/// `requiresAccessibilityCheck`만 보는데, 승차 step은 둘 다 false이면서
+/// `stairAccessState`가 `UNKNOWN`이다. 그 값이 leg DTO의
+/// `unknownAccessibilityCount = 1`로 실려 오면 모바일은 그 leg를 `unknown`으로
+/// 보므로([_routeV2StairAccessState]), 태그가 붙은 후보라도
+/// [RouteSearchResult.stairAccessLabel]은 `계단 여부를 확인하고 있어요`가 된다.
+/// 따라서 이 태그를 "확인된 무단차"로 표기하면 과대 주장이다.
 const _stepFreePreferredObjectiveTag = 'STEP_FREE_PREFERRED';
 
 class RouteSearchV2Itinerary {
@@ -1526,11 +1533,13 @@ class RouteSearchResult {
   final String arrivalTimeIso;
   final RouteSearchOfficialFare? officialFare;
 
-  /// 무단차 선호 검색에서 백엔드가 함께 보존한, 검증된 무단차 대안(#2582).
+  /// 무단차 선호 검색에서 백엔드가 함께 보존한 대안(#2582).
   ///
-  /// 없는 것이 정상이며, 있으면 이 결과는 계단 포함이거나 계단 여부 미확인이다
-  /// ([_stepFreePreferredObjectiveTag] 계약). 대안 자신은 이 필드를 갖지 않는다 —
-  /// 화면이 대안으로 전환하면 되돌아갈 대표는 화면이 계속 들고 있다.
+  /// 없는 것이 정상이다. 대안이 실제로 어느 계단 상태로 표시되는지는
+  /// [_stepFreePreferredObjectiveTag] 주석 참고 — 태그가 곧 `계단 없는 길이에요`를
+  /// 뜻하지는 않으므로 대안의 계단 표기는 대안 자신의 [stairAccessLabel]로만
+  /// 말한다. 대안 자신은 이 필드를 갖지 않는다 — 화면이 대안으로 전환하면
+  /// 되돌아갈 대표는 화면이 계속 들고 있다.
   final RouteSearchResult? stepFreeAlternative;
 
   bool get hasOfficialOdFareQuote => officialOdFareQuote != null;
@@ -1820,9 +1829,6 @@ class RouteSearchResult {
       comfortLabel,
       stairAccessLabel,
       ...badgeLabels,
-      // 존재 신호 한 조각만 넣는다. 소요 시간·검증 문구는 전환 행 버튼에
-      // 포커스했을 때만 읽혀 중복 낭독을 만들지 않는다(#2582).
-      if (stepFreeAlternative != null) '$_stepFreeAlternativeTitle 있음',
     ];
     if (!isBlocked && warnings.isNotEmpty) {
       parts.add(attentionLabel);
@@ -3401,7 +3407,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
       reportMobileError(error, stackTrace, context: '하차 알림 취소 중 예외가 발생했습니다.');
       if (mounted) {
         ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          const SnackBar(content: Text(_getOffAlarmCancelFailureMessage)),
+          const SnackBar(content: Text('하차 알림을 취소하지 못했어요. 다시 시도해 주세요.')),
         );
       }
       return false;
@@ -4908,38 +4914,18 @@ class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
     );
   }
 
-  /// 화면이 그리는 경로를 대표 ↔ 무단차 대안으로 바꾼다. 이동 조건 변경과 같은
-  /// 원칙으로, 다른 경로에 걸린 활성 하차 알림을 먼저 끈 뒤에만 전환한다.
-  Future<void> _switchStepFreeRoute(bool showsStepFreeAlternative) async {
+  /// 화면이 그리는 경로를 대표 ↔ 무단차 대안으로 바꾼다.
+  ///
+  /// 같은 응답 안에서 표시만 왕복하므로 활성 하차 알림은 건드리지 않는다.
+  /// 이동 조건 변경(`_changeObjective`)이 알림을 끄는 것은 그 뒤에 재검색이
+  /// 따라와 경로 자체가 교체되기 때문이고, 여기서는 원래 경로가 그대로 남는다.
+  /// 표시 정합도 `GetOffAlarmToggle`이 `activeRouteId == routeId`로 이미
+  /// 경로별로 판정하므로 취소 없이 성립한다.
+  void _switchStepFreeRoute(bool showsStepFreeAlternative) {
     if (_showsStepFreeAlternative == showsStepFreeAlternative) {
       return;
     }
-    if (!await _disableActiveGetOffAlarmForSwitch()) {
-      return;
-    }
-    if (!mounted) {
-      return;
-    }
     setState(() => _showsStepFreeAlternative = showsStepFreeAlternative);
-  }
-
-  Future<bool> _disableActiveGetOffAlarmForSwitch() async {
-    final controller = widget.getOffAlarmController;
-    if (controller == null || !controller.state.enabled) {
-      return true;
-    }
-    try {
-      await controller.disable();
-      return true;
-    } catch (error, stackTrace) {
-      reportMobileError(error, stackTrace, context: '하차 알림 취소 중 예외가 발생했습니다.');
-      if (mounted) {
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          const SnackBar(content: Text(_getOffAlarmCancelFailureMessage)),
-        );
-      }
-      return false;
-    }
   }
 
   bool get _canUseRouteActions => _isRecommendedRoute(_displayedResult);
@@ -5186,16 +5172,21 @@ RouteSearchStep? _matchingPreviousRideStep({
 }
 
 /// #2582 무단차 대안 전환 행이 그릴 대상. [target]은 탭했을 때 주 결과가 되는
-/// 경로다. 검증된 무단차 쪽으로 갈 때와 원래 대표로 돌아올 때 문구만 다르다.
+/// 경로이며, 제목만 방향에 따라 다르다.
+///
+/// 부제는 언제나 [target]의 [RouteSearchResult.stairAccessLabel]이다. 행이
+/// 약속하는 계단 상태와 전환 뒤 결과 카드의 칩이 같은 값이라 어긋날 수 없다.
+/// (백엔드는 `requiresAccessibilityCheck`로 무단차를 판정하지만 승차 leg는
+/// `stairAccessState=UNKNOWN`이라 모바일 라벨이 `계단 여부를 확인하고 있어요`로
+/// 떨어진다. 행이 "확인된 무단차"라고 단언하면 이 조합에서 과대 주장이 된다.)
 class _StepFreeRouteSwitch {
   const _StepFreeRouteSwitch._({
     required this.target,
     required this.title,
-    required this.detail,
     required this.onSwitch,
   });
 
-  /// 계단 포함·미확인 대표에서 검증된 무단차 대안으로.
+  /// 계단 포함·미확인 대표에서 무단차 선호가 고른 대안으로.
   factory _StepFreeRouteSwitch.toStepFree({
     required RouteSearchResult target,
     required VoidCallback onSwitch,
@@ -5203,34 +5194,34 @@ class _StepFreeRouteSwitch {
     return _StepFreeRouteSwitch._(
       target: target,
       title: _stepFreeAlternativeTitle,
-      detail: _stepFreeAlternativeDetail,
       onSwitch: onSwitch,
     );
   }
 
-  /// 무단차 대안을 보다가 요청 objective 대표로 되돌아가기.
+  /// 대안을 보다가 요청 objective 대표로 되돌아가기. 제목이 소요 시간 우열을
+  /// 주장하지 않도록 요청 objective 라벨을 쓴다. 대안이 존재하면 태그가 있는
+  /// 응답이므로 대표는 반드시 그 objective로 뽑힌 경로다(무태그 폴백 불가).
   factory _StepFreeRouteSwitch.toPrimary({
     required RouteSearchResult target,
     required VoidCallback onSwitch,
   }) {
     return _StepFreeRouteSwitch._(
       target: target,
-      title: _stepFreePrimaryTitle,
-      detail: target.stairAccessLabel,
+      title: '${target.objective.label} 경로',
       onSwitch: onSwitch,
     );
   }
 
   final RouteSearchResult target;
   final String title;
-  final String detail;
   final VoidCallback onSwitch;
 
   /// 대상 경로에 붙은 경고(LOW_DATA_CONFIDENCE 등)는 헤지 사전 문구 그대로
   /// 덧붙인다 — 대안이라고 검증 수준을 감추지 않는다.
   String get subtitle {
     final notice = target.warningNoticeText;
-    return notice.isEmpty ? detail : '$detail · $notice';
+    final stairAccessLabel = target.stairAccessLabel;
+    return notice.isEmpty ? stairAccessLabel : '$stairAccessLabel · $notice';
   }
 
   String get durationLabel {
@@ -5239,6 +5230,10 @@ class _StepFreeRouteSwitch {
   }
 
   String get semanticLabel => [title, durationLabel, subtitle].join(', ');
+
+  /// 상단 결과 라벨(liveRegion)에 붙일 존재 신호. 상세는 행에 포커스했을 때만
+  /// 읽혀 중복 낭독을 만들지 않는다. 왕복 두 방향 모두에 붙는다.
+  String get existenceLabel => '$title 있음';
 }
 
 /// 결과 타임라인 아래에 접힌 행 하나로 붙는 경로 전환 진입점(#2582).
@@ -5261,6 +5256,11 @@ class _StepFreeAlternativeRow extends StatelessWidget {
           child: InkWell(
             key: const Key('routeStepFreeAlternativeRow'),
             onTap: routeSwitch.onSwitch,
+            // 무장식 원칙: 정석 행 컴포넌트(station_search_body)와 같이 리플을
+            // 끈다. 자체 Material 없이 상위 표면에 잉크를 그리면 구분선 밖까지
+            // 번진다.
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
             child: ConstrainedBox(
               constraints: const BoxConstraints(minHeight: 48),
               child: Padding(
@@ -5337,7 +5337,14 @@ class _RouteResultsListView extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Semantics(
-          label: result.semanticLabel,
+          // #2582: 전환 행이 있으면 존재 신호 한 조각만 덧붙인다. 왕복 두 방향
+          // 모두 붙어야 스크린리더가 대안·대표 어느 쪽을 보고 있든 되돌아갈
+          // 행이 있다는 것을 알 수 있다.
+          label: switch (stepFreeRouteSwitch) {
+            null => result.semanticLabel,
+            final routeSwitch =>
+              '${result.semanticLabel}, ${routeSwitch.existenceLabel}',
+          },
           liveRegion: true,
           child: ExcludeSemantics(
             child: Column(

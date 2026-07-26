@@ -19441,9 +19441,7 @@ void main() {
 
       // 주 결과는 계단 포함 37분이고, 대안은 접힌 행 하나로만 존재한다.
       expect(find.text('37분'), findsOneWidget);
-      expect(find.text('계단 포함'), findsOneWidget);
       expect(find.text('계단 없는 다른 경로'), findsOneWidget);
-      expect(find.text('계단 없는 길로 확인된 경로예요'), findsOneWidget);
       // 무단차 경로를 "느린 경로"로 프레이밍하지 않는다 — 시간 차 표기 없음.
       expect(find.textContaining('분 더'), findsNothing);
       expect(find.textContaining('+3'), findsNothing);
@@ -19460,9 +19458,8 @@ void main() {
 
       // 대안이 그대로 주 결과가 되고, 같은 자리에 되돌아가는 행이 생긴다.
       expect(find.text('40분'), findsOneWidget);
-      expect(find.text('계단 없는 길이에요'), findsOneWidget);
       expect(find.text('계단 없는 다른 경로'), findsNothing);
-      expect(find.text('빠른 경로'), findsOneWidget);
+      expect(find.text('최단시간 경로'), findsOneWidget);
       expect(find.text('이동 순서'), findsOneWidget);
       expect(
         find.descendant(of: row, matching: find.text('37분')),
@@ -19473,8 +19470,96 @@ void main() {
       await _tapStepFreeAlternativeRow(tester);
       expect(find.text('37분'), findsOneWidget);
       expect(find.text('계단 없는 다른 경로'), findsOneWidget);
-      expect(find.text('빠른 경로'), findsNothing);
+      expect(find.text('최단시간 경로'), findsNothing);
       expectNoForbiddenUserCopy(tester);
+    });
+
+    testWidgets('전환 행 부제는 대상 경로가 실제로 표시할 계단 상태 그대로다', (tester) async {
+      // 백엔드가 STEP_FREE_PREFERRED를 붙여도 승차 leg 때문에 대안의 라벨은
+      // "계단 여부를 확인하고 있어요"가 될 수 있다. 행이 "확인된 무단차"를
+      // 단언하면 전환 후 칩과 어긋나므로, 부제는 대상의 stairAccessLabel을 쓴다.
+      await _pumpStepFreeAlternativeRouteScreen(
+        tester,
+        result: _stepFreeAlternativeRouteResult(
+          alternativeStairAccessState: 'unknown',
+        ),
+      );
+
+      final row = find.byKey(const Key('routeStepFreeAlternativeRow'));
+      expect(
+        find.descendant(of: row, matching: find.text('계단 여부를 확인하고 있어요')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('확인된 경로'), findsNothing);
+
+      await _tapStepFreeAlternativeRow(tester);
+
+      // 전환 후 결과 카드 칩과 방금 본 부제가 같은 문구다.
+      expect(find.text('계단 여부를 확인하고 있어요'), findsOneWidget);
+      // 되돌아가는 행 부제도 대표가 실제로 표시하는 계단 상태다.
+      expect(
+        find.descendant(of: row, matching: find.text('계단 포함')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('최소환승 검색에서 되돌아가는 행은 속도를 주장하지 않는다', (tester) async {
+      // 백엔드 대안 선정에 소요 시간 비교가 없어 최소환승 대표가 대안보다 느릴
+      // 수 있다. 그 조합에서 "빠른 경로 · 45분"이 40분 화면 위에 뜨면 안 된다.
+      await _pumpStepFreeAlternativeRouteScreen(
+        tester,
+        result: _stepFreeAlternativeRouteResult(
+          objective: RouteObjective.fewestTransfers,
+          primaryMinutes: 45,
+        ),
+      );
+
+      await _tapStepFreeAlternativeRow(tester);
+
+      final row = find.byKey(const Key('routeStepFreeAlternativeRow'));
+      expect(
+        find.descendant(of: row, matching: find.text('최소환승 경로')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: row, matching: find.text('45분')),
+        findsOneWidget,
+      );
+      expect(find.text('빠른 경로'), findsNothing);
+      expect(find.textContaining('빠른'), findsNothing);
+    });
+
+    testWidgets('대안을 봤다가 되돌아와도 하차 알림은 그대로 유지된다', (tester) async {
+      final controller = GetOffAlarmController(
+        notifier: _RecordingGetOffAlarmNotifier(),
+        permissionGate: _StubExactAlarmPermissionGate(),
+        notificationPermissionProvider: FakeNotificationPermissionProvider(
+          nextStatus: NotificationPermissionStatus.granted,
+        ),
+        repository: _MemoryGetOffAlarmStateRepository(),
+        now: () => DateTime.parse('2026-07-26T09:00:00+09:00'),
+      );
+      addTearDown(controller.dispose);
+      await _pumpStepFreeAlternativeRouteScreen(
+        tester,
+        result: _stepFreeAlternativeRouteResult(),
+        getOffAlarmController: controller,
+      );
+
+      await tester.ensureVisible(find.text('하차 알림'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('하차 알림'));
+      await tester.pumpAndSettle();
+      expect(controller.state.enabled, isTrue);
+      final activeRouteId = controller.state.activeRouteId;
+
+      // 대안을 봤다가 원래 경로로 되돌아온다.
+      await _tapStepFreeAlternativeRow(tester);
+      await _tapStepFreeAlternativeRow(tester);
+
+      // 같은 응답 안에서 표시만 왕복했으므로 알림은 취소되지 않는다.
+      expect(controller.state.enabled, isTrue);
+      expect(controller.state.activeRouteId, activeRouteId);
     });
 
     testWidgets('대안이 없는 응답은 전환 행 없이 기존 결과 화면 그대로다', (tester) async {
@@ -19503,10 +19588,7 @@ void main() {
         ),
       );
 
-      expect(
-        find.text('계단 없는 길로 확인된 경로예요 · 일부 시설 안내는 아직 확인되지 않았어요.'),
-        findsOneWidget,
-      );
+      expect(find.text('계단 없는 길이에요 · 일부 시설 안내는 아직 확인되지 않았어요.'), findsOneWidget);
     });
 
     testWidgets('전환 행은 버튼 하나로 읽히고 상단 라벨은 존재 신호만 덧붙인다', (tester) async {
@@ -19517,7 +19599,7 @@ void main() {
       );
 
       expect(
-        find.bySemanticsLabel('계단 없는 다른 경로, 40분, 계단 없는 길로 확인된 경로예요'),
+        find.bySemanticsLabel('계단 없는 다른 경로, 40분, 계단 없는 길이에요'),
         findsOneWidget,
       );
       // 상단 결과 라벨(liveRegion)에는 존재 신호 한 조각만 들어간다.
@@ -19525,11 +19607,19 @@ void main() {
         find.bySemanticsLabel(RegExp(r'^경로 검색 결과, .*계단 없는 다른 경로 있음')),
         findsOneWidget,
       );
-      // 소요 시간·검증 문구는 행에 포커스했을 때만 읽힌다(중복 낭독 방지).
+      // 소요 시간은 행에 포커스했을 때만 읽힌다(중복 낭독 방지).
       expect(
-        find.bySemanticsLabel(RegExp(r'^경로 검색 결과, .*계단 없는 길로 확인된 경로예요')),
+        find.bySemanticsLabel(RegExp(r'^경로 검색 결과, .*계단 없는 다른 경로, 40분')),
         findsNothing,
       );
+
+      // 대안을 보는 동안에도 되돌아갈 행의 존재 신호가 대칭으로 남는다.
+      await _tapStepFreeAlternativeRow(tester);
+      expect(
+        find.bySemanticsLabel(RegExp(r'^경로 검색 결과, .*최단시간 경로 있음')),
+        findsOneWidget,
+      );
+      expect(find.bySemanticsLabel('최단시간 경로, 37분, 계단 포함'), findsOneWidget);
       handle.dispose();
     });
   });
@@ -19538,12 +19628,14 @@ void main() {
 Future<void> _pumpStepFreeAlternativeRouteScreen(
   WidgetTester tester, {
   required RouteSearchResult result,
+  GetOffAlarmController? getOffAlarmController,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
       home: RouteSearchScreen(
         repository: FakeRouteSearchRepository(result: result),
         stationRepository: FakeStationSearchRepository(),
+        getOffAlarmController: getOffAlarmController,
         initialDraft: RouteDraft(
           origin: const RouteDraftStation(
             id: 'station-sangnoksu',
@@ -21622,16 +21714,21 @@ RouteSearchResult _sampleRouteSearchResult({
 
 /// #2582: 무단차 대안이 함께 온 `PREFER_STEP_FREE` 응답의 화면 모델.
 ///
-/// 백엔드 계약(#2560)상 대안이 붙으면 대표는 계단 포함이거나 계단 여부 미확인이고
-/// 대안은 항상 검증된 무단차다. 그 형태 그대로 대표 37분(계단 포함) + 대안 40분
-/// (계단 없음)을 만든다.
+/// 대표는 계단 포함, 대안은 무단차 선호가 고른 경로다. 대안의 계단 라벨은
+/// [alternativeStairAccessState]로 바꿀 수 있다 — 실응답에서는 승차 leg의
+/// `stairAccessState`가 `UNKNOWN`이라 `'unknown'`(= 계단 여부를 확인하고 있어요)이
+/// 되는 경우가 있고, 화면 문구가 그 상태와 어긋나면 안 되기 때문이다.
 RouteSearchResult _stepFreeAlternativeRouteResult({
   List<RouteSearchWarning> alternativeWarnings = const [],
+  String alternativeStairAccessState = 'stepFree',
+  RouteObjective objective = RouteObjective.fastest,
+  int primaryMinutes = 37,
 }) {
   return _sampleRouteSearchResult(
     routeSearchId: 'route-v2-stair',
     warnings: const [],
-    steps: const [
+    objective: objective,
+    steps: [
       RouteSearchStep(
         sequence: 1,
         stepType: 'ride',
@@ -21641,17 +21738,19 @@ RouteSearchResult _stepFreeAlternativeRouteResult({
         lineName: '수도권 4호선',
         fromStationId: 'station-sangnoksu',
         toStationId: 'station-sadang',
-        estimatedMinutes: 37,
+        estimatedMinutes: primaryMinutes,
         distanceMeters: 13500,
         includesStairs: true,
         requiresAccessibilityCheck: false,
         stairAccessState: 'stairOnly',
+        plannedArrivalTimeIso: '2026-07-26T09:37:30+09:00',
       ),
     ],
     stepFreeAlternative: _sampleRouteSearchResult(
       routeSearchId: 'route-v2-step-free',
       warnings: alternativeWarnings,
-      steps: const [
+      objective: objective,
+      steps: [
         RouteSearchStep(
           sequence: 1,
           stepType: 'ride',
@@ -21665,7 +21764,8 @@ RouteSearchResult _stepFreeAlternativeRouteResult({
           distanceMeters: 14200,
           includesStairs: false,
           requiresAccessibilityCheck: false,
-          stairAccessState: 'stepFree',
+          stairAccessState: alternativeStairAccessState,
+          plannedArrivalTimeIso: '2026-07-26T09:40:30+09:00',
         ),
       ],
     ),

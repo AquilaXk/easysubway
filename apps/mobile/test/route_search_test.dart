@@ -1805,8 +1805,6 @@ void main() {
     });
 
     test('#2582 무단차 대안 태그가 붙은 후보를 대표와 함께 화면 모델로 만든다', () {
-      // 백엔드 계약(#2560): 대안이 붙으면 대표는 계단 포함·미확인이고 대안은
-      // 검증된 무단차다. 두 상태가 한 화면에서 모순되지 않는 근거다.
       final result = _objectiveResult([
         _taggedItinerary(
           lineId: 'line-stair',
@@ -1830,14 +1828,38 @@ void main() {
       final alternative = display.stepFreeAlternative;
       expect(alternative, isNotNull);
       expect(alternative!.lineId, 'line-step-free');
-      expect(alternative.stairAccessLabel, '계단 없는 길이에요');
       // 대안 자신은 다시 대안을 갖지 않는다(전환 시 그대로 주 결과가 된다).
       expect(alternative.stepFreeAlternative, isNull);
       // 대안의 경고는 감추지 않고 그대로 실어 보낸다.
       expect(alternative.warningNoticeText, '일부 시설 안내는 아직 확인되지 않았어요.');
-      // 상단 라벨에는 존재 신호 한 조각만 들어간다.
-      expect(display.semanticLabel, contains('계단 없는 다른 경로 있음'));
-      expect(display.semanticLabel, isNot(contains('계단 없는 길로 확인된 경로예요')));
+    });
+
+    test('#2582 STEP_FREE_PREFERRED 태그는 계단 없음 단언이 아니다 — 승차 leg는 미확인으로 남는다', () {
+      // 백엔드 stairAccess()는 includesStairs·requiresAccessibilityCheck만 보고
+      // 태그를 붙이지만, 승차 step의 stairAccessState는 "UNKNOWN"이라 leg DTO의
+      // unknownAccessibilityCount가 1이 된다. 모바일은 그 leg를 미확인으로 보므로
+      // 태그가 붙은 대안도 라벨은 "계단 여부를 확인하고 있어요"다. 화면 문구가
+      // "확인된 무단차"를 단언하면 안 되는 근거다.
+      final result = _objectiveResult([
+        _taggedItinerary(
+          lineId: 'line-stair',
+          objectiveTags: const ['FASTEST'],
+          stairCount: 1,
+        ),
+        _taggedItinerary(
+          lineId: 'line-step-free',
+          objectiveTags: const ['STEP_FREE_PREFERRED'],
+          unknownAccessibilityCount: 1,
+        ),
+      ]);
+
+      final alternative = RouteSearchResult.fromV2(
+        result,
+        objective: RouteObjective.fastest,
+      ).stepFreeAlternative;
+
+      expect(alternative, isNotNull);
+      expect(alternative!.stairAccessLabel, '계단 여부를 확인하고 있어요');
     });
 
     test('#2582 무단차 대안 태그가 없으면 대안 없이 기존 단건 결과 그대로다', () {
@@ -1852,7 +1874,6 @@ void main() {
 
       expect(display.lineId, 'line-fast');
       expect(display.stepFreeAlternative, isNull);
-      expect(display.semanticLabel, isNot(contains('계단 없는 다른 경로')));
     });
 
     test('#2582 태그 없는 레거시 응답도 대안 없이 첫 FOUND를 그대로 쓴다', () {
@@ -2019,15 +2040,19 @@ Map<String, Object?> _rideLegJson({
   };
 }
 
+/// 실응답에서 승차 leg는 `stairAccessState = "UNKNOWN"`이라 leg DTO의
+/// `unknownAccessibilityCount`가 1이다(`AccessibilityRiskDto.from(RouteStep)`).
+/// 그 조합을 만들 수 있도록 카운터도 인자로 받는다.
 RouteSearchV2Itinerary _taggedItinerary({
   required String lineId,
   required List<String> objectiveTags,
   int stairCount = 0,
+  int unknownAccessibilityCount = 0,
   List<String> reasonCodes = const [],
 }) {
   final risk = RouteSearchV2AccessibilityRisk(
     stairCount: stairCount,
-    unknownAccessibilityCount: 0,
+    unknownAccessibilityCount: unknownAccessibilityCount,
     generatedConnectorCount: 0,
     staleDataCount: 0,
     lowConfidenceCount: 0,
