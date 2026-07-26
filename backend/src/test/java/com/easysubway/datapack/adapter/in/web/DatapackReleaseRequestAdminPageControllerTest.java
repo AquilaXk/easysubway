@@ -208,7 +208,7 @@ class DatapackReleaseRequestAdminPageControllerTest {
 	}
 
 	@Test
-	@DisplayName("목록은 DISPATCH_FAILED 행에 재시도 버튼을 렌더하지 않고, workflow run URL이 있으면 링크를 렌더한다")
+	@DisplayName("목록은 DISPATCH_FAILED 행에 재시도 버튼 대신 수동 실행 안내를, workflow run URL이 있으면 링크를 렌더한다")
 	void listRendersWorkflowRunLinkWithoutRetryAction() throws Exception {
 		insertReleaseRequest("rr-failed-3", "DISPATCH_FAILED", null);
 		insertReleaseRequest("rr-dispatched-1", "DISPATCHED",
@@ -222,6 +222,7 @@ class DatapackReleaseRequestAdminPageControllerTest {
 		assertThat(html)
 			.doesNotContain("retry-dispatch")
 			.doesNotContain("dispatch 재시도")
+			.contains("과거 자동 dispatch 실패 — 수동 실행 필요")
 			.contains("https://github.com/AquilaXk/easysubway/actions/runs/9001");
 	}
 

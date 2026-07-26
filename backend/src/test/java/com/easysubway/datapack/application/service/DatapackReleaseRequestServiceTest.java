@@ -62,7 +62,7 @@ class DatapackReleaseRequestServiceTest {
 	}
 
 	@Test
-	@DisplayName("findApproved는 미승인=empty, APPROVED=present, DISPATCHED 이력 행=present, DISPATCH_FAILED=empty")
+	@DisplayName("findApproved는 미승인·종결 상태=empty, APPROVED와 dispatch 계열 이력 행=present")
 	void findApprovedServesApprovedAndDispatched() {
 		// 미승인 → empty
 		var dormant = service.create(cmd("alice"));
@@ -78,11 +78,17 @@ class DatapackReleaseRequestServiceTest {
 		setStatus(dispatched.approvalId(), "DISPATCHED");
 		assertThat(service.findApproved(dispatched.approvalId())).isPresent();
 
-		// DISPATCH_FAILED 이력 행 → empty(미발화이므로 서빙 안 함)
+		// DISPATCH_FAILED 이력 행 → present(재시도 수단이 사라졌으므로 수동 게시로 종결할 수 있어야 함)
 		var failed = service.create(cmd("alice"));
 		service.approve(failed.approvalId(), "bob");
 		setStatus(failed.approvalId(), "DISPATCH_FAILED");
-		assertThat(service.findApproved(failed.approvalId())).isEmpty();
+		assertThat(service.findApproved(failed.approvalId())).isPresent();
+
+		// 종결 상태 → empty(더 진행할 게시가 없음)
+		var published = service.create(cmd("alice"));
+		service.approve(published.approvalId(), "bob");
+		setStatus(published.approvalId(), "PUBLISHED");
+		assertThat(service.findApproved(published.approvalId())).isEmpty();
 	}
 
 	@Test

@@ -53,11 +53,15 @@ public class DatapackReleaseRequestService {
 		return approved;
 	}
 
-	// 워크플로가 fetch 가능한 상태: 승인됨(APPROVED) + 과거 자동 dispatch로 전이한 DISPATCHED 이력 행.
-	// DISPATCHED는 더 이상 backend가 만들지 않지만 기존 행이 남아 있으므로 서빙 대상을 유지한다
-	// (read 경로 불변). DISPATCH_FAILED/FAILED 등 미발화·실패 상태는 서빙 대상이 아니다.
-	private static final Set<DatapackReleaseRequestStatus> SERVABLE_STATUSES =
-		Set.of(DatapackReleaseRequestStatus.APPROVED, DatapackReleaseRequestStatus.DISPATCHED);
+	// 워크플로가 fetch 가능한 상태: 승인됨(APPROVED) + 과거 자동 dispatch가 남긴 이력 행
+	// (DISPATCHED·DISPATCH_FAILED). 두 이력 상태는 backend가 더 이상 만들지 않지만 기존 행은
+	// 수동 게시 경로로 종결될 수 있어야 한다 — dispatch 재시도 수단이 사라진 DISPATCH_FAILED를
+	// 제외하면 그 행은 게시도 실패 확정도 못 하는 dead-end가 된다.
+	// 종결 상태(PUBLISHED·FAILED)와 미승인(REQUESTED)은 서빙 대상이 아니다.
+	private static final Set<DatapackReleaseRequestStatus> SERVABLE_STATUSES = Set.of(
+		DatapackReleaseRequestStatus.APPROVED,
+		DatapackReleaseRequestStatus.DISPATCHED,
+		DatapackReleaseRequestStatus.DISPATCH_FAILED);
 
 	@Transactional(readOnly = true)
 	public Optional<DatapackReleaseRequest> findApproved(String approvalId) {
