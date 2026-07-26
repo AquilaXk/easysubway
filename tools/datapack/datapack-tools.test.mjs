@@ -9269,6 +9269,52 @@ test("coverage 게이트는 placeholder-fixture 소스가 requirement를 지원�
   );
 });
 
+// 같은 축의 두 번째 경로. 전국 라벨 경로에만 회귀가 있으면 게시 차단 판정이 실제로 도는 release-scope
+// 평가에서 같은 유입이 열려도 회귀가 침묵한다 — 그 경로를 따로 때린다.
+// 축 분리 방법: 전국 계약(schemaVersion 2)은 provenance 없이는 어떤 소스도 뒷받침 소스로 세지 않으므로
+// provenance 없이 돌리면 전국 경로는 조용하고, pilot 계약(schemaVersion 1)으로 도는 release-scope
+// 경로에서만 소스가 requirement를 뒷받침한다.
+test("coverage 게이트는 release scope 평가에서도 placeholder-fixture 소스 지원을 거부한다", async () => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-coverage-placeholder-scope-"));
+  const reportPath = path.join(outputDir, "coverage-gap-report.json");
+  const targets = JSON.parse(await readFile(path.join(root, "tools/datapack/nationwide-coverage-targets.json"), "utf8"));
+  const inventory = completeCoverageInventory(targets);
+  const runWith = async (sources, name) => {
+    const inventoryPath = path.join(outputDir, name);
+    await writeFile(inventoryPath, `${JSON.stringify({ ...inventory, sources }, null, 2)}\n`);
+    return execFileAsync(process.execPath, [
+      "tools/datapack/report-coverage-gaps.mjs",
+      "--targets", "tools/datapack/nationwide-coverage-targets.json",
+      "--inventory", inventoryPath,
+      "--release-scope", "apps/mobile/release/production-datapack-scope.json",
+      "--output", reportPath,
+      "--allow-gaps",
+    ], { cwd: root });
+  };
+
+  await runWith(inventory.sources, "scope-baseline-inventory.json");
+  const baseline = JSON.parse(await readFile(reportPath, "utf8"));
+  // 전제 확인: 전국 경로에는 뒷받침 소스가 하나도 없고 release-scope 경로에는 있다 — 이 회귀가 겨냥한
+  // 분기에 실제로 닿는다는 뜻이다(전국 경로가 먼저 걸리면 축이 갈린다).
+  assert.ok(baseline.requirements.every(({ sourceIds }) => sourceIds.length === 0));
+  const scopeSourceIds = [...new Set(baseline.releaseScopeRequirements.flatMap(({ sourceIds }) => sourceIds))];
+  assert.ok(scopeSourceIds.length > 0);
+
+  await assert.rejects(
+    runWith(
+      inventory.sources.map((source) => (scopeSourceIds.includes(source.id)
+        ? {
+          ...source,
+          evidenceCategory: "placeholder-fixture",
+          evidenceCategoryReasonKo: "진짜 데이터 도착 전 임시값",
+        }
+        : source)),
+      "scope-placeholder-inventory.json",
+    ),
+    /release scope requirement .+ is supported by placeholder-fixture sources: /,
+  );
+});
+
 test("전국 coverage v2는 line-scoped inventory만으로 지원 완료를 선언하지 않는다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-coverage-provenance-required-${Date.now()}`);
   const inventoryPath = path.join(outputDir, "source-inventory.json");

@@ -79,7 +79,7 @@
     },
     "spec": {
       "path": "tools/datapack/nationwide-candidate-pack-spec.json",
-      "sha256": "cab6064ded06d9ae0b4adec56733140de4f6f097e05ec34529e2eb41f6a44116"
+      "sha256": "29658061a7723e547231b7620c4d86f2a6afd99375e213815f4e7efc6c6f6ef4"
     },
     "targets": {
       "path": "tools/datapack/nationwide-coverage-targets.json",
@@ -707,7 +707,7 @@
     }
   ],
   "packDataInclusions": {
-    "chainKo": "entries는 적용 순서다. 한 지역에 여러 도메인을 편입하면 뒤 편입의 승계 원본은 앞 편입 결과이므로 앞선 편입이 실은 행도 뒤 편입의 불변 대상이 된다. 순서를 조립이 강제하는 구간은 선행 조건이 있는 쌍뿐이다 — 대구 route_map·accessibility는 pack에 대구 시각표 소스가 이미 있을 것을 검사하므로 시각표 편입보다 앞서면 fail closed 되지만, 서로 선행 조건이 없는 두 편입(route_map↔accessibility)은 순서를 바꿔도 조립이 통과한다. 따라서 기록된 전체 순서를 고정하는 축은 조립 fail closed가 아니라 이 entries 배열 순서를 그대로 대조하는 회귀다. 부산은 선행 구조가 대구와 다르다 — 승계 원본에 부산 운영기관·노선·역이 아예 없어 topology 편입이 그 셋을 함께 싣고, 나머지 세 편입(시각표·노선도·편의시설)이 모두 그 소스 등재와 station_lines·network_edges 계보를 선행 조건으로 검사한다. 즉 부산 구간에서 선행 조건이 강제하는 것은 topology가 먼저라는 것뿐이다. 다만 부산 노선도 편입은 승계 원본에 없던 표(routeMapLineTracks)를 새로 만들기 때문에 뒤 세 편입끼리의 교환도 조립을 통과하지 못한다(실측) — 그 표를 0으로 선언해야 하는 편입이 순서에 따라 갈려 선언 행수 대조에서 걸리며, 이는 선행 조건 위반과 다른 축이다. 대전·광주는 부산과 같은 모양이되 편입 단위가 다르다: topology 전용 materializer가 편입이 아니고 시각표 편입 하나가 topology·membership·시각표를 함께 싣는다(대전은 시각표 materializer가 topology materializer를 호출하고, 광주는 한 함수가 세 소스를 함께 등재한다). 그래서 두 지역 모두 시각표 편입이 먼저다 — 노선도·편의시설 materializer는 그 지역 운영기관이 pack에 있을 것과 시각표 소스가 등재돼 있을 것을 함께 선행 조건으로 검사하고, 시각표 편입보다 앞서면 실측상 운영기관 조건에서 먼저 fail closed 된다. 반면 노선도와 편의시설 사이에는 선행 조건이 없어(대구와 같다) 두 편입의 교환은 조립을 통과한다(실측). 수도권 노선도 다섯 편입은 승계 pack 의존이 아예 없다 — 경로 그래프 계보를 inventory 소스가 아니라 tracked snapshot 파일로 대조하고 역·역노선을 스스로 만들어, 다섯 편입 사이에도 다른 지역에 대해서도 선행 조건이 없다. 그런데도 순서를 바꾸면 조립이 막힌다(실측): 광역철도 편입이 승계 원본에 없던 표(coverageLineOperatorScopes)를 새로 만들고 환승역 중복 제거 결과(stations·stationLines)도 앞선 편입이 무엇을 실었는지에 따라 갈려, 부산 노선도와 같은 선언 행수 대조가 걸린다. 9호선 1단계·2·3단계 두 편입의 교환도, 9호선 두 편입을 서울 1~8호선 앞으로 옮기는 것도 같은 행수 대조에서 걸린다(실측). 재정렬 선언(reorderedTables)도 같은 순서에 묶여 있지만(그 표에 승계 행이 있는지가 순서에 따라 갈린다) 실측상 먼저 걸리는 것은 행수 대조다. 인천은 부산과 같은 모양이다 — 승계 원본에 인천 운영기관·노선·역이 아예 없어 역사정보 편입이 그 셋을 함께 싣고, 시각표·편의시설 편입이 그 운영기관 존재를 선행 조건으로 검사해 역사정보보다 앞서면 각각 `Incheon timetable requires incheon-transit operator pack`·`Incheon accessibility requires incheon-transit operator pack`으로 막힌다(실측). 시각표와 편의시설 사이에는 선행 조건이 없어 둘의 교환은 조립을 그대로 통과한다(실측). 인천 구간 전체를 수도권 앞으로 옮기는 것은 선행 조건이 아니라 행수 대조가 막는다: 7호선 노선 레코드와 환승역 4곳(검암·계양·원인재·부천종합운동장)을 수도권 편입이 먼저 실었는지에 따라 역사정보 편입의 lines·stations·coverageLineOperatorScopes 선언이 갈린다(실측).",
+    "chainKo": "entries는 적용 순서다. 한 지역에 여러 도메인을 편입하면 뒤 편입의 승계 원본은 앞 편입 결과이므로 앞선 편입이 실은 행도 뒤 편입의 불변 대상이 된다. 순서를 조립이 강제하는 구간은 선행 조건이 있는 쌍뿐이다 — 대구 route_map·accessibility는 pack에 대구 시각표 소스가 이미 있을 것을 검사하므로 시각표 편입보다 앞서면 fail closed 되지만, 서로 선행 조건이 없는 두 편입(route_map↔accessibility)은 순서를 바꿔도 조립이 통과한다. 따라서 기록된 전체 순서를 고정하는 축은 조립 fail closed가 아니라 이 entries 배열 순서를 그대로 대조하는 회귀다. 부산은 선행 구조가 대구와 다르다 — 승계 원본에 부산 운영기관·노선·역이 아예 없어 topology 편입이 그 셋을 함께 싣고, 나머지 세 편입(시각표·노선도·편의시설)이 모두 그 소스 등재와 station_lines·network_edges 계보를 선행 조건으로 검사한다. 즉 부산 구간에서 선행 조건이 강제하는 것은 topology가 먼저라는 것뿐이다. 다만 부산 노선도 편입은 승계 원본에 없던 표(routeMapLineTracks)를 새로 만들기 때문에 뒤 세 편입끼리의 교환도 조립을 통과하지 못한다(실측) — 그 표를 0으로 선언해야 하는 편입이 순서에 따라 갈려 선언 행수 대조에서 걸리며, 이는 선행 조건 위반과 다른 축이다. 대전·광주는 부산과 같은 모양이되 편입 단위가 다르다: topology 전용 materializer가 편입이 아니고 시각표 편입 하나가 topology·membership·시각표를 함께 싣는다(대전은 시각표 materializer가 topology materializer를 호출하고, 광주는 한 함수가 세 소스를 함께 등재한다). 그래서 두 지역 모두 시각표 편입이 먼저다 — 노선도·편의시설 materializer는 그 지역 운영기관이 pack에 있을 것과 시각표 소스가 등재돼 있을 것을 함께 선행 조건으로 검사하고, 시각표 편입보다 앞서면 실측상 운영기관 조건에서 먼저 fail closed 된다. 반면 노선도와 편의시설 사이에는 선행 조건이 없어(대구와 같다) 두 편입의 교환은 조립을 통과한다(실측). 수도권 노선도 다섯 편입 사이에도 다른 지역에 대해서도 선행 조건이 없다 — 네 편입(광역철도·경전철·9호선 1단계·2·3단계)은 경로 그래프 계보를 inventory 소스가 아니라 tracked snapshot 파일로 대조하고 역·역노선을 스스로 만들어 승계 pack 의존이 아예 없다. 서울 1~8호선 편입만 승계 pack에 의존한다: 승계 원본의 서울교통공사 운영기관과 capital pilot cyberstation 소스 등재를 선행 조건으로 검사하고 승계 routeMapPositions의 (역, 노선, 권역) PK 집합으로 중복을 거른다. 그 셋은 전부 승계 원본이 이미 갖고 있어 다른 편입에 대한 순서 의존은 되지 않는다. 그런데도 순서를 바꾸면 조립이 막힌다(실측): 광역철도 편입이 승계 원본에 없던 표(coverageLineOperatorScopes)를 새로 만들고 환승역 중복 제거 결과(stations·stationLines)도 앞선 편입이 무엇을 실었는지에 따라 갈려, 부산 노선도와 같은 선언 행수 대조가 걸린다. 9호선 1단계·2·3단계 두 편입의 교환도, 9호선 두 편입을 서울 1~8호선 앞으로 옮기는 것도 같은 행수 대조에서 걸린다(실측). 재정렬 선언(reorderedTables)도 같은 순서에 묶여 있지만(그 표에 승계 행이 있는지가 순서에 따라 갈린다) 실측상 먼저 걸리는 것은 행수 대조다. 인천은 부산과 같은 모양이다 — 승계 원본에 인천 운영기관·노선·역이 아예 없어 역사정보 편입이 그 셋을 함께 싣고, 시각표·편의시설 편입이 그 운영기관 존재를 선행 조건으로 검사해 역사정보보다 앞서면 각각 `Incheon timetable requires incheon-transit operator pack`·`Incheon accessibility requires incheon-transit operator pack`으로 막힌다(실측). 시각표와 편의시설 사이에는 선행 조건이 없어 둘의 교환은 조립을 그대로 통과한다(실측). 인천 구간 전체를 수도권 앞으로 옮기는 것은 선행 조건이 아니라 행수 대조가 막는다: 7호선 노선 레코드와 환승역 4곳(검암·계양·원인재·부천종합운동장)을 수도권 편입이 먼저 실었는지에 따라 역사정보 편입의 lines·stations·coverageLineOperatorScopes 선언이 갈린다(실측).",
     "entries": [
       {
         "addedRows": {
@@ -1371,7 +1371,7 @@
       },
       {
         "addedRows": {
-          "coverageLineOperatorScopes": 6,
+          "coverageLineOperatorScopes": 5,
           "facilities": 0,
           "lines": 5,
           "movementPathCandidates": 0,
@@ -1525,7 +1525,7 @@
       },
       {
         "addedRows": {
-          "coverageLineOperatorScopes": 1,
+          "coverageLineOperatorScopes": 0,
           "facilities": 0,
           "lines": 0,
           "movementPathCandidates": 0,
@@ -1564,10 +1564,7 @@
         ],
         "materializedAt": "2026-07-25T04:00:00.000Z",
         "materializer": "tools/datapack/materialize-seoul9-route-map-positions.mjs",
-        "regionId": "capital",
-        "reorderedTables": [
-          "coverageLineOperatorScopes"
-        ]
+        "regionId": "capital"
       },
       {
         "addedRows": {
@@ -1703,7 +1700,7 @@
       }
     ],
     "modelKo": "승계 원본에 없는 지역 행은 tracked materializer가 tracked snapshot을 재생해 조립한다. 저장소에 행을 복제하지 않으므로 아래 입력 해시가 candidate 구성의 유일한 결속 축이며, 실제로 실린 행수(addedRows)가 spec 선언과 다르면(또는 승계 행이 바뀌면) 조립이 fail closed 된다.",
-    "reorderedTablesKo": "승계 행 불변 대조의 기본 전제는 append다 — 편입 후에도 각 표의 앞쪽 승계 행이 바이트 그대로여야 한다. 일부 materializer는 append 뒤 표를 id로 다시 정렬하는데(수도권 노선도 3종의 operators·lines·coverageLineOperatorScopes, 실측), 정렬은 승계 행 자체를 바꾸지 않으므로 편입을 막을 이유가 아니다. 그렇다고 전제를 조용히 풀지도 않는다: 편입이 reorderedTables로 그 표를 명시 선언한 경우에만 위치 대신 다중집합으로 본다. 선언한 표에서도 승계 행의 수정·삭제·중복도 변화는 그대로 fail closed이고, 선언하지 않은 표는 접두사 대조가 그대로 적용되며, 실제로 재정렬이 없는 표를 선언하거나 승계 행이 없는 표를 선언하면 그 선언 자체가 거부된다. 아래 entries에 이 키가 없는 편입은 append만 했다는 뜻이다.",
+    "reorderedTablesKo": "승계 행 불변 대조의 기본 전제는 append다 — 편입 후에도 각 표의 앞쪽 승계 행이 바이트 그대로여야 한다. 일부 materializer는 append 뒤 표를 id로 다시 정렬하는데(수도권 노선도 다섯 편입 중 넷이 operators·lines·coverageLineOperatorScopes 중 자기가 손댄 표를 그렇게 다시 정렬한다, 실측), 정렬은 승계 행 자체를 바꾸지 않으므로 편입을 막을 이유가 아니다. 그렇다고 전제를 조용히 풀지도 않는다: 편입이 reorderedTables로 그 표를 명시 선언한 경우에만 위치 대신 다중집합으로 본다. 선언한 표에서도 승계 행의 수정·삭제·중복도 변화는 그대로 fail closed이고, 선언하지 않은 표는 접두사 대조가 그대로 적용되며, 실제로 재정렬이 없는 표를 선언하거나 승계 행이 없는 표를 선언하면 그 선언 자체가 거부된다. 아래 entries에 이 키가 없는 편입은 append만 했다는 뜻이다.",
     "variantParityKo": "편입 행은 두 variant에 동일하게 들어간다. 편입은 line-scope 재기술과 독립이며, variant를 가르는 축은 재기술뿐이다."
   },
   "parentIssues": [

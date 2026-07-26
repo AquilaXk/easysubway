@@ -93,7 +93,7 @@ import { materializeGwangjuAccessibility } from "./materialize-gwangju-accessibi
 import { materializeGwangjuRouteMapPositions } from "./materialize-gwangju-route-map-positions.mjs";
 import { materializeGwangjuTimetable } from "./materialize-gwangju-timetable.mjs";
 import { materializeIncheonAccessibility } from "./materialize-incheon-accessibility.mjs";
-import { materializeIncheonStationInfo } from "./materialize-incheon-station-info.mjs";
+import { INCHEON_STATION_LINES, materializeIncheonStationInfo } from "./materialize-incheon-station-info.mjs";
 import { materializeIncheonTimetable } from "./materialize-incheon-timetable.mjs";
 import {
   materializeCapitalLightRailRouteMapPositions,
@@ -105,7 +105,7 @@ import { materializeSeoulRouteMapPositions } from "./materialize-seoul-route-map
 import {
   materializeSeoul9Phase1RouteMapPositions,
 } from "./materialize-seoul9-phase1-route-map-positions.mjs";
-import { materializeSeoul9RouteMapPositions } from "./materialize-seoul9-route-map-positions.mjs";
+import { SEOUL9_LINES, materializeSeoul9RouteMapPositions } from "./materialize-seoul9-route-map-positions.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
@@ -195,10 +195,13 @@ const PACK_DATA_MATERIALIZERS = new Map([
     materialize: materializeGwangjuAccessibilityInclusion,
     inputs: { paths: ["snapshotPath", "topologySnapshotPath"], linePaths: [] },
   }],
-  // 수도권 노선도 편입 3종(#2595). KRIC 광역·경전철 materializer는 소스(=노선) 하나만 처리하므로
+  // 수도권 노선도 다섯 편입 중 셋(#2595). KRIC 광역·경전철 materializer는 소스(=노선) 하나만 처리하므로
   // 편입 하나가 노선별 snapshot을 노선 층 경로 키로 받아 카탈로그 순서대로 체인한다 — 대구 시각표가
-  // 노선별 snapshot을 받는 형상과 같다. 세 편입 모두 승계 pack에 의존하지 않는다: topology를
-  // inventory 소스가 아니라 tracked snapshot 파일로만 대조하고 역·역노선을 스스로 만든다.
+  // 노선별 snapshot을 받는 형상과 같다. 앞의 두 편입은 승계 pack에 의존하지 않는다: topology를
+  // inventory 소스가 아니라 tracked snapshot 파일로만 대조하고 역·역노선을 스스로 만든다. 서울 1~8호선
+  // 편입은 다르다 — 승계 원본의 서울교통공사 운영기관과 capital pilot cyberstation 소스 등재를 선행
+  // 조건으로 검사하고 승계 routeMapPositions의 (역, 노선, 권역) PK 집합으로 중복을 거른다. 다만 그 셋은
+  // 전부 승계 원본이 이미 갖고 있어 다른 편입에 대한 순서 의존은 없다.
   ["tools/datapack/materialize-kric-capital-wide-rail-route-map-positions.mjs", {
     materialize: materializeCapitalWideRailRouteMapInclusion,
     inputs: { paths: ["topologySnapshotPath"], linePaths: ["snapshotPath"] },
@@ -265,6 +268,14 @@ const INCHEON_ACCESSIBILITY_SOURCE_ID = "incheon-transit-accessibility";
 const INCLUSION_BASE_KEYS = Object.freeze(["regionId", "materializer", "materializedAt", "lines", "addedRows"]);
 const INCLUSION_OPTIONAL_KEYS = Object.freeze(["reorderedTables"]);
 const INCLUSION_LINE_BASE_KEYS = Object.freeze(["lineNumber", "lineId"]);
+// lineNumber 생략이 열리는 편입. 이 두 카탈로그가 싣는 노선(경의중앙·경춘·수인분당·경강·공항철도·
+// 서해·GTX-A·의정부·신분당·에버라인·우이신설·신림·김포골드)에는 숫자 노선명이 아예 없어 선언할 값이
+// 없다 — 없는 번호를 지어내면 선언이 거짓이 되므로 이 두 편입만 키를 생략하고, 오히려 선언하면 거부한다.
+// 나머지 편입의 노선은 전부 번호가 있어(9호선·인천 1·2호선·수도권 7호선 포함) 키를 요구한다.
+const LINE_NUMBER_OPTIONAL_MATERIALIZERS = Object.freeze([
+  "tools/datapack/materialize-kric-capital-wide-rail-route-map-positions.mjs",
+  "tools/datapack/materialize-kric-capital-light-rail-route-map-positions.mjs",
+]);
 // 편입 레코드에 허용하는 서술 키. "*Ko 접미사면 통과"로 열어 두면 snapshotPathKo 같은 죽은 선언이 그대로
 // 통과해(실측) 선언과 실제 결속이 갈린 채 무성으로 남는다 — 실제로 쓰는 키만 명시로 연다.
 const INCLUSION_NARRATIVE_KEYS = Object.freeze([
@@ -638,6 +649,20 @@ async function materializeBusanAccessibilityInclusion(fixture, inclusion, { read
   });
 }
 
+// 선언한 노선 번호를 저장소 정본과 대조한다. lineId의 대조 상대는 admission 정본(coverageScope.lineIds)
+// 이지만 그 정본에는 번호 축이 아예 없다 — 번호를 요구하면서 대조 상대를 두지 않으면 선언만 늘고 확인이
+// 없는 축이 되므로, 그 노선을 소유하는 materializer 모듈의 정본 표와 (번호, lineId) 쌍째로 맞춘다.
+function assertDeclaredLineNumbers(inclusion, canonicalLines) {
+  const declared = inclusion.lines.map(({ lineNumber, lineId }) => ({ lineNumber, lineId }));
+  const canonical = canonicalLines.map(({ lineNumber, lineId }) => ({ lineNumber, lineId }));
+  if (JSON.stringify(declared) !== JSON.stringify(canonical)) {
+    throw new Error(
+      `${inclusionLabel(inclusion)} pack data inclusion lines must match the tracked line numbers: `
+        + `expected ${JSON.stringify(canonical)}, got ${JSON.stringify(declared)}`,
+    );
+  }
+}
+
 // 대전·광주·수도권 편입이 공유하는 노선 선언 대조(#2595). 이 세 지역에는 대구 DAEGU_LINES·부산
 // BUSAN_LINES 같은 collector 상수가 없어 저장소 정본을 admission 정본(source-inventory)의
 // coverageScope.lineIds로 잡는다 — 재기술 등재가 이미 같은 정본에 결속돼 있으므로(assertInventoryLineScopeSync)
@@ -925,6 +950,7 @@ async function materializeSeoul9RouteMapInclusionFor(fixture, inclusion, { readT
   materialize,
 }) {
   assertDeclaredLinesMatchAdmissionScope(inclusion, inventory, sourceId);
+  assertDeclaredLineNumbers(inclusion, SEOUL9_LINES);
   assertAdmissionSnapshotPath(inventory, sourceId, "routeMapAdmissionEvidence", inclusion.snapshotPath);
   const topologySnapshotPath = assertAdmissionTopologySnapshotPath(
     inventory,
@@ -983,6 +1009,7 @@ async function incheonTopologySnapshot(inclusion, readTracked, inventory, key) {
 // 좌표를 한 번에 싣는다. 뒤 두 편입은 이 편입이 실은 소스 등재와 역노선 계보를 선행 조건으로 검사한다.
 async function materializeIncheonStationInfoInclusion(fixture, inclusion, { readTracked, inventory }) {
   assertDeclaredLinesMatchAdmissionScope(inclusion, inventory, INCHEON_STATION_INFO_SOURCE_ID);
+  assertDeclaredLineNumbers(inclusion, INCHEON_STATION_LINES);
   assertAdmissionSnapshotPath(
     inventory,
     INCHEON_STATION_INFO_SOURCE_ID,
@@ -1032,6 +1059,9 @@ async function materializeIncheonTimetableInclusion(fixture, inclusion, { readTr
 // (rawSha256·rowsSha256이 snapshot 내용에서 파생된다) 경로 결속이 유일한 정체성 축이다.
 async function materializeIncheonAccessibilityInclusion(fixture, inclusion, { readTracked, inventory }) {
   assertDeclaredLinesMatchAdmissionScope(inclusion, inventory, INCHEON_ACCESSIBILITY_SOURCE_ID);
+  // 노선 번호 정본은 이 지역의 노선을 세우는 역사정보 materializer가 갖는다 — 두 편입의 admission
+  // coverageScope.lineIds가 같은 세 노선이라(위 대조가 그것을 강제한다) 같은 표를 대조 상대로 쓴다.
+  assertDeclaredLineNumbers(inclusion, INCHEON_STATION_LINES);
   assertAdmissionSnapshotPath(
     inventory,
     INCHEON_ACCESSIBILITY_SOURCE_ID,
@@ -1102,8 +1132,9 @@ function packRowCounts(pack) {
 // 행수와 바이트 해시를 떠 두고, 편입 후 같은 표의 앞쪽 승계 행이 그대로인지 본다(기본 전제는 append —
 // 삽입·재정렬·수정이 일어나면 그 자체가 검토 대상이므로 fail closed가 옳다).
 //
-// #2595에서 그 검토가 실제로 왔다: 수도권 노선도 materializer 3종은 append 뒤 pack.operators·pack.lines·
-// pack.coverageLineOperatorScopes를 id로 재정렬한다(실측). 정렬 자체는 승계 행을 바꾸지 않으므로 편입을
+// #2595에서 그 검토가 실제로 왔다: 수도권 노선도 다섯 편입 중 넷(광역철도·경전철·서울 1~8호선·9호선
+// 1단계)이 append 뒤 pack.operators·pack.lines·pack.coverageLineOperatorScopes 중 자기가 손댄 표를 id로
+// 다시 정렬한다(실측 — 표 조합은 편입마다 다르다). 정렬 자체는 승계 행을 바꾸지 않으므로 편입을
 // 막을 이유가 아니지만, 전제를 조용히 푸는 것도 옳지 않다 — 편입이 reorderedTables로 재정렬 표를 명시
 // 선언한 경우에만 그 표를 위치 대신 다중집합으로 본다. 선언한 표에서도 승계 행의 수정·삭제·중복도 변화는
 // 그대로 fail closed이며, 선언하지 않은 표는 접두사 대조가 그대로 적용된다.
@@ -1175,16 +1206,16 @@ export function assertInheritedRowsUnchanged(label, snapshot, pack) {
     }
     // 재정렬을 선언한 표: 승계 행이 전부 바이트 동일하게, 같은 중복도로 남아 있어야 한다. 늘어난 행수는
     // assertDeclaredRows가 따로 잡으므로 이 둘을 합치면 "승계 다중집합 + 선언한 증가분"으로 결과가 고정된다.
-    const remaining = new Map(inheritedBag);
-    for (const row of rows) {
-      const hash = sha256Hex(JSON.stringify(row));
-      const count = remaining.get(hash);
-      if (count === undefined) continue;
-      if (count === 1) remaining.delete(hash);
-      else remaining.set(hash, count - 1);
-    }
-    if (remaining.size > 0) {
-      throw new Error(`${label} pack data inclusion modified inherited rows: ${table}`);
+    //
+    // 대조는 양방향이다. 승계 행 하나가 사라지는 방향만 보면(부분집합 대조) 승계 행을 복제해 중복도가
+    // *느는* 방향이 그대로 통과한다(실측) — 결과 다중집합에서 승계 행 해시의 중복도가 승계 당시와 정확히
+    // 같아야 한다. 이 표들의 행은 id/키로 유일해 승계 행과 바이트 동일한 신규 행은 그 자체가 중복이므로,
+    // 정확 일치가 정상 편입을 막지 않는다(현행 5개 재정렬 편입 실측).
+    const resultBag = rowMultiset(rows);
+    for (const [hash, count] of inheritedBag) {
+      if (resultBag.get(hash) !== count) {
+        throw new Error(`${label} pack data inclusion modified inherited rows: ${table}`);
+      }
     }
     // 선언은 실측과 일치해야 한다. 실제로 재정렬이 없었다면(접두사가 그대로면) 그 선언은 접두사 대조를
     // 근거 없이 끈 것이므로 거부한다 — 선언과 실제가 갈린 채 무성으로 남지 않게 한다.
@@ -1569,8 +1600,9 @@ function buildEvidence({ spec, inputs, packDataInclusions, reports, variants, si
         + "축은 재기술뿐이다.",
       reorderedTablesKo:
         "승계 행 불변 대조의 기본 전제는 append다 — 편입 후에도 각 표의 앞쪽 승계 행이 바이트 그대로여야 "
-        + "한다. 일부 materializer는 append 뒤 표를 id로 다시 정렬하는데(수도권 노선도 3종의 operators·"
-        + "lines·coverageLineOperatorScopes, 실측), 정렬은 승계 행 자체를 바꾸지 않으므로 편입을 막을 "
+        + "한다. 일부 materializer는 append 뒤 표를 id로 다시 정렬하는데(수도권 노선도 다섯 편입 중 넷이 "
+        + "operators·lines·coverageLineOperatorScopes 중 자기가 손댄 표를 그렇게 다시 정렬한다, 실측), "
+        + "정렬은 승계 행 자체를 바꾸지 않으므로 편입을 막을 "
         + "이유가 아니다. 그렇다고 전제를 조용히 풀지도 않는다: 편입이 reorderedTables로 그 표를 명시 "
         + "선언한 경우에만 위치 대신 다중집합으로 본다. 선언한 표에서도 승계 행의 수정·삭제·중복도 변화는 "
         + "그대로 fail closed이고, 선언하지 않은 표는 접두사 대조가 그대로 적용되며, 실제로 재정렬이 없는 "
@@ -1596,9 +1628,13 @@ function buildEvidence({ spec, inputs, packDataInclusions, reports, variants, si
         + "materializer는 그 지역 운영기관이 pack에 있을 것과 시각표 소스가 등재돼 있을 것을 함께 선행 "
         + "조건으로 검사하고, 시각표 편입보다 앞서면 실측상 운영기관 조건에서 먼저 fail closed 된다. 반면 "
         + "노선도와 편의시설 사이에는 선행 조건이 없어(대구와 같다) 두 편입의 교환은 조립을 통과한다(실측). "
-        + "수도권 노선도 다섯 편입은 승계 pack 의존이 아예 없다 — 경로 그래프 계보를 inventory 소스가 아니라 "
-        + "tracked snapshot 파일로 대조하고 역·역노선을 스스로 만들어, 다섯 편입 사이에도 다른 지역에 대해서도 "
-        + "선행 조건이 없다. 그런데도 순서를 바꾸면 조립이 막힌다(실측): 광역철도 편입이 승계 원본에 없던 "
+        + "수도권 노선도 다섯 편입 사이에도 다른 지역에 대해서도 선행 조건이 없다 — 네 편입(광역철도·경전철·"
+        + "9호선 1단계·2·3단계)은 경로 그래프 계보를 inventory 소스가 아니라 tracked snapshot 파일로 대조하고 "
+        + "역·역노선을 스스로 만들어 승계 pack 의존이 아예 없다. 서울 1~8호선 편입만 승계 pack에 의존한다: "
+        + "승계 원본의 서울교통공사 운영기관과 capital pilot cyberstation 소스 등재를 선행 조건으로 검사하고 "
+        + "승계 routeMapPositions의 (역, 노선, 권역) PK 집합으로 중복을 거른다. 그 셋은 전부 승계 원본이 이미 "
+        + "갖고 있어 다른 편입에 대한 순서 의존은 되지 않는다. 그런데도 순서를 바꾸면 조립이 막힌다(실측): "
+        + "광역철도 편입이 승계 원본에 없던 "
         + "표(coverageLineOperatorScopes)를 새로 만들고 환승역 중복 제거 결과(stations·stationLines)도 앞선 "
         + "편입이 무엇을 실었는지에 따라 갈려, 부산 노선도와 같은 선언 행수 대조가 걸린다. 9호선 1단계·2·3단계 "
         + "두 편입의 교환도, 9호선 두 편입을 서울 1~8호선 앞으로 옮기는 것도 같은 행수 대조에서 걸린다(실측). "
@@ -1711,17 +1747,29 @@ function lineScopedPilotRequirement(lineScoped, key) {
 
 // 사유 코드가 요구하는 실측 술어를 확인한다. 이 확인이 없으면 non-transition 선언이 "안 열린다"는 주장을
 // 자유 서술로만 남기게 되고, 뒤에 데이터가 들어와 실제로 열릴 수 있게 돼도 선언이 그대로 살아남는다.
-function assertNonTransitionReasons(nonTransitions, lineScoped) {
+//
+// 분기는 전수 switch다. "관심 없는 코드는 continue"로 두면 술어 없는 코드를 allowlist에 얹는 것만으로
+// 그 선언이 무성 통과한다(실측) — 미처리 코드는 그 자리에서 fail closed 해 "새 사유 코드는 실측 술어를
+// 함께 넣어야만 allowlist에 오른다"는 계약을 서술이 아니라 코드가 강제하게 한다.
+export function assertNonTransitionReasons(nonTransitions, lineScoped) {
   for (const declaration of nonTransitions.values()) {
     const entry = lineScopedPilotRequirement(lineScoped, declaration.requirementKey);
-    if (declaration.reasonCode !== "NO_SUPPORTING_ROWS_FOR_LINE") continue;
-    const supporting = Object.entries(entry.supportingRecordCountByField)
-      .filter(([, count]) => count !== 0);
-    if (supporting.length > 0) {
-      throw new Error(
-        `non-transition reason NO_SUPPORTING_ROWS_FOR_LINE requires zero supporting provenance rows for `
-          + `${declaration.requirementKey}: ${supporting.map(([field, count]) => `${field}=${count}`).join(",")}`,
-      );
+    switch (declaration.reasonCode) {
+      case "NO_SUPPORTING_ROWS_FOR_LINE": {
+        const supporting = Object.entries(entry.supportingRecordCountByField)
+          .filter(([, count]) => count !== 0);
+        if (supporting.length > 0) {
+          throw new Error(
+            `non-transition reason NO_SUPPORTING_ROWS_FOR_LINE requires zero supporting provenance rows for `
+              + `${declaration.requirementKey}: ${supporting.map(([field, count]) => `${field}=${count}`).join(",")}`,
+          );
+        }
+        break;
+      }
+      default:
+        throw new Error(
+          `non-transition reason code has no harness predicate: ${declaration.reasonCode}`,
+        );
     }
   }
 }
@@ -2007,8 +2055,17 @@ function validatePackDataInclusions(spec, materializers) {
 // 재정렬 선언은 선택 키다. 선언하지 않으면 승계 행 접두사 대조가 그대로 적용되고, 선언하면 그 표만
 // 다중집합 대조로 바뀐다. 빈 배열은 아무것도 열지 않는 죽은 선언이라 키 자체를 두지 않는 것과 갈리지
 // 않으므로 거부한다. 표 이름은 중복 없이 코드포인트 오름차순으로 둬 spec diff가 정렬에 흔들리지 않게 한다.
+//
+// 서술 키(reorderedTablesKo)는 선언 키가 있을 때만 뜻이 있다. 선언 없이 서술만 남기면 "이 편입은 표를
+// 재정렬한다"는 주장이 아무것도 완화하지 않은 채 통과해(실측) 서술과 실제 결속이 갈린다 —
+// evidenceModelReasonKo·evidenceCategoryReasonKo가 선언 키를 요구하는 것과 같은 축으로 거부한다.
 function validateReorderedTables(inclusion, label) {
-  if (inclusion.reorderedTables === undefined) return;
+  if (inclusion.reorderedTables === undefined) {
+    if (inclusion.reorderedTablesKo !== undefined) {
+      throw new Error(`${label}.reorderedTablesKo requires reorderedTables`);
+    }
+    return;
+  }
   const tables = requiredStringArray(inclusion.reorderedTables, `${label}.reorderedTables`);
   if (new Set(tables).size !== tables.length) {
     throw new Error(`${label}.reorderedTables must not repeat a table`);
@@ -2038,12 +2095,17 @@ function validateInclusionInputs(inclusion, inputs, label) {
   if (!Array.isArray(inclusion.lines) || inclusion.lines.length === 0) {
     throw new Error(`${label}.lines must be a non-empty array`);
   }
+  // lineNumber 생략은 "숫자 노선명이 없다"는 사실에 열리는 것이지 편입이 고를 수 있는 자유가 아니다.
+  // 주석으로만 그 범위를 적어 두면 번호가 있는 노선에서도 키가 조용히 빠진다(실측: 9호선·인천 편입 4건이
+  // 그렇게 생략돼 있었다) — 생략을 여는 materializer를 allowlist로 못박아 그 밖에서는 키를 요구한다.
+  const lineNumberOptional = LINE_NUMBER_OPTIONAL_MATERIALIZERS.includes(inclusion.materializer);
   for (const line of inclusion.lines) {
-    // lineNumber는 숫자 노선명이 있는 편입에서만 뜻이 있다. 수도권 광역·경전철(경의중앙·경춘·수인분당·
-    // 경강·공항철도·의정부·에버라인·우이신설·신림·김포골드)에는 숫자 노선명이 아예 없어 선언할 값이
-    // 없다 — 없는 번호를 지어내면 선언이 거짓이 되므로 그 편입은 키를 생략한다. 있으면 양의 정수여야
-    // 하고, 어느 편입에서든 노선 정체성 축(lineId)은 요구하며 어댑터가 저장소 정본과 대조한다.
-    if (line?.lineNumber !== undefined && (!Number.isInteger(line.lineNumber) || line.lineNumber <= 0)) {
+    // 노선 정체성 축(lineId)은 어느 편입에서든 요구하고 어댑터가 저장소 정본과 대조한다.
+    if (lineNumberOptional) {
+      if (line?.lineNumber !== undefined) {
+        throw new Error(`${label}.lines[].lineNumber must be omitted for lines without a numbered name`);
+      }
+    } else if (!Number.isInteger(line?.lineNumber) || line.lineNumber <= 0) {
       throw new Error(`${label}.lines[].lineNumber must be a positive integer`);
     }
     requiredString(line?.lineId, `${label}.lines[].lineId`);

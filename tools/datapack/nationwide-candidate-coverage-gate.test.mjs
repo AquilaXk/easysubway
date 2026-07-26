@@ -16,9 +16,11 @@
 //  10. 선언된 non-transition 축이 전환 범위를 넓히지 못한다(B3): 실제로 전환되는 키에 선언을 달거나,
 //      사유를 빼거나, 선언 없이 전환되지 않은 키가 남으면 모두 fail closed 된다.
 //
-// 실행 시간: 편입별 결속·창 회귀는 그 편입 하나만 담은 축소 spec으로 돈다. 대상 편입은 전부 승계 pack에
-// 의존하지 않는 자체 생성형이고(지역의 첫 편입이 운영기관·노선·역을 세우거나, 수도권 노선도처럼 계보를
-// tracked snapshot 파일로 대조한다), 이 회귀들이 겨냥한 두 가드는 모두 어댑터의 경로 결속과 materializer
+// 실행 시간: 편입별 결속·창 회귀는 그 편입 하나만 담은 축소 spec으로 돈다. 대상 편입은 앞선 편입 결과에
+// 의존하지 않고(지역의 첫 편입이 운영기관·노선·역을 세우거나, 수도권 KRIC 노선도처럼 계보를 tracked
+// snapshot 파일로 대조한다. 서울 1~8호선 편입만 승계 pack에 의존하는데 그 선행 조건인 서울교통공사
+// 운영기관·cyberstation 소스는 승계 원본이 이미 갖고 있어 축소해도 그대로 만족된다),
+// 이 회귀들이 겨냥한 두 가드는 모두 어댑터의 경로 결속과 materializer
 // requiredSource의 창 판정이라 승계 행수 대조·pack 선행 조건 검사보다 먼저 걸린다(실측). 축소로 달라지는
 // addedRows는 그 판정에 닿지 않고, 가드를 끄면 진단 문구가 달라져 assert.rejects가 그대로 FAIL한다.
 // 순서 의존·체인 오염·addedRows 누적을 보는 회귀와 전이 판정을 보는 회귀는 그대로 전체 spec으로 돈다.
@@ -34,6 +36,7 @@ import { promisify } from "node:util";
 import {
   EVIDENCE_PATH,
   assertInheritedRowsUnchanged,
+  assertNonTransitionReasons,
   inheritedRowSnapshot,
   runNationwideCandidateCoverageGate,
 } from "./run-nationwide-candidate-coverage-gate.mjs";
@@ -425,7 +428,9 @@ const CAPITAL_INCLUSION_BINDINGS = [
     offset: 4,
     sourceId: "seoul-metro-line9-23-route-map-positions",
     evidenceKey: "routeMapAdmissionEvidence",
-    reorderedTables: ["coverageLineOperatorScopes"],
+    // 이 편입은 운영기관·노선·scope를 하나도 더하지 않아(1단계 편입이 이미 만들었고 FILE 계보 표기는
+    // scope로 내지 않는다) 어느 표도 재정렬하지 않는다 — 선언 키 자체가 없어야 한다.
+    reorderedTables: undefined,
     belowLowerBoundPattern:
       /seoul-metro-line9-23-route-map-positions inventory evidence does not match snapshot/,
   },
@@ -1098,8 +1103,10 @@ test("광주 5 requirement는 체인 편입으로 MISSING에서 SUPPORTED로 전
   );
 });
 
-// #2595 B3: 수도권 노선도는 한 도메인에 소스 11건이 붙는다. 편입은 materializer 단위로 3건이며
-// (광역철도 6소스 체인 / 경전철 4소스 체인 / 서울 1소스), 세 편입 모두 승계 pack에 의존하지 않는다.
+// #2595 B3: 수도권 노선도는 한 도메인에 소스 11건이 붙는다. 이 17건을 여는 편입은 materializer 단위로
+// 3건이며(광역철도 6소스 체인 / 경전철 4소스 체인 / 서울 1소스), 수도권 노선도 편입 전체는 9호선 두 건을
+// 더해 5건이다. 앞의 두 편입은 승계 pack에 의존하지 않고 서울 1~8호선 편입만 승계 원본의 운영기관·
+// cyberstation 소스 등재와 좌표 PK 집합에 의존한다(그 셋은 승계 원본이 이미 갖고 있다).
 test("수도권 노선도 17 requirement는 편입 3건으로 MISSING에서 SUPPORTED로 전이한다", async () => {
   const evidence = await readJson(EVIDENCE_PATH);
   const byKey = new Map(evidence.variants.lineScoped.pilotRequirements.map((entry) => [entry.requirementKey, entry]));
@@ -1129,9 +1136,10 @@ test("수도권 노선도 17 requirement는 편입 3건으로 MISSING에서 SUPP
 
   const [wideRail, lightRail, seoul] = evidence.packDataInclusions.entries.slice(CAPITAL_INDEX);
   // 광역철도 편입은 승계 원본에 없던 표(coverageLineOperatorScopes)를 새로 만든다 — 뒤 편입은 자기 몫만 더한다.
-  // 서해선·GTX-A·신분당선은 두 운영기관 scope를 함께 내므로 scope 행이 노선 수보다 많다.
+  // 서해선·GTX-A는 두 운영기관 scope를 함께 내므로 광역철도의 scope 행이 노선 수보다 둘 많다. 경전철은
+  // 노선당 하나다 — 신분당선 정본도 두 운영기관을 등재하지만 FILE 계보 표기(서울교통공사)는 scope로 내지 않는다.
   assert.equal(wideRail.addedRows.coverageLineOperatorScopes, 10);
-  assert.equal(lightRail.addedRows.coverageLineOperatorScopes, 6);
+  assert.equal(lightRail.addedRows.coverageLineOperatorScopes, 5);
   assert.equal(seoul.addedRows.coverageLineOperatorScopes, 0);
   assert.equal(wideRail.addedRows.sourceInventory, 8);
   assert.equal(lightRail.addedRows.sourceInventory, 5);
@@ -1212,10 +1220,12 @@ test("수도권 dual-operator 노선 6 requirement는 편입으로 MISSING에서
   assert.equal(phase23.addedRows.routeMapPositions, 13);
   assert.equal(phase23.addedRows.stations, 10);
   assert.equal(phase23.addedRows.stationLines, 13);
-  // 2·3단계 편입은 1단계가 만든 운영기관·노선을 다시 만들지 않고 남은 운영기관 scope만 더한다.
+  // 2·3단계 편입은 1단계가 만든 운영기관·노선·scope를 다시 만들지 않는다. 정본이 dual coverage로 등재한
+  // 나머지 표기(서울교통공사)는 activeLineScopes에 대응이 없는 FILE 계보라 scope 행으로도 내지 않는다.
   assert.equal(phase23.addedRows.operators, 0);
   assert.equal(phase23.addedRows.lines, 0);
-  assert.equal(phase23.addedRows.coverageLineOperatorScopes, 1);
+  assert.equal(phase23.addedRows.coverageLineOperatorScopes, 0);
+  assert.equal("reorderedTables" in phase23, false);
 });
 
 // #2138 증거 모델 축. 감사자가 evidence만 보고 "어느 건이 어느 근거 성격으로 섰는지" 알 수 있어야 한다.
@@ -1605,13 +1615,56 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
   });
 
   // 서술 키를 "*Ko 접미사면 통과"로 열어 두면 snapshotPathKo 같은 죽은 선언이 그대로 통과한다(실측).
-  // 명시 allowlist(reasonKo·materializedAtReasonKo·addedRowsKo)로 좁혔으므로 그 밖의 서술 키는 거부된다.
+  // 명시 allowlist(reasonKo·materializedAtReasonKo·addedRowsKo·reorderedTablesKo)로 좁혔으므로 그 밖의
+  // 서술 키는 거부된다.
   await context.test("등재되지 않은 서술 키는 거부된다", async () => {
     await rejectsWith(
       (value) => {
         value.packDataInclusions[1].snapshotPathKo = "tools/datapack/sources/does-not-exist.json";
       },
       /materialize-daegu-route-map-positions\.mjs has unknown keys: snapshotPathKo/,
+    );
+  });
+
+  // 등재된 서술 키라도 선언 키 없이 홀로 서면 아무것도 완화하지 않는 죽은 서술이다 — 그 상태로 통과하면
+  // "이 편입은 표를 재정렬한다"는 주장이 실제 결속 없이 evidence 밖에 남는다(실측: 그대로 통과했다).
+  await context.test("선언 키 없는 reorderedTablesKo는 거부된다", async () => {
+    await rejectsWith(
+      (value) => {
+        value.packDataInclusions[1].reorderedTablesKo = "선언 없이 서술만 남긴 죽은 키";
+      },
+      /materialize-daegu-route-map-positions\.mjs\.reorderedTablesKo requires reorderedTables/,
+    );
+  });
+
+  // lineNumber 생략은 숫자 노선명이 없는 두 KRIC 카탈로그 편입에만 열린다. 그 밖의 편입에서 키가 빠지면
+  // 거부되고(주석으로만 범위를 적어 두면 번호 있는 노선에서도 조용히 빠진다), 반대로 열린 편입이 번호를
+  // 선언하면 없는 값을 지어낸 것이므로 그것도 거부된다.
+  await context.test("생략이 열리지 않은 편입에서 lineNumber가 빠지면 거부된다", async () => {
+    await rejectsWith(
+      (value) => { delete value.packDataInclusions[INCHEON_INDEX].lines[0].lineNumber; },
+      /materialize-incheon-station-info\.mjs\.lines\[\]\.lineNumber must be a positive integer/,
+    );
+  });
+
+  await context.test("숫자 노선명이 없는 편입이 lineNumber를 선언하면 거부된다", async () => {
+    await rejectsWith(
+      (value) => { value.packDataInclusions[CAPITAL_INDEX].lines[0].lineNumber = 1; },
+      new RegExp(
+        "materialize-kric-capital-wide-rail-route-map-positions\\.mjs\\.lines\\[\\]\\.lineNumber "
+          + "must be omitted for lines without a numbered name",
+      ),
+    );
+  });
+
+  // 요구만 하고 대조 상대를 두지 않으면 번호는 선언만 늘고 확인이 없는 축이 된다 — 저장소 정본과 갈린
+  // 번호는 그 자리에서 거부된다.
+  await context.test("저장소 정본과 다른 lineNumber는 거부된다", async () => {
+    await rejectsWith(
+      // solo로 줄인 spec에서는 대상 편입이 인덱스 0이다.
+      (value) => { value.packDataInclusions[0].lines[0].lineNumber = 3; },
+      /materialize-incheon-station-info\.mjs pack data inclusion lines must match the tracked line numbers/,
+      { solo: INCHEON_INDEX },
     );
   });
 
@@ -2309,9 +2362,13 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
   });
 
   // 재정렬 선언은 선택 키이지만 선언과 실제가 갈리면 어느 방향으로도 fail closed 된다.
+  // 서술 키는 선언 키와 함께 지운다 — 서술만 남기면 그 죽은 선언이 먼저 걸려 이 축에 닿지 못한다.
   await context.test("재정렬 선언을 빼면 승계 행 불변 대조가 거부한다", async () => {
     await rejectsWith(
-      (value) => { delete value.packDataInclusions[CAPITAL_INDEX].reorderedTables; },
+      (value) => {
+        delete value.packDataInclusions[CAPITAL_INDEX].reorderedTables;
+        delete value.packDataInclusions[CAPITAL_INDEX].reorderedTablesKo;
+      },
       /materialize-kric-capital-wide-rail-route-map-positions\.mjs pack data inclusion modified inherited rows: (lines|operators)/,
     );
   });
@@ -2666,6 +2723,16 @@ test("재정렬 선언은 위치만 풀고 승계 행의 수정·삭제·중복�
     /synthetic pack data inclusion modified inherited rows: stations/,
   );
 
+  // 반대 방향도 같은 축이다: 승계 행을 그대로 둔 채 사본을 하나 더 붙이면 중복도가 *는다*. 부분집합
+  // 대조(승계 행이 남아 있기만 하면 통과)로는 이 방향이 그대로 지나가므로 정확 일치로 대조한다.
+  assert.throws(
+    () => assertInheritedRowsUnchanged("synthetic", snapshot, {
+      ...inherited,
+      stations: [{ id: "b" }, { id: "a" }, { id: "a" }],
+    }),
+    /synthetic pack data inclusion modified inherited rows: stations/,
+  );
+
   // 선언하지 않은 표는 접두사 대조가 그대로 걸린다.
   assert.throws(
     () => assertInheritedRowsUnchanged("synthetic", snapshot, {
@@ -2689,6 +2756,27 @@ test("재정렬 선언은 위치만 풀고 승계 행의 수정·삭제·중복�
   assert.throws(
     () => assertInheritedRowsUnchanged("synthetic", inheritedRowSnapshot(inherited, ["facilities"]), inherited),
     /synthetic pack data inclusion declared a reordered table the inherited pack lacks: facilities/,
+  );
+});
+
+// #2595: 사유 코드마다 실측 술어가 하나씩 있어야 한다는 계약을 코드가 강제하는지 본다. 분기가 "관심 없는
+// 코드는 continue"였을 때는 술어 없는 코드를 allowlist에 얹는 것만으로 그 선언이 무성 통과했다(실측) —
+// 전수 switch로 바꿔 미처리 코드가 그 자리에서 fail closed 되는지 고정한다.
+test("사유 술어가 없는 non-transition 코드는 무성 통과하지 않는다", () => {
+  const requirementKey = "capital:incheon-transit:line-15b3b8a93259:route_graph_topology";
+  const lineScoped = {
+    pilotRequirements: [{ requirementKey, supportingRecordCountByField: { network_edges: 0 } }],
+  };
+  const declarationWith = (reasonCode) => new Map([
+    [requirementKey, { requirementKey, reasonCode, reasonKo: "합성 선언" }],
+  ]);
+
+  // 술어가 있는 코드는 그대로 통과한다(전제 확인).
+  assertNonTransitionReasons(declarationWith("NO_SUPPORTING_ROWS_FOR_LINE"), lineScoped);
+
+  assert.throws(
+    () => assertNonTransitionReasons(declarationWith("OWNER_DEFERRED"), lineScoped),
+    /non-transition reason code has no harness predicate: OWNER_DEFERRED/,
   );
 });
 

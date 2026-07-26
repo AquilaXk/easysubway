@@ -4,7 +4,7 @@
   "issue": 2595,
   "parentIssues": [2510, 2138],
   "candidateId": "nationwide-candidate-20260725",
-  "trackKo": "전국 candidate 트랙의 조립 정본이다. production 게시 트랙(capital pilot)과 분리되며 게시 대상이 아니다. 정본 게이트(report-coverage-gaps.mjs)는 manifest의 required root pack이 단독으로 coverage 계약을 만족해야 한다고 판정하므로 candidate는 root가 되는 단일 pack으로 조립한다. #2514 B0가 파일럿 1 scope 전환을 실증했고, #2549 B1이 대구 1·2·3호선 9 requirement를 같은 승계 모델로 편입했으며, #2580 B2-a가 같은 지역의 route_map_positions·accessibility_facilities 6 requirement를 B1 편입 뒤에 체인으로 올렸고, #2587 B2-b가 두 번째 지역(부산 1·2·3·4호선 5도메인 20 requirement)을 편입했다. #2595 B3이 대전 1호선 5 requirement·광주 1호선 5 requirement와 수도권 노선도 23 requirement, 인천 13 requirement를 같은 스키마로 올린다 — 대전·광주는 topology 전용 materializer가 편입 단위가 아니라 시각표 materializer가 topology·membership·시각표를 한 번에 싣고, 수도권 노선도 다섯 편입은 경로 그래프 계보를 inventory 소스가 아니라 tracked snapshot 파일로 대조해 승계 pack에 의존하지 않으며, 인천은 부산과 같이 역사정보 편입이 지역 자체(운영기관·노선·역)를 세우고 시각표·편의시설이 그 계보에 붙는다. 인천 역사정보 소스는 7호선을 세 도메인 scope로 덮지만 구간(network_edges)은 admit하지 않아 그 노선의 route_graph_topology 하나만 열리지 않는다 — 재기술이 그 사실을 nonTransitioningRequirements로 명시하고 하네스가 실측으로 확인한다.",
+  "trackKo": "전국 candidate 트랙의 조립 정본이다. production 게시 트랙(capital pilot)과 분리되며 게시 대상이 아니다. 정본 게이트(report-coverage-gaps.mjs)는 manifest의 required root pack이 단독으로 coverage 계약을 만족해야 한다고 판정하므로 candidate는 root가 되는 단일 pack으로 조립한다. #2514 B0가 파일럿 1 scope 전환을 실증했고, #2549 B1이 대구 1·2·3호선 9 requirement를 같은 승계 모델로 편입했으며, #2580 B2-a가 같은 지역의 route_map_positions·accessibility_facilities 6 requirement를 B1 편입 뒤에 체인으로 올렸고, #2587 B2-b가 두 번째 지역(부산 1·2·3·4호선 5도메인 20 requirement)을 편입했다. #2595 B3이 대전 1호선 5 requirement·광주 1호선 5 requirement와 수도권 노선도 23 requirement, 인천 13 requirement를 같은 스키마로 올린다 — 대전·광주는 topology 전용 materializer가 편입 단위가 아니라 시각표 materializer가 topology·membership·시각표를 한 번에 싣고, 수도권 노선도 다섯 편입 중 넷은 경로 그래프 계보를 inventory 소스가 아니라 tracked snapshot 파일로 대조해 승계 pack에 의존하지 않고 서울 1~8호선 편입만 승계 원본의 운영기관·cyberstation 소스 등재와 좌표 PK 집합에 의존하며, 인천은 부산과 같이 역사정보 편입이 지역 자체(운영기관·노선·역)를 세우고 시각표·편의시설이 그 계보에 붙는다. 인천 역사정보 소스는 7호선을 세 도메인 scope로 덮지만 구간(network_edges)은 admit하지 않아 그 노선의 route_graph_topology 하나만 열리지 않는다 — 재기술이 그 사실을 nonTransitioningRequirements로 명시하고 하네스가 실측으로 확인한다.",
   "harness": "tools/datapack/run-nationwide-candidate-coverage-gate.mjs",
   "productionTrackInvarianceKo": "승계 원본(capital-production-reviewed-pack.json)의 pack.sourceInventory는 게시 시점 스냅샷이므로 operator-scope 기술을 그대로 둔다. line-scope 재기술은 candidate 조립분과 admission 정본(tools/datapack/source-inventory.json)에만 반영한다. 게시 차단 판정(report-coverage-gaps.mjs --release-scope)은 capital pilot targets(schemaVersion 1)로 평가돼 lineIds 기술 유무에 영향을 받지 않으므로 두 정본의 이 차이는 게시 동작을 바꾸지 않는다. 지역 데이터 편입(packDataInclusions)도 candidate 조립분에서만 일어나며 게시 fixture·release-request는 어떤 경로로도 바뀌지 않는다.",
   "inheritsFrom": {
@@ -670,7 +670,7 @@
         "networkEdges": 0,
         "routeMapPositions": 63,
         "routeMapLineTracks": 0,
-        "coverageLineOperatorScopes": 6,
+        "coverageLineOperatorScopes": 5,
         "facilities": 0,
         "stationFacilityEvidence": 0,
         "stationAccessibilitySummaries": 0,
@@ -688,10 +688,10 @@
         "requiredTables": 0,
         "sourceInventory": 5
       },
-      "addedRowsKo": "5개 snapshot의 좌표 63행에는 노선끼리 겹치는 역이 없지만(고유 역 63) 그중 5곳이 광역철도 편입이 이미 실은 역과 같아 역은 58행만 는다 — 겹친 역은 소속(역·노선 쌍)만 늘고 역 자체는 다시 실리지 않는다(신분당선 판교·정자·미금 3곳과 나머지 네 노선 2곳). 운영기관 5곳은 다섯 노선이 각각 다른 사업자이고 신분당선이 노선 운영기관인 네오트랜스를 더하기 때문이다 — 신분당선 정본의 다른 운영기관 표기(서울교통공사)는 승계 원본에 이미 있다. coverageLineOperatorScopes 6행은 노선 5개 중 신분당선이 두 운영기관 scope를 함께 내기 때문이다.",
+      "addedRowsKo": "5개 snapshot의 좌표 63행에는 노선끼리 겹치는 역이 없지만(고유 역 63) 그중 5곳이 광역철도 편입이 이미 실은 역과 같아 역은 58행만 는다 — 겹친 역은 소속(역·노선 쌍)만 늘고 역 자체는 다시 실리지 않는다(신분당선 판교·정자·미금 3곳과 나머지 네 노선 2곳). 운영기관 5곳은 다섯 노선이 각각 다른 사업자이고 신분당선이 노선 운영기관인 네오트랜스를 더하기 때문이다 — 신분당선 정본의 다른 운영기관 표기(서울교통공사)는 승계 원본에 이미 있다. coverageLineOperatorScopes 5행은 노선 하나에 scope 하나씩이다 — 신분당선 정본은 두 운영기관을 등재하지만 서울교통공사 표기는 FILE admission 계보 항목이라(#2138 activeLineScopes에 대응 scope가 없다) 카탈로그가 lineageOnlyOperatorIds로 갈라 scope 행으로는 내지 않는다.",
       "reorderedTables": ["coverageLineOperatorScopes", "lines", "operators"],
       "reorderedTablesKo": "이 materializer도 append 뒤 pack.operators·pack.lines를 id 오름차순으로 다시 정렬하며, 광역철도 편입이 이미 만들어 둔 coverageLineOperatorScopes까지 같은 축으로 다시 정렬한다(실측). 그래서 선언 표가 광역철도 편입보다 하나 많다 — 그 표가 이 편입에는 승계 행이 있는 표이기 때문이다.",
-      "reasonKo": "#2595 B3. 수도권 경전철 5노선(신분당·에버라인·우이신설·신림·김포골드라인) route_map_positions requirement를 판정에 올리려면 candidate root pack이 공식 노선도 좌표 행을 담아야 한다. 광역철도 편입과 형상이 같고(노선별 snapshot 체인) 서로 선행 조건이 없다. 신분당선은 이 배치의 첫 묶음에서 빠져 있었다: admission coverageScope.operatorIds가 2개라 서해선·GTX-A와 같은 이유로 거부됐고, 같은 카탈로그 등재 축으로 열렸다. 신분당선은 두 운영기관 scope를 내지만 requirement가 느는 것은 하나뿐이다 — 정본의 서울교통공사 표기는 FILE admission 계보 항목이라 #2138 activeLineScopes에 대응 scope가 없다. 이미 admission이 끝난 snapshot(#2505)을 재생한다.",
+      "reasonKo": "#2595 B3. 수도권 경전철 5노선(신분당·에버라인·우이신설·신림·김포골드라인) route_map_positions requirement를 판정에 올리려면 candidate root pack이 공식 노선도 좌표 행을 담아야 한다. 광역철도 편입과 형상이 같고(노선별 snapshot 체인) 서로 선행 조건이 없다. 신분당선은 이 배치의 첫 묶음에서 빠져 있었다: admission coverageScope.operatorIds가 2개라 서해선·GTX-A와 같은 이유로 거부됐고, 같은 카탈로그 등재 축으로 열렸다. 신분당선 정본은 두 운영기관을 등재하지만 pack scope와 requirement는 하나씩이다 — 정본의 서울교통공사 표기는 FILE admission 계보 항목이라 #2138 activeLineScopes에 대응 scope가 없고, 카탈로그가 그 표기를 lineageOnlyOperatorIds로 갈라 정본 대조·운영기관 등재에만 쓰고 scope 행으로는 내지 않는다. 이미 admission이 끝난 snapshot(#2505)을 재생한다.",
       "materializedAtReasonKo": "이 편입이 싣는 5개 소스도 admission 정본에 freshUntil이 없고 materializer가 하한만 검사하며, 다섯 소스의 capturedAt이 2026-07-25T06:00:00Z로 모두 같다(실측). 광역철도 편입과 pin 값이 같지만 묶지 않는다 — 값이 같은 것은 두 카탈로그의 snapshot을 같은 날 뜬 결과일 뿐이고, 한쪽 snapshot이 갱신되면 다른 편입의 기준 시각까지 함께 흔들려서는 안 된다."
     },
     {
@@ -750,7 +750,7 @@
       "snapshotPath": "tools/datapack/sources/kric-seoul-metro-line9-1-route-map-positions-20260725.json",
       "topologySnapshotPath": "tools/datapack/sources/capital-route-topology-20260724.json",
       "lines": [
-        { "lineId": "line-f0e747248a31" }
+        { "lineNumber": 9, "lineId": "line-f0e747248a31" }
       ],
       "addedRows": {
         "operators": 1,
@@ -793,7 +793,7 @@
       "snapshotPath": "tools/datapack/sources/seoul-metro-line9-23-route-map-positions-20260725.json",
       "topologySnapshotPath": "tools/datapack/sources/capital-route-topology-20260724.json",
       "lines": [
-        { "lineId": "line-f0e747248a31" }
+        { "lineNumber": 9, "lineId": "line-f0e747248a31" }
       ],
       "addedRows": {
         "operators": 0,
@@ -805,7 +805,7 @@
         "networkEdges": 0,
         "routeMapPositions": 13,
         "routeMapLineTracks": 0,
-        "coverageLineOperatorScopes": 1,
+        "coverageLineOperatorScopes": 0,
         "facilities": 0,
         "stationFacilityEvidence": 0,
         "stationAccessibilitySummaries": 0,
@@ -823,9 +823,7 @@
         "requiredTables": 0,
         "sourceInventory": 1
       },
-      "addedRowsKo": "2·3단계 좌표 13행 중 앞선 편입이 이미 실은 역 3곳(선정릉·종합운동장·석촌)이 있어 역은 10행만 늘고 소속은 13행 전부 는다. 1단계 소스와 겹치는 역은 없다(두 소스가 9호선을 구간으로 나눠 덮는다). 운영기관·노선은 0행 — 1단계 편입이 이미 만들었다. coverageLineOperatorScopes 1행은 이 소스가 dual coverage(FILE 계보 표기 서울교통공사 + 노선 운영기관 서울시메트로9호선)로 등재돼 있어 남은 한 운영기관 scope가 더해지는 것이다.",
-      "reorderedTables": ["coverageLineOperatorScopes"],
-      "reorderedTablesKo": "이 materializer는 scope를 더한 뒤 coverageLineOperatorScopes를 (권역:운영기관:노선) 오름차순으로 다시 정렬한다(실측). 운영기관·노선은 1단계 편입이 이미 만들어 두어 이 편입은 건드리지 않으므로 선언 표는 이 하나뿐이다.",
+      "addedRowsKo": "2·3단계 좌표 13행 중 앞선 편입이 이미 실은 역 3곳(선정릉·종합운동장·석촌)이 있어 역은 10행만 늘고 소속은 13행 전부 는다. 1단계 소스와 겹치는 역은 없다(두 소스가 9호선을 구간으로 나눠 덮는다). 운영기관·노선은 0행 — 1단계 편입이 이미 만들었다. coverageLineOperatorScopes도 0행이다: 이 소스는 dual coverage(FILE 계보 표기 서울교통공사 + 노선 운영기관 서울시메트로9호선)로 등재돼 있지만 계보 표기에는 #2138 activeLineScopes에 대응 scope가 없어 scope 행으로 내지 않고, 노선 운영기관 scope는 1단계 편입이 이미 실었다. 그래서 이 편입은 어느 표에도 재정렬을 일으키지 않는다(reorderedTables 선언 없음).",
       "reasonKo": "#2595 B3. 9호선 2·3단계 소스를 같은 노선 위에 이어 싣는다. 1단계 편입과 서로 선행 조건은 없지만 두 편입이 같은 노선의 역을 나눠 실어 중복 제거 결과가 순서에 따라 갈리므로 선언 행수 대조가 순서를 고정한다. 이미 admission이 끝난 snapshot(#2498)을 재생한다.",
       "materializedAtReasonKo": "이 소스의 admission 정본에도 freshUntil이 없고 materializer는 하한(capturedAt 2026-07-25T04:00:00Z 이후)만 검사한다 — pin은 그 하한 정각이다."
     },
@@ -835,9 +833,9 @@
       "materializedAt": "2026-07-24T06:00:00.000Z",
       "snapshotPath": "tools/datapack/sources/incheon-transit-station-info-20260724.json",
       "lines": [
-        { "lineId": "line-42b5805f3b5a" },
-        { "lineId": "line-98718184f016" },
-        { "lineId": "line-15b3b8a93259" }
+        { "lineNumber": 2, "lineId": "line-42b5805f3b5a" },
+        { "lineNumber": 1, "lineId": "line-98718184f016" },
+        { "lineNumber": 7, "lineId": "line-15b3b8a93259" }
       ],
       "addedRows": {
         "operators": 1,
@@ -921,9 +919,9 @@
       "snapshotPath": "tools/datapack/sources/incheon-transit-accessibility-20260724.json",
       "topologySnapshotPath": "tools/datapack/sources/incheon-transit-station-info-20260724.json",
       "lines": [
-        { "lineId": "line-42b5805f3b5a" },
-        { "lineId": "line-98718184f016" },
-        { "lineId": "line-15b3b8a93259" }
+        { "lineNumber": 2, "lineId": "line-42b5805f3b5a" },
+        { "lineNumber": 1, "lineId": "line-98718184f016" },
+        { "lineNumber": 7, "lineId": "line-15b3b8a93259" }
       ],
       "addedRows": {
         "operators": 0,
