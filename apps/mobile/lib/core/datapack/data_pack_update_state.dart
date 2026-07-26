@@ -9,6 +9,7 @@ import 'data_pack_manifest.dart';
 class DataPackUpdateStateRepository {
   DataPackUpdateStateRepository({
     required this.userDatabase,
+    this.minimumReleaseSequence,
     DateTime Function()? now,
   }) : _now = now ?? DateTime.now;
 
@@ -23,6 +24,11 @@ class DataPackUpdateStateRepository {
   static const _policyStateKey = 'datapack_update_policy_state';
 
   final user_db.UserDatabase userDatabase;
+
+  /// 수락 이력과 무관하게 적용되는 절대 순번 하한(이슈 #2531). production 서명
+  /// 공개키가 주입된 빌드에서만 값이 들어오고, 개발·테스트 빌드에서는 null이다.
+  /// 값의 단일 원본은 `apps/mobile/release/datapack-manifest-acceptance-policy.json`.
+  final int? minimumReleaseSequence;
   final DateTime Function() _now;
   final _secureRandom = Random.secure();
 
@@ -96,8 +102,11 @@ class DataPackUpdateStateRepository {
   }
 
   Future<void> ensureManifestCanBeAccepted(DataPackManifest manifest) async {
+    final floor = minimumReleaseSequence;
     if (!manifest.hasReplayProtection) {
-      if (await hasAcceptedManifestState()) {
+      // v1 봉투에는 순번이 없어 하한을 증명할 수 없다. 하한이 걸린 빌드에서는 수락
+      // 이력 유무와 무관하게 거부한다.
+      if (floor != null || await hasAcceptedManifestState()) {
         throw const DataPackManifestReplayException('앱 이동 정보를 안전하게 확인하지 못했어요.');
       }
       return;
@@ -105,6 +114,11 @@ class DataPackUpdateStateRepository {
     final channel = manifest.channel!;
     final sequence = manifest.releaseSequence!;
     final hash = manifest.manifestHash!;
+    // 이슈 #2531: 리플레이 방어가 단말 로컬 이력에만 기대면 재설치로 초기화된다.
+    // 하한은 이력이 비어 있는 신규 설치 단말에도 같은 바닥을 준다.
+    if (floor != null && sequence < floor) {
+      throw const DataPackManifestReplayException('앱 이동 정보가 오래된 버전입니다.');
+    }
     final accepted = await readAcceptedManifestState(channel);
     if (accepted == null) {
       return;

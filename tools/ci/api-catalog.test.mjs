@@ -697,14 +697,22 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
     findCatalogEntry(catalog, "provider:busan-transportation-official-fare-table").operation.method,
     "GET",
   );
-  assert.ok(catalog.some((entry) => entry.id === "integration:github-datapack-workflow-dispatch"));
   assert.ok(catalog.some((entry) => entry.id === "integration:mobile-ad-creative-image"));
   assert.ok(catalog.some((entry) => entry.id === "integration:mobile-report-photo-upload"));
   assert.ok(catalog.some((entry) => entry.id === "contract:report-api"));
+  // #2569: backend→GitHub workflow_dispatch 어댑터가 제거되어 outbound integration이 아니다.
   assert.equal(
-    findCatalogEntry(catalog, "integration:github-datapack-workflow-dispatch").endpointRef,
-    "config:easysubway.datapack.github-api-base-url(default=https://api.github.com)/repos/AquilaXk/easysubway/actions/workflows/datapack-release.yml/dispatches",
+    catalog.some((entry) => entry.id === "integration:github-datapack-workflow-dispatch"),
+    false,
   );
+  // id를 바꿔 endpointRef만 되살리는 우회도 차단한다(계약 원문 문자열 pin).
+  const integrationsSource = await readFile(
+    new URL("../../contracts/api/outbound-integrations.json", import.meta.url),
+    "utf8",
+  );
+  assert.doesNotMatch(integrationsSource, /actions\/workflows\/datapack-release\.yml\/dispatches/);
+  // 자격 증명 참조까지 함께 pin한다(#2569: 소비자가 사라진 Actions PAT의 계약 재등장 차단).
+  assert.doesNotMatch(integrationsSource, /EASYSUBWAY_GITHUB_ACTIONS_DISPATCH_TOKEN/);
 });
 
 test("프로젝트 provider catalog는 비API source를 제외하고 모든 호출 계약을 제공한다", async () => {

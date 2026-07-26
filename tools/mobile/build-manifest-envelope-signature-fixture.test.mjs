@@ -195,6 +195,61 @@ test("폴백 매니페스트는 자기해시 봉투로 정합하다", () => {
   }
 });
 
+test("v1 봉투 fixture는 신선도 필드 없이 운영 팩 서명만 갖는다", () => {
+  // 이슈 #2531(DP-05). v1 봉투가 "봉투 서명·채널·순번·만료가 아예 없는데 팩 서명은
+  // 전부 유효한" 문서라는 전제를 고정한다. 이 전제가 깨지면 Dart 쪽 거부 테스트의
+  // 거부 사유가 봉투 버전 하나로 좁혀지지 않는다.
+  const legacy = fixture.legacyEnvelopeManifest;
+
+  for (const field of ["manifestVersion", "channel", "releaseSequence", "publishedAt", "expiresAt", "keyId", "signature"]) {
+    assert.equal(field in legacy, false, `${field}가 v1 봉투에 남아 있다`);
+  }
+  assert.equal(legacy.packs.length, fixture.manifest.packs.length);
+
+  for (const [index, pack] of legacy.packs.entries()) {
+    const signed = fixture.manifest.packs[index];
+    assert.equal(pack.artifactKind, "production");
+    assert.equal(pack.signature.algorithm, "rsa-sha256-pack-manifest-v1");
+    assert.equal(signed.signature.algorithm, "rsa-sha256-pack-manifest-v2");
+    assert.ok(
+      verifies(`${packPayload(pack)}${productionSuffix(pack)}`, pack.signature.value),
+      `${pack.id} v1 봉투 팩 서명 검증 실패`,
+    );
+    assert.ok(
+      verifies(
+        `${routeRegressionPayload(pack)}${productionSuffix(pack)}`,
+        pack.representativeRouteRegressionSignature.value,
+      ),
+      `${pack.id} v1 봉투 대표 경로 회귀 서명 검증 실패`,
+    );
+    // 팩 서명 payload는 봉투 버전도 신선도도 결속하지 않는다. 그래서 v2 봉투의 서명
+    // 값과 **바이트 동일**하고, 과거에 정당하게 서명된 팩은 v1 봉투 안에서도 유효하다.
+    assert.equal(pack.signature.value, signed.signature.value);
+    assert.equal(
+      pack.representativeRouteRegressionSignature.value,
+      signed.representativeRouteRegressionSignature.value,
+    );
+  }
+});
+
+test("v1 폴백 봉투 fixture는 공개키 미주입 빌드가 파싱하는 형태다", () => {
+  // 이슈 #2531(DP-05). 개발·테스트 빌드(공개키 미주입) 동작이 그대로 유지되는지
+  // 확인하는 Dart 회귀 테스트가 쓰는 문서다. production 팩은 공개키 없이는 애초에
+  // 파싱되지 않으므로 fixture 팩 자기해시 서명이어야 한다.
+  const legacy = fixture.legacyFallbackEnvelopeManifest;
+
+  for (const field of ["manifestVersion", "channel", "releaseSequence", "publishedAt", "expiresAt", "keyId", "signature"]) {
+    assert.equal(field in legacy, false, `${field}가 v1 폴백 봉투에 남아 있다`);
+  }
+  for (const pack of legacy.packs) {
+    assert.equal(pack.artifactKind, "fixture");
+    assert.equal(pack.signature.algorithm, "sha256-pack-manifest-v1");
+    assert.equal(pack.signature.value, sha256Hex(packPayload(pack)));
+    assert.equal(pack.representativeRouteRegressionSignature.algorithm, "sha256-route-regression-v1");
+    assert.equal(pack.representativeRouteRegressionSignature.value, sha256Hex(routeRegressionPayload(pack)));
+  }
+});
+
 test("심은 경계 숫자가 DP-02 정준 계약과 위치까지 일치한다", () => {
   assert.deepEqual(fixture.boundaryNumbers, boundaryNumbers);
   const contractCanonical = new Map(contract.formatting.map((entry) => [entry.id, entry.canonical]));

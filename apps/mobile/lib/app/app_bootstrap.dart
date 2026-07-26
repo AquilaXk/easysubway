@@ -190,11 +190,28 @@ class AppBootstrap {
   }
 }
 
+/// 데이터팩 수락 상태 저장소는 이 한 곳에서만 만든다 (이슈 #2531).
+///
+/// 수락 순번 하한은 생성자 optional 인자라, 생성 지점이 흩어지면 어느 한 곳이 조용히
+/// 하한 없이 만들어져도 컴파일도 테스트도 그대로 통과한다. 조립을 여기로 모아
+/// `AppEndpoints`가 판정한 하한을 항상 주입하고, 이 배선은
+/// `data_pack_manifest_acceptance_policy_test.dart`가 실행으로 확인한다.
+DataPackUpdateStateRepository createDataPackUpdateStateRepository({
+  required UserDatabase userDatabase,
+  required AppEndpoints endpoints,
+}) {
+  return DataPackUpdateStateRepository(
+    userDatabase: userDatabase,
+    minimumReleaseSequence: endpoints.dataPackMinimumReleaseSequence,
+  );
+}
+
 Future<BundledDataPackFreshness?> _installedDataPackFreshness(
   UserDatabase userDatabase,
 ) async {
-  final cache = await DataPackUpdateStateRepository(
+  final cache = await createDataPackUpdateStateRepository(
     userDatabase: userDatabase,
+    endpoints: AppEndpoints.fromEnvironment(),
   ).readManifestCache();
   final expiresAt = cache?.expiresAt;
   if (expiresAt == null) {
@@ -237,8 +254,9 @@ Future<void> _defaultDataPackUpdateRunner({
   if (manifestUri == null) {
     return;
   }
-  final stateRepository = DataPackUpdateStateRepository(
+  final stateRepository = createDataPackUpdateStateRepository(
     userDatabase: userDatabase,
+    endpoints: endpoints,
   );
   final catalogDirectory = Directory(p.join(supportDirectory.path, 'catalog'));
   await DataPackUpdater(
