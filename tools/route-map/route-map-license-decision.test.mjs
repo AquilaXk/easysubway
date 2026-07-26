@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
@@ -329,5 +329,62 @@ test("배포 basemap 콘텐츠 정책이 실제 컴파일 입력과 일치한다
         `${vecName}: 정책이 excluded로 선언한 장식 텍스트 "${text}"가 배포 .vec에 있습니다.`,
       );
     }
+  }
+});
+
+// [2026-07-26 #2571] 오너 결정으로 구버전 SVG 보관 조항이 폐기됐다. 종전에는 각
+// 권역 notes가 "v1 SVG는 삭제하지 않고 review-reference로 보관한다"고 못박아
+// v1·v2가 정본과 나란히 남아 있었고, 어느 쪽이 정본인지 혼동을 키웠다. 폐기
+// 상태를 문서로만 두면 다음 반입 때 구버전이 조용히 다시 쌓이므로, 작업 트리에
+// 권역별 정본 1개씩만 있다는 것을 여기서 고정한다.
+test("구버전 SVG 보관 조항 폐기 — svg-sources에 권역별 정본만 남는다(#2571)", () => {
+  const decision = readJson("tools/route-map/route-map-license-decision.json");
+  const policy = decision.priorVersionSvgRetentionPolicy;
+
+  assert.equal(policy.status, "abolished");
+  assert.equal(policy.decidedAt, "2026-07-26");
+  assert.equal(policy.issue, 2571);
+  assert.equal(
+    policy.contractTest,
+    "tools/route-map/route-map-license-decision.test.mjs",
+  );
+
+  // 폐기 조항의 정본 목록은 결정문의 regions와 1:1이어야 한다(드리프트 방지).
+  assert.deepEqual(
+    [...policy.canonicalSvgs].sort(),
+    decision.regions
+      .map((region) => path.basename(region.sourceUrl))
+      .sort(),
+  );
+
+  // 작업 트리 실측 — svg-sources에는 정본만 존재한다.
+  const sourcesDir = path.join(
+    root,
+    "tools/route-map/route-map-defs/svg-sources",
+  );
+  assert.deepEqual(
+    readdirSync(sourcesDir).filter((name) => name.endsWith(".svg")).sort(),
+    [...policy.canonicalSvgs].sort(),
+    "svg-sources에 정본이 아닌 SVG가 있습니다 — 구버전은 git 히스토리로만 보관합니다(#2571).",
+  );
+
+  // 파생 추출 JSON도 정본에서 나온 것만 남는다.
+  const defsDir = path.join(root, "tools/route-map/route-map-defs");
+  assert.deepEqual(
+    readdirSync(defsDir)
+      .filter((name) => /^easy-subway-.*-geometry\.json$/.test(name))
+      .sort(),
+    policy.canonicalSvgs
+      .map((svg) => svg.replace(/\.svg$/, "-geometry.json"))
+      .sort(),
+    "정본이 아닌 SVG의 추출 JSON이 남아 있습니다(#2571).",
+  );
+
+  // 삭제 목록에 오른 파일이 실제로 없다.
+  for (const relativePath of policy.removedAt) {
+    assert.ok(
+      !existsSync(path.join(root, relativePath)),
+      `${relativePath}는 #2571로 삭제됐어야 합니다.`,
+    );
   }
 });
