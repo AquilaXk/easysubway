@@ -5476,6 +5476,82 @@ void main() {
     final ride = result.steps.firstWhere((s) => s.stepType == 'ride');
     expect(ride.servicePattern, isNull);
   });
+
+  test('#2582 온라인 결과의 무단차 대안도 카탈로그 이름으로 치환된다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    final online = RouteSearchResult.fromV2(
+      RouteSearchV2Result.fromJson(_routeV2Payload()),
+    );
+    // V2 변환 직후에는 역·노선 이름 자리에 ID가 들어 있다.
+    expect(online.originStationName, 'station-sangnoksu');
+    final repository = OnlineFirstRouteSearchRepository(
+      onlineRepository: _FixedOnlineRouteSearchRepository(
+        online.withDisplayLabels(stepFreeAlternative: online),
+      ),
+      localRepository: LocalRouteRepository(catalogDatabase: database),
+    );
+
+    final resolved = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    final alternative = resolved.stepFreeAlternative;
+    expect(alternative, isNotNull);
+    expect(alternative!.originStationName, '상록수');
+    expect(alternative.destinationStationName, '사당');
+    expect(alternative.lineName, isNot('seoul-4'));
+    expect(
+      alternative.steps.map((step) => step.title),
+      everyElement(isNot(contains('station-'))),
+    );
+    // 대안은 다시 대안을 갖지 않으므로 재귀는 1회로 끝난다.
+    expect(alternative.stepFreeAlternative, isNull);
+  });
+
+  test('#2582 대안이 없는 온라인 결과는 대안 없이 그대로 치환된다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    final repository = OnlineFirstRouteSearchRepository(
+      onlineRepository: _FixedOnlineRouteSearchRepository(
+        RouteSearchResult.fromV2(
+          RouteSearchV2Result.fromJson(_routeV2Payload()),
+        ),
+      ),
+      localRepository: LocalRouteRepository(catalogDatabase: database),
+    );
+
+    final resolved = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(resolved.stepFreeAlternative, isNull);
+    expect(resolved.originStationName, '상록수');
+  });
+}
+
+class _FixedOnlineRouteSearchRepository implements RouteSearchRepository {
+  _FixedOnlineRouteSearchRepository(this.result);
+
+  final RouteSearchResult result;
+
+  @override
+  Future<RouteSearchResult> searchRoute(RouteSearchRequest request) async =>
+      result;
+
+  @override
+  Future<RouteRefreshResult> refreshRoute(String routeSearchId) =>
+      Future.error(UnimplementedError());
 }
 
 Map<String, Object?> _routeV2Payload({
