@@ -27,9 +27,12 @@ import com.easysubway.route.domain.RouteSearchStatus;
 import com.easysubway.route.domain.RouteStep;
 import com.easysubway.route.domain.RouteWarning;
 import com.easysubway.route.domain.RouteWarningCode;
+import com.easysubway.route.domain.StairAccess;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -44,6 +47,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.RequestBuilder;
 
 @SpringBootTest(properties = {
 	"easysubway.admin.username=admin-user",
@@ -547,7 +551,7 @@ class RouteSearchV2ControllerTest {
 	}
 
 	@Test
-	@DisplayName("실제 미확인 사유가 있는 경로는 무단차로 승격되지 않는다")
+	@DisplayName("실제 미확인 사유가 있는 경로는 무단차로 승격되지 않고 leg 판정도 함께 내려간다")
 	void routeSearchV2DoesNotPromoteUnverifiedRouteToStepFree() throws Exception {
 		stubStairAccessRoute("station-unverified-origin", false, List.of(
 			new RouteWarning(RouteWarningCode.STALE_ACCESSIBILITY_DATA),
@@ -556,30 +560,57 @@ class RouteSearchV2ControllerTest {
 
 		mockMvc.perform(stairAccessSearch("station-unverified-origin"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.itineraries[0].stairAccess").value("UNKNOWN"));
+			.andExpect(jsonPath("$.data.itineraries[0].stairAccess").value("UNKNOWN"))
+			// leg 판정이 경로 판정보다 강하게 단언하면, 경로 판정을 잃은 화면이 leg를 접어
+			// 무단차로 되돌린다(#2590). 경로 단위 신뢰도 경고는 leg까지 내려가야 한다.
+			.andExpect(jsonPath("$.data.itineraries[0].legs[0].stairAccess").value("UNKNOWN"))
+			.andExpect(jsonPath("$.data.itineraries[0].legs[1].stairAccess").value("NOT_APPLICABLE"))
+			.andExpect(jsonPath("$.data.itineraries[0].legs[2].stairAccess").value("UNKNOWN"))
+			// 신뢰도 사유는 경로 단위 경고이므로 leg 카운터는 그대로 0이다.
+			.andExpect(jsonPath("$.data.itineraries[0].legs[0].accessibilityRisk.staleDataCount").value(0))
+			.andExpect(jsonPath("$.data.itineraries[0].legs[0].accessibilityRisk.lowConfidenceCount").value(0))
+			.andExpect(jsonPath("$.data.itineraries[0].accessibilityRisk.staleDataCount").value(1));
 	}
 
-	private void stubStairAccessRoute(String originStationId, boolean stairEntry, List<RouteWarning> warnings) {
+	@Test
+	@DisplayName("경로 계단 판정은 응답에 실린 leg 판정을 접은 값과 어긋나지 않는다")
+	void routeSearchV2ItineraryJudgmentMatchesFoldedLegJudgments() throws Exception {
+		stubStairAccessRoute("station-stepfree-origin", false, List.of());
+		stubStairAccessRoute("station-stair-origin", true, List.of());
+		stubStairAccessRoute("station-unverified-origin", false,
+			List.of(new RouteWarning(RouteWarningCode.STALE_ACCESSIBILITY_DATA)));
+
+		for (String originStationId : List.of(
+			"station-stepfree-origin", "station-stair-origin", "station-unverified-origin"
+		)) {
+			JsonNode itinerary = objectMapper.readTree(
+				mockMvc.perform(stairAccessSearch(originStationId))
+					.andExpect(status().isOk())
+					.andReturn().getResponse().getContentAsString()
+			).at("/data/itineraries/0");
+			List<StairAccess> legJudgments = new ArrayList<>();
+			itinerary.at("/legs").forEach(leg -> legJudgments.add(StairAccess.valueOf(leg.get("stairAccess").asText())));
+			StairAccess judged = StairAccess.valueOf(itinerary.get("stairAccess").asText());
+
+			// 계단 장벽을 질 수 있는 leg가 있는 경로에서는 접은 값과 경로 판정이 일치한다.
+			// 화면이 판정을 잃고 leg로 폴백해도 표시가 실제 근거보다 강해지지 않는다는 뜻이다.
+			assertThat(StairAccess.ofStepJudgments(legJudgments)).as(originStationId).isEqualTo(judged);
+		}
+	}
+
+	@Test
+	@DisplayName("계단 판정이 없는 BLOCKED 경로는 계단 경고를 그대로 말한다")
+	void routeSearchV2BlockedItineraryReportsStairOnly() throws Exception {
 		when(routeSearchUseCase.searchRouteAlternatives(argThat(command ->
-			originStationId.equals(command.originStationId())
-		), eq(1))).thenReturn(List.of(stairAccessRouteSearch(originStationId, stairEntry, warnings)));
-	}
+			"station-blocked-origin".equals(command.originStationId())
+		), eq(1))).thenReturn(List.of(blockedStairAccessRouteSearch()));
 
-	private org.springframework.test.web.servlet.RequestBuilder stairAccessSearch(String originStationId) {
-		return post("/api/v2/routes/search")
-			.contentType(MediaType.APPLICATION_JSON)
-			.content("""
-				{
-				  "originStationId": "%s",
-				  "destinationStationId": "station-stairaccess-destination",
-				  "departureTime": "2026-06-30T09:15:00+09:00",
-				  "mobilityType": "WHEELCHAIR",
-				  "constraintMode": "ALLOW_WITH_WARNINGS",
-				  "useRealtime": false,
-				  "maxTransfers": 1,
-				  "alternativeCount": 1
-				}
-				""".formatted(originStationId));
+		mockMvc.perform(stairAccessSearch("station-blocked-origin"))
+			.andExpect(status().isOk())
+			// leg가 없어 접을 근거가 없지만 STAIR_ONLY_ACCESS 경고는 경로 단위 사실이다.
+			.andExpect(jsonPath("$.data.itineraries[0].status").value("BLOCKED_ACCESSIBILITY"))
+			.andExpect(jsonPath("$.data.itineraries[0].legs").isEmpty())
+			.andExpect(jsonPath("$.data.itineraries[0].stairAccess").value("STAIR_ONLY"));
 	}
 
 	@Test
@@ -1317,6 +1348,51 @@ class RouteSearchV2ControllerTest {
 				new RouteWarning(RouteWarningCode.STALE_ACCESSIBILITY_DATA)
 			),
 			List.of(),
+			LocalDateTime.of(2026, 6, 30, 9, 0)
+		);
+	}
+
+	// 여러 출발지를 한 테스트에서 스텁하면 뒤이은 when() 호출이 null 인자로 mock을 건드리므로
+	// matcher가 null을 견뎌야 한다.
+	private void stubStairAccessRoute(String originStationId, boolean stairEntry, List<RouteWarning> warnings) {
+		when(routeSearchUseCase.searchRouteAlternatives(argThat(command ->
+			command != null && originStationId.equals(command.originStationId())
+		), eq(1))).thenReturn(List.of(stairAccessRouteSearch(originStationId, stairEntry, warnings)));
+	}
+
+	private RequestBuilder stairAccessSearch(String originStationId) {
+		return post("/api/v2/routes/search")
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("""
+				{
+				  "originStationId": "%s",
+				  "destinationStationId": "station-stairaccess-destination",
+				  "departureTime": "2026-06-30T09:15:00+09:00",
+				  "mobilityType": "WHEELCHAIR",
+				  "constraintMode": "ALLOW_WITH_WARNINGS",
+				  "useRealtime": false,
+				  "maxTransfers": 1,
+				  "alternativeCount": 1
+				}
+				""".formatted(originStationId));
+	}
+
+	// 접근성 차단 경로는 스텝 없이 STAIR_ONLY_ACCESS 경고만 남는다(RouteSearchService).
+	private RouteSearchResult blockedStairAccessRouteSearch() {
+		return new RouteSearchResult(
+			"route-search-stair-access-blocked",
+			"station-blocked-origin",
+			"판정 출발역",
+			"station-stairaccess-destination",
+			"판정 도착역",
+			MobilityType.WHEELCHAIR,
+			RouteSearchStatus.BLOCKED,
+			"line-stair-access",
+			"판정 노선",
+			0,
+			List.of(),
+			List.of(new RouteWarning(RouteWarningCode.STAIR_ONLY_ACCESS)),
+			List.of("계단 없는 역 접근 경로를 확인할 수 없습니다."),
 			LocalDateTime.of(2026, 6, 30, 9, 0)
 		);
 	}

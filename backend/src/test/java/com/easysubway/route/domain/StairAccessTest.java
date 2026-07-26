@@ -116,13 +116,82 @@ class StairAccessTest {
 			assertThat(StairAccess.ofItinerary(itinerary(steps, warningsOnly()))).isEqualTo(StairAccess.STEP_FREE);
 		}
 
-		@Test
-		@DisplayName("스텝 판정을 접은 결과는 경로 판정과 같다")
-		void foldingStepJudgmentsMatchesItineraryJudgment() {
-			List<RouteStep> steps = List.of(transitionStep(false, true), rideStep(), transitionStep(false, false));
+	}
 
-			assertThat(StairAccess.ofStepJudgments(steps.stream().map(StairAccess::ofStep).toList()))
-				.isEqualTo(StairAccess.ofItinerary(itinerary(steps, List.of())));
+	@Nested
+	@DisplayName("#2560 태깅 술어 동치")
+	class TaggingPredicateEquivalence {
+
+		@Test
+		@DisplayName("판정을 옮긴 뒤에도 구 RouteV2Planner.stairAccess()와 결론이 같다")
+		void matchesLegacyPredicate() {
+			List<RouteSearchResult> cases = List.of(
+				itinerary(List.of(), List.of()),
+				itinerary(List.of(), List.of(new RouteWarning(RouteWarningCode.STAIR_ONLY_ACCESS))),
+				itinerary(List.of(rideStep()), warningsOnly()),
+				itinerary(List.of(transitionStep(true, true), transitionStep(false, false), rideStep()), List.of()),
+				itinerary(List.of(transitionStep(false, true), rideStep(), transitionStep(false, true)), List.of()),
+				itinerary(List.of(transitionStep(false, false), rideStep()), List.of()),
+				itinerary(
+					List.of(transitionStep(false, true), rideStep()),
+					List.of(new RouteWarning(RouteWarningCode.STAIR_ONLY_ACCESS))
+				)
+			);
+
+			assertThat(cases).allSatisfy(itinerary ->
+				assertThat(StairAccess.ofItinerary(itinerary)).isEqualTo(legacyStairAccess(itinerary)));
+		}
+
+		/**
+		 * #2590 이전 {@code RouteV2Planner.stairAccess()}. 무단차 대안의 후보 집합은 이 술어로
+		 * 정해지므로, 판정을 도메인으로 옮기면서 집합이 바뀌지 않았음을 원본과 대조해 고정한다.
+		 */
+		private StairAccess legacyStairAccess(RouteSearchResult itinerary) {
+			if (itinerary.steps().stream().anyMatch(RouteStep::includesStairs)
+				|| itinerary.warnings().stream()
+					.anyMatch(warning -> warning.code() == RouteWarningCode.STAIR_ONLY_ACCESS)) {
+				return StairAccess.STAIR_ONLY;
+			}
+			return itinerary.steps().stream().anyMatch(RouteStep::requiresAccessibilityCheck)
+				? StairAccess.UNKNOWN
+				: StairAccess.STEP_FREE;
+		}
+	}
+
+	@Nested
+	@DisplayName("판정 병합과 신뢰도 분류")
+	class MergeAndEvidence {
+
+		@Test
+		@DisplayName("병합은 선언 순서가 아니라 명시된 신중함 등급을 따른다")
+		void mergeFollowsExplicitCautionRank() {
+			List<StairAccess> ascending = List.of(
+				StairAccess.NOT_APPLICABLE, StairAccess.STEP_FREE, StairAccess.UNKNOWN, StairAccess.STAIR_ONLY);
+
+			for (int left = 0; left < ascending.size(); left += 1) {
+				for (int right = 0; right < ascending.size(); right += 1) {
+					StairAccess expected = ascending.get(Math.max(left, right));
+					assertThat(ascending.get(left).merge(ascending.get(right))).isEqualTo(expected);
+					assertThat(ascending.get(right).merge(ascending.get(left))).isEqualTo(expected);
+				}
+			}
+		}
+
+		@Test
+		@DisplayName("계단 사실을 말하는 경고는 미확인 근거가 아니다")
+		void stairWarningIsNotUnverifiedEvidence() {
+			assertThat(StairAccess.hasUnverifiedEvidence(List.of())).isFalse();
+			assertThat(StairAccess.hasUnverifiedEvidence(
+				List.of(new RouteWarning(RouteWarningCode.STAIR_ONLY_ACCESS)))).isFalse();
+		}
+
+		@Test
+		@DisplayName("신뢰도 경고는 미확인 근거로 분류한다")
+		void confidenceWarningsAreUnverifiedEvidence() {
+			assertThat(StairAccess.hasUnverifiedEvidence(
+				List.of(new RouteWarning(RouteWarningCode.STALE_ACCESSIBILITY_DATA)))).isTrue();
+			assertThat(StairAccess.hasUnverifiedEvidence(
+				List.of(new RouteWarning(RouteWarningCode.LOW_DATA_CONFIDENCE)))).isTrue();
 		}
 	}
 

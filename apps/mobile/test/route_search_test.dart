@@ -2093,6 +2093,21 @@ void main() {
       expect(relabeled.stairAccessLabel, '계단 여부를 확인하고 있어요');
     });
 
+    test('계단 때문에 막힌 경로는 확인 중이 아니라 계단 포함이라고 말한다', () {
+      // 백엔드가 STAIR_ONLY_ACCESS 경고로 막은 경로는 leg가 없어 접을 근거가 없지만
+      // 계단이 있다는 것은 확인된 사실이다. 판정을 싣기 전에는 leg가 비었다는 이유로
+      // "확인 중"으로 약해졌다.
+      final display = _judgedDisplay(
+        stairAccess: 'STAIR_ONLY',
+        status: 'BLOCKED_ACCESSIBILITY',
+        riskLevel: 'BLOCKED',
+        legs: const [],
+      );
+
+      expect(display.isBlocked, isTrue);
+      expect(display.stairAccessLabel, '계단 포함');
+    });
+
     test('RouteSearchResult 재구성은 생성자 필드를 하나도 빠뜨리지 않는다', () {
       // C1 재발 방지: withDisplayLabels가 결과를 통째로 다시 만들기 때문에,
       // 여기 없는 필드는 온라인 결과가 화면에 닿기 전에 기본값으로 되돌아간다.
@@ -2277,10 +2292,11 @@ RouteSearchResult _judgedDisplay({
   int staleDataCount = 0,
   int lowConfidenceCount = 0,
   String riskLevel = 'MEDIUM',
+  String status = 'FOUND',
 }) {
   final itinerary = RouteSearchV2Itinerary(
     itineraryId: 'route-judged',
-    status: 'FOUND',
+    status: status,
     plannedArrivalTime: '2026-06-30T09:42:00+09:00',
     realtimeArrivalTime: null,
     etaSource: 'PLANNED',
