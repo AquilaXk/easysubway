@@ -503,6 +503,17 @@ jobs:
         if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.ci == 'true' || needs.changes.outputs.mobile == 'true' || needs.changes.outputs.datapack == 'true' }}
         run: node tools/ci/check-pack-app-schema-parity.mjs
 
+      # tools/routes는 detect-changed-paths.sh에서 tools/route-map과 같은 arm(repository=true,
+      # route_map=true)에 묶이지만 노선도 렌더링이 아니라 경로 탐색 도구라 Chrome이 필요 없다(#2558).
+      # 아래 route map 스텝에 합치면 setup-chrome에 불필요하게 묶이므로, 다른 도메인 스텝과 같은
+      # `repository || ci` 게이트로 별도 스텝을 둔다. setup-chrome 실패가 브라우저 비의존 테스트를
+      # 막지 않도록 Chrome 설치 스텝보다 앞에 배치한다.
+      - name: Repository CI / Run route tool tests
+        if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.ci == 'true' }}
+        env:
+          NODE_OPTIONS: --disable-warning=ExperimentalWarning
+        run: node --test tools/routes/*.test.mjs
+
       - name: Repository CI / Set up Chrome for route map tests
         if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.ci == 'true' }}
         id: setup-chrome
@@ -517,16 +528,6 @@ jobs:
           NODE_OPTIONS: --disable-warning=ExperimentalWarning
           ROUTE_MAP_CHROME_NO_SANDBOX: "1"
         run: node --test tools/route-map/*.test.mjs
-
-      # tools/routes는 detect-changed-paths.sh에서 tools/route-map과 같은 arm(repository=true,
-      # route_map=true)에 묶이지만 노선도 렌더링이 아니라 경로 탐색 도구라 Chrome이 필요 없다(#2558).
-      # 위 route map 스텝에 합치면 setup-chrome에 불필요하게 묶이므로, 다른 도메인 스텝과 같은
-      # `repository || ci` 게이트로 별도 스텝을 둔다.
-      - name: Repository CI / Run route tool tests
-        if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.ci == 'true' }}
-        env:
-          NODE_OPTIONS: --disable-warning=ExperimentalWarning
-        run: node --test tools/routes/*.test.mjs
 
       - name: Repository CI / Run realtime provider contract tests
         if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.ci == 'true' }}

@@ -18272,23 +18272,43 @@ test("CI 계약 테스트 스텝은 tools/lib, tools/mobile 테스트 글롭을 
 // (#2518의 tools/ 디렉토리 매핑 열거 가드와 동형 — 하드코딩 목록 대신 파일시스템이 원본).
 test("ci.yml의 node --test 인자는 tools/ 하위 모든 테스트 파일을 편입한다", async () => {
   const workflow = read(".github/workflows/ci.yml");
-  // `--test-name-pattern "..."` 같은 플래그와 값은 .test.mjs로 끝나지 않아 자연히 걸러진다.
-  const declaredArgs = [...workflow.matchAll(/node --test [^\n]*/g)]
-    .flatMap((match) => match[0].split(/\s+/))
-    .filter((token) => token.startsWith("tools/") && token.endsWith(".test.mjs"));
+  // 한계: 셸 백슬래시 줄 연속(`\`)으로 이어진 인자는 다음 줄로 넘어가 수집되지 않는다(ci.yml에는 미사용).
+  const commands = workflow
+    .split("\n")
+    // 주석 처리된 명령은 실행되지 않으므로, 첫 비공백 문자가 `#`인 줄은 커버리지 근거가 될 수 없다.
+    .filter((line) => !line.trimStart().startsWith("#"))
+    .flatMap((line) => [...line.matchAll(/node --test [^\n]*/g)].map((match) => match[0]))
+    // `--test-name-pattern`은 이름으로 걸러 일부만 실행하므로 그 파일 인자를 완전 편입으로 볼 수 없다.
+    .filter((command) => !command.includes("--test-name-pattern"));
+
+  // 인용부호로 감싼 토큰과 선행 `./`는 같은 경로의 다른 표기일 뿐이라 정규화 후 필터링한다.
+  const normalizeArg = (token) => {
+    const unquoted = token.match(/^(["'])(.*)\1$/)?.[2] ?? token;
+    return unquoted.replace(/^\.\//, "");
+  };
+  const declaredArgs = [
+    ...new Set(
+      commands
+        .flatMap((command) => command.split(/\s+/))
+        .map(normalizeArg)
+        .filter((token) => token.startsWith("tools/") && token.endsWith(".test.mjs")),
+    ),
+  ];
   assert.ok(declaredArgs.length > 0, "ci.yml must declare at least one tools/ node --test argument");
 
   // 셸 글롭의 `*`는 `/`를 넘지 않는다. tools/datapack/*.test.mjs가 lib/ 하위를 덮지 못한 원인이므로
-  // 그 의미를 그대로 옮겨야 미편입이 통과로 새지 않는다.
-  const matchers = declaredArgs.map(
-    (glob) =>
-      new RegExp(
-        `^${glob
-          .split("*")
-          .map((part) => part.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-          .join("[^/]*")}$`,
-      ),
-  );
+  // 그 의미를 그대로 옮겨야 미편입이 통과로 새지 않는다. 세그먼트 첫 글자의 `*`가 선행 `.`을
+  // 매칭하지 않는 것도 bash 기본 동작이라 dotfile 테스트가 편입된 것처럼 보이지 않게 함께 옮긴다.
+  const matchers = declaredArgs.map((glob) => {
+    let source = "";
+    for (const [index, part] of glob.split("*").entries()) {
+      if (index > 0) {
+        source += source === "" || source.endsWith("/") ? "(?!\\.)[^/]*" : "[^/]*";
+      }
+      source += part.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+    return { glob, pattern: new RegExp(`^${source}$`) };
+  });
 
   const entries = await readdir(path.join(root, "tools"), { recursive: true, withFileTypes: true });
   const testFiles = entries
@@ -18299,11 +18319,22 @@ test("ci.yml의 node --test 인자는 tools/ 하위 모든 테스트 파일을 �
     .sort();
   assert.ok(testFiles.length > 0, "tools/ must contain at least one .test.mjs file");
 
-  const orphans = testFiles.filter((file) => !matchers.some((matcher) => matcher.test(file)));
+  const orphans = testFiles.filter((file) => !matchers.some(({ pattern }) => pattern.test(file)));
   assert.deepEqual(
     orphans,
     [],
     `these tools tests run in no .github/workflows/ci.yml node --test step: ${orphans.join(", ")}`,
+  );
+
+  // 역방향: 마지막 테스트 파일이 지워지면 아무것도 매칭하지 않는 글롭이 남는다. 그 상태를 방치하면
+  // 다음에 같은 경로로 파일이 생겼을 때만 우연히 살아나므로, 죽은 인자는 즉시 정리하도록 강제한다.
+  const deadArgs = matchers
+    .filter(({ pattern }) => !testFiles.some((file) => pattern.test(file)))
+    .map(({ glob }) => glob);
+  assert.deepEqual(
+    deadArgs,
+    [],
+    `these .github/workflows/ci.yml node --test arguments match no tools test file: ${deadArgs.join(", ")}`,
   );
 });
 
