@@ -236,16 +236,19 @@ function powMod(base, exponent, modulus) {
   return result;
 }
 
+// 확장 유클리드 호제법. gcd가 1이 아니면 역원이 없다.
 function modInverse(value, modulus) {
-  let [old_r, r] = [value % modulus, modulus];
-  let [old_s, s] = [1n, 0n];
-  while (r !== 0n) {
-    const quotient = old_r / r;
-    [old_r, r] = [r, old_r - quotient * r];
-    [old_s, s] = [s, old_s - quotient * s];
+  let remainder = value % modulus;
+  let nextRemainder = modulus;
+  let coefficient = 1n;
+  let nextCoefficient = 0n;
+  while (nextRemainder > 0n) {
+    const quotient = remainder / nextRemainder;
+    [remainder, nextRemainder] = [nextRemainder, remainder - quotient * nextRemainder];
+    [coefficient, nextCoefficient] = [nextCoefficient, coefficient - quotient * nextCoefficient];
   }
-  if (old_r !== 1n) throw new Error("modular inverse does not exist");
-  return ((old_s % modulus) + modulus) % modulus;
+  if (remainder > 1n) throw new Error("modular inverse does not exist");
+  return ((coefficient % modulus) + modulus) % modulus;
 }
 
 function bigIntToBytes(value, length) {
