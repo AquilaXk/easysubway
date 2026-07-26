@@ -16,6 +16,11 @@ const SOURCE_INVENTORY_PATH = "apps/mobile/assets/datapacks/source-inventory.jso
 const SOURCE_INVENTORY_SCHEMA_PATH = "contracts/datapack/source-inventory.schema.json";
 const SOURCE_GOVERNANCE_POLICY_PATH = "tools/datapack/source-governance-policy.json";
 const FRESHNESS_POLICY_PATH = "apps/mobile/release/datapack-freshness-sla.json";
+const PACK_APP_SCHEMA_PARITY_ALLOWLIST_PATH = "contracts/datapack/pack-app-schema-parity-allowlist.json";
+const PACK_APP_SCHEMA_PARITY_ALLOWLIST_SCHEMA_PATH =
+  "contracts/datapack/pack-app-schema-parity-allowlist.schema.json";
+const CATALOG_RAW_SQL_TABLES_PATH = "contracts/datapack/catalog-raw-sql-tables.json";
+const CATALOG_RAW_SQL_TABLES_SCHEMA_PATH = "contracts/datapack/catalog-raw-sql-tables.schema.json";
 
 export function loadJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
@@ -34,6 +39,12 @@ export function collectContractErrors() {
     SOURCE_GOVERNANCE_POLICY_PATH,
     errors,
   );
+  validateJson(
+    PACK_APP_SCHEMA_PARITY_ALLOWLIST_SCHEMA_PATH,
+    PACK_APP_SCHEMA_PARITY_ALLOWLIST_PATH,
+    errors,
+  );
+  validateJson(CATALOG_RAW_SQL_TABLES_SCHEMA_PATH, CATALOG_RAW_SQL_TABLES_PATH, errors);
   if (!existsSync(FRESHNESS_POLICY_PATH)) errors.push(`${FRESHNESS_POLICY_PATH} 누락`);
   if ([SOURCE_INVENTORY_PATH, SOURCE_GOVERNANCE_POLICY_PATH, FRESHNESS_POLICY_PATH].every(existsSync)) {
     validateSourceGovernanceContracts({
