@@ -13,7 +13,7 @@
 // 양쪽에 있어(#2518, `.github/workflows/ci.yml`) Node 전용 변경과 Dart 전용 변경
 // 모두에서 이 가드가 돈다.
 import assert from "node:assert/strict";
-import { createPublicKey, createVerify } from "node:crypto";
+import { createHash, createPublicKey, createVerify, generateKeyPairSync } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
@@ -21,7 +21,9 @@ import { canonicalJson, withoutSignature } from "../datapack/lib/manifest-valida
 import {
   EXPECTED_TEST_MODULUS_BASE64URL,
   boundaryNumbers,
+  buildFixture,
   packPayload,
+  powMod,
   routeRegressionPayload,
   sha256Hex,
 } from "./build-manifest-envelope-signature-fixture.mjs";
@@ -58,6 +60,13 @@ test("fixture는 저장소의 테스트 전용 서명 키로 만들어졌다", (
   assert.equal(fixture.publicKey.modulusBase64Url, EXPECTED_TEST_MODULUS_BASE64URL);
   assert.equal(fixture.publicKey.exponentBase64Url, "AQAB");
   assert.equal(fixture.publicKey.modulusLengthBytes, 256);
+});
+
+test("생성기는 테스트 키가 아닌 개인키로는 fixture를 만들지 않는다", () => {
+  // 산출물 검사(위 테스트)만으로는 가드가 실제로 던지는지 알 수 없다. 다른 키로
+  // 직접 호출해 fixture 생성 전에 막히는지 확인한다.
+  const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  assert.throws(() => buildFixture(privateKey.export({ type: "pkcs8", format: "pem" })), /테스트 전용/);
 });
 
 test("저장된 정준 문자열이 현재 Node 정준 구현의 출력과 바이트 동일하다", () => {
@@ -150,6 +159,27 @@ test("modulus 과소 키는 최소 패딩 8바이트를 채울 수 없는 크기
   assert.equal(key.paddingLength, modulus.length - 51 - 3);
   assert.ok(key.paddingLength < 8);
   assert.ok(BigInt(`0x${signature.toString("hex")}`) < BigInt(`0x${modulus.toString("hex")}`));
+});
+
+test("modulus 과소 키 서명은 해당 키의 진짜 RSA 변환 결과다", () => {
+  // 길이만 맞는 난수였다면 Dart 쪽 거부 사유가 "modulus 크기 가드"가 아니라 "깨진
+  // 서명"이 되어 케이스가 의도한 조건을 격리하지 못한다. signature^e mod n 이 패딩
+  // 7 byte짜리 PKCS#1 v1.5 블록을 복원하는지 확인해 그 전제를 고정한다.
+  const key = fixture.rejections.undersizedModulusKey;
+  const toBigInt = (base64Url) => BigInt(`0x${Buffer.from(base64Url, "base64url").toString("hex")}`);
+  const recovered = powMod(toBigInt(key.signatureValue), toBigInt(key.exponentBase64Url), toBigInt(key.modulusBase64Url))
+    .toString(16)
+    .padStart(key.modulusLengthBytes * 2, "0");
+  const expectedBlock = Buffer.concat([
+    Buffer.from([0x00, 0x01]),
+    Buffer.alloc(key.paddingLength, 0xff),
+    Buffer.from([0x00]),
+    Buffer.from("3031300d060960864801650304020105000420", "hex"),
+    createHash("sha256").update(fixture.canonicalSignedPayload).digest(),
+  ]);
+
+  assert.equal(expectedBlock.length, key.modulusLengthBytes);
+  assert.equal(recovered, expectedBlock.toString("hex"));
 });
 
 test("폴백 매니페스트는 자기해시 봉투로 정합하다", () => {

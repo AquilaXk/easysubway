@@ -59,48 +59,20 @@ export const EXPECTED_TEST_MODULUS_BASE64URL =
 //   - 나머지 1 초과 값: ratio 필드는 `_requiredRatio`가 0..1로 막고, 정수 필드는
 //     `sizeBytes`가 양수 정수라 소수를 담을 수 없다.
 // 아래 9건이 담을 수 있는 전부다.
+function ratioBoundary(packIndex, field, contractId, canonical) {
+  return { contractId, pointer: `/packs/${packIndex}/regionalQualityMetrics/${field}`, canonical };
+}
+
 export const boundaryNumbers = [
   { contractId: "max-safe-integer", pointer: "/packs/1/sizeBytes", canonical: "9007199254740991" },
-  {
-    contractId: "double-rounding-artifact",
-    pointer: "/packs/0/regionalQualityMetrics/facilityCoverageRatio",
-    canonical: "0.30000000000000004",
-  },
-  {
-    contractId: "plain-boundary-lower",
-    pointer: "/packs/0/regionalQualityMetrics/unknownAccessibilityRatio",
-    canonical: "0.000001",
-  },
-  {
-    contractId: "exponent-boundary-lower",
-    pointer: "/packs/1/regionalQualityMetrics/facilityCoverageRatio",
-    canonical: "1e-7",
-  },
-  {
-    contractId: "smallest-subnormal",
-    pointer: "/packs/1/regionalQualityMetrics/unknownAccessibilityRatio",
-    canonical: "5e-324",
-  },
-  {
-    contractId: "plain-fraction",
-    pointer: "/packs/2/regionalQualityMetrics/facilityCoverageRatio",
-    canonical: "0.1",
-  },
-  {
-    contractId: "exponent-small-mantissa",
-    pointer: "/packs/2/regionalQualityMetrics/unknownAccessibilityRatio",
-    canonical: "1.5e-7",
-  },
-  {
-    contractId: "exponent-small",
-    pointer: "/packs/3/regionalQualityMetrics/facilityCoverageRatio",
-    canonical: "2.5e-10",
-  },
-  {
-    contractId: "zero",
-    pointer: "/packs/3/regionalQualityMetrics/unknownAccessibilityRatio",
-    canonical: "0",
-  },
+  ratioBoundary(0, "facilityCoverageRatio", "double-rounding-artifact", "0.30000000000000004"),
+  ratioBoundary(0, "unknownAccessibilityRatio", "plain-boundary-lower", "0.000001"),
+  ratioBoundary(1, "facilityCoverageRatio", "exponent-boundary-lower", "1e-7"),
+  ratioBoundary(1, "unknownAccessibilityRatio", "smallest-subnormal", "5e-324"),
+  ratioBoundary(2, "facilityCoverageRatio", "plain-fraction", "0.1"),
+  ratioBoundary(2, "unknownAccessibilityRatio", "exponent-small-mantissa", "1.5e-7"),
+  ratioBoundary(3, "facilityCoverageRatio", "exponent-small", "2.5e-10"),
+  ratioBoundary(3, "unknownAccessibilityRatio", "zero", "0"),
 ];
 
 const representativeRouteRegressions = [
@@ -287,7 +259,7 @@ function forgeCorruptedPadding(privateKeyPem, signatureBase64Url) {
   return privateDecrypt({ key: privateKey, padding: constants.RSA_NO_PADDING }, corrupted).toString("base64url");
 }
 
-function powMod(base, exponent, modulus) {
+export function powMod(base, exponent, modulus) {
   let result = 1n;
   let factor = base % modulus;
   let remaining = exponent;
