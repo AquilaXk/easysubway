@@ -2335,6 +2335,80 @@ void main() {
     expect(result.stairAccessLabel, '계단 없는 길이에요');
   });
 
+  test('#2590 검증된 접근 동선은 로컬에서도 확인 필요로 표기하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'ride-a-b-step-free',
+      fromNodeId: 'station-a:line-test:LOCAL',
+      toNodeId: 'station-b:line-test:LOCAL',
+      edgeType: 'RIDE',
+      durationSeconds: 120,
+      distanceMeters: 830,
+    );
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'SENIOR',
+      ),
+    );
+
+    final accessSteps = result.steps
+        .where((step) => step.stepType == 'entry' || step.stepType == 'exit')
+        .toList(growable: false);
+    expect(accessSteps, isNotEmpty);
+    expect(
+      accessSteps.map((step) => step.requiresAccessibilityCheck),
+      everyElement(isFalse),
+    );
+    // 같은 칩 행이 서로 다른 말을 하지 않는다.
+    expect(result.stairAccessLabel, '계단 없는 길이에요');
+    expect(result.accessibilityBadgeLabel, '계단 없는 경로 확인');
+  });
+
+  test('#2590 근거가 없는 접근 동선은 로컬에서 확인 필요로 남는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    // 명시 access edge 없이 생성 연결선만 남긴다. 위상 보조선일 뿐 검증 근거가 아니다.
+    await _seedLineWithoutNetworkEdges(
+      database,
+      includeExplicitAccessEdges: false,
+    );
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'ride-a-b-step-free',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-b:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 120,
+      distanceMeters: 830,
+    );
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'SENIOR',
+      ),
+    );
+
+    final accessSteps = result.steps
+        .where((step) => step.stepType == 'entry' || step.stepType == 'exit')
+        .toList(growable: false);
+    expect(accessSteps, isNotEmpty);
+    expect(
+      accessSteps.map((step) => step.requiresAccessibilityCheck),
+      everyElement(isTrue),
+    );
+    expect(result.stairAccessLabel, '계단 여부를 확인하고 있어요');
+  });
+
   test('#2590 데이터팩이 승차 구간에 미확인을 명시하면 무단차로 승격하지 않는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);

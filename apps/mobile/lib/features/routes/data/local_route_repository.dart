@@ -659,8 +659,7 @@ class LocalRouteRepository implements RouteSearchRepository {
             distanceMeters: step.distanceMeters,
             includesStairs: step.includesStairs,
             stairAccessState: _stairAccessStateOf(step),
-            requiresAccessibilityCheck:
-                step.type.name == 'entry' || step.type.name == 'exit',
+            requiresAccessibilityCheck: _requiresAccessibilityCheck(step),
             actionTitle: _stepActionTitle(step.type.name),
             actionDetail: _stepActionDetail(
               step.type.name,
@@ -699,6 +698,20 @@ class LocalRouteRepository implements RouteSearchRepository {
             step.stairAccessState == 'stepFree'
         ? 'notApplicable'
         : step.stairAccessState;
+  }
+
+  /// 로컬 경로의 "확인 필요"도 실제 접근성 근거에서 파생한다(#2590).
+  ///
+  /// 종전에는 `entry`·`exit`이면 근거와 무관하게 참이라, 데이터팩이 검증한 무단차
+  /// 동선까지 `엘리베이터 상태를 살펴봐 주세요`가 붙어 같은 칩 행의 계단 표기와 어긋났다.
+  /// 반대로 환승·연결 동선은 근거와 무관하게 거짓이라 미확인 구간이 조용히 넘어갔다.
+  /// 승차와 경유 경계 표식은 오르내릴 계단 자체가 없어 확인 대상이 아니다.
+  bool _requiresAccessibilityCheck(route_step.RouteStep step) {
+    return switch (step.type) {
+      route_step.RouteStepType.ride ||
+      route_step.RouteStepType.waypoint => false,
+      _ => !step.accessibilityVerified,
+    };
   }
 
   Map<int, String> _plannedRideArrivals(
@@ -1092,6 +1105,7 @@ local.LocalRouteResult mergeWaypointRouteResults(
         timeSource: step.timeSource,
         distanceSource: step.distanceSource,
         confidenceLabel: step.confidenceLabel,
+        accessibilityVerified: step.accessibilityVerified,
       ),
     );
   }
@@ -1225,6 +1239,8 @@ List<route_step.RouteStep> _collapseConsecutiveRideSteps(
       confidenceLabel: previous.confidenceLabel == step.confidenceLabel
           ? previous.confidenceLabel
           : '',
+      accessibilityVerified:
+          previous.accessibilityVerified && step.accessibilityVerified,
     );
   }
   return collapsed;

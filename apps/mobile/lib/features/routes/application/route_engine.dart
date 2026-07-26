@@ -466,6 +466,7 @@ class RouteAssembler {
           timeSource: edge.durationSeconds > 0 ? 'STATIC_ESTIMATE' : 'UNKNOWN',
           distanceSource: edge.distanceMeters > 0 ? 'MEASURED' : 'UNKNOWN',
           confidenceLabel: _confidenceLabel(edge),
+          accessibilityVerified: _accessibilityVerified(edge),
         ),
       );
     }
@@ -523,6 +524,24 @@ class RouteAssembler {
   String _lineIdFromNode(String nodeId) {
     final parts = nodeId.split(':');
     return parts.length >= 2 ? parts[1] : '';
+  }
+
+  /// 이 edge의 접근성이 "확인됐다"고 말할 근거가 실제로 있는지(#2590).
+  ///
+  /// 백엔드 시간표 플래너의 전이 검증(`VERIFIED` 상태 + 저신뢰·만료 경고 없음)과 같은
+  /// 격자를 로컬 그래프가 아는 사실로 재구성한다. 계단 상태를 모르는 구간·생성 연결선·
+  /// 근거가 엄격 경로 자격을 얻지 못한 구간은 확인된 것이 아니다. 계단이 있다고 확인된
+  /// 구간은 미확인이 아니라 확인된 장벽이므로 여기서 걸러 내지 않는다.
+  bool _accessibilityVerified(RouteEdge edge) {
+    return edge.stairAccessState != RouteStairAccessState.unknown &&
+        edge.accessibilityState == RouteAccessibilityState.available &&
+        !edge.isGeneratedConnector &&
+        !edge.isDataStale &&
+        edge.reliabilityScore >= 80 &&
+        edge.safetyEvidence.strictRouteEligible &&
+        !edge.safetyEvidence.isStale &&
+        !edge.safetyEvidence.isPlaceholderEvidence &&
+        edge.safetyEvidence.verificationStatus.toUpperCase() == 'VERIFIED';
   }
 
   String _confidenceLabel(RouteEdge edge) {
