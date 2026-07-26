@@ -13,7 +13,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -126,7 +126,9 @@ test("커밋된 candidate 게이트 evidence는 현행 입력에서 바이트 �
     }
     // 지역 편입 입력도 같은 축이다. 저장소에 편입 행을 복제하지 않으므로 이 해시가 candidate 구성의
     // 유일한 결속이며, snapshot 한 바이트가 바뀌면 evidence 재생성이 강제돼야 한다.
-    // 체인 순서도 기록 축이다 — 순서가 바뀌면 선행 조건(시각표 소스 선재)이 깨진다.
+    // 체인 순서도 기록 축이다. 다만 조립이 강제하는 순서는 선행 조건이 있는 쌍뿐이고
+    // route_map↔accessibility 교환은 조립을 그대로 통과한다(실측) — 기록된 전체 순서를 고정하는 축은
+    // 조립 fail closed가 아니라 이 evidence 대조다.
     assert.deepEqual(
       evidence.packDataInclusions.entries.map(({ materializer }) => materializer),
       DAEGU_MATERIALIZERS,
@@ -591,6 +593,17 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
     );
   });
 
+  // 서술 키를 "*Ko 접미사면 통과"로 열어 두면 snapshotPathKo 같은 죽은 선언이 그대로 통과한다(실측).
+  // 명시 allowlist(reasonKo·materializedAtReasonKo·addedRowsKo)로 좁혔으므로 그 밖의 서술 키는 거부된다.
+  await context.test("등재되지 않은 서술 키는 거부된다", async () => {
+    await rejectsWith(
+      (value) => {
+        value.packDataInclusions[1].snapshotPathKo = "tools/datapack/sources/does-not-exist.json";
+      },
+      /materialize-daegu-route-map-positions\.mjs has unknown keys: snapshotPathKo/,
+    );
+  });
+
   await context.test("materializer 형상에 없는 lines 키는 거부된다", async () => {
     await rejectsWith(
       (value) => {
@@ -614,30 +627,52 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
     );
   });
 
-  // 노선도 편입은 snapshot 바이트 해시를 admission 정본(snapshotSha256)과 대조하지만 편의시설 정본에는
-  // 바이트 축이 없다 — rawSha256·rowsSha256은 snapshot 내용에서 파생돼 재직렬화 사본도 같은 값을 낸다.
-  // 편입 경로를 정본 snapshotPath에 결속하지 않으면 아래 사본이 그대로 조립을 통과한다(실측).
-  await context.test("편의시설 편입이 admission 정본 밖 snapshot 사본을 가리키면 거부된다", async () => {
-    const copyPath = `tools/datapack/sources/accessibility-copy-${process.pid}.json`;
-    const original = await readFile(
-      path.join(root, "tools/datapack/sources/daegu-transportation-accessibility-20260724.json"),
-      "utf8",
-    );
-    await writeFile(path.join(root, copyPath), JSON.stringify(JSON.parse(original)));
+  // 두 편입 모두 admission 정본의 snapshotPath에 결속돼 있다. 결속이 없으면 아래 사본들이 그대로 조립을
+  // 통과한다(실측) — 편의시설 정본에는 바이트 축이 아예 없어 재직렬화 사본도 rawSha256·rowsSha256이 같고,
+  // 노선도 정본에는 바이트 축(snapshotSha256)이 있지만 바이트 동일 사본은 그 축을 그대로 지난다.
+  // 사본은 하네스가 읽을 수 있게 저장소 안에 두되 gitignore된 tmp/ 아래에 둔다(강제 종료 시 tracked
+  // 디렉터리에 잔재가 남지 않게).
+  async function rejectsSnapshotCopy({ index, sourcePath, copyName, serialize, expected }) {
+    const copyDir = path.join(root, "tmp", `nationwide-candidate-gate-copy-${process.pid}-${Date.now()}`);
+    await mkdir(copyDir, { recursive: true });
+    const copyPath = path.relative(root, path.join(copyDir, copyName));
+    await writeFile(path.join(root, copyPath), serialize(await readFile(path.join(root, sourcePath))));
     try {
-      await rejectsWith(
-        (value) => { value.packDataInclusions[2].snapshotPath = copyPath; },
-        /snapshotPath must match the daegu-transportation-accessibility admission evidence snapshotPath/,
-      );
+      await rejectsWith((value) => { value.packDataInclusions[index].snapshotPath = copyPath; }, expected);
     } finally {
-      await rm(path.join(root, copyPath), { force: true });
+      await rm(copyDir, { recursive: true, force: true });
     }
+  }
+
+  await context.test("노선도 편입이 admission 정본 밖 바이트 동일 사본을 가리키면 거부된다", async () => {
+    await rejectsSnapshotCopy({
+      index: 1,
+      sourcePath: "tools/datapack/sources/daegu-transportation-route-map-positions-20260724.json",
+      copyName: "route-map-copy.json",
+      // 바이트를 그대로 옮긴다 — materializer의 snapshotSha256 대조만으로는 이 사본이 통과한다(실측).
+      serialize: (bytes) => bytes,
+      expected:
+        /snapshotPath must match the daegu-transportation-route-map-positions admission evidence snapshotPath/,
+    });
   });
 
+  await context.test("편의시설 편입이 admission 정본 밖 snapshot 사본을 가리키면 거부된다", async () => {
+    await rejectsSnapshotCopy({
+      index: 2,
+      sourcePath: "tools/datapack/sources/daegu-transportation-accessibility-20260724.json",
+      copyName: "accessibility-copy.json",
+      serialize: (bytes) => JSON.stringify(JSON.parse(bytes.toString("utf8"))),
+      expected: /snapshotPath must match the daegu-transportation-accessibility admission evidence snapshotPath/,
+    });
+  });
+
+  // 노선도 편입의 snapshotPath는 admission 정본 경로에 결속돼 이 축에 닿기 전에 걸린다 — 결속이 없는
+  // 경로 키(lines[].topologySnapshotPath)로 일반화된 형상의 저장소 밖 입력 거부를 고정한다.
   await context.test("일반화된 형상의 편입 입력도 저장소 밖을 가리키면 거부된다", async () => {
     await rejectsWith(
       (value) => {
-        value.packDataInclusions[1].snapshotPath = "../daegu-transportation-route-map-positions-20260724.json";
+        value.packDataInclusions[1].lines[0].topologySnapshotPath =
+          "../daegu-line1-route-topology-20260721.json";
       },
       /must be a repository-relative path inside the repo/,
     );
@@ -738,14 +773,21 @@ test("승계 행 불변 단언은 append만 통과시키고 수정·삭제를 �
   );
 });
 
+// 승계 pack의 배열 표 전체를 0으로 선언한 addedRows. 합성 편입은 행을 더하지 않으므로 addedRows 대조는
+// 통과하고 회귀가 겨냥한 축만 걸린다.
+async function zeroAddedRows() {
+  const [inheritedPack] = (await readJson(REVIEWED_PACK_PATH)).packs;
+  return Object.fromEntries(
+    Object.entries(inheritedPack).filter(([, value]) => Array.isArray(value)).map(([table]) => [table, 0]),
+  );
+}
+
 // 위 단위 축과 별개로, 조립 경로가 그 단언을 실제로 호출하는지를 고정한다(호출이 사라지면 이 회귀가 깨진다).
 // PACK_DATA_MATERIALIZERS는 모듈 내부 상수라 spec 편집으로는 이 경로에 닿을 수 없어 in-process seam을 쓴다.
 test("조립 경로는 승계 행을 변조하는 materializer를 거부한다", async () => {
   const spec = structuredClone(await readJson(SPEC_PATH));
   const inventory = await readJson(INVENTORY_PATH);
-  const [inheritedPack] = (await readJson(REVIEWED_PACK_PATH)).packs;
   const materializerId = "test://mutates-inherited-rows";
-  // 행을 더하지 않으므로 선언 행수는 전부 0이다 — addedRows 대조는 통과하고 승계 행 불변 축만 걸린다.
   spec.packDataInclusions = [{
     regionId: "synthetic",
     materializer: materializerId,
@@ -757,9 +799,7 @@ test("조립 경로는 승계 행을 변조하는 materializer를 거부한다",
       topologySnapshotPath: "tools/datapack/sources/daegu-line1-route-topology-20260721.json",
       timetableSnapshotPath: "tools/datapack/sources/daegu-line1-train-timetable-20260721.json",
     }],
-    addedRows: Object.fromEntries(
-      Object.entries(inheritedPack).filter(([, value]) => Array.isArray(value)).map(([table]) => [table, 0]),
-    ),
+    addedRows: await zeroAddedRows(),
   }];
   const materializers = new Map([[materializerId, {
     materialize: (fixture) => {
@@ -831,13 +871,6 @@ function seamInclusion(materializer, addedRows) {
   };
 }
 
-async function zeroAddedRows() {
-  const [inheritedPack] = (await readJson(REVIEWED_PACK_PATH)).packs;
-  return Object.fromEntries(
-    Object.entries(inheritedPack).filter(([, value]) => Array.isArray(value)).map(([table]) => [table, 0]),
-  );
-}
-
 // 단일 편입 회귀는 승계 원본(capital pack) 행만 태운다. 체인에서는 앞 편입이 실은 행도 뒤 편입의 불변
 // 대상이므로, 1번째가 append한 행을 2번째가 in-place로 변조하는 2단 케이스를 따로 고정한다
 // (행수는 그대로라 addedRows 대조는 통과하고 승계 행 불변 축만 걸린다).
@@ -901,6 +934,30 @@ test("allowlist 항목의 inputs 형상이 깨지면 진단 가능한 오류로 
       inputs: { paths: "stationMapPath", linePaths: ["topologySnapshotPath"] },
     }]])),
     /pack data materializer inputs shape is invalid: test:\/\/broken-inputs/,
+  );
+});
+
+// 형상 검사가 잡는 것은 형상 자체가 깨진 경우뿐이다. 형상이 성립하면서 어댑터가 실제로 읽는 키보다 좁으면
+// spec 검사가 그 키를 요구하지 않아 결측 값이 readTracked까지 들어온다 — fail closed는 유지되지만 진단이
+// path.resolve TypeError로 붕괴했다(실측). 결측을 spec 검사와 같은 형식으로 되돌리는지 본다.
+test("등재 형상이 어댑터 read보다 좁으면 결측 입력을 진단 가능한 오류로 거부한다", async () => {
+  const spec = structuredClone(await readJson(SPEC_PATH));
+  const inventory = await readJson(INVENTORY_PATH);
+  const materializerId = "test://narrow-input-shape";
+  const inclusion = seamInclusion(materializerId, await zeroAddedRows());
+  // 등재 형상에 없는 키는 그 자체로 거부되므로 spec 쪽 선언도 함께 지운다.
+  delete inclusion.stationMapPath;
+  spec.packDataInclusions = [inclusion];
+
+  await assert.rejects(
+    runWithMaterializers(spec, inventory, new Map([[materializerId, {
+      materialize: async (fixture, entry, { readTracked }) => {
+        await readTracked(entry.stationMapPath, "stationMapPath");
+        return fixture;
+      },
+      inputs: { paths: [], linePaths: ["topologySnapshotPath"] },
+    }]])),
+    /synthetic:test:\/\/narrow-input-shape\.stationMapPath is required/,
   );
 });
 

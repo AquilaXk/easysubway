@@ -106,9 +106,12 @@ const PACK_DATA_MATERIALIZERS = new Map([
     inputs: { paths: ["snapshotPath"], linePaths: ["topologySnapshotPath"] },
   }],
 ]);
-// 형상과 무관하게 모든 편입 레코드가 갖는 키. 나머지 허용 키는 등재 형상의 경로 키뿐이다(*Ko 서술 키 예외).
+// 형상과 무관하게 모든 편입 레코드가 갖는 키. 나머지 허용 키는 등재 형상의 경로 키와 아래 서술 키뿐이다.
 const INCLUSION_BASE_KEYS = Object.freeze(["regionId", "materializer", "materializedAt", "lines", "addedRows"]);
 const INCLUSION_LINE_BASE_KEYS = Object.freeze(["lineNumber", "lineId"]);
+// 편입 레코드에 허용하는 서술 키. "*Ko 접미사면 통과"로 열어 두면 snapshotPathKo 같은 죽은 선언이 그대로
+// 통과해(실측) 선언과 실제 결속이 갈린 채 무성으로 남는다 — 실제로 쓰는 키만 명시로 연다.
+const INCLUSION_NARRATIVE_KEYS = Object.freeze(["reasonKo", "materializedAtReasonKo", "addedRowsKo"]);
 
 export async function runNationwideCandidateCoverageGate({
   spec,
@@ -222,7 +225,10 @@ async function applyPackDataInclusions(spec, inherited, inventory, materializers
     const entry = materializers.get(inclusion.materializer);
     if (!entry) throw new Error(`unknown pack data materializer: ${inclusion.materializer}`);
     const inputs = new Map();
-    const readTracked = (relativePath) => readTrackedBytes(relativePath, inputs);
+    const label = inclusionLabel(inclusion);
+    // 경로 키 이름을 함께 넘긴다 — 등재 형상이 어댑터가 실제로 읽는 키보다 좁으면 결측 값이 여기까지
+    // 들어오는데, 그때 진단이 spec 검사와 같은 "<편입>.<키> is required" 형식으로 나와야 한다.
+    const readTracked = (relativePath, key) => readTrackedBytes(relativePath, inputs, `${label}.${key}`);
     // 승계 스냅샷을 편입마다 다시 뜬다 — 체인의 n번째 편입에게 직전 편입 결과가 곧 승계 원본이므로
     // 앞선 편입이 실은 행도 뒤 편입의 불변 대상이 된다.
     const inheritedSnapshot = inheritedRowSnapshot(fixture.packs[0]);
@@ -232,7 +238,7 @@ async function applyPackDataInclusions(spec, inherited, inventory, materializers
     }
     const addedRows = subtractRowCounts(packRowCounts(fixture.packs[0]), inheritedSnapshot.counts);
     assertDeclaredRows(inclusion, addedRows);
-    assertInheritedRowsUnchanged(inclusionLabel(inclusion), inheritedSnapshot, fixture.packs[0]);
+    assertInheritedRowsUnchanged(label, inheritedSnapshot, fixture.packs[0]);
     records.push({
       regionId: inclusion.regionId,
       materializer: inclusion.materializer,
@@ -258,7 +264,7 @@ async function daeguTopologySnapshots(inclusion, readTracked) {
       throw new Error(`daegu pack data inclusion line ${index} does not match the tracked line config`);
     }
     topologySnapshots[config.lineNumber] = parseJsonBytes(
-      await readTracked(line.topologySnapshotPath),
+      await readTracked(line.topologySnapshotPath, "lines[].topologySnapshotPath"),
       line.topologySnapshotPath,
     );
   }
@@ -273,13 +279,13 @@ async function daeguTopologySnapshots(inclusion, readTracked) {
 // 창은 소스마다 다르므로 pin도 편입마다 따로 둔다.
 async function materializeDaeguTimetableInclusion(fixture, inclusion, { readTracked, inventory }) {
   const topologySnapshots = await daeguTopologySnapshots(inclusion, readTracked);
-  const stationMapBytes = await readTracked(inclusion.stationMapPath);
+  const stationMapBytes = await readTracked(inclusion.stationMapPath, "stationMapPath");
   const timetableSnapshots = {};
   const canonicalStationMappings = {};
   for (const [index, line] of inclusion.lines.entries()) {
     const config = DAEGU_LINES[index];
     timetableSnapshots[config.lineNumber] = parseJsonBytes(
-      await readTracked(line.timetableSnapshotPath),
+      await readTracked(line.timetableSnapshotPath, "lines[].timetableSnapshotPath"),
       line.timetableSnapshotPath,
     );
     canonicalStationMappings[config.lineNumber] = parseMolitDaeguStationMappings(stationMapBytes, config.lineName);
@@ -295,10 +301,18 @@ async function materializeDaeguTimetableInclusion(fixture, inclusion, { readTrac
 }
 
 // 대구 노선도 좌표 편입 어댑터(#2580). materializer가 snapshot 바이트 정체성(snapshotSha256)을 admission
-// 정본과 대조하므로, 하네스가 evidence에 남기는 입력 해시와 같은 바이트가 판정 근거가 된다.
+// 정본과 대조하므로 하네스가 evidence에 남기는 입력 해시와 같은 바이트가 판정 근거가 된다. 다만 바이트
+// 축만으로는 저장소 안 다른 경로에 둔 바이트 동일 사본을 가리켜도 통과한다(실측) — 편의시설 편입과 같이
+// 정본 snapshotPath에도 결속해 두 편입의 결속 축을 경로·바이트 양방향으로 맞춘다.
 async function materializeDaeguRouteMapInclusion(fixture, inclusion, { readTracked, inventory }) {
+  assertAdmissionSnapshotPath(
+    inventory,
+    "daegu-transportation-route-map-positions",
+    "routeMapAdmissionEvidence",
+    inclusion.snapshotPath,
+  );
   const topologySnapshots = await daeguTopologySnapshots(inclusion, readTracked);
-  const snapshotBytes = await readTracked(inclusion.snapshotPath);
+  const snapshotBytes = await readTracked(inclusion.snapshotPath, "snapshotPath");
   return materializeDaeguRouteMapPositions({
     baseFixture: fixture,
     snapshot: parseJsonBytes(snapshotBytes, inclusion.snapshotPath),
@@ -311,11 +325,11 @@ async function materializeDaeguRouteMapInclusion(fixture, inclusion, { readTrack
 
 // 대구 교통약자 편의시설 편입 어댑터(#2580).
 //
-// route_map 어댑터는 snapshot 바이트 해시를 materializer에 넘겨 admission 정본(snapshotSha256)과 대조하지만
-// accessibility 정본에는 바이트 축이 없다 — rawSha256·rowsSha256은 snapshot 내용에서 파생돼 재직렬화 사본도
-// 같은 값을 낸다(실측: 사본이 그대로 조립을 통과했다). materializer에 검사 지점이 없으므로 하네스가 편입이
-// 읽는 경로를 admission 정본의 snapshotPath에 결속해 대칭을 맞춘다. 그 경로에서 실제로 읽은 바이트 해시는
-// evidence inputs에 남으므로, 정본 경로 파일 자체가 재직렬화되면 evidence 바이트 재생성 회귀가 잡는다.
+// accessibility 정본에는 바이트 축이 아예 없다 — rawSha256·rowsSha256은 snapshot 내용에서 파생돼 재직렬화
+// 사본도 같은 값을 낸다(실측: 사본이 그대로 조립을 통과했다). materializer에 검사 지점이 없으므로 하네스가
+// 편입이 읽는 경로를 admission 정본의 snapshotPath에 결속한다(노선도 편입과 같은 축). 그 경로에서 실제로
+// 읽은 바이트 해시는 evidence inputs에 남으므로, 정본 경로 파일 자체가 재직렬화되면 evidence 바이트 재생성
+// 회귀가 잡는다.
 async function materializeDaeguAccessibilityInclusion(fixture, inclusion, { readTracked, inventory }) {
   assertAdmissionSnapshotPath(
     inventory,
@@ -327,7 +341,7 @@ async function materializeDaeguAccessibilityInclusion(fixture, inclusion, { read
   return materializeDaeguAccessibility({
     baseFixture: fixture,
     accessibilitySnapshot: parseJsonBytes(
-      await readTracked(inclusion.snapshotPath),
+      await readTracked(inclusion.snapshotPath, "snapshotPath"),
       inclusion.snapshotPath,
     ),
     topologySnapshots,
@@ -409,7 +423,11 @@ export function assertInheritedRowsUnchanged(label, snapshot, pack) {
 // 편입 입력은 저장소 안 상대 경로만 허용한다(절대 경로·경로 이탈 fail closed). 문자열 containment만
 // 보면 저장소 안 symlink가 밖을 가리킬 때 통과하므로, 링크를 해석한 실경로로 containment를 다시 본다.
 // git tracked 여부까지 보지는 않는다 — 그 축은 입력 바이트 해시를 evidence에 남기는 것으로 대신한다.
-async function readTrackedBytes(relativePath, inputs) {
+async function readTrackedBytes(relativePath, inputs, label) {
+  // 등재 형상의 경로 키 목록이 어댑터가 실제로 읽는 것보다 좁으면 spec 검사가 그 키를 요구하지 않아
+  // undefined가 여기까지 들어온다. 무검사로 path.resolve에 넘기면 fail closed는 유지되지만 진단이
+  // TypeError("paths[1] argument must be of type string") 스택으로 붕괴한다 — 결측을 그 자리에서 되돌린다.
+  requiredString(relativePath, label);
   const resolved = path.resolve(root, relativePath);
   if (path.isAbsolute(relativePath) || !resolved.startsWith(`${root}${path.sep}`)) {
     throw new Error(`pack data inclusion input must be a repository-relative path inside the repo: ${relativePath}`);
@@ -984,13 +1002,13 @@ function validatePackDataInclusions(spec, materializers) {
 //
 // 허용 키는 등재 형상이 정하고 그 밖의 키는 거부한다. 미등재 키를 조용히 무시하면 spec이 선언한 입력이
 // 읽히지도 해시되지도 않은 채 evidence를 통과해(예: 노선도 편입에 남은 시각표 경로), 선언과 실제 결속이
-// 갈린 상태가 무성으로 남는다. 서술용 *Ko 키는 저장소 문서 관례라 예외로 둔다.
+// 갈린 상태가 무성으로 남는다. 서술 키는 INCLUSION_NARRATIVE_KEYS에 등재된 것만 연다.
 function validateInclusionInputs(inclusion, inputs, label) {
   const { paths, linePaths } = materializerInputShape(inclusion.materializer, inputs);
   for (const key of paths) {
     requiredString(inclusion[key], `${label}.${key}`);
   }
-  assertKnownKeys(inclusion, [...INCLUSION_BASE_KEYS, ...paths], label);
+  assertKnownKeys(inclusion, [...INCLUSION_BASE_KEYS, ...INCLUSION_NARRATIVE_KEYS, ...paths], label);
   if (!Array.isArray(inclusion.lines) || inclusion.lines.length === 0) {
     throw new Error(`${label}.lines must be a non-empty array`);
   }
@@ -1024,7 +1042,7 @@ function isPathKeyList(value) {
 function assertKnownKeys(record, knownKeys, label) {
   const known = new Set(knownKeys);
   const unknown = Object.keys(record)
-    .filter((key) => !known.has(key) && !key.endsWith("Ko"))
+    .filter((key) => !known.has(key))
     .sort(codepointCompare);
   if (unknown.length > 0) {
     throw new Error(`${label} has unknown keys: ${unknown.join(",")}`);
