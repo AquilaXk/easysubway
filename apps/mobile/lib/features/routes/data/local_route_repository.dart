@@ -645,7 +645,7 @@ class LocalRouteRepository implements RouteSearchRepository {
                   lineId: step.lineId,
                 )
               : null;
-          final stairAccessState = _stairAccessStateOf(step);
+          final stairAccess = _stairAccessOf(step);
 
           return RouteSearchStep(
             sequence: index + 1,
@@ -659,10 +659,8 @@ class LocalRouteRepository implements RouteSearchRepository {
             estimatedMinutes: _estimatedMinutesFor(adjustedDurationSeconds),
             distanceMeters: step.distanceMeters,
             includesStairs: step.includesStairs,
-            stairAccessState: stairAccessState,
-            // 온라인 경로가 leg 판정에서 파생하는 규칙과 같다: 판정이 `unknown`일 때가
-            // 곧 "확인되지 않음"이고, 계단 개념이 적용되지 않는 구간은 확인 대상이 아니다.
-            requiresAccessibilityCheck: stairAccessState == 'unknown',
+            stairAccessState: stairAccess.state,
+            requiresAccessibilityCheck: stairAccess.requiresCheck,
             actionTitle: _stepActionTitle(step.type.name),
             actionDetail: _stepActionDetail(
               step.type.name,
@@ -690,28 +688,34 @@ class LocalRouteRepository implements RouteSearchRepository {
         .toList(growable: false);
   }
 
-  /// 로컬 경로의 계단 판정. 백엔드 `StairAccess`와 같은 격자다(#2590).
+  /// 로컬 경로의 계단 판정과 확인 필요 표기(#2590).
   ///
-  /// 승차와 경유 경계 표식은 오르내릴 계단 자체가 없어 미확인이 아니라 비적용이다.
-  /// 로컬 그래프는 계단 상태가 명시되지 않은 승차 edge를 `stepFree`로 기본 파생하는데
-  /// (`RouteEdge` 생성자) 그건 "확인된 무단차"가 아니라 "계단 장벽이 놓이지 않는
-  /// 구간"이라는 뜻이다. 데이터팩이 승차 edge에 계단 상태를 명시했으면(예: `UNKNOWN`)
-  /// 그 판단이 우선이라 건드리지 않는다.
+  /// 백엔드 시간표 플래너는 이 둘을 **두 축으로 나눠** 싣는다 — 상태는
+  /// `STAIR_ONLY`/`STEP_FREE`/`UNKNOWN`, 확인 필요는 `!verified`
+  /// (`RouteTimetableRaptorPlanner`의 접근 전이 생성). 계단이 있다고 확인된 동선에
+  /// 검증 근거가 없으면 계단 표기와 확인 필요가 함께 붙는다. 여기서도 같은 구조를 쓴다.
   ///
-  /// 나머지 구간은 계단 사실과 그 사실을 확인했는지를 함께 본다. 종전에는 계단 사실만
-  /// 옮겨 적고 확인 필요 표기는 `entry`·`exit`인지로만 정해, 검증된 동선에 확인 필요가
-  /// 붙거나 검증되지 않은 동선이 무단차로 적히는 어긋남이 같은 칩 행에서 났다.
-  String _stairAccessStateOf(route_step.RouteStep step) {
-    return switch (step.type) {
-      route_step.RouteStepType.ride || route_step.RouteStepType.waypoint =>
-        step.stairAccessState == 'stepFree'
-            ? 'notApplicable'
-            : step.stairAccessState,
-      _ =>
-        step.stairAccessState == 'stepFree' && !step.accessibilityVerified
-            ? 'unknown'
-            : step.stairAccessState,
-    };
+  /// 승차와 경유 경계 표식은 오르내릴 계단 자체가 없어 원자료와 무관하게 비적용으로
+  /// 확정한다. 데이터팩 `network_edges.stair_access_state`의 `UNKNOWN`은 "확인 결과
+  /// 미상"이 아니라 컬럼 기본값이고, 출시 팩의 승차 edge는 사실상 전부 이 값이라
+  /// 그대로 옮기면 열차 안에서 엘리베이터를 확인하라는 안내가 붙는다 — #2590이
+  /// 없애려던 증상 그대로다. 승차 구간을 상태값과 무관하게 비적용으로 두는 것은
+  /// 백엔드 [StairAccess.ofStep]과도 같다.
+  ({String state, bool requiresCheck}) _stairAccessOf(
+    route_step.RouteStep step,
+  ) {
+    if (_isStairIrrelevantStepType(step.type)) {
+      return (state: 'notApplicable', requiresCheck: false);
+    }
+    return (
+      // 근거가 없으면 무단차라 적혀 있어도 그렇게 말하지 않는다. 계단이 있다는 사실은
+      // 근거와 축이 달라 흔들지 않는다(`_accessibilityVerified`가 `unknown` 상태를
+      // 이미 걸러 내므로 미확인 상태가 무단차로 올라갈 갈래는 없다).
+      state: step.stairAccessState == 'stepFree' && !step.accessibilityVerified
+          ? 'unknown'
+          : step.stairAccessState,
+      requiresCheck: !step.accessibilityVerified,
+    );
   }
 
   Map<int, String> _plannedRideArrivals(
@@ -803,11 +807,11 @@ class LocalRouteRepository implements RouteSearchRepository {
     if (steps.isEmpty) {
       return const [];
     }
+    // 스텝 플래그와 같은 파생을 쓴다(#2590). 두 벌로 계산하면 같은 결과 객체 안에서
+    // 스텝은 확인 필요가 없다고 하고 요약은 확인 필요라고 하는 어긋남이 난다. 이 요약은
+    // 즐겨찾기에 직렬화되어 남으므로 어긋남이 저장까지 따라간다.
     final requiresAccessibilityCheck = steps.any(
-      (step) =>
-          step.type.name == 'entry' ||
-          step.type.name == 'exit' ||
-          step.stairAccessState == 'unknown',
+      (step) => _stairAccessOf(step).requiresCheck,
     );
     final hasDurationEstimate = steps.every((step) => step.durationSeconds > 0);
     final hasDistanceMeasure = steps.every((step) => step.distanceMeters > 0);
@@ -2984,6 +2988,13 @@ String _lineIdForNode(String nodeId) {
     return '';
   }
   return parts[1];
+}
+
+/// 오르내릴 계단 자체가 놓이지 않는 구간(#2590). 승차는 열차 안이고, 경유 경계
+/// 표식은 이동이 아니라 표식이다.
+bool _isStairIrrelevantStepType(route_step.RouteStepType type) {
+  return type == route_step.RouteStepType.ride ||
+      type == route_step.RouteStepType.waypoint;
 }
 
 String _selectNetworkEdgeColumn(

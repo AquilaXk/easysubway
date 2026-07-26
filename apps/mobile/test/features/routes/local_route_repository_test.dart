@@ -2469,10 +2469,96 @@ void main() {
     expect(result.stairAccessLabel, '계단 여부를 확인하고 있어요');
   });
 
-  test('#2590 데이터팩이 승차 구간에 미확인을 명시하면 무단차로 승격하지 않는다', () async {
+  test('#2590 출시 데이터팩 형태의 승차 구간에는 확인 안내를 붙이지 않는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
-    await _seedLineWithoutNetworkEdges(database);
+    // 번들 데이터팩(capital·core)의 실제 형태다: network_edges에 RIDE만 있고 근거
+    // 컬럼은 아예 없으며, 승차 edge의 stair_access_state는 사실상 전부 컬럼 기본값인
+    // UNKNOWN이다. 그 값을 그대로 옮기면 열차 승차 행에 확인 안내가 붙는다.
+    await _seedLineWithoutNetworkEdges(
+      database,
+      includeExplicitAccessEdges: false,
+      fillInsertedNetworkEdgeEvidence: false,
+    );
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, distance_meters,
+        edge_type, service_pattern, includes_stairs, stair_access_state,
+        accessibility_status, reliability_score, last_verified_at, service_class
+      )
+      VALUES (
+        'edge-line-test-station-a-station-b',
+        'station-a:line-test',
+        'station-b:line-test',
+        120,
+        0,
+        'RIDE',
+        'LOCAL',
+        0,
+        'UNKNOWN',
+        'UNKNOWN',
+        100,
+        NULL,
+        'SUBWAY'
+      )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'SENIOR',
+      ),
+    );
+
+    final rideStep = result.steps.singleWhere(
+      (step) => step.stepType == 'ride',
+    );
+    expect(rideStep.stairAccessState, 'notApplicable');
+    expect(rideStep.requiresAccessibilityCheck, isFalse);
+    expect(rideStep.burdenLabel, isNot(contains('엘리베이터 안내 미확인')));
+    // 승차를 판정에서 뺀다고 해서 경로가 무단차로 올라가지는 않는다. 근거 없는 접근
+    // 동선이 그대로 미확인으로 남아 경로 표기를 잡아 준다.
+    final accessSteps = result.steps
+        .where((step) => step.stepType == 'entry' || step.stepType == 'exit')
+        .toList(growable: false);
+    expect(accessSteps, isNotEmpty);
+    expect(
+      accessSteps.map((step) => step.requiresAccessibilityCheck),
+      everyElement(isTrue),
+    );
+    expect(result.stairAccessLabel, '계단 여부를 확인하고 있어요');
+    expect(result.evidenceSummary, contains('ACCESSIBILITY_CHECK_REQUIRED'));
+  });
+
+  test('#2590 계단으로 확인된 동선도 근거가 없으면 확인 필요를 함께 말한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(
+      database,
+      includeExplicitAccessEdges: false,
+      fillInsertedNetworkEdgeEvidence: false,
+    );
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, distance_meters,
+        edge_type, includes_stairs, stair_access_state,
+        accessibility_status, reliability_score
+      )
+      VALUES (
+        'exit-b-stair-only',
+        'station-b:line-test',
+        'station-b',
+        60,
+        0,
+        'EXIT',
+        1,
+        'STAIR_ONLY',
+        'AVAILABLE',
+        95
+      )
+    ''');
     await database.customStatement('''
       INSERT INTO network_edges (
         id, from_node_id, to_node_id, duration_seconds, distance_meters,
@@ -2480,8 +2566,8 @@ void main() {
       )
       VALUES (
         'ride-a-b-unknown-stair',
-        'station-a:line-test:LOCAL',
-        'station-b:line-test:LOCAL',
+        'station-a:line-test',
+        'station-b:line-test',
         120,
         830,
         'RIDE',
@@ -2500,11 +2586,18 @@ void main() {
       ),
     );
 
-    final rideStep = result.steps.singleWhere(
-      (step) => step.stepType == 'ride',
+    final exitStep = result.steps.singleWhere(
+      (step) => step.stepType == 'exit',
     );
-    expect(rideStep.stairAccessState, 'unknown');
-    expect(result.stairAccessLabel, '계단 여부를 확인하고 있어요');
+    // 계단 사실과 검증 여부는 다른 축이다. 계단이 확인됐다고 해서 확인 안내가 사라지면
+    // 가장 확인이 필요한 조합에서 안내가 없어진다.
+    expect(exitStep.stairAccessState, 'stairOnly');
+    expect(exitStep.requiresAccessibilityCheck, isTrue);
+    expect(exitStep.burdenLabel, contains('계단 포함'));
+    expect(exitStep.burdenLabel, contains('엘리베이터 안내 미확인'));
+    expect(result.stairAccessLabel, '계단 포함');
+    expect(result.accessibilityBadgeLabel, '엘리베이터 상태를 살펴봐 주세요');
+    expect(result.arrivalGuidanceStep, isNotNull);
   });
 
   test('로컬 경로 추천 이유와 음성 안내는 선택 경로에 없는 계단 차단 근거를 말하지 않는다', () async {
