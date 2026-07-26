@@ -120,15 +120,6 @@
      height="1800"
      fill="url(#subtle-background-grid-pattern)"
      opacity="0.52" />
-  <text
-     id="header-title-text"
-     x="84"
-     y="79.267"
-     class="ui-title"
-     fill="#FFFFFF"
-     font-size="32"
-     font-weight="900"
-     letter-spacing="-1">대전 도시철도 1호선 노선도</text>
   <g
      id="map-card-clipped-content-layer"
      clip-path="url(#rounded-map-card-clip-area)">

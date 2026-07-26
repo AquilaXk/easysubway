@@ -40,13 +40,13 @@
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
      inkscape:zoom="0.3173339"
-     inkscape:cx="855.56569"
-     inkscape:cy="616.07032"
-     inkscape:window-width="1920"
+     inkscape:cx="1492.1192"
+     inkscape:cy="597.1628"
+     inkscape:window-width="1024"
      inkscape:window-height="1022"
      inkscape:window-x="0"
      inkscape:window-y="30"
-     inkscape:window-maximized="1"
+     inkscape:window-maximized="0"
      inkscape:current-layer="gwangju-metro-line1-sma-v4-fresh" />
   <title
      id="map-title">광주 도시철도 1호선 노선도</title>
@@ -105,11 +105,6 @@
      height="1800"
      fill="url(#subtle-background-grid-pattern)"
      opacity="0.52" />
-  <text
-     id="header-title-text"
-     x="84"
-     y="79.267"
-     class="ui-title">광주 도시철도 1호선 노선도</text>
   <g
      id="map-card-clipped-content-layer"
      clip-path="url(#rounded-map-card-clip-area)">

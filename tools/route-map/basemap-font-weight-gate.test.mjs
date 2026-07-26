@@ -139,8 +139,8 @@ test("권역별 font-weight 구성 기준선", () => {
     seoul: { 600: 124, 700: 539, 900: 312 },
     busan: { 700: 135, 800: 12, 900: 32 },
     daegu: { 700: 92, 800: 5, 900: 18 },
-    daejeon: { 700: 22, 900: 4 },
-    gwangju: { 700: 20, 900: 3 },
+    daejeon: { 700: 22, 900: 3 },
+    gwangju: { 700: 20, 900: 2 },
   };
   for (const region of REGIONS) {
     const normalized = normalizeSvgForCompile(
