@@ -1702,6 +1702,10 @@ class RouteSearchResult {
     ].where((label) => label.trim().isNotEmpty).toList(growable: false);
   }
 
+  /// 표시용 이름만 채워 넣은 사본. 온라인 결과는 화면에 닿기 전 반드시 이 경로를
+  /// 지나므로([OnlineFirstRouteSearchRepository.searchRoute]), **여기서 옮기지 않은
+  /// 필드는 화면에 도달하지 못하고 기본값으로 되돌아간다.** 필드를 더할 때 이 목록에
+  /// 함께 더해야 하며, 빠뜨리면 `route_search_test.dart`의 필드 누락 가드가 잡는다.
   RouteSearchResult withDisplayLabels({
     String? originStationName,
     String? destinationStationName,
@@ -1752,6 +1756,7 @@ class RouteSearchResult {
       arrivalTimeIso: arrivalTimeIso,
       officialFare: officialFare,
       stepFreeAlternative: stepFreeAlternative ?? this.stepFreeAlternative,
+      stairAccess: stairAccess,
     );
   }
 
@@ -2310,6 +2315,9 @@ class RouteSearchStep {
         : leg.slackSeconds;
     final minutes = ((leg.durationSeconds + waitOrSlackSeconds) / 60).ceil();
     final title = _routeV2LegTitle(leg);
+    final stairAccessState = leg.stairAccess.isEmpty
+        ? _routeV2StairAccessState(leg.accessibilityRisk)
+        : _normalizeRouteStairState(leg.stairAccess);
     return RouteSearchStep(
       sequence: sequence,
       stepType: _routeV2StepType(leg.legType),
@@ -2322,12 +2330,13 @@ class RouteSearchStep {
       estimatedMinutes: minutes,
       distanceMeters: leg.distanceMeters,
       includesStairs: leg.accessibilityRisk.stairCount > 0,
-      stairAccessState: leg.stairAccess.isEmpty
-          ? _routeV2StairAccessState(leg.accessibilityRisk)
-          : _normalizeRouteStairState(leg.stairAccess),
-      requiresAccessibilityCheck: _routeV2RiskRequiresCheck(
-        leg.accessibilityRisk,
-      ),
+      stairAccessState: stairAccessState,
+      // 판정과 같은 근거에서 나와야 한 칩 행이 자기모순에 빠지지 않는다(#2590).
+      // 백엔드 판정이 `unknown`일 때가 곧 "확인되지 않음"이고, 승차 구간의
+      // `notApplicable`은 확인 대상이 아니다. 판정 필드가 없을 때만 원자료로 폴백한다.
+      requiresAccessibilityCheck: leg.stairAccess.isEmpty
+          ? _routeV2RiskRequiresCheck(leg.accessibilityRisk)
+          : stairAccessState == 'unknown',
       actionTitle: '',
       actionDetail: title,
       reason: leg.etaSource,
