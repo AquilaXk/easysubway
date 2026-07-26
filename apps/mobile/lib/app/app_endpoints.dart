@@ -9,6 +9,48 @@ import '../core/datapack/data_pack_manifest.dart';
 /// workflow가 publish 직전 `releaseSequence >= minimumReleaseSequence`를 검사한다.
 const int productionDataPackMinimumReleaseSequence = 114;
 
+/// 데이터팩 서명 공개키 dart-define의 주입 상태(이슈 #2532).
+enum DataPackSigningPublicKeyStatus {
+  /// modulus 또는 exponent가 비어 있다.
+  missing,
+
+  /// 값은 있지만 RSA 공개키 형식이 아니다.
+  malformed,
+
+  /// 서명 검증에 쓸 수 있는 형식이다.
+  present,
+}
+
+/// 데이터팩 업데이트 시작 판정(이슈 #2532).
+enum DataPackUpdateStartDecision {
+  /// 업데이트를 시작한다.
+  start,
+
+  /// 데이터팩 base URL이 없어 확인할 카탈로그가 없다(개발·테스트 빌드).
+  noManifestEndpoint,
+
+  /// production 빌드인데 서명 공개키가 주입되지 않았다.
+  missingProductionSigningKey,
+
+  /// production 빌드인데 서명 공개키 형식이 RSA 공개키가 아니다.
+  malformedProductionSigningKey,
+}
+
+extension DataPackUpdateStartDecisionDiagnostics
+    on DataPackUpdateStartDecision {
+  /// 업데이트를 시작하지 않은 이유. 진단 신호가 필요한 경우에만 값이 있다.
+  ///
+  /// base URL이 없는 구성은 개발·테스트 빌드의 정상 상태라 신호를 남기지 않는다.
+  String? get blockedDiagnosticMessage => switch (this) {
+    DataPackUpdateStartDecision.start ||
+    DataPackUpdateStartDecision.noManifestEndpoint => null,
+    DataPackUpdateStartDecision.missingProductionSigningKey =>
+      'production 빌드에 이동 정보 서명 공개키가 주입되지 않아 업데이트를 시작하지 않았습니다.',
+    DataPackUpdateStartDecision.malformedProductionSigningKey =>
+      'production 빌드의 이동 정보 서명 공개키 형식이 올바르지 않아 업데이트를 시작하지 않았습니다.',
+  };
+}
+
 class AppEndpoints {
   const AppEndpoints({
     required this.dataPackBaseUrl,
@@ -81,6 +123,45 @@ class AppEndpoints {
           ? 'production-v1'
           : dataPackSigningKeyId.trim(),
     );
+  }
+
+  /// 서명 공개키 dart-define의 주입 상태(이슈 #2532).
+  ///
+  /// [productionDataPackSigningPublicKey]는 미주입이면 `null`, 형식이 깨졌으면 검증에서만
+  /// 실패하는 키 객체를 돌려주므로 호출자가 둘을 구분할 수 없었다. 형식 오류는 매 시도마다
+  /// 서명 검증 실패로 끝나 네트워크·파싱 실패와 섞여 보이므로 별도로 구분한다.
+  DataPackSigningPublicKeyStatus get dataPackSigningPublicKeyStatus {
+    final key = productionDataPackSigningPublicKey;
+    if (key == null) {
+      return DataPackSigningPublicKeyStatus.missing;
+    }
+    return key.hasSupportedRsaFormat
+        ? DataPackSigningPublicKeyStatus.present
+        : DataPackSigningPublicKeyStatus.malformed;
+  }
+
+  /// 이 빌드가 데이터팩 업데이트를 시작해도 되는지(이슈 #2532).
+  ///
+  /// production 빌드 판정은 [expectedDataPackChannel]을 쓴다 — DP-05(#2531)가 수락 순번
+  /// 하한 적용 범위를 정할 때 쓴 기준과 같아야 "이 빌드가 무엇을 바라보는가"의 정의가
+  /// 하나로 남는다. 서명 공개키가 없거나 형식이 깨진 production 빌드는 봉투 서명이
+  /// 자기해시 대조로 강등돼 발신자 인증이 사라지므로 업데이트를 아예 시작하지 않는다.
+  /// 비-production(개발·테스트) 빌드는 기존 자기해시 폴백을 그대로 쓴다.
+  DataPackUpdateStartDecision get dataPackUpdateStartDecision {
+    if (dataPackManifestUri == null) {
+      return DataPackUpdateStartDecision.noManifestEndpoint;
+    }
+    if (expectedDataPackChannel != 'production') {
+      return DataPackUpdateStartDecision.start;
+    }
+    return switch (dataPackSigningPublicKeyStatus) {
+      DataPackSigningPublicKeyStatus.missing =>
+        DataPackUpdateStartDecision.missingProductionSigningKey,
+      DataPackSigningPublicKeyStatus.malformed =>
+        DataPackUpdateStartDecision.malformedProductionSigningKey,
+      DataPackSigningPublicKeyStatus.present =>
+        DataPackUpdateStartDecision.start,
+    };
   }
 
   /// 이 빌드에 적용되는 매니페스트 수락 순번 하한. 정책 파일이 선언한 적용 범위와

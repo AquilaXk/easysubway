@@ -1,10 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
 import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart';
 import 'package:easysubway_mobile/core/database/catalog/catalog_database_opener.dart';
 import 'package:easysubway_mobile/core/database/catalog/catalog_schema_diagnostics.dart';
+import 'package:easysubway_mobile/core/database/user/user_database.dart';
+import 'package:easysubway_mobile/core/datapack/data_pack_installer.dart';
 import 'package:easysubway_mobile/features/routes/data/local_route_repository.dart';
 import 'package:easysubway_mobile/route_search.dart';
 import 'package:flutter/services.dart';
@@ -370,6 +373,44 @@ void main() {
       logged.where((line) => line.contains('station_facility_evidence')),
       hasLength(1),
     );
+  });
+
+  test('구제 DDL이 팩 파일을 바꾸면 무결성 기준선을 함께 갱신한다', () async {
+    // 구제는 활성 팩 파일에 DDL을 쓴다(#2527). 기록된 기대 해시를 그대로 두면
+    // 재활성화 해시 대조(#2532)가 정상 팩을 거부한다.
+    final directory = await _temporaryDirectory('rescue-integrity-');
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    await catalogDirectory.create(recursive: true);
+    final pack = File('${catalogDirectory.path}/capital-v18.sqlite');
+    await _buildInstalledPack(pack, activePack: 'capital-v18');
+    _dropTables(pack, ['station_facility_evidence']);
+    final installedSha256 = sha256.convert(await pack.readAsBytes()).toString();
+    await File(
+      '${pack.path}.sha256',
+    ).writeAsString('$installedSha256\n', flush: true);
+    await _writeCurrentPointer(catalogDirectory, version: '18', file: pack);
+    final userDatabase = UserDatabase.memory();
+    addTearDown(userDatabase.close);
+
+    final opener = CatalogDatabaseOpener(
+      databaseDirectory: directory,
+      assetBundle: rootBundle,
+    );
+    final database = await opener.open();
+    addTearDown(database.close);
+    final rescuedSha256 = sha256.convert(await pack.readAsBytes()).toString();
+    final pointer = await DataPackInstaller(
+      catalogDirectory: catalogDirectory,
+      userDatabase: userDatabase,
+    ).readInstalledPointer(id: 'capital', version: '18');
+
+    expect(opener.openedBundledDataPack, isFalse);
+    expect(rescuedSha256, isNot(installedSha256));
+    expect(
+      await File('${pack.path}.sha256').readAsString(),
+      '$rescuedSha256\n',
+    );
+    expect(pointer?.sha256, rescuedSha256);
   });
 }
 

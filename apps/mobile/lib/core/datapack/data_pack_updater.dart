@@ -200,6 +200,11 @@ class DataPackUpdater {
         final installedOverride = await installer.readInstalledPointer(
           id: override.id,
           version: override.version,
+          expectedSha256: _manifestSqliteSha256(
+            manifest,
+            id: override.id,
+            version: override.version,
+          ),
         );
         if (installedOverride != null) {
           await emergencyOverrideRepository?.saveOverride(
@@ -345,6 +350,11 @@ class DataPackUpdater {
       final installedPointer = await installer.readInstalledPointer(
         id: activePack.id,
         version: activePack.version,
+        expectedSha256: _manifestSqliteSha256(
+          manifest,
+          id: activePack.id,
+          version: activePack.version,
+        ),
       );
       if (installedPointer != null) {
         return installedPointer;
@@ -376,6 +386,24 @@ class DataPackUpdater {
       throw const DataPackClientException('사용할 이동 정보를 선택하지 못했어요.');
     }
     return selected;
+  }
+
+  /// 서명된 매니페스트가 선언한 설치 파일 기대 해시(#2532).
+  ///
+  /// 이미 설치된 팩을 다시 가리킬 때 쓰는 기준값이다. 매니페스트가 그 버전을 더 이상 담지
+  /// 않으면(예: 설치본만 남은 롤백 대상) `null`이고, 단말에 기록된 기준선으로 판정한다.
+  String? _manifestSqliteSha256(
+    DataPackManifest manifest, {
+    required String id,
+    required String version,
+  }) {
+    for (final pack in manifest.packs) {
+      if (pack.id == id &&
+          _versionNumber(pack.version) == _versionNumber(version)) {
+        return pack.sqliteSha256;
+      }
+    }
+    return null;
   }
 
   Uri _packBaseUriForManifest(Uri manifestUri) {

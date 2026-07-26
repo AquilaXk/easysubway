@@ -6,7 +6,10 @@ import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../database/catalog/catalog_database.dart';
+import '../database/catalog/catalog_schema_diagnostics.dart';
 import '../database/user/user_database.dart' as user_db;
+import 'atomic_file_replace.dart';
+import 'data_pack_file_integrity.dart';
 import 'data_pack_manifest.dart';
 
 /// Enforces the data-pack pointer contract.
@@ -63,7 +66,7 @@ class DataPackInstaller {
         reason: DataPackInstallRejectionReason.sizeBytesMismatch,
       );
     }
-    final compressedHash = await _sha256File(compressedFile);
+    final compressedHash = await sha256OfFile(compressedFile);
     if (compressedHash != pack.compressedSha256) {
       await _deleteIfExists(compressedFile);
       return const DataPackInstallResult(
@@ -109,6 +112,8 @@ class DataPackInstaller {
     }
 
     await _replaceFile(temporary, target);
+    // 재활성화 대조의 기준선(#2532). 매니페스트가 선언하고 방금 실제 파일과 대조한 값이다.
+    await writeInstalledPackBaseline(target, pack.sqliteSha256);
     final pointer = InstalledDataPackPointer(
       id: pack.id,
       version: pack.version,
@@ -154,20 +159,40 @@ class DataPackInstaller {
     return InstalledDataPackPointer.fromJson(decoded);
   }
 
+  /// 이미 설치된 팩을 다시 가리킬 때 쓸 pointer(#2532).
+  ///
+  /// 디스크 해시를 기대 해시와 대조하고 어긋나면 pointer를 만들지 않는다. 대조할 기대
+  /// 해시가 하나도 없으면 "확인할 수 없음"이므로 역시 만들지 않는다 — 디스크 값을 그대로
+  /// 정답으로 기록하면 이후 검증의 기준선까지 오염된다.
+  ///
+  /// [expectedSha256]에는 호출자가 서명된 매니페스트에서 읽은 `sqliteSha256`을 넘긴다.
+  /// 없으면 설치 시 기록한 기준선 → 저장된 pointer → `installed_data_packs` 레코드
+  /// 순으로 찾는다.
   Future<InstalledDataPackPointer?> readInstalledPointer({
     required String id,
     required String version,
+    String? expectedSha256,
   }) async {
     final target = File(p.join(catalogDirectory.path, '$id-v$version.sqlite'));
     if (!await target.exists()) {
-      return _readInstalledPointerByNumericVersion(id: id, version: version);
+      return _readInstalledPointerByNumericVersion(
+        id: id,
+        version: version,
+        expectedSha256: expectedSha256,
+      );
     }
-    return _pointerForInstalledFile(file: target, id: id, version: version);
+    return _pointerForInstalledFile(
+      file: target,
+      id: id,
+      version: version,
+      expectedSha256: expectedSha256,
+    );
   }
 
   Future<InstalledDataPackPointer?> _readInstalledPointerByNumericVersion({
     required String id,
     required String version,
+    String? expectedSha256,
   }) async {
     final requestedVersion = int.tryParse(version);
     if (requestedVersion == null || !await catalogDirectory.exists()) {
@@ -195,20 +220,78 @@ class DataPackInstaller {
       file: candidate,
       id: id,
       version: candidateVersion,
+      expectedSha256: expectedSha256,
     );
   }
 
-  Future<InstalledDataPackPointer> _pointerForInstalledFile({
+  Future<InstalledDataPackPointer?> _pointerForInstalledFile({
     required File file,
     required String id,
     required String version,
+    required String? expectedSha256,
   }) async {
+    final expected =
+        expectedSha256 ??
+        await _recordedExpectedSha256(file: file, id: id, version: version);
+    final actual = await sha256OfFile(file);
+    if (expected == null || expected != actual) {
+      CatalogSchemaDiagnostics.instance.recordPackIntegrityRejected(
+        artifact: p.basename(file.path),
+        expectedSha256: expected,
+        actualSha256: actual,
+      );
+      return null;
+    }
     return InstalledDataPackPointer(
       id: id,
       version: version,
       path: file.path,
-      sha256: sha256.convert(await file.readAsBytes()).toString(),
+      sha256: actual,
     );
+  }
+
+  /// 단말에 남아 있는 기대 해시. 기준선 파일이 원본이고, 그 파일이 없는 기존 설치를 위해
+  /// 저장된 pointer와 설치 레코드를 차례로 본다.
+  Future<String?> _recordedExpectedSha256({
+    required File file,
+    required String id,
+    required String version,
+  }) async {
+    final baseline = await readInstalledPackBaseline(file);
+    if (baseline != null) {
+      return baseline;
+    }
+    final pointer = await _readStoredPointer();
+    if (pointer != null &&
+        pointer.id == id &&
+        pointer.version == version &&
+        pointer.sha256 != null &&
+        isSha256Text(pointer.sha256!)) {
+      return pointer.sha256;
+    }
+    final record = await (userDatabase.select(
+      userDatabase.installedDataPacks,
+    )..where((row) => row.packId.equals(id))).getSingleOrNull();
+    if (record != null && record.version == version) {
+      return record.sha256;
+    }
+    return null;
+  }
+
+  Future<InstalledDataPackPointer?> _readStoredPointer() async {
+    final file = File(p.join(catalogDirectory.path, 'current.json'));
+    if (!await file.exists()) {
+      return null;
+    }
+    try {
+      final decoded = jsonDecode(await file.readAsString());
+      if (decoded is! Map<String, Object?>) {
+        return null;
+      }
+      return InstalledDataPackPointer.fromJson(decoded);
+    } on Object {
+      return null;
+    }
   }
 
   Future<void> activateCurrentPointer(InstalledDataPackPointer pointer) async {
@@ -216,6 +299,11 @@ class DataPackInstaller {
   }
 
   Future<void> recoverInstallJournal() async {
+    // pointer 교체가 중단돼 직전 pointer만 남았으면 먼저 되살린다(#2532).
+    // pointer를 읽는 경로는 모두 이 복구를 먼저 거친다.
+    await restoreReplacedTarget(
+      File(p.join(catalogDirectory.path, 'current.json')),
+    );
     final journal = File(
       p.join(catalogDirectory.path, 'current.json.installing'),
     );
@@ -235,7 +323,8 @@ class DataPackInstaller {
         return;
       }
       final expectedSha256 = pointer.sha256;
-      if (expectedSha256 != null && expectedSha256 != await _sha256File(file)) {
+      if (expectedSha256 != null &&
+          expectedSha256 != await sha256OfFile(file)) {
         await _deleteIfExists(journal);
         return;
       }
@@ -352,27 +441,13 @@ class DataPackInstaller {
         continue;
       }
       await _deleteIfExists(file);
+      await deleteInstalledPackBaseline(file);
     }
   }
 
   Future<void> _replaceFile(File temporary, File target) async {
-    try {
-      await temporary.rename(target.path);
-    } on FileSystemException {
-      await _deleteIfExists(target);
-      await temporary.rename(target.path);
-    }
+    await replaceFileAtomically(temporary: temporary, target: target);
   }
-}
-
-Future<String> _sha256File(File file) async {
-  final output = _DigestSink();
-  final input = sha256.startChunkedConversion(output);
-  await for (final chunk in file.openRead()) {
-    input.add(chunk);
-  }
-  input.close();
-  return output.value.toString();
 }
 
 Future<String?> _inflateGzipToFile({

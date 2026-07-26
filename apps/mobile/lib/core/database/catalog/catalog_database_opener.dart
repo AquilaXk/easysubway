@@ -5,6 +5,8 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 
+import '../../datapack/atomic_file_replace.dart';
+import '../../datapack/data_pack_file_integrity.dart';
 import '../../datapack/data_pack_index.dart';
 import '../../datapack/data_pack_update_state.dart';
 import '../../datapack/emergency_override_repository.dart';
@@ -38,7 +40,11 @@ class CatalogDatabaseOpener {
     if (installedDatabase != null) {
       // 구제 DDL은 설치 팩 파일을 수정하므로 활성 팩이 확정된 뒤 이 한 곳에서만 실행한다(#2527).
       // known-good 후보를 훑는 동안에는 읽기 전용 판정만 하고 탐색 대상 파일은 건드리지 않는다.
-      await installedDatabase.rescueMissingCatalogTables();
+      final plan = await installedDatabase.rescueMissingCatalogTables();
+      await _refreshMutatedPackBaseline(
+        database: installedDatabase,
+        rescued: plan.hasRescuableMissingTables,
+      );
       return installedDatabase;
     }
 
@@ -61,6 +67,32 @@ class CatalogDatabaseOpener {
       File(p.join(datapackDirectory.path, 'capital.sqlite')).absolute.path,
     );
     return database;
+  }
+
+  /// 앱이 연 팩 파일을 스스로 바꿨으면 기대 해시 기준선을 다시 기록한다(#2532).
+  ///
+  /// 설치 팩 파일은 열기만 해도 내용이 바뀔 수 있다 — 구제 DDL(#2527)과 drift
+  /// 마이그레이션(팩 `user_version`이 앱보다 낮을 때)이 그렇다. 기준선을 그대로 두면
+  /// 재활성화 해시 대조가 정상 팩을 거부한다. 반대로 대조 시점마다 디스크 값을 그대로
+  /// 받아 적으면 기준선이 오염되므로, **앱이 쓴 사실이 확인된 경우에만** 갱신한다.
+  /// 갱신 비용(전체 해시 1회)도 그 경우에만 든다.
+  Future<void> _refreshMutatedPackBaseline({
+    required CatalogDatabase database,
+    required bool rescued,
+  }) async {
+    if (!rescued && !database.didRunSchemaMigration) {
+      return;
+    }
+    final artifact = _openedArtifactIdentity;
+    if (artifact.isEmpty) {
+      return;
+    }
+    final file = File(artifact);
+    try {
+      await writeInstalledPackBaseline(file, await sha256OfFile(file));
+    } on FileSystemException {
+      // 기준선을 못 쓰면 다음 재활성화가 거부로 닫힌다. 열기 자체는 막지 않는다.
+    }
   }
 
   Future<CatalogDatabase?> _openInstalledCurrentDataPack() async {
@@ -161,6 +193,9 @@ class CatalogDatabaseOpener {
     final catalogDirectory = Directory(
       p.join(databaseDirectory.path, 'catalog'),
     );
+    await restoreReplacedTarget(
+      File(p.join(catalogDirectory.path, 'current.json')),
+    );
     final journal = File(
       p.join(catalogDirectory.path, 'current.json.installing'),
     );
@@ -181,8 +216,7 @@ class CatalogDatabaseOpener {
       final expectedSha256 = decoded['sha256'];
       if (expectedSha256 is String &&
           expectedSha256.isNotEmpty &&
-          sha256.convert(await file.readAsBytes()).toString() !=
-              expectedSha256) {
+          await sha256OfFile(file) != expectedSha256) {
         await _deleteIfExists(journal);
         return;
       }
@@ -371,6 +405,13 @@ class CatalogDatabaseOpener {
     await _replaceFile(temporary, target);
   }
 
+  /// 번들 팩을 디스크의 팩 파일로 되돌린다(#2532).
+  ///
+  /// [target]은 이 세션이 곧 열 카탈로그 DB 파일이다. `open()`이 번들 설치를 먼저 끝내고
+  /// 그 뒤에 열므로 이 시점에는 아직 열려 있지 않지만, 이전 세션이나 홈 위젯 isolate가
+  /// 같은 파일을 열고 있을 수 있다. 그래서 교체 실패 시 대상을 지우지 않고
+  /// [replaceFileAtomically]가 직전 파일을 되돌리게 둔다 — 지웠다가 중단되면 카탈로그가
+  /// 통째로 사라진다.
   Future<void> _replaceInstalledDataPack(
     File target,
     List<int> databaseBytes,
@@ -381,23 +422,11 @@ class CatalogDatabaseOpener {
     }
 
     await temporary.writeAsBytes(databaseBytes, flush: true);
-    try {
-      await temporary.rename(target.path);
-    } on FileSystemException {
-      if (await target.exists()) {
-        await target.delete();
-      }
-      await temporary.rename(target.path);
-    }
+    await replaceFileAtomically(temporary: temporary, target: target);
   }
 
   Future<void> _replaceFile(File temporary, File target) async {
-    try {
-      await temporary.rename(target.path);
-    } on FileSystemException {
-      await _deleteIfExists(target);
-      await temporary.rename(target.path);
-    }
+    await replaceFileAtomically(temporary: temporary, target: target);
   }
 }
 

@@ -162,9 +162,16 @@ class CatalogDatabase extends _$CatalogDatabase {
   Set<String> _routeNetworkEdgeColumnNames = const {};
   Set<String> _routeFacilityColumnNames = const {};
   Future<String?>? _transitFeedEndDate;
+  bool _didRunSchemaMigration = false;
 
   Set<String> get routeNetworkEdgeColumnNames => _routeNetworkEdgeColumnNames;
   Set<String> get routeFacilityColumnNames => _routeFacilityColumnNames;
+
+  /// 이 세션이 연 파일에 drift 스키마 DDL을 실행했는지(#2532).
+  ///
+  /// 팩 `user_version`이 앱보다 낮으면 여는 것만으로 파일 내용이 바뀐다. 열기 경로가
+  /// 이 신호로 무결성 기준선 갱신 여부를 판정한다.
+  bool get didRunSchemaMigration => _didRunSchemaMigration;
 
   factory CatalogDatabase.file(File file) {
     return CatalogDatabase(NativeDatabase.createInBackground(file));
@@ -181,12 +188,14 @@ class CatalogDatabase extends _$CatalogDatabase {
   MigrationStrategy get migration {
     return MigrationStrategy(
       onCreate: (migrator) async {
+        _didRunSchemaMigration = true;
         await migrator.createAll();
         await _createRouteMapPositionsTable();
         await _createRouteMapLineTracksTable();
         await _createIndexes();
       },
       onUpgrade: (migrator, from, to) async {
+        _didRunSchemaMigration = true;
         if (from < 2) {
           await migrator.createTable(realtimeProviderLineMappings);
           await migrator.createTable(realtimeProviderStationMappings);
