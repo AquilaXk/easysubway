@@ -140,18 +140,36 @@ class AppEndpoints {
         : DataPackSigningPublicKeyStatus.malformed;
   }
 
+  /// 이 빌드가 스스로 production 채널이라고 선언했는지(이슈 #2532).
+  ///
+  /// [expectedDataPackChannel]과 기준이 다르다. 그쪽은 "이 빌드가 어떤 채널의 카탈로그를
+  /// 기대하는가"라 값이 비면 production으로 정규화하지만(수락 판정의 기본값), 이 술어는
+  /// "빌드가 production이라고 선언했는가"이므로 빈 값을 production으로 보지 않는다.
+  ///
+  /// 두 기준을 하나로 합치면 `.env.example` 구성(base URL은 로컬 서버, 채널·서명 공개키는
+  /// 빈 값)의 개발·QA 빌드가 [dataPackUpdateStartDecision]에서 전부 차단된다.
+  /// `contracts/env/env-scope-map.json`도 `EASYSUBWAY_DATAPACK_CHANNEL`을
+  /// `datapack-release` scope로만 선언해 모바일 빌드 입력이 아니다. 스토어 경로는
+  /// `tools/ci/validate-store-privacy-env.mjs`가 채널을 `production`으로 강제하므로
+  /// 이 술어로도 닫힌 상태가 유지된다.
+  bool get declaresProductionDataPackChannel {
+    return dataPackChannel.trim() == 'production';
+  }
+
   /// 이 빌드가 데이터팩 업데이트를 시작해도 되는지(이슈 #2532).
   ///
-  /// production 빌드 판정은 [expectedDataPackChannel]을 쓴다 — DP-05(#2531)가 수락 순번
-  /// 하한 적용 범위를 정할 때 쓴 기준과 같아야 "이 빌드가 무엇을 바라보는가"의 정의가
-  /// 하나로 남는다. 서명 공개키가 없거나 형식이 깨진 production 빌드는 봉투 서명이
-  /// 자기해시 대조로 강등돼 발신자 인증이 사라지므로 업데이트를 아예 시작하지 않는다.
-  /// 비-production(개발·테스트) 빌드는 기존 자기해시 폴백을 그대로 쓴다.
+  /// production 빌드 판정은 [declaresProductionDataPackChannel]을 쓴다. DP-05(#2531)가
+  /// 수락 순번 하한에 쓴 채널 조건과 같은 dart-define을 보되, 빈 값을 production으로
+  /// 승격하지 않는 점만 다르다(위 술어 주석 참고).
+  ///
+  /// 서명 공개키가 없거나 형식이 깨진 production 빌드는 봉투 서명이 자기해시 대조로
+  /// 강등돼 발신자 인증이 사라지므로 업데이트를 아예 시작하지 않는다. 채널을 production으로
+  /// 선언하지 않은 개발·테스트 빌드는 기존 자기해시 폴백을 그대로 쓴다.
   DataPackUpdateStartDecision get dataPackUpdateStartDecision {
     if (dataPackManifestUri == null) {
       return DataPackUpdateStartDecision.noManifestEndpoint;
     }
-    if (expectedDataPackChannel != 'production') {
+    if (!declaresProductionDataPackChannel) {
       return DataPackUpdateStartDecision.start;
     }
     return switch (dataPackSigningPublicKeyStatus) {

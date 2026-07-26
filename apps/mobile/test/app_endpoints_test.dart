@@ -173,6 +173,25 @@ void main() {
     );
   });
 
+  test('앱 endpoint는 채널 dart-define이 빈 개발 구성에서 업데이트를 막지 않는다', () {
+    // .env.example 구성: base URL은 로컬 서버, 채널·서명 공개키는 빈 값.
+    const endpoints = AppEndpoints(
+      dataPackBaseUrl: 'http://localhost:9000/easysubway-datapacks',
+      dataPackSigningPublicKeyModulus: '',
+      dataPackSigningPublicKeyExponent: '',
+      dataPackChannel: '',
+      reportApiBaseUrl: '',
+    );
+
+    expect(
+      endpoints.dataPackUpdateStartDecision,
+      DataPackUpdateStartDecision.start,
+    );
+    // 매니페스트 채널 기대값(수락 판정)은 기존 계약을 그대로 유지한다.
+    expect(endpoints.expectedDataPackChannel, 'production');
+    expect(endpoints.declaresProductionDataPackChannel, isFalse);
+  });
+
   test('앱 endpoint는 비-production 채널에서는 공개키 없이도 업데이트를 시작한다', () {
     const endpoints = AppEndpoints(
       dataPackBaseUrl: 'https://cdn.easysubway.example/datapacks/',

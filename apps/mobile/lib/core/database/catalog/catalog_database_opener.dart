@@ -43,6 +43,7 @@ class CatalogDatabaseOpener {
       final plan = await installedDatabase.rescueMissingCatalogTables();
       await _refreshMutatedPackBaseline(
         database: installedDatabase,
+        file: File(_openedArtifactIdentity),
         rescued: plan.hasRescuableMissingTables,
       );
       return installedDatabase;
@@ -52,6 +53,8 @@ class CatalogDatabaseOpener {
       p.join(databaseDirectory.path, 'datapacks'),
     );
     await datapackDirectory.create(recursive: true);
+    // 번들 팩·freshness 파일도 원자 교체 대상이라 중단 잔재가 남을 수 있다(#2532).
+    await restoreInterruptedReplacements(datapackDirectory);
     final index = await _installBundledDataPacks(datapackDirectory);
 
     final database = CatalogDatabase.file(
@@ -76,18 +79,21 @@ class CatalogDatabaseOpener {
   /// 재활성화 해시 대조가 정상 팩을 거부한다. 반대로 대조 시점마다 디스크 값을 그대로
   /// 받아 적으면 기준선이 오염되므로, **앱이 쓴 사실이 확인된 경우에만** 갱신한다.
   /// 갱신 비용(전체 해시 1회)도 그 경우에만 든다.
+  ///
+  /// 최종 선택된 팩만이 아니라 **판정 과정에서 연 모든 후보**가 대상이다. drift
+  /// 마이그레이션은 후보를 판정하려고 던지는 첫 질의에서 이미 실행되므로, 거부돼 닫히는
+  /// 후보(known-good 스캔·구제 불가 거부·override 후보)도 파일은 바뀐 채 남는다.
   Future<void> _refreshMutatedPackBaseline({
     required CatalogDatabase database,
-    required bool rescued,
+    required File file,
+    bool rescued = false,
   }) async {
     if (!rescued && !database.didRunSchemaMigration) {
       return;
     }
-    final artifact = _openedArtifactIdentity;
-    if (artifact.isEmpty) {
+    if (file.path.isEmpty) {
       return;
     }
-    final file = File(artifact);
     try {
       await writeInstalledPackBaseline(file, await sha256OfFile(file));
     } on FileSystemException {
@@ -193,9 +199,8 @@ class CatalogDatabaseOpener {
     final catalogDirectory = Directory(
       p.join(databaseDirectory.path, 'catalog'),
     );
-    await restoreReplacedTarget(
-      File(p.join(catalogDirectory.path, 'current.json')),
-    );
+    // pointer·설치 팩·기준선 어느 것이든 교체가 중단됐으면 먼저 정리한다(#2532).
+    await restoreInterruptedReplacements(catalogDirectory);
     final journal = File(
       p.join(catalogDirectory.path, 'current.json.installing'),
     );
@@ -316,6 +321,9 @@ class CatalogDatabaseOpener {
       return database;
     } finally {
       if (!returned) {
+        // 판정하는 동안 drift 마이그레이션이 이 파일을 바꿨을 수 있다(#2532).
+        // 거부한 후보도 기준선을 맞춰 두지 않으면 나중에 영구 거부로 남는다.
+        await _refreshMutatedPackBaseline(database: database, file: file);
         await database.close();
       }
     }
@@ -361,8 +369,9 @@ class CatalogDatabaseOpener {
 
     final target = File(p.join(datapackDirectory.path, '$id.sqlite'));
     if (await target.exists()) {
-      final installedBytes = await target.readAsBytes();
-      if (sha256.convert(installedBytes).toString() == expectedSqliteSha256) {
+      // 번들 팩도 전량 적재 대신 스트리밍으로 판정한다 — 설치 팩이 없는 모든 콜드 스타트가
+      // 지나는 경로라 팩 크기만큼 메모리를 한 번에 쓰면 안 된다(#2532).
+      if (await sha256OfFile(target) == expectedSqliteSha256) {
         return;
       }
     }

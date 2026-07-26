@@ -33,6 +33,13 @@ Future<void> replaceFileAtomically({
     // 폴백으로 내려간다. 대상은 이 시점에도 그대로 남아 있다.
   }
 
+  if (!await temporary.exists()) {
+    // 원본이 사라져 실패한 교체는 대상을 옆으로 옮겨도 결과가 같다. 옮겼다 되돌리는
+    // 동안 대상이 잠깐 사라지는 창만 생기고, 그 창에서 pointer를 읽는 다른 isolate는
+    // 설치 팩 없음으로 판정해 강등된다. 대상을 건드리지 않고 바로 올린다.
+    throw FileSystemException('Missing replacement source.', temporary.path);
+  }
+
   final backup = replacedTargetBackupFile(target);
   await _deleteIfExists(backup);
   final movedAside = await target.exists();
@@ -66,6 +73,32 @@ Future<void> restoreReplacedTarget(File target) async {
     return;
   }
   await backup.rename(target.path);
+}
+
+/// [directory]에 남은 모든 교체 잔재를 정리한다(#2532).
+///
+/// 교체 대상은 pointer(`current.json`)만이 아니라 설치 팩(`<id>-v<n>.sqlite`),
+/// 무결성 기준선(`<pack>.sqlite.sha256`), 번들 팩, freshness 파일까지다. 이름별로 복구
+/// 호출을 흩어 두면 어느 하나가 빠졌을 때 잔재가 영구히 남거나(정리 필터가 `.sqlite`만
+/// 본다) 기준선이 유실된 채 재활성화가 영구 거부된다. 디렉토리 단위로 한 번에 훑어
+/// 대상이 없으면 되살리고, 있으면 잔재를 지운다.
+Future<void> restoreInterruptedReplacements(Directory directory) async {
+  if (!await directory.exists()) {
+    return;
+  }
+  final backups = await directory
+      .list()
+      .where((entity) => entity is File)
+      .cast<File>()
+      .where((file) => file.path.endsWith(_replacedTargetSuffix))
+      .toList();
+  for (final backup in backups) {
+    final targetPath = backup.path.substring(
+      0,
+      backup.path.length - _replacedTargetSuffix.length,
+    );
+    await restoreReplacedTarget(File(targetPath));
+  }
 }
 
 Future<void> _deleteIfExists(File file) async {

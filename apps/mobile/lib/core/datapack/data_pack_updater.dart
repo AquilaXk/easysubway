@@ -206,13 +206,23 @@ class DataPackUpdater {
             version: override.version,
           ),
         );
-        if (installedOverride != null) {
+        if (installedOverride.pointer != null) {
           await emergencyOverrideRepository?.saveOverride(
             EmergencyDataPackOverride(
               id: override.id,
               version: override.version,
               reason: override.reason,
             ),
+          );
+        } else if (installedOverride.rejection ==
+            InstalledDataPackRejection.baselineMissing) {
+          // 무결성을 "확인하지 못한" 것은 "확인해 보니 다른" 것과 다르다(#2532).
+          // 기준선 없는 기존 설치본 때문에 장애 대응으로 고정해 둔 override를 해제하면
+          // 단말이 문제가 있던 활성 팩으로 되돌아간다. 기록은 그대로 두고 신호만 남긴다.
+          developer.log(
+            'emergencyOverrideRetained=baselineMissing '
+            'pack=${override.id}-v${override.version}',
+            name: 'DataPackUpdater',
           );
         } else {
           await emergencyOverrideRepository?.clearOverride();
@@ -356,8 +366,9 @@ class DataPackUpdater {
           version: activePack.version,
         ),
       );
-      if (installedPointer != null) {
-        return installedPointer;
+      final verifiedPointer = installedPointer.pointer;
+      if (verifiedPointer != null) {
+        return verifiedPointer;
       }
       // heldOut 단말 + activePack 미설치: 예외 대신 null 반환(기존 포인터 유지).
       // rolloutApplied 단말이거나 activePack이 설치된 경우는 이미 위에서 반환.

@@ -277,6 +277,31 @@ void main() {
     expect(logged.first, contains('station_facility_evidence'));
   });
 
+  test('같은 팩의 스키마 거부와 무결성 거부는 각각 신호를 남긴다', () async {
+    final logged = <String>[];
+    CatalogSchemaDiagnostics.replaceForTest(logged.add);
+    addTearDown(CatalogSchemaDiagnostics.reset);
+
+    CatalogSchemaDiagnostics.instance.recordPackRejected(
+      artifact: 'capital-v18.sqlite',
+      blockingTableNames: const {'transit_stop_times'},
+    );
+    CatalogSchemaDiagnostics.instance.recordPackIntegrityRejected(
+      artifact: 'capital-v18.sqlite',
+      expectedSha256: '0' * 64,
+      actualSha256: '1' * 64,
+    );
+
+    expect(
+      CatalogSchemaDiagnostics
+          .instance
+          .rejectedPackCounts['capital-v18.sqlite'],
+      2,
+    );
+    expect(logged.where((line) => line.contains('필수 테이블 결측')), hasLength(1));
+    expect(logged.where((line) => line.contains('무결성')), hasLength(1));
+  });
+
   test('구제 불가 결측에 known-good도 없으면 번들 팩으로 강등한다', () async {
     final directory = await _temporaryDirectory('rescue-blocked-bundled-');
     final catalogDirectory = Directory('${directory.path}/catalog');
@@ -399,7 +424,7 @@ void main() {
     final database = await opener.open();
     addTearDown(database.close);
     final rescuedSha256 = sha256.convert(await pack.readAsBytes()).toString();
-    final pointer = await DataPackInstaller(
+    final lookup = await DataPackInstaller(
       catalogDirectory: catalogDirectory,
       userDatabase: userDatabase,
     ).readInstalledPointer(id: 'capital', version: '18');
@@ -410,7 +435,49 @@ void main() {
       await File('${pack.path}.sha256').readAsString(),
       '$rescuedSha256\n',
     );
-    expect(pointer?.sha256, rescuedSha256);
+    expect(lookup.pointer?.sha256, rescuedSha256);
+  });
+
+  test('스캔 중 거부한 후보의 기준선도 마이그레이션 뒤 값으로 맞춘다', () async {
+    // drift onUpgrade는 후보 판정의 첫 질의에서 이미 실행된다. 거부돼 닫히는 후보도
+    // 파일은 바뀐 채 남으므로 기준선을 갱신하지 않으면 나중에 영구 거부가 된다(#2532).
+    final directory = await _temporaryDirectory('rescue-scan-integrity-');
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    await catalogDirectory.create(recursive: true);
+    final rejected = File('${catalogDirectory.path}/capital-v19.sqlite');
+    await _buildInstalledPack(rejected, activePack: 'capital-v19');
+    _dropTables(rejected, ['transit_stop_times']);
+    _setUserVersion(rejected, catalogDatabaseSchemaVersion - 1);
+    final knownGood = File('${catalogDirectory.path}/capital-v18.sqlite');
+    await _buildInstalledPack(knownGood, activePack: 'capital-v18');
+    final installedSha256 = sha256
+        .convert(await rejected.readAsBytes())
+        .toString();
+    await File(
+      '${rejected.path}.sha256',
+    ).writeAsString('$installedSha256\n', flush: true);
+    await _writeCurrentPointer(catalogDirectory, version: '19', file: rejected);
+    final userDatabase = UserDatabase.memory();
+    addTearDown(userDatabase.close);
+
+    final opener = CatalogDatabaseOpener(
+      databaseDirectory: directory,
+      assetBundle: rootBundle,
+    );
+    final database = await opener.open();
+    addTearDown(database.close);
+    final migratedSha256 = sha256
+        .convert(await rejected.readAsBytes())
+        .toString();
+    final lookup = await DataPackInstaller(
+      catalogDirectory: catalogDirectory,
+      userDatabase: userDatabase,
+    ).readInstalledPointer(id: 'capital', version: '19');
+
+    expect(opener.openedBundledDataPack, isFalse);
+    expect(await _activePack(database), 'capital-v18');
+    expect(migratedSha256, isNot(installedSha256));
+    expect(lookup.pointer?.sha256, migratedSha256);
   });
 }
 
@@ -470,6 +537,18 @@ void _dropTables(File file, List<String> tableNames) {
       raw.execute('DROP TABLE IF EXISTS $tableName');
     }
     raw.execute('PRAGMA user_version = $catalogDatabaseSchemaVersion');
+  } finally {
+    raw.close();
+  }
+}
+
+/// 팩 `user_version`을 앱 스키마보다 낮게 만들어 여는 것만으로 drift `onUpgrade`가
+/// 실행되도록 한다. 설치 검증이 `user_version <= 앱 버전`을 허용하므로 정상 팩에서도
+/// 생기는 상태다.
+void _setUserVersion(File file, int userVersion) {
+  final raw = sqlite.sqlite3.open(file.path);
+  try {
+    raw.execute('PRAGMA user_version = $userVersion');
   } finally {
     raw.close();
   }

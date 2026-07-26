@@ -165,15 +165,23 @@ class DataPackInstaller {
   /// 해시가 하나도 없으면 "확인할 수 없음"이므로 역시 만들지 않는다 — 디스크 값을 그대로
   /// 정답으로 기록하면 이후 검증의 기준선까지 오염된다.
   ///
+  /// 결과가 [InstalledDataPackLookup]인 이유: 설치본 없음·기준선 없음·해시 불일치는
+  /// 호출자가 다르게 처리해야 한다. 셋을 `null` 하나로 뭉치면 예컨대 긴급 override 해제
+  /// 판단이 "확인 못 함"과 "확인해 보니 다름"을 구분하지 못한다.
+  ///
   /// [expectedSha256]에는 호출자가 서명된 매니페스트에서 읽은 `sqliteSha256`을 넘긴다.
-  /// 없으면 설치 시 기록한 기준선 → 저장된 pointer → `installed_data_packs` 레코드
-  /// 순으로 찾는다.
-  Future<InstalledDataPackPointer?> readInstalledPointer({
+  /// 그 값이 있으면 **그 값만** 정답으로 쓴다(단말 기록으로 내려가지 않는다). 앱이 파일을
+  /// 바꿔 기준선을 다시 쓴 경우에도 매니페스트 기준으로는 그 파일이 더 이상 배포본이
+  /// 아니므로, 재활성화 대신 재설치 경로로 되돌리는 쪽이 맞다. 매니페스트 값이 없으면
+  /// 설치 시 기록한 기준선 → 저장된 pointer → `installed_data_packs` 레코드 순으로 찾는다.
+  Future<InstalledDataPackLookup> readInstalledPointer({
     required String id,
     required String version,
     String? expectedSha256,
   }) async {
     final target = File(p.join(catalogDirectory.path, '$id-v$version.sqlite'));
+    // 교체가 중단돼 직전 팩만 남았으면 되살린다(#2532).
+    await restoreReplacedTarget(target);
     if (!await target.exists()) {
       return _readInstalledPointerByNumericVersion(
         id: id,
@@ -189,14 +197,16 @@ class DataPackInstaller {
     );
   }
 
-  Future<InstalledDataPackPointer?> _readInstalledPointerByNumericVersion({
+  Future<InstalledDataPackLookup> _readInstalledPointerByNumericVersion({
     required String id,
     required String version,
     String? expectedSha256,
   }) async {
     final requestedVersion = int.tryParse(version);
     if (requestedVersion == null || !await catalogDirectory.exists()) {
-      return null;
+      return const InstalledDataPackLookup.rejected(
+        InstalledDataPackRejection.notInstalled,
+      );
     }
     final candidates = await catalogDirectory
         .list()
@@ -209,12 +219,16 @@ class DataPackInstaller {
       return p.basename(left.path).compareTo(p.basename(right.path));
     });
     if (candidates.isEmpty) {
-      return null;
+      return const InstalledDataPackLookup.rejected(
+        InstalledDataPackRejection.notInstalled,
+      );
     }
     final candidate = candidates.first;
     final candidateVersion = _versionText(candidate.path, id);
     if (candidateVersion == null) {
-      return null;
+      return const InstalledDataPackLookup.rejected(
+        InstalledDataPackRejection.notInstalled,
+      );
     }
     return _pointerForInstalledFile(
       file: candidate,
@@ -224,15 +238,17 @@ class DataPackInstaller {
     );
   }
 
-  Future<InstalledDataPackPointer?> _pointerForInstalledFile({
+  Future<InstalledDataPackLookup> _pointerForInstalledFile({
     required File file,
     required String id,
     required String version,
     required String? expectedSha256,
   }) async {
-    final expected =
-        expectedSha256 ??
-        await _recordedExpectedSha256(file: file, id: id, version: version);
+    // 매니페스트 값은 형식이 깨져 있어도 단말 기록으로 내려가지 않는다. 서명된 값이 있는데
+    // 대조에 실패하면 그것이 결론이다.
+    final expected = expectedSha256 != null
+        ? expectedSha256.trim().toLowerCase()
+        : await _recordedExpectedSha256(file: file, id: id, version: version);
     final actual = await sha256OfFile(file);
     if (expected == null || expected != actual) {
       CatalogSchemaDiagnostics.instance.recordPackIntegrityRejected(
@@ -240,18 +256,26 @@ class DataPackInstaller {
         expectedSha256: expected,
         actualSha256: actual,
       );
-      return null;
+      return InstalledDataPackLookup.rejected(
+        expected == null
+            ? InstalledDataPackRejection.baselineMissing
+            : InstalledDataPackRejection.sha256Mismatch,
+      );
     }
-    return InstalledDataPackPointer(
-      id: id,
-      version: version,
-      path: file.path,
-      sha256: actual,
+    return InstalledDataPackLookup.found(
+      InstalledDataPackPointer(
+        id: id,
+        version: version,
+        path: file.path,
+        sha256: actual,
+      ),
     );
   }
 
   /// 단말에 남아 있는 기대 해시. 기준선 파일이 원본이고, 그 파일이 없는 기존 설치를 위해
-  /// 저장된 pointer와 설치 레코드를 차례로 본다.
+  /// 저장된 pointer와 설치 레코드를 차례로 본다. 세 단 모두 같은 형식 정규화를 거친다 —
+  /// 한 단만 무검증으로 두면 형식이 깨진 값이 "어떤 파일과도 일치할 수 없는 기대값"이 되어
+  /// 그 버전이 영구히 거부된다.
   Future<String?> _recordedExpectedSha256({
     required File file,
     required String id,
@@ -262,18 +286,17 @@ class DataPackInstaller {
       return baseline;
     }
     final pointer = await _readStoredPointer();
-    if (pointer != null &&
-        pointer.id == id &&
-        pointer.version == version &&
-        pointer.sha256 != null &&
-        isSha256Text(pointer.sha256!)) {
-      return pointer.sha256;
+    if (pointer != null && pointer.id == id && pointer.version == version) {
+      final storedSha256 = normalizedSha256Text(pointer.sha256);
+      if (storedSha256 != null) {
+        return storedSha256;
+      }
     }
     final record = await (userDatabase.select(
       userDatabase.installedDataPacks,
     )..where((row) => row.packId.equals(id))).getSingleOrNull();
     if (record != null && record.version == version) {
-      return record.sha256;
+      return normalizedSha256Text(record.sha256);
     }
     return null;
   }
@@ -299,11 +322,9 @@ class DataPackInstaller {
   }
 
   Future<void> recoverInstallJournal() async {
-    // pointer 교체가 중단돼 직전 pointer만 남았으면 먼저 되살린다(#2532).
-    // pointer를 읽는 경로는 모두 이 복구를 먼저 거친다.
-    await restoreReplacedTarget(
-      File(p.join(catalogDirectory.path, 'current.json')),
-    );
+    // 교체가 중단돼 남은 잔재를 먼저 정리한다(#2532). pointer·설치 팩·기준선이 모두
+    // 대상이라 이름별로 부르지 않고 카탈로그 디렉토리를 한 번 훑는다.
+    await restoreInterruptedReplacements(catalogDirectory);
     final journal = File(
       p.join(catalogDirectory.path, 'current.json.installing'),
     );
@@ -441,6 +462,9 @@ class DataPackInstaller {
         continue;
       }
       await _deleteIfExists(file);
+      // 교체 잔재(`<pack>.previous`)는 정리 필터(`.sqlite`)에 걸리지 않아 여기서 함께
+      // 지우지 않으면 팩 한 벌 크기로 영구히 남는다.
+      await _deleteIfExists(replacedTargetBackupFile(file));
       await deleteInstalledPackBaseline(file);
     }
   }
@@ -454,7 +478,7 @@ Future<String?> _inflateGzipToFile({
   required File compressedFile,
   required File targetFile,
 }) async {
-  final output = _DigestSink();
+  final output = Sha256DigestSink();
   final input = sha256.startChunkedConversion(output);
   final sink = targetFile.openWrite();
   try {
@@ -474,24 +498,31 @@ Future<String?> _inflateGzipToFile({
   }
 }
 
-class _DigestSink implements Sink<Digest> {
-  Digest? _value;
+/// 설치본 재활성화 조회 결과(#2532).
+///
+/// pointer가 있으면 대조를 통과한 것이고, 없으면 [rejection]이 사유를 담는다.
+class InstalledDataPackLookup {
+  const InstalledDataPackLookup.found(InstalledDataPackPointer this.pointer)
+    : rejection = null;
 
-  Digest get value {
-    final digest = _value;
-    if (digest == null) {
-      throw const FormatException('Missing digest.');
-    }
-    return digest;
-  }
+  const InstalledDataPackLookup.rejected(
+    InstalledDataPackRejection this.rejection,
+  ) : pointer = null;
 
-  @override
-  void add(Digest data) {
-    _value = data;
-  }
+  final InstalledDataPackPointer? pointer;
+  final InstalledDataPackRejection? rejection;
+}
 
-  @override
-  void close() {}
+/// 재활성화를 거부한 사유(#2532).
+enum InstalledDataPackRejection {
+  /// 그 버전의 설치 파일이 없다.
+  notInstalled,
+
+  /// 대조할 기대 해시가 단말에 없어 무결성을 판정하지 못했다.
+  baselineMissing,
+
+  /// 디스크 해시가 기대 해시와 다르다.
+  sha256Mismatch,
 }
 
 class DataPackInstallResult {

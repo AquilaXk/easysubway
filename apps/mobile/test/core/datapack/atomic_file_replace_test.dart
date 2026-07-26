@@ -28,7 +28,15 @@ void main() {
 
     await expectLater(
       replaceFileAtomically(temporary: temporary, target: target),
-      throwsA(isA<FileSystemException>()),
+      // 원본이 없어 실패한 교체는 대상을 옆으로 옮겨 보지도 않는다. 옮겼다 되돌리는
+      // 동안 대상이 사라지는 창을 다른 isolate가 "설치 팩 없음"으로 읽는다.
+      throwsA(
+        isA<FileSystemException>().having(
+          (error) => error.message,
+          'message',
+          'Missing replacement source.',
+        ),
+      ),
     );
 
     expect(await target.exists(), isTrue);

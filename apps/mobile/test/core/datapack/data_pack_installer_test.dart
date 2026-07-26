@@ -473,14 +473,15 @@ void main() {
   test('installer는 설치된 pack을 다시 가리킬 때 기대 해시와 대조한다', () async {
     final fixture = await _installedFixture('reactivate-ok-');
 
-    final pointer = await fixture.installer.readInstalledPointer(
+    final lookup = await fixture.installer.readInstalledPointer(
       id: 'capital',
       version: '18',
     );
 
-    expect(pointer?.version, '18');
-    expect(pointer?.sha256, fixture.sqliteSha256);
-    expect(pointer?.path, fixture.pack.path);
+    expect(lookup.rejection, isNull);
+    expect(lookup.pointer?.version, '18');
+    expect(lookup.pointer?.sha256, fixture.sqliteSha256);
+    expect(lookup.pointer?.path, fixture.pack.path);
   });
 
   test('installer는 설치 후 변조된 pack을 재활성화하지 않는다', () async {
@@ -493,12 +494,13 @@ void main() {
       0,
     ], flush: true);
 
-    final pointer = await fixture.installer.readInstalledPointer(
+    final lookup = await fixture.installer.readInstalledPointer(
       id: 'capital',
       version: '18',
     );
 
-    expect(pointer, isNull);
+    expect(lookup.pointer, isNull);
+    expect(lookup.rejection, InstalledDataPackRejection.sha256Mismatch);
     expect(
       CatalogSchemaDiagnostics
           .instance
@@ -511,20 +513,21 @@ void main() {
   test('installer는 manifest 기대 해시가 어긋나면 재활성화하지 않는다', () async {
     final fixture = await _installedFixture('reactivate-manifest-');
 
-    final pointer = await fixture.installer.readInstalledPointer(
+    final lookup = await fixture.installer.readInstalledPointer(
       id: 'capital',
       version: '18',
       expectedSha256: '0' * 64,
     );
 
-    expect(pointer, isNull);
+    expect(lookup.pointer, isNull);
+    expect(lookup.rejection, InstalledDataPackRejection.sha256Mismatch);
   });
 
   test('installer는 기준선 파일이 없으면 설치 기록 해시로 대조한다', () async {
     final fixture = await _installedFixture('reactivate-record-');
     await File('${fixture.pack.path}.sha256').delete();
 
-    final pointer = await fixture.installer.readInstalledPointer(
+    final lookup = await fixture.installer.readInstalledPointer(
       id: 'capital',
       version: '18',
     );
@@ -532,13 +535,14 @@ void main() {
       ...await fixture.pack.readAsBytes(),
       0,
     ], flush: true);
-    final tamperedPointer = await fixture.installer.readInstalledPointer(
+    final tampered = await fixture.installer.readInstalledPointer(
       id: 'capital',
       version: '18',
     );
 
-    expect(pointer?.sha256, fixture.sqliteSha256);
-    expect(tamperedPointer, isNull);
+    expect(lookup.pointer?.sha256, fixture.sqliteSha256);
+    expect(tampered.pointer, isNull);
+    expect(tampered.rejection, InstalledDataPackRejection.sha256Mismatch);
   });
 
   test('installer는 기준선이 하나도 없으면 재활성화하지 않는다', () async {
@@ -560,12 +564,13 @@ void main() {
       userDatabase: userDatabase,
     );
 
-    final pointer = await installer.readInstalledPointer(
+    final lookup = await installer.readInstalledPointer(
       id: 'capital',
       version: '18',
     );
 
-    expect(pointer, isNull);
+    expect(lookup.pointer, isNull);
+    expect(lookup.rejection, InstalledDataPackRejection.baselineMissing);
   });
 
   test('installer는 pack 정리에서 기준선 파일도 함께 지운다', () async {
@@ -584,6 +589,132 @@ void main() {
     expect(await obsolete.exists(), isFalse);
     expect(await obsoleteBaseline.exists(), isFalse);
     expect(await File('${fixture.pack.path}.sha256').exists(), isTrue);
+  });
+
+  test('installer는 중단된 기준선 교체를 되살려 재활성화를 막지 않는다', () async {
+    final fixture = await _installedFixture('baseline-restore-');
+    final baseline = File('${fixture.pack.path}.sha256');
+    await baseline.rename('${baseline.path}.previous');
+
+    final lookup = await fixture.installer.readInstalledPointer(
+      id: 'capital',
+      version: '18',
+    );
+
+    expect(lookup.pointer?.sha256, fixture.sqliteSha256);
+    expect(await baseline.exists(), isTrue);
+    expect(await File('${baseline.path}.previous').exists(), isFalse);
+  });
+
+  test('installer는 정리에서 pack 교체 잔재도 함께 지운다', () async {
+    // 잔재는 정리 필터(`.sqlite`)에 걸리지 않는다. 여기서 지우지 않으면 팩 한 벌 크기로
+    // 남고, 나중에 잔재 복구가 이미 정리된 버전을 되살리기까지 한다.
+    final fixture = await _installedFixture('prune-residue-');
+    final obsolete = File('${fixture.pack.parent.path}/capital-v15.sqlite');
+    await obsolete.writeAsString('obsolete');
+    final obsoleteResidue = File('${obsolete.path}.previous');
+    await obsoleteResidue.writeAsString('obsolete residue');
+    final obsoleteBaselineResidue = File('${obsolete.path}.sha256.previous');
+    await obsoleteBaselineResidue.writeAsString('${'0' * 64}\n');
+
+    await fixture.installer.pruneObsoletePacks(
+      'capital',
+      keepVersionCount: 1,
+      protectedVersions: const {},
+    );
+
+    expect(await obsolete.exists(), isFalse);
+    expect(await obsoleteResidue.exists(), isFalse);
+    expect(await obsoleteBaselineResidue.exists(), isFalse);
+  });
+
+  test('installer는 중단된 pack 교체로 사라진 설치본을 되살린다', () async {
+    final fixture = await _installedFixture('pack-restore-');
+    await fixture.pack.rename('${fixture.pack.path}.previous');
+
+    final lookup = await fixture.installer.readInstalledPointer(
+      id: 'capital',
+      version: '18',
+    );
+
+    expect(lookup.pointer?.sha256, fixture.sqliteSha256);
+    expect(await fixture.pack.exists(), isTrue);
+    expect(await File('${fixture.pack.path}.previous').exists(), isFalse);
+  });
+
+  test('installer는 대문자 hex 설치 기록도 기대 해시로 받아들인다', () async {
+    final fixture = await _installedFixture('record-uppercase-');
+    await File('${fixture.pack.path}.sha256').delete();
+    await File('${fixture.pack.parent.path}/current.json').delete();
+    await fixture.userDatabase
+        .into(fixture.userDatabase.installedDataPacks)
+        .insertOnConflictUpdate(
+          user_db.InstalledDataPacksCompanion.insert(
+            packId: 'capital',
+            version: '18',
+            sha256: fixture.sqliteSha256.toUpperCase(),
+            installedAt: DateTime.utc(2026, 7, 26),
+          ),
+        );
+
+    final lookup = await fixture.installer.readInstalledPointer(
+      id: 'capital',
+      version: '18',
+    );
+
+    expect(lookup.pointer?.sha256, fixture.sqliteSha256);
+  });
+
+  test('installer는 형식이 깨진 설치 기록을 기대 해시로 쓰지 않는다', () async {
+    final fixture = await _installedFixture('record-malformed-');
+    await File('${fixture.pack.path}.sha256').delete();
+    await File('${fixture.pack.parent.path}/current.json').delete();
+    await fixture.userDatabase
+        .into(fixture.userDatabase.installedDataPacks)
+        .insertOnConflictUpdate(
+          user_db.InstalledDataPacksCompanion.insert(
+            packId: 'capital',
+            version: '18',
+            sha256: 'not-a-sha256',
+            installedAt: DateTime.utc(2026, 7, 26),
+          ),
+        );
+
+    final lookup = await fixture.installer.readInstalledPointer(
+      id: 'capital',
+      version: '18',
+    );
+
+    expect(lookup.rejection, InstalledDataPackRejection.baselineMissing);
+  });
+
+  test('installer는 manifest 기대 해시를 기준선보다 우선한다', () async {
+    final fixture = await _installedFixture('manifest-precedence-');
+    // 앱이 파일을 바꿔 기준선을 다시 쓴 상태를 흉내 낸다.
+    await fixture.pack.writeAsBytes([
+      ...await fixture.pack.readAsBytes(),
+      0,
+    ], flush: true);
+    final mutatedSha256 = sha256
+        .convert(await fixture.pack.readAsBytes())
+        .toString();
+    await File(
+      '${fixture.pack.path}.sha256',
+    ).writeAsString('$mutatedSha256\n', flush: true);
+
+    final byBaseline = await fixture.installer.readInstalledPointer(
+      id: 'capital',
+      version: '18',
+    );
+    final byManifest = await fixture.installer.readInstalledPointer(
+      id: 'capital',
+      version: '18',
+      expectedSha256: fixture.sqliteSha256,
+    );
+
+    expect(byBaseline.pointer?.sha256, mutatedSha256);
+    expect(byManifest.pointer, isNull);
+    expect(byManifest.rejection, InstalledDataPackRejection.sha256Mismatch);
   });
 
   test('installer는 journal 동시 복구로 rename이 실패해도 pointer를 잃지 않는다', () async {
@@ -667,11 +798,13 @@ void main() {
 class _InstalledFixture {
   const _InstalledFixture({
     required this.installer,
+    required this.userDatabase,
     required this.pack,
     required this.sqliteSha256,
   });
 
   final DataPackInstaller installer;
+  final user_db.UserDatabase userDatabase;
   final File pack;
   final String sqliteSha256;
 }
@@ -702,6 +835,7 @@ Future<_InstalledFixture> _installedFixture(String prefix) async {
   expect(result.status, DataPackInstallStatus.installed);
   return _InstalledFixture(
     installer: installer,
+    userDatabase: userDatabase,
     pack: File('${catalogDirectory.path}/capital-v18.sqlite'),
     sqliteSha256: sha256.convert(sqliteBytes).toString(),
   );

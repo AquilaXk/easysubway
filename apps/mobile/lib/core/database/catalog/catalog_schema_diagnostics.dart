@@ -26,6 +26,8 @@ class CatalogSchemaDiagnostics {
   final Map<String, int> _missingTableReads = <String, int>{};
   final Map<String, int> _rescuedTables = <String, int>{};
   final Map<String, int> _rejectedPacks = <String, int>{};
+  final Map<String, int> _integrityLoggedPacks = <String, int>{};
+  final Map<String, int> _schemaLoggedPacks = <String, int>{};
   bool _loggedSchemaRescue = false;
 
   /// 결측 테이블별 조회 시도 횟수. 상한 없이 누적하되 출력하지 않는다.
@@ -67,9 +69,10 @@ class CatalogSchemaDiagnostics {
     required String artifact,
     required Set<String> blockingTableNames,
   }) {
-    final previous = _rejectedPacks[artifact] ?? 0;
-    _rejectedPacks[artifact] = previous + 1;
-    if (previous > 0) {
+    _rejectedPacks[artifact] = (_rejectedPacks[artifact] ?? 0) + 1;
+    final logged = _schemaLoggedPacks[artifact] ?? 0;
+    _schemaLoggedPacks[artifact] = logged + 1;
+    if (logged > 0) {
       return;
     }
     _log(
@@ -82,15 +85,17 @@ class CatalogSchemaDiagnostics {
   ///
   /// 거부 횟수는 스키마 거부와 같은 카운터에 누적한다. 어느 쪽이든 "이 팩 파일을 열지
   /// 않았다"는 같은 사건이고, 운영에서 한 지표로 보는 편이 원인 추적에 낫다.
-  /// 로그는 팩 파일당 세션 1회.
+  /// 다만 로그 1회 상한은 사유별로 따로 센다 — 같은 팩이 스키마로도 무결성으로도 거부되는
+  /// 조합에서 공유 카운터를 상한 키로 쓰면 뒤에 온 사유가 한 줄도 남지 않는다.
   void recordPackIntegrityRejected({
     required String artifact,
     required String? expectedSha256,
     required String actualSha256,
   }) {
-    final previous = _rejectedPacks[artifact] ?? 0;
-    _rejectedPacks[artifact] = previous + 1;
-    if (previous > 0) {
+    _rejectedPacks[artifact] = (_rejectedPacks[artifact] ?? 0) + 1;
+    final logged = _integrityLoggedPacks[artifact] ?? 0;
+    _integrityLoggedPacks[artifact] = logged + 1;
+    if (logged > 0) {
       return;
     }
     _log(

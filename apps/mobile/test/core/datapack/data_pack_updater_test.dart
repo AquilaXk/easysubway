@@ -2624,6 +2624,33 @@ void main() {
     expect(pointer?.version, '17');
   });
 
+  test('updater는 무결성을 확인하지 못한 override 기록을 지우지 않는다', () async {
+    // 이 PR 이전 빌드가 설치해 기준선이 없는 팩이 override 대상인 경우(#2532).
+    // "확인 못 함"으로 장애 대응 고정을 해제하면 단말이 문제가 있던 팩으로 되돌아간다.
+    final fixture = await _overrideIntegrityFixture(
+      'override-baseline-missing-',
+    );
+
+    await fixture.updater.checkForUpdates();
+    final override = await fixture.overrideRepository.readOverride();
+
+    expect(override?.id, 'capital');
+    expect(override?.version, '18');
+    expect(override?.reason, '이전 세션 긴급 정정');
+  });
+
+  test('updater는 override 팩 해시가 어긋나면 기록을 해제한다', () async {
+    final fixture = await _overrideIntegrityFixture('override-mismatch-');
+    await File(
+      '${fixture.overridePack.path}.sha256',
+    ).writeAsString('${'0' * 64}\n', flush: true);
+
+    await fixture.updater.checkForUpdates();
+    final override = await fixture.overrideRepository.readOverride();
+
+    expect(override, isNull);
+  });
+
   test(
     'updater는 rollout heldOut + activePack 미설치 시에도 emergencyOverride를 저장한다',
     () async {
@@ -2743,6 +2770,107 @@ void main() {
       expect(override?.id, 'capital');
       expect(override?.version, '18');
     },
+  );
+}
+
+class _OverrideIntegrityFixture {
+  const _OverrideIntegrityFixture({
+    required this.updater,
+    required this.overrideRepository,
+    required this.overridePack,
+  });
+
+  final DataPackUpdater updater;
+  final EmergencyOverrideRepository overrideRepository;
+  final File overridePack;
+}
+
+/// 매니페스트가 emergencyOverride로 지정한 v18이 단말에 이미 설치돼 있고(기준선 없음),
+/// 매니페스트 packs에는 v19만 있는 구성. override 대상은 재다운로드되지 않으므로
+/// `readInstalledPointer` 판정이 그대로 override 유지/해제로 이어진다.
+Future<_OverrideIntegrityFixture> _overrideIntegrityFixture(
+  String prefix,
+) async {
+  final directory = await Directory.systemTemp.createTemp(
+    'easysubway-datapack-updater-$prefix',
+  );
+  addTearDown(() => directory.delete(recursive: true));
+  final userDatabase = user_db.UserDatabase.memory();
+  addTearDown(userDatabase.close);
+  final overrideRepository = EmergencyOverrideRepository(
+    userDatabase: userDatabase,
+  );
+  await overrideRepository.saveOverride(
+    const EmergencyDataPackOverride(
+      id: 'capital',
+      version: '18',
+      reason: '이전 세션 긴급 정정',
+    ),
+  );
+  final catalogDirectory = Directory('${directory.path}/catalog');
+  await catalogDirectory.create(recursive: true);
+  final sqliteBytes = await _validCatalogSqliteBytes(directory);
+  final overridePack = File('${catalogDirectory.path}/capital-v18.sqlite');
+  await overridePack.writeAsBytes(sqliteBytes, flush: true);
+  final activeCompressedBytes = gzip.encode(sqliteBytes);
+  final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+  addTearDown(server.close);
+  server.listen((request) {
+    switch (request.uri.path) {
+      case '/datapacks/catalog/current.json':
+        request.response
+          ..statusCode = HttpStatus.ok
+          ..headers.contentType = ContentType.json
+          ..write(
+            jsonEncode({
+              'ttlSeconds': 60,
+              'activePack': {'id': 'capital', 'version': '19'},
+              'emergencyOverride': {
+                'id': 'capital',
+                'version': '18',
+                'reason': '테스트 긴급 정정',
+              },
+              'packs': [
+                _packJson(
+                  version: '19',
+                  url: 'catalog/capital-v19.sqlite.gz',
+                  compressedBytes: activeCompressedBytes,
+                  sqliteBytes: sqliteBytes,
+                ),
+              ],
+            }),
+          )
+          ..close();
+      case '/datapacks/catalog/capital-v19.sqlite.gz':
+        request.response
+          ..statusCode = HttpStatus.ok
+          ..add(activeCompressedBytes)
+          ..close();
+      default:
+        request.response
+          ..statusCode = HttpStatus.notFound
+          ..close();
+    }
+  });
+  return _OverrideIntegrityFixture(
+    updater: DataPackUpdater(
+      client: DataPackClient(
+        manifestUri: Uri.parse(
+          'http://${server.address.host}:${server.port}/datapacks/catalog/current.json',
+        ),
+        stateRepository: DataPackUpdateStateRepository(
+          userDatabase: userDatabase,
+          now: () => DateTime.utc(2026, 7, 26, 10),
+        ),
+      ),
+      installer: DataPackInstaller(
+        catalogDirectory: catalogDirectory,
+        userDatabase: userDatabase,
+      ),
+      emergencyOverrideRepository: overrideRepository,
+    ),
+    overrideRepository: overrideRepository,
+    overridePack: overridePack,
   );
 }
 
