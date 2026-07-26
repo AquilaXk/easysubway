@@ -14,8 +14,9 @@ import 'package:vector_graphics_codec/vector_graphics_codec.dart';
 // `<text x y><tspan x dy="0">역명</tspan></text>`은 부모만 흡수하고 자식은
 // transform을 .vec에 그대로 실어, vector_graphics 1.2.2 런타임
 // (`_flushPendingTextChunk`의 `canvas.transform`)이 같은 변환을 한 번 더 적용했다
-// — 대전 22건이 map wrapper translate(0 88)를 두 번 먹어 +88px, 부산 63건이 라벨
-// 자신의 translate를 두 번 먹어 최대 +968px 어긋났다.
+// — 대전 라벨 22건이 map wrapper translate(0 88)를 두 번 먹어 +88px, 부산 라벨
+// 런 60건이 라벨 자신의 translate를 두 번 먹어 최대 +968px 어긋났다(컴파일 입력
+// 기준 교정 대상 tspan은 대전 22·부산 63 — 중첩 tspan 라벨은 런보다 tspan이 많다).
 //
 // 종전 게이트(tools/route-map/basemap-svg-fidelity-gate.test.mjs)는 라벨이
 // 바탕층에 **들어갔는지**(텍스트 전수)와 labels.json 앵커만 봤고, .vec에 실린
@@ -47,6 +48,18 @@ const _regions = <({String id, String svg})>[
   (id: 'daejeon', svg: 'easy-subway-daejeon-v3.svg'),
   (id: 'gwangju', svg: 'easy-subway-gwangju-v3.svg'),
 ];
+
+// 실측 기준선(2026-07-26). svgRuns는 오너 SVG 역명 라벨 레이어의 텍스트 런 수,
+// vecTexts는 .vec에 실린 텍스트 draw **전체** 수(라벨 + 배지·중간표기·칩 글자,
+// paint-order 분해 사본 포함)다. 좌표 대조만으로는 잡히지 않는 "조용한 누락·중복
+// 반입"을 개수로 못 박는다.
+const _expectedCounts = <String, ({int svgRuns, int vecTexts})>{
+  'seoul': (svgRuns: 729, vecTexts: 1057),
+  'busan': (svgRuns: 155, vecTexts: 342),
+  'daegu': (svgRuns: 104, vecTexts: 226),
+  'daejeon': (svgRuns: 22, vecTexts: 25),
+  'gwangju': (svgRuns: 20, vecTexts: 22),
+};
 
 // ── 독립 SVG 파서(게이트 전용) ───────────────────────────────────────────────
 
@@ -575,11 +588,14 @@ void main() {
           );
           continue;
         }
-        best.claimed = true;
         final dx = best.x - run.x;
         final dy = best.y - run.y;
         worst = worst > bestDistance ? worst : bestDistance;
         if (dx.abs() >= _epsilon || dy.abs() >= _epsilon) {
+          // ε 밖 후보는 **claim하지 않는다** — 잘못 짝지어진 draw를 소비해 버리면
+          // 뒤따르는 동명 런이 연쇄로 실패해 원인이 흐려진다. 실패만 기록하고
+          // 후보는 남겨 둔다(정상 데이터에서는 런마다 ε 안 후보가 정확히 하나라
+          // 순회 순서와 무관하게 결과가 같다).
           mismatched += 1;
           if (mismatched <= 5) {
             failures.add(
@@ -589,10 +605,30 @@ void main() {
               'Δ=(${dx.toStringAsFixed(3)}, ${dy.toStringAsFixed(3)})',
             );
           }
+          continue;
         }
+        best.claimed = true;
       }
       if (mismatched > 5) {
         failures.add('${region.id}: 좌표 불일치 총 $mismatched건(위 5건만 표시).');
+      }
+
+      // 역방향 고정: SVG 라벨 런 수와 .vec 텍스트 draw 수를 실측 기준선으로 못
+      // 박는다. "짝을 못 찾은 draw가 있으면 실패"로는 잡을 수 없다 — .vec에는
+      // 역명 라벨 말고도 노선 번호 배지·중간 표기·종점 칩 글자가 있고, #2584의
+      // paint-order 분해가 halo/글자 두 사본을 내므로 라벨 하나가 draw 둘이 되는
+      // 권역도 있다(busan·daegu). 그래서 "잉여 draw = 실패"가 아니라 **개수 자체를
+      // 고정**해, 라벨이 조용히 사라지거나 텍스트가 중복 반입되면 red가 되게 한다.
+      // 오너가 SVG에 역을 추가·삭제하면 여기도 함께 실측으로 갱신한다.
+      final expected = _expectedCounts[region.id]!;
+      if (runs.length != expected.svgRuns ||
+          draws.length != expected.vecTexts) {
+        failures.add(
+          '${region.id}: 텍스트 개수 기준선 이탈 — SVG 라벨 런 ${runs.length}건'
+          '(기준 ${expected.svgRuns}) / .vec 텍스트 ${draws.length}건'
+          '(기준 ${expected.vecTexts}). 라벨이 빠졌는지·중복 반입됐는지 먼저 규명하고 '
+          '정당한 변화면 기준선을 실측으로 갱신하세요.',
+        );
       }
       summary.add(
         '${region.id}: SVG 라벨 런 ${runs.length}건 / .vec 텍스트 ${draws.length}건 '

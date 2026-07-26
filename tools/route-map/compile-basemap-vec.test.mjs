@@ -699,6 +699,59 @@ test("여러 줄 라벨의 dy는 누적 절대 y로 접힌다(줄 간격 보존)
   assert.match(tspans[1], /\sy="240"/);
 });
 
+// 오너 소스의 실제 형태(수도권 총신대입구·부산 벡스코·광주 광주송정역)는 중첩
+// tspan이다 — 바깥 껍데기 tspan이 줄(x·y)을 잡고 안쪽 tspan이 글자를 담는다.
+// 안쪽 tspan은 x만 선언하므로 완결화 대상이고, 그 y는 바깥 껍데기가 옮겨 놓은
+// 펜 위치에서 와야 한다(부모 <text>의 y가 아니다).
+test("중첩 tspan(껍데기 줄 + 안쪽 글자)도 바깥이 옮긴 펜 y를 상속해 완결된다", () => {
+  const normalized = normalizeSvgForCompile(`
+    <svg>
+      <g id="map-card-clipped-content-layer">
+        <g id="map-content-positioned-layer" transform="translate(0 88)">
+          <g id="route-lines-layer"><polyline points="0,0 10,10" /></g>
+          <g id="station-name-labels-layer">
+            <text data-label-role="transfer" font-size="34" x="9646.0859" y="2928.2429"
+                  data-full-official-name="벡스코"><tspan id="line1" x="9301.377"
+                  y="2928.2429"><tspan id="glyph1" x="9301.377" dy="0">벡스코</tspan></tspan><tspan
+                  id="line2" x="9299.9766" y="3000.8716">(시립미술관)</tspan></text>
+          </g>
+        </g>
+      </g>
+    </svg>
+  `);
+  const openTagOf = (id) =>
+    normalized.match(new RegExp(`<tspan\\b[^>]*\\bid="${id}"[^>]*>`))[0];
+  // 껍데기 줄은 이미 완전 선언이라 불변.
+  assert.match(openTagOf("line1"), /\sy="2928\.2429"/);
+  assert.doesNotMatch(openTagOf("line1"), /\sdy=/);
+  // 안쪽 글자는 부모 <text>의 y가 아니라 껍데기가 옮긴 펜 y를 상속한다.
+  assert.match(openTagOf("glyph1"), /\sx="9301\.377"/);
+  assert.match(openTagOf("glyph1"), /\sy="2928\.2429"/);
+  assert.doesNotMatch(openTagOf("glyph1"), /\sdy=/);
+  // 중첩에서 빠져나온 다음 형제 줄은 자기 절대 y를 그대로 유지한다.
+  assert.match(openTagOf("line2"), /\sy="3000\.8716"/);
+});
+
+test("중첩 tspan의 dy는 바깥 줄 y에서 누적된다(펜이 <text> y로 되돌아가지 않는다)", () => {
+  const normalized = normalizeSvgForCompile(`
+    <svg>
+      <g id="map-card-clipped-content-layer">
+        <g id="map-content-positioned-layer" transform="translate(0 88)">
+          <g id="route-lines-layer"><polyline points="0,0 10,10" /></g>
+          <g id="station-name-labels-layer">
+            <text data-label-role="ordinary" font-size="34" x="100" y="200"
+                  data-full-official-name="중첩"><tspan id="outer" x="100"
+                  y="300"><tspan id="inner" x="100" dy="40">중첩</tspan></tspan></text>
+          </g>
+        </g>
+      </g>
+    </svg>
+  `);
+  const inner = normalized.match(/<tspan\b[^>]*\bid="inner"[^>]*>/)[0];
+  assert.match(inner, /\sy="340"/); // 300(바깥 줄) + 40(dy) — 200(부모 text)이 아니다.
+  assert.doesNotMatch(inner, /\sdy=/);
+});
+
 test("조상 transform이 항등이면 tspan 선언을 건드리지 않는다(정합 권역 산출 불변)", () => {
   const tspan = normalizeSvgForCompile(`
     <svg>
