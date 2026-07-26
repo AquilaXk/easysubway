@@ -198,6 +198,11 @@ Future<String> _loadSidecarJson() async {
 
 /// 이 권역 데이터에 실제로 있는 역과 매칭되는 오너 라벨 font-size의 중앙값
 /// (source 단위). 프로덕션 기준과 독립적으로 테스트가 직접 산출한다.
+///
+/// `fontSizePx > 0` 필터는 프로덕션 [networkMapReadableInitialMapScale]과 **같은
+/// 모집단**을 쓰기 위한 것이다. 현재 sidecar에는 0 이하 값이 없어 결과가 같지만,
+/// 재컴파일로 `fontSizePx: 0` 엔트리가 하나라도 들어오면 두 중앙값이 갈려 이
+/// 파일의 핵심 가드가 프로덕션 버그 없이 red가 되거나 실제 회귀를 통과시킨다.
 double _matchedOwnerFontSizeMedian(
   Map<String, List<RouteMapOwnerLabelEntry>> ownerLabels,
   Set<String> stationNames,
@@ -205,7 +210,8 @@ double _matchedOwnerFontSizeMedian(
   final sizes = <double>[
     for (final entry in ownerLabels.entries)
       if (stationNames.contains(entry.key))
-        for (final label in entry.value) label.fontSizePx,
+        for (final label in entry.value)
+          if (label.fontSizePx > 0) label.fontSizePx,
   ]..sort();
   expect(sizes, isNotEmpty, reason: '매칭되는 오너 라벨이 없다 — fixture/sidecar 확인');
   return sizes[sizes.length ~/ 2];

@@ -269,27 +269,36 @@ void main() {
       expect(camera.sourceBounds.width, closeTo(boundsWithLabels.width, 0.5));
       expect(camera.sourceBounds.height, closeTo(boundsWithLabels.height, 0.5));
 
-      // 회귀 가드 3(축소 하한에서 라벨 포함 폭 전체가 담긴다):
+      // [구 회귀 가드 3 — 삭제됨. #2068 트랙 QA 후속]
       //
-      // [계약 변경 · #2068 트랙 QA 후속] 종전에는 **초기** 카메라가 라벨 포함 폭
-      // 전체를 담는지(`camera.scale × width ≤ viewportWidth`)로 검증했다. 초기
-      // 카메라가 "콘텐츠 중앙을 글자가 읽히는 배율로 확대"로 바뀌면서 그 전체-fit
-      // 전제는 폐기됐다(오너 결정) — 이제 초기 화면은 의도적으로 라벨 일부를
-      // 화면 밖에 둘 수 있다.
+      // 종전 가드 3은 **초기** 카메라가 라벨 포함 폭 전체를 담는지
+      // (`camera.scale × sourceBounds.width ≤ viewportWidth`)를 봤다. 초기 카메라가
+      // "콘텐츠 중앙을 글자가 읽히는 배율로 확대"로 바뀌며 그 전체-fit 전제가
+      // 폐기돼(오너 결정) 초기 화면은 이제 의도적으로 라벨 일부를 화면 밖에 둔다.
       //
-      // 살아 있는 불변식은 "라벨 extents가 팬·축소로 **도달 가능**하다"이며, 그
-      // 직접 조건은 축소 하한(minScale)에서 폭 전체가 담기는 것이다. 오너 라벨이
-      // geometry(=팬 한계 sourceBounds)에서 빠지면 가드 1·2가 잡고, 팬 한계는
-      // 잡았는데 축소로 다 못 보는 회귀는 이 가드가 잡는다.
-      final viewportWidth = camera.viewportSize.width;
-      expect(
-        camera.minScale * camera.sourceBounds.width,
-        lessThanOrEqualTo(viewportWidth + 0.5),
-        reason:
-            'minScale=${camera.minScale} × '
-            'sourceBounds.width=${camera.sourceBounds.width}가 '
-            'viewportWidth=$viewportWidth를 넘는다 — 축소해도 라벨 폭 전체를 볼 수 없다',
-      );
+      // 이를 "축소 하한에서는 담긴다"(`minScale × width ≤ viewportWidth`)로
+      // 재정의했다가 **항등식이라 검출력이 0**임이 드러나 삭제한다. minScale은
+      // `_minimumMapScaleForBounds(fullBounds, constraints)`가
+      // `min(_minMapScale, min(vw / bounds.width, vh / bounds.height))`로 만들고, 그
+      // bounds·constraints가 그대로 카메라의 sourceBounds·viewportSize가 된다
+      // (`clamped()`는 center만 바꾼다). 따라서 `minScale ≤ vw / sourceBounds.width`가
+      // 정의상 성립해 부등식이 입력과 무관하게 참이다.
+      //
+      // 실측(오너 라벨을 geometry에서 떨어뜨려 이 파일이 잡겠다던 회귀를 재현):
+      //   기본 서피스  minScale=0.08 srcW=1827.0 labelsW=2282.0 vw=800.0 → 통과
+      //   세로 폰      minScale=0.08 srcW=1827.0 labelsW=2282.0 vw=411.0 → 통과
+      // 좌변을 독립 산출 ground truth(`boundsWithLabels.width`)로 바꿔도 minScale이
+      // `_minMapScale`(0.08) 하한에 걸려 0.08×2282=182.6 ≤ 411로 여전히 통과한다 —
+      // 어떤 변형으로도 red가 되지 않는다. 라벨이 빠지면 sourceBounds가 좁아지고
+      // minScale은 같거나 커져 부등식 여유가 오히려 늘어나는 구조이기 때문이다.
+      //
+      // 같은 변형에서 **가드 1·2는 즉시 red**가 된다(실측: `sourceBounds.width=1827.0`
+      // 이 station-only 1827.0보다 넓지 않아 가드 1 실패, 가드 2의
+      // `closeTo(2282.0)`도 실패). 이 파일이 지키려던 회귀 클래스("오너 라벨이
+      // geometry=팬 한계에서 다시 빠진다")는 가드 1·2가 전부 커버하고, 그 위에서
+      // 축소 도달성은 `_minimumMapScaleForBounds`의 정의상 자동으로 따라온다.
+      // 항상 통과하는 문장을 남겨 "축소 도달성이 가드되고 있다"는 착시를 만드는
+      // 대신, 이 메모로 계약 변경과 커버리지 근거를 남긴다.
     });
   });
 }
