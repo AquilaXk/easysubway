@@ -84,6 +84,8 @@ class DatapackReleaseRequestServiceTest {
 		assertThat(service.findApproved(published.approvalId())).isEmpty();
 	}
 
+	// dispatch 부재는 관찰 가능한 상태(APPROVED 유지 + dispatch_idempotency_key null)로만 검증한다.
+	// dispatch 포트 재도입 자체는 어댑터·포트가 제거되어(#2569) 컴파일 단계에서 차단된다.
 	@Test
 	@DisplayName("승인은 APPROVED 기록까지만 하고 release workflow를 dispatch하지 않는다")
 	void approveDoesNotDispatch() {

@@ -705,6 +705,12 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
     catalog.some((entry) => entry.id === "integration:github-datapack-workflow-dispatch"),
     false,
   );
+  // id를 바꿔 endpointRef만 되살리는 우회도 차단한다(계약 원문 문자열 pin).
+  const integrationsSource = await readFile(
+    new URL("../../contracts/api/outbound-integrations.json", import.meta.url),
+    "utf8",
+  );
+  assert.doesNotMatch(integrationsSource, /actions\/workflows\/datapack-release\.yml\/dispatches/);
 });
 
 test("프로젝트 provider catalog는 비API source를 제외하고 모든 호출 계약을 제공한다", async () => {
