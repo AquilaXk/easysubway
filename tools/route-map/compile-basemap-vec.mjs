@@ -1906,6 +1906,152 @@ function normalizeTextBaselineAndScale(svgText, k) {
   });
 }
 
+// ── 텍스트 위치 선언 완결화(#2068 대전 라벨 이중 이동, 2026-07-26) ───────────
+//
+// vector_graphics_compiler 1.2.6의 `TextPositionNode.computeTextPosition`
+// (src/svg/node.dart)은 그 노드가 **x·y(또는 dx·dy)를 둘 다** 선언했을 때만
+// 조상 transform을 좌표에 흡수한다(consumeTransform). 흡수하지 못하면 그
+// transform을 .vec 텍스트 위치 명령에 그대로 싣고, vector_graphics 1.2.2 런타임
+// (src/listener.dart의 `_flushPendingTextChunk`)이 그리기 직전
+// `canvas.transform(...)`으로 한 번 더 적용한다.
+//
+// 오너 역명 라벨 마크업은 `<text x y …><tspan x dy="0">역명</tspan></text>`
+// 형식이라 부모 `<text>`는 x·y를 둘 다 가져 흡수하는데, 자식 `<tspan>`은 x만
+// 있고 y가 없어 흡수하지 못한다 — **같은 transform이 부모에서 한 번(좌표),
+// 자식에서 또 한 번(캔버스) 적용**돼 이중 이동이 된다. 실측(2026-07-26,
+// .vec 디코드 + 런타임 청크 로직 재현):
+//   daejeon 22건 — map-content-positioned-layer의 translate(0 88)가 두 번.
+//     월드컵경기장 baseline y 695.727(기대) → 783.727(실측, +88).
+//   busan  63건 — 라벨 자신의 transform="translate(dx dy)"가 두 번.
+//     김해대학 y 2395.725(기대) → 3364.091(실측, +968.366).
+//   gwangju·daegu — 라벨 조상 transform이 항등이라 흡수 판정이 갈리지 않는다(정합).
+//   seoul — 래퍼 행렬에 미세 회전 성분이 남아 부모도 흡수하지 못한다(둘 다
+//     미흡수 → transform 1회 적용, 정합). 게다가 tspan이 이미 x·y를 둘 다 갖는다.
+//
+// 교정은 컴파일 입력에서 **부분 선언 `<tspan>`을 완전한 절대 x·y 쌍으로 채우는
+// 것**이다. 부모와 자식이 같은 흡수 판정을 받으므로 이중 적용이 구조적으로
+// 불가능해진다 — 컴파일러가 흡수하면 양쪽 다 좌표에 반영되고, 흡수하지 않으면
+// 양쪽 다 transform으로 남아 런타임이 정확히 한 번 적용한다. 즉 컴파일러 내부
+// 판정(encodableInRect 등)에 의존하지 않는다. 조상 transform이 항등인 텍스트는
+// 애초에 갈릴 판정이 없어 건드리지 않는다(gwangju·daegu 산출 바이트 불변).
+// 오너 SVG 원본은 불변이며 이 정규화는 컴파일 입력 사본에만 적용된다.
+
+function isIdentityMatrix(matrix) {
+  return matrix.every(
+    (value, index) => Math.abs(value - IDENTITY_MATRIX[index]) < 1e-12,
+  );
+}
+
+// 여는 태그의 x/y/dx/dy를 지우고 절대 x·y만 남긴다(자기폐쇄 형태 보존).
+function withAbsoluteTextPosition(openTag, x, y) {
+  const name = openTag.match(/^<([A-Za-z][\w:.-]*)/)?.[1];
+  if (!name) {
+    throw new Error(`텍스트 위치 태그를 해석하지 못했습니다: ${openTag}`);
+  }
+  const selfClosing = /\/\s*>$/.test(openTag);
+  const attributes = openTag
+    .slice(1 + name.length)
+    .replace(/\s*\/?>$/, "")
+    .replace(/\s+(?:dx|dy|x|y)="[^"]*"/g, "");
+  return `<${name}${attributes} x="${x}" y="${y}"${selfClosing ? " /" : ""}>`;
+}
+
+// [textNode] 한 그루의 `<tspan>` 위치 선언을 완결화하는 편집 목록을 모은다.
+function collectTextPositionEdits(textNode, edits) {
+  const matrix = composeMatrix(
+    ancestorMatrixOf(textNode),
+    parseTransformChain(firstAttr(textNode.openTag, "transform")),
+  );
+  // 조상·자신 transform이 항등이면 흡수 판정이 갈릴 여지가 없다(산출 불변).
+  if (isIdentityMatrix(matrix)) return;
+  // 부모 `<text>`가 x·y를 둘 다 선언하지 않으면 부모도 흡수하지 않는다 — 자식과
+  // 판정이 갈리지 않으므로 그대로 둔다(수도권 "뚝섬형" transform 배치 라벨).
+  const textX = firstCoordinateToken(firstAttr(textNode.openTag, "x"));
+  const textY = firstCoordinateToken(firstAttr(textNode.openTag, "y"));
+  if (textX == null || textY == null) return;
+  let penY = Number(textY);
+  if (!Number.isFinite(Number(textX)) || !Number.isFinite(penY)) return;
+
+  (function walk(node) {
+    for (const child of node.children) {
+      if (child.name !== "tspan") {
+        walk(child);
+        continue;
+      }
+      // 자기폐쇄 `<tspan/>`은 컴파일러가 위치 노드를 만들지 않는다(parser.dart의
+      // textOrTspan이 isSelfClosing에서 즉시 반환) — 펜도 움직이지 않는다.
+      if (child.openTag.endsWith("/>")) continue;
+      const rawX = firstCoordinateToken(firstAttr(child.openTag, "x"));
+      const rawY = firstCoordinateToken(firstAttr(child.openTag, "y"));
+      const rawDx = firstCoordinateToken(firstAttr(child.openTag, "dx"));
+      const rawDy = firstCoordinateToken(firstAttr(child.openTag, "dy"));
+      if (rawX == null) {
+        // x를 스스로 선언하지 않는 tspan의 절대 x는 **직전 글리프들의 진행폭**에
+        // 달려 있어 폰트 메트릭 없이는 계산할 수 없다. 조용히 넘기면 그 라벨만
+        // transform이 이중 적용된 채 배포되므로 실패시킨다(현행 5권역 소스에는
+        // 이 형태가 0건 — 오너 SVG에 새로 생기면 사람이 판정해야 한다).
+        throw new Error(
+          `x를 선언하지 않은 <tspan>이 transform이 걸린 <text>(${firstAttr(textNode.openTag, "id") ?? "id 없음"}) 안에 있습니다 ` +
+            "— 절대 x를 계산할 수 없어 텍스트 위치 완결화가 불가능합니다. " +
+            "오너 SVG에서 해당 tspan에 x를 명시하거나 이 정규화를 확장하세요.",
+        );
+      }
+      const x = Number(rawX) + (rawDx == null ? 0 : Number(rawDx));
+      const y =
+        (rawY == null ? penY : Number(rawY)) +
+        (rawDy == null ? 0 : Number(rawDy));
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        walk(child);
+        continue;
+      }
+      penY = y;
+      // 이미 완전 선언(x·y만 있고 상대 이동 없음)이면 손대지 않는다 — 수도권처럼
+      // 정합인 권역의 산출 바이트를 흔들지 않기 위함이다.
+      const alreadyComplete = rawY != null && rawDx == null && rawDy == null;
+      if (!alreadyComplete) {
+        edits.push({
+          start: child.start,
+          length: child.openTag.length,
+          openTag: withAbsoluteTextPosition(
+            child.openTag,
+            rawDx == null ? rawX : roundCoord(x),
+            rawY != null && rawDy == null ? rawY : roundCoord(y),
+          ),
+        });
+      }
+      walk(child);
+    }
+  })(textNode);
+}
+
+/**
+ * 컴파일 입력의 `<tspan>` 위치 선언을 완전한 절대 x·y 쌍으로 정규화한다
+ * (위 주석의 이중 transform 적용 방지). 텍스트 내용·순서·그 밖의 속성은 불변.
+ */
+export function completePartialTextPositions(svgText) {
+  const root = buildSvgTree(svgText);
+  const edits = [];
+  (function walk(node) {
+    for (const child of node.children) {
+      if (child.name === "text") {
+        collectTextPositionEdits(child, edits);
+        continue;
+      }
+      walk(child);
+    }
+  })(root);
+  if (edits.length === 0) return svgText;
+  let result = svgText;
+  // 뒤에서부터 치환해 앞쪽 인덱스가 어긋나지 않게 한다.
+  for (const edit of edits.sort((a, b) => b.start - a.start)) {
+    result =
+      result.slice(0, edit.start) +
+      edit.openTag +
+      result.slice(edit.start + edit.length);
+  }
+  return result;
+}
+
 // tag 문자열의 y="..." 값을 shift만큼 더한다(단일 값 가정). y가 없으면 그대로 둔다.
 function shiftTextYAttr(tag, shift) {
   const yMatch = tag.match(/\sy="(-?[\d.]+)"/);
@@ -2077,6 +2223,219 @@ export function stripHiddenElements(markup) {
   }
 }
 
+// ── SVG paint-order 지원(#2068 오너 실기기 회귀, 2026-07-26) ────────────────
+//
+// [원인] vector_graphics_compiler 1.2.6은 `paint-order`를 **읽지 않는다** —
+// svg/parser.dart의 presentation attribute 목록에도, style 선언 파서에도 없어
+// 조용히 무시된다(에러도 경고도 없다). 런타임 vector_graphics 1.2.2의
+// listener.dart `onDrawText`는 fill paragraph를 먼저 큐에 넣고 stroke paragraph를
+// 그 뒤에 넣어 `_flushPendingTextChunk`가 순서대로 그린다 — 즉 파이프라인 전체가
+// **fill → stroke 고정**이다.
+// 오너 SVG의 역명 라벨은 `paint-order:stroke fill` + 흰 halo를 쓴다
+// (busan `.station-name` stroke 5.747px @ font-size 48.85px,
+//  daegu `.station-name` stroke 5px @ 34px). stroke는 글리프 외곽선 중심으로
+// 그려져 안쪽으로 절반이 파고들므로, 순서가 뒤집히면 흰 stroke가 글자 fill을
+// 덮어 속이 빈 유령 글자가 된다(대구는 획 대비 stroke 비율이 커 역명이 화면에서
+// 사실상 소멸, 부산은 일반역명 파편화 + 환승역명 가늘어짐 — 오너 실기기 실측).
+//
+// [수정] 오너 SVG 원본은 불변이라는 원칙을 지키면서 컴파일 경로가 SVG 의미론을
+// 따르게 만든다. 정규화 단계에서 해당 요소를
+//   ① stroke 전용 사본(fill:none) → ② fill 전용 사본(stroke:none)
+// 두 형제로 분해해 halo가 글자 **뒤에** 깔리게 한다. 서브트리를 통째로 복제하므로
+// 좌표·transform·text-anchor·다줄 tspan·letter-spacing·font가 전부 동일하다.
+// `<text>`는 컴파일러가 anchored chunk를 reset하며 시작하므로(codec의 reset 플래그
+// → listener의 `_flushPendingTextChunk`) 두 사본은 각각 독립 chunk로 앵커링돼
+// text-anchor 계산도 어긋나지 않는다.
+//
+// [범위] fill과 stroke가 **둘 다 보이는** 요소만 분해한다. 한쪽이 none/미지정이면
+// paint-order는 렌더 결과에 영향이 없어(무의미한 draw 하나만 늘어난다) 원본
+// 마크업을 그대로 둔다. 그 결과 권역별 영향은 다음과 같다(실측):
+//   - 부산 text 147 + path 2, 대구 text 97 — 역명 라벨이 복원된다.
+//   - 수도권 path 6(공항 아이콘)만 분해 — **역명 라벨은 분해 대상 0건**이지만
+//     아이콘 분해 때문에 seoul.vec 자체는 바뀐다(라벨 불변 ≠ .vec 불변).
+//   - 대전·광주 0건 — 산출물이 바이트 단위로 동일하다.
+const PAINT_ORDER_DEFAULT_SEQUENCE = ["fill", "stroke", "markers"];
+// halo(stroke 전용) 사본의 표식. 오너 요소 전수를 세는 게이트들이 halo 사본을
+// 오너 요소로 오인하지 않도록 이 상수를 공유한다(문자열 중복 금지).
+//   - 표식 속성이 정본이다: id가 없는 요소도 분해될 수 있어 id 접미사만으로는
+//     판별이 불가능하다. 게이트는 이 속성으로 판별한다.
+//   - id 접미사는 그와 별개로 **문서 내 id 중복을 피하기 위한** 것이다.
+export const PAINT_ORDER_STROKE_COPY_ATTR = "data-paint-order-stroke-copy";
+export const PAINT_ORDER_STROKE_COPY_ID_SUFFIX = "-paint-order-stroke";
+// SVG presentation attribute로 실제 쓰이는 마커 property. CSS 축약형 `marker`는
+// presentation attribute가 아니라서 축약형만 보면 마커를 전부 놓친다.
+const MARKER_PROPERTIES = ["marker", "marker-start", "marker-mid", "marker-end"];
+
+// SVG 사양(`paint-order: normal | [ fill || stroke || markers ]`)대로 실제 그리기
+// 순서를 해석한다. 명시되지 않은 나머지 레이어는 기본 순서(fill·stroke·markers)로
+// 뒤에 붙는다. 사양 밖 토큰·중복 토큰은 fail-closed로 던진다 — 조용히 무시하면
+// 이번 회귀와 똑같은 종류의 사고가 다시 난다.
+export function resolvePaintOrderSequence(rawValue) {
+  const value = String(rawValue ?? "").trim();
+  if (value === "" || value === "normal") return [...PAINT_ORDER_DEFAULT_SEQUENCE];
+  const specified = [];
+  for (const token of value.split(/\s+/)) {
+    if (!PAINT_ORDER_DEFAULT_SEQUENCE.includes(token) || specified.includes(token)) {
+      throw new Error(
+        `지원하지 않는 paint-order 값입니다: "${rawValue}". ` +
+          "SVG 사양은 `normal` 또는 fill/stroke/markers의 중복 없는 나열만 허용합니다 " +
+          "— 조용히 무시하지 않고 실패합니다.",
+      );
+    }
+    specified.push(token);
+  }
+  return [
+    ...specified,
+    ...PAINT_ORDER_DEFAULT_SEQUENCE.filter((layer) => !specified.includes(layer)),
+  ];
+}
+
+// 여는 태그에 **직접 선언된** property 값(style 선언이 동명 presentation attribute를
+// 이긴다 — SVG/CSS 명세). 선언이 없으면 undefined.
+function declaredProperty(openTag, property) {
+  const style = openTag.match(/\sstyle="([^"]*)"/)?.[1];
+  if (style) {
+    const declared = style.match(
+      new RegExp(`(?:^|;)\\s*${property}\\s*:\\s*([^;]+)`),
+    )?.[1];
+    if (declared != null) return declared.trim();
+  }
+  return openTag.match(new RegExp(`\\s${property}="([^"]*)"`))?.[1]?.trim();
+}
+
+// 상속을 반영한 유효 paint 값. 조상까지 선언이 없으면 SVG 초기값
+// (fill=black 가시, stroke=none 비가시)을 쓴다.
+function effectivePaintValue(node, property) {
+  for (let current = node; current && current.name !== "#root"; current = current.parent) {
+    const value = declaredProperty(current.openTag, property);
+    if (value != null && value !== "" && value !== "inherit") return value;
+  }
+  return property === "fill" ? "#000000" : "none";
+}
+
+function isVisiblePaint(value) {
+  const normalized = value.toLowerCase();
+  return normalized !== "none" && normalized !== "transparent";
+}
+
+// 서브트리의 모든 여는 태그에서 property 선언(속성형·style형)을 제거한다.
+// `fill`/`stroke`만 지우고 `fill-opacity`·`stroke-width` 등 하이픈 파생 속성은
+// 건드리지 않는다(정규식이 `="`를 요구하고 style 선언은 `^property\s*:`로 앵커).
+function stripPropertyDeclarations(markup, property) {
+  return markup.replace(/<[A-Za-z][\w:.-]*\b[^>]*>/g, (tag) =>
+    tag
+      .replace(new RegExp(`\\s${property}="[^"]*"`, "g"), "")
+      .replace(/\sstyle="([^"]*)"/, (_m, styleValue) => {
+        const kept = styleValue
+          .split(";")
+          .map((declaration) => declaration.trim())
+          .filter(Boolean)
+          .filter(
+            (declaration) =>
+              !new RegExp(`^${property}\\s*:`).test(declaration),
+          );
+        return ` style="${kept.join(";")}"`;
+      }),
+  );
+}
+
+// 여는 태그에 property="value"를 덧붙인다(자기폐쇄 여부 유지).
+function withProperty(openTag, property, value) {
+  const selfClosing = /\/\s*>$/.test(openTag);
+  const body = openTag.replace(/\s*\/?>$/, "");
+  return `${body} ${property}="${value}"${selfClosing ? " />" : ">"}`;
+}
+
+// 요소 서브트리를 한쪽 paint만 남긴 사본으로 만든다.
+//   keep="stroke" → fill:none 사본(halo), keep="fill" → stroke:none 사본(글자).
+function paintOnlyCopy(subtree, keep) {
+  const dropped = keep === "stroke" ? "fill" : "stroke";
+  let copy = stripPropertyDeclarations(
+    stripPropertyDeclarations(subtree, dropped),
+    "paint-order",
+  );
+  if (keep === "stroke") {
+    // id 충돌을 피한다 — 원본 id는 글자(fill) 사본이 그대로 유지해 id 기반
+    // 조회(게이트·후속 도구)가 오너 요소를 계속 가리키게 한다.
+    copy = copy.replace(
+      /(\sid=")([^"]*)(")/g,
+      (_m, head, id, tail) => `${head}${id}${PAINT_ORDER_STROKE_COPY_ID_SUFFIX}${tail}`,
+    );
+  }
+  const openTagEnd = copy.indexOf(">") + 1;
+  let openTag = withProperty(copy.slice(0, openTagEnd), dropped, "none");
+  if (keep === "stroke") {
+    // halo 사본의 정본 표식 — id가 없는 요소도 다운스트림 게이트가 정확히
+    // 걸러낼 수 있게 한다. 컴파일러가 무시하는 data-* 속성이라 렌더에 영향이 없다.
+    openTag = withProperty(openTag, PAINT_ORDER_STROKE_COPY_ATTR, "true");
+  }
+  return openTag + copy.slice(openTagEnd);
+}
+
+/**
+ * paint-order가 stroke를 fill보다 먼저 그리도록 지정한 요소를
+ * `stroke 전용 사본 → fill 전용 사본` 두 형제로 분해한다.
+ * 그 외(기본 순서·한쪽 paint만 가시)는 마크업을 그대로 둔다.
+ */
+export function decomposePaintOrder(markup) {
+  const root = buildSvgTree(markup);
+  const targets = [];
+  (function walk(node) {
+    for (const child of node.children) {
+      const declared = declaredProperty(child.openTag, "paint-order");
+      if (declared != null) {
+        const sequence = resolvePaintOrderSequence(declared);
+        const strokeFirst = sequence.indexOf("stroke") < sequence.indexOf("fill");
+        const fillVisible = isVisiblePaint(effectivePaintValue(child, "fill"));
+        const strokeVisible = isVisiblePaint(effectivePaintValue(child, "stroke"));
+        if (strokeFirst && fillVisible && strokeVisible) {
+          // 마커를 가진 요소를 분해하면 두 사본이 마커를 중복 렌더한다.
+          // 축약형 `marker`뿐 아니라 실제로 쓰이는 marker-start/mid/end까지 본다.
+          const marker = MARKER_PROPERTIES.find((property) => {
+            const value = declaredProperty(child.openTag, property);
+            return value != null && isVisiblePaint(value);
+          });
+          if (marker) {
+            throw new Error(
+              `marker(${marker})와 paint-order를 함께 쓰는 요소는 지원하지 ` +
+                `않습니다 — 사본이 마커를 중복 렌더합니다: ${child.openTag}`,
+            );
+          }
+          targets.push(child);
+        }
+      }
+      walk(child);
+    }
+  })(root);
+  if (targets.length === 0) return markup;
+
+  for (const target of targets) {
+    for (const other of targets) {
+      if (other !== target && other.start > target.start && other.end <= target.end) {
+        throw new Error(
+          "paint-order 분해 대상이 서로 중첩돼 있습니다 — 순서 보장이 불가능해 " +
+            `실패합니다: ${target.openTag}`,
+        );
+      }
+    }
+  }
+
+  let result = markup;
+  // 인덱스가 밀리지 않도록 문서 역순으로 치환한다.
+  for (const target of [...targets].sort((a, b) => b.start - a.start)) {
+    const subtree = result.slice(target.start, target.end);
+    const lineStart = result.lastIndexOf("\n", target.start - 1) + 1;
+    const indent = /^[ \t]*/.exec(result.slice(lineStart, target.start))[0];
+    result =
+      result.slice(0, target.start) +
+      paintOnlyCopy(subtree, "stroke") +
+      `\n${indent}` +
+      paintOnlyCopy(subtree, "fill") +
+      result.slice(target.end);
+  }
+  return result;
+}
+
 export function normalizeSvgForCompile(svgText) {
   const extracted = extractMapSvg(svgText);
   const k = scaleFromMapTransform(
@@ -2103,10 +2462,19 @@ export function normalizeSvgForCompile(svgText) {
       },
     );
   // 칩 폰트 스케일 면제 표식은 정규화 파이프라인 내부용이라 컴파일 입력에서 지운다.
-  return normalizeTextBaselineAndScale(inlined, k).replaceAll(
+  const normalized = normalizeTextBaselineAndScale(inlined, k).replaceAll(
     ` ${TERMINAL_CHIP_FONT_EXEMPT_ATTR}="true"`,
     "",
   );
+  // 텍스트 위치 완결화는 foldTerminalChipScale·normalizeTextBaselineAndScale이
+  // `<text>` y를 최종값으로 옮겨 놓은 **뒤**라야 한다 — 그 값에서 파생한 tspan y가
+  // 부모와 같은 기준선을 갖는다. 동시에 paint-order 분해보다는 **앞**이다(분해가
+  // 복제하는 마크업이 이미 완결된 위치 선언을 담고 있어야 두 사본이 동일하다).
+  const positioned = completePartialTextPositions(normalized);
+  // paint-order 분해는 마지막에 둔다 — 앞선 정규화(폰트 굵기·baseline·font-size
+  // 스케일·좌표 단일화·텍스트 위치 완결화)를 모두 마친 마크업을 복제해야 두 사본이
+  // paint 선언을 제외하고 완전히 동일해진다.
+  return decomposePaintOrder(positioned);
 }
 
 // vector_graphics_compiler를 apps/mobile 컨텍스트에서 실행한다. `--packages`가
