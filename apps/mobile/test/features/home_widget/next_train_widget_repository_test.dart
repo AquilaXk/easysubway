@@ -273,6 +273,29 @@ void main() {
     expect(data.directions, isEmpty);
   });
 
+  test('feed_end_date 값이 NULL이거나 YYYYMMDD가 아니면 unavailable이다', () async {
+    await _seedSchedule(catalogDatabase);
+    await catalogDatabase.customStatement('DROP TABLE transit_feed_info');
+    await catalogDatabase.customStatement('''
+      CREATE TABLE transit_feed_info (
+        id INTEGER PRIMARY KEY,
+        feed_end_date TEXT
+      )
+    ''');
+    await catalogDatabase.customStatement(
+      'INSERT INTO transit_feed_info (id, feed_end_date) '
+      "VALUES (1, NULL), (2, '2026-12-31')",
+    );
+
+    final data = await repository.load(
+      _sadangLine4,
+      tz.TZDateTime(tz.getLocation('Asia/Seoul'), 2026, 7, 10, 9),
+    );
+
+    expect(data.status, NextTrainWidgetStatus.timetableUnavailable);
+    expect(data.directions, isEmpty);
+  });
+
   test('legacy feed schema 이외의 SQLite 오류는 전파한다', () async {
     await _seedSchedule(catalogDatabase);
     await catalogDatabase.customStatement('DROP TABLE transit_feed_info');

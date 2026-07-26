@@ -89,6 +89,17 @@ import '../../../support/capital_route_map_fixture.dart';
 //               복구(옛 소스 650과 대등하거나 더 나음). baseline을 새 소스
 //               실측값 652로 재설정한다(옛 소스 650과 비교 불가 — 새 좌표계
 //               기준선).
+//
+//               조사 13(#2068 오너 v4 반입, 2026-07-25): 652 → **655**.
+//               sidecar 라벨 키에 파이프라인 노드 매칭의 정본 규칙
+//               (SEOUL.canonicalRules)을 적용해, 도식 표기와 카탈로그 표기가
+//               다른 3역이 폴백 미니에서 오너 라벨로 복귀했다:
+//                 총신대입구(이수)→총신대입구 · 신촌(경의중앙선)→신촌 ·
+//                 하남검단산→하남검단산역.
+//               (성신여대입구는 오너가 v4 SVG에서 둘째 줄 tspan을 되살려 해소 —
+//               별건.) 남은 미매치 1건은 도라산으로, 오너 도식이 임진강까지만
+//               수록해 라벨 자체가 없는 알려진 위상 예외다. 개선이므로 기준선을
+//               함께 올린다(줄면 여전히 회귀).
 //   부산  146/146 (#2068 벡스코 병합 마감: 2호선 벡스코(부역명 시립미술관)와
 //               동해선 벡스코를 단일 환승 station_id로 병합(merge-busan-transfers.mjs)
 //               하면서, 후보(물리역)가 147→146으로 준다(벡스코가 비환승 2역에서
@@ -112,7 +123,7 @@ void main() {
   // 캘리브레이션) — 부산만 450(#2068 라벨 지오메트리 튜닝 라운드, 근거는
   // route_map_label_layout.dart의 ownerLabelMaxAnchorDistancePx 문서 참고).
   const cases = <(String, String, int, int, double)>[
-    ('수도권', 'seoul', 652, 656, kRouteMapOwnerLabelMaxAnchorDistancePx),
+    ('수도권', 'seoul', 655, 656, kRouteMapOwnerLabelMaxAnchorDistancePx),
     ('부산권', 'busan', 146, 146, 450.0),
     ('대구권', 'daegu', 97, 97, kRouteMapOwnerLabelMaxAnchorDistancePx),
     ('대전권', 'daejeon', 22, 22, kRouteMapOwnerLabelMaxAnchorDistancePx),
