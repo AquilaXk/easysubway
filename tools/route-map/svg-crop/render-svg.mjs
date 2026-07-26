@@ -12,7 +12,14 @@
 // 경로를 인자로 받지 않는 이유는 regions.mjs 주석 참조.
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 
 import {
@@ -121,9 +128,13 @@ mkdirSync(outDir, { recursive: true });
 // assertSafeRef 통과), 최종 경로는 outPathFor가 다시 .out/ 안인지 확인한다.
 const refPart = ref ? ref.replaceAll(/[^\w.-]/g, "_") : "working";
 const stem = `${region}-${refPart}${inkOnly ? "-ink" : ""}`;
-const htmlPath = outPathFor(`${stem}.html`);
 const outPng = outPathFor(`${stem}.png`);
-writeFileSync(htmlPath, html);
+
+// 브라우저에 넘기는 인자는 **고정 경로**만 쓴다. 최종 파일명은 렌더가 끝난 뒤
+// 파일 시스템 API로 옮긴다 — CLI에서 온 문자열이 OS 명령 인자에 닿지 않는다.
+const workHtml = path.resolve(outDir, "render-input.html");
+const workPng = path.resolve(outDir, "render-output.png");
+writeFileSync(workHtml, html);
 
 const args = [
   "--headless=new",
@@ -134,10 +145,11 @@ const args = [
   `--window-size=${width},${height}`,
   "--virtual-time-budget=60000",
   "--run-all-compositor-stages-before-draw",
-  `--screenshot=${outPng}`,
+  `--screenshot=${workPng}`,
 ];
 if (inkOnly) args.push("--default-background-color=00000000");
-args.push(`file://${htmlPath}`);
+args.push(`file://${workHtml}`);
 
 execFileSync(resolveChrome(), args, { stdio: ["ignore", "ignore", "ignore"] });
+renameSync(workPng, outPng);
 console.log(`${outPng}  ${width}x${height}  scale=${scale}  ink=${inkOnly}`);
