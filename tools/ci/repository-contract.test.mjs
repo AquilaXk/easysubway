@@ -957,12 +957,23 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
   assert.match(workflow, /CHROME_PATH: \$\{\{ steps\.setup-chrome\.outputs\.chrome-path \}\}/);
   assert.match(workflow, /ROUTE_MAP_CHROME_NO_SANDBOX: "1"/);
   assert.match(workflow, /Repository CI \/ Run route map tool tests/);
+  const repositoryJob = jobBlock(workflow, "repository-contracts", "backend");
+  // #2558: route 도구 테스트는 Chrome이 필요 없다. 브라우저 셋업 실패가 이 비의존 테스트까지 막지
+  // 않도록 같은 job 안에서 Chrome 설치 스텝보다 앞 순서를 고정한다.
+  const routeToolStepIndex = repositoryJob.indexOf("Repository CI / Run route tool tests");
+  const chromeSetupStepIndex = repositoryJob.indexOf(
+    "Repository CI / Set up Chrome for route map tests",
+  );
+  assert.ok(routeToolStepIndex >= 0, "Repository CI must declare a route tool test step");
+  assert.ok(
+    routeToolStepIndex < chromeSetupStepIndex,
+    "route 도구 테스트 스텝은 Chrome 설치 스텝보다 앞이어야 한다",
+  );
   assert.match(workflow, /Repository CI \/ Run security tool tests/);
   assert.match(workflow, /node --test tools\/security\/\*\.test\.mjs/);
   assert.match(workflow, /Repository CI \/ Run ops tool tests/);
   assert.match(workflow, /node --test tools\/ops\/\*\.test\.mjs/);
   // #2396: 워크플로 변경 시 actionlint 정적 검증 게이트가 pinned·checksum 검증으로 실행된다.
-  const repositoryJob = jobBlock(workflow, "repository-contracts", "backend");
   assert.match(repositoryJob, /Repository CI \/ Lint GitHub Actions workflows/);
   assert.match(repositoryJob, /needs\.changes\.outputs\.ci == 'true'/);
   assert.match(repositoryJob, /ACTIONLINT_VERSION: "1\.7\.12"/);
@@ -18347,6 +18358,82 @@ test("CI 계약 테스트 스텝은 tools/lib, tools/mobile 테스트 글롭을 
   ]) {
     assert.ok(command.includes(glob), `contract test step must run ${glob}`);
   }
+});
+
+// #2558: 위 하드코딩 목록은 이미 편입된 글롭이 계약 테스트 스텝에서 빠지는 회귀만 잡고,
+// 새로 생긴 디렉토리(tools/routes, tools/qa)나 하위 디렉토리(tools/datapack/lib)는 잡지 못한다.
+// 실제 테스트 파일을 재귀 열거해 ci.yml의 node --test 인자에 반드시 걸리도록 강제한다
+// (#2518의 tools/ 디렉토리 매핑 열거 가드와 동형 — 하드코딩 목록 대신 파일시스템이 원본).
+test("ci.yml의 node --test 인자는 tools/ 하위 모든 테스트 파일을 편입한다", async () => {
+  const workflow = read(".github/workflows/ci.yml");
+  // 한계: 셸 백슬래시 줄 연속(`\`)으로 이어진 인자는 다음 줄로 넘어가 수집되지 않는다(ci.yml에는 미사용).
+  const commands = workflow
+    .split("\n")
+    // 주석 처리된 명령은 실행되지 않으므로, 첫 비공백 문자가 `#`인 줄은 커버리지 근거가 될 수 없다.
+    .filter((line) => !line.trimStart().startsWith("#"))
+    .flatMap((line) => [...line.matchAll(/node --test [^\n]*/g)].map((match) => match[0]))
+    // YAML 플레인 스칼라의 주석은 "공백 뒤 `#`"부터다. 후행 인라인 주석(`run: node --test A # 이전: B`)
+    // 안의 옛 글롭까지 커버리지로 세면 실행 경로가 사라진 테스트가 통과로 새므로 잘라낸다
+    // (현행 ci.yml의 node --test 인자에는 `#`를 포함한 토큰이 없어 이 단순 절단으로 충분하다).
+    .map((command) => command.replace(/\s+#.*$/, ""))
+    // 이름·범위로 일부만 실행하는 플래그가 붙으면 그 파일 인자를 완전 편입으로 볼 수 없다.
+    .filter((command) => !/--test-(name-pattern|skip-pattern|only|shard)\b/.test(command));
+
+  // 인용부호로 감싼 토큰과 선행 `./`는 같은 경로의 다른 표기일 뿐이라 정규화 후 필터링한다.
+  const normalizeArg = (token) => {
+    const unquoted = token.match(/^(["'])(.*)\1$/)?.[2] ?? token;
+    return unquoted.replace(/^\.\//, "");
+  };
+  const declaredArgs = [
+    ...new Set(
+      commands
+        .flatMap((command) => command.split(/\s+/))
+        .map(normalizeArg)
+        .filter((token) => token.startsWith("tools/") && token.endsWith(".test.mjs")),
+    ),
+  ];
+  assert.ok(declaredArgs.length > 0, "ci.yml must declare at least one tools/ node --test argument");
+
+  // 셸 글롭의 `*`는 `/`를 넘지 않는다. tools/datapack/*.test.mjs가 lib/ 하위를 덮지 못한 원인이므로
+  // 그 의미를 그대로 옮겨야 미편입이 통과로 새지 않는다. 세그먼트 첫 글자의 `*`가 선행 `.`을
+  // 매칭하지 않는 것도 bash 기본 동작이라 dotfile 테스트가 편입된 것처럼 보이지 않게 함께 옮긴다.
+  const matchers = declaredArgs.map((glob) => {
+    let source = "";
+    for (const [index, part] of glob.split("*").entries()) {
+      if (index > 0) {
+        source += source === "" || source.endsWith("/") ? "(?!\\.)[^/]*" : "[^/]*";
+      }
+      source += part.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+    return { glob, pattern: new RegExp(`^${source}$`) };
+  });
+
+  const entries = await readdir(path.join(root, "tools"), { recursive: true, withFileTypes: true });
+  const testFiles = entries
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".test.mjs"))
+    .map((entry) => path.relative(root, path.join(entry.parentPath, entry.name)))
+    // 설치 산출물(tools/qa의 npm ci 등)은 저장소 자산이 아니라 CI 편입 대상이 아니다.
+    .filter((file) => !file.split("/").includes("node_modules"))
+    .sort();
+  assert.ok(testFiles.length > 0, "tools/ must contain at least one .test.mjs file");
+
+  const orphans = testFiles.filter((file) => !matchers.some(({ pattern }) => pattern.test(file)));
+  assert.deepEqual(
+    orphans,
+    [],
+    `these tools tests run in no .github/workflows/ci.yml node --test step: ${orphans.join(", ")}`,
+  );
+
+  // 역방향: 마지막 테스트 파일이 지워지면 아무것도 매칭하지 않는 글롭이 남는다. 그 상태를 방치하면
+  // 다음에 같은 경로로 파일이 생겼을 때만 우연히 살아나므로, 죽은 인자는 즉시 정리하도록 강제한다.
+  const deadArgs = matchers
+    .filter(({ pattern }) => !testFiles.some((file) => pattern.test(file)))
+    .map(({ glob }) => glob);
+  assert.deepEqual(
+    deadArgs,
+    [],
+    `these .github/workflows/ci.yml node --test arguments match no tools test file: ${deadArgs.join(", ")}`,
+  );
 });
 
 // #2518: status voice 인벤토리는 apps/mobile/lib 트리를 스캔하는 drift 가드라,

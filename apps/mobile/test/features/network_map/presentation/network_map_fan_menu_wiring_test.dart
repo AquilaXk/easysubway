@@ -9,14 +9,18 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:easysubway_mobile/network_map.dart'
     show
+        fanMenuAnchorNodeHeight,
         fanMenuSelectedSlots,
         fanMenuDisabledSlots,
         fanMenuShouldClear,
+        fanMenuTailAnchorPoint,
         fanMenuWidthForViewport,
         fanMenuPlacement,
         fanMenuTransferAnchor;
 import 'package:easysubway_mobile/features/network_map/presentation/station_fan_menu_geometry.dart'
     show kFanMenuDesignSize, kFanMenuTailTip;
+import 'package:easysubway_mobile/features/network_map/domain/route_map_design_space.dart'
+    show routeMapBasemapTransferCapsuleHalfWidthFor;
 
 void main() {
   group('fanMenuPlacement 배치 규칙(build·카메라 패닝 공유)', () {
@@ -38,7 +42,7 @@ void main() {
         ),
       );
       expect(placement.revealBounds.top, placement.top);
-      // 꼬리 팁의 뷰포트 좌표 = 앵커 노드 좌표(정중앙 접촉).
+      // 꼬리 팁의 뷰포트 좌표 = 넘겨받은 앵커점(노드 높이 2/3 지점, #2068 QA).
       final tipX =
           placement.left +
           placement.menuWidth * (kFanMenuTailTip.dx / kFanMenuDesignSize.width);
@@ -153,6 +157,208 @@ void main() {
           ),
         );
       }
+    });
+  });
+
+  group('팬 메뉴 꼬리 앵커점(#2068 QA — 노드 높이 2/3 지점)', () {
+    test('가로는 노드 중앙 그대로, 세로는 노드 상단에서 높이의 2/3', () {
+      // 노드 중심 (100,200)·높이 12 → 상단 194, 2/3 지점 = 194 + 8 = 202.
+      final anchor = fanMenuTailAnchorPoint(
+        nodeCenter: const Offset(100, 200),
+        nodeHeight: 12,
+      );
+      expect(anchor.dx, closeTo(100, 0.001));
+      expect(anchor.dy, closeTo(202, 0.001));
+      // 중심 기준으로는 항상 아래로 높이의 1/6.
+      expect(anchor.dy - 200, closeTo(12 / 6, 0.001));
+    });
+
+    test('높이 0(노드 크기 미상)이면 중심 그대로 — 회귀 안전', () {
+      final anchor = fanMenuTailAnchorPoint(
+        nodeCenter: const Offset(7, 9),
+        nodeHeight: 0,
+      );
+      expect(anchor, const Offset(7, 9));
+    });
+
+    test('일반역 노드 높이는 바탕층 심벌 지름(2×4.5 design px)을 source로 환산', () {
+      // designScale=1 → 9 design px = 9 source. 멤버 1개(=환승 아님)도 동일.
+      expect(
+        fanMenuAnchorNodeHeight(memberPositions: const [], designScale: 1),
+        closeTo(9, 0.001),
+      );
+      expect(
+        fanMenuAnchorNodeHeight(
+          memberPositions: const [Offset(3, 7)],
+          designScale: 1,
+        ),
+        closeTo(9, 0.001),
+      );
+      // designScale=2 → design px가 source 단위로 절반.
+      expect(
+        fanMenuAnchorNodeHeight(memberPositions: const [], designScale: 2),
+        closeTo(4.5, 0.001),
+      );
+    });
+
+    test('세로 캡슐은 멤버 수 기반 장축 반폭 정본(라벨 장애물과 동일)을 쓴다', () {
+      // 반폭 정본 = routeMapBasemapTransferCapsuleHalfWidthFor(n)
+      //           = max(13, (n-1)×7.5 + 9). 2멤버 → 16.5, 3멤버 → 24.
+      expect(
+        routeMapBasemapTransferCapsuleHalfWidthFor(2),
+        closeTo(16.5, 1e-9),
+      );
+      expect(routeMapBasemapTransferCapsuleHalfWidthFor(3), closeTo(24, 1e-9));
+      // spread=5 ≤ 8 → 스택(단일 캡슐), 세로 배열 → bbox 5 + 2×16.5 = 38.
+      expect(
+        fanMenuAnchorNodeHeight(
+          memberPositions: const [Offset(0, 0), Offset(0, 5)],
+          designScale: 1,
+        ),
+        closeTo(38, 0.001),
+      );
+      // 3멤버 세로(종로3가류): spread 10 → 스팬, bbox 10 + 2×24 = 58.
+      expect(
+        fanMenuAnchorNodeHeight(
+          memberPositions: const [Offset(0, 0), Offset(0, 5), Offset(0, 10)],
+          designScale: 1,
+        ),
+        closeTo(58, 0.001),
+      );
+    });
+
+    test('가로 캡슐에는 장축 하한을 세로로 적용하지 않는다 — 두께(26)만', () {
+      // bbox 세로 0 < 가로 → 장축이 가로다. 여기에 장축 하한(3멤버 24)을 세로로
+      // 쓰면 48이 되어 팁이 캡슐 밖으로 나간다(실측 캡슐 두께 반폭 8.3~11.0).
+      expect(
+        fanMenuAnchorNodeHeight(
+          memberPositions: const [Offset(0, 0), Offset(5, 0)],
+          designScale: 1,
+        ),
+        closeTo(26, 0.001),
+      );
+      expect(
+        fanMenuAnchorNodeHeight(
+          memberPositions: const [Offset(0, 0), Offset(5, 0), Offset(10, 0)],
+          designScale: 1,
+        ),
+        closeTo(26, 0.001),
+      );
+    });
+
+    test('스팬·강등 스택 구간도 단일 캡슐로 같은 식을 쓴다(모드 경계)', () {
+      // 스팬: 8 < spread(12) ≤ 16 → 단일 캡슐, 세로 → 12 + 33 = 45.
+      expect(
+        fanMenuAnchorNodeHeight(
+          memberPositions: const [Offset(0, 0), Offset(0, 12)],
+          designScale: 1,
+        ),
+        closeTo(45, 0.001),
+      );
+      // 강등 스택: 16 < spread(20) ≤ 28 → 여전히 단일 캡슐 → 20 + 33 = 53.
+      expect(
+        fanMenuAnchorNodeHeight(
+          memberPositions: const [Offset(0, 0), Offset(0, 20)],
+          designScale: 1,
+        ),
+        closeTo(53, 0.001),
+      );
+    });
+
+    test('separate(대이격)는 배지 하나가 노드 — 멤버 bbox를 쓰지 않는다', () {
+      // spread(40) > 28 → 멤버별 마커. 전체 bbox(세로 40)가 아니라 배지 두께 26.
+      expect(
+        fanMenuAnchorNodeHeight(
+          memberPositions: const [Offset(0, 0), Offset(0, 40)],
+          designScale: 1,
+        ),
+        closeTo(26, 0.001),
+      );
+    });
+
+    test('designScale이 커지면 같은 노드의 source 단위 높이는 줄어든다', () {
+      // 두 배율 모두 스택 모드를 유지하는 좌표(spread 3 → 3·6, 둘 다 ≤ 8)라
+      // 모드 전환이 아니라 스케일 환산만 측정한다.
+      const members = [Offset(0, 0), Offset(0, 3)];
+      final atOne = fanMenuAnchorNodeHeight(
+        memberPositions: members,
+        designScale: 1,
+      );
+      final atTwo = fanMenuAnchorNodeHeight(
+        memberPositions: members,
+        designScale: 2,
+      );
+      // scale 1: bbox 3 + 33 = 36 source. scale 2: design bbox 6 + 33 = 39 → 19.5.
+      expect(atOne, closeTo(36, 0.001));
+      expect(atTwo, closeTo(19.5, 0.001));
+      expect(atTwo, lessThan(atOne));
+    });
+
+    test('권역 실측 대조: 팁의 2/3 지점이 전 권역에서 실제 노드 안에 머문다', () {
+      // 오너 SVG 실측(2026-07-26, tools/route-map/route-map-defs/svg-sources의
+      // station-symbols-layer 지배 원 반경 × 권역 designScale, 캡슐 반폭은 환승
+      // shell stroke-width의 절반 × designScale). 노드 크기는 source가 아니라
+      // design px에서 권역 간 거의 일정하다 — 그래서 design px 상수를 권역
+      // designScale로 나누는 식이 전 권역에서 성립한다.
+      const regions = <String, (double, double, double?)>{
+        // 권역: (designScale, 노드 반경 design px, 환승 캡슐 두께 반폭 design px)
+        '수도권': (0.7579020051571872, 3.104, 8.92),
+        '부산권': (0.23735052795072922, 3.069, 8.82),
+        '대구권': (0.39669421487603307, 3.570, 10.97),
+        '대전권': (0.26666666666666666, 2.400, null), // 단일 노선 — 환승 없음
+        '광주권': (0.3, 2.700, 8.30),
+      };
+      for (final entry in regions.entries) {
+        final (designScale, nodeRadiusDesign, capsuleHalfDesign) = entry.value;
+        // 일반역: 중심에서 아래로 height/6. design px로 환산해 실측 반경과 비교.
+        final regularOffsetDesign =
+            fanMenuAnchorNodeHeight(
+              memberPositions: const [],
+              designScale: designScale,
+            ) /
+            6 *
+            designScale;
+        expect(
+          regularOffsetDesign,
+          lessThan(nodeRadiusDesign),
+          reason:
+              '${entry.key} 일반역: 이동 $regularOffsetDesign design px가 실측 '
+              '반경 $nodeRadiusDesign을 넘으면 팁이 노드 밖으로 나간다',
+        );
+        if (capsuleHalfDesign == null) {
+          continue;
+        }
+        // 환승 스택(멤버가 사실상 한 점): bbox 0 → 반폭만으로 높이가 정해진다.
+        final stackedOffsetDesign =
+            fanMenuAnchorNodeHeight(
+              memberPositions: const [Offset(0, 0), Offset(0, 0)],
+              designScale: designScale,
+            ) /
+            6 *
+            designScale;
+        expect(
+          stackedOffsetDesign,
+          lessThan(capsuleHalfDesign),
+          reason:
+              '${entry.key} 환승 스택: 이동 $stackedOffsetDesign design px가 실측 '
+              '캡슐 두께 반폭 $capsuleHalfDesign을 넘으면 꼬리가 캡슐 밖에 뜬다',
+        );
+      }
+    });
+
+    test('앵커점은 노드 중심보다 아래(꼬리 팁이 노드 하단쪽 2/3에 닿는다)', () {
+      const center = Offset(120, 340);
+      final height = fanMenuAnchorNodeHeight(
+        memberPositions: const [],
+        designScale: 1,
+      );
+      final anchor = fanMenuTailAnchorPoint(
+        nodeCenter: center,
+        nodeHeight: height,
+      );
+      expect(anchor.dx, closeTo(center.dx, 0.001));
+      expect(anchor.dy, greaterThan(center.dy));
+      expect(anchor.dy, closeTo(center.dy + 1.5, 0.001));
     });
   });
 
