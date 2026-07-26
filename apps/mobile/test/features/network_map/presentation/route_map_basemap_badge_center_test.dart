@@ -27,7 +27,7 @@ import '../../../support/pretendard_test_font.dart';
 // viewBox). translate는 소스 SVG에서 직접 파싱해 좌표가 바뀌어도 게이트가 따라간다.
 ({double tx, double ty}) _seoulScaleLayerTranslate() {
   final svg = File(
-    '../../tools/route-map/route-map-defs/svg-sources/easy-subway-sma-v2.svg',
+    '../../tools/route-map/route-map-defs/svg-sources/easy-subway-sma-v4.svg',
   ).readAsStringSync();
   final groupMatch = RegExp(
     r'<g\b(?=[^>]*\bid="main-map-scaled-layer")(?=[^>]*\btransform="([^"]+)")[^>]*>',
@@ -58,6 +58,7 @@ class _OwnerChip {
     this.capHalfWLocal,
     this.capHalfHLocal,
     this.fontRender,
+    this.inkHeightRatio,
   );
   final String label;
   final double cx; // scale-레이어 로컬(캡슐 중심)
@@ -65,16 +66,29 @@ class _OwnerChip {
   final double capHalfWLocal; // = rect.w/2 × 그룹 스케일 (로컬 단위)
   final double capHalfHLocal; // = rect.h/2 × 그룹 스케일 (로컬 단위)
   final double fontRender; // 렌더 fontSize
+  /// 잉크 높이 / [fontRender]. 글리프 집합에 따른 실측 비율(숫자 "1"·"9"는
+  /// 0.73~0.75, 한글 "신분당"은 0.91 — 한글이 세로로 더 꽉 찬다).
+  /// 오너가 칩 크기를 바꾸면 fontRender와 함께 이 값도 재실측해 갱신한다.
+  final double inkHeightRatio;
 }
 
 const double _k = 0.455; // 수도권 scale 레이어 배율.
 
 // 대표 칩 3개: 단자리 숫자(신창 1·개화 9)와 다자 캡슐(광교 신분당). 글자 fill 전부
 // #FFFFFF. 값은 오너 SVG 칩 transform 실측(foldTerminalChipScale 경로).
+//
+// #2068 오너 v4(2026-07-25) 재실측: 오너가 칩 그룹 배치를
+// `translate(...) scale(2.198) translate(...)` 에서 `matrix(2.7475,0,0,2.7475,e,f)`
+// 로 바꿨다 — 그룹 스케일 s가 2.198→2.7475로 커졌다(캡슐 rect 로컬 크기
+// 30×23·48×23과 로컬 font-size 10.5는 불변). 아래 상수는 전부 s에서 파생된
+// 실측값이라 함께 갱신한다(게이트 임계 0.15·폭 여유는 불변):
+//   capHalfW/H = rect 반폭·반높이 × s, fontRender = 10.5 × s × k.
+//   cx/cy = 칩 transform 적용 후 rect 중심(scale-레이어 로컬) — 신창·개화는
+//   v2와 같은 자리, 광교는 캡슐이 넓어지며 중심이 31.5px 좌측으로 옮겨졌다.
 const _ownerChips = <_OwnerChip>[
-  _OwnerChip('신창(1)', 6150.1831, 4417.5466, 32.970, 25.277, 10.5009),
-  _OwnerChip('개화(9)', -138.3960, 634.7050, 32.970, 25.277, 10.5009),
-  _OwnerChip('광교(신분당)', 2478.9530, 3472.6850, 52.752, 25.277, 10.5009),
+  _OwnerChip('신창(1)', 6150.1812, 4417.5457, 41.212, 31.596, 13.1262, 0.733),
+  _OwnerChip('개화(9)', -138.3960, 634.7052, 41.212, 31.596, 13.1262, 0.752),
+  _OwnerChip('광교(신분당)', 2447.4280, 3472.1745, 65.940, 31.596, 13.1262, 0.914),
 ];
 
 // 마곡 환승 배지(반전, 오너 원본 구조 transform="scale(-1)"). #2068 회귀 가드 유지.
@@ -141,7 +155,7 @@ void main() {
           format: ui.ImageByteFormat.rawRgba,
         ))!.buffer.asUint8List();
         double sy = 0;
-        int cnt = 0, minX = w, maxX = -1;
+        int cnt = 0, minX = w, maxX = -1, minY = h, maxY = -1;
         for (int py = 0; py < h; py++) {
           for (int px = 0; px < w; px++) {
             final o = (py * w + px) * 4;
@@ -150,6 +164,8 @@ void main() {
               cnt++;
               minX = math.min(minX, px);
               maxX = math.max(maxX, px);
+              minY = math.min(minY, py);
+              maxY = math.max(maxY, py);
             }
           }
         }
@@ -182,6 +198,26 @@ void main() {
           failures.add(
             '${c.label}: 글자가 캡슐 폭 초과 '
             '(${overflowX.toStringAsFixed(1)}px)',
+          );
+        }
+        // #2068 오너 디자인 보존 축: 렌더 글자 **크기**를 직접 고정한다.
+        // 중심 정렬 비율만 보면 글자가 통째로 축소·확대돼도(예: 맵 스케일 k를
+        // 이중 적용해 0.455배) 게이트가 통과한다 — 실제로 v4에서 칩 글자가
+        // 1.25배 부푼 채 ratio만 어긋났다. 잉크 높이를 오너 의도 렌더
+        // fontSize(L×s×k = fontRender)에 대한 비율로 묶어 두 방향 모두 막는다.
+        final inkHeight = (maxY - minY) / s;
+        final inkRatio = inkHeight / c.fontRender;
+        // ignore: avoid_print
+        print(
+          '[owner-chip-size] ${c.label}: inkHeight=${inkHeight.toStringAsFixed(2)} '
+          'fontRender=${c.fontRender.toStringAsFixed(3)} '
+          'ratio=${inkRatio.toStringAsFixed(3)} (기대 ${c.inkHeightRatio} ±0.10)',
+        );
+        if ((inkRatio - c.inkHeightRatio).abs() > 0.10) {
+          failures.add(
+            '${c.label}: 렌더 글자 크기 이탈 — 잉크 높이/의도 fontSize='
+            '${inkRatio.toStringAsFixed(3)} (기대 ${c.inkHeightRatio} ±0.10). '
+            '오너 의도 렌더 fontSize=${c.fontRender.toStringAsFixed(3)}',
           );
         }
       }
