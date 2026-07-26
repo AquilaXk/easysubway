@@ -373,23 +373,6 @@ class RouteSearchController {
 		}
 	}
 
-	/**
-	 * 응답에 실을 leg 계단 판정(#2590 정직성 제약). {@link StairAccess#ofStep(RouteStep)}은
-	 * #2560 태깅 술어와 같은 계단 사실만 보므로, 여기서 데이터 신뢰도 축을 겹쳐 한 단계 내린다.
-	 *
-	 * <p>{@code unverifiedItinerary}는 경로 단위 신뢰도 경고다. 특정 leg에 매달 수 없는
-	 * 신호지만 모든 leg에 내려 주지 않으면 leg 판정이 경로 판정보다 강하게 단언하게 되고,
-	 * 경로 판정을 잃은 화면(폴백·스냅샷)이 그 강한 값을 그대로 표시한다.
-	 *
-	 * <p>{@code stairAccessState}의 {@code UNKNOWN}은 판정이 아니라 미확인 원자료라
-	 * {@code requiresAccessibilityCheck}와 어긋난 스텝이 무단차로 새지 않게 함께 막는다.
-	 * 승차 구간은 {@link StairAccess#NOT_APPLICABLE}이라 이 강등에 걸리지 않는다.
-	 */
-	private static StairAccess legStairAccess(RouteStep step, boolean unverifiedItinerary) {
-		return StairAccess.ofStep(step)
-			.demotedIfUnverified(unverifiedItinerary || "UNKNOWN".equals(step.stairAccessState()));
-	}
-
 	private record ItineraryDto(
 		String itineraryId,
 		String status,
@@ -409,9 +392,7 @@ class RouteSearchController {
 	) {
 
 		private static ItineraryDto from(RouteSearchResult result, OffsetDateTime departureTime, String mobilityPreset) {
-			boolean unverifiedItinerary = StairAccess.hasUnverifiedEvidence(result.warnings());
-			List<LegDto> legs = LegDto.fromSteps(
-				result.steps(), departureTime, result.mobilityType(), mobilityPreset, unverifiedItinerary);
+			List<LegDto> legs = LegDto.fromSteps(result.steps(), departureTime, result.mobilityType(), mobilityPreset);
 			OffsetDateTime plannedArrivalTime = legs.isEmpty()
 				? departureTime
 				: OffsetDateTime.parse(legs.getLast().plannedArrivalTime());
@@ -432,31 +413,8 @@ class RouteSearchController {
 				OfficialFareDto.from(result.officialFare()),
 				legs,
 				false,
-				itineraryStairAccess(result, legs, unverifiedItinerary).name()
+				StairAccess.ofItineraryDisplay(result).name()
 			);
-		}
-
-		/**
-		 * leg 판정을 접어 올려 경로 판정을 만든다. 여기에 겹치는 두 신호는 어느 leg에도
-		 * 매달 수 없는 경로 단위 신호다 — 계단 경고와, 계단 장벽을 질 수 있는 leg가 하나도
-		 * 없는 경로의 신뢰도 강등. 그래서 경로 판정은 leg를 접은 값보다 결코 덜 신중하지 않다.
-		 *
-		 * <p>leg가 하나도 없으면 무단차라 말할 근거 자체가 없으므로 fail closed로 멈춘다.
-		 * 모바일 폴백(`_routeStairAccessFromSteps`)의 빈 목록 규칙과 같은 판단이다.
-		 * #2560 태깅 술어({@link StairAccess#ofItinerary})는 후보 집합을 흔들지 않도록
-		 * 종전 규칙을 유지하며, 그 갈래는 완결성 계약상 응답에 실릴 수 없다.
-		 */
-		private static StairAccess itineraryStairAccess(
-			RouteSearchResult result,
-			List<LegDto> legs,
-			boolean unverifiedItinerary
-		) {
-			StairAccess folded = legs.isEmpty()
-				? StairAccess.UNKNOWN
-				: StairAccess.ofStepJudgments(legs.stream().map(leg -> StairAccess.valueOf(leg.stairAccess())).toList());
-			return folded
-				.merge(StairAccess.ofWarnings(result.warnings()))
-				.demotedIfUnverified(unverifiedItinerary);
 		}
 
 		private static String statusOf(RouteSearchResult result) {
@@ -676,8 +634,7 @@ class RouteSearchController {
 			List<RouteStep> steps,
 			OffsetDateTime departureTime,
 			MobilityType mobilityType,
-			String mobilityPreset,
-			boolean unverifiedItinerary
+			String mobilityPreset
 		) {
 			List<LegDto> legs = new ArrayList<>();
 			OffsetDateTime cursor = departureTime;
@@ -693,7 +650,7 @@ class RouteSearchController {
 					: OffsetDateTime.parse(step.plannedArrivalTime());
 				durationSeconds = Math.toIntExact(Duration.between(plannedDepartureTime, plannedArrivalTime).toSeconds());
 				legs.add(from(step, legType, plannedDepartureTime, plannedArrivalTime, durationSeconds, slackSeconds,
-					mobilityPreset, unverifiedItinerary));
+					mobilityPreset));
 				cursor = plannedArrivalTime;
 			}
 			return List.copyOf(legs);
@@ -706,8 +663,7 @@ class RouteSearchController {
 			OffsetDateTime plannedArrivalTime,
 			int durationSeconds,
 			int slackSeconds,
-			String mobilityPreset,
-			boolean unverifiedItinerary
+			String mobilityPreset
 		) {
 			boolean hasTimetableWait = "TIMETABLE".equals(step.distanceSource()) && !"exit".equals(step.stepType());
 			int walkSeconds = walkSeconds(step, legType, durationSeconds, hasTimetableWait);
@@ -741,7 +697,7 @@ class RouteSearchController {
 				step.gatewayReceivedAt(),
 				step.servedAt(),
 				AccessibilityRiskDto.from(step),
-				legStairAccess(step, unverifiedItinerary).name()
+				StairAccess.ofStep(step).name()
 			);
 		}
 

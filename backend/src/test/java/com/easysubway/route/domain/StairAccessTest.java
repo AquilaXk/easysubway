@@ -119,6 +119,69 @@ class StairAccessTest {
 	}
 
 	@Nested
+	@DisplayName("표시용 경로 판정")
+	class DisplayJudgment {
+
+		@Test
+		@DisplayName("데이터 신뢰도 경고가 있으면 무단차로 단언하지 않는다")
+		void dataConfidenceWarningsDemoteDisplayJudgment() {
+			List<RouteStep> steps = List.of(transitionStep(false, true), rideStep());
+
+			assertThat(StairAccess.ofItineraryDisplay(itinerary(steps, warningsOnly()))).isEqualTo(StairAccess.UNKNOWN);
+		}
+
+		@Test
+		@DisplayName("신뢰도 경고는 계단 사실을 뒤집지 않는다")
+		void dataConfidenceWarningsKeepStairOnly() {
+			List<RouteStep> steps = List.of(transitionStep(true, true), rideStep());
+
+			assertThat(StairAccess.ofItineraryDisplay(itinerary(steps, warningsOnly()))).isEqualTo(StairAccess.STAIR_ONLY);
+		}
+
+		@Test
+		@DisplayName("스텝이 없으면 무단차라 말할 근거가 없어 UNKNOWN이다")
+		void emptyItineraryFailsClosed() {
+			assertThat(StairAccess.ofItineraryDisplay(itinerary(List.of(), List.of()))).isEqualTo(StairAccess.UNKNOWN);
+			// 태깅 술어는 후보 집합을 흔들지 않도록 종전 결론을 유지한다.
+			assertThat(StairAccess.ofItinerary(itinerary(List.of(), List.of()))).isEqualTo(StairAccess.STEP_FREE);
+		}
+
+		@Test
+		@DisplayName("스텝 판정을 접은 값보다 덜 신중해지지 않는다")
+		void isNeverLessCautiousThanFoldedSteps() {
+			List<List<RouteStep>> stepCases = List.of(
+				List.of(rideStep()),
+				List.of(transitionStep(false, true), rideStep(), transitionStep(false, true)),
+				List.of(transitionStep(false, false), rideStep(), transitionStep(false, true)),
+				List.of(transitionStep(true, true), rideStep(), transitionStep(false, true))
+			);
+
+			for (List<RouteStep> steps : stepCases) {
+				for (List<RouteWarning> warnings : List.of(
+					List.<RouteWarning>of(),
+					warningsOnly(),
+					List.of(new RouteWarning(RouteWarningCode.STAIR_ONLY_ACCESS))
+				)) {
+					StairAccess folded = StairAccess.ofStepJudgments(steps.stream().map(StairAccess::ofStep).toList());
+					StairAccess judged = StairAccess.ofItineraryDisplay(itinerary(steps, warnings));
+
+					assertThat(judged.merge(folded)).as("%s / %s", steps, warnings).isEqualTo(judged);
+				}
+			}
+		}
+
+		@Test
+		@DisplayName("검증된 구간의 판정은 경로 단위 경고에 흔들리지 않는다")
+		void stepJudgmentIgnoresItineraryWarnings() {
+			RouteStep verified = transitionStep(false, true);
+
+			assertThat(StairAccess.ofStep(verified)).isEqualTo(StairAccess.STEP_FREE);
+			assertThat(StairAccess.ofItineraryDisplay(itinerary(List.of(verified, rideStep()), warningsOnly())))
+				.isEqualTo(StairAccess.UNKNOWN);
+		}
+	}
+
+	@Nested
 	@DisplayName("#2560 태깅 술어 동치")
 	class TaggingPredicateEquivalence {
 

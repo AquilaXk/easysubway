@@ -10,15 +10,17 @@ import java.util.List;
  * 적힌다. 그 값을 표시 계층이 다시 판정하면 "확인해 봤더니 미상"과 "애초에 계단 개념이
  * 없음"이 한 토큰으로 뭉개진다. 판정은 여기서만 하고 결과를 응답에 실어 보낸다.
  *
- * <p><b>leg 판정과 경로 판정의 관계</b> — 경로 판정은 leg 판정을 접어 올린 값에,
- * 어느 leg에도 매달 수 없는 경로 단위 신호({@link #ofWarnings(List)})를 겹친 것이다.
- * 겹치는 연산이 {@link #merge(StairAccess)}와 {@link #demotedIfUnverified(boolean)}뿐이고
- * 둘 다 신중함을 낮추지 않으므로, <b>경로 판정은 leg 판정을 접은 값보다 결코 덜 신중하지
- * 않다.</b> 반대로 완전한 일치는 성립하지 않는다 — 계단 개념이 적용되지 않는 구간은
- * 미확인이 될 수 없어(정의상 {@link #NOT_APPLICABLE}) 경로 단위 신뢰도 경고를 대신
- * 짊어질 leg가 없기 때문이다. 표시 계층이 leg를 접어 경로 판정을 복원하는 것은 판정
- * 필드가 없는 응답에서의 폴백일 뿐이며, 그 폴백이 경로 판정보다 강하게 단언할 수 있는
- * 경우는 "계단 장벽을 질 수 있는 leg가 하나도 없는 경로"뿐이다.
+ * <p><b>leg 판정과 경로 판정은 같은 값이 아니며, 일치를 계약으로 두지 않는다.</b> leg 판정
+ * ({@link #ofStep(RouteStep)})은 그 구간 자신의 계단 사실만 담는다. 경로 판정
+ * ({@link #ofItineraryDisplay(RouteSearchResult)})은 거기에 어느 구간에도 매달 수 없는 경로
+ * 단위 신호 — 계단 경고({@link #ofWarnings(List)})와 데이터 신뢰도 경고
+ * ({@link #hasUnverifiedEvidence(List)}) — 를 겹치므로 leg를 접은 값보다 더 신중할 수 있다.
+ * 그 차이가 의도다. 경로 단위 신호를 leg마다 복제하면 그 신호와 무관하게 검증된 구간까지
+ * 미확인으로 뒤집혀, 실제로 확인한 사실을 잃는다.
+ *
+ * <p>표시 계층은 경로 판정이 응답에 실려 있으면 그 값을 쓴다. leg를 접어 경로 판정을 흉내
+ * 내는 것은 판정 필드가 없는 응답(레거시 백엔드·기기 내 로컬 경로)에서의 폴백이며, 그 경우
+ * 승차 leg가 원자료상 미확인으로 잡혀 fail closed로 떨어진다.
  */
 public enum StairAccess {
 
@@ -67,6 +69,25 @@ public enum StairAccess {
 	}
 
 	/**
+	 * 응답에 실어 화면이 표시할 경로 판정. 태깅 술어({@link #ofItinerary})에 데이터 신뢰도 축을
+	 * 겹친 값이다 — 후보 집합은 계단 사실만으로 정해야 하지만(#2560), 사용자에게 말할 때는
+	 * "확인하지 못했다"를 감출 수 없다.
+	 *
+	 * <p>스텝이 하나도 없으면(접근성 차단 결과) 무단차라 말할 근거 자체가 없으므로 접는 값을
+	 * {@link #UNKNOWN}으로 둔다. 계단 경고는 그때도 경로 단위 사실이라 그대로 겹친다.
+	 * {@link #ofStepJudgments(List)}의 빈 목록은 태깅 술어의 종전 결론을 유지하려 {@link #STEP_FREE}로
+	 * 남겨 두었고, 그 갈래는 완결성 계약상 응답에 실리지 않는다.
+	 */
+	public static StairAccess ofItineraryDisplay(RouteSearchResult itinerary) {
+		StairAccess folded = itinerary.steps().isEmpty()
+			? UNKNOWN
+			: ofStepJudgments(itinerary.steps().stream().map(StairAccess::ofStep).toList());
+		return folded
+			.merge(ofWarnings(itinerary.warnings()))
+			.demotedIfUnverified(hasUnverifiedEvidence(itinerary.warnings()));
+	}
+
+	/**
 	 * 스텝 판정들을 경로 판정으로 접는다. 모든 스텝이 {@link #NOT_APPLICABLE}이면 계단
 	 * 장벽이 놓인 구간이 하나도 없다는 뜻이므로 {@link #STEP_FREE}로 확정한다.
 	 */
@@ -99,8 +120,8 @@ public enum StairAccess {
 	}
 
 	/**
-	 * 확인되지 않은 근거가 붙은 구간을 무단차로 단언하지 않는다(정직 사다리). 계단 개념이
-	 * 적용되지 않는 구간은 미확인이 될 수 없으므로 그대로 둔다.
+	 * 확인되지 않은 근거가 붙었으면 무단차 단언을 거둔다(정직 사다리). 계단이 있다는 판정은
+	 * 신뢰도와 축이 다른 사실이라 흔들지 않는다.
 	 */
 	public StairAccess demotedIfUnverified(boolean unverifiedEvidence) {
 		return this == STEP_FREE && unverifiedEvidence ? UNKNOWN : this;
