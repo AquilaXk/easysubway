@@ -70,6 +70,18 @@
     ],
     "contractTest": "tools/route-map/route-map-license-decision.test.mjs"
   },
+  "retiredStaleArtifacts": {
+    "decidedAt": "2026-07-26",
+    "issue": 2571,
+    "note": "[2026-07-26 #2571] 구버전 SVG 폐기와 같은 라운드에서 걷어낸 stale 자산의 폐기 기록이다. priorVersionSvgRetentionPolicy가 SVG 계열만 다루므로 성격이 다른 항목은 여기에 남긴다. 기록이 없으면 같은 파일이 조용히 다시 커밋돼도 아무도 알아채지 못하므로, 아래 항목의 부재를 계약 테스트가 고정한다.",
+    "items": [
+      {
+        "path": "apps/mobile/assets/datapacks/metro_map_pack/SHA256SUMS.txt",
+        "reason": "기록 8행 중 7행이 실제 해시와 불일치한 채였고(SOURCE_URLS.txt 1행만 일치), 저장소에 생성 스크립트도 읽는 게이트도 없었다. pubspec asset 등재만 있어 stale 해시가 그대로 디바이스로 배포됐다. 검증 경로 없는 수동 재계산 대신 폐기했다. 번들 자산 무결성이 다시 필요하면 생성기와 게이트를 함께 신설한다 — 게이트 없는 체크섬 파일은 재유입 금지."
+      }
+    ],
+    "contractTest": "tools/route-map/route-map-license-decision.test.mjs"
+  },
   "regions": [
     {
       "id": "seoul",

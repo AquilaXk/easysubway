@@ -357,25 +357,29 @@ test("구버전 SVG 보관 조항 폐기 — svg-sources에 권역별 정본만 
       .sort(),
   );
 
-  // 작업 트리 실측 — svg-sources에는 정본만 존재한다.
-  const sourcesDir = path.join(
-    root,
-    "tools/route-map/route-map-defs/svg-sources",
-  );
+  // 작업 트리 실측 — route-map-defs 하위 전체를 재귀로 훑는다. 1단 목록만 보면
+  // svg-sources/archive/ 같은 하위 디렉터리나 defs 루트로 구버전이 다시 들어와도
+  // green이 된다. 확장자는 대소문자를 가리지 않는다(.SVG 회피 차단).
+  const defsDir = path.join(root, "tools/route-map/route-map-defs");
+  const defsEntries = readdirSync(defsDir, { recursive: true }).map(String);
+  const byExtension = (extension) =>
+    defsEntries
+      .filter((entry) => entry.toLowerCase().endsWith(extension))
+      .map((entry) => path.basename(entry))
+      .sort();
+
   assert.deepEqual(
-    readdirSync(sourcesDir).filter((name) => name.endsWith(".svg")).sort(),
+    byExtension(".svg"),
     [...policy.canonicalSvgs].sort(),
-    "svg-sources에 정본이 아닌 SVG가 있습니다 — 구버전은 git 히스토리로만 보관합니다(#2571).",
+    "route-map-defs에 정본이 아닌 SVG가 있습니다 — 구버전은 git 히스토리로만 보관합니다(#2571).",
   );
 
-  // 파생 추출 JSON도 정본에서 나온 것만 남는다.
-  const defsDir = path.join(root, "tools/route-map/route-map-defs");
+  // 파생 추출 JSON도 정본에서 나온 것만 남는다. 이름 접두사(easy-subway-)에
+  // 기대지 않고 -geometry.json 전수를 정본 파생 목록과 대조한다.
   assert.deepEqual(
-    readdirSync(defsDir)
-      .filter((name) => /^easy-subway-.*-geometry\.json$/.test(name))
-      .sort(),
+    byExtension("-geometry.json"),
     policy.canonicalSvgs
-      .map((svg) => svg.replace(/\.svg$/, "-geometry.json"))
+      .map((svg) => svg.replace(/\.svg$/i, "-geometry.json"))
       .sort(),
     "정본이 아닌 SVG의 추출 JSON이 남아 있습니다(#2571).",
   );
@@ -385,6 +389,44 @@ test("구버전 SVG 보관 조항 폐기 — svg-sources에 권역별 정본만 
     assert.ok(
       !existsSync(path.join(root, relativePath)),
       `${relativePath}는 #2571로 삭제됐어야 합니다.`,
+    );
+  }
+});
+
+// [2026-07-26 #2571] stale SHA256SUMS.txt 폐기. 구버전 SVG와 달리 이 파일은
+// 생성기도 읽는 게이트도 없이 pubspec asset 등재만으로 배포됐고, 기록 8행 중
+// 7행이 실제 해시와 어긋나 있었다. 폐기 사실을 기록만 해 두면 같은 파일이 다시
+// 커밋돼도 아무도 모르므로 부재를 여기서 고정한다.
+test("stale 자산 폐기 기록의 파일이 저장소에 없다(#2571)", () => {
+  const decision = readJson("tools/route-map/route-map-license-decision.json");
+  const retired = decision.retiredStaleArtifacts;
+
+  assert.equal(retired.decidedAt, "2026-07-26");
+  assert.equal(retired.issue, 2571);
+  assert.equal(
+    retired.contractTest,
+    "tools/route-map/route-map-license-decision.test.mjs",
+  );
+  assert.ok(retired.items.length > 0, "폐기 기록이 비어 있습니다.");
+
+  for (const item of retired.items) {
+    assert.ok(
+      typeof item.reason === "string" && item.reason.length > 0,
+      `${item.path}: 폐기 사유가 필요합니다.`,
+    );
+    assert.ok(
+      !existsSync(path.join(root, item.path)),
+      `${item.path}는 #2571로 폐기됐어야 합니다 — 재유입이라면 생성기와 검증 게이트를 함께 신설하고 이 기록을 갱신하세요.`,
+    );
+  }
+
+  // pubspec asset 등재도 함께 걷혔는지 확인한다(등재가 남으면 flutter 빌드가 깨진다).
+  const pubspec = readFileSync(path.join(root, "apps/mobile/pubspec.yaml"), "utf8");
+  for (const item of retired.items) {
+    const assetPath = item.path.replace(/^apps\/mobile\//, "");
+    assert.ok(
+      !pubspec.includes(assetPath),
+      `${assetPath}가 pubspec.yaml assets에 남아 있습니다.`,
     );
   }
 });

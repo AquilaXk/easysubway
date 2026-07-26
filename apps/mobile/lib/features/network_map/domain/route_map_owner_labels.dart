@@ -182,5 +182,11 @@ routeMapOwnerLabelsByRegionFrom(String sidecarJson) {
 
 /// basemap 모드 sidecar asset 경로. metro_map_pack/basemap/는 pubspec.yaml에
 /// 디렉터리째 등록돼 있어 별도 자산 선언이 필요 없다.
+///
+/// 이 sidecar의 최상위 `serviceTagObstacles` 블록은 **소비처가 없다**. 유일
+/// 소비처였던 라벨 솔버 basemap 분기가 #2577에서 사라지면서 Dart 쪽 파서·모델을
+/// #2571로 제거했고, 생산자(compile-basemap-vec.mjs)와 sidecar 필드는 남아 있어
+/// 지금도 배포 payload에 실린다. 살아 있는 계약이 아니므로 새 코드가 이 필드를
+/// 승계하지 않는다 — 스키마 제거는 schemaVersion 정책과 함께 #2571 m12에서 다룬다.
 const String kRouteMapOwnerLabelsAssetPath =
     'assets/datapacks/metro_map_pack/basemap/labels.json';
