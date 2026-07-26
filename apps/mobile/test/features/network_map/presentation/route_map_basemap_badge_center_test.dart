@@ -1,9 +1,9 @@
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vector_graphics_codec/vector_graphics_codec.dart';
+
+import '../../../support/basemap_vec_text_draws.dart';
 
 // #2068 오너 종점 칩 **글자 크기·앵커** 게이트(컴파일 seoul.vec 직접 대조).
 //
@@ -307,7 +307,9 @@ bool _matchesCompound(
   ({String? tag, String? id, List<String> classes}) compound,
 ) {
   if (compound.tag != null && compound.tag != node.name) return false;
-  if (compound.id != null && _attr(node.attrs, 'id') != compound.id) return false;
+  if (compound.id != null && _attr(node.attrs, 'id') != compound.id) {
+    return false;
+  }
   if (compound.classes.isEmpty) return true;
   final classes = (_attr(node.attrs, 'class') ?? '')
       .split(RegExp(r'\s+'))
@@ -440,214 +442,6 @@ List<_Expectation> _expectationsFrom(
   return results;
 }
 
-// ── .vec 디코드(텍스트 위치 + fontSize) ──────────────────────────────────────
-
-class _VecTextDraw {
-  _VecTextDraw(this.text, this.x, this.y, this.fontSize);
-
-  final String text;
-  final double x;
-  final double y;
-  final double fontSize;
-  bool claimed = false;
-}
-
-class _TextPositionRecord {
-  _TextPositionRecord(
-    this.x,
-    this.y,
-    this.dx,
-    this.dy,
-    this.reset,
-    this.transform,
-  );
-
-  final double? x;
-  final double? y;
-  final double? dx;
-  final double? dy;
-  final bool reset;
-  final Float64List? transform;
-}
-
-class _VecTextListener extends VectorGraphicsCodecListener {
-  final List<_TextPositionRecord> _positions = <_TextPositionRecord>[];
-  final Map<int, ({String text, double fontSize})> _texts =
-      <int, ({String text, double fontSize})>{};
-  final List<_VecTextDraw> draws = <_VecTextDraw>[];
-
-  double? _penX;
-  double _penY = 0;
-  Float64List? _transform;
-
-  @override
-  void onTextPosition(
-    int textPositionId,
-    double? x,
-    double? y,
-    double? dx,
-    double? dy,
-    bool reset,
-    Float64List? transform,
-  ) {
-    _positions.add(_TextPositionRecord(x, y, dx, dy, reset, transform));
-  }
-
-  @override
-  void onUpdateTextPosition(int textPositionId) {
-    final position = _positions[textPositionId];
-    if (position.reset) {
-      _penX = 0;
-      _penY = 0;
-    }
-    if (position.x != null) _penX = position.x;
-    if (position.y != null) _penY = position.y!;
-    if (position.dx != null) _penX = (_penX ?? 0) + position.dx!;
-    if (position.dy != null) _penY = _penY + position.dy!;
-    _transform = position.transform;
-  }
-
-  @override
-  void onTextConfig(
-    String text,
-    String? fontFamily,
-    double xAnchorMultiplier,
-    int fontWeight,
-    double fontSize,
-    int decoration,
-    int decorationStyle,
-    int decorationColor,
-    int id,
-  ) {
-    _texts[id] = (text: text, fontSize: fontSize);
-  }
-
-  @override
-  void onDrawText(int textId, int? fillId, int? strokeId, int? patternId) {
-    var x = _penX ?? 0;
-    var y = _penY;
-    final transform = _transform;
-    if (transform != null) {
-      // 런타임은 그리기 직전 canvas.transform(4x4 열 우선)을 적용한다.
-      final tx = transform[0] * x + transform[4] * y + transform[12];
-      final ty = transform[1] * x + transform[5] * y + transform[13];
-      x = tx;
-      y = ty;
-    }
-    final config = _texts[textId];
-    draws.add(
-      _VecTextDraw(config?.text ?? '', x, y, config?.fontSize ?? double.nan),
-    );
-  }
-
-  // ── 대조에 쓰지 않는 명령 ──────────────────────────────────────────────────
-  @override
-  void onSize(double width, double height) {}
-  @override
-  void onPaintObject({
-    required int color,
-    required int? strokeCap,
-    required int? strokeJoin,
-    required int blendMode,
-    required double? strokeMiterLimit,
-    required double? strokeWidth,
-    required int paintStyle,
-    required int id,
-    required int? shaderId,
-  }) {}
-  @override
-  void onPathStart(int id, int fillType) {}
-  @override
-  void onPathMoveTo(double x, double y) {}
-  @override
-  void onPathLineTo(double x, double y) {}
-  @override
-  void onPathCubicTo(
-    double x1,
-    double y1,
-    double x2,
-    double y2,
-    double x3,
-    double y3,
-  ) {}
-  @override
-  void onPathClose() {}
-  @override
-  void onPathFinished() {}
-  @override
-  void onDrawPath(int pathId, int? paintId, int? patternId) {}
-  @override
-  void onDrawVertices(
-    Float32List vertices,
-    Uint16List? indices,
-    int? paintId,
-  ) {}
-  @override
-  void onSaveLayer(int paintId) {}
-  @override
-  void onClipPath(int pathId) {}
-  @override
-  void onRestoreLayer() {}
-  @override
-  void onMask() {}
-  @override
-  void onRadialGradient(
-    double centerX,
-    double centerY,
-    double radius,
-    double? focalX,
-    double? focalY,
-    Int32List colors,
-    Float32List? offsets,
-    Float64List? transform,
-    int tileMode,
-    int id,
-  ) {}
-  @override
-  void onLinearGradient(
-    double fromX,
-    double fromY,
-    double toX,
-    double toY,
-    Int32List colors,
-    Float32List? offsets,
-    int tileMode,
-    int id,
-  ) {}
-  @override
-  void onImage(
-    int imageId,
-    int format,
-    Uint8List data, {
-    VectorGraphicsErrorListener? onError,
-  }) {}
-  @override
-  void onDrawImage(
-    int imageId,
-    double x,
-    double y,
-    double width,
-    double height,
-    Float64List? transform,
-  ) {}
-  @override
-  void onPatternStart(
-    int patternId,
-    double x,
-    double y,
-    double width,
-    double height,
-    Float64List transform,
-  ) {}
-}
-
-List<_VecTextDraw> _vecTextDraws(String path) {
-  final bytes = File(path).readAsBytesSync();
-  final listener = _VecTextListener();
-  const VectorGraphicsCodec().decode(ByteData.sublistView(bytes), listener);
-  return listener.draws;
-}
-
 void main() {
   test('#2068 오너 종점 칩 글자 크기·앵커가 오너 SVG 값과 일치한다', () {
     final svg = File(_svgPath).readAsStringSync();
@@ -663,7 +457,7 @@ void main() {
       reason: '$_chipLayerId에서 칩 텍스트를 하나도 못 읽었다 — 게이트 파서가 죽었다',
     );
 
-    final draws = _vecTextDraws(_vecPath);
+    final draws = basemapVecTextDraws(_vecPath);
     final failures = <String>[];
     var worstFontDelta = 0.0;
     var worstAnchorDelta = 0.0;
