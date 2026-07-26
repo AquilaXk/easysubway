@@ -230,9 +230,10 @@ void main() {
       });
     }
 
-    test('모든 권역이 실측 최악 구간(0.16) 대비 위치를 유지한다', () {
-      // 종전 하한 0.08은 최악 구간보다 한참 아래였다. 부산만 아직 아래이며
-      // 그 간극은 route_map_min_scale.dart 상단에 #2600 후속으로 명시돼 있다.
+    test('모든 권역 하한이 종전 0.08보다 위다', () {
+      // 실측 최악 구간(0.16)까지 올라갔는지는 여기서 보지 않는다 — 부산은 실제로
+      // 그 아래이며, 그 간극은 route_map_min_scale.dart 상단에 #2600 후속으로
+      // 명시돼 있다.
       for (final fixture in _fixtures) {
         expect(fixture.expectedFloor, greaterThan(0.08));
       }
@@ -278,14 +279,15 @@ void main() {
 
   group('(3) 기존 카메라 계약', () {
     for (final fixture in _fixtures) {
-      test('${fixture.region}: 초기 가독 배율이 하한보다 커서 첫 화면이 안 변한다', () {
-        // 하한이 초기 배율보다 커지면 앱을 열자마자 더 확대된 화면이 뜬다 —
-        // 이번 변경은 축소 여지만 줄이고 첫 화면은 건드리지 않는다. sidecar가
-        // 아직 없어 초기 배율이 더 낮은 프레임은 (6) 그룹이 따로 본다.
+      test('${fixture.region}: fixture 전제 — 초기 가독 배율 > 하한', () {
+        // 카메라를 만들지 않고 실측 상수 두 개만 비교한다. sidecar가 붙은 정상
+        // 상태에서 하한이 첫 화면을 밀어올리지 않는다는 **전제**를 고정하는 것이
+        // 목적이며, 실제 첫 화면이 안 변하는지는 (5)·(6) 위젯 그룹이 마운트해서
+        // 본다.
         expect(
           fixture.readableInitialScale,
           greaterThan(fixture.expectedFloor),
-          reason: '${fixture.region}: 하한이 초기 화면을 밀어올린다',
+          reason: '${fixture.region}: 하한이 초기 가독 배율보다 크다',
         );
       });
 
