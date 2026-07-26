@@ -297,7 +297,9 @@ void main() {
     expect(result.steps.first.stepType, 'entry');
     expect(result.steps.first.includesStairs, isFalse);
     expect(result.steps.first.requiresAccessibilityCheck, isTrue);
-    expect(result.steps.first.burdenLabel, '약 4분 · 180m · 엘리베이터 안내 미확인');
+    // 판정은 살아 있지만 구간 줄은 확인된 사실만 적는다. 확인 필요는 경로 단위
+    // 표기(접근성 배지·계단 표기)가 말한다.
+    expect(result.steps.first.burdenLabel, '약 4분 · 180m');
     expect(result.steps[1].userTitle, '사당역에서 출구 엘리베이터와 통로 안내를 확인');
     expect(result.semanticLabel, isNot(contains('접근성 정보')));
     expect(result.arrivalGuidanceStep?.description, '2번 출구의 엘리베이터를 먼저 확인하세요.');
@@ -1834,12 +1836,11 @@ void main() {
       expect(alternative.warningNoticeText, '일부 시설 안내는 아직 확인되지 않았어요.');
     });
 
-    test('#2582 STEP_FREE_PREFERRED 태그는 계단 없음 단언이 아니다 — 승차 leg는 미확인으로 남는다', () {
-      // 백엔드 stairAccess()는 includesStairs·requiresAccessibilityCheck만 보고
-      // 태그를 붙이지만, 승차 step의 stairAccessState는 "UNKNOWN"이라 leg DTO의
-      // unknownAccessibilityCount가 1이 된다. 모바일은 그 leg를 미확인으로 보므로
-      // 태그가 붙은 대안도 라벨은 "계단 여부를 확인하고 있어요"다. 화면 문구가
-      // "확인된 무단차"를 단언하면 안 되는 근거다.
+    test('#2582 판정 필드가 없는 레거시 응답에서는 태그가 붙어도 미확인으로 남는다', () {
+      // 백엔드가 계단 판정을 싣지 않는 응답에서는 화면이 원자료로 폴백한다(#2590).
+      // 승차 leg의 unknownAccessibilityCount=1을 미확인으로 읽어 라벨이 "계단 여부를
+      // 확인하고 있어요"로 떨어지므로, 태그를 "확인된 무단차"로 옮겨 적으면 과대
+      // 주장이 된다. 폴백은 이렇게 fail closed 쪽으로만 틀린다.
       final result = _objectiveResult([
         _taggedItinerary(
           lineId: 'line-stair',
@@ -1957,6 +1958,640 @@ void main() {
       expect(controller.state.result?.routeSearchId, 'route-few');
     });
   });
+
+  group('#2590 계단 접근성 판정 원천 통일', () {
+    test('승차 leg만 미확인인 경로는 백엔드 판정대로 계단 없는 길로 표시한다', () {
+      final display = _judgedDisplay(
+        stairAccess: 'STEP_FREE',
+        legs: [
+          _judgedLeg(legType: 'ACCESS', stairAccess: 'STEP_FREE'),
+          _judgedLeg(
+            legType: 'RIDE',
+            stairAccess: 'NOT_APPLICABLE',
+            unknownAccessibilityCount: 1,
+          ),
+          _judgedLeg(legType: 'EGRESS', stairAccess: 'STEP_FREE'),
+        ],
+      );
+
+      expect(display.stairAccessLabel, '계단 없는 길이에요');
+    });
+
+    test('계단 전이가 있는 경로는 계단 포함으로 표시한다', () {
+      final display = _judgedDisplay(
+        stairAccess: 'STAIR_ONLY',
+        legs: [
+          _judgedLeg(
+            legType: 'ACCESS',
+            stairAccess: 'STAIR_ONLY',
+            stairCount: 1,
+          ),
+          _judgedLeg(
+            legType: 'RIDE',
+            stairAccess: 'NOT_APPLICABLE',
+            unknownAccessibilityCount: 1,
+          ),
+        ],
+      );
+
+      expect(display.stairAccessLabel, '계단 포함');
+    });
+
+    test('실제 미확인 사유가 있는 경로는 계단 없는 길로 승격되지 않는다', () {
+      // 백엔드가 내는 형태 그대로다: 신뢰도 사유는 경로 단위 경고라 itinerary
+      // accessibilityRisk에만 실리고, 그 사유로 강등된 접근 leg는 판정 필드가
+      // UNKNOWN이 되며 leg 카운터는 그대로 0이다.
+      for (final reason in const ['staleDataCount', 'lowConfidenceCount']) {
+        final display = _judgedDisplay(
+          stairAccess: 'UNKNOWN',
+          staleDataCount: reason == 'staleDataCount' ? 1 : 0,
+          lowConfidenceCount: reason == 'lowConfidenceCount' ? 1 : 0,
+          legs: [
+            _judgedLeg(legType: 'ACCESS', stairAccess: 'UNKNOWN'),
+            _judgedLeg(
+              legType: 'RIDE',
+              stairAccess: 'NOT_APPLICABLE',
+              unknownAccessibilityCount: 1,
+            ),
+          ],
+        );
+
+        expect(
+          display.stairAccessLabel,
+          '계단 여부를 확인하고 있어요',
+          reason: '$reason가 있는 경로는 무단차로 단언하지 않는다',
+        );
+      }
+    });
+
+    test('미확인 사유로 강등된 경로는 칩 행과 스크린리더가 한 목소리로 말한다', () {
+      final display = _judgedDisplay(
+        stairAccess: 'UNKNOWN',
+        staleDataCount: 1,
+        legs: [
+          _judgedLeg(legType: 'ACCESS', stairAccess: 'UNKNOWN'),
+          _judgedLeg(
+            legType: 'RIDE',
+            stairAccess: 'NOT_APPLICABLE',
+            unknownAccessibilityCount: 1,
+          ),
+        ],
+      );
+
+      expect(display.stairAccessLabel, '계단 여부를 확인하고 있어요');
+      expect(display.accessibilityBadgeLabel, '엘리베이터 상태를 살펴봐 주세요');
+    });
+
+    test('무단차 경로는 계단 칩과 접근성 칩이 서로 모순되지 않는다', () {
+      final display = _judgedDisplay(
+        stairAccess: 'STEP_FREE',
+        legs: [
+          _judgedLeg(legType: 'ACCESS', stairAccess: 'STEP_FREE'),
+          _judgedLeg(
+            legType: 'RIDE',
+            stairAccess: 'NOT_APPLICABLE',
+            unknownAccessibilityCount: 1,
+          ),
+          _judgedLeg(legType: 'EGRESS', stairAccess: 'STEP_FREE'),
+        ],
+      );
+
+      expect(display.stairAccessLabel, '계단 없는 길이에요');
+      // 승차 leg의 unknownAccessibilityCount는 원자료라 "확인 필요"가 아니다.
+      // 이 값을 그대로 읽으면 같은 칩 행이 "계단 없는 길이에요"와 "엘리베이터
+      // 상태를 살펴봐 주세요"를 함께 내 자기모순에 빠진다(#2590).
+      expect(display.accessibilityBadgeLabel, '계단 없는 경로 확인');
+      expect(
+        display.steps.every((step) => !step.requiresAccessibilityCheck),
+        isTrue,
+      );
+      // 시간·거리 값이 없을 때 나오는 다른 "미확인" 문구는 이 변경의 범위 밖이라
+      // 구간 줄에서는 엘리베이터 확인 안내만 본다.
+      expect(
+        display.steps.map((step) => step.burdenLabel),
+        everyElement(isNot(contains('엘리베이터'))),
+      );
+    });
+
+    test('계단으로 확인된 leg도 근거가 없으면 확인 안내를 함께 낸다', () {
+      // 계단 사실과 검증 여부는 다른 축이다. 확인 필요 표기를 계단 판정에서 파생하면
+      // 계단이 있고 근거도 없는 — 가장 확인이 필요한 — 조합에서 안내가 사라진다(#2590).
+      final display = _judgedDisplay(
+        stairAccess: 'STAIR_ONLY',
+        legs: [
+          _judgedLeg(
+            legType: 'ACCESS',
+            stairAccess: 'STAIR_ONLY',
+            stairCount: 1,
+            requiresAccessibilityCheck: true,
+          ),
+          _judgedLeg(
+            legType: 'RIDE',
+            stairAccess: 'NOT_APPLICABLE',
+            unknownAccessibilityCount: 1,
+          ),
+        ],
+      );
+
+      final accessStep = display.steps.first;
+      expect(accessStep.stairAccessState, 'stairOnly');
+      expect(accessStep.requiresAccessibilityCheck, isTrue);
+      expect(accessStep.burdenLabel, contains('계단 포함'));
+      // 판정은 살아 있어도 구간 줄에 확인 안내를 적지 않는다. 그 사실은 아래 경로
+      // 단위 표기가 진다.
+      expect(accessStep.burdenLabel, isNot(contains('엘리베이터')));
+      expect(display.stairAccessLabel, '계단 포함');
+      expect(display.accessibilityBadgeLabel, '엘리베이터 상태를 살펴봐 주세요');
+      // 승차 leg는 여전히 확인 대상이 아니다.
+      expect(display.steps.last.requiresAccessibilityCheck, isFalse);
+    });
+
+    test('계단으로 확인되고 근거도 있는 leg에는 확인 안내를 붙이지 않는다', () {
+      final display = _judgedDisplay(
+        stairAccess: 'STAIR_ONLY',
+        legs: [
+          _judgedLeg(
+            legType: 'ACCESS',
+            stairAccess: 'STAIR_ONLY',
+            stairCount: 1,
+            requiresAccessibilityCheck: false,
+          ),
+          _judgedLeg(
+            legType: 'RIDE',
+            stairAccess: 'NOT_APPLICABLE',
+            unknownAccessibilityCount: 1,
+          ),
+        ],
+      );
+
+      final accessStep = display.steps.first;
+      expect(accessStep.requiresAccessibilityCheck, isFalse);
+      expect(accessStep.burdenLabel, contains('계단 포함'));
+      expect(accessStep.burdenLabel, isNot(contains('엘리베이터')));
+      expect(display.stairAccessLabel, '계단 포함');
+    });
+
+    test('표시 이름을 채워 넣어도 경로 판정이 leg 폴백으로 되돌아가지 않는다', () {
+      // 계단 장벽을 질 수 있는 leg가 없는 경로에서는 leg를 접어도 경로 판정을
+      // 복원할 수 없다. 판정을 옮기지 않는 재구성이 있으면 여기서 표시가 실제
+      // 근거보다 강해진다(#2590 C1).
+      final display = _judgedDisplay(
+        stairAccess: 'UNKNOWN',
+        staleDataCount: 1,
+        legs: [
+          _judgedLeg(
+            legType: 'RIDE',
+            stairAccess: 'NOT_APPLICABLE',
+            unknownAccessibilityCount: 1,
+          ),
+        ],
+      );
+
+      expect(display.stairAccessLabel, '계단 여부를 확인하고 있어요');
+
+      final relabeled = display.withDisplayLabels(lineName: '수도권 4호선');
+
+      expect(relabeled.stairAccess, 'UNKNOWN');
+      expect(relabeled.stairAccessLabel, '계단 여부를 확인하고 있어요');
+    });
+
+    test('계단 경고가 붙은 차단 경로는 확인 중이 아니라 계단 포함이라고 말한다', () {
+      // 차단 응답은 leg가 없어 접을 근거가 없지만, 계단 경고는 경로 단위 사실이라 그대로
+      // 말한다. 이 경고가 언제나 관측된 계단 구간에서 오는 것은 아니다 — V1은 고신뢰 출구
+      // 중 쓸 수 있는 무단차 출구를 찾지 못하면 부재 추론으로도 붙이고
+      // (`RouteSearchService.hasStairOnlyAccess`), 이 테스트가 다루는 차단 경로가 바로 그
+      // 갈래다. 그때의 `계단 포함`은 "계단을 확인했다"가 아니라 "무단차 출구를 찾지
+      // 못했다"에 가깝지만, 표시가 근거보다 신중해지는 방향이라 정직 사다리를 거스르지
+      // 않는다. 차단된 이유 자체는 별도의 사유 배지가 말한다.
+      final display = _judgedDisplay(
+        stairAccess: 'STAIR_ONLY',
+        status: 'BLOCKED_ACCESSIBILITY',
+        riskLevel: 'BLOCKED',
+        legs: const [],
+      );
+
+      expect(display.isBlocked, isTrue);
+      expect(display.stairAccessLabel, '계단 포함');
+    });
+
+    test('RouteSearchResult 재구성은 생성자 필드를 하나도 빠뜨리지 않는다', () {
+      // C1 재발 방지: withDisplayLabels가 결과를 통째로 다시 만들기 때문에,
+      // 여기 없는 필드는 온라인 결과가 화면에 닿기 전에 기본값으로 되돌아간다.
+      _expectRebuildCarriesEveryField(
+        source: File('lib/route_search.dart').readAsStringSync(),
+        constructorSignature: 'const RouteSearchResult({',
+        methodSignature: '  RouteSearchResult withDisplayLabels({',
+        callSignature: 'return RouteSearchResult(',
+      );
+    });
+
+    test('RouteSearchStep 재구성도 생성자 필드를 하나도 빠뜨리지 않는다', () {
+      // 온라인 step도 화면에 닿기 전 이 재구성을 지난다. 같은 유실 갈래다.
+      _expectRebuildCarriesEveryField(
+        source: File('lib/route_search.dart').readAsStringSync(),
+        constructorSignature: 'const RouteSearchStep({',
+        methodSignature: '  RouteSearchStep withDisplayLabels({',
+        callSignature: 'return RouteSearchStep(',
+      );
+    });
+
+    test('재구성 가드의 파라미터 파서는 감싼 선언과 중첩 인자를 정확히 읽는다', () {
+      // 가드가 필드를 조용히 놓치면 C1 같은 유실이 다시 통과한다. `dart format`이 긴
+      // 기본값을 여러 줄로 감싸는 것이 그 갈래라 파서 자신을 고정한다.
+      const parameterList = '''
+    required this.sequence,
+    this.wrapped =
+        const RouteSearchOfficialFare(currency: 'KRW', amount: 1450),
+    this.counts = const <String, int>{'a': 1, 'b': 2},
+    // 주석 줄은 필드가 아니다.
+    List<String> plain = const [],
+    this.trailing,
+''';
+
+      expect(_namedParameters(parameterList), {
+        'sequence',
+        'wrapped',
+        'counts',
+        'plain',
+        'trailing',
+      });
+    });
+
+    test('화면은 leg 판정을 재계산하지 않고 백엔드 값을 그대로 쓴다', () {
+      final display = _judgedDisplay(
+        stairAccess: 'STEP_FREE',
+        legs: [
+          _judgedLeg(legType: 'ACCESS', stairAccess: 'STEP_FREE'),
+          _judgedLeg(
+            legType: 'RIDE',
+            stairAccess: 'NOT_APPLICABLE',
+            unknownAccessibilityCount: 1,
+          ),
+        ],
+      );
+
+      expect(display.steps.map((step) => step.stairAccessState).toList(), [
+        'stepFree',
+        'notApplicable',
+      ]);
+    });
+
+    test('판정 필드가 없는 레거시 응답은 승차 leg 때문에 fail closed로 떨어진다', () {
+      // 판정을 싣기 전 백엔드가 내던 형태 그대로다. 접근 leg는 검증돼 카운터가 모두
+      // 0이지만 승차 leg의 stairAccessState="UNKNOWN"이 unknownAccessibilityCount=1로
+      // 실려, leg를 접는 폴백은 무단차라 단언하지 못한다. 폴백이 경로 판정보다 강하게
+      // 말할 수 없다는 뜻이며, #2590이 고치려던 증상이기도 하다.
+      final display = _judgedDisplay(
+        stairAccess: '',
+        legs: [
+          _judgedLeg(legType: 'ACCESS', stairAccess: ''),
+          _judgedLeg(
+            legType: 'RIDE',
+            stairAccess: '',
+            unknownAccessibilityCount: 1,
+          ),
+        ],
+      );
+
+      expect(display.stairAccessLabel, '계단 여부를 확인하고 있어요');
+    });
+
+    test('JSON 계약은 leg와 itinerary의 계단 판정을 읽고, 없으면 빈 값으로 폴백한다', () {
+      final withJudgment = RouteSearchV2Itinerary.fromJson(
+        _judgedItineraryJson(
+          stairAccess: 'STEP_FREE',
+          legStairAccess: 'NOT_APPLICABLE',
+          legRequiresAccessibilityCheck: false,
+        ),
+      );
+      expect(withJudgment.stairAccess, 'STEP_FREE');
+      expect(withJudgment.legs.single.stairAccess, 'NOT_APPLICABLE');
+      expect(withJudgment.legs.single.requiresAccessibilityCheck, isFalse);
+
+      final legacy = RouteSearchV2Itinerary.fromJson(_judgedItineraryJson());
+      expect(legacy.stairAccess, '');
+      expect(legacy.legs.single.stairAccess, '');
+      expect(legacy.legs.single.requiresAccessibilityCheck, isNull);
+    });
+  });
+}
+
+/// #2590 판정 필드를 실은 leg. [stairAccess]가 비면 판정 필드가 없는 레거시 응답이라
+/// 확인 필요 표기도 함께 비운다.
+///
+/// 신뢰도 카운터를 받지 않는 이유는 leg에서 구조적으로 늘 0이기 때문이다 — 백엔드
+/// leg DTO가 만드는 사유는 STAIR_ONLY_ACCESS·ACCESSIBILITY_CHECK_REQUIRED 둘뿐이고,
+/// 신뢰도 경고는 경로 단위라 itinerary 쪽에만 실린다.
+RouteSearchV2Leg _judgedLeg({
+  required String legType,
+  required String stairAccess,
+  int stairCount = 0,
+  int unknownAccessibilityCount = 0,
+  bool? requiresAccessibilityCheck,
+}) {
+  final isRide = legType == 'RIDE';
+  return RouteSearchV2Leg(
+    legType: legType,
+    fromStationId: 'station-a',
+    toStationId: 'station-b',
+    fromNodeId: '',
+    toNodeId: '',
+    lineId: 'line-4',
+    tripId: isRide ? 'trip-1' : '',
+    trainNo: isRide ? '4001' : '',
+    plannedDepartureTime: '2026-06-30T09:17:00+09:00',
+    realtimeDepartureTime: null,
+    plannedArrivalTime: '2026-06-30T09:42:00+09:00',
+    realtimeArrivalTime: null,
+    waitTimeSeconds: 0,
+    slackSeconds: 0,
+    durationSeconds: 1500,
+    distanceMeters: 12000,
+    etaSource: 'PLANNED',
+    confidence: 'MEDIUM',
+    accessibilityRisk: RouteSearchV2AccessibilityRisk(
+      stairCount: stairCount,
+      unknownAccessibilityCount: unknownAccessibilityCount,
+      generatedConnectorCount: 0,
+      staleDataCount: 0,
+      lowConfidenceCount: 0,
+      unavailableFacilityCount: 0,
+      riskLevel: 'LOW',
+      reasonCodes: const [],
+      level: 'LOW',
+      reasons: const [],
+    ),
+    stairAccess: stairAccess,
+    // 백엔드는 판정과 확인 필요 표기를 함께 싣는다. 따로 주지 않으면 플래너가 세우는
+    // 값(계단 사실과 무관하게 근거가 없을 때만 true)을 기본으로 둔다.
+    requiresAccessibilityCheck: stairAccess.isEmpty
+        ? null
+        : requiresAccessibilityCheck ?? stairAccess == 'UNKNOWN',
+    serviceClass: isRide ? 'SUBWAY' : null,
+    servicePattern: isRide ? 'LOCAL' : null,
+  );
+}
+
+/// 소스에서 [signature]로 시작하는 메서드 본문. 중괄호 균형 대신 클래스 들여쓰기의
+/// 닫는 줄을 찾는다 — 가드가 볼 것은 재구성 호출부뿐이다.
+String _methodSource(String source, String signature) {
+  final start = source.indexOf(signature);
+  expect(start, isNonNegative, reason: '$signature를 찾지 못했다');
+  final end = source.indexOf('\n  }\n', start);
+  expect(end, isNonNegative, reason: '$signature의 끝을 찾지 못했다');
+  return source.substring(start, end);
+}
+
+/// `이름({` 뒤부터 짝이 맞는 `}`까지. 생성자 파라미터 목록만 떼어낸다.
+String _parameterList(String source, String signature) {
+  final start = source.indexOf(signature);
+  expect(start, isNonNegative, reason: '$signature를 찾지 못했다');
+  var index = start + signature.length - 1;
+  var depth = 1;
+  while (depth > 0) {
+    index += 1;
+    depth += switch (source[index]) {
+      '{' => 1,
+      '}' => -1,
+      _ => 0,
+    };
+  }
+  return source.substring(start + signature.length, index);
+}
+
+/// 파라미터 목록에서 선언 이름을 뽑는다.
+///
+/// 줄 단위로 `,`로 끝나는 줄만 보면 `dart format`이 긴 기본값을 여러 줄로 감쌌을 때 그
+/// 필드를 **조용히 건너뛰고**, 중첩 인자 줄을 가짜 필드로 잡을 수도 있다. 커버리지가
+/// 소리 없이 줄어드는 것이 이 가드에서 가장 나쁜 고장이라, 최상위 쉼표로 잘라 조각마다
+/// 이름을 뽑고 하나라도 못 뽑으면 실패시킨다.
+///
+/// 알려진 한계: 주석 제거가 문자열 리터럴 안의 `//`를 구분하지 않는다. Dart 파서가
+/// 아니라 소스 가드이므로 그 형태가 나타나면 여기서 다뤄야 한다.
+Set<String> _namedParameters(String parameterList) {
+  final names = <String>{};
+  for (final segment in _topLevelSegments(parameterList)) {
+    final declaration = segment
+        .split('\n')
+        .map((line) {
+          final comment = line.indexOf('//');
+          return comment < 0 ? line : line.substring(0, comment);
+        })
+        .join(' ')
+        .split('=')
+        .first
+        .trim()
+        .replaceFirst('required ', '');
+    if (declaration.isEmpty) {
+      continue;
+    }
+    final name = declaration.startsWith('this.')
+        ? declaration.substring('this.'.length)
+        : declaration.split(RegExp(r'\s+')).last;
+    expect(
+      RegExp(r'^[A-Za-z_][A-Za-z0-9_]*$').hasMatch(name),
+      isTrue,
+      reason: '파라미터 선언에서 이름을 뽑지 못했다: $segment',
+    );
+    names.add(name);
+  }
+  return names;
+}
+
+/// 괄호·중괄호·대괄호·꺾쇠 깊이를 세어 최상위 쉼표로만 자른다. 제네릭 인자
+/// (`Map<String, int>`)와 중첩 기본값 안의 쉼표는 조각을 나누지 않는다.
+List<String> _topLevelSegments(String source) {
+  final segments = <String>[];
+  final buffer = StringBuffer();
+  var depth = 0;
+  var angleDepth = 0;
+  for (final character in source.split('')) {
+    if (character == '(' || character == '[' || character == '{') {
+      depth += 1;
+    } else if (character == ')' || character == ']' || character == '}') {
+      depth -= 1;
+    } else if (character == '<' && depth == 0) {
+      angleDepth += 1;
+    } else if (character == '>' && depth == 0 && angleDepth > 0) {
+      angleDepth -= 1;
+    }
+    if (character == ',' && depth == 0 && angleDepth == 0) {
+      segments.add(buffer.toString());
+      buffer.clear();
+    } else {
+      buffer.write(character);
+    }
+  }
+  segments.add(buffer.toString());
+  return segments;
+}
+
+/// 재구성 호출이 생성자 필드를 전부, 그리고 실제 값으로 옮기는지 본다.
+///
+/// 이름만 세면 `field: ''` 같은 상수 대입을 통과시키고, 중첩 생성자 호출의 인자까지
+/// 커버리지로 집계하면 가드가 조용히 무력해진다. 그래서 최상위 인자만 이름→값 식으로
+/// 떼어내고, 값 식이 그 필드(또는 그 private 백킹 필드)나 재구성 메서드의 파라미터를
+/// 참조하는지까지 본다 — 파라미터로 갈아 끼우는 것이 이 메서드의 목적이라 그 갈래는
+/// 허용한다.
+void _expectRebuildCarriesEveryField({
+  required String source,
+  required String constructorSignature,
+  required String methodSignature,
+  required String callSignature,
+}) {
+  final fields = _namedParameters(_parameterList(source, constructorSignature));
+  final parameters = _namedParameters(_parameterList(source, methodSignature));
+  final methodSource = _methodSource(source, methodSignature);
+  final forwarded = _topLevelNamedArguments(methodSource, callSignature);
+
+  expect(fields, isNotEmpty);
+  expect(parameters, isNotEmpty);
+  expect(
+    fields.difference(forwarded.keys.toSet()),
+    isEmpty,
+    reason: '$methodSignature가 옮기지 않는 생성자 필드가 있다',
+  );
+  for (final field in fields) {
+    final referenced = RegExp(
+      r'[A-Za-z_][A-Za-z0-9_]*',
+    ).allMatches(forwarded[field]!).map((match) => match.group(0)!).toSet();
+    expect(
+      referenced.contains(field) ||
+          referenced.contains('_$field') ||
+          referenced.intersection(parameters).isNotEmpty,
+      isTrue,
+      reason: '$methodSignature의 $field가 원래 값도 파라미터도 참조하지 않는다',
+    );
+  }
+}
+
+/// 호출 인자 목록에서 **최상위** named argument만 이름→값 식으로 뽑는다. 중첩 호출
+/// 안의 인자는 깊이로 걸러진다.
+Map<String, String> _topLevelNamedArguments(
+  String source,
+  String callSignature,
+) {
+  final start = source.indexOf(callSignature);
+  expect(start, isNonNegative, reason: '$callSignature를 찾지 못했다');
+  var index = start + callSignature.length;
+  var depth = 1;
+  final arguments = <String>[];
+  final buffer = StringBuffer();
+  while (depth > 0) {
+    final character = source[index];
+    depth += switch (character) {
+      '(' || '[' || '{' => 1,
+      ')' || ']' || '}' => -1,
+      _ => 0,
+    };
+    if (depth == 0) {
+      break;
+    }
+    if (character == ',' && depth == 1) {
+      arguments.add(buffer.toString());
+      buffer.clear();
+    } else {
+      buffer.write(character);
+    }
+    index += 1;
+  }
+  arguments.add(buffer.toString());
+
+  final named = <String, String>{};
+  final pattern = RegExp(
+    r'^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:(.*)$',
+    dotAll: true,
+  );
+  for (final argument in arguments) {
+    final match = pattern.firstMatch(argument);
+    if (match != null) {
+      named[match.group(1)!] = match.group(2)!;
+    }
+  }
+  return named;
+}
+
+/// [riskLevel]은 백엔드가 원자료로 계산하는 값이라 무단차 경로에서도 승차 step의
+/// `stairAccessState="UNKNOWN"` 때문에 `MEDIUM`이 된다. 판정과 별개 축임을 픽스처에
+/// 그대로 담는다.
+RouteSearchResult _judgedDisplay({
+  required String stairAccess,
+  required List<RouteSearchV2Leg> legs,
+  int staleDataCount = 0,
+  int lowConfidenceCount = 0,
+  String riskLevel = 'MEDIUM',
+  String status = 'FOUND',
+}) {
+  final itinerary = RouteSearchV2Itinerary(
+    itineraryId: 'route-judged',
+    status: status,
+    plannedArrivalTime: '2026-06-30T09:42:00+09:00',
+    realtimeArrivalTime: null,
+    etaSource: 'PLANNED',
+    etaConfidence: 'MEDIUM',
+    durationSeconds: 1620,
+    transferCount: 0,
+    walkingDistanceMeters: 80,
+    accessibilityRisk: RouteSearchV2AccessibilityRisk(
+      stairCount: 0,
+      unknownAccessibilityCount: 0,
+      generatedConnectorCount: 0,
+      staleDataCount: staleDataCount,
+      lowConfidenceCount: lowConfidenceCount,
+      unavailableFacilityCount: 0,
+      riskLevel: riskLevel,
+      reasonCodes: const [],
+      level: 'LOW',
+      reasons: const [],
+    ),
+    legs: legs,
+    commercialEtaEligible: false,
+    stairAccess: stairAccess,
+  );
+  return RouteSearchResult.fromV2(
+    _objectiveResult([itinerary]),
+    objective: RouteObjective.fastest,
+  );
+}
+
+Map<String, Object?> _judgedItineraryJson({
+  String? stairAccess,
+  String? legStairAccess,
+  bool? legRequiresAccessibilityCheck,
+}) {
+  final leg = _rideLegJson();
+  if (legStairAccess != null) {
+    leg['stairAccess'] = legStairAccess;
+  }
+  if (legRequiresAccessibilityCheck != null) {
+    leg['requiresAccessibilityCheck'] = legRequiresAccessibilityCheck;
+  }
+  return <String, Object?>{
+    'itineraryId': 'route-judged',
+    'status': 'FOUND',
+    'plannedArrivalTime': '2026-06-30T09:42:00+09:00',
+    'realtimeArrivalTime': null,
+    'etaSource': 'PLANNED',
+    'etaConfidence': 'MEDIUM',
+    'durationSeconds': 1620,
+    'transferCount': 0,
+    'walkingDistanceMeters': 80,
+    'accessibilityRisk': <String, Object?>{
+      'stairCount': 0,
+      'unknownAccessibilityCount': 0,
+      'generatedConnectorCount': 0,
+      'staleDataCount': 0,
+      'lowConfidenceCount': 0,
+      'unavailableFacilityCount': 0,
+      'riskLevel': 'LOW',
+      'reasonCodes': <String>[],
+      'level': 'LOW',
+      'reasons': <String>[],
+    },
+    'legs': <Object?>[leg],
+    'commercialEtaEligible': false,
+    'stairAccess': ?stairAccess,
+  };
 }
 
 class _ManualRouteSearchRepository implements RouteSearchRepository {
