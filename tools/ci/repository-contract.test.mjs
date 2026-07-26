@@ -957,12 +957,23 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
   assert.match(workflow, /CHROME_PATH: \$\{\{ steps\.setup-chrome\.outputs\.chrome-path \}\}/);
   assert.match(workflow, /ROUTE_MAP_CHROME_NO_SANDBOX: "1"/);
   assert.match(workflow, /Repository CI \/ Run route map tool tests/);
+  const repositoryJob = jobBlock(workflow, "repository-contracts", "backend");
+  // #2558: route 도구 테스트는 Chrome이 필요 없다. 브라우저 셋업 실패가 이 비의존 테스트까지 막지
+  // 않도록 같은 job 안에서 Chrome 설치 스텝보다 앞 순서를 고정한다.
+  const routeToolStepIndex = repositoryJob.indexOf("Repository CI / Run route tool tests");
+  const chromeSetupStepIndex = repositoryJob.indexOf(
+    "Repository CI / Set up Chrome for route map tests",
+  );
+  assert.ok(routeToolStepIndex >= 0, "Repository CI must declare a route tool test step");
+  assert.ok(
+    routeToolStepIndex < chromeSetupStepIndex,
+    "route 도구 테스트 스텝은 Chrome 설치 스텝보다 앞이어야 한다",
+  );
   assert.match(workflow, /Repository CI \/ Run security tool tests/);
   assert.match(workflow, /node --test tools\/security\/\*\.test\.mjs/);
   assert.match(workflow, /Repository CI \/ Run ops tool tests/);
   assert.match(workflow, /node --test tools\/ops\/\*\.test\.mjs/);
   // #2396: 워크플로 변경 시 actionlint 정적 검증 게이트가 pinned·checksum 검증으로 실행된다.
-  const repositoryJob = jobBlock(workflow, "repository-contracts", "backend");
   assert.match(repositoryJob, /Repository CI \/ Lint GitHub Actions workflows/);
   assert.match(repositoryJob, /needs\.changes\.outputs\.ci == 'true'/);
   assert.match(repositoryJob, /ACTIONLINT_VERSION: "1\.7\.12"/);
@@ -18278,8 +18289,12 @@ test("ci.yml의 node --test 인자는 tools/ 하위 모든 테스트 파일을 �
     // 주석 처리된 명령은 실행되지 않으므로, 첫 비공백 문자가 `#`인 줄은 커버리지 근거가 될 수 없다.
     .filter((line) => !line.trimStart().startsWith("#"))
     .flatMap((line) => [...line.matchAll(/node --test [^\n]*/g)].map((match) => match[0]))
-    // `--test-name-pattern`은 이름으로 걸러 일부만 실행하므로 그 파일 인자를 완전 편입으로 볼 수 없다.
-    .filter((command) => !command.includes("--test-name-pattern"));
+    // YAML 플레인 스칼라의 주석은 "공백 뒤 `#`"부터다. 후행 인라인 주석(`run: node --test A # 이전: B`)
+    // 안의 옛 글롭까지 커버리지로 세면 실행 경로가 사라진 테스트가 통과로 새므로 잘라낸다
+    // (현행 ci.yml의 node --test 인자에는 `#`를 포함한 토큰이 없어 이 단순 절단으로 충분하다).
+    .map((command) => command.replace(/\s+#.*$/, ""))
+    // 이름·범위로 일부만 실행하는 플래그가 붙으면 그 파일 인자를 완전 편입으로 볼 수 없다.
+    .filter((command) => !/--test-(name-pattern|skip-pattern|only|shard)\b/.test(command));
 
   // 인용부호로 감싼 토큰과 선행 `./`는 같은 경로의 다른 표기일 뿐이라 정규화 후 필터링한다.
   const normalizeArg = (token) => {
