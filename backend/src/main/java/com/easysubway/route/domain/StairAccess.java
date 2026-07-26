@@ -13,10 +13,21 @@ import java.util.List;
  * <p><b>leg 판정과 경로 판정은 같은 값이 아니며, 일치를 계약으로 두지 않는다.</b> leg 판정
  * ({@link #ofStep(RouteStep)})은 그 구간 자신의 계단 사실만 담는다. 경로 판정
  * ({@link #ofItineraryDisplay(RouteSearchResult)})은 거기에 어느 구간에도 매달 수 없는 경로
- * 단위 신호 — 계단 경고({@link #ofWarnings(List)})와 데이터 신뢰도 경고
- * ({@link #hasUnverifiedEvidence(List)}) — 를 겹치므로 leg를 접은 값보다 더 신중할 수 있다.
- * 그 차이가 의도다. 경로 단위 신호를 leg마다 복제하면 그 신호와 무관하게 검증된 구간까지
- * 미확인으로 뒤집혀, 실제로 확인한 사실을 잃는다.
+ * 단위 신호를 겹치므로 leg를 접은 값보다 더 신중할 수 있고, 그 차이가 의도다. 경로 단위
+ * 신호를 leg마다 복제하면 그 신호와 무관하게 검증된 구간까지 미확인으로 뒤집혀, 실제로
+ * 확인한 사실을 잃는다.
+ *
+ * <p>지금 실제로 차이를 만드는 갈래는 둘이다. 하나는 계단 경고({@link #ofWarnings(List)})다 —
+ * V1은 고신뢰 출구 중 쓸 수 있는 무단차 출구를 찾지 못하면 계단 구간을 관측하지 않고도
+ * {@code STAIR_ONLY_ACCESS}를 붙이므로({@code RouteSearchService.hasStairOnlyAccess}), 스텝을
+ * 접은 값이 {@link #STEP_FREE}여도 경로 판정은 {@link #STAIR_ONLY}가 된다. 다른 하나는 스텝이
+ * 하나도 없는 차단 결과이며, 그 차이는 {@link #ofItineraryDisplay}의 빈 목록 규칙이 만든다.
+ *
+ * <p>데이터 신뢰도 축({@link #demotedIfUnverified(boolean)})은 <b>현재 생산자에서 발화하지
+ * 않는다.</b> RAPTOR의 경로 경고는 지나온 전이들의 warningCodes를 OR한 것이고 LOW/STALE 비트를
+ * 낸 전이는 정의상 미검증이라 그 스텝이 이미 {@link #UNKNOWN}이며, V1의 접근 스텝은
+ * {@code requiresAccessibilityCheck}가 상수 {@code true}다. 그래도 겹쳐 두는 이유는 fail closed
+ * 하나뿐이다 — 이 축이 오늘 판정을 낮추고 있다고 읽어서는 안 된다.
  *
  * <p>표시 계층은 경로 판정이 응답에 실려 있으면 그 값을 쓴다. leg를 접어 경로 판정을 흉내
  * 내는 것은 판정 필드가 없는 응답에서의 폴백이며, 그 응답에서는 승차 leg의 미확인 원자료가
@@ -71,7 +82,8 @@ public enum StairAccess {
 	/**
 	 * 응답에 실어 화면이 표시할 경로 판정. 태깅 술어({@link #ofItinerary})에 데이터 신뢰도 축을
 	 * 겹친 값이다 — 후보 집합은 계단 사실만으로 정해야 하지만(#2560), 사용자에게 말할 때는
-	 * "확인하지 못했다"를 감출 수 없다.
+	 * "확인하지 못했다"를 감출 수 없다. 다만 그 축은 클래스 주석에 적은 대로 현재 생산자에서
+	 * 발화하지 않으므로, 오늘 {@link #ofItinerary}와 갈리는 갈래는 아래 빈 목록 규칙뿐이다.
 	 *
 	 * <p>스텝이 하나도 없으면(접근성 차단 결과) 무단차라 말할 근거 자체가 없으므로 접는 값을
 	 * {@link #UNKNOWN}으로 둔다. 계단 경고는 그때도 경로 단위 사실이라 그대로 겹친다.
@@ -122,6 +134,10 @@ public enum StairAccess {
 	/**
 	 * 확인되지 않은 근거가 붙었으면 무단차 단언을 거둔다(정직 사다리). 계단이 있다는 판정은
 	 * 신뢰도와 축이 다른 사실이라 흔들지 않는다.
+	 *
+	 * <p>현재 생산자에서는 이 강등이 일어나지 않는다(클래스 주석 참고). 순수 함수로 두고
+	 * 단위 테스트로 고정해 두는 것은 앞으로 검증된 스텝과 신뢰도 경고가 함께 오는 생산자가
+	 * 생겼을 때 판정이 조용히 열리지 않게 하기 위해서다.
 	 */
 	public StairAccess demotedIfUnverified(boolean unverifiedEvidence) {
 		return this == STEP_FREE && unverifiedEvidence ? UNKNOWN : this;

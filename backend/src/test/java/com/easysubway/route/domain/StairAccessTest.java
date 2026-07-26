@@ -125,6 +125,10 @@ class StairAccessTest {
 		@Test
 		@DisplayName("데이터 신뢰도 경고가 있으면 무단차로 단언하지 않는다")
 		void dataConfidenceWarningsDemoteDisplayJudgment() {
+			// 검증된 전이와 신뢰도 경고를 함께 둔 조합은 현재 플래너가 낼 수 없다 — RAPTOR의 경로
+			// 경고는 지나온 전이의 warningCodes를 OR한 것이라 LOW/STALE을 낸 전이는 반드시 미검증이다.
+			// 관측된 응답이 아니라, 그런 생산자가 생겼을 때 판정이 조용히 열리지 않게 하는 fail closed
+			// 규칙을 고정하는 테스트다.
 			List<RouteStep> steps = List.of(transitionStep(false, true), rideStep());
 
 			assertThat(StairAccess.ofItineraryDisplay(itinerary(steps, warningsOnly()))).isEqualTo(StairAccess.UNKNOWN);
