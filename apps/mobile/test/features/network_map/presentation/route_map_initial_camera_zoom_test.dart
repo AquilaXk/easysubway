@@ -1,5 +1,6 @@
 import 'dart:convert' show utf8;
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:easysubway_mobile/features/network_map/domain/map_camera.dart';
 import 'package:easysubway_mobile/features/network_map/domain/route_map_design_space.dart';
@@ -323,22 +324,77 @@ void main() {
   });
 
   group('대비 케이스: 소형(대전·광주) vs 초대형(부산·수도권)', () {
-    testWidgets('대전권은 이미 가독 배율이라 전체 조망이 유지된다(동작 불변)', (tester) async {
+    // 소규모 지역(#1764 E, 역 수 ≤ 40)은 초기 bounds 기준선이 지도 전체라
+    // 기준선 contain-fit을 카메라 자신의 값으로 재현할 수 있다. 그 위에서
+    // `max(contain-fit, 가독 배율)` 규칙이 실제로 적용됐는지 **분기까지 포함해**
+    // 고정한다.
+    //
+    // 처음에는 "대전은 전체 조망이 유지된다"를 `scale × width ≤ viewportWidth`로
+    // 직접 단언했는데, 이는 **viewport 형태 의존**이라 환경에 따라 깨진다. 지도
+    // 캔버스 높이는 상단바·하단 배너의 텍스트 높이에 좌우되고 그 텍스트 높이는
+    // 실행 환경 폰트에 따라 달라진다(로컬 macOS vs Linux CI). 캔버스가 짧아지면
+    // contain-fit이 세로에 걸려 작아지고, 그러면 대전도 가독 미달이 되어 규칙상
+    // **정당하게** 확대된다(CI 실측: scale × width = 545.0 > viewportWidth 411).
+    // 즉 프로덕션이 아니라 테스트의 기대가 과하게 좁았다. 그래서 "어느 분기가
+    // 선택돼야 하는가"를 카메라의 실제 viewport에서 판정해 검증한다.
+    testWidgets('대전권(소규모): max(contain-fit, 가독 배율) 규칙이 그대로 적용된다', (
+      tester,
+    ) async {
       final fixture = _loadRegionFixture('대전권');
+      final ownerLabels =
+          routeMapOwnerLabelsByRegionFrom(
+            await _loadSidecarJson(),
+          )['daejeon'] ??
+          const {};
+      final medianFontPx = _matchedOwnerFontSizeMedian(
+        ownerLabels,
+        fixture.stationNames,
+      );
       final camera = await _mountAndReadCamera(tester, fixture);
 
-      // 소규모 지역(#1764 E)은 초기 bounds가 지도 전체라 contain-fit이 곧
-      // 전체 조망이다. 대전은 그 배율에서 이미 라벨이 13px을 넘으므로 확대가
-      // 걸리지 않아야 한다 — 전체 폭·높이가 여전히 화면 안에 담긴다.
+      final containFit = math.min(
+        camera.viewportSize.width / camera.sourceBounds.width,
+        camera.viewportSize.height / camera.sourceBounds.height,
+      );
+      final readable = kRouteMapDesignLabelFontPx / medianFontPx;
+      final diagnostics =
+          'W=${camera.sourceBounds.width} H=${camera.sourceBounds.height} '
+          'viewport=${camera.viewportSize} 라벨중앙값=$medianFontPx '
+          'containFit=$containFit readable=$readable scale=${camera.scale}';
+
+      if (readable <= containFit) {
+        // 실기기급 세로 폰(411×768 캔버스) 실측이 이 분기다: containFit 0.2470 ·
+        // readable 0.2407 → 이미 13.3px이라 확대 없음(동작 불변, 전체 조망 유지).
+        expect(
+          camera.scale,
+          closeTo(containFit, 1e-6),
+          reason: '대전권이 이미 가독 배율인데 불필요하게 확대됐다 — $diagnostics',
+        );
+        expect(
+          camera.scale * camera.sourceBounds.width,
+          lessThanOrEqualTo(camera.viewportSize.width + 0.5),
+          reason: '대전권 전체 조망이 깨졌다 — $diagnostics',
+        );
+      } else {
+        // 캔버스가 짧아 contain-fit에서 라벨이 13px에 못 미치는 환경: 규칙대로
+        // 가독 배율까지 올라가야 한다(과확대도, 미확대도 아님).
+        expect(
+          camera.scale,
+          closeTo(readable, 1e-6),
+          reason: '대전권이 가독 미달인데 가독 배율로 올라가지 않았다 — $diagnostics',
+        );
+      }
+
+      // 분기와 무관한 공통 계약: 축소되지 않고, 라벨은 가독 기준 이상이다.
       expect(
-        camera.scale * camera.sourceBounds.width,
-        lessThanOrEqualTo(camera.viewportSize.width + 0.5),
-        reason: '대전권이 불필요하게 확대돼 전체 조망을 잃었다',
+        camera.scale,
+        greaterThanOrEqualTo(containFit - 1e-6),
+        reason: '대전권 초기 배율이 기존 contain-fit보다 축소됐다 — $diagnostics',
       );
       expect(
-        camera.scale * camera.sourceBounds.height,
-        lessThanOrEqualTo(camera.viewportSize.height + 0.5),
-        reason: '대전권이 불필요하게 확대돼 전체 조망을 잃었다',
+        medianFontPx * camera.scale,
+        greaterThanOrEqualTo(kRouteMapDesignLabelFontPx - 0.001),
+        reason: '대전권 초기 화면 라벨이 가독 기준 미만이다 — $diagnostics',
       );
     });
 
