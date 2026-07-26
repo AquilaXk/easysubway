@@ -109,6 +109,10 @@ const BUSAN_INCLUSION_BINDINGS = [
     offset: 2,
     sourceId: "busan-transportation-route-map-positions",
     evidenceKey: "routeMapAdmissionEvidence",
+    // 이 문구만 신선도 전용이 아니다 — 노선도 정본에는 freshUntil이 없어 materializer에 신선도 블록이
+    // 따로 없고, 하한(capturedAt 이후) 검사가 admission 정본 대조(positionsSha256·topologyContentSha256
+    // 등)와 한 조건에 묶여 같은 문구를 낸다. 문구를 가르는 것은 materializer 쪽 판단이라 이 하네스가
+    // 동작으로 바꾸지 않고, 대신 아래 대조 회귀가 그 문구의 원인을 하한 교차로 좁힌다.
     stalePinPattern: /busan-transportation-route-map-positions inventory evidence does not match snapshot/,
   },
   {
@@ -120,7 +124,12 @@ const BUSAN_INCLUSION_BINDINGS = [
     stalePinPattern: /busan-transportation-accessibility evidence freshness is invalid/,
   },
 ];
-const [BUSAN_TOPOLOGY_BINDING, , BUSAN_ROUTE_MAP_BINDING] = BUSAN_INCLUSION_BINDINGS;
+const [
+  BUSAN_TOPOLOGY_BINDING,
+  BUSAN_TIMETABLE_BINDING,
+  BUSAN_ROUTE_MAP_BINDING,
+  BUSAN_ACCESSIBILITY_BINDING,
+] = BUSAN_INCLUSION_BINDINGS;
 const admissionEvidenceOf = (inventory, sourceId, evidenceKey) =>
   inventory.sources.find(({ id }) => id === sourceId)[evidenceKey];
 
@@ -365,9 +374,11 @@ test("대구 route_map/accessibility 6 requirement는 체인 편입으로 MISSIN
     );
   }
 
-  // 체인 편입이 실제로 실은 행수. 두 표 모두 축이 역이 아니라 역·노선 쌍이다(고유 역 91 / 역·노선 쌍
-  // 94) — 노선도 좌표 91 역·노선 쌍, 편의시설 94 역·노선 쌍 × 3종 = 282행이며 각 편입은
-  // 소스 등재 1건씩만 더한다(승계 행과 앞선 편입 행은 그대로여야 한다).
+  // 체인 편입이 실제로 실은 행수. 두 표 모두 축이 역이 아니라 역·노선 쌍인데 쌍의 수도 표마다 갈리므로
+  // 표별로 못박는다 — 노선도 좌표는 91 역·노선 쌍(고유 역 88: 명덕·반월당·청라언덕 환승 3역이 2쌍씩),
+  // 편의시설은 94 역·노선 쌍(고유 역 91) × 3종 = 282행이다. 노선도가 3쌍 적은 것은 대구한의대병원·부호·
+  // 하양이 노선도 정본에 좌표가 없기 때문이다(snapshot topologyGaps 3건). 각 편입은 소스 등재 1건씩만
+  // 더한다(승계 행과 앞선 편입 행은 그대로여야 한다).
   const [, routeMap, accessibility] = evidence.packDataInclusions.entries;
   assert.equal(routeMap.addedRows.routeMapPositions, 91);
   assert.equal(routeMap.addedRows.sourceInventory, 1);
@@ -502,34 +513,32 @@ test("부산 20 requirement는 체인 편입으로 MISSING에서 SUPPORTED로 �
 
   // pin은 편입마다 따로 두고 각각 그 소스의 admission 창 안이어야 한다. 부산 4소스의 창은 모양이 갈린다 —
   // topology·시각표·편의시설은 [capturedAt, freshUntil) 양끝을 검사하고 노선도는 상한이 없다.
+  // 소스 id·evidence 키는 BUSAN_INCLUSION_BINDINGS가 정본이다 — 여기서 다시 인라인으로 쓰면 정본이
+  // 갱신돼도 이 블록만 낡은 짝을 보게 된다.
   const inventory = await readJson(INVENTORY_PATH);
-  const admissionEvidence = (sourceId, evidenceKey) => admissionEvidenceOf(inventory, sourceId, evidenceKey);
+  const bindingEvidence = ({ sourceId, evidenceKey }) => admissionEvidenceOf(inventory, sourceId, evidenceKey);
   const boundedWindows = [
-    [topology, "busan-transportation-route-topology", "topologyAdmissionEvidence"],
-    [timetable, "busan-transportation-timetable", "scheduleAdmissionEvidence"],
-    [accessibility, "busan-transportation-accessibility", "accessibilityAdmissionEvidence"],
+    [topology, BUSAN_TOPOLOGY_BINDING],
+    [timetable, BUSAN_TIMETABLE_BINDING],
+    [accessibility, BUSAN_ACCESSIBILITY_BINDING],
   ];
-  for (const [inclusion, sourceId, evidenceKey] of boundedWindows) {
-    const { capturedAt, freshUntil } = admissionEvidence(sourceId, evidenceKey);
+  for (const [inclusion, binding] of boundedWindows) {
+    const { capturedAt, freshUntil } = bindingEvidence(binding);
     const pin = Date.parse(inclusion.materializedAt);
-    assert.ok(pin >= Date.parse(capturedAt) && pin < Date.parse(freshUntil), `${sourceId} 창`);
+    assert.ok(pin >= Date.parse(capturedAt) && pin < Date.parse(freshUntil), `${binding.sourceId} 창`);
   }
-  const routeMapEvidence = admissionEvidence("busan-transportation-route-map-positions", "routeMapAdmissionEvidence");
+  const routeMapEvidence = bindingEvidence(BUSAN_ROUTE_MAP_BINDING);
   assert.equal(routeMapEvidence.freshUntil, undefined, "부산 노선도 admission 정본에도 상한이 없다");
   assert.ok(Date.parse(routeMap.materializedAt) >= Date.parse(routeMapEvidence.capturedAt), "노선도 창 하한");
   // 편의시설 창은 상한이 있는 두 창(topology·시각표)과 서로소다 — 그 셋은 pin 하나로 묶는 것이 애초에
   // 불가능하다. 다만 "부산 네 창이 전부 서로소"는 아니다: 노선도 창은 상한이 없어 [capturedAt, ∞)이고
   // 편의시설 창을 통째로 품는다(실측: 노선도 pin을 편의시설 capturedAt으로 옮기면 조립이 통과하고
   // 시각표 capturedAt으로 옮기면 거부된다). 그 포함 관계까지 함께 고정한다.
-  const accessibilityWindow = admissionEvidence("busan-transportation-accessibility", "accessibilityAdmissionEvidence");
-  for (const [sourceId, evidenceKey] of [
-    ["busan-transportation-route-topology", "topologyAdmissionEvidence"],
-    ["busan-transportation-timetable", "scheduleAdmissionEvidence"],
-  ]) {
+  const accessibilityWindow = bindingEvidence(BUSAN_ACCESSIBILITY_BINDING);
+  for (const binding of [BUSAN_TOPOLOGY_BINDING, BUSAN_TIMETABLE_BINDING]) {
     assert.ok(
-      Date.parse(admissionEvidence(sourceId, evidenceKey).freshUntil)
-        <= Date.parse(accessibilityWindow.capturedAt),
-      `${sourceId} 창은 편의시설 창보다 앞에서 닫혀 겹치지 않는다`,
+      Date.parse(bindingEvidence(binding).freshUntil) <= Date.parse(accessibilityWindow.capturedAt),
+      `${binding.sourceId} 창은 편의시설 창보다 앞에서 닫혀 겹치지 않는다`,
     );
   }
   assert.ok(
@@ -1094,6 +1103,52 @@ test("부산 노선도 편입은 상한이 없어 먼 미래 기준 시각도 �
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }
+});
+
+// 노선도 편입의 하한 회귀는 나머지 셋과 진단 특정성이 비대칭이다: 시각표·편의시설은 신선도 전용 문구
+// (`evidence freshness is invalid`), topology는 stale snapshot 전용 문구를 내지만 노선도는 admission 정본
+// 대조 축과 한 조건을 공유하는 문구를 낸다(BUSAN_INCLUSION_BINDINGS 주석 참조). 그래서 "거부됐다"만으로는
+// 하한 위반이 원인인지 다른 축이 낸 문구인지 갈리지 않는다 — pin 1ms 차이의 대조로 원인을 좁힌다.
+// tracked pin은 하한 정각이라 조립을 완주하고, 거기서 1ms만 내리면 같은 입력이 그 문구로 거부된다.
+test("부산 노선도 편입의 창 하한 진단은 pin 1ms 대조로 원인이 특정된다", async () => {
+  const spec = await readJson(SPEC_PATH);
+  const inventory = await readJson(INVENTORY_PATH);
+  const { capturedAt } = admissionEvidenceOf(
+    inventory,
+    BUSAN_ROUTE_MAP_BINDING.sourceId,
+    BUSAN_ROUTE_MAP_BINDING.evidenceKey,
+  );
+  const index = BUSAN_TOPOLOGY_INDEX + BUSAN_ROUTE_MAP_BINDING.offset;
+  // tracked pin이 하한 정각이라는 것부터 축이다 — 여기가 어긋나면 아래 1ms 대조가 하한을 때리지 않는다.
+  assert.equal(spec.packDataInclusions[index].materializedAt, capturedAt, "tracked pin은 창 하한 정각이다");
+
+  const runWithPin = async (materializedAt) => {
+    const mutated = structuredClone(spec);
+    mutated.packDataInclusions[index].materializedAt = materializedAt;
+    const workspace = await mkdtemp(path.join(tmpdir(), "nationwide-candidate-gate-lower-bound-"));
+    try {
+      return await runNationwideCandidateCoverageGate({
+        spec: mutated,
+        specInput: { path: SPEC_PATH, sha256: "a".repeat(64) },
+        targetsInput: { path: TARGETS_PATH, sha256: "b".repeat(64) },
+        inventory,
+        inventoryInput: { path: INVENTORY_PATH, sha256: "c".repeat(64) },
+        resolutionPlanInput: { path: RESOLUTION_PLAN_PATH, sha256: "d".repeat(64) },
+        resolutionsInput: { path: RESOLUTIONS_PATH, sha256: "e".repeat(64) },
+        workDir: workspace,
+      });
+    } finally {
+      await rm(workspace, { recursive: true, force: true });
+    }
+  };
+
+  // 하한 정각은 반개구간의 안쪽이다 — 이 실행이 통과해야 아래 거부가 "하한을 넘어서" 났다고 말할 수 있다.
+  const evidence = await runWithPin(capturedAt);
+  assert.equal(evidence.packDataInclusions.entries[index].materializedAt, capturedAt);
+  await assert.rejects(
+    runWithPin(new Date(Date.parse(capturedAt) - 1).toISOString()),
+    BUSAN_ROUTE_MAP_BINDING.stalePinPattern,
+  );
 });
 
 // 승계 행 불변 축은 행수가 그대로인 변조를 잡으므로 addedRows 대조가 대신 지켜 주지 못한다.
