@@ -1,4 +1,5 @@
-// #2514 (#2510 B0) 전국 candidate pack 게이트 하네스 회귀. #2549 (#2510 B1) 대구 편입으로 확장.
+// #2514 (#2510 B0) 전국 candidate pack 게이트 하네스 회귀. #2549 (#2510 B1) 대구 편입,
+// #2580 (#2510 B2-a) 다도메인 편입 체인으로 확장.
 //
 // 검증 축:
 //   1. tracked evidence가 현행 입력에서 바이트 단위로 재생성된다(오프라인·서명 키 없이).
@@ -7,6 +8,8 @@
 //   4. spec의 line-scope 재기술과 tracked source-inventory가 어긋나면 하네스가 fail closed 한다.
 //   5. 지역 데이터 편입은 allowlist materializer·tracked 입력·선언 행수·승계 행 불변에 묶인다(B1).
 //   6. production 게시 트랙 fixture는 candidate 조립에 영향받지 않는다.
+//   7. 대구 route_map_positions·accessibility_facilities 6 requirement가 B1 편입 뒤 체인으로 전이하고,
+//      스키마 일반화가 안전 경계를 넓히지 않는다(B2-a).
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -37,12 +40,22 @@ const RESOLUTIONS_PATH =
 const REVIEWED_PACK_PATH = "tools/datapack/release/capital-production-reviewed-pack.json";
 const PILOT_REQUIREMENT_KEY = "capital:seoul-metro:seoul-4:route_map_positions";
 const PILOT_SOURCE_ID = "seoulmetro-cyberstation-route-map";
-// #2549 B1 대상 9 requirement(대구 3노선 × membership/topology/timetable).
+// #2549 B1 대상 9 requirement(대구 3노선 × membership/topology/timetable)와
+// #2580 B2-a 대상 6 requirement(대구 3노선 × route_map_positions/accessibility_facilities).
 const DAEGU_LINE_IDS = ["line-5b8d9b05e7e6", "line-e2938a4cc492", "line-0ffaa95b1b5d"];
-const DAEGU_DOMAINS = ["station_line_membership", "route_graph_topology", "schedule_timetable"];
-const DAEGU_REQUIREMENT_KEYS = DAEGU_LINE_IDS
-  .flatMap((lineId) => DAEGU_DOMAINS.map((domain) => `daegu:daegu-transportation:${lineId}:${domain}`));
-const DAEGU_MATERIALIZER = "tools/datapack/materialize-daegu-timetable.mjs";
+const daeguRequirementKeys = (domains) => DAEGU_LINE_IDS
+  .flatMap((lineId) => domains.map((domain) => `daegu:daegu-transportation:${lineId}:${domain}`));
+const DAEGU_B1_DOMAINS = ["station_line_membership", "route_graph_topology", "schedule_timetable"];
+const DAEGU_B1_REQUIREMENT_KEYS = daeguRequirementKeys(DAEGU_B1_DOMAINS);
+const DAEGU_B2A_REQUIREMENT_KEYS = daeguRequirementKeys(["route_map_positions", "accessibility_facilities"]);
+const DAEGU_REQUIREMENT_KEYS = [...DAEGU_B1_REQUIREMENT_KEYS, ...DAEGU_B2A_REQUIREMENT_KEYS];
+// 편입 체인 순서. route_map·accessibility materializer는 pack.sourceInventory에 대구 시각표 소스가
+// 이미 있을 것을 선행 조건으로 검사하므로 시각표 편입이 먼저여야 한다.
+const DAEGU_MATERIALIZERS = [
+  "tools/datapack/materialize-daegu-timetable.mjs",
+  "tools/datapack/materialize-daegu-route-map-positions.mjs",
+  "tools/datapack/materialize-daegu-accessibility.mjs",
+];
 
 const INPUT_PATHS = {
   spec: SPEC_PATH,
@@ -96,7 +109,7 @@ test("커밋된 candidate 게이트 evidence는 현행 입력에서 바이트 �
 
     const evidence = JSON.parse(tracked);
     assert.equal(evidence.artifactKind, "nationwide-candidate-coverage-gate-evidence");
-    assert.equal(evidence.issue, 2549);
+    assert.equal(evidence.issue, 2580);
     assert.deepEqual(evidence.parentIssues, [2510, 2138]);
     assert.equal(evidence.regeneration.evidencePath, EVIDENCE_PATH);
     assert.equal(
@@ -113,12 +126,17 @@ test("커밋된 candidate 게이트 evidence는 현행 입력에서 바이트 �
     }
     // 지역 편입 입력도 같은 축이다. 저장소에 편입 행을 복제하지 않으므로 이 해시가 candidate 구성의
     // 유일한 결속이며, snapshot 한 바이트가 바뀌면 evidence 재생성이 강제돼야 한다.
-    const [daeguInclusion] = evidence.packDataInclusions.entries;
-    assert.equal(daeguInclusion.regionId, "daegu");
-    assert.equal(daeguInclusion.materializer, DAEGU_MATERIALIZER);
-    assert.ok(daeguInclusion.inputs.length > 0);
-    for (const input of daeguInclusion.inputs) {
-      assert.equal(input.sha256, await sha256Of(input.path));
+    // 체인 순서도 기록 축이다 — 순서가 바뀌면 선행 조건(시각표 소스 선재)이 깨진다.
+    assert.deepEqual(
+      evidence.packDataInclusions.entries.map(({ materializer }) => materializer),
+      DAEGU_MATERIALIZERS,
+    );
+    for (const inclusion of evidence.packDataInclusions.entries) {
+      assert.equal(inclusion.regionId, "daegu");
+      assert.ok(inclusion.inputs.length > 0);
+      for (const input of inclusion.inputs) {
+        assert.equal(input.sha256, await sha256Of(input.path));
+      }
     }
 
     // 임시 RSA 키·SQLite 바이트·wall-clock 의존 집계는 기록 축이 아니다(결정성 계약).
@@ -206,8 +224,8 @@ test("대구 9 requirement는 candidate 편입으로 MISSING에서 SUPPORTED로 
     schedule_timetable: ["service_calendar", "trip", "stop_time"],
   };
 
-  assert.equal(DAEGU_REQUIREMENT_KEYS.length, 9);
-  for (const requirementKey of DAEGU_REQUIREMENT_KEYS) {
+  assert.equal(DAEGU_B1_REQUIREMENT_KEYS.length, 9);
+  for (const requirementKey of DAEGU_B1_REQUIREMENT_KEYS) {
     const [, , , sourceDomain] = requirementKey.split(":");
     const before = baselineByKey.get(requirementKey);
     const after = byKey.get(requirementKey);
@@ -233,6 +251,64 @@ test("대구 9 requirement는 candidate 편입으로 MISSING에서 SUPPORTED로 
     "daegu-line1-route-topology",
     "molit-urban-rail-full-route-daegu-line1-membership",
   ]);
+});
+
+// #2580 B2-a: 같은 지역의 route_map_positions·accessibility_facilities 6 requirement가 B1 편입 뒤에
+// 체인으로 실린 행으로 전이한다. 두 도메인의 필수 필드 수가 다르므로 분모도 도메인별로 못박는다.
+test("대구 route_map/accessibility 6 requirement는 체인 편입으로 MISSING에서 SUPPORTED로 전이한다", async () => {
+  const evidence = await readJson(EVIDENCE_PATH);
+  const byKey = new Map(evidence.variants.lineScoped.pilotRequirements.map((entry) => [entry.requirementKey, entry]));
+  const baselineByKey = new Map(
+    evidence.variants.baseline.pilotRequirements.map((entry) => [entry.requirementKey, entry]),
+  );
+  const expected = {
+    route_map_positions: {
+      fields: ["route_map_position", "route_map_label_polygon"],
+      sourceIds: ["daegu-transportation-route-map-positions"],
+    },
+    accessibility_facilities: {
+      fields: ["elevator", "escalator", "wheelchair_lift", "status", "verified_at"],
+      sourceIds: ["daegu-transportation-accessibility"],
+    },
+  };
+
+  assert.equal(DAEGU_B2A_REQUIREMENT_KEYS.length, 6);
+  for (const requirementKey of DAEGU_B2A_REQUIREMENT_KEYS) {
+    const [, , , sourceDomain] = requirementKey.split(":");
+    const { fields, sourceIds } = expected[sourceDomain];
+    const before = baselineByKey.get(requirementKey);
+    const after = byKey.get(requirementKey);
+    assert.equal(before.status, "MISSING", `${requirementKey} baseline`);
+    assert.deepEqual(before.sourceIds, [], `${requirementKey} baseline sourceIds`);
+    assert.deepEqual(before.missingFields, fields, `${requirementKey} baseline missingFields`);
+    assert.equal(after.status, "SUPPORTED", `${requirementKey} lineScoped`);
+    assert.equal(after.releaseTier, "LAUNCH_REQUIRED");
+    assert.equal(after.denominator, fields.length);
+    assert.equal(after.coveredFields, fields.length);
+    assert.deepEqual(after.missingFields, []);
+    assert.deepEqual(after.fieldCoverage.map(({ field }) => field), fields);
+    assert.deepEqual(after.sourceIds, sourceIds, `${requirementKey} sourceIds`);
+    assert.ok(
+      Object.values(after.supportingRecordCountByField).every((count) => count > 0),
+      `${requirementKey} supporting rows`,
+    );
+  }
+
+  // 체인 편입이 실제로 실은 행수. 노선도 좌표 91역, 편의시설 94역 × 3종 = 282행이며 각 편입은
+  // 소스 등재 1건씩만 더한다(승계 행과 앞선 편입 행은 그대로여야 한다).
+  const [, routeMap, accessibility] = evidence.packDataInclusions.entries;
+  assert.equal(routeMap.addedRows.routeMapPositions, 91);
+  assert.equal(routeMap.addedRows.sourceInventory, 1);
+  assert.equal(routeMap.addedRows.transitStopTimes, 0);
+  assert.equal(accessibility.addedRows.facilities, 282);
+  assert.equal(accessibility.addedRows.stationFacilityEvidence, 282);
+  assert.equal(accessibility.addedRows.sourceInventory, 1);
+  assert.equal(accessibility.addedRows.routeMapPositions, 0);
+  // 소스마다 신선도 창이 달라 기준 시각 pin도 편입마다 따로여야 한다.
+  assert.equal(
+    new Set(evidence.packDataInclusions.entries.map(({ materializedAt }) => materializedAt)).size,
+    DAEGU_MATERIALIZERS.length,
+  );
 });
 
 test("candidate spec의 line-scope 재기술은 tracked source inventory와 동기다", async (context) => {
@@ -448,6 +524,89 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
       /evidence is stale or future-dated/,
     );
   });
+
+  // #2580 B2-a가 편입 스키마를 다도메인으로 넓혔다. 아래 축들이 그 완화가 안전 경계를 넓히지
+  // 않았음을 고정한다 — 중복 금지는 (regionId, materializer)로 좁혀졌을 뿐 사라지지 않았고,
+  // 형상 분기는 materializer가 실제로 읽는 경로 키를 여전히 필수로 요구하며, 그 경로는 모두
+  // 저장소 안 실경로 강제와 입력 해시 결속을 그대로 받는다.
+  await context.test("같은 지역·materializer 편입을 두 번 선언하면 거부된다", async () => {
+    await rejectsWith(
+      (value) => { value.packDataInclusions.push(structuredClone(value.packDataInclusions[1])); },
+      /duplicate pack data inclusion: daegu:tools\/datapack\/materialize-daegu-route-map-positions\.mjs/,
+    );
+  });
+
+  await context.test("materializer가 요구하는 입력 경로 키가 빠지면 거부된다", async () => {
+    await rejectsWith(
+      (value) => { delete value.packDataInclusions[1].snapshotPath; },
+      /materialize-daegu-route-map-positions\.mjs\.snapshotPath is required/,
+    );
+  });
+
+  await context.test("일반화된 형상의 편입 입력도 저장소 밖을 가리키면 거부된다", async () => {
+    await rejectsWith(
+      (value) => {
+        value.packDataInclusions[1].snapshotPath = "../daegu-transportation-route-map-positions-20260724.json";
+      },
+      /must be a repository-relative path inside the repo/,
+    );
+  });
+
+  // 체인 순서는 임의 배열이 아니다 — route_map·accessibility materializer는 대구 운영기관과 시각표
+  // 소스가 pack에 이미 있을 것을 선행 조건으로 검사하므로, 시각표 편입을 뒤로 미루면 조립이 멈춘다.
+  await context.test("편입 체인 순서를 뒤집으면 선행 조건이 깨져 거부된다", async () => {
+    await rejectsWith(
+      (value) => {
+        value.packDataInclusions = [
+          value.packDataInclusions[1],
+          value.packDataInclusions[0],
+          value.packDataInclusions[2],
+        ];
+      },
+      /Daegu route map positions require daegu-transportation operator pack/,
+    );
+  });
+
+  await context.test("체인 뒤 편입의 선언 행수가 다르면 거부된다", async () => {
+    await rejectsWith(
+      (value) => { value.packDataInclusions[2].addedRows.facilities += 1; },
+      /materialize-daegu-accessibility\.mjs pack data inclusion added rows do not match the spec declaration/,
+    );
+  });
+
+  // 편입마다 신선도 창이 다르므로 기준 시각 pin도 편입 단위다. 한 편입의 pin을 다른 편입의
+  // 창으로 옮기면 그 materializer가 fail closed 해야 한다.
+  await context.test("노선도 편입 기준 시각을 snapshot 포착 이전으로 옮기면 거부된다", async () => {
+    await rejectsWith(
+      (value) => { value.packDataInclusions[1].materializedAt = "2026-07-20T16:00:00.000Z"; },
+      /daegu-transportation-route-map-positions inventory evidence does not match snapshot/,
+    );
+  });
+
+  await context.test("편의시설 편입 기준 시각을 신선도 창 밖으로 옮기면 거부된다", async () => {
+    await rejectsWith(
+      (value) => { value.packDataInclusions[2].materializedAt = "2026-07-25T01:00:00.000Z"; },
+      /daegu-transportation-accessibility evidence freshness is invalid/,
+    );
+  });
+
+  // B2-a 재기술도 B0 파일럿과 같은 축에 묶여 있다: spec만 고쳐서 전환 범위를 넓힐 수 없다.
+  // snapshot 근거가 없는 노선을 spec 내부 정합을 맞춰 끼워 넣어도 admission 정본 결속이 막는다.
+  await context.test("snapshot 근거가 없는 노선을 재기술에 끼워 넣으면 거부된다", async () => {
+    await rejectsWith(
+      (value) => {
+        const entry = value.lineScopeRedescriptions.find(
+          ({ sourceId }) => sourceId === "daegu-transportation-route-map-positions",
+        );
+        entry.lineIds = [...entry.lineIds, "line-8f7ed01f290a"];
+        entry.requirementKeys = [
+          ...entry.requirementKeys,
+          "daegu:korail:line-8f7ed01f290a:route_map_positions",
+        ];
+      },
+      /source inventory coverageScope\.lineIds must match the spec redescription/,
+    );
+  });
 });
 
 // 승계 행 불변 축은 행수가 그대로인 변조를 잡으므로 addedRows 대조가 대신 지켜 주지 못한다.
@@ -509,10 +668,13 @@ test("조립 경로는 승계 행을 변조하는 materializer를 거부한다",
       Object.entries(inheritedPack).filter(([, value]) => Array.isArray(value)).map(([table]) => [table, 0]),
     ),
   }];
-  const materializers = new Map([[materializerId, (fixture) => {
-    const mutated = structuredClone(fixture);
-    mutated.packs[0].stations[0].nameKo = "변조";
-    return mutated;
+  const materializers = new Map([[materializerId, {
+    materialize: (fixture) => {
+      const mutated = structuredClone(fixture);
+      mutated.packs[0].stations[0].nameKo = "변조";
+      return mutated;
+    },
+    inputs: { paths: ["stationMapPath"], linePaths: ["topologySnapshotPath", "timetableSnapshotPath"] },
   }]]);
 
   const workspace = await mkdtemp(path.join(tmpdir(), "nationwide-candidate-gate-inherited-"));
@@ -529,7 +691,9 @@ test("조립 경로는 승계 행을 변조하는 materializer를 거부한다",
         workDir: workspace,
         materializers,
       }),
-      /synthetic pack data inclusion modified inherited rows: stations/,
+      // 편입 정체성 라벨은 (regionId, materializer)다 — 같은 지역을 여러 도메인으로 체인하면
+      // regionId만으로는 어느 편입이 걸렸는지 알 수 없다.
+      /synthetic:test:\/\/mutates-inherited-rows pack data inclusion modified inherited rows: stations/,
     );
   } finally {
     await rm(workspace, { recursive: true, force: true });
