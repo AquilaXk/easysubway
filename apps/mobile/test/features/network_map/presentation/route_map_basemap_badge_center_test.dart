@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 
@@ -219,14 +220,14 @@ _Element _findById(_Element root, String id) {
 //
 // 여기서는 **font-size를 선언하는 규칙만** 골라 자손 결합자 기반 단순 선택자를
 // 해석한다. 그 문법 밖 선택자가 font-size를 선언하면 조용히 넘기지 않고 던진다.
-class _FontSizeRule {
-  _FontSizeRule(this.parts, this.specificity, this.order, this.value);
+class _CssRule {
+  _CssRule(this.parts, this.specificity, this.order, this.value);
 
   /// 문서 앞→뒤 순서의 compound 목록(자손 결합자만).
   final List<({String? tag, String? id, List<String> classes})> parts;
   final int specificity;
   final int order;
-  final double value;
+  final String value;
 }
 
 ({String? tag, String? id, List<String> classes}) _parseCompound(String raw) {
@@ -243,7 +244,7 @@ class _FontSizeRule {
     final match = RegExp(r'^([.#])([A-Za-z_][\w-]*)').firstMatch(rest);
     if (match == null) {
       throw StateError(
-        'font-size를 선언하는 CSS 선택자에 이 게이트가 모르는 조각이 있습니다: "$raw" '
+        'CSS 선택자에 이 게이트가 모르는 조각이 있습니다: "$raw" '
         '— 틀린 기대치를 만들지 않도록 실패합니다.',
       );
     }
@@ -257,29 +258,27 @@ class _FontSizeRule {
   return (tag: tag, id: id, classes: classes);
 }
 
-List<_FontSizeRule> _fontSizeRules(String svg) {
+/// [property]를 선언하는 규칙만 모은다(문법 밖 선택자는 throw).
+List<_CssRule> _declarationRules(String svg, String property) {
   final css = RegExp(r'<style\b[^>]*>([\s\S]*?)</style>')
       .allMatches(svg)
       .map((m) => m.group(1)!)
       .join('\n')
       .replaceAll(RegExp(r'/\*[\s\S]*?\*/'), '');
-  final rules = <_FontSizeRule>[];
+  final rules = <_CssRule>[];
   var order = 0;
   for (final block in RegExp(r'([^{}]+)\{([^{}]*)\}').allMatches(css)) {
     final declaration = RegExp(
-      r'(?:^|;)\s*font-size\s*:\s*([^;]+)',
+      '(?:^|;)\\s*$property\\s*:\\s*([^;]+)',
     ).firstMatch(block.group(2)!);
     if (declaration == null) continue;
-    final value = _length(declaration.group(1)!.trim());
-    if (value == null) {
-      throw StateError('해석할 수 없는 CSS font-size: "${declaration.group(1)}"');
-    }
+    final value = declaration.group(1)!.trim();
     for (final rawSelector in block.group(1)!.split(',')) {
       final selector = rawSelector.trim();
       if (selector.isEmpty) continue;
       if (RegExp(r'[>+~\[\]:]').hasMatch(selector)) {
         throw StateError(
-          'font-size를 선언하는 선택자 "$selector"는 이 게이트의 자손 결합자 문법 밖입니다 '
+          '$property를 선언하는 선택자 "$selector"는 이 게이트의 자손 결합자 문법 밖입니다 '
           '— 실패합니다.',
         );
       }
@@ -296,7 +295,7 @@ List<_FontSizeRule> _fontSizeRules(String svg) {
             part.classes.length * 10 +
             (part.tag != null ? 1 : 0),
       );
-      rules.add(_FontSizeRule(parts, specificity, order++, value));
+      rules.add(_CssRule(parts, specificity, order++, value));
     }
   }
   return rules;
@@ -318,7 +317,7 @@ bool _matchesCompound(
   return compound.classes.every(classes.contains);
 }
 
-bool _matchesRule(_Element node, _FontSizeRule rule) {
+bool _matchesRule(_Element node, _CssRule rule) {
   if (!_matchesCompound(node, rule.parts.last)) return false;
   var current = node.parent;
   for (var index = rule.parts.length - 2; index >= 0; index -= 1) {
@@ -336,16 +335,21 @@ bool _matchesRule(_Element node, _FontSizeRule rule) {
   return true;
 }
 
-/// SVG 명세 우선순위대로 유효 로컬 font-size를 정한다.
-double? _effectiveFontSize(_Element node, List<_FontSizeRule> rules) {
+/// SVG 명세 우선순위(인라인 style > `<style>` 규칙 > presentation attribute)대로
+/// [property]의 유효 선언을 정한다.
+String? _effectiveDeclaration(
+  _Element node,
+  List<_CssRule> rules,
+  String property,
+) {
   final inline = _attr(node.attrs, 'style');
   if (inline != null) {
     final declared = RegExp(
-      r'(?:^|;)\s*font-size\s*:\s*([^;]+)',
+      '(?:^|;)\\s*$property\\s*:\\s*([^;]+)',
     ).firstMatch(inline);
-    if (declared != null) return _length(declared.group(1)!.trim());
+    if (declared != null) return declared.group(1)!.trim();
   }
-  _FontSizeRule? winner;
+  _CssRule? winner;
   for (final rule in rules) {
     if (!_matchesRule(node, rule)) continue;
     if (winner == null ||
@@ -355,7 +359,63 @@ double? _effectiveFontSize(_Element node, List<_FontSizeRule> rules) {
     }
   }
   if (winner != null) return winner.value;
-  return _length(_attr(node.attrs, 'font-size'));
+  return _attr(node.attrs, property);
+}
+
+double? _effectiveFontSize(_Element node, List<_CssRule> rules) =>
+    _length(_effectiveDeclaration(node, rules, 'font-size'));
+
+/// SVG 1.1: `alignment-baseline`은 `<text>`에 적용되지 않으므로 dominant만 본다.
+String? _cascadedBaseline(_Element node, List<_CssRule> rules) =>
+    _effectiveDeclaration(node, rules, 'dominant-baseline');
+
+// ── 번들 폰트 메트릭 판독(게이트 독립 구현) ───────────────────────────────────
+//
+// 런타임은 언제나 alphabetic baseline에 그리므로, `dominant-baseline`이 걸린 칩
+// 글자의 기대 baseline y는 `SVG y + ratio × font-size`다. ratio는 **번들 폰트 파일**
+// 에서 직접 읽어 유도한다(파이프라인 구현을 재사용하지 않는 독립 경로).
+//   central = (ascender + descender) / 2 / unitsPerEm   (SVG 1.1 §10.9.2)
+//   middle  = sxHeight / 2 / unitsPerEm
+const _fontPath = 'fonts/Pretendard-Regular.otf';
+
+({int unitsPerEm, int ascender, int descender, int xHeight}) _fontMetrics() {
+  final bytes = File(_fontPath).readAsBytesSync();
+  final data = ByteData.sublistView(bytes);
+  final tableCount = data.getUint16(4);
+  final offsets = <String, int>{};
+  for (var index = 0; index < tableCount; index += 1) {
+    final entry = 12 + index * 16;
+    final tag = String.fromCharCodes(bytes.sublist(entry, entry + 4));
+    offsets[tag] = data.getUint32(entry + 8);
+  }
+  for (final table in <String>['head', 'hhea', 'OS/2']) {
+    if (!offsets.containsKey(table)) {
+      throw StateError('$_fontPath: $table 테이블이 없어 메트릭을 읽을 수 없습니다.');
+    }
+  }
+  return (
+    unitsPerEm: data.getUint16(offsets['head']! + 18),
+    ascender: data.getInt16(offsets['hhea']! + 4),
+    descender: data.getInt16(offsets['hhea']! + 6),
+    xHeight: data.getInt16(offsets['OS/2']! + 86),
+  );
+}
+
+double _baselineShiftRatio(String? value) {
+  final metrics = _fontMetrics();
+  switch ((value ?? '').trim()) {
+    case '':
+    case 'auto':
+    case 'baseline':
+    case 'alphabetic':
+      return 0;
+    case 'central':
+      return (metrics.ascender + metrics.descender) / 2 / metrics.unitsPerEm;
+    case 'middle':
+      return metrics.xHeight / 2 / metrics.unitsPerEm;
+    default:
+      throw StateError('게이트가 모르는 dominant-baseline: $value');
+  }
 }
 
 // ── 대조 기대치(오너 SVG에서 유도) ────────────────────────────────────────────
@@ -366,6 +426,7 @@ class _Expectation {
     required this.text,
     required this.anchorX,
     required this.fontSize,
+    required this.baselineY,
     required this.capsuleTop,
     required this.capsuleBottom,
   });
@@ -379,6 +440,10 @@ class _Expectation {
   /// 오너 유효 로컬 font-size × 누적 균일 스케일 = 렌더돼야 할 크기.
   final double fontSize;
 
+  /// 오너 SVG y에 dominant-baseline 전개를 적용하고 조상 transform까지 반영한
+  /// **기대 baseline y**. `.vec`가 이 값과 다르면 글자가 캡슐 안에서 어긋난다.
+  final double baselineY;
+
   /// 이 텍스트가 담겨야 할 캡슐 rect의 세로 범위(절대 좌표).
   final double capsuleTop;
   final double capsuleBottom;
@@ -388,7 +453,8 @@ class _Expectation {
 List<_Expectation> _expectationsFrom(
   String svg,
   _Element group,
-  List<_FontSizeRule> fontSizeRules,
+  List<_CssRule> fontSizeRules,
+  List<_CssRule> baselineRules,
 ) {
   final results = <_Expectation>[];
   void walk(_Element node) {
@@ -421,12 +487,16 @@ List<_Expectation> _expectationsFrom(
         if (x == null || y == null) {
           throw StateError('$id: x·y 선언이 없어 앵커를 유도할 수 없습니다.');
         }
+        final ratio = _baselineShiftRatio(
+          _cascadedBaseline(text, baselineRules),
+        );
         results.add(
           _Expectation(
             label: id,
             text: _textOf(svg, text),
             anchorX: _apply(matrix, x, y).x,
             fontSize: localFontSize * scale,
+            baselineY: _apply(matrix, x, y + ratio * localFontSize).y,
             capsuleTop: math.min(top.y, bottom.y),
             capsuleBottom: math.max(top.y, bottom.y),
           ),
@@ -449,7 +519,8 @@ void main() {
     final expectations = _expectationsFrom(
       svg,
       _findById(root, _chipLayerId),
-      _fontSizeRules(svg),
+      _declarationRules(svg, 'font-size'),
+      _declarationRules(svg, 'dominant-baseline'),
     );
     expect(
       expectations,
@@ -461,6 +532,7 @@ void main() {
     final failures = <String>[];
     var worstFontDelta = 0.0;
     var worstAnchorDelta = 0.0;
+    var worstBaselineDelta = 0.0;
 
     for (final expectation in expectations) {
       final candidates = draws
@@ -501,6 +573,18 @@ void main() {
           '(Δ=${fontDelta.toStringAsFixed(4)}).',
         );
       }
+      // 세로는 **기대 baseline과의 일치**로 본다. 캡슐 범위(±1.1em)만 보면
+      // dominant-baseline 전개가 통째로 빠져도 green이 된다(#2593 리뷰 실증).
+      final baselineDelta = (draw.y - expectation.baselineY).abs();
+      worstBaselineDelta = math.max(worstBaselineDelta, baselineDelta);
+      if (baselineDelta >= _epsilon) {
+        failures.add(
+          '${expectation.label}("${expectation.text}"): baseline y 이탈 — '
+          '.vec ${draw.y.toStringAsFixed(3)} ↔ 오너 SVG 유도 '
+          '${expectation.baselineY.toStringAsFixed(3)} '
+          '(Δ=${baselineDelta.toStringAsFixed(3)}). dominant-baseline 전개가 어긋났다.',
+        );
+      }
       if (draw.y < expectation.capsuleTop ||
           draw.y > expectation.capsuleBottom) {
         failures.add(
@@ -516,6 +600,7 @@ void main() {
     print(
       '[basemap-chip-text] 칩 텍스트 ${expectations.length}건 대조 · '
       '최대 font-size Δ ${worstFontDelta.toStringAsFixed(6)} · '
+      '최대 baseline Δ ${worstBaselineDelta.toStringAsFixed(6)} · '
       '최대 앵커 Δ ${worstAnchorDelta.toStringAsFixed(6)}',
     );
     expect(

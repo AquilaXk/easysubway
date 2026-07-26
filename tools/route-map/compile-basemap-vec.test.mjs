@@ -1419,3 +1419,77 @@ test("텍스트 스케일 평탄화: 비균일·기울임 transform은 조용히
     /균일 스케일이 아닌 transform/,
   );
 });
+
+test("좌표 리스트: 자식 tspan 안의 글자까지 세어 조용한 절단을 막는다(#2593 리뷰)", () => {
+  // 종전에는 직접 문자 데이터만 세어 글리프 수가 0이 되고 무조건 접혔다.
+  assert.throws(
+    () =>
+      resolveGlyphCoordinateLists(
+        '<svg><text x="1 20 30" y="2"><tspan>가나다</tspan></text></svg>',
+      ),
+    /단일 값으로 접을 수 없습니다/,
+  );
+  assert.throws(
+    () =>
+      resolveGlyphCoordinateLists('<svg><text x="1 20"><tspan>가</tspan>나</text></svg>'),
+    /단일 값으로 접을 수 없습니다/,
+  );
+});
+
+test("텍스트 스케일 평탄화: 상속 font-size·stroke-width도 s배해 요소에 명시한다(#2593 리뷰)", () => {
+  const out = flattenTextScale(
+    '<svg><g transform="scale(0.5)" font-size="12" stroke="#FFFFFF" stroke-width="4">' +
+      '<text x="10" y="20">가</text></g></svg>',
+  );
+  // 원본 렌더 크기 12 × 0.5 = 6. 상속을 놓치면 12로 그려진다(2배).
+  assert.match(out, /<text[^>]*font-size="6"/);
+  assert.match(out, /<text[^>]*stroke-width="2"/);
+});
+
+test("텍스트 스케일 평탄화: 상속 font-size조차 없으면 조용히 넘기지 않고 던진다", () => {
+  assert.throws(
+    () => flattenTextScale('<svg><g transform="scale(0.5)"><text x="1" y="1">가</text></g></svg>'),
+    /font-size 선언을 요소에서도 조상에서도 찾지 못해/,
+  );
+});
+
+test("dominant-baseline: y 미선언 <text>에도 명시적 y를 붙인다(#2593 리뷰)", () => {
+  const ratio = baselineShiftRatio("central");
+  const out = expandDominantBaseline(
+    '<svg><text x="5" font-size="20" dominant-baseline="central">1</text></svg>',
+  );
+  // 종전에는 속성만 지워져 0.355469×20 = 7.11px 이동이 통째로 사라졌다.
+  assert.match(out, new RegExp(`y="${(ratio * 20).toFixed(4).replace(/0+$/, "")}"`));
+});
+
+test("dominant-baseline: <tspan>이 baseline을 선언하면 조용히 무시하지 않고 던진다", () => {
+  assert.throws(
+    () =>
+      expandDominantBaseline(
+        '<svg><text x="5" y="10" font-size="20">' +
+          '<tspan y="10" dominant-baseline="central">1</tspan></text></svg>',
+      ),
+    /이 전개는 부모 <text> 선언만 해석하므로/,
+  );
+});
+
+test("non-scaling-stroke: 상속 stroke-width를 해석하고 컨테이너 선언은 no-op이다(#2593 리뷰)", () => {
+  const inherited = normalizeSvgForCompile(
+    '<svg viewBox="0 0 10 10"><g transform="scale(0.5)" stroke-width="2">' +
+      '<path vector-effect="non-scaling-stroke" stroke="#000000" d="M0 0 L1 1" /></g></svg>',
+  );
+  // 상속값 2를 스케일 0.5의 역수로 나눠 4로 명시한다(컴파일러가 다시 0.5를 곱한다).
+  assert.match(inherited, /<path[^>]*stroke-width="4"/);
+  // `<g>`의 vector-effect는 SVG 2에서 상속되지 않아 렌더 no-op — 던지지 않는다.
+  const container = normalizeSvgForCompile(
+    '<svg viewBox="0 0 10 10"><g vector-effect="non-scaling-stroke">' +
+      '<path stroke="#000000" stroke-width="2" d="M0 0 L1 1" /></g></svg>',
+  );
+  assert.match(container, /<path[^>]*stroke-width="2"/);
+});
+
+test("matchFontWeight: 400~500 구간은 사양대로 500 이하를 먼저 본다(450 경계 없음)", () => {
+  assert.equal(matchFontWeight(430, [300, 500, 600]), 500);
+  assert.equal(matchFontWeight(460, [300, 500, 600]), 500);
+  assert.equal(matchFontWeight(430, [300, 600]), 300);
+});

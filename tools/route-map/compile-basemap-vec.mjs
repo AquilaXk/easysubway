@@ -96,8 +96,7 @@ const BUNDLED_TEXT_FONT_WEIGHTS = [400, 600, 700, 800, 900];
 /**
  * CSS Fonts 4 §5.2 "font-weight 매칭"을 [available]에 적용한다.
  *   - 목표가 정확히 있으면 그것.
- *   - 400 ≤ 목표 < 450: 500을 먼저, 그다음 목표 미만 내림차순, 그다음 오름차순.
- *   - 450 ≤ 목표 ≤ 500: 목표 이상 500 이하 오름차순, 그다음 목표 미만 내림차순,
+ *   - 400 ≤ 목표 ≤ 500: 목표 이상 500 이하 오름차순, 그다음 목표 미만 내림차순,
  *     그다음 500 초과 오름차순.
  *   - 목표 < 400: 목표 미만 내림차순, 그다음 목표 초과 오름차순.
  *   - 목표 > 500: 목표 초과 오름차순, 그다음 목표 미만 내림차순.
@@ -111,14 +110,12 @@ export function matchFontWeight(target, available = BUNDLED_TEXT_FONT_WEIGHTS) {
   const below = pool.filter((w) => w < target).sort((a, b) => b - a);
   const above = pool.filter((w) => w > target).sort((a, b) => a - b);
   const order = [];
-  if (target >= 400 && target < 450) {
-    if (pool.includes(500)) order.push(500);
-    order.push(...below, ...above);
-  } else if (target >= 450 && target <= 500) {
+  if (target >= 400 && target <= 500) {
+    // 400~500: 목표 이상 500 이하를 오름차순 → 목표 미만 내림차순 → 500 초과 오름차순.
     order.push(
-      ...above.filter((w) => w <= 500),
+      ...above.filter((weight) => weight <= 500),
       ...below,
-      ...above.filter((w) => w > 500),
+      ...above.filter((weight) => weight > 500),
     );
   } else if (target < 400) {
     order.push(...below, ...above);
@@ -179,9 +176,7 @@ const supportedClassStyleProperties = new Set([
   "fill-opacity",
   "font-family",
   "font-size",
-  "font-style",
   "font-weight",
-  "letter-spacing",
   "opacity",
   "paint-order",
   "stroke",
@@ -196,6 +191,28 @@ const supportedClassStyleProperties = new Set([
   "r",
   // non-scaling-stroke는 expandNonScalingStroke가 stroke-width로 동치 전개한다.
   "vector-effect",
+]);
+
+// ── 표현 불가 property(#2593 리뷰 Major, 2026-07-26) ─────────────────────────
+//
+// 준수 렌더러는 반영하지만 `.vec` 형식이 **담을 자리가 없는** property다.
+// vector_graphics_codec 1.1.13의 `TextConfig`는 text·xAnchorMultiplier·fontFamily·
+// fontWeight·fontSize·decoration 3종만 싣는다 — letter-spacing·word-spacing·
+// font-style 필드가 아예 없어, 컴파일러가 값을 읽어도 인코딩에서 사라진다.
+//
+// 그래서 이 property들은 supportedClassStyleProperties(= 인라인하면 렌더에 반영되는
+// 목록)에 두지 않는다. 대신
+//   ① 캐스케이드가 유효값을 요소에 그대로 인라인해 컴파일 입력이 오너 SVG의 의미를
+//      잃지 않게 하고(원본이 정본),
+//   ② `unrepresentableTextDeclarations()`가 건수를 세어 산출 로그·게이트에 드러낸다
+//      — 조용한 유실을 금지한다.
+// 재현하려면 글자별 x 좌표로 펼쳐야 하는데, 번들 폰트의 advance·커닝을 해석해
+// 텍스트마다 글리프 수만큼 `<tspan>`을 만들어야 한다(텍스트 draw 3~4배 증가,
+// text-anchor 청크 의미 변경). 비용·회귀 위험이 커서 #2571에 후속으로 남긴다.
+export const UNREPRESENTABLE_TEXT_PROPERTIES = new Set([
+  "letter-spacing",
+  "word-spacing",
+  "font-style",
 ]);
 
 function extractGroup(svgText, groupId) {
@@ -378,37 +395,7 @@ export function resolveStationNameLabelLayerId(svgText) {
   return classMatch ? classMatch[1] : null;
 }
 
-/**
- * 레이어 id 하나를 본문/장식/구조 래퍼로 분류한다. 세 목록 어디에도 없으면
- * "unclassified" — 분류 완전성 게이트가 실패한다(조용한 누락·조용한 반입 금지).
- */
-export function classifyLayerId(layerId, labelLayerId) {
-  if (layerId === labelLayerId) return "map-body";
-  if (MAP_BODY_LAYER_IDS.includes(layerId)) return "map-body";
-  if (EXCLUDED_DECOR_LAYER_ID_SET.has(layerId)) return "decor";
-  if (STRUCTURAL_WRAPPER_LAYER_IDS.includes(layerId)) return "structural";
-  return "unclassified";
-}
 
-/** 권역 SVG의 레이어 후보 id 전수(= 분류 게이트 입력). */
-export function svgLayerCandidateIds(svgText) {
-  const ids = new Set();
-  for (const match of svgText.matchAll(/<g\b[^>]*>/g)) {
-    const tag = match[0];
-    const id = (tag.match(/\bid="([^"]*)"/) || [])[1];
-    if (!id) continue;
-    const className = (tag.match(/\bclass="([^"]*)"/) || [])[1] ?? "";
-    const classes = className.split(/\s+/);
-    if (
-      id.endsWith("-layer") ||
-      classes.includes("render-layer") ||
-      classes.includes("label-layer")
-    ) {
-      ids.add(id);
-    }
-  }
-  return [...ids].sort(codepointCompare);
-}
 
 // ── KTX·SRT 표장 전수 수집(#2068 오너 지적 2026-07-26) ────────────────────────
 //
@@ -471,8 +458,10 @@ function buildSvgTree(svgText) {
   return root;
 }
 
+// 속성명 앞을 공백/태그시작으로 앵커한다. `\b`는 `-`와 문자 사이에서도 성립해
+// `data-curve-style="round"`(daegu v3 실재)가 `style` 조회에 잡힌다(#2593 리뷰).
 function nodeAttr(node, name) {
-  return (node.openTag.match(new RegExp(`\\b${name}="([^"]*)"`)) || [])[1];
+  return (node.openTag.match(new RegExp(`(?:^|\\s)${name}="([^"]*)"`)) || [])[1];
 }
 
 function isHiddenNode(node) {
@@ -1037,7 +1026,8 @@ export function resolveMediaBlocks(css) {
     }
     if (depth !== 0) throw new Error("@media 블록의 닫는 중괄호를 찾지 못했습니다.");
     const body = css.slice(at + header[0].length, index);
-    if (query === TARGET_CSS_MEDIA || query === "all") result += body;
+    // 본문에 또 다른 at-rule이 중첩될 수 있으므로 재귀로 다시 평가한다.
+    if (query === TARGET_CSS_MEDIA || query === "all") result += resolveMediaBlocks(body);
     cursor = index + 1;
   }
 }
@@ -1073,7 +1063,11 @@ export function parseStylesheet(svgText) {
       const important = /!important\s*$/.test(rawValue);
       const value = rawValue.replace(/\s*!important\s*$/, "").trim();
       const neutral = isRenderNeutralDeclaration(property, value);
-      if (!neutral && !supportedClassStyleProperties.has(property)) {
+      if (
+        !neutral &&
+        !supportedClassStyleProperties.has(property) &&
+        !UNREPRESENTABLE_TEXT_PROPERTIES.has(property)
+      ) {
         // 실제로 요소에 적용될 때 던진다(적용되지 않는 규칙은 무해하다).
         declarations.push({ property, value, important, unsupported: true });
         continue;
@@ -1104,27 +1098,46 @@ export function parseStylesheet(svgText) {
 // .vec는 원본 viewBox 좌표계를 그대로 쓰므로, 요소의 누적 스케일 s로 stroke-width를
 // **나눠 두면** 컴파일러가 다시 s를 곱해 viewport 단위 폭이 선언값 그대로 남는다 —
 // 사양과 동치인 전개다(맞춘 계수가 아니라 s의 역수). 균일 스케일이 아니면 던진다.
+// 렌더 대상이 아닌 컨테이너 요소(자신은 stroke를 그리지 않는다).
+const CONTAINER_ELEMENT_NAMES = new Set([
+  "svg",
+  "g",
+  "defs",
+  "symbol",
+  "marker",
+  "clipPath",
+  "mask",
+  "pattern",
+  "switch",
+  "a",
+]);
+
 function expandNonScalingStroke(svgText) {
   const root = buildSvgTree(svgText);
   const edits = [];
   (function walk(node) {
     for (const child of node.children) {
       const effect = declaredStyleOrAttr(child.openTag, "vector-effect");
-      if (effect === "non-scaling-stroke") {
+      // SVG 2 §13.4에서 vector-effect는 **상속되지 않는다** — 컨테이너(`<g>` 등)에
+      // 붙은 선언은 렌더에 아무 영향이 없는 no-op이므로 건드리지 않는다.
+      if (effect === "non-scaling-stroke" && !CONTAINER_ELEMENT_NAMES.has(child.name)) {
         const matrix = composeMatrix(
           ancestorMatrixOf(child),
           parseTransformChain(firstAttr(child.openTag, "transform")),
         );
         const describe = `<${child.name}>(${firstAttr(child.openTag, "id") ?? "id 없음"})`;
         const { scale } = decomposeUniformScale(matrix, describe);
-        const width = declaredStyleOrAttr(child.openTag, "stroke-width");
-        if (width == null) {
-          throw new Error(
-            `${describe}: vector-effect:non-scaling-stroke인데 stroke-width 선언이 없어 ` +
-              "viewport 단위 폭을 확정할 수 없습니다 — 실패합니다.",
-          );
-        }
-        let openTag = scaleLengthDeclaration(child.openTag, "stroke-width", 1 / scale);
+        // stroke-width는 상속 property다 — 조상 선언까지 보고, 아무도 선언하지
+        // 않았으면 SVG 초기값 1을 쓴다(사양값이라 맞춘 계수가 아니다).
+        const width = inheritedStyleOrAttr(child, "stroke-width") ?? "1";
+        let openTag = /\sstroke-width="[^"]*"/.test(child.openTag) ||
+          /stroke-width\s*:/.test(firstAttr(child.openTag, "style") ?? "")
+          ? scaleLengthDeclaration(child.openTag, "stroke-width", 1 / scale)
+          : withProperty(
+              child.openTag,
+              "stroke-width",
+              String(roundCoord(Number(String(width).replace(/px$/, "")) / scale)),
+            );
         openTag = openTag
           .replace(/\svector-effect="[^"]*"/g, "")
           .replace(/\sstyle="([^"]*)"/, (_m, styleValue) => {
@@ -1141,6 +1154,18 @@ function expandNonScalingStroke(svgText) {
     }
   })(root);
   return applyOpenTagEdits(svgText, edits);
+}
+
+/**
+ * 조상 체인까지 거슬러 상속 property의 유효 선언을 찾는다.
+ * (font-size·stroke-width·letter-spacing 등 SVG 상속 property용.)
+ */
+function inheritedStyleOrAttr(node, property) {
+  for (let current = node; current && current.name !== "#root"; current = current.parent) {
+    const value = declaredStyleOrAttr(current.openTag, property);
+    if (value != null && value !== "" && value !== "inherit") return value;
+  }
+  return null;
 }
 
 /** 여는 태그 자체가 display:none을 선언하는지(속성형·인라인 style형). */
@@ -1220,7 +1245,12 @@ export function applyStylesheet(svgText) {
         const inline = parseInlineStyle(openTag);
         let inlineChanged = false;
         for (const [property, declaration] of winners) {
-          if (declaration.unsupported && !inline.has(property) && !hidden) {
+          // `!important`는 인라인 style도 이기므로 인라인 선언 유무와 무관하게 던진다.
+          if (
+            declaration.unsupported &&
+            (declaration.important || !inline.has(property)) &&
+            !hidden
+          ) {
             throw new Error(
               `분류되지 않은 CSS 선언이 실제 요소에 적용됩니다: "${property}: ${declaration.value}" ` +
                 `(${child.openTag.slice(0, 120)}). 렌더에 영향이 있으면 ` +
@@ -1259,7 +1289,10 @@ export function applyStylesheet(svgText) {
   for (const edit of edits.sort((a, b) => b.start - a.start)) {
     result = result.slice(0, edit.start) + edit.openTag + result.slice(edit.start + edit.length);
   }
-  return result;
+  // 전개가 끝난 `<style>` 블록은 컴파일 입력에서 지운다 — 컴파일러가 읽지 않는
+  // 원본 CSS가 남아 있으면 "요소 선언이 정본"이라는 이 단계의 계약이 흐려지고,
+  // 뒤따르는 단계(font-weight 확정 등)가 죽은 텍스트까지 훑는다.
+  return result.replace(/\s*<style\b[^>]*>[\s\S]*?<\/style>/g, "");
 }
 
 // compiled-map-coordinate-layer 래퍼의 `scale(k)`에서 k를 파싱한다(없으면 1).
@@ -2442,6 +2475,18 @@ function scaleCoordinateDeclaration(openTag, name, factor) {
   );
 }
 
+/** 조상 체인에서 상속되는 font-size(로컬 단위). 없으면 null. */
+function inheritedFontSizeOf(node) {
+  for (let current = node; current && current.name !== "#root"; current = current.parent) {
+    const declared = declaredStyleOrAttr(current.openTag, "font-size");
+    if (declared != null) {
+      const value = Number(String(declared).replace(/px$/, ""));
+      if (Number.isFinite(value)) return value;
+    }
+  }
+  return null;
+}
+
 /** `<text>` 자신·자손의 유효 font-size(로컬 단위). 없으면 null. */
 function effectiveFontSize(openTag, inherited) {
   const declared = declaredStyleOrAttr(openTag, "font-size");
@@ -2467,6 +2512,20 @@ function effectiveFontSize(openTag, inherited) {
 // 실측(5권역): 부산 v3 벡스코 `dy="0 0 … 59.27"`(19값, 글자 3)만 해당하고 적용
 // 범위 안 값이 전부 0이라 동치로 접힌다. 나머지 권역은 리스트 0건이다.
 const GLYPH_COORDINATE_ATTRIBUTES = ["x", "y", "dx", "dy"];
+
+/**
+ * 요소가 여는 텍스트 청크의 **자손 문자 데이터 전체**.
+ *
+ * SVG 1.1 §10.5에서 `x`/`y`/`dx`/`dy` 리스트는 그 요소가 여는 청크의 **자손 글리프
+ * 전부**에 적용된다. 직접 문자 데이터만 세면 `<text x="1 20 30"><tspan>가나다</tspan></text>`
+ * 에서 글리프 수가 0이 돼 리스트가 조용히 첫 토큰으로 잘린다(#2593 리뷰 실증).
+ */
+function chunkTextOf(svgText, node) {
+  if (node.openTag.endsWith("/>")) return "";
+  const innerStart = node.start + node.openTag.length;
+  const innerEnd = Math.max(node.end - `</${node.name}>`.length, innerStart);
+  return svgText.slice(innerStart, innerEnd).replace(/<[^>]*>/g, "");
+}
 
 /** 요소의 **직접** 문자 데이터(자식 요소 내용 제외). */
 function directTextOf(svgText, node) {
@@ -2509,7 +2568,7 @@ export function resolveGlyphCoordinateLists(svgText) {
             `${describe}: 텍스트 요소가 아닌데 좌표 리스트를 씁니다 — 해석 규칙이 없어 실패합니다.`,
           );
         }
-        const glyphs = glyphCount(directTextOf(svgText, child));
+        const glyphs = glyphCount(chunkTextOf(svgText, child));
         const applied = tokens.slice(0, Math.max(glyphs, 0));
         const tail = applied.slice(1);
         const foldable =
@@ -2564,7 +2623,11 @@ export function expandDominantBaseline(svgText) {
               .filter((item) => !/^(?:dominant|alignment)-baseline\s*:/.test(item));
             return kept.length ? ` style="${kept.join(";")}"` : "";
           });
-      const textFontSize = effectiveFontSize(child.openTag, null);
+      // font-size는 상속 property다 — 자기 선언이 없으면 조상까지 본다.
+      const textFontSize = effectiveFontSize(
+        child.openTag,
+        inheritedFontSizeOf(child.parent),
+      );
       const push = (node_, openTag) => {
         if (openTag !== node_.openTag) {
           edits.push({ start: node_.start, length: node_.openTag.length, openTag });
@@ -2581,12 +2644,27 @@ export function expandDominantBaseline(svgText) {
         stripBaseline(
           ratio === 0
             ? child.openTag
-            : shiftDeclaredY(child.openTag, ratio * textFontSize),
+            : shiftDeclaredY(child.openTag, ratio * textFontSize, {
+                defaultWhenAbsent: true,
+              }),
         ),
       );
       (function walkTspans(parent, inheritedFontSize) {
         for (const tspan of parent.children) {
           if (tspan.name !== "tspan") continue;
+          // SVG 1.1 §10.9.2에서 alignment-baseline은 tspan에 적용되고
+          // dominant-baseline도 tspan에서 재선언될 수 있다. 이 전개는 부모 `<text>`
+          // 선언만 해석하므로, tspan 자신의 선언은 조용히 무시하지 않고 던진다
+          // (현행 5권역 실측 0건 — 오너 SVG에 생기면 사람이 판정해야 한다).
+          for (const property of ["dominant-baseline", "alignment-baseline"]) {
+            const declared = declaredStyleOrAttr(tspan.openTag, property);
+            if (declared != null && baselineShiftRatio(declared) !== 0) {
+              throw new Error(
+                `<tspan>이 ${property}="${declared}"를 선언했습니다 — 이 전개는 ` +
+                  "부모 <text> 선언만 해석하므로 조용히 무시하지 않고 실패합니다.",
+              );
+            }
+          }
           const own = effectiveFontSize(tspan.openTag, inheritedFontSize);
           if (ratio !== 0) {
             push(tspan, shiftDeclaredY(tspan.openTag, ratio * own));
@@ -2599,12 +2677,23 @@ export function expandDominantBaseline(svgText) {
   return applyOpenTagEdits(svgText, edits);
 }
 
-/** 여는 태그의 절대 y를 shift만큼 내린다(y 미선언이면 그대로 — 펜이 부모에서 온다). */
-function shiftDeclaredY(openTag, shift) {
-  return openTag.replace(
-    /\sy="(-?[\d.]+)"/,
-    (_m, value) => ` y="${roundCoord(Number(value) + shift)}"`,
-  );
+/**
+ * 여는 태그의 절대 y를 shift만큼 내린다.
+ *
+ * `<text>`가 y를 선언하지 않으면 SVG 기본값 y=0이므로 **명시적으로 붙인다** —
+ * 그냥 두면 baseline 속성만 제거돼 이동량이 통째로 사라진다(#2593 리뷰 실증).
+ * `<tspan>`은 y 미선언이 "부모에서 온 펜을 그대로 쓴다"는 뜻이고 부모가 이미
+ * 이동했으므로 건드리지 않는다.
+ */
+function shiftDeclaredY(openTag, shift, { defaultWhenAbsent = false } = {}) {
+  if (/\sy="(-?[\d.]+)"/.test(openTag)) {
+    return openTag.replace(
+      /\sy="(-?[\d.]+)"/,
+      (_m, value) => ` y="${roundCoord(Number(value) + shift)}"`,
+    );
+  }
+  if (!defaultWhenAbsent) return openTag;
+  return withProperty(openTag, "y", String(roundCoord(shift)));
 }
 
 /** 여는 태그 교체 편집 목록을 뒤에서부터 적용한다. */
@@ -2692,6 +2781,45 @@ const TEXT_SCALED_COORDINATES = ["x", "y", "dx", "dy"];
  * stroke-width로 흡수**하고, 남는 평행이동·회전만 요소 transform으로 남긴다.
  * 스케일이 1인 텍스트는 마크업을 그대로 둔다(산출 바이트 불변).
  */
+/** 여는 태그가 그 property를 직접 선언하는가(속성형·인라인 style형). */
+function declaresLength(openTag, property) {
+  if (new RegExp(`\\s${property}="`).test(openTag)) return true;
+  return new RegExp(`(?:^|;)\\s*${property}\\s*:`).test(firstAttr(openTag, "style") ?? "");
+}
+
+/**
+ * `<text>`가 스스로 선언하지 않은 font-size·stroke-width를 조상에서 해석해
+ * **s배한 값으로 요소에 명시**한다. 해석할 수 없으면 던진다.
+ *
+ * stroke-width는 stroke가 실제로 보일 때만 의미가 있다(보이지 않으면 그리지
+ * 않으므로 명시할 값도 없다). 그때 아무도 선언하지 않았다면 SVG 초기값 1을 쓴다.
+ */
+function withInheritedLengthMaterialized(node, openTag, describe, scale) {
+  let result = openTag;
+  if (!declaresLength(result, "font-size")) {
+    const inherited = inheritedFontSizeOf(node.parent);
+    if (inherited == null) {
+      throw new Error(
+        `${describe}: font-size 선언을 요소에서도 조상에서도 찾지 못해 스케일 ` +
+          "흡수 후 렌더 크기를 확정할 수 없습니다 — 조용히 어긋난 크기를 내지 않고 실패합니다.",
+      );
+    }
+    result = withProperty(result, "font-size", String(roundCoord(inherited * scale)));
+  }
+  if (!declaresLength(result, "stroke-width")) {
+    const stroke = inheritedStyleOrAttr(node, "stroke");
+    if (stroke != null && isVisiblePaint(stroke)) {
+      const width = inheritedStyleOrAttr(node, "stroke-width") ?? "1";
+      const value = Number(String(width).replace(/px$/, ""));
+      if (!Number.isFinite(value)) {
+        throw new Error(`${describe}: stroke-width "${width}"를 해석하지 못했습니다.`);
+      }
+      result = withProperty(result, "stroke-width", String(roundCoord(value * scale)));
+    }
+  }
+  return result;
+}
+
 export function flattenTextScale(svgText) {
   const root = buildSvgTree(svgText);
   const edits = [];
@@ -2715,6 +2843,11 @@ export function flattenTextScale(svgText) {
       for (const name of TEXT_SCALED_COORDINATES) {
         openTag = scaleCoordinateDeclaration(openTag, name, scale);
       }
+      // 유효 행렬에서 스케일을 없애는 이상, **상속된** font-size·stroke-width도
+      // 함께 s배해 요소에 명시해야 크기가 맞는다. 선언을 못 찾으면 조용히 넘기지
+      // 않고 던진다(#2593 리뷰 실증: `<g transform="scale(0.5)" font-size="12">`
+      // 아래 텍스트가 2배로 렌더되는데 경고조차 없었다).
+      openTag = withInheritedLengthMaterialized(child, openTag, describe, scale);
       const residualTransform = serializeSimilarity(residual, `${describe}의 잔여 transform`);
       openTag = /\stransform="[^"]*"/.test(openTag)
         ? openTag.replace(/\stransform="[^"]*"/, ` transform="${residualTransform}"`)
@@ -3153,6 +3286,29 @@ export function decomposePaintOrder(markup) {
   return result;
 }
 
+/**
+ * 컴파일 입력에서 **표현 불가 property가 실제로 걸린 텍스트 요소**를 센다.
+ * 초기값(예: `font-style:normal`)은 렌더 차이가 없으므로 제외한다.
+ */
+export function unrepresentableTextDeclarations(normalizedSvg) {
+  const INITIAL_VALUES = new Map([
+    ["letter-spacing", new Set(["normal", "0", "0px"])],
+    ["word-spacing", new Set(["normal", "0", "0px"])],
+    ["font-style", new Set(["normal"])],
+  ]);
+  const counts = new Map();
+  for (const tag of normalizedSvg.matchAll(/<(?:text|tspan)\b[^>]*>/g)) {
+    for (const property of UNREPRESENTABLE_TEXT_PROPERTIES) {
+      const value = declaredStyleOrAttr(tag[0], property);
+      if (value == null) continue;
+      if (INITIAL_VALUES.get(property)?.has(value.trim())) continue;
+      const key = `${property}:${value.trim()}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+  }
+  return counts;
+}
+
 export function normalizeSvgForCompile(svgText) {
   // ① `<style>` 캐스케이드를 요소 선언으로 전개(컴파일러가 <style>을 못 읽는다).
   //    이후 모든 단계가 "요소에 선언된 값"만 보면 되도록 가장 먼저 둔다.
@@ -3263,6 +3419,17 @@ function main() {
       process.stdout.write(
         `${region.id}.vec  sha256=${digest}  ownerLabels=${ownerLabels.length}\n`,
       );
+      // 표현 불가 property는 조용히 사라지지 않고 산출 로그에 드러낸다(#2593 리뷰).
+      const unrepresentable = unrepresentableTextDeclarations(normalizedSvg);
+      if (unrepresentable.size > 0) {
+        process.stdout.write(
+          `${region.id}.vec  .vec 형식이 담지 못하는 텍스트 선언: ` +
+            `${[...unrepresentable]
+              .sort((a, b) => b[1] - a[1])
+              .map(([key, count]) => `${key} ×${count}`)
+              .join(", ")}\n`,
+        );
+      }
 
       if (verify) {
         const secondVec = path.join(verifyDir, `${region.id}.vec`);

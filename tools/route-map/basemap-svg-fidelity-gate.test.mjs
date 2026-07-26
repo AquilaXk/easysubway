@@ -14,8 +14,8 @@
 // 캔버스 장식(반입 금지): 카드 배경·테두리, 제목/상태 헤더 바, 범례, 상단 노선
 //   설명 박스, 규격 견본 라이브러리, display:none으로 폐기된 레이어.
 //   → 앱이 자체 UI로 그리므로 바탕층에 있으면 지도 위 유령 그래픽이 된다.
-// 분류의 단일 원본은 compile-basemap-vec.mjs의 MAP_BODY_LAYER_IDS /
-// EXCLUDED_DECOR_LAYERS / STRUCTURAL_WRAPPER_LAYER_IDS 세 목록이고, 아래
+// #2593: 전량 반입 계약으로 레이어 분류 완전성 게이트는 삭제했다 — 오너가 SVG에
+// 레이어를 추가하는 것은 계약상 no-op인데 그 게이트가 CI를 세웠기 때문이다. 아래
 // "레이어 분류 완전성" 테스트가 세 목록의 합집합이 실제 SVG를 덮는지 확인한다.
 //
 // ── 독립성 ────────────────────────────────────────────────────────────────
@@ -29,13 +29,9 @@ import path from "node:path";
 import test from "node:test";
 
 import {
-  classifyLayerId,
   collectServiceMarks,
-  decorLayerBoundsOf,
   normalizeSvgForCompile,
   resolveStationNameLabelLayerId,
-  svgLayerCandidateIds,
-  DECOR_SERVICE_MARK_SAMPLE_IDS,
   PAINT_ORDER_STROKE_COPY_ATTR,
 } from "./compile-basemap-vec.mjs";
 
@@ -258,23 +254,6 @@ function findElementEnd(text, startIndex, tagName) {
 }
 
 // ── 게이트 ────────────────────────────────────────────────────────────────
-
-test("레이어 분류 완전성: 5권역 SVG의 모든 레이어가 본문/장식/구조 중 하나로 분류된다", () => {
-  for (const region of REGIONS) {
-    const text = svgTextOf(region);
-    const labelLayerId = resolveStationNameLabelLayerId(text);
-    const unclassified = svgLayerCandidateIds(text).filter(
-      (id) => classifyLayerId(id, labelLayerId) === "unclassified",
-    );
-    assert.deepEqual(
-      unclassified,
-      [],
-      `${region.id}: 분류되지 않은 레이어 — MAP_BODY_LAYER_IDS / EXCLUDED_DECOR_LAYERS / ` +
-        `STRUCTURAL_WRAPPER_LAYER_IDS 중 하나에 사유와 함께 등재해야 한다: ${unclassified.join(", ")}`,
-    );
-    assert.ok(labelLayerId, `${region.id}: 역명 라벨 레이어를 찾지 못했습니다.`);
-  }
-});
 
 test("역명 라벨 전수 ↔ labels.json 1:1 (개수·좌표 Δ<ε·anchor)", () => {
   const sidecar = JSON.parse(readFileSync(labelsSidecarPath, "utf8"));
