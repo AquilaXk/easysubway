@@ -18266,6 +18266,47 @@ test("CI 계약 테스트 스텝은 tools/lib, tools/mobile 테스트 글롭을 
   }
 });
 
+// #2558: 위 하드코딩 목록은 이미 편입된 글롭이 계약 테스트 스텝에서 빠지는 회귀만 잡고,
+// 새로 생긴 디렉토리(tools/routes, tools/qa)나 하위 디렉토리(tools/datapack/lib)는 잡지 못한다.
+// 실제 테스트 파일을 재귀 열거해 ci.yml의 node --test 인자에 반드시 걸리도록 강제한다
+// (#2518의 tools/ 디렉토리 매핑 열거 가드와 동형 — 하드코딩 목록 대신 파일시스템이 원본).
+test("ci.yml의 node --test 인자는 tools/ 하위 모든 테스트 파일을 편입한다", async () => {
+  const workflow = read(".github/workflows/ci.yml");
+  // `--test-name-pattern "..."` 같은 플래그와 값은 .test.mjs로 끝나지 않아 자연히 걸러진다.
+  const declaredArgs = [...workflow.matchAll(/node --test [^\n]*/g)]
+    .flatMap((match) => match[0].split(/\s+/))
+    .filter((token) => token.startsWith("tools/") && token.endsWith(".test.mjs"));
+  assert.ok(declaredArgs.length > 0, "ci.yml must declare at least one tools/ node --test argument");
+
+  // 셸 글롭의 `*`는 `/`를 넘지 않는다. tools/datapack/*.test.mjs가 lib/ 하위를 덮지 못한 원인이므로
+  // 그 의미를 그대로 옮겨야 미편입이 통과로 새지 않는다.
+  const matchers = declaredArgs.map(
+    (glob) =>
+      new RegExp(
+        `^${glob
+          .split("*")
+          .map((part) => part.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+          .join("[^/]*")}$`,
+      ),
+  );
+
+  const entries = await readdir(path.join(root, "tools"), { recursive: true, withFileTypes: true });
+  const testFiles = entries
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".test.mjs"))
+    .map((entry) => path.relative(root, path.join(entry.parentPath, entry.name)))
+    // 설치 산출물(tools/qa의 npm ci 등)은 저장소 자산이 아니라 CI 편입 대상이 아니다.
+    .filter((file) => !file.split("/").includes("node_modules"))
+    .sort();
+  assert.ok(testFiles.length > 0, "tools/ must contain at least one .test.mjs file");
+
+  const orphans = testFiles.filter((file) => !matchers.some((matcher) => matcher.test(file)));
+  assert.deepEqual(
+    orphans,
+    [],
+    `these tools tests run in no .github/workflows/ci.yml node --test step: ${orphans.join(", ")}`,
+  );
+});
+
 // #2518: status voice 인벤토리는 apps/mobile/lib 트리를 스캔하는 drift 가드라,
 // repository 게이트의 계약 테스트 스텝만으로는 Dart 전용 PR(mobile=true, repository=false)에서
 // 스킵된다. mobile 게이트에도 배선되어 있어야 두 변경 클래스가 모두 닫힌다.
