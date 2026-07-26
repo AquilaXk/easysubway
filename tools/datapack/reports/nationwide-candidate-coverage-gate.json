@@ -13,6 +13,28 @@
     "rootPackRuleKo": "게이트는 manifest의 required root pack(emergencyOverride + activePack/default)만 판정하고 각 root pack이 단독으로 coverage 계약을 만족해야 한다. candidate manifest는 이 pack 하나만 root로 둔다.",
     "version": "1"
   },
+  "declaredNonTransitions": {
+    "count": 1,
+    "entries": [
+      {
+        "after": "MISSING",
+        "before": "MISSING",
+        "reasonCode": "NO_SUPPORTING_ROWS_FOR_LINE",
+        "reasonKo": "이 소스는 7호선을 route_graph_topology scope로 덮지만 collector와 materializer가 7호선 구간(network_edges)을 구조적으로 admit하지 않는다 — 인천 구간과 서울 구간의 구간 데이터가 한 소스에 다 있지 않아 반쪽 경로 그래프를 만들지 않기로 한 admission 결정이다. 그래서 이 requirement를 뒷받침할 행이 조립 결과에 한 건도 없고, 이 배치에서는 열리지 않는다. 7호선 route_graph_topology는 서울·인천 구간을 함께 대는 별도 소스가 admit돼야 열린다.",
+        "requirementKey": "capital:incheon-transit:line-15b3b8a93259:route_graph_topology",
+        "sourceDomain": "route_graph_topology",
+        "sourceId": "incheon-transit-station-info",
+        "supportingRecordCountByField": {
+          "distance_meters": 0,
+          "duration_seconds": 0,
+          "network_edges": 0
+        }
+      }
+    ],
+    "modelKo": "재기술이 declare한 requirement 중 이 배치에서 전환되지 않는 것을 명시 선언한 목록이다. 소스가 덮는 노선 중 일부만 전환되는 편입을 표현하려면 이 축이 필요하다 — 재기술 lineIds는 admission 정본과 정확히 같아야 하고 선언한 lineIds는 requirementKeys가 전수 덮어야 하기 때문이다. 이 선언은 전환 범위를 넓히지 못한다: 기대 전환 집합에서 그 키를 빼는 것이 전부이고, 하네스가 ① 그 키가 실제로 SUPPORTED면 거부하고 ② 사유 코드가 요구하는 실측 술어를 확인한다. 선언하지 않은 키가 전환되지 않으면 그대로 fail closed다.",
+    "reasonCodesKo": "NO_SUPPORTING_ROWS_FOR_LINE — 그 scope를 뒷받침하는 official/field-verified provenance 행이 조립 결과에 필드마다 0건임을 하네스가 확인한다(아래 supportingRecordCountByField). 사유가 자유 서술로만 남지 않도록 코드마다 실측 술어를 하나씩 둔다. 새 사유 코드는 그 코드가 요구하는 실측 술어를 함께 넣어야만 allowlist에 오른다.",
+    "scopeKo": "선언 단위는 (sourceId, sourceDomain, lineId)다. 선언은 그 재기술이 declare한 requirement 키 안에서만 고를 수 있어 도메인 전체·소스 전체·와일드카드 선언이 들어올 통로가 없고, 한 재기술의 노선을 전부 선언하면 그 재기술이 아무것도 열지 않게 되므로 거부된다."
+  },
   "determinism": {
     "excludedAxes": [
       "candidate.manifestSha256",
@@ -57,7 +79,7 @@
     },
     "spec": {
       "path": "tools/datapack/nationwide-candidate-pack-spec.json",
-      "sha256": "1599631cdbfaaa0aeba971090445fdc7ad14f1cf407541309244ad4c2699df86"
+      "sha256": "cab6064ded06d9ae0b4adec56733140de4f6f097e05ec34529e2eb41f6a44116"
     },
     "targets": {
       "path": "tools/datapack/nationwide-coverage-targets.json",
@@ -547,10 +569,145 @@
       ],
       "sourceDomain": "route_map_positions",
       "sourceId": "kric-gimpo-goldline-route-map-positions"
+    },
+    {
+      "lineIds": [
+        "line-051552e50435"
+      ],
+      "requirementKeys": [
+        "capital:korail:line-051552e50435:route_map_positions",
+        "capital:operator-38450e138464:line-051552e50435:route_map_positions"
+      ],
+      "sourceDomain": "route_map_positions",
+      "sourceId": "kric-seohae-route-map-positions"
+    },
+    {
+      "lineIds": [
+        "line-8604048b6430"
+      ],
+      "requirementKeys": [
+        "capital:operator-5ca780d7dee1:line-8604048b6430:route_map_positions",
+        "capital:operator-9e999d4aa596:line-8604048b6430:route_map_positions"
+      ],
+      "sourceDomain": "route_map_positions",
+      "sourceId": "kric-gtx-a-route-map-positions"
+    },
+    {
+      "lineIds": [
+        "shinbundang"
+      ],
+      "requirementKeys": [
+        "capital:operator-28e01fb8509d:shinbundang:route_map_positions"
+      ],
+      "sourceDomain": "route_map_positions",
+      "sourceId": "kric-shinbundang-route-map-positions"
+    },
+    {
+      "lineIds": [
+        "line-f0e747248a31"
+      ],
+      "requirementKeys": [
+        "capital:operator-936e454d0bfb:line-f0e747248a31:route_map_positions"
+      ],
+      "sourceDomain": "route_map_positions",
+      "sourceId": "kric-seoul-metro-line9-1-route-map-positions"
+    },
+    {
+      "lineIds": [
+        "line-f0e747248a31"
+      ],
+      "requirementKeys": [
+        "capital:operator-936e454d0bfb:line-f0e747248a31:route_map_positions"
+      ],
+      "sourceDomain": "route_map_positions",
+      "sourceId": "seoul-metro-line9-23-route-map-positions"
+    },
+    {
+      "lineIds": [
+        "line-42b5805f3b5a",
+        "line-98718184f016",
+        "line-15b3b8a93259"
+      ],
+      "nonTransitioningRequirements": [
+        {
+          "reasonCode": "NO_SUPPORTING_ROWS_FOR_LINE",
+          "reasonKo": "이 소스는 7호선을 route_graph_topology scope로 덮지만 collector와 materializer가 7호선 구간(network_edges)을 구조적으로 admit하지 않는다 — 인천 구간과 서울 구간의 구간 데이터가 한 소스에 다 있지 않아 반쪽 경로 그래프를 만들지 않기로 한 admission 결정이다. 그래서 이 requirement를 뒷받침할 행이 조립 결과에 한 건도 없고, 이 배치에서는 열리지 않는다. 7호선 route_graph_topology는 서울·인천 구간을 함께 대는 별도 소스가 admit돼야 열린다.",
+          "requirementKey": "capital:incheon-transit:line-15b3b8a93259:route_graph_topology"
+        }
+      ],
+      "requirementKeys": [
+        "capital:incheon-transit:line-42b5805f3b5a:route_graph_topology",
+        "capital:incheon-transit:line-98718184f016:route_graph_topology",
+        "capital:incheon-transit:line-15b3b8a93259:route_graph_topology"
+      ],
+      "sourceDomain": "route_graph_topology",
+      "sourceId": "incheon-transit-station-info"
+    },
+    {
+      "lineIds": [
+        "line-42b5805f3b5a",
+        "line-98718184f016",
+        "line-15b3b8a93259"
+      ],
+      "requirementKeys": [
+        "capital:incheon-transit:line-42b5805f3b5a:route_map_positions",
+        "capital:incheon-transit:line-98718184f016:route_map_positions",
+        "capital:incheon-transit:line-15b3b8a93259:route_map_positions"
+      ],
+      "sourceDomain": "route_map_positions",
+      "sourceId": "incheon-transit-station-info"
+    },
+    {
+      "lineIds": [
+        "line-42b5805f3b5a",
+        "line-98718184f016",
+        "line-15b3b8a93259"
+      ],
+      "requirementKeys": [
+        "capital:incheon-transit:line-42b5805f3b5a:station_line_membership",
+        "capital:incheon-transit:line-98718184f016:station_line_membership",
+        "capital:incheon-transit:line-15b3b8a93259:station_line_membership"
+      ],
+      "sourceDomain": "station_line_membership",
+      "sourceId": "incheon-transit-station-info"
+    },
+    {
+      "lineIds": [
+        "line-42b5805f3b5a",
+        "line-98718184f016",
+        "line-15b3b8a93259"
+      ],
+      "requirementKeys": [
+        "capital:incheon-transit:line-42b5805f3b5a:accessibility_facilities",
+        "capital:incheon-transit:line-98718184f016:accessibility_facilities",
+        "capital:incheon-transit:line-15b3b8a93259:accessibility_facilities"
+      ],
+      "sourceDomain": "accessibility_facilities",
+      "sourceId": "incheon-transit-accessibility"
+    },
+    {
+      "lineIds": [
+        "line-98718184f016"
+      ],
+      "requirementKeys": [
+        "capital:incheon-transit:line-98718184f016:schedule_timetable"
+      ],
+      "sourceDomain": "schedule_timetable",
+      "sourceId": "incheon-line1-train-timetable"
+    },
+    {
+      "lineIds": [
+        "line-42b5805f3b5a"
+      ],
+      "requirementKeys": [
+        "capital:incheon-transit:line-42b5805f3b5a:schedule_timetable"
+      ],
+      "sourceDomain": "schedule_timetable",
+      "sourceId": "incheon-line2-train-timetable"
     }
   ],
   "packDataInclusions": {
-    "chainKo": "entries는 적용 순서다. 한 지역에 여러 도메인을 편입하면 뒤 편입의 승계 원본은 앞 편입 결과이므로 앞선 편입이 실은 행도 뒤 편입의 불변 대상이 된다. 순서를 조립이 강제하는 구간은 선행 조건이 있는 쌍뿐이다 — 대구 route_map·accessibility는 pack에 대구 시각표 소스가 이미 있을 것을 검사하므로 시각표 편입보다 앞서면 fail closed 되지만, 서로 선행 조건이 없는 두 편입(route_map↔accessibility)은 순서를 바꿔도 조립이 통과한다. 따라서 기록된 전체 순서를 고정하는 축은 조립 fail closed가 아니라 이 entries 배열 순서를 그대로 대조하는 회귀다. 부산은 선행 구조가 대구와 다르다 — 승계 원본에 부산 운영기관·노선·역이 아예 없어 topology 편입이 그 셋을 함께 싣고, 나머지 세 편입(시각표·노선도·편의시설)이 모두 그 소스 등재와 station_lines·network_edges 계보를 선행 조건으로 검사한다. 즉 부산 구간에서 선행 조건이 강제하는 것은 topology가 먼저라는 것뿐이다. 다만 부산 노선도 편입은 승계 원본에 없던 표(routeMapLineTracks)를 새로 만들기 때문에 뒤 세 편입끼리의 교환도 조립을 통과하지 못한다(실측) — 그 표를 0으로 선언해야 하는 편입이 순서에 따라 갈려 선언 행수 대조에서 걸리며, 이는 선행 조건 위반과 다른 축이다. 대전·광주는 부산과 같은 모양이되 편입 단위가 다르다: topology 전용 materializer가 편입이 아니고 시각표 편입 하나가 topology·membership·시각표를 함께 싣는다(대전은 시각표 materializer가 topology materializer를 호출하고, 광주는 한 함수가 세 소스를 함께 등재한다). 그래서 두 지역 모두 시각표 편입이 먼저다 — 노선도·편의시설 materializer는 그 지역 운영기관이 pack에 있을 것과 시각표 소스가 등재돼 있을 것을 함께 선행 조건으로 검사하고, 시각표 편입보다 앞서면 실측상 운영기관 조건에서 먼저 fail closed 된다. 반면 노선도와 편의시설 사이에는 선행 조건이 없어(대구와 같다) 두 편입의 교환은 조립을 통과한다(실측). 수도권 노선도 세 편입은 승계 pack 의존이 아예 없다 — 경로 그래프 계보를 inventory 소스가 아니라 tracked snapshot 파일로 대조하고 역·역노선을 스스로 만들어, 세 편입 사이에도 다른 지역에 대해서도 선행 조건이 없다. 그런데도 순서를 바꾸면 조립이 막힌다(실측): 광역철도 편입이 승계 원본에 없던 표(coverageLineOperatorScopes)를 새로 만들고 환승역 중복 제거 결과(stations·stationLines)도 앞선 편입이 무엇을 실었는지에 따라 갈려, 부산 노선도와 같은 선언 행수 대조가 걸린다. 재정렬 선언(reorderedTables)도 같은 순서에 묶여 있지만(그 표에 승계 행이 있는지가 순서에 따라 갈린다) 실측상 먼저 걸리는 것은 행수 대조다.",
+    "chainKo": "entries는 적용 순서다. 한 지역에 여러 도메인을 편입하면 뒤 편입의 승계 원본은 앞 편입 결과이므로 앞선 편입이 실은 행도 뒤 편입의 불변 대상이 된다. 순서를 조립이 강제하는 구간은 선행 조건이 있는 쌍뿐이다 — 대구 route_map·accessibility는 pack에 대구 시각표 소스가 이미 있을 것을 검사하므로 시각표 편입보다 앞서면 fail closed 되지만, 서로 선행 조건이 없는 두 편입(route_map↔accessibility)은 순서를 바꿔도 조립이 통과한다. 따라서 기록된 전체 순서를 고정하는 축은 조립 fail closed가 아니라 이 entries 배열 순서를 그대로 대조하는 회귀다. 부산은 선행 구조가 대구와 다르다 — 승계 원본에 부산 운영기관·노선·역이 아예 없어 topology 편입이 그 셋을 함께 싣고, 나머지 세 편입(시각표·노선도·편의시설)이 모두 그 소스 등재와 station_lines·network_edges 계보를 선행 조건으로 검사한다. 즉 부산 구간에서 선행 조건이 강제하는 것은 topology가 먼저라는 것뿐이다. 다만 부산 노선도 편입은 승계 원본에 없던 표(routeMapLineTracks)를 새로 만들기 때문에 뒤 세 편입끼리의 교환도 조립을 통과하지 못한다(실측) — 그 표를 0으로 선언해야 하는 편입이 순서에 따라 갈려 선언 행수 대조에서 걸리며, 이는 선행 조건 위반과 다른 축이다. 대전·광주는 부산과 같은 모양이되 편입 단위가 다르다: topology 전용 materializer가 편입이 아니고 시각표 편입 하나가 topology·membership·시각표를 함께 싣는다(대전은 시각표 materializer가 topology materializer를 호출하고, 광주는 한 함수가 세 소스를 함께 등재한다). 그래서 두 지역 모두 시각표 편입이 먼저다 — 노선도·편의시설 materializer는 그 지역 운영기관이 pack에 있을 것과 시각표 소스가 등재돼 있을 것을 함께 선행 조건으로 검사하고, 시각표 편입보다 앞서면 실측상 운영기관 조건에서 먼저 fail closed 된다. 반면 노선도와 편의시설 사이에는 선행 조건이 없어(대구와 같다) 두 편입의 교환은 조립을 통과한다(실측). 수도권 노선도 다섯 편입은 승계 pack 의존이 아예 없다 — 경로 그래프 계보를 inventory 소스가 아니라 tracked snapshot 파일로 대조하고 역·역노선을 스스로 만들어, 다섯 편입 사이에도 다른 지역에 대해서도 선행 조건이 없다. 그런데도 순서를 바꾸면 조립이 막힌다(실측): 광역철도 편입이 승계 원본에 없던 표(coverageLineOperatorScopes)를 새로 만들고 환승역 중복 제거 결과(stations·stationLines)도 앞선 편입이 무엇을 실었는지에 따라 갈려, 부산 노선도와 같은 선언 행수 대조가 걸린다. 9호선 1단계·2·3단계 두 편입의 교환도, 9호선 두 편입을 서울 1~8호선 앞으로 옮기는 것도 같은 행수 대조에서 걸린다(실측). 재정렬 선언(reorderedTables)도 같은 순서에 묶여 있지만(그 표에 승계 행이 있는지가 순서에 따라 갈린다) 실측상 먼저 걸리는 것은 행수 대조다. 인천은 부산과 같은 모양이다 — 승계 원본에 인천 운영기관·노선·역이 아예 없어 역사정보 편입이 그 셋을 함께 싣고, 시각표·편의시설 편입이 그 운영기관 존재를 선행 조건으로 검사해 역사정보보다 앞서면 각각 `Incheon timetable requires incheon-transit operator pack`·`Incheon accessibility requires incheon-transit operator pack`으로 막힌다(실측). 시각표와 편의시설 사이에는 선행 조건이 없어 둘의 교환은 조립을 그대로 통과한다(실측). 인천 구간 전체를 수도권 앞으로 옮기는 것은 선행 조건이 아니라 행수 대조가 막는다: 7호선 노선 레코드와 환승역 4곳(검암·계양·원인재·부천종합운동장)을 수도권 편입이 먼저 실었는지에 따라 역사정보 편입의 lines·stations·coverageLineOperatorScopes 선언이 갈린다(실측).",
     "entries": [
       {
         "addedRows": {
@@ -1139,27 +1296,27 @@
       },
       {
         "addedRows": {
-          "coverageLineOperatorScopes": 6,
+          "coverageLineOperatorScopes": 10,
           "facilities": 0,
-          "lines": 6,
+          "lines": 8,
           "movementPathCandidates": 0,
           "networkEdges": 0,
           "officialOdFareQuotes": 0,
-          "operators": 3,
+          "operators": 6,
           "representativeRouteRegressions": 0,
           "requiredTables": 0,
           "routeMapLineTracks": 0,
-          "routeMapPositions": 187,
+          "routeMapPositions": 217,
           "routeServiceArtifactEvidence": 0,
           "serviceCalendarDates": 0,
           "serviceCalendars": 0,
-          "sourceInventory": 6,
+          "sourceInventory": 8,
           "stationAccessibilitySummaries": 0,
           "stationAliases": 0,
           "stationExits": 0,
           "stationFacilityEvidence": 0,
-          "stationLines": 187,
-          "stations": 175,
+          "stationLines": 217,
+          "stations": 192,
           "transitFeedInfo": 0,
           "transitFrequencies": 0,
           "transitRoutes": 0,
@@ -1176,6 +1333,10 @@
             "sha256": "b09260393e119237f56ab6afed507abfe69be0eab34eb1dd3e0630c4f5d945c3"
           },
           {
+            "path": "tools/datapack/sources/kric-gtx-a-route-map-positions-20260725.json",
+            "sha256": "89bb3e4d5c530b7be3d8f20fc35702f9096feeef43d6dbc392db92877c39ff7a"
+          },
+          {
             "path": "tools/datapack/sources/kric-gyeongchun-route-map-positions-20260725.json",
             "sha256": "0e5321625953e55060a2fea04ac834f226ffd6d048b0afaf7bbc88606db6fd39"
           },
@@ -1186,6 +1347,10 @@
           {
             "path": "tools/datapack/sources/kric-gyeongui-jungang-route-map-positions-20260725.json",
             "sha256": "1519b96fde09ffc1b473762a2645945f9b08a3d6f1acf7b8fdbb17fbe74ffcb9"
+          },
+          {
+            "path": "tools/datapack/sources/kric-seohae-route-map-positions-20260725.json",
+            "sha256": "60363797c18da989a167b9a3a4f86f12b4e56d64c19b99208b4cb8e6e359922c"
           },
           {
             "path": "tools/datapack/sources/kric-suin-bundang-route-map-positions-20260725.json",
@@ -1206,27 +1371,27 @@
       },
       {
         "addedRows": {
-          "coverageLineOperatorScopes": 4,
+          "coverageLineOperatorScopes": 6,
           "facilities": 0,
-          "lines": 4,
+          "lines": 5,
           "movementPathCandidates": 0,
           "networkEdges": 0,
           "officialOdFareQuotes": 0,
-          "operators": 4,
+          "operators": 5,
           "representativeRouteRegressions": 0,
           "requiredTables": 0,
           "routeMapLineTracks": 0,
-          "routeMapPositions": 47,
+          "routeMapPositions": 63,
           "routeServiceArtifactEvidence": 0,
           "serviceCalendarDates": 0,
           "serviceCalendars": 0,
-          "sourceInventory": 4,
+          "sourceInventory": 5,
           "stationAccessibilitySummaries": 0,
           "stationAliases": 0,
           "stationExits": 0,
           "stationFacilityEvidence": 0,
-          "stationLines": 47,
-          "stations": 45,
+          "stationLines": 63,
+          "stations": 58,
           "transitFeedInfo": 0,
           "transitFrequencies": 0,
           "transitRoutes": 0,
@@ -1245,6 +1410,10 @@
           {
             "path": "tools/datapack/sources/kric-gimpo-goldline-route-map-positions-20260725.json",
             "sha256": "0761de1cad5b3a4d46295c1bb79a9d067c7a8c9da64c9c28fdc328d9fb5d7638"
+          },
+          {
+            "path": "tools/datapack/sources/kric-shinbundang-route-map-positions-20260725.json",
+            "sha256": "72b9545dbe723a3ef33883ead8cc2fd5948faf971aa84bbb6d2daeedf7ee4b51"
           },
           {
             "path": "tools/datapack/sources/kric-sillim-route-map-positions-20260725.json",
@@ -1286,7 +1455,7 @@
           "stationExits": 0,
           "stationFacilityEvidence": 0,
           "stationLines": 273,
-          "stations": 217,
+          "stations": 213,
           "transitFeedInfo": 0,
           "transitFrequencies": 0,
           "transitRoutes": 0,
@@ -1305,6 +1474,232 @@
         "reorderedTables": [
           "lines"
         ]
+      },
+      {
+        "addedRows": {
+          "coverageLineOperatorScopes": 1,
+          "facilities": 0,
+          "lines": 1,
+          "movementPathCandidates": 0,
+          "networkEdges": 0,
+          "officialOdFareQuotes": 0,
+          "operators": 1,
+          "representativeRouteRegressions": 0,
+          "requiredTables": 0,
+          "routeMapLineTracks": 0,
+          "routeMapPositions": 25,
+          "routeServiceArtifactEvidence": 0,
+          "serviceCalendarDates": 0,
+          "serviceCalendars": 0,
+          "sourceInventory": 1,
+          "stationAccessibilitySummaries": 0,
+          "stationAliases": 0,
+          "stationExits": 0,
+          "stationFacilityEvidence": 0,
+          "stationLines": 25,
+          "stations": 18,
+          "transitFeedInfo": 0,
+          "transitFrequencies": 0,
+          "transitRoutes": 0,
+          "transitStopTimes": 0,
+          "transitTrips": 0
+        },
+        "inputs": [
+          {
+            "path": "tools/datapack/sources/capital-route-topology-20260724.json",
+            "sha256": "1026e93ae3c6fd81bf9a6ac92b810439fc7e7e9fdd0a7c8167840cb5876d84a4"
+          },
+          {
+            "path": "tools/datapack/sources/kric-seoul-metro-line9-1-route-map-positions-20260725.json",
+            "sha256": "c42e4430e3d25f0d821324e96080235713c70811230ccde8881ffac97f4c23ac"
+          }
+        ],
+        "materializedAt": "2026-07-25T05:00:00.000Z",
+        "materializer": "tools/datapack/materialize-seoul9-phase1-route-map-positions.mjs",
+        "regionId": "capital",
+        "reorderedTables": [
+          "coverageLineOperatorScopes",
+          "lines",
+          "operators"
+        ]
+      },
+      {
+        "addedRows": {
+          "coverageLineOperatorScopes": 1,
+          "facilities": 0,
+          "lines": 0,
+          "movementPathCandidates": 0,
+          "networkEdges": 0,
+          "officialOdFareQuotes": 0,
+          "operators": 0,
+          "representativeRouteRegressions": 0,
+          "requiredTables": 0,
+          "routeMapLineTracks": 0,
+          "routeMapPositions": 13,
+          "routeServiceArtifactEvidence": 0,
+          "serviceCalendarDates": 0,
+          "serviceCalendars": 0,
+          "sourceInventory": 1,
+          "stationAccessibilitySummaries": 0,
+          "stationAliases": 0,
+          "stationExits": 0,
+          "stationFacilityEvidence": 0,
+          "stationLines": 13,
+          "stations": 10,
+          "transitFeedInfo": 0,
+          "transitFrequencies": 0,
+          "transitRoutes": 0,
+          "transitStopTimes": 0,
+          "transitTrips": 0
+        },
+        "inputs": [
+          {
+            "path": "tools/datapack/sources/capital-route-topology-20260724.json",
+            "sha256": "1026e93ae3c6fd81bf9a6ac92b810439fc7e7e9fdd0a7c8167840cb5876d84a4"
+          },
+          {
+            "path": "tools/datapack/sources/seoul-metro-line9-23-route-map-positions-20260725.json",
+            "sha256": "2db140beb94048ca65df3ef455bf45bafa2939812776d4944fe0c73da3517d53"
+          }
+        ],
+        "materializedAt": "2026-07-25T04:00:00.000Z",
+        "materializer": "tools/datapack/materialize-seoul9-route-map-positions.mjs",
+        "regionId": "capital",
+        "reorderedTables": [
+          "coverageLineOperatorScopes"
+        ]
+      },
+      {
+        "addedRows": {
+          "coverageLineOperatorScopes": 2,
+          "facilities": 0,
+          "lines": 2,
+          "movementPathCandidates": 0,
+          "networkEdges": 116,
+          "officialOdFareQuotes": 0,
+          "operators": 1,
+          "representativeRouteRegressions": 0,
+          "requiredTables": 0,
+          "routeMapLineTracks": 0,
+          "routeMapPositions": 71,
+          "routeServiceArtifactEvidence": 0,
+          "serviceCalendarDates": 0,
+          "serviceCalendars": 0,
+          "sourceInventory": 1,
+          "stationAccessibilitySummaries": 0,
+          "stationAliases": 0,
+          "stationExits": 0,
+          "stationFacilityEvidence": 0,
+          "stationLines": 71,
+          "stations": 65,
+          "transitFeedInfo": 0,
+          "transitFrequencies": 0,
+          "transitRoutes": 0,
+          "transitStopTimes": 0,
+          "transitTrips": 0
+        },
+        "inputs": [
+          {
+            "path": "tools/datapack/sources/incheon-transit-station-info-20260724.json",
+            "sha256": "52e5482eb42a40d7e29790a11742e59784753d1a60436ffc35cfea3be8e1b098"
+          }
+        ],
+        "materializedAt": "2026-07-24T06:00:00.000Z",
+        "materializer": "tools/datapack/materialize-incheon-station-info.mjs",
+        "regionId": "incheon",
+        "reorderedTables": [
+          "coverageLineOperatorScopes"
+        ]
+      },
+      {
+        "addedRows": {
+          "coverageLineOperatorScopes": 0,
+          "facilities": 0,
+          "lines": 0,
+          "movementPathCandidates": 0,
+          "networkEdges": 0,
+          "officialOdFareQuotes": 0,
+          "operators": 0,
+          "representativeRouteRegressions": 0,
+          "requiredTables": 0,
+          "routeMapLineTracks": 0,
+          "routeMapPositions": 0,
+          "routeServiceArtifactEvidence": 0,
+          "serviceCalendarDates": 76,
+          "serviceCalendars": 4,
+          "sourceInventory": 2,
+          "stationAccessibilitySummaries": 0,
+          "stationAliases": 0,
+          "stationExits": 0,
+          "stationFacilityEvidence": 0,
+          "stationLines": 0,
+          "stations": 0,
+          "transitFeedInfo": 0,
+          "transitFrequencies": 0,
+          "transitRoutes": 4,
+          "transitStopTimes": 40898,
+          "transitTrips": 1414
+        },
+        "inputs": [
+          {
+            "path": "tools/datapack/sources/incheon-line1-train-timetable-20260724.json",
+            "sha256": "bb0210b9a00cd230306e711c412259d8d59c6dddfdde7b6ba1eecdc9910bbbcd"
+          },
+          {
+            "path": "tools/datapack/sources/incheon-line2-train-timetable-20260724.json",
+            "sha256": "b0df25d6747d63ac1577e4a57b556997bf581da549620b66afd8312fb096e5de"
+          },
+          {
+            "path": "tools/datapack/sources/incheon-transit-station-info-20260724.json",
+            "sha256": "52e5482eb42a40d7e29790a11742e59784753d1a60436ffc35cfea3be8e1b098"
+          }
+        ],
+        "materializedAt": "2026-07-24T08:00:00.000Z",
+        "materializer": "tools/datapack/materialize-incheon-timetable.mjs",
+        "regionId": "incheon"
+      },
+      {
+        "addedRows": {
+          "coverageLineOperatorScopes": 0,
+          "facilities": 213,
+          "lines": 0,
+          "movementPathCandidates": 0,
+          "networkEdges": 0,
+          "officialOdFareQuotes": 0,
+          "operators": 0,
+          "representativeRouteRegressions": 0,
+          "requiredTables": 0,
+          "routeMapLineTracks": 0,
+          "routeMapPositions": 0,
+          "routeServiceArtifactEvidence": 0,
+          "serviceCalendarDates": 0,
+          "serviceCalendars": 0,
+          "sourceInventory": 1,
+          "stationAccessibilitySummaries": 0,
+          "stationAliases": 0,
+          "stationExits": 0,
+          "stationFacilityEvidence": 213,
+          "stationLines": 0,
+          "stations": 0,
+          "transitFeedInfo": 0,
+          "transitFrequencies": 0,
+          "transitRoutes": 0,
+          "transitStopTimes": 0,
+          "transitTrips": 0
+        },
+        "inputs": [
+          {
+            "path": "tools/datapack/sources/incheon-transit-accessibility-20260724.json",
+            "sha256": "b0d6b3efcc4da46ec636a8ed409312d3078c7ff2fa68d7f76a682a19e0ce3ede"
+          },
+          {
+            "path": "tools/datapack/sources/incheon-transit-station-info-20260724.json",
+            "sha256": "52e5482eb42a40d7e29790a11742e59784753d1a60436ffc35cfea3be8e1b098"
+          }
+        ],
+        "materializedAt": "2026-07-24T07:00:00.000Z",
+        "materializer": "tools/datapack/materialize-incheon-accessibility.mjs",
+        "regionId": "incheon"
       }
     ],
     "modelKo": "승계 원본에 없는 지역 행은 tracked materializer가 tracked snapshot을 재생해 조립한다. 저장소에 행을 복제하지 않으므로 아래 입력 해시가 candidate 구성의 유일한 결속 축이며, 실제로 실린 행수(addedRows)가 spec 선언과 다르면(또는 승계 행이 바뀌면) 조립이 fail closed 된다.",
@@ -1532,6 +1927,146 @@
     {
       "after": "SUPPORTED",
       "before": "MISSING",
+      "coveredFields": 5,
+      "denominator": 5,
+      "requirementKey": "capital:incheon-transit:line-15b3b8a93259:accessibility_facilities",
+      "sourceIds": [
+        "incheon-transit-accessibility"
+      ]
+    },
+    {
+      "after": "SUPPORTED",
+      "before": "MISSING",
+      "coveredFields": 2,
+      "denominator": 2,
+      "requirementKey": "capital:incheon-transit:line-15b3b8a93259:route_map_positions",
+      "sourceIds": [
+        "incheon-transit-station-info"
+      ]
+    },
+    {
+      "after": "SUPPORTED",
+      "before": "MISSING",
+      "coveredFields": 3,
+      "denominator": 3,
+      "requirementKey": "capital:incheon-transit:line-15b3b8a93259:station_line_membership",
+      "sourceIds": [
+        "incheon-transit-station-info"
+      ]
+    },
+    {
+      "after": "SUPPORTED",
+      "before": "MISSING",
+      "coveredFields": 5,
+      "denominator": 5,
+      "requirementKey": "capital:incheon-transit:line-42b5805f3b5a:accessibility_facilities",
+      "sourceIds": [
+        "incheon-transit-accessibility"
+      ]
+    },
+    {
+      "after": "SUPPORTED",
+      "before": "MISSING",
+      "coveredFields": 3,
+      "denominator": 3,
+      "requirementKey": "capital:incheon-transit:line-42b5805f3b5a:route_graph_topology",
+      "sourceIds": [
+        "incheon-transit-station-info"
+      ]
+    },
+    {
+      "after": "SUPPORTED",
+      "before": "MISSING",
+      "coveredFields": 2,
+      "denominator": 2,
+      "requirementKey": "capital:incheon-transit:line-42b5805f3b5a:route_map_positions",
+      "sourceIds": [
+        "incheon-transit-station-info"
+      ]
+    },
+    {
+      "after": "SUPPORTED",
+      "before": "MISSING",
+      "coveredFields": 3,
+      "denominator": 3,
+      "requirementKey": "capital:incheon-transit:line-42b5805f3b5a:schedule_timetable",
+      "sourceIds": [
+        "incheon-line2-train-timetable"
+      ]
+    },
+    {
+      "after": "SUPPORTED",
+      "before": "MISSING",
+      "coveredFields": 3,
+      "denominator": 3,
+      "requirementKey": "capital:incheon-transit:line-42b5805f3b5a:station_line_membership",
+      "sourceIds": [
+        "incheon-transit-station-info"
+      ]
+    },
+    {
+      "after": "SUPPORTED",
+      "before": "MISSING",
+      "coveredFields": 5,
+      "denominator": 5,
+      "requirementKey": "capital:incheon-transit:line-98718184f016:accessibility_facilities",
+      "sourceIds": [
+        "incheon-transit-accessibility"
+      ]
+    },
+    {
+      "after": "SUPPORTED",
+      "before": "MISSING",
+      "coveredFields": 3,
+      "denominator": 3,
+      "requirementKey": "capital:incheon-transit:line-98718184f016:route_graph_topology",
+      "sourceIds": [
+        "incheon-transit-station-info"
+      ]
+    },
+    {
+      "after": "SUPPORTED",
+      "before": "MISSING",
+      "coveredFields": 2,
+      "denominator": 2,
+      "requirementKey": "capital:incheon-transit:line-98718184f016:route_map_positions",
+      "sourceIds": [
+        "incheon-transit-station-info"
+      ]
+    },
+    {
+      "after": "SUPPORTED",
+      "before": "MISSING",
+      "coveredFields": 3,
+      "denominator": 3,
+      "requirementKey": "capital:incheon-transit:line-98718184f016:schedule_timetable",
+      "sourceIds": [
+        "incheon-line1-train-timetable"
+      ]
+    },
+    {
+      "after": "SUPPORTED",
+      "before": "MISSING",
+      "coveredFields": 3,
+      "denominator": 3,
+      "requirementKey": "capital:incheon-transit:line-98718184f016:station_line_membership",
+      "sourceIds": [
+        "incheon-transit-station-info"
+      ]
+    },
+    {
+      "after": "SUPPORTED",
+      "before": "MISSING",
+      "coveredFields": 2,
+      "denominator": 2,
+      "requirementKey": "capital:korail:line-051552e50435:route_map_positions",
+      "sourceIds": [
+        "kric-seohae-route-map-positions"
+      ]
+    },
+    {
+      "after": "SUPPORTED",
+      "before": "MISSING",
       "coveredFields": 2,
       "denominator": 2,
       "requirementKey": "capital:korail:line-54a7b980b7c3:route_map_positions",
@@ -1584,6 +2119,16 @@
       "before": "MISSING",
       "coveredFields": 2,
       "denominator": 2,
+      "requirementKey": "capital:operator-28e01fb8509d:shinbundang:route_map_positions",
+      "sourceIds": [
+        "kric-shinbundang-route-map-positions"
+      ]
+    },
+    {
+      "after": "SUPPORTED",
+      "before": "MISSING",
+      "coveredFields": 2,
+      "denominator": 2,
       "requirementKey": "capital:operator-29e323a78a93:line-62096860ab09:route_map_positions",
       "sourceIds": [
         "kric-uijeongbu-route-map-positions"
@@ -1604,6 +2149,16 @@
       "before": "MISSING",
       "coveredFields": 2,
       "denominator": 2,
+      "requirementKey": "capital:operator-38450e138464:line-051552e50435:route_map_positions",
+      "sourceIds": [
+        "kric-seohae-route-map-positions"
+      ]
+    },
+    {
+      "after": "SUPPORTED",
+      "before": "MISSING",
+      "coveredFields": 2,
+      "denominator": 2,
       "requirementKey": "capital:operator-3c623bf1a427:line-30886152e4f8:route_map_positions",
       "sourceIds": [
         "kric-ui-sinseol-route-map-positions"
@@ -1614,9 +2169,40 @@
       "before": "MISSING",
       "coveredFields": 2,
       "denominator": 2,
+      "requirementKey": "capital:operator-5ca780d7dee1:line-8604048b6430:route_map_positions",
+      "sourceIds": [
+        "kric-gtx-a-route-map-positions"
+      ]
+    },
+    {
+      "after": "SUPPORTED",
+      "before": "MISSING",
+      "coveredFields": 2,
+      "denominator": 2,
       "requirementKey": "capital:operator-8134e61f8dbd:line-e9e9a5b520a4:route_map_positions",
       "sourceIds": [
         "kric-airport-railroad-route-map-positions"
+      ]
+    },
+    {
+      "after": "SUPPORTED",
+      "before": "MISSING",
+      "coveredFields": 2,
+      "denominator": 2,
+      "requirementKey": "capital:operator-936e454d0bfb:line-f0e747248a31:route_map_positions",
+      "sourceIds": [
+        "kric-seoul-metro-line9-1-route-map-positions",
+        "seoul-metro-line9-23-route-map-positions"
+      ]
+    },
+    {
+      "after": "SUPPORTED",
+      "before": "MISSING",
+      "coveredFields": 2,
+      "denominator": 2,
+      "requirementKey": "capital:operator-9e999d4aa596:line-8604048b6430:route_map_positions",
+      "sourceIds": [
+        "kric-gtx-a-route-map-positions"
       ]
     },
     {
@@ -2752,6 +3338,575 @@
           "blockingThreshold": 1,
           "coverageRatio": 0,
           "coveredFields": 0,
+          "denominator": 5,
+          "fieldCoverage": [
+            {
+              "field": "elevator",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "escalator",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "wheelchair_lift",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "status",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "verified_at",
+              "sourceIds": [],
+              "status": "missing"
+            }
+          ],
+          "missingFields": [
+            "elevator",
+            "escalator",
+            "wheelchair_lift",
+            "status",
+            "verified_at"
+          ],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:incheon-transit:line-15b3b8a93259:accessibility_facilities",
+          "sourceIds": [],
+          "status": "MISSING",
+          "supportingRecordCountByField": {
+            "elevator": 0,
+            "escalator": 0,
+            "status": 0,
+            "verified_at": 0,
+            "wheelchair_lift": 0
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 0,
+          "coveredFields": 0,
+          "denominator": 3,
+          "fieldCoverage": [
+            {
+              "field": "network_edges",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "duration_seconds",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "distance_meters",
+              "sourceIds": [],
+              "status": "missing"
+            }
+          ],
+          "missingFields": [
+            "network_edges",
+            "duration_seconds",
+            "distance_meters"
+          ],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:incheon-transit:line-15b3b8a93259:route_graph_topology",
+          "sourceIds": [],
+          "status": "MISSING",
+          "supportingRecordCountByField": {
+            "distance_meters": 0,
+            "duration_seconds": 0,
+            "network_edges": 0
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 0,
+          "coveredFields": 0,
+          "denominator": 2,
+          "fieldCoverage": [
+            {
+              "field": "route_map_position",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "route_map_label_polygon",
+              "sourceIds": [],
+              "status": "missing"
+            }
+          ],
+          "missingFields": [
+            "route_map_position",
+            "route_map_label_polygon"
+          ],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:incheon-transit:line-15b3b8a93259:route_map_positions",
+          "sourceIds": [],
+          "status": "MISSING",
+          "supportingRecordCountByField": {
+            "route_map_label_polygon": 0,
+            "route_map_position": 0
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 0,
+          "coveredFields": 0,
+          "denominator": 3,
+          "fieldCoverage": [
+            {
+              "field": "line",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "station_name",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "station_code",
+              "sourceIds": [],
+              "status": "missing"
+            }
+          ],
+          "missingFields": [
+            "line",
+            "station_name",
+            "station_code"
+          ],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:incheon-transit:line-15b3b8a93259:station_line_membership",
+          "sourceIds": [],
+          "status": "MISSING",
+          "supportingRecordCountByField": {
+            "line": 0,
+            "station_code": 0,
+            "station_name": 0
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 0,
+          "coveredFields": 0,
+          "denominator": 5,
+          "fieldCoverage": [
+            {
+              "field": "elevator",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "escalator",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "wheelchair_lift",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "status",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "verified_at",
+              "sourceIds": [],
+              "status": "missing"
+            }
+          ],
+          "missingFields": [
+            "elevator",
+            "escalator",
+            "wheelchair_lift",
+            "status",
+            "verified_at"
+          ],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:incheon-transit:line-42b5805f3b5a:accessibility_facilities",
+          "sourceIds": [],
+          "status": "MISSING",
+          "supportingRecordCountByField": {
+            "elevator": 0,
+            "escalator": 0,
+            "status": 0,
+            "verified_at": 0,
+            "wheelchair_lift": 0
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 0,
+          "coveredFields": 0,
+          "denominator": 3,
+          "fieldCoverage": [
+            {
+              "field": "network_edges",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "duration_seconds",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "distance_meters",
+              "sourceIds": [],
+              "status": "missing"
+            }
+          ],
+          "missingFields": [
+            "network_edges",
+            "duration_seconds",
+            "distance_meters"
+          ],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:incheon-transit:line-42b5805f3b5a:route_graph_topology",
+          "sourceIds": [],
+          "status": "MISSING",
+          "supportingRecordCountByField": {
+            "distance_meters": 0,
+            "duration_seconds": 0,
+            "network_edges": 0
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 0,
+          "coveredFields": 0,
+          "denominator": 2,
+          "fieldCoverage": [
+            {
+              "field": "route_map_position",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "route_map_label_polygon",
+              "sourceIds": [],
+              "status": "missing"
+            }
+          ],
+          "missingFields": [
+            "route_map_position",
+            "route_map_label_polygon"
+          ],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:incheon-transit:line-42b5805f3b5a:route_map_positions",
+          "sourceIds": [],
+          "status": "MISSING",
+          "supportingRecordCountByField": {
+            "route_map_label_polygon": 0,
+            "route_map_position": 0
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 0,
+          "coveredFields": 0,
+          "denominator": 3,
+          "fieldCoverage": [
+            {
+              "field": "service_calendar",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "trip",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "stop_time",
+              "sourceIds": [],
+              "status": "missing"
+            }
+          ],
+          "missingFields": [
+            "service_calendar",
+            "trip",
+            "stop_time"
+          ],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:incheon-transit:line-42b5805f3b5a:schedule_timetable",
+          "sourceIds": [],
+          "status": "MISSING",
+          "supportingRecordCountByField": {
+            "service_calendar": 0,
+            "stop_time": 0,
+            "trip": 0
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 0,
+          "coveredFields": 0,
+          "denominator": 3,
+          "fieldCoverage": [
+            {
+              "field": "line",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "station_name",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "station_code",
+              "sourceIds": [],
+              "status": "missing"
+            }
+          ],
+          "missingFields": [
+            "line",
+            "station_name",
+            "station_code"
+          ],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:incheon-transit:line-42b5805f3b5a:station_line_membership",
+          "sourceIds": [],
+          "status": "MISSING",
+          "supportingRecordCountByField": {
+            "line": 0,
+            "station_code": 0,
+            "station_name": 0
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 0,
+          "coveredFields": 0,
+          "denominator": 5,
+          "fieldCoverage": [
+            {
+              "field": "elevator",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "escalator",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "wheelchair_lift",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "status",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "verified_at",
+              "sourceIds": [],
+              "status": "missing"
+            }
+          ],
+          "missingFields": [
+            "elevator",
+            "escalator",
+            "wheelchair_lift",
+            "status",
+            "verified_at"
+          ],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:incheon-transit:line-98718184f016:accessibility_facilities",
+          "sourceIds": [],
+          "status": "MISSING",
+          "supportingRecordCountByField": {
+            "elevator": 0,
+            "escalator": 0,
+            "status": 0,
+            "verified_at": 0,
+            "wheelchair_lift": 0
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 0,
+          "coveredFields": 0,
+          "denominator": 3,
+          "fieldCoverage": [
+            {
+              "field": "network_edges",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "duration_seconds",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "distance_meters",
+              "sourceIds": [],
+              "status": "missing"
+            }
+          ],
+          "missingFields": [
+            "network_edges",
+            "duration_seconds",
+            "distance_meters"
+          ],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:incheon-transit:line-98718184f016:route_graph_topology",
+          "sourceIds": [],
+          "status": "MISSING",
+          "supportingRecordCountByField": {
+            "distance_meters": 0,
+            "duration_seconds": 0,
+            "network_edges": 0
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 0,
+          "coveredFields": 0,
+          "denominator": 2,
+          "fieldCoverage": [
+            {
+              "field": "route_map_position",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "route_map_label_polygon",
+              "sourceIds": [],
+              "status": "missing"
+            }
+          ],
+          "missingFields": [
+            "route_map_position",
+            "route_map_label_polygon"
+          ],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:incheon-transit:line-98718184f016:route_map_positions",
+          "sourceIds": [],
+          "status": "MISSING",
+          "supportingRecordCountByField": {
+            "route_map_label_polygon": 0,
+            "route_map_position": 0
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 0,
+          "coveredFields": 0,
+          "denominator": 3,
+          "fieldCoverage": [
+            {
+              "field": "service_calendar",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "trip",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "stop_time",
+              "sourceIds": [],
+              "status": "missing"
+            }
+          ],
+          "missingFields": [
+            "service_calendar",
+            "trip",
+            "stop_time"
+          ],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:incheon-transit:line-98718184f016:schedule_timetable",
+          "sourceIds": [],
+          "status": "MISSING",
+          "supportingRecordCountByField": {
+            "service_calendar": 0,
+            "stop_time": 0,
+            "trip": 0
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 0,
+          "coveredFields": 0,
+          "denominator": 3,
+          "fieldCoverage": [
+            {
+              "field": "line",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "station_name",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "station_code",
+              "sourceIds": [],
+              "status": "missing"
+            }
+          ],
+          "missingFields": [
+            "line",
+            "station_name",
+            "station_code"
+          ],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:incheon-transit:line-98718184f016:station_line_membership",
+          "sourceIds": [],
+          "status": "MISSING",
+          "supportingRecordCountByField": {
+            "line": 0,
+            "station_code": 0,
+            "station_name": 0
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 0,
+          "coveredFields": 0,
+          "denominator": 2,
+          "fieldCoverage": [
+            {
+              "field": "route_map_position",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "route_map_label_polygon",
+              "sourceIds": [],
+              "status": "missing"
+            }
+          ],
+          "missingFields": [
+            "route_map_position",
+            "route_map_label_polygon"
+          ],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:korail:line-051552e50435:route_map_positions",
+          "sourceIds": [],
+          "status": "MISSING",
+          "supportingRecordCountByField": {
+            "route_map_label_polygon": 0,
+            "route_map_position": 0
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 0,
+          "coveredFields": 0,
           "denominator": 2,
           "fieldCoverage": [
             {
@@ -2920,6 +4075,36 @@
             "route_map_label_polygon"
           ],
           "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:operator-28e01fb8509d:shinbundang:route_map_positions",
+          "sourceIds": [],
+          "status": "MISSING",
+          "supportingRecordCountByField": {
+            "route_map_label_polygon": 0,
+            "route_map_position": 0
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 0,
+          "coveredFields": 0,
+          "denominator": 2,
+          "fieldCoverage": [
+            {
+              "field": "route_map_position",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "route_map_label_polygon",
+              "sourceIds": [],
+              "status": "missing"
+            }
+          ],
+          "missingFields": [
+            "route_map_position",
+            "route_map_label_polygon"
+          ],
+          "releaseTier": "LAUNCH_REQUIRED",
           "requirementKey": "capital:operator-29e323a78a93:line-62096860ab09:route_map_positions",
           "sourceIds": [],
           "status": "MISSING",
@@ -2980,6 +4165,36 @@
             "route_map_label_polygon"
           ],
           "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:operator-38450e138464:line-051552e50435:route_map_positions",
+          "sourceIds": [],
+          "status": "MISSING",
+          "supportingRecordCountByField": {
+            "route_map_label_polygon": 0,
+            "route_map_position": 0
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 0,
+          "coveredFields": 0,
+          "denominator": 2,
+          "fieldCoverage": [
+            {
+              "field": "route_map_position",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "route_map_label_polygon",
+              "sourceIds": [],
+              "status": "missing"
+            }
+          ],
+          "missingFields": [
+            "route_map_position",
+            "route_map_label_polygon"
+          ],
+          "releaseTier": "LAUNCH_REQUIRED",
           "requirementKey": "capital:operator-3c623bf1a427:line-30886152e4f8:route_map_positions",
           "sourceIds": [],
           "status": "MISSING",
@@ -3010,7 +4225,97 @@
             "route_map_label_polygon"
           ],
           "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:operator-5ca780d7dee1:line-8604048b6430:route_map_positions",
+          "sourceIds": [],
+          "status": "MISSING",
+          "supportingRecordCountByField": {
+            "route_map_label_polygon": 0,
+            "route_map_position": 0
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 0,
+          "coveredFields": 0,
+          "denominator": 2,
+          "fieldCoverage": [
+            {
+              "field": "route_map_position",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "route_map_label_polygon",
+              "sourceIds": [],
+              "status": "missing"
+            }
+          ],
+          "missingFields": [
+            "route_map_position",
+            "route_map_label_polygon"
+          ],
+          "releaseTier": "LAUNCH_REQUIRED",
           "requirementKey": "capital:operator-8134e61f8dbd:line-e9e9a5b520a4:route_map_positions",
+          "sourceIds": [],
+          "status": "MISSING",
+          "supportingRecordCountByField": {
+            "route_map_label_polygon": 0,
+            "route_map_position": 0
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 0,
+          "coveredFields": 0,
+          "denominator": 2,
+          "fieldCoverage": [
+            {
+              "field": "route_map_position",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "route_map_label_polygon",
+              "sourceIds": [],
+              "status": "missing"
+            }
+          ],
+          "missingFields": [
+            "route_map_position",
+            "route_map_label_polygon"
+          ],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:operator-936e454d0bfb:line-f0e747248a31:route_map_positions",
+          "sourceIds": [],
+          "status": "MISSING",
+          "supportingRecordCountByField": {
+            "route_map_label_polygon": 0,
+            "route_map_position": 0
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 0,
+          "coveredFields": 0,
+          "denominator": 2,
+          "fieldCoverage": [
+            {
+              "field": "route_map_position",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "route_map_label_polygon",
+              "sourceIds": [],
+              "status": "missing"
+            }
+          ],
+          "missingFields": [
+            "route_map_position",
+            "route_map_label_polygon"
+          ],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:operator-9e999d4aa596:line-8604048b6430:route_map_positions",
           "sourceIds": [],
           "status": "MISSING",
           "supportingRecordCountByField": {
@@ -4259,8 +5564,8 @@
         "totalCount": 45
       },
       "launchRequired": {
-        "supportedCount": 63,
-        "supportedRatio": 0.2333,
+        "supportedCount": 82,
+        "supportedRatio": 0.3037,
         "totalCount": 270
       },
       "pilotRequirements": [
@@ -5119,6 +6424,633 @@
         {
           "blockingThreshold": 1,
           "coverageRatio": 1,
+          "coveredFields": 5,
+          "denominator": 5,
+          "fieldCoverage": [
+            {
+              "field": "elevator",
+              "sourceIds": [
+                "incheon-transit-accessibility"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "escalator",
+              "sourceIds": [
+                "incheon-transit-accessibility"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "wheelchair_lift",
+              "sourceIds": [
+                "incheon-transit-accessibility"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "status",
+              "sourceIds": [
+                "incheon-transit-accessibility"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "verified_at",
+              "sourceIds": [
+                "incheon-transit-accessibility"
+              ],
+              "status": "covered"
+            }
+          ],
+          "missingFields": [],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:incheon-transit:line-15b3b8a93259:accessibility_facilities",
+          "sourceIds": [
+            "incheon-transit-accessibility"
+          ],
+          "status": "SUPPORTED",
+          "supportingRecordCountByField": {
+            "elevator": 11,
+            "escalator": 11,
+            "status": 33,
+            "verified_at": 33,
+            "wheelchair_lift": 11
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 0,
+          "coveredFields": 0,
+          "denominator": 3,
+          "fieldCoverage": [
+            {
+              "field": "network_edges",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "duration_seconds",
+              "sourceIds": [],
+              "status": "missing"
+            },
+            {
+              "field": "distance_meters",
+              "sourceIds": [],
+              "status": "missing"
+            }
+          ],
+          "missingFields": [
+            "network_edges",
+            "duration_seconds",
+            "distance_meters"
+          ],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:incheon-transit:line-15b3b8a93259:route_graph_topology",
+          "sourceIds": [],
+          "status": "MISSING",
+          "supportingRecordCountByField": {
+            "distance_meters": 0,
+            "duration_seconds": 0,
+            "network_edges": 0
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 1,
+          "coveredFields": 2,
+          "denominator": 2,
+          "fieldCoverage": [
+            {
+              "field": "route_map_position",
+              "sourceIds": [
+                "incheon-transit-station-info"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "route_map_label_polygon",
+              "sourceIds": [
+                "incheon-transit-station-info"
+              ],
+              "status": "covered"
+            }
+          ],
+          "missingFields": [],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:incheon-transit:line-15b3b8a93259:route_map_positions",
+          "sourceIds": [
+            "incheon-transit-station-info"
+          ],
+          "status": "SUPPORTED",
+          "supportingRecordCountByField": {
+            "route_map_label_polygon": 11,
+            "route_map_position": 11
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 1,
+          "coveredFields": 3,
+          "denominator": 3,
+          "fieldCoverage": [
+            {
+              "field": "line",
+              "sourceIds": [
+                "incheon-transit-station-info"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "station_name",
+              "sourceIds": [
+                "incheon-transit-station-info"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "station_code",
+              "sourceIds": [
+                "incheon-transit-station-info"
+              ],
+              "status": "covered"
+            }
+          ],
+          "missingFields": [],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:incheon-transit:line-15b3b8a93259:station_line_membership",
+          "sourceIds": [
+            "incheon-transit-station-info"
+          ],
+          "status": "SUPPORTED",
+          "supportingRecordCountByField": {
+            "line": 11,
+            "station_code": 11,
+            "station_name": 10
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 1,
+          "coveredFields": 5,
+          "denominator": 5,
+          "fieldCoverage": [
+            {
+              "field": "elevator",
+              "sourceIds": [
+                "incheon-transit-accessibility"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "escalator",
+              "sourceIds": [
+                "incheon-transit-accessibility"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "wheelchair_lift",
+              "sourceIds": [
+                "incheon-transit-accessibility"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "status",
+              "sourceIds": [
+                "incheon-transit-accessibility"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "verified_at",
+              "sourceIds": [
+                "incheon-transit-accessibility"
+              ],
+              "status": "covered"
+            }
+          ],
+          "missingFields": [],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:incheon-transit:line-42b5805f3b5a:accessibility_facilities",
+          "sourceIds": [
+            "incheon-transit-accessibility"
+          ],
+          "status": "SUPPORTED",
+          "supportingRecordCountByField": {
+            "elevator": 27,
+            "escalator": 27,
+            "status": 81,
+            "verified_at": 81,
+            "wheelchair_lift": 27
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 1,
+          "coveredFields": 3,
+          "denominator": 3,
+          "fieldCoverage": [
+            {
+              "field": "network_edges",
+              "sourceIds": [
+                "incheon-transit-station-info"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "duration_seconds",
+              "sourceIds": [
+                "incheon-transit-station-info"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "distance_meters",
+              "sourceIds": [
+                "incheon-transit-station-info"
+              ],
+              "status": "covered"
+            }
+          ],
+          "missingFields": [],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:incheon-transit:line-42b5805f3b5a:route_graph_topology",
+          "sourceIds": [
+            "incheon-transit-station-info"
+          ],
+          "status": "SUPPORTED",
+          "supportingRecordCountByField": {
+            "distance_meters": 52,
+            "duration_seconds": 52,
+            "network_edges": 52
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 1,
+          "coveredFields": 2,
+          "denominator": 2,
+          "fieldCoverage": [
+            {
+              "field": "route_map_position",
+              "sourceIds": [
+                "incheon-transit-station-info"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "route_map_label_polygon",
+              "sourceIds": [
+                "incheon-transit-station-info"
+              ],
+              "status": "covered"
+            }
+          ],
+          "missingFields": [],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:incheon-transit:line-42b5805f3b5a:route_map_positions",
+          "sourceIds": [
+            "incheon-transit-station-info"
+          ],
+          "status": "SUPPORTED",
+          "supportingRecordCountByField": {
+            "route_map_label_polygon": 27,
+            "route_map_position": 27
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 1,
+          "coveredFields": 3,
+          "denominator": 3,
+          "fieldCoverage": [
+            {
+              "field": "service_calendar",
+              "sourceIds": [
+                "incheon-line2-train-timetable"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "trip",
+              "sourceIds": [
+                "incheon-line2-train-timetable"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "stop_time",
+              "sourceIds": [
+                "incheon-line2-train-timetable"
+              ],
+              "status": "covered"
+            }
+          ],
+          "missingFields": [],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:incheon-transit:line-42b5805f3b5a:schedule_timetable",
+          "sourceIds": [
+            "incheon-line2-train-timetable"
+          ],
+          "status": "SUPPORTED",
+          "supportingRecordCountByField": {
+            "service_calendar": 2,
+            "stop_time": 22506,
+            "trip": 840
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 1,
+          "coveredFields": 3,
+          "denominator": 3,
+          "fieldCoverage": [
+            {
+              "field": "line",
+              "sourceIds": [
+                "incheon-transit-station-info"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "station_name",
+              "sourceIds": [
+                "incheon-transit-station-info"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "station_code",
+              "sourceIds": [
+                "incheon-transit-station-info"
+              ],
+              "status": "covered"
+            }
+          ],
+          "missingFields": [],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:incheon-transit:line-42b5805f3b5a:station_line_membership",
+          "sourceIds": [
+            "incheon-transit-station-info"
+          ],
+          "status": "SUPPORTED",
+          "supportingRecordCountByField": {
+            "line": 27,
+            "station_code": 27,
+            "station_name": 26
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 1,
+          "coveredFields": 5,
+          "denominator": 5,
+          "fieldCoverage": [
+            {
+              "field": "elevator",
+              "sourceIds": [
+                "incheon-transit-accessibility"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "escalator",
+              "sourceIds": [
+                "incheon-transit-accessibility"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "wheelchair_lift",
+              "sourceIds": [
+                "incheon-transit-accessibility"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "status",
+              "sourceIds": [
+                "incheon-transit-accessibility"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "verified_at",
+              "sourceIds": [
+                "incheon-transit-accessibility"
+              ],
+              "status": "covered"
+            }
+          ],
+          "missingFields": [],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:incheon-transit:line-98718184f016:accessibility_facilities",
+          "sourceIds": [
+            "incheon-transit-accessibility"
+          ],
+          "status": "SUPPORTED",
+          "supportingRecordCountByField": {
+            "elevator": 33,
+            "escalator": 33,
+            "status": 99,
+            "verified_at": 99,
+            "wheelchair_lift": 33
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 1,
+          "coveredFields": 3,
+          "denominator": 3,
+          "fieldCoverage": [
+            {
+              "field": "network_edges",
+              "sourceIds": [
+                "incheon-transit-station-info"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "duration_seconds",
+              "sourceIds": [
+                "incheon-transit-station-info"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "distance_meters",
+              "sourceIds": [
+                "incheon-transit-station-info"
+              ],
+              "status": "covered"
+            }
+          ],
+          "missingFields": [],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:incheon-transit:line-98718184f016:route_graph_topology",
+          "sourceIds": [
+            "incheon-transit-station-info"
+          ],
+          "status": "SUPPORTED",
+          "supportingRecordCountByField": {
+            "distance_meters": 64,
+            "duration_seconds": 64,
+            "network_edges": 64
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 1,
+          "coveredFields": 2,
+          "denominator": 2,
+          "fieldCoverage": [
+            {
+              "field": "route_map_position",
+              "sourceIds": [
+                "incheon-transit-station-info"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "route_map_label_polygon",
+              "sourceIds": [
+                "incheon-transit-station-info"
+              ],
+              "status": "covered"
+            }
+          ],
+          "missingFields": [],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:incheon-transit:line-98718184f016:route_map_positions",
+          "sourceIds": [
+            "incheon-transit-station-info"
+          ],
+          "status": "SUPPORTED",
+          "supportingRecordCountByField": {
+            "route_map_label_polygon": 33,
+            "route_map_position": 33
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 1,
+          "coveredFields": 3,
+          "denominator": 3,
+          "fieldCoverage": [
+            {
+              "field": "service_calendar",
+              "sourceIds": [
+                "incheon-line1-train-timetable"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "trip",
+              "sourceIds": [
+                "incheon-line1-train-timetable"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "stop_time",
+              "sourceIds": [
+                "incheon-line1-train-timetable"
+              ],
+              "status": "covered"
+            }
+          ],
+          "missingFields": [],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:incheon-transit:line-98718184f016:schedule_timetable",
+          "sourceIds": [
+            "incheon-line1-train-timetable"
+          ],
+          "status": "SUPPORTED",
+          "supportingRecordCountByField": {
+            "service_calendar": 2,
+            "stop_time": 18392,
+            "trip": 574
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 1,
+          "coveredFields": 3,
+          "denominator": 3,
+          "fieldCoverage": [
+            {
+              "field": "line",
+              "sourceIds": [
+                "incheon-transit-station-info"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "station_name",
+              "sourceIds": [
+                "incheon-transit-station-info"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "station_code",
+              "sourceIds": [
+                "incheon-transit-station-info"
+              ],
+              "status": "covered"
+            }
+          ],
+          "missingFields": [],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:incheon-transit:line-98718184f016:station_line_membership",
+          "sourceIds": [
+            "incheon-transit-station-info"
+          ],
+          "status": "SUPPORTED",
+          "supportingRecordCountByField": {
+            "line": 33,
+            "station_code": 33,
+            "station_name": 31
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 1,
+          "coveredFields": 2,
+          "denominator": 2,
+          "fieldCoverage": [
+            {
+              "field": "route_map_position",
+              "sourceIds": [
+                "kric-seohae-route-map-positions"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "route_map_label_polygon",
+              "sourceIds": [
+                "kric-seohae-route-map-positions"
+              ],
+              "status": "covered"
+            }
+          ],
+          "missingFields": [],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:korail:line-051552e50435:route_map_positions",
+          "sourceIds": [
+            "kric-seohae-route-map-positions"
+          ],
+          "status": "SUPPORTED",
+          "supportingRecordCountByField": {
+            "route_map_label_polygon": 21,
+            "route_map_position": 21
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 1,
           "coveredFields": 2,
           "denominator": 2,
           "fieldCoverage": [
@@ -5290,6 +7222,39 @@
             {
               "field": "route_map_position",
               "sourceIds": [
+                "kric-shinbundang-route-map-positions"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "route_map_label_polygon",
+              "sourceIds": [
+                "kric-shinbundang-route-map-positions"
+              ],
+              "status": "covered"
+            }
+          ],
+          "missingFields": [],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:operator-28e01fb8509d:shinbundang:route_map_positions",
+          "sourceIds": [
+            "kric-shinbundang-route-map-positions"
+          ],
+          "status": "SUPPORTED",
+          "supportingRecordCountByField": {
+            "route_map_label_polygon": 16,
+            "route_map_position": 16
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 1,
+          "coveredFields": 2,
+          "denominator": 2,
+          "fieldCoverage": [
+            {
+              "field": "route_map_position",
+              "sourceIds": [
                 "kric-uijeongbu-route-map-positions"
               ],
               "status": "covered"
@@ -5356,6 +7321,39 @@
             {
               "field": "route_map_position",
               "sourceIds": [
+                "kric-seohae-route-map-positions"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "route_map_label_polygon",
+              "sourceIds": [
+                "kric-seohae-route-map-positions"
+              ],
+              "status": "covered"
+            }
+          ],
+          "missingFields": [],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:operator-38450e138464:line-051552e50435:route_map_positions",
+          "sourceIds": [
+            "kric-seohae-route-map-positions"
+          ],
+          "status": "SUPPORTED",
+          "supportingRecordCountByField": {
+            "route_map_label_polygon": 21,
+            "route_map_position": 21
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 1,
+          "coveredFields": 2,
+          "denominator": 2,
+          "fieldCoverage": [
+            {
+              "field": "route_map_position",
+              "sourceIds": [
                 "kric-ui-sinseol-route-map-positions"
               ],
               "status": "covered"
@@ -5389,6 +7387,39 @@
             {
               "field": "route_map_position",
               "sourceIds": [
+                "kric-gtx-a-route-map-positions"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "route_map_label_polygon",
+              "sourceIds": [
+                "kric-gtx-a-route-map-positions"
+              ],
+              "status": "covered"
+            }
+          ],
+          "missingFields": [],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:operator-5ca780d7dee1:line-8604048b6430:route_map_positions",
+          "sourceIds": [
+            "kric-gtx-a-route-map-positions"
+          ],
+          "status": "SUPPORTED",
+          "supportingRecordCountByField": {
+            "route_map_label_polygon": 9,
+            "route_map_position": 9
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 1,
+          "coveredFields": 2,
+          "denominator": 2,
+          "fieldCoverage": [
+            {
+              "field": "route_map_position",
+              "sourceIds": [
                 "kric-airport-railroad-route-map-positions"
               ],
               "status": "covered"
@@ -5411,6 +7442,75 @@
           "supportingRecordCountByField": {
             "route_map_label_polygon": 14,
             "route_map_position": 14
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 1,
+          "coveredFields": 2,
+          "denominator": 2,
+          "fieldCoverage": [
+            {
+              "field": "route_map_position",
+              "sourceIds": [
+                "kric-seoul-metro-line9-1-route-map-positions",
+                "seoul-metro-line9-23-route-map-positions"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "route_map_label_polygon",
+              "sourceIds": [
+                "kric-seoul-metro-line9-1-route-map-positions",
+                "seoul-metro-line9-23-route-map-positions"
+              ],
+              "status": "covered"
+            }
+          ],
+          "missingFields": [],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:operator-936e454d0bfb:line-f0e747248a31:route_map_positions",
+          "sourceIds": [
+            "kric-seoul-metro-line9-1-route-map-positions",
+            "seoul-metro-line9-23-route-map-positions"
+          ],
+          "status": "SUPPORTED",
+          "supportingRecordCountByField": {
+            "route_map_label_polygon": 38,
+            "route_map_position": 38
+          }
+        },
+        {
+          "blockingThreshold": 1,
+          "coverageRatio": 1,
+          "coveredFields": 2,
+          "denominator": 2,
+          "fieldCoverage": [
+            {
+              "field": "route_map_position",
+              "sourceIds": [
+                "kric-gtx-a-route-map-positions"
+              ],
+              "status": "covered"
+            },
+            {
+              "field": "route_map_label_polygon",
+              "sourceIds": [
+                "kric-gtx-a-route-map-positions"
+              ],
+              "status": "covered"
+            }
+          ],
+          "missingFields": [],
+          "releaseTier": "LAUNCH_REQUIRED",
+          "requirementKey": "capital:operator-9e999d4aa596:line-8604048b6430:route_map_positions",
+          "sourceIds": [
+            "kric-gtx-a-route-map-positions"
+          ],
+          "status": "SUPPORTED",
+          "supportingRecordCountByField": {
+            "route_map_label_polygon": 9,
+            "route_map_position": 9
           }
         },
         {
@@ -6805,15 +8905,34 @@
         "busan:busan-transportation:line-eb7b47920390:route_map_positions",
         "busan:busan-transportation:line-eb7b47920390:schedule_timetable",
         "busan:busan-transportation:line-eb7b47920390:station_line_membership",
+        "capital:incheon-transit:line-15b3b8a93259:accessibility_facilities",
+        "capital:incheon-transit:line-15b3b8a93259:route_map_positions",
+        "capital:incheon-transit:line-15b3b8a93259:station_line_membership",
+        "capital:incheon-transit:line-42b5805f3b5a:accessibility_facilities",
+        "capital:incheon-transit:line-42b5805f3b5a:route_graph_topology",
+        "capital:incheon-transit:line-42b5805f3b5a:route_map_positions",
+        "capital:incheon-transit:line-42b5805f3b5a:schedule_timetable",
+        "capital:incheon-transit:line-42b5805f3b5a:station_line_membership",
+        "capital:incheon-transit:line-98718184f016:accessibility_facilities",
+        "capital:incheon-transit:line-98718184f016:route_graph_topology",
+        "capital:incheon-transit:line-98718184f016:route_map_positions",
+        "capital:incheon-transit:line-98718184f016:schedule_timetable",
+        "capital:incheon-transit:line-98718184f016:station_line_membership",
+        "capital:korail:line-051552e50435:route_map_positions",
         "capital:korail:line-54a7b980b7c3:route_map_positions",
         "capital:korail:line-558d0bd8312d:route_map_positions",
         "capital:korail:line-6e39be0cb6e2:route_map_positions",
         "capital:korail:line-e4939a4b4713:route_map_positions",
         "capital:operator-10d7cf275a80:line-aefa08ccc0a9:route_map_positions",
+        "capital:operator-28e01fb8509d:shinbundang:route_map_positions",
         "capital:operator-29e323a78a93:line-62096860ab09:route_map_positions",
         "capital:operator-2e23276dfa94:line-5500c1600f71:route_map_positions",
+        "capital:operator-38450e138464:line-051552e50435:route_map_positions",
         "capital:operator-3c623bf1a427:line-30886152e4f8:route_map_positions",
+        "capital:operator-5ca780d7dee1:line-8604048b6430:route_map_positions",
         "capital:operator-8134e61f8dbd:line-e9e9a5b520a4:route_map_positions",
+        "capital:operator-936e454d0bfb:line-f0e747248a31:route_map_positions",
+        "capital:operator-9e999d4aa596:line-8604048b6430:route_map_positions",
         "capital:operator-b2d80436b438:line-828f04afc588:route_map_positions",
         "capital:seoul-metro:line-15b3b8a93259:route_map_positions",
         "capital:seoul-metro:line-2b2d9eaa53d0:route_map_positions",
