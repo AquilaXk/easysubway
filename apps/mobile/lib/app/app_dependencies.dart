@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import '../auth_headers.dart';
 import '../core/database/catalog/catalog_database.dart';
 import '../core/database/user/user_database.dart';
@@ -90,6 +92,7 @@ class AppDependencies {
     AdRepository? adRepository,
     CatalogDatabase? catalogDatabase,
     UserDatabase? userDatabase,
+    Directory? userDatabaseDirectory,
     Uri? Function() apiBaseUri = defaultOptionalStationApiBaseUri,
     bool enableRouteV2OnlineFirst = const bool.fromEnvironment(
       'EASYSUBWAY_ROUTE_V2_ONLINE_FIRST_ENABLED',
@@ -283,6 +286,7 @@ class AppDependencies {
             baseUri: requireBaseUri,
             authProvider: null,
             userDatabase: userDatabase,
+            userDatabaseDirectory: userDatabaseDirectory,
           ),
       getOffAlarmController: _resolveGetOffAlarmController(
         userDatabase,
@@ -522,10 +526,14 @@ UserDataDeletionRepository? _defaultUserDataDeletionRepository({
   required Uri Function() baseUri,
   required AuthorizationHeaderProvider? authProvider,
   required UserDatabase? userDatabase,
+  required Directory? userDatabaseDirectory,
 }) {
   final localRepository = userDatabase == null
       ? null
-      : UserDataDeletionLocalRepository(userDatabase: userDatabase);
+      : UserDataDeletionLocalRepository(
+          userDatabase: userDatabase,
+          databaseDirectory: userDatabaseDirectory,
+        );
   final remoteRepository = authProvider == null
       ? null
       : (() {
