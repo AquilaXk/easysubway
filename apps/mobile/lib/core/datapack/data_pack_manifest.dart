@@ -400,6 +400,29 @@ class DataPackSigningPublicKey {
   final String exponentBase64Url;
   final String keyId;
 
+  /// 주입된 값이 RSA 공개키 형식인지(이슈 #2532).
+  ///
+  /// 판정 기준은 RC 게이트(`tools/ci/validate-store-privacy-env.mjs`의
+  /// `validateRsaModulusBase64Url`·`validateRsaExponentBase64Url`)와 같다: modulus는
+  /// base64url로 2048비트 이상, exponent는 8바이트 이하의 1보다 큰 홀수. 형식이 깨진 키는
+  /// [verify]에서 항상 false가 되므로, 그 상태를 서명 검증 실패가 아니라 빌드 구성 오류로
+  /// 먼저 판정하기 위한 것이다.
+  bool get hasSupportedRsaFormat {
+    try {
+      final modulusBytes = _base64UrlBytes(modulusBase64Url);
+      final exponentBytes = _base64UrlBytes(exponentBase64Url);
+      if (modulusBytes.length < 256 ||
+          exponentBytes.isEmpty ||
+          exponentBytes.length > 8) {
+        return false;
+      }
+      final exponent = _bigIntFromBytes(exponentBytes);
+      return exponent > BigInt.one && exponent.isOdd;
+    } on FormatException {
+      return false;
+    }
+  }
+
   bool verify(String message, String signatureBase64Url) {
     try {
       final modulusBytes = _base64UrlBytes(modulusBase64Url);

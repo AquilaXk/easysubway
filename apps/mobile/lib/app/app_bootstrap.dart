@@ -244,12 +244,31 @@ Future<void> _runDataPackUpdateSafely({
   }
 }
 
+/// 공개키 미주입·형식 오류 신호는 세션당 한 번만 올린다. 업데이트 확인은 앱 시작과
+/// foreground 복귀마다 도는데, 원인이 빌드 구성이라 반복 보고는 같은 사실만 늘린다.
+bool _reportedBlockedDataPackUpdate = false;
+
 Future<void> _defaultDataPackUpdateRunner({
   required Directory supportDirectory,
   required UserDatabase userDatabase,
   required UpdateTrigger trigger,
 }) async {
   final endpoints = AppEndpoints.fromEnvironment();
+  // production 빌드에 서명 공개키가 없으면 봉투 서명이 자기해시 대조로 강등돼 발신자
+  // 인증이 사라진다(#2532). base URL만 보고 진행하지 않고 여기서 닫는다.
+  final decision = endpoints.dataPackUpdateStartDecision;
+  if (decision != DataPackUpdateStartDecision.start) {
+    final message = decision.blockedDiagnosticMessage;
+    if (message != null && !_reportedBlockedDataPackUpdate) {
+      _reportedBlockedDataPackUpdate = true;
+      reportMobileError(
+        StateError(message),
+        StackTrace.current,
+        context: '이동 정보 업데이트를 시작하지 않았습니다.',
+      );
+    }
+    return;
+  }
   final manifestUri = endpoints.dataPackManifestUri;
   if (manifestUri == null) {
     return;

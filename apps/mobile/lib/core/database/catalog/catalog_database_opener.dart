@@ -5,6 +5,8 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 
+import '../../datapack/atomic_file_replace.dart';
+import '../../datapack/data_pack_file_integrity.dart';
 import '../../datapack/data_pack_index.dart';
 import '../../datapack/data_pack_update_state.dart';
 import '../../datapack/emergency_override_repository.dart';
@@ -38,7 +40,12 @@ class CatalogDatabaseOpener {
     if (installedDatabase != null) {
       // 구제 DDL은 설치 팩 파일을 수정하므로 활성 팩이 확정된 뒤 이 한 곳에서만 실행한다(#2527).
       // known-good 후보를 훑는 동안에는 읽기 전용 판정만 하고 탐색 대상 파일은 건드리지 않는다.
-      await installedDatabase.rescueMissingCatalogTables();
+      final plan = await installedDatabase.rescueMissingCatalogTables();
+      await _refreshMutatedPackBaseline(
+        database: installedDatabase,
+        file: File(_openedArtifactIdentity),
+        rescued: plan.hasRescuableMissingTables,
+      );
       return installedDatabase;
     }
 
@@ -46,6 +53,8 @@ class CatalogDatabaseOpener {
       p.join(databaseDirectory.path, 'datapacks'),
     );
     await datapackDirectory.create(recursive: true);
+    // 번들 팩·freshness 파일도 원자 교체 대상이라 중단 잔재가 남을 수 있다(#2532).
+    await restoreInterruptedReplacements(datapackDirectory);
     final index = await _installBundledDataPacks(datapackDirectory);
 
     final database = CatalogDatabase.file(
@@ -61,6 +70,35 @@ class CatalogDatabaseOpener {
       File(p.join(datapackDirectory.path, 'capital.sqlite')).absolute.path,
     );
     return database;
+  }
+
+  /// 앱이 연 팩 파일을 스스로 바꿨으면 기대 해시 기준선을 다시 기록한다(#2532).
+  ///
+  /// 설치 팩 파일은 열기만 해도 내용이 바뀔 수 있다 — 구제 DDL(#2527)과 drift
+  /// 마이그레이션(팩 `user_version`이 앱보다 낮을 때)이 그렇다. 기준선을 그대로 두면
+  /// 재활성화 해시 대조가 정상 팩을 거부한다. 반대로 대조 시점마다 디스크 값을 그대로
+  /// 받아 적으면 기준선이 오염되므로, **앱이 쓴 사실이 확인된 경우에만** 갱신한다.
+  /// 갱신 비용(전체 해시 1회)도 그 경우에만 든다.
+  ///
+  /// 최종 선택된 팩만이 아니라 **판정 과정에서 연 모든 후보**가 대상이다. drift
+  /// 마이그레이션은 후보를 판정하려고 던지는 첫 질의에서 이미 실행되므로, 거부돼 닫히는
+  /// 후보(known-good 스캔·구제 불가 거부·override 후보)도 파일은 바뀐 채 남는다.
+  Future<void> _refreshMutatedPackBaseline({
+    required CatalogDatabase database,
+    required File file,
+    bool rescued = false,
+  }) async {
+    if (!rescued && !database.didRunSchemaMigration) {
+      return;
+    }
+    if (file.path.isEmpty) {
+      return;
+    }
+    try {
+      await writeInstalledPackBaseline(file, await sha256OfFile(file));
+    } on FileSystemException {
+      // 기준선을 못 쓰면 다음 재활성화가 거부로 닫힌다. 열기 자체는 막지 않는다.
+    }
   }
 
   Future<CatalogDatabase?> _openInstalledCurrentDataPack() async {
@@ -161,6 +199,8 @@ class CatalogDatabaseOpener {
     final catalogDirectory = Directory(
       p.join(databaseDirectory.path, 'catalog'),
     );
+    // pointer·설치 팩·기준선 어느 것이든 교체가 중단됐으면 먼저 정리한다(#2532).
+    await restoreInterruptedReplacements(catalogDirectory);
     final journal = File(
       p.join(catalogDirectory.path, 'current.json.installing'),
     );
@@ -181,8 +221,7 @@ class CatalogDatabaseOpener {
       final expectedSha256 = decoded['sha256'];
       if (expectedSha256 is String &&
           expectedSha256.isNotEmpty &&
-          sha256.convert(await file.readAsBytes()).toString() !=
-              expectedSha256) {
+          await sha256OfFile(file) != expectedSha256) {
         await _deleteIfExists(journal);
         return;
       }
@@ -263,8 +302,10 @@ class CatalogDatabaseOpener {
   Future<CatalogDatabase?> _openUsableCatalogDatabase(File file) async {
     final database = CatalogDatabase.file(file);
     var returned = false;
+    var rejected = false;
     try {
       if (!await _isUsableCatalogDatabase(database)) {
+        rejected = true;
         return null;
       }
       // 빈 테이블 생성이 안전하지 않은 테이블이 빠져 있으면 이 팩을 열지 않고 known-good
@@ -275,6 +316,7 @@ class CatalogDatabaseOpener {
           artifact: p.basename(file.path),
           blockingTableNames: plan.blockingMissingTables,
         );
+        rejected = true;
         return null;
       }
       returned = true;
@@ -282,6 +324,14 @@ class CatalogDatabaseOpener {
       return database;
     } finally {
       if (!returned) {
+        // 판정하는 동안 drift 마이그레이션이 이 파일을 바꿨을 수 있다(#2532).
+        // 거부한 후보도 기준선을 맞춰 두지 않으면 나중에 영구 거부로 남는다.
+        //
+        // 판정을 끝내고 거부한 경우에만 갱신한다. 마이그레이션이 예외로 끝난 파일은 어떤
+        // 상태인지 알 수 없으므로 그 내용을 새 기대값으로 승격하지 않는다.
+        if (rejected) {
+          await _refreshMutatedPackBaseline(database: database, file: file);
+        }
         await database.close();
       }
     }
@@ -327,8 +377,9 @@ class CatalogDatabaseOpener {
 
     final target = File(p.join(datapackDirectory.path, '$id.sqlite'));
     if (await target.exists()) {
-      final installedBytes = await target.readAsBytes();
-      if (sha256.convert(installedBytes).toString() == expectedSqliteSha256) {
+      // 번들 팩도 전량 적재 대신 스트리밍으로 판정한다 — 설치 팩이 없는 모든 콜드 스타트가
+      // 지나는 경로라 팩 크기만큼 메모리를 한 번에 쓰면 안 된다(#2532).
+      if (await sha256OfFile(target) == expectedSqliteSha256) {
         return;
       }
     }
@@ -371,6 +422,13 @@ class CatalogDatabaseOpener {
     await _replaceFile(temporary, target);
   }
 
+  /// 번들 팩을 디스크의 팩 파일로 되돌린다(#2532).
+  ///
+  /// [target]은 이 세션이 곧 열 카탈로그 DB 파일이다. `open()`이 번들 설치를 먼저 끝내고
+  /// 그 뒤에 열므로 이 시점에는 아직 열려 있지 않지만, 이전 세션이나 홈 위젯 isolate가
+  /// 같은 파일을 열고 있을 수 있다. 그래서 교체 실패 시 대상을 지우지 않고
+  /// [replaceFileAtomically]가 직전 파일을 되돌리게 둔다 — 지웠다가 중단되면 카탈로그가
+  /// 통째로 사라진다.
   Future<void> _replaceInstalledDataPack(
     File target,
     List<int> databaseBytes,
@@ -381,23 +439,11 @@ class CatalogDatabaseOpener {
     }
 
     await temporary.writeAsBytes(databaseBytes, flush: true);
-    try {
-      await temporary.rename(target.path);
-    } on FileSystemException {
-      if (await target.exists()) {
-        await target.delete();
-      }
-      await temporary.rename(target.path);
-    }
+    await replaceFileAtomically(temporary: temporary, target: target);
   }
 
   Future<void> _replaceFile(File temporary, File target) async {
-    try {
-      await temporary.rename(target.path);
-    } on FileSystemException {
-      await _deleteIfExists(target);
-      await temporary.rename(target.path);
-    }
+    await replaceFileAtomically(temporary: temporary, target: target);
   }
 }
 
