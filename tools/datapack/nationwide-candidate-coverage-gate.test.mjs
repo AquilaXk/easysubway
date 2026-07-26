@@ -1218,6 +1218,53 @@ test("수도권 dual-operator 노선 6 requirement는 편입으로 MISSING에서
   assert.equal(phase23.addedRows.coverageLineOperatorScopes, 1);
 });
 
+// #2138 증거 모델 축. 감사자가 evidence만 보고 "어느 건이 어느 근거 성격으로 섰는지" 알 수 있어야 한다.
+// 값은 하네스가 지어내지 않고 판정 경로(report-coverage-gaps.mjs)가 requirement마다 실어 준 domain 선언
+// 그대로이며, 범주별 합이 SUPPORTED 총계와 같아야 한다.
+test("게이트 evidence는 SUPPORTED를 근거 성격별로 나눠 기록하고 합이 총계와 같다", async () => {
+  const evidence = await readJson(EVIDENCE_PATH);
+  const targets = await readJson(TARGETS_PATH);
+  const modelByDomain = new Map(
+    targets.requiredSourceDomains.map(({ id, evidenceModel }) => [id, evidenceModel ?? "official-source"]),
+  );
+  assert.equal(modelByDomain.get("route_map_positions"), "owner-authored-canonical");
+
+  for (const variant of ["baseline", "lineScoped"]) {
+    const summary = evidence.variants[variant];
+    // 집계는 SUPPORTED 키를 도메인 선언으로 되짚은 것과 정확히 같아야 한다(하네스가 따로 세지 않는다).
+    const expected = {};
+    for (const key of summary.supportedRequirementKeys) {
+      const model = modelByDomain.get(key.split(":")[3]);
+      expected[model] = (expected[model] ?? 0) + 1;
+    }
+    assert.deepEqual(summary.supportedByEvidenceModel, expected, variant);
+    assert.equal(
+      Object.values(summary.supportedByEvidenceModel).reduce((sum, count) => sum + count, 0),
+      summary.supportedRequirementKeys.length,
+      variant,
+    );
+  }
+  // 이 배치의 실측 수치를 못박는다 — 범주 비율이 조용히 움직이면 여기서 걸린다.
+  assert.deepEqual(evidence.variants.lineScoped.supportedByEvidenceModel, {
+    "official-source": 46,
+    "owner-authored-canonical": 36,
+  });
+  assert.deepEqual(evidence.variants.baseline.supportedByEvidenceModel, {});
+
+  // owner-authored-canonical 선언은 판정을 열어 주지 않는다: baseline에서 그 도메인 키는 재기술 전
+  // MISSING이고 분모·차단 임계는 lineScoped와 같다(선언이 아니라 근거가 판정을 낸다).
+  const routeMapKey = `capital:seoul-metro:${INCHEON_LINE7_ID}:route_map_positions`;
+  const requirementNamed = (variant) =>
+    evidence.variants[variant].pilotRequirements.find((entry) => entry.requirementKey === routeMapKey);
+  assert.equal(requirementNamed("baseline").status, "MISSING");
+  assert.equal(requirementNamed("lineScoped").status, "SUPPORTED");
+  assert.equal(requirementNamed("baseline").denominator, requirementNamed("lineScoped").denominator);
+  assert.equal(
+    requirementNamed("baseline").blockingThreshold,
+    requirementNamed("lineScoped").blockingThreshold,
+  );
+});
+
 // #2595 B3 두 번째 배치. 인천은 부산과 같은 모양(역사정보 편입이 지역 자체를 세운다)이지만, 소스가 덮는
 // 세 노선 중 7호선의 route_graph_topology 하나만 열리지 않는다 — 그 사실이 선언과 실측으로 함께 남는다.
 test("인천 13 requirement는 체인 편입으로 전이하고 7호선 구간만 선언대로 열리지 않는다", async () => {

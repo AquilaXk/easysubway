@@ -1333,12 +1333,13 @@ function assertInventoryLineScopeSync(spec, inventory) {
 }
 
 function summarizeVariant(spec, report, provenance) {
-  const supportedRequirementKeys = report.requirements
-    .filter((entry) => entry.status === "SUPPORTED")
-    .map(requirementKey)
-    .sort(codepointCompare);
+  const supported = report.requirements.filter((entry) => entry.status === "SUPPORTED");
+  const supportedRequirementKeys = supported.map(requirementKey).sort(codepointCompare);
   return {
     supportedRequirementKeys,
+    // #2138 범주별 집계. 어느 건이 어느 근거 성격으로 섰는지 evidence만 보고 알 수 있어야 한다 —
+    // 값은 판정 경로(report-coverage-gaps.mjs)가 requirement마다 실어 준 domain 증거 모델 그대로다.
+    supportedByEvidenceModel: supportedByEvidenceModel(supported),
     launchRequired: supportedCounts(report.summary.launchRequired),
     enhancement: supportedCounts(report.summary.enhancement),
     // 한 requirement를 여러 소스가 함께 뒷받침하면(대구 membership처럼) 같은 키가 여러 재기술 항목에
@@ -1346,6 +1347,19 @@ function summarizeVariant(spec, report, provenance) {
     pilotRequirements: declaredRequirementKeys(spec)
       .map((key) => pilotRequirement(report, key, provenance)),
   };
+}
+
+// SUPPORTED 건을 domain 증거 모델별로 센다. 판정 경로가 requirement마다 실어 준 값만 쓰고 여기서
+// 기본값을 지어내지 않는다 — 값이 없으면 판정 경로가 그 축을 잃은 것이므로 그대로 fail closed 한다.
+function supportedByEvidenceModel(supported) {
+  const counts = new Map();
+  for (const entry of supported) {
+    if (typeof entry.evidenceModel !== "string" || entry.evidenceModel.trim() === "") {
+      throw new Error(`coverage requirement is missing evidenceModel: ${requirementKey(entry)}`);
+    }
+    counts.set(entry.evidenceModel, (counts.get(entry.evidenceModel) ?? 0) + 1);
+  }
+  return Object.fromEntries([...counts].sort(([left], [right]) => codepointCompare(left, right)));
 }
 
 function declaredRequirementKeys(spec) {
@@ -1411,6 +1425,7 @@ function buildEvidence({ spec, inputs, packDataInclusions, reports, variants, si
     );
   }
   assertNonTransitionReasons(nonTransitions, variants.lineScoped);
+  assertEvidenceModelTotals(variants);
   const expectedKeys = declaredRequirementKeys(spec).filter((key) => !nonTransitions.has(key));
   assertCandidateRootPack(spec, reports);
   // 전이 판정은 절대 수치가 아니라 두 variant의 상대 비교다. baseline SUPPORTED 총량을 0으로 못박으면
@@ -1649,6 +1664,20 @@ function buildEvidence({ spec, inputs, packDataInclusions, reports, variants, si
     },
     transitions,
   };
+}
+
+// 범주별 집계의 합이 SUPPORTED 총계와 같아야 한다. 이 축이 없으면 범주 하나가 빠져도 evidence는
+// 그럴듯하게 남는다 — 감사자가 두 수를 손으로 더해 맞춰 보지 않아도 되게 하네스가 대조한다.
+function assertEvidenceModelTotals(variants) {
+  for (const [variant, summary] of Object.entries(variants)) {
+    const total = Object.values(summary.supportedByEvidenceModel).reduce((sum, count) => sum + count, 0);
+    if (total !== summary.supportedRequirementKeys.length) {
+      throw new Error(
+        `${variant} supportedByEvidenceModel must sum to the SUPPORTED total: `
+          + `expected ${summary.supportedRequirementKeys.length}, got ${total}`,
+      );
+    }
+  }
 }
 
 // spec이 선언한 non-transition을 requirementKey로 색인한다. 같은 키를 두 재기술이 선언하면(한 소스가
