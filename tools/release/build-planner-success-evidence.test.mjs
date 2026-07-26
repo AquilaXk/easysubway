@@ -124,6 +124,19 @@ test("#2560 무단차 대안을 포함한 3건 canary는 수락하고 alternativ
   }), /planner canary result contract is invalid/);
 });
 
+test("#2560 알려지지 않은 objective 태그를 단 후보는 거부한다", () => {
+  const unknownTag = canary();
+  unknownTag.plan.itineraries = [
+    ...unknownTag.plan.itineraries,
+    { ...unknownTag.plan.itineraries[1], objectiveTags: ["STEP_FREE"] },
+  ];
+
+  assert.throws(() => buildPlannerSuccessEvidence({
+    candidate: { phase: "CANDIDATE", issue: 2056, releaseCandidateIdentity: identity },
+    canary: unknownTag,
+  }), /planner objective tag vocabulary is invalid/);
+});
+
 test("provenance는 기본 final-candidate이며 unknownPatternDefaultedToLocal은 false를 명시한다", () => {
   const evidence = buildPlannerSuccessEvidence({
     candidate: { phase: "CANDIDATE", issue: 2056, releaseCandidateIdentity: identity },

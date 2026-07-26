@@ -199,8 +199,11 @@ function hasItxExpressRide(canary) {
 // canary 후보 수 상한은 요청 계약(RouteV2SearchUseCase.SearchRouteV2Command의 alternativeCount
 // 1..3)과 같은 3이다. #2560 이후 PREFER_STEP_FREE 응답은 objective 대표 2건에 더해 무단차 대안
 // 1건을 남는 자리에 담을 수 있으므로, 게이트가 2로 고정돼 있으면 계약상 유효한 응답을 거부한다.
-// 상한을 계약값에 맞추되 lower bound(>=1)와 objective 대표 태그 요구는 그대로 둔다.
+// 상한을 계약값에 맞추되 lower bound(>=1)와 objective 대표 태그 요구는 그대로 둔다. 상한 완화로
+// 느슨해지는 후보 수 회귀 탐지력은 아래 태그 어휘 검증이 상계한다 — 알려지지 않은 태그를 단 후보가
+// 늘어나면 여전히 fail closed한다.
 const CANARY_ITINERARY_LIMIT = 3;
+const KNOWN_OBJECTIVE_TAGS = new Set(["FASTEST", "FEWEST_TRANSFERS", "STEP_FREE_PREFERRED"]);
 
 function validateCanary(canary) {
   const plan = canary?.plan;
@@ -225,6 +228,11 @@ function validateCanary(canary) {
   const objectiveTags = new Set(itineraries.flatMap(({ objectiveTags }) => objectiveTags ?? []));
   if (!objectiveTags.has("FASTEST") || !objectiveTags.has("FEWEST_TRANSFERS")) {
     throw new Error("planner objective representatives are incomplete");
+  }
+  for (const tag of objectiveTags) {
+    if (!KNOWN_OBJECTIVE_TAGS.has(tag)) {
+      throw new Error("planner objective tag vocabulary is invalid");
+    }
   }
   const rideClasses = new Set();
   for (const itinerary of itineraries) {

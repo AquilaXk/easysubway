@@ -496,7 +496,8 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 	// 모두 계단 경로로 확정되기 때문이다. 선호(prefer)는 대안을 지우는 필터가 아니므로 대표를 교체하지
 	// 않고, alternativeCount에 남는 자리가 있을 때만 무단차 대표 1건을 덧붙인다 — 표시 선두("최속"·
 	// "최소 환승") 계약은 그대로 두고 응답 후보 집합만 넓힌다(정렬과 보존의 분리).
-	// 이미 응답에 담긴 대표 중 하나라도 계단이 없으면 무단차 선택지가 이미 노출된 것이므로 늘리지 않는다.
+	// 발동 조건은 "응답에 담긴 대표 중 검증된 무단차가 없음"이다. 검증되지 않은 접근 동선(UNKNOWN)은
+	// 무단차로 확인된 것이 아니므로 대표에 있어도 대안 보존을 막지 않는다.
 	private Optional<RouteSearchResult> stepFreeAlternative(
 		ConstraintMode constraintMode,
 		List<RouteSearchResult> found,
@@ -505,7 +506,7 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 	) {
 		if (constraintMode != ConstraintMode.PREFER_STEP_FREE
 			|| representatives.size() >= alternativeCount
-			|| !representatives.stream().allMatch(this::includesStairs)) {
+			|| representatives.stream().anyMatch(itinerary -> stairAccess(itinerary) == StairAccess.STEP_FREE)) {
 			return Optional.empty();
 		}
 		List<String> representativeIds = representatives.stream()
@@ -517,16 +518,36 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 			.thenComparingInt(RouteSearchResult::transferCount)
 			.thenComparing(RouteSearchResult::routeSearchId);
 		return found.stream()
-			.filter(itinerary -> !includesStairs(itinerary))
+			// 검증된 무단차 후보만 태깅한다. UNKNOWN 후보를 STEP_FREE_PREFERRED로 붙이면 태그가
+			// 그 후보의 stairAccessState=UNKNOWN·requiresAccessibilityCheck=true와 모순된다.
+			.filter(itinerary -> stairAccess(itinerary) == StairAccess.STEP_FREE)
 			.filter(itinerary -> !representativeIds.contains(itinerary.routeSearchId()))
-			.min(stepFreePreference)
-			.map(itinerary -> withObjectiveTags(itinerary, List.of(STEP_FREE_OBJECTIVE_TAG)));
+			.map(itinerary -> withObjectiveTags(itinerary, List.of(STEP_FREE_OBJECTIVE_TAG)))
+			// 응답에 편입되는 순간 prod 완결성 계약의 대상이 되고, 어기면 requireUsablePlan()이 plan
+			// 전체를 503으로 거부한다(200이던 검색이 통째로 실패). 계약을 못 채우는 후보는 붙이지 않아
+			// 기존 동작(=대안 미첨부)으로 안전하게 되돌아간다. 태깅 뒤에 걸러야 objectiveTags 조건을
+			// 실제 응답 형태로 판정한다.
+			.filter(itinerary -> !ProductionRouteV2Support.incompleteFoundItinerary(itinerary))
+			.min(stepFreePreference);
 	}
 
-	private boolean includesStairs(RouteSearchResult itinerary) {
-		return itinerary.steps().stream().anyMatch(RouteStep::includesStairs)
+	// 계단 접근성은 3값이다. 스텝의 stairAccessState가 STAIR_ONLY / STEP_FREE / UNKNOWN으로 갈리고
+	// (RouteTimetableRaptorPlanner의 접근 전이 생성), 미검증 전이는 계단 없음이 아니라 "확인되지 않음"이다.
+	private StairAccess stairAccess(RouteSearchResult itinerary) {
+		if (itinerary.steps().stream().anyMatch(RouteStep::includesStairs)
 			|| itinerary.warnings().stream()
-				.anyMatch(warning -> warning.code() == RouteWarningCode.STAIR_ONLY_ACCESS);
+				.anyMatch(warning -> warning.code() == RouteWarningCode.STAIR_ONLY_ACCESS)) {
+			return StairAccess.STAIR_ONLY;
+		}
+		return itinerary.steps().stream().anyMatch(RouteStep::requiresAccessibilityCheck)
+			? StairAccess.UNKNOWN
+			: StairAccess.STEP_FREE;
+	}
+
+	private enum StairAccess {
+		STEP_FREE,
+		UNKNOWN,
+		STAIR_ONLY
 	}
 
 	private long plannedArrivalEpochSecond(RouteSearchResult itinerary) {
