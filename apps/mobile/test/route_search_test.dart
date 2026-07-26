@@ -1804,6 +1804,85 @@ void main() {
       );
     });
 
+    test('#2582 무단차 대안 태그가 붙은 후보를 대표와 함께 화면 모델로 만든다', () {
+      // 백엔드 계약(#2560): 대안이 붙으면 대표는 계단 포함·미확인이고 대안은
+      // 검증된 무단차다. 두 상태가 한 화면에서 모순되지 않는 근거다.
+      final result = _objectiveResult([
+        _taggedItinerary(
+          lineId: 'line-stair',
+          objectiveTags: const ['FASTEST'],
+          stairCount: 1,
+        ),
+        _taggedItinerary(
+          lineId: 'line-step-free',
+          objectiveTags: const ['STEP_FREE_PREFERRED'],
+          reasonCodes: const ['LOW_DATA_CONFIDENCE'],
+        ),
+      ]);
+
+      final display = RouteSearchResult.fromV2(
+        result,
+        objective: RouteObjective.fastest,
+      );
+
+      expect(display.lineId, 'line-stair');
+      expect(display.stairAccessLabel, '계단 포함');
+      final alternative = display.stepFreeAlternative;
+      expect(alternative, isNotNull);
+      expect(alternative!.lineId, 'line-step-free');
+      expect(alternative.stairAccessLabel, '계단 없는 길이에요');
+      // 대안 자신은 다시 대안을 갖지 않는다(전환 시 그대로 주 결과가 된다).
+      expect(alternative.stepFreeAlternative, isNull);
+      // 대안의 경고는 감추지 않고 그대로 실어 보낸다.
+      expect(alternative.warningNoticeText, '일부 시설 안내는 아직 확인되지 않았어요.');
+      // 상단 라벨에는 존재 신호 한 조각만 들어간다.
+      expect(display.semanticLabel, contains('계단 없는 다른 경로 있음'));
+      expect(display.semanticLabel, isNot(contains('계단 없는 길로 확인된 경로예요')));
+    });
+
+    test('#2582 무단차 대안 태그가 없으면 대안 없이 기존 단건 결과 그대로다', () {
+      final result = _objectiveResult([
+        _taggedItinerary(lineId: 'line-fast', objectiveTags: const ['FASTEST']),
+      ]);
+
+      final display = RouteSearchResult.fromV2(
+        result,
+        objective: RouteObjective.fastest,
+      );
+
+      expect(display.lineId, 'line-fast');
+      expect(display.stepFreeAlternative, isNull);
+      expect(display.semanticLabel, isNot(contains('계단 없는 다른 경로')));
+    });
+
+    test('#2582 태그 없는 레거시 응답도 대안 없이 첫 FOUND를 그대로 쓴다', () {
+      final result = _objectiveResult([
+        _taggedItinerary(lineId: 'line-a', objectiveTags: const []),
+      ]);
+
+      final display = RouteSearchResult.fromV2(
+        result,
+        objective: RouteObjective.fewestTransfers,
+      );
+
+      expect(display.lineId, 'line-a');
+      expect(display.stepFreeAlternative, isNull);
+    });
+
+    test('#2582 대안 태그만 있고 요청 objective 대표가 없으면 여전히 fail closed', () {
+      final result = _objectiveResult([
+        _taggedItinerary(
+          lineId: 'line-step-free',
+          objectiveTags: const ['STEP_FREE_PREFERRED'],
+        ),
+      ]);
+      expect(
+        () =>
+            RouteSearchResult.fromV2(result, objective: RouteObjective.fastest),
+        throwsFormatException,
+      );
+    });
+
     test('태그가 있는데 요청 objective와 매칭되는 FOUND가 없으면 fail closed', () {
       // FASTEST 전용 경로만 있는데 최소환승을 요청하면 silent fallback(계약 위반)을
       // 피해 payload 오류로 실패시킨다. RouteSearchV2ApiRepository.searchRoute의 generic
@@ -1940,23 +2019,24 @@ Map<String, Object?> _rideLegJson({
   };
 }
 
-const _objectiveTestRisk = RouteSearchV2AccessibilityRisk(
-  stairCount: 0,
-  unknownAccessibilityCount: 0,
-  generatedConnectorCount: 0,
-  staleDataCount: 0,
-  lowConfidenceCount: 0,
-  unavailableFacilityCount: 0,
-  riskLevel: 'LOW',
-  reasonCodes: [],
-  level: 'LOW',
-  reasons: [],
-);
-
 RouteSearchV2Itinerary _taggedItinerary({
   required String lineId,
   required List<String> objectiveTags,
+  int stairCount = 0,
+  List<String> reasonCodes = const [],
 }) {
+  final risk = RouteSearchV2AccessibilityRisk(
+    stairCount: stairCount,
+    unknownAccessibilityCount: 0,
+    generatedConnectorCount: 0,
+    staleDataCount: 0,
+    lowConfidenceCount: 0,
+    unavailableFacilityCount: 0,
+    riskLevel: 'LOW',
+    reasonCodes: reasonCodes,
+    level: 'LOW',
+    reasons: reasonCodes,
+  );
   return RouteSearchV2Itinerary(
     itineraryId: 'route-$lineId-primary',
     status: 'FOUND',
@@ -1967,7 +2047,7 @@ RouteSearchV2Itinerary _taggedItinerary({
     durationSeconds: 1620,
     transferCount: 0,
     walkingDistanceMeters: 80,
-    accessibilityRisk: _objectiveTestRisk,
+    accessibilityRisk: risk,
     commercialEtaEligible: false,
     objectiveTags: objectiveTags,
     legs: [
@@ -1990,7 +2070,7 @@ RouteSearchV2Itinerary _taggedItinerary({
         distanceMeters: 12000,
         etaSource: 'PLANNED',
         confidence: 'MEDIUM',
-        accessibilityRisk: _objectiveTestRisk,
+        accessibilityRisk: risk,
         serviceClass: 'SUBWAY',
         servicePattern: 'LOCAL',
       ),

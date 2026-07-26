@@ -1306,7 +1306,13 @@ extension _OnlineRouteDisplayLabels on LocalRouteRepository {
   Future<RouteSearchResult> resolveDisplayLabels(
     RouteSearchResult result,
   ) async {
-    final bundle = await _routeCatalogBundle();
+    return _resolvedDisplayLabels(result, await _routeCatalogBundle());
+  }
+
+  RouteSearchResult _resolvedDisplayLabels(
+    RouteSearchResult result,
+    _RouteCatalogBundle bundle,
+  ) {
     final catalog = bundle.catalog;
     final steps = result.steps
         .map((step) {
@@ -1326,6 +1332,7 @@ extension _OnlineRouteDisplayLabels on LocalRouteRepository {
           );
         })
         .toList(growable: false);
+    final stepFreeAlternative = result.stepFreeAlternative;
     return result.withDisplayLabels(
       originStationName: catalog.stationName(result.originStationId),
       destinationStationName: catalog.stationName(result.destinationStationId),
@@ -1337,6 +1344,11 @@ extension _OnlineRouteDisplayLabels on LocalRouteRepository {
               result.destinationStationId,
             )]
           : null,
+      // #2582: 무단차 대안도 같은 카탈로그로 이름을 채워야 전환했을 때 역·노선
+      // ID가 그대로 보이지 않는다. 대안은 다시 대안을 갖지 않아 재귀는 1회다.
+      stepFreeAlternative: stepFreeAlternative == null
+          ? null
+          : _resolvedDisplayLabels(stepFreeAlternative, bundle),
     );
   }
 

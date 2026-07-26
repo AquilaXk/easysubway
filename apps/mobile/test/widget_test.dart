@@ -19431,6 +19431,142 @@ void main() {
       expect(recorded.region, '부산');
     },
   );
+
+  group('#2582 무단차 대안 노출', () {
+    testWidgets('대안이 있으면 타임라인 아래 전환 행이 뜨고 탭하면 주 결과가 바뀐다', (tester) async {
+      await _pumpStepFreeAlternativeRouteScreen(
+        tester,
+        result: _stepFreeAlternativeRouteResult(),
+      );
+
+      // 주 결과는 계단 포함 37분이고, 대안은 접힌 행 하나로만 존재한다.
+      expect(find.text('37분'), findsOneWidget);
+      expect(find.text('계단 포함'), findsOneWidget);
+      expect(find.text('계단 없는 다른 경로'), findsOneWidget);
+      expect(find.text('계단 없는 길로 확인된 경로예요'), findsOneWidget);
+      // 무단차 경로를 "느린 경로"로 프레이밍하지 않는다 — 시간 차 표기 없음.
+      expect(find.textContaining('분 더'), findsNothing);
+      expect(find.textContaining('+3'), findsNothing);
+      // 타임라인은 하나만 펴진다.
+      expect(find.text('이동 순서'), findsOneWidget);
+
+      final row = find.byKey(const Key('routeStepFreeAlternativeRow'));
+      expect(
+        find.descendant(of: row, matching: find.text('40분')),
+        findsOneWidget,
+      );
+
+      await _tapStepFreeAlternativeRow(tester);
+
+      // 대안이 그대로 주 결과가 되고, 같은 자리에 되돌아가는 행이 생긴다.
+      expect(find.text('40분'), findsOneWidget);
+      expect(find.text('계단 없는 길이에요'), findsOneWidget);
+      expect(find.text('계단 없는 다른 경로'), findsNothing);
+      expect(find.text('빠른 경로'), findsOneWidget);
+      expect(find.text('이동 순서'), findsOneWidget);
+      expect(
+        find.descendant(of: row, matching: find.text('37분')),
+        findsOneWidget,
+      );
+
+      // 되돌아가면 원래 대표 화면 그대로다.
+      await _tapStepFreeAlternativeRow(tester);
+      expect(find.text('37분'), findsOneWidget);
+      expect(find.text('계단 없는 다른 경로'), findsOneWidget);
+      expect(find.text('빠른 경로'), findsNothing);
+      expectNoForbiddenUserCopy(tester);
+    });
+
+    testWidgets('대안이 없는 응답은 전환 행 없이 기존 결과 화면 그대로다', (tester) async {
+      await _pumpStepFreeAlternativeRouteScreen(
+        tester,
+        result: _sampleRouteSearchResult(),
+      );
+
+      expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
+      expect(find.text('이동 순서'), findsOneWidget);
+      expect(
+        find.byKey(const Key('routeStepFreeAlternativeRow')),
+        findsNothing,
+      );
+      expect(find.text('계단 없는 다른 경로'), findsNothing);
+      expect(find.text('빠른 경로'), findsNothing);
+    });
+
+    testWidgets('대안에 붙은 경고는 전환 행에도 그대로 노출된다', (tester) async {
+      await _pumpStepFreeAlternativeRouteScreen(
+        tester,
+        result: _stepFreeAlternativeRouteResult(
+          alternativeWarnings: const [
+            RouteSearchWarning(code: 'LOW_DATA_CONFIDENCE'),
+          ],
+        ),
+      );
+
+      expect(
+        find.text('계단 없는 길로 확인된 경로예요 · 일부 시설 안내는 아직 확인되지 않았어요.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('전환 행은 버튼 하나로 읽히고 상단 라벨은 존재 신호만 덧붙인다', (tester) async {
+      final handle = tester.ensureSemantics();
+      await _pumpStepFreeAlternativeRouteScreen(
+        tester,
+        result: _stepFreeAlternativeRouteResult(),
+      );
+
+      expect(
+        find.bySemanticsLabel('계단 없는 다른 경로, 40분, 계단 없는 길로 확인된 경로예요'),
+        findsOneWidget,
+      );
+      // 상단 결과 라벨(liveRegion)에는 존재 신호 한 조각만 들어간다.
+      expect(
+        find.bySemanticsLabel(RegExp(r'^경로 검색 결과, .*계단 없는 다른 경로 있음')),
+        findsOneWidget,
+      );
+      // 소요 시간·검증 문구는 행에 포커스했을 때만 읽힌다(중복 낭독 방지).
+      expect(
+        find.bySemanticsLabel(RegExp(r'^경로 검색 결과, .*계단 없는 길로 확인된 경로예요')),
+        findsNothing,
+      );
+      handle.dispose();
+    });
+  });
+}
+
+Future<void> _pumpStepFreeAlternativeRouteScreen(
+  WidgetTester tester, {
+  required RouteSearchResult result,
+}) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      home: RouteSearchScreen(
+        repository: FakeRouteSearchRepository(result: result),
+        stationRepository: FakeStationSearchRepository(),
+        initialDraft: RouteDraft(
+          origin: const RouteDraftStation(
+            id: 'station-sangnoksu',
+            nameKo: '상록수',
+          ),
+          destination: const RouteDraftStation(
+            id: 'station-sadang',
+            nameKo: '사당',
+          ),
+          lastModifiedAt: DateTime(2026, 7, 26),
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+Future<void> _tapStepFreeAlternativeRow(WidgetTester tester) async {
+  final row = find.byKey(const Key('routeStepFreeAlternativeRow'));
+  await tester.ensureVisible(row);
+  await tester.pumpAndSettle();
+  await tester.tap(row);
+  await tester.pumpAndSettle();
 }
 
 Future<void> _showFacilityReportTypeOption(
@@ -21400,6 +21536,8 @@ RouteSearchResult _sampleRouteSearchResult({
   RouteTransportScope transportScope = RouteTransportScope.subway,
   OfficialOdFareQuote? officialOdFareQuote,
   List<RouteSearchStep>? steps,
+  List<RouteSearchWarning>? warnings,
+  RouteSearchResult? stepFreeAlternative,
   List<String> recommendationReasons = const [
     '엘리베이터 동선을 우선했어요',
     '계단 없는 출구를 확인했어요',
@@ -21456,16 +21594,18 @@ RouteSearchResult _sampleRouteSearchResult({
             stepType: 'exit',
           ),
         ],
-    warnings: const [
-      RouteSearchWarning(
-        code: 'LOW_DATA_CONFIDENCE',
-        message: '일부 시설 안내는 아직 확인되지 않았어요.',
-      ),
-      RouteSearchWarning(
-        code: 'STALE_ACCESSIBILITY_DATA',
-        message: '엘리베이터와 시설 안내가 오래됐을 수 있어요.',
-      ),
-    ],
+    warnings:
+        warnings ??
+        const [
+          RouteSearchWarning(
+            code: 'LOW_DATA_CONFIDENCE',
+            message: '일부 시설 안내는 아직 확인되지 않았어요.',
+          ),
+          RouteSearchWarning(
+            code: 'STALE_ACCESSIBILITY_DATA',
+            message: '엘리베이터와 시설 안내가 오래됐을 수 있어요.',
+          ),
+        ],
     recommendationReasons: recommendationReasons,
     blockedReasons: [],
     createdAt: '2026-06-13T04:20:00',
@@ -21476,6 +21616,59 @@ RouteSearchResult _sampleRouteSearchResult({
     arrivalTimeIso: arrivalTimeIso,
     objective: objective,
     transportScope: transportScope,
+    stepFreeAlternative: stepFreeAlternative,
+  );
+}
+
+/// #2582: 무단차 대안이 함께 온 `PREFER_STEP_FREE` 응답의 화면 모델.
+///
+/// 백엔드 계약(#2560)상 대안이 붙으면 대표는 계단 포함이거나 계단 여부 미확인이고
+/// 대안은 항상 검증된 무단차다. 그 형태 그대로 대표 37분(계단 포함) + 대안 40분
+/// (계단 없음)을 만든다.
+RouteSearchResult _stepFreeAlternativeRouteResult({
+  List<RouteSearchWarning> alternativeWarnings = const [],
+}) {
+  return _sampleRouteSearchResult(
+    routeSearchId: 'route-v2-stair',
+    warnings: const [],
+    steps: const [
+      RouteSearchStep(
+        sequence: 1,
+        stepType: 'ride',
+        title: '상록수에서 사당까지 이동',
+        description: '열차를 이용해 이동합니다.',
+        lineId: 'seoul-4',
+        lineName: '수도권 4호선',
+        fromStationId: 'station-sangnoksu',
+        toStationId: 'station-sadang',
+        estimatedMinutes: 37,
+        distanceMeters: 13500,
+        includesStairs: true,
+        requiresAccessibilityCheck: false,
+        stairAccessState: 'stairOnly',
+      ),
+    ],
+    stepFreeAlternative: _sampleRouteSearchResult(
+      routeSearchId: 'route-v2-step-free',
+      warnings: alternativeWarnings,
+      steps: const [
+        RouteSearchStep(
+          sequence: 1,
+          stepType: 'ride',
+          title: '상록수에서 사당까지 이동',
+          description: '엘리베이터로 이동합니다.',
+          lineId: 'seoul-2',
+          lineName: '수도권 2호선',
+          fromStationId: 'station-sangnoksu',
+          toStationId: 'station-sadang',
+          estimatedMinutes: 40,
+          distanceMeters: 14200,
+          includesStairs: false,
+          requiresAccessibilityCheck: false,
+          stairAccessState: 'stepFree',
+        ),
+      ],
+    ),
   );
 }
 

@@ -38,6 +38,7 @@ const _routeSearchTimeout = Duration(seconds: 8);
 const _routeSearchErrorMessage = '경로 정보를 불러오지 못했어요.';
 const _routeOnlineSearchErrorMessage = '실시간/서버 경로를 확인하지 못했어요.';
 const _routeRefreshErrorMessage = '도착 시간을 새로 확인하지 못했어요.';
+const _getOffAlarmCancelFailureMessage = '하차 알림을 취소하지 못했어요. 다시 시도해 주세요.';
 const _getOffAlarmRefreshRollbackMessage = '하차 알림을 갱신하지 못해 이전 경로를 유지해요.';
 const _getOffAlarmRefreshFailureMessage = '하차 알림을 새로 맞추지 못했어요. 이전 경로를 유지해요.';
 const _routeFeedbackErrorMessage = '의견을 보내지 못했어요.';
@@ -48,6 +49,11 @@ const _routeSearchFailureNextAction = '역을 다시 선택하거나 이동 조�
 const _routeFeedbackFailureNextAction = '잠시 후 다시 보내거나 경로 조건을 바꿔 다시 찾아보세요.';
 const _favoriteRouteSaveFailureNextAction =
     '네트워크 상태를 확인한 뒤 자주 쓰는 경로 저장을 다시 눌러 주세요.';
+// #2582 무단차 대안 전환 행 문구. 앱에 이미 있는 "계단 없는 …" 어휘를 그대로 쓰고
+// 시간 차("N분 더")는 쓰지 않는다 — 접근성 경로를 느린 경로로 프레이밍하지 않는다.
+const _stepFreeAlternativeTitle = '계단 없는 다른 경로';
+const _stepFreeAlternativeDetail = '계단 없는 길로 확인된 경로예요';
+const _stepFreePrimaryTitle = '빠른 경로';
 const _routeSearchPagePadding = EdgeInsets.only(
   left: EasySubwaySpacing.xl,
   top: EasySubwaySpacing.lg,
@@ -950,6 +956,14 @@ class RouteSearchV2Result {
   final String nextServiceTime;
 }
 
+/// 무단차 선호(`PREFER_STEP_FREE`) 검색에서 백엔드가 덧붙이는 대안 후보 태그.
+///
+/// 백엔드 계약(#2560): 대표 중 검증된 무단차가 하나도 없고 alternativeCount에
+/// 자리가 남을 때만, `stairAccess == STEP_FREE`로 **검증된** 후보 1건에만 붙는다.
+/// 따라서 이 태그가 달린 후보가 있으면 요청 objective 대표는 계단 포함이거나
+/// 계단 여부 미확인이며, 대안은 항상 검증된 무단차다.
+const _stepFreePreferredObjectiveTag = 'STEP_FREE_PREFERRED';
+
 class RouteSearchV2Itinerary {
   const RouteSearchV2Itinerary({
     required this.itineraryId,
@@ -1026,8 +1040,12 @@ class RouteSearchV2Itinerary {
   final bool commercialEtaEligible;
   final RouteSearchOfficialFare? officialFare;
 
-  /// 백엔드가 dual-tag dedupe한 대표 itinerary에 붙이는 objective 태그
-  /// (FASTEST·FEWEST_TRANSFERS). 두 objective가 같은 경로면 두 태그를 모두 담는다.
+  /// 백엔드가 itinerary에 붙이는 objective 태그.
+  ///
+  /// 대표 itinerary에는 요청 objective 어휘(`FASTEST`·`FEWEST_TRANSFERS`)가 붙고,
+  /// 두 objective가 같은 경로면 dual-tag dedupe로 두 태그를 모두 담는다. 여기에
+  /// 더해 무단차 선호 검색에서는 [_stepFreePreferredObjectiveTag]가 붙은 대안
+  /// 후보가 최대 1건 함께 올 수 있다(#2560). 모르는 태그는 무시한다.
   final List<String> objectiveTags;
 
   bool matchesObjective(RouteObjective objective) =>
@@ -1297,6 +1315,7 @@ class RouteSearchResult {
     this.departureTimeIso = '',
     this.arrivalTimeIso = '',
     this.officialFare,
+    this.stepFreeAlternative,
   }) : // `burdenCost`는 API contract 이름이고 저장 필드는 private 값이다.
        // ignore: prefer_initializing_formals
        _accessibilityScore = accessibilityScore,
@@ -1451,66 +1470,21 @@ class RouteSearchResult {
         departureTimeIso: result.departureTime,
       );
     }
-    final itinerary = _selectRouteV2Itinerary(result.itineraries, objective);
-    final lineId = _routeV2SummaryLineId(itinerary.legs);
-    return RouteSearchResult(
-      routeSearchId: _routeV2RouteSearchId(itinerary.itineraryId),
-      originStationId: result.originStationId,
-      originStationName: result.originStationId,
-      destinationStationId: result.destinationStationId,
-      destinationStationName: result.destinationStationId,
-      mobilityType: result.mobilityType,
-      constraintMode: result.constraintMode,
-      status: _routeV2Status(itinerary.status),
-      lineId: lineId,
-      lineName: lineId,
-      score: _scoreFromRisk(itinerary.accessibilityRisk),
-      burdenCost: itinerary.durationSeconds,
-      estimatedDurationSeconds: itinerary.durationSeconds,
-      walkingDistanceMeters: itinerary.walkingDistanceMeters,
-      transferCount: itinerary.transferCount,
-      evidenceSummary: [
-        'ETA_${itinerary.etaSource}',
-        'CONFIDENCE_${itinerary.etaConfidence}',
-      ],
-      steps: itinerary.legs
-          .asMap()
-          .entries
-          .map((entry) => RouteSearchStep.fromV2(entry.key + 1, entry.value))
-          .toList(growable: false),
-      warnings: itinerary.accessibilityRisk.reasonCodes
-          .map(
-            (code) => RouteSearchWarning(
-              code: code,
-              message: _routeV2RiskMessage(code),
-            ),
-          )
-          .toList(growable: false),
-      recommendationReasons: itinerary.commercialEtaEligible
-          ? const ['실시간 도착 정보를 반영했어요.']
-          : const [],
-      blockedReasons: itinerary.status == 'FOUND'
-          ? const []
-          : itinerary.accessibilityRisk.reasonCodes.isEmpty
-          ? [itinerary.status]
-          : itinerary.accessibilityRisk.reasonCodes,
-      createdAt: result.departureTime,
-      etaSource: itinerary.etaSource,
-      etaConfidence: itinerary.etaConfidence,
-      accessibilityRiskLevel: itinerary.accessibilityRisk.riskLevel,
-      transferSlackSeconds: _routeV2TransferSlackSeconds(itinerary.legs),
-      hasOutOfStationTransfer: itinerary.legs.any(
-        (leg) => leg.legType == 'OUT_OF_STATION_TRANSFER',
-      ),
-      commercialEtaEligible: itinerary.commercialEtaEligible,
-      sourceUpdatedAt: result.departureTime,
-      supportsRefresh: false,
-      transportScope: RouteTransportScope.subwayAndItxCheongchun,
+    final selection = _selectRouteV2Itinerary(result.itineraries, objective);
+    final alternative = selection.stepFreeAlternative;
+    return _routeSearchResultFromV2Itinerary(
+      result: result,
+      itinerary: selection.primary,
       objective: objective,
-      departureTimeIso: result.departureTime,
-      arrivalTimeIso:
-          itinerary.realtimeArrivalTime ?? itinerary.plannedArrivalTime,
-      officialFare: itinerary.officialFare,
+      // 대안도 같은 변환을 거쳐 동일한 화면 모델이 된다 — 탭 전환 시 그대로 주
+      // 결과가 되므로 별도 변환 경로를 두지 않는다(#2582).
+      stepFreeAlternative: alternative == null
+          ? null
+          : _routeSearchResultFromV2Itinerary(
+              result: result,
+              itinerary: alternative,
+              objective: objective,
+            ),
     );
   }
 
@@ -1551,6 +1525,13 @@ class RouteSearchResult {
   final String departureTimeIso;
   final String arrivalTimeIso;
   final RouteSearchOfficialFare? officialFare;
+
+  /// 무단차 선호 검색에서 백엔드가 함께 보존한, 검증된 무단차 대안(#2582).
+  ///
+  /// 없는 것이 정상이며, 있으면 이 결과는 계단 포함이거나 계단 여부 미확인이다
+  /// ([_stepFreePreferredObjectiveTag] 계약). 대안 자신은 이 필드를 갖지 않는다 —
+  /// 화면이 대안으로 전환하면 되돌아갈 대표는 화면이 계속 들고 있다.
+  final RouteSearchResult? stepFreeAlternative;
 
   bool get hasOfficialOdFareQuote => officialOdFareQuote != null;
 
@@ -1708,6 +1689,7 @@ class RouteSearchResult {
     String? etaSource,
     OfficialOdFareQuote? officialOdFareQuote,
     RouteObjective? objective,
+    RouteSearchResult? stepFreeAlternative,
   }) {
     return RouteSearchResult(
       routeSearchId: routeSearchId,
@@ -1748,6 +1730,7 @@ class RouteSearchResult {
       departureTimeIso: departureTimeIso,
       arrivalTimeIso: arrivalTimeIso,
       officialFare: officialFare,
+      stepFreeAlternative: stepFreeAlternative ?? this.stepFreeAlternative,
     );
   }
 
@@ -1837,6 +1820,9 @@ class RouteSearchResult {
       comfortLabel,
       stairAccessLabel,
       ...badgeLabels,
+      // 존재 신호 한 조각만 넣는다. 소요 시간·검증 문구는 전환 행 버튼에
+      // 포커스했을 때만 읽혀 중복 낭독을 만들지 않는다(#2582).
+      if (stepFreeAlternative != null) '$_stepFreeAlternativeTitle 있음',
     ];
     if (!isBlocked && warnings.isNotEmpty) {
       parts.add(attentionLabel);
@@ -1972,19 +1958,113 @@ class RouteRefreshResult {
   }
 }
 
-/// objective-tagged 대표 itinerary 중 현재 목표에 맞는 것을 고른다. 백엔드가 두
-/// objective를 하나로 dedupe하면 그 하나가 두 태그를 모두 달고 있어 어느 목표에서도
-/// 선택된다. FOUND itinerary가 전부 무태그(레거시)일 때만 첫 FOUND, 그마저 없으면 첫
-/// itinerary로 폴백해 기존 동작을 보존한다. 태그가 하나라도 있는데 요청 objective와
-/// 매칭되는 FOUND가 없으면 silent fallback(계약 위반)을 피해 payload 오류로 fail
-/// closed한다(generic unavailable 흐름으로 흐른다).
-RouteSearchV2Itinerary _selectRouteV2Itinerary(
+/// Route V2 itinerary 한 건을 화면 모델로 옮긴다. 대표와 무단차 대안이 같은
+/// 변환을 공유해 전환 시 대안이 그대로 주 결과가 된다(#2582).
+RouteSearchResult _routeSearchResultFromV2Itinerary({
+  required RouteSearchV2Result result,
+  required RouteSearchV2Itinerary itinerary,
+  required RouteObjective objective,
+  RouteSearchResult? stepFreeAlternative,
+}) {
+  final lineId = _routeV2SummaryLineId(itinerary.legs);
+  return RouteSearchResult(
+    routeSearchId: _routeV2RouteSearchId(itinerary.itineraryId),
+    originStationId: result.originStationId,
+    originStationName: result.originStationId,
+    destinationStationId: result.destinationStationId,
+    destinationStationName: result.destinationStationId,
+    mobilityType: result.mobilityType,
+    constraintMode: result.constraintMode,
+    status: _routeV2Status(itinerary.status),
+    lineId: lineId,
+    lineName: lineId,
+    score: _scoreFromRisk(itinerary.accessibilityRisk),
+    burdenCost: itinerary.durationSeconds,
+    estimatedDurationSeconds: itinerary.durationSeconds,
+    walkingDistanceMeters: itinerary.walkingDistanceMeters,
+    transferCount: itinerary.transferCount,
+    evidenceSummary: [
+      'ETA_${itinerary.etaSource}',
+      'CONFIDENCE_${itinerary.etaConfidence}',
+    ],
+    steps: itinerary.legs
+        .asMap()
+        .entries
+        .map((entry) => RouteSearchStep.fromV2(entry.key + 1, entry.value))
+        .toList(growable: false),
+    warnings: itinerary.accessibilityRisk.reasonCodes
+        .map(
+          (code) => RouteSearchWarning(
+            code: code,
+            message: _routeV2RiskMessage(code),
+          ),
+        )
+        .toList(growable: false),
+    recommendationReasons: itinerary.commercialEtaEligible
+        ? const ['실시간 도착 정보를 반영했어요.']
+        : const [],
+    blockedReasons: itinerary.status == 'FOUND'
+        ? const []
+        : itinerary.accessibilityRisk.reasonCodes.isEmpty
+        ? [itinerary.status]
+        : itinerary.accessibilityRisk.reasonCodes,
+    createdAt: result.departureTime,
+    etaSource: itinerary.etaSource,
+    etaConfidence: itinerary.etaConfidence,
+    accessibilityRiskLevel: itinerary.accessibilityRisk.riskLevel,
+    transferSlackSeconds: _routeV2TransferSlackSeconds(itinerary.legs),
+    hasOutOfStationTransfer: itinerary.legs.any(
+      (leg) => leg.legType == 'OUT_OF_STATION_TRANSFER',
+    ),
+    commercialEtaEligible: itinerary.commercialEtaEligible,
+    sourceUpdatedAt: result.departureTime,
+    supportsRefresh: false,
+    transportScope: RouteTransportScope.subwayAndItxCheongchun,
+    objective: objective,
+    departureTimeIso: result.departureTime,
+    arrivalTimeIso:
+        itinerary.realtimeArrivalTime ?? itinerary.plannedArrivalTime,
+    officialFare: itinerary.officialFare,
+    stepFreeAlternative: stepFreeAlternative,
+  );
+}
+
+/// 요청 objective의 대표 itinerary와, 함께 노출할 무단차 대안(있으면)을 고른다.
+///
+/// 대안은 없는 것이 정상이므로 대표 선택과 달리 fail closed 대상이 아니다(#2582).
+({RouteSearchV2Itinerary primary, RouteSearchV2Itinerary? stepFreeAlternative})
+_selectRouteV2Itinerary(
   List<RouteSearchV2Itinerary> itineraries,
   RouteObjective objective,
 ) {
   final foundItineraries = itineraries
       .where((itinerary) => itinerary.status == 'FOUND')
       .toList(growable: false);
+  final primary = _selectRouteV2Primary(
+    itineraries: itineraries,
+    foundItineraries: foundItineraries,
+    objective: objective,
+  );
+  return (
+    primary: primary,
+    stepFreeAlternative: _selectRouteV2StepFreeAlternative(
+      foundItineraries: foundItineraries,
+      primary: primary,
+    ),
+  );
+}
+
+/// objective-tagged 대표 itinerary 중 현재 목표에 맞는 것을 고른다. 백엔드가 두
+/// objective를 하나로 dedupe하면 그 하나가 두 태그를 모두 달고 있어 어느 목표에서도
+/// 선택된다. FOUND itinerary가 전부 무태그(레거시)일 때만 첫 FOUND, 그마저 없으면 첫
+/// itinerary로 폴백해 기존 동작을 보존한다. 태그가 하나라도 있는데 요청 objective와
+/// 매칭되는 FOUND가 없으면 silent fallback(계약 위반)을 피해 payload 오류로 fail
+/// closed한다(generic unavailable 흐름으로 흐른다).
+RouteSearchV2Itinerary _selectRouteV2Primary({
+  required List<RouteSearchV2Itinerary> itineraries,
+  required List<RouteSearchV2Itinerary> foundItineraries,
+  required RouteObjective objective,
+}) {
   for (final itinerary in foundItineraries) {
     if (itinerary.matchesObjective(objective)) {
       return itinerary;
@@ -2002,6 +2082,21 @@ RouteSearchV2Itinerary _selectRouteV2Itinerary(
     (candidate) => candidate.status == 'FOUND',
     orElse: () => itineraries.first,
   );
+}
+
+/// 대표로 뽑히지 않은 [_stepFreePreferredObjectiveTag] 후보를 고른다. 백엔드가
+/// 최대 1건만 붙이므로 첫 매칭이 그 1건이다(#2560 계약).
+RouteSearchV2Itinerary? _selectRouteV2StepFreeAlternative({
+  required List<RouteSearchV2Itinerary> foundItineraries,
+  required RouteSearchV2Itinerary primary,
+}) {
+  for (final itinerary in foundItineraries) {
+    if (!identical(itinerary, primary) &&
+        itinerary.objectiveTags.contains(_stepFreePreferredObjectiveTag)) {
+      return itinerary;
+    }
+  }
+  return null;
 }
 
 int _scoreFromRisk(RouteSearchV2AccessibilityRisk risk) {
@@ -3306,7 +3401,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
       reportMobileError(error, stackTrace, context: '하차 알림 취소 중 예외가 발생했습니다.');
       if (mounted) {
         ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          const SnackBar(content: Text('하차 알림을 취소하지 못했어요. 다시 시도해 주세요.')),
+          const SnackBar(content: Text(_getOffAlarmCancelFailureMessage)),
         );
       }
       return false;
@@ -4744,9 +4839,44 @@ class _RouteSearchResultCard extends StatefulWidget {
 }
 
 class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
+  /// #2582: 무단차 대안이 함께 온 응답에서 화면이 어느 쪽을 주 결과로 그리는지.
+  /// 검색 결과가 새로 오면 항상 요청 objective 대표로 되돌아간다.
+  bool _showsStepFreeAlternative = false;
+
+  @override
+  void didUpdateWidget(covariant _RouteSearchResultCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.result, widget.result)) {
+      _showsStepFreeAlternative = false;
+    }
+  }
+
+  RouteSearchResult get _displayedResult {
+    final alternative = widget.result.stepFreeAlternative;
+    return _showsStepFreeAlternative && alternative != null
+        ? alternative
+        : widget.result;
+  }
+
+  _StepFreeRouteSwitch? get _stepFreeRouteSwitch {
+    final alternative = widget.result.stepFreeAlternative;
+    if (alternative == null) {
+      return null;
+    }
+    return _showsStepFreeAlternative
+        ? _StepFreeRouteSwitch.toPrimary(
+            target: widget.result,
+            onSwitch: () => _switchStepFreeRoute(false),
+          )
+        : _StepFreeRouteSwitch.toStepFree(
+            target: alternative,
+            onSwitch: () => _switchStepFreeRoute(true),
+          );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final result = widget.result;
+    final result = _displayedResult;
     if (result.isBlocked) {
       return _wrapShellBack(_RouteBlockedWorkflow(result: result));
     }
@@ -4765,6 +4895,7 @@ class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
             result: result,
             onOpenDetail: () => _openDetail(result),
             adRepository: widget.adRepository,
+            stepFreeRouteSwitch: _stepFreeRouteSwitch,
           ),
           if (widget.getOffAlarmController != null)
             _GetOffAlarmEntryPoint(
@@ -4777,8 +4908,42 @@ class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
     );
   }
 
-  bool get _canUseRouteActions => _isRecommendedRoute(widget.result);
-  bool get _canUseApiActions => !widget.result.isLocalResult;
+  /// 화면이 그리는 경로를 대표 ↔ 무단차 대안으로 바꾼다. 이동 조건 변경과 같은
+  /// 원칙으로, 다른 경로에 걸린 활성 하차 알림을 먼저 끈 뒤에만 전환한다.
+  Future<void> _switchStepFreeRoute(bool showsStepFreeAlternative) async {
+    if (_showsStepFreeAlternative == showsStepFreeAlternative) {
+      return;
+    }
+    if (!await _disableActiveGetOffAlarmForSwitch()) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() => _showsStepFreeAlternative = showsStepFreeAlternative);
+  }
+
+  Future<bool> _disableActiveGetOffAlarmForSwitch() async {
+    final controller = widget.getOffAlarmController;
+    if (controller == null || !controller.state.enabled) {
+      return true;
+    }
+    try {
+      await controller.disable();
+      return true;
+    } catch (error, stackTrace) {
+      reportMobileError(error, stackTrace, context: '하차 알림 취소 중 예외가 발생했습니다.');
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(content: Text(_getOffAlarmCancelFailureMessage)),
+        );
+      }
+      return false;
+    }
+  }
+
+  bool get _canUseRouteActions => _isRecommendedRoute(_displayedResult);
+  bool get _canUseApiActions => !_displayedResult.isLocalResult;
   bool get _canSaveRoute =>
       _canUseApiActions &&
       widget.favoriteRouteRepository != null &&
@@ -5020,16 +5185,151 @@ RouteSearchStep? _matchingPreviousRideStep({
   return null;
 }
 
+/// #2582 무단차 대안 전환 행이 그릴 대상. [target]은 탭했을 때 주 결과가 되는
+/// 경로다. 검증된 무단차 쪽으로 갈 때와 원래 대표로 돌아올 때 문구만 다르다.
+class _StepFreeRouteSwitch {
+  const _StepFreeRouteSwitch._({
+    required this.target,
+    required this.title,
+    required this.detail,
+    required this.onSwitch,
+  });
+
+  /// 계단 포함·미확인 대표에서 검증된 무단차 대안으로.
+  factory _StepFreeRouteSwitch.toStepFree({
+    required RouteSearchResult target,
+    required VoidCallback onSwitch,
+  }) {
+    return _StepFreeRouteSwitch._(
+      target: target,
+      title: _stepFreeAlternativeTitle,
+      detail: _stepFreeAlternativeDetail,
+      onSwitch: onSwitch,
+    );
+  }
+
+  /// 무단차 대안을 보다가 요청 objective 대표로 되돌아가기.
+  factory _StepFreeRouteSwitch.toPrimary({
+    required RouteSearchResult target,
+    required VoidCallback onSwitch,
+  }) {
+    return _StepFreeRouteSwitch._(
+      target: target,
+      title: _stepFreePrimaryTitle,
+      detail: target.stairAccessLabel,
+      onSwitch: onSwitch,
+    );
+  }
+
+  final RouteSearchResult target;
+  final String title;
+  final String detail;
+  final VoidCallback onSwitch;
+
+  /// 대상 경로에 붙은 경고(LOW_DATA_CONFIDENCE 등)는 헤지 사전 문구 그대로
+  /// 덧붙인다 — 대안이라고 검증 수준을 감추지 않는다.
+  String get subtitle {
+    final notice = target.warningNoticeText;
+    return notice.isEmpty ? detail : '$detail · $notice';
+  }
+
+  String get durationLabel {
+    final minutes = _routeTotalMinutes(target);
+    return minutes > 0 ? '$minutes분' : '시간 확인';
+  }
+
+  String get semanticLabel => [title, durationLabel, subtitle].join(', ');
+}
+
+/// 결과 타임라인 아래에 접힌 행 하나로 붙는 경로 전환 진입점(#2582).
+/// 시각 원칙대로 카드가 아니라 구분선 사이의 행이며, 탭하면 대상 경로가 주
+/// 결과가 되어 화면이 다시 그려진다 — 타임라인이 동시에 두 개 펴지지 않는다.
+class _StepFreeAlternativeRow extends StatelessWidget {
+  const _StepFreeAlternativeRow({required this.routeSwitch});
+
+  final _StepFreeRouteSwitch routeSwitch;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return MergeSemantics(
+      child: Semantics(
+        button: true,
+        label: routeSwitch.semanticLabel,
+        onTap: routeSwitch.onSwitch,
+        child: ExcludeSemantics(
+          child: InkWell(
+            key: const Key('routeStepFreeAlternativeRow'),
+            onTap: routeSwitch.onSwitch,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 48),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  vertical: EasySubwaySpacing.md,
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            routeSwitch.title,
+                            style: textTheme.titleMedium?.copyWith(
+                              color: EasySubwayAccessibleColors.text,
+                              fontWeight: FontWeight.w700,
+                              height: 1.25,
+                            ),
+                          ),
+                          const SizedBox(height: EasySubwaySpacing.xs),
+                          Text(
+                            routeSwitch.subtitle,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: EasySubwayAccessibleColors.secondaryText,
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: EasySubwaySpacing.md),
+                    Text(
+                      routeSwitch.durationLabel,
+                      style: textTheme.titleMedium?.copyWith(
+                        color: EasySubwayAccessibleColors.text,
+                        fontWeight: FontWeight.w700,
+                        height: 1.25,
+                      ),
+                    ),
+                    const Icon(
+                      Icons.chevron_right,
+                      color: EasySubwayAccessibleColors.disclosure,
+                      size: 24,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _RouteResultsListView extends StatelessWidget {
   const _RouteResultsListView({
     required this.result,
     required this.onOpenDetail,
     required this.adRepository,
+    this.stepFreeRouteSwitch,
   });
 
   final RouteSearchResult result;
   final VoidCallback onOpenDetail;
   final AdRepository? adRepository;
+  final _StepFreeRouteSwitch? stepFreeRouteSwitch;
 
   @override
   Widget build(BuildContext context) {
@@ -5077,6 +5377,14 @@ class _RouteResultsListView extends StatelessWidget {
             const SizedBox(height: 8),
             _RouteArrivalGuidance(step: arrivalStep),
           ],
+        ],
+        // #2582: 백엔드가 보존한 무단차 대안으로 가는 전환 행. 결과-우선 위계를
+        // 지키기 위해 타임라인 뒤, 광고 슬롯 앞에 둔다.
+        if (stepFreeRouteSwitch case final routeSwitch?) ...[
+          const SizedBox(height: EasySubwaySpacing.lg),
+          const Divider(height: 1, color: EasySubwayAccessibleColors.line),
+          _StepFreeAlternativeRow(routeSwitch: routeSwitch),
+          const Divider(height: 1, color: EasySubwayAccessibleColors.line),
         ],
         // 경로 확인 휴지점(결과 목록 끝)에만 광고 슬롯. 안내 진행 화면에는 없음.
         const SizedBox(height: 16),
