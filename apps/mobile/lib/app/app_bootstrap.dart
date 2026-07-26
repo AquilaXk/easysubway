@@ -78,8 +78,11 @@ class AppBootstrap {
   }) async {
     final supportDirectory =
         databaseDirectory ?? await getApplicationSupportDirectory();
+    final userDatabaseDirectory = Directory(
+      p.join(supportDirectory.path, 'user'),
+    );
     final userDatabase = await UserDatabaseOpener(
-      databaseDirectory: Directory(p.join(supportDirectory.path, 'user')),
+      databaseDirectory: userDatabaseDirectory,
     ).open();
     final emergencyOverrideRepository = EmergencyOverrideRepository(
       userDatabase: userDatabase,
@@ -131,6 +134,7 @@ class AppBootstrap {
         userDataDeletionRepository: userDataDeletionRepository,
         catalogDatabase: catalogDatabase,
         userDatabase: userDatabase,
+        userDatabaseDirectory: userDatabaseDirectory,
         enablePushNotifications: enablePushNotifications,
       );
 

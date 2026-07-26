@@ -1,6 +1,9 @@
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
+// 정준 직렬화는 검증 대상 구현을 그대로 쓴다. 테스트가 규칙을 복제하면 3언어
+// 분열(이슈 #2528)을 구조적으로 검출할 수 없다.
+import 'package:easysubway_mobile/core/datapack/canonical_json.dart';
 import 'package:easysubway_mobile/core/datapack/data_pack_manifest.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -187,7 +190,9 @@ void main() {
     json['publishedAt'] = '2026-06-25T00:00:00';
     json['signature'] = {
       'algorithm': 'sha256-manifest-v2',
-      'value': sha256.convert(utf8.encode(_canonicalJson(json))).toString(),
+      'value': sha256
+          .convert(utf8.encode(canonicalDataPackJson(json)))
+          .toString(),
     };
 
     expect(() => DataPackManifest.fromJson(json), throwsFormatException);
@@ -893,7 +898,9 @@ Map<String, Object?> _v2ManifestJson({Map<String, Object?>? rollout}) {
   };
   manifest['signature'] = {
     'algorithm': 'sha256-manifest-v2',
-    'value': sha256.convert(utf8.encode(_canonicalJson(manifest))).toString(),
+    'value': sha256
+        .convert(utf8.encode(canonicalDataPackJson(manifest)))
+        .toString(),
   };
   return manifest;
 }
@@ -958,25 +965,11 @@ Map<String, Object?> _v2FixtureManifest() {
   };
   manifest['signature'] = {
     'algorithm': 'sha256-manifest-v2',
-    'value': sha256.convert(utf8.encode(_canonicalJson(manifest))).toString(),
+    'value': sha256
+        .convert(utf8.encode(canonicalDataPackJson(manifest)))
+        .toString(),
   };
   return manifest;
-}
-
-String _canonicalJson(Object? value) => jsonEncode(_canonicalValue(value));
-
-Object? _canonicalValue(Object? value) {
-  if (value == null || value is String || value is num || value is bool) {
-    return value;
-  }
-  if (value is List<Object?>) {
-    return value.map(_canonicalValue).toList(growable: false);
-  }
-  if (value is Map<String, Object?>) {
-    final sortedKeys = value.keys.toList()..sort();
-    return {for (final key in sortedKeys) key: _canonicalValue(value[key])};
-  }
-  throw StateError('unsupported value: $value');
 }
 
 String _routeRegressionSignatureValue(
