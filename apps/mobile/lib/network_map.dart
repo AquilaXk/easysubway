@@ -4200,6 +4200,18 @@ const _maxMapScale = 4.8;
 /// 아래로 내려가진 않는다(둘 다 같은 상한을 공유하므로) — pan-only로 완전히
 /// 퇴행하진 않되, 극단적으로 작은 지역에서는 확대가 체감되지 않을 수 있다.
 const _stationFocusInitialBoundsFraction = 0.42;
+
+/// 저장된 viewport가 없을 때 초기 카메라가 보장할 역명의 최소 화면 글자 크기
+/// (logical px, #2068 트랙 QA 후속). 오너 결정: "글자가 읽힐 정도로 중앙을 확대".
+///
+/// 값의 근거는 리포 내 기존 캘리브레이션 상수 [kRouteMapDesignLabelFontPx]
+/// (13.0)를 그대로 재사용한 것이다 — design space는 "일반 탐색 줌(라벨이 design
+/// 크기 그대로 보이는 scale ≈ k*)"에서 역명이 갖는 크기로 이 값을 정했고
+/// (route_map_design_space.dart), 그 반대편 상한이
+/// [kRouteMapMaxLabelScreenPx](26.0)다. 즉 13px은 이 노선도가 이미 "읽히는
+/// 역명 크기"로 캘리브레이션해 둔 값이라 새 기준을 창작하지 않는다(모바일 최소
+/// 가독 관례 12px보다 약간 보수적이기도 하다).
+const double _initialCameraReadableLabelScreenPx = kRouteMapDesignLabelFontPx;
 const _routeMapGestureRendererCommitInterval = Duration(milliseconds: 1100);
 const _routeMapGestureMaxTranslationDriftFraction = 1.35;
 const _routeMapGestureMaxScaleRatio = 3.4;
@@ -4262,6 +4274,9 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   // basemap 6차(#2068): asset id(seoul/busan/...) → station명 → 오너 라벨 앵커.
   // 로드 전·실패 시 null → basemap 라벨은 4차 자동 솔버로 전부 폴백(fail-safe).
   Map<String, Map<String, List<RouteMapOwnerLabelEntry>>>? _ownerLabelsByRegion;
+  // 초기 카메라 가독 배율(#2068 트랙 QA 후속) 캐시 — _readableInitialMapScaleFor.
+  double? _readableInitialMapScaleCache;
+  String? _readableInitialMapScaleCacheKey;
   // onTapUp 경로에서만 쓰는 stationLinesById를 매 build(팬 프레임)마다 재계산하지 않도록
   // region·stations identity로 캐시한다(#1973). 800역/24노선 재계산이 build 스파이크 원인.
   Map<String, List<NetworkMapLine>>? _stationLinesByIdCache;
@@ -4371,8 +4386,22 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
             geometry.height,
           );
           final minScale = _minimumMapScaleForBounds(fullBounds, constraints);
+          // #2068 트랙 QA 후속: 저장 viewport가 없을 때의 초기 카메라는
+          // 콘텐츠 중앙을 오너 라벨이 읽히는 배율로 연다. 오너 라벨 sidecar는
+          // 비동기 로드라 로드 전후로 가독 배율이 바뀌므로 layoutKey에 포함해
+          // 로드 완료 시 초기 카메라가 다시 계산되게 한다.
+          final readableScale = _readableInitialMapScaleFor(widget.data);
+          final initialCameraBounds = networkMapInitialCameraBounds(
+            fullBounds: fullBounds,
+            regionInitialBounds: geometry.initialBounds,
+            viewport: Size(
+              constraints.hasBoundedWidth ? constraints.maxWidth : 0,
+              constraints.hasBoundedHeight ? constraints.maxHeight : 0,
+            ),
+            readableScale: readableScale,
+          );
           final layoutKey =
-              '${widget.data.selectedRegion}:${geometry.width}:${geometry.height}:${constraints.maxWidth}:${constraints.maxHeight}';
+              '${widget.data.selectedRegion}:${geometry.width}:${geometry.height}:${constraints.maxWidth}:${constraints.maxHeight}:$readableScale';
           if (_layoutKey != layoutKey) {
             _layoutKey = layoutKey;
             _pendingCamera = null;
@@ -4380,7 +4409,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
             _gestureActive = false;
             _cameraFocusedStationId = null;
             final initialCamera = _cameraForBounds(
-              widget.initialViewport ?? geometry.initialBounds,
+              widget.initialViewport ?? initialCameraBounds,
               constraints,
               sourceBounds: fullBounds,
               contain: true,
@@ -4391,7 +4420,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
           var camera =
               _camera ??
               _cameraForBounds(
-                geometry.initialBounds,
+                initialCameraBounds,
                 constraints,
                 sourceBounds: fullBounds,
                 minScale: minScale,
@@ -4418,7 +4447,11 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
               focusedStation != null &&
               _cameraFocusedStationId != focusedStation.id) {
             final focusedCamera = _cameraForBounds(
-              _stationFocusBoundsFor(focusedStation, geometry),
+              _stationFocusBoundsFor(
+                focusedStation,
+                geometry,
+                initialBounds: initialCameraBounds,
+              ),
               constraints,
               sourceBounds: fullBounds,
               contain: true,
@@ -4675,6 +4708,34 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     _geometryCacheKey = cacheKey;
     _geometryCache = geometry;
     return geometry;
+  }
+
+  /// 이 지역 오너 라벨 sidecar로 산출한 초기 카메라 가독 배율(#2068 트랙 QA
+  /// 후속). sidecar 미로드·미매핑이면 null → 초기 카메라는 기존 contain-fit.
+  /// build는 팬 프레임마다 호출되므로 [_geometryFor]와 같은 키 규칙으로 캐시해
+  /// 라벨 수백~수천 건 중앙값 계산이 매 프레임 반복되지 않게 한다.
+  double? _readableInitialMapScaleFor(NetworkMapData data) {
+    final basemapAssetId =
+        kRouteMapBasemapRegionToId[_displayRegionName(data.selectedRegion)];
+    final ownerEntries = basemapAssetId == null
+        ? null
+        : _ownerLabelsByRegion?[basemapAssetId];
+    final cacheKey =
+        '${data.selectedRegion}:${identityHashCode(data.stations)}:'
+        '${data.stations.length}:'
+        '${ownerEntries == null ? 'none' : 'owner:${ownerEntries.length}'}';
+    if (_readableInitialMapScaleCacheKey == cacheKey) {
+      return _readableInitialMapScaleCache;
+    }
+    final scale = ownerEntries == null || ownerEntries.isEmpty
+        ? null
+        : networkMapReadableInitialMapScale(
+            ownerLabelsByStationName: ownerEntries,
+            stationNames: {for (final station in data.stations) station.nameKo},
+          );
+    _readableInitialMapScaleCacheKey = cacheKey;
+    _readableInitialMapScaleCache = scale;
+    return scale;
   }
 
   void _updateCameraForGesture(ScaleUpdateDetails details) {
@@ -5415,6 +5476,92 @@ Rect _readableBoundsFor(_MapGeometry geometry, {required int stationCount}) {
   return Rect.fromLTWH(left, top, width, height);
 }
 
+/// 오너 라벨이 "읽히는" 초기 카메라 배율(#2068 트랙 QA 후속). 없으면 null —
+/// 호출부는 기존 contain-fit 동작을 그대로 쓴다(sidecar 미로드·미매핑 fail-safe).
+///
+/// basemap 모드에서 화면에 실제로 그려지는 역명은 오너 라벨이다. 라벨은
+/// design px(`entry.fontSizePx × designScale`)로 그려지고 캔버스는
+/// `camera.scale / designScale`로 스케일되므로(structured_route_map_painter)
+/// designScale이 약분되어 **화면 글자 크기 = entry.fontSizePx × camera.scale**
+/// 이다. 따라서 중앙값 라벨이 [_initialCameraReadableLabelScreenPx]에 닿는
+/// scale은 `기준 px / 중앙값 fontSizePx`가 된다.
+///
+/// 모집단은 [stationNames]에 실제로 있는 역과 매칭되는 엔트리로 한정한다.
+/// sidecar에는 그 권역 데이터에 없는 라벨이 섞여 있다 — 광주 sidecar는 미개통
+/// 2호선 라벨(글자 14)이 42건이라 전 엔트리 중앙값이 14가 되는데, 운영 중인
+/// 1호선 라벨은 60이라 그대로 쓰면 실제 역 라벨 기준으로 5배 넘게 과확대된다.
+/// 매칭이 하나도 없으면 전 엔트리로 폴백한다 — 그 경우 렌더 경로도 전 엔트리
+/// 중앙값(폴백 라벨 크기, route_map_label_layout의 중앙값 규칙)으로 그린다.
+@visibleForTesting
+double? networkMapReadableInitialMapScale({
+  required Map<String, List<RouteMapOwnerLabelEntry>> ownerLabelsByStationName,
+  required Set<String> stationNames,
+}) {
+  final matched = <double>[
+    for (final entry in ownerLabelsByStationName.entries)
+      if (stationNames.contains(entry.key))
+        for (final label in entry.value)
+          if (label.fontSizePx > 0) label.fontSizePx,
+  ];
+  final sizes =
+      (matched.isNotEmpty
+            ? matched
+            : <double>[
+                for (final entries in ownerLabelsByStationName.values)
+                  for (final label in entries)
+                    if (label.fontSizePx > 0) label.fontSizePx,
+              ])
+        ..sort();
+  if (sizes.isEmpty) {
+    return null;
+  }
+  return _initialCameraReadableLabelScreenPx / sizes[sizes.length ~/ 2];
+}
+
+/// 저장된 viewport가 없을 때의 초기 카메라 bounds(#2068 트랙 QA 후속).
+///
+/// - 중심: 노선도 콘텐츠 bounding box 중앙 = [fullBounds].center. geometry는
+///   역·노선·라벨 extents에 대칭 54px 여백을 더한 것이라 그 중앙이 곧 콘텐츠
+///   중앙이다(viewBox 캔버스 중앙·헤더·여백이 아니다).
+/// - 배율: 기존 contain-fit([regionInitialBounds] 기준)과 [readableScale] 중 큰
+///   값. 하한이 기존 contain-fit이므로 지금보다 축소되는 권역은 없고, 이미
+///   가독 배율 이상인 소형 권역(대전)은 동작이 그대로다. 상한은
+///   [_maxMapScale] — readableScale만 캡하고 contain-fit은 캡하지 않는다
+///   (초소형 권역에서 오히려 축소되는 것을 막기 위해. 최종 scale은
+///   [_cameraForBounds]가 다시 상한으로 클램프한다).
+///
+/// viewport나 bounds가 비어 있으면 기존 [regionInitialBounds]를 그대로 돌려준다.
+@visibleForTesting
+Rect networkMapInitialCameraBounds({
+  required Rect fullBounds,
+  required Rect regionInitialBounds,
+  required Size viewport,
+  required double? readableScale,
+}) {
+  if (viewport.width <= 0 ||
+      viewport.height <= 0 ||
+      regionInitialBounds.width <= 0 ||
+      regionInitialBounds.height <= 0) {
+    return regionInitialBounds;
+  }
+  final containFitScale = math.min(
+    viewport.width / regionInitialBounds.width,
+    viewport.height / regionInitialBounds.height,
+  );
+  if (!containFitScale.isFinite || containFitScale <= 0) {
+    return regionInitialBounds;
+  }
+  final targetScale = math.max(
+    containFitScale,
+    math.min(readableScale ?? 0.0, _maxMapScale),
+  );
+  return Rect.fromCenter(
+    center: fullBounds.center,
+    width: viewport.width / targetScale,
+    height: viewport.height / targetScale,
+  );
+}
+
 @visibleForTesting
 Rect networkMapInitialOriginalAssetBounds({
   required double sourceWidth,
@@ -5431,9 +5578,19 @@ Rect networkMapInitialOriginalAssetBounds({
   );
 }
 
-Rect _stationFocusBoundsFor(NetworkMapStation station, _MapGeometry geometry) {
+/// [initialBounds]는 이 지역이 실제로 쓰는 초기 카메라 bounds다(#2068 트랙 QA
+/// 후속으로 [networkMapInitialCameraBounds]가 확대해 준 값). geometry의 원
+/// initialBounds를 쓰면 초기 화면이 확대된 만큼 focus가 오히려 축소돼 #2062
+/// ("focus는 초기 화면보다 확대") 불변식이 깨진다 — 두 카메라가 같은 bounds를
+/// 공유해야 focus 배율이 항상 초기 배율의 1/[_stationFocusInitialBoundsFraction]
+/// 배(≈2.38, 상한 이하 범위)로 유지된다.
+Rect _stationFocusBoundsFor(
+  NetworkMapStation station,
+  _MapGeometry geometry, {
+  required Rect initialBounds,
+}) {
   return _stationFocusBounds(
-    initialBounds: geometry.initialBounds,
+    initialBounds: initialBounds,
     center: Offset(geometry.x(station), geometry.y(station)),
     sourceWidth: geometry.width,
     sourceHeight: geometry.height,
