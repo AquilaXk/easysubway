@@ -664,6 +664,55 @@ void main() {
     expect(unavailable.directions, isEmpty);
   });
 
+  test('로컬 역 시간표는 transit_feed_info가 없는 카탈로그에서도 요일별 조회를 완료한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await _seedStationTimetable(database, includeFeedInfo: false);
+    final repository = DriftStationRepository(database: database);
+
+    final byDayType = <StationTimetableDayType, StationTimetable>{};
+    for (final dayType in StationTimetableDayType.values) {
+      byDayType[dayType] = await repository.loadStationTimetable(
+        stationId: 'station-sadang',
+        lineId: 'seoul-4',
+        dayType: dayType,
+        referenceDate: DateTime(2026, 7, 12),
+      );
+    }
+    final automaticDay = await repository.loadStationTimetableForDate(
+      stationId: 'station-sadang',
+      lineId: 'seoul-4',
+      date: DateTime(2026, 7, 7),
+    );
+
+    expect(
+      byDayType[StationTimetableDayType.weekday]!.directions
+          .expand((direction) => direction.departures)
+          .map((departure) => departure.timeLabel),
+      unorderedEquals(['05:20', '05:25', '다음 날 00:25']),
+    );
+    expect(
+      byDayType[StationTimetableDayType.saturday]!
+          .directions
+          .single
+          .departures
+          .single
+          .timeLabel,
+      '09:12',
+    );
+    expect(
+      byDayType[StationTimetableDayType.sundayHoliday]!
+          .directions
+          .single
+          .departures
+          .single
+          .timeLabel,
+      '10:30',
+    );
+    expect(automaticDay.isAvailable, isTrue);
+  });
+
   test('로컬 역 시간표는 평일 공휴일 exception을 일요일·공휴일로 자동 선택한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
@@ -768,16 +817,21 @@ void main() {
   });
 }
 
-Future<void> _seedStationTimetable(CatalogDatabase database) async {
-  await database.customStatement('''
-    CREATE TABLE transit_feed_info (
-      id INTEGER PRIMARY KEY,
-      feed_end_date TEXT NOT NULL
-    )
-  ''');
-  await database.customStatement(
-    "INSERT INTO transit_feed_info (id, feed_end_date) VALUES (1, '20261231')",
-  );
+Future<void> _seedStationTimetable(
+  CatalogDatabase database, {
+  bool includeFeedInfo = true,
+}) async {
+  if (includeFeedInfo) {
+    await database.customStatement('''
+      CREATE TABLE transit_feed_info (
+        id INTEGER PRIMARY KEY,
+        feed_end_date TEXT NOT NULL
+      )
+    ''');
+    await database.customStatement(
+      "INSERT INTO transit_feed_info (id, feed_end_date) VALUES (1, '20261231')",
+    );
+  }
   await database.customStatement('''
     INSERT INTO service_calendars (
       service_id, monday, tuesday, wednesday, thursday, friday,

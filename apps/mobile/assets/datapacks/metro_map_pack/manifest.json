@@ -15,7 +15,7 @@
       "name_ko": "수도권",
       "app_region": "수도권",
       "operator": "오너 자작(self-drawn)",
-      "source_url": "internal:route-map/route-map-defs/svg-sources/easy-subway-sma-v2.svg",
+      "source_url": "internal:route-map/route-map-defs/svg-sources/easy-subway-sma-v4.svg",
       "route_map_strategy": {
         "rendering_strategy": "self-drawn-hybrid-basemap",
         "bundled_svg_role": "hybrid-basemap-source",
@@ -28,15 +28,15 @@
         "included": true,
         "type": "vector-graphics-vec",
         "path": "assets/datapacks/metro_map_pack/basemap/seoul.vec",
-        "official_asset_url": "internal:route-map/route-map-defs/svg-sources/easy-subway-sma-v2.svg",
+        "official_asset_url": "internal:route-map/route-map-defs/svg-sources/easy-subway-sma-v4.svg",
         "mime_type": "application/vnd.flutter.vector-graphics"
       },
       "license": {
         "name": "오너 자작 노선도(self-drawn)",
         "spdx": "LicenseRef-Self-Drawn",
-        "url": "internal:route-map/route-map-defs/svg-sources/easy-subway-sma-v2.svg",
-        "source": "오너 자작 수도권 8선형 정본 도식(easy-subway-sma-v2)",
-        "source_page": "internal:route-map/route-map-defs/svg-sources/easy-subway-sma-v2.svg",
+        "url": "internal:route-map/route-map-defs/svg-sources/easy-subway-sma-v4.svg",
+        "source": "오너 자작 수도권 8선형 정본 도식(easy-subway-sma-v4)",
+        "source_page": "internal:route-map/route-map-defs/svg-sources/easy-subway-sma-v4.svg",
         "date": "2026-07-12",
         "authors": [
           "오너"
