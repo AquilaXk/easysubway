@@ -51,6 +51,8 @@ import 'package:easysubway_mobile/search_field.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/route_map_basemap_view.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/nearby_direction_title.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/structured_route_map_painter.dart';
+import 'package:easysubway_mobile/features/network_map/presentation/station_fan_menu_geometry.dart'
+    show kFanMenuDesignSize, kFanMenuTailTip;
 import 'package:easysubway_mobile/notification_settings.dart';
 import 'package:easysubway_mobile/onboarding.dart';
 import 'package:easysubway_mobile/route_search.dart';
@@ -2486,6 +2488,70 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(routeDraftController.draft.origin, isNull);
+  });
+
+  testWidgets('#2068 팬 메뉴 꼬리 팁은 노드 정중앙이 아니라 그 아래(높이 2/3 지점)에 닿는다', (
+    tester,
+  ) async {
+    // 배선 가드: network_map.dart의 팬 메뉴 호출부를 _fanMenuTailAnchorSource에서
+    // _fanMenuAnchorSource(정중앙)로 되돌리면 아래 delta가 0이 되어 red가 된다.
+    // 기준점은 같은 역의 draft pin이다 — pin은 정중앙 앵커를 그대로 쓰고
+    // (_NetworkMapDraftPin: pinTop = anchor.dy - 52, hitPadTop 10 · hitPadBottom 0)
+    // 히트박스 하단이 곧 노드 정중앙의 뷰포트 y다.
+    // 세로로 넉넉한 서피스: 기본 800x600에서는 팬 메뉴가 viewport 하단 클램프에
+    // 걸려(maxTop) 앵커 변화가 배치에 반영되지 않는다.
+    tester.view.physicalSize = const Size(400, 1200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final routeDraftController = RouteDraftController();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NetworkMapScreen(
+          repository: FakeStationSearchRepository(),
+          routeDraftController: routeDraftController,
+          onOpenStationSearch: (_, _) {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const Key('networkMapStation-sangnoksu-seoul-4')),
+    );
+    await tester.pumpAndSettle();
+    await _tapFanMenuSector(tester, _fanOriginLabel);
+    await tester.pumpAndSettle();
+
+    // 같은 역을 다시 탭해 팬 메뉴를 띄운다(핀은 그대로 남는다). 두 rect는 팬 메뉴
+    // 노출용 카메라 패닝이 끝난 **같은 프레임**에서 읽어야 한다 — 탭 전에 읽은
+    // 핀 위치는 패닝 이전 좌표라 기준점이 어긋난다.
+    await _tapStationByLabel(tester, '상록수역');
+    await tester.pumpAndSettle();
+    final pinRect = tester.getRect(
+      find.byKey(const Key('networkMapDraftPin-origin')),
+    );
+    // 핀 히트박스 = 핀 52 + 상단 10 + 하단 0. 이 전제가 깨지면 기준점이 어긋난다.
+    expect(pinRect.height, closeTo(62, 0.001));
+    final nodeCenterY = pinRect.bottom;
+    final menuRect = tester.getRect(
+      find.byKey(const Key('networkMapStationSheet')),
+    );
+    final tipY =
+        menuRect.top +
+        menuRect.height * (kFanMenuTailTip.dy / kFanMenuDesignSize.height);
+
+    // 팁은 노드 정중앙보다 아래다(정중앙 앵커로 회귀하면 delta = 0 → red).
+    // 팁은 노드 정중앙보다 아래다. 이 fixture 실측 이동량은 0.70px
+    // (= nodeHeight/6 × camera.scale)이고, 정중앙 앵커로 회귀하면 5.7e-14(=0)로
+    // 떨어진다 — 0.25는 그 사이를 양쪽 3배 여유로 가르는 문턱이다.
+    expect(
+      tipY - nodeCenterY,
+      greaterThan(0.25),
+      reason: '꼬리 팁이 노드 정중앙($nodeCenterY)에 붙어 있으면 #2068 QA 이동이 배선되지 않은 것이다',
+    );
+    // 이동량은 노드 크기(height/6) 수준이라 메뉴 높이에 비하면 매우 작다 —
+    // 과도한 이동(메뉴가 노드에서 떨어짐)도 함께 막는다.
+    expect(tipY - nodeCenterY, lessThan(menuRect.height * 0.1));
   });
 
   testWidgets('상단 오버레이 출발칸 검색 선택은 지도 탭과 같은 draft로 수렴한다(G4)', (tester) async {
