@@ -7,8 +7,11 @@
   "minimumReleaseSequence": 114,
   "minimumReleaseSequenceEvidence": {
     "observedReleaseSequence": 114,
-    "observedAt": "2026-07-26T00:00:00.000Z",
+    "observedManifestSha256": "fa67db645ee57fe2ca422a5641f2fb5ccbfa76fc4466c657ab90234481d22682",
+    "observedAt": "2026-07-26T04:58:56.000Z",
+    "observedPublishRunId": 28418295514,
+    "observedPublishRunNumber": 114,
     "source": "production-catalog-current-json"
   },
-  "notes": "하한은 관측한 published releaseSequence를 넘을 수 없다. 하한을 올리려면 새 관측값을 함께 기록해야 하고, 데이터팩 릴리즈 workflow가 publish 직전 releaseSequence >= minimumReleaseSequence 를 검사해 live < 하한 상태를 막는다. Dart 상수와의 동기화는 apps/mobile/test/core/datapack/data_pack_manifest_acceptance_policy_test.dart 가 강제한다."
+  "notes": "하한은 관측한 published releaseSequence를 넘을 수 없다. 하한을 올리려면 새 관측값(순번·해시·publish run)을 함께 기록해야 한다. 기록한 해시는 EASYSUBWAY_DATA_PACK_BASE_URL/catalog/current.json 을 받아 sha256으로 재검증할 수 있고, 같은 순번의 매니페스트를 만나면 tools/datapack/check-manifest-acceptance-floor.mjs 가 자동으로 대조한다. 그 스크립트는 데이터팩 릴리즈 workflow가 publish 직전 실행해 releaseSequence >= minimumReleaseSequence 를 강제한다. Dart 상수와의 동기화는 apps/mobile/test/core/datapack/data_pack_manifest_acceptance_policy_test.dart 가 강제한다."
 }

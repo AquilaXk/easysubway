@@ -9433,7 +9433,14 @@ test("데이터팩 manifest 수락 정책은 v1 봉투 차단과 절대 순번 �
   assert.ok(Number.isSafeInteger(policy.minimumReleaseSequence) && policy.minimumReleaseSequence >= 1);
   // 하한이 실제 배포 순번보다 높으면 그 하한을 심고 나간 빌드가 현재 매니페스트를
   // 거부한다. 하한을 올리려면 새 관측값을 함께 기록해야 한다.
-  assert.ok(policy.minimumReleaseSequence <= policy.minimumReleaseSequenceEvidence.observedReleaseSequence);
+  const evidence = policy.minimumReleaseSequenceEvidence;
+  assert.ok(policy.minimumReleaseSequence <= evidence.observedReleaseSequence);
+  // 관측 근거는 나중에 대조할 수 있는 식별자를 남긴다. 순번만 자기신고하면 하한을
+  // 올리는 변경이 관측값을 같이 올려도 아무도 재검증할 수 없다.
+  assert.match(evidence.observedManifestSha256 ?? "", /^[a-f0-9]{64}$/);
+  assert.match(evidence.observedAt ?? "", /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+  assert.ok(Number.isSafeInteger(evidence.observedPublishRunId) && evidence.observedPublishRunId > 0);
+  assert.equal(evidence.observedPublishRunNumber, evidence.observedReleaseSequence);
 
   const endpoints = read("apps/mobile/lib/app/app_endpoints.dart");
   assert.match(
@@ -9447,12 +9454,44 @@ test("데이터팩 manifest 수락 정책은 v1 봉투 차단과 절대 순번 �
   const updateStateSource = read("apps/mobile/lib/core/datapack/data_pack_update_state.dart");
   assert.match(updateStateSource, /if \(floor != null && sequence < floor\)/);
 
-  // 릴리즈 workflow가 'live >= 하한' 불변식을 지킨다.
+  // 하한이 실제로 적용되는 지점은 앱 조립 한 곳뿐이다. 생성이 흩어지면 어느 한 곳이
+  // 하한 없이 만들어져도 조용히 초록이 되므로, lib 안의 저장소 생성은 그 조립 함수
+  // 하나로 유지한다(조립 결과 자체는 Dart 테스트가 실행으로 확인한다).
+  const bootstrapSource = read("apps/mobile/lib/app/app_bootstrap.dart");
+  assert.match(
+    bootstrapSource,
+    /DataPackUpdateStateRepository createDataPackUpdateStateRepository\(\{[\s\S]*?minimumReleaseSequence: endpoints\.dataPackMinimumReleaseSequence,/,
+  );
+  // `create...` 팩토리 호출은 제외하고 생성자 직접 호출만 센다.
+  const directConstruction = /(^|[^A-Za-z])DataPackUpdateStateRepository\(/;
+  const libRepositoryConstructions = execFileSync(
+    "git",
+    ["grep", "-c", "-E", directConstruction.source, "--", "apps/mobile/lib"],
+    { cwd: root, encoding: "utf8" },
+  )
+    .trim()
+    .split("\n")
+    .map((line) => line.split(":"));
+  assert.deepEqual(
+    libRepositoryConstructions.filter(([, count]) => Number(count) > 0).map(([file]) => file).sort(),
+    ["apps/mobile/lib/app/app_bootstrap.dart", "apps/mobile/lib/core/datapack/data_pack_update_state.dart"],
+  );
+  assert.equal(
+    (bootstrapSource.match(new RegExp(directConstruction.source, "g")) ?? []).length,
+    1,
+    "lib의 저장소 생성은 createDataPackUpdateStateRepository 한 곳으로 유지한다",
+  );
+
+  // 릴리즈 workflow가 'live >= 하한' 불변식을 지킨다. 비교 방향·실패 동작은 스크립트
+  // 단위 테스트(tools/datapack/check-manifest-acceptance-floor.test.mjs)가 고정한다.
   const workflow = read(".github/workflows/datapack-release.yml");
   assert.match(
     workflow,
-    /apps\/mobile\/release\/datapack-manifest-acceptance-policy\.json.*policy\.minimumReleaseSequence/,
+    /node tools\/datapack\/check-manifest-acceptance-floor\.mjs \\\n\s+--manifest "\$\{EASYSUBWAY_DATAPACK_OUTPUT\}\/current\.json"/,
   );
+  const floorGate = read("tools/datapack/check-manifest-acceptance-floor.mjs");
+  assert.match(floorGate, /sequence < floor/);
+  assert.equal(floorGate.includes(policy.minimumReleaseSequence.toString()), false, "게이트는 하한 값을 복제하지 않는다");
 
   const gateIndex = readJson("contracts/release/gate-index.json");
   assert.ok(

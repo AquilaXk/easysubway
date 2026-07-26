@@ -83,12 +83,19 @@ class AppEndpoints {
     );
   }
 
-  /// 이 빌드에 적용되는 매니페스트 수락 순번 하한. production 서명 공개키가 주입된
-  /// 빌드에서만 값이 있고, 개발·테스트 빌드에서는 null이라 기존 동작이 유지된다.
+  /// 이 빌드에 적용되는 매니페스트 수락 순번 하한. 정책 파일이 선언한 적용 범위와
+  /// 같은 조건 — production 서명 공개키가 주입되고 기대 채널이 production인 빌드 —
+  /// 에서만 값이 있고, 개발·테스트 빌드에서는 null이라 기존 동작이 유지된다.
+  ///
+  /// 채널 조건이 필요한 이유: `EASYSUBWAY_DATAPACK_CHANNEL`은 서명 공개키와 독립된
+  /// dart-define이라, 키를 주입하면서 채널만 다르게 준 빌드는 순번 계열이 다른 카탈로그에
+  /// production 하한을 적용하게 된다.
   int? get dataPackMinimumReleaseSequence {
-    return productionDataPackSigningPublicKey == null
-        ? null
-        : productionDataPackMinimumReleaseSequence;
+    if (productionDataPackSigningPublicKey == null ||
+        expectedDataPackChannel != 'production') {
+      return null;
+    }
+    return productionDataPackMinimumReleaseSequence;
   }
 
   String get expectedDataPackChannel {
