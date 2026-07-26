@@ -9090,6 +9090,8 @@ test("#2052 전국 coverage 분모 증거는 공식 snapshot과 exact-set 결과
   const evidence = readJson("tools/datapack/reports/nationwide-coverage-denominator-20260713.json");
   assert.equal(evidence.artifactKind, "nationwide-coverage-denominator-evidence");
   assert.equal(evidence.issue, 2052);
+  // targets 해시는 판정에 쓰이지 않는 선언 필드(#2138 evidenceModel/evidenceModelReasonKo)만 늘어도 움직인다.
+  // 분모가 바뀐 것이 아니다 — 분모 자체는 아래 after/catalogTargetDiff 상수가 따로 고정한다.
   assert.equal(
     evidence.inputs.targets.sha256,
     createHash("sha256")
