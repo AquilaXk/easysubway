@@ -16,7 +16,7 @@
 //   CHROME_BIN=/path/to/chrome node …                            # 브라우저 지정
 
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,9 +24,19 @@ import { fileURLToPath } from "node:url";
 import { normalizeSvgForCompile } from "../compile-basemap-vec.mjs";
 import { FULL_CANVAS_DECOR_IDS, inkBBoxOf, viewBoxOf } from "../svg-ink-bbox.mjs";
 
-const CHROME =
-  process.env.CHROME_BIN ??
-  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+/** 실행할 브라우저. 실제 파일인지 확인해 임의 명령 실행을 막는다. */
+function resolveChrome() {
+  const candidate =
+    process.env.CHROME_BIN ??
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+  const resolved = path.resolve(candidate);
+  if (!existsSync(resolved) || !statSync(resolved).isFile()) {
+    throw new Error(`브라우저 실행 파일을 찾지 못했습니다: ${resolved}`);
+  }
+  return resolved;
+}
+
+const CHROME = resolveChrome();
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const svgDir = path.join(here, "..", "route-map-defs", "svg-sources");
@@ -41,7 +51,7 @@ const REGIONS = [
 
 /** 브라우저 안에서 도는 측정식. 전면 배경·그리드는 빼고 잉크만 union한다. */
 function measureExpression(excludeIds) {
-  return String.raw`
+  return `
 (async () => {
   const out = { ok: false };
   try {
@@ -82,8 +92,8 @@ function measureExpression(excludeIds) {
 function chromeInkBBox(svgText) {
   const [, , vbw, vbh] = viewBoxOf(svgText);
   let inlined = svgText
-    .replace(/<\?xml[\s\S]*?\?>/g, "")
-    .replace(/<!DOCTYPE[\s\S]*?>/g, "")
+    .replaceAll(/<\?xml[\s\S]*?\?>/g, "")
+    .replaceAll(/<!DOCTYPE[\s\S]*?>/g, "")
     .replace(/<svg\b/, '<svg id="target"');
   inlined = inlined
     .replace(/(<svg\b[^>]*?)\swidth\s*=\s*"[^"]*"/, "$1")
@@ -122,7 +132,7 @@ function chromeInkBBox(svgText) {
   const match = dom.match(/<pre id="RESULT">([\s\S]*?)<\/pre>/);
   if (!match) throw new Error("브라우저 측정 결과를 찾지 못했습니다.");
   const parsed = JSON.parse(
-    match[1].replace(/&lt;/g, "<").replace(/&amp;/g, "&"),
+    match[1].replaceAll("&lt;", "<").replaceAll("&amp;", "&"),
   );
   if (!parsed.ok) throw new Error(`브라우저 측정 실패: ${parsed.error}`);
   return parsed.ink;

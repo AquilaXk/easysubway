@@ -18,11 +18,33 @@
 우·하단만 자르는 현행 크롭(#2603)에서는 0 0이라 생략해도 된다.
 """
 import argparse
+import os
 import sys
+import tempfile
 
 from PIL import Image, ImageChops, ImageFilter
 
 Image.MAX_IMAGE_PIXELS = None
+
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_ALLOWED_ROOTS = [
+    os.path.realpath(os.path.join(_HERE, "..", "..", "..")),
+    os.path.realpath(tempfile.gettempdir()),
+    os.path.realpath("/tmp"),
+]
+
+
+def resolve_allowed(candidate):
+    """저장소나 임시 디렉터리 안으로 해석되는 경로만 돌려준다."""
+    resolved = os.path.realpath(candidate)
+    for root in _ALLOWED_ROOTS:
+        if resolved == root or resolved.startswith(root + os.sep):
+            return resolved
+    raise ValueError(
+        "경로가 허용 범위 밖입니다: %s (허용: %s)"
+        % (resolved, ", ".join(_ALLOWED_ROOTS))
+    )
 
 
 def alpha_mask(image):
@@ -47,8 +69,8 @@ def main():
     )
     args = parser.parse_args()
 
-    before = Image.open(args.before).convert("RGBA")
-    after = Image.open(args.after).convert("RGBA")
+    before = Image.open(resolve_allowed(args.before)).convert("RGBA")
+    after = Image.open(resolve_allowed(args.after)).convert("RGBA")
     left, top = args.offset
 
     if left + after.width > before.width or top + after.height > before.height:

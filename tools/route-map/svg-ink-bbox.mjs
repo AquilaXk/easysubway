@@ -67,28 +67,34 @@ function readGlyphAdvances(fontPath) {
     const offset = cmap + buffer.readUInt32BE(record + 4);
     const format = buffer.readUInt16BE(offset);
     if (format === 12) best = { format, offset };
-    else if (format === 4 && (!best || best.format !== 12)) {
-      best = { format, offset };
-    }
+    else if (format === 4 && best?.format !== 12) best = { format, offset };
   }
   if (!best) throw new Error(`${fontPath}: 지원하는 cmap subtable이 없습니다.`);
 
-  const glyphIdFor = (codePoint) => {
-    if (best.format === 12) {
-      const groups = buffer.readUInt32BE(best.offset + 12);
-      let lo = 0;
-      let hi = groups - 1;
-      while (lo <= hi) {
-        const mid = (lo + hi) >> 1;
-        const g = best.offset + 16 + mid * 12;
-        const start = buffer.readUInt32BE(g);
-        const end = buffer.readUInt32BE(g + 4);
-        if (codePoint < start) hi = mid - 1;
-        else if (codePoint > end) lo = mid + 1;
-        else return buffer.readUInt32BE(g + 8) + (codePoint - start);
+  // format 12: sequential map group을 이진 탐색한다.
+  const glyphIdFormat12 = (codePoint) => {
+    const groups = buffer.readUInt32BE(best.offset + 12);
+    let lo = 0;
+    let hi = groups - 1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      const g = best.offset + 16 + mid * 12;
+      const start = buffer.readUInt32BE(g);
+      if (codePoint < start) {
+        hi = mid - 1;
+        continue;
       }
-      return 0;
+      if (codePoint > buffer.readUInt32BE(g + 4)) {
+        lo = mid + 1;
+        continue;
+      }
+      return buffer.readUInt32BE(g + 8) + (codePoint - start);
     }
+    return 0;
+  };
+
+  // format 4: segment를 순회하며 idDelta·idRangeOffset을 적용한다(BMP 전용).
+  const glyphIdFormat4 = (codePoint) => {
     if (codePoint > 0xffff) return 0;
     const segCountX2 = buffer.readUInt16BE(best.offset + 6);
     const endBase = best.offset + 14;
@@ -102,13 +108,16 @@ function readGlyphAdvances(fontPath) {
       const delta = buffer.readInt16BE(deltaBase + seg * 2);
       const rangeOffset = buffer.readUInt16BE(rangeBase + seg * 2);
       if (rangeOffset === 0) return (codePoint + delta) & 0xffff;
-      const glyphAddr =
-        rangeBase + seg * 2 + rangeOffset + (codePoint - start) * 2;
-      const glyph = buffer.readUInt16BE(glyphAddr);
+      const glyph = buffer.readUInt16BE(
+        rangeBase + seg * 2 + rangeOffset + (codePoint - start) * 2,
+      );
       return glyph === 0 ? 0 : (glyph + delta) & 0xffff;
     }
     return 0;
   };
+
+  const glyphIdFor = (codePoint) =>
+    best.format === 12 ? glyphIdFormat12(codePoint) : glyphIdFormat4(codePoint);
 
   const advanceOf = (glyphId) => {
     const index = Math.min(glyphId, numberOfHMetrics - 1);
@@ -236,7 +245,9 @@ function quadExtremaAxis(p0, p1, p2, visit) {
 }
 
 /** SVG 호(A)를 중심 파라미터로 바꿔 조밀 샘플링한다(W3C 구현 노트 F.6.5). */
-function visitArc(x1, y1, rx, ry, rotDeg, largeArc, sweep, x2, y2, visit) {
+function visitArc(arc, visit) {
+  let { rx, ry } = arc;
+  const { x1, y1, rotDeg, largeArc, sweep, x2, y2 } = arc;
   if (rx === 0 || ry === 0) {
     visit(x2, y2);
     return;
@@ -282,7 +293,13 @@ function visitArc(x1, y1, rx, ry, rotDeg, largeArc, sweep, x2, y2, visit) {
 
 /** `d`가 실제로 지나는 점(곡선 극값 포함)을 [visit]한다. */
 export function visitPathExtremes(d, visit) {
-  const tokens = d.match(/[MmLlHhVvCcSsQqTtAaZz]|[+-]?(?:\d*\.\d+|\d+\.?)(?:[eE][+-]?\d+)?/g) ?? [];
+  // 복잡한 대안 정규식 대신 명령 문자와 부호 앞에 공백을 넣어 분해한다.
+  // `1e-4`의 지수 부호는 앞 문자가 e라 분해 대상이 아니다(lookbehind가 걸러낸다).
+  const tokens = d
+    .replaceAll(/([MmLlHhVvCcSsQqTtAaZz])/g, " $1 ")
+    .replaceAll(/(?<=[0-9.])(?=[+-])/g, " ")
+    .split(/[\s,]+/)
+    .filter(Boolean);
   let i = 0;
   let cx = 0;
   let cy = 0;
@@ -294,7 +311,9 @@ export function visitPathExtremes(d, visit) {
   const num = () => {
     const value = Number(tokens[i++]);
     if (!Number.isFinite(value)) {
-      throw new Error(`svg-ink-bbox: path 좌표를 읽지 못했습니다: "${d.slice(0, 60)}"`);
+      throw new TypeError(
+        `svg-ink-bbox: path 좌표를 읽지 못했습니다: "${d.slice(0, 60)}"`,
+      );
     }
     return value;
   };
@@ -405,7 +424,10 @@ export function visitPathExtremes(d, visit) {
         const sweep = num() !== 0;
         const x = num() + ox;
         const y = num() + oy;
-        visitArc(cx, cy, rx, ry, rot, largeArc, sweep, x, y, visit);
+        visitArc(
+          { x1: cx, y1: cy, rx, ry, rotDeg: rot, largeArc, sweep, x2: x, y2: y },
+          visit,
+        );
         prevC = prevQ = null;
         cx = x;
         cy = y;
@@ -427,11 +449,13 @@ export function visitPathExtremes(d, visit) {
 /** 게이트 실패 메시지가 "어느 요소가 넘쳤는지" 짚도록 태그를 요약한다. */
 function describeTag(tag, name, text = "") {
   const id = firstAttr(tag, "id");
-  const body = text.trim().replace(/\s+/g, " ").slice(0, 24);
-  return `<${name}${id ? ` id="${id}"` : ""}>${body ? ` "${body}"` : ""}`;
+  const body = text.trim().replaceAll(/\s+/g, " ").slice(0, 24);
+  const idPart = id ? ` id="${id}"` : "";
+  const textPart = body ? ` "${body}"` : "";
+  return `<${name}${idPart}>${textPart}`;
 }
 
-function numAttr(tag, name, fallback = NaN) {
+function numAttr(tag, name, fallback = Number.NaN) {
   const raw = firstAttr(tag, name);
   if (raw === null || raw === undefined || raw === "") return fallback;
   const value = Number(String(raw).trim().replace(/px$/, ""));
@@ -448,7 +472,7 @@ function styleProp(tag, name) {
   const style = firstAttr(tag, "style");
   if (!style) return null;
   const match = style.match(
-    new RegExp(`(?:^|;)\\s*${name}\\s*:\\s*([^;]+)`, "i"),
+    new RegExp(String.raw`(?:^|;)\s*${name}\s*:\s*([^;]+)`, "i"),
   );
   return match ? match[1].trim() : null;
 }
@@ -552,6 +576,13 @@ function visitTagInk(tag, name, matrix, inherited, visit) {
   }
 }
 
+/** text-anchor에 따른 상자 왼쪽 좌표. */
+function anchorLeft(anchor, x, width) {
+  if (anchor === "middle") return x - width / 2;
+  if (anchor === "end") return x - width;
+  return x;
+}
+
 /** `<text>` 한 덩어리(자식 tspan 포함)의 잉크 상자를 방문한다. */
 function visitTextInk(openTag, body, matrix, inherited, visit) {
   const own = firstAttr(openTag, "transform");
@@ -564,17 +595,24 @@ function visitTextInk(openTag, body, matrix, inherited, visit) {
     "text-anchor",
     inherited.textAnchor,
   );
-  const baseX = numAttr(openTag, "x", NaN);
-  const baseY = numAttr(openTag, "y", NaN);
+  const baseX = numAttr(openTag, "x", Number.NaN);
+  const baseY = numAttr(openTag, "y", Number.NaN);
 
   const runs = [];
-  const tspanRe = /<tspan\b([^>]*)>([\s\S]*?)<\/tspan>/g;
-  let match;
   let sawTspan = false;
-  while ((match = tspanRe.exec(body))) {
+  // 정규식 lazy 매칭은 긴 본문에서 역추적이 심해 인덱스로 스캔한다.
+  let cursor = 0;
+  while (cursor < body.length) {
+    const open = body.indexOf("<tspan", cursor);
+    if (open === -1) break;
+    const openEnd = body.indexOf(">", open);
+    if (openEnd === -1) break;
+    const close = body.indexOf("</tspan>", openEnd);
+    if (close === -1) break;
     sawTspan = true;
-    const attrs = `<tspan ${match[1]}>`;
-    const text = match[2].replace(/<[^>]*>/g, "");
+    const attrs = `<tspan ${body.slice(open + "<tspan".length, openEnd)}>`;
+    const text = body.slice(openEnd + 1, close).replaceAll(/<[^>]*>/g, "");
+    cursor = close + "</tspan>".length;
     const x = numAttr(attrs, "x", baseX);
     let y = numAttr(attrs, "y", baseY);
     const dy = numAttr(attrs, "dy", 0);
@@ -593,7 +631,7 @@ function visitTextInk(openTag, body, matrix, inherited, visit) {
   }
   if (!sawTspan) {
     runs.push({
-      text: body.replace(/<[^>]*>/g, ""),
+      text: body.replaceAll(/<[^>]*>/g, ""),
       x: baseX,
       y: baseY,
       size: Number(String(baseSize ?? "0").trim().replace(/px$/, "")),
@@ -613,13 +651,7 @@ function visitTextInk(openTag, body, matrix, inherited, visit) {
       continue;
     }
     const width = GLYPH_ADVANCES.widthOf(run.text.trim(), run.size);
-    const anchor = String(run.anchor ?? "start");
-    const left =
-      anchor === "middle"
-        ? run.x - width / 2
-        : anchor === "end"
-          ? run.x - width
-          : run.x;
+    const left = anchorLeft(String(run.anchor ?? "start"), run.x, width);
     const top = run.y - (ascender / unitsPerEm) * run.size;
     const bottom = run.y - (descender / unitsPerEm) * run.size;
     const label = describeTag(openTag, "text", run.text);
@@ -636,12 +668,13 @@ function visitTextInk(openTag, body, matrix, inherited, visit) {
  * `<g/>`를 가진 문서에서 짝을 영영 못 찾는다).
  */
 function matchingEnd(text, openIndex, name) {
-  const tagRe = new RegExp(`<(/?)${name}\\b([^>]*?)(/?)>`, "g");
+  const tagRe = new RegExp(String.raw`<(/?)${name}\b([^>]*)>`, "g");
   tagRe.lastIndex = openIndex;
   let depth = 0;
   let match;
   while ((match = tagRe.exec(text))) {
-    const [full, closing, , selfClose] = match;
+    const [full, closing, attrs] = match;
+    const selfClose = attrs.endsWith("/") ? "/" : "";
     if (closing === "/") {
       depth -= 1;
       if (depth === 0) return match.index + full.length;
@@ -656,6 +689,47 @@ function matchingEnd(text, openIndex, name) {
   throw new Error(`<${name}> 닫는 태그를 찾지 못했습니다.`);
 }
 
+const CONTAINER_TAGS = new Set(["g", "svg", "a", "switch"]);
+
+/** 컨테이너가 자식에게 물려줄 transform·상속 선언. */
+function childContext(openTag, matrix, inherited) {
+  const childTransform = firstAttr(openTag, "transform");
+  return {
+    matrix: childTransform
+      ? composeMatrix(matrix, parseTransformChain(childTransform))
+      : matrix,
+    inherited: {
+      fontSize: inheritedAttr(openTag, "font-size", inherited.fontSize),
+      textAnchor: inheritedAttr(openTag, "text-anchor", inherited.textAnchor),
+      stroke: {
+        paint: inheritedAttr(openTag, "stroke", inherited.stroke.paint),
+        width: inheritedAttr(openTag, "stroke-width", inherited.stroke.width),
+      },
+    },
+  };
+}
+
+/** 렌더에 참여하지 않거나 제외된 서브트리인지 판정한다. */
+function isSkipped(name, id, excluded) {
+  return NON_RENDERING_TAGS.has(name) || Boolean(id && excluded.has(id));
+}
+
+/** 처리할 수 없는 태그는 조용히 넘기지 않고 던진다. */
+function rejectUnknownTag(name) {
+  if (name === "use") {
+    throw new TypeError(
+      "svg-ink-bbox: <use>는 아직 지원하지 않습니다 — 참조 대상 잉크를 " +
+        "놓치지 않도록 fail-closed로 막습니다.",
+    );
+  }
+  if (name === "tspan") return; // <text> 처리에서 이미 소비했다.
+  throw new TypeError(
+    `svg-ink-bbox: 알 수 없는 태그 <${name}>입니다. 잉크를 놓친 채 게이트가 ` +
+      "통과하지 않도록 fail-closed로 막습니다 — 렌더에 참여하면 " +
+      "DRAWABLE_TAGS에, 아니면 NON_RENDERING_TAGS에 등록하세요.",
+  );
+}
+
 function walk(text, matrix, inherited, excluded, visit) {
   const tagRe = /<([a-zA-Z][\w:.-]*)\b([^>]*?)(\/?)>/g;
   let match;
@@ -665,39 +739,20 @@ function walk(text, matrix, inherited, excluded, visit) {
     const openTag = full;
     const id = firstAttr(openTag, "id");
 
-    if (NON_RENDERING_TAGS.has(name)) {
-      if (!selfClose) {
-        const end = matchingEnd(text, match.index, name);
-        tagRe.lastIndex = end;
-      }
+    if (isSkipped(name, id, excluded)) {
+      if (!selfClose) tagRe.lastIndex = matchingEnd(text, match.index, name);
       continue;
     }
 
-    if (id && excluded.has(id)) {
-      if (!selfClose) {
-        const end = matchingEnd(text, match.index, name);
-        tagRe.lastIndex = end;
-      }
-      continue;
-    }
-
-    if (name === "g" || name === "svg" || name === "a" || name === "switch") {
+    if (CONTAINER_TAGS.has(name)) {
       if (selfClose) continue;
-      const childTransform = firstAttr(openTag, "transform");
-      const childMatrix = childTransform
-        ? composeMatrix(matrix, parseTransformChain(childTransform))
-        : matrix;
-      const childInherited = {
-        fontSize: inheritedAttr(openTag, "font-size", inherited.fontSize),
-        textAnchor: inheritedAttr(openTag, "text-anchor", inherited.textAnchor),
-        stroke: {
-          paint: inheritedAttr(openTag, "stroke", inherited.stroke.paint),
-          width: inheritedAttr(openTag, "stroke-width", inherited.stroke.width),
-        },
-      };
+      const child = childContext(openTag, matrix, inherited);
       const end = matchingEnd(text, match.index, name);
-      const body = text.slice(match.index + openTag.length, end - `</${name}>`.length);
-      walk(body, childMatrix, childInherited, excluded, visit);
+      const body = text.slice(
+        match.index + openTag.length,
+        end - `</${name}>`.length,
+      );
+      walk(body, child.matrix, child.inherited, excluded, visit);
       tagRe.lastIndex = end;
       continue;
     }
@@ -716,30 +771,11 @@ function walk(text, matrix, inherited, excluded, visit) {
 
     if (DRAWABLE_TAGS.has(name)) {
       visitTagInk(openTag, name, matrix, inherited, visit);
-      if (!selfClose) {
-        const end = matchingEnd(text, match.index, name);
-        tagRe.lastIndex = end;
-      }
+      if (!selfClose) tagRe.lastIndex = matchingEnd(text, match.index, name);
       continue;
     }
 
-    if (name === "tspan" || name === "use") {
-      // tspan은 <text> 처리에서 소비된다. use는 현행 5권역에 없다 — 생기면
-      // 참조 대상까지 따라가야 하므로 조용히 넘기지 않고 던진다.
-      if (name === "use") {
-        throw new Error(
-          "svg-ink-bbox: <use>는 아직 지원하지 않습니다 — 참조 대상 잉크를 " +
-            "놓치지 않도록 fail-closed로 막습니다.",
-        );
-      }
-      continue;
-    }
-
-    throw new Error(
-      `svg-ink-bbox: 알 수 없는 태그 <${name}>입니다. 잉크를 놓친 채 게이트가 ` +
-        "통과하지 않도록 fail-closed로 막습니다 — 렌더에 참여하면 " +
-        "DRAWABLE_TAGS에, 아니면 NON_RENDERING_TAGS에 등록하세요.",
-    );
+    rejectUnknownTag(name);
   }
 }
 
@@ -774,7 +810,7 @@ export function inkBBoxOf(svgText, { excludeIds = [] } = {}) {
     },
   );
   if (!Number.isFinite(minX)) {
-    throw new Error("svg-ink-bbox: 잉크를 하나도 찾지 못했습니다.");
+    throw new TypeError("svg-ink-bbox: 잉크를 하나도 찾지 못했습니다.");
   }
   return { minX, minY, maxX, maxY, edges };
 }
