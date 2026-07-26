@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' show Offset;
 
 import 'structured_route_map.dart';
@@ -54,6 +55,24 @@ const double kRouteMapBasemapTransferSlotHalfWidthPx = 7.5;
 /// 여유를 더한 값. [kRouteMapBasemapTransferSlotHalfWidthPx]와 함께
 /// `(memberCount-1) × slot + base` 로 멤버 수 기반 반폭 하한을 이룬다.
 const double kRouteMapBasemapTransferCapsuleBaseHalfWidthPx = 9.0;
+
+/// basemap 캡슐 **장축** 반폭(design px). 위 세 상수를
+/// `(memberCount-1) × slot + base` 로 조합한 멤버 수 기반 하한이며, 고정 반폭
+/// [kRouteMapBasemapTransferCapsuleHalfWidthPx]와의 max를 취한다.
+///
+/// 이 값은 **장축** 하한이다. 라벨 솔버는 방향 정보가 없어 균등 inflate로 쓰지만
+/// (과대는 라벨이 조금 더 밀릴 뿐 안전 방향), 노드의 **세로 크기**를 구할 때는
+/// 캡슐 장축이 실제로 세로일 때만 쓰고 아니면 두께
+/// ([kRouteMapBasemapTransferCapsuleHalfWidthPx])를 써야 한다 — 가로 캡슐에 이
+/// 값을 세로로 적용하면 세로 크기를 크게 과대평가한다.
+///
+/// 라벨 장애물(`routeMapTransferObstacleRects`)과 팬 메뉴 앵커
+/// (`fanMenuAnchorNodeHeight`)가 같은 캡슐 모델을 소비하도록 단일 출처로 둔다.
+double routeMapBasemapTransferCapsuleHalfWidthFor(int memberCount) => math.max(
+  kRouteMapBasemapTransferCapsuleHalfWidthPx,
+  (memberCount - 1) * kRouteMapBasemapTransferSlotHalfWidthPx +
+      kRouteMapBasemapTransferCapsuleBaseHalfWidthPx,
+);
 
 /// SVG 바탕층(#2068) 노선 선의 design px 반폭. basemap 모드에서 선 장애물을
 /// 중심선만이 아니라 실제 선 폭으로 마킹해, 라벨이 선 위에 올라앉지 않게 한다
