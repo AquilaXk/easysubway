@@ -917,5 +917,815 @@
       "value": "c770134c203f4a9fe1868126e543e56db5dcf799fea960f840342d0fb9dcf46e"
     }
   },
-  "fallbackCanonicalSignedPayload": "{\"activePack\":{\"id\":\"capital\",\"version\":\"18\"},\"channel\":\"production\",\"expiresAt\":\"2026-07-02T00:00:00.000Z\",\"keyId\":\"datapack-test-v1\",\"manifestVersion\":2,\"packs\":[{\"artifactKind\":\"fixture\",\"id\":\"capital\",\"payloadKind\":\"sqlite_catalog\",\"regionalQualityMetrics\":{\"edgeCount\":600,\"facilityCoverageRatio\":0.30000000000000004,\"stationCount\":300,\"unknownAccessibilityRatio\":0.000001},\"representativeRouteRegressionSignature\":{\"algorithm\":\"sha256-route-regression-v1\",\"value\":\"2de77a0fb4c8246ab9cbc02b32e8b2f63c83a11b88df69f7fbe14a4c6399445f\"},\"representativeRouteRegressions\":[{\"fromNodeId\":\"station-a-line-1\",\"id\":\"direct-local-capital\",\"pattern\":\"DIRECT\",\"requiredEdgeIds\":[\"edge-a-b\"],\"toNodeId\":\"station-b-line-1\"},{\"fromNodeId\":\"station-a-line-1\",\"id\":\"transfer-capital\",\"pattern\":\"TRANSFER\",\"requiredEdgeIds\":[\"edge-a-b\",\"edge-b-transfer\",\"edge-b-c\"],\"toNodeId\":\"station-c-line-2\"},{\"fromNodeId\":\"station-a-line-1\",\"id\":\"multi-transfer-capital\",\"pattern\":\"MULTI_TRANSFER\",\"requiredEdgeIds\":[\"edge-a-b\",\"edge-b-transfer\",\"edge-c-transfer\",\"edge-c-d\"],\"toNodeId\":\"station-d-line-3\"},{\"fromNodeId\":\"station-branch-line-2\",\"id\":\"loop-branch-capital\",\"pattern\":\"LOOP_BRANCH\",\"requiredEdgeIds\":[\"edge-branch-loop\",\"edge-loop-c\"],\"toNodeId\":\"station-c-line-2\"},{\"fromNodeId\":\"station-a-line-1-express\",\"id\":\"express-local-capital\",\"pattern\":\"EXPRESS_LOCAL\",\"requiredEdgeIds\":[\"edge-a-b-express\"],\"toNodeId\":\"station-b-line-1-express\"}],\"requiredTables\":[\"catalog_metadata\",\"stations\"],\"schemaVersion\":\"1\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"signature\":{\"algorithm\":\"sha256-pack-manifest-v2\",\"value\":\"e66e0956b2823754610ff7277b159f248b2a149f19bc7f84bd355ef37fe26483\"},\"sizeBytes\":1024,\"sourceInventory\":[{\"fields\":[\"stations\",\"network_edges\"],\"id\":\"capital-catalog\",\"license\":\"fixture-only\",\"licenseStatus\":\"fixture-only\",\"owner\":\"테스트\",\"redistributionAllowed\":false,\"updateFrequency\":\"monthly\",\"updatedAt\":\"2026-06-19T00:00:00.000Z\",\"url\":\"https://example.invalid/source\"}],\"sqliteSha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"url\":\"catalog/capital-v18.sqlite.gz\",\"version\":\"18\"},{\"artifactKind\":\"fixture\",\"id\":\"metro\",\"payloadKind\":\"sqlite_catalog\",\"regionalQualityMetrics\":{\"edgeCount\":600,\"facilityCoverageRatio\":1e-7,\"stationCount\":300,\"unknownAccessibilityRatio\":5e-324},\"representativeRouteRegressionSignature\":{\"algorithm\":\"sha256-route-regression-v1\",\"value\":\"a85cb4d8d62cd7c067e974afd3f245b31d1989c4b33536f5ff427f88e995b1e4\"},\"representativeRouteRegressions\":[{\"fromNodeId\":\"station-a-line-1\",\"id\":\"direct-local-capital\",\"pattern\":\"DIRECT\",\"requiredEdgeIds\":[\"edge-a-b\"],\"toNodeId\":\"station-b-line-1\"},{\"fromNodeId\":\"station-a-line-1\",\"id\":\"transfer-capital\",\"pattern\":\"TRANSFER\",\"requiredEdgeIds\":[\"edge-a-b\",\"edge-b-transfer\",\"edge-b-c\"],\"toNodeId\":\"station-c-line-2\"},{\"fromNodeId\":\"station-a-line-1\",\"id\":\"multi-transfer-capital\",\"pattern\":\"MULTI_TRANSFER\",\"requiredEdgeIds\":[\"edge-a-b\",\"edge-b-transfer\",\"edge-c-transfer\",\"edge-c-d\"],\"toNodeId\":\"station-d-line-3\"},{\"fromNodeId\":\"station-branch-line-2\",\"id\":\"loop-branch-capital\",\"pattern\":\"LOOP_BRANCH\",\"requiredEdgeIds\":[\"edge-branch-loop\",\"edge-loop-c\"],\"toNodeId\":\"station-c-line-2\"},{\"fromNodeId\":\"station-a-line-1-express\",\"id\":\"express-local-capital\",\"pattern\":\"EXPRESS_LOCAL\",\"requiredEdgeIds\":[\"edge-a-b-express\"],\"toNodeId\":\"station-b-line-1-express\"}],\"requiredTables\":[\"catalog_metadata\",\"stations\"],\"schemaVersion\":\"1\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"signature\":{\"algorithm\":\"sha256-pack-manifest-v2\",\"value\":\"7be67c428b3541cc1c5fe83f9413daf05b5a2b8a526e851d8c70dbcf40d2e214\"},\"sizeBytes\":9007199254740991,\"sourceInventory\":[{\"fields\":[\"stations\",\"network_edges\"],\"id\":\"metro-catalog\",\"license\":\"fixture-only\",\"licenseStatus\":\"fixture-only\",\"owner\":\"테스트\",\"redistributionAllowed\":false,\"updateFrequency\":\"monthly\",\"updatedAt\":\"2026-06-19T00:00:00.000Z\",\"url\":\"https://example.invalid/source\"}],\"sqliteSha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"url\":\"catalog/metro-v7.sqlite.gz\",\"version\":\"7\"},{\"artifactKind\":\"fixture\",\"id\":\"harbor\",\"payloadKind\":\"sqlite_catalog\",\"regionalQualityMetrics\":{\"edgeCount\":600,\"facilityCoverageRatio\":0.1,\"stationCount\":300,\"unknownAccessibilityRatio\":1.5e-7},\"representativeRouteRegressionSignature\":{\"algorithm\":\"sha256-route-regression-v1\",\"value\":\"220f84d1b4d43301b1c6c6b18b7b54c71b66bd5928346298757c6b403640c3f3\"},\"representativeRouteRegressions\":[{\"fromNodeId\":\"station-a-line-1\",\"id\":\"direct-local-capital\",\"pattern\":\"DIRECT\",\"requiredEdgeIds\":[\"edge-a-b\"],\"toNodeId\":\"station-b-line-1\"},{\"fromNodeId\":\"station-a-line-1\",\"id\":\"transfer-capital\",\"pattern\":\"TRANSFER\",\"requiredEdgeIds\":[\"edge-a-b\",\"edge-b-transfer\",\"edge-b-c\"],\"toNodeId\":\"station-c-line-2\"},{\"fromNodeId\":\"station-a-line-1\",\"id\":\"multi-transfer-capital\",\"pattern\":\"MULTI_TRANSFER\",\"requiredEdgeIds\":[\"edge-a-b\",\"edge-b-transfer\",\"edge-c-transfer\",\"edge-c-d\"],\"toNodeId\":\"station-d-line-3\"},{\"fromNodeId\":\"station-branch-line-2\",\"id\":\"loop-branch-capital\",\"pattern\":\"LOOP_BRANCH\",\"requiredEdgeIds\":[\"edge-branch-loop\",\"edge-loop-c\"],\"toNodeId\":\"station-c-line-2\"},{\"fromNodeId\":\"station-a-line-1-express\",\"id\":\"express-local-capital\",\"pattern\":\"EXPRESS_LOCAL\",\"requiredEdgeIds\":[\"edge-a-b-express\"],\"toNodeId\":\"station-b-line-1-express\"}],\"requiredTables\":[\"catalog_metadata\",\"stations\"],\"schemaVersion\":\"1\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"signature\":{\"algorithm\":\"sha256-pack-manifest-v2\",\"value\":\"85dc5fa79b3b6091a08f92592edc2b81858e57fe445359f900747ed03d3c5210\"},\"sizeBytes\":2048,\"sourceInventory\":[{\"fields\":[\"stations\",\"network_edges\"],\"id\":\"harbor-catalog\",\"license\":\"fixture-only\",\"licenseStatus\":\"fixture-only\",\"owner\":\"테스트\",\"redistributionAllowed\":false,\"updateFrequency\":\"monthly\",\"updatedAt\":\"2026-06-19T00:00:00.000Z\",\"url\":\"https://example.invalid/source\"}],\"sqliteSha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"url\":\"catalog/harbor-v3.sqlite.gz\",\"version\":\"3\"},{\"artifactKind\":\"fixture\",\"id\":\"valley\",\"payloadKind\":\"sqlite_catalog\",\"regionalQualityMetrics\":{\"edgeCount\":600,\"facilityCoverageRatio\":2.5e-10,\"stationCount\":300,\"unknownAccessibilityRatio\":0},\"representativeRouteRegressionSignature\":{\"algorithm\":\"sha256-route-regression-v1\",\"value\":\"ee4e5ee2a71807a856687f194745f93b81d2cb141b26a5b620087c8e00b3a901\"},\"representativeRouteRegressions\":[{\"fromNodeId\":\"station-a-line-1\",\"id\":\"direct-local-capital\",\"pattern\":\"DIRECT\",\"requiredEdgeIds\":[\"edge-a-b\"],\"toNodeId\":\"station-b-line-1\"},{\"fromNodeId\":\"station-a-line-1\",\"id\":\"transfer-capital\",\"pattern\":\"TRANSFER\",\"requiredEdgeIds\":[\"edge-a-b\",\"edge-b-transfer\",\"edge-b-c\"],\"toNodeId\":\"station-c-line-2\"},{\"fromNodeId\":\"station-a-line-1\",\"id\":\"multi-transfer-capital\",\"pattern\":\"MULTI_TRANSFER\",\"requiredEdgeIds\":[\"edge-a-b\",\"edge-b-transfer\",\"edge-c-transfer\",\"edge-c-d\"],\"toNodeId\":\"station-d-line-3\"},{\"fromNodeId\":\"station-branch-line-2\",\"id\":\"loop-branch-capital\",\"pattern\":\"LOOP_BRANCH\",\"requiredEdgeIds\":[\"edge-branch-loop\",\"edge-loop-c\"],\"toNodeId\":\"station-c-line-2\"},{\"fromNodeId\":\"station-a-line-1-express\",\"id\":\"express-local-capital\",\"pattern\":\"EXPRESS_LOCAL\",\"requiredEdgeIds\":[\"edge-a-b-express\"],\"toNodeId\":\"station-b-line-1-express\"}],\"requiredTables\":[\"catalog_metadata\",\"stations\"],\"schemaVersion\":\"1\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"signature\":{\"algorithm\":\"sha256-pack-manifest-v2\",\"value\":\"58a0611b45ca6273568c22101675d365388c8dcf2e55c4ab0890c46e209cc2db\"},\"sizeBytes\":4096,\"sourceInventory\":[{\"fields\":[\"stations\",\"network_edges\"],\"id\":\"valley-catalog\",\"license\":\"fixture-only\",\"licenseStatus\":\"fixture-only\",\"owner\":\"테스트\",\"redistributionAllowed\":false,\"updateFrequency\":\"monthly\",\"updatedAt\":\"2026-06-19T00:00:00.000Z\",\"url\":\"https://example.invalid/source\"}],\"sqliteSha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"url\":\"catalog/valley-v11.sqlite.gz\",\"version\":\"11\"}],\"publishedAt\":\"2026-07-01T00:00:00.000Z\",\"releaseSequence\":42,\"rollout\":{\"percentage\":100,\"seed\":\"issue-2529\"},\"ttlSeconds\":3600}"
+  "fallbackCanonicalSignedPayload": "{\"activePack\":{\"id\":\"capital\",\"version\":\"18\"},\"channel\":\"production\",\"expiresAt\":\"2026-07-02T00:00:00.000Z\",\"keyId\":\"datapack-test-v1\",\"manifestVersion\":2,\"packs\":[{\"artifactKind\":\"fixture\",\"id\":\"capital\",\"payloadKind\":\"sqlite_catalog\",\"regionalQualityMetrics\":{\"edgeCount\":600,\"facilityCoverageRatio\":0.30000000000000004,\"stationCount\":300,\"unknownAccessibilityRatio\":0.000001},\"representativeRouteRegressionSignature\":{\"algorithm\":\"sha256-route-regression-v1\",\"value\":\"2de77a0fb4c8246ab9cbc02b32e8b2f63c83a11b88df69f7fbe14a4c6399445f\"},\"representativeRouteRegressions\":[{\"fromNodeId\":\"station-a-line-1\",\"id\":\"direct-local-capital\",\"pattern\":\"DIRECT\",\"requiredEdgeIds\":[\"edge-a-b\"],\"toNodeId\":\"station-b-line-1\"},{\"fromNodeId\":\"station-a-line-1\",\"id\":\"transfer-capital\",\"pattern\":\"TRANSFER\",\"requiredEdgeIds\":[\"edge-a-b\",\"edge-b-transfer\",\"edge-b-c\"],\"toNodeId\":\"station-c-line-2\"},{\"fromNodeId\":\"station-a-line-1\",\"id\":\"multi-transfer-capital\",\"pattern\":\"MULTI_TRANSFER\",\"requiredEdgeIds\":[\"edge-a-b\",\"edge-b-transfer\",\"edge-c-transfer\",\"edge-c-d\"],\"toNodeId\":\"station-d-line-3\"},{\"fromNodeId\":\"station-branch-line-2\",\"id\":\"loop-branch-capital\",\"pattern\":\"LOOP_BRANCH\",\"requiredEdgeIds\":[\"edge-branch-loop\",\"edge-loop-c\"],\"toNodeId\":\"station-c-line-2\"},{\"fromNodeId\":\"station-a-line-1-express\",\"id\":\"express-local-capital\",\"pattern\":\"EXPRESS_LOCAL\",\"requiredEdgeIds\":[\"edge-a-b-express\"],\"toNodeId\":\"station-b-line-1-express\"}],\"requiredTables\":[\"catalog_metadata\",\"stations\"],\"schemaVersion\":\"1\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"signature\":{\"algorithm\":\"sha256-pack-manifest-v2\",\"value\":\"e66e0956b2823754610ff7277b159f248b2a149f19bc7f84bd355ef37fe26483\"},\"sizeBytes\":1024,\"sourceInventory\":[{\"fields\":[\"stations\",\"network_edges\"],\"id\":\"capital-catalog\",\"license\":\"fixture-only\",\"licenseStatus\":\"fixture-only\",\"owner\":\"테스트\",\"redistributionAllowed\":false,\"updateFrequency\":\"monthly\",\"updatedAt\":\"2026-06-19T00:00:00.000Z\",\"url\":\"https://example.invalid/source\"}],\"sqliteSha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"url\":\"catalog/capital-v18.sqlite.gz\",\"version\":\"18\"},{\"artifactKind\":\"fixture\",\"id\":\"metro\",\"payloadKind\":\"sqlite_catalog\",\"regionalQualityMetrics\":{\"edgeCount\":600,\"facilityCoverageRatio\":1e-7,\"stationCount\":300,\"unknownAccessibilityRatio\":5e-324},\"representativeRouteRegressionSignature\":{\"algorithm\":\"sha256-route-regression-v1\",\"value\":\"a85cb4d8d62cd7c067e974afd3f245b31d1989c4b33536f5ff427f88e995b1e4\"},\"representativeRouteRegressions\":[{\"fromNodeId\":\"station-a-line-1\",\"id\":\"direct-local-capital\",\"pattern\":\"DIRECT\",\"requiredEdgeIds\":[\"edge-a-b\"],\"toNodeId\":\"station-b-line-1\"},{\"fromNodeId\":\"station-a-line-1\",\"id\":\"transfer-capital\",\"pattern\":\"TRANSFER\",\"requiredEdgeIds\":[\"edge-a-b\",\"edge-b-transfer\",\"edge-b-c\"],\"toNodeId\":\"station-c-line-2\"},{\"fromNodeId\":\"station-a-line-1\",\"id\":\"multi-transfer-capital\",\"pattern\":\"MULTI_TRANSFER\",\"requiredEdgeIds\":[\"edge-a-b\",\"edge-b-transfer\",\"edge-c-transfer\",\"edge-c-d\"],\"toNodeId\":\"station-d-line-3\"},{\"fromNodeId\":\"station-branch-line-2\",\"id\":\"loop-branch-capital\",\"pattern\":\"LOOP_BRANCH\",\"requiredEdgeIds\":[\"edge-branch-loop\",\"edge-loop-c\"],\"toNodeId\":\"station-c-line-2\"},{\"fromNodeId\":\"station-a-line-1-express\",\"id\":\"express-local-capital\",\"pattern\":\"EXPRESS_LOCAL\",\"requiredEdgeIds\":[\"edge-a-b-express\"],\"toNodeId\":\"station-b-line-1-express\"}],\"requiredTables\":[\"catalog_metadata\",\"stations\"],\"schemaVersion\":\"1\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"signature\":{\"algorithm\":\"sha256-pack-manifest-v2\",\"value\":\"7be67c428b3541cc1c5fe83f9413daf05b5a2b8a526e851d8c70dbcf40d2e214\"},\"sizeBytes\":9007199254740991,\"sourceInventory\":[{\"fields\":[\"stations\",\"network_edges\"],\"id\":\"metro-catalog\",\"license\":\"fixture-only\",\"licenseStatus\":\"fixture-only\",\"owner\":\"테스트\",\"redistributionAllowed\":false,\"updateFrequency\":\"monthly\",\"updatedAt\":\"2026-06-19T00:00:00.000Z\",\"url\":\"https://example.invalid/source\"}],\"sqliteSha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"url\":\"catalog/metro-v7.sqlite.gz\",\"version\":\"7\"},{\"artifactKind\":\"fixture\",\"id\":\"harbor\",\"payloadKind\":\"sqlite_catalog\",\"regionalQualityMetrics\":{\"edgeCount\":600,\"facilityCoverageRatio\":0.1,\"stationCount\":300,\"unknownAccessibilityRatio\":1.5e-7},\"representativeRouteRegressionSignature\":{\"algorithm\":\"sha256-route-regression-v1\",\"value\":\"220f84d1b4d43301b1c6c6b18b7b54c71b66bd5928346298757c6b403640c3f3\"},\"representativeRouteRegressions\":[{\"fromNodeId\":\"station-a-line-1\",\"id\":\"direct-local-capital\",\"pattern\":\"DIRECT\",\"requiredEdgeIds\":[\"edge-a-b\"],\"toNodeId\":\"station-b-line-1\"},{\"fromNodeId\":\"station-a-line-1\",\"id\":\"transfer-capital\",\"pattern\":\"TRANSFER\",\"requiredEdgeIds\":[\"edge-a-b\",\"edge-b-transfer\",\"edge-b-c\"],\"toNodeId\":\"station-c-line-2\"},{\"fromNodeId\":\"station-a-line-1\",\"id\":\"multi-transfer-capital\",\"pattern\":\"MULTI_TRANSFER\",\"requiredEdgeIds\":[\"edge-a-b\",\"edge-b-transfer\",\"edge-c-transfer\",\"edge-c-d\"],\"toNodeId\":\"station-d-line-3\"},{\"fromNodeId\":\"station-branch-line-2\",\"id\":\"loop-branch-capital\",\"pattern\":\"LOOP_BRANCH\",\"requiredEdgeIds\":[\"edge-branch-loop\",\"edge-loop-c\"],\"toNodeId\":\"station-c-line-2\"},{\"fromNodeId\":\"station-a-line-1-express\",\"id\":\"express-local-capital\",\"pattern\":\"EXPRESS_LOCAL\",\"requiredEdgeIds\":[\"edge-a-b-express\"],\"toNodeId\":\"station-b-line-1-express\"}],\"requiredTables\":[\"catalog_metadata\",\"stations\"],\"schemaVersion\":\"1\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"signature\":{\"algorithm\":\"sha256-pack-manifest-v2\",\"value\":\"85dc5fa79b3b6091a08f92592edc2b81858e57fe445359f900747ed03d3c5210\"},\"sizeBytes\":2048,\"sourceInventory\":[{\"fields\":[\"stations\",\"network_edges\"],\"id\":\"harbor-catalog\",\"license\":\"fixture-only\",\"licenseStatus\":\"fixture-only\",\"owner\":\"테스트\",\"redistributionAllowed\":false,\"updateFrequency\":\"monthly\",\"updatedAt\":\"2026-06-19T00:00:00.000Z\",\"url\":\"https://example.invalid/source\"}],\"sqliteSha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"url\":\"catalog/harbor-v3.sqlite.gz\",\"version\":\"3\"},{\"artifactKind\":\"fixture\",\"id\":\"valley\",\"payloadKind\":\"sqlite_catalog\",\"regionalQualityMetrics\":{\"edgeCount\":600,\"facilityCoverageRatio\":2.5e-10,\"stationCount\":300,\"unknownAccessibilityRatio\":0},\"representativeRouteRegressionSignature\":{\"algorithm\":\"sha256-route-regression-v1\",\"value\":\"ee4e5ee2a71807a856687f194745f93b81d2cb141b26a5b620087c8e00b3a901\"},\"representativeRouteRegressions\":[{\"fromNodeId\":\"station-a-line-1\",\"id\":\"direct-local-capital\",\"pattern\":\"DIRECT\",\"requiredEdgeIds\":[\"edge-a-b\"],\"toNodeId\":\"station-b-line-1\"},{\"fromNodeId\":\"station-a-line-1\",\"id\":\"transfer-capital\",\"pattern\":\"TRANSFER\",\"requiredEdgeIds\":[\"edge-a-b\",\"edge-b-transfer\",\"edge-b-c\"],\"toNodeId\":\"station-c-line-2\"},{\"fromNodeId\":\"station-a-line-1\",\"id\":\"multi-transfer-capital\",\"pattern\":\"MULTI_TRANSFER\",\"requiredEdgeIds\":[\"edge-a-b\",\"edge-b-transfer\",\"edge-c-transfer\",\"edge-c-d\"],\"toNodeId\":\"station-d-line-3\"},{\"fromNodeId\":\"station-branch-line-2\",\"id\":\"loop-branch-capital\",\"pattern\":\"LOOP_BRANCH\",\"requiredEdgeIds\":[\"edge-branch-loop\",\"edge-loop-c\"],\"toNodeId\":\"station-c-line-2\"},{\"fromNodeId\":\"station-a-line-1-express\",\"id\":\"express-local-capital\",\"pattern\":\"EXPRESS_LOCAL\",\"requiredEdgeIds\":[\"edge-a-b-express\"],\"toNodeId\":\"station-b-line-1-express\"}],\"requiredTables\":[\"catalog_metadata\",\"stations\"],\"schemaVersion\":\"1\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"signature\":{\"algorithm\":\"sha256-pack-manifest-v2\",\"value\":\"58a0611b45ca6273568c22101675d365388c8dcf2e55c4ab0890c46e209cc2db\"},\"sizeBytes\":4096,\"sourceInventory\":[{\"fields\":[\"stations\",\"network_edges\"],\"id\":\"valley-catalog\",\"license\":\"fixture-only\",\"licenseStatus\":\"fixture-only\",\"owner\":\"테스트\",\"redistributionAllowed\":false,\"updateFrequency\":\"monthly\",\"updatedAt\":\"2026-06-19T00:00:00.000Z\",\"url\":\"https://example.invalid/source\"}],\"sqliteSha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"url\":\"catalog/valley-v11.sqlite.gz\",\"version\":\"11\"}],\"publishedAt\":\"2026-07-01T00:00:00.000Z\",\"releaseSequence\":42,\"rollout\":{\"percentage\":100,\"seed\":\"issue-2529\"},\"ttlSeconds\":3600}",
+  "legacyEnvelopeManifest": {
+    "ttlSeconds": 3600,
+    "activePack": {
+      "id": "capital",
+      "version": "18"
+    },
+    "rollout": {
+      "percentage": 100,
+      "seed": "issue-2529"
+    },
+    "packs": [
+      {
+        "id": "capital",
+        "version": "18",
+        "url": "https://cdn.easysubway.example/catalog/capital-v18.sqlite.gz",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sqliteSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "sizeBytes": 1024,
+        "artifactKind": "production",
+        "payloadKind": "sqlite_catalog",
+        "representativeRouteRegressions": [
+          {
+            "id": "direct-local-capital",
+            "pattern": "DIRECT",
+            "fromNodeId": "station-a-line-1",
+            "toNodeId": "station-b-line-1",
+            "requiredEdgeIds": [
+              "edge-a-b"
+            ]
+          },
+          {
+            "id": "transfer-capital",
+            "pattern": "TRANSFER",
+            "fromNodeId": "station-a-line-1",
+            "toNodeId": "station-c-line-2",
+            "requiredEdgeIds": [
+              "edge-a-b",
+              "edge-b-transfer",
+              "edge-b-c"
+            ]
+          },
+          {
+            "id": "multi-transfer-capital",
+            "pattern": "MULTI_TRANSFER",
+            "fromNodeId": "station-a-line-1",
+            "toNodeId": "station-d-line-3",
+            "requiredEdgeIds": [
+              "edge-a-b",
+              "edge-b-transfer",
+              "edge-c-transfer",
+              "edge-c-d"
+            ]
+          },
+          {
+            "id": "loop-branch-capital",
+            "pattern": "LOOP_BRANCH",
+            "fromNodeId": "station-branch-line-2",
+            "toNodeId": "station-c-line-2",
+            "requiredEdgeIds": [
+              "edge-branch-loop",
+              "edge-loop-c"
+            ]
+          },
+          {
+            "id": "express-local-capital",
+            "pattern": "EXPRESS_LOCAL",
+            "fromNodeId": "station-a-line-1-express",
+            "toNodeId": "station-b-line-1-express",
+            "requiredEdgeIds": [
+              "edge-a-b-express"
+            ]
+          }
+        ],
+        "representativeRouteRegressionSignature": {
+          "algorithm": "rsa-sha256-route-regression-v1",
+          "value": "UmI9-5bLdUMmyxNcnOJb5Tyirv4KvKKvxXKcr-MgwCQhfI4baUYXvq2igeS6PVZsgBMv4nXD6BNeF5L8VW49afvfU9ZT15NXftD1wg986tEMwjf0YSXXDjriKWy_u-3cbsNIhHOW3oqvnAwCOb0ofvJ8I26bTcVQFjVh4QjXtSiwzCQqr8WHDGvBc2UbOk-3TOuPR7U3YwsNcXUl2uvo7qn5IwEgCh62k5NQPx222y2khlQz5p9do5DzaJKuHXM3kfwcXA-mJDKptx6pZIqx3n5brahAcPjX4dd6Kr6mYDiWU38y-23redacmWk-YgA8gXXXHSH92SLlqXEedOIiDg"
+        },
+        "signature": {
+          "algorithm": "rsa-sha256-pack-manifest-v1",
+          "value": "iF48gj_9CEV0os3gJMEO2qdn0aAcBXT71zl8Qz6KIWQZ2qm1A0TmCb7f6wTJEoP3cFSZQdgmXcj7IPFNv9gLE9O_s0-DmwniFX7OIv8icwGe1BKHNJfFmHCqWyLs0uuUVZTmY6RwqS_YnElf_0caT1qDS7L32uu5zYXnWGTg5ul2xeRuBgDGW9gFs9I4UkvdF-MbNjVxCby4tyuCsQSHxUhpFLSLKluLGWc7lY4u688Ss2dR9Zs-zlYiWb4GQ6lxKU_lfx_0FSl3yipgrhX7OpAihyVBuxh-PA_MA5KAqJ0C5HqxAJ_lYZhgYKb5zvJ3eChI7uWc2OhyZ2ZyE-jYdw"
+        },
+        "sourceInventory": [
+          {
+            "id": "capital-catalog",
+            "owner": "테스트 공공기관",
+            "url": "https://example.invalid/source",
+            "license": "test-open-license",
+            "licenseStatus": "redistributable",
+            "redistributionAllowed": true,
+            "updateFrequency": "monthly",
+            "updatedAt": "2026-06-19T00:00:00.000Z",
+            "fields": [
+              "stations",
+              "network_edges"
+            ]
+          }
+        ],
+        "regionalQualityMetrics": {
+          "stationCount": 300,
+          "facilityCoverageRatio": 0.30000000000000004,
+          "edgeCount": 600,
+          "unknownAccessibilityRatio": 0.000001
+        },
+        "schemaVersion": "1",
+        "requiredTables": [
+          "catalog_metadata",
+          "stations"
+        ]
+      },
+      {
+        "id": "metro",
+        "version": "7",
+        "url": "https://cdn.easysubway.example/catalog/metro-v7.sqlite.gz",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sqliteSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "sizeBytes": 9007199254740991,
+        "artifactKind": "production",
+        "payloadKind": "sqlite_catalog",
+        "representativeRouteRegressions": [
+          {
+            "id": "direct-local-capital",
+            "pattern": "DIRECT",
+            "fromNodeId": "station-a-line-1",
+            "toNodeId": "station-b-line-1",
+            "requiredEdgeIds": [
+              "edge-a-b"
+            ]
+          },
+          {
+            "id": "transfer-capital",
+            "pattern": "TRANSFER",
+            "fromNodeId": "station-a-line-1",
+            "toNodeId": "station-c-line-2",
+            "requiredEdgeIds": [
+              "edge-a-b",
+              "edge-b-transfer",
+              "edge-b-c"
+            ]
+          },
+          {
+            "id": "multi-transfer-capital",
+            "pattern": "MULTI_TRANSFER",
+            "fromNodeId": "station-a-line-1",
+            "toNodeId": "station-d-line-3",
+            "requiredEdgeIds": [
+              "edge-a-b",
+              "edge-b-transfer",
+              "edge-c-transfer",
+              "edge-c-d"
+            ]
+          },
+          {
+            "id": "loop-branch-capital",
+            "pattern": "LOOP_BRANCH",
+            "fromNodeId": "station-branch-line-2",
+            "toNodeId": "station-c-line-2",
+            "requiredEdgeIds": [
+              "edge-branch-loop",
+              "edge-loop-c"
+            ]
+          },
+          {
+            "id": "express-local-capital",
+            "pattern": "EXPRESS_LOCAL",
+            "fromNodeId": "station-a-line-1-express",
+            "toNodeId": "station-b-line-1-express",
+            "requiredEdgeIds": [
+              "edge-a-b-express"
+            ]
+          }
+        ],
+        "representativeRouteRegressionSignature": {
+          "algorithm": "rsa-sha256-route-regression-v1",
+          "value": "IMvZp6tCK_C48OjLAmN8fP6lwBsPtYavOFn67j_LwQTqEbibPLNYO43cMhxmFtiOKRLL64O351EivoJd1gbcvcr4HNKcdbCcFfX9mJKc3ItElnk3usnQSJyGXFnr4Skl8cBRc8QR3wz7vRlqO4ymJyBHTVjrc_aYejoA7XI1N-r5GNigvIMGj0BsCkpg-pbqeOtYjP4xyySRFPfsUO2rxx0SByYPR2Ym2rdNJuqToomgDgd_jO7R1QyfekqVk8oYzoE6ibSIDWjbzwHpk4pJZ929IVPiv9YT0MTBD1xhQ7JwTYVg7r3KWaOcqliZbdLgSwTDuw7oP2LRlpVLH9TpsA"
+        },
+        "signature": {
+          "algorithm": "rsa-sha256-pack-manifest-v1",
+          "value": "cdMIHulFto2ztcfrXysLEhDiZvBzqOdgbOG0teyJW2wYWXNtZrX9-1gXufJVSPs54VJDtK-OVb4v-cdrIRmmUMdMUqEJrFdzFkKZkbSkAhGTOWUnQWD4Lla7k9SMo0HpIjIfek_wFNjiDejHL9Z6lSZoNwOwZfFkU04h22KaLJqq1OTTQl8Ny1SxTjGAM6JshBAWkhvEejX9uu-ha8xFZgFj19UfYSH6MqH8QnKl4zzqoI4hvFoE3ZliUwwjNm5un4kLZ_DqfUl4budxLSZW-PVrSn-NGOC0TbxOjhQIwNFCjWiVg2Pfk4OBUdx-tUPxgifxIK4UaYeXrcGq2QjAGw"
+        },
+        "sourceInventory": [
+          {
+            "id": "metro-catalog",
+            "owner": "테스트 공공기관",
+            "url": "https://example.invalid/source",
+            "license": "test-open-license",
+            "licenseStatus": "redistributable",
+            "redistributionAllowed": true,
+            "updateFrequency": "monthly",
+            "updatedAt": "2026-06-19T00:00:00.000Z",
+            "fields": [
+              "stations",
+              "network_edges"
+            ]
+          }
+        ],
+        "regionalQualityMetrics": {
+          "stationCount": 300,
+          "facilityCoverageRatio": 1e-7,
+          "edgeCount": 600,
+          "unknownAccessibilityRatio": 5e-324
+        },
+        "schemaVersion": "1",
+        "requiredTables": [
+          "catalog_metadata",
+          "stations"
+        ]
+      },
+      {
+        "id": "harbor",
+        "version": "3",
+        "url": "https://cdn.easysubway.example/catalog/harbor-v3.sqlite.gz",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sqliteSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "sizeBytes": 2048,
+        "artifactKind": "production",
+        "payloadKind": "sqlite_catalog",
+        "representativeRouteRegressions": [
+          {
+            "id": "direct-local-capital",
+            "pattern": "DIRECT",
+            "fromNodeId": "station-a-line-1",
+            "toNodeId": "station-b-line-1",
+            "requiredEdgeIds": [
+              "edge-a-b"
+            ]
+          },
+          {
+            "id": "transfer-capital",
+            "pattern": "TRANSFER",
+            "fromNodeId": "station-a-line-1",
+            "toNodeId": "station-c-line-2",
+            "requiredEdgeIds": [
+              "edge-a-b",
+              "edge-b-transfer",
+              "edge-b-c"
+            ]
+          },
+          {
+            "id": "multi-transfer-capital",
+            "pattern": "MULTI_TRANSFER",
+            "fromNodeId": "station-a-line-1",
+            "toNodeId": "station-d-line-3",
+            "requiredEdgeIds": [
+              "edge-a-b",
+              "edge-b-transfer",
+              "edge-c-transfer",
+              "edge-c-d"
+            ]
+          },
+          {
+            "id": "loop-branch-capital",
+            "pattern": "LOOP_BRANCH",
+            "fromNodeId": "station-branch-line-2",
+            "toNodeId": "station-c-line-2",
+            "requiredEdgeIds": [
+              "edge-branch-loop",
+              "edge-loop-c"
+            ]
+          },
+          {
+            "id": "express-local-capital",
+            "pattern": "EXPRESS_LOCAL",
+            "fromNodeId": "station-a-line-1-express",
+            "toNodeId": "station-b-line-1-express",
+            "requiredEdgeIds": [
+              "edge-a-b-express"
+            ]
+          }
+        ],
+        "representativeRouteRegressionSignature": {
+          "algorithm": "rsa-sha256-route-regression-v1",
+          "value": "EpfpswDcUcpy1Ghf7IDACrugTFs2cqYy09JOpVd21OQYvdgqUhJ20yFuIF3gJYgabUI7-5DK2w1ysElkGfyPkYkkYO_tZAAWMUTZi-Q6SP6Uv0cJB0CTQmfQc5UIAronzrgJhnuAhuoLFaUx3m8oD5Qx2EHtaSuUWYafpCpVEc33i-NInFCrSHFZYaRlwwhfVeHgwTiob8X4btp8IhD2aoJVE8HQB2DK2ddhqPhR3jYJtglstCjMiRacasUr2uxEzSUV-hlB1lhnsrgc_MAglyRmPvOi5VeK7Kl6RfSEK3_c1ZEYjdUTWedp4QAiEPjMkqpxDA2DUpuKK7Lcml9wLQ"
+        },
+        "signature": {
+          "algorithm": "rsa-sha256-pack-manifest-v1",
+          "value": "HxHl9-cyassJhne7OZ4dJQdPzjaelMprMR9H-nfcNbdAbh6ESMwPhNZ02rta_rRwLKg7EvBIpildMvx69joeEBpnCRCRTCKD0fB_Ptys0EBSSTcJMnUUXxvhDAWgGeDgorAYUUoeCG2kmZ8nJvabt-3JOrJewK12c8k0gncyE7B8ovIHwhXee1RD2k8AZakGnp3xPnUfiGqqs7kGvQpxFpDYp3l0TZCxaKIjWM7ekM_eXatAytPwuumxxLgod5VGX-KLh6h7BNVss6YgC3Fu0qITOk2JUzUtEMF5mytMFl6r1uAaTo2CA4l8quG_gcv-kR6ZjDimx9dF6u3RWi7Gew"
+        },
+        "sourceInventory": [
+          {
+            "id": "harbor-catalog",
+            "owner": "테스트 공공기관",
+            "url": "https://example.invalid/source",
+            "license": "test-open-license",
+            "licenseStatus": "redistributable",
+            "redistributionAllowed": true,
+            "updateFrequency": "monthly",
+            "updatedAt": "2026-06-19T00:00:00.000Z",
+            "fields": [
+              "stations",
+              "network_edges"
+            ]
+          }
+        ],
+        "regionalQualityMetrics": {
+          "stationCount": 300,
+          "facilityCoverageRatio": 0.1,
+          "edgeCount": 600,
+          "unknownAccessibilityRatio": 1.5e-7
+        },
+        "schemaVersion": "1",
+        "requiredTables": [
+          "catalog_metadata",
+          "stations"
+        ]
+      },
+      {
+        "id": "valley",
+        "version": "11",
+        "url": "https://cdn.easysubway.example/catalog/valley-v11.sqlite.gz",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sqliteSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "sizeBytes": 4096,
+        "artifactKind": "production",
+        "payloadKind": "sqlite_catalog",
+        "representativeRouteRegressions": [
+          {
+            "id": "direct-local-capital",
+            "pattern": "DIRECT",
+            "fromNodeId": "station-a-line-1",
+            "toNodeId": "station-b-line-1",
+            "requiredEdgeIds": [
+              "edge-a-b"
+            ]
+          },
+          {
+            "id": "transfer-capital",
+            "pattern": "TRANSFER",
+            "fromNodeId": "station-a-line-1",
+            "toNodeId": "station-c-line-2",
+            "requiredEdgeIds": [
+              "edge-a-b",
+              "edge-b-transfer",
+              "edge-b-c"
+            ]
+          },
+          {
+            "id": "multi-transfer-capital",
+            "pattern": "MULTI_TRANSFER",
+            "fromNodeId": "station-a-line-1",
+            "toNodeId": "station-d-line-3",
+            "requiredEdgeIds": [
+              "edge-a-b",
+              "edge-b-transfer",
+              "edge-c-transfer",
+              "edge-c-d"
+            ]
+          },
+          {
+            "id": "loop-branch-capital",
+            "pattern": "LOOP_BRANCH",
+            "fromNodeId": "station-branch-line-2",
+            "toNodeId": "station-c-line-2",
+            "requiredEdgeIds": [
+              "edge-branch-loop",
+              "edge-loop-c"
+            ]
+          },
+          {
+            "id": "express-local-capital",
+            "pattern": "EXPRESS_LOCAL",
+            "fromNodeId": "station-a-line-1-express",
+            "toNodeId": "station-b-line-1-express",
+            "requiredEdgeIds": [
+              "edge-a-b-express"
+            ]
+          }
+        ],
+        "representativeRouteRegressionSignature": {
+          "algorithm": "rsa-sha256-route-regression-v1",
+          "value": "WuDqF1aNpjr-1Ove07k6we7RoJyTqjkY0S8x5J_RuoN7asD5fzFrjQr8Rg7i4atbwdxVVNtGtXm7PfErRliMvp4JpZ8q6s41d0-s8heW4MYMvvLi2-LgBosZC-JGjjH6r9kwasrz8xI4kYeRK95IFsTGgAS5h-uoe6MTGDl0iQWaipOEJpGdTAovsFW7aNVW3XiAUAbiG2mW9cn1DU16_GdcgLq8vZf0VXdaI5d-vqaHxff7ZcJz1dlTaRMimznl5JI7jmvHCd5EUpBh6VS_uUfxHQky8GKqyhceYL-zeib6sE7uMkUxb1lu8LS1LbC2wUXrsqyd0hEVwDM3DBE5AQ"
+        },
+        "signature": {
+          "algorithm": "rsa-sha256-pack-manifest-v1",
+          "value": "ZgeiWdudCQpkynyjEVK7sx-A8LqbaCUhoKQvxdDz6MiukdID1Bmtij77GhTiFyRGGXUBO9hbBqvJJrjk6YYiLKReA_fehJQjBHtLZxtJEu7INJ4fQMZ6sutvwMxU7-MrQK0EzavHcreJvbQB-F7f0osbtU7PEU9wwKQ2z4QYACbzZo1DKz9D6vAVKnSQ6z8Km2XAv5mu0vtDqNvQ3_L14tjHqGCD_R8SNZGo3EHDU3lBsoI6Phwl3G5gVcTL09-OC6_dxDLOa0MuwHcjnqhQdG4oLZbjcm750WxLxPbcj-vy0xFHWAqv1bt7jRdIrqQ2oBYf8SQfzrIGBZlL6Rlbwg"
+        },
+        "sourceInventory": [
+          {
+            "id": "valley-catalog",
+            "owner": "테스트 공공기관",
+            "url": "https://example.invalid/source",
+            "license": "test-open-license",
+            "licenseStatus": "redistributable",
+            "redistributionAllowed": true,
+            "updateFrequency": "monthly",
+            "updatedAt": "2026-06-19T00:00:00.000Z",
+            "fields": [
+              "stations",
+              "network_edges"
+            ]
+          }
+        ],
+        "regionalQualityMetrics": {
+          "stationCount": 300,
+          "facilityCoverageRatio": 2.5e-10,
+          "edgeCount": 600,
+          "unknownAccessibilityRatio": 0
+        },
+        "schemaVersion": "1",
+        "requiredTables": [
+          "catalog_metadata",
+          "stations"
+        ]
+      }
+    ]
+  },
+  "legacyFallbackEnvelopeManifest": {
+    "ttlSeconds": 3600,
+    "activePack": {
+      "id": "capital",
+      "version": "18"
+    },
+    "rollout": {
+      "percentage": 100,
+      "seed": "issue-2529"
+    },
+    "packs": [
+      {
+        "id": "capital",
+        "version": "18",
+        "url": "catalog/capital-v18.sqlite.gz",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sqliteSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "sizeBytes": 1024,
+        "artifactKind": "fixture",
+        "payloadKind": "sqlite_catalog",
+        "representativeRouteRegressions": [
+          {
+            "id": "direct-local-capital",
+            "pattern": "DIRECT",
+            "fromNodeId": "station-a-line-1",
+            "toNodeId": "station-b-line-1",
+            "requiredEdgeIds": [
+              "edge-a-b"
+            ]
+          },
+          {
+            "id": "transfer-capital",
+            "pattern": "TRANSFER",
+            "fromNodeId": "station-a-line-1",
+            "toNodeId": "station-c-line-2",
+            "requiredEdgeIds": [
+              "edge-a-b",
+              "edge-b-transfer",
+              "edge-b-c"
+            ]
+          },
+          {
+            "id": "multi-transfer-capital",
+            "pattern": "MULTI_TRANSFER",
+            "fromNodeId": "station-a-line-1",
+            "toNodeId": "station-d-line-3",
+            "requiredEdgeIds": [
+              "edge-a-b",
+              "edge-b-transfer",
+              "edge-c-transfer",
+              "edge-c-d"
+            ]
+          },
+          {
+            "id": "loop-branch-capital",
+            "pattern": "LOOP_BRANCH",
+            "fromNodeId": "station-branch-line-2",
+            "toNodeId": "station-c-line-2",
+            "requiredEdgeIds": [
+              "edge-branch-loop",
+              "edge-loop-c"
+            ]
+          },
+          {
+            "id": "express-local-capital",
+            "pattern": "EXPRESS_LOCAL",
+            "fromNodeId": "station-a-line-1-express",
+            "toNodeId": "station-b-line-1-express",
+            "requiredEdgeIds": [
+              "edge-a-b-express"
+            ]
+          }
+        ],
+        "representativeRouteRegressionSignature": {
+          "algorithm": "sha256-route-regression-v1",
+          "value": "2de77a0fb4c8246ab9cbc02b32e8b2f63c83a11b88df69f7fbe14a4c6399445f"
+        },
+        "signature": {
+          "algorithm": "sha256-pack-manifest-v1",
+          "value": "e66e0956b2823754610ff7277b159f248b2a149f19bc7f84bd355ef37fe26483"
+        },
+        "sourceInventory": [
+          {
+            "id": "capital-catalog",
+            "owner": "테스트",
+            "url": "https://example.invalid/source",
+            "license": "fixture-only",
+            "licenseStatus": "fixture-only",
+            "redistributionAllowed": false,
+            "updateFrequency": "monthly",
+            "updatedAt": "2026-06-19T00:00:00.000Z",
+            "fields": [
+              "stations",
+              "network_edges"
+            ]
+          }
+        ],
+        "regionalQualityMetrics": {
+          "stationCount": 300,
+          "facilityCoverageRatio": 0.30000000000000004,
+          "edgeCount": 600,
+          "unknownAccessibilityRatio": 0.000001
+        },
+        "schemaVersion": "1",
+        "requiredTables": [
+          "catalog_metadata",
+          "stations"
+        ]
+      },
+      {
+        "id": "metro",
+        "version": "7",
+        "url": "catalog/metro-v7.sqlite.gz",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sqliteSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "sizeBytes": 9007199254740991,
+        "artifactKind": "fixture",
+        "payloadKind": "sqlite_catalog",
+        "representativeRouteRegressions": [
+          {
+            "id": "direct-local-capital",
+            "pattern": "DIRECT",
+            "fromNodeId": "station-a-line-1",
+            "toNodeId": "station-b-line-1",
+            "requiredEdgeIds": [
+              "edge-a-b"
+            ]
+          },
+          {
+            "id": "transfer-capital",
+            "pattern": "TRANSFER",
+            "fromNodeId": "station-a-line-1",
+            "toNodeId": "station-c-line-2",
+            "requiredEdgeIds": [
+              "edge-a-b",
+              "edge-b-transfer",
+              "edge-b-c"
+            ]
+          },
+          {
+            "id": "multi-transfer-capital",
+            "pattern": "MULTI_TRANSFER",
+            "fromNodeId": "station-a-line-1",
+            "toNodeId": "station-d-line-3",
+            "requiredEdgeIds": [
+              "edge-a-b",
+              "edge-b-transfer",
+              "edge-c-transfer",
+              "edge-c-d"
+            ]
+          },
+          {
+            "id": "loop-branch-capital",
+            "pattern": "LOOP_BRANCH",
+            "fromNodeId": "station-branch-line-2",
+            "toNodeId": "station-c-line-2",
+            "requiredEdgeIds": [
+              "edge-branch-loop",
+              "edge-loop-c"
+            ]
+          },
+          {
+            "id": "express-local-capital",
+            "pattern": "EXPRESS_LOCAL",
+            "fromNodeId": "station-a-line-1-express",
+            "toNodeId": "station-b-line-1-express",
+            "requiredEdgeIds": [
+              "edge-a-b-express"
+            ]
+          }
+        ],
+        "representativeRouteRegressionSignature": {
+          "algorithm": "sha256-route-regression-v1",
+          "value": "a85cb4d8d62cd7c067e974afd3f245b31d1989c4b33536f5ff427f88e995b1e4"
+        },
+        "signature": {
+          "algorithm": "sha256-pack-manifest-v1",
+          "value": "7be67c428b3541cc1c5fe83f9413daf05b5a2b8a526e851d8c70dbcf40d2e214"
+        },
+        "sourceInventory": [
+          {
+            "id": "metro-catalog",
+            "owner": "테스트",
+            "url": "https://example.invalid/source",
+            "license": "fixture-only",
+            "licenseStatus": "fixture-only",
+            "redistributionAllowed": false,
+            "updateFrequency": "monthly",
+            "updatedAt": "2026-06-19T00:00:00.000Z",
+            "fields": [
+              "stations",
+              "network_edges"
+            ]
+          }
+        ],
+        "regionalQualityMetrics": {
+          "stationCount": 300,
+          "facilityCoverageRatio": 1e-7,
+          "edgeCount": 600,
+          "unknownAccessibilityRatio": 5e-324
+        },
+        "schemaVersion": "1",
+        "requiredTables": [
+          "catalog_metadata",
+          "stations"
+        ]
+      },
+      {
+        "id": "harbor",
+        "version": "3",
+        "url": "catalog/harbor-v3.sqlite.gz",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sqliteSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "sizeBytes": 2048,
+        "artifactKind": "fixture",
+        "payloadKind": "sqlite_catalog",
+        "representativeRouteRegressions": [
+          {
+            "id": "direct-local-capital",
+            "pattern": "DIRECT",
+            "fromNodeId": "station-a-line-1",
+            "toNodeId": "station-b-line-1",
+            "requiredEdgeIds": [
+              "edge-a-b"
+            ]
+          },
+          {
+            "id": "transfer-capital",
+            "pattern": "TRANSFER",
+            "fromNodeId": "station-a-line-1",
+            "toNodeId": "station-c-line-2",
+            "requiredEdgeIds": [
+              "edge-a-b",
+              "edge-b-transfer",
+              "edge-b-c"
+            ]
+          },
+          {
+            "id": "multi-transfer-capital",
+            "pattern": "MULTI_TRANSFER",
+            "fromNodeId": "station-a-line-1",
+            "toNodeId": "station-d-line-3",
+            "requiredEdgeIds": [
+              "edge-a-b",
+              "edge-b-transfer",
+              "edge-c-transfer",
+              "edge-c-d"
+            ]
+          },
+          {
+            "id": "loop-branch-capital",
+            "pattern": "LOOP_BRANCH",
+            "fromNodeId": "station-branch-line-2",
+            "toNodeId": "station-c-line-2",
+            "requiredEdgeIds": [
+              "edge-branch-loop",
+              "edge-loop-c"
+            ]
+          },
+          {
+            "id": "express-local-capital",
+            "pattern": "EXPRESS_LOCAL",
+            "fromNodeId": "station-a-line-1-express",
+            "toNodeId": "station-b-line-1-express",
+            "requiredEdgeIds": [
+              "edge-a-b-express"
+            ]
+          }
+        ],
+        "representativeRouteRegressionSignature": {
+          "algorithm": "sha256-route-regression-v1",
+          "value": "220f84d1b4d43301b1c6c6b18b7b54c71b66bd5928346298757c6b403640c3f3"
+        },
+        "signature": {
+          "algorithm": "sha256-pack-manifest-v1",
+          "value": "85dc5fa79b3b6091a08f92592edc2b81858e57fe445359f900747ed03d3c5210"
+        },
+        "sourceInventory": [
+          {
+            "id": "harbor-catalog",
+            "owner": "테스트",
+            "url": "https://example.invalid/source",
+            "license": "fixture-only",
+            "licenseStatus": "fixture-only",
+            "redistributionAllowed": false,
+            "updateFrequency": "monthly",
+            "updatedAt": "2026-06-19T00:00:00.000Z",
+            "fields": [
+              "stations",
+              "network_edges"
+            ]
+          }
+        ],
+        "regionalQualityMetrics": {
+          "stationCount": 300,
+          "facilityCoverageRatio": 0.1,
+          "edgeCount": 600,
+          "unknownAccessibilityRatio": 1.5e-7
+        },
+        "schemaVersion": "1",
+        "requiredTables": [
+          "catalog_metadata",
+          "stations"
+        ]
+      },
+      {
+        "id": "valley",
+        "version": "11",
+        "url": "catalog/valley-v11.sqlite.gz",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sqliteSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "sizeBytes": 4096,
+        "artifactKind": "fixture",
+        "payloadKind": "sqlite_catalog",
+        "representativeRouteRegressions": [
+          {
+            "id": "direct-local-capital",
+            "pattern": "DIRECT",
+            "fromNodeId": "station-a-line-1",
+            "toNodeId": "station-b-line-1",
+            "requiredEdgeIds": [
+              "edge-a-b"
+            ]
+          },
+          {
+            "id": "transfer-capital",
+            "pattern": "TRANSFER",
+            "fromNodeId": "station-a-line-1",
+            "toNodeId": "station-c-line-2",
+            "requiredEdgeIds": [
+              "edge-a-b",
+              "edge-b-transfer",
+              "edge-b-c"
+            ]
+          },
+          {
+            "id": "multi-transfer-capital",
+            "pattern": "MULTI_TRANSFER",
+            "fromNodeId": "station-a-line-1",
+            "toNodeId": "station-d-line-3",
+            "requiredEdgeIds": [
+              "edge-a-b",
+              "edge-b-transfer",
+              "edge-c-transfer",
+              "edge-c-d"
+            ]
+          },
+          {
+            "id": "loop-branch-capital",
+            "pattern": "LOOP_BRANCH",
+            "fromNodeId": "station-branch-line-2",
+            "toNodeId": "station-c-line-2",
+            "requiredEdgeIds": [
+              "edge-branch-loop",
+              "edge-loop-c"
+            ]
+          },
+          {
+            "id": "express-local-capital",
+            "pattern": "EXPRESS_LOCAL",
+            "fromNodeId": "station-a-line-1-express",
+            "toNodeId": "station-b-line-1-express",
+            "requiredEdgeIds": [
+              "edge-a-b-express"
+            ]
+          }
+        ],
+        "representativeRouteRegressionSignature": {
+          "algorithm": "sha256-route-regression-v1",
+          "value": "ee4e5ee2a71807a856687f194745f93b81d2cb141b26a5b620087c8e00b3a901"
+        },
+        "signature": {
+          "algorithm": "sha256-pack-manifest-v1",
+          "value": "58a0611b45ca6273568c22101675d365388c8dcf2e55c4ab0890c46e209cc2db"
+        },
+        "sourceInventory": [
+          {
+            "id": "valley-catalog",
+            "owner": "테스트",
+            "url": "https://example.invalid/source",
+            "license": "fixture-only",
+            "licenseStatus": "fixture-only",
+            "redistributionAllowed": false,
+            "updateFrequency": "monthly",
+            "updatedAt": "2026-06-19T00:00:00.000Z",
+            "fields": [
+              "stations",
+              "network_edges"
+            ]
+          }
+        ],
+        "regionalQualityMetrics": {
+          "stationCount": 300,
+          "facilityCoverageRatio": 2.5e-10,
+          "edgeCount": 600,
+          "unknownAccessibilityRatio": 0
+        },
+        "schemaVersion": "1",
+        "requiredTables": [
+          "catalog_metadata",
+          "stations"
+        ]
+      }
+    ]
+  }
 }

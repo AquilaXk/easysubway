@@ -563,6 +563,10 @@ jobs:
               --root "${EASYSUBWAY_DATAPACK_OUTPUT}" \
               --require-production
             node -e "const manifest=require(process.env.EASYSUBWAY_DATAPACK_OUTPUT + '/current.json'); if (manifest.channel !== process.env.EASYSUBWAY_DATAPACK_TARGET_CHANNEL) throw new Error('manifest channel must match targetChannel');"
+            # 이슈 #2531: 앱이 심고 나가는 수락 순번 하한 아래로는 publish하지 않는다.
+            # 이 게이트가 'live >= 하한' 불변식을 지켜 하한을 심은 빌드가 현재 매니페스트를
+            # 거부하는 상태를 막는다.
+            node -e "const manifest=require(process.env.EASYSUBWAY_DATAPACK_OUTPUT + '/current.json'); const policy=require(process.cwd() + '/apps/mobile/release/datapack-manifest-acceptance-policy.json'); if (!(manifest.releaseSequence >= policy.minimumReleaseSequence)) throw new Error('manifest releaseSequence must not fall below the mobile manifest acceptance floor');"
           fi
           node -e "const manifest=require(process.env.EASYSUBWAY_DATAPACK_OUTPUT + '/current.json'); if (!manifest.packs.every((pack) => Array.isArray(pack.sourceInventory) && pack.sourceInventory.length > 0)) throw new Error('sourceInventory missing');"
 

@@ -239,6 +239,7 @@ Future<void> _defaultDataPackUpdateRunner({
   }
   final stateRepository = DataPackUpdateStateRepository(
     userDatabase: userDatabase,
+    minimumReleaseSequence: endpoints.dataPackMinimumReleaseSequence,
   );
   final catalogDirectory = Directory(p.join(supportDirectory.path, 'catalog'));
   await DataPackUpdater(

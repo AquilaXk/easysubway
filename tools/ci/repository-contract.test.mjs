@@ -9421,6 +9421,50 @@ test("데이터팩 update policy는 자동 갱신 네트워크와 재시도 계�
   assert.match(updaterSource, /trigger != UpdateTrigger\.userConsent &&\s*backoffUntil != null/);
 });
 
+test("데이터팩 manifest 수락 정책은 v1 봉투 차단과 절대 순번 하한을 고정한다", () => {
+  // 이슈 #2531(DP-05). 하한 값은 정책 JSON 하나만 원본이고, 앱 상수·릴리즈 게이트가
+  // 그 값을 따라간다. 어느 한쪽만 바꾸면 여기서 걸린다.
+  const policy = readJson("apps/mobile/release/datapack-manifest-acceptance-policy.json");
+
+  assert.equal(policy.schemaVersion, 1);
+  assert.equal(policy.artifactKind, "datapack-manifest-acceptance-policy");
+  assert.equal(policy.channel, "production");
+  assert.equal(policy.rejectLegacyEnvelopeWhenSigningKeyInjected, true);
+  assert.ok(Number.isSafeInteger(policy.minimumReleaseSequence) && policy.minimumReleaseSequence >= 1);
+  // 하한이 실제 배포 순번보다 높으면 그 하한을 심고 나간 빌드가 현재 매니페스트를
+  // 거부한다. 하한을 올리려면 새 관측값을 함께 기록해야 한다.
+  assert.ok(policy.minimumReleaseSequence <= policy.minimumReleaseSequenceEvidence.observedReleaseSequence);
+
+  const endpoints = read("apps/mobile/lib/app/app_endpoints.dart");
+  assert.match(
+    endpoints,
+    new RegExp(`const int productionDataPackMinimumReleaseSequence = ${policy.minimumReleaseSequence};`),
+  );
+
+  // 봉투 수락 경로가 fail closed로 닫혀 있다.
+  const manifestSource = read("apps/mobile/lib/core/datapack/data_pack_manifest.dart");
+  assert.match(manifestSource, /if \(productionSigningPublicKey != null\) \{\s*throw const FormatException\('Invalid data pack manifest version\.'\);/);
+  const updateStateSource = read("apps/mobile/lib/core/datapack/data_pack_update_state.dart");
+  assert.match(updateStateSource, /if \(floor != null && sequence < floor\)/);
+
+  // 릴리즈 workflow가 'live >= 하한' 불변식을 지킨다.
+  const workflow = read(".github/workflows/datapack-release.yml");
+  assert.match(
+    workflow,
+    /apps\/mobile\/release\/datapack-manifest-acceptance-policy\.json.*policy\.minimumReleaseSequence/,
+  );
+
+  const gateIndex = readJson("contracts/release/gate-index.json");
+  assert.ok(
+    gateIndex.gates.some(
+      (gate) =>
+        gate.file === "datapack-manifest-acceptance-policy.json"
+        && gate.scope === "mobile"
+        && gate.area === "datapack",
+    ),
+  );
+});
+
 test("official source importer는 production placeholder evidence hash를 거부한다", async () => {
   const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-production-placeholder-evidence-"));
   const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");

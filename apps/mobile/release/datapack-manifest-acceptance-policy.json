@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "artifactKind": "datapack-manifest-acceptance-policy",
+  "issue": 2531,
+  "channel": "production",
+  "rejectLegacyEnvelopeWhenSigningKeyInjected": true,
+  "minimumReleaseSequence": 114,
+  "minimumReleaseSequenceEvidence": {
+    "observedReleaseSequence": 114,
+    "observedAt": "2026-07-26T00:00:00.000Z",
+    "source": "production-catalog-current-json"
+  },
+  "notes": "하한은 관측한 published releaseSequence를 넘을 수 없다. 하한을 올리려면 새 관측값을 함께 기록해야 하고, 데이터팩 릴리즈 workflow가 publish 직전 releaseSequence >= minimumReleaseSequence 를 검사해 live < 하한 상태를 막는다. Dart 상수와의 동기화는 apps/mobile/test/core/datapack/data_pack_manifest_acceptance_policy_test.dart 가 강제한다."
+}
