@@ -29,8 +29,8 @@ function policy({ minimumReleaseSequence = 114, observedReleaseSequence = 114, o
   };
 }
 
-function manifest(releaseSequence) {
-  return { manifestVersion: 2, channel: "production", releaseSequence, ttlSeconds: 3600, packs: [] };
+function manifest(releaseSequence, channel = "production") {
+  return { manifestVersion: 2, channel, releaseSequence, ttlSeconds: 3600, packs: [] };
 }
 
 test("하한 위 순번은 통과한다", () => {
@@ -88,6 +88,40 @@ test("releaseSequence가 없거나 정수가 아니면 거부한다", () => {
   }
 });
 
+test("정책 채널과 다른 매니페스트에는 하한을 적용하지 않는다", () => {
+  // 앱은 production 채널 빌드에만 하한을 심는다. release-candidate의 기본 대상 채널은
+  // production이 아니므로(workflow 기본값 dev), 다른 채널 후보를 production 하한으로
+  // 막으면 실제로 존재하지 않는 제약이 된다.
+  assert.deepEqual(
+    acceptanceFloorViolations({ manifest: manifest(1, "dev"), manifestSha256: "b".repeat(64), policy: policy() }),
+    [],
+  );
+  // 같은 순번이어도 다른 채널이면 관측 해시 대조도 돌지 않는다.
+  assert.deepEqual(
+    acceptanceFloorViolations({ manifest: manifest(114, "staging"), manifestSha256: "b".repeat(64), policy: policy() }),
+    [],
+  );
+});
+
+test("채널이 달라도 정책 자체의 불변식은 검사한다", () => {
+  const violations = acceptanceFloorViolations({
+    manifest: manifest(1, "dev"),
+    manifestSha256: "b".repeat(64),
+    policy: policy({ minimumReleaseSequence: 150, observedReleaseSequence: 114 }),
+  });
+  assert.equal(violations.length, 1);
+  assert.match(violations[0], /하한\(150\)은 관측한 published 순번\(114\)을 넘을 수 없다/);
+});
+
+test("정책 channel이 비어 있으면 거부한다", () => {
+  const violations = acceptanceFloorViolations({
+    manifest: manifest(200),
+    manifestSha256: "b".repeat(64),
+    policy: { ...policy(), channel: "" },
+  });
+  assert.ok(violations.some((violation) => /정책 channel/.test(violation)));
+});
+
 test("정책 artifactKind가 다르면 거부한다", () => {
   const violations = acceptanceFloorViolations({
     manifest: manifest(200),
@@ -139,7 +173,26 @@ test("CLI는 하한 이상 매니페스트에서 PASS 요약을 낸다", async (
   );
   const summary = JSON.parse(stdout);
   assert.equal(summary.status, "PASS");
+  assert.equal(summary.channel, "production");
   assert.equal(summary.releaseSequence, 115);
   assert.equal(summary.minimumReleaseSequence, 114);
   assert.equal(summary.manifestSha256, createHash("sha256").update(manifestJson).digest("hex"));
+});
+
+test("CLI는 정책 채널이 아닌 매니페스트를 하한 아래여도 통과시키고 그 사실을 알린다", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "acceptance-floor-"));
+  const manifestPath = path.join(dir, "current.json");
+  const policyPath = path.join(dir, "policy.json");
+  await writeFile(manifestPath, `${JSON.stringify(manifest(1, "dev"))}\n`);
+  await writeFile(policyPath, `${JSON.stringify(policy())}\n`);
+
+  const { stdout } = await execFileAsync(
+    "node",
+    ["tools/datapack/check-manifest-acceptance-floor.mjs", "--manifest", manifestPath, "--policy", policyPath],
+    { cwd: root },
+  );
+  const summary = JSON.parse(stdout);
+  assert.equal(summary.status, "SKIPPED_CHANNEL");
+  assert.equal(summary.channel, "dev");
+  assert.equal(summary.policyChannel, "production");
 });

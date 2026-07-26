@@ -19,7 +19,12 @@ export const DEFAULT_POLICY_PATH = "apps/mobile/release/datapack-manifest-accept
 
 /**
  * 정책 자체의 불변식: 하한은 실제로 관측한 published 순번을 넘을 수 없다. 하한만 올리는
- * 변경은 관측 근거를 함께 갱신해야 통과한다.
+ * 변경은 관측 근거를 함께 갱신해야 통과한다. 이 불변식은 채널과 무관하게 늘 검사한다.
+ *
+ * 순번 하한 자체는 정책이 선언한 채널(`policy.channel`)의 매니페스트에만 적용한다.
+ * 앱도 같은 조건에서만 하한을 심고 나가므로(`AppEndpoints.dataPackMinimumReleaseSequence`),
+ * 다른 채널 후보를 production 하한으로 막으면 실제로 존재하지 않는 제약이 된다.
+ * release-candidate 모드는 기본 채널이 production이 아니다(workflow 기본값 dev).
  */
 export function acceptanceFloorViolations({ manifest, manifestSha256, policy }) {
   const violations = [];
@@ -28,6 +33,9 @@ export function acceptanceFloorViolations({ manifest, manifestSha256, policy }) 
   }
   if (policy.artifactKind !== "datapack-manifest-acceptance-policy") {
     violations.push(`정책 artifactKind는 datapack-manifest-acceptance-policy여야 한다 (실제: ${describe(policy.artifactKind)})`);
+  }
+  if (typeof policy.channel !== "string" || policy.channel.length === 0) {
+    violations.push(`정책 channel은 비어 있지 않은 문자열이어야 한다 (실제: ${describe(policy.channel)})`);
   }
   const floor = policy.minimumReleaseSequence;
   if (!Number.isSafeInteger(floor) || floor < 1) {
@@ -44,6 +52,9 @@ export function acceptanceFloorViolations({ manifest, manifestSha256, policy }) 
 
   if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
     violations.push("매니페스트를 읽지 못했다");
+    return violations;
+  }
+  if (!appliesToManifest({ manifest, policy })) {
     return violations;
   }
   const sequence = manifest.releaseSequence;
@@ -63,6 +74,11 @@ export function acceptanceFloorViolations({ manifest, manifestSha256, policy }) 
     }
   }
   return violations;
+}
+
+/** 하한이 이 매니페스트에 적용되는지. 정책이 선언한 채널의 매니페스트에만 적용한다. */
+export function appliesToManifest({ manifest, policy }) {
+  return manifest?.channel === policy?.channel;
 }
 
 function describe(value) {
@@ -87,7 +103,9 @@ async function main(argv) {
     ].join("\n"));
   }
   process.stdout.write(`${JSON.stringify({
-    status: "PASS",
+    status: appliesToManifest({ manifest, policy }) ? "PASS" : "SKIPPED_CHANNEL",
+    channel: manifest.channel ?? null,
+    policyChannel: policy.channel,
     releaseSequence: manifest.releaseSequence,
     minimumReleaseSequence: policy.minimumReleaseSequence,
     manifestSha256,

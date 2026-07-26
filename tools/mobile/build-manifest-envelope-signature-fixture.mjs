@@ -228,7 +228,9 @@ function signLegacyFixturePack(pack) {
 // 봉투 서명·만료·순번은 애초에 표현되지 않는다.
 function legacyEnvelopeManifest({ production, keyId, privateKeyPem }) {
   const manifest = baseManifest({ production, keyId });
-  for (const field of ["manifestVersion", "channel", "releaseSequence", "publishedAt", "expiresAt", "keyId"]) {
+  // `signature`는 지금 baseManifest가 만들지 않지만 함께 지운다. 나중에 baseManifest가
+  // 봉투 서명을 달면 v1 fixture에 v2 봉투 서명이 남아 회귀 테스트가 조용히 의미를 잃는다.
+  for (const field of ["manifestVersion", "channel", "releaseSequence", "publishedAt", "expiresAt", "keyId", "signature"]) {
     delete manifest[field];
   }
   manifest.packs = manifest.packs.map((pack) =>
