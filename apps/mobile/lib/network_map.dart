@@ -4457,9 +4457,6 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
             geometry.width,
             geometry.height,
           );
-          final minScale = _minimumMapScaleForRegion(
-            widget.data.selectedRegion,
-          );
           // #2068 트랙 QA 후속: 저장 viewport가 없을 때의 초기 카메라는
           // 콘텐츠 중앙을 오너 라벨이 읽히는 배율로 연다. 오너 라벨 sidecar는
           // 비동기 로드라 로드 전후로 가독 배율이 바뀌므로 layoutKey에 포함해
@@ -4473,6 +4470,13 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
               constraints.hasBoundedHeight ? constraints.maxHeight : 0,
             ),
             readableScale: readableScale,
+          );
+          // 축소 하한(#2600)은 초기 화면 배율로 캡해 첫 화면을 절대 확대하지
+          // 않게 한다 — sidecar 미로드 프레임처럼 초기 배율이 하한보다 낮은
+          // 상태가 있고, 거기서 밀어올리면 #1764 E·#2062 계약이 깨진다.
+          final minScale = _minimumMapScaleForRegion(
+            widget.data.selectedRegion,
+            initialFitScale: _containFitScale(initialCameraBounds, constraints),
           );
           final layoutKey =
               '${widget.data.selectedRegion}:${geometry.width}:${geometry.height}:${constraints.maxWidth}:${constraints.maxHeight}:$readableScale';
@@ -5243,15 +5247,10 @@ class _OriginalRouteMapUnavailable extends StatelessWidget {
   }
 }
 
-String _displayRegionName(String region) {
-  return switch (region) {
-    '부산권' => '부산',
-    '광주권' => '광주',
-    '대구권' => '대구',
-    '대전권' => '대전',
-    _ => region,
-  };
-}
+/// 저장형 권역명('부산권')을 표시형('부산')으로 정규화한다. 규칙의 단일 원본은
+/// [routeMapDisplayRegionName]이다 — 사본을 두면 한쪽만 갱신돼 조회가 조용히
+/// 어긋난다(#2068).
+String _displayRegionName(String region) => routeMapDisplayRegionName(region);
 
 MapCameraState _cameraForBounds(
   Rect bounds,
@@ -5352,10 +5351,14 @@ MapCameraState networkMapStationFocusCameraForRegion({
 }
 
 /// 프로덕션 축소 하한(테스트용). 프로덕션 build 분기와 같은 조회를 쓴다(#2600).
-/// [region]은 저장형('광주권')·표시형('광주') 모두 받는다.
+/// [region]은 저장형('광주권')·표시형('광주') 모두 받는다. [initialFitScale]을
+/// 주면 프로덕션 build와 같은 "첫 화면을 확대하지 않는다" 캡까지 재현한다.
 @visibleForTesting
-double networkMapMinimumScaleForRegion(String region) {
-  return _minimumMapScaleForRegion(region);
+double networkMapMinimumScaleForRegion(
+  String region, {
+  double? initialFitScale,
+}) {
+  return _minimumMapScaleForRegion(region, initialFitScale: initialFitScale);
 }
 
 @visibleForTesting
@@ -5502,14 +5505,37 @@ Rect _sourceRectToViewport(Rect sourceRect, MapCameraState camera) {
 }
 
 /// 이 권역의 축소 하한(#2600). 값의 정본은
-/// [kRouteMapMinScaleByRegion](오너 지정·실기기 실측 표)이다.
-///
-/// [region]은 저장형 권역명이라 표 조회 전에 표시용으로 정규화한다.
-double _minimumMapScaleForRegion(String region) {
+/// [kRouteMapMinScaleByRegion](오너 지정·실기기 실측 표)이며, 저장형 권역명
+/// 정규화와 상한 캡([_maxMapScale]·[initialFitScale])은 [routeMapMinimumScale]이
+/// 맡는다.
+double _minimumMapScaleForRegion(String region, {double? initialFitScale}) {
   return routeMapMinimumScale(
-    region: _displayRegionName(region),
+    region: region,
     maxScale: _maxMapScale,
+    initialFitScale: initialFitScale,
   );
+}
+
+/// [bounds]를 [constraints] 뷰포트에 contain-fit 시킬 때의 배율. 뷰포트나 bounds가
+/// 비어 있으면 null(캡하지 않는다).
+double? _containFitScale(Rect bounds, BoxConstraints constraints) {
+  final viewportWidth = constraints.hasBoundedWidth
+      ? constraints.maxWidth
+      : 0.0;
+  final viewportHeight = constraints.hasBoundedHeight
+      ? constraints.maxHeight
+      : 0.0;
+  if (viewportWidth <= 0 ||
+      viewportHeight <= 0 ||
+      bounds.width <= 0 ||
+      bounds.height <= 0) {
+    return null;
+  }
+  final fitScale = math.min(
+    viewportWidth / bounds.width,
+    viewportHeight / bounds.height,
+  );
+  return fitScale.isFinite && fitScale > 0 ? fitScale : null;
 }
 
 /// 이 역 수(route_map_positions 행) 이하 지역은 초기 bounds **기준선**을 지역

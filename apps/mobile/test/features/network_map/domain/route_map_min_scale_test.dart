@@ -1,4 +1,5 @@
 import 'package:easysubway_mobile/features/network_map/domain/route_map_min_scale.dart';
+import 'package:easysubway_mobile/features/network_map/presentation/route_map_basemap_view.dart';
 import 'package:easysubway_mobile/network_map.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -10,7 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 // 실측 최악 구간(0.16, 팬 jank 7.4%·스와이프 19.4%)보다 아래로 열려 있었다.
 //
 // 프로덕션 카메라가 이 표를 실제로 소비하는지는
-// route_map_min_scale_camera_test.dart가 본다.
+// route_map_min_scale_camera_test.dart가 본다(위젯 마운트 포함).
 
 /// lib의 `_maxMapScale`(private)과 같은 값. 상한 cap 검증용 사본이며 lib 쪽
 /// 상수가 바뀌면 함께 갱신해야 한다.
@@ -47,34 +48,109 @@ void main() {
     }
   });
 
-  test('표에 없는 권역은 성능 쪽으로 안전한 기본값을 쓴다(하한 누락 금지)', () {
-    expect(
-      routeMapMinimumScale(region: '없는권역', maxScale: _maxScale),
-      kRouteMapDefaultMinScale,
-    );
-    expect(kRouteMapDefaultMinScale, greaterThan(0.08));
-  });
+  group('권역명 정규화는 조회 함수 안에 있다', () {
+    // 앱이 다루는 권역 문자열의 기본형은 저장형('부산권')이다. 정규화가 호출부에만
+    // 있으면 새 호출부가 저장형을 그대로 넘겼을 때 표를 못 찾고 폴백으로 새어
+    // 나간다 — 부산은 지정값 0.1128 대신 폴백을 받아 오너가 맞춘 최대 축소 상태에
+    // 도달하지 못하는데, 예외도 로그도 없어 눈으로 배율을 재기 전엔 안 보인다.
+    const storedToDisplay = <String, String>{
+      '부산권': '부산',
+      '대구권': '대구',
+      '대전권': '대전',
+      '광주권': '광주',
+      '수도권': '수도권',
+    };
 
-  test('하한은 확대 상한을 넘지 않는다(minScale > maxScale인 카메라 방지)', () {
-    expect(routeMapMinimumScale(region: '대전', maxScale: 0.1), 0.1);
-  });
-
-  group('프로덕션 조회 경로', () {
-    test('저장형 권역명(광주권)과 표시형(광주)이 같은 하한을 준다', () {
-      const pairs = <String, String>{
-        '부산권': '부산',
-        '대구권': '대구',
-        '대전권': '대전',
-        '광주권': '광주',
-        '수도권': '수도권',
-      };
-      pairs.forEach((stored, display) {
+    storedToDisplay.forEach((stored, display) {
+      test('$stored → $display 정규화 후 조회된다', () {
+        expect(routeMapDisplayRegionName(stored), display);
         expect(
-          networkMapMinimumScaleForRegion(stored),
+          routeMapMinimumScale(region: stored, maxScale: _maxScale),
           designated[display],
-          reason: '$stored → $display 정규화 실패 시 하한이 기본값으로 새어 나간다',
+          reason: '$stored이 폴백으로 새어 나갔다 — 정규화가 조회 함수 밖에 있다',
         );
       });
+    });
+
+    test('프로덕션 조회 경로도 저장형·표시형이 같은 하한을 준다', () {
+      storedToDisplay.forEach((stored, display) {
+        expect(networkMapMinimumScaleForRegion(stored), designated[display]);
+        expect(networkMapMinimumScaleForRegion(display), designated[display]);
+      });
+    });
+  });
+
+  group('표 등록 게이트', () {
+    test('앱이 바탕층을 그리는 전 권역에 하한이 등록돼 있다', () {
+      // 권역이 추가되면 basemap 매핑과 하한 표가 함께 늘어야 한다. 하나만 늘면
+      // 새 권역이 조용히 폴백 하한을 쓰게 되므로 여기서 red로 잡는다.
+      expect(
+        kRouteMapMinScaleByRegion.keys.toSet(),
+        kRouteMapBasemapRegionToId.keys.toSet(),
+      );
+    });
+
+    test('폴백 하한은 표에서 유도한다(리터럴 사본 금지)', () {
+      // 표를 재조정해도 폴백이 따라오는지. 리터럴 사본이면 오너가 수도권 값을
+      // 올렸을 때 폴백만 낡은 값에 남는다.
+      final tableMax = kRouteMapMinScaleByRegion.values.reduce(
+        (a, b) => a > b ? a : b,
+      );
+      expect(kRouteMapDefaultMinScale, tableMax);
+      expect(kRouteMapDefaultMinScale, designated['대전']);
+    });
+
+    test('표에 없는 권역은 가장 축소를 덜 허용하는 값을 쓴다(하한 누락 금지)', () {
+      expect(
+        routeMapMinimumScale(region: '없는권역', maxScale: _maxScale),
+        kRouteMapDefaultMinScale,
+      );
+      expect(kRouteMapDefaultMinScale, greaterThan(0.08));
+    });
+  });
+
+  group('하한은 축소만 막는다 — 두 상한을 넘지 않는다', () {
+    test('확대 상한을 넘지 않는다(minScale > maxScale인 카메라 방지)', () {
+      expect(routeMapMinimumScale(region: '대전', maxScale: 0.1), 0.1);
+    });
+
+    test('초기 화면 배율을 넘지 않는다(첫 화면을 확대하지 않는다)', () {
+      // sidecar 미로드 프레임의 부산 초기 contain-fit 0.0984 < 하한 0.1128.
+      // 캡이 없으면 첫 화면이 14.6% 확대되고 #1764 E·#2062 계약이 깨진다.
+      expect(
+        routeMapMinimumScale(
+          region: '부산권',
+          maxScale: _maxScale,
+          initialFitScale: 0.0984,
+        ),
+        0.0984,
+      );
+    });
+
+    test('초기 화면 배율이 하한보다 크면 하한 그대로다(축소 여지는 그대로 줄인다)', () {
+      // sidecar 로드 후 부산 초기 가독 배율 0.2661 > 하한 0.1128.
+      expect(
+        routeMapMinimumScale(
+          region: '부산권',
+          maxScale: _maxScale,
+          initialFitScale: 0.2661,
+        ),
+        designated['부산'],
+      );
+    });
+
+    test('초기 화면 배율이 없거나 퇴화하면 캡하지 않는다', () {
+      for (final fit in <double?>[null, 0, -1, double.nan, double.infinity]) {
+        expect(
+          routeMapMinimumScale(
+            region: '부산권',
+            maxScale: _maxScale,
+            initialFitScale: fit,
+          ),
+          designated['부산'],
+          reason: 'initialFitScale=$fit에서 하한이 사라졌다',
+        );
+      }
     });
   });
 }
