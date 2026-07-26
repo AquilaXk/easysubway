@@ -85,7 +85,9 @@ class DatapackReleaseRequestServiceTest {
 	}
 
 	// dispatch 부재는 관찰 가능한 상태(APPROVED 유지 + dispatch_idempotency_key null)로만 검증한다.
-	// dispatch 포트 재도입 자체는 어댑터·포트가 제거되어(#2569) 컴파일 단계에서 차단된다.
+	// dispatch 포트 재도입 자체는 tools/ci/api-catalog.test.mjs가 막는다 —
+	// outbound catalog에 해당 id가 없음을 단언하고 endpointRef 원문 문자열까지 pin해
+	// 계약 미등록 outbound 재도입을 잡는다.
 	@Test
 	@DisplayName("승인은 APPROVED 기록까지만 하고 release workflow를 dispatch하지 않는다")
 	void approveDoesNotDispatch() {

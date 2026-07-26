@@ -80,14 +80,14 @@ class DatapackReleaseRequestTest {
 	@Test
 	@DisplayName("이력 행 호환을 위해 유지되는 dispatch 진입 전이는 여전히 허용된다(REQUESTED→DISPATCHED는 불가)")
 	void dispatchEntryTransitionsRemainAllowed() {
-		var approved = requestIn(DatapackReleaseRequestStatus.APPROVED);
-		var dispatchFailed = requestIn(DatapackReleaseRequestStatus.DISPATCH_FAILED);
-		var requested = requestIn(DatapackReleaseRequestStatus.REQUESTED);
-
-		assertThat(approved.status().canTransitionTo(DatapackReleaseRequestStatus.DISPATCHED)).isTrue();
-		assertThat(approved.status().canTransitionTo(DatapackReleaseRequestStatus.DISPATCH_FAILED)).isTrue();
-		assertThat(dispatchFailed.status().canTransitionTo(DatapackReleaseRequestStatus.DISPATCHED)).isTrue();
-		assertThat(requested.status().canTransitionTo(DatapackReleaseRequestStatus.DISPATCHED)).isFalse();
+		assertThat(DatapackReleaseRequestStatus.APPROVED
+			.canTransitionTo(DatapackReleaseRequestStatus.DISPATCHED)).isTrue();
+		assertThat(DatapackReleaseRequestStatus.APPROVED
+			.canTransitionTo(DatapackReleaseRequestStatus.DISPATCH_FAILED)).isTrue();
+		assertThat(DatapackReleaseRequestStatus.DISPATCH_FAILED
+			.canTransitionTo(DatapackReleaseRequestStatus.DISPATCHED)).isTrue();
+		assertThat(DatapackReleaseRequestStatus.REQUESTED
+			.canTransitionTo(DatapackReleaseRequestStatus.DISPATCHED)).isFalse();
 	}
 
 	@Test

@@ -711,6 +711,8 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
     "utf8",
   );
   assert.doesNotMatch(integrationsSource, /actions\/workflows\/datapack-release\.yml\/dispatches/);
+  // 자격 증명 참조까지 함께 pin한다(#2569: 소비자가 사라진 Actions PAT의 계약 재등장 차단).
+  assert.doesNotMatch(integrationsSource, /EASYSUBWAY_GITHUB_ACTIONS_DISPATCH_TOKEN/);
 });
 
 test("프로젝트 provider catalog는 비API source를 제외하고 모든 호출 계약을 제공한다", async () => {

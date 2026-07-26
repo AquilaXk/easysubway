@@ -13254,7 +13254,8 @@ test("관리자 v3 공통 shell은 접근성 chrome과 inline style 제한을 �
   // #1694 Part A: 워크플로 전용 조회/콜백 API의 서비스 토큰(안전 기본값 = 미설정 시 전면 거부).
   assert.match(backendEnvAllowlist, /^EASYSUBWAY_DATAPACK_WORKFLOW_TOKEN$/m);
   // #2569: #2564로 backend dispatch 발화가 사라져 소비자가 없는 Actions PAT은 backend 컨테이너로 전달하지 않는다.
-  // PAT 자체는 아직 미회수 — 오너 revoke·배포 secret 값 제거는 #2574가 추적한다(완료 시 이 줄 정리).
+  // PAT 자체는 아직 미회수 — 오너 revoke·배포 secret 값 제거는 #2574가 추적한다
+  // (완료 시 이 주석만 제거, 아래 부재 단언은 유지).
   assert.doesNotMatch(backendEnvAllowlist, /^EASYSUBWAY_GITHUB_ACTIONS_DISPATCH_TOKEN$/m);
   // #1694 Part C: 데이터팩 콜백 HMAC 키(webhook 서명 검증용, 안전 기본값 = 미설정 시 전면 거부).
   assert.match(backendEnvAllowlist, /^EASYSUBWAY_DATAPACK_CALLBACK_HMAC_KEY$/m);
