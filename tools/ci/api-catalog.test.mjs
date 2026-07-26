@@ -697,13 +697,13 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
     findCatalogEntry(catalog, "provider:busan-transportation-official-fare-table").operation.method,
     "GET",
   );
-  assert.ok(catalog.some((entry) => entry.id === "integration:github-datapack-workflow-dispatch"));
   assert.ok(catalog.some((entry) => entry.id === "integration:mobile-ad-creative-image"));
   assert.ok(catalog.some((entry) => entry.id === "integration:mobile-report-photo-upload"));
   assert.ok(catalog.some((entry) => entry.id === "contract:report-api"));
+  // #2569: backend→GitHub workflow_dispatch 어댑터가 제거되어 outbound integration이 아니다.
   assert.equal(
-    findCatalogEntry(catalog, "integration:github-datapack-workflow-dispatch").endpointRef,
-    "config:easysubway.datapack.github-api-base-url(default=https://api.github.com)/repos/AquilaXk/easysubway/actions/workflows/datapack-release.yml/dispatches",
+    catalog.some((entry) => entry.id === "integration:github-datapack-workflow-dispatch"),
+    false,
   );
 });
 

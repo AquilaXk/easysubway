@@ -3,10 +3,7 @@ package com.easysubway.datapack.application.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.easysubway.datapack.application.port.out.DatapackWorkflowDispatchPort;
 import com.easysubway.datapack.application.service.DatapackReleaseRequestService.CreateReleaseRequestCommand;
-import java.util.ArrayList;
-import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,7 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,14 +25,11 @@ class DatapackReleaseRequestServiceTest {
 	@Autowired
 	private JdbcTemplate jdbcTemplate;
 	@Autowired
-	private RecordingDispatchPort dispatchPort;
-	@Autowired
 	private TxRollbackHelper txRollbackHelper;
 
 	@BeforeEach
 	void setUp() {
 		jdbcTemplate.update("DELETE FROM datapack_release_request");
-		dispatchPort.reset();
 	}
 
 	private CreateReleaseRequestCommand cmd(String requester) {
@@ -101,7 +94,6 @@ class DatapackReleaseRequestServiceTest {
 		assertThat(approved.status().name()).isEqualTo("APPROVED");
 		assertThat(status(created.approvalId())).isEqualTo("APPROVED");
 		assertThat(dispatchIdempotencyKey(created.approvalId())).isNull();
-		assertThat(dispatchPort.commands()).isEmpty();
 	}
 
 	@Test
@@ -113,7 +105,6 @@ class DatapackReleaseRequestServiceTest {
 			.isInstanceOf(IllegalStateException.class)
 			.hasMessageContaining("boom");
 
-		assertThat(dispatchPort.commands()).isEmpty();
 		assertThat(status(created.approvalId())).isEqualTo("REQUESTED");
 	}
 
@@ -135,37 +126,11 @@ class DatapackReleaseRequestServiceTest {
 	}
 
 	@TestConfiguration
-	static class DispatchStubConfiguration {
-
-		@Bean
-		@Primary
-		RecordingDispatchPort recordingDispatchPort() {
-			return new RecordingDispatchPort();
-		}
+	static class TxRollbackConfiguration {
 
 		@Bean
 		TxRollbackHelper txRollbackHelper(DatapackReleaseRequestService service) {
 			return new TxRollbackHelper(service);
-		}
-	}
-
-	/** dispatch 호출을 기록하는 포트 테스트 이중 — 승인 경로가 다시 발화하면 commands가 비지 않는다. */
-	static class RecordingDispatchPort implements DatapackWorkflowDispatchPort {
-
-		private final List<DispatchCommand> commands = new ArrayList<>();
-
-		@Override
-		public DispatchResult dispatch(DispatchCommand command) {
-			commands.add(command);
-			return DispatchResult.skippedResult();
-		}
-
-		List<DispatchCommand> commands() {
-			return commands;
-		}
-
-		void reset() {
-			commands.clear();
 		}
 	}
 
