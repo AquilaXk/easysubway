@@ -5606,6 +5606,71 @@ void main() {
     expect(resolved.stepFreeAlternative, isNull);
     expect(resolved.originStationName, '상록수');
   });
+
+  test('#2590 온라인 결과는 표시 이름 치환을 거쳐도 백엔드 계단 판정으로 표시된다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    final repository = OnlineFirstRouteSearchRepository(
+      onlineRepository: _FixedOnlineRouteSearchRepository(
+        RouteSearchResult.fromV2(
+          RouteSearchV2Result.fromJson(
+            _routeV2Payload(
+              stairAccess: 'STEP_FREE',
+              accessLegStairAccess: 'STEP_FREE',
+              rideLegStairAccess: 'NOT_APPLICABLE',
+            ),
+          ),
+        ),
+      ),
+      localRepository: LocalRouteRepository(catalogDatabase: database),
+    );
+
+    final resolved = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(resolved.originStationName, '상록수');
+    expect(resolved.stairAccess, 'STEP_FREE');
+    expect(resolved.stairAccessLabel, '계단 없는 길이에요');
+  });
+
+  test('#2590 강등된 판정도 표시 이름 치환 뒤 무단차로 승격되지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    final repository = OnlineFirstRouteSearchRepository(
+      onlineRepository: _FixedOnlineRouteSearchRepository(
+        RouteSearchResult.fromV2(
+          RouteSearchV2Result.fromJson(
+            _routeV2Payload(
+              // 신뢰도 경고로 접근 leg까지 강등된 응답. 백엔드가 실제로 내는 형태다.
+              stairAccess: 'UNKNOWN',
+              accessLegStairAccess: 'UNKNOWN',
+              rideLegStairAccess: 'NOT_APPLICABLE',
+              reasonCodes: const ['STALE_ACCESSIBILITY_DATA'],
+            ),
+          ),
+        ),
+      ),
+      localRepository: LocalRouteRepository(catalogDatabase: database),
+    );
+
+    final resolved = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(resolved.stairAccess, 'UNKNOWN');
+    expect(resolved.stairAccessLabel, '계단 여부를 확인하고 있어요');
+  });
 }
 
 class _FixedOnlineRouteSearchRepository implements RouteSearchRepository {
@@ -5625,6 +5690,9 @@ class _FixedOnlineRouteSearchRepository implements RouteSearchRepository {
 Map<String, Object?> _routeV2Payload({
   String status = 'FOUND',
   List<Object?> reasonCodes = const <Object?>[],
+  String? stairAccess,
+  String? accessLegStairAccess,
+  String? rideLegStairAccess,
 }) {
   return {
     'contractVersion': 'ROUTE_SEARCH_V2',
@@ -5692,6 +5760,8 @@ Map<String, Object?> _routeV2Payload({
               'level': 'LOW',
               'reasons': <Object?>[],
             },
+            if (accessLegStairAccess != null)
+              'stairAccess': accessLegStairAccess,
           },
           {
             'legType': 'RIDE',
@@ -5726,9 +5796,11 @@ Map<String, Object?> _routeV2Payload({
               'level': 'LOW',
               'reasons': <Object?>[],
             },
+            if (rideLegStairAccess != null) 'stairAccess': rideLegStairAccess,
           },
         ],
         'commercialEtaEligible': status == 'FOUND',
+        if (stairAccess != null) 'stairAccess': stairAccess,
       },
     ],
   };
