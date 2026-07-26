@@ -1120,6 +1120,7 @@ class RouteSearchV2Leg {
     required this.confidence,
     required this.accessibilityRisk,
     this.stairAccess = '',
+    this.requiresAccessibilityCheck,
     this.serviceClass,
     this.servicePattern,
   });
@@ -1164,6 +1165,10 @@ class RouteSearchV2Leg {
         rawAccessibilityRisk,
       ),
       stairAccess: _optionalRouteString(json, 'stairAccess'),
+      requiresAccessibilityCheck: _optionalRouteBool(
+        json,
+        'requiresAccessibilityCheck',
+      ),
       serviceClass: serviceClass,
       servicePattern: servicePattern,
     );
@@ -1195,6 +1200,12 @@ class RouteSearchV2Leg {
   /// 다를 수 있다 — 화면이 쓰는 것은 경로 판정이다. 판정 필드가 없는 레거시 응답에서는
   /// 빈 문자열이고, 그때만 화면이 원자료로 폴백한다.
   final String stairAccess;
+
+  /// 백엔드 플래너가 이 구간에 세운 확인 필요 표기(#2590). 계단 사실([stairAccess])과는
+  /// 다른 축이라 따로 싣는다 — 계단이 확인된 구간도 근거가 없으면 확인 안내가 함께
+  /// 붙어야 한다. 이 필드가 없는 레거시 응답에서는 null이고, 그때만 화면이 원자료로
+  /// 폴백한다.
+  final bool? requiresAccessibilityCheck;
 
   /// 운행 클래스(SUBWAY·ITX_CHEONGCHUN). RIDE leg에서만 채워지고, 그 외에는 null.
   final String? serviceClass;
@@ -2337,12 +2348,13 @@ class RouteSearchStep {
       distanceMeters: leg.distanceMeters,
       includesStairs: leg.accessibilityRisk.stairCount > 0,
       stairAccessState: stairAccessState,
-      // 판정과 같은 근거에서 나와야 한 칩 행이 자기모순에 빠지지 않는다(#2590).
-      // 백엔드 판정이 `unknown`일 때가 곧 "확인되지 않음"이고, 승차 구간의
-      // `notApplicable`은 확인 대상이 아니다. 판정 필드가 없을 때만 원자료로 폴백한다.
-      requiresAccessibilityCheck: leg.stairAccess.isEmpty
-          ? _routeV2RiskRequiresCheck(leg.accessibilityRisk)
-          : stairAccessState == 'unknown',
+      // 계단 사실에서 파생하지 않는다(#2590). 계단이 확인된 구간도 근거가 없으면 확인
+      // 안내가 함께 붙어야 하므로, 백엔드가 세운 표기를 그대로 쓴다. 그 필드가 없는
+      // 레거시 응답에서만 원자료로 폴백하고, 그 폴백은 승차 leg를 과대 표기하는
+      // 방향이라 표시가 근거보다 강해지지 않는다.
+      requiresAccessibilityCheck:
+          leg.requiresAccessibilityCheck ??
+          _routeV2RiskRequiresCheck(leg.accessibilityRisk),
       actionTitle: '',
       actionDetail: title,
       reason: leg.etaSource,

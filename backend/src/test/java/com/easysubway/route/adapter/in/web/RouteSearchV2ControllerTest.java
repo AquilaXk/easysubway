@@ -567,14 +567,38 @@ class RouteSearchV2ControllerTest {
 			// 경로 단위 신뢰도 경고는 이 구간에서 확인한 사실을 지우지 않는다. leg마다 복제하면
 			// 검증된 구간까지 미확인으로 뒤집혀 실제로 확인한 것을 잃는다(#2590).
 			.andExpect(jsonPath("$.data.itineraries[0].legs[2].stairAccess").value("STEP_FREE"))
-			// leg 판정과 그 leg의 위험 요약이 같은 근거에서 나와 응답이 자기모순에 빠지지 않는다.
+			// 접근·하차 leg는 판정과 위험 요약이 같은 근거에서 나온다.
 			.andExpect(jsonPath("$.data.itineraries[0].legs[0].accessibilityRisk.riskLevel").value("MEDIUM"))
 			.andExpect(jsonPath("$.data.itineraries[0].legs[0].accessibilityRisk.unknownAccessibilityCount").value(1))
 			.andExpect(jsonPath("$.data.itineraries[0].legs[2].accessibilityRisk.riskLevel").value("NONE"))
 			.andExpect(jsonPath("$.data.itineraries[0].legs[2].accessibilityRisk.unknownAccessibilityCount").value(0))
+			// 승차 leg는 그렇지 않다. 원자료 stairAccessState가 컬럼 기본값 "UNKNOWN"이라 카운터가
+			// 1로 잡히고 riskLevel도 MEDIUM이 되지만 판정은 NOT_APPLICABLE이다. 이 어긋남이 곧
+			// #2590의 원인이며, 카운터는 응답 형태를 지키려 남긴 자리다. 화면이 카운터가 아니라
+			// 판정과 requiresAccessibilityCheck를 읽는 이유가 여기 있다.
+			.andExpect(jsonPath("$.data.itineraries[0].legs[1].accessibilityRisk.unknownAccessibilityCount").value(1))
+			.andExpect(jsonPath("$.data.itineraries[0].legs[1].accessibilityRisk.riskLevel").value("MEDIUM"))
+			.andExpect(jsonPath("$.data.itineraries[0].legs[1].requiresAccessibilityCheck").value(false))
 			// 신뢰도 사유는 경로 단위 경고이므로 leg 카운터가 아니라 경로 카운터에만 잡힌다.
 			.andExpect(jsonPath("$.data.itineraries[0].legs[0].accessibilityRisk.staleDataCount").value(0))
 			.andExpect(jsonPath("$.data.itineraries[0].accessibilityRisk.staleDataCount").value(1));
+	}
+
+	@Test
+	@DisplayName("계단으로 확인된 구간도 근거가 없으면 확인 필요 표기를 함께 싣는다")
+	void routeSearchV2CarriesAccessibilityCheckAlongsideStairJudgment() throws Exception {
+		stubStairAccessRoute("station-stair-origin", true, false, List.of());
+
+		// 계단 사실과 검증 여부는 다른 축이다. 확인 필요 표기를 계단 판정에서 파생하면 계단이 있고
+		// 근거도 없는 — 가장 확인이 필요한 — 조합에서 표기가 사라진다(#2590).
+		mockMvc.perform(stairAccessSearch("station-stair-origin"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.itineraries[0].legs[0].stairAccess").value("STAIR_ONLY"))
+			.andExpect(jsonPath("$.data.itineraries[0].legs[0].requiresAccessibilityCheck").value(true))
+			.andExpect(jsonPath("$.data.itineraries[0].legs[1].stairAccess").value("NOT_APPLICABLE"))
+			.andExpect(jsonPath("$.data.itineraries[0].legs[1].requiresAccessibilityCheck").value(false))
+			.andExpect(jsonPath("$.data.itineraries[0].legs[2].stairAccess").value("STEP_FREE"))
+			.andExpect(jsonPath("$.data.itineraries[0].legs[2].requiresAccessibilityCheck").value(false));
 	}
 
 	@Test

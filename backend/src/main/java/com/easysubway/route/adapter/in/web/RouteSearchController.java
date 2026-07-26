@@ -627,7 +627,8 @@ class RouteSearchController {
 		String gatewayReceivedAt,
 		String servedAt,
 		AccessibilityRiskDto accessibilityRisk,
-		String stairAccess
+		String stairAccess,
+		boolean requiresAccessibilityCheck
 	) {
 
 		private static List<LegDto> fromSteps(
@@ -697,7 +698,11 @@ class RouteSearchController {
 				step.gatewayReceivedAt(),
 				step.servedAt(),
 				AccessibilityRiskDto.from(step),
-				StairAccess.ofStep(step).name()
+				StairAccess.ofStep(step).name(),
+				// 계단 사실과 검증 여부는 다른 축이다(#2590). 계단이 확인된 구간도 근거가
+				// 없으면 확인 안내가 함께 붙어야 하므로, 표시 계층이 stairAccess에서
+				// 파생하지 않도록 플래너가 세운 값을 그대로 싣는다.
+				step.requiresAccessibilityCheck()
 			);
 		}
 

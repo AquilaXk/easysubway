@@ -2069,6 +2069,61 @@ void main() {
       );
     });
 
+    test('계단으로 확인된 leg도 근거가 없으면 확인 안내를 함께 낸다', () {
+      // 계단 사실과 검증 여부는 다른 축이다. 확인 필요 표기를 계단 판정에서 파생하면
+      // 계단이 있고 근거도 없는 — 가장 확인이 필요한 — 조합에서 안내가 사라진다(#2590).
+      final display = _judgedDisplay(
+        stairAccess: 'STAIR_ONLY',
+        legs: [
+          _judgedLeg(
+            legType: 'ACCESS',
+            stairAccess: 'STAIR_ONLY',
+            stairCount: 1,
+            requiresAccessibilityCheck: true,
+          ),
+          _judgedLeg(
+            legType: 'RIDE',
+            stairAccess: 'NOT_APPLICABLE',
+            unknownAccessibilityCount: 1,
+          ),
+        ],
+      );
+
+      final accessStep = display.steps.first;
+      expect(accessStep.stairAccessState, 'stairOnly');
+      expect(accessStep.requiresAccessibilityCheck, isTrue);
+      expect(accessStep.burdenLabel, contains('계단 포함'));
+      expect(accessStep.burdenLabel, contains('엘리베이터 안내 미확인'));
+      expect(display.stairAccessLabel, '계단 포함');
+      expect(display.accessibilityBadgeLabel, '엘리베이터 상태를 살펴봐 주세요');
+      // 승차 leg는 여전히 확인 대상이 아니다.
+      expect(display.steps.last.requiresAccessibilityCheck, isFalse);
+    });
+
+    test('계단으로 확인되고 근거도 있는 leg에는 확인 안내를 붙이지 않는다', () {
+      final display = _judgedDisplay(
+        stairAccess: 'STAIR_ONLY',
+        legs: [
+          _judgedLeg(
+            legType: 'ACCESS',
+            stairAccess: 'STAIR_ONLY',
+            stairCount: 1,
+            requiresAccessibilityCheck: false,
+          ),
+          _judgedLeg(
+            legType: 'RIDE',
+            stairAccess: 'NOT_APPLICABLE',
+            unknownAccessibilityCount: 1,
+          ),
+        ],
+      );
+
+      final accessStep = display.steps.first;
+      expect(accessStep.burdenLabel, contains('계단 포함'));
+      expect(accessStep.burdenLabel, isNot(contains('엘리베이터 안내 미확인')));
+      expect(display.stairAccessLabel, '계단 포함');
+    });
+
     test('표시 이름을 채워 넣어도 경로 판정이 leg 폴백으로 되돌아가지 않는다', () {
       // 계단 장벽을 질 수 있는 leg가 없는 경로에서는 leg를 접어도 경로 판정을
       // 복원할 수 없다. 판정을 옮기지 않는 재구성이 있으면 여기서 표시가 실제
@@ -2173,19 +2228,23 @@ void main() {
         _judgedItineraryJson(
           stairAccess: 'STEP_FREE',
           legStairAccess: 'NOT_APPLICABLE',
+          legRequiresAccessibilityCheck: false,
         ),
       );
       expect(withJudgment.stairAccess, 'STEP_FREE');
       expect(withJudgment.legs.single.stairAccess, 'NOT_APPLICABLE');
+      expect(withJudgment.legs.single.requiresAccessibilityCheck, isFalse);
 
       final legacy = RouteSearchV2Itinerary.fromJson(_judgedItineraryJson());
       expect(legacy.stairAccess, '');
       expect(legacy.legs.single.stairAccess, '');
+      expect(legacy.legs.single.requiresAccessibilityCheck, isNull);
     });
   });
 }
 
-/// #2590 판정 필드를 실은 leg. [stairAccess]가 비면 판정 필드가 없는 레거시 응답이다.
+/// #2590 판정 필드를 실은 leg. [stairAccess]가 비면 판정 필드가 없는 레거시 응답이라
+/// 확인 필요 표기도 함께 비운다.
 ///
 /// 신뢰도 카운터를 받지 않는 이유는 leg에서 구조적으로 늘 0이기 때문이다 — 백엔드
 /// leg DTO가 만드는 사유는 STAIR_ONLY_ACCESS·ACCESSIBILITY_CHECK_REQUIRED 둘뿐이고,
@@ -2195,6 +2254,7 @@ RouteSearchV2Leg _judgedLeg({
   required String stairAccess,
   int stairCount = 0,
   int unknownAccessibilityCount = 0,
+  bool? requiresAccessibilityCheck,
 }) {
   final isRide = legType == 'RIDE';
   return RouteSearchV2Leg(
@@ -2229,6 +2289,11 @@ RouteSearchV2Leg _judgedLeg({
       reasons: const [],
     ),
     stairAccess: stairAccess,
+    // 백엔드는 판정과 확인 필요 표기를 함께 싣는다. 따로 주지 않으면 플래너가 세우는
+    // 값(계단 사실과 무관하게 근거가 없을 때만 true)을 기본으로 둔다.
+    requiresAccessibilityCheck: stairAccess.isEmpty
+        ? null
+        : requiresAccessibilityCheck ?? stairAccess == 'UNKNOWN',
     serviceClass: isRide ? 'SUBWAY' : null,
     servicePattern: isRide ? 'LOCAL' : null,
   );
@@ -2415,10 +2480,14 @@ RouteSearchResult _judgedDisplay({
 Map<String, Object?> _judgedItineraryJson({
   String? stairAccess,
   String? legStairAccess,
+  bool? legRequiresAccessibilityCheck,
 }) {
   final leg = _rideLegJson();
   if (legStairAccess != null) {
     leg['stairAccess'] = legStairAccess;
+  }
+  if (legRequiresAccessibilityCheck != null) {
+    leg['requiresAccessibilityCheck'] = legRequiresAccessibilityCheck;
   }
   return <String, Object?>{
     'itineraryId': 'route-judged',
