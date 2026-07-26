@@ -532,6 +532,12 @@ class RouteAssembler {
   /// 격자를 로컬 그래프가 아는 사실로 재구성한다. 계단 상태를 모르는 구간·생성 연결선·
   /// 근거가 엄격 경로 자격을 얻지 못한 구간은 확인된 것이 아니다. 계단이 있다고 확인된
   /// 구간은 미확인이 아니라 확인된 장벽이므로 여기서 걸러 내지 않는다.
+  ///
+  /// 항이 겹치는 것은 의도다. 데이터팩에서 온 edge라면 `strictRouteEligible`이 이미
+  /// `verificationStatus == VERIFIED`와 `!isPlaceholderEvidence`를 함의하고
+  /// (`_strictRouteBlockerReasons`), `safetyEvidence.isStale`는 `isDataStale`와 같은
+  /// 값이다. 그 세 항이 실제로 일하는 곳은 근거를 손으로 채워 만든 edge뿐이며, 남겨
+  /// 두는 이유는 어느 한 항이 느슨해져도 판정이 조용히 열리지 않게 하기 위해서다.
   bool _accessibilityVerified(RouteEdge edge) {
     return edge.stairAccessState != RouteStairAccessState.unknown &&
         edge.accessibilityState == RouteAccessibilityState.available &&
