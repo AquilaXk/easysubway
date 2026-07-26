@@ -297,7 +297,9 @@ void main() {
     expect(result.steps.first.stepType, 'entry');
     expect(result.steps.first.includesStairs, isFalse);
     expect(result.steps.first.requiresAccessibilityCheck, isTrue);
-    expect(result.steps.first.burdenLabel, '약 4분 · 180m · 엘리베이터 안내 미확인');
+    // 판정은 살아 있지만 구간 줄은 확인된 사실만 적는다. 확인 필요는 경로 단위
+    // 표기(접근성 배지·계단 표기)가 말한다.
+    expect(result.steps.first.burdenLabel, '약 4분 · 180m');
     expect(result.steps[1].userTitle, '사당역에서 출구 엘리베이터와 통로 안내를 확인');
     expect(result.semanticLabel, isNot(contains('접근성 정보')));
     expect(result.arrivalGuidanceStep?.description, '2번 출구의 엘리베이터를 먼저 확인하세요.');
@@ -2063,9 +2065,11 @@ void main() {
         display.steps.every((step) => !step.requiresAccessibilityCheck),
         isTrue,
       );
+      // 시간·거리 값이 없을 때 나오는 다른 "미확인" 문구는 이 변경의 범위 밖이라
+      // 구간 줄에서는 엘리베이터 확인 안내만 본다.
       expect(
         display.steps.map((step) => step.burdenLabel),
-        everyElement(isNot(contains('엘리베이터 안내 미확인'))),
+        everyElement(isNot(contains('엘리베이터'))),
       );
     });
 
@@ -2093,7 +2097,9 @@ void main() {
       expect(accessStep.stairAccessState, 'stairOnly');
       expect(accessStep.requiresAccessibilityCheck, isTrue);
       expect(accessStep.burdenLabel, contains('계단 포함'));
-      expect(accessStep.burdenLabel, contains('엘리베이터 안내 미확인'));
+      // 판정은 살아 있어도 구간 줄에 확인 안내를 적지 않는다. 그 사실은 아래 경로
+      // 단위 표기가 진다.
+      expect(accessStep.burdenLabel, isNot(contains('엘리베이터')));
       expect(display.stairAccessLabel, '계단 포함');
       expect(display.accessibilityBadgeLabel, '엘리베이터 상태를 살펴봐 주세요');
       // 승차 leg는 여전히 확인 대상이 아니다.
@@ -2119,8 +2125,9 @@ void main() {
       );
 
       final accessStep = display.steps.first;
+      expect(accessStep.requiresAccessibilityCheck, isFalse);
       expect(accessStep.burdenLabel, contains('계단 포함'));
-      expect(accessStep.burdenLabel, isNot(contains('엘리베이터 안내 미확인')));
+      expect(accessStep.burdenLabel, isNot(contains('엘리베이터')));
       expect(display.stairAccessLabel, '계단 포함');
     });
 

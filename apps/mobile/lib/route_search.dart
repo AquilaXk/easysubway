@@ -2467,12 +2467,19 @@ class RouteSearchStep {
 
   String get userDescription => _routeStepDetailLabel(stepType: stepType);
 
+  /// 구간 요약 줄(시간·거리·계단). **[requiresAccessibilityCheck]는 여기에 문구로
+  /// 나오지 않는다.** 구간마다 확인 안내를 붙이면 확인된 구간과 아닌 구간이 뒤섞여
+  /// 읽히므로 표기를 경로 단위로 모은다 — 확인이 필요한 스텝이 하나라도 있으면
+  /// [RouteSearchResult.accessibilityBadgeLabel]이 그 사실을 낸다.
+  ///
+  /// 판정 자체는 지우지 않는다. [RouteSearchResult.arrivalGuidanceStep]·
+  /// [RouteSearchResult.burdenLevelLabel]·[RouteSearchResult.accessibilityBadgeLabel]이
+  /// 계속 이 값을 읽는다.
   String get burdenLabel {
     final labels = <String>[
       _routeDurationLabel(estimatedMinutes),
       _routeDistanceLabel(distanceMeters),
       if (includesStairs) '계단 포함',
-      if (requiresAccessibilityCheck) '엘리베이터 안내 미확인',
     ];
     return labels.join(' · ');
   }

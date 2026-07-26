@@ -2373,9 +2373,11 @@ void main() {
     // 도착 안내 카드로 빠지지 않고 이동 목록에 남는다.
     expect(result.arrivalGuidanceStep, isNull);
     expect(result.movementSteps.length, result.steps.length);
+    // 구간 줄은 엘리베이터 확인 안내를 말하지 않는다. (시간·거리 값이 없을 때 나오는
+    // 다른 "미확인" 문구는 이 변경의 범위 밖이라 여기서 보지 않는다.)
     expect(
       result.steps.map((step) => step.burdenLabel),
-      everyElement(isNot(contains('엘리베이터 안내 미확인'))),
+      everyElement(isNot(contains('엘리베이터'))),
     );
   });
 
@@ -2517,7 +2519,7 @@ void main() {
     );
     expect(rideStep.stairAccessState, 'notApplicable');
     expect(rideStep.requiresAccessibilityCheck, isFalse);
-    expect(rideStep.burdenLabel, isNot(contains('엘리베이터 안내 미확인')));
+    expect(rideStep.burdenLabel, isNot(contains('엘리베이터')));
     // 승차를 판정에서 뺀다고 해서 경로가 무단차로 올라가지는 않는다. 근거 없는 접근
     // 동선이 그대로 미확인으로 남아 경로 표기를 잡아 준다.
     final accessSteps = result.steps
@@ -2594,7 +2596,9 @@ void main() {
     expect(exitStep.stairAccessState, 'stairOnly');
     expect(exitStep.requiresAccessibilityCheck, isTrue);
     expect(exitStep.burdenLabel, contains('계단 포함'));
-    expect(exitStep.burdenLabel, contains('엘리베이터 안내 미확인'));
+    // 판정(requiresAccessibilityCheck)은 위에서 이미 고정했다. 구간 줄에는 확인 안내를
+    // 적지 않고, 확인 필요는 바로 아래 경로 단위 표기가 말한다.
+    expect(exitStep.burdenLabel, isNot(contains('엘리베이터')));
     expect(result.stairAccessLabel, '계단 포함');
     expect(result.accessibilityBadgeLabel, '엘리베이터 상태를 살펴봐 주세요');
     expect(result.arrivalGuidanceStep, isNotNull);
