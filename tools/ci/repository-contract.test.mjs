@@ -18454,6 +18454,81 @@ test("Mobile App CI는 tools/mobile 도구 테스트를 mobile 게이트 전용 
   assert.doesNotMatch(command, /--test-name-pattern/);
 });
 
+// dart format 게이트는 인자 경로가 없어도 실패하지 않는다. Flutter 3.44.0의 Dart 3.12.0에서
+// `dart format --output=none --set-exit-if-changed nonexistent_only`는
+// `No file or directory found at "nonexistent_only".`를 로그로만 남기고 exit 0으로 끝난다.
+// 그래서 디렉토리 개편·인자 오타·게이트 라인 삭제가 빨간불 없이 검사 범위만 줄이고,
+// 극단적으로는 아무 파일도 보지 않는 no-op 게이트가 된다. 인자 집합을 tracked Dart 트리와
+// 양방향으로 맞춰 그 무력화를 red로 드러낸다(위 node --test 인자 교차 검증과 동형 —
+// 하드코딩 목록 대신 파일시스템이 원본).
+test("Mobile App CI의 dart format 게이트 인자는 apps/mobile의 tracked Dart 디렉토리와 일치한다", () => {
+  const mobileJob = jobBlock(read(".github/workflows/ci.yml"), "mobile-app", "android");
+  const formatCommands = [...mobileJob.matchAll(/^\s*(dart format [^\n]*)$/gm)]
+    // 주석 처리된 명령은 실행되지 않으므로 게이트 근거가 될 수 없다.
+    .filter((match) => !match[0].trimStart().startsWith("#"))
+    .map((match) => match[1]);
+  assert.equal(
+    formatCommands.length,
+    1,
+    "Mobile App CI must run exactly one dart format gate command",
+  );
+
+  const [formatCommand] = formatCommands;
+  // --output=none과 --set-exit-if-changed가 함께 있어야 검사 전용으로 동작하고 드리프트에서 실패한다.
+  // 둘 중 하나라도 빠지면 게이트가 파일을 덮어쓰거나(전자) 조용히 통과한다(후자).
+  assert.ok(
+    formatCommand.startsWith("dart format --output=none --set-exit-if-changed "),
+    `dart format gate must be a check-only gate: ${formatCommand}`,
+  );
+
+  const declaredPaths = formatCommand
+    .replace("dart format --output=none --set-exit-if-changed ", "")
+    .split(/\s+/)
+    .filter((token) => token !== "");
+  // 인자가 남지 않으면 dart format이 대상 없이 통과한다.
+  assert.ok(declaredPaths.length > 0, "dart format gate must declare at least one path argument");
+  assert.deepEqual(
+    declaredPaths.filter((token) => token.startsWith("-")),
+    [],
+    `dart format gate must not carry extra flags beyond the check-only pair: ${formatCommand}`,
+  );
+
+  // 게이트는 working-directory: apps/mobile에서 실행되므로 인자는 그 아래 상대 경로다.
+  const trackedDartFiles = execFileSync("git", ["ls-files", "apps/mobile/**/*.dart"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim().split("\n").filter((file) => file !== "");
+  assert.ok(trackedDartFiles.length > 0, "apps/mobile must contain tracked .dart files");
+
+  // apps/mobile 밖의 Dart 소스는 이 게이트가 덮지 못한다. 생기면 별도 게이트가 필요하므로 red로 드러낸다.
+  const outsideMobile = execFileSync("git", ["ls-files", "*.dart", ":!:apps/mobile"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim().split("\n").filter((file) => file !== "");
+  assert.deepEqual(
+    outsideMobile,
+    [],
+    `these Dart sources live outside apps/mobile and no format gate covers them: ${outsideMobile.join(", ")}`,
+  );
+
+  const relativePaths = trackedDartFiles.map((file) => file.replace(/^apps\/mobile\//, ""));
+  // apps/mobile 직속 .dart는 디렉토리 인자로 덮이지 않는다. 파일 인자를 따로 요구하기 전에 부재를 고정한다.
+  const rootLevelFiles = relativePaths.filter((file) => !file.includes("/"));
+  assert.deepEqual(
+    rootLevelFiles,
+    [],
+    `these apps/mobile root-level Dart files are outside every directory argument: ${rootLevelFiles.join(", ")}`,
+  );
+
+  const trackedDirectories = [...new Set(relativePaths.map((file) => file.split("/")[0]))].sort();
+  assert.deepEqual(
+    [...declaredPaths].sort(),
+    trackedDirectories,
+    "dart format gate arguments must equal the apps/mobile top-level directories holding tracked .dart files"
+      + ` (gate: ${[...declaredPaths].sort().join(", ")} / tracked: ${trackedDirectories.join(", ")})`,
+  );
+});
+
 test("경로 분류기는 백엔드 품질 gate 변경을 repository contract 대상으로 처리한다", async () => {
   const outputs = await classifyChangedFiles(["backend/quality/static-analysis-gate.json"]);
 
