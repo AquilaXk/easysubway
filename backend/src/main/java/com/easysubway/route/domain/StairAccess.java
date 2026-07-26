@@ -19,8 +19,8 @@ import java.util.List;
  * 미확인으로 뒤집혀, 실제로 확인한 사실을 잃는다.
  *
  * <p>표시 계층은 경로 판정이 응답에 실려 있으면 그 값을 쓴다. leg를 접어 경로 판정을 흉내
- * 내는 것은 판정 필드가 없는 응답(레거시 백엔드·기기 내 로컬 경로)에서의 폴백이며, 그 경우
- * 승차 leg가 원자료상 미확인으로 잡혀 fail closed로 떨어진다.
+ * 내는 것은 판정 필드가 없는 응답에서의 폴백이며, 그 응답에서는 승차 leg의 미확인 원자료가
+ * 폴백을 fail closed로 떨어뜨린다.
  */
 public enum StairAccess {
 
@@ -75,8 +75,8 @@ public enum StairAccess {
 	 *
 	 * <p>스텝이 하나도 없으면(접근성 차단 결과) 무단차라 말할 근거 자체가 없으므로 접는 값을
 	 * {@link #UNKNOWN}으로 둔다. 계단 경고는 그때도 경로 단위 사실이라 그대로 겹친다.
-	 * {@link #ofStepJudgments(List)}의 빈 목록은 태깅 술어의 종전 결론을 유지하려 {@link #STEP_FREE}로
-	 * 남겨 두었고, 그 갈래는 완결성 계약상 응답에 실리지 않는다.
+	 * {@link #ofStepJudgments(List)}의 빈 목록 결론은 #2560 후보 집합을 흔들지 않도록 종전
+	 * 그대로 뒀다.
 	 */
 	public static StairAccess ofItineraryDisplay(RouteSearchResult itinerary) {
 		StairAccess folded = itinerary.steps().isEmpty()

@@ -2379,6 +2379,58 @@ void main() {
     );
   });
 
+  test('#2590 무단차라 적혀 있어도 근거가 만료된 접근 동선은 무단차로 말하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(
+      database,
+      includeExplicitAccessEdges: false,
+    );
+    // 계단 상태는 STEP_FREE로 적혀 있지만 확인 시각이 만료된 진입 동선.
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'entry-a-stale',
+      fromNodeId: 'station-a',
+      toNodeId: 'station-a:line-test',
+      edgeType: 'ENTRY',
+      durationSeconds: 90,
+      lastVerifiedAtSeconds: 0,
+    );
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'ride-a-b-step-free',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-b:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 120,
+      distanceMeters: 830,
+    );
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'exit-b-verified',
+      fromNodeId: 'station-b:line-test',
+      toNodeId: 'station-b',
+      edgeType: 'EXIT',
+      durationSeconds: 60,
+    );
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'SENIOR',
+      ),
+    );
+
+    final entryStep = result.steps.singleWhere(
+      (step) => step.stepType == 'entry',
+    );
+    expect(entryStep.stairAccessState, 'unknown');
+    expect(entryStep.requiresAccessibilityCheck, isTrue);
+    expect(result.stairAccessLabel, '계단 여부를 확인하고 있어요');
+  });
+
   test('#2590 근거가 없는 접근 동선은 로컬에서 확인 필요로 남는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);

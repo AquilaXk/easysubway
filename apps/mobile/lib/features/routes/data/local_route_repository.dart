@@ -645,6 +645,7 @@ class LocalRouteRepository implements RouteSearchRepository {
                   lineId: step.lineId,
                 )
               : null;
+          final stairAccessState = _stairAccessStateOf(step);
 
           return RouteSearchStep(
             sequence: index + 1,
@@ -658,8 +659,10 @@ class LocalRouteRepository implements RouteSearchRepository {
             estimatedMinutes: _estimatedMinutesFor(adjustedDurationSeconds),
             distanceMeters: step.distanceMeters,
             includesStairs: step.includesStairs,
-            stairAccessState: _stairAccessStateOf(step),
-            requiresAccessibilityCheck: _requiresAccessibilityCheck(step),
+            stairAccessState: stairAccessState,
+            // 온라인 경로가 leg 판정에서 파생하는 규칙과 같다: 판정이 `unknown`일 때가
+            // 곧 "확인되지 않음"이고, 계단 개념이 적용되지 않는 구간은 확인 대상이 아니다.
+            requiresAccessibilityCheck: stairAccessState == 'unknown',
             actionTitle: _stepActionTitle(step.type.name),
             actionDetail: _stepActionDetail(
               step.type.name,
@@ -687,30 +690,27 @@ class LocalRouteRepository implements RouteSearchRepository {
         .toList(growable: false);
   }
 
-  /// 로컬 폴백도 백엔드 `StairAccess`와 같은 어휘로 계단 상태를 말한다(#2590).
+  /// 로컬 경로의 계단 판정. 백엔드 `StairAccess`와 같은 격자다(#2590).
   ///
-  /// 로컬 그래프는 계단 상태가 명시되지 않은 승차 edge를 `stepFree`로 기본 파생한다
-  /// (`RouteEdge` 생성자). 그건 "확인된 무단차"가 아니라 "계단 장벽이 놓이지 않는
-  /// 구간"이라는 뜻이므로 표시 어휘에서도 그대로 말한다. 데이터팩이 승차 edge에
-  /// 계단 상태를 명시했으면(예: `UNKNOWN`) 그 판단이 우선이라 건드리지 않는다.
+  /// 승차와 경유 경계 표식은 오르내릴 계단 자체가 없어 미확인이 아니라 비적용이다.
+  /// 로컬 그래프는 계단 상태가 명시되지 않은 승차 edge를 `stepFree`로 기본 파생하는데
+  /// (`RouteEdge` 생성자) 그건 "확인된 무단차"가 아니라 "계단 장벽이 놓이지 않는
+  /// 구간"이라는 뜻이다. 데이터팩이 승차 edge에 계단 상태를 명시했으면(예: `UNKNOWN`)
+  /// 그 판단이 우선이라 건드리지 않는다.
+  ///
+  /// 나머지 구간은 계단 사실과 그 사실을 확인했는지를 함께 본다. 종전에는 계단 사실만
+  /// 옮겨 적고 확인 필요 표기는 `entry`·`exit`인지로만 정해, 검증된 동선에 확인 필요가
+  /// 붙거나 검증되지 않은 동선이 무단차로 적히는 어긋남이 같은 칩 행에서 났다.
   String _stairAccessStateOf(route_step.RouteStep step) {
-    return step.type == route_step.RouteStepType.ride &&
-            step.stairAccessState == 'stepFree'
-        ? 'notApplicable'
-        : step.stairAccessState;
-  }
-
-  /// 로컬 경로의 "확인 필요"도 실제 접근성 근거에서 파생한다(#2590).
-  ///
-  /// 종전에는 `entry`·`exit`이면 근거와 무관하게 참이라, 데이터팩이 검증한 무단차
-  /// 동선까지 `엘리베이터 상태를 살펴봐 주세요`가 붙어 같은 칩 행의 계단 표기와 어긋났다.
-  /// 반대로 환승·연결 동선은 근거와 무관하게 거짓이라 미확인 구간이 조용히 넘어갔다.
-  /// 승차와 경유 경계 표식은 오르내릴 계단 자체가 없어 확인 대상이 아니다.
-  bool _requiresAccessibilityCheck(route_step.RouteStep step) {
     return switch (step.type) {
-      route_step.RouteStepType.ride ||
-      route_step.RouteStepType.waypoint => false,
-      _ => !step.accessibilityVerified,
+      route_step.RouteStepType.ride || route_step.RouteStepType.waypoint =>
+        step.stairAccessState == 'stepFree'
+            ? 'notApplicable'
+            : step.stairAccessState,
+      _ =>
+        step.stairAccessState == 'stepFree' && !step.accessibilityVerified
+            ? 'unknown'
+            : step.stairAccessState,
     };
   }
 
