@@ -3,11 +3,100 @@ import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 
+import 'catalog_schema_diagnostics.dart';
 import 'catalog_tables.dart';
 
 part 'catalog_database.g.dart';
 
 const catalogDatabaseSchemaVersion = 18;
+
+/// `transit_feed_info.feed_end_date`의 `YYYYMMDD` 형식 판정(#2530).
+///
+/// 형식을 통과하지 못한 값(`NULL`·`2026-12-31` 등)은 유효기간 비교에서 어떤
+/// 기준일에도 참이 될 수 없다. 값 존재 판정과 조립되는 필터가 같은 조건을 써야
+/// "행은 있는데 결과만 사라지는" 상태가 생기지 않는다.
+const transitFeedEndDateGlob = '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]';
+
+/// drift 선언 밖에서 raw SQL로만 읽는 카탈로그 테이블(#2527).
+///
+/// `@DriftDatabase(tables: [...])`에 없으므로 `allTables`에 잡히지 않는다. 판정 기준집합을
+/// drift 선언으로만 잡으면 이 세 테이블의 결측은 게이트도 구제도 거부도 하지 못한 채 통과한다.
+/// 그래서 필수 테이블 집합은 `allTables ∪ rawSqlCatalogTableNames`로 잡는다.
+///
+/// 이 목록의 정본 대조본은 `contracts/datapack/catalog-raw-sql-tables.json`이고,
+/// `tools/ci/check-pack-app-schema-parity.mjs`가 앱 소스의 raw SQL을 훑어 두 목록과
+/// 실제 코드가 어긋나지 않는지 CI에서 검증한다.
+const rawSqlCatalogTableNames = <String>{
+  'route_map_positions',
+  'route_map_line_tracks',
+  'transit_feed_info',
+};
+
+/// 팩에 없어도 앱이 빈 테이블로 만들어 여는 카탈로그 테이블(#2527).
+///
+/// 팩의 `PRAGMA user_version`이 [catalogDatabaseSchemaVersion]과 같으면 drift는 onCreate도
+/// onUpgrade도 돌리지 않는다. 즉 팩이 빠뜨린 테이블은 앱이 만들 기회를 영영 얻지 못한다.
+/// 그 결측을 어디까지 메울지는 "빈 테이블이 안전한가"로만 가른다.
+///
+/// 등재 기준: 그 테이블이 비어 있을 때 해당 기능만 "근거 없음"으로 강등되고, 다른 도메인의
+/// 정상 데이터를 필터·JOIN·EXISTS로 소거하지 않아야 한다.
+/// - 요금 4테이블: 앱 `lib`에 읽는 쿼리가 없다(경로 화면 요금은 `official_od_fare_quotes`에서
+///   온다). 앱이 쓰는 쪽은 수도권 baseline 요금 backfill뿐이라 빈 테이블이 안전하다.
+/// - 시설 근거·시설 상태 2테이블: 비면 접근성 근거 없음으로 강등되며, 이는 지금의 결측 가드가
+///   이미 만들고 있는 상태와 같다.
+/// - 역 내부 경로 2테이블·환승 규칙 1테이블: 앱 `lib`에 읽는 쿼리가 없어 빈 테이블이 어떤
+///   조회 결과도 바꾸지 않는다.
+/// - 노선도 2테이블: 노선도 화면의 구동 테이블이라 비면 그 화면이 빈 상태가 되지만, 역 검색·
+///   경로 탐색·시간표 등 다른 도메인의 정상 데이터는 소거되지 않는다. 결측이면 조회가 아예
+///   예외로 죽으므로 빈 테이블 구제가 현행보다 안전하고, 앱에는 이미
+///   `_createRouteMapPositionsTable()`·`_createRouteMapLineTracksTable()` 선례가 있다.
+///
+/// 구제 결과는 조용하지 않아야 한다 — 무엇이 빈 테이블로 대체됐는지
+/// [CatalogSchemaDiagnostics]가 세션당 한 번 남긴다.
+const rescuableCatalogTableNames = <String>{
+  'fare_zones',
+  'fare_rules',
+  'fare_discounts',
+  'station_fare_zones',
+  'station_facility_evidence',
+  'facility_status_snapshots',
+  'station_pathway_nodes',
+  'station_pathway_edges',
+  'transfer_rules',
+  'route_map_positions',
+  'route_map_line_tracks',
+};
+
+/// 없어도 팩을 거부하지 않지만 빈 테이블로 만들어서도 안 되는 카탈로그 테이블(#2527).
+///
+/// `transit_feed_info`가 유일하다. 빈 테이블을 만들면 시간표 쿼리가 붙이는 유효기간 필터가
+/// 어떤 기준일에도 참이 될 수 없어 시간표가 전부 사라지므로 구제 대상이 될 수 없다. 반대로
+/// 결측을 이유로 팩 전체를 거부하면 과잉 대응이다 — 결측 시 필터를 생략하는 쿼리 가드
+/// 대칭화는 #2530이 [hasTransitFeedValidityWindow]로 이미 넣었다. 그래서 "만들지도 않고
+/// 막지도 않는" 제3의 분류로 둔다.
+const absenceTolerantCatalogTableNames = <String>{'transit_feed_info'};
+
+/// 팩에 없는 필수 카탈로그 테이블을 처리 방식별로 나눈 결과(#2527).
+class CatalogSchemaRescuePlan {
+  const CatalogSchemaRescuePlan({
+    required this.rescuableMissingTables,
+    required this.toleratedMissingTables,
+    required this.blockingMissingTables,
+  });
+
+  /// 빈 테이블로 만들어도 안전한 결측 테이블.
+  final Set<String> rescuableMissingTables;
+
+  /// 만들지 않고 그대로 두는 결측 테이블([absenceTolerantCatalogTableNames]).
+  final Set<String> toleratedMissingTables;
+
+  /// 빈 테이블 생성이 안전하지 않아 팩 자체를 거부해야 하는 결측 테이블.
+  final Set<String> blockingMissingTables;
+
+  bool get isBlocked => blockingMissingTables.isNotEmpty;
+
+  bool get hasRescuableMissingTables => rescuableMissingTables.isNotEmpty;
+}
 
 /// 수도권 통합요금 기본거리(10km) 초과분 요금 단계(#1911).
 ///
@@ -72,6 +161,7 @@ class CatalogDatabase extends _$CatalogDatabase {
 
   Set<String> _routeNetworkEdgeColumnNames = const {};
   Set<String> _routeFacilityColumnNames = const {};
+  Future<String?>? _transitFeedEndDate;
 
   Set<String> get routeNetworkEdgeColumnNames => _routeNetworkEdgeColumnNames;
   Set<String> get routeFacilityColumnNames => _routeFacilityColumnNames;
@@ -188,9 +278,163 @@ class CatalogDatabase extends _$CatalogDatabase {
     _routeFacilityColumnNames = await _tableColumnNames('facilities');
   }
 
+  /// 이 카탈로그에서 읽을 수 있는 피드 종료일(`YYYYMMDD`)을 돌려준다(#2530).
+  ///
+  /// `transit_feed_info`는 데이터팩만 제공하는 테이블이라 앱 drift 선언에 없다.
+  /// 테이블이 없거나, `feed_end_date` 열이 없거나, `YYYYMMDD` 형식 행이 하나도
+  /// 없으면(행 0·`NULL`·형식 불일치 포함) "피드 정보 없음"으로 보고 `null`을
+  /// 돌려준다. 형식을 통과하지 못한 값은 유효기간 비교에 쓰면 어떤 기준일에도
+  /// 참이 될 수 없어, 값이 있다고 보면 결과가 통째로 사라진다.
+  ///
+  /// 여러 행이 있으면 가장 늦은 종료일을 고른다. 팩 스키마는 단일 행을 강제하지만
+  /// 이 함수의 전제는 "앱이 만들지 않은 카탈로그"이므로 판정을 결정적으로 둔다.
+  ///
+  /// 결과는 이 인스턴스에 캐시한다. 카탈로그 교체는 새 `CatalogDatabase`를 열므로
+  /// (`CatalogDatabaseOpener`) 캐시는 설치된 팩 단위로 무효화된다. 조회가 실패하면
+  /// 캐시를 비워 다음 호출이 다시 시도한다 — 일시적 SQLite 오류 하나가 인스턴스
+  /// 수명 내내 고정되지 않게 한다.
+  Future<String?> transitFeedEndDate() async {
+    final cached = _transitFeedEndDate;
+    if (cached != null) {
+      return cached;
+    }
+    final pending = _readTransitFeedEndDate();
+    _transitFeedEndDate = pending;
+    try {
+      return await pending;
+    } on Object {
+      _transitFeedEndDate = null;
+      rethrow;
+    }
+  }
+
+  /// 피드 유효기간 필터를 걸 수 있는지 알린다(#2530).
+  ///
+  /// `transitFeedEndDate()`가 `null`이면 호출자는 유효기간 필터를 조립하지 않는다.
+  Future<bool> hasTransitFeedValidityWindow() async {
+    return await transitFeedEndDate() != null;
+  }
+
+  Future<String?> _readTransitFeedEndDate() async {
+    final columnNames = await _tableColumnNames('transit_feed_info');
+    if (!columnNames.contains('feed_end_date')) {
+      return null;
+    }
+    final row = await customSelect('''
+      SELECT feed_end_date
+      FROM transit_feed_info
+      WHERE feed_end_date GLOB '$transitFeedEndDateGlob'
+      ORDER BY feed_end_date DESC
+      LIMIT 1
+      ''').getSingleOrNull();
+    return row?.read<String>('feed_end_date');
+  }
+
   Future<Set<String>> _tableColumnNames(String tableName) async {
     final rows = await customSelect('PRAGMA table_info($tableName)').get();
     return Set.unmodifiable({for (final row in rows) row.read<String>('name')});
+  }
+
+  /// 앱이 팩에 있기를 요구하는 카탈로그 테이블 전체(#2527).
+  ///
+  /// drift 선언만으로는 raw SQL로 읽는 테이블이 빠지므로 [rawSqlCatalogTableNames]를 합친다.
+  Set<String> get requiredCatalogTableNames => {
+    for (final table in allTables) table.actualTableName,
+    ...rawSqlCatalogTableNames,
+  };
+
+  /// 팩에 없는 필수 카탈로그 테이블을 구제/허용/거부로 분류한다(#2527).
+  ///
+  /// 읽기 전용이다. 호출자가 이 팩을 활성화할지 먼저 판정하고, 활성화가 확정된 뒤에만
+  /// [rescueMissingCatalogTables]로 실제 DDL을 실행한다.
+  Future<CatalogSchemaRescuePlan> planCatalogSchemaRescue() async {
+    final rows = await customSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table'",
+    ).get();
+    final present = {for (final row in rows) row.read<String>('name')};
+    final rescuable = <String>{};
+    final tolerated = <String>{};
+    final blocking = <String>{};
+    for (final name in requiredCatalogTableNames) {
+      if (present.contains(name)) {
+        continue;
+      }
+      if (rescuableCatalogTableNames.contains(name)) {
+        rescuable.add(name);
+      } else if (absenceTolerantCatalogTableNames.contains(name)) {
+        tolerated.add(name);
+      } else {
+        blocking.add(name);
+      }
+    }
+    return CatalogSchemaRescuePlan(
+      rescuableMissingTables: rescuable,
+      toleratedMissingTables: tolerated,
+      blockingMissingTables: blocking,
+    );
+  }
+
+  /// 구제 가능한 결측 테이블을 빈 테이블로 만든다(#2527).
+  ///
+  /// 번들 경로와 설치 경로 양쪽에서 같은 함수를 호출한다. 구제 불가 결측이 함께 있어도
+  /// 구제 가능분은 만든다 — 무관한 테이블 하나의 결측이 요금 테이블 생성과 그 뒤의 baseline
+  /// 요금 backfill까지 함께 끄던 결합을 만들지 않기 위해서다. 팩을 거부할지는 호출자가
+  /// [planCatalogSchemaRescue]로 따로 판정한다.
+  ///
+  /// 결측이 없으면 sqlite_master 조회 한 번으로 끝나므로 반복 호출해도 비용이 없다.
+  Future<CatalogSchemaRescuePlan> rescueMissingCatalogTables() async {
+    final plan = await planCatalogSchemaRescue();
+    if (!plan.hasRescuableMissingTables) {
+      return plan;
+    }
+    final migrator = createMigrator();
+    for (final table in allTables) {
+      if (!plan.rescuableMissingTables.contains(table.actualTableName)) {
+        continue;
+      }
+      await migrator.createTable(table);
+    }
+    await _createRescuedRawSqlTables(plan.rescuableMissingTables);
+    await _createRescuedTableIndexes(plan.rescuableMissingTables);
+    // 접근성 근거가 빈 테이블로 대체된 상태를 관측 가능하게 남긴다.
+    CatalogSchemaDiagnostics.instance.recordSchemaRescue(
+      plan.rescuableMissingTables,
+    );
+    return plan;
+  }
+
+  Future<void> _createRescuedRawSqlTables(Set<String> tableNames) async {
+    if (tableNames.contains('route_map_positions')) {
+      await _createRouteMapPositionsTable();
+    }
+    if (tableNames.contains('route_map_line_tracks')) {
+      await _createRouteMapLineTracksTable();
+    }
+  }
+
+  /// 구제한 테이블에는 `onCreate`가 그 테이블에 만들어 주는 인덱스만 만든다(#2527).
+  ///
+  /// `route_map_line_tracks`는 `onCreate`도 인덱스를 만들지 않으므로 여기서도 만들지 않는다.
+  /// 팩 스키마 원본이 선언한 `idx_route_map_line_tracks_region_line` 결측은 팩 재빌드로 푼다.
+  Future<void> _createRescuedTableIndexes(Set<String> tableNames) async {
+    if (tableNames.contains('station_facility_evidence')) {
+      await _createStationFacilityEvidenceIndexes();
+    }
+    if (tableNames.contains('facility_status_snapshots')) {
+      await _createFacilityStatusSnapshotIndexes();
+    }
+    if (tableNames.contains('station_pathway_nodes')) {
+      await _createStationPathwayNodeIndexes();
+    }
+    if (tableNames.contains('station_pathway_edges')) {
+      await _createStationPathwayEdgeIndexes();
+    }
+    if (tableNames.contains('transfer_rules')) {
+      await _createTransferRuleIndexes();
+    }
+    if (tableNames.contains('route_map_positions')) {
+      await _createRouteMapPositionIndexes();
+    }
   }
 
   Future<void> seedBaselineIfEmpty() async {
@@ -201,7 +445,9 @@ class CatalogDatabase extends _$CatalogDatabase {
       await _backfillBaselineAccessEdges();
       await _backfillBaselineNetworkEdgeEvidence();
       await _backfillBaselineRouteMapPositions();
-      await _createFareTablesIfMissing();
+      // 요금 backfill이 요금 테이블 존재를 전제하므로 여기서도 구제를 돌린다.
+      // 열기 경로에서 이미 돌았다면 sqlite_master 조회 한 번으로 끝난다.
+      await rescueMissingCatalogTables();
       await _backfillBaselineFareRules();
       await _backfillBaselineStationExitMapData();
       return;
@@ -614,57 +860,6 @@ class CatalogDatabase extends _$CatalogDatabase {
     });
   }
 
-  Future<void> _createFareTablesIfMissing() async {
-    await customStatement('''
-      CREATE TABLE IF NOT EXISTS fare_zones (
-        id TEXT NOT NULL PRIMARY KEY,
-        name_ko TEXT NOT NULL,
-        region TEXT NOT NULL,
-        currency_code TEXT NOT NULL DEFAULT 'KRW',
-        source_id TEXT NOT NULL DEFAULT ''
-      )
-    ''');
-    await customStatement('''
-      CREATE TABLE IF NOT EXISTS fare_rules (
-        id TEXT NOT NULL PRIMARY KEY,
-        zone_id TEXT NOT NULL,
-        base_card_fare INTEGER NOT NULL,
-        base_cash_fare INTEGER NOT NULL,
-        base_distance_meters INTEGER NOT NULL,
-        additional_steps_json TEXT NOT NULL DEFAULT '[]',
-        FOREIGN KEY (zone_id) REFERENCES fare_zones(id),
-        CHECK (base_card_fare >= 0),
-        CHECK (base_cash_fare >= 0),
-        CHECK (base_distance_meters >= 0)
-      )
-    ''');
-    await customStatement('''
-      CREATE TABLE IF NOT EXISTS fare_discounts (
-        id TEXT NOT NULL PRIMARY KEY,
-        zone_id TEXT NOT NULL,
-        rider_type TEXT NOT NULL,
-        card_fare INTEGER,
-        cash_fare INTEGER,
-        free_ride INTEGER NOT NULL DEFAULT 0 CHECK (free_ride IN (0, 1)),
-        description_ko TEXT NOT NULL DEFAULT '',
-        FOREIGN KEY (zone_id) REFERENCES fare_zones(id),
-        CHECK (card_fare IS NULL OR card_fare >= 0),
-        CHECK (cash_fare IS NULL OR cash_fare >= 0)
-      )
-    ''');
-    await customStatement('''
-      CREATE TABLE IF NOT EXISTS station_fare_zones (
-        station_id TEXT NOT NULL,
-        line_id TEXT NOT NULL,
-        zone_id TEXT NOT NULL,
-        PRIMARY KEY (station_id, line_id),
-        FOREIGN KEY (station_id, line_id)
-          REFERENCES station_lines(station_id, line_id),
-        FOREIGN KEY (zone_id) REFERENCES fare_zones(id)
-      )
-    ''');
-  }
-
   Future<bool> _shouldBackfillBaselineFareRules() async {
     final rows = await customSelect('''
       SELECT name
@@ -1030,10 +1225,7 @@ class CatalogDatabase extends _$CatalogDatabase {
       'CREATE INDEX IF NOT EXISTS idx_network_edges_from_node '
       'ON network_edges(from_node_id)',
     );
-    await customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_route_map_positions_region_line '
-      'ON route_map_positions(region, line_id)',
-    );
+    await _createRouteMapPositionIndexes();
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_facilities_station '
       'ON facilities(station_id)',
@@ -1046,6 +1238,13 @@ class CatalogDatabase extends _$CatalogDatabase {
     );
     await _createStationPathwayIndexes();
     await _createStationCarDoorHintIndexes();
+  }
+
+  Future<void> _createRouteMapPositionIndexes() async {
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_route_map_positions_region_line '
+      'ON route_map_positions(region, line_id)',
+    );
   }
 
   Future<void> _createStationCarDoorHintIndexes() async {
@@ -1078,14 +1277,26 @@ class CatalogDatabase extends _$CatalogDatabase {
   }
 
   Future<void> _createStationPathwayIndexes() async {
+    await _createStationPathwayNodeIndexes();
+    await _createStationPathwayEdgeIndexes();
+    await _createTransferRuleIndexes();
+  }
+
+  Future<void> _createStationPathwayNodeIndexes() async {
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_station_pathway_nodes_station '
       'ON station_pathway_nodes(station_id, line_id, node_type)',
     );
+  }
+
+  Future<void> _createStationPathwayEdgeIndexes() async {
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_station_pathway_edges_from '
       'ON station_pathway_edges(from_node_id)',
     );
+  }
+
+  Future<void> _createTransferRuleIndexes() async {
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_transfer_rules_from_line '
       'ON transfer_rules(from_station_id, from_line_id)',
@@ -1114,7 +1325,9 @@ class CatalogDatabase extends _$CatalogDatabase {
         attribution_required INTEGER NOT NULL DEFAULT 1 CHECK (attribution_required IN (0, 1)),
         reviewed_at INTEGER,
         updated_at INTEGER,
-        PRIMARY KEY (station_id, line_id, region)
+        PRIMARY KEY (station_id, line_id, region),
+        FOREIGN KEY (station_id, line_id)
+          REFERENCES station_lines(station_id, line_id)
       )
       ''');
   }
@@ -1137,7 +1350,8 @@ class CatalogDatabase extends _$CatalogDatabase {
         commercial_use_allowed INTEGER NOT NULL DEFAULT 0 CHECK (commercial_use_allowed IN (0, 1)),
         attribution_required INTEGER NOT NULL DEFAULT 1 CHECK (attribution_required IN (0, 1)),
         updated_at INTEGER,
-        PRIMARY KEY (region, line_id, track_index)
+        PRIMARY KEY (region, line_id, track_index),
+        FOREIGN KEY (line_id) REFERENCES lines(id)
       )
       ''');
   }

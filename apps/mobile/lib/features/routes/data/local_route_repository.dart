@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:isolate';
 
 import '../../../core/database/catalog/catalog_database.dart';
+import '../../../core/database/catalog/catalog_schema_diagnostics.dart';
 import '../../../mobile_error_reporter.dart';
 import '../../../route_hedge_labels.dart';
 import '../../../route_search.dart';
@@ -2952,6 +2953,18 @@ String _selectNetworkEdgeColumn(
   return columnNames.contains(columnName) ? columnName : fallbackExpression;
 }
 
+/// 결측 시 조회를 건너뛰는 가드. 조용한 강등을 진단 신호로 남긴다(#2527).
+Future<bool> _tableExistsForRead(
+  CatalogDatabase database,
+  String tableName,
+) async {
+  if (await _tableExists(database, tableName)) {
+    return true;
+  }
+  CatalogSchemaDiagnostics.instance.recordMissingTableRead(tableName);
+  return false;
+}
+
 Future<bool> _tableExists(CatalogDatabase database, String tableName) async {
   final row = await database.customSelect('''
         SELECT name
@@ -3205,7 +3218,7 @@ String _effectiveFacilityStatus({
 }
 
 Future<Set<String>> _eligibleFacilityEvidence(CatalogDatabase database) async {
-  if (!await _tableExists(database, 'station_facility_evidence')) {
+  if (!await _tableExistsForRead(database, 'station_facility_evidence')) {
     return const {};
   }
   final rows = await database.customSelect('''
@@ -3227,7 +3240,7 @@ Future<Set<String>> _eligibleFacilityEvidence(CatalogDatabase database) async {
 Future<_FacilityStatusSnapshotIndex> _facilityStatusSnapshots(
   CatalogDatabase database,
 ) async {
-  if (!await _tableExists(database, 'facility_status_snapshots')) {
+  if (!await _tableExistsForRead(database, 'facility_status_snapshots')) {
     return const _FacilityStatusSnapshotIndex.empty();
   }
   final nowSeconds = DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
@@ -3275,7 +3288,7 @@ Future<_FacilityStatusSnapshotIndex> _facilityStatusSnapshots(
 Future<Map<String, List<_FacilityStatusSnapshot>>> _allFacilityStatusSnapshots(
   CatalogDatabase database,
 ) async {
-  if (!await _tableExists(database, 'facility_status_snapshots')) {
+  if (!await _tableExistsForRead(database, 'facility_status_snapshots')) {
     return const {};
   }
   final rows = await database.customSelect('''
