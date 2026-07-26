@@ -1,5 +1,4 @@
 import 'package:drift/drift.dart';
-import 'package:sqlite3/common.dart' show SqliteException;
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -226,23 +225,16 @@ class NextTrainWidgetRepository {
     );
   }
 
+  /// 피드 종료일 판정은 카탈로그 쪽 단일 경로(`transitFeedEndDate()`)를 쓴다(#2530).
+  /// 테이블·열 결측을 예외 메시지 문자열로 판정하지 않고, `NULL`·형식 불일치 값도
+  /// 같은 자리에서 "피드 정보 없음"으로 걸러진다. 그 밖의 SQLite 오류는 그대로
+  /// 전파된다.
   Future<tz.TZDateTime?> _feedEndDate() async {
-    late final QueryRow? row;
-    try {
-      row = await catalogDatabase
-          .customSelect('SELECT feed_end_date FROM transit_feed_info LIMIT 1')
-          .getSingleOrNull();
-    } on SqliteException catch (error) {
-      if (error.message != 'no such table: transit_feed_info' &&
-          error.message != 'no such column: feed_end_date') {
-        rethrow;
-      }
+    final feedEndDate = await catalogDatabase.transitFeedEndDate();
+    if (feedEndDate == null) {
       return null;
     }
-    if (row == null) {
-      return null;
-    }
-    return _parseServiceDate(row.read<String>('feed_end_date'));
+    return _parseServiceDate(feedEndDate);
   }
 
   Future<List<CatalogStationDeparture>> _departures({

@@ -93,6 +93,16 @@ while IFS= read -r file; do
       ios=true
       deploy=true
       ;;
+    tools/mobile/**)
+      # tools/mobile은 Android 릴리즈 산출물 가드(dart-define 검증, 16KB page size,
+      # ELF load 정렬)와 status voice 인벤토리를 담는다(#2518).
+      # repository=true: 이 스크립트를 읽고 실행하는 계약 테스트가 스킵되면 안 된다.
+      # android=true: 가드를 실제로 실행하는 소비자는 release-artifacts.yml의
+      #   android-release job(if: android || mobile)이다. mobile=true는 tools/mobile을
+      #   소비하지 않는 Flutter mobile-app job까지 깨우므로 올리지 않는다.
+      repository=true
+      android=true
+      ;;
     tools/route-map/**|tools/routes/**)
       repository=true
       route_map=true
