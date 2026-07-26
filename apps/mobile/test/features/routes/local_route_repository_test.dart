@@ -2369,6 +2369,14 @@ void main() {
     // 같은 칩 행이 서로 다른 말을 하지 않는다.
     expect(result.stairAccessLabel, '계단 없는 길이에요');
     expect(result.accessibilityBadgeLabel, '계단 없는 경로 확인');
+    // 확인 필요 표기에 매달려 있던 화면 구조도 함께 따라온다: 하차 동선이 별도
+    // 도착 안내 카드로 빠지지 않고 이동 목록에 남는다.
+    expect(result.arrivalGuidanceStep, isNull);
+    expect(result.movementSteps.length, result.steps.length);
+    expect(
+      result.steps.map((step) => step.burdenLabel),
+      everyElement(isNot(contains('엘리베이터 안내 미확인'))),
+    );
   });
 
   test('#2590 근거가 없는 접근 동선은 로컬에서 확인 필요로 남는다', () async {
