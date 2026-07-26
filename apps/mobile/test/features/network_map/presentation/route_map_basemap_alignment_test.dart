@@ -281,4 +281,78 @@ void main() {
       );
     }
   });
+
+  // (E)(F) 대전·광주 전 역: seoul(B)·busan(C)·daegu(D)와 동일 하드 게이트를 남은
+  // 두 권역에 미러한다(#2068 오너 재제작 v3 반입). 두 권역은 이번 반입 전까지
+  // 이 게이트가 없었고, 실제로 광주는 respace가 팩 좌표를 오너 SVG 노드에서
+  // 최대 25.81px 밀어낸 상태였다(run-sma-pipeline-gwangju.sh에 --pin-stations가
+  // 빠져 있었다 — 5권역 중 대전·광주만). 두 스크립트에 --pin-stations를 붙여
+  // 다른 3권역과 같은 모드로 맞춘 뒤 실측 delta는 전 역 0px다.
+  //
+  // 대전은 오너가 v3에서 지도 본문을 map-content-positioned-layer(translate(0 88))
+  // 로 감쌌다 — 컴파일러가 그 래퍼를 흡수하지 않으면 .vec와 라벨 sidecar만 88px
+  // 위로 어긋나고 이 fixture(팩↔SVG 배정)는 여전히 0px이라 못 잡는다. 그 축은
+  // compile-basemap-vec.test.mjs의 compiled-map-coordinate-layer 계약이 잡는다.
+  const minDaejeonStationCoverage = 22; // 대전 1호선 22행 전수.
+  const minGwangjuStationCoverage = 20; // 광주 1호선 20행 전수.
+
+  for (final (label, regionKey, geometry, fixturePath, minCoverage)
+      in <(String, String, String, String, int)>[
+        (
+          'E',
+          '대전권',
+          'easy-subway-daejeon-v3-geometry.json',
+          'daejeon-alignment-fixture.json',
+          minDaejeonStationCoverage,
+        ),
+        (
+          'F',
+          '광주권',
+          'easy-subway-gwangju-v3-geometry.json',
+          'gwangju-alignment-fixture.json',
+          minGwangjuStationCoverage,
+        ),
+      ]) {
+    test(
+      '($label) $regionKey 바탕(SVG 배정) ↔ 인터랙션(팩) 좌표가 같은 viewBox 좌표계 — 전 역 하드 <5px',
+      () {
+        final file = File('../../tools/route-map/route-map-defs/$fixturePath');
+        expect(
+          file.existsSync(),
+          isTrue,
+          reason:
+              'fixture 없음 — node tools/route-map/generate-basemap-alignment-fixture.mjs '
+              '--region $regionKey --geometry tools/route-map/route-map-defs/$geometry '
+              '--out tools/route-map/route-map-defs/$fixturePath 로 생성 필요: ${file.path}',
+        );
+        final fixture =
+            jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+        final entries = (fixture['entries'] as List)
+            .cast<Map<String, dynamic>>();
+
+        expect(
+          entries.length,
+          greaterThanOrEqualTo(minCoverage),
+          reason:
+              'fixture 커버리지 급감 — canonical 정합이 대량 깨졌을 가능성(entries=${entries.length})',
+        );
+        expect(
+          fixture['unmatchedCount'],
+          0,
+          reason: '$regionKey 팩 행 중 SVG 배정이 없는 역이 생겼다(미매핑 회귀)',
+        );
+
+        for (final e in entries) {
+          final delta = (e['deltaPx'] as num).toDouble();
+          expect(
+            delta,
+            lessThan(alignmentThresholdPx),
+            reason:
+                '${e['name']}(${e['stationId']}/${e['lineId']}): svg=(${e['svgX']},${e['svgY']}) '
+                'pack=(${e['packX']},${e['packY']}) delta=$delta',
+          );
+        }
+      },
+    );
+  }
 }

@@ -9103,230 +9103,203 @@
     ],
     "daejeon": [
       {
-        "station": "2호선 201 서대전",
-        "role": "transfer",
-        "x": 1680,
-        "y": 1498,
-        "anchor": "middle",
-        "fontSizePx": 14.2,
-        "lines": []
-      },
-      {
-        "station": "2호선 214 오정",
-        "role": "transfer",
-        "x": 1980,
-        "y": 591.2,
-        "anchor": "middle",
-        "fontSizePx": 14.2,
-        "lines": []
-      },
-      {
-        "station": "2호선 237 도마·복수",
-        "role": "transfer",
-        "x": 1284,
-        "y": 1412.4,
-        "anchor": "middle",
-        "fontSizePx": 14.2,
-        "lines": []
-      },
-      {
         "station": "갈마",
         "role": "ordinary",
-        "x": 1076,
-        "y": 738,
+        "x": 1068.404,
+        "y": 821.727,
         "anchor": "start",
-        "fontSizePx": 54,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "갑천",
         "role": "ordinary",
-        "x": 1076,
-        "y": 378,
+        "x": 1068.404,
+        "y": 461.727,
         "anchor": "start",
-        "fontSizePx": 54,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "구암",
         "role": "ordinary",
-        "x": 1462,
-        "y": 182,
+        "x": 1432.1442,
+        "y": 308.1794,
         "anchor": "middle",
-        "fontSizePx": 54,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "노은",
         "role": "ordinary",
-        "x": 1616,
-        "y": 822,
+        "x": 1608.404,
+        "y": 905.727,
         "anchor": "start",
-        "fontSizePx": 54,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "대동",
-        "role": "transfer",
-        "x": 572,
-        "y": 740,
+        "role": "ordinary",
+        "x": 561.9728,
+        "y": 821.8649,
         "anchor": "start",
-        "fontSizePx": 58,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "대전",
-        "role": "transfer",
-        "x": 572,
-        "y": 920,
+        "role": "ordinary",
+        "x": 565.4656,
+        "y": 1001.5974,
         "anchor": "start",
-        "fontSizePx": 58,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "반석",
         "role": "terminal",
-        "x": 1616,
-        "y": 1243,
+        "x": 1608.076,
+        "y": 1326.295,
         "anchor": "start",
-        "fontSizePx": 57,
+        "fontSizePx": 34,
         "lines": [],
         "hasLineTerminalBadge": true
       },
       {
         "station": "서대전네거리",
-        "role": "transfer",
-        "x": 572,
-        "y": 1460,
+        "role": "ordinary",
+        "x": 561.2782,
+        "y": 1538.2529,
         "anchor": "start",
-        "fontSizePx": 58,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "시청",
         "role": "ordinary",
-        "x": 1076,
-        "y": 1098,
+        "x": 1068.404,
+        "y": 1181.727,
         "anchor": "start",
-        "fontSizePx": 54,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "신흥",
         "role": "ordinary",
-        "x": 572,
-        "y": 558,
+        "x": 565.4593,
+        "y": 641.727,
         "anchor": "start",
-        "fontSizePx": 54,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "오룡",
         "role": "ordinary",
         "x": 792,
-        "y": 1632,
+        "y": 1693.333,
         "anchor": "middle",
-        "fontSizePx": 54,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "용문",
         "role": "ordinary",
-        "x": 1076,
-        "y": 1458,
+        "x": 1068.404,
+        "y": 1541.727,
         "anchor": "start",
-        "fontSizePx": 54,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "월드컵경기장",
         "role": "ordinary",
-        "x": 1616,
-        "y": 612,
+        "x": 1608.404,
+        "y": 695.727,
         "anchor": "start",
-        "fontSizePx": 54,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "월평",
         "role": "ordinary",
-        "x": 1076,
-        "y": 558,
+        "x": 1068.404,
+        "y": 641.727,
         "anchor": "start",
-        "fontSizePx": 54,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "유성온천",
-        "role": "transfer",
-        "x": 1238,
-        "y": 182,
+        "role": "ordinary",
+        "x": 1258.8839,
+        "y": 308.4363,
         "anchor": "middle",
-        "fontSizePx": 58,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "정부청사",
-        "role": "transfer",
-        "x": 1076,
-        "y": 920,
+        "role": "ordinary",
+        "x": 1067.2947,
+        "y": 999.9447,
         "anchor": "start",
-        "fontSizePx": 58,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "중구청",
         "role": "ordinary",
-        "x": 572,
-        "y": 1278,
+        "x": 564.404,
+        "y": 1361.727,
         "anchor": "start",
-        "fontSizePx": 54,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "중앙로",
         "role": "ordinary",
-        "x": 572,
-        "y": 1098,
+        "x": 564.404,
+        "y": 1181.727,
         "anchor": "start",
-        "fontSizePx": 54,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "지족",
         "role": "ordinary",
-        "x": 1616,
-        "y": 1032,
+        "x": 1608.404,
+        "y": 1115.727,
         "anchor": "start",
-        "fontSizePx": 54,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "탄방",
         "role": "ordinary",
-        "x": 1076,
-        "y": 1278,
+        "x": 1068.404,
+        "y": 1361.727,
         "anchor": "start",
-        "fontSizePx": 54,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "판암",
         "role": "terminal",
-        "x": 572,
-        "y": 379,
+        "x": 564.076,
+        "y": 462.295,
         "anchor": "start",
-        "fontSizePx": 57,
+        "fontSizePx": 34,
         "lines": [],
         "hasLineTerminalBadge": true
       },
       {
         "station": "현충원",
         "role": "ordinary",
-        "x": 1616,
-        "y": 402,
+        "x": 1608.404,
+        "y": 485.727,
         "anchor": "start",
-        "fontSizePx": 54,
+        "fontSizePx": 34,
         "lines": []
       }
     ],
@@ -9334,572 +9307,183 @@
       {
         "station": "공항",
         "role": "ordinary",
-        "x": 302,
-        "y": 1139,
+        "x": 496,
+        "y": 1073.6,
         "anchor": "start",
-        "fontSizePx": 60,
-        "lines": []
-      },
-      {
-        "station": "광주공고",
-        "role": "ordinary",
-        "x": 1321.5817,
-        "y": 371.2406,
-        "anchor": "middle",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
-        "station": "광주교대",
-        "role": "ordinary",
-        "x": 1918,
-        "y": 588,
-        "anchor": "start",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
-        "station": "광주기독병원",
-        "role": "ordinary",
-        "x": 1748,
-        "y": 1114,
-        "anchor": "start",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
-        "station": "광주대",
-        "role": "ordinary",
-        "x": 1484,
-        "y": 1600,
-        "anchor": "start",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
-        "station": "광주법원·검찰청",
-        "role": "ordinary",
-        "x": 2060,
-        "y": 754,
-        "anchor": "start",
-        "fontSizePx": 14,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "광주송정역",
-        "role": "transfer",
-        "x": 302,
-        "y": 779,
+        "role": "ordinary",
+        "x": 496,
+        "y": 753.6,
         "anchor": "start",
-        "fontSizePx": 62,
-        "lines": []
-      },
-      {
-        "station": "광주역",
-        "role": "transfer",
-        "x": 1820,
-        "y": 486,
-        "anchor": "start",
-        "fontSizePx": 15,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "금남로4가",
         "role": "ordinary",
-        "x": 1490,
-        "y": 218,
+        "x": 1415,
+        "y": 287,
         "anchor": "middle",
-        "fontSizePx": 60,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "금남로5가",
         "role": "ordinary",
-        "x": 1122,
-        "y": 599,
+        "x": 1136,
+        "y": 593.6,
         "anchor": "start",
-        "fontSizePx": 60,
-        "lines": []
-      },
-      {
-        "station": "금호",
-        "role": "ordinary",
-        "x": 989.7188,
-        "y": 1075.0193,
-        "anchor": "start",
-        "fontSizePx": 14,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "김대중컨벤션센터",
         "role": "ordinary",
-        "x": 302,
-        "y": 1319,
+        "x": 496,
+        "y": 1233.6,
         "anchor": "start",
-        "fontSizePx": 48,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "남광주",
-        "role": "transfer",
-        "x": 1942,
-        "y": 679,
+        "role": "ordinary",
+        "x": 1746,
+        "y": 693.6,
         "anchor": "start",
-        "fontSizePx": 62,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "녹동",
         "role": "terminal",
-        "x": 1942,
-        "y": 1309,
+        "x": 1746,
+        "y": 1313.6,
         "anchor": "start",
-        "fontSizePx": 63,
+        "fontSizePx": 34,
         "lines": [],
         "hasLineTerminalBadge": true
       },
       {
         "station": "농성",
         "role": "ordinary",
-        "x": 1122,
-        "y": 1139,
+        "x": 1136,
+        "y": 1073.6,
         "anchor": "start",
-        "fontSizePx": 60,
-        "lines": []
-      },
-      {
-        "station": "대광여고",
-        "role": "ordinary",
-        "x": 1660,
-        "y": 1274,
-        "anchor": "start",
-        "fontSizePx": 14,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "도산",
         "role": "ordinary",
-        "x": 302,
-        "y": 599,
+        "x": 496,
+        "y": 593.6,
         "anchor": "start",
-        "fontSizePx": 60,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "돌고개",
         "role": "ordinary",
-        "x": 1122,
-        "y": 959,
+        "x": 1136,
+        "y": 913.6,
         "anchor": "start",
-        "fontSizePx": 60,
-        "lines": []
-      },
-      {
-        "station": "두암사거리",
-        "role": "ordinary",
-        "x": 2000,
-        "y": 694,
-        "anchor": "start",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
-        "station": "무등시장",
-        "role": "ordinary",
-        "x": 1520,
-        "y": 1129.3005,
-        "anchor": "middle",
-        "fontSizePx": 14,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "문화전당",
         "role": "ordinary",
-        "x": 1942,
-        "y": 469,
+        "x": 1746,
+        "y": 513.6,
         "anchor": "start",
-        "fontSizePx": 48,
-        "lines": []
-      },
-      {
-        "station": "방림",
-        "role": "ordinary",
-        "x": 1828,
-        "y": 1034,
-        "anchor": "start",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
-        "station": "백운광장",
-        "role": "transfer",
-        "x": 1640,
-        "y": 1123,
-        "anchor": "middle",
-        "fontSizePx": 15,
-        "lines": []
-      },
-      {
-        "station": "본촌산단",
-        "role": "ordinary",
-        "x": 959.2091,
-        "y": 550.1969,
-        "anchor": "middle",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
-        "station": "삼각",
-        "role": "ordinary",
-        "x": 1200,
-        "y": 370.8822,
-        "anchor": "middle",
-        "fontSizePx": 14,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "상무",
-        "role": "transfer",
-        "x": 302,
-        "y": 1499,
+        "role": "ordinary",
+        "x": 496,
+        "y": 1393.6,
         "anchor": "start",
-        "fontSizePx": 62,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "소태",
         "role": "ordinary",
-        "x": 1942,
-        "y": 1099,
+        "x": 1746,
+        "y": 1093.6,
         "anchor": "start",
-        "fontSizePx": 60,
-        "lines": []
-      },
-      {
-        "station": "송암공단",
-        "role": "ordinary",
-        "x": 1340,
-        "y": 1604,
-        "anchor": "middle",
-        "fontSizePx": 14,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "송정공원",
         "role": "ordinary",
-        "x": 302,
-        "y": 959,
+        "x": 496,
+        "y": 913.6,
         "anchor": "start",
-        "fontSizePx": 60,
-        "lines": []
-      },
-      {
-        "station": "수완",
-        "role": "ordinary",
-        "x": 280,
-        "y": 828,
-        "anchor": "start",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
-        "station": "시청",
-        "role": "ordinary",
-        "x": 658.4183,
-        "y": 818.3584,
-        "anchor": "middle",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
-        "station": "신가",
-        "role": "ordinary",
-        "x": 377.8023,
-        "y": 826.7738,
-        "anchor": "middle",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
-        "station": "신용",
-        "role": "ordinary",
-        "x": 476.8365,
-        "y": 553.3604,
-        "anchor": "middle",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
-        "station": "쌍암",
-        "role": "ordinary",
-        "x": 356.8365,
-        "y": 486.4955,
-        "anchor": "middle",
-        "fontSizePx": 14,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "쌍촌",
         "role": "ordinary",
-        "x": 1122,
-        "y": 1499,
+        "x": 1136,
+        "y": 1393.6,
         "anchor": "start",
-        "fontSizePx": 60,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "양동시장",
         "role": "ordinary",
-        "x": 1122,
-        "y": 779,
+        "x": 1136,
+        "y": 753.6,
         "anchor": "start",
-        "fontSizePx": 60,
-        "lines": []
-      },
-      {
-        "station": "양산산단",
-        "role": "ordinary",
-        "x": 840,
-        "y": 551.3462,
-        "anchor": "middle",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
-        "station": "양산우체국",
-        "role": "ordinary",
-        "x": 718.4183,
-        "y": 551.7787,
-        "anchor": "middle",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
-        "station": "오치주공",
-        "role": "ordinary",
-        "x": 1440,
-        "y": 370.8822,
-        "anchor": "middle",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
-        "station": "용두",
-        "role": "ordinary",
-        "x": 599.2091,
-        "y": 554.5096,
-        "anchor": "middle",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
-        "station": "운남",
-        "role": "ordinary",
-        "x": 500,
-        "y": 824,
-        "anchor": "middle",
-        "fontSizePx": 14,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "운천",
         "role": "ordinary",
-        "x": 670,
-        "y": 1750,
+        "x": 790,
+        "y": 1577,
         "anchor": "middle",
-        "fontSizePx": 60,
-        "lines": []
-      },
-      {
-        "station": "운천저수지",
-        "role": "ordinary",
-        "x": 900.8872,
-        "y": 1036.9849,
-        "anchor": "end",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
-        "station": "월드컵경기장",
-        "role": "ordinary",
-        "x": 1180,
-        "y": 1146.1371,
-        "anchor": "middle",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
-        "station": "유덕",
-        "role": "transfer",
-        "x": 580,
-        "y": 822,
-        "anchor": "middle",
-        "fontSizePx": 15,
-        "lines": []
-      },
-      {
-        "station": "응암공원",
-        "role": "ordinary",
-        "x": 160,
-        "y": 694,
-        "anchor": "end",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
-        "station": "일곡",
-        "role": "ordinary",
-        "x": 1078.4183,
-        "y": 367.2863,
-        "anchor": "middle",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
-        "station": "장덕",
-        "role": "ordinary",
-        "x": 160,
-        "y": 774,
-        "anchor": "end",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
-        "station": "전남대북문",
-        "role": "ordinary",
-        "x": 1559.2091,
-        "y": 370.4498,
-        "anchor": "middle",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
-        "station": "전남대후문",
-        "role": "ordinary",
-        "x": 1680,
-        "y": 369.3005,
-        "anchor": "middle",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
-        "station": "조선대",
-        "role": "ordinary",
-        "x": 2060,
-        "y": 874,
-        "anchor": "start",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
-        "station": "진월",
-        "role": "ordinary",
-        "x": 1660,
-        "y": 1374,
-        "anchor": "start",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
-        "station": "진월초교",
-        "role": "ordinary",
-        "x": 1588,
-        "y": 1492,
-        "anchor": "start",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
-        "station": "첨단",
-        "role": "ordinary",
-        "x": 244,
-        "y": 594,
-        "anchor": "end",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
-        "station": "치평",
-        "role": "ordinary",
-        "x": 740,
-        "y": 822,
-        "anchor": "middle",
-        "fontSizePx": 14,
+        "fontSizePx": 34,
         "lines": []
       },
       {
         "station": "평동",
         "role": "terminal",
-        "x": 302,
-        "y": 419,
+        "x": 496,
+        "y": 433.6,
         "anchor": "start",
-        "fontSizePx": 63,
+        "fontSizePx": 34,
         "lines": [],
         "hasLineTerminalBadge": true
       },
       {
-        "station": "풍금사거리",
-        "role": "ordinary",
-        "x": 1060,
-        "y": 1205.8102,
-        "anchor": "middle",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
-        "station": "풍암생활체육공원",
-        "role": "ordinary",
-        "x": 1374.4111,
-        "y": 1309.5289,
-        "anchor": "start",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
-        "station": "풍암호수공원",
-        "role": "ordinary",
-        "x": 1292.935,
-        "y": 1310.3198,
-        "anchor": "end",
-        "fontSizePx": 14,
-        "lines": []
-      },
-      {
         "station": "학동증심사입구",
         "role": "ordinary",
-        "x": 1942,
-        "y": 889,
+        "x": 1746,
+        "y": 873.6,
         "anchor": "start",
-        "fontSizePx": 48,
-        "lines": [
-          {
-            "text": "학동",
-            "x": 1942,
-            "y": 889
-          },
-          {
-            "text": "증심사입구",
-            "x": 1942,
-            "y": 944
-          }
-        ]
+        "fontSizePx": 34,
+        "lines": []
       },
       {
         "station": "화정",
         "role": "ordinary",
-        "x": 1122,
-        "y": 1319,
+        "x": 1136,
+        "y": 1233.6,
         "anchor": "start",
-        "fontSizePx": 60,
-        "lines": []
-      },
-      {
-        "station": "효천",
-        "role": "transfer",
-        "x": 1202,
-        "y": 1522,
-        "anchor": "end",
-        "fontSizePx": 15,
+        "fontSizePx": 34,
         "lines": []
       }
     ]
@@ -9916,7 +9500,23 @@
         "halfHeight": 13.056189406355372
       }
     ],
-    "daejeon": [],
-    "gwangju": []
+    "daejeon": [
+      {
+        "station": "대전역",
+        "x": 681.0683816000001,
+        "y": 988.46824847,
+        "halfWidth": 24.904488930000014,
+        "halfHeight": 15.638748469999996
+      }
+    ],
+    "gwangju": [
+      {
+        "station": "광주송정역",
+        "x": 678.5774716000001,
+        "y": 739.46109066,
+        "halfWidth": 24.904488930000014,
+        "halfHeight": 16.234423470000024
+      }
+    ]
   }
 }

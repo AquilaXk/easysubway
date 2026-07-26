@@ -4,6 +4,9 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:easysubway_mobile/core/database/user/user_database.dart'
     as user_db;
+// 정준 직렬화는 검증 대상 구현을 그대로 쓴다. 테스트가 규칙을 복제하면 3언어
+// 분열(이슈 #2528)을 구조적으로 검출할 수 없다.
+import 'package:easysubway_mobile/core/datapack/canonical_json.dart';
 import 'package:easysubway_mobile/core/datapack/data_pack_client.dart';
 import 'package:easysubway_mobile/core/datapack/data_pack_installer.dart';
 import 'package:easysubway_mobile/core/datapack/data_pack_manifest.dart';
@@ -444,7 +447,7 @@ Map<String, Object?> _signedV2PackManifest({
     'rollbackProvenance': ?rollbackProvenance,
     'packs': [pack],
   };
-  final canonical = jsonEncode(_canonicalValue(body));
+  final canonical = canonicalDataPackJson(body);
   return {
     ...body,
     'signature': {
@@ -452,18 +455,4 @@ Map<String, Object?> _signedV2PackManifest({
       'value': sha256.convert(utf8.encode(canonical)).toString(),
     },
   };
-}
-
-Object? _canonicalValue(Object? value) {
-  if (value == null || value is String || value is num || value is bool) {
-    return value;
-  }
-  if (value is List<Object?>) {
-    return value.map(_canonicalValue).toList(growable: false);
-  }
-  if (value is Map<String, Object?>) {
-    final keys = value.keys.toList()..sort();
-    return {for (final key in keys) key: _canonicalValue(value[key])};
-  }
-  throw ArgumentError('Unsupported canonical value: ${value.runtimeType}');
 }
