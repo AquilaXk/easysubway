@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
+import 'package:easysubway_mobile/core/datapack/canonical_json.dart';
 
 final _sha256Pattern = RegExp(r'^[a-f0-9]{64}$');
 
@@ -37,7 +38,7 @@ class DataPackManifest {
         : null;
     final keyId = manifestVersion == 2 ? _requiredString(json, 'keyId') : null;
     final signedCanonicalManifest = manifestVersion == 2
-        ? _canonicalJson(_withoutSignature(json))
+        ? canonicalDataPackJson(_withoutSignature(json))
         : null;
 
     final manifest = DataPackManifest(
@@ -76,7 +77,10 @@ class DataPackManifest {
           : null,
       rollout: manifestVersion == 2 ? _parseRollout(json['rollout']) : null,
     );
-    manifest._validateEnvelopeSignature(json, productionSigningPublicKey);
+    manifest._validateEnvelopeSignature(
+      signedCanonicalManifest,
+      productionSigningPublicKey,
+    );
     return manifest;
   }
 
@@ -101,14 +105,18 @@ class DataPackManifest {
     return expiry != null && !now.toUtc().isBefore(expiry);
   }
 
+  /// 파싱 시점에 이미 계산한 정준 문자열을 그대로 받는다. 서명 경계가 두 번
+  /// 계산되면 규칙이 갈라질 여지가 생기므로 계산 지점을 하나로 유지한다.
   void _validateEnvelopeSignature(
-    Map<String, Object?> json,
+    String? canonical,
     DataPackSigningPublicKey? productionSigningPublicKey,
   ) {
     if (manifestVersion != 2) {
       return;
     }
-    final canonical = _canonicalJson(_withoutSignature(json));
+    if (canonical == null) {
+      throw const FormatException('Invalid data pack manifest signature.');
+    }
     final parsedSignature = signature;
     if (parsedSignature == null) {
       throw const FormatException('Invalid data pack manifest signature.');
@@ -508,24 +516,6 @@ Map<String, Object?> _withoutSignature(Map<String, Object?> json) {
     for (final entry in json.entries)
       if (entry.key != 'signature') entry.key: entry.value,
   };
-}
-
-String _canonicalJson(Object? value) {
-  return jsonEncode(_canonicalValue(value));
-}
-
-Object? _canonicalValue(Object? value) {
-  if (value == null || value is String || value is num || value is bool) {
-    return value;
-  }
-  if (value is List<Object?>) {
-    return value.map(_canonicalValue).toList(growable: false);
-  }
-  if (value is Map<String, Object?>) {
-    final sortedKeys = value.keys.toList()..sort();
-    return {for (final key in sortedKeys) key: _canonicalValue(value[key])};
-  }
-  throw const FormatException('Invalid data pack manifest canonical value.');
 }
 
 bool _isAbsoluteHttpsWithHost(Uri uri) {
