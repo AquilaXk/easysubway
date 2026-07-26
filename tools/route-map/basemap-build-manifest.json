@@ -5,10 +5,12 @@
     "package": "vector_graphics_compiler",
     "version": "1.2.6"
   },
+  "pipelineRevision": 2,
   "content": {
-    "svgLayer": "route-lines-and-station-symbols",
+    "svgLayer": "owner-svg-map-body-layers",
     "stationSymbols": "owner-svg",
-    "labels": "owner-svg-anchor-with-solver-fallback",
+    "labels": "baked-into-vec",
+    "decoration": "excluded",
     "interaction": "route_map_positions"
   },
   "ownerLabelsSidecar": {

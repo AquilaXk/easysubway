@@ -46,6 +46,13 @@ const outDir = path.join(
 );
 const dartBin = process.env.DART_BIN ?? "dart";
 const compilerVersion = "1.2.6";
+// 바탕층 컴파일 파이프라인의 산출 의미 개정 번호(#2068 리뷰 M2, 2026-07-26).
+// compiler.version(=pubspec.lock에 잠긴 vector_graphics_compiler 패키지 버전)과
+// 분리해, "무엇을 굽는가"가 바뀔 때만 올린다.
+//   1 — 노선 형상 + 역 심벌만 굽던 시기(라벨은 앱 솔버가 그림)
+//   2 — 지도 본문 레이어 전수(역명 라벨·표장·중간표기·노선번호 배지 포함)를 굽고
+//       캔버스 장식은 명시 계약으로 제외(오너 결정 "글자도 복붙"·"장식 제거")
+const basemapPipelineRevision = 2;
 const buildManifestPath = path.join(
   root,
   "tools/route-map/basemap-build-manifest.json",
@@ -83,7 +90,10 @@ function normalizeFontWeightValue(raw) {
 //   1) 비표준 font-weight: 속성형·CSS 선언형 모두 가장 가까운 100 배수로.
 //   2) 다중값 x/y/dx/dy(예: <text dy="0 0 0 0">의 per-glyph 리스트): 컴파일러의
 //      DoubleOrPercentage.fromString은 단일 double만 파싱하므로 첫 토큰만 남긴다.
-//      (자작 SVG의 해당 값은 전부 0 리스트라 첫 토큰 축약이 시각적으로 무해하다.)
+//      (#2068 2026-07-26 정정: "해당 값은 전부 0 리스트"는 더 이상 사실이 아니다 —
+//      busan v3 벡스코가 `dy="0 0 … 59.27"`(19값)를 쓴다. 다만 그 라벨의 글자
+//      수(3)가 0이 아닌 값의 인덱스(18)보다 작아 렌더 결과는 여전히 동일하다.
+//      sidecar 추출도 firstCoordinateToken으로 같은 "첫 토큰만" 규칙을 쓴다.)
 //      `\b`가 아니라 앞에 `[\s"']` 경계를 둬 viewBox 등 다른 속성명은 건드리지 않는다.
 const supportedClassStyleProperties = new Set([
   "alignment-baseline",
@@ -472,13 +482,49 @@ function nodeBounds(svgText, node, matrix) {
   return Number.isFinite(minX) ? { minX, minY, maxX, maxY } : null;
 }
 
+// ── 장식 표장 견본 명시 목록(#2068 리뷰 M5, 2026-07-26) ──────────────────────
+//
+// 오너 수도권 v4는 헤더 범례용 KTX·SRT 로고 **견본** 2건을 지도 본문 마크 6건과
+// **같은 chip 그룹 안**(`rail-service-logo-chip-ktx-srt`)에 담았다 — 컨테이너
+// 소속으로는 못 가른다. 종전 구현은 오직 기하 규칙(장식 레이어 bbox 안이면 장식)
+// 하나로 갈랐는데, 실측 여유가 **148단위(viewBox 높이의 4.9%)** 뿐이라
+// (최상단 본문 표장 `logo-ktx-inline-vector-footer-0-6-9-4`의 minY=388.23 vs
+// 상단 설명 박스 하단 240) 오너가 상단 설명 박스를 키우거나 도면 최상단 역에
+// 표장을 추가하면 **본문 표장이 조용히 장식으로 오판**돼 바탕층에서 사라진다.
+//
+// 그래서 판정을 두 단계로 나눈다:
+//   1) **명시 견본 목록**(아래) — id가 확정된 장식 견본만 무조건 제외한다.
+//      오너가 견본을 어디로 옮겨도 제외가 유지되고, 반대로 본문 표장이 장식
+//      영역에 가까워져도 이 목록에 없으면 절대 제외되지 않는다.
+//   2) **기하 판정**(장식 레이어 bbox 안) — 목록에 없는 표장이 장식 영역에
+//      들어앉으면 **조용히 빼지 않고 실패**시킨다(fail-closed). 새 장식 견본이
+//      생기면 사람이 아래 목록에 사유와 함께 등재해야 한다.
+// 두 규칙의 조합으로 "조용한 누락 금지" 원칙이 기하 여유와 무관하게 성립한다.
+export const DECOR_SERVICE_MARK_SAMPLE_IDS = [
+  {
+    id: "logo-ktx-inline-vector-footer-0",
+    reason:
+      "수도권 헤더 상단 설명 박스의 KTX 범례 견본(translate(1400 0)로 헤더 배지 프레임에 얹혀 있다) — 지도 본문 표장 아님",
+  },
+  {
+    id: "logo-srt-inline-vector-footer-2",
+    reason:
+      "수도권 헤더 상단 설명 박스의 SRT 범례 견본(위와 같은 프레임) — 지도 본문 표장 아님",
+  },
+];
+
+const DECOR_SERVICE_MARK_SAMPLE_ID_SET = new Set(
+  DECOR_SERVICE_MARK_SAMPLE_IDS.map((sample) => sample.id),
+);
+
 /**
- * 장식 레이어들의 절대 bbox 합집합. 오너 수도권 v4는 헤더 범례용 KTX·SRT 로고
- * 견본 2건을 지도 본문 마크와 **같은 chip 그룹 안**에 담았다(id 규칙으로는 구분
- * 불가). 그 견본은 상단 설명 박스(top-route-line-explanation-layer) 영역 안에
- * 놓여 있으므로, 장식 레이어 bbox 안에 들어앉은 표장은 장식으로 판정해 제외한다
- * — 지도 본문 표장은 전부 이 영역 밖이다(실측).
+ * 장식 레이어들의 절대 bbox 합집합. 명시 견본 목록 밖의 표장이 이 영역에
+ * 들어앉으면 fail-closed로 빌드를 실패시키는 데 쓴다(위 주석 참고).
  */
+export function decorLayerBoundsOf(svgText) {
+  return decorBoundsOf(svgText, buildSvgTree(svgText));
+}
+
 function decorBoundsOf(svgText, root) {
   const bounds = [];
   (function walk(node) {
@@ -546,17 +592,37 @@ export function collectServiceMarks(svgText) {
       ) {
         const bounds = nodeBounds(svgText, child, ancestorMatrixOf(child));
         // 시각 내용이 없는 빈 표장(오너 소스의 잔재 `<g/>`)은 반입 대상이 아니다.
-        if (bounds && !childInDecor && !centerInsideAny(bounds, decorBounds)) {
-          marks.push({
-            id,
-            markup: svgText.slice(child.start, child.end),
-            ancestorTransform: ancestorTransformValue(child),
-            bounds,
-            insideBodyLayer: childInBody,
-          });
-          continue; // 하위 서브그룹(로고 path 묶음)은 이 마크에 포함된다.
+        if (!bounds) {
+          walk(child, childInDecor, childInBody);
+          continue;
         }
-        if (bounds) continue; // 장식 견본 — 하위도 건너뛴다.
+        // (1) 명시 견본 목록 — id가 확정된 장식 견본만 무조건 제외한다.
+        if (DECOR_SERVICE_MARK_SAMPLE_ID_SET.has(id)) continue;
+        // (2) 장식 레이어 소속이면 제외(레이어 단위 계약).
+        if (childInDecor) continue;
+        // (3) 명시 목록에 없는데 장식 영역에 들어앉았다 — 조용히 빼지 않고
+        //     실패시킨다. 종전에는 여기서 조용히 제외해, 오너가 상단 설명 박스를
+        //     키우거나 도면 최상단에 표장을 추가하면 본문 표장이 소리 없이
+        //     사라졌다(#2068 리뷰 M5). 새 장식 견본이면 사람이
+        //     DECOR_SERVICE_MARK_SAMPLE_IDS에 사유와 함께 등재해야 한다.
+        if (centerInsideAny(bounds, decorBounds)) {
+          throw new Error(
+            `표장 ${id || "(id 없음)"}가 장식 레이어 영역 안에 있습니다 ` +
+              `(bbox [${bounds.minX.toFixed(1)},${bounds.minY.toFixed(1)} .. ` +
+              `${bounds.maxX.toFixed(1)},${bounds.maxY.toFixed(1)}]). ` +
+              "지도 본문 표장이면 장식 레이어 bbox와 겹치지 않게 오너 SVG를 확인하고, " +
+              "장식 견본이면 DECOR_SERVICE_MARK_SAMPLE_IDS에 사유와 함께 등재하세요 " +
+              "— 조용히 누락시키지 않고 실패합니다.",
+          );
+        }
+        marks.push({
+          id,
+          markup: svgText.slice(child.start, child.end),
+          ancestorTransform: ancestorTransformValue(child),
+          bounds,
+          insideBodyLayer: childInBody,
+        });
+        continue; // 하위 서브그룹(로고 path 묶음)은 이 마크에 포함된다.
       }
       walk(child, childInDecor, childInBody);
     }
@@ -1548,13 +1614,20 @@ function ownerLabelEntryFrom(
   // 쓰면 앵커가 실제보다 오른쪽으로 밀려 이웃 라벨과 오탐 겹침을 만들었다.
   // tspan에 x/y가 없으면(daegu 등 transform 전용 다음 줄 tspan 관례, 뚝섬형
   // 위치형 포함) 부모 값을 그대로 쓴다.
+  // 글리프별 좌표 리스트(`x="9301.4 9355.9 9410.5"`)는 entry-level x/y에도 올 수
+  // 있다 — 줄 단위 경로(extractOwnerLabelLineLocalPositions)에만
+  // firstCoordinateToken을 적용하면 비대칭이 되고, 리스트를 만난 라벨은
+  // Number()가 NaN을 내 아래 유한성 검사에서 엔트리가 통째로 사라진다(lines는
+  // 정상 좌표인데 entry만 없어지는 자기모순). 컴파일 입력 정규화
+  // (normalizeSvgForCompile)가 이미 같은 "첫 토큰만" 규칙을 쓰므로 .vec와
+  // sidecar가 같은 값을 본다.
   const firstTspan = textBlock.match(/<tspan\b[^>]*>/)?.[0] ?? null;
   const x =
-    (firstTspan && firstAttr(firstTspan, "x")) ??
-    firstAttr(textOpenTag, "x");
+    firstCoordinateToken(firstTspan && firstAttr(firstTspan, "x")) ??
+    firstCoordinateToken(firstAttr(textOpenTag, "x"));
   const y =
-    (firstTspan && firstAttr(firstTspan, "y")) ??
-    firstAttr(textOpenTag, "y");
+    firstCoordinateToken(firstTspan && firstAttr(firstTspan, "y")) ??
+    firstCoordinateToken(firstAttr(textOpenTag, "y"));
   const [localX, localY] = applyMatrix(
     localMatrix,
     Number(x ?? NaN),
@@ -2176,10 +2249,22 @@ function main() {
           package: "vector_graphics_compiler",
           version: compilerVersion,
         },
+        // #2068 리뷰 M2(2026-07-26): compiler.version은 pubspec.lock에 잠긴
+        // **패키지 버전 그대로**를 적는 필드다(현재 1.2.6). 컴파일 의미가 바뀌었다고
+        // 이 값을 올리면 패키지 버전에 대한 거짓말이 되므로 올리지 않고, 산출 의미의
+        // 개정은 아래 pipelineRevision으로 따로 기록한다.
+        pipelineRevision: basemapPipelineRevision,
         content: {
-          svgLayer: "route-lines-and-station-symbols",
+          // #2068 SVG 충실도(2026-07-26): 실태 갱신. 이제 노선·역 심벌만이 아니라
+          // 오너 SVG의 **지도 본문 레이어 전수**(MAP_BODY_LAYER_IDS)를 굽는다.
+          svgLayer: "owner-svg-map-body-layers",
           stationSymbols: "owner-svg",
-          labels: "owner-svg-anchor-with-solver-fallback",
+          // 앱의 오너 앵커 고정 배치도 솔버 폴백도 바탕층 모드에서 실행되지 않는다
+          // — 역명 글자는 .vec에 구워져 있다(오너 결정 "글자도 복붙").
+          labels: "baked-into-vec",
+          // 캔버스 장식(헤더·범례·상단 설명 박스·카드 배경·규격 견본)은 반입 금지
+          // (EXCLUDED_DECOR_LAYERS 명시 계약 + 분류 완전성 게이트).
+          decoration: "excluded",
           interaction: "route_map_positions",
         },
         ownerLabelsSidecar: {

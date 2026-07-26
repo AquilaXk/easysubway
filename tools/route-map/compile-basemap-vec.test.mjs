@@ -835,11 +835,25 @@ test("build manifest가 source·normalized·vec hash와 viewBox를 결합한다"
       "utf8",
     ),
   );
+  // #2068 리뷰 M2: compiler.version은 pubspec.lock에 잠긴 **패키지 버전**이어야
+  // 한다(하드코딩 상수와 lock 양쪽을 대조해 드리프트를 막는다). 산출 의미의 개정은
+  // 별도 pipelineRevision이 기록한다.
   assert.equal(manifest.compiler.version, "1.2.6");
+  const lockedCompilerVersion = readFileSync(
+    path.join(root, "apps/mobile/pubspec.lock"),
+    "utf8",
+  ).match(/vector_graphics_compiler:[\s\S]*?version: "([^"]+)"/)?.[1];
+  assert.equal(
+    manifest.compiler.version,
+    lockedCompilerVersion,
+    "manifest.compiler.version은 pubspec.lock의 vector_graphics_compiler 버전과 같아야 합니다.",
+  );
+  assert.equal(manifest.pipelineRevision, 2);
   assert.deepEqual(manifest.content, {
-    svgLayer: "route-lines-and-station-symbols",
+    svgLayer: "owner-svg-map-body-layers",
     stationSymbols: "owner-svg",
-    labels: "owner-svg-anchor-with-solver-fallback",
+    labels: "baked-into-vec",
+    decoration: "excluded",
     interaction: "route_map_positions",
   });
   assert.equal(manifest.maps.length, 5);
