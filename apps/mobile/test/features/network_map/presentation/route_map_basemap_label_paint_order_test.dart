@@ -116,9 +116,7 @@ const _probes = <_LabelProbe>[
 const double _pixelsPerUnit = 2.0;
 
 Map<String, dynamic> _labelsSidecar() {
-  final file = File(
-    'assets/datapacks/metro_map_pack/basemap/labels.json',
-  );
+  final file = File('assets/datapacks/metro_map_pack/basemap/labels.json');
   return jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
 }
 
@@ -167,9 +165,7 @@ ui.Rect _glyphBox(Map<String, dynamic> entry) {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('#2068 역명 라벨의 글자 코어가 halo에 덮이지 않는다(.vec 픽셀 실측)', (
-    tester,
-  ) async {
+  testWidgets('#2068 역명 라벨의 글자 코어가 halo에 덮이지 않는다(.vec 픽셀 실측)', (tester) async {
     await loadPretendardTestFont();
     final sidecar = _labelsSidecar();
     final failures = <String>[];
