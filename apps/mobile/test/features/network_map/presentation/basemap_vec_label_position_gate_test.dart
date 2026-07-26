@@ -57,8 +57,12 @@ const _expectedCounts = <String, ({int svgRuns, int vecTexts})>{
   'seoul': (svgRuns: 729, vecTexts: 1057),
   'busan': (svgRuns: 155, vecTexts: 342),
   'daegu': (svgRuns: 104, vecTexts: 226),
-  'daejeon': (svgRuns: 22, vecTexts: 25),
-  'gwangju': (svgRuns: 20, vecTexts: 22),
+  // 대전·광주는 `#station-name-labels-layer text { paint-order:stroke; stroke:#FFFFFF; … }`
+  // 규칙이 자손 결합자라 종전 CSS 인라이너가 통째로 버렸다 — 라벨 halo가 조용히
+  // 빠져 있었다. 캐스케이드를 사양대로 전개하면서 라벨 전량이 halo/글자 두 사본으로
+  // 분해돼 .vec 텍스트 draw가 22·20건씩 늘었다(라벨 런 수는 그대로).
+  'daejeon': (svgRuns: 22, vecTexts: 47),
+  'gwangju': (svgRuns: 20, vecTexts: 42),
 };
 
 // ── 독립 SVG 파서(게이트 전용) ───────────────────────────────────────────────

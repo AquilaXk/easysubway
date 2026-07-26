@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vector_graphics/vector_graphics.dart';
@@ -44,5 +45,56 @@ void main() {
     // 느슨한 회귀 상한(계측이 주목적) — 로드가 2초를 넘으면 이상 신호.
     expect(loadDuration.inMilliseconds, lessThan(2000));
     expect(sizeBytes, greaterThan(0));
+  });
+
+  // #2593 리뷰 Major — 전량 반입으로 새로 들어온 `page-background`(전면 흰 rect)와
+  // `background-grid-overlay`(격자 패턴 타일)의 래스터 비용을 계측한다.
+  // 대전·광주 오버레이는 `opacity="0.52"`라 실제로 보이는 요소이고, 패턴 타일링이
+  // 프레임 시간을 크게 좌우한다(실측: 대전 p90 0.43ms → 1.93ms). 수도권 오버레이는
+  // `opacity="0"`이라 사실상 무료다. 상한은 프레임 예산(16.7ms) 기준의 느슨한
+  // 회귀 감지선이며, 목적은 수치를 기록해 두는 것이다.
+  testWidgets('바탕 .vec 래스터 프레임 시간 p50/p90 계측', (tester) async {
+    const targets = <String, String>{
+      'seoul': 'assets/datapacks/metro_map_pack/basemap/seoul.vec',
+      'daejeon': 'assets/datapacks/metro_map_pack/basemap/daejeon.vec',
+    };
+    await tester.runAsync(() async {
+      for (final entry in targets.entries) {
+        final info = await vg.loadPicture(AssetBytesLoader(entry.value), null);
+        // 첫 프레임들은 셰이더·JIT 워밍업이라 잡음이 크다 — 5장 버리고 잰다.
+        const warmup = 5;
+        final samples = <double>[];
+        for (var index = 0; index < warmup + 25; index += 1) {
+          final recorder = ui.PictureRecorder();
+          final canvas = ui.Canvas(recorder);
+          canvas.scale(0.35);
+          canvas.drawPicture(info.picture);
+          final frame = recorder.endRecording();
+          final stopwatch = Stopwatch()..start();
+          final image = await frame.toImage(1080, 1920);
+          stopwatch.stop();
+          image.dispose();
+          frame.dispose();
+          if (index >= warmup) {
+            samples.add(stopwatch.elapsedMicroseconds / 1000.0);
+          }
+        }
+        info.picture.dispose();
+        samples.sort();
+        final p50 = samples[samples.length ~/ 2];
+        final p90 = samples[(samples.length * 0.9).floor()];
+        // ignore: avoid_print
+        print(
+          '[#2593 raster] ${entry.key}.vec 1080x1920 '
+          'p50=${p50.toStringAsFixed(2)}ms p90=${p90.toStringAsFixed(2)}ms',
+        );
+        // CI 러너 성능 편차가 커서 상한은 p50에만 건다(p90은 기록이 목적).
+        expect(
+          p50,
+          lessThan(16.7),
+          reason: '${entry.key}: 래스터 p50이 프레임 예산을 넘었다',
+        );
+      }
+    });
   });
 }

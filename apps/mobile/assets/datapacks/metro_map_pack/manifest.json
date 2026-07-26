@@ -19,7 +19,7 @@
       "route_map_strategy": {
         "rendering_strategy": "self-drawn-hybrid-basemap",
         "bundled_svg_role": "hybrid-basemap-source",
-        "compiled_content": "route-lines-and-station-symbols",
+        "compiled_content": "owner-svg-verbatim-full-document",
         "structured_overlay": "labels-interaction",
         "commercial_production_ready": true,
         "decision_ref": "tools/route-map/route-map-license-decision.json"
@@ -58,7 +58,7 @@
       "route_map_strategy": {
         "rendering_strategy": "self-drawn-hybrid-basemap",
         "bundled_svg_role": "hybrid-basemap-source",
-        "compiled_content": "route-lines-and-station-symbols",
+        "compiled_content": "owner-svg-verbatim-full-document",
         "structured_overlay": "labels-interaction",
         "commercial_production_ready": true,
         "decision_ref": "tools/route-map/route-map-license-decision.json"
@@ -101,7 +101,7 @@
       "route_map_strategy": {
         "rendering_strategy": "self-drawn-hybrid-basemap",
         "bundled_svg_role": "hybrid-basemap-source",
-        "compiled_content": "route-lines-and-station-symbols",
+        "compiled_content": "owner-svg-verbatim-full-document",
         "structured_overlay": "labels-interaction",
         "commercial_production_ready": true,
         "decision_ref": "tools/route-map/route-map-license-decision.json"
@@ -139,7 +139,7 @@
       "route_map_strategy": {
         "rendering_strategy": "self-drawn-hybrid-basemap",
         "bundled_svg_role": "hybrid-basemap-source",
-        "compiled_content": "route-lines-and-station-symbols",
+        "compiled_content": "owner-svg-verbatim-full-document",
         "structured_overlay": "labels-interaction",
         "commercial_production_ready": true,
         "decision_ref": "tools/route-map/route-map-license-decision.json"
@@ -178,7 +178,7 @@
       "route_map_strategy": {
         "rendering_strategy": "self-drawn-hybrid-basemap",
         "bundled_svg_role": "hybrid-basemap-source",
-        "compiled_content": "route-lines-and-station-symbols",
+        "compiled_content": "owner-svg-verbatim-full-document",
         "structured_overlay": "labels-interaction",
         "commercial_production_ready": true,
         "decision_ref": "tools/route-map/route-map-license-decision.json"
