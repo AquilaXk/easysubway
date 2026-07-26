@@ -2,10 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'app/app_bootstrap.dart';
+import 'app/app_endpoints.dart';
 import 'app/demo_dependencies.dart';
 import 'app/easy_subway_app.dart';
 import 'core/crashlytics/mobile_crash_reporting.dart';
-import 'core/datapack/data_pack_update_state.dart';
 import 'features/get_off_alarm/get_off_alarm_controller.dart';
 import 'features/home_widget/home_widget_link_handler.dart';
 import 'features/home_widget/next_train_widget_repository.dart';
@@ -110,8 +110,9 @@ Future<void> main() async {
           facilityReportDraftTargetStore: draftTargetStore,
           facilityReportLostPhotoRestorer: photoPicker.retrieveLostPhoto,
           legacyCredentialCleaner: const SecureLegacyCredentialCleaner(),
-          dataPackUpdateStateRepository: DataPackUpdateStateRepository(
+          dataPackUpdateStateRepository: createDataPackUpdateStateRepository(
             userDatabase: bootstrap.userDatabase,
+            endpoints: AppEndpoints.fromEnvironment(),
           ),
           onDataPackMeteredConsent: bootstrap.acceptMeteredDataPackUpdate,
           dataPackUpdate: bootstrap.dataPackUpdate,

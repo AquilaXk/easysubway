@@ -8,6 +8,7 @@
     { "file": "android-release-quality-gate.json", "scope": "mobile", "area": "android" },
     { "file": "backup-restore-rehearsal-gate.json", "scope": "product", "area": "ops" },
     { "file": "datapack-freshness-sla.json", "scope": "product", "area": "datapack" },
+    { "file": "datapack-manifest-acceptance-policy.json", "scope": "mobile", "area": "datapack" },
     { "file": "datapack-release-readiness-gate.json", "scope": "product", "area": "datapack" },
     { "file": "datapack-update-policy.json", "scope": "mobile", "area": "datapack" },
     { "file": "external-map-deeplink-policy.json", "scope": "mobile", "area": "mobile-feature" },

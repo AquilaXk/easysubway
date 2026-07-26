@@ -79,7 +79,7 @@
             {"path": "apps/mobile/lib/features/settings/presentation/service_info_screen.dart", "sha256": "00fff84a415da6d5041c2e7bedbc453c251867058307c47478ead118d20d04c4"},
             {"path": "apps/mobile/lib/features/support/presentation/support_access_screen.dart", "sha256": "add48d006d50e4405b2668354ea72e010423594d5d0dcf4ed932bbbde2ce8db7"},
             {"path": "apps/mobile/lib/features/support/presentation/inquiry_screen.dart", "sha256": "f108ce5939e6542ec36438a2f6cbe8f9183eef09e4edcbacbc5549e5256f5581"},
-            {"path": "apps/mobile/lib/main.dart", "sha256": "b66a91bfc5c2ed1ff246ed6486a55fc8e97571b3d563050f6c56bb9b1eb06a4e"}
+            {"path": "apps/mobile/lib/main.dart", "sha256": "e03403afc1d3370905ef0c3f90533c67dc7fa37eb95c3d8743b7cbd52d2ab9b0"}
           ]
         },
         {
@@ -102,12 +102,12 @@
             {"path": "apps/mobile/release/signed-release-artifact-gate.json", "sha256": "42c9f83dca5a1c2c24d921cf6ab748c9be5a901dd1b62212a81055098349fc67"},
             {"path": "apps/mobile/pubspec.yaml", "sha256": "1c4918747c4acf22bbe885b7cb01cc34cc311e7e44598ac6b817848712614d42"},
             {"path": ".github/workflows/release-artifacts.yml", "sha256": "fc0068a3a93052f2daa3c90076d91c208b88c635f990edf8f40a391c18535fcf"},
-            {"path": ".github/workflows/datapack-release.yml", "sha256": "9d90197176adb1aa891005e9de2ede827b17eb2f098c9c089d780af2840673ed"},
+            {"path": ".github/workflows/datapack-release.yml", "sha256": "66e6bee443b0a38a7406dd51eaff447b74cdbe04c8d68b9edbe07aad9bf80b85"},
             {"path": "tools/ci/validate-store-privacy-env.mjs", "sha256": "18bb0dd8b93d6268c8f60f9cc12272d2ff31c03b60fbbafd6c1e8d16957ada2a"},
             {"path": "backend/build.gradle", "sha256": "cfefe1f4884d0f4b44f2875dc4e1bedabad358a7c9aab030c6504c87d8f21f2d"},
             {"path": "backend/Dockerfile", "sha256": "bb190eb507645836df69934a0ca6cf4dc7499bd508ed0a485e688eede70e615a"},
             {"path": "apps/mobile/release/rc-evidence-manifest-contract.json", "sha256": "7caaa17fc34e13e5e35076be4b4f35456f4fa57add102561e31267934bd6cd41"},
-            {"path": "tools/datapack/lib/manifest-validation.mjs", "sha256": "a3a60a521261ba39cad19d176b6b37c0faa1f7395fbf3fcc248bd625337574bb"},
+            {"path": "tools/datapack/lib/manifest-validation.mjs", "sha256": "9e35372f21307b9c20258fde15556ef4cfc2c28276a46435974fe30253055e81"},
             {"path": "tools/datapack/decide-datapack-release.mjs", "sha256": "19df0719c5c030db1981bd34622a42b98e610ac35851a4d0219c70c51dda675c"},
             {"path": "tools/datapack/verify-release-request-binding.mjs", "sha256": "33953a3a0432f82021f54df40e072288c3d4100d0a254317fbdeb700e8b03cb3"},
             {"path": "tools/datapack/validate-remote-datapack-artifact.mjs", "sha256": "153a5888903c503fb572b5596afac58d1b0ac1ae973f3e8fda5806948d168b26"},

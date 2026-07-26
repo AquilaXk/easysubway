@@ -112,6 +112,13 @@ class DataPackManifest {
     DataPackSigningPublicKey? productionSigningPublicKey,
   ) {
     if (manifestVersion != 2) {
+      // 이슈 #2531(DP-05): v1 봉투는 봉투 서명·채널·순번·만료를 아예 담지 않아
+      // 신선도를 증명할 방법이 없다. production 서명 공개키가 주입된 빌드는
+      // production 채널만 바라보므로 그 빌드에서는 수락 경로를 fail closed로 닫는다.
+      // 공개키가 없는 개발·테스트 빌드의 동작은 그대로 둔다.
+      if (productionSigningPublicKey != null) {
+        throw const FormatException('Invalid data pack manifest version.');
+      }
       return;
     }
     if (canonical == null) {
@@ -463,6 +470,13 @@ class DataPackSignature {
   const DataPackSignature({required this.algorithm, required this.value});
 
   factory DataPackSignature.fromJson(Map<String, Object?> json) {
+    // 이슈 #2531(DP-05): 봉투 서명 대상 정준 문자열은 `signature` 키를 통째로
+    // 제외하므로, 이 객체 안에 실린 값은 어떤 것도 서명되지 않는다. 알 수 없는 키를
+    // 수용하면 "서명된 문서"라는 진술이 무너지므로 거부한다. 생성기와 계약
+    // (`contracts/datapack/datapack-manifest.schema.json`)도 두 키만 허용한다.
+    if (json.keys.any((key) => key != 'algorithm' && key != 'value')) {
+      throw const FormatException('Invalid data pack signature.');
+    }
     final algorithm = _requiredString(json, 'algorithm');
     if (algorithm != 'sha256-pack-manifest-v1' &&
         algorithm != 'rsa-sha256-pack-manifest-v1' &&
