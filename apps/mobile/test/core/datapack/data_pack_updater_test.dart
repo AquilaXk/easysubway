@@ -2624,6 +2624,80 @@ void main() {
     expect(pointer?.version, '17');
   });
 
+  test('updater는 기준선 없는 activePack을 예외 없이 넘기고 기존 pointer를 유지한다', () async {
+    // 롤백 매니페스트가 이미 설치된 이전 버전을 activePack으로 지정하고 packs에는 담지
+    // 않으면 기대 해시 원천이 없다(#2532). 예외로 올리면 backoff도 manifest 캐시도 남지
+    // 않아 매 세션 같은 실패가 반복된다.
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-updater-activepack-baseline-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    await catalogDirectory.create(recursive: true);
+    final sqliteBytes = await _validCatalogSqliteBytes(directory);
+    // 이전 빌드가 설치해 기준선 파일이 없는 팩.
+    await File(
+      '${catalogDirectory.path}/capital-v18.sqlite',
+    ).writeAsBytes(sqliteBytes, flush: true);
+    // 해시를 담지 않던 시절의 pointer — 사다리 어느 단에도 기대값이 없다.
+    final previousPointer = File('${catalogDirectory.path}/current.json');
+    await previousPointer.writeAsString(
+      jsonEncode({
+        'id': 'capital',
+        'version': '18',
+        'path': '${catalogDirectory.path}/capital-v18.sqlite',
+      }),
+      flush: true,
+    );
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+    server.listen((request) {
+      switch (request.uri.path) {
+        case '/datapacks/catalog/current.json':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..headers.contentType = ContentType.json
+            ..write(
+              jsonEncode({
+                'ttlSeconds': 60,
+                'activePack': {'id': 'capital', 'version': '18'},
+                'packs': const <Object?>[],
+              }),
+            )
+            ..close();
+        default:
+          request.response
+            ..statusCode = HttpStatus.notFound
+            ..close();
+      }
+    });
+    final installer = DataPackInstaller(
+      catalogDirectory: catalogDirectory,
+      userDatabase: userDatabase,
+    );
+    final updater = DataPackUpdater(
+      client: DataPackClient(
+        manifestUri: Uri.parse(
+          'http://${server.address.host}:${server.port}/datapacks/catalog/current.json',
+        ),
+        stateRepository: DataPackUpdateStateRepository(
+          userDatabase: userDatabase,
+          now: () => DateTime.utc(2026, 7, 26, 10),
+        ),
+        now: () => DateTime.utc(2026, 7, 26, 10),
+      ),
+      installer: installer,
+    );
+
+    await expectLater(updater.checkForUpdates(), completes);
+    final pointer = await installer.readCurrentPointer();
+
+    expect(pointer?.version, '18');
+    expect(pointer?.sha256, isNull);
+  });
+
   test('updater는 무결성을 확인하지 못한 override 기록을 지우지 않는다', () async {
     // 이 PR 이전 빌드가 설치해 기준선이 없는 팩이 override 대상인 경우(#2532).
     // "확인 못 함"으로 장애 대응 고정을 해제하면 단말이 문제가 있던 팩으로 되돌아간다.

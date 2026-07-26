@@ -277,6 +277,30 @@ void main() {
     expect(logged.first, contains('station_facility_evidence'));
   });
 
+  test('마이그레이션이 예외로 끝난 후보의 기준선은 갱신하지 않는다', () async {
+    // 예외로 끝난 파일은 어떤 상태인지 알 수 없다. 그 내용을 새 기대값으로 승격하면
+    // 무결성 대조가 "앱이 망가뜨린 결과"를 정답으로 굳힌다(#2532).
+    final directory = await _temporaryDirectory('rescue-migration-failure-');
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    await catalogDirectory.create(recursive: true);
+    final pack = File('${catalogDirectory.path}/capital-v18.sqlite');
+    await _buildInstalledPack(pack, activePack: 'capital-v18');
+    _replaceStationsWithView(pack);
+    // stations가 뷰라 `from < 13`의 컬럼 추가가 실패한다.
+    _setUserVersion(pack, 12);
+    await _writeCurrentPointer(catalogDirectory, version: '18', file: pack);
+
+    final opener = CatalogDatabaseOpener(
+      databaseDirectory: directory,
+      assetBundle: rootBundle,
+    );
+    final database = await opener.open();
+    addTearDown(database.close);
+
+    expect(opener.openedBundledDataPack, isTrue);
+    expect(await File('${pack.path}.sha256').exists(), isFalse);
+  });
+
   test('같은 팩의 스키마 거부와 무결성 거부는 각각 신호를 남긴다', () async {
     final logged = <String>[];
     CatalogSchemaDiagnostics.replaceForTest(logged.add);
@@ -549,6 +573,20 @@ void _setUserVersion(File file, int userVersion) {
   final raw = sqlite.sqlite3.open(file.path);
   try {
     raw.execute('PRAGMA user_version = $userVersion');
+  } finally {
+    raw.close();
+  }
+}
+
+/// `stations`를 뷰로 바꿔 마이그레이션 도중 예외가 나게 만든다. 열기 판정의 첫 질의가
+/// drift 마이그레이션을 돌리므로, 이 팩은 판정을 끝내지 못하고 예외로 빠진다.
+void _replaceStationsWithView(File file) {
+  final raw = sqlite.sqlite3.open(file.path);
+  try {
+    raw.execute('ALTER TABLE stations RENAME TO stations_source');
+    raw.execute(
+      'CREATE VIEW stations AS SELECT id, name_ko, region FROM stations_source',
+    );
   } finally {
     raw.close();
   }

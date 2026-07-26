@@ -370,6 +370,19 @@ class DataPackUpdater {
       if (verifiedPointer != null) {
         return verifiedPointer;
       }
+      // 무결성을 "확인하지 못한" 경우는 override 경로와 같은 기준으로 기존 pointer를
+      // 유지한다(#2532). 예외로 올리면 이 블록 밖으로 나가 backoff도 manifest 캐시 저장도
+      // 남기지 못해, 매 세션 매니페스트를 다시 받고 팩 전체 해시를 다시 계산한 뒤 같은
+      // 예외로 끝나는 상태가 굳는다.
+      if (installedPointer.rejection ==
+          InstalledDataPackRejection.baselineMissing) {
+        developer.log(
+          'activePackUnverified=baselineMissing '
+          'pack=${activePack.id}-v${activePack.version}',
+          name: 'DataPackUpdater',
+        );
+        return null;
+      }
       // heldOut 단말 + activePack 미설치: 예외 대신 null 반환(기존 포인터 유지).
       // rolloutApplied 단말이거나 activePack이 설치된 경우는 이미 위에서 반환.
       if (!rolloutApplies) {

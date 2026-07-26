@@ -302,8 +302,10 @@ class CatalogDatabaseOpener {
   Future<CatalogDatabase?> _openUsableCatalogDatabase(File file) async {
     final database = CatalogDatabase.file(file);
     var returned = false;
+    var rejected = false;
     try {
       if (!await _isUsableCatalogDatabase(database)) {
+        rejected = true;
         return null;
       }
       // 빈 테이블 생성이 안전하지 않은 테이블이 빠져 있으면 이 팩을 열지 않고 known-good
@@ -314,6 +316,7 @@ class CatalogDatabaseOpener {
           artifact: p.basename(file.path),
           blockingTableNames: plan.blockingMissingTables,
         );
+        rejected = true;
         return null;
       }
       returned = true;
@@ -323,7 +326,12 @@ class CatalogDatabaseOpener {
       if (!returned) {
         // 판정하는 동안 drift 마이그레이션이 이 파일을 바꿨을 수 있다(#2532).
         // 거부한 후보도 기준선을 맞춰 두지 않으면 나중에 영구 거부로 남는다.
-        await _refreshMutatedPackBaseline(database: database, file: file);
+        //
+        // 판정을 끝내고 거부한 경우에만 갱신한다. 마이그레이션이 예외로 끝난 파일은 어떤
+        // 상태인지 알 수 없으므로 그 내용을 새 기대값으로 승격하지 않는다.
+        if (rejected) {
+          await _refreshMutatedPackBaseline(database: database, file: file);
+        }
         await database.close();
       }
     }
