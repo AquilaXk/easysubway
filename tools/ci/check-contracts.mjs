@@ -15,6 +15,8 @@ const RELEASE_GATE_DIRECTORY = "apps/mobile/release";
 const SOURCE_INVENTORY_PATH = "apps/mobile/assets/datapacks/source-inventory.json";
 const SOURCE_INVENTORY_SCHEMA_PATH = "contracts/datapack/source-inventory.schema.json";
 const SOURCE_GOVERNANCE_POLICY_PATH = "tools/datapack/source-governance-policy.json";
+const CANONICAL_NUMBER_CONTRACT_SCHEMA_PATH = "contracts/datapack/canonical-number-contract.schema.json";
+const CANONICAL_NUMBER_CONTRACT_PATH = "contracts/datapack/canonical-number-contract.json";
 const FRESHNESS_POLICY_PATH = "apps/mobile/release/datapack-freshness-sla.json";
 const PACK_APP_SCHEMA_PARITY_ALLOWLIST_PATH = "contracts/datapack/pack-app-schema-parity-allowlist.json";
 const PACK_APP_SCHEMA_PARITY_ALLOWLIST_SCHEMA_PATH =
@@ -37,6 +39,11 @@ export function collectContractErrors() {
   validateJson(
     "contracts/datapack/source-governance-policy.schema.json",
     SOURCE_GOVERNANCE_POLICY_PATH,
+    errors,
+  );
+  validateJson(
+    CANONICAL_NUMBER_CONTRACT_SCHEMA_PATH,
+    CANONICAL_NUMBER_CONTRACT_PATH,
     errors,
   );
   validateJson(
