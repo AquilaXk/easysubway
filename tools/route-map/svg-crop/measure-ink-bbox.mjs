@@ -16,13 +16,12 @@
 //   CHROME_BIN=/path/to/chrome node …                            # 브라우저 지정
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { normalizeSvgForCompile } from "../compile-basemap-vec.mjs";
 import { FULL_CANVAS_DECOR_IDS, inkBBoxOf, viewBoxOf } from "../svg-ink-bbox.mjs";
+import { outDir, REGIONS as REGION_FILES, svgPathFor } from "./regions.mjs";
 
 /** 실행할 브라우저. 실제 파일인지 확인해 임의 명령 실행을 막는다. */
 function resolveChrome() {
@@ -38,16 +37,7 @@ function resolveChrome() {
 
 const CHROME = resolveChrome();
 
-const here = path.dirname(fileURLToPath(import.meta.url));
-const svgDir = path.join(here, "..", "route-map-defs", "svg-sources");
-
-const REGIONS = [
-  { id: "seoul", svg: "easy-subway-sma-v4.svg" },
-  { id: "busan", svg: "easy-subway-busan-v3.svg" },
-  { id: "daegu", svg: "easy-subway-daegu-v3.svg" },
-  { id: "daejeon", svg: "easy-subway-daejeon-v3.svg" },
-  { id: "gwangju", svg: "easy-subway-gwangju-v3.svg" },
-];
+const REGIONS = Object.keys(REGION_FILES).map((id) => ({ id }));
 
 /** 브라우저 안에서 도는 측정식. 전면 배경·그리드는 빼고 잉크만 union한다. */
 function measureExpression(excludeIds) {
@@ -106,8 +96,8 @@ function chromeInkBBox(svgText) {
     `svg#target{display:block;width:${vbw}px;height:${vbh}px}</style></head>` +
     `<body>${inlined}<script>${measureExpression(FULL_CANVAS_DECOR_IDS)}</script></body></html>`;
 
-  const dir = mkdtempSync(path.join(tmpdir(), "svg-ink-"));
-  const htmlPath = path.join(dir, "page.html");
+  mkdirSync(outDir, { recursive: true });
+  const htmlPath = path.join(outDir, "measure-ink-bbox.html");
   writeFileSync(htmlPath, html);
   const dom = execFileSync(
     CHROME,
@@ -150,7 +140,7 @@ console.log(
   "region     viewBox                 여유 L/T/R/B (Chrome 실측)                       순수JS Δ maxX/maxY",
 );
 for (const region of targets) {
-  const raw = readFileSync(path.join(svgDir, region.svg), "utf8");
+  const raw = readFileSync(svgPathFor(region.id), "utf8");
   const normalized = normalizeSvgForCompile(raw);
   const [vx, vy, vw, vh] = viewBoxOf(raw);
   const chrome = chromeInkBBox(raw);

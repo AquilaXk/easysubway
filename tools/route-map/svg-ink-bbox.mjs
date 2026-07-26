@@ -66,8 +66,8 @@ function readGlyphAdvances(fontPath) {
     const record = cmap + 4 + index * 8;
     const offset = cmap + buffer.readUInt32BE(record + 4);
     const format = buffer.readUInt16BE(offset);
-    if (format === 12) best = { format, offset };
-    else if (format === 4 && best?.format !== 12) best = { format, offset };
+    const better = format === 12 || (format === 4 && best?.format !== 12);
+    if (better) best = { format, offset };
   }
   if (!best) throw new Error(`${fontPath}: 지원하는 cmap subtable이 없습니다.`);
 
@@ -576,6 +576,18 @@ function visitTagInk(tag, name, matrix, inherited, visit) {
   }
 }
 
+/** 마크업을 걷어내고 글자만 남긴다(정규식 역추적을 피해 선형 스캔한다). */
+function stripTags(value) {
+  let out = "";
+  let depth = 0;
+  for (const ch of value) {
+    if (ch === "<") depth += 1;
+    else if (ch === ">") depth = Math.max(0, depth - 1);
+    else if (depth === 0) out += ch;
+  }
+  return out;
+}
+
 /** text-anchor에 따른 상자 왼쪽 좌표. */
 function anchorLeft(anchor, x, width) {
   if (anchor === "middle") return x - width / 2;
@@ -611,7 +623,7 @@ function visitTextInk(openTag, body, matrix, inherited, visit) {
     if (close === -1) break;
     sawTspan = true;
     const attrs = `<tspan ${body.slice(open + "<tspan".length, openEnd)}>`;
-    const text = body.slice(openEnd + 1, close).replaceAll(/<[^>]*>/g, "");
+    const text = stripTags(body.slice(openEnd + 1, close));
     cursor = close + "</tspan>".length;
     const x = numAttr(attrs, "x", baseX);
     let y = numAttr(attrs, "y", baseY);
@@ -631,7 +643,7 @@ function visitTextInk(openTag, body, matrix, inherited, visit) {
   }
   if (!sawTspan) {
     runs.push({
-      text: body.replaceAll(/<[^>]*>/g, ""),
+      text: stripTags(body),
       x: baseX,
       y: baseY,
       size: Number(String(baseSize ?? "0").trim().replace(/px$/, "")),
@@ -730,52 +742,60 @@ function rejectUnknownTag(name) {
   );
 }
 
+/** 여는 태그 하나가 차지하는 범위의 끝 인덱스(자식 포함). */
+function elementEnd(text, openIndex, openTag, name, selfClose) {
+  return selfClose
+    ? openIndex + openTag.length
+    : matchingEnd(text, openIndex, name);
+}
+
+/** 컨테이너 하나를 파고든다. */
+function walkContainer(node, matrix, inherited, excluded, visit) {
+  const { text, openIndex, openTag, name, selfClose } = node;
+  if (selfClose) return openIndex + openTag.length;
+  const child = childContext(openTag, matrix, inherited);
+  const end = matchingEnd(text, openIndex, name);
+  const body = text.slice(openIndex + openTag.length, end - `</${name}>`.length);
+  walk(body, child.matrix, child.inherited, excluded, visit);
+  return end;
+}
+
+/** `<text>` 하나를 처리한다. */
+function walkText(node, matrix, inherited, visit) {
+  const { text, openIndex, openTag, name, selfClose } = node;
+  const end = elementEnd(text, openIndex, openTag, name, selfClose);
+  const body = selfClose
+    ? ""
+    : text.slice(openIndex + openTag.length, end - "</text>".length);
+  visitTextInk(openTag, body, matrix, inherited, visit);
+  return end;
+}
+
 function walk(text, matrix, inherited, excluded, visit) {
-  const tagRe = /<([a-zA-Z][\w:.-]*)\b([^>]*?)(\/?)>/g;
+  const tagRe = /<([a-zA-Z][\w:.-]*)\b([^>]*)>/g;
   let match;
   while ((match = tagRe.exec(text))) {
-    const [full, rawName, , selfClose] = match;
-    const name = rawName;
-    const openTag = full;
-    const id = firstAttr(openTag, "id");
+    const [openTag, name, attrs] = match;
+    const node = {
+      text,
+      openIndex: match.index,
+      openTag,
+      name,
+      selfClose: attrs.endsWith("/"),
+    };
 
-    if (isSkipped(name, id, excluded)) {
-      if (!selfClose) tagRe.lastIndex = matchingEnd(text, match.index, name);
-      continue;
-    }
-
-    if (CONTAINER_TAGS.has(name)) {
-      if (selfClose) continue;
-      const child = childContext(openTag, matrix, inherited);
-      const end = matchingEnd(text, match.index, name);
-      const body = text.slice(
-        match.index + openTag.length,
-        end - `</${name}>`.length,
-      );
-      walk(body, child.matrix, child.inherited, excluded, visit);
-      tagRe.lastIndex = end;
-      continue;
-    }
-
-    if (name === "text") {
-      const end = selfClose
-        ? match.index + openTag.length
-        : matchingEnd(text, match.index, name);
-      const body = selfClose
-        ? ""
-        : text.slice(match.index + openTag.length, end - "</text>".length);
-      visitTextInk(openTag, body, matrix, inherited, visit);
-      tagRe.lastIndex = end;
-      continue;
-    }
-
-    if (DRAWABLE_TAGS.has(name)) {
+    if (isSkipped(name, firstAttr(openTag, "id"), excluded)) {
+      tagRe.lastIndex = elementEnd(text, match.index, openTag, name, node.selfClose);
+    } else if (CONTAINER_TAGS.has(name)) {
+      tagRe.lastIndex = walkContainer(node, matrix, inherited, excluded, visit);
+    } else if (name === "text") {
+      tagRe.lastIndex = walkText(node, matrix, inherited, visit);
+    } else if (DRAWABLE_TAGS.has(name)) {
       visitTagInk(openTag, name, matrix, inherited, visit);
-      if (!selfClose) tagRe.lastIndex = matchingEnd(text, match.index, name);
-      continue;
+      tagRe.lastIndex = elementEnd(text, match.index, openTag, name, node.selfClose);
+    } else {
+      rejectUnknownTag(name);
     }
-
-    rejectUnknownTag(name);
   }
 }
 
