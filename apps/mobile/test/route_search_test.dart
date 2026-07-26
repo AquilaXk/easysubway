@@ -2093,10 +2093,10 @@ void main() {
       expect(relabeled.stairAccessLabel, '계단 여부를 확인하고 있어요');
     });
 
-    test('계단 때문에 막힌 경로는 확인 중이 아니라 계단 포함이라고 말한다', () {
-      // 백엔드가 STAIR_ONLY_ACCESS 경고로 막은 경로는 leg가 없어 접을 근거가 없지만
-      // 계단이 있다는 것은 확인된 사실이다. 판정을 싣기 전에는 leg가 비었다는 이유로
-      // "확인 중"으로 약해졌다.
+    test('계단 경고가 붙은 차단 경로는 확인 중이 아니라 계단 포함이라고 말한다', () {
+      // 차단 응답은 leg가 없어 접을 근거가 없지만, STAIR_ONLY_ACCESS는 두 플래너 모두
+      // 실제로 관측한 계단 구간에서만 붙이는 경고라 계단 표기는 사실이다. 차단된 이유
+      // 자체는 별도의 사유 배지가 말한다.
       final display = _judgedDisplay(
         stairAccess: 'STAIR_ONLY',
         status: 'BLOCKED_ACCESSIBILITY',
@@ -2111,19 +2111,21 @@ void main() {
     test('RouteSearchResult 재구성은 생성자 필드를 하나도 빠뜨리지 않는다', () {
       // C1 재발 방지: withDisplayLabels가 결과를 통째로 다시 만들기 때문에,
       // 여기 없는 필드는 온라인 결과가 화면에 닿기 전에 기본값으로 되돌아간다.
-      final source = File('lib/route_search.dart').readAsStringSync();
-      final constructorFields = _namedParameters(
-        _parameterList(source, 'const RouteSearchResult({'),
+      _expectRebuildCarriesEveryField(
+        source: File('lib/route_search.dart').readAsStringSync(),
+        constructorSignature: 'const RouteSearchResult({',
+        methodSignature: '  RouteSearchResult withDisplayLabels({',
+        callSignature: 'return RouteSearchResult(',
       );
-      final forwarded = _namedArguments(
-        _methodSource(source, '  RouteSearchResult withDisplayLabels({'),
-      );
+    });
 
-      expect(constructorFields, isNotEmpty);
-      expect(
-        constructorFields.difference(forwarded),
-        isEmpty,
-        reason: 'withDisplayLabels가 옮기지 않는 RouteSearchResult 필드가 있다',
+    test('RouteSearchStep 재구성도 생성자 필드를 하나도 빠뜨리지 않는다', () {
+      // 온라인 step도 화면에 닿기 전 이 재구성을 지난다. 같은 유실 갈래다.
+      _expectRebuildCarriesEveryField(
+        source: File('lib/route_search.dart').readAsStringSync(),
+        constructorSignature: 'const RouteSearchStep({',
+        methodSignature: '  RouteSearchStep withDisplayLabels({',
+        callSignature: 'return RouteSearchStep(',
       );
     });
 
@@ -2146,12 +2148,20 @@ void main() {
       ]);
     });
 
-    test('판정 필드가 없는 레거시 응답은 미확인 사유를 무단차로 올리지 않는다', () {
+    test('판정 필드가 없는 레거시 응답은 승차 leg 때문에 fail closed로 떨어진다', () {
+      // 판정을 싣기 전 백엔드가 내던 형태 그대로다. 접근 leg는 검증돼 카운터가 모두
+      // 0이지만 승차 leg의 stairAccessState="UNKNOWN"이 unknownAccessibilityCount=1로
+      // 실려, leg를 접는 폴백은 무단차라 단언하지 못한다. 폴백이 경로 판정보다 강하게
+      // 말할 수 없다는 뜻이며, #2590이 고치려던 증상이기도 하다.
       final display = _judgedDisplay(
         stairAccess: '',
         legs: [
-          _judgedLeg(legType: 'ACCESS', stairAccess: '', staleDataCount: 1),
-          _judgedLeg(legType: 'RIDE', stairAccess: ''),
+          _judgedLeg(legType: 'ACCESS', stairAccess: ''),
+          _judgedLeg(
+            legType: 'RIDE',
+            stairAccess: '',
+            unknownAccessibilityCount: 1,
+          ),
         ],
       );
 
@@ -2177,16 +2187,14 @@ void main() {
 
 /// #2590 판정 필드를 실은 leg. [stairAccess]가 비면 판정 필드가 없는 레거시 응답이다.
 ///
-/// 신뢰도 카운터는 [staleDataCount]만 받는다 — 백엔드 leg DTO가 실제로 만드는
-/// 사유는 STAIR_ONLY_ACCESS·ACCESSIBILITY_CHECK_REQUIRED 둘뿐이라 나머지 카운터는
-/// leg에서 구조적으로 늘 0이고, 그 형태로만 픽스처를 만들어야 응답과 어긋나지 않는다.
-/// [staleDataCount]는 판정 필드가 없던 시절의 레거시 폴백을 재현할 때만 쓴다.
+/// 신뢰도 카운터를 받지 않는 이유는 leg에서 구조적으로 늘 0이기 때문이다 — 백엔드
+/// leg DTO가 만드는 사유는 STAIR_ONLY_ACCESS·ACCESSIBILITY_CHECK_REQUIRED 둘뿐이고,
+/// 신뢰도 경고는 경로 단위라 itinerary 쪽에만 실린다.
 RouteSearchV2Leg _judgedLeg({
   required String legType,
   required String stairAccess,
   int stairCount = 0,
   int unknownAccessibilityCount = 0,
-  int staleDataCount = 0,
 }) {
   final isRide = legType == 'RIDE';
   return RouteSearchV2Leg(
@@ -2212,7 +2220,7 @@ RouteSearchV2Leg _judgedLeg({
       stairCount: stairCount,
       unknownAccessibilityCount: unknownAccessibilityCount,
       generatedConnectorCount: 0,
-      staleDataCount: staleDataCount,
+      staleDataCount: 0,
       lowConfidenceCount: 0,
       unavailableFacilityCount: 0,
       riskLevel: 'LOW',
@@ -2276,11 +2284,89 @@ Set<String> _namedParameters(String parameterList) {
   return names;
 }
 
-Set<String> _namedArguments(String methodSource) {
-  return RegExp(
-    r'^\s+([A-Za-z_][A-Za-z0-9_]*):',
-    multiLine: true,
-  ).allMatches(methodSource).map((match) => match.group(1)!).toSet();
+/// 재구성 호출이 생성자 필드를 전부, 그리고 실제 값으로 옮기는지 본다.
+///
+/// 이름만 세면 `field: ''` 같은 상수 대입을 통과시키고, 중첩 생성자 호출의 인자까지
+/// 커버리지로 집계하면 가드가 조용히 무력해진다. 그래서 최상위 인자만 이름→값 식으로
+/// 떼어내고, 값 식이 그 필드(또는 그 private 백킹 필드)나 재구성 메서드의 파라미터를
+/// 참조하는지까지 본다 — 파라미터로 갈아 끼우는 것이 이 메서드의 목적이라 그 갈래는
+/// 허용한다.
+void _expectRebuildCarriesEveryField({
+  required String source,
+  required String constructorSignature,
+  required String methodSignature,
+  required String callSignature,
+}) {
+  final fields = _namedParameters(_parameterList(source, constructorSignature));
+  final parameters = _namedParameters(_parameterList(source, methodSignature));
+  final methodSource = _methodSource(source, methodSignature);
+  final forwarded = _topLevelNamedArguments(methodSource, callSignature);
+
+  expect(fields, isNotEmpty);
+  expect(parameters, isNotEmpty);
+  expect(
+    fields.difference(forwarded.keys.toSet()),
+    isEmpty,
+    reason: '$methodSignature가 옮기지 않는 생성자 필드가 있다',
+  );
+  for (final field in fields) {
+    final referenced = RegExp(
+      r'[A-Za-z_][A-Za-z0-9_]*',
+    ).allMatches(forwarded[field]!).map((match) => match.group(0)!).toSet();
+    expect(
+      referenced.contains(field) ||
+          referenced.contains('_$field') ||
+          referenced.intersection(parameters).isNotEmpty,
+      isTrue,
+      reason: '$methodSignature의 $field가 원래 값도 파라미터도 참조하지 않는다',
+    );
+  }
+}
+
+/// 호출 인자 목록에서 **최상위** named argument만 이름→값 식으로 뽑는다. 중첩 호출
+/// 안의 인자는 깊이로 걸러진다.
+Map<String, String> _topLevelNamedArguments(
+  String source,
+  String callSignature,
+) {
+  final start = source.indexOf(callSignature);
+  expect(start, isNonNegative, reason: '$callSignature를 찾지 못했다');
+  var index = start + callSignature.length;
+  var depth = 1;
+  final arguments = <String>[];
+  final buffer = StringBuffer();
+  while (depth > 0) {
+    final character = source[index];
+    depth += switch (character) {
+      '(' || '[' || '{' => 1,
+      ')' || ']' || '}' => -1,
+      _ => 0,
+    };
+    if (depth == 0) {
+      break;
+    }
+    if (character == ',' && depth == 1) {
+      arguments.add(buffer.toString());
+      buffer.clear();
+    } else {
+      buffer.write(character);
+    }
+    index += 1;
+  }
+  arguments.add(buffer.toString());
+
+  final named = <String, String>{};
+  final pattern = RegExp(
+    r'^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:(.*)$',
+    dotAll: true,
+  );
+  for (final argument in arguments) {
+    final match = pattern.firstMatch(argument);
+    if (match != null) {
+      named[match.group(1)!] = match.group(2)!;
+    }
+  }
+  return named;
 }
 
 /// [riskLevel]은 백엔드가 원자료로 계산하는 값이라 무단차 경로에서도 승차 step의

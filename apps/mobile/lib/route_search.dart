@@ -1190,8 +1190,10 @@ class RouteSearchV2Leg {
   final RouteSearchV2AccessibilityRisk accessibilityRisk;
 
   /// 백엔드가 내린 leg 계단 판정(#2590). `STAIR_ONLY`·`STEP_FREE`·`UNKNOWN`과, 계단
-  /// 개념이 적용되지 않는 구간을 뜻하는 `NOT_APPLICABLE`을 받는다. 판정 필드가 없는
-  /// 레거시 응답에서는 빈 문자열이고, 그때만 화면이 원자료로 폴백한다.
+  /// 개념이 적용되지 않는 구간을 뜻하는 `NOT_APPLICABLE`을 받는다. 이 값은 그 구간
+  /// 자신의 사실만 담으므로 경로 전체의 판정([RouteSearchV2Itinerary.stairAccess])과
+  /// 다를 수 있다 — 화면이 쓰는 것은 경로 판정이다. 판정 필드가 없는 레거시 응답에서는
+  /// 빈 문자열이고, 그때만 화면이 원자료로 폴백한다.
   final String stairAccess;
 
   /// 운행 클래스(SUBWAY·ITX_CHEONGCHUN). RIDE leg에서만 채워지고, 그 외에는 null.
@@ -1705,7 +1707,11 @@ class RouteSearchResult {
   /// 표시용 이름만 채워 넣은 사본. 온라인 결과는 화면에 닿기 전 반드시 이 경로를
   /// 지나므로([OnlineFirstRouteSearchRepository.searchRoute]), **여기서 옮기지 않은
   /// 필드는 화면에 도달하지 못하고 기본값으로 되돌아간다.** 필드를 더할 때 이 목록에
-  /// 함께 더해야 하며, 빠뜨리면 `route_search_test.dart`의 필드 누락 가드가 잡는다.
+  /// 함께 더한다.
+  ///
+  /// `route_search_test.dart`의 소스 가드가 생성자 필드가 전부 나타나는지, 그리고 그
+  /// 값이 원래 필드나 이 메서드의 파라미터를 참조하는지까지 본다. 그 이상(옮긴 값이
+  /// 의미상 맞는지)은 가드의 범위 밖이다.
   RouteSearchResult withDisplayLabels({
     String? originStationName,
     String? destinationStationName,
@@ -6529,17 +6535,20 @@ String _routeStairAccessLabel(String stairAccess) {
   };
 }
 
-/// 판정 필드가 없는 응답(레거시 백엔드·로컬 폴백)에서 쓰는 유일한 폴백 판정.
+/// 판정 필드가 없는 응답(레거시 백엔드·기기 내 로컬 경로)에서 쓰는 유일한 폴백 판정.
 ///
 /// 판정 규칙이 여러 벌로 갈리지 않도록 두 경로가 이 함수 하나만 쓴다. 격자는 백엔드
 /// `StairAccess`와 같다: 계단 구간이 하나라도 있으면 `stairOnly`, 미확인이 있으면
 /// `unknown`, 계단 개념이 적용되지 않는 구간(`notApplicable`)은 판정에 기여하지
-/// 않는다. 스텝이 없으면 판정 근거 자체가 없으므로 `unknown`이며, 백엔드의 표시
-/// 판정(`RouteSearchController.itineraryStairAccess`)도 같은 규칙으로 fail closed다.
+/// 않는다. 스텝이 전부 `notApplicable`이면 계단 장벽이 놓인 구간이 하나도 없다는
+/// 뜻이라 `stepFree`이고, 스텝이 아예 없으면 판정 근거 자체가 없어 `unknown`이다
+/// (백엔드 `StairAccess.ofItineraryDisplay`도 같은 규칙으로 fail closed다).
 ///
-/// 스텝이 전부 `notApplicable`이면 `stepFree`다 — 계단 장벽이 놓인 구간이 하나도
-/// 없다는 뜻이라 "근거 없음"과 다르다. 이 갈래는 경로 단위 신뢰도 경고를 짊어질
-/// 스텝이 없어 백엔드 판정을 복원하지 못하는 유일한 지점이기도 하다.
+/// **이 폴백은 백엔드 경로 판정의 복원이 아니다.** 경로 판정은 어느 구간에도 매달 수
+/// 없는 경로 단위 경고까지 반영하는데 스텝에는 그 신호가 없다. 판정 필드가 실린
+/// 응답에서 이 함수를 타면 표시가 실제 근거보다 강해질 수 있으므로, 호출은 판정
+/// 필드가 비었을 때로만 제한한다. 레거시 응답에서는 승차 leg의 미확인 원자료가
+/// 폴백을 `unknown`으로 떨어뜨려 그 방향으로는 새지 않는다.
 String _routeStairAccessFromSteps(List<RouteSearchStep> steps) {
   if (steps.isEmpty) {
     return 'unknown';
