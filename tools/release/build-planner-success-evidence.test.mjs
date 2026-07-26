@@ -100,6 +100,30 @@ test("official fare나 typed ITX RIDE가 없는 canary는 거부한다", () => {
   }), /official fare/);
 });
 
+test("#2560 무단차 대안을 포함한 3건 canary는 수락하고 alternativeCount 상한 초과(4건)는 거부한다", () => {
+  const stepFree = canary();
+  const stepFreeItinerary = {
+    ...stepFree.plan.itineraries[1],
+    objectiveTags: ["STEP_FREE_PREFERRED"],
+  };
+  stepFree.plan.itineraries = [...stepFree.plan.itineraries, stepFreeItinerary];
+
+  const evidence = buildPlannerSuccessEvidence({
+    candidate: { phase: "CANDIDATE", issue: 2056, releaseCandidateIdentity: identity },
+    canary: stepFree,
+  });
+
+  assert.equal(evidence.status, "SATISFIED");
+
+  const overflow = canary();
+  overflow.plan.itineraries = [...overflow.plan.itineraries, stepFreeItinerary, stepFreeItinerary];
+
+  assert.throws(() => buildPlannerSuccessEvidence({
+    candidate: { phase: "CANDIDATE", issue: 2056, releaseCandidateIdentity: identity },
+    canary: overflow,
+  }), /planner canary result contract is invalid/);
+});
+
 test("provenance는 기본 final-candidate이며 unknownPatternDefaultedToLocal은 false를 명시한다", () => {
   const evidence = buildPlannerSuccessEvidence({
     candidate: { phase: "CANDIDATE", issue: 2056, releaseCandidateIdentity: identity },

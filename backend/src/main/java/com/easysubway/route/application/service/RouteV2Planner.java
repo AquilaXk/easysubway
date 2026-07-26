@@ -18,12 +18,14 @@ import com.easysubway.route.application.port.out.LoadRouteTimetablePort;
 import com.easysubway.route.application.port.out.LoadRouteTimetablePort.RouteTimetable;
 import com.easysubway.route.application.service.RouteTimetableRaptorPlanner.CompiledTimetable;
 import com.easysubway.route.application.service.RouteTimetableRaptorPlanner.RealtimeOverlay;
+import com.easysubway.route.domain.ConstraintMode;
 import com.easysubway.route.domain.EtaSource;
 import com.easysubway.route.domain.ProfileWalkTimeCalculator;
 import com.easysubway.route.domain.RouteNotFoundException;
 import com.easysubway.route.domain.RouteSearchResult;
 import com.easysubway.route.domain.RouteSearchStatus;
 import com.easysubway.route.domain.RouteStep;
+import com.easysubway.route.domain.RouteWarningCode;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -33,6 +35,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
@@ -48,6 +51,13 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 	private static final Logger log = LoggerFactory.getLogger(RouteV2Planner.class);
 	private static final String PLANNER_ADR = "tools/routes/route-algorithm-v2-adr.json";
 	private static final int RANKING_CANDIDATE_LIMIT = 3;
+	// #2560: PREFER_STEP_FREE에서 objective 대표와 별개로 보존하는 무단차 대안의 objective tag다.
+	// RouteObjective(요청 스키마)는 그대로 두고 응답 태그 어휘만 넓힌다 — 요청으로 지정할 수 있는
+	// objective가 아니라 FASTEST·FEWEST_TRANSFERS와 같은 "대표" 표시이며, "무단차 선호가 고른
+	// 후보"를 뜻한다. 접근성 검증 여부까지 단언하지 않는다(경로의 검증 수준은 기존대로 warnings·
+	// stairAccessState·requiresAccessibilityCheck가 전달한다). 미지 태그를 무시하는 클라이언트는
+	// 기존 동작 그대로다.
+	private static final String STEP_FREE_OBJECTIVE_TAG = "STEP_FREE_PREFERRED";
 
 	private final RouteSearchUseCase routeSearchUseCase;
 	private final LoadRouteTimetablePort routeTimetablePort;
@@ -159,6 +169,7 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 				timetableItineraries = rankTimetableItineraries(
 					timetableItineraries,
 					command.objective(),
+					command.constraintMode(),
 					command.alternativeCount()
 				);
 				return new RouteV2Plan(
@@ -436,6 +447,7 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 	private List<RouteSearchResult> rankTimetableItineraries(
 		List<RouteSearchResult> itineraries,
 		RouteObjective requestedObjective,
+		ConstraintMode constraintMode,
 		int alternativeCount
 	) {
 		if (itineraries.isEmpty()) {
@@ -471,11 +483,50 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 		}
 		List<RouteSearchResult> ranked = new ArrayList<>(alternativeCount);
 		rankedFound.stream().limit(alternativeCount).forEach(ranked::add);
+		stepFreeAlternative(constraintMode, found, ranked, alternativeCount).ifPresent(ranked::add);
 		itineraries.stream()
 			.filter(itinerary -> itinerary.status() != RouteSearchStatus.FOUND)
 			.limit(alternativeCount - ranked.size())
 			.forEach(ranked::add);
 		return List.copyOf(ranked);
+	}
+
+	// #2560: 플래너가 보존한 무단차 후보(#2534)는 objective 대표 2건 축약에서 다시 버려진다. 두
+	// comparator 모두 accessibilityRiskScore가 3순위라, 환승 수가 같고 계단 경로가 더 빠르면 두 대표가
+	// 모두 계단 경로로 확정되기 때문이다. 선호(prefer)는 대안을 지우는 필터가 아니므로 대표를 교체하지
+	// 않고, alternativeCount에 남는 자리가 있을 때만 무단차 대표 1건을 덧붙인다 — 표시 선두("최속"·
+	// "최소 환승") 계약은 그대로 두고 응답 후보 집합만 넓힌다(정렬과 보존의 분리).
+	// 이미 응답에 담긴 대표 중 하나라도 계단이 없으면 무단차 선택지가 이미 노출된 것이므로 늘리지 않는다.
+	private Optional<RouteSearchResult> stepFreeAlternative(
+		ConstraintMode constraintMode,
+		List<RouteSearchResult> found,
+		List<RouteSearchResult> representatives,
+		int alternativeCount
+	) {
+		if (constraintMode != ConstraintMode.PREFER_STEP_FREE
+			|| representatives.size() >= alternativeCount
+			|| !representatives.stream().allMatch(this::includesStairs)) {
+			return Optional.empty();
+		}
+		List<String> representativeIds = representatives.stream()
+			.map(RouteSearchResult::routeSearchId)
+			.toList();
+		Comparator<RouteSearchResult> stepFreePreference = Comparator
+			.comparingInt(this::accessibilityRiskScore)
+			.thenComparingLong(this::plannedArrivalEpochSecond)
+			.thenComparingInt(RouteSearchResult::transferCount)
+			.thenComparing(RouteSearchResult::routeSearchId);
+		return found.stream()
+			.filter(itinerary -> !includesStairs(itinerary))
+			.filter(itinerary -> !representativeIds.contains(itinerary.routeSearchId()))
+			.min(stepFreePreference)
+			.map(itinerary -> withObjectiveTags(itinerary, List.of(STEP_FREE_OBJECTIVE_TAG)));
+	}
+
+	private boolean includesStairs(RouteSearchResult itinerary) {
+		return itinerary.steps().stream().anyMatch(RouteStep::includesStairs)
+			|| itinerary.warnings().stream()
+				.anyMatch(warning -> warning.code() == RouteWarningCode.STAIR_ONLY_ACCESS);
 	}
 
 	private long plannedArrivalEpochSecond(RouteSearchResult itinerary) {
