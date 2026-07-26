@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // #2514 (#2510 B0) 전국 candidate pack 게이트 하네스. #2549 (#2510 B1)에서 지역 데이터 편입으로 확장하고,
 // #2580 (#2510 B2-a)에서 편입 스키마를 다도메인 체인으로 일반화했으며, #2587 (#2510 B2-b)에서 그 스키마로
-// 두 번째 지역(부산 4노선 5도메인)을 편입했다.
+// 두 번째 지역(부산 4노선 5도메인)을 편입했다. #2595 (#2510 B3)에서 대전·광주 5도메인과 수도권 노선도
+// 11소스를 같은 스키마로 올리면서, 편입이 재정렬하는 표를 명시 선언하는 축(reorderedTables)을 더했다.
 //
 // candidate spec → candidate fixture 조립 → build-datapack.mjs --fixture → report-coverage-gaps.mjs
 // 실행을 한 명령으로 묶고, line-scope 재기술 전(baseline)/후(lineScoped) 두 variant를 같은 실행에서
@@ -57,9 +58,19 @@ import { promisify } from "node:util";
 
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
 import { isMainModule } from "../lib/is-main-module.mjs";
-import { parseMolitDaeguStationMappings } from "./build-molit-nationwide-fixture.mjs";
+import {
+  parseMolitDaeguStationMappings,
+  parseMolitDaejeonStationMappings,
+  parseMolitGwangjuStationMappings,
+} from "./build-molit-nationwide-fixture.mjs";
 import { BUSAN_LINES } from "./collect-busan-route-topology.mjs";
 import { DAEGU_LINES } from "./collect-daegu-datapack-sources.mjs";
+import {
+  listCapitalLightRailRouteMapPositionLines,
+} from "./collect-kric-capital-light-rail-route-map-positions.mjs";
+import {
+  listCapitalWideRailRouteMapPositionLines,
+} from "./collect-kric-capital-wide-rail-route-map-positions.mjs";
 import { parseArgs, requireArg, sortJson } from "./lib/ledger-admission-cli.mjs";
 import { materializeBusanAccessibility } from "./materialize-busan-accessibility.mjs";
 import { materializeBusanRouteMapPositions } from "./materialize-busan-route-map-positions.mjs";
@@ -71,6 +82,19 @@ import { materializeBusanTimetable } from "./materialize-busan-timetable.mjs";
 import { materializeDaeguAccessibility } from "./materialize-daegu-accessibility.mjs";
 import { materializeDaeguRouteMapPositions } from "./materialize-daegu-route-map-positions.mjs";
 import { materializeDaeguTimetable } from "./materialize-daegu-timetable.mjs";
+import { materializeDaejeonAccessibility } from "./materialize-daejeon-accessibility.mjs";
+import { materializeDaejeonRouteMapPositions } from "./materialize-daejeon-route-map-positions.mjs";
+import { materializeDaejeonTimetable } from "./materialize-daejeon-timetable.mjs";
+import { materializeGwangjuAccessibility } from "./materialize-gwangju-accessibility.mjs";
+import { materializeGwangjuRouteMapPositions } from "./materialize-gwangju-route-map-positions.mjs";
+import { materializeGwangjuTimetable } from "./materialize-gwangju-timetable.mjs";
+import {
+  materializeCapitalLightRailRouteMapPositions,
+} from "./materialize-kric-capital-light-rail-route-map-positions.mjs";
+import {
+  materializeCapitalWideRailRouteMapPositions,
+} from "./materialize-kric-capital-wide-rail-route-map-positions.mjs";
+import { materializeSeoulRouteMapPositions } from "./materialize-seoul-route-map-positions.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
@@ -132,6 +156,50 @@ const PACK_DATA_MATERIALIZERS = new Map([
     materialize: materializeBusanAccessibilityInclusion,
     inputs: { paths: ["snapshotPath", "topologySnapshotPath"], linePaths: [] },
   }],
+  // 대전·광주 편입 3종씩(#2595). 두 지역 모두 topology 전용 materializer가 편입 단위가 아니다 —
+  // 시각표 materializer가 topology·membership·시각표를 한 번에 싣는다(대전은 내부에서
+  // materializeDaejeonRouteTopology를 호출하고, 광주는 한 함수가 세 소스를 함께 등재한다). 그래서
+  // 지역마다 편입은 시각표·노선도·편의시설 3건이고 도메인은 5개다.
+  ["tools/datapack/materialize-daejeon-timetable.mjs", {
+    materialize: materializeDaejeonTimetableInclusion,
+    inputs: { paths: ["snapshotPath", "topologySnapshotPath", "stationMapPath"], linePaths: [] },
+  }],
+  ["tools/datapack/materialize-daejeon-route-map-positions.mjs", {
+    materialize: materializeDaejeonRouteMapInclusion,
+    inputs: { paths: ["snapshotPath", "topologySnapshotPath"], linePaths: [] },
+  }],
+  ["tools/datapack/materialize-daejeon-accessibility.mjs", {
+    materialize: materializeDaejeonAccessibilityInclusion,
+    inputs: { paths: ["snapshotPath", "topologySnapshotPath"], linePaths: [] },
+  }],
+  ["tools/datapack/materialize-gwangju-timetable.mjs", {
+    materialize: materializeGwangjuTimetableInclusion,
+    inputs: { paths: ["snapshotPath", "topologySnapshotPath", "stationMapPath"], linePaths: [] },
+  }],
+  ["tools/datapack/materialize-gwangju-route-map-positions.mjs", {
+    materialize: materializeGwangjuRouteMapInclusion,
+    inputs: { paths: ["snapshotPath", "topologySnapshotPath"], linePaths: [] },
+  }],
+  ["tools/datapack/materialize-gwangju-accessibility.mjs", {
+    materialize: materializeGwangjuAccessibilityInclusion,
+    inputs: { paths: ["snapshotPath", "topologySnapshotPath"], linePaths: [] },
+  }],
+  // 수도권 노선도 편입 3종(#2595). KRIC 광역·경전철 materializer는 소스(=노선) 하나만 처리하므로
+  // 편입 하나가 노선별 snapshot을 노선 층 경로 키로 받아 카탈로그 순서대로 체인한다 — 대구 시각표가
+  // 노선별 snapshot을 받는 형상과 같다. 세 편입 모두 승계 pack에 의존하지 않는다: topology를
+  // inventory 소스가 아니라 tracked snapshot 파일로만 대조하고 역·역노선을 스스로 만든다.
+  ["tools/datapack/materialize-kric-capital-wide-rail-route-map-positions.mjs", {
+    materialize: materializeCapitalWideRailRouteMapInclusion,
+    inputs: { paths: ["topologySnapshotPath"], linePaths: ["snapshotPath"] },
+  }],
+  ["tools/datapack/materialize-kric-capital-light-rail-route-map-positions.mjs", {
+    materialize: materializeCapitalLightRailRouteMapInclusion,
+    inputs: { paths: ["topologySnapshotPath"], linePaths: ["snapshotPath"] },
+  }],
+  ["tools/datapack/materialize-seoul-route-map-positions.mjs", {
+    materialize: materializeSeoulRouteMapInclusion,
+    inputs: { paths: ["snapshotPath"], linePaths: [] },
+  }],
 ]);
 // 부산 편입이 admission 정본을 찾을 때 쓰는 소스 id. 네 편입 모두 상수로 두어 문자열이 어댑터마다
 // 인라인으로 흩어지지 않게 한다.
@@ -139,12 +207,29 @@ const BUSAN_TOPOLOGY_SOURCE_ID = "busan-transportation-route-topology";
 const BUSAN_TIMETABLE_SOURCE_ID = "busan-transportation-timetable";
 const BUSAN_ROUTE_MAP_SOURCE_ID = "busan-transportation-route-map-positions";
 const BUSAN_ACCESSIBILITY_SOURCE_ID = "busan-transportation-accessibility";
+// 대전·광주 편입이 admission 정본을 찾을 때 쓰는 소스 id(#2595).
+const DAEJEON_TOPOLOGY_SOURCE_ID = "daejeon-station-distance-fare";
+const DAEJEON_TIMETABLE_SOURCE_ID = "daejeon-train-timetable";
+const DAEJEON_ROUTE_MAP_SOURCE_ID = "daejeon-transportation-route-map-positions";
+const DAEJEON_ACCESSIBILITY_SOURCE_ID = "daejeon-transportation-accessibility";
+const GWANGJU_TOPOLOGY_SOURCE_ID = "gwangju-transportation-route-topology";
+const GWANGJU_TIMETABLE_SOURCE_ID = "gwangju-transportation-cyberstation-timetable";
+const GWANGJU_ROUTE_MAP_SOURCE_ID = "gwangju-transportation-route-map-positions";
+const GWANGJU_ACCESSIBILITY_SOURCE_ID = "gwangju-transportation-accessibility";
+const SEOUL_ROUTE_MAP_SOURCE_ID = "seoul-metro-route-map-positions";
 // 형상과 무관하게 모든 편입 레코드가 갖는 키. 나머지 허용 키는 등재 형상의 경로 키와 아래 서술 키뿐이다.
+// reorderedTables는 선택 키다 — 선언한 편입에만 재정렬 허용이 열리고, 선언과 실제가 갈리면 fail closed 된다.
 const INCLUSION_BASE_KEYS = Object.freeze(["regionId", "materializer", "materializedAt", "lines", "addedRows"]);
+const INCLUSION_OPTIONAL_KEYS = Object.freeze(["reorderedTables"]);
 const INCLUSION_LINE_BASE_KEYS = Object.freeze(["lineNumber", "lineId"]);
 // 편입 레코드에 허용하는 서술 키. "*Ko 접미사면 통과"로 열어 두면 snapshotPathKo 같은 죽은 선언이 그대로
 // 통과해(실측) 선언과 실제 결속이 갈린 채 무성으로 남는다 — 실제로 쓰는 키만 명시로 연다.
-const INCLUSION_NARRATIVE_KEYS = Object.freeze(["reasonKo", "materializedAtReasonKo", "addedRowsKo"]);
+const INCLUSION_NARRATIVE_KEYS = Object.freeze([
+  "reasonKo",
+  "materializedAtReasonKo",
+  "addedRowsKo",
+  "reorderedTablesKo",
+]);
 
 export async function runNationwideCandidateCoverageGate({
   spec,
@@ -264,7 +349,7 @@ async function applyPackDataInclusions(spec, inherited, inventory, materializers
     const readTracked = (relativePath, key) => readTrackedBytes(relativePath, inputs, `${label}.${key}`);
     // 승계 스냅샷을 편입마다 다시 뜬다 — 체인의 n번째 편입에게 직전 편입 결과가 곧 승계 원본이므로
     // 앞선 편입이 실은 행도 뒤 편입의 불변 대상이 된다.
-    const inheritedSnapshot = inheritedRowSnapshot(fixture.packs[0]);
+    const inheritedSnapshot = inheritedRowSnapshot(fixture.packs[0], inclusion.reorderedTables ?? []);
     fixture = await entry.materialize(fixture, inclusion, { readTracked, inventory });
     if (!Array.isArray(fixture?.packs) || fixture.packs.length !== 1) {
       throw new Error(`${inclusion.materializer} must keep the candidate pack single`);
@@ -277,6 +362,8 @@ async function applyPackDataInclusions(spec, inherited, inventory, materializers
       materializer: inclusion.materializer,
       materializedAt: inclusion.materializedAt,
       addedRows,
+      // 재정렬 허용은 선언한 편입에만 열리므로 evidence에도 선언한 편입에만 남긴다.
+      ...(inclusion.reorderedTables ? { reorderedTables: [...inclusion.reorderedTables] } : {}),
       inputs: [...inputs.values()].sort((left, right) => codepointCompare(left.path, right.path)),
     });
   }
@@ -502,6 +589,302 @@ async function materializeBusanAccessibilityInclusion(fixture, inclusion, { read
   });
 }
 
+// 대전·광주·수도권 편입이 공유하는 노선 선언 대조(#2595). 이 세 지역에는 대구 DAEGU_LINES·부산
+// BUSAN_LINES 같은 collector 상수가 없어 저장소 정본을 admission 정본(source-inventory)의
+// coverageScope.lineIds로 잡는다 — 재기술 등재가 이미 같은 정본에 결속돼 있으므로(assertInventoryLineScopeSync)
+// 편입 선언과 재기술 선언이 한 정본을 함께 가리키게 된다.
+function assertDeclaredLinesMatchAdmissionScope(inclusion, inventory, sourceId) {
+  const declared = inclusion.lines.map(({ lineId }) => lineId);
+  const admitted = inventory?.sources?.find(({ id }) => id === sourceId)?.coverageScope?.lineIds;
+  if (!Array.isArray(admitted) || JSON.stringify(declared) !== JSON.stringify(admitted)) {
+    throw new Error(
+      `${inclusionLabel(inclusion)} pack data inclusion lines must match the ${sourceId} admission coverageScope lineIds: `
+        + `expected ${JSON.stringify(admitted)}, got ${JSON.stringify(declared)}`,
+    );
+  }
+}
+
+// 대전 편입 3종이 공유하는 topology snapshot 로딩. 세 materializer는 topology 계보를 contentSha256으로
+// 대조하는데 그 해시는 snapshot 내용에서 파생돼 재직렬화 사본도 같은 값을 낸다 — 부산과 같이 경로도
+// admission 정본에 결속한다.
+async function daejeonTopologySnapshot(inclusion, readTracked, inventory) {
+  assertAdmissionSnapshotPath(
+    inventory,
+    DAEJEON_TOPOLOGY_SOURCE_ID,
+    "topologyAdmissionEvidence",
+    inclusion.topologySnapshotPath,
+  );
+  return parseJsonBytes(
+    await readTracked(inclusion.topologySnapshotPath, "topologySnapshotPath"),
+    inclusion.topologySnapshotPath,
+  );
+}
+
+// 대전 시각표 편입 어댑터(#2595). 이 편입 하나가 topology·membership·시각표를 함께 싣는다 —
+// materializeDaejeonTimetable이 내부에서 materializeDaejeonRouteTopology를 호출해 운영기관·노선·역·
+// 역노선·구간을 먼저 만들고 그 위에 시각표를 얹기 때문이다. 따라서 대전 구간에서 이 편입이 항상 먼저다.
+async function materializeDaejeonTimetableInclusion(fixture, inclusion, { readTracked, inventory }) {
+  assertDeclaredLinesMatchAdmissionScope(inclusion, inventory, DAEJEON_TOPOLOGY_SOURCE_ID);
+  assertAdmissionSnapshotPath(
+    inventory,
+    DAEJEON_TIMETABLE_SOURCE_ID,
+    "scheduleAdmissionEvidence",
+    inclusion.snapshotPath,
+  );
+  const topologySnapshot = await daejeonTopologySnapshot(inclusion, readTracked, inventory);
+  const stationMapBytes = await readTracked(inclusion.stationMapPath, "stationMapPath");
+  return materializeDaejeonTimetable({
+    baseFixture: fixture,
+    timetableSnapshot: parseJsonBytes(
+      await readTracked(inclusion.snapshotPath, "snapshotPath"),
+      inclusion.snapshotPath,
+    ),
+    topologySnapshot,
+    inventory,
+    canonicalStationMappings: parseMolitDaejeonStationMappings(stationMapBytes),
+    now: new Date(inclusion.materializedAt),
+  });
+}
+
+// 대전 노선도 좌표 편입 어댑터(#2595). materializer가 snapshot 바이트 정체성(snapshotSha256)을 admission
+// 정본과 대조하지만 바이트 축만으로는 저장소 안 바이트 동일 사본도 통과한다 — 정본 snapshotPath에도 결속한다.
+async function materializeDaejeonRouteMapInclusion(fixture, inclusion, { readTracked, inventory }) {
+  assertDeclaredLinesMatchAdmissionScope(inclusion, inventory, DAEJEON_ROUTE_MAP_SOURCE_ID);
+  assertAdmissionSnapshotPath(
+    inventory,
+    DAEJEON_ROUTE_MAP_SOURCE_ID,
+    "routeMapAdmissionEvidence",
+    inclusion.snapshotPath,
+  );
+  const topologySnapshot = await daejeonTopologySnapshot(inclusion, readTracked, inventory);
+  const snapshotBytes = await readTracked(inclusion.snapshotPath, "snapshotPath");
+  return materializeDaejeonRouteMapPositions({
+    baseFixture: fixture,
+    snapshot: parseJsonBytes(snapshotBytes, inclusion.snapshotPath),
+    snapshotSha256: sha256Hex(snapshotBytes),
+    topologySnapshot,
+    inventory,
+    now: new Date(inclusion.materializedAt),
+  });
+}
+
+// 대전 교통약자 편의시설 편입 어댑터(#2595). 대구·부산 편의시설과 같이 정본에 바이트 축이 없어
+// (rawSha256·rowsSha256이 snapshot 내용에서 파생된다) 경로 결속이 유일한 정체성 축이다.
+async function materializeDaejeonAccessibilityInclusion(fixture, inclusion, { readTracked, inventory }) {
+  assertDeclaredLinesMatchAdmissionScope(inclusion, inventory, DAEJEON_ACCESSIBILITY_SOURCE_ID);
+  assertAdmissionSnapshotPath(
+    inventory,
+    DAEJEON_ACCESSIBILITY_SOURCE_ID,
+    "accessibilityAdmissionEvidence",
+    inclusion.snapshotPath,
+  );
+  const topologySnapshot = await daejeonTopologySnapshot(inclusion, readTracked, inventory);
+  return materializeDaejeonAccessibility({
+    baseFixture: fixture,
+    accessibilitySnapshot: parseJsonBytes(
+      await readTracked(inclusion.snapshotPath, "snapshotPath"),
+      inclusion.snapshotPath,
+    ),
+    topologySnapshot,
+    inventory,
+    now: new Date(inclusion.materializedAt),
+  });
+}
+
+// 광주 편입 3종이 공유하는 topology snapshot 로딩(대전과 같은 축).
+async function gwangjuTopologySnapshot(inclusion, readTracked, inventory) {
+  assertAdmissionSnapshotPath(
+    inventory,
+    GWANGJU_TOPOLOGY_SOURCE_ID,
+    "topologyAdmissionEvidence",
+    inclusion.topologySnapshotPath,
+  );
+  return parseJsonBytes(
+    await readTracked(inclusion.topologySnapshotPath, "topologySnapshotPath"),
+    inclusion.topologySnapshotPath,
+  );
+}
+
+// 광주 시각표 편입 어댑터(#2595). 대전과 달리 materializer가 다른 materializer를 호출하는 것이 아니라
+// 한 함수가 topology·membership·시각표 소스 셋을 함께 등재하고 역·역노선·구간·시각표를 한 번에 싣는다.
+// 결과는 같다 — 광주 구간에서 이 편입이 항상 먼저다.
+async function materializeGwangjuTimetableInclusion(fixture, inclusion, { readTracked, inventory }) {
+  assertDeclaredLinesMatchAdmissionScope(inclusion, inventory, GWANGJU_TOPOLOGY_SOURCE_ID);
+  assertAdmissionSnapshotPath(
+    inventory,
+    GWANGJU_TIMETABLE_SOURCE_ID,
+    "scheduleAdmissionEvidence",
+    inclusion.snapshotPath,
+  );
+  const topologySnapshot = await gwangjuTopologySnapshot(inclusion, readTracked, inventory);
+  const stationMapBytes = await readTracked(inclusion.stationMapPath, "stationMapPath");
+  return materializeGwangjuTimetable({
+    baseFixture: fixture,
+    timetableSnapshot: parseJsonBytes(
+      await readTracked(inclusion.snapshotPath, "snapshotPath"),
+      inclusion.snapshotPath,
+    ),
+    topologySnapshot,
+    inventory,
+    canonicalStationMappings: parseMolitGwangjuStationMappings(stationMapBytes),
+    now: new Date(inclusion.materializedAt),
+  });
+}
+
+// 광주 노선도 좌표 편입 어댑터(#2595).
+async function materializeGwangjuRouteMapInclusion(fixture, inclusion, { readTracked, inventory }) {
+  assertDeclaredLinesMatchAdmissionScope(inclusion, inventory, GWANGJU_ROUTE_MAP_SOURCE_ID);
+  assertAdmissionSnapshotPath(
+    inventory,
+    GWANGJU_ROUTE_MAP_SOURCE_ID,
+    "routeMapAdmissionEvidence",
+    inclusion.snapshotPath,
+  );
+  const topologySnapshot = await gwangjuTopologySnapshot(inclusion, readTracked, inventory);
+  const snapshotBytes = await readTracked(inclusion.snapshotPath, "snapshotPath");
+  return materializeGwangjuRouteMapPositions({
+    baseFixture: fixture,
+    snapshot: parseJsonBytes(snapshotBytes, inclusion.snapshotPath),
+    snapshotSha256: sha256Hex(snapshotBytes),
+    topologySnapshot,
+    inventory,
+    now: new Date(inclusion.materializedAt),
+  });
+}
+
+// 광주 교통약자 편의시설 편입 어댑터(#2595).
+async function materializeGwangjuAccessibilityInclusion(fixture, inclusion, { readTracked, inventory }) {
+  assertDeclaredLinesMatchAdmissionScope(inclusion, inventory, GWANGJU_ACCESSIBILITY_SOURCE_ID);
+  assertAdmissionSnapshotPath(
+    inventory,
+    GWANGJU_ACCESSIBILITY_SOURCE_ID,
+    "accessibilityAdmissionEvidence",
+    inclusion.snapshotPath,
+  );
+  const topologySnapshot = await gwangjuTopologySnapshot(inclusion, readTracked, inventory);
+  return materializeGwangjuAccessibility({
+    baseFixture: fixture,
+    accessibilitySnapshot: parseJsonBytes(
+      await readTracked(inclusion.snapshotPath, "snapshotPath"),
+      inclusion.snapshotPath,
+    ),
+    topologySnapshot,
+    inventory,
+    now: new Date(inclusion.materializedAt),
+  });
+}
+
+// 수도권 KRIC 노선도 편입 2종(광역·경전철)이 공유하는 체인 어댑터(#2595).
+//
+// 두 materializer는 소스(=노선) 하나만 처리하므로 편입 하나가 카탈로그 순서대로 노선별 snapshot을 체인한다.
+// 노선 선언은 collector 카탈로그(저장소 정본)와 대조하고, 노선별 snapshotPath는 그 노선 소스의 admission
+// 정본 경로에 결속한다 — materializer는 snapshotSha256(바이트)까지 보지만 바이트 축만으로는 저장소 안
+// 바이트 동일 사본이 통과한다.
+//
+// topologySnapshotPath는 결이 다르다: capital-route-topology는 inventory 소스가 아니라 tracked snapshot
+// 파일로만 존재해 admission 정본에 snapshotPath 항목 자체가 없다. 대신 노선도 정본이 선언한
+// topologySnapshotId에서 저장소 경로 규약(tools/datapack/sources/<snapshotId>.json)으로 경로를 유도해
+// 결속한다 — materializer는 contentSha256만 대조하므로(재직렬화 사본도 통과) 경로 축을 여기서 더한다.
+async function materializeCapitalRailRouteMapInclusion(fixture, inclusion, { readTracked, inventory }, {
+  catalog,
+  materialize,
+}) {
+  const catalogByLineId = new Map(catalog.map((line) => [line.lineId, line]));
+  const catalogOrder = catalog.map(({ lineId }) => lineId);
+  const declared = inclusion.lines.map(({ lineId }) => lineId);
+  if (new Set(declared).size !== declared.length
+    || declared.some((lineId) => !catalogByLineId.has(lineId))
+    || JSON.stringify(declared) !== JSON.stringify(catalogOrder.filter((lineId) => declared.includes(lineId)))) {
+    throw new Error(
+      `${inclusionLabel(inclusion)} pack data inclusion lines must be distinct tracked catalog lines in catalog order`,
+    );
+  }
+  const topologySnapshotPath = assertAdmissionTopologySnapshotPath(
+    inventory,
+    catalogByLineId.get(declared[0]).sourceId,
+    inclusion.topologySnapshotPath,
+  );
+  const topologySnapshot = parseJsonBytes(
+    await readTracked(topologySnapshotPath, "topologySnapshotPath"),
+    topologySnapshotPath,
+  );
+  let chained = fixture;
+  for (const line of inclusion.lines) {
+    const { sourceId } = catalogByLineId.get(line.lineId);
+    // 노선마다 자기 소스의 정본 경로에 결속한다 — 편입 하나가 여러 소스를 싣더라도 결속은 소스 단위다.
+    assertAdmissionSnapshotPath(inventory, sourceId, "routeMapAdmissionEvidence", line.snapshotPath);
+    assertAdmissionTopologySnapshotPath(inventory, sourceId, inclusion.topologySnapshotPath);
+    const snapshotBytes = await readTracked(line.snapshotPath, "lines[].snapshotPath");
+    chained = materialize({
+      baseFixture: chained,
+      snapshot: parseJsonBytes(snapshotBytes, line.snapshotPath),
+      snapshotSha256: sha256Hex(snapshotBytes),
+      topologySnapshot,
+      inventory,
+      now: new Date(inclusion.materializedAt),
+    });
+  }
+  return chained;
+}
+
+async function materializeCapitalWideRailRouteMapInclusion(fixture, inclusion, context) {
+  return materializeCapitalRailRouteMapInclusion(fixture, inclusion, context, {
+    catalog: listCapitalWideRailRouteMapPositionLines(),
+    materialize: materializeCapitalWideRailRouteMapPositions,
+  });
+}
+
+async function materializeCapitalLightRailRouteMapInclusion(fixture, inclusion, context) {
+  return materializeCapitalRailRouteMapInclusion(fixture, inclusion, context, {
+    catalog: listCapitalLightRailRouteMapPositionLines(),
+    materialize: materializeCapitalLightRailRouteMapPositions,
+  });
+}
+
+// 서울교통공사 1~8호선 노선도 좌표 편입 어댑터(#2595). 노선 선언은 admission 정본의 lineIds와 대조하고,
+// lineNumber는 그 정본이 1호선부터 8호선 순으로 기술된다는 사실(실측)에 결속한다.
+async function materializeSeoulRouteMapInclusion(fixture, inclusion, { readTracked, inventory }) {
+  assertDeclaredLinesMatchAdmissionScope(inclusion, inventory, SEOUL_ROUTE_MAP_SOURCE_ID);
+  if (inclusion.lines.some((line, index) => line.lineNumber !== index + 1)) {
+    throw new Error(
+      `${inclusionLabel(inclusion)} pack data inclusion lines must declare Seoul line numbers 1 through `
+        + `${inclusion.lines.length} in admission order`,
+    );
+  }
+  assertAdmissionSnapshotPath(
+    inventory,
+    SEOUL_ROUTE_MAP_SOURCE_ID,
+    "routeMapAdmissionEvidence",
+    inclusion.snapshotPath,
+  );
+  const snapshotBytes = await readTracked(inclusion.snapshotPath, "snapshotPath");
+  return materializeSeoulRouteMapPositions({
+    baseFixture: fixture,
+    snapshot: parseJsonBytes(snapshotBytes, inclusion.snapshotPath),
+    snapshotSha256: sha256Hex(snapshotBytes),
+    inventory,
+    now: new Date(inclusion.materializedAt),
+  });
+}
+
+// capital-route-topology는 inventory 소스가 아니라 tracked snapshot 파일로만 존재해 admission 정본에
+// snapshotPath 항목이 없다. 노선도 정본의 topologySnapshotId에서 저장소 경로 규약으로 경로를 유도해
+// 선언과 대조하고, 유도한 경로를 돌려준다.
+function assertAdmissionTopologySnapshotPath(inventory, sourceId, snapshotPath) {
+  const snapshotId = inventory?.sources?.find(({ id }) => id === sourceId)
+    ?.routeMapAdmissionEvidence?.topologySnapshotId;
+  const expected = typeof snapshotId === "string" && snapshotId.trim() !== ""
+    ? `tools/datapack/sources/${snapshotId}.json`
+    : null;
+  if (expected === null || expected !== snapshotPath) {
+    throw new Error(
+      `pack data inclusion topologySnapshotPath must match the ${sourceId} admission evidence topologySnapshotId path: `
+        + `expected ${expected}, got ${snapshotPath}`,
+    );
+  }
+  return expected;
+}
+
 // 편입이 읽는 snapshot 경로를 admission 정본이 선언한 경로와 결속한다(바이트 축이 없는 소스의 대칭 보완).
 function assertAdmissionSnapshotPath(inventory, sourceId, evidenceKey, snapshotPath) {
   const declared = inventory?.sources?.find(({ id }) => id === sourceId)?.[evidenceKey]?.snapshotPath;
@@ -527,15 +910,36 @@ function packRowCounts(pack) {
 }
 
 // 승계 행이 in-place로 바뀌면 행수 차이는 0이라 assertDeclaredRows가 못 잡는다. 편입 전 각 표의
-// 행수와 바이트 해시를 떠 두고, 편입 후 같은 표의 앞쪽 승계 행이 그대로인지 본다(materializer는 append만
-// 한다는 전제 — 삽입·재정렬·수정이 일어나면 그 자체가 검토 대상이므로 fail closed가 옳다).
-export function inheritedRowSnapshot(pack) {
+// 행수와 바이트 해시를 떠 두고, 편입 후 같은 표의 앞쪽 승계 행이 그대로인지 본다(기본 전제는 append —
+// 삽입·재정렬·수정이 일어나면 그 자체가 검토 대상이므로 fail closed가 옳다).
+//
+// #2595에서 그 검토가 실제로 왔다: 수도권 노선도 materializer 3종은 append 뒤 pack.operators·pack.lines·
+// pack.coverageLineOperatorScopes를 id로 재정렬한다(실측). 정렬 자체는 승계 행을 바꾸지 않으므로 편입을
+// 막을 이유가 아니지만, 전제를 조용히 푸는 것도 옳지 않다 — 편입이 reorderedTables로 재정렬 표를 명시
+// 선언한 경우에만 그 표를 위치 대신 다중집합으로 본다. 선언한 표에서도 승계 행의 수정·삭제·중복도 변화는
+// 그대로 fail closed이며, 선언하지 않은 표는 접두사 대조가 그대로 적용된다.
+export function inheritedRowSnapshot(pack, reorderedTables = []) {
+  const reordered = new Set(reorderedTables);
+  const tables = packRowTables(pack);
   return {
     counts: packRowCounts(pack),
-    fingerprints: Object.fromEntries(
-      packRowTables(pack).map((table) => [table, sha256Hex(JSON.stringify(pack[table]))]),
+    fingerprints: Object.fromEntries(tables.map((table) => [table, sha256Hex(JSON.stringify(pack[table]))])),
+    reorderedTables: [...reorderedTables],
+    // 행 단위 다중집합은 선언한 표에만 뜬다. 전 표에 뜨면 편입마다 20만 행을 행별로 해시하게 돼
+    // 조립 비용이 표 크기에 비례해 불어난다 — 선언한 표에만 그 값을 치른다.
+    rowBags: Object.fromEntries(
+      tables.filter((table) => reordered.has(table)).map((table) => [table, rowMultiset(pack[table])]),
     ),
   };
+}
+
+function rowMultiset(rows) {
+  const bag = new Map();
+  for (const row of rows) {
+    const hash = sha256Hex(JSON.stringify(row));
+    bag.set(hash, (bag.get(hash) ?? 0) + 1);
+  }
+  return bag;
 }
 
 function subtractRowCounts(after, before) {
@@ -561,13 +965,42 @@ function assertDeclaredRows(inclusion, addedRows) {
 }
 
 export function assertInheritedRowsUnchanged(label, snapshot, pack) {
+  // 승계 pack에 없는 표를 재정렬 대상으로 선언하면 그 선언은 아무것도 완화하지 않은 채 남는다
+  // (그 편입이 처음 만드는 표에는 승계 행 자체가 없다) — 죽은 선언을 그 자리에서 되돌린다.
+  for (const table of snapshot.reorderedTables ?? []) {
+    if (!(table in snapshot.fingerprints)) {
+      throw new Error(`${label} pack data inclusion declared a reordered table the inherited pack lacks: ${table}`);
+    }
+  }
   for (const [table, fingerprint] of Object.entries(snapshot.fingerprints)) {
     const rows = pack[table];
     if (!Array.isArray(rows) || rows.length < snapshot.counts[table]) {
       throw new Error(`${label} pack data inclusion dropped inherited rows: ${table}`);
     }
-    if (sha256Hex(JSON.stringify(rows.slice(0, snapshot.counts[table]))) !== fingerprint) {
+    const inheritedBag = snapshot.rowBags?.[table];
+    if (!inheritedBag) {
+      if (sha256Hex(JSON.stringify(rows.slice(0, snapshot.counts[table]))) !== fingerprint) {
+        throw new Error(`${label} pack data inclusion modified inherited rows: ${table}`);
+      }
+      continue;
+    }
+    // 재정렬을 선언한 표: 승계 행이 전부 바이트 동일하게, 같은 중복도로 남아 있어야 한다. 늘어난 행수는
+    // assertDeclaredRows가 따로 잡으므로 이 둘을 합치면 "승계 다중집합 + 선언한 증가분"으로 결과가 고정된다.
+    const remaining = new Map(inheritedBag);
+    for (const row of rows) {
+      const hash = sha256Hex(JSON.stringify(row));
+      const count = remaining.get(hash);
+      if (count === undefined) continue;
+      if (count === 1) remaining.delete(hash);
+      else remaining.set(hash, count - 1);
+    }
+    if (remaining.size > 0) {
       throw new Error(`${label} pack data inclusion modified inherited rows: ${table}`);
+    }
+    // 선언은 실측과 일치해야 한다. 실제로 재정렬이 없었다면(접두사가 그대로면) 그 선언은 접두사 대조를
+    // 근거 없이 끈 것이므로 거부한다 — 선언과 실제가 갈린 채 무성으로 남지 않게 한다.
+    if (sha256Hex(JSON.stringify(rows.slice(0, snapshot.counts[table]))) === fingerprint) {
+      throw new Error(`${label} pack data inclusion declared a reordered table that stayed in order: ${table}`);
     }
   }
 }
@@ -903,6 +1336,15 @@ function buildEvidence({ spec, inputs, packDataInclusions, reports, variants, si
       variantParityKo:
         "편입 행은 두 variant에 동일하게 들어간다. 편입은 line-scope 재기술과 독립이며, variant를 가르는 "
         + "축은 재기술뿐이다.",
+      reorderedTablesKo:
+        "승계 행 불변 대조의 기본 전제는 append다 — 편입 후에도 각 표의 앞쪽 승계 행이 바이트 그대로여야 "
+        + "한다. 일부 materializer는 append 뒤 표를 id로 다시 정렬하는데(수도권 노선도 3종의 operators·"
+        + "lines·coverageLineOperatorScopes, 실측), 정렬은 승계 행 자체를 바꾸지 않으므로 편입을 막을 "
+        + "이유가 아니다. 그렇다고 전제를 조용히 풀지도 않는다: 편입이 reorderedTables로 그 표를 명시 "
+        + "선언한 경우에만 위치 대신 다중집합으로 본다. 선언한 표에서도 승계 행의 수정·삭제·중복도 변화는 "
+        + "그대로 fail closed이고, 선언하지 않은 표는 접두사 대조가 그대로 적용되며, 실제로 재정렬이 없는 "
+        + "표를 선언하거나 승계 행이 없는 표를 선언하면 그 선언 자체가 거부된다. 아래 entries에 이 키가 "
+        + "없는 편입은 append만 했다는 뜻이다.",
       chainKo:
         "entries는 적용 순서다. 한 지역에 여러 도메인을 편입하면 뒤 편입의 승계 원본은 앞 편입 결과이므로 "
         + "앞선 편입이 실은 행도 뒤 편입의 불변 대상이 된다. 순서를 조립이 강제하는 구간은 선행 조건이 "
@@ -916,7 +1358,20 @@ function buildEvidence({ spec, inputs, packDataInclusions, reports, variants, si
         + "topology가 먼저라는 것뿐이다. 다만 부산 노선도 편입은 승계 원본에 없던 표"
         + "(routeMapLineTracks)를 새로 만들기 때문에 뒤 세 편입끼리의 교환도 조립을 통과하지 못한다"
         + "(실측) — 그 표를 0으로 선언해야 하는 편입이 순서에 따라 갈려 선언 행수 대조에서 걸리며, "
-        + "이는 선행 조건 위반과 다른 축이다.",
+        + "이는 선행 조건 위반과 다른 축이다. 대전·광주는 부산과 같은 모양이되 편입 단위가 다르다: "
+        + "topology 전용 materializer가 편입이 아니고 시각표 편입 하나가 topology·membership·시각표를 "
+        + "함께 싣는다(대전은 시각표 materializer가 topology materializer를 호출하고, 광주는 한 함수가 "
+        + "세 소스를 함께 등재한다). 그래서 두 지역 모두 시각표 편입이 먼저다 — 노선도·편의시설 "
+        + "materializer는 그 지역 운영기관이 pack에 있을 것과 시각표 소스가 등재돼 있을 것을 함께 선행 "
+        + "조건으로 검사하고, 시각표 편입보다 앞서면 실측상 운영기관 조건에서 먼저 fail closed 된다. 반면 "
+        + "노선도와 편의시설 사이에는 선행 조건이 없어(대구와 같다) 두 편입의 교환은 조립을 통과한다(실측). "
+        + "수도권 노선도 세 편입은 승계 pack 의존이 아예 없다 — 경로 그래프 계보를 inventory 소스가 아니라 "
+        + "tracked snapshot 파일로 대조하고 역·역노선을 스스로 만들어, 세 편입 사이에도 다른 지역에 대해서도 "
+        + "선행 조건이 없다. 그런데도 순서를 바꾸면 조립이 막힌다(실측): 광역철도 편입이 승계 원본에 없던 "
+        + "표(coverageLineOperatorScopes)를 새로 만들고 환승역 중복 제거 결과(stations·stationLines)도 앞선 "
+        + "편입이 무엇을 실었는지에 따라 갈려, 부산 노선도와 같은 선언 행수 대조가 걸린다. 재정렬 선언"
+        + "(reorderedTables)도 같은 순서에 묶여 있지만(그 표에 승계 행이 있는지가 순서에 따라 갈린다) "
+        + "실측상 먼저 걸리는 것은 행수 대조다.",
       entries: packDataInclusions,
     },
     lineScopeRedescriptions: spec.lineScopeRedescriptions.map((redescription) => ({
@@ -1152,6 +1607,21 @@ function validatePackDataInclusions(spec, materializers) {
         throw new Error(`${label}.addedRows.${table} must be a non-negative integer`);
       }
     }
+    validateReorderedTables(inclusion, label);
+  }
+}
+
+// 재정렬 선언은 선택 키다. 선언하지 않으면 승계 행 접두사 대조가 그대로 적용되고, 선언하면 그 표만
+// 다중집합 대조로 바뀐다. 빈 배열은 아무것도 열지 않는 죽은 선언이라 키 자체를 두지 않는 것과 갈리지
+// 않으므로 거부한다. 표 이름은 중복 없이 코드포인트 오름차순으로 둬 spec diff가 정렬에 흔들리지 않게 한다.
+function validateReorderedTables(inclusion, label) {
+  if (inclusion.reorderedTables === undefined) return;
+  const tables = requiredStringArray(inclusion.reorderedTables, `${label}.reorderedTables`);
+  if (new Set(tables).size !== tables.length) {
+    throw new Error(`${label}.reorderedTables must not repeat a table`);
+  }
+  if (JSON.stringify(tables) !== JSON.stringify([...tables].sort(codepointCompare))) {
+    throw new Error(`${label}.reorderedTables must be sorted by codepoint`);
   }
 }
 
@@ -1167,15 +1637,23 @@ function validateInclusionInputs(inclusion, inputs, label) {
   for (const key of paths) {
     requiredString(inclusion[key], `${label}.${key}`);
   }
-  assertKnownKeys(inclusion, [...INCLUSION_BASE_KEYS, ...INCLUSION_NARRATIVE_KEYS, ...paths], label);
+  assertKnownKeys(
+    inclusion,
+    [...INCLUSION_BASE_KEYS, ...INCLUSION_OPTIONAL_KEYS, ...INCLUSION_NARRATIVE_KEYS, ...paths],
+    label,
+  );
   if (!Array.isArray(inclusion.lines) || inclusion.lines.length === 0) {
     throw new Error(`${label}.lines must be a non-empty array`);
   }
   for (const line of inclusion.lines) {
-    if (!Number.isInteger(line?.lineNumber) || line.lineNumber <= 0) {
+    // lineNumber는 숫자 노선명이 있는 편입에서만 뜻이 있다. 수도권 광역·경전철(경의중앙·경춘·수인분당·
+    // 경강·공항철도·의정부·에버라인·우이신설·신림·김포골드)에는 숫자 노선명이 아예 없어 선언할 값이
+    // 없다 — 없는 번호를 지어내면 선언이 거짓이 되므로 그 편입은 키를 생략한다. 있으면 양의 정수여야
+    // 하고, 어느 편입에서든 노선 정체성 축(lineId)은 요구하며 어댑터가 저장소 정본과 대조한다.
+    if (line?.lineNumber !== undefined && (!Number.isInteger(line.lineNumber) || line.lineNumber <= 0)) {
       throw new Error(`${label}.lines[].lineNumber must be a positive integer`);
     }
-    requiredString(line.lineId, `${label}.lines[].lineId`);
+    requiredString(line?.lineId, `${label}.lines[].lineId`);
     for (const key of linePaths) {
       requiredString(line[key], `${label}.lines[].${key}`);
     }

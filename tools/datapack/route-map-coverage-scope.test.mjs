@@ -780,16 +780,19 @@ test("MOLIT roster가 없는 scope는 감사에서 제외되고 위반으로 남
   );
 });
 
+// 대상 소스는 candidate spec이 재기술하지 않는 소스여야 이 축을 때린다. 재기술이 있는 소스에서 경로만
+// 지우면 판정이 재기술 근거 쪽 축(SOURCE_CANDIDATE_SCOPE_UNAUDITED)으로 넘어가 이 분기를 덮지 못한다
+// (#2595에서 대전 소스가 재기술 대상이 되면서 실제로 그렇게 갈렸다).
 test("lineIds를 claim한 route_map_positions 소스는 admitted snapshot 경로가 있어야 한다 (#2516)", async () => {
   const inputs = await loadAuditInputs();
   const inventory = structuredClone(inputs.inventory);
-  const source = inventory.sources.find(({ id }) => id === "daejeon-transportation-route-map-positions");
+  const source = inventory.sources.find(({ id }) => id === "kric-seohae-route-map-positions");
   delete source.routeMapAdmissionEvidence.snapshotPath;
 
   const result = auditRouteMapCoverageScopes({ ...inputs, inventory });
 
   assert.deepEqual(violationKinds(result), ["SOURCE_SNAPSHOT_PATH_MISSING"]);
-  assert.equal(result.auditedScopeKeys.includes("daejeon:daejeon-transportation:line-7051a9c2525c"), false);
+  assert.equal(result.auditedScopeKeys.includes("capital:korail:line-051552e50435"), false);
 });
 
 // #2514(#2510 B0)의 candidate 게이트 line-scope 재기술은 admitted snapshot 파일 없이 lineIds를 claim한다.
