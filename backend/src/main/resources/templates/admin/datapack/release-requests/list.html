@@ -23,12 +23,19 @@
 
 	<section class="admin-panel">
 		<h2>수동 dispatch 필요</h2>
-		<p>승인된 요청은 아래 명령의 경로 표시를 실제 evidence 파일로 바꾼 뒤 실행합니다.</p>
+		<p>승인된 요청은 아래 명령의 경로 표시를 실제 evidence 파일로 바꾼 뒤 실행합니다. <strong>요청 행의 대상 채널에 맞는 명령을 사용합니다</strong> — <code>production-publish</code>는 <code>targetChannel=production</code>에서만 허용되고 다른 채널로 보내면 워크플로가 즉시 실패합니다.</p>
+		<h3>프로덕션 요청</h3>
 		<pre><code>gh workflow run datapack-release.yml \
   --ref main \
   -f mode=production-publish \
   -f targetChannel=production \
   -f modeArgs='{"buildSpecPath":"&lt;빌드 스펙 경로&gt;","releaseRequestId":"&lt;릴리스 요청 ID&gt;","releaseRequestPath":"&lt;릴리스 요청 파일 경로&gt;","androidEvidencePath":"&lt;Android 증거 경로&gt;","strictRouteRegressionPath":"&lt;경로 회귀 증거 경로&gt;"}'</code></pre>
+		<h3>스테이징 · 개발 요청</h3>
+		<pre><code>gh workflow run datapack-release.yml \
+  --ref main \
+  -f mode=exploratory \
+  -f targetChannel=&lt;staging 또는 dev&gt; \
+  -f modeArgs='{"buildSpecPath":"&lt;빌드 스펙 경로&gt;","releaseRequestId":"&lt;릴리스 요청 ID&gt;","allowGaps":"false"}'</code></pre>
 		<p><strong>후보 등록:</strong> 현재 후보 생성·등록 경로는 없습니다. 이 화면은 <code>datapack_candidates</code>에 이미 등록된 <code>PROMOTED</code> 행만 읽습니다. 등록되지 않은 후보를 추정하거나 DB에 직접 넣지 말고 릴리스 요청 생성을 중단합니다.</p>
 	</section>
 

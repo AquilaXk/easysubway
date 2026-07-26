@@ -66,8 +66,13 @@ class DatapackReleaseRequestAdminPageControllerTest {
 			.contains("href=\"/admin/datapack/release-requests/page\"")
 			.contains("수동 dispatch 필요")
 			.contains("gh workflow run datapack-release.yml")
+			.contains("프로덕션 요청")
 			.contains("mode=production-publish")
 			.contains("targetChannel=production")
+			// 비프로덕션 요청에는 production dispatch가 아니라 채널에 맞는 명령을 안내한다.
+			.contains("스테이징 · 개발 요청")
+			.contains("mode=exploratory")
+			.contains("targetChannel=&lt;staging 또는 dev&gt;")
 			.contains("buildSpecPath")
 			.contains("releaseRequestId")
 			.contains("releaseRequestPath")
