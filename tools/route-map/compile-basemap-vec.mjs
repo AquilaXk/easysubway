@@ -2103,11 +2103,22 @@ export function stripHiddenElements(markup) {
 //
 // [범위] fill과 stroke가 **둘 다 보이는** 요소만 분해한다. 한쪽이 none/미지정이면
 // paint-order는 렌더 결과에 영향이 없어(무의미한 draw 하나만 늘어난다) 원본
-// 마크업을 그대로 둔다 — 수도권·대전·광주 라벨 산출물이 바뀌지 않는 이유다.
+// 마크업을 그대로 둔다. 그 결과 권역별 영향은 다음과 같다(실측):
+//   - 부산 text 147 + path 2, 대구 text 97 — 역명 라벨이 복원된다.
+//   - 수도권 path 6(공항 아이콘)만 분해 — **역명 라벨은 분해 대상 0건**이지만
+//     아이콘 분해 때문에 seoul.vec 자체는 바뀐다(라벨 불변 ≠ .vec 불변).
+//   - 대전·광주 0건 — 산출물이 바이트 단위로 동일하다.
 const PAINT_ORDER_DEFAULT_SEQUENCE = ["fill", "stroke", "markers"];
-// halo(stroke 전용) 사본의 id 접미사. 오너 요소 전수를 세는 게이트들이 halo
-// 사본을 오너 요소로 오인하지 않도록 이 상수를 공유한다(문자열 중복 금지).
+// halo(stroke 전용) 사본의 표식. 오너 요소 전수를 세는 게이트들이 halo 사본을
+// 오너 요소로 오인하지 않도록 이 상수를 공유한다(문자열 중복 금지).
+//   - 표식 속성이 정본이다: id가 없는 요소도 분해될 수 있어 id 접미사만으로는
+//     판별이 불가능하다. 게이트는 이 속성으로 판별한다.
+//   - id 접미사는 그와 별개로 **문서 내 id 중복을 피하기 위한** 것이다.
+export const PAINT_ORDER_STROKE_COPY_ATTR = "data-paint-order-stroke-copy";
 export const PAINT_ORDER_STROKE_COPY_ID_SUFFIX = "-paint-order-stroke";
+// SVG presentation attribute로 실제 쓰이는 마커 property. CSS 축약형 `marker`는
+// presentation attribute가 아니라서 축약형만 보면 마커를 전부 놓친다.
+const MARKER_PROPERTIES = ["marker", "marker-start", "marker-mid", "marker-end"];
 
 // SVG 사양(`paint-order: normal | [ fill || stroke || markers ]`)대로 실제 그리기
 // 순서를 해석한다. 명시되지 않은 나머지 레이어는 기본 순서(fill·stroke·markers)로
@@ -2206,7 +2217,12 @@ function paintOnlyCopy(subtree, keep) {
     );
   }
   const openTagEnd = copy.indexOf(">") + 1;
-  const openTag = withProperty(copy.slice(0, openTagEnd), dropped, "none");
+  let openTag = withProperty(copy.slice(0, openTagEnd), dropped, "none");
+  if (keep === "stroke") {
+    // halo 사본의 정본 표식 — id가 없는 요소도 다운스트림 게이트가 정확히
+    // 걸러낼 수 있게 한다. 컴파일러가 무시하는 data-* 속성이라 렌더에 영향이 없다.
+    openTag = withProperty(openTag, PAINT_ORDER_STROKE_COPY_ATTR, "true");
+  }
   return openTag + copy.slice(openTagEnd);
 }
 
@@ -2227,9 +2243,16 @@ export function decomposePaintOrder(markup) {
         const fillVisible = isVisiblePaint(effectivePaintValue(child, "fill"));
         const strokeVisible = isVisiblePaint(effectivePaintValue(child, "stroke"));
         if (strokeFirst && fillVisible && strokeVisible) {
-          if (declaredProperty(child.openTag, "marker") != null) {
+          // 마커를 가진 요소를 분해하면 두 사본이 마커를 중복 렌더한다.
+          // 축약형 `marker`뿐 아니라 실제로 쓰이는 marker-start/mid/end까지 본다.
+          const marker = MARKER_PROPERTIES.find((property) => {
+            const value = declaredProperty(child.openTag, property);
+            return value != null && isVisiblePaint(value);
+          });
+          if (marker) {
             throw new Error(
-              `marker와 paint-order를 함께 쓰는 요소는 지원하지 않습니다: ${child.openTag}`,
+              `marker(${marker})와 paint-order를 함께 쓰는 요소는 지원하지 ` +
+                `않습니다 — 사본이 마커를 중복 렌더합니다: ${child.openTag}`,
             );
           }
           targets.push(child);

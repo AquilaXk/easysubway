@@ -36,7 +36,7 @@ import {
   resolveStationNameLabelLayerId,
   svgLayerCandidateIds,
   DECOR_SERVICE_MARK_SAMPLE_IDS,
-  PAINT_ORDER_STROKE_COPY_ID_SUFFIX,
+  PAINT_ORDER_STROKE_COPY_ATTR,
 } from "./compile-basemap-vec.mjs";
 
 const sourcesDir = path.join(import.meta.dirname, "route-map-defs/svg-sources");
@@ -178,9 +178,9 @@ function svgStationLabels(text) {
     for (const child of node.children) {
       if (child.name === "text") {
         // #2068 paint-order 분해가 만든 halo 사본은 같은 오너 라벨의 stroke
-        // 레이어라 라벨 전수에 두 번 세지 않는다(글자 사본이 원본 id를 유지).
-        const id = attrOf(child.attrs, "id") ?? "";
-        if (id.endsWith(PAINT_ORDER_STROKE_COPY_ID_SUFFIX)) continue;
+        // 레이어라 라벨 전수에 두 번 세지 않는다(글자 사본이 원본 요소를 유지).
+        // id가 없는 halo 사본도 걸러지도록 표식 속성으로 판별한다.
+        if (attrOf(child.attrs, PAINT_ORDER_STROKE_COPY_ATTR) === "true") continue;
         const role =
           attrOf(child.attrs, "data-label-role") ??
           attrOf(child.parent?.attrs ?? "", "data-label-role");

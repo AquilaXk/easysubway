@@ -32,6 +32,8 @@ import {
   decomposePaintOrder,
   normalizeSvgForCompile,
   resolvePaintOrderSequence,
+  PAINT_ORDER_STROKE_COPY_ATTR,
+  PAINT_ORDER_STROKE_COPY_ID_SUFFIX,
 } from "./compile-basemap-vec.mjs";
 
 const root = path.resolve(import.meta.dirname, "../..");
@@ -48,7 +50,24 @@ const REGIONS = [
   { id: "gwangju", svg: "easy-subway-gwangju-v3.svg" },
 ];
 
-const STROKE_COPY_ID_SUFFIX = "-paint-order-stroke";
+// 정본 상수는 compile-basemap-vec.mjs가 export한다 — 여기서 리터럴을 다시
+// 선언하면 접미사·표식이 바뀔 때 아래 정규식들이 조용히 0건 매칭이 된다.
+const STROKE_COPY_ID_SUFFIX = PAINT_ORDER_STROKE_COPY_ID_SUFFIX;
+const strokeCopyAttrPattern = new RegExp(
+  `\\s${PAINT_ORDER_STROKE_COPY_ATTR}="true"`,
+);
+
+/**
+ * 사본 대조용 정규화 — halo 표식과 id 접미사를 지워 두 사본을 같은 기준으로 만든다.
+ * **표식 속성을 먼저** 지운다: 접미사 문자열이 표식 속성명에도 들어 있어
+ * 접미사를 먼저 지우면 속성명이 망가져 표식이 남는다.
+ */
+function canonicalCopy(markup) {
+  return markup
+    .replace(new RegExp(`\\s${PAINT_ORDER_STROKE_COPY_ATTR}="true"`, "g"), "")
+    .replaceAll(STROKE_COPY_ID_SUFFIX, "")
+    .replace(/\s(?:fill|stroke)="[^"]*"/g, "");
+}
 
 const normalizedByRegion = new Map(
   REGIONS.map((region) => [
@@ -74,6 +93,26 @@ function declaredProperty(openTag, property) {
 function isVisiblePaint(value) {
   const normalized = String(value ?? "").toLowerCase();
   return normalized !== "" && normalized !== "none" && normalized !== "transparent";
+}
+
+/**
+ * 마크업에서 halo(stroke 전용) 사본의 **루트 여는 태그**를 모두 찾는다.
+ * 반환 원소는 `[openTag, tagName]`이고 `.index`를 갖는다(matchAll 결과 그대로).
+ * 표식 속성은 루트에만 붙으므로 하위 tspan 사본은 포함되지 않는다.
+ */
+function strokeCopyOpenTags(markup) {
+  return [
+    ...markup.matchAll(
+      new RegExp(
+        `<([A-Za-z][\\w:.-]*)\\b[^>]*\\s${PAINT_ORDER_STROKE_COPY_ATTR}="true"[^>]*>`,
+        "g",
+      ),
+    ),
+  ].map((match) => {
+    const entry = [match[0], match[1]];
+    entry.index = match.index;
+    return entry;
+  });
 }
 
 test("paint-order 값 해석이 SVG 사양과 일치한다", () => {
@@ -130,16 +169,65 @@ test("stroke 우선 요소를 stroke 사본 → fill 사본으로 분해한다",
   assert.equal(declaredProperty(fillOpen, "fill"), "#111111");
   assert.equal(declaredProperty(fillOpen, "stroke"), "none");
   // 원본 id는 글자 사본이 유지하고 halo 사본만 접미사를 붙인다.
-  assert.match(strokeOpen, /id="a-paint-order-stroke"/);
+  assert.match(strokeOpen, new RegExp(`id="a${STROKE_COPY_ID_SUFFIX}"`));
   assert.match(fillOpen, /id="a"/);
+  // halo 사본에만 표식 속성이 붙는다(다운스트림 게이트의 정본 판별 기준).
+  assert.match(strokeOpen, strokeCopyAttrPattern);
+  assert.ok(!strokeCopyAttrPattern.test(fillOpen));
   // paint-order 선언은 구조로 바뀌었으므로 남지 않는다(id 접미사는 별개).
   assert.ok(!/\spaint-order="/.test(output));
-  // paint 선언과 id를 제외하면 두 사본은 완전히 동일하다.
-  const canonical = (markup) =>
-    markup
-      .replaceAll(STROKE_COPY_ID_SUFFIX, "")
-      .replace(/\s(?:fill|stroke)="[^"]*"/g, "");
-  assert.equal(canonical(strokeCopy), canonical(fillCopy));
+  // paint 선언·id·표식을 제외하면 두 사본은 완전히 동일하다.
+  assert.equal(canonicalCopy(strokeCopy), canonicalCopy(fillCopy));
+});
+
+test("id가 없는 요소도 halo 사본이 표식 속성으로 식별된다", () => {
+  // id 접미사만으로 판별하면 이 사본은 오너 요소와 구분되지 않는다.
+  const input =
+    '<svg><path d="M0,0 L1,1" paint-order="stroke fill" ' +
+    'fill="#111111" stroke="#FFFFFF" stroke-width="3" /></svg>';
+  const output = decomposePaintOrder(input);
+  const paths = [...output.matchAll(/<path\b[^>]*\/>/g)].map((m) => m[0]);
+  assert.equal(paths.length, 2);
+  assert.ok(!/\sid="/.test(output), "원본에 id가 없으면 사본에도 없다.");
+  assert.match(paths[0], strokeCopyAttrPattern);
+  assert.ok(!strokeCopyAttrPattern.test(paths[1]));
+});
+
+test("marker를 가진 stroke-우선 요소는 fail-closed로 던진다", () => {
+  // 축약형 `marker`뿐 아니라 실제 presentation attribute인
+  // marker-start/mid/end도 가드에 걸려야 한다(사본이 마커를 중복 렌더한다).
+  for (const property of [
+    "marker",
+    "marker-start",
+    "marker-mid",
+    "marker-end",
+  ]) {
+    const attr =
+      '<svg><path d="M0,0 L1,1" paint-order="stroke fill" fill="#111" ' +
+      `stroke="#FFF" ${property}="url(#arrow)" /></svg>`;
+    assert.throws(
+      () => decomposePaintOrder(attr),
+      /marker\(.+\)와 paint-order를 함께/,
+      `${property} 속성형이 가드를 통과했습니다.`,
+    );
+    const styled =
+      '<svg><path d="M0,0 L1,1" paint-order="stroke fill" fill="#111" ' +
+      `stroke="#FFF" style="${property}:url(#arrow)" /></svg>`;
+    assert.throws(
+      () => decomposePaintOrder(styled),
+      /marker\(.+\)와 paint-order를 함께/,
+      `${property} style 선언형이 가드를 통과했습니다.`,
+    );
+  }
+  // marker:none은 렌더되지 않으므로 가드 대상이 아니다.
+  const none =
+    '<svg><path d="M0,0 L1,1" paint-order="stroke fill" fill="#111" ' +
+    'stroke="#FFF" marker-end="none" /></svg>';
+  assert.equal(
+    [...decomposePaintOrder(none).matchAll(/<path\b/g)].length,
+    2,
+    "marker-end:none은 분해를 막지 않아야 합니다.",
+  );
 });
 
 test("fill·stroke 중 한쪽만 보이면 분해하지 않는다(불필요한 draw 금지)", () => {
@@ -204,44 +292,32 @@ test("분해 쌍은 stroke 사본이 먼저이고 paint 외 모든 속성이 동
   const mismatches = [];
   for (const region of REGIONS) {
     const normalized = normalizedByRegion.get(region.id);
-    for (const match of normalized.matchAll(
-      new RegExp(
-        `<([A-Za-z][\\w:.-]*)\\b[^>]*\\sid="([^"]*)${STROKE_COPY_ID_SUFFIX}"`,
-        "g",
-      ),
-    )) {
-      const [, tagName, baseId] = match;
-      // tspan 사본은 부모 사본 안에 딸린 하위 노드라 형제 대조 대상이 아니다
-      // (부모 text 사본 대조가 서브트리 전체 동일성을 이미 덮는다).
-      if (tagName === "tspan") continue;
-      // 같은 태그의 형제 fill 사본이 뒤에 있어야 한다.
-      const fillIndex = normalized.indexOf(`<${tagName}`, match.index + 1);
+    // halo 사본은 표식 속성으로 찾는다(id 유무와 무관한 정본 기준). 표식은
+    // 분해 대상의 **루트 여는 태그에만** 붙으므로 하위 tspan 사본은 잡히지 않는다.
+    for (const match of strokeCopyOpenTags(normalized)) {
+      const [strokeOpen, tagName] = match;
+      const label = strokeOpen.match(/\sid="([^"]*)"/)?.[1] ?? tagName;
+      // 같은 태그의 형제 fill 사본이 바로 뒤에 있어야 한다.
       const fillOpen = normalized
-        .slice(fillIndex)
+        .slice(normalized.indexOf(`<${tagName}`, match.index + 1))
         .match(new RegExp(`^<${tagName}\\b[^>]*>`))?.[0];
-      if (fillOpen == null || !fillOpen.includes(`id="${baseId}"`)) {
+      if (fillOpen == null || strokeCopyAttrPattern.test(fillOpen)) {
         mismatches.push(
-          `${region.id}: ${baseId} — stroke 사본 뒤에 대응하는 fill 사본이 없습니다.`,
+          `${region.id}: ${label} — stroke 사본 뒤에 대응하는 fill 사본이 없습니다.`,
         );
         continue;
       }
-      const strokeOpen = normalized
-        .slice(match.index)
-        .match(new RegExp(`^<${tagName}\\b[^>]*>`))[0];
       if (declaredProperty(strokeOpen, "fill") !== "none") {
-        mismatches.push(`${region.id}: ${baseId} — stroke 사본에 fill:none이 없습니다.`);
+        mismatches.push(`${region.id}: ${label} — stroke 사본에 fill:none이 없습니다.`);
       }
       if (declaredProperty(fillOpen, "stroke") !== "none") {
-        mismatches.push(`${region.id}: ${baseId} — fill 사본에 stroke:none이 없습니다.`);
+        mismatches.push(`${region.id}: ${label} — fill 사본에 stroke:none이 없습니다.`);
       }
-      const canonical = (tag) =>
-        tag
-          .replaceAll(STROKE_COPY_ID_SUFFIX, "")
-          .replace(/\s(?:fill|stroke)="[^"]*"/g, "");
-      if (canonical(strokeOpen) !== canonical(fillOpen)) {
+      if (canonicalCopy(strokeOpen) !== canonicalCopy(fillOpen)) {
         mismatches.push(
-          `${region.id}: ${baseId} — 두 사본의 좌표·앵커·폰트 속성이 다릅니다.\n` +
-            `  stroke: ${canonical(strokeOpen)}\n  fill:   ${canonical(fillOpen)}`,
+          `${region.id}: ${label} — 두 사본의 좌표·앵커·폰트 속성이 다릅니다.\n` +
+            `  stroke: ${canonicalCopy(strokeOpen)}\n` +
+            `  fill:   ${canonicalCopy(fillOpen)}`,
         );
       }
     }
@@ -255,7 +331,8 @@ test("권역별 paint-order 분해 대상 구성 기준선", () => {
   const expected = {
     // 수도권: 역명 라벨 halo는 `#…-layer text` **id 선택자** CSS라 인라인 대상이
     // 아니고 컴파일러도 <style>을 읽지 않아 애초에 stroke가 없다 — 라벨은
-    // 분해 대상이 0건이고, 공항 아이콘 path 6건만 분해된다(라벨 산출물 불변).
+    // 분해 대상이 0건이고, 공항 아이콘 path 6건만 분해된다. 즉 **라벨 산출물은
+    // 불변이지만 seoul.vec 자체는 아이콘 분해로 바뀐다**(불변 주장 범위 주의).
     seoul: { path: 6 },
     busan: { text: 147, path: 2 },
     daegu: { text: 97 },
@@ -266,15 +343,8 @@ test("권역별 paint-order 분해 대상 구성 기준선", () => {
   for (const region of REGIONS) {
     const normalized = normalizedByRegion.get(region.id);
     const counts = {};
-    for (const match of normalized.matchAll(
-      new RegExp(
-        `<([A-Za-z][\\w:.-]*)\\b[^>]*\\sid="[^"]*${STROKE_COPY_ID_SUFFIX}"`,
-        "g",
-      ),
-    )) {
-      // tspan은 부모 사본에 딸린 하위 노드라 대상 수에 세지 않는다.
-      if (match[1] === "tspan") continue;
-      counts[match[1]] = (counts[match[1]] ?? 0) + 1;
+    for (const [, tagName] of strokeCopyOpenTags(normalized)) {
+      counts[tagName] = (counts[tagName] ?? 0) + 1;
     }
     assert.deepEqual(counts, expected[region.id], `${region.id} 분해 대상 구성`);
   }
@@ -283,16 +353,14 @@ test("권역별 paint-order 분해 대상 구성 기준선", () => {
 test("halo 없는 3권역은 텍스트 분해가 no-op이다(라벨 산출물 불변)", () => {
   for (const regionId of ["seoul", "daejeon", "gwangju"]) {
     const normalized = normalizedByRegion.get(regionId);
-    const textCopies = [
-      ...normalized.matchAll(
-        new RegExp(`<text\\b[^>]*\\sid="[^"]*${STROKE_COPY_ID_SUFFIX}"`, "g"),
-      ),
-    ];
+    const textCopies = strokeCopyOpenTags(normalized).filter(
+      ([, tagName]) => tagName === "text",
+    );
     assert.equal(
       textCopies.length,
       0,
-      `${regionId}: 역명 라벨이 분해됐습니다 — 이 권역은 halo가 없어 산출물이 ` +
-        "바뀌면 안 됩니다.",
+      `${regionId}: 역명 라벨이 분해됐습니다 — 이 권역은 halo가 없어 라벨 ` +
+        "산출물이 바뀌면 안 됩니다.",
     );
   }
 });
