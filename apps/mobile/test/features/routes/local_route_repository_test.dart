@@ -2534,6 +2534,63 @@ void main() {
     expect(result.evidenceSummary, contains('ACCESSIBILITY_CHECK_REQUIRED'));
   });
 
+  test('#2590 계단이 적힌 승차 구간은 비적용으로 빠지지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    // 승차 구간을 비적용으로 두는 것은 계단이 적혀 있지 않을 때뿐이다. 타입을 계단
+    // 사실보다 먼저 보면 계단이 적힌 승차 행이 판정에서 사라져 화면이 과소 표시된다.
+    // 백엔드 StairAccess.ofStep은 includesStairs를 최우선으로 보고 승차라도
+    // STAIR_ONLY를 낸다.
+    await _seedLineWithoutNetworkEdges(
+      database,
+      includeExplicitAccessEdges: false,
+      fillInsertedNetworkEdgeEvidence: false,
+    );
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, distance_meters,
+        edge_type, service_pattern, includes_stairs, stair_access_state,
+        accessibility_status, reliability_score, last_verified_at, service_class
+      )
+      VALUES (
+        'edge-line-test-station-a-station-b',
+        'station-a:line-test',
+        'station-b:line-test',
+        120,
+        0,
+        'RIDE',
+        'LOCAL',
+        1,
+        'STAIR_ONLY',
+        'AVAILABLE',
+        95,
+        NULL,
+        'SUBWAY'
+      )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'SENIOR',
+      ),
+    );
+
+    final rideStep = result.steps.singleWhere(
+      (step) => step.stepType == 'ride',
+    );
+    expect(rideStep.includesStairs, isTrue);
+    expect(rideStep.stairAccessState, 'stairOnly');
+    // 계단 사실과 검증 여부는 다른 축이다. 근거가 없으면 확인 필요가 함께 붙는다.
+    expect(rideStep.requiresAccessibilityCheck, isTrue);
+    expect(rideStep.burdenLabel, contains('계단 포함'));
+    // 구간 줄에는 확인 안내를 적지 않는다(확인 필요는 경로 단위 표기가 말한다).
+    expect(rideStep.burdenLabel, isNot(contains('엘리베이터')));
+    expect(result.stairAccessLabel, '계단 포함');
+  });
+
   test('#2590 계단으로 확인된 동선도 근거가 없으면 확인 필요를 함께 말한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);

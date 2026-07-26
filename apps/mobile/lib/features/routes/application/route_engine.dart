@@ -538,12 +538,17 @@ class RouteAssembler {
   /// (`_strictRouteBlockerReasons`), `safetyEvidence.isStale`는 `isDataStale`와 같은
   /// 값이다. 그 세 항이 실제로 일하는 곳은 근거를 손으로 채워 만든 edge뿐이며, 남겨
   /// 두는 이유는 어느 한 항이 느슨해져도 판정이 조용히 열리지 않게 하기 위해서다.
+  /// 근거를 "확인됨"으로 볼 최소 신뢰도. 판정([_accessibilityVerified])과 표시
+  /// 라벨([_confidenceLabel])이 같은 경계를 쓰도록 한 곳에서 정의한다. 두 곳이 갈리면
+  /// "확인된 정보예요"라고 적힌 구간에 확인 안내가 함께 붙는 모순이 생긴다.
+  static const int _verifiedReliabilityScore = 80;
+
   bool _accessibilityVerified(RouteEdge edge) {
     return edge.stairAccessState != RouteStairAccessState.unknown &&
         edge.accessibilityState == RouteAccessibilityState.available &&
         !edge.isGeneratedConnector &&
         !edge.isDataStale &&
-        edge.reliabilityScore >= 80 &&
+        edge.reliabilityScore >= _verifiedReliabilityScore &&
         edge.safetyEvidence.strictRouteEligible &&
         !edge.safetyEvidence.isStale &&
         !edge.safetyEvidence.isPlaceholderEvidence &&
@@ -558,7 +563,7 @@ class RouteAssembler {
         edge.stairAccessState == RouteStairAccessState.unknown) {
       return '';
     }
-    if (edge.reliabilityScore >= 80) {
+    if (edge.reliabilityScore >= _verifiedReliabilityScore) {
       return '확인된 정보예요';
     }
     if (edge.reliabilityScore >= 60) {

@@ -695,15 +695,22 @@ class LocalRouteRepository implements RouteSearchRepository {
   /// (`RouteTimetableRaptorPlanner`의 접근 전이 생성). 계단이 있다고 확인된 동선에
   /// 검증 근거가 없으면 계단 표기와 이 표기가 함께 붙는다. 여기서도 같은 구조를 쓴다.
   ///
-  /// 승차와 경유 경계 표식은 오르내릴 계단 자체가 없어 원자료와 무관하게 비적용으로
-  /// 확정한다. 데이터팩 `network_edges.stair_access_state`의 `UNKNOWN`은 "확인 결과
-  /// 미상"이 아니라 컬럼 기본값이고, 출시 팩의 승차 edge는 사실상 전부 이 값이라
-  /// 그대로 옮기면 열차 안에서 엘리베이터를 확인하라는 안내가 붙는다 — #2590이
-  /// 없애려던 증상 그대로다. 승차 구간을 상태값과 무관하게 비적용으로 두는 것은
-  /// 백엔드 [StairAccess.ofStep]과도 같다.
+  /// 계단이 있다고 적힌 구간은 타입보다 계단 사실을 먼저 말한다. 백엔드
+  /// `StairAccess.ofStep`이 `includesStairs`를 최우선으로 보고 승차 구간이라도
+  /// `STAIR_ONLY`를 내는 것과 같은 순서다. 타입을 먼저 보면 계단이 적힌 승차·경유 행이
+  /// 비적용으로 빠져 화면에서 계단 사실이 사라지므로, 과소 표시 방향으로 갈래가 열린다.
+  ///
+  /// 승차와 경유 경계 표식은 **계단이 적혀 있지 않은 한** 오르내릴 계단 자체가 없어
+  /// 원자료와 무관하게 비적용으로 확정한다. 데이터팩 `network_edges.stair_access_state`의
+  /// `UNKNOWN`은 "확인 결과 미상"이 아니라 컬럼 기본값이고, 출시 팩의 승차 edge는 사실상
+  /// 전부 이 값이라 그대로 옮기면 열차 안에서 엘리베이터를 확인하라는 안내가 붙는다 —
+  /// #2590이 없애려던 증상 그대로다.
   ({String state, bool requiresCheck}) _stairAccessOf(
     route_step.RouteStep step,
   ) {
+    if (step.includesStairs) {
+      return (state: 'stairOnly', requiresCheck: !step.accessibilityVerified);
+    }
     if (_isStairIrrelevantStepType(step.type)) {
       return (state: 'notApplicable', requiresCheck: false);
     }
