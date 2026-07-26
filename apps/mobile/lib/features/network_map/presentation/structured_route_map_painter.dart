@@ -85,6 +85,19 @@ const TextStyle _badgeStyle = TextStyle(
   fontWeight: FontWeight.w700,
 );
 
+/// #2068 SVG 충실도(2026-07-26 오너 결정): 바탕층 모드가 소비하는 **빈** 라벨
+/// 레이아웃. 오너 SVG의 역명 라벨과 종점 마크가 .vec 바탕층에 그대로 구워지므로
+/// 앱은 같은 글자를 다시 그리지 않는다("글자도 복붙" — 화면이 SVG와 픽셀 동일).
+/// 라벨 솔버 자체는 구조화 노선도 모드(역 심벌을 앱이 그리는 모드)에서 그대로
+/// 쓰인다. 게이트: test/features/network_map/presentation/
+/// basemap_labels_are_baked_gate_test.dart.
+const RouteMapStaticLabelLayout kRouteMapBasemapEmptyLabelLayout =
+    RouteMapStaticLabelLayout(
+      labels: [],
+      badges: [],
+      unresolvedOverlapCount: 0,
+    );
+
 /// #2068: basemap 라벨 전용 폰트 family. 오너 SVG(Pretendard)와 동일 자폭으로
 /// 렌더해야 오너가 손배치한 라벨이 겹침 없이 그대로 성립한다(pubspec.yaml에
 /// weight 400/600/700 번들). 기본 모드(구조화 노선도)는 시스템 폰트를 유지한다.
@@ -720,29 +733,41 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
     Size measureBadge(String text, {required double fontSize}) =>
         measureRouteMapBadge(text, fontSize: fontSize, basemap: basemap);
 
-    final layout = solveRouteMapLabelLayout(
-      map: widget.map,
-      design: design,
-      labelTextByStationId: widget.labelTextByStationId,
-      badgeLabelByLineId: widget.lineBadgeLabelByLineId,
-      measureLabel: measureLabel,
-      measureBadge: measureBadge,
-      // 바탕층 모드(역 심벌 미렌더)에서는 화면 캡슐이 오너 SVG 것이라 실측
-      // 반폭이 크다 — 라벨 장애물·anchorPadding을 그 크기로 부풀린다(#2068).
-      basemap: !widget.drawStationSymbols,
-      // basemap 6차: 오너 SVG 라벨 앵커 sidecar(로드 전·express 모드는 빈 맵 →
-      // 4차 자동 솔버로 전부 폴백, fail-safe).
-      ownerLabelsByStationName: widget.ownerLabelsByStationName,
-      stationNameByStationId: widget.stationNameByStationId,
-      // #2068 광주 2차: sidecar 엔트리 중 하나라도 종점 호선 마크 플래그를
-      // 가지면(=이 region의 오너 SVG가 자체 종점 배지를 그림) 앱 솔버의
-      // 노선 뱃지 pill 후보를 억제한다(network_map.dart 변경 없이, 이미
-      // 통과하는 ownerLabelsByStationName만으로 도출).
-      suppressLineBadges: widget.ownerLabelsByStationName.values
-          .expand((entries) => entries)
-          .any((entry) => entry.hasLineTerminalBadge),
-      ownerLabelMaxAnchorDistancePx: widget.ownerLabelMaxAnchorDistancePx,
-    );
+    // #2068 SVG 충실도(2026-07-26 오너 결정): **바탕층 모드에서 앱은 역명 글자를
+    // 그리지 않는다.** 오너 SVG의 역명 라벨이 .vec 바탕층에 그대로 구워지므로
+    // (compile-basemap-vec.mjs의 MAP_BODY_LAYER_IDS에 라벨 레이어 포함), 앱이
+    // 같은 글자를 다시 배치·렌더하면 이중 렌더이자 오배치의 원인이 된다 —
+    // #1635에서 온 "라벨=구조화 렌더" 조항의 오너 공식 폐기다.
+    // 유지되는 것: 역 탭 히트(_labelPolygonFor는 labels.json 앵커를 직접 쓴다),
+    // 팬 메뉴, TalkBack semantics(시각 텍스트와 무관), 경로 강조 오버레이,
+    // 초기 카메라 가독 배율(labels.json fontSizePx 기반).
+    // 노선 뱃지 pill도 오너 SVG가 자체 종점 마크를 그리므로 함께 비운다
+    // (기존 suppressLineBadges가 이미 5권역 전부에서 참이라 동작 변화 없음).
+    final layout = basemap
+        ? kRouteMapBasemapEmptyLabelLayout
+        : solveRouteMapLabelLayout(
+            map: widget.map,
+            design: design,
+            labelTextByStationId: widget.labelTextByStationId,
+            badgeLabelByLineId: widget.lineBadgeLabelByLineId,
+            measureLabel: measureLabel,
+            measureBadge: measureBadge,
+            // 바탕층 모드(역 심벌 미렌더)에서는 화면 캡슐이 오너 SVG 것이라 실측
+            // 반폭이 크다 — 라벨 장애물·anchorPadding을 그 크기로 부풀린다(#2068).
+            basemap: !widget.drawStationSymbols,
+            // basemap 6차: 오너 SVG 라벨 앵커 sidecar(로드 전·express 모드는 빈 맵 →
+            // 4차 자동 솔버로 전부 폴백, fail-safe).
+            ownerLabelsByStationName: widget.ownerLabelsByStationName,
+            stationNameByStationId: widget.stationNameByStationId,
+            // #2068 광주 2차: sidecar 엔트리 중 하나라도 종점 호선 마크 플래그를
+            // 가지면(=이 region의 오너 SVG가 자체 종점 배지를 그림) 앱 솔버의
+            // 노선 뱃지 pill 후보를 억제한다(network_map.dart 변경 없이, 이미
+            // 통과하는 ownerLabelsByStationName만으로 도출).
+            suppressLineBadges: widget.ownerLabelsByStationName.values
+                .expand((entries) => entries)
+                .any((entry) => entry.hasLineTerminalBadge),
+            ownerLabelMaxAnchorDistancePx: widget.ownerLabelMaxAnchorDistancePx,
+          );
     _picture = recordRouteMapPicture(
       map: widget.map,
       design: design,
