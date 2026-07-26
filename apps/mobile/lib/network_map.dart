@@ -4656,7 +4656,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                 Builder(
                   builder: (context) {
                     final stationPoint = camera.sourceToViewportPoint(
-                      _fanMenuAnchorSource(selectedStation, geometry),
+                      _fanMenuTailAnchorSource(selectedStation, geometry),
                     );
                     // #2109: 배치 규칙은 fanMenuPlacement 단일 함수가 소유한다
                     // (카메라 최소 패닝 _panCameraToRevealFanMenu와 동일 규칙 소비).
@@ -5006,7 +5006,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     }
     final geometry = _geometryFor(widget.data);
     final stationPoint = camera.sourceToViewportPoint(
-      _fanMenuAnchorSource(station, geometry),
+      _fanMenuTailAnchorSource(station, geometry),
     );
     const margin = kFanMenuViewportMargin;
     // #2109: 배치 bbox는 build와 동일하게 fanMenuPlacement가 계산한다
@@ -5152,6 +5152,25 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   /// [MapCameraState.sourceToViewportPoint] 입력 좌표계로 맞춘다.
   /// build(렌더)와 [_panCameraToRevealFanMenu](카메라)가 같은 앵커를 소비하도록
   /// 단일 헬퍼로 둔다.
+  /// 팬 메뉴 꼬리 팁이 닿을 앵커의 source 좌표(#2068 QA). 노드 정중앙
+  /// ([_fanMenuAnchorSource])에서 노드 높이의 1/6만큼 내려온 "높이 2/3" 지점이다
+  /// (드래프트 핀은 이동 없이 정중앙을 그대로 쓴다). build(렌더)와
+  /// [_panCameraToRevealFanMenu](카메라)가 같은 앵커를 소비하도록 단일 헬퍼로 둔다.
+  Offset _fanMenuTailAnchorSource(
+    NetworkMapStation station,
+    _MapGeometry geometry,
+  ) {
+    final center = _fanMenuAnchorSource(station, geometry);
+    final group = _structuredTransferGroupCache?[station.id];
+    return fanMenuTailAnchorPoint(
+      nodeCenter: center,
+      nodeHeight: fanMenuAnchorNodeHeight(
+        memberPositions: group?.memberPositions ?? const <Offset>[],
+        designScale: _structuredDesignScaleCache ?? 1.0,
+      ),
+    );
+  }
+
   Offset _fanMenuAnchorSource(
     NetworkMapStation station,
     _MapGeometry geometry,
@@ -7352,9 +7371,10 @@ class FanMenuPlacement {
   final Rect revealBounds;
 }
 
-/// 역 노드의 뷰포트 좌표([stationPoint])로 팬 메뉴 배치를 계산한다(#2192 v3).
-/// 항상 노드 위쪽에 배치하되, 말풍선 꼬리 팁([kFanMenuTailTip])이 앵커 노드
-/// 정중앙에 닿도록 정렬한다(노드 위 8px 갭·flip 제거). 지도 최상단 역에서도
+/// 역 노드 앵커의 뷰포트 좌표([stationPoint])로 팬 메뉴 배치를 계산한다(#2192 v3).
+/// 항상 노드 위쪽에 배치하되, 말풍선 꼬리 팁([kFanMenuTailTip])이 넘겨받은
+/// 앵커점에 닿도록 정렬한다(노드 위 8px 갭·flip 제거). 앵커점 자체는
+/// [fanMenuTailAnchorPoint]가 정한다(#2068 QA: 노드 높이 2/3 지점). 지도 최상단 역에서도
 /// 성립하도록 카메라 최소 패닝([_NetworkMapCanvasState._panCameraToRevealFanMenu])이
 /// 메뉴 높이만큼 상단 헤드룸을 열어 노출한다.
 ///
@@ -7376,7 +7396,7 @@ FanMenuPlacement fanMenuPlacement({
   final menuWidth = fanMenuWidthForViewport(viewport.width);
   final menuHeight =
       menuWidth * (kFanMenuDesignSize.height / kFanMenuDesignSize.width);
-  // 꼬리 팁(design 좌표 kFanMenuTailTip)이 앵커 노드 정중앙에 오도록 배치.
+  // 꼬리 팁(design 좌표 kFanMenuTailTip)이 앵커점에 오도록 배치.
   // 팁 x=350/700=중앙, 팁 y=375/380이므로 top은 노드에서 팁 높이만큼 위로 민다.
   var left =
       stationPoint.dx -
@@ -7438,6 +7458,77 @@ Offset fanMenuTransferAnchor({
   }
   // separate 모드: 멤버별 캡슐 → 탭한 멤버의 캡슐 중심(=탭 좌표).
   return tappedPosition;
+}
+
+/// 팬 메뉴 꼬리 팁이 닿을 앵커점(#2068 QA). 가로는 노드 정중앙 그대로, 세로는
+/// **노드 상단에서 높이의 2/3** 지점이다(= 노드 중심에서 아래로 높이의 1/6).
+/// 정중앙 접촉(#2192 v3)은 메뉴가 노드보다 살짝 위에 떠 보인다는 실기기 QA
+/// 반려에 따라 이 지점으로 옮겼다.
+///
+/// 좌표계는 [nodeCenter]와 같은 단위를 쓴다(호출부는 source 좌표를 넘긴다 —
+/// 카메라 배율은 [MapCameraState.sourceToViewportPoint]가 적용한다).
+/// 드래프트 핀(출발·경유·도착)은 이 이동을 쓰지 않고 노드 정중앙을 그대로
+/// 앵커로 둔다 — 팬 메뉴 전용 규약이다.
+@visibleForTesting
+Offset fanMenuTailAnchorPoint({
+  required Offset nodeCenter,
+  required double nodeHeight,
+}) => Offset(
+  nodeCenter.dx,
+  // 노드 상단(중심 − 높이/2)에서 높이의 2/3만큼 내려온 지점.
+  nodeCenter.dy - nodeHeight / 2 + nodeHeight * 2 / 3,
+);
+
+/// [fanMenuTailAnchorPoint]가 쓰는 "노드"의 세로 크기(source 단위, #2068 QA).
+///
+/// 화면에 실제로 그려지는 바탕층(오너 SVG) 심벌의 실측 상수를 기준으로 한다
+/// (구조화 심벌은 basemap 모드에서 렌더되지 않는다):
+/// - 일반역: 심벌 지름 `2 × [kRouteMapBasemapStationNodeRadiusPx]`.
+/// - 환승역 단일 캡슐(스택·스팬·강등 스택): 멤버 design bbox를 캡슐 반폭
+///   ([kRouteMapBasemapTransferCapsuleHalfWidthPx])만큼 부풀린 rect의 height.
+///   bbox가 장축 방향을 이미 담고 있어 세로 캡슐은 장축, 가로 캡슐은 두께(2×반폭)
+///   가 그대로 높이가 된다.
+/// - separate(대이격) 모드: 앵커가 탭한 배지 하나에 붙으므로 전체 bbox가 아니라
+///   배지 두께(2×반폭)가 노드 높이다.
+///
+/// 모드 판정은 [fanMenuTransferAnchor]와 같이 [routeMapTransferMarkers] 결과
+/// (마커 수)를 그대로 소비한다 — 임계를 독립 재유도하면 앵커 중심과 노드 높이가
+/// 서로 다른 모드를 보게 된다. design px → source 환산은 [designScale]로 나눈다.
+@visibleForTesting
+double fanMenuAnchorNodeHeight({
+  required List<Offset> memberPositions,
+  required double designScale,
+}) {
+  if (designScale <= 0) {
+    return 0;
+  }
+  if (memberPositions.length < 2) {
+    return (2 * kRouteMapBasemapStationNodeRadiusPx) / designScale;
+  }
+  const halfWidth = kRouteMapBasemapTransferCapsuleHalfWidthPx;
+  final markers = routeMapTransferMarkers(
+    memberCenters: memberPositions,
+    // 캡슐 모드 판정은 색과 무관하나 함수 계약상 길이가 멤버 수와 같아야 한다.
+    colors: List<Color>.filled(memberPositions.length, const Color(0xFF000000)),
+    designSpread: offsetsMaxPairwiseDistance(memberPositions) * designScale,
+    dotRadius: kRouteMapTransferDotRadiusPx,
+    dotGap: kRouteMapTransferDotGapPx,
+    padding: kRouteMapTransferDotPaddingPx,
+  );
+  if (markers.length != 1) {
+    return (2 * halfWidth) / designScale;
+  }
+  var bounds = Rect.fromCenter(
+    center: memberPositions.first * designScale,
+    width: 0,
+    height: 0,
+  );
+  for (final position in memberPositions.skip(1)) {
+    bounds = bounds.expandToInclude(
+      Rect.fromCenter(center: position * designScale, width: 0, height: 0),
+    );
+  }
+  return bounds.inflate(halfWidth).height / designScale;
 }
 
 /// 팬 메뉴 배선용: 탭한 역이 이미 배정된 슬롯 집합(진한 채움 selected).

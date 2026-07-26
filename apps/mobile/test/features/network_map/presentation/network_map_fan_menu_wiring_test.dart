@@ -9,9 +9,11 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:easysubway_mobile/network_map.dart'
     show
+        fanMenuAnchorNodeHeight,
         fanMenuSelectedSlots,
         fanMenuDisabledSlots,
         fanMenuShouldClear,
+        fanMenuTailAnchorPoint,
         fanMenuWidthForViewport,
         fanMenuPlacement,
         fanMenuTransferAnchor;
@@ -38,7 +40,7 @@ void main() {
         ),
       );
       expect(placement.revealBounds.top, placement.top);
-      // 꼬리 팁의 뷰포트 좌표 = 앵커 노드 좌표(정중앙 접촉).
+      // 꼬리 팁의 뷰포트 좌표 = 넘겨받은 앵커점(노드 높이 2/3 지점, #2068 QA).
       final tipX =
           placement.left +
           placement.menuWidth * (kFanMenuTailTip.dx / kFanMenuDesignSize.width);
@@ -153,6 +155,107 @@ void main() {
           ),
         );
       }
+    });
+  });
+
+  group('팬 메뉴 꼬리 앵커점(#2068 QA — 노드 높이 2/3 지점)', () {
+    test('가로는 노드 중앙 그대로, 세로는 노드 상단에서 높이의 2/3', () {
+      // 노드 중심 (100,200)·높이 12 → 상단 194, 2/3 지점 = 194 + 8 = 202.
+      final anchor = fanMenuTailAnchorPoint(
+        nodeCenter: const Offset(100, 200),
+        nodeHeight: 12,
+      );
+      expect(anchor.dx, closeTo(100, 0.001));
+      expect(anchor.dy, closeTo(202, 0.001));
+      // 중심 기준으로는 항상 아래로 높이의 1/6.
+      expect(anchor.dy - 200, closeTo(12 / 6, 0.001));
+    });
+
+    test('높이 0(노드 크기 미상)이면 중심 그대로 — 회귀 안전', () {
+      final anchor = fanMenuTailAnchorPoint(
+        nodeCenter: const Offset(7, 9),
+        nodeHeight: 0,
+      );
+      expect(anchor, const Offset(7, 9));
+    });
+
+    test('일반역 노드 높이는 바탕층 심벌 지름(2×4.5 design px)을 source로 환산', () {
+      // designScale=1 → 9 design px = 9 source. 멤버 1개(=환승 아님)도 동일.
+      expect(
+        fanMenuAnchorNodeHeight(memberPositions: const [], designScale: 1),
+        closeTo(9, 0.001),
+      );
+      expect(
+        fanMenuAnchorNodeHeight(
+          memberPositions: const [Offset(3, 7)],
+          designScale: 1,
+        ),
+        closeTo(9, 0.001),
+      );
+      // designScale=2 → design px가 source 단위로 절반.
+      expect(
+        fanMenuAnchorNodeHeight(memberPositions: const [], designScale: 2),
+        closeTo(4.5, 0.001),
+      );
+    });
+
+    test('환승 단일 캡슐은 멤버 design bbox를 캡슐 반폭(13)만큼 부풀린 세로 크기', () {
+      // spread=5 ≤ 8 → 스택(단일 캡슐). bbox 높이 5 + 2×13 = 31 design px.
+      expect(
+        fanMenuAnchorNodeHeight(
+          memberPositions: const [Offset(0, 0), Offset(0, 5)],
+          designScale: 1,
+        ),
+        closeTo(31, 0.001),
+      );
+      // 가로로 늘어선 캡슐은 bbox 높이가 0이라 캡슐 두께(26)만 남는다.
+      expect(
+        fanMenuAnchorNodeHeight(
+          memberPositions: const [Offset(0, 0), Offset(5, 0)],
+          designScale: 1,
+        ),
+        closeTo(26, 0.001),
+      );
+    });
+
+    test('separate(대이격)는 배지 하나가 노드 — 멤버 bbox를 쓰지 않는다', () {
+      // spread(40) > 28 → 멤버별 마커. 전체 bbox(세로 40)가 아니라 배지 두께 26.
+      expect(
+        fanMenuAnchorNodeHeight(
+          memberPositions: const [Offset(0, 0), Offset(0, 40)],
+          designScale: 1,
+        ),
+        closeTo(26, 0.001),
+      );
+    });
+
+    test('designScale이 커지면 같은 노드의 source 단위 높이는 줄어든다', () {
+      final atOne = fanMenuAnchorNodeHeight(
+        memberPositions: const [Offset(0, 0), Offset(0, 5)],
+        designScale: 1,
+      );
+      final atTwo = fanMenuAnchorNodeHeight(
+        memberPositions: const [Offset(0, 0), Offset(0, 5)],
+        designScale: 2,
+      );
+      // design bbox 높이 10 + 26 = 36 design px → source 18.
+      expect(atTwo, closeTo(18, 0.001));
+      expect(atTwo, lessThan(atOne));
+    });
+
+    test('앵커점은 노드 중심보다 아래(꼬리 팁이 노드 하단쪽 2/3에 닿는다)', () {
+      const center = Offset(120, 340);
+      final height = fanMenuAnchorNodeHeight(
+        memberPositions: const [],
+        designScale: 1,
+      );
+      final anchor = fanMenuTailAnchorPoint(
+        nodeCenter: center,
+        nodeHeight: height,
+      );
+      expect(anchor.dx, closeTo(center.dx, 0.001));
+      expect(anchor.dy, greaterThan(center.dy));
+      expect(anchor.dy, closeTo(center.dy + 1.5, 0.001));
     });
   });
 
