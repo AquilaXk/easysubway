@@ -1414,6 +1414,7 @@ export function assertLineScopeRedescriptionsMatchActualRequiredSet(
   );
   const actual = new Map();
   const sourcesById = new Map();
+  const newCandidateSourceIds = [];
 
   for (const packSource of pack.sourceInventory ?? []) {
     const sourceId = requiredString(packSource?.id, "candidate pack sourceInventory[].id");
@@ -1432,22 +1433,28 @@ export function assertLineScopeRedescriptionsMatchActualRequiredSet(
       }
       continue;
     }
+    const inheritedLineIds = inheritedById.get(sourceId)?.coverageScope?.lineIds;
+    const transition = classifyLineScopeTransition(
+      inheritedLineIds,
+      packScope?.lineIds,
+      inventoryScope.lineIds,
+    );
+    if (transition === "UNDECLARED_INHERITED_SCOPE_EXTENSION") {
+      throw new Error(`${transition}: ${sourceId}`);
+    }
+    if (inheritedLineIds?.length && transition === null) {
+      throw new Error(
+        `inherited candidate pack coverageScope.lineIds must match candidate pack and source inventory: ${sourceId}`,
+      );
+    }
     // inclusions.pack은 재기술을 덮기 전 원형이다. 기존 source는 여기서 lineIds가 없고,
     // lineScoped fixture에서만 spec 값이 주입된다. tracked inventory가 그 후보 line scope의 정본이며,
     // 원형에 이미 lineIds가 있는 신규 source라면 둘의 집합이 같아야 한다.
     if (packScope?.lineIds && !sameStringSet(packScope.lineIds, inventoryScope.lineIds)) {
       throw new Error(`candidate pack coverageScope.lineIds must match source inventory: ${sourceId}`);
     }
-    const inheritedLineIds = inheritedById.get(sourceId)?.coverageScope?.lineIds;
-    if (inheritedLineIds?.length) {
-      if (!sameStringSet(inheritedLineIds, inventoryScope.lineIds)
-        || !sameStringSet(inheritedLineIds, packScope?.lineIds)) {
-        throw new Error(
-          `inherited candidate pack coverageScope.lineIds must match candidate pack and source inventory: ${sourceId}`,
-        );
-      }
-      continue;
-    }
+    if (transition === "UNCHANGED_INHERITED_SCOPE") continue;
+    if (transition === "NEW_CANDIDATE_SCOPE") newCandidateSourceIds.push(sourceId);
     sourcesById.set(sourceId, { packScope, inventoryScope });
   }
 
@@ -1502,7 +1509,8 @@ export function assertLineScopeRedescriptionsMatchActualRequiredSet(
     throw new Error(
       "line-scope redescriptions must exactly match the actual required set: "
         + `actual=${[...actual.keys()].sort(codepointCompare).join(",")}, `
-        + `declared=${[...declared.keys()].sort(codepointCompare).join(",")}`,
+        + `declared=${[...declared.keys()].sort(codepointCompare).join(",")}, `
+        + `transitions=${newCandidateSourceIds.map((sourceId) => `NEW_CANDIDATE_SCOPE:${sourceId}`).join(",")}`,
     );
   }
   for (const [key, required] of actual) {
@@ -1513,6 +1521,24 @@ export function assertLineScopeRedescriptionsMatchActualRequiredSet(
       throw new Error(`line-scope redescriptions must exactly match the actual required set: ${key}`);
     }
   }
+}
+
+export function classifyLineScopeTransition(inheritedLineIds, packLineIds, inventoryLineIds) {
+  if (!Array.isArray(inventoryLineIds) || inventoryLineIds.length === 0) return null;
+  if (!Array.isArray(inheritedLineIds) || inheritedLineIds.length === 0) {
+    return "NEW_CANDIDATE_SCOPE";
+  }
+  if (sameStringSet(inheritedLineIds, packLineIds)
+    && sameStringSet(inheritedLineIds, inventoryLineIds)) {
+    return "UNCHANGED_INHERITED_SCOPE";
+  }
+  if (inheritedLineIds.every((lineId) => inventoryLineIds.includes(lineId))
+    && inventoryLineIds.length > new Set(inheritedLineIds).size
+    && (sameStringSet(packLineIds, inheritedLineIds)
+      || sameStringSet(packLineIds, inventoryLineIds))) {
+    return "UNDECLARED_INHERITED_SCOPE_EXTENSION";
+  }
+  return null;
 }
 
 function sameStringSet(left, right) {

@@ -41,6 +41,7 @@ import {
   assertLineScopeRedescriptionsMatchActualRequiredSet,
   assertInheritedRowsUnchanged,
   assertNonTransitionReasons,
+  classifyLineScopeTransition,
   inheritedRowSnapshot,
   runNationwideCandidateCoverageGate,
   validateNationwideCandidateCoverageSpec,
@@ -2989,10 +2990,25 @@ for (const { sourceId, sourceDomain } of OMITTED_LINE_SCOPE_CASES) {
     fixture.spec.lineScopeRedescriptions = [];
     assert.throws(
       () => assertLineScopeRedescriptionsMatchActualRequiredSet(fixture.spec, fixture.pack, fixture.inventory, fixture.targets),
-      /line-scope redescriptions must exactly match the actual required set/,
+      /line-scope redescriptions must exactly match the actual required set.*NEW_CANDIDATE_SCOPE/,
     );
   });
 }
+
+test("actual line-scope transition은 승계 경계를 분류한다", () => {
+  assert.equal(
+    classifyLineScopeTransition(["line-a"], ["line-a"], ["line-a"]),
+    "UNCHANGED_INHERITED_SCOPE",
+  );
+  assert.equal(
+    classifyLineScopeTransition([], undefined, ["line-a"]),
+    "NEW_CANDIDATE_SCOPE",
+  );
+  assert.equal(
+    classifyLineScopeTransition(["line-a"], ["line-a"], ["line-a", "line-b"]),
+    "UNDECLARED_INHERITED_SCOPE_EXTENSION",
+  );
+});
 
 test("actual line-scope 선언은 source/domain, lineIds, requirementKeys가 정확히 일치해야 한다", () => {
   const valid = lineScopeExactMatchFixture("source", "schedule_timetable");
@@ -3068,6 +3084,23 @@ test("승계 pack에 이미 있던 line scope는 신규 재기술 대상으로 �
       fixture.spec, fixture.pack, fixture.inventory, fixture.targets, fixture.inheritedPack,
     ),
     /inherited candidate pack coverageScope\.lineIds must match candidate pack and source inventory/,
+  );
+});
+
+test("승계 pack line scope의 부분 확장은 명시 재기술 없이 거부된다", () => {
+  const fixture = lineScopeExactMatchFixture("inherited-extension", "schedule_timetable");
+  fixture.spec.lineScopeRedescriptions = [];
+  fixture.pack.sourceInventory[0].coverageScope = structuredClone(
+    fixture.inventory.sources[0].coverageScope,
+  );
+  fixture.inheritedPack.sourceInventory = structuredClone(fixture.pack.sourceInventory);
+  fixture.inventory.sources[0].coverageScope.lineIds.push("line-b");
+
+  assert.throws(
+    () => assertLineScopeRedescriptionsMatchActualRequiredSet(
+      fixture.spec, fixture.pack, fixture.inventory, fixture.targets, fixture.inheritedPack,
+    ),
+    /UNDECLARED_INHERITED_SCOPE_EXTENSION: inherited-extension/,
   );
 });
 
