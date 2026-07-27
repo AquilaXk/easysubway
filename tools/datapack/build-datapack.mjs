@@ -65,7 +65,7 @@ async function main() {
   const officialOdFareAdmissionBytes = await readFile(path.join(root, "tools/datapack/official-od-fare-admission.json"));
   const officialOdFareAdmissionBundle = JSON.parse(officialOdFareAdmissionBytes);
   const officialOdFareAdmissions = officialOdFareAdmissionsBySource(officialOdFareAdmissionBundle);
-  const { fixture, candidateBuild } = await loadBuildInput(
+  const { fixture, candidateBuild, artifactFreshUntil } = await loadBuildInput(
     args,
     officialOdFareAdmissions,
     officialOdFareAdmissionBytes,
@@ -163,6 +163,12 @@ async function main() {
     }));
   }
 
+  const manifestExpiresAt = optionalUtcDateString(fixture.manifest.expiresAt, "manifest.expiresAt")
+    ?? buildExpiresAt(fixture.manifest.publishedAt);
+  const boundedManifestExpiresAt = artifactFreshUntil != null
+    && Date.parse(artifactFreshUntil) < Date.parse(manifestExpiresAt)
+    ? artifactFreshUntil
+    : manifestExpiresAt;
   const manifest = {
     ...(fixture.manifest.manifestVersion === 2
       ? {
@@ -171,8 +177,7 @@ async function main() {
           releaseSequence: optionalPositiveInteger(fixture.manifest.releaseSequence, "manifest.releaseSequence")
             ?? defaultReleaseSequence(),
           publishedAt: optionalUtcDateString(fixture.manifest.publishedAt, "manifest.publishedAt") ?? buildPublishedAt(),
-          expiresAt: optionalUtcDateString(fixture.manifest.expiresAt, "manifest.expiresAt")
-            ?? buildExpiresAt(fixture.manifest.publishedAt),
+          expiresAt: boundedManifestExpiresAt,
           keyId: requiredString(fixture.manifest.keyId, "manifest.keyId"),
         }
       : {}),
@@ -223,6 +228,7 @@ async function loadBuildInput(args, officialOdFareAdmissions, officialOdFareAdmi
     return {
       fixture,
       candidateBuild: null,
+      artifactFreshUntil: null,
     };
   }
   if (args["test-only-itx-admission"] != null) {
@@ -234,7 +240,7 @@ async function loadBuildInput(args, officialOdFareAdmissions, officialOdFareAdmi
   const buildSpec = JSON.parse(buildSpecBytes);
   const fixture = JSON.parse(await readFile(await resolveBuildInputPath(buildSpec.fixturePath, "buildSpec.fixturePath"), "utf8"));
   rejectTestOnlyBuildInput(fixture);
-  const officialOdFareEvidence = await validateCandidateBuildSpec(
+  const { officialOdFareEvidence, artifactFreshUntil } = await validateCandidateBuildSpec(
     buildSpec,
     fixture,
     officialOdFareAdmissions,
@@ -243,6 +249,7 @@ async function loadBuildInput(args, officialOdFareAdmissions, officialOdFareAdmi
   return {
     fixture,
     candidateBuild: candidateBuildProvenance(buildSpec, sha256(buildSpecBytes), officialOdFareEvidence),
+    artifactFreshUntil,
   };
 }
 
@@ -428,8 +435,20 @@ async function validateCandidateBuildSpec(buildSpec, fixture, admissions, admiss
   }
   requiredString(buildSpec.builderVersion, "buildSpec.builderVersion");
   const itxTopologyEvidence = await validateTrackedItxTopologyEvidence(buildSpec, fixture);
-  await validateAndApplyNetworkEdgeProvenance(buildSpec, fixture, itxTopologyEvidence);
-  return validateOfficialOdFareEvidence(buildSpec.officialOdFareEvidence, fixture, admissions, admissionBytes);
+  const artifactFreshUntil = await validateAndApplyNetworkEdgeProvenance(
+    buildSpec,
+    fixture,
+    itxTopologyEvidence,
+  );
+  return {
+    officialOdFareEvidence: validateOfficialOdFareEvidence(
+      buildSpec.officialOdFareEvidence,
+      fixture,
+      admissions,
+      admissionBytes,
+    ),
+    artifactFreshUntil,
+  };
 }
 
 function candidateBuildProvenance(buildSpec, buildSpecSha256, officialOdFareEvidence) {
@@ -544,7 +563,7 @@ async function validateAndApplyNetworkEdgeProvenance(buildSpec, fixture, itxTopo
     if (fixture.packs?.some(({ artifactKind }) => artifactKind === "production")) {
       throw new Error("production build requires network edge evidence");
     }
-    return;
+    return null;
   }
   if (evidence.capitalTopologyAdmission == null) {
     throw new Error("production build requires capital topology edge admission");
@@ -591,6 +610,10 @@ async function validateAndApplyNetworkEdgeProvenance(buildSpec, fixture, itxTopo
     applyCapitalNetworkEdgeEvidence(pack, topology, capitalTopology.pinned.snapshotId, capitalAdmissions);
     applyItxNetworkEdgeEvidence(pack, itxAdmission);
   }
+  return new Date(Math.min(
+    Date.parse(topologyAdmission.freshUntil),
+    Date.parse(itxAdmission.freshUntil),
+  )).toISOString();
 }
 
 function materializeCapitalTopologySource(pack, topology, admissions) {
@@ -819,6 +842,7 @@ async function admittedItxNetworkEdgeEvidence(contract, topologyEvidence) {
     sourceSnapshotId: source.artifactId,
     evidenceHash: sourceEvidenceHash,
     verifiedAt: observedAt,
+    freshUntil,
     pairHashes,
   };
 }

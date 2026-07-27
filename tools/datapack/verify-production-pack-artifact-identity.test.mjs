@@ -32,6 +32,12 @@ test("production build와 bundled asset/index의 artifact identity를 exact-matc
       "--output", baselineDir,
     ], { cwd: root, env });
     const manifest = JSON.parse(await readFile(path.join(baselineDir, "current.json"), "utf8"));
+    const bundledIndex = JSON.parse(await readFile(
+      path.join(root, "apps/mobile/assets/datapacks/index.json"),
+      "utf8",
+    ));
+    assert.equal(manifest.expiresAt, "2026-08-02T15:00:00.000Z");
+    assert.equal(bundledIndex.freshnessExpiresAt, manifest.expiresAt);
     const pack = manifest.packs.find(({ id }) => id === "capital");
     const topologySource = pack.sourceInventory.find(({ id }) => id === "capital-route-topology");
     assert.ok(topologySource);
