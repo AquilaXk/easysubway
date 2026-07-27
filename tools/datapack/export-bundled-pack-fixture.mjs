@@ -136,6 +136,16 @@ const LEGACY_DEFAULTS = Object.freeze({
     verification_status: "UNKNOWN",
     evidence_hash: "",
   }),
+  internal_route_edges: Object.freeze({
+    source_id: "",
+    source_snapshot_id: "",
+    provider_record_hash: "",
+    provenance_kind: "UNKNOWN",
+    verification_status: "UNKNOWN",
+    facility_id: null,
+    last_verified_at: null,
+    evidence_hash: "",
+  }),
 });
 
 export function extractBundledPackFixture({ database, expectedDatabase, template, gzipSha256, sqliteSha256 }) {
@@ -162,6 +172,35 @@ export function extractBundledPackFixture({ database, expectedDatabase, template
     const available = tableColumns(database, table);
     if (table === "facilities" && PRODUCTION_FACILITY_COLUMNS.some((column) => !available.has(column))) {
       if (!Array.isArray(pack.facilities)) throw new Error("legacy facilities require reviewed template rows");
+      for (const legacy of database.prepare("SELECT * FROM facilities ORDER BY id").all()) {
+        const matches = pack.facilities.filter((facility) =>
+          facility.stationId === legacy.station_id && facility.type === legacy.type);
+        if (matches.length === 1) {
+          matches[0].id = legacy.id;
+          continue;
+        }
+        // ponytail: only this reviewed unmatched legacy ID is a compatibility record; add a mapping if another appears.
+        if (matches.length !== 0 || legacy.id !== "facility-sangnoksu-accessible-toilet-1") {
+          throw new Error(`legacy facility requires one reviewed successor: ${legacy.id}`);
+        }
+        pack.facilities.push({
+          ...normalizeRow("facilities", legacy, available),
+          lineId: "seoul-4",
+          sourceId: "seoul-metro-accessibility",
+          sourceSnapshotId: "seoul-metro-accessibility-capital-admission-20260712",
+          providerFacilityRef: legacy.id,
+          providerRecordHash: sqliteSha256,
+          provenanceKind: "MIGRATION_COMPATIBILITY",
+          verifiedAt: "2025-06-01T00:00:00.000Z",
+          retrievedAt: "2026-07-12T00:00:00.000Z",
+          evidenceHash: gzipSha256,
+          statusMeaning: "COMPATIBILITY_REFERENCE_ONLY",
+          operationalStatus: "UNKNOWN",
+          installationStatus: "UNKNOWN",
+          confidence: 0,
+          derivationKind: "GENERATED",
+        });
+      }
       continue;
     }
     pack[target] = readRows(database, expectedDatabase, table);
@@ -336,7 +375,7 @@ async function main(argv) {
         gzipSha256: sha256(gzipBytes),
         sqliteSha256: sha256(sqliteBytes),
       });
-      await writeFile(outputPath, `${JSON.stringify(fixture, null, 2)}\n`);
+      await writeFile(outputPath, `${JSON.stringify(fixture)}\n`);
     } finally {
     database.close();
     }

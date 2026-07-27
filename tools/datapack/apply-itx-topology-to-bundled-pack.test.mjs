@@ -267,7 +267,7 @@ test("64 KiB 초과 gzip은 승인된 serialization-only readmission이 없으�
   const evidencePath = path.join(directory, "evidence.json");
   const evidence = JSON.parse(await readFile(
     path.join(root, "tools/datapack/itx-cheongchun-topology-evidence.json"), "utf8"));
-  delete evidence.readmissions.at(-1).serializationOnly;
+  for (const readmission of evidence.readmissions) delete readmission.serializationOnly;
   await writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
 
   await assert.rejects(execFileAsync(process.execPath, [

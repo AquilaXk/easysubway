@@ -13,15 +13,16 @@ const CATALOG_VERSION = 18;
 const EXPECTED_EDGE_COUNT = 48;
 const MAX_GZIP_DELTA_BYTES = 64 * 1024;
 
-function hasApprovedSerializationOnlyReadmission(evidence) {
-  const readmission = evidence?.readmissions?.at(-1);
-  return readmission?.serializationOnly?.approvedByIssue === 2648
-    && readmission.serializationOnly.logicalRowsUnchanged === true
-    && Array.isArray(readmission.rowDiff)
-    && readmission.rowDiff.length === 0
-    && readmission.newPack?.sha256 === evidence?.pack?.outputSha256
-    && readmission.newPack?.sqliteSha256 === evidence?.pack?.outputSqliteSha256
-    && readmission.newPack?.byteSize === evidence?.pack?.byteSize;
+function hasApprovedSerializationOnlyReadmission(evidence, inputSha256) {
+  const readmissions = evidence?.readmissions ?? [];
+  const start = readmissions.findIndex(({ previousPack }) => previousPack?.sha256 === inputSha256);
+  return start >= 0
+    && readmissions.slice(start).some((readmission) =>
+      readmission?.serializationOnly?.approvedByIssue === 2648
+      && readmission.serializationOnly.logicalRowsUnchanged === true
+      && Array.isArray(readmission.rowDiff)
+      && readmission.rowDiff.length === 0)
+    && hasTrackedReadmissionToOutput(evidence, inputSha256);
 }
 
 function hasTrackedReadmissionToOutput(evidence, inputSha256) {
@@ -615,7 +616,10 @@ async function main() {
         && evidence.pack.inputByteSize !== topologySource.inputByteSize)
       || evidence?.pack?.byteSizeDelta !== inputGzipBytes.length - evidence.pack.inputByteSize
       || (evidence.pack.byteSizeDelta > MAX_GZIP_DELTA_BYTES
-        && !hasApprovedSerializationOnlyReadmission(evidence))
+        && !hasApprovedSerializationOnlyReadmission(
+          evidence,
+          source?.canonicalPackIdentity?.sha256,
+        ))
       || pack?.sha256 !== sha256(inputGzipBytes)
       || pack?.sqliteSha256 !== evidence?.pack?.outputSqliteSha256
       || pack?.byteSize !== inputGzipBytes.length) {

@@ -67,6 +67,10 @@ test("legacy bundled pack을 provenance 추론 없이 builder fixture로 옮긴�
     INSERT INTO facilities VALUES (
       'legacy-facility', 'station-a', NULL, 'ELEVATOR', 'legacy', 'NORMAL', 'B1', '1F', ''
     );
+    INSERT INTO facilities VALUES (
+      'facility-sangnoksu-accessible-toilet-1', 'station-sangnoksu', NULL,
+      'ACCESSIBLE_TOILET', 'legacy toilet', 'UNKNOWN', 'B1', 'B1', 'legacy compatibility'
+    );
     INSERT INTO route_map_positions VALUES (
       'station-a', 'line-a', '수도권', 1, 2, 0, 0, '', '', '',
       'source-a', 'source', 'https://example.com', 'license', 'redistributable',
@@ -94,7 +98,12 @@ test("legacy bundled pack을 provenance 추론 없이 builder fixture로 옮긴�
       sourceInventory: [{ id: "source-a" }],
       requiredTables: ["operators", "lines", "stations", "station_lines", "network_edges"],
       minimumTableRows: {},
-      facilities: [{ id: "reviewed-facility", sourceId: "source-a" }],
+      facilities: [{
+        id: "reviewed-facility",
+        stationId: "station-a",
+        type: "ELEVATOR",
+        sourceId: "source-a",
+      }],
       stationFacilityEvidence: [{ stationId: "station-a", lineId: "line-a", facilityType: "ELEVATOR" }],
     }],
   };
@@ -152,7 +161,36 @@ test("legacy bundled pack을 provenance 추론 없이 builder fixture로 옮긴�
     lastVerifiedAt: "2026-07-28T00:00:00.000Z",
     evidenceHash: "",
   }]);
-  assert.deepEqual(fixture.packs[0].facilities, [{ id: "reviewed-facility", sourceId: "source-a" }]);
+  assert.deepEqual(fixture.packs[0].facilities, [{
+    id: "legacy-facility",
+    stationId: "station-a",
+    type: "ELEVATOR",
+    sourceId: "source-a",
+  }, {
+    id: "facility-sangnoksu-accessible-toilet-1",
+    stationId: "station-sangnoksu",
+    lineId: "seoul-4",
+    exitId: null,
+    type: "ACCESSIBLE_TOILET",
+    name: "legacy toilet",
+    status: "UNKNOWN",
+    floorFrom: "B1",
+    floorTo: "B1",
+    description: "legacy compatibility",
+    sourceId: "seoul-metro-accessibility",
+    sourceSnapshotId: "seoul-metro-accessibility-capital-admission-20260712",
+    providerFacilityRef: "facility-sangnoksu-accessible-toilet-1",
+    providerRecordHash: "b".repeat(64),
+    provenanceKind: "MIGRATION_COMPATIBILITY",
+    verifiedAt: "2025-06-01T00:00:00.000Z",
+    retrievedAt: "2026-07-12T00:00:00.000Z",
+    evidenceHash: "a".repeat(64),
+    statusMeaning: "COMPATIBILITY_REFERENCE_ONLY",
+    operationalStatus: "UNKNOWN",
+    installationStatus: "UNKNOWN",
+    confidence: 0,
+    derivationKind: "GENERATED",
+  }]);
   assert.deepEqual(fixture.packs[0].stationFacilityEvidence, [
     { stationId: "station-a", lineId: "line-a", facilityType: "ELEVATOR" },
   ]);
@@ -186,6 +224,56 @@ test("지원하지 않는 schema table 행은 무음 유실 대신 거부한다"
       gzipSha256: "a".repeat(64),
       sqliteSha256: "b".repeat(64),
     }), /non-empty unsupported table: facility_status_snapshots/);
+  } finally {
+    database.close();
+    expectedDatabase.close();
+  }
+});
+
+test("legacy internal route edge의 결측 provenance는 UNKNOWN으로 보존한다", () => {
+  const database = new DatabaseSync(":memory:");
+  const expectedDatabase = new DatabaseSync(":memory:");
+  try {
+    database.exec(`
+      CREATE TABLE internal_route_edges (
+        id TEXT PRIMARY KEY, from_node_id TEXT NOT NULL, to_node_id TEXT NOT NULL,
+        instruction TEXT NOT NULL
+      );
+      INSERT INTO internal_route_edges VALUES ('edge-a', 'node-a', 'node-b', '이동');
+    `);
+    expectedDatabase.exec(`
+      CREATE TABLE internal_route_edges (
+        id TEXT PRIMARY KEY, from_node_id TEXT NOT NULL, to_node_id TEXT NOT NULL,
+        source_id TEXT NOT NULL, source_snapshot_id TEXT NOT NULL,
+        provider_record_hash TEXT NOT NULL, provenance_kind TEXT NOT NULL,
+        verification_status TEXT NOT NULL, facility_id TEXT,
+        last_verified_at INTEGER NOT NULL, evidence_hash TEXT NOT NULL,
+        instruction TEXT NOT NULL
+      );
+    `);
+
+    const fixture = extractBundledPackFixture({
+      database,
+      expectedDatabase,
+      template: { packs: [{ artifactKind: "production", requiredTables: [], internalRouteEdges: [] }] },
+      gzipSha256: "a".repeat(64),
+      sqliteSha256: "b".repeat(64),
+    });
+
+    assert.deepEqual(fixture.packs[0].internalRouteEdges, [{
+      id: "edge-a",
+      fromNodeId: "node-a",
+      toNodeId: "node-b",
+      instruction: "이동",
+      sourceId: "",
+      sourceSnapshotId: "",
+      providerRecordHash: "",
+      provenanceKind: "UNKNOWN",
+      verificationStatus: "UNKNOWN",
+      facilityId: null,
+      lastVerifiedAt: null,
+      evidenceHash: "",
+    }]);
   } finally {
     database.close();
     expectedDatabase.close();
