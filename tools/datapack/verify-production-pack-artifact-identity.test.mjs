@@ -79,7 +79,7 @@ test("production build와 bundled asset/index의 artifact identity를 exact-matc
           SUM(service_class = 'ITX_CHEONGCHUN' AND verification_status = 'VERIFIED') AS verifiedItxCount
         FROM network_edges
       `).get();
-      assert.ok(provenance.verifiedCount > 48);
+      assert.equal(provenance.verifiedCount, 652);
       assert.ok(provenance.unknownCount > 0);
       assert.equal(provenance.incompleteVerifiedCount, 0);
       assert.equal(provenance.verifiedItxCount, 48);
@@ -186,6 +186,14 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
     const partial = structuredClone(spec);
     partial.fixturePath = partialPath;
     await runRejectedBuild(partial, /capital topology fixture projection mismatch/);
+
+    const missingInventoryFixture = structuredClone(partialFixture);
+    delete missingInventoryFixture.packs[0].sourceInventory;
+    const missingInventoryPath = path.join(workspace, "missing-inventory-fixture.json");
+    await writeFile(missingInventoryPath, `${JSON.stringify(missingInventoryFixture)}\n`);
+    const missingInventory = structuredClone(spec);
+    missingInventory.fixturePath = missingInventoryPath;
+    await runRejectedBuild(missingInventory, /network edge evidence requires pack.sourceInventory/);
 
     const changedSource = JSON.parse(await readFile(
       "tools/datapack/sources/itx-cheongchun-source-timetable-20260727071853886.json",

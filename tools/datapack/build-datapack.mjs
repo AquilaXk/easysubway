@@ -571,7 +571,10 @@ function materializeCapitalTopologySource(pack, topology, admissions) {
       sourceDomains: ["route_graph_topology"],
     },
   };
-  const existing = pack.sourceInventory?.find(({ id }) => id === source.id);
+  if (!Array.isArray(pack.sourceInventory)) {
+    throw new Error("network edge evidence requires pack.sourceInventory");
+  }
+  const existing = pack.sourceInventory.find(({ id }) => id === source.id);
   if (existing == null) pack.sourceInventory.push(source);
   else if (JSON.stringify(existing) !== JSON.stringify(source)) {
     throw new Error("capital topology pack source inventory mismatch");
