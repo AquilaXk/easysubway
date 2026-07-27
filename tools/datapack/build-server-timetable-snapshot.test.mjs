@@ -576,6 +576,21 @@ test("pack 미입력 경로는 sqliteSha256만 어긋나도 fail closed 한다",
   );
 });
 
+test("pack 미입력 경로는 손상된 ITX projection hash를 거부한다", async () => {
+  const value = await inputs();
+  const evidence = JSON.parse(value.readmissionEvidenceBytes);
+  evidence.readmissions.at(-1).itxSubgraph.edgesSha256 = "0".repeat(64);
+
+  assert.throws(
+    () => buildServerTimetableSnapshot({
+      ...value,
+      readmissionEvidenceBytes: Buffer.from(`${JSON.stringify(evidence)}\n`),
+      buildNow,
+    }),
+    /canonical topology pack identity mismatch/,
+  );
+});
+
 test("pack 미입력 경로는 gzip이 파손되면 fail closed 한다", async () => {
   const value = await inputs({ withTopologyEvidence: true });
   const { contractBytes, sourceBytes } = consistentFreshnessInputs(value);

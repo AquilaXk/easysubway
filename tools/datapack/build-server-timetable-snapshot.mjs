@@ -556,6 +556,7 @@ function admittedCanonicalPack({ canonicalPackGzipBytes, admittedCanonicalPackId
   if (!directlyAdmitted) validateReadmissionEvidence({
     evidence: readmissionEvidence,
     admittedCanonicalPackIdentity,
+    itxProjection: canonicalItxProjection(canonicalPackSqliteBytes),
     outputSha256,
     outputSqliteSha256,
     byteSize: canonicalPackGzipBytes.length,
@@ -578,6 +579,7 @@ function admittedCanonicalPack({ canonicalPackGzipBytes, admittedCanonicalPackId
 function validateReadmissionEvidence({
   evidence,
   admittedCanonicalPackIdentity,
+  itxProjection,
   outputSha256,
   outputSqliteSha256,
   byteSize,
@@ -603,7 +605,9 @@ function validateReadmissionEvidence({
       || entry.previousPack?.sqliteSha256 !== previous.sqliteSha256
       || entry.previousPack?.byteSize !== previous.byteSize
       || entry.itxSubgraph?.unchanged !== true
-      || entry.itxSubgraph?.edgeCount !== 48) {
+      || entry.itxSubgraph?.edgeCount !== itxProjection.edgeCount
+      || entry.itxSubgraph?.edgesSha256 !== itxProjection.edgesSha256
+      || entry.itxSubgraph?.evidenceSha256 !== itxProjection.evidenceSha256) {
       throw new Error("canonical topology pack identity mismatch");
     }
     previous = entry.newPack;
@@ -613,6 +617,40 @@ function validateReadmissionEvidence({
     || previous.sqliteSha256 !== outputSqliteSha256
     || previous.byteSize !== byteSize) {
     throw new Error("canonical topology pack identity mismatch");
+  }
+}
+
+function canonicalItxProjection(sqliteBytes) {
+  const directory = mkdtempSync(path.join(tmpdir(), "server-snapshot-itx-"));
+  const sqlitePath = path.join(directory, "capital.sqlite");
+  let database;
+  try {
+    writeFileSync(sqlitePath, sqliteBytes);
+    database = new DatabaseSync(sqlitePath, { readOnly: true });
+    const edges = database.prepare(`
+      SELECT id, from_node_id, to_node_id, duration_seconds, distance_meters,
+             edge_type, service_pattern, service_class
+      FROM network_edges
+      WHERE service_class = 'ITX_CHEONGCHUN'
+      ORDER BY id
+    `).all();
+    const evidence = database.prepare(`
+      SELECT service_class, timetable_artifact_id, timetable_artifact_sha256,
+             canonical_pack_id, canonical_pack_sha256, canonical_pack_sqlite_sha256,
+             admission_status, admission_eligible, fresh_until, source_issue
+      FROM route_service_artifact_evidence
+      WHERE service_class = 'ITX_CHEONGCHUN'
+    `).all();
+    return {
+      edgeCount: edges.length,
+      edgesSha256: sha256(Buffer.from(JSON.stringify(edges))),
+      evidenceSha256: sha256(Buffer.from(JSON.stringify(evidence))),
+    };
+  } catch (error) {
+    throw new Error("canonical topology pack identity mismatch", { cause: error });
+  } finally {
+    database?.close();
+    rmSync(directory, { recursive: true, force: true });
   }
 }
 

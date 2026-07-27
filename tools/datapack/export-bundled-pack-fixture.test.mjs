@@ -191,3 +191,32 @@ test("지원하지 않는 facility status snapshot 행은 무음 유실 대신 �
     expectedDatabase.close();
   }
 });
+
+test("명시적 legacy 기본값이 없는 결측 컬럼은 거부한다", () => {
+  const database = new DatabaseSync(":memory:");
+  const expectedDatabase = new DatabaseSync(":memory:");
+  try {
+    database.exec(`
+      CREATE TABLE lines (
+        id TEXT PRIMARY KEY, operator_id TEXT NOT NULL, name_ko TEXT NOT NULL, name_en TEXT NOT NULL
+      )
+    `);
+    expectedDatabase.exec(`
+      CREATE TABLE lines (
+        id TEXT PRIMARY KEY, operator_id TEXT NOT NULL, name_ko TEXT NOT NULL,
+        name_en TEXT NOT NULL, color TEXT NOT NULL
+      )
+    `);
+
+    assert.throws(() => extractBundledPackFixture({
+      database,
+      expectedDatabase,
+      template: { packs: [{ artifactKind: "production", requiredTables: [] }] },
+      gzipSha256: "a".repeat(64),
+      sqliteSha256: "b".repeat(64),
+    }), /missing lines columns: color/);
+  } finally {
+    database.close();
+    expectedDatabase.close();
+  }
+});

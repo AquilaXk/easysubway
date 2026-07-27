@@ -230,10 +230,10 @@ function assertKnownColumns(table, columns, expectedColumns) {
   const expected = new Set(expectedColumns.map(({ name }) => name));
   const unknown = columns.map(({ name }) => name).filter((name) => !expected.has(name));
   if (unknown.length > 0) throw new Error(`unknown ${table} columns: ${unknown.join(", ")}`);
-  const expectedPrimaryKey = expectedColumns.filter(({ pk }) => pk > 0).map(({ name }) => name);
   const actual = new Set(columns.map(({ name }) => name));
-  const missingPrimaryKey = expectedPrimaryKey.filter((name) => !actual.has(name));
-  if (missingPrimaryKey.length > 0) throw new Error(`missing ${table} primary key columns: ${missingPrimaryKey.join(", ")}`);
+  const supportedLegacyColumns = new Set(Object.keys(LEGACY_DEFAULTS[table] ?? {}));
+  const missing = [...expected].filter((name) => !actual.has(name) && !supportedLegacyColumns.has(name));
+  if (missing.length > 0) throw new Error(`missing ${table} columns: ${missing.join(", ")}`);
 }
 
 function assertUniqueRows(table, rows, primaryKeyColumns) {
