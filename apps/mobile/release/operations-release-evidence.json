@@ -293,9 +293,9 @@
           "currentImplementation": {
             "status": "SATISFIED",
             "fields": ["snapshotSha256", "freshUntil"],
-            "snapshotId": "server-timetable-snapshot-5ad7ea3d33fac104",
-            "snapshotSha256": "5ad7ea3d33fac10406af24cbab07aa5ac2fe97cccc7ee56eb30c05f909d738a6",
-            "freshUntil": "2026-07-27T00:00:00+09:00",
+            "snapshotId": "server-timetable-snapshot-cf2f25d26584bbcc",
+            "snapshotSha256": "cf2f25d26584bbcced1f33e999ddd89b9885a9de3be7c4ff4fabceab323aef30",
+            "freshUntil": "2026-08-03T00:00:00+09:00",
             "evidencePath": "tools/datapack/server-timetable-snapshot-evidence.json"
           },
           "sharedRouteResponseCacheAllowed": false
