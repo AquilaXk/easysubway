@@ -686,7 +686,11 @@ function admittedCapitalLineEvidence(sourceInventory, topology, snapshotId, revi
     }
     const capturedAt = requiredUtcDateString(evidence.capturedAt, `${source.id}.routeMapAdmissionEvidence.capturedAt`);
     const freshUntil = requiredUtcDateString(evidence.freshUntil, `${source.id}.routeMapAdmissionEvidence.freshUntil`);
-    if (Date.parse(freshUntil) <= candidateBuildNow().getTime()) {
+    const now = candidateBuildNow().getTime();
+    if (Date.parse(capturedAt) > Date.parse(reviewedAt) || Date.parse(capturedAt) > now) {
+      throw new Error(`capital topology admission is future-dated: ${source.id}`);
+    }
+    if (Date.parse(freshUntil) <= now) {
       throw new Error(`capital topology admission is stale: ${source.id}`);
     }
     for (const lineage of evidence.topologyLineages) {
@@ -748,6 +752,8 @@ function requiredCapitalStationId(stationIds, lineId, stationName) {
 function applyCapitalNetworkEdgeEvidence(pack, topology, snapshotId, admissions) {
   const stationIds = capitalStationIdsByLine(pack);
   const edges = new Map((pack.networkEdges ?? []).map((edge) => [edge.id, edge]));
+  const admittedLineIds = new Set(topology.lines.map(({ lineId }) => lineId).filter((lineId) => admissions.has(lineId)));
+  const expectedEdgeIds = new Set();
   for (const line of topology.lines.filter(({ lineId }) => admissions.has(lineId))) {
     const admission = admissions.get(line.lineId);
     if (line.edgeCount !== line.edges.length) throw new Error(`capital topology edge count mismatch: ${line.lineId}`);
@@ -764,6 +770,7 @@ function applyCapitalNetworkEdgeEvidence(pack, topology, snapshotId, admissions)
         servicePattern: "LOCAL",
         serviceClass: "SUBWAY",
       };
+      expectedEdgeIds.add(expected.id);
       const edge = edges.get(expected.id);
       if (edge == null || Object.entries(expected).some(([key, value]) => edge[key] !== value)) {
         throw new Error(`capital topology fixture projection mismatch: ${expected.id}`);
@@ -787,6 +794,17 @@ function applyCapitalNetworkEdgeEvidence(pack, topology, snapshotId, admissions)
         },
       });
     }
+  }
+  assertExactCapitalTopologyProjection(pack, admittedLineIds, expectedEdgeIds);
+}
+
+function assertExactCapitalTopologyProjection(pack, admittedLineIds, expectedEdgeIds) {
+  const actualEdgeIds = (pack.networkEdges ?? [])
+    .filter((edge) => edge.edgeType === "RIDE" && edge.servicePattern === "LOCAL" && edge.serviceClass === "SUBWAY"
+      && lineIdsForNodes([edge.fromNodeId, edge.toNodeId]).some((lineId) => admittedLineIds.has(lineId)))
+    .map(({ id }) => id);
+  if (actualEdgeIds.length !== expectedEdgeIds.size || actualEdgeIds.some((id) => !expectedEdgeIds.has(id))) {
+    throw new Error("capital topology fixture projection is not exact");
   }
 }
 
@@ -847,6 +865,7 @@ async function admittedItxNetworkEdgeEvidence(contract, topologyEvidence) {
     || completeness.validationStatus !== "SUPPORTED"
     || completeness.admissionStatus !== "SUPPORTED"
     || completeness.materialization?.status !== "SUPPORTED"
+    || completeness.observedAt !== source.observedAt
     || completeness.sourceTimetableArtifact?.status !== "SUPPORTED"
     || completeness.sourceTimetableArtifact?.artifactId !== reference.artifactId
     || completeness.sourceTimetableArtifact?.policyVersion !== source.policyVersion
@@ -860,6 +879,7 @@ async function admittedItxNetworkEdgeEvidence(contract, topologyEvidence) {
   try {
     validateSourceCandidateSchema(source);
     const observedAt = new Date(source.observedAt);
+    if (observedAt.getTime() > candidateBuildNow().getTime()) throw new Error("future-dated ITX observation");
     validateItxServiceDates(source.selectedServiceDates, { now: observedAt });
     validateSourceFreshness(source, source.selectedServiceDates, observedAt);
   } catch (error) {
