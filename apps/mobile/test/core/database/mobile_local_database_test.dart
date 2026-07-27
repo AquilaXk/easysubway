@@ -406,6 +406,7 @@ void main() {
     expect(exits.single.read<String>('data_source_type'), 'OFFICIAL_FILE');
     expect(exits.single.read<int>('last_verified_at'), 1781827200);
     expect(facilities.map((row) => row.read<String>('type')).toSet(), {
+      'ACCESSIBLE_TOILET',
       'ELEVATOR',
       'ESCALATOR',
       'WHEELCHAIR_LIFT',
@@ -413,6 +414,7 @@ void main() {
     expect(
       facilities.map((row) => row.read<String>('name')),
       containsAll([
+        '대합실 장애인 화장실',
         '상록수역 엘리베이터 설치 정보',
         '상록수역 에스컬레이터 설치 정보',
         '상록수역 휠체어리프트 설치 정보',
