@@ -52,7 +52,7 @@ class EasySubwayFamilyAppBar extends StatelessWidget
             icon: const Icon(
               Icons.arrow_back,
               size: 26,
-              color: Color(0xFF4B4B4B),
+              color: EasySubwayAccessibleColors.contentPrimary,
             ),
           ),
       flexibleSpace: Align(

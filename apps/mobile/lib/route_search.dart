@@ -4241,7 +4241,11 @@ PreferredSizeWidget _routeSearchAppBar({required VoidCallback onBack}) {
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         padding: EdgeInsets.zero,
       ),
-      icon: const Icon(Icons.arrow_back, size: 26, color: Color(0xFF4B4B4B)),
+      icon: const Icon(
+        Icons.arrow_back,
+        size: 26,
+        color: EasySubwayAccessibleColors.contentPrimary,
+      ),
     ),
     title: const Text(
       '길찾기',

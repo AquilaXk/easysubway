@@ -115,6 +115,72 @@ void main() {
     );
   }
 
+  test('일반 UI는 raw 색을 우회하지 않는다', () {
+    const allowedRawColors = <String, Set<String>>{
+      'lib/accessible_design.dart': {
+        '0xFFF8F9FF', '0xFFF0F2FE', '0xFFE2E5FD', '0xFFCCD2FC',
+        '0xFFB4BCFB', '0xFF949FE8', '0xFF7480D2', '0xFF5C6BC0',
+        '0xFF4A58A9', '0xFF3B4890', '0xFF1F2340', '0xFFFFFFFF',
+        '0xFFF7F8FC', '0xFFF0F2F7', '0xFFE1E4EE', '0xFF4D536B',
+        '0xFF697089', '0xFF0A705A', '0xFF9A5600', '0xFFB42318',
+        '0xFF215EA8', '0xFFF0FBF7', '0xFFFFF0D1', '0xFFFFE8E6',
+        '0xFFEEF5FF', '0xFF1E3234', '0xFF7C949A', '0xFF8A9AA0',
+        '0xFFB0BEC5', '0xFF071B2F', '0xFF075D4B', '0xFFCBEADD',
+        '0xFFF1D49A', '0x0A071B2F', '0xFFC8D3DC', '0xFF007C91',
+        '0xFF006FD6', '0xFFFFF7ED', '0xFFF2DFC8', '0xFF5D4932',
+        '0xFF8F4B1E', '0xFFF6F6F8', '0xFF70717B', '0xFFDEDEE3',
+        '0xFF000000', '0xFF1A1D1E', '0xFF3A4143', '0xFFC5CDD4',
+        '0x32000000', '0x1D000000', '0x11000000', '0x07000000',
+        '0x00000000',
+      },
+      'lib/design_tokens.dart': {
+        '0xFF0A84FF', '0xFFF2F8FF', '0xFFE1F0FF', '0xFFFF9F0A',
+        '0xFFFFF8ED', '0xFFFFEFCC', '0xFFFF3B30', '0xFFFFF5F4',
+        '0xFFFFE8E6', '0x40000000', '0xFF0654A1', '0xFFA16506',
+        '0xFFA1251E', '0xFFFFFFFF', '0xFFE5E5E5', '0xFF666666',
+        '0x26000000', '0xFFF5F7FA', '0xFFE9EDF2', '0xFF475467',
+        '0xE8404445', '0xFF20262E',
+      },
+      'lib/features/stations/domain/station_line.dart': {
+        '0xFF006D77', '0xFF102A2C',
+      },
+      'lib/features/network_map/presentation/route_map_basemap_view.dart': {
+        '0xFF466467', '0xCCFFFFFF',
+      },
+      'lib/features/network_map/presentation/route_map_label_layout.dart': {
+        '0xFF000000',
+      },
+      'lib/features/network_map/presentation/structured_route_map_painter.dart': {
+        '0xFF102A2C', '0xFFFFFFFF', '0xFF466467', '0xFF8D8D8D',
+        '0xCCFFFFFF',
+      },
+      'lib/network_map.dart': {
+        '0x99000000', '0xE62F3437', '0xFF000000',
+      },
+      'lib/features/network_map/presentation/region_menu.dart': {
+        '0x99000000',
+      },
+    };
+    final rawColor = RegExp(r'Color\(\s*(0x[0-9A-Fa-f]{8})\s*\)');
+    final violations = <String>[];
+
+    sources.forEach((path, source) {
+      for (final match in rawColor.allMatches(source)) {
+        final value = match.group(1)!;
+        if (!(allowedRawColors[path]?.contains(value) ?? false)) {
+          final line = '\n'.allMatches(source.substring(0, match.start)).length + 1;
+          violations.add('$path:$line:$value');
+        }
+      }
+    });
+
+    expect(
+      violations,
+      isEmpty,
+      reason: '일반 UI raw 색은 역할 Semantic으로 교체해야 한다.\n${violations.join('\n')}',
+    );
+  });
+
   test('그라데이션 하드 밴 — 0건 유지', () {
     final offenders = countPerFile(
       RegExp(r'\bLinearGradient\b|\bRadialGradient\b|\bSweepGradient\b'),

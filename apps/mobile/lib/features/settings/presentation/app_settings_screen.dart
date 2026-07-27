@@ -93,7 +93,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
             icon: const Icon(
               Icons.arrow_back,
               size: 26,
-              color: Color(0xFF4B4B4B),
+              color: EasySubwayAccessibleColors.contentPrimary,
             ),
           ),
           flexibleSpace: const Align(

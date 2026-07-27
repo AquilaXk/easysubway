@@ -2399,7 +2399,7 @@ class _NetworkMapTopBar extends StatelessWidget {
                 icon: const Icon(
                   Icons.arrow_back,
                   size: 26,
-                  color: Color(0xFF4B4B4B),
+                  color: EasySubwayAccessibleColors.contentPrimary,
                 ),
               )
             else
@@ -2415,7 +2415,7 @@ class _NetworkMapTopBar extends StatelessWidget {
                 icon: const Icon(
                   Icons.menu,
                   size: 26,
-                  color: Color(0xFF4B4B4B),
+                  color: EasySubwayAccessibleColors.contentPrimary,
                 ),
               ),
             const SizedBox(width: 4),
@@ -2472,7 +2472,7 @@ class _NetworkMapTopBar extends StatelessWidget {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                    color: Color(0xFF606060),
+                                    color: EasySubwayAccessibleColors.contentSecondary,
                                     fontSize: 17,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -2482,7 +2482,7 @@ class _NetworkMapTopBar extends StatelessWidget {
                                 const SizedBox(width: 2),
                                 const Icon(
                                   Icons.keyboard_arrow_down,
-                                  color: Color(0xFF606060),
+                                  color: EasySubwayAccessibleColors.contentSecondary,
                                   size: 22,
                                 ),
                               ],
@@ -3018,7 +3018,10 @@ class _NetworkMapCurrentLocationButton extends StatelessWidget {
           color: Colors.white,
           elevation: 0,
           shape: const CircleBorder(
-            side: BorderSide(color: Color(0xFFD8D8D8), width: 1),
+            side: BorderSide(
+              color: EasySubwayAccessibleColors.borderSubtle,
+              width: 1,
+            ),
           ),
           child: InkWell(
             customBorder: const CircleBorder(),
@@ -3029,7 +3032,7 @@ class _NetworkMapCurrentLocationButton extends StatelessWidget {
               child: Icon(
                 Icons.my_location,
                 size: 27,
-                color: Color(0xFF565656),
+                color: EasySubwayAccessibleColors.contentSecondary,
               ),
             ),
           ),
@@ -3204,7 +3207,11 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
           color: Colors.white,
           border: expanded
               ? null
-              : const Border(top: BorderSide(color: Color(0xFFD8D8D8))),
+              : const Border(
+                  top: BorderSide(
+                    color: EasySubwayAccessibleColors.borderSubtle,
+                  ),
+                ),
         ),
         child: Column(
           mainAxisSize: expanded ? MainAxisSize.max : MainAxisSize.min,
@@ -3255,7 +3262,7 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
                       padding: EdgeInsets.zero,
                       icon: const Icon(
                         Icons.close,
-                        color: Color(0xFF454545),
+                        color: EasySubwayAccessibleColors.contentPrimary,
                         size: 27,
                       ),
                     ),
@@ -3264,7 +3271,10 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
                 ],
               ),
             ),
-            const Divider(height: 1, color: Color(0xFFD8D8D8)),
+            const Divider(
+              height: 1,
+              color: EasySubwayAccessibleColors.borderSubtle,
+            ),
             // 접힘·확장 모두 실시간/시간표 요약을 유지한다. 확장에서 Body로
             // 갈아끼우면 이미 뜬 열차 정보가 실패 카드로 사라진다.
             _NetworkMapNearbyPanelBody(
@@ -3278,7 +3288,10 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
               onSelectNeighbor: onSelectNeighbor,
             ),
             if (canExpandDetail) ...[
-              const Divider(height: 1, color: Color(0xFFD8D8D8)),
+              const Divider(
+                height: 1,
+                color: EasySubwayAccessibleColors.borderSubtle,
+              ),
               Expanded(
                 child: StationDetailExpandHost(
                   key: ValueKey('nearbyStationDetailHost-${primary.id}'),
@@ -3623,7 +3636,7 @@ class _SubwayDataUnavailable extends StatelessWidget {
             '-',
             key: Key('networkMapNearbyDataUnavailable'),
             style: TextStyle(
-              color: Color(0xFF2F2F2F),
+              color: EasySubwayAccessibleColors.contentPrimary,
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
@@ -3777,7 +3790,7 @@ class _SubwayTimetableDepartureView extends StatelessWidget {
     final time = Text(
       data.departure.timeLabel,
       style: const TextStyle(
-        color: Color(0xFFE23D3D),
+        color: EasySubwayAccessibleColors.statusDangerContent,
         fontSize: 15,
         fontWeight: FontWeight.w800,
       ),
@@ -6694,7 +6707,11 @@ class _NetworkMapTopBarRouteDraft extends StatelessWidget {
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           padding: EdgeInsets.zero,
         ),
-        icon: Icon(icon, size: 26, color: const Color(0xFF4B4B4B)),
+        icon: Icon(
+          icon,
+          size: 26,
+          color: EasySubwayAccessibleColors.contentPrimary,
+        ),
       ),
     );
   }
@@ -6713,7 +6730,7 @@ class _NetworkMapTopBarRouteDraft extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.right,
             style: const TextStyle(
-              color: Color(0xFF606060),
+              color: EasySubwayAccessibleColors.contentSecondary,
               fontSize: 17,
               fontWeight: FontWeight.w600,
             ),

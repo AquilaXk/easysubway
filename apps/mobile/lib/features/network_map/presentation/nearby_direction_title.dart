@@ -15,7 +15,7 @@ class NearbyDirectionTitle extends StatelessWidget {
   });
 
   static const _suffix = '방면';
-  static const _suffixColor = Color(0xFF2F2F2F);
+  static const _suffixColor = EasySubwayAccessibleColors.contentPrimary;
   static const _style = TextStyle(
     fontSize: 14,
     fontWeight: FontWeight.w900,
@@ -87,7 +87,7 @@ class NearbyArrivalRow extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                color: Color(0xFF2F2F2F),
+                color: EasySubwayAccessibleColors.contentPrimary,
                 fontSize: 13,
                 height: 1.3,
                 fontWeight: FontWeight.w700,

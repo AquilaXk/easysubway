@@ -303,7 +303,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
                           icon: const Icon(
                             Icons.arrow_back,
                             size: 26,
-                            color: Color(0xFF4B4B4B),
+                            color: EasySubwayAccessibleColors.contentPrimary,
                           ),
                         ),
                         const SizedBox(width: 4),
@@ -791,7 +791,7 @@ class _StationSearchRegionSelector extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          color: Color(0xFF606060),
+                          color: EasySubwayAccessibleColors.contentSecondary,
                           fontSize: 17,
                           fontWeight: FontWeight.w600,
                         ),
@@ -801,7 +801,7 @@ class _StationSearchRegionSelector extends StatelessWidget {
                       const SizedBox(width: 2),
                       const Icon(
                         Icons.keyboard_arrow_down,
-                        color: Color(0xFF606060),
+                        color: EasySubwayAccessibleColors.contentSecondary,
                         size: 22,
                       ),
                     ],

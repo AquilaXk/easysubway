@@ -26,7 +26,8 @@ const easySubwaySearchFieldBorderWidth = 1.0;
 
 /// 검색·출발/도착/경유 박스 외곽선.
 /// 표면 `#F6F8F9` 대비 약 3:1 이상인 전용 색(구분선 `#C5CDD4`와 분리).
-const easySubwaySearchFieldBorderColor = Color(0xFF8A9AA0);
+const easySubwaySearchFieldBorderColor =
+    EasySubwayAccessibleColors.interactionSecondaryBorder;
 
 /// 검색/지우기 아이콘 시각 크기(22).
 const easySubwaySearchFieldIconSize = 22.0;

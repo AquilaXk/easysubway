@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../accessible_design.dart';
+
 /// 주변역 패널의 이전-현재-다음역 노선 표시 바 (오너 스펙 2026-07-16, #2200).
 ///
 /// 좌우 바는 선택 노선색 단일 소스([lineColor])를 동일하게 쓰고(2호선이면 양쪽
@@ -190,7 +192,7 @@ class _StationNameLabel extends StatelessWidget {
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
-        color: const Color(0xFF102A2C),
+        color: EasySubwayAccessibleColors.contentPrimary,
         fontSize: fontSize,
         fontWeight: FontWeight.w800,
         height: 1.1,

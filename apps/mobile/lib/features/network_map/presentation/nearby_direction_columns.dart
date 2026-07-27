@@ -116,7 +116,7 @@ class NearbyPanelColumns extends StatelessWidget {
 
   /// 기존 `_SubwayDataUnavailable`의 대시 스타일(16sp w700 #2F2F2F)을 재사용한다.
   static const dashStyle = TextStyle(
-    color: Color(0xFF2F2F2F),
+    color: EasySubwayAccessibleColors.contentPrimary,
     fontSize: 16,
     fontWeight: FontWeight.w700,
   );
