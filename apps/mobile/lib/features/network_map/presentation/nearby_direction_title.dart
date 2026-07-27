@@ -4,7 +4,7 @@ import '../../../accessible_design.dart';
 
 /// 주변역 패널의 "○○ 방면" 제목 (오너 스펙 2026-07-16, #2200).
 ///
-/// 역명 부분은 선택 노선색, " 방면" 부분은 #2F2F2F로 스타일만 분리한다. 라벨
+/// 역명 부분은 선택 노선색, " 방면" 부분은 primary content 역할색으로 스타일만 분리한다. 라벨
 /// 문자열(데이터 포맷)은 조작하지 않는다 — "방면"으로 끝나지 않으면 전체를
 /// 노선색으로 그린다. 실시간·시간표 열이 공유하는 단일 스타일이다.
 class NearbyDirectionTitle extends StatelessWidget {
@@ -15,7 +15,7 @@ class NearbyDirectionTitle extends StatelessWidget {
   });
 
   static const _suffix = '방면';
-  static const _suffixColor = Color(0xFF2F2F2F);
+  static const _suffixColor = EasySubwayAccessibleColors.contentPrimary;
   static const _style = TextStyle(
     fontSize: 14,
     fontWeight: FontWeight.w900,
@@ -87,7 +87,7 @@ class NearbyArrivalRow extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                color: Color(0xFF2F2F2F),
+                color: EasySubwayAccessibleColors.contentPrimary,
                 fontSize: 13,
                 height: 1.3,
                 fontWeight: FontWeight.w700,

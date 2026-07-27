@@ -93,7 +93,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
             icon: const Icon(
               Icons.arrow_back,
               size: 26,
-              color: Color(0xFF4B4B4B),
+              color: EasySubwayAccessibleColors.contentPrimary,
             ),
           ),
           flexibleSpace: const Align(
@@ -410,9 +410,11 @@ class _AppSettingsPreferenceTile extends StatelessWidget {
               Switch(
                 value: enabled,
                 onChanged: onChanged,
-                activeThumbColor: Colors.white,
+                activeThumbColor:
+                    EasySubwayAccessibleColors.interactionOnPrimary,
                 activeTrackColor: EasySubwayAccessibleColors.switchActiveTrack,
-                inactiveThumbColor: Colors.white,
+                inactiveThumbColor:
+                    EasySubwayAccessibleColors.interactionOnPrimary,
                 inactiveTrackColor:
                     EasySubwayAccessibleColors.switchInactiveTrack,
                 materialTapTargetSize: MaterialTapTargetSize.padded,

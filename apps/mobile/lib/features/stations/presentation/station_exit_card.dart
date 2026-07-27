@@ -218,7 +218,8 @@ class _StationExitCardState extends State<StationExitCard> {
                                 height: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: Colors.white,
+                                  color: EasySubwayAccessibleColors
+                                      .interactionOnPrimary,
                                 ),
                               )
                             : const Icon(Icons.directions_walk),

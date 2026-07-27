@@ -36,6 +36,7 @@ import 'package:easysubway_mobile/features/realtime/realtime_repository.dart';
 import 'package:easysubway_mobile/features/route_draft/application/route_draft_controller.dart';
 import 'package:easysubway_mobile/features/stations/presentation/station_detail_body.dart';
 import 'package:easysubway_mobile/features/stations/presentation/station_detail_screen.dart';
+import 'package:easysubway_mobile/features/stations/presentation/station_facility_detail_screen.dart';
 import 'package:easysubway_mobile/features/stations/presentation/station_search_screen.dart';
 import 'package:easysubway_mobile/features/service_notice/data/notice_repository.dart';
 import 'package:easysubway_mobile/features/service_notice/domain/service_notice.dart';
@@ -86,6 +87,51 @@ OnboardingState _completedOnboardingStateWithPreferences({
 }) {
   return OnboardingState.completed(
     result: OnboardingResult(preset: preset, preferences: preferences),
+  );
+}
+
+void _expectSignatureColorScheme(ColorScheme colorScheme) {
+  expect(colorScheme.primary, EasySubwayAccessibleColors.interactionPrimary);
+  expect(
+    colorScheme.onPrimary,
+    EasySubwayAccessibleColors.interactionOnPrimary,
+  );
+  expect(
+    colorScheme.secondary,
+    EasySubwayAccessibleColors.interactionSecondarySurface,
+  );
+  expect(
+    colorScheme.onSecondary,
+    EasySubwayAccessibleColors.interactionOnBrand,
+  );
+  expect(
+    colorScheme.secondaryContainer,
+    EasySubwayAccessibleColors.interactionSecondaryPressedSurface,
+  );
+  expect(
+    colorScheme.onSecondaryContainer,
+    EasySubwayAccessibleColors.interactionOnBrand,
+  );
+  expect(colorScheme.surface, EasySubwayAccessibleColors.surfaceDefault);
+  expect(colorScheme.onSurface, EasySubwayAccessibleColors.contentPrimary);
+  expect(
+    colorScheme.onSurfaceVariant,
+    EasySubwayAccessibleColors.contentSecondary,
+  );
+  expect(
+    colorScheme.outline,
+    EasySubwayAccessibleColors.interactionSecondaryBorder,
+  );
+  expect(colorScheme.outlineVariant, EasySubwayAccessibleColors.borderSubtle);
+  expect(colorScheme.error, EasySubwayAccessibleColors.statusDangerContent);
+  expect(colorScheme.onError, EasySubwayAccessibleColors.interactionOnPrimary);
+  expect(
+    colorScheme.errorContainer,
+    EasySubwayAccessibleColors.statusDangerSurface,
+  );
+  expect(
+    colorScheme.onErrorContainer,
+    EasySubwayAccessibleColors.statusDangerContent,
   );
 }
 
@@ -520,6 +566,34 @@ Future<void> _tapFirstRouteResultListItem(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('앱 Theme는 시그니처 ColorScheme 역할색을 사용한다', (tester) async {
+    await tester.pumpWidget(
+      buildEasySubwayTestApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final theme = Theme.of(tester.element(find.byType(HomeScreen)));
+    expect(
+      theme.filledButtonTheme.style?.backgroundColor?.resolve({
+        WidgetState.pressed,
+      }),
+      EasySubwayAccessibleColors.interactionPrimaryPressed,
+    );
+    expect(theme.filledButtonTheme.style?.backgroundColor?.resolve({}), isNull);
+    expect(
+      theme.filledButtonTheme.style?.backgroundColor?.resolve({
+        WidgetState.disabled,
+      }),
+      isNull,
+    );
+    _expectSignatureColorScheme(theme.colorScheme);
+  });
+
   // 상대 확인 시점을 쓰는 테스트가 기준 시각을 고정한 뒤 항상 원래대로 되돌린다.
   tearDown(() {
     debugStationVerifiedClock = DateTime.now;
@@ -967,7 +1041,21 @@ void main() {
     final homeContext = tester.element(find.byType(HomeScreen));
 
     expect(MediaQuery.textScalerOf(homeContext).scale(20), closeTo(20, 0.01));
-    expect(Theme.of(homeContext).colorScheme.primary, const Color(0xFF1A1D1E));
+    final theme = Theme.of(homeContext);
+    expect(theme.colorScheme.primary, const Color(0xFF1A1D1E));
+    expect(theme.filledButtonTheme.style?.backgroundColor?.resolve({}), isNull);
+    expect(
+      theme.filledButtonTheme.style?.backgroundColor?.resolve({
+        WidgetState.disabled,
+      }),
+      isNull,
+    );
+    expect(
+      theme.filledButtonTheme.style?.backgroundColor?.resolve({
+        WidgetState.pressed,
+      }),
+      EasySubwayAccessibleColors.highContrastPrimary,
+    );
     expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
     expect(find.text('이동 프로필'), findsNothing);
     expect(find.text('시설 정보'), findsNothing);
@@ -1385,10 +1473,6 @@ void main() {
   });
 
   testWidgets('홈 검색바는 idle에서 active로 전환돼도 시각 박스 높이가 그대로 유지된다', (tester) async {
-    expect(
-      EasySubwayAccessibleColors.searchFieldSurface,
-      const Color(0xFFF6F8F9),
-    );
     await tester.pumpWidget(
       buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
@@ -1686,14 +1770,28 @@ void main() {
   });
 
   testWidgets('알림함 시설 상태는 쉬운 안내와 할 일을 함께 보여준다', (tester) async {
+    final reportRepository = FakeFacilityReportRepository(
+      reports: [
+        const FacilityReportResult(
+          id: 'report-2',
+          publicReceiptCode: 'ES-1002',
+          stationId: 'station-sangnoksu',
+          facilityId: 'facility-sangnoksu-elevator-1',
+          reportType: 'CLOSED',
+          description: '출입문이 막혀 있습니다.',
+          status: 'ACCEPTED',
+          createdAt: '2026-06-15T09:00:00',
+        ),
+      ],
+    );
     await tester.pumpWidget(
       buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
-        reportRepository: FakeFacilityReportRepository(),
+        reportRepository: reportRepository,
         routeRepository: FakeRouteSearchRepository(),
         favoriteRepository: FakeFavoriteStationRepository(),
         favoriteFacilityRepository: FakeFavoriteFacilityRepository(
-          favorites: [_favoriteFacility(status: 'USER_REPORTED')],
+          favorites: [_favoriteFacility(status: 'UNKNOWN')],
         ),
         notificationRepository: FakeNotificationSettingsRepository(),
         initialOnboardingState: _completedOnboardingState(),
@@ -1705,10 +1803,54 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('상록수역 1번 출구 엘리베이터'), findsOneWidget);
-    expect(find.text('가기 전 살펴보기 · 엘리베이터 제보됨'), findsOneWidget);
-    expect(find.text('역무원 도움 요청'), findsOneWidget);
+    expect(find.text('미확인 · 엘리베이터 설치 확인 · 운행상태 미확인'), findsOneWidget);
+    expect(find.text('자세히 보기'), findsOneWidget);
+    final reportTitle = find.text('제보 반영됨');
     expect(
-      find.bySemanticsLabel(RegExp('가기 전 살펴보기, .*공식 안내, 역무원 도움 요청')),
+      find.ancestor(of: reportTitle, matching: find.byType(Ink)),
+      findsOneWidget,
+    );
+    expect(
+      find.ancestor(of: reportTitle, matching: find.byType(InkWell)),
+      findsOneWidget,
+    );
+    final notificationRow = find
+        .ancestor(of: find.text('상록수역 1번 출구 엘리베이터'), matching: find.byType(Ink))
+        .first;
+    final notificationDecoration =
+        tester.widget<Ink>(notificationRow).decoration! as BoxDecoration;
+    expect(
+      notificationDecoration.color,
+      EasySubwayAccessibleColors.statusInfoSurface,
+    );
+    expect(
+      notificationDecoration.border! as Border,
+      const Border(
+        bottom: BorderSide(color: EasySubwayAccessibleColors.statusInfoContent),
+      ),
+    );
+    expect(
+      tester
+          .widget<Icon>(
+            find.descendant(
+              of: notificationRow,
+              matching: find.byIcon(Icons.elevator_outlined),
+            ),
+          )
+          .color,
+      EasySubwayAccessibleColors.statusInfoContent,
+    );
+    expect(
+      tester
+          .widget<Text>(
+            find.descendant(of: notificationRow, matching: find.text('시설')),
+          )
+          .style
+          ?.color,
+      EasySubwayAccessibleColors.contentSecondary,
+    );
+    expect(
+      find.bySemanticsLabel(RegExp('미확인, .*공식 안내, 자세히 보기')),
       findsOneWidget,
     );
     expectNoForbiddenUserCopy(tester);
@@ -2061,7 +2203,7 @@ void main() {
     expect(selectedText.style?.fontWeight, FontWeight.w700);
     expect(
       selectedText.style?.color,
-      EasySubwayAccessibleColors.brandSignature,
+      EasySubwayAccessibleColors.interactionOnBrand,
     );
     final busanText = tester.widget<Text>(
       find.descendant(of: busanRow, matching: find.text('부산')),
@@ -2078,7 +2220,7 @@ void main() {
     expect(checkFinder, findsOneWidget);
     expect(
       tester.widget<Icon>(checkFinder).color,
-      EasySubwayAccessibleColors.brandSignature,
+      EasySubwayAccessibleColors.interactionOnBrand,
     );
     expect(
       find.descendant(of: busanRow, matching: find.byIcon(Icons.check)),
@@ -5214,7 +5356,7 @@ void main() {
       expect(timeFinder, findsOneWidget);
       expect(
         tester.widget<Text>(timeFinder).style?.color,
-        const Color(0xFFE23D3D),
+        EasySubwayAccessibleColors.statusDangerContent,
       );
       expect(
         find.bySemanticsLabel(RegExp(RegExp.escape(item.semanticLabel))),
@@ -7080,7 +7222,7 @@ void main() {
           )
           .style
           ?.color,
-      const Color(0xFF2F2F2F),
+      EasySubwayAccessibleColors.contentPrimary,
     );
     expect(
       find.descendant(of: panel, matching: find.byType(VerticalDivider)),
@@ -7910,19 +8052,19 @@ void main() {
       expect(find.text('꺼짐'), findsWidgets);
       expect(
         EasySubwayAccessibleColors.brandSignature,
-        const Color(0xFF7C3AED),
+        const Color(0xFF5C6BC0),
       );
       expect(
         EasySubwayAccessibleColors.brandSignatureMedium,
-        const Color(0xFFAA7FF3),
+        const Color(0xFF7480D2),
       );
       expect(
         EasySubwayAccessibleColors.brandSignatureSoft,
-        const Color(0xFFD8C4FA),
+        const Color(0xFFE2E5FD),
       );
       expect(
         EasySubwayAccessibleColors.brandSignatureSurface,
-        const Color(0xFFF5EFFE),
+        const Color(0xFFB4BCFB),
       );
       final activeSettingsSwitch = tester
           .widgetList<Switch>(
@@ -12104,14 +12246,15 @@ void main() {
     expect(resultOrder[0], lessThan(resultOrder[1]));
     expect(resultOrder[0], lessThan(resultOrder[2]));
 
-    // 쿼리 일치 구간은 푸른색 하이라이트 span을 갖는다.
+    // 쿼리 일치 구간은 브랜드 하이라이트 span을 갖는다.
     final richTexts = tester.widgetList<RichText>(find.byType(RichText));
     final hasHighlight = richTexts.any((rich) {
       var found = false;
       rich.text.visitChildren((span) {
         if (span is TextSpan &&
             span.text == '서울' &&
-            span.style?.color == const Color(0xFF1565C0)) {
+            span.style?.color ==
+                EasySubwayAccessibleColors.interactionPrimary) {
           found = true;
         }
         return true;
@@ -17711,6 +17854,44 @@ void main() {
     }
   });
 
+  testWidgets('시설 상세 needsInfo 상태 아이콘은 정보 역할색을 사용한다', (tester) async {
+    const facility = StationFacilityInfo(
+      id: 'facility-needs-info',
+      stationId: 'station-sangnoksu',
+      exitId: 'exit-sangnoksu-1',
+      type: 'ELEVATOR',
+      name: '1번 출구 엘리베이터',
+      floorFrom: 'B1',
+      floorTo: '1F',
+      description: '1번 출구 앞',
+      status: 'UNKNOWN',
+      dataConfidence: 'LOW',
+      lastUpdatedAt: '2026-06-12',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FacilityDetailScreen(
+          station: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+          facility: facility,
+          onReportTap: () {},
+        ),
+      ),
+    );
+
+    final statusIcon = tester.widget<Container>(
+      find.descendant(
+        of: find.byKey(
+          const Key('facilityDetailStatusNotice-facility-needs-info'),
+        ),
+        matching: find.byType(Container),
+      ),
+    );
+    expect(
+      (statusIcon.decoration! as BoxDecoration).color,
+      EasySubwayAccessibleColors.statusInfoContent,
+    );
+  });
+
   testWidgets('시설 신고 화면은 신고 유형과 내용을 보내고 접수 결과를 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final reportRepository = FakeFacilityReportRepository();
@@ -17820,6 +18001,11 @@ void main() {
       expect(find.text('report-1'), findsNothing);
       expect(find.text('진행 상황'), findsOneWidget);
       expect(find.text('접수됨'), findsOneWidget);
+      final submittedStatus = tester.widget<Text>(find.text('접수됨'));
+      expect(
+        submittedStatus.style?.color,
+        EasySubwayAccessibleColors.statusInfoContent,
+      );
       expect(find.bySemanticsLabel('제보 번호 ES-1001, 현재 상태 접수됨'), findsOneWidget);
       expect(
         find.byKey(const Key('facilityReportPhotoUrlInput')),

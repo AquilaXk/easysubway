@@ -77,7 +77,7 @@ class AppCard extends StatelessWidget {
   // ignore: use_key_in_widget_constructors
   const AppCard({
     required this.child,
-    this.backgroundColor = Colors.white,
+    this.backgroundColor = EasySubwayAccessibleColors.surfaceDefault,
     this.borderColor = EasySubwayAccessibleColors.line,
     this.showBorder = true,
   });
@@ -185,7 +185,7 @@ class FeatureTile extends StatelessWidget {
         child: ExcludeSemantics(
           child: Card(
             margin: const EdgeInsets.only(bottom: 12),
-            color: Colors.white,
+            color: EasySubwayAccessibleColors.surfaceDefault,
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: mainThemeControlRadius,

@@ -49,7 +49,7 @@ class StationRealtimeSummary extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: EasySubwayAccessibleColors.surfaceDefault,
           borderRadius: _stationRealtimeSummaryRadius,
           border: Border.all(color: EasySubwayAccessibleColors.line),
         ),

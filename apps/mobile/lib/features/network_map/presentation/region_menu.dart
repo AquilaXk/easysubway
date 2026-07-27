@@ -98,7 +98,7 @@ class EasySubwayRegionMenuPanel extends StatelessWidget {
           },
           child: ColoredBox(
             color: isSelected
-                ? EasySubwayAccessibleColors.brandSignatureSurface
+                ? EasySubwayAccessibleColors.surfaceSignature
                 : Colors.transparent,
             child: SizedBox(
               height: EasySubwayTouchTarget.general,
@@ -114,7 +114,7 @@ class EasySubwayRegionMenuPanel extends StatelessWidget {
                           region.label,
                           style: TextStyle(
                             color: isSelected
-                                ? EasySubwayAccessibleColors.brandSignature
+                                ? EasySubwayAccessibleColors.interactionOnBrand
                                 : EasySubwayAccessibleColors.listRowText,
                             fontSize: 16,
                             fontWeight: isSelected
@@ -127,7 +127,7 @@ class EasySubwayRegionMenuPanel extends StatelessWidget {
                         const SizedBox(width: 12),
                         const Icon(
                           Icons.check,
-                          color: EasySubwayAccessibleColors.brandSignature,
+                          color: EasySubwayAccessibleColors.interactionOnBrand,
                           size: 20,
                         ),
                       ],
@@ -148,11 +148,13 @@ class EasySubwayRegionMenuPanel extends StatelessWidget {
       child: IntrinsicWidth(
         child: Material(
           elevation: 0,
-          color: EasySubwayAccessibleColors.surface,
+          color: EasySubwayAccessibleColors.surfaceDefault,
           surfaceTintColor: Colors.transparent,
           clipBehavior: Clip.antiAlias,
           shape: RoundedRectangleBorder(
-            side: const BorderSide(color: EasySubwayAccessibleColors.line),
+            side: const BorderSide(
+              color: EasySubwayAccessibleColors.borderSubtle,
+            ),
             borderRadius: BorderRadius.only(
               topLeft: Radius.circular(EasySubwayRadius.control),
               bottomLeft: Radius.circular(EasySubwayRadius.control),

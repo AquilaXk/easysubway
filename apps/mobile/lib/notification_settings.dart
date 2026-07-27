@@ -992,7 +992,7 @@ class _NotificationSwitchGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: EasySubwayAccessibleColors.surfaceDefault,
       clipBehavior: Clip.antiAlias,
       shape: const RoundedRectangleBorder(
         borderRadius: _notificationSwitchTileRadius,

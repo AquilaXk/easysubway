@@ -25,8 +25,9 @@ const easySubwaySearchFieldHorizontalPadding = 12.0;
 const easySubwaySearchFieldBorderWidth = 1.0;
 
 /// 검색·출발/도착/경유 박스 외곽선.
-/// 표면 `#F6F8F9` 대비 약 3:1 이상인 전용 색(구분선 `#C5CDD4`와 분리).
-const easySubwaySearchFieldBorderColor = Color(0xFF8A9AA0);
+/// secondary border 역할색으로 일반 구분선과 분리한다.
+const easySubwaySearchFieldBorderColor =
+    EasySubwayAccessibleColors.interactionSecondaryBorder;
 
 /// 검색/지우기 아이콘 시각 크기(22).
 const easySubwaySearchFieldIconSize = 22.0;
@@ -34,9 +35,9 @@ const easySubwaySearchFieldIconSize = 22.0;
 /// 아이콘과 텍스트 사이 간격(8).
 const easySubwaySearchFieldIconGap = 8.0;
 
-/// hint(placeholder) 텍스트 스타일. mutedText·17·w600·height 미지정.
+/// hint(placeholder) 텍스트 스타일. secondaryText·17·w600·height 미지정.
 const easySubwaySearchFieldHintStyle = TextStyle(
-  color: EasySubwayAccessibleColors.mutedText,
+  color: EasySubwayAccessibleColors.secondaryText,
   fontSize: 17,
   fontWeight: FontWeight.w600,
 );

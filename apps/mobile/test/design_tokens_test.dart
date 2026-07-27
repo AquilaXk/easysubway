@@ -20,20 +20,20 @@ void main() {
       expect(tokens, EasySubwayTokens.light);
     });
 
-    test('light 토큰 값은 기존 공용 팔레트와 일치한다 — 기준 화면 룩 불변 증명', () {
+    test('light 토큰은 시그니처 역할과 지도 오버레이 계약을 소비한다', () {
       const tokens = EasySubwayTokens.light;
-      expect(tokens.ink, EasySubwayAccessibleColors.text);
-      expect(tokens.inkSecondary, EasySubwayAccessibleColors.secondaryText);
-      expect(tokens.inkMuted, EasySubwayAccessibleColors.mutedText);
-      expect(tokens.line, EasySubwayAccessibleColors.line);
-      expect(tokens.surface, EasySubwayAccessibleColors.surface);
-      expect(tokens.scaffold, EasySubwayAccessibleColors.scaffoldSurface);
-      expect(tokens.accent, EasySubwayAccessibleColors.primary);
-      expect(tokens.good, EasySubwayAccessibleColors.mint);
-      expect(tokens.warn, EasySubwayAccessibleColors.amber);
-      expect(tokens.danger, EasySubwayAccessibleColors.red);
-      // 지도 오버레이 전용 톤 — 기준 화면(network_map)의 기존 값 그대로.
-      expect(tokens.mapSelectionAccent, const Color(0xFF13B8D6));
+      expect(tokens.ink, EasySubwayAccessibleColors.contentPrimary);
+      expect(tokens.inkSecondary, EasySubwayAccessibleColors.contentSecondary);
+      expect(tokens.inkMuted, EasySubwayAccessibleColors.contentMuted);
+      expect(tokens.line, EasySubwayAccessibleColors.borderSubtle);
+      expect(tokens.surface, EasySubwayAccessibleColors.surfaceDefault);
+      expect(tokens.scaffold, EasySubwayAccessibleColors.surfaceScaffold);
+      expect(tokens.accent, EasySubwayAccessibleColors.interactionPrimary);
+      expect(tokens.good, EasySubwayAccessibleColors.statusSuccessContent);
+      expect(tokens.warn, EasySubwayAccessibleColors.statusWarningContent);
+      expect(tokens.danger, EasySubwayAccessibleColors.statusDangerContent);
+      // 지도 오버레이는 일반 Theme 색과 분리된 고대비 값이다.
+      expect(tokens.mapSelectionAccent, const Color(0xFF007C91));
       expect(tokens.mapRegionAccent, const Color(0xFF006FD6));
     });
 

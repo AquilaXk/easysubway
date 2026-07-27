@@ -2,6 +2,34 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+abstract final class EasySubwayColorPrimitives {
+  static const brand50 = Color(0xFFF8F9FF);
+  static const brand100 = Color(0xFFF0F2FE);
+  static const brand200 = Color(0xFFE2E5FD);
+  static const brand300 = Color(0xFFCCD2FC);
+  static const brand400 = Color(0xFFB4BCFB);
+  static const brand500 = Color(0xFF949FE8);
+  static const brand600 = Color(0xFF7480D2);
+  static const brand700 = Color(0xFF5C6BC0);
+  static const brand800 = Color(0xFF4A58A9);
+  static const brand900 = Color(0xFF3B4890);
+  static const brand950 = Color(0xFF1F2340);
+  static const neutralWhite = Color(0xFFFFFFFF);
+  static const neutralScaffold = Color(0xFFF7F8FC);
+  static const neutralSubtle = Color(0xFFF0F2F7);
+  static const neutralBorder = Color(0xFFE1E4EE);
+  static const inkSecondary = Color(0xFF4D536B);
+  static const inkMuted = Color(0xFF697089);
+  static const statusSuccess = Color(0xFF0A705A);
+  static const statusWarning = Color(0xFF9A5600);
+  static const statusDanger = Color(0xFFB42318);
+  static const statusInfo = Color(0xFF215EA8);
+  static const statusSuccessSoft = Color(0xFFF0FBF7);
+  static const statusWarningSoft = Color(0xFFFFF0D1);
+  static const statusDangerSoft = Color(0xFFFFE8E6);
+  static const statusInfoSoft = Color(0xFFEEF5FF);
+}
+
 /// 노선도 화면을 기준으로 삼는 앱 공용 색 팔레트.
 ///
 /// 역할별로 상수를 묶어 화면마다 색이 섞이지 않게 한다.
@@ -17,103 +45,104 @@ import 'package:flutter/material.dart';
 class EasySubwayAccessibleColors {
   const EasySubwayAccessibleColors._();
 
-  // --- Surface & 중립 위계 ---
-  /// 기본 표면(플랫 화이트).
-  static const surface = Colors.white;
+  static const surfaceDefault = EasySubwayColorPrimitives.neutralWhite;
+  static const surfaceScaffold = EasySubwayColorPrimitives.neutralScaffold;
+  static const surfaceSubtle = EasySubwayColorPrimitives.neutralSubtle;
+  static const surfaceBrandChrome = EasySubwayColorPrimitives.brand50;
+  static const surfaceBrand = EasySubwayColorPrimitives.brand100;
+  static const surfaceBrandStrong = EasySubwayColorPrimitives.brand200;
+  static const surfaceSignature = EasySubwayColorPrimitives.brand400;
+  static const borderSubtle = EasySubwayColorPrimitives.neutralBorder;
+  static const contentPrimary = EasySubwayColorPrimitives.brand950;
+  static const contentSecondary = EasySubwayColorPrimitives.inkSecondary;
+  static const contentMuted = EasySubwayColorPrimitives.inkMuted;
+  static const interactionPrimary = EasySubwayColorPrimitives.brand700;
+  static const interactionPrimaryPressed = EasySubwayColorPrimitives.brand800;
+  static const interactionOnPrimary = EasySubwayColorPrimitives.neutralWhite;
+  static const interactionSecondarySurface = EasySubwayColorPrimitives.brand100;
+  static const interactionSecondaryBorder = EasySubwayColorPrimitives.brand600;
+  static const interactionSecondaryPressedSurface =
+      EasySubwayColorPrimitives.brand200;
+  static const interactionSecondaryPressedBorder =
+      EasySubwayColorPrimitives.brand700;
+  static const interactionOnSignatureBorder =
+      EasySubwayColorPrimitives.brand900;
+  static const interactionOnBrand = EasySubwayColorPrimitives.brand900;
+  static const focusDefault = EasySubwayColorPrimitives.brand700;
+  static const focusOnSignature = EasySubwayColorPrimitives.brand900;
+  static const decorativeDivider = EasySubwayColorPrimitives.brand300;
+  static const statusSuccessContent = EasySubwayColorPrimitives.statusSuccess;
+  static const statusSuccessSurface =
+      EasySubwayColorPrimitives.statusSuccessSoft;
+  static const statusWarningContent = EasySubwayColorPrimitives.statusWarning;
+  static const statusWarningSurface =
+      EasySubwayColorPrimitives.statusWarningSoft;
+  static const statusDangerContent = EasySubwayColorPrimitives.statusDanger;
+  static const statusDangerSurface = EasySubwayColorPrimitives.statusDangerSoft;
+  static const statusInfoContent = EasySubwayColorPrimitives.statusInfo;
+  static const statusInfoSurface = EasySubwayColorPrimitives.statusInfoSoft;
 
-  /// 본문 텍스트.
-  static const text = Color(0xFF102A2C);
-
-  /// 보조 텍스트.
-  static const secondaryText = Color(0xFF29484B);
-
-  /// 흐린 텍스트·비활성.
-  static const mutedText = Color(0xFF466467);
-
-  /// 구분선·얇은 테두리.
-  static const line = Color(0xFFDBE3E9);
+  static const surface = surfaceDefault;
+  static const text = contentPrimary;
+  static const secondaryText = contentSecondary;
+  static const mutedText = contentMuted;
+  static const line = borderSubtle;
+  static const primary = interactionPrimary;
+  static const brand = interactionPrimary;
+  static const brandSignature = interactionPrimary;
+  static const brandSignatureMedium = interactionSecondaryBorder;
+  static const brandSignatureSoft = surfaceBrandStrong;
+  static const brandSignatureSurface = surfaceSignature;
+  static const topBarSurface = surfaceBrandChrome;
+  static const searchFieldSurface = surfaceSubtle;
+  static const needsInfo = statusInfoContent;
+  static const skySoft = statusInfoSurface;
+  static const scaffoldSurface = surfaceScaffold;
 
   /// 목록 행 라벨 (기준 화면 좌측 메뉴의 행 텍스트 톤).
-  static const listRowText = Color(0xFF1E3234);
+  static const listRowText = contentPrimary;
 
   /// 섹션 캡션·부제 (기준 화면 좌측 메뉴의 섹션 톤).
-  static const caption = Color(0xFF7C949A);
+  static const caption = contentMuted;
 
   /// 보조 아이콘 (기준 화면 검색바 아이콘 톤).
-  static const iconMuted = Color(0xFF8A9AA0);
+  static const iconMuted = contentMuted;
 
   /// 셰브런·디스클로저·비활성 아이콘.
-  static const disclosure = Color(0xFFB0BEC5);
-
-  // --- 브랜드 액센트 (무채색 잉크 1계열) ---
-  /// 앱 전체 단일 브랜드 액센트. 초록(teal) 대신 무채색 차콜 잉크로 통일한다.
-  /// 화면의 유채색은 노선 색(데이터)뿐이며, 액센트는 CTA·선택·링크에만 쓴다.
-  static const primary = Color(0xFF2A2F31);
-
-  /// 과거 navy 액센트. 단일 브랜드 액센트로 통일했다. 신규 코드는 [primary] 사용.
-  static const brand = primary;
-
-  /// 시그니처 라벤더 팔레트(라이트 단일 모드).
-  /// 기준색은 흰 글자 대비 5.7:1(AA 통과)이며 CTA·활성 컨트롤에 쓴다.
-  static const brandSignature = Color(0xFF7C3AED);
-
-  /// 포커스·강조 아이콘에 쓰는 중간 라벤더.
-  static const brandSignatureMedium = Color(0xFFAA7FF3);
-
-  /// 선택 배경·강조선에 쓰는 연한 라벤더.
-  static const brandSignatureSoft = Color(0xFFD8C4FA);
-
-  /// 선택 영역에 쓰는 가장 연한 라벤더.
-  static const brandSignatureSurface = Color(0xFFF5EFFE);
-
-  /// 흰색에 가까운 전역 상단바 라벤더.
-  static const topBarSurface = Color(0xFFFAF8FF);
-
-  /// 플레이스홀더보다 연한 공용 검색창 중성 배경.
-  static const searchFieldSurface = Color(0xFFF6F8F9);
+  static const disclosure = contentMuted;
 
   /// 다크 히어로 등 짙은 브랜드 표면(레거시). 신규 화면에서는 사용하지 않는다.
-  static const brandDark = Color(0xFF071B2F);
+  static const brandDark = contentPrimary;
 
   // --- 상태색: 정상/복구 (success) ---
   /// 정상·복구 상태 텍스트/아이콘.
-  static const mint = Color(0xFF0A705A);
+  static const mint = statusSuccessContent;
 
   /// 정상·복구 상태 강조.
-  static const mintDark = Color(0xFF075D4B);
+  static const mintDark = statusSuccessContent;
 
   /// 정상·복구 상태 배경 틴트.
-  static const mintSoft = Color(0xFFF0FBF7);
+  static const mintSoft = statusSuccessSurface;
 
   /// 정상·복구 상태 테두리.
-  static const mintBorder = Color(0xFFCBEADD);
+  static const mintBorder = statusSuccessContent;
 
   // --- 상태색: 주의 (warning) ---
   /// 주의 상태 텍스트/아이콘.
-  static const amber = Color(0xFF9A5600);
+  static const amber = statusWarningContent;
 
   /// 주의 상태 배경 틴트.
-  static const amberSoft = Color(0xFFFFF0D1);
+  static const amberSoft = statusWarningSurface;
 
   /// 주의 상태 테두리.
-  static const amberBorder = Color(0xFFF1D49A);
+  static const amberBorder = statusWarningContent;
 
   // --- 상태색: 고장·오류 (danger) ---
   /// 고장·오류 상태 텍스트/아이콘.
-  static const red = Color(0xFFB42318);
+  static const red = statusDangerContent;
 
   /// 고장·오류 상태 배경 틴트.
-  static const redSoft = Color(0xFFFFE8E6);
-
-  /// 확인 중·제보됨(needsInfo) 상태색. 브랜드 액센트 1계열로 통일한다.
-  static const needsInfo = primary;
-
-  /// 정보 틴트(레거시). 장식용이므로 화면 정비 시 여백·구분선으로 대체한다.
-  static const skySoft = Color(0xFFE6F5FF);
-
-  // --- 공용 표면·컨트롤 토큰 ---
-  /// 스캐폴드 기본 배경(플랫 화이트에 아주 옅은 그레이).
-  static const scaffoldSurface = Color(0xFFF6F8F9);
+  static const redSoft = statusDangerSurface;
 
   /// 카드 그림자(최소 그림자 원칙).
   static const cardShadow = Color(0x0A071B2F);
@@ -122,39 +151,39 @@ class EasySubwayAccessibleColors {
   static const switchActiveTrack = brandSignature;
 
   /// 스위치 꺼짐 트랙.
-  static const switchInactiveTrack = Color(0xFFC8D3DC);
+  static const switchInactiveTrack = borderSubtle;
 
   // --- 지도 오버레이 전용 ---
   // 지도 배경 시인성 때문에 브랜드 액센트로 수렴하지 않는다 (기준 화면 실측 값).
 
   /// 지도 위 선택 역 말풍선 톤(밝은 시안).
-  static const mapSelectionAccent = Color(0xFF13B8D6);
+  static const mapSelectionAccent = Color(0xFF007C91);
 
   /// 지도 위 지역 선택 칩 톤(밝은 블루).
   static const mapRegionAccent = Color(0xFF006FD6);
 
   // --- 홈 신규 알림 안내 바 (오너 스펙 2026-07-16, #2200) ---
   /// 신규 알림 안내 바 배경.
-  static const noticeBarSurface = Color(0xFFFFF7ED);
+  static const noticeBarSurface = statusWarningSurface;
 
   /// 신규 알림 안내 바 하단 테두리(1dp).
-  static const noticeBarBorder = Color(0xFFF2DFC8);
+  static const noticeBarBorder = statusWarningContent;
 
   /// 신규 알림 안내 바 기본 문구.
-  static const noticeBarText = Color(0xFF5D4932);
+  static const noticeBarText = statusWarningContent;
 
   /// 신규 알림 안내 바 벨 아이콘·"알림 보기".
-  static const noticeBarAccent = Color(0xFF8F4B1E);
+  static const noticeBarAccent = statusWarningContent;
 
   // --- 주변역 패널 실시간/시간표 토글 (오너 스펙 2026-07-16, #2200) ---
   /// 토글 비선택 세그먼트 배경.
-  static const nearbyToggleIdleFill = Color(0xFFF6F6F8);
+  static const nearbyToggleIdleFill = surfaceSubtle;
 
   /// 토글 비선택 세그먼트 글자.
-  static const nearbyToggleIdleText = Color(0xFF70717B);
+  static const nearbyToggleIdleText = contentSecondary;
 
   /// 좌우 열차 정보 구분선.
-  static const arrivalColumnDivider = Color(0xFFDEDEE3);
+  static const arrivalColumnDivider = borderSubtle;
 
   // --- 고대비 모드 ---
   static const highContrastText = Color(0xFF000000);
@@ -176,8 +205,8 @@ class EasySubwayTouchTarget {
 /// 계약을 공유한다. 이 상수를 바꾸면 양쪽을 함께 갱신한다.
 const easySubwayTopBarContentHeight = 60.0;
 
-/// 네비/상단바 하단 구분선 색. 검색 박스 외곽선과 동일 톤(#C5CDD4).
-const easySubwayHeaderDividerColor = Color(0xFFC5CDD4);
+/// 네비/상단바 하단 구분선 색. 검색 박스 외곽선과 역할을 분리한다.
+const easySubwayHeaderDividerColor = EasySubwayAccessibleColors.borderSubtle;
 
 /// 상단바·시트와 본문을 나누는 1px 구분선.
 ///

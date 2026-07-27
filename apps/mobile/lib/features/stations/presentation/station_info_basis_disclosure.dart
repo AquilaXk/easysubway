@@ -46,7 +46,7 @@ class _StationInfoBasisDisclosureState
           Card(
             margin: EdgeInsets.zero,
             elevation: 0,
-            color: Colors.white,
+            color: EasySubwayAccessibleColors.surfaceDefault,
             shape: const RoundedRectangleBorder(
               borderRadius: _stationInfoBasisCardRadius,
               side: BorderSide(color: EasySubwayAccessibleColors.line),
