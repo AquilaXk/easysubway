@@ -15686,6 +15686,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const envExample = read(".env.example");
   const iosInfoPlist = read("apps/mobile/ios/Runner/Info.plist");
   const main = read("apps/mobile/lib/main.dart");
+  const kakaoMapConfiguration = read(
+    "apps/mobile/lib/core/external/kakao_map_configuration.dart",
+  );
   const appRoot = read("apps/mobile/lib/app/easy_subway_app.dart");
   const homeScreen = read(
     "apps/mobile/lib/features/home/presentation/home_screen.dart",
@@ -15723,6 +15726,15 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   );
   const stationExitMapTarget = read(
     "apps/mobile/lib/features/stations/presentation/station_exit_map_target.dart",
+  );
+  const stationExitMapPreview = read(
+    "apps/mobile/lib/features/stations/presentation/station_exit_map_preview.dart",
+  );
+  const stationExitSection = read(
+    "apps/mobile/lib/features/stations/presentation/station_exit_section.dart",
+  );
+  const stationDetailBody = read(
+    "apps/mobile/lib/features/stations/presentation/station_detail_body.dart",
   );
   const stationDetailHeader = read(
     "apps/mobile/lib/features/stations/presentation/station_detail_header.dart",
@@ -15763,6 +15775,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(pubspec, /sdk: \^3\./);
   assert.match(pubspec, /flutter_lints:/);
   assert.match(pubspec, /flutter_secure_storage:/);
+  assert.match(pubspec, /kakao_map_sdk: \^1\.2\.6/);
   assert.match(pubspec, /uses-material-design: true/);
   assert.match(analysisOptions, /package:flutter_lints\/flutter\.yaml/);
   assert.match(analysisOptions, /^analyzer:\n  language:\n    strict-casts: true\n    strict-inference: true\n    strict-raw-types: true$/m);
@@ -15801,6 +15814,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(appSettingsScreen, /이동 조건/);
   assert.match(appSettingsScreen, /알림 설정/);
   assert.match(main, /EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS/);
+  assert.match(kakaoMapConfiguration, /EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY/);
+  assert.match(main, /validateKakaoMapConfiguration/);
+  assert.match(main, /KakaoMapSdk\.instance\.initialize\(kakaoMapNativeAppKey\)/);
   assert.match(main, /defaultValue: false/);
   assert.match(main, /enablePushNotifications/);
   assert.doesNotMatch(`${main}\n${appDependencies}`, /AnonymousAuth|enableAnonymousAuth|anonymousAuth/);
@@ -15964,6 +15980,13 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(stationExitMapTarget, /StationExitMapTarget\? stationExitMapTarget/);
   assert.match(stationExitMapTarget, /usesStationFallback/);
   assert.match(stationExitCard, /stationExitMapTarget\(station: station, exit: exit\)/);
+  assert.match(stationExitMapPreview, /stationExitPreviewPoints/);
+  assert.match(stationExitMapPreview, /forceGesture: false/);
+  assert.match(stationExitMapPreview, /controller\.setGesture\(gesture, false\)/);
+  assert.match(stationExitMapPreview, /controller\.finish/);
+  assert.match(stationExitSection, /StationExitMapPreview/);
+  assert.match(stationDetailBody, /StationExitSection/);
+  assert.doesNotMatch(stationDetailBody, /for \(final exit in exits\)[\s\S]*StationExitCard/);
   assert.equal(
     externalMapDeeplinkPolicy.schema,
     "easysubway.external_map_deeplink_policy.v1",

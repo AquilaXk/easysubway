@@ -5,6 +5,7 @@ import '../../../core/external/kakao_map_launcher.dart';
 import '../domain/station_models.dart';
 import '../domain/station_repositories.dart';
 import 'station_exit_card.dart';
+import 'station_exit_map_preview.dart';
 import 'station_exit_map_target.dart';
 
 typedef StationExitMapPreviewBuilder =
@@ -54,17 +55,29 @@ class _StationExitSectionState extends State<StationExitSection> {
   Widget build(BuildContext context) {
     final selectedExit = widget.exits[_selectedIndex];
     final previewBuilder = widget.mapPreviewBuilder;
+    final showPreview = canShowStationExitMapPreview(
+      station: widget.station,
+      exits: widget.exits,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (previewBuilder != null) ...[
-          previewBuilder(
-            station: widget.station,
-            exits: widget.exits,
-            selectedExitId: selectedExit.id,
-            onOpenSelected: () => _openSelectedExit(context),
-          ),
+        if (showPreview) ...[
+          if (previewBuilder != null)
+            previewBuilder(
+              station: widget.station,
+              exits: widget.exits,
+              selectedExitId: selectedExit.id,
+              onOpenSelected: () => _openSelectedExit(context),
+            )
+          else
+            StationExitMapPreview(
+              station: widget.station,
+              exits: widget.exits,
+              selectedExitId: selectedExit.id,
+              onOpenSelected: () => _openSelectedExit(context),
+            ),
           const SizedBox(height: 8),
         ],
         Row(

@@ -1,11 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:kakao_map_sdk/kakao_map_sdk.dart';
 
 import 'app/app_bootstrap.dart';
 import 'app/app_endpoints.dart';
 import 'app/demo_dependencies.dart';
 import 'app/easy_subway_app.dart';
 import 'core/crashlytics/mobile_crash_reporting.dart';
+import 'core/external/kakao_map_configuration.dart';
 import 'features/get_off_alarm/get_off_alarm_controller.dart';
 import 'features/home_widget/home_widget_link_handler.dart';
 import 'features/home_widget/next_train_widget_repository.dart';
@@ -24,7 +26,22 @@ const defaultPushNotificationsEnabled = bool.fromEnvironment(
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  validateKakaoMapConfiguration(
+    nativeAppKey: kakaoMapNativeAppKey,
+    isReleaseMode: kReleaseMode,
+  );
   installMobileErrorHandlers();
+  if (kakaoMapNativeAppKey.trim().isNotEmpty) {
+    try {
+      await KakaoMapSdk.instance.initialize(kakaoMapNativeAppKey);
+    } catch (error, stackTrace) {
+      reportMobileError(
+        StateError('Kakao Map SDK initialization failed: ${error.runtimeType}'),
+        stackTrace,
+        context: '카카오맵 SDK 초기화 실패',
+      );
+    }
+  }
   await initializeMobileCrashReporting(isReleaseMode: kReleaseMode);
   registerBundledAssetLicenses();
   validateReleaseBuildFlags(
