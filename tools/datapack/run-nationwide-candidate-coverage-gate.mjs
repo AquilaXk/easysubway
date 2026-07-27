@@ -699,8 +699,8 @@ async function daejeonTopologySnapshot(inclusion, readTracked, inventory) {
 // materializeDaejeonTimetable이 내부에서 materializeDaejeonRouteTopology를 호출해 운영기관·노선·역·
 // 역노선·구간을 먼저 만들고 그 위에 시각표를 얹기 때문이다. 따라서 대전 구간에서 이 편입이 항상 먼저다.
 async function materializeDaejeonTimetableInclusion(fixture, inclusion, { readTracked, inventory }) {
-  assertDeclaredLineNumbers(inclusion, DAEJEON_LINES);
   assertDeclaredLinesMatchAdmissionScope(inclusion, inventory, DAEJEON_TOPOLOGY_SOURCE_ID);
+  assertDeclaredLineNumbers(inclusion, DAEJEON_LINES);
   assertAdmissionSnapshotPath(
     inventory,
     DAEJEON_TIMETABLE_SOURCE_ID,
@@ -725,8 +725,8 @@ async function materializeDaejeonTimetableInclusion(fixture, inclusion, { readTr
 // 대전 노선도 좌표 편입 어댑터(#2595). materializer가 snapshot 바이트 정체성(snapshotSha256)을 admission
 // 정본과 대조하지만 바이트 축만으로는 저장소 안 바이트 동일 사본도 통과한다 — 정본 snapshotPath에도 결속한다.
 async function materializeDaejeonRouteMapInclusion(fixture, inclusion, { readTracked, inventory }) {
-  assertDeclaredLineNumbers(inclusion, DAEJEON_LINES);
   assertDeclaredLinesMatchAdmissionScope(inclusion, inventory, DAEJEON_ROUTE_MAP_SOURCE_ID);
+  assertDeclaredLineNumbers(inclusion, DAEJEON_LINES);
   assertAdmissionSnapshotPath(
     inventory,
     DAEJEON_ROUTE_MAP_SOURCE_ID,
@@ -748,8 +748,8 @@ async function materializeDaejeonRouteMapInclusion(fixture, inclusion, { readTra
 // 대전 교통약자 편의시설 편입 어댑터(#2595). 대구·부산 편의시설과 같이 정본에 바이트 축이 없어
 // (rawSha256·rowsSha256이 snapshot 내용에서 파생된다) 경로 결속이 유일한 정체성 축이다.
 async function materializeDaejeonAccessibilityInclusion(fixture, inclusion, { readTracked, inventory }) {
-  assertDeclaredLineNumbers(inclusion, DAEJEON_LINES);
   assertDeclaredLinesMatchAdmissionScope(inclusion, inventory, DAEJEON_ACCESSIBILITY_SOURCE_ID);
+  assertDeclaredLineNumbers(inclusion, DAEJEON_LINES);
   assertAdmissionSnapshotPath(
     inventory,
     DAEJEON_ACCESSIBILITY_SOURCE_ID,
@@ -787,8 +787,8 @@ async function gwangjuTopologySnapshot(inclusion, readTracked, inventory) {
 // 한 함수가 topology·membership·시각표 소스 셋을 함께 등재하고 역·역노선·구간·시각표를 한 번에 싣는다.
 // 결과는 같다 — 광주 구간에서 이 편입이 항상 먼저다.
 async function materializeGwangjuTimetableInclusion(fixture, inclusion, { readTracked, inventory }) {
-  assertDeclaredLineNumbers(inclusion, GWANGJU_LINES);
   assertDeclaredLinesMatchAdmissionScope(inclusion, inventory, GWANGJU_TOPOLOGY_SOURCE_ID);
+  assertDeclaredLineNumbers(inclusion, GWANGJU_LINES);
   assertAdmissionSnapshotPath(
     inventory,
     GWANGJU_TIMETABLE_SOURCE_ID,
@@ -812,8 +812,8 @@ async function materializeGwangjuTimetableInclusion(fixture, inclusion, { readTr
 
 // 광주 노선도 좌표 편입 어댑터(#2595).
 async function materializeGwangjuRouteMapInclusion(fixture, inclusion, { readTracked, inventory }) {
-  assertDeclaredLineNumbers(inclusion, GWANGJU_LINES);
   assertDeclaredLinesMatchAdmissionScope(inclusion, inventory, GWANGJU_ROUTE_MAP_SOURCE_ID);
+  assertDeclaredLineNumbers(inclusion, GWANGJU_LINES);
   assertAdmissionSnapshotPath(
     inventory,
     GWANGJU_ROUTE_MAP_SOURCE_ID,
@@ -834,8 +834,8 @@ async function materializeGwangjuRouteMapInclusion(fixture, inclusion, { readTra
 
 // 광주 교통약자 편의시설 편입 어댑터(#2595).
 async function materializeGwangjuAccessibilityInclusion(fixture, inclusion, { readTracked, inventory }) {
-  assertDeclaredLineNumbers(inclusion, GWANGJU_LINES);
   assertDeclaredLinesMatchAdmissionScope(inclusion, inventory, GWANGJU_ACCESSIBILITY_SOURCE_ID);
+  assertDeclaredLineNumbers(inclusion, GWANGJU_LINES);
   assertAdmissionSnapshotPath(
     inventory,
     GWANGJU_ACCESSIBILITY_SOURCE_ID,
