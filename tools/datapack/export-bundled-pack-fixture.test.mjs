@@ -168,3 +168,26 @@ test("legacy bundled pack을 provenance 추론 없이 builder fixture로 옮긴�
   database.close();
   expectedDatabase.close();
 });
+
+test("지원하지 않는 facility status snapshot 행은 무음 유실 대신 거부한다", () => {
+  const database = new DatabaseSync(":memory:");
+  const expectedDatabase = new DatabaseSync(":memory:");
+  try {
+    const schema = "CREATE TABLE facility_status_snapshots (id TEXT PRIMARY KEY)";
+    database.exec(`${schema}; INSERT INTO facility_status_snapshots VALUES ('snapshot-a')`);
+    expectedDatabase.exec(schema);
+
+    assert.throws(() => extractBundledPackFixture({
+      database,
+      expectedDatabase,
+      template: {
+        packs: [{ artifactKind: "production", requiredTables: [] }],
+      },
+      gzipSha256: "a".repeat(64),
+      sqliteSha256: "b".repeat(64),
+    }), /non-empty unsupported table: facility_status_snapshots/);
+  } finally {
+    database.close();
+    expectedDatabase.close();
+  }
+});
