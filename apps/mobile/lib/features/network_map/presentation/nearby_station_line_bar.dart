@@ -137,7 +137,7 @@ class NearbyStationLineBar extends StatelessWidget {
                       horizontal: capsuleWidth * 0.08,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: EasySubwayAccessibleColors.surfaceDefault,
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(color: lineColor, width: 3),
                     ),
@@ -238,7 +238,7 @@ class _SideName extends StatelessWidget {
       overflow: TextOverflow.ellipsis,
       textAlign: TextAlign.center,
       style: const TextStyle(
-        color: Colors.white,
+        color: EasySubwayAccessibleColors.interactionOnPrimary,
         fontSize: 15,
         fontWeight: FontWeight.w700,
       ),
@@ -298,7 +298,7 @@ class _LineBadge extends StatelessWidget {
             text,
             maxLines: 1,
             style: const TextStyle(
-              color: Colors.white,
+              color: EasySubwayAccessibleColors.interactionOnPrimary,
               fontSize: 14,
               fontWeight: FontWeight.w800,
               height: 1.0,

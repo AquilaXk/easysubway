@@ -113,7 +113,23 @@ void _expectSignatureColorScheme(ColorScheme colorScheme) {
     EasySubwayAccessibleColors.interactionOnBrand,
   );
   expect(colorScheme.surface, EasySubwayAccessibleColors.surfaceDefault);
+  expect(colorScheme.onSurface, EasySubwayAccessibleColors.contentPrimary);
+  expect(
+    colorScheme.onSurfaceVariant,
+    EasySubwayAccessibleColors.contentSecondary,
+  );
   expect(colorScheme.outline, EasySubwayAccessibleColors.borderSubtle);
+  expect(colorScheme.outlineVariant, EasySubwayAccessibleColors.borderSubtle);
+  expect(colorScheme.error, EasySubwayAccessibleColors.statusDangerContent);
+  expect(colorScheme.onError, EasySubwayAccessibleColors.interactionOnPrimary);
+  expect(
+    colorScheme.errorContainer,
+    EasySubwayAccessibleColors.statusDangerSurface,
+  );
+  expect(
+    colorScheme.onErrorContainer,
+    EasySubwayAccessibleColors.statusDangerContent,
+  );
 }
 
 class _FakeNoticeRepository implements NoticeRepository {

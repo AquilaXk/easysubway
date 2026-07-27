@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart' show OrdinalSortKey;
 
+import '../../../accessible_design.dart';
 import '../../../design_tokens.dart';
 import '../../route_draft/domain/route_draft.dart';
 import 'station_fan_menu_geometry.dart';
@@ -306,7 +307,9 @@ class _StationFanMenuPainter extends CustomPainter {
       fill: selectedState
           ? selected
           : (pressedState ? pressedSurface : surface),
-      content: selectedState ? Colors.white : selected,
+      content: selectedState
+          ? EasySubwayAccessibleColors.interactionOnPrimary
+          : selected,
       opacity: disabled
           ? EasySubwayFanMenuColors.disabledOpacity
           : (pressedState ? EasySubwayFanMenuColors.pressedOpacity : 1),
@@ -384,14 +387,17 @@ class _StationFanMenuPainter extends CustomPainter {
     }
 
     canvas.saveLayer(bounds, Paint()..blendMode = BlendMode.dstIn);
-    canvas.drawRect(bounds, Paint()..color = Colors.white);
+    canvas.drawRect(
+      bounds,
+      Paint()..color = EasySubwayAccessibleColors.interactionOnPrimary,
+    );
     if (!pressedMask.getBounds().isEmpty) {
       canvas.save();
       canvas.clipPath(pressedMask);
       canvas.drawRect(
         bounds,
         Paint()
-          ..color = Colors.white.withValues(
+          ..color = EasySubwayAccessibleColors.interactionOnPrimary.withValues(
             alpha: EasySubwayFanMenuColors.pressedOpacity,
           )
           ..blendMode = BlendMode.src,
@@ -404,7 +410,7 @@ class _StationFanMenuPainter extends CustomPainter {
       canvas.drawRect(
         bounds,
         Paint()
-          ..color = Colors.white.withValues(
+          ..color = EasySubwayAccessibleColors.interactionOnPrimary.withValues(
             alpha: EasySubwayFanMenuColors.disabledOpacity,
           )
           ..blendMode = BlendMode.src,

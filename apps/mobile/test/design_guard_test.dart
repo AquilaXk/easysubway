@@ -200,20 +200,9 @@ void main() {
             '0xFF8D8D8D',
             '0xCCFFFFFF',
           },
-      'lib/network_map.dart': {
-        '0x99000000',
-        '0xE62F3437',
-        '0xFF000000',
-        'Colors.white',
-      },
+      'lib/network_map.dart': {'0x99000000', '0xE62F3437', '0xFF000000'},
       'lib/features/network_map/presentation/region_menu.dart': {'0x99000000'},
       'lib/app/accessibility_theme.dart': {'Colors.white'},
-      'lib/features/network_map/presentation/station_fan_menu.dart': {
-        'Colors.white',
-      },
-      'lib/features/network_map/presentation/nearby_station_line_bar.dart': {
-        'Colors.white',
-      },
     };
     final colorReferences = RegExp(
       r'Color\(\s*[^)]*?(0x[0-9A-Fa-f]{8})[^)]*\)|'

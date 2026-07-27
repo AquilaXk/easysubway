@@ -2259,7 +2259,7 @@ class _NetworkMapLookupToast extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
             style: const TextStyle(
-              color: Colors.white,
+              color: EasySubwayAccessibleColors.interactionOnPrimary,
               fontSize: 15,
               fontWeight: FontWeight.w800,
               height: 1.2,
@@ -7278,7 +7278,8 @@ class _NetworkMapDraftPin extends StatelessWidget {
                                   textAlign: TextAlign.center,
                                   maxLines: 1,
                                   style: const TextStyle(
-                                    color: Colors.white,
+                                    color: EasySubwayAccessibleColors
+                                        .interactionOnPrimary,
                                     fontWeight: FontWeight.w700,
                                     fontSize: _labelFontSize,
                                     height: 1.0,
