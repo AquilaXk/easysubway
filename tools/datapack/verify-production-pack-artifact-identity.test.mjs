@@ -208,9 +208,9 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
     await runRejectedBuild(stale, /capital topology admission is stale/);
 
     const earlyInventory = JSON.parse(await readFile("tools/datapack/source-inventory.json", "utf8"));
-    earlyInventory.sources.find(({ routeMapAdmissionEvidence }) =>
+    earlyInventory.sources.filter(({ routeMapAdmissionEvidence }) =>
       routeMapAdmissionEvidence?.topologySnapshotId === "capital-route-topology-20260724"
-    ).routeMapAdmissionEvidence.freshUntil = "2026-08-01T00:00:00.000Z";
+    )[1].routeMapAdmissionEvidence.freshUntil = "2026-08-01T00:00:00.000Z";
     const earlyBytes = Buffer.from(`${JSON.stringify(earlyInventory, null, 2)}\n`);
     const earlyPath = path.join(workspace, "early-source-inventory.json");
     await writeFile(earlyPath, earlyBytes);
