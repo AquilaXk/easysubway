@@ -5,6 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { validateDaejeonRouteMapPositionsSnapshot } from "./collect-daejeon-route-map-positions.mjs";
+import { assertRouteMapAdmissionFreshness } from "./lib/route-map-admission-freshness.mjs";
 
 const SOURCE_ID = "daejeon-transportation-route-map-positions";
 const TOPOLOGY_SOURCE_ID = "daejeon-station-distance-fare";
@@ -164,6 +165,7 @@ function requiredSource(inventory, snapshot, snapshotSha256, topologySnapshot, n
     throw new Error(`${SOURCE_ID} inventory evidence does not match snapshot`);
   }
   validateTopologyLineage(inventory, evidence, topologySnapshot);
+  assertRouteMapAdmissionFreshness(evidence, now, SOURCE_ID);
   return source;
 }
 

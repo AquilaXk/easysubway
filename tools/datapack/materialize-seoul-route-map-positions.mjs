@@ -5,6 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { validateSeoulRouteMapPositionsSnapshot } from "./collect-seoul-route-map-positions.mjs";
+import { assertRouteMapAdmissionFreshness } from "./lib/route-map-admission-freshness.mjs";
 
 const SOURCE_ID = "seoul-metro-route-map-positions";
 const CYBERSTATION_SOURCE_ID = "seoulmetro-cyberstation-route-map";
@@ -173,6 +174,7 @@ function requiredSource(inventory, snapshot, snapshotSha256, now) {
     || !Number.isFinite(observedNow) || observedNow < Date.parse(snapshot.capturedAt)) {
     throw new Error(`${SOURCE_ID} inventory evidence does not match snapshot`);
   }
+  assertRouteMapAdmissionFreshness(evidence, now, SOURCE_ID);
   return source;
 }
 

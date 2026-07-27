@@ -9,6 +9,7 @@ import {
   getCapitalLightRailRouteMapPositionLine,
   validateCapitalLightRailRouteMapPositionsSnapshot,
 } from "./collect-kric-capital-light-rail-route-map-positions.mjs";
+import { assertRouteMapAdmissionFreshness } from "./lib/route-map-admission-freshness.mjs";
 
 const TOPOLOGY_SOURCE_ID = "capital-route-topology";
 const TOPOLOGY_SNAPSHOT_ID = "capital-route-topology-20260724";
@@ -192,6 +193,7 @@ function requiredSource(inventory, snapshot, snapshotSha256, topologySnapshot, l
     throw new Error(`${line.sourceId} inventory evidence does not match snapshot`);
   }
   validateTopologyLineage(evidence, topologySnapshot, line);
+  assertRouteMapAdmissionFreshness(evidence, now, line.sourceId);
   return source;
 }
 

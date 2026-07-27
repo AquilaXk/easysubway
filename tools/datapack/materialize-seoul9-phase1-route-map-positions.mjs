@@ -5,6 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { validateSeoul9Phase1RouteMapPositionsSnapshot } from "./collect-seoul9-phase1-route-map-positions.mjs";
+import { assertRouteMapAdmissionFreshness } from "./lib/route-map-admission-freshness.mjs";
 
 const SOURCE_ID = "kric-seoul-metro-line9-1-route-map-positions";
 const TOPOLOGY_SOURCE_ID = "capital-route-topology";
@@ -195,6 +196,7 @@ function requiredSource(inventory, snapshot, snapshotSha256, topologySnapshot, n
     throw new Error(`${SOURCE_ID} inventory evidence does not match snapshot`);
   }
   validateTopologyLineage(evidence, topologySnapshot);
+  assertRouteMapAdmissionFreshness(evidence, now, SOURCE_ID);
   return source;
 }
 

@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url";
 
 import { DAEGU_LINES } from "./collect-daegu-datapack-sources.mjs";
 import { validateDaeguRouteMapPositionsSnapshot } from "./collect-daegu-route-map-positions.mjs";
+import { assertRouteMapAdmissionFreshness } from "./lib/route-map-admission-freshness.mjs";
 
 const SOURCE_ID = "daegu-transportation-route-map-positions";
 const PACK_ID = "nationwide-daegu-route-map";
@@ -162,6 +163,7 @@ function requiredSource(inventory, snapshot, snapshotSha256, topologySnapshots, 
     throw new Error(`${SOURCE_ID} inventory evidence does not match snapshot`);
   }
   validateTopologyLineages(inventory, evidence, topologySnapshots);
+  assertRouteMapAdmissionFreshness(evidence, now, SOURCE_ID);
   return source;
 }
 

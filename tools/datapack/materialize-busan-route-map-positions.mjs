@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url";
 
 import { validateBusanRouteMapPositionsSnapshot } from "./collect-busan-route-map-positions.mjs";
 import { busanRouteTopologyContentHash } from "./collect-busan-route-topology.mjs";
+import { assertRouteMapAdmissionFreshness } from "./lib/route-map-admission-freshness.mjs";
 
 const SOURCE_ID = "busan-transportation-route-map-positions";
 const TOPOLOGY_SOURCE_ID = "busan-transportation-route-topology";
@@ -178,6 +179,7 @@ function requiredSource(inventory, snapshot, snapshotSha256, topologySnapshot, n
     }) || JSON.stringify(source.fieldsProvided) !== JSON.stringify(snapshot.fieldsProvided)) {
     throw new Error(`${SOURCE_ID} topology or coverage scope mismatch`);
   }
+  assertRouteMapAdmissionFreshness(evidence, now, SOURCE_ID);
   return source;
 }
 
