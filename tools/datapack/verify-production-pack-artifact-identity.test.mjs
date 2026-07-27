@@ -234,6 +234,39 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
       contract.allowedConsumerIssues = contract.allowedConsumerIssues.filter((issue) => issue !== "#2649");
     }, /ITX network edge topology is not admitted for #2649/);
 
+    await runRejectedContractBuild("supported-itx-timetable-claim", (contract) => {
+      contract.coverageStates.schedule_timetable = "SUPPORTED";
+    }, /ITX network edge claim boundary is invalid/);
+
+    await runRejectedContractBuild("go-itx-claim", (contract) => {
+      contract.claimGate.currentStatus = "GO";
+    }, /ITX network edge claim boundary is invalid/);
+
+    await runRejectedContractBuild("allowed-itx-claim", (contract) => {
+      contract.claimGate.supportClaimAllowed = true;
+    }, /ITX network edge claim boundary is invalid/);
+
+    const preverifiedFixture = JSON.parse(await readFile(
+      "tools/datapack/release/capital-production-canonical-pack.json",
+      "utf8",
+    ));
+    Object.assign(preverifiedFixture.packs[0].networkEdges.find(({ fromNodeId }) =>
+      fromNodeId.endsWith(":line-472a81add377")
+    ), {
+      sourceId: "capital-route-topology",
+      sourceSnapshotId: "capital-route-topology-20260724",
+      providerRecordHash: "f".repeat(64),
+      provenanceKind: "OFFICIAL_SOURCE",
+      verificationStatus: "VERIFIED",
+      lastVerifiedAt: "2026-07-27T21:38:29.000Z",
+      evidenceHash: "e".repeat(64),
+    });
+    const preverifiedPath = path.join(workspace, "preverified-fixture.json");
+    await writeFile(preverifiedPath, `${JSON.stringify(preverifiedFixture)}\n`);
+    const preverified = structuredClone(spec);
+    preverified.fixturePath = preverifiedPath;
+    await runRejectedBuild(preverified, /production network edge fixture must not contain provenance/);
+
     const partialFixture = JSON.parse(await readFile(
       "tools/datapack/release/capital-production-canonical-pack.json",
       "utf8",

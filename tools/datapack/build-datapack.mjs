@@ -606,6 +606,14 @@ async function validateAndApplyNetworkEdgeProvenance(buildSpec, fixture, itxTopo
   const productionPacks = fixture.packs?.filter(({ artifactKind }) => artifactKind === "production") ?? [];
   if (productionPacks.length === 0) throw new Error("network edge evidence requires a production pack");
   for (const pack of productionPacks) {
+    if ((pack.networkEdges ?? []).some((edge) =>
+      [edge.sourceId, edge.sourceSnapshotId, edge.providerRecordHash, edge.evidenceHash,
+        edge.lastVerifiedAt, edge.verifiedAt].some(Boolean)
+      || ![undefined, "UNKNOWN"].includes(edge.provenanceKind)
+      || ![undefined, "UNKNOWN"].includes(edge.verificationStatus)
+    )) {
+      throw new Error("production network edge fixture must not contain provenance");
+    }
     materializeCapitalTopologySource(pack, topology, capitalAdmissions);
     applyCapitalNetworkEdgeEvidence(pack, topology, capitalTopology.pinned.snapshotId, capitalAdmissions);
     applyItxNetworkEdgeEvidence(pack, itxAdmission);
@@ -779,6 +787,11 @@ async function admittedItxNetworkEdgeEvidence(contract, topologyEvidence) {
     || reference.promotion?.mode !== "UNCHANGED_AUTO"
     || topologyEvidence?.sourceArtifact?.sha256 !== reference.promotion.previousArtifactSha256) {
     throw new Error("ITX network edge topology is not admitted for #2649");
+  }
+  if (contract.coverageStates?.schedule_timetable !== "MISSING"
+    || contract.claimGate?.currentStatus !== "NO_GO"
+    || contract.claimGate?.supportClaimAllowed !== false) {
+    throw new Error("ITX network edge claim boundary is invalid");
   }
   const sourceBytes = await readFile(await resolveBuildInputPath(
     reference.artifactPath,
