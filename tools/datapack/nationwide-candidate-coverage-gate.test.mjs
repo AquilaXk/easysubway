@@ -35,6 +35,7 @@ import { promisify } from "node:util";
 
 import {
   EVIDENCE_PATH,
+  assertLineScopeRedescriptionsMatchActualRequiredSet,
   assertInheritedRowsUnchanged,
   assertNonTransitionReasons,
   inheritedRowSnapshot,
@@ -1557,41 +1558,6 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
     );
   });
 
-  // 등재 소스를 빼면 그 소스는 baseline에서도 line-scope를 유지해 판정 자체는 그대로 나온다. #2592의
-  // actual required set 역결속이 buildEvidence 이전에 이 누락을 막으므로, 더 늦은 supporting-source 대조가
-  // 아니라 선언/실측 exact-match 진단을 기대한다.
-  await context.test("전이를 뒷받침한 소스가 등재 목록과 다르면 거부된다", async () => {
-    await rejectsWith(
-      (value) => {
-        value.lineScopeRedescriptions = value.lineScopeRedescriptions.filter(
-          ({ sourceId }) => sourceId !== "molit-urban-rail-full-route-daegu-line1-membership",
-        );
-      },
-      /line-scope redescriptions must exactly match the actual required set/,
-    );
-  });
-
-  // 선언 목록을 순회하는 검증만으로는 실제 candidate pack에 line-scope가 있는 소스를 선언에서 통째로
-  // 빼도 baseline과 lineScoped가 함께 그 scope를 유지해 통과한다. actual required set 역결속이 이
-  // 삭제를 source/domain 단위로 막아야 한다.
-  for (const { sourceId, sourceDomain } of [
-    { sourceId: "busan-transportation-timetable", sourceDomain: "schedule_timetable" },
-    { sourceId: "busan-transportation-route-map-positions", sourceDomain: "route_map_positions" },
-    { sourceId: "busan-transportation-accessibility", sourceDomain: "accessibility_facilities" },
-    { sourceId: "daegu-transportation-accessibility", sourceDomain: "accessibility_facilities" },
-  ]) {
-    await context.test(`${sourceId}/${sourceDomain} 재기술을 지우면 거부된다`, async () => {
-      await rejectsWith(
-        (value) => {
-          value.lineScopeRedescriptions = value.lineScopeRedescriptions.filter(
-            (entry) => entry.sourceId !== sourceId || entry.sourceDomain !== sourceDomain,
-          );
-        },
-        /line-scope redescriptions must exactly match the actual required set/,
-      );
-    });
-  }
-
   await context.test("선언과 다른 행수를 싣는 편입은 거부된다", async () => {
     await rejectsWith(
       (value) => { value.packDataInclusions[0].addedRows.transitStopTimes += 1; },
@@ -3054,4 +3020,108 @@ test("누락된 재기술은 emit fixture를 남기지 않고 거부된다", asy
     await rm(workspace, { recursive: true, force: true });
     await rm(emittedPath, { force: true });
   }
+});
+
+function lineScopeExactMatchFixture(sourceId, sourceDomain, releaseTier = "LAUNCH_REQUIRED") {
+  const requirementKey = `region:operator:line:${sourceDomain}`;
+  const coverageScope = {
+    lineIds: ["line"], sourceDomains: [sourceDomain], regionIds: ["region"], operatorIds: ["operator"],
+  };
+  return {
+    spec: {
+      lineScopeRedescriptions: [{ sourceId, sourceDomain, lineIds: ["line"], requirementKeys: [requirementKey] }],
+    },
+    pack: {
+      sourceInventory: [{ id: sourceId, coverageScope: { ...coverageScope, lineIds: undefined } }],
+    },
+    inventory: { sources: [{ id: sourceId, coverageScope }] },
+    targets: {
+      requiredSourceDomains: [{ id: sourceDomain, releaseTier }],
+      activeLineScopes: [{ regionId: "region", operatorId: "operator", lineId: "line" }],
+    },
+  };
+}
+
+function assertLineScopeExactMatch({ spec, pack, inventory, targets }) {
+  return assertLineScopeRedescriptionsMatchActualRequiredSet(spec, pack, inventory, targets);
+}
+
+test("actual line-scope set은 네 source/domain omission을 독립적으로 거부한다", () => {
+  for (const { sourceId, sourceDomain } of [
+    { sourceId: "busan-transportation-timetable", sourceDomain: "schedule_timetable" },
+    { sourceId: "busan-transportation-route-map-positions", sourceDomain: "route_map_positions" },
+    { sourceId: "busan-transportation-accessibility", sourceDomain: "accessibility_facilities" },
+    { sourceId: "daegu-transportation-accessibility", sourceDomain: "accessibility_facilities" },
+  ]) {
+    const fixture = lineScopeExactMatchFixture(sourceId, sourceDomain);
+    fixture.spec.lineScopeRedescriptions = [];
+    assert.throws(
+      () => assertLineScopeExactMatch(fixture),
+      /line-scope redescriptions must exactly match the actual required set/,
+      `${sourceId}/${sourceDomain}`,
+    );
+  }
+});
+
+test("actual line-scope 선언은 source/domain, lineIds, requirementKeys가 정확히 일치해야 한다", () => {
+  const valid = lineScopeExactMatchFixture("source", "schedule_timetable");
+  assert.doesNotThrow(() => assertLineScopeExactMatch(valid));
+
+  for (const [label, mutate, expected] of [
+    [
+      "추가",
+      (fixture) => fixture.spec.lineScopeRedescriptions.push({
+        sourceId: "extra", sourceDomain: "schedule_timetable", lineIds: ["line"], requirementKeys: [],
+      }),
+      /line-scope redescriptions must exactly match the actual required set/,
+    ],
+    [
+      "중복",
+      (fixture) => fixture.spec.lineScopeRedescriptions.push(structuredClone(fixture.spec.lineScopeRedescriptions[0])),
+      /duplicate declared line-scope source\/domain/,
+    ],
+    [
+      "lineIds 불일치",
+      (fixture) => { fixture.spec.lineScopeRedescriptions[0].lineIds = ["other-line"]; },
+      /line-scope redescriptions must exactly match the actual required set/,
+    ],
+    [
+      "requirementKeys 불일치",
+      (fixture) => { fixture.spec.lineScopeRedescriptions[0].requirementKeys = []; },
+      /line-scope redescriptions must exactly match the actual required set/,
+    ],
+  ]) {
+    const fixture = structuredClone(valid);
+    mutate(fixture);
+    assert.throws(() => assertLineScopeExactMatch(fixture), expected, label);
+  }
+});
+
+test("inactive scope와 LAUNCH_REQUIRED가 아닌 domain은 actual line-scope set에서 제외한다", () => {
+  const inactive = lineScopeExactMatchFixture("inactive", "schedule_timetable");
+  inactive.spec.lineScopeRedescriptions = [];
+  inactive.targets.activeLineScopes = [];
+  assert.doesNotThrow(() => assertLineScopeExactMatch(inactive));
+
+  const enhancement = lineScopeExactMatchFixture("enhancement", "schedule_timetable", "ENHANCEMENT");
+  enhancement.spec.lineScopeRedescriptions = [];
+  assert.doesNotThrow(() => assertLineScopeExactMatch(enhancement));
+});
+
+test("pack-only lineIds와 inventory 누락 lineIds는 fail closed다", () => {
+  const coverageScope = {
+    lineIds: ["line"], sourceDomains: ["schedule_timetable"], regionIds: ["region"], operatorIds: ["operator"],
+  };
+  assert.throws(
+    () => assertLineScopeExactMatch({
+      spec: { lineScopeRedescriptions: [] },
+      pack: { sourceInventory: [{ id: "pack-only", coverageScope }] },
+      inventory: { sources: [{ id: "pack-only", coverageScope: { ...coverageScope, lineIds: [] } }] },
+      targets: {
+        requiredSourceDomains: [{ id: "schedule_timetable", releaseTier: "LAUNCH_REQUIRED" }],
+        activeLineScopes: [{ regionId: "region", operatorId: "operator", lineId: "line" }],
+      },
+    }),
+    /candidate pack coverageScope\.lineIds must match source inventory: pack-only/,
+  );
 });

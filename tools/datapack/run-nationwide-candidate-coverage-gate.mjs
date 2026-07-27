@@ -1376,7 +1376,7 @@ function assertInventoryLineScopeSync(spec, inventory) {
 // lineScopeRedescriptions에 source/domain 단위로 빠짐없이 재기술돼야 한다. 선언 목록을 기준으로
 // fixture·baseline을 조립하면 선언을 지운 실제 소스가 두 variant에 함께 남아 fail open하므로, pack ×
 // tracked inventory × coverage targets에서 actual required set을 역으로 유도해 양방향 exact-match 한다.
-function assertLineScopeRedescriptionsMatchActualRequiredSet(spec, pack, inventory, targets) {
+export function assertLineScopeRedescriptionsMatchActualRequiredSet(spec, pack, inventory, targets) {
   const launchRequiredDomains = new Set(
     (targets.requiredSourceDomains ?? [])
       .filter(({ releaseTier }) => releaseTier === "LAUNCH_REQUIRED")
@@ -1398,7 +1398,12 @@ function assertLineScopeRedescriptionsMatchActualRequiredSet(spec, pack, invento
       continue;
     }
     const inventoryScope = inventorySource.coverageScope;
-    if (!inventoryScope?.lineIds?.length) continue;
+    if (!inventoryScope?.lineIds?.length) {
+      if (packScope?.lineIds?.length) {
+        throw new Error(`candidate pack coverageScope.lineIds must match source inventory: ${sourceId}`);
+      }
+      continue;
+    }
     // inclusions.pack은 재기술을 덮기 전 원형이다. 기존 source는 여기서 lineIds가 없고,
     // lineScoped fixture에서만 spec 값이 주입된다. tracked inventory가 그 후보 line scope의 정본이며,
     // 원형에 이미 lineIds가 있는 신규 source라면 둘의 집합이 같아야 한다.
