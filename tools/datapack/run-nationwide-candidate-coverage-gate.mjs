@@ -317,6 +317,7 @@ export async function runNationwideCandidateCoverageGate({
   // variant마다 달라질 수 없고, 한 번만 조립해 두 실행이 같은 행 바이트를 쓰는 것을 구조로 보장한다.
   const inclusions = await applyPackDataInclusions(spec, inherited, inventory, materializers);
   const targets = (await readJsonInput(targetsInput.path)).document;
+  assertLineScopeRedescriptionsMatchActualRequiredSet(spec, inclusions.pack, inventory, targets);
 
   const signing = ephemeralSigningKeys();
   const variants = {};
@@ -367,13 +368,6 @@ export async function runNationwideCandidateCoverageGate({
     const provenance = JSON.parse(await readFile(path.join(buildDir, "current.provenance.json"), "utf8"));
     variants[variant] = summarizeVariant(spec, reports[variant], provenance);
   }
-
-  assertLineScopeRedescriptionsMatchActualRequiredSet(
-    spec,
-    inclusions.pack,
-    inventory,
-    targets,
-  );
 
   return buildEvidence({
     spec,

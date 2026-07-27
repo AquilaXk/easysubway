@@ -3022,3 +3022,36 @@ test("production 게시 트랙 fixture는 candidate 조립에 영향받지 않�
   // candidate 조립이 게시 정체성(id·version·url·channel·activePack)을 건드리지 않는다는 위 행위 단언과
   // datapack/release 계약 테스트로 유지한다.
 });
+
+test("누락된 재기술은 emit fixture를 남기지 않고 거부된다", async () => {
+  const spec = await readJson(SPEC_PATH);
+  const inventory = await readJson(INVENTORY_PATH);
+  spec.lineScopeRedescriptions = spec.lineScopeRedescriptions.filter(
+    ({ sourceId, sourceDomain }) =>
+      sourceId !== "busan-transportation-timetable" || sourceDomain !== "schedule_timetable",
+  );
+  const workspace = await mkdtemp(path.join(tmpdir(), "nationwide-candidate-gate-no-emit-"));
+  const emitFixturePath = path.join("tmp", `nationwide-candidate-gate-no-emit-${process.pid}.json`);
+  const emittedPath = path.join(root, emitFixturePath);
+  await rm(emittedPath, { force: true });
+  try {
+    await assert.rejects(
+      runNationwideCandidateCoverageGate({
+        spec,
+        specInput: { path: SPEC_PATH, sha256: "a".repeat(64) },
+        targetsInput: { path: TARGETS_PATH, sha256: "b".repeat(64) },
+        inventory,
+        inventoryInput: { path: INVENTORY_PATH, sha256: "c".repeat(64) },
+        resolutionPlanInput: { path: RESOLUTION_PLAN_PATH, sha256: "d".repeat(64) },
+        resolutionsInput: { path: RESOLUTIONS_PATH, sha256: "e".repeat(64) },
+        workDir: workspace,
+        emitFixturePath,
+      }),
+      /line-scope redescriptions must exactly match the actual required set/,
+    );
+    await assert.rejects(readFile(emittedPath), { code: "ENOENT" });
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+    await rm(emittedPath, { force: true });
+  }
+});
