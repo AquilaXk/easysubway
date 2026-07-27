@@ -310,3 +310,47 @@ test("명시적 legacy 기본값이 없는 결측 컬럼은 거부한다", () =>
     expectedDatabase.close();
   }
 });
+
+test("legacy facilities의 알 수 없는 컬럼을 무음 유실하지 않는다", () => {
+  const database = new DatabaseSync(":memory:");
+  const expectedDatabase = new DatabaseSync(":memory:");
+  try {
+    database.exec(`
+      CREATE TABLE facilities (
+        id TEXT PRIMARY KEY, station_id TEXT, exit_id TEXT, type TEXT, name TEXT,
+        status TEXT, floor_from TEXT, floor_to TEXT, description TEXT, future_value TEXT
+      );
+      INSERT INTO facilities VALUES (
+        'legacy-facility', 'station-a', NULL, 'ELEVATOR', '엘리베이터',
+        'UNKNOWN', 'B1', '1F', '', 'must-not-be-dropped'
+      );
+    `);
+    expectedDatabase.exec(`
+      CREATE TABLE facilities (
+        id TEXT PRIMARY KEY, station_id TEXT, exit_id TEXT, type TEXT, name TEXT,
+        status TEXT, floor_from TEXT, floor_to TEXT, description TEXT,
+        source_id TEXT, source_snapshot_id TEXT, provider_facility_ref TEXT,
+        provider_record_hash TEXT, provenance_kind TEXT, verified_at INTEGER,
+        retrieved_at INTEGER, evidence_hash TEXT, status_meaning TEXT,
+        operational_status TEXT, installation_status TEXT, confidence INTEGER
+      );
+    `);
+
+    assert.throws(() => extractBundledPackFixture({
+      database,
+      expectedDatabase,
+      template: {
+        packs: [{
+          artifactKind: "production",
+          requiredTables: [],
+          facilities: [{ id: "reviewed", stationId: "station-a", type: "ELEVATOR" }],
+        }],
+      },
+      gzipSha256: "a".repeat(64),
+      sqliteSha256: "b".repeat(64),
+    }), /unknown facilities columns: future_value/);
+  } finally {
+    database.close();
+    expectedDatabase.close();
+  }
+});

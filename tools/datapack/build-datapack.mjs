@@ -31,6 +31,11 @@ const originalItxAdmissionOutput = Object.freeze({
   sqliteSha256: "c39f23cd6b8b20f88672d0456b72a4efbd3697b81035cfb49ded289e50f3a4aa",
   byteSize: 359388,
 });
+const originalItxAdmissionProjection = Object.freeze({
+  edgeCount: 48,
+  edgesSha256: "e09f9ece35f261b0690753b9c88749d2e460c79e889bea045fb44a46bae78709",
+  evidenceSha256: "a4834c3638dd45500292f67bd39e5a8ff9660162e1ffa2a78359c5d645b74996",
+});
 const productionMinimumTableRowNames = [
   "stations",
   "station_lines",
@@ -538,6 +543,12 @@ function validateTrackedItxReadmissionChain(evidence) {
         || candidateProjection.edgesSha256 !== projection.edgesSha256
         || candidateProjection.evidenceSha256 !== projection.evidenceSha256))) {
       throw new Error("tracked ITX readmission chain is invalid");
+    }
+    if (projection == null
+      && (candidateProjection.edgeCount !== originalItxAdmissionProjection.edgeCount
+        || candidateProjection.edgesSha256 !== originalItxAdmissionProjection.edgesSha256
+        || candidateProjection.evidenceSha256 !== originalItxAdmissionProjection.evidenceSha256)) {
+      throw new Error("tracked ITX readmission projection does not match original admission");
     }
     projection ??= candidateProjection;
     previous = requiredPackIdentity(entry.newPack);

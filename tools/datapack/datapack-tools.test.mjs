@@ -17712,6 +17712,33 @@ test("production candidate는 admission에 결속되지 않은 ITX timetable row
   }
 });
 
+test("production candidate는 최초 admission과 다른 ITX readmission projection을 거부한다", async () => {
+  const workspace = await mkdtemp(path.join(tmpdir(), "production-rewritten-itx-projection-"));
+  try {
+    const evidence = JSON.parse(await readFile("tools/datapack/itx-cheongchun-topology-evidence.json", "utf8"));
+    for (const entry of evidence.readmissions) entry.itxSubgraph.edgesSha256 = "f".repeat(64);
+    const evidenceBytes = Buffer.from(`${JSON.stringify(evidence)}\n`);
+    const evidencePath = path.join(workspace, "evidence.json");
+    await writeFile(evidencePath, evidenceBytes);
+    const buildSpec = JSON.parse(await readFile("tools/datapack/release/candidate-build-spec.json", "utf8"));
+    buildSpec.itxTopologyEvidencePath = evidencePath;
+    buildSpec.itxTopologyEvidenceSha256 = sha256(evidenceBytes);
+    const buildSpecPath = path.join(workspace, "build-spec.json");
+    await writeFile(buildSpecPath, `${JSON.stringify(buildSpec)}\n`);
+
+    await assert.rejects(
+      execFileAsync(process.execPath, [
+        "tools/datapack/build-datapack.mjs",
+        "--build-spec", buildSpecPath,
+        "--output", path.join(workspace, "output"),
+      ], { cwd: root, env: productionEnv }),
+      /tracked ITX readmission projection does not match original admission/,
+    );
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
 test("official OD fare release candidate는 admission과 다른 quote set evidence를 거부한다", async () => {
   const workspace = await mkdtemp(path.join(tmpdir(), "official-od-fare-release-mismatch-"));
   try {

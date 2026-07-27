@@ -171,6 +171,9 @@ export function extractBundledPackFixture({ database, expectedDatabase, template
     if (!tableExists(database, table)) continue;
     const available = tableColumns(database, table);
     if (table === "facilities" && PRODUCTION_FACILITY_COLUMNS.some((column) => !available.has(column))) {
+      const expected = tableColumns(expectedDatabase, table);
+      const unknown = [...available].filter((column) => !expected.has(column));
+      if (unknown.length > 0) throw new Error(`unknown facilities columns: ${unknown.join(", ")}`);
       if (!Array.isArray(pack.facilities)) throw new Error("legacy facilities require reviewed template rows");
       for (const legacy of database.prepare("SELECT * FROM facilities ORDER BY id").all()) {
         const matches = pack.facilities.filter((facility) =>
