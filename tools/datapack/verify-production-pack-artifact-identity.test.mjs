@@ -267,6 +267,27 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
     preverified.fixturePath = preverifiedPath;
     await runRejectedBuild(preverified, /production network edge fixture must not contain provenance/);
 
+    const nestedProvenanceFixture = JSON.parse(await readFile(
+      "tools/datapack/release/capital-production-canonical-pack.json",
+      "utf8",
+    ));
+    nestedProvenanceFixture.packs[0].networkEdges.find(({ id }) =>
+      id.startsWith("edge-line-051552e50435-")
+    ).fieldProvenance = {
+      network_edges: {
+        sourceId: "capital-route-topology",
+        sourceSnapshotId: "capital-route-topology-20260724",
+        providerRecordHash: "f".repeat(64),
+        evidenceHash: "e".repeat(64),
+        verifiedAt: "2026-07-27T21:38:29.000Z",
+      },
+    };
+    const nestedProvenancePath = path.join(workspace, "nested-provenance-fixture.json");
+    await writeFile(nestedProvenancePath, `${JSON.stringify(nestedProvenanceFixture)}\n`);
+    const nestedProvenance = structuredClone(spec);
+    nestedProvenance.fixturePath = nestedProvenancePath;
+    await runRejectedBuild(nestedProvenance, /production network edge fixture must not contain provenance/);
+
     const preverifiedTransferFixture = JSON.parse(await readFile(
       "tools/datapack/release/capital-production-canonical-pack.json",
       "utf8",

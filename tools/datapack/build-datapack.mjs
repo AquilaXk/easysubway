@@ -608,7 +608,8 @@ async function validateAndApplyNetworkEdgeProvenance(buildSpec, fixture, itxTopo
   for (const pack of productionPacks) {
     if ([...(pack.networkEdges ?? []), ...(pack.outOfStationTransferLinks ?? [])].some((edge) =>
       [edge.sourceId, edge.sourceSnapshotId, edge.providerRecordHash, edge.evidenceHash,
-        edge.lastVerifiedAt, edge.verifiedAt].some(Boolean)
+        edge.lastFieldVerifiedAt, edge.lastVerifiedAt, edge.verifiedAt].some(Boolean)
+      || edge.fieldProvenance !== undefined
       || ![undefined, "UNKNOWN"].includes(edge.provenanceKind)
       || ![undefined, "UNKNOWN"].includes(edge.verificationStatus)
     )) {
