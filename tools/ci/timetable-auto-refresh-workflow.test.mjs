@@ -94,6 +94,10 @@ test("collect는 admission service dates를 전달하고 승격은 UNCHANGED_AUT
     /steps\.collect\.outputs\.collect_exit == '0' && steps\.collect\.outputs\.promotion_status == 'SUPPORTED'/,
   );
   assert.match(workflow, /--promote-candidate "\$\{EASYSUBWAY_ITX_CANDIDATE\}"/);
+  assert.match(
+    workflow,
+    /--source-output-dir "\$\{GITHUB_WORKSPACE\}\/tools\/datapack\/sources"/,
+  );
 });
 
 test("승인 게이트를 우회하지 않고 review-required·수집 실패 시 fail closed 한다", () => {
