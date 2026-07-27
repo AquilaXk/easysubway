@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { canonicalScopeHash } from "../datapack/build-launch-denominator-report.mjs";
 import { selectEffectiveDataPack, selectFallbackDataPack, validateManifest } from "../datapack/lib/manifest-validation.mjs";
+import { codepointCompare } from "../lib/codepoint-compare.mjs";
 
 const SUCCESSFUL_FRESHNESS_REASON_CODES = new Set([
   "PACK_PUBLISH_FRESHNESS_EXPIRED",
@@ -670,16 +671,16 @@ function parsePairs(value) {
 
 function sameRcIdentity(evidenceIdentity, currentIdentity) {
   if (!evidenceIdentity || typeof evidenceIdentity !== "object" || Array.isArray(evidenceIdentity)) return false;
-  const expectedKeys = Object.keys(currentIdentity).sort((left, right) => left.localeCompare(right));
-  const actualKeys = Object.keys(evidenceIdentity).sort((left, right) => left.localeCompare(right));
+  const expectedKeys = Object.keys(currentIdentity).sort(codepointCompare);
+  const actualKeys = Object.keys(evidenceIdentity).sort(codepointCompare);
   return expectedKeys.length === actualKeys.length
     && expectedKeys.every((key, index) => key === actualKeys[index] && evidenceIdentity[key] === currentIdentity[key]);
 }
 
 function requiredGateEntries(requiredIds, requiredChecksById, provided, paths, identity, generatedAt, validationContext) {
   if (
-    Object.keys(requiredChecksById).sort((left, right) => left.localeCompare(right)).join(",")
-      !== [...requiredIds].sort((left, right) => left.localeCompare(right)).join(",")
+    Object.keys(requiredChecksById).sort(codepointCompare).join(",")
+      !== [...requiredIds].sort(codepointCompare).join(",")
     || requiredIds.some((id) => !Array.isArray(requiredChecksById[id]) || requiredChecksById[id].length === 0)
   ) {
     fail("requiredGateChecks must exactly cover requiredGateStatuses");
@@ -888,7 +889,7 @@ function requiredDatapackGates(
     }
     const normalized = {
       id, sourceIssue, status,
-      reasonCodes: [...evidence.reasonCodes].sort((left, right) => left.localeCompare(right)),
+      reasonCodes: [...evidence.reasonCodes].sort(codepointCompare),
       evidenceSha256: createHash("sha256").update(evidenceBytes).digest("hex"),
       evaluatedAt: new Date(evaluatedAt).toISOString(), expiresAt: new Date(expiresAt).toISOString(),
       rcIdentity: identity,
@@ -1185,16 +1186,16 @@ function requireResultSchema(result, gateId) {
 
 function requirePassingChecks(gateId, checks, requiredFields) {
   const suppliedFields = checks && typeof checks === "object" && !Array.isArray(checks)
-    ? Object.keys(checks).sort((left, right) => left.localeCompare(right))
+    ? Object.keys(checks).sort(codepointCompare)
     : [];
   if (
-    suppliedFields.join(",") !== [...requiredFields].sort((left, right) => left.localeCompare(right)).join(",")
+    suppliedFields.join(",") !== [...requiredFields].sort(codepointCompare).join(",")
     || requiredFields.some((field) => checks[field] !== true)
   ) {
     fail(`${gateId} requires every canonical result check to pass`);
   }
   return Object.fromEntries(
-    [...requiredFields].sort((left, right) => left.localeCompare(right)).map((field) => [field, true]),
+    [...requiredFields].sort(codepointCompare).map((field) => [field, true]),
   );
 }
 
@@ -1206,7 +1207,7 @@ function normalizeEvidenceReferences(gateId, references) {
   return references.map((reference) => {
     if (
       !reference || typeof reference !== "object" || Array.isArray(reference)
-      || Object.keys(reference).sort((left, right) => left.localeCompare(right)).join(",") !== "artifactId,sha256"
+      || Object.keys(reference).sort(codepointCompare).join(",") !== "artifactId,sha256"
       || typeof reference.artifactId !== "string" || reference.artifactId.trim().length === 0
       || artifactIds.has(reference.artifactId)
     ) {
@@ -1215,7 +1216,7 @@ function normalizeEvidenceReferences(gateId, references) {
     requireSha256(reference.sha256, `${gateId}.evidenceReferences.sha256`);
     artifactIds.add(reference.artifactId);
     return { artifactId: reference.artifactId, sha256: reference.sha256 };
-  }).sort((left, right) => left.artifactId.localeCompare(right.artifactId));
+  }).sort((left, right) => codepointCompare(left.artifactId, right.artifactId));
 }
 
 function requirePositiveSafeInteger(value, name) {
@@ -1286,7 +1287,7 @@ function normalizeSourceInventory(inventory, generatedAt, gateExpiresAt, require
       evidenceSha256: entry.evidenceSha256, evaluatedAt: new Date(entry.evaluatedAt).toISOString(),
       expiresAt: new Date(entry.expiresAt).toISOString(),
     };
-  }).sort((left, right) => left.sourceId.localeCompare(right.sourceId));
+  }).sort((left, right) => codepointCompare(left.sourceId, right.sourceId));
   const statusCounts = Object.fromEntries(requiredStatuses.map((status) => (
     [status, entries.filter((entry) => entry.status === status).length]
   )));
@@ -1307,8 +1308,8 @@ function normalizeSourceInventory(inventory, generatedAt, gateExpiresAt, require
   }
   if (
     !inventory?.statusCounts
-    || Object.keys(inventory.statusCounts).sort((left, right) => left.localeCompare(right)).join(",")
-      !== [...requiredStatuses].sort((left, right) => left.localeCompare(right)).join(",")
+    || Object.keys(inventory.statusCounts).sort(codepointCompare).join(",")
+      !== [...requiredStatuses].sort(codepointCompare).join(",")
     || requiredStatuses.some((status) => inventory.statusCounts[status] !== statusCounts[status])
   ) {
     fail("source governance evidence statusCounts must match current sourceInventory.entries");
@@ -1429,7 +1430,7 @@ function normalizeArtifactIdentity(name, identity, requiredFields) {
   if (!identity || typeof identity !== "object" || Array.isArray(identity)) {
     fail(`identity linkage has invalid ${name}.identity`);
   }
-  const entries = Object.entries(identity).sort(([left], [right]) => left.localeCompare(right));
+  const entries = Object.entries(identity).sort(([left], [right]) => codepointCompare(left, right));
   const allowedFields = new Set(requiredFields);
   if (
     entries.length === 0

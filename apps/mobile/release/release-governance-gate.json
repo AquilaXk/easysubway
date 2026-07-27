@@ -83,11 +83,13 @@
   },
   "latestOperationsEvidenceStatus": {
     "issue": 1019,
-    "preLaunchReadiness": "PASS",
+    "preLaunchReadiness": "BLOCKED_EXTERNAL",
     "postLaunchObservation": "PENDING_PUBLIC_RELEASE",
     "supportMailboxRouting": "RESOLVED_BY_QA_MANUAL_EVIDENCE",
     "alertRouteDryRun": "PASS",
-    "remainingPhaseABlockers": [],
+    "remainingPhaseABlockers": [
+      "fixed-release-versioncode-build-submit-procedure"
+    ],
     "pendingPostLaunchEvidence": [
       "play-review-status-summary",
       "crash-anr-vitals-summary",
@@ -100,7 +102,7 @@
     "reviewedMainMergeSha": "ef0084147f0c89c872328b4acbfc040f6db5d0a2",
     "currentDecision": "NO_GO",
     "decisionOwner": "release-owner",
-    "blockingOpenIssues": [571, 1016, 1018, 1021, 1022, 1230, 1414],
+    "blockingOpenIssues": [571, 1016, 1018, 1019, 1021, 1022, 1230, 1414],
     "recentlyResolvedEvidence": [
       "production-datapack-release-publish-success",
       "store-distribution-evidence-success",
@@ -109,8 +111,7 @@
       "server-minimized-android-release-scope-fixed",
       "android-quality-local-emulator-real-device-smoke-summary",
       "abuse-rehearsal-local-and-store-preflight-summary",
-      "operations-alert-and-mailbox-routing-summary",
-      "operations-phase-a-pass-phase-b-scheduled"
+      "operations-alert-and-mailbox-routing-summary"
     ],
     "remainingP0Blockers": [
       "play-installed-build-provenance",
@@ -120,6 +121,7 @@
       "play-installed-android-quality-performance-recovery-evidence",
       "production-like-abuse-rehearsal-evidence",
       "play-installed-server-minimized-final-acceptance-evidence",
+      "fixed-release-versioncode-build-submit-procedure",
       "route-result-v2-ui-badge-accessibility-copy-evidence",
       "route-release-readiness-tracker-evidence",
       "datapack-release-readiness-tracker-evidence"
@@ -259,9 +261,9 @@
       "id": "G8_OPERATIONS",
       "issue": 1019,
       "priority": "P0",
-      "status": "SATISFIED",
+      "status": "BLOCKED_EXTERNAL",
       "owner": "operations",
-      "nextAction": "공개 시각, versionCode, git SHA 확정 후 예약된 2h/24h/7d/30d Phase B 관측 실행",
+      "nextAction": "Node 24 fixed-release rehearsal을 같은 RC로 재실행하고 Phase A evidence를 재검증",
       "evidenceReference": "apps/mobile/release/post-launch-operations-review-gate.json"
     },
     {

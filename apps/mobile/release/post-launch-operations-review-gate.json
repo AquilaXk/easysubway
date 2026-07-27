@@ -56,10 +56,10 @@
             {"path": "apps/mobile/release/operations-release-evidence.json", "sha256": "d17a6941006bfbac056ad8b82909f7bd704d79507977695ebdbad784f4a50c22"},
             {"path": "apps/mobile/release/operations-observability-gate.json", "sha256": "6955ac139fbc57be0721bb955e834164015050f397f2562e4402298578027afe"},
             {"path": "tools/ops/generate-operations-phase-a-summary.mjs", "sha256": "e89a520d6b229c5fd042ef8bcaf74873476c7253cd03b48fac1de21cf55e0c4d"},
-            {"path": "tools/ops/validate-operations-release-summary.mjs", "sha256": "71a2a51da2b9c3a20d14512b608bccfbfee9022ca5718b77d44ff9254cc67979"},
-            {"path": "tools/release/summary-validation-utils.mjs", "sha256": "d6c8980536e6aba14d9d2f41879339c434759bfa986aca2045d6bf5909fe0d8e"},
+            {"path": "tools/ops/validate-operations-release-summary.mjs", "sha256": "474095e635706a442d79e9c21e274e0aa6eb9e992f480783dbc7d16c66a0fc7e"},
+            {"path": "tools/release/summary-validation-utils.mjs", "sha256": "aff1abc66a25e5310e69b8fd915026dfd5bf458f6f1977d445e5e635e10a35cc"},
             {"path": "tools/release/hash-android-bundle-payload.mjs", "sha256": "0bea0f2d7775960a4672e27622aa32a239cabadad07399cb3ee51ae524b234eb"},
-            {"path": "tools/datapack/run-emergency-datapack-drill.mjs", "sha256": "d371ece038c80d6ba9e50798528339344d3a314e983085aa4b8d3009813d83e7"},
+            {"path": "tools/datapack/run-emergency-datapack-drill.mjs", "sha256": "c5368fbe7ac1e705145eb39e5183cb34986dea560558f2e31b4d4e6eaca3c82c"},
             {"path": "apps/mobile/release/route-commercialization-gate.json", "sha256": "0ac7b2c2ee1e75fc556fa5418ddeac1473d329d2ccd5a1e539e8aced869cab30"}
           ]
         },
@@ -111,7 +111,7 @@
             {"path": "tools/datapack/decide-datapack-release.mjs", "sha256": "19df0719c5c030db1981bd34622a42b98e610ac35851a4d0219c70c51dda675c"},
             {"path": "tools/datapack/verify-release-request-binding.mjs", "sha256": "33953a3a0432f82021f54df40e072288c3d4100d0a254317fbdeb700e8b03cb3"},
             {"path": "tools/datapack/validate-remote-datapack-artifact.mjs", "sha256": "153a5888903c503fb572b5596afac58d1b0ac1ae973f3e8fda5806948d168b26"},
-            {"path": "tools/release/generate-rc-evidence-manifest.mjs", "sha256": "d4dcae15ee381ce16463ad4a8235353327b53adce6fb4d56f25dd6db8c0547c4"},
+            {"path": "tools/release/generate-rc-evidence-manifest.mjs", "sha256": "18becb8c1ae390c89cbf303c2e4f2ee83ba3c00d6290f7ea42869fef90c212cf"},
             {"path": "tools/release/count-gzip-uncompressed-bytes.mjs", "sha256": "e44ccdd89af5260c6a8027b6b03fdd660640bc52c99be9ba5d024a629d24dbb9"},
             {"path": "tools/release/select-rc-datapack-artifact.mjs", "sha256": "06b1d4e60c041e7cd44e461722a7e5519c515e1135612a16429845bdeac32287"},
             {"path": "tools/release/upload-play-internal.mjs", "sha256": "7bc41b1fb3ce86b2e24043a9a43e47e91577ab33c5170535c8e8c85c09b5c5eb"}
