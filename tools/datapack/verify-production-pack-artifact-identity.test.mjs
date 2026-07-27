@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { generateKeyPairSync } from "node:crypto";
+import { createHash, generateKeyPairSync } from "node:crypto";
 import { copyFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -18,6 +18,7 @@ const env = {
 };
 const verifierEnv = { ...process.env };
 delete verifierEnv.EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM;
+const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 
 test("production build와 bundled asset/index의 artifact identity를 exact-match한다", async () => {
   const workspace = await mkdtemp(path.join(tmpdir(), "easysubway-production-pack-identity-"));
@@ -107,6 +108,52 @@ test("production build와 bundled asset/index의 artifact identity를 exact-matc
       ], { cwd: root, env: verifierEnv }),
       /index sha256 mismatch/,
     );
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("network edge evidence는 pinned bytes·freshness·fixture projection mismatch를 거부한다", async () => {
+  const workspace = await mkdtemp(path.join(tmpdir(), "easysubway-network-edge-evidence-"));
+  const outputDir = path.join(workspace, "output");
+  const spec = JSON.parse(await readFile("tools/datapack/release/candidate-build-spec.json", "utf8"));
+  const runRejectedBuild = async (candidate, pattern) => {
+    const specPath = path.join(workspace, `spec-${Date.now()}.json`);
+    await writeFile(specPath, `${JSON.stringify(candidate, null, 2)}\n`);
+    await assert.rejects(execFileAsync(process.execPath, [
+      "tools/datapack/build-datapack.mjs",
+      "--build-spec", specPath,
+      "--output", outputDir,
+    ], { cwd: root, env }), pattern);
+  };
+  try {
+    const tampered = structuredClone(spec);
+    tampered.networkEdgeEvidence.sourceInventory.sha256 = "f".repeat(64);
+    await runRejectedBuild(tampered, /sourceInventory\.sha256 must match tracked input bytes/);
+
+    const staleInventory = JSON.parse(await readFile("tools/datapack/source-inventory.json", "utf8"));
+    staleInventory.sources.find(({ routeMapAdmissionEvidence }) =>
+      routeMapAdmissionEvidence?.topologySnapshotId === "capital-route-topology-20260724"
+    ).routeMapAdmissionEvidence.freshUntil = "2026-07-27T00:00:00.000Z";
+    const staleBytes = Buffer.from(`${JSON.stringify(staleInventory, null, 2)}\n`);
+    const stalePath = path.join(workspace, "stale-source-inventory.json");
+    await writeFile(stalePath, staleBytes);
+    const stale = structuredClone(spec);
+    stale.networkEdgeEvidence.sourceInventory = { path: stalePath, sha256: sha256(staleBytes) };
+    await runRejectedBuild(stale, /capital topology admission is stale/);
+
+    const partialFixture = JSON.parse(await readFile(
+      "tools/datapack/release/capital-production-canonical-pack.json",
+      "utf8",
+    ));
+    partialFixture.packs[0].networkEdges.find(({ id }) =>
+      id.startsWith("edge-line-051552e50435-")
+    ).distanceMeters += 1;
+    const partialPath = path.join(workspace, "partial-fixture.json");
+    await writeFile(partialPath, `${JSON.stringify(partialFixture)}\n`);
+    const partial = structuredClone(spec);
+    partial.fixturePath = partialPath;
+    await runRejectedBuild(partial, /capital topology fixture projection mismatch/);
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }

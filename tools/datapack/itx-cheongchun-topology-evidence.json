@@ -28,10 +28,10 @@
     "inputSha256": "7bb4bb68f0642e45377d98b083e93cd8c1c92aaa58dd353f32189e3f325a1562",
     "inputSqliteSha256": "ed84a649952cd2ccbb238b3a63265f2bd3144497ae8fd36fab5181ad776542fc",
     "inputByteSize": 359319,
-    "outputSha256": "6e4d7aafb533d57a405ee403c349d7608cbea9a5eda4f8dbcacb753da5d8e93e",
-    "outputSqliteSha256": "93aeff44980305e419bad1e618f0143854a2f625b331ba200dde6b779e616706",
-    "byteSize": 1373391,
-    "byteSizeDelta": 1014072
+    "outputSha256": "0a6267a6899143a525846788c2c1a2c2c238b07790c7eb76712cdedb17ae4cdf",
+    "outputSqliteSha256": "ae931aabc270356d51713a72db20e47caa34d1316ee129c2f07561a7a8fc2211",
+    "byteSize": 1465977,
+    "byteSizeDelta": 1106658
   },
   "readmissions": [
     {
@@ -1919,6 +1919,37 @@
             ],
             "changed": []
           }
+        }
+      ]
+    },
+    {
+      "readmittedAt": "2026-07-27T20:19:01.716Z",
+      "provenance": "#2649 owner-approved network_edges provenance wiring",
+      "previousPack": {
+        "sha256": "6e4d7aafb533d57a405ee403c349d7608cbea9a5eda4f8dbcacb753da5d8e93e",
+        "sqliteSha256": "93aeff44980305e419bad1e618f0143854a2f625b331ba200dde6b779e616706",
+        "byteSize": 1373391
+      },
+      "newPack": {
+        "sha256": "0a6267a6899143a525846788c2c1a2c2c238b07790c7eb76712cdedb17ae4cdf",
+        "sqliteSha256": "ae931aabc270356d51713a72db20e47caa34d1316ee129c2f07561a7a8fc2211",
+        "byteSize": 1465977
+      },
+      "byteSizeDelta": 92586,
+      "itxSubgraph": {
+        "unchanged": true,
+        "edgeCount": 48,
+        "edgesSha256": "e09f9ece35f261b0690753b9c88749d2e460c79e889bea045fb44a46bae78709",
+        "evidenceSha256": "a4834c3638dd45500292f67bd39e5a8ff9660162e1ffa2a78359c5d645b74996"
+      },
+      "rowDiff": [
+        {
+          "table": "network_edges",
+          "previousRowCount": 2178,
+          "newRowCount": 2178,
+          "rowsRemoved": 0,
+          "rowsAdded": 0,
+          "rowsChanged": 652
         }
       ]
     }

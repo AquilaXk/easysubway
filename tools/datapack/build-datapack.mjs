@@ -21,6 +21,8 @@ import {
   officialOdFareQuoteSetHash,
 } from "./lib/official-od-fare-evidence.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
+import { normalizeStationName } from "./collect-capital-route-topology.mjs";
+import { loadCapitalRouteTopologySnapshot } from "./apply-capital-route-topology-to-bundled-pack.mjs";
 
 const root = path.resolve(import.meta.dirname, "../..");
 const canonicalSqliteHeaderVersion = 3_053_000;
@@ -424,7 +426,8 @@ async function validateCandidateBuildSpec(buildSpec, fixture, admissions, admiss
     throw new Error("buildSpec.builderGitSha must be a git sha");
   }
   requiredString(buildSpec.builderVersion, "buildSpec.builderVersion");
-  await validateTrackedItxTopologyEvidence(buildSpec, fixture);
+  const itxTopologyEvidence = await validateTrackedItxTopologyEvidence(buildSpec, fixture);
+  await validateAndApplyNetworkEdgeProvenance(buildSpec, fixture, itxTopologyEvidence);
   return validateOfficialOdFareEvidence(buildSpec.officialOdFareEvidence, fixture, admissions, admissionBytes);
 }
 
@@ -455,8 +458,291 @@ function candidateBuildProvenance(buildSpec, buildSpecSha256, officialOdFareEvid
           "buildSpec.itxTopologyEvidenceSha256",
         ) }
       : {}),
+    ...(buildSpec.networkEdgeEvidence
+      ? { networkEdgeEvidence: candidateNetworkEdgeEvidence(buildSpec.networkEdgeEvidence) }
+      : {}),
     ...(officialOdFareEvidence ? { officialOdFareEvidence } : {}),
   };
+}
+
+function candidateNetworkEdgeEvidence(evidence) {
+  assertExactKeys(
+    evidence,
+    ["sourceInventory", "capitalTopology", "itxCoverageContract"],
+    "buildSpec.networkEdgeEvidence",
+  );
+  const sourceInventory = pinnedBuildInput(evidence.sourceInventory, "buildSpec.networkEdgeEvidence.sourceInventory");
+  const capitalTopology = pinnedBuildInput(
+    evidence.capitalTopology,
+    "buildSpec.networkEdgeEvidence.capitalTopology",
+    ["path", "sha256", "snapshotId"],
+  );
+  const itxCoverageContract = pinnedBuildInput(
+    evidence.itxCoverageContract,
+    "buildSpec.networkEdgeEvidence.itxCoverageContract",
+  );
+  return {
+    sourceInventorySha256: sourceInventory.sha256,
+    capitalTopologySnapshotId: capitalTopology.snapshotId,
+    capitalTopologySha256: capitalTopology.sha256,
+    itxCoverageContractSha256: itxCoverageContract.sha256,
+  };
+}
+
+function pinnedBuildInput(reference, label, keys = ["path", "sha256"]) {
+  assertExactKeys(reference, keys, label);
+  return {
+    path: requiredString(reference.path, `${label}.path`),
+    sha256: sha256HexString(reference.sha256, `${label}.sha256`),
+    ...(reference.snapshotId === undefined
+      ? {}
+      : { snapshotId: requiredString(reference.snapshotId, `${label}.snapshotId`) }),
+  };
+}
+
+async function readPinnedBuildJson(reference, label, keys) {
+  const pinned = pinnedBuildInput(reference, label, keys);
+  const bytes = await readFile(await resolveBuildInputPath(pinned.path, `${label}.path`));
+  if (sha256(bytes) !== pinned.sha256) throw new Error(`${label}.sha256 must match tracked input bytes`);
+  return { pinned, value: JSON.parse(bytes) };
+}
+
+async function validateAndApplyNetworkEdgeProvenance(buildSpec, fixture, itxTopologyEvidence) {
+  const evidence = buildSpec.networkEdgeEvidence;
+  if (evidence == null) return;
+  assertExactKeys(
+    evidence,
+    ["sourceInventory", "capitalTopology", "itxCoverageContract"],
+    "buildSpec.networkEdgeEvidence",
+  );
+  const sourceInventory = await readPinnedBuildJson(
+    evidence.sourceInventory,
+    "buildSpec.networkEdgeEvidence.sourceInventory",
+  );
+  const capitalTopology = await readPinnedBuildJson(
+    evidence.capitalTopology,
+    "buildSpec.networkEdgeEvidence.capitalTopology",
+    ["path", "sha256", "snapshotId"],
+  );
+  const itxContract = await readPinnedBuildJson(
+    evidence.itxCoverageContract,
+    "buildSpec.networkEdgeEvidence.itxCoverageContract",
+  );
+  const topology = loadCapitalRouteTopologySnapshot(capitalTopology.value);
+  const capitalAdmissions = admittedCapitalLineEvidence(
+    sourceInventory.value,
+    topology,
+    capitalTopology.pinned.snapshotId,
+  );
+  const itxAdmission = await admittedItxNetworkEdgeEvidence(itxContract.value, itxTopologyEvidence);
+  const productionPacks = fixture.packs?.filter(({ artifactKind }) => artifactKind === "production") ?? [];
+  if (productionPacks.length === 0) throw new Error("network edge evidence requires a production pack");
+  for (const pack of productionPacks) {
+    applyCapitalNetworkEdgeEvidence(pack, topology, capitalTopology.pinned.snapshotId, capitalAdmissions);
+    applyItxNetworkEdgeEvidence(pack, itxAdmission);
+  }
+}
+
+function admittedCapitalLineEvidence(sourceInventory, topology, snapshotId) {
+  if (sourceInventory?.schemaVersion !== 1
+    || sourceInventory.artifactKind !== "production-source-inventory"
+    || !Array.isArray(sourceInventory.sources)) {
+    throw new Error("network edge source inventory identity is invalid");
+  }
+  const topologyLines = new Set(topology.lines.map(({ lineId }) => lineId));
+  const admissions = new Map();
+  for (const source of sourceInventory.sources) {
+    const evidence = source.routeMapAdmissionEvidence;
+    if (evidence?.topologySourceId !== topology.sourceId) continue;
+    if (evidence.topologySnapshotId !== snapshotId
+      || evidence.topologyContentSha256 !== topology.contentSha256
+      || !Array.isArray(evidence.topologyLineages)
+      || evidence.topologyLineages.length === 0) {
+      throw new Error(`capital topology admission identity mismatch: ${source.id}`);
+    }
+    const capturedAt = requiredUtcDateString(evidence.capturedAt, `${source.id}.routeMapAdmissionEvidence.capturedAt`);
+    const freshUntil = requiredUtcDateString(evidence.freshUntil, `${source.id}.routeMapAdmissionEvidence.freshUntil`);
+    if (Date.parse(freshUntil) <= candidateBuildNow().getTime()) {
+      throw new Error(`capital topology admission is stale: ${source.id}`);
+    }
+    for (const lineage of evidence.topologyLineages) {
+      const lineId = requiredString(lineage.lineId, `${source.id}.routeMapAdmissionEvidence.topologyLineages.lineId`);
+      if (lineage.sourceId !== topology.sourceId
+        || lineage.snapshotId !== snapshotId
+        || lineage.contentSha256 !== topology.contentSha256
+        || !topologyLines.has(lineId)
+        || !evidence.lineIds?.includes(lineId)) {
+        throw new Error(`capital topology line admission mismatch: ${source.id}:${lineId}`);
+      }
+      const previous = admissions.get(lineId);
+      if (previous == null || Date.parse(capturedAt) > Date.parse(previous.verifiedAt)) {
+        admissions.set(lineId, { verifiedAt: capturedAt });
+      }
+    }
+  }
+  if (admissions.size === 0) throw new Error("capital topology has no fresh admitted line evidence");
+  return admissions;
+}
+
+const capitalStationAliases = Object.freeze({
+  능길: "신길온천",
+  김포공항역: "김포공항",
+  부천종합운동장역: "부천종합운동장",
+});
+
+function capitalStationName(value) {
+  const normalized = normalizeStationName(value);
+  return capitalStationAliases[normalized] ?? normalized;
+}
+
+function capitalStationIdsByLine(pack) {
+  const stations = new Map((pack.stations ?? []).map((station) => [station.id, station]));
+  const result = new Map();
+  for (const membership of pack.stationLines ?? []) {
+    const station = stations.get(membership.stationId);
+    if (station == null) throw new Error(`station_lines references missing station: ${membership.stationId}`);
+    const key = `${membership.lineId}\0${capitalStationName(station.nameKo)}`;
+    const ids = result.get(key) ?? [];
+    ids.push(station.id);
+    result.set(key, ids);
+  }
+  return result;
+}
+
+function requiredCapitalStationId(stationIds, lineId, stationName) {
+  const ids = stationIds.get(`${lineId}\0${capitalStationName(stationName)}`) ?? [];
+  if (ids.length !== 1) throw new Error(`capital topology station projection mismatch: ${lineId}:${stationName}`);
+  return ids[0];
+}
+
+function applyCapitalNetworkEdgeEvidence(pack, topology, snapshotId, admissions) {
+  const stationIds = capitalStationIdsByLine(pack);
+  const edges = new Map((pack.networkEdges ?? []).map((edge) => [edge.id, edge]));
+  for (const line of topology.lines) {
+    const admission = admissions.get(line.lineId);
+    if (admission == null) continue;
+    if (line.edgeCount !== line.edges.length) throw new Error(`capital topology edge count mismatch: ${line.lineId}`);
+    for (const sourceEdge of line.edges) {
+      const fromStationId = requiredCapitalStationId(stationIds, line.lineId, sourceEdge.fromStationName);
+      const toStationId = requiredCapitalStationId(stationIds, line.lineId, sourceEdge.toStationName);
+      const expected = {
+        id: `edge-${line.lineId}-${fromStationId}-${toStationId}`,
+        fromNodeId: `${fromStationId}:${line.lineId}`,
+        toNodeId: `${toStationId}:${line.lineId}`,
+        durationSeconds: sourceEdge.durationSeconds,
+        distanceMeters: sourceEdge.distanceMeters,
+        edgeType: "RIDE",
+        servicePattern: "LOCAL",
+        serviceClass: "SUBWAY",
+      };
+      const edge = edges.get(expected.id);
+      if (edge == null || Object.entries(expected).some(([key, value]) => edge[key] !== value)) {
+        throw new Error(`capital topology fixture projection mismatch: ${expected.id}`);
+      }
+      Object.assign(edge, {
+        sourceId: topology.sourceId,
+        sourceSnapshotId: snapshotId,
+        providerRecordHash: sha256(Buffer.from(canonicalJson({ lineId: line.lineId, ...sourceEdge }))),
+        provenanceKind: "OFFICIAL_SOURCE",
+        verificationStatus: "VERIFIED",
+        lastVerifiedAt: admission.verifiedAt,
+        evidenceHash: line.contentSha256,
+      });
+    }
+  }
+}
+
+async function admittedItxNetworkEdgeEvidence(contract, topologyEvidence) {
+  const reference = contract?.sourceTimetableArtifact;
+  if (contract?.schemaVersion !== 2
+    || contract.artifactKind !== "itx-cheongchun-coverage-contract"
+    || contract.serviceId !== "ITX_CHEONGCHUN"
+    || reference?.status !== "ADMITTED"
+    || reference.admissionEligible !== true
+    || reference.promotion?.mode !== "UNCHANGED_AUTO"
+    || topologyEvidence?.sourceArtifact?.sha256 !== reference.promotion.previousArtifactSha256) {
+    throw new Error("ITX network edge admission identity is invalid");
+  }
+  const sourceBytes = await readFile(await resolveBuildInputPath(
+    reference.artifactPath,
+    "networkEdgeEvidence.itxCoverageContract.sourceTimetableArtifact.artifactPath",
+  ));
+  const completenessBytes = await readFile(await resolveBuildInputPath(
+    reference.completenessEvidencePath,
+    "networkEdgeEvidence.itxCoverageContract.sourceTimetableArtifact.completenessEvidencePath",
+  ));
+  const previousBytes = await readFile(await resolveBuildInputPath(
+    reference.promotion.previousArtifactPath,
+    "networkEdgeEvidence.itxCoverageContract.sourceTimetableArtifact.promotion.previousArtifactPath",
+  ));
+  if (sha256(sourceBytes) !== reference.sha256
+    || sha256(completenessBytes) !== reference.completenessEvidenceSha256
+    || sha256(previousBytes) !== reference.promotion.previousArtifactSha256) {
+    throw new Error("ITX network edge admission bytes mismatch");
+  }
+  const source = JSON.parse(sourceBytes);
+  const completeness = JSON.parse(completenessBytes);
+  const { evidenceHash: sourceEvidenceHash, ...sourceWithoutEvidenceHash } = source;
+  const { evidenceHash: completenessEvidenceHash, ...completenessWithoutEvidenceHash } = completeness;
+  if (source?.schemaVersion !== 1
+    || source.artifactKind !== "itx-cheongchun-source-timetable"
+    || source.artifactId !== reference.artifactId
+    || source.serviceId !== "ITX_CHEONGCHUN"
+    || source.validationStatus !== "SUPPORTED"
+    || source.freshUntil !== reference.freshUntil
+    || source.completenessEvidenceSha256 !== reference.completenessEvidenceSha256
+    || sourceEvidenceHash !== sha256(Buffer.from(JSON.stringify(sourceWithoutEvidenceHash)))
+    || completeness?.schemaVersion !== 2
+    || completeness.artifactKind !== "korail-itx-cheongchun-completeness-evidence"
+    || completeness.serviceId !== "ITX_CHEONGCHUN"
+    || completeness.validationMode !== "ADMISSION"
+    || completeness.validationStatus !== "SUPPORTED"
+    || completeness.materialization?.status !== "SUPPORTED"
+    || completeness.sourceTimetableArtifact?.artifactId !== reference.artifactId
+    || completeness.sourceTimetableArtifact?.freshUntil !== reference.freshUntil
+    || completenessEvidenceHash !== sha256(Buffer.from(JSON.stringify(completenessWithoutEvidenceHash)))) {
+    throw new Error("ITX network edge admission evidence mismatch");
+  }
+  const observedAt = requiredUtcDateString(source.observedAt, "ITX network edge source observedAt");
+  const freshUntil = requiredUtcDateString(source.freshUntil, "ITX network edge source freshUntil");
+  if (Date.parse(freshUntil) <= candidateBuildNow().getTime()) throw new Error("ITX network edge admission is stale");
+  const pairHashes = new Map();
+  for (const sequence of source.stationSequences ?? []) {
+    for (let index = 0; index < (sequence.stops?.length ?? 0) - 1; index += 1) {
+      const fromStationId = requiredString(sequence.stops[index].stationId, "ITX network edge from stationId");
+      const toStationId = requiredString(sequence.stops[index + 1].stationId, "ITX network edge to stationId");
+      const record = { fromStationId, toStationId, serviceClass: "ITX_CHEONGCHUN" };
+      pairHashes.set(`${fromStationId}\0${toStationId}`, sha256(Buffer.from(canonicalJson(record))));
+    }
+  }
+  if (pairHashes.size === 0) throw new Error("ITX network edge admission has no directional pairs");
+  return {
+    sourceId: "kric-subway-timetable",
+    sourceSnapshotId: source.artifactId,
+    evidenceHash: sourceEvidenceHash,
+    verifiedAt: observedAt,
+    pairHashes,
+  };
+}
+
+function applyItxNetworkEdgeEvidence(pack, admission) {
+  const edges = (pack.networkEdges ?? []).filter(({ serviceClass }) => serviceClass === "ITX_CHEONGCHUN");
+  if (edges.length !== admission.pairHashes.size) throw new Error("ITX network edge fixture projection is partial");
+  for (const edge of edges) {
+    const fromStationId = requiredString(edge.fromNodeId, "ITX network edge fromNodeId").split(":")[0];
+    const toStationId = requiredString(edge.toNodeId, "ITX network edge toNodeId").split(":")[0];
+    const providerRecordHash = admission.pairHashes.get(`${fromStationId}\0${toStationId}`);
+    if (providerRecordHash == null) throw new Error(`ITX network edge fixture projection mismatch: ${edge.id}`);
+    Object.assign(edge, {
+      sourceId: admission.sourceId,
+      sourceSnapshotId: admission.sourceSnapshotId,
+      providerRecordHash,
+      provenanceKind: "OFFICIAL_SOURCE",
+      verificationStatus: "VERIFIED",
+      lastVerifiedAt: admission.verifiedAt,
+      evidenceHash: admission.evidenceHash,
+    });
+  }
 }
 
 async function validateTrackedItxTopologyEvidence(buildSpec, fixture) {
@@ -468,7 +754,7 @@ async function validateTrackedItxTopologyEvidence(buildSpec, fixture) {
     ...(pack.transitTrips ?? []),
     ...(pack.networkEdges ?? []),
   ].some(({ serviceClass }) => serviceClass === "ITX_CHEONGCHUN")) ?? [];
-  if (packs.length === 0) return;
+  if (packs.length === 0) return null;
   const evidencePath = await resolveBuildInputPath(
     buildSpec.itxTopologyEvidencePath,
     "buildSpec.itxTopologyEvidencePath",
@@ -523,6 +809,7 @@ async function validateTrackedItxTopologyEvidence(buildSpec, fixture) {
     validatedItxAdmissionPacks.add(pack);
     validatedItxAdmissionOutputs.set(pack, output);
   }
+  return evidence;
 }
 
 function validateTrackedItxReadmissionChain(evidence) {
