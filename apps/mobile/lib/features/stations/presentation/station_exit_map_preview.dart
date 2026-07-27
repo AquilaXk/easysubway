@@ -75,6 +75,10 @@ class _StationExitMapPreviewState extends State<StationExitMapPreview>
   KakaoMapController? _controller;
   final _pois = <String, Poi>{};
   bool _mapFailed = false;
+  bool _appActive = true;
+  bool _routeVisible = true;
+  bool? _controllerRunning;
+  int? _configuringGeneration;
   int _generation = 0;
 
   List<StationExitPreviewPoint> get _points =>
@@ -84,6 +88,19 @@ class _StationExitMapPreviewState extends State<StationExitMapPreview>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _appActive =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final routeVisible = TickerMode.valuesOf(context).enabled;
+    if (_routeVisible != routeVisible) {
+      _routeVisible = routeVisible;
+      _syncControllerLifecycle();
+    }
   }
 
   @override
@@ -109,19 +126,8 @@ class _StationExitMapPreviewState extends State<StationExitMapPreview>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    final controller = _controller;
-    if (controller == null) {
-      return;
-    }
-    switch (state) {
-      case AppLifecycleState.resumed:
-        _runControllerAction(controller.resume, '카카오맵 미리보기 resume 실패');
-      case AppLifecycleState.inactive ||
-          AppLifecycleState.hidden ||
-          AppLifecycleState.paused ||
-          AppLifecycleState.detached:
-        _runControllerAction(controller.pause, '카카오맵 미리보기 pause 실패');
-    }
+    _appActive = state == AppLifecycleState.resumed;
+    _syncControllerLifecycle();
   }
 
   @override
@@ -168,11 +174,13 @@ class _StationExitMapPreviewState extends State<StationExitMapPreview>
         child: Stack(
           fit: StackFit.expand,
           children: [
-            builder(
-              key: ValueKey('stationExitNativeMap-$_generation'),
-              option: option,
-              onMapReady: _onMapReady,
-              onMapError: _onMapError,
+            ExcludeSemantics(
+              child: builder(
+                key: ValueKey('stationExitNativeMap-$_generation'),
+                option: option,
+                onMapReady: _onMapReady,
+                onMapError: _onMapError,
+              ),
             ),
             if (selectedTarget != null)
               Semantics(
@@ -204,6 +212,8 @@ class _StationExitMapPreviewState extends State<StationExitMapPreview>
 
   void _onMapReady(KakaoMapController controller) {
     _controller = controller;
+    _controllerRunning = true;
+    _syncControllerLifecycle();
     final generation = _generation;
     unawaited(_configureMap(controller, generation));
   }
@@ -212,6 +222,8 @@ class _StationExitMapPreviewState extends State<StationExitMapPreview>
     KakaoMapController controller,
     int generation,
   ) async {
+    final selectedExitIdAtStart = widget.selectedExitId;
+    _configuringGeneration = generation;
     try {
       await Future.wait([
         for (final gesture in GestureType.values)
@@ -228,9 +240,12 @@ class _StationExitMapPreviewState extends State<StationExitMapPreview>
           id: point.id,
           style: await _markerStyle(
             point.number,
-            selected: point.id == widget.selectedExitId,
+            selected: point.id == selectedExitIdAtStart,
           ),
         );
+      }
+      if (selectedExitIdAtStart != widget.selectedExitId) {
+        await _synchronizeSelectedPoiStyles(generation);
       }
       final positions = [
         for (final point in _points) LatLng(point.latitude, point.longitude),
@@ -248,6 +263,30 @@ class _StationExitMapPreviewState extends State<StationExitMapPreview>
       _reportSanitizedError(error, stackTrace, '카카오맵 미리보기 구성 실패');
       if (mounted && generation == _generation) {
         setState(() => _mapFailed = true);
+      }
+    } finally {
+      if (_configuringGeneration == generation) {
+        _configuringGeneration = null;
+      }
+    }
+  }
+
+  Future<void> _synchronizeSelectedPoiStyles(int generation) async {
+    while (mounted && generation == _generation) {
+      final selectedExitId = widget.selectedExitId;
+      for (final point in _points) {
+        final poi = _pois[point.id];
+        if (poi != null) {
+          await poi.changeStyles(
+            await _markerStyle(
+              point.number,
+              selected: point.id == selectedExitId,
+            ),
+          );
+        }
+      }
+      if (selectedExitId == widget.selectedExitId) {
+        return;
       }
     }
   }
@@ -269,6 +308,9 @@ class _StationExitMapPreviewState extends State<StationExitMapPreview>
   }
 
   Future<void> _updateSelectedPoi(String previousId, String selectedId) async {
+    if (_configuringGeneration == _generation) {
+      return;
+    }
     final previous = _pois[previousId];
     final selected = _pois[selectedId];
     final previousPoint = _points
@@ -325,9 +367,26 @@ class _StationExitMapPreviewState extends State<StationExitMapPreview>
     );
   }
 
+  void _syncControllerLifecycle() {
+    final controller = _controller;
+    if (controller == null) {
+      return;
+    }
+    final shouldRun = _appActive && _routeVisible;
+    if (_controllerRunning == shouldRun) {
+      return;
+    }
+    _controllerRunning = shouldRun;
+    _runControllerAction(
+      shouldRun ? controller.resume : controller.pause,
+      shouldRun ? '카카오맵 미리보기 resume 실패' : '카카오맵 미리보기 pause 실패',
+    );
+  }
+
   void _finishController() {
     final controller = _controller;
     _controller = null;
+    _controllerRunning = null;
     if (controller != null) {
       _runControllerAction(controller.finish, '카카오맵 미리보기 종료 실패');
     }

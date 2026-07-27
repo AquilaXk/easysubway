@@ -3023,6 +3023,7 @@ test("OSV 의존성 취약점 게이트는 Gradle lockfile을 스캔 근거로 �
   assert.match(androidLockfile, /This is a Gradle generated file for dependency locking/);
   assert.match(backendLockfile, /\n[^#\n][^=\n]+=/);
   assert.match(androidLockfile, /\n[^#\n][^=\n]+=/);
+  assert.match(androidLockfile, /^com\.kakao\.maps\.open:android:2\.12\.18=/m);
   assert.doesNotMatch(androidLockfile, /^io\.flutter:/m);
 });
 

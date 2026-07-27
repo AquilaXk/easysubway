@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:easysubway_mobile/features/stations/domain/station_models.dart';
 import 'package:easysubway_mobile/features/stations/presentation/station_exit_map_preview.dart';
 import 'package:easysubway_mobile/mobile_error_reporter.dart';
@@ -118,6 +120,133 @@ void main() {
 
     expect(openCount, 1);
   });
+
+  testWidgets('native map semantics는 미리보기 열기 버튼 하나로 대체한다', (tester) async {
+    await _pumpPreview(
+      tester,
+      nativeMapBuilder:
+          ({
+            required key,
+            required option,
+            required onMapReady,
+            required onMapError,
+          }) => Semantics(
+            key: key,
+            label: 'native map internal',
+            child: const ColoredBox(color: Colors.grey),
+          ),
+    );
+
+    expect(find.bySemanticsLabel('native map internal'), findsNothing);
+    expect(
+      find.bySemanticsLabel('상록수역 1번 출구 카카오맵에서 보기, 새 앱이 열립니다'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('route가 가려지면 지도를 멈추고 다시 보이면 재개한다', (tester) async {
+    final controller = _FakeKakaoMapController();
+    var routeVisible = true;
+    late StateSetter updateHost;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            updateHost = setState;
+            return TickerMode(
+              enabled: routeVisible,
+              child: Scaffold(
+                body: StationExitMapPreview(
+                  station: _station(),
+                  exits: [
+                    _exit(
+                      id: 'exit-1',
+                      number: '1',
+                      latitude: 37.301,
+                      longitude: 126.861,
+                    ),
+                  ],
+                  selectedExitId: 'exit-1',
+                  onOpenSelected: () {},
+                  nativeAppKey: 'test-native-map-key',
+                  nativeMapBuilder: _readyMapBuilder(controller),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+
+    updateHost(() => routeVisible = false);
+    await tester.pump();
+    expect(controller.pauseCount, 1);
+
+    updateHost(() => routeVisible = true);
+    await tester.pump();
+    expect(controller.resumeCount, 1);
+  });
+
+  testWidgets('지도 구성 중 출구를 바꿔도 현재 출구 marker만 강조한다', (tester) async {
+    final firstPoiGate = Completer<void>();
+    final controller = _FakeKakaoMapController(firstPoiGate: firstPoiGate);
+    var selectedExitId = 'exit-1';
+    late StateSetter updateHost;
+    final exits = [
+      _exit(id: 'exit-1', number: '1', latitude: 37.301, longitude: 126.861),
+      _exit(id: 'exit-2', number: '2', latitude: 37.302, longitude: 126.862),
+    ];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            updateHost = setState;
+            return Scaffold(
+              body: StationExitMapPreview(
+                station: _station(),
+                exits: exits,
+                selectedExitId: selectedExitId,
+                onOpenSelected: () {},
+                nativeAppKey: 'test-native-map-key',
+                nativeMapBuilder: _readyMapBuilder(controller),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    for (
+      var attempt = 0;
+      attempt < 10 && controller.labels.addPoiCount == 0;
+      attempt++
+    ) {
+      await tester.pump(const Duration(milliseconds: 1));
+    }
+    expect(controller.labels.addPoiCount, 1);
+
+    updateHost(() => selectedExitId = 'exit-2');
+    await tester.pump();
+    firstPoiGate.complete();
+    for (
+      var attempt = 0;
+      attempt < 10 && controller.labels.changeStyleCount < 2;
+      attempt++
+    ) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+
+    expect(controller.labels.changeStyleCount, 2);
+    expect(controller.labels.pois['exit-1']!.lastStyle.icon!.width, 32);
+    expect(controller.labels.pois['exit-2']!.lastStyle.icon!.width, 36);
+  });
 }
 
 Future<void> _pumpPreview(
@@ -198,3 +327,128 @@ StationExitInfo _exit({
 }
 
 final class _FakeMapError extends Error {}
+
+StationExitNativeMapBuilder _readyMapBuilder(
+  _FakeKakaoMapController controller,
+) {
+  return ({
+    required key,
+    required option,
+    required onMapReady,
+    required onMapError,
+  }) => _MapReadyStub(key: key, controller: controller, onReady: onMapReady);
+}
+
+class _MapReadyStub extends StatefulWidget {
+  const _MapReadyStub({
+    required this.controller,
+    required this.onReady,
+    super.key,
+  });
+
+  final KakaoMapController controller;
+  final ValueChanged<KakaoMapController> onReady;
+
+  @override
+  State<_MapReadyStub> createState() => _MapReadyStubState();
+}
+
+class _MapReadyStubState extends State<_MapReadyStub> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        widget.onReady(widget.controller);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => const ColoredBox(color: Colors.grey);
+}
+
+final class _FakeKakaoMapController implements KakaoMapController {
+  _FakeKakaoMapController({Completer<void>? firstPoiGate})
+    : labels = _FakeLabelController(firstPoiGate: firstPoiGate);
+
+  final _FakeLabelController labels;
+  int pauseCount = 0;
+  int resumeCount = 0;
+
+  @override
+  LabelController get labelLayer => labels;
+
+  @override
+  Future<void> setGesture(GestureType gesture, bool enable) async {}
+
+  @override
+  Future<void> moveCamera(
+    CameraUpdate camera, {
+    CameraAnimation? animation,
+  }) async {}
+
+  @override
+  Future<void> pause() async => pauseCount++;
+
+  @override
+  Future<void> resume() async => resumeCount++;
+
+  @override
+  Future<void> finish() async {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+final class _FakeLabelController implements LabelController {
+  _FakeLabelController({this.firstPoiGate});
+
+  final Completer<void>? firstPoiGate;
+  final pois = <String, _FakePoi>{};
+  int addPoiCount = 0;
+  int get changeStyleCount =>
+      pois.values.fold(0, (count, poi) => count + poi.changeStyleCount);
+
+  @override
+  Future<void> setClickable(bool clickable) async {}
+
+  @override
+  Future<Poi> addPoi(
+    LatLng position, {
+    required PoiStyle style,
+    String? id,
+    String? text,
+    TransformMethod? transform,
+    int? rank,
+    VoidCallback? onClick,
+    bool visible = true,
+  }) async {
+    addPoiCount++;
+    if (addPoiCount == 1) {
+      await firstPoiGate?.future;
+    }
+    final poi = _FakePoi(style);
+    pois[id!] = poi;
+    return poi;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+final class _FakePoi implements Poi {
+  _FakePoi(this.lastStyle);
+
+  PoiStyle lastStyle;
+  int changeStyleCount = 0;
+
+  @override
+  Future<void> changeStyles(PoiStyle style, [bool transition = false]) async {
+    lastStyle = style;
+    changeStyleCount++;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
