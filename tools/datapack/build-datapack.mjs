@@ -591,6 +591,10 @@ async function validateAndApplyNetworkEdgeProvenance(buildSpec, fixture, itxTopo
     "buildSpec.networkEdgeEvidence.itxCoverageContract",
   );
   const topology = loadCapitalRouteTopologySnapshot(capitalTopology.value);
+  if (JSON.stringify([...(topology.fieldsProvided ?? [])].sort(compareStrings))
+    !== JSON.stringify(["branch_name", "distance_meters", "line", "network_edges", "station_name"])) {
+    throw new Error("capital topology fieldsProvided is invalid");
+  }
   const topologyAdmission = candidateCapitalTopologyAdmission(evidence.capitalTopologyAdmission);
   if (topologyAdmission.snapshotId !== capitalTopology.pinned.snapshotId
     || topologyAdmission.contentSha256 !== topology.contentSha256) {
@@ -784,6 +788,7 @@ async function admittedItxNetworkEdgeEvidence(contract, topologyEvidence) {
     || contract.serviceId !== "ITX_CHEONGCHUN"
     || contract.coverageStates?.route_graph_topology !== "SUPPORTED"
     || !contract.allowedConsumerIssues?.includes("#2649")
+    || reference?.schemaVersion !== 1
     || reference?.status !== "ADMITTED"
     || reference.admissionEligible !== true
     || reference.promotion?.mode !== "UNCHANGED_AUTO"
@@ -822,6 +827,7 @@ async function admittedItxNetworkEdgeEvidence(contract, topologyEvidence) {
     || source.artifactId !== reference.artifactId
     || source.serviceId !== "ITX_CHEONGCHUN"
     || source.validationStatus !== "SUPPORTED"
+    || source.policyVersion !== reference.policyVersion
     || source.freshUntil !== reference.freshUntil
     || source.completenessEvidenceSha256 !== reference.completenessEvidenceSha256
     || sourceEvidenceHash !== sha256(Buffer.from(JSON.stringify(sourceWithoutEvidenceHash)))
@@ -830,9 +836,15 @@ async function admittedItxNetworkEdgeEvidence(contract, topologyEvidence) {
     || completeness.serviceId !== "ITX_CHEONGCHUN"
     || completeness.validationMode !== "ADMISSION"
     || completeness.validationStatus !== "SUPPORTED"
+    || completeness.admissionStatus !== "SUPPORTED"
     || completeness.materialization?.status !== "SUPPORTED"
+    || completeness.sourceTimetableArtifact?.status !== "SUPPORTED"
     || completeness.sourceTimetableArtifact?.artifactId !== reference.artifactId
+    || completeness.sourceTimetableArtifact?.policyVersion !== source.policyVersion
     || completeness.sourceTimetableArtifact?.freshUntil !== reference.freshUntil
+    || JSON.stringify(completeness.selectedServiceDates) !== JSON.stringify(source.selectedServiceDates)
+    || !completeness.allowedConsumerIssues?.includes("#1400")
+    || completeness.credentialRedacted !== true
     || completenessEvidenceHash !== sha256(Buffer.from(JSON.stringify(completenessWithoutEvidenceHash)))) {
     throw new Error("ITX network edge admission evidence mismatch");
   }
