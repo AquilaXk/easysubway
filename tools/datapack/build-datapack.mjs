@@ -469,7 +469,7 @@ function candidateBuildProvenance(buildSpec, buildSpecSha256, officialOdFareEvid
 function candidateNetworkEdgeEvidence(evidence) {
   assertExactKeys(
     evidence,
-    ["sourceInventory", "capitalTopology", "itxCoverageContract"],
+    ["sourceInventory", "capitalTopology", "capitalTopologyAdmission", "itxCoverageContract"],
     "buildSpec.networkEdgeEvidence",
   );
   const sourceInventory = pinnedBuildInput(evidence.sourceInventory, "buildSpec.networkEdgeEvidence.sourceInventory");
@@ -486,8 +486,38 @@ function candidateNetworkEdgeEvidence(evidence) {
     sourceInventorySha256: sourceInventory.sha256,
     capitalTopologySnapshotId: capitalTopology.snapshotId,
     capitalTopologySha256: capitalTopology.sha256,
+    capitalTopologyAdmission: candidateCapitalTopologyAdmission(evidence.capitalTopologyAdmission),
     itxCoverageContractSha256: itxCoverageContract.sha256,
   };
+}
+
+function candidateCapitalTopologyAdmission(admission) {
+  if (admission == null) throw new Error("production build requires capital topology edge admission");
+  assertExactKeys(
+    admission,
+    ["schemaVersion", "artifactKind", "issue", "status", "snapshotId", "contentSha256", "reviewedAt", "freshUntil"],
+    "buildSpec.networkEdgeEvidence.capitalTopologyAdmission",
+  );
+  const normalized = {
+    schemaVersion: requiredInteger(admission.schemaVersion, "capital topology edge admission schemaVersion"),
+    artifactKind: requiredString(admission.artifactKind, "capital topology edge admission artifactKind"),
+    issue: requiredInteger(admission.issue, "capital topology edge admission issue"),
+    status: requiredString(admission.status, "capital topology edge admission status"),
+    snapshotId: requiredString(admission.snapshotId, "capital topology edge admission snapshotId"),
+    contentSha256: sha256HexString(admission.contentSha256, "capital topology edge admission contentSha256"),
+    reviewedAt: requiredUtcDateString(admission.reviewedAt, "capital topology edge admission reviewedAt"),
+    freshUntil: requiredUtcDateString(admission.freshUntil, "capital topology edge admission freshUntil"),
+  };
+  if (normalized.schemaVersion !== 1
+    || normalized.artifactKind !== "capital-network-edge-admission"
+    || normalized.issue !== 2649
+    || normalized.status !== "ADMITTED") {
+    throw new Error("capital topology edge admission identity is invalid");
+  }
+  const now = candidateBuildNow().getTime();
+  if (Date.parse(normalized.reviewedAt) > now) throw new Error("capital topology edge admission is future-dated");
+  if (Date.parse(normalized.freshUntil) <= now) throw new Error("capital topology edge admission is stale");
+  return normalized;
 }
 
 function pinnedBuildInput(reference, label, keys = ["path", "sha256"]) {
@@ -516,9 +546,12 @@ async function validateAndApplyNetworkEdgeProvenance(buildSpec, fixture, itxTopo
     }
     return;
   }
+  if (evidence.capitalTopologyAdmission == null) {
+    throw new Error("production build requires capital topology edge admission");
+  }
   assertExactKeys(
     evidence,
-    ["sourceInventory", "capitalTopology", "itxCoverageContract"],
+    ["sourceInventory", "capitalTopology", "capitalTopologyAdmission", "itxCoverageContract"],
     "buildSpec.networkEdgeEvidence",
   );
   const sourceInventory = await readPinnedBuildJson(
@@ -539,10 +572,16 @@ async function validateAndApplyNetworkEdgeProvenance(buildSpec, fixture, itxTopo
     "buildSpec.networkEdgeEvidence.itxCoverageContract",
   );
   const topology = loadCapitalRouteTopologySnapshot(capitalTopology.value);
+  const topologyAdmission = candidateCapitalTopologyAdmission(evidence.capitalTopologyAdmission);
+  if (topologyAdmission.snapshotId !== capitalTopology.pinned.snapshotId
+    || topologyAdmission.contentSha256 !== topology.contentSha256) {
+    throw new Error("capital topology edge admission does not match pinned snapshot");
+  }
   const capitalAdmissions = admittedCapitalLineEvidence(
     sourceInventory.value,
     topology,
     capitalTopology.pinned.snapshotId,
+    topologyAdmission.reviewedAt,
   );
   const itxAdmission = await admittedItxNetworkEdgeEvidence(itxContract.value, itxTopologyEvidence);
   const productionPacks = fixture.packs?.filter(({ artifactKind }) => artifactKind === "production") ?? [];
@@ -586,7 +625,7 @@ function materializeCapitalTopologySource(pack, topology, admissions) {
   }
 }
 
-function admittedCapitalLineEvidence(sourceInventory, topology, snapshotId) {
+function admittedCapitalLineEvidence(sourceInventory, topology, snapshotId, reviewedAt) {
   if (sourceInventory?.schemaVersion !== 1
     || sourceInventory.artifactKind !== "production-source-inventory"
     || !Array.isArray(sourceInventory.sources)) {
@@ -624,6 +663,7 @@ function admittedCapitalLineEvidence(sourceInventory, topology, snapshotId) {
     }
   }
   if (admissions.size === 0) throw new Error("capital topology has no fresh admitted line evidence");
+  for (const lineId of admissions.keys()) admissions.set(lineId, { verifiedAt: reviewedAt });
   return admissions;
 }
 

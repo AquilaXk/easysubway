@@ -16,6 +16,16 @@
       "sha256": "1026e93ae3c6fd81bf9a6ac92b810439fc7e7e9fdd0a7c8167840cb5876d84a4",
       "snapshotId": "capital-route-topology-20260724"
     },
+    "capitalTopologyAdmission": {
+      "schemaVersion": 1,
+      "artifactKind": "capital-network-edge-admission",
+      "issue": 2649,
+      "status": "ADMITTED",
+      "snapshotId": "capital-route-topology-20260724",
+      "contentSha256": "0492df28ff51dc4262508363e960ed1a5fed847d3aa5f593ea62ad0fd3d773f3",
+      "reviewedAt": "2026-07-27T21:38:29.000Z",
+      "freshUntil": "2026-08-03T21:38:29.000Z"
+    },
     "itxCoverageContract": {
       "path": "tools/datapack/itx-cheongchun-coverage-contract.json",
       "sha256": "1f0cbe4648d30fd44dfda55a0af51c52cb0dd217cb08b9a4f2340a85fc28d67c"

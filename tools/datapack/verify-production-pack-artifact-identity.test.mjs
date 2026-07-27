@@ -191,6 +191,23 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
     stale.sourceInventorySha256 = sha256(Buffer.from(JSON.stringify(staleInventory)));
     await runRejectedBuild(stale, /capital topology admission is stale/);
 
+    const missingEdgeAdmission = structuredClone(spec);
+    delete missingEdgeAdmission.networkEdgeEvidence.capitalTopologyAdmission;
+    await runRejectedBuild(missingEdgeAdmission, /production build requires capital topology edge admission/);
+
+    const staleEdgeAdmission = structuredClone(spec);
+    staleEdgeAdmission.networkEdgeEvidence.capitalTopologyAdmission = {
+      schemaVersion: 1,
+      artifactKind: "capital-network-edge-admission",
+      issue: 2649,
+      status: "ADMITTED",
+      snapshotId: "capital-route-topology-20260724",
+      contentSha256: "0492df28ff51dc4262508363e960ed1a5fed847d3aa5f593ea62ad0fd3d773f3",
+      reviewedAt: "2026-07-27T21:38:29.000Z",
+      freshUntil: "2026-07-27T21:38:30.000Z",
+    };
+    await runRejectedBuild(staleEdgeAdmission, /capital topology edge admission is stale/);
+
     const partialFixture = JSON.parse(await readFile(
       "tools/datapack/release/capital-production-canonical-pack.json",
       "utf8",
