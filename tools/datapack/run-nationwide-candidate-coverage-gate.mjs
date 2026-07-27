@@ -292,6 +292,15 @@ const NON_TRANSITION_KEYS = Object.freeze(["requirementKey", "reasonCode", "reas
 // NO_SUPPORTING_ROWS_FOR_LINE: 조립 결과의 그 scope provenance 행이 필드마다 0건임을 확인한다.
 const NON_TRANSITION_REASON_CODES = Object.freeze(["NO_SUPPORTING_ROWS_FOR_LINE"]);
 
+export function validateNationwideCandidateCoverageSpec(
+  spec,
+  inventory,
+  materializers = PACK_DATA_MATERIALIZERS,
+) {
+  validateSpec(spec, materializers);
+  assertInventoryLineScopeSync(spec, inventory);
+}
+
 export async function runNationwideCandidateCoverageGate({
   spec,
   specInput,
@@ -307,8 +316,7 @@ export async function runNationwideCandidateCoverageGate({
   // 임의 모듈을 실행시킬 수 없다"는 성질은 그대로다.
   materializers = PACK_DATA_MATERIALIZERS,
 }) {
-  validateSpec(spec, materializers);
-  assertInventoryLineScopeSync(spec, inventory);
+  validateNationwideCandidateCoverageSpec(spec, inventory, materializers);
   // 승계 원본도 입력 해시 축에 넣는다. 경로·pack 정체성만 기록하면 원본 좌표 같은 값 drift가
   // evidence를 바이트 동일하게 통과시킨다(구조 drift만 잡히는 상태) — 파일 바이트로 결속한다.
   const inheritedInput = await readJsonInput(spec.inheritsFrom.path);

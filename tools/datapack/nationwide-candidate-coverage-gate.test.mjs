@@ -40,6 +40,7 @@ import {
   assertNonTransitionReasons,
   inheritedRowSnapshot,
   runNationwideCandidateCoverageGate,
+  validateNationwideCandidateCoverageSpec,
 } from "./run-nationwide-candidate-coverage-gate.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -1385,35 +1386,41 @@ test("candidate spec의 line-scope 재기술은 tracked source inventory와 동�
   }
   assert.deepEqual(appInventory, inventory, "앱 번들 사본은 datapack 정본과 같아야 한다");
 
-  await context.test("inventory lineIds가 spec과 어긋나면 하네스가 거부한다", async () => {
-    const workspace = await mkdtemp(path.join(tmpdir(), "nationwide-candidate-gate-drift-"));
+  await context.test("inventory lineIds가 spec과 어긋나면 하네스가 거부한다", () => {
     const drifted = structuredClone(inventory);
     delete drifted.sources.find(({ id }) => id === PILOT_SOURCE_ID).coverageScope.lineIds;
-    try {
-      await assert.rejects(
-        runNationwideCandidateCoverageGate({
-          spec,
-          specInput: { path: SPEC_PATH, sha256: "a".repeat(64) },
-          targetsInput: { path: TARGETS_PATH, sha256: "b".repeat(64) },
-          inventory: drifted,
-          inventoryInput: { path: INVENTORY_PATH, sha256: "c".repeat(64) },
-          resolutionPlanInput: { path: RESOLUTION_PLAN_PATH, sha256: "d".repeat(64) },
-          resolutionsInput: { path: RESOLUTIONS_PATH, sha256: "e".repeat(64) },
-          workDir: workspace,
-        }),
-        /source inventory coverageScope\.lineIds must match the spec redescription/,
-      );
-    } finally {
-      await rm(workspace, { recursive: true, force: true });
-    }
+    assert.throws(
+      () => validateNationwideCandidateCoverageSpec(spec, drifted),
+      /source inventory coverageScope\.lineIds must match the spec redescription/,
+    );
   });
 });
 
 // candidate 안전 경계를 산문이 아니라 코드가 강제하는지 본다. 이 도구는 artifactKind production으로 실제
 // RSA 서명 manifest를 만들기 때문에, spec 편집만으로 production 채널·게시 가능 URL 서명본이 나오면 안 된다.
+test("candidate spec validation seam은 production 채널을 거부한다", async () => {
+  const spec = await readJson(SPEC_PATH);
+  const inventory = await readJson(INVENTORY_PATH);
+  spec.manifest.channel = "production";
+
+  assert.throws(
+    () => validateNationwideCandidateCoverageSpec(spec, inventory),
+    /manifest\.channel must be candidate/,
+  );
+});
+
 test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async (context) => {
   const spec = await readJson(SPEC_PATH);
   const inventory = await readJson(INVENTORY_PATH);
+
+  function rejectsValidationWith(mutate, expected) {
+    const mutated = structuredClone(spec);
+    mutate(mutated);
+    assert.throws(
+      () => validateNationwideCandidateCoverageSpec(mutated, inventory),
+      expected,
+    );
+  }
 
   // solo에 편입 인덱스를 주면 그 편입 하나만 담은 축소 spec으로 돌리고 mutation 대상도 인덱스 0이 된다.
   // 결속·창 회귀에만 쓴다: 두 가드는 어댑터의 경로 결속과 materializer requiredSource의 창 판정이라 승계
@@ -1444,15 +1451,8 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
     }
   }
 
-  await context.test("production 채널 manifest는 거부된다", async () => {
-    await rejectsWith(
-      (value) => { value.manifest.channel = "production"; },
-      /manifest\.channel must be candidate/,
-    );
-  });
-
-  await context.test("게시 가능한 pack url은 거부된다", async () => {
-    await rejectsWith(
+  await context.test("게시 가능한 pack url은 거부된다", () => {
+    rejectsValidationWith(
       (value) => { value.pack.url = "https://objectstorage.example.com/catalog/nationwide-candidate-v1.sqlite.gz"; },
       /pack\.url host must be the non-publishable host/,
     );
@@ -1460,8 +1460,8 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
 
   // #2549 B1이 파일럿의 "lineIds 1개" 단언을 근거 결속으로 바꿨다. 개수 제한이 사라진 자리를 아래 축이
   // 대신 막는지 본다 — 선언 범위는 admission 정본(inventory)과 declare한 requirementKeys에 묶여 있다.
-  await context.test("선언 lineIds가 admission 정본과 다르면 거부된다", async () => {
-    await rejectsWith(
+  await context.test("선언 lineIds가 admission 정본과 다르면 거부된다", () => {
+    rejectsValidationWith(
       (value) => {
         // requirementKeys까지 함께 넓혀 spec 내부 정합은 맞춘 채로 정본 결속만 어긋나게 한다.
         value.lineScopeRedescriptions[0].lineIds = ["seoul-4", "seoul-2"];
@@ -1474,8 +1474,8 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
     );
   });
 
-  await context.test("requirementKeys가 덮지 않는 lineIds는 거부된다", async () => {
-    await rejectsWith(
+  await context.test("requirementKeys가 덮지 않는 lineIds는 거부된다", () => {
+    rejectsValidationWith(
       (value) => {
         value.lineScopeRedescriptions[0].lineIds = ["seoul-4", "seoul-2"];
         value.lineScopeRedescriptions[0].requirementKeys = [PILOT_REQUIREMENT_KEY];
@@ -1484,8 +1484,8 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
     );
   });
 
-  await context.test("재기술 도메인을 벗어난 requirementKey는 거부된다", async () => {
-    await rejectsWith(
+  await context.test("재기술 도메인을 벗어난 requirementKey는 거부된다", () => {
+    rejectsValidationWith(
       (value) => {
         value.lineScopeRedescriptions[0].requirementKeys = ["capital:seoul-metro:seoul-4:route_graph_topology"];
       },
@@ -1495,8 +1495,8 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
 
   // 두 항목 각각은 내부 정합(도메인·lineIds·requirementKeys)이 맞아 도메인 가드에 걸리지 않는다 —
   // 오직 소스 간 lineIds 동일 강제 축만 이 mutation을 잡는다(정규식 alternation 없이 그 축을 고정한다).
-  await context.test("같은 소스를 도메인별로 갈라 다른 lineIds를 선언할 수 없다", async () => {
-    await rejectsWith(
+  await context.test("같은 소스를 도메인별로 갈라 다른 lineIds를 선언할 수 없다", () => {
+    rejectsValidationWith(
       (value) => {
         const entry = value.lineScopeRedescriptions.find(
           ({ sourceId, sourceDomain }) =>
@@ -1512,8 +1512,8 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
   // 저장소에 실재하는 materializer라도 allowlist에 없으면 spec이 가리킬 수 없다(#2587에서 부산 4종이,
   // #2595에서 대전·광주·수도권·인천 14종이 등재되면서 탐침을 그때마다 미등재 모듈로 옮겼다 — 등재 확대가
   // 이 축을 지우지 않는지 본다). 대전 topology 전용 materializer는 편입 단위가 아니라 미등재로 남아 있다.
-  await context.test("allowlist에 없는 materializer는 거부된다", async () => {
-    await rejectsWith(
+  await context.test("allowlist에 없는 materializer는 거부된다", () => {
+    rejectsValidationWith(
       (value) => {
         value.packDataInclusions[0].materializer = "tools/datapack/materialize-daejeon-route-topology.mjs";
       },
@@ -1521,8 +1521,8 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
     );
   });
 
-  await context.test("저장소 밖 편입 입력은 거부된다", async () => {
-    await rejectsWith(
+  await context.test("저장소 밖 편입 입력은 거부된다", () => {
+    rejectsValidationWith(
       (value) => { value.packDataInclusions[0].stationMapPath = "../molit-urban-rail-full-route-20251211.csv"; },
       /must be a repository-relative path inside the repo/,
     );
@@ -1551,8 +1551,8 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
     }
   });
 
-  await context.test("offset 없는 materializedAt은 거부된다", async () => {
-    await rejectsWith(
+  await context.test("offset 없는 materializedAt은 거부된다", () => {
+    rejectsValidationWith(
       (value) => { value.packDataInclusions[0].materializedAt = "2026-07-20T16:00:00"; },
       /materializedAt must be a UTC ISO-8601 timestamp/,
     );
@@ -1576,15 +1576,15 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
   // 않았음을 고정한다 — 중복 금지는 (regionId, materializer)로 좁혀졌을 뿐 사라지지 않았고,
   // 형상 분기는 materializer가 실제로 읽는 경로 키를 여전히 필수로 요구하며, 그 경로는 모두
   // 저장소 안 실경로 강제와 입력 해시 결속을 그대로 받는다.
-  await context.test("같은 지역·materializer 편입을 두 번 선언하면 거부된다", async () => {
-    await rejectsWith(
+  await context.test("같은 지역·materializer 편입을 두 번 선언하면 거부된다", () => {
+    rejectsValidationWith(
       (value) => { value.packDataInclusions.push(structuredClone(value.packDataInclusions[1])); },
       /duplicate pack data inclusion: daegu:tools\/datapack\/materialize-daegu-route-map-positions\.mjs/,
     );
   });
 
-  await context.test("materializer가 요구하는 입력 경로 키가 빠지면 거부된다", async () => {
-    await rejectsWith(
+  await context.test("materializer가 요구하는 입력 경로 키가 빠지면 거부된다", () => {
+    rejectsValidationWith(
       (value) => { delete value.packDataInclusions[1].snapshotPath; },
       /materialize-daegu-route-map-positions\.mjs\.snapshotPath is required/,
     );
@@ -1592,8 +1592,8 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
 
   // 형상 분기가 넓힌 자리의 반대 방향 축: 등재 형상에 없는 키는 어댑터가 읽지 않으므로 그대로 두면
   // spec이 선언한 입력이 읽히지도 해시되지도 않은 채 통과한다(실측: 무시됐다) — 좁혀서 거부한다.
-  await context.test("materializer 형상에 없는 편입 키는 거부된다", async () => {
-    await rejectsWith(
+  await context.test("materializer 형상에 없는 편입 키는 거부된다", () => {
+    rejectsValidationWith(
       (value) => {
         value.packDataInclusions[1].timetableSnapshotPath =
           "tools/datapack/sources/daegu-line1-train-timetable-20260721.json";
@@ -1605,8 +1605,8 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
   // 서술 키를 "*Ko 접미사면 통과"로 열어 두면 snapshotPathKo 같은 죽은 선언이 그대로 통과한다(실측).
   // 명시 allowlist(reasonKo·materializedAtReasonKo·addedRowsKo·reorderedTablesKo)로 좁혔으므로 그 밖의
   // 서술 키는 거부된다.
-  await context.test("등재되지 않은 서술 키는 거부된다", async () => {
-    await rejectsWith(
+  await context.test("등재되지 않은 서술 키는 거부된다", () => {
+    rejectsValidationWith(
       (value) => {
         value.packDataInclusions[1].snapshotPathKo = "tools/datapack/sources/does-not-exist.json";
       },
@@ -1616,8 +1616,8 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
 
   // 등재된 서술 키라도 선언 키 없이 홀로 서면 아무것도 완화하지 않는 죽은 서술이다 — 그 상태로 통과하면
   // "이 편입은 표를 재정렬한다"는 주장이 실제 결속 없이 evidence 밖에 남는다(실측: 그대로 통과했다).
-  await context.test("선언 키 없는 reorderedTablesKo는 거부된다", async () => {
-    await rejectsWith(
+  await context.test("선언 키 없는 reorderedTablesKo는 거부된다", () => {
+    rejectsValidationWith(
       (value) => {
         value.packDataInclusions[1].reorderedTablesKo = "선언 없이 서술만 남긴 죽은 키";
       },
@@ -1628,15 +1628,15 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
   // lineNumber 생략은 숫자 노선명이 없는 두 KRIC 카탈로그 편입에만 열린다. 그 밖의 편입에서 키가 빠지면
   // 거부되고(주석으로만 범위를 적어 두면 번호 있는 노선에서도 조용히 빠진다), 반대로 열린 편입이 번호를
   // 선언하면 없는 값을 지어낸 것이므로 그것도 거부된다.
-  await context.test("생략이 열리지 않은 편입에서 lineNumber가 빠지면 거부된다", async () => {
-    await rejectsWith(
+  await context.test("생략이 열리지 않은 편입에서 lineNumber가 빠지면 거부된다", () => {
+    rejectsValidationWith(
       (value) => { delete value.packDataInclusions[INCHEON_INDEX].lines[0].lineNumber; },
       /materialize-incheon-station-info\.mjs\.lines\[\]\.lineNumber must be a positive integer/,
     );
   });
 
-  await context.test("숫자 노선명이 없는 편입이 lineNumber를 선언하면 거부된다", async () => {
-    await rejectsWith(
+  await context.test("숫자 노선명이 없는 편입이 lineNumber를 선언하면 거부된다", () => {
+    rejectsValidationWith(
       (value) => { value.packDataInclusions[CAPITAL_INDEX].lines[0].lineNumber = 1; },
       new RegExp(
         "materialize-kric-capital-wide-rail-route-map-positions\\.mjs\\.lines\\[\\]\\.lineNumber "
@@ -1669,8 +1669,8 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
     }
   });
 
-  await context.test("materializer 형상에 없는 lines 키는 거부된다", async () => {
-    await rejectsWith(
+  await context.test("materializer 형상에 없는 lines 키는 거부된다", () => {
+    rejectsValidationWith(
       (value) => {
         value.packDataInclusions[1].lines[0].timetableSnapshotPath =
           "tools/datapack/sources/daegu-line1-train-timetable-20260721.json";
@@ -1748,8 +1748,8 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
 
   // 노선도 편입의 snapshotPath는 admission 정본 경로에 결속돼 이 축에 닿기 전에 걸린다 — 결속이 없는
   // 경로 키(lines[].topologySnapshotPath)로 일반화된 형상의 저장소 밖 입력 거부를 고정한다.
-  await context.test("일반화된 형상의 편입 입력도 저장소 밖을 가리키면 거부된다", async () => {
-    await rejectsWith(
+  await context.test("일반화된 형상의 편입 입력도 저장소 밖을 가리키면 거부된다", () => {
+    rejectsValidationWith(
       (value) => {
         value.packDataInclusions[1].lines[0].topologySnapshotPath =
           "../daegu-line1-route-topology-20260721.json";
@@ -2391,8 +2391,8 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
     );
   });
 
-  await context.test("재정렬 선언이 정렬돼 있지 않으면 거부된다", async () => {
-    await rejectsWith(
+  await context.test("재정렬 선언이 정렬돼 있지 않으면 거부된다", () => {
+    rejectsValidationWith(
       (value) => { value.packDataInclusions[CAPITAL_INDEX].reorderedTables = ["operators", "lines"]; },
       /reorderedTables must be sorted by codepoint/,
     );
@@ -2474,22 +2474,22 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
     );
   });
 
-  await context.test("사유 코드가 없는 non-transition 선언은 거부된다", async () => {
-    await rejectsWith(
+  await context.test("사유 코드가 없는 non-transition 선언은 거부된다", () => {
+    rejectsValidationWith(
       (value) => { delete nonTransitionEntryOf(value).declaration.reasonCode; },
       /nonTransitioningRequirements\[\]\.reasonCode is required/,
     );
   });
 
-  await context.test("사유 서술이 빈 non-transition 선언은 거부된다", async () => {
-    await rejectsWith(
+  await context.test("사유 서술이 빈 non-transition 선언은 거부된다", () => {
+    rejectsValidationWith(
       (value) => { nonTransitionEntryOf(value).declaration.reasonKo = "   "; },
       /nonTransitioningRequirements\[\]\.reasonKo is required/,
     );
   });
 
-  await context.test("등재되지 않은 사유 코드는 거부된다", async () => {
-    await rejectsWith(
+  await context.test("등재되지 않은 사유 코드는 거부된다", () => {
+    rejectsValidationWith(
       (value) => { nonTransitionEntryOf(value).declaration.reasonCode = "OUT_OF_SCOPE"; },
       /nonTransitioningRequirements\[\]\.reasonCode must be one of NO_SUPPORTING_ROWS_FOR_LINE/,
     );
@@ -2504,8 +2504,8 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
   });
 
   // 재기술이 declare하지 않은 requirement를 선언 대상으로 삼으면 이 축이 재기술 범위 밖까지 건드리게 된다.
-  await context.test("재기술이 declare하지 않은 requirement는 선언 대상이 될 수 없다", async () => {
-    await rejectsWith(
+  await context.test("재기술이 declare하지 않은 requirement는 선언 대상이 될 수 없다", () => {
+    rejectsValidationWith(
       (value) => {
         nonTransitionEntryOf(value).declaration.requirementKey =
           "daegu:daegu-transportation:line-5b8d9b05e7e6:route_graph_topology";
@@ -2521,8 +2521,8 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
     ["도메인 전체", "capital:incheon-transit:route_graph_topology"],
     ["소스 전체", "incheon-transit-station-info"],
   ]) {
-    await context.test(`${labelKo}을(를) 가리키는 non-transition 선언은 거부된다`, async () => {
-      await rejectsWith(
+    await context.test(`${labelKo}을(를) 가리키는 non-transition 선언은 거부된다`, () => {
+      rejectsValidationWith(
         (value) => { nonTransitionEntryOf(value).declaration.requirementKey = requirementKey; },
         /nonTransitioningRequirements\[\]\.requirementKey must be one of the declared requirementKeys/,
       );
@@ -2531,8 +2531,8 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
 
   // 재기술 노선을 전부 선언하면 그 재기술은 아무것도 열지 않는다 — 등재의 뜻이 사라지므로 거부한다.
   // 판정 단위가 requirementKey 개수가 아니라 노선이라는 것도 이 축에 함께 걸려 있다.
-  await context.test("재기술의 모든 노선을 선언하면 거부된다", async () => {
-    await rejectsWith(
+  await context.test("재기술의 모든 노선을 선언하면 거부된다", () => {
+    rejectsValidationWith(
       (value) => {
         const { redescription } = nonTransitionEntryOf(value);
         redescription.nonTransitioningRequirements = redescription.requirementKeys
@@ -2549,8 +2549,8 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
 
   // B2-a 재기술도 B0 파일럿과 같은 축에 묶여 있다: spec만 고쳐서 전환 범위를 넓힐 수 없다.
   // snapshot 근거가 없는 노선을 spec 내부 정합을 맞춰 끼워 넣어도 admission 정본 결속이 막는다.
-  await context.test("snapshot 근거가 없는 노선을 재기술에 끼워 넣으면 거부된다", async () => {
-    await rejectsWith(
+  await context.test("snapshot 근거가 없는 노선을 재기술에 끼워 넣으면 거부된다", () => {
+    rejectsValidationWith(
       (value) => {
         const entry = value.lineScopeRedescriptions.find(
           ({ sourceId }) => sourceId === "daegu-transportation-route-map-positions",
