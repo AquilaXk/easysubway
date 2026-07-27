@@ -6451,7 +6451,7 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
   assert.ok(gate.releaseReadiness.p0EscalationRules.includes("measured_performance_budget_failure"));
   assert.ok(gate.releaseReadiness.p0EscalationRules.includes("play_prelaunch_crash"));
   assert.equal(gate.latestOperationsEvidenceStatus.issue, 1019);
-  assert.equal(gate.latestOperationsEvidenceStatus.preLaunchReadiness, "PASS");
+  assert.equal(gate.latestOperationsEvidenceStatus.preLaunchReadiness, "BLOCKED_EXTERNAL");
   assert.equal(gate.latestOperationsEvidenceStatus.postLaunchObservation, "PENDING_PUBLIC_RELEASE");
   assert.equal(gate.latestOperationsEvidenceStatus.supportMailboxRouting, "RESOLVED_BY_QA_MANUAL_EVIDENCE");
   assert.equal(gate.latestOperationsEvidenceStatus.alertRouteDryRun, "PASS");
@@ -6461,7 +6461,9 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
     "support-ticket-summary-after-public-release",
     "post-launch-review-window-evidence-after-public-release",
   ]);
-  assert.deepEqual(gate.latestOperationsEvidenceStatus.remainingPhaseABlockers, []);
+  assert.deepEqual(gate.latestOperationsEvidenceStatus.remainingPhaseABlockers, [
+    "fixed-release-versioncode-build-submit-procedure",
+  ]);
   assert.equal(gate.latestGoNoGoStatus.qaEvidenceDateKst, "2026-07-15");
   assert.equal(gate.latestGoNoGoStatus.currentDecision, "NO_GO");
   assert.equal(gate.latestGoNoGoStatus.decisionOwner, "release-owner");
@@ -6504,7 +6506,115 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
   );
   assert.ok(gate.gates.some((item) => item.issue === 1021 && item.id === "G7_ANDROID_QUALITY"));
   assert.ok(gate.gates.some((item) => item.issue === 1018 && item.id === "G9_GOOGLE_PLAY"));
-  assert.equal(gate.gates.find((item) => item.id === "G8_OPERATIONS").status, "SATISFIED");
+  assert.equal(gate.gates.find((item) => item.id === "G8_OPERATIONS").status, "BLOCKED_EXTERNAL");
+  const operationsGate = readJson("apps/mobile/release/post-launch-operations-review-gate.json");
+  const g8 = gate.gates.find((item) => item.id === "G8_OPERATIONS");
+  const assertOperationsCoherence = (governance, operations, operationsGateEntry) => {
+    assert.equal(governance.latestOperationsEvidenceStatus.preLaunchReadiness, operations.preLaunchReadiness.status);
+    assert.equal(governance.latestOperationsEvidenceStatus.postLaunchObservation, operations.postLaunchObservation.status);
+    assert.deepEqual(
+      governance.latestOperationsEvidenceStatus.remainingPhaseABlockers,
+      operations.preLaunchReadiness.evidenceSummary
+        .filter((evidence) => evidence.status !== "PASS")
+        .map((evidence) => evidence.id),
+    );
+    if (operations.preLaunchReadiness.status !== "PASS") {
+      const expectedG8Status = operations.preLaunchReadiness.status === "FAIL"
+        ? "BLOCKED_TECHNICAL"
+        : operations.preLaunchReadiness.status;
+      assert.equal(operationsGateEntry.status, expectedG8Status);
+      return;
+    }
+    assert.ok(["PENDING_PUBLIC_RELEASE", "IN_PROGRESS", "PASS"].includes(operations.postLaunchObservation.status));
+    assert.equal(operationsGateEntry.status, "SATISFIED");
+  };
+  assertOperationsCoherence(gate, operationsGate, g8);
+  assertOperationsCoherence(
+    {
+      latestOperationsEvidenceStatus: {
+        preLaunchReadiness: "PASS",
+        postLaunchObservation: "PENDING_PUBLIC_RELEASE",
+        remainingPhaseABlockers: [],
+      },
+    },
+    {
+      preLaunchReadiness: { status: "PASS", evidenceSummary: [] },
+      postLaunchObservation: { status: "PENDING_PUBLIC_RELEASE" },
+    },
+    { status: "SATISFIED" },
+  );
+  for (const postLaunchStatus of ["IN_PROGRESS", "PASS"]) {
+    assertOperationsCoherence(
+      {
+        latestOperationsEvidenceStatus: {
+          preLaunchReadiness: "PASS",
+          postLaunchObservation: postLaunchStatus,
+          remainingPhaseABlockers: [],
+        },
+      },
+      {
+        preLaunchReadiness: { status: "PASS", evidenceSummary: [] },
+        postLaunchObservation: { status: postLaunchStatus },
+      },
+      { status: "SATISFIED" },
+    );
+  }
+  for (const postLaunchStatus of ["IN_PROGRESS", "PASS"]) {
+    assert.throws(
+      () => assertOperationsCoherence(
+        {
+          latestOperationsEvidenceStatus: {
+            preLaunchReadiness: "PASS",
+            postLaunchObservation: postLaunchStatus,
+            remainingPhaseABlockers: [],
+          },
+        },
+        {
+          preLaunchReadiness: { status: "PASS", evidenceSummary: [] },
+          postLaunchObservation: { status: postLaunchStatus },
+        },
+        { status: "IN_PROGRESS" },
+      ),
+    );
+  }
+  assert.throws(
+    () => assertOperationsCoherence(
+      {
+        latestOperationsEvidenceStatus: {
+          preLaunchReadiness: "BLOCKED_EXTERNAL",
+          postLaunchObservation: "PENDING_PUBLIC_RELEASE",
+          remainingPhaseABlockers: ["fixed-release-versioncode-build-submit-procedure"],
+        },
+      },
+      {
+        preLaunchReadiness: {
+          status: "BLOCKED_EXTERNAL",
+          evidenceSummary: [{ id: "fixed-release-versioncode-build-submit-procedure", status: "BLOCKED_EXTERNAL" }],
+        },
+        postLaunchObservation: { status: "PENDING_PUBLIC_RELEASE" },
+      },
+      { status: "SATISFIED" },
+    ),
+  );
+  assert.throws(
+    () => assertOperationsCoherence(
+      {
+        latestOperationsEvidenceStatus: {
+          preLaunchReadiness: "BLOCKED_EXTERNAL",
+          postLaunchObservation: "PENDING_PUBLIC_RELEASE",
+          remainingPhaseABlockers: [],
+        },
+      },
+      {
+        preLaunchReadiness: {
+          status: "BLOCKED_EXTERNAL",
+          evidenceSummary: [{ id: "fixed-release-versioncode-build-submit-procedure", status: "BLOCKED_EXTERNAL" }],
+        },
+        postLaunchObservation: { status: "PENDING_PUBLIC_RELEASE" },
+      },
+      { status: "BLOCKED_EXTERNAL" },
+    ),
+  );
   const routeResultV2UiCopyGatePath = "apps/mobile/release/route-result-v2-ui-copy-gate.json";
   const routeResultV2UiCopyGate = readJson(routeResultV2UiCopyGatePath);
   assert.equal(routeResultV2UiCopyGate.releaseGate, "route-result-v2-ui-copy");
@@ -19511,25 +19621,7 @@ test("tools/**/*.mjs는 로케일 미지정 localeCompare 호출을 두지 않�
   assert.equal(findLocaleUnspecified("// a.localeCompare(b)\n").length, 0);
   assert.equal(findLocaleUnspecified("assert.match(src, /a.localeCompare(b)/);").length, 0);
 
-  // 아래 파일들은 operations 리뷰 게이트의 소스 sha 핀(apps/mobile/release/post-launch-operations-review-gate.json,
-  // refreshOn "operations-contract-change")에 묶여 있다. 코드포인트 치환은 핀을 stale로 만들고,
-  // 운영 릴리스 요약 validator가 런타임에 그 핀을 강제하므로 핀 갱신에는 operations 재리뷰가 필요하다.
-  // 따라서 이 파일들의 치환+핀 갱신은 A급 후속 PR에서 operations 재리뷰와 함께 처리한다(#2390).
-  const PENDING_SEPARATE_A_GRADE = [
-    "tools/datapack/run-emergency-datapack-drill.mjs",
-    "tools/ops/validate-operations-release-summary.mjs",
-    "tools/release/generate-rc-evidence-manifest.mjs",
-    "tools/release/summary-validation-utils.mjs",
-  ];
-  // 자기청소: 후속 PR이 아래 파일을 치환하면 이 단언이 실패해 stale 예외를 강제로 제거하게 한다.
-  for (const rel of PENDING_SEPARATE_A_GRADE) {
-    assert.ok(
-      findLocaleUnspecified(read(rel)).length > 0,
-      `${rel} 는 이미 치환됐다 — PENDING_SEPARATE_A_GRADE 예외 항목을 제거하라.`,
-    );
-  }
-
-  const excluded = new Set(["tools/lib/codepoint-compare.mjs", ...PENDING_SEPARATE_A_GRADE]);
+  const excluded = new Set(["tools/lib/codepoint-compare.mjs"]);
   const files = execFileSync("git", ["ls-files", "tools"], { cwd: root, encoding: "utf8" })
     .split("\n")
     .filter((rel) => rel.endsWith(".mjs") && !excluded.has(rel));

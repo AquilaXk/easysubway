@@ -8,6 +8,7 @@ import {
   required,
   stableFlatJson,
 } from "../release/summary-validation-utils.mjs";
+import { codepointCompare } from "../lib/codepoint-compare.mjs";
 
 const STATUS = new Set(["PASS", "FAIL", "BLOCKED_EXTERNAL"]);
 const RAW_SECRET_PATTERNS = [
@@ -38,7 +39,7 @@ function isRfc3339Timestamp(value) {
 }
 
 function sortedStrings(values) {
-  return [...values].sort((left, right) => left.localeCompare(right));
+  return [...values].sort(codepointCompare);
 }
 
 function backendIdentityMatches(fields = [], left, right) {
