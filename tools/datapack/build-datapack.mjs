@@ -622,6 +622,7 @@ async function validateAndApplyNetworkEdgeProvenance(buildSpec, fixture, itxTopo
   return new Date(Math.min(
     Date.parse(topologyAdmission.freshUntil),
     Date.parse(itxAdmission.freshUntil),
+    ...[...capitalAdmissions.values()].map(({ freshUntil }) => Date.parse(freshUntil)),
   )).toISOString();
 }
 
@@ -690,12 +691,12 @@ function admittedCapitalLineEvidence(sourceInventory, topology, snapshotId, revi
       }
       const previous = admissions.get(lineId);
       if (previous == null || Date.parse(capturedAt) > Date.parse(previous.verifiedAt)) {
-        admissions.set(lineId, { verifiedAt: capturedAt });
+        admissions.set(lineId, { verifiedAt: capturedAt, freshUntil });
       }
     }
   }
   if (admissions.size === 0) throw new Error("capital topology has no fresh admitted line evidence");
-  for (const lineId of admissions.keys()) admissions.set(lineId, { verifiedAt: reviewedAt });
+  for (const [lineId, admission] of admissions) admissions.set(lineId, { ...admission, verifiedAt: reviewedAt });
   return admissions;
 }
 

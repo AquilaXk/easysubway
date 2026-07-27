@@ -207,6 +207,27 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
     stale.sourceInventorySha256 = sha256(Buffer.from(JSON.stringify(staleInventory)));
     await runRejectedBuild(stale, /capital topology admission is stale/);
 
+    const earlyInventory = JSON.parse(await readFile("tools/datapack/source-inventory.json", "utf8"));
+    earlyInventory.sources.find(({ routeMapAdmissionEvidence }) =>
+      routeMapAdmissionEvidence?.topologySnapshotId === "capital-route-topology-20260724"
+    ).routeMapAdmissionEvidence.freshUntil = "2026-08-01T00:00:00.000Z";
+    const earlyBytes = Buffer.from(`${JSON.stringify(earlyInventory, null, 2)}\n`);
+    const earlyPath = path.join(workspace, "early-source-inventory.json");
+    await writeFile(earlyPath, earlyBytes);
+    const early = structuredClone(spec);
+    early.networkEdgeEvidence.sourceInventory = { path: earlyPath, sha256: sha256(earlyBytes) };
+    early.sourceInventorySha256 = sha256(Buffer.from(JSON.stringify(earlyInventory)));
+    const earlySpecPath = path.join(workspace, "early-spec.json");
+    const earlyOutputDir = path.join(workspace, "early-output");
+    await writeFile(earlySpecPath, `${JSON.stringify(early, null, 2)}\n`);
+    await execFileAsync(process.execPath, [
+      "tools/datapack/build-datapack.mjs",
+      "--build-spec", earlySpecPath,
+      "--output", earlyOutputDir,
+    ], { cwd: root, env });
+    const earlyManifest = JSON.parse(await readFile(path.join(earlyOutputDir, "current.json"), "utf8"));
+    assert.equal(earlyManifest.expiresAt, "2026-08-01T00:00:00.000Z");
+
     const missingEdgeAdmission = structuredClone(spec);
     delete missingEdgeAdmission.networkEdgeEvidence.capitalTopologyAdmission;
     await runRejectedBuild(missingEdgeAdmission, /production build requires capital topology edge admission/);
