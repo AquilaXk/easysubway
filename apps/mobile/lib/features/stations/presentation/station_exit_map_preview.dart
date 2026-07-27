@@ -243,9 +243,6 @@ class _StationExitMapPreviewState extends State<StationExitMapPreview>
           ),
         );
       }
-      if (selectedExitIdAtStart != widget.selectedExitId) {
-        await _synchronizeSelectedPoiStyles(generation);
-      }
       final positions = [
         for (final point in _points) LatLng(point.latitude, point.longitude),
       ];
@@ -257,6 +254,9 @@ class _StationExitMapPreviewState extends State<StationExitMapPreview>
         await controller.moveCamera(
           CameraUpdate.newCenterPosition(_initialPosition, zoomLevel: 16),
         );
+      }
+      if (selectedExitIdAtStart != widget.selectedExitId) {
+        await _synchronizeSelectedPoiStyles(generation);
       }
     } on Object catch (error, stackTrace) {
       _reportSanitizedError(error, stackTrace, '카카오맵 미리보기 구성 실패');

@@ -309,6 +309,65 @@ void main() {
     expect(controller.labels.pois['exit-1']!.lastStyle.icon!.width, 36);
     expect(controller.labels.pois['exit-2']!.lastStyle.icon!.width, 32);
   });
+
+  testWidgets('카메라 이동 중 출구를 바꿔도 현재 선택 marker로 수렴한다', (tester) async {
+    final moveCameraGate = Completer<void>();
+    final controller = _FakeKakaoMapController(moveCameraGate: moveCameraGate);
+    var selectedExitId = 'exit-1';
+    late StateSetter updateHost;
+    final exits = [
+      _exit(id: 'exit-1', number: '1', latitude: 37.301, longitude: 126.861),
+      _exit(id: 'exit-2', number: '2', latitude: 37.302, longitude: 126.862),
+    ];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            updateHost = setState;
+            return Scaffold(
+              body: StationExitMapPreview(
+                station: _station(),
+                exits: exits,
+                selectedExitId: selectedExitId,
+                onOpenSelected: () {},
+                nativeAppKey: 'test-native-map-key',
+                nativeMapBuilder: _readyMapBuilder(controller),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+    for (
+      var attempt = 0;
+      attempt < 10 && controller.moveCameraCount == 0;
+      attempt++
+    ) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+      await tester.pump();
+    }
+    expect(controller.moveCameraCount, 1);
+
+    updateHost(() => selectedExitId = 'exit-2');
+    await tester.pump();
+    moveCameraGate.complete();
+    for (
+      var attempt = 0;
+      attempt < 10 && controller.labels.changeStyleCount < 2;
+      attempt++
+    ) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+
+    expect(controller.labels.pois['exit-1']!.lastStyle.icon!.width, 32);
+    expect(controller.labels.pois['exit-2']!.lastStyle.icon!.width, 36);
+  });
 }
 
 Future<void> _pumpPreview(
@@ -431,12 +490,14 @@ class _MapReadyStubState extends State<_MapReadyStub> {
 }
 
 final class _FakeKakaoMapController implements KakaoMapController {
-  _FakeKakaoMapController({Completer<void>? firstPoiGate})
+  _FakeKakaoMapController({Completer<void>? firstPoiGate, this.moveCameraGate})
     : labels = _FakeLabelController(firstPoiGate: firstPoiGate);
 
   final _FakeLabelController labels;
+  final Completer<void>? moveCameraGate;
   int pauseCount = 0;
   int resumeCount = 0;
+  int moveCameraCount = 0;
 
   @override
   LabelController get labelLayer => labels;
@@ -448,7 +509,10 @@ final class _FakeKakaoMapController implements KakaoMapController {
   Future<void> moveCamera(
     CameraUpdate camera, {
     CameraAnimation? animation,
-  }) async {}
+  }) async {
+    moveCameraCount++;
+    await moveCameraGate?.future;
+  }
 
   @override
   Future<void> pause() async => pauseCount++;
