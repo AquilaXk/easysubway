@@ -1770,10 +1770,24 @@ void main() {
   });
 
   testWidgets('알림함 시설 상태는 쉬운 안내와 할 일을 함께 보여준다', (tester) async {
+    final reportRepository = FakeFacilityReportRepository(
+      reports: [
+        const FacilityReportResult(
+          id: 'report-2',
+          publicReceiptCode: 'ES-1002',
+          stationId: 'station-sangnoksu',
+          facilityId: 'facility-sangnoksu-elevator-1',
+          reportType: 'CLOSED',
+          description: '출입문이 막혀 있습니다.',
+          status: 'ACCEPTED',
+          createdAt: '2026-06-15T09:00:00',
+        ),
+      ],
+    );
     await tester.pumpWidget(
       buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
-        reportRepository: FakeFacilityReportRepository(),
+        reportRepository: reportRepository,
         routeRepository: FakeRouteSearchRepository(),
         favoriteRepository: FakeFavoriteStationRepository(),
         favoriteFacilityRepository: FakeFavoriteFacilityRepository(
@@ -1791,14 +1805,20 @@ void main() {
     expect(find.text('상록수역 1번 출구 엘리베이터'), findsOneWidget);
     expect(find.text('미확인 · 엘리베이터 설치 확인 · 운행상태 미확인'), findsOneWidget);
     expect(find.text('자세히 보기'), findsOneWidget);
+    final reportTitle = find.text('제보 반영됨');
+    expect(
+      find.ancestor(of: reportTitle, matching: find.byType(Ink)),
+      findsOneWidget,
+    );
+    expect(
+      find.ancestor(of: reportTitle, matching: find.byType(InkWell)),
+      findsOneWidget,
+    );
     final notificationRow = find
-        .ancestor(
-          of: find.text('상록수역 1번 출구 엘리베이터'),
-          matching: find.byType(Container),
-        )
+        .ancestor(of: find.text('상록수역 1번 출구 엘리베이터'), matching: find.byType(Ink))
         .first;
     final notificationDecoration =
-        tester.widget<Container>(notificationRow).decoration! as BoxDecoration;
+        tester.widget<Ink>(notificationRow).decoration! as BoxDecoration;
     expect(
       notificationDecoration.color,
       EasySubwayAccessibleColors.statusInfoSurface,

@@ -313,7 +313,7 @@ class _NotificationInboxRow extends StatelessWidget {
     }
 
     final accent = _facilitySeverityAccent(item.severity);
-    final row = Container(
+    final row = Ink(
       padding: const EdgeInsets.symmetric(vertical: 14),
       decoration: BoxDecoration(
         color: accent.backgroundColor,
