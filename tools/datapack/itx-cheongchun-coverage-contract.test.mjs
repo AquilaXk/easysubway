@@ -337,14 +337,10 @@ test("ITX-청춘 admission pin은 historical source를 보존하고 readmission 
     "./itx-cheongchun-topology-evidence.json",
     import.meta.url,
   ), "utf8"));
-  const sourceArtifact = JSON.parse(await readFile(new URL(
-    `../../${contract.sourceTimetableArtifact.artifactPath}`,
-    import.meta.url,
-  ), "utf8"));
   assert.deepEqual(contract.officialEvidence.korailCompletenessAdmission.canonicalPackIdentity, {
     id: "capital",
     sourceIssue: 2097,
-    sha256: sourceArtifact.canonicalPackIdentity.sha256,
+    sha256: "f91ccbba0dda86809355dc6b2eb686faaa6a72e88c06825be3ffe64a43139673",
     sqliteSha256: "b550b351daa17c5ddc3172bc4229f06a8834a92b3d4835ceb06d2ebaf748bce7",
   });
   assert.equal(topologyEvidence.sourceIssue, 2135);
