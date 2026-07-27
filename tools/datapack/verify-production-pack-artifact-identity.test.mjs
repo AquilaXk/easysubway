@@ -179,6 +179,24 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
     candidate.networkEdgeEvidence.itxCoverageContract = { path: contractPath, sha256: sha256(bytes) };
     await runRejectedBuild(candidate, pattern);
   };
+  const runRejectedCompletenessBuild = async (label, mutate, pattern) => {
+    const contract = JSON.parse(await readFile("tools/datapack/itx-cheongchun-coverage-contract.json", "utf8"));
+    const completeness = JSON.parse(await readFile(contract.sourceTimetableArtifact.completenessEvidencePath, "utf8"));
+    mutate(completeness);
+    const { evidenceHash: ignored, ...withoutEvidenceHash } = completeness;
+    completeness.evidenceHash = sha256(Buffer.from(JSON.stringify(withoutEvidenceHash)));
+    const completenessBytes = Buffer.from(`${JSON.stringify(completeness, null, 2)}\n`);
+    const completenessPath = path.join(workspace, `${label}-completeness.json`);
+    await writeFile(completenessPath, completenessBytes);
+    contract.sourceTimetableArtifact.completenessEvidencePath = completenessPath;
+    contract.sourceTimetableArtifact.completenessEvidenceSha256 = sha256(completenessBytes);
+    const contractBytes = Buffer.from(`${JSON.stringify(contract, null, 2)}\n`);
+    const contractPath = path.join(workspace, `${label}-contract.json`);
+    await writeFile(contractPath, contractBytes);
+    const candidate = structuredClone(spec);
+    candidate.networkEdgeEvidence.itxCoverageContract = { path: contractPath, sha256: sha256(contractBytes) };
+    await runRejectedBuild(candidate, pattern);
+  };
   try {
     const missingEvidence = structuredClone(spec);
     delete missingEvidence.networkEdgeEvidence;
@@ -187,6 +205,19 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
     const tampered = structuredClone(spec);
     tampered.networkEdgeEvidence.sourceInventory.sha256 = "f".repeat(64);
     await runRejectedBuild(tampered, /sourceInventory\.sha256 must match tracked input bytes/);
+
+    const overclaimedTopology = JSON.parse(await readFile(
+      "tools/datapack/sources/capital-route-topology-20260724.json",
+      "utf8",
+    ));
+    overclaimedTopology.fieldsProvided.push("duration_seconds");
+    const overclaimedTopologyBytes = Buffer.from(`${JSON.stringify(overclaimedTopology)}\n`);
+    const overclaimedTopologyPath = path.join(workspace, "overclaimed-capital-topology.json");
+    await writeFile(overclaimedTopologyPath, overclaimedTopologyBytes);
+    const overclaimed = structuredClone(spec);
+    overclaimed.networkEdgeEvidence.capitalTopology.path = overclaimedTopologyPath;
+    overclaimed.networkEdgeEvidence.capitalTopology.sha256 = sha256(overclaimedTopologyBytes);
+    await runRejectedBuild(overclaimed, /capital topology fieldsProvided is invalid/);
 
     const ungovernedInventory = JSON.parse(await readFile("tools/datapack/source-inventory.json", "utf8"));
     ungovernedInventory.reviewProbe = true;
@@ -271,6 +302,14 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
     await runRejectedContractBuild("allowed-itx-claim", (contract) => {
       contract.claimGate.supportClaimAllowed = true;
     }, /ITX network edge claim boundary is invalid/);
+
+    await runRejectedCompletenessBuild("missing-itx-nested-admission", (completeness) => {
+      completeness.sourceTimetableArtifact.status = "MISSING";
+    }, /ITX network edge admission evidence mismatch/);
+
+    await runRejectedCompletenessBuild("drifted-itx-service-dates", (completeness) => {
+      completeness.selectedServiceDates["7"] = "20260808";
+    }, /ITX network edge admission evidence mismatch/);
 
     const preverifiedFixture = JSON.parse(await readFile(
       "tools/datapack/release/capital-production-canonical-pack.json",
