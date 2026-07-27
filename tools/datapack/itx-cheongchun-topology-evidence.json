@@ -28,10 +28,10 @@
     "inputSha256": "7bb4bb68f0642e45377d98b083e93cd8c1c92aaa58dd353f32189e3f325a1562",
     "inputSqliteSha256": "ed84a649952cd2ccbb238b3a63265f2bd3144497ae8fd36fab5181ad776542fc",
     "inputByteSize": 359319,
-    "outputSha256": "213c824f2801860b58aabe57a3c401ce52e508a0a0a06501127be61c4523f829",
-    "outputSqliteSha256": "bcc7dbedfa7a275956e9f565f296992d2907b89afe110d9216edb59b0b8765db",
-    "byteSize": 1466134,
-    "byteSizeDelta": 1106815
+    "outputSha256": "a5e7d41a16eba4ccc8ff37fdd57a2b3cc6db49bb816cfa05dfbdda1634f4ea9b",
+    "outputSqliteSha256": "526a1edddaf160b5e3eab51f060c5145a1a704f5b6a3726498a6d964e020c378",
+    "byteSize": 1466420,
+    "byteSizeDelta": 1107101
   },
   "readmissions": [
     {
@@ -1950,6 +1950,37 @@
           "rowsRemoved": 0,
           "rowsAdded": 0,
           "rowsChanged": 652
+        }
+      ]
+    },
+    {
+      "readmittedAt": "2026-07-27T21:44:09.199Z",
+      "provenance": "#2649 exact topology edge admission freshness and provenance review",
+      "previousPack": {
+        "sha256": "213c824f2801860b58aabe57a3c401ce52e508a0a0a06501127be61c4523f829",
+        "sqliteSha256": "bcc7dbedfa7a275956e9f565f296992d2907b89afe110d9216edb59b0b8765db",
+        "byteSize": 1466134
+      },
+      "newPack": {
+        "sha256": "a5e7d41a16eba4ccc8ff37fdd57a2b3cc6db49bb816cfa05dfbdda1634f4ea9b",
+        "sqliteSha256": "526a1edddaf160b5e3eab51f060c5145a1a704f5b6a3726498a6d964e020c378",
+        "byteSize": 1466420
+      },
+      "byteSizeDelta": 286,
+      "itxSubgraph": {
+        "unchanged": true,
+        "edgeCount": 48,
+        "edgesSha256": "e09f9ece35f261b0690753b9c88749d2e460c79e889bea045fb44a46bae78709",
+        "evidenceSha256": "a4834c3638dd45500292f67bd39e5a8ff9660162e1ffa2a78359c5d645b74996"
+      },
+      "rowDiff": [
+        {
+          "table": "network_edges",
+          "previousRowCount": 2178,
+          "newRowCount": 2178,
+          "rowsRemoved": 0,
+          "rowsAdded": 0,
+          "rowsChanged": 604
         }
       ]
     }
