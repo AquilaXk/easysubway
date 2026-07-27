@@ -572,6 +572,22 @@ test("v16 bundled pack 변환은 ITX topology 외 timetable·calendar·fare row�
       ALTER TABLE ${table}_v16 RENAME TO ${table};
     `);
   }
+  inputDatabase.exec(`
+    CREATE INDEX idx_transit_trips_route_service_pattern
+      ON transit_trips(route_id, service_id, service_pattern);
+    CREATE INDEX idx_network_edges_from_node ON network_edges(from_node_id);
+  `);
+  assert.deepEqual(inputDatabase.prepare(`
+    SELECT name FROM sqlite_schema
+    WHERE type = 'index' AND name IN (
+      'idx_network_edges_from_node',
+      'idx_transit_trips_route_service_pattern'
+    )
+    ORDER BY name
+  `).all().map(({ name }) => name), [
+    "idx_network_edges_from_node",
+    "idx_transit_trips_route_service_pattern",
+  ]);
   inputDatabase.exec("PRAGMA foreign_keys = ON");
   assert.deepEqual(inputDatabase.prepare("PRAGMA foreign_key_check").all(), []);
   inputDatabase.exec("PRAGMA user_version = 16");
