@@ -32,8 +32,10 @@ test("production build와 bundled asset/index의 artifact identity를 exact-matc
       "--output", baselineDir,
     ], { cwd: root, env });
     const manifest = JSON.parse(await readFile(path.join(baselineDir, "current.json"), "utf8"));
+    const buildSpec = JSON.parse(await readFile("tools/datapack/release/candidate-build-spec.json", "utf8"));
     const hashEvidence = JSON.parse(await readFile("tools/datapack/release/hash-evidence.json", "utf8"));
-    const canonicalFixtureBytes = await readFile(hashEvidence.fixturePath.value);
+    assert.equal(hashEvidence.fixturePath.value, buildSpec.fixturePath);
+    const canonicalFixtureBytes = await readFile(buildSpec.fixturePath);
     assert.equal(hashEvidence.fixturePath.sha256, sha256(canonicalFixtureBytes));
     const bundledIndex = JSON.parse(await readFile(
       path.join(root, "apps/mobile/assets/datapacks/index.json"),
