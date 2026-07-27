@@ -4,8 +4,10 @@ import { generateKeyPairSync } from "node:crypto";
 import { copyFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { promisify } from "node:util";
 import test from "node:test";
+import { gunzipSync } from "node:zlib";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
@@ -31,6 +33,20 @@ test("production build와 bundled asset/index의 artifact identity를 exact-matc
     const manifest = JSON.parse(await readFile(path.join(baselineDir, "current.json"), "utf8"));
     const pack = manifest.packs.find(({ id }) => id === "capital");
     await copyFile(path.join(baselineDir, "catalog/capital-v1.sqlite.gz"), assetPath);
+    const gzipBytes = await readFile(assetPath);
+    assert.equal(gzipBytes[9], 255);
+    const sqliteBytes = gunzipSync(gzipBytes);
+    assert.equal(sqliteBytes.readUInt32BE(96), 3_053_000);
+    const sqlitePath = path.join(workspace, "capital.sqlite");
+    await writeFile(sqlitePath, sqliteBytes);
+    const database = new DatabaseSync(sqlitePath, { readOnly: true });
+    try {
+      assert.deepEqual(database.prepare(
+        "SELECT name FROM sqlite_schema WHERE name LIKE 'sqlite_stat%' ORDER BY name",
+      ).all(), []);
+    } finally {
+      database.close();
+    }
     await writeFile(indexPath, `${JSON.stringify({ packs: [{
       id: "capital",
       sha256: pack.sha256,

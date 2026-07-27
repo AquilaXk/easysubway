@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
 import { mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
-import { gunzipSync, gzipSync } from "node:zlib";
+import { constants as zlibConstants, gunzipSync, gzipSync } from "node:zlib";
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import { tmpdir } from "node:os";
@@ -23,6 +23,7 @@ import {
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
 
 const root = path.resolve(import.meta.dirname, "../..");
+const canonicalSqliteHeaderVersion = 3_053_000;
 const validatedItxAdmissionPacks = new WeakSet();
 const validatedItxAdmissionOutputs = new WeakMap();
 const originalItxAdmissionOutput = Object.freeze({
@@ -86,7 +87,12 @@ async function main() {
     buildSqlitePack(sqlitePath, schema, pack, officialOdFareAdmissions);
 
     const sqliteBytes = await readFile(sqlitePath);
-    const compressedBytes = gzipSync(sqliteBytes, { level: 9, mtime: 0 });
+    // ponytail: offset 96 is informational and otherwise records the platform SQLite patch version.
+    sqliteBytes.writeUInt32BE(canonicalSqliteHeaderVersion, 96);
+    await writeFile(sqlitePath, sqliteBytes);
+    // ponytail: Z_RLE is stable across supported zlib versions; byte 9 removes the platform OS marker.
+    const compressedBytes = gzipSync(sqliteBytes, { level: 9, mtime: 0, strategy: zlibConstants.Z_RLE });
+    compressedBytes[9] = 255;
     await writeFile(compressedPath, compressedBytes);
     const compressedSha256 = sha256(compressedBytes);
     const sqliteSha256 = sha256(sqliteBytes);
@@ -2211,7 +2217,8 @@ function buildSqlitePack(sqlitePath, schema, pack, officialOdFareAdmissions) {
         ],
       );
       database.exec("COMMIT");
-      vacuum(database);
+      // ponytail: ANALYZE/optimize statistics differ across SQLite builds; the release artifact must not embed them.
+      database.exec("VACUUM");
     } catch (error) {
       database.exec("ROLLBACK");
       throw error;
@@ -2278,11 +2285,6 @@ function insertRows(database, table, columns, rows, mapRow) {
   for (const row of rows ?? []) {
     statement.run(...mapRow(row));
   }
-}
-
-function vacuum(database) {
-  database.exec("PRAGMA optimize");
-  database.exec("VACUUM");
 }
 
 function validateFixture(fixture) {
