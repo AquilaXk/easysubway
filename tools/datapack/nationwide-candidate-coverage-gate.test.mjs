@@ -3052,6 +3052,18 @@ test("actual line-scope 선언은 source/domain, lineIds, requirementKeys가 정
   }
 });
 
+test("actual line-scope 새 candidate의 동수 key 불일치도 transition reason을 남긴다", () => {
+  const fixture = lineScopeExactMatchFixture("new-candidate", "schedule_timetable");
+  fixture.spec.lineScopeRedescriptions[0].sourceId = "declared-other-source";
+
+  assert.throws(
+    () => assertLineScopeRedescriptionsMatchActualRequiredSet(
+      fixture.spec, fixture.pack, fixture.inventory, fixture.targets,
+    ),
+    /line-scope redescriptions must exactly match the actual required set: .*NEW_CANDIDATE_SCOPE:new-candidate/,
+  );
+});
+
 test("inactive scope와 LAUNCH_REQUIRED가 아닌 domain은 actual line-scope set에서 제외한다", () => {
   const inactive = lineScopeExactMatchFixture("inactive", "schedule_timetable");
   inactive.spec.lineScopeRedescriptions = [];
@@ -3101,6 +3113,24 @@ test("승계 pack line scope의 부분 확장은 명시 재기술 없이 거부�
       fixture.spec, fixture.pack, fixture.inventory, fixture.targets, fixture.inheritedPack,
     ),
     /UNDECLARED_INHERITED_SCOPE_EXTENSION: inherited-extension/,
+  );
+});
+
+test("승계 pack line scope의 축소는 빈 candidate와 inventory여도 거부된다", () => {
+  const fixture = lineScopeExactMatchFixture("inherited-shrink", "schedule_timetable");
+  fixture.spec.lineScopeRedescriptions = [];
+  fixture.pack.sourceInventory[0].coverageScope = structuredClone(
+    fixture.inventory.sources[0].coverageScope,
+  );
+  fixture.inheritedPack.sourceInventory = structuredClone(fixture.pack.sourceInventory);
+  fixture.pack.sourceInventory[0].coverageScope.lineIds = [];
+  fixture.inventory.sources[0].coverageScope.lineIds = [];
+
+  assert.throws(
+    () => assertLineScopeRedescriptionsMatchActualRequiredSet(
+      fixture.spec, fixture.pack, fixture.inventory, fixture.targets, fixture.inheritedPack,
+    ),
+    /inherited candidate pack coverageScope\.lineIds must match candidate pack and source inventory: inherited-shrink/,
   );
 });
 

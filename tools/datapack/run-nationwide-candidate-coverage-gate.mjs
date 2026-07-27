@@ -1427,13 +1427,18 @@ export function assertLineScopeRedescriptionsMatchActualRequiredSet(
       continue;
     }
     const inventoryScope = inventorySource.coverageScope;
+    const inheritedLineIds = inheritedById.get(sourceId)?.coverageScope?.lineIds;
     if (!inventoryScope?.lineIds?.length) {
+      if (inheritedLineIds?.length) {
+        throw new Error(
+          `inherited candidate pack coverageScope.lineIds must match candidate pack and source inventory: ${sourceId}`,
+        );
+      }
       if (packScope?.lineIds?.length) {
         throw new Error(`candidate pack coverageScope.lineIds must match source inventory: ${sourceId}`);
       }
       continue;
     }
-    const inheritedLineIds = inheritedById.get(sourceId)?.coverageScope?.lineIds;
     const transition = classifyLineScopeTransition(
       inheritedLineIds,
       packScope?.lineIds,
@@ -1504,13 +1509,16 @@ export function assertLineScopeRedescriptionsMatchActualRequiredSet(
     if (!launchRequiredDomains.has(redescription.sourceDomain)) continue;
     declared.set(key, redescription);
   }
+  const transitionDiagnostics = newCandidateSourceIds
+    .map((sourceId) => `NEW_CANDIDATE_SCOPE:${sourceId}`)
+    .join(",");
 
   if (actual.size !== declared.size) {
     throw new Error(
       "line-scope redescriptions must exactly match the actual required set: "
         + `actual=${[...actual.keys()].sort(codepointCompare).join(",")}, `
         + `declared=${[...declared.keys()].sort(codepointCompare).join(",")}, `
-        + `transitions=${newCandidateSourceIds.map((sourceId) => `NEW_CANDIDATE_SCOPE:${sourceId}`).join(",")}`,
+        + `transitions=${transitionDiagnostics}`,
     );
   }
   for (const [key, required] of actual) {
@@ -1518,7 +1526,10 @@ export function assertLineScopeRedescriptionsMatchActualRequiredSet(
     if (!redescription
       || !sameStringSet(redescription.lineIds, required.lineIds)
       || !sameStringSet(redescription.requirementKeys, required.requirementKeys)) {
-      throw new Error(`line-scope redescriptions must exactly match the actual required set: ${key}`);
+      throw new Error(
+        `line-scope redescriptions must exactly match the actual required set: ${key}, `
+          + `transitions=${transitionDiagnostics}`,
+      );
     }
   }
 }
