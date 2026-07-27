@@ -146,7 +146,6 @@ function requiredSource(inventory, snapshot, snapshotSha256, now) {
   if (!/^[a-f0-9]{64}$/.test(snapshotSha256 ?? "") || evidence?.snapshotSha256 !== snapshotSha256) {
     throw new Error("Seoul route map snapshot byte identity mismatch");
   }
-  const observedNow = now instanceof Date ? now.getTime() : Number.NaN;
   if (source?.productionUseAllowed !== true || source.license?.redistributionAllowed !== true
     || source.license?.type !== "PUBLIC_DATA_FREE_USE"
     || source.license.commercialUseAllowed !== true || source.license.derivativeWorkAllowed !== true
@@ -170,8 +169,7 @@ function requiredSource(inventory, snapshot, snapshotSha256, now) {
       lineIds: [...LINE_IDS],
       sourceDomains: ["route_map_positions"],
     })
-    || JSON.stringify(source.fieldsProvided) !== JSON.stringify(snapshot.fieldsProvided)
-    || !Number.isFinite(observedNow) || observedNow < Date.parse(snapshot.capturedAt)) {
+    || JSON.stringify(source.fieldsProvided) !== JSON.stringify(snapshot.fieldsProvided)) {
     throw new Error(`${SOURCE_ID} inventory evidence does not match snapshot`);
   }
   assertRouteMapAdmissionFreshness(evidence, now, SOURCE_ID);
