@@ -8,6 +8,7 @@ import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
 import { promisify } from "node:util";
 import { gunzipSync, gzipSync } from "node:zlib";
+import { isUnchangedRefresh } from "./apply-itx-topology-to-bundled-pack.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
@@ -255,6 +256,18 @@ test("tracked production ITX topology evidence와 bundled pack은 --check를 통
     "tools/datapack/apply-itx-topology-to-bundled-pack.mjs",
     "--check",
   ], { cwd: root, env: freshBuildEnv });
+});
+
+test("UNCHANGED_AUTO historical fallback은 immediate previous source 변경을 거부한다", async () => {
+  const contract = JSON.parse(await readFile(
+    path.join(root, "tools/datapack/itx-cheongchun-coverage-contract.json"), "utf8"));
+  const source = JSON.parse(await readFile(
+    path.join(root, contract.sourceTimetableArtifact.artifactPath), "utf8"));
+  const previous = JSON.parse(await readFile(
+    path.join(root, contract.sourceTimetableArtifact.promotion.previousArtifactPath), "utf8"));
+  previous.normalizedSnapshotSets[0].sets.stationSet.push("station-diverged-from-current");
+
+  assert.equal(isUnchangedRefresh(contract.sourceTimetableArtifact, source, previous), false);
 });
 
 test("--check는 hash가 갱신된 bundled pack의 foreign key 손상도 거부한다", async (context) => {

@@ -4,6 +4,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { pathToFileURL } from "node:url";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
 
@@ -133,26 +134,37 @@ function assertCanonicalInputIdentity(contract, source, gzipSha256, sqliteSha256
   }
 }
 
-function isUnchangedRefresh(reference, source) {
+export function isUnchangedRefresh(reference, source, previous) {
   const promotion = reference?.promotion;
   const snapshotDiff = source?.snapshotDiff;
   const setNames = ["stationSet", "odSet", "trainSet", "stopSequenceSet", "timetableTupleSet"];
-  return promotion?.mode === "UNCHANGED_AUTO"
-    && promotion.previousArtifactSha256 === snapshotDiff?.previousArtifactSha256
-    && /^tools\/datapack\/sources\/itx-cheongchun-source-timetable-\d+\.json$/.test(
-      promotion.previousArtifactPath ?? "",
-    )
-    && promotion.approvalUrl === null
-    && promotion.approvedArtifactSha256 === null
-    && source?.promotionStatus === "SUPPORTED"
-    && snapshotDiff?.status === "SUPPORTED"
-    && Array.isArray(snapshotDiff.serviceDays)
-    && snapshotDiff.serviceDays.length > 0
-    && snapshotDiff.serviceDays.every((day) => day?.blocked === false
-      && setNames.every((name) => Array.isArray(day.sets?.[name]?.added)
-        && day.sets[name].added.length === 0
-        && Array.isArray(day.sets[name].removed)
-        && day.sets[name].removed.length === 0));
+  const previousMatch = /^tools\/datapack\/sources\/(itx-cheongchun-source-timetable-\d+)\.json$/.exec(
+    promotion?.previousArtifactPath ?? "",
+  );
+  try {
+    return promotion?.mode === "UNCHANGED_AUTO"
+      && promotion.previousArtifactSha256 === snapshotDiff?.previousArtifactSha256
+      && previousMatch !== null
+      && promotion.approvalUrl === null
+      && promotion.approvedArtifactSha256 === null
+      && source?.promotionStatus === "SUPPORTED"
+      && previous?.schemaVersion === 1
+      && previous.artifactKind === "itx-cheongchun-source-timetable"
+      && previous.artifactId === previousMatch[1]
+      && previous.serviceId === "ITX_CHEONGCHUN"
+      && JSON.stringify(source.normalizedSnapshotSets) === JSON.stringify(previous.normalizedSnapshotSets)
+      && deriveTopology(source).sha256 === deriveTopology(previous).sha256
+      && snapshotDiff?.status === "SUPPORTED"
+      && Array.isArray(snapshotDiff.serviceDays)
+      && snapshotDiff.serviceDays.length > 0
+      && snapshotDiff.serviceDays.every((day) => day?.blocked === false
+        && setNames.every((name) => Array.isArray(day.sets?.[name]?.added)
+          && day.sets[name].added.length === 0
+          && Array.isArray(day.sets[name].removed)
+          && day.sets[name].removed.length === 0));
+  } catch {
+    return false;
+  }
 }
 
 async function admittedTopologySource(reference, source, evidence, contractPath) {
@@ -169,17 +181,20 @@ async function admittedTopologySource(reference, source, evidence, contractPath)
   const historicalSha256 = evidence?.sourceArtifact?.sha256;
   const historicalId = evidence?.sourceArtifact?.id;
   const historicalAdmission = ADMITTED_CANONICAL_INPUTS.get(historicalSha256);
-  if (!isUnchangedRefresh(reference, source)
+  const previousPath = reference?.promotion?.previousArtifactPath;
+  if (!/^tools\/datapack\/sources\/itx-cheongchun-source-timetable-\d+\.json$/.test(previousPath ?? "")
     || !/^itx-cheongchun-source-timetable-\d+$/.test(historicalId ?? "")
     || historicalAdmission == null) {
     throw new Error("ITX topology production source identity is not admitted");
   }
-  const previousBytes = await readFile(repositoryPath(reference.promotion.previousArtifactPath));
+  const previousBytes = await readFile(repositoryPath(previousPath));
   const historicalBytes = await readFile(repositoryPath(
     `tools/datapack/sources/${historicalId}.json`,
   ));
+  const previous = JSON.parse(previousBytes);
   const historical = JSON.parse(historicalBytes);
   if (sha256(previousBytes) !== reference.promotion.previousArtifactSha256
+    || !isUnchangedRefresh(reference, source, previous)
     || sha256(historicalBytes) !== historicalSha256
     || historical?.schemaVersion !== 1
     || historical?.artifactKind !== "itx-cheongchun-source-timetable"
@@ -655,7 +670,9 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-  process.exitCode = 1;
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    process.exitCode = 1;
+  });
+}
