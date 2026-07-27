@@ -114,8 +114,12 @@ input:focus-visible {
 	border-radius: 0;
 	border-left-color: var(--admin-accent);
 	background: var(--admin-sidebar-accent);
-	color: var(--admin-ink);
+	color: var(--admin-accent-ink);
 	font-weight: var(--admin-w-strong);
+}
+
+.nav-link:hover:focus-visible {
+	outline-color: var(--admin-focus-on-signature);
 }
 
 .nav-link.active:focus-visible {

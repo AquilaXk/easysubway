@@ -186,6 +186,14 @@ class AdminDesignGuardTest {
 			.contains("outline-color: var(--admin-focus-on-signature);");
 		assertThat(rule(read(CSS_OPERATOR), "\\.nav-link\\.active:focus-visible"))
 			.contains("outline-color: var(--admin-focus-on-signature);");
+		assertThat(rule(read(CSS_SHELL), "\\.admin-nav-item\\.is-active"))
+			.contains("color: var(--admin-accent-ink);");
+		assertThat(rule(read(CSS_OPERATOR), "\\.nav-link\\.active"))
+			.contains("color: var(--admin-accent-ink);");
+		assertThat(rule(read(CSS_SHELL), "\\.admin-nav-item:hover:focus-visible"))
+			.contains("outline-color: var(--admin-focus-on-signature);");
+		assertThat(rule(read(CSS_OPERATOR), "\\.nav-link:hover:focus-visible"))
+			.contains("outline-color: var(--admin-focus-on-signature);");
 		assertThat(read(CSS_COMPONENTS)).contains("color: var(--admin-on-primary);");
 		assertThat(read(CSS_OPERATOR)).contains("color: var(--admin-on-primary);");
 
