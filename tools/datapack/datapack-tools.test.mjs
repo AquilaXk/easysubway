@@ -8802,7 +8802,7 @@ test("전국 coverage target은 공식 snapshot의 현재 catalog 노선과 정�
         coverageContract: "tools/datapack/itx-cheongchun-coverage-contract.json",
         coverageStates: {
           station_line_membership: "SUPPORTED",
-          route_graph_topology: "MISSING",
+          route_graph_topology: "SUPPORTED",
           schedule_timetable: "MISSING",
         },
         supportClaimAllowed: false,

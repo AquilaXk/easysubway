@@ -749,11 +749,13 @@ async function admittedItxNetworkEdgeEvidence(contract, topologyEvidence) {
   if (contract?.schemaVersion !== 2
     || contract.artifactKind !== "itx-cheongchun-coverage-contract"
     || contract.serviceId !== "ITX_CHEONGCHUN"
+    || contract.coverageStates?.route_graph_topology !== "SUPPORTED"
+    || !contract.allowedConsumerIssues?.includes("#2649")
     || reference?.status !== "ADMITTED"
     || reference.admissionEligible !== true
     || reference.promotion?.mode !== "UNCHANGED_AUTO"
     || topologyEvidence?.sourceArtifact?.sha256 !== reference.promotion.previousArtifactSha256) {
-    throw new Error("ITX network edge admission identity is invalid");
+    throw new Error("ITX network edge topology is not admitted for #2649");
   }
   const sourceBytes = await readFile(await resolveBuildInputPath(
     reference.artifactPath,

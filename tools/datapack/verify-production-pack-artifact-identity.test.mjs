@@ -158,6 +158,16 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
       "--output", outputDir,
     ], { cwd: root, env }), pattern);
   };
+  const runRejectedContractBuild = async (label, mutate, pattern) => {
+    const contract = JSON.parse(await readFile("tools/datapack/itx-cheongchun-coverage-contract.json", "utf8"));
+    mutate(contract);
+    const bytes = Buffer.from(`${JSON.stringify(contract, null, 2)}\n`);
+    const contractPath = path.join(workspace, `${label}.json`);
+    await writeFile(contractPath, bytes);
+    const candidate = structuredClone(spec);
+    candidate.networkEdgeEvidence.itxCoverageContract = { path: contractPath, sha256: sha256(bytes) };
+    await runRejectedBuild(candidate, pattern);
+  };
   try {
     const missingEvidence = structuredClone(spec);
     delete missingEvidence.networkEdgeEvidence;
@@ -207,6 +217,16 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
       freshUntil: "2026-07-27T21:38:30.000Z",
     };
     await runRejectedBuild(staleEdgeAdmission, /capital topology edge admission is stale/);
+
+    await runRejectedContractBuild("missing-itx-topology-admission", (contract) => {
+      contract.coverageStates.route_graph_topology = "MISSING";
+      contract.allowedConsumerIssues.push("#2649");
+    }, /ITX network edge topology is not admitted for #2649/);
+
+    await runRejectedContractBuild("unauthorized-itx-topology-consumer", (contract) => {
+      contract.coverageStates.route_graph_topology = "SUPPORTED";
+      contract.allowedConsumerIssues = contract.allowedConsumerIssues.filter((issue) => issue !== "#2649");
+    }, /ITX network edge topology is not admitted for #2649/);
 
     const partialFixture = JSON.parse(await readFile(
       "tools/datapack/release/capital-production-canonical-pack.json",

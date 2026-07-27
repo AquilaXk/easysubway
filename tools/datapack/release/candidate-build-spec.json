@@ -28,7 +28,7 @@
     },
     "itxCoverageContract": {
       "path": "tools/datapack/itx-cheongchun-coverage-contract.json",
-      "sha256": "1f0cbe4648d30fd44dfda55a0af51c52cb0dd217cb08b9a4f2340a85fc28d67c"
+      "sha256": "8e45ce12b513c5e16109141314d8c5c0390f6621875b18ddd440cc26e8f3a1d5"
     }
   },
   "sourceSnapshotEvidencePath": "tools/datapack/release/source-snapshots.json",
