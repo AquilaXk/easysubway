@@ -3042,30 +3042,27 @@ function lineScopeExactMatchFixture(sourceId, sourceDomain, releaseTier = "LAUNC
   };
 }
 
-function assertLineScopeExactMatch({ spec, pack, inventory, targets }) {
-  return assertLineScopeRedescriptionsMatchActualRequiredSet(spec, pack, inventory, targets);
-}
-
-test("actual line-scope set은 네 source/domain omission을 독립적으로 거부한다", () => {
-  for (const { sourceId, sourceDomain } of [
-    { sourceId: "busan-transportation-timetable", sourceDomain: "schedule_timetable" },
-    { sourceId: "busan-transportation-route-map-positions", sourceDomain: "route_map_positions" },
-    { sourceId: "busan-transportation-accessibility", sourceDomain: "accessibility_facilities" },
-    { sourceId: "daegu-transportation-accessibility", sourceDomain: "accessibility_facilities" },
-  ]) {
+for (const { sourceId, sourceDomain } of [
+  { sourceId: "busan-transportation-timetable", sourceDomain: "schedule_timetable" },
+  { sourceId: "busan-transportation-route-map-positions", sourceDomain: "route_map_positions" },
+  { sourceId: "busan-transportation-accessibility", sourceDomain: "accessibility_facilities" },
+  { sourceId: "daegu-transportation-accessibility", sourceDomain: "accessibility_facilities" },
+]) {
+  test(`${sourceId}/${sourceDomain} omission은 actual line-scope set에서 거부된다`, () => {
     const fixture = lineScopeExactMatchFixture(sourceId, sourceDomain);
     fixture.spec.lineScopeRedescriptions = [];
     assert.throws(
-      () => assertLineScopeExactMatch(fixture),
+      () => assertLineScopeRedescriptionsMatchActualRequiredSet(fixture.spec, fixture.pack, fixture.inventory, fixture.targets),
       /line-scope redescriptions must exactly match the actual required set/,
-      `${sourceId}/${sourceDomain}`,
     );
-  }
-});
+  });
+}
 
 test("actual line-scope 선언은 source/domain, lineIds, requirementKeys가 정확히 일치해야 한다", () => {
   const valid = lineScopeExactMatchFixture("source", "schedule_timetable");
-  assert.doesNotThrow(() => assertLineScopeExactMatch(valid));
+  assert.doesNotThrow(() => assertLineScopeRedescriptionsMatchActualRequiredSet(
+    valid.spec, valid.pack, valid.inventory, valid.targets,
+  ));
 
   for (const [label, mutate, expected] of [
     [
@@ -3093,7 +3090,13 @@ test("actual line-scope 선언은 source/domain, lineIds, requirementKeys가 정
   ]) {
     const fixture = structuredClone(valid);
     mutate(fixture);
-    assert.throws(() => assertLineScopeExactMatch(fixture), expected, label);
+    assert.throws(
+      () => assertLineScopeRedescriptionsMatchActualRequiredSet(
+        fixture.spec, fixture.pack, fixture.inventory, fixture.targets,
+      ),
+      expected,
+      label,
+    );
   }
 });
 
@@ -3101,11 +3104,15 @@ test("inactive scope와 LAUNCH_REQUIRED가 아닌 domain은 actual line-scope se
   const inactive = lineScopeExactMatchFixture("inactive", "schedule_timetable");
   inactive.spec.lineScopeRedescriptions = [];
   inactive.targets.activeLineScopes = [];
-  assert.doesNotThrow(() => assertLineScopeExactMatch(inactive));
+  assert.doesNotThrow(() => assertLineScopeRedescriptionsMatchActualRequiredSet(
+    inactive.spec, inactive.pack, inactive.inventory, inactive.targets,
+  ));
 
   const enhancement = lineScopeExactMatchFixture("enhancement", "schedule_timetable", "ENHANCEMENT");
   enhancement.spec.lineScopeRedescriptions = [];
-  assert.doesNotThrow(() => assertLineScopeExactMatch(enhancement));
+  assert.doesNotThrow(() => assertLineScopeRedescriptionsMatchActualRequiredSet(
+    enhancement.spec, enhancement.pack, enhancement.inventory, enhancement.targets,
+  ));
 });
 
 test("pack-only lineIds와 inventory 누락 lineIds는 fail closed다", () => {
@@ -3113,15 +3120,15 @@ test("pack-only lineIds와 inventory 누락 lineIds는 fail closed다", () => {
     lineIds: ["line"], sourceDomains: ["schedule_timetable"], regionIds: ["region"], operatorIds: ["operator"],
   };
   assert.throws(
-    () => assertLineScopeExactMatch({
-      spec: { lineScopeRedescriptions: [] },
-      pack: { sourceInventory: [{ id: "pack-only", coverageScope }] },
-      inventory: { sources: [{ id: "pack-only", coverageScope: { ...coverageScope, lineIds: [] } }] },
-      targets: {
+    () => assertLineScopeRedescriptionsMatchActualRequiredSet(
+      { lineScopeRedescriptions: [] },
+      { sourceInventory: [{ id: "pack-only", coverageScope }] },
+      { sources: [{ id: "pack-only", coverageScope: { ...coverageScope, lineIds: [] } }] },
+      {
         requiredSourceDomains: [{ id: "schedule_timetable", releaseTier: "LAUNCH_REQUIRED" }],
         activeLineScopes: [{ regionId: "region", operatorId: "operator", lineId: "line" }],
       },
-    }),
+    ),
     /candidate pack coverageScope\.lineIds must match source inventory: pack-only/,
   );
 });
