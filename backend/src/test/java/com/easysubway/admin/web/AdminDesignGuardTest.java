@@ -203,6 +203,9 @@ class AdminDesignGuardTest {
 			.contains("border-left-color: var(--admin-sidebar-accent-border);");
 		assertThat(rule(read(CSS_OPERATOR), "\\.nav-link\\.active"))
 			.contains("border-left-color: var(--admin-sidebar-accent-border);");
+		assertThat(rule(read(CSS_DATA),
+			"\\.admin-v3 \\.timeline \\.timeline-current \\.timeline-time"))
+			.contains("color: var(--admin-ink-2);");
 		assertThat(read(CSS_COMPONENTS)).contains("color: var(--admin-on-primary);");
 		assertThat(read(CSS_OPERATOR)).contains("color: var(--admin-on-primary);");
 
