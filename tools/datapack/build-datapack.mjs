@@ -22,6 +22,10 @@ import {
 } from "./lib/official-od-fare-evidence.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
 import { normalizeStationName } from "./collect-capital-route-topology.mjs";
+import {
+  validateSourceCandidateSchema,
+  validateSourceFreshness,
+} from "./collect-korail-itx-cheongchun-timetable.mjs";
 import { loadCapitalRouteTopologySnapshot } from "./apply-capital-route-topology-to-bundled-pack.mjs";
 import { isUnchangedRefresh } from "./apply-itx-topology-to-bundled-pack.mjs";
 
@@ -641,7 +645,7 @@ function materializeCapitalTopologySource(pack, topology, admissions) {
     licenseStatus: "redistributable",
     redistributionAllowed: topology.license?.redistributionAllowed === true,
     updateFrequency: "snapshot-on-change",
-    updatedAt: [...admissions.values()].map(({ verifiedAt }) => verifiedAt).sort().at(-1),
+    updatedAt: [...admissions.values()].map(({ verifiedAt }) => verifiedAt).sort(compareStrings).at(-1),
     fields: [...topology.fieldsProvided],
     coverageScope: {
       regionIds: ["capital"],
@@ -653,7 +657,7 @@ function materializeCapitalTopologySource(pack, topology, admissions) {
     },
   };
   if (!Array.isArray(pack.sourceInventory)) {
-    throw new Error("network edge evidence requires pack.sourceInventory");
+    throw new TypeError("network edge evidence requires pack.sourceInventory");
   }
   const existing = pack.sourceInventory.find(({ id }) => id === source.id);
   if (existing == null) pack.sourceInventory.push(source);
@@ -670,9 +674,9 @@ function admittedCapitalLineEvidence(sourceInventory, topology, snapshotId, revi
   }
   const topologyLines = new Set(topology.lines.map(({ lineId }) => lineId));
   const admissions = new Map();
-  for (const source of sourceInventory.sources) {
+  for (const source of sourceInventory.sources.filter(({ routeMapAdmissionEvidence }) =>
+    routeMapAdmissionEvidence?.topologySourceId === topology.sourceId)) {
     const evidence = source.routeMapAdmissionEvidence;
-    if (evidence?.topologySourceId !== topology.sourceId) continue;
     if (evidence.topologySnapshotId !== snapshotId
       || evidence.topologyContentSha256 !== topology.contentSha256
       || !Array.isArray(evidence.topologyLineages)
@@ -685,14 +689,7 @@ function admittedCapitalLineEvidence(sourceInventory, topology, snapshotId, revi
       throw new Error(`capital topology admission is stale: ${source.id}`);
     }
     for (const lineage of evidence.topologyLineages) {
-      const lineId = requiredString(lineage.lineId, `${source.id}.routeMapAdmissionEvidence.topologyLineages.lineId`);
-      if (lineage.sourceId !== topology.sourceId
-        || lineage.snapshotId !== snapshotId
-        || lineage.contentSha256 !== topology.contentSha256
-        || !topologyLines.has(lineId)
-        || !evidence.lineIds?.includes(lineId)) {
-        throw new Error(`capital topology line admission mismatch: ${source.id}:${lineId}`);
-      }
+      const lineId = requiredCapitalLineAdmission(source, evidence, lineage, topology, snapshotId, topologyLines);
       const previous = admissions.get(lineId);
       if (previous == null || Date.parse(capturedAt) > Date.parse(previous.verifiedAt)) {
         admissions.set(lineId, { verifiedAt: capturedAt, freshUntil });
@@ -702,6 +699,18 @@ function admittedCapitalLineEvidence(sourceInventory, topology, snapshotId, revi
   if (admissions.size === 0) throw new Error("capital topology has no fresh admitted line evidence");
   for (const [lineId, admission] of admissions) admissions.set(lineId, { ...admission, verifiedAt: reviewedAt });
   return admissions;
+}
+
+function requiredCapitalLineAdmission(source, evidence, lineage, topology, snapshotId, topologyLines) {
+  const lineId = requiredString(lineage.lineId, `${source.id}.routeMapAdmissionEvidence.topologyLineages.lineId`);
+  if (lineage.sourceId !== topology.sourceId
+    || lineage.snapshotId !== snapshotId
+    || lineage.contentSha256 !== topology.contentSha256
+    || !topologyLines.has(lineId)
+    || !evidence.lineIds?.includes(lineId)) {
+    throw new Error(`capital topology line admission mismatch: ${source.id}:${lineId}`);
+  }
+  return lineId;
 }
 
 const capitalStationAliases = Object.freeze({
@@ -738,9 +747,8 @@ function requiredCapitalStationId(stationIds, lineId, stationName) {
 function applyCapitalNetworkEdgeEvidence(pack, topology, snapshotId, admissions) {
   const stationIds = capitalStationIdsByLine(pack);
   const edges = new Map((pack.networkEdges ?? []).map((edge) => [edge.id, edge]));
-  for (const line of topology.lines) {
+  for (const line of topology.lines.filter(({ lineId }) => admissions.has(lineId))) {
     const admission = admissions.get(line.lineId);
-    if (admission == null) continue;
     if (line.edgeCount !== line.edges.length) throw new Error(`capital topology edge count mismatch: ${line.lineId}`);
     for (const sourceEdge of line.edges) {
       const fromStationId = requiredCapitalStationId(stationIds, line.lineId, sourceEdge.fromStationName);
@@ -847,6 +855,12 @@ async function admittedItxNetworkEdgeEvidence(contract, topologyEvidence) {
     || completeness.credentialRedacted !== true
     || completenessEvidenceHash !== sha256(Buffer.from(JSON.stringify(completenessWithoutEvidenceHash)))) {
     throw new Error("ITX network edge admission evidence mismatch");
+  }
+  try {
+    validateSourceCandidateSchema(source);
+    validateSourceFreshness(source, source.selectedServiceDates);
+  } catch (error) {
+    throw new Error("ITX network edge admission evidence mismatch", { cause: error });
   }
   if (!isUnchangedRefresh(reference, source, previous)) {
     throw new Error("ITX network edge unchanged admission is invalid");
