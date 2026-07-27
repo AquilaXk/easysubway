@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "artifactKind": "datapack-build-spec-hash-evidence",
   "issue": 1996,
-  "builderGitSha": "fe748608e74d686b0bbbd926984cb5d13c6d3260",
-  "builderVersion": "build-datapack.mjs@11",
+  "builderGitSha": "9e3b05cc2bd6220981f77850532b8f5ac8d117ee",
+  "builderVersion": "build-datapack.mjs@12",
   "productionScopeId": "capital_pilot_android_v1",
   "truthfulnessRule": "모든 값은 (a) 커밋 데이터에서 결정적 재산출, 또는 (b) #1415·#1992·#1996 admission 실행 산출물의 재생성·검증본에서만 채웠다. 임의 합성값 없음. 사당·상록수 4호선 접근성 상태는 실측 그대로(UNDER_MAINTENANCE/NO_OFFICIAL_FEED) 기록 — 거짓 AVAILABLE 위장 없음.",
   "ledgerHashes": {
@@ -56,7 +56,7 @@
   "fixturePath": {
     "value": "tools/datapack/release/capital-production-canonical-pack.json",
     "sha256": "be9898a8410db60e1e5a21a3c758b6acd9288e6968bdae0cfb474fd9e81c633c",
-    "contract": "#2648에서 배포 중인 capital SQLite 전체를 lossless fixture로 고정하고, fe748608 builder가 전체 ITX readmission chain과 최종 output identity를 검증한다.",
+    "contract": "#2648에서 배포 중인 capital SQLite 전체를 lossless fixture로 고정하고, 9e3b05cc builder가 전체 ITX readmission chain과 최종 output identity를 검증한다.",
     "reproductionCommand": "shasum -a 256 tools/datapack/release/capital-production-canonical-pack.json"
   },
   "identifiers": {
