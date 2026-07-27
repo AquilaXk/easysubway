@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "artifactKind": "datapack-build-spec-hash-evidence",
   "issue": 1996,
-  "builderGitSha": "caefc5024070884997440e147e51ee5a80be8eff",
-  "builderVersion": "build-datapack.mjs@6",
+  "builderGitSha": "b6386a755fa148c531f8ada3b890f2193c0a6687",
+  "builderVersion": "build-datapack.mjs@7",
   "productionScopeId": "capital_pilot_android_v1",
   "truthfulnessRule": "모든 값은 (a) 커밋 데이터에서 결정적 재산출, 또는 (b) #1415·#1992·#1996 admission 실행 산출물의 재생성·검증본에서만 채웠다. 임의 합성값 없음. 사당·상록수 4호선 접근성 상태는 실측 그대로(UNDER_MAINTENANCE/NO_OFFICIAL_FEED) 기록 — 거짓 AVAILABLE 위장 없음.",
   "ledgerHashes": {
