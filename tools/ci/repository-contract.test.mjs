@@ -15721,6 +15721,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const stationExitCard = read(
     "apps/mobile/lib/features/stations/presentation/station_exit_card.dart",
   );
+  const stationExitMapTarget = read(
+    "apps/mobile/lib/features/stations/presentation/station_exit_map_target.dart",
+  );
   const stationDetailHeader = read(
     "apps/mobile/lib/features/stations/presentation/station_detail_header.dart",
   );
@@ -15736,11 +15739,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const stationApiRepository = read(
     "apps/mobile/lib/features/stations/data/station_api_repository.dart",
   );
-  const mapAdapter = read("apps/mobile/lib/map_adapter.dart");
   const externalMapDeeplinkPolicy = readJson(
     "apps/mobile/release/external-map-deeplink-policy.json",
   );
-  const mapAdapterTest = read("apps/mobile/test/map_adapter_test.dart");
   const facilityReport = read("apps/mobile/lib/facility_report.dart");
   const facilityReportTest = read("apps/mobile/test/facility_report_test.dart");
   const notificationSettings = read("apps/mobile/lib/notification_settings.dart");
@@ -15959,17 +15960,10 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(read("apps/mobile/test/station_search_test.dart"), /릴리즈 빌드는 HTTPS API 주소만 사용한다/);
   assert.match(read("apps/mobile/test/station_search_test.dart"), /릴리즈 빌드는 호스트가 없는 API 주소를 거부한다/);
   assert.match(read("apps/mobile/test/station_search_test.dart"), /개발 빌드는 Android 에뮬레이터 로컬 API 주소를 유지한다/);
-  assert.match(mapAdapter, /enum MapProviderType/);
-  assert.match(mapAdapter, /MapProviderType\.kakao => '카카오 지도'/);
-  assert.match(mapAdapter, /const MapProviderConfiguration\.defaults\(\)/);
-  assert.match(mapAdapter, /primary = MapProviderType\.kakao/);
-  assert.doesNotMatch(mapAdapter, /fallbacks/);
-  assert.match(mapAdapter, /abstract interface class MapAdapter/);
-  assert.match(mapAdapter, /class EasySubwayMapAdapter implements MapAdapter/);
-  assert.match(mapAdapter, /markersForStationDetail/);
-  assert.match(mapAdapter, /_coordinateFrom\(station\.latitude, station\.longitude\)/);
-  assert.match(mapAdapter, /_coordinateFrom\(exit\.latitude, exit\.longitude\)/);
-  assert.match(mapAdapter, /_coordinateFrom\(facility\.latitude, facility\.longitude\)/);
+  assert.match(stationExitMapTarget, /final class StationExitMapTarget/);
+  assert.match(stationExitMapTarget, /StationExitMapTarget\? stationExitMapTarget/);
+  assert.match(stationExitMapTarget, /usesStationFallback/);
+  assert.match(stationExitCard, /stationExitMapTarget\(station: station, exit: exit\)/);
   assert.equal(
     externalMapDeeplinkPolicy.schema,
     "easysubway.external_map_deeplink_policy.v1",
@@ -16009,11 +16003,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
     /카카오맵 앱에서는 현재 위치와 출구 좌표를, 웹에서는 출구 좌표만 카카오에 전달합니다/,
   );
   assert.match(widgetTest, /출구 좌표가 없어 역 위치 기준으로 안내합니다/);
-  assert.doesNotMatch(stationSearch, /EasySubwayMapAdapter\(\)\.markersForStationDetail/);
   assert.doesNotMatch(stationSearch, /Text\(\s*'지도 위치 목록'/);
   assert.doesNotMatch(stationSearch, /지도를 열 수 없어도 아래 위치 목록으로 확인할 수 있습니다\./);
-  assert.match(mapAdapterTest, /지도 제공자는 승인된 기본 제공자만 사용한다/);
-  assert.match(mapAdapterTest, /지도 어댑터는 좌표가 있는 역 출구 시설만 쉬운 이름의 마커로 만든다/);
   assert.match(widgetTest, /중복 "지도 위치 목록" 섹션은 제거됐다\(#1497\)\./);
   assert.match(widgetTest, /find\.text\('지도 위치 목록'\), findsNothing/);
   assert.doesNotMatch(widgetTest, /지도를 열 수 없어도 아래 위치 목록으로 확인할 수 있습니다/);
