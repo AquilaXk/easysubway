@@ -53,7 +53,7 @@
         {
           "refreshOn": "operations-contract-change",
           "files": [
-            {"path": "apps/mobile/release/operations-release-evidence.json", "sha256": "7bf61f5129629014aa008a5ab627d63ba9f3ee39c5aae75c26b47de8534e7d4e"},
+            {"path": "apps/mobile/release/operations-release-evidence.json", "sha256": "a5ab66518e4d96680fb28dddf554ca2a54f358df43e9a1b0be4fdb43a760ca3e"},
             {"path": "apps/mobile/release/operations-observability-gate.json", "sha256": "6955ac139fbc57be0721bb955e834164015050f397f2562e4402298578027afe"},
             {"path": "tools/ops/generate-operations-phase-a-summary.mjs", "sha256": "e89a520d6b229c5fd042ef8bcaf74873476c7253cd03b48fac1de21cf55e0c4d"},
             {"path": "tools/ops/validate-operations-release-summary.mjs", "sha256": "474095e635706a442d79e9c21e274e0aa6eb9e992f480783dbc7d16c66a0fc7e"},

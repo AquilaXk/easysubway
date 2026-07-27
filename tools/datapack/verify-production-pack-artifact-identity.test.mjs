@@ -267,6 +267,31 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
     preverified.fixturePath = preverifiedPath;
     await runRejectedBuild(preverified, /production network edge fixture must not contain provenance/);
 
+    const preverifiedTransferFixture = JSON.parse(await readFile(
+      "tools/datapack/release/capital-production-canonical-pack.json",
+      "utf8",
+    ));
+    preverifiedTransferFixture.packs[0].outOfStationTransferLinks = [{
+      id: "review-probe-transfer",
+      fromStationId: "station-00089f8f97de",
+      fromLineId: "line-558d0bd8312d",
+      toStationId: "station-007e4c97db14",
+      toLineId: "line-e9e9a5b520a4",
+      bidirectional: false,
+      sourceId: "capital-route-topology",
+      sourceSnapshotId: "capital-route-topology-20260724",
+      providerRecordHash: "f".repeat(64),
+      provenanceKind: "OFFICIAL_SOURCE",
+      verificationStatus: "VERIFIED",
+      lastVerifiedAt: "2026-07-27T21:38:29.000Z",
+      evidenceHash: "e".repeat(64),
+    }];
+    const preverifiedTransferPath = path.join(workspace, "preverified-transfer-fixture.json");
+    await writeFile(preverifiedTransferPath, `${JSON.stringify(preverifiedTransferFixture)}\n`);
+    const preverifiedTransfer = structuredClone(spec);
+    preverifiedTransfer.fixturePath = preverifiedTransferPath;
+    await runRejectedBuild(preverifiedTransfer, /production network edge fixture must not contain provenance/);
+
     const partialFixture = JSON.parse(await readFile(
       "tools/datapack/release/capital-production-canonical-pack.json",
       "utf8",

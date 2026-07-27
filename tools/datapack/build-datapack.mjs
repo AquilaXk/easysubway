@@ -606,7 +606,7 @@ async function validateAndApplyNetworkEdgeProvenance(buildSpec, fixture, itxTopo
   const productionPacks = fixture.packs?.filter(({ artifactKind }) => artifactKind === "production") ?? [];
   if (productionPacks.length === 0) throw new Error("network edge evidence requires a production pack");
   for (const pack of productionPacks) {
-    if ((pack.networkEdges ?? []).some((edge) =>
+    if ([...(pack.networkEdges ?? []), ...(pack.outOfStationTransferLinks ?? [])].some((edge) =>
       [edge.sourceId, edge.sourceSnapshotId, edge.providerRecordHash, edge.evidenceHash,
         edge.lastVerifiedAt, edge.verifiedAt].some(Boolean)
       || ![undefined, "UNKNOWN"].includes(edge.provenanceKind)
