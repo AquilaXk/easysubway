@@ -252,6 +252,21 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
     stale.sourceInventorySha256 = sha256(Buffer.from(JSON.stringify(staleInventory)));
     await runRejectedBuild(stale, /capital topology admission is stale/);
 
+    const futureInventory = JSON.parse(await readFile("tools/datapack/source-inventory.json", "utf8"));
+    futureInventory.sources.find(({ routeMapAdmissionEvidence }) =>
+      routeMapAdmissionEvidence?.topologySnapshotId === "capital-route-topology-20260724"
+    ).routeMapAdmissionEvidence.capturedAt = "2026-07-27T21:38:30.000Z";
+    const futureInventoryBytes = Buffer.from(`${JSON.stringify(futureInventory, null, 2)}\n`);
+    const futureInventoryPath = path.join(workspace, "future-source-inventory.json");
+    await writeFile(futureInventoryPath, futureInventoryBytes);
+    const futureInventorySpec = structuredClone(spec);
+    futureInventorySpec.networkEdgeEvidence.sourceInventory = {
+      path: futureInventoryPath,
+      sha256: sha256(futureInventoryBytes),
+    };
+    futureInventorySpec.sourceInventorySha256 = sha256(Buffer.from(JSON.stringify(futureInventory)));
+    await runRejectedBuild(futureInventorySpec, /capital topology admission is future-dated/);
+
     const earlyInventory = JSON.parse(await readFile("tools/datapack/source-inventory.json", "utf8"));
     earlyInventory.sources.filter(({ routeMapAdmissionEvidence }) =>
       routeMapAdmissionEvidence?.topologySnapshotId === "capital-route-topology-20260724"
@@ -327,6 +342,8 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
     }, /ITX network edge admission evidence mismatch/);
 
     await runRejectedCompletenessBuild("shifted-itx-service-dates", ({ source, completeness, reference }) => {
+      source.observedAt = "2026-08-03T07:18:53.886Z";
+      completeness.observedAt = source.observedAt;
       source.selectedServiceDates = { "7": "20260808", "8": "20260803", "9": "20260809" };
       completeness.selectedServiceDates = structuredClone(source.selectedServiceDates);
       source.freshUntil = "2026-08-10T00:00:00+09:00";
@@ -415,6 +432,18 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
       "tools/datapack/release/capital-production-canonical-pack.json",
       "utf8",
     ));
+
+    const extraEdgeFixture = structuredClone(partialFixture);
+    const extraEdge = extraEdgeFixture.packs[0].networkEdges.find(({ id }) =>
+      id.startsWith("edge-line-051552e50435-")
+    );
+    extraEdgeFixture.packs[0].networkEdges.push({ ...extraEdge, id: `${extraEdge.id}-review-extra` });
+    const extraEdgePath = path.join(workspace, "extra-edge-fixture.json");
+    await writeFile(extraEdgePath, `${JSON.stringify(extraEdgeFixture)}\n`);
+    const extraEdgeSpec = structuredClone(spec);
+    extraEdgeSpec.fixturePath = extraEdgePath;
+    await runRejectedBuild(extraEdgeSpec, /capital topology fixture projection is not exact/);
+
     partialFixture.packs[0].networkEdges.find(({ id }) =>
       id.startsWith("edge-line-051552e50435-")
     ).distanceMeters += 1;
