@@ -26,6 +26,7 @@ import {
   validateSourceCandidateSchema,
   validateSourceFreshness,
 } from "./collect-korail-itx-cheongchun-timetable.mjs";
+import { validateItxServiceDates } from "./collect-tago-itx-cheongchun-od.mjs";
 import { loadCapitalRouteTopologySnapshot } from "./apply-capital-route-topology-to-bundled-pack.mjs";
 import { isUnchangedRefresh } from "./apply-itx-topology-to-bundled-pack.mjs";
 
@@ -858,7 +859,9 @@ async function admittedItxNetworkEdgeEvidence(contract, topologyEvidence) {
   }
   try {
     validateSourceCandidateSchema(source);
-    validateSourceFreshness(source, source.selectedServiceDates);
+    const observedAt = new Date(source.observedAt);
+    validateItxServiceDates(source.selectedServiceDates, { now: observedAt });
+    validateSourceFreshness(source, source.selectedServiceDates, observedAt);
   } catch (error) {
     throw new Error("ITX network edge admission evidence mismatch", { cause: error });
   }
