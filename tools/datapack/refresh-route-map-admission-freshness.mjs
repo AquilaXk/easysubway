@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { readFile, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { mkdir, open, readFile, rename, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -30,6 +31,26 @@ export function assertInventoryMirrorByteParity(inventories) {
   }
 }
 
+export async function replaceFileAtomically(targetPath, bytes) {
+  const directory = path.dirname(targetPath);
+  await mkdir(directory, { recursive: true });
+  const mode = (await stat(targetPath)).mode & 0o777;
+  const temporaryPath = path.join(directory, `.${path.basename(targetPath)}.${process.pid}.${randomUUID()}.tmp`);
+  let temporaryFile;
+  try {
+    temporaryFile = await open(temporaryPath, "wx", mode);
+    await temporaryFile.writeFile(bytes);
+    await temporaryFile.sync();
+    await temporaryFile.close();
+    temporaryFile = undefined;
+    await rename(temporaryPath, targetPath);
+  } catch (error) {
+    await temporaryFile?.close().catch(() => {});
+    await rm(temporaryPath, { force: true }).catch(() => {});
+    throw error;
+  }
+}
+
 async function main() {
   const inventories = await Promise.all(inventoryPaths.map(async (relativePath) => ({
     relativePath,
@@ -38,7 +59,7 @@ async function main() {
   assertInventoryMirrorByteParity(inventories);
   const canonical = withRouteMapAdmissionFreshness(JSON.parse(inventories[0].bytes.toString("utf8")));
   const bytes = `${JSON.stringify(canonical, null, 2)}\n`;
-  await Promise.all(inventories.map(({ relativePath }) => writeFile(path.join(root, relativePath), bytes)));
+  await Promise.all(inventories.map(({ relativePath }) => replaceFileAtomically(path.join(root, relativePath), bytes)));
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
