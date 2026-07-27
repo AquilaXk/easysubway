@@ -46,6 +46,12 @@ test("production build와 bundled asset/index의 artifact identity를 exact-matc
       .filter(({ sourceId, field }) => sourceId === "capital-route-topology" && field === "duration_seconds");
     assert.ok(capitalDurationRecords.length > 0);
     assert.ok(capitalDurationRecords.every(({ derivationKind }) => derivationKind === "GENERATED"));
+    const itxPlaceholderRecords = fieldProvenance.packs
+      .flatMap(({ records }) => records)
+      .filter(({ sourceId, field }) => sourceId === "kric-subway-timetable"
+        && ["duration_seconds", "distance_meters"].includes(field));
+    assert.ok(itxPlaceholderRecords.length > 0);
+    assert.ok(itxPlaceholderRecords.every(({ derivationKind }) => derivationKind === "GENERATED"));
     await copyFile(path.join(baselineDir, "catalog/capital-v1.sqlite.gz"), assetPath);
     const gzipBytes = await readFile(assetPath);
     assert.equal(gzipBytes[9], 255);
@@ -144,6 +150,18 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
     tampered.networkEdgeEvidence.sourceInventory.sha256 = "f".repeat(64);
     await runRejectedBuild(tampered, /sourceInventory\.sha256 must match tracked input bytes/);
 
+    const ungovernedInventory = JSON.parse(await readFile("tools/datapack/source-inventory.json", "utf8"));
+    ungovernedInventory.reviewProbe = true;
+    const ungovernedBytes = Buffer.from(`${JSON.stringify(ungovernedInventory, null, 2)}\n`);
+    const ungovernedPath = path.join(workspace, "ungoverned-source-inventory.json");
+    await writeFile(ungovernedPath, ungovernedBytes);
+    const ungoverned = structuredClone(spec);
+    ungoverned.networkEdgeEvidence.sourceInventory = {
+      path: ungovernedPath,
+      sha256: sha256(ungovernedBytes),
+    };
+    await runRejectedBuild(ungoverned, /network edge source inventory must match buildSpec.sourceInventorySha256/);
+
     const staleInventory = JSON.parse(await readFile("tools/datapack/source-inventory.json", "utf8"));
     staleInventory.sources.find(({ routeMapAdmissionEvidence }) =>
       routeMapAdmissionEvidence?.topologySnapshotId === "capital-route-topology-20260724"
@@ -153,6 +171,7 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
     await writeFile(stalePath, staleBytes);
     const stale = structuredClone(spec);
     stale.networkEdgeEvidence.sourceInventory = { path: stalePath, sha256: sha256(staleBytes) };
+    stale.sourceInventorySha256 = sha256(Buffer.from(JSON.stringify(staleInventory)));
     await runRejectedBuild(stale, /capital topology admission is stale/);
 
     const partialFixture = JSON.parse(await readFile(

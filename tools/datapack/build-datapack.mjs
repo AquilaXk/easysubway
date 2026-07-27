@@ -520,6 +520,10 @@ async function validateAndApplyNetworkEdgeProvenance(buildSpec, fixture, itxTopo
     evidence.sourceInventory,
     "buildSpec.networkEdgeEvidence.sourceInventory",
   );
+  if (sha256(Buffer.from(JSON.stringify(sourceInventory.value)))
+    !== sha256HexString(buildSpec.sourceInventorySha256, "buildSpec.sourceInventorySha256")) {
+    throw new Error("network edge source inventory must match buildSpec.sourceInventorySha256");
+  }
   const capitalTopology = await readPinnedBuildJson(
     evidence.capitalTopology,
     "buildSpec.networkEdgeEvidence.capitalTopology",
@@ -782,6 +786,11 @@ function applyItxNetworkEdgeEvidence(pack, admission) {
       verificationStatus: "VERIFIED",
       lastVerifiedAt: admission.verifiedAt,
       evidenceHash: admission.evidenceHash,
+      fieldProvenance: {
+        ...edge.fieldProvenance,
+        duration_seconds: { derivationKind: "GENERATED" },
+        distance_meters: { derivationKind: "GENERATED" },
+      },
     });
   }
 }
