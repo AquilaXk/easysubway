@@ -396,6 +396,7 @@ async function validateCandidateBuildSpec(buildSpec, fixture, admissions, admiss
     throw new Error("buildSpec.builderGitSha must be a git sha");
   }
   requiredString(buildSpec.builderVersion, "buildSpec.builderVersion");
+  await validateTrackedItxTopologyEvidence(buildSpec, fixture);
   return validateOfficialOdFareEvidence(buildSpec.officialOdFareEvidence, fixture, admissions, admissionBytes);
 }
 
@@ -420,8 +421,76 @@ function candidateBuildProvenance(buildSpec, buildSpecSha256, officialOdFareEvid
     sourceInventorySha256: normalizedHashes.sourceInventorySha256,
     builderGitSha: requiredString(buildSpec.builderGitSha, "buildSpec.builderGitSha"),
     builderVersion: requiredString(buildSpec.builderVersion, "buildSpec.builderVersion"),
+    ...(buildSpec.itxTopologyEvidenceSha256
+      ? { itxTopologyEvidenceSha256: sha256HexString(
+          buildSpec.itxTopologyEvidenceSha256,
+          "buildSpec.itxTopologyEvidenceSha256",
+        ) }
+      : {}),
     ...(officialOdFareEvidence ? { officialOdFareEvidence } : {}),
   };
+}
+
+async function validateTrackedItxTopologyEvidence(buildSpec, fixture) {
+  const packs = fixture.packs?.filter((pack) => [
+    ...(pack.transitTrips ?? []),
+    ...(pack.networkEdges ?? []),
+  ].some(({ serviceClass }) => serviceClass === "ITX_CHEONGCHUN")) ?? [];
+  if (packs.length === 0) return;
+  const evidencePath = await resolveBuildInputPath(
+    buildSpec.itxTopologyEvidencePath,
+    "buildSpec.itxTopologyEvidencePath",
+  );
+  const evidenceBytes = await readFile(evidencePath);
+  if (sha256HexString(buildSpec.itxTopologyEvidenceSha256, "buildSpec.itxTopologyEvidenceSha256")
+    !== sha256(evidenceBytes)) {
+    throw new Error("buildSpec.itxTopologyEvidenceSha256 must match tracked evidence bytes");
+  }
+  const evidence = JSON.parse(evidenceBytes);
+  if (evidence?.artifactKind !== "itx-cheongchun-mobile-topology-evidence"
+    || evidence.serviceId !== "ITX_CHEONGCHUN"
+    || evidence.sourceIssue !== 2135) {
+    throw new Error("buildSpec ITX topology evidence must be the #2135 admission artifact");
+  }
+  const admission = evidence.readmissions?.at(-1)?.itxSubgraph;
+  if (admission?.unchanged !== true) throw new Error("tracked ITX topology evidence must have an unchanged readmission");
+  for (const pack of packs) {
+    const edges = (pack.networkEdges ?? [])
+      .filter(({ serviceClass }) => serviceClass === "ITX_CHEONGCHUN")
+      .map((row) => ({
+        id: row.id,
+        from_node_id: row.fromNodeId,
+        to_node_id: row.toNodeId,
+        duration_seconds: row.durationSeconds,
+        distance_meters: row.distanceMeters,
+        edge_type: row.edgeType,
+        service_pattern: row.servicePattern,
+        service_class: row.serviceClass,
+      }))
+      .sort((left, right) => codepointCompare(left.id, right.id));
+    const routeEvidence = (pack.routeServiceArtifactEvidence ?? [])
+      .filter(({ serviceClass }) => serviceClass === "ITX_CHEONGCHUN")
+      .map((row) => ({
+        service_class: row.serviceClass,
+        timetable_artifact_id: row.timetableArtifactId,
+        timetable_artifact_sha256: row.timetableArtifactSha256,
+        canonical_pack_id: row.canonicalPackId,
+        canonical_pack_sha256: row.canonicalPackSha256,
+        canonical_pack_sqlite_sha256: row.canonicalPackSqliteSha256,
+        admission_status: row.admissionStatus,
+        admission_eligible: row.admissionEligible ? 1 : 0,
+        fresh_until: row.freshUntil,
+        source_issue: row.sourceIssue,
+      }));
+    if (edges.length !== admission.edgeCount
+      || sha256(Buffer.from(JSON.stringify(edges))) !== admission.edgesSha256) {
+      throw new Error("ITX_CHEONGCHUN edge projection does not match tracked topology evidence");
+    }
+    if (sha256(Buffer.from(JSON.stringify(routeEvidence))) !== admission.evidenceSha256) {
+      throw new Error("ITX_CHEONGCHUN route evidence projection does not match tracked topology evidence");
+    }
+    validatedItxAdmissionPacks.add(pack);
+  }
 }
 
 function validateOfficialOdFareEvidence(evidence, fixture, admissions, admissionBytes) {
@@ -457,8 +526,8 @@ function validateOfficialOdFareEvidence(evidence, fixture, admissions, admission
   if (officialOdFareQuoteSetHash(evidence.quotes) !== admission.quoteSetHash) {
     throw new Error(`${label}.quotes must match admission quote set`);
   }
-  if (JSON.stringify(candidateQuotes) !== JSON.stringify(evidence.quotes)) {
-    throw new Error(`${label}.quotes must exactly match candidate fixture quotes`);
+  if (officialOdFareQuoteSetHash(candidateQuotes) !== officialOdFareQuoteSetHash(evidence.quotes)) {
+    throw new Error(`${label}.quotes must match candidate fixture quote set`);
   }
   return evidence;
 }
@@ -1651,8 +1720,8 @@ function buildSqlitePack(sqlitePath, schema, pack, officialOdFareAdmissions) {
           requiredString(row.stationId, "routeMapPositions.stationId"),
           requiredString(row.lineId, "routeMapPositions.lineId"),
           requiredString(row.region, "routeMapPositions.region"),
-          requiredNonNegativeInteger(row.x, "routeMapPositions.x"),
-          requiredNonNegativeInteger(row.y, "routeMapPositions.y"),
+          requiredNonNegativeFiniteNumber(row.x, "routeMapPositions.x"),
+          requiredNonNegativeFiniteNumber(row.y, "routeMapPositions.y"),
           row.labelDx ?? 0,
           row.labelDy ?? 0,
           canonicalLabelPolygon(row.labelPolygon, "routeMapPositions.labelPolygon"),

@@ -4,6 +4,8 @@
   "candidateId": "capital-pilot-candidate-20260712",
   "productionScopeId": "capital_pilot_android_v1",
   "fixturePath": "tools/datapack/release/capital-production-reviewed-pack.json",
+  "itxTopologyEvidencePath": "tools/datapack/itx-cheongchun-topology-evidence.json",
+  "itxTopologyEvidenceSha256": "c195e6684fddff1319572759d867c68ed14166117cb87aebefb8765481227731",
   "sourceSnapshotEvidencePath": "tools/datapack/release/source-snapshots.json",
   "sourceSnapshotIds": [
     "molit-urban-rail-full-route-capital-admission-20260712",

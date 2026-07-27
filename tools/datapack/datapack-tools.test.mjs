@@ -1758,6 +1758,106 @@ test("데이터팩 생성기는 같은 buildSpec에서 candidate artifact hash�
   }
 });
 
+test("데이터팩 생성기는 tracked ITX topology evidence와 일치하는 buildSpec 행만 허용한다", async () => {
+  const workDir = await mkdtemp(path.join(tmpdir(), "easysubway-datapack-itx-evidence-"));
+  const fixturePath = path.join(workDir, "fixture.json");
+  const buildSpecPath = path.join(workDir, "build-spec.json");
+  const evidencePath = path.join(workDir, "itx-evidence.json");
+  const outputDir = path.join(workDir, "output");
+  try {
+    const fixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
+    const edge = {
+      id: "itx-cheongchun:test-edge",
+      fromNodeId: "station-sangnoksu:seoul-4:EXPRESS",
+      toNodeId: "station-sadang:seoul-4:EXPRESS",
+      durationSeconds: 0,
+      distanceMeters: 0,
+      edgeType: "RIDE",
+      servicePattern: "EXPRESS",
+      serviceClass: "ITX_CHEONGCHUN",
+    };
+    const routeEvidence = {
+      serviceClass: "ITX_CHEONGCHUN",
+      timetableArtifactId: "itx-test",
+      timetableArtifactSha256: "a".repeat(64),
+      canonicalPackId: "capital",
+      canonicalPackSha256: "b".repeat(64),
+      canonicalPackSqliteSha256: "c".repeat(64),
+      admissionStatus: "ADMITTED",
+      admissionEligible: true,
+      freshUntil: "2026-08-31T00:00:00.000Z",
+      sourceIssue: 2135,
+    };
+    fixture.packs[0].networkEdges.push(edge);
+    fixture.packs[0].routeServiceArtifactEvidence = [routeEvidence];
+    await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+
+    const edgeProjection = [{
+      id: edge.id,
+      from_node_id: edge.fromNodeId,
+      to_node_id: edge.toNodeId,
+      duration_seconds: edge.durationSeconds,
+      distance_meters: edge.distanceMeters,
+      edge_type: edge.edgeType,
+      service_pattern: edge.servicePattern,
+      service_class: edge.serviceClass,
+    }];
+    const evidenceProjection = [{
+      service_class: routeEvidence.serviceClass,
+      timetable_artifact_id: routeEvidence.timetableArtifactId,
+      timetable_artifact_sha256: routeEvidence.timetableArtifactSha256,
+      canonical_pack_id: routeEvidence.canonicalPackId,
+      canonical_pack_sha256: routeEvidence.canonicalPackSha256,
+      canonical_pack_sqlite_sha256: routeEvidence.canonicalPackSqliteSha256,
+      admission_status: routeEvidence.admissionStatus,
+      admission_eligible: 1,
+      fresh_until: routeEvidence.freshUntil,
+      source_issue: routeEvidence.sourceIssue,
+    }];
+    const evidence = {
+      schemaVersion: 1,
+      artifactKind: "itx-cheongchun-mobile-topology-evidence",
+      serviceId: "ITX_CHEONGCHUN",
+      sourceIssue: 2135,
+      readmissions: [{
+        itxSubgraph: {
+          unchanged: true,
+          edgeCount: 1,
+          edgesSha256: sha256(JSON.stringify(edgeProjection)),
+          evidenceSha256: sha256(JSON.stringify(evidenceProjection)),
+        },
+      }],
+    };
+    const evidenceBytes = Buffer.from(`${JSON.stringify(evidence, null, 2)}\n`);
+    await writeFile(evidencePath, evidenceBytes);
+
+    const buildSpec = JSON.parse(await readFile("tools/datapack/fixtures/candidate-build-spec.json", "utf8"));
+    buildSpec.fixturePath = fixturePath;
+    buildSpec.itxTopologyEvidencePath = evidencePath;
+    buildSpec.itxTopologyEvidenceSha256 = sha256(evidenceBytes);
+    await writeFile(buildSpecPath, `${JSON.stringify(buildSpec, null, 2)}\n`);
+
+    await execFileAsync(process.execPath, [
+      "tools/datapack/build-datapack.mjs",
+      "--build-spec", buildSpecPath,
+      "--output", outputDir,
+    ], { cwd: root, env: productionEnv });
+
+    fixture.packs[0].networkEdges.at(-1).durationSeconds = 1;
+    await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+    await assert.rejects(
+      execFileAsync(process.execPath, [
+        "tools/datapack/build-datapack.mjs",
+        "--build-spec", buildSpecPath,
+        "--output", outputDir,
+      ], { cwd: root, env: productionEnv }),
+      /ITX_CHEONGCHUN edge projection does not match tracked topology evidence/,
+    );
+  } finally {
+    await rm(workDir, { recursive: true, force: true });
+  }
+});
+
 test("데이터팩 생성기는 temp buildSpec이 생성 fixture를 참조할 수 있다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-datapack-build-spec-temp-output-${Date.now()}`);
   const buildSpecDir = path.join(tmpdir(), `easysubway-datapack-build-spec-temp-${process.pid}-${Date.now()}`);
@@ -2034,6 +2134,33 @@ test("데이터팩 생성기는 route map label polygon 좌표 계약을 검증�
       ),
       testCase.expected,
     );
+  }
+});
+
+test("데이터팩 생성기는 route map 소수 좌표를 보존한다", async () => {
+  const workspace = await mkdtemp(path.join(tmpdir(), "easysubway-datapack-fractional-route-map-"));
+  try {
+    const fixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
+    fixture.packs[0].routeMapPositions[0].x = 1492.231;
+    fixture.packs[0].routeMapPositions[0].y = 753.307;
+    const fixturePath = path.join(workspace, "fixture.json");
+    await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+    await execFileAsync(process.execPath, [
+      "tools/datapack/build-datapack.mjs",
+      "--fixture", fixturePath,
+      "--output", path.join(workspace, "output"),
+    ], { cwd: root, env: productionEnv });
+    const database = new DatabaseSync(path.join(workspace, "output/catalog/capital-v1.sqlite"), { readOnly: true });
+    try {
+      assert.deepEqual({ ...database.prepare("SELECT x, y FROM route_map_positions ORDER BY rowid LIMIT 1").get() }, {
+        x: 1492.231,
+        y: 753.307,
+      });
+    } finally {
+      database.close();
+    }
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
   }
 });
 
@@ -17539,6 +17666,28 @@ test("official OD fare release candidate는 승인된 두 방향 quote와 proven
     assert.deepEqual(provenance.candidateBuild.officialOdFareEvidence, approvedEvidence);
   } finally {
     await rm(outputDir, { recursive: true, force: true });
+  }
+});
+
+test("official OD fare release candidate는 승인 quote 순서에 의존하지 않는다", async () => {
+  const workspace = await mkdtemp(path.join(tmpdir(), "official-od-fare-release-order-"));
+  try {
+    const fixture = JSON.parse(await readFile("tools/datapack/release/capital-production-reviewed-pack.json", "utf8"));
+    fixture.packs[0].officialOdFareQuotes.reverse();
+    const fixturePath = path.join(workspace, "fixture.json");
+    await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+    const buildSpec = JSON.parse(await readFile("tools/datapack/release/candidate-build-spec.json", "utf8"));
+    buildSpec.fixturePath = fixturePath;
+    const buildSpecPath = path.join(workspace, "build-spec.json");
+    await writeFile(buildSpecPath, `${JSON.stringify(buildSpec, null, 2)}\n`);
+
+    await execFileAsync(process.execPath, [
+      "tools/datapack/build-datapack.mjs",
+      "--build-spec", buildSpecPath,
+      "--output", path.join(workspace, "output"),
+    ], { cwd: root, env: productionEnv });
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
   }
 });
 
