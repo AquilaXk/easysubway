@@ -17664,7 +17664,7 @@ test("official OD fare release candidate는 승인된 두 방향 quote와 proven
 test("official OD fare release candidate는 승인 quote 순서에 의존하지 않는다", async () => {
   const workspace = await mkdtemp(path.join(tmpdir(), "official-od-fare-release-order-"));
   try {
-    const fixture = JSON.parse(await readFile("tools/datapack/release/capital-production-reviewed-pack.json", "utf8"));
+    const fixture = JSON.parse(await readFile("tools/datapack/release/capital-production-canonical-pack.json", "utf8"));
     fixture.packs[0].officialOdFareQuotes.reverse();
     const fixturePath = path.join(workspace, "fixture.json");
     await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);

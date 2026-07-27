@@ -53,7 +53,7 @@
         {
           "refreshOn": "operations-contract-change",
           "files": [
-            {"path": "apps/mobile/release/operations-release-evidence.json", "sha256": "be04e7dfa75ff2b845c93ee1504c4539763177b996acd3f0c877f5ead7452cab"},
+            {"path": "apps/mobile/release/operations-release-evidence.json", "sha256": "b16cdc9bd0f42123520c2d1340be19f78f6555683cd9c8801938cdeaa68424a0"},
             {"path": "apps/mobile/release/operations-observability-gate.json", "sha256": "6955ac139fbc57be0721bb955e834164015050f397f2562e4402298578027afe"},
             {"path": "tools/ops/generate-operations-phase-a-summary.mjs", "sha256": "e89a520d6b229c5fd042ef8bcaf74873476c7253cd03b48fac1de21cf55e0c4d"},
             {"path": "tools/ops/validate-operations-release-summary.mjs", "sha256": "474095e635706a442d79e9c21e274e0aa6eb9e992f480783dbc7d16c66a0fc7e"},
@@ -101,7 +101,7 @@
           "files": [
             {"path": "apps/mobile/release/signed-release-artifact-gate.json", "sha256": "42c9f83dca5a1c2c24d921cf6ab748c9be5a901dd1b62212a81055098349fc67"},
             {"path": "apps/mobile/pubspec.yaml", "sha256": "1c4918747c4acf22bbe885b7cb01cc34cc311e7e44598ac6b817848712614d42"},
-            {"path": ".github/workflows/release-artifacts.yml", "sha256": "fc0068a3a93052f2daa3c90076d91c208b88c635f990edf8f40a391c18535fcf"},
+            {"path": ".github/workflows/release-artifacts.yml", "sha256": "7a40f47727818e79abe1156eee2dd105a0c499eda087708f419993759d404245"},
             {"path": ".github/workflows/datapack-release.yml", "sha256": "66e6bee443b0a38a7406dd51eaff447b74cdbe04c8d68b9edbe07aad9bf80b85"},
             {"path": "tools/ci/validate-store-privacy-env.mjs", "sha256": "18bb0dd8b93d6268c8f60f9cc12272d2ff31c03b60fbbafd6c1e8d16957ada2a"},
             {"path": "backend/build.gradle", "sha256": "cfefe1f4884d0f4b44f2875dc4e1bedabad358a7c9aab030c6504c87d8f21f2d"},

@@ -169,7 +169,7 @@ test("legacy bundled pack을 provenance 추론 없이 builder fixture로 옮긴�
   expectedDatabase.close();
 });
 
-test("지원하지 않는 facility status snapshot 행은 무음 유실 대신 거부한다", () => {
+test("지원하지 않는 schema table 행은 무음 유실 대신 거부한다", () => {
   const database = new DatabaseSync(":memory:");
   const expectedDatabase = new DatabaseSync(":memory:");
   try {

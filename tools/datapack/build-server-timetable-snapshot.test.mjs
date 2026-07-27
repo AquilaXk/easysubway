@@ -359,6 +359,16 @@ test("complete snapshot은 source·completeness identity와 freshness를 fail cl
     }),
     /canonical topology pack identity mismatch/,
   );
+  const missingNewPack = JSON.parse(value.readmissionEvidenceBytes);
+  delete missingNewPack.readmissions[0].newPack;
+  assert.throws(
+    () => buildServerTimetableSnapshot({
+      ...value,
+      readmissionEvidenceBytes: Buffer.from(JSON.stringify(missingNewPack)),
+      buildNow,
+    }),
+    /canonical topology pack identity mismatch/,
+  );
   const topologyValue = await inputs({ withTopologyEvidence: true });
   const consistentTopology = consistentFreshnessInputs(topologyValue);
   const topologyEvidence = JSON.parse(consistentTopology.topologyEvidenceBytes);

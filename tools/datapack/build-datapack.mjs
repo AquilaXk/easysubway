@@ -97,7 +97,10 @@ async function main() {
       sqliteSha256,
       byteSize: sizeBytes,
     })) {
-      throw new Error("built ITX pack identity does not match tracked readmission output");
+      throw new Error(`built ITX pack identity does not match tracked readmission output: ${JSON.stringify({
+        expected: admittedOutput,
+        actual: { sha256: compressedSha256, sqliteSha256, byteSize: sizeBytes },
+      })}`);
     }
     const representativeRouteRegressions = canonicalRepresentativeRouteRegressions(
       pack.representativeRouteRegressions,
@@ -1391,10 +1394,13 @@ function buildSqlitePack(sqlitePath, schema, pack, officialOdFareAdmissions) {
           requiredString(row.zoneId, "stationFareZones.zoneId"),
         ],
       );
-      const officialOdFareQuotes = (pack.officialOdFareQuotes ?? []).map((row) => {
-        const admission = officialOdFareAdmissions.get(row.sourceId);
-        return { admission, row, values: officialOdFareQuoteValues(row, admission) };
-      });
+      const officialOdFareQuotes = (pack.officialOdFareQuotes ?? [])
+        .map((row) => {
+          const admission = officialOdFareAdmissions.get(row.sourceId);
+          return { admission, row, values: officialOdFareQuoteValues(row, admission) };
+        })
+        .sort((left, right) => codepointCompare(left.values[0], right.values[0])
+          || codepointCompare(left.values[1], right.values[1]));
       for (const admission of new Set(officialOdFareQuotes.map(({ admission }) => admission))) {
         const sourceQuotes = officialOdFareQuotes.filter(({ admission: rowAdmission }) => rowAdmission === admission);
         if (sourceQuotes.length !== admission.quoteCount) {

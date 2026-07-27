@@ -150,10 +150,12 @@ export function extractBundledPackFixture({ database, expectedDatabase, template
   const pack = fixture.packs[0];
   assertKnownTemplateArrays(pack);
   assertKnownDatabaseTables(database, expectedDatabase);
-  // ponytail: fail closed until the production builder owns snapshot rows.
-  if (tableExists(database, "facility_status_snapshots")
-    && database.prepare("SELECT count(*) AS count FROM facility_status_snapshots").get().count !== 0) {
-    throw new Error("non-empty unsupported table: facility_status_snapshots");
+  const supportedTables = new Set([...TABLES.map(([table]) => table), "catalog_metadata"]);
+  for (const table of listTables(database)) {
+    if (!supportedTables.has(table)
+      && database.prepare(`SELECT count(*) AS count FROM ${quoteIdentifier(table)}`).get().count !== 0) {
+      throw new Error(`non-empty unsupported table: ${table}`);
+    }
   }
   for (const [table, target] of TABLES) {
     if (!tableExists(database, table)) continue;

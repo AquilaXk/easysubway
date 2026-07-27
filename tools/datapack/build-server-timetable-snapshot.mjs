@@ -610,7 +610,7 @@ function validateReadmissionEvidence({
       || entry.itxSubgraph?.evidenceSha256 !== itxProjection.evidenceSha256) {
       throw new Error("canonical topology pack identity mismatch");
     }
-    previous = entry.newPack;
+    previous = entry.newPack ?? {};
   }
   if (!includesAdmission
     || previous.sha256 !== outputSha256
