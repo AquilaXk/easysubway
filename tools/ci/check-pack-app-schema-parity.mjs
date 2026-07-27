@@ -522,6 +522,7 @@ async function readMobileSources(root) {
 export async function checkPackAppSchemaParity({
   root = REPOSITORY_ROOT,
   allowlistPath = ALLOWLIST_PATH,
+  packPath,
 } = {}) {
   const read = (relative) => readFile(path.resolve(root, relative), "utf8");
   const driftTables = parseDriftDeclaredTables(await read(DRIFT_GENERATED_PATH));
@@ -583,7 +584,9 @@ export async function checkPackAppSchemaParity({
     for (const pack of catalogPacks) {
       const assetPath = path.posix.join(DATAPACK_ASSET_ROOT, String(pack.asset));
       const sqlitePath = path.join(workDirectory, `${pack.id}.sqlite`);
-      await writeFile(sqlitePath, gunzipSync(await readFile(path.resolve(root, assetPath))));
+      await writeFile(sqlitePath, gunzipSync(await readFile(
+        packPath ? path.resolve(packPath) : path.resolve(root, assetPath),
+      )));
       const packSchema = readPackSchema(sqlitePath);
       results.push(evaluatePackAppSchemaParity({
         packId: String(pack.id),
@@ -623,10 +626,15 @@ export async function checkPackAppSchemaParity({
 }
 
 function parseCliArgs(argv) {
-  const args = { allowlistPath: ALLOWLIST_PATH };
+  const args = { allowlistPath: ALLOWLIST_PATH, packPath: undefined };
   for (let index = 0; index < argv.length; index += 1) {
     if (argv[index] === "--allowlist" && index + 1 < argv.length) {
       args.allowlistPath = argv[index + 1];
+      index += 1;
+      continue;
+    }
+    if (argv[index] === "--pack" && index + 1 < argv.length) {
+      args.packPath = argv[index + 1];
       index += 1;
       continue;
     }
@@ -636,8 +644,8 @@ function parseCliArgs(argv) {
 }
 
 if (isMainModule(import.meta.url)) {
-  const { allowlistPath } = parseCliArgs(process.argv.slice(2));
-  const report = await checkPackAppSchemaParity({ allowlistPath });
+  const { allowlistPath, packPath } = parseCliArgs(process.argv.slice(2));
+  const report = await checkPackAppSchemaParity({ allowlistPath, packPath });
   console.log(formatReport(report));
   for (const error of report.documentErrors) {
     console.error(`allowlist 오류: ${error}`);

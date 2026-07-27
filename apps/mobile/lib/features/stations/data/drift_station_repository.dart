@@ -605,8 +605,8 @@ class DriftStationRepository
             stationCode: row.read<String>('station_code'),
             sequence: row.read<int>('line_sequence'),
             position: NetworkMapPosition(
-              x: row.read<int>('x'),
-              y: row.read<int>('y'),
+              x: (row.data['x'] as num).round(),
+              y: (row.data['y'] as num).round(),
               labelDx: row.read<int>('label_dx'),
               labelDy: row.read<int>('label_dy'),
               labelPolygon: row.read<String>('label_polygon'),

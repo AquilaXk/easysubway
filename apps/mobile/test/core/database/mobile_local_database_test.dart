@@ -409,10 +409,16 @@ void main() {
       'ACCESSIBLE_TOILET',
       'ELEVATOR',
       'ESCALATOR',
+      'WHEELCHAIR_LIFT',
     });
     expect(
       facilities.map((row) => row.read<String>('name')),
-      containsAll(['1번 출구 엘리베이터', '1번 출구 에스컬레이터', '대합실 장애인 화장실']),
+      containsAll([
+        '대합실 장애인 화장실',
+        '상록수역 엘리베이터 설치 정보',
+        '상록수역 에스컬레이터 설치 정보',
+        '상록수역 휠체어리프트 설치 정보',
+      ]),
     );
     expect(
       fieldValidationRecords

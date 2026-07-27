@@ -279,6 +279,28 @@ void main() {
     );
   });
 
+  test('노선도 데이터는 SQLite REAL 좌표를 int 모델로 반올림한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement('''
+      UPDATE route_map_positions
+      SET x = 1492.231, y = 753.807
+      WHERE station_id = 'station-sangnoksu' AND line_id = 'seoul-4'
+      ''');
+    final repository = DriftStationRepository(database: database);
+
+    final map = await repository.getNetworkMap(
+      region: '수도권',
+      lineId: 'seoul-4',
+    );
+    final position = map.stations
+        .singleWhere((station) => station.id == 'station-sangnoksu')
+        .position;
+
+    expect((position.x, position.y), (1492, 754));
+  });
+
   test('역 상세와 출구, 시설 정보는 로컬 카탈로그의 품질/검증일을 유지한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);

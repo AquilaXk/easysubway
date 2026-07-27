@@ -7520,8 +7520,8 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
     currentImplementation: {
       status: "SATISFIED",
       fields: ["snapshotSha256", "freshUntil"],
-      snapshotId: "server-timetable-snapshot-cf2f25d26584bbcc",
-      snapshotSha256: "cf2f25d26584bbcced1f33e999ddd89b9885a9de3be7c4ff4fabceab323aef30",
+      snapshotId: "server-timetable-snapshot-a0eb22245b5d1e57",
+      snapshotSha256: "a0eb22245b5d1e573b33a27ee703d9cfa54c24274965bc78c27028e1d4127849",
       freshUntil: "2026-08-03T00:00:00+09:00",
       evidencePath: "tools/datapack/server-timetable-snapshot-evidence.json",
     },
