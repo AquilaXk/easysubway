@@ -180,7 +180,7 @@ class EasySubwayAccessibleColors {
   static const nearbyToggleIdleFill = surfaceSubtle;
 
   /// 토글 비선택 세그먼트 글자.
-  static const nearbyToggleIdleText = contentMuted;
+  static const nearbyToggleIdleText = contentSecondary;
 
   /// 좌우 열차 정보 구분선.
   static const arrivalColumnDivider = borderSubtle;

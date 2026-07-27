@@ -207,6 +207,10 @@ void main() {
       // 비선택 칸은 pill을 그리지 않는다(단일 배경 track이 뒤에서 감싼다).
       expect(timetableDeco.color, Colors.transparent);
       expect(timetableDeco.border, isNull);
+      expect(
+        tester.widget<Text>(find.text('시간표')).style!.color,
+        EasySubwayAccessibleColors.contentSecondary,
+      );
     });
 
     testWidgets('두 칸이 간격 없이 하나의 단일 배경 track 안에 붙어 있다', (tester) async {

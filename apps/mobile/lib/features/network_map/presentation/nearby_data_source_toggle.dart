@@ -5,7 +5,7 @@ import '../../../accessible_design.dart';
 /// 주변역 패널 실시간/시간표 세그먼트 토글 (오너 스펙 2026-07-16, #2200/#2207).
 ///
 /// 두 칸(59×48, 전체 118×48 터치 영역)이 하나의 라운드 컨테이너 안에 붙어 있는
-/// 단일 세그먼트 컨트롤이다. 비선택 surface와 muted content가
+/// 단일 세그먼트 컨트롤이다. 비선택 surface와 secondary content가
 /// 두 칸을 하나로 감싸고(세로 inset 상하 8 → 시각 118×32, radius 16), 두 칸 사이
 /// 간격은 없다. 선택된 칸만 default surface + secondary border pill(59×32, radius
 /// 16)로 그 절반 위에 겹쳐 그린다. 전환 애니메이션·splash는 없다. 비선택 칸을
