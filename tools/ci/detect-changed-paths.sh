@@ -70,6 +70,9 @@ while IFS= read -r file; do
       ci=true
       repository=true
       ;;
+    tools/design/**)
+      repository=true
+      ;;
     .env.example)
       repository=true
       contracts=true
