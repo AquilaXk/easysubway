@@ -32,9 +32,15 @@ class AdminDesignGuardTest {
 	private static final String CSS_DATA = "backend/src/main/resources/static/css/admin-data.css";
 	private static final String CSS_ADMIN_V3 = "backend/src/main/resources/static/css/admin-v3.css";
 	private static final String CSS_OPERATOR = "backend/src/main/resources/static/css/operator-v3.css";
+	private static final String JS_DASHBOARD_CHARTS = "backend/src/main/resources/static/js/admin/dashboard-charts.js";
+	private static final String JS_BATCH_HISTORY_CHARTS = "backend/src/main/resources/static/js/admin/batch-history-charts.js";
+	private static final String JS_OPERATOR_REPORT_CHARTS = "backend/src/main/resources/static/js/operator/report-charts.js";
 	private static final String COLOR_SYSTEM_JSON = "tools/design/easysubway-color-system.json";
 	private static final Pattern CSS_CUSTOM_PROPERTY = Pattern.compile(
 		"(?m)^\\s*(--[a-z0-9-]+)\\s*:\\s*([^;]+);");
+	private static final Pattern HEX_COLOR = Pattern.compile("#[0-9a-fA-F]{3,8}\\b");
+	private static final List<String> CHART_JS_FILES = List.of(
+		JS_DASHBOARD_CHARTS, JS_BATCH_HISTORY_CHARTS, JS_OPERATOR_REPORT_CHARTS);
 
 	// import 순서(tokens → foundation → shell → components → data)를 그대로 소유하는 4책임 파일.
 	private static final List<String> RESPONSIBILITY_FILES = List.of(
@@ -157,6 +163,72 @@ class AdminDesignGuardTest {
 		Map<String, String> actualAliases = new LinkedHashMap<>();
 		expectedAliases.keySet().forEach(name -> actualAliases.put(name, cssProperties.get(name)));
 		assertThat(actualAliases).containsExactlyInAnyOrderEntriesOf(expectedAliases);
+	}
+
+	@Test
+	@DisplayName("관리자·운영자 색 소비자는 semantic token과 chart 역할을 분리한다")
+	void adminAndOperatorColorConsumersUseSemanticTokensOnly() throws IOException {
+		List<String> rawColors = new ArrayList<>();
+		for (String path : CSS_FILES) {
+			String css = read(path).replaceAll("(?s)/\\*.*?\\*/", "");
+			Matcher colors = HEX_COLOR.matcher(css);
+			while (colors.find()) {
+				String color = colors.group();
+				boolean allowedTokenPrimitive = path.equals(CSS_TOKENS)
+					&& css.substring(0, colors.start()).lastIndexOf("--es-")
+						> css.substring(0, colors.start()).lastIndexOf(";");
+				boolean allowedChartSeries = path.equals(CSS_TOKENS)
+					&& color.equalsIgnoreCase("#2F6F9F")
+					&& css.substring(0, colors.start()).lastIndexOf("--admin-chart-series")
+						> css.substring(0, colors.start()).lastIndexOf(";");
+				boolean allowedDangerHover = path.equals(CSS_TOKENS)
+					&& color.equalsIgnoreCase("#000")
+					&& css.substring(0, colors.start()).lastIndexOf("--admin-danger-hover")
+						> css.substring(0, colors.start()).lastIndexOf(";");
+				if (!allowedTokenPrimitive && !allowedChartSeries && !allowedDangerHover) {
+					rawColors.add(path + ": " + color);
+				}
+			}
+		}
+		assertThat(rawColors).as("token 선언 밖 CSS raw color: %s", rawColors).isEmpty();
+
+		assertThat(rule(read(CSS_FOUNDATION),
+			"\\.admin-v3 a:focus-visible,\\s*\\.admin-v3 button:focus-visible,\\s*"
+				+ "\\.admin-v3 input:focus-visible,\\s*\\.admin-v3 select:focus-visible,\\s*"
+				+ "\\.admin-v3 textarea:focus-visible,\\s*\\.admin-v3 \\.admin-panel:focus-visible"))
+			.contains("outline: 3px solid var(--admin-focus);");
+		assertThat(rule(read(CSS_OPERATOR),
+			"a:focus-visible,\\s*button:focus-visible,\\s*input:focus-visible"))
+			.contains("outline: 3px solid var(--admin-focus);");
+		assertThat(rule(read(CSS_SHELL), "\\.admin-nav-item\\.is-active:focus-visible"))
+			.contains("outline-color: var(--admin-focus-on-signature);");
+		assertThat(rule(read(CSS_OPERATOR), "\\.nav-link\\.active:focus-visible"))
+			.contains("outline-color: var(--admin-focus-on-signature);");
+		assertThat(read(CSS_COMPONENTS)).contains("color: var(--admin-on-primary);");
+		assertThat(read(CSS_OPERATOR)).contains("color: var(--admin-on-primary);");
+
+		for (String path : CHART_JS_FILES) {
+			String js = read(path);
+			assertThat(js).as("%s tokenColor fallback 금지", path)
+				.contains("function tokenColor(name) {")
+				.doesNotContain("function tokenColor(name,");
+			assertThat(js.replaceAll("(?m)//.*$", ""))
+				.as("%s raw HEX fallback 금지", path)
+				.doesNotContainPattern(HEX_COLOR);
+		}
+
+		String dashboardCharts = read(JS_DASHBOARD_CHARTS);
+		assertThat(dashboardCharts)
+			.contains("tokenColor('--admin-chart-series')")
+			.doesNotContain("tokenColor('--admin-good')")
+			.doesNotContain("tokenColor('--admin-warn')")
+			.doesNotContain("tokenColor('--admin-danger')");
+		assertThat(read(JS_BATCH_HISTORY_CHARTS))
+			.contains("tokenColor('--admin-good')")
+			.contains("tokenColor('--admin-danger')")
+			.contains("tokenColor('--admin-warn')")
+			.contains("tokenColor('--admin-ink-3')")
+			.doesNotContain("--admin-chart-series");
 	}
 
 	@Test

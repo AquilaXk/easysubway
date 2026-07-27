@@ -178,6 +178,10 @@
 	font-weight: var(--admin-w-strong);
 }
 
+.admin-nav-item.is-active:focus-visible {
+	outline-color: var(--admin-focus-on-signature);
+}
+
 .admin-main {
 	min-width: 0;
 	width: 100%;
