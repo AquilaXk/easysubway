@@ -3042,12 +3042,26 @@ function lineScopeExactMatchFixture(sourceId, sourceDomain, releaseTier = "LAUNC
   };
 }
 
-for (const { sourceId, sourceDomain } of [
+const OMITTED_LINE_SCOPE_CASES = Object.freeze([
   { sourceId: "busan-transportation-timetable", sourceDomain: "schedule_timetable" },
   { sourceId: "busan-transportation-route-map-positions", sourceDomain: "route_map_positions" },
   { sourceId: "busan-transportation-accessibility", sourceDomain: "accessibility_facilities" },
   { sourceId: "daegu-transportation-accessibility", sourceDomain: "accessibility_facilities" },
-]) {
+]);
+
+test("omission 회귀 대상은 tracked candidate spec에 선언돼 있다", async () => {
+  const { lineScopeRedescriptions } = await readJson(SPEC_PATH);
+  for (const { sourceId, sourceDomain } of OMITTED_LINE_SCOPE_CASES) {
+    assert.ok(
+      lineScopeRedescriptions.some(
+        (entry) => entry.sourceId === sourceId && entry.sourceDomain === sourceDomain,
+      ),
+      `${sourceId}/${sourceDomain}`,
+    );
+  }
+});
+
+for (const { sourceId, sourceDomain } of OMITTED_LINE_SCOPE_CASES) {
   test(`${sourceId}/${sourceDomain} omission은 actual line-scope set에서 거부된다`, () => {
     const fixture = lineScopeExactMatchFixture(sourceId, sourceDomain);
     fixture.spec.lineScopeRedescriptions = [];
