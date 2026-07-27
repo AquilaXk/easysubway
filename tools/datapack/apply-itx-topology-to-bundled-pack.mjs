@@ -20,6 +20,7 @@ const ADMITTED_CANONICAL_INPUTS = new Map([
     "e3c4f942a02712904d44d642627eb909523d55189efce96296a0d2b96e3ea4ad",
     {
       gzipSha256: "580814a58ce8d94b174de1ca8753ef7f350ce806dd793f6a7f43e07e7aa155b9",
+      sqliteSha256: "72b85f941a8cb3a905218287a3e2ff4ce38561397ed5c22d77816576529ffe03",
       byteSize: 354980,
     },
   ],
@@ -27,6 +28,7 @@ const ADMITTED_CANONICAL_INPUTS = new Map([
     "e2894d7ce6decb08fc9fec982394e77151799c34d099b83948481080e56d780e",
     {
       gzipSha256: "7bb4bb68f0642e45377d98b083e93cd8c1c92aaa58dd353f32189e3f325a1562",
+      sqliteSha256: "ed84a649952cd2ccbb238b3a63265f2bd3144497ae8fd36fab5181ad776542fc",
       byteSize: 359319,
     },
   ],
@@ -167,7 +169,7 @@ export function isUnchangedRefresh(reference, source, previous) {
   }
 }
 
-async function admittedTopologySource(reference, source, evidence, contractPath) {
+export async function admittedTopologySource(reference, source, evidence, contractPath) {
   const admitted = ADMITTED_CANONICAL_INPUTS.get(reference?.sha256);
   if (admitted != null) {
     if (source?.canonicalPackIdentity?.sha256 !== admitted.gzipSha256) {
@@ -204,6 +206,7 @@ async function admittedTopologySource(reference, source, evidence, contractPath)
       !== evidence.sourceArtifact.completenessEvidenceSha256
     || historical?.freshUntil !== evidence.sourceArtifact.freshUntil
     || historical?.canonicalPackIdentity?.sha256 !== historicalAdmission.gzipSha256
+    || evidence?.pack?.inputSqliteSha256 !== historicalAdmission.sqliteSha256
     || source?.canonicalPackIdentity?.sha256 !== evidence?.pack?.outputSha256
     || JSON.stringify(source.normalizedSnapshotSets)
       !== JSON.stringify(historical.normalizedSnapshotSets)

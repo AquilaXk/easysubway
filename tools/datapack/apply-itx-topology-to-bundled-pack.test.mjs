@@ -8,7 +8,10 @@ import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
 import { promisify } from "node:util";
 import { gunzipSync, gzipSync } from "node:zlib";
-import { isUnchangedRefresh } from "./apply-itx-topology-to-bundled-pack.mjs";
+import {
+  admittedTopologySource,
+  isUnchangedRefresh,
+} from "./apply-itx-topology-to-bundled-pack.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
@@ -268,6 +271,21 @@ test("UNCHANGED_AUTO historical fallback은 immediate previous source 변경을 
   previous.normalizedSnapshotSets[0].sets.stationSet.push("station-diverged-from-current");
 
   assert.equal(isUnchangedRefresh(contract.sourceTimetableArtifact, source, previous), false);
+});
+
+test("historical fallback은 admitted SQLite identity 변조를 거부한다", async () => {
+  const contractPath = path.join(root, "tools/datapack/itx-cheongchun-coverage-contract.json");
+  const contract = JSON.parse(await readFile(contractPath, "utf8"));
+  const source = JSON.parse(await readFile(
+    path.join(root, contract.sourceTimetableArtifact.artifactPath), "utf8"));
+  const evidence = JSON.parse(await readFile(
+    path.join(root, "tools/datapack/itx-cheongchun-topology-evidence.json"), "utf8"));
+  evidence.pack.inputSqliteSha256 = "0".repeat(64);
+
+  await assert.rejects(
+    admittedTopologySource(contract.sourceTimetableArtifact, source, evidence, contractPath),
+    /admitted canonical input identity mismatch/,
+  );
 });
 
 test("--check는 hash가 갱신된 bundled pack의 foreign key 손상도 거부한다", async (context) => {
