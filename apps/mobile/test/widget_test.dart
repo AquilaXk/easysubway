@@ -36,6 +36,7 @@ import 'package:easysubway_mobile/features/realtime/realtime_repository.dart';
 import 'package:easysubway_mobile/features/route_draft/application/route_draft_controller.dart';
 import 'package:easysubway_mobile/features/stations/presentation/station_detail_body.dart';
 import 'package:easysubway_mobile/features/stations/presentation/station_detail_screen.dart';
+import 'package:easysubway_mobile/features/stations/presentation/station_facility_detail_screen.dart';
 import 'package:easysubway_mobile/features/stations/presentation/station_search_screen.dart';
 import 'package:easysubway_mobile/features/service_notice/data/notice_repository.dart';
 import 'package:easysubway_mobile/features/service_notice/domain/service_notice.dart';
@@ -87,6 +88,26 @@ OnboardingState _completedOnboardingStateWithPreferences({
   return OnboardingState.completed(
     result: OnboardingResult(preset: preset, preferences: preferences),
   );
+}
+
+void _expectSignatureColorScheme(ColorScheme colorScheme) {
+  expect(colorScheme.primary, EasySubwayAccessibleColors.interactionPrimary);
+  expect(colorScheme.onPrimary, EasySubwayAccessibleColors.interactionOnPrimary);
+  expect(
+    colorScheme.secondary,
+    EasySubwayAccessibleColors.interactionSecondarySurface,
+  );
+  expect(colorScheme.onSecondary, EasySubwayAccessibleColors.interactionOnBrand);
+  expect(
+    colorScheme.secondaryContainer,
+    EasySubwayAccessibleColors.interactionSecondaryPressedSurface,
+  );
+  expect(
+    colorScheme.onSecondaryContainer,
+    EasySubwayAccessibleColors.interactionOnBrand,
+  );
+  expect(colorScheme.surface, EasySubwayAccessibleColors.surfaceDefault);
+  expect(colorScheme.outline, EasySubwayAccessibleColors.borderSubtle);
 }
 
 class _FakeNoticeRepository implements NoticeRepository {
@@ -520,6 +541,22 @@ Future<void> _tapFirstRouteResultListItem(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('앱 Theme는 시그니처 ColorScheme 역할색을 사용한다', (tester) async {
+    await tester.pumpWidget(
+      buildEasySubwayTestApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    _expectSignatureColorScheme(
+      Theme.of(tester.element(find.byType(HomeScreen))).colorScheme,
+    );
+  });
+
   // 상대 확인 시점을 쓰는 테스트가 기준 시각을 고정한 뒤 항상 원래대로 되돌린다.
   tearDown(() {
     debugStationVerifiedClock = DateTime.now;
@@ -1693,7 +1730,7 @@ void main() {
         routeRepository: FakeRouteSearchRepository(),
         favoriteRepository: FakeFavoriteStationRepository(),
         favoriteFacilityRepository: FakeFavoriteFacilityRepository(
-          favorites: [_favoriteFacility(status: 'USER_REPORTED')],
+          favorites: [_favoriteFacility(status: 'UNKNOWN')],
         ),
         notificationRepository: FakeNotificationSettingsRepository(),
         initialOnboardingState: _completedOnboardingState(),
@@ -1705,10 +1742,42 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('상록수역 1번 출구 엘리베이터'), findsOneWidget);
-    expect(find.text('가기 전 살펴보기 · 엘리베이터 제보됨'), findsOneWidget);
-    expect(find.text('역무원 도움 요청'), findsOneWidget);
     expect(
-      find.bySemanticsLabel(RegExp('가기 전 살펴보기, .*공식 안내, 역무원 도움 요청')),
+      find.text('미확인 · 엘리베이터 설치 확인 · 운행상태 미확인'),
+      findsOneWidget,
+    );
+    expect(find.text('자세히 보기'), findsOneWidget);
+    final notificationRow = find.ancestor(
+      of: find.text('상록수역 1번 출구 엘리베이터'),
+      matching: find.byType(Container),
+    ).first;
+    final notificationDecoration =
+        tester.widget<Container>(notificationRow).decoration! as BoxDecoration;
+    expect(
+      notificationDecoration.color,
+      EasySubwayAccessibleColors.statusInfoSurface,
+    );
+    expect(
+      notificationDecoration.border! as Border,
+      const Border(
+        bottom: BorderSide(
+          color: EasySubwayAccessibleColors.statusInfoContent,
+        ),
+      ),
+    );
+    expect(
+      tester
+          .widget<Icon>(
+            find.descendant(
+              of: notificationRow,
+              matching: find.byIcon(Icons.elevator_outlined),
+            ),
+          )
+          .color,
+      EasySubwayAccessibleColors.statusInfoContent,
+    );
+    expect(
+      find.bySemanticsLabel(RegExp('미확인, .*공식 안내, 자세히 보기')),
       findsOneWidget,
     );
     expectNoForbiddenUserCopy(tester);
@@ -17711,6 +17780,42 @@ void main() {
     }
   });
 
+  testWidgets('시설 상세 needsInfo 상태 아이콘은 정보 역할색을 사용한다', (tester) async {
+    const facility = StationFacilityInfo(
+      id: 'facility-needs-info',
+      stationId: 'station-sangnoksu',
+      exitId: 'exit-sangnoksu-1',
+      type: 'ELEVATOR',
+      name: '1번 출구 엘리베이터',
+      floorFrom: 'B1',
+      floorTo: '1F',
+      description: '1번 출구 앞',
+      status: 'UNKNOWN',
+      dataConfidence: 'LOW',
+      lastUpdatedAt: '2026-06-12',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FacilityDetailScreen(
+          station: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+          facility: facility,
+          onReportTap: () {},
+        ),
+      ),
+    );
+
+    final statusIcon = tester.widget<Container>(
+      find.descendant(
+        of: find.byKey(const Key('facilityDetailStatusNotice-facility-needs-info')),
+        matching: find.byType(Container),
+      ),
+    );
+    expect(
+      (statusIcon.decoration! as BoxDecoration).color,
+      EasySubwayAccessibleColors.statusInfoContent,
+    );
+  });
+
   testWidgets('시설 신고 화면은 신고 유형과 내용을 보내고 접수 결과를 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final reportRepository = FakeFacilityReportRepository();
@@ -17820,6 +17925,11 @@ void main() {
       expect(find.text('report-1'), findsNothing);
       expect(find.text('진행 상황'), findsOneWidget);
       expect(find.text('접수됨'), findsOneWidget);
+      final submittedStatus = tester.widget<Text>(find.text('접수됨'));
+      expect(
+        submittedStatus.style?.color,
+        EasySubwayAccessibleColors.statusInfoContent,
+      );
       expect(find.bySemanticsLabel('제보 번호 ES-1001, 현재 상태 접수됨'), findsOneWidget);
       expect(
         find.byKey(const Key('facilityReportPhotoUrlInput')),

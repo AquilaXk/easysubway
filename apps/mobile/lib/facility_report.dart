@@ -2666,6 +2666,7 @@ class _FacilityReportStatusPanel extends StatelessWidget {
                     _FacilityReportStatusRow(
                       label: '진행 상황',
                       value: result.statusLabel,
+                      valueColor: _reportStatusColor(result.status),
                     ),
                   ],
                 ),
@@ -2686,10 +2687,15 @@ class _FacilityReportStatusPanel extends StatelessWidget {
 }
 
 class _FacilityReportStatusRow extends StatelessWidget {
-  const _FacilityReportStatusRow({required this.label, required this.value});
+  const _FacilityReportStatusRow({
+    required this.label,
+    required this.value,
+    this.valueColor,
+  });
 
   final String label;
   final String value;
+  final Color? valueColor;
 
   @override
   Widget build(BuildContext context) {
@@ -2708,7 +2714,7 @@ class _FacilityReportStatusRow extends StatelessWidget {
         Text(
           value,
           style: textTheme.titleMedium?.copyWith(
-            color: EasySubwayAccessibleColors.text,
+            color: valueColor ?? EasySubwayAccessibleColors.text,
             fontWeight: FontWeight.w700,
             height: 1.25,
           ),

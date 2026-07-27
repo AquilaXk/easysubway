@@ -170,10 +170,10 @@ class EasySubwayApp extends StatelessWidget {
             ).copyWith(
               primary: EasySubwayAccessibleColors.interactionPrimary,
               onPrimary: EasySubwayAccessibleColors.interactionOnPrimary,
-              secondary: EasySubwayAccessibleColors.interactionSecondaryBorder,
+              secondary: EasySubwayAccessibleColors.interactionSecondarySurface,
               onSecondary: EasySubwayAccessibleColors.interactionOnBrand,
               secondaryContainer:
-                  EasySubwayAccessibleColors.interactionSecondarySurface,
+                  EasySubwayAccessibleColors.interactionSecondaryPressedSurface,
               onSecondaryContainer:
                   EasySubwayAccessibleColors.interactionOnBrand,
               surface: EasySubwayAccessibleColors.surfaceDefault,
