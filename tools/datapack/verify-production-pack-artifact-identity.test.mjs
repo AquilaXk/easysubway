@@ -37,6 +37,9 @@ test("production build와 bundled asset/index의 artifact identity를 exact-matc
     assert.ok(topologySource);
     assert.ok(topologySource.fields.includes("network_edges"));
     assert.ok(!topologySource.fields.includes("duration_seconds"));
+    const itxSource = pack.sourceInventory.find(({ id }) => id === "itx-cheongchun-source-timetable");
+    assert.ok(itxSource);
+    assert.deepEqual(itxSource.fields, ["network_edges"]);
     const fieldProvenance = JSON.parse(await readFile(
       path.join(baselineDir, "current.provenance.json"),
       "utf8",
@@ -46,9 +49,14 @@ test("production build와 bundled asset/index의 artifact identity를 exact-matc
       .filter(({ sourceId, field }) => sourceId === "capital-route-topology" && field === "duration_seconds");
     assert.ok(capitalDurationRecords.length > 0);
     assert.ok(capitalDurationRecords.every(({ derivationKind }) => derivationKind === "GENERATED"));
+    const capitalDistanceRecords = fieldProvenance.packs
+      .flatMap(({ records }) => records)
+      .filter(({ sourceId, field }) => sourceId === "capital-route-topology" && field === "distance_meters");
+    assert.equal(capitalDistanceRecords.filter(({ derivationKind }) => derivationKind === "GENERATED").length, 62);
+    assert.equal(capitalDistanceRecords.filter(({ derivationKind }) => derivationKind === "OFFICIAL").length, 542);
     const itxPlaceholderRecords = fieldProvenance.packs
       .flatMap(({ records }) => records)
-      .filter(({ sourceId, field }) => sourceId === "kric-subway-timetable"
+      .filter(({ sourceId, field }) => sourceId === "itx-cheongchun-source-timetable"
         && ["duration_seconds", "distance_meters"].includes(field));
     assert.ok(itxPlaceholderRecords.length > 0);
     assert.ok(itxPlaceholderRecords.every(({ derivationKind }) => derivationKind === "GENERATED"));
@@ -83,6 +91,11 @@ test("production build와 bundled asset/index의 artifact identity를 exact-matc
       assert.ok(provenance.unknownCount > 0);
       assert.equal(provenance.incompleteVerifiedCount, 0);
       assert.equal(provenance.verifiedItxCount, 48);
+      assert.deepEqual(database.prepare(`
+        SELECT DISTINCT source_id AS sourceId
+        FROM network_edges
+        WHERE service_class = 'ITX_CHEONGCHUN'
+      `).all().map(({ sourceId }) => sourceId), ["itx-cheongchun-source-timetable"]);
       const unsupportedCapitalLine = database.prepare(`
         SELECT COUNT(*) AS edgeCount,
                SUM(verification_status = 'VERIFIED') AS verifiedCount

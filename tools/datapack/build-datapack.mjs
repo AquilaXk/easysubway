@@ -685,12 +685,15 @@ function applyCapitalNetworkEdgeEvidence(pack, topology, snapshotId, admissions)
         verificationStatus: "VERIFIED",
         lastVerifiedAt: admission.verifiedAt,
         evidenceHash: line.contentSha256,
-        ...(topology.fieldsProvided.includes("duration_seconds") ? {} : {
-          fieldProvenance: {
-            ...edge.fieldProvenance,
+        fieldProvenance: {
+          ...edge.fieldProvenance,
+          ...(topology.fieldsProvided.includes("duration_seconds") ? {} : {
             duration_seconds: { derivationKind: "GENERATED" },
-          },
-        }),
+          }),
+          ...(sourceEdge.distanceMeters === 0 ? {
+            distance_meters: { derivationKind: "GENERATED" },
+          } : {}),
+        },
       });
     }
   }
@@ -765,7 +768,7 @@ async function admittedItxNetworkEdgeEvidence(contract, topologyEvidence) {
   }
   if (pairHashes.size === 0) throw new Error("ITX network edge admission has no directional pairs");
   return {
-    sourceId: "kric-subway-timetable",
+    sourceId: source.artifactKind,
     sourceSnapshotId: source.artifactId,
     evidenceHash: sourceEvidenceHash,
     verifiedAt: observedAt,
@@ -776,6 +779,32 @@ async function admittedItxNetworkEdgeEvidence(contract, topologyEvidence) {
 function applyItxNetworkEdgeEvidence(pack, admission) {
   const edges = (pack.networkEdges ?? []).filter(({ serviceClass }) => serviceClass === "ITX_CHEONGCHUN");
   if (edges.length !== admission.pairHashes.size) throw new Error("ITX network edge fixture projection is partial");
+  const lineIds = [...new Set(edges.flatMap(({ fromNodeId, toNodeId }) =>
+    [fromNodeId, toNodeId].map((nodeId) => String(nodeId).split(":")[1])))].sort(compareStrings);
+  const source = {
+    id: admission.sourceId,
+    owner: "국토교통부·한국철도공사",
+    url: "https://www.data.go.kr/",
+    license: "공공데이터포털 이용허락범위 제한 없음",
+    licenseStatus: "redistributable",
+    redistributionAllowed: true,
+    updateFrequency: "weekly-snapshot",
+    updatedAt: admission.verifiedAt,
+    fields: ["network_edges"],
+    coverageScope: {
+      regionIds: ["capital"],
+      operatorIds: [...new Set((pack.lines ?? [])
+        .filter(({ id }) => lineIds.includes(id))
+        .map(({ operatorId }) => operatorId))].sort(compareStrings),
+      lineIds,
+      sourceDomains: ["route_graph_topology"],
+    },
+  };
+  const existing = pack.sourceInventory.find(({ id }) => id === source.id);
+  if (existing == null) pack.sourceInventory.push(source);
+  else if (JSON.stringify(existing) !== JSON.stringify(source)) {
+    throw new Error("ITX network edge pack source inventory mismatch");
+  }
   for (const edge of edges) {
     const fromStationId = requiredString(edge.fromNodeId, "ITX network edge fromNodeId").split(":")[0];
     const toStationId = requiredString(edge.toNodeId, "ITX network edge toNodeId").split(":")[0];
