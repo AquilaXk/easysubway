@@ -14,6 +14,8 @@ const env = {
   ...process.env,
   EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM: privateKey.export({ type: "pkcs8", format: "pem" }),
 };
+const verifierEnv = { ...process.env };
+delete verifierEnv.EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM;
 
 test("production build와 bundled asset/index의 artifact identity를 exact-match한다", async () => {
   const workspace = await mkdtemp(path.join(tmpdir(), "easysubway-production-pack-identity-"));
@@ -42,7 +44,7 @@ test("production build와 bundled asset/index의 artifact identity를 exact-matc
       "--asset", assetPath,
       "--index", indexPath,
       "--pack-id", "capital",
-    ], { cwd: root, env });
+    ], { cwd: root, env: verifierEnv });
     const report = JSON.parse(stdout);
     assert.equal(report.gzipSha256, pack.sha256);
     assert.equal(report.sqliteSha256, pack.sqliteSha256);
@@ -59,7 +61,7 @@ test("production build와 bundled asset/index의 artifact identity를 exact-matc
         "--asset", assetPath,
         "--index", indexPath,
         "--pack-id", "capital",
-      ], { cwd: root, env }),
+      ], { cwd: root, env: verifierEnv }),
       /index sha256 mismatch/,
     );
   } finally {

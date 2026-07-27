@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "artifactKind": "server-timetable-snapshot-evidence",
   "schemaIdentity": "backend-timetable-snapshot-v1",
-  "snapshotId": "server-timetable-snapshot-cf2f25d26584bbcc",
-  "snapshotSha256": "cf2f25d26584bbcced1f33e999ddd89b9885a9de3be7c4ff4fabceab323aef30",
+  "snapshotId": "server-timetable-snapshot-2da245b280020329",
+  "snapshotSha256": "2da245b2800203294d1f7b6e6bfb0a43b3f0054f7bd72d98ba69f224be52c798",
   "snapshotSqlByteSize": 9714509,
-  "snapshotGzipSha256": "575ba396e052171a94cbb0fded0ad708a37b10b9490aecc63746c2cdd7c9a1d2",
-  "snapshotGzipByteSize": 348025,
+  "snapshotGzipSha256": "0dfca35c1234ed1a995acfe211f9b5ab8a202d2ef0e14dccf64be914f1151e61",
+  "snapshotGzipByteSize": 348023,
   "freshUntil": "2026-08-03T00:00:00+09:00",
   "serviceIdentity": {
     "serviceId": "ITX_CHEONGCHUN",
@@ -21,13 +21,14 @@
   },
   "canonicalPackIdentity": {
     "id": "capital",
-    "sha256": "f91ccbba0dda86809355dc6b2eb686faaa6a72e88c06825be3ffe64a43139673",
-    "sqliteSha256": "b550b351daa17c5ddc3172bc4229f06a8834a92b3d4835ceb06d2ebaf748bce7"
+    "sha256": "afd584475ee6e420f3743c12fd8f51fe7cb5ad37b620d4e86aed1d4cc7c110f7",
+    "sqliteSha256": "1dea1adb965ffda147e5f71c01061ca21c308aeb14ca8314750b00970e2339fd"
   },
   "canonicalPackLineage": {
-    "provenance": "coverage-contract-admission",
+    "provenance": "tracked-readmission-chain",
     "admittedInputSha256": "f91ccbba0dda86809355dc6b2eb686faaa6a72e88c06825be3ffe64a43139673",
-    "admittedInputSqliteSha256": "b550b351daa17c5ddc3172bc4229f06a8834a92b3d4835ceb06d2ebaf748bce7"
+    "admittedInputSqliteSha256": "b550b351daa17c5ddc3172bc4229f06a8834a92b3d4835ceb06d2ebaf748bce7",
+    "readmissionCount": 7
   },
   "accessibilitySource": {
     "materializedSqlSha256": "3f0b8240eacf190cd3206e9803ea9cb9dfa6d0dbaf299e683cbd28ad5e430d2e"
@@ -122,5 +123,5 @@
     "transferRules": 0,
     "routeEdgeEvidence": 4
   },
-  "evidenceHash": "e440bb3ebd1628e1fda442a23e60d9c933ee066fc06f7bcc588b83a54ea52064"
+  "evidenceHash": "3889cfccd492dbd08b3c907e323bc9d9a6621264dc4ba69b679daa66480221bf"
 }

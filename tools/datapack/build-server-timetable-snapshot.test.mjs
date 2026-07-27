@@ -38,7 +38,8 @@ async function inputs({ withTopologyEvidence = false } = {}) {
     contract.sourceTimetableArtifact.completenessEvidencePath,
   ));
   const canonicalPackGzipBytes = await readFile(canonicalPackPath);
-  const topologyEvidenceBytes = withTopologyEvidence ? await readFile(topologyEvidencePath) : null;
+  const readmissionEvidenceBytes = await readFile(topologyEvidencePath);
+  const topologyEvidenceBytes = withTopologyEvidence ? readmissionEvidenceBytes : null;
   const subwayRosterBytes = await readFile(subwayRosterPath);
   const reviewedPackBytes = await readFile(reviewedPackPath);
   const sourceSnapshotsBytes = await readFile(sourceSnapshotsPath);
@@ -49,6 +50,7 @@ async function inputs({ withTopologyEvidence = false } = {}) {
     completenessBytes,
     canonicalPackGzipBytes,
     topologyEvidenceBytes,
+    readmissionEvidenceBytes,
     subwayRosterBytes,
     reviewedPackBytes,
     sourceSnapshotsBytes,
@@ -84,10 +86,11 @@ test("#2135 ADMITTED source와 subway seed를 deterministic complete server snap
     sqliteSha256: sha256(gunzipSync(value.canonicalPackGzipBytes)),
   });
   assert.deepEqual(first.evidence.canonicalPackLineage, {
-    provenance: "coverage-contract-admission",
+    provenance: "tracked-readmission-chain",
     admittedInputSha256: contract.officialEvidence.korailCompletenessAdmission.canonicalPackIdentity.sha256,
     admittedInputSqliteSha256:
       contract.officialEvidence.korailCompletenessAdmission.canonicalPackIdentity.sqliteSha256,
+    readmissionCount: 7,
   });
   assert.deepEqual(first.evidence.serviceIdentity, {
     serviceId: "ITX_CHEONGCHUN",
@@ -342,6 +345,16 @@ test("complete snapshot은 source·completeness identity와 freshness를 fail cl
     () => buildServerTimetableSnapshot({
       ...value,
       canonicalPackGzipBytes: Buffer.concat([value.canonicalPackGzipBytes, Buffer.from("tampered")]),
+      buildNow,
+    }),
+    /canonical topology pack identity mismatch/,
+  );
+  const brokenReadmission = JSON.parse(value.readmissionEvidenceBytes);
+  brokenReadmission.readmissions[0].previousPack.sha256 = "0".repeat(64);
+  assert.throws(
+    () => buildServerTimetableSnapshot({
+      ...value,
+      readmissionEvidenceBytes: Buffer.from(JSON.stringify(brokenReadmission)),
       buildNow,
     }),
     /canonical topology pack identity mismatch/,

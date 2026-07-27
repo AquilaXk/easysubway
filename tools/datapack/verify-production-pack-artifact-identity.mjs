@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync } from "node:crypto";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -60,11 +60,19 @@ async function main(argv) {
   const packId = requiredArg(args, "pack-id");
   const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-production-pack-identity-"));
   try {
+    // ponytail: manifest signatures are outside this SQLite identity gate, so CI needs no publish private key.
+    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
     await execFileAsync(process.execPath, [
       path.join(root, "tools/datapack/build-datapack.mjs"),
       "--build-spec", buildSpecPath,
       "--output", outputDir,
-    ], { cwd: root, env: process.env });
+    ], {
+      cwd: root,
+      env: {
+        ...process.env,
+        EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM: privateKey.export({ type: "pkcs8", format: "pem" }),
+      },
+    });
 
     const manifest = JSON.parse(await readFile(path.join(outputDir, "current.json"), "utf8"));
     const packs = manifest.packs.filter(({ id }) => id === packId);

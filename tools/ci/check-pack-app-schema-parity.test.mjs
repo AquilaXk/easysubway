@@ -86,7 +86,7 @@ test("카탈로그 팩 id가 모호하면 멈춘다", () => {
   );
 });
 
-test("현행 번들 팩은 tracked allowlist로 게이트를 통과한다", async () => {
+test("현행 번들 팩은 schema 결측 없이 게이트를 통과한다", async () => {
   const report = await checkPackAppSchemaParity();
 
   assert.equal(report.ok, true);
@@ -95,8 +95,8 @@ test("현행 번들 팩은 tracked allowlist로 게이트를 통과한다", asyn
   const [capital] = report.results;
   assert.equal(capital.packId, "capital");
   assert.equal(capital.packUserVersion, capital.appSchemaVersion);
-  assert.equal(capital.missingTables.length, 9);
-  assert.equal(capital.missingIndexes.length, 7);
+  assert.equal(capital.missingTables.length, 0);
+  assert.equal(capital.missingIndexes.length, 0);
   assert.deepEqual(capital.unallowedMissingTables, []);
   assert.deepEqual(capital.unallowedMissingIndexes, []);
   assert.deepEqual(report.skippedPackIds, ["core"]);

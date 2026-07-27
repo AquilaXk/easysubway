@@ -189,6 +189,7 @@ jobs:
           set -euo pipefail
           mkdir -p "${RUNNER_TEMP}/release-gate"
           node tools/ci/audit-mobile-datapack-assets.mjs --index apps/mobile/assets/datapacks/index.json --root apps/mobile > "${RUNNER_TEMP}/release-gate/mobile-datapack-asset-audit.json"
+          node tools/datapack/verify-production-pack-artifact-identity.mjs --build-spec tools/datapack/release/candidate-build-spec.json --asset apps/mobile/assets/datapacks/capital.sqlite.gz --index apps/mobile/assets/datapacks/index.json --pack-id capital > "${RUNNER_TEMP}/release-gate/production-pack-artifact-identity.json"
           echo "EASYSUBWAY_MOBILE_DATAPACK_ASSET_AUDIT=${RUNNER_TEMP}/release-gate/mobile-datapack-asset-audit.json" >> "${GITHUB_ENV}"
 
       - name: Android Release Artifact / Restore Crashlytics google-services.json
