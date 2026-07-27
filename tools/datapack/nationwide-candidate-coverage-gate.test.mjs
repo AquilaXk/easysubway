@@ -239,7 +239,7 @@ const [
 // 대전·광주·수도권 편입의 결속 지점·신선도 창 축(#2595). 부산 표와 같은 목적이지만 창 서술이 한 단계
 // 넓다: 이 배치의 시각표 편입은 소스 하나가 아니라 두셋의 시각 판정을 동시에 받으므로 pin 창의 하한·상한이
 // 서로 다른 정본에서 온다. 그래서 snapshot 결속(경로)과 창 경계(어느 정본의 어느 필드)를 따로 기술하고,
-// 값은 전부 admission 정본에서 끌어온다. upperBound가 없으면 그 편입의 창에는 상한이 없다는 뜻이다.
+// 값은 전부 admission 정본에서 끌어온다.
 const DAEJEON_TOPOLOGY_SOURCE_ID = "daejeon-station-distance-fare";
 const GWANGJU_TOPOLOGY_SOURCE_ID = "gwangju-transportation-route-topology";
 const DAEJEON_INCLUSION_BINDINGS = [
@@ -363,8 +363,7 @@ const GWANGJU_INCLUSION_BINDINGS = [
   },
 ];
 // 수도권 노선도 편입은 결속 단위가 편입이 아니라 노선(=소스)이다. 광역·경전철 편입은 노선별 snapshotPath를
-// 각 노선 소스의 정본 경로에 결속하고, 서울 편입만 편입 층 snapshotPath 하나를 쓴다. 세 편입 모두 창에
-// 상한이 없다(정본에 freshUntil이 없고 materializer도 하한만 검사한다).
+// 각 노선 소스의 정본 경로에 결속하고, 서울 편입만 편입 층 snapshotPath 하나를 쓴다.
 const CAPITAL_WIDE_RAIL_LINE_SOURCE_IDS = [
   "kric-gyeongui-jungang-route-map-positions",
   "kric-gyeongchun-route-map-positions",
@@ -763,9 +762,7 @@ test("대구 route_map/accessibility 6 requirement는 체인 편입으로 MISSIN
       assert.ok(pin >= Date.parse(capturedAt) && pin < Date.parse(freshUntil), `${sourceId} 창`);
     }
   }
-  // 노선도 편입: 신선도 보장이 다른 두 편입과 비대칭이다 — admission 정본에 freshUntil이 없고
-  // materializer도 하한(capturedAt 이후)만 검사해 상한이 없다(먼 미래 pin도 통과함이 실측된다).
-  // 상한 도입 여부는 materializer 쪽 판단이라 이 하네스의 축이 아니며, 여기서는 그 비대칭을 기록한다.
+  // 노선도 편입도 SLA P1Y 반개구간 안의 pin만 허용한다.
   const routeMapEvidence = admissionEvidence(
     "daegu-transportation-route-map-positions",
     "routeMapAdmissionEvidence",
@@ -867,8 +864,7 @@ test("부산 20 requirement는 체인 편입으로 MISSING에서 SUPPORTED로 �
   assert.equal(accessibility.addedRows.stationFacilityEvidence, 342);
   assert.equal(accessibility.addedRows.routeMapPositions, 0);
 
-  // pin은 편입마다 따로 두고 각각 그 소스의 admission 창 안이어야 한다. 부산 4소스의 창은 모양이 갈린다 —
-  // topology·시각표·편의시설은 [capturedAt, freshUntil) 양끝을 검사하고 노선도는 상한이 없다.
+  // pin은 편입마다 따로 두고 각각 그 소스의 admission 창 안이어야 한다.
   // 소스 id·evidence 키는 BUSAN_INCLUSION_BINDINGS가 정본이다 — 여기서 다시 인라인으로 쓰면 정본이
   // 갱신돼도 이 블록만 낡은 짝을 보게 된다.
   const inventory = await readJson(INVENTORY_PATH);
@@ -887,9 +883,7 @@ test("부산 20 requirement는 체인 편입으로 MISSING에서 SUPPORTED로 �
   assert.ok(Date.parse(routeMap.materializedAt) >= Date.parse(routeMapEvidence.capturedAt)
     && Date.parse(routeMap.materializedAt) < Date.parse(routeMapEvidence.freshUntil), "노선도 창");
   // 편의시설 창은 상한이 있는 두 창(topology·시각표)과 서로소다 — 그 셋은 pin 하나로 묶는 것이 애초에
-  // 불가능하다. 다만 "부산 네 창이 전부 서로소"는 아니다: 노선도 창은 상한이 없어 [capturedAt, ∞)이고
-  // 편의시설 창을 통째로 품는다(실측: 노선도 pin을 편의시설 capturedAt으로 옮기면 조립이 통과하고
-  // 시각표 capturedAt으로 옮기면 거부된다). 그 포함 관계까지 함께 고정한다.
+  // 불가능하다. 다만 "부산 네 창이 전부 서로소"는 아니다: P1Y 노선도 창이 편의시설 창을 통째로 품는다.
   const accessibilityWindow = bindingEvidence(BUSAN_ACCESSIBILITY_BINDING);
   for (const binding of [BUSAN_TOPOLOGY_BINDING, BUSAN_TIMETABLE_BINDING]) {
     assert.ok(
@@ -899,7 +893,11 @@ test("부산 20 requirement는 체인 편입으로 MISSING에서 SUPPORTED로 �
   }
   assert.ok(
     Date.parse(routeMapEvidence.capturedAt) <= Date.parse(accessibilityWindow.capturedAt),
-    "상한 없는 노선도 창은 편의시설 창을 통째로 품는다",
+    "노선도 창은 편의시설 창보다 먼저 시작한다",
+  );
+  assert.ok(
+    Date.parse(accessibilityWindow.freshUntil) <= Date.parse(routeMapEvidence.freshUntil),
+    "P1Y 노선도 창은 편의시설 창보다 나중에 닫힌다",
   );
 });
 
@@ -983,7 +981,7 @@ test("대전 5 requirement는 체인 편입으로 MISSING에서 SUPPORTED로 전
   assert.equal(accessibility.addedRows.routeMapPositions, 0);
 
   // pin은 편입마다 따로 두고 각각 그 소스의 창 안이어야 한다. 대전 세 창은 서로소인데, 그 서로소가
-  // 성립하는 이유가 광주와 다르므로(상한 없는 노선도 창의 하한이 편의시설 창 상한보다 늦다) 그 부등식을
+  // 성립하는 이유가 광주와 다르므로(P1Y 노선도 창의 하한이 편의시설 창 상한보다 늦다) 그 부등식을
   // 직접 고정한다 — spec 서술이 실측과 갈리면 여기서 깨진다.
   const inventory = await readJson(INVENTORY_PATH);
   assertPinsInsideWindows(inventory, evidence, DAEJEON_INDEX, DAEJEON_INCLUSION_BINDINGS);
@@ -1000,12 +998,12 @@ test("대전 5 requirement는 체인 편입으로 MISSING에서 SUPPORTED로 전
   assert.ok(Date.parse(daejeonRouteMap.freshUntil) > Date.parse(daejeonRouteMap.capturedAt));
   assert.ok(
     Date.parse(daejeonRouteMap.capturedAt) >= Date.parse(daejeonAccessibility.freshUntil),
-    "대전은 상한 없는 노선도 창이 편의시설 창보다 뒤에서 시작해 두 창이 서로소다",
+    "대전은 P1Y 노선도 창이 편의시설 창보다 뒤에서 시작해 두 창이 서로소다",
   );
 });
 
 // pin이 그 편입의 창 [하한, 상한) 안인지 본다. 이 배치의 시각표 편입은 창 경계가 서로 다른 정본에서
-// 오므로 경계 값을 binding 기술대로 끌어온다. 상한이 없는 편입은 하한만 본다.
+// 오므로 경계 값을 binding 기술대로 끌어온다.
 function assertPinsInsideWindows(inventory, evidence, regionIndex, bindings) {
   for (const binding of bindings) {
     const pin = Date.parse(evidence.packDataInclusions.entries[regionIndex + binding.offset].materializedAt);
@@ -1015,14 +1013,6 @@ function assertPinsInsideWindows(inventory, evidence, regionIndex, bindings) {
       binding.lowerBound.evidenceKey,
     )[binding.lowerBound.field];
     assert.ok(pin >= Date.parse(lower), `${binding.sourceId} 창 하한`);
-    if (binding.upperBound === undefined) {
-      assert.equal(
-        admissionEvidenceOf(inventory, binding.sourceId, binding.evidenceKey).freshUntil,
-        undefined,
-        `${binding.sourceId} 정본에는 상한이 없다`,
-      );
-      continue;
-    }
     const upper = admissionEvidenceOf(
       inventory,
       binding.upperBound.sourceId,
@@ -1071,8 +1061,8 @@ test("광주 5 requirement는 체인 편입으로 MISSING에서 SUPPORTED로 전
   assert.equal(schedule.supportingRecordCountByField.stop_time, 13_360);
   assert.equal(timetable.addedRows.transitStopTimes - schedule.supportingRecordCountByField.stop_time, 811);
 
-  // 광주 세 창의 관계는 대전과 다르다 — 상한 없는 노선도 창의 하한이 편의시설 창 상한보다 이르러 두 창이
-  // 한 시간을 공유한다. "상한이 없으면 늘 다른 창을 품는다"도 "지역 안 창은 늘 서로소다"도 아니라는 뜻이라
+  // 광주 세 창의 관계는 대전과 다르다 — P1Y 노선도 창의 하한이 편의시설 창 상한보다 이르러 두 창이
+  // 한 시간을 공유한다. "노선도 창은 늘 다른 창을 품는다"도 "지역 안 창은 늘 서로소다"도 아니라는 뜻이라
   // 실측 부등식을 그대로 고정한다.
   const inventory = await readJson(INVENTORY_PATH);
   assertPinsInsideWindows(inventory, evidence, GWANGJU_INDEX, GWANGJU_INCLUSION_BINDINGS);
@@ -1090,7 +1080,7 @@ test("광주 5 requirement는 체인 편입으로 MISSING에서 SUPPORTED로 전
   assert.ok(
     Date.parse(gwangjuRouteMap.capturedAt) < Date.parse(gwangjuAccessibility.freshUntil)
       && Date.parse(gwangjuRouteMap.capturedAt) >= Date.parse(gwangjuAccessibility.capturedAt),
-    "광주는 상한 없는 노선도 창이 편의시설 창 안에서 시작해 두 창이 겹친다",
+    "광주는 P1Y 노선도 창이 편의시설 창 안에서 시작해 두 창이 겹친다",
   );
   // 시각표 편입 창은 두 창 모두와 서로소다(상한이 편의시설 창 하한보다 앞에서 닫힌다).
   const gwangjuScheduleUpper = admissionEvidenceOf(
@@ -1794,14 +1784,25 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
     );
   });
 
-  // 편입마다 신선도 창이 다르므로 기준 시각 pin도 편입 단위다. 다만 노선도 편입의 창은 하한뿐이라
-  // 다른 두 편입(시각표·편의시설의 [capturedAt, freshUntil))과 신선도 보장이 비대칭이다 — 포착 이전
-  // pin만 fail closed 되고 먼 미래 pin은 통과한다. 상한 도입은 materializer 쪽 판단이라 여기서
-  // 동작으로 고정하지 않고 비대칭을 기록만 한다.
-  await context.test("노선도 편입 기준 시각을 snapshot 포착 이전으로 옮기면 거부된다(하한만 검사·상한 없음)", async () => {
+  // 노선도 편입도 P1Y 반개구간의 양끝을 fail closed 한다.
+  await context.test("노선도 편입 기준 시각을 snapshot 포착 이전으로 옮기면 거부된다", async () => {
     await rejectsWith(
       (value) => { value.packDataInclusions[1].materializedAt = "2026-07-20T16:00:00.000Z"; },
-      /daegu-transportation-route-map-positions inventory evidence does not match snapshot/,
+      /daegu-transportation-route-map-positions route-map admission snapshot is stale or future-dated/,
+    );
+  });
+
+  await context.test("노선도 편입 기준 시각을 P1Y 상한으로 옮기면 거부된다", async () => {
+    const inventory = await readJson(INVENTORY_PATH);
+    const freshUntil = admissionEvidenceOf(
+      inventory,
+      "daegu-transportation-route-map-positions",
+      "routeMapAdmissionEvidence",
+    ).freshUntil;
+    await rejectsWith(
+      (value) => { value.packDataInclusions[0].materializedAt = freshUntil; },
+      /daegu-transportation-route-map-positions route-map admission snapshot is stale or future-dated/,
+      { solo: 1 },
     );
   });
 
@@ -1911,7 +1912,7 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
   });
 
   // pin 창 회귀도 편입 단위다. 편입 하나의 창만 덮으면 나머지 세 창이 풀려도 침묵하는데, 창 모양이
-  // 편입마다 갈리므로(양끝 검사 3편입 / 하한만 1편입) 한 편입의 통과가 다른 편입의 근거가 되지도
+  // 편입마다 갈리므로 한 편입의 통과가 다른 편입의 근거가 되지도
   // 않는다. 창 값은 admission 정본에서 끌어와 하한 직전(capturedAt - 1ms)과 상한 정각(freshUntil,
   // 반개구간이라 이미 창 밖)을 각각 때린다.
   for (const { labelKo, offset, sourceId, evidenceKey, stalePinPattern } of BUSAN_INCLUSION_BINDINGS) {
