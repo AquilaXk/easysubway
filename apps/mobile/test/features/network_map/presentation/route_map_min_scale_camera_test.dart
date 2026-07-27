@@ -287,7 +287,7 @@ void main() {
         expect(
           fixture.readableInitialScale,
           greaterThan(fixture.expectedFloor),
-          reason: '${fixture.region}: 하한이 초기 가독 배율보다 크다',
+          reason: '${fixture.region}: 초기 가독 배율이 하한보다 크다',
         );
       });
 
