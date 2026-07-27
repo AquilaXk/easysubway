@@ -584,10 +584,7 @@ void main() {
       }),
       EasySubwayAccessibleColors.interactionPrimaryPressed,
     );
-    expect(
-      theme.filledButtonTheme.style?.backgroundColor?.resolve({}),
-      isNull,
-    );
+    expect(theme.filledButtonTheme.style?.backgroundColor?.resolve({}), isNull);
     expect(
       theme.filledButtonTheme.style?.backgroundColor?.resolve({
         WidgetState.disabled,
@@ -1046,10 +1043,7 @@ void main() {
     expect(MediaQuery.textScalerOf(homeContext).scale(20), closeTo(20, 0.01));
     final theme = Theme.of(homeContext);
     expect(theme.colorScheme.primary, const Color(0xFF1A1D1E));
-    expect(
-      theme.filledButtonTheme.style?.backgroundColor?.resolve({}),
-      isNull,
-    );
+    expect(theme.filledButtonTheme.style?.backgroundColor?.resolve({}), isNull);
     expect(
       theme.filledButtonTheme.style?.backgroundColor?.resolve({
         WidgetState.disabled,
