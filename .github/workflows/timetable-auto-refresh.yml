@@ -222,7 +222,7 @@ jobs:
           node tools/datapack/collect-korail-itx-cheongchun-timetable.mjs \
             --promote-candidate "${EASYSUBWAY_ITX_CANDIDATE}" \
             --completeness-evidence "${EASYSUBWAY_ITX_COMPLETENESS}" \
-            --source-output-dir "${GITHUB_WORKSPACE}" \
+            --source-output-dir "${GITHUB_WORKSPACE}/tools/datapack/sources" \
             --coverage-contract tools/datapack/itx-cheongchun-coverage-contract.json
           git add -N tools/datapack/sources tools/datapack/itx-cheongchun-coverage-contract.json
           git diff -- tools/datapack/sources tools/datapack/itx-cheongchun-coverage-contract.json > "${EASYSUBWAY_ITX_REFRESH_PATCH}"
