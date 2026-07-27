@@ -349,7 +349,7 @@ class _NotificationInboxRow extends StatelessWidget {
                     Text(
                       item.kind,
                       style: const TextStyle(
-                        color: EasySubwayAccessibleColors.mutedText,
+                        color: EasySubwayAccessibleColors.contentSecondary,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),

@@ -179,7 +179,7 @@ class EasySubwayApp extends StatelessWidget {
               surface: EasySubwayAccessibleColors.surfaceDefault,
               onSurface: EasySubwayAccessibleColors.contentPrimary,
               onSurfaceVariant: EasySubwayAccessibleColors.contentSecondary,
-              outline: EasySubwayAccessibleColors.borderSubtle,
+              outline: EasySubwayAccessibleColors.interactionSecondaryBorder,
               outlineVariant: EasySubwayAccessibleColors.borderSubtle,
               error: EasySubwayAccessibleColors.statusDangerContent,
               onError: EasySubwayAccessibleColors.interactionOnPrimary,
@@ -206,16 +206,25 @@ class EasySubwayApp extends StatelessWidget {
         ),
         // 주 행동(채움)만 강하게: 높이 60, 진한 채움.
         filledButtonTheme: FilledButtonThemeData(
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(EasySubwayTouchTarget.primary),
-            shape: const RoundedRectangleBorder(
-              borderRadius: mainThemeControlRadius,
-            ),
-            textStyle: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+          style:
+              FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(
+                  EasySubwayTouchTarget.primary,
+                ),
+                shape: const RoundedRectangleBorder(
+                  borderRadius: mainThemeControlRadius,
+                ),
+                textStyle: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ).copyWith(
+                backgroundColor: WidgetStateProperty.resolveWith(
+                  (states) => states.contains(WidgetState.pressed)
+                      ? EasySubwayAccessibleColors.interactionPrimaryPressed
+                      : null,
+                ),
+              ),
         ),
         // 보조 행동은 조용하게: 중립 얇은 보더(line 토큰) + primary 텍스트,
         // 높이는 접근성 최소(56). 고대비 대비는 _themeForPreferences에서 보정.

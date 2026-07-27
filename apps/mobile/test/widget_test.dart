@@ -118,7 +118,10 @@ void _expectSignatureColorScheme(ColorScheme colorScheme) {
     colorScheme.onSurfaceVariant,
     EasySubwayAccessibleColors.contentSecondary,
   );
-  expect(colorScheme.outline, EasySubwayAccessibleColors.borderSubtle);
+  expect(
+    colorScheme.outline,
+    EasySubwayAccessibleColors.interactionSecondaryBorder,
+  );
   expect(colorScheme.outlineVariant, EasySubwayAccessibleColors.borderSubtle);
   expect(colorScheme.error, EasySubwayAccessibleColors.statusDangerContent);
   expect(colorScheme.onError, EasySubwayAccessibleColors.interactionOnPrimary);
@@ -574,9 +577,24 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    _expectSignatureColorScheme(
-      Theme.of(tester.element(find.byType(HomeScreen))).colorScheme,
+    final theme = Theme.of(tester.element(find.byType(HomeScreen)));
+    expect(
+      theme.filledButtonTheme.style?.backgroundColor?.resolve({
+        WidgetState.pressed,
+      }),
+      EasySubwayAccessibleColors.interactionPrimaryPressed,
     );
+    expect(
+      theme.filledButtonTheme.style?.backgroundColor?.resolve({}),
+      isNull,
+    );
+    expect(
+      theme.filledButtonTheme.style?.backgroundColor?.resolve({
+        WidgetState.disabled,
+      }),
+      isNull,
+    );
+    _expectSignatureColorScheme(theme.colorScheme);
   });
 
   // 상대 확인 시점을 쓰는 테스트가 기준 시각을 고정한 뒤 항상 원래대로 되돌린다.
@@ -1026,7 +1044,24 @@ void main() {
     final homeContext = tester.element(find.byType(HomeScreen));
 
     expect(MediaQuery.textScalerOf(homeContext).scale(20), closeTo(20, 0.01));
-    expect(Theme.of(homeContext).colorScheme.primary, const Color(0xFF1A1D1E));
+    final theme = Theme.of(homeContext);
+    expect(theme.colorScheme.primary, const Color(0xFF1A1D1E));
+    expect(
+      theme.filledButtonTheme.style?.backgroundColor?.resolve({}),
+      isNull,
+    );
+    expect(
+      theme.filledButtonTheme.style?.backgroundColor?.resolve({
+        WidgetState.disabled,
+      }),
+      isNull,
+    );
+    expect(
+      theme.filledButtonTheme.style?.backgroundColor?.resolve({
+        WidgetState.pressed,
+      }),
+      EasySubwayAccessibleColors.highContrastPrimary,
+    );
     expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
     expect(find.text('이동 프로필'), findsNothing);
     expect(find.text('시설 정보'), findsNothing);
@@ -1794,6 +1829,15 @@ void main() {
           )
           .color,
       EasySubwayAccessibleColors.statusInfoContent,
+    );
+    expect(
+      tester
+          .widget<Text>(
+            find.descendant(of: notificationRow, matching: find.text('시설')),
+          )
+          .style
+          ?.color,
+      EasySubwayAccessibleColors.contentSecondary,
     );
     expect(
       find.bySemanticsLabel(RegExp('미확인, .*공식 안내, 자세히 보기')),
