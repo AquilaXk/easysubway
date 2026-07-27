@@ -496,6 +496,19 @@ function consistentFreshnessInputs(value) {
   };
 }
 
+function staleCanonicalInputs(value) {
+  const source = JSON.parse(value.sourceBytes);
+  source.canonicalPackIdentity.sha256 = "0".repeat(64);
+  const { evidenceHash: _drop, ...sourceWithoutHash } = source;
+  source.evidenceHash = sha256(Buffer.from(JSON.stringify(sourceWithoutHash)));
+  const sourceBytes = Buffer.from(`${JSON.stringify(source, null, 2)}\n`);
+  const contract = JSON.parse(value.contractBytes);
+  contract.officialEvidence.korailCompletenessAdmission.canonicalPackIdentity.sha256 = "0".repeat(64);
+  contract.officialEvidence.korailCompletenessAdmission.canonicalPackIdentity.sqliteSha256 = "1".repeat(64);
+  contract.sourceTimetableArtifact.sha256 = sha256(sourceBytes);
+  return { contract, sourceBytes };
+}
+
 test("pack 미입력 순수 freshness 경로는 admit된 pack identity를 evidence에 기록한다", async () => {
   const value = await inputs({ withTopologyEvidence: true });
   const { contractBytes, sourceBytes, measuredGzipSha, measuredSqliteSha } = consistentFreshnessInputs(value);
@@ -520,17 +533,17 @@ test("pack 미입력 순수 freshness 경로는 admit된 pack identity를 eviden
 
 test("pack 미입력 경로는 admit된 identity와 번들 pack이 불일치하면 fail closed 한다", async () => {
   const value = await inputs();
-  const contract = JSON.parse(value.contractBytes);
-  contract.officialEvidence.korailCompletenessAdmission.canonicalPackIdentity.sha256 = "0".repeat(64);
+  const { contract, sourceBytes } = staleCanonicalInputs(value);
 
   assert.throws(
     () => buildServerTimetableSnapshot({
       ...value,
       contractBytes: Buffer.from(`${JSON.stringify(contract, null, 2)}\n`),
+      sourceBytes,
       topologyEvidenceBytes: null,
       buildNow,
     }),
-    /canonical (?:topology )?pack identity mismatch/,
+    /canonical topology pack identity mismatch/,
   );
 });
 
@@ -589,10 +602,15 @@ test("pack 미입력 경로와 topology evidence 경로는 동일 입력에서 b
 test("CLI --without-topology-evidence는 admit된 pack identity와 번들 pack 불일치를 fail closed 한다", async (context) => {
   const directory = await mkdtemp(path.join(tmpdir(), "server-timetable-snapshot-freshness-"));
   context.after(() => rm(directory, { recursive: true, force: true }));
-  const contract = JSON.parse(await readFile(contractPath, "utf8"));
-  contract.officialEvidence.korailCompletenessAdmission.canonicalPackIdentity.sha256 = "0".repeat(64);
+  const value = await inputs();
+  const { contract, sourceBytes } = staleCanonicalInputs(value);
   const staleContractPath = path.join(directory, "contract.json");
-  await writeFile(staleContractPath, `${JSON.stringify(contract, null, 2)}\n`);
+  const staleSourcePath = path.join(directory, "source.json");
+  contract.sourceTimetableArtifact.artifactPath = staleSourcePath;
+  await Promise.all([
+    writeFile(staleContractPath, `${JSON.stringify(contract, null, 2)}\n`),
+    writeFile(staleSourcePath, sourceBytes),
+  ]);
 
   await assert.rejects(
     execFileAsync(process.execPath, [
@@ -606,6 +624,6 @@ test("CLI --without-topology-evidence는 admit된 pack identity와 번들 pack �
       cwd: root,
       env: { ...process.env, EASYSUBWAY_TIMETABLE_SNAPSHOT_BUILD_NOW: buildNow.toISOString() },
     }),
-    /canonical (?:topology )?pack identity mismatch/,
+    /canonical topology pack identity mismatch/,
   );
 });
