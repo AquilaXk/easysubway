@@ -13446,7 +13446,7 @@ test("관리자 v3 공통 shell은 접근성 chrome과 inline style 제한을 �
   assert.match(formErrorsFragment, /id="form-error-summary-title"/);
   assert.match(paginationFragment, /aria-current=\$\{pageLink\.current \? 'page' : null\}/);
   assert.match(adminCss, /\.admin-v3 a:focus-visible/);
-  assert.match(adminCss, /outline: 3px solid #ffbf47/);
+  assert.match(adminCss, /outline: 3px solid var\(--admin-focus\)/);
   assert.match(adminCss, /\.admin-topbar-row/);
   // #2071 scroll 소유권 계약: 관리자 table의 horizontal scroll은 .admin-table-scroll wrapper가 단독 소유한다.
   // .admin-main / .admin-panel / .admin-card 는 scroll을 소유하지 않는다(overflow-x: visible).
