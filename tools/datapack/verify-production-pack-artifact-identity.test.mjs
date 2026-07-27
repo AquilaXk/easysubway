@@ -44,6 +44,33 @@ test("production build와 bundled asset/index의 artifact identity를 exact-matc
       assert.deepEqual(database.prepare(
         "SELECT name FROM sqlite_schema WHERE name LIKE 'sqlite_stat%' ORDER BY name",
       ).all(), []);
+      const provenance = database.prepare(`
+        SELECT
+          SUM(verification_status = 'VERIFIED') AS verifiedCount,
+          SUM(verification_status = 'UNKNOWN') AS unknownCount,
+          SUM(
+            verification_status = 'VERIFIED'
+            AND (
+              source_id = '' OR source_snapshot_id = '' OR provider_record_hash = ''
+              OR provenance_kind != 'OFFICIAL_SOURCE' OR last_verified_at IS NULL
+              OR evidence_hash = ''
+            )
+          ) AS incompleteVerifiedCount,
+          SUM(service_class = 'ITX_CHEONGCHUN' AND verification_status = 'VERIFIED') AS verifiedItxCount
+        FROM network_edges
+      `).get();
+      assert.ok(provenance.verifiedCount > 48);
+      assert.ok(provenance.unknownCount > 0);
+      assert.equal(provenance.incompleteVerifiedCount, 0);
+      assert.equal(provenance.verifiedItxCount, 48);
+      const unsupportedCapitalLine = database.prepare(`
+        SELECT COUNT(*) AS edgeCount,
+               SUM(verification_status = 'VERIFIED') AS verifiedCount
+        FROM network_edges
+        WHERE from_node_id GLOB '*:line-472a81add377'
+      `).get();
+      assert.ok(unsupportedCapitalLine.edgeCount > 0);
+      assert.equal(unsupportedCapitalLine.verifiedCount, 0);
     } finally {
       database.close();
     }
