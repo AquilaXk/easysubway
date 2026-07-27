@@ -3,8 +3,10 @@ import { execFile } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import { promisify } from "node:util";
+import { gunzipSync, gzipSync } from "node:zlib";
 
 import {
   ALLOWLIST_PATH,
@@ -29,6 +31,20 @@ import {
 
 const execFileAsync = promisify(execFile);
 const read = (relative) => readFile(path.resolve(REPOSITORY_ROOT, relative), "utf8");
+
+async function incompletePackFixture(directory) {
+  const sqlitePath = path.join(directory, "capital.sqlite");
+  await writeFile(sqlitePath, gunzipSync(await readFile(path.join(
+    REPOSITORY_ROOT,
+    "apps/mobile/assets/datapacks/capital.sqlite.gz",
+  ))));
+  const database = new DatabaseSync(sqlitePath);
+  database.exec("DROP TABLE station_facility_evidence");
+  database.close();
+  const packPath = `${sqlitePath}.gz`;
+  await writeFile(packPath, gzipSync(await readFile(sqlitePath), { level: 9, mtime: 0 }));
+  return packPath;
+}
 
 test("앱 drift 선언 테이블을 생성 산출물에서 읽는다", async () => {
   const tables = parseDriftDeclaredTables(await read(DRIFT_GENERATED_PATH));
@@ -102,7 +118,7 @@ test("현행 번들 팩은 schema 결측 없이 게이트를 통과한다", asyn
   assert.deepEqual(report.skippedPackIds, ["core"]);
 });
 
-test("allowlist가 비면 결측 9테이블·7인덱스를 전부 이름으로 보고하고 실패한다", async () => {
+test("결측 pack은 빈 allowlist에서 테이블·인덱스를 이름으로 보고하고 실패한다", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "easysubway-parity-empty-"));
   try {
     const allowlistPath = path.join(directory, "allowlist.json");
@@ -111,14 +127,15 @@ test("allowlist가 비면 결측 9테이블·7인덱스를 전부 이름으로 �
       artifactKind: "pack-app-schema-parity-allowlist",
       packs: [],
     }));
-    const report = await checkPackAppSchemaParity({ allowlistPath });
+    const packPath = await incompletePackFixture(directory);
+    const report = await checkPackAppSchemaParity({ allowlistPath, packPath });
 
     assert.equal(report.ok, false);
     const [capital] = report.results;
     assert.deepEqual(capital.unallowedMissingTables, capital.missingTables);
     assert.deepEqual(capital.unallowedMissingIndexes, capital.missingIndexes);
-    assert.equal(capital.unallowedMissingTables.length, 9);
-    assert.equal(capital.unallowedMissingIndexes.length, 7);
+    assert.deepEqual(capital.unallowedMissingTables, ["station_facility_evidence"]);
+    assert.deepEqual(capital.unallowedMissingIndexes, ["idx_station_facility_evidence_station"]);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -133,16 +150,21 @@ test("CLI는 위반 시 결측 이름을 출력하고 비영점 종료한다", a
       artifactKind: "pack-app-schema-parity-allowlist",
       packs: [],
     }));
+    const packPath = await incompletePackFixture(directory);
     await assert.rejects(
       execFileAsync(
         process.execPath,
-        ["tools/ci/check-pack-app-schema-parity.mjs", "--allowlist", allowlistPath],
+        [
+          "tools/ci/check-pack-app-schema-parity.mjs",
+          "--allowlist", allowlistPath,
+          "--pack", packPath,
+        ],
         { cwd: REPOSITORY_ROOT },
       ),
       (error) => {
         assert.equal(error.code, 1);
         assert.match(error.stdout, /- station_facility_evidence/);
-        assert.match(error.stdout, /- idx_route_map_line_tracks_region_line/);
+        assert.match(error.stdout, /- idx_station_facility_evidence_station/);
         assert.match(error.stderr, /게이트 실패/);
         return true;
       },
