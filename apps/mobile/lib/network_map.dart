@@ -3015,7 +3015,7 @@ class _NetworkMapCurrentLocationButton extends StatelessWidget {
       child: ExcludeSemantics(
         child: Material(
           key: const Key('nearbyStationButton'),
-          color: Colors.white,
+          color: EasySubwayAccessibleColors.surfaceDefault,
           elevation: 0,
           shape: const CircleBorder(
             side: BorderSide(
@@ -3204,7 +3204,7 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
       bottom: true,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: EasySubwayAccessibleColors.surfaceDefault,
           border: expanded
               ? null
               : const Border(
@@ -3325,7 +3325,7 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
 
     return Material(
       key: const Key('networkMapNearbyStationPanel'),
-      color: Colors.white,
+      color: EasySubwayAccessibleColors.surfaceDefault,
       elevation: 0,
       child: expanded
           ? SizedBox.expand(
@@ -3851,7 +3851,7 @@ class _NetworkMapMenuPanel extends StatelessWidget {
       alignment: Alignment.centerLeft,
       child: Material(
         key: const Key('networkMapMenuPanel'),
-        color: Colors.white,
+        color: EasySubwayAccessibleColors.surfaceDefault,
         child: SizedBox(
           width: 256,
           height: double.infinity,
@@ -4460,7 +4460,9 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   Widget build(BuildContext context) {
     return Container(
       key: const Key('networkMapSurface'),
-      decoration: const BoxDecoration(color: Colors.white),
+      decoration: const BoxDecoration(
+        color: EasySubwayAccessibleColors.surfaceDefault,
+      ),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final geometry = _geometryFor(widget.data);
@@ -5249,7 +5251,7 @@ class _OriginalRouteMapUnavailable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const ColoredBox(
-      color: Colors.white,
+      color: EasySubwayAccessibleColors.surfaceDefault,
       child: Center(
         child: Text(
           '노선도를 불러오지 못했어요',

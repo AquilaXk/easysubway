@@ -25,7 +25,7 @@ const easySubwaySearchFieldHorizontalPadding = 12.0;
 const easySubwaySearchFieldBorderWidth = 1.0;
 
 /// 검색·출발/도착/경유 박스 외곽선.
-/// 표면 `#F6F8F9` 대비 약 3:1 이상인 전용 색(구분선 `#C5CDD4`와 분리).
+/// secondary border 역할색으로 일반 구분선과 분리한다.
 const easySubwaySearchFieldBorderColor =
     EasySubwayAccessibleColors.interactionSecondaryBorder;
 

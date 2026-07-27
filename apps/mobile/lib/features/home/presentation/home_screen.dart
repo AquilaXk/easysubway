@@ -873,7 +873,7 @@ class _HomeNotificationButton extends StatelessWidget {
               iconSize: 26,
               style: IconButton.styleFrom(
                 minimumSize: const Size.square(48),
-                backgroundColor: Colors.white,
+                backgroundColor: EasySubwayAccessibleColors.surfaceDefault,
                 foregroundColor: EasySubwayAccessibleColors.secondaryText,
                 side: const BorderSide(
                   color: EasySubwayAccessibleColors.line,

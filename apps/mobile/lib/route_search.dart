@@ -6927,7 +6927,7 @@ class _RouteLineNode extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(2),
       decoration: const BoxDecoration(
-        color: Colors.white,
+        color: EasySubwayAccessibleColors.surfaceDefault,
         shape: BoxShape.circle,
       ),
       child: Container(
@@ -6936,7 +6936,10 @@ class _RouteLineNode extends StatelessWidget {
         decoration: BoxDecoration(
           color: color,
           shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: small ? 2 : 3),
+          border: Border.all(
+            color: EasySubwayAccessibleColors.surfaceDefault,
+            width: small ? 2 : 3,
+          ),
         ),
       ),
     );
@@ -7379,7 +7382,11 @@ class _RouteTimelineBadge extends StatelessWidget {
               color: EasySubwayAccessibleColors.mutedText,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.more_horiz, size: 12, color: Colors.white),
+            child: const Icon(
+              Icons.more_horiz,
+              size: 12,
+              color: EasySubwayAccessibleColors.interactionOnPrimary,
+            ),
           ),
         ),
       );

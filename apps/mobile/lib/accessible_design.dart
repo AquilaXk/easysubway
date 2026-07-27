@@ -100,49 +100,49 @@ class EasySubwayAccessibleColors {
   static const scaffoldSurface = surfaceScaffold;
 
   /// 목록 행 라벨 (기준 화면 좌측 메뉴의 행 텍스트 톤).
-  static const listRowText = Color(0xFF1E3234);
+  static const listRowText = contentPrimary;
 
   /// 섹션 캡션·부제 (기준 화면 좌측 메뉴의 섹션 톤).
-  static const caption = Color(0xFF7C949A);
+  static const caption = contentMuted;
 
   /// 보조 아이콘 (기준 화면 검색바 아이콘 톤).
-  static const iconMuted = Color(0xFF8A9AA0);
+  static const iconMuted = contentMuted;
 
   /// 셰브런·디스클로저·비활성 아이콘.
-  static const disclosure = Color(0xFFB0BEC5);
+  static const disclosure = contentMuted;
 
   /// 다크 히어로 등 짙은 브랜드 표면(레거시). 신규 화면에서는 사용하지 않는다.
-  static const brandDark = Color(0xFF071B2F);
+  static const brandDark = contentPrimary;
 
   // --- 상태색: 정상/복구 (success) ---
   /// 정상·복구 상태 텍스트/아이콘.
-  static const mint = Color(0xFF0A705A);
+  static const mint = statusSuccessContent;
 
   /// 정상·복구 상태 강조.
-  static const mintDark = Color(0xFF075D4B);
+  static const mintDark = statusSuccessContent;
 
   /// 정상·복구 상태 배경 틴트.
-  static const mintSoft = Color(0xFFF0FBF7);
+  static const mintSoft = statusSuccessSurface;
 
   /// 정상·복구 상태 테두리.
-  static const mintBorder = Color(0xFFCBEADD);
+  static const mintBorder = statusSuccessContent;
 
   // --- 상태색: 주의 (warning) ---
   /// 주의 상태 텍스트/아이콘.
-  static const amber = Color(0xFF9A5600);
+  static const amber = statusWarningContent;
 
   /// 주의 상태 배경 틴트.
-  static const amberSoft = Color(0xFFFFF0D1);
+  static const amberSoft = statusWarningSurface;
 
   /// 주의 상태 테두리.
-  static const amberBorder = Color(0xFFF1D49A);
+  static const amberBorder = statusWarningContent;
 
   // --- 상태색: 고장·오류 (danger) ---
   /// 고장·오류 상태 텍스트/아이콘.
-  static const red = Color(0xFFB42318);
+  static const red = statusDangerContent;
 
   /// 고장·오류 상태 배경 틴트.
-  static const redSoft = Color(0xFFFFE8E6);
+  static const redSoft = statusDangerSurface;
 
   /// 카드 그림자(최소 그림자 원칙).
   static const cardShadow = Color(0x0A071B2F);
@@ -151,7 +151,7 @@ class EasySubwayAccessibleColors {
   static const switchActiveTrack = brandSignature;
 
   /// 스위치 꺼짐 트랙.
-  static const switchInactiveTrack = Color(0xFFC8D3DC);
+  static const switchInactiveTrack = borderSubtle;
 
   // --- 지도 오버레이 전용 ---
   // 지도 배경 시인성 때문에 브랜드 액센트로 수렴하지 않는다 (기준 화면 실측 값).
@@ -164,26 +164,26 @@ class EasySubwayAccessibleColors {
 
   // --- 홈 신규 알림 안내 바 (오너 스펙 2026-07-16, #2200) ---
   /// 신규 알림 안내 바 배경.
-  static const noticeBarSurface = Color(0xFFFFF7ED);
+  static const noticeBarSurface = statusWarningSurface;
 
   /// 신규 알림 안내 바 하단 테두리(1dp).
-  static const noticeBarBorder = Color(0xFFF2DFC8);
+  static const noticeBarBorder = statusWarningContent;
 
   /// 신규 알림 안내 바 기본 문구.
-  static const noticeBarText = Color(0xFF5D4932);
+  static const noticeBarText = statusWarningContent;
 
   /// 신규 알림 안내 바 벨 아이콘·"알림 보기".
-  static const noticeBarAccent = Color(0xFF8F4B1E);
+  static const noticeBarAccent = statusWarningContent;
 
   // --- 주변역 패널 실시간/시간표 토글 (오너 스펙 2026-07-16, #2200) ---
   /// 토글 비선택 세그먼트 배경.
-  static const nearbyToggleIdleFill = Color(0xFFF6F6F8);
+  static const nearbyToggleIdleFill = surfaceSubtle;
 
   /// 토글 비선택 세그먼트 글자.
-  static const nearbyToggleIdleText = Color(0xFF70717B);
+  static const nearbyToggleIdleText = contentMuted;
 
   /// 좌우 열차 정보 구분선.
-  static const arrivalColumnDivider = Color(0xFFDEDEE3);
+  static const arrivalColumnDivider = borderSubtle;
 
   // --- 고대비 모드 ---
   static const highContrastText = Color(0xFF000000);
@@ -205,8 +205,8 @@ class EasySubwayTouchTarget {
 /// 계약을 공유한다. 이 상수를 바꾸면 양쪽을 함께 갱신한다.
 const easySubwayTopBarContentHeight = 60.0;
 
-/// 네비/상단바 하단 구분선 색. 검색 박스 외곽선과 동일 톤(#C5CDD4).
-const easySubwayHeaderDividerColor = Color(0xFFC5CDD4);
+/// 네비/상단바 하단 구분선 색. 검색 박스 외곽선과 역할을 분리한다.
+const easySubwayHeaderDividerColor = EasySubwayAccessibleColors.borderSubtle;
 
 /// 상단바·시트와 본문을 나누는 1px 구분선.
 ///
